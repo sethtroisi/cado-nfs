@@ -225,60 +225,6 @@ struct cxx_mpz_mat {
     mpz_mat_ptr operator->() { return x; }
     mpz_mat_srcptr operator->() const { return x; }
 };
-struct cxx_mpz_t{
-    mpz_t x;
-    cxx_mpz_t() {mpz_init(x);}
-    ~cxx_mpz_t() {mpz_clear(x);}
-    cxx_mpz_t(cxx_mpz_t const & o) {
-        mpz_init(x);
-        mpz_set(x, o.x);
-    }
-    cxx_mpz_t & operator=(cxx_mpz_t const & o) {
-        mpz_set(x, o.x);
-        return *this;
-    }
-#if __cplusplus >= 201103L
-    cxx_mpz_t(cxx_mpz_t && o) {
-        mpz_init(x);
-        mpz_swap(x, o.x);
-    }
-    cxx_mpz_t& operator=(cxx_mpz_t && o) {
-        mpz_swap(x, o.x);
-        return *this;
-    }
-#endif
-    operator mpz_ptr() { return x; }
-    operator mpz_srcptr() const { return x; }
-    mpz_ptr operator->() { return x; }
-    mpz_srcptr operator->() const { return x; }
-};
-struct cxx_mpq_t{
-    mpq_t x;
-    cxx_mpq_t() {mpq_init(x);}
-    ~cxx_mpq_t() {mpq_clear(x);}
-    cxx_mpq_t(cxx_mpq_t const & o) {
-        mpq_init(x);
-        mpq_set(x, o.x);
-    }
-    cxx_mpq_t & operator=(cxx_mpq_t const & o) {
-        mpq_set(x, o.x);
-        return *this;
-    }
-#if __cplusplus >= 201103L
-    cxx_mpq_t(cxx_mpq_t && o) {
-        mpq_init(x);
-        mpq_swap(x, o.x);
-    }
-    cxx_mpq_t& operator=(cxx_mpq_t && o) {
-        mpq_swap(x, o.x);
-        return *this;
-    }
-#endif
-    operator mpq_ptr() { return x; }
-    operator mpq_srcptr() const { return x; }
-    mpq_ptr operator->() { return x; }
-    mpq_srcptr operator->() const { return x; }
-};
 struct cxx_mpq_mat {
     mpq_mat x;
     cxx_mpq_mat() { mpq_mat_init(x, 0, 0); }

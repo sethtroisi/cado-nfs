@@ -1339,7 +1339,7 @@ int valuation_of_ideal_at_prime_ideal(mpq_mat_srcptr G, mpz_poly_srcptr g, mpq_m
 
 // Roots contains elements of P^1 (Z/pZ)
 // This function leaves each element only once (e.g. if roots contains 1/1 and 4/4, then 4/4 will be deleted from the vector)
-void filter_roots(vector<pair<cxx_mpz_t, cxx_mpz_t>>& roots, unsigned int p)
+void filter_roots(vector<pair<cxx_mpz, cxx_mpz>>& roots, unsigned int p)
 {
     unsigned int i = 0;
 
@@ -1348,13 +1348,13 @@ void filter_roots(vector<pair<cxx_mpz_t, cxx_mpz_t>>& roots, unsigned int p)
         // We look for roots[j] equal to roots[i], for j > i
         unsigned int j = i+1;
         while (j < roots.size()){
-            cxx_mpz_t a = roots[j].first;
-            cxx_mpz_t b = roots[j].second;
+            cxx_mpz a = roots[j].first;
+            cxx_mpz b = roots[j].second;
             
             // At this point, we will multiply a and b with 2, then a and b with 3, etc...
             // if we find one k such that a*k = roots[i].first and b*k = roots[i].second, then it's the same quotient
             // Thus we can erase a/b
-            cxx_mpz_t a1, b1;
+            cxx_mpz a1, b1;
             unsigned int k = 2;
             bool eq = false;
             while( (k < p) && (!eq) ){
@@ -1385,7 +1385,7 @@ void filter_roots(vector<pair<cxx_mpz_t, cxx_mpz_t>>& roots, unsigned int p)
     // Putting each root on the form (_/1)
     for (i = 0 ; i < roots.size() ; i++){
         if(mpz_cmp_ui(roots[i].second,1) != 0){
-            cxx_mpz_t a1, b1;
+            cxx_mpz a1, b1;
             unsigned int k = 2;
             bool eq = false;
             while( (k < p) && (!eq) ){
@@ -1462,17 +1462,17 @@ void print_comments_for_badideals_above_p(string& SBAD, string& SBADINFO, const 
        
     
     // Now listing all roots of the homogenous polynomial build from f
-    vector<pair<cxx_mpz_t, cxx_mpz_t>> rootsp;
+    vector<pair<cxx_mpz, cxx_mpz>> rootsp;
     for (unsigned int i = 0 ; i < p ; i++){
         for (unsigned int j = 1 ; j < p ; j++){
-            cxx_mpz_t res, a, b;
+            cxx_mpz res, a, b;
             mpz_set_ui(a,i);
             mpz_set_ui(b,j);
             
             mpz_poly_homogeneous_eval_siui(res,f,i,j);
             mpz_mod_ui(res,res,p);
             if(mpz_congruent_ui_p(res,0,p)){
-                pair<cxx_mpz_t,cxx_mpz_t> new_elem;
+                pair<cxx_mpz,cxx_mpz> new_elem;
                 new_elem = make_pair(a,b);
                 rootsp.push_back(new_elem);
             }
@@ -1486,13 +1486,13 @@ void print_comments_for_badideals_above_p(string& SBAD, string& SBADINFO, const 
     filter_roots(rootsp, p); 
     
     // Testing if (1 : 0) is a root
-    cxx_mpz_t fd;
+    cxx_mpz fd;
     mpz_poly_getcoeff(fd,f->deg,f);
     if(mpz_congruent_ui_p(fd,0,p)){
-        cxx_mpz_t a,b;
+        cxx_mpz a,b;
         mpz_set_ui(a,1);
         mpz_set_ui(b,0);
-        pair<cxx_mpz_t,cxx_mpz_t> new_elem;
+        pair<cxx_mpz,cxx_mpz> new_elem;
         new_elem = make_pair(a,b);
         rootsp.push_back(new_elem);
     }
@@ -1504,8 +1504,8 @@ void print_comments_for_badideals_above_p(string& SBAD, string& SBADINFO, const 
     
     // Now going to compute the valuation of each ideal <p, a-b*alpha> on each ideals above p, where a/b belong to the set of roots
     for(unsigned int i = 0 ; i < rootsp.size() ; i++){
-        cxx_mpz_t u = rootsp[i].first;
-        cxx_mpz_t v = rootsp[i].second;
+        cxx_mpz u = rootsp[i].first;
+        cxx_mpz v = rootsp[i].second;
         
         // Computing the ideal ii, e.g. <p,(v*alpha-u)>*J
         cxx_mpz_mat gens_ii;
@@ -1543,7 +1543,7 @@ void print_comments_for_badideals_above_p(string& SBAD, string& SBADINFO, const 
         
         // Normalisation of the root
         int a;
-        pair<cxx_mpz_t, cxx_mpz_t> Q;
+        pair<cxx_mpz, cxx_mpz> Q;
         Q = rootsp[i];
         if(mpz_cmp_ui(Q.second, 0) != 0){
             a = mpz_get_ui(Q.first);
