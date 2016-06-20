@@ -37,7 +37,7 @@ char *phash = "";
 /* Read-Only */
 uint32_t *Primes = NULL;
 unsigned long lenPrimes = 1; // length of Primes[]
-int nq = INT_MAX;
+unsigned long nq = 1000;
 size_t keep = KEEP;
 const double exp_rot[] = {0, 0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 0};
 static int verbose = 0;
@@ -218,7 +218,9 @@ static double
 expected_collisions (uint32_t twoP)
 {
   double m = (lenPrimes << 1) / (double) twoP;
-  return m * m;
+  /* we multiply by 0.5 here because we only keep collisions for which
+     a[d] * a[d-2] < 0 */
+  return 0.5 * m * m;
 }
 
 static void
@@ -1197,15 +1199,15 @@ aux_nextcomb ( unsigned int *ind,
 }
 
 
-/* Compute crted rq */
+/* Compute crt-ed rq (qqz,rqqz) = (q_1 * ... * q_k,
+                                   CRT([r_1, ..., r_k], [q_1, ..., q_k])) */
 static inline void
 aux_return_rq ( qroots_t SQ_R,
                 unsigned long *idx_q,
                 unsigned int *idx_nr,
                 unsigned long k,
                 mpz_t qqz,
-                mpz_t rqqz,
-                unsigned long lq )
+                mpz_t rqqz)
 {
   unsigned long i, q[k], rq[k];
 
@@ -1216,13 +1218,14 @@ aux_return_rq ( qroots_t SQ_R,
   }
 
   /* crt roots */
-  crt_sq (qqz, rqqz, q, rq, lq);
+  crt_sq (qqz, rqqz, q, rq, k);
 
   return;
 }
 
 
-/* Consider each rq */
+/* Consider each rq which is the product of k pairs (q,r).
+   In this routine the q[i] are fixed, only the roots mod q[i] change. */
 static inline void
 collision_on_batch_sq_r ( header_t header,
                           proots_t R,
@@ -1231,12 +1234,12 @@ collision_on_batch_sq_r ( header_t header,
                           unsigned long *idx_q,
                           unsigned long *inv_qq,
                           unsigned long number_pr,
-                          int *curr_nq,
-                          unsigned long lq )
+                          unsigned long *curr_nq,
+                          unsigned long k)
 {
   int count;
-  unsigned int ind_qr[lq]; /* indices of roots for each small q */
-  unsigned int len_qnr[lq]; /* for each small q, number of roots */
+  unsigned int ind_qr[k]; /* indices of roots for each small q */
+  unsigned int len_qnr[k]; /* for each small q, number of roots */
   unsigned long i;
   mpz_t qqz, rqqz[BATCH_SIZE];
 
@@ -1245,17 +1248,17 @@ collision_on_batch_sq_r ( header_t header,
     mpz_init (rqqz[i]);
 
   /* initialization indices */
-  for (i = 0; i < lq; i ++) {
+  for (i = 0; i < k; i ++) {
     ind_qr[i] = 0;
     len_qnr[i] = SQ_R->nr[idx_q[i]];
   }
 
 #if 0
   fprintf (stderr, "q: %lu, ", q);
-  for (i = 0; i < lq; i ++)
+  for (i = 0; i < k; i ++)
     fprintf (stderr, "%u ", SQ_R->q[idx_q[i]]);
   fprintf (stderr, ", ");
-  for (i = 0; i < lq; i ++)
+  for (i = 0; i < k; i ++)
     fprintf (stderr, "%u ", SQ_R->nr[idx_q[i]]);
   fprintf (stderr, "\n");
 #endif
@@ -1268,8 +1271,8 @@ collision_on_batch_sq_r ( header_t header,
     num_rq = 0;
     for (count = 0; count < BATCH_SIZE; count ++)
     {
-        aux_return_rq (SQ_R, idx_q, ind_qr, lq, qqz, rqqz[count], lq);
-        re = aux_nextcomb (ind_qr, lq, len_qnr);
+        aux_return_rq (SQ_R, idx_q, ind_qr, k, qqz, rqqz[count]);
+        re = aux_nextcomb (ind_qr, k, len_qnr);
         (*curr_nq)++;
         num_rq ++;
         if ((*curr_nq) >= nq)
@@ -1288,18 +1291,20 @@ collision_on_batch_sq_r ( header_t header,
 }
 
 
-/* SQ inversion, write 1/q^2 (mod p_i^2) to invqq[i] */
+/* SQ inversion, write 1/q^2 (mod p_i^2) to invqq[i].
+   In this routine the q[i] are fixed, corresponding to indices idx_q[0], ...,
+   idx_q[k-1] */
 static inline void
-collision_on_batch_sq ( header_t header,
-                        proots_t R,
-                        qroots_t SQ_R,
-                        unsigned long q,
-                        unsigned long *idx_q,
-                        unsigned long number_pr,
-                        unsigned long lq )
+collision_on_batch_sq (header_t header,
+                       proots_t R,
+                       qroots_t SQ_R,
+                       unsigned long q,
+                       unsigned long *idx_q,
+                       unsigned long number_pr,
+                       unsigned long k,
+                       unsigned long *curr_nq)
 {
   unsigned nr;
-  int curr_nq = 0;
   uint64_t pp;
   unsigned long nprimes, p;
   unsigned long *invqq = malloc (lenPrimes * sizeof (unsigned long));
@@ -1347,25 +1352,22 @@ collision_on_batch_sq ( header_t header,
   /* Step 2: find collisions on q. */
   int st2 = milliseconds();
 
-  collision_on_batch_sq_r ( header, R, SQ_R, q, idx_q, invqq, number_pr,
-                            &curr_nq, lq );
+  collision_on_batch_sq_r (header, R, SQ_R, q, idx_q, invqq, number_pr,
+                           curr_nq, k);
   if (verbose > 2)
-    fprintf (stderr, "#  stage (special-q) for %d special-q's took %lums\n",
-             curr_nq, milliseconds() - st2);
+    fprintf (stderr, "#  stage (special-q) for %lu special-q's took %lums\n",
+             *curr_nq, milliseconds() - st2);
 
   free (invqq);
 }
 
-
 /* collision on special-q, call collision_on_batch_sq */
 static inline void
-collision_on_sq ( header_t header,
-                  proots_t R,
-                  unsigned long c )
+collision_on_sq (header_t header, proots_t R, unsigned long c )
 {
-  int prod = 1;
+  unsigned long prod = 1;
   unsigned int i;
-  unsigned long j, lq = 0UL;
+  unsigned long k = 0UL, lq;
   qroots_t SQ_R;
   double sq = 1.0;
 
@@ -1381,30 +1383,32 @@ collision_on_sq ( header_t header,
     prod *= header->d; /* We multiply by d instead of SQ_R->nr[i] to limit
                           the number of primes and thus the Y1 value. */
     sq *= (double) SQ_R->q[i];
-    lq ++;
+    k ++;
   }
 
-  /* lq < 8 for the moment */
-  if (lq > 7)
-    lq = 7;
-  if (lq < 1)
-    lq = 1;
+  /* k < 8 for the moment */
+  if (k > 7)
+    k = 7;
+  if (k < 1)
+    k = 1;
 
-  unsigned long q, idx_q[lq];
-  mpz_t qqz;
-  mpz_init (qqz);
+  for (lq = k; number_comb (SQ_R, k, lq) < (unsigned long) nq &&
+         lq < SQ_R->size; lq++);
 
-  for (j = 0; j < lq; j ++)
-    idx_q[j] = j;
-  q = return_q_norq (SQ_R, idx_q, lq, qqz);
+  unsigned long q, idx_q[lq], curr_nq = 0;
 
-  /* collision batch */
-  collision_on_batch_sq (header, R, SQ_R, q, idx_q, c, lq);
+  first_comb (k, idx_q);
+  while (curr_nq < nq)
+    {
+      q = return_q_norq (SQ_R, idx_q, k);
+
+      /* collision batch */
+      collision_on_batch_sq (header, R, SQ_R, q, idx_q, c, k, &curr_nq);
+      next_comb (lq, k, idx_q);
+    }
 
   /* clean */
-  mpz_clear (qqz);
   qroots_clear (SQ_R);
-  return;
 }
 
 
@@ -1941,7 +1945,7 @@ main (int argc, char *argv[])
   if (P == 0) usage(argv0[0], "P", pl);
 
   param_list_parse_int (pl, "t", &nthreads);
-  param_list_parse_int (pl, "nq", &nq);
+  param_list_parse_ulong (pl, "nq", &nq);
   param_list_parse_uint (pl, "degree", &d);
 
   /* if no -admin is given, mpz_init did set it to 0, which is exactly
@@ -1965,12 +1969,6 @@ main (int argc, char *argv[])
 
   /* check degree */
   if (d <= 0) usage(argv0[0], "degree", pl);
-
-  /* check lq and nq */
-  if (nq < 0) {
-    fprintf (stderr, "Error, number of special-q's should >= 0\n");
-    exit (1);
-  }
 
   /* allocate threads */
   tid = malloc (nthreads * sizeof (pthread_t));
@@ -2011,7 +2009,7 @@ main (int argc, char *argv[])
   st = milliseconds ();
   lenPrimes = initPrimes (P, &Primes);
 
-  printf ("# Info: initializing %lu P primes took %lums, nq=%d\n",
+  printf ("# Info: initializing %lu P primes took %lums, nq=%lu\n",
           lenPrimes, milliseconds () - st, nq);
   printf ( "# Info: estimated peak memory=%.2fMB (%d thread(s),"
            " batch %d inversions on SQ)\n",
