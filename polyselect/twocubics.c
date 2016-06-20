@@ -1096,18 +1096,15 @@ collision_on_sq ( header_t header,
     lq = 1;
 
   unsigned long q, idx_q[lq];
-  mpz_t qqz;
-  mpz_init (qqz);
 
   for (j = 0; j < lq; j ++)
     idx_q[j] = j;
-  q = return_q_norq (SQ_R, idx_q, lq, qqz);
+  q = return_q_norq (SQ_R, idx_q, lq);
 
   /* collision batch */
   collision_on_batch_sq (header, R, SQ_R, q, idx_q, c, lq);
 
   /* clean */
-  mpz_clear (qqz);
   qroots_clear (SQ_R);
   return;
 }

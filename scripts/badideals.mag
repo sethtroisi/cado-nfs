@@ -2,7 +2,6 @@ ZZ:=Integers();
 QQ:=Rationals();
 
 ZP<x>:=PolynomialAlgebra(ZZ);
-ZPH:=PolynomialRing(ZZ,2);
 
 // When DEBUG is assigned, it is possible to load this file and debug
 // the explicitly given polynomial that follows:
@@ -15,6 +14,16 @@ if assigned DEBUG then
     polyfile := "";
     mainp := "";
     polys := [g, f];
+elif assigned COEFFS then
+    polys := [Polynomial(StringToIntegerSequence(COEFFS))];
+    ell := 42;
+    badfile := "";
+    badinfofile := "";
+    polyfile := "";
+    mainp := "";
+    printf "# %o\n", COEFFS;
+    if Content(polys[1]) ne 1 then quit; end if;
+    if not IsIrreducible(polys[1]) then quit; end if;
 else
     lines := Split(Read(polyfile));
     f := ZP!0;
@@ -674,210 +683,211 @@ function NormalizeProjectiveElement(uv, pk)
     end if;
 end function;
 
-SBAD := "";
-SBADINFO := "";
+function LiftsOfProjectiveLineElements(Pk, x, p)
+    pk1:=#BaseRing(Scheme(x));
+    u,v:=Explode(ChangeUniverse(Eltseq(x), Integers()));
+    if Gcd(v, p) eq p then
+        lQs:=[Pk![u,v+pk1*j] : j in [0..p-1]];
+    else
+        lQs:=[Pk![u+pk1*j,1] : j in [0..p-1]];
+    end if;
+    return lQs;
+end function;
 
-SBAD := Sprintf("%o# badideals for pol[0]=%o and pol[1]=%o\n", SBAD,
-   polys[1], polys[2]);
 
-for side := 0 to #polys-1 do
+function local_info_for_bad_primes(K)
+    FacBadPrimes := [
+        <p,G,fac_p>
+            where fac_p is factorization_of_prime(K, p)
+            where  _,G is p_maximal_order(K, p)
+            where p is x[1]
+        : x in Factorization(Discriminant(f)*LeadingCoefficient(f)
+            : ECMLimit:=100, MPQSLimit:=0) 
+         | x[2] gt 1 and x[1] le 10^6 ]
+         where f is DefiningPolynomial(K);
+    return FacBadPrimes;
+end function;
 
-f := polys[side+1];
-if Degree(f) eq 1 then continue; end if;
-SBADINFO := Sprintf("%o# bad ideals for poly[%o]=%o\n", SBADINFO, side, f);
-K<alpha>:=NumberField(f);
+function valuation_above_root(f, root, p)
+    /* Give the p-valuation of the homogenous polynomial equivalent to f(r+pX)
+     * for the root r (in the projective plane)
+     */
+    u,v:=Explode(ChangeUniverse(Eltseq(root),Integers()));
+    // we need to write a parameterized form for the p points above (u:v)
+    ZPH:=PolynomialRing(Integers(),2);
+    X:=ZPH.1;
+    Y:=ZPH.2;
+    if v eq 0 then
+        assert u eq 1;
+        ff:=Evaluate(Homogenization(Evaluate(f,X),Y,Degree(f)),[u,p*x]);
+    else
+        assert v eq 1;
+        ff:=Evaluate(Homogenization(Evaluate(f,X),Y,Degree(f)),[u+p*x,v]);
+    end if;
+    w:=Valuation(Content(ff),p);
+    return w;
+end function;
 
-d:=Discriminant(f)*LeadingCoefficient(f);
-fff := Factorization(d : ECMLimit:=100, MPQSLimit:=0);
-BadPrimes := [ x[1] : x in fff | x[2] gt 1 and x[1] le 10^6 ];
+LIFTING_INFO:=recformat<
+    p : Integers(),     /* prime */
+    order : SeqEnum,    /* basis of the p-maximal order */
+    ideals : SeqEnum,   /* prime ideals above p */
+    inertia : SeqEnum,  /* inertia degree for all prime ideals above p */
+    val : UserProgram>; /* function which returns the valuation vector */
 
-    /* This is only the debug part. Won't go in C */
-/*
-    OK:=Order([LeadingCoefficient(f)*alpha]);
-    for p in BadPrimes do OK := pMaximalOrder(OK, p); end for;
-    OK`Maximal := true;
-    K`MaximalOrder := OK;
-    J:=ideal<OK|ideal<OK|1,alpha>^-1>;
-*/
+function lift_root(lifting_info, k0, Q, vals)
+    /*
+     * Q is a point on P^1(Z/p^k). We assume that vals gives the vector of all
+     * valuations for ideals above Q
+     * (that is, ideals of the form <p^k, v*alpha-u>).
+     *
+     */
 
-FacBadPrimes := [];
+     p:=lifting_info`p;
+     K:=Universe(lifting_info`order);
+     alpha:=K.1;
 
-for p in BadPrimes do
-    _,G:=p_maximal_order(K, p);
-    fac_p:=factorization_of_prime(K, p);
-    Append(~FacBadPrimes, <p,G,fac_p>);
-end for;
+     k:=k0+1;
+     P1k:=ProjectiveSpace(Integers(p^k),1);
 
-for pf in FacBadPrimes do
-    p,G,fac:=Explode(pf);
+     dead_branches_reports:=[];
+     live_branches:=[]; 
+     alive_ideals:={};
+
+     worried:=false;
+     for nQ in LiftsOfProjectiveLineElements(P1k, Q, p) do
+         u,v := Explode(ChangeUniverse(Eltseq(nQ),Integers()));
+         newvals:=lifting_info`val(
+             nf_elements_hnf(
+                 [foo*bar :  foo in lifting_info`order,
+                             bar in [p^k, p^k*alpha, v*alpha-u]
+             ]));
+         /* All valuations are expected to be >= the base valuation. For
+             * some, it's going to lift higher. Find which ones.  */
+         alive:=[i:i in [1..#vals] | newvals[i] ne vals[i]];
+         if #alive eq 0 then
+         /* most often we have the following situation, but not always.
+          * See e.g. x^9 + 85*x^8 + 89770*x^7 + 593728275*x^6 +
+          * 283940743250*x^5 + 472456493155000*x^4 + 432131333316700000*x^3 +
+          * 430133520259178859375*x^2 + 187639110350099814765625*x +
+          * 163282249771063692092187500
+         if not &and [lifting_info`inertia[i] eq 1: i in [1..#vals]|vals[i] ne 0] then
+             worried:=true;
+         end if;
+          */
+             Append(~dead_branches_reports, <p, k, NormalizeProjectiveElement([u,v], p^k), [Integers()| vals[j]*lifting_info`inertia[j]:j in [1..#vals]]>);
+         else
+             Append(~live_branches, <nQ, newvals>);
+         end if;
+         alive_ideals join:= Seqset(alive);
+     end for;
+     if #alive_ideals le 1 then
+         vv:=[vals[i]*lifting_info`inertia[i]: i in [1..#vals]];
+         for i in alive_ideals do
+             vv[i]:= -&+[Integers()| vals[j]*lifting_info`inertia[j]:j in [1..#vals]|j ne i];
+         end for;
+         return [<p, k0, NormalizeProjectiveElement(Q, p^k0), vv>];
+     else
+         /* This is the case which makes important the multiplication by the
+          * inertia degree in dead_branches_reports above !
+         if worried then
+             print "XXX", vals, lifting_info`inertia;
+         end if;
+         // assert not worried;
+          */
+         return dead_branches_reports cat &cat [
+             lift_root(lifting_info, k, Q, v)
+             where Q,v is Explode(Qv)
+             : Qv in live_branches];
+     end if;
+ end function;
+
+
+procedure print_comments_for_badideals_above_p(~SBAD, ~SBADINFO, side, p, order, ideals)
+    lifting_info:=rec<LIFTING_INFO|
+        p:=p,
+        order:=order,
+        ideals:=ideals,
+        inertia:=[prime_ideal_inertia_degree(order, I[1]):I in ideals]
+        /**/>;
+    K:=Universe(order);
+    f:=DefiningPolynomial(K);
+    alpha:=K.1;
+
     /* this is the same as J^-1, but with respect to our locally maximal order
      */
-    jj:=nf_elements_hnf([foo*bar:foo in G, bar in [1,alpha]]);
-    // printf "Prime ideals above %o:\n%o\n", p, fac;
+    jj:=nf_elements_hnf([foo*bar:foo in order, bar in [1,alpha]]);
+    lifting_info`val:=func<I|[valuation_of_ideal_at_prime_ideal(order,I,pi[1],p,pi[2])-valuation_of_ideal_at_prime_ideal(order,jj,pi[1],p,pi[2]):pi in ideals]>;
+
+
+    // printf "Prime ideals above %o:\n%o\n", p, ideals;
     P1 := ProjectiveSpace(GF(p),1);
     rootsp:=Points(Scheme(P1,Homogenization(Evaluate(f,P1.1),P1.2,Degree(f))));
-    found:={};
+
+
+    // found:={};
     for Q in rootsp do
+        // (u:v) (projective version of u/v) is one root of f mod p.
         u,v:=Explode(ChangeUniverse(Eltseq(Q),ZZ));
         // we want to see which are the ideals in the factorization of p which
         // are above this root. We thus try to decompose <p,(v*alpha-u)>*J.
-        ii:=nf_elements_hnf([foo*bar: foo in G, bar in [p, p*alpha, v*alpha-u]]);
-        pp:=nf_elements_hnf([foo*p: foo in G]);
-        val:=func<I,pi|valuation_of_ideal_at_prime_ideal(G,I,pi[1],p,pi[2])>;
-        vals:=[ val(ii, pi) - val(jj, pi) : pi in fac ];
-        capvals:=[ Minimum(val(ii, pi) - val(jj, pi), val(pp,pi)) : pi in fac ];
-        X:=ZPH.1;
-        Y:=ZPH.2;
-        /* same as usual, we need to write a parametrized form for the p
-         * points above (u:v) */
-        if v eq 0 then
-            assert u eq 1;
-            ff:=Evaluate(Homogenization(Evaluate(f,X),Y,Degree(f)),[u,p*x]);
-        else
-            assert v eq 1;
-            ff:=Evaluate(Homogenization(Evaluate(f,X),Y,Degree(f)),[u+p*x,v]);
-        end if;
-        w:=Valuation(Content(ff),p);
-        if #[x : x in vals | x ne 0] gt 1 then
-            if Q[2] ne 0 then
-                QQ := Integers()!Q[1];
-            else
-                QQ := p;
-            end if;
-            SBAD := Sprintf("%o%o,%o:%o: %o\n", SBAD, IntegerToString(p, 16),
-            IntegerToString(QQ, 16), side, #[x : x in vals | x ne 0]);
-        end if;
-        text:=Sprintf("### %o %o %o %o", p, Q, w, vals);
-        // print [ val(ii, pi) : pi in fac ];
-        matches:=[i:i in [1..#fac] | vals[i] gt 0];
-        all_special:=[];
-        for i in matches do
-            special:=[];
-            e_ramif:=fac[i][2];
-            f_inert:=prime_ideal_inertia_degree(G, fac[i][1]);
-            if e_ramif gt 1 then
-                Append(~special, Sprintf("ramified, e=%o", e_ramif));
-            end if;
-            if f_inert gt 1 then
-                Append(~special, Sprintf("f=%o", f_inert));
-            end if;
-            special:=Join(special, ", ");
-            if #special gt 0 then
-                special:=Sprintf("i=%o: ", i) cat special;
-                Append(~all_special, special);
-            end if;
-        end for;
-        if #all_special gt 0 then
-            text cat:= " (" cat Join(all_special, "; ") cat ")";
-        end if;
-        if #matches eq 1 then 
-            // I:=ideal<OK|ideal<OK|p,v*alpha-u>*J> + ideal<OK|p>;
-            // assert IsPrime(I);
-            i:=matches[1];
-            e_ramif:=fac[i][2];
-            f_inert:=prime_ideal_inertia_degree(G, fac[i][1]);
-            assert vals[i]*f_inert eq w;
-            Include(~found, matches[1]);
-            SBADINFO := Sprintf("%o%o ; easy.\n", SBADINFO, text);
-            continue;
-        end if;
-        SBADINFO := Sprintf("%o%o\n", SBADINFO, text);
+        //
+        // ii is <p,(v*alpha-u)>*J
+        ii:=nf_elements_hnf([foo*bar: foo in order, bar in [p, p*alpha, v*alpha-u]]);
+        // vals contains the valuation of <p,(v*alpha-u)> at all prime ideals
+        // above p. This may be greater than one (rarely, but it does happen).
+        vals:=lifting_info`val(ii);
+
+        // tell how many *distinct* prime ideals exist above p, corresponding
+        // to this congruence class mod p. The congruence class is written as
+        // an integer in [0,p], where p actually means (1:0).
+        //
+
+        indices:=[x:x in [1..#vals]|vals[x] ne 0];
+        if #indices eq 1 then continue; end if;
+
+        SBAD cat:= Sprintf("%o,%o:%o: %o\n",
+            ToLower(IntegerToString(p, 16)),
+            ToLower(IntegerToString(NormalizeProjectiveElement(Q, p), 16)),
+            side,
+            #indices);
+
         /* Now see how this root lifts */
-        /* we'll be tredding over some variables which are used above, sorry
-         */
-        status:=[<Q,vals,matches>];
-        report:=[];
-        k:=1;
-        while #status ge 1 do
-            k+:=1;
-            P1k:=ProjectiveSpace(Integers(p^k),1);
-            next_status:=[];
-            for Qvm in status do
-                cQ,base,base_alive:=Explode(Qvm);
-                next_status_above_this:=[];
-                alive_above_this:={};
-                if Gcd(Integers()!cQ[2], p) eq p then
-                    lQs:=[P1k![ZZ!cQ[1],ZZ!cQ[2]+p^(k-1)*x] : x in [0..p-1]];
-                else
-                    lQs:=[P1k![ZZ!cQ[1]+p^(k-1)*x,1] : x in [0..p-1]];
-                end if;
-                above:=[**];
-                for nQ in lQs do
-                    u,v:=Explode(ChangeUniverse(Eltseq(nQ),ZZ));
-                    ii:=nf_elements_hnf([foo*bar: foo in G, bar in [p^k, p^k*alpha, v*alpha-u]]);
-                    nvals:=[ val(ii, pi) - val(jj, pi) : pi in fac ];
-                    alive:=[i:i in [1..#fac] | nvals[i] ne base[i]];
-                    // printf "%o mod %o^%o -> still alive %o (%o)\n", nQ, p, k, alive, nvals;
-                    if #alive gt 0 then
-                        Append(~next_status_above_this, <nQ, nvals, alive>);
-                    end if;
-                    alive_above_this join:= Seqset(alive);
-                    Append(~above, <<u,v>,0,nvals,alive>);
-                end for;
-                if #alive_above_this le 1 then
-                    // printf "%o mod %o^%o is accurate enough\n", cQ, p, k-1;
-                    totval:=0;
-                    for i in matches do
-                        if i in alive_above_this then continue; end if;
-                        totval+:=base[i]*prime_ideal_inertia_degree(G, fac[i][1]);
-                    end for;
-                    ccQ := NormalizeProjectiveElement(cQ, p^(k-1));
-                    str := Sprintf("%o %o %o %o", p, k-1, ccQ, side);
-                    for i in matches do
-                        if i in alive_above_this then
-                            assert #[a:a in above|i in a[4]] in {0,1,p};
-                            // print [a:a in above|i in a[4]];
-                            // print [a[3][i]:a in above | i in a[4]];
-                            SBADINFO := Sprintf("%o# %o mod %o^%o ; v_%o_%o=e-%o\n",
-                                SBADINFO,
-                                cQ, p, k-1,
-                                p, i, totval);
-                            str := Sprintf("%o -%o", str, totval);
-                        else
-                            myval := base[i]*prime_ideal_inertia_degree(G, fac[i][1]);
-                            SBADINFO := Sprintf("%o# %o mod %o^%o ; v_%o_%o=%o\n",
-                                SBADINFO,
-                                cQ, p, k-1,
-                                p, i, myval);
-                            str := Sprintf("%o %o", str, myval);
-                        end if;
-                    end for;
-                    Append(~report, str);
-                    SBADINFO := Sprintf("%o##\n", SBADINFO);
-                else
-                    /* we are going to recurse on a subset of lQs, which might
-                     * be strict. If this is the case, then we must provide
-                     * the valuation info for the branches into which we are
-                     * *not* going to recurse */
-                    for a in above do
-                        uv,ii,nvals,alive:=Explode(a);
-                        if #alive gt 0 then continue; end if;
-                        ccQ := NormalizeProjectiveElement(uv, p^k);
-                        str := Sprintf("%o %o %o %o", p, k, ccQ, side);
-                        for i in matches do
-                            SBADINFO := Sprintf("%o# (%o : %o) mod %o^%o ; v_%o_%o=%o\n",
-                                SBADINFO,
-                                uv[1], uv[2], p, k,
-                                p, i, base[i]);
-                            str := Sprintf("%o %o", str, base[i]);
-                        end for;
-                        Append(~report, str);
-                        SBADINFO := Sprintf("%o##\n", SBADINFO);
-                    end for;
-                    next_status cat:= next_status_above_this;
-                end if;
-            end for;
-            status:=next_status;
-        end while;
-        for l in report do
-            SBADINFO := Sprintf("%o%o\n",SBADINFO,l);
+
+        for report in lift_root(lifting_info, 1, Q, vals) do
+            p, k, cQ, vv:=Explode(report);
+            svv:=Join([Sprintf("%o", vv[x]): x in indices], " ");
+            SBADINFO cat:= Sprintf("%o %o %o %o %o\n", p, k, cQ, side, svv);
         end for;
     end for;
-end for; // loop on the potential bad p's 
+end procedure;
 
-end for; // loop on the two polynomials
+procedure print_comments_for_badideals(~SBAD, ~SBADINFO, side)
+    f := polys[side+1];
+    if Degree(f) eq 1 then return; end if;
+    // SBADINFO cat:= Sprintf("# bad ideals for poly[%o]=%o\n", side, f);
+    K<alpha>:=NumberField(f);
+    FacBadPrimes := local_info_for_bad_primes(K);
+    for pf in FacBadPrimes do
+        p,order,ideals:=Explode(pf);
+        print_comments_for_badideals_above_p(~SBAD, ~SBADINFO, side, p, order, ideals);
+    end for;
+end procedure;
 
-if assigned DEBUG then
+
+
+
+
+SBAD := "";
+SBADINFO := "";
+// spols:=Join([Sprintf("pol[%o]=%o", i, polys[i]):i in [1..#polys]], " and ");
+// SBAD cat:= "# badideals for " cat spols cat "\n";
+
+for side := 0 to #polys-1 do
+    print_comments_for_badideals(~SBAD, ~SBADINFO, side);
+end for;
+
+if assigned DEBUG or assigned COEFFS then
     printf SBAD;
     printf SBADINFO;
 else
@@ -907,6 +917,6 @@ else
     for side:=1 to #polys do
         printf "nmaps%o %o\n", side-1, nmaps[side];
     end for;
-    exit;
+    quit;
 end if;
 

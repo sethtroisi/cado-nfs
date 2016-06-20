@@ -34,7 +34,6 @@ double sopt_local_descent (mpz_poly_ptr, mpz_poly_ptr, mpz_poly_srcptr,
                            mpz_poly_srcptr, int, int, unsigned int, int);
 double size_optimization (mpz_poly_ptr, mpz_poly_ptr, mpz_poly_srcptr,
                           mpz_poly_srcptr, const unsigned int, const int);
-double expected_rotation_gain (mpz_poly_ptr f, mpz_poly_ptr g);
 
 #endif	/* POLYSELECT_SIZE_OPTIMIZATION_H_ */
 

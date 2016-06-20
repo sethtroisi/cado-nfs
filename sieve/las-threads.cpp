@@ -66,7 +66,7 @@ reservation_array<T>::allocate_buckets(const uint32_t n_bucket, const double fil
      is not too large compared to the number of slices (i.e. the size of the
      factor bases).
      */
-  double ratio = fill_ratio;
+  double ratio = 1.2*fill_ratio;
   if (n > 1) {
       ratio *= 1.2;
   } else if (n > 8) {

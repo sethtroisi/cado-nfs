@@ -140,7 +140,7 @@ extern "C" {
 
 /* Typical use pattern:
      
-    bw_common_init_new(bw, &argc, &argv);
+    bw_common_init(bw, &argc, &argv);
     param_list_init(pl);
 
     bw_common_decl_usage(pl);
@@ -157,15 +157,15 @@ extern "C" {
 
     // program !
 
-    bw_common_clear_new(bw);
+    bw_common_clear(bw);
 
 */
 
 void bw_common_decl_usage(param_list);
 void bw_common_parse_cmdline(struct bw_params * bw, param_list pl, int * p_argc, char *** p_argv);
 void bw_common_interpret_parameters(struct bw_params * bw, param_list pl);
-int bw_common_init_new(struct bw_params * bw, int * p_argc, char *** p_argv);
-int bw_common_clear_new(struct bw_params * bw);
+int bw_common_init(struct bw_params * bw, int * p_argc, char *** p_argv);
+int bw_common_clear(struct bw_params * bw);
 
 
 /* utility function. */

@@ -178,6 +178,9 @@ typedef struct {
   int mode; 
   /* record quadratic rotation information */
   int w; 
+  double ropt_time_stage1;
+  double ropt_time_tuning;
+  double ropt_time_stage2;
 } _ropt_info_t;
 typedef _ropt_info_t ropt_info_t[1];
 
@@ -204,9 +207,7 @@ void ropt_bound_setup ( ropt_poly_t poly,
                         ropt_bound_t bound,
                         ropt_param_t param );
 
-double ropt_bound_expected_E ( mpz_t *f,
-                               unsigned int d,
-                               mpz_t *g );
+double ropt_bound_expected_E (mpz_poly F, mpz_poly G);
 
 void ropt_bound_reset ( ropt_poly_t poly,
                         ropt_bound_t bound,

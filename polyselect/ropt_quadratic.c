@@ -21,7 +21,7 @@ ropt_quadratic_stage1 ( ropt_poly_t poly,
                         alpha_pq *alpha_pqueue )
 {
   const int numw = 3;
-  int i, j, k, r, w, old_i, old_nbest_sl, used, *w_good, w_top[numw];
+  int i, j, k, r, w, old_verbose, old_i, old_nbest_sl, used, *w_good, w_top[numw];
   const unsigned int size_alpha_pqueue_all_w =
       s1param->nbest_sl * TUNE_NUM_SUBLATTICE;
   double score;
@@ -39,7 +39,7 @@ ropt_quadratic_stage1 ( ropt_poly_t poly,
   new_alpha_pq (&alpha_pqueue_all_w, size_alpha_pqueue_all_w);
 
   /* parameters for tuning quadratic rotation */
-  j = param->verbose;
+  old_verbose = param->verbose;
   param->verbose = 0;
   old_nbest_sl = s1param->nbest_sl;
 
@@ -56,7 +56,7 @@ ropt_quadratic_stage1 ( ropt_poly_t poly,
   k = 0;
   old_i = 0;
   for (i = bound->global_w_boundl; i <= bound->global_w_boundr; i++) {
-    if (j >= 2 && k % 10 == 0)
+    if (old_verbose >= 2 && k % 10 == 0)
       fprintf (stderr, "# Info: quadratic rotation range %d*x^2\n", i);
     old_i = rotate_aux (poly->f, poly->g[1], m, old_i, i, 2);
     ropt_poly_setup (poly);
@@ -65,7 +65,7 @@ ropt_quadratic_stage1 ( ropt_poly_t poly,
   }
 
   /* get/rotate back */
-  param->verbose = j;
+  param->verbose = old_verbose;
   rotate_aux (poly->f, poly->g[1], m, old_i, 0, 2);
   ropt_poly_setup (poly);
   old_i = 0;
@@ -169,6 +169,10 @@ ropt_quadratic_tune ( ropt_poly_t poly,
 
   int i, j, w, used, old_i;
   double score, old_MurphyE;
+#if TUNE_EARLY_ABORT
+  double ave_E, ave_bestE, new_ave_E, new_ave_bestE;
+  int acc;
+#endif  
   mpz_t m, u, tmpu, v, mod, old_mod;
   ropt_s2param_t s2param;
   alpha_pq *tmp_alpha_pqueue;
@@ -180,12 +184,13 @@ ropt_quadratic_tune ( ropt_poly_t poly,
   mpz_init (v);
   mpz_init (mod);
   mpz_init (old_mod);
-
   ropt_s2param_init (poly, s2param);
-  new_alpha_pq (&tmp_alpha_pqueue, s1param->nbest_sl);
 
-  /* Step 1: test sieve on alpha_pqueue, reduce the sublattice number
-     to the s1param->nbest_sl, and record them to tmp_alpha_pqueue. */
+  /* Step 1: the following is done:
+     -- test sieve on alpha_pqueue (many) returned from ropt_stage1();
+     -- reduce the sublattice number to the s1param->nbest_sl;
+     -- record them to tmp_alpha_pqueue. */
+  new_alpha_pq (&tmp_alpha_pqueue, s1param->nbest_sl);
   used = alpha_pqueue->used - 1;
   old_i = 0;
   for (i = 0; i < used; i ++) {
@@ -202,12 +207,12 @@ ropt_quadratic_tune ( ropt_poly_t poly,
     /* rank by alpha or by E */
 #if RANK_SUBLATTICE_BY_E
     if (param->verbose >= 1) {
-      gmp_fprintf (stderr, "# Info: tune %4d sublattice (%d, %Zd, %Zd) "
+      gmp_fprintf (stderr, "# Info: tune (1st) [%4d] sublattice (%d, %Zd, %Zd) "
                    "(mod %Zd), E: %.2f\n", i + 1, w, u, v, mod, score);
     }
 #else
-    if (param->verbose >= 1) {
-      gmp_fprintf (stderr, "# Info: tune %4d sublattice (%d, %Zd, %Zd) "
+    if (param->verbose >= 1) r
+      gmp_fprintf (stderr, "# Info: tune (1st) [%4d] sublattice (%d, %Zd, %Zd) "
                    "(mod %Zd), alpha: %.2f\n", i + 1, w, u, v, mod, score);
     }
 #endif
@@ -233,7 +238,10 @@ ropt_quadratic_tune ( ropt_poly_t poly,
   old_i = 0;
 
 
-  /* Step 2: detect good (u, v). This is the slow step. */
+  /* Step 2: detect good (u, v). This is the slow step:
+     -- for each sublattice in s1param->nbest_sl;
+     -- do an early abort based on best_E score;
+  */
   reset_alpha_pq (alpha_pqueue);
   used = tmp_alpha_pqueue->used - 1;
   old_i = 0;
@@ -248,17 +256,25 @@ ropt_quadratic_tune ( ropt_poly_t poly,
 
     // ropt_bound_reset (poly, bound, param);  //may have this
     if (param->verbose >= 1) {
-      gmp_fprintf (stderr, "# Info: tune %4d sublattice (%d, %Zd, %Zd) "
+      gmp_fprintf (stderr, "# Info: tune (2nd) [%4d] sublattice (%d, %Zd, %Zd) "
                    "(mod %Zd), E: %.2e\n", i + 1, w, u, v, mod, -score);
     }
 
     /* detect positive good u (may also detect good mod with more time) */
     mpz_set (tmpu, u);
     j = 0;
+#if TUNE_EARLY_ABORT
+    ave_E = 0.0;
+    ave_bestE = 0.0;
+    new_ave_E = 0.0;
+    new_ave_bestE = 0.0;
+    acc = 0;
+#endif
     while (mpz_cmp_si(tmpu, bound->global_u_boundr) < 0) {
 
-      if (j > 16) break;
-
+      if (j > TUNE_BOUND_ON_UV_TRIALS)
+        break;
+      
       ropt_s2param_setup_tune (s1param, s2param, tmpu, v, mod,
                                0, size_tune_sievearray, NP-1);
 
@@ -266,7 +282,6 @@ ropt_quadratic_tune ( ropt_poly_t poly,
 
       insert_alpha_pq (alpha_pqueue, w, tmpu, v, mod,
                        -info->ave_MurphyE);
-
       if (param->verbose >= 3) {
         gmp_fprintf (stderr, "# Info: ave. E: %.2e, best E: %.2e on "
                      "sublattice (%d, %Zd, %Zd) (mod %Zd) (%d, %d)\n",
@@ -275,15 +290,37 @@ ropt_quadratic_tune ( ropt_poly_t poly,
       }
 
       mpz_add (tmpu, tmpu, mod); // consider original u itself.
+
+#if TUNE_EARLY_ABORT
+      new_ave_E = ave_E + info->ave_MurphyE;
+      new_ave_bestE = ave_bestE + info->best_MurphyE;
+      if (j>0) {
+        if ((ave_E/j>new_ave_E/(j+1)) && (ave_bestE/j > new_ave_bestE/(j+1))) {
+          acc ++;
+          if (acc >= TUNE_EARLY_ABORT_THR)
+            break;
+        }
+      }
+      ave_E = new_ave_E;
+      ave_bestE = new_ave_bestE;
+#endif      
+
       j ++;
     }
     
     /* detect negative good u */
     mpz_set (tmpu, u);
     j = 0;
+#if TUNE_EARLY_ABORT
+    ave_E = 0.0;
+    ave_bestE = 0.0;
+    new_ave_E = 0.0;
+    new_ave_bestE = 0.0;
+    acc = 0;
+#endif
     while (mpz_cmp_si (tmpu, bound->global_u_boundl) > 0) {
 
-      if (j >= 16)
+      if (j > TUNE_BOUND_ON_UV_TRIALS)
         break;
       mpz_sub (tmpu, tmpu, mod);
 
@@ -301,9 +338,24 @@ ropt_quadratic_tune ( ropt_poly_t poly,
                      info->ave_MurphyE, info->best_MurphyE,
                      w, tmpu, v, mod, i + 1, j);
       }
+#if TUNE_EARLY_ABORT
+      new_ave_E = ave_E + info->ave_MurphyE;
+      new_ave_bestE = ave_bestE + info->best_MurphyE;
+      if (j>0) {
+        if ((ave_E/j>new_ave_E/(j+1)) && (ave_bestE/j > new_ave_bestE/(j+1))) {
+          acc ++;
+          if (acc >= TUNE_EARLY_ABORT_THR)
+            break;
+        }
+      }
+      ave_E = new_ave_E;
+      ave_bestE = new_ave_bestE;
+#endif      
       j ++;
     }
+
   }
+  
   /* rotate back */
   rotate_aux (poly->f, poly->g[1], m, old_i, 0, 2);
   ropt_poly_setup (poly);
@@ -329,16 +381,16 @@ ropt_quadratic_tune ( ropt_poly_t poly,
     ropt_poly_setup (poly);
 
     if (param->verbose >= 1) {
-      gmp_fprintf ( stderr, "# Info: ave. E: %.2e, tune (#%4d ) sublattice "
-                    "(%d, %Zd, %Zd) (mod %Zd)\n",
-                    -score, i + 1, w, u, v, mod );
+      gmp_fprintf ( stderr, "# Info: tune (3rd) [%4d] sublattice "
+                    "(%d, %Zd, %Zd) (mod %Zd), E: %.2e\n",
+                    i + 1, w, u, v, mod, -score);
     }
 
     insert_alpha_pq (alpha_pqueue, w, u, v, mod, score);
 
     j = 0;
     old_MurphyE = -score;
-    while (j < 8) {
+    while (j < TUNE_BOUND_ON_MOD_TRIALS) {
 
       mpz_mul_ui (mod, mod, primes[s1param->tlen_e_sl + j]);
 
@@ -575,7 +627,7 @@ ropt_quadratic ( ropt_poly_t poly,
                  ropt_param_t param,
                  ropt_info_t info )
 {
-  unsigned long t1, t2, t3;
+  double t1, t2, t3;
   ropt_bound_t bound;
   ropt_s1param_t s1param;
   alpha_pq *alpha_pqueue;
@@ -589,31 +641,35 @@ ropt_quadratic ( ropt_poly_t poly,
 
   /* nbest_sl is the number of sublattice to be finally root-sieved.
      Here we use some larger value since alpha_pqueue records more 
-     sublattices to be tunned */
+     sublattices to be tuned */
   new_alpha_pq (&alpha_pqueue, s1param->nbest_sl * TUNE_NUM_SUBLATTICE);
   new_MurphyE_pq (&global_E_pqueue, s1param->nbest_sl);
 
   /* Step 1: find good sublattice */
-  t1 = milliseconds ();
+  t1 = seconds_thread ();
   ropt_quadratic_stage1 (poly, bound, s1param, param, alpha_pqueue);
-  t1 = milliseconds () - t1;
+  t1 = seconds_thread () - t1;
   
   /* Step 2: rank/tune above found sublattices by short sieving */
-  t2 = milliseconds ();
+  t2 = seconds_thread ();
   ropt_quadratic_tune (poly, bound, s1param, param, info, alpha_pqueue,
                        global_E_pqueue);
-  t2 = milliseconds () - t2;
+  t2 = seconds_thread () - t2;
   
   /* Step 3, root sieve */
-  t3 = milliseconds ();
+  t3 = seconds_thread ();
   ropt_quadratic_sieve (poly, bound, s1param, param, info, alpha_pqueue,
                         global_E_pqueue);
-  t3 = milliseconds () - t3;
+  t3 = seconds_thread () - t3;
+  
+  info->ropt_time_stage1 = t1;
+  info->ropt_time_tuning = t2;
+  info->ropt_time_stage2 = t3;
   
   if (param->verbose >= 2) {
-    fprintf ( stderr, "# Stat: tot (stage 1) took %lums\n", t1 );
-    fprintf ( stderr, "# Stat: tot (tuning ) took %lums\n", t2 );
-    fprintf ( stderr, "# Stat: tot (stage 2) took %lums\n", t3 );
+    fprintf ( stderr, "# Stat: this polynomial (stage 1) took %.2fs\n", t1 );
+    fprintf ( stderr, "# Stat: this polynomial (tuning ) took %.2fs\n", t2 );
+    fprintf ( stderr, "# Stat: this polynomial (stage 2) took %.2fs\n", t3 );
   }
 
   /* Step 4, return best poly */
