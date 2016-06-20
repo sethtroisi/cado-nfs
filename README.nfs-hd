@@ -1,3 +1,7 @@
+WARNING: with gcc version below than 5.3 (at least), the __builtin_*_overflow
+are not supported. You need to enable SLLL_SAFE instead (see the section about
+nfs-hd/CMakeLists.txt). A better workaround will be available soon.
+
 Compile:
   * (optionaly) copy "local.sh.example" in "local.sh" in the same directory;
   * (optionaly) edit "local.sh" if you want that binaries are stored in a
@@ -85,3 +89,4 @@ An incomplete list is given below:
     activated, disable ASSERT_SIEVE during line sieve (same for
     MODE_SIEVE_PLANE and MODE_SIEVE_SPACE).
   * SPACE_SIEVE_STAT: do some stat during space sieve.
+  * SLLL_SAFE: use mpz version of LLL to perform skew LLL.

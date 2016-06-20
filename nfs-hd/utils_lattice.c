@@ -173,6 +173,7 @@ int gauss_reduction_zero(int64_vector_ptr v0, int64_vector_ptr v1,
   return det; 
 }
 
+#ifndef SLLL_SAFE
 void skew_LLL(mat_int64_ptr MSLLL, mat_int64_srcptr M_root,
     int64_vector_srcptr skewness)
 {
@@ -200,7 +201,7 @@ void skew_LLL(mat_int64_ptr MSLLL, mat_int64_srcptr M_root,
   mat_int64_clear(I_s);
   mat_int64_clear(M);
 }
-
+#else // SLLL_SAFE
 void skew_LLL_safe(mat_int64_ptr MSLLL, mat_int64_srcptr M_root,
     int64_vector_srcptr skewness)
 {
@@ -228,6 +229,7 @@ void skew_LLL_safe(mat_int64_ptr MSLLL, mat_int64_srcptr M_root,
   mat_int64_clear(I_s);
   mat_int64_clear(M);
 }
+#endif // SLLL_SAFE
 
 int reduce_qlattice(int64_vector_ptr v0, int64_vector_ptr v1,
     int64_vector_srcptr v0_root, int64_vector_srcptr v1_root, int64_t I)
@@ -1384,6 +1386,7 @@ unsigned int space_sieve_1_next_plane_seek(int64_vector_ptr s_tmp,
   return hit;
 }
 
+#ifndef SLLL_SAFE
 /* This uses Paul Zimmermann implementation.
 
    LLL using exact multiprecision arithmetic.
@@ -2358,3 +2361,4 @@ void lll_Mqr_unimodular(mat_int64_ptr U, mat_int64_srcptr A)
   mat_int64_clear(U_tmp);
 #endif // NDEBUG
 }
+#endif // SLLL_SAFE
