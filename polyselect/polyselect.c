@@ -59,8 +59,7 @@ double potential_collisions = 0.0, aver_opt_lognorm = 0.0,
 #define LOGNORM_MAX 999.99
 double min_raw_lognorm = LOGNORM_MAX, max_raw_lognorm = 0.0;
 double min_opt_lognorm = LOGNORM_MAX, max_opt_lognorm = 0.0;
-double min_exp_E = LOGNORM_MAX, max_exp_E = 0.0,
-  aver_exp_E = 0.0, var_exp_E = 0.0;
+data_t data_exp_E;
 unsigned long collisions = 0;
 unsigned long collisions_good = 0;
 double *best_opt_logmu, *best_exp_E;
@@ -199,8 +198,8 @@ print_poly_info ( char *buf,
     {
       double beta, eta, m, prob;
 
-      m = aver_exp_E / collisions_good;
-      estimate_weibull (&beta, &eta, m, var_exp_E / collisions_good - m * m);
+      m = data_mean (data_exp_E);
+      estimate_weibull (&beta, &eta, m, data_var (data_exp_E));
       prob = 1.0 - exp (- pow (target_E / eta, beta));
       sprintf (buf + strlen(buf), "# target_E=%.2f: collisions=%.2e, time=%.2e"
                " (beta=%.2f,eta=%.2f)\n",
@@ -288,7 +287,7 @@ output_skipped_poly (const mpz_t ad, const mpz_t l, const mpz_t g0)
 {
   mpz_t m;
   mpz_init(m);
-  mpz_neg(m, g0); 
+  mpz_neg(m, g0);
   mutex_lock (&lock);
   gmp_printf ("# Skip polynomial: %.2f, ad: %Zd, l: %Zd, m: %Zd\n", ad, l, m);
   mutex_unlock (&lock);
@@ -390,12 +389,7 @@ optimize_raw_poly (mpz_poly F, mpz_t *g)
   if (logmu > max_opt_lognorm)
     max_opt_lognorm = logmu;
 
-  aver_exp_E += exp_E;
-  var_exp_E += exp_E * exp_E;
-  if (exp_E < min_exp_E)
-    min_exp_E = exp_E;
-  if (exp_E > max_exp_E)
-    max_exp_E = exp_E;
+  data_add (data_exp_E, exp_E);
 
   mutex_unlock (&lock);
 
@@ -570,11 +564,11 @@ match (unsigned long p1, unsigned long p2, const int64_t i, mpz_t m0,
 
   if (did_optimize && out != NULL)
     output_msieve (out, d, F->coeff, g);
-  
+
   /* print optimized (maybe size- or size-root- optimized) polynomial */
   if (did_optimize && verbose >= 0)
     output_polynomials (fold, d, gold, N, F->coeff, g);
-  
+
   if (!did_optimize && verbose >= 1)
     output_skipped_poly (ad, l, g[0]);
 
@@ -743,7 +737,7 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
   /* print optimized (maybe size- or size-root- optimized) polynomial */
   if (did_optimize && verbose >= 0)
     output_polynomials (fold, d, gold, N, F->coeff, g);
-  
+
   if (!did_optimize && verbose >= 1)
     output_skipped_poly (ad, l, g[0]);
 
@@ -1879,6 +1873,7 @@ main (int argc, char *argv[])
   mpz_init (admax);
   cado_poly_init (best_poly);
   cado_poly_init (curr_poly);
+  data_init (data_exp_E);
 
   /* read params */
   param_list pl;
@@ -2071,13 +2066,13 @@ main (int argc, char *argv[])
           if (collisions_good > 0)
             {
               double mean = aver_opt_lognorm / collisions_good;
-              double Emean = aver_exp_E / collisions_good;
+              double Emean = data_mean (data_exp_E);
               printf ("# Stat: optimized lognorm (nr/min/av/max/std): %lu/%1.2f/%1.2f/%1.2f/%1.2f\n",
                       collisions_good, min_opt_lognorm, mean, max_opt_lognorm,
                       sqrt (var_opt_lognorm / collisions_good - mean * mean));
               printf ("# Stat: exp_E (nr/min/av/max/std): %lu/%1.2f/%1.2f/%1.2f/%1.2f\n",
-                      collisions_good, min_exp_E, Emean, max_exp_E,
-                      sqrt (var_exp_E / collisions_good - Emean * Emean));
+                      collisions_good, data_exp_E->min, Emean,
+                      data_exp_E->max, sqrt (data_var (data_exp_E)));
             }
         }
     }
@@ -2120,6 +2115,7 @@ main (int argc, char *argv[])
   free(best_exp_E);
   param_list_clear (pl);
   free (tid);
+  data_clear (data_exp_E);
 
   return 0;
 }
