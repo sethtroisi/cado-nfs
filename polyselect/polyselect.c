@@ -205,7 +205,8 @@ estimate_weibull_mle (double *beta, double *eta, data_t s)
   double dbeta, deta, d2beta, d2eta;
 
   /* first start from initial values computed using the method of moments */
-  if (s->beta == 0.0 || isnan (s->beta))
+  if (s->beta <= 0.0 || isnan (s->beta)
+      || s->eta <= 0.0 || isnan (s->eta))
     estimate_weibull_moments (beta, eta, s);
   else
     {
