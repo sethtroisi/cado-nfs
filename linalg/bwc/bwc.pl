@@ -114,7 +114,7 @@ if (!defined($bindir=$ENV{'BWC_BINDIR'})) {
 #  - %$param hash, with special rules for the hosts argument.
 #  - $show_only, @extra_args
 #  - obey -h
-my @extra_args=(split(' ', '@MPIEXEC_EXTRA_STANZAS@'));
+my @extra_args=();
 my $show_only=0;
 my $param={};
 my $param_defaults={
@@ -926,6 +926,7 @@ if ($mpi_needed) {
     if (defined($mpi_extra_args)) {
         push @mpi_precmd, split(' ', $mpi_extra_args);
     }
+    push @mpi_precmd, split(' ', '@MPIEXEC_EXTRA_STANZAS@');
 
     @mpi_precmd_single = @mpi_precmd;
     @mpi_precmd_lingen = @mpi_precmd;
