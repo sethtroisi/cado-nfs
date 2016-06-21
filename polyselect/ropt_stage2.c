@@ -903,7 +903,7 @@ rootsieve_one_sublattice ( ropt_poly_t poly,
   size_array_mem = len_A * size_B_block;
 
   /* init structs: if tune mode, look for less top candidates; */
-  if (info->mode==1) {
+  if (info->mode == ROPT_MODE_TUNE) {
     new_sievescore_pq (&sievescore, TUNE_NUM_TOPALPHA_SIEVEARRAY);
     new_MurphyE_pq (&local_E_pqueue, TUNE_NUM_TOPE_SUBLATTICE);
   }
@@ -1012,7 +1012,7 @@ rootsieve_one_sublattice ( ropt_poly_t poly,
   best_MurphyE = 0.0;
   for (i = 1; i < local_E_pqueue->used; i ++) {
     
-    if (param->verbose >= 2 && info->mode == 0) {
+    if (param->verbose >= 2 && info->mode == ROPT_MODE_INIT) {
       gmp_fprintf ( stderr, "# Found (%3dth) (w=%d, u=%Zd, v=%Zd) "
                     "gives E = %1.2e\n",
                     i, 
@@ -1050,7 +1050,7 @@ rootsieve_one_sublattice ( ropt_poly_t poly,
   info->best_MurphyE = best_MurphyE;
   
   /* output stats */
-  if (param->verbose >= 2 && info->mode == 0) {
+  if (param->verbose >= 2 && info->mode == ROPT_MODE_INIT) {
     gmp_fprintf ( stderr,
                   "# Stat: ave. MurphyE of top %ld polynomials: "
                   "%1.2e (on sublattice %Zd, %Zd)\n",
@@ -1084,8 +1084,7 @@ ropt_stage2 ( ropt_poly_t poly,
 {
   int i;
 
-  //  if (param->verbose >= 2 && info->mode == 0)
-  if (param->verbose >= 2 && info->mode == 0)
+  if (param->verbose >= 2 && info->mode == ROPT_MODE_INIT)
     ropt_s2param_print (s2param);
 
   for (i = 0; i <= poly->d; i++)
