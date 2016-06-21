@@ -11,6 +11,7 @@
 #include "getprime.h"
 #include "makefb.h"
 #include "utils_int64.h"
+#include "math.h"
 
 /*
  * Mode:
@@ -146,8 +147,23 @@ void makefb(factor_base_t * fb, cado_poly_srcptr f, uint64_t * fbb,
     qmax = MAX(qmax, fbb[k]);
   }
 
+  //Approximative number of enumerated primes.
+#ifndef PRINT_INFO
+  uint64_t nb_max = (uint64_t) ((double)qmax / (log((double)qmax)));
+  uint64_t cpt = 0;
+  unsigned int percent = 0;
+#endif // PRINT_INFO
+
   //For all the prime q less than the max of fbb.
   for ( ; q <= qmax; q = getprime_mt(pi)) {
+#ifndef PRINT_INFO
+    cpt++;
+    if ((double)cpt / (double)nb_max * 100.0 >= (double)percent && percent <
+        101) {
+      printf("# [%3u %%] Building factor bases.\n", percent);
+      percent += 10;
+    }
+#endif // PRINT_INFO
     mpz_set_ui(a, q);
     for (unsigned int k = 0; k < V; k++) {
       //Projective root?
@@ -765,6 +781,10 @@ int main(int argc, char ** argv)
   //5 because name of the file is p,n,V.
   FILE * file;
   file = fopen (file_r, "w+");
+
+#ifndef PRINT_INFO
+  printf("# Write the factor bases in the file %s.\n", file_r);
+#endif // PRINT_INFO
 
   export_factor_base(file, fb, f, fbb, lpb, t);
 
