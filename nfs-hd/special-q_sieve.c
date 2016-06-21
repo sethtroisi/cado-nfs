@@ -2454,7 +2454,7 @@ int Ha_defined(sieving_bound_srcptr Ha)
 void do_all_for_spq(array_spq_ptr spq, int64_t q, cado_poly_srcptr f,
     unsigned int q_side, sieving_bound_srcptr H, gmp_randstate_t state,
     int deg_bound_factorise, mpz_vector_srcptr skewness, unsigned int gal,
-    mpz_vector_t * c, unsigned int nb_vec, mpz_poly_srcptr g,
+    unsigned int gal_version, mpz_vector_t * c, unsigned int nb_vec, mpz_poly_srcptr g,
     FILE * outstd, FILE * file_trace_pos, unsigned int * max_norm,
     unsigned int V, double * log2_base, uint64_array_t * indexes,
     array_ptr array, double ** time, FILE * errstd, uint64_t * sieve_start,
@@ -2560,7 +2560,7 @@ void do_all_for_spq(array_spq_ptr spq, int64_t q, cado_poly_srcptr f,
     sec = seconds();
     * nb_rel += (uint64_t) find_relations(indexes, array->number_element, lpb,
         spq->MqLLL[i], f->pols, H, V, spq->spq[i], q_side, main_side,
-        outstd, gal);
+        outstd, gal, gal_version);
     sec_cofact = seconds() - sec;
 
     for (unsigned j = 0; j < V; j++) {
@@ -2598,7 +2598,7 @@ void do_all_for_spq(array_spq_ptr spq, int64_t q, cado_poly_srcptr f,
 void read_q_file(FILE * qfile, array_spq_ptr spq, cado_poly_srcptr f,
     sieving_bound_srcptr H, gmp_randstate_t state,
     int deg_bound_factorise, mpz_vector_srcptr skewness, unsigned int gal,
-    mpz_vector_t * c, unsigned int nb_vec, mpz_poly_srcptr g,
+    unsigned int gal_version, mpz_vector_t * c, unsigned int nb_vec, mpz_poly_srcptr g,
     FILE * outstd, FILE * file_trace_pos, unsigned int * max_norm,
     unsigned int V, double * log2_base, uint64_array_t * indexes,
     array_ptr array, double ** time, FILE * errstd, uint64_t * sieve_start,
@@ -2633,9 +2633,9 @@ void read_q_file(FILE * qfile, array_spq_ptr spq, cado_poly_srcptr f,
 #endif // NDEBUG
 
     do_all_for_spq(spq, q, f, q_side, H, state, deg_bound_factorise, skewness,
-        gal, c, nb_vec, g, outstd, file_trace_pos, max_norm, V, log2_base,
-        indexes, array, time, errstd, sieve_start, fb, thresh, lpb, main_side,
-        nb_rel, spq_tot, total_time, file_space_sieve_stat);
+        gal, gal_version, c, nb_vec, g, outstd, file_trace_pos, max_norm, V,
+        log2_base, indexes, array, time, errstd, sieve_start, fb, thresh, lpb,
+        main_side, nb_rel, spq_tot, total_time, file_space_sieve_stat);
   }
   free(line);
 }
@@ -2738,7 +2738,7 @@ int parse_spq(char * str, unsigned int * q_side, uint64_t * q, mpz_poly_ptr g)
 void read_q_file_spq(FILE * qfile, array_spq_ptr spq, cado_poly_srcptr f,
     sieving_bound_srcptr H, gmp_randstate_t state,
     int deg_bound_factorise, mpz_vector_srcptr skewness, unsigned int gal,
-    mpz_vector_t * c, unsigned int nb_vec,
+    unsigned int gal_version, mpz_vector_t * c, unsigned int nb_vec,
     FILE * outstd, MAYBE_UNUSED FILE * file_trace_pos, unsigned int * max_norm,
     unsigned int V, double * log2_base, uint64_array_t * indexes,
     array_ptr array, double ** time, FILE * errstd, uint64_t * sieve_start,
@@ -2778,9 +2778,9 @@ void read_q_file_spq(FILE * qfile, array_spq_ptr spq, cado_poly_srcptr f,
 #endif // NDEBUG
 
     do_all_for_spq(spq, q, f, q_side, H, state, deg_bound_factorise, skewness,
-        gal, c, nb_vec, g, outstd, file_trace_pos, max_norm, V, log2_base,
-        indexes, array, time, errstd, sieve_start, fb, thresh, lpb, main_side,
-        nb_rel, spq_tot, total_time, file_space_sieve_stat);
+        gal, gal_version, c, nb_vec, g, outstd, file_trace_pos, max_norm, V,
+        log2_base, indexes, array, time, errstd, sieve_start, fb, thresh, lpb,
+        main_side, nb_rel, spq_tot, total_time, file_space_sieve_stat);
   }
   mpz_poly_clear(g);
   free(line);
@@ -2803,8 +2803,7 @@ void declare_usage(param_list pl)
   param_list_decl_usage(pl, "Ha", "sieving region for a");
   param_list_decl_usage(pl, "base", "specify the bases");
   param_list_decl_usage(pl, "g", "polynomial associated with q");
-  param_list_decl_usage(pl, "gal", "type of Galois action (6 with action "
-    "x-> -(2 * x + 1) / (x - 1))");
+  param_list_decl_usage(pl, "gal", "type of Galois action (autom<order>.<version>");
   param_list_decl_usage(pl, "qfile", "path to a qfile");
   param_list_decl_usage(pl, "qfilespq", "path to a qfile");
 }
@@ -2830,7 +2829,8 @@ void initialise_parameters(int argc, char * argv[], cado_poly_ptr f,
     array_ptr array, unsigned int * q_side, unsigned int * V,
     int * main_side, double ** log2_base, FILE ** outstd, FILE ** errstd,
     uint64_t ** sieve_start, sieving_bound_ptr Ha, mpz_poly_ptr g,
-    unsigned int * gal, FILE ** qfile, unsigned int * qfilespq)
+    unsigned int * gal, unsigned int * gal_version, FILE ** qfile,
+    unsigned int * qfilespq)
 {
   param_list pl;
   param_list_init(pl);
@@ -2973,7 +2973,7 @@ void initialise_parameters(int argc, char * argv[], cado_poly_ptr f,
   param_list_parse_mpz_poly(pl, "g", g, ",");
   ASSERT(g->deg == -1 || g->deg > 0);
 #ifndef NDEBUG
-  if (* qfile == NULL) {
+  if (* qfilespq != 0) {
     ASSERT(g->deg == -1);
   }
 #endif // NDEBUG
@@ -3063,8 +3063,13 @@ void initialise_parameters(int argc, char * argv[], cado_poly_ptr f,
 #endif // NDEBUG
 
   * gal = 1;
-  param_list_parse_uint(pl, "gal", gal);
+  * gal_version = 0;
+  size_t size_gal_str = 1024;
+  char * gal_str = (char * ) malloc(sizeof(char) * size_gal_str);
+  param_list_parse_string(pl, "gal", gal_str, size_gal_str);
+  sscanf(gal_str, "autom%u.%u", gal, gal_version);
   ASSERT(* gal == 1 || * gal == 6);
+  free(gal_str);
 
   param_list_clear(pl);
 }
@@ -3093,12 +3098,13 @@ int main(int argc, char * argv[])
   sieving_bound_t Ha;
   mpz_poly g;
   unsigned int gal;
+  unsigned int gal_version;
   FILE * qfile;
   unsigned int qfilespq;
 
-  initialise_parameters(argc, argv, f, &fbb, &fb, H, &q_range,
-      &thresh, &lpb, array, &q_side, &V, &main_side, &log2_base,
-      &outstd, &errstd, &sieve_start, Ha, g, &gal, &qfile, &qfilespq);
+  initialise_parameters(argc, argv, f, &fbb, &fb, H, &q_range, &thresh, &lpb,
+      array, &q_side, &V, &main_side, &log2_base, &outstd, &errstd,
+      &sieve_start, Ha, g, &gal, &gal_version, &qfile, &qfilespq);
 
   //Store all the index of array with resulting norm less than thresh.
   uint64_array_t * indexes =
@@ -3202,22 +3208,22 @@ int main(int argc, char * argv[])
       ASSERT(qfile == NULL);
       //Use fonction here.
       do_all_for_spq(spq, q, f, q_side, H, state, deg_bound_factorise, skewness,
-          gal, c, nb_vec, g, outstd, file_trace_pos, max_norm, V, log2_base,
-          indexes, array, time, errstd, sieve_start, fb, thresh, lpb, main_side,
-          &nb_rel, &spq_tot, &total_time, file_space_sieve_stat);
+          gal, gal_version, c, nb_vec, g, outstd, file_trace_pos, max_norm, V,
+          log2_base, indexes, array, time, errstd, sieve_start, fb, thresh, lpb,
+          main_side, &nb_rel, &spq_tot, &total_time, file_space_sieve_stat);
     }
   } else if (qfilespq == 1){
     read_q_file(qfile, spq, f, H, state, deg_bound_factorise, skewness, gal,
-        c, nb_vec, g, outstd, file_trace_pos, max_norm, V, log2_base, indexes,
-        array, time, errstd, sieve_start, fb, thresh, lpb, main_side, &nb_rel,
-        &spq_tot, &total_time, file_space_sieve_stat);
+        gal_version, c, nb_vec, g, outstd, file_trace_pos, max_norm, V,
+        log2_base, indexes, array, time, errstd, sieve_start, fb, thresh, lpb,
+        main_side, &nb_rel, &spq_tot, &total_time, file_space_sieve_stat);
   } else {
     ASSERT(qfilespq == 2);
 
     read_q_file_spq(qfile, spq, f, H, state, deg_bound_factorise, skewness, gal,
-        c, nb_vec, outstd, file_trace_pos, max_norm, V, log2_base, indexes,
-        array, time, errstd, sieve_start, fb, thresh, lpb, main_side, &nb_rel,
-        &spq_tot, &total_time, file_space_sieve_stat);
+        gal_version, c, nb_vec, outstd, file_trace_pos, max_norm, V, log2_base,
+        indexes, array, time, errstd, sieve_start, fb, thresh, lpb, main_side,
+        &nb_rel, &spq_tot, &total_time, file_space_sieve_stat);
   }
 
   fprintf(outstd, "# Total time: %fs.\n", total_time);

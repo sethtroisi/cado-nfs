@@ -90,3 +90,16 @@ An incomplete list is given below:
     MODE_SIEVE_PLANE and MODE_SIEVE_SPACE).
   * SPACE_SIEVE_STAT: do some stat during space sieve.
   * SLLL_SAFE: use mpz version of LLL to perform skew LLL.
+
+-----
+Galois action
+If qfile (not qfilespq) or q_range are used, special-q_sieve try to select the
+special-q with the best estimated number of relations (fuction
+"compute_all_spq").
+To add support of galois action, you need to add some code to
+use the galois action in the function "good_polynomial". An example of this
+code can be found in the function "printf_relation_galois_6_0".
+If you want to add a new action, please follow the nomenclature
+"autom<order_of_the_galois_action>.<type>".
+Implemented galois action:
+  * autom6.0: x-> -(2 * x + 1) / (x - 1))

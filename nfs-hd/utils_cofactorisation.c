@@ -671,7 +671,7 @@ static void rewrite_poly_6(mpz_poly_ptr b, factor_t * fac, unsigned int V)
 }
 
 //TODO. assert facto is false: need to recompute.
-static void printf_relation_galois(factor_t * factor,
+static void printf_relation_galois_6_0(factor_t * factor,
     mpz_poly_srcptr a, unsigned int t, unsigned int V,
     FILE * outstd, MAYBE_UNUSED unsigned int * assert_facto,
     MAYBE_UNUSED mpz_vector_srcptr c)
@@ -711,12 +711,12 @@ static void printf_relation_galois(factor_t * factor,
  * t: dimension of the lattice.
  * V: number of number fields.
  */
-static void good_polynomial(mpz_poly_srcptr a, const mpz_poly * f,
-    unsigned int * L, MAYBE_UNUSED unsigned int t, unsigned int V, int main,
-    facul_aux_data *data, unsigned int * nb_rel_found,
-    ideal_spq_srcptr special_q, unsigned int q_side, unsigned int size,
-    MAYBE_UNUSED FILE * outstd, MAYBE_UNUSED unsigned int * number_factorisation,
-    MAYBE_UNUSED mpz_vector_srcptr c, unsigned int gal, MAYBE_UNUSED unsigned int * nb_rel_gal)
+static void good_polynomial(mpz_poly_srcptr a, const mpz_poly * f, unsigned int
+    * L, MAYBE_UNUSED unsigned int t, unsigned int V, int main, facul_aux_data
+    *data, unsigned int * nb_rel_found, ideal_spq_srcptr special_q, unsigned int
+    q_side, unsigned int size, MAYBE_UNUSED FILE * outstd, MAYBE_UNUSED unsigned
+    int * number_factorisation, MAYBE_UNUSED mpz_vector_srcptr c,
+    unsigned int gal, unsigned int * nb_rel_gal, unsigned int gal_version)
 {
   mpz_t res;
   mpz_init(res);
@@ -850,9 +850,11 @@ static void good_polynomial(mpz_poly_srcptr a, const mpz_poly * f,
     (* nb_rel_found)++;
 
     if (gal == 6) {
+      if (gal_version == 0) {
 #ifndef NOT_PRINT_RELATION
-      printf_relation_galois(factor, a, t, V, outstd, assert_facto, c);
+        printf_relation_galois_6_0(factor, a, t, V, outstd, assert_facto, c);
 #endif // NOT_PRINT_RELATION
+      }
       (* nb_rel_gal) += 5;
     }
   }
@@ -958,7 +960,7 @@ static void find_relation(uint64_array_t * indices, uint64_t * index,
     facul_aux_data *data, unsigned int * nb_rel_found,
     ideal_spq_srcptr special_q, unsigned int q_side, FILE * outstd,
     MAYBE_UNUSED unsigned int * number_factorisation, unsigned int gal,
-    MAYBE_UNUSED unsigned int * nb_rel_gal)
+    unsigned int * nb_rel_gal, unsigned int gal_version)
 {
   unsigned int * L = (unsigned int *) malloc(V * sizeof(unsigned int));
   unsigned int size = 0;
@@ -991,7 +993,7 @@ static void find_relation(uint64_array_t * indices, uint64_t * index,
 
       good_polynomial(a, f, L, H->t, V, main, data, nb_rel_found,
           special_q, q_side, size, outstd, number_factorisation, c, gal,
-          nb_rel_gal);
+          nb_rel_gal, gal_version);
     }
 
     mpz_poly_clear(a);
@@ -1014,7 +1016,8 @@ static void find_relation(uint64_array_t * indices, uint64_t * index,
 unsigned int find_relations(uint64_array_t * indices, uint64_t number_element,
     unsigned int * lpb, mat_Z_srcptr matrix, const mpz_poly * f,
     sieving_bound_srcptr H, unsigned int V, ideal_spq_srcptr special_q,
-    unsigned int q_side, int main, FILE * outstd, unsigned int gal)
+    unsigned int q_side, int main, FILE * outstd, unsigned int gal,
+    unsigned int gal_version)
 {
   //index[i] is the current index of indices[i].
   uint64_t * index = (uint64_t * ) malloc(sizeof(uint64_t) * V);
@@ -1061,7 +1064,7 @@ unsigned int find_relations(uint64_array_t * indices, uint64_t number_element,
     while(sum_index(index, V, main) < length_tot) {
       find_relation(indices, index, number_element, matrix, f, H, V, main,
           max_indices, data, &nb_rel_found, special_q, q_side, outstd,
-          number_factorisation, gal, &nb_rel_gal);
+          number_factorisation, gal, &nb_rel_gal, gal_version);
     }
   }
   if (nb_rel_found != 0) {
