@@ -62,14 +62,16 @@
    Parameters for test sieving
    ------------------------- */
 
-/* Increase num in the tuning */
-#define TUNE_NUM_SUBLATTICE 32
+/* Ratio for the num. of increased sublattice in tuning */
+#define TUNE_NUM_SUBLATTICE 16
+#define TUNE_NUM_SUBLATTICE_STAGE1 4
+#define TUNE_NUM_SUBLATTICE_STAGE2 2
 
 /* Similar to above, but in tune mode */
-#define TUNE_NUM_TOPALPHA_SIEVEARRAY 4
+#define TUNE_NUM_TOPALPHA_SIEVEARRAY 8
 
 /* Similar to above, but in tune mode */
-#define TUNE_NUM_TOPE_SUBLATTICE 4
+#define TUNE_NUM_TOPE_SUBLATTICE 8
 
 /* Tuning parameter */
 #define TUNE_EARLY_ABORT 1

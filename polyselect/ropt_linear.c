@@ -47,7 +47,7 @@ ropt_linear_tune ( ropt_poly_t poly,
   mpz_init (old_mod);
 
   ropt_s2param_init (poly, s2param);
-  new_alpha_pq (&tmp_alpha_pqueue, s1param->nbest_sl*TUNE_NUM_SUBLATTICE/4);
+  new_alpha_pq (&tmp_alpha_pqueue, s1param->nbest_sl);
 
   /* Step 1: test sieve on alpha_pqueue */
   used = alpha_pqueue->used - 1;
@@ -493,7 +493,7 @@ ropt_linear_deg5 ( ropt_poly_t poly,
   /* Step 1:, find good sublattices */
   t1 = seconds_thread ();
   int old_nbest_sl = s1param->nbest_sl;
-  s1param->nbest_sl = old_nbest_sl*TUNE_NUM_SUBLATTICE;
+  s1param->nbest_sl = old_nbest_sl*TUNE_NUM_SUBLATTICE_STAGE1;
   r = ropt_stage1 (poly, bound, s1param, param, alpha_pqueue, 0);
   t1 = seconds_thread () - t1;
   s1param->nbest_sl = old_nbest_sl;
@@ -501,8 +501,11 @@ ropt_linear_deg5 ( ropt_poly_t poly,
   
   /* Step 2: rank/tune above found sublattices by short sieving */
   t2 = seconds_thread ();
+  old_nbest_sl = s1param->nbest_sl;
+  s1param->nbest_sl = old_nbest_sl*TUNE_NUM_SUBLATTICE_STAGE2;
   ropt_linear_tune (poly, bound, s1param, param, info, alpha_pqueue,
                     global_E_pqueue);
+  s1param->nbest_sl = old_nbest_sl;
   t2 = seconds_thread () - t2;
 
   /* Step 3, root sieve */

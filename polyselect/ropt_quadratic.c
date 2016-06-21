@@ -23,7 +23,7 @@ ropt_quadratic_stage1 ( ropt_poly_t poly,
   const int numw = 3;
   int i, j, k, r, w, old_verbose, old_i, old_nbest_sl, used, *w_good, w_top[numw];
   const unsigned int size_alpha_pqueue_all_w =
-      s1param->nbest_sl * TUNE_NUM_SUBLATTICE;
+    s1param->nbest_sl * TUNE_NUM_SUBLATTICE;
   double score;
   mpz_t m, u, v, mod;
   alpha_pq *alpha_pqueue_all_w;
@@ -45,7 +45,7 @@ ropt_quadratic_stage1 ( ropt_poly_t poly,
   /* used in ropt_stage1(), the larger the slower for each
      quadratic rotation w. */
   old_nbest_sl = s1param->nbest_sl;
-  s1param->nbest_sl = 32;
+  s1param->nbest_sl = 16;
 
   /* used in ropt_stage1(), uses this to reduce the length of 
      individual sublattice queue */
@@ -110,7 +110,7 @@ ropt_quadratic_stage1 ( ropt_poly_t poly,
   /* Step 3: for each top w, re-detect (u, v) harder */
 
   /* consider more sublattices in stage 1 and leave them for tuning */
-  s1param->nbest_sl = old_nbest_sl*TUNE_NUM_SUBLATTICE; 
+  s1param->nbest_sl = old_nbest_sl * TUNE_NUM_SUBLATTICE_STAGE1; 
   s1param->nbest_sl_tunemode = 0; // Note: used in ropt_stage1()
   old_i = 0;
   for (i = 0; i < numw; i ++) {
@@ -196,7 +196,7 @@ ropt_quadratic_tune ( ropt_poly_t poly,
      -- test sieve on alpha_pqueue (many) returned from ropt_stage1();
      -- reduce the sublattice number to the s1param->nbest_sl;
      -- record them to tmp_alpha_pqueue. */
-  new_alpha_pq (&tmp_alpha_pqueue, s1param->nbest_sl*TUNE_NUM_SUBLATTICE/2);
+  new_alpha_pq (&tmp_alpha_pqueue, s1param->nbest_sl);
   used = alpha_pqueue->used - 1;
   old_i = 0;
   
@@ -654,11 +654,14 @@ ropt_quadratic ( ropt_poly_t poly,
   t1 = seconds_thread ();
   ropt_quadratic_stage1 (poly, bound, s1param, param, alpha_pqueue);
   t1 = seconds_thread () - t1;
-  
+
   /* Step 2: rank/tune above found sublattices by short sieving */
   t2 = seconds_thread ();
+  int old_nbest_sl = s1param->nbest_sl;
+  s1param->nbest_sl = old_nbest_sl*TUNE_NUM_SUBLATTICE_STAGE1;
   ropt_quadratic_tune (poly, bound, s1param, param, info, alpha_pqueue,
                        global_E_pqueue);
+  s1param->nbest_sl = old_nbest_sl;
   t2 = seconds_thread () - t2;
   
   /* Step 3, root sieve */
