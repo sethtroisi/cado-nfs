@@ -1178,6 +1178,7 @@ data_init (data_t s)
   s->sum = s->var = 0.0;
   s->min = DBL_MAX;
   s->max = -DBL_MAX;
+  s->beta = s->eta = 0.0; /* means non initialized */
 }
 
 void

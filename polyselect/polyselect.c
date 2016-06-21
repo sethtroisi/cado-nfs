@@ -53,13 +53,11 @@ pthread_mutex_t lock=PTHREAD_MUTEX_INITIALIZER; /* used as mutual exclusion
 int tot_found = 0; /* total number of polynomials */
 int opt_found = 0; /* number of size-optimized polynomials */
 int ros_found = 0; /* number of rootsieved polynomials */
-double potential_collisions = 0.0, aver_opt_lognorm = 0.0,
-  aver_raw_lognorm = 0.0, var_opt_lognorm = 0.0,
+double potential_collisions = 0.0, aver_raw_lognorm = 0.0,
   var_raw_lognorm = 0.0;
 #define LOGNORM_MAX 999.99
 double min_raw_lognorm = LOGNORM_MAX, max_raw_lognorm = 0.0;
-double min_opt_lognorm = LOGNORM_MAX, max_opt_lognorm = 0.0;
-data_t data_exp_E;
+data_t data_opt_lognorm, data_exp_E;
 unsigned long collisions = 0;
 unsigned long collisions_good = 0;
 double *best_opt_logmu, *best_exp_E;
@@ -140,17 +138,90 @@ check_parameters (mpz_t m0, double q)
 }
 
 /* given a distribution with mean m and variance v, estimate the parameters
-   beta and eta from a matching Weibull distribution:
+   beta and eta from a matching Weibull distribution, using the method of
+   moments:
    m = eta * gamma (1 + 1/beta)
    v = eta^2 * [gamma (1 + 2/beta) - gamma (1 + 1/beta)^2] */
 static void
-estimate_weibull (double *beta, double *eta, double m, double v)
+estimate_weibull_moments (double *beta, double *eta, data_t s)
 {
+  double m = data_mean (s);
+  double v = data_var (s);
   double y = sqrt (v) / m;
 
   y = y * (0.7796968012336761 + y * (0.61970313728462 + 0.0562963108244 * y));
   *beta = 1.0 / y;
   *eta = m * (1.0 + y * (0.57721566490153 - 0.655878071520 * y));
+}
+
+/* compute the 1st and 2nd derivatives of log(L) wrt beta and eta:
+
+   diff(log(L),beta) = n/beta + sum(log(x_i/eta), i)
+                     - sum((x_i/eta)^beta*log(x_i/eta), i)
+
+   diff(log(L),eta) = -n*beta/eta + beta/eta*sum((x_i/eta)^beta, i)
+
+   diff(log(L),beta,2) = -n/beta^2
+                       - sum((x_i/eta)^beta*log(x_i/eta)^2, i)
+
+   diff(log(L),eta,2) = n*beta/eta^2 - beta/eta^2*sum((x_i/eta)^beta, i)
+                      - beta^2/eta^2*sum((x_i/eta)^beta, i)
+*/
+static void
+estimate_weibull_mle_aux (double *dbeta, double *deta,
+                          double *d2beta, double *d2eta,
+                          data_t s, double beta, double eta)
+{
+  unsigned long i, n = s->size;
+
+  *dbeta = (double) n / beta;
+  *deta = - (double) n;
+  *d2beta = - (double) n / (beta * beta);
+  *d2eta = (double) n;
+  for (i = 0; i < n; i++)
+    {
+      double u = s->x[i] / eta;
+      double l = log (u);
+      double v = pow (u, beta);
+      *dbeta += l * (1.0 - v);
+      *deta += v;
+      *d2beta -= v * l * l;
+      *d2eta -= v * (1.0 + beta);
+    }
+  *deta *= beta / eta;
+  *d2eta *= beta / (eta * eta);
+}
+
+/* same as above, using the MLE (Maximum Likelihood Estimation) method,
+   which consists in maximizing the value of
+   L = (beta/eta)^n * product((x_i/eta)^(beta-1)*exp(-(x_i/eta)^beta), i)
+
+   log(L) = n*log(beta/eta) + (beta-1)*sum(log(x_i/eta),i)
+          - sum((x_i/eta)^beta, i)
+*/
+static void
+estimate_weibull_mle (double *beta, double *eta, data_t s)
+{
+  double dbeta, deta, d2beta, d2eta;
+
+  /* first start from initial values computed using the method of moments */
+  if (s->beta == 0.0 || isnan (s->beta))
+    estimate_weibull_moments (beta, eta, s);
+  else
+    {
+      *beta = s->beta;
+      *eta = s->eta;
+    }
+
+  estimate_weibull_mle_aux (&dbeta, &deta, &d2beta, &d2eta, s, *beta, *eta);
+
+  /* use tangent's method: assume diff(L,beta+x) = dbeta + x*d2beta */
+  *beta -= dbeta / d2beta;
+  *eta -= deta / d2eta;
+
+  /* store current values */
+  s->beta = *beta;
+  s->eta = *eta;
 }
 
 /* print poly info */
@@ -196,10 +267,10 @@ print_poly_info ( char *buf,
 
   if (!raw_option && target_E != 0.0)
     {
-      double beta, eta, m, prob;
+      double beta, eta, prob;
 
-      m = data_mean (data_exp_E);
-      estimate_weibull (&beta, &eta, m, data_var (data_exp_E));
+      // estimate_weibull_moments (&beta, &eta, data_exp_E);
+      estimate_weibull_mle (&beta, &eta, data_exp_E);
       prob = 1.0 - exp (- pow (target_E / eta, beta));
       sprintf (buf + strlen(buf), "# target_E=%.2f: collisions=%.2e, time=%.2e"
                " (beta=%.2f,eta=%.2f)\n",
@@ -380,15 +451,9 @@ optimize_raw_poly (mpz_poly F, mpz_t *g)
   sorted_insert_double (best_exp_E, keep, exp_E);
 
   mutex_lock (&lock);
+
   collisions_good ++;
-
-  aver_opt_lognorm += logmu;
-  var_opt_lognorm += logmu * logmu;
-  if (logmu < min_opt_lognorm)
-    min_opt_lognorm = logmu;
-  if (logmu > max_opt_lognorm)
-    max_opt_lognorm = logmu;
-
+  data_add (data_opt_lognorm, logmu);
   data_add (data_exp_E, exp_E);
 
   mutex_unlock (&lock);
@@ -1873,6 +1938,7 @@ main (int argc, char *argv[])
   mpz_init (admax);
   cado_poly_init (best_poly);
   cado_poly_init (curr_poly);
+  data_init (data_opt_lognorm);
   data_init (data_exp_E);
 
   /* read params */
@@ -2065,11 +2131,11 @@ main (int argc, char *argv[])
                   sqrt (var_raw_lognorm / collisions - rawmean * rawmean));
           if (collisions_good > 0)
             {
-              double mean = aver_opt_lognorm / collisions_good;
+              double mean = data_mean (data_opt_lognorm);
               double Emean = data_mean (data_exp_E);
               printf ("# Stat: optimized lognorm (nr/min/av/max/std): %lu/%1.2f/%1.2f/%1.2f/%1.2f\n",
-                      collisions_good, min_opt_lognorm, mean, max_opt_lognorm,
-                      sqrt (var_opt_lognorm / collisions_good - mean * mean));
+                      collisions_good, data_opt_lognorm->min, mean, data_opt_lognorm->max,
+                      sqrt (data_var (data_opt_lognorm)));
               printf ("# Stat: exp_E (nr/min/av/max/std): %lu/%1.2f/%1.2f/%1.2f/%1.2f\n",
                       collisions_good, data_exp_E->min, Emean,
                       data_exp_E->max, sqrt (data_var (data_exp_E)));
@@ -2115,6 +2181,7 @@ main (int argc, char *argv[])
   free(best_exp_E);
   param_list_clear (pl);
   free (tid);
+  data_clear (data_opt_lognorm);
   data_clear (data_exp_E);
 
   return 0;
