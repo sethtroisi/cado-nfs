@@ -740,7 +740,7 @@ int param_list_parse_long_and_long(param_list pl, const char * key, long * r, co
 
 int param_list_parse_int_and_int(param_list pl, const char * key, int * r, const char * sep)
 {
-    long rr[2];
+    long rr[2] = {0, 0};
     if (r) {
         rr[0] = r[0];
         rr[1] = r[1];
