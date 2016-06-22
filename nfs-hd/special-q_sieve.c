@@ -277,24 +277,18 @@ void compute_all_spq(array_spq_ptr array_spq, uint64_t q, mpz_poly_srcptr f,
   mpz_clear(q_Z);
 
   for (int i = 0; i < l->size; i++) {
-
     if (l->factors[i]->f->deg < deg_bound_factorise) {
       if (l->factors[i]->f->deg == 1) {
-#ifdef SPQ_DEFINED
-        if (mpz_poly_cmp(g, l->factors[i]->f)) {
+        if (g->deg == 1 && mpz_poly_cmp(g, l->factors[i]->f)) {
           continue;
         }
-#endif // SPQ_DEFINED
         ideal_spq_set_part(array_spq_tmp->spq[array_spq_tmp->number], q,
             l->factors[i]->f, H->t, 0);
       } else {
         ASSERT(l->factors[i]->f->deg > 1);
-
-#ifdef SPQ_DEFINED
-        if (mpz_poly_cmp(g, l->factors[i]->f)) {
+        if (g->deg > 1 && mpz_poly_cmp(g, l->factors[i]->f)) {
           continue;
         }
-#endif // SPQ_DEFINED
         ideal_spq_set_part(array_spq_tmp->spq[array_spq_tmp->number], q,
             l->factors[i]->f, H->t, 1);
       }
@@ -327,7 +321,7 @@ void compute_all_spq(array_spq_ptr array_spq, uint64_t q, mpz_poly_srcptr f,
   array_spq_swap(array_spq_tmp, array_spq);
   array_spq_clear(array_spq_tmp, H->t);
 
-  if (gal == 6) {
+  if (gal == 6 && g->deg == -1) {
     if (array_spq->number > 0) {
       mpz_t norm_inf;
       mpz_init(norm_inf);
@@ -3069,6 +3063,14 @@ void initialise_parameters(int argc, char * argv[], cado_poly_ptr f,
   param_list_parse_string(pl, "gal", gal_str, size_gal_str);
   sscanf(gal_str, "autom%u.%u", gal, gal_version);
   ASSERT(* gal == 1 || * gal == 6);
+  if ((* gal != 6 || * gal_version != 0) && * gal != 1) {
+    fprintf(* errstd, "# Galois action not implemented.\n");
+    * gal = 1;
+    * gal_version = 0;
+  }
+  if (* gal == 6 && * gal_version == 0 && H->t > 3) {
+    fprintf(* errstd, "# Galois action not fully implemented.\n");
+  }
   free(gal_str);
 
   param_list_clear(pl);
