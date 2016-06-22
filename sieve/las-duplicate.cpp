@@ -395,7 +395,6 @@ sq_was_previously_sieved(const unsigned long sq, int side, sieve_info_srcptr si)
     return (sq > si->conf->sides[side]->lim);
   } else {
     // Did we sieve other sides?
-    ASSERT_ALWAYS(si->conf->sides[side]->qmax != 0);
     if (si->conf->sides[side]->qmax == 0)
       return 0;
     // Is q smaller than current, and within the bounds for this side?
