@@ -373,7 +373,7 @@ inline cachefile& operator<<(cachefile& c, combiner const & z) { return z.cachef
 /* {{{ Temporary buffers which are used when reading the dispatchers.  */
 struct temp_buffer {
     unsigned int j0;
-    typedef vector<fast_elt, aligned_allocator<fast_elt> > vec_type;  
+    typedef vector<fast_elt, aligned_allocator<fast_elt, fast_elt::alignment> > vec_type;  
     vec_type v;
     vec_type::iterator ptr;
     temp_buffer(unsigned int j0, size_t n) : j0(j0), v(n), ptr(v.begin()) {}
@@ -422,8 +422,8 @@ struct matmul_zone_data {/*{{{*/
 
     vector<block_of_rows> blocks;
 
-    vector<fast_elt, aligned_allocator<fast_elt> > alternate_src;
-    vector<fast_elt, aligned_allocator<fast_elt> > alternate_dst;
+    vector<fast_elt, aligned_allocator<fast_elt, fast_elt::alignment> > alternate_src;
+    vector<fast_elt, aligned_allocator<fast_elt, fast_elt::alignment> > alternate_dst;
 
 #ifdef DISPATCHERS_AND_COMBINERS
     size_t maxmaxw = 0;
@@ -945,6 +945,8 @@ void matmul_zone_data::mul(void * xdst, void const * xsrc, int d)
 
     fast_elt::zero(dst, ndst);
 
+    aligned_allocator<fast_elt_ur, fast_elt_ur::alignment> scratch_alloc;
+
     /* Processing order:
      *
      *  - vector data corresponding to the combiner blocks is
@@ -979,9 +981,9 @@ void matmul_zone_data::mul(void * xdst, void const * xsrc, int d)
          * indices for the negative coefficients. Oddly enough, we don't
          * seem to do so currently for the immediate zones...
          */
-        fast_elt_ur * tdst = new fast_elt_ur[2*rowbatch];
+        fast_elt_ur * tdst = scratch_alloc.allocate(2*rowbatch);
 #else
-        fast_elt_ur * tdst = new fast_elt_ur[rowbatch];
+        fast_elt_ur * tdst = scratch_alloc.allocate(rowbatch);
 #endif
 
         ASM_COMMENT("critical loop");
@@ -1038,8 +1040,7 @@ void matmul_zone_data::mul(void * xdst, void const * xsrc, int d)
 #endif
 
             /* reduce last batch. It could possibly be incomplete */
-            size_t active = std::min(rowbatch,
-                    (size_t) (mm->public_->dim[!d] - B.i0));
+            size_t active = std::min(rowbatch, (size_t) (ndst - B.i0));
             for(size_t i = 0 ; i < active ; i++) {
 #ifdef DISPATCHERS_AND_COMBINERS
                 fast_gfp::sub_ur(tdst[i], tdst[i + rowbatch]);
@@ -1049,14 +1050,19 @@ void matmul_zone_data::mul(void * xdst, void const * xsrc, int d)
         }
 
         ASM_COMMENT("end of critical loop");
-        delete[] tdst;
+
+#ifdef DISPATCHERS_AND_COMBINERS
+        scratch_alloc.deallocate(tdst, 2*rowbatch);
+#else
+        scratch_alloc.deallocate(tdst, rowbatch);
+#endif
     } else {
 #ifdef DISPATCHERS_AND_COMBINERS
         fprintf(stderr, "transposed product not yet implemented for the dispatch-combine trick");
         ASSERT_ALWAYS(0);
 #endif
-        fast_elt_ur * tdst = new fast_elt_ur[mm->public_->dim[!d]];
-        fast_elt_ur::zero(tdst, mm->public_->dim[!d]);
+        fast_elt_ur * tdst = scratch_alloc.allocate(ndst);
+        fast_elt_ur::zero(tdst, ndst);
 
         ASM_COMMENT("critical loop");
 
@@ -1066,12 +1072,18 @@ void matmul_zone_data::mul(void * xdst, void const * xsrc, int d)
                 z.tmul(tdst + z.j0, src + B.i0, prime, preinverse);
             }
         }
-        for(size_t j = 0 ; j < mm->public_->dim[!d] ; j++) {
+        for(size_t j = 0 ; j < ndst ; j++) {
             fast_gfp::reduce(dst[j], tdst[j], prime, preinverse);
         }
 
         ASM_COMMENT("end of critical loop");
-        delete[] tdst;
+        scratch_alloc.deallocate(tdst, ndst);
+    }
+
+    if (!arith_modp::details::is_same<gfp::elt, fast_elt>::value) {
+        std::copy(alternate_dst.begin(),
+                alternate_dst.end(),
+                (gfp::elt *) xdst);
     }
 
     ASM_COMMENT("end of multiplication code");

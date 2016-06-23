@@ -24,7 +24,7 @@ void mmt_vec_set_0n(mmt_vec_ptr v, size_t items)
      * thing: IOW, we have set_ui_at, but no set_ui. So let's do a
      * dirty cast */
     // ASSERT_ALWAYS((size_t) v->abase->vec_elt_stride(v->abase, 1) <= sizeof(uint64_t));
-    ASSERT_ALWAYS(v->abase->vec_elt_stride(v->abase, 1) %  sizeof(uint64_t) == 0);
+    ASSERT_ALWAYS(v->abase->vec_elt_stride(v->abase, 1) % sizeof(uint64_t) == 0);
     // size_t nwords = (size_t) v->abase->vec_elt_stride(v->abase, 1) / sizeof(uint64_t);
     size_t off = mmt_my_own_offset_in_items(v);
     size_t sz = mmt_my_own_size_in_items(v);

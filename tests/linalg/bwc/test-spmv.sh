@@ -73,9 +73,15 @@ redirect_unless_debug() {
     file="$1"
     shift
     if [ "$CADO_DEBUG" ] ; then
-        "$@" 2>&1 | tee "$file"
+        if ! "$@" > >(tee "$file") 2>&1 ; then
+            echo "Failed command: $@" >&2
+            exit 1
+        fi
     else
-        "$@" > $file 2>&1
+        if ! "$@" > $file 2>&1 ; then
+            echo "Failed command: $@" >&2
+            exit 1
+        fi
     fi
 }
 
@@ -83,7 +89,9 @@ if ! [ "$nrows" ] ; then usage ; fi
 
 wdir=$(mktemp -d  /tmp/cado.XXXXXXXX)
 cleanup() { if ! [ "$CADO_DEBUG" ] ; then rm -rf $wdir ; fi ; }
+argh() { echo "Failed on command error" >&2 ; cleanup ; }
 trap cleanup EXIT
+trap argh ERR
 
 extra_args_random_matrix=()
 extra_args_mf=()
@@ -120,6 +128,13 @@ fi
 
 
 for impl in "${backends[@]}" ; do
+    rm -f $wdir/Xa.0 $wdir/Xb.0
+    rm -f $wdir/Xa.1 $wdir/Xb.1
+    rm -f $wdir/XTa.0 $wdir/XTb.0
+    rm -f $wdir/XTa.1 $wdir/XTb.1
+    rm -f $wdir/MY.0 $wdir/sMY.0
+    rm -f $wdir/WM.0 $wdir/sWM.0
+
     # The nullspace argument is just for selecting the preferred
     # direction for the matrix times vector product. But in the spmv_test
     # file, we unconditionally compute M times Y in the file MY, and W

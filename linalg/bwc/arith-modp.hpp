@@ -29,6 +29,7 @@ namespace details {
     typedef make_signed<mp_limb_t>::type signed_mp_limb_t;
 
     template<int n> struct mpn {
+        static const int alignment = sizeof(mp_limb_t);
         typedef mpn<n> self;
         mp_limb_t x[n];
         mpn() { memset(x, 0, n * sizeof(mp_limb_t)); }
@@ -47,6 +48,11 @@ namespace details {
         bool operator==(self const& a) {
             return memcmp(x, a.x, n * sizeof(mp_limb_t)) == 0;
         }
+        bool is_zero() const {
+            for(int i = 0 ; i < n ; i++) if (x[i]) return false;
+            return true;
+        }
+
         /*
         bool operator<(self const& a) {
             return memcmp(x, a.x, n * sizeof(mp_limb_t)) < 0;
@@ -86,6 +92,10 @@ namespace details {
                     if (dst[i]) return false;
                 return true;
             }
+
+            static inline bool is_zero(elt const & x) { return x.is_zero(); }
+            static inline bool is_zero(elt_ur const & x) { return x.is_zero(); }
+
 
             static inline void stream_store(elt * dst, elt const& src) { *dst = src; }
             static inline void add(elt_ur & dst, elt const & src)
@@ -831,6 +841,11 @@ namespace details {
         struct elt;
         typedef elt elt_ur;
         struct elt {
+#ifdef  HAVE_AVX2
+        static const int alignment = 32;
+#else
+        static const int alignment = 16;
+#endif
             typedef elt self;
 #ifdef  HAVE_AVX2
             __m256i data[1];
@@ -875,6 +890,7 @@ namespace details {
 
             /* same, but we assume carry is zero */
             operator super::elt() const {
+                ASSERT(conv_backend_get_carries(*this).is_zero());
                 return conv_backend_get_main(*this);
             }
         };
@@ -930,6 +946,90 @@ namespace details {
 
         /* conversions are done as a combination of blend & shuffle */
 
+#ifdef  HAVE_AVX2
+        /* We grok only values for w_i which are integer immediates
+         * within {-1} \cup {0..15}
+         */
+#define shuffle_16bit_words(in,	        		        	\
+            w0, w1, w2, w3,						\
+            w4, w5, w6, w7,						\
+            w8, w9, wa, wb,						\
+            wc, wd, we, wf)						\
+        _mm256_xor_si256(					        \
+            _mm256_shuffle_epi8(					\
+            in,								\
+            _mm256_setr_epi8( 						\
+                (w0 < 0) ? -1 : ((w0 < 8)  ? 2*(w0&7) + 0 : -1),	\
+                (w0 < 0) ? -1 : ((w0 < 8)  ? 2*(w0&7) + 1 : -1),	\
+                (w1 < 0) ? -1 : ((w1 < 8)  ? 2*(w1&7) + 0 : -1),	\
+                (w1 < 0) ? -1 : ((w1 < 8)  ? 2*(w1&7) + 1 : -1),	\
+                (w2 < 0) ? -1 : ((w2 < 8)  ? 2*(w2&7) + 0 : -1),	\
+                (w2 < 0) ? -1 : ((w2 < 8)  ? 2*(w2&7) + 1 : -1),	\
+                (w3 < 0) ? -1 : ((w3 < 8)  ? 2*(w3&7) + 0 : -1),	\
+                (w3 < 0) ? -1 : ((w3 < 8)  ? 2*(w3&7) + 1 : -1),	\
+                (w4 < 0) ? -1 : ((w4 < 8)  ? 2*(w4&7) + 0 : -1),	\
+                (w4 < 0) ? -1 : ((w4 < 8)  ? 2*(w4&7) + 1 : -1),	\
+                (w5 < 0) ? -1 : ((w5 < 8)  ? 2*(w5&7) + 0 : -1),	\
+                (w5 < 0) ? -1 : ((w5 < 8)  ? 2*(w5&7) + 1 : -1),	\
+                (w6 < 0) ? -1 : ((w6 < 8)  ? 2*(w6&7) + 0 : -1),	\
+                (w6 < 0) ? -1 : ((w6 < 8)  ? 2*(w6&7) + 1 : -1),	\
+                (w7 < 0) ? -1 : ((w7 < 8)  ? 2*(w7&7) + 0 : -1),	\
+                (w7 < 0) ? -1 : ((w7 < 8)  ? 2*(w7&7) + 1 : -1),	\
+                (w8 < 0) ? -1 : ((w8 >= 8) ? 2*(w8&7) + 0 : -1),	\
+                (w8 < 0) ? -1 : ((w8 >= 8) ? 2*(w8&7) + 1 : -1),	\
+                (w9 < 0) ? -1 : ((w9 >= 8) ? 2*(w9&7) + 0 : -1),	\
+                (w9 < 0) ? -1 : ((w9 >= 8) ? 2*(w9&7) + 1 : -1),	\
+                (wa < 0) ? -1 : ((wa >= 8) ? 2*(wa&7) + 0 : -1),	\
+                (wa < 0) ? -1 : ((wa >= 8) ? 2*(wa&7) + 1 : -1),	\
+                (wb < 0) ? -1 : ((wb >= 8) ? 2*(wb&7) + 0 : -1),	\
+                (wb < 0) ? -1 : ((wb >= 8) ? 2*(wb&7) + 1 : -1),	\
+                (wc < 0) ? -1 : ((wc >= 8) ? 2*(wc&7) + 0 : -1),	\
+                (wc < 0) ? -1 : ((wc >= 8) ? 2*(wc&7) + 1 : -1),	\
+                (wd < 0) ? -1 : ((wd >= 8) ? 2*(wd&7) + 0 : -1),	\
+                (wd < 0) ? -1 : ((wd >= 8) ? 2*(wd&7) + 1 : -1),	\
+                (we < 0) ? -1 : ((we >= 8) ? 2*(we&7) + 0 : -1),	\
+                (we < 0) ? -1 : ((we >= 8) ? 2*(we&7) + 1 : -1),	\
+                (wf < 0) ? -1 : ((wf >= 8) ? 2*(wf&7) + 0 : -1),	\
+                (wf < 0) ? -1 : ((wf >= 8) ? 2*(wf&7) + 1 : -1))),	\
+            _mm256_shuffle_epi8(					\
+                /* 0x4E is 0b01001110 aka (1,0,3,2) */			\
+                _mm256_permute4x64_epi64 (in, _MM_SHUFFLE(1,0,3,2)), 	\
+            _mm256_setr_epi8( 						\
+                (w0 < 0) ? -1 : ((w0 >= 8) ? 2*(w0&7) + 0 : -1),	\
+                (w0 < 0) ? -1 : ((w0 >= 8) ? 2*(w0&7) + 1 : -1),	\
+                (w1 < 0) ? -1 : ((w1 >= 8) ? 2*(w1&7) + 0 : -1),	\
+                (w1 < 0) ? -1 : ((w1 >= 8) ? 2*(w1&7) + 1 : -1),	\
+                (w2 < 0) ? -1 : ((w2 >= 8) ? 2*(w2&7) + 0 : -1),	\
+                (w2 < 0) ? -1 : ((w2 >= 8) ? 2*(w2&7) + 1 : -1),	\
+                (w3 < 0) ? -1 : ((w3 >= 8) ? 2*(w3&7) + 0 : -1),	\
+                (w3 < 0) ? -1 : ((w3 >= 8) ? 2*(w3&7) + 1 : -1),	\
+                (w4 < 0) ? -1 : ((w4 >= 8) ? 2*(w4&7) + 0 : -1),	\
+                (w4 < 0) ? -1 : ((w4 >= 8) ? 2*(w4&7) + 1 : -1),	\
+                (w5 < 0) ? -1 : ((w5 >= 8) ? 2*(w5&7) + 0 : -1),	\
+                (w5 < 0) ? -1 : ((w5 >= 8) ? 2*(w5&7) + 1 : -1),	\
+                (w6 < 0) ? -1 : ((w6 >= 8) ? 2*(w6&7) + 0 : -1),	\
+                (w6 < 0) ? -1 : ((w6 >= 8) ? 2*(w6&7) + 1 : -1),	\
+                (w7 < 0) ? -1 : ((w7 >= 8) ? 2*(w7&7) + 0 : -1),	\
+                (w7 < 0) ? -1 : ((w7 >= 8) ? 2*(w7&7) + 1 : -1),	\
+                (w8 < 0) ? -1 : ((w8 < 8)  ? 2*(w8&7) + 0 : -1),	\
+                (w8 < 0) ? -1 : ((w8 < 8)  ? 2*(w8&7) + 1 : -1),	\
+                (w9 < 0) ? -1 : ((w9 < 8)  ? 2*(w9&7) + 0 : -1),	\
+                (w9 < 0) ? -1 : ((w9 < 8)  ? 2*(w9&7) + 1 : -1),	\
+                (wa < 0) ? -1 : ((wa < 8)  ? 2*(wa&7) + 0 : -1),	\
+                (wa < 0) ? -1 : ((wa < 8)  ? 2*(wa&7) + 1 : -1),	\
+                (wb < 0) ? -1 : ((wb < 8)  ? 2*(wb&7) + 0 : -1),	\
+                (wb < 0) ? -1 : ((wb < 8)  ? 2*(wb&7) + 1 : -1),	\
+                (wc < 0) ? -1 : ((wc < 8)  ? 2*(wc&7) + 0 : -1),	\
+                (wc < 0) ? -1 : ((wc < 8)  ? 2*(wc&7) + 1 : -1),	\
+                (wd < 0) ? -1 : ((wd < 8)  ? 2*(wd&7) + 0 : -1),	\
+                (wd < 0) ? -1 : ((wd < 8)  ? 2*(wd&7) + 1 : -1),	\
+                (we < 0) ? -1 : ((we < 8)  ? 2*(we&7) + 0 : -1),	\
+                (we < 0) ? -1 : ((we < 8)  ? 2*(we&7) + 1 : -1),	\
+                (wf < 0) ? -1 : ((wf < 8)  ? 2*(wf&7) + 0 : -1),	\
+                (wf < 0) ? -1 : ((wf < 8)  ? 2*(wf&7) + 1 : -1)))	\
+        )
+#endif
+
         /* case of 192 bits within 256 bits. Three 64-bit words
          * split into four 48-bit words.
          */
@@ -956,6 +1056,13 @@ namespace details {
              * 15   <empty>
              */
 #ifdef  HAVE_AVX2
+            /* I'm really upset here. _mm256_shuffle_epi8, aka VPSHUFB,
+             * reads only 4-byte immediates (and discards the rest). As a
+             * consequnence, the following does not work: the indices
+             * 12,13,14,15 read off bounds, while the 16,17, etc actually
+             * do what they want, but based on the fact that they're
+             * reduced mod 16 + implicitly considered wrt the high part
+             * of the operand...
             dst.data[0] = _mm256_shuffle_epi8(
                     _mm256_loadu_si256((__m256i*) a.x),
                     _mm256_setr_epi8( 
@@ -963,8 +1070,33 @@ namespace details {
                         6,7,8,9,10,11,-1,-1,
                         12,13,14,15,16,17,-1,-1,
                         18,19,20,21,22,23,-1,-1));
+            */
 
+#if 0
+            __m256i in = _mm256_loadu_si256((__m256i*) a.x);
+            dst.data[0] =
+                    _mm256_xor_si256(
+                        _mm256_shuffle_epi8(
+                        in,
+                        _mm256_setr_epi8( 
+                            0,1,2,3,4,5,-1,-1,
+                            6,7,8,9,10,11,-1,-1,
+                            -1,-1,-1,-1,0,1,-1,-1,
+                            2,3,4,5,6,7,-1,-1)),
+                        _mm256_shuffle_epi8(
+                            /* 0x4E is 0b01001110 aka (1,0,3,2) */
+                            _mm256_permute4x64_epi64 (in, _MM_SHUFFLE(1,0,3,2)), 
+                        _mm256_setr_epi8( 
+                            -1,-1,-1,-1,-1,-1,-1,-1,
+                            -1,-1,-1,-1,-1,-1,-1,-1,
+                            12,13,14,15,-1,-1,-1,-1,
+                            -1,-1,-1,-1,-1,-1,-1,-1)));
+#endif
+            __m256i in = _mm256_loadu_si256((__m256i*) a.x);
+            dst.data[0] = shuffle_16bit_words(in,
+                    0,1,2,-1, 3,4,5,-1, 6,7,8,-1, 9,10,11,-1);
 #else   /* SSSE3 !! */
+            ASSERT_ALWAYS(0);   // untested.
             __m128i lo = _mm_loadu_si128((__m128i*) a.x);
             __m128i hi = _mm_loadu_si128((__m128i*) (a.x + 2));
             /* note that 16bit-wide shuffles use an 8-bit immediate,
@@ -985,18 +1117,23 @@ namespace details {
         }
 
         static super::elt conv_backend_get_main(elt const& src) {
-            super::elt main;
+            /* This is needed because we knowingly write off bounds */
+            union station {
+                super::elt e;
 #ifdef  HAVE_AVX2
-            _mm256_storeu_si256((__m256i*) main.x,
-                    _mm256_shuffle_epi8(src.data[0],
-                        _mm256_setr_epi8(
-                            0,1,2,3,4,5,
-                            8,9,10,11,12,13,
-                            16,17,18,19,20,21,
-                            24,25,26,27,28,29,
-                            -1,-1,-1,-1,-1,-1,-1,-1)));
+                __m256i v[1];
 #else
-            _mm_storeu_si128((__m128i*) main.x,
+                __m128i v[2];
+#endif
+                station() {};
+            } main;
+#ifdef  HAVE_AVX2
+            _mm256_storeu_si256(main.v,
+                    shuffle_16bit_words(src.data[0],
+                            0,1,2, 4,5,6, 8,9,10, 12,13,14, -1,-1,-1,-1));
+#else
+            ASSERT_ALWAYS(0);   // untested.
+            _mm_storeu_si128(main.v,
                     _mm_xor_si128(
                         _mm_shuffle_epi8(src.data[0],
                             _mm_setr_epi8(
@@ -1008,33 +1145,49 @@ namespace details {
                                 -1,-1,-1,-1,-1,-1,
                                 -1,-1,-1,-1,-1,-1,
                                 0,1,2,3))));
-            _mm_storeu_si128((__m128i*) (main.x + 2),
+            _mm_storeu_si128(main.v + 1,
                     _mm_shuffle_epi8(src.data[1],
                         _mm_setr_epi8(
                             4,5,
                             8,9,10,11,12,13,
                             -1,-1,-1,-1,-1,-1,-1,-1)));
 #endif
-            return main;
+            return main.e;
         }
         static super::elt_ur conv_backend_get_carries(elt const& src) {
-            super::elt_ur carries;
+            union station {
+                super::elt_ur e;
 #ifdef  HAVE_AVX2
-            _mm256_storeu_si256((__m256i*) carries.x,
-                    _mm256_shuffle_epi8(src.data[0],
-                        _mm256_setr_epi8(
-                            -1,-1,-1,-1,-1,-1,
-                            6,7,
-                            -1,-1,-1,-1,
-                            14,15,
-                            -1,-1,-1,-1,
-                            22,23,
-                            -1,-1,-1,-1,
-                            30,31,
-                            -1,-1,-1,-1,-1,-1
-                            )));
+                __m256i v[1];
 #else
-            _mm_storeu_si128((__m128i*) carries.x,
+                __m128i v[2];
+#endif
+                station() {};
+            } carries, ncarries;
+
+            /* It's slightly more complicated than it seems. The carry
+             * words may be negative. So we must sign-extend them to the
+             * full unreduced element size.
+             */
+#ifdef  HAVE_AVX2
+            _mm256_storeu_si256(carries.v,
+                    shuffle_16bit_words(src.data[0],
+                            -1,-1,-1,3,
+                            -1,-1,7,-1,
+                            -1,11,-1,-1,
+                            15,-1,-1,-1));
+            __m256i zero = _mm256_setzero_si256();
+            _mm256_storeu_si256(ncarries.v,
+                shuffle_16bit_words(
+                _mm256_sub_epi16(zero, _mm256_cmpgt_epi16(zero, carries.v[0])),
+                            -1,-1,-1,-1,
+                            3,-1,-1,6,
+                            -1,-1,9,-1,
+                            -1,12,-1,-1));
+            super::sub_ur(carries.e, ncarries.e);
+#else
+            ASSERT_ALWAYS(0);   // untested.
+            _mm_storeu_si128(carries.v,
                     _mm_shuffle_epi8(src.data[0],
                         _mm_setr_epi8(
                             -1,-1,-1,-1,-1,-1,
@@ -1042,7 +1195,7 @@ namespace details {
                             -1,-1,-1,-1,
                             14,15,
                             -1,-1)));
-            _mm_storeu_si128((__m128i*) carries.x,
+            _mm_storeu_si128(carries.v + 1,
                     _mm_shuffle_epi8(src.data[1],
                         _mm_setr_epi8(
                             -1,-1,
@@ -1052,7 +1205,7 @@ namespace details {
                             -1,-1,-1,-1,-1,-1
                             )));
 #endif
-            return carries;
+            return carries.e;
         }
 
 
