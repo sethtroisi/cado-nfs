@@ -950,12 +950,13 @@ namespace details {
         /* We grok only values for w_i which are integer immediates
          * within {-1} \cup {0..15}
          */
-#define shuffle_16bit_words(in,	        		        	\
+#define shuffle_16bit_words(out, in,        		        	\
             w0, w1, w2, w3,						\
             w4, w5, w6, w7,						\
             w8, w9, wa, wb,						\
             wc, wd, we, wf)						\
-        _mm256_xor_si256(					        \
+    do {                                                                \
+        *out = _mm256_xor_si256(				        \
             _mm256_shuffle_epi8(					\
             in,								\
             _mm256_setr_epi8( 						\
@@ -1027,7 +1028,86 @@ namespace details {
                 (we < 0) ? -1 : ((we < 8)  ? 2*(we&7) + 1 : -1),	\
                 (wf < 0) ? -1 : ((wf < 8)  ? 2*(wf&7) + 0 : -1),	\
                 (wf < 0) ? -1 : ((wf < 8)  ? 2*(wf&7) + 1 : -1)))	\
-        )
+        );                                                              \
+    } while (0)
+#else
+#define shuffle_16bit_words(out, lo, hi,       		        	\
+            w0, w1, w2, w3,						\
+            w4, w5, w6, w7,						\
+            w8, w9, wa, wb,						\
+            wc, wd, we, wf)						\
+    do {                                                                \
+        out[0] = _mm_xor_si128(			        	        \
+            _mm_shuffle_epi8(lo, _mm_setr_epi8( 			\
+                (w0 < 0) ? -1 : ((w0 < 8)  ? 2*(w0&7) + 0 : -1),	\
+                (w0 < 0) ? -1 : ((w0 < 8)  ? 2*(w0&7) + 1 : -1),	\
+                (w1 < 0) ? -1 : ((w1 < 8)  ? 2*(w1&7) + 0 : -1),	\
+                (w1 < 0) ? -1 : ((w1 < 8)  ? 2*(w1&7) + 1 : -1),	\
+                (w2 < 0) ? -1 : ((w2 < 8)  ? 2*(w2&7) + 0 : -1),	\
+                (w2 < 0) ? -1 : ((w2 < 8)  ? 2*(w2&7) + 1 : -1),	\
+                (w3 < 0) ? -1 : ((w3 < 8)  ? 2*(w3&7) + 0 : -1),	\
+                (w3 < 0) ? -1 : ((w3 < 8)  ? 2*(w3&7) + 1 : -1),	\
+                (w4 < 0) ? -1 : ((w4 < 8)  ? 2*(w4&7) + 0 : -1),	\
+                (w4 < 0) ? -1 : ((w4 < 8)  ? 2*(w4&7) + 1 : -1),	\
+                (w5 < 0) ? -1 : ((w5 < 8)  ? 2*(w5&7) + 0 : -1),	\
+                (w5 < 0) ? -1 : ((w5 < 8)  ? 2*(w5&7) + 1 : -1),	\
+                (w6 < 0) ? -1 : ((w6 < 8)  ? 2*(w6&7) + 0 : -1),	\
+                (w6 < 0) ? -1 : ((w6 < 8)  ? 2*(w6&7) + 1 : -1),	\
+                (w7 < 0) ? -1 : ((w7 < 8)  ? 2*(w7&7) + 0 : -1),	\
+                (w7 < 0) ? -1 : ((w7 < 8)  ? 2*(w7&7) + 1 : -1))),	\
+            _mm_shuffle_epi8(hi, _mm_setr_epi8( 			\
+                (w0 < 0) ? -1 : ((w0 >= 8) ? 2*(w0&7) + 0 : -1),	\
+                (w0 < 0) ? -1 : ((w0 >= 8) ? 2*(w0&7) + 1 : -1),	\
+                (w1 < 0) ? -1 : ((w1 >= 8) ? 2*(w1&7) + 0 : -1),	\
+                (w1 < 0) ? -1 : ((w1 >= 8) ? 2*(w1&7) + 1 : -1),	\
+                (w2 < 0) ? -1 : ((w2 >= 8) ? 2*(w2&7) + 0 : -1),	\
+                (w2 < 0) ? -1 : ((w2 >= 8) ? 2*(w2&7) + 1 : -1),	\
+                (w3 < 0) ? -1 : ((w3 >= 8) ? 2*(w3&7) + 0 : -1),	\
+                (w3 < 0) ? -1 : ((w3 >= 8) ? 2*(w3&7) + 1 : -1),	\
+                (w4 < 0) ? -1 : ((w4 >= 8) ? 2*(w4&7) + 0 : -1),	\
+                (w4 < 0) ? -1 : ((w4 >= 8) ? 2*(w4&7) + 1 : -1),	\
+                (w5 < 0) ? -1 : ((w5 >= 8) ? 2*(w5&7) + 0 : -1),	\
+                (w5 < 0) ? -1 : ((w5 >= 8) ? 2*(w5&7) + 1 : -1),	\
+                (w6 < 0) ? -1 : ((w6 >= 8) ? 2*(w6&7) + 0 : -1),	\
+                (w6 < 0) ? -1 : ((w6 >= 8) ? 2*(w6&7) + 1 : -1),	\
+                (w7 < 0) ? -1 : ((w7 >= 8) ? 2*(w7&7) + 0 : -1),	\
+                (w7 < 0) ? -1 : ((w7 >= 8) ? 2*(w7&7) + 1 : -1))));	\
+        out[1] = _mm_xor_si128(			        	        \
+            _mm_shuffle_epi8(lo, _mm_setr_epi8( 			\
+                (w8 < 0) ? -1 : ((w8 < 8)  ? 2*(w8&7) + 0 : -1),	\
+                (w8 < 0) ? -1 : ((w8 < 8)  ? 2*(w8&7) + 1 : -1),	\
+                (w9 < 0) ? -1 : ((w9 < 8)  ? 2*(w9&7) + 0 : -1),	\
+                (w9 < 0) ? -1 : ((w9 < 8)  ? 2*(w9&7) + 1 : -1),	\
+                (wa < 0) ? -1 : ((wa < 8)  ? 2*(wa&7) + 0 : -1),	\
+                (wa < 0) ? -1 : ((wa < 8)  ? 2*(wa&7) + 1 : -1),	\
+                (wb < 0) ? -1 : ((wb < 8)  ? 2*(wb&7) + 0 : -1),	\
+                (wb < 0) ? -1 : ((wb < 8)  ? 2*(wb&7) + 1 : -1),	\
+                (wc < 0) ? -1 : ((wc < 8)  ? 2*(wc&7) + 0 : -1),	\
+                (wc < 0) ? -1 : ((wc < 8)  ? 2*(wc&7) + 1 : -1),	\
+                (wd < 0) ? -1 : ((wd < 8)  ? 2*(wd&7) + 0 : -1),	\
+                (wd < 0) ? -1 : ((wd < 8)  ? 2*(wd&7) + 1 : -1),	\
+                (we < 0) ? -1 : ((we < 8)  ? 2*(we&7) + 0 : -1),	\
+                (we < 0) ? -1 : ((we < 8)  ? 2*(we&7) + 1 : -1),	\
+                (wf < 0) ? -1 : ((wf < 8)  ? 2*(wf&7) + 0 : -1),	\
+                (wf < 0) ? -1 : ((wf < 8)  ? 2*(wf&7) + 1 : -1))),	\
+            _mm_shuffle_epi8(hi, _mm_setr_epi8(                         \
+                (w8 < 0) ? -1 : ((w8 >= 8) ? 2*(w8&7) + 0 : -1),	\
+                (w8 < 0) ? -1 : ((w8 >= 8) ? 2*(w8&7) + 1 : -1),	\
+                (w9 < 0) ? -1 : ((w9 >= 8) ? 2*(w9&7) + 0 : -1),	\
+                (w9 < 0) ? -1 : ((w9 >= 8) ? 2*(w9&7) + 1 : -1),	\
+                (wa < 0) ? -1 : ((wa >= 8) ? 2*(wa&7) + 0 : -1),	\
+                (wa < 0) ? -1 : ((wa >= 8) ? 2*(wa&7) + 1 : -1),	\
+                (wb < 0) ? -1 : ((wb >= 8) ? 2*(wb&7) + 0 : -1),	\
+                (wb < 0) ? -1 : ((wb >= 8) ? 2*(wb&7) + 1 : -1),	\
+                (wc < 0) ? -1 : ((wc >= 8) ? 2*(wc&7) + 0 : -1),	\
+                (wc < 0) ? -1 : ((wc >= 8) ? 2*(wc&7) + 1 : -1),	\
+                (wd < 0) ? -1 : ((wd >= 8) ? 2*(wd&7) + 0 : -1),	\
+                (wd < 0) ? -1 : ((wd >= 8) ? 2*(wd&7) + 1 : -1),	\
+                (we < 0) ? -1 : ((we >= 8) ? 2*(we&7) + 0 : -1),	\
+                (we < 0) ? -1 : ((we >= 8) ? 2*(we&7) + 1 : -1),	\
+                (wf < 0) ? -1 : ((wf >= 8) ? 2*(wf&7) + 0 : -1),	\
+                (wf < 0) ? -1 : ((wf >= 8) ? 2*(wf&7) + 1 : -1))));	\
+    } while (0)
 #endif
 
         /* case of 192 bits within 256 bits. Three 64-bit words
@@ -1093,26 +1173,17 @@ namespace details {
                             -1,-1,-1,-1,-1,-1,-1,-1)));
 #endif
             __m256i in = _mm256_loadu_si256((__m256i*) a.x);
-            dst.data[0] = shuffle_16bit_words(in,
+            shuffle_16bit_words(dst.data, in,
                     0,1,2,-1, 3,4,5,-1, 6,7,8,-1, 9,10,11,-1);
 #else   /* SSSE3 !! */
-            ASSERT_ALWAYS(0);   // untested.
             __m128i lo = _mm_loadu_si128((__m128i*) a.x);
             __m128i hi = _mm_loadu_si128((__m128i*) (a.x + 2));
+            shuffle_16bit_words(dst.data, lo, hi,
+                    0,1,2,-1, 3,4,5,-1, 6,7,8,-1, 9,10,11,-1);
             /* note that 16bit-wide shuffles use an 8-bit immediate,
              * but do not offer the option to selectively insert
              * zeroes. So we're probably better off shuffling bytes.
              */
-            dst.data[0] = _mm_shuffle_epi8(lo, _mm_setr_epi8( 
-                        0,1,2,3,4,5,-1,-1,
-                        6,7,8,9,10,11,-1,-1));
-            dst.data[1] = _mm_xor_si128(
-                    _mm_shuffle_epi8(lo, _mm_setr_epi8( 
-                            12,13,14,15,-1,-1,-1,-1,
-                            -1,-1,-1,-1, -1,-1,-1,-1)),
-                    _mm_shuffle_epi8(hi, _mm_setr_epi8( 
-                            -1,-1,-1,-1, 0, 1,-1,-1,
-                            2, 3, 4, 5, 6, 7, -1, -1)));
 #endif
         }
 
@@ -1128,29 +1199,11 @@ namespace details {
                 station() {};
             } main;
 #ifdef  HAVE_AVX2
-            _mm256_storeu_si256(main.v,
-                    shuffle_16bit_words(src.data[0],
-                            0,1,2, 4,5,6, 8,9,10, 12,13,14, -1,-1,-1,-1));
+            shuffle_16bit_words(main.v, src.data[0],
+                    0,1,2, 4,5,6, 8,9,10, 12,13,14, -1,-1,-1,-1);
 #else
-            ASSERT_ALWAYS(0);   // untested.
-            _mm_storeu_si128(main.v,
-                    _mm_xor_si128(
-                        _mm_shuffle_epi8(src.data[0],
-                            _mm_setr_epi8(
-                                0,1,2,3,4,5,
-                                8,9,10,11,12,13,
-                                -1,-1,-1,-1)),
-                        _mm_shuffle_epi8(src.data[1],
-                            _mm_setr_epi8(
-                                -1,-1,-1,-1,-1,-1,
-                                -1,-1,-1,-1,-1,-1,
-                                0,1,2,3))));
-            _mm_storeu_si128(main.v + 1,
-                    _mm_shuffle_epi8(src.data[1],
-                        _mm_setr_epi8(
-                            4,5,
-                            8,9,10,11,12,13,
-                            -1,-1,-1,-1,-1,-1,-1,-1)));
+            shuffle_16bit_words(main.v, src.data[0], src.data[1],
+                    0,1,2, 4,5,6, 8,9,10, 12,13,14, -1,-1,-1,-1);
 #endif
             return main.e;
         }
@@ -1170,41 +1223,35 @@ namespace details {
              * full unreduced element size.
              */
 #ifdef  HAVE_AVX2
-            _mm256_storeu_si256(carries.v,
-                    shuffle_16bit_words(src.data[0],
-                            -1,-1,-1,3,
-                            -1,-1,7,-1,
-                            -1,11,-1,-1,
-                            15,-1,-1,-1));
+            shuffle_16bit_words(carries.v, src.data[0],
+                    -1,-1,-1,3,
+                    -1,-1,7,-1,
+                    -1,11,-1,-1,
+                    15,-1,-1,-1);
             __m256i zero = _mm256_setzero_si256();
-            _mm256_storeu_si256(ncarries.v,
-                shuffle_16bit_words(
-                _mm256_sub_epi16(zero, _mm256_cmpgt_epi16(zero, carries.v[0])),
-                            -1,-1,-1,-1,
-                            3,-1,-1,6,
-                            -1,-1,9,-1,
-                            -1,12,-1,-1));
-            super::sub_ur(carries.e, ncarries.e);
+            shuffle_16bit_words(ncarries.v,
+                    _mm256_sub_epi16(zero,
+                        _mm256_cmpgt_epi16(zero, carries.v[0])),
+                    -1,-1,-1,-1,
+                    3,-1,-1,6,
+                    -1,-1,9,-1,
+                    -1,12,-1,-1);
 #else
-            ASSERT_ALWAYS(0);   // untested.
-            _mm_storeu_si128(carries.v,
-                    _mm_shuffle_epi8(src.data[0],
-                        _mm_setr_epi8(
-                            -1,-1,-1,-1,-1,-1,
-                            6,7,
-                            -1,-1,-1,-1,
-                            14,15,
-                            -1,-1)));
-            _mm_storeu_si128(carries.v + 1,
-                    _mm_shuffle_epi8(src.data[1],
-                        _mm_setr_epi8(
-                            -1,-1,
-                            6,7,
-                            -1,-1,-1,-1,
-                            14,15,
-                            -1,-1,-1,-1,-1,-1
-                            )));
+            shuffle_16bit_words(carries.v, src.data[0], src.data[1],
+                    -1,-1,-1,3,
+                    -1,-1,7,-1,
+                    -1,11,-1,-1,
+                    15,-1,-1,-1);
+            __m128i zero = _mm_setzero_si128();
+            shuffle_16bit_words(ncarries.v,
+                    _mm_sub_epi16(zero, _mm_cmpgt_epi16(zero, carries.v[0])),
+                    _mm_sub_epi16(zero, _mm_cmpgt_epi16(zero, carries.v[1])),
+                    -1,-1,-1,-1,
+                    3,-1,-1,6,
+                    -1,-1,9,-1,
+                    -1,12,-1,-1);
 #endif
+            super::sub_ur(carries.e, ncarries.e);
             return carries.e;
         }
 
