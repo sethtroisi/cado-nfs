@@ -23,10 +23,15 @@ void mmt_vec_set_0n(mmt_vec_ptr v, size_t items)
      * to set to the integer i, when in fact we're talking a simd
      * thing: IOW, we have set_ui_at, but no set_ui. So let's do a
      * dirty cast */
-    ASSERT_ALWAYS((size_t) v->abase->vec_elt_stride(v->abase, 1) <= sizeof(uint64_t));
+    // ASSERT_ALWAYS((size_t) v->abase->vec_elt_stride(v->abase, 1) <= sizeof(uint64_t));
+    ASSERT_ALWAYS(v->abase->vec_elt_stride(v->abase, 1) %  sizeof(uint64_t) == 0);
+    // size_t nwords = (size_t) v->abase->vec_elt_stride(v->abase, 1) / sizeof(uint64_t);
     size_t off = mmt_my_own_offset_in_items(v);
     size_t sz = mmt_my_own_size_in_items(v);
     void * data = mmt_my_own_subvec(v);
+    /* Put 0's everywhere, and put i at other places (just with a dirty
+     * cast) */
+    memset(mmt_my_own_subvec(v), 0, v->abase->vec_elt_stride(v->abase, mmt_my_own_size_in_items(v)));
     for(size_t s = 0 ; s < sz ; s++) {
         uint64_t * ptr = v->abase->vec_coeff_ptr(v->abase, data, s);
         *ptr = (v->i0 + off + s < items) ? v->i0 + off + s : 0;
@@ -42,13 +47,19 @@ void mmt_vec_check_equal_0n(mmt_vec_ptr v, size_t items)
 {
     serialize(v->pi->m);
     ASSERT_ALWAYS(v->consistency == 2);
-    ASSERT_ALWAYS((size_t) v->abase->vec_elt_stride(v->abase, 1) <= sizeof(uint64_t));
+    // ASSERT_ALWAYS((size_t) v->abase->vec_elt_stride(v->abase, 1) <= sizeof(uint64_t));
+    ASSERT_ALWAYS(v->abase->vec_elt_stride(v->abase, 1) %  sizeof(uint64_t) == 0);
+    size_t nwords = (size_t) v->abase->vec_elt_stride(v->abase, 1) / sizeof(uint64_t);
     size_t off = mmt_my_own_offset_in_items(v);
     size_t sz = mmt_my_own_size_in_items(v);
     void * data = mmt_my_own_subvec(v);
     for(size_t s = 0 ; s < sz ; s++) {
         uint64_t * ptr = v->abase->vec_coeff_ptr(v->abase, data, s);
         ASSERT_ALWAYS(*ptr == (v->i0 + off + s < items ? v->i0 + off + s : 0));
+        /* check that we have zeroes elsewhere */
+        for(size_t i = 1 ; i < nwords ; i++) {
+            ASSERT_ALWAYS(ptr[i] == 0);
+        }
     }
 }
 
@@ -57,13 +68,19 @@ void mmt_vec_check_equal_0n_permuted(mmt_vec_ptr v, size_t items, uint32_t * p)
 {
     serialize(v->pi->m);
     ASSERT_ALWAYS(v->consistency == 2);
-    ASSERT_ALWAYS((size_t) v->abase->vec_elt_stride(v->abase, 1) <= sizeof(uint64_t));
+    // ASSERT_ALWAYS((size_t) v->abase->vec_elt_stride(v->abase, 1) <= sizeof(uint64_t));
+    ASSERT_ALWAYS(v->abase->vec_elt_stride(v->abase, 1) %  sizeof(uint64_t) == 0);
+    size_t nwords = (size_t) v->abase->vec_elt_stride(v->abase, 1) / sizeof(uint64_t);
     size_t off = mmt_my_own_offset_in_items(v);
     size_t sz = mmt_my_own_size_in_items(v);
     void * data = mmt_my_own_subvec(v);
     for(size_t s = 0 ; s < sz ; s++) {
         uint64_t * ptr = v->abase->vec_coeff_ptr(v->abase, data, s);
         ASSERT_ALWAYS(*ptr == (v->i0 + off + s < items ? p[v->i0 + off + s] : 0));
+        /* check that we have zeroes elsewhere */
+        for(size_t i = 1 ; i < nwords ; i++) {
+            ASSERT_ALWAYS(ptr[i] == 0);
+        }
     }
 }
 
@@ -71,7 +88,9 @@ void mmt_vec_check_equal_0n_permuted(mmt_vec_ptr v, size_t items, uint32_t * p)
 void mmt_vec_check_equal_0n_inv_permuted(mmt_vec_ptr v, size_t items, uint32_t * p)
 {
     serialize(v->pi->m);
-    ASSERT_ALWAYS((size_t) v->abase->vec_elt_stride(v->abase, 1) <= sizeof(uint64_t));
+    // ASSERT_ALWAYS((size_t) v->abase->vec_elt_stride(v->abase, 1) <= sizeof(uint64_t));
+    ASSERT_ALWAYS(v->abase->vec_elt_stride(v->abase, 1) %  sizeof(uint64_t) == 0);
+    size_t nwords = (size_t) v->abase->vec_elt_stride(v->abase, 1) / sizeof(uint64_t);
     size_t off = mmt_my_own_offset_in_items(v);
     size_t sz = mmt_my_own_size_in_items(v);
     void * data = mmt_my_own_subvec(v);
@@ -82,6 +101,10 @@ void mmt_vec_check_equal_0n_inv_permuted(mmt_vec_ptr v, size_t items, uint32_t *
         } else {
             ASSERT_ALWAYS(*ptr < items);
             ASSERT_ALWAYS(p[*ptr] == v->i0 + off + s);
+        }
+        /* check that we have zeroes elsewhere */
+        for(size_t i = 1 ; i < nwords ; i++) {
+            ASSERT_ALWAYS(ptr[i] == 0);
         }
     }
     serialize_threads(v->pi->wr[v->d]);

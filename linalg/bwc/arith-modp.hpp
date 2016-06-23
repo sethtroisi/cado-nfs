@@ -957,7 +957,7 @@ namespace details {
              */
 #ifdef  HAVE_AVX2
             dst.data[0] = _mm256_shuffle_epi8(
-                    _mm256_loadu_si256((__m128i*) a.x),
+                    _mm256_loadu_si256((__m256i*) a.x),
                     _mm256_setr_epi8( 
                         0,1,2,3,4,5,-1,-1,
                         6,7,8,9,10,11,-1,-1,
