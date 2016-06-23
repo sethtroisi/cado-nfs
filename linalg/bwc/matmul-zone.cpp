@@ -25,6 +25,7 @@
 
 typedef arith_modp::gfp<sizeof(abelt)/sizeof(unsigned long)> gfp;
 typedef arith_modp::fast_type<gfp> fast_gfp;
+// typedef gfp fast_gfp;
 typedef fast_gfp::elt fast_elt;
 typedef fast_gfp::elt_ur fast_elt_ur;
 
@@ -422,8 +423,7 @@ struct matmul_zone_data {/*{{{*/
 
     vector<block_of_rows> blocks;
 
-    vector<fast_elt, aligned_allocator<fast_elt, fast_elt::alignment> > alternate_src;
-    vector<fast_elt, aligned_allocator<fast_elt, fast_elt::alignment> > alternate_dst;
+    vector<fast_elt, aligned_allocator<fast_elt, fast_elt::alignment> > alternate[2];
 
 #ifdef DISPATCHERS_AND_COMBINERS
     size_t maxmaxw = 0;
@@ -920,19 +920,20 @@ void matmul_zone_data::mul(void * xdst, void const * xsrc, int d)
         src = (const fast_elt *) xsrc;
         dst = (fast_elt *) xdst;
     } else {
-        if (alternate_src.empty()) alternate_src.assign(nsrc, fast_elt());
-        if (alternate_dst.empty()) alternate_dst.assign(ndst, fast_elt());
-        ASSERT_ALWAYS(alternate_src.size() == nsrc);
-        ASSERT_ALWAYS(alternate_dst.size() == ndst);
+        for(int j = 0 ; j < 2 ; j++) {
+            if (alternate[j].empty())
+                alternate[j].assign(mm->public_->dim[j], fast_elt());
+            ASSERT_ALWAYS(alternate[j].size() == mm->public_->dim[j]);
+        }
         /* we read items in xsrc exactly as they are, which is gfp::elt's.
          * And because those are convertible to fast_gfp::elt's, we'll
          * get our vector.
          */
         const gfp::elt * begin = (const gfp::elt *) xsrc;
         const gfp::elt * end = begin + nsrc;
-        alternate_src.assign(begin, end);
-        src = &alternate_src.front();
-        dst = &alternate_dst.front();
+        alternate[d].assign(begin, end);
+        src = &alternate[d].front();
+        dst = &alternate[!d].front();
     }
 
 
@@ -1081,8 +1082,8 @@ void matmul_zone_data::mul(void * xdst, void const * xsrc, int d)
     }
 
     if (!arith_modp::details::is_same<gfp::elt, fast_elt>::value) {
-        std::copy(alternate_dst.begin(),
-                alternate_dst.end(),
+        std::copy(alternate[!d].begin(),
+                alternate[!d].end(),
                 (gfp::elt *) xdst);
     }
 

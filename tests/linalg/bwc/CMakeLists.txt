@@ -262,7 +262,7 @@ target_link_libraries(short_matmul bwc_base)
 
 set(test-spmv-binary-u64k1_alltests YES)
 set(test-spmv-binary-u64k4_alltests YES)
-set(test-spmv-prime-p_4_alltests YES)
+set(test-spmv-prime-p_3_alltests YES)
 
 macro(create_test_spmv test_spmv_base)
 cado_define_test(
