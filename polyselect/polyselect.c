@@ -154,77 +154,6 @@ estimate_weibull_moments (double *beta, double *eta, data_t s)
   *eta = m * (1.0 + y * (0.57721566490153 - 0.655878071520 * y));
 }
 
-/* compute the 1st and 2nd derivatives of log(L) wrt beta and eta:
-
-   diff(log(L),beta) = n/beta + sum(log(x_i/eta), i)
-                     - sum((x_i/eta)^beta*log(x_i/eta), i)
-
-   diff(log(L),eta) = -n*beta/eta + beta/eta*sum((x_i/eta)^beta, i)
-
-   diff(log(L),beta,2) = -n/beta^2
-                       - sum((x_i/eta)^beta*log(x_i/eta)^2, i)
-
-   diff(log(L),eta,2) = n*beta/eta^2 - beta/eta^2*sum((x_i/eta)^beta, i)
-                      - beta^2/eta^2*sum((x_i/eta)^beta, i)
-*/
-static void
-estimate_weibull_mle_aux (double *dbeta, double *deta,
-                          double *d2beta, double *d2eta,
-                          data_t s, double beta, double eta)
-{
-  unsigned long i, n = s->size;
-
-  *dbeta = (double) n / beta;
-  *deta = - (double) n;
-  *d2beta = - (double) n / (beta * beta);
-  *d2eta = (double) n;
-  for (i = 0; i < n; i++)
-    {
-      double u = s->x[i] / eta;
-      double l = log (u);
-      double v = pow (u, beta);
-      *dbeta += l * (1.0 - v);
-      *deta += v;
-      *d2beta -= v * l * l;
-      *d2eta -= v * (1.0 + beta);
-    }
-  *deta *= beta / eta;
-  *d2eta *= beta / (eta * eta);
-}
-
-/* same as above, using the MLE (Maximum Likelihood Estimation) method,
-   which consists in maximizing the value of
-   L = (beta/eta)^n * product((x_i/eta)^(beta-1)*exp(-(x_i/eta)^beta), i)
-
-   log(L) = n*log(beta/eta) + (beta-1)*sum(log(x_i/eta),i)
-          - sum((x_i/eta)^beta, i)
-*/
-static void
-estimate_weibull_mle (double *beta, double *eta, data_t s)
-{
-  double dbeta, deta, d2beta, d2eta;
-
-  /* first start from initial values computed using the method of moments */
-  if (s->beta <= 0.0 || isnan (s->beta)
-      || s->eta <= 0.0 || isnan (s->eta))
-    estimate_weibull_moments (beta, eta, s);
-  else
-    {
-      *beta = s->beta;
-      *eta = s->eta;
-    }
-
-  estimate_weibull_mle_aux (&dbeta, &deta, &d2beta, &d2eta, s, *beta, *eta);
-
-  /* use tangent's method: assume diff(L,beta+x) = dbeta + x*d2beta */
-  *beta -= dbeta / d2beta;
-  *eta -= deta / d2eta;
-
-  /* store current values */
-  s->beta = *beta;
-  s->eta = *eta;
-}
-
 /* print poly info */
 void
 print_poly_info ( char *buf,
@@ -270,8 +199,7 @@ print_poly_info ( char *buf,
     {
       double beta, eta, prob;
 
-      // estimate_weibull_moments (&beta, &eta, data_exp_E);
-      estimate_weibull_mle (&beta, &eta, data_exp_E);
+      estimate_weibull_moments (&beta, &eta, data_exp_E);
       prob = 1.0 - exp (- pow (target_E / eta, beta));
       sprintf (buf + strlen(buf), "# target_E=%.2f: collisions=%.2e, time=%.2e"
                " (beta=%.2f,eta=%.2f)\n",
