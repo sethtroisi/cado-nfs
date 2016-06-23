@@ -49,8 +49,14 @@ typedef fast_gfp::elt_ur fast_elt_ur;
 
 using namespace std;
 
-
 /* Config block */
+
+/* The implementation of the "dispatchers and combiners" here is rotten.
+ * I mean to delete it at some point. Maybe replace it with something
+ * better. The point is that the current code does not do what it should
+ * do, namely write in several buckets simultaneously. So in essence,
+ * it's just wasted energy.
+ */
 #define xxxDISPATCHERS_AND_COMBINERS
 
 /* Size of the row blocks. This impacts both the immediate blocks, and
@@ -296,7 +302,8 @@ struct zone : public placed_block { /* {{{ (immediate zones) */
     zone(unsigned int i0, unsigned int j0) : placed_block(i0, j0) {}
     inline bool empty() const { return qp.empty() && qm.empty() && qg.empty(); }
     inline size_t size() const { return qp.size() + qm.size() + qg.size(); }
-    void operator()(fast_elt_ur *, const fast_elt *, gfp::elt const&, gfp::preinv const&) const;
+    void mul(fast_elt_ur *, const fast_elt *, gfp::elt const&, gfp::preinv const&) const;
+    void tmul(fast_elt_ur *, const fast_elt *, gfp::elt const&, gfp::preinv const&) const;
 
     struct sort_qpm {
         inline bool operator()(qpm_t::value_type const& a, qpm_t::value_type const& b) const {
@@ -836,7 +843,7 @@ void __attribute__((noinline)) gfp3_dispatch_sub (void * tdst, const void * tsrc
 }
 #endif
 
-void zone::operator()(fast_elt_ur * tdst, const fast_elt * tsrc,
+void zone::mul(fast_elt_ur * tdst, const fast_elt * tsrc,
         gfp::elt const& prime, gfp::preinv const& preinverse) const
 {
 #if 1
@@ -856,6 +863,30 @@ void zone::operator()(fast_elt_ur * tdst, const fast_elt * tsrc,
             fast_gfp::addmul_ui(tdst[i], tsrc[j], c, prime, preinverse);
         } else {
             fast_gfp::submul_ui(tdst[i], tsrc[j], -c, prime, preinverse);
+        }
+    }
+}
+
+void zone::tmul(fast_elt_ur * tdst, const fast_elt * tsrc,
+        gfp::elt const& prime, gfp::preinv const& preinverse) const
+{
+#if 1
+    for(auto const& ij : qp) 
+        fast_gfp::add(tdst[ij.second], tsrc[ij.first]);
+    for(auto const& ij : qm) 
+        fast_gfp::sub(tdst[ij.second], tsrc[ij.first]);
+#else
+    gfp3_dispatch_add((void*)tdst, (const void*)tsrc, (const void*)(&*qp.begin()), qp.size());
+    gfp3_dispatch_sub((void*)tdst, (const void*)tsrc, (const void*)(&*qm.begin()), qm.size());
+#endif
+    for(auto const& ijc : qg) {
+        uint16_t i = ijc.first;
+        uint16_t j = ijc.second.first;
+        int32_t c = ijc.second.second;
+        if (c>0) {
+            fast_gfp::addmul_ui(tdst[j], tsrc[i], c, prime, preinverse);
+        } else {
+            fast_gfp::submul_ui(tdst[j], tsrc[i], -c, prime, preinverse);
         }
     }
 }
@@ -943,7 +974,6 @@ void matmul_zone_data::mul(void * xdst, void const * xsrc, int d)
 
     /* TODO: missing in mpfq elt_ur_{add,sub}_elt */
     if (d == !mm->public_->store_transposed) {
-
 #ifdef DISPATCHERS_AND_COMBINERS
         /* Doubling rowbatch is because we do a nasty trick with the
          * indices for the negative coefficients. Oddly enough, we don't
@@ -983,7 +1013,7 @@ void matmul_zone_data::mul(void * xdst, void const * xsrc, int d)
 
             /* process immediate zones */
             for(auto const & z : B.Z) {
-                z(tdst, src + z.j0, prime, preinverse);
+                z.mul(tdst, src + z.j0, prime, preinverse);
             }
 
 #ifdef DISPATCHERS_AND_COMBINERS
@@ -1021,60 +1051,27 @@ void matmul_zone_data::mul(void * xdst, void const * xsrc, int d)
         ASM_COMMENT("end of critical loop");
         delete[] tdst;
     } else {
-#if 0
-        abvec_ur tdst;
-        abvec_ur_init(x, &tdst, mm->public_->dim[!d]);
-        abelt_ur tmp;
-        abelt_ur_init(x, &tmp);
-        if (mm->public_->iteration[d] == 10) {
-            fprintf(stderr, "Warning: Doing many iterations with transposed code\n");
-        }
-        abvec_set_zero(x, dst, mm->public_->dim[!d]);
-        abvec_ur_set_zero(x, tdst, mm->public_->dim[!d]);
-        ASM_COMMENT("critical loop (transposed mult)");
-        uint32_t * q;
-        q = &(qp[0]);
-        for(unsigned int i = 0 ; i < mm->public_->dim[d] ; i++) {
-            uint32_t len = *q++;
-            abelt_ur_set_elt(x, tmp, abvec_coeff_ptr_const(x, src, i));
-            for(unsigned int j = 0 ; len-- ; ) {
-                j = *q++;
-                ASSERT(j < mm->public_->dim[!d]);
-                abdst_elt_ur yj = abvec_ur_coeff_ptr(x, tdst, j);
-                abelt_ur_add(x, yj, yj, tmp);
-            }
-        }
-        q = &(qm[0]);
-        for(unsigned int i = 0 ; i < mm->public_->dim[d] ; i++) {
-            uint32_t len = *q++;
-            abelt_ur_set_elt(x, tmp, abvec_coeff_ptr_const(x, src, i));
-            for(unsigned int j = 0 ; len-- ; ) {
-                j = *q++;
-                ASSERT(j < mm->public_->dim[!d]);
-                abdst_elt_ur yj = abvec_ur_coeff_ptr(x, tdst, j);
-                abelt_ur_sub(x, yj, yj, tmp);
-            }
-        }
-        q = &(qq[0]);
-        for(unsigned int i = 0 ; i < mm->public_->dim[d] ; i++) {
-            uint32_t len = *q++ / 2;
-            if (!len) continue;
-            abelt_ur_set_elt(x, tmp, abvec_coeff_ptr_const(x, src, i));
-            for(unsigned int j = 0 ; len-- ; ) {
-                j = *q++;
-                int32_t c = *(int32_t*)q++;
-                ASSERT(j < mm->public_->dim[!d]);
-                abdst_elt_ur yj = abvec_ur_coeff_ptr(x, tdst, j);
-                abaddmul_si_ur(x, yj, tmp, c);
-            }
-        }
-        for(unsigned int j = 0 ; j < mm->public_->dim[!d] ; j++) {
-            abreduce(x, abvec_coeff_ptr(x, dst, j), abvec_ur_coeff_ptr(x, tdst, j));
-        }
-        ASM_COMMENT("end of critical loop (transposed mult)");
-        abelt_ur_clear(x, &tmp);
-        abvec_ur_clear(x, &tdst, mm->public_->dim[!d]);
+#ifdef DISPATCHERS_AND_COMBINERS
+        fprintf(stderr, "transposed product not yet implemented for the dispatch-combine trick");
+        ASSERT_ALWAYS(0);
 #endif
+        fast_elt_ur * tdst = new fast_elt_ur[mm->public_->dim[!d]];
+        fast_elt_ur::zero(tdst, mm->public_->dim[!d]);
+
+        ASM_COMMENT("critical loop");
+
+        for(auto const& B : blocks) {
+            /* process immediate zones */
+            for(auto const & z : B.Z) {
+                z.tmul(tdst + z.j0, src + B.i0, prime, preinverse);
+            }
+        }
+        for(size_t j = 0 ; j < mm->public_->dim[!d] ; j++) {
+            fast_gfp::reduce(dst[j], tdst[j], prime, preinverse);
+        }
+
+        ASM_COMMENT("end of critical loop");
+        delete[] tdst;
     }
 
     ASM_COMMENT("end of multiplication code");
