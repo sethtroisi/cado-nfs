@@ -4030,7 +4030,6 @@ class LinAlgDLPTask(Task):
                                  matrix=matrix,  wdir=wdir,
                                  rhs=smfile,
                                  prime=self.params["ell"],
-                                 mm_impl="basicp",
                                  nullspace="right",
                                  stdout=str(stdoutpath),
                                  stderr=str(stderrpath),

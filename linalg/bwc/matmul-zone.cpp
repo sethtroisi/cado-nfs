@@ -730,11 +730,8 @@ void matmul_zone_data::build_cache(uint32_t * data)/*{{{*/
                 n_immediate++;
             }
         }
-        fprintf(stderr, "block at position %u: %zu immediate blocks\n",
-                B.i0, B.Z.size());
         blocks.push_back(std::move(B));
     }
-    fprintf(stderr, "%zu blocks in total\n", blocks.size());
     ASSERT_ALWAYS(ptr - data == (ptrdiff_t) (nrows_t + 2 * mm->public_->ncoeffs));
 #ifdef DISPATCHERS_AND_COMBINERS
     /* We now merge dispatchers */
