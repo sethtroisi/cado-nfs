@@ -265,8 +265,8 @@ template<typename T> cachefile& operator<<(cachefile & c, vector<T> const &v)
     c << v.size();
     return cachefile::seq<T>().out(c, &(v[0]), v.size());
 }
-// template<typename T> inline cachefile& operator>>(cachefile& c, T& z) { return z.cachefile_load(c); }
-// template<typename T> inline cachefile& operator<<(cachefile& c, T const & z) { return z.cachefile_save(c); }
+template<typename T> inline cachefile& operator>>(cachefile& c, T& z) { return z.cachefile_load(c); }
+template<typename T> inline cachefile& operator<<(cachefile& c, T const & z) { return z.cachefile_save(c); }
 /* }}} */
 
 struct placed_block {/*{{{*/
@@ -283,6 +283,10 @@ struct placed_block {/*{{{*/
             return a.j0 < b.j0 || (a.j0 == b.j0 && a.i0 < b.i0);
         }
     };/*}}}*/
+    /* NOTE that the cachefile_load and _save functions below *must* be
+     * overloaded in children classes, otherwise we'll end up saving only
+     * *OUR* data, that's it.
+     */
     cachefile& cachefile_load(cachefile& c) {/*{{{*/
         return c >> i0 >> j0;
     }/*}}}*/
@@ -290,8 +294,6 @@ struct placed_block {/*{{{*/
         return c << i0 << j0;
     }/*}}}*/
 };
-inline cachefile& operator>>(cachefile& c, placed_block& z) { return z.cachefile_load(c); }
-inline cachefile& operator<<(cachefile& c, placed_block const & z) { return z.cachefile_save(c); }
 /*}}}*/
 
 struct zone : public placed_block { /* {{{ (immediate zones) */
@@ -330,8 +332,6 @@ struct zone : public placed_block { /* {{{ (immediate zones) */
         return c << (placed_block const&) *this << qp << qm << qg;
     }/*}}}*/
 };
-inline cachefile& operator>>(cachefile& c, zone& z) { return z.cachefile_load(c); }
-inline cachefile& operator<<(cachefile& c, zone const & z) { return z.cachefile_save(c); }
 /*}}}*/
 #ifdef DISPATCHERS_AND_COMBINERS
 struct dispatcher : public vector<uint16_t>, public placed_block {/*{{{*/
@@ -344,8 +344,6 @@ struct dispatcher : public vector<uint16_t>, public placed_block {/*{{{*/
         return c << (placed_block const&)*this << (super const&)*this;
     }/*}}}*/
 };
-inline cachefile& operator>>(cachefile& c, dispatcher& z) { return z.cachefile_load(c); }
-inline cachefile& operator<<(cachefile& c, dispatcher const & z) { return z.cachefile_save(c); }
 /*}}}*/
 struct combiner : public placed_block {/*{{{*/
     /* which buffer will we read from, and how many values, from
@@ -368,8 +366,6 @@ struct combiner : public placed_block {/*{{{*/
             << main << aux;
     }/*}}}*/
 };
-inline cachefile& operator>>(cachefile& c, combiner& z) { return z.cachefile_load(c); }
-inline cachefile& operator<<(cachefile& c, combiner const & z) { return z.cachefile_save(c); }
 /*}}}*/
 /* {{{ Temporary buffers which are used when reading the dispatchers.  */
 struct temp_buffer {
@@ -734,8 +730,11 @@ void matmul_zone_data::build_cache(uint32_t * data)/*{{{*/
                 n_immediate++;
             }
         }
+        fprintf(stderr, "block at position %u: %zu immediate blocks\n",
+                B.i0, B.Z.size());
         blocks.push_back(std::move(B));
     }
+    fprintf(stderr, "%zu blocks in total\n", blocks.size());
     ASSERT_ALWAYS(ptr - data == (ptrdiff_t) (nrows_t + 2 * mm->public_->ncoeffs));
 #ifdef DISPATCHERS_AND_COMBINERS
     /* We now merge dispatchers */
