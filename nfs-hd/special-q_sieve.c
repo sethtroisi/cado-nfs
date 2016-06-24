@@ -1441,7 +1441,7 @@ void space_sieve_1(array_ptr array, FILE * file_trace_pos, ideal_1_srcptr r,
 
   unsigned int fail = 0;
   unsigned int vector_1 = space_sieve_1_init(list_vec, list_vec_zero, r, Mqr,
-      H, array->number_element, &fail, file_space_sieve_stat);
+      H, array->number_element, &fail, file_space_sieve_stat, errstd);
 
 #ifdef SPACE_SIEVE_STAT
   unsigned int nb_vec_0 = list_vec_zero->length;

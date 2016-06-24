@@ -175,7 +175,7 @@ int gauss_reduction_zero(int64_vector_ptr v0, int64_vector_ptr v1,
 
 #ifndef SLLL_SAFE
 void skew_LLL(mat_int64_ptr MSLLL, mat_int64_srcptr M_root,
-    int64_vector_srcptr skewness)
+    int64_vector_srcptr skewness, FILE * errstd)
 {
   ASSERT(skewness->dim == M_root->NumCols);
   ASSERT(M_root->NumRows == M_root->NumCols);
@@ -193,7 +193,7 @@ void skew_LLL(mat_int64_ptr MSLLL, mat_int64_srcptr M_root,
 
   mat_int64_t U;
   mat_int64_init(U, M_root->NumRows, M_root->NumCols);
-  lll_Mqr_unimodular(U, M);
+  lll_Mqr_unimodular(U, M, errstd);
 
   mat_int64_mul_mat_int64(MSLLL, M_root, U);
 
@@ -1151,7 +1151,7 @@ unsigned int space_sieve_1_init(list_int64_vector_index_ptr list_vec,
     list_int64_vector_index_ptr list_vec_zero, ideal_1_srcptr r,
     mat_int64_srcptr Mqr, sieving_bound_srcptr H, uint64_t number_element,
     MAYBE_UNUSED unsigned int * skew_lll_fail,
-    MAYBE_UNUSED FILE * file_space_sieve_stat)
+    MAYBE_UNUSED FILE * file_space_sieve_stat, MAYBE_UNUSED FILE * errstd)
 {
   int64_vector_t skewness;
   int64_vector_init(skewness, 3);
@@ -1182,7 +1182,7 @@ unsigned int space_sieve_1_init(list_int64_vector_index_ptr list_vec,
 #ifdef SLLL_SAFE
   skew_LLL_safe(MSLLL, Mqr, skewness);
 #else // SLLL_SAFE
-  skew_LLL(MSLLL, Mqr, skewness);
+  skew_LLL(MSLLL, Mqr, skewness, errstd);
 #endif // SLLL_SAFE
   int64_vector_clear(skewness);
 
@@ -1420,11 +1420,11 @@ static int int128_convert_64(int64_t * x_64, __int128_t x)
 
 // Return 0 if overflow, 1 otherwise.
 static int innerproduct(int64_t * x, int64_t * a, int64_t * b,
-    unsigned int n)
+    unsigned int n, FILE * errstd)
 {
   * x = 0;
   if (__builtin_smull_overflow(a[1], b[1], x)) {
-    fprintf(stderr, "Overflow with int64 LLL. Fall back to mpz LLL.\n");
+    fprintf(errstd, "Overflow with int64 LLL. Fall back to mpz LLL.\n");
     return 0;
   }
   int64_t tmp = 0;
@@ -1432,7 +1432,7 @@ static int innerproduct(int64_t * x, int64_t * a, int64_t * b,
     /*x = x + a[i] * b[i];*/
     if (__builtin_smull_overflow(a[i], b[i], &tmp) ||
         __builtin_saddl_overflow(* x, tmp, x)) {
-      fprintf(stderr, "Overflow with int64 LLL. Fall back to mpz LLL.\n");
+      fprintf(errstd, "Overflow with int64 LLL. Fall back to mpz LLL.\n");
       return 0;
     }
   }
@@ -1465,7 +1465,7 @@ static int innerproduct(int64_t * x, int64_t * a, int64_t * b,
 
 /* c = (x*c1 + y*c2)/z */
 static int muladddiv(int64_t * tmp, int64_t c1, int64_t c2, int64_t x,
-    int64_t y, int64_t z)
+    int64_t y, int64_t z, FILE * errstd)
 {
 #ifdef OLD_LLL
   ASSERT(z != 0);
@@ -1527,7 +1527,7 @@ static int muladddiv(int64_t * tmp, int64_t c1, int64_t c2, int64_t x,
 
     if(!int128_convert_64(tmp, (x_128 * c1_128 + y_128 * c2_128) /
         z_128)) {
-      fprintf(stderr, "Overflow with int64 LLL. Fall back to mpz LLL.\n");
+      fprintf(errstd, "Overflow with int64 LLL. Fall back to mpz LLL.\n");
       return 0;
     }
   } else {
@@ -1573,7 +1573,7 @@ static int muladddiv(int64_t * tmp, int64_t c1, int64_t c2, int64_t x,
 
 /* c = (x*c1 - y*c2)/z */
 static int mulsubdiv(int64_t * tmp, int64_t c1, int64_t c2, int64_t x,
-    int64_t y, int64_t z)
+    int64_t y, int64_t z, FILE * errstd)
 {
   ASSERT(z != 0);
 
@@ -1631,7 +1631,7 @@ static int mulsubdiv(int64_t * tmp, int64_t c1, int64_t c2, int64_t x,
 
     if (!int128_convert_64(tmp, (x_128 * c1_128 - y_128 * c2_128) /
         z_128)) {
-      fprintf(stderr, "Overflow with int64 LLL. Fall back to mpz LLL.\n");
+      fprintf(errstd, "Overflow with int64 LLL. Fall back to mpz LLL.\n");
       return 0;
     }
   } else {
@@ -1676,7 +1676,7 @@ static int mulsubdiv(int64_t * tmp, int64_t c1, int64_t c2, int64_t x,
 }
 
 static int incrementalgs(mat_int64_srcptr B, unsigned int * P, int64_t * D,
-    int64_t ** lam, unsigned int * s, unsigned int k)
+    int64_t ** lam, unsigned int * s, unsigned int k, FILE * errstd)
 {
   unsigned int n = B->NumCols;
   int64_t u = 0;
@@ -1687,14 +1687,14 @@ static int incrementalgs(mat_int64_srcptr B, unsigned int * P, int64_t * D,
       continue;
     }
 
-    if (!innerproduct(&u, B->coeff[k], B->coeff[j], n)) {
+    if (!innerproduct(&u, B->coeff[k], B->coeff[j], n, errstd)) {
       return 0;
     }
     for (unsigned int i = 1; i <= posj - 1; i++) {
       ASSERT(D[i - 1] != 0);
 
       /*u = (D[i] * u - lam[k][i] * lam[j][i]) / D[i - 1];*/
-      if (!mulsubdiv(&u, u, lam[j][i], D[i], lam[k][i], D[i - 1])) {
+      if (!mulsubdiv(&u, u, lam[j][i], D[i], lam[k][i], D[i - 1], errstd)) {
         return 0;
       }
     }
@@ -1702,7 +1702,7 @@ static int incrementalgs(mat_int64_srcptr B, unsigned int * P, int64_t * D,
     lam[k][posj] = u;
   }
 
-  if (!innerproduct(&u, B->coeff[k], B->coeff[k], n)) {
+  if (!innerproduct(&u, B->coeff[k], B->coeff[k], n, errstd)) {
     return 0;
   }
 
@@ -1710,7 +1710,7 @@ static int incrementalgs(mat_int64_srcptr B, unsigned int * P, int64_t * D,
     ASSERT(D[i - 1] != 0);
 
     /*u = (D[i] * u - lam[k][i] * lam[k][i]) / D[i - 1];*/
-    if (!mulsubdiv(&u, u, lam[k][i], D[i], lam[k][i], D[i - 1])) {
+    if (!mulsubdiv(&u, u, lam[k][i], D[i], lam[k][i], D[i - 1], errstd)) {
       return 0;
     }
   }
@@ -1743,7 +1743,8 @@ static int64_t baldiv(int64_t a, int64_t d)
 }
 
 /* c0 = c0 - x*c1 */
-static int mulsubn (int64_t * c0, int64_t * c1, int64_t x, unsigned int n)
+static int mulsubn (int64_t * c0, int64_t * c1, int64_t x, unsigned int n,
+    FILE * errstd)
 {
 #ifdef ASSERT_LLL
   mpz_t * c = (mpz_t *) malloc(sizeof(mpz_t) * n);
@@ -1771,7 +1772,7 @@ static int mulsubn (int64_t * c0, int64_t * c1, int64_t x, unsigned int n)
   for (unsigned int i = 1; i <= n; i++) {
     if (__builtin_smull_overflow(x, c1[i], &tmp) ||
         __builtin_ssubl_overflow(c0[i], tmp, c0 + i)) {
-      fprintf(stderr, "Overflow with int64 LLL. Fall back to mpz LLL.\n");
+      fprintf(errstd, "Overflow with int64 LLL. Fall back to mpz LLL.\n");
       return 0;
     }
   }
@@ -1820,7 +1821,8 @@ static int mulsubn (int64_t * c0, int64_t * c1, int64_t x, unsigned int n)
 }
 
 static int reduce(unsigned int k, unsigned int l, mat_int64_ptr B,
-    unsigned int * P, int64_t * D, int64_t ** lam, mat_int64_ptr U)
+    unsigned int * P, int64_t * D, int64_t ** lam, mat_int64_ptr U,
+    FILE * errstd)
 {
   if (P[l] == 0) {
     return 1;
@@ -1834,12 +1836,12 @@ static int reduce(unsigned int k, unsigned int l, mat_int64_ptr B,
   }
 
   r = baldiv(lam[k][P[l]], D[P[l]]);
-  if (!mulsubn(B->coeff[k], B->coeff[l], r, B->NumCols)) {
+  if (!mulsubn(B->coeff[k], B->coeff[l], r, B->NumCols, errstd)) {
     return 0;
   }
 
   if (U != NULL) {
-    if (!mulsubn(U->coeff[k], U->coeff[l], r, B->NumRows)) {
+    if (!mulsubn(U->coeff[k], U->coeff[l], r, B->NumRows, errstd)) {
       return 0;
     }
   }
@@ -1863,7 +1865,7 @@ static int reduce(unsigned int k, unsigned int l, mat_int64_ptr B,
       int64_t tmp = 0;
       if (__builtin_smull_overflow(r, lam[l][P[j]], &tmp) ||
           __builtin_ssubl_overflow(lam[k][P[j]] , tmp, lam[k] + P[j])) {
-        fprintf(stderr, "Overflow with int64 LLL. Fall back to mpz LLL.\n");
+        fprintf(errstd, "Overflow with int64 LLL. Fall back to mpz LLL.\n");
         return 0;
       }
 #endif // OLD_LLL
@@ -1895,7 +1897,7 @@ static int reduce(unsigned int k, unsigned int l, mat_int64_ptr B,
   int64_t tmp = 0;
   if (__builtin_smull_overflow(r, D[P[l]], &tmp) ||
       __builtin_ssubl_overflow(lam[k][P[l]] , tmp, lam[k] + P[l])) {
-    fprintf(stderr, "Overflow with int64 LLL. Fall back to mpz LLL.\n");
+    fprintf(errstd, "Overflow with int64 LLL. Fall back to mpz LLL.\n");
     return 0;
   }
 #endif // OLD_LLL
@@ -1969,7 +1971,7 @@ static int swaptest(int64_t d0, int64_t d1, int64_t d2, int64_t lam,
 
 /* (c1, c2) = (x*c1 + y*c2, u*c1 + v*c2) */
 static int rowtransform(int64_t * c1, int64_t * c2, int64_t x, int64_t y,
-    int64_t u, int64_t v)
+    int64_t u, int64_t v, FILE * errstd)
 {
 #ifdef ASSERT_LLL
   mpz_t t1_Z, t2_Z;
@@ -2038,7 +2040,7 @@ static int rowtransform(int64_t * c1, int64_t * c2, int64_t x, int64_t y,
   int64_t yc2 = 0;
   if (__builtin_smull_overflow(x, * c1, &xc1) ||
       __builtin_smull_overflow(y, * c2, &yc2)) {
-    fprintf(stderr, "Overflow with int64 LLL. Fall back to mpz LLL.\n");
+    fprintf(errstd, "Overflow with int64 LLL. Fall back to mpz LLL.\n");
     return 0;
   }
 
@@ -2046,20 +2048,20 @@ static int rowtransform(int64_t * c1, int64_t * c2, int64_t x, int64_t y,
   int64_t vc2 = 0;
   if (__builtin_smull_overflow(u, * c1, &uc1) ||
       __builtin_smull_overflow(v, * c2, &vc2)) {
-    fprintf(stderr, "Overflow with int64 LLL. Fall back to mpz LLL.\n");
+    fprintf(errstd, "Overflow with int64 LLL. Fall back to mpz LLL.\n");
     return 0;
   }
 
   int64_t t1 = 0;
   if (__builtin_saddl_overflow(xc1, yc2, &t1)) {
-    fprintf(stderr, "Overflow with int64 LLL. Fall back to mpz LLL.\n");
+    fprintf(errstd, "Overflow with int64 LLL. Fall back to mpz LLL.\n");
     return 0;
   }
   int64_t t2 = uc1;
   * c1 = t1;
   t1 = vc2;
   if (__builtin_saddl_overflow(t1, t2, c2)) {
-    fprintf(stderr, "Overflow with int64 LLL. Fall back to mpz LLL.\n");
+    fprintf(errstd, "Overflow with int64 LLL. Fall back to mpz LLL.\n");
     return 0;
   }
 #endif // OLD_LLL
@@ -2079,7 +2081,7 @@ static int rowtransform(int64_t * c1, int64_t * c2, int64_t x, int64_t y,
 
 /* (c1, c2) = (x*c1 + y*c2, u*c1 + v*c2) */
 static int rowtransformn(int64_t * c1, int64_t * c2, int64_t x, int64_t y,
-    int64_t u, int64_t v, unsigned int n)
+    int64_t u, int64_t v, unsigned int n, FILE * errstd)
 {
   for (unsigned int i = 1; i <= n; i++) {
 #ifdef ASSERT_LLL
@@ -2137,7 +2139,7 @@ static int rowtransformn(int64_t * c1, int64_t * c2, int64_t x, int64_t y,
     int64_t yc2 = 0;
     if (__builtin_smull_overflow(x, c1[i], &xc1) ||
         __builtin_smull_overflow(y, c2[i], &yc2)) {
-      fprintf(stderr, "Overflow with int64 LLL. Fall back to mpz LLL.\n");
+      fprintf(errstd, "Overflow with int64 LLL. Fall back to mpz LLL.\n");
       return 0;
     }
 
@@ -2145,20 +2147,20 @@ static int rowtransformn(int64_t * c1, int64_t * c2, int64_t x, int64_t y,
     int64_t vc2 = 0;
     if (__builtin_smull_overflow(u, c1[i], &uc1) ||
         __builtin_smull_overflow(v, c2[i], &vc2)) {
-      fprintf(stderr, "Overflow with int64 LLL. Fall back to mpz LLL.\n");
+      fprintf(errstd, "Overflow with int64 LLL. Fall back to mpz LLL.\n");
       return 0;
     }
 
     int64_t t1 = 0;
     if (__builtin_saddl_overflow(xc1, yc2, &t1)) {
-      fprintf(stderr, "Overflow with int64 LLL. Fall back to mpz LLL.\n");
+      fprintf(errstd, "Overflow with int64 LLL. Fall back to mpz LLL.\n");
       return 0;
     }
     int64_t t2 = uc1;
     c1[i] = t1;
     t1 = vc2;
     if (__builtin_saddl_overflow(t1, t2, c2 + i)) {
-      fprintf(stderr, "Overflow with int64 LLL. Fall back to mpz LLL.\n");
+      fprintf(errstd, "Overflow with int64 LLL. Fall back to mpz LLL.\n");
       return 0;
     }
 #endif // OLD_LLL
@@ -2184,7 +2186,7 @@ static int rowtransformn(int64_t * c1, int64_t * c2, int64_t x, int64_t y,
 
 /* swaps vectors k-1 and k;  assumes P(k-1) != 0 */
 static int swaplll (unsigned int k, mat_int64_ptr B, unsigned int * P,
-    int64_t * D, int64_t ** lam, mat_int64_ptr U, unsigned int m)
+    int64_t * D, int64_t ** lam, mat_int64_ptr U, unsigned int m, FILE * errstd)
 {
   unsigned int i, j;
   int64_t t1, t2, t3, e, x, y;
@@ -2203,18 +2205,18 @@ static int swaplll (unsigned int k, mat_int64_ptr B, unsigned int * P,
 
     for (unsigned int i = k + 1; i <= m; i++) {
       if (!muladddiv(&t1, lam[i][P[k] - 1], lam[i][P[k]],
-          lam[k][P[k] - 1], D[P[k] - 2], D[P[k] - 1])) {
+          lam[k][P[k] - 1], D[P[k] - 2], D[P[k] - 1], errstd)) {
         return 0;
       }
       if (!mulsubdiv(lam[i] + P[k], lam[i][P[k] - 1], lam[i][P[k]], 
-          D[P[k]], lam[k][P[k] - 1], D[P[k] - 1])) {
+          D[P[k]], lam[k][P[k] - 1], D[P[k] - 1], errstd)) {
         return 0;
       }
       lam[i][P[k] - 1] = t1;
     }
 
     if (!muladddiv(D + (P[k] - 1), D[P[k]], lam[k][P[k] - 1],
-        D[P[k] - 2], lam[k][P[k] - 1], D[P[k] - 1])) {
+        D[P[k] - 2], lam[k][P[k] - 1], D[P[k] - 1], errstd)) {
       return 0;
     }
   } else if (lam[k][P[k - 1]] != 0) {
@@ -2225,26 +2227,28 @@ static int swaplll (unsigned int k, mat_int64_ptr B, unsigned int * P,
 
     t3 = t2;
     t2 = -t2;
-    if (!rowtransformn(B->coeff[k - 1], B->coeff[k], t1, t2, y, x, B->NumCols))
+    if (!rowtransformn(B->coeff[k - 1], B->coeff[k], t1, t2, y, x, B->NumCols,
+          errstd))
     {
       return 0;
     }
     if (U != NULL) {
       if (!rowtransformn(U->coeff[k - 1], U->coeff[k], t1, t2, y, x,
-            B->NumCols)) {
+            B->NumCols, errstd)) {
         return 0;
       }
     }
     for (unsigned j = 1; j <= k - 2; j++) {
       if (P[j] != 0) {
-        if (!rowtransform(&(lam[k - 1][P[j]]), &(lam[k][P[j]]), t1, t2, y, x)) {
+        if (!rowtransform(&(lam[k - 1][P[j]]), &(lam[k][P[j]]), t1, t2, y, x,
+              errstd)) {
           return 0;
         }
       }
     }
 
     if (__builtin_smull_overflow(t2, t2, &t2)) {
-      fprintf(stderr, "Overflow with int64 LLL. Fall back to mpz LLL.\n");
+      fprintf(errstd, "Overflow with int64 LLL. Fall back to mpz LLL.\n");
       return 0;
     }
 
@@ -2291,7 +2295,7 @@ static int swaplll (unsigned int k, mat_int64_ptr B, unsigned int * P,
  n is the number of columns (i.e., length of each vector)
  */
 int lll(unsigned int * s, int64_t * det, mat_int64_ptr B,
-    mat_int64_ptr U, int64_t a, int64_t b)
+    mat_int64_ptr U, int64_t a, int64_t b, FILE * errstd)
 {
   unsigned int m = B->NumRows;
   unsigned int n = B->NumCols;
@@ -2326,7 +2330,7 @@ int lll(unsigned int * s, int64_t * det, mat_int64_ptr B,
 
   while (k <= m) {
     if (k > max_k) {
-      if (!incrementalgs(B, P, D, lam, s, k)) {
+      if (!incrementalgs(B, P, D, lam, s, k, errstd)) {
         free(D);
         for (unsigned int j = 0; j <= m; j++) {
           free (lam[j]);
@@ -2344,7 +2348,7 @@ int lll(unsigned int * s, int64_t * det, mat_int64_ptr B,
       continue;
     }
 
-    if (!reduce(k, k - 1, B, P, D, lam, U)) {
+    if (!reduce(k, k - 1, B, P, D, lam, U, errstd)) {
       free(D);
       for (unsigned int j = 0; j <= m; j++) {
         free (lam[j]);
@@ -2358,7 +2362,7 @@ int lll(unsigned int * s, int64_t * det, mat_int64_ptr B,
     if (P[k - 1] != 0 && (P[k] == 0 || 
           swaptest(D[P[k]], D[P[k] - 1], D[P[k] - 2],
             lam[k][P[k] - 1], a, b))) {
-      if (!swaplll(k, B, P, D, lam, U, max_k)) {
+      if (!swaplll(k, B, P, D, lam, U, max_k, errstd)) {
         free(D);
         for (unsigned int j = 0; j <= m; j++) {
           free (lam[j]);
@@ -2371,7 +2375,7 @@ int lll(unsigned int * s, int64_t * det, mat_int64_ptr B,
       k--;
     } else {
       for (unsigned int j = k - 2; j >= 1; j--) {
-        if (reduce(k, j, B, P, D, lam, U)) {
+        if (reduce(k, j, B, P, D, lam, U, errstd)) {
           free(D);
           for (unsigned int j = 0; j <= m; j++) {
             free (lam[j]);
@@ -2398,7 +2402,7 @@ int lll(unsigned int * s, int64_t * det, mat_int64_ptr B,
   return 1;
 }
 
-void lll_Mqr(mat_int64_ptr C, mat_int64_srcptr A)
+void lll_Mqr(mat_int64_ptr C, mat_int64_srcptr A, FILE * errstd)
 {
   ASSERT(A->NumRows == C->NumRows);
   ASSERT(A->NumCols == C->NumCols);
@@ -2409,7 +2413,8 @@ void lll_Mqr(mat_int64_ptr C, mat_int64_srcptr A)
   int64_t det = 0;
   unsigned int s = 0;
 
-  if (!lll(&s, &det, C, NULL, a, b)) {
+  if (!lll(&s, &det, C, NULL, a, b, errstd)) {
+    mat_int64_fprintf(errstd, A);
     mat_int64_LLL_transpose(C, A);
   } else {
     mat_int64_transpose(C, C);
@@ -2426,7 +2431,7 @@ void lll_Mqr(mat_int64_ptr C, mat_int64_srcptr A)
 #endif // NDEBUG
 }
 
-void lll_Mqr_unimodular(mat_int64_ptr U, mat_int64_srcptr A)
+void lll_Mqr_unimodular(mat_int64_ptr U, mat_int64_srcptr A, FILE * errstd)
 {
   ASSERT(A->NumRows == U->NumRows);
   ASSERT(A->NumCols == U->NumCols);
@@ -2439,7 +2444,8 @@ void lll_Mqr_unimodular(mat_int64_ptr U, mat_int64_srcptr A)
   int64_t det = 0;
   unsigned int s = 0;
 
-  if (!lll(&s, &det, C, U, a, b)) {
+  if (!lll(&s, &det, C, U, a, b, errstd)) {
+    mat_int64_fprintf(errstd, A);
     mat_int64_LLL_unimodular_transpose(U, A);
   } else {
     mat_int64_transpose(U, U);
@@ -2461,7 +2467,12 @@ void lll_Mqr_unimodular(mat_int64_ptr U, mat_int64_srcptr A)
 #ifdef MAIN_LLL_INT64
 int main(int argc, char ** argv)
 {
-  ASSERT(argc >= 3);
+  if (argc < 3) {
+    fprintf(stderr, "The matrix is defined as matrix([[argc], [0, 1, …, 0], …,"
+      "[0, …, 0, 1]]).\n");
+    fprintf(stderr, "Need at least two argument for lll_int64.\n");
+    return EXIT_FAILURE;
+  }
   mat_int64_t M;
   mat_int64_init(M, (unsigned int) argc - 1, (unsigned int) argc - 1);
   mat_int64_set_zero(M);
@@ -2480,7 +2491,7 @@ int main(int argc, char ** argv)
   mat_int64_t MLLL_safe;
   mat_int64_init(MLLL_safe, (unsigned int) argc - 1, (unsigned int) argc - 1);
 
-  lll_Mqr(MLLL, M);
+  lll_Mqr(MLLL, M, stderr);
 
   mat_int64_LLL_transpose(MLLL_safe, M);
   printf("MLLL = ");
@@ -2488,7 +2499,7 @@ int main(int argc, char ** argv)
 
   ASSERT(mat_int64_equal(MLLL, MLLL_safe));
 
-  lll_Mqr_unimodular(MLLL, M);
+  lll_Mqr_unimodular(MLLL, M, stderr);
 
   mat_int64_LLL_unimodular_transpose(MLLL_safe, M);
 
@@ -2501,6 +2512,6 @@ int main(int argc, char ** argv)
   mat_int64_clear(MLLL);
   mat_int64_clear(MLLL_safe);
 
-  return 0;
+  return EXIT_SUCCESS;
 }
 #endif // MAIN_LLL_INT64

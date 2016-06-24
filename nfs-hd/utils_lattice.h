@@ -46,7 +46,7 @@ int gauss_reduction_zero(int64_vector_ptr v0, int64_vector_ptr v1,
  * skewness: skewness (for the rows).
  */
 void skew_LLL(mat_int64_ptr MSLLL, mat_int64_srcptr M_root,
-    int64_vector_srcptr skewness);
+    int64_vector_srcptr skewness, FILE * errstd);
 
 /*
  * Use the Franke-Kleinjung to modify the two first coordinates of v0_root and
@@ -203,7 +203,7 @@ void plane_sieve_1_incomplete(int64_vector_ptr s_out, int64_vector_srcptr s,
 unsigned int space_sieve_1_init(list_int64_vector_index_ptr list_vec,
     list_int64_vector_index_ptr list_vec_zero, ideal_1_srcptr r,
     mat_int64_srcptr Mqr, sieving_bound_srcptr H, uint64_t number_element,
-    unsigned int * skew_lll_fail, FILE * file_skew_lll_stat);
+    unsigned int * skew_lll_fail, FILE * file_skew_lll_stat, FILE * errstd);
 /*
  * During the plane sieve, compute reduce q lattice and SV4 and store vectors in
  *  the appropriate lists.
@@ -223,8 +223,8 @@ unsigned int space_sieve_1_next_plane_seek(int64_vector_ptr s_tmp,
     list_int64_vector_srcptr list_s, list_int64_vector_index_srcptr list_vec,
     sieving_bound_srcptr H, int64_vector_srcptr s);
 
-void lll_Mqr(mat_int64_ptr C, mat_int64_srcptr A);
+void lll_Mqr(mat_int64_ptr C, mat_int64_srcptr A, FILE * errstd);
 
-void lll_Mqr_unimodular(mat_int64_ptr U, mat_int64_srcptr A);
+void lll_Mqr_unimodular(mat_int64_ptr U, mat_int64_srcptr A, FILE * errstd);
 
 #endif // UTILS_SIEVE_H
