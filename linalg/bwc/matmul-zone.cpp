@@ -24,8 +24,8 @@
 #include "arith-modp.hpp"
 
 typedef arith_modp::gfp<sizeof(abelt)/sizeof(unsigned long)> gfp;
-typedef arith_modp::fast_type<gfp> fast_gfp;
-// typedef gfp fast_gfp;
+// typedef arith_modp::fast_type<gfp> fast_gfp;
+typedef gfp fast_gfp;
 typedef fast_gfp::elt fast_elt;
 typedef fast_gfp::elt_ur fast_elt_ur;
 
