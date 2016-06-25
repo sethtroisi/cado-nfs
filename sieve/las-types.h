@@ -32,6 +32,7 @@ struct siever_config_s {
     unsigned long bucket_thresh;    // bucket sieve primes >= bucket_thresh
     unsigned long bucket_thresh1;   // primes above are 2-level bucket-sieved
     unsigned int td_thresh;
+    unsigned int skipped;           // don't sieve below this
     unsigned int unsieve_thresh;
     struct {
         unsigned long lim; /* factor base bound */
@@ -95,6 +96,7 @@ struct sieve_side_info_s {
         int td[2];
         int rs[2];
         int rest[2];
+        int skipped[2];
     } fb_parts_x[1];
     
     /* The reading, mapping or generating the factor base all create the

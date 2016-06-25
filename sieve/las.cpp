@@ -259,9 +259,9 @@ void reorder_fb(sieve_info_ptr si, int side)
     /* We go through all the primes in FB part 0 and sort them into one of
        5 vectors, and some we discard */
 
-    /* alloc the 5 vectors */
-    enum {POW2, POW3, TD, RS, REST};
-    std::vector<fb_general_entry> *pieces = new std::vector<fb_general_entry>[5];
+    /* alloc the 6 vectors */
+    enum {POW2, POW3, TD, RS, REST, SKIPPED};
+    std::vector<fb_general_entry> *pieces = new std::vector<fb_general_entry>[6];
 
     fb_part *small_part = si->sides[side]->fb->get_part(0);
     ASSERT_ALWAYS(small_part->is_only_general());
@@ -278,7 +278,9 @@ void reorder_fb(sieve_info_ptr si, int side)
         /* The extra conditions on powers of 2 and 3 are related to how
          * pattern-sieving is done.
          */
-        if (it->p == 2 && it->q <= pattern2_size) {
+        if (it->q < si->conf->skipped) {
+            pieces[SKIPPED].push_back(*it);
+        } else if (it->p == 2 && it->q <= pattern2_size) {
             pieces[POW2].push_back(*it);
         } else if (it->q == 3) { /* Currently only q=3 is pattern sieved */
             pieces[POW3].push_back(*it);
@@ -293,14 +295,14 @@ void reorder_fb(sieve_info_ptr si, int side)
             abort();
         }
     }
-    /* Concatenate the 5 vectors into one, and store the beginning and ending
+    /* Concatenate the 6 vectors into one, and store the beginning and ending
        index of each part in fb_parts_x */
     std::vector<fb_general_entry> *s = new std::vector<fb_general_entry>;
     /* FIXME: hack to be able to access the struct fb_parts_x entries via
        an index */
     typedef int interval_t[2];
     interval_t *parts_as_array = &si->sides[side]->fb_parts_x->pow2;
-    for (int i = 0; i < 5; i++) {
+    for (int i = 0; i < 6; i++) {
         parts_as_array[i][0] = count_roots(*s);
         std::sort(pieces[i].begin(), pieces[i].end());
         s->insert(s->end(), pieces[i].begin(), pieces[i].end());
@@ -667,6 +669,7 @@ static void las_info_init_hint_table(las_info_ptr las, param_list pl)/*{{{*/
         sc->bucket_thresh = las->config_base->bucket_thresh;
         sc->bucket_thresh1 = las->config_base->bucket_thresh1;
         sc->td_thresh = las->config_base->td_thresh;
+        sc->skipped = las->config_base->skipped;
         sc->unsieve_thresh = las->config_base->unsieve_thresh;
         for(int side = 0 ; side < 2 ; side++) {
             sc->sides[side]->powlim = las->config_base->sides[side]->powlim;
@@ -883,7 +886,9 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
 
         /* Parse optional siever configuration parameters */
         sc->td_thresh = 1024;	/* default value */
+        sc->skipped = 1;	/* default value */
         param_list_parse_uint(pl, "tdthresh", &(sc->td_thresh));
+        param_list_parse_uint(pl, "skipped", &(sc->skipped));
 
         sc->unsieve_thresh = 100;
         if (param_list_parse_uint(pl, "unsievethresh", &(sc->unsieve_thresh))) {
@@ -2739,6 +2744,7 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "ncurves0", "controls number of curves on side 0");
   param_list_decl_usage(pl, "ncurves1", "controls number of curves on side 1");
   param_list_decl_usage(pl, "tdthresh", "trial-divide primes p/r <= ththresh (r=number of roots)");
+  param_list_decl_usage(pl, "skipped", "primes below this bound are not sieved at all");
   param_list_decl_usage(pl, "bkthresh", "bucket-sieve primes p >= bkthresh");
   param_list_decl_usage(pl, "bkthresh1", "2-level bucket-sieve primes p >= bkthresh1");
   param_list_decl_usage(pl, "unsievethresh", "Unsieve all p > unsievethresh where p|gcd(a,b)");
