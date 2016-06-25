@@ -1177,6 +1177,13 @@ unsigned int space_sieve_1_init(list_int64_vector_index_ptr list_vec,
 #endif // SKEWNESS
 #endif // SKEWNESS_TRUE
 
+  for (unsigned int i = 0; i < skewness->dim; i++) {
+    ASSERT(skewness->c[i] >= 0);
+    if (skewness->c[i] == 0) {
+      skewness->c[i] = 1;
+    }
+  }
+
   mat_int64_t MSLLL;
   mat_int64_init(MSLLL, Mqr->NumRows, Mqr->NumCols);
 #ifdef SLLL_SAFE
