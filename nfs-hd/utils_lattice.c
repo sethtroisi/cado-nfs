@@ -2355,7 +2355,7 @@ int lll(unsigned int * s, int64_t * det, mat_int64_ptr B,
       k--;
     } else {
       for (unsigned int j = k - 2; j >= 1; j--) {
-        if (reduce(k, j, B, P, D, lam, U)) {
+        if (!reduce(k, j, B, P, D, lam, U)) {
           free(D);
           for (unsigned int j = 0; j <= m; j++) {
             free (lam[j]);
