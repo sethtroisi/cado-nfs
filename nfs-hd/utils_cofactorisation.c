@@ -677,9 +677,9 @@ static void printf_relation_galois_6_0(factor_t * factor,
     MAYBE_UNUSED mpz_vector_srcptr c)
 {
   if (a->deg > 2) {
-    fprintf(outstd, "# Can not use Galois 6.\n");
+    fprintf(outstd, "# Can not use Galois 6.0.\n");
   } else {
-    fprintf(outstd, "# Use Galois 6.\n");
+    fprintf(outstd, "# Use Galois 6.0.\n");
     mpz_poly b;
     mpz_poly_init(b, a->deg);
     mpz_poly_set(b, a);
