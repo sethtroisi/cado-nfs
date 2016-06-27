@@ -761,6 +761,7 @@ class Las(Program):
                  q0: Parameter(checktype=int),
                  q1: Parameter(checktype=int)=None,
                  rho: Parameter(checktype=int)=None,
+                 skipped: Parameter(checktype=int)=None,
                  tdthresh: Parameter(checktype=int)=None,
                  bkthresh: Parameter(checktype=int)=None,
                  bkthresh1: Parameter(checktype=int)=None,
