@@ -8,7 +8,7 @@
 ###########################################################################
 
 name = c190
-tasks.threads = 2
+#tasks.threads = 2
 
 ###########################################################################
 # Polynomial selection
@@ -27,11 +27,11 @@ tasks.polyselect.nrkeep = 1000
 # Sieve
 ###########################################################################
 
-rlim = 160000000
+rlim = 130000000
 alim = 100000000
 lpbr = 32
-lpba = 33
-tasks.sieve.mfbr = 99
+lpba = 32
+tasks.sieve.mfbr = 85
 tasks.sieve.mfba = 96
 tasks.sieve.rlambda = 2.5
 tasks.sieve.alambda = 3.2
@@ -47,8 +47,7 @@ tasks.sieve.qrange = 10000
 
 tasks.filter.purge.keep = 160
 tasks.filter.maxlevel = 25
-tasks.filter.coverNmax = 100.0
-tasks.filter.merge.forbw = 3
+tasks.filter.target_density = 170.0
 
 ###########################################################################
 # Linear algebra
