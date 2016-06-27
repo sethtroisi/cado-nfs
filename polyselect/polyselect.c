@@ -154,11 +154,11 @@ estimate_weibull_moments (double *beta, double *eta, data_t s)
   *eta = m * (1.0 + y * (0.57721566490153 - 0.655878071520 * y));
 }
 
-/* Estimation via extreme values: we cut the total n values into chunks of
-   k consecutive values, with k near sqrt(n), and for each chunk we keep only
-   the minimum. If the series of minimum values satisfies a Weilbull distribution
-   with parameters beta and eta, then the original one has parameters
-   beta (identical) and eta*n^(1/beta). */
+/* Estimation via extreme values: we cut the total n values into samples of k
+   values, and for each sample we keep only the minimum. If the series of
+   minimum values satisfies a Weilbull distribution with parameters beta and eta,
+   then the original one has parameters beta (identical) and eta*k^(1/beta).
+   Here we choose k near sqrt(n). */
 static void
 estimate_weibull_moments2 (double *beta, double *eta, data_t s)
 {
@@ -178,7 +178,7 @@ estimate_weibull_moments2 (double *beta, double *eta, data_t s)
       data_add (smin, min);
     }
   estimate_weibull_moments (beta, &eta_min, smin);
-  *eta = eta_min * pow ((double) n, 1.0 / *beta);
+  *eta = eta_min * pow ((double) k, 1.0 / *beta);
 }
 
 /* print poly info */
