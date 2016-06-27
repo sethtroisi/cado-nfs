@@ -60,6 +60,7 @@ Required software tools:
 Optionally:
 *) Support for curl library.
 *) Support for MPI (see local.sh.example and linalg/bwc/README)
+*) Support for hwloc (see linalg/bwc/cpubinding.conf)
 
 
 Configure
