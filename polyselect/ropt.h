@@ -9,9 +9,18 @@
 #include "ropt_str.h"
 
 
+/* timing structure for ropt */
+typedef struct
+{
+  double ropt_time;
+  double ropt_time_stage1;
+  double ropt_time_tuning;
+  double ropt_time_stage2;
+} __ropt_time_struct;
+typedef __ropt_time_struct ropt_time_t[1];
+
+
 /* -- declarations -- */
-
-
 void ropt ( ropt_poly_t poly,
             ropt_bestpoly_t bestpoly,
             ropt_param_t param,
@@ -22,6 +31,6 @@ void ropt_get_bestpoly ( ropt_poly_t poly,
                          ropt_bestpoly_t bestpoly );
 
 void ropt_polyselect (cado_poly_ptr output_poly, cado_poly_ptr input_poly,
-                      ropt_param_t param);
+                      ropt_param_t param, ropt_time_t thr);
 
 #endif /* ROPT_H */

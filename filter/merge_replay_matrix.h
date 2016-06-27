@@ -18,6 +18,7 @@
 
 /* rows correspond to relations, and columns to primes (or prime ideals) */
 typedef struct {
+  int verbose;         /* verbose level */
   uint64_t nrows;
   uint64_t ncols;
   uint64_t rem_nrows;  /* number of remaining rows */
@@ -81,7 +82,7 @@ extern void print_row(filter_matrix_t *mat, int i);
 #define SPARSE_ITERATE(mat, i, k) for((k)=1; (k)<=lengthRow((mat),(i)); (k)++)
 
 extern void freeRj(filter_matrix_t *mat, int j);
-extern void remove_i_from_Rj(filter_matrix_t *mat, int i, int j);
+extern void remove_i_from_Rj(filter_matrix_t *mat, index_t i, int j);
 extern void add_i_to_Rj(filter_matrix_t *mat, int i, int j);
 extern int decrS(int w);
 extern int incrS(int w);

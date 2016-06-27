@@ -8,6 +8,7 @@ use File::Temp qw/tempdir tempfile mktemp/;
 use List::Util qw[max];
 use Data::Dumper;
 use Fcntl;
+use Carp;
 
 # This companion program serves as a helper for running bwc programs.
 #
@@ -113,7 +114,7 @@ if (!defined($bindir=$ENV{'BWC_BINDIR'})) {
 #  - %$param hash, with special rules for the hosts argument.
 #  - $show_only, @extra_args
 #  - obey -h
-my @extra_args;
+my @extra_args=();
 my $show_only=0;
 my $param={};
 my $param_defaults={
@@ -122,7 +123,6 @@ my $param_defaults={
     thr => '1x1',
     mpi => '1x1',
     lingen_mpi => '1x1',
-    shuffled_product => 1,
     interval => 200,
 };
 # {{{
@@ -591,7 +591,9 @@ sub detect_mpi {
     }
 
     my $maybe_mvapich2=1;
-    my $maybe_mpich2=1;
+    # mpich versions implementing the mpi-2 standard were named mpich2.
+    # From standard mpi-3 on, the name has returned to mpich.
+    my $maybe_mpich=1;
     my $maybe_openmpi=1;
 
     if (defined($mpi)) {
@@ -610,10 +612,16 @@ sub detect_mpi {
                 if ($mpiexec =~ /openmpi/) {
                     print STDERR "Auto-detecting openmpi based on alternatives\n";
                     $maybe_mvapich2=0;
-                    $maybe_mpich2=0;
+                    $maybe_mpich=0;
                     last;
                 } elsif ($mpiexec =~ /mpich2/) {
                     print STDERR "Auto-detecting mpich2(old) based on alternatives\n";
+                    $maybe_mpich='mpich2';
+                    $maybe_mvapich2=0;
+                    $maybe_openmpi=0;
+                    last;
+                } elsif ($mpiexec =~ /mpich/) {
+                    print STDERR "Auto-detecting mpich based on alternatives\n";
                     $maybe_mvapich2=0;
                     $maybe_openmpi=0;
                     last;
@@ -621,11 +629,11 @@ sub detect_mpi {
                     # Newer mvapich2 uses hydra as well...
                     print STDERR "Auto-detecting mpich or mvapich2 (hydra) based on alternatives\n";
                     $maybe_mvapich2='hydra';
-                    $maybe_mpich2='hydra';
+                    $maybe_mpich='hydra';
                     $maybe_openmpi=0;
                 } elsif ($mpiexec =~ /mvapich2/) {
                     print STDERR "Auto-detecting mvapich2 based on alternatives\n";
-                    $maybe_mpich2=0;
+                    $maybe_mpich=0;
                     $maybe_openmpi=0;
                     last;
                 }
@@ -648,8 +656,8 @@ sub detect_mpi {
                     }
                 }
             }
-            CHECK_MPICH2_VERSION: {
-                if ($maybe_mpich2 && -x "$mpi/mpich2version") {
+            CHECK_MPICH_VERSION: {
+                if ($maybe_mpich =~ /^(hydra|mpich2)/ && -x "$mpi/mpich2version") {
                     my $v = `$mpi/mpich2version -v`;
                     chomp($v);
                     if ($v =~ /MPICH2 Version:\s*(\d.*)$/) {
@@ -666,9 +674,22 @@ sub detect_mpi {
                         $mpi_ver .= "+hydra";
                         $needs_mpd=0;
                     }
-                    if ($maybe_mpich2 eq 'hydra') {
+                    if ($maybe_mpich eq 'hydra') {
                         $mpi_ver .= "+hydra" unless $mpi_ver =~ /hydra/;
                         $needs_mpd=0;
+                    }
+                    last SEVERAL_CHECKS;
+                } elsif ($maybe_mpich && -x "$mpi/mpichversion") {
+                    my $v = `$mpi/mpichversion -v`;
+                    chomp($v);
+                    if ($v =~ /MPICH Version:\s*(\d.*)$/) {
+                        $mpi_ver="mpich-$1";
+                        # Only antique mpich-1.x versions don't use
+                        # hydra.
+                        $needs_mpd=($mpi_ver =~ /^mpich-[01]\./);
+                    } else {
+                        $mpi_ver="mpich-UNKNOWN";
+                        $needs_mpd=1;
                     }
                     last SEVERAL_CHECKS;
                 }
@@ -713,7 +734,7 @@ EOMSG
         exit 1;
     }
 }
-# 
+
 # Starting daemons for mpich2 1.[012].x and mvapich2 ; we're assuming
 # this works the same for older mpich2's, although this has never been
 # checked.
@@ -905,6 +926,7 @@ if ($mpi_needed) {
     if (defined($mpi_extra_args)) {
         push @mpi_precmd, split(' ', $mpi_extra_args);
     }
+    push @mpi_precmd, split(' ', '@MPIEXEC_EXTRA_STANZAS@');
 
     @mpi_precmd_single = @mpi_precmd;
     @mpi_precmd_lingen = @mpi_precmd;
@@ -1089,6 +1111,9 @@ sub rename_file_on_leader {
 # {{{ get_cached_bfile -> check for balancing file.
 sub get_cached_bfile {
     my $key = 'balancing';
+    if ($param->{$key}) {
+        $cache->{$key}=[$param->{$key}];
+    }
     if (defined(my $z = $cache->{$key})) {
         my @x = @$z;
         return wantarray ? @x : $x[0];
@@ -1101,11 +1126,7 @@ sub get_cached_bfile {
     $x =~ s{^(?:.*/)?([^/]+)$}{$1};
     $x =~ s/\.(?:bin|txt)$//;
     my $pre_pat = "$x\.${nh}x${nv}";
-    if ($param->{'shuffled_product'}) {
-        $pat = qr/([0-9a-f]{7}[13579bdf])\.bin\s*$/;
-    } else {
-        $pat = qr/([0-9a-f]{7}[02468ace])\.bin\s*$/;
-    }
+    $pat = qr/([0-9a-f]{8})\.bin\s*$/;
     my @bfiles;
     my $hash;
     for my $fileinfo (get_cached_leadernode_filelist) {
@@ -1129,13 +1150,48 @@ sub get_cached_bfile {
 sub get_cached_balancing_header {
     my $key = 'balancing_header';
     if (defined(my $z = $cache->{$key})) { return @$z; }
-    my $balancing = get_cached_bfile;
+    my $balancing = get_cached_bfile or confess "\$balancing undefined";
     sysopen(my $fh, $balancing, O_RDONLY) or die "$balancing: $!";
     sysread($fh, my $bhdr, 16);
     my @x = unpack("LLLL", $bhdr);
     $cache->{$key} = \@x;
     close($fh);
     return @x;
+}
+sub get_nrows_ncols {
+    my $key = 'nrows_ncols';
+    if (defined(my $z = $cache->{$key})) {
+        return @$z;
+    }
+    if (defined(my $z = $cache->{'balancing_header'})) {
+        my @x = @$z;
+        shift @x;
+        shift @x;
+        $cache->{$key} = \@x;
+        return @x;
+    }
+    if (defined(my $balancing = get_cached_bfile)) {
+        sysopen(my $fh, $balancing, O_RDONLY) or die "$balancing: $!";
+        sysread($fh, my $bhdr, 16);
+        my @xx = unpack("LLLL", $bhdr);
+        $cache->{'balancing_header'} = \@xx;
+        my @x = @xx;
+        close($fh);
+        shift @x;
+        shift @x;
+        $cache->{$key} = \@x;
+        return @x;
+    }
+    (my $mrw = $matrix) =~ s/(\.(?:bin|txt))$/.rw$1/;
+    (my $mcw = $matrix) =~ s/(\.(?:bin|txt))$/.cw$1/;
+    if ($mrw ne $matrix && $mcw ne $matrix && -f $mrw && -f $mcw) {
+        my $nrows = ((stat $mrw)[7] / 4);
+        my $ncols = ((stat $mcw)[7] / 4);
+        my @x = ($nrows, $ncols);
+        $cache->{$key} = \@x;
+        return @x;
+    }
+    confess "Cannot find nrows and ncols ???";
 }
 # }}}
 
@@ -1199,7 +1255,7 @@ sub list_afiles {
 }
 
 sub list_sfiles {
-    my ($f, $filesize) = list_files_generic(4, qr/S\.sols(\d+)-(\d+).(\d+)-(\d+)\.(\d+)/);
+    my ($f, $filesize) = list_files_generic(4, qr/S\.sols(\d+)-(\d+).(\d+)-(\d+)\.(\d+)-(\d+)/);
     if ($filesize) {    # take the occasion to store it.
         my ($bnh, $bnv, $bnrows, $bncols) = get_cached_balancing_header;
         my $N = $bncols > $bnrows ? $bncols : $bnrows;
@@ -1211,7 +1267,9 @@ sub list_sfiles {
         eval { store_cached_entry('nbytes_per_splitwidth', $filesize / ($length/$splitwidth)); };
         die "Problem with the size of S files:\n$@" if $@;
     }
-    my $flatten = sub { local $_; map { shift @$_ } @_; };
+    # Because our S pattern now includes the iteration range, we pick
+    # $_->[1] for the identifier.
+    my $flatten = sub { local $_; map { $_->[1] } @_; };
     $f->{$_} = [&$flatten(@{$f->{$_}})] for keys %$f;
     @{$f->{$_}} = sort { $a <=> $b } @{$f->{$_}} for keys %$f;
     return $f;
@@ -1237,7 +1295,7 @@ sub get_cached_nbytes_per_splitwidth {
 # {{{ inferring max iteration indices.
 sub max_krylov_iteration {
     # read matrix dimension from the balancing header.
-    my ($bnh, $bnv, $bnrows, $bncols) = get_cached_balancing_header;
+    my ($bnrows, $bncols) = get_nrows_ncols;
     my $length = $bncols > $bnrows ? $bncols : $bnrows;
     $length = int(($length+$m-1)/$m) + int(($length+$n-1)/$n);
     $length += 2 * int(($m+$n-1)/$m);
@@ -1282,7 +1340,6 @@ sub task_common_run {
     # are we absolutely sure that lingen needs no matrix ?
     @_ = grep !/^ys=/, @_ unless $program =~ /(?:krylov|mksol|dispatch)$/;
     @_ = grep !/^n?rhs=/, @_ unless $program =~ /(?:prep|gather|plingen.*|mksol)$/;
-    @_ = grep !/shuffled_product/, @_ unless $program =~ /mf_bal/;
     @_ = grep !/skip_decorrelating_permutation/, @_ unless $program =~ /mf_bal/;
     @_ = grep !/(?:precmd|tolerate_failure)/, @_;
 
@@ -1343,7 +1400,6 @@ sub subtask_find_or_create_balancing {
 
     print STDERR "No bfile found, we need a new one\n";
     my @mfbal=("mfile=$matrix", "out=$wdir/", $nh, $nv);
-    unshift @mfbal, "--shuffled-product" if $param->{'shuffled_product'};
     unshift @mfbal, "--withcoeffs" if $prime ne '2';
     task_common_run "mf_bal", @mfbal;
     expire_cache_entry "balancing";
@@ -1584,7 +1640,7 @@ sub task_dispatch {
     }
 
     if ($status eq 'some') {
-        task_check_message 'error', "Missing ouput files for $current_task", @missing, "We don't fix this automatically. Please investigate.";
+        task_check_message 'error', "Missing output files for $current_task", @missing, "We don't fix this automatically. Please investigate.";
         die;
     }
 
@@ -1649,7 +1705,7 @@ sub task_prep {
     }
 
     if ($status eq 'some') {
-        task_check_message 'error', "Missing ouput files for $current_task", @missing, "We don't fix this automatically. Please investigate.";
+        task_check_message 'error', "Missing output files for $current_task", @missing, "We don't fix this automatically. Please investigate.";
         die;
     }
 
@@ -1732,13 +1788,18 @@ sub task_krylov {
 # {{{ lingen
 
 sub task_lingen_input_errors {
+    # krylov_length is not documented. It's just here to fool lingen and
+    # let it believe that it does have the full data set.
     my $h = shift;
-    my $length = max_krylov_iteration;
+    my $length = $param->{'krylov_length'} || max_krylov_iteration;
     my $afiles = list_afiles;
     my $astrings = {};
     my $ok = 1;
     my $nb_afiles = 0;
     my $rlength = int(($length + $param->{'interval'} - 1) / $param->{'interval'}) * $param->{'interval'};
+    if (defined($param->{'krylov_length'})) {
+        $rlength = $param->{'krylov_length'};
+    }
     for my $k (keys %$afiles) {
         my @strings;
         my ($z0, $z1);
@@ -1828,6 +1889,8 @@ sub task_lingen {
     # obvious though.
     if ($prime == 2) {
         my @args = @main_args;
+        my $t = $thr_split[0]*$thr_split[1];
+        push @args, "t=$t";
         task_common_run("lingen", @args);
         task_common_run('split',
             (grep { /^(?:mn|m|n|wdir|prime|splits|verbose_flags)=/ } @main_args),
@@ -1847,7 +1910,11 @@ sub task_lingen {
             @args = grep { !/^(mpi|thr)=/ } @args;
         }
         push @args, grep { /^verbose_flags=/ } @main_args;
-        task_common_run("plingen_pz", @args);
+        if (! -f "$wdir/$concatenated_A.gen") {
+            task_common_run("plingen_pz", @args);
+        } else {
+            task_check_message 'ok', "lingen already has .gen file, good.";
+        }
         # Some splitting work needed...
         @args=();
         push @args, "splits=" . join(",",@splits);
@@ -1920,54 +1987,63 @@ sub task_mksol {
     }
     
     my @todo;
-    eval {
-        @todo = subtask_krylov_mksol_todo $length, sub {
-            my ($range, $cp) = @_;
-            ## return if $cp > $length;
-            my @musthave_found;
-            my @musthave_notfound;
-            for my $s (@sols) {
-                $s =~ /^(\d+)\.\.(\d+)$/ or die;
-                my $optional = $1 >= $nsolvecs;
-                last if $optional;
-                if ($sfiles->{$s . ".." . $range}->{$cp}) {
-                    push @musthave_found, $s;
-                } else {
-                    push @musthave_notfound, $s;
+
+    my @only_seq = grep(/^ys=\d+\.\.\d+$/, @main_args);
+    my @only_start = grep(/^start=\d+$/, @main_args);
+
+    if (@only_start && @only_seq) {
+        @todo = (join(" ", (@only_seq, @only_start)));
+        task_check_message 'ok', "Command line imposes one specific subtask @todo";
+    } else {
+        eval {
+            @todo = subtask_krylov_mksol_todo $length, sub {
+                my ($range, $cp) = @_;
+                ## return if $cp > $length;
+                my @musthave_found;
+                my @musthave_notfound;
+                for my $s (@sols) {
+                    $s =~ /^(\d+)\.\.(\d+)$/ or die;
+                    my $optional = $1 >= $nsolvecs;
+                    last if $optional;
+                    if ($sfiles->{$s . ".." . $range}->{$cp}) {
+                        push @musthave_found, $s;
+                    } else {
+                        push @musthave_notfound, $s;
+                    }
                 }
-            }
-            return 1 unless @musthave_notfound;
-            return 0 unless @musthave_found;
-            print "\n";
-            print STDERR "\n";
-            my $msg = <<EOF;
+                return 1 unless @musthave_notfound;
+                return 0 unless @musthave_found;
+                print "\n";
+                print STDERR "\n";
+                my $msg = <<EOF;
 ## A previous run of mksol has been done with a different value of nsolvecs.
 ## The code presently wants to compute all solutions together, so we cannot
 ## work around this easily
 ##   found: @musthave_found
 ##   notfound: @musthave_notfound
 EOF
-            die $msg;
+                die $msg;
+            };
         };
-    };
-    if ($@) {
-        task_check_message 'error', "Failure message while checking $current_task files";
-        die;
+        if ($@) {
+            task_check_message 'error', "Failure message while checking $current_task files";
+            die;
+        }
+        if (!@todo) {
+            # Note that we haven't checked for the A files yet !
+            task_check_message 'ok', "All $current_task tasks are done, good.\n";
+            return;
+        }
+
+        task_check_message 'missing',
+                    "Pending tasks for $current_task:\n" . join("\n", @todo);
     }
 
-    if (!@todo) {
-        # Note that we haven't checked for the A files yet !
-        task_check_message 'ok', "All $current_task tasks are done, good.\n";
-        return;
-    }
-
-    task_check_message 'missing',
-                "Pending tasks for $current_task:\n" . join("\n", @todo);
     for my $t (@todo) {
         # take out ys from main_args, put the right one in place if
         # needed.
         # print "main_args: @main_args\n";
-        my @args = grep { !/^(ys|n?rhs)/ } @main_args;
+        my @args = grep { !/^(ys|n?rhs|start)/ } @main_args;
         push @args, split(' ', $t);
         if (!grep { /^nsolvecs=(\d+)/} @args) {
             push @args, "nsolvecs=$nsolvecs";

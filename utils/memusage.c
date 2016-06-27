@@ -7,11 +7,12 @@
 /* Returns memory usage, in KB 
  * This is the VmSize field in the status file of /proc/pid/ dir
  * This is highly non portable.
- * Return -1 in case of failure.
+ * Return -1 in case of failure. When not supported, simply return 0.
  */
 long
 Memusage (void)
 {
+#if defined(__linux__) || defined(__linux)
   pid_t pid = getpid();
 
   char str[1024];
@@ -36,12 +37,16 @@ Memusage (void)
       return mem;
     }
   }
+#else
+  return 0;
+#endif
 }
 
 /* same as above, for resident memory (column RES of top) */
 long
 Memusage2 (void)
 {
+#if defined(__linux__) || defined(__linux)
   pid_t pid = getpid();
 
   char str[1024];
@@ -66,6 +71,9 @@ Memusage2 (void)
       return mem;
     }
   }
+#else
+  return 0;
+#endif
 }
 
 /* Returns peak memory usage, in KB 
@@ -76,6 +84,7 @@ Memusage2 (void)
 long
 PeakMemusage (void)
 {
+#if defined(__linux__) || defined(__linux)
   pid_t pid = getpid();
 
   char str[1024];
@@ -100,5 +109,8 @@ PeakMemusage (void)
       return mem;
     }
   }
+#else
+  return 0;
+#endif
 }
 

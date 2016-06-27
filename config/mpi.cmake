@@ -53,9 +53,24 @@ else()
         endif()
     endif()
 
-    find_program(MPI_C_COMPILER ${mpicc_names} ${findprog_flags})
-    find_program(MPI_CXX_COMPILER ${mpicxx_names} ${findprog_flags})
-    find_program(MPIEXEC ${mpiexec_names} ${findprog_flags})
+    if(DEFINED ENV{MPI_C_COMPILER})
+        set(MPI_C_COMPILER "$ENV{MPI_C_COMPILER}")
+    else()
+        find_program(MPI_C_COMPILER ${mpicc_names} ${findprog_flags})
+    endif()
+
+
+    if(DEFINED ENV{MPI_CXX_COMPILER})
+        set(MPI_CXX_COMPILER "$ENV{MPI_CXX_COMPILER}")
+    else()
+        find_program(MPI_CXX_COMPILER ${mpicxx_names} ${findprog_flags})
+    endif()
+
+    if(DEFINED ENV{MPIEXEC})
+        set(MPIEXEC "$ENV{MPIEXEC}")
+    else()
+        find_program(MPIEXEC ${mpiexec_names} ${findprog_flags})
+    endif()
 
     if (MPI_C_COMPILER AND MPI_CXX_COMPILER AND MPIEXEC)
         message(STATUS "Using MPI C compiler ${MPI_C_COMPILER}")
@@ -66,6 +81,76 @@ else()
         # to escape its scope and go into the cache right now.
         set(WITH_MPI 1 CACHE INTERNAL "MPI is being used (for relevant code parts)")
 
+
+        # Run mpicc -v to detect the MPI implementation. We need this at least
+        # to add some command-line arguments to MPI builds for the Intel MPI
+        # implementation.
+
+        execute_process(COMMAND ${MPI_C_COMPILER} -v
+                RESULT_VARIABLE test_return_code
+                OUTPUT_VARIABLE test_stdout
+                ERROR_VARIABLE test_stderr
+                )
+        string(STRIP "${test_stdout}" test_stdout)
+        if (test_return_code)
+        else()
+            if(test_stdout MATCHES "mpi.*for MVAPICH2 version (.*)")
+                message(STATUS "MPI C Compiler is mvapich2, version ${CMAKE_MATCH_1}")
+                set(MPI_COMPILER_IS_MVAPICH2 1)
+                set(MPI_MVAPICH2_COMPILER_VERSION ${CMAKE_MATCH_1})
+            elseif(test_stdout MATCHES "mpi.*for MPICH.*version (.*)")
+                message(STATUS "MPI C Compiler is mpich, version ${CMAKE_MATCH_1}")
+                set(MPI_COMPILER_IS_MPICH 1)
+                set(MPI_MPICH_COMPILER_VERSION ${CMAKE_MATCH_1})
+            elseif(test_stdout MATCHES "^mpi.*for.*Intel.*MPI.*Library ([0-9].*) for")
+                message(STATUS "MPI C Compiler is Intel MPI, version ${CMAKE_MATCH_1}")
+                set(MPI_COMPILER_IS_INTEL_MPI 1)
+                set(MPI_INTEL_COMPILER_VERSION ${CMAKE_MATCH_1})
+		set(MPI_C_COMPILER_CMDLINE_INSERTIONS "-cc=${CMAKE_C_COMPILER}")
+		set(MPI_CXX_COMPILER_CMDLINE_INSERTIONS "-cxx=${CMAKE_CXX_COMPILER}")
+            else()
+                # perhaps it's openmpi, but openmpi won't tell on mere
+                # mpicc -v...
+                execute_process(COMMAND ${MPI_C_COMPILER} -showme:version
+                        RESULT_VARIABLE test_return_code
+                        OUTPUT_VARIABLE test_stdout
+                        ERROR_VARIABLE test_stderr
+                        )
+                string(STRIP "${test_stdout}" test_stdout)
+                if(test_stdout MATCHES "Open MPI ([^ ]*)")
+                    message(STATUS "MPI C Compiler is Open MPI, version ${CMAKE_MATCH_1}")
+                    set(MPI_COMPILER_IS_OPEN_MPI 1)
+                    set(MPI_OPEN_MPI_COMPILER_VERSION ${CMAKE_MATCH_1})
+                    if(MPI_OPEN_MPI_COMPILER_VERSION VERSION_GREATER 1.6.5
+                            AND
+                            MPI_OPEN_MPI_COMPILER_VERSION VERSION_LESS 2.0.0)
+                        message(STATUS "Enabling workaround for long-standing OpenMPI breakage (ompi/pull/1495)")
+                        # tl;dr leave_pinned is just plain broken
+                        # throughout most of the 1.7, 1.8. 1.9, and 1.10
+                        # series of OpenMPI. The work to fix this is at
+                        # https://github.com/open-mpi/ompi/pull/1495 ;
+                        # see the attached commit logs (namely, commits
+                        # 57035744 and 4b7cd1c0 in ompi-release carry the
+                        # fix. Those are open-mpi/ompi@7aa03d66 and
+                        # open-mpi/ompi@11e2d788 in the ompi repository).
+                        set(MPIEXEC_EXTRA_STANZAS "--mca mpi_leave_pinned 0")
+                        # This is solely to fix
+                        # https://github.com/open-mpi/ompi/issues/299 but
+                        # the problem is broader than that.
+                        # set(MPI_C_COMPILER_CMDLINE_INSERTIONS "--openmpi:linkall")
+                        # set(MPI_CXX_COMPILER_CMDLINE_INSERTIONS "--openmpi:linkall")
+                    endif()
+                else()
+                    message(STATUS "MPI C Compiler front-end not recognized, proceeding anyway")
+                endif()
+            endif()
+        endif()
+        if (MPI_C_COMPILER_CMDLINE_INSERTIONS)
+            message(STATUS "Adding ${MPI_C_COMPILER_CMDLINE_INSERTIONS} to mpicc command line")
+        endif()
+        if (MPI_CXX_COMPILER_CMDLINE_INSERTIONS)
+            message(STATUS "Adding ${MPI_CXX_COMPILER_CMDLINE_INSERTIONS} to mpicxx command line")
+        endif()
         # Now check for the MPI API version.
         macro(my_try_compile_mpicc SOURCE VAR)
             string(RANDOM LENGTH 8 ALPHABET "0123456789abcdef" uuid)

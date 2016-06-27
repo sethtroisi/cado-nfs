@@ -7,16 +7,14 @@
 #include "portability.h"
 #include "utils.h"
 
-#define MAX_THREADS 16
-
 /*
  * Compute g(x) = f(a*x+b), with deg f = d, and a and b are longs.
  * Must have a != 0 and d >= 1
  */
 void mp_poly_linear_comp(mpz_t *g, mpz_t *f, int d, long a, long b) {
     ASSERT (a != 0  &&  d >= 1);
-    // lazy: use the mpz_poly_t interface of utils/mpz_poly.h
-    mpz_poly_t aXpb, aXpbi, G, Aux;
+    // lazy: use the mpz_poly interface of utils/mpz_poly.h
+    mpz_poly aXpb, aXpbi, G, Aux;
     mpz_poly_init(aXpb, 1);  // alloc sets to zero
     mpz_poly_init(aXpbi, d);
     mpz_poly_init(G, d);
@@ -199,7 +197,7 @@ void all_roots_affine(entry_list *L, mpz_t *f, int d, unsigned long p,
     unsigned long *roots;
     mpz_t aux;
 
-    mpz_poly_t F;
+    mpz_poly F;
     F->coeff = f;
     F->deg = d;
 
@@ -373,7 +371,7 @@ one_thread (void* args)
   return NULL;
 }
 
-void makefb_with_powers(FILE* outfile, mpz_poly_t F, unsigned long alim,
+void makefb_with_powers(FILE* outfile, mpz_poly F, unsigned long alim,
                         int maxbits, int nb_threads)
 {
     mpz_t *f = F->coeff;
@@ -385,9 +383,11 @@ void makefb_with_powers(FILE* outfile, mpz_poly_t F, unsigned long alim,
     fprintf(outfile, "# alim = %lu\n", alim);
     fprintf(outfile, "# maxbits = %d\n", maxbits);
 
-    pthread_t tid[MAX_THREADS];
+    pthread_t *tid;
     unsigned long p;
-    tab_t T[MAX_THREADS];
+    tab_t *T;
+    tid = (pthread_t*) malloc (nb_threads * sizeof (pthread_t));
+    T = (tab_t*) malloc (nb_threads * sizeof (tab_t));
     for (j = 0; j < nb_threads; j++)
       {
         T[j]->f = f;
@@ -436,6 +436,8 @@ void makefb_with_powers(FILE* outfile, mpz_poly_t F, unsigned long alim,
         }
       }
     }
+    free (tid);
+    free (T);
     prime_info_clear (pi);
 }
 
@@ -499,7 +501,7 @@ main (int argc, char *argv[])
   }
 
   param_list_parse_ulong(pl, "t"   , &nb_threads);
-  ASSERT_ALWAYS(1 <= nb_threads && nb_threads <= MAX_THREADS);
+  ASSERT_ALWAYS(1 <= nb_threads);
 
   param_list_parse_ulong(pl, "lim", &lim);
   if (lim == 0) {

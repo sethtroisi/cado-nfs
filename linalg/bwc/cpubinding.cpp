@@ -11,6 +11,7 @@
 #include <cctype>
 #include <algorithm>
 #include <iterator>
+#include <vector>
 
 #include <hwloc.h>
 #include <stdio.h>
@@ -715,25 +716,23 @@ void cpubinder::read_param_list(param_list_ptr pl, int want_conf_file)
          * still groks that. Let's do a transformation for pre-1.9, that
          * should keep us safe.
          */
-#if HWLOC_API_VERSION >= 0x010900
-        int rc = hwloc_topology_set_synthetic(topology, topology_string);
-        if (rc < 0)
-            cerr << "hwloc_topology_set_synthetic("<< topology_string <<") failed\n";
-#else
-        int rc;
+        int rc = -1;
         {
             istringstream is(topology_string);
             synthetic_topology stopo;
             if (is >> stopo) {
+#if HWLOC_API_VERSION < 0x010b00
                 for(auto& x: stopo) {
+#if HWLOC_API_VERSION < 0x010900
                     if (x.object == "NUMANode") { x.object="node"; }
-                    /* Obviously, pre-1.9 is also pre-1.11, so we don't
-                     * want "Package" in that case */
+#endif
                     if (x.object == "Package") { x.object="Socket"; }
                 }
+#endif
                 ostringstream os;
                 os << stopo;
-                const char * v = os.str().c_str();
+                string ss(os.str());
+                const char * v = ss.c_str();
                 rc = hwloc_topology_set_synthetic(topology, v);
                 if (rc < 0)
                     cerr << "hwloc_topology_set_synthetic("<< v <<") [mangled for hwloc<1.9] failed\n";
@@ -742,7 +741,6 @@ void cpubinder::read_param_list(param_list_ptr pl, int want_conf_file)
                 rc = -1;
             }
         }
-#endif
         ASSERT_ALWAYS(rc >= 0);
         fake = true;
     } else {

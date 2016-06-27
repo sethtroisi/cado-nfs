@@ -36,6 +36,12 @@
     families=[
      [ u64k1, u64k2, u64k3, u64k4, ],
      [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_1, tag=p_1, }, ],
+     [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_10, tag=p_10, }, ],
+     [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_11, tag=p_11, }, ],
+     [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_12, tag=p_12, }, ],
+     [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_13, tag=p_13, }, ],
+     [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_14, tag=p_14, }, ],
+     [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_15, tag=p_15, }, ],
      [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_2, tag=p_2, }, ],
      [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_3, tag=p_3, }, ],
      [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_4, tag=p_4, }, ],
@@ -48,6 +54,12 @@
      ],
     member_templates_restrict={
      p_1=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_1, tag=p_1, }, ],
+     p_10=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_10, tag=p_10, }, ],
+     p_11=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_11, tag=p_11, }, ],
+     p_12=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_12, tag=p_12, }, ],
+     p_13=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_13, tag=p_13, }, ],
+     p_14=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_14, tag=p_14, }, ],
+     p_15=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_15, tag=p_15, }, ],
      p_2=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_2, tag=p_2, }, ],
      p_3=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_3, tag=p_3, }, ],
      p_4=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_4, tag=p_4, }, ],
@@ -141,7 +153,7 @@ static inline
 void mpfq_u64k1_field_init(mpfq_u64k1_dst_field);
 /* *simd_u64k::code_for_field_clear */
 #define mpfq_u64k1_field_clear(K)	/**/
-void mpfq_u64k1_field_specify(mpfq_u64k1_dst_field, unsigned long, void *);
+void mpfq_u64k1_field_specify(mpfq_u64k1_dst_field, unsigned long, const void *);
 /* *simd_u64k::code_for_field_setopt */
 #define mpfq_u64k1_field_setopt(f, x, y)	/**/
 
@@ -168,6 +180,10 @@ void mpfq_u64k1_add(mpfq_u64k1_dst_field, mpfq_u64k1_dst_elt, mpfq_u64k1_src_elt
 #define mpfq_u64k1_sub(K, r, s1, s2)	mpfq_u64k1_add(K,r,s1,s2)
 /* *simd_char2::code_for_neg */
 #define mpfq_u64k1_neg(K, r, s)	mpfq_u64k1_set(K,r,s)
+static inline
+void mpfq_u64k1_mul(mpfq_u64k1_dst_field, mpfq_u64k1_dst_elt, mpfq_u64k1_src_elt, mpfq_u64k1_src_elt);
+static inline
+int mpfq_u64k1_inv(mpfq_u64k1_dst_field, mpfq_u64k1_dst_elt, mpfq_u64k1_src_elt);
 
 /* Operations involving unreduced elements */
 /* *Mpfq::defaults::flatdata::code_for_elt_ur_init, simd_flat */
@@ -224,7 +240,8 @@ static inline
 void mpfq_u64k1_vec_rev(mpfq_u64k1_dst_field, mpfq_u64k1_dst_vec, mpfq_u64k1_src_vec, unsigned int);
 static inline
 void mpfq_u64k1_vec_sub(mpfq_u64k1_dst_field, mpfq_u64k1_dst_vec, mpfq_u64k1_src_vec, mpfq_u64k1_src_vec, unsigned int);
-/* missing vec_scal_mul */
+static inline
+void mpfq_u64k1_vec_scal_mul(mpfq_u64k1_dst_field, mpfq_u64k1_dst_vec, mpfq_u64k1_src_vec, mpfq_u64k1_src_elt, unsigned int);
 static inline
 void mpfq_u64k1_vec_random(mpfq_u64k1_dst_field, mpfq_u64k1_dst_vec, unsigned int, gmp_randstate_t);
 /* missing vec_random2 */
@@ -305,9 +322,9 @@ void mpfq_u64k1_dotprod(mpfq_u64k1_dst_field, mpfq_u64k1_dst_vec, mpfq_u64k1_src
 /* Member templates related to SIMD operation */
 
 /* Object-oriented interface */
+void mpfq_u64k1_oo_field_init(mpfq_vbase_ptr);
 static inline
 void mpfq_u64k1_oo_field_clear(mpfq_vbase_ptr);
-void mpfq_u64k1_oo_field_init(mpfq_vbase_ptr);
 #ifdef  __cplusplus
 }
 #endif
@@ -349,6 +366,27 @@ void mpfq_u64k1_add(mpfq_u64k1_dst_field K MAYBE_UNUSED, mpfq_u64k1_dst_elt r, m
         for(unsigned int i = 0 ; i < sizeof(mpfq_u64k1_elt)/sizeof(*r) ; i++) {
             r[i] = s1[i] ^ s2[i];
         }
+}
+
+/* *simd_char2::code_for_mul */
+static inline
+void mpfq_u64k1_mul(mpfq_u64k1_dst_field K MAYBE_UNUSED, mpfq_u64k1_dst_elt r, mpfq_u64k1_src_elt s1, mpfq_u64k1_src_elt s2)
+{
+        for(unsigned int i = 0 ; i < sizeof(mpfq_u64k1_elt)/sizeof(*r) ; i++) {
+            r[i] = s1[i] & s2[i];
+        }
+}
+
+/* *simd_char2::code_for_inv */
+static inline
+int mpfq_u64k1_inv(mpfq_u64k1_dst_field K MAYBE_UNUSED, mpfq_u64k1_dst_elt r, mpfq_u64k1_src_elt s)
+{
+        int rc = 0;
+        for(unsigned int i = 0 ; i < sizeof(mpfq_u64k1_elt)/sizeof(*r) ; i++) {
+            r[i] = s[i];
+            if (r[i]) rc = 1;
+        }
+        return rc;
 }
 
 /* *Mpfq::defaults::flatdata::code_for_elt_ur_set, simd_flat */
@@ -470,6 +508,15 @@ void mpfq_u64k1_vec_sub(mpfq_u64k1_dst_field K MAYBE_UNUSED, mpfq_u64k1_dst_vec 
     unsigned int i;
     for(i = 0; i < n; ++i)
         mpfq_u64k1_sub(K, w[i], u[i], v[i]);
+}
+
+/* *Mpfq::defaults::vec::mul::code_for_vec_scal_mul, Mpfq::defaults::vec */
+static inline
+void mpfq_u64k1_vec_scal_mul(mpfq_u64k1_dst_field K MAYBE_UNUSED, mpfq_u64k1_dst_vec w, mpfq_u64k1_src_vec u, mpfq_u64k1_src_elt x, unsigned int n)
+{
+        unsigned int i;
+    for(i = 0; i < n; i+=1)
+        mpfq_u64k1_mul(K, w[i], u[i], x);
 }
 
 /* *Mpfq::defaults::vec::getset::code_for_vec_random, Mpfq::defaults::vec */

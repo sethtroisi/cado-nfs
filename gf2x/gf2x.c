@@ -128,7 +128,7 @@ void gf2x_mul_r(unsigned long * c,
 #ifdef GF2X_MUL_FFT_TABLE
     long ix, K, sab = sc / 2;
     long max_ix = sizeof(T_FFT_TAB)/sizeof(T_FFT_TAB[0]);
-    for (ix = 0; T_FFT_TAB[ix + 1][0] <= sab && ix + 1 < max_ix; ix++);
+    for (ix = 0; ix + 1 < max_ix && T_FFT_TAB[ix + 1][0] <= sab; ix++);
     /* now T_FFT_TAB[ix][0] <= sab < T_FFT_TAB[ix+1][0] */
     K = T_FFT_TAB[ix][1];
 

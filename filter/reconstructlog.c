@@ -7,9 +7,6 @@
 #include "filter_config.h"
 
 #include "utils_with_io.h"
-#ifdef FOR_FFS
-#include "utils-ffs.h"
-#endif
 #define DEBUG 0
 
 stats_data_t stats; /* struct for printing progress */
@@ -51,7 +48,7 @@ log_rel_free (log_rel_t *rels, uint64_t nrels)
   free(rels);
 }
 
-/***** Light relations structure (for constructing the dependancy graph) *****/
+/***** Light relations structure (for constructing the dependency graph) *****/
 typedef struct
 {
   weight_t len;
@@ -195,7 +192,7 @@ read_data_free (read_data_ptr data)
 }
 
 /************************ Handling of the SMs *******************************/
-/* number of SM that must be used for side 1. Must be 0 for FFS */
+/* number of SM that must be used. */
 
 /* 
  * given S ==  data->sm_info[i], the range data->smlogs[i][0..S->nsm[
@@ -214,30 +211,61 @@ thread_sm (void * context_data, earlyparsed_relation_ptr rel)
     uint64_t b = rel->b;
 
     uint64_t nonvoidside = 0; /* bit vector of which sides appear in the rel */
-    for (weight_t i = 0; i < rel->nb; i++)
-    {
+    for (weight_t i = 0; i < rel->nb; i++) {
       index_t h = rel->primes[i].h;
       int side = renumber_get_side_from_index (data->renum_tab, h, data->poly);
       nonvoidside |= ((uint64_t) 1) << side;
     }
 
-    mpz_srcptr ell = data->log->ell;
-    for(int side = 0 ; side < data->poly->nb_polys ; side++)
-    {
-      sm_side_info_srcptr S = data->sm_info[side];
-      if (S->nsm > 0 && (nonvoidside & (((uint64_t) 1) << side)))
-      {
-	  mpz_poly_t u;
-	  mpz_poly_init(u, MAX(1, S->f->deg-1));
-	  mpz_poly_setcoeff_int64(u, 0, a);
-	  mpz_poly_setcoeff_int64(u, 1, -b);
-	  compute_sm_piecewise(u, u, S);
-	  ASSERT_ALWAYS(u->deg < S->f->deg);
-	  for(int i = S->f->deg-1-u->deg; i < S->nsm; i++)
-              mpz_addmul (l, data->smlogs[side][i], u->coeff[S->f->deg-1-i]);
-	  mpz_mod(l, l, ell);
-	  mpz_poly_clear(u);
-      }
+    if (rel->sm_size) {
+        /* use the SM values which are already present in the input file,
+         * because some goodwill computed them for us.
+         */
+        int c = 0;
+        for(int side = 0 ; side < data->poly->nb_polys ; side++) {
+            sm_side_info_srcptr S = data->sm_info[side];
+            if (S->nsm > 0 && (nonvoidside & (((uint64_t) 1) << side))) {
+#define xxxDOUBLECHECK_SM
+#ifdef DOUBLECHECK_SM
+                mpz_poly u;
+                mpz_poly_init(u, MAX(1, S->f->deg-1));
+                mpz_poly_setcoeff_int64(u, 0, a);
+                mpz_poly_setcoeff_int64(u, 1, -b);
+                compute_sm_piecewise(u, u, S);
+                ASSERT_ALWAYS(u->deg < S->f->deg);
+                ASSERT_ALWAYS(u->deg == S->f->deg - 1);
+                for(int i = 0 ; i < S->nsm; i++) {
+                    ASSERT_ALWAYS(mpz_cmp(u->coeff[S->f->deg-1-i],rel->sm[c + i]) == 0);
+                }
+
+#endif
+                ASSERT_ALWAYS(c + S->nsm <= rel->sm_size);
+                for(int i = 0 ; i < S->nsm ; i++, c++) {
+                    mpz_addmul(l, data->smlogs[side][i], rel->sm[c]);
+                }
+                mpz_mod(l, l, data->log->ell);
+#ifdef DOUBLECHECK_SM
+                mpz_poly_clear(u);
+#endif
+            }
+        }
+    } else {
+        mpz_srcptr ell = data->log->ell;
+        for(int side = 0 ; side < data->poly->nb_polys ; side++) {
+            sm_side_info_srcptr S = data->sm_info[side];
+            if (S->nsm > 0 && (nonvoidside & (((uint64_t) 1) << side))) {
+                mpz_poly u;
+                mpz_poly_init(u, MAX(1, S->f->deg-1));
+                mpz_poly_setcoeff_int64(u, 0, a);
+                mpz_poly_setcoeff_int64(u, 1, -b);
+                compute_sm_piecewise(u, u, S);
+                ASSERT_ALWAYS(u->deg < S->f->deg);
+                for(int i = S->f->deg-1-u->deg; i < S->nsm; i++)
+                    mpz_addmul (l, data->smlogs[side][i], u->coeff[S->f->deg-1-i]);
+                mpz_mod(l, l, ell);
+                mpz_poly_clear(u);
+            }
+        }
     }
 
     return NULL;
@@ -379,7 +407,7 @@ log_do_one_part_of_iter (read_data_ptr data, bit_vector not_used, uint64_t start
 
 #define log_do_one_iter_mono(d, bv, n) log_do_one_part_of_iter (d, bv, 0, n)
 
-/************************** Dependancy graph *********************************/
+/************************** Dependency graph *********************************/
 typedef struct
 {
   uint8_t state;
@@ -527,8 +555,8 @@ dep_nb_unknown_log (dep_read_data_ptr data, uint64_t i, index_t *h)
   return nb;
 }
 
-/* Compute all dependancies for relations in [start,end[.
- * Return the number of dependancies found */
+/* Compute all dependencies for relations in [start,end[.
+ * Return the number of dependencies found */
 static uint64_t
 dep_do_one_part_of_iter (dep_read_data_ptr data, bit_vector not_used,
                          uint64_t start, uint64_t end)
@@ -933,20 +961,25 @@ compute_log_from_rels (bit_vector needed_rels,
   if (nrels_needed != nrels)
     printf ("# Parsing only %" PRIu64 " needed relations out of %" PRIu64 "\n",
             nrels_needed, nrels);
-#if ! defined (FOR_FFS) && DEBUG >= 1
+#if DEBUG >= 1
   printf ("# DEBUG: Using %d thread(s) for thread_sm\n", nt);
 #endif
   fflush(stdout);
   char *fic[3] = {(char *) relspfilename, (char *) relsdfilename, NULL};
+
+  /* When purged.gz and relsdel.gz both have SM info included, we may
+   * have an advantage in having more threads for thread_insert. Note
+   * though that we'll most probably be limited by gzip throughput */
   struct filter_rels_description desc[3] = {
                    { .f = thread_insert, .arg=data, .n=1},
-#ifndef FOR_FFS
                    { .f = thread_sm,     .arg=data, .n=nt},
-#endif
-                   { .f = NULL,          .arg=0,     .n=0}
+                   { .f = NULL,          .arg=0,    .n=0}
       };
-  filter_rels2 (fic, desc, EARLYPARSE_NEED_AB_HEXA | EARLYPARSE_NEED_INDEX,
-                needed_rels, NULL);
+  filter_rels2 (fic, desc,
+          EARLYPARSE_NEED_AB_HEXA |
+          EARLYPARSE_NEED_INDEX |
+          EARLYPARSE_NEED_SM, /* It's fine (albeit slow) if we recompute them */
+          needed_rels, NULL);
 
   /* computing missing log */
   printf ("# Starting to compute missing logarithms from rels\n");
@@ -1028,7 +1061,7 @@ compute_needed_rels (bit_vector needed_rels,
                EARLYPARSE_NEED_INDEX, NULL, NULL);
 
   /* computing dependencies */
-  printf ("# Starting to compute dependancies from rels\n");
+  printf ("# Starting to compute dependencies from rels\n");
 
   /* adjust the number of threads based on the number of relations */
   double ntm = ceil((nrels + 0.0)/SIZE_BLOCK);
@@ -1053,7 +1086,7 @@ compute_needed_rels (bit_vector needed_rels,
       computed = dep_do_one_iter_mono (data, needed_rels, nrels);
     total_computed += computed;
 
-    printf ("# Iteration %" PRIu64 ": %" PRIu64 " new dependancies computed\n",
+    printf ("# Iteration %" PRIu64 ": %" PRIu64 " new dependencies computed\n",
             iter, computed);
     printf ("# Iteration %" PRIu64 " took %.1fs (wall-clock time).\n",
             iter, wct_seconds() - wct_tt);
@@ -1061,7 +1094,7 @@ compute_needed_rels (bit_vector needed_rels,
     iter++;
   } while (computed);
 
-  printf ("# Computing dependancies took %.1fs (wall-clock time)\n",
+  printf ("# Computing dependencies took %.1fs (wall-clock time)\n",
           wct_seconds() - wct_tt0);
 
   FILE *f = NULL;
@@ -1118,9 +1151,7 @@ static void declare_usage(param_list pl)
                                      "-nrels parameter)");
   param_list_decl_usage(pl, "partial", "(switch) do not reconstruct everything "
                                        "that can be reconstructed");
-#ifndef FOR_FFS
   param_list_decl_usage(pl, "nsm", "number of SM's to add on side 0,1,...");
-#endif
   param_list_decl_usage(pl, "mt", "number of threads (default 1)");
   param_list_decl_usage(pl, "wanted", "file containing list of wanted logs");
   param_list_decl_usage(pl, "force-posix-threads", "(switch)");
@@ -1142,7 +1173,7 @@ main(int argc, char *argv[])
   char *argv0 = argv[0];
 
   renumber_t renumber_table;
-  uint64_t nrels_tot = 0, nrels_purged, nideals_purged, nrels_del, nrels_needed;
+  uint64_t nrels_tot = 0, nrels_purged, nrels_del, nrels_needed;
   uint64_t nprimes;
   int mt = 1;
   int partial = 0;
@@ -1164,17 +1195,6 @@ main(int argc, char *argv[])
 
   param_list_configure_switch(pl, "partial", &partial);
   param_list_configure_switch(pl, "force-posix-threads", &filter_rels_force_posix_threads);
-
-#ifndef FOR_FFS
-  int units0 = 0;
-  param_list_configure_switch(pl, "explicit_units0", &units0);
-  int units1 = 0;
-  param_list_configure_switch(pl, "explicit_units1", &units1);
-  if(units0 != 0 && units1 != 0){
-      fprintf (stderr, "units0 and units1 cannot be both set\n");
-      exit (EXIT_FAILURE);
-  }
-#endif
 
 #ifdef HAVE_MINGW
   _fmode = _O_BINARY;     /* Binary open for all files */
@@ -1203,19 +1223,17 @@ main(int argc, char *argv[])
   const char * renumberfilename = param_list_lookup_string(pl, "renumber");
   const char * polyfilename = param_list_lookup_string(pl, "poly");
   const char * wantedfilename = param_list_lookup_string(pl, "wanted");
-  param_list_parse_uint64(pl, "nrels", &nrels_tot);
-  param_list_parse_mpz(pl, "ell", ell);
   param_list_parse_int(pl, "mt", &mt);
   const char *path_antebuffer = param_list_lookup_string(pl, "path_antebuffer");
 
   /* Some checks on command line arguments */
-  if (mpz_cmp_ui (ell, 0) <= 0)
+  if (!param_list_parse_mpz(pl, "ell", ell) || mpz_cmp_ui (ell, 0) <= 0)
   {
     fprintf(stderr, "Error, missing -ell command line argument "
                     "(or ell <= 0)\n");
     usage (pl, argv0);
   }
-  if (nrels_tot == 0)
+  if (!param_list_parse_uint64(pl, "nrels", &nrels_tot) || nrels_tot == 0)
   {
     fprintf(stderr, "Error, missing -nrels command line argument "
                     "(or nrels = 0)\n");
@@ -1280,17 +1298,12 @@ main(int argc, char *argv[])
   }
 
   cado_poly_init (poly);
-#ifndef FOR_FFS
   if (!cado_poly_read (poly, polyfilename))
-#else
-  if (!ffs_poly_read (poly, polyfilename))
-#endif
   {
     fprintf (stderr, "Error reading polynomial file\n");
     exit (EXIT_FAILURE);
   }
 
-#ifndef FOR_FFS
   /* Read number of sm to be printed from command line */
   param_list_parse_int_list (pl, "nsm", nsm_arg, poly->nb_polys, ",");
   for(int side = 0; side < poly->nb_polys; side++)
@@ -1302,8 +1315,6 @@ main(int argc, char *argv[])
       exit (EXIT_FAILURE);
     }
   }
-
-#endif
 
   if (param_list_warn_unused(pl))
   {
@@ -1318,7 +1329,6 @@ main(int argc, char *argv[])
   nsm_tot = 0;
   for (int side = 0; side < poly->nb_polys; side++)
   {
-#ifndef FOR_FFS
     sm_side_info_init(sm_info[side], poly->pols[side], ell);
     fprintf(stdout, "\n# Polynomial on side %d:\n# F[%d] = ", side, side);
     mpz_poly_fprintf(stdout, poly->pols[side]);
@@ -1339,9 +1349,6 @@ main(int argc, char *argv[])
       ASSERT_ALWAYS(sm_info[side]->unit_rank != 0);
     }
     nsm_tot += sm_info[side]->nsm;
-#else
-    sm_info[side]->nsm = 0;
-#endif
   }
   fflush(stdout);
 
@@ -1353,8 +1360,11 @@ main(int argc, char *argv[])
   nprimes = renumber_table->size;
 
   /* Read number of rows and cols on first line of purged file */
-  purgedfile_read_firstline (relspfilename, &nrels_purged, &nideals_purged);
-  nrels_del = nrels_tot - nrels_purged;
+  {
+      uint64_t nideals_purged;
+      purgedfile_read_firstline (relspfilename, &nrels_purged, &nideals_purged);
+      nrels_del = nrels_tot - nrels_purged;
+  }
 
   /* Malloc'ing log tab and reading values of log */
   printf ("\n###### Reading known logarithms ######\n");
@@ -1420,10 +1430,8 @@ main(int argc, char *argv[])
   logtab_clear (log);
   mpz_clear(ell);
 
-#ifndef FOR_FFS
   for (int side = 0 ; side < poly->nb_polys ; side++)
     sm_side_info_clear (sm_info[side]);
-#endif
 
   renumber_clear (renumber_table);
   bit_vector_clear(rels_to_process);

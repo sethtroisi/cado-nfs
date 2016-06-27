@@ -22,6 +22,7 @@
 #define EARLYPARSE_NEED_PRIMES                  8
 /* for reading index (i.e. renumber ideal) */
 #define EARLYPARSE_NEED_INDEX                  16
+#define EARLYPARSE_NEED_SM                     32
 
 
 /* Initial size of primes_data array in earlyparsed_relation_s,
@@ -58,6 +59,9 @@ struct earlyparsed_relation_s {
   // weight_t nb_above_min_index; /* nb of primes above min_index, must be <=nb */
   uint64_t num;          /* (absolute) relation number */
   char *line;           /* If not NULL, contains the relation with a '\n' at the end */
+  mpz_t * sm;
+  int sm_size;
+  int sm_alloc;
 };
 typedef struct earlyparsed_relation_s earlyparsed_relation[1];
 typedef struct earlyparsed_relation_s * earlyparsed_relation_ptr;

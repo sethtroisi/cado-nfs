@@ -27,7 +27,7 @@ ropt_get_bestpoly ( ropt_poly_t poly,
   double ave_MurphyE = 0.0, best_E = 0.0;
   int i, old_i, k;
   mpz_t m, t, *fuv, *guv;
-  mpz_poly_t Fuv, Guv;
+  mpz_poly Fuv, Guv;
 
   mpz_init_set (m, poly->g[0]);
   mpz_neg (m, m);
@@ -106,7 +106,7 @@ ropt_do_stage2 (ropt_poly_t poly,
   ropt_bound_t bound;
   ropt_s2param_t s2param;
   MurphyE_pq *global_E_pqueue;
-  mpz_poly_t Fuv;
+  mpz_poly Fuv;
 
   ropt_bound_init (bound);
   new_MurphyE_pq (&global_E_pqueue, 4);
@@ -231,7 +231,7 @@ ropt ( ropt_poly_t poly,
  */
 void
 ropt_polyselect (cado_poly_ptr output_poly, cado_poly_ptr input_poly,
-                 ropt_param_t param)
+                 ropt_param_t param, ropt_time_t eacht)
 {
   int i;
   ropt_poly_t poly;
@@ -265,6 +265,11 @@ ropt_polyselect (cado_poly_ptr output_poly, cado_poly_ptr input_poly,
   mpz_poly_cleandeg (output_poly->pols[ALG_SIDE], input_poly->pols[ALG_SIDE]->deg);
   mpz_set (output_poly->n, input_poly->n);
 
+  /* get time passed from info, use info to keep interface unchanged */
+  eacht->ropt_time_stage1 = info->ropt_time_stage1;
+  eacht->ropt_time_tuning = info->ropt_time_tuning;
+  eacht->ropt_time_stage2 = info->ropt_time_stage2;
+  
   /* free */
   ropt_bestpoly_free (bestpoly, poly->d);
   ropt_info_free (info);

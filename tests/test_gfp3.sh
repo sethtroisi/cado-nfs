@@ -36,7 +36,7 @@ slaves.nrclients = $(((1+NCPUS)/2))
 tasks.threads = 2
 tasks.linalg.bwc.threads = $NCPUS
 tasks.execpath = $CADO_NFS_BINARY_DIR
-slaves.scriptpath = $CADO_NFS_SOURCE_DIR/scripts/cadofactor
+slaves.scriptpath = $CADO_NFS_SOURCE_DIR
 tasks.workdir = $WDIR
 slaves.basepath= $WDIR/client
 slaves.hostnames = localhost
@@ -56,12 +56,12 @@ tasks.polyselect.nq = 1000
 
 rlim = 20000
 alim = 20000
-lpbr = 15
-lpba = 15
+lpbr = 16
+lpba = 16
 tasks.sieve.mfbr = 32
 tasks.sieve.mfba = 32
 tasks.sieve.qrange = 1000
-tasks.sieve.rels_wanted = 10000
+tasks.sieve.rels_wanted = 20000
 
 tasks.linalg.allow_zero_on_rhs = 1
 tasks.reconstructlog.partial = true
@@ -76,4 +76,4 @@ cleanup() {
     fi
 }
 
-${CADO_NFS_SOURCE_DIR}/scripts/cadofactor/cadofactor.py $PARAMFILE && cleanup
+${CADO_NFS_SOURCE_DIR}/cado-nfs.py $PARAMFILE && cleanup

@@ -27,6 +27,7 @@
 #include "mpfq/mpfq.h"
 #include "mpfq/mpfq_vbase.h"
 #include "matmul-mf.h"
+#include "cheating_vec_init.h"
 
 void usage()
 {
@@ -97,6 +98,7 @@ void init_func(struct worker_threads_group * tg MAYBE_UNUSED, int tnum, struct b
         fprintf(stderr, "T%d Cache save time %ds wct\n",
                 tnum, (int) time(NULL) - t0);
         pthread_mutex_unlock(&tg->mu);
+        if (m->mfile) free(m->mfile);
     }
 
     pthread_mutex_lock(&tg->mu);
@@ -111,8 +113,8 @@ void init_func(struct worker_threads_group * tg MAYBE_UNUSED, int tnum, struct b
     matmul_aux(p->mm, MATMUL_AUX_GET_READAHEAD, &nr);
     matmul_aux(p->mm, MATMUL_AUX_GET_READAHEAD, &nc);
 
-    ba->xx->vec_init(ba->xx, &p->colvec, nc);
-    ba->xx->vec_init(ba->xx, &p->rowvec, nr);
+    cheating_vec_init(ba->xx, &p->colvec, nc);
+    cheating_vec_init(ba->xx, &p->rowvec, nr);
     ba->xx->vec_set_zero(ba->xx, p->colvec, nc);
     ba->xx->vec_set_zero(ba->xx, p->rowvec, nr);
 }/*}}}*/
@@ -131,15 +133,15 @@ void check_func(struct worker_threads_group * tg MAYBE_UNUSED, int tnum, struct 
 
     void * colvec_bis;
     void * rowvec_bis;
-    A->vec_init(A, &colvec_bis, nc);
-    A->vec_init(A, &rowvec_bis, nr);
+    cheating_vec_init(A, &colvec_bis, nc);
+    cheating_vec_init(A, &rowvec_bis, nr);
     A->vec_set_zero(A, colvec_bis, nc);
     A->vec_set_zero(A, rowvec_bis, nr);
 
     void * check0;
     void * check1;
-    A->vec_init(A, &check0, A->groupsize(A));
-    A->vec_init(A, &check1, A->groupsize(A));
+    cheating_vec_init(A, &check0, A->groupsize(A));
+    cheating_vec_init(A, &check1, A->groupsize(A));
 
     A->vec_set(A, colvec_bis, p->colvec, nc);
     A->vec_set(A, rowvec_bis, p->rowvec, nr);
@@ -170,10 +172,10 @@ void check_func(struct worker_threads_group * tg MAYBE_UNUSED, int tnum, struct 
         abort();
     }
 
-    A->vec_clear(A, &colvec_bis, nc);
-    A->vec_clear(A, &rowvec_bis, nr);
-    A->vec_clear(A, &check0, A->groupsize(A));
-    A->vec_clear(A, &check1, A->groupsize(A));
+    cheating_vec_clear(A, &colvec_bis, nc);
+    cheating_vec_clear(A, &rowvec_bis, nr);
+    cheating_vec_clear(A, &check0, A->groupsize(A));
+    cheating_vec_clear(A, &check1, A->groupsize(A));
 
 
     matmul_aux(p->mm, MATMUL_AUX_ZERO_STATS);
@@ -198,8 +200,8 @@ void clear_func(struct worker_threads_group * tg MAYBE_UNUSED, int tnum, struct 
     printf("\n");
     pthread_mutex_unlock(&tg->mu);
     matmul_clear(p->mm);
-    A->vec_clear(A, &p->colvec, nc);
-    A->vec_clear(A, &p->rowvec, nr);
+    cheating_vec_clear(A, &p->colvec, nc);
+    cheating_vec_clear(A, &p->rowvec, nr);
 }/*}}}*/
 
 void banner(int argc, char * argv[])

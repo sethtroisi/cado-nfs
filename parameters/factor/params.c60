@@ -1,0 +1,63 @@
+###########################################################################
+#     Parameter file for Cado-NFS
+###########################################################################
+# See params/params.c90 for an example which contains some documentation.
+
+###########################################################################
+# General parameters
+###########################################################################
+
+name = c60
+
+###########################################################################
+# Polynomial selection with Kleinjung's algorithm
+###########################################################################
+
+tasks.polyselect.degree = 4
+
+tasks.polyselect.admax = 10000
+tasks.polyselect.adrange = 5000
+tasks.polyselect.incr = 60
+tasks.polyselect.P = 420
+tasks.polyselect.nq = 64
+tasks.polyselect.nrkeep = 10
+tasks.polyselect.ropteffort = 1
+
+###########################################################################
+# Sieve
+###########################################################################
+
+rlim = 161143
+alim = 96426
+lpbr = 18
+lpba = 19
+tasks.sieve.mfbr = 18
+tasks.sieve.mfba = 38
+tasks.sieve.ncurves0 = 16
+tasks.sieve.ncurves1 = 17
+tasks.I = 10
+tasks.sieve.qrange = 2000
+
+###########################################################################
+# Filtering
+###########################################################################
+
+tasks.filter.purge.keep = 160
+tasks.filter.maxlevel = 20
+tasks.filter.target_density = 170.0
+
+###########################################################################
+# Linear algebra
+###########################################################################
+
+tasks.linalg.bwc.interval = 100
+tasks.linalg.bwc.interleaving = 0
+tasks.linalg.bwc.m = 64
+tasks.linalg.bwc.n = 64
+
+###########################################################################
+# Characters
+###########################################################################
+
+tasks.linalg.characters.nchar = 50
+

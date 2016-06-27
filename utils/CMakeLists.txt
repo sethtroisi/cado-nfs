@@ -8,7 +8,8 @@ set (sources
         mpz_poly.c crc.c purgedfile.c bit_vector.c
         barrier.c usp.c fix-endianness.c memusage.c
         cachesize_cpuid.c cachesize_guess.c roots_mod.c mod_mpz.c renumber.c
-        ringbuf.c sm_utils.c memalloc.c mpz_vector.c memory.c stats.c lll.c
+        ringbuf.c sm_utils.c galois_utils.c memalloc.c 
+	mpz_vector.c memory.c stats.c lll.c
         verbose.c 
         version_info.c
 	modified_files.c threadpool.cpp
@@ -51,7 +52,7 @@ target_link_libraries(utils_with_io utils)
 add_dependencies(utils_with_io antebuffer)
 
 if(ENABLE_SHARED)
-install(TARGETS utils utils_with_io DESTINATION ${LIBSUFFIX})
+install(TARGETS utils utils_with_io DESTINATION ${LIBSUFFIX}/utils)
 endif()
 
 # To avoid the warning: implicit declaration of function nanosleep. It's POSIX, non c99.
@@ -62,7 +63,7 @@ set (CMAKE_C_FLAGS "${CMAKE_OLD_C_FLAGS}")
 
 target_link_libraries(antebuffer pthread)
 
-install(TARGETS antebuffer RUNTIME DESTINATION ${BINSUFFIX}/utils)
+install(TARGETS antebuffer RUNTIME DESTINATION ${LIBSUFFIX}/utils)
 
 include(CMakeLists-nodist.txt OPTIONAL)
 

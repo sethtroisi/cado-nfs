@@ -156,12 +156,12 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
   unsigned long j;
   int cmp;
   double skew, logmu, E;
-  mpz_poly_t F;
+  mpz_poly F;
 #endif
 
   mpz_t l, r, k, mprime, Nprime, C, l2, tmp, r1, r0, t, adm1, m, skew, root;
   mpz_vector_t a, b, reduced_a, reduced_b;
-  mpz_poly_t f, g;
+  mpz_poly f, g;
 
   mpz_init (root);
   mpz_init (m);
@@ -366,15 +366,11 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
 
   logmu = L2_lognorm (F, skew);
 
-#ifdef MAX_THREADS
   pthread_mutex_lock (&lock);
-#endif
   /* information on all polynomials */
   collisions ++;
   tot_found ++;
-#ifdef MAX_THREADS
   pthread_mutex_unlock (&lock);
-#endif
 
   mpz_poly_content (t, F);
   /* if the polynomial has small norm, and content 1 we keep it */
@@ -384,9 +380,7 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
       best_raw_logmu[j] = best_raw_logmu[j-1];
     best_raw_logmu[j] = logmu;
 
-#ifdef MAX_THREADS
     pthread_mutex_lock (&lock);
-#endif
     /* MurphyE */
     mpz_set (curr_poly->rat->coeff[0], g[0]);
     mpz_set (curr_poly->rat->coeff[1], g[1]);
@@ -402,16 +396,12 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
       best_E = E;
       cado_poly_set (best_poly, curr_poly);
     }
-#ifdef MAX_THREADS
-		  pthread_mutex_unlock (&lock);
-#endif
+    pthread_mutex_unlock (&lock);
 
     /* print polynomial */
     if (verbose >= 0)
       {
-#ifdef MAX_THREADS
-		  pthread_mutex_lock (&lock);
-#endif
+        pthread_mutex_lock (&lock);
         printf ("# Raw polynomial:\n");
         gmp_printf ("%sn: %Zd\n", phash, N);
         //print_poly_info (fold, d, gold, 1, phash);
@@ -422,23 +412,17 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
                 bound_f, bound_g, area, E, best_E);
         printf ("\n");
         fflush (stdout);
-#ifdef MAX_THREADS
-		  pthread_mutex_unlock (&lock);
-#endif
+        pthread_mutex_unlock (&lock);
       }
   }
   else /* otherwise we skip it */
   {
     if (verbose >= 1)
     {
-#ifdef MAX_THREADS
-		  pthread_mutex_lock (&lock);
-#endif
+      pthread_mutex_lock (&lock);
       gmp_printf ("# Skip polynomial: %.2f, ad: %Zd, l: %Zd, m: %Zd\n",
                     logmu, ad, l, m);
-#ifdef MAX_THREADS
-		  pthread_mutex_unlock (&lock);
-#endif
+      pthread_mutex_unlock (&lock);
     }
   }
 
@@ -1112,18 +1096,15 @@ collision_on_sq ( header_t header,
     lq = 1;
 
   unsigned long q, idx_q[lq];
-  mpz_t qqz;
-  mpz_init (qqz);
 
   for (j = 0; j < lq; j ++)
     idx_q[j] = j;
-  q = return_q_norq (SQ_R, idx_q, lq, qqz);
+  q = return_q_norq (SQ_R, idx_q, lq);
 
   /* collision batch */
   collision_on_batch_sq (header, R, SQ_R, q, idx_q, c, lq);
 
   /* clean */
-  mpz_clear (qqz);
   qroots_clear (SQ_R);
   return;
 }
@@ -1214,9 +1195,7 @@ main (int argc, char *argv[])
   int quiet = 0, tries = 0, i, nthreads = 1, st,
     target_time = TARGET_TIME, incr_target_time = TARGET_TIME;
   tab_t *T;
-#ifdef MAX_THREADS
-  pthread_t tid[MAX_THREADS];
-#endif
+  pthread_t *tid;
 
   mpz_init (N);
   mpz_init (maxS);
@@ -1315,13 +1294,9 @@ main (int argc, char *argv[])
     exit (1);
   }
 
-  /* check nthreads */
-#ifdef MAX_THREADS
-  if (nthreads > MAX_THREADS) {
-    fprintf (stderr, "Error, nthreads should be <= %d\n", MAX_THREADS);
-    exit (1);
-  }
-#endif
+  /* allocate threads */
+  tid = malloc (nthreads * sizeof (pthread_t));
+  ASSERT_ALWAYS(tid != NULL);
 
   /* quiet mode */
   if (quiet == 1)
@@ -1418,17 +1393,11 @@ main (int argc, char *argv[])
       if (verbose >= 1)
         gmp_printf ("# %d ad=%Zd\n", tries, admin);
       mpz_set (T[i]->ad, admin);
-#ifndef MAX_THREADS
-      newAlgo (N, d, admin);
-#else
       pthread_create (&tid[i], NULL, one_thread, (void *) (T+i));
-#endif
       mpz_add_ui (admin, admin, incr);
     }
-#ifdef MAX_THREADS
     for (i = 0 ; i < nthreads ; i++)
       pthread_join(tid[i], NULL);
-#endif
 
     if (milliseconds () > (unsigned long) target_time || verbose > 0)
     {
@@ -1484,6 +1453,7 @@ main (int argc, char *argv[])
   cado_poly_clear (best_poly);
   cado_poly_clear (curr_poly);
   param_list_clear (pl);
+  free (tid);
 
   return 0;
 }

@@ -501,9 +501,11 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
                 return
 
         if self.db_pool:
-            wu_text = self.db_pool.assign(clientid)
+            wu_text = self.db_pool.assign(clientid,
+                    timeout_hint=self.timeout_hint)
         else:
-            wu_text = wudb.WuAccess(self.dbfilename).assign(clientid)
+            wu_text = wudb.WuAccess(self.dbfilename).assign(clientid,
+                    timeout_hint=self.timeout_hint)
         if not wu_text:
             # This flag is to downgrade the logging level. Ugly.
             self.no_work_available = True
@@ -615,7 +617,7 @@ subjectAltName=@altnames
     def __init__(self, address, port, threaded, dbfilename,
                 registered_filenames, uploaddir, *, bg = False,
                 use_db_pool = True, scriptdir = None, only_registered=False,
-                cafile=None, whitelist=None):
+                cafile=None, whitelist=None, timeout_hint=None):
         
         self.name = "HTTP server"
         self.logger = logging.getLogger(self.name)
@@ -626,6 +628,7 @@ subjectAltName=@altnames
         self.only_registered = only_registered
         upload_scriptname = "upload.py"
         self.serving_wus = [True]
+        self.timeout_hint = timeout_hint
         # formatter = logging.Formatter(
         #    fmt='%(address_string)s - - [%(asctime)s] %(message)s')
         #self.ch = logging.StreamHandler()
@@ -683,7 +686,8 @@ subjectAltName=@altnames
             "cgi_directories" : ['/cgi-bin'],
             "upload_path": upload_url_path,
             "only_registered": only_registered,
-            "serving_wus": self.serving_wus
+            "serving_wus": self.serving_wus,
+            "timeout_hint": self.timeout_hint
         }
         MyHandlerWithParams = type("MyHandlerWithParams", (MyHandler, ), handler_params)
         
@@ -744,6 +748,7 @@ subjectAltName=@altnames
 
         self.port = self.httpd.server_address[1]
         self.url = "%s://%s:%d" % (scheme, self.url_address, self.port)
+        self.url_loc = "%s://localhost:%d" % (scheme, self.port)
         self.httpd.server_name = self.name
 
         if self.address == "localhost" or self.httpd.server_address[0].startswith("127."):
@@ -753,7 +758,11 @@ subjectAltName=@altnames
     def get_port(self):
         return self.port
 
-    def get_url(self):
+    def get_url(self, origin=None):
+        if origin is "localhost":
+            return self.url_loc
+        elif origin is not None:
+            self.logger.warn("Server address requested for origin=%s ; this is not understood, returning generic url %s instead" % (origin, self.url))
         return self.url
 
     def get_cert_sha1(self):
@@ -821,7 +830,7 @@ subjectAltName=@altnames
         else:
             self.logger.info("For debugging purposes, the URL above may be accessed")
         certstr = "" if self.cert_sha1 is None else " --certsha1=%s" % self.cert_sha1
-        self.logger.info("You can start additional wuclient2.py scripts with "
+        self.logger.info("You can start additional cado-nfs-client.py scripts with "
                          "parameters: --server=%s%s", self.url, certstr)
         self.logger.info("If you want to start additional clients, remember "
                          "to add their hosts to server.whitelist")

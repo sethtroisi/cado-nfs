@@ -119,7 +119,7 @@ static void
 removeColumnAndUpdate(filter_matrix_t *mat, int j)
 {
     MkzRemoveJ (mat, j);
-    freeRj(mat, j);
+    freeRj (mat, j);
 }
 
 // The cell [i, j] may be incorporated to the data structure, at least
@@ -625,6 +625,29 @@ number_of_superfluous_rows(filter_matrix_t *mat)
     return ni2rem;
 }
 
+static void
+print_memory_usage (filter_matrix_t *mat)
+{
+  unsigned long mem_rows, mem_wt, mem_cols, mem_MKZ;
+
+  mem_rows = mat->nrows * sizeof (typerow_t*);
+  for (unsigned long i = 0; i < mat->nrows; i++)
+    if (mat->rows[i] != NULL)
+      mem_rows += (rowLength(mat->rows, i) + 1) * sizeof (typerow_t);
+  mem_wt = mat->ncols * sizeof (int32_t);
+  mem_cols = mat->ncols * sizeof (index_t*);
+  for (unsigned long j = 0; j < mat->ncols; j++)
+    if (mat->R[j] != NULL)
+      mem_cols += (mat->R[j][0] + 1) * sizeof (index_t);
+  mem_MKZ = (mat->MKZQ[1] + 1) * 2 * sizeof(int32_t); /* memory for MKZQ */
+  mem_MKZ += (mat->ncols + 1) * sizeof(index_t); /* memory for MKZA */
+  printf ("# memory usage: rows %luMB, cols %luMB, wt %luMB, MKZ %luMB, "
+          "tot %lu MB (VmPeak %ld)\n",
+          mem_rows >> 20, mem_cols >> 20, mem_wt >> 20, mem_MKZ >> 20,
+          (mem_rows + mem_cols + mem_wt + mem_MKZ) >> 20,
+          PeakMemusage () >> 10);
+}
+
 static inline void
 print_report (filter_matrix_t *mat)
 {
@@ -632,62 +655,107 @@ print_report (filter_matrix_t *mat)
           "W/N=%.2f\n", mat->rem_nrows,
           ((int64_t) mat->rem_nrows) - ((int64_t) mat->rem_ncols),
           mat->weight, compute_WN(mat), compute_WoverN(mat));
+  if (mat->verbose)
+    print_memory_usage (mat);
   fflush (stdout);
 }
 
+struct merge_stats_s
+{
+  uint64_t nb;
+  int32_t w_min;
+  int32_t w_max;
+  float w_av;
+};
+
+typedef struct merge_stats_s merge_stats_t;
+
+merge_stats_t *
+merge_stats_malloc (int maxlevel)
+{
+  merge_stats_t *data = NULL;
+  data = (merge_stats_t *) malloc ((maxlevel + 1) * sizeof (merge_stats_t));
+  ASSERT_ALWAYS (data != NULL);
+  for (int i = 0; i <= maxlevel; i++)
+  {
+    data[i].nb = 0;
+    data[i].w_min = INT32_MAX;
+    data[i].w_max = INT32_MIN;
+    data[i].w_av = 0.0;
+  }
+
+  return data;
+}
+
+/* This function assumes that 0 <= level <= maxlevel */
+static inline int
+merge_stats_is_first_merge (merge_stats_t *data, int level)
+{
+  return (data[level].nb == 0);
+}
+
+/* This function assumes that 0 <= level <= maxlevel */
+static inline void
+merge_stats_update (merge_stats_t *data, int level, int32_t weight)
+{
+  data[level].nb++;
+  data[level].w_max = MAX (data[level].w_max, weight);
+  data[level].w_min = MIN (data[level].w_min, weight);
+  data[level].w_av += (float) weight;
+}
+
+void
+merge_stats_print (merge_stats_t *data, int maxlevel)
+{
+  uint64_t nbtot = 0;
+  for (int level = 1; level <= maxlevel; level++)
+  {
+    nbtot += data[level].nb;
+    if (data[level].nb > 0)
+      printf ("Number of %d-merges: %" PRIu64 " (min_weight = %" PRId32 ", "
+              "max_weight = %" PRId32 ", av_weight = %.2f)\n", level,
+              data[level].nb, data[level].w_min, data[level].w_max,
+              data[level].w_av / ((float) data[level].nb));
+    else
+      printf ("Number of %d-merges: %" PRIu64 "\n", level, data[level].nb);
+  }
+  printf ("Total number of merge: %" PRIu64 "\n", nbtot);
+}
 
 void
 mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel,
-               int forbw, double ratio, double coverNmax, int64_t nbmergemax)
+               double target_density)
 {
   double totopt = 0.0, totfill = 0.0, totMST = 0.0;
   int njrem = 0;
   int ni2rem;
   int32_t j, mkz;
-  double REPORT = 20.0; /* threshold of w/N from which reports are done */
-                        /* on stdout                                    */
-  double FREQ_REPORT = 5.0; /* Once the threshold is exceeded, this is added */
-  int64_t nbmerge = 0;
   uint64_t WN_prev, WN_cur, WN_min;
   double WoverN;
-  unsigned int ncost = 0, ncostmax = 20; //TODO ncostmax should be a parameter
+  unsigned int ncost = 0;
   int m;
-  uint64_t *nb_merges;
+  merge_stats_t *merge_data;
 
   printf ("# Using %s to compute the merges\n", __func__);
 
   // clean things
   njrem = removeSingletons(rep, mat);
 
-  nb_merges = (uint64_t *) malloc ((maxlevel + 1) * sizeof (uint64_t));
-  ASSERT_ALWAYS (nb_merges != NULL);
-  memset(nb_merges, 0, (maxlevel + 1) * sizeof(uint64_t));
+  merge_data = merge_stats_malloc (maxlevel);
 
   WN_min = WN_cur = compute_WN(mat);
   WoverN = compute_WoverN(mat);
-  print_report (mat);
+
+  /* report lines are printed for each multiple of report_incr */
+  double report_incr = 5.0;
+  double report_next = ceil (WoverN / report_incr) * report_incr;
 
   while(1)
   {
     /* Do we need to stop */
-    if(nbmergemax >= 0 && nbmerge >= nbmergemax)
+    if (WoverN >= target_density)
     {
-      printf ("nbmergemax=%" PRId64 " reached, stopping.\n", nbmergemax);
-      break;
-    }
-    if (forbw == 0 && ((double) WN_cur > ratio * (double) WN_min))
-    {
-      printf ("WN=%.2f*WN_min, stopping.\n", (double) WN_cur / (double) WN_min);
-      break;
-    }
-    else if (forbw == 3 && WoverN >= coverNmax)
-    {
-      printf ("W/N=%.2f too high, stopping.\n", WoverN);
-      break;
-    }
-    else if(forbw == 1 && ncost >= ncostmax)
-    {
-      printf ("WN value increased %u times in a row, stopping.\n", ncost);
+      printf ("Reached target density W/N=%.2f.\n", WoverN);
       break;
     }
 
@@ -710,21 +778,22 @@ mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel,
 #endif
     if (m == 1) /* singleton ideal */
         removeColDefinitely(rep, mat, j);
-    else if (m > 0) {
-        if (nb_merges[m] == 0 && m > 1) {
-            fprintf(rep->outfile, "## First %d-merge\n", m);
-        }
-        fprintf(rep->outfile, "#\n");
-        mergeForColumn2(rep, mat, &njrem, &totopt, &totfill, &totMST, j);
-    }
-
-    if (nb_merges[m]++ == 0 && m > 1) {
-      printf ("First %d-merge, cost %d (#Q=%d)\n", m, mkz,
-          MkzQueueCardinality(mat->MKZQ));
+    else if (m > 0)
+    {
+      if (m > 1 && merge_stats_is_first_merge (merge_data, m))
+      {
+        fprintf(rep->outfile, "## First %d-merge\n", m);
+        print_report (mat);
+        printf ("First %d-merge, (estimated) cost %d (#Q=%d)\n", m, mkz,
+                MkzQueueCardinality(mat->MKZQ));
+        fflush(stdout);
+      }
+      fprintf(rep->outfile, "#\n");
+      mergeForColumn2(rep, mat, &njrem, &totopt, &totfill, &totMST, j);
     }
 
     /* Update values and report if necessary */
-    nbmerge++;
+    merge_stats_update (merge_data, m, mkz);
     WoverN = compute_WoverN(mat);
     WN_prev = WN_cur;
     WN_cur = compute_WN(mat);
@@ -735,36 +804,31 @@ mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel,
     if (WN_cur < WN_min)
       WN_min = WN_cur;
 
-    if (WoverN >= REPORT)
+    if (WoverN >= report_next)
     {
-      REPORT += FREQ_REPORT;
+      print_report (mat);
+      report_next += report_incr;
       njrem = removeSingletons (rep, mat);
       ni2rem = number_of_superfluous_rows (mat);
       deleteSuperfluousRows (rep, mat, ni2rem, m);
-      print_report (mat);
     }
   }
 
-  if (nbmergemax < 0)
-  {
-    uint64_t excess = mat->rem_nrows - mat->rem_ncols;
-    printf ("Removing final excess, nrows=%" PRIu64 "\n", mat->rem_nrows);
-    deleteSuperfluousRows(rep, mat, excess - mat->keep, INT_MAX);
-    printf ("Removing singletons, nrows=%" PRIu64 "\n", mat->rem_nrows);
-    removeSingletons (rep, mat);
-  }
-
-  if(forbw == 1)
-    printf ("Minimal WN value: %" PRIu64 "\n", WN_min);
+  uint64_t excess = mat->rem_nrows - mat->rem_ncols;
+  printf ("Removing final excess, nrows=%" PRIu64 "\n", mat->rem_nrows);
+  deleteSuperfluousRows(rep, mat, excess - mat->keep, INT_MAX);
+  printf ("Removing singletons, nrows=%" PRIu64 "\n", mat->rem_nrows);
+  removeSingletons (rep, mat);
 
 #if DEBUG >= 1
   checkWeights (mat);
-  printf ("Total number of row additions: %lu\n", row_additions);
 #endif
 
-  for (m = 1; m <= maxlevel; m++)
-    printf ("Number of %d-merges: %" PRIu64 "\n", m, nb_merges[m]);
-  free (nb_merges);
+  merge_stats_print (merge_data, maxlevel);
+  free (merge_data);
+
+  printf ("Total number of removed columns: %" PRId64 "\n",
+          mat->ncols-mat->rem_ncols);
 
   printf ("Time spent finding optimal combination: %.2fs (among which %.2fs "
           "for filling the weight matrices and %.2fs for computing minimal "

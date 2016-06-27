@@ -24,6 +24,12 @@
     families=[
      [ u64k1, u64k2, u64k3, u64k4, ],
      [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_1, tag=p_1, }, ],
+     [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_10, tag=p_10, }, ],
+     [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_11, tag=p_11, }, ],
+     [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_12, tag=p_12, }, ],
+     [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_13, tag=p_13, }, ],
+     [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_14, tag=p_14, }, ],
+     [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_15, tag=p_15, }, ],
      [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_2, tag=p_2, }, ],
      [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_3, tag=p_3, }, ],
      [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_4, tag=p_4, }, ],
@@ -36,6 +42,12 @@
      ],
     member_templates_restrict={
      p_1=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_1, tag=p_1, }, ],
+     p_10=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_10, tag=p_10, }, ],
+     p_11=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_11, tag=p_11, }, ],
+     p_12=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_12, tag=p_12, }, ],
+     p_13=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_13, tag=p_13, }, ],
+     p_14=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_14, tag=p_14, }, ],
+     p_15=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_15, tag=p_15, }, ],
      p_2=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_2, tag=p_2, }, ],
      p_3=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_3, tag=p_3, }, ],
      p_4=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_4, tag=p_4, }, ],
@@ -109,8 +121,11 @@
 /* Member templates related to SIMD operation */
 
 /* Object-oriented interface */
+void mpfq_p_9_p_9_wrapper_dotprod(mpfq_vbase_ptr, mpfq_vbase_ptr, mpfq_p_9_dst_vec, mpfq_p_9_src_vec, mpfq_p_9_src_vec, unsigned int);
 void mpfq_p_9_p_9_dotprod(mpfq_p_9_dst_field, mpfq_p_9_dst_field, mpfq_p_9_dst_vec, mpfq_p_9_src_vec, mpfq_p_9_src_vec, unsigned int);
+void mpfq_p_9_p_9_wrapper_addmul_tiny(mpfq_vbase_ptr, mpfq_vbase_ptr, mpfq_p_9_dst_vec, mpfq_p_9_src_vec, mpfq_p_9_dst_vec, unsigned int);
 void mpfq_p_9_p_9_addmul_tiny(mpfq_p_9_dst_field, mpfq_p_9_dst_field, mpfq_p_9_dst_vec, mpfq_p_9_src_vec, mpfq_p_9_dst_vec, unsigned int);
+void mpfq_p_9_p_9_wrapper_transpose(mpfq_vbase_ptr, mpfq_vbase_ptr, mpfq_p_9_dst_vec, mpfq_p_9_src_vec);
 void mpfq_p_9_p_9_transpose(mpfq_p_9_dst_field, mpfq_p_9_dst_field, mpfq_p_9_dst_vec, mpfq_p_9_src_vec);
 
 #endif  /* MPFQ_P_9_T_H_ */

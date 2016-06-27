@@ -52,14 +52,8 @@ static void declare_usage(param_list pl)
                                     STR(DEFAULT_MERGE_SKIP) ")");
   param_list_decl_usage(pl, "maxlevel", "maximum number of rows in a merge "
                             "(default " STR(DEFAULT_MERGE_MAXLEVEL) ")");
-  param_list_decl_usage(pl, "forbw", "controls the optimization function "
-                            "(see below, default " STR(DEFAULT_MERGE_FORBW) ")");
-  param_list_decl_usage(pl, "ratio", "maximal ration cN(final)/cN(min) with "
-                            "-forbw 0 (default " STR(DEFAULT_MERGE_RATIO) ")");
-  param_list_decl_usage(pl, "coverNmax", "stop when c/N exceeds this value with"
-                            " -forbw 3 (default " STR(DEFAULT_MERGE_COVERNMAX) ")");
-  param_list_decl_usage(pl, "nbmergemax", "Maximum number of merges that can "
-                                          "be done (default is no maximum)");
+  param_list_decl_usage(pl, "target_density", "stop when the average row density exceeds this value"
+                            " (default " STR(DEFAULT_MERGE_TARGET_DENSITY) ")");
   param_list_decl_usage(pl, "resume", "resume from history file");
   param_list_decl_usage(pl, "mkztype", "controls how the weight of a merge is "
                             "approximated (default " STR(DEFAULT_MERGE_MKZTYPE) ")");
@@ -69,19 +63,13 @@ static void declare_usage(param_list pl)
                                               "used for merges");
   param_list_decl_usage(pl, "force-posix-threads", "(switch)");
   param_list_decl_usage(pl, "path_antebuffer", "path to antebuffer program");
-  verbose_decl_usage(pl);
+  param_list_decl_usage(pl, "v", "verbose level");
 }
 
 static void
 usage (param_list pl, char *argv0)
 {
     param_list_print_usage(pl, argv0, stderr);
-    fprintf (stderr, "\nThe different optimization functions are, where c is "
-                     "the total matrix weight and N \nthe number of rows "
-                     "(relation-sets):\n");
-  fprintf (stderr, "   -forbw 0 - stop when cN exceeds ratio*min(cN)\n");
-  fprintf (stderr, "   -forbw 1 - stop when the product cN is minimal\n");
-  fprintf (stderr, "   -forbw 3 - stop when the ratio c/N exceeds coverNmax\n");
     exit(EXIT_FAILURE);
 }
 
@@ -97,13 +85,10 @@ main (int argc, char *argv[])
     int maxlevel = DEFAULT_MERGE_MAXLEVEL;
     uint32_t keep = DEFAULT_FILTER_EXCESS;
     uint32_t skip = DEFAULT_MERGE_SKIP;
-    double ratio = DEFAULT_MERGE_RATIO; /* bound on cN_new/cN to stop the merge */
-    uint32_t forbw = DEFAULT_MERGE_FORBW;
-    double coverNmax = DEFAULT_MERGE_COVERNMAX;
+    double target_density = DEFAULT_MERGE_TARGET_DENSITY;
     uint32_t mkztype = DEFAULT_MERGE_MKZTYPE;
     uint32_t wmstmax = DEFAULT_MERGE_WMSTMAX;
                                /* use real MST minimum for wt[j] <= wmstmax*/
-    int64_t nbmergemax = -1; /* Negative value means no maximum */
 
 #ifdef HAVE_MINGW
     _fmode = _O_BINARY;     /* Binary open for all files */
@@ -112,11 +97,13 @@ main (int argc, char *argv[])
     double tt;
     double wct0 = wct_seconds ();
     param_list pl;
+    int verbose = 0;
     param_list_init (pl);
     declare_usage(pl);
     argv++,argc--;
 
     param_list_configure_switch(pl, "force-posix-threads", &filter_rels_force_posix_threads);
+    param_list_configure_switch(pl, "v", &verbose);
 
 #ifdef HAVE_MINGW
     _fmode = _O_BINARY;     /* Binary open for all files */
@@ -131,7 +118,7 @@ main (int argc, char *argv[])
       usage (pl, argv0);
     }
     /* print command-line arguments */
-    verbose_interpret_parameters(pl);
+    verbose_interpret_parameters (pl);
     param_list_print_command_line (stdout, pl);
     fflush(stdout);
 
@@ -146,15 +133,11 @@ main (int argc, char *argv[])
     param_list_parse_int (pl, "maxlevel", &maxlevel);
     param_list_parse_uint (pl, "keep", &keep);
     param_list_parse_uint (pl, "skip", &skip);
-    param_list_parse_uint (pl, "forbw", &forbw);
 
-    param_list_parse_double (pl, "ratio", &ratio);
-    param_list_parse_double (pl, "coverNmax", &coverNmax);
+    param_list_parse_double (pl, "target_density", &target_density);
 
     param_list_parse_uint (pl, "mkztype", &mkztype);
     param_list_parse_uint (pl, "wmstmax", &wmstmax);
-
-    param_list_parse_int64 (pl, "nbmergemax", &nbmergemax);
 
     /* Some checks on command line arguments */
     if (param_list_warn_unused(pl))
@@ -177,11 +160,6 @@ main (int argc, char *argv[])
     {
       fprintf (stderr, "Error: maxlevel should be positive and less than %d\n",
                        MERGE_LEVEL_MAX);
-      usage (pl, argv0);
-    }
-    if (forbw > 3 || forbw == 2)
-    {
-      fprintf (stderr, "Error: -forbw should be 0, 1 or 3.\n");
       usage (pl, argv0);
     }
     if (mkztype > 2)
@@ -219,13 +197,14 @@ main (int argc, char *argv[])
       matR_disable_cols (mat, forbidden_cols);
     }
 
+    mat->verbose = verbose;
     mat->wmstmax = wmstmax;
     mat->mkztype = mkztype;
     tt = seconds();
     MkzInit (mat);
     printf ("Time for MkzInit: %2.2lfs\n", seconds()-tt);
 
-    mergeOneByOne (rep, mat, maxlevel, forbw, ratio, coverNmax, nbmergemax);
+    mergeOneByOne (rep, mat, maxlevel, target_density);
 
     fclose_maybe_compressed (rep->outfile, outname);
     printf ("Final matrix has N=%" PRIu64 " nc=%" PRIu64 " (%" PRId64 ") "
@@ -241,7 +220,7 @@ main (int argc, char *argv[])
 
     printf ("Total merge time: %.2f seconds\n", seconds ());
 
-    print_timing_and_memory (wct0);
+    print_timing_and_memory (stdout, wct0);
 
     return 0;
 }

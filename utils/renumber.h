@@ -87,6 +87,8 @@ void renumber_clear (renumber_ptr);
 int renumber_is_bad(int *, index_t*,renumber_srcptr, p_r_values_t, p_r_values_t, int);
 int renumber_is_additional_column (renumber_srcptr, index_t);
 index_t renumber_get_index_from_p_r (renumber_srcptr, p_r_values_t, p_r_values_t,int);
+index_t renumber_get_random_index_from_p_side(renumber_srcptr renumber_info,
+    p_r_values_t p, int side);
 void renumber_get_p_r_from_index (renumber_srcptr, p_r_values_t *, p_r_values_t *,
                                                     int *, index_t, cado_poly);
 int renumber_get_side_from_index (renumber_srcptr, index_t, cado_poly);

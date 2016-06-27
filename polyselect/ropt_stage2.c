@@ -870,7 +870,7 @@ rootsieve_one_sublattice ( ropt_poly_t poly,
   sievescore_pq *sievescore;
   sievearray_t sa;
 
-  mpz_poly_t F, G;
+  mpz_poly F, G;
   F->coeff = s2param->f;
   G->coeff = s2param->g;
   F->deg = poly->d;
@@ -882,12 +882,10 @@ rootsieve_one_sublattice ( ropt_poly_t poly,
   len_A = (unsigned long) (s2param->Amax - s2param->Amin + 1);
   len_B = (unsigned long) (s2param->Bmax - s2param->Bmin + 1);
 
-  /* size of sieveing array that fits in memory */
+  /* size of sieveing array that fits in memory, may change later */
   size_array_mem = SIZE_SIEVEARRAY;
-
   if (len_B < (double) size_array_mem / len_A)
     size_array_mem = len_B * len_A;
-
   if (size_array_mem <= (unsigned long) len_A) {
     fprintf (stderr, "Error: Amax - Amin + 1 = %lu is too long. "
              "This happend when A is too large while B is "
@@ -899,15 +897,20 @@ rootsieve_one_sublattice ( ropt_poly_t poly,
   /* size of B block that fits in memory at one time. Note:
      the siever is inefficient when len_A is large since
      the 2d-sieve is in the short L1-cache blocks. */
-  size_B_block = (unsigned long) (
-    (double) size_array_mem / (double) len_A );
+  size_B_block = (unsigned long) ((double)size_array_mem/(double)len_A);
 
   /* repair */
   size_array_mem = len_A * size_B_block;
 
-  /* init structs */
-  new_sievescore_pq (&sievescore, NUM_TOPALPHA_SIEVEARRAY);
-  new_MurphyE_pq (&local_E_pqueue, NUM_TOPE_SUBLATTICE);
+  /* init structs: if tune mode, look for less top candidates; */
+  if (info->mode == ROPT_MODE_TUNE) {
+    new_sievescore_pq (&sievescore, TUNE_NUM_TOPALPHA_SIEVEARRAY);
+    new_MurphyE_pq (&local_E_pqueue, TUNE_NUM_TOPE_SUBLATTICE);
+  }
+  else {
+    new_sievescore_pq (&sievescore, NUM_TOPALPHA_SIEVEARRAY);
+    new_MurphyE_pq (&local_E_pqueue, NUM_TOPE_SUBLATTICE);
+  }
   sievearray_init (sa, len_A, size_B_block);
   mpz_init (tmpv);
   mpz_init (tmpu);
@@ -931,6 +934,7 @@ rootsieve_one_sublattice ( ropt_poly_t poly,
        and Bmax will be used in rootsieve_v(). */
     rootsieve_one_block (sa, poly, s2param);
 
+    
     /* compute the alpha of top slots */
     for (j = 0; j < size_array_mem; j++) {
 
@@ -972,28 +976,24 @@ rootsieve_one_sublattice ( ropt_poly_t poly,
       /* translation-only optimize */
       mpz_set (s2param->g[0], poly->g[0]);
       mpz_set (s2param->g[1], poly->g[1]);
-
       sopt_local_descent (F, G, F, G, 1, -1, SOPT_DEFAULT_MAX_STEPS, 0);
       s2param->f = F->coeff;
       s2param->g = G->coeff;
 
+#if 1
       MurphyE = print_poly_fg (F, s2param->g, poly->n, 0);
-
       insert_MurphyE_pq (local_E_pqueue, info->w, tmpu, tmpv,
                          s2param->MOD, MurphyE);
-
-      /* // Further approximate.
-      double skew = L2_skewness (s2param->f, poly->d,
-                                 SKEWNESS_DEFAULT_PREC, 0);
-      MurphyE = L2_lognorm (s2param->f, poly->d, skew, 0);
-      double alpha = get_alpha (s2param->f, poly->d, ALPHA_BOUND);
+#else
+      /* the approximation takes slightly less time */
+      double skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
+      MurphyE = L2_lognorm (F, skew);
+      double alpha = get_alpha (F, ALPHA_BOUND);
       insert_MurphyE_pq (local_E_pqueue, info->w, tmpu, tmpv, 
-                         s2param->MOD,
-                         - (MurphyE + alpha));
-      */
-
+                         s2param->MOD, -(MurphyE + alpha));
+#endif
     }
-
+    
     /* next j */
     s2param->Bmin = s2param->Bmax + 1;
 
@@ -1012,7 +1012,7 @@ rootsieve_one_sublattice ( ropt_poly_t poly,
   best_MurphyE = 0.0;
   for (i = 1; i < local_E_pqueue->used; i ++) {
     
-    if (param->verbose >= 2 && info->mode == 0) {
+    if (param->verbose >= 2 && info->mode == ROPT_MODE_INIT) {
       gmp_fprintf ( stderr, "# Found (%3dth) (w=%d, u=%Zd, v=%Zd) "
                     "gives E = %1.2e\n",
                     i, 
@@ -1050,7 +1050,7 @@ rootsieve_one_sublattice ( ropt_poly_t poly,
   info->best_MurphyE = best_MurphyE;
   
   /* output stats */
-  if (param->verbose >= 2 && info->mode == 0) {
+  if (param->verbose >= 2 && info->mode == ROPT_MODE_INIT) {
     gmp_fprintf ( stderr,
                   "# Stat: ave. MurphyE of top %ld polynomials: "
                   "%1.2e (on sublattice %Zd, %Zd)\n",
@@ -1084,8 +1084,7 @@ ropt_stage2 ( ropt_poly_t poly,
 {
   int i;
 
-  //  if (param->verbose >= 2 && info->mode == 0)
-  if (param->verbose >= 2 && info->mode == 0)
+  if (param->verbose >= 2 && info->mode == ROPT_MODE_INIT)
     ropt_s2param_print (s2param);
 
   for (i = 0; i <= poly->d; i++)

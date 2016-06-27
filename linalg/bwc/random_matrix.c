@@ -9,10 +9,10 @@
 #include "portability.h"
 #include "macros.h"
 #include "utils.h"
+#include "parallelizing_info.h"
 
 /* the files below are not useful for the standalone program */
 #ifndef WANT_MAIN
-#include "parallelizing_info.h"
 #include "random_matrix.h"
 #include "balancing.h"
 #endif
@@ -214,6 +214,206 @@ double random_binomial(gmp_randstate_t rstate, unsigned long n, double p)
 }
 /*}}}*/
 
+/* {{{ random_matrix_process_data */
+/* This data type gathers the internal state of the random generation */
+struct random_matrix_process_data_s {
+    unsigned long nrows;
+    unsigned long ncols;
+    int density;
+    unsigned long seed;
+    int maxcoeff;
+    int ascii;
+    FILE * out;
+    struct rhs_data {
+        int n;
+        mpz_t p;
+        FILE * f;
+    } rhs[1];
+    struct freq_data {
+        FILE * cw;
+        FILE * rw;
+    } freq[1];
+};
+typedef struct random_matrix_process_data_s random_matrix_process_data[1];
+typedef struct random_matrix_process_data_s * random_matrix_process_data_ptr;
+typedef const struct random_matrix_process_data_s * random_matrix_process_data_srcptr;
+
+void random_matrix_process_data_init(random_matrix_process_data_ptr r)
+{
+    memset(r, 0, sizeof(*r));
+}
+
+void random_matrix_process_data_clear(random_matrix_process_data_ptr r)
+{
+    if (r->rhs->n) {
+        fclose(r->rhs->f);
+        mpz_clear(r->rhs->p);
+    }
+    if (r->freq->cw) fclose(r->freq->cw);
+    if (r->freq->rw) fclose(r->freq->rw);
+    if (r->out) fclose(r->out);
+}
+
+/* {{{ This reads the full parameter list -- not only the param_list
+ * structure --, and fills r with all argument which has been found
+ * relevant. This can primarily be seen as a function dedicated to the
+ * standalone program, even though the random_matrix= mechanism uses it
+ * too as a back-end.
+ *
+ * This function does *NOT* check that all arguments in pl have been
+ * consumed.
+ */
+int random_matrix_process_data_set_from_args(random_matrix_process_data_ptr r,
+        param_list_ptr pl, int argc, char ** argv)
+{
+    const char * tmp;
+    int binary=0;
+    int freq=0;
+    param_list_configure_alias(pl, "output", "-o");
+    param_list_configure_switch(pl, "--binary", &binary);
+    param_list_configure_switch(pl, "--freq", &freq);
+    int wild_args[3] = { 0, 0, 0 }; // nrows ncols coeffs_per_row
+    int wild = 0;
+    for( ; argc ; ) {
+        if (param_list_update_cmdline(pl, &argc, &argv)) { continue; }
+        if (argv[0][0] != '-' && wild < 3) {
+            char * tmp;
+            wild_args[wild] = strtoul(argv[0], &tmp, 0);
+            if (*tmp != '\0') {
+                fprintf(stderr, "Parse error for parameter %s\n", argv[0]);
+                exit(1);
+            }
+            argv++, argc--;
+            wild++;
+            continue;
+        }
+        fprintf(stderr, "Unhandled parameter %s\n", argv[0]);
+        return 0;
+    }
+
+    /* {{{ parse r->nrows, r->ncols, density */
+    if ((r->nrows = wild_args[0]) == 0) {
+        fprintf(stderr, "Please specify r->nrows\n");
+        exit(1);
+    }
+    r->ncols = wild_args[1];
+    if (!(r->ncols = wild_args[1])) r->ncols = r->nrows;
+    if (param_list_parse_int(pl, "density", &r->density)) {
+        if (wild_args[2] > 0) {
+            fprintf(stderr, "density specified twice\n");
+            exit(1);
+        }
+    } else {
+        if ((r->density = wild_args[2]) == 0)
+            r->density = MIN(100, MAX(r->ncols / 10, MIN(4, r->ncols)));
+    }
+    ASSERT_ALWAYS(r->ncols > 10 && r->nrows > 10);
+    /* }}} */
+
+    param_list_parse_ulong(pl, "seed", &r->seed);
+    if (!r->seed) r->seed = time(NULL);
+    param_list_parse_int(pl, "c", &r->maxcoeff);
+
+    r->ascii = !binary;
+
+    /* {{{ try to parse the rhs info */
+    if ((tmp = param_list_lookup_string(pl, "rhs")) != NULL) {
+        ASSERT_ALWAYS(r->maxcoeff > 0);
+        char * rhsname = malloc(1 + strlen(tmp));
+        mpz_init(r->rhs->p);
+        int rc = gmp_sscanf(tmp, "%d,%Zd,%s", &r->rhs->n, r->rhs->p, rhsname);
+        ASSERT_ALWAYS(rc == 3);
+        if (r->rhs->n == 0) {
+            fprintf(stderr, "--rhs argument requires setting more than 0 vectors !\n");
+            exit(1);
+        }
+        r->rhs->f = fopen(rhsname, "w");
+        DIE_ERRNO_DIAG(r->rhs->f == NULL, "fopen", rhsname);
+        // rhs file is now always in ascii
+        // if (r->ascii)
+            gmp_fprintf(r->rhs->f, "%lu %d %Zd\n", r->nrows, r->rhs->n, r->rhs->p);
+    }
+    /* }}} */
+
+    r->out = stdout;
+
+    const char * ofilename = NULL;
+
+    if ((ofilename = param_list_lookup_string(pl, "output")) != NULL) {
+        r->out = fopen(ofilename, binary ? "wb" : "w");
+        DIE_ERRNO_DIAG(r->out == NULL, "fopen", ofilename);
+    } else {
+        if (binary) {
+            fprintf(stderr, "Error: --binary requires --output\n");
+            exit(1);
+        }
+        if (freq) {
+            fprintf(stderr, "Error: --freq requires --output\n");
+            exit(1);
+        }
+    }
+
+    if (freq) {
+        char * cwname = derived_filename(ofilename, "cw", binary ? ".bin" : ".txt");
+        r->freq->cw = fopen(cwname, binary ? "wb" : "w");
+        DIE_ERRNO_DIAG(r->freq->cw == NULL, "fopen", cwname);
+        free(cwname);
+
+        char * rwname = derived_filename(ofilename, "rw", binary ? ".bin" : ".txt");
+        r->freq->rw = fopen(rwname, binary ? "wb" : "w");
+        DIE_ERRNO_DIAG(r->freq->rw == NULL, "fopen", rwname);
+        free(rwname);
+    }
+
+    return 1;
+}
+/* }}} */
+/* {{{ This is primarily used for the random_matrix= hack. The standalone
+ * program does not follow this route. Here we check that all parts of
+ * the provided string are understood as legitimate arguments to
+ * random_matrix=
+ */
+int random_matrix_process_data_set_from_string(random_matrix_process_data_ptr r, const char * str)
+{
+    char * rmstring;
+    char ** n_argv;
+    char ** n_argv0;
+    int n_argc;
+    param_list pl2;
+
+    /* Create a new param_list from the random_matrix argument {{{ */
+    ASSERT_ALWAYS(str);
+    rmstring = strdup(str);
+
+    n_argv0 = n_argv = malloc(strlen(rmstring) * sizeof(char*));
+    n_argc = 0;
+    n_argv[n_argc++]="random_matrix";
+    for(char * q = rmstring, * qq; q != NULL; q = qq) {
+        qq = strchr(q, ',');
+        if (qq) { *qq++='\0'; }
+        n_argv[n_argc++]=q;
+    }
+    /* }}} */
+    param_list_init(pl2);
+    int ok = random_matrix_process_data_set_from_args(r, pl2, n_argc-1, n_argv+1);
+    if (!ok || param_list_warn_unused(pl2)) {
+        fprintf(stderr, "Bad argument list for parameter random_matrix: %s\n", rmstring);
+        exit(1);
+    }
+    if (!param_list_lookup_string(pl2, "output")) {
+        /* the default is then that r->out == stdout, but for this very
+         * usage we want no output at all, so r->out should be NULL. */
+        r->out = NULL;
+    }
+
+    param_list_clear(pl2);
+    free(rmstring);
+    free(n_argv0);
+    return ok;
+}
+/* }}} */
+/* }}} */
+
 /* {{{ random_matrix_ddata type -- characteristics of the distribution */
 struct random_matrix_ddata_s {
     double alpha;
@@ -222,11 +422,17 @@ struct random_matrix_ddata_s {
                            smaller than 32 presently. Quite unsafe to
                            change. */
     double scale;       /* event function is scale/(x+offset)^alpha */
+    unsigned int maxcoeff;      /* 0 for factorization matrices */
+    double coeff_alpha; /* computed */
+    double coeff_n0;    /* computed */
     double mean;        /* computed */
     double sdev;        /* computed */
     double spread;
     unsigned long ncols;        /* only for constraint correction */
     unsigned long nrows;        /* informational */
+    unsigned long padcols;        /* only for constraint correction */
+    unsigned long padrows;        /* informational */
+    int print;  /* 1 if we should print */
 
     uint64_t total_coeffs;   /* informational, after generation */
     double row_avg;     /* informational, after generation */
@@ -238,7 +444,8 @@ typedef struct random_matrix_ddata_s * random_matrix_ddata_ptr;
 void random_matrix_ddata_init(random_matrix_ddata_ptr d);
 void random_matrix_ddata_set_default(random_matrix_ddata_ptr d);
 void random_matrix_ddata_clear(random_matrix_ddata_ptr d);
-void random_matrix_ddata_adjust(random_matrix_ddata_ptr f, unsigned long nrows, unsigned long ncols, double density, double spread);
+void random_matrix_ddata_adjust(random_matrix_ddata_ptr f, random_matrix_process_data_srcptr r, parallelizing_info_srcptr pi, unsigned long padded_nrows, unsigned long padded_ncols);
+void random_matrix_ddata_adjust_force_kernel(random_matrix_ddata_ptr f, random_matrix_process_data_srcptr r, parallelizing_info_srcptr pi, unsigned long padded_nrows, unsigned long padded_ncols, int kernel_left, int kernel_right);
 void random_matrix_ddata_info(FILE * out, random_matrix_ddata_ptr f);
 void random_matrix_ddata_init(random_matrix_ddata_ptr F);
 void random_matrix_ddata_clear(random_matrix_ddata_ptr F);
@@ -349,21 +556,83 @@ void random_matrix_ddata_info(FILE * out, random_matrix_ddata_ptr f)
             extreme_normal(nrows, mean_n, -sdev_n));
 }
 
-void random_matrix_ddata_adjust(random_matrix_ddata_ptr f, unsigned long nrows, unsigned long ncols, double density, double spread)
+/* in the mmt structures, because of the balancing work, we promised that
+ * matrices of size padded_nrows*padded_ncols would be generated on each
+ * node. However, we know that the real matrix has to have one particular
+ * shape, which means that on the current node, it might be that we'll
+ * have some padding rows and columns to generate.
+ *
+ * Note that the on-the-fly random_matrix setup omits the balancing
+ * permutations, so that all padding rows are on the last blocks.
+ */
+void random_matrix_ddata_adjust_force_kernel(random_matrix_ddata_ptr f, random_matrix_process_data_srcptr R, parallelizing_info_srcptr pi, unsigned long padded_nrows, unsigned long padded_ncols, int kernel_left, int kernel_right)
 {
+    f->print = pi ? pi->m->jrank == 0 && pi->m->trank == 0 : 1;
+    /* Adapt to the parallelizing_info structure : divide */
+    /* note that padding has to still be padding. */
+    f->nrows = (R->nrows - kernel_right) / (pi ? pi->wr[1]->totalsize : 1);
+    f->ncols = (R->ncols - kernel_left) / (pi ? pi->wr[0]->totalsize : 1);
+
+#define ADJUST(pi, items, comm, ker) do {				\
+    if (pi) {								\
+        unsigned int rk = comm->jrank * comm->ncores + comm->trank;	\
+        if (rk * padded_n ## items >= R->n ## items - ker) {		\
+            f->n ## items = 0;						\
+        } else if ((rk+1) * padded_n ## items >= R->n ## items - ker) {	\
+            f->n ## items = R->n ## items - ker - rk * padded_n ## items; \
+        } else {							\
+            f->n ## items = padded_n ## items;				\
+        }								\
+        f->pad ## items = padded_n ## items - f->n ## items;		\
+    } else {								\
+        f->n ## items =  R->n ## items - ker;				\
+    }									\
+} while (0)
+
+    ADJUST(pi, rows, pi->wr[1], kernel_right);
+    ADJUST(pi, cols, pi->wr[0], kernel_left);
+
+    // experimental: don't scale. Somehow it seems that I'm doing this scaling
+    // twice. I shouldn't. Alas, I see no obvious place where this seems to
+    // happen.
+    //
+    // double density = R->density / (pi ? pi->wr[0]->totalsize : 1);
+    double density = R->density;
+
     /* sets the scale parameter so that the expected row weight matches
      * our desired density target */
-    f->scale = density / dist_q(f, ncols);
-    f->spread = spread;
-    f->mean = dist_q(f, ncols);
-    f->sdev = sqrt(f->mean * f->mean - dist_qq(f, ncols));
-    f->nrows = nrows;
-    f->ncols = ncols;
+    f->scale = density / dist_q(f, f->ncols);
+    f->spread = pi ? pi->wr[0]->totalsize : 1;
+    f->mean = dist_q(f, f->ncols);
+    f->sdev = sqrt(f->mean * f->mean - dist_qq(f, f->ncols));
+    f->maxcoeff = R->maxcoeff;
+    if (f->maxcoeff) {
+        /* Compute n0, which is used to generate coefficients. It
+         * essentially counts, in the heaviest column, the number of
+         * coefficients equal to 1 */
+        double n0 = f->nrows / 2;
+        double old_n0 = INFINITY;
+        for(int spin = 0 ; n0 != old_n0 && spin < 100  ; spin++) {
+            /* How many rows in total would be fit for that n0 ? */
+            old_n0 = n0;
+            double alpha = pow(n0, -1.0 / f->maxcoeff);
+            double y = 2*(n0-1) / (1-alpha);
+            n0 /= y/f->nrows;
+        }
+        f->coeff_n0 = n0;
+        f->coeff_alpha = pow(n0, -1.0 / f->maxcoeff);
+    }
     if (dist_p(f, 0) >= 1.0) {
         fprintf(stderr, "Error: this density is not acceptable for the current distribution equation. Please adjust the internal offset parameter to something larger.\nrows");
         exit(1);
     }
 }
+
+void random_matrix_ddata_adjust(random_matrix_ddata_ptr f, random_matrix_process_data_srcptr r, parallelizing_info_srcptr pi, unsigned long padded_nrows, unsigned long padded_ncols)
+{
+    random_matrix_ddata_adjust_force_kernel(f, r, pi, padded_nrows, padded_ncols, 0, 0);
+}
+
 /* }}} */
 
 /* {{{ punch intervals */
@@ -518,8 +787,6 @@ void punched_interval_print(FILE * f, punched_interval_ptr c)
 
 /* }}} */
 
-
-
 typedef int (*sortfunc_t)(const void *, const void *);
 
 int cmp_u32(uint32_t * a, uint32_t * b)
@@ -623,203 +890,24 @@ void test_random_poisson(gmp_randstate_t rstate, double xm, unsigned long n)
 
 /* }}} */
 
-/* {{{ random_matrix_process_data */
-/* This data type gathers the internal state of the random generation */
-struct random_matrix_process_data_s {
-    unsigned long nrows;
-    unsigned long ncols;
-    int density;
-    unsigned long seed;
-    int maxcoeff;
-    int ascii;
-    FILE * out;
-    struct rhs_data {
-        int n;
-        mpz_t p;
-        FILE * f;
-    } rhs[1];
-    struct freq_data {
-        FILE * cw;
-        FILE * rw;
-    } freq[1];
-};
-typedef struct random_matrix_process_data_s random_matrix_process_data[1];
-typedef struct random_matrix_process_data_s * random_matrix_process_data_ptr;
-typedef const struct random_matrix_process_data_s * random_matrix_process_data_srcptr;
-
-void random_matrix_process_data_init(random_matrix_process_data_ptr r)
+int32_t generate_coefficient(gmp_randstate_t rstate, random_matrix_ddata_ptr F, unsigned long j MAYBE_UNUSED)
 {
-    memset(r, 0, sizeof(*r));
-}
+    unsigned long x = gmp_urandomm_ui(rstate, F->nrows);
+    long neg;
+    if ((neg = x >= F->nrows/2)) { x -= F->nrows/2; }
 
-void random_matrix_process_data_clear(random_matrix_process_data_ptr r)
-{
-    if (r->rhs->n) {
-        fclose(r->rhs->f);
-        mpz_clear(r->rhs->p);
-    }
-    if (r->freq->cw) fclose(r->freq->cw);
-    if (r->freq->rw) fclose(r->freq->rw);
-    if (r->out) fclose(r->out);
-}
-
-/* {{{ This reads the full parameter list -- not only the param_list
- * structure --, and fills r with all argument which has been found
- * relevant. This can primarily be seen as a function dedicated to the
- * standalone program, even though the random_matrix= mechanism uses it
- * too as a back-end.
- *
- * This function does *NOT* check that all arguments in pl have been
- * consumed.
- */
-int random_matrix_process_data_set_from_args(random_matrix_process_data_ptr r,
-        param_list_ptr pl, int argc, char ** argv)
-{
-    const char * tmp;
-    int binary=0;
-    int freq=0;
-    param_list_configure_alias(pl, "output", "-o");
-    param_list_configure_switch(pl, "--binary", &binary);
-    param_list_configure_switch(pl, "--freq", &freq);
-    int wild_args[3] = { 0, 0, 0 }; // nrows ncols coeffs_per_row
-    int wild = 0;
-    for( ; argc ; ) {
-        if (param_list_update_cmdline(pl, &argc, &argv)) { continue; }
-        if (argv[0][0] != '-' && wild < 3) {
-            char * tmp;
-            wild_args[wild] = strtoul(argv[0], &tmp, 0);
-            if (*tmp != '\0') {
-                fprintf(stderr, "Parse error for parameter %s\n", argv[0]);
-                exit(1);
-            }
-            argv++, argc--;
-            wild++;
-            continue;
-        }
-        fprintf(stderr, "Unhandled parameter %s\n", argv[0]);
-        return 0;
-    }
-    /* {{{ parse r->nrows, r->ncols, density */
-    if ((r->nrows = wild_args[0]) == 0) {
-        fprintf(stderr, "Please specify r->nrows\n");
-        exit(1);
-    }
-    r->ncols = wild_args[1];
-    if (!(r->ncols = wild_args[1])) r->ncols = r->nrows;
-    if (param_list_parse_int(pl, "density", &r->density)) {
-        if (wild_args[2] > 0) {
-            fprintf(stderr, "density specified twice\n");
-            exit(1);
-        }
+    int c = 1;
+    if (j < 100) {
+        double alpha = F->coeff_alpha;
+        for(double b = F->coeff_n0; x >= b; x -= b, b *= alpha, c++) ;
     } else {
-        if ((r->density = wild_args[2]) == 0)
-            r->density = MIN(100, MAX(r->ncols / 10, MIN(4, r->ncols)));
-    }
-    ASSERT_ALWAYS(r->ncols > 10 && r->nrows > 10);
-    /* }}} */
-
-    param_list_parse_ulong(pl, "seed", &r->seed);
-    if (!r->seed) r->seed = time(NULL);
-    param_list_parse_int(pl, "c", &r->maxcoeff);
-
-    r->ascii = !binary;
-
-    /* {{{ try to parse the rhs info */
-    if ((tmp = param_list_lookup_string(pl, "rhs")) != NULL) {
-        ASSERT_ALWAYS(r->maxcoeff > 0);
-        char * rhsname = malloc(1 + strlen(tmp));
-        mpz_init(r->rhs->p);
-        int rc = gmp_sscanf(tmp, "%d,%Zd,%s", &r->rhs->n, r->rhs->p, rhsname);
-        ASSERT_ALWAYS(rc == 3);
-        if (r->rhs->n == 0) {
-            fprintf(stderr, "--rhs argument requires setting more than 0 vectors !\n");
-            exit(1);
-        }
-        r->rhs->f = fopen(rhsname, "w");
-        DIE_ERRNO_DIAG(r->rhs->f == NULL, "fopen", rhsname);
-        // rhs file is now always in ascii
-        // if (r->ascii)
-            gmp_fprintf(r->rhs->f, "%lu %d %Zd\n", r->nrows, r->rhs->n, r->rhs->p);
-    }
-    /* }}} */
-
-    r->out = stdout;
-
-    const char * ofilename = NULL;
-
-    if ((ofilename = param_list_lookup_string(pl, "output")) != NULL) {
-        r->out = fopen(ofilename, binary ? "wb" : "w");
-        DIE_ERRNO_DIAG(r->out == NULL, "fopen", ofilename);
-    } else {
-        if (binary) {
-            fprintf(stderr, "Error: --binary requires --output\n");
-            exit(1);
-        }
-        if (freq) {
-            fprintf(stderr, "Error: --freq requires --output\n");
-            exit(1);
-        }
+        c += x < log(F->coeff_n0);
     }
 
-    if (freq) {
-        char * cwname = derived_filename(ofilename, "cw", binary ? ".bin" : ".txt");
-        r->freq->cw = fopen(cwname, binary ? "wb" : "w");
-        DIE_ERRNO_DIAG(r->freq->cw == NULL, "fopen", cwname);
-        free(cwname);
+    if (neg) c = -c;
 
-        char * rwname = derived_filename(ofilename, "rw", binary ? ".bin" : ".txt");
-        r->freq->rw = fopen(rwname, binary ? "wb" : "w");
-        DIE_ERRNO_DIAG(r->freq->rw == NULL, "fopen", rwname);
-        free(rwname);
-    }
-
-    return 1;
+    return c;
 }
-/* }}} */
-/* {{{ This is primarily used for the random_matrix= hack. The standalone
- * program does not follow this route. Here we check that all parts of
- * the provided string are understood as legitimate arguments to
- * random_matrix=
- */
-int random_matrix_process_data_set_from_string(random_matrix_process_data_ptr r, const char * str)
-{
-    char * rmstring;
-    char ** n_argv;
-    char ** n_argv0;
-    int n_argc;
-    param_list pl2;
-
-    /* Create a new param_list from the random_matrix argument {{{ */
-    ASSERT_ALWAYS(str);
-    rmstring = strdup(str);
-
-    n_argv0 = n_argv = malloc(strlen(rmstring) * sizeof(char*));
-    n_argc = 0;
-    for(char * q = rmstring, * qq; q != NULL; q = qq) {
-        qq = strchr(q, ',');
-        if (qq) { *qq++='\0'; }
-        n_argv[n_argc++]=q;
-    }
-    /* }}} */
-    param_list_init(pl2);
-    int ok = random_matrix_process_data_set_from_args(r, pl2, n_argc, n_argv);
-    if (!ok || param_list_warn_unused(pl2)) {
-        fprintf(stderr, "Bad argument list for parameter random_matrix: %s\n", rmstring);
-        exit(1);
-    }
-    if (!param_list_lookup_string(pl2, "output")) {
-        /* the default is then that r->out == stdout, but for this very
-         * usage we want no output at all, so r->out should be NULL. */
-        r->out = NULL;
-    }
-
-    param_list_clear(pl2);
-    free(rmstring);
-    free(n_argv0);
-    return ok;
-}
-/* }}} */
-/* }}} */
 
 #ifndef WANT_MAIN
 void random_matrix_fill_fake_balancing_header(balancing_ptr bal, parallelizing_info_ptr pi, const char * rtmp)
@@ -834,7 +922,9 @@ void random_matrix_fill_fake_balancing_header(balancing_ptr bal, parallelizing_i
     bal->h->ncols = r->ncols;
     bal->h->ncoeffs = 0; /* FIXME ; what should I do ? */
     bal->h->checksum = 0;
-    bal->h->flags = FLAG_PADDING|FLAG_COLPERM|FLAG_SHUFFLED_MUL|FLAG_REPLICATE;
+    bal->h->flags = FLAG_COLPERM;
+    if (bal->h->nrows == bal->h->ncols)
+        bal->h->flags |= FLAG_REPLICATE;
     bal->h->pshuf[0] = 1;
     bal->h->pshuf[1] = 0;
     bal->h->pshuf_inv[0] = 1;
@@ -913,52 +1003,9 @@ uint32_t * matrix_transpose(uint32_t * p, size_t size, unsigned long nrows, unsi
 }
 #endif
 
-
-void * random_matrix_get_u32(parallelizing_info_ptr pi, param_list pl, matrix_u32_ptr arg)
+void * random_matrix_get_u32_byrows(gmp_randstate_t rstate, random_matrix_ddata_ptr F, matrix_u32_ptr arg)
 {
-    const char * rtmp = param_list_lookup_string(pl, "random_matrix");
-    ASSERT_ALWAYS(rtmp);
-
-    unsigned long nrows;
-    unsigned long ncols;
-    unsigned long seed;
-    int density;
-    int maxcoeff;
-
-    {
-        random_matrix_process_data r;
-        random_matrix_process_data_init(r);
-        random_matrix_process_data_set_from_string(r, rtmp);
-        nrows = r->nrows;
-        ncols = r->ncols;
-        density = r->density;
-        maxcoeff = r->maxcoeff;
-        /* This is not supported here -- mostly because we haven't been
-         * extremely careful. */
-        ASSERT_ALWAYS(!r->rhs->n);
-        seed = r->seed + pi->m->jrank * pi->m->ncores + pi->m->trank;
-        random_matrix_process_data_clear(r);
-    }
-
-    gmp_randstate_t rstate;
-    gmp_randinit_default(rstate);
-
-    nrows /= pi->wr[1]->totalsize;
-    ncols /= pi->wr[0]->totalsize;
-    density /= pi->wr[0]->totalsize;
-    // F->offset /= pi->wr[0]->totalsize;
-    gmp_randseed_ui(rstate, seed);
-
-
-    random_matrix_ddata F;
-    random_matrix_ddata_init(F);
-    random_matrix_ddata_set_default(F);
-
-    /* Adapt to the parallelizing_info structure : divide */
-    /* note that padding has to still be padding. */
-
-    random_matrix_ddata_adjust(F, nrows, ncols, density, pi->wr[0]->totalsize);
-
+    int has_coeffs = F->maxcoeff > 0;
 
     /* Now we essentially have a copy of printrows above, except that
      * we're outputting binary, and not to a stream but to memory.  */
@@ -977,36 +1024,30 @@ void * random_matrix_get_u32(parallelizing_info_ptr pi, param_list pl, matrix_u3
         arg->p[arg->size++] = (x);					\
     } while (0)
 
-    if (pi->m->jrank == 0 && pi->m->trank == 0) {
-        printf("Each of the %u jobs on %u nodes creates a matrix with %lu rows %lu cols, and %d coefficients per row on average. Seed for rank 0 is %lu.\n",
-                pi->m->totalsize, pi->m->njobs, nrows, ncols, density, seed);
-    }
-
     time_t t0 = time(NULL);
     struct progress_info last_printed[1];
     last_printed->t = t0;
     last_printed->z = 0;
 
-    if (!arg->transpose) {
-        uint32_t * ptr = malloc(ncols * sizeof(unsigned long));
+        uint32_t * ptr = malloc(F->ncols * sizeof(uint32_t));
         /* we'd like to avoid constant malloc()'s and free()'s */
         punched_interval_ptr pool = NULL;
         punched_interval_ptr range = punched_interval_alloc(&pool, 0, 1);
-        for(unsigned long i = 0 ; i < nrows ; i++) {
+        for(unsigned long i = 0 ; i < F->nrows ; i++) {
             // long v = 0;
             uint32_t c = generate_row(rstate, F, ptr, range, & pool);
             PUSH_P(c);
             for(unsigned long j = 0 ; j < c ; j++) {
                 PUSH_P(ptr[j]);
-                if (maxcoeff) {
-                    int co = gmp_urandomm_ui(rstate, 2 * maxcoeff + 1) - maxcoeff;
+                if (has_coeffs) {
+                    int32_t co = generate_coefficient(rstate, F, ptr[j]);
                     PUSH_P(co);
                     // if (r->rhs->n) v += co * (1+ptr[j]);
                 }
             }
             total_coeffs += c;
             tot_sq += (double) c * (double) c;
-            if (pi->m->jrank == 0 && pi->m->trank == 0 && should_print_now(last_printed, arg->size * sizeof(uint32_t))) {
+            if (F->print && should_print_now(last_printed, arg->size * sizeof(uint32_t))) {
                 double dt = last_printed->t - t0;
                 char buf[16];
                 char buf2[16];
@@ -1016,39 +1057,78 @@ void * random_matrix_get_u32(parallelizing_info_ptr pi, param_list pl, matrix_u3
                 fflush(stdout);
             }
         }
-        if (pi->m->jrank == 0 && pi->m->trank == 0) {
-            printf("\n");
+        for(unsigned long j = 0 ; j < F->padrows ; j++) {
+            PUSH_P(0);
         }
+        if (F->print) printf("\n");
         punched_interval_free(range, &pool);
         punched_interval_free_pool(&pool);
         free(ptr);
-    } else {
+#undef PUSH_P
+
+    F->total_coeffs = total_coeffs;
+    double e = (double) total_coeffs / F->nrows;
+    double s = (double) tot_sq / F->nrows;
+    double sdev = sqrt(s - e*e);
+    F->row_avg = e;
+    F->row_sdev = sdev;
+    if (verbose_enabled(CADO_VERBOSE_PRINT_BWC_CACHE_BUILD) && F->print) {
+        fprintf(stderr, "Actual density per row avg %.2f sdev %.2f\n",
+                F->row_avg, F->row_sdev);
+    }
+    return arg;
+}
+
+void * random_matrix_get_u32_bycolumns(gmp_randstate_t rstate, random_matrix_ddata_ptr F, matrix_u32_ptr arg)
+{
+    uint64_t total_coeffs = 0;
+    double tot_sq = 0;
+
+    int has_coeffs = F->maxcoeff > 0;
+
+    size_t alloc = 0;
+    ASSERT_ALWAYS(arg->p == NULL);
+    ASSERT_ALWAYS(arg->size == 0);
+
+#define PUSH_P(x) do {    						\
+        if (arg->size >= alloc) {					\
+            alloc = arg->size + 64 + alloc / 4;			        \
+            arg->p = realloc(arg->p, alloc * sizeof(uint32_t));	        \
+        }								\
+        arg->p[arg->size++] = (x);					\
+    } while (0)
+
+    time_t t0 = time(NULL);
+    struct progress_info last_printed[1];
+    last_printed->t = t0;
+    last_printed->z = 0;
+
         size_t size0 = 0;
-        uint32_t * ptr = malloc(ncols * sizeof(unsigned long));
+        uint32_t * ptr = malloc(F->ncols * sizeof(uint32_t));
         random_matrix_ddata G;
         random_matrix_ddata_init(G);
         /* use a special ddata, for our specially simple process (which
          * still needs the pick-and-punch thing */
         G->alpha=0;
-        G->ncols = nrows; /* yes */
+        G->ncols = F->nrows; /* yes */
         /* Then in fact it's easier, as we can avoid inverse transform
          * sampling for the computation of the coefficients */
         // int heavy = 1;
         punched_interval_ptr pool = NULL;
-        for(unsigned long j = 0 ; j < ncols ; j++) {
+        for(unsigned long j = 0 ; j < F->ncols ; j++) {
             double p = dist_p(F, j);
             G->scale = p;
             unsigned long weight;
             if (p > 0.1) {
                 weight = 0;
-                for(unsigned long i = 0 ; i < nrows ; i++) {
+                for(unsigned long i = 0 ; i < F->nrows ; i++) {
                     if (random_uniform(rstate) < p)
                         ptr[weight++]=i;
                 }
             } else {
-                weight = random_binomial(rstate, nrows, p);
+                weight = random_binomial(rstate, F->nrows, p);
                 for(unsigned long i = 0 ; i < weight ; i++) {
-                    ptr[i] = gmp_urandomm_ui(rstate, nrows);
+                    ptr[i] = gmp_urandomm_ui(rstate, F->nrows);
                 }
                 qsort(ptr, weight, sizeof(uint32_t), (sortfunc_t) &cmp_u32);
                 unsigned long nw = 0;
@@ -1104,10 +1184,15 @@ void * random_matrix_get_u32(parallelizing_info_ptr pi, param_list pl, matrix_u3
             PUSH_P(weight);
             for(unsigned long i = 0 ; i < weight ; i++) {
                 PUSH_P(ptr[i]);
+                if (has_coeffs) {
+                    int32_t co = generate_coefficient(rstate, F, j);
+                    PUSH_P(co);
+                    // if (r->rhs->n) v += co * (1+ptr[j]);
+                }
             }
             total_coeffs += weight;
             tot_sq += (double) weight * (double) weight;
-            if (pi->m->jrank == 0 && pi->m->trank == 0 && should_print_now(last_printed, arg->size * sizeof(uint32_t))) {
+            if (F->print && should_print_now(last_printed, arg->size * sizeof(uint32_t))) {
                 double dt = last_printed->t - t0;
                 char buf[16];
                 char buf2[16];
@@ -1117,27 +1202,66 @@ void * random_matrix_get_u32(parallelizing_info_ptr pi, param_list pl, matrix_u3
                 fflush(stdout);
             }
         }
+        for(unsigned long j = 0 ; j < F->padcols ; j++) {
+            PUSH_P(0);
+        }
         punched_interval_free_pool(&pool);
         random_matrix_ddata_clear(G);
         free(ptr);
-    }
 #undef PUSH_P
     F->total_coeffs = total_coeffs;
-    double e = (double) total_coeffs / nrows;
-    double s = (double) tot_sq / nrows;
+    double e = (double) total_coeffs / F->nrows;
+    double s = (double) tot_sq / F->nrows;
     double sdev = sqrt(s - e*e);
     F->row_avg = e;
     F->row_sdev = sdev;
-    if (verbose_enabled(CADO_VERBOSE_PRINT_BWC_CACHE_BUILD) && pi->m->jrank == 0 && pi->m->trank == 0) {
+    if (verbose_enabled(CADO_VERBOSE_PRINT_BWC_CACHE_BUILD) && F->print) {
         fprintf(stderr, "Actual density per row avg %.2f sdev %.2f\n",
                 F->row_avg, F->row_sdev);
     }
 
-
-    gmp_randclear(rstate);
-    random_matrix_ddata_clear(F);
     return arg;
 }
+
+
+void * random_matrix_get_u32(parallelizing_info_ptr pi, param_list pl, matrix_u32_ptr arg, unsigned long padded_nrows, unsigned long padded_ncols)
+{
+    random_matrix_process_data r;
+    random_matrix_process_data_init(r);
+
+    const char * rtmp = param_list_lookup_string(pl, "random_matrix");
+    ASSERT_ALWAYS(rtmp);
+    random_matrix_process_data_set_from_string(r, rtmp);
+
+    /* This is not supported here -- mostly because we haven't been
+     * extremely careful. */
+    ASSERT_ALWAYS(!r->rhs->n);
+
+
+    random_matrix_ddata F;
+    random_matrix_ddata_init(F);
+    random_matrix_ddata_set_default(F);
+    random_matrix_ddata_adjust(F, r, pi, padded_nrows, padded_ncols);
+
+    if (F->print) {
+        printf("Each of the %u jobs on %u nodes creates a matrix with %lu rows %lu cols, and %d coefficients per row on average. Seed for rank 0 is %lu.\n",
+                pi->m->totalsize, pi->m->njobs,
+                F->nrows, F->ncols, r->density / pi->wr[0]->totalsize, r->seed);
+    }
+
+    gmp_randstate_t rstate;
+    gmp_randinit_default(rstate);
+    gmp_randseed_ui(rstate, r->seed + pi->m->jrank * pi->m->ncores + pi->m->trank);
+    if (arg->transpose)
+        return random_matrix_get_u32_bycolumns(rstate, F, arg);
+    else
+        return random_matrix_get_u32_byrows(rstate, F, arg);
+
+    random_matrix_ddata_clear(F);
+    gmp_randclear(rstate);
+    random_matrix_process_data_clear(r);
+}
+
 #endif
 
 #ifdef  WANT_MAIN
@@ -1155,6 +1279,8 @@ void random_matrix_process_print(random_matrix_process_data_ptr r, random_matrix
         colweights = malloc(r->ncols * sizeof(uint32_t));
         memset(colweights, 0, r->ncols * sizeof(uint32_t));
     }
+
+    int has_coeffs = r->maxcoeff > 0;
 
 
 #define WU32(out, pre, x, post) do {					\
@@ -1195,8 +1321,8 @@ void random_matrix_process_print(random_matrix_process_data_ptr r, random_matrix
         for(uint32_t j = 0 ; j < c ; j++) {
             WU32(out, " ", ptr[j], "");
             if (colweights) colweights[ptr[j]]++;
-            if (r->maxcoeff) {
-                int32_t co = gmp_urandomm_ui(rstate, 2 * r->maxcoeff + 1) - r->maxcoeff;
+            if (has_coeffs) {
+                int32_t co = generate_coefficient(rstate, F, ptr[j]);
                 WS32(out, ":", co, "");
                 if (r->rhs->n) v += (long) co * (long) (1+ptr[j]);
             }
@@ -1260,7 +1386,7 @@ void random_matrix_process_print(random_matrix_process_data_ptr r, random_matrix
 
 void usage()
 {
-    fprintf(stderr, "Usage: ./random <nrows> [<ncols>] [<density>] [options]\n"
+    fprintf(stderr, "Usage: ./random_matrix <nrows> [<ncols>] [<density>] [options]\n"
             "Options:\n"
             "\t-d <density> : desired density per row\n"
             "\t-s <seed> : seed\n"
@@ -1327,6 +1453,12 @@ int main(int argc, char * argv[])
         fprintf(stderr, "Warning, left kernel is large."
                 " Could trigger misbehaviours\n");
     }
+    if (kernel_left >= r->ncols) {
+        kernel_left = r->ncols - 1;
+    }
+    if (kernel_right >= r->nrows) {
+        kernel_right = r->nrows - 1;
+    }
 
     if (r->rhs->n) {
         ASSERT_ALWAYS(kernel_left == 0);
@@ -1343,7 +1475,7 @@ int main(int argc, char * argv[])
     random_matrix_ddata F;
     random_matrix_ddata_init(F);
     random_matrix_ddata_set_default(F);
-    random_matrix_ddata_adjust(F, r->nrows - kernel_right, r->ncols - kernel_left, r->density, 1);
+    random_matrix_ddata_adjust_force_kernel(F, r, NULL, r->nrows, r->ncols, kernel_left, kernel_right);
     if (verbose) random_matrix_ddata_info(stderr, F);
 
     random_matrix_process_print(r, F);

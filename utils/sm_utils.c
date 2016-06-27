@@ -5,7 +5,7 @@
 
 /* compute the SM */
 static void
-compute_sm_lowlevel (mpz_poly_t SM, mpz_poly_srcptr num, const mpz_poly_t F, const mpz_t ell,
+compute_sm_lowlevel (mpz_poly SM, mpz_poly_srcptr num, const mpz_poly F, const mpz_t ell,
             const mpz_t smexp, const mpz_t ell2, const mpz_t invl2)
 {
     int use_barrett = 0;
@@ -35,7 +35,7 @@ double m_seconds = 0;
 /* u and dst may be equal */
 void compute_sm_piecewise(mpz_poly_ptr dst, mpz_poly_srcptr u, sm_side_info_srcptr sm)
 {
-    /* now for a split-chunk compute_sm_straightforward */
+    /* now for a split-chunk compute_sm */
 
     if (sm->nsm == 0)
         return;
@@ -44,11 +44,11 @@ void compute_sm_piecewise(mpz_poly_ptr dst, mpz_poly_srcptr u, sm_side_info_srcp
     mpz_poly_realloc(dst, n);
     mpz_poly_factor_list_srcptr fac = sm->fac;
 
-    mpz_poly_t temp;
+    mpz_poly temp;
     mpz_poly_init(temp, n);
 
     /* we can afford calling malloc() here */
-    mpz_poly_t * chunks = malloc(fac->size * sizeof(mpz_poly_t));
+    mpz_poly * chunks = malloc(fac->size * sizeof(mpz_poly));
     for(int j = 0 ; j < fac->size ; j++) {
         mpz_poly_srcptr g = fac->factors[j]->f;
         mpz_poly_init(chunks[j], g->deg-1);
@@ -113,7 +113,7 @@ void compute_sm_piecewise(mpz_poly_ptr dst, mpz_poly_srcptr u, sm_side_info_srcp
 
 /* Assume nSM > 0 */
 void
-print_sm (FILE *f, mpz_poly_t SM, int nSM, int d)
+print_sm2 (FILE *f, mpz_poly SM, int nSM, int d, const char * delim)
 {
   if (nSM == 0)
     return;
@@ -128,14 +128,21 @@ print_sm (FILE *f, mpz_poly_t SM, int nSM, int d)
     if (d > SM->deg)
       fprintf(f, " 0");
     else
-      gmp_fprintf(f, " %Zu", SM->coeff[d]);
+      gmp_fprintf(f, "%s%Zu", delim, SM->coeff[d]);
   }
   //fprintf(f, "\n");
 }
+void
+print_sm (FILE *f, mpz_poly SM, int nSM, int d)
+{
+    print_sm2(f, SM, nSM, d, " ");
+}
+
 
 void
 sm_relset_init (sm_relset_t r, int *d, int nb_polys)
 {
+  r->nb_polys = nb_polys;
   for (int side = 0; side < nb_polys; side++) {
     mpz_poly_init (r->num[side], d[side]);
     mpz_poly_init (r->denom[side], d[side]);
@@ -151,6 +158,17 @@ sm_relset_clear (sm_relset_t r, int nb_polys)
   }
 }
 
+void
+sm_relset_copy (sm_relset_t r, sm_relset_srcptr s)
+{
+  r->nb_polys = s->nb_polys;
+  for (int side = 0; side < r->nb_polys; side++) {
+    mpz_poly_set (r->num[side], s->num[side]);
+    mpz_poly_set (r->denom[side], s->denom[side]);
+  }
+}
+
+
 /* Given an array of index of rows and an array of abpolys,
  * construct the polynomial that corresponds to the relation-set, i.e. 
  *          rel = prod(abpoly[rk]^ek)
@@ -160,12 +178,12 @@ sm_relset_clear (sm_relset_t r, int nb_polys)
  */
 void
 sm_build_one_relset (sm_relset_ptr rel, uint64_t *r, int64_t *e, int len,
-		     mpz_poly_t * abpolys, mpz_poly_ptr *F, int nb_polys,
+		     mpz_poly * abpolys, mpz_poly_ptr *F, int nb_polys,
 		     const mpz_t ell2)
 {
   mpz_t ee;
   mpz_init(ee);  
-  mpz_poly_t tmp[NB_POLYS_MAX];
+  mpz_poly tmp[NB_POLYS_MAX];
   for (int side = 0; side < nb_polys; side++) {
     if (F[side] == NULL) continue;
     mpz_poly_init(tmp[side], F[side]->deg);
@@ -228,7 +246,7 @@ static int compute_unit_rank(mpz_poly_srcptr f)
 
 void compute_change_of_basis_matrix(mpz_t * matrix, mpz_poly_srcptr f, mpz_poly_factor_list_srcptr fac, mpz_srcptr ell)
 {
-    /* now compute the change of basis matrix. This is given simpy
+    /* now compute the change of basis matrix. This is given simply
      * as the CRT matrix from the piecewise representation modulo
      * the factors of f to the full representation.
      *
@@ -242,7 +260,7 @@ void compute_change_of_basis_matrix(mpz_t * matrix, mpz_poly_srcptr f, mpz_poly_
      */
 
     for(int i = 0, s = 0 ; i < fac->size ; i++) {
-        mpz_poly_t d, a, b, h;
+        mpz_poly d, a, b, h;
         mpz_poly_srcptr g = fac->factors[i]->f;
         mpz_poly_init(h, f->deg - g->deg);
         mpz_poly_init(d, 0);

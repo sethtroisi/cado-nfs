@@ -111,7 +111,7 @@ test_modul_poly_roots_ulong (unsigned long iter)
   mpz_set_ui (f[1], 0);
   mpz_set_ui (f[2], 1);
   d = 2;
-  mpz_poly_t F;
+  mpz_poly F;
   F->coeff =  f;
   F->deg = d;
   modul_initmod_ul (p, 113);

@@ -1,7 +1,7 @@
 
 *** THIS DOCUMENTATION IS NOT REGULARILY CHECKED TO BE UP-TO-DATE. ***
 
-last update: 20130724
+last update: 20130724 [20160201 for the MPI section]
 
 See bwc-trace.sh and bwc-trace.m for the most up-to-date checks relative
 to the exact meaning of most files.
@@ -173,7 +173,7 @@ expected to be present in the same directory as the calling binary.
     stored. If the value here is too small, then there are chances that
     you exhaust your disk space.
 
-* mm_impl=[basic|sliced|threaded|bucket|...]
+* mm_impl=[basic|sliced|bucket|...]
 
     low-level matrix multiplication code to use. See below in this document.
 
@@ -296,10 +296,9 @@ wdir/W.<bchecksum>                  kernel vectors
 The permutation P
 =================
 
-bwc now uses (optionally) a shuffled matrix times vector product, which
-as a side effect of the matrix times vector product also multiplies by a
-certain permutation matrix. This is done for best efficiency. For the
-case of the un-shuffled product, P is the identity.
+bwc uses a shuffled matrix times vector product, which as a side
+effect of the matrix times vector product also multiplies by a certain
+permutation matrix. This is done for best efficiency.
 
 This permutation matrix is as follows. We assume that the matrix m is
 split in nh horizontal and nv vertical strips. M is first and foremost
@@ -595,8 +594,36 @@ Using bwc.pl
     More extensive documentation in bwc.pl is included in the file
     header.
 
-Using bwc.pl with MPI (updated 20150611)
+Using bwc.pl with MPI (updated 20160201)
 =====================
+
+    0) Think a bit about the block Wiedemann parameters you will use.
+    Here, we care mostly about the choice of the parameters m, n,
+    interval, mpi, and thr.
+
+    Given N the number of column and rows of your sparse submatrix
+    (printed at the end of the replay binary), here are some tips.
+
+     - m and n must be multiples of 64
+     - for n=k*64, we do "k sequences". Don't try k>1 before having well
+       understood the workflow.
+     - the block Wiedemann algorithm will do N/m + 2 * N/n products
+       matrix times vector (more precisely, L = N/m + N/n in the krylov
+       step, and N/n in the mksol step). Note that for n=k*64, all these
+       products are done k times.
+     - the linear generator step has time complexity
+           O((m+n)*N*log(N)*(m+n+log(N)))
+       and space complexity O((m+n)*N). So do not exaggerate with your
+       choice of m and n.
+     - checkpoints will be saved every [[interval]] iterations. The
+       default value is too small. Please set [[interval]] to something
+       of your liking. Something like sqrt(L) rounded up to the next
+       power of 2, or power of 10, does not seem absurd.
+     - a matrix-times-vector product does not scale linearly with mpi=
+       and thr=, because of communications. mpi= and thr= are
+       two-dimensional parameters, and you'd better have them describe a
+       split which should be as close to a square as possible (because
+       this minimizes communication costs).
 
     1) first you have to compile CADO-NFS with MPI support:
 
@@ -604,54 +631,99 @@ Using bwc.pl with MPI (updated 20150611)
     $ MPI=1 make
     (or MPI=$HOME/packages/openmpi-1.8.6/ make)
 
+    [ note: you may find it convenient to add to your local.sh the
+    line:  if [ "$MPI" ] ; then build_tree="${build_tree}.mpi" ; fi
+    so that MPI and non-MPI builds go to different build directories ]
+
     Check the following lines are present in the make output:
 
     -- Using MPI C compiler /usr/bin/mpicc
     -- Using MPI C++ compiler /usr/bin/mpic++
     -- Using MPI driver /usr/bin/mpiexec
 
-    2) secondly you need a working directory (wdir) which is accessible by all
-       machines (it can be empty initially)
+    2) secondly you need a working directory (wdir) which will be created
+       on all machines. It can be empty initially. This directory does
+       not need to be shared via NFS, but having it shared doesn't hurt
+       either.
 
-    3) then launch the following command where you have to adapt:
+    3) run simple tests to make sure everything is right. If you're at
+       loss with these, then you'll have a hard time doing the rest.
+
+    $ MPI=1 make -j8 test_hello
+
+    # a simple non-mpi threaded test run
+    $ ./build/xxxxxxx/tests/linalg/bwc/test_hello thr=2x2
+
+    # a simple mpi non-threaded test run
+    $ /usr/bin/mpiexec -n 4 ./build/xxxxxxx/tests/linalg/bwc/test_hello mpi=2x2
+
+    # combining both
+    $ /usr/bin/mpiexec -n 4 ./build/xxxxxxx/tests/linalg/bwc/test_hello mpi=2x2 thr=2x2
+
+    # specify a node file (unique list of machine names in $nodefile)
+    $ /usr/bin/mpiexec -n 4 -machinefile $nodefile ./build/xxxxxxx/tests/linalg/bwc/test_hello mpi=2x2 thr=2x2
+
+    # most often, for the previous run to succeed, you have to add
+    # some stanzas (here for openmpi and the OAR job scheduler):
+    $ /usr/bin/mpiexec -n 4 -machinefile $OAR_NODEFILE --mca rmaps_base_mapping_policy node -mca plm_rsh_agent oarsh ./build/xxxxxxx/tests/linalg/bwc/test_hello  mpi=2x2 thr=4x4
+
+    4) then launch the script ./build/xxxxxxx/linalg/bwc/bwc.pl, as in
+    the command line below, where you have to adapt:
        thr=3x4   each machine has 12 cores, we split them in 3x4
        mpi=2x2:  we use 4 machines, and split them in 2x2
-       hosts=... list of machines used (number should match mpi=...)
        matrix=   location of the matrix (on the machine where bwc.pl is run)
        wdir=...  working directory (accessible by all machines)
-       bwc_bindir= where the binaries are (accessible by all machines)
-       mpi_extra_args= this is needed for openmpi
 
-    $ bwc.pl :complete seed=1 thr=2x2 mpi=2x2 hosts=andouille,chipolata,chorizo,merguez matrix=/localdisk/tmp/nfs/c156.sparse.bin nullspace=left mm_impl=bucket interleaving=0 interval=1000 mn=64 wdir=/global/bwc.wdir shuffled_product=1 bwc_bindir=/global/bin/bwc mpi_extra_args='--mca btl_tcp_if_exclude lo,virbr0'
+    # A simple command-line where we benefit from some auto-guessing for
+    # some arcane parameters
+    $ ./build/xxxxxxx/linalg/bwc/bwc.pl :complete thr=3x4 mpi=2x2 matrix=/localdisk/tmp/nfs/c156.sparse.bin interval=4096 m=64 n=64 wdir=/tmp/bwc.wdir
 
-Note: Some additional scheduler-specific bits and pieces (consider them as
-example documentation status only -- none are part of regular tests):
+    # A rather more ``manual'' run.
+    $ ./build/xxxxxxx/linalg/bwc/bwc.pl :complete thr=3x4 mpi=2x2 hosts=andouille,chipolata,chorizo,merguez matrix=/localdisk/tmp/nfs/c156.sparse.bin interval=4096 m=64 n=64 wdir=/global/bwc.wdir bwc_bindir=/global/bin/bwc mpi_extra_args='--mca btl_tcp_if_exclude lo,virbr0'
+
+    There are very many internal parameters, some of which get passed to
+    mpiexec, based on some auto-detection, both of the job scheduler and
+    the MPI back-end which is used. This works sometimes rather
+    awkwardly, so the relevant bits of the linalg/bwc/bwc.pl script may
+    have to be edited to best suit your combination (please submit your
+    changes to the cado-nfs-discuss mailing list, if you do so).
+
+    Note: Some additional scheduler-specific bits and pieces (consider them as
+    example documentation status only -- none are part of regular tests):
     openpbs/torque : linalg/bwc/README.TORQUE
 
-If you intend to only use one sequence, it's not very difficult. If you
-want to do several sequences, you have to split the :complete meta-step
-into several, and run them at the appropriate moments. This also works,
-but requires you to know a bit what you're doing.
+    Note: see also cpu binding below.
+
+If you intend to only use one sequence (n == 64), it's not very
+difficult. If you want to do several sequences, you have to split the
+:complete meta-step into several, and run them at the appropriate
+moments. This also works, but requires you to know a bit what you're
+doing.
 
 Cpu binding (updated 20141002)
-===========
+==============================
 
-If hwloc (Portable Hardware Locality, http://www.open-mpi.org/projects/hwloc/)
-is installed, then bwc.pl might use it for cpu binding, which will improve the
-performance of the linear algebra step. When hwloc is used, the keyword
-"cpubinding" should appear in cxxx.bwc.log.
+If hwloc (Portable Hardware Locality,
+http://www.open-mpi.org/projects/hwloc/) is installed and you have a
+C++11 compiler, then bwc.pl might use it for cpu binding, which will
+improve the performance of the linear algebra step. When hwloc is used,
+the keyword "cpubinding" should appear in cxxx.bwc.log.
 
 See cpubinding.conf for more information. In short, you just need to add on the
-cadofactor.py command line: cpubinding=$(CADO)/linalg/bwc/cpubinding.conf.
+cado-nfs.py command line: cpubinding=$(CADO)/parameters/misc/cpubinding.conf.
 
 Using Cantor's algorithm
 ========================
 
-At the highest levels of the recursion tree of the 'lingen' program,
-one might use Cantor's algorithm to speed up the computations
-(see https://hal.inria.fr/inria-00188261). This not done by default
-because it was not fully tested yet. To use Cantor's algorithm, add
-for example cantor_threshold=128 to the cadofactor.py command line.
+At the highest levels of the recursion tree of the 'lingen' program, one
+might use Cantor's algorithm to speed up the computations (see
+https://hal.inria.fr/inria-00188261). To use Cantor's algorithm, add for
+example tasks.linalg.bwc.cantor_threshold=128 to the cado-nfs.py command line;
+this means that Cantor's algorithm will be used to multiply matrices of
+polynomials of degree 128 or more. Note that Cantor's algorithm is faster
+for large degrees, but uses more memory. The default is
+tasks.linalg.bwc.cantor_threshold=2048. To disable Cantor's algorithm, use
+tasks.linalg.bwc.cantor_threshold=4294967295.
 
 Using several sequences
 =======================

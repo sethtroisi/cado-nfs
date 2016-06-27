@@ -53,16 +53,15 @@ def run(param_file, problem):
         "lpba": 22,
         "mfbr": 22,
         "mfba": 22,
-        "rlambda": 1.2,
-        "alambda": 1.2,
         "ncurves0": 6,
         "ncurves1": 6,
-        "t": 1 # number of threads for las
+        "t": 2 # number of threads for las
     }
     makefb_params = {
         "poly" : las_params["poly"],
         "alim": las_params["alim"],
-        "maxbits": las_params["I"] - 1
+        "maxbits": las_params["I"],
+        "t": 1
     }
 
     params = read_params_from_file(param_file)
@@ -71,15 +70,19 @@ def run(param_file, problem):
     update_existing(las_params, params)
     las_params["mfbr"] = max(las_params["mfbr"], las_params["lpbr"])
     las_params["mfba"] = max(las_params["mfba"], las_params["lpba"])
+
+    las_params["rlim"] = min(las_params["rlim"], 2 ** las_params["lpbr"])
+    las_params["alim"] = min(las_params["alim"], 2 ** las_params["lpba"])
     
-    to_print = ["I", "alim", "lpba", "mfba", "alambda", "rlim", "lpbr", "mfbr", "rlambda", "ncurves0", "ncurves1"]
+    to_print = ["I", "alim", "lpba", "mfba", "rlim", "lpbr", "mfbr", "ncurves0", "ncurves1"]
     sys.stderr.write("Using parameters %s\n" % " ".join(["%s:%s" % (key, las_params[key]) for key in to_print]))
 
     # Update parameters for makefb (which may depend on las parameters)
     update_existing(makefb_params, params)
     # also update "maxbits" which depends on "I"
-    makefb_params["maxbits"] = params["I"] - 1
+    makefb_params["maxbits"] = params["I"]
     makefb_params["out"] = las_params["fb"]
+    makefb_params["t"] = las_params["t"]
 
     makefb_cmd_line = [makefb]
     for (key, value) in makefb_params.items():
@@ -91,7 +94,8 @@ def run(param_file, problem):
     q0 = las_params["alim"]
     q_range = 1000
     q_inc = 0
-    rels_wanted = int(primepi(las_params["lpba"]) + primepi(las_params["lpbr"]))
+    # since we remove duplicates, 80% of the total ideals should be enough
+    rels_wanted = int(0.8 * primepi(las_params["lpba"]) + 0.8 * primepi(las_params["lpbr"]))
     # read the best time so far (if any)
     best_time = get_best_time ("las.best")
     if best_time >= 1e308:
@@ -104,7 +108,7 @@ def run(param_file, problem):
         outputfile = "las.%d.out" % q0
         las_params.update({"q0": q0, "q1": q0 + q_range, "out": outputfile})
 
-        las_cmd_line = [las, "-allow-largesq"]
+        las_cmd_line = [las, "-allow-largesq", "-dup"]
         for (key, value) in las_params.items():
             las_cmd_line += ["-%s" % key, str(value)]
         # sys.stderr.write("Running: %s\n" % " ".join(las_cmd_line))

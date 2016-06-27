@@ -18,9 +18,6 @@
 #include "las-dlog-base.h"
 #include "ecm/batch.h"
 
-/* define BATCH to use batch cofactorization */
-// #define BATCH 1
-
 /* {{{ siever_config */
 /* The following structure lists the fields with an impact on the siever.
  * Different values for these fields will correspond to different siever
@@ -35,6 +32,7 @@ struct siever_config_s {
     unsigned long bucket_thresh;    // bucket sieve primes >= bucket_thresh
     unsigned long bucket_thresh1;   // primes above are 2-level bucket-sieved
     unsigned int td_thresh;
+    unsigned int skipped;           // don't sieve below this
     unsigned int unsieve_thresh;
     struct {
         unsigned long lim; /* factor base bound */
@@ -43,6 +41,7 @@ struct siever_config_s {
         int mfb;           /* bound for residuals is 2^mfbr */
         int ncurves;       /* number of cofactorization curves */
         double lambda;     /* lambda sieve parameter */
+        unsigned long qmax; /* largest q sieved on this side, for dup sup */
     } sides[2][1];
 };
 typedef struct siever_config_s siever_config[1];
@@ -97,6 +96,7 @@ struct sieve_side_info_s {
         int td[2];
         int rs[2];
         int rest[2];
+        int skipped[2];
     } fb_parts_x[1];
     
     /* The reading, mapping or generating the factor base all create the
@@ -117,7 +117,7 @@ struct sieve_side_info_s {
     double cexp2[257]; /* for 2^X * scale + GUARD */
     double logmax;     /* norms on the alg-> side are < 2^alg->logmax */
 
-    mpz_poly_t fij;   /* coefficients of F(a0*i+a1*j, b0*i+b1*j) (divided by 
+    mpz_poly fij;   /* coefficients of F(a0*i+a1*j, b0*i+b1*j) (divided by 
                          q on the special-q side) */
     double *fijd;     /* coefficients of F_q (divided by q on the special q side) */
     unsigned int nroots; /* Number (+1) and values (+0.0) of the roots of */
@@ -128,8 +128,6 @@ struct sieve_side_info_s {
     small_sieve_data_t ssd[1];
     /* And this is just created as an extraction of the above */
     small_sieve_data_t rsd[1];
-
-    facul_strategy_t *strategy;
 };
 typedef struct sieve_side_info_s * sieve_side_info_ptr;
 typedef const struct sieve_side_info_s * sieve_side_info_srcptr;
@@ -176,9 +174,6 @@ struct sieve_info_s {
     unsieve_aux_data_srcptr us;
     /* Data for divisibility tests p|i in lines where p|j */
     j_div_srcptr j_div;
-
-    /* used in check_leftover_norm */
-    mpz_t BB[2], BBB[2], BBBB[2];
 };
 typedef struct sieve_info_s sieve_info[1];
 
@@ -248,9 +243,8 @@ struct las_info_s {
 #endif
     descent_tree * tree;
 
-#ifdef BATCH
-    cofac_list L; /* to store (a,b) and corresponding cofactors */
-#endif
+    int batch; /* batch mode for cofactorization */
+    cofac_list L; /* store (a,b) and corresponding cofactors in batch mode */
 };
 
 typedef struct las_info_s las_info[1];

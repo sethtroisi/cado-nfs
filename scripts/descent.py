@@ -254,6 +254,14 @@ class GeneralClass(object):
     def p(self):
         d=self.poly_data()
         return int(d["n"])
+    
+    # short name for the target, to be used in filenames
+    def short_target(self):
+        target = str(self.args.target)
+        if len(target) <= 20:
+            return target
+        else:
+            return target[:10] + "..." + target[-10:]
 
     def rational_poly():
         d=self.poly_data()
@@ -594,13 +602,21 @@ class DescentUpperClass(object):
         self.I        = int(args.init_I)
         self.slaves   = int(args.slaves)
 
+    def __isqrt(self, n):
+        x = n
+        y = (x + 1) // 2
+        while y < x:
+            x = y
+            y = (x + n // x) // 2
+        return x
+
     def __myxgcd(self, a, b, T):
         assert type(a) == int
         assert type(b) == int
         assert type(T) == int
         ainit = a
         binit = b
-        bound = math.floor(math.sqrt(b*T))
+        bound = self.__isqrt(b*T)
         x = 0
         lastx = 1
         y = 1
@@ -636,7 +652,7 @@ class DescentUpperClass(object):
             general.initrandomizer = random.randrange(p)
 
         tmpdir = general.tmpdir()
-        prefix = general.prefix() + ".descent.%s.init." % args.target
+        prefix = general.prefix() + ".descent.%s.init." % general.short_target()
 
         polyfilename = os.path.join(tmpdir, prefix + "poly")
         with open(polyfilename, 'w') as f:
@@ -824,7 +840,7 @@ class DescentMiddleClass(object):
 
     def do_descent(self, todofile):
         tmpdir = general.tmpdir()
-        prefix = general.prefix() + ".descent.%s.middle." % args.target
+        prefix = general.prefix() + ".descent.%s.middle." % general.short_target()
 
         f = open(todofile, 'r')
         ntodo = len(list(f))
@@ -907,7 +923,7 @@ class DescentLowerClass(object):
     def do_descent(self, relsfile, initial_split):
         args = parser.parse_args()
         tmpdir = general.tmpdir()
-        prefix = general.prefix() + ".descent.%s.lower." % args.target
+        prefix = general.prefix() + ".descent.%s.lower." % general.short_target()
         relsforSM = os.path.join(tmpdir, prefix + "relsforSM")
         SMfile = os.path.join(tmpdir, prefix + "SM")
 

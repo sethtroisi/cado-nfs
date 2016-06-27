@@ -9,7 +9,7 @@
 #define FREQ 2 // when possible one time out of FREQ we try sm_single_rel
 
 void
-mpz_poly_getcoeff_wrapper (mpz_t res, int i, const mpz_poly_t f)
+mpz_poly_getcoeff_wrapper (mpz_t res, int i, const mpz_poly f)
 {
   if (i <= f->deg)
     mpz_poly_getcoeff (res, i, f);
@@ -27,11 +27,11 @@ test_sm (FILE * datafile)
   {
     int ret, degF, degN, degD, nb_ab, nbSM;
     unsigned int nb_test_single_rel = 0;
-    mpz_poly_t F, N, Nc, D, Dc, SM, SMc;
+    mpz_poly F, N, Nc, D, Dc, SM, SMc;
     mpz_t tmp, ell;
     int64_t a, e[MAX_LEN_RELSET];
     uint64_t b, len_relset, r[MAX_LEN_RELSET];
-    mpz_poly_t ab_polys[TEST_MAX_AB];
+    mpz_poly ab_polys[TEST_MAX_AB];
     sm_relset_t relset;
 
     ret = fscanf(datafile, "in %d", &degF);
@@ -119,7 +119,7 @@ test_sm (FILE * datafile)
     //     /* artificially duplicate data, to test both sides */
     //     mpz_poly_ptr FF[2];
     //     FF[0] = &F[0]; FF[1] = &F[0];
-    //     mpz_poly_t SMc2;
+    //     mpz_poly SMc2;
     //     mpz_poly_init(SMc2, degF);
     //     mpz_poly_ptr SSMc[2];
     //     SSMc[0] = &SMc[0]; SSMc[1] = &SMc2[0];

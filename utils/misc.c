@@ -238,7 +238,10 @@ int mkdir_with_parents(const char * dir, int fatal)
 #else
             rc = mkdir (tmp, 0777);
 #endif
-            if (rc < 0) {
+            /* We have an obvious race condition between the check above
+             * and the mkdir here. So failing with EEXIST can be a
+             * legitimate event */
+            if (rc < 0 && errno != EEXIST) {
                 fprintf(stderr, "mkdir(%s): %s\n", tmp, strerror(errno));
                 free(tmp);
                 if (fatal) exit(1);
@@ -275,17 +278,22 @@ char * path_resolve(const char * progname, char * resolved)
 }
 
 //  trivial utility
-const char *size_disp(size_t s, char buf[16])
+const char *size_disp_fine(size_t s, char buf[16], double cutoff)
 {
     char *prefixes = "bkMGT";
     double ds = s;
     const char *px = prefixes;
-    for (; px[1] && ds > 500.0;) {
+    for (; px[1] && ds > cutoff;) {
 	ds /= 1024.0;
 	px++;
     }
     snprintf(buf, 10, "%.1f%c", ds, *px);
     return buf;
 }
+const char *size_disp(size_t s, char buf[16])
+{
+    return size_disp_fine(s, buf, 500.0);
+}
+
 // 
 

@@ -16,14 +16,6 @@ struct timing_interval_data_s {
 };
 typedef struct timing_interval_data_s timing_interval_data[1];
 
-#ifdef  MEASURE_LINALG_JITTER_TIMINGS
-#define NTIMERS_EACH_ITERATION  4
-#define TIMER_NAMES { "CPU", "cpu-wait", "COMM", "comm-wait", }
-#else
-#define NTIMERS_EACH_ITERATION  2
-#define TIMER_NAMES { "CPU", "COMM", }
-#endif
-
 struct timing_data {
     int go_mark;
     int begin_mark;
@@ -33,26 +25,35 @@ struct timing_data {
     int next_async_check;
     int async_check_period;
     int which;
-    timing_interval_data since_last_reset[NTIMERS_EACH_ITERATION];
-    timing_interval_data since_beginning[NTIMERS_EACH_ITERATION];
-    // since_last_reset[which^1] and since_beginning[which^1] are all
-    // complete timings, while the others are running -- in the sense
-    // that `running' timings must be added  the contribution of the
-    // current timer to constitute something meaningful.
+    int ntimers;
+    char ** names;
+    size_t * items;
+    timing_interval_data * since_last_reset;
+    timing_interval_data * since_beginning;
+    /* values stored in the timing_interval_data structures correspond to
+     * time interval values, except for the [which] structure, where it
+     * is (the opposite of) the time since when we've been measuring on
+     * its account. Switching from a timer to another then means getting
+     * a clock tick, adding it to counter [which], and subtracting it to
+     * another (which will then become [which]).
+     */
 };
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-void timing_init(struct timing_data * t, int start, int end);
+void timing_init(struct timing_data * t, int n, int start, int end);
+void timing_set_timer_name(struct timing_data * t, int i, const char *, ...)
+    ATTR_PRINTF(3, 4);
+void timing_set_timer_items(struct timing_data * t, int i, size_t count);
 void timing_clear(struct timing_data * t);
 void timing_next_timer(struct timing_data * t);
 
 void timing_check(parallelizing_info pi, struct timing_data * t, int iter, int print);
 void timing_update_ticks(struct timing_data * t, int iter);
-void timing_disp_collective_oneline(parallelizing_info pi, struct timing_data * timing, int iter, unsigned long ncoeffs, int print, int stage);
-void timing_final_tally(parallelizing_info pi, struct timing_data * timing, unsigned long ncoeffs, int print, int stage);
+void timing_disp_collective_oneline(parallelizing_info pi, struct timing_data * timing, int iter, int print, const char * stage);
+void timing_final_tally(parallelizing_info pi, struct timing_data * timing, int print, const char * stage);
 
 void block_control_signals();
 void catch_control_signals();

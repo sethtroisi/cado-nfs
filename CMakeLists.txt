@@ -2,24 +2,28 @@
 project(CADO_NFS)
 
 set(CADO_VERSION_MAJOR  2)
-set(CADO_VERSION_MINOR  1)
-set(CADO_VERSION_STRING  "${CADO_VERSION_MAJOR}.${CADO_VERSION_MINOR}")
+set(CADO_VERSION_MINOR  2)
+set(CADO_VERSION_PATCHLEVEL  1)
+set(CADO_VERSION_STRING  "${CADO_VERSION_MAJOR}.${CADO_VERSION_MINOR}.${CADO_VERSION_PATCHLEVEL}")
 
 # CADO_DIST_ARCHIVE_NAME may be overridden by environment.
 set(CADO_DIST_ARCHIVE_NAME "cado-nfs-${CADO_VERSION_STRING}")
 
 #####################################################################
-# cmake version -- set_property requires 2.6. Note that haters of progress
-# report things (this include me, casually) have to wait for cmake 2.7, since
-# it has only recently become possible to (only partially) disable them:
-# http://public.kitware.com/Bug/view.php?id=8726
-# set_property(GLOBAL PROPERTY RULE_MESSAGES OFF)
-# set(CMAKE_COLOR_MAKEFILE OFF)
 
 # If you change the min version, also change scripts/call_cmake.sh
 cmake_minimum_required(VERSION 2.8.0)
 if(COMMAND cmake_policy)
         cmake_policy(SET CMP0003 NEW)
+endif()
+
+set(CMAKE_LEGACY_CYGWIN_WIN32 0) # Remove when CMake >= 2.8.4 is required
+
+if (MINGW)
+    # we could do this as well in other cases.
+    # http://public.kitware.com/Bug/view.php?id=8726
+    set_property(GLOBAL PROPERTY RULE_MESSAGES OFF)
+    set(CMAKE_COLOR_MAKEFILE OFF)
 endif()
 
 #####################################################################
@@ -68,6 +72,13 @@ get_override(BWC_GFP_ARITHMETIC_BACKENDS BWC_GFP_ARITHMETIC_BACKENDS)
 get_override(BWC_GFP_MATMUL_BACKENDS    BWC_GFP_MATMUL_BACKENDS)
 get_override(BWC_EXTRA_BACKENDS    BWC_EXTRA_BACKENDS)
 
+if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Darwin")
+	# sigh...
+	# https://cmake.org/Bug/view.php?id=10342
+	message(STATUS "Using ranlib -c for Darwin platforms")
+	SET(CMAKE_C_ARCHIVE_FINISH "<CMAKE_RANLIB> -c <TARGET>")
+	SET(CMAKE_CXX_ARCHIVE_FINISH "<CMAKE_RANLIB> -c <TARGET>")
+endif()
 
 if(EXISTS ${CADO_NFS_SOURCE_DIR}/files.dist)
     set(EXCLUDE_FROM_RELEASE_BUILD )
@@ -77,10 +88,9 @@ endif()
 
 
 set(package_basename ${CADO_DIST_ARCHIVE_NAME})
-set(BINSUFFIX bin CACHE STRING "subpath below PREFIX for storing binaries")
-set(LIBSUFFIX lib/${package_basename} CACHE STRING "subpath below PREFIX for storing libraries")
+set(BINSUFFIX bin CACHE STRING "subpath below PREFIX for storing the two main scripts")
+set(LIBSUFFIX lib/${package_basename} CACHE STRING "subpath below PREFIX for storing libraries and binaries")
 set(DATASUFFIX share/${package_basename} CACHE STRING "subpath below PREFIX for storing parameters")
-set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/${LIBSUFFIX}")
 
 #####################################################################
 # Add the CFLAGS that are needed in all cases.
@@ -134,6 +144,25 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     endif()
 endif()
 
+if(CMAKE_C_COMPILER_ID MATCHES "Intel")
+    message(STATUS "Applying flags for icc")
+    set (CMAKE_C_FLAGS   "-std=c99 -g -W -Wall -wd13200,13203 ${CMAKE_C_FLAGS}")
+endif()
+
+if(CMAKE_CXX_COMPILER_ID MATCHES "Intel")
+    message(STATUS "Applying flags for icpc")
+    # only icc>=15 is full c++11 compliant, it seems. But 14 will do.
+    if (NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS 14)
+        set (CMAKE_CXX_FLAGS   "-std=c++11 -g -W -Wall -wd13200,13203 ${CMAKE_CXX_FLAGS}")
+        set(HAVE_CXX11 1)
+        message(STATUS "Enabling C++11 support")
+    else()
+        set (CMAKE_CXX_FLAGS   "-g -W -Wall -wd13200,13203 ${CMAKE_CXX_FLAGS}")
+        # don't set standard flags explicitly. The default seems fine.
+        # set (CMAKE_CXX_FLAGS   "-std=gnu++98 -g -W -Wall ${CMAKE_CXX_FLAGS}")
+    endif()
+endif()
+
 
 #####################################################################
 # Set dependencies for external software.
@@ -184,11 +213,13 @@ endif()
 
 get_override(GF2X_CONFIGURE_FLAGS GF2X_CONFIGURE_FLAGS)
 
-IF (NOT DEFINED ENV{NO_INLINE_ASSEMBLY})
+if (NOT DEFINED ENV{NO_INLINE_ASSEMBLY})
   include("${CADO_NFS_SOURCE_DIR}/config/gcc-inline-assembly.cmake")
 endif()
 include("${CADO_NFS_SOURCE_DIR}/config/gcc-bugs.cmake")
-include("${CADO_NFS_SOURCE_DIR}/config/gas-assembly.cmake")
+if (NOT DEFINED ENV{NO_GAS_ASSEMBLY})
+  include("${CADO_NFS_SOURCE_DIR}/config/gas-assembly.cmake")
+endif()
 include("${CADO_NFS_SOURCE_DIR}/config/curl.cmake")
 include("${CADO_NFS_SOURCE_DIR}/config/alloca.cmake")
 include("${CADO_NFS_SOURCE_DIR}/config/math.cmake")
@@ -202,23 +233,29 @@ include("${CADO_NFS_SOURCE_DIR}/config/odd_address_io_int.cmake")
 include("${CADO_NFS_SOURCE_DIR}/config/strlcpy.cmake")
 include("${CADO_NFS_SOURCE_DIR}/config/linux.cmake")
 include("${CADO_NFS_SOURCE_DIR}/config/hwloc.cmake")
-include("${CADO_NFS_SOURCE_DIR}/config/numa.cmake")
 IF (NOT DEFINED ENV{NO_PYTHON_CHECK})
   include("${CADO_NFS_SOURCE_DIR}/config/python.cmake")
 endif()
 
-string(COMPARE NOTEQUAL "$ENV{ENABLE_SHARED}" "" ENABLE_SHARED)
-
 set(CADO_SHARED)
 
-if(ENABLE_SHARED)
+if("$ENV{ENABLE_SHARED}")
+    # cmake scripts here and there use the cmake variable, not the
+    # environment variable.
+    set(ENABLE_SHARED 1)
     if(MINGW)
         message(FATAL_ERROR "ENABLE_SHARED is not supported with MINGW")
     endif()
     set(CADO_SHARED SHARED)
-    message(STATUS "Building with dynamic libraries (ENABLE_SHARED)")
+    message(STATUS "Building with dynamic libraries (ENABLE_SHARED=$ENV{ENABLE_SHARED})")
+    string_join(rpath ":"
+        "${CMAKE_INSTALL_PREFIX}/${LIBSUFFIX}/utils"
+        "${CMAKE_INSTALL_PREFIX}/${LIBSUFFIX}/polyselect"
+        "${CMAKE_INSTALL_PREFIX}/${LIBSUFFIX}/linalg/bwc"
+    )
+    set(CMAKE_INSTALL_RPATH ${rpath})
 else()
-    message(STATUS "Building with static libraries")
+    message(STATUS "Building with static libraries (ENABLE_SHARED=\"$ENV{ENABLE_SHARED}\")")
 endif()
 
 
@@ -259,9 +296,9 @@ configure_file(cado_mpi_config_h.in cado_mpi_config.h ESCAPE_QUOTES @ONLY)
 # there would have been ways to do it without a generated helper script,
 # I guess -- unfortunately I couldn't find one ;-((
 configure_file(config/ccwrap.pl.in ccwrap.pl ESCAPE_QUOTES @ONLY)
-set(CMAKE_C_COMPILER "${CADO_NFS_BINARY_DIR}/ccwrap.pl")
-
 configure_file(config/cxxwrap.pl.in cxxwrap.pl ESCAPE_QUOTES @ONLY)
+
+set(CMAKE_C_COMPILER "${CADO_NFS_BINARY_DIR}/ccwrap.pl")
 set(CMAKE_CXX_COMPILER "${CADO_NFS_BINARY_DIR}/cxxwrap.pl")
 
 # It's weird. This thing does not seem to apply, or at least not always. I've
@@ -290,9 +327,6 @@ include_directories(${CADO_NFS_BINARY_DIR}/gf2x)
 ############################################################
 
 
-
-# TODO: get rid of example_subdir
-set(example_subdir ${DATASUFFIX})
 
 add_custom_command(OUTPUT ${CADO_NFS_BINARY_DIR}/gf2x/Makefile
     COMMAND mkdir -p ${CADO_NFS_BINARY_DIR}/gf2x
@@ -330,13 +364,14 @@ add_custom_target(dist
     WORKING_DIRECTORY ${CADO_NFS_SOURCE_DIR}
 )
 
-install(DIRECTORY params/ DESTINATION ${DATASUFFIX} FILES_MATCHING PATTERN "params.*")
+# The trailing / is very important here. Without it, we would create a
+# parameters/ directory in ${PREFIX}/share/cado-nfs-X.Y/
+install(DIRECTORY parameters/ DESTINATION ${DATASUFFIX})
 
-configure_file(
-    ${CADO_NFS_SOURCE_DIR}/factor.sh
-    ${CADO_NFS_BINARY_DIR}/factor.sh
-    ESCAPE_QUOTES
-    @ONLY)
+configure_file(cado-nfs.py cado-nfs.py ESCAPE_QUOTES @ONLY)
+configure_file(cado-nfs-client.py cado-nfs-client.py ESCAPE_QUOTES @ONLY)
+install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/cado-nfs.py DESTINATION ${BINSUFFIX})
+install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/cado-nfs-client.py DESTINATION ${BINSUFFIX})
 
 # Copy magma scripts, to make our life easier; this should be removed 
 # once everything will be rewritten in C.
@@ -350,10 +385,8 @@ foreach(script magma-linalg-wrapper.sh magma-nmbrthry-wrapper.sh
 endforeach(script)
 
 
-install(PROGRAMS ${CADO_NFS_BINARY_DIR}/factor.sh DESTINATION ${BINSUFFIX})
-
-message(STATUS "Binaries will go to ${CMAKE_INSTALL_PREFIX}/${BINSUFFIX}")
-message(STATUS "Libraries will go to ${CMAKE_INSTALL_PREFIX}/${LIBSUFFIX}")
+message(STATUS "Main scripts will go to ${CMAKE_INSTALL_PREFIX}/${BINSUFFIX}")
+message(STATUS "Libraries and binaries will go to ${CMAKE_INSTALL_PREFIX}/${LIBSUFFIX}")
 message(STATUS "Data will go to ${CMAKE_INSTALL_PREFIX}/${DATASUFFIX}")
 
 IF (DEFINED ENV{CMAKE_DUMP_VARIABLES})

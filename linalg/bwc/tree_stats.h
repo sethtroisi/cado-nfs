@@ -35,6 +35,8 @@ struct tree_stats_s {
 
     unsigned tree_total_breadth;
     double last_print_time;
+
+    double begin;       /* stored as a wct_seconds() return value */
 };
 typedef struct tree_stats_s tree_stats[1];
 typedef struct tree_stats_s *tree_stats_ptr;

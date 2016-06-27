@@ -338,7 +338,7 @@ class Program(object, metaclass=InspectType):
                  execsubdir=None, execbin=None, execsuffix=defaultsuffix,
                  runprefix=None):
         ''' Takes a dict of of command line options. Defaults are filled in
-        from the cadoaprams.Parameters instance parameters.
+        from the cadoparams.Parameters instance parameters.
 
         The stdin, stdout, and stderr parameters accept strings. If a string is
         given, it is interpreted as the file name to use for redirecting that
@@ -402,8 +402,10 @@ class Program(object, metaclass=InspectType):
         binary = str(execbin or self.binary) + execsuffix
         execfile = os.path.normpath(os.sep.join([path, binary]))
         execsubfile = os.path.normpath(os.sep.join([path, subdir, binary]))
+        self.suggest_subdir=dict()
         if execsubfile != execfile and os.path.isfile(execsubfile):
             self.execfile = execsubfile
+            self.suggest_subdir[self.execfile]=subdir
         elif os.path.isfile(execfile):
             self.execfile = execfile
         else:
@@ -616,6 +618,8 @@ class Program(object, metaclass=InspectType):
             wu.append('%s %s' % (key, os.path.basename(filename)))
             if with_checksum:
                 wu.append('CHECKSUM %s' % sha1cache.get_sha1(filename))
+            if self.suggest_subdir.get(filename, None):
+                wu.append('SUGGEST_%s %s' % (key, self.suggest_subdir[filename]))
         
         workunit = ['WORKUNIT %s' % wuname]
         for filename in self.get_input_files():
@@ -743,7 +747,7 @@ class FreeRel(Program):
                  pmin: Parameter(checktype=int)=None,
                  pmax: Parameter(checktype=int)=None,
                  lcideals: Toggle() = None,
-                 threads: Parameter("t")=None,
+                 threads: Parameter("t", checktype=int)=None,
                  **kwargs):
         super().__init__(locals(), **kwargs)
 
@@ -759,6 +763,7 @@ class Las(Program):
                  rho: Parameter(checktype=int)=None,
                  tdthresh: Parameter(checktype=int)=None,
                  bkthresh: Parameter(checktype=int)=None,
+                 bkthresh1: Parameter(checktype=int)=None,
                  rlim: Parameter(checktype=int)=None,
                  alim: Parameter(checktype=int)=None,
                  lpbr: Parameter(checktype=int)=None,
@@ -778,7 +783,7 @@ class Las(Program):
                  factorbase1: Parameter("fb1", is_input_file=True)=None,
                  out: Parameter(is_output_file=True)=None,
                  threads: Parameter("t", checktype=int)=None,
-                 ratq: Toggle()=None,
+                 batch: Toggle()=None,
                  sqside: Parameter(checktype=int)=None,
                  dup: Toggle()=None,
                  galois: Parameter() = None,
@@ -882,10 +887,7 @@ class Merge(Program):
                  maxlevel: Parameter(checktype=int)=None,
                  keep: Parameter(checktype=int)=None,
                  skip: Parameter(checktype=int)=None,
-                 forbw: Parameter(checktype=int)=None,
-                 ratio: Parameter(checktype=float)=None,
-                 coverNmax: Parameter(checktype=float)=None,
-                 nbmergemax: Parameter(checktype=int)=None,
+                 target_density: Parameter(checktype=float)=None,
                  resume: Parameter(is_input_file=True)=None,
                  mkztype: Parameter(checktype=int)=None,
                  wmstmax: Parameter(checktype=int)=None,
@@ -903,10 +905,7 @@ class MergeDLP(Program):
                  maxlevel: Parameter(checktype=int)=None,
                  keep: Parameter(checktype=int)=None,
                  skip: Parameter(checktype=int)=None,
-                 forbw: Parameter(checktype=int)=None,
-                 ratio: Parameter(checktype=float)=None,
-                 coverNmax: Parameter(checktype=float)=None,
-                 nbmergemax: Parameter(checktype=int)=None,
+                 target_density: Parameter(checktype=float)=None,
                  resume: Parameter(is_input_file=True)=None,
                  mkztype: Parameter(checktype=int)=None,
                  wmstmax: Parameter(checktype=int)=None,
@@ -996,11 +995,10 @@ class BWC(Program):
                  hosts: ParameterEq()=None,
                  hostfile: ParameterEq()=None,
                  interleaving: ParameterEq()=None,
-                 shuffled_product: ParameterEq()=None,
                  bwc_bindir: ParameterEq()=None,
                  mm_impl: ParameterEq()=None,
                  cpubinding: ParameterEq()=None,
-                 cantor_threshold: ParameterEq()=None,
+                 cantor_threshold: ParameterEq()=2048,
                  lingen_threshold: ParameterEq()=None,
                  precmd: ParameterEq()=None,
                  # put None below for a random seed,
@@ -1019,6 +1017,9 @@ class BWC(Program):
                 bwc_bindir = os.path.normpath(os.sep.join([kwargs["execpath"], self.subdir]))
             bwc_bindir = translate_mingw_path(bwc_bindir)
         super().__init__(locals(), **kwargs)
+    def make_command_line(self, *args, **kwargs):
+	    c = super().make_command_line(*args, **kwargs)
+	    return c
 
 class SM(Program):
     binary = "sm"
@@ -1121,10 +1122,10 @@ class Sqrt(Program):
                  **kwargs):
         super().__init__(locals(), **kwargs)
 
-class WuClient(Program):
-    binary = "wuclient2.py"
-    name = "wuclient"
-    subdir = "scripts/cadofactor"
+class CadoNFSClient(Program):
+    binary = "cado-nfs-client.py"
+    name = "cado_nfs_client"
+    subdir = ""
     def __init__(self,
                  server: Parameter(prefix='--'),
                  daemon: Toggle(prefix='--')=None,

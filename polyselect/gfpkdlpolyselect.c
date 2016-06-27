@@ -57,7 +57,7 @@ static void get_degree_CONJ_f_g(unsigned int n, unsigned int *deg_f, unsigned in
  * NOTE: maybe input phi and deg_phi directly ? Or a poly structure ?
  */
 // works only if PY is of degree 2
-void eval_mpz_phi_mpz_uv(mpz_poly_t g, mpz_t** phi_coeff, unsigned int deg_phi, mpz_t u, mpz_t v)
+void eval_mpz_phi_mpz_uv(mpz_poly g, mpz_t** phi_coeff, unsigned int deg_phi, mpz_t u, mpz_t v)
 {
   unsigned int i;
   for (i=0; i <= deg_phi; i++){
@@ -74,7 +74,7 @@ void eval_mpz_phi_mpz_uv(mpz_poly_t g, mpz_t** phi_coeff, unsigned int deg_phi, 
     // ff.phi[i][1] * u
     // phi_i = phi_i0 + phi_i1 * Y
     // the function does not use modular arithmetic but exact integer arithmetic
-void eval_si_phi_mpz_uv(mpz_poly_t g, const long int phi_coeff[MAXDEGREE + 1][DEG_PY], unsigned int deg_phi, mpz_t u, mpz_t v)
+void eval_si_phi_mpz_uv(mpz_poly g, const long int phi_coeff[MAXDEGREE + 1][DEG_PY], unsigned int deg_phi, mpz_t u, mpz_t v)
 {
   unsigned int i;
   for (i=0; i <= deg_phi; i++){
@@ -85,7 +85,7 @@ void eval_si_phi_mpz_uv(mpz_poly_t g, const long int phi_coeff[MAXDEGREE + 1][DE
   mpz_poly_cleandeg(g, deg_phi); // set deg to deg_phi at most (check that coeff is not 0)
 }
 
-void eval_si_phi_mpz_y(mpz_poly_t g, const long int phi_coeff[MAXDEGREE + 1][DEG_PY], unsigned int deg_phi, mpz_t y)
+void eval_si_phi_mpz_y(mpz_poly g, const long int phi_coeff[MAXDEGREE + 1][DEG_PY], unsigned int deg_phi, mpz_t y)
 {
   unsigned int i;
   for (i=0; i <= deg_phi; i++){
@@ -336,7 +336,7 @@ bool is_irreducible_mod_p_si(const long int * f, int deg_f, mpz_srcptr p){
 
 // [almost] same as is_good_poly in gfpk/magma/polyselect_utils.mag
 // return: error_code, see above
-//int is_good_poly_light(pp_t params, ppf_t poly_params, mpz_poly_t f){}
+//int is_good_poly_light(pp_t params, ppf_t poly_params, mpz_poly f){}
 
   /* check: 
      + deg f
@@ -403,11 +403,11 @@ bool is_irreducible_mod_p_si(const long int * f, int deg_f, mpz_srcptr p){
  * \return bool true if phi is of degree n and irreducible mod p
  * \return false otherwise
  */
-//bool is_good_phi(mpz_poly_t phi, unsigned int n, mpz_t p){}
+//bool is_good_phi(mpz_poly phi, unsigned int n, mpz_t p){}
   //    return (Degree(phi_p) eq n) and IsIrreducible(phi_p);
 
 
-void mpz_poly_set_si(mpz_poly_t f, const int * h, int deg_h)
+void mpz_poly_set_si(mpz_poly f, const int * h, int deg_h)
 {
   int i;
   for (i=0; i<=deg_h; i++){
@@ -425,7 +425,7 @@ void mpz_poly_setcoeff_sli(mpz_poly_ptr f, int i, long int z)
     mpz_poly_cleandeg (f, i);
 }
 
-void mpz_poly_set_sli(mpz_poly_t f, const long int * h, int deg_h)
+void mpz_poly_set_sli(mpz_poly f, const long int * h, int deg_h)
 {
   int i;
   for (i=0; i<=deg_h; i++){
@@ -455,8 +455,8 @@ bool get_f_CONJ(int* f_id, mpz_t * tab_roots_Py, int* nb_roots_Py, const fPyphi_
   int nb_roots_y = 0;
   bool found_good_f = false;
   mpz_t *y;
-  mpz_poly_t phiy; // phi evaluated at a given y
-  mpz_poly_t Pyi_mpz_poly;// Py with mpz_t coeffs
+  mpz_poly phiy; // phi evaluated at a given y
+  mpz_poly Pyi_mpz_poly;// Py with mpz_t coeffs
 
   if(ff != NULL){
     // Now, find an appropriate poly f in that table.
@@ -522,10 +522,10 @@ bool get_f_CONJ(int* f_id, mpz_t * tab_roots_Py, int* nb_roots_Py, const fPyphi_
   return found_good_f;
 }
 
-// add mpz_poly_t phi maybe in other versions, for n>2.
+// add mpz_poly phi maybe in other versions, for n>2.
 // no optimization on g0, g1 here.
 // g0, g1 are output of LLL.
-static bool get_g_phi_y(mpz_poly_t g[], int* nb_found, 
+static bool get_g_phi_y(mpz_poly g[], int* nb_found, 
 			   ppf_t params_g,
 			   int f_id, mpz_t y, const fPyphi_poly_t * ff, pp_t params){
 
@@ -612,12 +612,12 @@ static bool get_g_phi_y(mpz_poly_t g[], int* nb_found,
   }
   return found;
 }
-bool get_g_CONJ(mpz_poly_t g[], mpz_poly_t phi,
+bool get_g_CONJ(mpz_poly g[], mpz_poly phi,
 		ppf_t params_g,
 		int f_id, mpz_t * tab_roots_Py, int nb_roots_Py, const fPyphi_poly_t * ff, pp_t params){
   bool found_g=false;
   int i,nb_found;
-  mpz_poly_t * gi;
+  mpz_poly * gi;
   int nb_LLL_poly = 2;
   /* for each phiy:
      reduce y with lll (add skewness if needed to get the right signature)
@@ -626,7 +626,7 @@ bool get_g_CONJ(mpz_poly_t g[], mpz_poly_t phi,
      
    */
   if (ff->deg_Py == 2){
-    gi = (mpz_poly_t *) malloc(nb_LLL_poly * sizeof(mpz_poly_t));
+    gi = (mpz_poly *) malloc(nb_LLL_poly * sizeof(mpz_poly));
     for(i=0; i < nb_LLL_poly; i++){
       mpz_poly_init(gi[i], ff->deg_phi);
     }
@@ -677,11 +677,11 @@ int gfpkdlpolyselect( unsigned int n, mpz_srcptr p, mpz_srcptr ell, unsigned int
   int return_code=0;
   unsigned int deg_f = 2*n, deg_g = 2*n, i=0;
   // take the largest possibility as default init for deg_f and deg_g.
-  mpz_poly_t f;
-  mpz_poly_t *g;
+  mpz_poly f;
+  mpz_poly *g;
 
   const fPyphi_poly_t* ff;
-  mpz_poly_t phi;
+  mpz_poly phi;
   mpz_t tab_roots_Py[DEG_PY]; // a tab for the roots of Py
   int nb_roots_Py;
   pp_t params;
@@ -698,7 +698,7 @@ int gfpkdlpolyselect( unsigned int n, mpz_srcptr p, mpz_srcptr ell, unsigned int
     // plus quelques autres parametres
     if (ff != NULL){
       mpz_poly_init(f, deg_f);
-      g = (mpz_poly_t *) malloc(mnfs * sizeof(mpz_poly_t));
+      g = (mpz_poly *) malloc(mnfs * sizeof(mpz_poly));
       FATAL_ERROR_CHECK (g == NULL, "not enough memory to allocate for table of g.");
       for (i=0; i<mnfs;i++){
 	mpz_poly_init(g[i], ff->deg_phi);
@@ -765,7 +765,7 @@ int gfpkdlpolyselect( unsigned int n, mpz_srcptr p, mpz_srcptr ell, unsigned int
     poly<i>: f0,f1,f2,...,fd\n
     (new format decided in 2015 for DL in GF(p^n))
 */
-void mpz_poly_fprintf_cado_format_line (FILE *fp, mpz_poly_t f, const int j, const char* label_poly)
+void mpz_poly_fprintf_cado_format_line (FILE *fp, mpz_poly f, const int j, const char* label_poly)
 {
   if (label_poly != NULL){
     fprintf (fp, "# ");
@@ -822,7 +822,7 @@ void mpz_phi_poly_fprintf_cado_format_line (FILE *fp, const long int phi_coeff[M
 
 
 void
-fprintf_gfpn_poly_info ( FILE* fp, mpz_poly_t f, const char *label_poly)
+fprintf_gfpn_poly_info ( FILE* fp, mpz_poly f, const char *label_poly)
 {
   //unsigned int i;
     double skew, logmu, alpha;

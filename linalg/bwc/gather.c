@@ -20,10 +20,12 @@
 #include "balancing.h"
 #include "mpfq/mpfq.h"
 #include "mpfq/mpfq_vbase.h"
+#include "cheating_vec_init.h"
 
 struct sfile_info {
     unsigned int n0,n1;
-    unsigned int iter;
+    unsigned int iter0;
+    unsigned int iter1;
 };
 
 struct sfiles_list {
@@ -39,6 +41,18 @@ struct sols_list {
     struct sfiles_list (*sols)[1];
 };
 
+static int sort_sfile_info(const struct sfile_info * a, const struct sfile_info * b)
+{
+    int r = (a->n0 > b->n0) - (b->n0 > a->n0);
+    if (r) return r;
+    r = (a->n1 > b->n1) - (b->n1 > a->n1);
+    if (r) return r;
+    r = (a->iter1 > b->iter1) - (b->iter1 > a->iter1);
+    if (r) return r;
+    r = (a->iter1 > b->iter1) - (b->iter1 > a->iter1);
+    return r;
+}
+
 int exitcode = 0;
 
 static void prelude(parallelizing_info_ptr pi, struct sols_list * sl)
@@ -47,7 +61,7 @@ static void prelude(parallelizing_info_ptr pi, struct sols_list * sl)
     sl->sols = NULL;
     sl->nsols=0;
     serialize_threads(pi->m);
-    const char * spat = S_FILE_BASE_PATTERN ".%u" "%n";
+    const char * spat = S_FILE_BASE_PATTERN ".%u-%u" "%n";
     if (pi->m->jrank == 0 && pi->m->trank == 0) {
         /* It's our job to collect the directory data.
          */
@@ -59,8 +73,8 @@ static void prelude(parallelizing_info_ptr pi, struct sols_list * sl)
             int rc;
             unsigned int n0,n1;
             unsigned int s0,s1;
-            unsigned int iter;
-            rc = sscanf(de->d_name, spat, &s0, &s1, &n0, &n1, &iter, &k);
+            unsigned int iter0, iter1;
+            rc = sscanf(de->d_name, spat, &s0, &s1, &n0, &n1, &iter0, &iter1, &k);
             if (rc < 5 || k != (int) strlen(de->d_name)) {
                 continue;
             }
@@ -89,8 +103,9 @@ static void prelude(parallelizing_info_ptr pi, struct sols_list * sl)
             }
             s->sfiles[s->nsfiles]->n0 = n0;
             s->sfiles[s->nsfiles]->n1 = n1;
-            s->sfiles[s->nsfiles]->iter = iter;
-            if (bw->interval && iter % bw->interval != 0) {
+            s->sfiles[s->nsfiles]->iter0 = iter0;
+            s->sfiles[s->nsfiles]->iter1 = iter1;
+            if (bw->interval && iter1 % bw->interval != 0) {
                 fprintf(stderr,
                         "Warning: %s is not a checkpoint at a multiple of "
                         "the interval value %d -- this might indicate a "
@@ -101,6 +116,28 @@ static void prelude(parallelizing_info_ptr pi, struct sols_list * sl)
         }
         closedir(dir);
     }
+    for(int i = 0 ; i < sl->nsols ; i++) {
+        struct sfiles_list * s = sl->sols[i];
+        qsort(s->sfiles, s->nsfiles, sizeof(struct sfile_info),
+             (int(*)(const void*,const void*)) &sort_sfile_info);
+        for(int i = 1 ; i < s->nsfiles ; i++) {
+            struct sfile_info * prev = s->sfiles[i-1];
+            struct sfile_info * cur = s->sfiles[i];
+            if (cur->iter0 == 0)
+                continue;
+            if (cur->n0 != prev->n0 || cur->n1 != prev->n1 || cur->iter0 != prev->iter1) {
+                fprintf(stderr, "Within the set of S files, there seems to be a gap between "
+                        S_FILE_BASE_PATTERN ".%u-%u"
+                        " and "
+                        S_FILE_BASE_PATTERN ".%u-%u"
+                        "\n",
+                        s->s0, s->s1, prev->n0, prev->n1, prev->iter0, prev->iter1,
+                        s->s0, s->s1, cur->n0, cur->n1, cur->iter0, cur->iter1);
+                exit(EXIT_FAILURE);
+            }
+        }
+    }
+
     /* Note that it's not necessary to care about the file names -- in
      * practice, the file name is only relevant to the job/thread doing
      * actual I/O.
@@ -126,18 +163,10 @@ static void prelude(parallelizing_info_ptr pi, struct sols_list * sl)
 
 void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSED)
 {
-    /* Interleaving does not make sense for this program. So the second
-     * block of threads just leave immediately */
-    if (pi->interleaved && pi->interleaved->idx)
-        return NULL;
+    ASSERT_ALWAYS(!pi->interleaved);
 
     int tcan_print = bw->can_print && pi->m->trank == 0;
     matmul_top_data mmt;
-
-
-    int flags[2];
-    flags[bw->dir] = THREAD_SHARED_VECTOR;
-    flags[!bw->dir] = 0;
 
     int nsolvecs = bw->nsolvecs;
     unsigned int multi = 1;
@@ -164,9 +193,15 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
             MPFQ_GROUPSIZE, nsolvecs_pervec,
             MPFQ_DONE);
 
-    pi_datatype_ptr A_pi = pi_alloc_mpfq_datatype(pi, A);
+    matmul_top_init(mmt, A, pi, pl, bw->dir);
 
-    matmul_top_init(mmt, A, A_pi, pi, flags, pl, bw->dir);
+    mmt_vec ymy[2];
+    mmt_vec_ptr y = ymy[0];
+    mmt_vec_ptr my = ymy[1];
+
+    mmt_vec_init(mmt,0,0, y,   bw->dir, /* shared ! */ 1, mmt->n[bw->dir]);
+    mmt_vec_init(mmt,0,0, my, !bw->dir,                0, mmt->n[!bw->dir]);
+
 
     /* this is really a misnomer, because in the typical case, M is
      * rectangular, and then the square matrix does induce some padding.
@@ -176,9 +211,6 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
      * are arranged to be multiples */
     unsigned int unpadded = MAX(mmt->n0[0], mmt->n0[1]);
     unsigned int nrhs = 0;
-
-    mmt_comm_ptr mcol = mmt->wr[bw->dir];
-    mmt_comm_ptr mrow = mmt->wr[!bw->dir];
 
     struct sols_list sl[1];
     prelude(pi, sl);
@@ -193,20 +225,11 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
         return NULL;
     }
 
-    pi_comm_ptr picol = pi->wr[bw->dir];
-
-    unsigned int ii0, ii1;
-    unsigned int di = mcol->i1 - mcol->i0;
-
-    ii0 = mcol->i0 + di * (picol->jrank * picol->ncores + picol->trank) /
-        (picol->njobs * picol->ncores);
-    ii1 = mcol->i0 + di * (picol->jrank * picol->ncores + picol->trank + 1) /
-        (picol->njobs * picol->ncores);
-
-    mmt_vec svec;
-    mmt_vec tvec;
-    vec_init_generic(pi->m, A, A_pi, svec, 0, ii1-ii0);
-    vec_init_generic(pi->m, A, A_pi, tvec, 0, ii1-ii0);
+    size_t eblock = mmt_my_own_size_in_items(y);
+    void * svec;
+    void * tvec;
+    cheating_vec_init(A, &svec, eblock);
+    cheating_vec_init(A, &tvec, eblock);
 
     const char * rhs_name = param_list_lookup_string(pl, "rhs");
     if (rhs_name != NULL) {
@@ -237,7 +260,7 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
     if (rhscoeffs_name) {
         if (!pi->m->trank && !pi->m->jrank)
             rhscoeffs_file = fopen(rhscoeffs_name, "rb");
-        matmul_top_vec_init_generic(mmt, A, A_pi, rhscoeffs_vec, bw->dir, 0);
+        mmt_vec_init(mmt, A, mmt->pitype, rhscoeffs_vec, bw->dir, 0, mmt->n[bw->dir]);
     }
 
     for(int s = 0 ; s < sl->nsols ; s++) {
@@ -253,14 +276,14 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
             printf("Trying to build solutions %u..%u\n", sf->s0, sf->s1);
         }
 
-        A->vec_set_zero(A, mrow->v->v, mrow->i1 - mrow->i0);
+        mmt_full_vec_set_zero(my);
 
         /* This array receives the nrhs coefficients affecting the
          * rhs * columns in the identities obtained */
-        void * rhscoeffs;
+        void * rhscoeffs = NULL;
 
         if (rhscoeffs_name) {
-            A->vec_init(A, &rhscoeffs, nrhs);
+            cheating_vec_init(A, &rhscoeffs, nrhs);
 
             if (tcan_print) {
                 printf("Reading rhs coefficients for solution %u\n", sf->s0);
@@ -280,9 +303,9 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
                     ASSERT_ALWAYS(rc == 1);
                 }
             }
-            pi_bcast(rhscoeffs, nrhs, A_pi, 0, 0, pi->m);
+            pi_bcast(rhscoeffs, nrhs, mmt->pitype, 0, 0, pi->m);
 
-            A->vec_set_zero(A, tvec->v, ii1 - ii0);
+            A->vec_set_zero(A, tvec, eblock);
             for(unsigned int j = 0 ; j < nrhs ; j++) {
                 /* Add c_j times v_j to tvec */
                 ASSERT_ALWAYS(sf->s1 == sf->s0 + 1);
@@ -291,16 +314,16 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
                 ASSERT_ALWAYS(rc >= 0);
 
                 pi_file_handle f;
-                rc = pi_file_open(f, pi, bw->dir, tmp, "rb", A->vec_elt_stride(A, unpadded));
+                rc = pi_file_open(f, pi, bw->dir, tmp, "rb");
                 if (tcan_print && !rc) fprintf(stderr, "%s: not found\n", tmp);
                 ASSERT_ALWAYS(rc);
-                ssize_t s = pi_file_read(f, svec->v, A->vec_elt_stride(A, ii1 - ii0));
+                ssize_t s = pi_file_read(f, svec, A->vec_elt_stride(A, eblock), A->vec_elt_stride(A, unpadded));
                 ASSERT_ALWAYS(s >= 0 && s == A->vec_elt_stride(A, unpadded));
                 pi_file_close(f);
                 free(tmp);
 
-                A->vec_scal_mul(A, svec->v, svec->v, A->vec_coeff_ptr(A, rhscoeffs, j), ii1 - ii0);
-                A->vec_add(A, tvec->v, tvec->v, svec->v, ii1 - ii0);
+                A->vec_scal_mul(A, svec, svec, A->vec_coeff_ptr(A, rhscoeffs, j), eblock);
+                A->vec_add(A, tvec, tvec, svec, eblock);
             }
 
             /* Now save the sum to a temp file, which we'll read later on
@@ -310,10 +333,10 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
                 int rc = asprintf(&tmp, R_FILE_BASE_PATTERN ".0", sf->s0, sf->s1);
                 ASSERT_ALWAYS(rc >= 0);
                 pi_file_handle f;
-                rc = pi_file_open(f, pi, bw->dir, tmp, "wb", A->vec_elt_stride(A, unpadded));
+                rc = pi_file_open(f, pi, bw->dir, tmp, "wb");
                 if (tcan_print && !rc) fprintf(stderr, "%s: not found\n", tmp);
                 ASSERT_ALWAYS(rc);
-                ssize_t s = pi_file_write(f, tvec->v, A->vec_elt_stride(A, ii1 - ii0));
+                ssize_t s = pi_file_write(f, tvec, A->vec_elt_stride(A, eblock), A->vec_elt_stride(A, unpadded));
                 ASSERT_ALWAYS(s >= 0 && s == A->vec_elt_stride(A, unpadded));
                 pi_file_close(f);
                 free(tmp);
@@ -321,54 +344,45 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
         }
 
         /* Collect now the sum of the LHS contributions */
-        matmul_top_zero_vec_area(mmt, bw->dir);
-        void * sv = A->vec_subvec(A, mcol->v->v, ii0-mcol->i0);
+        mmt_full_vec_set_zero(y);
+        void * sv = mmt_my_own_subvec(y);
 
         for(int i = 0 ; i < sf->nsfiles ; i++) {
             char * tmp;
-            int rc = asprintf(&tmp, S_FILE_BASE_PATTERN ".%u",
+            int rc = asprintf(&tmp, S_FILE_BASE_PATTERN ".%u-%u",
                     sf->s0, sf->s1,
                     sf->sfiles[i]->n0, sf->sfiles[i]->n1,
-                    sf->sfiles[i]->iter);
+                    sf->sfiles[i]->iter0,
+                    sf->sfiles[i]->iter1);
             ASSERT_ALWAYS(rc >= 0);
 
             if (tcan_print && verbose_enabled(CADO_VERBOSE_PRINT_BWC_LOADING_MKSOL_FILES)) {
                 printf("loading %s\n", tmp);
             }
             pi_file_handle f;
-            rc = pi_file_open(f, pi, bw->dir, tmp, "rb", A->vec_elt_stride(A, unpadded));
+            rc = pi_file_open(f, pi, bw->dir, tmp, "rb");
             if (tcan_print && !rc) fprintf(stderr, "%s: not found\n", tmp);
             ASSERT_ALWAYS(rc);
-            ssize_t s = pi_file_read(f, svec->v, A->vec_elt_stride(A, ii1 - ii0));
+            ssize_t s = pi_file_read(f, svec, A->vec_elt_stride(A, eblock), A->vec_elt_stride(A, unpadded));
             ASSERT_ALWAYS(s >= 0 && s == A->vec_elt_stride(A, unpadded));
             pi_file_close(f);
             free(tmp);
 
-            A->vec_add(A, sv, sv, svec->v, ii1 - ii0);
+            A->vec_add(A, sv, sv, svec, eblock);
         }
+        y->consistency = 1;
 
-        /* allgather, really */
-        allreduce_across(mmt, bw->dir);
+        mmt_vec_broadcast(y);
 
-        /* This is a noop if bw->dir == 0 */
-        matmul_top_unapply_T(mmt, bw->dir);
-        matmul_top_save_vector(mmt, kprefix, bw->dir, 0, unpadded);
-        matmul_top_apply_T(mmt, bw->dir);
+        mmt_vec_unapply_T(mmt, y);
+        mmt_vec_save(y, kprefix, 0, unpadded);
+        mmt_vec_apply_T(mmt, y);
                 
-        int is_zero = 0;
-
         serialize(pi->m);
-        matmul_top_twist_vector(mmt, bw->dir);
+        mmt_vec_twist(mmt, y);
 
-        unsigned int how_many;
-        unsigned int offset_c;
-        unsigned int offset_v;
-        how_many = intersect_two_intervals(&offset_c, &offset_v,
-                    mrow->i0, mrow->i1,
-                    mcol->i0, mcol->i1);
-
-        void * check_area = SUBVEC(mcol->v, v, offset_v);
-        is_zero = A->vec_is_zero(A, check_area, how_many);
+        int is_zero = A->vec_is_zero(A,
+                mmt_my_own_subvec(y), mmt_my_own_size_in_items(y));
         pi_allreduce(NULL, &is_zero, 1, BWC_PI_INT, BWC_PI_MIN, pi->m);
 
         if (is_zero) {
@@ -384,15 +398,15 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
         for(int i = 1 ; i < 10 ; i++) {
             serialize(pi->m);
 
-            matmul_top_mul(mmt, bw->dir);
+            matmul_top_mul(mmt, ymy, NULL);
 
-            matmul_top_untwist_vector(mmt, bw->dir);
+            mmt_vec_untwist(mmt, y);
 
             if (rhscoeffs_name) {
                 char * tmp;
                 int rc = asprintf(&tmp, R_FILE_BASE_PATTERN, sf->s0, sf->s1);
                 ASSERT_ALWAYS(rc >= 0);
-                matmul_top_load_vector_generic(mmt, rhscoeffs_vec, tmp, bw->dir, 0, unpadded);
+                mmt_vec_load(rhscoeffs_vec, tmp, 0, unpadded);
                 free(tmp);
                 if (rhscoeffs_file) {
                     /* Now get rid of the R file, we don't need it */
@@ -403,11 +417,15 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
                     free(tmp);
                 }
 
-                A->vec_add(A, check_area, check_area,
-                        SUBVEC(rhscoeffs_vec, v, offset_v), how_many);
+                A->vec_add(A,
+                        mmt_my_own_subvec(y),
+                        mmt_my_own_subvec(y),
+                        mmt_my_own_subvec(rhscoeffs_vec),
+                        mmt_my_own_size_in_items(y));
             }
 
-            is_zero = A->vec_is_zero(A, check_area, how_many);
+            is_zero = A->vec_is_zero(A,
+                    mmt_my_own_subvec(y), mmt_my_own_size_in_items(y));
             pi_allreduce(NULL, &is_zero, 1, BWC_PI_INT, BWC_PI_MIN, pi->m);
 
             if (is_zero) {
@@ -423,10 +441,10 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
             }
             if (rhscoeffs_name) break;
 
-            matmul_top_unapply_T(mmt, bw->dir);
-            matmul_top_save_vector(mmt, kprefix, bw->dir, i, unpadded);
-            matmul_top_apply_T(mmt, bw->dir);
-            matmul_top_twist_vector(mmt, bw->dir);
+            mmt_vec_unapply_T(mmt, y);
+            mmt_vec_save(y, kprefix, i, unpadded);
+            mmt_vec_apply_T(mmt, y);
+            mmt_vec_twist(mmt, y);
         }
         if (!is_zero) {
             if (tcan_print) {
@@ -482,17 +500,19 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
 
         serialize(pi->m);
         free(kprefix);
-        if (rhscoeffs_name) A->vec_clear(A, &rhscoeffs, nrhs);
+        if (rhscoeffs_name) cheating_vec_clear(A, &rhscoeffs, nrhs);
     }
 
     if (rhscoeffs_file) fclose(rhscoeffs_file);
-    if (rhscoeffs_name) matmul_top_vec_clear_generic(mmt, rhscoeffs_vec, bw->dir);
+    if (rhscoeffs_name) mmt_vec_clear(mmt, rhscoeffs_vec);
 
-    vec_clear_generic(pi->m, svec, ii1-ii0);
-    vec_clear_generic(pi->m, tvec, ii1-ii0);
+    cheating_vec_clear(A, &svec, eblock);
+    cheating_vec_clear(A, &tvec, eblock);
+
+    mmt_vec_clear(mmt, y);
+    mmt_vec_clear(mmt, my);
 
     matmul_top_clear(mmt);
-    pi_free_mpfq_datatype(pi, A_pi);
 
     A->oo_field_clear(A);
 
@@ -509,7 +529,7 @@ int main(int argc, char * argv[])
 {
     param_list pl;
 
-    bw_common_init_new(bw, &argc, &argv);
+    bw_common_init(bw, &argc, &argv);
     param_list_init(pl);
     parallelizing_info_init();
 
@@ -523,6 +543,8 @@ int main(int argc, char * argv[])
             "for the solution vector(s), this corresponds to the contribution(s) on the columns concerned by the rhs");
 
     bw_common_parse_cmdline(bw, pl, &argc, &argv);
+
+    param_list_remove_key(pl, "interleaving");
 
     bw_common_interpret_parameters(bw, pl);
     parallelizing_info_lookup_parameters(pl);
@@ -540,7 +562,7 @@ int main(int argc, char * argv[])
 
     parallelizing_info_finish();
     param_list_clear(pl);
-    bw_common_clear_new(bw);
+    bw_common_clear(bw);
 
     return exitcode;
 }

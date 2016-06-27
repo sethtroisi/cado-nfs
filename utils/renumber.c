@@ -2,6 +2,7 @@
 #include <stdint.h>     /* AIX wants it first (it's a bug) */
 #include <inttypes.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <ctype.h>
 #include "portability.h"
 #include "utils.h"
@@ -433,7 +434,12 @@ renumber_init_for_writing (renumber_ptr renumber_info, unsigned int nb_polys,
     renumber_info->nb_bits = 32;
   else
     renumber_info->nb_bits = 64;
-  ASSERT_ALWAYS (renumber_info->nb_bits <= 8 * sizeof(p_r_values_t));
+  if (renumber_info->nb_bits > 8 * sizeof(p_r_values_t))
+    {
+      fprintf (stderr, "Error, p_r_values_t is too small to store ideals, "
+               "recompile with FLAGS_SIZE=\"-D__SIZEOF_P_R_VALUES__=8\"\n");
+      exit (1);
+    }
 
   /* Compute the number of additional columns needed in the renumbering table
    * due to the non monic polynomials.
@@ -828,20 +834,13 @@ renumber_write_p (renumber_ptr tab, unsigned long p,
     tab->size += k[i];
 }
 
-/* side is 0 if (p,r) corresponds to the left part in the relation,
- * side is 1 if (p,r) corresponds to the right part.
- * If side corresponds to the rational side (if it exists), the value of r is
- * meaningless. */
 index_t
-renumber_get_index_from_p_r (renumber_srcptr renumber_info, p_r_values_t p,
-                             p_r_values_t r, int side)
+renumber_get_first_index_from_p(renumber_srcptr renumber_info,
+    p_r_values_t p, int side)
 {
   index_t i;
   p_r_values_t *tab = renumber_info->table;
-  p_r_values_t vr, vp; /* values of r and p as they are stored in the table*/
-
-  vp = compute_vp_from_p (renumber_info,  p);
-  vr = compute_vr_from_p_r (renumber_info,  p, r, side);
+  p_r_values_t vp = compute_vp_from_p (renumber_info,  p);
 
   /**************************************************************************/
   /* Search for i such that
@@ -927,13 +926,65 @@ renumber_get_index_from_p_r (renumber_srcptr renumber_info, p_r_values_t p,
   else /* Error */
   {
     /* prime p is bigger than lpb[side] => Fatal error */
-    fprintf(stderr, "Fatal error in %s at %s:%d\nIdeal (p, r, side) = (0x%" PRpr
-                    ", 0x%" PRpr ", %d) is bigger that large prime bound "
-                    "2^%ld\n", __func__, __FILE__, __LINE__, p, r, side,
+    fprintf(stderr, "Fatal error in %s at %s:%d\nIdeal (p, side) = (0x%" PRpr
+                    ", %d) is bigger that large prime bound "
+                    "2^%ld\n", __func__, __FILE__, __LINE__, p, side,
                     renumber_info->lpb[side]);
     abort();
   }
+  return i;
+}
 
+index_t
+renumber_get_random_index_from_p_side(renumber_srcptr renumber_info,
+    p_r_values_t p, int side)
+{
+  // Get the first index corresponding to p
+  index_t i = renumber_get_first_index_from_p(renumber_info, p, side);
+
+  p_r_values_t *tab = renumber_info->table;
+  // Some cases where there is no choice
+  if (side == renumber_info->rat || i == renumber_info->size - 1
+                                 || tab[i] <= tab[i+1]) {
+    return i;
+  }
+
+  // Find list of valid indices
+  index_t valid_i[MAXDEGREE];
+  int n = 0;
+  do {
+    p_r_values_t r;
+    int s;
+    compute_r_side_from_p_vr (&r, &s, renumber_info, p, tab[i]);
+    if (s == side) {
+      ASSERT_ALWAYS(n < MAXDEGREE);
+      valid_i[n] = i;
+      n++;
+    }
+    i++;
+  } while (i != renumber_info->size - 1 && tab[i-1] > tab[i]);
+  ASSERT_ALWAYS(n != 0);
+
+  long rnd = random()%n;
+  return valid_i[rnd];
+}
+
+
+/* side is 0 if (p,r) corresponds to the left part in the relation,
+ * side is 1 if (p,r) corresponds to the right part.
+ * If side corresponds to the rational side (if it exists), the value of r is
+ * meaningless. */
+index_t
+renumber_get_index_from_p_r (renumber_srcptr renumber_info, p_r_values_t p,
+                             p_r_values_t r, int side)
+{
+  index_t i;
+  p_r_values_t *tab = renumber_info->table;
+  p_r_values_t vr; /* values of r as it is stored in the table*/
+
+  vr = compute_vr_from_p_r (renumber_info,  p, r, side);
+
+  i = renumber_get_first_index_from_p(renumber_info, p, side);
 
   /**************************************************************************/
   /* Now i points at the beginning of a decreasing sequence of values of vr */
@@ -997,12 +1048,9 @@ renumber_get_p_r_from_index (renumber_srcptr renumber_info, p_r_values_t *p,
         *p > renumber_info->biggest_prime_below_lpb[renumber_info->rat])
     {
       *side = renumber_info->nb_polys - 1;
-      while (*side >= 0 && !get_largest_root_mod_p (r, pol->pols[*side], *p))
-      {
-        *side -= 1;
-        if (*side == renumber_info->rat) /* skip rational poly, if it exists */
-          *side -= 1;
-      }
+      while (*side >= 0 && (*p > renumber_info->biggest_prime_below_lpb[*side] ||
+                            !get_largest_root_mod_p (r, pol->pols[*side], *p)))
+        (*side)--;
       ASSERT_ALWAYS (*side >= 0);
     }
     else

@@ -17,8 +17,18 @@
 # $cado_source_tree/build/`hostname`, but customizing it is easy).
 
 
-up_path="$(readlink -f `dirname $0`/..)"
-if [ "$(readlink -f $up_path/scripts/`basename $0`)" != "$(readlink -f $0)" ] ; then
+# This is readlink -f on many unices. Alas, not on mac.
+if [ "`uname -s`" = Darwin ] ; then
+    # use code from https://github.com/mkropat/sh-realpath, MIT-licensed.
+    source "`dirname $0`/realpath.sh"
+    readlink_f() { realpath "$@" ; }
+else
+    readlink_f() { readlink -f "$@" ; }
+fi
+
+
+up_path="$(readlink_f `dirname $0`/..)"
+if [ "$(readlink_f $up_path/scripts/`basename $0`)" != "$(readlink_f $0)" ] ; then
     echo "Error: `basename $0` must be inside the cado-nfs source tree"
     exit 1
 fi
@@ -26,8 +36,15 @@ pwdP="pwd -P"
 if ! $pwdP >/dev/null 2>&1 ; then
     pwdP=pwd
 fi
-called_from="`pwd`"
-absolute_path_of_source="$(readlink -f $up_path)"
+#
+# When "make" is run from the subdirectory $CADO/linalg/bwc, we set:
+#
+# called_from to be the absolute path of $CADO/linalg/bwc
+# absolute_path_of_source to be the absolute path of $CADO
+# relative_path_of_cwd to be linalg/bwc
+#
+called_from="$(readlink_f `pwd`)"
+absolute_path_of_source="$(readlink_f $up_path)"
 relative_path_of_cwd="${called_from##$absolute_path_of_source}"
 
 ########################################################################
@@ -103,6 +120,7 @@ export ENABLE_SHARED
 export NO_PYTHON_CHECK
 export NO_SSE
 export NO_INLINE_ASSEMBLY
+export NO_GAS_ASSEMBLY
 export CHECKS_EXPENSIVE
 export BWC_GF2_MATMUL_BACKENDS
 export BWC_GFP_MATMUL_BACKENDS

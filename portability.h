@@ -264,9 +264,6 @@ asprintf( char ** const sptr, const char * const fmt, ... )
 #endif
 #endif  /* HAVE_ASPRINTF */
 
-#ifndef HAVE_GETC_UNLOCKED
-#define getc_unlocked getc
-#endif
 #ifndef HAVE_LRAND48
 #include <stdlib.h>
 #define lrand48 rand

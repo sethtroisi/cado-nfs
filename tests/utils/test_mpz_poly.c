@@ -9,7 +9,7 @@
 
 /* put random coefficients of k bits in a polynomial (already initialized) */
 static void
-mpz_poly_random (mpz_poly_t f, int d, int k)
+mpz_poly_random (mpz_poly f, int d, int k)
 {
   int i;
   mpz_t u;
@@ -29,7 +29,7 @@ mpz_poly_random (mpz_poly_t f, int d, int k)
   f->deg = d;
 }
 
-static void mpz_poly_setcoeffs_ui_var(mpz_poly_t f, int d, ...)
+static void mpz_poly_setcoeffs_ui_var(mpz_poly f, int d, ...)
 {
     va_list ap;
     va_start(ap, d);
@@ -41,7 +41,7 @@ static void mpz_poly_setcoeffs_ui_var(mpz_poly_t f, int d, ...)
     va_end(ap);
 }
 
-static void mpz_poly_setcoeffs_si_var(mpz_poly_t f, int d, ...)
+static void mpz_poly_setcoeffs_si_var(mpz_poly f, int d, ...)
 {
     va_list ap;
     va_start(ap, d);
@@ -57,7 +57,7 @@ void
 test_polymodF_mul ()
 {
   int d1, d2, d;
-  mpz_poly_t F, T, U;
+  mpz_poly F, T, U;
   polymodF_t P1, P2, Q, P1_saved;
   int k = 2 + (lrand48 () % 128), count = 0;
   mpz_t c;
@@ -149,7 +149,7 @@ test_polymodF_mul ()
 /* { */
 /*   mpz_t r[10], f[10], p, res; */
 /*   unsigned long i, n, d; */
-/*   mpz_poly_t F; */
+/*   mpz_poly F; */
 
 /*   for (i = 0; i < 10; i++) */
 /*     { */
@@ -215,7 +215,7 @@ test_mpz_poly_sqr_mod_f_mod_mpz (unsigned long iter)
 {
   while (iter--)
     {
-      mpz_poly_t Q, P, f;
+      mpz_poly Q, P, f;
       mpz_t m, invm;
       int k = 2 + (lrand48 () % 127);
       int d = 1 + (lrand48 () % 7);
@@ -260,7 +260,7 @@ test_mpz_poly_sqr_mod_f_mod_mpz (unsigned long iter)
 void
 test_mpz_poly_fprintf (void)
 {
-  mpz_poly_t f, g;
+  mpz_poly f, g;
   mpz_t c, v[2], m, invm;
   int res;
   mpz_poly_srcptr F[2];
@@ -353,7 +353,7 @@ test_mpz_poly_fprintf (void)
 void
 test_mpz_poly_div_2_mod_mpz (void)
 {
-  mpz_poly_t f;
+  mpz_poly f;
   mpz_t m;
 
   mpz_init_set_ui (m, 17);
@@ -374,7 +374,7 @@ test_mpz_poly_div_2_mod_mpz (void)
 void
 test_mpz_poly_derivative (void)
 {
-  mpz_poly_t f, df;
+  mpz_poly f, df;
 
   mpz_poly_init (f, -1);
   mpz_poly_init (df, 1);
@@ -406,7 +406,7 @@ test_mpz_poly_derivative (void)
 void
 test_mpz_poly_power_mod_f_mod_ui (void)
 {
-  mpz_poly_t Q, P, f;
+  mpz_poly Q, P, f;
   mpz_t a, pp, invp;
   unsigned long p = 4294967291UL;
 
@@ -574,7 +574,7 @@ void
 test_mpz_poly_base_modp_init (unsigned long iter)
 {
   int p, l, k, K[32], d, i;
-  mpz_poly_t f, *P, g;
+  mpz_poly f, *P, g;
   mpz_t pk;
   size_t s;
 
@@ -600,8 +600,8 @@ test_mpz_poly_base_modp_init (unsigned long iter)
           m = 833;
         }
       mpz_poly_random (f, d, m);
-      s = mpz_poly_sizeinbase (f, d, 2);
-      for (i = 0; i <= d; i++)
+      s = mpz_poly_sizeinbase (f, 2);
+      for (i = 0; i <= f->deg; i++)
         ASSERT_ALWAYS(mpz_sizeinbase (f->coeff[i], 2) <= s);
       P = mpz_poly_base_modp_init (f, p, K, l);
       /* check f = P[0] + p^K[l]*P[1] + p^K[l-1]*P[2] + ... + p^K[1]*P[l] */
@@ -621,7 +621,7 @@ test_mpz_poly_base_modp_init (unsigned long iter)
 void test_mpz_poly_is_root(unsigned long iter)
 {
     mpz_t p, r;
-    mpz_poly_t f, ell;
+    mpz_poly f, ell;
     mpz_init(p);
     mpz_init(r);
     mpz_poly_init(f, 10);
@@ -649,11 +649,50 @@ void test_mpz_poly_factor(unsigned long iter)
 {
     mpz_t p;
     mpz_poly_factor_list lf;
-    mpz_poly_t f;
+    mpz_poly f;
 
     mpz_init(p);
     mpz_poly_init(f, -1);
     mpz_poly_factor_list_init(lf);
+
+    
+    mpz_set_ui(p, 2);
+    // 0+1*x^1+2*x^2+2*x^3+2*x^4  
+    mpz_poly_setcoeffs_si_var(f, 4, 0, 1, 2, 2, 2);
+    mpz_poly_factor(lf, f, p, state);
+    ASSERT_ALWAYS(lf->size == 1);
+    mpz_t coeff;
+    mpz_init(coeff);
+    mpz_poly_getcoeff(coeff, 0, lf->factors[0]->f);
+    ASSERT_ALWAYS(mpz_cmp_ui(coeff, 0) == 0);
+    mpz_poly_getcoeff(coeff, 1, lf->factors[0]->f);
+    ASSERT_ALWAYS(mpz_cmp_ui(coeff, 1) == 0);
+
+    // 1+0*x^1+2*x^2+2*x^3+2*x^4  
+    mpz_poly_setcoeffs_si_var(f, 4, 1, 0, 2, 2, 2);
+    mpz_poly_factor(lf, f, p, state);
+    ASSERT_ALWAYS(lf->size == 0);
+
+    //0+1*x^1-2*x^2-2*x^3-2*x^4
+    mpz_poly_setcoeffs_si_var(f, 4, 0, 1, -2, -2, -2);
+    mpz_poly_factor(lf, f, p, state);
+    ASSERT_ALWAYS(lf->size == 1);
+    mpz_poly_getcoeff(coeff, 0, lf->factors[0]->f);
+    ASSERT_ALWAYS(mpz_cmp_ui(coeff, 0) == 0);
+    mpz_poly_getcoeff(coeff, 1, lf->factors[0]->f);
+    ASSERT_ALWAYS(mpz_cmp_ui(coeff, 1) == 0);
+
+    mpz_clear(coeff);
+
+    //x^10 + x^9 + x^8 + 1
+    mpz_poly_setcoeffs_si_var(f, 10, 1, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1);
+    mpz_poly_factor(lf, f, p, state);
+    ASSERT_ALWAYS(lf->size == 3);
+
+    //x^10 + x^8 + x^7 + x^6 + x^2 + x + 1
+    mpz_poly_setcoeffs_si_var(f, 10, 1, 1, 1, 0, 0, 0, 1, 1, 1, 0, 1);
+    mpz_poly_factor(lf, f, p, state);
+    ASSERT_ALWAYS(lf->size == 1);
 
     mpz_set_ui(p, 13);
     mpz_poly_setcoeffs_ui_var(f, 21, 3, 8, 5, 5, 6, 1, 9, 4, 3, 3, 8, 7, 7, 7, 0, 12, 5, 11, 11, 1, 7, 10);
@@ -686,6 +725,14 @@ void test_mpz_poly_factor(unsigned long iter)
     ASSERT_ALWAYS(lf->factors[2]->m == 2);
     ASSERT_ALWAYS(lf->factors[3]->f->deg == 5);
     ASSERT_ALWAYS(lf->factors[4]->f->deg == 8);
+
+    mpz_set_ui(p, 5);
+    mpz_poly_setcoeffs_ui_var(f, 8, 3, 3, 3, 3, 2, 2, 2, 2, 3);
+    printf ("f="); mpz_poly_fprintf (stdout, f);
+    mpz_poly_factor(lf, f, p, state);
+    ASSERT_ALWAYS(lf->size == 2);
+    ASSERT_ALWAYS(lf->factors[0]->f->deg == 4);
+    ASSERT_ALWAYS(lf->factors[1]->f->deg == 4);
 
     mpz_set_ui(p, 3);
     mpz_poly_setcoeffs_ui_var(f, 20, 1, 1, 1, 2, 1, 0, 0, 1, 0, 0, 0, 1, 2, 0, 2, 0, 2, 0, 1, 1, 2);
@@ -751,7 +798,7 @@ void test_mpz_poly_factor(unsigned long iter)
         mpz_poly_mod_mpz(f, f, p, NULL);
         // mpz_poly_fprintf(stderr, f);
         mpz_poly_factor(lf, f, p, state);
-        mpz_poly_t g;
+        mpz_poly g;
         mpz_poly_init(g, f->deg);
         mpz_poly_set_xi(g, 0);
         for(int i = 0 ; i < lf->size ; i++) {
@@ -773,7 +820,7 @@ void test_mpz_poly_factor(unsigned long iter)
 void test_mpz_poly_trivialities()
 {
     mpz_t a[5], p;
-    mpz_poly_t f, g, q, r;
+    mpz_poly f, g, q, r;
     mpz_poly_factor_list lf;
     int rc;
 
@@ -889,7 +936,7 @@ void test_mpz_poly_trivialities()
 
 void test_mpz_poly_resultant()
 {
-  mpz_poly_t f, g;
+  mpz_poly f, g;
   mpz_poly_init(f, 10);
   mpz_poly_init(g, 10);
   mpz_t res;
@@ -997,7 +1044,7 @@ void test_mpz_poly_resultant()
 void
 test_mpz_poly_discriminant (unsigned long iter)
 {
-    mpz_poly_t f;
+    mpz_poly f;
     mpz_t D;
     mpz_poly_init(f, -1);
     mpz_init(D);
