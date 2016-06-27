@@ -168,7 +168,6 @@ estimate_weibull_moments2 (double *beta, double *eta, data_t s)
   double min, eta_min;
 
   data_init (smin);
-  data_clear (smin);
 
   for (i = 0; i < n; i += k)
     {
@@ -178,6 +177,7 @@ estimate_weibull_moments2 (double *beta, double *eta, data_t s)
       data_add (smin, min);
     }
   estimate_weibull_moments (beta, &eta_min, smin);
+  data_clear (smin);
   *eta = eta_min * pow ((double) k, 1.0 / *beta);
 }
 
