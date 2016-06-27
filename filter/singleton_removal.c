@@ -170,10 +170,10 @@ singleton_removal (purge_matrix_ptr mat, unsigned int nthreads, int verbose)
       fflush(stdout);
     }
 
-  if (nthreads > 1)
-    singleton_removal_oneiter_mt (mat, nthreads);
-  else
-    singleton_removal_oneiter_mono (mat);
+    if (nthreads > 1)
+        singleton_removal_oneiter_mt (mat, nthreads);
+    else
+        singleton_removal_oneiter_mono (mat);
 
     iter++;
   } while (oldnrows != mat->nrows);

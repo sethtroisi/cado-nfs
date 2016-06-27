@@ -357,6 +357,16 @@ Examples of basic usage:
 
 ./cado-nfs.py 90377629292003121684002147101760858109247336549001090677693 
 
+* Run a full factorization on the local machine, using all available
+  cores, but with a slightly modified set of default parameters.
+
+  The difficulty here is that when cado-nfs.py uses a parameter file
+  supplied on the command line, it does not automatically insert into the
+  parameter set the options which are necessary for running jobs.
+  Therefore, we need to add these options:
+
+./cado-nfs.py --parameters ./parameters/factor/params.c60 90377629292003121684002147101760858109247336549001090677693 slaves.hostnames=localhost slaves.nrclients=2
+
 * Run a full factorization on the local machine, using 8 threads for the
   server (this includes the linear algebra), and 4 jobs of 2 threads
   each for the polynomial selection and the sieving:
@@ -388,6 +398,15 @@ slaves.hostnames=machine1,machine2
 Note that, in that case, you have to specify machine1 as well in the list
 of hostnames if you want it to contribute to the polynomial selection and
 the sieving.
+
+
+Stopping the factorization during a specific step:
+==================================================
+It is possible to stop the factorization:
+
+./cado-nfs.py 90377629292003121684002147101760858109247336549001090677693 tasks.xxxx.run=false
+
+This command works with: xxxx = polyselect, sieve, filter, linalg
 
 
 Known problems:

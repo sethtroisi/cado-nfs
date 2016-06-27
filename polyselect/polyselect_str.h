@@ -13,8 +13,6 @@
 #include "auxiliary.h"
 #include "murphyE.h"
 
-#define MAX_THREADS 16
-
 #define LEN_SPECIAL_Q 55
 //#define DEBUG_HASH_TABLE
 
@@ -113,6 +111,19 @@ typedef struct
 } _header_struct;
 typedef _header_struct header_t[1];
 
+/* structure for series of data */
+typedef struct
+{
+  unsigned long size;  /* number of values */
+  unsigned long alloc; /* allocated size */
+  double *x;           /* values */
+  double sum;          /* sum = x[0] + ... + x[size-1] */
+  double var;          /* var = x[0]^2 + ... + x[size-1]^2 */
+  double min, max;     /* minimum and maximum values */
+  double beta, eta;    /* parameters for Weibull distribution */
+} data_struct;
+typedef data_struct data_t[1];
+
 /* inline functions */
 
 #ifndef EMIT_ADDRESSABLE_shash_add
@@ -171,6 +182,13 @@ void hash_grow (hash_t);
 void hash_clear (hash_t);
 void shash_clear (shash_t);
 
-void print_poly_info (mpz_t *, unsigned int d, mpz_t *, const mpz_t, int, const char *);
+void print_poly_info (char *, mpz_t *, unsigned int, mpz_t *, const mpz_t, int,
+                      const char *, bool);
+
+void data_init (data_t);
+void data_clear (data_t);
+void data_add (data_t, double);
+double data_mean (data_t);
+double data_var (data_t);
 
 #endif

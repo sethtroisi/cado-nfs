@@ -142,13 +142,9 @@ static void sieve_info_clear_trialdiv(sieve_info_ptr si, int side)/*{{{*/
 /* {{{ Initialize the factor bases */
 void sieve_info_init_factor_bases(las_info_ptr las, sieve_info_ptr si, param_list pl)
 {
-    double tfb;
-    const char * fbcfilename = param_list_lookup_string(pl, "fbc");
+    fb_factorbase *fb[2];
 
     for(int side = 0 ; side < 2 ; side++) {
-        mpz_poly_ptr pol = las->cpoly->pols[side];
-        sieve_side_info_ptr sis = si->sides[side];
-
         const fbprime_t bk_thresh = si->conf->bucket_thresh;
         fbprime_t bk_thresh1 = si->conf->bucket_thresh1;
         const fbprime_t fbb = si->conf->sides[side]->lim;
@@ -162,24 +158,30 @@ void sieve_info_init_factor_bases(las_info_ptr las, sieve_info_ptr si, param_lis
         }
         const fbprime_t thresholds[4] = {bk_thresh, bk_thresh1, fbb, fbb};
         const bool only_general[4]={true, false, false, false};
-        sis->fb = new fb_factorbase(thresholds, powlim, only_general);
+        fb[side] = si->sides[side]->fb = new fb_factorbase(thresholds, powlim, only_general);
+    }
 
-        if (fbcfilename != NULL) {
-            /* Try to read the factor base cache file. If that fails, because
-               the file does not exist or is not compatible with our parameters,
-               it will be written after we generate the factor bases. */
-            verbose_output_print(0, 1, "# Mapping memory image of factor base from file %s\n",
-                   fbcfilename);
-            if (sis->fb->mmap_fbc(fbcfilename)) {
-                verbose_output_print(0, 1, "# Finished mapping memory image of factor base\n");
-                continue;
-            } else {
-                verbose_output_print(0, 1, "# Could not map memory image of factor base\n");
-            }
-        }
+    const char * fbcfilename = param_list_lookup_string(pl, "fbc");
+
+    if (fbcfilename != NULL) {
+      /* Try to read the factor base cache file. If that fails, because
+         the file does not exist or is not compatible with our parameters,
+         it will be written after we generate the factor bases. */
+      verbose_output_print(0, 1, "# Mapping memory image of factor base from file %s\n",
+                           fbcfilename);
+      if (fb_mmap_fbc(fb, fbcfilename)) {
+        verbose_output_print(0, 1, "# Finished mapping memory image of factor base\n");
+        return;
+      } else {
+        verbose_output_print(0, 1, "# Could not map memory image of factor base\n");
+      }
+    }
+
+    for(int side = 0 ; side < 2 ; side++) {
+        mpz_poly_ptr pol = las->cpoly->pols[side];
 
         if (pol->deg > 1) {
-            tfb = seconds ();
+            double tfb = seconds ();
             char fbparamname[4];
             snprintf(fbparamname, sizeof(fbparamname), "fb%d", side);
             const char * fbfilename = param_list_lookup_string(pl, fbparamname);
@@ -189,29 +191,29 @@ void sieve_info_init_factor_bases(las_info_ptr las, sieve_info_ptr si, param_lis
             }
             verbose_output_print(0, 1, "# Reading %s factor base from %s\n", sidenames[side], fbfilename);
             tfb = seconds () - tfb;
-            if (!sis->fb->read(fbfilename))
+            if (!fb[side]->read(fbfilename))
                 exit(EXIT_FAILURE);
             verbose_output_print(0, 1,
                     "# Reading %s factor base of %zuMb took %1.1fs\n",
                     sidenames[side],
-                    sis->fb->size() >> 20, tfb);
+                    fb[side]->size() >> 20, tfb);
         } else {
-            tfb = seconds ();
+            double tfb = seconds ();
             double tfb_wct = wct_seconds ();
-            sis->fb->make_linear_threadpool ((const mpz_t *) pol->coeff,
+            fb[side]->make_linear_threadpool ((const mpz_t *) pol->coeff,
                     las->nb_threads);
             tfb = seconds () - tfb;
             tfb_wct = wct_seconds() - tfb_wct;
             verbose_output_print(0, 1,
                     "# Creating rational factor base of %zuMb took %1.1fs (%1.1fs real)\n",
-                    sis->fb->size() >> 20, tfb, tfb_wct);
+                    fb[side]->size() >> 20, tfb, tfb_wct);
         }
+    }
 
-        if (fbcfilename != NULL) {
-            verbose_output_print(0, 1, "# Writing memory image of factor base to file %s\n", fbcfilename);
-            sis->fb->dump_fbc(fbcfilename);
-            verbose_output_print(0, 1, "# Finished writing memory image of factor base\n");
-        }
+    if (fbcfilename != NULL) {
+        verbose_output_print(0, 1, "# Writing memory image of factor base to file %s\n", fbcfilename);
+        fb_dump_fbc(fb, fbcfilename);
+        verbose_output_print(0, 1, "# Finished writing memory image of factor base\n");
     }
 }
 /*}}}*/
@@ -257,26 +259,28 @@ void reorder_fb(sieve_info_ptr si, int side)
     /* We go through all the primes in FB part 0 and sort them into one of
        5 vectors, and some we discard */
 
-    /* alloc the 5 vectors */
-    enum {POW2, POW3, TD, RS, REST};
-    std::vector<fb_general_entry> *pieces = new std::vector<fb_general_entry>[5];
+    /* alloc the 6 vectors */
+    enum {POW2, POW3, TD, RS, REST, SKIPPED};
+    std::vector<fb_general_entry> *pieces = new std::vector<fb_general_entry>[6];
 
     fb_part *small_part = si->sides[side]->fb->get_part(0);
     ASSERT_ALWAYS(small_part->is_only_general());
-    const std::vector<fb_general_entry> *small_entries = small_part->get_general_vector();
+    const fb_vector<fb_general_entry> *small_entries = small_part->get_general_vector();
 
     fbprime_t plim = si->conf->bucket_thresh;
     fbprime_t costlim = si->conf->td_thresh;
 
     const size_t pattern2_size = sizeof(unsigned long) * 2;
-    for(std::vector<fb_general_entry>::const_iterator it = small_entries->begin();
-        it != small_entries->end();
-        it++)
+    for (fb_vector<fb_general_entry>::const_iterator it = small_entries->begin();
+         it != small_entries->end();
+         it++)
     {
         /* The extra conditions on powers of 2 and 3 are related to how
          * pattern-sieving is done.
          */
-        if (it->p == 2 && it->q <= pattern2_size) {
+        if (it->q < si->conf->skipped) {
+            pieces[SKIPPED].push_back(*it);
+        } else if (it->p == 2 && it->q <= pattern2_size) {
             pieces[POW2].push_back(*it);
         } else if (it->q == 3) { /* Currently only q=3 is pattern sieved */
             pieces[POW3].push_back(*it);
@@ -291,14 +295,14 @@ void reorder_fb(sieve_info_ptr si, int side)
             abort();
         }
     }
-    /* Concatenate the 5 vectors into one, and store the beginning and ending
+    /* Concatenate the 6 vectors into one, and store the beginning and ending
        index of each part in fb_parts_x */
     std::vector<fb_general_entry> *s = new std::vector<fb_general_entry>;
     /* FIXME: hack to be able to access the struct fb_parts_x entries via
        an index */
     typedef int interval_t[2];
     interval_t *parts_as_array = &si->sides[side]->fb_parts_x->pow2;
-    for (int i = 0; i < 5; i++) {
+    for (int i = 0; i < 6; i++) {
         parts_as_array[i][0] = count_roots(*s);
         std::sort(pieces[i].begin(), pieces[i].end());
         s->insert(s->end(), pieces[i].begin(), pieces[i].end());
@@ -472,11 +476,6 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
 
     for(int side = 0 ; side < 2 ; side++) {
 	sieve_info_init_trialdiv(si, side); /* Init refactoring stuff */
-
-        // This variable is obsolete (but las-duplicates.cpp still reads
-        // it) FIXME
-        si->sides[side]->strategy = NULL;
-
         reorder_fb(si, side);
         verbose_output_print(0, 2, "# small %s factor base", sidenames[side]);
         size_t nr_roots;
@@ -552,9 +551,6 @@ static void sieve_info_clear (las_info_ptr las, sieve_info_ptr si)/*{{{*/
     si->j_div = NULL;
 
     for(int s = 0 ; s < 2 ; s++) {
-        if (si->sides[s]->strategy != NULL)
-	    facul_clear_strategy (si->sides[s]->strategy);
-	si->sides[s]->strategy = NULL;
 	sieve_info_clear_trialdiv(si, s);
         delete si->sides[s]->fb_smallsieved;
         si->sides[s]->fb_smallsieved = NULL;
@@ -673,6 +669,7 @@ static void las_info_init_hint_table(las_info_ptr las, param_list pl)/*{{{*/
         sc->bucket_thresh = las->config_base->bucket_thresh;
         sc->bucket_thresh1 = las->config_base->bucket_thresh1;
         sc->td_thresh = las->config_base->td_thresh;
+        sc->skipped = las->config_base->skipped;
         sc->unsieve_thresh = las->config_base->unsieve_thresh;
         for(int side = 0 ; side < 2 ; side++) {
             sc->sides[side]->powlim = las->config_base->sides[side]->powlim;
@@ -889,7 +886,9 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
 
         /* Parse optional siever configuration parameters */
         sc->td_thresh = 1024;	/* default value */
+        sc->skipped = 1;	/* default value */
         param_list_parse_uint(pl, "tdthresh", &(sc->td_thresh));
+        param_list_parse_uint(pl, "skipped", &(sc->skipped));
 
         sc->unsieve_thresh = 100;
         if (param_list_parse_uint(pl, "unsievethresh", &(sc->unsieve_thresh))) {
@@ -919,6 +918,11 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
             if (!param_list_parse_int(pl, ncurves_params[side],
                         &sc->sides[side]->ncurves))
                 sc->sides[side]->ncurves = -1;
+
+        long dupqmax[2] = {0, 0};
+        param_list_parse_long_and_long(pl, "dup-qmax", dupqmax, ",");
+        sc->sides[0]->qmax = dupqmax[0];
+        sc->sides[1]->qmax = dupqmax[1];
 
         if (complete)
             las->default_config = sc;
@@ -2740,6 +2744,7 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "ncurves0", "controls number of curves on side 0");
   param_list_decl_usage(pl, "ncurves1", "controls number of curves on side 1");
   param_list_decl_usage(pl, "tdthresh", "trial-divide primes p/r <= ththresh (r=number of roots)");
+  param_list_decl_usage(pl, "skipped", "primes below this bound are not sieved at all");
   param_list_decl_usage(pl, "bkthresh", "bucket-sieve primes p >= bkthresh");
   param_list_decl_usage(pl, "bkthresh1", "2-level bucket-sieve primes p >= bkthresh1");
   param_list_decl_usage(pl, "unsievethresh", "Unsieve all p > unsievethresh where p|gcd(a,b)");
@@ -2753,6 +2758,7 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "prepend-relation-time", "prefix all relation produced with time offset since beginning of special-q processing");
   param_list_decl_usage(pl, "ondemand-siever-config", "(switch) defer initialization of siever precomputed structures (one per special-q side) to time of first actual use");
   param_list_decl_usage(pl, "dup", "(switch) suppress duplicate relations");
+  param_list_decl_usage(pl, "dup-qmax", "limits of q-sieving for 2-sided duplicate removal");
   param_list_decl_usage(pl, "batch", "(switch) use batch cofactorization");
   param_list_decl_usage(pl, "batch0", "side-0 batch file");
   param_list_decl_usage(pl, "batch1", "side-1 batch file");

@@ -118,6 +118,12 @@
 /* Member templates related to SIMD operation */
 
 /* Object-oriented interface */
+/* Mpfq::engine::handler::create_code */
+void mpfq_pz_pz_wrapper_dotprod(mpfq_vbase_ptr K0 MAYBE_UNUSED, mpfq_vbase_ptr K1 MAYBE_UNUSED, mpfq_pz_dst_vec xw, mpfq_pz_src_vec xu1, mpfq_pz_src_vec xu0, unsigned int n)
+{
+    mpfq_pz_pz_dotprod(K0->obj, K1->obj, xw, xu1, xu0, n);
+}
+
 /* *simd_pz::code_for_member_template_dotprod */
 void mpfq_pz_pz_dotprod(mpfq_pz_dst_field K0 MAYBE_UNUSED, mpfq_pz_dst_field K1 MAYBE_UNUSED, mpfq_pz_dst_vec xw, mpfq_pz_src_vec xu1, mpfq_pz_src_vec xu0, unsigned int n)
 {
@@ -134,6 +140,12 @@ void mpfq_pz_pz_dotprod(mpfq_pz_dst_field K0 MAYBE_UNUSED, mpfq_pz_dst_field K1 
         mpfq_pz_elt_ur_clear(K0, &t);
 }
 
+/* Mpfq::engine::handler::create_code */
+void mpfq_pz_pz_wrapper_addmul_tiny(mpfq_vbase_ptr K MAYBE_UNUSED, mpfq_vbase_ptr L MAYBE_UNUSED, mpfq_pz_dst_vec w, mpfq_pz_src_vec u, mpfq_pz_dst_vec v, unsigned int n)
+{
+    mpfq_pz_pz_addmul_tiny(K->obj, L->obj, w, u, v, n);
+}
+
 /* *simd_pz::code_for_member_template_addmul_tiny */
 void mpfq_pz_pz_addmul_tiny(mpfq_pz_dst_field K MAYBE_UNUSED, mpfq_pz_dst_field L MAYBE_UNUSED, mpfq_pz_dst_vec w, mpfq_pz_src_vec u, mpfq_pz_dst_vec v, unsigned int n)
 {
@@ -144,6 +156,12 @@ void mpfq_pz_pz_addmul_tiny(mpfq_pz_dst_field K MAYBE_UNUSED, mpfq_pz_dst_field 
             mpfq_pz_add(K, mpfq_pz_vec_coeff_ptr(K, w, i), mpfq_pz_vec_coeff_ptr_const(K, w, i), s);
         }
         mpfq_pz_clear(K, &s);
+}
+
+/* Mpfq::engine::handler::create_code */
+void mpfq_pz_pz_wrapper_transpose(mpfq_vbase_ptr K MAYBE_UNUSED, mpfq_vbase_ptr L MAYBE_UNUSED, mpfq_pz_dst_vec w, mpfq_pz_src_vec u)
+{
+    mpfq_pz_pz_transpose(K->obj, L->obj, w, u);
 }
 
 /* *simd_pz::code_for_member_template_transpose */

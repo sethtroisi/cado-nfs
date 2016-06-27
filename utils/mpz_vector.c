@@ -78,7 +78,7 @@ mpz_vector_is_coordinate_zero (mpz_vector_t v, unsigned int i)
 }
 
 void
-mpz_vector_get_mpz_poly (mpz_poly_t p, mpz_vector_t v)
+mpz_vector_get_mpz_poly (mpz_poly p, mpz_vector_t v)
 {
   for (unsigned int i = 0; i < v->dim; i++)
     mpz_poly_setcoeff (p, i, v->c[i]);

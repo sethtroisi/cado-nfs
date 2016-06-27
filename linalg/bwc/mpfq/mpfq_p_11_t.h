@@ -121,8 +121,11 @@
 /* Member templates related to SIMD operation */
 
 /* Object-oriented interface */
+void mpfq_p_11_p_11_wrapper_dotprod(mpfq_vbase_ptr, mpfq_vbase_ptr, mpfq_p_11_dst_vec, mpfq_p_11_src_vec, mpfq_p_11_src_vec, unsigned int);
 void mpfq_p_11_p_11_dotprod(mpfq_p_11_dst_field, mpfq_p_11_dst_field, mpfq_p_11_dst_vec, mpfq_p_11_src_vec, mpfq_p_11_src_vec, unsigned int);
+void mpfq_p_11_p_11_wrapper_addmul_tiny(mpfq_vbase_ptr, mpfq_vbase_ptr, mpfq_p_11_dst_vec, mpfq_p_11_src_vec, mpfq_p_11_dst_vec, unsigned int);
 void mpfq_p_11_p_11_addmul_tiny(mpfq_p_11_dst_field, mpfq_p_11_dst_field, mpfq_p_11_dst_vec, mpfq_p_11_src_vec, mpfq_p_11_dst_vec, unsigned int);
+void mpfq_p_11_p_11_wrapper_transpose(mpfq_vbase_ptr, mpfq_vbase_ptr, mpfq_p_11_dst_vec, mpfq_p_11_src_vec);
 void mpfq_p_11_p_11_transpose(mpfq_p_11_dst_field, mpfq_p_11_dst_field, mpfq_p_11_dst_vec, mpfq_p_11_src_vec);
 
 #endif  /* MPFQ_P_11_T_H_ */

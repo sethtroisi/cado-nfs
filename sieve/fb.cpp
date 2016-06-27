@@ -1,11 +1,17 @@
 #include "cado.h"
 #include <cstdlib>
+#include <cstdio>
 #include <algorithm>
 #include <cmath>
 #include <cstdarg>
 #include <cctype>
 #include <gmp.h>
 #include <pthread.h>
+#ifdef HAVE_SYS_MMAN_H
+#include <sys/mman.h>
+#else
+#define MAP_FAILED ((void *) -1)
+#endif
 #include "fb.h"
 #include "mod_ul.h"
 #include "verbose.h"
@@ -382,6 +388,7 @@ fb_vector<FB_ENTRY_TYPE>::~fb_vector()
   for (it = cached_slices.begin(); it != cached_slices.end(); it++) {
     delete it->second;
   }
+  clear();
 }
 
 
@@ -390,8 +397,8 @@ void
 fb_vector<FB_ENTRY_TYPE>::extract_bycost(std::vector<unsigned long> &p,
     fbprime_t pmax, fbprime_t td_thresh) const
 {
-  for (size_t i = 0; i < vec.size(); i++)
-    vec[i].extract_bycost(p, pmax, td_thresh);
+  for (size_t i = 0; i < size; i++)
+    data[i].extract_bycost(p, pmax, td_thresh);
 }
 
 
@@ -446,19 +453,19 @@ void
 fb_vector<FB_ENTRY_TYPE>::_count_entries(size_t *nprimes, size_t *nroots, double *weight) const
 {
   if (nprimes != NULL)
-    *nprimes += vec.size();
+    *nprimes += size;
   double w = 0.;
   size_t nr = 0;
-  for (size_t i = 0; i < vec.size(); i++) {
+  for (size_t i = 0; i < size; i++) {
 #if 0
       /* see compiler bug section above... */
-      unsigned char nr_i = vec[i].nr_roots;
+      unsigned char nr_i = data[i].nr_roots;
 #else
       /* use workaround */
-      unsigned char nr_i = get_nroots<FB_ENTRY_TYPE>(vec[i])();
+      unsigned char nr_i = get_nroots<FB_ENTRY_TYPE>(data[i])();
 #endif
       nr += nr_i;
-      w += vec[i].weight();
+      w += data[i].weight();
   }
   if (nroots != NULL)
     *nroots += nr;
@@ -473,7 +480,7 @@ template <class FB_ENTRY_TYPE>
 double
 fb_vector<FB_ENTRY_TYPE>::est_weight_max(const size_t start, const size_t end) const
 {
-  return vec[start].weight() * (end - start);
+  return data[start].weight() * (end - start);
 }
 
 /* Estimate weight by the average of the weight of the two endpoints, i.e.,
@@ -482,7 +489,7 @@ template <class FB_ENTRY_TYPE>
 double
 fb_vector<FB_ENTRY_TYPE>::est_weight_avg(const size_t start, const size_t end) const
 {
-  return (vec[start].weight() + vec[end-1].weight()) / 2. * (end - start);
+  return (data[start].weight() + data[end-1].weight()) / 2. * (end - start);
 }
 
 /* Estimate weight by Simpson's rule on the weight of the two endpoints and
@@ -492,7 +499,7 @@ double
 fb_vector<FB_ENTRY_TYPE>::est_weight_simpson(const size_t start, const size_t end) const
 {
   const size_t midpoint = start + (end - start) / 2;
-  return (vec[start].weight() + 4.*vec[midpoint].weight() + vec[end-1].weight()) / 6. * (end - start);
+  return (data[start].weight() + 4.*data[midpoint].weight() + data[end-1].weight()) / 6. * (end - start);
 }
 
 /* Estimate weight by using Merten's rule on the primes at the two endpoints */
@@ -500,7 +507,7 @@ template <class FB_ENTRY_TYPE>
 double
 fb_vector<FB_ENTRY_TYPE>::est_weight_mertens(const size_t start, const size_t end) const
 {
-  return log(log(vec[end-1].get_q())) - log(log(vec[start].get_q()));
+  return log(log(data[end-1].get_q())) - log(log(data[start].get_q()));
 }
 
 /* Compute weight exactly with a sum over all entries */
@@ -510,7 +517,7 @@ fb_vector<FB_ENTRY_TYPE>::est_weight_sum(const size_t start, const size_t end) c
 {
   double sum = 0.;
   for (size_t i = start; i < end; i++)
-    sum += vec[i].weight();
+    sum += data[i].weight();
   return sum;
 }
 
@@ -600,11 +607,11 @@ void
 fb_vector<FB_ENTRY_TYPE>::make_slices(const double scale, const double max_weight,
                                       slice_index_t &next_index)
 {
-  /* Entries in vec must be sorted in order of non-decreasing round(log(p));
+  /* Entries in data must be sorted in order of non-decreasing round(log(p));
      since the logarithm base varies, this implies order of non-decreasing p.
   */
 
-  if (vec.empty()) {
+  if (size == 0) {
     /* Nothing to do. Leave slices == NULL */
     ASSERT_ALWAYS(slices == NULL);
     return;
@@ -632,20 +639,20 @@ fb_vector<FB_ENTRY_TYPE>::make_slices(const double scale, const double max_weigh
 
   size_t cur_slice_start = 0;
 
-  while (cur_slice_start < vec.size()) {
-    const unsigned char cur_logp = fb_log (vec[cur_slice_start].p, scale, 0.);
+  while (cur_slice_start < size) {
+    const unsigned char cur_logp = fb_log (data[cur_slice_start].p, scale, 0.);
 
-    size_t next_slice_start = std::min(cur_slice_start + max_slice_len, vec.size());
+    size_t next_slice_start = std::min(cur_slice_start + max_slice_len, size);
     ASSERT_ALWAYS(cur_slice_start < next_slice_start);
-    ASSERT_ALWAYS(vec[cur_slice_start].p <= vec[next_slice_start - 1].p);
+    ASSERT_ALWAYS(data[cur_slice_start].p <= data[next_slice_start - 1].p);
 
     /* See if last element of the current slice has a greater log(p) than
        the first element */
-    if (cur_logp < fb_log (vec[next_slice_start - 1].p, scale, 0.)) {
+    if (cur_logp < fb_log (data[next_slice_start - 1].p, scale, 0.)) {
       /* Find out the first place where log(p) changes occurs, and make that
          next_slice_start */
       for (next_slice_start = cur_slice_start;
-           cur_logp == fb_log (vec[next_slice_start].p, scale, 0.);
+           cur_logp == fb_log (data[next_slice_start].p, scale, 0.);
            next_slice_start++);
       /* We know that a log(p) change occurs so the slice len cannot exceed
          the max allowed */
@@ -668,13 +675,13 @@ fb_vector<FB_ENTRY_TYPE>::make_slices(const double scale, const double max_weigh
     verbose_output_print (0, 4, "# Slice %u starts at offset %zu (p = %"
         FBPRIME_FORMAT ", log(p) = %u) and ends at offset %zu (p = %"
         FBPRIME_FORMAT ", log(p) = %u), weight = %.3f\n",
-           (unsigned int) next_index, cur_slice_start, vec[cur_slice_start].p,
-           (unsigned int) fb_log (vec[cur_slice_start].p, scale, 0.), 
-           next_slice_start - 1, vec[next_slice_start - 1].p,
-           (unsigned int) fb_log (vec[next_slice_start - 1].p, scale, 0.),
+           (unsigned int) next_index, cur_slice_start, data[cur_slice_start].p,
+           (unsigned int) fb_log (data[cur_slice_start].p, scale, 0.), 
+           next_slice_start - 1, data[next_slice_start - 1].p,
+           (unsigned int) fb_log (data[next_slice_start - 1].p, scale, 0.),
            weight);
-    fb_slice<FB_ENTRY_TYPE> s(vec.data() + cur_slice_start,
-                              vec.data() + next_slice_start, cur_logp,
+    fb_slice<FB_ENTRY_TYPE> s(data + cur_slice_start,
+                              data + next_slice_start, cur_logp,
                               next_index++, weight);
     new_slices->push_back(s);
 
@@ -691,7 +698,7 @@ template <class FB_ENTRY_TYPE>
 void
 fb_vector<FB_ENTRY_TYPE>::sort()
 {
-  std::sort(vec.begin(), vec.end());
+  std::sort(data, data+size);
 }
 
 
@@ -708,9 +715,67 @@ fb_vector<FB_ENTRY_TYPE>::fprint(FILE *out) const
   } else {
     /* Otherwise we print the whole vector */
     fprintf(out, "#    Not sliced\n");
-    for (size_t i = 0; i < vec.size(); i++)
-      vec[i].fprint(out);
+    for (size_t i = 0; i < size; i++)
+      data[i].fprint(out);
   }
+}
+
+// Return NULL on error.
+template <class FB_ENTRY_TYPE>
+void *
+fb_vector<FB_ENTRY_TYPE>::mmap_fbc(void *p, void * const end)
+{
+  struct vec_t {
+    size_t        size;
+    FB_ENTRY_TYPE data[0];
+  };
+  vec_t *v = static_cast<vec_t *>(p);
+
+  if (v->data > end || v->data + v->size > end) {
+    verbose_output_print(1, 0, "# Could not read memory image of factor base: truncated file?\n");
+    return NULL;
+  }
+
+  data      = v->data;
+  size      = v->size;
+  alloc     = 0;
+  read_only = true;
+  mmapped   = true;
+
+  return static_cast<void *>(data + size);
+}
+
+template <class FB_ENTRY_TYPE>
+bool
+fb_vector<FB_ENTRY_TYPE>::dump_fbc(FILE *f) const
+{
+  ASSERT_ALWAYS(read_only);
+  if (fwrite(&size, sizeof(size),          1,    f) != 1 ||
+      fwrite( data, sizeof(FB_ENTRY_TYPE), size, f) != size) {
+    verbose_output_print(1, 0, "# Could not write memory image of factor base to file\n");
+    return false;
+  }
+  return true;
+}
+
+template <class FB_ENTRY_TYPE>
+void
+fb_vector<FB_ENTRY_TYPE>::clear()
+{
+  if (!mmapped)
+    free(data);
+  init();
+}
+
+template <class FB_ENTRY_TYPE>
+void
+fb_vector<FB_ENTRY_TYPE>::init()
+{
+  data      = NULL;
+  size      = 0;
+  alloc     = 0;
+  read_only = false;
+  mmapped   = false;
 }
 
 
@@ -806,6 +871,42 @@ fb_part::make_slices(const double scale, const double max_weight,
        slices. */
     general_vector.make_slices(scale, max_weight, next_index);
   }
+}
+
+// Return NULL on error.
+void *
+fb_part::mmap_fbc(void *p, void * const end)
+{
+  if (!only_general) {
+    for (int i_roots = 0; p != NULL && i_roots <= MAXDEGREE; ++i_roots)
+      p = get_slices(i_roots)->mmap_fbc(p, end);
+  }
+  if (p != NULL)
+    p = general_vector.mmap_fbc(p, end);
+  return p;
+}
+
+bool
+fb_part::dump_fbc(FILE *f) const
+{
+  bool rc = true;
+  if (!only_general) {
+    for (int i_roots = 0; rc && i_roots <= MAXDEGREE; ++i_roots)
+      rc = cget_slices(i_roots)->dump_fbc(f);
+  }
+  if (rc)
+    rc = general_vector.dump_fbc(f);
+  return rc;
+}
+
+void
+fb_part::clear()
+{
+  if (!only_general) {
+    for (int i_roots = 0; i_roots <= MAXDEGREE; ++i_roots)
+      get_slices(i_roots)->clear();
+  }
+  general_vector.clear();
 }
 
 /* powlim could well be one value per part, like thresholds */
@@ -1365,6 +1466,129 @@ fb_factorbase::make_slices(const double scale, const double max_weight[FB_MAX_PA
   for (size_t part = 0; part < FB_MAX_PARTS; part++) {
     parts[part]->make_slices(scale, max_weight[part], next_index);
   }
+}
+
+// Return NULL on error.
+void *
+fb_factorbase::mmap_fbc(void *p, void * const end)
+{
+  for (size_t part = 0; p != NULL && part < FB_MAX_PARTS; ++part) {
+    p = parts[part]->mmap_fbc(p, end);
+    size_t sz = 0;
+    parts[part]->_count_entries(&sz, NULL, NULL);
+    if (sz)
+      toplevel = part;
+  }
+  return p;
+}
+
+bool
+fb_factorbase::dump_fbc(FILE *f) const
+{
+  bool rc = true;
+  for (size_t part = 0; rc && part < FB_MAX_PARTS; ++part)
+    rc = parts[part]->dump_fbc(f);
+  return rc;
+}
+
+void
+fb_factorbase::clear()
+{
+  for (size_t part = 0; part < FB_MAX_PARTS; ++part)
+    parts[part]->clear();
+  toplevel = 0;
+}
+
+bool
+fb_mmap_fbc(fb_factorbase *fb[2] MAYBE_UNUSED, const char *filename MAYBE_UNUSED)
+{
+#ifdef HAVE_MMAP
+  FILE *f = fopen(filename, "rb");
+  if (f == NULL) {
+    verbose_output_print(0, 1, "# Could not open file %s for reading\n",
+                         filename);
+    return false;
+  }
+
+  bool  rc  = true;
+  long  sz  = 0;
+  void *ptr = NULL;
+
+  if (fseek(f, 0, SEEK_END) != 0) {
+    verbose_output_print(1, 0, "# Could not seek to end of file %s\n",
+                         filename);
+    rc = false;
+    goto cleanup;
+  }
+
+  sz = ftell(f);
+  if (sz < 0) {
+    verbose_output_print(1, 0, "# Could not get size of file %s\n",
+                         filename);
+    rc = false;
+    goto cleanup;
+  }
+
+  ptr = mmap(NULL, sz, PROT_READ, MAP_PRIVATE, fileno(f), 0);
+  if (ptr == MAP_FAILED) {
+    verbose_output_print(1, 0, "# Could not map file %s to memory\n",
+                         filename);
+    rc  = false;
+    ptr = NULL;
+    goto cleanup;
+  }
+
+  {
+    void *p   = ptr;
+    void *end = static_cast<char *>(ptr) + sz;
+    for (size_t side = 0; rc && side < 2; ++side)
+      rc = (p = fb[side]->mmap_fbc(p, end)) != NULL;
+  }
+
+cleanup:
+  if (fclose(f) != 0) {
+    verbose_output_print(1, 0, "# Could not close file %s\n",
+                         filename);
+    rc = false;
+  }
+
+  if (!rc && ptr != NULL) {
+    if (munmap(ptr, sz) != 0) {
+      verbose_output_print(1, 0, "# Could not unmap file %s\n",
+                           filename);
+    }
+    for (size_t side = 0; side < 2; ++side)
+      fb[side]->clear();
+  }
+
+  return rc;
+#else
+  return false;
+#endif
+}
+
+void
+fb_dump_fbc(fb_factorbase *fb[2], const char *filename)
+{
+  FILE *f = fopen(filename, "wb");
+  if (f == NULL) {
+    verbose_output_print(1, 0, "# Could not open file %s for writing\n",
+                         filename);
+    return;
+  }
+
+  bool rc = true;
+  for (size_t side = 0; rc && side < 2; ++side)
+    rc = fb[side]->dump_fbc(f);
+
+  if (fclose(f) != 0) {
+    verbose_output_print(1, 0, "# Could not close file %s\n",
+                         filename);
+    rc = false;
+  }
+
+  if (!rc)
+    unlink(filename);
 }
 
 

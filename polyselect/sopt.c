@@ -101,7 +101,7 @@ int main (int argc, char **argv)
   while (cado_poly_read_next_poly_from_stream (poly, polys_file))
   {
     unsigned int nrroots;
-    double lognorm, alpha, alpha_proj;
+    double lognorm, alpha, alpha_proj, exp_E;
 
     printf ("\n### Input raw polynomial (%u) ###\n", nb_input_polys);
     poly->skew = L2_skewness (poly->pols[ALG_SIDE], SKEWNESS_DEFAULT_PREC);
@@ -109,8 +109,11 @@ int main (int argc, char **argv)
     lognorm = L2_lognorm (poly->pols[ALG_SIDE], poly->skew);
     alpha = get_alpha (poly->pols[ALG_SIDE], ALPHA_BOUND);
     alpha_proj = get_biased_alpha_projective (poly->pols[ALG_SIDE], ALPHA_BOUND);
+    exp_E = lognorm
+      + expected_rotation_gain (poly->pols[ALG_SIDE], poly->pols[RAT_SIDE]);
     cado_poly_fprintf (stdout, poly, "# ");
-    cado_poly_fprintf_info (stdout, lognorm, alpha, alpha_proj, nrroots, "# ");
+    cado_poly_fprintf_info (stdout, lognorm, exp_E, alpha, alpha_proj, nrroots,
+                            "# ");
 
     ave_raw_lognorm += lognorm;
     min_raw_lognorm = (lognorm < min_raw_lognorm) ? lognorm : min_raw_lognorm;
@@ -131,8 +134,11 @@ int main (int argc, char **argv)
     lognorm = L2_lognorm (poly->pols[ALG_SIDE], poly->skew);
     alpha = get_alpha (poly->pols[ALG_SIDE], ALPHA_BOUND);
     alpha_proj = get_biased_alpha_projective (poly->pols[ALG_SIDE], ALPHA_BOUND);
+    exp_E = lognorm
+      + expected_rotation_gain (poly->pols[ALG_SIDE], poly->pols[RAT_SIDE]);
     cado_poly_fprintf (stdout, poly, NULL);
-    cado_poly_fprintf_info (stdout, lognorm, alpha, alpha_proj, nrroots, NULL);
+    cado_poly_fprintf_info (stdout, lognorm, exp_E, alpha, alpha_proj, nrroots,
+                            NULL);
 
 
     ave_sopt_lognorm += lognorm;

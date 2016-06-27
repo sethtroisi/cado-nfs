@@ -954,9 +954,7 @@ shash_find_collision (shash_t H)
     __builtin_prefetch(TH, 1, 3);		\
   } while (0)					\
 
-#ifdef MAX_THREADS
   pthread_mutex_lock (&lock);
-#endif
   if (!size) {
     size = H->balloc << 1;
     /* round up to power of 2 */
@@ -968,9 +966,7 @@ shash_find_collision (shash_t H)
     mask = size - 1;
     size += 16; /* Guard to avoid to test the end of hash_table when ++TH */
   }
-#ifdef MAX_THREADS
   pthread_mutex_unlock (&lock);
-#endif
   T = (uint32_t*) malloc (size * sizeof(*T));
   for (k = 0; k < SHASH_NBUCKETS; k++) {
     Hj = H->base[k];
@@ -1174,17 +1170,49 @@ hash_grow (hash_t H)
   mpz_clear (tmp);
 }
 
-#if 0
-double
-hash_mean_value (hash_t H)
+void
+data_init (data_t s)
 {
-  double s = 0;
-  unsigned long j;
-
-  for (j = 0; j < H->alloc; j++)
-    if (H->p[j] != 0)
-      s += fabs ((double) H->i[j]);
-  return s / (double) H->size;
+  s->size = s->alloc = 0;
+  s->x = NULL;
+  s->sum = s->var = 0.0;
+  s->min = DBL_MAX;
+  s->max = -DBL_MAX;
+  s->beta = s->eta = 0.0; /* means non initialized */
 }
-#endif
 
+void
+data_clear (data_t s)
+{
+  free (s->x);
+}
+
+void
+data_add (data_t s, double x)
+{
+  if (s->size == s->alloc)
+    {
+      s->alloc += 1 + s->alloc / 2;
+      s->x = realloc (s->x, s->alloc * sizeof (double));
+    }
+  s->x[s->size++] = x;
+  s->sum += x;
+  s->var += x * x;
+  if (x < s->min)
+    s->min = x;
+  if (x > s->max)
+    s->max = x;
+}
+
+double
+data_mean (data_t s)
+{
+  return s->sum / (double) s->size;
+}
+
+double
+data_var (data_t s)
+{
+  double m = data_mean (s);
+  return s->var / (double) s->size - m * m;
+}

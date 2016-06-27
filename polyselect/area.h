@@ -1,4 +1,4 @@
-/* parameters for Murphy's E-value */
+/* default parameters for Murphy's E-value */
 #define BOUND_F 1e7
 #define BOUND_G 5e6
 #define AREA    1e16

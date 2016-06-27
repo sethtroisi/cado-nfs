@@ -20,7 +20,7 @@
    array r also.
 */
 unsigned long
-mpz_poly_roots_gen (mpz_t **rp, mpz_poly_t F, const mpz_t n)
+mpz_poly_roots_gen (mpz_t **rp, mpz_poly F, const mpz_t n)
 {
   unsigned long k, i, j, d = F->deg;
   mpz_t Q, nn, p;
@@ -125,7 +125,7 @@ mpz_poly_roots_gen (mpz_t **rp, mpz_poly_t F, const mpz_t n)
 /* Entry point for rootfind routines, for prime p.
    Assume r is an array of deg(F) entries, which are mpz_init'ed. */
 int
-mpz_poly_roots (mpz_t *r, mpz_poly_t F, const mpz_t p)
+mpz_poly_roots (mpz_t *r, mpz_poly F, const mpz_t p)
 {
     int d = F->deg;
 
@@ -161,7 +161,7 @@ mpz_poly_roots (mpz_t *r, mpz_poly_t F, const mpz_t p)
 /* put in r[0], ..., r[n-1] the roots of F modulo p, where p is prime,
    and the return value n is the number of roots (without multiplicities) */
 int
-mpz_poly_roots_ulong (unsigned long *r, mpz_poly_t F, unsigned long p)
+mpz_poly_roots_ulong (unsigned long *r, mpz_poly F, unsigned long p)
 {
     int n;
 
@@ -197,7 +197,7 @@ mpz_poly_roots_ulong (unsigned long *r, mpz_poly_t F, unsigned long p)
 
 
 int
-mpz_poly_roots_uint64 (uint64_t * r, mpz_poly_t F, uint64_t p)
+mpz_poly_roots_uint64 (uint64_t * r, mpz_poly F, uint64_t p)
 {
     /* This is glue around poly_roots_ulong, nothing more. When uint64
        is larger than ulong, we call mpz_poly_roots_mpz as a fallback */
@@ -261,10 +261,10 @@ static int mpz_poly_coeff_cmp(const mpz_t *a, const mpz_t *b) {
    and put the corresponding roots mod p in r[]. Return number of roots
    which should be degree of f. Assumes p is odd, and deg(f) >= 1. */
 static int
-mpz_poly_cantor_zassenhaus (mpz_t *r, mpz_poly_t f, const mpz_t p, int depth)
+mpz_poly_cantor_zassenhaus (mpz_t *r, mpz_poly f, const mpz_t p, int depth)
 {
   mpz_t a, aux;
-  mpz_poly_t q, h;
+  mpz_poly q, h;
   int d = f->deg, dq, n, m;
 
   mpz_init (a);
@@ -337,11 +337,11 @@ clear_a:
    Assume d (the degree of f) is at least 1.
  */
 int
-mpz_poly_roots_mpz (mpz_t *r, mpz_poly_t f, const mpz_t p)
+mpz_poly_roots_mpz (mpz_t *r, mpz_poly f, const mpz_t p)
 {
   int nr = 0;
   mpz_t tmp;
-  mpz_poly_t fp, g, h;
+  mpz_poly fp, g, h;
   int d = f->deg;
 
   ASSERT(d >= 1);

@@ -63,13 +63,16 @@ double_poly_eval (double_poly_srcptr p, const double x)
 static long
 mpz_set_d_exp (mpz_t r, double x)
 {
-  long e = 0;
+  long e;
 
-  if (x != 0.0)
+  if (x == 0.0)
     {
-      e = ilogb (x) - 52;
-      mpz_set_d (r, ldexp (x, -e));
+      mpz_set_ui (r, 0);
+      return 0;
     }
+
+  e = ilogb (x) - 52;
+  mpz_set_d (r, ldexp (x, -e));
   return e;
 }
 

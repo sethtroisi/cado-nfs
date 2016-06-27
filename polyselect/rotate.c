@@ -8,7 +8,7 @@
 #include "area.h"
 
 static void usage_and_die(char *argv0) {
-    fprintf(stderr, "usage: %s [-area a] [-Bf b] [-Bg c] poly j k\n", argv0);
+    fprintf(stderr, "usage: %s [-area a] [-I nnn] [-Bf b] [-Bg c] poly j k\n", argv0);
     fprintf(stderr, "  apply rotation f += (j*x+k)*g to poly.\n");
     fprintf(stderr, "  poly: filename of polynomial\n");
     fprintf(stderr, "  j,k : integers\n");
@@ -18,6 +18,7 @@ static void usage_and_die(char *argv0) {
 int main(int argc, char **argv) {
     cado_poly poly;
     long j, k;
+    int I = 0;
     mpz_t b, m;
 
     mpz_init(b);
@@ -36,6 +37,12 @@ int main(int argc, char **argv) {
             argv += 2;
             argc -= 2;
           }
+        else if (strcmp (argv[1], "-I") == 0)
+          {
+            I = atoi (argv [2]);
+            argv += 2;
+            argc -= 2;
+          }
         else if (strcmp (argv[1], "-Bg") == 0)
           {
             bound_g = atof (argv [2]);
@@ -47,6 +54,10 @@ int main(int argc, char **argv) {
       }
     if (argc != 4)
         usage_and_die(argv[0]);
+
+    if (I != 0)
+      area = bound_f * pow (2.0, (double) (2 * I - 1));
+
     cado_poly_init (poly);
     if (!cado_poly_read(poly, argv[1])) {
         fprintf(stderr, "Problem when reading file %s\n", argv[1]);

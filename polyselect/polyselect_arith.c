@@ -105,10 +105,9 @@ roots_lift (uint64_t *r, mpz_t N, unsigned long d, mpz_t m0,
 }
 
 
-/* first combination: 0, 1, 2, 3, \cdots */
+/* first combination of k elements among 0, ..., n-1: 0, 1, 2, 3, \cdots */
 void
-first_comb ( unsigned long k,
-             unsigned long *r )
+first_comb (unsigned long k, unsigned long *r)
 {
   unsigned long i;
   for (i = 0; i < k; ++i)
@@ -116,7 +115,8 @@ first_comb ( unsigned long k,
 }
 
 
-/* next combination */
+/* next combination of k elements among 0, 1, ..., n-1,
+   return the index of the first increased element (k if finished) */
 unsigned long
 next_comb ( unsigned long n,
             unsigned long k,
@@ -125,11 +125,10 @@ next_comb ( unsigned long n,
   unsigned long j;
 
   /* if the last combination */
-  if (r[0] == (n - k)) {
+  if (r[0] == (n - k)) /* we have n-k, n-k+1, ..., n-1 */
     return k;
-  }
 
-  /* r[k-1] doesnot equal to the n-1, just increase it */
+  /* r[k-1] is not equal to n-1, just increase it */
   j = k - 1;
   if (r[j] < (n-1)) {
     r[j] ++;
@@ -250,6 +249,25 @@ comp_sq_roots ( header_t header,
   qroots_realloc (SQ_R, SQ_R->size); /* free unused space */
 }
 
+/* return the maximal number of special-q's with k elements among lq */
+unsigned long
+number_comb (qroots_t SQ_R, unsigned long k, unsigned long lq)
+{
+  unsigned long s = 0;
+  unsigned long idx[k], j;
+
+  first_comb (k, idx);
+  while (1)
+    {
+      unsigned long p = 1;
+      for (j = 0; j < k; j++)
+        p *= SQ_R->nr[idx[j]];
+      s += p;
+      if (next_comb (lq, k, idx) == k)
+        break;
+    }
+  return s;
+}
 
 /* given individual q's, return crted rq */
 uint64_t
@@ -285,20 +303,15 @@ return_q_rq ( qroots_t SQ_R,
 }
 
 
-/* given individual q's, return \product q and q^2 only, no rq */
+/* given individual q's, return \product q, no rq */
 uint64_t
-return_q_norq ( qroots_t SQ_R,
-                unsigned long *idx_q,
-                unsigned long k,
-                mpz_t qqz )
+return_q_norq (qroots_t SQ_R, unsigned long *idx_q, unsigned long k)
 {
   unsigned long i;
   uint64_t q = 1;
 
   for (i = 0; i < k; i ++)
     q = q * SQ_R->q[idx_q[i]];
-  mpz_set_uint64 (qqz, q);
-  mpz_mul (qqz, qqz, qqz);
   return q;
 }
 

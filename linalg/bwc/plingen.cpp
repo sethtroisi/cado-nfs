@@ -2167,8 +2167,11 @@ void bm_io_begin_read(bm_io_ptr aa)/*{{{*/
 
     matpoly_init(ab, aa->A, m, n, 1);
 
-    if (random_input_length)
+    if (random_input_length) {
+        /* see below. I think it would be a bug to not do that */
+        bm_io_read1(aa, 0);
         return;
+    }
 
     aa->f = fopen(aa->input_file, aa->ascii ? "r" : "rb");
 
@@ -2690,7 +2693,7 @@ int main(int argc, char *argv[])
 
     param_list pl;
 
-    bw_common_init_new(bw, &argc, &argv);
+    bw_common_init(bw, &argc, &argv);
     param_list_init(pl);
 
     bw_common_decl_usage(pl);
@@ -3028,7 +3031,7 @@ int main(int argc, char *argv[])
     gmp_randclear(rstate);
 
     param_list_clear(pl);
-    bw_common_clear_new(bw);
+    bw_common_clear(bw);
 
     return rank0_exit_code;
 }

@@ -53,8 +53,10 @@ las_dlog_base::~las_dlog_base()
 }
 
 bool las_dlog_base::is_known(int side, uint64_t p, uint64_t r) const {
-    if (p >> lpb[side])
+    if (p >> lpb[side]) {
+        ASSERT(lpb[side] < 64); /* otherwise the shift above returns garbage */
         return false;
+    }
     if (renumberfilename) {
         /* For now we assume that we know the log of all bad ideals */
         /* If we want to be able to do a complete lookup for bad ideals
@@ -80,6 +82,14 @@ void las_dlog_base::read()
     verbose_output_print(0, 1, "# Descent: will get list of known logs from %s, using also %s for mapping\n", logfilename, renumberfilename);
 
     renumber_read_table(renumber_table, renumberfilename);
+
+    for(int side = 0 ; side < 2 ; side++) {
+        if (lpb[side] != renumber_table->lpb[side]) {
+            fprintf(stderr, "lpb%d=%lu different from lpb%d=%lu stored in renumber table, probably a bug\n", side, lpb[side], side, renumber_table->lpb[side]);
+            exit(EXIT_FAILURE);
+        }
+    }
+
     uint64_t nprimes = renumber_table->size;
     known_logs.reserve(nprimes);
     /* format of the log table: there are FIVE different line types.
@@ -95,6 +105,7 @@ void las_dlog_base::read()
      */
     FILE * f = fopen(logfilename, "r");
     ASSERT_ALWAYS(f != NULL);
+    size_t nlogs=0;
     for(int lnum = 0 ; ; lnum++) {
         char line[1024];
         char * x = fgets(line, sizeof(line), f);
@@ -108,9 +119,11 @@ void las_dlog_base::read()
             fprintf(stderr, "Parse error at line %d in %s: %s\n", lnum, logfilename, line);
             break;
         }
+	nlogs+=!known_logs[z];
         known_logs[z] = true;
     }
     fclose(f);
+    verbose_output_print(0, 1, "# Got %zu known logs from %s\n", nlogs, logfilename);
 }
 
 

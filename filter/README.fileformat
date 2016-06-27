@@ -36,7 +36,7 @@ It contains the table that links an ideal (p on rational side, (p,r) on
 algebraic side) to its index that going to be used during filtering.
 
 The first line has the following format:
-nbits ratside nbad add nbpolys lpb0 lpb1
+nbits ratside nbad n_add nonmonic nbpolys lpb0 lpb1
 where
   - nbits is 32 or 64 (depending on the maximum value of p possible, ie the large
     prime bounds).
@@ -45,9 +45,12 @@ where
       ratside = 1 means rational side corresponds to side 1.
       ratside = -1 means there is no rational side.
   - nbad is the number of bad ideals (should be 0 for factorization)
-  - add is 0 or 1 (should be 0 for factorization). If add is 1, a column is
-    added to the matrix. It is useful to take into account the logarithm of
+  - n_add is between 0 and nbpolys (this field is useful only for DLP; it
+    should be 0 for factorization). This counts the number of columns
+    which have been added to the matrix to take into account the logarithm of
     the denominator ideal (often denoted J) for DLP problems.
+  - nonmonic is a bitmask, written in hex, of which polynomials are
+    not monic.
   - nbpolys is the number of polynomials (usually 2)
   - lpb0 is the large prime bound on side 0
   - lpb1 is the large prime bound on side 1
@@ -223,6 +226,15 @@ Equivalent shell line:
 
 Note: The mf_scan binary can also handle DL matrices, but the
 --withcoeffs option must be added.
+
+File XXX.reconstructlog.dlog
+============================
+
+This file is meant to be the most useful form of the log database, for
+humans and computer scripts alike. It gives the correspondence between
+rational primes, or algebraic prime ideals, and their virtual logarithms.
+
+
 
 Files XXX.sparse.* versus XXX.dense.*
 =====================================

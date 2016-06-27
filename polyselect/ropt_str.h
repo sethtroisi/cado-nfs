@@ -171,13 +171,17 @@ typedef _ropt_bestpoly_t ropt_bestpoly_t[1];
 /**
  * Struct for info (e.g. miscellaneous and for extension purpose).
  */
+#define ROPT_MODE_INIT 0
+#define ROPT_MODE_TUNE 1
 typedef struct {
   double ave_MurphyE;
   double best_MurphyE;
-  /* tuning mode = 1 */
-  int mode; 
+  int mode; /* ROPT_MODE_INIT or ROPT_MODE_TUNE */
   /* record quadratic rotation information */
   int w; 
+  double ropt_time_stage1;
+  double ropt_time_tuning;
+  double ropt_time_stage2;
 } _ropt_info_t;
 typedef _ropt_info_t ropt_info_t[1];
 
@@ -204,9 +208,7 @@ void ropt_bound_setup ( ropt_poly_t poly,
                         ropt_bound_t bound,
                         ropt_param_t param );
 
-double ropt_bound_expected_E ( mpz_t *f,
-                               unsigned int d,
-                               mpz_t *g );
+double ropt_bound_expected_E (mpz_poly F, mpz_poly G);
 
 void ropt_bound_reset ( ropt_poly_t poly,
                         ropt_bound_t bound,

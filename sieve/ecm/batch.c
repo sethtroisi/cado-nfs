@@ -137,7 +137,7 @@ prime_list (ulong_list L, prime_info pi, unsigned long pmin,
 
 static unsigned long
 prime_list_poly (ulong_list L, prime_info pi, unsigned long pmin,
-                 unsigned long pmax, mpz_poly_t f)
+                 unsigned long pmax, mpz_poly f)
 {
   unsigned long p;
 
@@ -171,7 +171,7 @@ prime_tree (mpz_product_tree L, prime_info pi, unsigned long pmin,
    root modulo p, or the leading coefficient of f vanishes modulo p */
 static unsigned long
 prime_tree_poly (mpz_product_tree L, prime_info pi, unsigned long pmin,
-                 unsigned long pmax, mpz_poly_t f)
+                 unsigned long pmax, mpz_poly f)
 {
   unsigned long p, *q;
   int i, j, nthreads = 1;
@@ -282,7 +282,7 @@ cofac_list_clear (cofac_list l)
    modulo p */
 static void
 prime_product_poly (mpz_t P, prime_info pi, unsigned long p_max,
-                    unsigned long p_last, mpz_poly_t f)
+                    unsigned long p_last, mpz_poly f)
 {
   mpz_product_tree L;
 
@@ -586,7 +586,7 @@ find_smooth (cofac_list l, mpz_t batchP[2], FILE *out,
 static char*
 print_smooth_aux (mpz_t *factors, mpz_t n, facul_method_t *methods,
                   struct modset_t *fm, struct modset_t *cfm,
-                  int lpb, double B, char *str0, char *str)
+                  int lpb, double B, char *str0, char *str, size_t str0size)
 {
   unsigned long i;
   int j, res_fac;
@@ -605,8 +605,8 @@ print_smooth_aux (mpz_t *factors, mpz_t n, facul_method_t *methods,
       for (j = 0; j < res_fac; j++)
         {
           if (str > str0)
-            str += sprintf (str, ",");
-          str += gmp_sprintf (str, "%Zx", factors[j]);
+            str += snprintf (str, str0size - (str - str0), ",");
+          str += gmp_snprintf (str, str0size - (str - str0), "%Zx", factors[j]);
           mpz_divexact (n, n, factors[j]);
         }
 
@@ -620,7 +620,7 @@ print_smooth_aux (mpz_t *factors, mpz_t n, facul_method_t *methods,
           ASSERT(mpz_cmp_d (t, BB) >= 0);
           mpz_divexact (n, n, t);
           str = print_smooth_aux (factors, t, methods + i + 1, fm, &cfm2,
-                                  lpb, B, str0, str);
+                                  lpb, B, str0, str, str0size);
           modset_clear (fm);
           fm->arith = CHOOSE_NONE;
           mpz_clear (t);
@@ -636,7 +636,7 @@ print_smooth_aux (mpz_t *factors, mpz_t n, facul_method_t *methods,
           ASSERT(mpz_cmp_d (t, BB) >= 0);
           mpz_divexact (n, n, t);
           str = print_smooth_aux (factors, t, methods + i + 1, &fm2, cfm,
-                                  lpb, B, str0, str);
+                                  lpb, B, str0, str, str0size);
           modset_clear (cfm);
           cfm->arith = CHOOSE_NONE;
           mpz_clear (t);
@@ -647,8 +647,8 @@ print_smooth_aux (mpz_t *factors, mpz_t n, facul_method_t *methods,
     {
       ASSERT (mpz_cmp_d (n, BB) < 0);
       if (str > str0)
-        str += sprintf (str, ",");
-      str += gmp_sprintf (str, "%Zx", n);
+        str += snprintf (str, str0size - (str - str0), ",");
+      str += gmp_snprintf (str, str0size - (str - str0), "%Zx", n);
     }
 
   return str;
@@ -656,7 +656,7 @@ print_smooth_aux (mpz_t *factors, mpz_t n, facul_method_t *methods,
 
 /* return the end of the written string */
 static char*
-trial_divide (mpz_t n, unsigned long *sp, unsigned long spsize, char *str)
+trial_divide (mpz_t n, unsigned long *sp, unsigned long spsize, char *str, size_t strsize)
 {
   unsigned long i;
   char *str0 = str;
@@ -666,8 +666,8 @@ trial_divide (mpz_t n, unsigned long *sp, unsigned long spsize, char *str)
       while (mpz_divisible_ui_p (n, sp[i]))
         {
           if (str > str0)
-            str += sprintf (str, ",");
-          str += sprintf (str, "%lx", sp[i]);
+            str += snprintf (str, strsize - (str - str0), ",");
+          str += snprintf (str, strsize - (str - str0), "%lx", sp[i]);
           mpz_divexact_ui (n, n, sp[i]);
         }
     }
@@ -687,7 +687,7 @@ print_smooth (mpz_t *factors, mpz_t n, facul_method_t *methods,
               struct modset_t *fm, struct modset_t *cfm,
               unsigned int lpb, double B, unsigned long *sp,
               unsigned long spsize, mpz_t cofac, mpz_ptr sq,
-              char *str)
+              char *str, size_t strsize)
 {
   char *str0 = str;
 
@@ -701,19 +701,19 @@ print_smooth (mpz_t *factors, mpz_t n, facul_method_t *methods,
     }
 
   /* remove small primes */
-  str = trial_divide (n, sp, spsize, str);
+  str = trial_divide (n, sp, spsize, str, strsize - (str - str0));
 
   /* factor the cofactor */
-  str = print_smooth_aux (factors, cofac, methods, fm, cfm, lpb, B, str0, str);
+  str = print_smooth_aux (factors, cofac, methods, fm, cfm, lpb, B, str0, str, strsize - (str - str0));
 
   /* factor rest of factor base primes */
-  str = print_smooth_aux (factors, n, methods, fm, cfm, lpb, B, str0, str);
+  str = print_smooth_aux (factors, n, methods, fm, cfm, lpb, B, str0, str, strsize - (str - str0));
 
   if (sq != NULL)
     {
       if (str > str0)
-        str += sprintf (str, ",");
-      str += gmp_sprintf (str, "%Zx", sq);
+        str += snprintf (str, strsize - (str - str0), ",");
+      str += gmp_snprintf (str, strsize - (str - str0), "%Zx", sq);
     }
 
   return str;
@@ -752,18 +752,18 @@ factor_one (cofac_list L, cado_poly pol, unsigned long *lim, int *lpb,
   mpz_poly_homogeneous_eval_siui (norm, pol->pols[0],
                                   L->a[perm[i]], L->b[perm[i]]);
 
-  s += sprintf (s, "%" PRId64 ",%" PRIu64 ":", L->a[perm[i]], L->b[perm[i]]);
+  s += snprintf (s, sizeof(s0)-(s-s0), "%" PRId64 ",%" PRIu64 ":", L->a[perm[i]], L->b[perm[i]]);
 
   s = print_smooth (factors, norm, methods, &fm, &cfm, lpb[0], (double) lim[0],
                     sp[0], spsize[0], L->R0[perm[i]],
-                    (sqside == 0) ? L->sq[perm[i]] : NULL, s);
-  s += sprintf (s, ":");
+                    (sqside == 0) ? L->sq[perm[i]] : NULL, s, sizeof(s0)-(s-s0));
+  s += snprintf (s, sizeof(s0)-(s-s0), ":");
 
   mpz_poly_homogeneous_eval_siui (norm, pol->pols[1],
                                   L->a[perm[i]], L->b[perm[i]]);
   s = print_smooth (factors, norm, methods, &fm, &cfm, lpb[1], (double) lim[1],
                     sp[1], spsize[1], L->A0[perm[i]],
-                    (sqside == 1) ? L->sq[perm[i]] : NULL, s);
+                    (sqside == 1) ? L->sq[perm[i]] : NULL, s, sizeof(s0)-(s-s0));
 
   /* avoid two threads writing a relation simultaneously */
 #ifdef  HAVE_OPENMP
@@ -832,7 +832,7 @@ factor (cofac_list L, unsigned long n, cado_poly pol, int lpb[], int sqside,
 }
 
 static void
-create_batch_product (mpz_t P, unsigned long B, unsigned long L, mpz_poly_t pol)
+create_batch_product (mpz_t P, unsigned long B, unsigned long L, mpz_poly pol)
 {
   prime_info pi;
   unsigned long p;
@@ -855,7 +855,7 @@ create_batch_product (mpz_t P, unsigned long B, unsigned long L, mpz_poly_t pol)
 */
 void
 create_batch_file (const char *f, mpz_t P, unsigned long B, unsigned long L,
-                   mpz_poly_t pol, FILE *out, int nthreads MAYBE_UNUSED)
+                   mpz_poly pol, FILE *out, int nthreads MAYBE_UNUSED)
 {
   FILE *fp;
   double s = seconds (), wct = wct_seconds ();

@@ -141,12 +141,21 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
         }
     }
 
+    /* let's be generous with interleaving protection. I don't want to be
+     * bothered, really */
+    pi_interleaving_flip(pi);
+    pi_interleaving_flip(pi);
+    matmul_top_comm_bench(mmt, bw->dir);
+    pi_interleaving_flip(pi);
+    pi_interleaving_flip(pi);
+
     char * v_name = NULL;
     int rc = asprintf(&v_name, V_FILE_BASE_PATTERN, ys[0], ys[1]);
     ASSERT_ALWAYS(rc >= 0);
     if (!fake) {
-        if (tcan_print) { printf("Loading %s...", v_name); fflush(stdout); }
+        if (tcan_print) { printf("Loading %s.%u ...", v_name, bw->start); fflush(stdout); }
         mmt_vec_load(ymy[0], v_name, bw->start, unpadded);
+        mmt_vec_reduce_mod_p(ymy[0]);
         if (tcan_print) { printf("done\n"); }
     } else {
         gmp_randstate_t rstate;
@@ -329,7 +338,7 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
                         electric_free(test,rstride * abnbits(abase));
                     }
 #endif
-                    ArxA->transpose(Ar->obj, A->obj,
+                    ArxA->transpose(Ar, A,
                             Ar->vec_subvec(Ar, fcoeffs[k], i * A->groupsize(A)),
                             ahead);
                 }
@@ -349,7 +358,7 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
 
         /* broadcast f */
         for(unsigned int k = 0 ; k < multi ; k++) {
-            pi_bcast(fcoeffs[k], A->groupsize(A) * bw->interval, mmt->pitype, 0, 0, pi->m);
+            pi_bcast(fcoeffs[k], A->groupsize(A) * bw->interval, Ar_pi, 0, 0, pi->m);
         }
 
         for(unsigned int k = 0 ; k < multi ; k++) {
@@ -363,7 +372,7 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
         
         if (!bw->skip_online_checks) {
             A->vec_set_zero(A, ahead, nchecks);
-            AxAc->dotprod(A->obj, Ac->obj, ahead,
+            AxAc->dotprod(A, Ac, ahead,
                     mmt_my_own_subvec(check_vector),
                     mmt_my_own_subvec(ymy[0]),
                     mmt_my_own_size_in_items(ymy[0]));
@@ -389,7 +398,7 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
 
         for(int i = 0 ; i < bw->interval ; i++) {
             for(unsigned int k = 0 ; k < multi ; k++) {
-                AxAr->addmul_tiny(A->obj, Ar->obj,
+                AxAr->addmul_tiny(A, Ar,
                         sum[k],
                         mmt_my_own_subvec(ymy[0]),
                         Ar->vec_subvec(Ar, fcoeffs[k], i * A->groupsize(A)),
@@ -496,7 +505,7 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
 
             /* TODO: this can now be done with mmt_vec_save ! */
             char * s_name;
-            rc = asprintf(&s_name, S_FILE_BASE_PATTERN ".%u", k, k + nsolvecs_pervec, ys[0], ys[1], s+bw->interval);
+            rc = asprintf(&s_name, S_FILE_BASE_PATTERN ".%u-%u", k, k + nsolvecs_pervec, ys[0], ys[1], s, s+bw->interval);
             pi_file_handle f;
             pi_file_open(f, pi, bw->dir, s_name, "wb");
             ssize_t s = pi_file_write(f, sum[k], Ar->vec_elt_stride(Ar, eblock), Ar->vec_elt_stride(Ar, unpadded));
@@ -523,6 +532,9 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
         // reached s + bw->interval. Count our time on cpu, and compute the sum.
         timing_disp_collective_oneline(pi, timing, s + bw->interval, tcan_print, "mksol");
     }
+
+    timing->end_mark = bw->start + bw->interval * iceildiv(bw->end - bw->start, bw->interval);
+
     timing_final_tally(pi, timing, tcan_print, "mksol");
 
     if (tcan_print) {
@@ -567,7 +579,7 @@ int main(int argc, char * argv[])
 {
     param_list pl;
 
-    bw_common_init_new(bw, &argc, &argv);
+    bw_common_init(bw, &argc, &argv);
     param_list_init(pl);
     parallelizing_info_init();
 
@@ -594,7 +606,7 @@ int main(int argc, char * argv[])
 
     parallelizing_info_finish();
     param_list_clear(pl);
-    bw_common_clear_new(bw);
+    bw_common_clear(bw);
 
     return 0;
 }

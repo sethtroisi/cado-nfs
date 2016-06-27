@@ -8,7 +8,6 @@
 ###########################################################################
 
 name = c60
-#tasks.threads = 2
 
 ###########################################################################
 # Polynomial selection with Kleinjung's algorithm
@@ -28,16 +27,14 @@ tasks.polyselect.ropteffort = 1
 # Sieve
 ###########################################################################
 
-rlim = 160461
-alim = 96227
+rlim = 161143
+alim = 96426
 lpbr = 18
 lpba = 19
-tasks.sieve.mfbr = 45
-tasks.sieve.mfba = 52
-tasks.sieve.rlambda = 1.01
-tasks.sieve.alambda = 2.02
+tasks.sieve.mfbr = 18
+tasks.sieve.mfba = 38
 tasks.sieve.ncurves0 = 16
-tasks.sieve.ncurves1 = 14
+tasks.sieve.ncurves1 = 17
 tasks.I = 10
 tasks.sieve.qrange = 2000
 
