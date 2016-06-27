@@ -911,8 +911,9 @@ class Cado_NFS_toplevel(object):
         
         screenlvl = getattr(cadologger, self.args.screenlog.upper())
         self.logger = logging.getLogger()
-        self.logger.addHandler(cadologger.ScreenHandler(lvl = screenlvl,
-            colour=not self.args.no_colors))
+        if not self.logger.handlers:
+            self.logger.addHandler(cadologger.ScreenHandler(lvl = screenlvl,
+                                                            colour=not self.args.no_colors))
         self.purge_files=[]
         self.pathdict=dict()
         # I have some fairly weird behaviour here in the doctests.

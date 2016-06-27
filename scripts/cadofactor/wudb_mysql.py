@@ -577,7 +577,6 @@ class DictDbAccess(collections.MutableMapping):
         primarily for making the doctest work, so we can reuse the same 
         memory-backed DB connection, but it may be useful in other contexts.
         '''
-        
         if isinstance(db, str):
             #self._conn = sqlite3.connect(db)
             self._conn = mysql.connector.connect(user=username, password=password, host="localhost", database=db)
@@ -652,7 +651,13 @@ class DictDbAccess(collections.MutableMapping):
 
 
     def get_cursor(self):
-        c = self._conn.cursor(MyCursor)
+        for i in range(10):
+            try:
+                c = self._conn.cursor(MyCursor)
+                break
+            except mysql.connector.errors.OperationalError:
+                self._conn = mysql.connector.connect(user=username, password=password, host="localhost", database=db)
+            
         c.__class__ = MyCursor
         c._conn = self._conn
         c._conn.commit()

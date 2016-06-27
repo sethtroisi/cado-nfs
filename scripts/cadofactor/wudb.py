@@ -41,6 +41,8 @@ for key, value in pathdict.items():
 parameters = toplevel_params.get_cooked_parameters()
 use_mysql = parameters.get_simple("mysql.use",False)
 if use_mysql:
+    import wudb_mysql
+    wudb_mysql.dbname = parameters.get_simple("name")
     print("Loading Mysql")
     import wudb_mysql
     wudb_mysql.username = parameters.get_simple("mysql.username",'cado')
