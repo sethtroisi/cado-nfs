@@ -154,6 +154,33 @@ estimate_weibull_moments (double *beta, double *eta, data_t s)
   *eta = m * (1.0 + y * (0.57721566490153 - 0.655878071520 * y));
 }
 
+/* Estimation via extreme values: we cut the total n values into chunks of
+   k consecutive values, with k near sqrt(n), and for each chunk we keep only
+   the minimum. If the series of minimum values satisfies a Weilbull distribution
+   with parameters beta and eta, then the original one has parameters
+   beta (identical) and eta*n^(1/beta). */
+static void
+estimate_weibull_moments2 (double *beta, double *eta, data_t s)
+{
+  unsigned long n = s->size;
+  unsigned long k = (unsigned long) ceil (sqrt ((double) n)), i, j;
+  data_t smin;
+  double min, eta_min;
+
+  data_init (smin);
+  data_clear (smin);
+
+  for (i = 0; i < n; i += k)
+    {
+      for (j = i, min = DBL_MAX; j < i + k && j < n; j++)
+        if (s->x[j] < min)
+          min = s->x[j];
+      data_add (smin, min);
+    }
+  estimate_weibull_moments (beta, &eta_min, smin);
+  *eta = eta_min * pow ((double) n, 1.0 / *beta);
+}
+
 /* print poly info */
 void
 print_poly_info ( char *buf,
@@ -199,7 +226,7 @@ print_poly_info ( char *buf,
     {
       double beta, eta, prob;
 
-      estimate_weibull_moments (&beta, &eta, data_exp_E);
+      estimate_weibull_moments2 (&beta, &eta, data_exp_E);
       prob = 1.0 - exp (- pow (target_E / eta, beta));
       sprintf (buf + strlen(buf), "# target_E=%.2f: collisions=%.2e, time=%.2e"
                " (beta=%.2f,eta=%.2f)\n",
