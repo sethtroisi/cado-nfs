@@ -66,12 +66,7 @@ reservation_array<T>::allocate_buckets(const uint32_t n_bucket, const double fil
      is not too large compared to the number of slices (i.e. the size of the
      factor bases).
      */
-  double ratio = 1.2*fill_ratio;
-  if (n > 1) {
-      ratio *= 1.2;
-  } else if (n > 8) {
-      ratio *= 1.3;
-  }
+  double ratio = fill_ratio;
   for (size_t i = 0; i < n; i++)
     BAs[i].allocate_memory(n_bucket, ratio / n);
 }
@@ -154,20 +149,21 @@ reservation_group::reservation_group(const size_t nr_bucket_arrays)
 }
 
 void
-reservation_group::allocate_buckets(const uint32_t *n_bucket, const double *fill_ratio)
+reservation_group::allocate_buckets(const uint32_t *n_bucket,
+        const double mult, const double *fill_ratio)
 {
   /* Short hint updates are generated only by fill_in_buckets(), so each BA
      gets filled only by its respective FB part */
-  RA1_short.allocate_buckets(n_bucket[1], fill_ratio[1]);
-  RA2_short.allocate_buckets(n_bucket[2], fill_ratio[2]);
-  RA3_short.allocate_buckets(n_bucket[3], fill_ratio[3]);
+  RA1_short.allocate_buckets(n_bucket[1], mult*fill_ratio[1]);
+  RA2_short.allocate_buckets(n_bucket[2], mult*fill_ratio[2]);
+  RA3_short.allocate_buckets(n_bucket[3], mult*fill_ratio[3]);
 
   /* Long hint bucket arrays get filled by downsorting. The level-2 longhint
      array gets the shorthint updates from level 3 sieving, and the level-1
      longhint array gets the shorthint updates from level 2 sieving as well
      as the previously downsorted longhint updates from level 3 sieving. */
-  RA1_long.allocate_buckets(n_bucket[1], fill_ratio[2] + fill_ratio[3]);
-  RA2_long.allocate_buckets(n_bucket[2], fill_ratio[3]);
+  RA1_long.allocate_buckets(n_bucket[1], mult*(fill_ratio[2] + fill_ratio[3]));
+  RA2_long.allocate_buckets(n_bucket[2], mult*fill_ratio[3]);
 }
 
 
@@ -282,8 +278,22 @@ thread_workspaces::pickup_si(sieve_info_ptr _si)
     /* Always allocate the max number of buckets (i.e., as if we were using the
        max value for J), even if we use a smaller J due to a poor q-lattice
        basis */
+    double multiplier = 1.0;
+    /* Take some margin depending on parameters */
+    /* Multithreading perturbates the fill-in ratio */
+    multiplier *= 1.1 + double(nr_workspaces)/20.0;
+    /* Using bkthresh1 as well... */
+    if (si->conf->bucket_thresh1 != 0) {
+        double rat = double(si->conf->bucket_thresh1-si->conf->bucket_thresh) /
+            double(MAX(si->conf->sides[0]->lim, si->conf->sides[1]->lim) - 
+                    si->conf->bucket_thresh);
+        multiplier *= 1.0 + rat*0.2;
+    }
+    verbose_output_print(0, 2, "# Reserving buckets with a multiplier of %f\n",
+            multiplier);
     for (unsigned int i_side = 0; i_side < nr_sides; i_side++)
-      groups[i_side]->allocate_buckets(si->nb_buckets_max, si->sides[i_side]->max_bucket_fill_ratio);
+      groups[i_side]->allocate_buckets(si->nb_buckets_max,
+              multiplier, si->sides[i_side]->max_bucket_fill_ratio);
 }
 
 void
