@@ -287,7 +287,7 @@ thread_workspaces::pickup_si(sieve_info_ptr _si)
         double rat = double(si->conf->bucket_thresh1-si->conf->bucket_thresh) /
             double(MAX(si->conf->sides[0]->lim, si->conf->sides[1]->lim) - 
                     si->conf->bucket_thresh);
-        multiplier *= 1.0 + rat*0.2;
+        multiplier *= 1.0 + rat*1.0;
     }
     verbose_output_print(0, 2, "# Reserving buckets with a multiplier of %f\n",
             multiplier);
