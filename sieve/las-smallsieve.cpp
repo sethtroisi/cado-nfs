@@ -99,13 +99,13 @@ static void small_sieve_print_contents(const char * prefix, small_sieve_data_t *
     }
     ASSERT_ALWAYS(next_marker->index == ssd->nb_ssp);
 
-    verbose_output_print(0, 1, "# %s: %d nice primes", prefix, nice);
+    verbose_output_print(0, 2, "# %s: %d nice primes", prefix, nice);
     /* Primes may be both even and projective... */
-    if (npow2) verbose_output_print(0, 1, ", %d powers of 2", npow2);
-    if (nproj) verbose_output_print(0, 1, ", and %d projective primes", nproj);
-    verbose_output_print(0, 1, ".");
-    if (ndiscard) verbose_output_print(0, 1, " %d discarded.", ndiscard);
-    verbose_output_print(0, 1, "\n");
+    if (npow2) verbose_output_print(0, 2, ", %d powers of 2", npow2);
+    if (nproj) verbose_output_print(0, 2, ", and %d projective primes", nproj);
+    verbose_output_print(0, 2, ".");
+    if (ndiscard) verbose_output_print(0, 2, " %d discarded.", ndiscard);
+    verbose_output_print(0, 2, "\n");
     /* With -v -v -v, dump all the small sieve data */
     verbose_output_vfprint (0, 4, small_sieve_dump, "# Dump of small sieve data:\n", ssd);
 }
