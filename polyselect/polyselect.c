@@ -169,9 +169,10 @@ estimate_weibull_moments2 (double *beta, double *eta, data_t s)
 
   data_init (smin);
 
-  for (i = 0; i < n; i += k)
+  /* we consider full samples only */
+  for (i = 0; i + k <= n; i += k)
     {
-      for (j = i, min = DBL_MAX; j < i + k && j < n; j++)
+      for (j = i, min = DBL_MAX; j < i + k; j++)
         if (s->x[j] < min)
           min = s->x[j];
       data_add (smin, min);
