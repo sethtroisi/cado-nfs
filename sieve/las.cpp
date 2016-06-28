@@ -524,6 +524,8 @@ static void sieve_info_update (sieve_info_ptr si, int nb_threads,
             BRS[si->toplevel-1]; 
         // we forbid skipping two levels.
         ASSERT_ALWAYS(si->nb_buckets[si->toplevel-1] != 1);
+  } else {
+      si->nb_buckets[si->toplevel-1] = BRS[si->toplevel] / BRS[si->toplevel-1];
   }
 
   /* Update the slices of the factor base according to new log base */
