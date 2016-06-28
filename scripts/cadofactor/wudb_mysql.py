@@ -469,7 +469,9 @@ class WuTable(DbTable):
     )
     primarykey = fields[0][0]
     references = None
-    index = {"wuidindex": (fields[1][0],), "statusindex" : (fields[3][0],), "priorityindex" : (fields[14][0],),}
+    index = {"wuidindex": (fields[1][0],), "submitterindex" : (fields[2][0],), "priorityindex" : (fields[14][0],), \
+             "priority" : (fields[14][0],), "status" : (fields[3][0],)
+    }
 
 class FilesTable(DbTable):
     tablename = "files"
