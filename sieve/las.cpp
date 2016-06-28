@@ -670,6 +670,7 @@ static void las_info_init_hint_table(las_info_ptr las, param_list pl)/*{{{*/
         sc->bucket_thresh1 = las->config_base->bucket_thresh1;
         sc->td_thresh = las->config_base->td_thresh;
         sc->skipped = las->config_base->skipped;
+        sc->bk_multiplier = las->config_base->bk_multiplier;
         sc->unsieve_thresh = las->config_base->unsieve_thresh;
         for(int side = 0 ; side < 2 ; side++) {
             sc->sides[side]->powlim = las->config_base->sides[side]->powlim;
@@ -898,9 +899,11 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
 
         sc->bucket_thresh = 1 << sc->logI;	/* default value */
         sc->bucket_thresh1 = 0;	/* default value */
+        sc->bk_multiplier = 0.0;
         /* overrides default only if parameter is given */
         param_list_parse_ulong(pl, "bkthresh", &(sc->bucket_thresh));
         param_list_parse_ulong(pl, "bkthresh1", &(sc->bucket_thresh1));
+        param_list_parse_double(pl, "bkmult", &(sc->bk_multiplier));
 
         const char *powlim_params[2] = {"powlim0", "powlim1"};
         for (int side = 0; side < 2; side++) {
@@ -2747,6 +2750,7 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "skipped", "primes below this bound are not sieved at all");
   param_list_decl_usage(pl, "bkthresh", "bucket-sieve primes p >= bkthresh");
   param_list_decl_usage(pl, "bkthresh1", "2-level bucket-sieve primes p >= bkthresh1");
+  param_list_decl_usage(pl, "bkmult", "multiplier to use for taking margin in the bucket allocation\n");
   param_list_decl_usage(pl, "unsievethresh", "Unsieve all p > unsievethresh where p|gcd(a,b)");
 
   param_list_decl_usage(pl, "allow-largesq", "(switch) allows large special-q, e.g. for a DL descent");

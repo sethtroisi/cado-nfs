@@ -57,7 +57,7 @@ double potential_collisions = 0.0, aver_raw_lognorm = 0.0,
   var_raw_lognorm = 0.0;
 #define LOGNORM_MAX 999.99
 double min_raw_lognorm = LOGNORM_MAX, max_raw_lognorm = 0.0;
-data_t data_opt_lognorm, data_exp_E;
+data_t data_opt_lognorm, data_exp_E, data_beta, data_eta;
 unsigned long collisions = 0;
 unsigned long collisions_good = 0;
 double *best_opt_logmu, *best_exp_E;
@@ -228,6 +228,15 @@ print_poly_info ( char *buf,
       double beta, eta, prob;
 
       estimate_weibull_moments2 (&beta, &eta, data_exp_E);
+      if (!isnan (beta) && !isinf (beta) && !isnan (eta) && !isinf (eta))
+        {
+          /* since the estimation via extreme values varies much with the size
+             of the sample, we average over all values computed so far */
+          data_add (data_beta, beta);
+          data_add (data_eta, eta);
+          beta = data_mean (data_beta);
+          eta = data_mean (data_eta);
+        }
       prob = 1.0 - exp (- pow (target_E / eta, beta));
       sprintf (buf + strlen(buf), "# target_E=%.2f: collisions=%.2e, time=%.2e"
                " (beta=%.2f,eta=%.2f)\n",
@@ -1897,6 +1906,8 @@ main (int argc, char *argv[])
   cado_poly_init (curr_poly);
   data_init (data_opt_lognorm);
   data_init (data_exp_E);
+  data_init (data_beta);
+  data_init (data_eta);
 
   /* read params */
   param_list pl;
@@ -2140,6 +2151,8 @@ main (int argc, char *argv[])
   free (tid);
   data_clear (data_opt_lognorm);
   data_clear (data_exp_E);
+  data_clear (data_beta);
+  data_clear (data_eta);
 
   return 0;
 }

@@ -278,16 +278,19 @@ thread_workspaces::pickup_si(sieve_info_ptr _si)
     /* Always allocate the max number of buckets (i.e., as if we were using the
        max value for J), even if we use a smaller J due to a poor q-lattice
        basis */
-    double multiplier = 1.0;
     /* Take some margin depending on parameters */
     /* Multithreading perturbates the fill-in ratio */
-    multiplier *= 1.1 + double(nr_workspaces)/20.0;
-    /* Using bkthresh1 as well... */
-    if (si->conf->bucket_thresh1 != 0) {
-        double rat = double(si->conf->bucket_thresh1-si->conf->bucket_thresh) /
-            double(MAX(si->conf->sides[0]->lim, si->conf->sides[1]->lim) - 
-                    si->conf->bucket_thresh);
-        multiplier *= 1.0 + rat*1.0;
+    double multiplier = si->conf->bk_multiplier;
+    if (multiplier == 0.0) {
+        multiplier = 1.1 + double(nr_workspaces)/20.0;
+        /* Using bkthresh1 as well... */
+        if (si->conf->bucket_thresh1 != 0) {
+            double rat =
+                double(si->conf->bucket_thresh1- si->conf->bucket_thresh) /
+                double(MAX(si->conf->sides[0]->lim, si->conf->sides[1]->lim) - 
+                        si->conf->bucket_thresh);
+            multiplier *= 1.0 + rat*1.0;
+        }
     }
     verbose_output_print(0, 2, "# Reserving buckets with a multiplier of %f\n",
             multiplier);
