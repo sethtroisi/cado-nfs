@@ -161,11 +161,12 @@ void * tst_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
         mmt_vec_save(v, "Z", 0, mmt->n0[0]);
         mmt_apply_identity(vi, v);
         mmt_vec_allreduce(vi);
+        mmt_vec_clear_padding(vi, mmt->n0[1], mmt->n0[0]);
         mmt_vec_check_equal_0n(vi, mmt->n0[1]);
         mmt_vec_save(vi, "ZI", 0, mmt->n0[1]);
         mmt_apply_identity(vii, vi);
         mmt_vec_allreduce(vii);
-        mmt_vec_check_equal_0n(vii, mmt->n0[0]);
+        mmt_vec_check_equal_0n(vii, MIN(mmt->n0[0], mmt->n0[1]));
         mmt_vec_save(vi, "ZII", 0, mmt->n0[0]);
         mmt_vec_clear(mmt, v);
         mmt_vec_clear(mmt, vi);

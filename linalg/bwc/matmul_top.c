@@ -407,6 +407,24 @@ static void mmt_own_vec_clear_complement(matmul_top_data_ptr mmt, int d)
     }
 }
 #endif
+void mmt_vec_clear_padding(mmt_vec_ptr v, size_t unpadded, size_t padded)
+{
+    /* This can be applied no matter what the consistency argument says
+     * */
+    serialize(v->pi->m);
+    if (unpadded >= padded) return;
+
+    size_t s0 = unpadded >= v->i0 ? (unpadded - v->i0) : 0;
+    size_t s1 = padded >= v->i0 ? (padded - v->i0) : 0;
+    s0 = MIN(s0, v->i1 - v->i0);
+    s1 = MIN(s1, v->i1 - v->i0);
+
+    if (s1 - s0)
+        v->abase->vec_set_zero(v->abase,
+                v->abase->vec_subvec(v->abase, v->v, s0), s1-s0);
+
+    serialize(v->pi->m);
+}
 
 mmt_vec_ptr mmt_vec_sibling(mmt_vec_ptr v, unsigned int i)
 {

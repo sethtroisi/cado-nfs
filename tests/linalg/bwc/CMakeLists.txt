@@ -278,6 +278,7 @@ cado_define_test(
 cado_divert_test(test-spmv-${test_spmv_base} 11 APPEND_ARGUMENTS thr=1x1)
 if(${test-spmv-${test_spmv_base}_alltests})
 cado_divert_test(test-spmv-${test_spmv_base} 12 APPEND_ARGUMENTS thr=1x2)
+cado_divert_test(test-spmv-${test_spmv_base} 22 APPEND_ARGUMENTS thr=2x2)
 cado_divert_test(test-spmv-${test_spmv_base} 13 APPEND_ARGUMENTS thr=1x3)
 cado_divert_test(test-spmv-${test_spmv_base} 32 APPEND_ARGUMENTS thr=3x2)
 cado_divert_test(test-spmv-${test_spmv_base} 23 APPEND_ARGUMENTS thr=2x3)
