@@ -190,5 +190,6 @@ void data_clear (data_t);
 void data_add (data_t, double);
 double data_mean (data_t);
 double data_var (data_t);
+double data_median (data_t);
 
 #endif

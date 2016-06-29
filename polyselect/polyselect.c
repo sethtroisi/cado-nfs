@@ -163,19 +163,31 @@ static void
 estimate_weibull_moments2 (double *beta, double *eta, data_t s)
 {
   unsigned long n = s->size;
-  unsigned long i, j, k;
+  unsigned long i, j, k, p, u;
   data_t smin;
   double min, eta_min;
+
+  ASSERT_ALWAYS(n > 0);
 
   data_init (smin);
 
   k = 50; /* sample size */
-  /* we consider full samples only */
+  /* We consider full samples only. Since we call this function several times
+     with the same sequence, we perform a random permutation of the sequence
+     at each call to avoid side effects due to the particular order of
+     elements. In practice instead of considering s[j] we consider
+     s[(p*j) % n] where p is random with gcd(p,n)=1. */
+  do
+    p = lrand48 () % n;
+  while (gcd_uint64 (p, n) != 1);
   for (i = 0; i + k <= n; i += k)
     {
       for (j = i, min = DBL_MAX; j < i + k; j++)
-        if (s->x[j] < min)
-          min = s->x[j];
+        {
+          u = (p * j) % n;
+          if (s->x[u] < min)
+            min = s->x[u];
+        }
       data_add (smin, min);
     }
   estimate_weibull_moments (beta, &eta_min, smin);
@@ -229,6 +241,19 @@ print_poly_info ( char *buf,
       double beta, eta, prob;
 
       estimate_weibull_moments2 (&beta, &eta, data_exp_E);
+      /* since the estimation using extreme values has a high variability
+         in terms of the sample size, we permute the elements at each try,
+         and we take the median of the beta/eta values */
+      if (!isnan (beta) && !isinf (beta))
+        {
+          data_add (data_beta, beta);
+          beta = data_median (data_beta);
+        }
+      if (!isnan (eta) && !isinf (eta))
+        {
+          data_add (data_eta, eta);
+          eta = data_median (data_eta);
+        }
       prob = 1.0 - exp (- pow (target_E / eta, beta));
       sprintf (buf + strlen(buf), "# target_E=%.2f: collisions=%.2e, time=%.2e"
                " (beta=%.2f,eta=%.2f)\n",
