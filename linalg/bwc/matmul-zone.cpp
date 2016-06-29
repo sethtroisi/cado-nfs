@@ -12,6 +12,7 @@
 #include <sstream>
 #include <algorithm>
 #include <map>
+#include <type_traits>
 
 #include "bwc_config.h"
 #include "matmul.h"
@@ -128,10 +129,12 @@ struct cachefile {
 template<> struct cachefile::seq<uint16_t> : public cachefile::basic_seq<uint16_t> {
     typedef uint16_t T;
     cachefile& in(cachefile& c, T * t, size_t n) {
+        static_assert(sizeof(T) == sizeof(uint16_t), "please fix struct padding");
         MATMUL_COMMON_READ_MANY16(t, n, c.f);
         return c;
     }
     cachefile& out(cachefile& c, T const * t, size_t n) const {
+        static_assert(sizeof(T) == sizeof(uint16_t), "please fix struct padding");
         MATMUL_COMMON_WRITE_MANY16(t, n, c.f);
         return c;
     }
@@ -140,10 +143,12 @@ template<> struct cachefile::seq<uint16_t> : public cachefile::basic_seq<uint16_
 template<> struct cachefile::seq<uint32_t> : public cachefile::basic_seq<uint32_t> {
     typedef uint32_t T;
     cachefile& in(cachefile& c, T * t, size_t n) {
+        static_assert(sizeof(T) == sizeof(uint32_t), "please fix struct padding");
         MATMUL_COMMON_READ_MANY32(t, n, c.f);
         return c;
     }
     cachefile& out(cachefile& c, T const * t, size_t n) const {
+        static_assert(sizeof(T) == sizeof(uint32_t), "please fix struct padding");
         MATMUL_COMMON_WRITE_MANY32(t, n, c.f);
         return c;
     }
@@ -152,34 +157,42 @@ template<> struct cachefile::seq<uint32_t> : public cachefile::basic_seq<uint32_
 template<> struct cachefile::seq<pair<int, uint32_t>> : public cachefile::basic_seq<pair<int, uint32_t>> {
     typedef pair<int, uint32_t> T;
     cachefile& in(cachefile& c, T * t, size_t n) {
+        static_assert(sizeof(T) == 2 * sizeof(uint32_t), "please fix struct padding");
         MATMUL_COMMON_READ_MANY32(t, 2*n, c.f);
         return c;
     }
     cachefile& out(cachefile& c, T const * t, size_t n) const {
+        static_assert(sizeof(T) == 2 * sizeof(uint32_t), "please fix struct padding");
         MATMUL_COMMON_WRITE_MANY32(t, 2*n, c.f);
         return c;
     }
 };
 
 template<> struct cachefile::seq<pair<uint16_t, int32_t>> : public cachefile::basic_seq<pair<uint16_t, int32_t>> {
+#if 0
     typedef pair<uint16_t, int32_t> T;
     cachefile& in(cachefile& c, T * t, size_t n) {
+        static_assert(sizeof(T) == 3 * sizeof(uint16_t), "please fix struct padding");
         MATMUL_COMMON_READ_MANY16(t, 3*n, c.f);
         return c;
     }
     cachefile& out(cachefile& c, T const * t, size_t n) const {
+        static_assert(sizeof(T) == 3 * sizeof(uint16_t), "please fix struct padding");
         MATMUL_COMMON_WRITE_MANY16(t, 3*n, c.f);
         return c;
     }
+#endif
 };
 
 template<> struct cachefile::seq<pair<uint16_t, uint16_t>> : public cachefile::basic_seq<pair<uint16_t, uint16_t>> {
     typedef pair<uint16_t, uint16_t> T;
     cachefile& in(cachefile& c, T * t, size_t n) {
+        static_assert(sizeof(T) == 2 * sizeof(uint16_t), "please fix struct padding");
         MATMUL_COMMON_READ_MANY16(t, 2*n, c.f);
         return c;
     }
     cachefile& out(cachefile& c, T const * t, size_t n) const {
+        static_assert(sizeof(T) == 2 * sizeof(uint16_t), "please fix struct padding");
         MATMUL_COMMON_WRITE_MANY16(t, 2*n, c.f);
         return c;
     }
@@ -188,22 +201,34 @@ template<> struct cachefile::seq<pair<uint16_t, uint16_t>> : public cachefile::b
 template<> struct cachefile::seq<pair<int, pair<uint32_t, int32_t>>> : public cachefile::basic_seq<pair<int, pair<uint32_t, int32_t>>> {
     typedef pair<int, pair<uint32_t, int32_t>> T;
     cachefile& in(cachefile& c, T * t, size_t n) {
+        static_assert(sizeof(T) == 3 * sizeof(uint32_t), "please fix struct padding");
         MATMUL_COMMON_READ_MANY32(t, 3*n, c.f);
         return c;
     }
     cachefile& out(cachefile& c, T const * t, size_t n) const {
+        static_assert(sizeof(T) == 3 * sizeof(uint32_t), "please fix struct padding");
         MATMUL_COMMON_WRITE_MANY32(t, 3*n, c.f);
         return c;
     }
 };
 
-template<> struct cachefile::seq<pair<uint16_t, pair<uint16_t, int32_t>>> : public cachefile::basic_seq<pair<uint16_t, pair<uint16_t, int32_t>>> {
-    typedef pair<uint16_t, pair<uint16_t, int32_t>> T;
+struct triple_161632 {
+    uint16_t first;
+    uint16_t second;
+    uint32_t third;
+    triple_161632() { first = second = third = 0; }
+    triple_161632(uint16_t a, uint16_t b, uint32_t c) : first(a), second(b), third(c) {}
+};
+
+template<> struct cachefile::seq<triple_161632> : public cachefile::basic_seq<triple_161632> {
+    typedef triple_161632 T;
     cachefile& in(cachefile& c, T * t, size_t n) {
+        static_assert(sizeof(T) == 4 * sizeof(uint16_t), "please fix struct padding");
         MATMUL_COMMON_READ_MANY16(t, 4*n, c.f);
         return c;
     }
     cachefile& out(cachefile& c, T const * t, size_t n) const {
+        static_assert(sizeof(T) == 4 * sizeof(uint16_t), "please fix struct padding");
         MATMUL_COMMON_WRITE_MANY16(t, 4*n, c.f);
         return c;
     }
@@ -298,7 +323,7 @@ struct placed_block {/*{{{*/
 
 struct zone : public placed_block { /* {{{ (immediate zones) */
     typedef vector<pair<uint16_t, uint16_t>> qpm_t;
-    typedef vector<pair<uint16_t, pair<uint16_t, int32_t>>> qg_t;
+    typedef vector<triple_161632> qg_t;
     qpm_t qp, qm;
     qg_t qg;
     zone() {}
@@ -316,7 +341,7 @@ struct zone : public placed_block { /* {{{ (immediate zones) */
 
     struct sort_qg {
         inline bool operator()(qg_t::value_type const& a, qg_t::value_type const& b) const {
-            return a.second.first < b.second.first;
+            return a.second < b.second;
         }
     };
 
@@ -618,9 +643,9 @@ pair<dispatcher, combiner> create_dispatcher_and_combiner(zone const& q)/*{{{*/
         C.main.push_back(destrow_id + rowbatch);
     }
     for(auto const& ijc : q.qg) {
-        uint16_t col_id = ijc.second.first;
+        uint16_t col_id = ijc.second;
         uint16_t destrow_id = ijc.first;
-        int32_t coeff = ijc.second.second;
+        int32_t coeff = ijc.third;
         D.push_back(col_id);
         C.aux.push_back(make_pair(destrow_id, coeff));
     }
@@ -705,7 +730,7 @@ void matmul_zone_data::build_cache(uint32_t * data)/*{{{*/
                             z.qp.push_back(make_pair(k, j));
                         }
                     } else {
-                        z.qg.push_back(make_pair(k, make_pair(j, c)));
+                        z.qg.push_back(triple_161632(k, j, c));
                     }
                 }
             }
@@ -853,8 +878,8 @@ void zone::mul(fast_elt_ur * tdst, const fast_elt * tsrc,
 #endif
     for(auto const& ijc : qg) {
         uint16_t i = ijc.first;
-        uint16_t j = ijc.second.first;
-        int32_t c = ijc.second.second;
+        uint16_t j = ijc.second;
+        int32_t c = ijc.third;
         if (c>0) {
             fast_gfp::addmul_ui(tdst[i], tsrc[j], c, prime, preinverse);
         } else {
@@ -877,8 +902,8 @@ void zone::tmul(fast_elt_ur * tdst, const fast_elt * tsrc,
 #endif
     for(auto const& ijc : qg) {
         uint16_t i = ijc.first;
-        uint16_t j = ijc.second.first;
-        int32_t c = ijc.second.second;
+        uint16_t j = ijc.second;
+        int32_t c = ijc.third;
         if (c>0) {
             fast_gfp::addmul_ui(tdst[j], tsrc[i], c, prime, preinverse);
         } else {
