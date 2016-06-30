@@ -373,7 +373,6 @@ insert_sublattice_pq_up ( sublattice_pq *pqueue,
   mpz_set (pqueue->v[i], v);
   mpz_set (pqueue->modulus[i], mod);
   pqueue->val[i] = val;
-
   pqueue->used ++;
 }
 
@@ -651,7 +650,6 @@ new_alpha_pq ( alpha_pq **ppqueue,
   }
 
   (*ppqueue)->len = len;
-
   (*ppqueue)->w = (int *) malloc (len* sizeof (int));
   (*ppqueue)->alpha = (float *) malloc (len* sizeof (float));
   (*ppqueue)->u = (mpz_t *) malloc (len* sizeof (mpz_t));
@@ -730,13 +728,11 @@ insert_alpha_pq_up ( alpha_pq *pqueue,
     pqueue->w[k] = pqueue->w[pq_parent(k)];
     pqueue->alpha[k] = pqueue->alpha[pq_parent(k)];
   }
-
   mpz_set (pqueue->u[k], u);
   mpz_set (pqueue->v[k], v);
   mpz_set (pqueue->modulus[k], modulus);
   pqueue->w[k] = w;
   pqueue->alpha[k] = alpha;
-
   pqueue->used ++;
 }
 
@@ -867,6 +863,44 @@ reset_alpha_pq ( alpha_pq *pqueue )
   pqueue->w[0] = 0;
   pqueue->alpha[0] = FLT_MAX;
   pqueue->used = 1;
+}
+
+
+/**
+ * Remove duplicates in alpha queue.
+ */
+void
+remove_rep_alpha ( alpha_pq *pqueue )
+{
+  int flag;
+  alpha_pq *new;
+  new_alpha_pq (&new, pqueue->len);
+  for (int i=1; i<pqueue->used; i++) {
+    flag = 0;
+    for (int k=i+1; k<pqueue->used; k++) {
+      if ( (pqueue->w[i] == pqueue->w[k]) &&
+           mpz_cmp(pqueue->u[i],pqueue->u[k])==0 &&
+           mpz_cmp(pqueue->v[i],pqueue->v[k])==0 &&
+           mpz_cmp(pqueue->modulus[i], pqueue->modulus[k])==0) {
+        flag = 1;
+        break;
+      }
+    }
+    if (flag==0) {
+      insert_alpha_pq (new, pqueue->w[i], pqueue->u[i], pqueue->v[i],
+                       pqueue->modulus[i], pqueue->alpha[i]);
+    }
+  }
+  reset_alpha_pq (pqueue);
+  pqueue->used = new->used;
+  for (int i=1; i<pqueue->used; i++) {
+    pqueue->w[i] = new->w[i];
+    mpz_set(pqueue->u[i],new->u[i]);
+    mpz_set(pqueue->v[i],new->v[i]);
+    mpz_set(pqueue->modulus[i],new->modulus[i]);
+    pqueue->alpha[i] = new->alpha[i];
+  }
+  free_alpha_pq (&new);
 }
 
 

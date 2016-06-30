@@ -159,6 +159,8 @@ void extract_alpha_pq ( alpha_pq *pqueue,
 
 void reset_alpha_pq ( alpha_pq *pqueue );
 
+void remove_rep_alpha ( alpha_pq *pqueue );
+
 void free_alpha_pq ( alpha_pq **ppqueue );
 
 /* sievescore_pq, used in ropt_stage2.c */

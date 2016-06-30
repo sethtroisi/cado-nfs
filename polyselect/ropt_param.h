@@ -32,8 +32,8 @@
 
 #define SUP_ALPHA 4.843
 
-/* maximum lognorm increment for each rotation */
-#define BOUND_LOGNORM_INCR_MAX 1.5
+/* maximum lognorm+exp_E increment for each rotation */
+#define BOUND_LOGNORM_INCR_MAX 1.05
 
 #define MAX_LINE_LENGTH 4096
 
@@ -47,11 +47,11 @@
 
 /* Top 32 (alpha) in each "SIZE_SIEVEARRAY": this does not
    affect the running-time since it is not dominating */
-#define NUM_TOPALPHA_SIEVEARRAY 32
+#define NUM_TOPALPHA_SIEVEARRAY 16
 
 /* Top 32 (E) for each sublattice, may contain several
    SIZE_SIEVEARRAY */
-#define NUM_TOPE_SUBLATTICE 32
+#define NUM_TOPE_SUBLATTICE 16
 
 /* Either rank stage 1 sublattices by E or by alpha, the former
    seems to be more accurate */
@@ -64,7 +64,13 @@
 
 /* Ratio for the num. of increased sublattice in tuning */
 #define TUNE_NUM_SUBLATTICE 16
-#define TUNE_NUM_SUBLATTICE_STAGE1 4
+
+
+/* allow more sublattice in Stage 1 (ranking based on alpha values) */
+#define TUNE_NUM_SUBLATTICE_STAGE1 8
+
+#define TUNE_NUM_SUBLATTICE_STAGE1 8
+
 #define TUNE_NUM_SUBLATTICE_STAGE2 2
 
 /* Similar to above, but in tune mode */
@@ -107,7 +113,7 @@ extern const unsigned int s1_size_each_sublattice[NUM_SUBLATTICE_PRIMES][NUM_SUB
 
 extern const unsigned int s1_size_each_sublattice_tune[NUM_SUBLATTICE_PRIMES];
 
-extern const unsigned int size_total_sublattices[8][2];
+extern const unsigned int size_total_sublattices[9][3];
 
 double exp_alpha (double logK);
 

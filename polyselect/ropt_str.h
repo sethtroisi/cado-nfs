@@ -45,6 +45,7 @@ typedef struct {
   /* used to decide global bounds */
   double init_lognorm;
   double bound_lognorm;
+  double bound_E;
   double exp_min_alpha;
 } _ropt_bound_t;
 typedef _ropt_bound_t ropt_bound_t[1];
@@ -59,6 +60,9 @@ typedef struct {
 
   /* num of all sublattices */
   unsigned int nbest_sl;
+
+  /* num of all sublattices */
+  unsigned int nbest_sieve;
 
   /* tune mode 1 */
   unsigned int nbest_sl_tunemode;
@@ -208,7 +212,9 @@ void ropt_bound_setup ( ropt_poly_t poly,
                         ropt_bound_t bound,
                         ropt_param_t param );
 
+#if 0
 double ropt_bound_expected_E (mpz_poly F, mpz_poly G);
+#endif
 
 void ropt_bound_reset ( ropt_poly_t poly,
                         ropt_bound_t bound,

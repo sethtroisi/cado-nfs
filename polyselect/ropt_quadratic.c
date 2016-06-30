@@ -80,12 +80,12 @@ ropt_quadratic_stage1 ( ropt_poly_t poly,
 
 #if RANK_SUBLATTICE_BY_E
     if (param->verbose >= 3) {
-      gmp_fprintf (stderr, "# Info: got %4d sublattice (%d, %Zd, %Zd) "
+      gmp_fprintf (stderr, "# Info: got %4d lat (%d, %Zd, %Zd) "
                    "(mod %Zd), E %.2f\n", i + 1, w, u, v, mod, score);
     }
 #else
     if (param->verbose >= 3) {
-      gmp_fprintf (stderr, "# Info: got %4d sublattice (%d, %Zd, %Zd) "
+      gmp_fprintf (stderr, "# Info: got %4d lat (%d, %Zd, %Zd) "
                    "(mod %Zd), alpha: %.2f\n", i + 1, w, u, v, mod, score);
     }
 #endif
@@ -121,7 +121,7 @@ ropt_quadratic_stage1 ( ropt_poly_t poly,
       continue;
     
     if (param->verbose >= 2)
-      fprintf (stderr, "\n# Info: find sublattice on quadratic rotation "
+      fprintf (stderr, "\n# Info: find lat on quadratic rotation "
                "by %d*x^2\n", w);
 
     old_i = rotate_aux (poly->f, poly->g[1], m, old_i, w, 2);
@@ -214,12 +214,12 @@ ropt_quadratic_tune ( ropt_poly_t poly,
     /* rank by alpha or by E */
 #if RANK_SUBLATTICE_BY_E
     if (param->verbose >= 1) {
-      gmp_fprintf (stderr, "# Info: tune (1st) [%4d] sublattice (%d, %Zd, %Zd) "
+      gmp_fprintf (stderr, "# Info: tune (1st) [%4d] lat (%d, %Zd, %Zd) "
                    "(mod %Zd), E: %.2f\n", i + 1, w, u, v, mod, score);
     }
 #else
     if (param->verbose >= 1) {
-      gmp_fprintf (stderr, "# Info: tune (1st) [%4d] sublattice (%d, %Zd, %Zd) "
+      gmp_fprintf (stderr, "# Info: tune (1st) [%4d] lat (%d, %Zd, %Zd) "
                    "(mod %Zd), alpha: %.2f\n", i + 1, w, u, v, mod, score);
     }
 #endif
@@ -232,7 +232,7 @@ ropt_quadratic_tune ( ropt_poly_t poly,
 
     if (param->verbose >= 3) {
       gmp_fprintf (stderr, "# Info: ave. E: %.2e, best E: %.2e on "
-                   "sublattice (%d, %Zd, %Zd) (mod %Zd)\n",
+                   "lat (%d, %Zd, %Zd) (mod %Zd)\n",
                    info->ave_MurphyE, info->best_MurphyE,
                    w, u, v, mod);
     }
@@ -261,7 +261,7 @@ ropt_quadratic_tune ( ropt_poly_t poly,
 
     // ropt_bound_reset (poly, bound, param);  //may have this
     if (param->verbose >= 1) {
-      gmp_fprintf (stderr, "# Info: tune (2nd) [%4d] sublattice (%d, %Zd, %Zd) "
+      gmp_fprintf (stderr, "# Info: tune (2nd) [%4d] lat (%d, %Zd, %Zd) "
                    "(mod %Zd), E: %.2e\n", i + 1, w, u, v, mod, -score);
     }
 
@@ -289,7 +289,7 @@ ropt_quadratic_tune ( ropt_poly_t poly,
                        -info->ave_MurphyE);
       if (param->verbose >= 3) {
         gmp_fprintf (stderr, "# Info: ave. E: %.2e, best E: %.2e on "
-                     "sublattice (%d, %Zd, %Zd) (mod %Zd) (%d, %d)\n",
+                     "lat (%d, %Zd, %Zd) (mod %Zd) (%d, %d)\n",
                      info->ave_MurphyE, info->best_MurphyE,
                      w, tmpu, v, mod, i + 1, j);
       }
@@ -339,7 +339,7 @@ ropt_quadratic_tune ( ropt_poly_t poly,
 
       if (param->verbose >= 3) {
         gmp_fprintf (stderr, "# Info: ave. E: %.2e, best E: %.2e on "
-                     "sublattice (%d, %Zd, %Zd) (mod %Zd) (%d, %d)\n",
+                     "lat (%d, %Zd, %Zd) (mod %Zd) (%d, %d)\n",
                      info->ave_MurphyE, info->best_MurphyE,
                      w, tmpu, v, mod, i + 1, j);
       }
@@ -386,7 +386,7 @@ ropt_quadratic_tune ( ropt_poly_t poly,
     ropt_poly_setup (poly);
 
     if (param->verbose >= 1) {
-      gmp_fprintf ( stderr, "# Info: tune (3rd) [%4d] sublattice "
+      gmp_fprintf ( stderr, "# Info: tune (3rd) [%4d] lat "
                     "(%d, %Zd, %Zd) (mod %Zd), E: %.2e\n",
                     i + 1, w, u, v, mod, -score);
     }
@@ -486,7 +486,7 @@ ropt_quadratic_sieve ( ropt_poly_t poly,
 
       if (param->verbose >= 2) {
         gmp_fprintf (stderr, "# Info: found best E: %.2e on (#%4d) "
-                     "sublattice (%d, %Zd, %Zd) (mod %Zd)\n",
+                     "lat (%d, %Zd, %Zd) (mod %Zd)\n",
                      score, i + 1, w, u, v, mod);
       }
     }
@@ -506,7 +506,7 @@ ropt_quadratic_sieve ( ropt_poly_t poly,
 
         if (param->verbose >= 2) {
           gmp_fprintf (stderr, "# Info: found best E: %.2e on (#%4d) "
-                       "sublattice (%d, %Zd, %Zd) (mod %Zd)\n",
+                       "lat (%d, %Zd, %Zd) (mod %Zd)\n",
                        score, i + 1, w, u, v, mod);
         }
       }
@@ -540,7 +540,7 @@ ropt_quadratic_sieve ( ropt_poly_t poly,
 
       if (param->verbose >= 2) {
         gmp_fprintf (stderr, "# Info: found best ave. E: %.2e on (#%4d) "
-                     "sublattice (%d, %Zd, %Zd) (mod %Zd)\n",
+                     "lat (%d, %Zd, %Zd) (mod %Zd)\n",
                      -score, i + 1, w, u, v, mod);
       }
     }
@@ -558,7 +558,7 @@ ropt_quadratic_sieve ( ropt_poly_t poly,
 
       if (param->verbose >= 2) {
         gmp_fprintf (stderr, "# Info: found best ave. E: %.2e on (#%4d) "
-                     "sublattice (%d, %Zd, %Zd) (mod %Zd)\n",
+                     "lat (%d, %Zd, %Zd) (mod %Zd)\n",
                      -score, i + 1, w, u, v, mod);
       }
     }
@@ -581,7 +581,7 @@ ropt_quadratic_sieve ( ropt_poly_t poly,
     ropt_poly_setup (poly);
 
     if (param->verbose >= 2) {
-      gmp_fprintf (stderr, "# Info: Sieve sublattice (# %2d), "
+      gmp_fprintf (stderr, "# Info: Sieve lat (# %2d), "
                    "(w, u, v): (%d, %Zd, %Zd) (mod %Zd), "
                    "tsieve. E: %.2e\n",
                    i + 1, w, u, v, mod, score);
@@ -596,7 +596,7 @@ ropt_quadratic_sieve ( ropt_poly_t poly,
       info->mode = 0; // normal mode
 
       if (param->verbose >= 2) {
-        fprintf (stderr, "# Info: Re-sieve sublattice (# %2d) in "
+        fprintf (stderr, "# Info: Re-sieve lat (# %2d) in "
                  "range %u.\n", i + 1, size_tune_sievearray * 2);
       }
      
