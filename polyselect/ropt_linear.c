@@ -6,7 +6,7 @@
  * This is description of the flow:
  * - first we call rotp_stage1() to get N lats based only on alpha;
  * - then fast_tune() gets N' << N good lats based on crude test-sieve;
- * - then tune() gets N'' ~ N lats based on finer and recursieve test-sieve;
+ * - then slow_tune() gets N'' ~ N lats based on finer and recursieve test-sieve;
  * - finally we root-sieve the top few candidates from above.
  */ 
 
@@ -325,16 +325,16 @@ ropt_linear_fast_tune ( ropt_poly_t poly,
  * Rank found sublattices by test sieving.
  */
 static void
-ropt_linear_tune_one ( ropt_poly_t poly,
-                       ropt_bound_t bound,
-                       ropt_s1param_t s1param,
-                       ropt_param_t param,
-                       ropt_info_t info,
-                       alpha_pq *alpha_pqueue,
-                       MurphyE_pq *global_E_pqueue,
-                       unsigned int curr_size_tune,
-                       int tune_round,
-                       unsigned int curr_nbest )
+ropt_linear_slow_tune ( ropt_poly_t poly,
+                        ropt_bound_t bound,
+                        ropt_s1param_t s1param,
+                        ropt_param_t param,
+                        ropt_info_t info,
+                        alpha_pq *alpha_pqueue,
+                        MurphyE_pq *global_E_pqueue,
+                        unsigned int curr_size_tune,
+                        int tune_round,
+                        unsigned int curr_nbest )
 {
   /* tune mode */
   info->mode = 1;
@@ -638,7 +638,13 @@ ropt_linear_tune ( ropt_poly_t poly,
   unsigned int old_nbest = s1param->nbest_sl;
   unsigned int curr_size_tune = size_tune_sievearray;
   int r = 1;
-  /* recursively tune alpha_pqueue */
+
+  /* fast tune for lats from stage 1*/
+  ropt_linear_fast_tune (poly, bound, s1param, param, info, alpha_pqueue,
+    global_E_pqueue, curr_size_tune, r, s1param->nbest_sl);
+
+
+  /* then recursively tune alpha_pqueue */
   while (1) {
     if (param->verbose >= 1) {
       printf ("# Info: tuning (round %d), tunesize: %u, nbest: %u\n",
@@ -646,8 +652,8 @@ ropt_linear_tune ( ropt_poly_t poly,
     }
     curr_size_tune = curr_size_tune*2;
     s1param->nbest_sl = s1param->nbest_sl/2;
-    ropt_linear_tune_one (poly, bound, s1param, param, info, alpha_pqueue,
-                          global_E_pqueue, curr_size_tune, r, s1param->nbest_sl);
+    ropt_linear_slow_tune (poly, bound, s1param, param, info, alpha_pqueue,
+      global_E_pqueue, curr_size_tune, r, s1param->nbest_sl);
     r ++;
     remove_rep_alpha (alpha_pqueue);
     /* doing 2 rounds of tuning seems enough */

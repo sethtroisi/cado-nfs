@@ -62,13 +62,10 @@
    Parameters for test sieving
    ------------------------- */
 
-/* Ratio for the num. of increased sublattice in tuning */
-#define TUNE_NUM_SUBLATTICE 16
-
+/* This is the maxmum of the following values */
+#define TUNE_NUM_SUBLATTICE 8
 
 /* allow more sublattice in Stage 1 (ranking based on alpha values) */
-#define TUNE_NUM_SUBLATTICE_STAGE1 8
-
 #define TUNE_NUM_SUBLATTICE_STAGE1 8
 
 #define TUNE_NUM_SUBLATTICE_STAGE2 2
