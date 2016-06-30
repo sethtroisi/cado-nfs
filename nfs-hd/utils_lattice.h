@@ -225,6 +225,9 @@ unsigned int space_sieve_1_next_plane_seek(int64_vector_ptr s_tmp,
 
 void lll_Mqr(mat_int64_ptr C, mat_int64_srcptr A, FILE * errstd);
 
+void slll_Mqr(mat_int64_ptr C, mat_int64_srcptr A, int64_vector_srcptr,
+    FILE * errstd);
+
 void lll_Mqr_unimodular(mat_int64_ptr U, mat_int64_srcptr A, FILE * errstd);
 
 #endif // UTILS_SIEVE_H

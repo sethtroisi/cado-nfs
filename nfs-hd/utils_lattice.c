@@ -182,6 +182,8 @@ void skew_LLL(mat_int64_ptr MSLLL, mat_int64_srcptr M_root,
   ASSERT(MSLLL->NumRows == M_root->NumCols);
   ASSERT(MSLLL->NumRows == M_root->NumCols);
 
+
+#if 0
   mat_int64_t I_s;
   mat_int64_init(I_s, M_root->NumRows, M_root->NumCols);
   mat_int64_set_diag(I_s, skewness);
@@ -200,6 +202,44 @@ void skew_LLL(mat_int64_ptr MSLLL, mat_int64_srcptr M_root,
   mat_int64_clear(U);
   mat_int64_clear(I_s);
   mat_int64_clear(M);
+#else // 1
+  int64_vector_t skew;
+  int64_vector_init(skew, skewness->dim);
+  int overflow = 0;
+  for (unsigned int i = 0; i < skewness->dim; i++) {
+    if (__builtin_smull_overflow(skewness->c[i], skewness->c[i], &(skew->c[i])))
+    {
+      overflow = 1;
+      break;
+    }
+  }
+  if (!overflow) {
+    slll_Mqr(MSLLL, M_root, skew, errstd);
+  } else {
+    fprintf(errstd, "# Can not use slll_Mqr, use safe skew LLL instead.\n");
+
+    mat_int64_t I_s;
+    mat_int64_init(I_s, M_root->NumRows, M_root->NumCols);
+    mat_int64_set_diag(I_s, skewness);
+
+    mat_int64_t M;
+    mat_int64_init(M, M_root->NumRows, M_root->NumCols);
+    mat_int64_mul_mat_int64(M, I_s, M_root);
+
+
+    mat_int64_t U;
+    mat_int64_init(U, M_root->NumRows, M_root->NumCols);
+    mat_int64_LLL_unimodular_transpose(U, M);
+
+    mat_int64_mul_mat_int64(MSLLL, M_root, U);
+
+    mat_int64_clear(U);
+    mat_int64_clear(I_s);
+    mat_int64_clear(M);
+  }
+  int64_vector_clear(skew);
+#endif // 1
+
 }
 #else // SLLL_SAFE
 void skew_LLL_safe(mat_int64_ptr MSLLL, mat_int64_srcptr M_root,
@@ -1425,6 +1465,123 @@ static int int128_convert_64(int64_t * x_64, __int128_t x)
   return ret;
 }
 
+static int skewinnerproduct_square(int64_t * x, int64_t * a, int64_t * b,
+    unsigned int n, FILE * errstd, int64_vector_srcptr skewness)
+{
+  int64_t tmp_skew = 0;
+  * x = 0;
+  if (__builtin_smull_overflow(b[1], skewness->c[0], &tmp_skew) ||
+      __builtin_smull_overflow(a[1], tmp_skew, x)) {
+    fprintf(errstd, "# ----- LLL int64 -----\n");
+    fprintf(errstd, "# Overflow during skewinnerproduct_square, ");
+    return 0;
+  }
+  int64_t tmp = 0;
+  for (unsigned int i = 2; i <= n; i++) {
+    /*x = x + a[i] * b[i];*/
+    if (__builtin_smull_overflow(b[i], skewness->c[i - 1], &tmp_skew) ||
+        __builtin_smull_overflow(a[i], tmp_skew, &tmp) ||
+        __builtin_saddl_overflow(* x, tmp, x)) {
+      fprintf(errstd, "# ----- LLL int64 -----\n");
+      fprintf(errstd, "# Overflow during skewinnerproduct_square, ");
+      return 0;
+    }
+  }
+
+#ifdef ASSERT_LLL
+  mpz_t a_Z, b_Z, skew, res, ret;
+  mpz_init(a_Z);
+  mpz_init(b_Z);
+  mpz_init(skew);
+  mpz_init(res);
+  mpz_init(ret);
+  mpz_set_int64(ret, * x);
+  mpz_set_int64(a_Z, a[1]);
+  mpz_set_int64(b_Z, b[1]);
+  mpz_set_int64(skew, skewness->c[0]);
+
+  mpz_mul (skew, skew, skew);
+  mpz_mul (b_Z, b_Z, skew);
+  mpz_mul (res, a_Z, b_Z);
+  for (unsigned int i = 2; i <= n; i++) {
+    mpz_set_int64(a_Z, a[i]);
+    mpz_set_int64(b_Z, b[i]);
+    mpz_set_int64(skew, skewness->c[i - 1]);
+    mpz_mul (skew, skew, skew);
+    mpz_mul (b_Z, b_Z, skew);
+    mpz_addmul(res, a_Z, b_Z);
+  }
+  ASSERT_ALWAYS(mpz_cmp(res, ret) == 0);
+  mpz_clear(a_Z);
+  mpz_clear(b_Z);
+  mpz_clear(skew);
+  mpz_clear(res);
+  mpz_clear(ret);
+#endif // ASSERT_LLL
+
+  return 1;
+}
+
+// Return 0 if overflow, 1 otherwise.
+static int skewinnerproduct(int64_t * x, int64_t * a, int64_t * b,
+    unsigned int n, FILE * errstd, int64_vector_srcptr skewness)
+{
+  int64_t tmp_skew = 0;
+  * x = 0;
+  if (__builtin_smull_overflow(skewness->c[0], skewness->c[0], &tmp_skew) ||
+      __builtin_smull_overflow(b[1], tmp_skew, &tmp_skew) ||
+      __builtin_smull_overflow(a[1], tmp_skew, x)) {
+    fprintf(errstd, "# ----- LLL int64 -----\n");
+    fprintf(errstd, "# Overflow during skewinnerproduct, ");
+    return 0;
+  }
+  int64_t tmp = 0;
+  for (unsigned int i = 2; i <= n; i++) {
+    /*x = x + a[i] * b[i];*/
+    if (__builtin_smull_overflow(skewness->c[i - 1], skewness->c[i - 1], &tmp_skew) ||
+        __builtin_smull_overflow(b[i], tmp_skew, &tmp_skew) ||
+        __builtin_smull_overflow(a[i], tmp_skew, &tmp) ||
+        __builtin_saddl_overflow(* x, tmp, x)) {
+      fprintf(errstd, "# ----- LLL int64 -----\n");
+      fprintf(errstd, "# Overflow during skewinnerproduct, ");
+      return 0;
+    }
+  }
+
+#ifdef ASSERT_LLL
+  mpz_t a_Z, b_Z, skew, res, ret;
+  mpz_init(a_Z);
+  mpz_init(b_Z);
+  mpz_init(skew);
+  mpz_init(res);
+  mpz_init(ret);
+  mpz_set_int64(ret, * x);
+  mpz_set_int64(a_Z, a[1]);
+  mpz_set_int64(b_Z, b[1]);
+  mpz_set_int64(skew, skewness->c[0]);
+
+  mpz_mul (skew, skew, skew);
+  mpz_mul (b_Z, b_Z, skew);
+  mpz_mul (res, a_Z, b_Z);
+  for (unsigned int i = 2; i <= n; i++) {
+    mpz_set_int64(a_Z, a[i]);
+    mpz_set_int64(b_Z, b[i]);
+    mpz_set_int64(skew, skewness->c[i - 1]);
+    mpz_mul (skew, skew, skew);
+    mpz_mul (b_Z, b_Z, skew);
+    mpz_addmul(res, a_Z, b_Z);
+  }
+  ASSERT_ALWAYS(mpz_cmp(res, ret) == 0);
+  mpz_clear(a_Z);
+  mpz_clear(b_Z);
+  mpz_clear(skew);
+  mpz_clear(res);
+  mpz_clear(ret);
+#endif // ASSERT_LLL
+
+  return 1;
+}
+
 // Return 0 if overflow, 1 otherwise.
 static int innerproduct(int64_t * x, int64_t * a, int64_t * b,
     unsigned int n, FILE * errstd)
@@ -1682,6 +1839,119 @@ static int mulsubdiv(int64_t * tmp, int64_t c1, int64_t c2, int64_t x,
   mpz_clear(t1);
   mpz_clear(c);
 #endif // ASSERT_LLL
+
+  return 1;
+}
+
+static int skewincrementalgs_square(mat_int64_srcptr B, unsigned int * P,
+    int64_t * D, int64_t ** lam, unsigned int * s, unsigned int k,
+    int64_vector_srcptr skewness, FILE * errstd)
+{
+  unsigned int n = B->NumCols;
+  int64_t u = 0;
+
+  for (unsigned int j = 1; j <= k - 1; j++) {
+    unsigned int posj = P[j];
+    if (posj == 0) {
+      continue;
+    }
+
+    if (!skewinnerproduct_square(&u, B->coeff[k], B->coeff[j], n, errstd,
+          skewness)) {
+      fprintf(errstd, "skewincrementalgs_square, ");
+      return 0;
+    }
+    for (unsigned int i = 1; i <= posj - 1; i++) {
+      ASSERT(D[i - 1] != 0);
+
+      /*u = (D[i] * u - lam[k][i] * lam[j][i]) / D[i - 1];*/
+      if (!mulsubdiv(&u, u, lam[j][i], D[i], lam[k][i], D[i - 1], errstd)) {
+        fprintf(errstd, "skewincrementalgs_square, ");
+        return 0;
+      }
+    }
+
+    lam[k][posj] = u;
+  }
+
+  if (!skewinnerproduct_square(&u, B->coeff[k], B->coeff[k], n, errstd, skewness)) {
+    fprintf(errstd, "skewincrementalgs_square, ");
+    return 0;
+  }
+
+  for (unsigned int i = 1; i <= * s; i++) {
+    ASSERT(D[i - 1] != 0);
+
+    /*u = (D[i] * u - lam[k][i] * lam[k][i]) / D[i - 1];*/
+    if (!mulsubdiv(&u, u, lam[k][i], D[i], lam[k][i], D[i - 1], errstd)) {
+      fprintf(errstd, "skewincrementalgs_square, ");
+      return 0;
+    }
+  }
+
+  if (u == 0) {
+    P[k] = 0;
+  } else {
+    * s = * s + 1;
+    P[k] = * s;
+    D[* s] = u;
+  }
+
+  return 1;
+}
+
+static int skewincrementalgs(mat_int64_srcptr B, unsigned int * P, int64_t * D,
+    int64_t ** lam, unsigned int * s, unsigned int k,
+    int64_vector_srcptr skewness, FILE * errstd)
+{
+  unsigned int n = B->NumCols;
+  int64_t u = 0;
+
+  for (unsigned int j = 1; j <= k - 1; j++) {
+    unsigned int posj = P[j];
+    if (posj == 0) {
+      continue;
+    }
+
+    if (!skewinnerproduct(&u, B->coeff[k], B->coeff[j], n, errstd, skewness)) {
+      fprintf(errstd, "skewincrementalgs, ");
+      return 0;
+    }
+    for (unsigned int i = 1; i <= posj - 1; i++) {
+      ASSERT(D[i - 1] != 0);
+
+      /*u = (D[i] * u - lam[k][i] * lam[j][i]) / D[i - 1];*/
+      if (!mulsubdiv(&u, u, lam[j][i], D[i], lam[k][i], D[i - 1], errstd)) {
+        fprintf(errstd, "skewincrementalgs, ");
+        return 0;
+      }
+    }
+
+    lam[k][posj] = u;
+  }
+
+  if (!skewinnerproduct(&u, B->coeff[k], B->coeff[k], n, errstd, skewness)) {
+    fprintf(errstd, "skewincrementalgs, ");
+    return 0;
+  }
+
+  for (unsigned int i = 1; i <= * s; i++) {
+    ASSERT(D[i - 1] != 0);
+
+    /*u = (D[i] * u - lam[k][i] * lam[k][i]) / D[i - 1];*/
+    if (!mulsubdiv(&u, u, lam[k][i], D[i], lam[k][i], D[i - 1], errstd)) {
+      fprintf(errstd, "skewincrementalgs, ");
+      return 0;
+    }
+  }
+
+  if (u == 0) {
+    P[k] = 0;
+  } else {
+    * s = * s + 1;
+    P[k] = * s;
+    D[* s] = u;
+  }
 
   return 1;
 }
@@ -2318,6 +2588,232 @@ static int swaplll (unsigned int k, mat_int64_ptr B, unsigned int * P,
   return 1;
 }
 
+int slll_square(unsigned int * s, int64_t * det, mat_int64_ptr B,
+    mat_int64_ptr U, int64_t a, int64_t b, int64_vector_srcptr skewness,
+    FILE * errstd)
+{
+  unsigned int m = B->NumRows;
+  unsigned int n = B->NumCols;
+  ASSERT_ALWAYS(n >= m);
+
+  unsigned int * P = (unsigned int *) malloc((m + 1) * sizeof(unsigned int));
+
+  int64_t * D = (int64_t *) malloc((m + 1) * sizeof(int64_t));
+  for (unsigned int j = 0; j <= m; j++) {
+    D[j] = (j == 0);
+  }
+
+  int64_t ** lam = (int64_t **) malloc((m + 1) * sizeof(int64_t *));
+  for (unsigned int j = 0; j <= m; j++) {
+    lam[j] = (int64_t *) malloc((m + 1) * sizeof(int64_t));
+    for (unsigned int k = 0; k <= m; k++) {
+      lam[j][k] = 0;
+    }
+  }
+
+  if (U != NULL) {
+    ASSERT(U->NumRows == m);
+    ASSERT(U->NumCols == m);
+
+    mat_int64_set_identity(U);
+  }
+
+  * s = 0;
+
+  unsigned int k = 1;
+  unsigned int max_k = 0;
+
+  while (k <= m) {
+    if (k > max_k) {
+      if (!skewincrementalgs_square(B, P, D, lam, s, k, skewness, errstd)) {
+        fprintf(errstd, "slll_square.\n");
+        free(D);
+        for (unsigned int j = 0; j <= m; j++) {
+          free (lam[j]);
+        }
+        free (lam);
+
+        free(P);
+        return 0;
+      }
+      max_k = k;
+    }
+
+    if (k == 1) {
+      k++;
+      continue;
+    }
+
+    if (!reduce(k, k - 1, B, P, D, lam, U, errstd)) {
+      fprintf(errstd, "slll_square.\n");
+      free(D);
+      for (unsigned int j = 0; j <= m; j++) {
+        free (lam[j]);
+      }
+      free (lam);
+
+      free(P);
+      return 0;
+    }
+
+    if (P[k - 1] != 0 && (P[k] == 0 || 
+          swaptest(D[P[k]], D[P[k] - 1], D[P[k] - 2],
+            lam[k][P[k] - 1], a, b))) {
+      if (!swaplll(k, B, P, D, lam, U, max_k, errstd)) {
+        fprintf(errstd, "slll_square.\n");
+        free(D);
+        for (unsigned int j = 0; j <= m; j++) {
+          free (lam[j]);
+        }
+        free (lam);
+
+        free(P);
+        return 0;
+      }
+      k--;
+    } else {
+      for (unsigned int j = k - 2; j >= 1; j--) {
+        if (!reduce(k, j, B, P, D, lam, U, errstd)) {
+          fprintf(errstd, "slll_square.\n");
+          free(D);
+          for (unsigned int j = 0; j <= m; j++) {
+            free (lam[j]);
+          }
+          free (lam);
+
+          free(P);
+          return 0;
+        }
+      }
+      k++;
+    }
+  }
+
+  * det = D[* s];
+  free(D);
+  for (unsigned int j = 0; j <= m; j++) {
+    free (lam[j]);
+  }
+  free (lam);
+
+  free(P);
+
+  return 1;
+}
+
+int slll(unsigned int * s, int64_t * det, mat_int64_ptr B,
+    mat_int64_ptr U, int64_t a, int64_t b, int64_vector_srcptr skewness,
+    FILE * errstd)
+{
+  unsigned int m = B->NumRows;
+  unsigned int n = B->NumCols;
+  ASSERT_ALWAYS(n >= m);
+
+  unsigned int * P = (unsigned int *) malloc((m + 1) * sizeof(unsigned int));
+
+  int64_t * D = (int64_t *) malloc((m + 1) * sizeof(int64_t));
+  for (unsigned int j = 0; j <= m; j++) {
+    D[j] = (j == 0);
+  }
+
+  int64_t ** lam = (int64_t **) malloc((m + 1) * sizeof(int64_t *));
+  for (unsigned int j = 0; j <= m; j++) {
+    lam[j] = (int64_t *) malloc((m + 1) * sizeof(int64_t));
+    for (unsigned int k = 0; k <= m; k++) {
+      lam[j][k] = 0;
+    }
+  }
+
+  if (U != NULL) {
+    ASSERT(U->NumRows == m);
+    ASSERT(U->NumCols == m);
+
+    mat_int64_set_identity(U);
+  }
+
+  * s = 0;
+
+  unsigned int k = 1;
+  unsigned int max_k = 0;
+
+  while (k <= m) {
+    if (k > max_k) {
+      if (!skewincrementalgs(B, P, D, lam, s, k, skewness, errstd)) {
+        fprintf(errstd, "slll.\n");
+        free(D);
+        for (unsigned int j = 0; j <= m; j++) {
+          free (lam[j]);
+        }
+        free (lam);
+
+        free(P);
+        return 0;
+      }
+      max_k = k;
+    }
+
+    if (k == 1) {
+      k++;
+      continue;
+    }
+
+    if (!reduce(k, k - 1, B, P, D, lam, U, errstd)) {
+      fprintf(errstd, "slll\n");
+      free(D);
+      for (unsigned int j = 0; j <= m; j++) {
+        free (lam[j]);
+      }
+      free (lam);
+
+      free(P);
+      return 0;
+    }
+
+    if (P[k - 1] != 0 && (P[k] == 0 || 
+          swaptest(D[P[k]], D[P[k] - 1], D[P[k] - 2],
+            lam[k][P[k] - 1], a, b))) {
+      if (!swaplll(k, B, P, D, lam, U, max_k, errstd)) {
+        fprintf(errstd, "slll.\n");
+        free(D);
+        for (unsigned int j = 0; j <= m; j++) {
+          free (lam[j]);
+        }
+        free (lam);
+
+        free(P);
+        return 0;
+      }
+      k--;
+    } else {
+      for (unsigned int j = k - 2; j >= 1; j--) {
+        if (!reduce(k, j, B, P, D, lam, U, errstd)) {
+          fprintf(errstd, "slll.\n");
+          free(D);
+          for (unsigned int j = 0; j <= m; j++) {
+            free (lam[j]);
+          }
+          free (lam);
+
+          free(P);
+          return 0;
+        }
+      }
+      k++;
+    }
+  }
+
+  * det = D[* s];
+  free(D);
+  for (unsigned int j = 0; j <= m; j++) {
+    free (lam[j]);
+  }
+  free (lam);
+
+  free(P);
+
+  return 1;
+}
+
 /* LLL-reduce the matrix B (whose rows represent vectors, with indices
    starting at 1):
  * det (output) is the determinant
@@ -2383,7 +2879,7 @@ int lll(unsigned int * s, int64_t * det, mat_int64_ptr B,
     }
 
     if (!reduce(k, k - 1, B, P, D, lam, U, errstd)) {
-      fprintf(errstd, "lll\n");
+      fprintf(errstd, "lll.\n");
       free(D);
       for (unsigned int j = 0; j <= m; j++) {
         free (lam[j]);
@@ -2412,7 +2908,7 @@ int lll(unsigned int * s, int64_t * det, mat_int64_ptr B,
     } else {
       for (unsigned int j = k - 2; j >= 1; j--) {
         if (!reduce(k, j, B, P, D, lam, U, errstd)) {
-          fprintf(errstd, "lll\n");
+          fprintf(errstd, "lll.\n");
           free(D);
           for (unsigned int j = 0; j <= m; j++) {
             free (lam[j]);
@@ -2439,6 +2935,62 @@ int lll(unsigned int * s, int64_t * det, mat_int64_ptr B,
   return 1;
 }
 
+void slll_Mqr(mat_int64_ptr C, mat_int64_srcptr A,
+    int64_vector_srcptr skewness, FILE * errstd)
+{
+  ASSERT(A->NumRows == C->NumRows);
+  ASSERT(A->NumCols == C->NumCols);
+
+  mat_int64_transpose(C, A);
+  int64_t a = 3;
+  int64_t b = 4;
+  int64_t det = 0;
+  unsigned int s = 0;
+
+  if (!slll_square(&s, &det, C, NULL, a, b, skewness, errstd)) {
+    fprintf(errstd, "# Mqr=\n");
+    mat_int64_fprintf_comment(errstd, A);
+    fprintf(errstd, "# -----\n");
+
+    int64_vector_t skew;
+    int64_vector_init(skew, skewness->dim);
+    for (unsigned int i = 0; i < skewness->dim; i++) {
+      skew->c[i] = (int64_t) sqrt((double)skewness->c[i]);
+    }
+
+    mat_int64_t I_s;
+    mat_int64_init(I_s, A->NumRows, A->NumCols);
+    mat_int64_set_diag(I_s, skew);
+
+    mat_int64_t M;
+    mat_int64_init(M, A->NumRows, A->NumCols);
+    mat_int64_mul_mat_int64(M, I_s, A);
+
+
+    mat_int64_t U;
+    mat_int64_init(U, A->NumRows, A->NumCols);
+    mat_int64_LLL_unimodular_transpose(U, M);
+
+    mat_int64_mul_mat_int64(C, A, U);
+
+    mat_int64_clear(U);
+    mat_int64_clear(I_s);
+    mat_int64_clear(M);
+  } else {
+    mat_int64_transpose(C, C);
+  }
+
+
+/*#ifndef NDEBUG*/
+  /*mat_int64_t C_tmp;*/
+  /*mat_int64_init(C_tmp, C->NumRows, C->NumCols);*/
+  /*mat_int64_set_zero(C_tmp);*/
+  /*mat_int64_LLL_transpose(C_tmp, A);*/
+  /*ASSERT(mat_int64_equal(C_tmp, C));*/
+  /*mat_int64_clear(C_tmp);*/
+/*#endif // NDEBUG*/
+}
+
 void lll_Mqr(mat_int64_ptr C, mat_int64_srcptr A, FILE * errstd)
 {
   ASSERT(A->NumRows == C->NumRows);
@@ -2451,7 +3003,6 @@ void lll_Mqr(mat_int64_ptr C, mat_int64_srcptr A, FILE * errstd)
   unsigned int s = 0;
 
   if (!lll(&s, &det, C, NULL, a, b, errstd)) {
-    fprintf(errstd, "# Overflow with int64 LLL. Fall back to mpz LLL.\n");
     fprintf(errstd, "# Mqr=\n");
     mat_int64_fprintf_comment(errstd, A);
     fprintf(errstd, "# -----\n");
@@ -2485,7 +3036,6 @@ void lll_Mqr_unimodular(mat_int64_ptr U, mat_int64_srcptr A, FILE * errstd)
   unsigned int s = 0;
 
   if (!lll(&s, &det, C, U, a, b, errstd)) {
-    fprintf(errstd, "# Overflow with int64 LLL. Fall back to mpz LLL.\n");
     fprintf(errstd, "# Mqr =\n");
     mat_int64_fprintf_comment(errstd, A);
     fprintf(errstd, "# -----\n");
