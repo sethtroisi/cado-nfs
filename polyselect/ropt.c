@@ -134,7 +134,7 @@ ropt_do_stage2 (ropt_poly_t poly,
 
   /* reset after rotation */
   ropt_poly_setup (poly);
-  ropt_bound_setup (poly, bound, param);
+  ropt_bound_setup (poly, bound, param, BOUND_LOGNORM_INCR_MAX);
 
   /* print some basic information */
   compute_fuv_mp (fuv, poly->f, poly->g, poly->d, param->s2_u, param->s2_v);

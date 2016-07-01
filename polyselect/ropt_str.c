@@ -440,7 +440,8 @@ ropt_bound_init ( ropt_bound_t bound )
 static inline void
 ropt_bound_setup_normbound ( ropt_poly_t poly,
                              ropt_bound_t bound,
-                             ropt_param_t param )
+                             ropt_param_t param,
+                             double incr )
 {
   mpz_poly F, G;
   double skewness;
@@ -451,7 +452,7 @@ ropt_bound_setup_normbound ( ropt_poly_t poly,
   skewness = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
   bound->init_lognorm = L2_lognorm (F, skewness);
   bound->bound_E = (bound->init_lognorm + expected_rotation_gain (F, G))
-    * BOUND_LOGNORM_INCR_MAX;
+    * incr;
   /* setup lognorm bound, either from input or by default
      By default, we do not use bound_lognorm to bound the 
      rotation; instead we use (lognorm + exp_E)          */
@@ -555,10 +556,11 @@ ropt_bound_setup_others ( ropt_bound_t bound )
 void
 ropt_bound_setup ( ropt_poly_t poly,
                    ropt_bound_t bound,
-                   ropt_param_t param )
+                   ropt_param_t param,
+                   double incr )
 {
   /* set bound->bound_lognorm */
-  ropt_bound_setup_normbound (poly, bound, param);
+  ropt_bound_setup_normbound (poly, bound, param, incr);
 
   /* set w, u, v bounds */
   ropt_bound_setup_globalbound (poly, bound, param);
@@ -575,12 +577,45 @@ ropt_bound_setup ( ropt_poly_t poly,
                   bound->global_u_boundr,
                   bound->global_v_boundl,
                   bound->global_v_boundr );
-    gmp_fprintf ( stderr, "# Info: exp_alpha: %.3f, norm bound: %.3f, "
-                  "E bound: %.3f (init. norm: %.3f)\n",
-                  bound->exp_min_alpha,
-                  bound->bound_lognorm,
-                  bound->bound_E,
-                  bound->init_lognorm );
+    if (bound->bound_lognorm==DBL_MAX) {
+      gmp_fprintf ( stderr, "# Info: exp_alpha: %.3f, norm bound: DBL_MAX, "
+                    "E bound: %.3f (init. norm: %.3f)\n",
+                    bound->exp_min_alpha,
+                    bound->bound_E,
+                    bound->init_lognorm );
+    }
+    else {
+      gmp_fprintf ( stderr, "# Info: exp_alpha: %.3f, norm bound: %.3f, "
+                    "E bound: %.3f (init. norm: %.3f)\n",
+                    bound->exp_min_alpha,
+                    bound->bound_lognorm,
+                    bound->bound_E,
+                    bound->init_lognorm );
+    }
+  }
+}
+
+
+/**
+ * This is for tuning function 
+ */
+void
+ropt_bound_setup_incr ( ropt_poly_t poly,
+                        ropt_bound_t bound,
+                        ropt_param_t param,
+                        double incr )
+{
+  ropt_bound_setup_normbound (poly, bound, param, incr);
+  ropt_bound_setup_globalbound (poly, bound, param);
+  ropt_bound_setup_others (bound);
+  if (param->verbose >= 2) {
+    gmp_fprintf ( stderr, "# Info: tune (%d:%d, %ld:%ld, %Zd:%Zd)\n",
+                  bound->global_w_boundl,
+                  bound->global_w_boundr,
+                  bound->global_u_boundl,
+                  bound->global_u_boundr,
+                  bound->global_v_boundl,
+                  bound->global_v_boundr );
   }
 }
 
@@ -790,6 +825,41 @@ ropt_s1param_setup ( ropt_poly_t poly,
     printf ("# Info: s1param->nbest_sl: %u (= size_total_sublattices*ropteffort)\n", s1param->nbest_sl);
     printf ("# Info: s1param->nbest_sieve: %u (for sieving)\n", s1param->nbest_sieve);
   }
+
+  /* Set 3: set "e_sl[]" */
+  ropt_s1param_setup_e_sl (poly, s1param, bound, param);
+
+  /* Set 4: set "individual_nbest_sl[]" */
+  ropt_s1param_setup_individual_nbest_sl (s1param);
+}
+
+
+/**
+ * Setup s1param by default parameters and/or param (stdin).
+ */
+void
+ropt_s1param_resetup ( ropt_poly_t poly,
+                       ropt_s1param_t s1param,
+                       ropt_bound_t bound,
+                       ropt_param_t param,
+                       unsigned int nbest )
+{
+  unsigned int i, j;
+
+  /* Set 1: "len_e_sl" and "tlen_e_sl" */
+  s1param->len_e_sl = NUM_SUBLATTICE_PRIMES;
+  s1param->tlen_e_sl = s1param->len_e_sl;
+
+  /* Set 2: "nbest_sl", depending on the size of n */
+  j = mpz_sizeinbase (poly->n, 10);
+  for (i = 0; i < 8; i ++)
+    if (size_total_sublattices[i][0] > j)
+      break;
+
+  s1param->nbest_sl = (unsigned long) nbest;
+  s1param->nbest_sieve = (unsigned long) ((double) size_total_sublattices[i][2]);
+  if (s1param->nbest_sl < 4)
+    s1param->nbest_sl = 4;
 
   /* Set 3: set "e_sl[]" */
   ropt_s1param_setup_e_sl (poly, s1param, bound, param);

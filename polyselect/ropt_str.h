@@ -210,7 +210,13 @@ void ropt_bound_init ( ropt_bound_t );
 
 void ropt_bound_setup ( ropt_poly_t poly,
                         ropt_bound_t bound,
-                        ropt_param_t param );
+                        ropt_param_t param,
+                        double incr );
+
+void ropt_bound_setup_incr ( ropt_poly_t poly,
+                             ropt_bound_t bound,
+                             ropt_param_t param,
+                             double incr );
 
 #if 0
 double ropt_bound_expected_E (mpz_poly F, mpz_poly G);
@@ -234,6 +240,12 @@ void ropt_s1param_setup ( ropt_poly_t poly,
                           ropt_s1param_t s1param,
                           ropt_bound_t bound,
                           ropt_param_t param);
+
+void ropt_s1param_resetup ( ropt_poly_t poly,
+                            ropt_s1param_t s1param,
+                            ropt_bound_t bound,
+                            ropt_param_t param,
+                            unsigned int nbest );
 
 void ropt_s1param_free ( ropt_s1param_t s1param );
 

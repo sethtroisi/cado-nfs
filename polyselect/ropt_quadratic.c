@@ -640,7 +640,7 @@ ropt_quadratic ( ropt_poly_t poly,
 
   /* setup bound, s1param, alpha_pqueue, tsieve_E_pqueue */
   ropt_bound_init (bound);
-  ropt_bound_setup (poly, bound, param);
+  ropt_bound_setup (poly, bound, param, BOUND_LOGNORM_INCR_MAX);
   ropt_s1param_init (s1param);
   ropt_s1param_setup (poly, s1param, bound, param);
 
