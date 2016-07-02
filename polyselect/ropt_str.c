@@ -739,6 +739,10 @@ ropt_s1param_setup_e_sl ( ropt_poly_t poly,
   else
     sublattice = bound_by_u / 16;
 
+  gmp_printf (" boundl is %Zd\n", bound->global_v_boundl);
+  gmp_printf (" boundr is %Zd\n", bound->global_v_boundr);
+  printf (" sublattice is %lu\n", sublattice);
+  
   mpz_poly F;
   F->coeff = poly->f;
   F->deg = poly->d;
@@ -758,6 +762,8 @@ ropt_s1param_setup_e_sl ( ropt_poly_t poly,
   /* set e_sl[] from default array */
   for (j = 0; j < NUM_SUBLATTICE_PRIMES; j++) {
     s1param->e_sl[j] = default_sublattice_pe[i][j];
+    printf (": %u, value is %u\n", j, s1param->e_sl[j]);
+    
   }
 
   /* overwrite e_sl[] from from stdin, if needed */
@@ -845,17 +851,12 @@ ropt_s1param_resetup ( ropt_poly_t poly,
                        unsigned int nbest )
 {
   unsigned int i, j;
-
-  /* Set 1: "len_e_sl" and "tlen_e_sl" */
   s1param->len_e_sl = NUM_SUBLATTICE_PRIMES;
   s1param->tlen_e_sl = s1param->len_e_sl;
-
-  /* Set 2: "nbest_sl", depending on the size of n */
   j = mpz_sizeinbase (poly->n, 10);
   for (i = 0; i < 8; i ++)
     if (size_total_sublattices[i][0] > j)
       break;
-
   s1param->nbest_sl = (unsigned long) nbest;
   s1param->nbest_sieve = (unsigned long) ((double) size_total_sublattices[i][2]);
   if (s1param->nbest_sl < 4)

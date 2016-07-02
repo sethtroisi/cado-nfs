@@ -33,7 +33,7 @@
 #define SUP_ALPHA 4.843
 
 /* maximum lognorm+exp_E increment for each rotation */
-#define BOUND_LOGNORM_INCR_MAX 1.01
+#define BOUND_LOGNORM_INCR_MAX 1.005
 #define BOUND_LOGNORM_INCR_MAX_TUNESTEP 0.005
 
 #define MAX_LINE_LENGTH 4096

@@ -455,59 +455,6 @@ ropt_linear_tune ( ropt_poly_t poly,
 }
 
 
-
-/**
- * Tune the BOUND_LOGNORM_INCR_MAX
- */
-static double
-ropt_linear_pre_tune ( ropt_poly_t poly,
-                       ropt_param_t param,
-                       ropt_info_t info,
-                       MurphyE_pq *global_E_pqueue )
-{
-  info->mode = 0;
-
-  /* setup bound, pqueue */
-  int r, k = -1;
-  ropt_bound_t bound;
-  alpha_pq *pqueue;
-  ropt_s1param_t s1param;
-  ropt_bound_init (bound);
-  new_alpha_pq (&pqueue, 32);
-  ropt_s1param_init (s1param);
-  double score, maxscore,
-    incr = BOUND_LOGNORM_INCR_MAX,
-    best_incr = BOUND_LOGNORM_INCR_MAX;
-  maxscore = 0;
-  while ((double)k<=param->effort) {
-
-    ropt_bound_setup_incr (poly, bound, param, incr);
-    ropt_s1param_resetup (poly, s1param, bound, param, 8);
-    r = ropt_stage1 (poly, bound, s1param, param, pqueue, 0);
-    if (r == -1) break;
-    score = ropt_linear_tune_fast (poly, s1param, param, info, pqueue,
-                                   global_E_pqueue, size_tune_sievearray);
-    if (maxscore < score) {
-      maxscore = score;
-      best_incr = incr;
-    }
-    reset_alpha_pq (pqueue);
-    incr += BOUND_LOGNORM_INCR_MAX_TUNESTEP;
-    k ++;
-  }
-  if (param->verbose >= 1) {
-    gmp_fprintf (stderr, "# Info: pre_tune, best_incr: %f\n", best_incr);
-  }
-
-  free_alpha_pq (&pqueue);
-  ropt_s1param_free (s1param);
-  ropt_bound_free (bound);
-  info->mode = 0;
-  return best_incr;
-}
-
-
-
 /**
  *a Call root sieve
  */
@@ -682,7 +629,55 @@ ropt_linear_sieve ( ropt_poly_t poly,
 }
 
 
+/**
+ * Tune the BOUND_LOGNORM_INCR_MAX
+ */
+static double
+ropt_linear_pre_tune ( ropt_poly_t poly,
+                       ropt_param_t param,
+                       ropt_info_t info,
+                       MurphyE_pq *global_E_pqueue )
+{
+  info->mode = 0;
 
+  /* setup bound, pqueue */
+  int r, k = -1;
+  ropt_bound_t bound;
+  alpha_pq *pqueue;
+  ropt_s1param_t s1param;
+  ropt_bound_init (bound);
+  new_alpha_pq (&pqueue, 32);
+  ropt_s1param_init (s1param);
+  double score, maxscore,
+    incr = BOUND_LOGNORM_INCR_MAX,
+    best_incr = BOUND_LOGNORM_INCR_MAX;
+  maxscore = 0;
+  while ((double)k<=param->effort) {
+
+    ropt_bound_setup_incr (poly, bound, param, incr);
+    ropt_s1param_resetup (poly, s1param, bound, param, 8);
+    r = ropt_stage1 (poly, bound, s1param, param, pqueue, 0);
+    if (r == -1) break;
+    score = ropt_linear_tune_fast (poly, s1param, param, info, pqueue,
+                                   global_E_pqueue, size_tune_sievearray);
+    if (maxscore < score) {
+      maxscore = score;
+      best_incr = incr;
+    }
+    reset_alpha_pq (pqueue);
+    incr += BOUND_LOGNORM_INCR_MAX_TUNESTEP;
+    k ++;
+  }
+  if (param->verbose >= 1) {
+    gmp_fprintf (stderr, "# Info: pre_tune, best_incr: %f\n", best_incr);
+  }
+
+  free_alpha_pq (&pqueue);
+  ropt_s1param_free (s1param);
+  ropt_bound_free (bound);
+  info->mode = 0;
+  return best_incr;
+}
 
 
 /**
