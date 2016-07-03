@@ -63,17 +63,17 @@ using namespace std;
 
 /* Size of the row blocks. This impacts both the immediate blocks, and
  * the dispatch/combine blocks */
-size_t rowbatch = 2048;
+static size_t rowbatch = 2048;
 
 /* Immediate blocks have this many columns. */
-size_t colbatch0 = 65536;
+static size_t colbatch0 = 65536;
 
 /* Coefficients whose absolute value is below this bound are stored as
  * repetition of the column index several times.
  */
-int coeff_repeat_bound = 4;
+static int coeff_repeat_bound = 4;
 
-int debug_print = 0;
+static int debug_print = 0;
 
 #ifdef DISPATCHERS_AND_COMBINERS
 /* column indices below col_col_dispatcher_cutoff are treated as immediate
@@ -81,7 +81,7 @@ int debug_print = 0;
  * sufficient to force the first vertical strip to be processed as
  * immediate blocks only, which is generally something we want
  * because there are so many coefficients there. */
-size_t col_dispatcher_cutoff = 262144;
+static size_t col_dispatcher_cutoff = 262144;
 
 /* For the dispatcher/combiner split, we treat this number of columns at
  * a time.  */
@@ -91,7 +91,7 @@ size_t col_dispatcher_cutoff = 262144;
  * 32k 0.71 cpu @100
  * 64k 0.70 cpu @100
  */
-size_t colbatch1 = 65536;
+static size_t colbatch1 = 65536;
 #endif
 
 static inline uint64_t cputicks()
