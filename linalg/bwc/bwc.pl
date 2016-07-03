@@ -1325,7 +1325,7 @@ sub task_common_run {
     # We start with lingen, because it's slightly specific
     # take out the ones we don't need (and acollect shares some
     # peculiarities).
-    @_ = grep !/^(cpubinding|balancing|interleaving|matrix|mm_impl|mpi|thr)?=/, @_ if $program =~ /(lingen|acollect$)/;
+    @_ = grep !/^(rebuild_cache|cpubinding|balancing|interleaving|matrix|mm_impl|mpi|thr)?=/, @_ if $program =~ /(lingen|acollect$)/;
     if ($program =~ /plingen/) {
         @_ = map { s/^lingen_mpi\b/mpi/; $_; } @_;
     } else {

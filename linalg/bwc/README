@@ -173,9 +173,16 @@ expected to be present in the same directory as the calling binary.
     stored. If the value here is too small, then there are chances that
     you exhaust your disk space.
 
-* mm_impl=[basic|sliced|bucket|...]
+* mm_impl=[basic|sliced|bucket|basicp|zone]
 
-    low-level matrix multiplication code to use. See below in this document.
+    low-level matrix multiplication code to use. Several such back-ends
+    are programmed. The first three above are for systems defined over
+    GF(2), while "basicp" and "zone" are for systems over prime fields.
+    As the name suggests, the two "basic" variants are intentionally
+    simple and stupid. In contrast, the "bucket" and "zone"
+    implementations are the faster ones, and should be used for better
+    performance (the implementation defaults to using these, depending on
+    which value is chosen for the prime).
 
 * seed=<number>
 

@@ -122,8 +122,9 @@ extern void matmul_top_init(matmul_top_data_ptr mmt,
         int optimized_direction);
 
 
-void matmul_top_decl_usage(param_list_ptr pl);
-void matmul_top_lookup_parameters(param_list_ptr pl);
+extern void matmul_top_decl_usage(param_list_ptr pl);
+extern void matmul_top_lookup_parameters(param_list_ptr pl);
+extern void matmul_top_report(matmul_top_data_ptr mmt, double scale);
 extern void matmul_top_clear(matmul_top_data_ptr mmt);
 #if 0
 extern void matmul_top_fill_random_source(matmul_top_data_ptr mmt, int d);
@@ -162,6 +163,7 @@ extern int mmt_vec_save_stream(pi_file_handle f, mmt_vec_ptr v, unsigned int ite
 extern int mmt_vec_load(mmt_vec_ptr v, const char * name, unsigned int iter, unsigned int itemsondisk);
 extern int mmt_vec_save(mmt_vec_ptr v, const char * name, unsigned int iter, unsigned int itemsondisk);
 extern void mmt_vec_reduce_mod_p(mmt_vec_ptr v);
+extern void mmt_vec_clear_padding(mmt_vec_ptr v, size_t unpadded, size_t padded);
 
 extern void mmt_vec_broadcast(mmt_vec_ptr v);
 extern void mmt_vec_reduce(mmt_vec_ptr w, mmt_vec_ptr v);
