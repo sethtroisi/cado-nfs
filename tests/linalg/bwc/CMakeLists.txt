@@ -260,23 +260,56 @@ target_link_libraries(spmv_test bwc_base)
 add_executable(short_matmul short_matmul.c)
 target_link_libraries(short_matmul bwc_base)
 
-cado_define_test(SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/test-spmv.sh
+set(test-spmv-binary-u64k1_alltests YES)
+set(test-spmv-binary-u64k4_alltests YES)
+set(test-spmv-prime-p_3_alltests YES)
+
+macro(create_test_spmv test_spmv_base)
+cado_define_test(
+    TEST_NAME test-spmv-${test_spmv_base}
+    SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/test-spmv.sh
     ARGUMENTS
     --matrix-size 1000 --density 10 --bindir ${CADO_NFS_BINARY_DIR}
+    ${ARGN}
     NO_DEFAULT_RUN
     TARGET_DEPENDENCIES
     random_matrix spmv_test short_matmul mf_scan mf_bal bwc_matmul)
 
-cado_divert_test(test-spmv 11 APPEND_ARGUMENTS thr=1x1)
-cado_divert_test(test-spmv 12 APPEND_ARGUMENTS thr=1x2)
-cado_divert_test(test-spmv 13 APPEND_ARGUMENTS thr=1x3)
-cado_divert_test(test-spmv 32 APPEND_ARGUMENTS thr=3x2)
-cado_divert_test(test-spmv 23 APPEND_ARGUMENTS thr=2x3)
+cado_divert_test(test-spmv-${test_spmv_base} 11 APPEND_ARGUMENTS thr=1x1)
+if(${test-spmv-${test_spmv_base}_alltests})
+cado_divert_test(test-spmv-${test_spmv_base} 12 APPEND_ARGUMENTS thr=1x2)
+cado_divert_test(test-spmv-${test_spmv_base} 22 APPEND_ARGUMENTS thr=2x2)
+cado_divert_test(test-spmv-${test_spmv_base} 13 APPEND_ARGUMENTS thr=1x3)
+cado_divert_test(test-spmv-${test_spmv_base} 32 APPEND_ARGUMENTS thr=3x2)
+cado_divert_test(test-spmv-${test_spmv_base} 23 APPEND_ARGUMENTS thr=2x3)
 if(HAVE_MPI)
-cado_divert_test(test-spmv 2122 APPEND_ARGUMENTS mpi=2x1 thr=2x2)
-cado_divert_test(test-spmv 1322 APPEND_ARGUMENTS mpi=1x3 thr=2x2)
-cado_divert_test(test-spmv 3222 APPEND_ARGUMENTS mpi=3x2 thr=2x2)
+cado_divert_test(test-spmv-${test_spmv_base} 2122 APPEND_ARGUMENTS mpi=2x1 thr=2x2)
+cado_divert_test(test-spmv-${test_spmv_base} 1322 APPEND_ARGUMENTS mpi=1x3 thr=2x2)
+cado_divert_test(test-spmv-${test_spmv_base} 3222 APPEND_ARGUMENTS mpi=3x2 thr=2x2)
 endif()
+endif()
+endmacro()
+
+foreach(arith_layer ${BWC_GF2_ARITHMETIC_BACKENDS})
+    string_join(mm_backends " " ${BWC_GF2_MATMUL_BACKENDS})
+
+    create_test_spmv(binary-${arith_layer}
+        --backends "${mm_backends}"
+        --arith-layer ${arith_layer})
+endforeach()
+
+foreach(arith_layer ${BWC_GFP_ARITHMETIC_BACKENDS})
+    set(extra)
+    string(REGEX MATCH "p_([0-9]+)" t "${arith_layer}")
+    if(t)
+        set(width ${CMAKE_MATCH_1})
+    endif()
+    string_join(mm_backends " " ${BWC_GFP_MATMUL_BACKENDS})
+    create_test_spmv(prime-${arith_layer}
+        --backends "${mm_backends}"
+        --arith-layer ${arith_layer}
+        --prime "${prime_${width}}")
+endforeach()
 
 cado_define_test(SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/test-matcache.sh
     --matrix-size 1000 --density 10 --bindir

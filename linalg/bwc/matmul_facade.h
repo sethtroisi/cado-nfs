@@ -13,17 +13,6 @@
 
 /* Include all matmul implementations here */
 
-#define MM_IMPL_MAGIC_basic     1
-#define MM_IMPL_MAGIC_sliced    2
-#define MM_IMPL_MAGIC_bucket    3
-#if 0
-#define MM_IMPL_MAGIC_threaded  4
-#endif
-#define MM_IMPL_MAGIC_basicp    1025
-
-#define CPP_PAD2(A,B) A ## B
-#define MM_IMPL_MY_MAGIC(X) CPP_PAD2(MM_IMPL_MAGIC_,X)
-
 #if !defined(MM_MPFQ_LAYER)
 #error "Please compile this file with the MM_MPFQ_LAYER macro defined"
 #endif
