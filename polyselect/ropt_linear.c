@@ -3,17 +3,17 @@
  * Main function for linear rotation.
  * Called by ropt.c and call stage1.c and stage2.c.
  *
- * This is description of the flow:
- * - first we call rotp_stage1() to get N lats based only on alpha;
+ * This is description of the flow (for deg-5 polys):
+ * - first pre_tune() tunes lognorm_incr and hence bounds;
+ * - then stage1()    gets N lats based only on alpha;
  * - then fast_tune() gets N' << N good lats based on crude test-sieve;
  * - then slow_tune() gets N'' ~ N lats based on finer and recursieve test-sieve;
- * - finally we root-sieve the top few candidates from above.
+ * - then we root-sieve the top few candidates from above.
  *
  * For the above figures:
- *  N  = size_total_sublattices[][1] * ropteffort * TUNE_NUM_SUBLATTICE_STAGE1
- *  N' = size_total_sublattices[][1] * ropteffort
- * 
- *
+ *  N   = size_total_sublattices[][1] * ropteffort * TUNE_NUM_SUBLATTICE_STAGE1
+ *  N'  = size_total_sublattices[][1] * ropteffort
+ *  N'' = size_total_sublattices[][2] (no ropteffort here)
  */ 
 
 
@@ -663,12 +663,12 @@ ropt_linear_sieve ( ropt_poly_t poly,
 /**
  * Tune the BOUND_LOGNORM_INCR_MAX
  */
-static double
-ropt_linear_pre_tune ( ropt_poly_t poly,
-                       ropt_param_t param,
-                       alpha_pq *alpha_pqueue,
-                       ropt_info_t info,
-                       MurphyE_pq *global_E_pqueue )
+double
+ropt_pre_tune ( ropt_poly_t poly,
+                ropt_param_t param,
+                alpha_pq *alpha_pqueue,
+                ropt_info_t info,
+                MurphyE_pq *global_E_pqueue )
 {
   info->mode = 0;
   unsigned int pqueue_size = 32;
@@ -734,6 +734,7 @@ ropt_linear_pre_tune ( ropt_poly_t poly,
 }
 #endif
 
+
 /**
  * Linear rotation: deg 5.
  */
@@ -757,6 +758,8 @@ ropt_linear_deg5 ( ropt_poly_t poly,
   alpha_pq *pre_alpha_pqueue;
 #endif
   MurphyE_pq *global_E_pqueue;
+
+  /* setup bound, s1param, alpha_pqueue, tsieve_E_pqueue */
   ropt_bound_init (bound);
   ropt_bound_setup (poly, bound, param, BOUND_LOGNORM_INCR_MAX);
   ropt_s1param_init (s1param);
@@ -765,12 +768,14 @@ ropt_linear_deg5 ( ropt_poly_t poly,
 #if TUNE_LOGNORM_INCR
   new_alpha_pq (&pre_alpha_pqueue, s1param->nbest_sl);
 #endif  
+  /* Here we use some larger value since alpha_pqueue records
+     more sublattices to be tuned */
   new_alpha_pq (&alpha_pqueue, s1param->nbest_sl*TUNE_NUM_SUBLATTICE);
 
   /* Step 1: tune ropt_bound first */
 #if TUNE_LOGNORM_INCR
-  incr = ropt_linear_pre_tune (poly, param, pre_alpha_pqueue,
-                               info, global_E_pqueue);
+  incr = ropt_pre_tune (poly, param, pre_alpha_pqueue,
+                        info, global_E_pqueue);
   ropt_bound_setup_incr (poly, bound, param, incr);
   ropt_s1param_resetup (poly, s1param, bound, param, s1param->nbest_sl);
 #endif

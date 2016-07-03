@@ -10,21 +10,33 @@
 #include "ropt.h"
 #include "portability.h"
 
+
 /**
  * Tune stage 1 for quadratic rotation.
+ * - tune qudratic rotation w
+ *  -- tune lognorm_incr
  */
 static void
 ropt_quadratic_stage1 ( ropt_poly_t poly,
                         ropt_bound_t bound,
                         ropt_s1param_t s1param,
                         ropt_param_t param,
-                        alpha_pq *alpha_pqueue )
+                        alpha_pq *alpha_pqueue
+#if TUNE_LOGNORM_INCR
+                        , alpha_pq *pre_alpha_pqueue,
+                        ropt_info_t info,
+                        MurphyE_pq *global_E_pqueue
+#endif
+  )
 {
   const int numw = 3;
   int i, j, k, r, w, old_verbose, old_i, old_nbest_sl, used, *w_good, w_top[numw];
   const unsigned int size_alpha_pqueue_all_w =
     s1param->nbest_sl * TUNE_NUM_SUBLATTICE;
   double score;
+#if TUNE_LOGNORM_INCR
+  double incr;
+#endif
   mpz_t m, u, v, mod;
   alpha_pq *alpha_pqueue_all_w;
   
@@ -44,7 +56,6 @@ ropt_quadratic_stage1 ( ropt_poly_t poly,
 
   /* used in ropt_stage1(), the larger the slower for each
      quadratic rotation w. */
-  old_nbest_sl = s1param->nbest_sl;
   s1param->nbest_sl = 16;
 
   /* used in ropt_stage1(), uses this to reduce the length of 
@@ -106,33 +117,38 @@ ropt_quadratic_stage1 ( ropt_poly_t poly,
     if (r != 1)
       w_top[k++] = w_good[i];
   }
+
   
   /* Step 3: for each top w, re-detect (u, v) harder */
 
   /* consider more sublattices in stage 1 and leave them for tuning */
-  s1param->nbest_sl = old_nbest_sl * TUNE_NUM_SUBLATTICE_STAGE1; 
-  s1param->nbest_sl_tunemode = 0; // Note: used in ropt_stage1()
   old_i = 0;
+  s1param->nbest_sl_tunemode = 0; // Note: used in ropt_stage1()
   for (i = 0; i < numw; i ++) {
     w = w_top[i];
-    
     /* w_top[3] is not full? */
-    if (w >= bound->global_w_boundr + 1)
-      continue;
-    
+    if (w >= bound->global_w_boundr + 1) continue;
     if (param->verbose >= 2)
       fprintf (stderr, "\n# Info: find lat on quadratic rotation "
                "by %d*x^2\n", w);
 
+    /* quadratic rotation and setup */
     old_i = rotate_aux (poly->f, poly->g[1], m, old_i, w, 2);
-
     ropt_poly_setup (poly);
 
-    ropt_bound_reset (poly, bound, param);
+    /* tune incr */
+#if TUNE_LOGNORM_INCR
+    incr = ropt_pre_tune (poly, param, pre_alpha_pqueue,
+                          info, global_E_pqueue);
+    ropt_bound_setup_incr (poly, bound, param, incr);
+    ropt_s1param_resetup (poly, s1param, bound, param, s1param->nbest_sl);
+#endif
 
+    old_nbest_sl = s1param->nbest_sl;
+    s1param->nbest_sl = old_nbest_sl * TUNE_NUM_SUBLATTICE_STAGE1;
     r = ropt_stage1 (poly, bound, s1param, param, alpha_pqueue, w);
+    s1param->nbest_sl = old_nbest_sl;
   }
-  s1param->nbest_sl = old_nbest_sl;
   if (param->verbose >= 2) fprintf (stderr, "\n");
 
   /* rotate back */
@@ -637,23 +653,34 @@ ropt_quadratic ( ropt_poly_t poly,
   ropt_s1param_t s1param;
   alpha_pq *alpha_pqueue;
   MurphyE_pq *global_E_pqueue;
+#if TUNE_LOGNORM_INCR
+  alpha_pq *pre_alpha_pqueue;
+#endif
 
   /* setup bound, s1param, alpha_pqueue, tsieve_E_pqueue */
   ropt_bound_init (bound);
   ropt_bound_setup (poly, bound, param, BOUND_LOGNORM_INCR_MAX);
   ropt_s1param_init (s1param);
   ropt_s1param_setup (poly, s1param, bound, param);
-
-  /* nbest_sl is the number of sublattice to be finally root-sieved.
-     Here we use some larger value since alpha_pqueue records more 
-     sublattices to be tuned */
-  new_alpha_pq (&alpha_pqueue, s1param->nbest_sl * TUNE_NUM_SUBLATTICE);
   new_MurphyE_pq (&global_E_pqueue, s1param->nbest_sl);
+#if TUNE_LOGNORM_INCR
+  new_alpha_pq (&pre_alpha_pqueue, s1param->nbest_sl);
+#endif  
+  /* Here we use some larger value since alpha_pqueue records
+     more sublattices to be tuned */
+  new_alpha_pq (&alpha_pqueue, s1param->nbest_sl * TUNE_NUM_SUBLATTICE);
 
-  /* Step 1: find good sublattice */
+  /* Step 1: find w first */
   t1 = seconds_thread ();
+#if TUNE_LOGNORM_INCR
+  ropt_quadratic_stage1 (poly, bound, s1param, param, alpha_pqueue,
+                         pre_alpha_pqueue, info, global_E_pqueue);
+#else
   ropt_quadratic_stage1 (poly, bound, s1param, param, alpha_pqueue);
+#endif  
   t1 = seconds_thread () - t1;
+
+
 
   /* Step 2: rank/tune above found sublattices by short sieving */
   t2 = seconds_thread ();
