@@ -38,15 +38,15 @@ unsigned int size_tune_sievearray = 6144;
  * the best sublattices first.
  */
 const unsigned int size_total_sublattices[9][3] = {
-  /* {digits, num_of_sublattices} */
+  /* {digits, num_of_sublattices, num_of_final_sieves} */
   {80,  4,    4},  /* for up to 79 digits */
   {140, 8,    8},  /* up to 139 digits */
-  {150, 8,   8},  /* up to 149 digits */
+  {150, 8,    8},  /* up to 149 digits */
   {160, 16,   8},  /* up to 159 digits */
   {170, 16,   8}, /* up to 169 digits */
   {180, 32,  16}, /* up to 179 digits */
-  {220, 32, 16}, /* up to 219 digits */
-  {260, 64, 32}, /* up to 259 digits */
+  {220, 64,  16}, /* up to 219 digits */
+  {260, 64,  32}, /* up to 259 digits */
   {300, 128, 64} /* up to 299 digits */
 };
 

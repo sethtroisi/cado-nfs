@@ -718,52 +718,46 @@ ropt_s1param_setup_e_sl ( ropt_poly_t poly,
                           ropt_param_t param )
 {
   unsigned int i, j;
-  unsigned long sublattice;
+  unsigned long modbound;
   mpz_t bound_by_v;
   mpz_init (bound_by_v);
 
-  /* e_sl */
+  /* check bound_by_u */
   unsigned long bound_by_u = (unsigned long)
     (bound->global_u_boundr < (-bound->global_u_boundl)) ?
     bound->global_u_boundr : (-bound->global_u_boundl);
 
+  /* check bound_by_v */
   mpz_fdiv_q_ui (bound_by_v, bound->global_v_boundr,
                  SIZE_SIEVEARRAY_V_MIN);
 
-  /* fix for small skewnss */
+  /* compare two bounds */
   if ( mpz_cmp_ui (bound_by_v, bound_by_u) < 0 ) {
-    sublattice = mpz_get_ui (bound_by_v);
-    if (sublattice > bound_by_u / 16)
-      sublattice = bound_by_u / 16;
+    modbound = mpz_get_ui (bound_by_v);
   }
   else
-    sublattice = bound_by_u / 16;
+    modbound = bound_by_u;
 
-  gmp_printf (" boundl is %Zd\n", bound->global_v_boundl);
-  gmp_printf (" boundr is %Zd\n", bound->global_v_boundr);
-  printf (" sublattice is %lu\n", sublattice);
-  
+  /* adjust for small skewness but large bound (not sure if this is good) */
   mpz_poly F;
   F->coeff = poly->f;
   F->deg = poly->d;
   double skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
+  if ( (double) modbound > skew )
+    modbound = (unsigned long) (skew);
 
-  /* fix for small skewness but large bound */
-  if ( (double) sublattice > (skew / 16.0) )
-    sublattice = (unsigned long) (skew / 16.0);
-
+  /* find i */
   for (i = 0; i < NUM_DEFAULT_SUBLATTICE; i ++)
-    if (default_sublattice_prod[i] > sublattice)
+    if (default_sublattice_prod[i] > modbound)
       break;
-  /* fix if i too large */
+
+  /* check if i > limit and fix if so */
   i = (i >= NUM_DEFAULT_SUBLATTICE) ?
     (NUM_DEFAULT_SUBLATTICE - 1) : i;
 
   /* set e_sl[] from default array */
   for (j = 0; j < NUM_SUBLATTICE_PRIMES; j++) {
     s1param->e_sl[j] = default_sublattice_pe[i][j];
-    printf (": %u, value is %u\n", j, s1param->e_sl[j]);
-    
   }
 
   /* overwrite e_sl[] from from stdin, if needed */

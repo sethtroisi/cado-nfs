@@ -34,7 +34,10 @@
 
 /* maximum lognorm+exp_E increment for each rotation */
 #define BOUND_LOGNORM_INCR_MAX 1.005
+
 #define BOUND_LOGNORM_INCR_MAX_TUNESTEP 0.005
+
+#define TUNE_LOGNORM_INCR 1
 
 #define MAX_LINE_LENGTH 4096
 
