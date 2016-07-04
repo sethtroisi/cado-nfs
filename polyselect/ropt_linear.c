@@ -668,14 +668,15 @@ ropt_pre_tune ( ropt_poly_t poly,
                 ropt_param_t param,
                 alpha_pq *alpha_pqueue,
                 ropt_info_t info,
-                MurphyE_pq *global_E_pqueue )
+                MurphyE_pq *global_E_pqueue,
+                unsigned long quad )
 {
   info->mode = 0;
-  unsigned int pqueue_size = 32;
-  unsigned int s1_size = 16;
 
   /* setup bound, pqueue */
-  int i, r, w, used, k = -1;
+  unsigned int pqueue_size = 32, s1_size = 16;
+  unsigned int *old_e;
+  int i, r, w, used, k = -1, flag;
   ropt_bound_t bound;
   alpha_pq *pqueue;
   ropt_s1param_t s1param;
@@ -686,16 +687,42 @@ ropt_pre_tune ( ropt_poly_t poly,
   ropt_bound_init (bound);
   new_alpha_pq (&pqueue, pqueue_size);
   ropt_s1param_init (s1param);
+  old_e = (unsigned int*) malloc(NUM_SUBLATTICE_PRIMES*sizeof(unsigned int));
+
   double score, maxscore,
     incr = BOUND_LOGNORM_INCR_MAX,
     best_incr = BOUND_LOGNORM_INCR_MAX;
   maxscore = 0;
+
   while ((double)k<=param->effort) {
 
     /* change bound and test-sieve */
     ropt_bound_setup_incr (poly, bound, param, incr);
     ropt_s1param_resetup (poly, s1param, bound, param, s1_size);
-    r = ropt_stage1 (poly, bound, s1param, param, pqueue, 0);
+
+    /* skip if no change */
+    if (k==-1) {
+      for (i = 0; i < NUM_SUBLATTICE_PRIMES; i ++)
+        old_e[i] = s1param->e_sl[i];
+    }
+    flag = 0;
+    for (i = 0; i < NUM_SUBLATTICE_PRIMES; i ++) {
+      if (old_e[i] != s1param->e_sl[i]) {
+        flag = 1;
+        break;
+      }
+    }
+    if (flag) {
+      reset_alpha_pq (pqueue);
+      incr += BOUND_LOGNORM_INCR_MAX_TUNESTEP;
+      k ++;
+      continue;
+    }
+    
+    /* setup stage 1 and tune */
+    s1param->nbest_sl_tunemode = 1;
+    r = ropt_stage1 (poly, bound, s1param, param, pqueue, quad);
+    s1param->nbest_sl_tunemode = 0;
     if (r == -1) break;
     score = ropt_linear_tune_fast (poly, s1param, param, info, pqueue,
                                    global_E_pqueue, size_tune_sievearray);
@@ -723,12 +750,14 @@ ropt_pre_tune ( ropt_poly_t poly,
                  best_incr);
   }
 
+  free(old_e);
   mpz_clear (u);
   mpz_clear (v);
   mpz_clear (mod);
   free_alpha_pq (&pqueue);
   ropt_s1param_free (s1param);
   ropt_bound_free (bound);
+
   info->mode = 0;
   return best_incr;
 }
@@ -775,7 +804,7 @@ ropt_linear_deg5 ( ropt_poly_t poly,
   /* Step 1: tune ropt_bound first */
 #if TUNE_LOGNORM_INCR
   incr = ropt_pre_tune (poly, param, pre_alpha_pqueue,
-                        info, global_E_pqueue);
+                        info, global_E_pqueue, 0);
   ropt_bound_setup_incr (poly, bound, param, incr);
   ropt_s1param_resetup (poly, s1param, bound, param, s1param->nbest_sl);
 #endif

@@ -42,7 +42,7 @@
 #define MAX_LINE_LENGTH 4096
 
 /* number of default parameters for various sublattices */
-#define NUM_DEFAULT_SUBLATTICE 26
+#define NUM_DEFAULT_SUBLATTICE 28
 
 #define DEBUG 0
 
