@@ -25,10 +25,14 @@
 #include "arith-modp.hpp"
 
 typedef arith_modp::gfp<sizeof(abelt)/sizeof(unsigned long)> gfp;
-// typedef arith_modp::fast_type<gfp> fast_gfp;
-typedef gfp fast_gfp;
-typedef fast_gfp::elt fast_elt;
-typedef fast_gfp::elt_ur fast_elt_ur;
+
+template<typename gfp> struct fast_default {
+    // uncomment the following line (and comment out the next one) to
+    // enable the SSE2/AVX2 carry-save code.
+    // typedef arith_modp::fast_type<gfp> type;
+    typedef gfp type;
+};
+
 
 /* This extension is used to distinguish between several possible
  * implementations of the product */
@@ -235,45 +239,49 @@ template<> struct cachefile::seq<triple_161632> : public cachefile::basic_seq<tr
 };
 
 
-cachefile& operator>>(cachefile & c, uint32_t & x) {
+static cachefile& operator>>(cachefile & c, uint32_t & x) {
     MATMUL_COMMON_READ_ONE32(x, c.f);
     return c;
 }
 
-cachefile& operator<<(cachefile & c, uint32_t const & x) {
+static cachefile& operator<<(cachefile & c, uint32_t const & x) {
     MATMUL_COMMON_WRITE_ONE32(x, c.f);
     return c;
 }
 
-cachefile& operator>>(cachefile & c, int32_t & x) {
+#if 0
+static cachefile& operator>>(cachefile & c, int32_t & x) {
     MATMUL_COMMON_READ_ONE32(x, c.f);
     return c;
 }
 
-cachefile& operator<<(cachefile & c, int32_t const & x) {
+static cachefile& operator<<(cachefile & c, int32_t const & x) {
     MATMUL_COMMON_WRITE_ONE32(x, c.f);
     return c;
 }
+#endif
 
-cachefile& operator>>(cachefile & c, uint64_t & x) {
+static cachefile& operator>>(cachefile & c, uint64_t & x) {
     MATMUL_COMMON_READ_ONE64(x, c.f);
     return c;
 }
 
-cachefile& operator<<(cachefile & c, uint64_t const & x) {
+static cachefile& operator<<(cachefile & c, uint64_t const & x) {
     MATMUL_COMMON_WRITE_ONE64(x, c.f);
     return c;
 }
 
-cachefile& operator>>(cachefile & c, int64_t & x) {
+#if 0
+static cachefile& operator>>(cachefile & c, int64_t & x) {
     MATMUL_COMMON_READ_ONE64(x, c.f);
     return c;
 }
 
-cachefile& operator<<(cachefile & c, int64_t const & x) {
+static cachefile& operator<<(cachefile & c, int64_t const & x) {
     MATMUL_COMMON_WRITE_ONE64(x, c.f);
     return c;
 }
+#endif
 
 template<typename T> cachefile& operator>>(cachefile & c, cachefile::seq<T> & s);
 template<typename T> cachefile& operator<<(cachefile & c, cachefile::seq<T> const & s);
@@ -321,7 +329,13 @@ struct placed_block {/*{{{*/
 };
 /*}}}*/
 
-struct zone : public placed_block { /* {{{ (immediate zones) */
+template<typename gfp, typename fast_gfp = typename fast_default<gfp>::type >
+class zone : public placed_block { /* {{{ (immediate zones) */
+    typedef typename gfp::elt elt;
+    typedef typename gfp::preinv preinv;
+    typedef typename fast_gfp::elt fast_elt;
+    typedef typename fast_gfp::elt_ur fast_elt_ur;
+public:
     typedef vector<pair<uint16_t, uint16_t>> qpm_t;
     typedef vector<triple_161632> qg_t;
     qpm_t qp, qm;
@@ -330,8 +344,8 @@ struct zone : public placed_block { /* {{{ (immediate zones) */
     zone(unsigned int i0, unsigned int j0) : placed_block(i0, j0) {}
     inline bool empty() const { return qp.empty() && qm.empty() && qg.empty(); }
     inline size_t size() const { return qp.size() + qm.size() + qg.size(); }
-    void mul(fast_elt_ur *, const fast_elt *, gfp::elt const&, gfp::preinv const&) const;
-    void tmul(fast_elt_ur *, const fast_elt *, gfp::elt const&, gfp::preinv const&) const;
+    void mul(fast_elt_ur *, const fast_elt *, elt const&, preinv const&) const;
+    void tmul(fast_elt_ur *, const fast_elt *, elt const&, preinv const&) const;
 
     struct sort_qpm {
         inline bool operator()(qpm_t::value_type const& a, qpm_t::value_type const& b) const {
@@ -393,7 +407,10 @@ struct combiner : public placed_block {/*{{{*/
 };
 /*}}}*/
 /* {{{ Temporary buffers which are used when reading the dispatchers.  */
-struct temp_buffer {
+template<typename gfp, typename fast_gfp = typename fast_default<gfp>::type >
+class temp_buffer {
+    typedef typename fast_gfp::elt fast_elt;
+public:
     unsigned int j0;
     typedef vector<fast_elt, aligned_allocator<fast_elt, fast_elt::alignment> > vec_type;  
     vec_type v;
@@ -404,6 +421,7 @@ struct temp_buffer {
 /* }}} */
 #endif
 
+template<typename gfp, typename fast_gfp = typename fast_default<gfp>::type >
 struct block_of_rows : public placed_block {/*{{{*/
     /* A block of rows contains:
      *
@@ -413,7 +431,7 @@ struct block_of_rows : public placed_block {/*{{{*/
      *
      * It is processed in the order found in matmul_zone_data::mul
      */
-    vector<zone> Z;
+    vector<zone<gfp, fast_gfp> > Z;
 #ifdef DISPATCHERS_AND_COMBINERS
     vector<dispatcher> D;       /* can be empty */
     vector<combiner> C;
@@ -436,13 +454,19 @@ struct block_of_rows : public placed_block {/*{{{*/
     }/*}}}*/
 };/*}}}*/
 
-struct matmul_zone_data {/*{{{*/
+template<typename gfp, typename fast_gfp = typename fast_default<gfp>::type >
+class matmul_zone_data {/*{{{*/
+    typedef typename gfp::elt elt;
+    typedef typename gfp::preinv preinv;
+    typedef typename fast_gfp::elt fast_elt;
+    typedef typename fast_gfp::elt_ur fast_elt_ur;
+public:
     /* repeat the fields from the public interface */
     struct matmul_public_s public_[1];
     /* now our private fields */
     abdst_field xab;
 
-    vector<block_of_rows> blocks;
+    vector<block_of_rows<gfp, fast_gfp> > blocks;
 
     vector<fast_elt, aligned_allocator<fast_elt, fast_elt::alignment> > alternate[2];
 
@@ -479,59 +503,61 @@ struct matmul_zone_data {/*{{{*/
 /*{{{ trampolines for C bindings */
 void MATMUL_NAME(clear)(matmul_ptr mm0)
 {
-    delete (matmul_zone_data *) mm0;
+    delete (matmul_zone_data<gfp> *) mm0;
 }
 
 matmul_ptr MATMUL_NAME(init)(void* xx, param_list pl, int optimized_direction)
 {
-    return (matmul_ptr) new matmul_zone_data(xx, pl, optimized_direction);
+    return (matmul_ptr) new matmul_zone_data<gfp>(xx, pl, optimized_direction);
 }
 
 void MATMUL_NAME(build_cache)(matmul_ptr mm0, uint32_t * data)
 {
-    ((matmul_zone_data*)mm0)->build_cache(data);
+    ((matmul_zone_data<gfp>*)mm0)->build_cache(data);
 }
 
 int MATMUL_NAME(reload_cache)(matmul_ptr mm0)
 {
-    return ((matmul_zone_data*)mm0)->reload_cache();
+    return ((matmul_zone_data<gfp>*)mm0)->reload_cache();
 }
 
 void MATMUL_NAME(save_cache)(matmul_ptr mm0)
 {
-    ((matmul_zone_data*)mm0)->save_cache();
+    ((matmul_zone_data<gfp>*)mm0)->save_cache();
 }
 
 void MATMUL_NAME(mul)(matmul_ptr mm0, void * xdst, void const * xsrc, int d)
 {
-    ((matmul_zone_data*)mm0)->mul(xdst, xsrc, d);
+    ((matmul_zone_data<gfp>*)mm0)->mul(xdst, xsrc, d);
 }
 
 void MATMUL_NAME(report)(matmul_ptr mm0 MAYBE_UNUSED, double scale MAYBE_UNUSED) {
-    ((matmul_zone_data*)mm0)->report(scale);
+    ((matmul_zone_data<gfp>*)mm0)->report(scale);
 }
 
 void MATMUL_NAME(auxv)(matmul_ptr mm0 MAYBE_UNUSED, int op MAYBE_UNUSED, va_list ap MAYBE_UNUSED)
 {
-    ((matmul_zone_data*)mm0)->auxv(op, ap);
+    ((matmul_zone_data<gfp>*)mm0)->auxv(op, ap);
 }
 
 void MATMUL_NAME(aux)(matmul_ptr mm0, int op, ...)
 {
     va_list ap;
     va_start(ap, op);
-    ((matmul_zone_data*)mm0)->auxv(op, ap);
+    ((matmul_zone_data<gfp>*)mm0)->auxv(op, ap);
     va_end(ap);
 }
 /*}}}*/
 
 /**************************************************************************/
 
-matmul_zone_data::~matmul_zone_data() {/*{{{*/
+template<typename gfp, typename fast_gfp>
+matmul_zone_data<gfp, fast_gfp>::~matmul_zone_data() {/*{{{*/
     matmul_common_clear(public_);
 }
 /*}}}*/
-matmul_zone_data::matmul_zone_data(void* xab, param_list pl, int optimized_direction) : xab((abdst_field) xab)/*{{{*/
+template<typename gfp, typename fast_gfp>
+matmul_zone_data<gfp, fast_gfp>::matmul_zone_data(void* xab, param_list pl, int optimized_direction) : xab((abdst_field) xab)/*{{{*/
 {
     memset(&public_, 0, sizeof(public_));
     int suggest = optimized_direction ^ MM_DIR0_PREFERS_TRANSP_MULT;
@@ -653,7 +679,8 @@ pair<dispatcher, combiner> create_dispatcher_and_combiner(zone const& q)/*{{{*/
 }/*}}}*/
 #endif
 
-void matmul_zone_data::build_cache(uint32_t * data)/*{{{*/
+template<typename gfp, typename fast_gfp>
+void matmul_zone_data<gfp, fast_gfp>::build_cache(uint32_t * data)/*{{{*/
 {
     matmul_zone_data * mm = this;
 
@@ -685,7 +712,7 @@ void matmul_zone_data::build_cache(uint32_t * data)/*{{{*/
         /* Create the data structures for the horizontal strip starting
          * at row i0, column 0.
          */
-        block_of_rows B(i0);
+        block_of_rows<gfp, fast_gfp> B(i0);
 
         /* Because this horizontal strip will be split in many blocks, we
          * need to have a batch of pointers for reading each row. */
@@ -714,7 +741,7 @@ void matmul_zone_data::build_cache(uint32_t * data)/*{{{*/
 #else
             colbatch = colbatch0;
 #endif
-            zone z(i0, j0);
+            zone<gfp, fast_gfp> z(i0, j0);
             for(unsigned int k = 0 ; k < rowbatch ; k++) {
                 for( ; cc[k] < pp[k+1] ; cc[k] += 2) {
                     uint32_t j = cc[k][0] - j0;
@@ -783,7 +810,8 @@ void matmul_zone_data::build_cache(uint32_t * data)/*{{{*/
 }
 /*}}}*/
 /* cache load and save {{{ */
-int matmul_zone_data::reload_cache()
+template<typename gfp, typename fast_gfp>
+int matmul_zone_data<gfp, fast_gfp>::reload_cache()
 {
     FILE * f = matmul_common_reload_cache_fopen(sizeof(abelt), public_, MM_MAGIC);
     if (f == NULL) { return 0; }
@@ -802,7 +830,8 @@ int matmul_zone_data::reload_cache()
     return 1;
 }
 
-void matmul_zone_data::save_cache()
+template<typename gfp, typename fast_gfp>
+void matmul_zone_data<gfp, fast_gfp>::save_cache()
 {
     FILE * f = matmul_common_save_cache_fopen(sizeof(abelt), public_, MM_MAGIC);
     cachefile c(f);
@@ -837,7 +866,7 @@ void __attribute__((noinline)) gfp3_dispatch_sub (void * tdst, const void * tsrc
     }
 }
 #endif
-#if 1
+#if 0
 extern "C" {
 extern void gfp3_dispatch_add(void * tdst, const void * tsrc, const void * p, size_t size);
 extern void gfp3_dispatch_sub(void * tdst, const void * tsrc, const void * p, size_t size);
@@ -864,8 +893,9 @@ void __attribute__((noinline)) gfp3_dispatch_sub (void * tdst, const void * tsrc
 }
 #endif
 
-void zone::mul(fast_elt_ur * tdst, const fast_elt * tsrc,
-        gfp::elt const& prime, gfp::preinv const& preinverse) const
+template<typename gfp, typename fast_gfp>
+void zone<gfp, fast_gfp>::mul(fast_elt_ur * tdst, const fast_elt * tsrc,
+        elt const& prime, preinv const& preinverse) const
 {
 #if 1
     for(auto const& ij : qp) 
@@ -888,8 +918,9 @@ void zone::mul(fast_elt_ur * tdst, const fast_elt * tsrc,
     }
 }
 
-void zone::tmul(fast_elt_ur * tdst, const fast_elt * tsrc,
-        gfp::elt const& prime, gfp::preinv const& preinverse) const
+template<typename gfp, typename fast_gfp>
+void zone<gfp, fast_gfp>::tmul(fast_elt_ur * tdst, const fast_elt * tsrc,
+        elt const& prime, preinv const& preinverse) const
 {
 #if 1
     for(auto const& ij : qp) 
@@ -912,14 +943,15 @@ void zone::tmul(fast_elt_ur * tdst, const fast_elt * tsrc,
     }
 }
 
-void matmul_zone_data::mul(void * xdst, void const * xsrc, int d)
+template<typename gfp, typename fast_gfp>
+void matmul_zone_data<gfp, fast_gfp>::mul(void * xdst, void const * xsrc, int d)
 {
     matmul_zone_data * mm = this;
     ASM_COMMENT("multiplication code");
     abdst_field x = mm->xab;
 
-    gfp::preinv preinverse;
-    gfp::elt prime;
+    preinv preinverse;
+    elt prime;
 
     {
         mpz_t p;
@@ -937,7 +969,7 @@ void matmul_zone_data::mul(void * xdst, void const * xsrc, int d)
     size_t nsrc = mm->public_->dim[d];
     size_t ndst = mm->public_->dim[!d];
     
-    if (arith_modp::details::is_same<gfp::elt, fast_elt>::value) {
+    if (arith_modp::details::is_same<elt, fast_elt>::value) {
         src = (const fast_elt *) xsrc;
         dst = (fast_elt *) xdst;
     } else {
@@ -950,8 +982,8 @@ void matmul_zone_data::mul(void * xdst, void const * xsrc, int d)
          * And because those are convertible to fast_gfp::elt's, we'll
          * get our vector.
          */
-        const gfp::elt * begin = (const gfp::elt *) xsrc;
-        const gfp::elt * end = begin + nsrc;
+        const elt * begin = (const elt *) xsrc;
+        const elt * end = begin + nsrc;
         alternate[d].assign(begin, end);
         src = &alternate[d].front();
         dst = &alternate[!d].front();
@@ -982,7 +1014,7 @@ void matmul_zone_data::mul(void * xdst, void const * xsrc, int d)
      */
 
 #ifdef DISPATCHERS_AND_COMBINERS
-    vector<temp_buffer> buffers;
+    vector<temp_buffer<gfp, fast_gfp> > buffers;
     unsigned int ncols_t = mm->public_->dim[!mm->public_->store_transposed];
 
     /* replay the sequence of starting column indices */
@@ -1102,10 +1134,8 @@ void matmul_zone_data::mul(void * xdst, void const * xsrc, int d)
         scratch_alloc.deallocate(tdst, ndst);
     }
 
-    if (!arith_modp::details::is_same<gfp::elt, fast_elt>::value) {
-        std::copy(alternate[!d].begin(),
-                alternate[!d].end(),
-                (gfp::elt *) xdst);
+    if (!arith_modp::details::is_same<elt, fast_elt>::value) {
+        std::copy(alternate[!d].begin(), alternate[!d].end(), (elt*) xdst);
     }
 
     ASM_COMMENT("end of multiplication code");
@@ -1113,23 +1143,26 @@ void matmul_zone_data::mul(void * xdst, void const * xsrc, int d)
     mm->public_->iteration[d]++;
 }
 
-void matmul_zone_data::report(double scale MAYBE_UNUSED)
+template<typename gfp, typename fast_gfp>
+void matmul_zone_data<gfp, fast_gfp>::report(double scale MAYBE_UNUSED)
 {
     static pthread_mutex_t lk = PTHREAD_MUTEX_INITIALIZER;
     pthread_mutex_lock(&lk);
     unsigned int niter = public_->iteration[0] + public_->iteration[1];
-    for(tmap_t::const_iterator it = tmap.begin() ; it != tmap.end() ; it++) {
+    for(typename tmap_t::const_iterator it = tmap.begin() ; it != tmap.end() ; it++) {
         printf("j0=%u [%u zones]: avg %.1f cycles/c [%.1f coeffs avg] - %.1f Mcycles/iter\n",
                 it->first, it->second.n / niter, it->second.tt / scale / it->second.w, (double) it->second.w / it->second.n, (double) it->second.tt / niter * 1.0e-6);
     }
     pthread_mutex_unlock(&lk);
 }
 
-void matmul_zone_data::auxv(int op MAYBE_UNUSED, va_list ap MAYBE_UNUSED)
+template<typename gfp, typename fast_gfp>
+void matmul_zone_data<gfp, fast_gfp>::auxv(int op MAYBE_UNUSED, va_list ap MAYBE_UNUSED)
 {
 }
 
-void matmul_zone_data::aux(int op, ...)
+template<typename gfp, typename fast_gfp>
+void matmul_zone_data<gfp, fast_gfp>::aux(int op, ...)
 {
     va_list ap;
     va_start(ap, op);
