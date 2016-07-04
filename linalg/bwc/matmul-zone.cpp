@@ -288,14 +288,14 @@ template<typename T> cachefile& operator<<(cachefile & c, cachefile::seq<T> cons
 
 template<typename T> cachefile& operator>>(cachefile & c, vector<T>&v)
 {
-    size_t size;
+    uint64_t size;
     c >> size;
     v.insert(v.end(), size, T());
     return cachefile::seq<T>().in(c, &(v[0]), v.size());
 }
 template<typename T> cachefile& operator<<(cachefile & c, vector<T> const &v)
 {
-    c << v.size();
+    c << (uint64_t) v.size();
     return cachefile::seq<T>().out(c, &(v[0]), v.size());
 }
 template<typename T> inline cachefile& operator>>(cachefile& c, T& z) { return z.cachefile_load(c); }
