@@ -383,7 +383,7 @@ Examples of basic usage:
 * Run a server on machine1, and a slave on machine2, disabling ssl:
 
 machine1$ ./cado-nfs.py --server 90377629292003121684002147101760858109247336549001090677693 server.port=4242 server.ssl=no server.whitelist=machine2
-machine2$ ./cado-nfs-client.py --server=http://machine1:4242
+machine2$ ./cado-nfs-client.py --server=http://machine1:4242 --bindir=...
 
 Note: if you are on an insecure network, you'll have to activate ssl, and
 then pass the appropriate sha1 certificate to the client (the server
