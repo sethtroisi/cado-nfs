@@ -88,98 +88,6 @@ list_mpz_sort_and_remove_dup (list_mpz_ptr l, const int verbose)
       gmp_fprintf (stderr, "# sopt: Remove duplicate %Zd\n", l->tab[i]);
 }
 
-
-/****************************** Hash table for uint64_t ***********************/
-typedef struct {
-  uint64_t *tab;
-  unsigned long size;
-  unsigned long used;
-} hash_table_uint64_s;
-
-typedef hash_table_uint64_s hash_table_uint64_t[1];
-typedef hash_table_uint64_s * hash_table_uint64_ptr;
-typedef const hash_table_uint64_s * hash_table_uint64_srcptr;
-
-/* Internal function. Do not use it directly, use hash_uint64_insert instead. */
-/* return 1 if new, 0 if already present in table */
-static inline int
-hash_uint64_insert_internal (uint64_t *H, unsigned long size, uint64_t h)
-{
-  uint64_t i = h % size;
-
-  while (H[i] != 0 && H[i] != h)
-    if (++i == size)
-      i = 0;
-  if (H[i] == h) /* already present */
-    return 0;
-  else
-  {
-    ASSERT_ALWAYS(H[i] == 0);
-    H[i] = h;
-    return 1;
-  }
-}
-
-static inline void
-hash_uint64_realloc (hash_table_uint64_ptr H, unsigned long wanted_size)
-{
-  uint64_t *new;
-  unsigned long new_used = 0, new_size;
-
-  new_size = ulong_nextprime (wanted_size);
-  new = (uint64_t *) malloc (new_size * sizeof (uint64_t));
-  memset (new, 0, new_size * sizeof (uint64_t));
-  for (unsigned long i = 0; i < H->size; i++)
-    if (H->tab[i])
-      new_used += hash_uint64_insert_internal (new, new_size, H->tab[i]);
-  free (H->tab);
-  H->tab = new;
-  H->size = new_size;
-  ASSERT_ALWAYS(new_used == H->used);
-}
-
-static inline void MAYBE_UNUSED
-hash_uint64_init (hash_table_uint64_ptr H, unsigned long init_size)
-{
-  H->used  = 0;
-  H->size = 0;
-  H->tab = NULL;
-  hash_uint64_realloc (H, init_size);
-}
-
-static inline void MAYBE_UNUSED
-hash_uint64_clear (hash_table_uint64_ptr H)
-{
-  free (H->tab);
-  H->tab = NULL;
-  H->size = 0;
-  H->used = 0;
-}
-
-static inline void MAYBE_UNUSED
-hash_uint64_reset (hash_table_uint64_ptr H)
-{
-  memset (H->tab, 0, H->size * sizeof (uint64_t));
-  H->used = 0;
-}
-
-/* return 1 if new, 0 if already present in table */
-static inline int MAYBE_UNUSED
-hash_uint64_insert (hash_table_uint64_ptr H, uint64_t h)
-{
-  if (2 * H->used >= H->size) /* realloc */
-    hash_uint64_realloc (H, 2*H->size + 1);
-
-  if (hash_uint64_insert_internal (H->tab, H->size, h))
-  {
-    H->used++;
-    return 1;
-  }
-  else
-    return 0;
-}
-
-
 /******************************************************************************/
 
 /* store in Q[0..nb_approx-1] the (at most) nb_approx first best rational
@@ -654,35 +562,6 @@ LLL_set_matrix_from_polys (mat_Z *m, mpz_poly_srcptr ft, mpz_poly_srcptr gt,
     mpz_mul (m->coeff[k+2][k+1], m->coeff[k+2][k+1], gt->coeff[0]);
     mpz_mul (m->coeff[k+2][k+2], m->coeff[k+2][k+2], gt->coeff[1]);
   }
-}
-
-/* Construct poly from i-th row vector of length d of m. */
-static inline void MAYBE_UNUSED
-LLL_set_poly_from_vector (mpz_poly_ptr flll, mat_Z U, int k, mpz_poly_srcptr ft,
-                          mpz_poly_srcptr gt)
-{
-  int d = ft->deg;
-  mpz_poly_realloc (flll, d+1);
-  for (int i = 0; i <= d; i++)
-  {
-    mpz_mul (flll->coeff[i], ft->coeff[i], U.coeff[k][1]);
-    if (i <= d-2)
-      mpz_addmul (flll->coeff[i], U.coeff[k][i+2], gt->coeff[0]);
-    if (i >= 1 && i <= d-1)
-      mpz_addmul (flll->coeff[i], U.coeff[k][i+1], gt->coeff[1]);
-  }
-  flll->deg = d;
-  /* force leading coefficient of f to be positive */
-  if (mpz_sgn (flll->coeff[d]) < 0)
-    mpz_poly_neg (flll, flll);
-}
-
-static inline uint64_t MAYBE_UNUSED
-get_LLL_uid (mat_Z U, int k, int d)
-{
-  uint64_t v1 = ((uint64_t) mpz_get_ui (U.coeff[k][1])) & 0x00000000FFFFFFFF;
-  uint64_t v2 = ((uint64_t) mpz_get_ui (U.coeff[k][d])) & 0x00000000FFFFFFFF;
-  return  (v1 << 32) | v2;
 }
 
 /* Print only the two coefficients of higher degree of a polynomial */
