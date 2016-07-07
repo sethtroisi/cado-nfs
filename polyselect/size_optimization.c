@@ -138,7 +138,7 @@ hash_uint64_realloc (hash_table_uint64_ptr H, unsigned long wanted_size)
   ASSERT_ALWAYS(new_used == H->used);
 }
 
-static inline void
+static inline void MAYBE_UNUSED
 hash_uint64_init (hash_table_uint64_ptr H, unsigned long init_size)
 {
   H->used  = 0;
@@ -147,7 +147,7 @@ hash_uint64_init (hash_table_uint64_ptr H, unsigned long init_size)
   hash_uint64_realloc (H, init_size);
 }
 
-static inline void
+static inline void MAYBE_UNUSED
 hash_uint64_clear (hash_table_uint64_ptr H)
 {
   free (H->tab);
@@ -156,7 +156,7 @@ hash_uint64_clear (hash_table_uint64_ptr H)
   H->used = 0;
 }
 
-static inline void
+static inline void MAYBE_UNUSED
 hash_uint64_reset (hash_table_uint64_ptr H)
 {
   memset (H->tab, 0, H->size * sizeof (uint64_t));
@@ -164,7 +164,7 @@ hash_uint64_reset (hash_table_uint64_ptr H)
 }
 
 /* return 1 if new, 0 if already present in table */
-static inline int
+static inline int MAYBE_UNUSED
 hash_uint64_insert (hash_table_uint64_ptr H, uint64_t h)
 {
   if (2 * H->used >= H->size) /* realloc */
@@ -657,7 +657,7 @@ LLL_set_matrix_from_polys (mat_Z *m, mpz_poly_srcptr ft, mpz_poly_srcptr gt,
 }
 
 /* Construct poly from i-th row vector of length d of m. */
-static inline void
+static inline void MAYBE_UNUSED
 LLL_set_poly_from_vector (mpz_poly_ptr flll, mat_Z U, int k, mpz_poly_srcptr ft,
                           mpz_poly_srcptr gt)
 {
@@ -677,7 +677,7 @@ LLL_set_poly_from_vector (mpz_poly_ptr flll, mat_Z U, int k, mpz_poly_srcptr ft,
     mpz_poly_neg (flll, flll);
 }
 
-static inline uint64_t
+static inline uint64_t MAYBE_UNUSED
 get_LLL_uid (mat_Z U, int k, int d)
 {
   uint64_t v1 = ((uint64_t) mpz_get_ui (U.coeff[k][1])) & 0x00000000FFFFFFFF;
