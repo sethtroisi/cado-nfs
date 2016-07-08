@@ -111,12 +111,12 @@ else()
             else()
                 # perhaps it's openmpi, but openmpi won't tell on mere
                 # mpicc -v...
-                execute_process(COMMAND ${MPI_C_COMPILER} -showme:version
+                execute_process(COMMAND ${MPI_C_COMPILER} "-showme:version"
                         RESULT_VARIABLE test_return_code
                         OUTPUT_VARIABLE test_stdout
                         ERROR_VARIABLE test_stderr
                         )
-                string(STRIP "${test_stdout}" test_stdout)
+                string(STRIP "${test_stdout} ${test_stderr}" test_stdout)
                 if(test_stdout MATCHES "Open MPI ([^ ]*)")
                     message(STATUS "MPI C Compiler is Open MPI, version ${CMAKE_MATCH_1}")
                     set(MPI_COMPILER_IS_OPEN_MPI 1)
@@ -216,9 +216,9 @@ endif()
 
 if(HAVE_MPI)
     if(EXISTS ${HAVE_MPI}/ompi_info)
-        execute_process(COMMAND ${HAVE_MPI}/ompi_info -V OUTPUT_VARIABLE t)
-        string(REGEX MATCH "Open MPI v([0-9\\.]+(rc[0-9]*)?)" t ${t})
-        string(REGEX REPLACE "Open MPI v" "" MPI_OPENMPI_VERSION ${t})
+        execute_process(COMMAND ${HAVE_MPI}/ompi_info OUTPUT_VARIABLE t ERROR_VARIABLE tx)
+        string(REGEX MATCH "Open MPI: ([0-9\\.]+(rc[0-9]*)?)" t "${t} ${tx}")
+        set(MPI_OPENMPI_VERSION t)
         message(STATUS "Open MPI version ${MPI_OPENMPI_VERSION}")
     endif()
 endif()

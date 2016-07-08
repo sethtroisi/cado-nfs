@@ -37,7 +37,7 @@ template<typename F> struct our_gfp_type<F, UINT_MAX> {
 };
 
 /* If this line complains that ::type is not a type, then see above */
-typedef typename our_gfp_type<abelt,abimpl_max_characteristic_bits()>::type gfp;
+typedef our_gfp_type<abelt,abimpl_max_characteristic_bits()>::type gfp;
 
 
 
