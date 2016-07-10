@@ -74,6 +74,8 @@ typedef struct {
   unsigned int *e_sl;
 
   mpz_t modulus;
+
+  unsigned long modbound;
 } _ropt_s1param_t;
 typedef _ropt_s1param_t ropt_s1param_t[1];
 
@@ -246,6 +248,14 @@ void ropt_s1param_resetup ( ropt_poly_t poly,
                             ropt_bound_t bound,
                             ropt_param_t param,
                             unsigned int nbest );
+
+void
+ropt_s1param_resetup_modbound ( ropt_poly_t poly,
+                                ropt_s1param_t s1param,
+                                ropt_bound_t bound,
+                                ropt_param_t param,
+                                unsigned int nbest,
+                                unsigned long modbound);
 
 void ropt_s1param_free ( ropt_s1param_t s1param );
 

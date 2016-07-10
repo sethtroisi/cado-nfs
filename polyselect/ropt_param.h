@@ -44,6 +44,9 @@
 /* number of default parameters for various sublattices */
 #define NUM_DEFAULT_SUBLATTICE 28
 
+/* number of rows for size_total_sublattices */
+#define NUM_DEFAULT_DIGITS 20
+
 #define DEBUG 0
 
 /* Don't change this. */
@@ -51,11 +54,11 @@
 
 /* Top 32 (alpha) in each "SIZE_SIEVEARRAY": this does not
    affect the running-time since it is not dominating */
-#define NUM_TOPALPHA_SIEVEARRAY 16
+#define NUM_TOPALPHA_SIEVEARRAY 32
 
 /* Top 32 (E) for each sublattice, may contain several
    SIZE_SIEVEARRAY */
-#define NUM_TOPE_SUBLATTICE 16
+#define NUM_TOPE_SUBLATTICE 32
 
 /* Either rank stage 1 sublattices by E or by alpha, the former
    seems to be more accurate */
@@ -115,7 +118,7 @@ extern const unsigned int s1_size_each_sublattice[NUM_SUBLATTICE_PRIMES][NUM_SUB
 
 extern const unsigned int s1_size_each_sublattice_tune[NUM_SUBLATTICE_PRIMES];
 
-extern const unsigned int size_total_sublattices[9][3];
+extern const unsigned int size_total_sublattices[NUM_DEFAULT_DIGITS][3];
 
 double exp_alpha (double logK);
 

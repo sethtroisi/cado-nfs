@@ -682,7 +682,8 @@ ropt_s1param_init ( ropt_s1param_t s1param )
   s1param->tlen_e_sl = 0;
   s1param->nbest_sl = 0;
   s1param->nbest_sieve = 0;
-
+  s1param->modbound = 0;
+  
   /* set to 1 for using quicker, smaller nbest_sl for tuning
      sublattices */
   s1param->nbest_sl_tunemode = 0;
@@ -710,6 +711,9 @@ ropt_s1param_init ( ropt_s1param_t s1param )
 
 /**
  * Helper function to setup "e_sl[]".
+ * Note the factor 16 in the following function seems
+ * important. It has the effect to reduce the bounds
+ * which is better in practice.
  */
 static inline void
 ropt_s1param_setup_e_sl ( ropt_poly_t poly,
@@ -734,17 +738,19 @@ ropt_s1param_setup_e_sl ( ropt_poly_t poly,
   /* compare two bounds */
   if ( mpz_cmp_ui (bound_by_v, bound_by_u) < 0 ) {
     modbound = mpz_get_ui (bound_by_v);
+    if (modbound > bound_by_u / 16)
+      modbound = bound_by_u / 16;
   }
   else
-    modbound = bound_by_u;
+    modbound = bound_by_u / 16;
 
   /* adjust for small skewness but large bound (not sure if this is good) */
   mpz_poly F;
   F->coeff = poly->f;
   F->deg = poly->d;
   double skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
-  if ( (double) modbound > skew )
-    modbound = (unsigned long) (skew);
+  if ((double) modbound > (skew / 16.0))
+    modbound = (unsigned long) (skew / 16.0);
 
   /* find i */
   for (i = 0; i < NUM_DEFAULT_SUBLATTICE; i ++)
@@ -760,11 +766,18 @@ ropt_s1param_setup_e_sl ( ropt_poly_t poly,
     s1param->e_sl[j] = default_sublattice_pe[i][j];
   }
 
-  /* overwrite e_sl[] from from stdin, if needed */
-  if (param->s1_num_e_sl != 0)
-    for (i = 0; i < NUM_SUBLATTICE_PRIMES; i++)
-      s1param->e_sl[i] = param->s1_e_sl[i];
+  /* get mod bound */
+  s1param->modbound = default_sublattice_prod[i];
 
+  /* overwrite e_sl[] from from stdin, if needed */
+  if (param->s1_num_e_sl != 0) {
+    s1param->modbound = 1;
+    for (i = 0; i < NUM_SUBLATTICE_PRIMES; i++) {
+      s1param->e_sl[i] = param->s1_e_sl[i];
+      s1param->modbound *= param->s1_e_sl[i];
+    }
+  }
+  
   mpz_clear (bound_by_v);
 }
 
@@ -812,7 +825,7 @@ ropt_s1param_setup ( ropt_poly_t poly,
 
   /* Set 2: "nbest_sl", depending on the size of n */
   j = mpz_sizeinbase (poly->n, 10);
-  for (i = 0; i < 8; i ++)
+  for (i = 0; i < NUM_DEFAULT_DIGITS; i ++)
     if (size_total_sublattices[i][0] > j)
       break;
 
@@ -831,6 +844,7 @@ ropt_s1param_setup ( ropt_poly_t poly,
 
   /* Set 4: set "individual_nbest_sl[]" */
   ropt_s1param_setup_individual_nbest_sl (s1param);
+
 }
 
 
@@ -848,7 +862,7 @@ ropt_s1param_resetup ( ropt_poly_t poly,
   s1param->len_e_sl = NUM_SUBLATTICE_PRIMES;
   s1param->tlen_e_sl = s1param->len_e_sl;
   j = mpz_sizeinbase (poly->n, 10);
-  for (i = 0; i < 8; i ++)
+  for (i = 0; i < NUM_DEFAULT_DIGITS; i ++)
     if (size_total_sublattices[i][0] > j)
       break;
   s1param->nbest_sl = (unsigned long) nbest;
@@ -861,6 +875,41 @@ ropt_s1param_resetup ( ropt_poly_t poly,
 
   /* Set 4: set "individual_nbest_sl[]" */
   ropt_s1param_setup_individual_nbest_sl (s1param);
+
+}
+
+
+/**
+ * Setup s1param with modbound as extra input
+ */
+void
+ropt_s1param_resetup_modbound ( ropt_poly_t poly,
+                                ropt_s1param_t s1param,
+                                ropt_bound_t bound,
+                                ropt_param_t param,
+                                unsigned int nbest,
+                                unsigned long modbound)
+{
+  ropt_s1param_resetup (poly, s1param, bound, param, nbest);
+
+  /* find i */
+  int i, j;
+  for (i = 0; i < NUM_DEFAULT_SUBLATTICE; i ++)
+    if (default_sublattice_prod[i] > modbound)
+      break;
+
+  /* check if i > limit and fix if so */
+  i = (i >= NUM_DEFAULT_SUBLATTICE) ?
+    (NUM_DEFAULT_SUBLATTICE - 1) : i;
+
+  /* set e_sl[] from default array */
+  for (j = 0; j < NUM_SUBLATTICE_PRIMES; j++) {
+    s1param->e_sl[j] = default_sublattice_pe[i][j];
+  }
+
+  /* get mod bound */
+  s1param->modbound = default_sublattice_prod[i];
+
 }
 
 

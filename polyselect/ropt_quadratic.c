@@ -137,8 +137,8 @@ ropt_quadratic_stage1 ( ropt_poly_t poly,
 
     /* tune incr */
 #if TUNE_LOGNORM_INCR
-    incr = ropt_pre_tune (poly, param, pre_alpha_pqueue,
-                          info, global_E_pqueue, w);
+    incr = ropt_stage1_tune (poly, param, pre_alpha_pqueue, alpha_pqueue,
+                             info, global_E_pqueue, w);
     ropt_bound_setup_incr (poly, bound, param, incr);
     ropt_s1param_setup (poly, s1param, bound, param);
 #endif

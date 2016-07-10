@@ -68,7 +68,7 @@ ropt_linear_tune_fast ( ropt_poly_t poly,
     }
     
     ropt_s2param_setup_tune (s1param, s2param, u, v, mod,
-                             0, curr_size_tune, NP-1);
+                             0, curr_size_tune*10, NP-1);
     ropt_stage2 (poly, s2param, param, info, global_E_pqueue, w);
     insert_alpha_pq (tmp_alpha_pqueue, w, u, v, mod, -info->ave_MurphyE);
     if (param->verbose >= 4)
@@ -446,8 +446,8 @@ ropt_linear_tune ( ropt_poly_t poly,
   r ++;
 
 
+  /* aux: in case pretune not empty, combine it */
 #if TUNE_LOGNORM_INCR
-  /* aux: in case pretune not empty, get it */
   used = pre_alpha_pqueue->used - 1;
   for (i = 0; i < used; i ++) {
     extract_alpha_pq (pre_alpha_pqueue, &w, u, v, mod, &score);
@@ -483,6 +483,133 @@ ropt_linear_tune ( ropt_poly_t poly,
 #endif
   return;
 }
+
+
+#if TUNE_LOGNORM_INCR
+/**
+ * Tune the parameters for ropt_stage1().
+ *  note even ropt_stage1() only computes sublattice, it depends on
+ *  the parameters in `bound'. Here we use test-sieve to tune good
+ *  parameters for `bound'. For now, the only parameter is
+ *   BOUND_LOGNORM_INCR_MAX which affects bound.
+ */
+double
+ropt_stage1_tune ( ropt_poly_t poly,
+                   ropt_param_t param,
+                   alpha_pq *tune_E_pqueue,
+                   alpha_pq *alpha_pqueue,
+                   ropt_info_t info,
+                   MurphyE_pq *global_E_pqueue,
+                   unsigned long quad )
+{
+  info->mode = 0;
+
+  /* setup bound, pqueue */
+  unsigned int pqueue_size = 8*param->effort, s1_size = 4*param->effort;
+  int i, k, kk, r, w, used, steps = 0;
+  ropt_bound_t bound;
+  alpha_pq *pqueue;
+  ropt_s1param_t s1param;
+  mpz_t u, v, mod;
+  mpz_init (u);
+  mpz_init (v);
+  mpz_init (mod);
+  ropt_bound_init (bound);
+  new_alpha_pq (&pqueue, pqueue_size);
+  ropt_s1param_init (s1param);
+
+  double score, maxscore,
+    start_incr = BOUND_LOGNORM_INCR_MAX,
+    best_incr = BOUND_LOGNORM_INCR_MAX,
+    upper_incr = start_incr + BOUND_LOGNORM_INCR_MAX_TUNESTEP*param->effort,
+    incr_step;
+  maxscore = 0.0;
+  unsigned long start_modbound, upper_modbound;
+  
+  /* compute initial bound */
+  ropt_bound_setup_incr (poly, bound, param, start_incr);
+  ropt_s1param_resetup (poly, s1param, bound, param, s1_size);
+  start_modbound = s1param->modbound;
+
+  /* compute upper bound modulus for stage1 */
+  ropt_bound_setup_incr (poly, bound, param, upper_incr);
+  ropt_s1param_resetup (poly, s1param, bound, param, s1_size);
+  upper_modbound = s1param->modbound;
+  for (k = 0; k < NUM_DEFAULT_SUBLATTICE; k ++)
+    if (default_sublattice_prod[k] == start_modbound)
+      break;
+  kk = k;
+  while (default_sublattice_prod[k] <= upper_modbound) {
+    k++;
+    steps++;
+  }
+  incr_step = (upper_incr-start_incr)/steps;
+
+  /* compute incr step */
+  while (default_sublattice_prod[kk] <= upper_modbound) {
+
+    /* change bound and test-sieve */
+    start_modbound = default_sublattice_prod[kk];
+    ropt_bound_setup_incr (poly, bound, param, start_incr);
+    ropt_s1param_resetup_modbound (poly, s1param, bound, param,
+                                   s1_size, start_modbound); 
+    s1param->nbest_sl_tunemode = 1;
+    r = ropt_stage1 (poly, bound, s1param, param, pqueue, quad);
+    s1param->nbest_sl_tunemode = 0;
+    if (r == -1)
+      break;
+
+    /* better not wasting sublattice */
+    used = pqueue->used;
+    for (i = 1; i < used; i ++) {
+      /*
+      gmp_fprintf (stderr, "# Info: inserting %.2f on "
+                   "lat (%d, %Zd, %Zd) (mod %Zd)\n",
+                   pqueue->alpha[i], pqueue->w[i], pqueue->u[i], pqueue->v[i],
+                   pqueue->modulus[i]);
+      */
+      insert_alpha_pq (alpha_pqueue, pqueue->w[i], pqueue->u[i], pqueue->v[i],
+                       pqueue->modulus[i], pqueue->alpha[i]);
+    }
+    
+    /* test root sieve */
+    score = ropt_linear_tune_fast (poly, s1param, param, info, pqueue,
+                                   global_E_pqueue, size_tune_sievearray);
+    /* update maxscore */
+    if (maxscore < score) {
+      maxscore = score;
+      best_incr = start_incr;
+    }
+
+   /* also better not wasting sieved slots, save to tune_E_pqueue */
+    used = pqueue->used - 1;
+    for (i = 0; i < used; i ++) {
+      extract_alpha_pq (pqueue, &w, u, v, mod, &score);
+      insert_alpha_pq (tune_E_pqueue, w, u, v, mod, score);
+    }
+
+    /* reset queue */
+    reset_alpha_pq (pqueue);
+    start_incr += incr_step;
+    kk++;
+  }
+  
+  if (param->verbose >= 1) {
+    gmp_fprintf (stderr, "# Info: tune (incr), best_lognorm_incr: %f\n",
+                 best_incr);
+  }
+
+  mpz_clear (u);
+  mpz_clear (v);
+  mpz_clear (mod);
+  free_alpha_pq (&pqueue);
+  ropt_s1param_free (s1param);
+  ropt_bound_free (bound);
+
+  info->mode = 0;
+  return best_incr;
+}
+#endif
 
 
 /**
@@ -659,111 +786,6 @@ ropt_linear_sieve ( ropt_poly_t poly,
 }
 
 
-#if TUNE_LOGNORM_INCR
-/**
- * Tune the BOUND_LOGNORM_INCR_MAX
- */
-double
-ropt_pre_tune ( ropt_poly_t poly,
-                ropt_param_t param,
-                alpha_pq *alpha_pqueue,
-                ropt_info_t info,
-                MurphyE_pq *global_E_pqueue,
-                unsigned long quad )
-{
-  info->mode = 0;
-
-  /* setup bound, pqueue */
-  unsigned int pqueue_size = 32, s1_size = 16;
-  unsigned int *old_e;
-  int i, r, w, used, k = -1, flag;
-  ropt_bound_t bound;
-  alpha_pq *pqueue;
-  ropt_s1param_t s1param;
-  mpz_t u, v, mod;
-  mpz_init (u);
-  mpz_init (v);
-  mpz_init (mod);
-  ropt_bound_init (bound);
-  new_alpha_pq (&pqueue, pqueue_size);
-  ropt_s1param_init (s1param);
-  old_e = (unsigned int*) malloc(NUM_SUBLATTICE_PRIMES*sizeof(unsigned int));
-
-  double score, maxscore,
-    incr = BOUND_LOGNORM_INCR_MAX,
-    best_incr = BOUND_LOGNORM_INCR_MAX;
-  maxscore = 0;
-
-  while ((double)k<=param->effort) {
-
-    /* change bound and test-sieve */
-    ropt_bound_setup_incr (poly, bound, param, incr);
-    ropt_s1param_resetup (poly, s1param, bound, param, s1_size);
-
-    /* skip if no change */
-    if (k==-1) {
-      for (i = 0; i < NUM_SUBLATTICE_PRIMES; i ++)
-        old_e[i] = s1param->e_sl[i];
-    }
-    flag = 0;
-    for (i = 0; i < NUM_SUBLATTICE_PRIMES; i ++) {
-      if (old_e[i] != s1param->e_sl[i]) {
-        flag = 1;
-        break;
-      }
-    }
-    if (flag) {
-      reset_alpha_pq (pqueue);
-      incr += BOUND_LOGNORM_INCR_MAX_TUNESTEP;
-      k ++;
-      continue;
-    }
-    
-    /* setup stage 1 and tune */
-    s1param->nbest_sl_tunemode = 1;
-    r = ropt_stage1 (poly, bound, s1param, param, pqueue, quad);
-    s1param->nbest_sl_tunemode = 0;
-    if (r == -1) break;
-    score = ropt_linear_tune_fast (poly, s1param, param, info, pqueue,
-                                   global_E_pqueue, size_tune_sievearray);
-    /* update maxscore */
-    if (maxscore < score) {
-      maxscore = score;
-      best_incr = incr;
-    }
-
-    /* better not wasting sieved slots */
-    used = pqueue->used - 1;
-    for (i = 0; i < used; i ++) {
-      extract_alpha_pq (pqueue, &w, u, v, mod, &score);
-      insert_alpha_pq (alpha_pqueue, w, u, v, mod, score);
-    }
-
-    /* reset queue */
-    reset_alpha_pq (pqueue);
-    incr += BOUND_LOGNORM_INCR_MAX_TUNESTEP;
-    k ++;
-  }
-  
-  if (param->verbose >= 1) {
-    gmp_fprintf (stderr, "# Info: tune (incr), best_lognorm_incr: %f\n",
-                 best_incr);
-  }
-
-  free(old_e);
-  mpz_clear (u);
-  mpz_clear (v);
-  mpz_clear (mod);
-  free_alpha_pq (&pqueue);
-  ropt_s1param_free (s1param);
-  ropt_bound_free (bound);
-
-  info->mode = 0;
-  return best_incr;
-}
-#endif
-
-
 /**
  * Linear rotation: deg 5.
  */
@@ -784,7 +806,7 @@ ropt_linear_deg5 ( ropt_poly_t poly,
   ropt_s1param_t s1param;
   alpha_pq *alpha_pqueue;
 #if TUNE_LOGNORM_INCR
-  alpha_pq *pre_alpha_pqueue;
+  alpha_pq *tune_E_pqueue;
 #endif
   MurphyE_pq *global_E_pqueue;
 
@@ -793,23 +815,25 @@ ropt_linear_deg5 ( ropt_poly_t poly,
   ropt_bound_setup (poly, bound, param, BOUND_LOGNORM_INCR_MAX);
   ropt_s1param_init (s1param);
   ropt_s1param_setup (poly, s1param, bound, param);
-  new_MurphyE_pq (&global_E_pqueue, s1param->nbest_sl);
+  new_MurphyE_pq (&global_E_pqueue, s1param->nbest_sl); /* always used */
 #if TUNE_LOGNORM_INCR
-  new_alpha_pq (&pre_alpha_pqueue, s1param->nbest_sl);
+  new_alpha_pq (&tune_E_pqueue, s1param->nbest_sl);
 #endif  
   /* Here we use some larger value since alpha_pqueue records
      more sublattices to be tuned */
   new_alpha_pq (&alpha_pqueue, s1param->nbest_sl*TUNE_NUM_SUBLATTICE);
 
-  /* Step 1: tune ropt_bound first */
+  /* [Step 1] tune ropt_bound first */
 #if TUNE_LOGNORM_INCR
-  incr = ropt_pre_tune (poly, param, pre_alpha_pqueue,
-                        info, global_E_pqueue, 0);
-  ropt_bound_setup_incr (poly, bound, param, incr);
-  ropt_s1param_resetup (poly, s1param, bound, param, s1param->nbest_sl);
+  if (param->s1_num_e_sl==0) {
+    incr = ropt_stage1_tune (poly, param, tune_E_pqueue, alpha_pqueue,
+                             info, global_E_pqueue, 0);
+    ropt_bound_setup_incr (poly, bound, param, incr);
+    ropt_s1param_resetup (poly, s1param, bound, param, s1param->nbest_sl);
+  }
 #endif
   
-  /* Step 2:, tuning to find good sublattices */
+  /* [Step 2] ropt_stage1() find good sublattices */
   t1 = seconds_thread ();
   old_nbest_sl = s1param->nbest_sl;
   s1param->nbest_sl = s1param->nbest_sl*TUNE_NUM_SUBLATTICE_STAGE1;
@@ -818,40 +842,39 @@ ropt_linear_deg5 ( ropt_poly_t poly,
   t1 = seconds_thread () - t1;
   if (r == -1) return;
   
-  /* Step 3: rank/tune above found sublattices by short sieving */
+  /* [Step 3] rank/tune above found sublattices by short sieving */
   t2 = seconds_thread ();
 #if TUNE_LOGNORM_INCR
   ropt_linear_tune (poly, bound, s1param, param, info, alpha_pqueue,
-                    pre_alpha_pqueue, global_E_pqueue);
+                    tune_E_pqueue, global_E_pqueue);
 #else
   ropt_linear_tune (poly, bound, s1param, param, info, alpha_pqueue,
                     global_E_pqueue);
 #endif
   t2 = seconds_thread () - t2;
 
-  /* Step 3, root sieve */
+  /* [Step 4] final root sieve */
   t3 = seconds_thread ();
   ropt_linear_sieve (poly, bound, s1param, param, info, alpha_pqueue,
                      global_E_pqueue);
   t3 = seconds_thread () - t3;
 
+  /* [Step 5] return best poly */
+  ropt_get_bestpoly (poly, global_E_pqueue, bestpoly);
+
   info->ropt_time_stage1 = t1;
   info->ropt_time_tuning = t2;
   info->ropt_time_stage2 = t3;
-
   if (param->verbose >= 1) {
     fprintf ( stderr, "# Stat: this polynomial (stage 1) took %.2fs\n", t1 );
     fprintf ( stderr, "# Stat: this polynomial (tuning ) took %.2fs\n", t2 );
     fprintf ( stderr, "# Stat: this polynomial (stage 2) took %.2fs\n", t3 );
   }
 
-  /* Step 4, return best poly */
-  ropt_get_bestpoly (poly, global_E_pqueue, bestpoly);
-
   /* free */
   free_MurphyE_pq (&global_E_pqueue);
 #if TUNE_LOGNORM_INCR
-  free_alpha_pq (&pre_alpha_pqueue);
+  free_alpha_pq (&tune_E_pqueue);
 #endif
   free_alpha_pq (&alpha_pqueue);
   ropt_s1param_free (s1param);

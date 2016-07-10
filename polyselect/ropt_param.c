@@ -37,17 +37,29 @@ unsigned int size_tune_sievearray = 6144;
  * is not always necessary since the sieving is done in order with
  * the best sublattices first.
  */
-const unsigned int size_total_sublattices[9][3] = {
+
+const unsigned int size_total_sublattices[NUM_DEFAULT_DIGITS][3] = {
   /* {digits, num_of_sublattices, num_of_final_sieves} */
-  { 80,   4,   4},  /* for up to 79 digits */
-  {140,   8,   8},  /* up to 139 digits */
-  {150,   8,   8},  /* up to 149 digits */
-  {160,  16,  16},  /* up to 159 digits */
-  {170,  16,  16}, /* up to 169 digits */
-  {180,  32,  32}, /* up to 179 digits */
-  {220,  64,  64}, /* up to 219 digits */
-  {260,  64,  64}, /* up to 259 digits */
-  {300, 128,  64} /* up to 299 digits */
+  { 80,   4,    4},  /* up to 79 digits */
+  {100,   6,    6},  /* up to 99 digits */
+  {120,   8,    8},  /* up to 119 digits */
+  {140,  12,   12},  /* up to 139 digits */
+  {150,  16,   16},  /* up to 149 digits */
+  {160,  20,   20},  /* up to 159 digits */
+  {170,  24,   24},  /* up to 169 digits */
+  {180,  32,   32},  /* up to 179 digits */
+  {190,  40,   40},  /* up to 189 digits */
+  {200,  48,   48},  /* up to 199 digits */
+  {210,  56,   56},  /* up to 209 digits */
+  {220,  64,   64},  /* up to 219 digits */
+  {230,  72,   72},  /* up to 229 digits */
+  {240,  80,   80},  /* up to 239 digits */
+  {250,  88,   88},  /* up to 249 digits */
+  {260,  96,   96},  /* up to 259 digits */
+  {270, 104,  104},  /* up to 269 digits */
+  {280, 112,  112},  /* up to 279 digits */
+  {290, 120,  120},  /* up to 289 digits */
+  {300, 128,  128}   /* up to 299 digits */
 };
 
 

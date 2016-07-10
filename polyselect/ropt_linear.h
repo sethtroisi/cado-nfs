@@ -14,12 +14,13 @@ void ropt_linear ( ropt_poly_t poly,
 
 #if TUNE_LOGNORM_INCR
 double
-ropt_pre_tune ( ropt_poly_t poly,
-                ropt_param_t param,
-                alpha_pq *alpha_pqueue,
-                ropt_info_t info,
-                MurphyE_pq *global_E_pqueue,
-                unsigned long w);
+ropt_stage1_tune ( ropt_poly_t poly,
+                   ropt_param_t param,
+                   alpha_pq *tune_E_pqueue,
+                   alpha_pq *alpha_pqueue,
+                   ropt_info_t info,
+                   MurphyE_pq *global_E_pqueue,
+                   unsigned long w);
 #endif
 
 #endif /* ROPT_LINEAR_H */
