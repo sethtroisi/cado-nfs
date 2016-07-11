@@ -469,7 +469,7 @@ class WuTable(DbTable):
     )
     primarykey = fields[0][0]
     references = None
-    index = {"wuidindex": (fields[1][0],), "statusindex" : (fields[2][0],)}
+    index = {"wurowidindex" : (fields[0][0],), "wuidindex": (fields[1][0],), "statusindex" : (fields[2][0],)}
 
 class FilesTable(DbTable):
     tablename = "files"
