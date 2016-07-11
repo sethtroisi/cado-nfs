@@ -88,7 +88,8 @@ extern void param_list_clear(param_list pl);
 extern void param_list_decl_usage(param_list pl, const char * key,
         const char * doc);
 extern void param_list_print_usage(param_list pl, const char * argv0, FILE *f);
-extern void param_list_usage_header(param_list pl, const char * hdr);
+extern void param_list_usage_header(param_list pl, const char * hdr, ...)
+    ATTR_PRINTF(2, 3);
 
 // takes a file, in the Cado-NFS params format, and stores the dictionary
 // of parameters to pl.
@@ -123,6 +124,7 @@ extern int param_list_parse_string(param_list, const char *, char *, size_t);
 extern int param_list_parse_mpz(param_list, const char *, mpz_ptr);
 extern int param_list_parse_intxint(param_list pl, const char * key, int * r);
 extern int param_list_parse_int_and_int(param_list pl, const char * key, int * r, const char * sep);
+extern int param_list_parse_long_and_long(param_list pl, const char * key, long * r, const char * sep);
 extern int param_list_parse_string_list_alloc(param_list pl, const char * key, char *** r, int * n, const char * sep);
 extern int param_list_get_list_count(param_list_ptr pl, const char * key);
 extern int param_list_parse_int_list(param_list pl, const char * key, int * r, size_t n, const char * sep);

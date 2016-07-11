@@ -387,12 +387,14 @@ struct polmat { /* {{{ */
          * not. If it does, call xclean0_col */
         // deg(j) += deg(j) >= 0;
     }/*}}}*/
-    void addpoly(unsigned int i, unsigned int j, const unsigned long * src) {/*{{{*/
+    void addpoly(unsigned int i, unsigned int j, polmat const& y, unsigned int iy, unsigned int jy) {/*{{{*/
         ASSERT(i < nrows);
         ASSERT(j < ncols);
+        ASSERT(iy < y.nrows);
+        ASSERT(jy < y.ncols);
         unsigned long * dst = x + (j * nrows + i) * stride();
-        for(unsigned int k = 0 ; k < stride() ; k++)
-            dst[k] ^= src[k];
+        unsigned long * src = y.x + (jy * y.nrows + iy) * y.stride();
+        mpn_xor_n(dst, dst, src, MIN(stride(), y.stride()));
     }/*}}}*/
 
     unsigned long valuation() const {/*{{{*/

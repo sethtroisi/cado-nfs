@@ -31,7 +31,11 @@ ropt_linear_tune ( ropt_poly_t poly,
   mpz_t u, tmpu, v, mod, old_mod;
   ropt_s2param_t s2param;
   alpha_pq *tmp_alpha_pqueue;
-
+#if TUNE_EARLY_ABORT
+  double ave_E, ave_bestE, new_ave_E, new_ave_bestE;
+  int acc;
+#endif  
+  
 #ifdef ROPT_LINEAR_TUNE_HARDER
   int k;
 #endif
@@ -68,9 +72,18 @@ ropt_linear_tune ( ropt_poly_t poly,
     /* detect positive good u (may also detect good mod with more time) */
     mpz_set (tmpu, u);
     j = 0;
+#if TUNE_EARLY_ABORT
+    ave_E = 0.0;
+    ave_bestE = 0.0;
+    new_ave_E = 0.0;
+    new_ave_bestE = 0.0;
+    acc = 0;
+#endif
+    
     while (mpz_cmp_si(tmpu, bound->global_u_boundr) <= 0) {
-
-      if (j > 32) break;
+      
+      if (j > TUNE_BOUND_ON_UV_TRIALS)
+        break;
 
 #ifdef ROPT_LINEAR_TUNE_HARDER /* slow tuning process */
       k = 0;
@@ -125,15 +138,36 @@ ropt_linear_tune ( ropt_poly_t poly,
 #endif
 
       mpz_add (tmpu, tmpu, mod); // consider original u itself.
+#if TUNE_EARLY_ABORT
+      new_ave_E = ave_E + info->ave_MurphyE;
+      new_ave_bestE = ave_bestE + info->best_MurphyE;
+      if (j>0) {
+        if ((ave_E/j>new_ave_E/(j+1)) && (ave_bestE/j > new_ave_bestE/(j+1))) {
+          acc ++;
+          if (acc >= TUNE_EARLY_ABORT_THR)
+            break;
+        }
+      }
+      ave_E = new_ave_E;
+      ave_bestE = new_ave_bestE;
+#endif      
       j ++;
     }
 
     /* detect negative good u */
     mpz_set (tmpu, u);
     j = 0;
+#if TUNE_EARLY_ABORT
+    ave_E = 0.0;
+    ave_bestE = 0.0;
+    new_ave_E = 0.0;
+    new_ave_bestE = 0.0;
+    acc = 0;
+#endif
+
     while (mpz_cmp_si (tmpu, bound->global_u_boundl) > 0) {
 
-      if (j >= 32)
+      if (j > TUNE_BOUND_ON_UV_TRIALS)
         break;
       mpz_sub (tmpu, tmpu, mod);
 
@@ -188,6 +222,20 @@ ropt_linear_tune ( ropt_poly_t poly,
       }
 
 #endif
+
+#if TUNE_EARLY_ABORT
+      new_ave_E = ave_E + info->ave_MurphyE;
+      new_ave_bestE = ave_bestE + info->best_MurphyE;
+      if (j>0) {
+        if ((ave_E/j>new_ave_E/(j+1)) && (ave_bestE/j > new_ave_bestE/(j+1))) {
+          acc ++;
+          if (acc >= TUNE_EARLY_ABORT_THR)
+            break;
+        }
+      }
+      ave_E = new_ave_E;
+      ave_bestE = new_ave_bestE;
+#endif      
 
       j ++;
 
@@ -428,7 +476,7 @@ ropt_linear_deg5 ( ropt_poly_t poly,
                    ropt_info_t info )
 {
   int r;
-  unsigned long t1, t2, t3;
+  double t1, t2, t3;
   ropt_bound_t bound;
   ropt_s1param_t s1param;
   alpha_pq *alpha_pqueue;
@@ -439,31 +487,41 @@ ropt_linear_deg5 ( ropt_poly_t poly,
   ropt_bound_setup (poly, bound, param);
   ropt_s1param_init (s1param);
   ropt_s1param_setup (poly, s1param, bound, param);
-  new_alpha_pq (&alpha_pqueue, s1param->nbest_sl);
+  new_alpha_pq (&alpha_pqueue, s1param->nbest_sl*TUNE_NUM_SUBLATTICE);
   new_MurphyE_pq (&global_E_pqueue, s1param->nbest_sl);
 
   /* Step 1:, find good sublattices */
-  t1 = milliseconds ();
+  t1 = seconds_thread ();
+  int old_nbest_sl = s1param->nbest_sl;
+  s1param->nbest_sl = old_nbest_sl*TUNE_NUM_SUBLATTICE_STAGE1;
   r = ropt_stage1 (poly, bound, s1param, param, alpha_pqueue, 0);
-  t1 = milliseconds () - t1;
+  t1 = seconds_thread () - t1;
+  s1param->nbest_sl = old_nbest_sl;
   if (r == -1) return;
   
   /* Step 2: rank/tune above found sublattices by short sieving */
-  t2 = milliseconds ();
+  t2 = seconds_thread ();
+  old_nbest_sl = s1param->nbest_sl;
+  s1param->nbest_sl = old_nbest_sl*TUNE_NUM_SUBLATTICE_STAGE2;
   ropt_linear_tune (poly, bound, s1param, param, info, alpha_pqueue,
                     global_E_pqueue);
-  t2 = milliseconds () - t2;
+  s1param->nbest_sl = old_nbest_sl;
+  t2 = seconds_thread () - t2;
 
   /* Step 3, root sieve */
-  t3 = milliseconds ();
+  t3 = seconds_thread ();
   ropt_linear_sieve (poly, bound, s1param, param, info, alpha_pqueue,
                      global_E_pqueue);
-  t3 = milliseconds () - t3;
+  t3 = seconds_thread () - t3;
 
-  if (param->verbose >= 2) {
-    fprintf ( stderr, "# Stat: tot (stage 1) took %lums\n", t1 );
-    fprintf ( stderr, "# Stat: tot (tuning ) took %lums\n", t2 );
-    fprintf ( stderr, "# Stat: tot (stage 2) took %lums\n", t3 );
+  info->ropt_time_stage1 = t1;
+  info->ropt_time_tuning = t2;
+  info->ropt_time_stage2 = t3;
+
+  if (param->verbose >= 1) {
+    fprintf ( stderr, "# Stat: this polynomial (stage 1) took %.2fs\n", t1 );
+    fprintf ( stderr, "# Stat: this polynomial (tuning ) took %.2fs\n", t2 );
+    fprintf ( stderr, "# Stat: this polynomial (stage 2) took %.2fs\n", t3 );
   }
 
   /* Step 4, return best poly */
@@ -479,6 +537,7 @@ ropt_linear_deg5 ( ropt_poly_t poly,
 
 /**
  * Linear rotation: deg 4.
+ * No tuning at all.
  */
 void
 ropt_linear_deg34 ( ropt_poly_t poly,

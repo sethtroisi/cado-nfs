@@ -108,9 +108,13 @@ void param_list_clear(param_list pl)
     memset(pl, 0, sizeof(pl[0]));
 }
 
-void param_list_usage_header(param_list pl, const char * hdr)
+void param_list_usage_header(param_list pl, const char * hdr, ...)
 {
-    pl->usage_hdr = strdup(hdr);
+    va_list ap;
+    va_start(ap, hdr);
+    int rc = vasprintf(&(pl->usage_hdr), hdr, ap);
+    ASSERT_ALWAYS(rc >= 0);
+    va_end(ap);
 }
 
 
@@ -704,7 +708,7 @@ int param_list_parse_int(param_list pl, const char * key, int * r)
     return rc;
 }
 
-int param_list_parse_int_and_int(param_list pl, const char * key, int * r, const char * sep)
+int param_list_parse_long_and_long(param_list pl, const char * key, long * r, const char * sep)
 {
     char *value;
     int seen;
@@ -732,6 +736,31 @@ int param_list_parse_int_and_int(param_list pl, const char * key, int * r, const
         r[1] = res[1];
     }
     return seen;
+}
+
+int param_list_parse_int_and_int(param_list pl, const char * key, int * r, const char * sep)
+{
+#if 1
+  long rr[2] = {0, 0};
+    if (r) {
+        rr[0] = r[0];
+        rr[1] = r[1];
+    }
+    int seen = param_list_parse_long_and_long(pl, key, rr, sep);
+    if (r) {
+        r[0] = rr[0];
+        r[1] = rr[1];
+    }
+    return seen;
+#else
+    long rr[2];
+    int seen = param_list_parse_long_and_long(pl, key,r ? rr : NULL, sep);
+    if (r) {
+        r[0] = rr[0];
+        r[1] = rr[1];
+    }
+    return seen;
+#endif
 }
 
 int param_list_parse_intxint(param_list pl, const char * key, int * r)

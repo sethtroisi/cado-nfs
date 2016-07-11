@@ -259,7 +259,7 @@ void
 test_double_poly_set_mpz_poly (void)
 {
   double_poly_t p;
-  mpz_poly_t q;
+  mpz_poly q;
 
   mpz_poly_init (q, 2);
   double_poly_init (p, 2);

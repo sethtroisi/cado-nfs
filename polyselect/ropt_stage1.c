@@ -859,7 +859,7 @@ ropt_stage1 ( ropt_poly_t poly,
   int st = 0, i, re;
   double alpha_lat;
   mpz_t *fuv;
-  mpz_poly_t Fuv;
+  mpz_poly Fuv;
   sublattice_pq *pqueue;
 
   /* size-cutoff of top sublattices */

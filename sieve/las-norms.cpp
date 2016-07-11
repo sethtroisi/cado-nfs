@@ -1559,6 +1559,7 @@ sieve_info_update_norm_data (sieve_info_ptr si, int nb_threads)
        We require that scale is of the form (int) * 0.025, so that only a small
        number of different factor base slicings can occur. */
     sideptr->scale = (int)(((double) UCHAR_MAX - GUARD) / maxlog2 * 40.)*0.025;
+    verbose_output_start_batch();
     verbose_output_print (0, 1,
         "# Side %d: log2(maxnorm)=%1.2f scale=%1.2f, logbase=%1.6f",
         side, maxlog2, sideptr->scale, exp2 (1. / sideptr->scale));
@@ -1579,6 +1580,7 @@ sieve_info_update_norm_data (sieve_info_ptr si, int nb_threads)
       }
       sideptr->bound = (unsigned char) (r * sideptr->scale + GUARD);
       verbose_output_print (0, 1, " bound=%u\n", sideptr->bound);
+      verbose_output_end_batch();
       if (lambda > max_lambda)
         verbose_output_print (0, 1, "# Warning, lambda>%.1f on side %d does "
             "not make sense (capped to limit)\n", max_lambda, side);

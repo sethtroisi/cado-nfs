@@ -761,8 +761,11 @@ class Las(Program):
                  q0: Parameter(checktype=int),
                  q1: Parameter(checktype=int)=None,
                  rho: Parameter(checktype=int)=None,
+                 skipped: Parameter(checktype=int)=None,
                  tdthresh: Parameter(checktype=int)=None,
                  bkthresh: Parameter(checktype=int)=None,
+                 bkthresh1: Parameter(checktype=int)=None,
+                 bkmult: Parameter(checktype=float)=None,
                  rlim: Parameter(checktype=int)=None,
                  alim: Parameter(checktype=int)=None,
                  lpbr: Parameter(checktype=int)=None,
@@ -1016,6 +1019,9 @@ class BWC(Program):
                 bwc_bindir = os.path.normpath(os.sep.join([kwargs["execpath"], self.subdir]))
             bwc_bindir = translate_mingw_path(bwc_bindir)
         super().__init__(locals(), **kwargs)
+    def make_command_line(self, *args, **kwargs):
+	    c = super().make_command_line(*args, **kwargs)
+	    return c
 
 class SM(Program):
     binary = "sm"

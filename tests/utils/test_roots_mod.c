@@ -34,7 +34,7 @@ roots_mod_mpz(uint64_t *r, uint64_t a, int d, uint64_t p)
 {
   mpz_t *f;
   int n, i;
-  mpz_poly_t F;
+  mpz_poly F;
 
   f = (mpz_t*) malloc ((d + 1) * sizeof (mpz_t));
   for (i = 0; i <= d; i++)

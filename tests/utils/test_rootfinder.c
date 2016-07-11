@@ -27,7 +27,7 @@ test (int d, const char *pp, const char *ff[], int nroots)
 {
   mpz_t p, *f, *r, v;
   int i, n, n1;
-  mpz_poly_t F;
+  mpz_poly F;
 
   mpz_init (p);
   if (strlen (pp) > 0)

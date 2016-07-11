@@ -17,6 +17,8 @@
 #define K_FILE_BASE_PATTERN "K.sols%u-%u"
 #define R_FILE_BASE_PATTERN "R.sols%u-%u"       /* short-lived */
 #define CHECK_FILE_BASE "C"
+#define CHECK_D_FILE_BASE "D"
+#define CHECK_DR_FILE_BASE "DR"
 #define W_FILE "W"
 
 

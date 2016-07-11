@@ -45,19 +45,43 @@
 /* Don't change this. */
 #define NUM_SUBLATTICE_PRIMES 9
 
-/* Top 16 (alpha) in each "SIZE_SIEVEARRAY" */
-#define NUM_TOPALPHA_SIEVEARRAY 16
+/* Top 32 (alpha) in each "SIZE_SIEVEARRAY": this does not
+   affect the running-time since it is not dominating */
+#define NUM_TOPALPHA_SIEVEARRAY 32
 
-/* Top 16 (E) for each sublattice, may contain several
+/* Top 32 (E) for each sublattice, may contain several
    SIZE_SIEVEARRAY */
-#define NUM_TOPE_SUBLATTICE 16
+#define NUM_TOPE_SUBLATTICE 32
 
 /* Either rank stage 1 sublattices by E or by alpha, the former
    seems to be more accurate */
 #define RANK_SUBLATTICE_BY_E 1
 
-/* Increase num in the tuning */
-#define TUNE_NUM_SUBLATTICE 8
+
+/* -------------------------
+   Parameters for test sieving
+   ------------------------- */
+
+/* Ratio for the num. of increased sublattice in tuning */
+#define TUNE_NUM_SUBLATTICE 16
+#define TUNE_NUM_SUBLATTICE_STAGE1 4
+#define TUNE_NUM_SUBLATTICE_STAGE2 2
+
+/* Similar to above, but in tune mode */
+#define TUNE_NUM_TOPALPHA_SIEVEARRAY 8
+
+/* Similar to above, but in tune mode */
+#define TUNE_NUM_TOPE_SUBLATTICE 8
+
+/* Tuning parameter */
+#define TUNE_EARLY_ABORT 1
+
+#define TUNE_EARLY_ABORT_THR 2
+
+#define TUNE_BOUND_ON_UV_TRIALS 64
+
+#define TUNE_BOUND_ON_MOD_TRIALS 64
+
 
 /* mu and sigma in function exp_alpha() */
 #define MU 0.0

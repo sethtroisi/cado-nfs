@@ -13,6 +13,7 @@ linalg/bwc/bind_threads.sh
 linalg/bwc/bwc.sty
 filter/merge_mpi.c
 filter/merge_mpi.h
+scripts/estimate_matsize.sh
 scripts/polsel_effort
 scripts/plot_params.sh
 scripts/plot_sieve_region.py
@@ -55,6 +56,7 @@ polyselect/rotation_bound.sage
 polyselect/E.sage
 polyselect/MurphyE.sage
 polyselect/twoquadratics.sage
+polyselect/size_optimization.sage
 scripts/check_file_lists.pl
 scripts/dist.sh
 sieve/ecm/CMakeLists-nodist.txt
@@ -79,6 +81,7 @@ parameters/polynomials/rsa155.poly5
 parameters/polynomials/rsa180.poly
 parameters/polynomials/rsa190.poly
 parameters/polynomials/rsa704.poly
+parameters/polynomials/rsa768.poly
 parameters/polynomials/c60.poly
 parameters/polynomials/c65.poly
 parameters/polynomials/c70.poly
@@ -141,5 +144,6 @@ sieve/strategies/script_str_r.sh
 sieve/strategies/CMakeLists-nodist.txt
 sieve/strategies/test_strategy_cado.c
 sieve/strategies/F9.sh
+sieve/fake_rels.cpp
 linalg/bwc/lingen.txt
 .mailmap

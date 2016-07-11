@@ -31,8 +31,8 @@ void mpz_vector_skew_dot_product (mpz_t, mpz_vector_t, mpz_vector_t, mpz_t);
 void mpz_vector_norm (mpz_t, mpz_vector_t);
 void mpz_vector_skew_norm (mpz_t, mpz_vector_t, mpz_t);
 
-/* Convert from mpz_vector_t to mpz_poly_t */
-void mpz_vector_get_mpz_poly (mpz_poly_t, mpz_vector_t);
+/* Convert from mpz_vector_t to mpz_poly */
+void mpz_vector_get_mpz_poly (mpz_poly, mpz_vector_t);
 
 /* Operations on vectors */
 void mpz_vector_submul (mpz_vector_t r, mpz_t q, mpz_vector_t v);

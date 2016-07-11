@@ -322,9 +322,9 @@ void mpfq_u64k4_dotprod(mpfq_u64k4_dst_field, mpfq_u64k4_dst_vec, mpfq_u64k4_src
 /* Member templates related to SIMD operation */
 
 /* Object-oriented interface */
-void mpfq_u64k4_oo_field_init(mpfq_vbase_ptr);
 static inline
 void mpfq_u64k4_oo_field_clear(mpfq_vbase_ptr);
+void mpfq_u64k4_oo_field_init(mpfq_vbase_ptr);
 #ifdef  __cplusplus
 }
 #endif

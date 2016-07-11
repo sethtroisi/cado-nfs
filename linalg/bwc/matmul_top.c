@@ -58,6 +58,8 @@
  */
 
 /* _this_ part can be configured */
+// #define RS_CHOICE RS_CHOICE_STOCK_RS
+// #define AG_CHOICE AG_CHOICE_STOCK_AG
 #define RS_CHOICE RS_CHOICE_MINE_PARALLEL
 #define AG_CHOICE (MPI_VERSION_ATLEAST(3,0) ? AG_CHOICE_STOCK_IAG : AG_CHOICE_STOCK_AG)
 
@@ -602,6 +604,29 @@ int mmt_vec_save(mmt_vec_ptr v, const char * name, unsigned int iter, unsigned i
 /* }}} */
 /* }}} */
 
+void mmt_vec_reduce_mod_p(mmt_vec_ptr v)
+{
+    /* if it so happens that there's no reduce function defined, it may
+     * correspond to a case where we have nothing to do, like over GF(2)
+     * -- where unreduced elements are just the same, period */
+    if (!v->abase->reduce)
+        return;
+    void * ptr = mmt_my_own_subvec(v);
+    void * tmp;
+    v->abase->vec_ur_init(v->abase, &tmp, 1);
+    for(size_t i = 0 ; i < mmt_my_own_size_in_items(v) ; i++) {
+        v->abase->elt_ur_set_elt(v->abase,
+                tmp,
+                v->abase->vec_coeff_ptr_const(v->abase, ptr, i));
+        v->abase->reduce(v->abase,
+                v->abase->vec_coeff_ptr(v->abase, ptr, i),
+                tmp);
+    }
+    v->abase->vec_ur_clear(v->abase, &tmp, 1);
+}
+
+
+
 //////////////////////////////////////////////////////////////////////////
 
 void matmul_top_mul(matmul_top_data_ptr mmt, mmt_vec * v, struct timing_data * tt)/*{{{*/
@@ -1076,7 +1101,7 @@ mmt_vec_reduce_inner(mmt_vec_ptr v)
             int * rc = malloc(wr->njobs * sizeof(int));
             for(unsigned int k = 0 ; k < wr->njobs ; k++)
                 rc[k] = (v->i1 - v->i0) / wr->njobs;
-            err = MPI_Reduce_scatter(dptr, dptr, rc,
+            int err = MPI_Reduce_scatter(dptr, dptr, rc,
                     v->pitype->datatype,
                     BWC_PI_SUM->custom,
                     wr->pals);
@@ -1087,7 +1112,7 @@ mmt_vec_reduce_inner(mmt_vec_ptr v)
 #elif RS_CHOICE == RS_CHOICE_STOCK_RSBLOCK
         void * dptr = mmt_vec_sibling(v, 0)->v;
         SEVERAL_THREADS_PLAY_MPI_BEGIN(xr) {
-            err = MPI_Reduce_scatter_block(dptr, dptr,
+            int err = MPI_Reduce_scatter_block(dptr, dptr,
                     (v->i1 - v->i0) / wr->njobs,
                     v->pitype->datatype,
                     BWC_PI_SUM->custom,
@@ -1098,7 +1123,7 @@ mmt_vec_reduce_inner(mmt_vec_ptr v)
 #elif RS_CHOICE == RS_CHOICE_MINE_DROP_IN
         void * dptr = mmt_vec_sibling(v, 0)->v;
         SEVERAL_THREADS_PLAY_MPI_BEGIN(xr) {
-            err = my_MPI_Reduce_scatter_block(MPI_IN_PLACE, dptr,
+            int err = my_MPI_Reduce_scatter_block(MPI_IN_PLACE, dptr,
                     (v->i1 - v->i0) / wr->njobs,
                     v->pitype->datatype,
                     BWC_PI_SUM->custom,
@@ -1110,7 +1135,7 @@ mmt_vec_reduce_inner(mmt_vec_ptr v)
         void * dptr = mmt_vec_sibling(v, 0)->v;
         MPI_Request * req = shared_malloc(xr, xr->ncores * sizeof(MPI_Request));
         SEVERAL_THREADS_PLAY_MPI_BEGIN(xr) {
-            err = MPI_Ireduce_scatter(dptr, dptr,
+            int err = MPI_Ireduce_scatter(dptr, dptr,
                     (v->i1 - v->i0) / wr->njobs,
                     v->pitype->datatype,
                     BWC_PI_SUM->custom,
@@ -2112,6 +2137,17 @@ void mmt_vec_set_random_inconsistent(mmt_vec_ptr v, gmp_randstate_t rstate)
     v->consistency=1;
 }
 
+void mmt_vec_truncate(matmul_top_data_ptr mmt, mmt_vec_ptr v)
+{
+    ASSERT_ALWAYS(v != NULL);
+    if (mmt->n0[v->d] >= v->i0 && mmt->n0[v->d] < v->i1) {
+        v->abase->vec_set_zero(v->abase, 
+                v->abase->vec_subvec(v->abase, 
+                    v->v, mmt->n0[v->d] - v->i0),
+                v->i1 - mmt->n0[v->d]);
+    }
+}
+
 void mmt_vec_set_x_indices(mmt_vec_ptr y, uint32_t * gxvecs, int m, unsigned int nx)
 {
     int shared = !y->siblings;
@@ -2594,6 +2630,14 @@ static int export_cache_list_if_requested(matmul_top_data_ptr mmt, int midx, par
     return 1;
 }
 
+static unsigned int local_fraction(unsigned int padded, unsigned int normal, pi_comm_ptr wr)
+{
+    ASSERT_ALWAYS(padded % wr->totalsize == 0);
+    unsigned int i = wr->jrank * wr->ncores + wr->trank;
+    unsigned int quo = padded / wr->totalsize;
+    return MIN(normal - i * quo, quo);
+}
+
 
 
 static void matmul_top_read_submatrix(matmul_top_data_ptr mmt, int midx, param_list_ptr pl, int optimized_direction)
@@ -2685,7 +2729,15 @@ static void matmul_top_read_submatrix(matmul_top_data_ptr mmt, int midx, param_l
             if (mmt->pi->m->jrank == 0 && mmt->pi->m->trank == 0) {
                 printf("Begin creation of fake matrix data in parallel\n");
             }
-            random_matrix_get_u32(mmt->pi, pl, m, Mloc->mm->dim[0], Mloc->mm->dim[1]);
+            /* Mloc->mm->dim[0,1] contains the dimensions of the padded
+             * matrix. This is absolutely fine in the normal case. But in
+             * the case of staged matrices, it's a bit different. We must
+             * make sure that we generate matrices which have zeroes in
+             * the padding area.
+             */
+            random_matrix_get_u32(mmt->pi, pl, m,
+                    local_fraction(Mloc->n[0], Mloc->n0[0], mmt->pi->wr[1]),
+                    local_fraction(Mloc->n[1], Mloc->n0[1], mmt->pi->wr[0]));
         } else {
             if (mmt->pi->m->jrank == 0 && mmt->pi->m->trank == 0) {
                 printf("Matrix dispatching starts\n");
@@ -2760,14 +2812,12 @@ void matmul_top_clear(matmul_top_data_ptr mmt)
 
     for(int midx = 0 ; midx < mmt->nmatrices ; midx++) {
         matmul_top_matrix_ptr Mloc = mmt->matrices[midx];
-#if RS_CHOICE == RS_CHOICE_MINE || RS_CHOICE == RS_CHOICE_MINE_PARALLEL
         for(int d = 0 ; d < 2 ; d++)  {
             permutation_data_free(Mloc->perm[d]);
             // both are expected to hold storage for:
             // (mmt->n[d] / mmt->pi->m->totalsize * mmt->pi->wr[d]->ncores))
             // elements, corresponding to the largest abase encountered.
         }
-#endif  /* RS_CHOICE == RS_CHOICE_MINE || RS_CHOICE == RS_CHOICE_MINE_PARALLEL */
         serialize(mmt->pi->m);
         if (!mmt->pi->interleaved) {
             matmul_clear(Mloc->mm);

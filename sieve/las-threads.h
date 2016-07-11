@@ -112,7 +112,8 @@ protected:
   cget() const;
 public:
   reservation_group(size_t nr_bucket_arrays);
-  void allocate_buckets(const uint32_t *n_bucket, const double *fill_ratio);
+  void allocate_buckets(const uint32_t *n_bucket, const double multiplier,
+          const double *fill_ratio);
 };
 
 class thread_workspaces : private NonCopyable {

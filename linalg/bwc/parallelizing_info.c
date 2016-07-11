@@ -3,11 +3,6 @@
 #include <stdio.h>
 #include <string.h>
 
-// we're doing open close mmap truncate...
-#ifdef disabled_because_apparently_buggy_with_openib_yesss_HAVE_MMAN_H
-/* See https://github.com/open-mpi/ompi/issues/299 */
-#include <sys/mman.h>
-#endif
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -1678,6 +1673,25 @@ int area_is_zero(const void * src, ptrdiff_t offset0, ptrdiff_t offset1)
     }
     return 1;
 }
+
+ssize_t pi_file_write_leader(pi_file_handle_ptr f, void * buf, size_t size)
+{
+    unsigned long ret;
+    if (f->pi->m->jrank == 0 && f->pi->m->trank == 0)
+        ret = fwrite(buf, 1, size, f->f);
+    pi_bcast(&ret, 1, BWC_PI_UNSIGNED_LONG, 0, 0, f->pi->m);
+    return (ssize_t) ret;
+}
+
+ssize_t pi_file_read_leader(pi_file_handle_ptr f, void * buf, size_t size)
+{
+    unsigned long ret;
+    if (f->pi->m->jrank == 0 && f->pi->m->trank == 0)
+        ret = fread(buf, 1, size, f->f);
+    pi_bcast(&ret, 1, BWC_PI_UNSIGNED_LONG, 0, 0, f->pi->m);
+    return (ssize_t) ret;
+}
+
 
 ssize_t pi_file_write(pi_file_handle_ptr f, void * buf, size_t size, size_t totalsize)
 {

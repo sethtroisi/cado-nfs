@@ -56,7 +56,7 @@ unsigned long prime_product (mpz_t, prime_info, unsigned long, unsigned long);
 unsigned long find_smooth (cofac_list, mpz_t[2], FILE*, int);
 void factor (cofac_list, unsigned long, cado_poly, int[], int, FILE*, int);
 void create_batch_file (const char*, mpz_t, unsigned long, unsigned long,
-                        mpz_poly_t, FILE*, int);
+                        mpz_poly, FILE*, int);
 
 #ifdef __cplusplus
 }
