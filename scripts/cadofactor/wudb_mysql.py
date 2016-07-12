@@ -403,7 +403,7 @@ class DbTable(object):
         cursor.create_table(self.tablename, fields)
         if self.references:
             # We always create an index on the foreign key
-            cursor.create_index(self.tablename + "_pkindex", r.tablename, 
+            cursor.create_index(self.tablename + "_pkindex", self.tablename, 
                                 (fk[0], ))
         for indexname in self.index:
             try:
@@ -469,7 +469,7 @@ class WuTable(DbTable):
     )
     primarykey = fields[0][0]
     references = None
-    index = {"wurowidindex" : (fields[0][0],), "wuidindex": (fields[1][0],), "submitterindex" : (fields[2][0],), "priorityindex" : (fields[14][0],), \
+    index = {"wuidindex": (fields[1][0],), "submitterindex" : (fields[2][0],), "priorityindex" : (fields[14][0],), \
              "priority" : (fields[14][0],), "status" : (fields[3][0],)
     }
 
@@ -485,7 +485,7 @@ class FilesTable(DbTable):
     )
     primarykey = fields[0][0]
     references = WuTable()
-    index = {"filesrowidindex": (fields[0][0],),}
+    index = {}
 
 
 class DictDbTable(DbTable):
