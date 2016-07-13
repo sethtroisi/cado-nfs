@@ -1831,8 +1831,8 @@ void enum_lattice(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
 void special_q_sieve(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
     mat_Z_srcptr matrix, factor_base_srcptr fb, sieving_bound_srcptr H,
     MAYBE_UNUSED mpz_poly_srcptr f, MAYBE_UNUSED FILE * outstd, FILE * errstd,
-    uint64_t sieve_start, MAYBE_UNUSED ideal_spq_srcptr special_q, FILE *
-    file_space_sieve_stat)
+    uint64_t sieve_start, MAYBE_UNUSED ideal_spq_srcptr special_q,
+    MAYBE_UNUSED FILE * file_space_sieve_stat)
 {
 #ifdef TIME_SIEVES
   double time_line_sieve = 0;
@@ -2119,8 +2119,8 @@ void special_q_sieve(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
   // fail and need of new vector
   skew_lll_fail[3] = 0;
 #else // SPACE_SIEVE_STAT
-  uint64_t * call_plane_sieve = NULL;
-  uint64_t * skew_lll_fail = NULL;
+  MAYBE_UNUSED uint64_t * call_plane_sieve = NULL;
+  MAYBE_UNUSED uint64_t * skew_lll_fail = NULL;
 #endif // SPACE_SIEVE_STAT
 
   while (i < fb->number_element_1) {
