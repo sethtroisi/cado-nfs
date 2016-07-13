@@ -341,13 +341,15 @@ sq_finds_relation(const unsigned long sq, const int sq_side,
     goto clear_and_exit;
   }
 
-  /* Check that the cofactor is within the mfb bound */
-  if (!check_leftover_norm (cof[sq_side], si, sq_side)) {
-    if (verbose) {
-      verbose_output_vfprint(0, 1, gmp_vfprintf, "# DUPECHECK cofactor %Zd is outside bounds\n", cof);
+  /* Check that the cofactors are within the mfb bound */
+  for (int side = 0; side < 2; ++side) {
+    if (!check_leftover_norm (cof[side], si, side)) {
+      if (verbose) {
+        verbose_output_vfprint(0, 1, gmp_vfprintf, "# DUPECHECK cofactor %Zd is outside bounds\n", cof);
+      }
+      is_dupe = 0;
+      goto clear_and_exit;
     }
-    is_dupe = 0;
-    goto clear_and_exit;
   }
 
   for(int side = 0 ; side < 2 ; side++) {
@@ -395,7 +397,6 @@ sq_was_previously_sieved(const unsigned long sq, int side, sieve_info_srcptr si)
     return (sq > si->conf->sides[side]->lim);
   } else {
     // Did we sieve other sides?
-    ASSERT_ALWAYS(si->conf->sides[side]->qmax != 0);
     if (si->conf->sides[side]->qmax == 0)
       return 0;
     // Is q smaller than current, and within the bounds for this side?

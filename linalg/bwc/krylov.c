@@ -347,6 +347,7 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
     }
     free(ymy);
 
+    matmul_top_report(mmt, 1.0);
     matmul_top_clear(mmt);
     pi_free_mpfq_datatype(pi, Ac_pi);
     A->oo_field_clear(A);

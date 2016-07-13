@@ -101,7 +101,7 @@ done
 
 ## Sampling / faking on each side
 NCHUNKS=5
-NBSAMPLE=20
+NBSAMPLE=50
 fakefiles=()
 if [ $nsides == 1 ]; then
     dupqmax="0,0"

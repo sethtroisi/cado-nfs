@@ -1178,6 +1178,7 @@ data_init (data_t s)
   s->sum = s->var = 0.0;
   s->min = DBL_MAX;
   s->max = -DBL_MAX;
+  s->beta = s->eta = 0.0; /* means non initialized */
 }
 
 void
@@ -1214,4 +1215,20 @@ data_var (data_t s)
 {
   double m = data_mean (s);
   return s->var / (double) s->size - m * m;
+}
+
+static int
+data_cmp (const void *a, const void *b)
+{
+  const double *x = a;
+  const double *y = b;
+
+  return (*x < *y) ? -1 : (*x > *y) ? 1 : 0;
+}
+
+double
+data_median (data_t s)
+{
+  qsort (s->x, s->size, sizeof (double), data_cmp);
+  return s->x[s->size / 2];
 }

@@ -99,13 +99,13 @@ static void small_sieve_print_contents(const char * prefix, small_sieve_data_t *
     }
     ASSERT_ALWAYS(next_marker->index == ssd->nb_ssp);
 
-    verbose_output_print(0, 1, "# %s: %d nice primes", prefix, nice);
+    verbose_output_print(0, 2, "# %s: %d nice primes", prefix, nice);
     /* Primes may be both even and projective... */
-    if (npow2) verbose_output_print(0, 1, ", %d powers of 2", npow2);
-    if (nproj) verbose_output_print(0, 1, ", and %d projective primes", nproj);
-    verbose_output_print(0, 1, ".");
-    if (ndiscard) verbose_output_print(0, 1, " %d discarded.", ndiscard);
-    verbose_output_print(0, 1, "\n");
+    if (npow2) verbose_output_print(0, 2, ", %d powers of 2", npow2);
+    if (nproj) verbose_output_print(0, 2, ", and %d projective primes", nproj);
+    verbose_output_print(0, 2, ".");
+    if (ndiscard) verbose_output_print(0, 2, " %d discarded.", ndiscard);
+    verbose_output_print(0, 2, "\n");
     /* With -v -v -v, dump all the small sieve data */
     verbose_output_vfprint (0, 4, small_sieve_dump, "# Dump of small sieve data:\n", ssd);
 }
@@ -225,7 +225,7 @@ void small_sieve_init(small_sieve_data_t *ssd, las_info_ptr las,
     // while we have any regular primes or bad primes < thresh left
     ssp_t * tail = ssd->ssp;
 
-    int index = 0;
+    unsigned int index = 0;
 
     // The processing of bucket region by nb_threads is interleaved.
     // It means that the positions for the small sieve must jump
@@ -234,13 +234,14 @@ void small_sieve_init(small_sieve_data_t *ssd, las_info_ptr las,
     // the ssp struct.
     
     const unsigned int skiprows = (bucket_region >> si->conf->logI)*(las->nb_threads-1);
-    for (std::vector<fb_general_entry>::const_iterator iter = fb->begin() ; iter != fb->end() ; iter++) {
+    for (std::vector<fb_general_entry>::const_iterator iter = fb->begin() ; iter != fb->end() && index < size ; iter++) {
         /* p=pp^k, the prime or prime power in this entry, and pp is prime */
         const fbprime_t p = iter->q, pp = iter->p;
         WHERE_AM_I_UPDATE(w, p, p);
 
-        if (p > thresh)
+        if (p > thresh) {
             continue;
+        }
 
         const double log_scale = si->sides[side]->scale * LOG_SCALE;
 

@@ -53,13 +53,11 @@ pthread_mutex_t lock=PTHREAD_MUTEX_INITIALIZER; /* used as mutual exclusion
 int tot_found = 0; /* total number of polynomials */
 int opt_found = 0; /* number of size-optimized polynomials */
 int ros_found = 0; /* number of rootsieved polynomials */
-double potential_collisions = 0.0, aver_opt_lognorm = 0.0,
-  aver_raw_lognorm = 0.0, var_opt_lognorm = 0.0,
+double potential_collisions = 0.0, aver_raw_lognorm = 0.0,
   var_raw_lognorm = 0.0;
 #define LOGNORM_MAX 999.99
 double min_raw_lognorm = LOGNORM_MAX, max_raw_lognorm = 0.0;
-double min_opt_lognorm = LOGNORM_MAX, max_opt_lognorm = 0.0;
-data_t data_exp_E;
+data_t data_opt_lognorm, data_exp_E, data_beta, data_eta;
 unsigned long collisions = 0;
 unsigned long collisions_good = 0;
 double *best_opt_logmu, *best_exp_E;
@@ -140,17 +138,61 @@ check_parameters (mpz_t m0, double q)
 }
 
 /* given a distribution with mean m and variance v, estimate the parameters
-   beta and eta from a matching Weibull distribution:
+   beta and eta from a matching Weibull distribution, using the method of
+   moments:
    m = eta * gamma (1 + 1/beta)
    v = eta^2 * [gamma (1 + 2/beta) - gamma (1 + 1/beta)^2] */
 static void
-estimate_weibull (double *beta, double *eta, double m, double v)
+estimate_weibull_moments (double *beta, double *eta, data_t s)
 {
+  double m = data_mean (s);
+  double v = data_var (s);
   double y = sqrt (v) / m;
 
   y = y * (0.7796968012336761 + y * (0.61970313728462 + 0.0562963108244 * y));
   *beta = 1.0 / y;
   *eta = m * (1.0 + y * (0.57721566490153 - 0.655878071520 * y));
+}
+
+/* Estimation via extreme values: we cut the total n values into samples of k
+   values, and for each sample we keep only the minimum. If the series of
+   minimum values satisfies a Weilbull distribution with parameters beta and eta,
+   then the original one has parameters beta (identical) and eta*k^(1/beta).
+   Here we choose k near sqrt(n). */
+static void
+estimate_weibull_moments2 (double *beta, double *eta, data_t s)
+{
+  unsigned long n = s->size;
+  unsigned long i, j, k, p, u;
+  data_t smin;
+  double min, eta_min;
+
+  ASSERT_ALWAYS(n > 0);
+
+  data_init (smin);
+
+  k = 50; /* sample size */
+  /* We consider full samples only. Since we call this function several times
+     with the same sequence, we perform a random permutation of the sequence
+     at each call to avoid side effects due to the particular order of
+     elements. In practice instead of considering s[j] we consider
+     s[(p*j) % n] where p is random with gcd(p,n)=1. */
+  do
+    p = lrand48 () % n;
+  while (gcd_uint64 (p, n) != 1);
+  for (i = 0; i + k <= n; i += k)
+    {
+      for (j = i, min = DBL_MAX; j < i + k; j++)
+        {
+          u = (p * j) % n;
+          if (s->x[u] < min)
+            min = s->x[u];
+        }
+      data_add (smin, min);
+    }
+  estimate_weibull_moments (beta, &eta_min, smin);
+  data_clear (smin);
+  *eta = eta_min * pow ((double) k, 1.0 / *beta);
 }
 
 /* print poly info */
@@ -196,10 +238,22 @@ print_poly_info ( char *buf,
 
   if (!raw_option && target_E != 0.0)
     {
-      double beta, eta, m, prob;
+      double beta, eta, prob;
 
-      m = data_mean (data_exp_E);
-      estimate_weibull (&beta, &eta, m, data_var (data_exp_E));
+      estimate_weibull_moments2 (&beta, &eta, data_exp_E);
+      /* since the estimation using extreme values has a high variability
+         in terms of the sample size, we permute the elements at each try,
+         and we take the median of the beta/eta values */
+      if (!isnan (beta) && !isinf (beta))
+        {
+          data_add (data_beta, beta);
+          beta = data_median (data_beta);
+        }
+      if (!isnan (eta) && !isinf (eta))
+        {
+          data_add (data_eta, eta);
+          eta = data_median (data_eta);
+        }
       prob = 1.0 - exp (- pow (target_E / eta, beta));
       sprintf (buf + strlen(buf), "# target_E=%.2f: collisions=%.2e, time=%.2e"
                " (beta=%.2f,eta=%.2f)\n",
@@ -380,15 +434,9 @@ optimize_raw_poly (mpz_poly F, mpz_t *g)
   sorted_insert_double (best_exp_E, keep, exp_E);
 
   mutex_lock (&lock);
+
   collisions_good ++;
-
-  aver_opt_lognorm += logmu;
-  var_opt_lognorm += logmu * logmu;
-  if (logmu < min_opt_lognorm)
-    min_opt_lognorm = logmu;
-  if (logmu > max_opt_lognorm)
-    max_opt_lognorm = logmu;
-
+  data_add (data_opt_lognorm, logmu);
   data_add (data_exp_E, exp_E);
 
   mutex_unlock (&lock);
@@ -1873,7 +1921,10 @@ main (int argc, char *argv[])
   mpz_init (admax);
   cado_poly_init (best_poly);
   cado_poly_init (curr_poly);
+  data_init (data_opt_lognorm);
   data_init (data_exp_E);
+  data_init (data_beta);
+  data_init (data_eta);
 
   /* read params */
   param_list pl;
@@ -2065,11 +2116,11 @@ main (int argc, char *argv[])
                   sqrt (var_raw_lognorm / collisions - rawmean * rawmean));
           if (collisions_good > 0)
             {
-              double mean = aver_opt_lognorm / collisions_good;
+              double mean = data_mean (data_opt_lognorm);
               double Emean = data_mean (data_exp_E);
               printf ("# Stat: optimized lognorm (nr/min/av/max/std): %lu/%1.2f/%1.2f/%1.2f/%1.2f\n",
-                      collisions_good, min_opt_lognorm, mean, max_opt_lognorm,
-                      sqrt (var_opt_lognorm / collisions_good - mean * mean));
+                      collisions_good, data_opt_lognorm->min, mean, data_opt_lognorm->max,
+                      sqrt (data_var (data_opt_lognorm)));
               printf ("# Stat: exp_E (nr/min/av/max/std): %lu/%1.2f/%1.2f/%1.2f/%1.2f\n",
                       collisions_good, data_exp_E->min, Emean,
                       data_exp_E->max, sqrt (data_var (data_exp_E)));
@@ -2115,7 +2166,10 @@ main (int argc, char *argv[])
   free(best_exp_E);
   param_list_clear (pl);
   free (tid);
+  data_clear (data_opt_lognorm);
   data_clear (data_exp_E);
+  data_clear (data_beta);
+  data_clear (data_eta);
 
   return 0;
 }
