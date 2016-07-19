@@ -14,6 +14,15 @@
 using namespace std;
 using namespace NTL;
 
+//The polynomial is not irreducible.
+#define IRREDUCIBLE "#1"
+//The factorization contains not prime factors.
+#define PRIME "#2"
+//The factorization is false.
+#define FACTORIZATION "#3"
+//The factorization is not smooth.
+#define SMOOTHNESS "#4"
+
 // Read a polynomial in the correct form.
 void read_poly(ZZX& a, string poly)
 {
@@ -184,12 +193,24 @@ void extract_factorisation(Vec < Vec < ZZ > >& factorizations, string line,
   }
 }
 
-void compute_factorization(ZZ& factorization, Vec <ZZ> factor)
+/*
+ * Return 0 if an element of factor is not prime, 1 if all the elements of
+ * factor  are prime.
+ */
+unsigned int compute_factorization(ZZ& factorization, Vec <ZZ> factor)
 {
   factorization = 1;
+  unsigned int not_prime = 1;
+  //TODO: maybe it is too large.
+  long nb_try = 25;
   for (long i = 0; i < factor.length(); i++) {
     factorization *= factor[i];
+    if (!ProbPrime(factor[i], nb_try)) {
+      not_prime = 0;
+    }
   }
+
+  return not_prime;
 }
 
 unsigned int is_smooth(Vec <ZZ> factor, ZZ lpb) {
@@ -232,9 +253,9 @@ int main(int argc, char ** argv)
     read_lpb(lpb, argv[4], f.length());
     fileerr.open(argv[5]);
   } else {
-    cerr << "Usage error\n";
-    cerr << "./irreducible <file_relation> [<output>, <output> <poly.poly> "
-      "<lpb> <error>\n";
+    cerr << "Usage error" << endl;
+    cerr << "./check_relations <file_relation> [<output>, <output> <poly.poly> "
+      "<lpb> <error>" << endl;
   }
 
   //Number of relations.
@@ -244,6 +265,12 @@ int main(int argc, char ** argv)
   nb_not_rel = 0;
   ZZ nb_err_rel;
   nb_err_rel = 0;
+  ZZ nb_err_prime;
+  nb_err_prime = 0;
+  ZZ nb_err_facto;
+  nb_err_facto = 0;
+  ZZ nb_err_smooth;
+  nb_err_smooth = 0;
 
   string line;
 
@@ -259,13 +286,11 @@ int main(int argc, char ** argv)
       assert(deg(a) > 0);
       //TODO: if there exists a irreducible test, use it.
       factor(c, factors, a);
-#ifdef NDEBUG
       assert(c == 1);
-#endif // NDEBUG
 
       if (factors.length() == 1) {
         if (argc == 2 || argc == 3) {
-          filew << line << "\n";
+          filew << line << endl;
           nb_rel++;
         } else if (argc == 6) {
           unsigned int error = 0;
@@ -275,21 +300,37 @@ int main(int argc, char ** argv)
             ZZ norm;
             norm = abs(resultant(a, f[j]));
             ZZ test;
-            compute_factorization(test, factorization[j]);
-
-            if (norm != test || !is_smooth(factorization[j], lpb[j])) {
-              fileerr << line << "\n";
+            unsigned int all_prime = compute_factorization(test,
+                factorization[j]);
+            if (!all_prime) {
+              fileerr << line << PRIME << endl;
               error = 1;
               nb_err_rel++;
+              nb_err_prime++;
+              break;
+            }
+            if (norm != test) {
+              fileerr << line << FACTORIZATION << endl;
+              error = 1;
+              nb_err_rel++;
+              nb_err_facto++;
+              break;
+            }
+            if (!is_smooth(factorization[j], lpb[j])) {
+              fileerr << line << SMOOTHNESS << endl;
+              error = 1;
+              nb_err_rel++;
+              nb_err_smooth++;
               break;
             }
           }
           if (!error) {
-            filew << line << "\n";
+            filew << line << endl;
             nb_rel++;
           }
         }
       } else {
+        fileerr << line << IRREDUCIBLE << endl;
         nb_not_rel++;
       }
     }
@@ -301,10 +342,14 @@ int main(int argc, char ** argv)
     fileerr.close();
   }
 
-  cout << "Number of relations: " << nb_rel << ".\n";
-  cout << "Number of false relations: " << nb_not_rel << ".\n";
+  cout << "Number of relations: " << nb_rel << "." << endl;
+  cout << "Number of false relations: " << nb_not_rel << "." <<endl;
   if (nb_err_rel != 0) {
-    cout << "Number of relations with error: " << nb_err_rel << "\n";
+    assert(nb_err_rel == nb_err_prime + nb_err_facto + nb_err_smooth);
+    cout << "Number of relations with error: " << nb_err_rel << "." << endl;
+    cout << "  contains not prime factor: " << nb_err_prime << "." << endl;
+    cout << "  contains bad factorisation: " << nb_err_facto << "." << endl;
+    cout << "  is not smooth: " << nb_err_smooth << "." << endl;
   }
 
   return 0;
