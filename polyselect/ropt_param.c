@@ -41,9 +41,12 @@ unsigned int size_tune_sievearray = 6144;
  * C is number of sublattices used in tuning the best lognorm bound;
  * A is number of sublattices used in tuning;
  * B number of sublattices used in final sieve;
- * In general, A is large; while B, C are larger.
+ * In general, A is large; while B, C are small 
+ *  (perhaps C could also be large).
  * They will be scaled by ropt_effort linearly.
- *
+ * Note the total running-time is scaled approx. linearly since 
+ * each lats in B take more time but there are less lats in B
+ * than others.
  */
 const unsigned int size_total_sublattices[NUM_DEFAULT_DIGITS][4] = {
   { 80,    8,    4,    2},  /* up to 79 digits */
