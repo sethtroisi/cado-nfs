@@ -196,5 +196,9 @@ void extract_MurphyE_pq ( MurphyE_pq *pqueue,
 
 void free_MurphyE_pq ( MurphyE_pq **ppqueue );
 
+void reset_MurphyE_pq ( MurphyE_pq *pqueue );
+
+void remove_rep_MurphyE ( MurphyE_pq *pqueue );
+
 
 #endif /* ROPT_TREE_H */

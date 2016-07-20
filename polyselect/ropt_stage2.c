@@ -1034,13 +1034,13 @@ rootsieve_one_sublattice ( ropt_poly_t poly,
   for (i = 1; i < local_E_pqueue->used; i ++) {
     
     if (param->verbose >= 3 && info->mode == ROPT_MODE_INIT) {
-      gmp_fprintf ( stderr, "# Found (%3dth) (w=%d, u=%Zd, v=%Zd) "
-                    "gives E = %1.2e\n",
+      gmp_fprintf ( stderr, "# Found (%3dth) E: %1.2e (w=%d, u=%Zd, v=%Zd)\n",
                     i, 
+                    local_E_pqueue->E[i],
                     local_E_pqueue->w[i],
                     local_E_pqueue->u[i],
-                    local_E_pqueue->v[i],
-                    local_E_pqueue->E[i] );
+                    local_E_pqueue->v[i]
+                    );
 
       if (param->verbose >= 4) {
 
@@ -1073,8 +1073,8 @@ rootsieve_one_sublattice ( ropt_poly_t poly,
   /* output stats */
   if (param->verbose >= 2 && info->mode == ROPT_MODE_INIT) {
     gmp_fprintf ( stderr,
-                  "# Stat: ave. MurphyE of top %ld polynomials: "
-                  "%1.2e (on sublattice %Zd, %Zd)\n",
+                  "# Stat: ave. E of top %ld polynomials: "
+                  "%1.2e (%Zd, %Zd)\n",
                   local_E_pqueue->used - 1,
                   info->ave_MurphyE,
                   s2param->A, s2param->B );

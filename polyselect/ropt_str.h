@@ -58,9 +58,12 @@ typedef struct {
   unsigned int len_e_sl;
   unsigned int tlen_e_sl;
 
-  /* num of all sublattices */
+  /* num of sublattices */
   unsigned int nbest_sl;
 
+  /* num of sublattices for tune */
+  unsigned int nbest_sl_tune;
+  
   /* num of all sublattices */
   unsigned int nbest_sieve;
 

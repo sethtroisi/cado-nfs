@@ -5,9 +5,10 @@
 #include "ropt_str.h"
 
 
-/* ------------------
-   possible to change
-   ------------------ */
+/* -------------------------
+   perhaps no need to change
+   ------------------------- */
+
 
 /* Stage 2 memory cutoff: at most, use 2^28 of int16_t
    which is about 256M memory. Large sieving region will
@@ -23,21 +24,9 @@
 /* Max default sieve length of u */
 #define SIZE_SIEVEARRAY_U 64
 
-
-/* -------------------------
-   perhaps no need to change
-   ------------------------- */
-
 #define PI 3.14159265358979
 
 #define SUP_ALPHA 4.843
-
-/* maximum lognorm+exp_E increment for each rotation */
-#define BOUND_LOGNORM_INCR_MAX 1.005
-
-#define BOUND_LOGNORM_INCR_MAX_TUNESTEP 0.005
-
-#define TUNE_LOGNORM_INCR 1
 
 #define MAX_LINE_LENGTH 4096
 
@@ -49,8 +38,20 @@
 
 #define DEBUG 0
 
+/* mu and sigma in function exp_alpha() */
+#define MU 0.0
+
+#define SIGMA 0.824
+
 /* Don't change this. */
 #define NUM_SUBLATTICE_PRIMES 9
+
+/* Either rank stage 1 sublattices by E or by alpha, the former
+   seems to be more accurate */
+#define RANK_SUBLATTICE_BY_E 1
+
+/* Toggle for tuning lognorm, it seems better on */
+#define TUNE_LOGNORM_INCR 1
 
 /* Top 32 (alpha) in each "SIZE_SIEVEARRAY": this does not
    affect the running-time since it is not dominating */
@@ -60,27 +61,8 @@
    SIZE_SIEVEARRAY */
 #define NUM_TOPE_SUBLATTICE 32
 
-/* Either rank stage 1 sublattices by E or by alpha, the former
-   seems to be more accurate */
-#define RANK_SUBLATTICE_BY_E 1
-
-
-/* -------------------------
-   Parameters for test sieving
-   ------------------------- */
-
-/* This is the maxmum of the following values */
-#define TUNE_NUM_SUBLATTICE 8
-
-/* allow more sublattice in Stage 1 (ranking based on alpha values) */
-#define TUNE_NUM_SUBLATTICE_STAGE1 8
-
-#define TUNE_NUM_SUBLATTICE_STAGE2 2
-
-/* Similar to above, but in tune mode */
+/* Similar to above, but used in tune mode for speed */
 #define TUNE_NUM_TOPALPHA_SIEVEARRAY 8
-
-/* Similar to above, but in tune mode */
 #define TUNE_NUM_TOPE_SUBLATTICE 8
 
 /* Tuning parameter */
@@ -93,9 +75,21 @@
 #define TUNE_BOUND_ON_MOD_TRIALS 64
 
 
-/* mu and sigma in function exp_alpha() */
-#define MU 0.0
-#define SIGMA 0.824
+/* -------------------------
+   Parameters you may change
+   ------------------------- */
+
+
+/* maximum lognorm+exp_E increment for each rotation */
+#define BOUND_LOGNORM_INCR_MAX 1.002
+
+#define BOUND_LOGNORM_INCR_MAX_TUNESTEP 0.005
+
+/* ratio of sublattices in Stage 1 ranking based on partial alpha values */
+#define TUNE_RATIO_STAGE1_PART_ALPHA 5
+
+/* cutoff from above by ranking based on partial alpha values */
+#define TUNE_RATIO_STAGE1_FULL_ALPHA 1
 
 
 /* --- declarations --- */
@@ -118,7 +112,7 @@ extern const unsigned int s1_size_each_sublattice[NUM_SUBLATTICE_PRIMES][NUM_SUB
 
 extern const unsigned int s1_size_each_sublattice_tune[NUM_SUBLATTICE_PRIMES];
 
-extern const unsigned int size_total_sublattices[NUM_DEFAULT_DIGITS][3];
+extern const unsigned int size_total_sublattices[NUM_DEFAULT_DIGITS][4];
 
 double exp_alpha (double logK);
 

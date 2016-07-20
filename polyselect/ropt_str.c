@@ -535,13 +535,13 @@ ropt_bound_setup_others ( ropt_bound_t bound )
 
   /*
     printf ("size: %ld, uboundr: %ld, uboundl: %ld\n",
-            size, bound->global_u_boundr, bound->global_u_boundl);
+    size, bound->global_u_boundr, bound->global_u_boundl);
   */
 
   size += (int) log2 ((double) (bound->global_u_boundr -
                                 bound->global_u_boundl));
 
-  ASSERT_ALWAYS(size <= 150);
+  ASSERT_ALWAYS(size <= 152);
 
   bound->exp_min_alpha = exp_alpha((double)(size-1)*M_LN2);
 }
@@ -681,6 +681,7 @@ ropt_s1param_init ( ropt_s1param_t s1param )
   s1param->len_e_sl = 0;
   s1param->tlen_e_sl = 0;
   s1param->nbest_sl = 0;
+  s1param->nbest_sl_tune = 1;
   s1param->nbest_sieve = 0;
   s1param->modbound = 0;
   
@@ -738,19 +739,19 @@ ropt_s1param_setup_e_sl ( ropt_poly_t poly,
   /* compare two bounds */
   if ( mpz_cmp_ui (bound_by_v, bound_by_u) < 0 ) {
     modbound = mpz_get_ui (bound_by_v);
-    if (modbound > bound_by_u / 16)
-      modbound = bound_by_u / 16;
+    if (modbound > bound_by_u / 8)
+      modbound = bound_by_u / 8;
   }
   else
-    modbound = bound_by_u / 16;
+    modbound = bound_by_u / 8;
 
   /* adjust for small skewness but large bound (not sure if this is good) */
   mpz_poly F;
   F->coeff = poly->f;
   F->deg = poly->d;
   double skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
-  if ((double) modbound > (skew / 16.0))
-    modbound = (unsigned long) (skew / 16.0);
+  if ((double) modbound > skew)
+    modbound = (unsigned long) skew;
 
   /* find i */
   for (i = 0; i < NUM_DEFAULT_SUBLATTICE; i ++)
@@ -768,7 +769,7 @@ ropt_s1param_setup_e_sl ( ropt_poly_t poly,
 
   /* get mod bound */
   s1param->modbound = default_sublattice_prod[i];
-
+  
   /* overwrite e_sl[] from from stdin, if needed */
   if (param->s1_num_e_sl != 0) {
     s1param->modbound = 1;
@@ -829,9 +830,13 @@ ropt_s1param_setup ( ropt_poly_t poly,
     if (size_total_sublattices[i][0] > j)
       break;
 
-  s1param->nbest_sl = (unsigned long) ((double) size_total_sublattices[i][1]
-                                       * param->effort);
-  s1param->nbest_sieve = (unsigned long) ((double) size_total_sublattices[i][2]);
+  s1param->nbest_sl = (unsigned int) ((double) size_total_sublattices[i][1]);
+
+  s1param->nbest_sieve = (unsigned int) ((double) size_total_sublattices[i][2]);
+
+  s1param->nbest_sl_tune = (unsigned int) ((double) size_total_sublattices[i][3]);
+  
+
   if (s1param->nbest_sl < 4)
     s1param->nbest_sl = 4;
   if (param->verbose >= 1) {

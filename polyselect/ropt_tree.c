@@ -1285,3 +1285,68 @@ insert_MurphyE_pq ( MurphyE_pq *pqueue,
   }
 }
 
+
+/**
+ * Reset priority queue for alpha.
+ */
+void
+reset_MurphyE_pq ( MurphyE_pq *pqueue )
+{
+
+  if ( pqueue == NULL) {
+    fprintf(stderr,"Error: malloc failed in reset_MurphyE_pq()\n");
+    exit(1);
+  }
+
+  if ( pqueue->w == NULL || pqueue->u == NULL ||
+       pqueue->v == NULL || pqueue->modulus == NULL ||
+       pqueue->E == NULL ) {
+    fprintf(stderr,"Error: malloc failed in reset_MurphyE_pq()\n");
+    exit(1);
+  }
+
+  mpz_set_ui ( pqueue->u[0], 0 );
+  mpz_set_ui ( pqueue->v[0], 0 );
+  mpz_set_ui ( pqueue->modulus[0], 0 );
+  pqueue->w[0] = 0;
+  pqueue->E[0] = -DBL_MAX;
+  pqueue->used = 1;
+}
+
+
+/**
+ * Remove duplicates in murphyE queue.
+ */
+void
+remove_rep_MurphyE ( MurphyE_pq *pqueue )
+{
+  int flag;
+  MurphyE_pq *new;
+  new_MurphyE_pq (&new, pqueue->len);
+  for (int i=1; i<pqueue->used; i++) {
+    flag = 0;
+    for (int k=i+1; k<pqueue->used; k++) {
+      if ( (pqueue->w[i] == pqueue->w[k]) &&
+           mpz_cmp(pqueue->u[i],pqueue->u[k])==0 &&
+           mpz_cmp(pqueue->v[i],pqueue->v[k])==0 &&
+           mpz_cmp(pqueue->modulus[i], pqueue->modulus[k])==0) {
+        flag = 1;
+        break;
+      }
+    }
+    if (flag==0) {
+      insert_MurphyE_pq (new, pqueue->w[i], pqueue->u[i], pqueue->v[i],
+                         pqueue->modulus[i], pqueue->E[i]);
+    }
+  }
+  reset_MurphyE_pq (pqueue);
+  pqueue->used = new->used;
+  for (int i=1; i<pqueue->used; i++) {
+    pqueue->w[i] = new->w[i];
+    mpz_set(pqueue->u[i],new->u[i]);
+    mpz_set(pqueue->v[i],new->v[i]);
+    mpz_set(pqueue->modulus[i],new->modulus[i]);
+    pqueue->E[i] = new->E[i];
+  }
+  free_MurphyE_pq (&new);
+}
