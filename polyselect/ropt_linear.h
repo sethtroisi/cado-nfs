@@ -67,5 +67,9 @@ ropt_call_sieve ( ropt_poly_t poly,
                   alpha_pq *alpha_pqueue,
                   MurphyE_pq *global_E_pqueue );
 
+void
+ropt_MurphyE_to_alpha ( MurphyE_pq *E_pqueue,
+                        alpha_pq *alpha_pqueue );
+
 
 #endif /* ROPT_LINEAR_H */

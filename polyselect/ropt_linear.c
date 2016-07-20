@@ -105,6 +105,7 @@ ropt_linear_tune_stage1 ( ropt_poly_t poly,
     ropt_bound_setup_incr (poly, bound, param, start_incr);
     ropt_s1param_resetup_modbound (poly, s1param_tune, bound, param,
                                    s1_size, start_modbound); 
+    /* num. lat (for each p) bounded by s1_size_each_sublattice_tune[] resp. */
     s1param_tune->nbest_sl_tunemode = 1;
     r = ropt_stage1 (poly, bound, s1param_tune, param, pqueue, quad);
     s1param_tune->nbest_sl_tunemode = 0;
@@ -124,7 +125,7 @@ ropt_linear_tune_stage1 ( ropt_poly_t poly,
                        pqueue->modulus[i], pqueue->alpha[i]);
     }
     
-    /* test root sieve */
+    /* test root sieve, pqueue changed to have MurphyE scores */
     score = ropt_tune_stage2_fast (poly, s1param_tune, param, info, pqueue,
                                    global_E_pqueue, size_tune_sievearray);
     /* update maxscore */
@@ -162,6 +163,29 @@ ropt_linear_tune_stage1 ( ropt_poly_t poly,
   return best_incr;
 }
 #endif
+
+
+/**
+ * Aux function that copy all E_pqueue to alpha_pqueue
+ *  -- use it with caution as it assumes alpha_pqueue now have MurphyE scores
+ */
+void
+ropt_MurphyE_to_alpha ( MurphyE_pq *E_pqueue,
+                        alpha_pq *alpha_pqueue )
+{
+  int i, used = E_pqueue->used;
+  for (i = 1; i < used; i ++) {
+    /*
+      gmp_fprintf (stderr, "# got %.2g"
+      "(%d, %Zd, %Zd) (mod %Zd), %d\n",
+      E_pqueue->E[i], E_pqueue->w[i], E_pqueue->u[i], E_pqueue->v[i],
+      E_pqueue->modulus[i], alpha_pqueue->w[0]);
+    */
+    insert_alpha_pq (alpha_pqueue, E_pqueue->w[i],
+                     E_pqueue->u[i], E_pqueue->v[i], 
+                     E_pqueue->modulus[i], -E_pqueue->E[i]);
+  }
+}
 
 
 /**
@@ -233,7 +257,7 @@ ropt_tune_stage2_fast ( ropt_poly_t poly,
   ropt_poly_setup (poly);
   old_i = 0;
 
-  /* End: save to alpha_pqueue */
+  /* save result to alpha_pqueue */
   reset_alpha_pq (alpha_pqueue);
   used =  tmp_alpha_pqueue->used - 1;
   max_score = 0;
@@ -249,6 +273,10 @@ ropt_tune_stage2_fast ( ropt_poly_t poly,
   }
   max_score = -max_score;
 
+  /* also save best score so far to alpha_pqueue, E_queue 
+     is smaller than alpha_queue. Do not seem good in tests */
+  //ropt_MurphyE_to_alpha (global_E_pqueue, alpha_pqueue);
+  
   /* free s2param */
   free_alpha_pq (&tmp_alpha_pqueue);
   ropt_s2param_free (poly, s2param);

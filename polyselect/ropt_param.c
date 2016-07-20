@@ -41,7 +41,7 @@ unsigned int size_tune_sievearray = 6144;
  * C is number of sublattices used in tuning the best lognorm bound;
  * A is number of sublattices used in tuning;
  * B number of sublattices used in final sieve;
- * In general, A and C are small; while B is larger.
+ * In general, A is large; while B, C are larger.
  * They will be scaled by ropt_effort linearly.
  *
  */
@@ -49,23 +49,23 @@ const unsigned int size_total_sublattices[NUM_DEFAULT_DIGITS][4] = {
   { 80,    8,    4,    2},  /* up to 79 digits */
   {100,   16,    8,    3},  /* up to 99 digits */
   {120,   32,   12,    4},  /* up to 119 digits */
-  {140,   48,   16,    5},  /* up to 139 digits */
-  {150,   64,   20,    6},  /* up to 149 digits */
-  {160,   96,   24,    7},  /* up to 159 digits */
-  {170,  128,   28,    8},  /* up to 169 digits */
-  {180,  160,   32,    9},  /* up to 179 digits */
-  {190,  192,   36,    10},  /* up to 189 digits */
-  {200,  224,   40,    11},  /* up to 199 digits */
-  {210,  256,   44,    12},  /* up to 209 digits */
-  {220,  288,   64,    13},  /* up to 219 digits */
-  {230,  320,   52,    14},  /* up to 229 digits */
-  {240,  352,   56,    15},  /* up to 239 digits */
-  {250,  384,   60,    16},  /* up to 249 digits */
-  {260,  416,   64,    17},  /* up to 259 digits */
-  {270,  448,   68,    18},  /* up to 269 digits */
-  {280,  480,   72,    19},  /* up to 279 digits */
-  {290,  512,   76,    20},  /* up to 289 digits */
-  {300,  544,   80,    21}   /* up to 299 digits */
+  {140,   64,   16,    5},  /* up to 139 digits */
+  {150,   96,   20,    6},  /* up to 149 digits */
+  {160,  128,   24,    7},  /* up to 159 digits */
+  {170,  160,   28,    8},  /* up to 169 digits */
+  {180,  192,   32,    9},  /* up to 179 digits */
+  {190,  224,   36,    10},  /* up to 189 digits */
+  {200,  256,   40,    11},  /* up to 199 digits */
+  {210,  288,   44,    12},  /* up to 209 digits */
+  {220,  320,   48,    13},  /* up to 219 digits */
+  {230,  368,   52,    14},  /* up to 229 digits */
+  {240,  416,   56,    15},  /* up to 239 digits */
+  {250,  464,   60,    16},  /* up to 249 digits */
+  {260,  512,   64,    17},  /* up to 259 digits */
+  {270,  560,   68,    18},  /* up to 269 digits */
+  {280,  608,   72,    19},  /* up to 279 digits */
+  {290,  656,   76,    20},  /* up to 289 digits */
+  {300,  704,   80,    21}   /* up to 299 digits */
 };
 
 
