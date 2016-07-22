@@ -663,6 +663,154 @@ function factorization_of_prime(K, p)
     return ideals;
 end function;
 
+/* 
+ * Let G be the basis of an order (denoted G) of K.
+ * Let I and J be two coprime ideals of G such that I*J=p*G.
+ *
+ * The basis of I and J are expressed with respect to the same generators as
+ * those on which G is expressed (that is, I being an ideal of G, we have that
+ * I*G^-1 has integer coefficients).
+ *
+ * This returns a factorization of I into prime ideals (as a sequence of
+ * (prime ideal, exponent) pairs).
+ */
+function factorization_of_prime2_inner(K, G, N, p, Ip, I, J)
+    /* pick an element of J */
+
+    if Determinant(Matrix([Eltseq(x):x in I])*N) eq 1 then return []; end if;
+    O  := Order(G);
+
+    c  := &+[Random([0..p-1])*x:x in J];
+    Mc := Matrix(GF(p),Matrix([Eltseq(c*x):x in G])*N);
+    Pc := MinimalPolynomial(Mc);
+    fac_Pc:=Factorization(Pc);
+    characteristic_subspaces:=[Basis(Nullspace(Evaluate(f[1],Mc)^f[2])):f in fac_Pc];
+    // the vector space is the direct sum of all the characteristic subspaces.
+
+    ideals:=[];
+    for i in [1..#fac_Pc] do
+        e:=fac_Pc[i][2];
+        /* We had I*J=p
+         *
+         * Let C be a basis of characteristic_subspaces[i]. We are especially
+         * interested in J inter C (intersection of the two vector spaces),
+         * because that is really the thing we are willing to decompose.
+         *
+         * It is quite easy to build a basis for the set of p*x for x in J
+         * inter C: build one for the set of p*x for x in C, and take the gcd
+         * of that with I. Call this gcd I2, which is a divisor of I.
+         *
+         * As for what the new J2 should be, it should be a smaller vector
+         * space to be decomposed, and therefore a bigger ideal. We want J2 to
+         * be the product of J and J inter C. We achieve that by simply
+         * multiplying J with C, and taking the gcd with p.
+         */
+        I2:=I;
+        for j in [1..#fac_Pc] do
+            p1:=i eq j select p else 1;
+            for v in characteristic_subspaces[j] do
+                Append(~I2, p1*K!O!ChangeUniverse(Eltseq(v),Z));
+            end for;
+        end for;
+
+        if #characteristic_subspaces[i] eq e*Degree(fac_Pc[i][1]) then
+            Ix:=nf_elements_hnf(I2 cat Ip);
+            Append(~ideals, <Ix,e>);
+        else
+            I2:=nf_elements_hnf(I2);
+            J2:=nf_elements_hnf([p*g:g in G] cat [j*K!O!ChangeUniverse(Eltseq(v),Z):v in characteristic_subspaces[i], j in J]);
+            ideals cat:= factorization_of_prime2_inner(K, G, N, p, Ip, I2, J2);
+        end if;
+    end for;
+    return ideals;
+end function;
+
+
+function factorization_of_prime2(K, p)
+    n:=Degree(K);
+    _,G:=p_maximal_order(K, p);
+    Ip:=p_radical_of_order(G,p);
+
+    M:=Matrix([Eltseq(g):g in G]);
+    N:=M^-1;
+
+    Z:=Integers();
+    ideals:=[];
+    SetSeed(1);
+
+    return factorization_of_prime2_inner(K, G, N, p, Ip, [p*x:x in G], G);
+end function;
+
+function factorization_of_prime3_inner(K, G, N, p, Ip, I, J)
+    // J is an m-dimensional subspace of O/pO.
+    // J is given as an m times n matrix with coordinates in GF(p)
+    O := Order(G);
+
+    /* pick an element of J */
+    c  := O!Eltseq(Vector(Integers(),Vector([Random(GF(p)): i in [1..Nrows(J)]]) * J));
+
+    /* write the m*m matrix of the multiplication by c, but with respect to J.
+     *
+     * Given coordinates CJ of c*j with respect to G, for basis elements of J,
+     * the matrix we're looking for is such that M * J = CJ
+     */
+    CJ := J*Matrix(GF(p),Matrix([Eltseq(K!(c*x)):x in G])*N);
+    /* solve the linear system M * J = CJ */
+    Mc := Matrix(Solution(J,CJ));
+
+    fac_Pc:=Factorization(MinimalPolynomial(Mc));
+    characteristic_subspaces:=[*Matrix(Basis(Nullspace(Evaluate(f[1],Mc)^f[2]))):f in fac_Pc*];
+
+    /* cosmetic */
+    D_:=Matrix(Integers(),n,n,[i+j eq n+1 select 1 else 0:i,j in [1..n]]);
+    I_elements:=Eltseq(Vector(G)*Transpose(Matrix(K,I)));
+
+    ideals:=[];
+    for i in [1..#fac_Pc] do
+        /* And the corresponding ideal. This naturally involves an HNF. */
+        /* Generating elements are p times the basis vector of the current
+         * characteristic subspace, plus the (not multiplied) basis vector of
+         * the other characteristic subspaces.
+         *
+         * First write the basis with respect to J, and convert later.
+         */
+        basis_I2:=Matrix(Integers(),Matrix(&cat([
+                    Parent(Rows(characteristic_subspaces[i]))|
+                    Rows(characteristic_subspaces[j])
+                    : j in [1..#fac_Pc] | j ne i])) * J);
+
+        e:=fac_Pc[i][2];
+        if Nrows(characteristic_subspaces[i]) eq e*Degree(fac_Pc[i][1]) then
+            I2_elements:=Eltseq(Vector(G)*Transpose(Matrix(K,basis_I2)));
+            Ix:=nf_elements_hnf(I_elements cat I2_elements cat Ip);
+            Append(~ideals, <Ix,e>);
+        else
+            /* in essence, this is nf_elements_hnf(I_elements cat
+             * I2_elements), but we keep a matrix notation */
+            I2:=D_*Submatrix(HermiteForm(VerticalJoin(I, basis_I2)*D_)*D_,1,1,n,n);
+            /* The next subspace with which we will intersect */
+            J2:=characteristic_subspaces[i]*J;
+            ideals cat:= factorization_of_prime3_inner(K, G, N, p, Ip, I2, J2);
+        end if;
+    end for;
+    return ideals;
+end function;
+
+
+function factorization_of_prime3(K, p)
+    n:=Degree(K);
+    _,G:=p_maximal_order(K, p);
+    Ip:=p_radical_of_order(G,p);
+
+    M:=Matrix([Eltseq(g):g in G]);
+    N:=M^-1;
+
+    SetSeed(1);
+
+    In:=IdentityMatrix(Integers(),n);
+    return factorization_of_prime3_inner(K, G, N, p, Ip, p*In, IdentityMatrix(GF(p),n));
+end function;
+
 
 
 //////////////////////////////////////////////////////////////////////////
