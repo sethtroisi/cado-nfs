@@ -46,13 +46,18 @@ ropt_linear_tune_stage1 ( ropt_poly_t poly,
   info->mode = 0;
 
   /* setup bound, tmporary pqueue */
-  unsigned int s1_size = s1param->nbest_sl_tune*param->effort,
-    pqueue_size = s1_size;
+  unsigned int s1_size, pqueue_size;
   int i, k, kk, r, w, used, steps = 0;
   ropt_bound_t bound;
   alpha_pq *pqueue;
   ropt_s1param_t s1param_tune;
   mpz_t u, v, mod;
+
+  s1_size = s1param->nbest_sl_tune * param->effort;
+  if (s1_size < 2)
+    s1_size = 2; /* required by new_alpha_pq() */
+  pqueue_size = s1_size;
+
   mpz_init (u);
   mpz_init (v);
   mpz_init (mod);

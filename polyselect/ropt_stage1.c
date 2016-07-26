@@ -866,6 +866,9 @@ ropt_stage1 ( ropt_poly_t poly,
   unsigned long len_full_alpha = s1param->nbest_sl *
     TUNE_RATIO_STAGE1_FULL_ALPHA * param->effort;
 
+  if (len_part_alpha < 2)
+    len_part_alpha = 2; /* required by new_sublattice_pq() */
+
   /* size-cutoff of top sublattices based on partial alpha */
   new_sublattice_pq (&pqueue, len_part_alpha);
   
