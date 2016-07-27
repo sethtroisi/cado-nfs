@@ -3,7 +3,7 @@
 CADO_NFS_SOURCE_DIR=$1
 CADO_NFS_BINARY_DIR=$2
 
-t=`mktemp -d /tmp/cado-check.XXXXXXX`
+t=`mktemp -d ${TMPDIR-/tmp}/cado-check.XXXXXXX`
 cd $t
 
 cat > c120.poly <<EOF
@@ -36,7 +36,6 @@ $CADO_NFS_SOURCE_DIR/sieve/strategies/create_strat_file.sh $lim0 $lpb0 $mfb0 $li
 
 nl=`wc -l final_st | cut -d " " -f 1`
 if [ $nl == "382" ]; then
-    cd /tmp
     rm -rf $t
     exit 0
 else

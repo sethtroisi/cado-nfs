@@ -4,6 +4,7 @@
 # expected to do, and also checks that the permutations do what they are
 # expected to do as well.
 
+: ${TMPDIR=/tmp}
 nrows=100
 ncols=100
 density=10
@@ -87,7 +88,7 @@ redirect_unless_debug() {
 
 if ! [ "$nrows" ] ; then usage ; fi
 
-wdir=$(mktemp -d  /tmp/cado.XXXXXXXX)
+wdir=$(mktemp -d  $TMPDIR/cado.XXXXXXXX)
 cleanup() { if ! [ "$CADO_DEBUG" ] ; then rm -rf $wdir ; fi ; }
 argh() { echo "Failed on command error" >&2 ; cleanup ; }
 trap cleanup EXIT
