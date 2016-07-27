@@ -52,10 +52,10 @@ BASENAME="`basename "${POLY}"`"
 BASENAME="${BASENAME%%.*}"
 
 # Output files
-TMPDIR=`mktemp -d /tmp/cadotest.XXXXXXXXXX`
+WORKDIR=`mktemp -d ${TMPDIR-/tmp}/cadotest.XXXXXXXXXX`
 # Make temp direcotry world-readable for easier debugging
-chmod a+rx "${TMPDIR}"
-RELS="${TMPDIR}/${BASENAME}.rels"
+chmod a+rx "${WORKDIR}"
+RELS="${WORKDIR}/${BASENAME}.rels"
 
 if [ -n "$q1" ]
 then
@@ -68,7 +68,7 @@ fi
 
 bailout() {
     if [ "$EXPECTED_FAIL" ] && ! [ "$KEEP_SIEVETEST" ] ; then
-        rm -rf "$TMPDIR"
+        rm -rf "$WORKDIR"
     fi
     exit 1
 }
@@ -99,7 +99,7 @@ then
   then
     REFMSG=", as created by Git revision ${REFERENCE_REVISION}"
   fi
-  echo "$0: Got SHA1 of ${SHA1} but expected ${REFERENCE_SHA1}${REFMSG}. Files remain in ${TMPDIR}"
+  echo "$0: Got SHA1 of ${SHA1} but expected ${REFERENCE_SHA1}${REFMSG}. Files remain in ${WORKDIR}"
   exit 1
 fi
 
@@ -120,7 +120,7 @@ then
   then
     rm -f "${MYCHECKSUM_FILE}"
   fi
-  rmdir "${TMPDIR}"
+  rmdir "${WORKDIR}"
 else
-  echo "Keeping files in ${TMPDIR}"
+  echo "Keeping files in ${WORKDIR}"
 fi
