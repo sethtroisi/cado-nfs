@@ -890,6 +890,8 @@ ropt_stage1 ( ropt_poly_t poly,
   if (param->verbose >= 2) {
     gmp_fprintf ( stderr, "# Info: found    %8lu lat with part alpha\n",
                   pqueue->used-1);
+    if ((long) len_full_alpha > pqueue->used-1)
+      len_full_alpha = pqueue->used-1;
     gmp_fprintf ( stderr, "# Info: ranked   %8lu lat with full alpha\n",
                   len_full_alpha);
     gmp_fprintf ( stderr, "# Info: find best lat took %lums\n",

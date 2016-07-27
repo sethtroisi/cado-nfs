@@ -521,29 +521,17 @@ ropt_bound_setup_globalbound ( ropt_poly_t poly,
  * Subroutine for ropt_bound_setup().
  */
 static inline void
-ropt_bound_setup_others ( ropt_bound_t bound )
+ropt_bound_setup_others ( ropt_poly_t poly,
+                          ropt_bound_t bound )
 {
-  long size, sizel, sizer;
-  sizel = mpz_sizeinbase (bound->global_v_boundl, 2);
-  sizer = mpz_sizeinbase (bound->global_v_boundr, 2);
-  size = (sizel > sizer) ? sizel : sizer;
-
-  if (bound->global_u_boundr == 0)
-    bound->global_u_boundr = 1;
-  if (bound->global_u_boundl == 0)
-    bound->global_u_boundr = 1;
-
-  /*
-    printf ("size: %ld, uboundr: %ld, uboundl: %ld\n",
-    size, bound->global_u_boundr, bound->global_u_boundl);
-  */
-
-  size += (int) log2 ((double) (bound->global_u_boundr -
-                                bound->global_u_boundl));
-
-  ASSERT_ALWAYS(size <= 152);
-
-  bound->exp_min_alpha = exp_alpha((double)(size-1)*M_LN2);
+  mpz_poly F, G;
+  mpz_poly_init (F, poly->d);
+  mpz_poly_init (G, 1);
+  mpz_poly_setcoeffs (F, poly->f, poly->d);
+  mpz_poly_setcoeffs (G, poly->g, 1);
+  bound->exp_min_alpha = expected_rotation_gain (F, G);
+  mpz_poly_clear (F);
+  mpz_poly_clear (G);
 }
 
 
@@ -566,7 +554,7 @@ ropt_bound_setup ( ropt_poly_t poly,
   ropt_bound_setup_globalbound (poly, bound, param);
 
   /* set exp_min_alpha */
-  ropt_bound_setup_others (bound);
+  ropt_bound_setup_others (poly, bound);
 
   if (param->verbose >= 1) {
     gmp_fprintf ( stderr, "# Info: global bounds (%d:%d, %ld:%ld, %Zd:%Zd)"
@@ -607,7 +595,7 @@ ropt_bound_setup_incr ( ropt_poly_t poly,
 {
   ropt_bound_setup_normbound (poly, bound, param, incr);
   ropt_bound_setup_globalbound (poly, bound, param);
-  ropt_bound_setup_others (bound);
+  ropt_bound_setup_others (poly, bound);
   if (param->verbose >= 2) {
     gmp_fprintf ( stderr, "# Info: tune (%d:%d, %ld:%ld, %Zd:%Zd)\n",
                   bound->global_w_boundl,
@@ -636,7 +624,7 @@ ropt_bound_reset ( ropt_poly_t poly,
   rotate_bounds_V_mpz (poly->f, poly->g, poly->d, bound);
 
   /* set exp_min_alpha */
-  ropt_bound_setup_others (bound);
+  ropt_bound_setup_others (poly, bound);
 
   if (param->verbose >= 2) {
     gmp_fprintf ( stderr, "# Info: reset bounds (%d:%d, %ld:%ld, %Zd:%Zd)"
