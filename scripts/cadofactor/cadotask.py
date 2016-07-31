@@ -5279,17 +5279,6 @@ class CompleteFactorization(HasState, wudb.DbAccess,
             self.tasks = (self.polysel1, self.polysel2, self.fb, self.freerel,
                           self.sieving, self.dup1, self.dup2, self.purge,
                           self.merge, self.linalg, self.characters, self.sqrt)
-            if len(sys.argv)>2:
-                if sys.argv[2]=="tasks.sieve.run=false":
-                    self.tasks = (self.polysel1, self.polysel2, self.fb, self.freerel,
-                          self.sieving)
-                if sys.argv[2]=="tasks.filter.run=false":
-                    self.tasks = (self.polysel1, self.polysel2, self.fb, self.freerel,
-                          self.sieving, self.dup1)
-                if sys.argv[2]=="tasks.linalg.run=false":
-                    self.tasks = (self.polysel1, self.polysel2, self.fb, self.freerel,
-                          self.sieving, self.dup1, self.dup2, self.purge,
-                          self.merge, self.linalg)
 
         for (path, key, value) in parameters.get_unused_parameters():
             self.logger.warning("Parameter %s = %s was not used anywhere",
