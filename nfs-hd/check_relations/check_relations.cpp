@@ -1,5 +1,4 @@
-//Usage: ./check_relations <file_relation> [<output>, <output> <poly.poly> <lpb>
-//<error>]
+//Usage: ./check_relations <file_relation> <output> <poly.poly> <lpb> <error>
 
 #include <stdio.h>
 #include <cassert>
@@ -239,23 +238,16 @@ int main(int argc, char ** argv)
   //Large prime bounds.
   Vec <ZZ> lpb;
 
-  if (argc == 2) {
-    char * filew_name = (char *) malloc(sizeof(char) * strlen(argv[1]) + 7);
-    strcpy(filew_name, argv[1]);
-    strcat(filew_name, ".output");
-    filew.open(filew_name);
-    free(filew_name);
-  } else if (argc == 3) {
-    filew.open(argv[2]);
-  } else if (argc == 6) {
+  if (argc == 6) {
     filew.open(argv[2]);
     read_poly_file(f, argv[3]);
     read_lpb(lpb, argv[4], f.length());
     fileerr.open(argv[5]);
   } else {
     cerr << "Usage error" << endl;
-    cerr << "./check_relations <file_relation> [<output>, <output> <poly.poly> "
+    cerr << "./check_relations <file_relation> <output> <poly.poly> "
       "<lpb> <error>" << endl;
+    return 1;
   }
 
   //Number of relations.
@@ -289,10 +281,6 @@ int main(int argc, char ** argv)
       assert(c == 1);
 
       if (factors.length() == 1) {
-        if (argc == 2 || argc == 3) {
-          filew << line << endl;
-          nb_rel++;
-        } else if (argc == 6) {
           unsigned int error = 0;
           Vec < Vec < ZZ > > factorization;
           extract_factorisation(factorization, line, f.length());
@@ -302,18 +290,18 @@ int main(int argc, char ** argv)
             ZZ test;
             unsigned int all_prime = compute_factorization(test,
                 factorization[j]);
-            if (!all_prime) {
-              fileerr << line << PRIME << endl;
-              error = 1;
-              nb_err_rel++;
-              nb_err_prime++;
-              break;
-            }
             if (norm != test) {
               fileerr << line << FACTORIZATION << endl;
               error = 1;
               nb_err_rel++;
               nb_err_facto++;
+              break;
+            }
+            if (!all_prime) {
+              fileerr << line << PRIME << endl;
+              error = 1;
+              nb_err_rel++;
+              nb_err_prime++;
               break;
             }
             if (!is_smooth(factorization[j], lpb[j])) {
@@ -328,7 +316,6 @@ int main(int argc, char ** argv)
             filew << line << endl;
             nb_rel++;
           }
-        }
       } else {
         fileerr << line << IRREDUCIBLE << endl;
         nb_not_rel++;
