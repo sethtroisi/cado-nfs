@@ -123,7 +123,7 @@ argument_checking() {
             echo "Unsupported combination of arguments for specifying system" >&2
             echo "Detected arguments:" >&2
             for a in matrix rhsfile nrhs random_matrix_size random_matrix_maxcoeff ; do
-                v=`eval echo "\$$a"`
+                v=`eval echo '$'"$a"`
                 if [ "$v" != "" ] ; then
                     echo "$a=$v" >&2
                 fi
@@ -649,9 +649,9 @@ fi
 echo "Running magma verification script"
 
 if [ "$prime" = 2 ] ; then
-    s="`dirname $0`/bwc-trace.m"
+    s="`dirname $(readlink -f $0)`/bwc-trace.m"
 else
-    s="`dirname $0`/bwc-ptrace.m"
+    s="`dirname $(readlink -f $0)`/bwc-ptrace.m"
 fi
 cd $wdir
 # magma does not exit with a useful return code, so we have to grep its

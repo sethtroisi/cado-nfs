@@ -447,8 +447,19 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
             mmt_vec_twist(mmt, y);
         }
         if (!is_zero) {
+            int nb_nonzero_coeffs=0;
+            for(unsigned int i = 0 ; i < mmt_my_own_size_in_items(y) ; i++) {
+                nb_nonzero_coeffs += !
+                    A->vec_is_zero(A,
+                            A->vec_subvec(A, mmt_my_own_subvec(y), i),
+                            1);
+            }
+            pi_allreduce(NULL, &nb_nonzero_coeffs, 1, BWC_PI_INT, BWC_PI_SUM, pi->m);
             if (tcan_print) {
-                printf("Solution range %u..%u: no solution found, most probably a bug\n", sf->s0, sf->s1);
+                printf("Solution range %u..%u: no solution found [%d non zero coefficients], most probably a bug\n", sf->s0, sf->s1, nb_nonzero_coeffs);
+                if (nb_nonzero_coeffs < bw->n) {
+                    printf("There is some likelihood that by combining %d different solutions (each entailing a separate mksol run), a full solution can be recovered. Ask for support.\n", nb_nonzero_coeffs + 1);
+                }
             }
             pthread_mutex_lock(pi->m->th->m);
             exitcode=1;
