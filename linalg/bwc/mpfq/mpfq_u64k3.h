@@ -322,9 +322,9 @@ void mpfq_u64k3_dotprod(mpfq_u64k3_dst_field, mpfq_u64k3_dst_vec, mpfq_u64k3_src
 /* Member templates related to SIMD operation */
 
 /* Object-oriented interface */
+void mpfq_u64k3_oo_field_init(mpfq_vbase_ptr);
 static inline
 void mpfq_u64k3_oo_field_clear(mpfq_vbase_ptr);
-void mpfq_u64k3_oo_field_init(mpfq_vbase_ptr);
 #ifdef  __cplusplus
 }
 #endif
@@ -336,11 +336,11 @@ void mpfq_u64k3_field_init(mpfq_u64k3_dst_field f MAYBE_UNUSED)
 {
 }
 
-/* *Mpfq::defaults::flatdata::code_for_set, simd_flat */
+/* *simd_flat::code_for_set */
 static inline
 void mpfq_u64k3_set(mpfq_u64k3_dst_field K MAYBE_UNUSED, mpfq_u64k3_dst_elt r, mpfq_u64k3_src_elt s)
 {
-    if (r != s) memcpy(r,s,sizeof(mpfq_u64k3_elt));
+    mpfq_copy(r,s,sizeof(mpfq_u64k3_elt)/sizeof(mp_limb_t));
 }
 
 /* *simd_flat::code_for_set_zero */
@@ -389,11 +389,11 @@ int mpfq_u64k3_inv(mpfq_u64k3_dst_field K MAYBE_UNUSED, mpfq_u64k3_dst_elt r, mp
         return rc;
 }
 
-/* *Mpfq::defaults::flatdata::code_for_elt_ur_set, simd_flat */
+/* *simd_flat::code_for_elt_ur_set */
 static inline
 void mpfq_u64k3_elt_ur_set(mpfq_u64k3_dst_field K MAYBE_UNUSED, mpfq_u64k3_dst_elt_ur r, mpfq_u64k3_src_elt_ur s)
 {
-    if (r != s) memcpy(r,s,sizeof(mpfq_u64k3_elt_ur));
+    mpfq_copy(r,s,sizeof(mpfq_u64k3_elt_ur)/sizeof(mp_limb_t));
 }
 
 /* *Mpfq::defaults::flatdata::code_for_elt_ur_set_elt, simd_flat */

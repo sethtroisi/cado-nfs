@@ -446,9 +446,9 @@ void mpfq_p_12_dotprod(mpfq_p_12_dst_field, mpfq_p_12_dst_vec, mpfq_p_12_src_vec
 /* Member templates related to SIMD operation */
 
 /* Object-oriented interface */
+void mpfq_p_12_oo_field_init(mpfq_vbase_ptr);
 static inline
 void mpfq_p_12_oo_field_clear(mpfq_vbase_ptr);
-void mpfq_p_12_oo_field_init(mpfq_vbase_ptr);
 #ifdef  __cplusplus
 }
 #endif
