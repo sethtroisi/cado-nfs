@@ -320,15 +320,29 @@ invmod_redc_32(uint32_t a, uint32_t b) {
   if (LIKELY(t)) {
     if (LIKELY((int8_t) t > 0)) {
       uint8_t n = (t + 7) >> 3;
-      switch (t & 7) { case 0: do { T3;
-	case 7: T3; case 6: T3; case 5: T3; case 4: T3;
-	case 3: T3; case 2: T3; case 1: T3; } while (--n > 0);
+      switch (t & 7) {
+          case 0: do { T3;
+                      case 7: T3;
+                      case 6: T3;
+                      case 5: T3;
+                      case 4: T3;
+                      case 3: T3;
+                      case 2: T3;
+                      case 1: T3;
+                  } while (--n > 0);
       }
     } else {
       uint8_t n = ((t = -t) + 7) >> 3;
-      switch (t & 7) { case 0: do { T4;
-	case 7: T4; case 6: T4; case 5: T4; case 4: T4;
-	case 3: T4; case 2: T4; case 1: T4; } while (--n > 0);
+      switch (t & 7) {
+            case 0: do { T4;
+                        case 7: T4;
+                        case 6: T4;
+                        case 5: T4;
+                        case 4: T4;
+                        case 3: T4;
+                        case 2: T4;
+                        case 1: T4;
+                    } while (--n > 0);
       }
     }
   }
@@ -377,17 +391,25 @@ invmod_redc_64(uint64_t a, uint64_t b)
 #else
 #define T1 do { b-=a; lsh=cado_ctz(b); v+=u; b>>=lsh; t+=lsh; u<<=lsh; if (a==b) goto ok; } while (0)
 #define T2 do { a-=b; lsh=cado_ctz(a); u+=v; a>>=lsh; t+=lsh; v<<=lsh; if (b==a) goto ok; } while (0)
-  for (;;) {
-    do {
-      T1; if (a > b) break; T1; if (a > b) break;
-      T1; if (a > b) break; T1; if (a > b) break; T1;
-    } while (a < b);
-    do {
-      T2; if (b > a) break; T2; if (b > a) break;
-      T2; if (b > a) break; T2; if (b > a) break; T2;
-    } while (b < a);
+  {
+      for (;;) {
+          do {
+              T1; if (a > b) break;
+              T1; if (a > b) break;
+              T1; if (a > b) break;
+              T1; if (a > b) break;
+              T1;
+          } while (a < b);
+          do {
+              T2; if (b > a) break;
+              T2; if (b > a) break;
+              T2; if (b > a) break;
+              T2; if (b > a) break;
+              T2;
+          } while (b < a);
+      }
+    ok: ; /* Need something after the label */
   }
- ok: while (0); /* Need something after the label */
 #endif
 #undef T1
 #undef T2
@@ -432,16 +454,29 @@ invmod_redc_64(uint64_t a, uint64_t b)
   if (LIKELY(t)) {
     if (LIKELY((int8_t) t > 0)) {
       uint8_t n = (t + 7) >> 3;
-      switch (t & 7) { case 0: do { T3;
-	case 7: T3; case 6: T3; case 5: T3; case 4: T3;
-	case 3: T3; case 2: T3; case 1: T3;
-	} while (--n > 0);
+      switch (t & 7) {
+          case 0: do { T3;
+                      case 7: T3;
+                      case 6: T3;
+                      case 5: T3;
+                      case 4: T3;
+                      case 3: T3;
+                      case 2: T3;
+                      case 1: T3;
+                  } while (--n > 0);
       }
     } else {
       uint8_t n = ((t = -t) + 7) >> 3;
-      switch (t & 7) { case 0: do { T4;
-	case 7: T4; case 6: T4; case 5: T4; case 4: T4;
-	case 3: T4; case 2: T4; case 1: T4; } while (--n > 0);
+      switch (t & 7) {
+          case 0: do { T4;
+                      case 7: T4;
+                      case 6: T4;
+                      case 5: T4;
+                      case 4: T4;
+                      case 3: T4;
+                      case 2: T4;
+                      case 1: T4;
+                  } while (--n > 0);
       }
     }
   }
