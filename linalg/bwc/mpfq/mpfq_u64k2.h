@@ -340,7 +340,7 @@ void mpfq_u64k2_field_init(mpfq_u64k2_dst_field f MAYBE_UNUSED)
 static inline
 void mpfq_u64k2_set(mpfq_u64k2_dst_field K MAYBE_UNUSED, mpfq_u64k2_dst_elt r, mpfq_u64k2_src_elt s)
 {
-    mpfq_copy(r,s,sizeof(mpfq_u64k2_elt)/sizeof(mp_limb_t));
+    mpfq_copy((mp_limb_t*)r,(const mp_limb_t*)s,sizeof(mpfq_u64k2_elt)/sizeof(mp_limb_t));
 }
 
 /* *simd_flat::code_for_set_zero */
@@ -393,7 +393,7 @@ int mpfq_u64k2_inv(mpfq_u64k2_dst_field K MAYBE_UNUSED, mpfq_u64k2_dst_elt r, mp
 static inline
 void mpfq_u64k2_elt_ur_set(mpfq_u64k2_dst_field K MAYBE_UNUSED, mpfq_u64k2_dst_elt_ur r, mpfq_u64k2_src_elt_ur s)
 {
-    mpfq_copy(r,s,sizeof(mpfq_u64k2_elt_ur)/sizeof(mp_limb_t));
+    mpfq_copy((mp_limb_t*)r,(const mp_limb_t*)s,sizeof(mpfq_u64k2_elt_ur)/sizeof(mp_limb_t));
 }
 
 /* *Mpfq::defaults::flatdata::code_for_elt_ur_set_elt, simd_flat */
