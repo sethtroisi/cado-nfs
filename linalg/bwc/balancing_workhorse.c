@@ -705,9 +705,10 @@ struct master_data_s {/*{{{*/
      * to keep all.
      */
     struct {
+        uint64_t w;
         uint32_t c;
         uint16_t n;
-        uint64_t w;
+        bool     notempty;
     } * colmap;
 };
 typedef struct master_data_s master_data[1];
@@ -1313,12 +1314,28 @@ void set_master_variables(master_data m, parallelizing_info_ptr pi)/*{{{*/
         m->colmap[i].w = DUMMY_VECTOR_COORD_VALUE(q);
         m->colmap[i].c = m->fw_colperm[q];
         m->colmap[i].n = who_has_col(m, c);
+        m->colmap[i].notempty = 0;
     }
     printf(" done\n");
 }/*}}}*/
 
 void clear_master_variables(master_data m)/*{{{*/
 {
+    int zcols = 0;
+    for(uint32_t i = 0 ; i < m->bal->h->ncols ; i++) {
+        zcols += !m->colmap[i].notempty;
+    }
+    if (zcols) {
+        fprintf(stderr, "Note: found %d zero columns in input matrix %s\n", zcols, m->mfile);
+        for(uint32_t i = 0 ; i < m->bal->h->ncols ; i++) {
+            if (!m->colmap[i].notempty) {
+                fprintf(stderr, "\tcol %d\n", i);
+            }
+        }
+        fprintf(stderr, "While this *may* work, we have little guarantee, so we prefer to abort the computation. Comment out the abort() at %s:%d if you dare.\n", __FILE__, __LINE__+1);
+        abort();
+    }
+
     free(m->colmap);
     free(m->fw_colperm);
     free(m->fw_rowperm);
@@ -1412,6 +1429,7 @@ int master_dispatcher_put(master_dispatcher_ptr d, uint32_t * p, size_t n)
             if (d->check_vector) {
                 d->w ^= m->colmap[q].w;
             }
+            m->colmap[q].notempty = 1;
             
             ASSERT_ALWAYS(d->noderow + nodecol < (int) d->m->pi->m->totalsize);
             data_dest_ptr where = d->x[d->noderow + nodecol];
