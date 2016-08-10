@@ -257,17 +257,25 @@ invmod_redc_32(uint32_t a, uint32_t b) {
 #else
 #define T1 do { b-=a; lsh=cado_ctz(b); v+=u; b>>=lsh; t+=lsh; u<<=lsh; if (a==b) goto ok; } while (0)
 #define T2 do { a-=b; lsh=cado_ctz(a); u+=v; a>>=lsh; t+=lsh; v<<=lsh; if (b==a) goto ok; } while (0)
-  for (;;) {
-    do {
-      T1; if (a > b) break; T1; if (a > b) break;
-      T1; if (a > b) break; T1; if (a > b) break; T1;
-    } while (a < b);
-    do {
-      T2; if (b > a) break; T2; if (b > a) break;
-      T2; if (b > a) break; T2; if (b > a) break; T2;
-    } while (b < a);
+  {
+      for (;;) {
+          do {
+              T1; if (a > b) break;
+              T1; if (a > b) break;
+              T1; if (a > b) break;
+              T1; if (a > b) break;
+              T1;
+          } while (a < b);
+          do {
+              T2; if (b > a) break;
+              T2; if (b > a) break;
+              T2; if (b > a) break;
+              T2; if (b > a) break;
+              T2;
+          } while (b < a);
+      }
+    ok: ; /* Need something after the label */
   }
- ok: while (0); /* Need something after the label */
 #endif
 #undef T1
 #undef T2
