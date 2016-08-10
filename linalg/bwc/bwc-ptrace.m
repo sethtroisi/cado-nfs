@@ -175,6 +175,9 @@ load "x.m";
 Xt:=Matrix(GF(p),nr_orig,1,[]);
 for i in [1..1] do for u in var[i] do Xt[u][i] +:=1; end for; end for;
 
+function canvec(V,i) x:=V!0; x[i]:=1; return x; end function;
+
+
 Xfull:=Matrix(GF(p),nr_orig,#var,[]);
 for i in [1..#var] do for u in var[i] do Xfull[u][i] +:=1; end for; end for;
 
@@ -203,7 +206,6 @@ end if;
 M2:=MQsmall*MQsmall;
 M4:=M2*M2;
 M8:=M4*M4;
-// M16:=M8*M8;
 xi:=x0;
 xblock:=[Universe(x0)|];
 for i in [1..8] do
@@ -216,22 +218,19 @@ MX:=Matrix(xblock);
 MXN:=MX;
 i:=0;
 rr:=[Universe(Rows(MX))|];
-
-rr cat:=Rows(MXN);
-time MXN:=MXN*Transpose(M8);
-i+:=8;
-print i;
-if i mod 128 eq 0 or (i ge 240 and i mod 32 eq 0) then
-time U:=sub<Universe(x0)|rr>;
-time Dimension(U);
-end if;
-
-for foo in [1..100] do
-    U +:= sub<Universe(x0)|Rows(MXN)>;
+while i * m lt Nrows(MQsmall) do
+    rr cat:=Rows(MXN);
     MXN:=MXN*M8;
     i+:=8;
-    print i, Dimension(U);
-end for;
+    printf ".";
+    if i le 32 or i mod 128 eq 0 or (i ge 240 and i mod 32 eq 0) then
+        printf "\n";
+        time U:=sub<Universe(x0)|rr>;
+        time d:=Dimension(U);
+        print i, d, i*m-d;
+    end if;
+end while;
+
 */
 
 
@@ -476,9 +475,10 @@ for k in [0..degF] do
     end for;
     z:=z*Transpose(MQsmall);
 end for;
+zz:=images + solutions * Transpose(MQsmall);
 for j in [1..n] do
     printf "Checking that column %o (sols%o-%o) is indeed a solution... ", j, j-1, j;
-    assert IsZero(images[j] + solutions[j] * Transpose(MQsmall));
+    assert IsZero(zz[j]);
     print " ok";
 end for;
 
