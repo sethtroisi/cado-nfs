@@ -245,6 +245,7 @@ struct las_info_s {
     descent_tree * tree;
 
     int batch; /* batch mode for cofactorization */
+    int batch_print_survivors;
     cofac_list L; /* store (a,b) and corresponding cofactors in batch mode */
 };
 

@@ -789,6 +789,7 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
 
     las->suppress_duplicates = param_list_parse_switch(pl, "-dup");
     las->batch = param_list_parse_switch(pl, "-batch");
+    las->batch_print_survivors = param_list_parse_switch(pl, "-batch-print-survivors");
     las->nb_threads = 1;		/* default value */
     param_list_parse_int(pl, "t", &las->nb_threads);
     if (las->nb_threads <= 0) {
@@ -2318,6 +2319,11 @@ factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED)
             }
             if (!pass) continue;
 
+            if (las->batch_print_survivors) {
+                gmp_printf("%" PRId64 " %" PRIu64 " %Zd %Zd\n", a, b,
+                        norm[0], norm[1]);
+                continue;
+            }
 	    if (las->batch)
 	      {
 		verbose_output_start_batch ();
@@ -2770,6 +2776,7 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "batch", "(switch) use batch cofactorization");
   param_list_decl_usage(pl, "batch0", "side-0 batch file");
   param_list_decl_usage(pl, "batch1", "side-1 batch file");
+  param_list_decl_usage(pl, "batch-print-survivors", "(switch) just print survivros for an external cofactorization");
   param_list_decl_usage(pl, "galois", "(switch) for reciprocal polynomials, sieve only half of the q's");
 #ifdef TRACE_K
   param_list_decl_usage(pl, "traceab", "Relation to trace, in a,b format");
@@ -2826,6 +2833,7 @@ int main (int argc0, char *argv0[])/*{{{*/
     param_list_configure_switch(pl, "-prepend-relation-time", &prepend_relation_time);
     param_list_configure_switch(pl, "-dup", NULL);
     param_list_configure_switch(pl, "-batch", NULL);
+    param_list_configure_switch(pl, "-batch-print-survivors", NULL);
     //    param_list_configure_switch(pl, "-galois", NULL);
     param_list_configure_alias(pl, "skew", "S");
     // TODO: All these aliases should disappear, one day.
