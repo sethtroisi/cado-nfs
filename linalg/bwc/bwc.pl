@@ -1401,6 +1401,7 @@ sub subtask_find_or_create_balancing {
     print STDERR "No bfile found, we need a new one\n";
     my @mfbal=("mfile=$matrix", "out=$wdir/", $nh, $nv);
     unshift @mfbal, "--withcoeffs" if $prime ne '2';
+    unshift @mfbal, qw/--reorder columns/;
     task_common_run "mf_bal", @mfbal;
     expire_cache_entry "balancing";
     @res = get_cached_bfile;
