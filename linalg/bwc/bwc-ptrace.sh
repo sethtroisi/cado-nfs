@@ -236,8 +236,10 @@ create_test_matrix_if_needed() {
     data_ncols=$((`wc -c < $cwfile` / 4))
     data_nrows=$((`wc -c < $rwfile` / 4))
     if [ "$data_ncols" -lt "$ncols" ] ; then
-        echo "padding $cwfile with $((ncols-data_ncols)) zero columns"
-        dd if=/dev/zero bs=4 count=$((ncols-data_ncols)) >> $cwfile
+        if [ "$prime" = 2 ] || ! [ "$nrhs" ] ; then
+            echo "padding $cwfile with $((ncols-data_ncols)) zero columns"
+            dd if=/dev/zero bs=4 count=$((ncols-data_ncols)) >> $cwfile
+        fi
     fi
     if [ "$data_nrows" -lt "$nrows" ] ; then
         echo "padding $cwfile with $((nrows-data_nrows)) zero rows"
