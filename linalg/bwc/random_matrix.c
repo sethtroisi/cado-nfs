@@ -1369,7 +1369,7 @@ void random_matrix_process_print(random_matrix_process_data_ptr r, random_matrix
         }
     }
     */
-    if (colweights) {
+    if (r->freq->cw) {
         if (ascii) {
             for(unsigned long j = 0 ; j < r->ncols ; j++) {
                 WU32(r->freq->cw, "", colweights[j], "\n");
