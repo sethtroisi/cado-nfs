@@ -39,7 +39,7 @@ def brent12(p,B1,B2,sigma):
    return is_smooth(l.expand(),B1,B2,2)
 
 def monty12(p,B1,B2,k,extra):
-   E=EllipticCurve([-12,0])
+   E=EllipticCurve(GF(p), [-12,0])
    P=E(-2,4)
    kP=k*P; u=kP[0]; v=kP[1]
    t2 = (u^2-12)/(4*u)
