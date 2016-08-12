@@ -1266,6 +1266,8 @@ void * random_matrix_get_u32(parallelizing_info_ptr pi, param_list pl, matrix_u3
 
 #ifdef  WANT_MAIN
 
+int avoid_zero_columns = 0;
+
 void random_matrix_process_print(random_matrix_process_data_ptr r, random_matrix_ddata_ptr F)
 {
     int ascii = r->ascii;
@@ -1313,11 +1315,13 @@ void random_matrix_process_print(random_matrix_process_data_ptr r, random_matrix
     for(unsigned long i = 0 ; i < r->nrows ; i++) {
         long v = 0;
         uint32_t c = generate_row(rstate, F, ptr, range, &pool);
-        if (i >= 0.9 * r->ncols) {
+        if (avoid_zero_columns && i >= 0.9 * r->ncols) {
             for( ; next_priority_col < r->ncols ; next_priority_col++)
                 if (!colweights[next_priority_col]) break;
             if (next_priority_col < r->ncols) {
-                printf("injecting col %" PRIu32 " for row %lu\n", next_priority_col, i);
+                // don't print anything, because stdout might be our data
+                // output...
+                // printf("injecting col %" PRIu32 " for row %lu\n", next_priority_col, i);
                 ptr[c++] = next_priority_col;
                 qsort(ptr, c, sizeof(uint32_t), (sortfunc_t) &cmp_u32);
             }
@@ -1400,6 +1404,7 @@ void usage()
             "\t-s <seed> : seed\n"
             "\t-c <maxc> : add coefficients\n"
             "\t-v : turn verbosity on\n"
+            "\t-Z : avoid zero columns\n"
             "\t-o <matfile> : output file name\n"
             "\t--binary : output in binary\n"
             "\t--kleft <d>: ensure at least a left kernel of dimension d\n"
@@ -1423,6 +1428,7 @@ int main(int argc, char * argv[])
     param_list_configure_alias(pl, "density", "-d");
     param_list_configure_alias(pl, "seed", "-s");
     param_list_configure_switch(pl, "-v", &verbose);
+    param_list_configure_switch(pl, "-Z", &avoid_zero_columns);
 
     random_matrix_process_data_init(r);
     if (!random_matrix_process_data_set_from_args(r, pl, argc, argv))

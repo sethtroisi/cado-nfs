@@ -182,6 +182,8 @@
 // both sizes below are in uint32_t's
 const size_t default_queue_size = 1 << 20;
 
+int accept_zero_columns;
+
 void balancing_decl_usage(param_list_ptr pl)
 {
     param_list_decl_usage(pl, "balancing_use_auxfile",
@@ -190,6 +192,8 @@ void balancing_decl_usage(param_list_ptr pl)
             "adjust internal pipe lengths within dispatch");
     param_list_decl_usage(pl, "sanity_check_vector",
             "while dispatching the matrix, store a fixed matrix times vector product in the given file");
+    param_list_decl_usage(pl, "accept_zero_columns",
+            "whether zero columns in the input matrix will be accepted or not (defaults to false)");
 }
 
 void balancing_lookup_parameters(param_list_ptr pl)
@@ -197,6 +201,7 @@ void balancing_lookup_parameters(param_list_ptr pl)
     param_list_lookup_string(pl, "balancing_use_auxfile");
     param_list_lookup_string(pl, "balancing_queue_size");
     param_list_lookup_string(pl, "sanity_check_vector");
+    param_list_lookup_string(pl, "accept_zero_columns");
 }
 
 /* {{{ sources  */
@@ -1181,7 +1186,7 @@ void endpoint_loop(parallelizing_info_ptr pi, param_list_ptr pl, slave_data_ptr 
 
 /* {{{ master loop */
 
-void set_master_variables(master_data m, parallelizing_info_ptr pi)/*{{{*/
+void set_master_variables(master_data m, param_list_ptr pl, parallelizing_info_ptr pi)/*{{{*/
 {
     uint32_t quo_r = m->bal->trows / m->bal->h->nh;
     int rem_r = m->bal->trows % m->bal->h->nh;
@@ -1317,6 +1322,7 @@ void set_master_variables(master_data m, parallelizing_info_ptr pi)/*{{{*/
         m->colmap[i].notempty = 0;
     }
     printf(" done\n");
+    param_list_parse_int(pl, "accept_zero_columns", &accept_zero_columns);
 }/*}}}*/
 
 void clear_master_variables(master_data m)/*{{{*/
@@ -1327,13 +1333,23 @@ void clear_master_variables(master_data m)/*{{{*/
     }
     if (zcols) {
         fprintf(stderr, "Note: found %d zero columns in input matrix %s\n", zcols, m->mfile);
-        for(uint32_t i = 0 ; i < m->bal->h->ncols ; i++) {
+        int pzcols=0;
+        for(uint32_t i = 0 ; i < m->bal->h->ncols && pzcols < 32 ; i++) {
             if (!m->colmap[i].notempty) {
                 fprintf(stderr, "\tcol %d\n", i);
+                pzcols++;
             }
         }
-        fprintf(stderr, "While this *may* work, we have little guarantee, so we prefer to abort the computation. Comment out the abort() at %s:%d if you dare.\n", __FILE__, __LINE__+1);
-        abort();
+        if (pzcols < zcols) {
+            fprintf(stderr, "\tand %d other zero columns\n", zcols-pzcols);
+        }
+        fprintf(stderr, "This *may* work, but we have little guarantee\n");
+        if (accept_zero_columns) {
+            fprintf(stderr, "Proceeding anyway because of accept_zero_columns=1.\n");
+        } else {
+            fprintf(stderr, "We prefer to abort the computation. Override with accept_zero_columns=1 if you dare.\n");
+            abort();
+        }
     }
 
     free(m->colmap);
@@ -1708,7 +1724,7 @@ void * balancing_get_matrix_u32(parallelizing_info_ptr pi, param_list pl, matrix
 	    printf("Padding to a matrix of size %" PRIu32 "x%" PRIu32 "\n",
 		   m->bal->trows, m->bal->tcols);
 	}
-        set_master_variables(m, pi);
+        set_master_variables(m, pl, pi);
         memcpy(s->bal->h, m->bal->h, sizeof(balancing_header));
         s->bal->trows = m->bal->trows;
         s->bal->tcols = m->bal->tcols;

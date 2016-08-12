@@ -194,7 +194,7 @@ create_test_matrix_if_needed() {
     # random_matrix for that (not mandatory though, since
     # nrows,ncols,density, may be specified in full).
 
-    rmargs=()
+    rmargs=(-Z)
     # defaults, some of the subcases below tweak that.
     nrows=`echo $random_matrix_size | cut -d, -f1`
     ncols=`echo $random_matrix_size | cut -d, -f2`   # = nrows if no comma

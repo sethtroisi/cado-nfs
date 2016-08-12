@@ -97,6 +97,7 @@ set \
     sequential_cache_build=1	\
     sanity_check_vector=H1	\
     rebuild_cache=1	\
+    accept_zero_columns=1       \
     matmul_bucket_methods=small1,small2,large
 
 if [ "$hostfile" ] ; then
