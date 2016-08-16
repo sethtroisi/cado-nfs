@@ -300,7 +300,7 @@ void param_list_remove_key(param_list pl, const char * key)
 int param_list_read_stream(param_list pl, FILE *f, int stop_on_empty_line)
 {
     int all_ok=1;
-    const int linelen = 512;
+    const int linelen = 2048;
     char line[linelen];
     char * newkey;
     char * newvalue;
