@@ -3,6 +3,7 @@ are not supported. You need to enable SLLL_SAFE instead (see the section about
 nfs-hd/CMakeLists.txt). A better workaround will be available soon.
 
 Compile:
+  * remove "#" in "#add_subdirectory (nfs-hd)";
   * (optionaly) copy "local.sh.example" in "local.sh" in the same directory;
   * (optionaly) edit "local.sh" if you want that binaries are stored in a
      specific directory (see line "build_tree=…");

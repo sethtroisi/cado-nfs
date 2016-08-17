@@ -258,13 +258,46 @@ void max_infinity_norm(mpz_ptr max, mat_Z_srcptr MqLLL, mpz_vector_t * c,
   mpz_poly_clear(a);
 }
 
-void compute_all_spq(array_spq_ptr array_spq, uint64_t q, mpz_poly_srcptr f,
+void max_norm(mpz_ptr max, mat_Z_srcptr MqLLL, mpz_vector_t * c,
+    unsigned int nb_vec, cado_poly_srcptr f)
+{
+  mpz_poly a;
+  mpz_poly_init(a, c[0]->dim);
+  mpz_t tmp;
+  mpz_init(tmp);
+  mpz_t tmp1;
+  mpz_init(tmp1);
+
+  mat_Z_mul_mpz_vector_to_mpz_poly(a, MqLLL, c[0]);
+  mpz_poly_infinity_norm(max, a);
+
+  for (unsigned int i = 1; i < nb_vec; i++) {
+    mat_Z_mul_mpz_vector_to_mpz_poly(a, MqLLL, c[i]);
+    mpz_set_ui(tmp, 1);
+    for (int j = 0; j < f->nb_polys; j++) {
+      norm_poly(tmp1, f->pols[j], a);
+      mpz_mul(tmp, tmp, tmp1);
+    }
+    if (mpz_cmp(max, tmp) < 0) {
+      mpz_set(max, tmp);
+    }
+  }
+
+  mpz_clear(tmp);
+  mpz_clear(tmp1);
+  mpz_poly_clear(a);
+}
+ 
+
+
+void compute_all_spq(array_spq_ptr array_spq, uint64_t q, cado_poly_srcptr f,
     sieving_bound_srcptr H, gmp_randstate_t state, int deg_bound_factorise,
     MAYBE_UNUSED mpz_vector_srcptr skewness, unsigned int gal,
-    mpz_vector_t * c, unsigned int nb_vec, MAYBE_UNUSED mpz_poly_srcptr g)
+    mpz_vector_t * c, unsigned int nb_vec, MAYBE_UNUSED mpz_poly_srcptr g,
+    unsigned int q_side)
 {
   array_spq_t array_spq_tmp;
-  array_spq_init(array_spq_tmp, f->deg, H->t);
+  array_spq_init(array_spq_tmp, f->pols[q_side]->deg, H->t);
 
   mpz_poly_factor_list l;
   mpz_t q_Z;
@@ -273,7 +306,7 @@ void compute_all_spq(array_spq_ptr array_spq, uint64_t q, mpz_poly_srcptr f,
   mpz_set_ui(q_Z, q);
   mpz_poly_factor_list_init(l);
 
-  mpz_poly_factor(l, f, q_Z, state);
+  mpz_poly_factor(l, f->pols[q_side], q_Z, state);
   mpz_clear(q_Z);
 
   for (int i = 0; i < l->size; i++) {
@@ -327,11 +360,20 @@ void compute_all_spq(array_spq_ptr array_spq, uint64_t q, mpz_poly_srcptr f,
       mpz_init(norm_inf);
       mpz_t tmp;
       mpz_init(tmp);
+#if OLD_GALOIS_SELECTION
       max_infinity_norm(norm_inf, array_spq->MqLLL[0], c, nb_vec);
+#else // OLD_GALOIS_SELECTION
+      max_norm(norm_inf, array_spq->MqLLL[0], c, nb_vec, f);
+#endif // OLD_GALOIS_SELECTION
       unsigned int index = 0;
 
       for (unsigned int i = 1; i < array_spq->number; i++) {
+#if OLD_GALOIS_SELECTION
         max_infinity_norm(tmp, array_spq->MqLLL[i], c, nb_vec);
+#else // OLD_GALOIS_SELECTION
+        max_norm(tmp, array_spq->MqLLL[i], c, nb_vec, f);
+#endif // OLD_GALOIS_SELECTION
+
         if (mpz_cmp(tmp, norm_inf) < 0) {
           index = i;
           mpz_set(norm_inf, tmp);
@@ -2461,8 +2503,8 @@ void do_all_for_spq(array_spq_ptr spq, int64_t q, cado_poly_srcptr f,
   double sec;
 
   //TODO: print time to build MqLLL.
-  compute_all_spq(spq, q, f->pols[q_side], H, state, deg_bound_factorise,
-      skewness, gal, c, nb_vec, g);
+  compute_all_spq(spq, q, f, H, state, deg_bound_factorise,
+      skewness, gal, c, nb_vec, g, q_side);
 
   for (unsigned int i = 0; i < spq->number; i++) {
     sec = seconds();
