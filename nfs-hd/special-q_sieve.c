@@ -269,7 +269,11 @@ void max_norm(mpz_ptr max, mat_Z_srcptr MqLLL, mpz_vector_t * c,
   mpz_init(tmp1);
 
   mat_Z_mul_mpz_vector_to_mpz_poly(a, MqLLL, c[0]);
-  mpz_poly_infinity_norm(max, a);
+  mpz_set_ui(max, 1);
+  for (int j = 0; j < f->nb_polys; j++) {
+    norm_poly(tmp1, f->pols[j], a);
+    mpz_mul(max, max, tmp1);
+  }
 
   for (unsigned int i = 1; i < nb_vec; i++) {
     mat_Z_mul_mpz_vector_to_mpz_poly(a, MqLLL, c[i]);
@@ -287,8 +291,6 @@ void max_norm(mpz_ptr max, mat_Z_srcptr MqLLL, mpz_vector_t * c,
   mpz_clear(tmp1);
   mpz_poly_clear(a);
 }
- 
-
 
 void compute_all_spq(array_spq_ptr array_spq, uint64_t q, cado_poly_srcptr f,
     sieving_bound_srcptr H, gmp_randstate_t state, int deg_bound_factorise,
