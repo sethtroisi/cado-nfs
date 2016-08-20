@@ -1,14 +1,14 @@
 
 *** THIS DOCUMENTATION IS NOT REGULARILY CHECKED TO BE UP-TO-DATE. ***
 
-last update: 20130724 [20160201 for the MPI section]
+20160820 scattered update ; removed some deprecated stuff.
+20160201 edit the MPI section
+20130724 general update
 
-See bwc-trace.sh and bwc-trace.m for the most up-to-date checks relative
-to the exact meaning of most files.
-
-See bwc-ptrace.sh and bwc-ptrace.m for the most up-to-date checks relative
-to the exact meaning of most files for the case of linear systems over
-GF(p). More generally, all GF(p) specific information is in README.gfp
+See bwc-ptrace.sh and bwc-ptrace.m for the most up-to-date checks
+relative to the exact meaning of most files for the case of linear
+systems over GF(p) or GF(2). More generally, all GF(p) specific
+information is in README.gfp
 
 
 The tools present in this subdirectory form an implementation of the
@@ -45,6 +45,18 @@ nullspace (zero combination of rows) or right nullspace (zero combination
 of columns) may be computed. The kernel ends up in the file called W in
 the chosen working directory.
 
+Split width
+===========
+
+A quantity which is pervasive in the code is the "split width". This
+really means 64 when we're talking binary linear systems, and 1
+otherwise. The block Wiedemann sequences are defined for blocks of
+vectors whose width is exactly this "split width", understood as
+sub-blocks of the big vector blocks with n columns.
+
+Some of this documentation was written specifically with the binary case
+in mind, whence the appearance of "64" below should really be understood
+as "split width".
 
 Calling sequence of binaries
 ============================
@@ -66,27 +78,21 @@ using the bwc.pl driver script, documented below.
      satisfied
  4 - secure
      precompute some data useful for checksums
- 5 - split Y
-     split the main input vector Y into several blocks for independent
-     processing at different sites.
-!6 - krylov
+!5 - krylov
      compute the Krylov sequence
- 7 - acollect
+ 6 - acollect
      collect the Krylov sequence files into one big file. Can be done at
      several moments in the computation.
-!8 - lingen
+!7 - lingen
      Berlekamp-Massey -like step: produces a generating polynomial
- 9 - split F
-     split the linear generator computed into several blocks for independent
-     processing at each site.
-!10 - mksol
+!8 - mksol
      create the solutions from the polynomial
- 11 - gather
+ 9 - gather
      reconstruct solutions from the mess
 
-krylov, lingen, mksol are the steps having a real computational impact.
+krylov, lingen, and to a lesser extent mksol are the steps having a real computational impact.
 prep is cheap but important for ensuring the success of the algorithm.
-split,acollect,gather are just trivial bookkeeping.
+acollect and gather are just trivial bookkeeping.
 dispatch may be I/O intensive.
 secure is akin to doing a few krylov iterations. It runs for roughly just
 as long as the desired time between two recoverable checkpoints (the
@@ -119,10 +125,6 @@ expected to be present in the same directory as the calling binary.
     Having a wdir is generally a good idea, as bwc will otherwise happily
     populate your working directory with data files.
 
-* cfg=<filename>
-
-    Read extra parameters from file name.
-
 * matrix=<path>
 * balancing=<path>
     path to matrix file, and to balancing file. May be absolute paths,
@@ -133,7 +135,7 @@ expected to be present in the same directory as the calling binary.
     format recognized by the cURL library, if the use of the latter has
     been enabled.
     
-* m=<number>, n=<number>, or mn=<number> for setting both.
+* m=<number>, n=<number>
 
     Set the corresponding parameters from the block Wiedemann algorithm. Note
     that these are the _global_ values. Presumably both are multiples of 64.
@@ -173,8 +175,59 @@ expected to be present in the same directory as the calling binary.
     stored. If the value here is too small, then there are chances that
     you exhaust your disk space.
 
-* mm_impl=[basic|sliced|bucket|basicp|zone]
+* rhs=<file>
 
+    Indicate that we want to solve an inhomogeneous linear system. Right
+    now this only works over GF(p), for a system of the kind M*X=R*Y (so,
+    "nullspace=right"), and with n being at least as large as the number
+    of columns of R.
+
+* keep_rolling_checkpoints=<n>
+    instructs the program to discard the rolling vector checkpoints every
+    <n> checkpoints. This assumes for example that checkpoints are
+    offloaded to external storage in the background by another process.
+    Use of this option is conjunction with skip_online_checks=1 is
+    dangerous, since it leaves open the possibility of a failure which
+    stands no chance to be eventually detected.
+
+* checkpoint_precious=<K>
+    overrides the behaviour of keep_rolling_checkpoints and keeps all
+    checkpoints which correspond to an iteration count which is a
+    multiple of K.
+
+The following parameters are also passed by bwc.pl to the relevant
+sub-steps
+
+* start=<value>, end=<value>
+
+    limits for doing partial krylov/mksol
+
+* ys=<number y0>..<number y1> (note the ".." separator)
+
+    specify which sub-sequence to work with.  In normal usage y0 and y1
+    should be consecutive multiples of the split width.  When
+    interleaving=1, the interval y0..y1 is divided into two sub-intervals
+    describing two subsequences whose computation is interleaved. The
+    quantity K=(y1-y0)/(1+interleaving) quantifies the operating width of
+    the innermost arithmetical operations ; when K=64, operations are
+    based on unsigned longs (on 64-bit machines). Usual values for K are
+    64 and 128.  Note that when ys is different from 0..n, then
+    computation only involves some of the needed subsequences, not all --
+    and all subsequences must be computed.
+
+* solutions=<s0>-<s1> (note the "-" separator -- the divergence with the
+  ".." separator above ought to be fixed someday).
+
+    This is relevant to mksol and gather. This indicates
+    (unsurprisingly), out of the n possible solutions which can be formed
+    by the block Wiedemann algorithm, the ones we choose to produce. As
+    above, it is expected that s0 and a1 are consecutive multiples of the
+    split width, so that mksol can do matrix times vector operations on
+    data whose size is the split width.
+
+Some more internal parameters.
+
+* mm_impl=[basic|sliced|bucket|basicp|zone]
     low-level matrix multiplication code to use. Several such back-ends
     are programmed. The first three above are for systems defined over
     GF(2), while "basicp" and "zone" are for systems over prime fields.
@@ -194,23 +247,6 @@ expected to be present in the same directory as the calling binary.
     Threshold for recursive algorithm, only relevant for lingen. <number> is
     currently 64.
 
-Some more internal parameters.
-
-* start=<value>, end=<value> limits for doing partial krylov/mksol
-* ys=<number y0>..<number y1> specify which sub-sequence to work with.
-  In normal usage y0 should be 0, and y1 should be the parameter "n".
-  When interleaving=1, this interval is divided into two sub-intervals
-  describing two subsequences whose computation is interleaved. The
-  quantity K=(y1-y0)/(1+interleaving) quantifies the operating width of the
-  innermost arithmetical operations ; when K=64, operations are based on
-  unsigned longs (on 64-bit machines). Usual values for K are 64 and 128.
-  Note that when ys is different from 0..n, then computation only involves
-  some of the needed subsequences, not all -- and all subsequences must be
-  computed.
-* splits=<number1>,<number2>,... Only for the auxilary program ``split''.
-  Splits Y0-<n> (or equivalently F) in files V<number1>-<number2>.*,
-  V<number2>-<number3>.*, to prepare for several independent subsequence
-  computations.
 * Some cpu-level parameters, relevant for the low-level routines.
     - l1_cache_size=<number>
     - l2_cache_size=<number>
@@ -233,12 +269,6 @@ Some more internal parameters.
   step. The default is to do the check. If it is not done, it must be
   done externally (by a program which would be trivial to write but which
   incidetally has never been written).
-* keep_rolling_checkpoints=<n> instructs the program to discard the
-  rolling vector checkpoints every <n> checkpoints. This assumes for
-  example that checkpoints are offloaded to external storage in the
-  background by another process. Use of this option is conjunction with
-  skip_online_checks=1 is dangerous, since it leaves open the possibility
-  of a failure which stands no chance to be eventually detected.
 * save_submatrices=[0|1] save the sub-matrices used by each node in
   simple binary files. These files are not used by the computation, so
   this option is not enabled by default.
@@ -263,20 +293,17 @@ wdir/mat.<nh>x<v>.<bchecksum>.hi.vj-MMMMMM.bin       in-memory version of the su
 wdir/X.<bchecksum>                  X vector used for Krylov.
     created by prep
     read by krylov and secure
-wdir/Y.0.<bchecksum>                Y vector used for Krylov.
-    created by prep
-    read by split ifile=Y.0 ofile-fmt=V%u-%u.0 splits=[...,]<n1>,<n2>[,...]
 wdir/C.<n>.<bchecksum>              check vector = trsp(M)^n * X  (See note (T))
     created by secure
-    read by krylov mksol
-wdir/V<n1>-<n2>.0.<bchecksum>       columns <n1>..<n2> (n2 exclusive) of Y
+    read by krylov
+wdir/V<n1>-<n2>.0                   columns <n1>..<n2> (n2 exclusive) of Y
     created by split ifile=Y.0 ofile-fmt=V%u-%u.0 splits=[...,]<n1>,<n2>[,...]
     read by krylov mksol
 wdir/A<n1>-<n2>.<j1>-<j2>       krylov sequence data.
     created by krylov
     read by acollect. acollect replaces all these files by a file matching the
     same pattern, read in turn by lingen.
-wdir/V<n1>-<n2>.<j>.<bchecksum>     columns <n1>..<n2> of M^j Y (See note (T))
+wdir/V<n1>-<n2>.<j>             columns <n1>..<n2> of M^j Y (See note (T))
     created by krylov while computing.
     never read again unless for external checking (not all of it implemented
     yet)
@@ -288,16 +315,14 @@ wdir/pi-<t1>-<t2>               current state for lingen
     created by lingen
     never read again unless by lingen again for resuming (resuming in lingen
     is not functional at the moment)
-wdir/F                          linear generator.
+wdir/F.sols<s1>-<s2>.<j1>-<j2>  linear generator.
     created by lingen
-    read by split --ifile F --ofile-fmt F.sols0-$n.%u-%u
-wdir/F<n1>..<n2>                columns <n1>..<n2> of F (n2 exclusive).
-    created by split --ifile F --ofile-fmt F.sols0-$n.%u-%u")
     read by mksol
-wdir/S<n1>-<n2>.<j>.<bchecksum>     mksol sequence data.
+wdir/S.sols<s1>-<s2>.<n1>-<n2>  mksol sequence data.
     created by mksol
     read by gather
-wdir/W.<bchecksum>                  kernel vectors
+wdir/W                          kernel vectors
+wdir/K.sols<s1>-<s2>.<j>        kernel vectors
     created by gather
 
 The permutation P
@@ -444,15 +469,20 @@ prep
 
     X and Y are stored as:
 
-    X.<bchecksum>                    X vector used for Krylov.
-    Y.0.<bchecksum>                  Y vector used for Krylov.
+    X                             X vector used for Krylov.
+    V<n1>-<n2>.0                  V vector used for Krylov.
+
+    The V files correspond together to columns n1 to n2 of Y. n1 and n2
+    are two consecutive multiples of the split width.
+
+
 
 secure
 ------
 
     secure reads the output from prep, and creates:
     
-    C.<interval>.<bchecksum>         check vector = trsp(M)^<interval> * X
+    C.<interval>         check vector = trsp(M)^<interval> * X
     
     When M^(k*interval)*Y has been computed, using C one can look ahead the
     value trsp(X) * M^((k+1)*interval) * Y which will be computed after
@@ -464,19 +494,6 @@ secure
     will be implemented soon.
 
     (See note (T) for the whole paragraphs above).
-
-split (split Y)
----------------
-
-    The syntax of split is ./split [--split-y|--split-f] --splits=<integer list>
-
-    We assume below that the integer list is for example 0,64,192
-
-    split --split-y reads only Y.0.<bchecksum>, which is a vector whose entries
-    are 192-bit wide, and creates
-
-    V0-64.0.<bchecksum>            columns 0..63 of Y.
-    V64-192.0.<bchecksum>          columns 64..191 of Y.
 
 krylov
 ------
@@ -500,21 +517,21 @@ krylov
 
     krylov also creates
     
-    V<n1>-<n2>.<j>.<bchecksum>      columns <n1>..<n2> of M^j Y. (see note (T)).
+    V<n1>-<n2>.<j>      columns <n1>..<n2> of M^j Y. (see note (T)).
 
     This can be used to resume computations at iteration j.
 
-    (j2-j1 is always equal to <interval> as in C.<interval>.<bchecksum>, and j is
+    (j2-j1 is always equal to <interval> as in C.<interval>, and j is
     always a multiple of <interval>).
 
-    When V<n1>-<n2>.<j2>.<bchecksum> is computed, krylov verifies that it is in
-    accordance with the input vector V<n1>-<n2>.<j1>.<bchecksum>. The file
+    When V<n1>-<n2>.<j2> is computed, krylov verifies that it is in
+    accordance with the input vector V<n1>-<n2>.<j1>. The file
     A<n1>-<n2>.<j1>-<j2> is written only if this test succeeds. Otherwise the
     program aborts.
 
     Note on resuming. If the extra parameter start=<j> is passed to krylov,
     then computations resume after iteration <j>. Instead of
-    V.<n1>-<n2>.0.<bchecksum>, V.<n1>-<n2>.<j>.<bchecksum> is read instead, and
+    V.<n1>-<n2>.0, V.<n1>-<n2>.<j> is read instead, and
     only subsequent A files will be touched. It is also possible to change the
     end value for the computation, in order to stop the subsequence
     computation prematurely.
@@ -542,7 +559,7 @@ lingen
     represents an n times n matrix of polynomials of degree ceil(N/n)
     which satisfies
 
-    A * trsp(F) = matrix of polynomials of degree < ceil(N/n)
+    A * F = matrix of polynomials of degree < ceil(N/n)
 
     F is stored coefficient by coefficient. Each coefficient is an n
     times n bit matrix, stored row-major.
@@ -551,21 +568,18 @@ lingen
     it were written when the corresponding algorithm barely existed. It
     admittedly deserves a rewrite.
 
-split (split F)
----------------
-
-    in bijection with what is done for splitting Y, split --split-F
-    selects only part of the columns of F. This creates:
-
-    F<n1>..<n2>                columns <n1>..<n2> of F (n2 exclusive).
+    lingen is called by default with the --split-output-file option,
+    whence the generator is saved as (n/s)^2 submatrices of size s*s,
+    where s is the "split width" (64 for p=2, 1 otherwise).
 
 mksol
 -----
 
-    This reads the files F<n1>..<n2> as well as Y<n1>..<n2>.0.<bchecksum>,
-    and creates files:
+    This reads the files F.sols<s1>..<s2>.<n1>..<n2> as well as
+    V<n1>..<n2>.<start> (for start=0, but really any multiple too), and
+    creates files:
 
-    S<n1>..<n2>.<j1>..<j2>.<bchecksum>      partial sums for evaluation.
+    S.sols<s1>-<s2>.<n1>..<n2>      partial sums for evaluation.
 
     All the S* files must be summed to form the final kernel vector
     element.
@@ -582,7 +596,7 @@ gather
     This sums all S* files, and check how many times one must iterate in
     order to obtain M^k*(sum_of_S) == 0 (see note T). Then it stores:
 
-    W.<bchecksum>                   M^(k-1)*sum_of_S (see note T).
+    W                   M^(k-1)*sum_of_S (see note T).
 
 Using bwc.pl
 ============

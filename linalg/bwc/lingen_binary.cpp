@@ -36,7 +36,6 @@
 #include "macros.h"
 #include "utils.h"
 #include "bw-common.h"
-#include "filenames.h"
 #include "tree_stats.h"
 #include "logline.h"
 
@@ -88,6 +87,9 @@ void compose_inner<gf2x_fake_fft, strassen_default_selector>(
 char input_file[FILENAME_MAX]={'\0'};
 
 char output_file[FILENAME_MAX]={'\0'};
+
+int split_input_file = 0;  /* unsupported ; do acollect by ourselves */
+int split_output_file = 0; /* do split by ourselves */
 
 /* threshold for the recursive algorithm */
 unsigned int lingen_threshold = 64;
@@ -537,13 +539,29 @@ void bw_commit_f(polmat& F)
     unsigned long * buf;
     size_t rz;
 
-    FILE * f;
-    if (!strlen(output_file)) {
-        f = fopen(LINGEN_F_FILE, "wb");
+    FILE ** fw;
+    if (split_output_file) {
+        fw = (FILE**) malloc((n/64)*(n/64)*sizeof(FILE*));
+        for(unsigned int i = 0 ; i < n ; i+=64) {
+            for(unsigned int j = 0 ; j < n ; j+=64) {
+                FILE * f;
+                char * str;
+                int rc = asprintf(&str, "%s.sols%d-%d.%d-%d",
+                        output_file,
+                        j, j + 64,
+                        i, i + 64);
+                ASSERT_ALWAYS(rc >= 0);
+                f = fopen(str, "wb");
+                DIE_ERRNO_DIAG(f == NULL, "fopen", str);
+                fw[(i/64)*(n/64)+(j/64)] = f;
+                free(str);
+            }
+        }
     } else {
-        f = fopen(output_file, "wb");
+        fw = (FILE**) malloc(sizeof(FILE*));
+        fw[0] = fopen(output_file, "wb");
+        DIE_ERRNO_DIAG(fw[0] == NULL, "fopen", output_file);
     }
-    DIE_ERRNO_DIAG(f == NULL, "fopen", LINGEN_F_FILE);
 
     buf = (unsigned long *) malloc(ulongs_per_mat * sizeof(unsigned long));
 
@@ -570,21 +588,36 @@ void bw_commit_f(polmat& F)
     for(unsigned int k = 0 ; k < ncoef ; k++) {
         memset(buf, 0, ulongs_per_mat * sizeof(unsigned long));
 
-        unsigned long * v = buf;
-        unsigned long lmask = 1UL;
-
-        for(unsigned int i = 0 ; i < nres ; i++) {
-            for(unsigned int j = 0 ; j < n ; j++) {
+        /* Each solution, which is a column, has to be a column in the
+         * resulting file.
+         *
+         * Below, j is a row index; i is a column index in the final F,
+         * and pick[i] is a column index of the F with (m+n) columns.
+         *
+         */
+        for(unsigned int j = 0 ; j < n ; j++) {
+            unsigned long * v = buf + j * (n / ULONG_BITS);
+            for(unsigned int i = 0 ; i < nres ; i++) {
                 if (foffsets[i] != UINT_MAX)
-                    *v |= lmask & -((F.poly(j,pick[i])[foffsets[i]] & fmasks[i]) != 0);
-                lmask <<= 1;
-                v += (lmask == 0);
-                lmask += (lmask == 0);
+                    v[i/ULONG_BITS] |= (1UL<<(i%ULONG_BITS)) & -((F.poly(j,pick[i])[foffsets[i]] & fmasks[i]) != 0);
             }
         }
 
-        rz = fwrite(buf, sizeof(unsigned long), ulongs_per_mat, f);
-        ASSERT_ALWAYS(rz == ulongs_per_mat);
+        if (split_output_file) {
+            unsigned long * b = buf;
+            for(unsigned int i = 0 ; i < n ; i++) {
+                for(unsigned int j = 0 ; j < n ; j+=64) {
+                    FILE * f = fw[(i/64)*(n/64)+(j/64)];
+                    size_t s = 64 / ULONG_BITS;
+                    rz = fwrite(b, sizeof(unsigned long), s, f);
+                    ASSERT_ALWAYS(rz == s);
+                    b += s;
+                }
+            }
+        } else {
+            rz = fwrite(buf, sizeof(unsigned long), ulongs_per_mat, fw[0]);
+            ASSERT_ALWAYS(rz == ulongs_per_mat);
+        }
 
         for(unsigned int i = 0 ; i < nres ; i++) {
             if (foffsets[i] == UINT_MAX)
@@ -595,7 +628,17 @@ void bw_commit_f(polmat& F)
             fmasks[i] += ((unsigned long) (fmasks[i] == 0)) << (ULONG_BITS-1);
         }
     }
-    fclose(f);
+    if (split_output_file) {
+        for(unsigned int i = 0 ; i < n ; i+=64) {
+            for(unsigned int j = 0 ; j < n ; j+=64) {
+                FILE * f = fw[(i/64)*(n/64)+(j/64)];
+                fclose(f);
+            }
+        }
+    } else {
+        fclose(fw[0]);
+    }
+    free(fw);
     free(fmasks);
     free(foffsets);
     free(pick);
@@ -638,7 +681,7 @@ void write_polmat(polmat const& P, const char * fn)/*{{{*/
 void write_pi(polmat const& P, unsigned int t1, unsigned int t2)
 {
     char * tmp;
-    int rc = asprintf(&tmp, LINGEN_PI_PATTERN, t1, t2);
+    int rc = asprintf(&tmp, "pi-%u-%u", t1, t2);
     ASSERT_ALWAYS(rc >= 0);
     write_polmat(P, tmp);
     // printf("written %s\n", tmp);
@@ -648,7 +691,7 @@ void write_pi(polmat const& P, unsigned int t1, unsigned int t2)
 void unlink_pi(unsigned int t1, unsigned int t2)
 {
     char * tmp;
-    int rc = asprintf(&tmp, LINGEN_PI_PATTERN, t1, t2);
+    int rc = asprintf(&tmp, "pi-%u-%u", t1, t2);
     ASSERT_ALWAYS(rc >= 0);
     rc = unlink(tmp);
     WARN_ERRNO_DIAG(rc < 0, "unlink", tmp);
@@ -658,7 +701,7 @@ void unlink_pi(unsigned int t1, unsigned int t2)
 
 bool recover_f0_data()/*{{{*/
 {
-    std::ifstream f(LINGEN_BOOTSTRAP_FILE);
+    std::ifstream f("F_INIT_QUICK");
 
     using namespace globals;
     for(unsigned int i = 0 ; i < m ; i++) {
@@ -667,13 +710,13 @@ bool recover_f0_data()/*{{{*/
             return false;
         f0_data.push_back(std::make_pair(cnum,exponent));
     }
-    printf("recovered " LINGEN_BOOTSTRAP_FILE " from disk\n");
+    printf("recovered " "F_INIT_QUICK" " from disk\n");
     return true;
 }/*}}}*/
 
 bool write_f0_data()/*{{{*/
 {
-    std::ofstream f(LINGEN_BOOTSTRAP_FILE);
+    std::ofstream f("F_INIT_QUICK");
 
     using namespace globals;
     for(unsigned int i = 0 ; i < m ; i++) {
@@ -683,7 +726,7 @@ bool write_f0_data()/*{{{*/
             return false;
     }
     f << std::endl;
-    printf("written " LINGEN_BOOTSTRAP_FILE " to disk\n");
+    printf("written " "F_INIT_QUICK" " to disk\n");
     return true;
 }/*}}}*/
 
@@ -1469,6 +1512,10 @@ int main(int argc, char *argv[])
     param_list_decl_usage(pl, "lingen_threshold", "sequence length above which we use the recursive algorithm for lingen");
     param_list_decl_usage(pl, "cantor_threshold", "polynomial length above which cantor algorithm is used for binary polynomial multiplication");
     param_list_decl_usage(pl, "t", "number of threads used");
+    param_list_decl_usage(pl, "split-input-file",
+            "work with split files on input");
+    param_list_decl_usage(pl, "split-output-file",
+            "work with split files on output");
     /* }}} */
     logline_decl_usage(pl);
 
@@ -1486,17 +1533,18 @@ int main(int argc, char *argv[])
             }
         }
         tmp = param_list_lookup_string(pl, "lingen-output-file");
-        if (tmp) {
-            size_t rc = strlcpy(output_file, tmp, sizeof(output_file));
-            if (rc >= sizeof(output_file)) {
-                fprintf(stderr, "file names longer than %zu bytes do not work\n", sizeof(output_file));
-                exit(EXIT_FAILURE);
-            }
+        if (!tmp) tmp = "F";
+        size_t rc = strlcpy(output_file, tmp, sizeof(output_file));
+        if (rc >= sizeof(output_file)) {
+            fprintf(stderr, "file names longer than %zu bytes do not work\n", sizeof(output_file));
+            exit(EXIT_FAILURE);
         }
     }
     param_list_parse_uint(pl, "lingen_threshold", &lingen_threshold);
     param_list_parse_uint(pl, "cantor_threshold", &cantor_threshold);
     param_list_parse_uint(pl, "t", &nthreads);
+    param_list_parse_int(pl, "split-output-file", &split_output_file);
+    param_list_parse_int(pl, "split-input-file", &split_input_file);
 
     /* }}} */
     logline_interpret_parameters(pl);
@@ -1525,6 +1573,10 @@ int main(int argc, char *argv[])
         exit(1);
     }
 
+    if (split_input_file) {
+        fprintf(stderr, "--split-input-file not supported yet\n");
+        exit(EXIT_FAILURE);
+    }
     if (!strlen(input_file)) {
         unsigned int n0, n1, j0, j1;
         /* {{{ detect the input file -- there must be only one file. */
@@ -1533,7 +1585,7 @@ int main(int argc, char *argv[])
             struct dirent * de;
             for( ; (de = readdir(dir)) != NULL ; ) {
                 int len;
-                int rc = sscanf(de->d_name, A_FILE_PATTERN "%n",
+                int rc = sscanf(de->d_name, "A%u-%u.%u-%u" "%n",
                         &n0, &n1, &j0, &j1, &len);
                 /* rc is expected to be 4 or 5 depending on our reading of the
                  * standard */
@@ -1683,6 +1735,8 @@ int main(int argc, char *argv[])
     // E.resize(deg + 1);
     polmat pi_left;
     compute_lingen(E, pi_left);
+
+    print_deltas();
 
     int nresults = 0;
     for (unsigned int j = 0; j < m + n; j++) {

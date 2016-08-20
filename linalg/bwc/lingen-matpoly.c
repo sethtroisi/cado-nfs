@@ -131,7 +131,7 @@ void matpoly_multiply_column_by_x(abdst_field ab, matpoly_ptr pi, unsigned int j
     }
 }/*}}}*/
 
-void matpoly_truncate(abdst_field ab, matpoly_ptr dst, matpoly_ptr src, unsigned int size)/*{{{*/
+void matpoly_truncate(abdst_field ab, matpoly_ptr dst, matpoly_srcptr src, unsigned int size)/*{{{*/
 {
     ASSERT_ALWAYS(size <= src->alloc);
     if (dst == src) {
@@ -152,7 +152,7 @@ void matpoly_truncate(abdst_field ab, matpoly_ptr dst, matpoly_ptr src, unsigned
         for(unsigned int j = 0 ; j < src->n ; j++) {
             abvec_set(ab,
                     matpoly_part(ab, dst, i, j, 0),
-                    matpoly_part(ab, src, i, j, 0),
+                    matpoly_part_const(ab, src, i, j, 0),
                     size);
         }
     }
@@ -162,13 +162,38 @@ void matpoly_truncate(abdst_field ab, matpoly_ptr dst, matpoly_ptr src, unsigned
  * clearly ! */
 void matpoly_extract_column(abdst_field ab,/*{{{*/
         matpoly_ptr dst, unsigned int jdst, unsigned int kdst,
-        matpoly_ptr src, unsigned int jsrc, unsigned int ksrc)
+        matpoly_srcptr src, unsigned int jsrc, unsigned int ksrc)
 {
     ASSERT_ALWAYS(dst->m == src->m);
     for(unsigned int i = 0 ; i < src->m ; i++)
         abset(ab,
             matpoly_coeff(ab, dst, i, jdst, kdst),
-            matpoly_coeff(ab, src, i, jsrc, ksrc));
+            matpoly_coeff_const(ab, src, i, jsrc, ksrc));
+}/*}}}*/
+
+void matpoly_transpose_dumb(abdst_field ab, matpoly_ptr dst, matpoly_srcptr src) /*{{{*/
+{
+    if (dst == src) {
+        matpoly tmp;
+        matpoly_init(ab, tmp, 0, 0, 0);  /* pre-init for now */
+        matpoly_transpose_dumb(ab, tmp, src);
+        matpoly_swap(dst, tmp);
+        matpoly_clear(ab, tmp);
+        return;
+    }
+    if (!matpoly_check_pre_init(dst))
+        matpoly_clear(ab, dst);
+    matpoly_init(ab, dst, src->n, src->m, src->size);
+    dst->size = src->size;
+    for(unsigned int i = 0 ; i < src->m ; i++) {
+        for(unsigned int j = 0 ; j < src->n ; j++) {
+            for(unsigned int k = 0 ; k < src->size ; k++) {
+                abset(ab,
+                        matpoly_coeff(ab, dst, j, i, k),
+                        matpoly_coeff_const(ab, src, i, j, k));
+            }
+        }
+    }
 }/*}}}*/
 
 void matpoly_zero_column(abdst_field ab,/*{{{*/
@@ -181,7 +206,7 @@ void matpoly_zero_column(abdst_field ab,/*{{{*/
 
 void matpoly_extract_row_fragment(abdst_field ab,/*{{{*/
         matpoly_ptr dst, unsigned int i1, unsigned int j1,
-        matpoly_ptr src, unsigned int i0, unsigned int j0,
+        matpoly_srcptr src, unsigned int i0, unsigned int j0,
         unsigned int n)
 {
     ASSERT_ALWAYS(src->size <= dst->alloc);
@@ -189,10 +214,10 @@ void matpoly_extract_row_fragment(abdst_field ab,/*{{{*/
     for(unsigned int k = 0 ; k < n ; k++)
         abvec_set(ab,
                 matpoly_part(ab, dst, i1, j1 + k, 0),
-                matpoly_part(ab, src, i0, j0 + k, 0), dst->size);
+                matpoly_part_const(ab, src, i0, j0 + k, 0), dst->size);
 }/*}}}*/
 
-void matpoly_rshift(abdst_field ab, matpoly_ptr dst, matpoly_ptr src, unsigned int k)/*{{{*/
+void matpoly_rshift(abdst_field ab, matpoly_ptr dst, matpoly_srcptr src, unsigned int k)/*{{{*/
 {
     ASSERT_ALWAYS(k <= src->size);
     unsigned int newsize = src->size - k;
@@ -207,7 +232,7 @@ void matpoly_rshift(abdst_field ab, matpoly_ptr dst, matpoly_ptr src, unsigned i
         for(unsigned int j = 0 ; j < src->n ; j++) {
             abvec_set(ab,
                     matpoly_part(ab, dst, i, j, 0),
-                    matpoly_part(ab, src, i, j, k),
+                    matpoly_part_const(ab, src, i, j, k),
                     newsize);
         }
     }

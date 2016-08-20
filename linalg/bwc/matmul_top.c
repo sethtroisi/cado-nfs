@@ -11,7 +11,6 @@
 #include "matmul_top.h"
 #include "select_mpi.h"
 #include "intersections.h"
-#include "filenames.h"
 #include "balancing_workhorse.h"
 #include "portability.h"
 #include "misc.h"
@@ -556,13 +555,10 @@ int mmt_vec_load_stream(pi_file_handle f, mmt_vec_ptr v, unsigned int itemsondis
     serialize_threads(v->pi->m);
     return ok;
 }
-int mmt_vec_load(mmt_vec_ptr v, const char * name, unsigned int iter, unsigned int itemsondisk)
+int mmt_vec_load(mmt_vec_ptr v, const char * filename, unsigned int itemsondisk)
 {
     ASSERT_ALWAYS(v != NULL);
     serialize(v->pi->m);
-    char * filename;
-    int rc = asprintf(&filename, "%s.%u", name, iter);
-    ASSERT_ALWAYS(rc >= 0);
 
     pi_file_handle f;
     int ok = pi_file_open(f, v->pi, v->d, filename, "rb");
@@ -577,7 +573,6 @@ int mmt_vec_load(mmt_vec_ptr v, const char * name, unsigned int iter, unsigned i
         if (v->pi->m->trank == 0)
             MPI_Abort(v->pi->m->pals, EXIT_FAILURE);
     }
-    free(filename);
     serialize_threads(v->pi->m);
     return ok;
 }
@@ -595,13 +590,9 @@ int mmt_vec_save_stream(pi_file_handle f, mmt_vec_ptr v, unsigned int itemsondis
     serialize_threads(v->pi->m);
     return s >= 0 && (size_t) s == sizeondisk;
 }
-int mmt_vec_save(mmt_vec_ptr v, const char * name, unsigned int iter, unsigned int itemsondisk)
+int mmt_vec_save(mmt_vec_ptr v, const char * filename, unsigned int itemsondisk)
 {
     serialize_threads(v->pi->m);
-
-    char * filename;
-    int rc = asprintf(&filename, "%s.%u", name, iter);
-    ASSERT_ALWAYS(rc >= 0);
 
     pi_file_handle f;
     int ok = pi_file_open(f, v->pi, v->d, filename, "wb");
@@ -615,7 +606,6 @@ int mmt_vec_save(mmt_vec_ptr v, const char * name, unsigned int iter, unsigned i
             unlink(filename);
         }
     }
-    free(filename);
     serialize_threads(v->pi->m);
     return ok;
 }
@@ -2109,7 +2099,7 @@ void matmul_top_mul_comm(mmt_vec_ptr v, mmt_vec_ptr w)
 // Doing a mmt_vec_broadcast columns will ensure that each row contains
 // the complete data set for our vector.
 
-void mmt_vec_set_random_through_file(mmt_vec_ptr v, const char * name, unsigned int iter, unsigned int itemsondisk, gmp_randstate_t rstate)
+void mmt_vec_set_random_through_file(mmt_vec_ptr v, const char * filename, unsigned int itemsondisk, gmp_randstate_t rstate)
 {
     /* FIXME: this generates the complete vector on rank 0, saves it, and
      * loads it again. But I'm a bit puzzled by the choice of saving a
@@ -2121,11 +2111,6 @@ void mmt_vec_set_random_through_file(mmt_vec_ptr v, const char * name, unsigned 
     parallelizing_info_ptr pi = v->pi;
 
     if (pi->m->trank == 0) {
-        char * filename;
-        int rc;
-        rc = asprintf(&filename, "%s.%d", name, iter);
-        ASSERT_ALWAYS(rc >= 0);
-
         void * y;
         cheating_vec_init(A, &y, v->n);
         A->vec_set_zero(A, y, v->n);
@@ -2139,13 +2124,12 @@ void mmt_vec_set_random_through_file(mmt_vec_ptr v, const char * name, unsigned 
         ASSERT_ALWAYS(!err);
         FILE * f = fopen(filename, "wb");
         ASSERT_ALWAYS(f);
-        rc = fwrite(y, A->vec_elt_stride(A,1), itemsondisk, f);
+        int rc = fwrite(y, A->vec_elt_stride(A,1), itemsondisk, f);
         ASSERT_ALWAYS(rc == (int) itemsondisk);
         fclose(f);
         cheating_vec_clear(A, &y, v->n);
-        free(filename);
     }
-    mmt_vec_load(v, name, iter, itemsondisk);
+    mmt_vec_load(v, filename, itemsondisk);
 }
 
 void mmt_vec_set_random_inconsistent(mmt_vec_ptr v, gmp_randstate_t rstate)

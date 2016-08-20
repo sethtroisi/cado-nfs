@@ -39,7 +39,12 @@ macro(add_lingen_binary_test testname)
         TARGET_DEPENDENCIES lingen)
 endmacro()
 
-add_lingen_binary_test(test0 1dea0d8879d125aa280e26b8573f932f6bccea75,d0e758e619c8e81b3e28bbd4fe69c32826e9a4bd 64 64 160 1 lingen_threshold=10)
+# the sha1sums here are from the time were we were transposing the
+# output. Now we no longer do that.
+# add_lingen_binary_test(test0 1dea0d8879d125aa280e26b8573f932f6bccea75,d0e758e619c8e81b3e28bbd4fe69c32826e9a4bd 64 64 160 1 lingen_threshold=10)
+
+# todo presumably, on 32 bit, we get something different for the sha1sum.
+add_lingen_binary_test(test0 893801e0727d840353a35b2623430fb758e4d379 64 64 160 1 lingen_threshold=10)
 
 # The test below fails on 32bit. This should be investigated.
 # add_lingen_binary_test(test1 30b90451fb828f08caa160f96c585c4b1c0951a8 64 64 200 1 lingen_threshold=10)
@@ -194,10 +199,12 @@ add_dependencies(test-bwc-mod2-8k_dependencies mf_scan)
 add_bwc_test(mod2-oddthr bwc-trace.sh random_matrix_size=800 m=128 n=128 seed=1 thr=3)
 add_dependencies(test-bwc-mod2-oddthr_dependencies mf_scan)
 
-add_bwc_test(mod2-interleaving bwc-trace.sh random_matrix_size=800 m=128 n=128
-    interleaving=1 seed=1 thr=2)
-add_dependencies(test-bwc-mod2-oddthr_dependencies mf_scan)
-
+# temporarily disabling this test, until I get to re-enabling the
+# feature.
+# add_bwc_test(mod2-interleaving bwc-trace.sh random_matrix_size=800 m=128 n=128
+#     interleaving=1 seed=1 thr=2)
+# add_dependencies(test-bwc-mod2-oddthr_dependencies mf_scan)
+ 
 add_bwc_test(mod2-m-neq-n bwc-trace.sh random_matrix_size=400 m=128 n=64
     seed=1 thr=5)
 add_dependencies(test-bwc-mod2-m-neq-n_dependencies mf_scan)

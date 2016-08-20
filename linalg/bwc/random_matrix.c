@@ -1314,7 +1314,11 @@ void random_matrix_process_print(random_matrix_process_data_ptr r, random_matrix
     punched_interval_ptr range = punched_interval_alloc(&pool, 0, 1);
     for(unsigned long i = 0 ; i < r->nrows ; i++) {
         long v = 0;
-        uint32_t c = generate_row(rstate, F, ptr, range, &pool);
+        uint32_t c;
+        if (i >= F->nrows)
+            c = 0;
+        else
+            c = generate_row(rstate, F, ptr, range, &pool);
         if (avoid_zero_columns && i >= 0.9 * r->ncols) {
             for( ; next_priority_col < r->ncols ; next_priority_col++)
                 if (!colweights[next_priority_col]) break;

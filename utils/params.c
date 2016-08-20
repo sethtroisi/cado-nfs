@@ -763,6 +763,21 @@ int param_list_parse_int_and_int(param_list pl, const char * key, int * r, const
 #endif
 }
 
+int param_list_parse_uint_and_uint(param_list pl, const char * key, unsigned int * r, const char * sep)
+{
+    long rr[2] = {0, 0};
+    if (r) {
+        rr[0] = r[0];
+        rr[1] = r[1];
+    }
+    int seen = param_list_parse_long_and_long(pl, key, rr, sep);
+    if (r) {
+        r[0] = rr[0];
+        r[1] = rr[1];
+    }
+    return seen;
+}
+
 int param_list_parse_intxint(param_list pl, const char * key, int * r)
 {
     return param_list_parse_int_and_int(pl, key, r, "x");

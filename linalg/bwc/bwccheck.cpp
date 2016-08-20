@@ -21,7 +21,6 @@
 #include "misc.h"
 #include "bw-common.h"
 #include "async.h"
-#include "filenames.h"
 #include "xdotprod.h"
 #include "rolling.h"
 #include "mpfq/mpfq.h"
@@ -52,8 +51,8 @@ const char * my_basename(const char * x)
 struct Cfile : public string {
     unsigned int stretch;
     Cfile(const char * x) : string(x) {
-        int rc = sscanf(my_basename(x), CHECK_FILE_BASE ".%u", &stretch);
-        if (rc != 1) throw std::runtime_error("want " CHECK_FILE_BASE ".%u");
+        int rc = sscanf(my_basename(x), "C.%u", &stretch);
+        if (rc != 1) throw std::runtime_error("want C.%u");
     }
     inline bool operator<(Cfile const& o) {
         return stretch < o.stretch;
@@ -67,8 +66,8 @@ struct Vfile : public string {
         return make_pair(j0, j1);
     }
     Vfile(const char * x) : string(x) {
-        int rc = sscanf(my_basename(x), V_FILE_BASE_PATTERN ".%u", &j0, &j1, &n);
-        if (rc != 3) throw std::runtime_error("want " V_FILE_BASE_PATTERN ".%u");
+        int rc = sscanf(my_basename(x), "V%u-%u.%u", &j0, &j1, &n);
+        if (rc != 3) throw std::runtime_error("want " "V%u-%u.%u");
     }
     inline bool operator<(Vfile const& o) {
         if (j0 != o.j0) return j0 < o.j0;
@@ -88,8 +87,8 @@ struct Afile : public string {
         return make_pair(n0, n1);
     }
     Afile(const char * x) : string(x) {
-        int rc = sscanf(my_basename(x), A_FILE_PATTERN, &j0, &j1, &n0, &n1);
-        if (rc != 4) throw std::runtime_error("want " A_FILE_PATTERN);
+        int rc = sscanf(my_basename(x), "A%u-%u.%u-%u", &j0, &j1, &n0, &n1);
+        if (rc != 4) throw std::runtime_error("want " "A%u-%u.%u-%u");
     }
     inline bool operator<(Afile const& o) {
         if (j0 != o.j0) return j0 < o.j0;
@@ -100,6 +99,7 @@ struct Afile : public string {
     }
 };
 
+#if 0
 struct Ffile : public string {
     unsigned int s0, s1, j0, j1;
     int checks;
@@ -148,6 +148,7 @@ struct Sfile : public string {
         return false;
     }
 };
+#endif
 
 void vec_alloc(mpfq_vbase_ptr A, void *& z, size_t vsize)
 {
@@ -196,8 +197,8 @@ void * check_prog(param_list pl MAYBE_UNUSED, int argc, char * argv[])
     vector<Cfile> Cfiles;
     vector<Vfile> Vfiles;
     vector<Afile> Afiles;
-    vector<Ffile> Ffiles;
-    vector<Sfile> Sfiles;
+    // vector<Ffile> Ffiles;
+    // vector<Sfile> Sfiles;
 
     for(int i = 0 ; i < argc ; i++) {
         try {
@@ -208,6 +209,7 @@ void * check_prog(param_list pl MAYBE_UNUSED, int argc, char * argv[])
                 case 'C': Cfiles.push_back(argv[i]); break;
                 case 'A': Afiles.push_back(argv[i]); break;
                 case 'V': Vfiles.push_back(argv[i]); break;
+#if 0
                 case 'F':
                           if (strncmp(p, "F.sols", 6) == 0)
                               Ffiles.push_back(argv[i]);
@@ -215,6 +217,11 @@ void * check_prog(param_list pl MAYBE_UNUSED, int argc, char * argv[])
                            */
                           break;
                 case 'S': Sfiles.push_back(argv[i]); break;
+#endif
+                  /* since we changed the format, and since we
+                   * were not doing checks of any sort yet
+                   * anyway, just discard them right away */
+                case 'F': case 'S': break;
                 default:
                   fprintf(stderr, "File name not recognized: %s\n", argv[i]);
                   exit(EXIT_FAILURE);
@@ -228,8 +235,8 @@ void * check_prog(param_list pl MAYBE_UNUSED, int argc, char * argv[])
     std::sort(Cfiles.begin(), Cfiles.end());
     std::sort(Afiles.begin(), Afiles.end());
     std::sort(Vfiles.begin(), Vfiles.end());
-    std::sort(Ffiles.begin(), Ffiles.end());
-    std::sort(Sfiles.begin(), Sfiles.end());
+    // std::sort(Ffiles.begin(), Ffiles.end());
+    // std::sort(Sfiles.begin(), Sfiles.end());
 
     /* How many (j0-j1) ranges do we have for V files */
     typedef std::map<pair<unsigned int, unsigned int>, vector<Vfile> > vseq_t;

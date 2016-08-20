@@ -353,7 +353,6 @@ macro(bwc_program v)
 endmacro()
 
 bwc_program(acollect acollect.c)
-bwc_program(split split.c)
 bwc_program(prep prep.c)
 target_link_libraries(prep bitlinalg)
 bwc_program(krylov krylov.c xdotprod.c)
@@ -450,7 +449,7 @@ add_custom_target(bwc_matmul)
 add_dependencies(bwc_matmul ${all_matmul_libs})
 
 add_custom_target(bwc_full)
-add_dependencies(bwc_full mf_bal random_matrix split acollect lingen
+add_dependencies(bwc_full mf_bal random_matrix acollect lingen
     cleanup prep krylov dispatch mksol gather secure bwc_base
     bwc_matmul bwccheck)
 

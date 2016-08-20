@@ -7,7 +7,6 @@
 #include "params.h"
 #include "xvectors.h"
 #include "bw-common.h"
-#include "filenames.h"
 #include "mpfq/mpfq.h"
 #include "mpfq/mpfq_vbase.h"
 #include "async.h"
@@ -123,7 +122,7 @@ void * sec_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
     // matmul_top_twist_vector(mmt, !bw->dir);
     // mmt_vec_save(mmt, NULL, "ux", !bw->dir, 0);
     // save_untwisted_transposed_vector(mmt, "tx", !bw->dir, 0);
-    mmt_vec_save(my, CHECK_FILE_BASE, 0, unpadded);
+    mmt_vec_save(my, "C.0", unpadded);
 
 
     if (tcan_print) {
@@ -166,9 +165,15 @@ void * sec_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
         serialize(pi->m);
         serialize_threads(mmt->pi->m);
         mmt_vec_untwist(mmt, my);
-        mmt_vec_save(my, CHECK_FILE_BASE, k, unpadded);
-        if (tcan_print) {
-            printf("saved %s.%d\n", CHECK_FILE_BASE, next);
+        {
+            char * tmp;
+            int rc = asprintf(&tmp, "C.%d", k);
+            ASSERT_ALWAYS(rc >= 0);
+            mmt_vec_save(my, tmp, unpadded);
+            if (tcan_print) {
+                printf("saved %s\n", tmp);
+            }
+            free(tmp);
         }
     }
 
