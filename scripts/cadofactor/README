@@ -27,12 +27,15 @@ unless slaves.hostnames is set.
 To start additional clients, do (following the command line given in the
 output of the server):
 
-./cado-nfs-client.py --server=https://quiche.loria.fr:8001 --certsha1=[Certificate SHA1]
+./cado-nfs-client.py --server=https://quiche.loria.fr:8001 --certsha1=[Certificate SHA1] --bindir=...
 
 where the --server and --certsha1 parameters should be given the URL and
 certificate SHA1 value of the server, respectively, as printed by the
 cado-nfs.py script. You can start an arbitrary number of client scripts,
 on any machines that can connect to the server via HTTP.
+
+The (optional) --bindir parameter tells where to find the binaries to use
+instead of having them downloaded from the server.
 
 If you want to let the server automatically start clients, you need to supply a list of hostnames on which to start clients, e.g.,
 

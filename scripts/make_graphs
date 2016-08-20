@@ -4,7 +4,7 @@ set d=$2
 
 /bin/rm -f $d/cpu $d/rep $d/mem
 
-foreach f ($in/2015*)
+foreach f ($in/201*)
    set t1=`grep "Total cpu time" $f | cut -d" " -f5 | sed 's/s//g'`
    set t2=`grep "Total cpu time" $f | cut -d" " -f9`
    set t3=`grep "Total cpu time" $f | cut -d" " -f16`

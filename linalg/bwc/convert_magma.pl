@@ -127,7 +127,7 @@ if ($mode eq 'balancing') {
     print "nr:=$tr; // originally $nr\n";
     print "nc:=$tc; // originally $nc\n";
     print "nr_orig:=$nr;\n";
-    print "n_origc:=$nc;\n";
+    print "nc_orig:=$nc;\n";
     my $s = $nh * $nv;
     while ($tr % $s) { $tr++; }
     while ($tc % $s) { $tc++; }

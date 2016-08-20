@@ -7,6 +7,7 @@
     -ropteffort    "effort scales"
     -t             "number of threads"
     -area          "sieving area"
+    -I             "I-value (alternative to -area)"
     -Bf            "algebraic smoothness bound"
     -Bg            "rational smoothness bound"
     -v             "toggle verbose"
@@ -16,7 +17,7 @@
    Input polynomials are in "CADO". They are read from FILENAME.
    Output polynomials are in "CADO" format.
 
-   Please report bugs to the public mailing list 
+   Please report bugs to the public mailing list
        cado-nfs-discuss@lists.gforge.inria.fr
 */
 
@@ -93,6 +94,7 @@ usage_adv (char **argv)
   fprintf (stderr, " -Bf F         algebraic smoothness bound (default %.2e).\n", BOUND_F);
   fprintf (stderr, " -Bg G         rational smoothness bound (default %.2e).\n", BOUND_G);
   fprintf (stderr, " -area A       sieving area (default %.2e).\n", AREA);
+  fprintf (stderr, " -I I          I-value (alternative to -area).\n");
   fprintf (stderr, " -ropteffort M   sieving effort ranging from 1 to 10 (default %.0f).\n", DEFAULT_ROPTEFFORT);
 
   fprintf (stderr, "\nExample 1: %s %s -f fname\n", argv[0], argv[1]);
@@ -128,6 +130,10 @@ ropt_parse_param ( int argc,
                    char **argv,
                    ropt_param_t param )
 {
+  int I = 0;
+  int I_area = 0; /* 0 when neither -area nor I is given,
+                     1 when -area is given
+                     2 when -I is given */
 
   /* filename only */
   if (argc > 1) {
@@ -212,7 +218,25 @@ ropt_parse_param ( int argc,
         }
         else if (argc >= 3 && strcmp (argv[1], "-area") == 0)
         {
+          if (I_area == 2)
+            {
+              fprintf (stderr, "Error, both -I and -area are given\n");
+              exit (1);
+            }
           area = atof (argv[2]);
+          I_area = 1;
+          argv += 2;
+          argc -= 2;
+        }
+        else if (argc >= 3 && strcmp (argv[1], "-I") == 0)
+        {
+          if (I_area == 1)
+            {
+              fprintf (stderr, "Error, both -area and -I are given\n");
+              exit (1);
+            }
+          I_area = 2;
+          I = atoi (argv[2]);
           argv += 2;
           argc -= 2;
         }
@@ -240,6 +264,8 @@ ropt_parse_param ( int argc,
         else {
           usage_adv (argv);
         }
+        if (I_area == 2)
+          area = bound_f * pow (2.0, (double) (2*I-1));
       }
     }
     /* stage 1 and stage 2 parameters */
@@ -415,7 +441,7 @@ ropt_wrapper (cado_poly_ptr input_poly, unsigned int poly_id,
   tott->ropt_time_stage1 += eacht->ropt_time_stage1;
   tott->ropt_time_tuning += eacht->ropt_time_tuning;
   tott->ropt_time_stage2 += eacht->ropt_time_stage2;
-  
+
   if (curr_MurphyE > best_MurphyE)
     {
       best_MurphyE = curr_MurphyE;
@@ -554,6 +580,8 @@ declare_usage_basic (param_list pl)
   param_list_decl_usage(pl, "t", "number of threads to use (default 1)");
   snprintf (str, 200, "sieving area (default %.2e)", AREA);
   param_list_decl_usage(pl, "area", str);
+  snprintf (str, 200, "I-value (alternative to -area)");
+  param_list_decl_usage(pl, "I", str);
   snprintf (str, 200, "algebraic smoothness bound (default %.2e)", BOUND_F);
   param_list_decl_usage(pl, "Bf", str);
   snprintf (str, 200, "rational smoothness bound (default %.2e)", BOUND_G);
@@ -593,6 +621,8 @@ main_basic (int argc, char **argv)
   unsigned int nb_input_polys = 0; /* number of input polynomials */
   unsigned int size_input_polys = 16; /* Size of input_polys tab. */
   ropt_time_t tott;
+  int I;
+
   tott->ropt_time = 0.0;
   tott->ropt_time_stage1 = 0.0;
   tott->ropt_time_tuning = 0.0;
@@ -623,12 +653,23 @@ main_basic (int argc, char **argv)
   }
 
   param_list_parse_uint (pl, "t", &nthreads);
-  if (param_list_parse_double (pl, "area", &area) == 0) /* no -area */
-    area = AREA;
+
   if (param_list_parse_double (pl, "Bf", &bound_f) == 0) /* no -Bf */
     bound_f = BOUND_F;
   if (param_list_parse_double (pl, "Bg", &bound_g) == 0) /* no -Bg */
     bound_g = BOUND_G;
+  int has_area = param_list_parse_double (pl, "area", &area);
+  int has_I = param_list_parse_int (pl, "I", &I);
+  if (has_area == 0 && has_I == 0) /* no -area nor -I */
+    area = AREA;
+  else if (has_area && has_I)
+    {
+      fprintf (stderr, "Error, both -area and -I given\n");
+      exit (1);
+    }
+  else if (has_I)
+    area = bound_f * pow (2.0, (double) (2*I-1));
+
   /* sieving effort that passed to ropt */
   param_list_parse_double (pl, "ropteffort", &(ropt_param->effort));
   /* param for ropt */
@@ -728,7 +769,7 @@ main_basic (int argc, char **argv)
     printf ("# Stat:  (tuning took %.2fs)\n", tott->ropt_time_tuning);
     printf ("# Stat:  (stage 2 (sieving) took %.2fs)\n", tott->ropt_time_stage2);
   }
-  
+
   if (best_MurphyE == 0.0)
   {
     if (nb_input_polys > 0)
@@ -768,7 +809,7 @@ main_basic (int argc, char **argv)
 
 /**
  * There are two interfaces: either call "main_adv" or "main_basic"
- * depending whether we have the option --adv. 
+ * depending whether we have the option --adv.
  * Note the cadoprograms.py uses the main_basic() interface.
  */
 int

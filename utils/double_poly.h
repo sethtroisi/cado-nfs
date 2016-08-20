@@ -42,6 +42,11 @@ unsigned int double_poly_compute_all_roots_with_bound(double *,
 unsigned int double_poly_compute_all_roots(double *, double_poly_srcptr);
 void double_poly_print (FILE *, double_poly_srcptr, char *name);
 void double_poly_set_mpz_poly (double_poly_ptr p, mpz_poly_ptr q);
+void double_poly_set_const_mpz_poly (double_poly_ptr p, mpz_poly_srcptr q);
+void mpz_poly_set_double_poly(mpz_poly_ptr f, double_poly_srcptr g);
+
+void double_poly_degree(double_poly_ptr f);
+double double_poly_resultant(double_poly_srcptr p, double_poly_srcptr q);
 
 #ifdef __cplusplus
 }

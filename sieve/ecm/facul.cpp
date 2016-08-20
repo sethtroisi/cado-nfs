@@ -1228,6 +1228,7 @@ facul_both_src (mpz_t **factors, const modset_t* m,
   for (int i = 0; methods[i].method != NULL; i++)
     {
       // {for the stats
+      // FIXME: the stats are not thread-safe!
       stats_current_index = i - stats_nb_side * stats_index_transition;
       if (methods[i].is_the_last)
 	{

@@ -4,6 +4,7 @@
 # expected to do, and also checks that the permutations do what they are
 # expected to do as well.
 
+: ${TMPDIR=/tmp}
 nrows=100
 ncols=100
 density=10
@@ -87,7 +88,7 @@ redirect_unless_debug() {
 
 if ! [ "$nrows" ] ; then usage ; fi
 
-wdir=$(mktemp -d  /tmp/cado.XXXXXXXX)
+wdir=$(mktemp -d  $TMPDIR/cado.XXXXXXXX)
 cleanup() { if ! [ "$CADO_DEBUG" ] ; then rm -rf $wdir ; fi ; }
 argh() { echo "Failed on command error" >&2 ; cleanup ; }
 trap cleanup EXIT
@@ -141,7 +142,7 @@ for impl in "${backends[@]}" ; do
     # times M in the file WM. Which of these products uses the "fast" or
     # "slow" code depdens on $ns.
     for ns in ${nullspace_values[@]} ; do
-        redirect_unless_debug $wdir/spmv-$impl-left.out $bindir/linalg/bwc/bwc.pl :mpirun ${bwc_extra} -- $bindir/tests/linalg/bwc/spmv_test wdir=$wdir "${bwc_common[@]}" prime=$prime balancing=$B matrix=$wdir/mat.bin nullspace=$ns mm_impl=$impl no_save_cache=1 "${bwc_extra[@]}"
+        redirect_unless_debug $wdir/spmv-$impl-left.out $bindir/linalg/bwc/bwc.pl :mpirun ${bwc_extra} -- $bindir/tests/linalg/bwc/spmv_test wdir=$wdir "${bwc_common[@]}" prime=$prime balancing=$B matrix=$wdir/mat.bin nullspace=$ns mm_impl=$impl no_save_cache=1 "${bwc_extra[@]}" accept_zero_columns=1
         # check done within the C code.
         # diff -q $wdir/Z.0 $wdir/ZI.0
         # diff -q $wdir/Z.0 $wdir/ZII.0

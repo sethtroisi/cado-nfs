@@ -25,28 +25,50 @@ unsigned int size_tune_sievearray = 6144;
 /**
  * Total number of sublattices in the tuning and sieving steps.
  * If with the default parametes (SIZE_SIEVEARRAY_V_MAX 4194304),
- * each root sieve takes about 2-4 seconds. The first column is 
+ * each root sieve takes about 2-4 seconds. The first column is `
  * ranked by the digits of integers to be factored and the right
  * column is the number (actually number+1).
  *
  * Usually, there is one or more tuning steps before the final root
- * sieve. In that case, more sublattices are checked (e.g. double/quad
- * the following valeus).
+ * sieve. In that case, more sublattices are checked.
  * 
  * The number is linearly scaled by param->effort, but a larger value
  * is not always necessary since the sieving is done in order with
  * the best sublattices first.
+ *
+ * It is organized as {digits, A, B, C}
+ *
+ * C is number of sublattices used in tuning the best lognorm bound;
+ * A is number of sublattices used in tuning;
+ * B number of sublattices used in final sieve;
+ * In general, A is large; while B, C are small 
+ *  (perhaps C could also be large).
+ * They will be scaled by ropt_effort linearly.
+ * Note the total running-time is scaled approx. linearly since 
+ * each lats in B take more time but there are less lats in B
+ * than others.
  */
-const unsigned int size_total_sublattices[8][2] = {
-  /* {digits, num_of_sublattices} */
-  {80,  4},  /* for up to 79 digits */
-  {100, 8},  /* up to 99 digits */
-  {140, 16},  /* up to 139 digits */
-  {170, 32}, /* up to 169 digits */
-  {180, 64}, /* up to 179 digits */
-  {220, 128}, /* up to 219 digits */
-  {260, 256}, /* up to 259 digits */
-  {300, 512} /* up to 299 digits */
+const unsigned int size_total_sublattices[NUM_DEFAULT_DIGITS][4] = {
+  { 80,    8,    4,    2},  /* up to 79 digits */
+  {100,   16,    8,    3},  /* up to 99 digits */
+  {120,   32,   12,    4},  /* up to 119 digits */
+  {140,   64,   16,    5},  /* up to 139 digits */
+  {150,   96,   20,    6},  /* up to 149 digits */
+  {160,  128,   24,    7},  /* up to 159 digits */
+  {170,  160,   28,    8},  /* up to 169 digits */
+  {180,  192,   32,    9},  /* up to 179 digits */
+  {190,  224,   36,    10},  /* up to 189 digits */
+  {200,  256,   40,    11},  /* up to 199 digits */
+  {210,  288,   44,    12},  /* up to 209 digits */
+  {220,  320,   48,    13},  /* up to 219 digits */
+  {230,  368,   52,    14},  /* up to 229 digits */
+  {240,  416,   56,    15},  /* up to 239 digits */
+  {250,  464,   60,    16},  /* up to 249 digits */
+  {260,  512,   64,    17},  /* up to 259 digits */
+  {270,  560,   68,    18},  /* up to 269 digits */
+  {280,  608,   72,    19},  /* up to 279 digits */
+  {290,  656,   76,    20},  /* up to 289 digits */
+  {300,  704,   80,    21}   /* up to 299 digits */
 };
 
 
@@ -119,6 +141,8 @@ default_sublattice_pe[NUM_DEFAULT_SUBLATTICE][NUM_SUBLATTICE_PRIMES] = {
   { 8, 3, 2, 1, 1, 0, 0, 0, 0 }, // 13305600
   { 7, 4, 2, 1, 1, 0, 0, 0, 0 }, // 19958400
   { 6, 3, 2, 1, 1, 1, 0, 0, 0 }, // 43243200
+  { 7, 3, 2, 1, 1, 1, 0, 0, 0 }, // 86486400
+  { 7, 4, 2, 1, 1, 1, 0, 0, 0 }, // 259459200
 };
 
 
@@ -130,7 +154,7 @@ default_sublattice_prod[NUM_DEFAULT_SUBLATTICE] = {
   2, 4, 12, 24, 48, 72, 120, 144, 240, 288, 360, 480,
   720, 1440, 4320, 10080, 20160, 21600, 50400, 100800,
   302400, 3326400, 6652800, 13305600, 19958400, 43243200,
-};
+  86486400, 259459200 };
 
 
 /**

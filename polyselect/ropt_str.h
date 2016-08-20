@@ -45,6 +45,7 @@ typedef struct {
   /* used to decide global bounds */
   double init_lognorm;
   double bound_lognorm;
+  double bound_E;
   double exp_min_alpha;
 } _ropt_bound_t;
 typedef _ropt_bound_t ropt_bound_t[1];
@@ -57,8 +58,14 @@ typedef struct {
   unsigned int len_e_sl;
   unsigned int tlen_e_sl;
 
-  /* num of all sublattices */
+  /* num of sublattices */
   unsigned int nbest_sl;
+
+  /* num of sublattices for tune */
+  unsigned int nbest_sl_tune;
+  
+  /* num of all sublattices */
+  unsigned int nbest_sieve;
 
   /* tune mode 1 */
   unsigned int nbest_sl_tunemode;
@@ -70,6 +77,8 @@ typedef struct {
   unsigned int *e_sl;
 
   mpz_t modulus;
+
+  unsigned long modbound;
 } _ropt_s1param_t;
 typedef _ropt_s1param_t ropt_s1param_t[1];
 
@@ -206,9 +215,17 @@ void ropt_bound_init ( ropt_bound_t );
 
 void ropt_bound_setup ( ropt_poly_t poly,
                         ropt_bound_t bound,
-                        ropt_param_t param );
+                        ropt_param_t param,
+                        double incr );
 
+void ropt_bound_setup_incr ( ropt_poly_t poly,
+                             ropt_bound_t bound,
+                             ropt_param_t param,
+                             double incr );
+
+#if 0
 double ropt_bound_expected_E (mpz_poly F, mpz_poly G);
+#endif
 
 void ropt_bound_reset ( ropt_poly_t poly,
                         ropt_bound_t bound,
@@ -228,6 +245,20 @@ void ropt_s1param_setup ( ropt_poly_t poly,
                           ropt_s1param_t s1param,
                           ropt_bound_t bound,
                           ropt_param_t param);
+
+void ropt_s1param_resetup ( ropt_poly_t poly,
+                            ropt_s1param_t s1param,
+                            ropt_bound_t bound,
+                            ropt_param_t param,
+                            unsigned int nbest );
+
+void
+ropt_s1param_resetup_modbound ( ropt_poly_t poly,
+                                ropt_s1param_t s1param,
+                                ropt_bound_t bound,
+                                ropt_param_t param,
+                                unsigned int nbest,
+                                unsigned long modbound);
 
 void ropt_s1param_free ( ropt_s1param_t s1param );
 

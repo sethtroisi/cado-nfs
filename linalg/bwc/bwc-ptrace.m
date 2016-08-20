@@ -148,13 +148,18 @@ assert IsZero(Transpose(Mx*Q)[nc_orig+1..nc]);
 
 /* The matrix by which we multiply, really */
 
-assert Submatrix(Transpose(Mx*Q),1,1,nr_orig,nr_orig) eq Submatrix(Transpose(Q),1,1,nr_orig,nr_orig)*Transpose(Matrix(M_orig));
+// assert Submatrix(Transpose(Mx*Q),1,1,nr_orig,nr_orig) eq Submatrix(Transpose(Q),1,1,nr_orig,nr_orig)*Transpose(Matrix(M_orig));
+
+assert Submatrix(Transpose(Mx*Q),1,1,nr_orig,nr_orig) eq Submatrix(Transpose(Q),1,1,nr_orig,nr_orig)*Transpose(Matrix(GF(p),nr_orig,nr_orig,Eltseq(M_orig)));
 
 
 Qsmall:=Submatrix(Q,1,1,nr_orig,nr_orig);
-Msmall:=Matrix(GF(p),Matrix(M_orig));
+// Msmall:=Matrix(GF(p),Matrix(M_orig));
+Msmall:=Matrix(GF(p),nr_orig,nr_orig,Eltseq(M_orig));
 
-MM:=Transpose(Msmall*Qsmall);
+MQsmall:=Msmall*Qsmall;
+MM:=Transpose(MQsmall); /* Is it ever used ? */
+
 
 
 load "R.m";
@@ -170,12 +175,16 @@ load "x.m";
 Xt:=Matrix(GF(p),nr_orig,1,[]);
 for i in [1..1] do for u in var[i] do Xt[u][i] +:=1; end for; end for;
 
+function canvec(V,i) x:=V!0; x[i]:=1; return x; end function;
+
+
 Xfull:=Matrix(GF(p),nr_orig,#var,[]);
 for i in [1..#var] do for u in var[i] do Xfull[u][i] +:=1; end for; end for;
 
 x0:=Rows(Transpose(Xfull));
-print "Dimension of the span of the vectors of is X", Dimension(sub<Universe(x0)|x0>);
-xi:=[v*(Msmall*Qsmall) : v in x0];
+print "Dimension of the span of the vectors of X is", Dimension(sub<Universe(x0)|x0>);
+xi:=[v*MQsmall : v in x0];
+
 
 // if System("test -f C0.m") eq 0 then
 // magma can't do if (...) then load "..."; (sigh).
@@ -193,19 +202,51 @@ elif assigned C1 then
 end if;
 // load "C50.m"; C50:=Vector(GF(p),nr_orig,g(var));
 
+/*
+M2:=MQsmall*MQsmall;
+M4:=M2*M2;
+M8:=M4*M4;
+xi:=x0;
+xblock:=[Universe(x0)|];
+for i in [1..8] do
+    xblock cat:= xi;
+    xi:=[v*MQsmall : v in xi];
+end for;
+MX:=Matrix(xblock);
+
+
+MXN:=MX;
+i:=0;
+rr:=[Universe(Rows(MX))|];
+while i * m lt Nrows(MQsmall) do
+    rr cat:=Rows(MXN);
+    MXN:=MXN*M8;
+    i+:=8;
+    printf ".";
+    if i le 32 or i mod 128 eq 0 or (i ge 240 and i mod 32 eq 0) then
+        printf "\n";
+        time U:=sub<Universe(x0)|rr>;
+        time d:=Dimension(U);
+        print i, d, i*m-d;
+    end if;
+end while;
+
+*/
+
+
 // interval:=50;
 interval:=1;
 
 if assigned C1 then
     print "Checking consistency of check vector C1";
     assert C1 eq xi[1];
-    // C1 eq Vector(Xt)*Transpose(Msmall*Qsmall);
+    // C1 eq Vector(Xt)*Transpose(MQsmall);
     print "Checking consistency of check vector C1: done";
 end if;
 // end if;
 
 // foo:=Vector(Xt);
-// for i in [1..interval] do print i; foo *:= Transpose(Transpose(Msmall*Qsmall)); end for;
+// for i in [1..interval] do print i; foo *:= Transpose(Transpose(MQsmall)); end for;
 // // C50 eq foo;
 
 print "Checking that RHS vectors are in V[1]";
@@ -216,7 +257,7 @@ print "Checking that RHS vectors are in V[1]: done";
 
 print "Checking consistency of all vectors V_i";
 for i in [1..#VV-1] do
-    assert Matrix(VV[i])*Transpose(Msmall*Qsmall) eq Matrix(VV[i+1]);
+    assert Matrix(VV[i])*Transpose(MQsmall) eq Matrix(VV[i+1]);
 end for;
 print "Checking consistency of all vectors V_i: done";
 
@@ -285,7 +326,7 @@ A:=matpol_from_sequence(g(var),m,n);
 
 print "Checking consistency of A";
 for k in [0..9] do
-    assert mcoeff(A, k) eq Matrix(n,n,[(x0[i],VV[k+1][j]):i,j in [1..n]]);
+    assert mcoeff(A, k) eq Matrix(m,n,[(x0[i],VV[k+1][j]):j in [1..n], i in[1..m]]);
 end for;
 print "Checking consistency of A: done";
 
@@ -378,14 +419,14 @@ else
         v:=Matrix(RHS);
         summand1:=Transpose(rhscoeffs)*Matrix(RHS);
         for k in [1..degF+1] do
-            v:=v*Transpose(Msmall*Qsmall);
+            v:=v*Transpose(MQsmall);
             assert mcoeff(Fx0,k) eq Submatrix(mcoeff(F,k-1),1,1,r, n);
             summand1+:=Transpose(mcoeff(Fx0,k))*v;
         end for;
         summand2:=Parent(summand1)!0;
         w:=Matrix(VV[1][r+1..n]);
         for k in [1..degF+1] do
-            w:=w*Transpose(Msmall*Qsmall);
+            w:=w*Transpose(MQsmall);
             assert mcoeff(Fx1,k-1) eq Submatrix(mcoeff(F,k-1),r+1, 1, n-r, n);
             summand2+:=Transpose(mcoeff(Fx1,k-1))*w;
         end for;
@@ -400,17 +441,17 @@ else
         // w := Matrix(VV[1][r+1..n]);
         z := Matrix(VV[1]);
         for k in [1..degF+1] do
-            // v:=v*Transpose(Msmall*Qsmall);
-            // w:=w*Transpose(Msmall*Qsmall);
+            // v:=v*Transpose(MQsmall);
+            // w:=w*Transpose(MQsmall);
             // assert mcoeff(Fx0,k) eq Submatrix(mcoeff(F,k-1),1,1,r, n);
             // assert mcoeff(Fx1,k-1) eq Submatrix(mcoeff(F,k-1),r+1, 1, n-r, n);
             // addend:=Transpose(mcoeff(Fx0,k))*v;
             // addend+:=Transpose(mcoeff(Fx1,k-1))*w;
             // addend eq 
             summand2+:=Transpose(mcoeff(F,k-1))*z;
-            z:=z*Transpose(Msmall*Qsmall);
+            z:=z*Transpose(MQsmall);
         end for;
-        IsZero(summand1 + summand2 * Transpose(Msmall*Qsmall));
+        IsZero(summand1 + summand2 * Transpose(MQsmall));
         */
 
 end if;
@@ -432,11 +473,12 @@ for k in [0..degF] do
     for j in [1..n] do
         solutions[j]+:=mcoeff(mcol(F,j),k)*z;
     end for;
-    z:=z*Transpose(Msmall*Qsmall);
+    z:=z*Transpose(MQsmall);
 end for;
+zz:=images + solutions * Transpose(MQsmall);
 for j in [1..n] do
     printf "Checking that column %o (sols%o-%o) is indeed a solution... ", j, j-1, j;
-    assert IsZero(images[j] + solutions[j] * Transpose(Msmall*Qsmall));
+    assert IsZero(zz[j]);
     print " ok";
 end for;
 
@@ -457,7 +499,7 @@ SS:=[[&+[SS[k+1,i+1,j+1]:k in [0..nblocks-1]]:j in [0..n-1]]:i in [0..nsols-1]];
 print "Checking that mksol has computed what we expect";
 for i in [1..nsols] do
     for j in [1..n] do
-        assert SS[i,j] eq mpol_eval(V_0[j],Transpose(Msmall*Qsmall),F[j,i]);
+        assert SS[i,j] eq mpol_eval(V_0[j],Transpose(MQsmall),F[j,i]);
     end for;
 end for;
 print "Checking that mksol has computed what we expect: done";
@@ -470,7 +512,7 @@ IsZero(all_rhs[1] + &+SS[1]*Transpose(Qsmall)*Transpose(Msmall));
 Mpad:=HorizontalJoin(Msmall, Transpose(Matrix(RHS)));
 ww:=[];
 for c in [1..nsols] do
-    // v:=&+[mpol_eval(V_0[j],Transpose(Msmall*Qsmall),F[j,c]): j in [1..n]];
+    // v:=&+[mpol_eval(V_0[j],Transpose(MQsmall),F[j,c]): j in [1..n]];
     v:=&+SS[c];
     assert IsZero(all_rhs[c] + v * Transpose(Qsmall)*Transpose(Msmall));
     w0:=v * Transpose(Qsmall);

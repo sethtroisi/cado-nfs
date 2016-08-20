@@ -123,7 +123,7 @@ argument_checking() {
             echo "Unsupported combination of arguments for specifying system" >&2
             echo "Detected arguments:" >&2
             for a in matrix rhsfile nrhs random_matrix_size random_matrix_maxcoeff ; do
-                v=`eval echo "\$$a"`
+                v=`eval echo '$'"$a"`
                 if [ "$v" != "" ] ; then
                     echo "$a=$v" >&2
                 fi
@@ -194,7 +194,7 @@ create_test_matrix_if_needed() {
     # random_matrix for that (not mandatory though, since
     # nrows,ncols,density, may be specified in full).
 
-    rmargs=()
+    rmargs=(-Z)
     # defaults, some of the subcases below tweak that.
     nrows=`echo $random_matrix_size | cut -d, -f1`
     ncols=`echo $random_matrix_size | cut -d, -f2`   # = nrows if no comma
@@ -236,8 +236,10 @@ create_test_matrix_if_needed() {
     data_ncols=$((`wc -c < $cwfile` / 4))
     data_nrows=$((`wc -c < $rwfile` / 4))
     if [ "$data_ncols" -lt "$ncols" ] ; then
-        echo "padding $cwfile with $((ncols-data_ncols)) zero columns"
-        dd if=/dev/zero bs=4 count=$((ncols-data_ncols)) >> $cwfile
+        if [ "$prime" = 2 ] || ! [ "$nrhs" ] ; then
+            echo "padding $cwfile with $((ncols-data_ncols)) zero columns"
+            dd if=/dev/zero bs=4 count=$((ncols-data_ncols)) >> $cwfile
+        fi
     fi
     if [ "$data_nrows" -lt "$nrows" ] ; then
         echo "padding $cwfile with $((nrows-data_nrows)) zero rows"
@@ -649,9 +651,9 @@ fi
 echo "Running magma verification script"
 
 if [ "$prime" = 2 ] ; then
-    s="`dirname $0`/bwc-trace.m"
+    s="`dirname $(readlink -f $0)`/bwc-trace.m"
 else
-    s="`dirname $0`/bwc-ptrace.m"
+    s="`dirname $(readlink -f $0)`/bwc-ptrace.m"
 fi
 cd $wdir
 # magma does not exit with a useful return code, so we have to grep its

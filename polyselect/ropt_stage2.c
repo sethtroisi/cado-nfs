@@ -9,7 +9,7 @@
 #include "portability.h"
 #include "size_optimization.h"
 
-
+//#define TIMING_ROPT_STAGE2
 /**
  * Print sieve array for debugging.
  */
@@ -929,12 +929,21 @@ rootsieve_one_sublattice ( ropt_poly_t poly,
 #if 0
     fprintf (stderr, "[%ld, %ld] ", s2param->Bmin, s2param->Bmax);
 #endif
-    
+
+
+#ifdef TIMING_ROPT_STAGE2
+    unsigned long st = milliseconds_thread ();
+#endif    
     /* root sieve for v. Note, s2param with updated Bmin 
        and Bmax will be used in rootsieve_v(). */
     rootsieve_one_block (sa, poly, s2param);
+#ifdef TIMING_ROPT_STAGE2
+    st = milliseconds_thread () - st;
+    printf ( "ropt_one : size %lu, [sieve %lu, ", size_array_mem, st);
+    st = milliseconds_thread ();
+    /* the following insertion took relatively short time compared to sieve */
+#endif
 
-    
     /* compute the alpha of top slots */
     for (j = 0; j < size_array_mem; j++) {
 
@@ -956,6 +965,13 @@ rootsieve_one_sublattice ( ropt_poly_t poly,
                    j % (size_B_block) );
 #endif
     }
+
+#ifdef TIMING_ROPT_STAGE2
+    st = milliseconds_thread () - st;
+    printf ( "insert %lu", st);
+    st = milliseconds_thread ();
+    /* the following print_poly_fg ~ sieve_array 2^18  */
+#endif    
 
     /* put sievescore into the MurphyE priority queue */
     for (i = 1; i < sievescore->used; i ++) {
@@ -993,6 +1009,11 @@ rootsieve_one_sublattice ( ropt_poly_t poly,
                          s2param->MOD, -(MurphyE + alpha));
 #endif
     }
+
+#ifdef TIMING_ROPT_STAGE2
+    st = milliseconds_thread () - st;
+    printf ( ", murphy %lu]\n", st);
+#endif
     
     /* next j */
     s2param->Bmin = s2param->Bmax + 1;
@@ -1012,16 +1033,16 @@ rootsieve_one_sublattice ( ropt_poly_t poly,
   best_MurphyE = 0.0;
   for (i = 1; i < local_E_pqueue->used; i ++) {
     
-    if (param->verbose >= 2 && info->mode == ROPT_MODE_INIT) {
-      gmp_fprintf ( stderr, "# Found (%3dth) (w=%d, u=%Zd, v=%Zd) "
-                    "gives E = %1.2e\n",
+    if (param->verbose >= 3 && info->mode == ROPT_MODE_INIT) {
+      gmp_fprintf ( stderr, "# Found (%3dth) E: %1.2e (w=%d, u=%Zd, v=%Zd)\n",
                     i, 
+                    local_E_pqueue->E[i],
                     local_E_pqueue->w[i],
                     local_E_pqueue->u[i],
-                    local_E_pqueue->v[i],
-                    local_E_pqueue->E[i] );
+                    local_E_pqueue->v[i]
+                    );
 
-      if (param->verbose >= 3) {
+      if (param->verbose >= 4) {
 
         compute_fuv_mp (s2param->f, poly->f, poly->g, poly->d,
                         local_E_pqueue->u[i], local_E_pqueue->v[i]);
@@ -1052,13 +1073,15 @@ rootsieve_one_sublattice ( ropt_poly_t poly,
   /* output stats */
   if (param->verbose >= 2 && info->mode == ROPT_MODE_INIT) {
     gmp_fprintf ( stderr,
-                  "# Stat: ave. MurphyE of top %ld polynomials: "
-                  "%1.2e (on sublattice %Zd, %Zd)\n",
+                  "# Stat: ave. E of top %ld polynomials: "
+                  "%1.2e (%Zd, %Zd)\n",
                   local_E_pqueue->used - 1,
                   info->ave_MurphyE,
                   s2param->A, s2param->B );
-    fprintf ( stderr, "# Stat: root sieve took %lums\n",
-              milliseconds () - st );
+    if (param->verbose >= 3) {
+      fprintf ( stderr, "# Stat: root sieve took %lums\n",
+                milliseconds () - st );
+    }
   }
 
   /* free */
@@ -1084,7 +1107,7 @@ ropt_stage2 ( ropt_poly_t poly,
 {
   int i;
 
-  if (param->verbose >= 2 && info->mode == ROPT_MODE_INIT)
+  if (param->verbose >= 3 && info->mode == ROPT_MODE_INIT)
     ropt_s2param_print (s2param);
 
   for (i = 0; i <= poly->d; i++)
