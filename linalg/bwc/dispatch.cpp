@@ -228,7 +228,7 @@ int main(int argc, char * argv[])
     /* interpret our parameters: none here (so far). */
 
     ASSERT_ALWAYS(param_list_lookup_string(pl, "ys"));
-    ASSERT_ALWAYS(!param_list_lookup_string(pl, "sols"));
+    ASSERT_ALWAYS(!param_list_lookup_string(pl, "solutions"));
 
     if (param_list_warn_unused(pl)) {
         param_list_print_usage(pl, bw->original_argv[0], stderr);
@@ -237,9 +237,6 @@ int main(int argc, char * argv[])
     // param_list_clear(pl);
 
     if (bw->ys[0] < 0) { fprintf(stderr, "no ys value set\n"); exit(1); }
-
-    ASSERT_ALWAYS(param_list_lookup_string(pl, "ys"));
-    ASSERT_ALWAYS(!param_list_lookup_string(pl, "sols"));
 
     /* Forcibly disable interleaving here */
     param_list_remove_key(pl, "interleaving");

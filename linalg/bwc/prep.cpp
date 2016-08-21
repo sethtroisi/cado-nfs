@@ -430,7 +430,7 @@ int main(int argc, char * argv[])
         param_list_lookup_string(pl, "rhs");
 
     ASSERT_ALWAYS(!param_list_lookup_string(pl, "ys"));
-    ASSERT_ALWAYS(!param_list_lookup_string(pl, "sols"));
+    ASSERT_ALWAYS(!param_list_lookup_string(pl, "solutions"));
 
     if (param_list_warn_unused(pl)) {
         param_list_print_usage(pl, argv[0], stderr);

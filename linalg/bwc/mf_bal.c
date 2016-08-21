@@ -16,38 +16,7 @@
 #include "balancing.h"
 #include "rowset_heap.h"
 #include "cheating_vec_init.h"
-
-/* This program computes how a matrix would have to be balanced for
- * fitting a job grid of given size. This does _not_ read the matrix,
- * only the row-weight and col-weight files are read.
- */
-
-/* TODO: Now that all files input and output by bwc are permutation
- * independent, there is room for computing this permutation on the fly
- * if the balancing argument is not provided (and only in this case).
- * Essentially we would hook onto the mmt_fill_fields_from_balancing()
- * function called from mmt_finish_init().
- */
-void usage(int rc) {
-    fprintf(stderr,
-            "Usage: ./mf_bal [options,flags] <nh> <nv> <matrix file>\n");
-    fprintf(stderr,
-            "Recognized options"
-                " (<option_name>=<value>, or --<option_name> <value>:\n"
-            " mfile       matrix file (can also be given freeform)\n"
-            " rwfile      row weight file (defaults to <mfile>.rw)\n"
-            " cwfile      col weight file (defaults to <mfile>.cw)\n"
-            " like        balance in a way compatible with this file\n"
-            " out         output file name (defaults to stdout)\n"
-            "Recognized flags:"
-            " --balance2d balance both dimensions\n"
-            " --ascii     output in ascii\n"
-            " --quiet     be quiet\n"
-            " --rowperm   permute rows in priority (defaults to auto)\n"
-            " --colperm   permute rows in priority (defaults to auto)\n"
-           );
-    exit(rc);
-}
+#include "mf_bal.h"
 
 typedef int (*sortfunc_t) (const void *, const void *);
 
@@ -254,127 +223,22 @@ void read_mfile_header(balancing_ptr bal, const char * mfile, int withcoeffs)
 }
 /* }}} */
 
-int main(int argc, char * argv[])
+void mf_bal(struct mf_bal_args * mba)
 {
-    param_list pl;
-    const char * rwfile = NULL;
-    const char * cwfile = NULL;
-    const char * mfile = NULL;
-    unsigned int wild =  0;
     int rc;
-    int quiet =  0;
-    int nh=0;
-    int nv=0;
-    int twodim=0;
-    int withcoeffs=0;
-    // int ascii_in = 0;
-    // int ascii_out = 0;
-    // int binary_in = 0;
-    // int binary_out = 0;
-    // int ascii_freq = 0;
-    // int binary_freq = 0;
-    int rectangular = 0;
-    // const char * ref_balance = NULL;
-    // int display_correlation = 0;
     /* we sometimes allocate strings, which need to be freed eventually */
     char * freeit[2] = { NULL, NULL, };
-
-    enum { YES, NO, AUTO } do_perm[2] = { AUTO, AUTO };
-
-    param_list_init(pl);
-    argv++,argc--;
-    param_list_configure_switch(pl, "--quiet", &quiet);
-    // param_list_configure_switch(pl, "--display-correlation", &display_correlation);
-    // param_list_configure_switch(pl, "--ascii-in", &ascii_in);
-    // param_list_configure_switch(pl, "--binary-in", &binary_in);
-    // param_list_configure_switch(pl, "--ascii-out", &ascii_out);
-    // param_list_configure_switch(pl, "--binary-out", &binary_out);
-    // param_list_configure_switch(pl, "--ascii-freq", &ascii_freq);
-    // param_list_configure_switch(pl, "--binary-freq", &binary_freq);
-    param_list_configure_switch(pl, "--balance2d", &twodim);
-    param_list_configure_switch(pl, "--rectangular", &rectangular);
-    param_list_configure_switch(pl, "--withcoeffs", &withcoeffs);
-
-    for(;argc;) {
-        char * q;
-        if (param_list_update_cmdline(pl, &argc, &argv)) continue;
-
-        if (argv[0][0] != '-' && wild == 0 && (q = strchr(argv[0],'x')) != NULL) {
-            nh = atoi(argv[0]);
-            nv = atoi(q+1);
-            wild+=2;
-            argv++,argc--;
-            continue;
-        }
-
-        if (argv[0][0] != '-' && wild == 0) { nh = atoi(argv[0]); wild++,argv++,argc--; continue; }
-        if (argv[0][0] != '-' && wild == 1) { nv = atoi(argv[0]); wild++,argv++,argc--; continue; }
-        if (argv[0][0] != '-' && wild == 2) {
-            mfile = argv[0];
-            wild++;
-            argv++,argc--;
-            continue;
-        }
-        fprintf(stderr, "unknown option %s\n", argv[0]);
-        exit(1);
+    if (mba->mfile && !mba->rwfile) {
+        mba->rwfile = freeit[0] = build_mat_auxfile(mba->mfile, "rw", ".bin");
     }
 
-    if (nh == 0 || nv == 0)
-        usage(1);
-
-    const char * tmp;
-    if ((tmp = param_list_lookup_string(pl, "reorder")) != NULL) {
-        if (strcmp(tmp, "auto") == 0) {
-            do_perm[1] = AUTO;
-            do_perm[0] = AUTO;
-        } else if (strcmp(tmp, "rows") == 0) {
-            do_perm[1] = NO;
-            do_perm[0] = YES;
-        } else if (strcmp(tmp, "columns") == 0) {
-            do_perm[1] = YES;
-            do_perm[0] = NO;
-        } else if (strcmp(tmp, "rows,columns") == 0) {
-            do_perm[1] = YES;
-            do_perm[0] = YES;
-        } else if (strcmp(tmp, "columns,rows") == 0) {
-            do_perm[1] = YES;
-            do_perm[0] = YES;
-        } else if (strcmp(tmp, "both") == 0) {
-            do_perm[1] = YES;
-            do_perm[0] = YES;
-        } else {
-            fprintf(stderr, "Argument \"%s\" to the \"reorder\" parameter not understood\n"
-                    "Supported values are:\n"
-                    "\tauto (default)\n"
-                    "\trows\n"
-                    "\tcolumns\n"
-                    "\tboth (equivalent forms: \"rows,columns\" or \"columns,rows\"\n",
-                    tmp);
-            exit(EXIT_FAILURE);
-        }
+    if (mba->mfile && !mba->cwfile) {
+        mba->cwfile = freeit[1] = build_mat_auxfile(mba->mfile, "cw", ".bin");
     }
 
-    if ((tmp = param_list_lookup_string(pl, "mfile")) != NULL) {
-        mfile = tmp;
-    }
-    if ((tmp = param_list_lookup_string(pl, "rwfile")) != NULL) {
-        rwfile = tmp;
-    }
-    if ((tmp = param_list_lookup_string(pl, "cwfile")) != NULL) {
-        cwfile = tmp;
-    }
-
-    if (mfile && !rwfile) {
-        rwfile = freeit[0] = build_mat_auxfile(mfile, "rw", ".bin");
-    }
-
-    if (mfile && !cwfile) {
-        cwfile = freeit[1] = build_mat_auxfile(mfile, "cw", ".bin");
-    }
-
-    if (!rwfile) { fprintf(stderr, "No rwfile given\n"); exit(1); }
-    if (!cwfile) { fprintf(stderr, "No cwfile given\n"); exit(1); }
-    if (!mfile) {
+    if (!mba->rwfile) { fprintf(stderr, "No rwfile given\n"); exit(1); }
+    if (!mba->cwfile) { fprintf(stderr, "No cwfile given\n"); exit(1); }
+    if (!mba->mfile) {
         fprintf(stderr, "Matrix file name (mfile) must be given, even though the file itself does not have to be present\n");
         exit(1);
     }
@@ -382,26 +246,26 @@ int main(int argc, char * argv[])
     balancing bal;
     balancing_init(bal);
 
-    bal->h->nh = nh;
-    bal->h->nv = nv;
+    bal->h->nh = mba->nh;
+    bal->h->nv = mba->nv;
 
     struct stat sbuf[2][1];
-    rc = stat(rwfile, sbuf[0]);
-    if (rc < 0) { perror(rwfile); exit(1); }
+    rc = stat(mba->rwfile, sbuf[0]);
+    if (rc < 0) { perror(mba->rwfile); exit(1); }
     bal->h->nrows = sbuf[0]->st_size / sizeof(uint32_t);
 
-    rc = stat(cwfile, sbuf[1]);
-    if (rc < 0) { perror(cwfile); exit(1); }
+    rc = stat(mba->cwfile, sbuf[1]);
+    if (rc < 0) { perror(mba->cwfile); exit(1); }
     bal->h->ncols = sbuf[1]->st_size / sizeof(uint32_t);
 
     if (bal->h->ncols > bal->h->nrows) {
         fprintf(stderr, "Warning. More columns than rows. There could be bugs.\n");
     }
 
-    read_mfile_header(bal, mfile, withcoeffs);
+    read_mfile_header(bal, mba->mfile, mba->withcoeffs);
 
     /* {{{ Compute the de-correlating permutation */
-    if (param_list_lookup_string(pl, "skip_decorrelating_permutation")) {
+    if (mba->skip_decorrelating_permutation) {
         /* internal, for debugging. This removes the de-correlating
          * permutation. Nothing to do with what is called
          * "shuffled-product" elsewhere, except that both are taken care
@@ -441,7 +305,7 @@ int main(int argc, char * argv[])
 
     const char * text[2] = { "row", "column", };
     unsigned int matsize[2] = { bal->h->nrows, bal->h->ncols, };
-    unsigned int gridsize[2] = { nh, nv };
+    unsigned int gridsize[2] = { mba->nh, mba->nv };
     unsigned int block[2];
     unsigned int padding[2];
     uint32_t * weights[2];
@@ -449,7 +313,7 @@ int main(int argc, char * argv[])
 
     for(int d = 0 ; d < 2 ; d++) {
         /* d == 0 : padding the rows */
-        block[d] = iceildiv(matsize[d], nh * nv);
+        block[d] = iceildiv(matsize[d], mba->nh * mba->nv);
         /* We also want to enforce alignment of the block size with
          * respect to the SIMD things.
          * Given that mmt_vec_init provides 64-byte alignment of vector
@@ -461,23 +325,23 @@ int main(int argc, char * argv[])
         for ( ; block[d] % (FORCED_ALIGNMENT_ON_MPFQ_VEC_TYPES / MINIMUM_ITEM_SIZE_OF_MPFQ_VEC_TYPES) ; block[d]++);
     }
 
-    if (!rectangular) {
+    if (!mba->rectangular) {
         printf("Padding to a square matrix\n");
         block[0] = block[1] = MAX(block[0], block[1]);
     }
 
     for(int d = 0 ; d < 2 ; d++) {
-        padding[d] = nv * nh * block[d] - matsize[d];
+        padding[d] = mba->nv * mba->nh * block[d] - matsize[d];
         printf("Padding to %u+%u=%u %ss which is %u blocks of %u*%u=%u %ss\n",
-                matsize[d], padding[d], nv * nh * block[d], text[d],
+                matsize[d], padding[d], mba->nv * mba->nh * block[d], text[d],
                 gridsize[d],
                 gridsize[!d], block[d], gridsize[!d] * block[d], text[d]);
 
-        if (do_perm[d] == NO) continue;
+        if (mba->do_perm[d] == MF_BAL_PERM_NO) continue;
 
         size_t n = matsize[d] + padding[d];
         uint32_t ** pperm = d == 0 ? &bal->rowperm : &bal->colperm;
-        const char * filename = d == 0 ? rwfile : cwfile;
+        const char * filename = d == 0 ? mba->rwfile : mba->cwfile;
         *pperm = malloc(2 * n * sizeof(uint32_t));
         FILE * fw = fopen(filename, "rb");
         if (fw == NULL) { perror(filename); exit(1); }
@@ -595,22 +459,22 @@ int main(int argc, char * argv[])
                 dcorr);
     }
 #endif
-    if (do_perm[0] != NO) free(weights[0]);
-    if (do_perm[1] != NO) free(weights[1]);
+    if (mba->do_perm[0] != MF_BAL_PERM_NO) free(weights[0]);
+    if (mba->do_perm[1] != MF_BAL_PERM_NO) free(weights[1]);
 
-    if (do_perm[0] == AUTO) {
+    if (mba->do_perm[0] == MF_BAL_PERM_AUTO) {
         int choose = sdev[1] > sdev[0];
         printf("Choosing a %s permutation based on largest deviation"
                 " (%.2f > %.2f)\n",
                 text[choose], sdev[choose], sdev[!choose]);
-        do_perm[choose] = YES;
-        do_perm[!choose] = NO;
+        mba->do_perm[choose] = MF_BAL_PERM_YES;
+        mba->do_perm[!choose] = MF_BAL_PERM_NO;
     }
 
     bal->h->flags = 0;
 
     for(int d = 0 ; d < 2 ; d++) {
-        if (do_perm[d] == NO) continue;
+        if (mba->do_perm[d] == MF_BAL_PERM_NO) continue;
         bal->h->flags |= (d == 0) ? FLAG_ROWPERM : FLAG_COLPERM;
         uint32_t ** pperm = d == 0 ? &bal->rowperm : &bal->colperm;
         struct slice * h = shuffle_rtable(text[d], *pperm, matsize[d] + padding[d], gridsize[d]);
@@ -623,19 +487,16 @@ int main(int argc, char * argv[])
         free_slices(h, gridsize[d]);
     }
 
-    if (!rectangular) {
+    if (!mba->rectangular) {
         bal->h->flags |= FLAG_REPLICATE;
     }
 
     balancing_finalize(bal);
 
-    balancing_write(bal, mfile, param_list_lookup_string(pl, "out"));
+    balancing_write(bal, mba->mfile, mba->bfile);
     balancing_clear(bal);
-
-    param_list_clear(pl);
 
     if (freeit[0]) free(freeit[0]);
     if (freeit[1]) free(freeit[1]);
-
-    return 0;
 }
+

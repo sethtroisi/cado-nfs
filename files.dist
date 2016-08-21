@@ -1265,3 +1265,5 @@ config/avx.c
 config/avx.cmake
 config/avx2.c
 config/avx2.cmake
+linalg/bwc/mf_bal_main.c
+linalg/bwc/mf_bal.h

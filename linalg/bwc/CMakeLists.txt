@@ -102,7 +102,6 @@ set(balancing_sources ${balancing_sources} balancing_curl_source.c)
 endif()
 
 set(bwc_base_sources
-    ${balancing_sources}
     parallelizing_info.c
     intersections.c
     xvectors.c
@@ -112,6 +111,10 @@ set(bwc_base_sources
     matmul.c
     matmul_top.c
     random_matrix.c
+    mf.c 
+    mf_bal.c
+    ../rowset_heap.cpp
+    ${balancing_sources}
 )
 
 if(HAVE_CXX11 AND HAVE_HWLOC)
@@ -124,16 +127,15 @@ endif()
 mpi_add_library(bwc_base ${CADO_SHARED} ${bwc_base_sources})
 
 target_link_libraries(bwc_base ${gmp_libname})
+if (HAVE_CURL)
+target_link_libraries(bwc_base curl)
+endif()
 
 if (MPI_OPENMPI_VERSION VERSION_GREATER 1.4)
     # https://www.open-mpi.org/community/lists/users/2014/11/25891.php
     message(STATUS "Enabling workaround for https://github.com/open-mpi/ompi/issues/299")
     link_directories(${HAVE_MPI}/../lib)
     target_link_libraries(bwc_base open-pal open-rte)
-endif()
-
-if (HAVE_CURL)
-target_link_libraries(bwc_base curl)
 endif()
 
 if(HAVE_CXX11 AND HAVE_HWLOC)
@@ -147,18 +149,13 @@ endif()
 
 ### end bwc_base
 
-mpi_add_library(mf ${CADO_SHARED} mf.c)
-target_link_libraries(mf bwc_base utils)
-if(ENABLE_SHARED)
-    install(TARGETS mf DESTINATION ${LIBSUFFIX}/linalg/bwc)
-endif()
 mpi_add_executable(mf_scan ${EXCLUDE_FROM_RELEASE_BUILD} mf_scan.c)
-target_link_libraries(mf_scan mf)
+target_link_libraries(mf_scan bwc_base)
 
 
 include_directories(${CADO_NFS_SOURCE_DIR}/linalg)
-mpi_add_executable(mf_bal mf_bal.c ../rowset_heap.cpp)
-target_link_libraries(mf_bal mf m)
+mpi_add_executable(mf_bal mf_bal_main.c)
+target_link_libraries(mf_bal bwc_base m)
 install(TARGETS mf_bal RUNTIME DESTINATION ${LIBSUFFIX}/linalg/bwc)
 
 
@@ -327,7 +324,7 @@ endif()
 
 ### matmul_mf
 mpi_add_library(matmul_mf ${CADO_SHARED} matmul-mf.c)
-target_link_libraries(matmul_mf mf)
+target_link_libraries(matmul_mf bwc_base)
 if(ENABLE_SHARED)
     install(TARGETS matmul_mf DESTINATION ${LIBSUFFIX}/linalg/bwc)
 endif()

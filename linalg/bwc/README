@@ -64,30 +64,21 @@ Calling sequence of binaries
 We describe here the list of binaries to run. This can be somewhat automated
 using the bwc.pl driver script, documented below.
 
- 1 - mf_bal
-     Given files for row and column frequencies of the input matrix,
-     compute a permutation of rows and columns which would provide the
-     best balancing of the computation load across the different jobs.
-     decomposes the input matrix into blocks that will be dispatched to
-     nodes
- 2 - dispatch
-     apply the previous permutation to the input matrix, and compute
-     in-memory caches.
- 3 - prep
+ 1 - prep
      select input blocks of vectors, and check that rank conditions are
      satisfied
- 4 - secure
+ 2 - secure
      precompute some data useful for checksums
-!5 - krylov
+!3 - krylov
      compute the Krylov sequence
- 6 - acollect
+ 4 - acollect
      collect the Krylov sequence files into one big file. Can be done at
      several moments in the computation.
-!7 - lingen
+!5 - lingen
      Berlekamp-Massey -like step: produces a generating polynomial
-!8 - mksol
+!6 - mksol
      create the solutions from the polynomial
- 9 - gather
+ 7 - gather
      reconstruct solutions from the mess
 
 krylov, lingen, and to a lesser extent mksol are the steps having a real computational impact.
@@ -134,6 +125,11 @@ expected to be present in the same directory as the calling binary.
     used). The ``matrix'' parameter may point to a remote URI in any
     format recognized by the cURL library, if the use of the latter has
     been enabled.
+
+    A balancing file can be created by the "mf_bal" binary. The
+    thread-specific matrix cache files can be computed with the
+    "dispatch" binary. None of these calls is necessary, as the task is
+    performed automatically if defaults parameters are deemed fine.
     
 * m=<number>, n=<number>
 

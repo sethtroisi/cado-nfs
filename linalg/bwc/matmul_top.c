@@ -16,6 +16,7 @@
 #include "misc.h"
 #include "random_matrix.h"
 #include "cheating_vec_init.h"
+#include "mf_bal.h"
 
 /* Our innermost communication routines are essentially all-gather and
  * reduce-scatter, following the MPI terminology. We provide several
@@ -126,6 +127,16 @@ void matmul_top_lookup_parameters(param_list_ptr pl)
     param_list_lookup_string(pl, "sequential_cache_read");
     balancing_lookup_parameters(pl);
     matmul_lookup_parameters(pl);
+}
+
+static int is_char2(mpfq_vbase_ptr abase)
+{
+    mpz_t p;
+    mpz_init(p);
+    abase->field_characteristic(abase, p);
+    int char2 = mpz_cmp_ui(p, 2) == 0;
+    mpz_clear(p);
+    return char2;
 }
 
 
@@ -2215,6 +2226,27 @@ static char * matrix_list_get_item(param_list_ptr pl, const char * key, int midx
     return res;
 }
 
+/* return an allocated string with the name of a balancing file for this
+ * matrix and this mpi/thr split.
+ */
+static char* matrix_get_derived_balancing_filename(const char * matrixname, parallelizing_info_ptr pi)
+{
+    unsigned int nh = pi->wr[0]->totalsize;
+    unsigned int nv = pi->wr[1]->totalsize;
+    char * copy = strdup(matrixname);
+    char * t;
+    if (strlen(copy) > 4 && strcmp((t = copy + strlen(copy) - 4), ".bin") == 0) {
+        *t = '\0';
+    }
+    if ((t = strrchr(copy, '/')) == NULL) { /* basename */
+        t = copy;
+    }
+    int rc = asprintf(&t, "%s.%ux%u.bin", t, nh, nv);
+    ASSERT_ALWAYS(rc >=0);
+    free(copy);
+    return t;
+}
+
 static void mmt_fill_fields_from_balancing(matmul_top_data_ptr mmt, param_list_ptr pl)
 {
     char ** mnames;
@@ -2335,8 +2367,12 @@ void matmul_top_init(matmul_top_data_ptr mmt,
         fprintf(stderr, "missing parameter matrix=\n");
         exit(EXIT_FAILURE);
     } else if (!nbals && mmt->nmatrices) {
+        /*
         fprintf(stderr, "missing parameter balancing=\n");
         exit(EXIT_FAILURE);
+        */
+        /* see nbals == 0 as a hint towards taking the default balancing
+         * file names, that's it */
     } else if (nbals != mmt->nmatrices) {
         fprintf(stderr, "balancing= and matrix= have inconsistent number of items\n");
         exit(EXIT_FAILURE);
@@ -2359,18 +2395,37 @@ void matmul_top_init(matmul_top_data_ptr mmt,
     // are filled in later within read_info_file
 
     if (pi->m->jrank == 0 && pi->m->trank == 0) {
-        if (nbals) {
-            /* we could conceivably use a list of balancing files...  */
-            char ** bnames;
-            param_list_parse_string_list_alloc(pl, "balancing", &bnames, &nbals, ",");
-            for(int i = 0 ; i < nbals ; i++) {
-                balancing_read_header(mmt->matrices[i]->bal, bnames[i]);
-                free(bnames[i]);
-            }
-            free(bnames);
-        }
+        /* We'll use the default balancing file name for all matrices
+        */
         if (random_description) {
             random_matrix_fill_fake_balancing_header(mmt->matrices[0]->bal, pi, random_description);
+        } else {
+            for(int i = 0 ; i < mmt->nmatrices ; i++) {
+                char * mname = matrix_list_get_item(pl, "matrix", i);
+                char * bname = matrix_list_get_item(pl, "balancing", i);
+                if (!bname) {
+                    bname = matrix_get_derived_balancing_filename(mname, mmt->pi);
+                }
+                if (access(bname, R_OK) != 0) {
+                    if (errno == ENOENT) {
+                        printf("Creating balancing file %s\n", bname);
+                        struct mf_bal_args mba = {
+                            .mfile = mname,
+                            .bfile = bname,
+                            .nh = mmt->pi->wr[0]->totalsize,
+                            .nv = mmt->pi->wr[1]->totalsize,
+                            .withcoeffs = !is_char2(mmt->abase),
+                            .do_perm = { MF_BAL_PERM_AUTO, MF_BAL_PERM_AUTO },
+                        };
+                        mf_bal(&mba);
+                    } else {
+                        fprintf(stderr, "Cannot access balancing file %s: %s\n", bname, strerror(errno));
+                    }
+                }
+                balancing_read_header(mmt->matrices[i]->bal, bname);
+                free(bname);
+                free(mname);
+            }
         }
     }
 
@@ -2641,7 +2696,6 @@ static unsigned int local_fraction(unsigned int padded, unsigned int normal, pi_
 }
 
 
-
 static void matmul_top_read_submatrix(matmul_top_data_ptr mmt, int midx, param_list_ptr pl, int optimized_direction)
 {
     int rebuild = 0;
@@ -2720,13 +2774,7 @@ static void matmul_top_read_submatrix(matmul_top_data_ptr mmt, int midx, param_l
         // may cause the direct or transposed ordering to be preferred.
         // Thus we have to read this back from the mm structure.
         m->transpose = Mloc->mm->store_transposed;
-        {
-            mpz_t p;
-            mpz_init(p);
-            mmt->abase->field_characteristic(mmt->abase, p);
-            m->withcoeffs = mpz_cmp_ui(p, 2) != 0;
-            mpz_clear(p);
-        }
+        m->withcoeffs = !is_char2(mmt->abase);
         if (param_list_lookup_string(pl, "random_matrix")) {
             if (mmt->pi->m->jrank == 0 && mmt->pi->m->trank == 0) {
                 printf("Begin creation of fake matrix data in parallel\n");
@@ -2741,6 +2789,9 @@ static void matmul_top_read_submatrix(matmul_top_data_ptr mmt, int midx, param_l
                     local_fraction(Mloc->n[0], Mloc->n0[0], mmt->pi->wr[1]),
                     local_fraction(Mloc->n[1], Mloc->n0[1], mmt->pi->wr[0]));
         } else {
+            if (!m->bfile) {
+                m->bfile = matrix_get_derived_balancing_filename(m->mfile, mmt->pi);
+            }
             if (mmt->pi->m->jrank == 0 && mmt->pi->m->trank == 0) {
                 printf("Matrix dispatching starts\n");
             }
