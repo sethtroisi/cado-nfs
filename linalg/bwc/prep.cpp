@@ -92,7 +92,7 @@ void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUS
     unsigned int prep_lookahead_iterations = iceildiv(bw->m, bw->n) + 1;
 
     unsigned int my_nx = 1;
-    uint32_t * xvecs = malloc(my_nx * bw->m * sizeof(uint32_t));
+    uint32_t * xvecs = (uint32_t*) malloc(my_nx * bw->m * sizeof(uint32_t));
     void * xymats;
 
     /* We're cheating on the generic init routines */
@@ -111,7 +111,7 @@ void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUS
             if (tcan_print) {
                 printf("// Getting bored. Trying %u x vectors\n", my_nx);
             }
-            xvecs = realloc(xvecs, my_nx * bw->m * sizeof(uint32_t));
+            xvecs = (uint32_t*) realloc(xvecs, my_nx * bw->m * sizeof(uint32_t));
             ASSERT_ALWAYS(xvecs != NULL);
         }
         serialize_threads(pi->m);
@@ -261,6 +261,9 @@ void * prep_prog_gfp(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_
     int char2 = mpz_cmp_ui(bw->p, 2) == 0;
     int splitwidth = char2 ? 64 : 1;
 
+    const char * rhs_name;
+    FILE * rhs;
+
     mpfq_vbase A;
     mpfq_vbase_oo_field_init_byfeatures(A, 
             MPFQ_PRIME_MPZ, bw->p,
@@ -292,8 +295,8 @@ void * prep_prog_gfp(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_
         printf("// Random generator seeded with %d\n", bw->seed);
     }
 
-    const char * rhs_name = param_list_lookup_string(pl, "rhs");
-    FILE * rhs = NULL;
+    rhs_name = param_list_lookup_string(pl, "rhs");
+    rhs = NULL;
     if (rhs_name) {
         rhs = fopen(rhs_name, "r");
         get_rhs_file_header_stream(rhs, NULL, &nrhs, NULL);
@@ -303,8 +306,8 @@ void * prep_prog_gfp(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_
     /* First create all RHS vectors -- these are just splits of the big
      * RHS block. Those files get created together. */
     if (nrhs) {
-        char ** vec_names = malloc(nrhs * sizeof(char *));
-        FILE ** vec_files = malloc(nrhs * sizeof(FILE *));
+        char ** vec_names = (char**) malloc(nrhs * sizeof(char *));
+        FILE ** vec_files = (FILE**) malloc(nrhs * sizeof(FILE *));
         for(unsigned int j = 0 ; j < nrhs ; j++) {
             int rc = asprintf(&vec_names[j], "V%d-%d.0", j, j+1);
             ASSERT_ALWAYS(rc >= 0);
@@ -361,7 +364,7 @@ void * prep_prog_gfp(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_
     {
         /* initialize x -- make it completely deterministic. */
         unsigned int my_nx = 1;
-        uint32_t * xvecs = malloc(my_nx * bw->m * sizeof(uint32_t));
+        uint32_t * xvecs = (uint32_t*) malloc(my_nx * bw->m * sizeof(uint32_t));
         /* with rhs, consider the strategy where the matrix is kept with
          * its full size, but the SM block is replaced with zeros. Here
          * we just force the x vectors to have data there, so as to avoid

@@ -70,7 +70,7 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
 
     int nmats_odd = mmt->nmatrices & 1;
 
-    mmt_vec * ymy = malloc((mmt->nmatrices + nmats_odd) * sizeof(mmt_vec));
+    mmt_vec * ymy = new mmt_vec[mmt->nmatrices + nmats_odd];
     matmul_top_matrix_ptr mptr;
     mptr = (matmul_top_matrix_ptr) mmt->matrices + (bw->dir ? (mmt->nmatrices - 1) : 0);
     for(int i = 0 ; i < mmt->nmatrices ; i++) {
@@ -355,7 +355,7 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
     for(int i = 0 ; i < mmt->nmatrices + nmats_odd ; i++) {
         mmt_vec_clear(mmt, ymy[i]);
     }
-    free(ymy);
+    delete[] ymy;
 
     matmul_top_report(mmt, 1.0);
     matmul_top_clear(mmt);

@@ -6,6 +6,8 @@
 #include <limits.h>
 #include <dirent.h>
 #include <errno.h>
+#include <vector>
+#include <algorithm>
 #include "bwc_config.h"
 #include "parallelizing_info.h"
 #include "matmul_top.h"
@@ -21,97 +23,86 @@
 #include "mpfq/mpfq_vbase.h"
 #include "cheating_vec_init.h"
 
+using namespace std;
+
 struct sfile_info {
     unsigned int iter0;
     unsigned int iter1;
+    char name[NAME_MAX];
+    static bool match(sfile_info& v, const char * name, unsigned int sol0, unsigned int sol1) {
+        int k;
+        int rc;
+        unsigned int s0,s1;
+        unsigned int iter0, iter1;
+        rc = sscanf(name, "S.sols%u-%u.%u-%u%n", &s0, &s1, &iter0, &iter1, &k);
+        if (rc < 4 || k != (int) strlen(name))
+            return false;
+        if (s0 != sol0 || s1 != sol1)
+            return false;
+        v.iter0 = iter0;
+        v.iter1 = iter1;
+        size_t res = strlcpy(v.name, name, NAME_MAX);
+        ASSERT_ALWAYS(res < NAME_MAX);
+        return true;
+    }
 };
 
-struct sfiles_list {
-    int sfiles_alloc;
-    int nsfiles;
-    struct sfile_info (*sfiles)[1];
-};
-
-static int sort_sfile_info(const struct sfile_info * a, const struct sfile_info * b)
+static bool operator<(sfile_info const & a, sfile_info const & b)
 {
-    return (a->iter1 > b->iter1) - (b->iter1 > a->iter1);
+    return a.iter1 < b.iter1;
 }
 
 int exitcode = 0;
 
-static void prelude(parallelizing_info_ptr pi, struct sfiles_list * sl)
+vector<sfile_info> prelude(parallelizing_info_ptr pi)
 {
-    sl->sfiles_alloc=0;
-    sl->sfiles = NULL;
-    sl->nsfiles=0;
+    vector<sfile_info> res;
     serialize_threads(pi->m);
-    const char * spat = "S.sols%u-%u.%u-%u%n";
     if (pi->m->jrank == 0 && pi->m->trank == 0) {
-        /* It's our job to collect the directory data.
-         */
-        DIR * dir;
-        dir = opendir(".");
+        /* It's our job to collect the directory data.  */
+        DIR * dir = opendir(".");
         struct dirent * de;
         for( ; (de = readdir(dir)) != NULL ; ) {
-            int k;
-            int rc;
-            unsigned int s0,s1;
-            unsigned int iter0, iter1;
-            rc = sscanf(de->d_name, spat, &s0, &s1, &iter0, &iter1, &k);
-            if (rc < 4 || k != (int) strlen(de->d_name)) {
+            sfile_info sf;
+            if (!sfile_info::match(sf, de->d_name, bw->solutions[0], bw->solutions[1]))
                 continue;
-            }
-            if (s0 != bw->solutions[0] || s1 != bw->solutions[1])
-                continue;
-
-            /* append this file to the list */
-            if (sl->nsfiles >= sl->sfiles_alloc) {
-                for( ; sl->nsfiles >= sl->sfiles_alloc ; sl->sfiles_alloc += 8 + sl->sfiles_alloc/2);
-                sl->sfiles = realloc(sl->sfiles, sl->sfiles_alloc * sizeof(struct sfile_info));
-            }
-            sl->sfiles[sl->nsfiles]->iter0 = iter0;
-            sl->sfiles[sl->nsfiles]->iter1 = iter1;
-            if (bw->interval && iter1 % bw->interval != 0) {
+            res.push_back(sf);
+            if (bw->interval && sf.iter1 % bw->interval != 0) {
                 fprintf(stderr,
                         "Warning: %s is not a checkpoint at a multiple of "
                         "the interval value %d -- this might indicate a "
                         "severe bug with leftover data, likely to corrupt "
-                        "the final computation\n", de->d_name, bw->interval);
+                        "the final computation\n", sf.name, bw->interval);
             }
-            sl->nsfiles++;
         }
         closedir(dir);
-    }
 
-    qsort(sl->sfiles, sl->nsfiles, sizeof(struct sfile_info),
-            (int(*)(const void*,const void*)) &sort_sfile_info);
+        sort(res.begin(), res.end());
 
-    unsigned int prev_iter = 0;
-    for(int i = 0 ; i < sl->nsfiles ; i++) {
-        struct sfile_info * cur = sl->sfiles[i];
-        if (cur->iter0 != prev_iter) {
-            fprintf(stderr, "Within the set of S files, file "
-                    "S.sols%u-%u.%u-%u seems to be the first "
-                    "to come after iteration %u, therefore there is "
-                    "a gap for the range %u..%u\n",
-                    bw->solutions[0], bw->solutions[1],
-                    cur->iter0, cur->iter1,
-                    prev_iter, prev_iter, cur->iter0);
-            exit(EXIT_FAILURE);
+        unsigned int prev_iter = 0;
+        for(size_t i = 0 ; i < res.size() ; i++) {
+            sfile_info const & cur(res[i]);
+            if (cur.iter0 != prev_iter) {
+                fprintf(stderr, "Within the set of S files, file "
+                        "%s seems to be the first "
+                        "to come after iteration %u, therefore there is "
+                        "a gap for the range %u..%u\n",
+                        cur.name, prev_iter, prev_iter, cur.iter0);
+                exit(EXIT_FAILURE);
+            }
+            prev_iter = cur.iter1;
         }
-        prev_iter = cur->iter1;
     }
 
     serialize(pi->m);
-    pi_bcast(sl, sizeof(struct sfiles_list), BWC_PI_BYTE, 0, 0, pi->m);
+    unsigned long s = res.size();
+    pi_bcast(&s, 1, BWC_PI_UNSIGNED_LONG, 0, 0, pi->m);
     if (pi->m->jrank || pi->m->trank) {
-        sl->sfiles = malloc(sl->sfiles_alloc * sizeof(struct sfile_info));
+        res.assign(s, sfile_info());
     }
-    pi_bcast(sl->sfiles,
-            sl->nsfiles * sizeof(struct sfile_info), BWC_PI_BYTE,
-            0, 0,
-            pi->m);
+    pi_bcast(&(res[0]), s * sizeof(sfile_info), BWC_PI_BYTE, 0, 0, pi->m);
     serialize(pi->m);
+    return res;
 }
 
 void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSED)
@@ -186,9 +177,8 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
     unsigned int unpadded = MAX(mmt->n0[0], mmt->n0[1]);
     unsigned int nrhs = 0;
 
-    struct sfiles_list sl[1];
-    prelude(pi, sl);
-    if (sl->nsfiles == 0) {
+    vector<sfile_info> sl = prelude(pi);
+    if (sl.empty()) {
         if (tcan_print) {
             fprintf(stderr, "Found zero S files for solution range %u..%u. "
                     "Problem with command line ?\n",
@@ -244,19 +234,11 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
     { /* {{{ Collect now the sum of the LHS contributions */
         mmt_vec svec;
         mmt_vec_init(mmt,0,0, svec,bw->dir, /* shared ! */ 1, mmt->n[bw->dir]);
-        for(int i = 0 ; i < sl->nsfiles ; i++) {
-            char * tmp;
-            int rc = asprintf(&tmp, "S.sols%u-%u.%u-%u",
-                    solutions[0], solutions[1],
-                    sl->sfiles[i]->iter0,
-                    sl->sfiles[i]->iter1);
-            ASSERT_ALWAYS(rc >= 0);
-
+        for(size_t i = 0 ; i < sl.size() ; i++) {
             if (tcan_print && verbose_enabled(CADO_VERBOSE_PRINT_BWC_LOADING_MKSOL_FILES)) {
-                printf("loading %s\n", tmp);
+                printf("loading %s\n", sl[i].name);
             }
-            mmt_vec_load(svec, tmp, unpadded);
-            free(tmp);
+            mmt_vec_load(svec, sl[i].name, unpadded);
 
             A->vec_add(A,
                     mmt_my_own_subvec(y), 
@@ -456,8 +438,6 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
     pi_free_mpfq_datatype(pi, Av_pi);
     A->oo_field_clear(A);
     Av->oo_field_clear(Av);
-
-    free(sl->sfiles);
 
     return NULL;
 }

@@ -98,7 +98,7 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
      * XXX note that As_multiplex is equal to 1 above
      */
     int nmats_odd = mmt->nmatrices & 1;
-    mmt_vec * ymy = malloc((mmt->nmatrices + nmats_odd) * sizeof(mmt_vec));
+    mmt_vec * ymy = new mmt_vec[mmt->nmatrices + nmats_odd];
     matmul_top_matrix_ptr mptr;
     mptr = (matmul_top_matrix_ptr) mmt->matrices + (bw->dir ? (mmt->nmatrices - 1) : 0);
     for(int i = 0 ; i < mmt->nmatrices ; i++) {
@@ -118,7 +118,7 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
      *   the coefficients which get added to the computation at each
      *   iteration: we need n vectors -- or n/64 for the binary case.
      */
-    mmt_vec * vi = malloc(bw->n / splitwidth * sizeof(mmt_vec));
+    mmt_vec * vi = new mmt_vec[bw->n / splitwidth];
     mptr = (matmul_top_matrix_ptr) mmt->matrices + (bw->dir ? (mmt->nmatrices - 1) : 0);
     for(int i = 0 ; i < bw->n / splitwidth ; i++) {
         mmt_vec_init(mmt, Av, Av_pi, vi[i], bw->dir, 1, mptr->n[bw->dir]);
@@ -185,8 +185,7 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
      *
      * We have Av_multiplex "sets of rows", and As_multiplex "sets of columns".
      */
-    void ** fcoeffs;
-    fcoeffs = malloc(Av_multiplex * As_multiplex * sizeof(void *));
+    void ** fcoeffs = new void*[Av_multiplex * As_multiplex];
     size_t one_fcoeff = As->vec_elt_stride(As, Av->groupsize(Av));
     if (tcan_print) {
         printf("Each thread allocates %zd kb for the F matrices\n",
@@ -448,17 +447,17 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
     for(int i = 0 ; i < bw->n / splitwidth ; i++) {
         mmt_vec_clear(mmt, vi[i]);
     }
-    free(vi);
+    delete[] vi;
 
     for(unsigned int k = 0 ; k < Av_multiplex * As_multiplex ; k++) {
         cheating_vec_clear(As, &(fcoeffs[k]), one_fcoeff * bw->interval);
     }
-    free(fcoeffs);
+    delete[] fcoeffs;
 
     for(int i = 0 ; i < mmt->nmatrices + nmats_odd ; i++) {
         mmt_vec_clear(mmt, ymy[i]);
     }
-    free(ymy);
+    delete[] ymy;
 
     matmul_top_clear(mmt);
     pi_free_mpfq_datatype(pi, Av_pi);
