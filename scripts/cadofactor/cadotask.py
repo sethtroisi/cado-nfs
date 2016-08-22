@@ -1037,7 +1037,7 @@ class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
             self.workdir = WorkDir(self.params["workdir"], self.params["name"],
                                self.name)
         # Request mediator to run this task. It the "run" parameter is set
-        # to falsem, then run() below will abort.
+        # to false, then run() below will abort.
         self.send_notification(Notification.WANT_TO_RUN, None)
         self.logger.debug("Exit Task.__init__(%s)", self.name)
         return
