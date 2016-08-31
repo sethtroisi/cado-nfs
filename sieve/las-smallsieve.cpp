@@ -249,6 +249,14 @@ void small_sieve_init(small_sieve_data_t *ssd, las_info_ptr las,
             const fb_general_root *root = &(iter->roots[nr]);
             /* Convert into old format for projective roots by adding p if projective */
             const fbroot_t r = root->r + (root->proj ? p : 0);
+            /* skip q: mark it in place of p to be recognized quickly.
+               TODO: maybe use the SSP_DISCARD mechanism ?
+               */
+            if (mpz_cmp_ui(si->qbasis.q, pp) == 0) {
+                tail->p = pp;
+                tail++;
+                continue;
+            }
             unsigned int event = 0;
             if ((p & 1)==0) event |= SSP_POW2;
 
@@ -511,6 +519,9 @@ void sieve_small_bucket_region(unsigned char *S, int N,
             }
             if (n < fence) {
                 const fbprime_t p = ssd->ssp[n].p;
+                if (mpz_cmp_ui(si->qbasis.q, p) == 0) {
+                    continue;
+                }
                 uint64_t i0 = ssdpos[n];
                 if (i0 < I) {
                     // At the start of the bucket region, we are not sure
@@ -754,6 +765,9 @@ void sieve_small_bucket_region(unsigned char *S, int N,
 #endif
       for( ; k < (size_t) fence ; k++) {
 	const fbprime_t p = ssd->ssp[k].p;
+        if (mpz_cmp_ui(si->qbasis.q, p) == 0) {
+            continue;
+        }
 	/* Don't sieve 3 again as it was pattern-sieved -- unless
 	 * it's projective, but in this branch we have no projective
 	 * primes. */
@@ -994,6 +1008,9 @@ resieve_small_bucket_region (bucket_primes_t *BP, int N, unsigned char *S,
         for( ; i < fence ; i++) {
             ssp_t * ssp = &(ssd->ssp[i]);
             const fbprime_t p = ssp->p;
+            if (mpz_cmp_ui(si->qbasis.q, p) == 0) {
+                continue;
+            }
             fbprime_t r = ssp->r;
             WHERE_AM_I_UPDATE(w, p, p);
             unsigned int i0 = ssdpos[i];
