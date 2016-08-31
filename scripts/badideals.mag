@@ -865,7 +865,7 @@ end procedure;
 procedure print_comments_for_badideals(~SBAD, ~SBADINFO, side)
     f := polys[side+1];
     if Degree(f) eq 1 then return; end if;
-    // SBADINFO cat:= Sprintf("# bad ideals for poly[%o]=%o\n", side, f);
+    SBADINFO cat:= Sprintf("# bad ideals for poly[%o]=%o\n", side, f);
     K<alpha>:=NumberField(f);
     FacBadPrimes := local_info_for_bad_primes(K);
     for pf in FacBadPrimes do
