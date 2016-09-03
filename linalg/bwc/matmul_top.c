@@ -2231,8 +2231,8 @@ static char * matrix_list_get_item(param_list_ptr pl, const char * key, int midx
  */
 static char* matrix_get_derived_balancing_filename(const char * matrixname, parallelizing_info_ptr pi)
 {
-    unsigned int nh = pi->wr[0]->totalsize;
-    unsigned int nv = pi->wr[1]->totalsize;
+    unsigned int nh = pi->wr[1]->totalsize;
+    unsigned int nv = pi->wr[0]->totalsize;
     char * copy = strdup(matrixname);
     char * t;
     if (strlen(copy) > 4 && strcmp((t = copy + strlen(copy) - 4), ".bin") == 0) {
