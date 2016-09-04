@@ -2412,8 +2412,8 @@ void matmul_top_init(matmul_top_data_ptr mmt,
                         struct mf_bal_args mba = {
                             .mfile = mname,
                             .bfile = bname,
-                            .nh = mmt->pi->wr[0]->totalsize,
-                            .nv = mmt->pi->wr[1]->totalsize,
+                            .nh = mmt->pi->wr[1]->totalsize,
+                            .nv = mmt->pi->wr[0]->totalsize,
                             .withcoeffs = !is_char2(mmt->abase),
                             .do_perm = { MF_BAL_PERM_AUTO, MF_BAL_PERM_AUTO },
                         };
