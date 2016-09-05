@@ -15,6 +15,7 @@ Checklist for making a release of CADO-NFS:
    -> When relevant, apply to master too.
 7. Test build and run from (clean) working copy
 7b. Test build and run with CFLAGS=-O3 -DNDEBUG
+7c. Disable -Werror in cado.h for GCC.
 8. make dist
 9. If git stashed, remember git stash pop
 10. Check that build from tarball works
@@ -22,6 +23,7 @@ Checklist for making a release of CADO-NFS:
 12. Check that make install works
 13. Check that cado-nfs.py from install directory works
 14. Make sure that all items in this list have been followed.
+15. Once the release is made, re-enable -Werror in cado.h for GCC.
 
 Files which contain the CADO version number and which need to be updated for a release:
 README
