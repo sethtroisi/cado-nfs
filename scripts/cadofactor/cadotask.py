@@ -4043,7 +4043,7 @@ class LinAlgDLPTask(Task):
             message = self.submit_command(p, "", log_errors=True)
             if message.get_exitcode(0) != 0:
                 raise Exception("Program failed")
-            virtual_logs_filename = self.workdir.make_filename("K.sols0-1.0.truncated.txt", use_subdir=True)
+            virtual_logs_filename = self.workdir.make_filename("K.sols0-1.0.txt", use_subdir=True)
             if not virtual_logs_filename.isfile():
                 raise Exception("Kernel file %s does not exist" % virtual_logs_filename)
             self.remember_input_versions(commit=False)

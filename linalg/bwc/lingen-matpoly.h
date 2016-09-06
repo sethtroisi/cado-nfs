@@ -38,8 +38,7 @@ static inline abdst_vec matpoly_part(abdst_field ab, matpoly_ptr p, unsigned int
 static inline abdst_elt matpoly_coeff(abdst_field ab, matpoly_ptr p, unsigned int i, unsigned int j, unsigned int k);
 void matpoly_set_polymat(abdst_field ab MAYBE_UNUSED, matpoly_ptr dst, polymat_srcptr src);
 
-
-
+#if 0   /* nonexistent ? */
 void matpoly_addmat(abdst_field ab,
         matpoly c, unsigned int kc,
         matpoly a, unsigned int ka,
@@ -49,20 +48,22 @@ void matpoly_submat(abdst_field ab,
         matpoly c, unsigned int kc,
         matpoly a, unsigned int ka,
         matpoly b, unsigned int kb);
+#endif
 
-void matpoly_truncate(abdst_field ab, matpoly_ptr dst, matpoly_ptr src, unsigned int size);
+void matpoly_truncate(abdst_field ab, matpoly_ptr dst, matpoly_srcptr src, unsigned int size);
 void matpoly_multiply_column_by_x(abdst_field ab, matpoly_ptr pi, unsigned int j, unsigned int size);
 void matpoly_zero_column(abdst_field ab,
         matpoly_ptr dst, unsigned int jdst, unsigned int kdst);
 void matpoly_extract_column(abdst_field ab,
         matpoly_ptr dst, unsigned int jdst, unsigned int kdst,
-        matpoly_ptr src, unsigned int jsrc, unsigned int ksrc);
+        matpoly_srcptr src, unsigned int jsrc, unsigned int ksrc);
 void matpoly_extract_row_fragment(abdst_field ab,
         matpoly_ptr dst, unsigned int i1, unsigned int j1,
-        matpoly_ptr src, unsigned int i0, unsigned int j0,
+        matpoly_srcptr src, unsigned int i0, unsigned int j0,
         unsigned int n);
-void matpoly_rshift(abdst_field ab, matpoly_ptr dst, matpoly_ptr src, unsigned int k);
+void matpoly_rshift(abdst_field ab, matpoly_ptr dst, matpoly_srcptr src, unsigned int k);
 
+void matpoly_transpose_dumb(abdst_field ab, matpoly_ptr dst, matpoly_srcptr src);
 
 void matpoly_addmul(abdst_field ab, matpoly c, matpoly a, matpoly b);
 void matpoly_addmp(abdst_field ab, matpoly c, matpoly a, matpoly b);

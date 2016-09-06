@@ -17,7 +17,7 @@ if ($mode eq 'matrix') {
     my $i = 0;
     my $ne = 0;
     my $needcomma = 0;
-    print "var:=SparseMatrix($nr,$nc,[\n";
+    print "var:=[\n";
     while (<>) {
         s/^(\d+)// or die;
         my $l = $1;
@@ -36,7 +36,8 @@ if ($mode eq 'matrix') {
         die unless /^\s*$/;
         $i++;
     }
-    print "]);\n";
+    print "];\n";
+    print "var:=#var eq 0 select SparseMatrix($nr,$nc) else SparseMatrix($nr,$nc,var);\n";
     if ($i != $nr) {
         print STDERR "Matrix nrows was wrong (read $i, expected $nr)\n";
     }
@@ -58,9 +59,10 @@ if ($mode eq 'bmatrix') {
             push @coeffs, [$nr, $v+1];
         }
     }
-    print "var:=SparseMatrix($nr,$nc,[\n";
+    print "var:=[\n";
     print join(", ", map { "<$_->[0], $_->[1],1>" } @coeffs);
-    print "]);\n";
+    print "];\n";
+    print "var:=#var eq 0 select SparseMatrix($nr,$nc) else SparseMatrix($nr,$nc,var);\n";
     die unless $curr==0;
     exit;
 }
@@ -91,9 +93,10 @@ if ($mode =~ /^bpmatrix(?:_(\d+)_(\d+))?$/) {
         $nr = $nr0;
         $nc = $nc0;
     }
-    print "var:=SparseMatrix($nr,$nc,[\n";
+    print "var:=[\n";
     print join(", ", map { "<$_->[0], $_->[1], $_->[2]>" } @coeffs);
-    print "]);\n";
+    print "];\n";
+    print "var:=#var eq 0 select SparseMatrix($nr,$nc) else SparseMatrix($nr,$nc,var);\n";
     die unless $curr==0;
     exit;
 }
@@ -211,13 +214,20 @@ if ($mode eq 'x') {
 }
 
 if ($mode eq 'vector') {
-    # Dump a list of uint64_t's ; this version is robust on 32-bits.
+#    # Dump a list of uint64_t's ; this version is robust on 32-bits.
+#    my @p=();
+#    while(sysread(STDIN, my $x, 8)) {
+#        my @v = unpack("L2",$x);
+#        my $sv = join(',',@v);
+#        my $v = "Seqint([$sv],2^32)";
+#        push @p, $v;
+#    }
+#    print "var:=[",join(',',@p),"];\n";
+#    exit;
+#   get rid of 32-bit clutter.
     my @p=();
     while(sysread(STDIN, my $x, 8)) {
-        my @v = unpack("L2",$x);
-        my $sv = join(',',@v);
-        my $v = "Seqint([$sv],2^32)";
-        push @p, $v;
+        push @p, unpack("Q",$x); 
     }
     print "var:=[",join(',',@p),"];\n";
     exit;

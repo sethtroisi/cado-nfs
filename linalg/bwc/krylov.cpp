@@ -10,7 +10,6 @@
 #include "misc.h"
 #include "bw-common.h"
 #include "async.h"
-#include "filenames.h"
 #include "xdotprod.h"
 #include "rolling.h"
 #include "mpfq/mpfq.h"
@@ -71,7 +70,7 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
 
     int nmats_odd = mmt->nmatrices & 1;
 
-    mmt_vec * ymy = malloc((mmt->nmatrices + nmats_odd) * sizeof(mmt_vec));
+    mmt_vec * ymy = new mmt_vec[mmt->nmatrices + nmats_odd];
     matmul_top_matrix_ptr mptr;
     mptr = (matmul_top_matrix_ptr) mmt->matrices + (bw->dir ? (mmt->nmatrices - 1) : 0);
     for(int i = 0 ; i < mmt->nmatrices ; i++) {
@@ -115,11 +114,11 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
      */
     serialize(pi->m);
     char * v_name = NULL;
-    int rc = asprintf(&v_name, V_FILE_BASE_PATTERN, ys[0], ys[1]);
-    ASSERT_ALWAYS(rc >= 0);
     if (!fake) {
         if (tcan_print) { printf("Loading %s.%u ...", v_name, bw->start); fflush(stdout); }
-        mmt_vec_load(ymy[0], v_name, bw->start, unpadded);
+        int rc = asprintf(&v_name, "V%u-%u.%u", ys[0], ys[1], bw->start);
+        ASSERT_ALWAYS(rc >= 0);
+        mmt_vec_load(ymy[0], v_name, unpadded);
         mmt_vec_reduce_mod_p(ymy[0]);
         if (tcan_print) { printf("done\n"); }
     } else {
@@ -171,9 +170,13 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
          */
         mmt_vec_init(mmt, Ac, Ac_pi,
                 check_vector, bw->dir, THREAD_SHARED_VECTOR, mmt->n[bw->dir]);
-        if (tcan_print) { printf("Loading check vector..."); fflush(stdout); }
-        mmt_vec_load(check_vector, CHECK_FILE_BASE, bw->interval,  mmt->n0[bw->dir]);
+        char * tmp;
+        int rc = asprintf(&tmp, "C.%u", bw->interval);
+        ASSERT_ALWAYS(rc >= 0);
+        if (tcan_print) { printf("Loading check vector %s...", tmp); fflush(stdout); }
+        mmt_vec_load(check_vector, tmp,  mmt->n0[bw->dir]);
         if (tcan_print) { printf("done\n"); }
+        free(tmp);
     }
 
     if (!bw->skip_online_checks) {
@@ -295,7 +298,7 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
         if (pi->m->trank == 0 && pi->m->jrank == 0) {
             char * tmp;
             int rc;
-            rc = asprintf(&tmp, A_FILE_PATTERN, ys[0], ys[1], s, s+bw->interval);
+            rc = asprintf(&tmp, "A%u-%u.%u-%u", ys[0], ys[1], s, s+bw->interval);
             FILE * f = fopen(tmp, "wb");
             rc = fwrite(xymats, A->vec_elt_stride(A, 1), bw->m*bw->interval, f);
             if (rc != bw->m*bw->interval) {
@@ -308,10 +311,17 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
             free(tmp);
         }
 
-        mmt_vec_save(ymy[0], v_name, s + bw->interval, unpadded);
+        int rc = asprintf(&v_name, "V%u-%u.%u", ys[0], ys[1], s + bw->interval);
+        ASSERT_ALWAYS(rc >= 0);
+        mmt_vec_save(ymy[0], v_name, unpadded);
 
-        if (pi->m->trank == 0 && pi->m->jrank == 0)
-            keep_rolling_checkpoints(v_name, s + bw->interval);
+        if (pi->m->trank == 0 && pi->m->jrank == 0) {
+            char * v_stem;
+            rc = asprintf(&v_stem, "V%u-%u", ys[0], ys[1]);
+            ASSERT_ALWAYS(rc >= 0);
+            keep_rolling_checkpoints(v_stem, s + bw->interval);
+            free(v_stem);
+        }
 
         serialize(pi->m);
 
@@ -345,7 +355,7 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
     for(int i = 0 ; i < mmt->nmatrices + nmats_odd ; i++) {
         mmt_vec_clear(mmt, ymy[i]);
     }
-    free(ymy);
+    delete[] ymy;
 
     matmul_top_report(mmt, 1.0);
     matmul_top_clear(mmt);
@@ -379,6 +389,10 @@ int main(int argc, char * argv[])
     matmul_top_lookup_parameters(pl);
     /* interpret our parameters */
     if (bw->ys[0] < 0) { fprintf(stderr, "no ys value set\n"); exit(1); }
+
+    ASSERT_ALWAYS(param_list_lookup_string(pl, "ys"));
+    ASSERT_ALWAYS(!param_list_lookup_string(pl, "solutions"));
+
     catch_control_signals();
 
     if (param_list_warn_unused(pl)) {

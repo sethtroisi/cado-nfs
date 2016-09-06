@@ -102,7 +102,6 @@ set(balancing_sources ${balancing_sources} balancing_curl_source.c)
 endif()
 
 set(bwc_base_sources
-    ${balancing_sources}
     parallelizing_info.c
     intersections.c
     xvectors.c
@@ -112,6 +111,10 @@ set(bwc_base_sources
     matmul.c
     matmul_top.c
     random_matrix.c
+    mf.c 
+    mf_bal.c
+    ../rowset_heap.cpp
+    ${balancing_sources}
 )
 
 if(HAVE_CXX11 AND HAVE_HWLOC)
@@ -124,16 +127,15 @@ endif()
 mpi_add_library(bwc_base ${CADO_SHARED} ${bwc_base_sources})
 
 target_link_libraries(bwc_base ${gmp_libname})
+if (HAVE_CURL)
+target_link_libraries(bwc_base curl)
+endif()
 
 if (MPI_OPENMPI_VERSION VERSION_GREATER 1.4)
     # https://www.open-mpi.org/community/lists/users/2014/11/25891.php
     message(STATUS "Enabling workaround for https://github.com/open-mpi/ompi/issues/299")
     link_directories(${HAVE_MPI}/../lib)
     target_link_libraries(bwc_base open-pal open-rte)
-endif()
-
-if (HAVE_CURL)
-target_link_libraries(bwc_base curl)
 endif()
 
 if(HAVE_CXX11 AND HAVE_HWLOC)
@@ -147,18 +149,13 @@ endif()
 
 ### end bwc_base
 
-mpi_add_library(mf ${CADO_SHARED} mf.c)
-target_link_libraries(mf bwc_base utils)
-if(ENABLE_SHARED)
-    install(TARGETS mf DESTINATION ${LIBSUFFIX}/linalg/bwc)
-endif()
 mpi_add_executable(mf_scan ${EXCLUDE_FROM_RELEASE_BUILD} mf_scan.c)
-target_link_libraries(mf_scan mf)
+target_link_libraries(mf_scan bwc_base)
 
 
 include_directories(${CADO_NFS_SOURCE_DIR}/linalg)
-mpi_add_executable(mf_bal mf_bal.c ../rowset_heap.cpp)
-target_link_libraries(mf_bal mf m)
+mpi_add_executable(mf_bal mf_bal_main.c)
+target_link_libraries(mf_bal bwc_base m)
 install(TARGETS mf_bal RUNTIME DESTINATION ${LIBSUFFIX}/linalg/bwc)
 
 
@@ -327,7 +324,7 @@ endif()
 
 ### matmul_mf
 mpi_add_library(matmul_mf ${CADO_SHARED} matmul-mf.c)
-target_link_libraries(matmul_mf mf)
+target_link_libraries(matmul_mf bwc_base)
 if(ENABLE_SHARED)
     install(TARGETS matmul_mf DESTINATION ${LIBSUFFIX}/linalg/bwc)
 endif()
@@ -353,15 +350,14 @@ macro(bwc_program v)
 endmacro()
 
 bwc_program(acollect acollect.c)
-bwc_program(split split.c)
-bwc_program(prep prep.c)
+bwc_program(prep prep.cpp)
 target_link_libraries(prep bitlinalg)
-bwc_program(krylov krylov.c xdotprod.c)
+bwc_program(krylov krylov.cpp xdotprod.c)
 bwc_program(bwccheck bwccheck.cpp xdotprod.c)
-bwc_program(dispatch dispatch.c xdotprod.c)
-bwc_program(mksol mksol.c xdotprod.c)
-bwc_program(gather gather.c)
-bwc_program(secure secure.c)
+bwc_program(dispatch dispatch.cpp xdotprod.c)
+bwc_program(mksol mksol.cpp xdotprod.c)
+bwc_program(gather gather.cpp)
+bwc_program(secure secure.cpp)
 bwc_program(blocklanczos blocklanczos.c)
 target_link_libraries(blocklanczos bitlinalg)
 
@@ -374,7 +370,7 @@ link_directories (${CADO_NFS_BINARY_DIR}/gf2x/.libs)
 
 include_directories(${CADO_NFS_SOURCE_DIR}/gf2x/fft)
 include_directories(${CADO_NFS_SOURCE_DIR}/gf2x/fft/mpfq)
-add_executable(lingen lingen_binary.cpp tree_stats.c logline.c
+add_executable(lingen lingen_binary.cpp tree_stats.cpp logline.c
     lingen_qcode.c lingen_qcode_do.cpp)
 # This **MUST** match the #define in gf2x/Makefile.am
 set_source_files_properties(lingen_qcode_do.cpp COMPILE_FLAGS
@@ -413,7 +409,7 @@ foreach(v ${BWC_GFP_ARITHMETIC_BACKENDS})
         bw-common.c
         plingen.cpp
         plingen-tuning.cpp
-        tree_stats.c
+        tree_stats.cpp
         logline.c
         lingen-matpoly.c
         lingen-bigmatpoly.c
@@ -450,7 +446,7 @@ add_custom_target(bwc_matmul)
 add_dependencies(bwc_matmul ${all_matmul_libs})
 
 add_custom_target(bwc_full)
-add_dependencies(bwc_full mf_bal random_matrix split acollect lingen
+add_dependencies(bwc_full mf_bal random_matrix acollect lingen
     cleanup prep krylov dispatch mksol gather secure bwc_base
     bwc_matmul bwccheck)
 

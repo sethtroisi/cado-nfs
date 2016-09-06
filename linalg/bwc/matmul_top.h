@@ -68,8 +68,19 @@ struct matmul_top_matrix_s {
     unsigned int n[2];
     unsigned int n0[2]; // n0: unpadded.
 
-    // this really ends up within the mm field.
+    // this really ends up within the mm field. It's not a complete file
+    // name though. We lack the implementation extension, the possible
+    // transposition tag, as well as the .bin extension.
     char * locfile;
+
+    /* These two are global to all threads and jobs (well, each thread
+     * has its own pointer though, it's not a shared_malloc. It could be,
+     * but it isn't).
+     *
+     * For random matrices, both strings below are NULL.
+     */
+    char * mname;
+    char * bname;
 
     balancing bal;
 
@@ -135,7 +146,7 @@ extern size_t mmt_my_own_offset_in_items(mmt_vec_ptr v);
 extern size_t mmt_my_own_offset_in_bytes(mmt_vec_ptr v);
 extern void * mmt_my_own_subvec(mmt_vec_ptr v);
 
-extern void mmt_vec_set_random_through_file(mmt_vec_ptr v, const char * name, unsigned int iter, unsigned int itemsondisk, gmp_randstate_t rstate);
+extern void mmt_vec_set_random_through_file(mmt_vec_ptr v, const char * name, unsigned int itemsondisk, gmp_randstate_t rstate);
 /* do not use this function if you want consistency when the splitting
  * changes ! */
 extern void mmt_vec_set_random_inconsistent(mmt_vec_ptr v, gmp_randstate_t rstate);
@@ -160,8 +171,8 @@ extern void matmul_top_fill_random_source_generic(matmul_top_data_ptr mmt, size_
 #endif
 extern int mmt_vec_load_stream(pi_file_handle f, mmt_vec_ptr v, unsigned int itemsondisk);
 extern int mmt_vec_save_stream(pi_file_handle f, mmt_vec_ptr v, unsigned int itemsondisk);
-extern int mmt_vec_load(mmt_vec_ptr v, const char * name, unsigned int iter, unsigned int itemsondisk);
-extern int mmt_vec_save(mmt_vec_ptr v, const char * name, unsigned int iter, unsigned int itemsondisk);
+extern int mmt_vec_load(mmt_vec_ptr v, const char * name, unsigned int itemsondisk);
+extern int mmt_vec_save(mmt_vec_ptr v, const char * name, unsigned int itemsondisk);
 extern void mmt_vec_reduce_mod_p(mmt_vec_ptr v);
 extern void mmt_vec_clear_padding(mmt_vec_ptr v, size_t unpadded, size_t padded);
 

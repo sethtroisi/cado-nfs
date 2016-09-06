@@ -46,11 +46,10 @@
 
 #include "bw-common.h"		/* Handy. Allows Using global functions
                                  * for recovering parameters */
-#include "filenames.h"
 #include "plingen.h"
 #include "plingen-tuning.h"
 #include "logline.h"
-#include "tree_stats.h"
+#include "tree_stats.hpp"
 
 /* Call tree for methods within this program:
  *
@@ -77,6 +76,9 @@ static unsigned int io_block_size = 1 << 20;
 /* If non-zero, then reading from A is actually replaced by reading from
  * a random generator */
 static unsigned int random_input_length = 0;
+
+static int split_input_file = 0;  /* unsupported ; do acollect by ourselves */
+static int split_output_file = 0; /* do split by ourselves */
 
 gmp_randstate_t rstate;
 
@@ -141,13 +143,15 @@ void plingen_decl_usage(param_list_ptr pl)
             "number of columns to treat differently, as corresponding to rhs vectors");
     param_list_decl_usage(pl, "rhs",
             "file with rhs vectors (only the header is read)");
-    param_list_decl_usage(pl, "rhscoeffs_file",
-            "file to which the contribution f the solution vectors to RHS coefficients is stored");
 
     param_list_decl_usage(pl, "afile",
             "input sequence file");
     param_list_decl_usage(pl, "random-input-with-length",
             "use surrogate for input");
+    param_list_decl_usage(pl, "split-input-file",
+            "work with split files on input");
+    param_list_decl_usage(pl, "split-output-file",
+            "work with split files on output");
     param_list_decl_usage(pl, "random_seed",
             "seed the random generator");
     param_list_decl_usage(pl, "ffile",
@@ -260,7 +264,7 @@ static inline unsigned int expected_pi_length(dims * d, unsigned int len)/*{{{*/
 /* TODO: adapt for GF(2) */
 static int bw_lingen_basecase(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta) /*{{{*/
 {
-    tree_stats_enter(stats, __func__, E->size);
+    stats.enter(__func__, E->size);
     dims * d = bm->d;
     unsigned int m = d->m;
     unsigned int n = d->n;
@@ -527,7 +531,7 @@ static int bw_lingen_basecase(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned i
     free(pivots);
     free(pi_lengths);   /* What shall we do with this one ??? */
 
-    return tree_stats_leave(stats, generator_found);
+    return stats.leave(generator_found);
 }/*}}}*/
 
 /*}}}*/
@@ -613,7 +617,38 @@ int matpoly_write(abdst_field ab, FILE * f, matpoly_srcptr M, unsigned int k0, u
     }
     abclear(ab, &tmp);
     return k1 - k0;
-}/* }}} */
+}
+
+/* fw must be an array of FILE* pointers of exactly the same size as the
+ * matrix to be written.
+ */
+int matpoly_write_split(abdst_field ab, FILE ** fw, matpoly_srcptr M, unsigned int k0, unsigned int k1, int ascii)
+{
+    ASSERT_ALWAYS(k0 == k1 || (k0 < M->size && k1 <= M->size));
+    abelt tmp;
+    abinit(ab, &tmp);
+    for(unsigned int k = k0 ; k < k1 ; k++) {
+        int err = 0;
+        int matnb = 0;
+        for(unsigned int i = 0 ; !err && i < M->m ; i++) {
+            for(unsigned int j = 0 ; !err && j < M->n ; j++) {
+                FILE * f = fw[i*M->n+j];
+                absrc_elt x = matpoly_coeff_const(ab, M, i, j, k);
+                if (ascii) {
+                    err = abfprint(ab, f, x) <= 0;
+                    if (!err) err = fprintf(f, "\n") <= 0;
+                } else {
+                    err = fwrite(x, abvec_elt_stride(ab, 1), 1, f) < 1;
+                }
+                if (!err) matnb++;
+            }
+        }
+        if (err) return (matnb == 0) ? (int) (k - k0) : -1;
+    }
+    abclear(ab, &tmp);
+    return k1 - k0;
+}
+/* }}} */
 
 /* {{{ matpoly_read
  * reads some of the matpoly data from f, either in ascii or binary
@@ -680,7 +715,7 @@ struct cp_info {
 void cp_info_init_backend(struct cp_info * cp)
 {
     int rc;
-    cp->level = stats->depth;
+    cp->level = stats.depth;
     rc = asprintf(&cp->auxfile, "%s/pi.%d.%u.%u.aux",
             checkpoint_directory, cp->level, cp->t0, cp->t1);
     ASSERT_ALWAYS(rc >= 0);
@@ -1152,7 +1187,7 @@ static int bw_biglingen_collective(bmstatus_ptr bm, bigmatpoly pi, bigmatpoly E,
 static int bw_lingen_recursive(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta) /*{{{*/
 {
     size_t z = E->size;
-    tree_stats_enter(stats, __func__, E->size);
+    stats.enter(__func__, E->size);
     dims * d = bm->d;
     abdst_field ab = d->ab;
     int done;
@@ -1181,28 +1216,32 @@ static int bw_lingen_recursive(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned 
         matpoly_swap(pi_left, pi);
         matpoly_clear(ab, pi_left);
         // fprintf(stderr, "Leave %s\n", __func__);
-        return tree_stats_leave(stats, 1);
+        return stats.leave(1);
     }
 
+    stats.begin_smallstep("MP");
     matpoly_rshift(ab, E, E, half - pi_left->size + 1);
     logline_begin(stdout, z, "t=%u MP(%zu, %zu) -> %zu",
             bm->t, E->size, pi_left->size, E->size - pi_left->size + 1);
     matpoly_mp(ab, E_right, E, pi_left);
     logline_end(&(bm->t_mp), "");
+    stats.end_smallstep();
 
     done = bw_lingen_single(bm, pi_right, E_right, delta);
     matpoly_clear(ab, E_right);
 
+    stats.begin_smallstep("MUL");
     logline_begin(stdout, z, "t=%u MUL(%zu, %zu) -> %zu",
             bm->t, pi_left->size, pi_right->size, pi_left->size + pi_right->size - 1);
     matpoly_mul(ab, pi, pi_left, pi_right);
     logline_end(&bm->t_mul, "");
+    stats.end_smallstep();
 
     matpoly_clear(ab, pi_left);
     matpoly_clear(ab, pi_right);
 
     // fprintf(stderr, "Leave %s\n", __func__);
-    return tree_stats_leave(stats, done);
+    return stats.leave(done);
 }/*}}}*/
 
 static int bw_lingen_single(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta) /*{{{*/
@@ -1239,7 +1278,7 @@ static int bw_lingen_single(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int
 static int bw_biglingen_recursive(bmstatus_ptr bm, bigmatpoly pi, bigmatpoly E, unsigned int *delta) /*{{{*/
 {
     size_t z = E->size;
-    tree_stats_enter(stats, __func__, E->size);
+    stats.enter(__func__, E->size);
 
     dims * d = bm->d;
     abdst_field ab = d->ab;
@@ -1273,11 +1312,11 @@ static int bw_biglingen_recursive(bmstatus_ptr bm, bigmatpoly pi, bigmatpoly E, 
         bigmatpoly_clear(ab, pi_right);
         bigmatpoly_clear(ab, E_right);
         // fprintf(stderr, "Leave %s\n", __func__);
-        return tree_stats_leave(stats, 1);
+        return stats.leave(1);
     }
 
+    stats.begin_smallstep("MP");
     bigmatpoly_rshift(ab, E, E, half - pi_left->size + 1);
-
     logline_begin(stdout, z, "t=%u MPI-MP%s(%zu, %zu) -> %zu",
             bm->t, caching ? "-caching" : "",
             E->size, pi_left->size, E->size - pi_left->size + 1);
@@ -1288,10 +1327,12 @@ static int bw_biglingen_recursive(bmstatus_ptr bm, bigmatpoly pi, bigmatpoly E, 
 #endif
         bigmatpoly_mp(ab, E_right, E, pi_left);
     logline_end(&bm->t_mp, "");
+    stats.end_smallstep();
 
     done = bw_biglingen_collective(bm, pi_right, E_right, delta);
     bigmatpoly_clear(ab, E_right);
 
+    stats.begin_smallstep("MUL");
     logline_begin(stdout, z, "t=%u MPI-MUL%s(%zu, %zu) -> %zu",
             bm->t, caching ? "-caching" : "",
             pi_left->size, pi_right->size, pi_left->size + pi_right->size - 1);
@@ -1302,11 +1343,13 @@ static int bw_biglingen_recursive(bmstatus_ptr bm, bigmatpoly pi, bigmatpoly E, 
 #endif
         bigmatpoly_mul(ab, pi, pi_left, pi_right);
     logline_end(&bm->t_mul, "");
+    stats.end_smallstep();
+
     bigmatpoly_clear(ab, pi_left);
     bigmatpoly_clear(ab, pi_right);
 
     // fprintf(stderr, "Leave %s\n", __func__);
-    return tree_stats_leave(stats, done);
+    return stats.leave(done);
 }/*}}}*/
 
 static int bw_biglingen_collective(bmstatus_ptr bm, bigmatpoly pi, bigmatpoly E, unsigned int *delta)/*{{{*/
@@ -1339,12 +1382,16 @@ static int bw_biglingen_collective(bmstatus_ptr bm, bigmatpoly pi, bigmatpoly E,
         matpoly_init(ab, sE, m, b, E->size);
         matpoly_init(ab, spi, 0, 0, 0);
 
+        stats.begin_smallstep("gather(L+R)");
         bigmatpoly_gather_mat(ab, sE, E);
+        stats.end_smallstep();
+
         /* Only the master node does the local computation */
         if (!rank)
             done = bw_lingen_single(bm, spi, sE, delta);
-        bigmatpoly_scatter_mat(ab, pi, spi);
 
+        stats.begin_smallstep("scatter(L+R)");
+        bigmatpoly_scatter_mat(ab, pi, spi);
         MPI_Bcast(&done, 1, MPI_INT, 0, bm->com[0]);
         MPI_Bcast(delta, b, MPI_UNSIGNED, 0, bm->com[0]);
         MPI_Bcast(bm->lucky, b, MPI_UNSIGNED, 0, bm->com[0]);
@@ -1352,6 +1399,7 @@ static int bw_biglingen_collective(bmstatus_ptr bm, bigmatpoly pi, bigmatpoly E,
         /* Don't forget to broadcast delta from root node to others ! */
         matpoly_clear(ab, spi);
         matpoly_clear(ab, sE);
+        stats.end_smallstep();
     }
     // fprintf(stderr, "Leave %s\n", __func__);
 
@@ -1396,11 +1444,14 @@ unsigned int get_max_delta_on_solutions(bmstatus_ptr bm, unsigned int * delta)/*
 struct bm_io_s {/*{{{*/
     bmstatus_ptr bm;
     unsigned int t0;
-    FILE * f;
+    FILE ** fr; /* array of n files when split_input_file is supported
+                   (which is not the case as of now),
+                   or otherwise just a 1-element array */
+    FILE ** fw; /* array of n^2 files (with split_output_file)
+                   or otherwise just a 1-element array */
     char * iobuf;
     const char * input_file;
     const char * output_file;
-    const char * rhs_output_file;
     int ascii;
     /* This is only a rolling window ! */
     matpoly A, F;
@@ -1481,8 +1532,19 @@ void bm_io_write_one_F_coeff(bm_io_ptr aa, unsigned int deg)
     abdst_field ab = d->ab;
     deg = deg % aa->F->alloc;
     // if (random_input_length) return;
+    /* what the heck ?
     if (!aa->ascii || !random_input_length)
         matpoly_write(ab, aa->f, aa->F, deg, deg + 1, aa->ascii, 1);
+        */
+    if (random_input_length) {
+        /* we used to do this only in the non-ascii case */
+        matpoly_write(ab, aa->fw[0], aa->F, deg, deg + 1, aa->ascii, 1);
+    } else if (split_output_file) {
+        matpoly_write_split(ab, aa->fw, aa->F, deg, deg + 1, aa->ascii);
+    } else {
+        matpoly_write(ab, aa->fw[0], aa->F, deg, deg + 1, aa->ascii, 1);
+    }
+
 }
 
 void bm_io_clear_one_F_coeff(bm_io_ptr aa, unsigned int deg)
@@ -1771,13 +1833,14 @@ void bm_io_compute_final_F(bm_io_ptr aa, Reader& pi, unsigned int * delta)/*{{{*
     abdst_field ab = d->ab;
     int rank;
     MPI_Comm_rank(bm->com[0], &rank);
+    int leader = rank == 0;
 
 
     /* We are not interested by pi->size, but really by the number of
      * coefficients for the columns which give solutions. */
     unsigned int maxdelta = get_max_delta_on_solutions(bm, delta);
 
-    if (!rank) printf("Final f(X)=f0(X)pi(X) has degree %u\n", maxdelta);
+    if (leader) printf("Final f(X)=f0(X)pi(X) has degree %u\n", maxdelta);
 
     unsigned int window = aa->F->alloc;
 
@@ -1815,12 +1878,10 @@ void bm_io_compute_final_F(bm_io_ptr aa, Reader& pi, unsigned int * delta)/*{{{*
          */
 
         matpoly rhs;
-        if (!rank) {
+        if (leader) {
             matpoly_init(ab, rhs, d->nrhs, n, 1);
             rhs->size = 1;
         }
-
-        unsigned int rhscontribs = 0;
 
         /* Now redo the exact same loop as above, this time
          * adding the contributions to the rhs matrix. */
@@ -1839,22 +1900,19 @@ void bm_io_compute_final_F(bm_io_ptr aa, Reader& pi, unsigned int * delta)/*{{{*
                 ASSERT_ALWAYS(delta[jpi] >= offset);
                 unsigned kpi = delta[jpi] - offset;
 
-
-                rhscontribs++;
                 ASSERT_ALWAYS(d->nrhs);
                 ASSERT_ALWAYS(iF < d->nrhs);
                 ASSERT_ALWAYS(jF < n);
                 absrc_elt src = pi.coeff_const(ipi, jpi, kpi);
 
-                if (!rank) {
+                if (leader) {
                     abdst_elt dst = matpoly_coeff(ab, rhs, iF, jF, 0);
                     abadd(ab, dst, dst, src);
                 }
             }
         }
 
-        if (!rank) {
-            printf("Note: %u contributions to RHS coefficients have been added into the rhs file %s\n", rhscontribs, aa->rhs_output_file);
+        if (leader) {
             /* Now comes the time to prioritize the different solutions. Our
              * goal is to get the unessential solutions last ! */
             int (*sol_score)[2];
@@ -1874,7 +1932,7 @@ void bm_io_compute_final_F(bm_io_ptr aa, Reader& pi, unsigned int * delta)/*{{{*
             }
             qsort(sol_score, n, 2 * sizeof(int), (sortfunc_t) & lexcmp2);
 
-            if (!rank) {
+            if (leader) {
                 printf("Reordered solutions:\n");
                 for(unsigned int i = 0 ; i < n ; i++) {
                     printf(" %d (col %d in pi, weight %d on rhs vectors)\n", sol_score[i][1], sols[sol_score[i][1]], -sol_score[i][0]);
@@ -1915,10 +1973,43 @@ void bm_io_compute_final_F(bm_io_ptr aa, Reader& pi, unsigned int * delta)/*{{{*
 
             free(sol_score);
 
+            /* Because we've done the swap above, the rhs matrix is now a
+             * matrix with dimension nrhs * n, as required.
+             *
+             * XXX hmm. there are nrhs contributions, but n solutions. So
+             * we'd better get that transposed, right ?
+             */
+            matpoly_transpose_dumb(ab, rhs, rhs);
 
-            FILE * f = fopen(aa->rhs_output_file, aa->ascii ? "w" : "wb");
-            matpoly_write(ab, f, rhs, 0, 1, aa->ascii, 0);
-            fclose(f);
+            if (split_output_file) {
+                FILE ** fw = (FILE**) malloc(d->n * d->nrhs * sizeof(FILE*));
+                for(unsigned int i = 0 ; i < d->n ; i++) {
+                    for(unsigned int j = 0 ; j < d->nrhs ; j++) {
+                        char * tmp;
+                        int rc = asprintf(&tmp, "%s.sols%u-%u.%u-%u.rhs",
+                                aa->output_file, i, i+1, j, j+1);
+                        ASSERT_ALWAYS(rc >= 0);
+                        fw[i*d->nrhs+j] = fopen(tmp, aa->ascii ? "w" : "wb");
+                        free(tmp);
+                    }
+                }
+                matpoly_write_split(ab, fw, rhs, 0, 1, aa->ascii);
+                for(unsigned int i = 0 ; i < d->n * d->nrhs ; i++) {
+                    fclose(fw[i]);
+                }
+            } else {
+                /* we used to write F transposed, but we no longer do
+                 * that.
+                 */
+                char * tmp;
+                int rc = asprintf(&tmp, "%s.rhs", aa->output_file);
+                ASSERT_ALWAYS(rc >= 0);
+                FILE * f = fopen(tmp, aa->ascii ? "w" : "wb");
+                matpoly_write(ab, f, rhs, 0, 1, aa->ascii, 0);
+                fclose(f);
+                printf("Note: contributions to RHS coefficients saved to the rhs file %s\n", tmp);
+                free(tmp);
+            }
             matpoly_clear(ab, rhs);
         }
     }
@@ -2051,7 +2142,7 @@ void bm_io_compute_final_F(bm_io_ptr aa, Reader& pi, unsigned int * delta)/*{{{*
             }
         }
 
-        if (!rank && s > next_report_s) {
+        if (leader && s > next_report_s) {
             double tt = wct_seconds();
             if (tt > next_report_t) {
                 printf(
@@ -2063,7 +2154,7 @@ void bm_io_compute_final_F(bm_io_ptr aa, Reader& pi, unsigned int * delta)/*{{{*
         }
     }
     /* flush the pipe */
-    if (!rank && window <= maxdelta) {
+    if (leader && window <= maxdelta) {
         for(unsigned int s = window ; s-- > 0 ; )
             bm_io_write_one_F_coeff(aa, maxdelta - s);
     }
@@ -2120,11 +2211,11 @@ int bm_io_read1(bm_io_ptr aa, unsigned int io_window)/*{{{*/
             abdst_elt x = matpoly_coeff(ab, A, i, j, pos);
             int rc;
             if (aa->ascii) {
-                rc = abfscan(ab, aa->f, x);
+                rc = abfscan(ab, aa->fr[0], x);
                 /* rc is the number of bytes read -- non-zero on success */
             } else {
                 size_t elemsize = abvec_elt_stride(ab, 1);
-                rc = fread(x, elemsize, 1, aa->f);
+                rc = fread(x, elemsize, 1, aa->fr[0]);
                 rc = rc == 1;
                 abnormalize(ab, x);
             }
@@ -2144,14 +2235,13 @@ int bm_io_read1(bm_io_ptr aa, unsigned int io_window)/*{{{*/
     return 1;
 }/*}}}*/
 
-void bm_io_init(bm_io_ptr aa, bmstatus_ptr bm, const char * input_file, const char * output_file, const char * rhs_output_file, int ascii)/*{{{*/
+void bm_io_init(bm_io_ptr aa, bmstatus_ptr bm, const char * input_file, const char * output_file, int ascii)/*{{{*/
 {
     memset(aa, 0, sizeof(*aa));
     aa->bm = bm;
     aa->ascii = ascii;
     aa->input_file = input_file;
     aa->output_file = output_file;
-    aa->rhs_output_file = rhs_output_file;
 }/*}}}*/
 
 void bm_io_begin_read(bm_io_ptr aa)/*{{{*/
@@ -2173,11 +2263,16 @@ void bm_io_begin_read(bm_io_ptr aa)/*{{{*/
         return;
     }
 
-    aa->f = fopen(aa->input_file, aa->ascii ? "r" : "rb");
+    if (split_input_file) {
+        fprintf(stderr, "--split-input-file not supported yet\n");
+        exit(EXIT_FAILURE);
+    }
+    aa->fr = (FILE**) malloc(sizeof(FILE*));
+    aa->fr[0] = fopen(aa->input_file, aa->ascii ? "r" : "rb");
 
-    DIE_ERRNO_DIAG(aa->f == NULL, "fopen", aa->input_file);
+    DIE_ERRNO_DIAG(aa->fr[0] == NULL, "fopen", aa->input_file);
     aa->iobuf = (char*) malloc(2 * io_block_size);
-    setbuffer(aa->f, aa->iobuf, 2 * io_block_size);
+    setbuffer(aa->fr[0], aa->iobuf, 2 * io_block_size);
 
     /* read the first coefficient ahead of time. This is because in most
      * cases, we'll discard it. Only in the DL case, we will consider the
@@ -2199,8 +2294,9 @@ void bm_io_end_read(bm_io_ptr aa)/*{{{*/
     if (rank) return;
     matpoly_clear(aa->bm->d->ab, aa->A);
     if (random_input_length) return;
-    fclose(aa->f);
-    aa->f = NULL;
+    fclose(aa->fr[0]);
+    free(aa->fr);
+    aa->fr = NULL;
     free(aa->iobuf);
     aa->iobuf = 0;
 }/*}}}*/
@@ -2220,14 +2316,36 @@ void bm_io_begin_write(bm_io_ptr aa)/*{{{*/
     if (random_input_length) {
         /* It's horrible. I really want "checksum" to be printed at the
          * exact right moment, hence the following hack...  */
-        aa->f = popen("(echo \"checksum:\" ; sha1sum) | xargs echo", "w");
+        aa->fw = (FILE**) malloc(sizeof(FILE*));
+        aa->fw[0] = popen("(echo \"checksum:\" ; sha1sum) | xargs echo", "w");
+        DIE_ERRNO_DIAG(aa->fw[0] == NULL, "popen", "random sink");
+    } else if (split_output_file) {
+        aa->fw = (FILE**) malloc(n*n*sizeof(FILE*));
+        for(unsigned int i = 0 ; i < n ; i++) {
+            for(unsigned int j = 0 ; j < n ; j++) {
+                FILE * f;
+                char * str;
+                int rc = asprintf(&str, "%s.sols%d-%d.%d-%d",
+                        aa->output_file,
+                        j, j + 1,
+                        i, i + 1);
+                ASSERT_ALWAYS(rc >= 0);
+                f = fopen(str, aa->ascii ? "w" : "wb");
+                DIE_ERRNO_DIAG(f == NULL, "fopen", str);
+                /* I doubt the iobuf makes sense in this case */
+                /*
+                   aa->iobuf = (char*) malloc(2 * io_block_size);
+                   setbuffer(f, aa->iobuf, 2 * io_block_size);
+                   */
+                aa->fw[i*n+j] = f;
+            }
+        }
     } else {
-        aa->f = fopen(aa->output_file, aa->ascii ? "w" : "wb");
-    }
-    DIE_ERRNO_DIAG(aa->f == NULL, "fopen", aa->output_file);
-    if (!random_input_length) {
+        aa->fw = (FILE**) malloc(sizeof(FILE*));
+        aa->fw[0] = fopen(aa->output_file, aa->ascii ? "w" : "wb");
+        DIE_ERRNO_DIAG(aa->fw[0] == NULL, "fopen", aa->output_file);
         aa->iobuf = (char*) malloc(2 * io_block_size);
-        setbuffer(aa->f, aa->iobuf, 2 * io_block_size);
+        setbuffer(aa->fw[0], aa->iobuf, 2 * io_block_size);
     }
 }/*}}}*/
 
@@ -2238,12 +2356,19 @@ void bm_io_end_write(bm_io_ptr aa)/*{{{*/
     if (rank) return;
     matpoly_clear(aa->bm->d->ab, aa->F);
     if (random_input_length) {
-        pclose(aa->f);
+        pclose(aa->fw[0]);
+    } else if (split_output_file) {
+        for(unsigned int i = 0 ; i < aa->bm->d->n ; i++) {
+            for(unsigned int j = 0 ; j < aa->bm->d->n ; j++) {
+                fclose(aa->fw[i*aa->bm->d->n+j]);
+            }
+        }
     } else {
-        fclose(aa->f);
+        fclose(aa->fw[0]);
     }
-    aa->f = NULL;
-    free(aa->iobuf);
+    free(aa->fw);
+    aa->fw = NULL;
+    if (aa->iobuf) free(aa->iobuf);
     aa->iobuf = 0;
 }/*}}}*/
 
@@ -2270,7 +2395,7 @@ void bm_io_guess_length(bm_io_ptr aa)/*{{{*/
 
     if (!rank) {
         struct stat sbuf[1];
-        int rc = fstat(fileno(aa->f), sbuf);
+        int rc = fstat(fileno(aa->fr[0]), sbuf);
         if (rc < 0) {
             perror(aa->input_file);
             exit(EXIT_FAILURE);
@@ -2715,6 +2840,8 @@ int main(int argc, char *argv[])
 
     param_list_parse_int(pl, "allow_zero_on_rhs", &allow_zero_on_rhs);
     param_list_parse_uint(pl, "random-input-with-length", &random_input_length);
+    param_list_parse_int(pl, "split-output-file", &split_output_file);
+    param_list_parse_int(pl, "split-input-file", &split_input_file);
     param_list_parse_int(pl, "caching", &caching);
 
     const char * afile = param_list_lookup_string(pl, "afile");
@@ -2742,15 +2869,6 @@ int main(int argc, char *argv[])
         ASSERT_ALWAYS(rc >= 0);
     }
     ASSERT_ALWAYS((afile==NULL) == (ffile == NULL));
-
-    tmp = param_list_lookup_string(pl, "rhscoeffs_file");
-    char * rhscoeffs_file = NULL;
-    if (tmp) {
-        rhscoeffs_file = strdup(tmp);
-    } else if (afile) {
-        int rc = asprintf(&rhscoeffs_file, "%s.gen.rhs", afile);
-        ASSERT_ALWAYS(rc >= 0);
-    }
 
 #ifndef ENABLE_CACHING_MPI_LINGEN
     if (caching) {
@@ -2907,7 +3025,7 @@ int main(int argc, char *argv[])
      * that non-root nodes essentially do nothing while the master job
      * does the I/O stuff) */
     bm_io aa;
-    bm_io_init(aa, bm, afile, ffile, rhscoeffs_file, global_flag_ascii);
+    bm_io_init(aa, bm, afile, ffile, global_flag_ascii);
     bm_io_begin_read(aa);
     bm_io_guess_length(aa);
 
@@ -2917,8 +3035,6 @@ int main(int argc, char *argv[])
     unsigned int t0 = bm->t;
     unsigned int * delta = (unsigned int*) malloc((m + n) * sizeof(unsigned int));
     for(unsigned int j = 0 ; j < m + n ; delta[j++]=t0);
-
-    stats->tree_total_breadth = aa->guessed_length;
 
     int go_mpi = aa->guessed_length >= bm->lingen_mpi_threshold;
 

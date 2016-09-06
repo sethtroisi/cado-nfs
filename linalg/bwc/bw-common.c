@@ -11,7 +11,6 @@
 #include "cado_config.h"
 #include "bw-common.h"
 #include "params.h"
-#include "filenames.h"
 #include "utils.h"
 #include "select_mpi.h"
 #include "timing.h"
@@ -47,7 +46,6 @@ void bw_common_decl_usage(param_list pl)/*{{{*/
 
     /* {{{ Parameters which are related to the interaction with the OS */
     param_list_decl_usage(pl, "wdir", "working directory, created if it does not exist. All file accesses are relative to this directory.");
-    param_list_decl_usage(pl, "cfg", "path to a file containing more parameters to be interpreted.");
     param_list_decl_usage(pl, "seed", "set seed for all pseudo-random number generation");
     param_list_decl_usage(pl, "v", "More verbose output");
     /* }}} */
@@ -65,8 +63,10 @@ void bw_common_decl_usage(param_list pl)/*{{{*/
     /* }}} */
 
     /* {{{ Parameters related to multi-sequences */
-    param_list_decl_usage(pl, "ys", "indicates which sequence(s) should be worked on. Syntax is <n0>..<n1> for working with vectors of indices i with n0<=i<n1, with of course 0<=n0<n1<=n.");
-    param_list_decl_usage(pl, "nsolvecs", "for mksol and gather, produce this many independent solutions. Default is n");
+    param_list_decl_usage(pl, "ys",
+            "indicates which sequence(s) should be worked on. Syntax is <n0>..<n1> for working with vectors of indices i with n0<=i<n1, with of course 0<=n0<n1<=n.");
+    param_list_decl_usage(pl, "solutions",
+            "indicates which solution(s) should be worked on. Syntax is <n0>..<n1> for working with solutions of indices i with n0<=i<n1, with of course 0<=n0<n1<=n.");
     /* }}} */
 
     verbose_decl_usage(pl);
@@ -79,7 +79,6 @@ const char * bw_common_usage_string()
     static char t[]=
         "Common options:\n"
         "\twdir=<path>\tchdir to <path> beforehand\n"
-        "\tcfg=<file>\timport many settings from <file>\n"
         "\tm=<int>\tset bw->m blocking factor\n"
         "\tn=<int>\tset bw->n blocking factor\n"
         "\tmn=<int>\tset both bw->m and bw->n (exclusive with the two above)\n"
@@ -138,16 +137,10 @@ void bw_common_interpret_parameters(struct bw_params * bw, param_list pl)/*{{{*/
         }
     }
 
-    const char * cfg;
-
-    if ((cfg = param_list_lookup_string(pl, "cfg"))) {
-        param_list_read_file(pl, cfg);
-    }
-
-
     param_list_parse_int(pl, "seed", &bw->seed);
     param_list_parse_int(pl, "interval", &bw->interval);
     param_list_parse_int_and_int(pl, "ys", bw->ys, "..");
+    param_list_parse_uint_and_uint(pl, "solutions", bw->solutions, "-");
     param_list_parse_int(pl, "start", &bw->start);
     param_list_parse_int(pl, "end", &bw->end);
     param_list_parse_int(pl, "skip_online_checks", &bw->skip_online_checks);
@@ -231,8 +224,6 @@ void bw_common_interpret_parameters(struct bw_params * bw, param_list pl)/*{{{*/
         param_list_print_usage(pl, bw->original_argv[0], stderr);
         exit(EXIT_FAILURE);
     }
-    bw->nsolvecs = bw->n;
-    param_list_parse_int(pl, "nsolvecs", &bw->nsolvecs);
 
     bw->number_of_check_stops = param_list_parse_int_list(pl, "check_stops", bw->check_stops, MAX_NUMBER_OF_CHECK_STOPS, ",");
     int interval_already_in_check_stops = 0;

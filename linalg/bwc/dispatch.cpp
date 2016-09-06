@@ -17,7 +17,6 @@
 #include "misc.h"
 #include "bw-common.h"
 #include "async.h"
-#include "filenames.h"
 #include "mpfq/mpfq.h"
 #include "mpfq/mpfq_vbase.h"
 #include "cheating_vec_init.h"
@@ -93,7 +92,7 @@ void * dispatch_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_
          */
         const char * checkname;
 
-        checkname = "1st check: consistency of M*arbitrary1 (Hx.0 == H1)";
+        checkname = "1st check: consistency of M*arbitrary1 (Hx == H1)";
 
         mmt_full_vec_set_zero(y);
         ASSERT_ALWAYS(y->siblings);     /* shared vector undesired */
@@ -106,12 +105,12 @@ void * dispatch_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_
         matmul_top_mul(mmt, ymy, NULL);
         mmt_vec_untwist(mmt, y);
 
-        mmt_vec_save(y, "Hx", 0, unpadded);
+        mmt_vec_save(y, "Hx", unpadded);
 
         // compare if files are equal.
         if (pi->m->jrank == 0 && pi->m->trank == 0) {
             char cmd[1024];
-            int rc = snprintf(cmd, 80, "diff -q %s Hx.0", tmp);
+            int rc = snprintf(cmd, 80, "diff -q %s Hx", tmp);
             ASSERT_ALWAYS(rc>=0);
             rc = system(cmd);
             if (rc) {
@@ -171,7 +170,7 @@ void * dispatch_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_
             mmt_vec_clear(mmt, myy[1]);
         }
         mmt_vec_untwist(mmt, my);
-        mmt_vec_save(my, "Hy", 0, unpadded);
+        mmt_vec_save(my, "Hy", unpadded);
 
         mmt_full_vec_set_zero(y);
         ASSERT_ALWAYS(y->siblings);     /* shared vector undesired */
@@ -228,18 +227,19 @@ int main(int argc, char * argv[])
     matmul_top_lookup_parameters(pl);
     /* interpret our parameters: none here (so far). */
 
+    ASSERT_ALWAYS(param_list_lookup_string(pl, "ys"));
+    ASSERT_ALWAYS(!param_list_lookup_string(pl, "solutions"));
+
     if (param_list_warn_unused(pl)) {
         param_list_print_usage(pl, bw->original_argv[0], stderr);
         exit(EXIT_FAILURE);
     }
     // param_list_clear(pl);
 
-
     if (bw->ys[0] < 0) { fprintf(stderr, "no ys value set\n"); exit(1); }
 
     /* Forcibly disable interleaving here */
-    /* TODO: don't do it that way ! */
-    param_list_add_key(pl, "interleaving", "0", PARAMETER_FROM_CMDLINE);
+    param_list_remove_key(pl, "interleaving");
 
     catch_control_signals();
     pi_go(dispatch_prog, pl, 0);

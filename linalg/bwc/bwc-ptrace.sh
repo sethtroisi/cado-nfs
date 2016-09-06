@@ -68,7 +68,7 @@ wordsize=64
 rhsfile="$rhs"
 : ${nullspace=right}
 : ${interval=50}
-: ${mm_impl=basicp}
+# : ${mm_impl=basicp}
 
 if ! type -p seq >/dev/null ; then
     seq() {
@@ -144,13 +144,6 @@ derived_variables() {
         splitwidth=64
     else
         splitwidth=1
-    fi
-    if ! [ "$nsolvecs" ] ; then
-        if [ "$prime" = 2 ] ; then
-            nsolvecs=$n
-        else
-            nsolvecs=1
-        fi
     fi
 }
 
@@ -295,11 +288,11 @@ prepare_common_arguments() {
         n=$n
         wdir=$wdir
         prime=$prime
-        mm_impl=$mm_impl
         nullspace=$nullspace
         interval=$interval
 
 EOF
+    if [ "$mm_impl" ] ; then common="$common mm_impl=$mm_impl" ; fi
     if [ "$prime" != 2 ] ; then common="$common lingen_mpi=$lingen_mpi" ; fi
 }
 
@@ -315,9 +308,7 @@ else
     create_auxiliary_weight_files
 fi
 
-if [ "$magma" ] ; then
-    interval=1
-fi
+# if [ "$magma" ] ; then interval=1 ; fi
 
 prepare_common_arguments
 
@@ -349,10 +340,19 @@ fi
 
 if ! [ "$magma" ] ; then
     $bindir/bwc.pl :complete "$@" "${pass_bwcpl_args[@]}"
-    $bindir/bwccheck prime=$prime m=$m n=$n -- $wdir/[ACVFS]*
-    exit 0
+    rc=$?
+    set +x
+    $bindir/bwccheck prime=$prime m=$m n=$n -- $wdir/[ACVFS]* > $wdir/bwccheck.log
+    grep NOK $wdir/bwccheck.log || :
+    exit $rc
 else
-    if $bindir/bwc.pl :complete "$@" "${pass_bwcpl_args[@]}" ; then
+    set +e
+    $bindir/bwc.pl :complete "$@" "${pass_bwcpl_args[@]}" 
+    rc=$?
+    set +x
+    $bindir/bwccheck prime=$prime m=$m n=$n -- $wdir/[ACVFS]* > $wdir/bwccheck.log
+    grep NOK $wdir/bwccheck.log
+    if [ $rc = 0 ] ; then
         echo " ========== SUCCESS ! bwc.pl returned true ========== "
         echo " ========== SUCCESS ! bwc.pl returned true ========== "
         echo " ========== SUCCESS ! bwc.pl returned true ========== "
@@ -361,7 +361,6 @@ else
         echo " ########## FAILURE ! bwc.pl returned false ########## "
         echo " ########## FAILURE ! bwc.pl returned false ########## "
     fi
-    $bindir/bwccheck prime=$prime m=$m n=$n -- $wdir/[ACVFS]*
 fi
 
 set +x
@@ -376,26 +375,28 @@ fi
 Nh=$((${BASH_REMATCH[1]}*${BASH_REMATCH[3]}))
 Nv=$((${BASH_REMATCH[2]}*${BASH_REMATCH[4]}))
 
-split=${Nh}x${Nv}
-
-echo find $wdir -name "`basename $matrix .bin`.$split.????????.bin"
-bfile=$(find $wdir -name "`basename $matrix .bin`.$split.????????.bin")
-if ! [[ "$bfile" =~ \.[0-9a-f]{8}\.bin$ ]] ; then
-    echo "Found no bfile, or nothing satisfactory ($bfile)" >&2
-    exit 1
-fi
+bfile="`basename $matrix .bin`.${Nh}x${Nv}.bin"
 
 cmd=`dirname $0`/convert_magma.pl
 
 
 # This is for the **unbalanced** matrix !!
 
-echo "m:=$m;n:=$n;interval:=$interval;" > $mdir/mn.m
-if [ "$nrhs" ] ; then
-    echo "nrhs:=$nrhs;" >> $mdir/mn.m
+if [ "$prime" = 2 ] ; then
+    magmaprintmode=vector
+else
+    magmaprintmode=spvector64
 fi
 
-echo "Saving matrix to magma format"
+: ${nrhs:=0}
+
+print_main_parameters() {
+    echo "m:=$m;n:=$n;interval:=$interval;"
+    echo "nrhs:=$nrhs;"
+}
+print_main_parameters > $mdir/mn.m
+
+echo "Saving matrix to magma format" # {{{
 $cmd weights < $rwfile > $mdir/rw.m
 $cmd weights < $cwfile > $mdir/cw.m
 if [ "$prime" = 2 ] ; then
@@ -403,8 +404,14 @@ if [ "$prime" = 2 ] ; then
 else
     $cmd bpmatrix_${nrows}_${ncols} < $matrix > $mdir/t.m
 fi
-$cmd balancing < "$bfile" > $mdir/b.m
+$cmd balancing < "$wdir/$bfile" > $mdir/b.m
+checksum=$(perl -ne '/checksum (\w+)/ && print "$1\n";' < $mdir/b.m)
 echo "ncpad:=nc;nrpad:=nr;nc:=nc_orig;nr:=nr_orig;" >> $mdir/b.m
+if [ "$prime" = 2 ] ; then
+    echo "VS:=KMatrixSpace(GF(2), 64, nr_orig);"
+else
+    echo "VS:=VectorSpace(GF(p), nr_orig);" 
+fi > $mdir/vectorspace.m
 
 placemats() {
     if [ "$nullspace" = left ] ; then
@@ -437,9 +444,9 @@ EOF
 EOF
         for j in `seq 0 $((Nv-1))` ; do
             if [ "$prime" = 2 ] ; then
-                $cmd bmatrix < ${bfile%%.bin}.h$i.v$j> $mdir/t$i$j.m
+                $cmd bmatrix < $wdir/${bfile%%.bin}.h$i.v$j.bin > $mdir/t$i$j.m
             else
-                $cmd bpmatrix < ${bfile%%.bin}.h$i.v$j> $mdir/t$i$j.m
+                $cmd bpmatrix < $wdir/${bfile%%.bin}.h$i.v$j.bin > $mdir/t$i$j.m
             fi
             cat <<-EOF
                 nc$j:=ncp; /*  div nv + ($j lt nc mod nv select 1 else 0); */
@@ -467,194 +474,175 @@ EOF
 }
 
 placemats > $mdir/placemats.m
+# }}}
 
-echo "Saving vectors to magma format"
+echo "Saving vectors to magma format" # {{{
 $cmd x $wdir/X > $mdir/x.m
 
-if [ "$prime" = 2 ] ; then
-    convert_and_display() {
-        text="$1"
-        pattern="$2"
-        terse="$3"
-        n=($(find $wdir -maxdepth 1 -name "$pattern"'*' -a \! -name '*.m' -printf '%f\n'))
-        echo -n "Saving $text to magma format ; ${#n[@]} files"
-        if ! [ "$terse" ] && [ "${#n[@]}" -lt 10 ] && [ "${#n[@]}" -gt 0 ] ; then echo -n ": ${n[@]}" ; fi
-        echo
-        for f in "${n[@]}" ; do $cmd vector < $wdir/$f > $mdir/`basename $f`.m ; done
-    }
-
-    convert_and_display "check vectors" "[HC]"
-    convert_and_display "krylov sequence" "[VAY]"
-    convert_and_display "linear generator" "F"
-    convert_and_display "mksol sequence" "S"
-    convert_and_display "gather data" "[WK]"
-
-else
-    print_all_rhs() {
-        echo "RHS:=[VectorSpace(GF(p), nr_orig)|];"
-        for j in `seq 0 $splitwidth $((nrhs-1))` ; do
-            let j1=j+splitwidth
-            $cmd spvector64 < $wdir/V${j}-${j1}.0 > $mdir/V${j}.0.m
-            cat <<-EOF
-            load "$mdir/V${j}.0.m";
-            Append(~RHS, g(var));
-EOF
-        done
-    }
-
-    print_all_v() {
-        echo "$2:=[VectorSpace(GF(p), nr_orig)|];" 
-        for j in `seq 0 $splitwidth $((n-1))` ; do
-            let j1=j+splitwidth
-            if ! [ -f $wdir/V${j}-${j1}.$1 ] ; then
-                break;
-            fi
-            $cmd spvector64 < $wdir/V${j}-${j1}.$1 > $mdir/V${j}.$1.m
-            cat <<-EOF
-            load "$mdir/V${j}.${1}.m";
-            Append(~$2, g(var));
-EOF
-        done
-    }
-
-    print_all_rhs > $mdir/R.m
-    print_all_v 0 Y > $mdir/Y0.m
-
-    # When magma debug has been activated, we normally have the first 10
-    # iterates of each sequence.
-    echo "VV:=[];" > $mdir/VV.m
-    for i in {0..10} ; do
-        print_all_v $i V_$i > $mdir/V.$i.m
-        if ! [ -f $mdir/V0.$i.m ] ; then
+# prints to stdout magma code defining all vectors V whose iteration
+# number is equal to the first specified parameter.
+# The second parameter tells which is the name of the magma variable
+# where this is put.
+print_all_v() {
+    echo "$2:=[VS|];"
+    for j in `seq 0 $splitwidth $((n-1))` ; do
+        let j1=j+splitwidth
+        if ! [ -f $wdir/V${j}-${j1}.$1 ] ; then
             break;
         fi
-        cat >> $mdir/VV.m <<-EOF
-        load "$mdir/V.$i.m";
-        Append(~VV, V_$i);
+        $cmd $magmaprintmode < $wdir/V${j}-${j1}.$1 > $mdir/V${j}-${j1}.$1.m
+        cat <<-EOF
+        load "$mdir/V${j}-${j1}.${1}.m";
+        Append(~$2, g(var));
 EOF
     done
+}
 
-    echo "Saving check vectors to magma format"
-    if [ -f "$wdir/C.0" ] ; then
-        $cmd spvector64 < $wdir/C.0 > $mdir/C0.m
-        $cmd spvector64 < $wdir/C.1 > $mdir/C1.m
-        $cmd spvector64 < $wdir/C.$interval > $mdir/C$interval.m
-    else
-        echo "var:=0;" > $mdir/C0.m
-        echo "var:=0;" > $mdir/C1.m
-        echo "var:=0;" > $mdir/C$interval.m
+# When magma debug has been activated, we normally have the first 10
+# iterates of each sequence.
+echo "VV:=[];" > $mdir/VV.m
+for i in {0..10} ; do
+    ii=$((i*interval))
+    print_all_v $ii V_$ii > $mdir/V.$ii.m
+    if ! [ -f $mdir/V0-$splitwidth.$ii.m ] ; then
+        break;
     fi
-
-
-    echo "Saving krylov sequence to magma format"
-    afile="`find $wdir -name 'A*[0-9]'`"
-    if ! [ "$afile" ] ; then
-        echo "########## FAILURE ! Krylov sequence not finished #############"
-        exit 1
-    fi
-    afile=$(basename $afile)
-    $cmd spvector64 < $wdir/$afile > $mdir/A.m
-
-
-
-    echo "Saving linear generator to magma format"
-    $cmd spvector64 < $wdir/$afile.gen > $mdir/F.m
-    if [ -f $wdir/$afile.gen.rhs ] ; then
-        $cmd spvector64 < $wdir/$afile.gen.rhs > $mdir/rhscoeffs.m
-    else
-        # We must create an empty file, because otherwise magma won't accept
-        # "load" being conditional...
-        echo > $mdir/rhscoeffs.m
-    fi
-
-    print_all_Ffiles() {
-        echo "Fchunks:=[];";
-        for s in `seq 0 $splitwidth $((n-1))` ; do
-            let s1=s+splitwidth
-            echo "Fs:=[];"
-            for j in `seq 0 $splitwidth $((n-1))` ; do
-                let j1=j+splitwidth
-                $cmd spvector64 < $wdir/F.sols${s}-${s1}.${j}-${j1} > $mdir/F.$s.$j.m
-                cat <<-EOF
-                load "$mdir/F.$s.$j.m";
-                Append(~Fs, g(var));
+    cat >> $mdir/VV.m <<-EOF
+    load "$mdir/V.$ii.m";
+    Append(~VV, V_$ii);
 EOF
-            done
-            echo "Append(~Fchunks, Fs);"
-        done
-    }
-    print_all_Ffiles > $mdir/Fchunks.m
+done
+# }}}
 
+echo "Saving check vectors to magma format" # {{{
+if [ -f "$wdir/C.0" ] ; then
+    $cmd $magmaprintmode < $wdir/C.0 > $mdir/C0.m
+    $cmd $magmaprintmode < $wdir/C.$interval > $mdir/Ci.m
+else
+    echo "var:=0;" > $mdir/C0.m
+    echo "var:=0;" > $mdir/Ci.m
+fi
+# }}}
+
+echo "Saving krylov sequence to magma format" # {{{
+afile=(`find $wdir -name 'A*[0-9]'`)
+if [ "${#afile[@]}" != 1 ] ; then
+    echo "########## FAILURE ! Krylov sequence not finished #############"
+    exit 1
+fi
+afile=$(basename "${afile[0]}")
+$cmd $magmaprintmode < $wdir/$afile > $mdir/A.m
+# }}}
+
+
+echo "Saving linear generator to magma format" # {{{
+#    $cmd spvector64 < $wdir/$afile.gen > $mdir/F.m
+#    if [ -f $wdir/$afile.gen.rhs ] ; then
+#        $cmd spvector64 < $wdir/$afile.gen.rhs > $mdir/rhscoeffs.m
+#    else
+#        # We must create an empty file, because otherwise magma won't accept
+#        # "load" being conditional...
+#        echo > $mdir/rhscoeffs.m
+#    fi
     # Ffiles=(`ls $wdir | perl -ne '/^F.sols\d+-\d+.\d+-\d+$/ && print;' | sort -n`)
 
-    echo "Saving mksol data to magma format"
-
-    save_s() {
-        i="$1"
-        j="$2"
-        k0="$3"
-        k1="$4"
-        let i1=i+1
-        let j1=j+1
-        binfile="S.sols${i}-${i1}.${j}-${j1}.${k0}-${k1}"
-        magmafile="S${i},${j}.${k0}-${k1}.m"
-        if ! [ -f "$wdir/$binfile" ] ; then return 1 ; fi
-        $cmd spvector64 < "$wdir/$binfile" > "$mdir/$magmafile"
-        echo "load \"$mdir/$magmafile\"; Append(~vars, var);" >> "$mdir/S.m"
-        return 0
-    }
-
-    save_s_j() {
-        i="$1"
-        k0="$2"
-        k1="$3"
-        for j in `seq 0 $((n-1))` ; do
-            if ! save_s $i $j $k0 $k1 ; then
-                if [ $i != 0 ] || [ $j != 0 ] ; then
-                    echo "Weird. Short of S files not at i,j=($i,$j)!=(0,0) ?" >&2
-                    exit 1
+print_all_Ffiles() {
+    echo "Fchunks:=[];";
+    echo "Rchunks:=[];";
+    # Solutions correspond to *columns* of F, so let us be consistent
+    # and use that everywhere, including in the format of the data we
+    # pass to magma for verification.
+    for j in `seq 0 $splitwidth $((n-1))` ; do
+        let j1=j+splitwidth
+        echo "Fj:=[];"
+        echo "Rj:=[];"
+        for s in `seq 0 $splitwidth $((n-1))` ; do
+            let s1=s+splitwidth
+            basename=F.sols${s}-${s1}.${j}-${j1}
+            $cmd $magmaprintmode < $wdir/$basename > $mdir/$basename.m
+            cat <<-EOF
+                load "$mdir/$basename.m";
+                Append(~Fj, g(var));
+EOF
+            if [ "$nrhs" ] ; then
+                if [ "$j" -lt "$nrhs" ] ; then
+                    basename=F.sols${s}-${s1}.${j}-${j1}.rhs
+                    $cmd $magmaprintmode < $wdir/$basename > $mdir/$basename.m
+                    cat <<-EOF
+                        load "$mdir/$basename.m";
+                        Append(~Rj, g(var));
+EOF
                 fi
-                echo "nblocks:=$((k1/interval-1));" >> $mdir/S.m
-                return 1
             fi
         done
-        return 0
-    }
-
-    save_s_ij() {
-        k0="$1"
-        k1="$2"
-        for i in `seq 0 $((nsolvecs-1))` ; do
-            if ! save_s_j $i $k0 $k1 ; then
-                return 1
-            fi
-        done
-        return 0
-    }
-
-    echo "vars:=[];" > $mdir/S.m
-    k=0;
-    while save_s_ij $k $((k+interval)) ; do
-        k=$((k+interval))
+        echo "Append(~Fchunks, Fj);"
+        if [ "$j" -lt "$nrhs" ] ; then
+            echo "Append(~Rchunks, Rj);"
+        fi
     done
-    echo "nblocks:=$((k/interval));" >> $mdir/S.m
+}
+print_all_Ffiles > $mdir/Fchunks.m
+# }}}
 
-    echo "Saving gather data to magma format"
-    echo "vars:=[];" > $mdir/K.m
-    (cd $wdir ; find  -name K.sols\*[0-9]) | while read f ; do
-    $cmd spvector64 < $wdir/$f > $mdir/$f.m
-    echo "load \"$mdir/$f.m\"; Append(~vars, var);" >> $mdir/K.m
+echo "Saving mksol data to magma format" # {{{
+
+echo "vars:=[];" > $mdir/S.m
+for i in `seq 0 $splitwidth $((n-1))` ; do
+    k=0;
+    echo "solvars:=[];" >> $mdir/S.m
+    while true ; do
+        k0=$k
+        k1=$((k+interval))
+        let i1=i+splitwidth
+        binfile="S.sols${i}-${i1}.${k0}-${k1}"
+        magmafile="S${i}.${k0}-${k1}.m"
+        if ! [ -f "$wdir/$binfile" ] ; then
+            break
+        fi
+        $cmd $magmaprintmode < "$wdir/$binfile" > "$mdir/$magmafile"
+        echo "load \"$mdir/$magmafile\"; Append(~solvars, var);" >> "$mdir/S.m"
+        let k=k1
+    done
+    if [ $k = 0 ] ; then
+        break
+    else
+        echo "Append(~vars, solvars);" >>  $mdir/S.m
+    fi
 done
 
-fi
+echo "Saving gather data to magma format"
+echo "vars:=[];" > $mdir/K.m
+(cd $wdir ; find  -name K.sols\*[0-9]) | while read f ; do
+    $cmd $magmaprintmode < $wdir/$f > $mdir/$f.m
+    echo "load \"$mdir/$f.m\"; Append(~vars, var);" >> $mdir/K.m
+done
+# }}}
+
+#if [ "$prime" = 2 ] ; then
+#    convert_and_display() {
+#        text="$1"
+#        pattern="$2"
+#        terse="$3"
+#        n=($(find $wdir -maxdepth 1 -name "$pattern"'*' -a \! -name '*.m' -printf '%f\n'))
+#        echo -n "Saving $text to magma format ; ${#n[@]} files"
+#        if ! [ "$terse" ] && [ "${#n[@]}" -lt 10 ] && [ "${#n[@]}" -gt 0 ] ; then echo -n ": ${n[@]}" ; fi
+#        echo
+#        for f in "${n[@]}" ; do $cmd vector < $wdir/$f > $mdir/`basename $f`.m ; done
+#    }
+#
+#    convert_and_display "check vectors" "H"
+#    # convert_and_display "krylov sequence" "[AY]"
+#    # convert_and_display "linear generator" "F"
+#    # convert_and_display "mksol sequence" "S"
+#    convert_and_display "gather data" "[WK]"
+#
+#else
+#    :
+#fi
 
 echo "Running magma verification script"
 
-if [ "$prime" = 2 ] ; then
-    s="`dirname $(readlink -f $0)`/bwc-trace.m"
-else
-    s="`dirname $(readlink -f $0)`/bwc-ptrace.m"
-fi
+s="`dirname $(readlink -f $0)`/bwc-ptrace.m"
 cd $wdir
 # magma does not exit with a useful return code, so we have to grep its
 # output.
