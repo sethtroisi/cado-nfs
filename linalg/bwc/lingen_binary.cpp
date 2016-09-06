@@ -36,7 +36,7 @@
 #include "macros.h"
 #include "utils.h"
 #include "bw-common.h"
-#include "tree_stats.h"
+#include "tree_stats.hpp"
 #include "logline.h"
 
 #include "lingen_qcode.h"
@@ -1074,7 +1074,7 @@ static bool go_quadratic(polmat& E, polmat& pi)/*{{{*/
 {
     using namespace globals;
     using namespace std;
-    tree_stats_enter(stats, __func__, E.ncoef);
+    stats.enter(__func__, E.ncoef);
 
     unsigned int deg = E.ncoef - 1;
     for(unsigned int j = 0 ; j < E.ncols ; j++) {
@@ -1124,7 +1124,7 @@ static bool go_quadratic(polmat& E, polmat& pi)/*{{{*/
     }
     pi.swap(tmp_pi);
 
-    tree_stats_leave(stats, finished);
+    stats.leave(finished);
     return finished;
 }/*}}}*/
 
@@ -1134,7 +1134,7 @@ template<typename fft_type>/*{{{*/
 static bool go_recursive(polmat& E, polmat& pi)
 {
     using namespace globals;
-    tree_stats_enter(stats, fft_type::name(), E.ncoef);
+    stats.enter(fft_type::name(), E.ncoef);
 
     /* E is known up to O(X^E.ncoef), so we'll consider this is a problem
      * of degree E.ncoef -- this is exactly the number of increases we
@@ -1196,7 +1196,7 @@ static bool go_recursive(polmat& E, polmat& pi)
         printf("%-8u" "deg(pi_l) = %ld ; escaping\n",
                 t, pi_l_deg);
         pi.swap(pi_left);
-        tree_stats_leave(stats, 1);
+        stats.leave(1);
         return true;
     }
 
@@ -1259,6 +1259,7 @@ static bool go_recursive(polmat& E, polmat& pi)
                 /* E_length + expected_pi_deg - kill, */
                 m + n);
 
+        stats.begin_smallstep("MP");
         logline_begin(stdout, E_length,
                 "t=%u DFT_pi_left(%lu) [%s]",
                 t, pi_left_length, fft_type::name());
@@ -1275,6 +1276,7 @@ static bool go_recursive(polmat& E, polmat& pi)
                 fft_type::name());
         fft_combo_inplace(E, pi_l_hat, o, E_length, E_length + pi_l_deg - kill + 1);
         logline_end(&t_mp, "");
+        stats.end_smallstep();
     }
 
     /* Make sure that the first llen-kill coefficients of all entries of
@@ -1299,6 +1301,7 @@ static bool go_recursive(polmat& E, polmat& pi)
         tpolmat<fft_type> pi_r_hat;
         fft_type o(pi_l_deg + 1, pi_r_deg + 1, m + n);
 
+        stats.begin_smallstep("MUL");
         logline_begin(stdout, E_length, "t=%u DFT_pi_right(%lu) [%s]",
                 t, pi_right_length, fft_type::name());
         transform(pi_r_hat, pi_right, o, pi_r_deg + 1);
@@ -1313,6 +1316,7 @@ static bool go_recursive(polmat& E, polmat& pi)
                 fft_type::name());
         fft_combo_inplace(pi_left, pi_r_hat, o, pi_l_deg + 1, pi_l_deg + pi_r_deg + 1);
         logline_end(&t_mul, "");
+        stats.end_smallstep();
         pi.swap(pi_left);
     }
 
@@ -1335,7 +1339,7 @@ static bool go_recursive(polmat& E, polmat& pi)
         printf("%-8u" "deg(pi_r) = %ld ; escaping\n",
                 t, pi.maxdeg());
     }
-    tree_stats_leave(stats, finished_early);
+    stats.leave(finished_early);
     return finished_early;
 }/*}}}*/
 
@@ -1634,7 +1638,6 @@ int main(int argc, char *argv[])
         sequence_length = sbuf->st_size / one_mat;
         printf("Automatically detected sequence length %u\n", sequence_length);
     }
-    stats->tree_total_breadth = sequence_length;
 
     m = bw->m;
     n = bw->n;

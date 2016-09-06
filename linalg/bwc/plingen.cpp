@@ -49,7 +49,7 @@
 #include "plingen.h"
 #include "plingen-tuning.h"
 #include "logline.h"
-#include "tree_stats.h"
+#include "tree_stats.hpp"
 
 /* Call tree for methods within this program:
  *
@@ -264,7 +264,7 @@ static inline unsigned int expected_pi_length(dims * d, unsigned int len)/*{{{*/
 /* TODO: adapt for GF(2) */
 static int bw_lingen_basecase(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta) /*{{{*/
 {
-    tree_stats_enter(stats, __func__, E->size);
+    stats.enter(__func__, E->size);
     dims * d = bm->d;
     unsigned int m = d->m;
     unsigned int n = d->n;
@@ -531,7 +531,7 @@ static int bw_lingen_basecase(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned i
     free(pivots);
     free(pi_lengths);   /* What shall we do with this one ??? */
 
-    return tree_stats_leave(stats, generator_found);
+    return stats.leave(generator_found);
 }/*}}}*/
 
 /*}}}*/
@@ -715,7 +715,7 @@ struct cp_info {
 void cp_info_init_backend(struct cp_info * cp)
 {
     int rc;
-    cp->level = stats->depth;
+    cp->level = stats.depth;
     rc = asprintf(&cp->auxfile, "%s/pi.%d.%u.%u.aux",
             checkpoint_directory, cp->level, cp->t0, cp->t1);
     ASSERT_ALWAYS(rc >= 0);
@@ -1187,7 +1187,7 @@ static int bw_biglingen_collective(bmstatus_ptr bm, bigmatpoly pi, bigmatpoly E,
 static int bw_lingen_recursive(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta) /*{{{*/
 {
     size_t z = E->size;
-    tree_stats_enter(stats, __func__, E->size);
+    stats.enter(__func__, E->size);
     dims * d = bm->d;
     abdst_field ab = d->ab;
     int done;
@@ -1216,28 +1216,32 @@ static int bw_lingen_recursive(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned 
         matpoly_swap(pi_left, pi);
         matpoly_clear(ab, pi_left);
         // fprintf(stderr, "Leave %s\n", __func__);
-        return tree_stats_leave(stats, 1);
+        return stats.leave(1);
     }
 
+    stats.begin_smallstep("MP");
     matpoly_rshift(ab, E, E, half - pi_left->size + 1);
     logline_begin(stdout, z, "t=%u MP(%zu, %zu) -> %zu",
             bm->t, E->size, pi_left->size, E->size - pi_left->size + 1);
     matpoly_mp(ab, E_right, E, pi_left);
     logline_end(&(bm->t_mp), "");
+    stats.end_smallstep();
 
     done = bw_lingen_single(bm, pi_right, E_right, delta);
     matpoly_clear(ab, E_right);
 
+    stats.begin_smallstep("MUL");
     logline_begin(stdout, z, "t=%u MUL(%zu, %zu) -> %zu",
             bm->t, pi_left->size, pi_right->size, pi_left->size + pi_right->size - 1);
     matpoly_mul(ab, pi, pi_left, pi_right);
     logline_end(&bm->t_mul, "");
+    stats.end_smallstep();
 
     matpoly_clear(ab, pi_left);
     matpoly_clear(ab, pi_right);
 
     // fprintf(stderr, "Leave %s\n", __func__);
-    return tree_stats_leave(stats, done);
+    return stats.leave(done);
 }/*}}}*/
 
 static int bw_lingen_single(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta) /*{{{*/
@@ -1274,7 +1278,7 @@ static int bw_lingen_single(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int
 static int bw_biglingen_recursive(bmstatus_ptr bm, bigmatpoly pi, bigmatpoly E, unsigned int *delta) /*{{{*/
 {
     size_t z = E->size;
-    tree_stats_enter(stats, __func__, E->size);
+    stats.enter(__func__, E->size);
 
     dims * d = bm->d;
     abdst_field ab = d->ab;
@@ -1308,11 +1312,11 @@ static int bw_biglingen_recursive(bmstatus_ptr bm, bigmatpoly pi, bigmatpoly E, 
         bigmatpoly_clear(ab, pi_right);
         bigmatpoly_clear(ab, E_right);
         // fprintf(stderr, "Leave %s\n", __func__);
-        return tree_stats_leave(stats, 1);
+        return stats.leave(1);
     }
 
+    stats.begin_smallstep("MP");
     bigmatpoly_rshift(ab, E, E, half - pi_left->size + 1);
-
     logline_begin(stdout, z, "t=%u MPI-MP%s(%zu, %zu) -> %zu",
             bm->t, caching ? "-caching" : "",
             E->size, pi_left->size, E->size - pi_left->size + 1);
@@ -1323,10 +1327,12 @@ static int bw_biglingen_recursive(bmstatus_ptr bm, bigmatpoly pi, bigmatpoly E, 
 #endif
         bigmatpoly_mp(ab, E_right, E, pi_left);
     logline_end(&bm->t_mp, "");
+    stats.end_smallstep();
 
     done = bw_biglingen_collective(bm, pi_right, E_right, delta);
     bigmatpoly_clear(ab, E_right);
 
+    stats.begin_smallstep("MUL");
     logline_begin(stdout, z, "t=%u MPI-MUL%s(%zu, %zu) -> %zu",
             bm->t, caching ? "-caching" : "",
             pi_left->size, pi_right->size, pi_left->size + pi_right->size - 1);
@@ -1337,11 +1343,13 @@ static int bw_biglingen_recursive(bmstatus_ptr bm, bigmatpoly pi, bigmatpoly E, 
 #endif
         bigmatpoly_mul(ab, pi, pi_left, pi_right);
     logline_end(&bm->t_mul, "");
+    stats.end_smallstep();
+
     bigmatpoly_clear(ab, pi_left);
     bigmatpoly_clear(ab, pi_right);
 
     // fprintf(stderr, "Leave %s\n", __func__);
-    return tree_stats_leave(stats, done);
+    return stats.leave(done);
 }/*}}}*/
 
 static int bw_biglingen_collective(bmstatus_ptr bm, bigmatpoly pi, bigmatpoly E, unsigned int *delta)/*{{{*/
@@ -1374,12 +1382,16 @@ static int bw_biglingen_collective(bmstatus_ptr bm, bigmatpoly pi, bigmatpoly E,
         matpoly_init(ab, sE, m, b, E->size);
         matpoly_init(ab, spi, 0, 0, 0);
 
+        stats.begin_smallstep("gather(L+R)");
         bigmatpoly_gather_mat(ab, sE, E);
+        stats.end_smallstep();
+
         /* Only the master node does the local computation */
         if (!rank)
             done = bw_lingen_single(bm, spi, sE, delta);
-        bigmatpoly_scatter_mat(ab, pi, spi);
 
+        stats.begin_smallstep("scatter(L+R)");
+        bigmatpoly_scatter_mat(ab, pi, spi);
         MPI_Bcast(&done, 1, MPI_INT, 0, bm->com[0]);
         MPI_Bcast(delta, b, MPI_UNSIGNED, 0, bm->com[0]);
         MPI_Bcast(bm->lucky, b, MPI_UNSIGNED, 0, bm->com[0]);
@@ -1387,6 +1399,7 @@ static int bw_biglingen_collective(bmstatus_ptr bm, bigmatpoly pi, bigmatpoly E,
         /* Don't forget to broadcast delta from root node to others ! */
         matpoly_clear(ab, spi);
         matpoly_clear(ab, sE);
+        stats.end_smallstep();
     }
     // fprintf(stderr, "Leave %s\n", __func__);
 
@@ -3022,8 +3035,6 @@ int main(int argc, char *argv[])
     unsigned int t0 = bm->t;
     unsigned int * delta = (unsigned int*) malloc((m + n) * sizeof(unsigned int));
     for(unsigned int j = 0 ; j < m + n ; delta[j++]=t0);
-
-    stats->tree_total_breadth = aa->guessed_length;
 
     int go_mpi = aa->guessed_length >= bm->lingen_mpi_threshold;
 

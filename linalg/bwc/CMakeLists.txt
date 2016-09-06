@@ -370,7 +370,7 @@ link_directories (${CADO_NFS_BINARY_DIR}/gf2x/.libs)
 
 include_directories(${CADO_NFS_SOURCE_DIR}/gf2x/fft)
 include_directories(${CADO_NFS_SOURCE_DIR}/gf2x/fft/mpfq)
-add_executable(lingen lingen_binary.cpp tree_stats.c logline.c
+add_executable(lingen lingen_binary.cpp tree_stats.cpp logline.c
     lingen_qcode.c lingen_qcode_do.cpp)
 # This **MUST** match the #define in gf2x/Makefile.am
 set_source_files_properties(lingen_qcode_do.cpp COMPILE_FLAGS
@@ -409,7 +409,7 @@ foreach(v ${BWC_GFP_ARITHMETIC_BACKENDS})
         bw-common.c
         plingen.cpp
         plingen-tuning.cpp
-        tree_stats.c
+        tree_stats.cpp
         logline.c
         lingen-matpoly.c
         lingen-bigmatpoly.c
