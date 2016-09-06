@@ -68,8 +68,19 @@ struct matmul_top_matrix_s {
     unsigned int n[2];
     unsigned int n0[2]; // n0: unpadded.
 
-    // this really ends up within the mm field.
+    // this really ends up within the mm field. It's not a complete file
+    // name though. We lack the implementation extension, the possible
+    // transposition tag, as well as the .bin extension.
     char * locfile;
+
+    /* These two are global to all threads and jobs (well, each thread
+     * has its own pointer though, it's not a shared_malloc. It could be,
+     * but it isn't).
+     *
+     * For random matrices, both strings below are NULL.
+     */
+    char * mname;
+    char * bname;
 
     balancing bal;
 

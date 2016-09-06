@@ -2202,7 +2202,6 @@ void mmt_vec_set_x_indices(mmt_vec_ptr y, uint32_t * gxvecs, int m, unsigned int
 
 
 /**********************************************************************/
-static void mmt_finish_init(matmul_top_data_ptr mmt, param_list_ptr pl, int optimized_direction);
 static void matmul_top_read_submatrix(matmul_top_data_ptr mmt, int midx, param_list_ptr pl, int optimized_direction);
 
 /* returns an allocated string holding the name of the midx-th submatrix */
@@ -2231,6 +2230,8 @@ static char * matrix_list_get_item(param_list_ptr pl, const char * key, int midx
  */
 static char* matrix_get_derived_balancing_filename(const char * matrixname, parallelizing_info_ptr pi)
 {
+    /* input is NULL in the case of random matrices */
+    if (!matrixname) return NULL;
     unsigned int nh = pi->wr[1]->totalsize;
     unsigned int nv = pi->wr[0]->totalsize;
     char * copy = strdup(matrixname);
@@ -2240,6 +2241,8 @@ static char* matrix_get_derived_balancing_filename(const char * matrixname, para
     }
     if ((t = strrchr(copy, '/')) == NULL) { /* basename */
         t = copy;
+    } else {
+        t++;
     }
     int rc = asprintf(&t, "%s.%ux%u.bin", t, nh, nv);
     ASSERT_ALWAYS(rc >=0);
@@ -2247,96 +2250,210 @@ static char* matrix_get_derived_balancing_filename(const char * matrixname, para
     return t;
 }
 
-static void mmt_fill_fields_from_balancing(matmul_top_data_ptr mmt, param_list_ptr pl)
+static char* matrix_get_derived_cache_filename_stem(const char * matrixname, parallelizing_info_ptr pi, uint32_t checksum)
 {
-    char ** mnames;
-    int nmatrices;
-    // get basename of matrix file. Remove potential suffix, .txt or .bin
-    if (param_list_lookup_string(pl, "random_matrix")) {
-        mnames = malloc(sizeof(char *));
-        mnames[0] = malloc(16);
-        int rc = strlcpy(mnames[0], "fake", 16);
-        ASSERT_ALWAYS(rc < 16);
-    } else {
-        int rc = param_list_parse_string_list_alloc(pl, "matrix", &mnames, &nmatrices, ",");
-        ASSERT_ALWAYS(rc);
+    /* input is NULL in the case of random matrices */
+    if (!matrixname) return NULL;
+    unsigned int nh = pi->wr[1]->totalsize;
+    unsigned int nv = pi->wr[0]->totalsize;
+    char * copy = strdup(matrixname);
+    char * t;
+    if (strlen(copy) > 4 && strcmp((t = copy + strlen(copy) - 4), ".bin") == 0) {
+        *t = '\0';
     }
-
+    if ((t = strrchr(copy, '/')) == NULL) { /* basename */
+        t = copy;
+    } else {
+        t++;
+    }
     int pos[2];
     for(int d = 0 ; d < 2 ; d++)  {
-        pi_comm_ptr wr = mmt->pi->wr[d];
+        pi_comm_ptr wr = pi->wr[d];
         pos[d] = wr->jrank * wr->ncores + wr->trank;
     }
+    int rc = asprintf(&t, "%s.%ux%u.%08" PRIx32 ".h%d.v%d", t, nh, nv, checksum, pos[1], pos[0]);
+    ASSERT_ALWAYS(rc >=0);
+    free(copy);
+    return t;
+}
 
-    for(int midx = 0 ; midx < mmt->nmatrices ; midx++) {
-        matmul_top_matrix_ptr Mloc = mmt->matrices[midx];
-        Mloc->n[0] = Mloc->bal->trows;
-        Mloc->n[1] = Mloc->bal->tcols;
-        Mloc->n0[0] = Mloc->bal->h->nrows;
-        Mloc->n0[1] = Mloc->bal->h->ncols;
-
-        // nslices[0] is the number of slices in a column -- this is the number of
-        // ``horizontal slices'', in balance.c parlance.
-        //
-        // nslices[0] is also the number of big pieces into which a left
-        // vector is split (eventually, it is split in nh * nv pieces of
-        // course, but the topmost split level is nh).
-
-        int ok = 1;
-        ok = ok && mmt->pi->wr[0]->totalsize == Mloc->bal->h->nv;
-        ok = ok && mmt->pi->wr[1]->totalsize == Mloc->bal->h->nh;
-
-        if (!ok) {
-            fprintf(stderr, "Balancing file for matrix %d"
-                    " has dimensions %ux%u,"
-                    " this conflicts with the current run,"
-                    " which expects dimensions (%ux%u)x(%ux%u).\n",
-                    midx,
-                    Mloc->bal->h->nh, Mloc->bal->h->nv,
-                    mmt->pi->wr[0]->njobs,
-                    mmt->pi->wr[0]->ncores,
-                    mmt->pi->wr[1]->njobs,
-                    mmt->pi->wr[1]->ncores);
-            serialize(mmt->pi->m);
-            exit(1);
-        }
-
-        /* basename of current matrix. Used to derive cache file. */
-        char * base;
-        {
-            char * mname = mnames[midx];
-            char * last_slash = strrchr(mname, '/');
-            if (last_slash) {
-                mname = last_slash + 1;
-            }
-            const char * suffixes[] = { ".txt", ".bin" };
-            unsigned int l = strlen(mname);
-            for(unsigned int k = 0 ; k < sizeof(suffixes) / sizeof(suffixes[0]) ; k++) {
-                unsigned int ls = strlen(suffixes[k]);
-                if (ls > l) continue;
-                if (strcmp(mname+l-ls,suffixes[k]) == 0)
-                    l -= ls;
-            }
-            base = strndup(mname, l);
-        }
-
-        /* The name choice is only indicative. Depending on the value of
-         * the nullspace argument, the matrices in h?.v? may in fact be
-         * transposed because this is what the cache building code prefers to
-         * receive.
-         */
-        int rc = asprintf(&Mloc->locfile, "%s.%dx%d.%08" PRIx32 ".h%d.v%d", base, Mloc->bal->h->nh, Mloc->bal->h->nv, Mloc->bal->h->checksum, pos[1], pos[0]);
-        ASSERT_ALWAYS(rc >= 0);
-        free(base);
+static char* matrix_get_derived_submatrix_filename(const char * matrixname, parallelizing_info_ptr pi)
+{
+    /* input is NULL in the case of random matrices */
+    if (!matrixname) return NULL;
+    unsigned int nh = pi->wr[1]->totalsize;
+    unsigned int nv = pi->wr[0]->totalsize;
+    char * copy = strdup(matrixname);
+    char * t;
+    if (strlen(copy) > 4 && strcmp((t = copy + strlen(copy) - 4), ".bin") == 0) {
+        *t = '\0';
     }
-    mmt->n[0] = mmt->matrices[0]->n[0];
-    mmt->n0[0] = mmt->matrices[0]->n0[0];
-    mmt->n[1] = mmt->matrices[mmt->nmatrices-1]->n[1];
-    mmt->n0[1] = mmt->matrices[mmt->nmatrices-1]->n0[1];
-    for(int midx = 0 ; midx < mmt->nmatrices ; midx++) {
-        free(mnames[midx]);
+    if ((t = strrchr(copy, '/')) == NULL) { /* basename */
+        t = copy;
+    } else {
+        t++;
     }
-    free(mnames);
+    int pos[2];
+    for(int d = 0 ; d < 2 ; d++)  {
+        pi_comm_ptr wr = pi->wr[d];
+        pos[d] = wr->jrank * wr->ncores + wr->trank;
+    }
+    int rc = asprintf(&t, "%s.%ux%u.h%d.v%d.bin", t, nh, nv, pos[1], pos[0]);
+    ASSERT_ALWAYS(rc >=0);
+    free(copy);
+    return t;
+}
+
+static void matmul_top_init_fill_balancing_header(matmul_top_data_ptr mmt, int i, param_list_ptr pl)
+{
+    parallelizing_info_ptr pi = mmt->pi;
+    matmul_top_matrix_ptr Mloc = mmt->matrices[i];
+
+    if (pi->m->jrank == 0 && pi->m->trank == 0) {
+        if (!Mloc->mname) {
+            random_matrix_fill_fake_balancing_header(Mloc->bal, pi, param_list_lookup_string(pl, "random_matrix"));
+        } else {
+            if (access(Mloc->bname, R_OK) != 0) {
+                if (errno == ENOENT) {
+                    printf("Creating balancing file %s\n", Mloc->bname);
+                    struct mf_bal_args mba = {
+                        .mfile = Mloc->mname,
+                        .bfile = Mloc->bname,
+                        .nh = pi->wr[1]->totalsize,
+                        .nv = pi->wr[0]->totalsize,
+                        .withcoeffs = !is_char2(mmt->abase),
+                        .do_perm = { MF_BAL_PERM_AUTO, MF_BAL_PERM_AUTO },
+                    };
+                    mf_bal(&mba);
+                } else {
+                    fprintf(stderr, "Cannot access balancing file %s: %s\n", Mloc->bname, strerror(errno));
+                }
+            }
+            balancing_read_header(Mloc->bal, Mloc->bname);
+        }
+    }
+    pi_bcast(Mloc->bal, sizeof(balancing), BWC_PI_BYTE, 0, 0, mmt->pi->m);
+
+    /* check that balancing dimensions are compatible with our run */
+    int ok = 1;
+    ok = ok && mmt->pi->wr[0]->totalsize == Mloc->bal->h->nv;
+    ok = ok && mmt->pi->wr[1]->totalsize == Mloc->bal->h->nh;
+    if (ok) return;
+
+    if (pi->m->jrank == 0 && pi->m->trank == 0) {
+        fprintf(stderr, "Matrix %d, %s: balancing file %s"
+                " has dimensions %ux%u,"
+                " this conflicts with the current run,"
+                " which expects dimensions (%ux%u)x(%ux%u).\n",
+                i, Mloc->mname, Mloc->bname,
+                Mloc->bal->h->nh, Mloc->bal->h->nv,
+                mmt->pi->wr[1]->njobs,
+                mmt->pi->wr[1]->ncores,
+                mmt->pi->wr[0]->njobs,
+                mmt->pi->wr[0]->ncores);
+    }
+    serialize(mmt->pi->m);
+    exit(1);
+}
+
+static void matmul_top_init_prepare_local_permutations(matmul_top_data_ptr mmt, int i)
+{
+    matmul_top_matrix_ptr Mloc = mmt->matrices[i];
+    /* Here, we get a copy of the rowperm and colperm.
+     *
+     * For each (job,thread), two pairs of intervals are defined.
+     *
+     * for row indices: [i0[0], i1[0][ = [mrow->i0, mrow->i1[ and [Xi0[0], Xi1[0][
+     * for col indices: [i0[1], i1[1][ = [mcol->i0, mcol->i1[ and [Xi0[1], Xi1[1][
+     *
+     * The parts we get are:
+     *      [i, rowperm[i]] for    i in [mrow->i0, mrow->i1[
+     *                         and rowperm[i] in [X0, X1[
+     *      [j, colperm[j]] for    j in [mcol->i0, mcol->i1[
+     *                         and colperm[i] in [Y0, Y1[
+     * where X0 is what would be mcol->i0 if the matrix as many columns as
+     * rows, and ditto for X1,Y0,Y1.
+     */
+
+    unsigned int rowperm_items=0;
+    unsigned int colperm_items=0;
+
+    /* Define a complete structure for the balancing which is shared
+     * among threads, so that we'll be able to access it from all threads
+     * simultaneously. We will put things in bal_tmp->rowperm and
+     * bal_tmp->colperm, but beyond that, the header part will be wrong
+     * at non-root nodes.
+     */
+    balancing_ptr bal_tmp = shared_malloc_set_zero(mmt->pi->m, sizeof(balancing));
+
+    if (mmt->pi->m->jrank == 0 && mmt->pi->m->trank == 0) {
+        if (Mloc->bname)
+            balancing_read(bal_tmp, Mloc->bname);
+        /* It's fine if we have nothing. This just means that we'll have
+         * no balancing to deal with (this occurs only for matrices
+         * which are generated at random on the fly). */
+        rowperm_items = bal_tmp->rowperm != NULL ? bal_tmp->trows : 0;
+        colperm_items = bal_tmp->colperm != NULL ? bal_tmp->tcols : 0;
+    }
+    pi_bcast(&rowperm_items, 1, BWC_PI_UNSIGNED, 0, 0, mmt->pi->m);
+    pi_bcast(&colperm_items, 1, BWC_PI_UNSIGNED, 0, 0, mmt->pi->m);
+
+    if (mmt->pi->m->trank == 0) {
+        if (rowperm_items) {
+            ASSERT_ALWAYS(rowperm_items == Mloc->bal->trows);
+            if (mmt->pi->m->jrank != 0)
+                bal_tmp->rowperm = malloc(Mloc->bal->trows * sizeof(uint32_t));
+            MPI_Bcast(bal_tmp->rowperm, Mloc->bal->trows * sizeof(uint32_t), MPI_BYTE, 0, mmt->pi->m->pals);
+        }
+        if (colperm_items) {
+            ASSERT_ALWAYS(colperm_items == Mloc->bal->tcols);
+            if (mmt->pi->m->jrank != 0)
+                bal_tmp->colperm = malloc(Mloc->bal->tcols * sizeof(uint32_t));
+            MPI_Bcast(bal_tmp->colperm, Mloc->bal->tcols * sizeof(uint32_t), MPI_BYTE, 0, mmt->pi->m->pals);
+        }
+    }
+    serialize_threads(mmt->pi->m);      /* important ! */
+
+    uint32_t * balperm[2] = { bal_tmp->rowperm, bal_tmp->colperm };
+    for(int d = 0 ; d < 2 ; d++)  {
+        unsigned int ii[2];
+        unsigned int jj[2];
+        get_local_permutations_ranges(mmt, d, ii, jj);
+
+        if (!balperm[d]) continue;
+
+        Mloc->perm[d] = permutation_data_alloc();
+#ifdef  MVAPICH2_NUMVERSION
+        /* apparently mvapich2 frowns on realloc() */
+        permutation_data_ensure(Mloc->perm[d],ii[1] - ii[0]);
+#endif
+
+        /* now create the really local permutation */
+        for(unsigned int i = ii[0] ; i < ii[1] ; i++) {
+            unsigned int j = balperm[d][i];
+            if (j >= jj[0] && j < jj[1]) {
+                unsigned int ij[2] = { i, j };
+                permutation_data_push(Mloc->perm[d], ij);
+            }
+        }
+#if 0
+        const char * text[2] = { "left", "right", };
+        printf("[%s] J%uT%u does %zu/%u permutation pairs for %s vectors\n",
+                mmt->pi->nodenumber_s,
+                mmt->pi->m->jrank, mmt->pi->m->trank,
+                Mloc->perm[d]->n, d ? Mloc->bal->tcols : Mloc->bal->trows,
+                text[d]);
+#endif
+    }
+
+    serialize_threads(mmt->pi->m);      /* important ! */
+
+    if (mmt->pi->m->trank == 0) {
+        if (bal_tmp->colperm) free(bal_tmp->colperm);
+        if (bal_tmp->rowperm) free(bal_tmp->rowperm);
+    }
+
+    shared_free(mmt->pi->m, bal_tmp);
 }
 
 void matmul_top_init(matmul_top_data_ptr mmt,
@@ -2367,12 +2484,8 @@ void matmul_top_init(matmul_top_data_ptr mmt,
         fprintf(stderr, "missing parameter matrix=\n");
         exit(EXIT_FAILURE);
     } else if (!nbals && mmt->nmatrices) {
-        /*
-        fprintf(stderr, "missing parameter balancing=\n");
-        exit(EXIT_FAILURE);
-        */
-        /* see nbals == 0 as a hint towards taking the default balancing
-         * file names, that's it */
+        /* nbals == 0 is a hint towards taking the default balancing file
+         * names, that's it */
     } else if (nbals != mmt->nmatrices) {
         fprintf(stderr, "balancing= and matrix= have inconsistent number of items\n");
         exit(EXIT_FAILURE);
@@ -2381,196 +2494,48 @@ void matmul_top_init(matmul_top_data_ptr mmt,
     if (random_description)
         mmt->nmatrices = 1;
 
-    if (mmt->nmatrices) {
-        mmt->matrices = malloc(mmt->nmatrices * sizeof(matmul_top_matrix));
-        memset(mmt->matrices, 0, mmt->nmatrices * sizeof(matmul_top_matrix));
-    }
+    mmt->matrices = malloc(mmt->nmatrices * sizeof(matmul_top_matrix));
+    memset(mmt->matrices, 0, mmt->nmatrices * sizeof(matmul_top_matrix));
 
     serialize_threads(mmt->pi->m);
 
-    // n[]
-    // ncoeffs_total, ncoeffs,
-    // locfile,
-    // wr[]->*
-    // are filled in later within read_info_file
-
-    if (pi->m->jrank == 0 && pi->m->trank == 0) {
-        /* We'll use the default balancing file name for all matrices
-        */
-        if (random_description) {
-            random_matrix_fill_fake_balancing_header(mmt->matrices[0]->bal, pi, random_description);
-        } else {
-            for(int i = 0 ; i < mmt->nmatrices ; i++) {
-                char * mname = matrix_list_get_item(pl, "matrix", i);
-                char * bname = matrix_list_get_item(pl, "balancing", i);
-                if (!bname) {
-                    bname = matrix_get_derived_balancing_filename(mname, mmt->pi);
-                }
-                if (access(bname, R_OK) != 0) {
-                    if (errno == ENOENT) {
-                        printf("Creating balancing file %s\n", bname);
-                        struct mf_bal_args mba = {
-                            .mfile = mname,
-                            .bfile = bname,
-                            .nh = mmt->pi->wr[1]->totalsize,
-                            .nv = mmt->pi->wr[0]->totalsize,
-                            .withcoeffs = !is_char2(mmt->abase),
-                            .do_perm = { MF_BAL_PERM_AUTO, MF_BAL_PERM_AUTO },
-                        };
-                        mf_bal(&mba);
-                    } else {
-                        fprintf(stderr, "Cannot access balancing file %s: %s\n", bname, strerror(errno));
-                    }
-                }
-                balancing_read_header(mmt->matrices[i]->bal, bname);
-                free(bname);
-                free(mname);
-            }
-        }
-    }
-
+    /* The initialization goes through several passes */
     for(int i = 0 ; i < mmt->nmatrices ; i++) {
-        pi_bcast(mmt->matrices[i]->bal, sizeof(balancing), BWC_PI_BYTE, 0, 0, mmt->pi->m);
+        matmul_top_matrix_ptr Mloc = mmt->matrices[i];
+        Mloc->mname = matrix_list_get_item(pl, "matrix", i);
+        Mloc->bname = matrix_list_get_item(pl, "balancing", i);
+        if (!Mloc->bname) {
+            Mloc->bname = matrix_get_derived_balancing_filename(Mloc->mname, mmt->pi);
+        }
+        ASSERT_ALWAYS((Mloc->bname != NULL) == !random_description);
+
+        matmul_top_init_fill_balancing_header(mmt, i, pl);
+
+        Mloc->n[0] = Mloc->bal->trows;
+        Mloc->n[1] = Mloc->bal->tcols;
+        Mloc->n0[0] = Mloc->bal->h->nrows;
+        Mloc->n0[1] = Mloc->bal->h->ncols;
+        Mloc->locfile = matrix_get_derived_cache_filename_stem(Mloc->mname, mmt->pi, Mloc->bal->h->checksum);
+
     }
 
-    // after that, we need to check for every node if the cache file can
-    // be found. If none is found, rebuild the cache files
-    mmt_finish_init(mmt, pl, optimized_direction);
-}
+    mmt->n[0] = mmt->matrices[0]->n[0];
+    mmt->n0[0] = mmt->matrices[0]->n0[0];
+    mmt->n[1] = mmt->matrices[mmt->nmatrices-1]->n[1];
+    mmt->n0[1] = mmt->matrices[mmt->nmatrices-1]->n0[1];
 
-/* Here, we get a copy of the rowperm and colperm.
- *
- * For each (job,thread), two pairs of intervals are defined.
- *
- * for row indices: [i0[0], i1[0][ = [mrow->i0, mrow->i1[ and [Xi0[0], Xi1[0][
- * for col indices: [i0[1], i1[1][ = [mcol->i0, mcol->i1[ and [Xi0[1], Xi1[1][
- *
- * The parts we get are:
- *      [i, rowperm[i]] for    i in [mrow->i0, mrow->i1[
- *                         and rowperm[i] in [X0, X1[
- *      [j, colperm[j]] for    j in [mcol->i0, mcol->i1[
- *                         and colperm[i] in [Y0, Y1[
- * where X0 is what would be mcol->i0 if the matrix as many columns as
- * rows, and ditto for X1,Y0,Y1.
- */
+    /* in the second loop below, get_local_permutations_ranges uses
+     * mmt->n[], so we do it in a second pass.
+     * Now, given that double matrices only barely work at the moment,
+     * I'm not absolutely sure that it's really needed.
+     */
+    for(int i = 0 ; i < mmt->nmatrices ; i++) {
+        matmul_top_matrix_ptr Mloc = mmt->matrices[i];
 
-static void mmt_get_local_permutation_data(matmul_top_data_ptr mmt, param_list_ptr pl)
-{
-    serialize_threads(mmt->pi->m);
+        matmul_top_init_prepare_local_permutations(mmt, i);
 
-    int nbals = param_list_get_list_count(pl, "balancing");
-    ASSERT_ALWAYS(nbals == 0 || nbals == mmt->nmatrices);
-
-    for(int midx = 0 ; midx < mmt->nmatrices ; midx++) {
-        matmul_top_matrix_ptr Mloc = mmt->matrices[midx];
-        /* we're going to read the balancing file completely, on the leader
-         * node. Make sure there's nothing there yet.
-         */
-        ASSERT_ALWAYS(Mloc->bal->rowperm == NULL);
-        ASSERT_ALWAYS(Mloc->bal->colperm == NULL);
-        unsigned int rowperm_items=0;
-        unsigned int colperm_items=0;
-
-        /* Define a complete structure for the balancing which is shared
-         * among threads, so that we'll be able to access it from all threads
-         * simultaneously. We will put things in bal_tmp->rowperm and
-         * bal_tmp->colperm, but beyond that, the header part will be wrong
-         * at non-root nodes.
-         */
-        balancing_ptr bal_tmp = shared_malloc_set_zero(mmt->pi->m, sizeof(balancing));
-
-        if (mmt->pi->m->jrank == 0 && mmt->pi->m->trank == 0) {
-            char * tmp = matrix_list_get_item(pl, "balancing", midx);
-            if (tmp) {
-                balancing_read(bal_tmp, tmp);
-                free(tmp);
-            }
-            /* It's fine if we have nothing. This just means that we'll have
-             * no balancing to deal with. */
-            rowperm_items = bal_tmp->rowperm != NULL ? bal_tmp->trows : 0;
-            colperm_items = bal_tmp->colperm != NULL ? bal_tmp->tcols : 0;
-        }
-        pi_bcast(&rowperm_items, 1, BWC_PI_UNSIGNED, 0, 0, mmt->pi->m);
-        pi_bcast(&colperm_items, 1, BWC_PI_UNSIGNED, 0, 0, mmt->pi->m);
-
-        if (mmt->pi->m->trank == 0) {
-            if (rowperm_items) {
-                ASSERT_ALWAYS(rowperm_items == Mloc->bal->trows);
-                if (mmt->pi->m->jrank != 0)
-                    bal_tmp->rowperm = malloc(Mloc->bal->trows * sizeof(uint32_t));
-                MPI_Bcast(bal_tmp->rowperm, Mloc->bal->trows * sizeof(uint32_t), MPI_BYTE, 0, mmt->pi->m->pals);
-            }
-            if (colperm_items) {
-                ASSERT_ALWAYS(colperm_items == Mloc->bal->tcols);
-                if (mmt->pi->m->jrank != 0)
-                    bal_tmp->colperm = malloc(Mloc->bal->tcols * sizeof(uint32_t));
-                MPI_Bcast(bal_tmp->colperm, Mloc->bal->tcols * sizeof(uint32_t), MPI_BYTE, 0, mmt->pi->m->pals);
-            }
-        }
-        serialize_threads(mmt->pi->m);      /* important ! */
-
-        uint32_t * balperm[2] = { bal_tmp->rowperm, bal_tmp->colperm };
-        for(int d = 0 ; d < 2 ; d++)  {
-            unsigned int ii[2];
-            unsigned int jj[2];
-            get_local_permutations_ranges(mmt, d, ii, jj);
-
-            if (!balperm[d]) continue;
-
-            Mloc->perm[d] = permutation_data_alloc();
-#ifdef  MVAPICH2_NUMVERSION
-            /* apparently mvapich2 frowns on realloc() */
-            permutation_data_ensure(Mloc->perm[d],ii[1] - ii[0]);
-#endif
-
-            /* now create the really local permutation */
-            for(unsigned int i = ii[0] ; i < ii[1] ; i++) {
-                unsigned int j = balperm[d][i];
-                if (j >= jj[0] && j < jj[1]) {
-                    unsigned int ij[2] = { i, j };
-                    permutation_data_push(Mloc->perm[d], ij);
-                }
-            }
-#if 0
-        const char * text[2] = { "left", "right", };
-            printf("[%s] J%uT%u does %zu/%u permutation pairs for %s vectors\n",
-                    mmt->pi->nodenumber_s,
-                    mmt->pi->m->jrank, mmt->pi->m->trank,
-                    Mloc->perm[d]->n, d ? Mloc->bal->tcols : Mloc->bal->trows,
-                    text[d]);
-#endif
-        }
-
-        serialize_threads(mmt->pi->m);      /* important ! */
-
-        if (mmt->pi->m->trank == 0) {
-            if (bal_tmp->colperm) free(bal_tmp->colperm);
-            if (bal_tmp->rowperm) free(bal_tmp->rowperm);
-        }
-
-        shared_free(mmt->pi->m, bal_tmp);
-    }
-}
-
-
-
-
-/* Some work has to be done in order to fill the remaining fields in the
- * matmul_top structure.
- */
-static void mmt_finish_init(matmul_top_data_ptr mmt, param_list_ptr pl, int optimized_direction)
-{
-    mmt_fill_fields_from_balancing(mmt, pl);
-
-    mmt_get_local_permutation_data(mmt, pl);
-
-    // TODO: reuse the ../bw-matmul/matmul/matrix_base.cpp things for
-    // displaying communication info.
-
-    for(int midx = 0 ; midx < mmt->nmatrices ; midx++) {
-        matmul_top_matrix_ptr Mloc = mmt->matrices[midx];
         if (!mmt->pi->interleaved) {
-            matmul_top_read_submatrix(mmt, midx, pl, optimized_direction );
+            matmul_top_read_submatrix(mmt, i, pl, optimized_direction );
         } else {
             /* Interleaved threads will share their matrix data. The first
              * thread to arrive will do the initialization, and the second
@@ -2583,66 +2548,64 @@ static void mmt_finish_init(matmul_top_data_ptr mmt, param_list_ptr pl, int opti
 #define MMT_MM_MAGIC_KEY        0xaa000000UL
 
             if (mmt->pi->interleaved->idx == 0) {
-                matmul_top_read_submatrix(mmt, midx, pl, optimized_direction);
-                pi_store_generic(mmt->pi, MMT_MM_MAGIC_KEY + midx, mmt->pi->m->trank, Mloc->mm);
+                matmul_top_read_submatrix(mmt, i, pl, optimized_direction);
+                pi_store_generic(mmt->pi, MMT_MM_MAGIC_KEY + i, mmt->pi->m->trank, Mloc->mm);
             } else {
-                Mloc->mm = pi_load_generic(mmt->pi, MMT_MM_MAGIC_KEY + midx, mmt->pi->m->trank);
+                Mloc->mm = pi_load_generic(mmt->pi, MMT_MM_MAGIC_KEY + i, mmt->pi->m->trank);
             }
         }
     }
 }
 
-static int export_cache_list_if_requested(matmul_top_data_ptr mmt, int midx, param_list_ptr pl)
+static int export_cache_list_if_requested(matmul_top_matrix_ptr Mloc, parallelizing_info_ptr pi, param_list_ptr pl)
 {
     const char * cachelist = param_list_lookup_string(pl, "export_cachelist");
     if (!cachelist) return 0;
 
-    matmul_top_matrix_ptr Mloc = mmt->matrices[midx];
-
     char * myline = NULL;
     int rc;
-    rc = asprintf(&myline, "%s %s", mmt->pi->nodename, Mloc->mm->cachefile_name);
+    rc = asprintf(&myline, "%s %s", pi->nodename, Mloc->mm->cachefile_name);
     ASSERT_ALWAYS(rc >= 0);
     ASSERT_ALWAYS(myline != NULL);
     char ** tlines = NULL;
-    tlines = shared_malloc_set_zero(mmt->pi->m, mmt->pi->m->ncores * sizeof(const char *));
-    tlines[mmt->pi->m->trank] = myline;
-    serialize_threads(mmt->pi->m);
+    tlines = shared_malloc_set_zero(pi->m, pi->m->ncores * sizeof(const char *));
+    tlines[pi->m->trank] = myline;
+    serialize_threads(pi->m);
 
     /* Also, just out of curiosity, try to see what we have currently */
     struct stat st[1];
-    int * has_cache = shared_malloc_set_zero(mmt->pi->m, mmt->pi->m->totalsize * sizeof(int));
+    int * has_cache = shared_malloc_set_zero(pi->m, pi->m->totalsize * sizeof(int));
     rc = stat(Mloc->mm->cachefile_name, st);
-    unsigned int mynode = mmt->pi->m->ncores * mmt->pi->m->jrank;
-    has_cache[mynode + mmt->pi->m->trank] = rc == 0;
-    serialize_threads(mmt->pi->m);
+    unsigned int mynode = pi->m->ncores * pi->m->jrank;
+    has_cache[mynode + pi->m->trank] = rc == 0;
+    serialize_threads(pi->m);
 
     int len = 0;
-    if (mmt->pi->m->trank == 0) {
+    if (pi->m->trank == 0) {
     MPI_Allgather(MPI_IN_PLACE, 0, MPI_DATATYPE_NULL,
-                has_cache, mmt->pi->m->ncores, MPI_INT, mmt->pi->m->pals);
+                has_cache, pi->m->ncores, MPI_INT, pi->m->pals);
 
-        for(unsigned int j = 0 ; j < mmt->pi->m->ncores ; j++) {
+        for(unsigned int j = 0 ; j < pi->m->ncores ; j++) {
             int s = strlen(tlines[j]);
             if (s >= len) len = s;
         }
-        MPI_Allreduce(MPI_IN_PLACE, &len, 1, MPI_INT, MPI_MAX, mmt->pi->m->pals);
-        char * info = malloc(mmt->pi->m->totalsize * (len + 1));
-        char * mybuf = malloc(mmt->pi->m->ncores * (len+1));
-        memset(mybuf, 0, mmt->pi->m->ncores * (len+1));
-        for(unsigned int j = 0 ; j < mmt->pi->m->ncores ; j++) {
+        MPI_Allreduce(MPI_IN_PLACE, &len, 1, MPI_INT, MPI_MAX, pi->m->pals);
+        char * info = malloc(pi->m->totalsize * (len + 1));
+        char * mybuf = malloc(pi->m->ncores * (len+1));
+        memset(mybuf, 0, pi->m->ncores * (len+1));
+        for(unsigned int j = 0 ; j < pi->m->ncores ; j++) {
             memcpy(mybuf + j * (len+1), tlines[j], strlen(tlines[j])+1);
         }
-        MPI_Allgather(mybuf, mmt->pi->m->ncores * (len+1), MPI_BYTE,
-                info, mmt->pi->m->ncores * (len+1), MPI_BYTE,
-                mmt->pi->m->pals);
-        if (mmt->pi->m->jrank == 0) {
+        MPI_Allgather(mybuf, pi->m->ncores * (len+1), MPI_BYTE,
+                info, pi->m->ncores * (len+1), MPI_BYTE,
+                pi->m->pals);
+        if (pi->m->jrank == 0) {
             FILE * f = fopen(cachelist, "wb");
             DIE_ERRNO_DIAG(f == NULL, "fopen", cachelist);
-            for(unsigned int j = 0 ; j < mmt->pi->m->njobs ; j++) {
-                unsigned int j0 = j * mmt->pi->m->ncores;
+            for(unsigned int j = 0 ; j < pi->m->njobs ; j++) {
+                unsigned int j0 = j * pi->m->ncores;
                 fprintf(f, "get-cache ");
-                for(unsigned int k = 0 ; k < mmt->pi->m->ncores ; k++) {
+                for(unsigned int k = 0 ; k < pi->m->ncores ; k++) {
                     char * t = info + (j0 + k) * (len + 1);
                     char * q = strchr(t, ' ');
                     ASSERT_ALWAYS(q);
@@ -2655,10 +2618,10 @@ static int export_cache_list_if_requested(matmul_top_data_ptr mmt, int midx, par
                 }
                 fprintf(f, "\n");
             }
-            for(unsigned int j = 0 ; j < mmt->pi->m->njobs ; j++) {
-                unsigned int j0 = j * mmt->pi->m->ncores;
+            for(unsigned int j = 0 ; j < pi->m->njobs ; j++) {
+                unsigned int j0 = j * pi->m->ncores;
                 fprintf(f, "has-cache ");
-                for(unsigned int k = 0 ; k < mmt->pi->m->ncores ; k++) {
+                for(unsigned int k = 0 ; k < pi->m->ncores ; k++) {
                     char * t = info + (j0 + k) * (len + 1);
                     char * q = strchr(t, ' ');
                     ASSERT_ALWAYS(q);
@@ -2667,7 +2630,7 @@ static int export_cache_list_if_requested(matmul_top_data_ptr mmt, int midx, par
                         fprintf(f, "%s", t);
                         *q=' ';
                     }
-                    if (!has_cache[mmt->pi->m->ncores * j + k]) continue;
+                    if (!has_cache[pi->m->ncores * j + k]) continue;
                     fprintf(f, "%s", q);
                 }
                 fprintf(f, "\n");
@@ -2677,12 +2640,12 @@ static int export_cache_list_if_requested(matmul_top_data_ptr mmt, int midx, par
         free(info);
         free(mybuf);
     }
-    serialize_threads(mmt->pi->m);
-    shared_free(mmt->pi->m, tlines);
-    shared_free(mmt->pi->m, has_cache);
-    serialize_threads(mmt->pi->m);
+    serialize_threads(pi->m);
+    shared_free(pi->m, tlines);
+    shared_free(pi->m, has_cache);
+    serialize_threads(pi->m);
     free(myline);
-    serialize(mmt->pi->m);
+    serialize(pi->m);
 
     return 1;
 }
@@ -2700,6 +2663,7 @@ static void matmul_top_read_submatrix(matmul_top_data_ptr mmt, int midx, param_l
 {
     int rebuild = 0;
     param_list_parse_int(pl, "rebuild_cache", &rebuild);
+    int can_print = (mmt->pi->m->jrank == 0 && mmt->pi->m->trank == 0);
 
     matmul_top_matrix_ptr Mloc = mmt->matrices[midx];
 
@@ -2716,7 +2680,7 @@ static void matmul_top_read_submatrix(matmul_top_data_ptr mmt, int midx, param_l
 
     int cache_loaded = 0;
 
-    if (export_cache_list_if_requested(mmt, midx, pl)) {
+    if (export_cache_list_if_requested(Mloc, mmt->pi, pl)) {
         /* If we are being called from dispatch, once all submatrices
          * have had their list of required files printed, the program
          * will exit. */
@@ -2724,7 +2688,7 @@ static void matmul_top_read_submatrix(matmul_top_data_ptr mmt, int midx, param_l
     }
 
     if (!rebuild) {
-        if (mmt->pi->m->jrank == 0 && mmt->pi->m->trank == 0) {
+        if (can_print) {
             printf("Now trying to load matrix cache files\n");
         }
         if (sqread) {
@@ -2740,10 +2704,8 @@ static void matmul_top_read_submatrix(matmul_top_data_ptr mmt, int midx, param_l
     }
 
     if (!pi_data_eq(&cache_loaded, 1, BWC_PI_INT, mmt->pi->m)) {
-        if (mmt->pi->m->trank == 0) {
-        if (mmt->pi->m->jrank == 0) {
+        if (can_print) {
             fprintf(stderr, "Fatal error: cache files not present at expected locations\n");
-        }
         }
         SEVERAL_THREADS_PLAY_MPI_BEGIN(mmt->pi->m) {
             fprintf(stderr, "[%s] J%uT%u: cache %s: %s\n",
@@ -2767,16 +2729,16 @@ static void matmul_top_read_submatrix(matmul_top_data_ptr mmt, int midx, param_l
      * matrix_u32 */
 
     if (!cache_loaded) {
-        m->mfile = matrix_list_get_item(pl, "matrix", midx);
-        m->bfile = matrix_list_get_item(pl, "balancing", midx);
         // the mm layer is informed of the higher priority computations
         // that will take place. Depending on the implementation, this
         // may cause the direct or transposed ordering to be preferred.
         // Thus we have to read this back from the mm structure.
+        m->bfile = Mloc->bname;
+        m->mfile = Mloc->mname;
         m->transpose = Mloc->mm->store_transposed;
         m->withcoeffs = !is_char2(mmt->abase);
-        if (param_list_lookup_string(pl, "random_matrix")) {
-            if (mmt->pi->m->jrank == 0 && mmt->pi->m->trank == 0) {
+        if (!(Mloc->mname)) {
+            if (can_print) {
                 printf("Begin creation of fake matrix data in parallel\n");
             }
             /* Mloc->mm->dim[0,1] contains the dimensions of the padded
@@ -2789,22 +2751,21 @@ static void matmul_top_read_submatrix(matmul_top_data_ptr mmt, int midx, param_l
                     local_fraction(Mloc->n[0], Mloc->n0[0], mmt->pi->wr[1]),
                     local_fraction(Mloc->n[1], Mloc->n0[1], mmt->pi->wr[0]));
         } else {
-            if (!m->bfile) {
-                m->bfile = matrix_get_derived_balancing_filename(m->mfile, mmt->pi);
-            }
-            if (mmt->pi->m->jrank == 0 && mmt->pi->m->trank == 0) {
+            if (can_print) {
                 printf("Matrix dispatching starts\n");
             }
             balancing_get_matrix_u32(mmt->pi, pl, m);
-        }
 
-        int ssm = 0;
-        param_list_parse_int(pl, "save_submatrices", &ssm);
-        if (ssm) {
-            fprintf(stderr, "DEBUG: creating %s\n", Mloc->locfile);
-            FILE * f = fopen(Mloc->locfile, "wb");
-            fwrite(m->p, sizeof(uint32_t), m->size, f);
-            fclose(f);
+            int ssm = 0;
+            param_list_parse_int(pl, "save_submatrices", &ssm);
+            if (ssm) {
+                char * submat = matrix_get_derived_submatrix_filename(Mloc->mname, mmt->pi);
+                fprintf(stderr, "DEBUG: creating %s\n", submat);
+                FILE * f = fopen(submat, "wb");
+                fwrite(m->p, sizeof(uint32_t), m->size, f);
+                fclose(f);
+                free(submat);
+            }
         }
     }
 
@@ -2850,9 +2811,6 @@ static void matmul_top_read_submatrix(matmul_top_data_ptr mmt, int midx, param_l
                 Mloc->mm->cachefile_name);
         my_pthread_mutex_unlock(mmt->pi->m->th->m);
     }
-
-    if (m->mfile) free(m->mfile);
-    if (m->bfile) free(m->bfile);
 }
 
 void matmul_top_report(matmul_top_data_ptr mmt, double scale)
@@ -2887,6 +2845,8 @@ void matmul_top_clear(matmul_top_data_ptr mmt)
             */
         }
         free(Mloc->locfile);
+        free(Mloc->mname);
+        free(Mloc->bname);
     }
     serialize(mmt->pi->m);
     free(mmt->matrices);

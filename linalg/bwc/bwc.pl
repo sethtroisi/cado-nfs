@@ -34,7 +34,7 @@ The action to be performed is either:
   prepended by a colon.
     :complete -- do a complete linear system solving. The solution ends
                  up in \$wdir/W.
-    :bench    -- does dispatch, prep, secure, and krylov with
+    :bench    -- does prep, secure, and krylov with
                  an exceedingly large finish bound in order to perform
                  some timings.
 
@@ -520,7 +520,7 @@ if (!-d $wdir) {        # create $wdir on script node.
 # important argument lists:
 #  - @mpi_precmd @mpi_precmd_single
 #    --> Simply put, the former is prepended before all important
-#    mpi-level programs (dispatch secure krylov mksol gather), while the
+#    mpi-level programs (secure krylov mksol gather), while the
 #    other is of course for leader-node-only programs.
 #  - @mpi_precmd_lingen (currently this is only for *plingen*)
 #    --> use lingen_mpi (no lingen_thr exists at this point)
@@ -956,7 +956,6 @@ push @main_args, "matrix=$matrix";
 # Now we have one function for each of the following macroscopic steps of
 # the program
 #
-# dispatch
 # prep
 # krylov
 # lingen
@@ -1099,25 +1098,12 @@ sub get_cached_bfile {
     my $x = $matrix;
     $x =~ s{^(?:.*/)?([^/]+)$}{$1};
     $x =~ s/\.(?:bin|txt)$//;
-    my $pre_pat = "$x\.${nh}x${nv}";
-    $pat = qr/([0-9a-f]{8})\.bin\s*$/;
-    my @bfiles;
-    my $hash;
-    for my $fileinfo (get_cached_leadernode_filelist) {
-        my ($file, $size) = @$fileinfo;
-        $file =~ /^(.*)\.$pat/ && $1 eq $pre_pat or next;
-        $hash = $2;
-        push @bfiles, $file;
+    my $bfile = "$wdir/$x.${nh}x${nv}.bin";
+    if (!-f $bfile) {
+        return undef;
     }
-    return unless scalar @bfiles;
-    if (scalar @bfiles != 1) {
-        print STDERR "Expected 1 bfile, found " . scalar @bfiles . ":\n";
-        print "$_\n" foreach (@bfiles);
-        die;
-    }
-    my @x = ($wdir . "/" . shift @bfiles, $hash);
-    $cache->{$key} = \@x;
-    return wantarray ? @x : $x[0];
+    $cache->{$key} = $bfile;
+    return $bfile;
 }
 # }}}
 
@@ -1315,9 +1301,9 @@ sub task_common_run {
     @_ = grep !/lingen_threshold/, @_ unless $program =~ /lingen/;
     @_ = grep !/lingen_mpi_threshold/, @_ unless $program =~ /lingen/;
     @_ = grep !/allow_zero_on_rhs/, @_ unless $program =~ /^plingen/;
-    @_ = grep !/^save_submatrices?=/, @_ unless $program =~ /^(dispatch|prep|krylov|mksol|gather)$/;
+    @_ = grep !/^save_submatrices?=/, @_ unless $program =~ /^(prep|krylov|mksol|gather)$/;
     # are we absolutely sure that lingen needs no matrix ?
-    @_ = grep !/^ys=/, @_ unless $program =~ /(?:krylov|dispatch)$/;
+    @_ = grep !/^ys=/, @_ unless $program =~ /krylov$/;
     @_ = grep !/^solutions=/, @_ unless $program =~ /(?:mksol|gather)$/;
     @_ = grep !/^rhs=/, @_ unless $program =~ /(?:prep|gather|plingen.*|mksol)$/;
     @_ = grep !/skip_decorrelating_permutation/, @_ unless $program =~ /mf_bal/;
@@ -1335,7 +1321,7 @@ sub task_common_run {
             unshift @_, @mpi_precmd_lingen;
         } elsif ($program =~ /\/(?:split|acollect|lingen|mf_bal|cleanup)$/) {
             unshift @_, @mpi_precmd_single;
-        } elsif ($program =~ /\/(?:prep|secure|krylov|mksol|gather|dispatch)$/) {
+        } elsif ($program =~ /\/(?:prep|secure|krylov|mksol|gather)$/) {
             unshift @_, @mpi_precmd;
         } else {
             die "Don't know the parallel status of program $program ... ?";
@@ -1358,40 +1344,6 @@ sub task_common_run {
 # }}}
 
 # {{{ SUBTASKS are used by one or several tasks.
-# {{{ subtask_find_or_create_balancing
-sub subtask_find_or_create_balancing {
-    my %opts = @_;
-
-    my @res = map { /^balancing=(.*\.([0-9a-f]{8})\.bin)$/ ? ($1, $2) : (); } @main_args;
-    if (@res > 2) {
-        die "More than one balancing file found on the command line: @res.";
-    } elsif (@res) {
-        return wantarray ? @res : $res[0];
-    }
-    @res = get_cached_bfile;
-    if (@res) {
-        push @main_args, "balancing=$res[0]";
-        return @res;
-    }
-    if ($opts{'-may_create'} eq 'no') {
-        task_check_message 'error', "No balancing file found, please run dispatch first\n";
-        die;
-    };
-
-    print STDERR "No bfile found, we need a new one\n";
-    my @mfbal=("mfile=$matrix", "out=$wdir/", $nh, $nv);
-    unshift @mfbal, "--withcoeffs" if $prime ne '2';
-    unshift @mfbal, qw/--reorder columns/;
-    task_common_run "mf_bal", @mfbal;
-    expire_cache_entry "balancing";
-    @res = get_cached_bfile;
-    die unless @res;
-    my ($balancing, $balancing_hash) = @res;
-    print "# Using balancing file $balancing\n";
-    push @main_args, "balancing=$balancing";
-    return wantarray ? @res : $res[0];
-}
-# }}}
 
 # {{{ subtask_krylov_todo - the hard checkpoint recovery work
 sub subtask_krylov_todo {
@@ -1495,102 +1447,9 @@ sub subtask_krylov_todo {
 # }}}
 # }}}
 
-# {{{ dispatch
-
-sub task_dispatch_missing_output_files {
-    my ($balancing, $balancing_hash) = subtask_find_or_create_balancing(-may_create=>'yes');
-
-    if ($param->{'rebuild_cache'}) {
-        # Then we don't even need to bother.
-        return 'all';
-    }
-
-    # Note the ys=0..$splitwidth below. It's here only to match the width
-    # which is used in the main krylov/mksol programs. The reason is that
-    # the data width for vector coefficients gets passed to the cache
-    # building code, which may take decisions depending on processor
-    # cache size, which translate into a given number of vector
-    # coefficients.
-    # XXX For an SSE-2 binary, we would need something else.
-    my @more_args = "ys=0..$splitwidth";
-
-    # Do this always. This is a trivial operation, and we use it to see
-    # who has what as far as cache files are concerned.
-    task_common_run 'dispatch', (grep { !/^ys=/ } @main_args), @more_args, "export_cachelist=$wdir/cachelist.$balancing_hash.txt";
-
-    # TODO: make sure that the matrix cache files are present everywhere.
-    my $cachelist={};
-    for my $line (eval { open F, "$wdir/cachelist.$balancing_hash.txt"; my @x=<F>; @x; }) {
-        my ($token, $node, @files) = split(' ', $line);
-        if ($token eq 'get-cache') {
-            $cachelist->{$node}->{$_}=0 for @files;
-        } elsif ($token eq 'has-cache') {
-            $cachelist->{$node}->{$_}='found' for @files;
-        }
-    }
-    my @missing;
-    for my $node (keys %{$cachelist}) {
-        for my $file (keys %{$cachelist->{$node}}) {
-            push @missing, "$node:$file" unless $cachelist->{$node}->{$file};
-        }
-    }
-    if (@missing == $nh * $nv) {
-        return 'all', @missing;
-    } elsif (@missing) {
-        return 'some', @missing;
-    } else {
-        return 'none';
-    }
-}
-
-
-sub task_dispatch {
-    task_begin_message;
-    # This does the matrix dispatch, or ensures that it's been already
-    # done.
- 
-    # input files:
-    #   well, nothing. The matrix, of course, but it is outside $wdir.
-    #
-    # output files, created if needed.
-    #   - $balancing
-    #   - cache files
-    #
-    # side-effect files, which have no impact on whether this step gets
-    # re-run or not:
-    #   - H1 Hx ; these are sanity check vectors, used within dispatch (only)
-    #   - cachelist.$balancing_hash.txt ; recomputed each time, just to
-    #   see which cache files are where.
- 
-    my ($status, @missing) = task_dispatch_missing_output_files;
-
-    if ($status eq 'none') {
-        task_check_message 'ok', "All output files for $current_task have been found, good";
-        return;
-    }
-
-    if ($status eq 'some') {
-        task_check_message 'error', "Missing output files for $current_task", @missing, "We don't fix this automatically. Please investigate.";
-        die;
-    }
-
-    task_check_message 'missing', "none of the output files for $current_task have been found, need to run $current_task now. We want to create files:", @missing;
-
-    # Note that the sanity check vectors Hx and H1 are just
-    # side-effects of the dispatch program, but there is no need to keep
-    # them around. They're never reused.
-
-    my @more_args = ("ys=0..$splitwidth", 'sequential_cache_build=1');
-    push @more_args, "sanity_check_vector=H1" if $prime == 2;
-    task_common_run('dispatch', @main_args, @more_args);
-
-} # }}}
-
 # {{{ prep
 
 sub task_prep_missing_output_files {
-    subtask_find_or_create_balancing(-may_create => 'no');
-
     my @starts;
     for my $i (0..$n/$splitwidth-1) {
         my $x0 = $i*$splitwidth;
@@ -1646,7 +1505,6 @@ sub task_prep {
 # {{{ secure -- this is now just a subtask of krylov or mksol
 sub subtask_secure {
     return if $param->{'skip_online_checks'};
-    subtask_find_or_create_balancing(-may_create => 'no');
     my $leader_files = get_cached_leadernode_filelist 'HASH';
     my @x = grep { !exists($leader_files->{$_}); } "C.$param->{'interval'}";
     if (@x) {
@@ -1661,7 +1519,7 @@ sub task_krylov {
     task_begin_message;
 
     # input files:
-    #   - output files from previous tasks: dispatch prep
+    #   - output files from previous tasks: prep
     #     More accurately, we need V${x0}-${x1}.$i for some iteration i.
     #
     # if ys is found in the command line, then we focus on that sequence
@@ -1676,8 +1534,6 @@ sub task_krylov {
     # re-run or not:
     #   - A${x0}-${x1}.* ; dot product files which are fed to lingen.
     #   These are write-only as far as this task is concerned.
-
-    subtask_find_or_create_balancing(-may_create => 'no');
 
     subtask_secure;
 
@@ -1848,7 +1704,6 @@ sub task_mksol {
     task_begin_message;
 
     # input files:
-    #   - output files from dispatch
     #   - V*-*.<some iteration>, e.g. maybe the starting one generated by
     #     prep, or any other.
     #   - F.sols*-*.*-* ; all polynomial entries of the generating
@@ -1867,8 +1722,6 @@ sub task_mksol {
     # re-run or not:
     #   - S.sols*-*.*-*.* ; partial sum which are fed to gather.
     #   These are write-only as far as this task is concerned.
-
-    subtask_find_or_create_balancing(-may_create => 'no');
 
     subtask_secure;
 
@@ -1956,8 +1809,6 @@ sub task_gather {
 
     # input files:
     #   - S.sols*-*.*-*.* ; partial sums computed by mksol
-
-    subtask_find_or_create_balancing(-may_create => 'no');
 
     my @missing;
     my @todo;
@@ -2096,12 +1947,15 @@ sub task_cleanup {
         } else {
             task_check_message 'missing', "Will run cleanup to compute $wfile from the files:", @ks;
         }
-        push @todo, [$wfile, @ks];
+        push @todo, [$sol, $wfile, @ks];
     }
     for my $klist (@todo) {
+        my $sol = shift @$klist;
         my @x = map { "$wdir/$_"; } @$klist;
         my $wfile = shift @x;
-        task_common_run('cleanup', "--ncols", $n, "--out", $wfile, @x);
+        $sol =~ /^(\d+)-(\d+)$/ or die "$sol: could not parse";
+        my $nsols = $2-$1;
+        task_common_run('cleanup', "--ncols", $nsols, "--out", $wfile, @x);
     }
     if (scalar @solutions == 1 && (!-f"$wdir/W" || ((stat "$wdir/W")[7] lt (stat "$wdir/W.sols$solutions[0]")[7]))) {
         print STDERR "## Providing $wdir/W as an alias to $wdir/W.sols$solutions[0]\n";
@@ -2111,7 +1965,6 @@ sub task_cleanup {
 # }}}
 
 my @tasks = (
-    [ 'dispatch', \&task_dispatch],
     [ 'prep', \&task_prep],
     [ 'krylov', \&task_krylov],
     [ 'lingen', \&task_lingen],

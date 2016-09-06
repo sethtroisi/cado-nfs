@@ -1,6 +1,8 @@
 
 *** THIS DOCUMENTATION IS NOT REGULARILY CHECKED TO BE UP-TO-DATE. ***
 
+20160905 continuation of the previous update. mf_bal and dispatch now
+         second-class citizens.
 20160820 scattered update ; removed some deprecated stuff.
 20160201 edit the MPI section
 20130724 general update
@@ -84,7 +86,6 @@ using the bwc.pl driver script, documented below.
 krylov, lingen, and to a lesser extent mksol are the steps having a real computational impact.
 prep is cheap but important for ensuring the success of the algorithm.
 acollect and gather are just trivial bookkeeping.
-dispatch may be I/O intensive.
 secure is akin to doing a few krylov iterations. It runs for roughly just
 as long as the desired time between two recoverable checkpoints (the
 longer it runs, the less often checks are done -- but checks are
@@ -277,19 +278,24 @@ This list links at who creates what and uses what. The prefix ``mat'' is
 actually replaced by the basename of the input matrix, with suffixes
 removed.
 
-wdir/mat.<nh>x<v>.<bchecksum>.bin  permutations used for balancing.
-    created by mf_bal
-    read by dispatch primarily, but relevant to the whole computation.
-wdir/mat.<nh>x<v>.<bchecksum>.hi.vj        sub-matrix files.
-    created by dispatch
-    unused (can be useful for debugging, though)
-wdir/mat.<nh>x<v>.<bchecksum>.hi.vj-MMMMMM.bin       in-memory version of the sub-matrices
-    created by {dispatch,prep,secure,krylov,mksol,gather} if not found.
+wdir/mat.<nh>x<nv>.bin  permutations used for balancing.
+wdir/mat.<nh>x<nv>.<bchecksum>.bin  permutations used for balancing.
+    Both files are identical. The former is used as a shorthand.
+    Files are created by either prep, secure, krylov, or mksol the first time a
+    balancing of total size <nh>x<nv> is to be used. It is also possible
+    to use the standalone binary mf_bal for that.
+    These files are read by prep, secure, krylov, or mksol.
+wdir/mat.<nh>x<nv>.hi.vj.bin        sub-matrix files.
+    created by prep, secure, krylov, or mksol the first time a
+    balancing of total size <nh>x<nv> is to be used, and if and only
+    if the save_submatrices option is set (useful for debugging)
+wdir/mat.<nh>x<nv>.<bchecksum>.hi.vj-MMMMMM.bin       in-memory version of the sub-matrices
+    created by {prep,secure,krylov,mksol,gather} if not found.
     used by {prep,secure,krylov,mksol,gather}
-wdir/X.<bchecksum>                  X vector used for Krylov.
+wdir/X                              X vector used for Krylov.
     created by prep
     read by krylov and secure
-wdir/C.<n>.<bchecksum>              check vector = trsp(M)^n * X  (See note (T))
+wdir/C.<n>                          check vector = trsp(M)^n * X  (See note (T))
     created by secure
     read by krylov
 wdir/V<n1>-<n2>.0                   columns <n1>..<n2> (n2 exclusive) of Y
@@ -303,22 +309,19 @@ wdir/V<n1>-<n2>.<j>             columns <n1>..<n2> of M^j Y (See note (T))
     created by krylov while computing.
     never read again unless for external checking (not all of it implemented
     yet)
-wdir/F_INIT_QUICK               initial data for lingen
-    created by lingen
-    never read again unless by lingen again for resuming (resuming in lingen
-    is not functional at the moment)
-wdir/pi-<t1>-<t2>               current state for lingen
-    created by lingen
-    never read again unless by lingen again for resuming (resuming in lingen
-    is not functional at the moment)
 wdir/F.sols<s1>-<s2>.<j1>-<j2>  linear generator.
+wdir/F.sols<s1>-<s2>.<j1>-<j2>.rhs  linear generator.
     created by lingen
     read by mksol
+    the .rhs files are only defined for j2 <= the total number of rhs
+    vecgtors.
 wdir/S.sols<s1>-<s2>.<n1>-<n2>  mksol sequence data.
     created by mksol
     read by gather
 wdir/W                          kernel vectors
+wdir/W.sols<s1>-<s2>.<j>        kernel vectors
 wdir/K.sols<s1>-<s2>.<j>        kernel vectors
+wdir/K.sols<s1>-<s2>.<j>.txt    kernel vectors
     created by gather
 
 The permutation P
@@ -352,6 +355,9 @@ source file comments if there are such comments.
 
 mf_bal
 ------
+    (this step gets run automatically behind the scenes the first time
+    one runs one of the prep, secure, krylov, mksol, or gather binaries)
+
     mf_bal computes a row and column permutation which is applicable to
     the input matrix M, to be transformed into a twisted matrix
     Sr*M*Sc^-1 which such that when split in a 2d rectangular grid
@@ -375,8 +381,11 @@ mf_bal
 
 dispatch
 --------
+    (this step gets run automatically behind the scenes the first time
+    one runs one of the prep, secure, krylov, mksol, or gather binaries)
+
     dispatch uses the mf_bal output to compute the per-job in-memory
-    data.  mat.<nh>x<nv>.<bchecksum>.hi.vj denotes the (i,j) block of the
+    data.  mat.<nh>x<nv>.hi.vj denotes the (i,j) block of the
     matrix, but is normally not saved to disk. Rather, the copies
     mat.<nh>x<nv>.<bchecksum>.hi.vj-XXXXXXXX.bin of the in-memory
     structures are saved.

@@ -375,14 +375,7 @@ fi
 Nh=$((${BASH_REMATCH[1]}*${BASH_REMATCH[3]}))
 Nv=$((${BASH_REMATCH[2]}*${BASH_REMATCH[4]}))
 
-split=${Nh}x${Nv}
-
-echo find $wdir -name "`basename $matrix .bin`.$split.????????.bin"
-bfile=$(find $wdir -name "`basename $matrix .bin`.$split.????????.bin")
-if ! [[ "$bfile" =~ \.[0-9a-f]{8}\.bin$ ]] ; then
-    echo "Found no bfile, or nothing satisfactory ($bfile)" >&2
-    exit 1
-fi
+bfile="`basename $matrix .bin`.${Nh}x${Nv}.bin"
 
 cmd=`dirname $0`/convert_magma.pl
 
@@ -411,7 +404,8 @@ if [ "$prime" = 2 ] ; then
 else
     $cmd bpmatrix_${nrows}_${ncols} < $matrix > $mdir/t.m
 fi
-$cmd balancing < "$bfile" > $mdir/b.m
+$cmd balancing < "$wdir/$bfile" > $mdir/b.m
+checksum=$(perl -ne '/checksum (\w+)/ && print "$1\n";' < $mdir/b.m)
 echo "ncpad:=nc;nrpad:=nr;nc:=nc_orig;nr:=nr_orig;" >> $mdir/b.m
 if [ "$prime" = 2 ] ; then
     echo "VS:=KMatrixSpace(GF(2), 64, nr_orig);"
@@ -450,9 +444,9 @@ EOF
 EOF
         for j in `seq 0 $((Nv-1))` ; do
             if [ "$prime" = 2 ] ; then
-                $cmd bmatrix < ${bfile%%.bin}.h$i.v$j> $mdir/t$i$j.m
+                $cmd bmatrix < $wdir/${bfile%%.bin}.h$i.v$j.bin > $mdir/t$i$j.m
             else
-                $cmd bpmatrix < ${bfile%%.bin}.h$i.v$j> $mdir/t$i$j.m
+                $cmd bpmatrix < $wdir/${bfile%%.bin}.h$i.v$j.bin > $mdir/t$i$j.m
             fi
             cat <<-EOF
                 nc$j:=ncp; /*  div nv + ($j lt nc mod nv select 1 else 0); */
