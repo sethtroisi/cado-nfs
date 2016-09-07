@@ -134,7 +134,11 @@ matmul_ptr matmul_init(mpfq_vbase_ptr x, unsigned int nr, unsigned int nc, const
     if (!impl) {
         const char * tmp = param_list_lookup_string(pl, "prime");
         if (tmp && strcmp(tmp, "2") != 0) {
+#ifdef HAVE_CXX11
             impl = "zone";
+#else   /* HAVE_CXX11 */
+            impl = "basicp";
+#endif  /* HAVE_CXX11 */
         } else {
             impl = "bucket";
         }
