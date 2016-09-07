@@ -302,22 +302,25 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
                 mmt_vec_load(vi, tmp, unpadded);
                 free(tmp);
 
-                rc = asprintf(&tmp, "F.sols%u-%u.%u-%u.rhs", solutions[0], solutions[1], j, j+Av_width);
-                if (tcan_print && verbose_enabled(CADO_VERBOSE_PRINT_BWC_LOADING_MKSOL_FILES)) {
-                    printf("loading %s\n", tmp);
+                if (pi->m->trank == 0 && pi->m->jrank == 0) {
+                    rc = asprintf(&tmp, "F.sols%u-%u.%u-%u.rhs", solutions[0], solutions[1], j, j+Av_width);
+                    if (verbose_enabled(CADO_VERBOSE_PRINT_BWC_LOADING_MKSOL_FILES)) {
+                        printf("loading %s\n", tmp);
+                    }
+                    ASSERT_ALWAYS(rc >= 0);
+                    FILE * f = fopen(tmp, "rb");
+                    rc = fread(
+                            A->vec_subvec(A, rhscoeffs, j),
+                            A->vec_elt_stride(A,1),
+                            1, f);
+                    ASSERT_ALWAYS(rc == 1);
+                    if (A->is_zero(A, A->vec_coeff_ptr_const(A, rhscoeffs, j))) {
+                        printf("Notice: coefficient for vector V%u-%u in file %s is zero\n", j, j+1, tmp);
+                    }
+                    fclose(f);
+                    free(tmp);
                 }
-                ASSERT_ALWAYS(rc >= 0);
-                FILE * f = fopen(tmp, "rb");
-                rc = fread(
-                        A->vec_subvec(A, rhscoeffs, j),
-                        A->vec_elt_stride(A,1),
-                        1, f);
-                ASSERT_ALWAYS(rc == 1);
-                if (A->is_zero(A, A->vec_coeff_ptr_const(A, rhscoeffs, j))) {
-                    printf("Notice: coefficient for vector V%u-%u in file %s is zero\n", j, j+1, tmp);
-                }
-                fclose(f);
-                free(tmp);
+                pi_bcast(A->vec_subvec(A, rhscoeffs, j), 1, mmt->pitype, 0, 0, pi->m);
 
                 AvxA->addmul_tiny(Av, A, 
                                 mmt_my_own_subvec(y),
