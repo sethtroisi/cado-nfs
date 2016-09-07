@@ -558,7 +558,7 @@ void * bl_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSED
          *      Transpose(w) <- M' * v
          *      v <- P * Transpose(w) = P * M' * v
          *
-         * (in a nutshell, P transforms row index N*x+y to N*y+x -- but
+         * (in a nutshell, P transforms row index N*x+y to N*y+x -- but
          * it's slightly more complicated than this. This is because we
          * do communications with all-gather and reduce-scatter).
          *

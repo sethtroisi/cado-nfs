@@ -49,14 +49,14 @@
 /* {{{ _cado_mm_set1_epi64 _m128i from 1 int64_t's */
 #define _cado_mm_set1_epi64(u) _mm_set1_epi64( _cado_mm_cvtsi64_m64((int64_t) (u)))
 /* }}} */
-/* {{{ _cado_mm_setr_epi64_c _m128i from 2 int64_t CONSTANTS (and try to get suffix right) */
+/* {{{ _cado_mm_setr_epi64_c _m128i from 2 int64_t CONSTANTS (and try to get suffix right) */
 #define _cado_mm_setr_epi64_c(lo, hi)                    		\
     _mm_setr_epi64(                                      		\
             _cado_mm_cvtsi64_m64(INT64_C(lo)),          		\
             _cado_mm_cvtsi64_m64(INT64_C(hi))           		\
         )
 /* }}} */
-/* {{{ _cado_mm_set1_epi64_c _m128i from 1 int64_t CONSTANT (and try to get suffix right) */
+/* {{{ _cado_mm_set1_epi64_c _m128i from 1 int64_t CONSTANT (and try to get suffix right) */
 #define _cado_mm_set1_epi64_c(u) _mm_set1_epi64( _cado_mm_cvtsi64_m64(INT64_C(u)))
 /* }}} */
 /* {{{ same for 32-bits (which, for some, have SSE-2) */

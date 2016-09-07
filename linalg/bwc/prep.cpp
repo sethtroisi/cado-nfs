@@ -146,7 +146,7 @@ void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUS
                 mmt_vec_set_random_through_file(y, tmp, unpadded, rstate);
             }
             if (tcan_print) {
-                printf("// generated %s (trial # %u)\n", tmp, ntri);
+                printf("// generated %s (trial # %u)\n", tmp, ntri);
             }
             free(tmp);
 

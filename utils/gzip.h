@@ -59,7 +59,7 @@ char * search_real_exec_in_path(const char *executable, char *real_path);
  */
 int set_antebuffer_path (const char *executable_filename, const char *path_antebuffer);
 
-/* There are of course scores of existing basename() codes accessible,
+/* There are of course scores of existing basename() codes accessible,
  * starting with POSIX basename. However we fear posible inconsistencies
  * here, so we stick to a simple-and-stupid version, whose specification
  * meets our needs. Here, the returned string is always a substring of
