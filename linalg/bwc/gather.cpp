@@ -269,9 +269,13 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
     pi_allreduce(NULL, &is_zero, 1, BWC_PI_INT, BWC_PI_MIN, pi->m);
 
     if (is_zero) {
-        fprintf(stderr, "Found zero vector. Most certainly a bug. "
-                "No solution found.\n");
+        if (tcan_print)
+            fprintf(stderr, "Found zero vector. Most certainly a bug. "
+                    "No solution found.\n");
+        pthread_mutex_lock(pi->m->th->m);
         exitcode=1;
+        pthread_mutex_unlock(pi->m->th->m);
+        return NULL;
     }
     serialize(pi->m);
 
@@ -341,9 +345,16 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
         if (is_zero) {
             if (tcan_print) {
                 if (nrhs) {
-                    printf("M^%u * V + R is zero\n", i);
+                    const char * strings[] = {
+                        "V * M^%u + R is zero\n", /* unsupported anyway */
+                        "M^%u * V + R is zero\n",};
+                    printf(strings[bw->dir], i);
                 } else {
-                    printf("M^%u * V is zero [K.sols%u-%u.%u contains M^%u * V]!\n", i, solutions[0], solutions[1], i-1, i-1);
+                    const char * strings[] = {
+                    "V * M^%u is zero [K.sols%u-%u.%u contains V * M^%u]!\n",
+                    "M^%u * V is zero [K.sols%u-%u.%u contains M^%u * V]!\n",
+                    };
+                    printf(strings[bw->dir], i, solutions[0], solutions[1], i-1, i-1);
                 }
             }
             break;
