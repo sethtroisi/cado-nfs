@@ -282,6 +282,7 @@ prepare_common_arguments() {
     # This sets the common arguments for all bwc binaries
     read -s -r -d '' common <<-EOF
         matrix=$matrix
+        balancing_options=reorder=columns
         mpi=$mpi
         thr=$thr
         m=$m

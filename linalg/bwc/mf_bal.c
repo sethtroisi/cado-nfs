@@ -223,6 +223,49 @@ void read_mfile_header(balancing_ptr bal, const char * mfile, int withcoeffs)
 }
 /* }}} */
 
+void mf_bal_adjust_from_option_string(struct mf_bal_args * mba, const char * opts)
+{
+    if (!opts) return;
+    /* Take a comma-separated list of balancing_options, and use that to
+     * adjust the mba structure.
+     *
+     * Only two of the options which exist in the mf_bal command line are
+     * obeyed here (otherwise we would be synthetizing a full
+     * param_list):
+     *
+     *  reorder=[rows|columns|both|auto]
+     *  rectangular
+     */
+    for(const char * v = opts, * nv ; *v ; v = nv) {
+        const char * w = strchr(v, ',');
+        if (w == NULL) {
+            w = v + strlen(v);
+            nv = w;
+        } else {
+            nv = w + 1;
+        }
+#define CMP(v, s)       strncmp((v),(s),strlen(s))
+        if (CMP(v, "rectangular") == 0) {
+            mba->rectangular=1;
+        } else if (CMP(v, "reorder=auto") == 0) {
+            mba->do_perm[0] = MF_BAL_PERM_AUTO;
+            mba->do_perm[1] = MF_BAL_PERM_AUTO;
+        } else if (CMP(v, "reorder=both") == 0) {
+            mba->do_perm[0] = MF_BAL_PERM_YES;
+            mba->do_perm[1] = MF_BAL_PERM_YES;
+        } else if (CMP(v, "reorder=rows") == 0) {
+            mba->do_perm[0] = MF_BAL_PERM_YES;
+            mba->do_perm[1] = MF_BAL_PERM_NO;
+        } else if (CMP(v, "reorder=columns") == 0) {
+            mba->do_perm[0] = MF_BAL_PERM_NO;
+            mba->do_perm[1] = MF_BAL_PERM_YES;
+        } else {
+            fprintf(stderr, "Unexpected option for %s: %s\n", __func__, v);
+            exit(EXIT_FAILURE);
+        }
+    }
+}
+
 void mf_bal(struct mf_bal_args * mba)
 {
     int rc;

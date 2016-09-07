@@ -20,6 +20,7 @@ struct mf_bal_args {
 };
 
 void mf_bal(struct mf_bal_args * mba);
+void mf_bal_adjust_from_option_string(struct mf_bal_args * mba, const char * opts);
 
 #ifdef __cplusplus
 }

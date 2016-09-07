@@ -384,7 +384,6 @@ int random_matrix_process_data_set_from_string(random_matrix_process_data_ptr r,
     /* Create a new param_list from the random_matrix argument {{{ */
     ASSERT_ALWAYS(str);
     rmstring = strdup(str);
-
     n_argv0 = n_argv = malloc(strlen(rmstring) * sizeof(char*));
     n_argc = 0;
     n_argv[n_argc++]="random_matrix";

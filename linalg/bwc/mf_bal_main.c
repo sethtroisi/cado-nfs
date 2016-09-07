@@ -38,7 +38,6 @@ void usage(int rc) {
             " mfile       matrix file (can also be given freeform)\n"
             " rwfile      row weight file (defaults to <mfile>.rw)\n"
             " cwfile      col weight file (defaults to <mfile>.cw)\n"
-            " like        balance in a way compatible with this file\n"
             " out         output file name (defaults to stdout)\n"
             "Recognized flags:"
             " --ascii     output in ascii\n"

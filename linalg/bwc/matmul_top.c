@@ -111,6 +111,8 @@ void matmul_top_decl_usage(param_list_ptr pl)
             "build the cache files sequentially on each node");
     param_list_decl_usage(pl, "sequential_cache_read",
             "read the cache files sequentially on each node");
+    param_list_decl_usage(pl, "balancing_options",
+            "options to pass to the balancing subprogram (see mf_bal_adjust_from_option_string)");
     balancing_decl_usage(pl);
     matmul_decl_usage(pl);
 }
@@ -125,6 +127,7 @@ void matmul_top_lookup_parameters(param_list_ptr pl)
     param_list_lookup_string(pl, "save_submatrices");
     param_list_lookup_string(pl, "sequential_cache_build");
     param_list_lookup_string(pl, "sequential_cache_read");
+    param_list_lookup_string(pl, "balancing_options");
     balancing_lookup_parameters(pl);
     matmul_lookup_parameters(pl);
 }
@@ -2324,6 +2327,7 @@ static void matmul_top_init_fill_balancing_header(matmul_top_data_ptr mmt, int i
                         .withcoeffs = !is_char2(mmt->abase),
                         .do_perm = { MF_BAL_PERM_AUTO, MF_BAL_PERM_AUTO },
                     };
+                    mf_bal_adjust_from_option_string(&mba, param_list_lookup_string(pl, "balancing_options"));
                     mf_bal(&mba);
                 } else {
                     fprintf(stderr, "Cannot access balancing file %s: %s\n", Mloc->bname, strerror(errno));
