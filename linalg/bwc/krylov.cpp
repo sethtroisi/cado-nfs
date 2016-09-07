@@ -119,6 +119,7 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
         int rc = asprintf(&v_name, "V%u-%u.%u", ys[0], ys[1], bw->start);
         ASSERT_ALWAYS(rc >= 0);
         mmt_vec_load(ymy[0], v_name, unpadded);
+        free(v_name);
         mmt_vec_reduce_mod_p(ymy[0]);
         if (tcan_print) { printf("done\n"); }
     } else {
@@ -314,6 +315,7 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
         int rc = asprintf(&v_name, "V%u-%u.%u", ys[0], ys[1], s + bw->interval);
         ASSERT_ALWAYS(rc >= 0);
         mmt_vec_save(ymy[0], v_name, unpadded);
+        free(v_name);
 
         if (pi->m->trank == 0 && pi->m->jrank == 0) {
             char * v_stem;
@@ -350,7 +352,6 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
     }
 
     free(gxvecs);
-    free(v_name);
 
     for(int i = 0 ; i < mmt->nmatrices + nmats_odd ; i++) {
         mmt_vec_clear(mmt, ymy[i]);
