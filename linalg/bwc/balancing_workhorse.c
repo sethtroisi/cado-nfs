@@ -1663,7 +1663,7 @@ void * do_loops(struct do_loops_arg * arg)
     return NULL;
 }
 
-void * balancing_get_matrix_u32(parallelizing_info_ptr pi, param_list pl, matrix_u32_ptr arg)
+void balancing_get_matrix_u32(parallelizing_info_ptr pi, param_list pl, matrix_u32_ptr arg)
 {
     master_data m;
     memset(m, 0, sizeof(master_data));
@@ -1769,6 +1769,4 @@ void * balancing_get_matrix_u32(parallelizing_info_ptr pi, param_list pl, matrix
     /* this also clears m->bal */
     clear_master_variables(m);
     shared_free(pi->m, slaves);
-
-    return arg;
 }

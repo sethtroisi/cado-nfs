@@ -1002,7 +1002,7 @@ uint32_t * matrix_transpose(uint32_t * p, size_t size, unsigned long nrows, unsi
 }
 #endif
 
-void * random_matrix_get_u32_byrows(gmp_randstate_t rstate, random_matrix_ddata_ptr F, matrix_u32_ptr arg)
+void random_matrix_get_u32_byrows(gmp_randstate_t rstate, random_matrix_ddata_ptr F, matrix_u32_ptr arg)
 {
     int has_coeffs = F->maxcoeff > 0;
 
@@ -1075,10 +1075,9 @@ void * random_matrix_get_u32_byrows(gmp_randstate_t rstate, random_matrix_ddata_
         fprintf(stderr, "Actual density per row avg %.2f sdev %.2f\n",
                 F->row_avg, F->row_sdev);
     }
-    return arg;
 }
 
-void * random_matrix_get_u32_bycolumns(gmp_randstate_t rstate, random_matrix_ddata_ptr F, matrix_u32_ptr arg)
+void random_matrix_get_u32_bycolumns(gmp_randstate_t rstate, random_matrix_ddata_ptr F, matrix_u32_ptr arg)
 {
     uint64_t total_coeffs = 0;
     double tot_sq = 0;
@@ -1218,12 +1217,10 @@ void * random_matrix_get_u32_bycolumns(gmp_randstate_t rstate, random_matrix_dda
         fprintf(stderr, "Actual density per row avg %.2f sdev %.2f\n",
                 F->row_avg, F->row_sdev);
     }
-
-    return arg;
 }
 
 
-void * random_matrix_get_u32(parallelizing_info_ptr pi, param_list pl, matrix_u32_ptr arg, unsigned long padded_nrows, unsigned long padded_ncols)
+void random_matrix_get_u32(parallelizing_info_ptr pi, param_list pl, matrix_u32_ptr arg, unsigned long padded_nrows, unsigned long padded_ncols)
 {
     random_matrix_process_data r;
     random_matrix_process_data_init(r);
@@ -1252,9 +1249,9 @@ void * random_matrix_get_u32(parallelizing_info_ptr pi, param_list pl, matrix_u3
     gmp_randinit_default(rstate);
     gmp_randseed_ui(rstate, r->seed + pi->m->jrank * pi->m->ncores + pi->m->trank);
     if (arg->transpose)
-        return random_matrix_get_u32_bycolumns(rstate, F, arg);
+        random_matrix_get_u32_bycolumns(rstate, F, arg);
     else
-        return random_matrix_get_u32_byrows(rstate, F, arg);
+        random_matrix_get_u32_byrows(rstate, F, arg);
 
     random_matrix_ddata_clear(F);
     gmp_randclear(rstate);
