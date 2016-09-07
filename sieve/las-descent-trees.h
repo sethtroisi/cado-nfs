@@ -12,6 +12,13 @@
                          * it's not totally clear that #include <cmath> +
                          * accessing std::isfinite works.
                          */
+#ifdef isfinite
+/* Under some conditions, we can get #define'd C functions, which
+ * obviously invalidate the C++ prototype (icc version 16.0.3 based on
+ * gcc-6.1.0 on CentOS 7.2.1511)
+ */
+#undef isfinite
+#endif
 
 #include "relation.h"
 #include "las-forwardtypes.h"
