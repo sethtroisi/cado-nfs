@@ -187,7 +187,7 @@ create_test_matrix_if_needed() {
     # random_matrix for that (not mandatory though, since
     # nrows,ncols,density, may be specified in full).
 
-    rmargs=(-Z)
+    rmargs=()
     # defaults, some of the subcases below tweak that.
     nrows=`echo $random_matrix_size | cut -d, -f1`
     ncols=`echo $random_matrix_size | cut -d, -f2`   # = nrows if no comma
@@ -214,7 +214,7 @@ create_test_matrix_if_needed() {
         basename=$mats/t${escaped_size}p+${nrhs}
         density=`echo "l($random_matrix_size)^2/2" | bc -l | cut -d. -f1`
         if [ "$density" -lt 12 ] ; then density=12; fi
-        rmargs=("${rmargs[@]}" -d $density)
+        rmargs=("${rmargs[@]}" -d $density -Z)
         matrix="$basename.matrix.bin"
         rhsfile="$basename.rhs.txt"
         rmargs=("${rmargs[@]}" -c ${random_matrix_maxcoeff})
