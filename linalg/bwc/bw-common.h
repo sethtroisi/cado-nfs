@@ -139,6 +139,7 @@ struct bw_params {
 };
 
 extern struct bw_params bw[1];
+extern const char * bw_dirtext[];
 
 #ifdef __cplusplus
 extern "C" {

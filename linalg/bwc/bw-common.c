@@ -20,7 +20,7 @@
 
 struct bw_params bw[1];
 
-const char * dirtext[] = { "left", "right" };
+const char * bw_dirtext[] = { "left", "right" };
 
 typedef int (*sortfunc_t) (const void*, const void*);
 
@@ -172,20 +172,20 @@ void bw_common_interpret_parameters(struct bw_params * bw, param_list pl)/*{{{*/
             tmp_l[i] = cl;
             nullspace_forced |= c != cl;
         }
-        if (strcmp(tmp_l, dirtext[0]) == 0) {
+        if (strcmp(tmp_l, bw_dirtext[0]) == 0) {
             bw->dir = 0;
-        } else if (strcmp(tmp_l, dirtext[1]) == 0) {
+        } else if (strcmp(tmp_l, bw_dirtext[1]) == 0) {
             bw->dir = 1;
         } else {
             fprintf(stderr, "Parameter nullspace may only be %s|%s\n",
-                    dirtext[0], dirtext[1]);
+                    bw_dirtext[0], bw_dirtext[1]);
             exit(EXIT_FAILURE);
         }
         free(tmp_l);
     } else {
         /* Default is right nullspace for p>2, and left for p==2 */
         bw->dir = mpz_cmp_ui(bw->p, 2) != 0;
-        param_list_add_key(pl, "nullspace", dirtext[bw->dir], PARAMETER_FROM_FILE);
+        param_list_add_key(pl, "nullspace", bw_dirtext[bw->dir], PARAMETER_FROM_FILE);
     }
 
     if ((mpz_cmp_ui(bw->p, 2) == 0) != (bw->dir == 0)) {
