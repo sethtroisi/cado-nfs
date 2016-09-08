@@ -383,7 +383,7 @@ std::string intlist_to_string(iterator t0, iterator t1)
 // polynomials.
 void compute_final_F_from_PI(polmat& F, polmat const& pi)/*{{{*/
 {
-    printf("Computing final F from PI (crc(pi)=%" PRIx32 ", ncoef=%lu)\n", pi.crc(), pi.ncoef);
+    printf("Computing final F from PI (crc(pi)=%08" PRIx32 ", ncoef=%lu)\n", pi.crc(), pi.ncoef);
     using namespace globals;
     // We take t0 rows, so that we can do as few shifts as possible
     // tmpmat is used only within the inner loop.
@@ -516,7 +516,7 @@ void bw_commit_f(polmat& F)
     using namespace std;
 
     /* Say n' columns are said interesting. We'll pad these to n */
-    printf("Writing F files (crc(F)=%" PRIx32 ")\n", F.crc());
+    printf("Writing F files (crc(F)=%08" PRIx32 ")\n", F.crc());
 
     unsigned int * pick = (unsigned int *) malloc(n * sizeof(unsigned int));
     memset(pick, 0, n * sizeof(unsigned int));
@@ -532,7 +532,7 @@ void bw_commit_f(polmat& F)
         }
     }
     string s = intlist_to_string(pick, pick + nres);
-    printf("Picking columns %s\n", s.c_str());
+    printf("Picking %u columns %s\n", nres, s.c_str());
 
     ASSERT_ALWAYS(n % ULONG_BITS == 0);
     size_t ulongs_per_mat = n*n/ULONG_BITS;
@@ -580,6 +580,8 @@ void bw_commit_f(polmat& F)
     for(unsigned int i = 0 ; i < nres ; i++) {
         unsigned int ii = pick[i];
         unsigned int d = delta[ii];
+        // printf("Valuation of column %u is %lu\n", ii, F.leading_zeros(ii, d));
+        d -= F.leading_zeros(ii, d);
 
         fmasks[i] = 1UL << (d % ULONG_BITS);
         foffsets[i] = d / ULONG_BITS;

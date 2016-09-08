@@ -471,17 +471,24 @@ int spanned_basis(mp_limb_t * lmat, mp_limb_t * mat, int nrows, int ncols,
             .rank = 0, }};
     gaussian_elimination(G);
 
+
+    G->rank = 0;
+    for (i = 0; i < NROWS; ++i) {
+        if (G->set_used[i]) {
+            G->rank++;
+        }
+    }
+
     int r = 0;
-    int h = NROWS;
+    int h = G->rank;
 
     for (i = 0; i < NROWS; ++i) {
-        assert(r < h);
         if (G->set_used[i]) {
             memcpy(lmat + r * limbs_per_col, lmat2 + i * limbs_per_col, limbs_per_col * sizeof(mp_limb_t));
             r++;
         } else {
-            h--;
             memcpy(lmat + h * limbs_per_col, lmat2 + i * limbs_per_col, limbs_per_col * sizeof(mp_limb_t));
+            h++;
         }
     }
 

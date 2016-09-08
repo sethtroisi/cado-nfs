@@ -346,6 +346,7 @@ void mul_o64_T6464_C_parity3(uint64_t * w, uint64_t a, mat64_srcptr b)
 void transp_6464(mat64_ptr dst, mat64_srcptr src)
 {
     int i, j;
+    ASSERT_ALWAYS(dst != src);
     for (i = 0; i < 64; i++) {
 	dst[i] = 0;
 	for (j = 0; j < 64; j++) {

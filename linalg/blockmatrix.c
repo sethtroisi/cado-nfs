@@ -130,8 +130,16 @@ void blockmatrix_mul_Ta_b(blockmatrix c,
     ASSERT_ALWAYS(c->ncols == b->ncols);
     ASSERT_ALWAYS(a->nrows == b->nrows);
 
-    ASSERT_ALWAYS(a != b);
-    ASSERT_ALWAYS(a != c);
+    if (c == a || c == b) {
+        blockmatrix tc = blockmatrix_alloc(a->ncols, b->ncols);
+        blockmatrix_mul_Ta_b(tc, a, b);
+        blockmatrix_swap(tc, c);
+        blockmatrix_free(tc);
+        return;
+    }
+
+    ASSERT_ALWAYS(c != b);
+    ASSERT_ALWAYS(c != a);
 
     blockmatrix_set_zero(c);
 
@@ -153,8 +161,16 @@ void blockmatrix_mul_smallb(blockmatrix c,
     ASSERT_ALWAYS(c->ncols == b->ncols);
     ASSERT_ALWAYS(a->ncols == b->nrows);
 
-    ASSERT_ALWAYS(a != b);
-    ASSERT_ALWAYS(a != c);
+    if (c == a || c == b) {
+        blockmatrix tc = blockmatrix_alloc(a->nrows, b->ncols);
+        blockmatrix_mul_smallb(tc, a, b);
+        blockmatrix_swap(tc, c);
+        blockmatrix_free(tc);
+        return;
+    }
+
+    ASSERT_ALWAYS(c != b);
+    ASSERT_ALWAYS(c != a);
 
     blockmatrix_set_zero(c);
 
@@ -164,6 +180,45 @@ void blockmatrix_mul_smallb(blockmatrix c,
                     (uint64_t *) (c->mb + j * c->stride),
                     (uint64_t *) (a->mb + i * a->stride),
                     b->mb[i + j * b->stride], a->nrows);
+        }
+    }
+}
+
+void blockmatrix_reverse_columns(blockmatrix c, const blockmatrix a)
+{
+    ASSERT_ALWAYS(a->nrows == c->nrows);
+    ASSERT_ALWAYS(a->ncols == c->ncols);
+    if (a->nrows == a->ncols) {
+        blockmatrix_transpose(c, a);
+        blockmatrix_reverse_rows(c, c);
+        blockmatrix_transpose(c, c);
+    } else {
+        /* different striding. Better to allocate */
+        blockmatrix ta = blockmatrix_alloc(a->ncols, a->nrows);
+        blockmatrix_transpose(ta, a);
+        blockmatrix_reverse_rows(ta, ta);
+        blockmatrix_transpose(c, ta);
+        blockmatrix_free(ta);
+    }
+}
+
+void blockmatrix_reverse_rows(blockmatrix c, const blockmatrix a)
+{
+    ASSERT_ALWAYS(a->nrows == c->nrows);
+    ASSERT_ALWAYS(a->ncols == c->ncols);
+    for(unsigned int ib = 0 ; ib < a->nrblocks ; ib++) {
+        unsigned int xib = a->nrblocks - 1 - ib;
+        if (xib < ib) break;
+        for(unsigned int i = 0 ; i < 64 ; i++) {
+            unsigned int ii = ib * 64 + i;
+            unsigned int xi = 63 - i;
+            unsigned int xii = xib * 64 + xi;
+            if (xii < ii) break;
+            for(unsigned int j = 0 ; j < a->ncblocks ; j++) {
+                uint64_t t = a->mb[ib + j * a->stride][i];
+                c->mb[ib + j * a->stride][i] = a->mb[xib + j * a->stride][xi];
+                c->mb[xib + j * a->stride][xi] = t;
+            }
         }
     }
 }
@@ -345,13 +400,19 @@ void blockmatrix_write_to_flat_file(const char * name, blockmatrix k, int i0, in
     fclose(f);
 }
 
-void blockmatrix_transpose(blockmatrix b, blockmatrix a)
+void blockmatrix_transpose(blockmatrix b, const blockmatrix a)
 {
     ASSERT_ALWAYS(b->nrows == a->ncols);
     ASSERT_ALWAYS(a->nrows == b->ncols);
+    mat64 tmp;
     for(unsigned int i = 0 ; i < a->nrblocks ; i++) {
-        for(unsigned int j = 0 ; j < a->ncblocks ; j++) {
-            transp_6464(b->mb[j + i * b->stride], a->mb[i + j * a->stride]);
+        /* Make it this way so that self-assignment works */
+        transp_6464(tmp, a->mb[i + i * a->stride]);
+        mat64_copy(b->mb[i + i * b->stride], tmp);
+        for(unsigned int j = i + 1 ; j < a->ncblocks ; j++) {
+            transp_6464(tmp, a->mb[i + j * a->stride]);
+            transp_6464(b->mb[i + j * b->stride], a->mb[j + i * a->stride]);
+            mat64_copy(b->mb[j + i * b->stride], tmp);
         }
     }
 }
