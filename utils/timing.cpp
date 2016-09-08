@@ -65,6 +65,13 @@ milliseconds (void)
     return (unsigned long) (microseconds() / (uint64_t) 1000);
 }
 
+/* cputime */
+unsigned long 
+milliseconds_thread (void)
+{
+    return (unsigned long) (microseconds_thread() / (uint64_t) 1000);
+}
+
 double
 seconds (void)
 {

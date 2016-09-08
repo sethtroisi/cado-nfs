@@ -12,7 +12,7 @@ set -e
 : ${m=128}
 : ${n=128}
 : ${wdir=/tmp/bwc}
-: ${mm_impl=bucket}
+# : ${mm_impl=bucket}
 : ${nullspace=left}
 
 export m n scriptpath wdir mm_impl prime=2 nullspace

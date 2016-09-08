@@ -225,9 +225,14 @@ extern struct pi_op_s BWC_PI_BOR[1];
 /* we define new datatypes in a way which diverts from the mpi calling
  * interface, because that interface is slightly awkward for our needs */
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 extern pi_datatype_ptr pi_alloc_mpfq_datatype(parallelizing_info_ptr pi, mpfq_vbase_ptr abase);
 extern void pi_free_mpfq_datatype(parallelizing_info_ptr pi, pi_datatype_ptr ptr);
-
+#ifdef __cplusplus
+}
+#endif
 
 
 

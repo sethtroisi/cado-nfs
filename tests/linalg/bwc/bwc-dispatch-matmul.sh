@@ -68,7 +68,7 @@ nh=$((thr1 * mpi1))
 nv=$((thr2 * mpi2))
 
 M=x$seed
-D=`mktemp -d /tmp/bwc.XXXXXXXXXXX`
+D=`mktemp -d ${TMPDIR-/tmp}/bwc.XXXXXXXXXXX`
 
 cleanup() {
     if ! [ "$CADO_DEBUG" ] ; then
@@ -97,6 +97,7 @@ set \
     sequential_cache_build=1	\
     sanity_check_vector=H1	\
     rebuild_cache=1	\
+    skip_bw_early_rank_check=1       \
     matmul_bucket_methods=small1,small2,large
 
 if [ "$hostfile" ] ; then

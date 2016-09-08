@@ -384,7 +384,6 @@ int random_matrix_process_data_set_from_string(random_matrix_process_data_ptr r,
     /* Create a new param_list from the random_matrix argument {{{ */
     ASSERT_ALWAYS(str);
     rmstring = strdup(str);
-
     n_argv0 = n_argv = malloc(strlen(rmstring) * sizeof(char*));
     n_argc = 0;
     n_argv[n_argc++]="random_matrix";
@@ -1003,7 +1002,7 @@ uint32_t * matrix_transpose(uint32_t * p, size_t size, unsigned long nrows, unsi
 }
 #endif
 
-void * random_matrix_get_u32_byrows(gmp_randstate_t rstate, random_matrix_ddata_ptr F, matrix_u32_ptr arg)
+void random_matrix_get_u32_byrows(gmp_randstate_t rstate, random_matrix_ddata_ptr F, matrix_u32_ptr arg)
 {
     int has_coeffs = F->maxcoeff > 0;
 
@@ -1076,10 +1075,9 @@ void * random_matrix_get_u32_byrows(gmp_randstate_t rstate, random_matrix_ddata_
         fprintf(stderr, "Actual density per row avg %.2f sdev %.2f\n",
                 F->row_avg, F->row_sdev);
     }
-    return arg;
 }
 
-void * random_matrix_get_u32_bycolumns(gmp_randstate_t rstate, random_matrix_ddata_ptr F, matrix_u32_ptr arg)
+void random_matrix_get_u32_bycolumns(gmp_randstate_t rstate, random_matrix_ddata_ptr F, matrix_u32_ptr arg)
 {
     uint64_t total_coeffs = 0;
     double tot_sq = 0;
@@ -1219,12 +1217,10 @@ void * random_matrix_get_u32_bycolumns(gmp_randstate_t rstate, random_matrix_dda
         fprintf(stderr, "Actual density per row avg %.2f sdev %.2f\n",
                 F->row_avg, F->row_sdev);
     }
-
-    return arg;
 }
 
 
-void * random_matrix_get_u32(parallelizing_info_ptr pi, param_list pl, matrix_u32_ptr arg, unsigned long padded_nrows, unsigned long padded_ncols)
+void random_matrix_get_u32(parallelizing_info_ptr pi, param_list pl, matrix_u32_ptr arg, unsigned long padded_nrows, unsigned long padded_ncols)
 {
     random_matrix_process_data r;
     random_matrix_process_data_init(r);
@@ -1253,9 +1249,9 @@ void * random_matrix_get_u32(parallelizing_info_ptr pi, param_list pl, matrix_u3
     gmp_randinit_default(rstate);
     gmp_randseed_ui(rstate, r->seed + pi->m->jrank * pi->m->ncores + pi->m->trank);
     if (arg->transpose)
-        return random_matrix_get_u32_bycolumns(rstate, F, arg);
+        random_matrix_get_u32_bycolumns(rstate, F, arg);
     else
-        return random_matrix_get_u32_byrows(rstate, F, arg);
+        random_matrix_get_u32_byrows(rstate, F, arg);
 
     random_matrix_ddata_clear(F);
     gmp_randclear(rstate);
@@ -1266,6 +1262,8 @@ void * random_matrix_get_u32(parallelizing_info_ptr pi, param_list pl, matrix_u3
 
 #ifdef  WANT_MAIN
 
+int avoid_zero_columns = 0;
+
 void random_matrix_process_print(random_matrix_process_data_ptr r, random_matrix_ddata_ptr F)
 {
     int ascii = r->ascii;
@@ -1275,10 +1273,9 @@ void random_matrix_process_print(random_matrix_process_data_ptr r, random_matrix
     gmp_randinit_default(rstate);
     gmp_randseed_ui(rstate, r->seed);
     uint32_t * colweights = NULL;
-    if (r->freq->cw) {
-        colweights = malloc(r->ncols * sizeof(uint32_t));
-        memset(colweights, 0, r->ncols * sizeof(uint32_t));
-    }
+    colweights = malloc(r->ncols * sizeof(uint32_t));
+    memset(colweights, 0, r->ncols * sizeof(uint32_t));
+    uint32_t next_priority_col = 0;
 
     int has_coeffs = r->maxcoeff > 0;
 
@@ -1313,14 +1310,29 @@ void random_matrix_process_print(random_matrix_process_data_ptr r, random_matrix
     punched_interval_ptr range = punched_interval_alloc(&pool, 0, 1);
     for(unsigned long i = 0 ; i < r->nrows ; i++) {
         long v = 0;
-        uint32_t c = generate_row(rstate, F, ptr, range, &pool);
+        uint32_t c;
+        if (i >= F->nrows)
+            c = 0;
+        else
+            c = generate_row(rstate, F, ptr, range, &pool);
+        if (avoid_zero_columns && i >= 0.9 * r->ncols) {
+            for( ; next_priority_col < r->ncols ; next_priority_col++)
+                if (!colweights[next_priority_col]) break;
+            if (next_priority_col < r->ncols) {
+                // don't print anything, because stdout might be our data
+                // output...
+                // printf("injecting col %" PRIu32 " for row %lu\n", next_priority_col, i);
+                ptr[c++] = next_priority_col;
+                qsort(ptr, c, sizeof(uint32_t), (sortfunc_t) &cmp_u32);
+            }
+        }
         WU32(out, "", c, "");
         if (r->freq->rw) {
             WU32(r->freq->rw, "", c, "\n");
         }
         for(uint32_t j = 0 ; j < c ; j++) {
             WU32(out, " ", ptr[j], "");
-            if (colweights) colweights[ptr[j]]++;
+            colweights[ptr[j]]++;
             if (has_coeffs) {
                 int32_t co = generate_coefficient(rstate, F, ptr[j]);
                 WS32(out, ":", co, "");
@@ -1361,7 +1373,7 @@ void random_matrix_process_print(random_matrix_process_data_ptr r, random_matrix
         }
     }
     */
-    if (colweights) {
+    if (r->freq->cw) {
         if (ascii) {
             for(unsigned long j = 0 ; j < r->ncols ; j++) {
                 WU32(r->freq->cw, "", colweights[j], "\n");
@@ -1369,8 +1381,8 @@ void random_matrix_process_print(random_matrix_process_data_ptr r, random_matrix
         } else {
             fwrite(colweights, sizeof(uint32_t), r->ncols, r->freq->cw);
         }
-        free(colweights);
     }
+    free(colweights);
     punched_interval_free(range, &pool);
     punched_interval_free_pool(&pool);
     free(ptr);
@@ -1392,6 +1404,7 @@ void usage()
             "\t-s <seed> : seed\n"
             "\t-c <maxc> : add coefficients\n"
             "\t-v : turn verbosity on\n"
+            "\t-Z : avoid zero columns\n"
             "\t-o <matfile> : output file name\n"
             "\t--binary : output in binary\n"
             "\t--kleft <d>: ensure at least a left kernel of dimension d\n"
@@ -1415,6 +1428,7 @@ int main(int argc, char * argv[])
     param_list_configure_alias(pl, "density", "-d");
     param_list_configure_alias(pl, "seed", "-s");
     param_list_configure_switch(pl, "-v", &verbose);
+    param_list_configure_switch(pl, "-Z", &avoid_zero_columns);
 
     random_matrix_process_data_init(r);
     if (!random_matrix_process_data_set_from_args(r, pl, argc, argv))

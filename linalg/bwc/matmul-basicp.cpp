@@ -37,7 +37,7 @@ template<typename F> struct our_gfp_type<F, UINT_MAX> {
 };
 
 /* If this line complains that ::type is not a type, then see above */
-typedef typename our_gfp_type<abelt,abimpl_max_characteristic_bits()>::type gfp;
+typedef our_gfp_type<abelt,abimpl_max_characteristic_bits()>::type gfp;
 
 
 
@@ -201,9 +201,9 @@ void MATMUL_NAME(mul)(matmul_ptr mm0, void * xdst, void const * xsrc, int d)
                 } else if (c == -1) {
                     gfp::sub(rowsum, src[j]);
                 } else if (c > 0) {
-                    gfp::addmul_ui(rowsum, src[j], c);
+                    gfp::addmul_ui(rowsum, src[j], c, prime, preinverse);
                 } else {
-                    gfp::submul_ui(rowsum, src[j], -c);
+                    gfp::submul_ui(rowsum, src[j], -c, prime, preinverse);
                 }
             }
             gfp::reduce(dst[i], rowsum, prime, preinverse);
@@ -228,9 +228,9 @@ void MATMUL_NAME(mul)(matmul_ptr mm0, void * xdst, void const * xsrc, int d)
                 } else if (c == -1) {
                     gfp::sub(tdst[j], src[i]);
                 } else if (c > 0) {
-                    gfp::addmul_ui(tdst[j], src[i], c);
+                    gfp::addmul_ui(tdst[j], src[i], c, prime, preinverse);
                 } else {
-                    gfp::submul_ui(tdst[j], src[i], -c);
+                    gfp::submul_ui(tdst[j], src[i], -c, prime, preinverse);
                 }
             }
         }

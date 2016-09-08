@@ -62,18 +62,24 @@ struct bw_params {
     int start;
     int end;
 
-    /* for a given krylov/mksol task, indicates the coordinate range in
-     * [0..n[ that is relevant for us. ys[1]-ys[0] defines the ``local''
-     * blocking factor n'.
+    /*
+     * relevant for krylov mostly, but not only.
+     *
+     * for krylov: indicates the coordinate range in [0..n[ that is
+     * relevant for us. ys[1]-ys[0] defines the ``local'' blocking factor
+     * n'.
+     *
+     * for dispatch: only the difference ys[1]-ys[0] is used, and fed as
+     * a parameter to the cache building routines (those have an interest
+     * in knowing the width of the vectors which will be worked on.
      */
     int ys[2];
 
-    /* for mksol only: by default this is n, but it is possible to have
-     * it set to a small divisor of this. Note that nothing beyond mksol
-     * itself supports this. It's also exemplified in bwc-ptrace.sh, but
-     * really don't count on this flag. It's an undocumented feature.
+    /* for mksol and gather, indicate which sub-range of the solution
+     * space we intend to compute. This must be aligned on multiples of
+     * the quantity ys[1]-ys[0] derived from the supplied values ys.
      */
-    int nsolvecs;
+    unsigned int solutions[2];
 
     /* dir is a boolean flag equal to 1 if we are looking for the right
      * nullspace of the matrix. In matmul_top speak, it indicates where the
@@ -133,6 +139,7 @@ struct bw_params {
 };
 
 extern struct bw_params bw[1];
+extern const char * bw_dirtext[];
 
 #ifdef __cplusplus
 extern "C" {

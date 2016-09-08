@@ -37,6 +37,7 @@ extern int mat64_is_uppertriangular(mat64_srcptr u);
 extern int mat64_is_lowertriangular(mat64_srcptr u);
 extern int mat64_triangular_is_unit(mat64_srcptr u);
 extern int mat64_eq(mat64_srcptr a, mat64_srcptr b);
+extern void mat64_copy(mat64_ptr a, mat64_srcptr b);
 
 /* These are the only important entry points. These functions
  * are meant to be accessors for tuned implementations (ok, for now

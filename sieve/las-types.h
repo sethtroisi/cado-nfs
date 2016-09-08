@@ -32,6 +32,8 @@ struct siever_config_s {
     unsigned long bucket_thresh;    // bucket sieve primes >= bucket_thresh
     unsigned long bucket_thresh1;   // primes above are 2-level bucket-sieved
     unsigned int td_thresh;
+    unsigned int skipped;           // don't sieve below this
+    double bk_multiplier;           // how much margin when allocating buckets
     unsigned int unsieve_thresh;
     struct {
         unsigned long lim; /* factor base bound */
@@ -40,6 +42,7 @@ struct siever_config_s {
         int mfb;           /* bound for residuals is 2^mfbr */
         int ncurves;       /* number of cofactorization curves */
         double lambda;     /* lambda sieve parameter */
+        unsigned long qmax; /* largest q sieved on this side, for dup sup */
     } sides[2][1];
 };
 typedef struct siever_config_s siever_config[1];
@@ -94,6 +97,7 @@ struct sieve_side_info_s {
         int td[2];
         int rs[2];
         int rest[2];
+        int skipped[2];
     } fb_parts_x[1];
     
     /* The reading, mapping or generating the factor base all create the
@@ -241,6 +245,7 @@ struct las_info_s {
     descent_tree * tree;
 
     int batch; /* batch mode for cofactorization */
+    int batch_print_survivors;
     cofac_list L; /* store (a,b) and corresponding cofactors in batch mode */
 };
 

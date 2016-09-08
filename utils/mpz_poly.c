@@ -27,13 +27,6 @@ MAYBE_UNUSED static inline mpz_ptr mpz_poly_lc(mpz_poly_ptr f)
     return f->coeff[f->deg];
 }
 
-MAYBE_UNUSED static inline mpz_srcptr mpz_poly_lc_const(mpz_poly_srcptr f)
-{
-    assert(f->deg >= 0);
-    return f->coeff[f->deg];
-}
-
-
 /* --------------------------------------------------------------------------
    Static functions
    -------------------------------------------------------------------------- */
@@ -452,6 +445,14 @@ void mpz_poly_setcoeff_uint64(mpz_poly_ptr f, int i, uint64_t z)
     mpz_poly_cleandeg (f, i);
 }
 
+void mpz_poly_setcoeff_double(mpz_poly_ptr f, int i, double z)
+{
+  mpz_poly_realloc (f, i + 1);
+  mpz_set_d (f->coeff[i], z);
+  if (i >= f->deg)
+    mpz_poly_cleandeg (f, i);
+}
+
 /* Get coefficient for the i-th term. */
 void mpz_poly_getcoeff(mpz_t res, int i, mpz_poly_srcptr f)
 {
@@ -627,15 +628,24 @@ oom:
     return -1;
 }
 
-
-/* Print coefficients of f. */
-void mpz_poly_fprintf (FILE *fp, mpz_poly_srcptr f)
+/* Print coefficients of f.
+ * endl = 1 if "\n" at the end of fprintf. */
+void mpz_poly_fprintf_endl (FILE *fp, mpz_poly_srcptr f, int endl)
 {
     char * res;
     int rc = mpz_poly_asprintf(&res, f);
     ASSERT_ALWAYS(rc >= 0);
-    fprintf(fp, "%s\n", res);
+    fprintf(fp, "%s", res);
+    if (endl) {
+      fprintf(fp, "\n");
+    }
     free(res);
+}
+
+/* Print coefficients of f. */
+void mpz_poly_fprintf (FILE *fp, mpz_poly_srcptr f)
+{
+  mpz_poly_fprintf_endl (fp, f, 1);
 }
 
 /* Print f of degree d with the following format
@@ -1889,6 +1899,30 @@ mpz_poly_sizeinbase (mpz_poly_srcptr f, int b)
       S = s;
   }
   return S;
+}
+
+static void mpz_max(mpz_ptr max, mpz_srcptr a, mpz_srcptr b)
+{
+    if (mpz_cmp(a, b) < 0) {
+        mpz_set(max, b);
+    } else if (mpz_cmp(a, b) > 0) {
+        mpz_set(max, a);
+    } else {
+        mpz_set(max, a);
+    }
+}
+
+void mpz_poly_infinity_norm(mpz_ptr in, mpz_poly_srcptr f)
+{
+  int i = 1;
+  mpz_t tmp;
+  mpz_init(tmp);
+  mpz_abs(in, f->coeff[0]);
+  for ( ; i < f->deg + 1; i++) {
+    mpz_abs(tmp, f->coeff[i]);
+    mpz_max(in, in, tmp);
+  }
+  mpz_clear(tmp);
 }
 
 /* return the total size (in bytes) to store the polynomial f */

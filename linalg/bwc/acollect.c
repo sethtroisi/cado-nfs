@@ -13,7 +13,6 @@
 #include "portability.h"
 #include "macros.h"
 #include "utils.h"
-#include "filenames.h"
 #include "bw-common.h"
 
 /* This program is rather standalone. It checks the current directory
@@ -75,7 +74,7 @@ int read_afiles(struct afile_list * a)
         }
         afile_ptr A = a->a[a->n];
         int k;
-        int rc = sscanf(de->d_name, A_FILE_PATTERN "%n", &A->n0, &A->n1, &A->j0, &A->j1, &k);
+        int rc = sscanf(de->d_name, "A%u-%u.%u-%u%n", &A->n0, &A->n1, &A->j0, &A->j1, &k);
         /* rc is expected to be 4 or 5 depending on our reading of the
          * standard */
         if (rc < 4 || k != (int) strlen(de->d_name)) {
@@ -111,7 +110,7 @@ int read_afiles(struct afile_list * a)
 
     if (a->n == 1) {
         char * tmp;
-        int rc = asprintf(&tmp, A_FILE_PATTERN,
+        int rc = asprintf(&tmp, "A%u-%u.%u-%u",
                 a->a[0]->n0,a->a[0]->n1,a->a[0]->j0,a->a[0]->j1);
         ASSERT_ALWAYS(rc >= 0);
         printf("%s\n", tmp);
@@ -200,7 +199,7 @@ int main(int argc, char * argv[])
         FILE * f = fopen("A.temp", "wb");
         for(int k = k0 ; k < k1 ; k++) {
             char * tmp;
-            int rc = asprintf(&tmp, A_FILE_PATTERN,
+            int rc = asprintf(&tmp, "A%u-%u.%u-%u",
                     a->a[k]->n0,a->a[k]->n1,a->a[k]->j0,a->a[k]->j1);
             ASSERT_ALWAYS(rc >= 0);
             FILE * g = fopen(tmp, "rb");
@@ -234,7 +233,7 @@ int main(int argc, char * argv[])
         fclose(f);
         {
             char * tmp;
-            int r = asprintf(&tmp, A_FILE_PATTERN, n0,n1,j0,j1);
+            int r = asprintf(&tmp, "A%u-%u.%u-%u", n0,n1,j0,j1);
             ASSERT_ALWAYS(r >= 0);
             r = rename("A.temp", tmp);
             if (r < 0) {
@@ -302,7 +301,7 @@ int main(int argc, char * argv[])
         FILE ** rs = malloc((k1-k0) * sizeof(FILE *));
         for(int k = k0 ; k < k1 ; k++) {
             char * tmp;
-            int rc = asprintf(&tmp, A_FILE_PATTERN,
+            int rc = asprintf(&tmp, "A%u-%u.%u-%u",
                     a->a[k]->n0,a->a[k]->n1,a->a[k]->j0,a->a[k]->j1);
             ASSERT_ALWAYS(rc >= 0);
             rs[k - k0] = fopen(tmp, "rb");
@@ -359,7 +358,7 @@ int main(int argc, char * argv[])
             fclose(rs[k-k0]);
             if (!remove_old) continue;
             char * tmp;
-            int rc = asprintf(&tmp, A_FILE_PATTERN,
+            int rc = asprintf(&tmp, "A%u-%u.%u-%u",
                     a->a[k]->n0,a->a[k]->n1,a->a[k]->j0,a->a[k]->j1);
             ASSERT_ALWAYS(rc >= 0);
             if (unlink(tmp) < 0) {
@@ -374,7 +373,7 @@ int main(int argc, char * argv[])
     if (final->j0 != UINT_MAX) {
         char * tmp;
         int r;
-        r = asprintf(&tmp, A_FILE_PATTERN, final->n0,final->n1,final->j0,final->j1);
+        r = asprintf(&tmp, "A%u-%u.%u-%u", final->n0,final->n1,final->j0,final->j1);
         r = rename("A.temp", tmp);
         if (r < 0) {
             fprintf(stderr, "rename(A.temp, %s): %s\n", tmp, strerror(errno));

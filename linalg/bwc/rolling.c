@@ -11,7 +11,6 @@
 #include "bwc_config.h"
 #include "params.h"
 #include "async.h"
-#include "filenames.h"
 #include "portability.h"
 #include "misc.h"
 

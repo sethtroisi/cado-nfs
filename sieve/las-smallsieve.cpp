@@ -99,13 +99,13 @@ static void small_sieve_print_contents(const char * prefix, small_sieve_data_t *
     }
     ASSERT_ALWAYS(next_marker->index == ssd->nb_ssp);
 
-    verbose_output_print(0, 1, "# %s: %d nice primes", prefix, nice);
+    verbose_output_print(0, 2, "# %s: %d nice primes", prefix, nice);
     /* Primes may be both even and projective... */
-    if (npow2) verbose_output_print(0, 1, ", %d powers of 2", npow2);
-    if (nproj) verbose_output_print(0, 1, ", and %d projective primes", nproj);
-    verbose_output_print(0, 1, ".");
-    if (ndiscard) verbose_output_print(0, 1, " %d discarded.", ndiscard);
-    verbose_output_print(0, 1, "\n");
+    if (npow2) verbose_output_print(0, 2, ", %d powers of 2", npow2);
+    if (nproj) verbose_output_print(0, 2, ", and %d projective primes", nproj);
+    verbose_output_print(0, 2, ".");
+    if (ndiscard) verbose_output_print(0, 2, " %d discarded.", ndiscard);
+    verbose_output_print(0, 2, "\n");
     /* With -v -v -v, dump all the small sieve data */
     verbose_output_vfprint (0, 4, small_sieve_dump, "# Dump of small sieve data:\n", ssd);
 }
@@ -225,7 +225,7 @@ void small_sieve_init(small_sieve_data_t *ssd, las_info_ptr las,
     // while we have any regular primes or bad primes < thresh left
     ssp_t * tail = ssd->ssp;
 
-    int index = 0;
+    unsigned int index = 0;
 
     // The processing of bucket region by nb_threads is interleaved.
     // It means that the positions for the small sieve must jump
@@ -234,13 +234,14 @@ void small_sieve_init(small_sieve_data_t *ssd, las_info_ptr las,
     // the ssp struct.
     
     const unsigned int skiprows = (bucket_region >> si->conf->logI)*(las->nb_threads-1);
-    for (std::vector<fb_general_entry>::const_iterator iter = fb->begin() ; iter != fb->end() ; iter++) {
+    for (std::vector<fb_general_entry>::const_iterator iter = fb->begin() ; iter != fb->end() && index < size ; iter++) {
         /* p=pp^k, the prime or prime power in this entry, and pp is prime */
         const fbprime_t p = iter->q, pp = iter->p;
         WHERE_AM_I_UPDATE(w, p, p);
 
-        if (p > thresh)
+        if (p > thresh) {
             continue;
+        }
 
         const double log_scale = si->sides[side]->scale * LOG_SCALE;
 
@@ -248,6 +249,14 @@ void small_sieve_init(small_sieve_data_t *ssd, las_info_ptr las,
             const fb_general_root *root = &(iter->roots[nr]);
             /* Convert into old format for projective roots by adding p if projective */
             const fbroot_t r = root->r + (root->proj ? p : 0);
+            /* skip q: mark it in place of p to be recognized quickly.
+               TODO: maybe use the SSP_DISCARD mechanism ?
+               */
+            if (mpz_cmp_ui(si->qbasis.q, pp) == 0) {
+                tail->p = pp;
+                tail++;
+                continue;
+            }
             unsigned int event = 0;
             if ((p & 1)==0) event |= SSP_POW2;
 
@@ -510,6 +519,9 @@ void sieve_small_bucket_region(unsigned char *S, int N,
             }
             if (n < fence) {
                 const fbprime_t p = ssd->ssp[n].p;
+                if (mpz_cmp_ui(si->qbasis.q, p) == 0) {
+                    continue;
+                }
                 uint64_t i0 = ssdpos[n];
                 if (i0 < I) {
                     // At the start of the bucket region, we are not sure
@@ -753,6 +765,9 @@ void sieve_small_bucket_region(unsigned char *S, int N,
 #endif
       for( ; k < (size_t) fence ; k++) {
 	const fbprime_t p = ssd->ssp[k].p;
+        if (mpz_cmp_ui(si->qbasis.q, p) == 0) {
+            continue;
+        }
 	/* Don't sieve 3 again as it was pattern-sieved -- unless
 	 * it's projective, but in this branch we have no projective
 	 * primes. */
@@ -993,6 +1008,9 @@ resieve_small_bucket_region (bucket_primes_t *BP, int N, unsigned char *S,
         for( ; i < fence ; i++) {
             ssp_t * ssp = &(ssd->ssp[i]);
             const fbprime_t p = ssp->p;
+            if (mpz_cmp_ui(si->qbasis.q, p) == 0) {
+                continue;
+            }
             fbprime_t r = ssp->r;
             WHERE_AM_I_UPDATE(w, p, p);
             unsigned int i0 = ssdpos[i];

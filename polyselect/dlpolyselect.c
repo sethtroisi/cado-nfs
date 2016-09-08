@@ -38,21 +38,24 @@ double bound_g=BOUND_G;
 /*
   Print two nonlinear poly info
 */
-void
+static void
 print_nonlinear_poly_info ( mpz_t *f,
                             mpz_t *g,
                             unsigned int df,
                             unsigned int dg,
-                            int format )
+                            int format,
+                            mpz_t n,
+                            mpz_t m )
 {
     unsigned int i;
-    double skew[2], logmu[2], alpha[2];
+    double skew[2], logmu[2], alpha[2], score;
     mpz_poly ff;
     ff->deg = df;
     ff->coeff = f;
     mpz_poly gg;
     gg->deg = dg;
     gg->coeff = g;
+    static double best_score = DBL_MAX;
 
     skew[0] = L2_skewness (ff, SKEWNESS_DEFAULT_PREC);
     logmu[0] = L2_lognorm (ff, skew[0]);
@@ -60,6 +63,17 @@ print_nonlinear_poly_info ( mpz_t *f,
     skew[1] = L2_skewness (gg, SKEWNESS_DEFAULT_PREC);
     logmu[1] = L2_lognorm (gg, skew[0]);
     alpha[1] = get_alpha (gg, ALPHA_BOUND);
+
+    score = logmu[1] + alpha[1] + logmu[0] + alpha[0];
+    if (score >= best_score)
+      return; /* only print record scores */
+
+    best_score = score;
+
+    if (format == 1)
+      gmp_printf ("n: %Zd\n", n);
+    else
+      gmp_printf ("N %Zd\n", n);
 
     if (format == 1) {
         for (i = df + 1; i -- != 0; )
@@ -85,8 +99,12 @@ print_nonlinear_poly_info ( mpz_t *f,
             "exp_E %1.2f\n",
             logmu[1], skew[1], alpha[1], logmu[1] + alpha[1],
             logmu[1] + exp_alpha(exp_rot[df] * log (skew[0])));
-    printf ("# f+g score %1.2f\n", logmu[1] + alpha[1] + logmu[0] + alpha[0]);
+    printf ("# f+g score %1.2f\n", score);
 
+    if (format == 1)
+      gmp_printf ("m: %Zd\n", n);
+    else
+      gmp_printf ("M %Zd\n\n", m);
 }
 
 
@@ -243,16 +261,8 @@ polygen_JL ( mpz_t n,
         polygen_JL_g (n, dg, g, rf[i]);
 
         for (j = 1; j <= dg + 1; j ++) {
-            if (format == 1)
-                gmp_printf ("n: %Zd\n", n);
-            else
-                gmp_printf ("N %Zd\n", n);
-
-            print_nonlinear_poly_info (f, &((g.coeff[j])[1]), df, dg, format);
-            if (format == 1)
-                gmp_printf ("m: %Zd\n", n);
-            else
-                gmp_printf ("M %Zd\n\n", rf[i]);
+          print_nonlinear_poly_info (f, &((g.coeff[j])[1]), df, dg, format,
+                                     n, rf[i]);
         }
     }
     

@@ -45,6 +45,6 @@
 #ifdef __cplusplus
 #include "utils/cxx_mpz.hpp"
 #endif
-
+#include "mpz_poly_bivariate.h"
 
 #endif	/* CADO_UTILS_H_ */

@@ -1170,17 +1170,65 @@ hash_grow (hash_t H)
   mpz_clear (tmp);
 }
 
-#if 0
-double
-hash_mean_value (hash_t H)
+void
+data_init (data_t s)
 {
-  double s = 0;
-  unsigned long j;
-
-  for (j = 0; j < H->alloc; j++)
-    if (H->p[j] != 0)
-      s += fabs ((double) H->i[j]);
-  return s / (double) H->size;
+  s->size = s->alloc = 0;
+  s->x = NULL;
+  s->sum = s->var = 0.0;
+  s->min = DBL_MAX;
+  s->max = -DBL_MAX;
+  s->beta = s->eta = 0.0; /* means non initialized */
 }
-#endif
 
+void
+data_clear (data_t s)
+{
+  free (s->x);
+}
+
+void
+data_add (data_t s, double x)
+{
+  if (s->size == s->alloc)
+    {
+      s->alloc += 1 + s->alloc / 2;
+      s->x = realloc (s->x, s->alloc * sizeof (double));
+    }
+  s->x[s->size++] = x;
+  s->sum += x;
+  s->var += x * x;
+  if (x < s->min)
+    s->min = x;
+  if (x > s->max)
+    s->max = x;
+}
+
+double
+data_mean (data_t s)
+{
+  return s->sum / (double) s->size;
+}
+
+double
+data_var (data_t s)
+{
+  double m = data_mean (s);
+  return s->var / (double) s->size - m * m;
+}
+
+static int
+data_cmp (const void *a, const void *b)
+{
+  const double *x = a;
+  const double *y = b;
+
+  return (*x < *y) ? -1 : (*x > *y) ? 1 : 0;
+}
+
+double
+data_median (data_t s)
+{
+  qsort (s->x, s->size, sizeof (double), data_cmp);
+  return s->x[s->size / 2];
+}

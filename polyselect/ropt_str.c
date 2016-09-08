@@ -23,12 +23,11 @@ static inline double
 rotate_bounds_V_mpz ( mpz_t *f,
                       mpz_t *g,
                       int d,
-                      ropt_bound_t bound,
-                      bool flagE )
+                      ropt_bound_t bound )
 {
   mpz_t V;
   mpz_poly F0, G0, F, G;
-  double lognorm, exp_E = DBL_MAX;
+  double lognorm, exp_E = DBL_MAX, min_exp_E = DBL_MAX;
   mpz_poly_init (F0, d);
   mpz_poly_init (F, d);
   mpz_poly_init (G0, 1);
@@ -36,6 +35,19 @@ rotate_bounds_V_mpz ( mpz_t *f,
   mpz_poly_setcoeffs (F0, f, d);
   mpz_poly_setcoeffs (G0, g, 1);
 
+  mpz_poly_ptr fptr, gptr;
+  cado_poly poly;
+  cado_poly_init (poly);
+  fptr = poly->pols[ALG_SIDE];
+  fptr->deg = d;
+  gptr = poly->pols[RAT_SIDE];
+  gptr->deg = 1;
+  for (int i = 0; i < (d+1); i++)
+    mpz_set(poly->pols[ALG_SIDE]->coeff[i], f[i]);
+  for (int i = 0; i < 2; i++)
+    mpz_set(poly->pols[RAT_SIDE]->coeff[i], g[i]);
+
+  
   /* look for positive V: 2, 4, 8, ... */
   mpz_init_set_ui (V, 1);
   for (unsigned int i = 0; i < 150; i++, mpz_mul_2exp (V, V, 1) )
@@ -43,18 +55,19 @@ rotate_bounds_V_mpz ( mpz_t *f,
     /* F = F0 + V*G0 */
     mpz_poly_rotation (F, F0, G0, V, 0);
 
-    /* translation-optimize the rotated polynomial */
-    if (!flagE) {
-      sopt_local_descent (F, G, F, G0, 1, -1, SOPT_DEFAULT_MAX_STEPS, 0);
-      lognorm = L2_skew_lognorm (F, SKEWNESS_DEFAULT_PREC);
-    }
-    else {
-      lognorm = L2_skew_lognorm (F, SKEWNESS_DEFAULT_PREC);
-      exp_E = fmin(exp_E, lognorm + exp_alpha((double)i*M_LN2));
-    }
-    
-    if (lognorm > bound->bound_lognorm)
-      break;
+    /* translation-optimize the rotated polynomial and compute exp_E */
+    sopt_local_descent (F, G, F, G0, 1, -1, SOPT_DEFAULT_MAX_STEPS, 0); 
+    lognorm = L2_skew_lognorm (F, SKEWNESS_DEFAULT_PREC);
+    exp_E = lognorm + expected_rotation_gain (F, G);
+    min_exp_E = fmin(min_exp_E, exp_E);
+#if 0
+    gmp_printf (" i: %u, translation: %Zd --", i, V);
+    printf (" lognorm: %f, exp_apha: %f, exp_E: %f\n", lognorm,
+            expected_rotation_gain (F, G),  exp_E);
+#endif
+    if (exp_E > bound->bound_E) break;
+    if (lognorm > bound->bound_lognorm) break;
+
   }
   mpz_set (bound->global_v_boundr, V);
 
@@ -66,26 +79,27 @@ rotate_bounds_V_mpz ( mpz_t *f,
     mpz_poly_rotation (F, F0, G0, V, 0);
 
     /* translation-optimize the rotated polynomial */
-    if (!flagE) {
-      sopt_local_descent (F, G, F, G0, 1, -1, SOPT_DEFAULT_MAX_STEPS, 0);
-      lognorm = L2_skew_lognorm (F, SKEWNESS_DEFAULT_PREC);
-    }
-    else {
-      lognorm = L2_skew_lognorm (F, SKEWNESS_DEFAULT_PREC);
-      exp_E = fmin(exp_E, lognorm + exp_alpha((double)i*M_LN2));
-    }
-    
-    if (lognorm > bound->bound_lognorm)
-      break;
+    sopt_local_descent (F, G, F, G0, 1, -1, SOPT_DEFAULT_MAX_STEPS, 0); 
+    lognorm = L2_skew_lognorm (F, SKEWNESS_DEFAULT_PREC);
+    exp_E = lognorm + expected_rotation_gain (F, G);
+    min_exp_E = fmin(min_exp_E, exp_E);
+#if 0
+    gmp_printf (" i: %u, translation: %Zd --", i, V);
+    printf (" lognorm: %f, exp_apha: %f, exp_E: %f\n", lognorm,
+            expected_rotation_gain (F, G),  exp_E);
+#endif
+    if (exp_E > bound->bound_E) break;
+    if (lognorm > bound->bound_lognorm) break;
   }
   mpz_set (bound->global_v_boundl, V);
-
+  
+  cado_poly_clear (poly);
   mpz_poly_clear (F0);
   mpz_poly_clear (F);
   mpz_poly_clear (G0);
   mpz_poly_clear (G);
   mpz_clear (V);
-  return exp_E;
+  return min_exp_E;
 }
 
 
@@ -96,11 +110,10 @@ static inline double
 rotate_bounds_U_lu ( mpz_t *f,
                      mpz_t *g,
                      int d,
-                     ropt_bound_t bound,
-                     bool flagE )
+                     ropt_bound_t bound )
 {
   mpz_poly F0, G0, F, G;
-  double lognorm, exp_E = DBL_MAX;
+  double lognorm, exp_E = DBL_MAX, min_exp_E = DBL_MAX;
   mpz_poly_init (F0, d);
   mpz_poly_init (F, d);
   mpz_poly_init (G0, 1);
@@ -116,17 +129,17 @@ rotate_bounds_U_lu ( mpz_t *f,
     mpz_poly_rotation_int64 (F, F0, G0, u, 1);
 
     /* translation-optimize the rotated polynomial */
-    if (!flagE) {
-      sopt_local_descent (F, G, F, G0, 1, -1, SOPT_DEFAULT_MAX_STEPS, 0);
-      lognorm = L2_skew_lognorm (F, SKEWNESS_DEFAULT_PREC);
-    }
-    else {
-      lognorm = L2_skew_lognorm (F, SKEWNESS_DEFAULT_PREC);
-      exp_E = fmin(exp_E, lognorm + exp_alpha((double)i*M_LN2));
-    }
-
-    if (lognorm > bound->bound_lognorm)
-      break;
+    sopt_local_descent (F, G, F, G0, 1, -1, SOPT_DEFAULT_MAX_STEPS, 0); 
+    lognorm = L2_skew_lognorm (F, SKEWNESS_DEFAULT_PREC);
+    exp_E = lognorm + expected_rotation_gain (F, G);
+    min_exp_E = fmin(min_exp_E, exp_E);    
+#if 0
+    printf (" i: %u, translation: %ld --", i, u);
+    printf (" lognorm: %f, exp_apha: %f, exp_E: %f\n", lognorm,
+            expected_rotation_gain (F, G),  exp_E);
+#endif
+    if (exp_E > bound->bound_E) break;
+    if (lognorm > bound->bound_lognorm) break;
   }
   bound->global_u_boundr = u;
 
@@ -137,18 +150,19 @@ rotate_bounds_U_lu ( mpz_t *f,
     /* F = F0 + u*x*G0 */
     mpz_poly_rotation_int64 (F, F0, G0, u, 1);
 
-    /* translation-optimize the rotated polynomial */
-    if (!flagE) {
-      sopt_local_descent (F, G, F, G0, 1, -1, SOPT_DEFAULT_MAX_STEPS, 0);
-      lognorm = L2_skew_lognorm (F, SKEWNESS_DEFAULT_PREC);
-    }
-    else {
-      lognorm = L2_skew_lognorm (F, SKEWNESS_DEFAULT_PREC);
-      exp_E = fmin(exp_E, lognorm + exp_alpha((double)i*M_LN2));
-    }
 
-    if (lognorm > bound->bound_lognorm)
-      break;
+    /* translation-optimize the rotated polynomial */
+    sopt_local_descent (F, G, F, G0, 1, -1, SOPT_DEFAULT_MAX_STEPS, 0); 
+    lognorm = L2_skew_lognorm (F, SKEWNESS_DEFAULT_PREC);
+    exp_E = lognorm + expected_rotation_gain (F, G);
+    min_exp_E = fmin(min_exp_E, exp_E);    
+#if 0
+    printf (" i: %u, translation: %ld --", i, u);
+    printf (" lognorm: %f, exp_apha: %f, exp_E: %f\n", lognorm,
+            expected_rotation_gain (F, G),  exp_E);
+#endif
+    if (exp_E > bound->bound_E) break;
+    if (lognorm > bound->bound_lognorm) break;
   }
   bound->global_u_boundl = u;
 
@@ -414,7 +428,8 @@ ropt_bound_init ( ropt_bound_t bound )
   mpz_init_set_ui (bound->global_v_boundl, 0UL);
   mpz_init_set_ui (bound->global_v_boundr, 0UL);
   bound->init_lognorm = 0.0;
-  bound->bound_lognorm = 0.0;
+  bound->bound_lognorm = DBL_MAX;
+  bound->bound_E = 0.0;
   bound->exp_min_alpha = 0.0;
 }
 
@@ -425,28 +440,28 @@ ropt_bound_init ( ropt_bound_t bound )
 static inline void
 ropt_bound_setup_normbound ( ropt_poly_t poly,
                              ropt_bound_t bound,
-                             ropt_param_t param )
+                             ropt_param_t param,
+                             double incr )
 {
-  mpz_poly F;
+  mpz_poly F, G;
   double skewness;
   F->coeff = poly->f;
   F->deg = poly->d;
+  G->coeff = poly->g;
+  G->deg = 1;
   skewness = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
   bound->init_lognorm = L2_lognorm (F, skewness);
-
-  /* setup lognorm bound, either from input or by default. */
-  if (param->bound_lognorm > 0) {
+  bound->bound_E = (bound->init_lognorm + expected_rotation_gain (F, G))
+    * incr;
+  /* setup lognorm bound, either from input or by default
+     By default, we do not use bound_lognorm to bound the 
+     rotation; instead we use (lognorm + exp_E)          */
+  if (param->bound_lognorm > 0) 
     bound->bound_lognorm = param->bound_lognorm;
-  }
-  else {
-    /* The higher, the more margin in computing the sieving bound
-       w, u and v, hence the larger the sieving bound, and hence
-       larger individual sublattices. */
-    bound->bound_lognorm = bound->init_lognorm + BOUND_LOGNORM_INCR_MAX;
-  }
 }
 
 
+#if 0
 double
 ropt_bound_expected_E (mpz_poly F, mpz_poly G)
 {
@@ -461,12 +476,13 @@ ropt_bound_expected_E (mpz_poly F, mpz_poly G)
   F->coeff = f;
   F->deg = d;
   bound->init_lognorm = L2_skew_lognorm (F, SKEWNESS_DEFAULT_PREC);
-  bound->bound_lognorm = bound->init_lognorm + BOUND_LOGNORM_INCR_MAX;
-  exp_E = rotate_bounds_U_lu (f, g, d, bound, 1);
-  exp_E = fmin(exp_E, rotate_bounds_V_mpz (f, g, d, bound, 1));
+  bound->bound_lognorm = bound->init_lognorm * BOUND_LOGNORM_INCR_MAX;
+  exp_E = rotate_bounds_U_lu (f, g, d, bound);
+  exp_E = fmin(exp_E, rotate_bounds_V_mpz (f, g, d, bound));
   ropt_bound_free (bound);  
   return exp_E;
 }
+#endif
 
 
 /**
@@ -494,10 +510,10 @@ ropt_bound_setup_globalbound ( ropt_poly_t poly,
   }
 
   /* u bound */
-  rotate_bounds_U_lu (poly->f, poly->g, poly->d, bound, 0);
+  rotate_bounds_U_lu (poly->f, poly->g, poly->d, bound);
 
   /* v bound */
-  rotate_bounds_V_mpz (poly->f, poly->g, poly->d, bound, 0);
+  rotate_bounds_V_mpz (poly->f, poly->g, poly->d, bound);
 }
 
 
@@ -505,29 +521,17 @@ ropt_bound_setup_globalbound ( ropt_poly_t poly,
  * Subroutine for ropt_bound_setup().
  */
 static inline void
-ropt_bound_setup_others ( ropt_bound_t bound )
+ropt_bound_setup_others ( ropt_poly_t poly,
+                          ropt_bound_t bound )
 {
-  long size, sizel, sizer;
-  sizel = mpz_sizeinbase (bound->global_v_boundl, 2);
-  sizer = mpz_sizeinbase (bound->global_v_boundr, 2);
-  size = (sizel > sizer) ? sizel : sizer;
-
-  if (bound->global_u_boundr == 0)
-    bound->global_u_boundr = 1;
-  if (bound->global_u_boundl == 0)
-    bound->global_u_boundr = 1;
-
-  /*
-    printf ("size: %ld, uboundr: %ld, uboundl: %ld\n",
-            size, bound->global_u_boundr, bound->global_u_boundl);
-  */
-
-  size += (int) log2 ((double) (bound->global_u_boundr -
-                                bound->global_u_boundl));
-
-  ASSERT_ALWAYS(size <= 150);
-
-  bound->exp_min_alpha = exp_alpha((double)(size-1)*M_LN2);
+  mpz_poly F, G;
+  mpz_poly_init (F, poly->d);
+  mpz_poly_init (G, 1);
+  mpz_poly_setcoeffs (F, poly->f, poly->d);
+  mpz_poly_setcoeffs (G, poly->g, 1);
+  bound->exp_min_alpha = expected_rotation_gain (F, G);
+  mpz_poly_clear (F);
+  mpz_poly_clear (G);
 }
 
 
@@ -540,16 +544,17 @@ ropt_bound_setup_others ( ropt_bound_t bound )
 void
 ropt_bound_setup ( ropt_poly_t poly,
                    ropt_bound_t bound,
-                   ropt_param_t param )
+                   ropt_param_t param,
+                   double incr )
 {
   /* set bound->bound_lognorm */
-  ropt_bound_setup_normbound (poly, bound, param);
+  ropt_bound_setup_normbound (poly, bound, param, incr);
 
   /* set w, u, v bounds */
   ropt_bound_setup_globalbound (poly, bound, param);
 
   /* set exp_min_alpha */
-  ropt_bound_setup_others (bound);
+  ropt_bound_setup_others (poly, bound);
 
   if (param->verbose >= 1) {
     gmp_fprintf ( stderr, "# Info: global bounds (%d:%d, %ld:%ld, %Zd:%Zd)"
@@ -560,11 +565,45 @@ ropt_bound_setup ( ropt_poly_t poly,
                   bound->global_u_boundr,
                   bound->global_v_boundl,
                   bound->global_v_boundr );
-    gmp_fprintf ( stderr, "# Info: exp_alpha: %.3f, norm bound: %.3f, "
-                  "initial norm: %.3f\n",
-                  bound->exp_min_alpha,
-                  bound->bound_lognorm,
-                  bound->init_lognorm );
+    if (bound->bound_lognorm==DBL_MAX) {
+      gmp_fprintf ( stderr, "# Info: exp_alpha: %.3f, norm bound: DBL_MAX, "
+                    "E bound: %.3f (init. norm: %.3f)\n",
+                    bound->exp_min_alpha,
+                    bound->bound_E,
+                    bound->init_lognorm );
+    }
+    else {
+      gmp_fprintf ( stderr, "# Info: exp_alpha: %.3f, norm bound: %.3f, "
+                    "E bound: %.3f (init. norm: %.3f)\n",
+                    bound->exp_min_alpha,
+                    bound->bound_lognorm,
+                    bound->bound_E,
+                    bound->init_lognorm );
+    }
+  }
+}
+
+
+/**
+ * This is for tuning function 
+ */
+void
+ropt_bound_setup_incr ( ropt_poly_t poly,
+                        ropt_bound_t bound,
+                        ropt_param_t param,
+                        double incr )
+{
+  ropt_bound_setup_normbound (poly, bound, param, incr);
+  ropt_bound_setup_globalbound (poly, bound, param);
+  ropt_bound_setup_others (poly, bound);
+  if (param->verbose >= 2) {
+    gmp_fprintf ( stderr, "# Info: tune (%d:%d, %ld:%ld, %Zd:%Zd)\n",
+                  bound->global_w_boundl,
+                  bound->global_w_boundr,
+                  bound->global_u_boundl,
+                  bound->global_u_boundr,
+                  bound->global_v_boundl,
+                  bound->global_v_boundr );
   }
 }
 
@@ -579,13 +618,13 @@ ropt_bound_reset ( ropt_poly_t poly,
 {
 
   /* u bound */
-  rotate_bounds_U_lu (poly->f, poly->g, poly->d, bound, 0);
+  rotate_bounds_U_lu (poly->f, poly->g, poly->d, bound);
 
   /* v bound */
-  rotate_bounds_V_mpz (poly->f, poly->g, poly->d, bound, 0);
+  rotate_bounds_V_mpz (poly->f, poly->g, poly->d, bound);
 
   /* set exp_min_alpha */
-  ropt_bound_setup_others (bound);
+  ropt_bound_setup_others (poly, bound);
 
   if (param->verbose >= 2) {
     gmp_fprintf ( stderr, "# Info: reset bounds (%d:%d, %ld:%ld, %Zd:%Zd)"
@@ -596,10 +635,11 @@ ropt_bound_reset ( ropt_poly_t poly,
                   bound->global_u_boundr,
                   bound->global_v_boundl,
                   bound->global_v_boundr );
-    gmp_fprintf ( stderr, "# Info: exp_alpha: %.3f, L2 bound: %.3f, "
-                  "initial L2: %.3f\n",
+    gmp_fprintf ( stderr, "# Info: exp_alpha: %.3f, norm bound: %.3f, "
+                  "E bound: %.3f (init norm: %.3f)\n",
                   bound->exp_min_alpha,
                   bound->bound_lognorm,
+                  bound->bound_E,
                   bound->init_lognorm );
   }
 }
@@ -629,7 +669,10 @@ ropt_s1param_init ( ropt_s1param_t s1param )
   s1param->len_e_sl = 0;
   s1param->tlen_e_sl = 0;
   s1param->nbest_sl = 0;
-
+  s1param->nbest_sl_tune = 1;
+  s1param->nbest_sieve = 0;
+  s1param->modbound = 0;
+  
   /* set to 1 for using quicker, smaller nbest_sl for tuning
      sublattices */
   s1param->nbest_sl_tunemode = 0;
@@ -657,6 +700,9 @@ ropt_s1param_init ( ropt_s1param_t s1param )
 
 /**
  * Helper function to setup "e_sl[]".
+ * Note the factor 16 in the following function seems
+ * important. It has the effect to reduce the bounds
+ * which is better in practice.
  */
 static inline void
 ropt_s1param_setup_e_sl ( ropt_poly_t poly,
@@ -665,40 +711,42 @@ ropt_s1param_setup_e_sl ( ropt_poly_t poly,
                           ropt_param_t param )
 {
   unsigned int i, j;
-  unsigned long sublattice;
+  unsigned long modbound;
   mpz_t bound_by_v;
   mpz_init (bound_by_v);
 
-  /* e_sl */
+  /* check bound_by_u */
   unsigned long bound_by_u = (unsigned long)
     (bound->global_u_boundr < (-bound->global_u_boundl)) ?
     bound->global_u_boundr : (-bound->global_u_boundl);
 
+  /* check bound_by_v */
   mpz_fdiv_q_ui (bound_by_v, bound->global_v_boundr,
                  SIZE_SIEVEARRAY_V_MIN);
 
-  /* fix for small skewnss */
+  /* compare two bounds */
   if ( mpz_cmp_ui (bound_by_v, bound_by_u) < 0 ) {
-    sublattice = mpz_get_ui (bound_by_v);
-    if (sublattice > bound_by_u / 16)
-      sublattice = bound_by_u / 16;
+    modbound = mpz_get_ui (bound_by_v);
+    if (modbound > bound_by_u / 8)
+      modbound = bound_by_u / 8;
   }
   else
-    sublattice = bound_by_u / 16;
+    modbound = bound_by_u / 8;
 
+  /* adjust for small skewness but large bound (not sure if this is good) */
   mpz_poly F;
   F->coeff = poly->f;
   F->deg = poly->d;
   double skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
+  if ((double) modbound > skew)
+    modbound = (unsigned long) skew;
 
-  /* fix for small skewness but large bound */
-  if ( (double) sublattice > (skew / 16.0) )
-    sublattice = (unsigned long) (skew / 16.0);
-
+  /* find i */
   for (i = 0; i < NUM_DEFAULT_SUBLATTICE; i ++)
-    if (default_sublattice_prod[i] > sublattice)
+    if (default_sublattice_prod[i] > modbound)
       break;
-  /* fix if i too large */
+
+  /* check if i > limit and fix if so */
   i = (i >= NUM_DEFAULT_SUBLATTICE) ?
     (NUM_DEFAULT_SUBLATTICE - 1) : i;
 
@@ -707,11 +755,18 @@ ropt_s1param_setup_e_sl ( ropt_poly_t poly,
     s1param->e_sl[j] = default_sublattice_pe[i][j];
   }
 
+  /* get mod bound */
+  s1param->modbound = default_sublattice_prod[i];
+  
   /* overwrite e_sl[] from from stdin, if needed */
-  if (param->s1_num_e_sl != 0)
-    for (i = 0; i < NUM_SUBLATTICE_PRIMES; i++)
+  if (param->s1_num_e_sl != 0) {
+    s1param->modbound = 1;
+    for (i = 0; i < NUM_SUBLATTICE_PRIMES; i++) {
       s1param->e_sl[i] = param->s1_e_sl[i];
-
+      s1param->modbound *= param->s1_e_sl[i];
+    }
+  }
+  
   mpz_clear (bound_by_v);
 }
 
@@ -759,21 +814,95 @@ ropt_s1param_setup ( ropt_poly_t poly,
 
   /* Set 2: "nbest_sl", depending on the size of n */
   j = mpz_sizeinbase (poly->n, 10);
-  for (i = 0; i < 7; i ++)
+  for (i = 0; i < NUM_DEFAULT_DIGITS-1; i ++)
     if (size_total_sublattices[i][0] > j)
       break;
 
-  s1param->nbest_sl = (unsigned long) ((double) size_total_sublattices[i][1] * param->effort);
+  s1param->nbest_sl = (unsigned int) ((double) size_total_sublattices[i][1]);
+
+  s1param->nbest_sieve = (unsigned int) ((double) size_total_sublattices[i][2]);
+
+  s1param->nbest_sl_tune = (unsigned int) ((double) size_total_sublattices[i][3]);
+  
+
   if (s1param->nbest_sl < 4)
     s1param->nbest_sl = 4;
-  if (param->verbose >= 1)
-    printf ("# Info: s1param->nbest_sl: %u\n", s1param->nbest_sl);
+  if (param->verbose >= 1) {
+    printf ("# Info: s1param->nbest_sl: %u (= size_total_sublattices*ropteffort)\n", s1param->nbest_sl);
+    printf ("# Info: s1param->nbest_sieve: %u (for sieving)\n", s1param->nbest_sieve);
+  }
 
   /* Set 3: set "e_sl[]" */
   ropt_s1param_setup_e_sl (poly, s1param, bound, param);
 
   /* Set 4: set "individual_nbest_sl[]" */
   ropt_s1param_setup_individual_nbest_sl (s1param);
+
+}
+
+
+/**
+ * Setup s1param by default parameters and/or param (stdin).
+ */
+void
+ropt_s1param_resetup ( ropt_poly_t poly,
+                       ropt_s1param_t s1param,
+                       ropt_bound_t bound,
+                       ropt_param_t param,
+                       unsigned int nbest )
+{
+  unsigned int i, j;
+  s1param->len_e_sl = NUM_SUBLATTICE_PRIMES;
+  s1param->tlen_e_sl = s1param->len_e_sl;
+  j = mpz_sizeinbase (poly->n, 10);
+  for (i = 0; i < NUM_DEFAULT_DIGITS; i ++)
+    if (size_total_sublattices[i][0] > j)
+      break;
+  s1param->nbest_sl = (unsigned long) nbest;
+  s1param->nbest_sieve = (unsigned long) ((double) size_total_sublattices[i][2]);
+  if (s1param->nbest_sl < 4)
+    s1param->nbest_sl = 4;
+
+  /* Set 3: set "e_sl[]" */
+  ropt_s1param_setup_e_sl (poly, s1param, bound, param);
+
+  /* Set 4: set "individual_nbest_sl[]" */
+  ropt_s1param_setup_individual_nbest_sl (s1param);
+
+}
+
+
+/**
+ * Setup s1param with modbound as extra input
+ */
+void
+ropt_s1param_resetup_modbound ( ropt_poly_t poly,
+                                ropt_s1param_t s1param,
+                                ropt_bound_t bound,
+                                ropt_param_t param,
+                                unsigned int nbest,
+                                unsigned long modbound)
+{
+  ropt_s1param_resetup (poly, s1param, bound, param, nbest);
+
+  /* find i */
+  int i, j;
+  for (i = 0; i < NUM_DEFAULT_SUBLATTICE; i ++)
+    if (default_sublattice_prod[i] > modbound)
+      break;
+
+  /* check if i > limit and fix if so */
+  i = (i >= NUM_DEFAULT_SUBLATTICE) ?
+    (NUM_DEFAULT_SUBLATTICE - 1) : i;
+
+  /* set e_sl[] from default array */
+  for (j = 0; j < NUM_SUBLATTICE_PRIMES; j++) {
+    s1param->e_sl[j] = default_sublattice_pe[i][j];
+  }
+
+  /* get mod bound */
+  s1param->modbound = default_sublattice_prod[i];
+
 }
 
 
@@ -1113,7 +1242,7 @@ ropt_param_init ( ropt_param_t param )
   param->s2_Amax = 0;
   param->s2_Bmax = 0;
   param->s2_w = 0;
-  param->bound_lognorm = 0;
+  param->bound_lognorm = -1;
   param->s1_e_sl = (unsigned short*)
     malloc ( NUM_SUBLATTICE_PRIMES * sizeof (unsigned short) );
   int i;

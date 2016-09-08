@@ -11,7 +11,6 @@
 #include "cado_config.h"
 #include "bw-common.h"
 #include "params.h"
-#include "filenames.h"
 #include "utils.h"
 #include "select_mpi.h"
 #include "timing.h"
@@ -21,7 +20,7 @@
 
 struct bw_params bw[1];
 
-const char * dirtext[] = { "left", "right" };
+const char * bw_dirtext[] = { "left", "right" };
 
 typedef int (*sortfunc_t) (const void*, const void*);
 
@@ -43,11 +42,11 @@ void bw_common_decl_usage(param_list pl)/*{{{*/
     param_list_decl_usage(pl, "mn", "set the block Wiedemann parameters m and n to the same given value");
     param_list_decl_usage(pl, "m", "set the block Wiedemann parameter m to this value");
     param_list_decl_usage(pl, "n", "set the block Wiedemann parameter n to this value");
+    param_list_decl_usage(pl, "skip_bw_early_rank_check", "proceed even if we expect that the parameters lead us to failure");
     /* }}} */
 
     /* {{{ Parameters which are related to the interaction with the OS */
     param_list_decl_usage(pl, "wdir", "working directory, created if it does not exist. All file accesses are relative to this directory.");
-    param_list_decl_usage(pl, "cfg", "path to a file containing more parameters to be interpreted.");
     param_list_decl_usage(pl, "seed", "set seed for all pseudo-random number generation");
     param_list_decl_usage(pl, "v", "More verbose output");
     /* }}} */
@@ -65,8 +64,10 @@ void bw_common_decl_usage(param_list pl)/*{{{*/
     /* }}} */
 
     /* {{{ Parameters related to multi-sequences */
-    param_list_decl_usage(pl, "ys", "indicates which sequence(s) should be worked on. Syntax is <n0>..<n1> for working with vectors of indices i with n0<=i<n1, with of course 0<=n0<n1<=n.");
-    param_list_decl_usage(pl, "nsolvecs", "for mksol and gather, produce this many independent solutions. Default is n");
+    param_list_decl_usage(pl, "ys",
+            "indicates which sequence(s) should be worked on. Syntax is <n0>..<n1> for working with vectors of indices i with n0<=i<n1, with of course 0<=n0<n1<=n.");
+    param_list_decl_usage(pl, "solutions",
+            "indicates which solution(s) should be worked on. Syntax is <n0>..<n1> for working with solutions of indices i with n0<=i<n1, with of course 0<=n0<n1<=n.");
     /* }}} */
 
     verbose_decl_usage(pl);
@@ -79,7 +80,6 @@ const char * bw_common_usage_string()
     static char t[]=
         "Common options:\n"
         "\twdir=<path>\tchdir to <path> beforehand\n"
-        "\tcfg=<file>\timport many settings from <file>\n"
         "\tm=<int>\tset bw->m blocking factor\n"
         "\tn=<int>\tset bw->n blocking factor\n"
         "\tmn=<int>\tset both bw->m and bw->n (exclusive with the two above)\n"
@@ -138,16 +138,10 @@ void bw_common_interpret_parameters(struct bw_params * bw, param_list pl)/*{{{*/
         }
     }
 
-    const char * cfg;
-
-    if ((cfg = param_list_lookup_string(pl, "cfg"))) {
-        param_list_read_file(pl, cfg);
-    }
-
-
     param_list_parse_int(pl, "seed", &bw->seed);
     param_list_parse_int(pl, "interval", &bw->interval);
     param_list_parse_int_and_int(pl, "ys", bw->ys, "..");
+    param_list_parse_uint_and_uint(pl, "solutions", bw->solutions, "-");
     param_list_parse_int(pl, "start", &bw->start);
     param_list_parse_int(pl, "end", &bw->end);
     param_list_parse_int(pl, "skip_online_checks", &bw->skip_online_checks);
@@ -167,6 +161,8 @@ void bw_common_interpret_parameters(struct bw_params * bw, param_list pl)/*{{{*/
         fprintf(stderr, " Proceeding anyway\n");
     }
 
+    param_list_lookup_string(pl, "skip_bw_early_rank_check");
+
     mpz_init_set_ui(bw->p, 2);
     param_list_parse_mpz(pl, "prime", bw->p);
     int nullspace_forced = 0;
@@ -179,20 +175,20 @@ void bw_common_interpret_parameters(struct bw_params * bw, param_list pl)/*{{{*/
             tmp_l[i] = cl;
             nullspace_forced |= c != cl;
         }
-        if (strcmp(tmp_l, dirtext[0]) == 0) {
+        if (strcmp(tmp_l, bw_dirtext[0]) == 0) {
             bw->dir = 0;
-        } else if (strcmp(tmp_l, dirtext[1]) == 0) {
+        } else if (strcmp(tmp_l, bw_dirtext[1]) == 0) {
             bw->dir = 1;
         } else {
             fprintf(stderr, "Parameter nullspace may only be %s|%s\n",
-                    dirtext[0], dirtext[1]);
+                    bw_dirtext[0], bw_dirtext[1]);
             exit(EXIT_FAILURE);
         }
         free(tmp_l);
     } else {
         /* Default is right nullspace for p>2, and left for p==2 */
         bw->dir = mpz_cmp_ui(bw->p, 2) != 0;
-        param_list_add_key(pl, "nullspace", dirtext[bw->dir], PARAMETER_FROM_FILE);
+        param_list_add_key(pl, "nullspace", bw_dirtext[bw->dir], PARAMETER_FROM_FILE);
     }
 
     if ((mpz_cmp_ui(bw->p, 2) == 0) != (bw->dir == 0)) {
@@ -231,8 +227,6 @@ void bw_common_interpret_parameters(struct bw_params * bw, param_list pl)/*{{{*/
         param_list_print_usage(pl, bw->original_argv[0], stderr);
         exit(EXIT_FAILURE);
     }
-    bw->nsolvecs = bw->n;
-    param_list_parse_int(pl, "nsolvecs", &bw->nsolvecs);
 
     bw->number_of_check_stops = param_list_parse_int_list(pl, "check_stops", bw->check_stops, MAX_NUMBER_OF_CHECK_STOPS, ",");
     int interval_already_in_check_stops = 0;
@@ -300,12 +294,16 @@ int bw_common_init(struct bw_params * bw, int * p_argc, char *** p_argv)/*{{{*/
     int prov;
     MPI_Init_thread(p_argc, p_argv, req, &prov);
     if (req != prov) {
-        asprintf(&mpiinit_diag, "Cannot init mpi with MPI_THREAD_SERIALIZED ;"
+        int rc = asprintf(&mpiinit_diag, "Cannot init mpi with MPI_THREAD_SERIALIZED ;"
                 " got %d != req %d\n"
                 "Proceeding anyway\n",
                 prov, req);
+        ASSERT_ALWAYS(rc >= 0);
     } else {
-        asprintf(&mpiinit_diag, "Successfully initialized MPI with MPI_THREAD_SERIALIZED\n");
+#ifndef FAKEMPI_H_
+        int rc = asprintf(&mpiinit_diag, "Successfully initialized MPI with MPI_THREAD_SERIALIZED\n");
+        ASSERT_ALWAYS(rc >= 0);
+#endif
     }
     // MPI_Init(p_argc, p_argv);
 #endif
@@ -323,9 +321,11 @@ int bw_common_init(struct bw_params * bw, int * p_argc, char *** p_argv)/*{{{*/
     setvbuf(stderr,NULL,_IONBF,0);
 
     if (bw->can_print) {
-        fputs(mpiinit_diag, stdout);
-        if (req != prov) {
-            fputs(mpiinit_diag, stderr);
+        if (mpiinit_diag) {
+            fputs(mpiinit_diag, stdout);
+            if (req != prov) {
+                fputs(mpiinit_diag, stderr);
+            }
         }
         int ver, subver;
         MPI_Get_version(&ver, &subver);
@@ -335,7 +335,11 @@ int bw_common_init(struct bw_params * bw, int * p_argc, char *** p_argv)/*{{{*/
         MPI_Get_library_version(libname, &len);
         printf("MPI library is %s [MPI-%d.%d]\n", libname, ver, subver);
 #else
+#ifndef FAKEMPI_H_
+        /* It's rather misleading to speak about the MPI library when in
+         * fact we're only using our placeholder API. */
         printf("MPI library follows [MPI-%d.%d]\n", ver, subver);
+#endif
 #endif
         if (ver != MPI_VERSION || subver != MPI_SUBVERSION) {
             if (LEXGE2(ver,subver,MPI_VERSION,MPI_SUBVERSION)) {
@@ -346,7 +350,8 @@ int bw_common_init(struct bw_params * bw, int * p_argc, char *** p_argv)/*{{{*/
             }
         }
     }
-    free(mpiinit_diag);
+    if (mpiinit_diag)
+        free(mpiinit_diag);
 
 
     return 0;

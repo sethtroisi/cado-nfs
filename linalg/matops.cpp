@@ -49,14 +49,14 @@
 /* {{{ _cado_mm_set1_epi64 _m128i from 1 int64_t's */
 #define _cado_mm_set1_epi64(u) _mm_set1_epi64( _cado_mm_cvtsi64_m64((int64_t) (u)))
 /* }}} */
-/* {{{ _cado_mm_setr_epi64_c _m128i from 2 int64_t CONSTANTS (and try to get suffix right) */
+/* {{{ _cado_mm_setr_epi64_c _m128i from 2 int64_t CONSTANTS (and try to get suffix right) */
 #define _cado_mm_setr_epi64_c(lo, hi)                    		\
     _mm_setr_epi64(                                      		\
             _cado_mm_cvtsi64_m64(INT64_C(lo)),          		\
             _cado_mm_cvtsi64_m64(INT64_C(hi))           		\
         )
 /* }}} */
-/* {{{ _cado_mm_set1_epi64_c _m128i from 1 int64_t CONSTANT (and try to get suffix right) */
+/* {{{ _cado_mm_set1_epi64_c _m128i from 1 int64_t CONSTANT (and try to get suffix right) */
 #define _cado_mm_set1_epi64_c(u) _mm_set1_epi64( _cado_mm_cvtsi64_m64(INT64_C(u)))
 /* }}} */
 /* {{{ same for 32-bits (which, for some, have SSE-2) */
@@ -346,6 +346,7 @@ void mul_o64_T6464_C_parity3(uint64_t * w, uint64_t a, mat64_srcptr b)
 void transp_6464(mat64_ptr dst, mat64_srcptr src)
 {
     int i, j;
+    ASSERT_ALWAYS(dst != src);
     for (i = 0; i < 64; i++) {
 	dst[i] = 0;
 	for (j = 0; j < 64; j++) {

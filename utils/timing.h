@@ -15,6 +15,7 @@ extern "C" {
 extern uint64_t microseconds (void);
 extern uint64_t microseconds_thread (void);
 extern unsigned long milliseconds (void);
+extern unsigned long milliseconds_thread (void);
 extern double seconds (void);
 extern double seconds_thread (void);
 extern void seconds_user_sys (double *);

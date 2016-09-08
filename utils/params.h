@@ -6,6 +6,7 @@
 #include <gmp.h>
 
 #include "macros.h"
+#include "mpz_poly.h" // TODO: modify this.
 
 struct param_list_doc_s {
     char * key;
@@ -119,14 +120,58 @@ extern int param_list_parse_uint(param_list, const char *, unsigned int *);
 extern int param_list_parse_ulong(param_list, const char *, unsigned long *);
 extern int param_list_parse_int64(param_list, const char *, int64_t *);
 extern int param_list_parse_uint64(param_list, const char *, uint64_t *);
+extern int param_list_parse_uchar(param_list, const char * , unsigned char *);
 extern int param_list_parse_double(param_list, const char *, double *);
+extern int param_list_parse_double_and_double(param_list, const char *,
+    double *, const char *);
 extern int param_list_parse_string(param_list, const char *, char *, size_t);
 extern int param_list_parse_mpz(param_list, const char *, mpz_ptr);
 extern int param_list_parse_intxint(param_list pl, const char * key, int * r);
 extern int param_list_parse_int_and_int(param_list pl, const char * key, int * r, const char * sep);
+int param_list_parse_uint_and_uint(param_list pl, const char * key, unsigned int * r, const char * sep);
+extern int param_list_parse_long_and_long(param_list pl, const char * key, long * r, const char * sep);
 extern int param_list_parse_string_list_alloc(param_list pl, const char * key, char *** r, int * n, const char * sep);
 extern int param_list_get_list_count(param_list_ptr pl, const char * key);
 extern int param_list_parse_int_list(param_list pl, const char * key, int * r, size_t n, const char * sep);
+int param_list_parse_uint64_and_uint64(param_list pl, const char * key,
+    uint64_t * r, const char * sep);
+extern int param_list_parse_uint_list(param_list pl, const char * key,
+    unsigned int * r, size_t n, const char * sep);
+int param_list_parse_uint64_list(param_list pl, const char * key,
+    uint64_t * r, size_t n, const char * sep);
+extern int param_list_parse_uchar_list(param_list pl, const char * key,
+    unsigned char * r, size_t n, const char * sep);
+int param_list_parse_double_list(param_list pl, const char * key,
+    double * r, size_t n, const char * sep);
+
+/*
+  Return an array r with its size t. The array is initialised with the string
+  separate by sep.
+  Usage: if sep is ".,", the string "5.5,5" gives r = [5,5,5] and t = 3.
+  Tested with sep = ".,".
+
+  pl: parameter list.
+  key: key in the parameter list.
+  r: array with the integer value contained in the key.
+  t: number of element in array.
+  sep: separators of the string.
+*/
+extern void param_list_parse_int_list_size(param_list pl, const char * key,
+    int ** r, unsigned int * t, const char *sep);
+/*
+  Return a mpz_poly f. The polynomial is initialised with the string separate by
+  sep.
+  Usage: if sep is ".,", the string "5.5,5" gives f = 5+5*x^2+5*x^3.
+  Tested with sep = ".,".
+
+  pl: parameter list.
+  key: key in the parameter list.
+  f: the polynomial.
+  sep: separators of the string.
+*/
+extern void param_list_parse_mpz_poly(param_list pl, const char * key,
+                                      mpz_poly_ptr f, const char *sep);
+
 extern int param_list_parse_size_t(param_list pl, const char * key, size_t * r);
 extern int param_list_parse_switch(param_list pl, const char * key);
 

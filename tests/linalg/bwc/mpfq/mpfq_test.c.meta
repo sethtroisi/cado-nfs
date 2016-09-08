@@ -3,6 +3,7 @@
 #define _GNU_SOURCE     /* asprintf */
 #define _BSD_SOURCE     /* asprintf sometimes (I think) */
 #define _POSIX_C_SOURCE 200809L
+//#define _DEFAULT_SOURCE /* asprintf in last versions */
 #line 7 "PATH_TO_SRC_TEST_DIRECTORYmpfq_test.c.meta"
 /* test_TAG.c is sed- generated from test.c.meta */
 
@@ -52,9 +53,10 @@ Kfield K;
             DO_ONE_TEST_GENERIC(name, CODE, Kcmp(r1, r2) == 0)
 #define DO_ONE_TEST_VEC(name, CODE) \
             DO_ONE_TEST_GENERIC(name, CODE, Kvec_cmp(v1, v2, length) == 0)
+#ifndef RNS
 #define DO_ONE_TEST_POLY(name, CODE) \
             DO_ONE_TEST_GENERIC(name, CODE, Kpoly_cmp(p1, p2) == 0)
-
+#endif
 
 void usage() {
     fprintf(stderr, "usage: ./test [-q] [-N <nb_loops>] [-n <nb_tests>] [-s <seed>]\n");
@@ -182,7 +184,7 @@ int main(int argc, char * argv[])
         }
         Kfield_specify(MPFQ_PRIME_MPZ, p);
         mpz_clear(p);
-
+#ifndef RNS
         int extdeg = 5;
         MPFQ_CREATE_FUNCTION_NAME(BFIELD, poly) defpol;
         MPFQ_CREATE_FUNCTION_NAME(BFIELD, poly_init) (K->kbase, defpol, 0);
@@ -190,6 +192,7 @@ int main(int argc, char * argv[])
         MPFQ_CREATE_FUNCTION_NAME(BFIELD, poly_setcoeff_ui) (K->kbase, defpol, 1, extdeg);
         MPFQ_CREATE_FUNCTION_NAME(BFIELD, poly_setcoeff_ui) (K->kbase, defpol, 1, 0);
         Kfield_specify(MPFQ_POLYNOMIAL, defpol);
+#endif
 #endif  /* EXTENSION_OF_GFP */
 
 
@@ -667,6 +670,10 @@ int main(int argc, char * argv[])
             Kset_ui(r1, 1);
             Kset_ui(r2, 0);
             Kfscan(f, r2);
+            /*
+			Kprint(r2);
+			printf("toto\n");
+                        */
 #ifdef CHAR2
             /* In the characteristic 2 case, it is perfectly legitimate
              * for this test to return false -- so we're only testing

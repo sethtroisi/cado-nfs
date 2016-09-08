@@ -20,13 +20,9 @@ import cadoparams
 import cadocommand
 import wuserver
 import workunit
-import sys
 from struct import error as structerror
 from shutil import rmtree
 from workunit import Workunit
-
-
-
 # Patterns for floating-point numbers
 # They can be used with the string.format() function, e.g.,
 # re.compile("value = {cap_fp}".format(**REGEXES))
@@ -34,11 +30,6 @@ from workunit import Workunit
 RE_FP = r"[-+]?[0-9]*\.?[0-9]+(?:[eE][-+]?[0-9]+)?"
 CAP_FP = "(%s)" % RE_FP
 REGEXES = {"fp": RE_FP, "cap_fp": CAP_FP}
-
-class nb:
-    nb_sieving=0
-    nb_filter=0
-    nb_linalg=0
 
 def re_cap_n_fp(prefix, n, suffix=""):
     """ Generate a regular expression that starts with prefix, then captures
@@ -1045,14 +1036,16 @@ class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
         if "workdir" in self.params:
             self.workdir = WorkDir(self.params["workdir"], self.params["name"],
                                self.name)
-        # Request mediator to run this task, unless "run" parameter is set
-        # to false
-        if self.params["run"]:
-            self.send_notification(Notification.WANT_TO_RUN, None)
+        # Request mediator to run this task. It the "run" parameter is set
+        # to false, then run() below will abort.
+        self.send_notification(Notification.WANT_TO_RUN, None)
         self.logger.debug("Exit Task.__init__(%s)", self.name)
         return
 
     def run(self):
+        if not self.params["run"]:
+            self.logger.info("Stopping at %s", self.name)
+            raise Exception("Job aborted because of a forcibly disabled task")
         self.logger.info("Starting")
         self.logger.debug("%s.run(): Task state: %s", self.name, self.state)
         super().run()
@@ -1268,7 +1261,6 @@ class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
         result to updateObserver().
         '''
         wuname = self.make_wuname(identifier)
-        #self.logger.info(" created WUname %s" % wuname)
         process = cadocommand.Command(command)
         cputime_used = os.times()[2] # CPU time of child processes
         realtime_used = time.time()
@@ -2680,10 +2672,6 @@ class SievingTask(ClientServerTask, DoesImport, FilesCreator, HasStatistics,
         return "Lattice Sieving"
     @property
     def programs(self):
-        nb.nb_sieving+=1
-        if len(sys.argv)>2 and sys.argv[2]=="tasks.sieve.run=false" and nb.nb_sieving>=2:
-            self.logger.info("Not run (%s)", sys.argv[2])
-            sys.exit("Factorization stopped")
         override = ("q0", "q1", "factorbase", "out", "stats_stderr")
         input = {"poly": Request.GET_POLYNOMIAL_FILENAME}
         return ((cadoprograms.Las, override, input),)
@@ -2967,10 +2955,6 @@ class Duplicates1Task(Task, FilesCreator, HasStatistics):
         return "Filtering - Duplicate Removal, splitting pass"
     @property
     def programs(self):
-        nb.nb_filter+=1
-        if len(sys.argv)>2 and sys.argv[2]=="tasks.filter.run=false" and nb.nb_filter>=2:
-            self.logger.info("Not run (%s)", sys.argv[2])
-            sys.exit("Factorization stopped")
         return ((cadoprograms.Duplicates1, ("filelist", "prefix", "out"), {}),)
     @property
     def paramnames(self):
@@ -4050,7 +4034,6 @@ class LinAlgDLPTask(Task):
                                  matrix=matrix,  wdir=wdir,
                                  rhs=smfile,
                                  prime=self.params["ell"],
-                                 mm_impl="basicp",
                                  nullspace="right",
                                  stdout=str(stdoutpath),
                                  stderr=str(stderrpath),
@@ -4060,7 +4043,7 @@ class LinAlgDLPTask(Task):
             message = self.submit_command(p, "", log_errors=True)
             if message.get_exitcode(0) != 0:
                 raise Exception("Program failed")
-            virtual_logs_filename = self.workdir.make_filename("K.sols0-1.0.truncated.txt", use_subdir=True)
+            virtual_logs_filename = self.workdir.make_filename("K.sols0-1.0.txt", use_subdir=True)
             if not virtual_logs_filename.isfile():
                 raise Exception("Kernel file %s does not exist" % virtual_logs_filename)
             self.remember_input_versions(commit=False)
@@ -4089,10 +4072,6 @@ class LinAlgTask(Task, HasStatistics):
         return "Linear Algebra"
     @property
     def programs(self):
-        nb.nb_linalg+=1
-        if len(sys.argv)>2 and sys.argv[2]=="tasks.linalg.run=false" and nb.nb_linalg>=2:
-            self.logger.info("Not run (%s)", sys.argv[2])
-            sys.exit("Factorization stopped")
         return ((cadoprograms.BWC, ("complete", "matrix",  "wdir", "nullspace"),
                  {"merged": Request.GET_MERGED_FILENAME}),)
     @property
@@ -5300,17 +5279,6 @@ class CompleteFactorization(HasState, wudb.DbAccess,
             self.tasks = (self.polysel1, self.polysel2, self.fb, self.freerel,
                           self.sieving, self.dup1, self.dup2, self.purge,
                           self.merge, self.linalg, self.characters, self.sqrt)
-            if len(sys.argv)>2:
-                if sys.argv[2]=="tasks.sieve.run=false":
-                    self.tasks = (self.polysel1, self.polysel2, self.fb, self.freerel,
-                          self.sieving)
-                if sys.argv[2]=="tasks.filter.run=false":
-                    self.tasks = (self.polysel1, self.polysel2, self.fb, self.freerel,
-                          self.sieving, self.dup1)
-                if sys.argv[2]=="tasks.linalg.run=false":
-                    self.tasks = (self.polysel1, self.polysel2, self.fb, self.freerel,
-                          self.sieving, self.dup1, self.dup2, self.purge,
-                          self.merge, self.linalg)
 
         for (path, key, value) in parameters.get_unused_parameters():
             self.logger.warning("Parameter %s = %s was not used anywhere",

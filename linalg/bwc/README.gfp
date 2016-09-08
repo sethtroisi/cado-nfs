@@ -43,7 +43,6 @@ You need to call bwc.pl with a command line similar to the following:
     $bindir/linalg/bwc/bwc.pl :complete                                 \
         prime=1009 matrix=/tmp/matrix.bin rhs=/tmp/rhs.bin  nrhs=3      \
             nullspace=right                                             \
-            mm_impl=basicp                                              \
             mpi=1x1 thr=2x2                                             \
             m=4 n=4                                                     \
             wdir=/tmp/bwc

@@ -762,7 +762,7 @@ return_combined_sublattice ( ropt_poly_t poly,
     for (i = 0; i < s1param->tlen_e_sl; i ++) {
       count *= t_size[i];
     }
-    fprintf (stderr, "# Info: computed %u CRTs\n", count);
+    fprintf (stderr, "# Info: computed %8u CRTs\n", count);
   }
 
   /* clearence */
@@ -814,7 +814,7 @@ return_best_sublattice ( ropt_poly_t poly,
       bound->global_u_boundr *= 2;
       if (verbose >= 2) {
         fprintf ( stderr,
-                  "# Warn: not enough sublattice classes. "
+                  "# Warn: not enough lat classes. "
                   "Reset \"bound->global_u_bound = %lu\" (#%d)\n",
                   bound->global_u_boundr, count );
       }
@@ -833,7 +833,7 @@ return_best_sublattice ( ropt_poly_t poly,
   /* info */
   if (verbose >= 2) {
     fprintf ( stderr,
-              "# Info: best %d sublattices (\"size_total_sublattices\") "
+              "# Info: found    %8d lat (\"size_total_sublattices\") "
               "where |u| < %lu\n",
               pqueue->used - 1, bound->global_u_boundr);
   }
@@ -861,10 +861,17 @@ ropt_stage1 ( ropt_poly_t poly,
   mpz_t *fuv;
   mpz_poly Fuv;
   sublattice_pq *pqueue;
+  unsigned long len_part_alpha = s1param->nbest_sl *
+    TUNE_RATIO_STAGE1_PART_ALPHA * param->effort;
+  unsigned long len_full_alpha = s1param->nbest_sl *
+    TUNE_RATIO_STAGE1_FULL_ALPHA * param->effort;
 
-  /* size-cutoff of top sublattices */
-  new_sublattice_pq (&pqueue, s1param->nbest_sl);
+  if (len_part_alpha < 2)
+    len_part_alpha = 2; /* required by new_sublattice_pq() */
 
+  /* size-cutoff of top sublattices based on partial alpha */
+  new_sublattice_pq (&pqueue, len_part_alpha);
+  
   /* return the nbest sublattices to pqueue ranked by the size of u */
   if (param->verbose >= 2)
     st = milliseconds ();
@@ -880,9 +887,16 @@ ropt_stage1 ( ropt_poly_t poly,
     return -1;
   }
 
-  if (param->verbose >= 2)
-    gmp_fprintf ( stderr, "# Info: find best sublattices took %lums\n",
+  if (param->verbose >= 2) {
+    gmp_fprintf ( stderr, "# Info: found    %8lu lat with part alpha\n",
+                  pqueue->used-1);
+    if ((long) len_full_alpha > pqueue->used-1)
+      len_full_alpha = pqueue->used-1;
+    gmp_fprintf ( stderr, "# Info: ranked   %8lu lat with full alpha\n",
+                  len_full_alpha);
+    gmp_fprintf ( stderr, "# Info: find best lat took %lums\n",
                   milliseconds () - st );
+  }
 
   /* fuv is f+(u*x+v)*g */
   mpz_poly_init (Fuv, poly->d);
@@ -905,16 +919,16 @@ ropt_stage1 ( ropt_poly_t poly,
     /* use exp_E as benchmark instead of alpha. */
     double skew = L2_skewness (Fuv, SKEWNESS_DEFAULT_PREC);
     alpha_lat = L2_lognorm (Fuv, skew);
-    alpha_lat += get_alpha (Fuv, 2000);
+    alpha_lat += get_alpha (Fuv, ALPHA_BOUND);
 #else
     //alpha_lat = get_alpha (fuv, poly->d, primes[s1param->tlen_e_sl-1]);
-    alpha_lat = get_alpha (Fuv, 2000);
+    alpha_lat = get_alpha (Fuv, ALPHA_BOUND);
 #endif
 
 #if DEBUG_ROPT_STAGE1
-     skew = L2_skewness (Fuv, SKEWNESS_DEFAULT_PREC);
-    double logmu = L2_lognorm (Fuv, skew, 0);
-    gmp_fprintf ( stderr, "# Info: insert sublattice #%4d, (w, u, v): "
+    skew = L2_skewness (Fuv, SKEWNESS_DEFAULT_PREC);
+    double logmu = L2_lognorm (Fuv, skew);
+    gmp_fprintf ( stderr, "# Info: insert lat #%4d, (w, u, v): "
                   "(%d, %Zd, %Zd) (mod %Zd), partial_alpha: %.2f,"
                   "lognorm: %.2f\n",
                   i,
@@ -934,9 +948,9 @@ ropt_stage1 ( ropt_poly_t poly,
                       pqueue->modulus[i],
                       alpha_lat );
   }
-
+ 
   if (param->verbose >= 2)
-    gmp_fprintf ( stderr, "# Info: rank above sublattices took %lums\n",
+    gmp_fprintf ( stderr, "# Info: rank lat took %lums\n",
                   milliseconds () - st );
 
   /* free priority queue */

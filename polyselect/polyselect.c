@@ -37,7 +37,7 @@ char *phash = "";
 /* Read-Only */
 uint32_t *Primes = NULL;
 unsigned long lenPrimes = 1; // length of Primes[]
-int nq = INT_MAX;
+unsigned long nq = 1000;
 size_t keep = KEEP;
 const double exp_rot[] = {0, 0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 0};
 static int verbose = 0;
@@ -53,20 +53,18 @@ pthread_mutex_t lock=PTHREAD_MUTEX_INITIALIZER; /* used as mutual exclusion
 int tot_found = 0; /* total number of polynomials */
 int opt_found = 0; /* number of size-optimized polynomials */
 int ros_found = 0; /* number of rootsieved polynomials */
-double potential_collisions = 0.0, aver_opt_lognorm = 0.0,
-  aver_raw_lognorm = 0.0, var_opt_lognorm = 0.0,
+double potential_collisions = 0.0, aver_raw_lognorm = 0.0,
   var_raw_lognorm = 0.0;
 #define LOGNORM_MAX 999.99
 double min_raw_lognorm = LOGNORM_MAX, max_raw_lognorm = 0.0;
-double min_opt_lognorm = LOGNORM_MAX, max_opt_lognorm = 0.0;
-double min_exp_E = LOGNORM_MAX, max_exp_E = 0.0,
-  aver_exp_E = 0.0, var_exp_E = 0.0;
+data_t data_opt_lognorm, data_exp_E, data_beta, data_eta;
 unsigned long collisions = 0;
 unsigned long collisions_good = 0;
 double *best_opt_logmu, *best_exp_E;
 double optimize_time = 0.0;
 mpz_t admin, admax;
 int tries = 0;
+double target_E = 0.0; /* target E-value, 0.0 if not given */
 
 static void
 mutex_lock(pthread_mutex_t *lock)
@@ -139,6 +137,64 @@ check_parameters (mpz_t m0, double q)
   return pow ((double) Primes[lenPrimes - 1], 4.0) * q < mpz_get_d (m0);
 }
 
+/* given a distribution with mean m and variance v, estimate the parameters
+   beta and eta from a matching Weibull distribution, using the method of
+   moments:
+   m = eta * gamma (1 + 1/beta)
+   v = eta^2 * [gamma (1 + 2/beta) - gamma (1 + 1/beta)^2] */
+static void
+estimate_weibull_moments (double *beta, double *eta, data_t s)
+{
+  double m = data_mean (s);
+  double v = data_var (s);
+  double y = sqrt (v) / m;
+
+  y = y * (0.7796968012336761 + y * (0.61970313728462 + 0.0562963108244 * y));
+  *beta = 1.0 / y;
+  *eta = m * (1.0 + y * (0.57721566490153 - 0.655878071520 * y));
+}
+
+/* Estimation via extreme values: we cut the total n values into samples of k
+   values, and for each sample we keep only the minimum. If the series of
+   minimum values satisfies a Weilbull distribution with parameters beta and eta,
+   then the original one has parameters beta (identical) and eta*k^(1/beta).
+   Here we choose k near sqrt(n). */
+static void
+estimate_weibull_moments2 (double *beta, double *eta, data_t s)
+{
+  unsigned long n = s->size;
+  unsigned long i, j, k, p, u;
+  data_t smin;
+  double min, eta_min;
+
+  ASSERT_ALWAYS(n > 0);
+
+  data_init (smin);
+
+  k = 50; /* sample size */
+  /* We consider full samples only. Since we call this function several times
+     with the same sequence, we perform a random permutation of the sequence
+     at each call to avoid side effects due to the particular order of
+     elements. In practice instead of considering s[j] we consider
+     s[(p*j) % n] where p is random with gcd(p,n)=1. */
+  do
+    p = lrand48 () % n;
+  while (gcd_uint64 (p, n) != 1);
+  for (i = 0; i + k <= n; i += k)
+    {
+      for (j = i, min = DBL_MAX; j < i + k; j++)
+        {
+          u = (p * j) % n;
+          if (s->x[u] < min)
+            min = s->x[u];
+        }
+      data_add (smin, min);
+    }
+  estimate_weibull_moments (beta, &eta_min, smin);
+  data_clear (smin);
+  *eta = eta_min * pow ((double) k, 1.0 / *beta);
+}
+
 /* print poly info */
 void
 print_poly_info ( char *buf,
@@ -163,30 +219,48 @@ print_poly_info ( char *buf,
   else
     sprintf (buf, "# Size-optimized polynomial:\n");
 
-  //gmp_printf ("%sn: %Zd\n", prefix, n);
   gmp_sprintf (buf+strlen(buf), "%sn: %Zd\n", prefix, n);
-  //gmp_printf ("%sY1: %Zd\n%sY0: %Zd\n", prefix, g[1], prefix, g[0]);
   gmp_sprintf (buf+strlen(buf), "%sY1: %Zd\n%sY0: %Zd\n", prefix, g[1], prefix, g[0]);
   for (i = d + 1; i -- != 0; )
-    //gmp_printf ("%sc%u: %Zd\n", prefix, i, f[i]);
     gmp_sprintf (buf+strlen(buf), "%sc%u: %Zd\n", prefix, i, f[i]);
   skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
   nroots = numberOfRealRoots (f, d, 0, 0, NULL);
   skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
   logmu = L2_lognorm (F, skew);
-  // exp_E = ropt_bound_expected_E (F, G);
   exp_E = logmu + expected_rotation_gain (F, G);
   if (raw == 1)
-    //printf ("# raw exp_E");
     sprintf (buf+strlen(buf), "# raw exp_E");
   else
-    //printf ("# exp_E");
     sprintf (buf+strlen(buf), "# exp_E");
 
-  //printf (" %1.2f, lognorm %1.2f, skew %1.2f, %u rroots\n",
-  // exp_E, logmu, skew, nroots);
   sprintf (buf+strlen(buf), " %1.2f, lognorm %1.2f, skew %1.2f, %u rroots\n",
            exp_E, logmu, skew, nroots);
+
+  if (!raw_option && target_E != 0.0)
+    {
+      double beta, eta, prob;
+
+      estimate_weibull_moments2 (&beta, &eta, data_exp_E);
+      /* since the estimation using extreme values has a high variability
+         in terms of the sample size, we permute the elements at each try,
+         and we take the median of the beta/eta values */
+      if (!isnan (beta) && !isinf (beta))
+        {
+          data_add (data_beta, beta);
+          beta = data_median (data_beta);
+        }
+      if (!isnan (eta) && !isinf (eta))
+        {
+          data_add (data_eta, eta);
+          eta = data_median (data_eta);
+        }
+      prob = 1.0 - exp (- pow (target_E / eta, beta));
+      sprintf (buf + strlen(buf), "# target_E=%.2f: collisions=%.2e, time=%.2e"
+               " (beta=%.2f,eta=%.2f)\n",
+               target_E, 1.0 / prob, seconds () / (prob * collisions_good),
+               beta, eta);
+    }
+
   if (!raw_option)
     sprintf (buf+strlen(buf), "\n");
 }
@@ -197,7 +271,9 @@ static double
 expected_collisions (uint32_t twoP)
 {
   double m = (lenPrimes << 1) / (double) twoP;
-  return m * m;
+  /* we multiply by 0.5 here because we only keep collisions for which
+     a[d] * a[d-2] < 0 */
+  return 0.5 * m * m;
 }
 
 static void
@@ -265,7 +341,7 @@ output_skipped_poly (const mpz_t ad, const mpz_t l, const mpz_t g0)
 {
   mpz_t m;
   mpz_init(m);
-  mpz_neg(m, g0); 
+  mpz_neg(m, g0);
   mutex_lock (&lock);
   gmp_printf ("# Skip polynomial: %.2f, ad: %Zd, l: %Zd, m: %Zd\n", ad, l, m);
   mutex_unlock (&lock);
@@ -358,21 +434,10 @@ optimize_raw_poly (mpz_poly F, mpz_t *g)
   sorted_insert_double (best_exp_E, keep, exp_E);
 
   mutex_lock (&lock);
+
   collisions_good ++;
-
-  aver_opt_lognorm += logmu;
-  var_opt_lognorm += logmu * logmu;
-  if (logmu < min_opt_lognorm)
-    min_opt_lognorm = logmu;
-  if (logmu > max_opt_lognorm)
-    max_opt_lognorm = logmu;
-
-  aver_exp_E += exp_E;
-  var_exp_E += exp_E * exp_E;
-  if (exp_E < min_exp_E)
-    min_exp_E = exp_E;
-  if (exp_E > max_exp_E)
-    max_exp_E = exp_E;
+  data_add (data_opt_lognorm, logmu);
+  data_add (data_exp_E, exp_E);
 
   mutex_unlock (&lock);
 
@@ -547,11 +612,11 @@ match (unsigned long p1, unsigned long p2, const int64_t i, mpz_t m0,
 
   if (did_optimize && out != NULL)
     output_msieve (out, d, F->coeff, g);
-  
+
   /* print optimized (maybe size- or size-root- optimized) polynomial */
   if (did_optimize && verbose >= 0)
     output_polynomials (fold, d, gold, N, F->coeff, g);
-  
+
   if (!did_optimize && verbose >= 1)
     output_skipped_poly (ad, l, g[0]);
 
@@ -720,7 +785,7 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
   /* print optimized (maybe size- or size-root- optimized) polynomial */
   if (did_optimize && verbose >= 0)
     output_polynomials (fold, d, gold, N, F->coeff, g);
-  
+
   if (!did_optimize && verbose >= 1)
     output_skipped_poly (ad, l, g[0]);
 
@@ -1176,15 +1241,15 @@ aux_nextcomb ( unsigned int *ind,
 }
 
 
-/* Compute crted rq */
+/* Compute crt-ed rq (qqz,rqqz) = (q_1 * ... * q_k,
+                                   CRT([r_1, ..., r_k], [q_1, ..., q_k])) */
 static inline void
 aux_return_rq ( qroots_t SQ_R,
                 unsigned long *idx_q,
                 unsigned int *idx_nr,
                 unsigned long k,
                 mpz_t qqz,
-                mpz_t rqqz,
-                unsigned long lq )
+                mpz_t rqqz)
 {
   unsigned long i, q[k], rq[k];
 
@@ -1195,13 +1260,14 @@ aux_return_rq ( qroots_t SQ_R,
   }
 
   /* crt roots */
-  crt_sq (qqz, rqqz, q, rq, lq);
+  crt_sq (qqz, rqqz, q, rq, k);
 
   return;
 }
 
 
-/* Consider each rq */
+/* Consider each rq which is the product of k pairs (q,r).
+   In this routine the q[i] are fixed, only the roots mod q[i] change. */
 static inline void
 collision_on_batch_sq_r ( header_t header,
                           proots_t R,
@@ -1210,12 +1276,12 @@ collision_on_batch_sq_r ( header_t header,
                           unsigned long *idx_q,
                           unsigned long *inv_qq,
                           unsigned long number_pr,
-                          int *curr_nq,
-                          unsigned long lq )
+                          unsigned long *curr_nq,
+                          unsigned long k)
 {
   int count;
-  unsigned int ind_qr[lq]; /* indices of roots for each small q */
-  unsigned int len_qnr[lq]; /* for each small q, number of roots */
+  unsigned int ind_qr[k]; /* indices of roots for each small q */
+  unsigned int len_qnr[k]; /* for each small q, number of roots */
   unsigned long i;
   mpz_t qqz, rqqz[BATCH_SIZE];
 
@@ -1224,17 +1290,17 @@ collision_on_batch_sq_r ( header_t header,
     mpz_init (rqqz[i]);
 
   /* initialization indices */
-  for (i = 0; i < lq; i ++) {
+  for (i = 0; i < k; i ++) {
     ind_qr[i] = 0;
     len_qnr[i] = SQ_R->nr[idx_q[i]];
   }
 
 #if 0
   fprintf (stderr, "q: %lu, ", q);
-  for (i = 0; i < lq; i ++)
+  for (i = 0; i < k; i ++)
     fprintf (stderr, "%u ", SQ_R->q[idx_q[i]]);
   fprintf (stderr, ", ");
-  for (i = 0; i < lq; i ++)
+  for (i = 0; i < k; i ++)
     fprintf (stderr, "%u ", SQ_R->nr[idx_q[i]]);
   fprintf (stderr, "\n");
 #endif
@@ -1247,8 +1313,8 @@ collision_on_batch_sq_r ( header_t header,
     num_rq = 0;
     for (count = 0; count < BATCH_SIZE; count ++)
     {
-        aux_return_rq (SQ_R, idx_q, ind_qr, lq, qqz, rqqz[count], lq);
-        re = aux_nextcomb (ind_qr, lq, len_qnr);
+        aux_return_rq (SQ_R, idx_q, ind_qr, k, qqz, rqqz[count]);
+        re = aux_nextcomb (ind_qr, k, len_qnr);
         (*curr_nq)++;
         num_rq ++;
         if ((*curr_nq) >= nq)
@@ -1267,18 +1333,20 @@ collision_on_batch_sq_r ( header_t header,
 }
 
 
-/* SQ inversion, write 1/q^2 (mod p_i^2) to invqq[i] */
+/* SQ inversion, write 1/q^2 (mod p_i^2) to invqq[i].
+   In this routine the q[i] are fixed, corresponding to indices idx_q[0], ...,
+   idx_q[k-1] */
 static inline void
-collision_on_batch_sq ( header_t header,
-                        proots_t R,
-                        qroots_t SQ_R,
-                        unsigned long q,
-                        unsigned long *idx_q,
-                        unsigned long number_pr,
-                        unsigned long lq )
+collision_on_batch_sq (header_t header,
+                       proots_t R,
+                       qroots_t SQ_R,
+                       unsigned long q,
+                       unsigned long *idx_q,
+                       unsigned long number_pr,
+                       unsigned long k,
+                       unsigned long *curr_nq)
 {
   unsigned nr;
-  int curr_nq = 0;
   uint64_t pp;
   unsigned long nprimes, p;
   unsigned long *invqq = malloc (lenPrimes * sizeof (unsigned long));
@@ -1326,25 +1394,22 @@ collision_on_batch_sq ( header_t header,
   /* Step 2: find collisions on q. */
   int st2 = milliseconds();
 
-  collision_on_batch_sq_r ( header, R, SQ_R, q, idx_q, invqq, number_pr,
-                            &curr_nq, lq );
+  collision_on_batch_sq_r (header, R, SQ_R, q, idx_q, invqq, number_pr,
+                           curr_nq, k);
   if (verbose > 2)
-    fprintf (stderr, "#  stage (special-q) for %d special-q's took %lums\n",
-             curr_nq, milliseconds() - st2);
+    fprintf (stderr, "#  stage (special-q) for %lu special-q's took %lums\n",
+             *curr_nq, milliseconds() - st2);
 
   free (invqq);
 }
 
-
 /* collision on special-q, call collision_on_batch_sq */
 static inline void
-collision_on_sq ( header_t header,
-                  proots_t R,
-                  unsigned long c )
+collision_on_sq (header_t header, proots_t R, unsigned long c )
 {
-  int prod = 1;
+  unsigned long prod = 1;
   unsigned int i;
-  unsigned long j, lq = 0UL;
+  unsigned long k = 0UL, lq;
   qroots_t SQ_R;
   double sq = 1.0;
 
@@ -1360,30 +1425,32 @@ collision_on_sq ( header_t header,
     prod *= header->d; /* We multiply by d instead of SQ_R->nr[i] to limit
                           the number of primes and thus the Y1 value. */
     sq *= (double) SQ_R->q[i];
-    lq ++;
+    k ++;
   }
 
-  /* lq < 8 for the moment */
-  if (lq > 7)
-    lq = 7;
-  if (lq < 1)
-    lq = 1;
+  /* k < 8 for the moment */
+  if (k > 7)
+    k = 7;
+  if (k < 1)
+    k = 1;
 
-  unsigned long q, idx_q[lq];
-  mpz_t qqz;
-  mpz_init (qqz);
+  for (lq = k; number_comb (SQ_R, k, lq) < (unsigned long) nq &&
+         lq < SQ_R->size; lq++);
 
-  for (j = 0; j < lq; j ++)
-    idx_q[j] = j;
-  q = return_q_norq (SQ_R, idx_q, lq, qqz);
+  unsigned long q, idx_q[lq], curr_nq = 0;
 
-  /* collision batch */
-  collision_on_batch_sq (header, R, SQ_R, q, idx_q, c, lq);
+  first_comb (k, idx_q);
+  while (curr_nq < nq)
+    {
+      q = return_q_norq (SQ_R, idx_q, k);
+
+      /* collision batch */
+      collision_on_batch_sq (header, R, SQ_R, q, idx_q, c, k, &curr_nq);
+      next_comb (lq, k, idx_q);
+    }
 
   /* clean */
-  mpz_clear (qqz);
   qroots_clear (SQ_R);
-  return;
 }
 
 
@@ -1821,6 +1888,7 @@ declare_usage(param_list pl)
   param_list_decl_usage(pl, "t", "number of threads to use (default 1)");
   param_list_decl_usage(pl, "v", "(switch) verbose mode");
   param_list_decl_usage(pl, "q", "(switch) quiet mode");
+  param_list_decl_usage(pl, "target_E", "target E-value\n");
   verbose_decl_usage(pl);
 }
 
@@ -1853,6 +1921,10 @@ main (int argc, char *argv[])
   mpz_init (admax);
   cado_poly_init (best_poly);
   cado_poly_init (curr_poly);
+  data_init (data_opt_lognorm);
+  data_init (data_exp_E);
+  data_init (data_beta);
+  data_init (data_eta);
 
   /* read params */
   param_list pl;
@@ -1919,7 +1991,7 @@ main (int argc, char *argv[])
   if (P == 0) usage(argv0[0], "P", pl);
 
   param_list_parse_int (pl, "t", &nthreads);
-  param_list_parse_int (pl, "nq", &nq);
+  param_list_parse_ulong (pl, "nq", &nq);
   param_list_parse_uint (pl, "degree", &d);
 
   /* if no -admin is given, mpz_init did set it to 0, which is exactly
@@ -1931,6 +2003,7 @@ main (int argc, char *argv[])
 
   param_list_parse_ulong (pl, "incr", &incr);
   param_list_parse_double (pl, "maxtime", &maxtime);
+  param_list_parse_double (pl, "target_E", &target_E);
   out = param_list_lookup_string (pl, "out");
 
   if (param_list_warn_unused(pl))
@@ -1942,12 +2015,6 @@ main (int argc, char *argv[])
 
   /* check degree */
   if (d <= 0) usage(argv0[0], "degree", pl);
-
-  /* check lq and nq */
-  if (nq < 0) {
-    fprintf (stderr, "Error, number of special-q's should >= 0\n");
-    exit (1);
-  }
 
   /* allocate threads */
   tid = malloc (nthreads * sizeof (pthread_t));
@@ -1988,7 +2055,7 @@ main (int argc, char *argv[])
   st = milliseconds ();
   lenPrimes = initPrimes (P, &Primes);
 
-  printf ("# Info: initializing %lu P primes took %lums, nq=%d\n",
+  printf ("# Info: initializing %lu P primes took %lums, nq=%lu\n",
           lenPrimes, milliseconds () - st, nq);
   printf ( "# Info: estimated peak memory=%.2fMB (%d thread(s),"
            " batch %d inversions on SQ)\n",
@@ -2049,14 +2116,14 @@ main (int argc, char *argv[])
                   sqrt (var_raw_lognorm / collisions - rawmean * rawmean));
           if (collisions_good > 0)
             {
-              double mean = aver_opt_lognorm / collisions_good;
-              double Emean = aver_exp_E / collisions_good;
+              double mean = data_mean (data_opt_lognorm);
+              double Emean = data_mean (data_exp_E);
               printf ("# Stat: optimized lognorm (nr/min/av/max/std): %lu/%1.2f/%1.2f/%1.2f/%1.2f\n",
-                      collisions_good, min_opt_lognorm, mean, max_opt_lognorm,
-                      sqrt (var_opt_lognorm / collisions_good - mean * mean));
+                      collisions_good, data_opt_lognorm->min, mean, data_opt_lognorm->max,
+                      sqrt (data_var (data_opt_lognorm)));
               printf ("# Stat: exp_E (nr/min/av/max/std): %lu/%1.2f/%1.2f/%1.2f/%1.2f\n",
-                      collisions_good, min_exp_E, Emean, max_exp_E,
-                      sqrt (var_exp_E / collisions_good - Emean * Emean));
+                      collisions_good, data_exp_E->min, Emean,
+                      data_exp_E->max, sqrt (data_var (data_exp_E)));
             }
         }
     }
@@ -2099,6 +2166,10 @@ main (int argc, char *argv[])
   free(best_exp_E);
   param_list_clear (pl);
   free (tid);
+  data_clear (data_opt_lognorm);
+  data_clear (data_exp_E);
+  data_clear (data_beta);
+  data_clear (data_eta);
 
   return 0;
 }
