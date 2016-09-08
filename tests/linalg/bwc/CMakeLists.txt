@@ -404,7 +404,7 @@ cado_define_test(TEST_NAME test-lingen-crc
     ${CADO_NFS_SOURCE_DIR}/tests/linalg/bwc/test-lingen-crc.sh
     bindir=${CADO_NFS_BINARY_DIR}/linalg/bwc
     seed=0 m=64 n=64 random_stem=30000 sequence_length=200
-    expect_crc_pi=c29af350 expect_crc_F=4f4e167
+    expect_crc_pi=c29af350 expect_crc_F=04f4e167
     TARGET_DEPENDENCIES lingen)
 
 cado_define_test(test-arith-modp.cpp LIBRARIES tests utils)
