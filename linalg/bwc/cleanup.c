@@ -13,6 +13,10 @@
 #include "blockmatrix.h"
 #include "gauss.h"
 
+void usage()
+{
+    fprintf(stderr, "Usage: ./cleanup -ncols <N> -out <file> <file.0> <file.1> ...\n");
+}
 int main(int argc, char **argv)
 {
     param_list pl;
@@ -29,9 +33,9 @@ int main(int argc, char **argv)
     outfile = param_list_lookup_string(pl, "out");
     param_list_parse_uint(pl, "ncols", &ncols);
     if (param_list_warn_unused(pl) || ncols == 0 || outfile == 0) {
-        fprintf(stderr, "Usage: ./cleanup -ncols <N> -out <file> <file.0> <file.1> ...\n");
+        usage();
         fflush (stderr);
-        exit(1);
+        exit(EXIT_FAILURE);
     }
 
         ASSERT_ALWAYS(ncols % 64 == 0);
@@ -49,33 +53,41 @@ int main(int argc, char **argv)
     unsigned int common_nrows = 0;
     unsigned int nrows;
 
-    blockmatrix k = NULL;
-    blockmatrix kprev = NULL;
-    blockmatrix kS = NULL;
-    uint64_t * zone = NULL;
-    int limbs_per_col = 0;
-    int prevrank = ncols;
 
-    blockmatrix kfinal = NULL;
-    
+    if (argc == 0) {
+        fprintf(stderr, "Error: no input files\n");
+        usage();
+        exit(EXIT_FAILURE);
+    }
+
+    /* read very first file, deduce some important info about sizes */
+    {
+        struct stat sbuf[1];
+        int rc = stat(argv[0], sbuf);
+        if (rc < 0) { perror(argv[0]); exit(EXIT_FAILURE); }
+        ASSERT_ALWAYS(sbuf->st_size % (ncols/8) == 0);
+        nrows = sbuf->st_size / (ncols/8);
+        common_nrows = nrows;
+    }
+
+    blockmatrix k = blockmatrix_alloc(nrows, ncols);
+    blockmatrix kprev = blockmatrix_alloc(nrows, ncols);
+    blockmatrix kfinal = blockmatrix_alloc(nrows, ncols);
+    blockmatrix_set_zero(kfinal);
+    blockmatrix kS = blockmatrix_alloc(nrows, ncols);
+    uint64_t * zone = malloc(FLAT_BYTES_WITH_READAHEAD(ncols, nrows));
+    int limbs_per_col = iceildiv(nrows, 64);
+    int prevrank = ncols;
     int rank0 = 0;
+
+
     for(int i = 0 ; i < argc ; i++) {
         struct stat sbuf[1];
         int rc = stat(argv[i], sbuf);
-        if (rc < 0) { perror(argv[i]); exit(1); }
+        if (rc < 0) { perror(argv[i]); exit(EXIT_FAILURE); }
         ASSERT_ALWAYS(sbuf->st_size % (ncols/8) == 0);
         nrows = sbuf->st_size / (ncols/8);
         fprintf(stderr, "%s: %u x %u\n", argv[i], nrows, ncols);
-        if (i == 0) {
-            common_nrows = nrows;
-            k = blockmatrix_alloc(nrows, ncols);
-            kprev = blockmatrix_alloc(nrows, ncols);
-            kfinal = blockmatrix_alloc(nrows, ncols);
-            blockmatrix_set_zero(kfinal);
-            kS = blockmatrix_alloc(nrows, ncols);
-            zone = malloc(FLAT_BYTES_WITH_READAHEAD(ncols, nrows));
-            limbs_per_col = iceildiv(nrows, 64);
-        }
         ASSERT_ALWAYS(common_nrows == nrows);
 
         blockmatrix_read_from_flat_file(k, 0, 0, argv[i], nrows, ncols);
