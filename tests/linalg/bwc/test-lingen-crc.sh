@@ -10,7 +10,7 @@ n=64
 random_stem=30000
 sequence_length=200
 expect_crc_pi=c29af350
-expect_crc_F=4f4e167
+expect_crc_F=04f4e167
 
 while [ $# -gt 0 ] ; do
     if [[ "$1" =~ ^(seed|m|n|random_stem|sequence_length|expect_crc_[a-zA-Z]+)=[0-9a-f]+$ ]] ; then
