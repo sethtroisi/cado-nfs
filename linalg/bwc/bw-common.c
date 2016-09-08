@@ -300,8 +300,10 @@ int bw_common_init(struct bw_params * bw, int * p_argc, char *** p_argv)/*{{{*/
                 prov, req);
         ASSERT_ALWAYS(rc >= 0);
     } else {
+#ifndef FAKEMPI_H_
         int rc = asprintf(&mpiinit_diag, "Successfully initialized MPI with MPI_THREAD_SERIALIZED\n");
         ASSERT_ALWAYS(rc >= 0);
+#endif
     }
     // MPI_Init(p_argc, p_argv);
 #endif
@@ -319,9 +321,11 @@ int bw_common_init(struct bw_params * bw, int * p_argc, char *** p_argv)/*{{{*/
     setvbuf(stderr,NULL,_IONBF,0);
 
     if (bw->can_print) {
-        fputs(mpiinit_diag, stdout);
-        if (req != prov) {
-            fputs(mpiinit_diag, stderr);
+        if (mpiinit_diag) {
+            fputs(mpiinit_diag, stdout);
+            if (req != prov) {
+                fputs(mpiinit_diag, stderr);
+            }
         }
         int ver, subver;
         MPI_Get_version(&ver, &subver);
@@ -346,7 +350,8 @@ int bw_common_init(struct bw_params * bw, int * p_argc, char *** p_argv)/*{{{*/
             }
         }
     }
-    free(mpiinit_diag);
+    if (mpiinit_diag)
+        free(mpiinit_diag);
 
 
     return 0;
