@@ -102,8 +102,12 @@ if ($mode =~ /^bpmatrix(?:_(\d+)_(\d+))?$/) {
 }
 
 if ($mode eq 'balancing') {
-    sysread(STDIN, my $x, 32);
-    my ($nh,$nv,$nr,$nc,$ncoeffs,$checksum,$flags) = unpack("L4QLL", $x);
+    sysread(STDIN, my $x, 8);
+    my ($zero, $magic) = unpack("L2", $x);
+    die unless $zero == 0;
+    die unless $magic == 0xba1a0000;
+    sysread(STDIN, $x, 40);
+    my ($nh,$nv,$nr,$nc,$nzr,$nzc,$ncoeffs,$checksum,$flags) = unpack("L6QLL", $x);
     sysread(STDIN, $x, 8);
     my ($pa, $pb) = unpack("L2", $x);
     sysread(STDIN, $x, 8);
@@ -129,6 +133,8 @@ if ($mode eq 'balancing') {
     }
     print "nr:=$tr; // originally $nr\n";
     print "nc:=$tc; // originally $nc\n";
+    print "nzr:=$nzr;\n";
+    print "nzc:=$nzc;\n";
     print "nr_orig:=$nr;\n";
     print "nc_orig:=$nc;\n";
     my $s = $nh * $nv;
