@@ -42,6 +42,7 @@ void bw_common_decl_usage(param_list pl)/*{{{*/
     param_list_decl_usage(pl, "mn", "set the block Wiedemann parameters m and n to the same given value");
     param_list_decl_usage(pl, "m", "set the block Wiedemann parameter m to this value");
     param_list_decl_usage(pl, "n", "set the block Wiedemann parameter n to this value");
+    param_list_decl_usage(pl, "skip_bw_early_rank_check", "proceed even if we expect that the parameters lead us to failure");
     /* }}} */
 
     /* {{{ Parameters which are related to the interaction with the OS */
@@ -159,6 +160,8 @@ void bw_common_interpret_parameters(struct bw_params * bw, param_list pl)/*{{{*/
         }
         fprintf(stderr, " Proceeding anyway\n");
     }
+
+    param_list_lookup_string(pl, "skip_bw_early_rank_check");
 
     mpz_init_set_ui(bw->p, 2);
     param_list_parse_mpz(pl, "prime", bw->p);
@@ -328,7 +331,11 @@ int bw_common_init(struct bw_params * bw, int * p_argc, char *** p_argv)/*{{{*/
         MPI_Get_library_version(libname, &len);
         printf("MPI library is %s [MPI-%d.%d]\n", libname, ver, subver);
 #else
+#ifndef FAKEMPI_H_
+        /* It's rather misleading to speak about the MPI library when in
+         * fact we're only using our placeholder API. */
         printf("MPI library follows [MPI-%d.%d]\n", ver, subver);
+#endif
 #endif
         if (ver != MPI_VERSION || subver != MPI_SUBVERSION) {
             if (LEXGE2(ver,subver,MPI_VERSION,MPI_SUBVERSION)) {

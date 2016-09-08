@@ -37,13 +37,20 @@
                                    we get conjugated permutations.
                                    */
 
+#define BALANCING_MAGIC UINT32_C(0xba1a0000)
+
 struct balancing_header_s {
-    // FIXME: add a magic number here ? This header is read directly in
-    // binary format, so it might be a good idea.
+    uint32_t zero;      /* previous versions had neither zero nor magic.
+                           By enforcing a zero field here, we make sure
+                           that older and newer code will choke on
+                           incompatible balancing files */
+    uint32_t magic;
     uint32_t nh;
     uint32_t nv;
     uint32_t nrows;
     uint32_t ncols;
+    uint32_t nzrows;
+    uint32_t nzcols;
     uint64_t ncoeffs;
     uint32_t checksum;
     uint32_t flags;

@@ -2360,6 +2360,7 @@ static void matmul_top_init_fill_balancing_header(matmul_top_data_ptr mmt, int i
     exit(1);
 }
 
+
 static void matmul_top_init_prepare_local_permutations(matmul_top_data_ptr mmt, int i)
 {
     matmul_top_matrix_ptr Mloc = mmt->matrices[i];
@@ -2560,6 +2561,18 @@ void matmul_top_init(matmul_top_data_ptr mmt,
         }
     }
 }
+
+unsigned int matmul_top_rank_upper_bound(matmul_top_data_ptr mmt)
+{
+    unsigned int r = MAX(mmt->n0[0], mmt->n0[1]);
+    for(int i = 0 ; i < mmt->nmatrices ; i++) {
+        matmul_top_matrix_ptr Mloc = mmt->matrices[i];
+        r = MAX(r, Mloc->bal->h->nrows - Mloc->bal->h->nzrows);
+        r = MAX(r, Mloc->bal->h->ncols - Mloc->bal->h->nzcols);
+    }
+    return r;
+}
+
 
 static int export_cache_list_if_requested(matmul_top_matrix_ptr Mloc, parallelizing_info_ptr pi, param_list_ptr pl)
 {

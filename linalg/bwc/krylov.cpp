@@ -115,8 +115,8 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
     serialize(pi->m);
     char * v_name = NULL;
     if (!fake) {
-        if (tcan_print) { printf("Loading %s.%u ...", v_name, bw->start); fflush(stdout); }
         int rc = asprintf(&v_name, "V%u-%u.%u", ys[0], ys[1], bw->start);
+        if (tcan_print) { printf("Loading %s.%u ...", v_name, bw->start); fflush(stdout); }
         ASSERT_ALWAYS(rc >= 0);
         mmt_vec_load(ymy[0], v_name, unpadded);
         free(v_name);

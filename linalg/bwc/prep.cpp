@@ -15,6 +15,28 @@
 #include "portability.h"
 #include "cheating_vec_init.h"
 
+
+void bw_rank_check(matmul_top_data_ptr mmt, param_list_ptr pl)
+{
+    int tcan_print = bw->can_print && mmt->pi->m->trank == 0;
+    unsigned int r = matmul_top_rank_upper_bound(mmt);
+    if (tcan_print) {
+        printf("Matrix rank is at most %u (based on zero columns and rows encountered)\n", r);
+    }
+    int skip=0;
+    param_list_parse_int(pl, "skip_bw_early_rank_check", &skip);
+    if (bw->m + r < mmt->n0[0]) {
+        fprintf(stderr, "Based on the parameter m (=%u) and the rank defect of the matrix (>=%u), we can't expect to compute solutions reliably.\n",
+                bw->m, mmt->n0[0]-r);
+        if (skip) {
+            fprintf(stderr, "Proceeding anyway as per skip_bw_early_rank_check=1\n");
+        } else {
+            fprintf(stderr, "Aborting. Use skip_bw_early_rank_check=1 to proceed nevertheless.\n");
+            exit(EXIT_FAILURE);
+        }
+    }
+}
+
 void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSED)
 {
     /* Interleaving does not make sense for this program. So the second
@@ -44,9 +66,7 @@ void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUS
 
     matmul_top_init(mmt, A, pi, pl, bw->dir);
 
-
-
-
+    bw_rank_check(mmt, pl);
 
 
     gmp_randstate_t rstate;
@@ -271,6 +291,8 @@ void * prep_prog_gfp(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_
             MPFQ_DONE);
 
     matmul_top_init(mmt, A, pi, pl, bw->dir);
+
+    bw_rank_check(mmt, pl);
 
     if (pi->m->trank || pi->m->jrank) {
         /* as said above, this is *NOT* a parallel program.  */

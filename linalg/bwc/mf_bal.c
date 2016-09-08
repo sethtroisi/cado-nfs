@@ -352,6 +352,7 @@ void mf_bal(struct mf_bal_args * mba)
     unsigned int block[2];
     unsigned int padding[2];
     uint32_t * weights[2];
+    uint32_t nzero[2];
     double avg[2], sdev[2];
 
     for(int d = 0 ; d < 2 ; d++) {
@@ -380,12 +381,10 @@ void mf_bal(struct mf_bal_args * mba)
                 gridsize[d],
                 gridsize[!d], block[d], gridsize[!d] * block[d], text[d]);
 
-        if (mba->do_perm[d] == MF_BAL_PERM_NO) continue;
-
         size_t n = matsize[d] + padding[d];
-        uint32_t ** pperm = d == 0 ? &bal->rowperm : &bal->colperm;
+
+        /* Read the file with row or column weights */
         const char * filename = d == 0 ? mba->rwfile : mba->cwfile;
-        *pperm = malloc(2 * n * sizeof(uint32_t));
         FILE * fw = fopen(filename, "rb");
         if (fw == NULL) { perror(filename); exit(1); }
         weights[d] = malloc(n * sizeof(uint32_t));
@@ -402,6 +401,20 @@ void mf_bal(struct mf_bal_args * mba)
         }
         printf("read %s in %.1f s (%.1f MB / s)\n", filename, t_w,
                 1.0e-6 * sbuf[d]->st_size / t_w);
+        /* count zero rows or columns */
+        nzero[d] = 0;
+        for(size_t r = 0 ; r < matsize[d] ; r++) {
+            nzero[d] += (weights[d][r] == 0);
+        }
+
+        if (mba->do_perm[d] == MF_BAL_PERM_NO) {
+            free(weights[d]);
+            weights[d] = NULL;
+            continue;
+        }
+
+        uint32_t ** pperm = d == 0 ? &bal->rowperm : &bal->colperm;
+        *pperm = malloc(2 * n * sizeof(uint32_t));
 
         /* prepare for qsort */
         uint32_t * perm = *pperm;
@@ -448,6 +461,9 @@ void mf_bal(struct mf_bal_args * mba)
         printf("%" PRIu32 " %ss ; avg %.1f sdev %.1f [scan time %.1f s]\n",
                 matsize[d], text[d], avg[d], sdev[d], t_w);
     }
+
+    bal->h->nzrows = nzero[0];
+    bal->h->nzcols = nzero[1];
 
 #if 0
     /* We used to examine the correlation between row and column
