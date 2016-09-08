@@ -1,5 +1,9 @@
 #!/bin/bash
 
+if [ "$CADO_DEBUG" ] ; then
+    set -x
+fi
+
 nfields=10
 primelist="2 3 5 7 11 13 17 19 23"
 
