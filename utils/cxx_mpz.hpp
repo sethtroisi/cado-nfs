@@ -29,4 +29,31 @@ struct cxx_mpz {
     mpz_srcptr operator->() const { return x; }
 };
 
+struct cxx_mpq{
+    mpq_t x;
+    cxx_mpq() {mpq_init(x);}
+    ~cxx_mpq() {mpq_clear(x);}
+    cxx_mpq(cxx_mpq const & o) {
+        mpq_init(x);
+        mpq_set(x, o.x);
+    }
+    cxx_mpq & operator=(cxx_mpq const & o) {
+        mpq_set(x, o.x);
+        return *this;
+    }
+#if __cplusplus >= 201103L
+    cxx_mpq(cxx_mpq && o) {
+        mpq_init(x);
+        mpq_swap(x, o.x);
+    }
+    cxx_mpq& operator=(cxx_mpq && o) {
+        mpq_swap(x, o.x);
+        return *this;
+    }
+#endif
+    operator mpq_ptr() { return x; }
+    operator mpq_srcptr() const { return x; }
+    mpq_ptr operator->() { return x; }
+    mpq_srcptr operator->() const { return x; }
+};
 #endif	/* CXX_MPZ_HPP_ */
