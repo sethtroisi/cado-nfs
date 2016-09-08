@@ -192,6 +192,8 @@ void mpz_mat_kernel(mpz_mat_ptr K, mpz_mat_srcptr M, unsigned int p);
 void mpq_mat_invert(mpq_mat_ptr dst, mpq_mat_srcptr src);
 
 int mpq_mat_eq(mpq_mat_srcptr A, mpq_mat_srcptr B);
+int mpq_mat_cmp(mpq_mat_srcptr M, mpq_mat_srcptr N);
+void mpq_mat_fprint_as_mpz(FILE* f, mpq_mat_srcptr M);
 
 #ifdef __cplusplus
 }

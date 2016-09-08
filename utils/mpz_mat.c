@@ -1413,3 +1413,52 @@ int mpq_mat_eq(mpq_mat_srcptr A, mpq_mat_srcptr B)
 }
 /* }}} */
 
+int mpq_mat_cmp(mpq_mat_srcptr M, mpq_mat_srcptr N)
+{
+    //mpq_mat_fprint(stdout,M);
+    //printf("\n");
+    //mpq_mat_fprint(stdout,N);
+    //printf("\n");
+    ASSERT_ALWAYS((M->m == N->m) && (M->n == N->n));
+    unsigned int m = M->m;
+    unsigned int n = M->n;
+    unsigned int i,j;
+    for (i = 0 ; i < m ; i++){
+        for (j = 0 ; j < n ; j++){
+            int k = mpq_cmp(mpq_mat_entry_const(M,i,j),mpq_mat_entry_const(N,i,j));
+            if(k!=0) return k;
+        }
+    }
+    return 0;
+}
+
+void mpq_mat_fprint_as_mpz(FILE* f, mpq_mat_srcptr M)
+{
+    mpz_t denom;
+    mpz_init(denom);
+    mpz_set_ui(denom,1);
+    
+    for(unsigned int i = 0 ; i < M->m ; i++){
+        for(unsigned int j = 0 ; j < M->n ; j++){
+            mpz_lcm(denom,denom,mpq_denref(mpq_mat_entry_const(M,i,j)));
+        }
+    }
+    
+    mpq_t denomq;
+    mpq_init(denomq);
+    mpq_set_z(denomq,denom);
+    
+    mpq_mat N;
+    mpq_mat_init(N,M->m,M->n);
+    
+    mpq_mat_set(N,M);
+    mpq_mat_multiply_by_mpq(N,N,denomq);
+    
+    mpq_mat_fprint(f,N);
+    gmp_fprintf(f, "Denominator is : %Qd\n",denomq);
+    
+    mpq_mat_clear(N);
+    mpq_clear(denomq);
+    mpz_clear(denom);
+}
+

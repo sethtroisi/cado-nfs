@@ -20,19 +20,6 @@
 
 using namespace std;
 
-/*{{{ timer*/
-double
-seconds (void)
-{
-    struct rusage res[1];
-    getrusage(RUSAGE_SELF, res);
-    uint64_t r;
-    r = (uint64_t) res->ru_utime.tv_sec;
-    r *= (uint64_t) 1000000UL;
-    r += (uint64_t) res->ru_utime.tv_usec;
-    return r * 1.0e-6;
-}
-/*}}}*/
 /*{{{ conversion of rows and columns to polynomials*/
 void mpz_mat_row_to_poly(mpz_poly_ptr f, mpz_mat_srcptr M, const unsigned int i)
 {
@@ -123,32 +110,6 @@ void mpq_mat_column_to_poly(mpz_poly_ptr f, mpz_ptr denom, mpq_mat_srcptr M, con
 	}
 }
 /*}}}*/
-
-
-/* Structure defining a rational polynomial
- * For now it's just here to make it easier to store rational polynomials
- * in a vector Some parts of ant.cpp could be changed with this, but
- * that's no priority for now */
-struct cxx_mpq_poly
-{
-    cxx_mpz_poly num;
-    cxx_mpz den;
-};
-
-// Prints the polynomial
-void print_polynomial(mpz_t * f, int degree)
-{
-    int i;
-    for (i = degree; i >= 0; i--) {
-	if (mpz_get_ui(f[i]) != 0) {
-	    gmp_printf("%Zd", f[i]);
-	    if (i > 0) {
-		printf("*x^%d + ", i);
-	    }
-	}
-    }
-    printf("\n");
-}
 
 // Takes a matrix B containing the generators (w_0, ... w_{n-1}) of an order,
 // and returns the matrix U containing ((w_0)^p, ..., (w_{n-1})^p),
@@ -1469,9 +1430,10 @@ unsigned int prime_ideal_inertia_degree(mpq_mat_srcptr G, mpq_mat_srcptr I)
     return (int) (log((double) a)/log((double) p));
 }
 
-void print_comments_for_badideals_above_p(string& SBAD, string& SBADINFO, const unsigned int side, 
-                mpq_mat_srcptr order, mpz_poly_srcptr f, 
-                vector<pair<cxx_mpq_mat, int>> ideals, const unsigned int p)
+void print_comments_for_badideals_above_p(string& SBAD,
+        const unsigned int side, 
+        mpq_mat_srcptr order, mpz_poly_srcptr f, 
+        vector<pair<cxx_mpq_mat, int>> ideals, const unsigned int p)
 {
     ASSERT_ALWAYS(order->m == order->n);
     int n = order->m;
@@ -1598,90 +1560,11 @@ void print_comments_for_badideals_above_p(string& SBAD, string& SBADINFO, const 
 
 }
 
-void disc(mpz_ptr res, mpz_poly_ptr f)
-{
-       unsigned int i,j,k;
-       // Initialisation
-       unsigned int degree = f->deg;
-       //mpz_t f[degree+1];
-       mpz_mat mul_alpha, M, N, D, D2;
-       mpz_t p;
-       mpz_t minus;
-
-       //Initialising each matrix
-       mpz_mat_init(mul_alpha,degree,degree);
-       mpz_mat_init(M,degree,degree);
-       mpz_mat_init(N,degree,degree);
-       mpz_mat_init(D,degree,degree);
-       mpz_mat_init(D2,2*degree,degree);
-       mpz_init(p);
-       mpz_init(minus);
-       mpz_mat_set_ui(M,1); // M starts as the identity Matrix
-       mpz_set_si(minus,-1);
-
-
-       // Filling the coefficients in mul_alpha, the companion matrix of f
-       for(i = 0 ; i < degree ; i++){
-       // Setting the left part of the companion matrix
-       for(j = 0 ; j < degree-1 ; j++){
-       if(i == j+1){ mpz_set_ui(mpz_mat_entry(mul_alpha,i,j),1); }
-       else{ mpz_set_ui(mpz_mat_entry(mul_alpha,i,j),0); }
-       }
-
-       // Computing the coefficients for the column on the right
-       mpz_poly_getcoeff(p,i,f);
-       mpz_mul(p,p,minus);
-       for(k = 1 ; k <= degree-1-i ; k++){
-        mpz_t f_d;
-        mpz_init(f_d);
-        mpz_poly_getcoeff(f_d,degree,f);
-        mpz_mul(p,p,f_d);
-        mpz_clear(f_d);
-       }
-       mpz_set(mpz_mat_entry(mul_alpha,i,j),p);
-       }
-
-
-
-       // Filling the coefficients in D, whose determinant must be computed to get the discriminant.
-       for(i = 0 ; i < degree ; i++){
-       for(j = 0 ; j <= i ; j++){
-       mpz_mat_trace(mpz_mat_entry(D, i-j, j), M);
-       }
-       mpz_mat_multiply(N,M,mul_alpha);
-       mpz_mat_swap(M,N);
-       }
-       for(j = 1 ; j < degree ; j++){
-       for(i = degree-1 ; j <= i ; i--){
-       mpz_mat_trace(mpz_mat_entry(D,i,j+(degree-1)-i),M);
-       }
-       mpz_mat_multiply(N,M,mul_alpha);
-       mpz_mat_swap(M,N);
-       }
-
-
-       // Preparing the HNF
-       mpz_mat_realloc(M,degree,degree);
-       int sign = mpz_hnf_backend(D, M);
-
-       mpz_mat_determinant_triangular(p, D);
-       mpz_mul_si(res,p,sign);
-       //gmp_printf("\nThe discriminant of Z[f_d * alpha] is %Zd\n\n",p);
-
-       mpz_clear(p);
-       mpz_clear(minus);
-       mpz_mat_clear(mul_alpha);
-       mpz_mat_clear(M);
-       mpz_mat_clear(N);
-       mpz_mat_clear(D);
-       mpz_mat_clear(D2);
-}
-
-void factorization_of_whatever_ideal(vector<pair<cxx_mpq_mat, int>>& ideals, mpz_poly_srcptr g, 
+/*
+void factorization_of_arbitrary_ideal(vector<pair<cxx_mpq_mat, int>>& ideals, mpz_poly_srcptr g, 
     mpz_mat_srcptr gens, gmp_randstate_t state)
 {
     ASSERT_ALWAYS((gens->m == 1) && (gens->n == (unsigned int) g->deg));
-    unsigned int n = gens->n;
     unsigned long int a = mpz_get_ui(mpz_mat_entry_const(gens,0,0));
     unsigned long int b = mpz_get_ui(mpz_mat_entry_const(gens,0,1));
     mpz_t res;
@@ -1691,55 +1574,7 @@ void factorization_of_whatever_ideal(vector<pair<cxx_mpq_mat, int>>& ideals, mpz
     
     mpz_clear(res);
 }
-
-void mpq_mat_fprint_as_mpz(FILE* f, mpq_mat_srcptr M)
-{
-    mpz_t denom;
-    mpz_init(denom);
-    mpz_set_ui(denom,1);
-    
-    for(unsigned int i = 0 ; i < M->m ; i++){
-        for(unsigned int j = 0 ; j < M->n ; j++){
-            mpz_lcm(denom,denom,mpq_denref(mpq_mat_entry_const(M,i,j)));
-        }
-    }
-    
-    mpq_t denomq;
-    mpq_init(denomq);
-    mpq_set_z(denomq,denom);
-    
-    mpq_mat N;
-    mpq_mat_init(N,M->m,M->n);
-    
-    mpq_mat_set(N,M);
-    mpq_mat_multiply_by_mpq(N,N,denomq);
-    
-    mpq_mat_fprint(f,N);
-    gmp_fprintf(f, "Denominator is : %Qd\n",denomq);
-    
-    mpq_mat_clear(N);
-    mpq_clear(denomq);
-    mpz_clear(denom);
-}
-
-int compare_matrices(mpq_mat_srcptr M, mpq_mat_srcptr N)
-{
-    //mpq_mat_fprint(stdout,M);
-    //printf("\n");
-    //mpq_mat_fprint(stdout,N);
-    //printf("\n");
-    ASSERT_ALWAYS((M->m == N->m) && (M->n == N->n));
-    unsigned int m = M->m;
-    unsigned int n = M->n;
-    unsigned int i,j;
-    for (i = 0 ; i < m ; i++){
-        for (j = 0 ; j < n ; j++){
-            int k = mpq_cmp(mpq_mat_entry_const(M,i,j),mpq_mat_entry_const(N,i,j));
-            if(k!=0) return k;
-        }
-    }
-    return 0;
-}
+*/
 
 void sort_matrices(vector<pair<cxx_mpq_mat, int>>& ideals)
 {
@@ -1747,7 +1582,7 @@ void sort_matrices(vector<pair<cxx_mpq_mat, int>>& ideals)
     for(unsigned int i = n-2 ; (int) i >= 0 ; i--){
         for(unsigned int j = 0 ; j <= i ; j++){
             
-            if(compare_matrices(ideals[j].first,ideals[j+1].first) > 0){
+            if(mpq_mat_cmp(ideals[j].first,ideals[j+1].first) > 0){
                 pair<cxx_mpq_mat, int> k;
                 k = ideals[j];
                 ideals[j] = ideals[j+1];
