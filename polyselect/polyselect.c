@@ -255,6 +255,8 @@ print_poly_info ( char *buf,
           eta = data_median (data_eta);
         }
       prob = 1.0 - exp (- pow (target_E / eta, beta));
+      if (prob == 0) /* for x small, exp(x) ~ 1+x */
+        prob = pow (target_E / eta, beta);
       sprintf (buf + strlen(buf), "# target_E=%.2f: collisions=%.2e, time=%.2e"
                " (beta=%.2f,eta=%.2f)\n",
                target_E, 1.0 / prob, seconds () / (prob * collisions_good),
