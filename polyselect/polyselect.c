@@ -497,7 +497,10 @@ match (unsigned long p1, unsigned long p2, const int64_t i, mpz_t m0,
 
   /* Small improvement: we have Ntilde = mtilde^d + l^2*R with R small.
      If p^2 divides R, with p prime to d*ad, then we can accumulate p into l,
-     which will give an even smaller R' = R/p^2. */
+     which will give an even smaller R' = R/p^2.
+     Note: this might produce duplicate polynomials, since a given p*l
+     might be found in different ways.
+  */
   unsigned long *p, Primes[] = {2, 3, 5, 7, 11, 13, 17, 19, 0};
   mpz_mul_ui (m, ad, d);
   mpz_pow_ui (m, m, d);
