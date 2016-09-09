@@ -1265,9 +1265,10 @@ numbertheory/ant.cpp
 numbertheory/CMakeLists.txt
 numbertheory/Makefile
 tests/numbertheory/CMakeLists.txt
-tests/numbertheory/test-numbertheory.sh
+tests/numbertheory/test-p-maximal-order.sh
+tests/numbertheory/test-factorization-of-prime.sh
 tests/utils/test_cxx_mpz_mat.cpp
-utils/mpz_mat.c
+utils/mpz_mat.cpp
 utils/mpz_mat.h
 utils/cxx_mpz.hpp
 config/avx.c
@@ -1276,3 +1277,8 @@ config/avx2.c
 config/avx2.cmake
 linalg/bwc/mf_bal_main.c
 linalg/bwc/mf_bal.h
+numbertheory/ant.hpp
+tests/numbertheory/test-ant.cpp
+config/gmpxx.cpp
+utils/gmpxx.cpp
+tests/numbertheory/p_maximal_order.data

@@ -61,3 +61,15 @@ message(FATAL_ERROR "GMP library cannot be found. Please install Gnu MP, and spe
 endif()
 
 set(gmp_libname "gmp")
+
+message(STATUS "Testing whether gmpxx is available")
+try_compile(HAVE_GMPXX
+    ${PROJECT_BINARY_DIR}/config
+    ${PROJECT_SOURCE_DIR}/config/gmpxx.cpp
+    LINK_LIBRARIES ${gmp_libname} "${gmp_libname}xx")
+
+if (HAVE_GMPXX)
+message(STATUS "Testing whether gmpxx is available -- yes")
+else()
+message(STATUS "Testing whether gmpxx is available -- no")
+endif()

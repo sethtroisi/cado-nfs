@@ -47,29 +47,38 @@ void mpq_mat_clear(mpq_mat_ptr M);
 void mpq_mat_realloc(mpq_mat_ptr M, unsigned int m, unsigned int n);
 
 /* operations on submatrices, and swaps*/
+void mpz_mat_swap(mpz_mat_ptr A, mpz_mat_ptr B);
+void mpq_mat_swap(mpq_mat_ptr A, mpq_mat_ptr B);
 void mpz_mat_submat_swap(
         mpz_mat_ptr A0, unsigned int i0, unsigned int j0,
         mpz_mat_ptr A1, unsigned int i1, unsigned int j1,
         unsigned int dm, unsigned int dn);
-void mpz_mat_swap(mpz_mat_ptr A, mpz_mat_ptr B);
 void mpq_mat_submat_swap(
         mpq_mat_ptr A0, unsigned int i0, unsigned int j0,
         mpq_mat_ptr A1, unsigned int i1, unsigned int j1,
         unsigned int dm, unsigned int dn);
-void mpq_mat_swap(mpq_mat_ptr A, mpq_mat_ptr B);
+void mpz_mat_submat_set(
+        mpz_mat_ptr A0, unsigned int i0, unsigned int j0,
+        mpz_mat_srcptr A1, unsigned int i1, unsigned int j1,
+        unsigned int dm, unsigned int dn);
+void mpq_mat_submat_set(
+        mpq_mat_ptr A0, unsigned int i0, unsigned int j0,
+        mpq_mat_srcptr A1, unsigned int i1, unsigned int j1,
+        unsigned int dm, unsigned int dn);
 
 /* set/set_ui*/
 void mpz_mat_set(mpz_mat_ptr dst, mpz_mat_srcptr src);
-void mpz_mat_set_ui(mpz_mat_ptr M, unsigned int a);
-void mpq_mat_set_ui(mpq_mat_ptr M, unsigned int a);
+void mpz_mat_set_ui(mpz_mat_ptr M, unsigned long a);
+void mpq_mat_set_ui(mpq_mat_ptr M, unsigned long a);
 void mpq_mat_set(mpq_mat_ptr dst, mpq_mat_srcptr src);
 void mpz_mat_urandomm(mpz_mat_ptr M, gmp_randstate_t state, mpz_srcptr p);
 void mpq_mat_urandomm(mpq_mat_ptr M, gmp_randstate_t state, mpz_srcptr p);
 
 /* Joining matrices */
-// I didn't write all possible functions there, only those I needed, but it could be completed
 void mpz_mat_vertical_join(mpz_mat_ptr N, mpz_mat_srcptr M1, mpz_mat_srcptr M2);
 void mpq_mat_vertical_join(mpq_mat_ptr N, mpq_mat_srcptr M1, mpq_mat_srcptr M2);
+void mpz_mat_horizontal_join(mpz_mat_ptr N, mpz_mat_srcptr M1, mpz_mat_srcptr M2);
+void mpq_mat_horizontal_join(mpq_mat_ptr N, mpq_mat_srcptr M1, mpq_mat_srcptr M2);
 
 /* determinant and trace */
 // We assume that M is square
@@ -81,11 +90,15 @@ void mpq_mat_trace(mpq_ptr t, mpq_mat_srcptr M);
 // We assume that M is triangular (and square)
 void mpq_mat_determinant_triangular(mpq_ptr d, mpq_mat_srcptr M);
 void mpz_mat_transpose(mpz_mat_ptr D, mpz_mat_srcptr M);
+void mpz_mat_reverse_rows(mpz_mat_ptr B, mpz_mat_srcptr A);
+void mpz_mat_reverse_columns(mpz_mat_ptr B, mpz_mat_srcptr A);
 
 /* miscellaneous */
 int mpq_mat_numden(mpz_mat_ptr num, mpz_ptr den, mpq_mat_srcptr M);
-void mpz_mat_to_mpq_mat(mpq_mat_ptr N, mpz_mat_srcptr M);
-void mpz_mat_mod_ui(mpz_mat_ptr dst, mpz_mat_srcptr src, unsigned int p);
+void mpq_mat_set_mpz_mat(mpq_mat_ptr N, mpz_mat_srcptr M);
+void mpq_mat_set_mpz_mat_denom(mpq_mat_ptr N, mpz_mat_srcptr M, mpz_srcptr d);
+
+void mpz_mat_mod_ui(mpz_mat_ptr dst, mpz_mat_srcptr src, unsigned long p);
 
 /*  row-level operations */
 // Return 1 if the k-th line of M is null, 0 otherwise
@@ -134,23 +147,29 @@ void mpz_mat_fprint(FILE * stream, mpz_mat_srcptr M);
 void mpq_mat_fprint(FILE * stream, mpq_mat_srcptr M);
 
 /* multiplication */
-void mpz_mat_multiply(mpz_mat_ptr D, mpz_mat_srcptr A, mpz_mat_srcptr B);
-void mpz_mat_multiply_mod_ui(mpz_mat_ptr D, mpz_mat_srcptr A, mpz_mat_srcptr B, unsigned int p);
-void mpz_mat_multiply_by_mpz(mpz_mat_ptr C, mpz_mat_srcptr A, mpz_ptr k);
-void mpz_mat_multiply_by_si(mpz_mat_ptr C, mpz_mat_srcptr A, int k);
-void mpz_mat_multiply_by_ui(mpz_mat_ptr C, mpz_mat_srcptr A, unsigned int k);
+void mpz_mat_mul(mpz_mat_ptr D, mpz_mat_srcptr A, mpz_mat_srcptr B);
+void mpz_mat_mul_mod_ui(mpz_mat_ptr D, mpz_mat_srcptr A, mpz_mat_srcptr B, unsigned long p);
+void mpz_mat_mul_mpz(mpz_mat_ptr C, mpz_mat_srcptr A, mpz_ptr k);
+void mpz_mat_mul_si(mpz_mat_ptr C, mpz_mat_srcptr A, long k);
+void mpz_mat_mul_ui(mpz_mat_ptr C, mpz_mat_srcptr A, unsigned long k);
 // Returns A^n for n >= 2 ; assume A is a square matrix ; it's possible to use the same variable for A and B, but you lose the contents of A
-void mpz_mat_power_ui(mpz_mat_ptr B, mpz_mat_srcptr A, unsigned int n);
+void mpz_mat_pow_ui(mpz_mat_ptr B, mpz_mat_srcptr A, unsigned long n);
 // Returns A^n mod p for n >= 2 ; assume A is a square matrix ; it's possible to use the same variable for A and B, but you lose the contents of A
-void mpz_mat_power_ui_mod_ui(mpz_mat_ptr B, mpz_mat_srcptr A, unsigned int n, unsigned int p);
-void mpq_mat_multiply(mpq_mat_ptr D, mpq_mat_srcptr A, mpq_mat_srcptr B);
-void mpq_mat_multiply_by_mpq(mpq_mat_ptr C, mpq_mat_srcptr A, mpq_ptr k);
-void mpq_mat_multiply_by_si(mpq_mat_ptr C, mpq_mat_srcptr A, int k);
-void mpq_mat_multiply_by_ui(mpq_mat_ptr C, mpq_mat_srcptr A, unsigned int k);
+void mpz_mat_pow_ui_mod_ui(mpz_mat_ptr B, mpz_mat_srcptr A, unsigned long n, unsigned long p);
+void mpq_mat_mul(mpq_mat_ptr D, mpq_mat_srcptr A, mpq_mat_srcptr B);
+void mpq_mat_mul_mpq(mpq_mat_ptr C, mpq_mat_srcptr A, mpq_srcptr k);
+void mpq_mat_mul_si(mpq_mat_ptr C, mpq_mat_srcptr A, long k);
+void mpq_mat_mul_ui(mpq_mat_ptr C, mpq_mat_srcptr A, unsigned long k);
+void mpq_mat_mul_mpz(mpq_mat_ptr C, mpq_mat_srcptr A, mpz_srcptr k);
+void mpq_mat_div_mpq(mpq_mat_ptr C, mpq_mat_srcptr A, mpq_srcptr k);
+void mpq_mat_div_si(mpq_mat_ptr C, mpq_mat_srcptr A, long k);
+void mpq_mat_div_ui(mpq_mat_ptr C, mpq_mat_srcptr A, unsigned long k);
+void mpq_mat_div_mpz(mpq_mat_ptr C, mpq_mat_srcptr A, mpz_srcptr k);
 void mpz_mat_add(mpz_mat_ptr D, mpz_mat_srcptr A, mpz_mat_srcptr B);
+void mpq_mat_add(mpq_mat_ptr D, mpq_mat_srcptr A, mpq_mat_srcptr B);
 /* XXX what does that do ??? */
 void mpz_poly_eval_mpz_mat(mpz_mat_ptr D, mpz_mat_srcptr M, mpz_poly_srcptr f);
-void mpz_poly_eval_mpz_mat_mod_ui(mpz_mat_ptr D, mpz_mat_srcptr M, mpz_poly_srcptr f, unsigned int p);
+void mpz_poly_eval_mpz_mat_mod_ui(mpz_mat_ptr D, mpz_mat_srcptr M, mpz_poly_srcptr f, unsigned long p);
 
 /*  gaussian reduction over the rationals
  * this is a backend for row gaussian reduction. T receives the
@@ -187,11 +206,11 @@ int mpz_hnf_backend(mpz_mat_ptr M, mpz_mat_ptr T);
 
 /* kernel*/
 // This is supposed to compute the Kernel of M mod p and to store it in the matrix K. If r is the rank of M, and M is a square matrix n*n, K is a n*(n-r) matrix
-void mpz_mat_kernel(mpz_mat_ptr K, mpz_mat_srcptr M, unsigned int p);
+void mpz_mat_kernel_mod_ui(mpz_mat_ptr K, mpz_mat_srcptr M, unsigned long p);
 
-void mpq_mat_invert(mpq_mat_ptr dst, mpq_mat_srcptr src);
+void mpq_mat_inv(mpq_mat_ptr dst, mpq_mat_srcptr src);
 
-int mpq_mat_eq(mpq_mat_srcptr A, mpq_mat_srcptr B);
+int mpz_mat_cmp(mpz_mat_srcptr M, mpz_mat_srcptr N);
 int mpq_mat_cmp(mpq_mat_srcptr M, mpq_mat_srcptr N);
 void mpq_mat_fprint_as_mpz(FILE* f, mpq_mat_srcptr M);
 
@@ -200,9 +219,15 @@ void mpq_mat_fprint_as_mpz(FILE* f, mpq_mat_srcptr M);
 #endif
 
 #ifdef __cplusplus
+
 struct cxx_mpz_mat {
     mpz_mat x;
     cxx_mpz_mat() { mpz_mat_init(x, 0, 0); }
+    cxx_mpz_mat(int m, int n) { mpz_mat_init(x, m, n); }
+    cxx_mpz_mat(int m, int n, unsigned long z) {
+        mpz_mat_init(x, m, n);
+        mpz_mat_set_ui(x, z);
+    }
     ~cxx_mpz_mat() { mpz_mat_clear(x); }
     cxx_mpz_mat(cxx_mpz_mat const & o) {
         mpz_mat_init(x, 0, 0);
@@ -222,6 +247,12 @@ struct cxx_mpz_mat {
         return *this;
     }
 #endif
+    bool operator==(cxx_mpz_mat const & o) const {
+        return mpz_mat_cmp(x, o.x) == 0;
+    }
+    bool operator!=(cxx_mpz_mat const & o) const {
+        return mpz_mat_cmp(x, o.x) != 0;
+    }
     operator mpz_mat_ptr() { return x; }
     operator mpz_mat_srcptr() const { return x; }
     mpz_mat_ptr operator->() { return x; }
@@ -230,6 +261,11 @@ struct cxx_mpz_mat {
 struct cxx_mpq_mat {
     mpq_mat x;
     cxx_mpq_mat() { mpq_mat_init(x, 0, 0); }
+    cxx_mpq_mat(int m, int n) { mpq_mat_init(x, m, n); }
+    cxx_mpq_mat(int m, int n, unsigned long z) {
+        mpq_mat_init(x, m, n);
+        mpq_mat_set_ui(x, z);
+    }
     ~cxx_mpq_mat() { mpq_mat_clear(x); }
     cxx_mpq_mat(cxx_mpq_mat const & o) {
         mpq_mat_init(x, 0, 0);
@@ -254,17 +290,26 @@ struct cxx_mpq_mat {
      * of course. */
     cxx_mpq_mat(cxx_mpz_mat const & o) {
         mpq_mat_init(x, 0, 0);
-        mpz_mat_to_mpq_mat(x, o.x);
+        mpq_mat_set_mpz_mat(x, o.x);
     }
     cxx_mpq_mat & operator=(cxx_mpz_mat const & o) {
-        mpz_mat_to_mpq_mat(x, o.x);
+        mpq_mat_set_mpz_mat(x, o.x);
         return *this;
+    }
+    bool operator==(cxx_mpq_mat const & o) const {
+        return mpq_mat_cmp(x, o.x) == 0;
+    }
+    bool operator!=(cxx_mpq_mat const & o) const {
+        return mpq_mat_cmp(x, o.x) != 0;
     }
     operator mpq_mat_ptr() { return x; }
     operator mpq_mat_srcptr() const { return x; }
     mpq_mat_ptr operator->() { return x; }
     mpq_mat_srcptr operator->() const { return x; }
 };
+
+extern std::ostream& operator<<(std::ostream& os, cxx_mpz_mat const& M);
+extern std::ostream& operator<<(std::ostream& os, cxx_mpq_mat const& M);
 #endif
 
 #endif	/* MPZ_MAT_H_ */

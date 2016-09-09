@@ -456,13 +456,10 @@ void mpz_poly_setcoeff_double(mpz_poly_ptr f, int i, double z)
 /* Get coefficient for the i-th term. */
 void mpz_poly_getcoeff(mpz_t res, int i, mpz_poly_srcptr f)
 {
-  // The code below will work anyway,
-  // this assert is better called a warning.
-  ASSERT_ALWAYS( f->deg == -1 ||  f->deg>=i );
-  if (i > f->deg)
-    mpz_set_ui (res, 0);
-  else
-    mpz_set (res, f->coeff[i]);
+    if (i > f->deg)
+        mpz_set_ui (res, 0);
+    else
+        mpz_set (res, f->coeff[i]);
 }
 
 /* x^i is often useful */
@@ -1476,7 +1473,10 @@ mpz_poly_mod_f_mod_mpz (mpz_poly_ptr R, mpz_poly_srcptr f, mpz_srcptr m,
     return R->deg;
 }
 
-/* Stores in g the polynomial linked to f by : alpha is a root of f if and only if lc(f)*alpha is a root of g ; g is a monic */
+/* Stores in g the polynomial linked to f by:
+ *  - alpha is a root of f if and only if lc(f)*alpha is a root of g
+ *  - g is monic
+ */
 void mpz_poly_to_monic(mpz_poly_ptr g, mpz_poly_srcptr f)
 {
     mpz_t fd,temp;
@@ -1501,7 +1501,11 @@ void mpz_poly_to_monic(mpz_poly_ptr g, mpz_poly_srcptr f)
 /* Reduce R[d]*x^d + ... + R[0] mod f[df]*x^df + ... + f[0]
    Return the degree of the remainder. Stores the resut of the reduction in R */
 /* Assume that f is a monic polynomial */
-int mpz_poly_mod_f(mpz_poly_ptr R, mpz_poly_srcptr f){
+int mpz_poly_mod_f(mpz_poly_ptr R, mpz_poly_srcptr f)
+{
+    /* TODO: write tri-operand */
+    ASSERT_ALWAYS(f->deg >= 0);
+    ASSERT_ALWAYS(mpz_cmp_ui(f->coeff[f->deg], 1) == 0);
     if(R->deg >= f->deg) {
         mpz_poly aux;
         mpz_t Rd;
@@ -1630,22 +1634,37 @@ void mpz_poly_derivative(mpz_poly_ptr df, mpz_poly_srcptr f) {
     mpz_mul_si (df->coeff[n], f->coeff[n + 1], n + 1);
 }
 
-/* Q = P^a mod f, assuming f is monic */
-void mpz_poly_power_mod_f (mpz_poly_ptr Q, mpz_poly_srcptr P, mpz_poly_srcptr f,
-                         unsigned int a)
+/* B = A^n mod f, assuming f is monic */
+void mpz_poly_pow_ui_mod_f(mpz_poly_ptr B, mpz_poly_srcptr A, unsigned long n, mpz_poly_srcptr f)/*{{{*/
 {
-    mpz_poly P2;
-    mpz_poly_init(P2,P->deg+1);
-    mpz_poly_set(P2,P);
-    mpz_poly_set(Q,P);
-
-    mpz_poly_mod_f(Q,f);
-    for (unsigned int i = 2 ; i <= a ; i++){
-        mpz_poly_mul_mod_f(Q,Q,P2,f);
+    if (n == 0) {
+        mpz_poly_set_xi(B, 0);
+        return;
     }
-
-    mpz_poly_clear(P2);
-}
+    if (B == A || B  == f) {
+        mpz_poly C;
+        mpz_poly_init(C, f->deg-1);
+        mpz_poly_pow_ui_mod_f(C, A, n, f);
+        mpz_poly_swap(B, C);
+        mpz_poly_clear(C);
+        return;
+    }
+    unsigned long k = ((~0UL)>>1) + 1;
+    for( ; k > n ; k >>= 1);
+    mpz_poly_set(B, A);
+    mpz_poly Q;
+    mpz_poly_init(Q, 3*f->deg-3);
+    for( ; k >>= 1 ; ) {
+        mpz_poly_mul(Q, B, B);
+        mpz_poly_swap(Q, B);
+        if (n & k) {
+            mpz_poly_mul(Q, B, A);
+            mpz_poly_swap(Q, B);
+        }
+        mpz_poly_mod_f(B, f);
+    }
+    mpz_poly_clear(Q);
+}/*}}}*/
 
 /* Q = P^a mod f, mod p (f is the algebraic polynomial, non monic) */
 /* Coefficients of f must be reduced mod m on input
@@ -1653,12 +1672,12 @@ void mpz_poly_power_mod_f (mpz_poly_ptr Q, mpz_poly_srcptr P, mpz_poly_srcptr f,
  * Coefficients of Q are reduced mod p.
  */
 void
-mpz_poly_power_mod_f_mod_ui (mpz_poly_ptr Q, mpz_poly_srcptr P, mpz_poly_srcptr f,
+mpz_poly_pow_mod_f_mod_ui (mpz_poly_ptr Q, mpz_poly_srcptr P, mpz_poly_srcptr f,
                          mpz_srcptr a, unsigned long p)
 {
     mpz_t m;
     mpz_init_set_ui(m, p);
-    mpz_poly_power_mod_f_mod_mpz(Q, P, f, a, m);
+    mpz_poly_pow_mod_f_mod_mpz(Q, P, f, a, m);
     mpz_clear(m);
 }
 
@@ -1669,10 +1688,10 @@ mpz_poly_power_mod_f_mod_ui (mpz_poly_ptr Q, mpz_poly_srcptr P, mpz_poly_srcptr 
  * Coefficients of Q are reduced mod p.
  */
 void
-mpz_poly_power_mod_f_mod_mpz (mpz_poly_ptr Q, mpz_poly_srcptr P, mpz_poly_srcptr f,
+mpz_poly_pow_mod_f_mod_mpz (mpz_poly_ptr Q, mpz_poly_srcptr P, mpz_poly_srcptr f,
                           mpz_srcptr a, mpz_srcptr p)
 {
-    mpz_poly_power_mod_f_mod_mpz_barrett(Q, P, f, a, p, NULL);
+    mpz_poly_pow_mod_f_mod_mpz_barrett(Q, P, f, a, p, NULL);
 }
 
 /* Coefficients of f must be reduced mod m on input
@@ -1680,12 +1699,12 @@ mpz_poly_power_mod_f_mod_mpz (mpz_poly_ptr Q, mpz_poly_srcptr P, mpz_poly_srcptr
  * Coefficients of Q are reduced mod p.
  */
 void
-mpz_poly_power_ui_mod_f_mod_mpz (mpz_poly_ptr Q, mpz_poly_srcptr P, mpz_poly_srcptr f,
+mpz_poly_pow_ui_mod_f_mod_mpz (mpz_poly_ptr Q, mpz_poly_srcptr P, mpz_poly_srcptr f,
                           unsigned long a, mpz_srcptr p)
 {
     mpz_t az;
     mpz_init_set_ui(az, a);
-    mpz_poly_power_mod_f_mod_mpz(Q, P, f, az, p);
+    mpz_poly_pow_mod_f_mod_mpz(Q, P, f, az, p);
     mpz_clear(az);
 }
 
@@ -1744,7 +1763,7 @@ void barrett_mod (mpz_ptr a, mpz_srcptr b, mpz_srcptr m, mpz_srcptr invm)
 }
 
 /* Q = P^a mod f, mod p. Note, p is mpz_t */
-/* Same as mpz_poly_power_mod_f_mod_mpz but use barrett for reduction mod p */
+/* Same as mpz_poly_pow_mod_f_mod_mpz but use barrett for reduction mod p */
 /* For f == NULL, there is no reduction mod f */
 /* Coefficients of f must be reduced mod p on input
  * Coefficients of P need not be reduced mod p.
@@ -1752,7 +1771,7 @@ void barrett_mod (mpz_ptr a, mpz_srcptr b, mpz_srcptr m, mpz_srcptr invm)
  * invp may be NULL, of must have been computed by barrett_init
  */
 void
-mpz_poly_power_mod_f_mod_mpz_barrett (mpz_poly_ptr Q, mpz_poly_srcptr P,
+mpz_poly_pow_mod_f_mod_mpz_barrett (mpz_poly_ptr Q, mpz_poly_srcptr P,
                                       mpz_poly_srcptr f, mpz_srcptr a,
                                       mpz_srcptr p, mpz_srcptr invp)
 {
@@ -2564,7 +2583,7 @@ static int mpz_poly_factor_sqf_inner(mpz_poly_factor_list_ptr lf, mpz_poly_srcpt
     mpz_poly_set_xi(T, 0);
     for(int i = 1 ; mi->deg > 0 ; i++) {
         /* note the weird argument ordering */
-        mpz_poly_power_ui_mod_f_mod_mpz(t0, mi, NULL, i, p);
+        mpz_poly_pow_ui_mod_f_mod_mpz(t0, mi, NULL, i, p);
         mpz_poly_divexact(t1, f, t0, p);
         /* t1 = all polynomials in mi taken out from f with multiplicity i */
         mpz_poly_gcd_mpz(mi1, t1, mi, p);
@@ -2578,7 +2597,7 @@ static int mpz_poly_factor_sqf_inner(mpz_poly_factor_list_ptr lf, mpz_poly_srcpt
         mpz_poly_divexact(tmp, mi, mi1, p);
         mpz_poly_set(lf->factors[i * stride]->f, tmp);
         /* multiplicity field still unused at this point */
-        mpz_poly_power_ui_mod_f_mod_mpz(t0, lf->factors[i * stride]->f, NULL, i, p);
+        mpz_poly_pow_ui_mod_f_mod_mpz(t0, lf->factors[i * stride]->f, NULL, i, p);
         mpz_poly_mul(T, T, t0);
         mpz_poly_mod_mpz(T, T, p, NULL);
         mpz_poly_swap(mi, mi1);
@@ -2701,7 +2720,7 @@ static int mpz_poly_factor_ddf_inner(mpz_poly_factor_list_ptr lf, mpz_poly_srcpt
         }
 
         /* g <- g^p mod fp */
-        mpz_poly_power_mod_f_mod_mpz (g, g, f, p, p);
+        mpz_poly_pow_mod_f_mod_mpz (g, g, f, p, p);
 
         /* subtract x */
         mpz_poly_sub (gmx, g, x);
@@ -2971,7 +2990,7 @@ static void mpz_poly_factor_edf_pre(mpz_poly g[2], mpz_poly_srcptr f, int k, mpz
             mpz_poly_setcoeff_ui(xplusa, 0, a);
         }
 
-        mpz_poly_power_mod_f_mod_mpz(g[0], xplusa, f, half_pk, p);
+        mpz_poly_pow_mod_f_mod_mpz(g[0], xplusa, f, half_pk, p);
 
         mpz_poly_add_ui(g[1], g[0], 1);     /* (x+a)^((p^k-1)/2) + 1 */
         mpz_poly_sub_ui(g[0], g[0], 1);     /* (x+a)^((p^k-1)/2) - 1 */

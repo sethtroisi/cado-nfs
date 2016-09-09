@@ -5,7 +5,7 @@ set (sources
         modredc_ul.c modredc_15ul.c modredc_2ul2.c modul_poly.c gmp_aux.c
         double_poly.c rootfinder.c params.c gcd.c
         mpz_array.c gzip.c misc.c
-        mpz_mat.c mpz_poly.c crc.c purgedfile.c bit_vector.c
+        mpz_mat.cpp mpz_poly.c crc.c purgedfile.c bit_vector.c
         barrier.c usp.c fix-endianness.c memusage.c
         cachesize_cpuid.c cachesize_guess.c roots_mod.c mod_mpz.c renumber.c
         ringbuf.c sm_utils.c galois_utils.c memalloc.c 
@@ -16,6 +16,10 @@ set (sources
 )
 if (NOT MINGW)
     set (sources ${sources} cado_popen.c)
+endif()
+
+if (HAVE_GMPXX OR HAVE_MPIRXX)
+    set (sources ${sources} gmpxx.cpp)
 endif()
 
 set (sources_io
@@ -46,6 +50,9 @@ add_library (utils ${CADO_SHARED} ${sources})
 set_source_files_properties("${CMAKE_CURRENT_BINARY_DIR}/modified_files.c" PROPERTIES GENERATED TRUE)
 add_dependencies(utils list_modified_files)
 target_link_libraries(utils pthread ${gmp_libname} m)
+if (HAVE_GMPXX OR HAVE_MPIRXX)
+    target_link_libraries(utils "${gmp_libname}xx")
+endif()
 
 add_library (utils_with_io ${CADO_SHARED} ${sources_io})
 target_link_libraries(utils_with_io utils)

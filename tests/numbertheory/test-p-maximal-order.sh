@@ -41,6 +41,14 @@ input_file_for_binary() {
     shift
     echo $d
     echo "$@"
+#    for i in `seq 1 $d` ; do
+#        for j in `seq 1 $d` ; do
+#            x=0
+#            if [ $i = $j ] ; then x=1; fi;
+#            echo -n " $x"
+#        done
+#        echo
+#    done
 }
 
 read -s -r -d '' perl_code <<-'EOF'
