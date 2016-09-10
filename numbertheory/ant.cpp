@@ -105,18 +105,66 @@ void mpq_mat_column_to_poly(mpz_poly_ptr f, mpz_ptr denom, mpq_mat_srcptr M, con
 }
 /*}}}*/
 
-/* Let O be an order, with basis written with respect to the polynomial
- * basis defined by g (of degree denoted below by n). O is thus an n*n
- * matrix.
- *
- * This function computes the integer matrix of size n*n^2 such that the
- * n coordinates at position (i,j*n) to (i,j*n+n-1) are the coordinates
- * of the i-th times the j-th generator of O, expressed as
- * combinations of the generators of O.
- */
-cxx_mpz_mat multiplication_table_of_order(cxx_mpq_mat const& O,
+/*{{{ commonly used wrappers around HNF functions */
+int mpz_hnf_backend_rev(mpz_mat_ptr M, mpz_mat_ptr T) // {{{
+{
+    /* This is almost like hnf_backend, except that we do it in a
+     * different order, which is more suitable for displaying number
+     * field elements in a way which ends up being similar to magma's
+     *
+     * T receives the transformation matrix.
+     * M is put into HNF form.
+     */
+    mpz_mat_reverse_rows(M, M);
+    mpz_mat_reverse_columns(M, M);
+    int s = mpz_hnf_backend(M, T);
+    mpz_mat_reverse_rows(M, M);
+    mpz_mat_reverse_columns(M, M);
+    mpz_mat_reverse_rows(T, T);
+    mpz_mat_reverse_columns(T, T);
+    return s;
+}//}}}
+
+cxx_mpz_mat join_HNF(cxx_mpz_mat const& K, const unsigned long p)//{{{
+{
+    cxx_mpz_mat J(K->n, K->n, p);
+    cxx_mpz_mat T0;
+    cxx_mpz_mat I;
+
+    mpz_mat_vertical_join(I, J, K);
+    mpz_hnf_backend(I, T0);
+    mpz_mat_submat_swap(I, 0, 0, J, 0, 0, K->n, K->n);
+    return J;
+}
+//}}}
+
+cxx_mpz_mat join_HNF_rev(cxx_mpz_mat const& K, const unsigned long p)//{{{
+{
+    // Builds the block matrix containing p*identity in the top, and K in
+    // the bottom Then computes its HNF and stores it in I
+    cxx_mpz_mat J(K->n, K->n, p);
+    cxx_mpz_mat T0;
+    cxx_mpz_mat I;
+
+    mpz_mat_vertical_join(I, J, K);
+    mpz_hnf_backend_rev(I, T0);
+    mpz_mat_submat_swap(I, 0, 0, J, 0, 0, K->n, K->n);
+    return J;
+}//}}}
+/*}}}*/
+
+cxx_mpz_mat multiplication_table_of_order(cxx_mpq_mat const& O,/*{{{*/
                                   cxx_mpz_poly const& g)
 {
+    /* Let O be an order, with basis written with respect to the
+     * polynomial basis defined by g (of degree denoted below by n). O is
+     * thus an n*n matrix.
+     *
+     * This function computes the integer matrix of size n*n^2 such that
+     * the n coordinates at position (i,j*n) to (i,j*n+n-1) are the
+     * coordinates of the i-th times the j-th generator of O, expressed
+     * as combinations of the generators of O.
+     */
     unsigned int n = g->deg;
     ASSERT_ALWAYS(O->m == n);
     ASSERT_ALWAYS(O->n == n);
@@ -146,28 +194,22 @@ cxx_mpz_mat multiplication_table_of_order(cxx_mpq_mat const& O,
         }
     }
     return M;
-}
+}/*}}}*/
 
-
-/* Let O be an order, with basis written with respect to the polynomial
- * basis defined by g (of degree denoted below by n). O is thus an n*n
- * matrix.
- *
- * Let I be an ideal of O, given as an n*n matrix with entries expressed
- * as coordinate vectors with respect to the basis O.
- *
- * This function computes the integer matrix of size n*n^2 such that the
- * n coordinates at position (i,j*n) to (i,j*n+n-1) are the coordinates
- * of the i-th generator of O times the j-th generator of I, expressed as
- * combinations of the generators of I.
- */
-/* This other version uses the multiplication matrix of the order as
- * computed by the dedicated function above. Of course, it still takes
- * the basis of the ideal, too.
- */
-cxx_mpz_mat multiplication_table_of_ideal(cxx_mpz_mat const& M,
+cxx_mpz_mat multiplication_table_of_ideal(cxx_mpz_mat const& M,/*{{{*/
 				  cxx_mpz_mat const& I)
 {
+    /* Let O be an order of a degree n number field. Let M be the n*n^2
+     * multiplication matrix of O.
+     *
+     * Let I be an ideal of O, given as an n*n matrix with entries
+     * expressed as coordinate vectors with respect to the basis O.
+     *
+     * This function computes the integer matrix of size n*n^2 such that
+     * the n coordinates at position (i,j*n) to (i,j*n+n-1) are the
+     * coordinates of the i-th generator of O times the j-th generator of
+     * I, expressed as combinations of the generators of I.
+     */
     unsigned int n = M->m;
     ASSERT_ALWAYS(M->n == n * n);
     ASSERT_ALWAYS(I->m == n);
@@ -197,18 +239,17 @@ cxx_mpz_mat multiplication_table_of_ideal(cxx_mpz_mat const& M,
         }
     }
     return MI;
-}
+}/*}}}*/
 
-/* Let O be an order in a degree n number field.
- *
- * Given the n*n^2 matrix M of the multiplication within that order,
- * given matrices E and F of size k*n with coordinates of k elements of O, return
- * the matrix of size k*n with i-th row giving coordinates of e_i times
- * f_i
- * in O.
- */
-cxx_mpz_mat multiply_elements_in_order(cxx_mpz_mat const& M, cxx_mpz_mat const& E, cxx_mpz_mat const& F)
+cxx_mpz_mat multiply_elements_in_order(cxx_mpz_mat const& M, cxx_mpz_mat const& E, cxx_mpz_mat const& F)/*{{{*/
 {
+    /* Let O be an order in a degree n number field.
+     *
+     * Given the n*n^2 matrix M of the multiplication within that order,
+     * given matrices E and F of size k*n with coordinates of k elements
+     * of O, return the matrix of size k*n with i-th row giving
+     * coordinates of e_i times f_i in O.
+     */
     unsigned int n = M->m;
     unsigned int k = E->m;
     ASSERT_ALWAYS(M->n == n * n);
@@ -230,18 +271,18 @@ cxx_mpz_mat multiply_elements_in_order(cxx_mpz_mat const& M, cxx_mpz_mat const& 
         }
     }
     return R;
-}
+}/*}}}*/
 
-// frobenius_matrix ; utility function for computing the p-radical
-// Takes a matrix B containing the generators (w_0, ... w_{n-1}) of an
-// order, expressed as polynomials in the root of the polynomial g,
-// return the matrix U containing ((w_0)^p, ..., (w_{n-1})^p), and
-// expressed as a linear transformation within the order B.
-
-/* This version uses the multiplication table of the order (and does all
- * arithmetic mod p), and binary powering. */
-cxx_mpz_mat frobenius_matrix(cxx_mpz_mat const& M, unsigned long p)
+cxx_mpz_mat frobenius_matrix(cxx_mpz_mat const& M, unsigned long p) //{{{
 {
+    // frobenius_matrix ; utility function for computing the p-radical
+    // Takes a matrix B containing the generators (w_0, ... w_{n-1}) of an
+    // order, expressed as polynomials in the root of the polynomial g,
+    // return the matrix U containing ((w_0)^p, ..., (w_{n-1})^p), and
+    // expressed as a linear transformation within the order B.
+
+    /* This version uses the multiplication table of the order (and does all
+     * arithmetic mod p), and binary powering. */
     unsigned int n = M->m;
     ASSERT_ALWAYS(M->n == n * n);
     cxx_mpz_mat Mp = M;
@@ -258,56 +299,7 @@ cxx_mpz_mat frobenius_matrix(cxx_mpz_mat const& M, unsigned long p)
         mpz_mat_mod_ui(F, F, p);
     }
     return F;
-}
-
-// {{{ some HNF trivia.
-
-/* This is almost like hnf_backend, except that we do it in a different
- * order, which is more suitable for displaying number field elements in
- * a way which ends up being similar to magma's
- *
- * T receives the transformation matrix.
- * M is put into HNF form.
- */
-
-int mpz_hnf_backend_rev(mpz_mat_ptr M, mpz_mat_ptr T)
-{
-    mpz_mat_reverse_rows(M, M);
-    mpz_mat_reverse_columns(M, M);
-    int s = mpz_hnf_backend(M, T);
-    mpz_mat_reverse_rows(M, M);
-    mpz_mat_reverse_columns(M, M);
-    mpz_mat_reverse_rows(T, T);
-    mpz_mat_reverse_columns(T, T);
-    return s;
-}
-
-// Builds the block matrix containing p*identity in the top, and K in the bottom
-// Then computes its HNF and stores it in I
-cxx_mpz_mat join_HNF_rev(cxx_mpz_mat const& K, const unsigned long p)
-{
-    cxx_mpz_mat J(K->n, K->n, p);
-    cxx_mpz_mat T0;
-    cxx_mpz_mat I;
-
-    mpz_mat_vertical_join(I, J, K);
-    mpz_hnf_backend_rev(I, T0);
-    mpz_mat_submat_swap(I, 0, 0, J, 0, 0, K->n, K->n);
-    return J;
-}
-
-cxx_mpz_mat join_HNF(cxx_mpz_mat const& K, const unsigned long p)
-{
-    cxx_mpz_mat J(K->n, K->n, p);
-    cxx_mpz_mat T0;
-    cxx_mpz_mat I;
-
-    mpz_mat_vertical_join(I, J, K);
-    mpz_hnf_backend(I, T0);
-    mpz_mat_submat_swap(I, 0, 0, J, 0, 0, K->n, K->n);
-    return J;
-}
-//}}}
+}//}}}
 
 // {{{ cxx_mpz_mat p_radical_of_order(cxx_mpq_mat const& B, cxx_mpz_poly const& g, unsigned long p)
 // Stores in I the p-radical of the order whose multiplication matrix is
