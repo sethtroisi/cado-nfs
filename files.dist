@@ -1282,3 +1282,4 @@ tests/numbertheory/test-ant.cpp
 config/gmpxx.cpp
 utils/gmpxx.cpp
 tests/numbertheory/p_maximal_order.data
+tests/numbertheory/p_maximal_order_quick.data
