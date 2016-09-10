@@ -161,46 +161,6 @@ cxx_mpz_mat multiplication_table_of_order(cxx_mpq_mat const& O,
  * of the i-th generator of O times the j-th generator of I, expressed as
  * combinations of the generators of I.
  */
-#if 0
-/* This version does the calculation up front */
-cxx_mpz_mat multiplication_table_of_ideal(cxx_mpq_mat const& O,
-				  cxx_mpz_mat const& I,
-                                  cxx_mpz_poly const& g)
-{
-    unsigned int n = g->deg;
-    ASSERT_ALWAYS(O->m == n);
-    ASSERT_ALWAYS(O->n == n);
-    cxx_mpq_mat R;
-
-    cxx_mpq_mat IO;
-    mpq_mat_mul(IO, cxx_mpq_mat(I), O);
-    mpq_mat_inv(R, IO);
-    cxx_mpz_mat M(n, n * n);
-
-    for(unsigned int i = 0; i < n; i++) {
-        cxx_mpz_poly w;
-        cxx_mpz dw;
-        mpq_mat_row_to_poly(w, dw, O, i);
-        cxx_mpq_mat T(n, n);
-        for (unsigned int j = 0; j < n; j++) {
-            cxx_mpz_poly c;
-            cxx_mpz dc;
-            mpq_mat_row_to_poly(c, dc, O, j);
-            mpz_poly_mul_mod_f(c, c, w, g);
-            mpz_mul(dc, dc, dw);
-            mpq_poly_to_mat_row(T, j, c, dc);
-        }
-        mpq_mat_mul(T, T, R);
-        cxx_mpz_mat Tz;
-        int rc = mpq_mat_numden(Tz, NULL, T);
-        ASSERT_ALWAYS(rc);
-        for (unsigned int j = 0; j < n; j++) {
-            mpz_mat_submat_swap(M, i, j*n, Tz, j, 0, 1, n);
-        }
-    }
-    return M;
-}
-#endif
 /* This other version uses the multiplication matrix of the order as
  * computed by the dedicated function above. Of course, it still takes
  * the basis of the ideal, too.
@@ -239,52 +199,6 @@ cxx_mpz_mat multiplication_table_of_ideal(cxx_mpz_mat const& M,
     return MI;
 }
 
-// frobenius_matrix ; utility function for computing the p-radical
-// Takes a matrix B containing the generators (w_0, ... w_{n-1}) of an
-// order, expressed as polynomials in the root of the polynomial g,
-// return the matrix U containing ((w_0)^p, ..., (w_{n-1})^p), and
-// expressed as a linear transformation within the order B.
-#if 0
-// {{{
-/* This version is very slow, as it does a full expansion of the
- * polynomial operation before reducing */
-/* see the other version further down */
-cxx_mpz_mat frobenius_matrix(cxx_mpq_mat const& B,
-			   cxx_mpz_poly const& g,
-                           unsigned long p)
-{
-    ASSERT_ALWAYS(B->m == B->n);
-    unsigned int n = B->m;
-
-
-    cxx_mpq_mat T(n, n);
-
-    for (unsigned int i = 0; i < n; i++) {
-	cxx_mpz_poly f(B->n - 1);
-        cxx_mpz den;
-
-        mpq_mat_row_to_poly(f, den, B, i);
-
-        /* This is stupid. We're boldly exponential in p here. There's no
-         * point; we should find a fix.
-         */
-        abort();
-
-	mpz_poly_pow_ui_mod_f(f, f, p, g);
-	mpz_pow_ui(den, den, p);
-        mpq_poly_to_mat_row(T, i, f, den);
-    }
-    cxx_mpq_mat B_inv;
-    mpq_mat_inv(B_inv, B);
-    mpq_mat_mul(T, T, B_inv);
-    cxx_mpz_mat F;
-    int rc = mpq_mat_numden(F, NULL, T);
-    ASSERT_ALWAYS(rc);
-    mpz_mat_mod_ui(F, F, p);
-    return F;
-}//}}}
-#endif
-
 /* Let O be an order in a degree n number field.
  *
  * Given the n*n^2 matrix M of the multiplication within that order,
@@ -317,6 +231,12 @@ cxx_mpz_mat multiply_elements_in_order(cxx_mpz_mat const& M, cxx_mpz_mat const& 
     }
     return R;
 }
+
+// frobenius_matrix ; utility function for computing the p-radical
+// Takes a matrix B containing the generators (w_0, ... w_{n-1}) of an
+// order, expressed as polynomials in the root of the polynomial g,
+// return the matrix U containing ((w_0)^p, ..., (w_{n-1})^p), and
+// expressed as a linear transformation within the order B.
 
 /* This version uses the multiplication table of the order (and does all
  * arithmetic mod p), and binary powering. */
@@ -388,103 +308,6 @@ cxx_mpz_mat join_HNF(cxx_mpz_mat const& K, const unsigned long p)
     return J;
 }
 //}}}
-
-#if 0/*{{{*/
-void read_data(unsigned int *deg, mpz_poly_ptr f, /*mpz_mat_ptr gen,*/
-	       FILE * problemfile)
-{
-    int rc = fscanf(problemfile, "%u", deg);
-    ASSERT_ALWAYS(rc == 1);
-    
-    mpz_poly_realloc(f, *deg + 1);
-    mpz_t c;
-    mpz_init(c);
-    for (unsigned int i = 0; i <= *deg; i++) {
-        gmp_fscanf(problemfile, "%Zd", &c);
-        mpz_poly_setcoeff (f, i, c);
-    }
-    mpz_clear(c);
-
-    // Creating one ideal from two coefficients a and b, representing the generator a-b*alpha
-    //mpz_mat_realloc(gen, 2, *deg);
-    /*
-    for(unsigned int i = 0 ; i < gen->m ; i++){
-        for(unsigned int j = 0 ; j < gen->n ; j++){
-            int a;
-            fscanf(problemfile, "%d", &a);
-            mpz_set_si(mpz_mat_entry(gen,i,j),a);
-        }
-    }
-    */
-    /*
-    mpq_mat_realloc(J,*deg,*deg);
-    for (unsigned int i = 0; i < *deg; i++) {
-        long int denom;
-        denom = 1;
-        fscanf(problemfile, "%ld", &denom);
-        for (unsigned int j = 0; j < *deg; j++) {
-            long int c;
-            fscanf(problemfile, "%ld", &c);
-            mpq_set_si(mpq_mat_entry(J, i, j), c, denom);
-            mpq_canonicalize(mpq_mat_entry(J,i,j));
-        }
-    }*/
-}
-#endif/*}}}*/
-
-// generators_to_integers_mod_p -- utility function for computing the
-// p-maximal order.
-//
-// We want to find the elements x of the order O such that x*Ip is in
-// p*Ip. This matrix gives the decompositions of the products x*y, for x
-// a basis element of the order, and y a basis element of Ip. Those
-// decompositions are expressed on the basis of Ip.
-//
-// The basis of O is expected to be expressed with respect to the
-// polynomial basis defined by the polynomial g.
-#if 0
-// {{{
-cxx_mpz_mat generators_to_integers_mod_p(cxx_mpq_mat const& B,
-				  cxx_mpz_mat const& Ip,
-                                  cxx_mpz_poly const& g,
-				  unsigned long p)
-{
-    ASSERT_ALWAYS((B->m == B->n) && (Ip->m == Ip->n) && (B->m == Ip->m));
-    unsigned int n = B->m;
-    cxx_mpq_mat R;
-    cxx_mpz_mat M(n, n * n);
-
-    /* write Ip in the polynomial basis, and write the matrix for
-     * expressing the polynomials back as elements within Ip. */
-    cxx_mpq_mat IpB;
-    mpq_mat_mul(IpB, cxx_mpq_mat(Ip), B);
-    mpq_mat_inv(R, IpB);
-
-    for(unsigned int i = 0; i < n; i++) {
-        cxx_mpz_poly w;
-        cxx_mpz dw;
-        mpq_mat_row_to_poly(w, dw, B, i);
-        cxx_mpq_mat T(n, n);
-        for (unsigned int j = 0; j < n; j++) {
-            cxx_mpz_poly c;
-            cxx_mpz dc;
-            mpq_mat_row_to_poly(c, dc, IpB, j);
-            mpz_poly_mul_mod_f(c, c, w, g);
-            mpz_mul(dc, dc, dw);
-            mpq_poly_to_mat_row(T, j, c, dc);
-        }
-        mpq_mat_mul(T, T, R);
-        cxx_mpz_mat Tz;
-        int rc = mpq_mat_numden(Tz, NULL, T);
-        ASSERT_ALWAYS(rc);
-        mpz_mat_mod_ui(Tz, Tz, p);
-        for (unsigned int j = 0; j < n; j++) {
-            mpz_mat_submat_swap(M, i, j*n, Tz, j, 0, 1, n);
-        }
-    }
-    return M;
-}//}}}
-#endif
 
 // {{{ cxx_mpz_mat p_radical_of_order(cxx_mpq_mat const& B, cxx_mpz_poly const& g, unsigned long p)
 // Stores in I the p-radical of the order whose multiplication matrix is
