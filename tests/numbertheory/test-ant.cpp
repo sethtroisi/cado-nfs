@@ -179,45 +179,6 @@ int main(int argc, char *argv[]) /*{{{ */
     }
 
 #if 0
-
-    /* param_list_lookup_string gives a const char * pointer which will
-     * live only for as long as the param_list structure isn't freed. The
-     * return value is NULL if no such key exists */
-
-    if ((tmp = param_list_lookup_string(pl, "subdir")) != NULL) {
-        fprintf(stderr, "--subdir is no longer supported."
-                " prepend --out with a path instead.\n");
-        exit(1);
-    }
-
-    /* ... */
-
-    /* It is possible to strdup() it of course */
-    working_filename = strdup(param_list_lookup_string(pl, "out"));
-    if (working_filename == NULL) {
-        fprintf(stderr, "Required argument --out is missing\n");
-        exit(1);
-    }
-    /* ... */
-
-
-    /* all parsing functions return 1 when the key was found, 0 if not.
-     * If no key was found, no assignment is performed and the default
-     * value set beforehand remains */
-    param_list_parse_int(pl, "hslices", &split[0]);
-    param_list_parse_int(pl, "vslices", &split[1]);
-
-    int split[2] = {1,1};
-    param_list_parse_intxint(pl, "nbuckets", split);
-
-    /* Good practice mandates that unused parameters trigger a warning,
-     * if not an error. Only unused parameters from command line are
-     * considered for issuance of a warning. Unused parameters found in
-     * config files are considered normal and trigger nothing.
-     */
-    if (param_list_warn_unused(pl)) {
-        usage();
-    }
     param_list_clear(pl);
     /*
        unsigned int m = 8;
@@ -355,25 +316,6 @@ int main(int argc, char *argv[]) /*{{{ */
     end = clock();
     cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
     
-    // Here we print the maximal order in a file
-    
-    printf("\n");    
-    FILE *maxOrderFile = NULL;
-    maxOrderFile = fopen("maxOrderC.data","w+");
-    mpq_mat_fprint_as_mpz(maxOrderFile, D);
-    fclose(maxOrderFile);
-    
-    
-    // Here we print the time for the computation of p-maximal order in a file
-    
-    FILE *maxOrderTimeFile = NULL;
-    maxOrderTimeFile = fopen("maxOrderCTime.data","a+");
-    fprintf(maxOrderTimeFile,"%d %f\n",(unsigned int) f->deg, cpu_time_used);
-    fclose(maxOrderTimeFile);
-    
-    
-    printf("\n");
-
     gmp_randstate_t state;
     gmp_randinit_default(state);
     gmp_randseed_ui(state, seed);

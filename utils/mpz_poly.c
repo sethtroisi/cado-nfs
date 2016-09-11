@@ -1066,7 +1066,7 @@ mpz_poly_div_r (mpz_poly_ptr h, mpz_poly_srcptr f, mpz_srcptr p)
 int mpz_poly_div_qr (mpz_poly_ptr q, mpz_poly_ptr r, mpz_poly_srcptr f, mpz_poly_srcptr g, mpz_srcptr p)
 {
   int k, j, df = f->deg, dg = g->deg, dq = df - dg;
-  mpz_t tmp, lg, invlg;
+  mpz_t lg, invlg;
 
   if (df < dg) /* f is already reduced mod g */
     {
@@ -1095,13 +1095,11 @@ int mpz_poly_div_qr (mpz_poly_ptr q, mpz_poly_ptr r, mpz_poly_srcptr f, mpz_poly
     }
 
 
-  mpz_init(tmp);
   for (k = df-dg ; k >=0 ; k--) {
     mpz_mul(q->coeff[k], r->coeff[k+dg], invlg);
     mpz_mod(q->coeff[k], q->coeff[k], p);
     for (j = dg+k ; j >= k ; j--) {
-      mpz_mul(tmp, q->coeff[k], g->coeff[j-k]);
-      mpz_sub(r->coeff[j], r->coeff[j], tmp);
+      mpz_submul(r->coeff[j], q->coeff[k], g->coeff[j-k]);
       mpz_mod(r->coeff[j], r->coeff[j], p);
     }
   }
@@ -1109,9 +1107,57 @@ int mpz_poly_div_qr (mpz_poly_ptr q, mpz_poly_ptr r, mpz_poly_srcptr f, mpz_poly
 
   mpz_clear(invlg);
   mpz_clear(lg);
-  mpz_clear(tmp);
   return 1;
 }
+
+/* This also computes q and r such that f = q * g + r, but over Z, not
+ * modulo a prime. Also, we do not assume that g is monic. Of course, if
+ * it is not, then most often the result will be undefined (over Z). We
+ * return something well-defined if q and r happen to be integer
+ * polynomials.
+ * We return 0 if this is not the case (in which case q and r are
+ * undefined).
+ * r==f is allowed.
+ */
+int mpz_poly_div_qr_z (mpz_poly_ptr q, mpz_poly_ptr r, mpz_poly_srcptr f, mpz_poly_srcptr g)
+{
+  int k, j, df = f->deg, dg = g->deg, dq = df - dg;
+
+  if (df < dg) /* f is already reduced mod g */
+    {
+      mpz_poly_set_zero (q);
+      mpz_poly_set (r, f);
+      return 1;
+    }
+
+  /* now df >= dg */
+  mpz_poly_realloc(q, dq + 1);
+
+  mpz_poly_set(r, f);
+  q->deg = dq;
+
+  mpz_srcptr lg = g->coeff[dg];
+
+  for (k = df-dg ; k >=0 ; k--) {
+    if (!mpz_divisible_p(r->coeff[k+dg], lg))
+        return 0;
+    mpz_divexact(q->coeff[k], r->coeff[k+dg], lg);
+    for (j = dg+k ; j >= k ; j--) {
+      mpz_submul(r->coeff[j], q->coeff[k], g->coeff[j-k]);
+    }
+  }
+  mpz_poly_cleandeg(r, r->deg);
+  return 1;
+}
+int mpz_poly_div_r_z (mpz_poly_ptr r, mpz_poly_srcptr f, mpz_poly_srcptr g)
+{
+    mpz_poly quo;
+    mpz_poly_init(quo,-1);
+    int ret = mpz_poly_div_qr_z(quo,r,f,g);
+    mpz_poly_clear(quo);
+    return ret;
+}
+
 
 /* q=divexact(h, f) mod p, f not necessarily monic.
    Assumes lc(h) <> 0 mod p.
@@ -1498,32 +1544,6 @@ void mpz_poly_to_monic(mpz_poly_ptr g, mpz_poly_srcptr f)
     mpz_clear(fd);
 }
 
-/* Reduce R[d]*x^d + ... + R[0] mod f[df]*x^df + ... + f[0]
-   Return the degree of the remainder. Stores the resut of the reduction in R */
-/* Assume that f is a monic polynomial */
-int mpz_poly_mod_f(mpz_poly_ptr R, mpz_poly_srcptr f)
-{
-    /* TODO: write tri-operand */
-    ASSERT_ALWAYS(f->deg >= 0);
-    ASSERT_ALWAYS(mpz_cmp_ui(f->coeff[f->deg], 1) == 0);
-    if(R->deg >= f->deg) {
-        mpz_poly aux;
-        mpz_t Rd;
-        mpz_poly_init(aux,R->deg-f->deg);
-        mpz_init(Rd);
-
-        mpz_poly_getcoeff(Rd,R->deg,R);
-        mpz_poly_setcoeff(aux,R->deg-f->deg,Rd);
-        mpz_poly_mul(aux,aux,f);
-        mpz_poly_sub(R,R,aux);
-
-        mpz_clear(Rd);
-        mpz_poly_clear(aux);
-        mpz_poly_mod_f(R,f);
-    }
-    return R->deg;
-}
-
 /*  Reduce frac (= num / denom) mod F mod m ,
     i.e. compute num * denom^-1 mod F mod m .
     The return value is in num, denom is set to constant polynomial 1
@@ -1593,7 +1613,7 @@ mpz_poly_mul_mod_f (mpz_poly_ptr Q, mpz_poly_srcptr P1, mpz_poly_srcptr P2,
                         mpz_poly_srcptr f)
 {
     mpz_poly_mul(Q,P1,P2);
-    mpz_poly_mod_f(Q,f);
+    mpz_poly_div_r_z(Q,Q,f);
 }
 
 /* Q = P^2 mod f, mod m
@@ -1661,7 +1681,7 @@ void mpz_poly_pow_ui_mod_f(mpz_poly_ptr B, mpz_poly_srcptr A, unsigned long n, m
             mpz_poly_mul(Q, B, A);
             mpz_poly_swap(Q, B);
         }
-        mpz_poly_mod_f(B, f);
+        mpz_poly_div_r_z(B, B, f);
     }
     mpz_poly_clear(Q);
 }/*}}}*/

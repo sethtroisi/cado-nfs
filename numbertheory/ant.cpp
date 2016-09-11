@@ -17,6 +17,7 @@
 #include "mpz_poly.h"
 #include "mpz_mat.h"
 #include "utils/cxx_mpz.hpp"
+#include "ant.hpp"
 
 using namespace std;
 
