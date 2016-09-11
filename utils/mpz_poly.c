@@ -329,6 +329,17 @@ mpz_poly_init_set_ab (mpz_poly_ptr rel, int64_t a, uint64_t b)
     mpz_poly_setcoeff_int64(rel, 1, -b);
 }
 
+void
+mpz_poly_init_set_mpz_ab (mpz_poly_ptr rel, mpz_t a, mpz_t b)
+{
+    mpz_poly_init(rel, 1);
+    mpz_poly_setcoeff(rel, 0, a);
+    mpz_t mb;
+    mpz_init(mb);
+    mpz_neg(mb, b);
+    mpz_poly_setcoeff(rel, 1, mb);
+    mpz_clear(mb);
+}
 
 /* swap f and g */
 void

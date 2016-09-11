@@ -63,9 +63,12 @@ static void my_sm(const char *outfile, const char *infile,
     }
     else{
 	// we read a relation
-	relation rel;
-	rel.parse(buf);
-	mpz_poly_init_set_ab(pol, rel.a, rel.b);
+        mpz_t a, b;
+        mpz_init(a); mpz_init(b);
+        int ret = gmp_sscanf(buf, "%Zd,%Zd:", a, b);
+        ASSERT_ALWAYS(ret == 2);
+	mpz_poly_init_set_mpz_ab(pol, a, b);
+        mpz_clear(a); mpz_clear(b);
     }
     for (int side = 0; side < nb_polys; ++side) {
       compute_sm_piecewise(smpol, pol, sm_info[side]);
