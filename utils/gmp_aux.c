@@ -348,3 +348,34 @@ mpz_get_ld (mpz_t z)
   mpz_clear (t);
   return ld;
 }
+
+/* returns the p-valuation of a, where p is expected to be prime. INT_MAX
+ * is returned if a==0 */
+int mpz_p_valuation(mpz_srcptr a, mpz_srcptr p)
+{
+    mpz_t c;
+    mpz_init(c);
+    int v = 0;
+    if (mpz_size(a) == 0) return INT_MAX;
+    mpz_set(c, a);
+    for( ; mpz_divisible_p(c, p) ; v++)
+        mpz_fdiv_q(c, c, p);
+    mpz_clear(c);
+    return v;
+}
+
+/* returns the p-valuation of a, where p is expected to be prime. INT_MAX
+ * is returned if a==0 */
+int mpz_p_valuation_ui(mpz_srcptr a, unsigned long p)
+{
+    mpz_t c;
+    mpz_init(c);
+    int v = 0;
+    if (mpz_size(a) == 0) return INT_MAX;
+    mpz_set(c, a);
+    for( ; mpz_divisible_ui_p(c, p) ; v++)
+        mpz_fdiv_q_ui(c, c, p);
+    mpz_clear(c);
+    return v;
+}
+

@@ -13,7 +13,7 @@ for i in [1..100] do
         B:=BasisMatrix(O);
         Bd:=Denominator(B);
         Bz:=Matrix(Integers(),B*Bd);
-        print d, ps(Eltseq(f));
+        print ps(Eltseq(f));
         print ps([p, Bd] cat Eltseq(Bz));
     end for;
 end for;

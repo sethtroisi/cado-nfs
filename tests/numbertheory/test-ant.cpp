@@ -5,30 +5,38 @@
 #include <sstream>
 #include <fstream>
 #include <algorithm>
+#include <iterator>
 
 using namespace std;
 static char ** original_argv;
 
 istream& operator>>(istream& is, cxx_mpz_poly& f)/*{{{*/
 {
-    int deg;
-    if (!(is >> deg) || deg <= 0) {
-        is.clear();
-        is.setstate(is.rdstate() | ios_base::failbit);
-        return is;
+    vector<cxx_mpz> v;
+    cxx_mpz a;
+    for( ; is >> a ; v.push_back(a)) ;
+    mpz_poly_realloc(f, v.size());
+    for(unsigned int i = 0 ; i < v.size() ; i++) {
+        mpz_set(f->coeff[i], v[i]);
     }
-    mpz_poly_realloc(f, deg + 1);
-    for(int i = 0 ; i <= deg ; i++) {
-        if (!(is >> f->coeff[i])) {
-            is.clear();
-            is.setstate(is.rdstate() | ios_base::failbit);
-            return is;
-        }
-    }
-    mpz_poly_cleandeg(f, deg);
+    mpz_poly_cleandeg(f, v.size()-1);
+    is.clear();
     return is;
 }
 /*}}}*/
+
+ostream& operator<<(ostream& o, cxx_mpz_poly const& v) {
+    /* note that we can't cheat and use cxx_mpz here */
+    ostream_iterator<mpz_t> it(o, " ");
+    if (v->deg>=0) {
+        copy(v->coeff, v->coeff + v->deg, it);
+        o << v->coeff[v->deg];
+    } else {
+        o << "0";
+    }
+    return o;
+}
+
 
 static void decl_usage(param_list_ptr pl)
 {
@@ -39,6 +47,7 @@ static void decl_usage(param_list_ptr pl)
     param_list_decl_usage(pl, "out", "output file");
     param_list_decl_usage(pl, "batch", "batch input file with test vectors and expected results");
     param_list_decl_usage(pl, "seed", "seed used for random picks");
+    param_list_decl_usage(pl, "elements", "ideal generators (separated by ;)");
 }
 
 void usage(param_list_ptr pl, char ** argv, const char * msg = NULL)
@@ -195,7 +204,7 @@ void do_factorization_of_prime(param_list_ptr pl) {/*{{{*/
     gmp_randclear(state);
     out << F.size() << "\n";
     for(unsigned int k = 0 ; k < F.size() ; k++) {
-        out << F[k].first << F[k].second << endl;
+        out << F[k].first << " " << F[k].second << endl;
     }
 }
 /*}}}*/
@@ -257,11 +266,16 @@ void do_factorization_of_prime_batch(param_list_ptr pl) {/*{{{*/
                 if (!(is1 >> e)) throw exc;
                 ideals.push_back(make_pair(A, e));
             }
+            sort(ideals.begin(), ideals.end(), ideal_comparator());
         }       // }}}
 
         cxx_mpq_mat my_M = p_maximal_order(f, p);
         gmp_randstate_t state;
         gmp_randinit_default(state);
+        unsigned long seed = 0;
+        if (param_list_parse_ulong(pl, "seed", &seed)) {
+            gmp_randseed_ui(state, seed);
+        }
 
         /* What if we simply ask our code to compute the factorization of
          * p with respect to the order basis which was chosen by magma ?
@@ -269,8 +283,6 @@ void do_factorization_of_prime_batch(param_list_ptr pl) {/*{{{*/
         vector<pair<cxx_mpz_mat, int>> my_ideals = factorization_of_prime(M, f, p, state);
         gmp_randclear(state);
 
-        sort(ideals.begin(), ideals.end(), ideal_comparator());
-        sort(my_ideals.begin(), my_ideals.end(), ideal_comparator());
 
         bool ok=(ideals.size() == my_ideals.size());
         for(unsigned int k = 0 ; ok && k < ideals.size() ; k++) {
@@ -284,6 +296,111 @@ void do_factorization_of_prime_batch(param_list_ptr pl) {/*{{{*/
 }
 /*}}}*/
 
+void do_valuations_of_ideal(param_list_ptr pl) {/*{{{*/
+    cxx_mpz_poly f;
+    unsigned long p;
+
+    if (!param_list_parse_ulong(pl, "prime", &p)) usage(pl, original_argv, "missing prime argument");
+
+    iowrap io(pl);
+    istream in(io.ibuf);
+    ostream out(io.obuf);
+
+    /* Now read the element description */
+    vector<cxx_mpz_poly> elements; 
+    {
+        const char * tmp;
+        if ((tmp = param_list_lookup_string(pl, "elements")) == NULL)
+            usage(pl, original_argv, "missing ideal generators");
+        char * desc = strdup(tmp);
+        for(char * q = desc, * nq ; q ; q = nq) {
+            nq = strchr(desc, ';');
+            if (nq) *nq++='\0';
+            istringstream is(q);
+            cxx_mpz_poly x;
+            if (!(is >> x)) usage(pl, original_argv, "cannot parse ideal generators");
+            elements.push_back(x);
+        }
+    }
+
+
+    if (!(in >> f)) usage(pl, original_argv, "cannot parse polynomial");
+    cxx_mpq_mat O = p_maximal_order(f, p);
+    cxx_mpz_mat M = multiplication_table_of_order(O, f);
+
+    /* We need to reduce our generating elements modulo f, at the expense
+     * of creating denominators all over the place.
+     */
+    cxx_mpz_mat I;
+    cxx_mpz denom;
+    {
+        cxx_mpq_mat generators(elements.size(), f->deg);
+        cxx_mpz_poly fh;
+        mpz_poly_to_monic(fh, f);
+        for(unsigned int i = 0 ; i < elements.size() ; i++) {
+            cxx_mpz_poly& e(elements[i]);
+            /* e is e0+e1*x+e2*x^2+...
+             * f(alpha) is zero.
+             * let y = lc(f)*alpha
+             * g is monic, and g(y) = 0.
+             * e(alpha) is also e'(lc*alpha), with
+             * lc(f)^deg(e)*e'(y) = e0*lc^deg_e + e1*lc^(deg_e-1)*x + ...
+             * e' can be reduced mod fh.
+             * now we need to compute ([y^i]e')*lc^i / lc^deg_e.
+             */
+            cxx_mpz denom, c;
+            mpz_set_ui(denom, 1);
+            mpz_set_ui(c, 1);
+            for(int k = e->deg ; k-- ; ) {
+                mpz_mul(denom, denom, f->coeff[f->deg]);
+                mpz_mul(e->coeff[k], e->coeff[k], denom);
+            }
+            mpz_poly_div_r_z(e, e, f);
+            for(int k = 0 ; k <= e->deg ; k++) {
+                mpz_mul(e->coeff[k], e->coeff[k], c);
+                mpz_mul(c, c, f->coeff[f->deg]);
+                mpq_ptr gik = mpq_mat_entry(generators, i, k);
+                mpz_set(mpq_numref(gik), e->coeff[k]);
+                mpz_set(mpq_denref(gik), denom);
+                mpq_canonicalize(gik);
+            }
+        }
+        pair<cxx_mpz_mat, cxx_mpz> Id = generate_ideal(O, M, generators);
+        swap(Id.first, I);
+        swap(Id.second, denom);
+    }
+
+    gmp_randstate_t state;
+    gmp_randinit_default(state);
+    unsigned long seed = 0;
+    if (param_list_parse_ulong(pl, "seed", &seed)) {
+        gmp_randseed_ui(state, seed);
+    }
+    vector<pair<cxx_mpz_mat, int>> F = factorization_of_prime(O, f, p, state);
+    gmp_randclear(state);
+
+    int w = mpz_p_valuation_ui(denom, p);
+
+    for(unsigned int k = 0 ; k < F.size() ; k++) {
+        cxx_mpz_mat const& fkp(F[k].first);
+        cxx_mpz_mat a = valuation_helper_for_ideal(M, fkp, p);
+        pair<cxx_mpz, cxx_mpz_mat> two = prime_ideal_two_element(O, f, M, fkp);
+        cxx_mpz_poly alpha;
+        /* should we display O-coefficients or K-coefficients ?
+        mpz_mat_row_to_poly(alpha, two.second, 0);
+        */
+        cxx_mpq_mat alpha_q;
+        mpq_mat_set_mpz_mat(alpha_q, two.second);
+        mpq_mat_mul(alpha_q, alpha_q, O);
+        cxx_mpz alpha_denom;
+        mpq_mat_row_to_poly(alpha, alpha_denom, alpha_q, 0);
+        int v = valuation_of_ideal_at_prime_ideal(M, I, a, p);
+        cout << "(p=" << p << ", k=" << k << ", f="<<prime_ideal_inertia_degree(fkp)<<", e="<<F[k].second<< ";" << two.first << ",["<< alpha <<"]/"<<alpha_denom<<")^" << v-w << "\n";
+    }
+}
+
+
+/*}}}*/
 int main(int argc, char *argv[]) /*{{{ */
 {
     param_list pl;
@@ -316,6 +433,9 @@ int main(int argc, char *argv[]) /*{{{ */
         return 0;
     } else if (strcmp(tmp, "factorization-of-prime") == 0) {
         do_factorization_of_prime(pl);
+        return 0;
+    } else if (strcmp(tmp, "valuations-of-ideal") == 0) {
+        do_valuations_of_ideal(pl);
         return 0;
     } else if (strcmp(tmp, "factorization-of-prime-batch") == 0) {
         do_factorization_of_prime_batch(pl);

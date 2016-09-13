@@ -97,6 +97,8 @@ void mpz_mat_reverse_columns(mpz_mat_ptr B, mpz_mat_srcptr A);
 int mpq_mat_numden(mpz_mat_ptr num, mpz_ptr den, mpq_mat_srcptr M);
 void mpq_mat_set_mpz_mat(mpq_mat_ptr N, mpz_mat_srcptr M);
 void mpq_mat_set_mpz_mat_denom(mpq_mat_ptr N, mpz_mat_srcptr M, mpz_srcptr d);
+int mpz_mat_p_valuation(mpz_mat_srcptr A, mpz_srcptr p);
+int mpz_mat_p_valuation_ui(mpz_mat_srcptr A, unsigned long p);
 
 void mpz_mat_mod_ui(mpz_mat_ptr dst, mpz_mat_srcptr src, unsigned long p);
 
@@ -135,21 +137,20 @@ void mpz_mat_mulrow_mod(mpz_mat_ptr M, unsigned int i0, mpz_srcptr lambda, mpz_s
 /* multiply row i0 by lambda */
 void mpq_mat_mulrow(mpq_mat_ptr M, unsigned int i0, mpq_srcptr lambda);
 
-/* this computes an additive combination of n rows into row [didx] of the
- * initial matrix. We require that this destination row be cleared
- * initially.
- */
-void mpz_mat_combinerows(mpz_mat_ptr M, unsigned int didx, unsigned int sidx,
-        mpz_srcptr * lambda, unsigned int n);
-/*  */
-/* I/O*/
-void mpz_mat_fprint(FILE * stream, mpz_mat_srcptr M);
-void mpq_mat_fprint(FILE * stream, mpq_mat_srcptr M);
+/*{{{ conversion of rows and columns to polynomials*/
+void mpz_mat_row_to_poly(mpz_poly_ptr f, mpz_mat_srcptr M, const unsigned int i);
+void mpz_mat_row_to_poly_rev(mpz_poly_ptr f, mpz_mat_srcptr M, const unsigned int i);
+void mpz_mat_column_to_poly(mpz_poly_ptr f, mpz_mat_srcptr M, const unsigned int j);
+void mpq_mat_row_to_poly(mpz_poly_ptr f, mpz_ptr lcm, mpq_mat_srcptr M, const unsigned int i);
+void mpq_poly_to_mat_row(mpq_mat_ptr M, const unsigned int i, mpz_poly_srcptr f, mpz_srcptr denom);
+void mpq_mat_column_to_poly(mpz_poly_ptr f, mpz_ptr lcm, mpq_mat_srcptr M, const unsigned int j);
 
 /* multiplication */
 void mpz_mat_mul(mpz_mat_ptr D, mpz_mat_srcptr A, mpz_mat_srcptr B);
 void mpz_mat_mul_mod_ui(mpz_mat_ptr D, mpz_mat_srcptr A, mpz_mat_srcptr B, unsigned long p);
 void mpz_mat_mul_mpz(mpz_mat_ptr C, mpz_mat_srcptr A, mpz_ptr k);
+void mpz_mat_divexact_mpz(mpz_mat_ptr B, mpz_mat_srcptr A, mpz_srcptr k);
+void mpz_mat_divexact_ui(mpz_mat_ptr B, mpz_mat_srcptr A, unsigned long k);
 void mpz_mat_mul_si(mpz_mat_ptr C, mpz_mat_srcptr A, long k);
 void mpz_mat_mul_ui(mpz_mat_ptr C, mpz_mat_srcptr A, unsigned long k);
 // Returns A^n for n >= 2 ; assume A is a square matrix ; it's possible to use the same variable for A and B, but you lose the contents of A
@@ -167,7 +168,8 @@ void mpq_mat_div_ui(mpq_mat_ptr C, mpq_mat_srcptr A, unsigned long k);
 void mpq_mat_div_mpz(mpq_mat_ptr C, mpq_mat_srcptr A, mpz_srcptr k);
 void mpz_mat_add(mpz_mat_ptr D, mpz_mat_srcptr A, mpz_mat_srcptr B);
 void mpq_mat_add(mpq_mat_ptr D, mpq_mat_srcptr A, mpq_mat_srcptr B);
-/* XXX what does that do ??? */
+void mpz_mat_sub(mpz_mat_ptr D, mpz_mat_srcptr A, mpz_mat_srcptr B);
+void mpq_mat_sub(mpq_mat_ptr D, mpq_mat_srcptr A, mpq_mat_srcptr B);
 void mpz_poly_eval_mpz_mat(mpz_mat_ptr D, mpz_mat_srcptr M, mpz_poly_srcptr f);
 void mpz_poly_eval_mpz_mat_mod_ui(mpz_mat_ptr D, mpz_mat_srcptr M, mpz_poly_srcptr f, unsigned long p);
 

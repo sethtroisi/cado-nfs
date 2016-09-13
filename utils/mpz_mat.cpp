@@ -527,6 +527,47 @@ void mpz_mat_mod_mpz(mpz_mat_ptr dst, mpz_mat_srcptr src, mpz_srcptr p)/*{{{*/
         }
     }
 }/*}}}*/
+
+int mpz_mat_p_valuation(mpz_mat_srcptr A, mpz_srcptr p)
+{
+    int val = INT_MAX;
+    mpz_t c;
+    mpz_init(c);
+    for (unsigned int i = 0 ; val && i < A->m ; i++){
+        for (unsigned int j = 0 ; val && j < A->n ; j++){
+            int v = 0;
+            mpz_srcptr aij = mpz_mat_entry_const(A, i, j);
+            if (mpz_size(aij) == 0) continue;
+            mpz_set(c, aij);
+            for( ; v < val && mpz_divisible_p(c, p) ; v++)
+                mpz_fdiv_q(c, c, p);
+            val = v;
+        }
+    }
+    mpz_clear(c);
+    return val;
+}
+
+int mpz_mat_p_valuation_ui(mpz_mat_srcptr A, unsigned long p)
+{
+    int val = INT_MAX;
+    mpz_t c;
+    mpz_init(c);
+    for (unsigned int i = 0 ; val && i < A->m ; i++){
+        for (unsigned int j = 0 ; val && j < A->n ; j++){
+            int v = 0;
+            mpz_srcptr aij = mpz_mat_entry_const(A, i, j);
+            if (mpz_size(aij) == 0) continue;
+            mpz_set(c, aij);
+            for( ; v < val && mpz_divisible_ui_p(c, p) ; v++)
+                mpz_fdiv_q_ui(c, c, p);
+            val = v;
+        }
+    }
+    mpz_clear(c);
+    return val;
+}
+
 /*}}}*/
 
 /* {{{ row-level operations (for Gauss and friends, mostly) */
@@ -1035,6 +1076,25 @@ void mpz_mat_mul_mpz(mpz_mat_ptr B, mpz_mat_srcptr A, mpz_ptr k)/*{{{*/
     for(unsigned int i = 0 ; i < B->m ; i++) {
         for(unsigned int j = 0 ; j < B->n ; j++) {
             mpz_mul(mpz_mat_entry(B, i, j),mpz_mat_entry_const(A,i,j),k);
+        }
+    }
+}/*}}}*/
+
+void mpz_mat_divexact_mpz(mpz_mat_ptr B, mpz_mat_srcptr A, mpz_ptr k)/*{{{*/
+{
+    mpz_mat_realloc(B,A->m,A->n);       /* no-op if A == B */
+    for(unsigned int i = 0 ; i < B->m ; i++) {
+        for(unsigned int j = 0 ; j < B->n ; j++) {
+            mpz_divexact(mpz_mat_entry(B, i, j),mpz_mat_entry_const(A,i,j),k);
+        }
+    }
+}/*}}}*/
+void mpz_mat_divexact_ui(mpz_mat_ptr B, mpz_mat_srcptr A, unsigned long k)/*{{{*/
+{
+    mpz_mat_realloc(B,A->m,A->n);       /* no-op if A == B */
+    for(unsigned int i = 0 ; i < B->m ; i++) {
+        for(unsigned int j = 0 ; j < B->n ; j++) {
+            mpz_divexact_ui(mpz_mat_entry(B, i, j),mpz_mat_entry_const(A,i,j),k);
         }
     }
 }/*}}}*/
@@ -1834,7 +1894,7 @@ ostream& operator<<(ostream& os, cxx_mpz_mat const& M)/*{{{*/
             if (j) os << " ";
             os << mpz_mat_entry_const(M, i, j);
         }
-        if (i < M->m) os << "\n";
+        if (i < M->m - 1) os << "\n";
     }
     return os;
 }
@@ -1846,7 +1906,7 @@ ostream& operator<<(ostream& os, cxx_mpq_mat const& M)/*{{{*/
             if (j) os << " ";
             os << mpq_mat_entry_const(M, i, j);
         }
-        if (i < M->m) os << "\n";
+        if (i < M->m - 1) os << "\n";
     }
     return os;
 }

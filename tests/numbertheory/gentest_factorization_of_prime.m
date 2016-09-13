@@ -17,7 +17,7 @@ for i in [1..100] do
         Bz:=Matrix(Integers(),B*Bd);
         O`Maximal:=true;
         Fp:=Factorization(ideal<O|p>);
-        print Degree(f), ps(Eltseq(f));
+        print ps(Eltseq(f));
         iprint:=function(Im)
             I,m:=Explode(Im);
             MI:=BasisMatrix(I);
