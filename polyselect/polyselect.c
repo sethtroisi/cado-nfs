@@ -58,6 +58,7 @@ double potential_collisions = 0.0, aver_raw_lognorm = 0.0,
 #define LOGNORM_MAX 999.99
 double min_raw_lognorm = LOGNORM_MAX, max_raw_lognorm = 0.0;
 data_t data_opt_lognorm, data_exp_E, data_beta, data_eta;
+data_t raw_proj_alpha, opt_proj_alpha;
 unsigned long collisions = 0;
 unsigned long collisions_good = 0;
 double *best_opt_logmu, *best_exp_E;
@@ -215,9 +216,15 @@ print_poly_info ( char *buf,
   G->deg = 1;
 
   if (raw_option)
-    sprintf (buf, "# Raw polynomial:\n");
+    {
+      sprintf (buf, "# Raw polynomial:\n");
+      data_add (raw_proj_alpha, get_biased_alpha_projective (F, ALPHA_BOUND));
+    }
   else
-    sprintf (buf, "# Size-optimized polynomial:\n");
+    {
+      sprintf (buf, "# Size-optimized polynomial:\n");
+      data_add (opt_proj_alpha, get_biased_alpha_projective (F, ALPHA_BOUND));
+    }
 
   gmp_sprintf (buf+strlen(buf), "%sn: %Zd\n", prefix, n);
   gmp_sprintf (buf+strlen(buf), "%sY1: %Zd\n%sY0: %Zd\n", prefix, g[1], prefix, g[0]);
@@ -1930,6 +1937,8 @@ main (int argc, char *argv[])
   data_init (data_exp_E);
   data_init (data_beta);
   data_init (data_eta);
+  data_init (raw_proj_alpha);
+  data_init (opt_proj_alpha);
 
   /* read params */
   param_list pl;
@@ -2119,6 +2128,8 @@ main (int argc, char *argv[])
           printf ("# Stat: raw lognorm (nr/min/av/max/std): %lu/%1.2f/%1.2f/%1.2f/%1.2f\n",
                   collisions, min_raw_lognorm, rawmean, max_raw_lognorm,
                   sqrt (var_raw_lognorm / collisions - rawmean * rawmean));
+          printf ("# Stat: raw proj. alpha (nr/min/av/max/std): %lu/%1.3f/%1.3f/%1.3f/%1.3f\n",
+                  collisions, raw_proj_alpha->min, data_mean (raw_proj_alpha), raw_proj_alpha->max, sqrt (data_var (raw_proj_alpha)));
           if (collisions_good > 0)
             {
               double mean = data_mean (data_opt_lognorm);
@@ -2126,6 +2137,8 @@ main (int argc, char *argv[])
               printf ("# Stat: optimized lognorm (nr/min/av/max/std): %lu/%1.2f/%1.2f/%1.2f/%1.2f\n",
                       collisions_good, data_opt_lognorm->min, mean, data_opt_lognorm->max,
                       sqrt (data_var (data_opt_lognorm)));
+              printf ("# Stat: opt proj. alpha (nr/min/av/max/std): %lu/%1.3f/%1.3f/%1.3f/%1.3f\n",
+                  collisions_good, opt_proj_alpha->min, data_mean (opt_proj_alpha), opt_proj_alpha->max, sqrt (data_var (opt_proj_alpha)));
               printf ("# Stat: exp_E (nr/min/av/max/std): %lu/%1.2f/%1.2f/%1.2f/%1.2f\n",
                       collisions_good, data_exp_E->min, Emean,
                       data_exp_E->max, sqrt (data_var (data_exp_E)));
@@ -2175,6 +2188,8 @@ main (int argc, char *argv[])
   data_clear (data_exp_E);
   data_clear (data_beta);
   data_clear (data_eta);
+  data_clear (raw_proj_alpha);
+  data_clear (opt_proj_alpha);
 
   return 0;
 }
