@@ -1446,6 +1446,9 @@ collision_on_sq (header_t header, proots_t R, unsigned long c )
   if (k < 1)
     k = 1;
 
+  /* If all factors in sq have d roots, then a single special-q is enough.
+     Otherwise, we consider special-q's from combinations of k primes among lq,
+     so that the total number of combinations is at least nq. */
   for (lq = k; number_comb (SQ_R, k, lq) < (unsigned long) nq &&
          lq < SQ_R->size; lq++);
 
@@ -2108,6 +2111,11 @@ main (int argc, char *argv[])
   /* if admin = 0, start from incr */
   if (mpz_cmp_ui (admin, 0) == 0)
     mpz_set_ui (admin, incr);
+
+  /* admin should be a non-zero multiple of 'incr', since when the global
+     [admin, admax] range is cut by cado-nfs.py between different workunits,
+     some bounds might no longer be multiple of 'incr'. */
+  mpz_add_ui (admin, admin, (incr - mpz_fdiv_ui (admin, incr)) % incr);
 
   int i;
   for (i = 0; i < nthreads; i++)
