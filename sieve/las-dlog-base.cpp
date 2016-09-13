@@ -53,8 +53,10 @@ las_dlog_base::~las_dlog_base()
 }
 
 bool las_dlog_base::is_known(int side, uint64_t p, uint64_t r) const {
+    // if p is above large prime bound,  its log is not known.
+    if (lpb[side] >= 64)
+        return false;
     if (p >> lpb[side]) {
-        ASSERT(lpb[side] < 64); /* otherwise the shift above returns garbage */
         return false;
     }
     if (renumberfilename) {
