@@ -33,7 +33,7 @@ int main(int argc, char *argv[])
        mpq_mat_urandomm(M, state, p);
        mpq_mat_fprint(stdout, M);
        printf("\n");
-       mpq_gauss_backend(M, T);
+       mpq_mat_gauss_backend(M, T);
        mpq_mat_fprint(stdout, M);
        printf("\n");
        mpq_mat_fprint(stdout, T);
@@ -45,7 +45,7 @@ int main(int argc, char *argv[])
        mpz_mat_urandomm(Mz, state, p);
        mpz_mat_fprint(stdout, Mz);
        printf("\n");
-       mpz_gauss_backend_mod(Mz, Tz, p);
+       mpz_mat_gauss_backend_mod(Mz, Tz, p);
        mpz_mat_fprint(stdout, Mz);
        printf("\n");
        mpz_mat_fprint(stdout, Tz);
@@ -58,7 +58,7 @@ int main(int argc, char *argv[])
        mpz_mat_urandomm(Mz, state, p);
        mpz_mat_fprint(stdout, Mz); printf("\n");
        double t = seconds();
-       mpz_hnf_backend(Mz, Tz);
+       mpz_mat_hnf_backend(Mz, Tz);
        t = seconds()-t;
        mpz_mat_fprint(stdout, Mz); printf("\n");
        mpz_mat_fprint(stdout, Tz); printf("\n");

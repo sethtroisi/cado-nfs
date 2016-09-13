@@ -118,7 +118,7 @@ void mpz_mat_submat_set(
     }
 }
 
-void mpz_mat_swap(mpz_mat_ptr A, mpz_mat_ptr B)
+void mpq_mat_swap(mpz_mat_ptr A, mpz_mat_ptr B)
 {
     mpz_mat C;
     memcpy(C, A, sizeof(mpz_mat));
@@ -162,6 +162,14 @@ void mpq_mat_submat_set(
     }
 }
 
+void mpz_mat_swap(mpz_mat_ptr A, mpz_mat_ptr B)
+{
+    mpz_mat C;
+    memcpy(C, A, sizeof(mpz_mat));
+    memcpy(A, B, sizeof(mpz_mat));
+    memcpy(B, C, sizeof(mpz_mat));
+}
+
 void mpq_mat_swap(mpq_mat_ptr A, mpq_mat_ptr B)
 {
     mpq_mat C;
@@ -188,6 +196,32 @@ void mpz_mat_set_ui(mpz_mat_ptr M, unsigned long a)
     for(unsigned int i = 0 ; i < M->m ; i++)
         for(unsigned int j = 0 ; j < M->n ; j++)
             mpz_set_ui(mpz_mat_entry(M, i, j), i == j ? a : 0);
+}
+
+void mpz_mat_set_z(mpz_mat_ptr M, mpz_srcptr a)
+{
+    ASSERT_ALWAYS(M->m == M->n);
+    for(unsigned int i = 0 ; i < M->m ; i++) {
+        mpz_set(mpz_mat_entry(M, i, i), a);
+    }
+}
+
+void mpz_mat_add_ui(mpz_mat_ptr M, unsigned long a)
+{
+    ASSERT_ALWAYS(M->m == M->n);
+    for(unsigned int i = 0 ; i < M->m ; i++) {
+        mpz_ptr mii = mpz_mat_entry(M, i, i);
+        mpz_add_ui(mii, mii, a);
+    }
+}
+
+void mpz_mat_add_z(mpz_mat_ptr M, mpz_srcptr a)
+{
+    ASSERT_ALWAYS(M->m == M->n);
+    for(unsigned int i = 0 ; i < M->m ; i++) {
+        mpz_ptr mii = mpz_mat_entry(M, i, i);
+        mpz_add(mii, mii, a);
+    }
 }
 
 void mpq_mat_set_ui(mpq_mat_ptr M, unsigned long a)
@@ -230,6 +264,14 @@ void mpq_mat_urandomm(mpq_mat_ptr M, gmp_randstate_t state, mpz_srcptr p)
 /*{{{ Joining matrices */
 void mpz_mat_vertical_join(mpz_mat_ptr N, mpz_mat_srcptr M1, mpz_mat_srcptr M2)
 {
+    if (N == M1 || N == M2) {
+        mpz_mat Nx;
+        mpz_mat_init(Nx, 0, 0);
+        mpz_mat_vertical_join(Nx, M1, M2);
+        mpz_mat_swap(Nx, N);
+        mpz_mat_clear(Nx);
+        return;
+    }
     ASSERT_ALWAYS(M1->n == M2->n);
     mpz_mat_realloc(N,M1->m+M2->m,M1->n);
     mpz_mat_submat_set(N,0,0,M1,0,0,M1->m,M1->n);
@@ -237,6 +279,14 @@ void mpz_mat_vertical_join(mpz_mat_ptr N, mpz_mat_srcptr M1, mpz_mat_srcptr M2)
 }
 void mpq_mat_vertical_join(mpq_mat_ptr N, mpq_mat_srcptr M1, mpq_mat_srcptr M2)
 {
+    if (N == M1 || N == M2) {
+        mpq_mat Nx;
+        mpq_mat_init(Nx, 0, 0);
+        mpq_mat_vertical_join(Nx, M1, M2);
+        mpq_mat_swap(Nx, N);
+        mpq_mat_clear(Nx);
+        return;
+    }
     ASSERT_ALWAYS(M1->n == M2->n);
     mpq_mat_realloc(N,M1->m+M2->m,M1->n);
     mpq_mat_submat_set(N,0,0,M1,0,0,M1->m,M1->n);
@@ -244,6 +294,14 @@ void mpq_mat_vertical_join(mpq_mat_ptr N, mpq_mat_srcptr M1, mpq_mat_srcptr M2)
 }
 void mpz_mat_horizontal_join(mpz_mat_ptr N, mpz_mat_srcptr M1, mpz_mat_srcptr M2)
 {
+    if (N == M1 || N == M2) {
+        mpz_mat Nx;
+        mpz_mat_init(Nx, 0, 0);
+        mpz_mat_horizontal_join(Nx, M1, M2);
+        mpz_mat_swap(Nx, N);
+        mpz_mat_clear(Nx);
+        return;
+    }
     ASSERT_ALWAYS(M1->m == M2->m);
     mpz_mat_realloc(N,M1->m,M1->n + M2->n);
     mpz_mat_submat_set(N,0,0,M1,0,0,M1->m,M1->n);
@@ -251,6 +309,14 @@ void mpz_mat_horizontal_join(mpz_mat_ptr N, mpz_mat_srcptr M1, mpz_mat_srcptr M2
 }
 void mpq_mat_horizontal_join(mpq_mat_ptr N, mpq_mat_srcptr M1, mpq_mat_srcptr M2)
 {
+    if (N == M1 || N == M2) {
+        mpq_mat Nx;
+        mpq_mat_init(Nx, 0, 0);
+        mpq_mat_horizontal_join(Nx, M1, M2);
+        mpq_mat_swap(Nx, N);
+        mpq_mat_clear(Nx);
+        return;
+    }
     ASSERT_ALWAYS(M1->m == M2->m);
     mpq_mat_realloc(N,M1->m,M1->n + M2->n);
     mpq_mat_submat_set(N,0,0,M1,0,0,M1->m,M1->n);
@@ -286,6 +352,14 @@ void mpz_mat_transpose(mpz_mat_ptr D, mpz_mat_srcptr M)/*{{{*/
                 mpz_set(dji, mij);
             }
         }
+    } else if (M->m != M->n) {
+        /* transpose a rectangular matrix in place. Rather annoying to do
+         * with real swaps, right ? */
+        mpz_mat Mc;
+        mpz_mat_init(Mc, 0, 0);
+        mpz_mat_set(Mc, M);
+        mpz_mat_transpose(D, Mc);
+        mpz_mat_clear(Mc);
     } else {
         for(unsigned int i = 0 ; i < M->m ; i++){
             for(unsigned int j = i + 1 ; j < M->n ; j++){
@@ -353,6 +427,14 @@ void mpq_mat_transpose(mpq_mat_ptr D, mpq_mat_srcptr M)/*{{{*/
                 mpq_set(dji, mij);
             }
         }
+    } else if (M->m != M->n) {
+        /* transpose a rectangular matrix in place. Rather annoying to do
+         * with real swaps, right ? */
+        mpq_mat Mc;
+        mpq_mat_init(Mc, 0, 0);
+        mpq_mat_set(Mc, M);
+        mpq_mat_transpose(D, Mc);
+        mpq_mat_clear(Mc);
     } else {
         for(unsigned int i = 0 ; i < M->m ; i++){
             for(unsigned int j = i + 1 ; j < M->n ; j++){
@@ -873,11 +955,18 @@ void mpq_mat_sub(mpq_mat_ptr C, mpq_mat_srcptr A, mpq_mat_srcptr B)/*{{{*/
 /*}}}*/
 /*}}}*/
 /*{{{ multiplication */
-void mpz_mat_mul(mpz_mat_ptr D, mpz_mat_srcptr A, mpz_mat_srcptr B)/*{{{*/
+void mpz_mat_mul(mpz_mat_ptr C, mpz_mat_srcptr A, mpz_mat_srcptr B)/*{{{*/
 {
     ASSERT_ALWAYS(A->n == B->m);
-    mpz_mat C;
-    mpz_mat_init(C, A->m, B->n);
+    if (C == A || C == B) {
+        mpz_mat D;
+        mpz_mat_init(D, A->m, B->n);
+        mpz_mat_mul(D, A, B);
+        mpz_mat_swap(D, C);
+        mpz_mat_clear(D);
+        return;
+    }
+    mpz_mat_realloc(C, A->m, B->n);
     for(unsigned int i = 0 ; i < A->m ; i++) {
         for(unsigned int j = 0 ; j < B->n ; j++) {
             mpz_set_ui(mpz_mat_entry(C, i, j), 0);
@@ -888,16 +977,20 @@ void mpz_mat_mul(mpz_mat_ptr D, mpz_mat_srcptr A, mpz_mat_srcptr B)/*{{{*/
             }
         }
     }
-    mpz_mat_realloc(D, A->m, B->n);
-    mpz_mat_set(D,C);
-    mpz_mat_clear(C);
 }/*}}}*/
 
-void mpz_mat_mul_mod_ui(mpz_mat_ptr D, mpz_mat_srcptr A, mpz_mat_srcptr B, unsigned long p)/*{{{*/
+void mpz_mat_mul_mod_ui(mpz_mat_ptr C, mpz_mat_srcptr A, mpz_mat_srcptr B, unsigned long p)/*{{{*/
 {
     ASSERT_ALWAYS(A->n == B->m);
-    mpz_mat C;
-    mpz_mat_init(C, A->m, B->n);
+    if (C == A || C == B) {
+        mpz_mat D;
+        mpz_mat_init(D, A->m, B->n);
+        mpz_mat_mul_mod_ui(D, A, B, p);
+        mpz_mat_swap(D, C);
+        mpz_mat_clear(D);
+        return;
+    }
+    mpz_mat_realloc(C, A->m, B->n);
     for(unsigned int i = 0 ; i < A->m ; i++) {
         for(unsigned int j = 0 ; j < B->n ; j++) {
             mpz_set_ui(mpz_mat_entry(C, i, j), 0);
@@ -909,15 +1002,20 @@ void mpz_mat_mul_mod_ui(mpz_mat_ptr D, mpz_mat_srcptr A, mpz_mat_srcptr B, unsig
         }
     }
     mpz_mat_mod_ui(C,C,p);
-    mpz_mat_realloc(D, A->m, B->n);
-    mpz_mat_set(D,C);
-    mpz_mat_clear(C);
 }/*}}}*/
-void mpz_mat_mul_mod_mpz(mpz_mat_ptr D, mpz_mat_srcptr A, mpz_mat_srcptr B, mpz_srcptr p)/*{{{*/
+
+void mpz_mat_mul_mod_mpz(mpz_mat_ptr C, mpz_mat_srcptr A, mpz_mat_srcptr B, mpz_srcptr p)/*{{{*/
 {
     ASSERT_ALWAYS(A->n == B->m);
-    mpz_mat C;
-    mpz_mat_init(C, A->m, B->n);
+    if (C == A || C == B) {
+        mpz_mat D;
+        mpz_mat_init(D, A->m, B->n);
+        mpz_mat_mul_mod_mpz(D, A, B, p);
+        mpz_mat_swap(D, C);
+        mpz_mat_clear(D);
+        return;
+    }
+    mpz_mat_realloc(C, A->m, B->n);
     for(unsigned int i = 0 ; i < A->m ; i++) {
         for(unsigned int j = 0 ; j < B->n ; j++) {
             mpz_set_ui(mpz_mat_entry(C, i, j), 0);
@@ -929,9 +1027,6 @@ void mpz_mat_mul_mod_mpz(mpz_mat_ptr D, mpz_mat_srcptr A, mpz_mat_srcptr B, mpz_
         }
     }
     mpz_mat_mod_mpz(C,C,p);
-    mpz_mat_realloc(D, A->m, B->n);
-    mpz_mat_set(D,C);
-    mpz_mat_clear(C);
 }/*}}}*/
 
 void mpz_mat_mul_mpz(mpz_mat_ptr B, mpz_mat_srcptr A, mpz_ptr k)/*{{{*/
@@ -965,30 +1060,33 @@ void mpz_mat_mul_ui(mpz_mat_ptr B, mpz_mat_srcptr A, unsigned long k)/*{{{*/
 }/*}}}*/
 
 
-void mpq_mat_mul(mpq_mat_ptr D, mpq_mat_srcptr A, mpq_mat_srcptr B)/*{{{*/
+void mpq_mat_mul(mpq_mat_ptr C, mpq_mat_srcptr A, mpq_mat_srcptr B)/*{{{*/
 {
     ASSERT_ALWAYS(A->n == B->m);
     mpq_t z;
     mpq_init(z);
-    mpq_mat C;
-    mpq_mat_init(C, A->m, B->n);
+    if (C == A || C == B) {
+        mpq_mat D;
+        mpq_mat_init(D, A->m, B->n);
+        mpq_mat_mul(D, A, B);
+        mpq_mat_swap(D, C);
+        mpq_mat_clear(D);
+        return;
+    }
+    mpq_mat_realloc(C, A->m, B->n);
     for(unsigned int i = 0 ; i < A->m ; i++) {
         for(unsigned int j = 0 ; j < B->n ; j++) {
-            mpq_set_ui(mpq_mat_entry(C, i, j), 0, 1);
+            mpq_ptr cij = mpq_mat_entry(C, i, j);
+            mpq_set_ui(cij, 0, 1);
             for(unsigned int k = 0 ; k < B->m ; k++) {
-                mpq_mul(z,
-                        mpq_mat_entry_const(A, i, k),
-                        mpq_mat_entry_const(B, k, j));
-                mpq_add(mpq_mat_entry(C, i, j),
-                        mpq_mat_entry(C, i, j),
-                        z);
+                mpq_srcptr aik = mpq_mat_entry_const(A, i, k);
+                mpq_srcptr bkj = mpq_mat_entry_const(B, k, j);
+                mpq_mul(z, aik, bkj);
+                mpq_add(cij, cij, z);
             }
-            mpq_canonicalize(mpq_mat_entry(C,i,j));
+            mpq_canonicalize(cij);
         }
     }
-    mpq_mat_realloc(D,A->m,B->n);
-    mpq_mat_set(D,C);
-    mpq_mat_clear(C);
     mpq_clear(z);
 }/*}}}*/
 
@@ -1197,71 +1295,58 @@ void mpz_mat_pow_ui_mod_mpz(mpz_mat_ptr B, mpz_mat_srcptr A, unsigned long n, mp
 }/*}}}*/
 /*}}}*/
 /* {{{ polynomial evaluation */
-/* TODO: Horner ! */
+
 void mpz_poly_eval_mpz_mat(mpz_mat_ptr D, mpz_mat_srcptr M, mpz_poly_srcptr f)/*{{{*/
 {
     ASSERT_ALWAYS(M->m == M->n);
     unsigned int n = M->n;
     int d = f->deg;
-    mpz_mat total, current_power;
-    mpz_mat_init(total,n,n);
-    mpz_mat_init(current_power,n,n);
-    mpz_mat_set_ui(current_power,1);
-    
-    for (int i = 0 ; i <= d ; i++) {
-        mpz_mat current_term;
-        mpz_mat_init(current_term,n,n);
-        mpz_t aux;
-        mpz_init(aux);
-        
-        mpz_poly_getcoeff(aux,i,f);
-        mpz_mat_mul_mpz(current_term,current_power,aux);
-        mpz_mat_add(total,total,current_term);
-        mpz_mat_mul(current_power,current_power,M);
-        
-        mpz_clear(aux);
-        mpz_mat_clear(current_term);
-        
+    if (d < 0) {
+        mpz_mat_realloc(D, n, n);
+        mpz_mat_set_ui(D, 0);
+        return;
     }
-    
-    mpz_mat_set(D,total);
-    mpz_mat_clear(current_power);
-    mpz_mat_clear(total);
+    if (D == M) {
+        mpz_mat X;
+        mpz_mat_init(X, 0, 0);
+        mpz_poly_eval_mpz_mat(X, M, f);
+        mpz_mat_swap(D, X);
+        mpz_mat_clear(X);
+        return;
+    }
+    mpz_mat_realloc(D, n, n);
+    mpz_mat_set_z(D, f->coeff[f->deg]);
+    for(int i = f->deg - 1 ; i >= 0 ; i--) {
+        mpz_mat_mul(D, M, D);
+        mpz_mat_add_z(D, f->coeff[i]);
+    }
 }
 /*}}}*/
-/* TODO: Horner ! */
 void mpz_poly_eval_mpz_mat_mod_ui(mpz_mat_ptr D, mpz_mat_srcptr M, mpz_poly_srcptr f, unsigned long p)/*{{{*/
 {
     ASSERT_ALWAYS(M->m == M->n);
     unsigned int n = M->n;
     int d = f->deg;
-    mpz_mat total, current_power;
-    mpz_mat_init(total,n,n);
-    mpz_mat_init(current_power,n,n);
-    mpz_mat_set_ui(current_power,1);
-    
-    for (int i = 0 ; i <= d ; i++) {
-        mpz_mat current_term;
-        mpz_mat_init(current_term,n,n);
-        mpz_t aux;
-        mpz_init(aux);
-        
-        mpz_poly_getcoeff(aux,i,f);
-        mpz_mat_mul_mpz(current_term,current_power,aux);
-        mpz_mat_add(total,total,current_term);
-        mpz_mat_mul(current_power,current_power,M);
-        
-        mpz_clear(aux);
-        mpz_mat_clear(current_term);
-        
-        mpz_mat_mod_ui(total,total,p);
-        mpz_mat_mod_ui(current_power,current_power,p);
-        
+    if (d < 0) {
+        mpz_mat_realloc(D, n, n);
+        mpz_mat_set_ui(D, 0);
+        return;
     }
-    
-    mpz_mat_set(D,total);
-    mpz_mat_clear(current_power);
-    mpz_mat_clear(total);
+    if (D == M) {
+        mpz_mat X;
+        mpz_mat_init(X, 0, 0);
+        mpz_poly_eval_mpz_mat_mod_ui(X, M, f, p);
+        mpz_mat_swap(D, X);
+        mpz_mat_clear(X);
+        return;
+    }
+    mpz_mat_realloc(D, n, n);
+    mpz_mat_set_ui(D, mpz_fdiv_ui(f->coeff[f->deg], p));
+    for(int i = f->deg - 1 ; i >= 0 ; i--) {
+        mpz_mat_mul_mod_ui(D, M, D, p);
+        mpz_mat_add_ui(D, mpz_fdiv_ui(f->coeff[i], p));
+        mpz_mat_mod_ui(D, D, p);
+    }
 }
 /*}}}*/
 /*}}}*/
@@ -1274,10 +1359,11 @@ void mpz_poly_eval_mpz_mat_mod_ui(mpz_mat_ptr D, mpz_mat_srcptr M, mpz_poly_srcp
  * this works reasonably well over Fp, but for rationals we suffer from
  * coefficient blowup.
  */
-void mpq_gauss_backend(mpq_mat_ptr M, mpq_mat_ptr T)
+void mpq_mat_gauss_backend(mpq_mat_ptr M, mpq_mat_ptr T)
 {
     unsigned int m = M->m;
     unsigned int n = M->n;
+    ASSERT_ALWAYS(M != T);
     mpq_mat_realloc(T, m, m);
     mpq_mat_set_ui(T, 1);
     unsigned int rank = 0;
@@ -1326,10 +1412,11 @@ void mpq_gauss_backend(mpq_mat_ptr M, mpq_mat_ptr T)
  * T may be NULL in case we don't give a penny about the transformation
  * matrix.
  */
-void mpz_gauss_backend_mod(mpz_mat_ptr M, mpz_mat_ptr T, mpz_srcptr p)
+void mpz_mat_gauss_backend_mod(mpz_mat_ptr M, mpz_mat_ptr T, mpz_srcptr p)
 {
     unsigned int m = M->m;
     unsigned int n = M->n;
+    ASSERT_ALWAYS(M != T);
     if (T) mpz_mat_realloc(T, m, m);
     if (T) mpz_mat_set_ui(T, 1);
     unsigned int rank = 0;
@@ -1380,11 +1467,11 @@ void mpz_gauss_backend_mod(mpz_mat_ptr M, mpz_mat_ptr T, mpz_srcptr p)
 }
 /* }}} */
 
-void mpz_gauss_backend_mod_ui(mpz_mat_ptr M, mpz_mat_ptr T, unsigned long p)
+void mpz_mat_gauss_backend_mod_ui(mpz_mat_ptr M, mpz_mat_ptr T, unsigned long p)
 {
     mpz_t pz;
     mpz_init_set_ui(pz, p);
-    mpz_gauss_backend_mod(M, T, pz);
+    mpz_mat_gauss_backend_mod(M, T, pz);
     mpz_clear(pz);
 }
 
@@ -1478,12 +1565,12 @@ static void sort_heap_inverse(unsigned int * heap, unsigned int n, cmp_t cmp, vo
  * than 30*30, in which case it's sufficient.
  */
 /*{{{ hnf helper algorithm (for column matrices) */
-struct mpz_hnf_helper_heap_aux {
+struct mpz_mat_hnf_helper_heap_aux {
     double * dd;
     mpz_mat_ptr A;
 };
 
-static int mpz_hnf_helper_heap_aux_cmp(struct mpz_hnf_helper_heap_aux * data, unsigned int a, unsigned int b)
+static int mpz_mat_hnf_helper_heap_aux_cmp(struct mpz_mat_hnf_helper_heap_aux * data, unsigned int a, unsigned int b)
 {
     /* The heap will have the largest elements on top according to this
      * measure. Thus the comparison on the ->a field must be as per
@@ -1516,9 +1603,10 @@ static int mpz_hnf_helper_heap_aux_cmp(struct mpz_hnf_helper_heap_aux * data, un
  *
  * return +1 or -1 which is the determinant of T.
  */
-static int mpz_hnf_helper(mpz_mat_ptr T, mpz_mat_ptr dT, mpz_ptr * a, unsigned int n0, unsigned int n)
+static int mpz_mat_hnf_helper(mpz_mat_ptr T, mpz_mat_ptr dT, mpz_ptr * a, unsigned int n0, unsigned int n)
 {
     int signdet=1;
+    ASSERT_ALWAYS(dT != T);
     mpz_mat_realloc(dT, n, n);
     mpz_mat_set_ui(dT, 1);
 
@@ -1530,10 +1618,10 @@ static int mpz_hnf_helper(mpz_mat_ptr T, mpz_mat_ptr dT, mpz_ptr * a, unsigned i
     mpz_init(q);
     mpz_init(r2);
     unsigned int * heap = (unsigned int *) malloc(n * sizeof(unsigned int));
-    struct mpz_hnf_helper_heap_aux cmpdata[1];
+    struct mpz_mat_hnf_helper_heap_aux cmpdata[1];
     cmpdata->A = A;
     cmpdata->dd = (double*) malloc(n * sizeof(double));
-    cmp_t cmp = (cmp_t) &mpz_hnf_helper_heap_aux_cmp;
+    cmp_t cmp = (cmp_t) &mpz_mat_hnf_helper_heap_aux_cmp;
     for(unsigned int i = 0 ; i < n ; i++) {
         mpz_ptr Ai = mpz_mat_entry(A, i, 0);
         mpz_set(Ai, a[i]);
@@ -1624,7 +1712,7 @@ void mpz_gcd_many(mpz_mat_ptr dT, mpz_ptr * a, unsigned int n)
     mpz_mat T;
     mpz_mat_init(T, n, n);
     mpz_mat_set_ui(T, 1);
-    mpz_hnf_helper(T, dT, a, 0, n);
+    mpz_mat_hnf_helper(T, dT, a, 0, n);
     mpz_mat_clear(T);
 }
 /*}}}*/
@@ -1632,13 +1720,16 @@ void mpz_gcd_many(mpz_mat_ptr dT, mpz_ptr * a, unsigned int n)
 
 /* return +1 or -1, which is the determinant of the transformation matrix
  * T */
-int mpz_hnf_backend(mpz_mat_ptr M, mpz_mat_ptr T)
+int mpz_mat_hnf_backend(mpz_mat_ptr M, mpz_mat_ptr T)
 {
     ASSERT_ALWAYS(M != T);
-    /* Warning ; for this to work, we need to have extra blank rows in M
-     * and T, so we require on input M and T to be overallocated (twice
-     * as many rows).
-     */
+    if (T == NULL) {
+        mpz_mat xT;
+        mpz_mat_init(xT,0,0);
+        int r = mpz_mat_hnf_backend(M, xT);
+        mpz_mat_clear(xT);
+        return r;
+    }
     int signdet = 1;
     unsigned int m = M->m;
     unsigned int n = M->n;
@@ -1656,7 +1747,7 @@ int mpz_hnf_backend(mpz_mat_ptr M, mpz_mat_ptr T)
         for(unsigned int i = 0 ; i < m ; i++) {
             colm[i] = mpz_mat_entry(M, i, j);
         }
-        signdet *= mpz_hnf_helper(T, dT, colm, rank, m);
+        signdet *= mpz_mat_hnf_helper(T, dT, colm, rank, m);
 
         /* apply dT to the submatrix of size m * (n - 1 - j) of M */
         mpz_mat_realloc(Mx, m, n - 1 - j);
@@ -1679,7 +1770,11 @@ int mpz_hnf_backend(mpz_mat_ptr M, mpz_mat_ptr T)
 }
 /* }}} */
 /*{{{ kernel*/
-// This is supposed to compute the Kernel of M mod p and to store it in the matrix K. If r is the rank of M, and M is a square matrix n*n, K is a n*(n-r) matrix
+// This is supposed to compute the Kernel of M mod p and to store it in
+// the matrix K. If r is the rank of M, and M is a square matrix n*n, K
+// is a n*(n-r) matrix
+// 
+// self-assignment is ok.
 void mpz_mat_kernel_mod_ui(mpz_mat_ptr K, mpz_mat_srcptr M, unsigned long p)
 {
     mpz_mat T, H;
@@ -1692,7 +1787,7 @@ void mpz_mat_kernel_mod_ui(mpz_mat_ptr K, mpz_mat_srcptr M, unsigned long p)
     mpz_mat_set(H,M);
 
     // Storing a reduced matrix of M in H with gauss
-    mpz_gauss_backend_mod(H,T,p2);
+    mpz_mat_gauss_backend_mod(H,T,p2);
 
     // Finding the rank of M and H
     r = H->m;
@@ -1706,12 +1801,11 @@ void mpz_mat_kernel_mod_ui(mpz_mat_ptr K, mpz_mat_srcptr M, unsigned long p)
     mpz_mat_realloc(K, H->m-r, H->m);
     mpz_mat_submat_swap(    K, 0, 0,
                             T, r, 0, 
-                            M->m - r, M->m);
+                            H->m - r, H->m);
 
     mpz_clear(p2);
     mpz_mat_clear(T);
     mpz_mat_clear(H);
-    
 }
 /* }}} */
 /*{{{ inversion*/
@@ -1725,7 +1819,7 @@ void mpq_mat_inv(mpq_mat_ptr dst, mpq_mat_srcptr src)
 
     /* This is self-assignment compatible (done reading src before
      * dst is touched). */
-    mpq_gauss_backend(aux,dst);
+    mpq_mat_gauss_backend(aux,dst);
 
     mpq_mat_clear(aux);
 }

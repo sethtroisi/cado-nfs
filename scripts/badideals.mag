@@ -677,6 +677,8 @@ end function;
 function factorization_of_prime2_inner(K, G, N, p, Ip, I, J)
     /* pick an element of J */
 
+    Z:=Integers();
+
     if Determinant(Matrix([Eltseq(x):x in I])*N) eq 1 then return []; end if;
     O  := Order(G);
 
@@ -742,6 +744,9 @@ function factorization_of_prime2(K, p)
 end function;
 
 function factorization_of_prime3_inner(K, G, N, p, Ip, I, J)
+    n:=Degree(K);
+    Z:=Integers();
+
     // J is an m-dimensional subspace of O/pO.
     // J is given as an m times n matrix with coordinates in GF(p)
     O := Order(G);

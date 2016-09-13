@@ -24,32 +24,32 @@ using namespace std;
 /*{{{ conversion of rows and columns to polynomials*/
 void mpz_mat_row_to_poly(mpz_poly_ptr f, mpz_mat_srcptr M, const unsigned int i)
 {
-	mpz_poly_clear(f);
-	mpz_poly_init(f,M->n-1);
-	unsigned int j;
-	for (j = 0 ; j < M->n; j++){
-		mpz_poly_setcoeff(f,j,mpz_mat_entry_const(M,i,j));
-	}
+    mpz_poly_realloc(f,M->n);
+    unsigned int j;
+    for (j = 0 ; j < M->n; j++){
+        mpz_poly_setcoeff(f,j,mpz_mat_entry_const(M,i,j));
+    }
+    mpz_poly_cleandeg(f, M->n - 1);
 }
 
 void mpz_mat_row_to_poly_rev(mpz_poly_ptr f, mpz_mat_srcptr M, const unsigned int i)
 {
-	mpz_poly_clear(f);
-	mpz_poly_init(f,M->n-1);
-	unsigned int j;
-	for (j = 0 ; j < M->n; j++){
-		mpz_poly_setcoeff(f,j,mpz_mat_entry_const(M,i,M->n-1-j));
-	}
+    mpz_poly_realloc(f,M->n);
+    unsigned int j;
+    for (j = 0 ; j < M->n; j++){
+        mpz_poly_setcoeff(f,j,mpz_mat_entry_const(M,i,M->n-1-j));
+    }
+    mpz_poly_cleandeg(f, M->n - 1);
 }
 
 void mpz_mat_column_to_poly(mpz_poly_ptr f, mpz_mat_srcptr M, const unsigned int j)
 {
-	mpz_poly_clear(f);
-	mpz_poly_init(f,M->m-1);
-	unsigned int i;
-	for (i = 0 ; i < M->m; i++){
-		mpz_poly_setcoeff(f,i,mpz_mat_entry_const(M,i,j));
-	}
+    mpz_poly_realloc(f,M->m);
+    unsigned int i;
+    for (i = 0 ; i < M->m; i++){
+        mpz_poly_setcoeff(f,i,mpz_mat_entry_const(M,i,j));
+    }
+    mpz_poly_cleandeg(f, M->m - 1);
 }
 
 void mpq_mat_row_to_poly(mpz_poly_ptr f, mpz_ptr lcm, mpq_mat_srcptr M, const unsigned int i)
@@ -82,32 +82,24 @@ void mpq_poly_to_mat_row(mpq_mat_ptr M, const unsigned int i, mpz_poly_srcptr f,
     }
 }
 
-void mpq_mat_column_to_poly(mpz_poly_ptr f, mpz_ptr denom, mpq_mat_srcptr M, const unsigned int j)
+void mpq_mat_column_to_poly(mpz_poly_ptr f, mpz_ptr lcm, mpq_mat_srcptr M, const unsigned int j)
 {
-	mpz_poly_clear(f);
-	mpz_poly_init(f,M->m-1);
-	mpz_set_si(denom,1);
-	unsigned int i;
-    for (i = 0 ; i < M->m ; i++) {
-        mpz_lcm(denom,denom,mpq_denref(mpq_mat_entry_const(M,i,j)));
+    mpz_poly_realloc(f,M->m);
+    mpz_set_si(lcm,1);
+    for (unsigned int i = 0 ; i < M->m ; i++) {
+        mpz_lcm(lcm,lcm,mpq_denref(mpq_mat_entry_const(M,i,j)));
     }
-	for (i = 0 ; i < M->m; i++){
-		mpq_t aux;
-		mpz_t num;
-		mpq_init(aux);
-		mpz_init(num);
-		mpq_set_z(aux,denom);
-		mpq_mul(aux,aux,mpq_mat_entry_const(M,i,j));
-		mpz_set(num,mpq_numref(aux));
-		mpz_poly_setcoeff(f,i,num);
-		mpq_clear(aux);
-		mpz_init(num);
-	}
+    for (unsigned int i = 0 ; i < M->m; i++){
+        mpq_srcptr mij = mpq_mat_entry_const(M, i, j);
+        mpz_divexact(f->coeff[i], lcm, mpq_denref(mij));
+        mpz_mul(f->coeff[i], f->coeff[i], mpq_numref(mij));
+    }
+    mpz_poly_cleandeg(f, M->m - 1);
 }
 /*}}}*/
 
 /*{{{ commonly used wrappers around HNF functions */
-int mpz_hnf_backend_rev(mpz_mat_ptr M, mpz_mat_ptr T) // {{{
+int mpz_mat_hnf_backend_rev(mpz_mat_ptr M, mpz_mat_ptr T) // {{{
 {
     /* This is almost like hnf_backend, except that we do it in a
      * different order, which is more suitable for displaying number
@@ -118,11 +110,11 @@ int mpz_hnf_backend_rev(mpz_mat_ptr M, mpz_mat_ptr T) // {{{
      */
     mpz_mat_reverse_rows(M, M);
     mpz_mat_reverse_columns(M, M);
-    int s = mpz_hnf_backend(M, T);
+    int s = mpz_mat_hnf_backend(M, T);
     mpz_mat_reverse_rows(M, M);
     mpz_mat_reverse_columns(M, M);
-    mpz_mat_reverse_rows(T, T);
-    mpz_mat_reverse_columns(T, T);
+    if (T) mpz_mat_reverse_rows(T, T);
+    if (T) mpz_mat_reverse_columns(T, T);
     return s;
 }//}}}
 
@@ -133,7 +125,7 @@ cxx_mpz_mat join_HNF(cxx_mpz_mat const& K, const unsigned long p)//{{{
     cxx_mpz_mat I;
 
     mpz_mat_vertical_join(I, J, K);
-    mpz_hnf_backend(I, T0);
+    mpz_mat_hnf_backend(I, T0);
     mpz_mat_submat_swap(I, 0, 0, J, 0, 0, K->n, K->n);
     return J;
 }
@@ -148,13 +140,14 @@ cxx_mpz_mat join_HNF_rev(cxx_mpz_mat const& K, const unsigned long p)//{{{
     cxx_mpz_mat I;
 
     mpz_mat_vertical_join(I, J, K);
-    mpz_hnf_backend_rev(I, T0);
+    mpz_mat_hnf_backend_rev(I, T0);
     mpz_mat_submat_swap(I, 0, 0, J, 0, 0, K->n, K->n);
     return J;
 }//}}}
 /*}}}*/
 
-cxx_mpz_mat multiplication_table_of_order(cxx_mpq_mat const& O,/*{{{*/
+/* {{{ multiplication_table_of_order */
+cxx_mpz_mat multiplication_table_of_order(cxx_mpq_mat const& O,
                                   cxx_mpz_poly const& g)
 {
     /* Let O be an order, with basis written with respect to the
@@ -197,7 +190,8 @@ cxx_mpz_mat multiplication_table_of_order(cxx_mpq_mat const& O,/*{{{*/
     return M;
 }/*}}}*/
 
-cxx_mpz_mat multiplication_table_of_ideal(cxx_mpz_mat const& M,/*{{{*/
+/* {{{ multiplication_table_of_ideal*/
+cxx_mpz_mat multiplication_table_of_ideal(cxx_mpz_mat const& M,
 				  cxx_mpz_mat const& I)
 {
     /* Let O be an order of a degree n number field. Let M be the n*n^2
@@ -242,7 +236,8 @@ cxx_mpz_mat multiplication_table_of_ideal(cxx_mpz_mat const& M,/*{{{*/
     return MI;
 }/*}}}*/
 
-cxx_mpz_mat multiply_elements_in_order(cxx_mpz_mat const& M, cxx_mpz_mat const& E, cxx_mpz_mat const& F)/*{{{*/
+/*{{{ multiply_elements_in_order */
+cxx_mpz_mat multiply_elements_in_order(cxx_mpz_mat const& M, cxx_mpz_mat const& E, cxx_mpz_mat const& F)
 {
     /* Let O be an order in a degree n number field.
      *
@@ -274,7 +269,8 @@ cxx_mpz_mat multiply_elements_in_order(cxx_mpz_mat const& M, cxx_mpz_mat const& 
     return R;
 }/*}}}*/
 
-cxx_mpz_mat frobenius_matrix(cxx_mpz_mat const& M, unsigned long p) //{{{
+//{{{ frobenius_matrix
+cxx_mpz_mat frobenius_matrix(cxx_mpz_mat const& M, unsigned long p)
 {
     // frobenius_matrix ; utility function for computing the p-radical
     // Takes a matrix B containing the generators (w_0, ... w_{n-1}) of an
@@ -302,7 +298,7 @@ cxx_mpz_mat frobenius_matrix(cxx_mpz_mat const& M, unsigned long p) //{{{
     return F;
 }//}}}
 
-// {{{ cxx_mpz_mat p_radical_of_order(cxx_mpq_mat const& B, cxx_mpz_poly const& g, unsigned long p)
+// {{{ cxx_mpz_mat p_radical_of_order
 // Stores in I the p-radical of the order whose multiplication matrix is
 // given by M. I is expressed with respect to the basis of the order.
 cxx_mpz_mat p_radical_of_order(cxx_mpz_mat const& M, unsigned long p)
@@ -390,475 +386,226 @@ cxx_mpq_mat p_maximal_order(cxx_mpz_poly const& f, unsigned long p)
     cxx_mpz_mat Dz;
     cxx_mpz den;
     mpq_mat_numden(Dz, den, D);
-    mpz_hnf_backend_rev(Dz, cxx_mpz_mat());
+    mpz_mat_hnf_backend_rev(Dz, NULL);
     mpq_mat_set_mpz_mat_denom(D, Dz, den);
     return D;
 }
 //}}}
 
-/* theta is expected to be an element of the order whose basis is given
- * by W. Thus we read theta as a vector with integer coordinates (matrix
- * of size 1*n)
- */
-void matrix_of_multiplication_theta_local(mpz_mat_ptr M, mpq_mat_srcptr W, mpz_mat_srcptr theta, mpz_poly_srcptr g, const unsigned long p)
+//{{{ mpz_mat_minpoly_mod_ui
+cxx_mpz_poly mpz_mat_minpoly_mod_ui(cxx_mpz_mat M, unsigned long p)
 {
-    unsigned int n = W->m;
-    ASSERT_ALWAYS(W->m == W->n);
-    ASSERT_ALWAYS(theta->m == 1 && theta->n == n);
-    
-    // First let's build the matrix of multiplication by theta, in the
-    // basis of (W[0], ... W[n-1])
-    mpz_mat times_theta;
-    mpq_mat times_theta_rat;
-    mpz_mat_init(times_theta,n,n);
-    mpq_mat_init(times_theta_rat,n,n);
-    
-    mpq_mat theta_rat; // Will contain theta in the basis of alpha^
-    mpq_mat_init(theta_rat,1,n);
-    mpq_mat_set_mpz_mat(theta_rat,theta);
-    mpq_mat_mul(theta_rat,theta_rat,W); // Now contains theta in the basis of alpha^ (rational coefficients)
-
-    // Converting theta into one polynomial, with a denominator
-    mpz_poly theta_poly;
-    mpz_t theta_denom;
-    mpz_poly_init(theta_poly,n-1);
-    mpz_init(theta_denom);
-    mpq_mat_row_to_poly(theta_poly,theta_denom,theta_rat,0);
-    
-    // Computing theta*w[i] (in the basis of alpha^ ) for each i
-    for (unsigned i = 0 ; i < n ; i++) {
-        // Converting w[i] (already in the basis of alpha^) into one
-        // polynom and one common denominator
-        mpz_poly w_poly;
-        mpz_poly_init(w_poly,n-1);
-
-        mpz_t w_denom;
-        mpz_init(w_denom);
-
-        mpq_mat_row_to_poly(w_poly,w_denom,W,i);
-
-        mpz_t denom;
-        mpz_init(denom);
-        mpz_mul(denom,theta_denom,w_denom);
-        
-        mpz_poly res;
-        mpz_poly_init(res,n-1);        
-        mpz_poly_mul_mod_f(res,theta_poly,w_poly,g);
-        mpz_poly_cleandeg(res,n-1);
-        
-        mpq_poly_to_mat_row(times_theta_rat, i, res, denom);
-
-        mpz_poly_clear(res);
-        mpz_clear(w_denom);
-        mpz_poly_clear(w_poly);
-        mpz_clear(denom);
-    }
-    
-    
-    // Now we have to multiply by W^-1, in order to get into the basis of
-    // (w[0], ... w[n-1]) again
-    mpq_mat W_inv;
-    mpq_mat_init(W_inv,n,n);
-    mpq_mat_inv(W_inv,W);
-    mpq_mat_mul(times_theta_rat,times_theta_rat,W_inv);
-    
-    // Now we have to convert it into a matrix of integers
-    int rc = mpq_mat_numden(times_theta, NULL, times_theta_rat);
-    ASSERT_ALWAYS(rc == 1);
-    
-    // And mod p
-    mpz_mat_mod_ui(times_theta,times_theta,p);
-
-    mpz_mat_swap(M, times_theta);
-
-    mpq_mat_clear(W_inv);
-    mpz_clear(theta_denom);
-    mpz_poly_clear(theta_poly);
-    mpq_mat_clear(theta_rat);
-    mpq_mat_clear(times_theta_rat);
-    mpz_mat_clear(times_theta);
-}
-
-
-// W is the matrix containing the generators of one p-maximal order Ok,
-// in the basis of alpha^ (root of g) theta is a row matrix representing
-// an element of Ok/pOk, thus a vector on the basis (W[0], ... W[n-1])
-// (with coeffs mod p)
-// g is the monic polynom defining the number field in which we are
-void minimal_poly_of_mul_theta(mpz_poly_ptr f, mpq_mat_srcptr W, mpz_mat_srcptr theta, mpz_poly_srcptr g, const unsigned long p)
-{
-    unsigned int n = W->m;
-    
-    mpz_mat times_theta;
-    mpz_mat_init(times_theta,n,n);
-
-    matrix_of_multiplication_theta_local(times_theta, W, theta, g, p);
-    
-    // Now starting to compute the (n+1,n^2) matrix whose kernel will be computed
-    mpz_mat M,current;
-    mpz_mat_init(M,n+1,n*n);
-    mpz_mat_init(current,n,n);
-    mpz_mat_set_ui(current,1);
-    for (unsigned int k = 0 ; k < n+1 ; k++){
-        for (unsigned int i = 0 ; i < n ; i++){
-            for (unsigned int j = 0 ; j < n ; j++){
-                mpz_set(mpz_mat_entry(M,n-k,j+n*i),mpz_mat_entry(current,i,j));
-            }
+    ASSERT_ALWAYS(M->m == M->n);
+    unsigned long n = M->n;
+    cxx_mpz_mat B(n+1, n*n);
+    cxx_mpz_mat T(n,n,1);
+    for(unsigned int k = 0 ; k < n + 1 ; k++) {
+        for(unsigned int i = 0 ; i < n ; i++) {
+            mpz_mat_submat_set(B, n - k, i * n, T, i, 0, 1, n);
         }
-        mpz_mat_mod_ui(M,M,p);
-        mpz_mat_mul(current,current,times_theta);
-        mpz_mat_mod_ui(current,current,p);
+        mpz_mat_mul_mod_ui(T, T, M, p);
     }
+    cxx_mpz_mat K;
+    mpz_mat_kernel_mod_ui(K, B, p);
+    mpz_mat_gauss_backend_mod_ui(K, NULL, p);
 
+    /* TODO: write down exactly what we need in terms of ordering from
+     * mpz_mat_gauss_backend_mod_ui. I take it that we're happy if it
+     * computes a RREF, so that the last row is the one with the largest
+     * number of column coordinates killed, corresponding to highest
+     * degree coefficients absent ?
+     */
+    cxx_mpz_poly f;
+    mpz_mat_row_to_poly_rev(f,K,K->m-1);
 
-    // Now computing its kernel
-    mpz_mat K;
-    mpz_mat_init(K,0,0);
-    mpz_mat_kernel_mod_ui(K,M,p);
+    return f;
+}
+/*}}}*/
 
-    mpz_gauss_backend_mod_ui(K,NULL,p);
-    
-    // Getting the minimal polynomial and verifying that f(M) = 0
-    if(K->m == 0){
-        mpz_poly_realloc(f,0);
+/*{{{ matrix_of_multmap */
+cxx_mpz_mat matrix_of_multmap(
+        cxx_mpz_mat const& M,
+        cxx_mpz_mat const& J, 
+        cxx_mpz_mat const& c,
+        unsigned long p)
+{
+    /* Let O be an order, represented here simply by its multiplication
+     * matrix. Let J be an m-dimensional subalgebra of O/pO. Let c be an
+     * element of J (a linear combination of the rows of J).
+     * This returns the m times m matrix which expresses multiplication by c
+     * within J.
+     */
+    /* We write the coordinates in O/pO of all products of the for c*j_k,
+     * j_k being one of the generators of J, and denote this matrix by
+     * CJ.  Now we look for a matrix M such that M*J = CJ. To do this, we
+     * need to do gaussian reduction on transpose(J): Find a matrix K
+     * such that K*transpose(J) is verticaljoin(identity_matrix(m),
+     * zero_matrix(n-m,m)). Then, taking K' as the first m rows of K, we
+     * will have M = CJ * transpose(K').
+     */
+    unsigned int m = J->m;
+    unsigned int n = M->m;
+    ASSERT_ALWAYS(M->n == n*n);
+    ASSERT_ALWAYS(J->n == n);
+    ASSERT_ALWAYS(c->n == n);
+    ASSERT_ALWAYS(c->m == 1);
+    cxx_mpz_mat Mc;
+    cxx_mpz_mat Jt;
+    cxx_mpz_mat K;
+    mpz_mat_transpose(Jt, J);
+    cxx_mpz_mat T;
+    mpz_mat_gauss_backend_mod_ui(Jt, T, p);
+    cxx_mpz_mat Kt(m, n);
+    mpz_mat_submat_swap(Kt, 0, 0, T, 0, 0, m, n);
+    mpz_mat_transpose(Kt, Kt);  /* Kt is now n times m */
+    cxx_mpz_mat CJ(m, n);
+    for(unsigned int k = 0 ; k < m ; k++) {
+        cxx_mpz_mat jk(1,n);
+        mpz_mat_submat_set(jk,0,0,J,k,0,1,n);
+        cxx_mpz_mat w = multiply_elements_in_order(M, c, jk);
+        mpz_mat_submat_swap(CJ,k,0,w,0,0,1,n);
+    }
+    mpz_mat_mul_mod_ui(Mc, CJ, Kt, p);
+    return Mc;
+}
+/*}}}*/
+
+/*{{{ factorization_of_polynomial_mod_ui */
+vector<pair<cxx_mpz_poly, int>> factorization_of_polynomial_mod_ui(cxx_mpz_poly const& f, unsigned long p, gmp_randstate_t state)
+{
+    cxx_mpz pz;
+    mpz_set_ui(pz,p);
+    mpz_poly_factor_list lf;
+    mpz_poly_factor_list_init(lf);
+    mpz_poly_factor(lf,f,pz,state);
+    vector<pair<cxx_mpz_poly, int>> res(lf->size);
+    for(int i = 0 ; i < lf->size ; i++) {
+        mpz_poly_swap(res[i].first, lf->factors[i]->f);
+        res[i].second = lf->factors[i]->m;
+    }
+    mpz_poly_factor_list_clear(lf);
+    return res;
+}
+/*}}}*/
+
+/*{{{ template <typename T> void append_move(vector<T> &a, vector<T> &b) */
+template <typename T> void append_move(vector<T> &a, vector<T> &b)
+{
+    a.reserve(a.size() + b.size());
+    size_t na = a.size();
+    size_t nb = b.size();
+    if (&a == &b) {
+        for(size_t i = 0 ; i < nb ; i++) {
+            a.push_back(b[i]);
+        }
     } else {
-        mpz_poly_set_zero(f);
-        mpz_mat_row_to_poly_rev(f,K,K->m-1);
+        a.insert(a.end(), nb, T());
+        for(size_t i = 0 ; i < nb ; i++) {
+            std::swap(a[na + i], b[i]);
+        }
     }
-    
-    mpz_mat_clear(K);
-    mpz_mat_clear(current);
-    mpz_mat_clear(M);
-    mpz_mat_clear(times_theta);
 }
+/*}}}*/
 
-// Represents the type of elements found in pick_from, in badideals.mag
-struct subspace_ideal {
-    cxx_mpz_mat E; // the basis of the subspace E
-    cxx_mpz_mat I; // the basis of one ideal
-    cxx_mpz_mat V; // same as E, in fact
-};
-
-// U and W are matrices containing generators (in rows) of vector subspaces of one big vector space
-// This computes the basis of the intersection of those subspaces
-void intersection_of_subspaces_mod_ui(mpz_mat_ptr M, mpz_mat_srcptr U, mpz_mat_srcptr W, const unsigned long p)
+// {{{ factorization_of_prime
+vector<pair<cxx_mpz_mat, int>> factorization_of_prime_inner(
+        cxx_mpq_mat const & B,
+        cxx_mpz_mat const & M,
+        unsigned long p,
+        cxx_mpz_mat const& Ip,
+        cxx_mpz_mat const& I,
+        cxx_mpz_mat const& J,
+        gmp_randstate_t state)
 {
-    ASSERT_ALWAYS(U->n == W->n);
-    mpz_mat U_t, W_t; // U and W, transposed
-    mpz_mat_init(U_t, U->n, U->m);
-    mpz_mat_init(W_t, W->n, W->m);
-    
-    mpz_mat_transpose(U_t,U);
-    mpz_mat_transpose(W_t,W);
-    
-    mpz_mat X, Y; // Left kernel of U_t and W_t
-    mpz_mat_init(X, 0, U->n);
-    mpz_mat_init(Y, 0, W->n);
-    
-    mpz_mat_kernel_mod_ui(X,U_t,p); // X = ker(x -> x*(transpose of U)
-    mpz_mat_kernel_mod_ui(Y,W_t,p); // Y = ker(y -> y*(transpose of W)
-    
-    mpz_mat Z, Z_t; // Block matrix, X on the top, Y in the bottom ; and its transposed
-    mpz_mat_init(Z,X->m + Y->m, U->n);
-    mpz_mat_init(Z_t, U->n, X->m + Y->m);
-    mpz_mat_vertical_join(Z,X,Y);
-    
-    mpz_mat_transpose(Z_t, Z);
-    mpz_mat_kernel_mod_ui(M, Z_t, p); // M = ker(z -> z*(transpose of Z);
-    
-    mpz_mat_clear(Z_t);
-    mpz_mat_clear(Z);
-    mpz_mat_clear(X);
-    mpz_mat_clear(Y);
-    mpz_mat_clear(U_t);
-    mpz_mat_clear(W_t);
+    unsigned int m = J->m;
+    unsigned int n = J->n;
+    ASSERT_ALWAYS(I->m == n);
+    ASSERT_ALWAYS(I->n == n);
+    /* J represents an m-dimensional subalgebra of O/pO */
+
+    /* Pick a random element of J */
+    cxx_mpz_mat c(1, m);
+    for(unsigned int i = 0 ; i < m ; i++) {
+        mpz_set_ui(mpz_mat_entry(c,0,i), gmp_urandomm_ui(state, p));
+    }
+    mpz_mat_mul_mod_ui(c, c, J, p);
+
+    cxx_mpz_mat Mc = matrix_of_multmap(M, J, c, p);
+
+    /* Now we would like to find the minimal polynomial of Mc, which is
+     * simply the matrix of multiplication by c. For this, we write an
+     * (m+1) times m^2 matrix, and compute a left kernel.
+     */
+    cxx_mpz_poly Pc = mpz_mat_minpoly_mod_ui(Mc, p);
+
+    vector<pair<cxx_mpz_poly, int>> facP = factorization_of_polynomial_mod_ui(Pc, p, state);
+
+    vector<pair<cxx_mpz_mat, int>> ideals;
+
+    vector<cxx_mpz_mat> characteristic_subspaces;
+
+    for(unsigned int i = 0 ; i < facP.size() ; i++) {
+        cxx_mpz_poly const& f(facP[i].first);
+        /* We need the basis of the kernel of f(Mc) */
+        cxx_mpz_mat E;
+        mpz_poly_eval_mpz_mat_mod_ui(E, Mc, f, p);
+        mpz_mat_pow_ui_mod_ui(E, E, facP[i].second, p);
+        mpz_mat_kernel_mod_ui(E, E, p);
+        /* This line is just to be exactly in line with what magma says
+         */
+        mpz_mat_gauss_backend_mod_ui(E, NULL, p);
+        mpz_mat_mul_mod_ui(E, E, J, p);
+        characteristic_subspaces.push_back(E);
+    }
+
+    for(unsigned int i = 0 ; i < facP.size() ; i++) {
+        unsigned int e = facP[i].second;
+        cxx_mpz_poly const& f(facP[i].first);
+        cxx_mpz_mat const& Ci(characteristic_subspaces[i]);
+        /* We need to find an ideal which is smaller than Ip, and whose
+         * generators are p*the generators of Ci, as well as the
+         * unmodified generators of I and of the other characteristic
+         * subspaces.
+         */
+        cxx_mpz_mat Ix(n + J->m - Ci->m, n);
+        mpz_mat_submat_set(Ix,0,0,I,0,0,n,n);
+        for(unsigned int r = n, k = 0; k < facP.size() ; k++) {
+            if (k == i) continue;
+            cxx_mpz_mat const& Ck(characteristic_subspaces[k]);
+            unsigned int mk = Ck->m;
+            mpz_mat_submat_set(Ix, r, 0, Ck, 0, 0, mk, n);
+            r += mk;
+        }
+        cxx_mpz_mat Ihead(n, n);
+        if (Ci->m == e * f->deg) {
+            mpz_mat_vertical_join(Ix, Ix, Ip);
+            mpz_mat_hnf_backend_rev(Ix, NULL);
+            mpz_mat_submat_swap(Ihead,0,0,Ix,Ix->m-n,0,n,n);
+            ideals.push_back(make_pair(Ihead, e));
+        } else {
+            mpz_mat_hnf_backend_rev(Ix, NULL);
+            mpz_mat_submat_swap(Ihead,0,0,Ix,Ix->m-n,0,n,n);
+            vector<pair<cxx_mpz_mat, int>> more_ideals;
+            more_ideals = factorization_of_prime_inner(B,M,p,Ip,Ihead,Ci,state);
+            append_move(ideals, more_ideals);
+        }
+    }
+    return ideals;
 }
 
-
-// I wasn't sure if hnf_backend now follows the convention of magma
-// This takes M on (under magma conventions) and returns its hnf under
-// magma conventions
-void hnf_magma_style(mpq_mat_ptr D, mpq_mat_srcptr M)
-{
-    // Will contain the result before going in D
-    mpq_mat tmp;
-    mpq_mat_init(tmp,M->m,M->n);
-    mpq_mat_set(tmp,M);
-    
-    // Thats not really a transposition. In fact, coeff (i,j) goes to
-    // (n-1-i,n-1-j);
-    for (unsigned int i = 0 ;  i < M->m/2 ; i++){
-        mpq_mat_submat_swap(tmp,i,0,tmp,M->m-1-i,0,1,M->n);
-    }
-    for (unsigned int j = 0 ;  j < M->n/2 ; j++){
-        mpq_mat_submat_swap(tmp,0,j,tmp,0,M->n-1-j,M->m,1);
-    }
-    
-    mpz_t denom;
-    mpq_t denom_inv, denom_rat;
-    mpz_mat tmp_int, T;
-    mpz_init(denom);
-    mpq_init(denom_inv);
-    mpq_init(denom_rat);
-    mpz_mat_init(tmp_int,M->m,M->n);
-    mpz_mat_init(T,0,0);
-    
-    // Doing HNF on integer-matrix
-    mpq_mat_numden(tmp_int,denom,tmp);
-    mpq_set_ui(denom_inv,1,1);
-    mpq_set_z(denom_rat,denom);
-    mpq_div(denom_inv,denom_inv,denom_rat);
-    mpz_hnf_backend(tmp_int,T);
-    mpq_mat_set_mpz_mat(tmp,tmp_int);
-    mpq_mat_mul_mpq(tmp,tmp,denom_inv);
-
-
-    // Inverting the transformation made before
-    for (unsigned int j = 0 ;  j < M->n/2 ; j++){
-        mpq_mat_submat_swap(tmp,0,j,tmp,0,M->n-1-j,M->m,1);
-    }
-    for (unsigned int i = 0 ;  i < M->m/2 ; i++){
-        mpq_mat_submat_swap(tmp,i,0,tmp,M->m-1-i,0,1,M->n);
-    }
-    
-    mpz_mat_clear(T);
-    mpz_mat_clear(tmp_int);
-    mpq_clear(denom_rat);
-    mpq_clear(denom_inv);
-    mpz_clear(denom);
-    mpq_mat_set(D,tmp);
-    mpq_mat_clear(tmp);
-}
-
-void mpq_hnf_backend_rev(mpq_mat_ptr M0, mpz_mat_ptr T0)
-{
-    // Will contain the result before going in D
-    mpq_mat tmp;
-    mpq_mat_init(tmp,M0->m,M0->n);
-    mpq_mat_set(tmp,M0);
-    
-    mpz_t denom;
-    mpq_t denom_inv, denom_rat;
-    mpz_mat tmp_int;
-    mpz_init(denom);
-    mpq_init(denom_inv);
-    mpq_init(denom_rat);
-    mpz_mat_init(tmp_int,M0->m,M0->n);
-    
-    // Doing HNF on integer-matrix
-    mpq_mat_numden(tmp_int,denom,tmp);
-    mpq_set_ui(denom_inv,1,1);
-    mpq_set_z(denom_rat,denom);
-    mpq_div(denom_inv,denom_inv,denom_rat);
-    mpz_hnf_backend_rev(tmp_int,T0);
-    mpq_mat_set_mpz_mat(tmp,tmp_int);
-    mpq_mat_mul_mpq(tmp,tmp,denom_inv);
-
-    mpz_mat_clear(tmp_int);
-    mpq_clear(denom_rat);
-    mpq_clear(denom_inv);
-    mpz_clear(denom);
-    mpq_mat_set(M0,tmp);
-    mpq_mat_clear(tmp);
-}
-
-#if 0
-void factorization_of_prime(vector<pair<cxx_mpq_mat, int>>& ideals, mpz_poly_srcptr g, const unsigned long p, gmp_randstate_t state)
+vector<pair<cxx_mpz_mat, int>> factorization_of_prime(
+        cxx_mpq_mat & B, cxx_mpz_poly const& g,
+        unsigned long p,
+        gmp_randstate_t state)
 {
     int n = g->deg;
-    
-    mpq_mat G, G_inv; // G = Basis of p-maximal-order Ok ; Id_q = identity (in rational domain)
-    mpz_mat Ip; // p radical of Ok, in its basis
-    cxx_mpz_mat Id_z; // Identity (in integers domain)
-    cxx_mpq_mat Ip_rat; // p radical, in the basis of alpha^
-    mpq_mat_init(G,n,n);
-    mpq_mat_init(G_inv,n,n);
-    mpz_mat_init(Ip,n,n);
-    mpz_mat_realloc(Id_z,n,n);
-    mpq_mat_realloc(Ip_rat,n,n);
-    mpz_mat_set_ui(Id_z,1);
-    
-    // Computing the generators of p-maximal order, storing them in G
-    mpq_mat_set(G, p_maximal_order(g,p));
-    // Computing the p-radical of the order of G, storing it in Ip
-    p_radical_of_order(Ip,G,g,p);
-    mpq_mat_inv(G_inv,G);
-    
-    // Computing the p-radical in the basis of alpha^
-    mpq_mat_set_mpz_mat(Ip_rat,Ip);
-    mpq_mat_mul(Ip_rat,Ip_rat,G);
-    hnf_magma_style(Ip_rat,Ip_rat);
-    
-    
-    
-    // The initial value in pick_from
-    subspace_ideal initial;
-    initial.E = Id_z; // It is the basis of Ok/p*Ok, but written on the basis of Ok/p*Ok ; thus, it's the identity
-    initial.I = Id_z; //p*identity ; the ideal we're trying to separate, in the basis of Ok/p*Ok
-    initial.V = Id_z; // identity ; current characteristic subspace, in the basis of Ok/p*Ok
-    mpz_mat_mul_ui(initial.I,initial.I,p);
-    
-    // The vector on which the recursion will happen.
-    queue<subspace_ideal> pick_from;
-    pick_from.push(initial);
-    
-    while (!pick_from.empty()) {
-        mpz_poly f;
-        mpz_poly_init(f,n);
-        
-        // Getting the head element
-        subspace_ideal current = pick_from.front();
-        pick_from.pop();
-        
-        // Picking one random element of subspace E
-        cxx_mpz_mat c_E, c_O; // c_E : coeffs of linear combination of dim(E) elements (which are given on the basis of O)
-                              // c_O : same element, given directly on the basis of O
-        mpz_mat_realloc(c_E,1,current.E->m);
-        mpz_mat_realloc(c_O,1,n);
-        for (unsigned int i = 0 ; i < current.E->m ; i++) {
-            mpz_set_ui(mpz_mat_entry(c_E,0,i),gmp_urandomm_ui(state,p));
-        }
-        mpz_mat_mul_mod_ui(c_O,c_E,current.E,p);
-        
-        // Finding its minimal polynomial
-        cxx_mpz_mat Mc;
-        mpz_mat_realloc(Mc,n,n);
-        matrix_of_multiplication_theta_local(Mc,G,c_O,g,p);
-        minimal_poly_of_mul_theta(f,G,c_O,g,p);
-        mpz_poly_cleandeg(f,n);
-        
-        // Factorization of the minimal polynomial
-        mpz_poly_factor_list lf;
-        mpz_poly_factor_list_init(lf);
-        mpz_t p_0;
-        mpz_init(p_0);
-        mpz_set_ui(p_0,p);
-        mpz_poly_factor(lf,f,p_0,state);
-        
-        // Building the list of characteristic subspaces
-        vector<cxx_mpz_mat> char_subspaces;
-        for (int i = 0 ; i < lf->size ; i++){
-            // For each factor f (with multiplicity m), we compute (f(Mc))^m mod p
-            cxx_mpz_mat res, ker, char_sub;
-            mpz_mat_realloc(res,n,n);
-            mpz_poly_eval_mpz_mat_mod_ui(res,Mc,lf->factors[i]->f,p);
-            mpz_mat_pow_ui_mod_ui(res,res,lf->factors[i]->m,p);
-            
-            // Computing the kernel
-            mpz_mat_kernel_mod_ui(ker,res,p);
-            
-            
-            //Now we have to compute the intersection of Vect(ker) and V
-            intersection_of_subspaces_mod_ui(char_sub, current.V, ker, p);
-            mpz_gauss_backend_mod_ui(char_sub,NULL,p);
-            char_subspaces.push_back(char_sub);
-        }
-        
-        // Purging it from null characteristic subspaces
-        mpz_poly_factor_list fac_Pc; // reduced list of factors
-        mpz_poly_factor_list_init(fac_Pc);
-        vector<cxx_mpz_mat> r_char_subspaces;
-        for (int i = 0 ; i < lf->size ; i++){
-            if(char_subspaces[i]->m > 0){
-                mpz_poly_factor_list_push(fac_Pc, lf->factors[i]->f, lf->factors[i]->m);
-                cxx_mpz_mat aux;
-                aux = char_subspaces[i];
-                r_char_subspaces.push_back(aux);
-            }
-        }        
-        
-        // Now finishing the run on the tree
-        for (int i = 0 ; i < fac_Pc->size ; i++){
-            
-            int e = fac_Pc->factors[i]->m;
-                
-            /* Consider the elements of O which map to zero in O/I^e, and
-             * non-zero elsewhere. These generate I !  Those are going in
-             * gens*/
-            cxx_mpq_mat gens;
-            mpq_mat_realloc(gens,n,n);
-            
-            int current_line = 0;
-            for (int j = 0 ; j < fac_Pc->size ; j++){
-                unsigned long p1;
-                if(i == j)
-                    p1 = p;
-                else
-                    p1 = 1;
-                for (unsigned int k = 0 ; k < r_char_subspaces[j]->m ; k++){
-                    // Extracting the k-th vector of the basis of j-th
-                    // characteristic subspace
-                    cxx_mpz_mat aux;
-                    cxx_mpz_mat v;
-                    cxx_mpq_mat v_rat;
-                    mpz_mat_realloc(aux,1,n);
-                    mpz_mat_realloc(v,1,n);
-                    
-                    mpz_mat_submat_swap(aux,0,0,r_char_subspaces[j],k,0,1,n);
-                    mpz_mat_set(v,aux);
-                    mpz_mat_submat_swap(aux,0,0,r_char_subspaces[j],k,0,1,n);
-                    // v now contains this vector, on the basis of O
-                    
-                    
-                    // Multiplying v by G transfers v in the number field
-                    // K (rational coefficients, thus v goes into v_rat)
-                    mpq_mat_set_mpz_mat(v_rat,v);
-                    mpq_mat_mul(v_rat,v_rat,G);
-                    mpq_mat_mul_ui(v_rat,v_rat,p1);
-
-                    mpq_mat_submat_swap(gens,current_line,0,v_rat,0,0,1,n);
-                    current_line++;
-                }
-            }
-             
-             // Transfering current ideal (the one we try to separate)
-             // subspace basis of alpha^
-             cxx_mpq_mat gcd_with;
-             mpq_mat_set_mpz_mat(gcd_with,current.I);
-             mpq_mat_mul(gcd_with,gcd_with,G);
-             
-             //Now computing 3n*n matrix with gens, Ip_rat and gcd_with
-             
-             cxx_mpq_mat big_matrix, bigger_matrix, Ix, new_ideal_rat;
-             cxx_mpz_mat new_ideal;
-             mpq_mat_realloc(Ix,n,n);
-             mpq_mat_realloc(new_ideal_rat,n,n);
-             mpz_mat_realloc(new_ideal,n,n);
-             
-             mpq_mat_vertical_join(big_matrix,gens,Ip_rat);
-             mpq_mat_vertical_join(bigger_matrix,big_matrix,gcd_with);
-             hnf_magma_style(bigger_matrix, bigger_matrix);
-             mpq_mat_submat_swap(Ix,0,0,bigger_matrix,2*n,0,n,n);
-             
-             mpq_mat_mul(new_ideal_rat,Ix,G_inv);
-             mpq_mat_numden(new_ideal,NULL,new_ideal_rat);
-             
-             if( (int) r_char_subspaces[i]->m == e*(fac_Pc->factors[i]->f->deg)){
-                 pair<cxx_mpq_mat, int> new_pair = make_pair(Ix,e);
-                 ideals.push_back(new_pair);
-             }
-             else{
-                 subspace_ideal new_subspace_ideal;
-                 new_subspace_ideal.E = r_char_subspaces[i];
-                 new_subspace_ideal.I = new_ideal;
-                 new_subspace_ideal.V = r_char_subspaces[i];
-                 pick_from.push(new_subspace_ideal);
-             }
-             
-            
-        }
-        
-        mpz_clear(p_0);
-        mpz_poly_factor_list_clear(fac_Pc);
-        mpz_poly_factor_list_clear(lf);
-        mpz_poly_clear(f);
-    }
-    
-    mpz_mat_clear(Ip);
-    mpq_mat_clear(G_inv);
-    mpq_mat_clear(G);
+    cxx_mpz_mat M = multiplication_table_of_order(B, g);
+    cxx_mpz_mat Ip = p_radical_of_order(M, p);
+    return factorization_of_prime_inner(B, M, p, Ip,
+            cxx_mpz_mat(n, n, p),
+            cxx_mpz_mat(n, n, 1), state);
 }
-#endif
+//}}}
 
 // Let O be the order generated by elements of G.
 // This stores in I the ideal of O generated by gen (supposed to be in
@@ -894,7 +641,8 @@ void make_principal_ideal(mpq_mat_ptr I, mpq_mat_srcptr G, mpz_poly_srcptr g, mp
         mpz_clear(denom);
     }
 
-    hnf_magma_style(I,I);
+    // hnf_magma_style(I,I);
+    // mpz_mat_hnf_backend_rev(I, NULL);
 }
 
 // Let O be the order generated by elements of G.
@@ -930,7 +678,7 @@ void make_ideal(mpq_mat_ptr I, mpq_mat_srcptr G, mpz_poly_srcptr g, mpz_mat_srcp
         }
     }
     
-    hnf_magma_style(I,I);
+    // hnf_magma_style(I,I);
     
     cxx_mpq_mat J;
     mpq_mat_realloc(J,n,n);
@@ -996,7 +744,7 @@ void valuation_helper_for_ideal(mpq_mat_ptr h, mpq_mat_srcptr G,
     // Reducing mod p and computing the kernel
     mpz_mat_mod_ui(C, C, p);
     mpz_mat_kernel_mod_ui(ker, C, p);
-    mpz_hnf_backend(ker,C); // We don't need C anymore, so we use it to contain the transformation matrix
+    mpz_mat_hnf_backend(ker,C); // We don't need C anymore, so we use it to contain the transformation matrix
     
     cxx_mpq_mat ker_rat;
     mpq_t p_inv;

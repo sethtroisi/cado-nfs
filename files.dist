@@ -1281,5 +1281,7 @@ numbertheory/ant.hpp
 tests/numbertheory/test-ant.cpp
 config/gmpxx.cpp
 utils/gmpxx.cpp
+tests/numbertheory/gentest_factorization_of_prime.m
+tests/numbertheory/gentest_p_maximal_order.m
+tests/numbertheory/factorization_of_prime.data
 tests/numbertheory/p_maximal_order.data
-tests/numbertheory/p_maximal_order_quick.data

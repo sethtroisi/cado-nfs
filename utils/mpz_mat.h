@@ -181,8 +181,8 @@ void mpz_poly_eval_mpz_mat_mod_ui(mpz_mat_ptr D, mpz_mat_srcptr M, mpz_poly_srcp
  *
  * T may be NULL in case we don't care.
  */
-void mpq_gauss_backend(mpq_mat_ptr M, mpq_mat_ptr T);
-void mpz_gauss_backend_mod_ui(mpz_mat_ptr M, mpz_mat_ptr T, unsigned long p);
+void mpq_mat_gauss_backend(mpq_mat_ptr M, mpq_mat_ptr T);
+void mpz_mat_gauss_backend_mod_ui(mpz_mat_ptr M, mpz_mat_ptr T, unsigned long p);
 
 
 /* Gaussian reduction over Z/pZ
@@ -192,7 +192,7 @@ void mpz_gauss_backend_mod_ui(mpz_mat_ptr M, mpz_mat_ptr T, unsigned long p);
  * M is the reduced matrix (modification in place of the input), T the
  * transformation matrix (so that T * input-M = output-M)
  */
-void mpz_gauss_backend_mod(mpz_mat_ptr M, mpz_mat_ptr T, mpz_srcptr p);
+void mpz_mat_gauss_backend_mod(mpz_mat_ptr M, mpz_mat_ptr T, mpz_srcptr p);
 
 /* this computes the row hnf on a column C.
  * The result is always of the form C'=(gcd(C),0,0,...,0). The transform
@@ -202,7 +202,7 @@ void mpz_gauss_backend_mod(mpz_mat_ptr M, mpz_mat_ptr T, mpz_srcptr p);
 void mpz_gcd_many(mpz_mat_ptr dT, mpz_ptr * a, unsigned int n);
 
 /* return +1 or -1, which is the determinant of the transformation matrix T */
-int mpz_hnf_backend(mpz_mat_ptr M, mpz_mat_ptr T);
+int mpz_mat_hnf_backend(mpz_mat_ptr M, mpz_mat_ptr T);
 
 /* kernel*/
 // This is supposed to compute the Kernel of M mod p and to store it in the matrix K. If r is the rank of M, and M is a square matrix n*n, K is a n*(n-r) matrix

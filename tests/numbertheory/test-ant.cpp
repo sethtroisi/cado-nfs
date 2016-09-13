@@ -4,6 +4,7 @@
 #include <iostream>
 #include <sstream>
 #include <fstream>
+#include <algorithm>
 
 using namespace std;
 static char ** original_argv;
@@ -37,6 +38,7 @@ static void decl_usage(param_list_ptr pl)
     param_list_decl_usage(pl, "polyfile", "polynomial (file)");
     param_list_decl_usage(pl, "out", "output file");
     param_list_decl_usage(pl, "batch", "batch input file with test vectors and expected results");
+    param_list_decl_usage(pl, "seed", "seed used for random picks");
 }
 
 void usage(param_list_ptr pl, char ** argv, const char * msg = NULL)
@@ -48,47 +50,81 @@ void usage(param_list_ptr pl, char ** argv, const char * msg = NULL)
     exit(EXIT_FAILURE);
 }
 
+struct iowrap {
+    streambuf * ibuf, * obuf;
+private:
+    ifstream ifs;
+    ofstream ofs;
+    istringstream iss;
+public:
+    iowrap(param_list_ptr pl) {
+        const char * tmp;
+        if ((tmp = param_list_lookup_string(pl, "polystr")) != NULL) {
+            iss.str(tmp);
+            ibuf = iss.rdbuf();
+        } else if ((tmp = param_list_lookup_string(pl, "polyfile")) != NULL) {
+            if (strcmp(tmp, "-") == 0) {
+                ibuf = cin.rdbuf();
+            } else {
+                ifs.open(tmp);
+                ibuf = ifs.rdbuf();
+            }
+        } else {
+            usage(pl, original_argv, "Please provide either --polyfile or --polystr");
+        }
+        if ((tmp = param_list_lookup_string(pl, "out")) != NULL && strcmp(tmp, "-") != 0) {
+            ofs.open(tmp);
+            obuf = ofs.rdbuf();
+        } else {
+            obuf = cout.rdbuf();
+        }
+    }
+};
+
 void do_p_maximal_order(param_list_ptr pl) {/*{{{*/
     cxx_mpz_poly f;
     unsigned long p;
-    const char * tmp;
 
     if (!param_list_parse_ulong(pl, "prime", &p)) usage(pl, original_argv, "missing prime argument");
 
-    if ((tmp = param_list_lookup_string(pl, "polystr")) != NULL) {
-        istringstream is(tmp);
-        if (!(is >> f)) usage(pl, original_argv, "cannot parse polynomial");
-    } else if ((tmp = param_list_lookup_string(pl, "polyfile")) != NULL) {
-        if (strcmp(tmp, "-") == 0) {
-            if (!(cin >> f)) usage(pl, original_argv, "cannot parse polynomial");
-        } else {
-            ifstream F(tmp);
-            if (!(F >> f)) usage(pl, original_argv, "cannot parse polynomial");
-        }
-    } else {
-        usage(pl, original_argv, "Please provide either --polyfile or --polystr");
-    }
+    iowrap io(pl);
+    istream in(io.ibuf);
+    ostream out(io.obuf);
 
-
+    if (!(in >> f)) usage(pl, original_argv, "cannot parse polynomial");
     cxx_mpq_mat M = p_maximal_order(f, p);
-
     cxx_mpz D;
     cxx_mpz_mat A;
-
     mpq_mat_numden(A, D, M);
-
-    if ((tmp = param_list_lookup_string(pl, "out")) != NULL) {
-        if (strcmp(tmp, "-") == 0) {
-            cout << "1/" << D << "*\n" << A << endl;
-        } else {
-            ofstream F(tmp);
-            F << "1/" << D << "*\n" << A << endl; 
-        }
-    } else {
-        cout << "1/" << D << "*\n" << A << endl;
-    }
+    out << "1/" << D << "*\n" << A << endl;
 }
 /*}}}*/
+
+/* This is over SL_n(Z_p) */
+bool sl_equivalent_matrices(cxx_mpq_mat const& M, cxx_mpq_mat const& A, unsigned long p)
+{
+    if (M->m != A->m) return false;
+    if (M->n != A->n) return false;
+    cxx_mpq_mat Mi;
+    mpq_mat_inv(Mi, M);
+    cxx_mpq_mat AMi;
+    mpq_mat_mul(AMi, A, Mi);
+    /* check that the p-valuation is zero */
+    for(unsigned int i = 0 ; i < AMi->m ; i++) {
+        for(unsigned int j = 0 ; j < AMi->n ; j++) {
+            mpq_srcptr mij = mpq_mat_entry_const(AMi, i, j);
+            if (mpz_divisible_ui_p(mpq_denref(mij), p)) return false;
+        }
+    }
+    return true;
+}
+
+bool sl_equivalent_matrices(cxx_mpq_mat const& M, cxx_mpq_mat const& A)
+{
+    cxx_mpq_mat Mq(M);
+    cxx_mpq_mat Aq(A);
+    return sl_equivalent_matrices(Mq, Aq);
+}
 
 void do_p_maximal_order_batch(param_list_ptr pl) {/*{{{*/
     cxx_mpz_poly f;
@@ -102,39 +138,143 @@ void do_p_maximal_order_batch(param_list_ptr pl) {/*{{{*/
     for(int test = 0; getline(is, s, '\n') ; ) {
         if (s.empty()) continue;
         if (s[0] == '#') continue;
+        invalid_argument exc(string("Parse error on input") + s);
         istringstream is0(s);
         if (!(is0 >> f)) usage(pl, original_argv, "cannot parse polynomial");
 
         if (!(getline(is, s, '\n')))
-            throw invalid_argument(string("Parse error on input") + s);
+            throw exc;
         cxx_mpz d;
         cxx_mpz_mat A(f->deg, f->deg);
         istringstream is1(s);
         unsigned long p;
         if (!(is1 >> p))
-            throw invalid_argument(string("Parse error on input") + s);
+            throw exc;
         if (!(is1 >> d))
-            throw invalid_argument(string("Parse error on input") + s);
+            throw exc;
         for(unsigned int i = 0 ; i < A->m ; i++) {
             for(unsigned int j = 0 ; j < A->n ; j++) {
                 if (!(is1 >> mpz_mat_entry(A, i, j)))
-                    throw invalid_argument(string("Parse error on input") + s);
+                    throw exc;
             }
         }
+        cxx_mpq_mat M;
+        mpq_mat_set_mpz_mat_denom(M, A, d);
 
-        cxx_mpq_mat M = p_maximal_order(f, p);
-        cxx_mpq_mat Mi;
-        mpq_mat_inv(Mi, M);
-        M = A;
-        mpq_mat_div_mpz(M, M, d);
-        mpq_mat_mul(M, M, Mi);
-        /* check that the p-valuation is zero */
-        bool ok = true;
-        for(unsigned int i = 0 ; i < M->m ; i++) {
-            for(unsigned int j = 0 ; j < M->n ; j++) {
-                mpq_srcptr mij = mpq_mat_entry_const(M, i, j);
-                if (mpz_divisible_ui_p(mpq_denref(mij), p)) ok = false;
+        cxx_mpq_mat my_M = p_maximal_order(f, p);
+
+        bool ok = sl_equivalent_matrices(M, my_M, p);
+
+        cout << (ok ? "ok" : "NOK") << " test " << test
+            << " (degree " << f->deg << ", p=" << p << ")"
+            << endl;
+        test++;
+    }
+}
+/*}}}*/
+
+void do_factorization_of_prime(param_list_ptr pl) {/*{{{*/
+    cxx_mpz_poly f;
+    unsigned long p;
+
+    if (!param_list_parse_ulong(pl, "prime", &p)) usage(pl, original_argv, "missing prime argument");
+
+    iowrap io(pl);
+    istream in(io.ibuf);
+    ostream out(io.obuf);
+
+    if (!(in >> f)) usage(pl, original_argv, "cannot parse polynomial");
+    cxx_mpq_mat M = p_maximal_order(f, p);
+    gmp_randstate_t state;
+    gmp_randinit_default(state);
+    unsigned long seed = 0;
+    if (param_list_parse_ulong(pl, "seed", &seed)) {
+        gmp_randseed_ui(state, seed);
+    }
+    vector<pair<cxx_mpz_mat, int>> F = factorization_of_prime(M, f, p, state);
+    gmp_randclear(state);
+    out << F.size() << "\n";
+    for(unsigned int k = 0 ; k < F.size() ; k++) {
+        out << F[k].first << F[k].second << endl;
+    }
+}
+/*}}}*/
+
+void do_factorization_of_prime_batch(param_list_ptr pl) {/*{{{*/
+    cxx_mpz_poly f;
+    const char * tmp;
+
+    if ((tmp = param_list_lookup_string(pl, "batch")) == NULL)
+        usage(pl, original_argv, "missing batch argument");
+
+    ifstream is(tmp);
+    string s;
+    for(int test = 0; getline(is, s, '\n') ; ) {
+        if (s.empty()) continue;
+        if (s[0] == '#') continue;
+
+        invalid_argument exc(string("Parse error on input") + s);
+
+        istringstream is0(s);
+        if (!(is0 >> f)) usage(pl, original_argv, "cannot parse polynomial");
+
+        if (!(getline(is, s, '\n')))
+            throw exc;
+
+        istringstream is1(s);
+
+        unsigned long p;
+        if (!(is1 >> p)) throw exc;
+
+        cxx_mpq_mat M;
+        {       /* {{{ read magma's basis of the p-maximal order */
+            cxx_mpz_mat A(f->deg, f->deg);
+            cxx_mpz d;
+            if (!(is1 >> d))
+                throw exc;
+            for(unsigned int i = 0 ; i < A->m ; i++) {
+                for(unsigned int j = 0 ; j < A->n ; j++) {
+                    if (!(is1 >> mpz_mat_entry(A, i, j)))
+                        throw exc;
+                }
             }
+            mpq_mat_set_mpz_mat_denom(M, A, d);
+        }       // }}}
+
+        vector<pair<cxx_mpz_mat, int> > ideals;
+        {       /* {{{ read magma's factorization of p */
+            unsigned int nideals;
+            if (!(is1 >> nideals))
+                throw exc;
+            for(unsigned int k = 0 ; k < nideals ; k++) {
+                cxx_mpz_mat A(f->deg, f->deg);
+                int e;
+                for(unsigned int i = 0 ; i < A->m ; i++) {
+                    for(unsigned int j = 0 ; j < A->n ; j++) {
+                        if (!(is1 >> mpz_mat_entry(A, i, j))) throw exc;
+                    }
+                }
+                if (!(is1 >> e)) throw exc;
+                ideals.push_back(make_pair(A, e));
+            }
+        }       // }}}
+
+        cxx_mpq_mat my_M = p_maximal_order(f, p);
+        gmp_randstate_t state;
+        gmp_randinit_default(state);
+
+        /* What if we simply ask our code to compute the factorization of
+         * p with respect to the order basis which was chosen by magma ?
+         * */
+        vector<pair<cxx_mpz_mat, int>> my_ideals = factorization_of_prime(M, f, p, state);
+        gmp_randclear(state);
+
+        sort(ideals.begin(), ideals.end(), ideal_comparator());
+        sort(my_ideals.begin(), my_ideals.end(), ideal_comparator());
+
+        bool ok=(ideals.size() == my_ideals.size());
+        for(unsigned int k = 0 ; ok && k < ideals.size() ; k++) {
+            ok = (ideals[k] == my_ideals[k]);
         }
         cout << (ok ? "ok" : "NOK") << " test " << test
             << " (degree " << f->deg << ", p=" << p << ")"
@@ -174,6 +314,12 @@ int main(int argc, char *argv[]) /*{{{ */
     } else if (strcmp(tmp, "p-maximal-order-batch") == 0) {
         do_p_maximal_order_batch(pl);
         return 0;
+    } else if (strcmp(tmp, "factorization-of-prime") == 0) {
+        do_factorization_of_prime(pl);
+        return 0;
+    } else if (strcmp(tmp, "factorization-of-prime-batch") == 0) {
+        do_factorization_of_prime_batch(pl);
+        return 0;
     } else {
         usage(pl, original_argv, "unknown test");
     }
@@ -211,7 +357,7 @@ int main(int argc, char *argv[]) /*{{{ */
        mpq_mat_urandomm(M, state, p);
        mpq_mat_fprint(stdout, M);
        printf("\n");
-       mpq_gauss_backend(M, T);
+       mpq_mat_gauss_backend(M, T);
        mpq_mat_fprint(stdout, M);
        printf("\n");
        mpq_mat_fprint(stdout, T);
@@ -223,7 +369,7 @@ int main(int argc, char *argv[]) /*{{{ */
        mpz_mat_urandomm(Mz, state, p);
        mpz_mat_fprint(stdout, Mz);
        printf("\n");
-       mpz_gauss_backend_mod(Mz, Tz, p);
+       mpz_mat_gauss_backend_mod(Mz, Tz, p);
        mpz_mat_fprint(stdout, Mz);
        printf("\n");
        mpz_mat_fprint(stdout, Tz);
@@ -236,7 +382,7 @@ int main(int argc, char *argv[]) /*{{{ */
        mpz_mat_urandomm(Mz, state, p);
        mpz_mat_fprint(stdout, Mz); printf("\n");
        double t = seconds();
-       mpz_hnf_backend(Mz, Tz);
+       mpz_mat_hnf_backend(Mz, Tz);
        t = seconds()-t;
        mpz_mat_fprint(stdout, Mz); printf("\n");
        mpz_mat_fprint(stdout, Tz); printf("\n");
