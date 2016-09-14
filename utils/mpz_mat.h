@@ -215,6 +215,8 @@ void mpq_mat_inv(mpq_mat_ptr dst, mpq_mat_srcptr src);
 int mpz_mat_cmp(mpz_mat_srcptr M, mpz_mat_srcptr N);
 int mpq_mat_cmp(mpq_mat_srcptr M, mpq_mat_srcptr N);
 void mpq_mat_fprint_as_mpz(FILE* f, mpq_mat_srcptr M);
+void mpz_mat_fprint(FILE * stream, mpz_mat_srcptr M);
+void mpq_mat_fprint(FILE * stream, mpq_mat_srcptr M);
 
 #ifdef __cplusplus
 }
