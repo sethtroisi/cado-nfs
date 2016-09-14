@@ -16,6 +16,7 @@
 
 #include "cado.h"
 #include <stdio.h>
+#include <limits.h> /* for CHAR_BIT */
 #include "portability.h"
 #include "polyselect.h"
 #include "mpz_poly.h"
