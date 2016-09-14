@@ -31,7 +31,8 @@ for i in [1..40] do
         samples:=[];
         for k in [1..20] do
             gens:=[K![Random(-5,5):i in [1..Degree(f)]]:i in [1..2]];
-            I:=ideal<O|gens>;
+            // magma bug.
+            I:=&+[ideal<O|x>:x in gens];
             // this would be nice, but unfortunately we can't do that since we
             // don't really have a maximal order.
             // I*:=Random(Fp)[1]^Random(-2,2);
