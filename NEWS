@@ -1,3 +1,11 @@
+Main changes between cado-nfs-2.2.0 and cado-nfs-2.3.0:
+* The estimated time of arrival (ETA) is now printed during the linear
+  algebra phase too.
+* Speedup in the linear algebra phase (mksol) when m > n
+* DLP support: got rid of the Magma dependency (TO BE CHECKED)
+* Fixed compiler warnings with new versions of compilers.
+* Several bug fixes.
+
 Main changes between cado-nfs-2.1.1 and cado-nfs-2.2.0:
 
 * The toplevel scripts (factor.sh, cadofactor.py, wuclient2.py) have
