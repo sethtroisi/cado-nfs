@@ -195,7 +195,8 @@ int tree_stats::leave(int rc)
     s.time_self += now;
     if (!curstack.empty())
         curstack.back().time_children += s.time_self;
-    ASSERT_ALWAYS(s.time_children < s.time_self);
+    // comparing timings is asking for (non-reproducible) trouble.
+    // ASSERT_ALWAYS(s.time_children <= s.time_self);
     s.time_self -= s.time_children;
     unsigned int level = --depth;
     ASSERT_ALWAYS(depth == curstack.size());
