@@ -25,7 +25,8 @@ istream& operator>>(istream& is, cxx_mpz_poly& f)/*{{{*/
 }
 /*}}}*/
 
-ostream& operator<<(ostream& o, cxx_mpz_poly const& v) {
+ostream& operator<<(ostream& o, cxx_mpz_poly const& v)/*{{{*/
+{
     /* note that we can't cheat and use cxx_mpz here */
     ostream_iterator<mpz_t> it(o, " ");
     if (v->deg>=0) {
@@ -35,10 +36,9 @@ ostream& operator<<(ostream& o, cxx_mpz_poly const& v) {
         o << "0";
     }
     return o;
-}
+}/*}}}*/
 
-
-static void decl_usage(param_list_ptr pl)
+static void decl_usage(param_list_ptr pl)/*{{{*/
 {
     param_list_decl_usage(pl, "test", "which test to run");
     param_list_decl_usage(pl, "prime", "prime");
@@ -48,18 +48,18 @@ static void decl_usage(param_list_ptr pl)
     param_list_decl_usage(pl, "batch", "batch input file with test vectors and expected results");
     param_list_decl_usage(pl, "seed", "seed used for random picks");
     param_list_decl_usage(pl, "elements", "ideal generators (separated by ;)");
-}
+}/*}}}*/
 
-void usage(param_list_ptr pl, char ** argv, const char * msg = NULL)
+void usage(param_list_ptr pl, char ** argv, const char * msg = NULL)/*{{{*/
 {
     param_list_print_usage(pl, argv[0], stderr);
     if (msg) {
         fprintf(stderr, "%s\n", msg);
     }
     exit(EXIT_FAILURE);
-}
+}/*}}}*/
 
-struct iowrap {
+struct iowrap {/*{{{*/
     streambuf * ibuf, * obuf;
 private:
     ifstream ifs;
@@ -88,9 +88,10 @@ public:
             obuf = cout.rdbuf();
         }
     }
-};
+};/*}}}*/
 
-void do_p_maximal_order(param_list_ptr pl) {/*{{{*/
+int do_p_maximal_order(param_list_ptr pl) /*{{{*/
+{
     cxx_mpz_poly f;
     unsigned long p;
 
@@ -106,12 +107,14 @@ void do_p_maximal_order(param_list_ptr pl) {/*{{{*/
     cxx_mpz_mat A;
     mpq_mat_numden(A, D, M);
     out << "1/" << D << "*\n" << A << endl;
+
+    return 1;
 }
 /*}}}*/
 
-/* This is over SL_n(Z_p) */
-bool sl_equivalent_matrices(cxx_mpq_mat const& M, cxx_mpq_mat const& A, unsigned long p)
+bool sl_equivalent_matrices(cxx_mpq_mat const& M, cxx_mpq_mat const& A, unsigned long p)/*{{{*/
 {
+    /* This is over SL_n(Z_p) */
     if (M->m != A->m) return false;
     if (M->n != A->n) return false;
     cxx_mpq_mat Mi;
@@ -126,16 +129,69 @@ bool sl_equivalent_matrices(cxx_mpq_mat const& M, cxx_mpq_mat const& A, unsigned
         }
     }
     return true;
-}
+}/*}}}*/
 
-bool sl_equivalent_matrices(cxx_mpq_mat const& M, cxx_mpq_mat const& A)
+bool sl_equivalent_matrices(cxx_mpq_mat const& M, cxx_mpq_mat const& A)/*{{{*/
 {
     cxx_mpq_mat Mq(M);
     cxx_mpq_mat Aq(A);
     return sl_equivalent_matrices(Mq, Aq);
-}
+}/*}}}*/
 
-void do_p_maximal_order_batch(param_list_ptr pl) {/*{{{*/
+cxx_mpq_mat batch_read_order_basis(istream & in, unsigned int n)/*{{{*/
+{
+    invalid_argument exc(string("Parse error"));
+    cxx_mpq_mat O;
+    string keyword;
+    if (!(in >> keyword) || keyword != "order") throw exc;
+    cxx_mpz_mat A(n, n);
+    cxx_mpz d;
+    if (!(in >> d))
+        throw exc;
+    for(unsigned int i = 0 ; i < A->m ; i++) {
+        for(unsigned int j = 0 ; j < A->n ; j++) {
+            if (!(in >> mpz_mat_entry(A, i, j)))
+                throw exc;
+        }
+    }
+    mpq_mat_set_mpz_mat_denom(O, A, d);
+    return O;
+}/*}}}*/
+
+vector<pair<cxx_mpz_mat, int> > batch_read_prime_factorization(istream & in, unsigned int n, unsigned long p, cxx_mpq_mat const& O, cxx_mpz_mat const& M)/*{{{*/
+{
+    invalid_argument exc(string("Parse error"));
+    vector<pair<cxx_mpz_mat, int> > ideals;
+    string keyword;
+    if (!(in >> keyword) || keyword != "ideals") throw exc;
+    unsigned int nideals;
+    if (!(in >> nideals))
+        throw exc;
+    for(unsigned int k = 0 ; k < nideals ; k++) {
+        cxx_mpq_mat A(2, n);
+        cxx_mpz den;
+        int e;
+        mpq_set_ui(mpq_mat_entry(A,0,0),p,1);
+        if (!(in >> den)) throw exc;
+        for(unsigned int j = 0 ; j < A->n ; j++) {
+            cxx_mpz num;
+            if (!(in >> num)) throw exc;
+            mpq_ptr aa = mpq_mat_entry(A, 1, j);
+            mpz_set(mpq_numref(aa), num);
+            mpz_set(mpq_denref(aa), den);
+            mpq_canonicalize(aa);
+        }
+        if (!(in >> e)) throw exc;
+        pair<cxx_mpz_mat, cxx_mpz> Id = generate_ideal(O,M,A);
+        ASSERT_ALWAYS(mpz_cmp_ui(Id.second, 1) == 0);
+        ideals.push_back(make_pair(Id.first,e));
+    }
+    return ideals;
+}/*}}}*/
+
+
+int do_p_maximal_order_batch(param_list_ptr pl) /*{{{*/
+{
     cxx_mpz_poly f;
     const char * tmp;
 
@@ -144,6 +200,9 @@ void do_p_maximal_order_batch(param_list_ptr pl) {/*{{{*/
 
     ifstream is(tmp);
     string s;
+    int nok = 0;
+    int nfail = 0;
+
     for(int test = 0; getline(is, s, '\n') ; ) {
         if (s.empty()) continue;
         if (s[0] == '#') continue;
@@ -159,30 +218,28 @@ void do_p_maximal_order_batch(param_list_ptr pl) {/*{{{*/
         unsigned long p;
         if (!(is1 >> p))
             throw exc;
-        if (!(is1 >> d))
-            throw exc;
-        for(unsigned int i = 0 ; i < A->m ; i++) {
-            for(unsigned int j = 0 ; j < A->n ; j++) {
-                if (!(is1 >> mpz_mat_entry(A, i, j)))
-                    throw exc;
-            }
-        }
-        cxx_mpq_mat M;
-        mpq_mat_set_mpz_mat_denom(M, A, d);
 
-        cxx_mpq_mat my_M = p_maximal_order(f, p);
+        cxx_mpq_mat O = batch_read_order_basis(is1, f->deg);
+        cxx_mpq_mat my_O = p_maximal_order(f, p);
 
-        bool ok = sl_equivalent_matrices(M, my_M, p);
+        bool ok = sl_equivalent_matrices(O, my_O, p);
 
         cout << (ok ? "ok" : "NOK") << " test " << test
             << " (degree " << f->deg << ", p=" << p << ")"
             << endl;
         test++;
+        nok += ok;
+        nfail += !ok;
     }
+    cout << nok << " tests passed";
+    if (nfail) cout << ", " << nfail << " TESTS FAILED";
+    cout << endl;
+    return nfail == 0;
 }
 /*}}}*/
 
-void do_factorization_of_prime(param_list_ptr pl) {/*{{{*/
+int do_factorization_of_prime(param_list_ptr pl) /*{{{*/
+{
     cxx_mpz_poly f;
     unsigned long p;
 
@@ -206,10 +263,12 @@ void do_factorization_of_prime(param_list_ptr pl) {/*{{{*/
     for(unsigned int k = 0 ; k < F.size() ; k++) {
         out << F[k].first << " " << F[k].second << endl;
     }
+    return 1;
 }
 /*}}}*/
 
-void do_factorization_of_prime_batch(param_list_ptr pl) {/*{{{*/
+int do_factorization_of_prime_batch(param_list_ptr pl) /*{{{*/
+{
     cxx_mpz_poly f;
     const char * tmp;
 
@@ -218,6 +277,8 @@ void do_factorization_of_prime_batch(param_list_ptr pl) {/*{{{*/
 
     ifstream is(tmp);
     string s;
+    int nok = 0;
+    int nfail = 0;
     for(int test = 0; getline(is, s, '\n') ; ) {
         if (s.empty()) continue;
         if (s[0] == '#') continue;
@@ -235,41 +296,16 @@ void do_factorization_of_prime_batch(param_list_ptr pl) {/*{{{*/
         unsigned long p;
         if (!(is1 >> p)) throw exc;
 
-        cxx_mpq_mat M;
-        {       /* {{{ read magma's basis of the p-maximal order */
-            cxx_mpz_mat A(f->deg, f->deg);
-            cxx_mpz d;
-            if (!(is1 >> d))
-                throw exc;
-            for(unsigned int i = 0 ; i < A->m ; i++) {
-                for(unsigned int j = 0 ; j < A->n ; j++) {
-                    if (!(is1 >> mpz_mat_entry(A, i, j)))
-                        throw exc;
-                }
-            }
-            mpq_mat_set_mpz_mat_denom(M, A, d);
-        }       // }}}
+        string keyword;
+        cxx_mpq_mat O = batch_read_order_basis(is1, f->deg);
+        cxx_mpz_mat M = multiplication_table_of_order(O, f);
 
-        vector<pair<cxx_mpz_mat, int> > ideals;
-        {       /* {{{ read magma's factorization of p */
-            unsigned int nideals;
-            if (!(is1 >> nideals))
-                throw exc;
-            for(unsigned int k = 0 ; k < nideals ; k++) {
-                cxx_mpz_mat A(f->deg, f->deg);
-                int e;
-                for(unsigned int i = 0 ; i < A->m ; i++) {
-                    for(unsigned int j = 0 ; j < A->n ; j++) {
-                        if (!(is1 >> mpz_mat_entry(A, i, j))) throw exc;
-                    }
-                }
-                if (!(is1 >> e)) throw exc;
-                ideals.push_back(make_pair(A, e));
-            }
-            sort(ideals.begin(), ideals.end(), ideal_comparator());
-        }       // }}}
+        vector<pair<cxx_mpz_mat, int> > ideals = batch_read_prime_factorization(is1, f->deg, p, O, M);
 
-        cxx_mpq_mat my_M = p_maximal_order(f, p);
+        cxx_mpq_mat my_O = p_maximal_order(f, p);
+
+        bool ok = sl_equivalent_matrices(O, my_O, p);
+
         gmp_randstate_t state;
         gmp_randinit_default(state);
         unsigned long seed = 0;
@@ -280,11 +316,12 @@ void do_factorization_of_prime_batch(param_list_ptr pl) {/*{{{*/
         /* What if we simply ask our code to compute the factorization of
          * p with respect to the order basis which was chosen by magma ?
          * */
-        vector<pair<cxx_mpz_mat, int>> my_ideals = factorization_of_prime(M, f, p, state);
+        vector<pair<cxx_mpz_mat, int>> my_ideals = factorization_of_prime(O, f, p, state);
         gmp_randclear(state);
 
-
-        bool ok=(ideals.size() == my_ideals.size());
+        // sort magma ideals. Ours are sorted already.
+        sort(ideals.begin(), ideals.end(), ideal_comparator());
+        ok = ok && (ideals.size() == my_ideals.size());
         for(unsigned int k = 0 ; ok && k < ideals.size() ; k++) {
             ok = (ideals[k] == my_ideals[k]);
         }
@@ -292,11 +329,18 @@ void do_factorization_of_prime_batch(param_list_ptr pl) {/*{{{*/
             << " (degree " << f->deg << ", p=" << p << ")"
             << endl;
         test++;
+        nok += ok;
+        nfail += !ok;
     }
+    cout << nok << " tests passed";
+    if (nfail) cout << ", " << nfail << " TESTS FAILED";
+    cout << endl;
+    return nfail == 0;
 }
 /*}}}*/
 
-void do_valuations_of_ideal(param_list_ptr pl) {/*{{{*/
+int do_valuations_of_ideal(param_list_ptr pl) /*{{{*/
+{
     cxx_mpz_poly f;
     unsigned long p;
 
@@ -395,12 +439,128 @@ void do_valuations_of_ideal(param_list_ptr pl) {/*{{{*/
         cxx_mpz alpha_denom;
         mpq_mat_row_to_poly(alpha, alpha_denom, alpha_q, 0);
         int v = valuation_of_ideal_at_prime_ideal(M, I, a, p);
-        cout << "(p=" << p << ", k=" << k << ", f="<<prime_ideal_inertia_degree(fkp)<<", e="<<F[k].second<< ";" << two.first << ",["<< alpha <<"]/"<<alpha_denom<<")^" << v-w << "\n";
+        cout << "(p=" << p << ", k=" << k << ", f="<<prime_ideal_inertia_degree(fkp)<<", e="<<F[k].second<< ";" << two.first << ",["<< alpha <<"]/"<<alpha_denom<<")^" << v-w*F[k].second << "\n";
     }
+    return 1;
 }
-
-
 /*}}}*/
+
+int do_valuations_of_ideal_batch(param_list_ptr pl) /*{{{*/
+{
+    cxx_mpz_poly f;
+    const char * tmp;
+
+    if ((tmp = param_list_lookup_string(pl, "batch")) == NULL)
+        usage(pl, original_argv, "missing batch argument");
+
+    ifstream is(tmp);
+    string s;
+    int nok = 0;
+    int nfail = 0;
+
+    for(int test = 0; getline(is, s, '\n') ; ) {
+        if (s.empty()) continue;
+        if (s[0] == '#') continue;
+
+        invalid_argument exc(string("Parse error on input") + s);
+
+        istringstream is0(s);
+        if (!(is0 >> f)) usage(pl, original_argv, "cannot parse polynomial");
+
+        if (!(getline(is, s, '\n')))
+            throw exc;
+
+        istringstream is1(s);
+
+        unsigned long p;
+        if (!(is1 >> p)) throw exc;
+
+        string keyword;
+        cxx_mpq_mat O = batch_read_order_basis(is1, f->deg);
+        cxx_mpz_mat M = multiplication_table_of_order(O, f);
+
+        vector<pair<cxx_mpz_mat, int> > ideals = batch_read_prime_factorization(is1, f->deg, p, O, M);
+
+        cxx_mpq_mat my_O = p_maximal_order(f, p);
+
+        bool ok = sl_equivalent_matrices(O, my_O, p);
+
+        gmp_randstate_t state;
+        gmp_randinit_default(state);
+        unsigned long seed = 0;
+        if (param_list_parse_ulong(pl, "seed", &seed)) {
+            gmp_randseed_ui(state, seed);
+        }
+
+        /* What if we simply ask our code to compute the factorization of
+         * p with respect to the order basis which was chosen by magma ?
+         * */
+        vector<pair<cxx_mpz_mat, int>> my_ideals = factorization_of_prime(O, f, p, state);
+        gmp_randclear(state);
+
+        /* compute matching table */
+        ok = ok && (ideals.size() == my_ideals.size());
+        vector<unsigned int> magma_to_mine(ideals.size());
+        vector<unsigned int> mine_to_magma(my_ideals.size());
+        for(unsigned int k = 0 ; ok && k < ideals.size() ; k++) {
+            bool found = false;
+            for(unsigned int ell = 0 ; ell < my_ideals.size() ; ell++) {
+                if (ideals[k] == my_ideals[ell]) {
+                    magma_to_mine[k] = ell;
+                    mine_to_magma[ell] = k;
+                    found = true;
+                    break;
+                }
+            }
+            ok = found;
+        }
+
+        /* now read the list of composites */
+        for( ; ok ; ) {
+            string keyword;
+            if (!(is1 >> keyword) || keyword != "composite") throw exc;
+            int ngens;
+            if (!(is1 >> ngens)) throw exc;
+            if (ngens == 0) break;
+            cxx_mpz_mat gens(ngens, f->deg);
+            for(unsigned int i = 0 ; i < gens->m ; i++) {
+                for(unsigned int j = 0 ; j < gens->n ; j++) {
+                    if (!(is1 >> mpz_mat_entry(gens, i, j)))
+                        throw exc;
+                }
+            }
+            pair<cxx_mpz_mat, cxx_mpz> Id = generate_ideal(O, M, cxx_mpq_mat(gens));
+            vector<int> my_vals;
+            int w = mpz_p_valuation_ui(Id.second, p);
+            for(unsigned int ell = 0 ; ell < my_ideals.size() ; ell++) {
+                cxx_mpz_mat const& fkp(my_ideals[ell].first);
+                cxx_mpz_mat a = valuation_helper_for_ideal(M, fkp, p);
+                int v = valuation_of_ideal_at_prime_ideal(M, Id.first, a, p);
+                my_vals.push_back(v-w*my_ideals[ell].second);
+            }
+            if (!(is1 >> keyword) || keyword != "valuations") throw exc;
+            for(unsigned int k = 0 ; ok && k < ideals.size() ; k++) {
+                int v;
+                if (!(is1 >> v)) throw exc;
+                ok = (v == my_vals[magma_to_mine[k]]);
+            }
+        }
+
+
+        cout << (ok ? "ok" : "NOK") << " test " << test
+            << " (degree " << f->deg << ", p=" << p << ")"
+            << endl;
+        test++;
+        nok += ok;
+        nfail += !ok;
+    }
+    cout << nok << " tests passed";
+    if (nfail) cout << ", " << nfail << " TESTS FAILED";
+    cout << endl;
+    return nfail == 0;
+}
+/*}}}*/
+
 int main(int argc, char *argv[]) /*{{{ */
 {
     param_list pl;
@@ -425,24 +585,24 @@ int main(int argc, char *argv[]) /*{{{ */
     const char * tmp = param_list_lookup_string(pl, "test");
     if (!tmp) usage(pl, original_argv, "missing --test argument");
 
+    int rc;
+
     if (strcmp(tmp, "p-maximal-order") == 0) {
-        do_p_maximal_order(pl);
-        return 0;
+        rc = do_p_maximal_order(pl);
     } else if (strcmp(tmp, "p-maximal-order-batch") == 0) {
-        do_p_maximal_order_batch(pl);
-        return 0;
+        rc = do_p_maximal_order_batch(pl);
     } else if (strcmp(tmp, "factorization-of-prime") == 0) {
-        do_factorization_of_prime(pl);
-        return 0;
-    } else if (strcmp(tmp, "valuations-of-ideal") == 0) {
-        do_valuations_of_ideal(pl);
-        return 0;
+        rc = do_factorization_of_prime(pl);
     } else if (strcmp(tmp, "factorization-of-prime-batch") == 0) {
-        do_factorization_of_prime_batch(pl);
-        return 0;
+        rc = do_factorization_of_prime_batch(pl);
+    } else if (strcmp(tmp, "valuations-of-ideal") == 0) {
+        rc = do_valuations_of_ideal(pl);
+    } else if (strcmp(tmp, "valuations-of-ideal-batch") == 0) {
+        rc = do_valuations_of_ideal_batch(pl);
     } else {
         usage(pl, original_argv, "unknown test");
     }
+    return rc ? EXIT_SUCCESS : EXIT_FAILURE;
 
 #if 0
     param_list_clear(pl);

@@ -117,6 +117,34 @@ int mpz_mat_hnf_backend_rev(mpz_mat_ptr M, mpz_mat_ptr T) // {{{
     mpz_mat_reverse_columns(M, M);
     if (T) mpz_mat_reverse_rows(T, T);
     if (T) mpz_mat_reverse_columns(T, T);
+    if (M->m > M->n) {
+        /* we need some swaps... */
+        mpz_mat sM;
+        mpz_mat_init(sM, M->m, M->n);
+        mpz_mat_submat_swap(sM, 0, 0,    M, M->m-M->n, 0, M->n, M->n);
+        mpz_mat_submat_swap(sM, M->n, 0, M, 0, 0,         M->m-M->n, M->n);
+        mpz_mat_swap(sM, M);
+        mpz_mat_clear(sM);
+        if (T) {
+            mpz_mat sT;
+            mpz_mat_init(sT, T->m, T->n);
+            mpz_mat_submat_swap(sT, 0, 0,    T, T->m-T->n, 0, T->n, T->n);
+            mpz_mat_submat_swap(sT, T->n, 0, T, 0, 0,         T->m-T->n, T->n);
+            mpz_mat_swap(sT, T);
+            mpz_mat_clear(sT);
+        }
+        /* While the transformations above had no effect on s (because
+         * they compensate), this one has.
+         * we have n circular shifts on length m, plus a reversal on m-n.
+         * a circular shift on length k is exactly k-1 inversions, so
+         * that sums up to n*(m-1) inversions. Then we add
+         * (m-n)*(m-n-1)/2 inversions. This is, in total,
+         * (m(m-1)+n(n-1))/2 inversions.
+         * m*(m-1) is congruent to 2 mod 4 when m is 2 or 3 mod 4
+         */
+        int ninvs = ((M->m&2)+(M->n&2))/2;
+        if (ninvs) s=-s;
+    }
     return s;
 }//}}}
 
@@ -582,11 +610,11 @@ vector<pair<cxx_mpz_mat, int>> factorization_of_prime_inner(
         if (Ci->m == e * f->deg) {
             mpz_mat_vertical_join(Ix, Ix, Ip);
             mpz_mat_hnf_backend_rev(Ix, NULL);
-            mpz_mat_submat_swap(Ihead,0,0,Ix,Ix->m-n,0,n,n);
+            mpz_mat_submat_swap(Ihead,0,0,Ix,0,0,n,n);
             ideals.push_back(make_pair(Ihead, e));
         } else {
             mpz_mat_hnf_backend_rev(Ix, NULL);
-            mpz_mat_submat_swap(Ihead,0,0,Ix,Ix->m-n,0,n,n);
+            mpz_mat_submat_swap(Ihead,0,0,Ix,0,0,n,n);
             vector<pair<cxx_mpz_mat, int>> more_ideals;
             more_ideals = factorization_of_prime_inner(B,M,p,Ip,Ihead,Ci,state);
             append_move(ideals, more_ideals);
@@ -681,7 +709,7 @@ pair<cxx_mpz_mat, cxx_mpz> generate_ideal(cxx_mpq_mat const& O, cxx_mpz_mat cons
         }
     }
     /* And put this in HNF */
-    mpz_mat_hnf_backend(products, NULL);
+    mpz_mat_hnf_backend_rev(products, NULL);
     cxx_mpz_mat I(n,n);
     mpz_mat_submat_swap(I,0,0,products,0,0,n,n);
     return make_pair(I, denom);

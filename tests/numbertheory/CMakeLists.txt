@@ -8,8 +8,8 @@ cado_define_test(
     numbertheory-p-maximal-order
     PROGRAM
     ${CMAKE_CURRENT_BINARY_DIR}/test-ant
-    -test p-maximal-order-batch -batch
-    ${CMAKE_CURRENT_SOURCE_DIR}/p_maximal_order.data
+    -test p-maximal-order-batch
+    -batch ${CMAKE_CURRENT_SOURCE_DIR}/test.data
     TARGET_DEPENDENCIES
     test-ant
     )
@@ -17,8 +17,18 @@ cado_define_test(
     numbertheory-factorization-of-prime
     PROGRAM
     ${CMAKE_CURRENT_BINARY_DIR}/test-ant
-    -test p-maximal-order-batch -batch
-    ${CMAKE_CURRENT_SOURCE_DIR}/factorization_of_prime.data
+    -test factorization-of-prime-batch
+    -batch ${CMAKE_CURRENT_SOURCE_DIR}/test.data
+    TARGET_DEPENDENCIES
+    test-ant
+    )
+
+cado_define_test(
+    numbertheory-valuations-of-ideal
+    PROGRAM
+    ${CMAKE_CURRENT_BINARY_DIR}/test-ant
+    -test valuations-of-ideal-batch
+    -batch ${CMAKE_CURRENT_SOURCE_DIR}/test.data
     TARGET_DEPENDENCIES
     test-ant
     )
@@ -28,14 +38,21 @@ if(MAGMA AND CHECKS_EXPENSIVE)
 cado_define_test(
     numbertheory-p-maximal-order-expensive
     PROGRAM
-    bash -c "${CMAKE_CURRENT_BINARY_DIR}/test-ant -test p-maximal-order-batch -batch <(${MAGMA} -b -S 1 ${CMAKE_CURRENT_SOURCE_DIR}/gentest_p_maximal_order.m < /dev/null)"
+    bash -c "${CMAKE_CURRENT_BINARY_DIR}/test-ant -test p-maximal-order-batch -batch <(${MAGMA} -b -S 1 ${CMAKE_CURRENT_SOURCE_DIR}/gentest.m < /dev/null)"
     TARGET_DEPENDENCIES
     test-ant
     )
 cado_define_test(
     numbertheory-factorization-of-prime-expensive
     PROGRAM
-    bash -c "${CMAKE_CURRENT_BINARY_DIR}/test-ant -test p-maximal-order-batch -batch <(${MAGMA} -b -S 1 ${CMAKE_CURRENT_SOURCE_DIR}/gentest_factorization_of_prime.m < /dev/null)"
+    bash -c "${CMAKE_CURRENT_BINARY_DIR}/test-ant -test factorization-of-prime-batch -batch <(${MAGMA} -b -S 1 ${CMAKE_CURRENT_SOURCE_DIR}/gentest.m < /dev/null)"
+    TARGET_DEPENDENCIES
+    test-ant
+    )
+cado_define_test(
+    numbertheory-valuations-of-ideal-expensive
+    PROGRAM
+    bash -c "${CMAKE_CURRENT_BINARY_DIR}/test-ant -test valuations-of-ideal-batch -batch <(${MAGMA} -b -S 1 ${CMAKE_CURRENT_SOURCE_DIR}/gentest.m < /dev/null)"
     TARGET_DEPENDENCIES
     test-ant
     )
