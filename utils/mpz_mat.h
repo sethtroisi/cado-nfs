@@ -69,6 +69,9 @@ void mpq_mat_submat_set(
 /* set/set_ui*/
 void mpz_mat_set(mpz_mat_ptr dst, mpz_mat_srcptr src);
 void mpz_mat_set_ui(mpz_mat_ptr M, unsigned long a);
+void mpz_mat_set_mpz(mpz_mat_ptr M, mpz_srcptr a);
+void mpz_mat_add_ui(mpz_mat_ptr M, unsigned long a);
+void mpz_mat_add_mpz(mpz_mat_ptr M, mpz_srcptr a);
 void mpq_mat_set_ui(mpq_mat_ptr M, unsigned long a);
 void mpq_mat_set(mpq_mat_ptr dst, mpq_mat_srcptr src);
 void mpz_mat_urandomm(mpz_mat_ptr M, gmp_randstate_t state, mpz_srcptr p);
@@ -101,6 +104,7 @@ int mpz_mat_p_valuation(mpz_mat_srcptr A, mpz_srcptr p);
 int mpz_mat_p_valuation_ui(mpz_mat_srcptr A, unsigned long p);
 
 void mpz_mat_mod_ui(mpz_mat_ptr dst, mpz_mat_srcptr src, unsigned long p);
+void mpz_mat_mod_mpz(mpz_mat_ptr dst, mpz_mat_srcptr src, mpz_srcptr p);
 
 /*  row-level operations */
 // Return 1 if the k-th line of M is null, 0 otherwise
@@ -148,6 +152,7 @@ void mpq_mat_column_to_poly(mpz_poly_ptr f, mpz_ptr lcm, mpq_mat_srcptr M, const
 /* multiplication */
 void mpz_mat_mul(mpz_mat_ptr D, mpz_mat_srcptr A, mpz_mat_srcptr B);
 void mpz_mat_mul_mod_ui(mpz_mat_ptr D, mpz_mat_srcptr A, mpz_mat_srcptr B, unsigned long p);
+void mpz_mat_mul_mod_mpz(mpz_mat_ptr C, mpz_mat_srcptr A, mpz_mat_srcptr B, mpz_srcptr p);
 void mpz_mat_mul_mpz(mpz_mat_ptr C, mpz_mat_srcptr A, mpz_ptr k);
 void mpz_mat_divexact_mpz(mpz_mat_ptr B, mpz_mat_srcptr A, mpz_srcptr k);
 void mpz_mat_divexact_ui(mpz_mat_ptr B, mpz_mat_srcptr A, unsigned long k);
@@ -156,6 +161,7 @@ void mpz_mat_mul_ui(mpz_mat_ptr C, mpz_mat_srcptr A, unsigned long k);
 // Returns A^n for n >= 2 ; assume A is a square matrix ; it's possible to use the same variable for A and B, but you lose the contents of A
 void mpz_mat_pow_ui(mpz_mat_ptr B, mpz_mat_srcptr A, unsigned long n);
 // Returns A^n mod p for n >= 2 ; assume A is a square matrix ; it's possible to use the same variable for A and B, but you lose the contents of A
+void mpz_mat_pow_ui_mod_mpz(mpz_mat_ptr B, mpz_mat_srcptr A, unsigned long n, mpz_srcptr p);
 void mpz_mat_pow_ui_mod_ui(mpz_mat_ptr B, mpz_mat_srcptr A, unsigned long n, unsigned long p);
 void mpq_mat_mul(mpq_mat_ptr D, mpq_mat_srcptr A, mpq_mat_srcptr B);
 void mpq_mat_mul_mpq(mpq_mat_ptr C, mpq_mat_srcptr A, mpq_srcptr k);
@@ -172,6 +178,7 @@ void mpz_mat_sub(mpz_mat_ptr D, mpz_mat_srcptr A, mpz_mat_srcptr B);
 void mpq_mat_sub(mpq_mat_ptr D, mpq_mat_srcptr A, mpq_mat_srcptr B);
 void mpz_poly_eval_mpz_mat(mpz_mat_ptr D, mpz_mat_srcptr M, mpz_poly_srcptr f);
 void mpz_poly_eval_mpz_mat_mod_ui(mpz_mat_ptr D, mpz_mat_srcptr M, mpz_poly_srcptr f, unsigned long p);
+void mpz_poly_eval_mpz_mat_mod_mpz(mpz_mat_ptr D, mpz_mat_srcptr M, mpz_poly_srcptr f, mpz_srcptr p);
 
 /*  gaussian reduction over the rationals
  * this is a backend for row gaussian reduction. T receives the
@@ -184,7 +191,6 @@ void mpz_poly_eval_mpz_mat_mod_ui(mpz_mat_ptr D, mpz_mat_srcptr M, mpz_poly_srcp
  * T may be NULL in case we don't care.
  */
 void mpq_mat_gauss_backend(mpq_mat_ptr M, mpq_mat_ptr T);
-void mpz_mat_gauss_backend_mod_ui(mpz_mat_ptr M, mpz_mat_ptr T, unsigned long p);
 
 
 /* Gaussian reduction over Z/pZ
@@ -194,7 +200,8 @@ void mpz_mat_gauss_backend_mod_ui(mpz_mat_ptr M, mpz_mat_ptr T, unsigned long p)
  * M is the reduced matrix (modification in place of the input), T the
  * transformation matrix (so that T * input-M = output-M)
  */
-void mpz_mat_gauss_backend_mod(mpz_mat_ptr M, mpz_mat_ptr T, mpz_srcptr p);
+void mpz_mat_gauss_backend_mod_mpz(mpz_mat_ptr M, mpz_mat_ptr T, mpz_srcptr p);
+void mpz_mat_gauss_backend_mod_ui(mpz_mat_ptr M, mpz_mat_ptr T, unsigned long p);
 
 /* this computes the row hnf on a column C.
  * The result is always of the form C'=(gcd(C),0,0,...,0). The transform
@@ -209,6 +216,7 @@ int mpz_mat_hnf_backend(mpz_mat_ptr M, mpz_mat_ptr T);
 /* kernel*/
 // This is supposed to compute the Kernel of M mod p and to store it in the matrix K. If r is the rank of M, and M is a square matrix n*n, K is a n*(n-r) matrix
 void mpz_mat_kernel_mod_ui(mpz_mat_ptr K, mpz_mat_srcptr M, unsigned long p);
+void mpz_mat_kernel_mod_mpz(mpz_mat_ptr K, mpz_mat_srcptr M, mpz_srcptr p);
 
 void mpq_mat_inv(mpq_mat_ptr dst, mpq_mat_srcptr src);
 
@@ -231,6 +239,10 @@ struct cxx_mpz_mat {
     cxx_mpz_mat(int m, int n, unsigned long z) {
         mpz_mat_init(x, m, n);
         mpz_mat_set_ui(x, z);
+    }
+    cxx_mpz_mat(int m, int n, mpz_srcptr z) {
+        mpz_mat_init(x, m, n);
+        mpz_mat_set_mpz(x, z);
     }
     ~cxx_mpz_mat() { mpz_mat_clear(x); }
     cxx_mpz_mat(cxx_mpz_mat const & o) {

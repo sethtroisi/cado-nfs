@@ -198,7 +198,7 @@ void mpz_mat_set_ui(mpz_mat_ptr M, unsigned long a)
             mpz_set_ui(mpz_mat_entry(M, i, j), i == j ? a : 0);
 }
 
-void mpz_mat_set_z(mpz_mat_ptr M, mpz_srcptr a)
+void mpz_mat_set_mpz(mpz_mat_ptr M, mpz_srcptr a)
 {
     ASSERT_ALWAYS(M->m == M->n);
     for(unsigned int i = 0 ; i < M->m ; i++) {
@@ -215,7 +215,7 @@ void mpz_mat_add_ui(mpz_mat_ptr M, unsigned long a)
     }
 }
 
-void mpz_mat_add_z(mpz_mat_ptr M, mpz_srcptr a)
+void mpz_mat_add_mpz(mpz_mat_ptr M, mpz_srcptr a)
 {
     ASSERT_ALWAYS(M->m == M->n);
     for(unsigned int i = 0 ; i < M->m ; i++) {
@@ -1080,7 +1080,7 @@ void mpz_mat_mul_mpz(mpz_mat_ptr B, mpz_mat_srcptr A, mpz_ptr k)/*{{{*/
     }
 }/*}}}*/
 
-void mpz_mat_divexact_mpz(mpz_mat_ptr B, mpz_mat_srcptr A, mpz_ptr k)/*{{{*/
+void mpz_mat_divexact_mpz(mpz_mat_ptr B, mpz_mat_srcptr A, mpz_srcptr k)/*{{{*/
 {
     mpz_mat_realloc(B,A->m,A->n);       /* no-op if A == B */
     for(unsigned int i = 0 ; i < B->m ; i++) {
@@ -1089,6 +1089,7 @@ void mpz_mat_divexact_mpz(mpz_mat_ptr B, mpz_mat_srcptr A, mpz_ptr k)/*{{{*/
         }
     }
 }/*}}}*/
+
 void mpz_mat_divexact_ui(mpz_mat_ptr B, mpz_mat_srcptr A, unsigned long k)/*{{{*/
 {
     mpz_mat_realloc(B,A->m,A->n);       /* no-op if A == B */
@@ -1375,10 +1376,10 @@ void mpz_poly_eval_mpz_mat(mpz_mat_ptr D, mpz_mat_srcptr M, mpz_poly_srcptr f)/*
         return;
     }
     mpz_mat_realloc(D, n, n);
-    mpz_mat_set_z(D, f->coeff[f->deg]);
+    mpz_mat_set_mpz(D, f->coeff[f->deg]);
     for(int i = f->deg - 1 ; i >= 0 ; i--) {
         mpz_mat_mul(D, M, D);
-        mpz_mat_add_z(D, f->coeff[i]);
+        mpz_mat_add_mpz(D, f->coeff[i]);
     }
 }
 /*}}}*/
@@ -1407,6 +1408,38 @@ void mpz_poly_eval_mpz_mat_mod_ui(mpz_mat_ptr D, mpz_mat_srcptr M, mpz_poly_srcp
         mpz_mat_add_ui(D, mpz_fdiv_ui(f->coeff[i], p));
         mpz_mat_mod_ui(D, D, p);
     }
+}
+/*}}}*/
+void mpz_poly_eval_mpz_mat_mod_mpz(mpz_mat_ptr D, mpz_mat_srcptr M, mpz_poly_srcptr f, mpz_srcptr p)/*{{{*/
+{
+    ASSERT_ALWAYS(M->m == M->n);
+    unsigned int n = M->n;
+    int d = f->deg;
+    if (d < 0) {
+        mpz_mat_realloc(D, n, n);
+        mpz_mat_set_ui(D, 0);
+        return;
+    }
+    if (D == M) {
+        mpz_mat X;
+        mpz_mat_init(X, 0, 0);
+        mpz_poly_eval_mpz_mat_mod_mpz(X, M, f, p);
+        mpz_mat_swap(D, X);
+        mpz_mat_clear(X);
+        return;
+    }
+    mpz_mat_realloc(D, n, n);
+    mpz_t tmp;
+    mpz_init(tmp);
+    mpz_fdiv_r(tmp, f->coeff[f->deg], p);
+    mpz_mat_set_mpz(D, tmp);
+    for(int i = f->deg - 1 ; i >= 0 ; i--) {
+        mpz_mat_mul_mod_mpz(D, M, D, p);
+        mpz_fdiv_r(tmp, f->coeff[i], p);
+        mpz_mat_add_mpz(D, tmp);
+        mpz_mat_mod_mpz(D, D, p);
+    }
+    mpz_clear(tmp);
 }
 /*}}}*/
 /*}}}*/
@@ -1472,7 +1505,7 @@ void mpq_mat_gauss_backend(mpq_mat_ptr M, mpq_mat_ptr T)
  * T may be NULL in case we don't give a penny about the transformation
  * matrix.
  */
-void mpz_mat_gauss_backend_mod(mpz_mat_ptr M, mpz_mat_ptr T, mpz_srcptr p)
+void mpz_mat_gauss_backend_mod_mpz(mpz_mat_ptr M, mpz_mat_ptr T, mpz_srcptr p)
 {
     unsigned int m = M->m;
     unsigned int n = M->n;
@@ -1531,7 +1564,7 @@ void mpz_mat_gauss_backend_mod_ui(mpz_mat_ptr M, mpz_mat_ptr T, unsigned long p)
 {
     mpz_t pz;
     mpz_init_set_ui(pz, p);
-    mpz_mat_gauss_backend_mod(M, T, pz);
+    mpz_mat_gauss_backend_mod_mpz(M, T, pz);
     mpz_clear(pz);
 }
 
@@ -1835,19 +1868,17 @@ int mpz_mat_hnf_backend(mpz_mat_ptr M, mpz_mat_ptr T)
 // is a n*(n-r) matrix
 // 
 // self-assignment is ok.
-void mpz_mat_kernel_mod_ui(mpz_mat_ptr K, mpz_mat_srcptr M, unsigned long p)
+void mpz_mat_kernel_mod_mpz(mpz_mat_ptr K, mpz_mat_srcptr M, mpz_srcptr p)
 {
     mpz_mat T, H;
-    mpz_t p2;
     unsigned int r;
 
     mpz_mat_init(T,M->m,M->m);
     mpz_mat_init(H,M->m,M->n);
-    mpz_init_set_ui(p2,p);
     mpz_mat_set(H,M);
 
     // Storing a reduced matrix of M in H with gauss
-    mpz_mat_gauss_backend_mod(H,T,p2);
+    mpz_mat_gauss_backend_mod_mpz(H,T,p);
 
     // Finding the rank of M and H
     r = H->m;
@@ -1863,9 +1894,15 @@ void mpz_mat_kernel_mod_ui(mpz_mat_ptr K, mpz_mat_srcptr M, unsigned long p)
                             T, r, 0, 
                             H->m - r, H->m);
 
-    mpz_clear(p2);
     mpz_mat_clear(T);
     mpz_mat_clear(H);
+}
+void mpz_mat_kernel_mod_ui(mpz_mat_ptr K, mpz_mat_srcptr M, unsigned long p)
+{
+    mpz_t p2;
+    mpz_init_set_ui(p2,p);
+    mpz_mat_kernel_mod_mpz(K,M,p2);
+    mpz_clear(p2);
 }
 /* }}} */
 /*{{{ inversion*/

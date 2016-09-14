@@ -93,9 +93,9 @@ public:
 int do_p_maximal_order(param_list_ptr pl) /*{{{*/
 {
     cxx_mpz_poly f;
-    unsigned long p;
+    cxx_mpz p;
 
-    if (!param_list_parse_ulong(pl, "prime", &p)) usage(pl, original_argv, "missing prime argument");
+    if (!param_list_parse_mpz(pl, "prime", p)) usage(pl, original_argv, "missing prime argument");
 
     iowrap io(pl);
     istream in(io.ibuf);
@@ -112,7 +112,7 @@ int do_p_maximal_order(param_list_ptr pl) /*{{{*/
 }
 /*}}}*/
 
-bool sl_equivalent_matrices(cxx_mpq_mat const& M, cxx_mpq_mat const& A, unsigned long p)/*{{{*/
+bool sl_equivalent_matrices(cxx_mpq_mat const& M, cxx_mpq_mat const& A, cxx_mpz const& p)/*{{{*/
 {
     /* This is over SL_n(Z_p) */
     if (M->m != A->m) return false;
@@ -125,7 +125,7 @@ bool sl_equivalent_matrices(cxx_mpq_mat const& M, cxx_mpq_mat const& A, unsigned
     for(unsigned int i = 0 ; i < AMi->m ; i++) {
         for(unsigned int j = 0 ; j < AMi->n ; j++) {
             mpq_srcptr mij = mpq_mat_entry_const(AMi, i, j);
-            if (mpz_divisible_ui_p(mpq_denref(mij), p)) return false;
+            if (mpz_divisible_p(mpq_denref(mij), p)) return false;
         }
     }
     return true;
@@ -158,7 +158,7 @@ cxx_mpq_mat batch_read_order_basis(istream & in, unsigned int n)/*{{{*/
     return O;
 }/*}}}*/
 
-vector<pair<cxx_mpz_mat, int> > batch_read_prime_factorization(istream & in, unsigned int n, unsigned long p, cxx_mpq_mat const& O, cxx_mpz_mat const& M)/*{{{*/
+vector<pair<cxx_mpz_mat, int> > batch_read_prime_factorization(istream & in, unsigned int n, cxx_mpz const& p, cxx_mpq_mat const& O, cxx_mpz_mat const& M)/*{{{*/
 {
     invalid_argument exc(string("Parse error"));
     vector<pair<cxx_mpz_mat, int> > ideals;
@@ -171,7 +171,7 @@ vector<pair<cxx_mpz_mat, int> > batch_read_prime_factorization(istream & in, uns
         cxx_mpq_mat A(2, n);
         cxx_mpz den;
         int e;
-        mpq_set_ui(mpq_mat_entry(A,0,0),p,1);
+        mpq_set_z(mpq_mat_entry(A,0,0),p);
         if (!(in >> den)) throw exc;
         for(unsigned int j = 0 ; j < A->n ; j++) {
             cxx_mpz num;
@@ -215,7 +215,7 @@ int do_p_maximal_order_batch(param_list_ptr pl) /*{{{*/
         cxx_mpz d;
         cxx_mpz_mat A(f->deg, f->deg);
         istringstream is1(s);
-        unsigned long p;
+        cxx_mpz p;
         if (!(is1 >> p))
             throw exc;
 
@@ -241,9 +241,9 @@ int do_p_maximal_order_batch(param_list_ptr pl) /*{{{*/
 int do_factorization_of_prime(param_list_ptr pl) /*{{{*/
 {
     cxx_mpz_poly f;
-    unsigned long p;
+    cxx_mpz p;
 
-    if (!param_list_parse_ulong(pl, "prime", &p)) usage(pl, original_argv, "missing prime argument");
+    if (!param_list_parse_mpz(pl, "prime", p)) usage(pl, original_argv, "missing prime argument");
 
     iowrap io(pl);
     istream in(io.ibuf);
@@ -293,7 +293,7 @@ int do_factorization_of_prime_batch(param_list_ptr pl) /*{{{*/
 
         istringstream is1(s);
 
-        unsigned long p;
+        cxx_mpz p;
         if (!(is1 >> p)) throw exc;
 
         string keyword;
@@ -342,9 +342,9 @@ int do_factorization_of_prime_batch(param_list_ptr pl) /*{{{*/
 int do_valuations_of_ideal(param_list_ptr pl) /*{{{*/
 {
     cxx_mpz_poly f;
-    unsigned long p;
+    cxx_mpz p;
 
-    if (!param_list_parse_ulong(pl, "prime", &p)) usage(pl, original_argv, "missing prime argument");
+    if (!param_list_parse_mpz(pl, "prime", p)) usage(pl, original_argv, "missing prime argument");
 
     iowrap io(pl);
     istream in(io.ibuf);
@@ -423,7 +423,7 @@ int do_valuations_of_ideal(param_list_ptr pl) /*{{{*/
     vector<pair<cxx_mpz_mat, int>> F = factorization_of_prime(O, f, p, state);
     gmp_randclear(state);
 
-    int w = mpz_p_valuation_ui(denom, p);
+    int w = mpz_p_valuation(denom, p);
 
     for(unsigned int k = 0 ; k < F.size() ; k++) {
         cxx_mpz_mat const& fkp(F[k].first);
@@ -472,7 +472,7 @@ int do_valuations_of_ideal_batch(param_list_ptr pl) /*{{{*/
 
         istringstream is1(s);
 
-        unsigned long p;
+        cxx_mpz p;
         if (!(is1 >> p)) throw exc;
 
         string keyword;
@@ -531,7 +531,7 @@ int do_valuations_of_ideal_batch(param_list_ptr pl) /*{{{*/
             }
             pair<cxx_mpz_mat, cxx_mpz> Id = generate_ideal(O, M, cxx_mpq_mat(gens));
             vector<int> my_vals;
-            int w = mpz_p_valuation_ui(Id.second, p);
+            int w = mpz_p_valuation(Id.second, p);
             for(unsigned int ell = 0 ; ell < my_ideals.size() ; ell++) {
                 cxx_mpz_mat const& fkp(my_ideals[ell].first);
                 cxx_mpz_mat a = valuation_helper_for_ideal(M, fkp, p);
@@ -601,7 +601,7 @@ int do_linear_algebra_timings(param_list_ptr pl)/*{{{*/
         mpz_mat_urandomm(Mz, state, p);
         mpz_mat_fprint(stdout, Mz);
         printf("\n");
-        mpz_mat_gauss_backend_mod(Mz, Tz, p);
+        mpz_mat_gauss_backend_mod_mpz(Mz, Tz, p);
         mpz_mat_fprint(stdout, Mz);
         printf("\n");
         mpz_mat_fprint(stdout, Tz);

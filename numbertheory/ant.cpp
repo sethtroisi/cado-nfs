@@ -148,7 +148,7 @@ int mpz_mat_hnf_backend_rev(mpz_mat_ptr M, mpz_mat_ptr T) // {{{
     return s;
 }//}}}
 
-cxx_mpz_mat join_HNF(cxx_mpz_mat const& K, const unsigned long p)//{{{
+cxx_mpz_mat join_HNF(cxx_mpz_mat const& K, cxx_mpz const& p)//{{{
 {
     cxx_mpz_mat J(K->n, K->n, p);
     cxx_mpz_mat T0;
@@ -161,7 +161,7 @@ cxx_mpz_mat join_HNF(cxx_mpz_mat const& K, const unsigned long p)//{{{
 }
 //}}}
 
-cxx_mpz_mat join_HNF_rev(cxx_mpz_mat const& K, const unsigned long p)//{{{
+cxx_mpz_mat join_HNF_rev(cxx_mpz_mat const& K, cxx_mpz const& p)//{{{
 {
     // Builds the block matrix containing p*identity in the top, and K in
     // the bottom Then computes its HNF and stores it in I
@@ -300,7 +300,7 @@ cxx_mpz_mat multiply_elements_in_order(cxx_mpz_mat const& M, cxx_mpz_mat const& 
 }/*}}}*/
 
 //{{{ frobenius_matrix
-cxx_mpz_mat frobenius_matrix(cxx_mpz_mat const& M, unsigned long p)
+cxx_mpz_mat frobenius_matrix(cxx_mpz_mat const& M, cxx_mpz const& p)
 {
     // frobenius_matrix ; utility function for computing the p-radical
     // Takes a matrix B containing the generators (w_0, ... w_{n-1}) of an
@@ -313,17 +313,16 @@ cxx_mpz_mat frobenius_matrix(cxx_mpz_mat const& M, unsigned long p)
     unsigned int n = M->m;
     ASSERT_ALWAYS(M->n == n * n);
     cxx_mpz_mat Mp = M;
-    mpz_mat_mod_ui(Mp, Mp, p);
+    mpz_mat_mod_mpz(Mp, Mp, p);
 
     cxx_mpz_mat E(n, n, 1), F(E);
 
-    unsigned long k = ((~0UL)>>1) + 1;
-    for( ; k > p ; k >>= 1);
-    for( ; k >>= 1 ; ) {
+    int k = mpz_sizeinbase(p, 2) - 1;
+    for( ; k-- ; ) {
         F = multiply_elements_in_order(M, F, F);
-        if (p & k)
+        if (mpz_tstbit(p, k))
             F = multiply_elements_in_order(M, E, F);
-        mpz_mat_mod_ui(F, F, p);
+        mpz_mat_mod_mpz(F, F, p);
     }
     return F;
 }//}}}
@@ -331,7 +330,7 @@ cxx_mpz_mat frobenius_matrix(cxx_mpz_mat const& M, unsigned long p)
 // {{{ cxx_mpz_mat p_radical_of_order
 // Stores in I the p-radical of the order whose multiplication matrix is
 // given by M. I is expressed with respect to the basis of the order.
-cxx_mpz_mat p_radical_of_order(cxx_mpz_mat const& M, unsigned long p)
+cxx_mpz_mat p_radical_of_order(cxx_mpz_mat const& M, cxx_mpz const& p)
 {
     unsigned int n = M->m;
     ASSERT_ALWAYS(M->n == n * n);
@@ -344,23 +343,24 @@ cxx_mpz_mat p_radical_of_order(cxx_mpz_mat const& M, unsigned long p)
 
     /* Which power of p ? */
     int k = 1;
-    for (unsigned int pk = p; pk < n; k++, pk *= p);
-    mpz_mat_pow_ui_mod_ui(T, T, k, p);
+    for (cxx_mpz pk = p; mpz_cmp_ui(pk, n) < 0; k++)
+        mpz_mul(pk, pk, p);
+    mpz_mat_pow_ui_mod_mpz(T, T, k, p);
 
     // Storing in K a basis of Ker((z -> (z^%p mod g mod p))^k)
-    mpz_mat_kernel_mod_ui(K, T, p);
+    mpz_mat_kernel_mod_mpz(K, T, p);
 
     // Getting generators of the p radical from Ker(X) by computing HNF
     // of the vertical block matrix (p*Id, K);
     return join_HNF(K, p);
 }// }}}
 
-// {{{ cxx_mpq_mat p_maximal_order(cxx_mpz_poly const& f, unsigned long p)
+// {{{ cxx_mpq_mat p_maximal_order(cxx_mpz_poly const& f, cxx_mpz const& p)
 // Builds one p-maximal-order starting from the matrix B, containing the
 // generators of one order (in the basis of alpha^) In the number field
 // of the polynomial f, of degree n Stores the generators of this
 // p-maximal-order (in the basis of alpha^) in D
-cxx_mpq_mat p_maximal_order(cxx_mpz_poly const& f, unsigned long p)
+cxx_mpq_mat p_maximal_order(cxx_mpz_poly const& f, cxx_mpz const& p)
 {
     unsigned int n = f->deg;
 
@@ -382,12 +382,12 @@ cxx_mpq_mat p_maximal_order(cxx_mpz_poly const& f, unsigned long p)
         // Building the (n,n^2) matrix containing the integers mod p
         // associated to all generators of O
         cxx_mpz_mat M2 = multiplication_table_of_ideal(M, I);
-        mpz_mat_mod_ui(M2, M2, p);
+        mpz_mat_mod_mpz(M2, M2, p);
         //printf("M is :\n"); mpz_mat_fprint(stdout, M); printf("\n");
         
         // Computing Ker(M)
         cxx_mpz_mat K;	        // Ker(M)
-        mpz_mat_kernel_mod_ui(K, M2, p);
+        mpz_mat_kernel_mod_mpz(K, M2, p);
         // printf("Ker(M) is :\n"); mpz_mat_fprint(stdout, K_M); printf("\n");
 
         // Getting generators of p*O' by computing HNF of the vertical block matrix (p*Id, K_M);
@@ -397,7 +397,7 @@ cxx_mpq_mat p_maximal_order(cxx_mpz_poly const& f, unsigned long p)
         mpq_mat_mul(new_D, cxx_mpq_mat(J), D);
 
         // Dividing by p
-        mpq_mat_div_ui(new_D, new_D, p);
+        mpq_mat_div_mpz(new_D, new_D, p);
 
     } while (D != new_D);
 
@@ -423,7 +423,7 @@ cxx_mpq_mat p_maximal_order(cxx_mpz_poly const& f, unsigned long p)
 //}}}
 
 //{{{ mpz_mat_minpoly_mod_ui
-cxx_mpz_poly mpz_mat_minpoly_mod_ui(cxx_mpz_mat M, unsigned long p)
+cxx_mpz_poly mpz_mat_minpoly_mod_mpz(cxx_mpz_mat M, cxx_mpz const& p)
 {
     ASSERT_ALWAYS(M->m == M->n);
     unsigned long n = M->n;
@@ -433,11 +433,11 @@ cxx_mpz_poly mpz_mat_minpoly_mod_ui(cxx_mpz_mat M, unsigned long p)
         for(unsigned int i = 0 ; i < n ; i++) {
             mpz_mat_submat_set(B, n - k, i * n, T, i, 0, 1, n);
         }
-        mpz_mat_mul_mod_ui(T, T, M, p);
+        mpz_mat_mul_mod_mpz(T, T, M, p);
     }
     cxx_mpz_mat K;
-    mpz_mat_kernel_mod_ui(K, B, p);
-    mpz_mat_gauss_backend_mod_ui(K, NULL, p);
+    mpz_mat_kernel_mod_mpz(K, B, p);
+    mpz_mat_gauss_backend_mod_mpz(K, NULL, p);
 
     /* TODO: write down exactly what we need in terms of ordering from
      * mpz_mat_gauss_backend_mod_ui. I take it that we're happy if it
@@ -457,7 +457,7 @@ cxx_mpz_mat matrix_of_multmap(
         cxx_mpz_mat const& M,
         cxx_mpz_mat const& J, 
         cxx_mpz_mat const& c,
-        unsigned long p)
+        cxx_mpz const& p)
 {
     /* Let O be an order, represented here simply by its multiplication
      * matrix. Let J be an m-dimensional subalgebra of O/pO. Let c be an
@@ -484,7 +484,7 @@ cxx_mpz_mat matrix_of_multmap(
     cxx_mpz_mat K;
     mpz_mat_transpose(Jt, J);
     cxx_mpz_mat T;
-    mpz_mat_gauss_backend_mod_ui(Jt, T, p);
+    mpz_mat_gauss_backend_mod_mpz(Jt, T, p);
     cxx_mpz_mat Kt(m, n);
     mpz_mat_submat_swap(Kt, 0, 0, T, 0, 0, m, n);
     mpz_mat_transpose(Kt, Kt);  /* Kt is now n times m */
@@ -495,19 +495,17 @@ cxx_mpz_mat matrix_of_multmap(
         cxx_mpz_mat w = multiply_elements_in_order(M, c, jk);
         mpz_mat_submat_swap(CJ,k,0,w,0,0,1,n);
     }
-    mpz_mat_mul_mod_ui(Mc, CJ, Kt, p);
+    mpz_mat_mul_mod_mpz(Mc, CJ, Kt, p);
     return Mc;
 }
 /*}}}*/
 
-/*{{{ factorization_of_polynomial_mod_ui */
-vector<pair<cxx_mpz_poly, int>> factorization_of_polynomial_mod_ui(cxx_mpz_poly const& f, unsigned long p, gmp_randstate_t state)
+/*{{{ factorization_of_polynomial_mod_mpz */
+vector<pair<cxx_mpz_poly, int>> factorization_of_polynomial_mod_mpz(cxx_mpz_poly const& f, cxx_mpz const& p, gmp_randstate_t state)
 {
-    cxx_mpz pz;
-    mpz_set_ui(pz,p);
     mpz_poly_factor_list lf;
     mpz_poly_factor_list_init(lf);
-    mpz_poly_factor(lf,f,pz,state);
+    mpz_poly_factor(lf,f,p,state);
     vector<pair<cxx_mpz_poly, int>> res(lf->size);
     for(int i = 0 ; i < lf->size ; i++) {
         mpz_poly_swap(res[i].first, lf->factors[i]->f);
@@ -541,7 +539,7 @@ template <typename T> void append_move(vector<T> &a, vector<T> &b)
 vector<pair<cxx_mpz_mat, int>> factorization_of_prime_inner(
         cxx_mpq_mat const & B,
         cxx_mpz_mat const & M,
-        unsigned long p,
+        cxx_mpz const& p,
         cxx_mpz_mat const& Ip,
         cxx_mpz_mat const& I,
         cxx_mpz_mat const& J,
@@ -556,9 +554,9 @@ vector<pair<cxx_mpz_mat, int>> factorization_of_prime_inner(
     /* Pick a random element of J */
     cxx_mpz_mat c(1, m);
     for(unsigned int i = 0 ; i < m ; i++) {
-        mpz_set_ui(mpz_mat_entry(c,0,i), gmp_urandomm_ui(state, p));
+        mpz_urandomm(mpz_mat_entry(c,0,i), state, p);
     }
-    mpz_mat_mul_mod_ui(c, c, J, p);
+    mpz_mat_mul_mod_mpz(c, c, J, p);
 
     cxx_mpz_mat Mc = matrix_of_multmap(M, J, c, p);
 
@@ -566,9 +564,9 @@ vector<pair<cxx_mpz_mat, int>> factorization_of_prime_inner(
      * simply the matrix of multiplication by c. For this, we write an
      * (m+1) times m^2 matrix, and compute a left kernel.
      */
-    cxx_mpz_poly Pc = mpz_mat_minpoly_mod_ui(Mc, p);
+    cxx_mpz_poly Pc = mpz_mat_minpoly_mod_mpz(Mc, p);
 
-    vector<pair<cxx_mpz_poly, int>> facP = factorization_of_polynomial_mod_ui(Pc, p, state);
+    vector<pair<cxx_mpz_poly, int>> facP = factorization_of_polynomial_mod_mpz(Pc, p, state);
 
     vector<pair<cxx_mpz_mat, int>> ideals;
 
@@ -578,13 +576,13 @@ vector<pair<cxx_mpz_mat, int>> factorization_of_prime_inner(
         cxx_mpz_poly const& f(facP[i].first);
         /* We need the basis of the kernel of f(Mc) */
         cxx_mpz_mat E;
-        mpz_poly_eval_mpz_mat_mod_ui(E, Mc, f, p);
-        mpz_mat_pow_ui_mod_ui(E, E, facP[i].second, p);
-        mpz_mat_kernel_mod_ui(E, E, p);
+        mpz_poly_eval_mpz_mat_mod_mpz(E, Mc, f, p);
+        mpz_mat_pow_ui_mod_mpz(E, E, facP[i].second, p);
+        mpz_mat_kernel_mod_mpz(E, E, p);
         /* This line is just to be exactly in line with what magma says
          */
-        mpz_mat_gauss_backend_mod_ui(E, NULL, p);
-        mpz_mat_mul_mod_ui(E, E, J, p);
+        mpz_mat_gauss_backend_mod_mpz(E, NULL, p);
+        mpz_mat_mul_mod_mpz(E, E, J, p);
         characteristic_subspaces.push_back(E);
     }
 
@@ -626,7 +624,7 @@ vector<pair<cxx_mpz_mat, int>> factorization_of_prime_inner(
 
 vector<pair<cxx_mpz_mat, int>> factorization_of_prime(
         cxx_mpq_mat & B, cxx_mpz_poly const& g,
-        unsigned long p,
+        cxx_mpz const& p,
         gmp_randstate_t state)
 {
     int n = g->deg;
@@ -646,7 +644,7 @@ vector<pair<cxx_mpz_mat, int>> factorization_of_prime(
 //
 // The uniformizing element is such that (a/p)*I is in O, yet a is not in
 // p*O.
-cxx_mpz_mat valuation_helper_for_ideal(cxx_mpz_mat const& M, cxx_mpz_mat const& I, unsigned long p)
+cxx_mpz_mat valuation_helper_for_ideal(cxx_mpz_mat const& M, cxx_mpz_mat const& I, cxx_mpz const& p)
 {
     unsigned int n = M->m;
     ASSERT_ALWAYS(M->n == n * n);
@@ -663,14 +661,14 @@ cxx_mpz_mat valuation_helper_for_ideal(cxx_mpz_mat const& M, cxx_mpz_mat const& 
         for (unsigned int j = 0; j < n; j++) {
             mpz_mat_submat_set(Tz, j, 0, M, i, j*n, 1, n);
         }
-        mpz_mat_mul_mod_ui(Tz, I, Tz, p);
+        mpz_mat_mul_mod_mpz(Tz, I, Tz, p);
         for (unsigned int j = 0; j < n; j++) {
             mpz_mat_submat_swap(MI, i, j*n, Tz, j, 0, 1, n);
         }
     }
 
     cxx_mpz_mat ker;
-    mpz_mat_kernel_mod_ui(ker, MI, p);
+    mpz_mat_kernel_mod_mpz(ker, MI, p);
     mpz_mat_hnf_backend(ker, NULL);
 
     cxx_mpz_mat res(1, n);
@@ -726,7 +724,7 @@ int prime_ideal_inertia_degree(cxx_mpz_mat const& I)/*{{{*/
     return f;
 }
 /*}}}*/
-int valuation_of_ideal_at_prime_ideal(cxx_mpz_mat const& M, cxx_mpz_mat const& I, cxx_mpz_mat const& a, unsigned long p)/*{{{*/
+int valuation_of_ideal_at_prime_ideal(cxx_mpz_mat const& M, cxx_mpz_mat const& I, cxx_mpz_mat const& a, cxx_mpz const& p)/*{{{*/
 {
     unsigned int n = M->m;
     ASSERT_ALWAYS(M->n == n * n);
@@ -744,14 +742,14 @@ int valuation_of_ideal_at_prime_ideal(cxx_mpz_mat const& M, cxx_mpz_mat const& I
             b = multiply_elements_in_order(M, a, b);
             mpz_mat_submat_swap(b,0,0,Ia,i,0,1,n);
         }
-        if (mpz_mat_p_valuation_ui(Ia, p) < 1)
+        if (mpz_mat_p_valuation(Ia, p) < 1)
             return val;
-        mpz_mat_divexact_ui(Ia, Ia, p);
+        mpz_mat_divexact_mpz(Ia, Ia, p);
     }
 }
 /*}}}*/
 
-struct hypercube_walk {
+struct hypercube_walk {/*{{{*/
     struct iterator {
         int B;
         vector<int> v;
@@ -798,14 +796,13 @@ struct hypercube_walk {
         z.last = make_pair(-1,-1);
         return z;
     }
-};
+};/*}}}*/
  
 /* {{{ prime_ideal_two_element */
 /* I must be in HNF */
 pair<cxx_mpz, cxx_mpz_mat> prime_ideal_two_element(cxx_mpq_mat const& O, cxx_mpz_poly const& f, cxx_mpz_mat const& M, cxx_mpz_mat const& I)
 {
-    unsigned long p;
-    cxx_mpz pz;
+    cxx_mpz p;
     unsigned int n = M->m;
     ASSERT_ALWAYS(M->n == n * n);
     ASSERT_ALWAYS(I->m == n);
@@ -814,12 +811,11 @@ pair<cxx_mpz, cxx_mpz_mat> prime_ideal_two_element(cxx_mpq_mat const& O, cxx_mpz
     for(unsigned int i = 0 ; i < n ; i++) {
         mpz_srcptr di = mpz_mat_entry_const(I, i, i);
         if (mpz_cmp_ui(di, 1) != 0) {
-            mpz_set(pz, di);
+            mpz_set(p, di);
             inertia++;
         }
     }
-    ASSERT_ALWAYS(mpz_size(pz) != 0);
-    p = mpz_get_ui(pz);
+    ASSERT_ALWAYS(mpz_size(p) != 0);
 
     /* We use a homebrew algorithm, loosely inspired on Cohen's. We
      * prefer an enumeration which favors small generators. Based on
@@ -877,7 +873,7 @@ pair<cxx_mpz, cxx_mpz_mat> prime_ideal_two_element(cxx_mpq_mat const& O, cxx_mpz
             cxx_mpz res;
             mpq_mat_row_to_poly(pgen, dgen, gen, 0);
             mpz_poly_resultant(res, pgen, f);
-            int v = mpz_p_valuation_ui(res, p) - f->deg * (mpz_p_valuation_ui(f->coeff[f->deg], p) + mpz_p_valuation_ui(dgen, p));
+            int v = mpz_p_valuation(res, p) - f->deg * (mpz_p_valuation(f->coeff[f->deg], p) + mpz_p_valuation(dgen, p));
             ASSERT_ALWAYS(v >= inertia);
             if (v == inertia) {
                 cxx_mpz_mat lambda(1, m);
@@ -886,7 +882,7 @@ pair<cxx_mpz, cxx_mpz_mat> prime_ideal_two_element(cxx_mpq_mat const& O, cxx_mpz
                     mpz_set_si(mpz_mat_entry(lambda,0,i),v[i]);
                 }
                 mpz_mat_mul(lambda, lambda, OI);
-                return make_pair(pz, lambda);
+                return make_pair(p, lambda);
             }
         }
     }
