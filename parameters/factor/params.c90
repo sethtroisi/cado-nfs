@@ -173,6 +173,7 @@ tasks.polyselect.P = 10000		# choose lc(g) with two prime factors in [P,2P]
     # but the number of found polynomials will be smaller.
     # As a rule of thumb, we want at least 100 found polynomials in total
     # (without norm limitation, see below).
+    # We must have P larger than primes in the SPECIAL_Q[] list.
 
 tasks.polyselect.admin = 0          # min value for leading coefficient of f(x)
     # If not set, the default is 0.
