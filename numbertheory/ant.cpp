@@ -872,8 +872,15 @@ pair<cxx_mpz, cxx_mpz_mat> prime_ideal_two_element(cxx_mpq_mat const& O, cxx_mpz
             cxx_mpz dgen;
             cxx_mpz res;
             mpq_mat_row_to_poly(pgen, dgen, gen, 0);
+            if (pgen->deg < 0) continue;
             mpz_poly_resultant(res, pgen, f);
-            int v = mpz_p_valuation(res, p) - f->deg * (mpz_p_valuation(f->coeff[f->deg], p) + mpz_p_valuation(dgen, p));
+            /* We want the absolute norm to have p-valuation equal to the
+             * inertia degree.
+             * absolute norm is galois norm. galois norm is product of
+             * all conjugate of pgen(alpha). Resultant(f,pgen) is
+             * lc(f)^deg(pgen) times the galois norm.
+             */
+            int v = mpz_p_valuation(res, p) - pgen->deg * mpz_p_valuation(f->coeff[f->deg], p) - f->deg * mpz_p_valuation(dgen, p);
             ASSERT_ALWAYS(v >= inertia);
             if (v == inertia) {
                 cxx_mpz_mat lambda(1, m);
