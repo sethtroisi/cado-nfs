@@ -242,7 +242,8 @@ comp_sq_roots ( header_t header,
     qroots_add (SQ_R, q, nrq, rq);
   }
 
-  /* Reorder R entries by nr. It is safe to comment it. */
+  /* Reorder R entries by decreasing number of roots (nr).
+     It is safe to comment it. */
   qroots_rearrange (SQ_R);
 
   free(rq);

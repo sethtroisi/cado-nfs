@@ -1441,9 +1441,8 @@ collision_on_sq (header_t header, proots_t R, unsigned long c )
     k ++;
   }
 
-  /* since all primes in SPECIAL_Q[] have at most 8 bits, and the special-q
-     must fit on an "unsigned long", we should have k <= 4 on a 32-bit machine,
-     and k <= 8 on a 64-bit machine */
+  /* We force k <= 4 on a 32-bit machine, and k <= 8 on a 64-bit machine,
+     to ensure q fits on an "unsigned long". */
   if (k > (sizeof (unsigned long) * CHAR_BIT) / 8)
     k = (sizeof (unsigned long) * CHAR_BIT) / 8;
   if (k < 1)
