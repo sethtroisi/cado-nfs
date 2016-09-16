@@ -15,6 +15,7 @@
 #include "fb.h"
 #include "portability.h"
 #include "utils.h"           /* lots of stuff */
+#include "relation.h"
 #include "ecm/facul.h"
 #include "bucket.h"
 #include "trialdiv.h"

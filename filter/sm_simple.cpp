@@ -13,7 +13,6 @@
 
 #include "macros.h"
 #include "utils.h"
-#include "relation.h"
 
 static void my_sm(const char *outfile, const char *infile, 
 		  sm_side_info *sm_info, int nb_polys)
