@@ -9,7 +9,6 @@
 #include "bucket.h"
 #include "cado_poly.h"
 #include "ecm/facul.h"
-#include "relation.h"
 #include "las-forwardtypes.h"
 #include "las-unsieve.h"
 #include "las-qlattice.h"
