@@ -173,7 +173,7 @@ estimate_weibull_moments2 (double *beta, double *eta, data_t s)
 
   data_init (smin);
 
-  k = 50; /* sample size */
+  k = (unsigned long) sqrt ((double) n); /* sample size */
   /* We consider full samples only. Since we call this function several times
      with the same sequence, we perform a random permutation of the sequence
      at each call to avoid side effects due to the particular order of
@@ -265,6 +265,10 @@ print_poly_info ( char *buf,
       prob = 1.0 - exp (- pow (target_E / eta, beta));
       if (prob == 0) /* for x small, exp(x) ~ 1+x */
         prob = pow (target_E / eta, beta);
+      sprintf (buf + strlen(buf),
+               "# E: %lu, min %.2f, avg %.2f, max %.2f, stddev %.2f\n",
+               data_exp_E->size, data_exp_E->min, data_mean (data_exp_E),
+               data_exp_E->max, sqrt (data_var (data_exp_E)));
       sprintf (buf + strlen(buf), "# target_E=%.2f: collisions=%.2e, time=%.2e"
                " (beta=%.2f,eta=%.2f)\n",
                target_E, 1.0 / prob, seconds () / (prob * collisions_good),
