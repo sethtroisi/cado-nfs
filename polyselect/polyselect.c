@@ -2059,7 +2059,8 @@ main (int argc, char *argv[])
     exit (1);
   }
   if (P <= (unsigned long) SPECIAL_Q[LEN_SPECIAL_Q - 2]) {
-    fprintf (stderr, "Error, too small value of P\n");
+    fprintf (stderr, "Error, too small value of P, need P > %u\n",
+             SPECIAL_Q[LEN_SPECIAL_Q - 2]);
     exit (1);
   }
   /* since for each prime p in [P,2P], we convert p^2 to int64_t, we need
