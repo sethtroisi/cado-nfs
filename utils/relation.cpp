@@ -31,8 +31,8 @@ relation::parse(const char *line)
 
     if (gmp_sscanf(line, "%Zd,%Zd:%n", (mpz_ptr) az, (mpz_ptr)bz, &consumed) < 2)
         return 0;
-    a = mpz_get_si(az);
-    b = mpz_get_ui(az);
+    a = mpz_get_int64(az);
+    b = mpz_get_uint64(az);
 
     for(int i = 0; i < NB_POLYS_MAX; i++)
 	sides[i].clear();
