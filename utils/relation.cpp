@@ -29,8 +29,10 @@ relation::parse(const char *line)
     int consumed;
     int side = 0;
 
-    if (sscanf(line, "%" SCNd64 ",%" SCNu64 ":%n", &a, &b, &consumed) < 2)
+    if (gmp_sscanf(line, "%Zd,%Zd:%n", (mpz_ptr) az, (mpz_ptr)bz, &consumed) < 2)
         return 0;
+    a = mpz_get_si(az);
+    b = mpz_get_ui(az);
 
     for(int i = 0; i < NB_POLYS_MAX; i++)
 	sides[i].clear();
@@ -73,7 +75,7 @@ relation::print (FILE *file, const char *prefix) const
     c = strlcpy(p, prefix, fence - p);
     p += strnlen(prefix, sizeof(buf));
 
-    c = snprintf(p, fence - p, "%" PRId64 ",%" PRIu64, a, b);
+    c = gmp_snprintf(p, fence - p, "%Zd,%Zd", (mpz_srcptr)az, (mpz_srcptr)bz);
     p += c;
 
     for(int side = 0 ; side < nb_polys ; side++) {
@@ -110,9 +112,9 @@ void relation::add(int side, mpz_srcptr p)
         pr x;
         mpz_set(x.p, p);
 
-        mpz_set_uint64(x.r, b);
+        mpz_set(x.r, bz);
         if (mpz_invert(x.r, x.r, x.p)) {
-            mpz_mul_int64(x.r, x.r, a);
+            mpz_mul(x.r, x.r, az);
             mpz_mod(x.r, x.r, x.p);
         } else {
             mpz_set(x.r, x.p);
@@ -141,9 +143,9 @@ void relation::fixup_r(bool also_rational)
             if (mpz_cmp_ui(sides[side][i].r,0) == 0) {
                 pr & x(sides[side][i]);
 
-                mpz_set_uint64(x.r, b);
+                mpz_set(x.r, bz);
                 if (mpz_invert(x.r, x.r, x.p)) {
-                    mpz_mul_int64(x.r, x.r, a);
+                    mpz_mul(x.r, x.r, az);
                     mpz_mod(x.r, x.r, x.p);
                 } else {
                     mpz_set(x.r, x.p);

@@ -2227,6 +2227,11 @@ factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED)
             continue;
 #endif
         size_t offset = (const unsigned char *) SS_lw - SS;
+#ifdef SUPPORT_LARGE_Q
+        mpz_t az, bz;
+        mpz_init(az);
+        mpz_init(bz);
+#endif
         for (size_t x = offset; x < offset + together; ++x) {
             if (SS[x] == 255) continue;
 
@@ -2243,6 +2248,9 @@ factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED)
 
             // Compute algebraic and rational norms.
             NxToAB (&a, &b, N, x, si);
+#ifdef SUPPORT_LARGE_Q
+            NxToABmpz (az, bz, N, x, si);
+#endif
 #ifdef TRACE_K
             if (trace_on_spot_ab(a, b))
               verbose_output_print(TRACE_CHANNEL, 0, "# about to start cofactorization for (%"
@@ -2253,28 +2261,30 @@ factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED)
              * sieving, may fall below the report bound (see tracker
              * issue #15437). Therefore it is safe to continue here. */
             // ASSERT((a | b) & 1);
+#ifndef SUPPORT_LARGE_Q
             if (UNLIKELY(((a | b) & 1) == 0))
+#else
+            if (UNLIKELY(mpz_even_p(az) && mpz_even_p(bz)))
+#endif
             {
                 th->rep->both_even++;
                 continue;
-#if 0
-                verbose_output_print (1, 0,
-                        "# Error: a and b both even for N = %d, x = %d,\n"
-                        "i = %d, j = %d, a = %ld, b = %lu\n",
-                        N, x, ((x + N*BUCKET_REGION) & (si->I - 1))
-                        - (si->I >> 1),
-                        (x + N*BUCKET_REGION) >> si->conf->logI,
-                        (long) a, (unsigned long) b);
-                abort();
-#endif
             }
 
             /* Since the q-lattice is exactly those (a, b) with
                a == rho*b (mod q), q|b  ==>  q|a  ==>  q | gcd(a,b) */
             /* FIXME: fast divisibility test here! */
             /* Dec 2014: on a c90, it takes 0.1 % of total sieving time*/
+#ifndef SUPPORT_LARGE_Q
             if (b == 0 || (mpz_cmp_ui(si->doing->p, b) <= 0 && b % mpz_get_ui(si->doing->p) == 0))
+#else
+            if ((mpz_cmp_ui(bz, 0) == 0) || 
+                (mpz_cmp(si->doing->p, bz) <= 0 &&
+                 mpz_divisible_p(bz, si->doing->p)))
+#endif
+            {
                 continue;
+            }
 
             copr++;
 
@@ -2321,8 +2331,12 @@ factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED)
             if (!pass) continue;
 
             if (las->batch_print_survivors) {
+#ifndef SUPPORT_LARGE_Q
                 gmp_printf("%" PRId64 " %" PRIu64 " %Zd %Zd\n", a, b,
                         norm[0], norm[1]);
+#else
+                gmp_printf("%Zd %Zd %Zd %Zd\n", az, bz, norm[0], norm[1]);
+#endif
                 continue;
             }
 	    if (las->batch)
@@ -2367,7 +2381,11 @@ factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED)
 	    
             // ASSERT (bin_gcd_int64_safe (a, b) == 1);
 
+#ifndef SUPPORT_LARGE_Q
             relation rel(a, b);
+#else
+            relation rel(az, bz);
+#endif
 
             /* Note that we explicitly do not bother about storing r in
              * the relations below */
@@ -2429,6 +2447,10 @@ factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED)
                 break;
 #endif  /* DLP_DESCENT */
         }
+#ifdef SUPPORT_LARGE_Q
+        mpz_clear(az);
+        mpz_clear(bz);
+#endif
     }
 
     verbose_output_print(0, 3, "# There were %d survivors in bucket %d\n", surv, N);

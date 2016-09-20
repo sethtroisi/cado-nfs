@@ -11,14 +11,32 @@
 
 #include "cado_poly.h"
 
+#include "cxx_mpz.hpp"
+
 struct relation_ab {
     int64_t a;		/* only a is allowed to be negative */
     uint64_t b;
+    cxx_mpz az;
+    cxx_mpz bz;
     operator bool() const { return a || b; }
-    relation_ab() { a=b=0; }
-    relation_ab(int64_t a, uint64_t b) : a(a), b(b) {}
+    relation_ab() {
+        a=0;
+        b=0;
+    }
+    relation_ab(int64_t a, uint64_t b) : a(a), b(b) {
+        mpz_set_si(az, a);
+        mpz_set_ui(bz, b);
+    }
+    relation_ab(mpz_t _az, mpz_t _bz) {
+        mpz_set(az, _az);
+        mpz_set(bz, _bz);
+        a = mpz_get_si(az);
+        b = mpz_get_ui(bz);
+    }
     bool operator<(const relation_ab& o) const {
-        return a < o.a || (a == o.a && b < o.b);
+        return ((mpz_cmp(az, o.az) < 0) ||
+                (mpz_cmp(az, o.az) == 0 &&
+                 mpz_cmp(bz, o.bz) < 0));
     }
 };
 
@@ -77,6 +95,9 @@ struct relation : public relation_ab {
     relation() {}
     operator bool() const { return (bool) (relation_ab) *this; }
     relation(int64_t a, uint64_t b, int rational_side = -1, int nb_polys = 2)
+        : relation_ab(a,b), rational_side(rational_side), nb_polys(nb_polys)
+    {}
+    relation(mpz_t a, mpz_t b, int rational_side = -1, int nb_polys = 2)
         : relation_ab(a,b), rational_side(rational_side), nb_polys(nb_polys)
     {}
 
