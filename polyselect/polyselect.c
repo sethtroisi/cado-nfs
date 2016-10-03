@@ -593,8 +593,9 @@ match (unsigned long p1, unsigned long p2, const int64_t i, mpz_t m0,
   check_divexact (t, t, "t", l, "l");
   mpz_set (f[0], t);
 
-  /* if the coefficient of degree d-2 is negative, the size optimization
-     will not work well, thus we simply discard those polynomials */
+  /* If the coefficient of degree d-2 is of the same sign as the leading
+     coefficient, the size optimization will not work well, thus we simply
+     discard those polynomials. */
   if (mpz_sgn (f[d]) * mpz_sgn (f[d-2]) > 0)
     goto end;
 
