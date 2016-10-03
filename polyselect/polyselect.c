@@ -515,7 +515,6 @@ match (unsigned long p1, unsigned long p2, const int64_t i, mpz_t m0,
      Note: this might produce duplicate polynomials, since a given p*l
      might be found in different ways.
   */
-  unsigned long *p, Primes[] = {2, 3, 5, 7, 11, 13, 17, 19, 0};
   mpz_mul_ui (m, ad, d);
   mpz_pow_ui (m, m, d);
   mpz_divexact (m, m, ad);
@@ -524,16 +523,27 @@ match (unsigned long p1, unsigned long p2, const int64_t i, mpz_t m0,
   mpz_sub (t, m, t);
   mpz_divexact (t, t, l);
   mpz_divexact (t, t, l);
-  for (p = Primes; p[0]; p++)
+  unsigned long p;
+  prime_info pi;
+  prime_info_init (pi);
+  /* Note: we could find p^2 dividing t in a much more efficient way, for
+     example by precomputing the product of all primes < 2*P, then doing
+     a gcd with t, which gives say g, then computing gcd(t, t/g).
+     But if P is small, it would gain little with respect to the naive loop
+     below, and if P is large, we have only a few hits, thus the global
+     overhead will be small too. */
+  for (p = 2; p <= Primes[lenPrimes - 1]; p = getprime_mt (pi))
     {
-      if (d % p[0] == 0 || mpz_divisible_ui_p (ad, p[0]))
+      if (d % p == 0 || mpz_divisible_ui_p (ad, p))
         continue;
-      while (mpz_divisible_ui_p (t, p[0] * p[0]))
+      if (mpz_divisible_ui_p (t, p * p))
         {
-          mpz_mul_ui (l, l, p[0]);
-          mpz_divexact_ui (t, t, p[0] * p[0]);
+          mpz_mul_ui (l, l, p);
+          mpz_divexact_ui (t, t, p * p);
         }
     }
+  prime_info_clear (pi);
+  /* end of small improvement */
 
   /* we want mtilde = d*ad*m + a_{d-1}*l with 0 <= a_{d-1} < d*ad.
      We have a_{d-1} = mtilde/l mod (d*ad). */
