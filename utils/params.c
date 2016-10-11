@@ -1181,25 +1181,39 @@ int param_list_parse_uchar_list(param_list pl, const char * key,
 }
 
 void param_list_parse_int_list_size(param_list pl, const char * key , int ** r ,
-                                    unsigned int * t, const char * sep)
+    unsigned int * t)
 {
   char *value;
   if (!get_assoc(pl, key, &value, NULL))
     return ;
-  * t = 0;
-  unsigned int i = 0;
-  while (value[i] != '\0') {
-    if (strchr(sep, (int)value[i])) {
-      (* t)++;
+  char *tmp = value;
+  int i = 0;
+  * r = (int * ) malloc(sizeof(int) * 1);
+  * t = 1;
+  for (;;) {
+    int ret = sscanf(tmp, "%d", &i);
+    if (ret != 1) {
+      fprintf (stderr, "Error while parsing coffecient array %s[%d]\n", key, *t
+          - 1);
+      exit(1);
     }
-    i++;
-  }
-  (* t)++;
-  * r = malloc(sizeof(int) * (* t));
-  char *token;
-  for (i = 0; i < * t; i++) {
-    token = strsep (&value, sep);
-    (*r)[i] = atoi(token);
+    (*r)[*t - 1] = i;
+    if (*tmp == '-') {
+      tmp++;
+    }
+    while (isdigit(*tmp)) {
+      tmp++;
+    }
+    if(*tmp == '\0') {
+      break;
+    }
+    if (*tmp != ',') {
+      fprintf (stderr, "Error while parsing array %s\n", key);
+      exit(1);
+    }
+    tmp++;
+    *t = *t + 1;
+    * r = realloc(* r, sizeof(int) * (*t));
   }
 }
 
@@ -1243,27 +1257,36 @@ int param_list_parse_double_list(param_list pl, const char * key,
 }
 
 void param_list_parse_mpz_poly(param_list pl, const char * key,
-    mpz_poly_ptr f, const char *sep)
+    mpz_poly_ptr f)
 {
   char *value;
   if (!get_assoc(pl, key, &value, NULL))
     return ;
-  int deg = -1;
-  int i = 0;
-  while (value[i] != '\0') {
-    if (strchr(sep, (int)value[i])) {
-      deg++;
-    }
-    i++;
-  }
-  deg++;
-  char *token;
+  char *tmp = value;
   mpz_t coeff;
   mpz_init(coeff);
-  for (i = 0; i <= deg; i++) {
-    token = strsep (&value, sep);
-    mpz_set_str(coeff, token, 10);
-    mpz_poly_setcoeff(f, i, coeff);
+  for(unsigned int j = 0; ; j++) {
+    int ret = gmp_sscanf(tmp, "%Zd", coeff);
+    if (ret != 1) {
+      fprintf (stderr, "Error while parsing coefficients of degree %u "
+          "of polynomial %s\n", j, key);
+      exit(1);
+    }
+    mpz_poly_setcoeff(f, j, coeff);
+    if (*tmp == '-') {
+      tmp++;
+    }
+    while (isdigit(*tmp)) {
+      tmp++;
+    }
+    if(*tmp == '\0') {
+      break;
+    }
+    if (*tmp != ',') {
+      fprintf (stderr, "Error while parsing polynomial %s\n", key);
+      exit(1);
+    }
+    tmp++;
   }
   mpz_clear(coeff);
 }

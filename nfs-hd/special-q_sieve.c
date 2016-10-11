@@ -2895,7 +2895,7 @@ void initialise_parameters(int argc, char * argv[], cado_poly_ptr f,
 
   unsigned int t;
   int * r;
-  param_list_parse_int_list_size(pl, "H", &r, &t, ".,");
+  param_list_parse_int_list_size(pl, "H", &r, &t);
   ASSERT(t > 2);
   sieving_bound_init(H, t);
   for (unsigned int i = 0; i < t; i++) {
@@ -2904,7 +2904,7 @@ void initialise_parameters(int argc, char * argv[], cado_poly_ptr f,
 
   sieving_bound_init(Ha, t);
   t = 0;
-  param_list_parse_int_list_size(pl, "Ha", &r, &t, ".,");
+  param_list_parse_int_list_size(pl, "Ha", &r, &t);
   if (!t) {
     for (unsigned int i = 0; i < H->t; i++) {
       sieving_bound_set_hi(Ha, i, 2);
@@ -3008,7 +3008,7 @@ void initialise_parameters(int argc, char * argv[], cado_poly_ptr f,
   }
 
   mpz_poly_init(g, -1);
-  param_list_parse_mpz_poly(pl, "g", g, ",");
+  param_list_parse_mpz_poly(pl, "g", g);
   ASSERT(g->deg == -1 || g->deg > 0);
 #ifndef NDEBUG
   if (* qfilespq != 0) {
