@@ -16,11 +16,12 @@ name = c125
 tasks.polyselect.degree = 5
 
 tasks.polyselect.P = 40000
-tasks.polyselect.admax = 2e6
-tasks.polyselect.adrange = 2e4
+tasks.polyselect.admax = 5e5
+tasks.polyselect.adrange = 5e3
 tasks.polyselect.incr = 60
 tasks.polyselect.nq = 625
 tasks.polyselect.nrkeep = 100
+tasks.polyselect.ropteffort = 5
 
 ###########################################################################
 # Sieve
