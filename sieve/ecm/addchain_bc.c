@@ -13,11 +13,14 @@
 #include "prac_bc.h"
 #include "addchain_bc.h"
 
+/* Only used with l <= 31 */
+#define mpz_mod_ui_2exp(n,l) (((n)->_mp_size) ? ((n)->_mp_d[0]&((1<<l)-1)) : 0)
+
 char
 addchain_find_best_r (mpz_srcptr k, const unsigned char q)
 {
   int l = nbits(2*q);
-  unsigned int r = k->_mp_d[0] & ((1 << l) - 1);
+  unsigned int r = mpz_mod_ui_2exp (k, l);
   if (r < q)
     return (char) r;
   else if (q - r < q)
@@ -25,7 +28,7 @@ addchain_find_best_r (mpz_srcptr k, const unsigned char q)
   else
   {
     l--;
-    r = k->_mp_d[0] & ((1 << l) - 1);
+    r = mpz_mod_ui_2exp (k, l);
     if (r < q)
       return (char) r;
     else /* we are sure that (q - r < q) */
@@ -61,7 +64,7 @@ addchain_rec (mpz_t k, const unsigned char q, addchain_cost_srcptr opcost,
     return opcost->add;
   }
   /* Case 2:  q+4 <= k <= 3*q-2 and k % 6 == 1 */
-  else if (0 <= mpz_cmp_ui (k, q+4) && mpz_cmp_ui (k, 3*q-2)
+  else if (0 <= mpz_cmp_ui (k, q+4) && mpz_cmp_ui (k, 3*q-2) <= 0
                                     && mpz_congruent_ui_p (k, 1, 6))
   {
     unsigned int kui = mpz_get_ui (k);
@@ -78,7 +81,7 @@ addchain_rec (mpz_t k, const unsigned char q, addchain_cost_srcptr opcost,
     return opcost->dbladd;
   }
   /* Case 3:  q+4 <= k <= 3*q and k % 6 == 3 */
-  else if (0 <= mpz_cmp_ui (k, q+4) && mpz_cmp_ui (k, 3*q)
+  else if (0 <= mpz_cmp_ui (k, q+4) && mpz_cmp_ui (k, 3*q) <= 0
                                     && mpz_congruent_ui_p (k, 3, 6))
   {
     unsigned int kui = mpz_get_ui (k);
@@ -96,7 +99,7 @@ addchain_rec (mpz_t k, const unsigned char q, addchain_cost_srcptr opcost,
     return opcost->dbladd;
   }
   /* Case 4:  q+4 <= k <= 3*q-4 and k % 6 == 5 */
-  else if (0 <= mpz_cmp_ui (k, q+4) && mpz_cmp_ui (k, 3*q-4)
+  else if (0 <= mpz_cmp_ui (k, q+4) && mpz_cmp_ui (k, 3*q-4) <= 0
                                     && mpz_congruent_ui_p (k, 5, 6))
   {
     unsigned int kui = mpz_get_ui (k);
@@ -113,8 +116,8 @@ addchain_rec (mpz_t k, const unsigned char q, addchain_cost_srcptr opcost,
     return opcost->dbladd;
   }
   /* Case 5: 4 <= k <= 2*q-2 and k % 4 == 0 */
-  else if (0 <= mpz_cmp_ui (k, 4) && mpz_cmp_ui (k, 3*q-4)
-                                    && mpz_congruent_2exp_p (k, 0, 2))
+  else if (0 <= mpz_cmp_ui (k, 4) && mpz_cmp_ui (k, 2*q-2) <= 0
+                                  && mpz_mod_ui_2exp (k, 2) == 0)
   {
     unsigned int kui = mpz_get_ui (k);
     unsigned char r1 = (unsigned char) ((kui-2)/2);
@@ -181,7 +184,6 @@ addchain (mpz_srcptr E, const unsigned char q, addchain_cost_srcptr opcost,
   /* Recursively compute the cost of the addition chain */
   cost += addchain_rec (k, q, opcost, state);
 
-  FATAL_ERROR_CHECK (mpz_cmp_ui (k, 1) != 0, "Error, k != 1 at the end");
   mpz_clear (k);
   return cost;
 }
@@ -219,10 +221,10 @@ addchain_bytecode (const unsigned int B1, addchain_cost_srcptr opcost,
   {
     double cost = addchain (E, q, opcost, NULL);
     if (cost < mincost)
-	  {
-	    mincost = cost;
-	    best_q = q;
-	  }
+    {
+      mincost = cost;
+      best_q = q;
+    }
   }
 
   /* Put the best addchain into bytecode */
