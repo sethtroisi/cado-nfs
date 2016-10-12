@@ -24,6 +24,7 @@ if [ $# != 1 ]; then
 fi
 
 ## default parameters: can be overriden using env variables
+## these correspond more or less to a DLP-512.
 : ${I=15}
 : ${lim0=30000000}
 : ${lim1=30000000}

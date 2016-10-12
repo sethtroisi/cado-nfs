@@ -147,30 +147,26 @@ int param_list_parse_double_list(param_list pl, const char * key,
 /*
   Return an array r with its size t. The array is initialised with the string
   separate by sep.
-  Usage: if sep is ".,", the string "5.5,5" gives r = [5,5,5] and t = 3.
-  Tested with sep = ".,".
+  Usage: "5,5,5" gives r = [5,5,5] and t = 3.
 
   pl: parameter list.
   key: key in the parameter list.
   r: array with the integer value contained in the key.
   t: number of element in array.
-  sep: separators of the string.
 */
 extern void param_list_parse_int_list_size(param_list pl, const char * key,
-    int ** r, unsigned int * t, const char *sep);
+    int ** r, unsigned int * t);
 /*
   Return a mpz_poly f. The polynomial is initialised with the string separate by
   sep.
-  Usage: if sep is ".,", the string "5.5,5" gives f = 5+5*x^2+5*x^3.
-  Tested with sep = ".,".
+  Usage: "5,4,3" gives f = 5 + 4 * x + 3 * x^2.
 
   pl: parameter list.
   key: key in the parameter list.
   f: the polynomial.
-  sep: separators of the string.
 */
 extern void param_list_parse_mpz_poly(param_list pl, const char * key,
-                                      mpz_poly_ptr f, const char *sep);
+    mpz_poly_ptr f);
 
 extern int param_list_parse_size_t(param_list pl, const char * key, size_t * r);
 extern int param_list_parse_switch(param_list pl, const char * key);

@@ -256,7 +256,7 @@ void initialise_parameters(int argc, char * argv[], mpz_poly_ptr f,
   }
 
   mpz_poly_init(f, -1);
-  param_list_parse_mpz_poly(pl, "f", f, ",");
+  param_list_parse_mpz_poly(pl, "f", f);
   ASSERT(f->deg > 0);
   
   * p = 2000;

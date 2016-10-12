@@ -4,7 +4,6 @@
 #include "las-types.h"
 #include "relation.h"
 #include "mpz_array.h"
-#include "relation.h"
 
 sieve_info_ptr
 fill_in_sieve_info(const mpz_t q, const mpz_t rho,

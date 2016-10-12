@@ -8,12 +8,17 @@
 #include <inttypes.h>
 #include <gmp.h>
 #include <pthread.h>
+#include <limits.h> /* for ULONG_MAX */
 #include "portability.h"
 #include "utils.h"
 #include "auxiliary.h"
 #include "murphyE.h"
 
-#define LEN_SPECIAL_Q 55
+#if ULONG_MAX == 4294967295UL
+#define LEN_SPECIAL_Q 57
+#else
+#define LEN_SPECIAL_Q 59
+#endif
 //#define DEBUG_HASH_TABLE
 
 #ifndef INLINE

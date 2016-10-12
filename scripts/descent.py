@@ -589,18 +589,29 @@ class DescentUpperClass(object):
         parser.add_argument("--slaves",
                 help="Number of slaves to use",
                 type=int, default=1)
+        # In case we used an external process
+        parser.add_argument("--external-init",
+                help="Use precomputed external data for the descent bootstrap",
+                type=str,
+                default=None)
 
     def __init__(self, general, args):
         self.general = general
         self.logDB = general.logDB
 
-        self.tkewness = int(args.init_tkewness)
-        self.lim      = int(args.init_lim)
-        self.lpb      = int(args.init_lpb)
-        self.mfb      = int(args.init_mfb)
-        self.ncurves  = int(args.init_ncurves)
-        self.I        = int(args.init_I)
-        self.slaves   = int(args.slaves)
+        if args.external_init != None:
+            self.external = args.external_init
+            if not os.path.exists(self.external):
+                raise NameError("Given external file for init does not exist")
+        else:
+            self.external = None
+            self.tkewness = int(args.init_tkewness)
+            self.lim      = int(args.init_lim)
+            self.lpb      = int(args.init_lpb)
+            self.mfb      = int(args.init_mfb)
+            self.ncurves  = int(args.init_ncurves)
+            self.I        = int(args.init_I)
+            self.slaves   = int(args.slaves)
 
     def __isqrt(self, n):
         x = n
@@ -634,7 +645,70 @@ class DescentUpperClass(object):
             y = newy
         return [ [ b, x ], [ a, lastx ] ]
 
-    def do_descent(self, z):
+    def use_external_data(self, z):
+        fil = open(self.external, "r")
+        rrr = fil.read()
+        fil.close()
+        lines = rrr.splitlines()
+        e = int(lines[0])
+        Num = int(lines[1])
+        Den = int(lines[2])
+        ## check that we are talking about the same z!
+        p = general.p()
+        zz = pow(z, e, p)
+        assert (zz*Den-Num) % p == 0
+        general.initrandomizer = e       # for later use
+        fnum = [ int(x) for x in lines[3].split() ]
+        fden = [ int(x) for x in lines[4].split() ]
+        large_q = [ int(x) for x in lines[5].split() ]
+        descrelfile = lines[6]
+
+        ## create todolist from fnum and fden, skipping primes of the
+        ## large_q list
+        prefix = general.prefix() + ".descent.%s.init." % general.short_target()
+        todofilename = os.path.join(general.datadir(), prefix + "todo")
+        with open(todofilename, "w") as f:
+            for q in fnum + fden:
+                if q in large_q:
+                    continue
+                if self.logDB.has(q,-1,0):
+                    continue
+                logq = math.ceil(math.log(q, 2))
+                print("Will do further descent for %d-bit rational prime %d"
+                        % (logq, q))
+                # las can understand when the rational root is missing
+                f.write("0 %d\n" % q)
+        fil = open(descrelfile, "r")
+        rrr = fil.read()
+        fil.close()
+        lines = rrr.splitlines()
+        with open(todofilename, "a") as f:
+            for line in lines:
+                foo = re.match("^Taken: ([0-9\-]+),([0-9\-]+):([0-9a-fA-F,]+):([0-9a-fA-F,]+)", line)
+                assert foo
+                foog = foo.groups()
+                a = int(foog[0])
+                b = int(foog[1])
+                list_p = [[int(x, 16) for x in foog[i].split(",") ] for i in [2, 3]]
+                for side in range(2):
+                    for p in list_p[side]:
+                        if p in large_q:
+                            continue
+                        if side == 0:
+                            if not self.logDB.has(p,-1,0):
+                                f.write("0 %d\n" % p)
+                        else:
+                            if b % p == 0:
+                                continue
+                            ideal = ideals_above_p(p, 1, a, b, side, general)
+                            if ideal.get_log() != None:
+                                continue
+                            else:
+                                r = a_over_b_mod_p(a, b, p)
+                                f.write("1 %d %d\n" % (p, r))
+        return todofilename, [Num, Den, fnum, fden], descrelfile
+
+    def do_descent_for_real(self, z):
         p = general.p()
         bound = p.bit_length() // 2 + 20
         # make the randomness deterministic to be able to replay
@@ -776,8 +850,13 @@ class DescentUpperClass(object):
                     print("Will do further descent for %d-bit rational prime %d" % (logq, q))
 
 
-        return todofilename, [Num, Den, factNum, factDen]
+        return todofilename, [Num, Den, factNum, factDen], None
 
+    def do_descent(self, z):
+        if not self.external:
+            return self.do_descent_for_real(z)
+        else:
+            return self.use_external_data(z)
 
 class DescentMiddleClass(object):
     def declare_args(parser):
@@ -929,24 +1008,25 @@ class DescentLowerClass(object):
 
         # Read descent relations
         descrels = []
-        with open(relsfile, 'r') as file:
-            with open(relsforSM, 'w') as fileSM:
-                for line in file:
-                    foo = re.match("^Taken: (-?\d+),(\d+):", line)
-                    if foo:
-                        r = line.split(':')[1:]
-                        r[0] = r[0].lstrip()
-                        fileSM.write(r[0] + ":" + r[1] + ":" + r[2])
-                        a,b = r[0].split(',')
-                        a=int(a)
-                        b=int(b)
-                        list_p = [ [], [] ]
-                        for side in range(2):
-                            for p in r[side+1].strip().split(','):
-                                list_p[side].append(int(p, 16))
-                        list_p = [ self.__count_multiplicites(list_p[0]),
-                                self.__count_multiplicites(list_p[1])]
-                        descrels.append(([a,b], list_p))
+        for rfile in relsfile:
+            with open(rfile, 'r') as file:
+                with open(relsforSM, 'a') as fileSM:
+                    for line in file:
+                        foo = re.match("^Taken: (-?\d+),(-?\d+):", line)
+                        if foo:
+                            r = line.split(':')[1:]
+                            r[0] = r[0].lstrip()
+                            fileSM.write(r[0] + ":" + r[1] + ":" + r[2])
+                            a,b = r[0].split(',')
+                            a=int(a)
+                            b=int(b)
+                            list_p = [ [], [] ]
+                            for side in range(2):
+                                for p in r[side+1].strip().split(','):
+                                    list_p[side].append(int(p, 16))
+                            list_p = [ self.__count_multiplicites(list_p[0]),
+                                    self.__count_multiplicites(list_p[1])]
+                            descrels.append(([a,b], list_p))
         nrels = len(descrels)
         print ("--- Final reconstruction (from %d relations) ---" % nrels)
 
@@ -1108,8 +1188,11 @@ if __name__ == '__main__':
     middle = DescentMiddleClass(general, args)
     lower = DescentLowerClass(general, args)
 
-    todofile, initial_split = init.do_descent(int(args.target))
+    todofile, initial_split, firstrelsfile = init.do_descent(int(args.target))
     relsfile = middle.do_descent(todofile)
-    lower.do_descent(relsfile, initial_split)
+    if firstrelsfile:
+        lower.do_descent([firstrelsfile, relsfile], initial_split)
+    else:
+        lower.do_descent([relsfile], initial_split)
 
     general.cleanup()

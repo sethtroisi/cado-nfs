@@ -64,24 +64,11 @@ int cado_poly_set_plist(cado_poly poly, param_list pl)
     snprintf(tag, sizeof(tag), "poly%d", i);
     if(param_list_parse_string(pl, tag, buf, BUF_MAX))
     {
-      /* feeding poly->pols[i] from buf="c0,c1,..." */
-      char *tmp = buf;
-      if(i >= 2)
+      if(i >= 2) {
         mpz_poly_init (poly->pols[i], MAXDEGREE);
-      for(unsigned int j = 0; ; j++)
-      {
-        int ret = gmp_sscanf(tmp, "%Zd", poly->pols[i]->coeff[j]);
-        if (ret != 1)
-        {
-          fprintf (stderr, "Error while parsing coefficients of degree %u "
-                           "of polynomial %d in polynomial file\n", j, i);
-          abort();
-        }
-        for( ; *tmp != '\0' && *tmp != ','; tmp++);
-        if(*tmp == '\0')
-          break;
-        tmp++;
       }
+      param_list_parse_mpz_poly(pl, tag, poly->pols[i]);
+      ASSERT(poly->pols[i]->deg <= MAXDEGREE);
     }
     else
     {

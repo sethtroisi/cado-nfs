@@ -173,6 +173,7 @@ tasks.polyselect.P = 10000		# choose lc(g) with two prime factors in [P,2P]
     # but the number of found polynomials will be smaller.
     # As a rule of thumb, we want at least 100 found polynomials in total
     # (without norm limitation, see below).
+    # We must have P larger than primes in the SPECIAL_Q[] list.
 
 tasks.polyselect.admin = 0          # min value for leading coefficient of f(x)
     # If not set, the default is 0.
@@ -210,11 +211,11 @@ tasks.polyselect.sopteffort = 0
     # polynomial selection. The default value is 0. The size optimization time
     # is roughly proportional to 1+sopteffort.
 
-tasks.polyselect.ropteffort = 5
+tasks.polyselect.ropteffort = 0.2
     # Indicates how much effort is spent in stage 2 (rootsieve) of the
     # polynomial selection. The number of sublattices considered is
     # proportional to ropteffort, and the rootsieve time is roughly
-    # proportional to ropteffort.
+    # proportional to ropteffort. This is a floating-point value.
 
 
 ###########################################################################

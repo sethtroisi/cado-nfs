@@ -88,7 +88,7 @@ void initialise_parameters(int argc, char * argv[], mpz_ptr p, mpz_poly_ptr h,
   ASSERT((*coeff)[1] > 0);
 
   if (* type == 1) {
-    param_list_parse_mpz_poly(pl, "h", h, ",");
+    param_list_parse_mpz_poly(pl, "h", h);
     if (h->deg < (int) * n) {
       ASSERT(h->deg == 0);
 

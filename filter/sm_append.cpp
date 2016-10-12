@@ -27,7 +27,6 @@
 #include "macros.h"
 #include "utils.h"
 #include "select_mpi.h"
-#include "relation.h"
 
 using namespace std;
 

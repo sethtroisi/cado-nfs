@@ -16,6 +16,7 @@
 
 #include "cado.h"
 #include <stdio.h>
+#include <limits.h> /* for CHAR_BIT */
 #include "portability.h"
 #include "polyselect.h"
 #include "mpz_poly.h"
@@ -31,13 +32,13 @@ char *phash = "# ";
 char *phash = "";
 #endif
 
-#define BATCH_SIZE 20 /* number of special (q, r) per batch */
-#define KEEP 10       /* number of best raw polynomials kept */
-
+#define BATCH_SIZE 20    /* number of special (q, r) per batch */
+#define KEEP 10          /* number of best raw polynomials kept */
+#define DEFAULT_NQ 1000  /* default max num of nq considered for each ad */
 /* Read-Only */
 uint32_t *Primes = NULL;
 unsigned long lenPrimes = 1; // length of Primes[]
-unsigned long nq = 1000;
+unsigned long nq = DEFAULT_NQ;
 size_t keep = KEEP;
 const double exp_rot[] = {0, 0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 0};
 static int verbose = 0;
@@ -58,6 +59,7 @@ double potential_collisions = 0.0, aver_raw_lognorm = 0.0,
 #define LOGNORM_MAX 999.99
 double min_raw_lognorm = LOGNORM_MAX, max_raw_lognorm = 0.0;
 data_t data_opt_lognorm, data_exp_E, data_beta, data_eta;
+data_t raw_proj_alpha, opt_proj_alpha;
 unsigned long collisions = 0;
 unsigned long collisions_good = 0;
 double *best_opt_logmu, *best_exp_E;
@@ -171,7 +173,7 @@ estimate_weibull_moments2 (double *beta, double *eta, data_t s)
 
   data_init (smin);
 
-  k = 50; /* sample size */
+  k = (unsigned long) sqrt ((double) n); /* sample size */
   /* We consider full samples only. Since we call this function several times
      with the same sequence, we perform a random permutation of the sequence
      at each call to avoid side effects due to the particular order of
@@ -215,9 +217,15 @@ print_poly_info ( char *buf,
   G->deg = 1;
 
   if (raw_option)
-    sprintf (buf, "# Raw polynomial:\n");
+    {
+      sprintf (buf, "# Raw polynomial:\n");
+      data_add (raw_proj_alpha, get_biased_alpha_projective (F, ALPHA_BOUND));
+    }
   else
-    sprintf (buf, "# Size-optimized polynomial:\n");
+    {
+      sprintf (buf, "# Size-optimized polynomial:\n");
+      data_add (opt_proj_alpha, get_biased_alpha_projective (F, ALPHA_BOUND));
+    }
 
   gmp_sprintf (buf+strlen(buf), "%sn: %Zd\n", prefix, n);
   gmp_sprintf (buf+strlen(buf), "%sY1: %Zd\n%sY0: %Zd\n", prefix, g[1], prefix, g[0]);
@@ -255,6 +263,12 @@ print_poly_info ( char *buf,
           eta = data_median (data_eta);
         }
       prob = 1.0 - exp (- pow (target_E / eta, beta));
+      if (prob == 0) /* for x small, exp(x) ~ 1+x */
+        prob = pow (target_E / eta, beta);
+      sprintf (buf + strlen(buf),
+               "# E: %lu, min %.2f, avg %.2f, max %.2f, stddev %.2f\n",
+               data_exp_E->size, data_exp_E->min, data_mean (data_exp_E),
+               data_exp_E->max, sqrt (data_var (data_exp_E)));
       sprintf (buf + strlen(buf), "# target_E=%.2f: collisions=%.2e, time=%.2e"
                " (beta=%.2f,eta=%.2f)\n",
                target_E, 1.0 / prob, seconds () / (prob * collisions_good),
@@ -497,8 +511,10 @@ match (unsigned long p1, unsigned long p2, const int64_t i, mpz_t m0,
 
   /* Small improvement: we have Ntilde = mtilde^d + l^2*R with R small.
      If p^2 divides R, with p prime to d*ad, then we can accumulate p into l,
-     which will give an even smaller R' = R/p^2. */
-  unsigned long *p, Primes[] = {2, 3, 5, 7, 11, 13, 17, 19, 0};
+     which will give an even smaller R' = R/p^2.
+     Note: this might produce duplicate polynomials, since a given p*l
+     might be found in different ways.
+  */
   mpz_mul_ui (m, ad, d);
   mpz_pow_ui (m, m, d);
   mpz_divexact (m, m, ad);
@@ -507,16 +523,27 @@ match (unsigned long p1, unsigned long p2, const int64_t i, mpz_t m0,
   mpz_sub (t, m, t);
   mpz_divexact (t, t, l);
   mpz_divexact (t, t, l);
-  for (p = Primes; p[0]; p++)
+  unsigned long p;
+  prime_info pi;
+  prime_info_init (pi);
+  /* Note: we could find p^2 dividing t in a much more efficient way, for
+     example by precomputing the product of all primes < 2*P, then doing
+     a gcd with t, which gives say g, then computing gcd(t, t/g).
+     But if P is small, it would gain little with respect to the naive loop
+     below, and if P is large, we have only a few hits, thus the global
+     overhead will be small too. */
+  for (p = 2; p <= Primes[lenPrimes - 1]; p = getprime_mt (pi))
     {
-      if (d % p[0] == 0 || mpz_divisible_ui_p (ad, p[0]))
+      if (d % p == 0 || mpz_divisible_ui_p (ad, p))
         continue;
-      while (mpz_divisible_ui_p (t, p[0] * p[0]))
+      if (mpz_divisible_ui_p (t, p * p))
         {
-          mpz_mul_ui (l, l, p[0]);
-          mpz_divexact_ui (t, t, p[0] * p[0]);
+          mpz_mul_ui (l, l, p);
+          mpz_divexact_ui (t, t, p * p);
         }
     }
+  prime_info_clear (pi);
+  /* end of small improvement */
 
   /* we want mtilde = d*ad*m + a_{d-1}*l with 0 <= a_{d-1} < d*ad.
      We have a_{d-1} = mtilde/l mod (d*ad). */
@@ -576,8 +603,9 @@ match (unsigned long p1, unsigned long p2, const int64_t i, mpz_t m0,
   check_divexact (t, t, "t", l, "l");
   mpz_set (f[0], t);
 
-  /* if the coefficient of degree d-2 is negative, the size optimization
-     will not work well, thus we simply discard those polynomials */
+  /* If the coefficient of degree d-2 is of the same sign as the leading
+     coefficient, the size optimization will not work well, thus we simply
+     discard those polynomials. */
   if (mpz_sgn (f[d]) * mpz_sgn (f[d-2]) > 0)
     goto end;
 
@@ -1428,12 +1456,16 @@ collision_on_sq (header_t header, proots_t R, unsigned long c )
     k ++;
   }
 
-  /* k < 8 for the moment */
-  if (k > 7)
-    k = 7;
+  /* We force k <= 4 on a 32-bit machine, and k <= 8 on a 64-bit machine,
+     to ensure q fits on an "unsigned long". */
+  if (k > (sizeof (unsigned long) * CHAR_BIT) / 8)
+    k = (sizeof (unsigned long) * CHAR_BIT) / 8;
   if (k < 1)
     k = 1;
 
+  /* If all factors in sq have d roots, then a single special-q is enough.
+     Otherwise, we consider special-q's from combinations of k primes among lq,
+     so that the total number of combinations is at least nq. */
   for (lq = k; number_comb (SQ_R, k, lq) < (unsigned long) nq &&
          lq < SQ_R->size; lq++);
 
@@ -1877,7 +1909,7 @@ declare_usage(param_list pl)
 
   char str[200];
   snprintf (str, 200, "maximum number of special-q's considered\n"
-            "               for each ad (default %d)", INT_MAX);
+            "               for each ad (default %d)", DEFAULT_NQ);
   param_list_decl_usage(pl, "nq", str);
   snprintf(str, 200, "number of polynomials kept (default %d)", KEEP);
   param_list_decl_usage(pl, "keep", str);
@@ -1925,6 +1957,8 @@ main (int argc, char *argv[])
   data_init (data_exp_E);
   data_init (data_beta);
   data_init (data_eta);
+  data_init (raw_proj_alpha);
+  data_init (opt_proj_alpha);
 
   /* read params */
   param_list pl;
@@ -2040,7 +2074,8 @@ main (int argc, char *argv[])
     exit (1);
   }
   if (P <= (unsigned long) SPECIAL_Q[LEN_SPECIAL_Q - 2]) {
-    fprintf (stderr, "Error, too small value of P\n");
+    fprintf (stderr, "Error, too small value of P, need P > %u\n",
+             SPECIAL_Q[LEN_SPECIAL_Q - 2]);
     exit (1);
   }
   /* since for each prime p in [P,2P], we convert p^2 to int64_t, we need
@@ -2095,6 +2130,11 @@ main (int argc, char *argv[])
   if (mpz_cmp_ui (admin, 0) == 0)
     mpz_set_ui (admin, incr);
 
+  /* admin should be a non-zero multiple of 'incr', since when the global
+     [admin, admax] range is cut by cado-nfs.py between different workunits,
+     some bounds might no longer be multiple of 'incr'. */
+  mpz_add_ui (admin, admin, (incr - mpz_fdiv_ui (admin, incr)) % incr);
+
   int i;
   for (i = 0; i < nthreads; i++)
     pthread_create (&tid[i], NULL, one_thread, (void *) (T+i));
@@ -2114,6 +2154,8 @@ main (int argc, char *argv[])
           printf ("# Stat: raw lognorm (nr/min/av/max/std): %lu/%1.2f/%1.2f/%1.2f/%1.2f\n",
                   collisions, min_raw_lognorm, rawmean, max_raw_lognorm,
                   sqrt (var_raw_lognorm / collisions - rawmean * rawmean));
+          printf ("# Stat: raw proj. alpha (nr/min/av/max/std): %lu/%1.3f/%1.3f/%1.3f/%1.3f\n",
+                  collisions, raw_proj_alpha->min, data_mean (raw_proj_alpha), raw_proj_alpha->max, sqrt (data_var (raw_proj_alpha)));
           if (collisions_good > 0)
             {
               double mean = data_mean (data_opt_lognorm);
@@ -2121,6 +2163,8 @@ main (int argc, char *argv[])
               printf ("# Stat: optimized lognorm (nr/min/av/max/std): %lu/%1.2f/%1.2f/%1.2f/%1.2f\n",
                       collisions_good, data_opt_lognorm->min, mean, data_opt_lognorm->max,
                       sqrt (data_var (data_opt_lognorm)));
+              printf ("# Stat: opt proj. alpha (nr/min/av/max/std): %lu/%1.3f/%1.3f/%1.3f/%1.3f\n",
+                  collisions_good, opt_proj_alpha->min, data_mean (opt_proj_alpha), opt_proj_alpha->max, sqrt (data_var (opt_proj_alpha)));
               printf ("# Stat: exp_E (nr/min/av/max/std): %lu/%1.2f/%1.2f/%1.2f/%1.2f\n",
                       collisions_good, data_exp_E->min, Emean,
                       data_exp_E->max, sqrt (data_var (data_exp_E)));
@@ -2170,6 +2214,8 @@ main (int argc, char *argv[])
   data_clear (data_exp_E);
   data_clear (data_beta);
   data_clear (data_eta);
+  data_clear (raw_proj_alpha);
+  data_clear (opt_proj_alpha);
 
   return 0;
 }

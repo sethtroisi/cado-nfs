@@ -681,7 +681,7 @@ class PolyselectRopt(Program):
                  verbose : Toggle("v")=None,
                  threads : Parameter("t", checktype=int)=None,
                  inputpolys : Parameter(is_input_file=True)=None,
-                 ropteffort: Parameter(checktype=int)=None,
+                 ropteffort: Parameter(checktype=float)=None,
                  area : Parameter(checktype=float)=None,
                  Bf : Parameter(checktype=float)=None,
                  Bg : Parameter(checktype=float)=None,
