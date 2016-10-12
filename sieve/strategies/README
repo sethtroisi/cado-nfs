@@ -143,7 +143,7 @@ To optain 'cofactors.stats' and '137.07', one uses las with the option
 '-stats-cofact' followed by the name of the output file.
 
 For example, if one runs las with: 
-./makefb -poly rsa155.poly -alim 16777216 -maxbits 13 -out rsa155.roots
+./makefb -poly rsa155.poly -lim 16777216 -maxbits 13 -out rsa155.roots
 ./las -I 14 -poly rsa155.poly -q0 30000100 -q1 30000500 -lim0 16777216
 -lim1 16777216 -lpb0 29 -lpb1 29 -mfb0 90 -mfb1 90 -mt 1 -stats-cofact
 cofactors.stats -fb1 rsa155.roots

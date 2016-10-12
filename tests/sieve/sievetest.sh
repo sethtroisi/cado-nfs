@@ -34,8 +34,8 @@ then
 fi
 
 
-if [[ -z "$rlim" || -z "$alim" || -z "$lpbr" || -z "$lpba" || -z "$maxbits" \
-      || -z "$mfbr" || -z "$mfba" || -z "$rlambda" || -z "$alambda" || -z "$I" \
+if [[ -z "$lim0" || -z "$lim1" || -z "$lpb0" || -z "$lpb1" || -z "$maxbits" \
+      || -z "$mfb0" || -z "$mfb1" || -z "$lambda0" || -z "$lambda1" || -z "$I" \
       || -z "$q0" || ( -z "$q1" && -z "$rho" ) ]]
 then
   echo "Required shell environment variable not set" >&2
@@ -75,9 +75,9 @@ bailout() {
 }
 
 # first exercise the -fbc command-line option to create a cache file
-run "$LAS" -poly "$POLY" -fb "${FB}" -I "$I" -rlim "$rlim" -lpbr "$lpbr" -mfbr "$mfbr" -rlambda "$rlambda" -alim "$alim" -lpba "$lpba" -mfba "$mfba" -alambda "$alambda" -q0 "$q0" -q1 "$q0" -out "${RELS}" -fbc "${FBC}" "$@" || bailout
+run "$LAS" -poly "$POLY" -fb "${FB}" -I "$I" -lim0 "$lim0" -lpb0 "$lpb0" -mfb0 "$mfb0" -lambda0 "$lambda0" -lim1 "$lim1" -lpb1 "$lpb1" -mfb1 "$mfb1" -lambda1 "$lambda1" -q0 "$q0" -q1 "$q0" -out "${RELS}" -fbc "${FBC}" "$@" || bailout
 # then use the cache file created above
-run "$LAS" -poly "$POLY" -fb "${FB}" -I "$I" -rlim "$rlim" -lpbr "$lpbr" -mfbr "$mfbr" -rlambda "$rlambda" -alim "$alim" -lpba "$lpba" -mfba "$mfba" -alambda "$alambda" -q0 "$q0" "${end[@]}" -out "${RELS}" -fbc "${FBC}" "$@" || bailout
+run "$LAS" -poly "$POLY" -fb "${FB}" -I "$I" -lim0 "$lim0" -lpb0 "$lpb0" -mfb0 "$mfb0" -lambda0 "$lambda0" -lim1 "$lim1" -lpb1 "$lpb1" -mfb1 "$mfb1" -lambda1 "$lambda1" -q0 "$q0" "${end[@]}" -out "${RELS}" -fbc "${FBC}" "$@" || bailout
 
 
 SHA1BIN=sha1sum

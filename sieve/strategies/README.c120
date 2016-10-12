@@ -25,14 +25,14 @@ Y1: 54675511261073897
 
 Parameters (from params.c120):
 
-rlim = 2371302
-alim = 3837507
-lpbr = 26
-lpba = 26
-tasks.sieve.mfbr = 54
-tasks.sieve.mfba = 53
-tasks.sieve.rlambda = 2.18
-tasks.sieve.alambda = 2.14
+lim0 = 2371302
+lim1 = 3837507
+lpb0 = 26
+lpb1 = 26
+tasks.sieve.mfb0 = 54
+tasks.sieve.mfb1 = 53
+tasks.sieve.lambda0 = 2.18
+tasks.sieve.lambda1 = 2.14
 tasks.sieve.ncurves0 = 6
 tasks.sieve.ncurves1 = 9
 tasks.I = 12
@@ -106,8 +106,8 @@ mkdir decomp_tmp
 
 limr=2097152
 x=43
-mfbr=54
-while [ $x -le $mfbr ]
+mfb0=54
+while [ $x -le $mfb0 ]
 do
 ./gst -gdc -lim0 $limr -mfb0 $x -out decomp_tmp/decomp_${limr}_${x}
 x=$[$x+1]
@@ -123,7 +123,7 @@ mkdir res_matrix
 
 ./script_str.sh 2097152 54 2097152 53 res_precompt_st res_matrix
 
-./makefb -poly c120.polyselect2.poly -alim 3837507 -maxbits 11 -out c120.roots
+./makefb -poly c120.polyselect2.poly -lim 3837507 -maxbits 11 -out c120.roots
 
 ./las -I 12 -poly c120.polyselect2.poly -q0 3837507 -q1 3847507 -lim0 2371302 -lim1 3837507 -lpb0 26 -lpb1 26 -mfb0 54 -mfb1 53 -mt 1 -stats-cofact cofactors.stats -fb1 c120.roots
 ...

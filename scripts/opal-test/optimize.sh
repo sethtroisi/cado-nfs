@@ -6,8 +6,8 @@
 # The CADO_BUILD environment variable must contain the CADO-NFS build
 # directory (makefb and las are taken from $CADO_BUILD/sieve)
 
-# Important: if lpbr and/or lpba change, you need to recompute rels_wanted,
-# which should be near from prime_pi(2^lpbr) + prime_pi(2^lpba)
+# Important: if lpb0 and/or lpb1 change, you need to recompute rels_wanted,
+# which should be near from prime_pi(2^lpb0) + prime_pi(2^lpb1)
 
 cwd=`pwd`
 params=$1
@@ -16,12 +16,12 @@ d=`mktemp -d`
 echo "Working directory:" $d
 cp $2 las_optimize.py report.py $d
 sed "s/c59.polyselect2.poly/$poly/g" las_run.py > $d/las_run.py
-rlim=`grep "^rlim.*=" $params | cut -d= -f2`
-alim=`grep "^alim.*=" $params | cut -d= -f2`
-lpbr=`grep "^lpbr.*=" $params | cut -d= -f2`
-lpba=`grep "^lpba.*=" $params | cut -d= -f2`
-mfbr=`grep "mfbr.*=" $params | cut -d= -f2`
-mfba=`grep "mfba.*=" $params | cut -d= -f2`
+lim0=`grep "^lim0.*=" $params | cut -d= -f2`
+lim1=`grep "^lim1.*=" $params | cut -d= -f2`
+lpb0=`grep "^lpb0.*=" $params | cut -d= -f2`
+lpb1=`grep "^lpb1.*=" $params | cut -d= -f2`
+mfb0=`grep "mfb0.*=" $params | cut -d= -f2`
+mfb1=`grep "mfb1.*=" $params | cut -d= -f2`
 grep "ncurves0.*=" $params > /dev/null
 if [ $? -eq 0 ]; then
    ncurves0=`grep "ncurves0.*=" $params | cut -d= -f2`
@@ -39,23 +39,23 @@ else
    has_ncurves1=0
 fi
 I=`grep "I.*=" $params | cut -d= -f2`
-rlim_min=`expr $rlim / 2`
-rlim_max=`expr $rlim \* 2`
-alim_min=`expr $alim / 2`
-alim_max=`expr $alim \* 2`
-lpbr_min=`expr $lpbr - 1`
-lpbr_max=`expr $lpbr + 1`
-lpba_min=`expr $lpba - 1`
-lpba_max=`expr $lpba + 1`
-mfbr_min=$lpbr_min
-mfbr_max=`expr $lpbr_max \* 3`
-if [ $mfbr -gt $mfbr_max ]; then
-   mfbr_max=$mfbr
+lim0_min=`expr $lim0 / 2`
+lim0_max=`expr $lim0 \* 2`
+lim1_min=`expr $lim1 / 2`
+lim1_max=`expr $lim1 \* 2`
+lpb0_min=`expr $lpb0 - 1`
+lpb0_max=`expr $lpb0 + 1`
+lpb1_min=`expr $lpb1 - 1`
+lpb1_max=`expr $lpb1 + 1`
+mfb0_min=$lpb0_min
+mfb0_max=`expr $lpb0_max \* 3`
+if [ $mfb0 -gt $mfb0_max ]; then
+   mfb0_max=$mfb0
 fi
-mfba_min=$lpba_min
-mfba_max=`expr $lpba_max \* 3`
-if [ $mfba -gt $mfba_max ]; then
-   mfba_max=$mfba
+mfb1_min=$lpb1_min
+mfb1_max=`expr $lpb1_max \* 3`
+if [ $mfb1 -gt $mfb1_max ]; then
+   mfb1_max=$mfb1
 fi
 if [ $ncurves0 -gt 3 ]; then
 ncurves0_min=`expr $ncurves0 - 3`
@@ -71,18 +71,18 @@ fi
 ncurves1_max=`expr $ncurves1 + 3`
 I_min=`expr $I - 1`
 I_max=`expr $I + 1`
-sed "s/rlim_def/$rlim/g" las_decl_template.py | \
-sed "s/rlim_min/$rlim_min/g" | sed "s/rlim_max/$rlim_max/g" | \
-sed "s/alim_def/$alim/g" | sed "s/alim_min/$alim_min/g" | \
-sed "s/alim_max/$alim_max/g" | \
-sed "s/lpbr_def/$lpbr/g" | sed "s/lpbr_min/$lpbr_min/g" | \
-sed "s/lpbr_max/$lpbr_max/g" | \
-sed "s/lpba_def/$lpba/g" | sed "s/lpba_min/$lpba_min/g" | \
-sed "s/lpba_max/$lpba_max/g" | \
-sed "s/mfbr_def/$mfbr/g" | sed "s/mfbr_min/$mfbr_min/g" | \
-sed "s/mfbr_max/$mfbr_max/g" | \
-sed "s/mfba_def/$mfba/g" | sed "s/mfba_min/$mfba_min/g" | \
-sed "s/mfba_max/$mfba_max/g" | \
+sed "s/lim0_def/$lim0/g" las_decl_template.py | \
+sed "s/lim0_min/$lim0_min/g" | sed "s/lim0_max/$lim0_max/g" | \
+sed "s/lim1_def/$lim1/g" | sed "s/lim1_min/$lim1_min/g" | \
+sed "s/lim1_max/$lim1_max/g" | \
+sed "s/lpb0_def/$lpb0/g" | sed "s/lpb0_min/$lpb0_min/g" | \
+sed "s/lpb0_max/$lpb0_max/g" | \
+sed "s/lpb1_def/$lpb1/g" | sed "s/lpb1_min/$lpb1_min/g" | \
+sed "s/lpb1_max/$lpb1_max/g" | \
+sed "s/mfb0_def/$mfb0/g" | sed "s/mfb0_min/$mfb0_min/g" | \
+sed "s/mfb0_max/$mfb0_max/g" | \
+sed "s/mfb1_def/$mfb1/g" | sed "s/mfb1_min/$mfb1_min/g" | \
+sed "s/mfb1_max/$mfb1_max/g" | \
 sed "s/ncurves0_def/$ncurves0/g" | sed "s/ncurves0_min/$ncurves0_min/g" | \
 sed "s/ncurves0_max/$ncurves0_max/g" | \
 sed "s/ncurves1_def/$ncurves1/g" | sed "s/ncurves1_min/$ncurves1_min/g" | \
@@ -93,32 +93,32 @@ cd $d
 python las_optimize.py
 # optimized parameters are in nomad-solution.nnn.txt
 f=`ls -t nomad-solution.*.txt | head -1`
-rlim_opt=`head -1 $f`
-alim_opt=`head -2 $f | tail -1`
-lpbr_opt=`head -3 $f | tail -1`
-lpba_opt=`head -4 $f | tail -1`
-mfbr_opt=`head -5 $f | tail -1`
-mfba_opt=`head -6 $f | tail -1`
+lim0_opt=`head -1 $f`
+lim1_opt=`head -2 $f | tail -1`
+lpb0_opt=`head -3 $f | tail -1`
+lpb1_opt=`head -4 $f | tail -1`
+mfb0_opt=`head -5 $f | tail -1`
+mfb1_opt=`head -6 $f | tail -1`
 ncurves0_opt=`head -7 $f | tail -1`
 ncurves1_opt=`head -8 $f | tail -1`
 I_opt=`head -9 $f | tail -1`
 echo "Optimal parameters:"
-echo "rlim=" $rlim_opt " min=" $rlim_min " max=" $rlim_max
-echo "alim=" $alim_opt " min=" $alim_min " max=" $alim_max
-echo "lpbr=" $lpbr_opt " min=" $lpbr_min " max=" $lpbr_max
-echo "lpba=" $lpba_opt " min=" $lpba_min " max=" $lpba_max
-echo "mfbr=" $mfbr_opt " min=" $mfbr_min " max=" $mfbr_max
-echo "mfba=" $mfba_opt " min=" $mfba_min " max=" $mfba_max
+echo "lim0=" $lim0_opt " min=" $lim0_min " max=" $lim0_max
+echo "lim1=" $lim1_opt " min=" $lim1_min " max=" $lim1_max
+echo "lpb0=" $lpb0_opt " min=" $lpb0_min " max=" $lpb0_max
+echo "lpb1=" $lpb1_opt " min=" $lpb1_min " max=" $lpb1_max
+echo "mfb0=" $mfb0_opt " min=" $mfb0_min " max=" $mfb0_max
+echo "mfb1=" $mfb1_opt " min=" $mfb1_min " max=" $mfb1_max
 echo "ncurves0=" $ncurves0_opt " min=" $ncurves0_min " max=" $ncurves0_max
 echo "ncurves1=" $ncurves1_opt " min=" $ncurves1_min " max=" $ncurves1_max
 echo "I=" $I_opt " min=" $I_min " max=" $I_max
 cd $cwd
-sed "s/rlim.*=.*$/rlim = $rlim_opt/g" $params | \
-sed "s/alim.*=.*$/alim = $alim_opt/g" | \
-sed "s/lpbr.*=.*$/lpbr = $lpbr_opt/g" | \
-sed "s/lpba.*=.*$/lpba = $lpba_opt/g" | \
-sed "s/mfbr.*=.*$/mfbr = $mfbr_opt/g" | \
-sed "s/mfba.*=.*$/mfba = $mfba_opt/g" | \
+sed "s/lim0.*=.*$/lim0 = $lim0_opt/g" $params | \
+sed "s/lim1.*=.*$/lim1 = $lim1_opt/g" | \
+sed "s/lpb0.*=.*$/lpb0 = $lpb0_opt/g" | \
+sed "s/lpb1.*=.*$/lpb1 = $lpb1_opt/g" | \
+sed "s/mfb0.*=.*$/mfb0 = $mfb0_opt/g" | \
+sed "s/mfb1.*=.*$/mfb1 = $mfb1_opt/g" | \
 sed "s/ncurves0.*=.*$/ncurves0 = $ncurves0_opt/g" | \
 sed "s/ncurves1.*=.*$/ncurves1 = $ncurves1_opt/g" | \
 sed "s/I.*=.*$/I = $I_opt/g" > $params.opt

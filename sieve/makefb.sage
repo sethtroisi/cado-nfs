@@ -109,18 +109,18 @@ x=PolynomialRing(Integers(),['x']).gen()
 f=69042960*x^5 -150777388929552*x^4 +129632089360584232586*x^3 +263540073072166885859228735*x^2 -48947696216829079528262929524278*x -32290899357812757163668740209282119536
 
 #f=1008593880*x^5 - 47389790327*x^4 - 84256212127259029352*x^3 + 3474222647711706240332297*x^2 + 76764659243128790828718944401*x + 62435925692971697863740890240
-#alim=40000000
-alim=100
+#lim=40000000
+lim=100
 powerlim=12    # in bits
 
 
 
 
 print "# f={0}".format(f)
-print "# alim={0}".format(alim)
+print "# lim={0}".format(lim)
 print "# powerlim={0}".format(powerlim)
 p = 2
-while p <= alim:
+while p <= lim:
     xx = all_roots(f, p, powerlim)
     xx = rewrite_roots(xx)
     for r in xx:

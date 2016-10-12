@@ -12,7 +12,7 @@ then
   exit 1
 fi
 
-KEYWORDS=( degree qrange I polyselect.P polyselect.admax polyselect.adrange rlim alim lpbr lpba )
+KEYWORDS=( degree qrange I polyselect.P polyselect.admax polyselect.adrange lim0 lim1 lpb0 lpb1 )
 declare -a OUTPUTFILES
 
 for S in "${KEYWORDS[@]}"

@@ -90,19 +90,19 @@ class Option(object, metaclass=abc.ABCMeta):
         The reason for this is that command line parameters can be specified
         in the constructor of Program sub-classes as, e.g.,
           class Las(Program):
-            def __init__(lpba : Parameter()=None):
-        and the name "lpba" of the Las constructor's parameter should also be
+            def __init__(lpb1 : Parameter()=None):
+        and the name "lpb1" of the Las constructor's parameter should also be
         the default name of command line parameter. However, the Parameter()
         gets instantiated when the ":" annotation gets parsed, i.e., at the 
         time the class definition of Las is parsed, and the fact that this
-        Parameter instance will act as an annotation to the "lpba" parameter
+        Parameter instance will act as an annotation to the "lpb1" parameter
         is not known to the Parameter() instance. I.e., at its instantiation,
         the Parameter instance cannot tell to which parameter it will belong.
 
         This information must be filled in later, via set_defaultname(), which
         is called from Program.__init__(). It uses introspection to find out
         which Option objects belong to which Program constructor parameter, and
-        fills in the constructor parameters' name via set_defaultname("lpba").
+        fills in the constructor parameters' name via set_defaultname("lpb1").
 
         If the Option constructor had received an arg parameter, then that is
         used instead of the defaultname, which allows for using different names
@@ -727,10 +727,10 @@ class MakeFB(Program):
 
 class FreeRel(Program):
     """
-    >>> p = FreeRel(poly="foo.poly", renumber="foo.renumber", lpbr=1, lpba=2, out="foo.freerel")
+    >>> p = FreeRel(poly="foo.poly", renumber="foo.renumber", lpb0=1, lpb1=2, out="foo.freerel")
     >>> p.make_command_line().replace(defaultsuffix + " ", " ", 1)
     'freerel -poly foo.poly -renumber foo.renumber -lpb0 1 -lpb1 2 -out foo.freerel'
-    >>> p = FreeRel(poly="foo.poly", renumber="foo.renumber", lpbr=1, lpba=2, out="foo.freerel", badideals="foo.bad", pmin=123, pmax=234)
+    >>> p = FreeRel(poly="foo.poly", renumber="foo.renumber", lpb0=1, lpb1=2, out="foo.freerel", badideals="foo.bad", pmin=123, pmax=234)
     >>> p.make_command_line().replace(defaultsuffix + " ", " ", 1)
     'freerel -poly foo.poly -renumber foo.renumber -lpb0 1 -lpb1 2 -out foo.freerel -badideals foo.bad -pmin 123 -pmax 234'
     """
@@ -740,8 +740,8 @@ class FreeRel(Program):
     def __init__(self, *,
                  poly: Parameter(is_input_file=True),
                  renumber: Parameter(is_output_file=True),
-                 lpbr: Parameter("lpb0", checktype=int),
-                 lpba: Parameter("lpb1", checktype=int),
+                 lpb0: Parameter("lpb0", checktype=int),
+                 lpb1: Parameter("lpb1", checktype=int),
                  out: Parameter(is_output_file=True),
                  badideals: Parameter(is_output_file=True)=None,
                  pmin: Parameter(checktype=int)=None,
@@ -766,20 +766,20 @@ class Las(Program):
                  bkthresh: Parameter(checktype=int)=None,
                  bkthresh1: Parameter(checktype=int)=None,
                  bkmult: Parameter(checktype=float)=None,
-                 rlim: Parameter(checktype=int)=None,
-                 alim: Parameter(checktype=int)=None,
-                 lpbr: Parameter(checktype=int)=None,
-                 lpba: Parameter(checktype=int)=None,
-                 mfbr: Parameter(checktype=int)=None,
-                 mfba: Parameter(checktype=int)=None,
-                 rlambda: Parameter(checktype=float)=None,
-                 alambda: Parameter(checktype=float)=None,
+                 lim0: Parameter(checktype=int)=None,
+                 lim1: Parameter(checktype=int)=None,
+                 lpb0: Parameter(checktype=int)=None,
+                 lpb1: Parameter(checktype=int)=None,
+                 mfb0: Parameter(checktype=int)=None,
+                 mfb1: Parameter(checktype=int)=None,
+                 lambda0: Parameter(checktype=float)=None,
+                 lambda1: Parameter(checktype=float)=None,
                  ncurves0: Parameter(checktype=int)=None,
                  ncurves1: Parameter(checktype=int)=None,
                  skewness: Parameter("S", checktype=float)=None,
                  verbose: Toggle("v")=None,
-                 rpowlim: Parameter(checktype=int)=None,
-                 apowlim: Parameter(checktype=int)=None,
+                 powlim0: Parameter(checktype=int)=None,
+                 powlim1: Parameter(checktype=int)=None,
                  factorbase: Parameter("fb", is_input_file=True)=None,
                  factorbase0: Parameter("fb0", is_input_file=True)=None,
                  factorbase1: Parameter("fb1", is_input_file=True)=None,
@@ -1097,8 +1097,8 @@ class Characters(Program):
                  heavyblock: Parameter(),
                  out: Parameter(),
                  wfile: Parameter("ker"),
-                 lpbr: Parameter("lpb0"),
-                 lpba: Parameter("lpb1"),
+                 lpb0: Parameter("lpb0"),
+                 lpb1: Parameter("lpb1"),
                  nchar: Parameter()=None,
                  nratchars: Parameter()=None,
                  threads: Parameter("t")=None,

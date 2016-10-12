@@ -748,7 +748,7 @@ renumber_write_buffer_p (char *out, renumber_ptr tab, unsigned long p,
 {
   size_t n = 0;
   /* The root on rat side becomes vp. If there is no rat side or not root on
-   * rat side for this prime (i.e., lpbr < p), then the largest root becomes vp.
+   * rat side for this prime (i.e., lpb < p), then the largest root becomes vp.
    */
   p_r_values_t vp = compute_vp_from_p (tab, (p_r_values_t) p);
   unsigned int replace_first = 0;

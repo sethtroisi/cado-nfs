@@ -2862,16 +2862,6 @@ int main (int argc0, char *argv0[])/*{{{*/
     // TODO: All these aliases should disappear, one day.
     // This is just legacy.
     param_list_configure_alias(pl, "fb1", "fb");
-    param_list_configure_alias(pl, "lim0", "rlim");
-    param_list_configure_alias(pl, "lim1", "alim");
-    param_list_configure_alias(pl, "lpb0", "lpbr");
-    param_list_configure_alias(pl, "lpb1", "lpba");
-    param_list_configure_alias(pl, "mfb0", "mfbr");
-    param_list_configure_alias(pl, "mfb1", "mfba");
-    param_list_configure_alias(pl, "lambda0", "rlambda");
-    param_list_configure_alias(pl, "lambda1", "alambda");
-    param_list_configure_alias(pl, "powlim0", "rpowlim");
-    param_list_configure_alias(pl, "powlim1", "apowlim");
 #ifdef  DLP_DESCENT
     param_list_configure_switch(pl, "-recursive-descent", &recursive_descent);
     param_list_configure_switch(pl, "-never-discard", &never_discard);

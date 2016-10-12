@@ -1593,7 +1593,7 @@ class Polysel1Task(ClientServerTask, DoesImport, HasStatistics, patterns.Observe
     def paramnames(self):
         return self.join_params(super().paramnames, {
             "N": int, "adrange": int, "admin": 0, "admax": int,
-            "I": int, "alim": int, "rlim": int, "nrkeep": 20,
+            "I": int, "lim1": int, "lim0": int, "nrkeep": 20,
             "import_sopt": [str]})
     @staticmethod
     def update_lognorms(old_lognorm, new_lognorm):
@@ -2079,7 +2079,7 @@ class Polysel2Task(ClientServerTask, HasStatistics, DoesImport, patterns.Observe
     @property
     def paramnames(self):
         return self.join_params(super().paramnames, {
-            "N": int, "I": int, "alim": int, "rlim": int, "batch": [int],
+            "N": int, "I": int, "lim1": int, "lim0": int, "batch": [int],
             "import_ropt": [str]})
     @property
     def stat_conversions(self):
@@ -2119,10 +2119,11 @@ class Polysel2Task(ClientServerTask, HasStatistics, DoesImport, patterns.Observe
         if "bestpoly" in self.state:
             self.bestpoly = Polynomials(self.state["bestpoly"].splitlines())
         self.state.setdefault("nr_poly_submitted", 0)
+        # I don't understand why the area is based on one particular side.
         self.progparams[0].setdefault("area", 2.**(2*self.params["I"]-1) \
-                * self.params["alim"])
-        self.progparams[0].setdefault("Bf", float(self.params["alim"]))
-        self.progparams[0].setdefault("Bg", float(self.params["rlim"]))
+                * self.params["lim1"])
+        self.progparams[0].setdefault("Bf", float(self.params["lim1"]))
+        self.progparams[0].setdefault("Bg", float(self.params["lim0"]))
         if not "batch" in self.params:
             t = self.progparams[0].get("threads", 1)
             # batch = 5 rounded up to a multiple of t
@@ -2417,17 +2418,17 @@ class FactorBaseTask(Task):
     @property
     def paramnames(self):
         return self.join_params(super().paramnames,
-                {"gzip": True, "I": int, "rlim": int, "alim": int})
+                {"gzip": True, "I": int, "lim0": int, "lim1": int})
 
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator=mediator, db=db, parameters=parameters,
                          path_prefix=path_prefix)
         # Invariant: if we have a result (in self.state["outputfile"]) then we
-        # must also have a polynomial (in self.state["poly"] ) and the alim
-        # value used in self.state["alim"]
+        # must also have a polynomial (in self.state["poly"] ) and the
+        # lim1 value used in self.state["lim1"]
         if "outputfile" in self.state:
             assert "poly" in self.state
-            assert "alim" in self.state
+            assert "lim1" in self.state
             # The target file must correspond to the polynomial "poly"
         self.progparams[0].setdefault("maxbits", self.params["I"])
     
@@ -2441,7 +2442,7 @@ class FactorBaseTask(Task):
                             "received from PolyselTask")
         twoalgsides = self.send_request(Request.GET_HAVE_TWO_ALG_SIDES)
         check_params = {key: self.params[key]
-                        for key in ["alim", "rlim"][0:1 + twoalgsides]}
+                        for key in ["lim1", "lim0"][0:1 + twoalgsides]}
         
         # Check if we have already computed the outputfile for this polynomial
         # and fbb. If any of the inputs mismatch, we remove outputfile from
@@ -2481,7 +2482,7 @@ class FactorBaseTask(Task):
                     self.make_std_paths(cadoprograms.MakeFB.name)
             if not twoalgsides:
                 p = cadoprograms.MakeFB(out=str(outputfilename),
-                                    lim=self.params["alim"],
+                                    lim=self.params["lim1"],
                                     stdout=str(stdoutpath),
                                     stderr=str(stderrpath),
                                     **self.merged_args[0])
@@ -2491,7 +2492,7 @@ class FactorBaseTask(Task):
             else:
                 p = cadoprograms.MakeFB(out=str(outputfilename0),
                                     side=0,
-                                    lim=self.params["rlim"],
+                                    lim=self.params["lim0"],
                                     stdout=str(stdoutpath),
                                     stderr=str(stderrpath),
                                     **self.merged_args[0])
@@ -2500,7 +2501,7 @@ class FactorBaseTask(Task):
                     raise Exception("Program failed")
                 p = cadoprograms.MakeFB(out=str(outputfilename1),
                                     side=1,
-                                    lim=self.params["alim"],
+                                    lim=self.params["lim1"],
                                     stdout=str(stdoutpath),
                                     stderr=str(stderrpath),
                                     **self.merged_args[0])
@@ -2563,11 +2564,11 @@ class FreeRelTask(Task):
             self.progparams[0].setdefault("lcideals", True)
         # Invariant: if we have a result (in self.state["freerelfilename"])
         # then we must also have a polynomial (in self.state["poly"]) and
-        # the lpba/lpbr values used in self.state["lpba"] / ["lpbr"]
+        # the lpb0/lpb1 values used in self.state["lpb1"] / ["lpb0"]
         if "freerelfilename" in self.state:
             assert "poly" in self.state
-            assert "lpba" in self.state
-            assert "lpbr" in self.state
+            assert "lpb1" in self.state
+            assert "lpb0" in self.state
             # The target file must correspond to the polynomial "poly"
     
     def run(self):
@@ -2589,9 +2590,9 @@ class FreeRelTask(Task):
                 self.logger.warn("Received different polynomial, discarding "
                                  "old free relations file")
                 discard = True
-            elif self.state["lpba"] != self.progparams[0]["lpba"] or \
-                 self.state["lpbr"] != self.progparams[0]["lpbr"]:
-                self.logger.warn("Parameter lpba/lpbr changed, discarding old "
+            elif self.state["lpb1"] != self.progparams[0]["lpb1"] or \
+                 self.state["lpb0"] != self.progparams[0]["lpb0"]:
+                self.logger.warn("Parameter lpb1/lpb0 changed, discarding old "
                                  "free relations file")
                 discard = True
             if discard:
@@ -2600,8 +2601,8 @@ class FreeRelTask(Task):
         # If outputfile is not in state, because we never produced it or because
         # input parameters changed, we remember our current input parameters
         if not "freerelfilename" in self.state:
-            self.state.update({"poly": str(poly), "lpba": self.progparams[0]["lpba"],
-                               "lpbr": self.progparams[0]["lpbr"]})
+            self.state.update({"poly": str(poly), "lpb1": self.progparams[0]["lpb1"],
+                               "lpb0": self.progparams[0]["lpb0"]})
 
         if not "freerelfilename" in self.state or self.have_new_input_files():
             # Make file name for factor base/free relations file
@@ -2678,7 +2679,7 @@ class SievingTask(ClientServerTask, DoesImport, FilesCreator, HasStatistics,
     @property
     def paramnames(self):
         return self.join_params(super().paramnames, {
-            "qmin": 0, "qrange": int, "rels_wanted": 0, "alim": int,
+            "qmin": 0, "qrange": int, "rels_wanted": 0, "lim1": int,
             "gzip": True})
 
     @property
@@ -2736,18 +2737,18 @@ class SievingTask(ClientServerTask, DoesImport, FilesCreator, HasStatistics,
         if "qnext" in self.state:
             self.state["qnext"] = max(self.state["qnext"], qmin)
         else:
-            # qmin = 0 is magic value that uses alim instead. Not pretty.
-            self.state["qnext"] = qmin if qmin > 0 else self.params["alim"]
+            # qmin = 0 is magic value that uses lim1 instead. Not pretty.
+            self.state["qnext"] = qmin if qmin > 0 else self.params["lim1"]
         
         self.state.setdefault("rels_found", 0)
         self.state["rels_wanted"] = self.params["rels_wanted"]
         if self.state["rels_wanted"] == 0:
             # taking into account duplicates, the initial value
-            # 0.9 * (pi(2^lpbr) + pi(2^lpba)) should be good
-            nr = 2 ** self.progparams[0]["lpbr"]
-            na =  2 ** self.progparams[0]["lpba"]
-            nra = int(0.9 * nr / log (nr) + 0.9 * na / log (na))
-            self.state["rels_wanted"] = nra
+            # 0.9 * (pi(2^lpb0) + pi(2^lpb1)) should be good
+            n0 = 2 ** self.progparams[0]["lpb0"]
+            n1 =  2 ** self.progparams[0]["lpb1"]
+            n01 = int(0.9 * n0 / log (n0) + 0.9 * n1 / log (n1))
+            self.state["rels_wanted"] = n01
     
     def run(self):
         super().run()

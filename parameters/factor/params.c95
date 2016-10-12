@@ -27,14 +27,14 @@ tasks.polyselect.ropteffort = 0.2
 # Sieve
 ###########################################################################
 
-rlim = 497312
-alim = 290379
-lpbr = 23
-lpba = 23
-tasks.sieve.mfbr = 53
-tasks.sieve.mfba = 75
-tasks.sieve.rlambda = 2.01
-tasks.sieve.alambda = 2.02
+lim0 = 497312
+lim1 = 290379
+lpb0 = 23
+lpb1 = 23
+tasks.sieve.mfb0 = 53
+tasks.sieve.mfb1 = 75
+tasks.sieve.lambda0 = 2.01
+tasks.sieve.lambda1 = 2.02
 tasks.sieve.ncurves0 = 7
 tasks.sieve.ncurves1 = 13
 tasks.I = 11

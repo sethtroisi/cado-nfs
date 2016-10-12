@@ -109,8 +109,8 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "mfb1", "set algebraic cofactor bound 2^mfb1");
   param_list_decl_usage(pl, "ncurves0", "set rational number of curves");
   param_list_decl_usage(pl, "ncurves1", "set algebraic number of curves"); 
-  param_list_decl_usage(pl, "lambda0", "(alias rlambda) rational lambda value");
-  param_list_decl_usage(pl, "lambda1", "(alias alambda) algebraic lambda value");
+  param_list_decl_usage(pl, "lambda0", "rational lambda value");
+  param_list_decl_usage(pl, "lambda1", "algebraic lambda value");
   param_list_decl_usage(pl, "powlim0", "limit on powers on rat side");
   param_list_decl_usage(pl, "powlim1", "limit on powers on alg side");
   param_list_decl_usage(pl, "dup-qmax", "limits of q-sieving for 2-sided duplicate removal");

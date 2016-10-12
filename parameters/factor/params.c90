@@ -146,18 +146,18 @@ tasks.wutimeout = 3600 # one hour
 # is probably too small and should be increased.
 tasks.maxtimedout = 100
 
-# Various tasks refer to the factor base bounds rlim, alim, and to the
-# large prime bounds lpbr, lpba. By adding these value to the root node of
+# Various tasks refer to the factor base bounds lim0, lim1, and to the
+# large prime bounds lpb0, lpb1. By adding these value to the root node of
 # the parameter tree, all tasks can find them.
 
 # (r,a) means rational or algebraic side
-rlim = 386090
-alim = 417250
-# The number of rational (resp. # algebraic) primes is roughly rlim/log(rlim)
-# (resp. alim/log(rlim))
-lpbr = 23
-lpba = 23
-# lpbr/lpba is the (base 2 log of the) large prime bound
+lim0 = 386090
+lim1 = 417250
+# The number of rational (resp. # algebraic) primes is roughly lim0/log(lim0)
+# (resp. lim1/log(lim0))
+lpb0 = 23
+lpb1 = 23
+# lpb0/lpb1 is the (base 2 log of the) large prime bound
 
 ###########################################################################
 # Polynomial selection task with Kleinjung's algorithm (2008)
@@ -222,25 +222,25 @@ tasks.polyselect.ropteffort = 0.2
 # Sieve task
 ###########################################################################
 
-tasks.sieve.mfbr = 46
-tasks.sieve.mfba = 46
-    # mfbr/mfba is the (base 2 log of the) limit for the cofactor we try
+tasks.sieve.mfb0 = 46
+tasks.sieve.mfb1 = 46
+    # mfb0/mfb1 is the (base 2 log of the) limit for the cofactor we try
     # to split into large primes.
 
-# tasks.sieve.rlambda = 2.131250000000000
-# tasks.sieve.alambda = 2.103125000000000
-    # rlambda/alambda is the early-abort ratio: if after sieving, and
+# tasks.sieve.lambda0 = 2.131250000000000
+# tasks.sieve.lambda1 = 2.103125000000000
+    # lambda0/lambda1 is the early-abort ratio: if after sieving, and
     # subtracting from the log of the norm the contribution of the
     # sieved primes, the approximation of the log of the remaining
     # cofactor is larger than lambda times lpb, we reject.
-    # Note that this has in particular the effect that if e.g. rlambda <
+    # Note that this has in particular the effect that if e.g. lambda0 <
     # some integer k+1, then at most k large primes are allowed on the
     # rational side. It is customary, when at most k large primes are
-    # allowed, to set rlambda to e.g. k + 0.1, in order to compensate for
+    # allowed, to set lambda0 to e.g. k + 0.1, in order to compensate for
     # inaccuracies due to sieving.
-    # In case rlambda or alambda are not given (or have value 0),
-    # a default value is computed from mfbr or mfba. Since the sieving
-    # parameters are optimized without rlambda/alambda, it is better to
+    # In case lambda0 or lambda1 are not given (or have value 0),
+    # a default value is computed from mfb0 or mfb1. Since the sieving
+    # parameters are optimized without lambda0/lambda1, it is better to
     # leave them unspecified.
 
 tasks.sieve.ncurves0 = 8
@@ -250,8 +250,8 @@ tasks.sieve.ncurves1 = 8
     # use 3+ncurves0 curves. If one increases ncurves0, one will find more
     # relations, but the cofactorization cost will increase.
     # Same for ncurves1 on side 1 (algebraic side).
-    # If unspecified, the number of curves is deduced from the value of lpbr
-    # or lpba, see function nb_curves() in file sieve/ecm/facul.c.
+    # If unspecified, the number of curves is deduced from the value of lpb0
+    # or lpb1, see function nb_curves() in file sieve/ecm/facul.c.
 
 
 tasks.I = 11

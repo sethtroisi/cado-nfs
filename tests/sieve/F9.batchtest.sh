@@ -13,20 +13,20 @@ shift 4
 # number of relations (except if the order of primes changes)
 REFERENCE_SHA1="6acf11b0b7927bbc8cd350c7441f8ad028ef9adc" # 272 relations
 
-rlim=2300000
-alim=1200000
-lpbr=26
-lpba=24
+lim0=2300000
+lim1=1200000
+lpb0=26
+lpb1=24
 maxbits=10
-mfbr=52
-mfba=72
-rlambda=2.2
-alambda=2.9
+mfb0=52
+mfb1=72
+lambda0=2.2
+lambda1=2.9
 I=12
 q0=1200000
 q1=1200200
 
-export rlim alim lpbr lpba maxbits mfbr mfba rlambda alambda I q0 q1
+export lim0 lim1 lpb0 lpb1 maxbits mfb0 mfb1 lambda0 lambda1 I q0 q1
 "${SOURCE_TEST_DIR}"/batchtest.sh "${FB}" "${LAS}" "${SRCDIR}/parameters/polynomials/F9.poly" "${REFERENCE_SHA1}" "${REFERENCE_REVISION}" "${CHECKSUM_FILE}" "$@" || exit 1
 
 exit 0

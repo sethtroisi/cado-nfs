@@ -3,10 +3,10 @@
 name = F9
 N = 5529373746539492451469451709955220061537996975706118061624681552800446063738635599565773930892108210210778168305399196915314944498011438291393118209
 
-rlim = 2300000
-alim = 1200000
-lpbr = 26
-lpba = 26
+lim0 = 2300000
+lim1 = 1200000
+lpb0 = 26
+lpb1 = 26
 
 # We supply the SNFS polynomial, so we don't want any polynomial selection
 # to happen. To this effect we set admin and admax both to 0. Note that
@@ -37,10 +37,10 @@ tasks.polyselect.import = parameters/polynomials/F9.poly
 # contain a large coefficient or two... and without knowing how large the
 # norms on the two sides are, one cannot suggest good sieving parameters.
 # These parameters happen to work alright for F9, though.
-tasks.sieve.mfbr = 52
-tasks.sieve.mfba = 52
-tasks.sieve.rlambda = 2.1
-tasks.sieve.alambda = 2.2
+tasks.sieve.mfb0 = 52
+tasks.sieve.mfb1 = 52
+tasks.sieve.lambda0 = 2.1
+tasks.sieve.lambda1 = 2.2
 tasks.I = 12
 tasks.sieve.qmin = 2000000
 tasks.sieve.qrange = 5000

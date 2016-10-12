@@ -301,7 +301,7 @@ Big factorization (more than 200 digits):
 
 By default, to decrease memory usage, it is assumed than less than 2^32 (~ four
 billion) relations or ideals are needed and that the ideals will be less than
-2^32 (i.e., the lpba/lpbr parameters are less or equal to 32). In the case of
+2^32 (i.e., the lpb0/lpb1 parameters are less or equal to 32). In the case of
 factorizations of numbers of more than 200 digits, these assumptions may not
 hold. In this case, you have to set some variables in your local.sh script
 (see Configure section above for more information on local.sh and section on

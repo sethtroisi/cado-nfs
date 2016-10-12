@@ -15,20 +15,20 @@ REFERENCE_REVISION="0bd0c87d93c709279cc5c3dd471292b28ae04198" # 430 relations
 # Previous revisions and number of relations found (most recent first):
 # 9253f54766c5438fe3198053f9edd811ee254a17 (421 relations)
 
-rlim=2300000
-alim=1200000
-lpbr=26
-lpba=26
+lim0=2300000
+lim1=1200000
+lpb0=26
+lpb1=26
 maxbits=10
-mfbr=52
-mfba=52
-rlambda=2.1
-alambda=2.2
+mfb0=52
+mfb1=52
+lambda0=2.1
+lambda1=2.2
 I=12
 q0=1200000
 q1=1200200
 
-export rlim alim lpbr lpba maxbits mfbr mfba rlambda alambda I q0 q1
+export lim0 lim1 lpb0 lpb1 maxbits mfb0 mfb1 lambda0 lambda1 I q0 q1
 "${SOURCE_TEST_DIR}"/sievetest.sh "${FB}" "${LAS}" "${SRCDIR}/parameters/polynomials/F9.poly" "${REFERENCE_SHA1}" "${REFERENCE_REVISION}" "${CHECKSUM_FILE}" -v -v "$@" || exit 1
 
 exit 0
