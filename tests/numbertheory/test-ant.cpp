@@ -374,6 +374,12 @@ int do_valuations_of_ideal(param_list_ptr pl) /*{{{*/
 
     /* We need to reduce our generating elements modulo f, at the expense
      * of creating denominators all over the place.
+     *
+     * Note that we are *not* changing conventions at all.
+     *
+     * We start with something in the basis [alpha^i]. We rewrite it in
+     * the basis [alpha_hat^i]. We reduce modulo f_hat, which is monic.
+     * And then we rewrite that back to the basis [alpha^i].
      */
     cxx_mpz_mat I;
     cxx_mpz denom;
@@ -399,7 +405,7 @@ int do_valuations_of_ideal(param_list_ptr pl) /*{{{*/
                 mpz_mul(denom, denom, f->coeff[f->deg]);
                 mpz_mul(e->coeff[k], e->coeff[k], denom);
             }
-            mpz_poly_div_r_z(e, e, f);
+            mpz_poly_div_r_z(e, e, fh);
             for(int k = 0 ; k <= e->deg ; k++) {
                 mpz_mul(e->coeff[k], e->coeff[k], c);
                 mpz_mul(c, c, f->coeff[f->deg]);
@@ -429,17 +435,20 @@ int do_valuations_of_ideal(param_list_ptr pl) /*{{{*/
         cxx_mpz_mat const& fkp(F[k].first);
         cxx_mpz_mat a = valuation_helper_for_ideal(M, fkp, p);
         pair<cxx_mpz, cxx_mpz_mat> two = prime_ideal_two_element(O, f, M, fkp);
-        cxx_mpz_poly alpha;
-        /* should we display O-coefficients or K-coefficients ?
-        mpz_mat_row_to_poly(alpha, two.second, 0);
-        */
-        cxx_mpq_mat alpha_q;
-        mpq_mat_set_mpz_mat(alpha_q, two.second);
-        mpq_mat_mul(alpha_q, alpha_q, O);
-        cxx_mpz alpha_denom;
-        mpq_mat_row_to_poly(alpha, alpha_denom, alpha_q, 0);
+
+        cxx_mpq_mat theta_q;
+        mpq_mat_set_mpz_mat(theta_q, two.second);
+        string uniformizer = write_element_as_polynomial(theta_q, "alpha");
+
         int v = valuation_of_ideal_at_prime_ideal(M, I, a, p);
-        cout << "(p=" << p << ", k=" << k << ", f="<<prime_ideal_inertia_degree(fkp)<<", e="<<F[k].second<< ";" << two.first << ",["<< alpha <<"]/"<<alpha_denom<<")^" << v-w*F[k].second << "\n";
+        cout << "# (p=" << p
+            << ", k=" << k
+            << ", f="<< prime_ideal_inertia_degree(fkp)
+            << ", e="<< F[k].second
+            << "; ideal<O|" << two.first << "," << uniformizer << ">"
+            << ")"
+            << "^" << v-w*F[k].second
+            << ";" << endl;
     }
     return 1;
 }

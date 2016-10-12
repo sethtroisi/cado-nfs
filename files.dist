@@ -597,7 +597,7 @@ utils/mpz_array.c
 utils/mpz_array.h
 utils/params.c
 utils/params.h
-utils/mpz_poly.c
+utils/mpz_poly.cpp
 utils/mpz_poly.h
 utils/purgedfile.c
 utils/purgedfile.h
@@ -1175,3 +1175,4 @@ config/gmpxx.cpp
 utils/gmpxx.cpp
 tests/numbertheory/gentest.m
 tests/numbertheory/test.data
+numbertheory/badideals.cpp

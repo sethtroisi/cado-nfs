@@ -14,6 +14,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <gmp.h>
+#include <sstream>
 #include "utils.h"
 #include "portability.h"
 
@@ -495,7 +496,7 @@ void mpz_poly_div_xi(mpz_poly_ptr g, mpz_poly_srcptr f, int i)
     }
     if (g == f) {
         /* rotate the coefficients, don't do any freeing */
-        mpz_t * temp = malloc(i * sizeof(mpz_t));
+        mpz_t * temp = (mpz_t*) malloc(i * sizeof(mpz_t));
         memcpy(temp, g->coeff, i * sizeof(mpz_t));
         memmove(g->coeff, g->coeff + i, (g->deg + 1 - i) * sizeof(mpz_t));
         memcpy(g->coeff + (g->deg + 1 - i), temp, i * sizeof(mpz_t));
@@ -578,14 +579,14 @@ int mpz_poly_asprintf(char ** res, mpz_poly_srcptr f)
     *res = NULL;
 
     alloc += batch;
-    *res = realloc(*res, alloc);
+    *res = (char*) realloc(*res, alloc);
     if (*res == NULL) goto oom;
 
 #define SNPRINTF_FRAGMENT(fmt, arg) do {				\
     rc = gmp_snprintf(*res + size, alloc - size, fmt, arg);     	\
     if (size + (size_t) rc + 1 >= alloc) {				\
         alloc = MAX(alloc + batch, size + (size_t) rc + 1);             \
-        *res = realloc(*res, alloc);					\
+        *res = (char*) realloc(*res, alloc);				\
         if (*res == NULL) goto oom;					\
         rc = gmp_snprintf(*res + size, alloc - size, fmt, arg); 	\
     }									\
@@ -597,7 +598,7 @@ int mpz_poly_asprintf(char ** res, mpz_poly_srcptr f)
     rc = strlen(arg);                                                   \
     if (size + (size_t) rc + 1 >= alloc) {      			\
         alloc = MAX(alloc + batch, size + (size_t) rc + 1);		\
-        *res = realloc(*res, alloc);					\
+        *res = (char*) realloc(*res, alloc);				\
         if (*res == NULL) goto oom;					\
     }									\
     size += strlcpy(*res + size, arg, alloc-size);			\
@@ -2152,7 +2153,7 @@ mpz_poly_homography (mpz_poly_ptr Fij, mpz_poly_ptr F, int64_t H[4])
 
   Fij->deg = d;
 
-  g = malloc ((d + 1) * sizeof (mpz_t));
+  g = (mpz_t*) malloc ((d + 1) * sizeof (mpz_t));
   FATAL_ERROR_CHECK (g == NULL, "not enough memory");
   for (k = 0; k <= d; k++)
     mpz_init (g[k]);
@@ -2540,7 +2541,7 @@ void mpz_poly_factor_list_prepare_write(mpz_poly_factor_list_ptr l, int index)
 {
     if (index >= l->alloc) {
         l->alloc = index + 4 + l->alloc / 4;
-        l->factors = realloc(l->factors, l->alloc * sizeof(mpz_poly_with_m));
+        l->factors = (mpz_poly_with_m*) realloc(l->factors, l->alloc * sizeof(mpz_poly_with_m));
         /* We need to set something. A zero polynomial has NULL storage
          * area, so that will do (realloc behaves as needed).  */
         for(int i = l->size ; i < l->alloc ; i++) {
@@ -3266,3 +3267,25 @@ int mpz_poly_factor_and_lift_padically(mpz_poly_factor_list_ptr fac, mpz_poly_sr
     return 1;
 }
 
+std::string cxx_mpz_poly::print_poly(std::string const& var) const
+{
+    std::ostringstream os;
+    for(int i = 0 ; i <= x->deg ; i++) {
+        int r = mpz_cmp_ui(x->coeff[i], 0);
+        if (r == 0) continue;
+        if (r > 0 && os.str().size())
+            os << "+";
+        if (mpz_cmp_ui(x->coeff[i], 1) == 0) {
+        } else if (mpz_cmp_ui(x->coeff[i], -1) == 0) {
+            os << "-";
+        } else {
+            os << x->coeff[i];
+            if (i) os << "*";
+        }
+        if (i) {
+            os << var;
+            if (i > 1) os << "^" << i;
+        }
+    }
+    return os.str();
+}
