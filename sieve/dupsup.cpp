@@ -87,7 +87,10 @@ parse_config(siever_config_ptr sc, param_list pl)
     param_list_parse_long_and_long(pl, "dup-qmax", dupqmax, ",");
     sc->sides[0]->qmax = dupqmax[0];
     sc->sides[1]->qmax = dupqmax[1];
-
+    if (!param_list_parse_ulong(pl, "powlim0", &sc->sides[0]->powlim))
+        sc->sides[0]->powlim = (1<<sc->logI) - 1;
+    if (!param_list_parse_ulong(pl, "powlim1", &sc->sides[1]->powlim))
+        sc->sides[1]->powlim = (1<<sc->logI) - 1;
     return seen;
 }
 

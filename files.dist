@@ -504,6 +504,7 @@ tests/sieve/F9.tracektest.sh
 tests/sieve/F9.cofactest.sh
 tests/sieve/F9.todotest.sh
 tests/sieve/F9.descenttest.sh
+tests/sieve/F9.dupsup.sh
 tests/sieve/F9.todo
 tests/sieve/F9.hint
 tests/sieve/c120.poly
