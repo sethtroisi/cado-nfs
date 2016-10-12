@@ -1093,15 +1093,15 @@ sieve_info_ptr get_sieve_info_from_config(las_info_ptr las, siever_config_srcptr
         if (siever_config_cmp(si->conf, sc) == 0)
             break;
     }
-    if (si->conf->bitsize)
-        return si;
-    /* We've hit the end marker. Need to add a new config. */
-    las->sievers = (sieve_info_ptr) realloc(las->sievers, (n+2) * sizeof(sieve_info));
-    si = las->sievers + n;
-    verbose_output_print(0, 1, "# Creating new sieve configuration for q~2^%d on the %s side\n",
-            sc->bitsize, sidenames[sc->side]);
-    sieve_info_init_from_siever_config(las, si, sc, pl);
-    memset(si + 1, 0, sizeof(sieve_info));
+    if (!si->conf->bitsize) {
+        /* We've hit the end marker. Need to add a new config. */
+        las->sievers = (sieve_info_ptr) realloc(las->sievers, (n+2) * sizeof(sieve_info));
+        si = las->sievers + n;
+        verbose_output_print(0, 1, "# Creating new sieve configuration for q~2^%d on the %s side\n",
+                sc->bitsize, sidenames[sc->side]);
+        sieve_info_init_from_siever_config(las, si, sc, pl);
+        memset(si + 1, 0, sizeof(sieve_info));
+    }
     siever_config_display(sc);
     return si;
 }/*}}}*/
