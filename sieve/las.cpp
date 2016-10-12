@@ -1093,15 +1093,15 @@ sieve_info_ptr get_sieve_info_from_config(las_info_ptr las, siever_config_srcptr
         if (siever_config_cmp(si->conf, sc) == 0)
             break;
     }
-    if (si->conf->bitsize)
-        return si;
-    /* We've hit the end marker. Need to add a new config. */
-    las->sievers = (sieve_info_ptr) realloc(las->sievers, (n+2) * sizeof(sieve_info));
-    si = las->sievers + n;
-    verbose_output_print(0, 1, "# Creating new sieve configuration for q~2^%d on the %s side\n",
-            sc->bitsize, sidenames[sc->side]);
-    sieve_info_init_from_siever_config(las, si, sc, pl);
-    memset(si + 1, 0, sizeof(sieve_info));
+    if (!si->conf->bitsize) {
+        /* We've hit the end marker. Need to add a new config. */
+        las->sievers = (sieve_info_ptr) realloc(las->sievers, (n+2) * sizeof(sieve_info));
+        si = las->sievers + n;
+        verbose_output_print(0, 1, "# Creating new sieve configuration for q~2^%d on the %s side\n",
+                sc->bitsize, sidenames[sc->side]);
+        sieve_info_init_from_siever_config(las, si, sc, pl);
+        memset(si + 1, 0, sizeof(sieve_info));
+    }
     siever_config_display(sc);
     return si;
 }/*}}}*/
@@ -3004,11 +3004,22 @@ int main (int argc0, char *argv0[])/*{{{*/
         {
             const las_todo_entry * const next_todo = las->todo->top();
             if (next_todo->iteration) {
-                verbose_output_print(0, 1, "#\n# NOTE: we are re-playing this special-q because of %d previous failed attempt(s)\n#\n", next_todo->iteration);
+                verbose_output_print(0, 1, "#\n# NOTE: we are re-playing this special-q because of %d previous failed attempt(s)\n", next_todo->iteration);
                 /* update sieving parameters here */
+                double ratio = double(current_config->sides[0]->mfb) /
+                    double(current_config->sides[0]->lpb);
                 current_config->sides[0]->lpb += next_todo->iteration;
+                current_config->sides[0]->mfb = ratio*current_config->sides[0]->lpb;
+                ratio = double(current_config->sides[1]->mfb) /
+                    double(current_config->sides[1]->lpb);
                 current_config->sides[1]->lpb += next_todo->iteration;
-                /* TODO: do we update the mfb or not ? */
+                current_config->sides[1]->mfb = ratio*current_config->sides[1]->lpb;
+                verbose_output_print(0, 1,
+                        "# NOTE: current values of lpb/mfb: %d,%d %d,%d\n#\n", 
+                        current_config->sides[0]->lpb,
+                        current_config->sides[0]->mfb,
+                        current_config->sides[1]->lpb,
+                        current_config->sides[1]->mfb);
             }
         }
 

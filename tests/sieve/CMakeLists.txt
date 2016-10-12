@@ -15,6 +15,7 @@ set(makefb_path         ${CADO_NFS_BINARY_DIR}/sieve/makefb)
 set(las_path            ${CADO_NFS_BINARY_DIR}/sieve/las)
 set(las_tracek_path     ${CADO_NFS_BINARY_DIR}/sieve/las_tracek)
 set(las_descent_path    ${CADO_NFS_BINARY_DIR}/sieve/las_descent)
+set(dupsup_path         ${CADO_NFS_BINARY_DIR}/sieve/dupsup)
 
 set(F9_roots "${CMAKE_CURRENT_BINARY_DIR}/F9.roots")
 
@@ -108,6 +109,15 @@ cado_define_test(F9_descenttest
     ${CADO_NFS_SOURCE_DIR}/tests/sieve/F9.hint 
     TARGET_DEPENDENCIES las_descent
     TEST_DEPENDENCIES F9_makefbtest)
+
+# Try duplicate online suppression
+cado_define_test(F9_dupsuptest
+    SCRIPT
+    ${CMAKE_CURRENT_SOURCE_DIR}/F9.dupsup.sh
+    ${F9_roots} ${las_path} ${dupsup_path} ${CADO_NFS_SOURCE_DIR}
+    TARGET_DEPENDENCIES dupsup
+    TEST_DEPENDENCIES F9_makefbtest)
+
 
 cado_define_test(test_memset_things.cpp LIBRARIES las-norms utils)
 

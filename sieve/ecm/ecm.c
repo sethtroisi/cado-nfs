@@ -391,6 +391,13 @@ ellEe_swap (ellEe_point_t Q, ellEe_point_t P, const modulus_t m)
   mod_swap (Q->z, P->z, m);
 }
 
+static inline void
+ellEe_neg (ellEe_point_t P, const modulus_t m)
+{
+  mod_neg (P->x, P->x, m);
+  mod_neg (P->t, P->t, m);
+}
+
 /* 
    Computes Q=2P in E using dedicated doubling in Projective twisted Edwards
    coordinates from [Bernstein et al. 2008] 
@@ -537,7 +544,7 @@ ellEe_double (ellEe_point_t Q, const ellEe_point_t P, const modulus_t m,
 */
 static void
 ellEe_add (ellEe_point_t R, const ellEe_point_t P, const ellEe_point_t Q,
-	  const residue_t a, const modulus_t m)
+	   const modulus_t m, const residue_t a)
 {
   /* FIXME: optimize registers */
   residue_t A, B, C, D, E, F, G, H;
@@ -631,6 +638,23 @@ ellEe_add (ellEe_point_t R, const ellEe_point_t P, const ellEe_point_t Q,
   mod_clear (H, m);
 }
 
+/* Computes Q = 2P + R in projective coordinates,   */
+/* where P is given in projective coord. and R in extended coord. */
+MAYBE_UNUSED
+static void
+ellE_double_add (ellE_point_t Q, const ellE_point_t P, const ellEe_point_t R, const modulus_t m, const residue_t a)
+{
+  ellEe_point_t Qe;
+  ellEe_init (Qe, m);
+  /* TODO: optimize cost */
+  ellE_double (Q, P, m, a);
+  ellEe_set_from_E (Qe, Q, m);
+  ellEe_add (Qe, Qe, R, m, a);
+  ellE_set_from_Ee (Q, Qe, m);
+
+  ellEe_clear (Qe, m);
+}
+
 
 /* Computes R = [e]P (mod m) in homogeneous Edwards coordinates
 
@@ -696,7 +720,7 @@ ellE_mul_ul (ellE_point_t R, const ellE_point_t P, const unsigned long e,
     {
       ellEe_double (T, T, m, a);
       if (j & e)
-	ellEe_add (T, T, Pe, a, m);
+	ellEe_add (T, T, Pe, m, a);
       j >>= 1;
     }
 
@@ -999,13 +1023,91 @@ end_of_bytecode:
   ellM_clear (t2, m);
 }
 
+/* ICI */
+
 /* Interpret the addition chain written in bc */
-#if 0
-void ellE_interpret_bytecode (ellE_point_t P, const char *bc, const modulus_t m, const residue_t a)
+/* Computes Q = sP, where */
+/* - s is the primorial exponent depending only on B1 */
+/* - P is the initial point given in extended coord */
+/* - Q is returned in projective coord */
+
+MAYBE_UNUSED
+static
+void ellE_interpret_bytecode (ellE_point_t P, const char *bc, const unsigned int bc_len, const modulus_t m, const residue_t a)
 {
+  unsigned char q = bc[0];  // ce qui permet de remplacer les couilles en coquilles [PG, Oct. 2016]
+  ASSERT (q & 1);   // q is odd
+
+  unsigned char rP_size = (q+1)/2;
+
+  /* Precomputation phase */
   
+  /* _2Pe = [2]P in extended coord */
+  ellEe_point_t _2Pe;
+  ellEe_init (_2Pe, m);
+  ellEe_set_from_E (_2Pe, P, m);
+  ellEe_double (_2Pe, _2Pe, m, a);
+  
+  /* _rP[i] = [2*i+1]P in extended coord */
+  ellEe_point_t *_rP;
+  _rP = (ellEe_point_t *) malloc (rP_size * sizeof (ellEe_point_t));
+
+  ellEe_set_from_E (_rP[0], P, m);
+
+  for (int i = 1 ; i < rP_size ; i++)
+    ellEe_add (_rP[i], _rP[i-1], _2Pe, m, a);
+
+  /* Addition chain */
+  
+  /* Starting point (depends on bc[1] and bc[2]) */
+  ellE_point_t Q;
+  ellEe_point_t Te;
+  ellE_init (Q, m);
+  ellEe_init (Te, m);
+
+  unsigned int i = bc[1] & 0x7F;
+  if (i == 0x7F)
+    ellEe_set (Te, _2Pe, m);
+  else
+    ellEe_set (Te, _rP[i], m);
+  
+  if (bc[1] & 0x80)
+    {
+      i = bc[2] & 0x7F;
+      ellEe_add (Te, Te, _rP[i], m, a);
+
+    }
+  ellE_set_from_Ee (Q, Te, m);
+
+  /* scan bc[i] for i > 2 */
+  i = 2;
+  while (++i < bc_len)
+    {
+      int j = bc[i] & 0x7F;
+      if (j == 0x7F)
+	{
+	  ellE_double (Q, Q, m, a);
+	  if (bc[i] & 0x80)
+	    ellE_double (Q, Q, m, a);
+	}
+      else
+	{
+	  ellEe_set (Te, _rP[j], m);
+	  if (bc[i] & 0x80)
+	    ellEe_neg (Te, m);
+	  ellE_double_add (Q, Q, Te, m, a);
+	}
+    }
+  
+  ellE_set (P, Q, m);
+
+  ellE_clear (Q, m);
+  ellEe_clear (_2Pe, m);
+  ellEe_clear (Te, m);
+  for (i=0 ; i < rP_size ; i++)
+    ellEe_clear (_rP[i], m);
+  free (_rP);
 }
-#endif
 
 
 /* Produces curve in Montgomery form from sigma value.

@@ -32,13 +32,13 @@ char *phash = "# ";
 char *phash = "";
 #endif
 
-#define BATCH_SIZE 20 /* number of special (q, r) per batch */
-#define KEEP 10       /* number of best raw polynomials kept */
-
+#define BATCH_SIZE 20    /* number of special (q, r) per batch */
+#define KEEP 10          /* number of best raw polynomials kept */
+#define DEFAULT_NQ 1000  /* default max num of nq considered for each ad */
 /* Read-Only */
 uint32_t *Primes = NULL;
 unsigned long lenPrimes = 1; // length of Primes[]
-unsigned long nq = 1000;
+unsigned long nq = DEFAULT_NQ;
 size_t keep = KEEP;
 const double exp_rot[] = {0, 0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 0};
 static int verbose = 0;
@@ -1909,7 +1909,7 @@ declare_usage(param_list pl)
 
   char str[200];
   snprintf (str, 200, "maximum number of special-q's considered\n"
-            "               for each ad (default %d)", INT_MAX);
+            "               for each ad (default %d)", DEFAULT_NQ);
   param_list_decl_usage(pl, "nq", str);
   snprintf(str, 200, "number of polynomials kept (default %d)", KEEP);
   param_list_decl_usage(pl, "keep", str);
