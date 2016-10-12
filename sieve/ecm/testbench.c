@@ -146,7 +146,7 @@ void print_help (char *programname)
   printf ("-inp <f> Read decimal numbers to factor from file <f>\n");
   printf ("-inpraw <f>  Read numbers in GMP raw format from file <f>\n");
   printf ("-inpstop <n> Stop after reading <n> numbers\n");
-  printf ("-po <s>, -pom12 <s>, -pom16 <s> Compute order of starting point. Use -vf\n");
+  printf ("-po <s>, -pom12 <s>, -pom16 <s>, -poe16 <s> Compute order of starting point. Use -vf\n");
 }
 
 int main (int argc, char **argv)
