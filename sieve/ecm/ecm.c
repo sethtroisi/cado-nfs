@@ -1000,9 +1000,15 @@ end_of_bytecode:
 }
 
 /* Interpret the addition chain written in bc */
+/* Returns the corresponding point */
+
+/* ICI */
+
 #if 0
 void ellE_interpret_bytecode (ellE_point_t P, const char *bc, const modulus_t m, const residue_t a)
 {
+  ellE_point_t Q;
+
   
 }
 #endif
