@@ -280,52 +280,53 @@ ecm_make_plan (ecm_plan_t *plan, const unsigned int B1, const unsigned int B2,
       bc_state = bytecoder_init (compress ? &ecm_dict : NULL);
       /* If group order is divisible by 12, add another 3 to stage 1 primes */
       if (extra_primes && (parameterization & ECM_TORSION12))
-      {
         totalcost += prac_bytecode (3, addcost, doublecost, bytecost,
                                                           changecost, bc_state);
-        prime_info pi;
-        prime_info_init (pi);
-        unsigned int p = (unsigned int) getprime_mt (pi);
-        ASSERT (p == 3);
-        for ( ; p <= B1; p = (unsigned int) getprime_mt (pi))
-        {
-          for (unsigned int q = 1; q <= B1 / p; q *= p)
-            totalcost += prac_bytecode (p, addcost, doublecost, bytecost,
-                                                          changecost, bc_state);
-        }
-        prime_info_clear (pi);
-        bytecoder ((literal_t) 12, bc_state);
-        bytecoder_flush (bc_state);
-        plan->bc_len = bytecoder_size (bc_state);
-        plan->bc = (char *) malloc (plan->bc_len);
-        ASSERT (plan->bc);
-        bytecoder_read (plan->bc, bc_state);
-        bytecoder_clear (bc_state);
-        /* Save chain for future use (global variable).
-         * XXX: If this get multithreaded someday, we should have a mutex here
-         */
-        save_chain(B1, plan->bc_len, plan->bc);
-      }
 
-      if (!compress)
+      /* Then do all the other odd primes */
+      prime_info pi;
+      prime_info_init (pi);
+      unsigned int p = (unsigned int) getprime_mt (pi);
+      ASSERT (p == 3);
+      for ( ; p <= B1; p = (unsigned int) getprime_mt (pi))
       {
-        /* The very first chain init and very last chain end are hard-coded
-        in the stage 1 code and must be removed from the byte code. */
-        size_t i;
-        ASSERT (plan->bc[0] == 10); /* check that first code is chain init */
-        ASSERT (plan->bc[plan->bc_len - 2] == 11); /* check that next-to-last
-        code is chain end */
-        /* check that last code is bytecode end */
-        ASSERT (plan->bc[plan->bc_len - 1] == (literal_t) 12);
-        /* Remove first code 10 and last code 11 */
-        for (i = 1; i < plan->bc_len; i++)
-          plan->bc[i - 1] = plan->bc[i];
-        plan->bc[plan->bc_len - 3] = plan->bc[plan->bc_len - 2];
-        plan->bc_len -= 2;
+        for (unsigned int q = 1; q <= B1 / p; q *= p)
+          totalcost += prac_bytecode (p, addcost, doublecost, bytecost,
+                                                        changecost, bc_state);
       }
+      prime_info_clear (pi);
 
       /* Do not forget to add in totalcost, the cost of the initial doublings */
       totalcost += plan->exp2 * doublecost;
+
+      bytecoder ((literal_t) 12, bc_state);
+      bytecoder_flush (bc_state);
+      plan->bc_len = bytecoder_size (bc_state);
+      plan->bc = (char *) malloc (plan->bc_len);
+      ASSERT (plan->bc);
+      bytecoder_read (plan->bc, bc_state);
+      bytecoder_clear (bc_state);
+      /* Save chain for future use (global variable).
+       * XXX: If this get multithreaded someday, we should have a mutex here
+       */
+      save_chain(B1, plan->bc_len, plan->bc);
+    }
+
+    if (!compress)
+    {
+      /* The very first chain init and very last chain end are hard-coded
+      in the stage 1 code and must be removed from the byte code. */
+      size_t i;
+      ASSERT (plan->bc[0] == 10); /* check that first code is chain init */
+      ASSERT (plan->bc[plan->bc_len - 2] == 11); /* check that next-to-last
+      code is chain end */
+      /* check that last code is bytecode end */
+      ASSERT (plan->bc[plan->bc_len - 1] == (literal_t) 12);
+      /* Remove first code 10 and last code 11 */
+      for (i = 1; i < plan->bc_len; i++)
+        plan->bc[i - 1] = plan->bc[i];
+      plan->bc[plan->bc_len - 3] = plan->bc[plan->bc_len - 2];
+      plan->bc_len -= 2;
     }
   }
   else if (parameterization & FULLTWED)
@@ -386,20 +387,3 @@ ecm_clear_plan (ecm_plan_t *plan)
   if (plan->parameterization & FULLTWED)
     plan->E = NULL;
 }
-
-
-/* void */
-/* ecmE_make_plan (ecmE_plan_t *plan, const unsigned int B1, const int parameterization) */
-/* { */
-/*   fprintf(stderr, "In ecmE_make_plan\n"); */
-
-/*   plan->exp2 = 0; */
-/*   plan->B1 = B1; */
-/*   plan->parameterization = parameterization; */
-/*   plan->E = &Ecurve14; */
-/* } */
-
-/* void  */
-/* ecmE_clear_plan (ecmE_plan_t *plan MAYBE_UNUSED) */
-/* { */
-/* } */
