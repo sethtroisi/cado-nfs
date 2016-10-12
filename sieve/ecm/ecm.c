@@ -1000,6 +1000,10 @@ end_of_bytecode:
 }
 
 
+void ellE_interpret_bytecode (ellE_point_t P, const char *code, const modulus_t m, const residue_t a)
+{}
+
+
 /* Produces curve in Montgomery form from sigma value.
    Return 1 if it worked, 0 if a modular inverse failed.
    If modular inverse failed, return non-invertible value in x. */
@@ -2085,6 +2089,9 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
     {
       residue_t a;
       unsigned long p, q;
+
+      // TODO
+      // ellE_interpret_bytecode (P, plan->bc, m, b);
 
       /* Naive scalar mult on Edwards curve */
       
