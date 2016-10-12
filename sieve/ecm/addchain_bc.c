@@ -20,19 +20,20 @@ char
 addchain_find_best_r (mpz_srcptr k, const unsigned char q)
 {
   int l = nbits(2*q);
+printf (" [ q = %u; l = %u ] ", q, l);
   unsigned int r = mpz_mod_ui_2exp (k, l);
-  if (r < q)
+  if (r <= q)
     return (char) r;
-  else if (q - r < q)
-    return (char) ((int) r) - ((int) q);
+  else if ((1 << l) - r <= q)
+    return (char) (r - (1 << l));
   else
   {
     l--;
     r = mpz_mod_ui_2exp (k, l);
-    if (r < q)
+    if (r <= q)
       return (char) r;
     else /* we are sure that (q - r < q) */
-    return (char) ((int) r) - ((int) q);
+      return (char) (r - (1 << l));
   }
 }
 
@@ -179,7 +180,7 @@ addchain (mpz_srcptr E, const unsigned char q, addchain_cost_srcptr opcost,
   /* Cost of the precomputation: 1 DBL (to compute 2P) and (q-1)/2 ADD (to
    * compute (2k+1)P from (2k-1)P and 2P, for k in [1..(q-1)/2])
    */
-  cost = opcost->dbl_precomp + (q >> 2) * opcost->add_precomp;
+  cost = opcost->dbl_precomp + (q >> 1) * opcost->add_precomp;
   
   /* Recursively compute the cost of the addition chain */
   cost += addchain_rec (k, q, opcost, state);
