@@ -21,7 +21,7 @@ tasks.polyselect.incr = 60
 tasks.polyselect.P = 950
 tasks.polyselect.nq = 64
 tasks.polyselect.nrkeep = 15
-tasks.polyselect.ropteffort = 1
+tasks.polyselect.ropteffort = 0.1
 
 ###########################################################################
 # Sieve
