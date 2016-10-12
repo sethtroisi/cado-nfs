@@ -71,18 +71,23 @@ parse_config(siever_config_ptr sc, param_list pl)
 {
     sc->side = 1; // Legacy default.
     param_list_parse_int(pl, "-sqside", &sc->side);
-    param_list_parse_double(pl, "lambda0", &(sc->sides[0]->lambda));
-    param_list_parse_double(pl, "lambda1", &(sc->sides[1]->lambda));
     int seen = 1;
     seen  = param_list_parse_int   (pl, "I",     &(sc->logI));
     seen &= param_list_parse_ulong (pl, "lim0",  &(sc->sides[0]->lim));
     seen &= param_list_parse_int   (pl, "lpb0",  &(sc->sides[0]->lpb));
     seen &= param_list_parse_int   (pl, "mfb0",  &(sc->sides[0]->mfb));
+    seen &= param_list_parse_double(pl, "lambda0", &(sc->sides[0]->lambda));
     seen &= param_list_parse_int   (pl, "ncurves0",  &(sc->sides[0]->ncurves));
     seen &= param_list_parse_ulong (pl, "lim1",  &(sc->sides[1]->lim));
     seen &= param_list_parse_int   (pl, "lpb1",  &(sc->sides[1]->lpb));
     seen &= param_list_parse_int   (pl, "mfb1",  &(sc->sides[1]->mfb));
+    seen &= param_list_parse_double(pl, "lambda1", &(sc->sides[1]->lambda));
     seen &= param_list_parse_int   (pl, "ncurves1",  &(sc->sides[1]->ncurves));
+    long dupqmax[2] = {0, 0};
+    param_list_parse_long_and_long(pl, "dup-qmax", dupqmax, ",");
+    sc->sides[0]->qmax = dupqmax[0];
+    sc->sides[1]->qmax = dupqmax[1];
+
     return seen;
 }
 
@@ -92,19 +97,20 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "path_antebuffer", "path to antebuffer program");
   param_list_decl_usage(pl, "poly", "polynomial file");
   param_list_decl_usage(pl, "I",    "set sieving region to 2^I");
-  param_list_decl_usage(pl, "skew", "(alias S) skewness");
-  param_list_decl_usage(pl, "lim0", "(alias rlim) rational factor base bound");
-  param_list_decl_usage(pl, "lim1", "(alias alim) algebraic factor base bound");
-  param_list_decl_usage(pl, "lpb0", "(alias lpbr) set rational large prime bound to 2^lpb0");
-  param_list_decl_usage(pl, "lpb1", "(alias lpba) set algebraic large prime bound to 2^lpb1");
-  param_list_decl_usage(pl, "mfb0", "(alias mfbr) set rational cofactor bound 2^mfb0");
-  param_list_decl_usage(pl, "mfb1", "(alias mfba) set algebraic cofactor bound 2^mfb1");
+  param_list_decl_usage(pl, "skew", "skewness");
+  param_list_decl_usage(pl, "lim0", "rational factor base bound");
+  param_list_decl_usage(pl, "lim1", "algebraic factor base bound");
+  param_list_decl_usage(pl, "lpb0", "set rational large prime bound to 2^lpb0");
+  param_list_decl_usage(pl, "lpb1", "set algebraic large prime bound to 2^lpb1");
+  param_list_decl_usage(pl, "mfb0", "set rational cofactor bound 2^mfb0");
+  param_list_decl_usage(pl, "mfb1", "set algebraic cofactor bound 2^mfb1");
   param_list_decl_usage(pl, "ncurves0", "set rational number of curves");
   param_list_decl_usage(pl, "ncurves1", "set algebraic number of curves"); 
   param_list_decl_usage(pl, "lambda0", "(alias rlambda) rational lambda value");
   param_list_decl_usage(pl, "lambda1", "(alias alambda) algebraic lambda value");
-  param_list_decl_usage(pl, "powlim0", "(alias rpowlim) limit on powers on rat side");
-  param_list_decl_usage(pl, "powlim1", "(alias apowlim) limit on powers on alg side");
+  param_list_decl_usage(pl, "powlim0", "limit on powers on rat side");
+  param_list_decl_usage(pl, "powlim1", "limit on powers on alg side");
+  param_list_decl_usage(pl, "dup-qmax", "limits of q-sieving for 2-sided duplicate removal");
   param_list_decl_usage(pl, "sqside", "side of special-q (default=1)");
   param_list_decl_usage(pl, "mt",   "number of threads to use");
   verbose_decl_usage(pl);
@@ -191,6 +197,10 @@ main (int argc, char * argv[])
 
     for (int argi = 0; argi < argc; argi++) {
       FILE *f = fopen_maybe_compressed(argv[argi], "rb");
+      if (f == NULL) {
+          perror(argv[argi]);
+          abort();
+      }
       sieve_info_ptr si = NULL;
       while (!feof(f)) {
         char line[1024];
