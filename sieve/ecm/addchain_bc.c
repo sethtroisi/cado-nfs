@@ -1,11 +1,10 @@
 #include "getprime.h"
 
-#define M_MAX 15
+#define M_MAX 253
 
 /* Bytecode an addition chain for k = prod (primes) < B1 */
 
-
-double f1 (char **bc, unsigned int B1, double doublecost, double addcost)
+double addchain_bytecode (const unsigned int B1, const double dbl_cost, const double dbladd_cost, const double dbl_precomp_cost, double add_precomp_cost, bc_state_t *state)
 {
   double chaincost;
   mpz_t E;
@@ -63,35 +62,4 @@ double f1 (char **bc, unsigned int B1, double doublecost, double addcost)
   return chaincost;
 }
 
-
-
-double f2 (char *bc, mpz_t E, unsigned int m, double addcost, double doublecost)
-{
-  double chaincost;
-  mpz_t exp;
-  mpz_init_set (exp, E);
-
-  while (mpz_cmp_ui (exp, 1) > 0)
-    {
-
-      /* TODO: cas particuliers */
-
-      if (mpz_even_p (exp))
-	{
-	  mpz_tdiv_q_2exp (exp, exp, 1);
-	  if (bc)
-	    *bc++ = 0;
-	}
-      else
-	{
-	  /* TODO : tester la puissance de 2 > 2m, sinon celle d'en dessous */
-	}
-    }
-
-  mpz_clear (exp);
-  return chaincost;
-}
-
-unsigned long best_m (mpz_t E, double addcost, double doublecost)
-{}
 
