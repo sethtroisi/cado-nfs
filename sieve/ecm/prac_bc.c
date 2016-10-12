@@ -41,7 +41,6 @@ bytecoder_literal_to_code (const literal_t l)
 static void 
 bytecoder_output (const code_t c, bc_state_t *state)
 {
-  assert (c < BC_MAXCODE);
   if (state->buffull == state->bufalloc)
     {
       assert (state->bufalloc > 0);

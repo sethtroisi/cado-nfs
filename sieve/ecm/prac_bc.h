@@ -1,6 +1,3 @@
-/* One more than the highest code number the byte code generator can produce */
-#define BC_MAXCODE 32
-
 #define PRAC_NR_MULTIPLIERS 19
 
 typedef char literal_t;
