@@ -16,6 +16,17 @@
 /* Only used with l <= 31 */
 #define mpz_mod_ui_2exp(n,l) (((n)->_mp_size) ? ((n)->_mp_d[0]&((1<<l)-1)) : 0)
 
+/* Given k and q compute the best value for r, i.e. the odd integer r in [-q..q]
+ * with the biggest valuation in 2 for k-r.
+ *  Let l = nbits (2*q)
+ *  r = k % 2^l ( with remainder in [-2^(l-1)..2^(l-1)-1]
+ *  if abs(r) <= q
+ *    return r
+ *  else
+ *    recompute r with the same formula but with l-1
+ *    we known that in this case abs(r) <= q
+ *    return r
+ */
 char
 addchain_find_best_r (mpz_srcptr k, const unsigned char q)
 {

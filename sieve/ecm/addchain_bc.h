@@ -19,8 +19,23 @@ typedef const struct addchain_cost_s * addchain_cost_srcptr;
 
 double addchain_bytecode (const unsigned int, addchain_cost_srcptr,
                                                                   bc_state_t *);
-/* Op cost for Twisted Edwards Curves with a=-1
- * TODO explain different models and why dbladd > add+dbl*/
+
+/* Costs of operations for Twisted Edwards Curves with a=-1
+ *  For those curves, we use 3 different models:
+ *    projective, extended and (only internally) completed
+ *  The costs corresponds to operations on different models:
+ *    - dbl corresponds to a doubling projective -> projective
+ *    - add corresponds to an addition extended,extended -> projective
+ *    - dbladd corresponds to a doubling and an addition
+ *        projective, extended -> projective
+ *      It is more costly than add + dbl but it is due to the fact that if we
+ *      wanted to do the same operation with 1 add and 1 dbl, we would need to
+ *      convert the output of the dbl from projective to extended in order to be
+ *      able to use the add, which is costly.
+ *    - dbl_precomp corresponds to a doubling extended -> extended
+ *    - add_precomp corresponds to an addition extended, extended, -> extended
+ *  We count 1 for a multiplication and 1 for a squaring on the base field.
+ */
 static inline void
 opcost_TwEdwards_minus1_opcost (addchain_cost_ptr opcost)
 {
