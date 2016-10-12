@@ -10,9 +10,12 @@
 #define BRENT12   1
 #define MONTY12   2
 #define MONTY16   4
-#define FULLMONTY 7
 #define TWED12    8
 #define TWED16   16
+#define FULLMONTY (BRENT12 | MONTY12 | MONTY16)
+#define FULLTWED (TWED12 | TWED16)
+#define ECM_TORSION16 (MONTY16 | TWED16)
+#define ECM_TORSION12 (BRENT12 | MONTY12 | TWED12)
 
 
 /* Twisted Edwards curve with a = -1 */
