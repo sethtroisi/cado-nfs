@@ -14,6 +14,8 @@ cmd="${LAS} -poly ${SRCDIR}/parameters/polynomials/F9.poly \
     -ncurves0 10 -ncurves1 10"
 echo "$cmd -dup"
 ndup_ref=`$cmd -dup | grep "DUPE " | wc -l`
+# remove leading spaces (for openbsd 5.3)
+let ndup_ref=ndup_ref
 if [ "$ndup_ref" != "12" ]; then
     echo "Wrong number of duplicates in las -dup"
     exit 1
@@ -34,6 +36,8 @@ cmd="${DUPSUP} -poly ${SRCDIR}/parameters/polynomials/F9.poly \
     $TMPFILE"
 echo $cmd
 ndup=`$cmd | grep "DUPE " | wc -l`
+# remove leading spaces (for openbsd 5.3)
+let ndup=ndup
 if [ "$ndup" != "12" ]; then
     echo "Wrong number of duplicates in dupsup"
     exit 1
