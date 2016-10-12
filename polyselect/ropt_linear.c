@@ -867,6 +867,8 @@ ropt_linear_deg5 ( ropt_poly_t poly,
      more sublattices to be tuned by test root sieve */
   unsigned long len_full_alpha = s1param->nbest_sl *
     TUNE_RATIO_STAGE1_FULL_ALPHA * param->effort;
+  if (len_full_alpha < 2)
+    len_full_alpha = 2; /* required by new_alpha_pq */
   new_alpha_pq (&alpha_pqueue, len_full_alpha);
 
   /* [Step 1] tune ropt_bound first */
