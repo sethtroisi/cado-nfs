@@ -999,9 +999,13 @@ end_of_bytecode:
   ellM_clear (t2, m);
 }
 
-
-void ellE_interpret_bytecode (ellE_point_t P, const char *code, const modulus_t m, const residue_t a)
-{}
+/* Interpret the addition chain written in bc */
+#if 0
+void ellE_interpret_bytecode (ellE_point_t P, const char *bc, const modulus_t m, const residue_t a)
+{
+  
+}
+#endif
 
 
 /* Produces curve in Montgomery form from sigma value.
