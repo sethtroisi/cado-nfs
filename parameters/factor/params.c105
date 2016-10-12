@@ -21,6 +21,7 @@ tasks.polyselect.adrange = 1e4
 tasks.polyselect.incr = 60
 tasks.polyselect.nq = 256
 tasks.polyselect.nrkeep = 50
+tasks.polyselect.ropteffort = 1
 
 ###########################################################################
 # Sieve
