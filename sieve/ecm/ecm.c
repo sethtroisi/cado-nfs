@@ -2076,9 +2076,8 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
   residue_t u, b, d, a;
   ellM_point_t P, Pt;
 
-  MAYBE_UNUSED
-  ellE_point_t Q, Qt;
-  
+  ellE_point_t Q;
+
   /* P is initialized here because the coordinates of P may be used as temporary
      variables when constructing curves from sigma! (mouaif) */
   ellM_init (P, m); 
@@ -2229,6 +2228,7 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
       
       ellE_interpret_bytecode (Q, plan->bc, plan->bc_len, m, a);
       
+      ellE_point_t Qt;
       ellE_init (Qt, m);
       ellE_set (Qt, Q, m);
       for (i = 0; i < plan->exp2; i++)
@@ -2245,7 +2245,8 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
 #endif
 	}
       mod_gcd (f, Q[0].x, m);
-      
+
+      ellE_clear (Qt, m);
     }
   
 #if 0
@@ -2265,9 +2266,11 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
   ellM_clear (P, m);
   ellM_clear (Pt, m);
   
-  mod_clear (a, m);
-  ellE_clear (Q, m);
-  ellE_clear (Qt, m);
+  if (plan->parameterization & FULLTWED)
+  {
+    mod_clear (a, m);
+    ellE_clear (Q, m);
+  }
 
   return bt;
 }
