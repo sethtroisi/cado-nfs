@@ -45,6 +45,9 @@ extern int mpz_coprime_p (mpz_t a, mpz_t b);
 extern int nbits (uintmax_t p);
 extern long double mpz_get_ld (mpz_t z);
 
+extern int mpz_p_valuation(mpz_srcptr a, mpz_srcptr p);
+extern int mpz_p_valuation_ui(mpz_srcptr a, unsigned long p);
+
 #if !GMP_VERSION_ATLEAST(5,0,0)
 mp_limb_t mpn_neg (mp_limb_t *rp, const mp_limb_t *sp, mp_size_t n);
 void mpn_xor_n (mp_limb_t *rp, const mp_limb_t *s1p, const mp_limb_t *s2p,

@@ -17,7 +17,7 @@ compute_sm_lowlevel (mpz_poly SM, mpz_poly_srcptr num, const mpz_poly F, const m
      *  - the bit size of num (we mutliply by it often)
      *  - the bit size of the coefficients of F
      */
-    mpz_poly_power_mod_f_mod_mpz_barrett(SM, num, F, smexp, ell2, use_barrett ? invl2 : NULL);
+    mpz_poly_pow_mod_f_mod_mpz_barrett(SM, num, F, smexp, ell2, use_barrett ? invl2 : NULL);
     mpz_poly_sub_ui(SM, SM, 1);
     mpz_poly_divexact_mpz(SM, SM, ell);
 }
@@ -208,7 +208,7 @@ sm_build_one_relset (sm_relset_ptr rel, uint64_t *r, int64_t *e, int len,
       /* TODO: mpz_poly_long_power_mod_f_mod_mpz */
       for (int s = 0; s < nb_polys; ++s) {
         if (F[s] == NULL) continue;
-        mpz_poly_power_mod_f_mod_mpz (tmp[s], abpolys[r[k]], F[s], ee, ell2);
+        mpz_poly_pow_mod_f_mod_mpz (tmp[s], abpolys[r[k]], F[s], ee, ell2);
         mpz_poly_mul_mod_f_mod_mpz (rel->num[s], rel->num[s], tmp[s], F[s],
             ell2, NULL);
       }
@@ -219,7 +219,7 @@ sm_build_one_relset (sm_relset_ptr rel, uint64_t *r, int64_t *e, int len,
       /* TODO: mpz_poly_long_power_mod_f_mod_mpz */
       for (int s = 0; s < nb_polys; ++s) {
         if (F[s] == NULL) continue;
-        mpz_poly_power_mod_f_mod_mpz(tmp[s], abpolys[r[k]], F[s], ee, ell2);
+        mpz_poly_pow_mod_f_mod_mpz(tmp[s], abpolys[r[k]], F[s], ee, ell2);
         mpz_poly_mul_mod_f_mod_mpz(rel->denom[s], rel->denom[s], tmp[s], F[s],
             ell2, NULL);
       }

@@ -41,6 +41,12 @@ enable_testing()
 # Also allow testing with "make check", but building all required
 # dependencies (las for the sieve test, etc.) as well. We also add the
 # "verbose" command line option here to get more meaningful output
+
+# Note the $(ARGS) here. It is expanded by make, not by cmake, so that
+# the arguments which are present on the "make check" command line are
+# obeyed. This has the consequence that in order to pass a $, you need to
+# pass $$ ; well, plus quoting. So that gives, e.g.:
+#        make check ARGS="-R ^foo\$\$"
 add_custom_target(check COMMAND ${CMAKE_CTEST_COMMAND} -V $(ARGS))
 
 #####################################################################
@@ -71,6 +77,7 @@ get_override(BWC_GF2_MATMUL_BACKENDS    BWC_GF2_MATMUL_BACKENDS)
 get_override(BWC_GFP_ARITHMETIC_BACKENDS BWC_GFP_ARITHMETIC_BACKENDS)
 get_override(BWC_GFP_MATMUL_BACKENDS    BWC_GFP_MATMUL_BACKENDS)
 get_override(BWC_EXTRA_BACKENDS    BWC_EXTRA_BACKENDS)
+get_override(CHECKS_EXPENSIVE   CHECKS_EXPENSIVE)
 
 if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Darwin")
 	# sigh...
@@ -353,6 +360,7 @@ add_custom_target(gf2x-build ALL
 # add_subdirectory (gf2x-fft)
 add_subdirectory (utils)
 add_subdirectory (polyselect)
+add_subdirectory (numbertheory)
 add_subdirectory (sieve)
 add_subdirectory (sqrt)
 add_subdirectory (linalg)
