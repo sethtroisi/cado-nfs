@@ -46,12 +46,12 @@ tasks.I = 10
 # Sieve
 #########
 
-rlim = 20000
-alim = 20000
-lpbr = 17
-lpba = 17
-tasks.sieve.mfbr = 34
-tasks.sieve.mfba = 34
+lim0 = 20000
+lim1 = 20000
+lpb0 = 17
+lpb1 = 17
+tasks.sieve.mfb0 = 34
+tasks.sieve.mfb1 = 34
 tasks.sieve.qmin = 20000
 tasks.sieve.qrange = 1000
 tasks.sieve.rels_wanted = 1

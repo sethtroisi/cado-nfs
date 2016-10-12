@@ -41,14 +41,14 @@ directory. A (very slow) automatic optimization of the
 The optimal parameters are written in a file nomad-solution.xxx.txt,
 in the order they are defined in las_declaration.py, for example:
 
-0.900000000000000 # alambda
-1.100000500679016 # rlambda
-1000000           # alim
-1000000           # rlim
-19                # lpba
-19                # lpbr
-23                # mfba
-21                # mfbr
+0.900000000000000 # lambda1
+1.100000500679016 # lambda0
+1000000           # lim1
+1000000           # lim0
+19                # lpb1
+19                # lpb0
+23                # mfb1
+21                # mfb0
 11                # I
 
 For larger numbers, you should also update the hard-coded parameters in
@@ -63,7 +63,7 @@ With special-q's on the rational side, some changes have to be made:
 
 1) report.py, line 15: change 'algebraic' into 'rational'
 
-2) las_run.py, line 77: change q0 = las_params["alim"] into
-                               q0 = las_params["rlim"]
+2) las_run.py, line 77: change q0 = las_params["lim1"] into
+                               q0 = las_params["lim0"]
 
 3) some other changes might be needed...

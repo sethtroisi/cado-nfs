@@ -47,14 +47,14 @@ tasks.polyselect.nq = 1000
 ###########################################################################
 
 
-rlim = 50000
-alim = 100000
-lpbr = 22
-lpba = 22
-tasks.sieve.mfbr = 24
-tasks.sieve.mfba = 24
-tasks.sieve.rlambda = 1.2
-tasks.sieve.alambda = 1.2
+lim0 = 50000
+lim1 = 100000
+lpb0 = 22
+lpb1 = 22
+tasks.sieve.mfb0 = 24
+tasks.sieve.mfb1 = 24
+tasks.sieve.lambda0 = 1.2
+tasks.sieve.lambda1 = 1.2
 
 tasks.sieve.qmin = 200000
 tasks.sieve.qrange = 1000

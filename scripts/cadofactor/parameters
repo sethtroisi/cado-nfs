@@ -89,18 +89,18 @@ tasks.verbose = 1
 # tasks.polyselect.verbose = 0
 
 
-# rlim, lpbr, mfbr, rlambda, alim, lpba, mfba, alambda: The sieving
+# lim0, lpb0, mfb0, lambda0, lim1, lpb1, mfb1, lambda1: The sieving
 # parameters. Also used by several other Tasks and Programs, so best
 # specified at path "tasks" where everyone can find them.
 
-tasks.rlim=50000
-tasks.alim=100000
-tasks.lpbr=22
-tasks.lpba=22
-tasks.mfbr=22
-tasks.mfba=22
-tasks.rlambda=1.2
-tasks.alambda=1.2
+tasks.lim0=50000
+tasks.lim1=100000
+tasks.lpb0=22
+tasks.lpb1=22
+tasks.mfb0=22
+tasks.mfb1=22
+tasks.lambda0=1.2
+tasks.lambda1=1.2
 tasks.I = 11
 
 

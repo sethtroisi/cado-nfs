@@ -37,21 +37,21 @@ tasks.polyselect.nrkeep = 100
 ###########################################################################
 
 # (r,a) means rational or algebraic side
-# rlim/alim is the bound for sieving
-# lpbr/lpba is the (base 2 log of the) large prime bound
-# mfbr/mfba is the (base 2 log of the) limit for the cofactor we try to
+# lim0/lim1 is the bound for sieving
+# lpb0/lpb1 is the (base 2 log of the) large prime bound
+# mfb0/mfb1 is the (base 2 log of the) limit for the cofactor we try to
 #                                      split into large primes.
-# rlambda/alambda is the early-abort ratio: if after sieving the
+# lambda0/lambda1 is the early-abort ratio: if after sieving the
 #                                      approximate norm is more than
 #                                      lambda times lpb, we reject.
-rlim = 40000000
-alim = 80000000
-lpbr = 32
-lpba = 32
-tasks.sieve.mfbr = 64
-tasks.sieve.mfba = 96
-tasks.sieve.rlambda = 2.1
-tasks.sieve.alambda = 2.8
+lim0 = 40000000
+lim1 = 80000000
+lpb0 = 32
+lpb1 = 32
+tasks.sieve.mfb0 = 64
+tasks.sieve.mfb1 = 96
+tasks.sieve.lambda0 = 2.1
+tasks.sieve.lambda1 = 2.8
 
 tasks.I = 15
 # Wagstaff did use I=14, I=15 should be better

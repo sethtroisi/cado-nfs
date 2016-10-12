@@ -371,7 +371,7 @@ one_thread (void* args)
   return NULL;
 }
 
-void makefb_with_powers(FILE* outfile, mpz_poly F, unsigned long alim,
+void makefb_with_powers(FILE* outfile, mpz_poly F, unsigned long lim,
                         int maxbits, int nb_threads)
 {
     mpz_t *f = F->coeff;
@@ -380,7 +380,7 @@ void makefb_with_powers(FILE* outfile, mpz_poly F, unsigned long alim,
     fprintf(outfile, "# Roots for polynomial ");
     mpz_poly_fprintf(outfile, F);
     fprintf(outfile, "# DEGREE: %d\n", d);
-    fprintf(outfile, "# alim = %lu\n", alim);
+    fprintf(outfile, "# lim = %lu\n", lim);
     fprintf(outfile, "# maxbits = %d\n", maxbits);
 
     pthread_t *tid;
@@ -396,10 +396,10 @@ void makefb_with_powers(FILE* outfile, mpz_poly F, unsigned long alim,
       }
     prime_info pi;
     prime_info_init (pi);
-    for (p = 2; p <= alim;) {
-      for (j = 0; j < nb_threads && p <= alim; j++)
+    for (p = 2; p <= lim;) {
+      for (j = 0; j < nb_threads && p <= lim; j++)
         {
-          for (k = 0; k < GROUP && p <= alim; p = getprime_mt (pi), k++)
+          for (k = 0; k < GROUP && p <= lim; p = getprime_mt (pi), k++)
             T[j]->p[k] = p;
           T[j]->n = k;
         }
@@ -470,9 +470,6 @@ main (int argc, char *argv[])
   param_list_init(pl);
   declare_usage(pl);
   cado_poly_init(cpoly);
-
-  // Legacy
-  param_list_configure_alias(pl, "lim", "alim"); 
 
   argv++, argc--;
   for( ; argc ; ) {

@@ -79,14 +79,14 @@ cado_define_test(sievetest_I
     TARGET_DEPENDENCIES las)
 
 # Try a too-large lambda value
-cado_define_test(F9_rlambdatest
-    PROGRAM env rlambda=5 ${CMAKE_CURRENT_SOURCE_DIR}/F9.tracektest.sh
+cado_define_test(F9_lambda0test
+    PROGRAM env lambda0=5 ${CMAKE_CURRENT_SOURCE_DIR}/F9.tracektest.sh
     ${F9_roots} ${las_path} ${CADO_NFS_SOURCE_DIR} -regex "lambda>.* does
     not make sense"
     TARGET_DEPENDENCIES las
     TEST_DEPENDENCIES F9_makefbtest)
-cado_define_test(F9_alambdatest
-    PROGRAM env alambda=5 ${CMAKE_CURRENT_SOURCE_DIR}/F9.tracektest.sh
+cado_define_test(F9_lambda1test
+    PROGRAM env lambda1=5 ${CMAKE_CURRENT_SOURCE_DIR}/F9.tracektest.sh
     ${F9_roots} ${las_path} ${CADO_NFS_SOURCE_DIR} -regex "lambda>.* does
     not make sense"
     TARGET_DEPENDENCIES las

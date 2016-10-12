@@ -67,12 +67,12 @@ tasks.polyselect.adrange = 500
 tasks.polyselect.P = 420
 tasks.polyselect.nq = 1000
 
-rlim = 2000
-alim = 2000
-lpbr = 15
-lpba = 15
-tasks.sieve.mfbr = 17
-tasks.sieve.mfba = 17
+lim0 = 2000
+lim1 = 2000
+lpb0 = 15
+lpb1 = 15
+tasks.sieve.mfb0 = 17
+tasks.sieve.mfb1 = 17
 tasks.sieve.qrange = 100
 # tasks.sieve.rels_wanted = 10000
 
