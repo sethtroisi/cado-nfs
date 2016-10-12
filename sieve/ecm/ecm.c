@@ -1031,26 +1031,34 @@ end_of_bytecode:
 /* - P is the initial point given in extended coord */
 /* - Q is returned in projective coord */
 
-MAYBE_UNUSED
 static
 void ellE_interpret_bytecode (ellE_point_t P, const char *bc, const unsigned int bc_len, const modulus_t m, const residue_t a)
 {
-  unsigned char q = bc[0];  // ce qui permet de remplacer les couilles en coquilles [PG, Oct. 2016]
+  unsigned char q;
+
+  q = 253; // bc[0];  // ce qui permet de remplacer les couilles en coquilles [PG, Oct. 2016]
   ASSERT (q & 1);   // q is odd
 
   unsigned char rP_size = (q+1)/2;
+  ASSERT (rP_size <= 127);
 
   /* Precomputation phase */
   
   /* _2Pe = [2]P in extended coord */
   ellEe_point_t _2Pe;
   ellEe_init (_2Pe, m);
+
   ellEe_set_from_E (_2Pe, P, m);
   ellEe_double (_2Pe, _2Pe, m, a);
-  
+
   /* _rP[i] = [2*i+1]P in extended coord */
   ellEe_point_t *_rP;
   _rP = (ellEe_point_t *) malloc (rP_size * sizeof (ellEe_point_t));
+
+  ASSERT (_rP != NULL);
+
+  for (int i=0 ; i < rP_size ; i++)
+    ellEe_init (_rP[i], m);
 
   ellEe_set_from_E (_rP[0], P, m);
 
@@ -1474,6 +1482,61 @@ Montgomery16_curve_from_k (residue_t b, residue_t x, const unsigned long k,
   return 1;
 }
 
+static 
+int Edwards16_curve_from_sigma (residue_t d, ellE_point_t P, 
+				MAYBE_UNUSED const unsigned long sigma, 
+				const modulus_t m)
+{
+  residue_t u, f;
+  const Edwards_curve_t *E = &Ecurve14;
+
+  residue_t xn, xd, yn, yd, dd;
+  
+  mod_init (u, m);
+  mod_init (f, m);
+  
+  mod_set_ul (xn, E->x_numer, m);
+  mod_set_ul (xd, E->x_denom, m);
+  
+  /* (xn, yn) = P (mod m) */
+  if ( mod_inv (u, xd, m) == 0)
+    {
+      mod_gcd (f, xd, m);
+      mod_clear (u, m);
+      return 0;
+    }
+  mod_mul (P->x, xn, u, m);
+  
+  mod_set_ul (yn, E->y_numer, m);
+  mod_set_ul (yd, E->y_denom, m);
+  if (mod_inv (u, yd, m) == 0)
+    {
+      mod_gcd (f, yd, m);
+      mod_clear (u, m);
+      ellE_clear (P, m);
+      return 0;
+    }
+  mod_mul (P->y, yn, u, m);
+  
+  mod_set1 (P->z, m);
+  
+  /* Reduce d = dn/dd mod m */
+  mod_set_ul (d, E->d_numer, m);
+  mod_set_ul (dd, E->d_denom, m);
+  if (mod_inv (u, dd, m) == 0)
+    {
+      mod_gcd (f, dd, m);
+      mod_clear (u, m);
+      ellE_clear (P, m);
+      return 0;
+    }
+  mod_mul (d, d, u, m);
+  
+  mod_clear (u, m);
+  mod_clear (f, m);
+
+  return 1;
+}
 
 
 /* Make a curve of the form y^2 = x^3 + a*x^2 + b with a valid point
@@ -2010,10 +2073,15 @@ ecm_stage2 (residue_t r, const ellM_point_t P, const stage2_plan_t *plan,
 int 
 ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
 {
-  residue_t u, b, d;
+  residue_t u, b, d, a;
   ellM_point_t P, Pt;
-  ellE_point_t Q;
-  ellM_init (P, m);
+
+  MAYBE_UNUSED
+  ellE_point_t Q, Qt;
+  
+  /* P is initialized here because the coordinates of P may be used as temporary
+     variables when constructing curves from sigma! (mouaif) */
+  ellM_init (P, m); 
 
   unsigned int i;
   int bt = 0;
@@ -2083,48 +2151,50 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
   }
   else if (plan->parameterization == TWED16)
   {
-    /* Construct Edwards16 curve [Barbulescu et. al 2012] */
+    /* TODO: Construct Edwards16 curve [Barbulescu et. al 2012] */
     /* Curve is constant for now */
     
-    residue_t xn, xd, yn, yd, dd;
+    Edwards16_curve_from_sigma (d, Q, plan->sigma, m);
 
-    mod_set_ul (xn, Ecurve14.x_numer, m);
-    mod_set_ul (xd, Ecurve14.x_denom, m);
-    
-    /* (xn, yn) = P (mod m) */
-    if ( mod_inv (u, xd, m) == 0)
-      {
-	mod_gcd (f, xd, m);
-	mod_clear (u, m);
-	return 0;
-      }
-    ellE_init (Q, m);
-    mod_mul (Q->x, xn, u, m);
-    
-    mod_set_ul (yn, Ecurve14.y_numer, m);
-    mod_set_ul (yd, Ecurve14.y_denom, m);
-    if (mod_inv (u, yd, m) == 0)
-      {
-	mod_gcd (f, yd, m);
-	mod_clear (u, m);
-	ellE_clear (Q, m);
-	return 0;
-      }
-    mod_mul (Q->y, yn, u, m);
-    
-    mod_set1 (Q->z, m);
+    /* residue_t xn, xd, yn, yd, dd; */
 
-    /* Reduce d = dn/dd mod m */
-    mod_set_ul (d, Ecurve14.d_numer, m);
-    mod_set_ul (dd, Ecurve14.d_denom, m);
-    if (mod_inv (u, dd, m) == 0)
-      {
-	mod_gcd (f, dd, m);
-	mod_clear (u, m);
-	ellE_clear (Q, m);
-	return 0;
-      }
-    mod_mul (d, d, u, m);
+    /* mod_set_ul (xn, Ecurve14.x_numer, m); */
+    /* mod_set_ul (xd, Ecurve14.x_denom, m); */
+    
+    /* /\* (xn, yn) = P (mod m) *\/ */
+    /* if ( mod_inv (u, xd, m) == 0) */
+    /*   { */
+    /* 	mod_gcd (f, xd, m); */
+    /* 	mod_clear (u, m); */
+    /* 	return 0; */
+    /*   } */
+    /* mod_mul (Q->x, xn, u, m); */
+    
+    /* mod_set_ul (yn, Ecurve14.y_numer, m); */
+    /* mod_set_ul (yd, Ecurve14.y_denom, m); */
+    /* if (mod_inv (u, yd, m) == 0) */
+    /*   { */
+    /* 	mod_gcd (f, yd, m); */
+    /* 	mod_clear (u, m); */
+    /* 	ellE_clear (Q, m); */
+    /* 	return 0; */
+    /*   } */
+    /* mod_mul (Q->y, yn, u, m); */
+    
+    /* mod_set1 (Q->z, m); */
+
+    /* /\* Reduce d = dn/dd mod m *\/ */
+    /* mod_set_ul (d, Ecurve14.d_numer, m); */
+    /* mod_set_ul (dd, Ecurve14.d_denom, m); */
+    /* if (mod_inv (u, dd, m) == 0) */
+    /*   { */
+    /* 	mod_gcd (f, dd, m); */
+    /* 	mod_clear (u, m); */
+    /* 	ellE_clear (Q, m); */
+    /* 	return 0; */
+    /*   } */
+    /* mod_mul (d, d, u, m); */
+
   }
   else
   {
@@ -2193,32 +2263,46 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
   }
   else if (plan->parameterization == TWED16)
     {
-      residue_t a;
-      unsigned long p, q;
 
-      // TODO
-      // ellE_interpret_bytecode (P, plan->bc, m, b);
-
-      /* Naive scalar mult on Edwards curve */
-      
-      mod_init (a, m);
       /* a = -1 */
+      mod_init (a, m);
       mod_set1 (a, m);
       mod_neg (a, a, m);
 
-      prime_info pi;
-      prime_info_init (pi);
-      for (p = 2; p <= plan->B1; p = getprime_mt (pi))
-	{
-	  for (q = p; q <= plan->B1 / p; q *= p);
-	  ellE_mul_ul (Q, Q, q, m, a);
-	}
-      prime_info_clear (pi);
+      ellE_interpret_bytecode (Q, plan->bc, plan->bc_len, m, a);
+      
+      /* Naive scalar mult on Edwards curve */
+      /* mod_init (a, m); */
+      /* /\* a = -1 *\/ */
+      /* mod_set1 (a, m); */
+      /* mod_neg (a, a, m); */
 
-      mod_gcd (f, Q->z, m);
+      /* prime_info pi; */
+      /* prime_info_init (pi); */
+      /* for (p = 2; p <= plan->B1; p = getprime_mt (pi)) */
+      /* 	{ */
+      /* 	  for (q = p; q <= plan->B1 / p; q *= p); */
+      /* 	  ellE_mul_ul (Q, Q, q, m, a); */
+      /* 	} */
+      /* prime_info_clear (pi); */
 
-      mod_clear (a, m);
-      ellE_clear (Q, m);
+    ellE_init (Qt, m);
+    ellE_set (Qt, Q, m);
+    for (i = 0; i < plan->exp2; i++)
+      {
+	ellE_double (Q, Q, m, b);
+#if ECM_BACKTRACKING
+	if (mod_is0 (Q[0].x, m))
+	  {
+	    ellE_set (Q, Qt, m);
+	    bt = 1;
+	    break;
+	  }
+	ellE_set (Qt, Q, m);
+#endif
+      }
+    mod_gcd (f, Q[0].x, m);
+
     }
   
 #if 0
@@ -2238,6 +2322,10 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
   ellM_clear (P, m);
   ellM_clear (Pt, m);
   
+  mod_clear (a, m);
+  ellE_clear (Q, m);
+  ellE_clear (Qt, m);
+
   return bt;
 }
 
@@ -2288,6 +2376,19 @@ ell_pointorder (const residue_t sigma, const int parameterization,
     if (Montgomery16_curve_from_k (A, x, mod_get_ul (sigma, m), m) == 0)
       return 0;
   }
+  else if (parameterization == TWED16)
+    {
+      // TODO
+      // if (TwistedEdwards16_curve_from_sigma (...) == 0)
+      //      return 0;
+      // Montgomery16_curve_from_Edwards16...
+      // ax^2 + y^2 = 1 + dx^2y^2 ---> By^2 = x^3 + Ax^2 + x
+      // A = 2(a+d)/(a-d), B = 4/(a-d)
+      // u = (1+y)/(1-y)
+      // v = (1+y)/(1-y)x
+      // source: http://math.stackexchange.com/questions/1391732/birational-equvalence-of-twisted-edwards-and-montgomery-curves?noredirect=1&lq=1
+
+    }
   else
   {
     fprintf (stderr, "ecm: Unknown parameterization\n");
