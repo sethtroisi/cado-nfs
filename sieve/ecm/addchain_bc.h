@@ -1,5 +1,5 @@
 #ifndef _ECM_ADDCHAIN_BC_H_
-#define _ECM_ADDCAHIN_BC_H_
+#define _ECM_ADDCHAIN_BC_H_
 
 struct addchain_cost_s
 {
