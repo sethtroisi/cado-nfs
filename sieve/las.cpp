@@ -3006,9 +3006,16 @@ int main (int argc0, char *argv0[])/*{{{*/
             if (next_todo->iteration) {
                 verbose_output_print(0, 1, "#\n# NOTE: we are re-playing this special-q because of %d previous failed attempt(s)\n#\n", next_todo->iteration);
                 /* update sieving parameters here */
+                /* TODO: do we update lpb and mfb just for once, or for
+                 * all subsequent descents of the same size? */
+                double ratio = double(current_config->sides[0]->mfb) /
+                    double(current_config->sides[0]->lpb);
                 current_config->sides[0]->lpb += next_todo->iteration;
+                current_config->sides[0]->mfb = ratio*current_config->sides[0]->lpb;
+                ratio = double(current_config->sides[1]->mfb) /
+                    double(current_config->sides[1]->lpb);
                 current_config->sides[1]->lpb += next_todo->iteration;
-                /* TODO: do we update the mfb or not ? */
+                current_config->sides[1]->mfb = ratio*current_config->sides[1]->lpb;
             }
         }
 
