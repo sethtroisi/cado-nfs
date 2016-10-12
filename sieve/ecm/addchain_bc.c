@@ -20,7 +20,6 @@ char
 addchain_find_best_r (mpz_srcptr k, const unsigned char q)
 {
   int l = nbits(2*q);
-printf (" [ q = %u; l = %u ] ", q, l);
   unsigned int r = mpz_mod_ui_2exp (k, l);
   if (r <= q)
     return (char) r;
