@@ -1176,3 +1176,6 @@ utils/gmpxx.cpp
 tests/numbertheory/gentest.m
 tests/numbertheory/test.data
 numbertheory/badideals.cpp
+tests/utils/test_mpz_poly_bivariate.c
+utils/mpz_poly_bivariate.c
+utils/mpz_poly_bivariate.h
