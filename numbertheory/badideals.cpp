@@ -182,7 +182,6 @@ private:
     vector<int> inertia;
     pair<cxx_mpz_mat, cxx_mpz> jjinv;
     vector<cxx_mpz_mat> helpers;
-    int wjjinv;
     vector<int> val_base;
 
 public:
