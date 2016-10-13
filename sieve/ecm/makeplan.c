@@ -30,6 +30,24 @@ static code_t ecm_dict_code[ECM_DICT_NRENTRIES] = {0, 0, 10, 11};
 static bc_dict_t ecm_dict =
   {ECM_DICT_NRENTRIES, ecm_dict_len, ecm_dict_entry, ecm_dict_code};
 
+/* Costs of operations for Twisted Edwards Curves with a=-1
+ *  For those curves, we use 3 different models:
+ *    projective, extended and (only internally) completed
+ *  The costs corresponds to operations on different models:
+ *    - dbl corresponds to a doubling projective -> projective
+ *    - add corresponds to an addition extended,extended -> projective
+ *    - dbladd corresponds to a doubling and an addition
+ *        projective, extended -> projective
+ *      It is more costly than add + dbl but it is due to the fact that if we
+ *      wanted to do the same operation with 1 add and 1 dbl, we would need to
+ *      convert the output of the dbl from projective to extended in order to be
+ *      able to use the add, which is costly.
+ *    - dbl_precomp corresponds to a doubling extended -> extended
+ *    - add_precomp corresponds to an addition extended, extended, -> extended
+ *  We count 1 for a multiplication and 1 for a squaring on the base field.
+ */
+addchain_cost_t TwEdwards_minus1_opcost = { .dbl=7. , .add=7. , .dbladd=15. ,
+                                            .dbl_precomp=8. , .add_precomp=8. };
 
 /* Store already computed ECM stage 1 chains in a global variable.
  * WARNING: for the moment, this is not thread safe
@@ -331,13 +349,12 @@ ecm_make_plan (ecm_plan_t *plan, const unsigned int B1, const unsigned int B2,
   }
   else if (parameterization & FULLTWED)
   {
-    addchain_cost_t opcost;
-    opcost_TwEdwards_minus1_opcost (opcost); /* set the cost for TwEd curves */
+    addchain_cost_t * opcost = &TwEdwards_minus1_opcost;
 
     plan->E = &Ecurve14; /* To remove */
 
     bc_state = bytecoder_init (NULL);
-    totalcost = addchain_bytecode (B1, opcost, bc_state);
+    totalcost = addchain_bytecode (B1, opcost, bc_state, verbose);
     bytecoder_flush (bc_state);
     plan->bc_len = bytecoder_size (bc_state);
     plan->bc = (char *) malloc (plan->bc_len);
@@ -347,6 +364,8 @@ ecm_make_plan (ecm_plan_t *plan, const unsigned int B1, const unsigned int B2,
 
     /* Do not forget to add in totalcost, the cost of the initial doublings */
     totalcost += plan->exp2 * opcost->dbl;
+    if (verbose)
+      printf ("## Addchain: cost of power of 2: %.0f\n",plan->exp2*opcost->dbl);
   }
   else
     FATAL_ERROR_CHECK (1, "Unknown parametrization");
