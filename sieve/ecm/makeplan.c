@@ -294,6 +294,8 @@ ecm_make_plan (ecm_plan_t *plan, const unsigned int B1, const unsigned int B2,
     plan->exp2 = 0;
   for (unsigned int q = 1; q <= B1 / 2; q *= 2)
     plan->exp2++;
+  if (verbose)
+    printf ("Exponent of 2 in stage 1 primes: %u\n", plan->exp2);
 
   /* Make bytecode for stage 1 */
   plan->B1 = B1;
@@ -358,44 +360,31 @@ ecm_make_plan (ecm_plan_t *plan, const unsigned int B1, const unsigned int B2,
       plan->bc[plan->bc_len - 3] = plan->bc[plan->bc_len - 2];
       plan->bc_len -= 2;
     }
+
+    if (verbose)
+    {
+      int changes = 0;
+      printf ("Exponent of 2 in stage 1 primes: %u\n", plan->exp2);
+      printf ("Byte code for stage 1: ");
+      for (unsigned int p = 0; p < plan->bc_len; p++)
+      {
+        printf ("%s%d", (p == 0) ? "" : ", ", (int) (plan->bc[p]));
+        changes += (p > 0 && plan->bc[p-1] != plan->bc[p]);
+      }
+      printf ("\n");
+      printf ("Length %d, %d code changes, total cost: %f\n",
+      plan->bc_len, changes, totalcost);
+    }
   }
   else if (parameterization & FULLTWED)
   {
-    addchain_cost_t * opcost = &TwEdwards_minus1_opcost;
-
-    plan->E = &Ecurve14; /* To remove */
-
-    bc_state = bytecoder_init (compress ? &ecm_addchain_dict : NULL);
-    totalcost = addchain_bytecode (B1, opcost, bc_state, verbose);
-    bytecoder_flush (bc_state);
-    plan->bc_len = bytecoder_size (bc_state);
-    plan->bc = (char *) malloc (plan->bc_len);
-    ASSERT (plan->bc);
-    bytecoder_read (plan->bc, bc_state);
-    bytecoder_clear (bc_state);
-
-    /* Do not forget to add in totalcost, the cost of the initial doublings */
-    totalcost += plan->exp2 * opcost->dbl;
-    if (verbose)
-      printf ("## Addchain: cost of power of 2: %.0f\n",plan->exp2*opcost->dbl);
+    /* Allocates plan->bc, fills it and returns bc_len */
+    plan->bc_len = addchain_bytecode (&(plan->bc), B1, plan->exp2,
+                              &TwEdwards_minus1_opcost,
+                              compress ? &ecm_addchain_dict : NULL, verbose);
   }
   else
     FATAL_ERROR_CHECK (1, "Unknown parametrization");
-
-  if (verbose)
-  {
-    int changes = 0;
-    printf ("Exponent of 2 in stage 1 primes: %u\n", plan->exp2);
-    printf ("Byte code for stage 1: ");
-    for (unsigned int p = 0; p < plan->bc_len; p++)
-    {
-      printf ("%s%d", (p == 0) ? "" : ", ", (int) (plan->bc[p]));
-      changes += (p > 0 && plan->bc[p-1] != plan->bc[p]);
-    }
-    printf ("\n");
-    printf ("Length %d, %d code changes, total cost: %f\n",
-    plan->bc_len, changes, totalcost);
-  }
 
   /* Make stage 2 plan */
   stage2_make_plan (&(plan->stage2), B1, B2, verbose);
@@ -414,7 +403,4 @@ ecm_clear_plan (ecm_plan_t *plan)
     plan->bc = NULL;
     plan->bc_len = 0;
   }
-
-  if (plan->parameterization & FULLTWED)
-    plan->E = NULL;
 }

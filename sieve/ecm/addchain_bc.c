@@ -68,7 +68,7 @@ _starting_point (uint8_t k, uint8_t r, const addchain_cost_t * opcost,
   if (verbose > 1)
   {
     if (r != ZEROPOINT)
-      printf ("  Q <- %uP + %uP [cost: %.0f]\n", k, r, opcost->add);
+      printf ("  Q <- %uP + %uP [cost: %f]\n", k, r, opcost->add);
     else
       printf ("  Q <- %uP [cost: 0]\n", k);
   }
@@ -90,7 +90,7 @@ static inline double
 _dbladd (int r, const addchain_cost_t * opcost, bc_state_t *state, int verbose)
 {
   if (verbose > 1)
-    printf ("  Q <- 2Q%+dP [cost: %.0f]\n", r, opcost->dbladd);
+    printf ("  Q <- 2Q%+dP [cost: %f]\n", r, opcost->dbladd);
 
   uint8_t rabs = (r >= 0) ? (uint8_t) r : (uint8_t) -r;
   ASSERT_ALWAYS (rabs % 2 == 1);
@@ -109,7 +109,7 @@ static inline double
 _dbl (const addchain_cost_t * opcost, bc_state_t *state, int verbose)
 {
   if (verbose > 1)
-    printf ("  Q <- 2Q [cost: %.0f]\n", opcost->dbl);
+    printf ("  Q <- 2Q [cost: %f]\n", opcost->dbl);
 
   if (state)
     bytecoder (ADDCHAIN_DBL, state);
@@ -234,7 +234,7 @@ addchain (mpz_srcptr E, const uint8_t q, const addchain_cost_t * opcost,
    */
   cost = opcost->dbl_precomp + (q >> 1) * opcost->add_precomp;
   if (verbose > 1)
-    printf ("## cost of precomputation: %.0f\n", cost);
+    printf ("## cost of precomputation: %f\n", cost);
 
   /* Recursively compute the cost of the addition chain */
   cost += addchain_rec (k, q, opcost, state, verbose);
@@ -246,9 +246,10 @@ addchain (mpz_srcptr E, const uint8_t q, const addchain_cost_t * opcost,
 /* Bytecode an addition chain for
  *        E = prod (p^floor(log(B1)/log(p)) for f odd prime <= B1)
  */
-double
-addchain_bytecode (const unsigned int B1, const addchain_cost_t * opcost,
-                   bc_state_t *state, int verbose)
+unsigned int
+addchain_bytecode (char **bc, const unsigned int B1, const unsigned int exp2,
+                   const addchain_cost_t * opcost, bc_dict_t *bc_dict,
+                   int verbose)
 {
   mpz_t E;
 
@@ -275,7 +276,7 @@ addchain_bytecode (const unsigned int B1, const addchain_cost_t * opcost,
   /* Computes the bytecode for E: try every odd q up to ADDCHAIN_M_MAX and keep
    * the one with the lowest cost.
    */
-  double chaincost, mincost = DBL_MAX;
+  double mincost = DBL_MAX;
   uint8_t best_q = 0;
   for (uint8_t q = 1 ; q <= ADDCHAIN_Q_MAX ; q += 2)
   {
@@ -288,15 +289,73 @@ addchain_bytecode (const unsigned int B1, const addchain_cost_t * opcost,
       best_q = q;
     }
     if (verbose)
-      printf ("## Addchain: q = %u ; cost = %.0f\n", q, cost);
+      printf ("## Addchain: q = %u ; cost = %f\n", q, cost);
   }
 
   if (verbose)
-    printf ("## Addchain: best_q = %u mincost = %.0f\n", best_q, mincost);
+    printf ("## Addchain: best_q = %u mincost = %f\n", best_q, mincost);
 
   /* Put the best addchain into bytecode */
-  chaincost = addchain (E, best_q, opcost, state, verbose);
+  bc_state_t * bc_state = bytecoder_init (bc_dict);
+  double chaincost = addchain (E, best_q, opcost, bc_state, verbose);
+  bytecoder_flush (bc_state);
+  unsigned int bc_len = bytecoder_size (bc_state);
+  *bc = (char *) malloc (bc_len * sizeof (char));
+  ASSERT_ALWAYS (*bc);
+  bytecoder_read (*bc, bc_state);
+  bytecoder_clear (bc_state);
+
+  if (verbose)
+  {
+    /* The cost of the initial doublings */
+    double power2cost = exp2 * opcost->dbl;
+    if (verbose > 1)
+    {
+      printf ("Byte code for stage 1: ");
+      addchain_bytecode_fprintf (stdout, *bc, bc_len);
+    }
+    printf ("## Addchain: cost of power of 2: %f\n", power2cost);
+    printf ("## Addchain: total cost: %f\n", chaincost + power2cost);
+  }
 
   mpz_clear (E);
-  return chaincost;
+  return bc_len;
+}
+
+void
+addchain_bytecode_fprintf (FILE *out, const char *bc, unsigned int len)
+{
+  ASSERT_ALWAYS (len >= 3);
+  fprintf (out, "(len = %u) %x [m = %u]", len, bc[0], bc[0]);
+  fprintf (out, ", %x, %x", bc[1], bc[2]);
+  unsigned int k = ((bc[1] & 0x7f) == 0x7f) ? 2 :
+                                            ((uint8_t) (bc[1] & 0x7f) << 1) + 1;
+  if (bc[1] & 0x80)
+  {
+    unsigned int r = ((uint8_t) (bc[2] & 0x7f) << 1) + 1;
+    fprintf (out, " [starting point is %uP + %uP ]", k, r);
+  }
+  else
+    fprintf (out, " [starting point is %uP]", k);
+  for (unsigned int i = 3; i < len; i++)
+  {
+    char b = bc[i];
+    int r;
+    switch (b)
+    {
+      case ADDCHAIN_2DBL:
+        fprintf (out, ", %x [2DBL]", (uint8_t) b);
+        break;
+      case ADDCHAIN_DBL:
+        fprintf (out, ", %x [DBL]", (uint8_t) b);
+        break;
+      default:
+        r = ((uint8_t) (b & 0x7f) << 1) + 1;
+        if (b & 0x80)
+          r = -r;
+        fprintf (out, ", %x [DBLADD with r = %d]", (uint8_t) b, r);
+        break;
+    }
+  }
+  fprintf (out, "\n");
 }

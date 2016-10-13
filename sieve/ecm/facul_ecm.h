@@ -60,7 +60,6 @@ typedef struct {
 			   multiplier for Montgomery torsion-12 curves */
 
   stage2_plan_t stage2;
-  const Edwards_curve_t *E;   /* Parameters for Edwards curve */
 } ecm_plan_t;
 
 
