@@ -50,9 +50,6 @@ static const Edwards_curve_t Ecurve14 = {
  /* }; */
 
 
-/* TODO:  */
-/* change to ecmM_plan_t  */
-/* create ecmE_plan_t */
 typedef struct {
   char *bc;             /* Bytecode for the Lucas chain for stage 1 */
   unsigned int bc_len;  /* Number of bytes in bytecode */
@@ -66,19 +63,10 @@ typedef struct {
 } ecm_plan_t;
 
 
-/* typedef struct { */
-/*   unsigned int exp2; */
-/*   unsigned int B1; */
-/*   int parameterization; /\* TWED12 or TWED16 *\/ */
-/*   const Edwards_curve_t *E;   /\* Parameters for Edwards curve *\/ */
-/* } ecmE_plan_t; */
-
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/* TODO */
-/* ecm_* --> ecmM_* and ecmE_* */
 int ecm_ul (modintredcul_t, const modulusredcul_t, const ecm_plan_t *);
 int ecm_15ul (modintredc15ul_t, const modulusredc15ul_t, const ecm_plan_t *);
 int ecm_2ul2 (modintredc2ul2_t, const modulusredc2ul2_t, const ecm_plan_t *);
@@ -113,15 +101,10 @@ unsigned long ellM_curveorder_jacobi_mpz (residuempz_t, residuempz_t,
                                            modulusmpz_t);
 
 
-/* TODO: --> ecmM_*_plan */
 void ecm_make_plan (ecm_plan_t *, const unsigned int, const unsigned int, 
 		    const int, const unsigned long, const int, const int);
 
 void ecm_clear_plan (ecm_plan_t *);
-
-
-/* void ecmE_make_plan (ecmE_plan_t *, const unsigned int, const int);  */
-/* void ecmE_clear_plan (ecmE_plan_t *); */
 
 #ifdef __cplusplus
 }
