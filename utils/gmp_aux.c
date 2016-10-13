@@ -3,6 +3,7 @@
 #include "cado.h"
 #include <stdint.h>
 #include <string.h>
+#include <limits.h>
 #include "gmp_aux.h"
 #include "macros.h"
 
