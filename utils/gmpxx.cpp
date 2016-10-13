@@ -3,6 +3,8 @@
 #include <istream>
 #include <ostream>
 #include <string>
+#include <stdlib.h>
+#include "gmpxx.hpp"
 
 using namespace std;
 
