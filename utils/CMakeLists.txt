@@ -18,7 +18,7 @@ if (NOT MINGW)
     set (sources ${sources} cado_popen.c)
 endif()
 
-if (HAVE_GMPXX OR HAVE_MPIRXX)
+if (NOT HAVE_GMPXX AND NOT HAVE_MPIRXX)
     set (sources ${sources} gmpxx.cpp)
 endif()
 
