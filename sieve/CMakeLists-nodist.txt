@@ -1,0 +1,4 @@
+
+add_executable(fake_rels EXCLUDE_FROM_ALL fake_rels.cpp)
+target_link_libraries(fake_rels utils_with_io)
+

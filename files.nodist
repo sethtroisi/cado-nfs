@@ -203,6 +203,5 @@ README.nfs-hd
 nfs-hd/automatic_p6bd40.sh
 nfs-hd/check_relations/
 parameters/nfs-hd/
-tests/utils/test_mpz_poly_bivariate.c
-utils/mpz_poly_bivariate.c
-utils/mpz_poly_bivariate.h
+sieve/CMakeLists-nodist.txt
+filter/CMakeLists-nodist.txt
