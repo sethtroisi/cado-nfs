@@ -14,7 +14,7 @@ struct addchain_cost_s
 
 typedef struct addchain_cost_s addchain_cost_t;
 
-#define ADDCHAIN_Q_MAX 253 /* Must always fit in a char and be < 255 */
+#define ADDCHAIN_Q_MAX 253 /* Must be < 255 */
 #define ADDCHAIN_DBL ((literal_t) 0x7f)
 
 double addchain_bytecode (const unsigned int, const addchain_cost_t *,

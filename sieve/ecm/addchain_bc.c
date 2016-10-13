@@ -12,8 +12,6 @@
 #include "getprime.h"
 #include "gmp_aux.h" /* for nbits */
 
-#define ZEROPOINT 0x00
-
 /* Only used with l <= 31 */
 #define mpz_mod_ui_2exp(n,l) (((n)->_mp_size) ? ((n)->_mp_d[0]&((1<<l)-1)) : 0)
 
@@ -38,32 +36,34 @@
  *    we known that in this case abs(r) <= q
  *    return r
  */
-char
-addchain_find_best_r (mpz_srcptr k, const unsigned char q)
+int
+addchain_find_best_r (mpz_srcptr k, const uint8_t q)
 {
   int l = nbits(2*q);
   unsigned int r = mpz_mod_ui_2exp (k, l);
   if (r <= q)
-    return (char) r;
+    return (int) r;
   else if ((1 << l) - r <= q)
-    return (char) (r - (1 << l));
+    return (int) (r - (1 << l));
   else
   {
     l--;
     r = mpz_mod_ui_2exp (k, l);
     if (r <= q)
-      return (char) r;
-    else /* we are sure that (q - r < q) */
-      return (char) (r - (1 << l));
+      return (int) r;
+    else /* we are sure that ((1 << l) - r <= q) */
+      return (int) (r - (1 << l));
   }
 }
+
+#define ZEROPOINT ((uint8_t) 0x00)
 
 /* If r = ZEROPOINT the starting point is kP. Else starting point is kP + rP
  * r must be != 2
  */
 static inline double
-_starting_point (unsigned char k, unsigned char r,
-                 const addchain_cost_t * opcost, bc_state_t *state, int verbose)
+_starting_point (uint8_t k, uint8_t r, const addchain_cost_t * opcost,
+                 bc_state_t *state, int verbose)
 {
   if (verbose > 1)
   {
@@ -72,6 +72,7 @@ _starting_point (unsigned char k, unsigned char r,
     else
       printf ("  Q <- %uP [cost: 0]\n", k);
   }
+  ASSERT_ALWAYS (r != 2);
   if (state)
   {
     literal_t bc1 = (k == 2) ? 0x7f : (k >> 1);
@@ -84,18 +85,21 @@ _starting_point (unsigned char k, unsigned char r,
   return (r == ZEROPOINT) ? 0. : opcost->add;
 }
 
+/* r must be odd */
 static inline double
 _dbladd (int r, const addchain_cost_t * opcost, bc_state_t *state, int verbose)
 {
   if (verbose > 1)
     printf ("  Q <- 2Q%+dP [cost: %.0f]\n", r, opcost->dbladd);
 
+  uint8_t rabs = (r >= 0) ? (uint8_t) r : (uint8_t) -r;
+  ASSERT_ALWAYS (rabs % 2 == 1);
   if (state)
   {
-    if (r > 0)
-      bytecoder ((literal_t) (0x7f & (r >> 1)), state); /* dbladd with rP */
-    else
-      bytecoder ((literal_t) (0x80 | ((-r) >> 1)), state);/* dblsub with rP */
+    literal_t bc = (rabs >> 1);
+    if (r < 0)
+      bc |= 0x80; /* set the first bit to 1 */
+    bytecoder (bc, state);
   }
 
   return opcost->dbladd;
@@ -114,7 +118,7 @@ _dbl (const addchain_cost_t * opcost, bc_state_t *state, int verbose)
 }
 
 static double
-addchain_rec (mpz_t k, const unsigned char q, const addchain_cost_t * opcost,
+addchain_rec (mpz_t k, const uint8_t q, const addchain_cost_t * opcost,
               bc_state_t *state, int verbose)
 {
   /* Case 0: k is <= q and (2 or odd) [ i.e., one of the precomputed points ] */
@@ -140,8 +144,8 @@ addchain_rec (mpz_t k, const unsigned char q, const addchain_cost_t * opcost,
     if (verbose > 1)
       gmp_printf ("# k = %Zd [base case 2]\n", k);
     unsigned int kui = mpz_get_ui (k);
-    unsigned char s = (unsigned char) ((kui+2)/3);
-    unsigned char r = (unsigned char) ((kui-4)/3); 
+    uint8_t s = (uint8_t) ((kui+2)/3);
+    uint8_t r = (uint8_t) ((kui-4)/3);
     /* starting point is sP */
     double c = _starting_point (s, ZEROPOINT, opcost, state, verbose);
     /* Then we do add dbladd */
@@ -154,7 +158,7 @@ addchain_rec (mpz_t k, const unsigned char q, const addchain_cost_t * opcost,
     if (verbose > 1)
       gmp_printf ("# k = %Zd [base case 3]\n", k);
     unsigned int kui = mpz_get_ui (k);
-    unsigned char s = (unsigned char) (kui/3);
+    uint8_t s = (uint8_t) (kui/3);
     /* starting point is sP */
     double c = _starting_point (s, ZEROPOINT, opcost, state, verbose);
     /* Then we do add dbladd */
@@ -169,8 +173,8 @@ addchain_rec (mpz_t k, const unsigned char q, const addchain_cost_t * opcost,
     if (verbose > 1)
       gmp_printf ("# k = %Zd [base case 4]\n", k);
     unsigned int kui = mpz_get_ui (k);
-    unsigned char s = (unsigned char) ((kui-2)/3);
-    unsigned char r = (unsigned char) ((kui+4)/3); 
+    uint8_t s = (uint8_t) ((kui-2)/3);
+    uint8_t r = (uint8_t) ((kui+4)/3);
     /* starting point is sP */
     double c = _starting_point (s, ZEROPOINT, opcost, state, verbose);
     /* Then we do add dbladd */
@@ -183,8 +187,8 @@ addchain_rec (mpz_t k, const unsigned char q, const addchain_cost_t * opcost,
     if (verbose > 1)
       gmp_printf ("# k = %Zd [base case 5]\n", k);
     unsigned int kui = mpz_get_ui (k);
-    unsigned char r1 = (unsigned char) ((kui-2)/2);
-    unsigned char r2 = (unsigned char) ((kui+2)/2); 
+    uint8_t r1 = (uint8_t) ((kui-2)/2);
+    uint8_t r2 = (uint8_t) ((kui+2)/2);
     /* starting point is r1P + r2P */
     return _starting_point (r1, r2, opcost, state, verbose);
   }
@@ -201,7 +205,7 @@ addchain_rec (mpz_t k, const unsigned char q, const addchain_cost_t * opcost,
   {
     if (verbose > 1)
       gmp_printf ("# k = %Zd [odd case]\n", k);
-    char r = addchain_find_best_r (k, q);
+    int r = addchain_find_best_r (k, q);
     mpz_sub_div2_si (k, r);
     double cost = addchain_rec (k, q, opcost, state, verbose);
     return cost + _dbladd (r, opcost, state, verbose);
@@ -209,7 +213,7 @@ addchain_rec (mpz_t k, const unsigned char q, const addchain_cost_t * opcost,
 }
 
 double
-addchain (mpz_srcptr E, const unsigned char q, const addchain_cost_t * opcost,
+addchain (mpz_srcptr E, const uint8_t q, const addchain_cost_t * opcost,
           bc_state_t *state, int verbose)
 {
   double cost;
@@ -231,7 +235,7 @@ addchain (mpz_srcptr E, const unsigned char q, const addchain_cost_t * opcost,
   cost = opcost->dbl_precomp + (q >> 1) * opcost->add_precomp;
   if (verbose > 1)
     printf ("## cost of precomputation: %.0f\n", cost);
-  
+
   /* Recursively compute the cost of the addition chain */
   cost += addchain_rec (k, q, opcost, state, verbose);
 
@@ -255,14 +259,14 @@ addchain_bytecode (const unsigned int B1, const addchain_cost_t * opcost,
   prime_info_init (pi);
   unsigned long p = getprime_mt (pi);
   ASSERT (p == 3);
-  
+
   for ( ; p <= B1; p = (unsigned int) getprime_mt (pi))
   {
     for (unsigned long q = 1; q <= B1 / p; q *= p)
       mpz_mul_ui (E, E, p);
   }
   prime_info_clear (pi);
-  
+
   if (verbose > 1)
     gmp_printf ("### E = %Zd\n", E);
   if (verbose)
@@ -272,8 +276,8 @@ addchain_bytecode (const unsigned int B1, const addchain_cost_t * opcost,
    * the one with the lowest cost.
    */
   double chaincost, mincost = DBL_MAX;
-  unsigned char best_q = 0;
-  for (unsigned char q = 1 ; q <= ADDCHAIN_Q_MAX ; q += 2)
+  uint8_t best_q = 0;
+  for (uint8_t q = 1 ; q <= ADDCHAIN_Q_MAX ; q += 2)
   {
     if (verbose > 1)
       printf ("### Compute addchain with q = %u\n", q);
@@ -289,9 +293,10 @@ addchain_bytecode (const unsigned int B1, const addchain_cost_t * opcost,
 
   if (verbose)
     printf ("## Addchain: best_q = %u mincost = %.0f\n", best_q, mincost);
+
   /* Put the best addchain into bytecode */
   chaincost = addchain (E, best_q, opcost, state, verbose);
- 
+
   mpz_clear (E);
   return chaincost;
 }
