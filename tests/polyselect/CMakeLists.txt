@@ -16,7 +16,7 @@ polyselect_test(7 -N ${example_N} degree=7 P=1000 admax=1000 nq=10)
 # in the following example, there are 6 roots for q=241, but only 0 or 2 roots
 # for the other small primes
 set(example_N 412023436986659543855531365332575948179811699844327982845455626433876445565248426198098870423161841879261420247188869492560931776375033421130982397485150944909106910269861031862704114880866970564902903653658867433731720813104105190864254793282601391257624033946373269391)
-polyselect_test(8 -N ${example_N} degree=6 P=1000000 admin=3720 admax=3721 nq=46657)
+polyselect_test(8 -N ${example_N} degree=6 P=1000000 admin=3720 admax=3721 nq=7776)
 
 cado_define_test(test_auxiliary.c LIBRARIES utils tests polyselect_common)
 cado_define_test(test_rho.c LIBRARIES polyselect_common tests)
