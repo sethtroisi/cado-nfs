@@ -399,14 +399,17 @@ cado_define_test(full_c30
         characters
         bwc_full
         sqrt)
-cado_define_test(full_p30
-    SCRIPT ${CADO_NFS_SOURCE_DIR}/cado-nfs.py
-    -dlp -ell 101538509534246169632617439
-    -t 2 -dlp-no-keep
-    target=92800609832959449330691138186
-    191907783019725260605646959711
-    TARGET_DEPENDENCIES full_c30_dependencies debug_renumber
-    plingen_pz sm sm_simple las_descent reconstructlog-dl merge-dl replay-dl)
+    if(HAVE_GCC_STYLE_AMD64_INLINE_ASM)
+        # see linalg/bwc/CMakeLists.txt for an explanation
+        cado_define_test(full_p30
+            SCRIPT ${CADO_NFS_SOURCE_DIR}/cado-nfs.py
+            -dlp -ell 101538509534246169632617439
+            -t 2 -dlp-no-keep
+            target=92800609832959449330691138186
+            191907783019725260605646959711
+            TARGET_DEPENDENCIES full_c30_dependencies debug_renumber
+            plingen_pz sm sm_simple las_descent reconstructlog-dl merge-dl replay-dl)
+    endif()
 endif()
 if(DEFINED ENV{CHECKS_EXPENSIVE})
     cado_define_test(full_c59
