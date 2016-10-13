@@ -19,7 +19,7 @@
 
 cxx_mpq_mat p_maximal_order(cxx_mpz_poly const& f, cxx_mpz const& p);
 
-std::vector<std::pair<cxx_mpz_mat, int>> factorization_of_prime(cxx_mpq_mat & B, cxx_mpz_poly const& g, cxx_mpz const& p, gmp_randstate_t state);
+std::vector<std::pair<cxx_mpz_mat, int> > factorization_of_prime(cxx_mpq_mat & B, cxx_mpz_poly const& g, cxx_mpz const& p, gmp_randstate_t state);
 
 cxx_mpz_mat multiplication_table_of_order(cxx_mpq_mat const& O, cxx_mpz_poly const& g);
 

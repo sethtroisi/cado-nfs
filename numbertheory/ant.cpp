@@ -507,12 +507,12 @@ cxx_mpz_mat matrix_of_multmap(
 /*}}}*/
 
 /*{{{ factorization_of_polynomial_mod_mpz */
-vector<pair<cxx_mpz_poly, int>> factorization_of_polynomial_mod_mpz(cxx_mpz_poly const& f, cxx_mpz const& p, gmp_randstate_t state)
+vector<pair<cxx_mpz_poly, int> > factorization_of_polynomial_mod_mpz(cxx_mpz_poly const& f, cxx_mpz const& p, gmp_randstate_t state)
 {
     mpz_poly_factor_list lf;
     mpz_poly_factor_list_init(lf);
     mpz_poly_factor(lf,f,p,state);
-    vector<pair<cxx_mpz_poly, int>> res(lf->size);
+    vector<pair<cxx_mpz_poly, int> > res(lf->size);
     for(int i = 0 ; i < lf->size ; i++) {
         mpz_poly_swap(res[i].first, lf->factors[i]->f);
         res[i].second = lf->factors[i]->m;
@@ -542,7 +542,7 @@ template <typename T> void append_move(vector<T> &a, vector<T> &b)
 /*}}}*/
 
 // {{{ factorization_of_prime
-vector<pair<cxx_mpz_mat, int>> factorization_of_prime_inner(
+vector<pair<cxx_mpz_mat, int> > factorization_of_prime_inner(
         cxx_mpq_mat const & B,
         cxx_mpz_mat const & M,
         cxx_mpz const& p,
@@ -572,9 +572,9 @@ vector<pair<cxx_mpz_mat, int>> factorization_of_prime_inner(
      */
     cxx_mpz_poly Pc = mpz_mat_minpoly_mod_mpz(Mc, p);
 
-    vector<pair<cxx_mpz_poly, int>> facP = factorization_of_polynomial_mod_mpz(Pc, p, state);
+    vector<pair<cxx_mpz_poly, int> > facP = factorization_of_polynomial_mod_mpz(Pc, p, state);
 
-    vector<pair<cxx_mpz_mat, int>> ideals;
+    vector<pair<cxx_mpz_mat, int> > ideals;
 
     vector<cxx_mpz_mat> characteristic_subspaces;
 
@@ -619,7 +619,7 @@ vector<pair<cxx_mpz_mat, int>> factorization_of_prime_inner(
         } else {
             mpz_mat_hnf_backend_rev(Ix, NULL);
             mpz_mat_submat_swap(Ihead,0,0,Ix,0,0,n,n);
-            vector<pair<cxx_mpz_mat, int>> more_ideals;
+            vector<pair<cxx_mpz_mat, int> > more_ideals;
             more_ideals = factorization_of_prime_inner(B,M,p,Ip,Ihead,Ci,state);
             append_move(ideals, more_ideals);
         }
@@ -628,7 +628,7 @@ vector<pair<cxx_mpz_mat, int>> factorization_of_prime_inner(
     return ideals;
 }
 
-vector<pair<cxx_mpz_mat, int>> factorization_of_prime(
+vector<pair<cxx_mpz_mat, int> > factorization_of_prime(
         cxx_mpq_mat & B, cxx_mpz_poly const& g,
         cxx_mpz const& p,
         gmp_randstate_t state)
