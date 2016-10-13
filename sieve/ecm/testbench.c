@@ -198,7 +198,7 @@ int main (int argc, char **argv)
 	  strategy->methods[nr_methods].plan = malloc (sizeof (pm1_plan_t));
 	  ASSERT (strategy->methods[nr_methods].plan != NULL);
 	  pm1_make_plan (strategy->methods[nr_methods].plan, B1, B2, 
-			 (verbose >= 3));
+			 (verbose / 3));
 	  nr_methods++;
 	  argc -= 3;
 	  argv += 3;
@@ -213,7 +213,7 @@ int main (int argc, char **argv)
 	  strategy->methods[nr_methods].plan = malloc (sizeof (pp1_plan_t));
 	  ASSERT (strategy->methods[nr_methods].plan != NULL);
 	  pp1_make_plan (strategy->methods[nr_methods].plan, B1, B2, 
-			 (verbose >= 3));
+			 (verbose / 3));
 	  nr_methods++;
 	  argc -= 3;
 	  argv += 3;
@@ -229,7 +229,7 @@ int main (int argc, char **argv)
 	  strategy->methods[nr_methods].plan = malloc (sizeof (pp1_plan_t));
 	  ASSERT (strategy->methods[nr_methods].plan != NULL);
 	  pp1_make_plan (strategy->methods[nr_methods].plan, B1, B2, 
-			 (verbose >= 3));
+			 (verbose / 3));
 	  nr_methods++;
 	  argc -= 3;
 	  argv += 3;
@@ -268,7 +268,7 @@ int main (int argc, char **argv)
 	  ASSERT (strategy->methods[nr_methods].plan != NULL);
 	  ecm_make_plan (strategy->methods[nr_methods].plan, B1, B2, 
 			 parameterization, labs (sigma), extra_primes, 
-			 (verbose >= 3));
+			 (verbose / 3));
 	  nr_methods++;
 	  argc -= 4;
 	  argv += 4;
@@ -412,7 +412,7 @@ int main (int argc, char **argv)
     {
       free(strategy->methods);
       free(strategy);
-      strategy = facul_make_strategy (fbb, lpb, ncurves, (verbose >= 3));
+      strategy = facul_make_strategy (fbb, lpb, ncurves, (verbose / 3));
     }
   else
     {
