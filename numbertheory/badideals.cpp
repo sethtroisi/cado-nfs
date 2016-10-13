@@ -1,3 +1,6 @@
+/* 
+ * Authors: Joshua Peignier and Emmanuel Thomé
+ */
 #include "cado.h"
 #include <iostream>
 #include <sstream>
