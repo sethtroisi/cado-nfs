@@ -514,7 +514,6 @@ shash_find_collision (shash_t H)
     case 3: SHASH_RESEARCH(Th1, i1);
     case 4: SHASH_RESEARCH(Th0, i0);
     }
-#endif
   }
   free (T);
   return 0;
