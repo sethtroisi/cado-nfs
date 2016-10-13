@@ -34,7 +34,7 @@ cado_define_test(
     )
 
 find_program(MAGMA magma HINTS ENV MAGMA)
-if(MAGMA AND CHECKS_EXPENSIVE)
+if(MAGMA AND DEFINED ENV{CHECKS_EXPENSIVE})
 cado_define_test(
     numbertheory-p-maximal-order-expensive
     PROGRAM
