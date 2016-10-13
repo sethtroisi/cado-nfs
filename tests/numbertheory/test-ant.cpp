@@ -660,7 +660,7 @@ int main(int argc, char *argv[]) /*{{{ */
     const char * tmp = param_list_lookup_string(pl, "test");
     if (!tmp) usage(pl, original_argv, "missing --test argument");
 
-    int rc;
+    int rc = 0; /* placate gcc */
 
     if (strcmp(tmp, "p-maximal-order") == 0) {
         rc = do_p_maximal_order(pl);
