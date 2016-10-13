@@ -93,7 +93,6 @@ ellM_swap (ellM_point_t Q, ellM_point_t P, const modulus_t m)
      - m : number to factor
      - b : (a+2)/4 mod n
   It is permissible to let P and Q use the same memory. */
-
 static void
 ellM_double (ellM_point_t Q, const ellM_point_t P, const modulus_t m, 
              const residue_t b)
@@ -144,7 +143,6 @@ ellM_double (ellM_point_t Q, const ellM_point_t P, const modulus_t m,
    is (0:0) although it shouldn't be (which actually is good for factoring!).
 
    R may be identical to P, Q and/or D. */
-
 static void
 ellM_add (ellM_point_t R, const ellM_point_t P, const ellM_point_t Q, 
           const ellM_point_t D, MAYBE_UNUSED const residue_t b, 
@@ -812,7 +810,6 @@ ellW_double (ellW_point_t R, const ellW_point_t P, const residue_t a,
    in Weierstrass coordinates and puts result in R. 
    Returns 1 if the addition worked (i.e. the modular inverse existed) 
    and 0 otherwise (resulting point is point at infinity) */
-
 static int
 ellW_add (ellW_point_t R, const ellW_point_t P, const ellW_point_t Q, 
           const residue_t a, const modulus_t m)
@@ -917,7 +914,6 @@ ellW_mul_ui (ellW_point_t P, const unsigned long e, residue_t a,
 
 /* Interpret the bytecode located at "code" and do the 
    corresponding elliptic curve operations on (x::z) */
-
 /* static */ void
 ellM_interpret_bytecode (ellM_point_t P, const char *code,
 			 const modulus_t m, const residue_t b)
@@ -1024,21 +1020,20 @@ end_of_bytecode:
   ellM_clear (t2, m);
 }
 
-/* ICI */
 
 /* Interpret the addition chain written in bc */
 /* Computes Q = sP, where */
 /* - s is the primorial exponent depending only on B1 */
 /* - P is the initial point given in extended coord */
 /* - Q is returned in projective coord */
-
-static
-void ellE_interpret_bytecode (ellE_point_t P, const char *bc, const unsigned int bc_len, const modulus_t m, const residue_t a)
+static void
+ellE_interpret_bytecode (ellE_point_t P, const char *bc, const unsigned int bc_len,
+			 const modulus_t m, const residue_t a)
 {
   unsigned char q;
 
-  q = 253; // bc[0];  // ce qui permet de remplacer les couilles en coquilles [PG, Oct. 2016]
-  ASSERT (q & 1);   // q is odd
+  q = bc[0];       /* 'q':  permet de remplacer les couilles en coquilles [PG, Oct. 2016] */
+  ASSERT (q & 1);  /* q is odd */
 
   unsigned char rP_size = (q+1)/2;
   ASSERT (rP_size <= 127);
@@ -1122,7 +1117,6 @@ void ellE_interpret_bytecode (ellE_point_t P, const char *bc, const unsigned int
 /* Produces curve in Montgomery form from sigma value.
    Return 1 if it worked, 0 if a modular inverse failed.
    If modular inverse failed, return non-invertible value in x. */
-
 static int
 Brent12_curve_from_sigma (residue_t A, residue_t x, const residue_t sigma, 
 			  const modulus_t m)
@@ -1386,7 +1380,6 @@ clear_and_exit:
    Return 1 if it worked, 0 if a modular inverse failed.
    Currently can produce only one, hard-coded curve that is cheap 
    to initialise */
-
 static int
 Montgomery16_curve_from_k (residue_t b, residue_t x, const unsigned long k, 
 		           const modulus_t m)
@@ -1483,10 +1476,12 @@ Montgomery16_curve_from_k (residue_t b, residue_t x, const unsigned long k,
   return 1;
 }
 
-static 
-int Twisted_Edwards16_curve_from_sigma (residue_t d, ellE_point_t P, 
-				MAYBE_UNUSED const unsigned long sigma, 
-				const modulus_t m)
+
+
+static int 
+Twisted_Edwards16_curve_from_sigma (residue_t d, ellE_point_t P,
+				    MAYBE_UNUSED const unsigned long sigma, 
+				    const modulus_t m)
 {
   residue_t u, f;
   const Edwards_curve_t *E = &Ecurve14;
@@ -1544,7 +1539,6 @@ int Twisted_Edwards16_curve_from_sigma (residue_t d, ellE_point_t P,
    (x, y) from a curve Y^2 = X^3 + A*X^2 + X. The value of b will not
    be computed. 
    x and X may be the same variable. */
-
 static int
 curveW_from_Montgomery (residue_t a, ellW_point_t P, const residue_t X, 
                         const residue_t A, const modulus_t m)
@@ -2151,8 +2145,11 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
   }
   else if (plan->parameterization == TWED16)
   {
-    // TODO: check if factor found!
-    Twisted_Edwards16_curve_from_sigma (d, Q, plan->sigma, m);
+    if (Twisted_Edwards16_curve_from_sigma (d, Q, plan->sigma, m) == 0)
+      {
+	// TODO: check if factor found!
+	return 0;
+      }
   }
   else
   {
@@ -2291,7 +2288,8 @@ ell_pointorder (const residue_t sigma, const int parameterization,
 		const modulus_t m, const int verbose)
 {
   ellW_point_t P, Pi, Pg;
-  residue_t A, x, a;
+  ellE_point_t Q;
+  residue_t A, x, a, d;
   unsigned long min, max, i, j, order, cof, p;
   unsigned long giant_step, giant_min, baby_len;
   modint_t tm;
@@ -2304,6 +2302,7 @@ ell_pointorder (const residue_t sigma, const int parameterization,
   mod_init (A, m);
   mod_init (x, m);
   mod_init (a, m);
+  mod_init (d, m);
   ellW_init (P, m);
   ellW_init (Pi, m);
   ellW_init (Pg, m);
@@ -2322,13 +2321,15 @@ ell_pointorder (const residue_t sigma, const int parameterization,
   {
     if (Montgomery16_curve_from_k (A, x, mod_get_ul (sigma, m), m) == 0)
       return 0;
+    //    printf ("Montg16 curve built\n");
   }
   else if (parameterization == TWED16)
     {
+      if (Twisted_Edwards16_curve_from_sigma (d, Q, mod_get_ul(sigma, m), m) == 0)
+	return 0;
 
-      // TODO
-      // if (Twisted_Edwards16_curve_from_sigma (d, Q, plan->sigma, m)) == 0)
-      //   return 0;
+      //      printf ("Twed16 curve built\n");
+
       // Montgomery16_curve_from_Edwards16...
       // ax^2 + y^2 = 1 + dx^2y^2 ---> By^2 = x^3 + Ax^2 + x
       // A = 2(a+d)/(a-d), B = 4/(a-d)
@@ -2336,6 +2337,29 @@ ell_pointorder (const residue_t sigma, const int parameterization,
       // v = (1+y)/(1-y)x
       // source: http://math.stackexchange.com/questions/1391732/birational-equvalence-of-twisted-edwards-and-montgomery-curves?noredirect=1&lq=1
 
+      //      A = 2(a+d)/(a-d) = 2(-1+d)/(-1-d)
+
+      mod_set1 (A, m);        // A = 1
+      mod_neg (A, A, m);         // A = -1
+      mod_set (x, A, m);      // x = -1
+      mod_add (x, x, d, m);   // x = (-1+d)
+      mod_add (x, x, x, m);   // x = 2(-1+d)
+      mod_sub (A, A, d, m);   // A = -1-d
+      mod_inv (A, A, m);      // A = 1/(-1-d)
+      mod_mul (A, A, x, m);   // A = 2(-1+d)/(-1-d)
+
+      //      x = (1+Q->y)/(1-Q->y)
+      //      we don't need y
+
+      mod_set1 (a, m);           // a = 1
+      mod_add (a, a, Q->y, m);   // a = (1+Q->y)
+      mod_set1 (x, m);           // x = 1
+      mod_sub (x, x, Q->y, m);   // x = (1-Q->y)
+      mod_inv (x, x, m);         // x = 1/(1-Q->y)
+      mod_mul (x, x, a, m);      // x = (1+Q->y)/(1-Q->y)
+
+      //      printf ("Twed16 curve and point converted to Montg16\n");
+      
     }
   else
   {
@@ -2359,6 +2383,8 @@ ell_pointorder (const residue_t sigma, const int parameterization,
 
   if (curveW_from_Montgomery (a, P, x, A, m) == 0)
     return 0UL;
+  
+  //  printf ("Montg16 curve and point converted to Weierstrass\n");
 
   if (verbose >= 2)
     {
@@ -2564,10 +2590,12 @@ found_inf:
   mod_clear (A, m);
   mod_clear (x, m);
   mod_clear (a, m);
+  mod_clear (d, m);
   mod_intclear (tm);
   ellW_clear (P, m);
   ellW_clear (Pi, m);
   ellW_clear (Pg, m);
+  ellE_clear (Q, m);
 
   return order;
 }

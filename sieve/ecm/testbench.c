@@ -295,7 +295,6 @@ int main (int argc, char **argv)
 	    po_parameterization = MONTY12;
 	  if (strcmp (argv[1], "-pom16") == 0)
 	    po_parameterization = MONTY16;
-	  /* TODO: add code to compute point order for twisted Edward curves */
 	  if (strcmp (argv[1], "-poe16") == 0)
 	    po_parameterization = TWED16;
 	  po_sigma = strtol (argv[2], NULL, 10);
@@ -456,7 +455,7 @@ int main (int argc, char **argv)
 	  
 	  total++;
 	  if (do_pointorder)
-	    print_pointorder (i, po_sigma, po_parameterization, printfactors);
+	    print_pointorder (i, po_sigma, po_parameterization, verbose+printfactors);
           else
 	    {
               mpz_mul_ui (N, cof, i);
