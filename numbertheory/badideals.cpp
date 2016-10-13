@@ -151,9 +151,9 @@ ostream& operator<<(ostream& o, cxx_mpz_poly const& v)/*{{{*/
     return o;
 }/*}}}*/
 
-vector<pair<cxx_mpz, int>> trial_division(cxx_mpz const& n0, unsigned long B, cxx_mpz & cofactor)/*{{{*/
+vector<pair<cxx_mpz, int> > trial_division(cxx_mpz const& n0, unsigned long B, cxx_mpz & cofactor)/*{{{*/
 {
-    vector<pair<cxx_mpz, int>> res;
+    vector<pair<cxx_mpz, int> > res;
     prime_info pinf;
 
     prime_info_init (pinf);
@@ -178,7 +178,7 @@ struct all_valuations_above_p {/*{{{*/
 private:
     cxx_mpq_mat O;
     cxx_mpz_mat M;
-    vector<pair<cxx_mpz_mat, int>> F;
+    vector<pair<cxx_mpz_mat, int> > F;
     vector<int> inertia;
     pair<cxx_mpz_mat, cxx_mpz> jjinv;
     vector<cxx_mpz_mat> helpers;
@@ -311,7 +311,7 @@ vector<cxx_mpz> lift_p1_elements(cxx_mpz const& p, int k, cxx_mpz const& x)/*{{{
 vector<badideal::branch> lift_root(all_valuations_above_p const& A, int k0, cxx_mpz const& Q, vector<int> v)/*{{{*/
 {
     vector<badideal::branch> dead_branches_reports;
-    vector<pair<cxx_mpz, vector<int>>> live_branches;
+    vector<pair<cxx_mpz, vector<int> > > live_branches;
     vector<int> live_ideals;
     cxx_mpz const& p(A.p);
 
@@ -449,9 +449,9 @@ vector<badideal> badideals_for_polynomial(cxx_mpz_poly const& f)/*{{{*/
     mpz_mul(disc, disc, f->coeff[f->deg]);
 
     /* We're not urged to use ecm here */
-    vector<pair<cxx_mpz,int>> small_primes = trial_division(disc, 10000000, disc);
+    vector<pair<cxx_mpz,int> > small_primes = trial_division(disc, 10000000, disc);
 
-    typedef vector<pair<cxx_mpz,int>>::const_iterator vzci_t;
+    typedef vector<pair<cxx_mpz,int> >::const_iterator vzci_t;
 
 
     for(vzci_t it = small_primes.begin() ; it != small_primes.end() ; it++) {

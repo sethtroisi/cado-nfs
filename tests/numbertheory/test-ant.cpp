@@ -258,7 +258,7 @@ int do_factorization_of_prime(param_list_ptr pl) /*{{{*/
     if (param_list_parse_ulong(pl, "seed", &seed)) {
         gmp_randseed_ui(state, seed);
     }
-    vector<pair<cxx_mpz_mat, int>> F = factorization_of_prime(M, f, p, state);
+    vector<pair<cxx_mpz_mat, int> > F = factorization_of_prime(M, f, p, state);
     gmp_randclear(state);
     out << F.size() << "\n";
     for(unsigned int k = 0 ; k < F.size() ; k++) {
@@ -317,7 +317,7 @@ int do_factorization_of_prime_batch(param_list_ptr pl) /*{{{*/
         /* What if we simply ask our code to compute the factorization of
          * p with respect to the order basis which was chosen by magma ?
          * */
-        vector<pair<cxx_mpz_mat, int>> my_ideals = factorization_of_prime(O, f, p, state);
+        vector<pair<cxx_mpz_mat, int> > my_ideals = factorization_of_prime(O, f, p, state);
         gmp_randclear(state);
 
         // sort magma ideals. Ours are sorted already.
@@ -427,7 +427,7 @@ int do_valuations_of_ideal(param_list_ptr pl) /*{{{*/
     if (param_list_parse_ulong(pl, "seed", &seed)) {
         gmp_randseed_ui(state, seed);
     }
-    vector<pair<cxx_mpz_mat, int>> F = factorization_of_prime(O, f, p, state);
+    vector<pair<cxx_mpz_mat, int> > F = factorization_of_prime(O, f, p, state);
     gmp_randclear(state);
 
     int w = mpz_p_valuation(denom, p);
@@ -505,7 +505,7 @@ int do_valuations_of_ideal_batch(param_list_ptr pl) /*{{{*/
         /* What if we simply ask our code to compute the factorization of
          * p with respect to the order basis which was chosen by magma ?
          * */
-        vector<pair<cxx_mpz_mat, int>> my_ideals = factorization_of_prime(O, f, p, state);
+        vector<pair<cxx_mpz_mat, int> > my_ideals = factorization_of_prime(O, f, p, state);
         gmp_randclear(state);
 
         /* compute matching table */
