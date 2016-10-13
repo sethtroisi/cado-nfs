@@ -399,6 +399,14 @@ cado_define_test(full_c30
         characters
         bwc_full
         sqrt)
+cado_define_test(full_p30
+    SCRIPT ${CADO_NFS_SOURCE_DIR}/cado-nfs.py
+    -dlp -ell 101538509534246169632617439
+    -t 2 -dlp-no-keep
+    target=92800609832959449330691138186
+    191907783019725260605646959711
+    TARGET_DEPENDENCIES full_c30_dependencies debug_renumber
+    plingen_pz sm sm_simple las_descent reconstructlog-dl merge-dl replay-dl)
 endif()
 if(DEFINED ENV{CHECKS_EXPENSIVE})
     cado_define_test(full_c59
@@ -434,9 +442,6 @@ if(DEFINED ENV{CHECKS_EXPENSIVE})
         TARGET_DEPENDENCIES
             full_c30_dependencies
         )
-    find_program(MAGMA magma HINTS ENV MAGMA)
-    if (MAGMA)
-        message(STATUS "magma found: ${MAGMA}")
 #        this test is probably not very useful, given that the other
 #        (quicker) tests cover everything covered by this test.
 #        cado_define_test(full_p59
@@ -448,14 +453,6 @@ if(DEFINED ENV{CHECKS_EXPENSIVE})
 #            TARGET_DEPENDENCIES full_c30_dependencies debug_renumber
 #            plingen_pz sm reconstructlog-dl merge-dl replay-dl
 #        )
-        cado_define_test(full_p30
-            SCRIPT ${CADO_NFS_SOURCE_DIR}/cado-nfs.py
-            -dlp -ell 101538509534246169632617439
-            -t 2 -dlp-no-keep
-            target=92800609832959449330691138186
-            191907783019725260605646959711
-            TARGET_DEPENDENCIES full_c30_dependencies debug_renumber
-	    plingen_pz sm sm_simple las_descent reconstructlog-dl merge-dl replay-dl)
         cado_define_test(test_gfp3
             SCRIPT
                 ${CMAKE_CURRENT_SOURCE_DIR}/test_gfp3.sh
@@ -474,9 +471,6 @@ if(DEFINED ENV{CHECKS_EXPENSIVE})
             TARGET_DEPENDENCIES full_c30_dependencies debug_renumber
             plingen_pz sm reconstructlog-dl merge-dl replay-dl
 	    filter_galois)
-    else()
-        message(STATUS "magma found: ${MAGMA}")
-    endif()
 endif()
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})

@@ -469,6 +469,7 @@ void badideals_declare_usage(param_list_ptr pl)/*{{{*/
     param_list_decl_usage(pl, "polystr", "polynomial (string)");
     param_list_decl_usage(pl, "poly", "polynomial file");
     param_list_decl_usage(pl, "seed", "random seed");
+    param_list_decl_usage(pl, "ell", "ell (for computing default number of maps)");
 }/*}}}*/
 
 void usage(param_list_ptr pl, char ** argv, const char * msg = NULL)/*{{{*/
@@ -561,7 +562,18 @@ int main(int argc, char * argv[])
                 b.print_dot_badidealinfo_file(fbi, side);
             }
         }
+        cxx_mpz ell;
+        if (param_list_parse_mpz(pl, "ell", ell)) {
+            for(int side = 0 ; side < cpoly->nb_polys ; side++) {
+                sm_side_info sm;
+                sm_side_info_init(sm, cpoly->pols[side], ell);
+                cout << "# nmaps" << side << " " << sm->nsm << endl;
+                sm_side_info_clear(sm);
+            }
+        }
         cado_poly_clear(cpoly);
+    } else {
+        usage(pl, original_argv, "-poly or -polystr are mandatory");
     }
 
     gmp_randclear(state);

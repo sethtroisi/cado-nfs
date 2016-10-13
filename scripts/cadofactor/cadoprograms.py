@@ -945,30 +945,15 @@ class ReplayDLP(Program):
                  **kwargs):
         super().__init__(locals(), **kwargs)
 
-class MagmaNmbrthry(Program):
-    binary = "magma-nmbrthry-wrapper.sh"
+class NumberTheory(Program):
+    binary = "badideals"
     name = binary
-    subdir = "scripts"
+    subdir = "numbertheory"
     def __init__(self,
                  poly: Parameter(),
-                 N: Parameter("p"),
-                 badidealinfo: Parameter("badinfofile"),
-                 badideals: Parameter("badfile"),
                  ell: Parameter(),
-                 **kwargs):
-        super().__init__(locals(), **kwargs)
-
-
-class MagmaLinalg(Program):
-    binary = "magma-linalg-wrapper.sh"
-    name = binary
-    subdir = "scripts"
-    def __init__(self,
-                 ell: Parameter(),
-                 nmaps: Parameter(),
-                 sparsemat: Parameter(),
-                 sm: Parameter(),
-                 ker: Parameter()=None,
+                 badidealinfo: Parameter(),
+                 badideals: Parameter(),
                  **kwargs):
         super().__init__(locals(), **kwargs)
 

@@ -96,8 +96,8 @@ class GeneralClass(object):
         parser.add_argument("--log",
                 help="File with known logs",
                 type=str)
-        parser.add_argument("--magmadata",
-                help="File with magma data",
+        parser.add_argument("--numbertheorydata",
+                help="File with numbertheory data",
                 type=str)
         # This one applies to both las in the initial step, and
         # reconstructlog in the final step
@@ -127,7 +127,7 @@ class GeneralClass(object):
             # do mkdir ???
         else:
             self._tmpdir = tempfile.mkdtemp(dir="/tmp")
-        self.magmadata=None
+        self.numbertheorydata=None
         self.hello()
         self.__load_badidealdata()
         self.logDB = LogBase(self)
@@ -195,32 +195,32 @@ class GeneralClass(object):
     def log(self):
         return self.__getfile("log", "reconstructlog.dlog", "reconstructlog", "dlog")
     def badideals(self):
-        return self.__getfile("badideals", "magmanmbrthry.badideals", "magmanmbrthry", "badfile")
+        return self.__getfile("badideals", "numbertheory.badideals", "numbertheory", "badidealsfile")
     def badidealinfo(self):
-        return self.__getfile("badidealinfo", "magmanmbrthry.badidealinfo", "magmanmbrthry", "badinfofile")
+        return self.__getfile("badidealinfo", "numbertheory.badidealinfo", "numbertheory", "badidealinfofile")
     def fb1(self):
         return self.__getfile("fb1", "factorbase.roots.gz", "factorbase", "outputfile")
-    def __read_magmadata_file(self):
-        f = self.__getfile("magmadata", "magmanmbrthry.magma-nmbrthry-wrapper.sh.stdout", None, None)
-        self.magmadata=dict()
+    def __read_numbertheorydata_file(self):
+        f = self.__getfile("numbertheorydata", "numbertheory.badideals.stdout", None, None)
+        self.numbertheorydata=dict()
         with open(f, 'r') as file:
             for line in file:
                 key,value=line.strip().split(" ")
-                self.magmadata[key]=int(value)
-    def __get_magma_data(self, key):
+                self.numbertheorydata[key]=int(value)
+    def __get_numbertheory_data(self, key):
         try:
-            return int(self.__getarg(key, "magmanmbrthry", key))
+            return int(self.__getarg(key, "numbertheory", key))
         except ValueError as e:
             pass
-        if self.magmadata is None:
-            self.__read_magmadata_file()
-        return self.magmadata[key]
+        if self.numbertheorydata is None:
+            self.__read_numbertheorydata_file()
+        return self.numbertheorydata[key]
     def ell(self):
         return int(args.ell)
     def nmaps0(self):
-        return self.__get_magma_data("nmaps0")
+        return self.__get_numbertheory_data("nmaps0")
     def nmaps1(self):
-        return self.__get_magma_data("nmaps1")
+        return self.__get_numbertheory_data("nmaps1")
     def lpb0(self):
         return args.lpb0
     def lpb1(self):

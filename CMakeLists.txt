@@ -385,11 +385,8 @@ configure_file(cado-nfs-client.py cado-nfs-client.py ESCAPE_QUOTES @ONLY)
 install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/cado-nfs.py DESTINATION ${BINSUFFIX})
 install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/cado-nfs-client.py DESTINATION ${BINSUFFIX})
 
-# Copy magma scripts, to make our life easier; this should be removed 
-# once everything will be rewritten in C.
-foreach(script magma-linalg-wrapper.sh magma-nmbrthry-wrapper.sh
-        badideals.mag  linalg.mag
-        split.py descent.py)
+# Some scripts are handy to have also in the bin directory.
+foreach(script split.py descent.py)
     configure_file(
         ${CADO_NFS_SOURCE_DIR}/scripts/${script}
         ${CADO_NFS_BINARY_DIR}/scripts/${script}

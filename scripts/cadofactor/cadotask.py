@@ -2544,7 +2544,7 @@ class FreeRelTask(Task):
     def programs(self):
         input = {"poly": Request.GET_POLYNOMIAL_FILENAME}
         if self.params["dlp"]:
-            input["badideals"] = Request.GET_BADIDEAL_FILENAME
+            input["badideals"] = Request.GET_BADIDEALS_FILENAME
         return ((cadoprograms.FreeRel, ("renumber", "out"), input),)
     @property
     def paramnames(self):
@@ -3851,17 +3851,17 @@ class MergeTask(Task):
         return self.get_state_filename("densefile")
 
 
-class NmbrthryTask(Task):
+class NumberTheoryTask(Task):
     """ Number theory tasks for dlp"""
     @property
     def name(self):
-        return "magmanmbrthry"
+        return "numbertheory"
     @property
     def title(self):
         return "Number Theory for DLP"
     @property
     def programs(self):
-        return ((cadoprograms.MagmaNmbrthry, ("badidealinfo", "badideals"),
+        return ((cadoprograms.NumberTheory, ("badidealinfo", "badideals"),
                  {"poly": Request.GET_POLYNOMIAL_FILENAME}),)
     @property
     def paramnames(self):
@@ -3877,16 +3877,16 @@ class NmbrthryTask(Task):
         # Check if we already compute the bad ideals (we check only
         # one of the files, assuming everything was correct during the
         # first run).
-        if "badfile" in self.state:
-            self.logger.info("Nmbrthry task has already run, reusing the result.");
+        if "badidealsfile" in self.state:
+            self.logger.info("NumberTheory task has already run, reusing the result.");
             return True
 
         # Create output files and start the computation
-        badfile = self.workdir.make_filename("badideals")
-        badinfofile = self.workdir.make_filename("badidealinfo")
-        (stdoutpath, stderrpath) = self.make_std_paths(cadoprograms.MagmaNmbrthry.name)
-        p = cadoprograms.MagmaNmbrthry(badidealinfo=badinfofile,
-                               badideals=badfile,
+        badidealsfile = self.workdir.make_filename("badideals")
+        badidealinfofile = self.workdir.make_filename("badidealinfo")
+        (stdoutpath, stderrpath) = self.make_std_paths(cadoprograms.NumberTheory.name)
+        p = cadoprograms.NumberTheory(badidealinfo=badidealinfofile,
+                               badideals=badidealsfile,
                                stdout=str(stdoutpath),
                                stderr=str(stderrpath),
                                **self.merged_args[0])
@@ -3897,10 +3897,10 @@ class NmbrthryTask(Task):
         stdout = message.read_stdout(0).decode("utf-8")
         update = {}
         for line in stdout.splitlines():
-            match = re.match(r'nmaps0 (\d+)', line)
+            match = re.match(r'# nmaps0 (\d+)', line)
             if match:
                 update["nmaps0"] = int(match.group(1))
-            match = re.match(r'nmaps1 (\d+)', line)
+            match = re.match(r'# nmaps1 (\d+)', line)
             if match:
                 update["nmaps1"] = int(match.group(1))
         # Allow user-given parameter to override what we compute:
@@ -3908,84 +3908,31 @@ class NmbrthryTask(Task):
             update["nmaps0"] = self.params["nsm0"]
         if self.params["nsm1"] != -1:
             update["nmaps1"] = self.params["nsm1"]
-        update["badinfofile"] = badinfofile.get_wdir_relative()
-        update["badfile"] = badfile.get_wdir_relative()
+        update["badidealinfofile"] = badidealinfofile.get_wdir_relative()
+        update["badidealsfile"] = badidealsfile.get_wdir_relative()
         
         if not "nmaps0" in update:
             raise Exception("Stdout does not give nmaps0")
         if not "nmaps1" in update:
             raise Exception("Stdout does not give nmaps1")
-        if not badfile.isfile():
-            raise Exception("Output file %s does not exist" % badfile)
-        if not badinfofile.isfile():
-            raise Exception("Output file %s does not exist" % badinfofile)
+        if not badidealsfile.isfile():
+            raise Exception("Output file %s does not exist" % badidealsfile)
+        if not badidealinfofile.isfile():
+            raise Exception("Output file %s does not exist" % badidealinfofile)
         # Update the state entries atomically
         self.state.update(update)
 
-        self.logger.debug("Exit NmbrthryTask.run(" + self.name + ")")
+        self.logger.debug("Exit NumberTheoryTask.run(" + self.name + ")")
         return True
 
-    def get_badinfo_filename(self):
-        return self.get_state_filename("badinfofile")
+    def get_badidealinfo_filename(self):
+        return self.get_state_filename("badidealinfofile")
     
-    def get_bad_filename(self):
-        return self.get_state_filename("badfile")
+    def get_badideals_filename(self):
+        return self.get_state_filename("badidealsfile")
     
     def get_nmaps(self):
         return (self.state["nmaps0"], self.state["nmaps1"])
-
-
-class LinAlgDLPTask_Magma(Task):
-    """ Runs the linear algebra step for dlp"""
-    @property
-    def name(self):
-        return "magmalinalg"
-    @property
-    def title(self):
-        return "Linear Algebra for DLP"
-    @property
-    def programs(self):
-        return ((cadoprograms.MagmaLinalg, ("ker", "nmaps"),
-                 {"sparsemat": Request.GET_MERGED_FILENAME,
-                  "sm": Request.GET_SM_FILENAME}),)
-    @property
-    def paramnames(self):
-        return super().paramnames
-    
-    def __init__(self, *, mediator, db, parameters, path_prefix):
-        super().__init__(mediator=mediator, db=db, parameters=parameters,
-                         path_prefix=path_prefix)
-
-    def run(self):
-        super().run()
-
-        if not "kerfile" in self.state or self.have_new_input_files():
-            kerfile = self.workdir.make_filename("ker")
-            nmaps = self.send_request(Request.GET_NMAPS)
-            nn = nmaps[0] + nmaps[1];
-            (stdoutpath, stderrpath) = self.make_std_paths(cadoprograms.MagmaLinalg.name)
-            p = cadoprograms.MagmaLinalg(ker=kerfile,
-                                   nmaps=nn,
-                                   stdout=str(stdoutpath),
-                                   stderr=str(stderrpath),
-                                   **self.merged_args[0])
-            message = self.submit_command(p, "", log_errors=True)
-            if message.get_exitcode(0) != 0:
-                raise Exception("Program failed")
-            
-            if not kerfile.isfile():
-                raise Exception("Output file %s does not exist" % kerfile)
-            self.remember_input_versions(commit=False)
-            output_version = self.state.get("output_version", 0) + 1
-            update = {"kerfile": kerfile.get_wdir_relative(),
-                      "output_version": output_version}
-            self.state.update(update)
-            
-        self.logger.debug("Exit LinAlgDLPTask.run(" + self.name + ")")
-        return True
-    
-    def get_virtual_logs_filename(self):
-        return self.get_state_filename("kerfile")
 
 class bwc_output_filter(RealTimeOutputFilter):
     def filter(self, data):
@@ -5128,7 +5075,7 @@ class Request(Message):
     GET_RELSDEL_FILENAME = object()
     GET_SM_FILENAME = object()
     GET_UNITS_DIRNAME = object()
-    GET_BADIDEAL_FILENAME = object()
+    GET_BADIDEALS_FILENAME = object()
     GET_BADIDEALINFO_FILENAME = object()
     GET_SMEXP = object()
     GET_NMAPS = object()
@@ -5244,7 +5191,7 @@ class CompleteFactorization(HasState, wudb.DbAccess,
 
         if self.params["dlp"]:
             ## Tasks specific to dlp
-            self.nmbrthry = NmbrthryTask(mediator=self,
+            self.numbertheory = NumberTheoryTask(mediator=self,
                              db=db,
                              parameters=self.parameters,
                              path_prefix=parampath)
@@ -5299,7 +5246,7 @@ class CompleteFactorization(HasState, wudb.DbAccess,
                 self.tasks = (self.polysel1, self.polysel2)
             else:
                 self.tasks = (self.polyselgfpn,)
-            self.tasks = self.tasks + (self.nmbrthry, self.fb,
+            self.tasks = self.tasks + (self.numbertheory, self.fb,
                           self.freerel, self.sieving,
                           self.dup1, self.dup2,
                           self.filtergalois, self.purge, self.merge,
@@ -5353,9 +5300,9 @@ class CompleteFactorization(HasState, wudb.DbAccess,
         if self.params["dlp"]:
             self.request_map[Request.GET_IDEAL_FILENAME] = self.merge.get_ideal_filename
             self.request_map[Request.GET_GAL_UNIQUE_RELCOUNT] = self.filtergalois.get_nrels
-            self.request_map[Request.GET_BADIDEAL_FILENAME] = self.nmbrthry.get_bad_filename
-            self.request_map[Request.GET_BADIDEALINFO_FILENAME] = self.nmbrthry.get_badinfo_filename
-            self.request_map[Request.GET_NMAPS] = self.nmbrthry.get_nmaps
+            self.request_map[Request.GET_BADIDEALS_FILENAME] = self.numbertheory.get_badideals_filename
+            self.request_map[Request.GET_BADIDEALINFO_FILENAME] = self.numbertheory.get_badidealinfo_filename
+            self.request_map[Request.GET_NMAPS] = self.numbertheory.get_nmaps
             self.request_map[Request.GET_SM_FILENAME] = self.sm.get_sm_filename
             self.request_map[Request.GET_RELSDEL_FILENAME] = self.purge.get_relsdel_filename
             self.request_map[Request.GET_KERNEL_FILENAME] = self.linalg.get_virtual_logs_filename
