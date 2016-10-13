@@ -6,6 +6,7 @@
 #include <fstream>
 #include <algorithm>
 #include <iterator>
+#include <stdexcept>
 
 using namespace std;
 static char ** original_argv;
