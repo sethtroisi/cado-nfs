@@ -43,7 +43,8 @@
 #include "mpz_mat.h"
 #include "version_info.h"
 #ifdef __cplusplus
-#include "utils/cxx_mpz.hpp"
+#include "cxx_mpz.hpp"
+#include "gmpxx.hpp"
 #endif
 #include "mpz_poly_bivariate.h"
 
