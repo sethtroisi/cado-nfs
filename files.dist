@@ -346,6 +346,8 @@ sieve/ecm/CMakeLists.txt
 sieve/ecm/Makefile
 sieve/ecm/addchain_bc.c
 sieve/ecm/addchain_bc.h
+sieve/ecm/bytecoder.c
+sieve/ecm/bytecoder.h
 sieve/ecm/ecm.c
 sieve/ecm/facul_ecm.h
 sieve/ecm/ecm_15ul.c
