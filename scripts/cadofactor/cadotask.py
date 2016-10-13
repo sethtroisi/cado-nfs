@@ -3691,7 +3691,19 @@ class MergeDLPTask(Task):
             message = self.submit_command(p, "", log_errors=True)
             if message.get_exitcode(0) != 0:
                 raise Exception("Program failed")
-            
+            stdout = message.read_stdout(0).decode("utf-8")
+            matsize = 0
+            matweight = 0
+            for line in stdout.splitlines():
+                match = re.match(r'Final matrix has N=(\d+) nc=\d+ \(\d+\) w\(M\)=(\d+)', line)
+                if match:
+                    matsize=int(match.group(1))
+                    matweight=int(match.group(2))
+            if (matsize == 0) or (matweight == 0):
+                raise Exception("Could not read matrix size and weight")
+            self.logger.info("Merged matrix has %d rows and total weight %d (%.1f entries per row on average)"
+                    % (matsize, matweight, float(matweight)/float(matsize)))
+
             indexfile = self.workdir.make_filename("index" + use_gz)
             mergedfile = self.workdir.make_filename("sparse.bin")
             (stdoutpath, stderrpath) = self.make_std_paths(cadoprograms.Replay.name)
@@ -3788,7 +3800,19 @@ class MergeTask(Task):
             message = self.submit_command(p, "", log_errors=True)
             if message.get_exitcode(0) != 0:
                 raise Exception("Program failed")
-            
+            stdout = message.read_stdout(0).decode("utf-8")
+            matsize = 0
+            matweight = 0
+            for line in stdout.splitlines():
+                match = re.match(r'Final matrix has N=(\d+) nc=\d+ \(\d+\) w\(M\)=(\d+)', line)
+                if match:
+                    matsize=int(match.group(1))
+                    matweight=int(match.group(2))
+            if (matsize == 0) or (matweight == 0):
+                raise Exception("Could not read matrix size and weight")
+            self.logger.info("Merged matrix has %d rows and total weight %d (%.1f entries per row on average)"
+                    % (matsize, matweight, float(matweight)/float(matsize)))
+
             indexfile = self.workdir.make_filename("index" + use_gz)
             mergedfile = self.workdir.make_filename("sparse.bin")
             (stdoutpath, stderrpath) = self.make_std_paths(cadoprograms.Replay.name)
