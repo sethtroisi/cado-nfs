@@ -363,8 +363,6 @@ ecm_make_plan (ecm_plan_t *plan, const unsigned int B1, const unsigned int B2,
   {
     addchain_cost_t * opcost = &TwEdwards_minus1_opcost;
 
-    plan->E = &Ecurve14; /* To remove */
-
     bc_state = bytecoder_init (compress ? &ecm_addchain_dict : NULL);
     totalcost = addchain_bytecode (B1, opcost, bc_state, verbose);
     bytecoder_flush (bc_state);
@@ -414,7 +412,4 @@ ecm_clear_plan (ecm_plan_t *plan)
     plan->bc = NULL;
     plan->bc_len = 0;
   }
-
-  if (plan->parameterization & FULLTWED)
-    plan->E = NULL;
 }
