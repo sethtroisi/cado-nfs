@@ -110,7 +110,6 @@ void mpz_poly_rotation_int64 (mpz_poly_ptr, mpz_poly_srcptr, mpz_poly_srcptr, co
 void mpz_poly_makemonic_mod_mpz (mpz_poly_ptr Q, mpz_poly_srcptr P, mpz_srcptr m);
 int mpz_poly_mod_f_mod_mpz (mpz_poly_ptr R, mpz_poly_srcptr f, mpz_srcptr m,
                         mpz_srcptr invm);
-int mpz_poly_mod_f(mpz_poly_ptr R, mpz_poly_srcptr f);
 int mpz_poly_mod_mpz (mpz_poly_ptr R, mpz_poly_srcptr A, mpz_srcptr m, mpz_srcptr invm);
 void mpz_poly_mul_mod_f_mod_mpz(mpz_poly_ptr Q, mpz_poly_srcptr P1, mpz_poly_srcptr P2,
                             mpz_poly_srcptr f, mpz_srcptr m,
@@ -121,6 +120,8 @@ void mpz_poly_reduce_frac_mod_f_mod_mpz (mpz_poly_ptr num, mpz_poly_ptr denom,
                                          mpz_poly_srcptr F, mpz_srcptr m, mpz_srcptr invm);
 int mpz_poly_div_qr (mpz_poly_ptr q, mpz_poly_ptr r, mpz_poly_srcptr f, mpz_poly_srcptr g, mpz_srcptr p);
 int mpz_poly_div_r (mpz_poly_ptr h, mpz_poly_srcptr f, mpz_srcptr p);
+int mpz_poly_div_qr_z (mpz_poly_ptr q, mpz_poly_ptr r, mpz_poly_srcptr f, mpz_poly_srcptr g);
+int mpz_poly_div_r_z (mpz_poly_ptr r, mpz_poly_srcptr f, mpz_poly_srcptr g);
 int mpz_poly_divexact (mpz_poly_ptr q, mpz_poly_srcptr h, mpz_poly_srcptr f, mpz_srcptr p);
 void mpz_poly_div_2_mod_mpz(mpz_poly_ptr f, mpz_poly_srcptr g, mpz_srcptr m);
 void mpz_poly_div_xi(mpz_poly_ptr g, mpz_poly_srcptr f, int i);
@@ -143,15 +144,14 @@ void polymodF_mul(polymodF_t Q, const polymodF_t P1, const polymodF_t P2,
                   mpz_poly_srcptr F);
 void mpz_poly_sqr_mod_f_mod_mpz(mpz_poly_ptr Q, mpz_poly_srcptr P, mpz_poly_srcptr f,
                             mpz_srcptr m, mpz_srcptr invm);
-void mpz_poly_power_mod_f(mpz_poly_ptr Q, mpz_poly_srcptr P, mpz_poly_srcptr f,
-                         unsigned int a);
-void mpz_poly_power_mod_f_mod_ui(mpz_poly_ptr Q, mpz_poly_srcptr P, mpz_poly_srcptr f,
+void mpz_poly_pow_ui_mod_f(mpz_poly_ptr B, mpz_poly_srcptr A, unsigned long n, mpz_poly_srcptr f);
+void mpz_poly_pow_mod_f_mod_ui(mpz_poly_ptr Q, mpz_poly_srcptr P, mpz_poly_srcptr f,
                              mpz_srcptr a, unsigned long p);
-void mpz_poly_power_mod_f_mod_mpz (mpz_poly_ptr Q, mpz_poly_srcptr P, mpz_poly_srcptr f,
+void mpz_poly_pow_mod_f_mod_mpz (mpz_poly_ptr Q, mpz_poly_srcptr P, mpz_poly_srcptr f,
                                mpz_srcptr a, mpz_srcptr p);
-void mpz_poly_power_ui_mod_f_mod_mpz (mpz_poly_ptr Q, mpz_poly_srcptr P, mpz_poly_srcptr f,
+void mpz_poly_pow_ui_mod_f_mod_mpz (mpz_poly_ptr Q, mpz_poly_srcptr P, mpz_poly_srcptr f,
                                unsigned long a, mpz_srcptr p);
-void mpz_poly_power_mod_f_mod_mpz_barrett (mpz_poly_ptr, mpz_poly_srcptr,
+void mpz_poly_pow_mod_f_mod_mpz_barrett (mpz_poly_ptr, mpz_poly_srcptr,
                                            mpz_poly_srcptr, mpz_srcptr,
                                            mpz_srcptr, mpz_srcptr);
 void mpz_poly_derivative(mpz_poly_ptr df, mpz_poly_srcptr f);
@@ -247,6 +247,8 @@ int mpz_poly_factor_and_lift_padically(mpz_poly_factor_list_ptr fac, mpz_poly_sr
 struct cxx_mpz_poly {
     mpz_poly x;
     cxx_mpz_poly() { mpz_poly_init(x, -1); }
+    cxx_mpz_poly(int deg) { mpz_poly_init(x, deg); }
+    cxx_mpz_poly(mpz_poly_srcptr f) { mpz_poly_init(x, -1); mpz_poly_set(x, f); }
     ~cxx_mpz_poly() { mpz_poly_clear(x); }
     cxx_mpz_poly(cxx_mpz_poly const & o) {
         mpz_poly_init(x, -1);
@@ -270,6 +272,7 @@ struct cxx_mpz_poly {
     operator mpz_poly_srcptr() const { return x; }
     mpz_poly_ptr operator->() { return x; }
     mpz_poly_srcptr operator->() const { return x; }
+    std::string print_poly(std::string const& var) const;
 };
 
 #endif

@@ -493,7 +493,7 @@ static int param_list_update_cmdline_alias(param_list pl,
         if (strncmp(a, al->alias, strlen(al->alias)) != 0)
             return 0;
         a += strlen(al->alias);
-        if (a[1] == '\0')
+        if (a[0] == '\0')
             return 0;
         // no +1 , since the alias contains the = sign already.
         param_list_add_key(pl, al->key, a, PARAMETER_FROM_CMDLINE);
