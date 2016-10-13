@@ -273,7 +273,7 @@ ecm_make_plan (ecm_plan_t *plan, const unsigned int B1, const unsigned int B2,
               const int parameterization, const unsigned long sigma,
               const int extra_primes, const int verbose)
 {
-  const unsigned int compress = 0;
+  const unsigned int compress = 1;
   bc_state_t *bc_state;
   double totalcost = 0.;
 
