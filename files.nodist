@@ -203,3 +203,4 @@ README.nfs-hd
 nfs-hd/automatic_p6bd40.sh
 nfs-hd/check_relations/
 parameters/nfs-hd/
+sieve/CMakeLists-nodist.txt
