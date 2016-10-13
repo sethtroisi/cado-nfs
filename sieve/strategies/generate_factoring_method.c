@@ -626,7 +626,7 @@ tabular_fm_t *bench_proba_time_pset(int method, int curve,
     tabular_fm_t *tab_fusion = tabular_fm_create();
 
     //add zero method
-    unsigned long tmp_method[4] = { method, 0, 0, 0 };
+    unsigned long tmp_method[4] = { method, curve, 0, 0 };
     double zero = 0;
     tabular_fm_add(tab_fusion, tmp_method, 4, &zero, 1, &zero, 1, len_p_min);
 
