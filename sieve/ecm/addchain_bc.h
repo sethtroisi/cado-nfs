@@ -22,4 +22,5 @@ typedef struct addchain_cost_s addchain_cost_t;
 unsigned int addchain_bytecode (char **, const unsigned int, const unsigned int,
                                 const addchain_cost_t *, bc_dict_t *, int);
 void addchain_bytecode_fprintf (FILE *, const char *, unsigned int);
+int addchain_bytecode_check (const char *, unsigned int, mpz_srcptr, int);
 #endif

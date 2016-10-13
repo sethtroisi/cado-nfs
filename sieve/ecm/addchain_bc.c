@@ -315,6 +315,7 @@ addchain_bytecode (char **bc, const unsigned int B1, const unsigned int exp2,
     {
       printf ("Byte code for stage 1: ");
       addchain_bytecode_fprintf (stdout, *bc, bc_len);
+      addchain_bytecode_check (*bc, bc_len, E, verbose);
     }
     printf ("## Addchain: cost of power of 2: %f\n", power2cost);
     printf ("## Addchain: total cost: %f\n", chaincost + power2cost);
@@ -334,8 +335,8 @@ addchain_bytecode_fprintf (FILE *out, const char *bc, unsigned int len)
                                             ((uint8_t) (bc[1] & 0x7f) << 1) + 1;
   if (bc[1] & 0x80)
   {
-    unsigned int r = ((uint8_t) (bc[2] & 0x7f) << 1) + 1;
-    fprintf (out, " [starting point is %uP + %uP ]", k, r);
+    unsigned int k2 = ((uint8_t) (bc[2] & 0x7f) << 1) + 1;
+    fprintf (out, " [starting point is %uP + %uP ]", k, k2);
   }
   else
     fprintf (out, " [starting point is %uP]", k);
@@ -360,4 +361,94 @@ addchain_bytecode_fprintf (FILE *out, const char *bc, unsigned int len)
     }
   }
   fprintf (out, "\n");
+}
+
+/* Return nonzero if the bytecode does not produce E. Return 0 otherwise. */
+int
+addchain_bytecode_check (const char *bc, unsigned int len, mpz_srcptr E,
+                         int verbose)
+{
+  mpz_t Q;
+  uint8_t q;
+
+  if (len < 3)
+  {
+    printf ("## Addchain: bytecode_check failed: len must be at least 3\n");
+    return 1;
+  }
+
+  q = (uint8_t) bc[0];
+  if (q > ADDCHAIN_Q_MAX)
+  {
+    printf ("## Addchain: bytecode_check failed: q = %u is larger than "
+            "ADDCHAIN_Q_MAX = %u\n", q, ADDCHAIN_Q_MAX);
+    return 1;
+  }
+
+  unsigned int k1 = ((bc[1] & 0x7f) == 0x7f) ? 2 :
+                                            ((uint8_t) (bc[1] & 0x7f) << 1) + 1;
+  if (k1 > q)
+  {
+    printf ("## Addchain: bytecode_check failed: bc[1] = %u is larger than "
+            "q = %u\n", k1, q);
+    return 1;
+  }
+
+  if (bc[1] & 0x80)
+  {
+    unsigned int k2 = ((uint8_t) (bc[2] & 0x7f) << 1) + 1;
+    if (k2 > q)
+    {
+      printf ("## Addchain: bytecode_check failed: bc[2] = %u is larger than "
+              "q = %u\n", k1, q);
+      return 1;
+    }
+    mpz_init_set_ui (Q, k1+k2);
+  }
+  else
+    mpz_init_set_ui (Q, k1);
+
+  int ret = 0;
+  for (unsigned int i = 3; i < len && ret == 0; i++)
+  {
+    char b = bc[i];
+    unsigned int r;
+    switch (b)
+    {
+      case ADDCHAIN_2DBL:
+        mpz_mul_2exp (Q, Q, 2);
+        break;
+      case ADDCHAIN_DBL:
+        mpz_mul_2exp (Q, Q, 1);
+        break;
+      default:
+        mpz_mul_2exp (Q, Q, 1);
+        r = ((uint8_t) (b & 0x7f) << 1) + 1;
+        if (r > q)
+        {
+          printf ("## Addchain: bytecode_check failed: bc[%u] corresponds to a "
+                  "dbladd with |r|=%u which is larger than q = %u\n", i, r, q);
+          ret = 1;
+        }
+        if (b & 0x80)
+          mpz_sub_ui (Q, Q, r);
+        else
+          mpz_add_ui (Q, Q, r);
+        break;
+    }
+  }
+
+  if (ret == 0)
+  {
+    if (mpz_cmp (Q, E) != 0)
+    {
+      gmp_printf ("## Addchain: bytecode_check failed:\n"
+                  "  Expected %Zd\n  Got %Zd\n", E, Q);
+      ret = 1;
+    }
+  }
+  if (ret == 0 && verbose)
+    printf ("## Addchain: bytecode_check: chain is ok\n");
+  mpz_clear (Q);
+  return ret;
 }
