@@ -138,7 +138,6 @@ sieve/strategies/script_str_r.sh
 sieve/strategies/CMakeLists-nodist.txt
 sieve/strategies/test_strategy_cado.c
 sieve/strategies/F9.sh
-sieve/fake_rels.cpp
 linalg/bwc/lingen.txt
 nfs-hd/array.c
 nfs-hd/array.h
@@ -203,5 +202,4 @@ README.nfs-hd
 nfs-hd/automatic_p6bd40.sh
 nfs-hd/check_relations/
 parameters/nfs-hd/
-sieve/CMakeLists-nodist.txt
 filter/CMakeLists-nodist.txt

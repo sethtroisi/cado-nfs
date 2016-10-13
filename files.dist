@@ -427,6 +427,7 @@ sieve/makefb.sage
 sieve/trialdiv.c
 sieve/trialdiv.h
 sieve/dupsup.cpp
+sieve/fake_rels.cpp
 sqrt/CMakeLists.txt
 sqrt/Makefile
 sqrt/checkdep.c
@@ -507,6 +508,7 @@ tests/sieve/F9.cofactest.sh
 tests/sieve/F9.todotest.sh
 tests/sieve/F9.descenttest.sh
 tests/sieve/F9.dupsup.sh
+tests/sieve/F9.fakerels.sh
 tests/sieve/F9.todo
 tests/sieve/F9.hint
 tests/sieve/c120.poly

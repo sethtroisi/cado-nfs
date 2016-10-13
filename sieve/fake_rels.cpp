@@ -9,6 +9,31 @@
 #include <vector>
 #include <algorithm>
 
+/*
+ * The goal of this binary is to produce relations that try to be good
+ * approximations of what las would produce, with respect to filtering.
+ * The idea is to feed the purge/merge steps of the filtering with these
+ * relations to get an idea of the final matrix that will come out of the
+ * sieving step for a given set of parameters.
+ *
+ * The shell script cado-nfs/misc/estimate_matsize.sh is an attempt to
+ * run all the required steps for such a simulation: sampling with las,
+ * fake relation generation with this binary, and filter.
+ *
+ * The binary takes as input:
+ *   - poly file
+ *   - lpb on each side
+ *   - a range of special-q for a given side
+ *   - a sample of relations (output of las) for this range
+ *   - the renumber table.
+ * The renumber table is required, because this binary will produce
+ * relations as if they were coming out of dup2 (hence renumbered).
+ *
+ * The sample of relations must also be de-duplicated, therefore the -dup
+ * option of las must be used for the sampling.
+ *
+ */
+
 using namespace std;
 
 // Structure that contains indices (in the sense of renumber.[ch]) for
