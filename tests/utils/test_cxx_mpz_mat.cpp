@@ -49,7 +49,7 @@ int main(int argc, char * argv[])
         v.insert(make_pair(mpz_get_ui(det), M));
     }
 
-    for(decltype(v)::const_iterator it = v.begin() ; it != v.end() ; it++) {
+    for(map<unsigned long, cxx_mpz_mat>::const_iterator it = v.begin() ; it != v.end() ; it++) {
         printf("[det=%ld] ", it->first);
         mpz_mat_fprint(stdout, it->second);
     }
