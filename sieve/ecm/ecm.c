@@ -2,10 +2,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include "portability.h"
 #include "facul_ecm.h"
 #include "ularith.h"
-#include "portability.h"
 #include "getprime.h"
+#include "addchain_bc.h"
 
 /* Do we want backtracking when processing factors of 2 in E? */
 #ifndef ECM_BACKTRACKING
@@ -1087,25 +1088,25 @@ void ellE_interpret_bytecode (ellE_point_t P, const char *bc, const unsigned int
     }
   ellE_set_from_Ee (Q, Te, m);
 
-  /* scan bc[i] for i > 2 */
-  i = 2;
-  while (++i < bc_len)
+  /* scan bc[i] for i >= 3 */
+  for (unsigned int i = 3; i < bc_len; i++)
+  {
+    char b = bc[i];
+    switch (b)
     {
-      int j = bc[i] & 0x7F;
-      if (j == 0x7F)
-	{
-	  ellE_double (Q, Q, m, a);
-	  if (bc[i] & 0x80)
-	    ellE_double (Q, Q, m, a);
-	}
-      else
-	{
-	  ellEe_set (Te, _rP[j], m);
-	  if (bc[i] & 0x80)
-	    ellEe_neg (Te, m);
-	  ellE_double_add (Q, Q, Te, m, a);
-	}
+      case ADDCHAIN_2DBL:
+        ellE_double (Q, Q, m, a);
+      case ADDCHAIN_DBL:
+        ellE_double (Q, Q, m, a);
+        break;
+      default:
+        ellEe_set (Te, _rP[b & 0x7f], m);
+	      if (b & 0x80)
+	        ellEe_neg (Te, m);
+	      ellE_double_add (Q, Q, Te, m, a);
+        break;
     }
+  }
   
   ellE_set (P, Q, m);
 

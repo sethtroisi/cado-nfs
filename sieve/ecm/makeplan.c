@@ -21,14 +21,26 @@ static bc_dict_t pp1_dict =
   {PP1_DICT_NRENTRIES, pp1_dict_len, pp1_dict_entry, pp1_dict_code};
 
 
-#define ECM_DICT_NRENTRIES 4
-static size_t ecm_dict_len[ECM_DICT_NRENTRIES] = {1, 1, 2, 2};
-static literal_t *ecm_dict_entry[ECM_DICT_NRENTRIES] =
+#define ECM_PRAC_DICT_NRENTRIES 4
+static size_t ecm_prac_dict_len[ECM_PRAC_DICT_NRENTRIES] = {1, 1, 2, 2};
+static literal_t *ecm_prac_dict_entry[ECM_PRAC_DICT_NRENTRIES] =
 {"\xB", "\xA", "\xB\xA", "\x3\x0"};
-static code_t ecm_dict_code[ECM_DICT_NRENTRIES] = {0, 0, 10, 11};
+static code_t ecm_prac_dict_code[ECM_PRAC_DICT_NRENTRIES] = {0, 0, 10, 11};
 
-static bc_dict_t ecm_dict =
-  {ECM_DICT_NRENTRIES, ecm_dict_len, ecm_dict_entry, ecm_dict_code};
+static bc_dict_t ecm_prac_dict =
+  {ECM_PRAC_DICT_NRENTRIES, ecm_prac_dict_len, ecm_prac_dict_entry,
+                                                ecm_prac_dict_code};
+
+#define ECM_ADDCHAIN_DICT_NRENTRIES 4
+static size_t ecm_addchain_dict_len[ECM_ADDCHAIN_DICT_NRENTRIES] = {2};
+static literal_t *ecm_addchain_dict_entry[ECM_ADDCHAIN_DICT_NRENTRIES] =
+{ADDCHAIN_DBL_STR ADDCHAIN_DBL_STR };
+static code_t ecm_addchain_dict_code[ECM_ADDCHAIN_DICT_NRENTRIES] =
+                                                                {ADDCHAIN_2DBL};
+
+static bc_dict_t ecm_addchain_dict =
+  {ECM_ADDCHAIN_DICT_NRENTRIES, ecm_addchain_dict_len, ecm_addchain_dict_entry,
+                                                ecm_addchain_dict_code};
 
 /* Costs of operations for Twisted Edwards Curves with a=-1
  *  For those curves, we use 3 different models:
@@ -295,7 +307,7 @@ ecm_make_plan (ecm_plan_t *plan, const unsigned int B1, const unsigned int B2,
     plan->bc_len = lookup_saved_chain(&plan->bc, B1);
     if (plan->bc_len == 0)
     {
-      bc_state = bytecoder_init (compress ? &ecm_dict : NULL);
+      bc_state = bytecoder_init (compress ? &ecm_prac_dict : NULL);
       /* If group order is divisible by 12, add another 3 to stage 1 primes */
       if (extra_primes && (parameterization & ECM_TORSION12))
         totalcost += prac_bytecode (3, addcost, doublecost, bytecost,
@@ -353,7 +365,7 @@ ecm_make_plan (ecm_plan_t *plan, const unsigned int B1, const unsigned int B2,
 
     plan->E = &Ecurve14; /* To remove */
 
-    bc_state = bytecoder_init (NULL);
+    bc_state = bytecoder_init (compress ? &ecm_addchain_dict : NULL);
     totalcost = addchain_bytecode (B1, opcost, bc_state, verbose);
     bytecoder_flush (bc_state);
     plan->bc_len = bytecoder_size (bc_state);

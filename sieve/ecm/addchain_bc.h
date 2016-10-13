@@ -16,6 +16,8 @@ typedef struct addchain_cost_s addchain_cost_t;
 
 #define ADDCHAIN_Q_MAX 253 /* Must be < 255 */
 #define ADDCHAIN_DBL ((literal_t) 0x7f)
+#define ADDCHAIN_DBL_STR "\x7f"
+#define ADDCHAIN_2DBL ((literal_t) 0xff)
 
 double addchain_bytecode (const unsigned int, const addchain_cost_t *,
                           bc_state_t *, int);
