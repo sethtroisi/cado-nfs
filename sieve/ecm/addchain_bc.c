@@ -166,8 +166,10 @@ addchain_rec (mpz_t k, const uint8_t q, const addchain_cost_t * opcost,
     /* XXX If one day, we have a tripling more efficient that add + dbladd, we
      * could use it here */
   }
-  /* Case 4:  q+4 <= k <= 3*q-4 and k % 6 == 5 */
-  else if (0 <= mpz_cmp_ui (k, q+4) && mpz_cmp_ui (k, 3*q-4) <= 0
+  /* Case 4:  q+4 <= k <= 3*q-4 and k % 6 == 5
+   * Note: for q = 1, 3*q-4 is < 0 so this cas never happens.
+   */
+  else if (0 <= mpz_cmp_ui (k, q+4) && q > 1 && mpz_cmp_ui (k, 3*q-4) <= 0
                                     && mpz_congruent_ui_p (k, 5, 6))
   {
     if (verbose > 1)
