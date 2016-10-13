@@ -1170,7 +1170,7 @@ linalg/bwc/mf_bal_main.c
 linalg/bwc/mf_bal.h
 numbertheory/ant.hpp
 tests/numbertheory/test-ant.cpp
-config/gmpxx.cpp
+config/gmpxx-test.cpp
 utils/gmpxx.hpp
 utils/gmpxx.cpp
 tests/numbertheory/gentest.m

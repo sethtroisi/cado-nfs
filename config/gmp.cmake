@@ -65,7 +65,7 @@ set(gmp_libname "gmp")
 message(STATUS "Testing whether gmpxx is available")
 try_compile(HAVE_GMPXX
     ${PROJECT_BINARY_DIR}/config
-    ${PROJECT_SOURCE_DIR}/config/gmpxx.cpp
+    ${PROJECT_SOURCE_DIR}/config/gmpxx-test.cpp
     CMAKE_FLAGS "-DLINK_LIBRARIES:STRING=${gmp_libname};${gmp_libname}xx")
 
 if (HAVE_GMPXX)
