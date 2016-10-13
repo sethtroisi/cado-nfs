@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <gmp.h>
+#include <limits.h>     /* for INT_MAX */
 #include <ostream>
 #include "mpz_mat.h"
 #include "portability.h"

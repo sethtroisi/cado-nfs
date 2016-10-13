@@ -3,7 +3,7 @@
 #include "cado.h"
 #include <stdint.h>
 #include <string.h>
-#include <limits.h>
+#include <limits.h>     /* for INT_MAX */
 #include "gmp_aux.h"
 #include "macros.h"
 
