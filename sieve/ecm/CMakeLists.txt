@@ -53,7 +53,7 @@ add_library(facul
         pm1_mpz.c
         pp1_mpz.c
         facul_doit_mpz.c
-        stage2.c prac_bc.c addchain_bc.c
+        stage2.c bytecoder.c prac_bc.c addchain_bc.c
 	makeplan.c facul.cpp
         mpqs_doit.c mpqs_ul.c mpqs_15ul.c mpqs_2ul2.c mpqs_mpz.c
 	batch.c)

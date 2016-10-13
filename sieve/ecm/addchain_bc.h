@@ -1,6 +1,8 @@
 #ifndef _ECM_ADDCHAIN_BC_H_
 #define _ECM_ADDCHAIN_BC_H_
 
+#include "bytecoder.h"
+
 struct addchain_cost_s
 {
   double dbl;

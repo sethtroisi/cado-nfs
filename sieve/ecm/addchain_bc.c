@@ -8,10 +8,9 @@
 
 #include "portability.h"
 #include "macros.h"
+#include "addchain_bc.h"
 #include "getprime.h"
 #include "gmp_aux.h" /* for nbits */
-#include "prac_bc.h"
-#include "addchain_bc.h"
 
 /* Only used with l <= 31 */
 #define mpz_mod_ui_2exp(n,l) (((n)->_mp_size) ? ((n)->_mp_d[0]&((1<<l)-1)) : 0)
