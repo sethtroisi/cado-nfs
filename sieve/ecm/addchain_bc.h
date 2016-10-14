@@ -19,6 +19,10 @@ typedef struct addchain_cost_s addchain_cost_t;
  * they never produce better additions chains.
  */
 #define ADDCHAIN_Q_MAX 101
+/* The code for ADDCHAIN_[n]DBL must be different from 0 because if we use a
+ * dict to combine multiple ADDCHAIN_DBL into ADDCHAIN_[n]DBL, 0 has a special
+ * meaning (which is remove from the bytecode).
+ */
 #define ADDCHAIN_DBL ((literal_t) 0x7f)
 #define ADDCHAIN_DBL_STR "\x7f"
 #define ADDCHAIN_2DBL ((literal_t) 0xff)
