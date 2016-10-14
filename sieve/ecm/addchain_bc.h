@@ -14,10 +14,16 @@ struct addchain_cost_s
 
 typedef struct addchain_cost_s addchain_cost_t;
 
-#define ADDCHAIN_Q_MAX 253 /* Must be < 255 */
+/* ADDCHAIN_Q_MAX must be < 255.
+ * Set it to 101, because for B1 < 1024, it is not necessary to try bigger q,
+ * they never produce better additions chains.
+ */
+#define ADDCHAIN_Q_MAX 101
 #define ADDCHAIN_DBL ((literal_t) 0x7f)
 #define ADDCHAIN_DBL_STR "\x7f"
 #define ADDCHAIN_2DBL ((literal_t) 0xff)
+/* max number of consecutive DBL that we can encode */
+#define ADDCHAIN_MAX_CONSECUTIVE_DBL 2
 
 unsigned int addchain_bytecode (char **, unsigned int, unsigned int,
                                 unsigned int, const addchain_cost_t *, int);
