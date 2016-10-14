@@ -749,6 +749,7 @@ facul_make_default_strategy (int n, const int verbose)
 	 With B2=17*B1, and 29 curves, we find 1898 factors in 4.07s.
 	 With B2=100*B1, and 21 curves we find 1856 factors in 3.76s.
 	 Thus 50 seems close to optimal.
+	 Warning: changing the value of B2 might break the sieving tests.
       */
       B2 = 50.0 * B1;
       /* we round B2 to (2k+1)*105, thus k is the integer nearest to
