@@ -19,8 +19,8 @@ typedef struct addchain_cost_s addchain_cost_t;
 #define ADDCHAIN_DBL_STR "\x7f"
 #define ADDCHAIN_2DBL ((literal_t) 0xff)
 
-unsigned int addchain_bytecode (char **, const unsigned int, const unsigned int,
-                                const addchain_cost_t *, bc_dict_t *, int);
+unsigned int addchain_bytecode (char **, unsigned int, unsigned int,
+                                unsigned int, const addchain_cost_t *, int);
 void addchain_bytecode_fprintf (FILE *, const char *, unsigned int);
 int addchain_bytecode_check (const char *, unsigned int, mpz_srcptr, int);
 #endif

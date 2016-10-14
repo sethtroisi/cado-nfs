@@ -31,17 +31,6 @@ static bc_dict_t ecm_prac_dict =
   {ECM_PRAC_DICT_NRENTRIES, ecm_prac_dict_len, ecm_prac_dict_entry,
                                                 ecm_prac_dict_code};
 
-#define ECM_ADDCHAIN_DICT_NRENTRIES 4
-static size_t ecm_addchain_dict_len[ECM_ADDCHAIN_DICT_NRENTRIES] = {2};
-static literal_t *ecm_addchain_dict_entry[ECM_ADDCHAIN_DICT_NRENTRIES] =
-{ADDCHAIN_DBL_STR ADDCHAIN_DBL_STR };
-static code_t ecm_addchain_dict_code[ECM_ADDCHAIN_DICT_NRENTRIES] =
-                                                                {ADDCHAIN_2DBL};
-
-static bc_dict_t ecm_addchain_dict =
-  {ECM_ADDCHAIN_DICT_NRENTRIES, ecm_addchain_dict_len, ecm_addchain_dict_entry,
-                                                ecm_addchain_dict_code};
-
 /* Costs of operations for Twisted Edwards Curves with a=-1
  *  For those curves, we use 3 different models:
  *    projective, extended and (only internally) completed
@@ -274,6 +263,7 @@ ecm_make_plan (ecm_plan_t *plan, const unsigned int B1, const unsigned int B2,
               const int extra_primes, const int verbose)
 {
   const unsigned int compress = 1;
+  unsigned int pow3_extra;
   bc_state_t *bc_state;
   double totalcost = 0.;
 
@@ -296,6 +286,11 @@ ecm_make_plan (ecm_plan_t *plan, const unsigned int B1, const unsigned int B2,
     plan->exp2++;
   if (verbose)
     printf ("Exponent of 2 in stage 1 primes: %u\n", plan->exp2);
+
+  /* If group order is divisible by 12, add another 3 to stage 1 primes */
+  pow3_extra = (extra_primes && (parameterization & ECM_TORSION12)) ? 1 : 0 ;
+  if (verbose && pow3_extra)
+    printf ("Add another 3 to stage 1 primes\n");
 
   /* Make bytecode for stage 1 */
   plan->B1 = B1;
@@ -379,9 +374,8 @@ ecm_make_plan (ecm_plan_t *plan, const unsigned int B1, const unsigned int B2,
   else if (parameterization & FULLTWED)
   {
     /* Allocates plan->bc, fills it and returns bc_len */
-    plan->bc_len = addchain_bytecode (&(plan->bc), B1, plan->exp2,
-                              &TwEdwards_minus1_opcost,
-                              compress ? &ecm_addchain_dict : NULL, verbose);
+    plan->bc_len = addchain_bytecode (&(plan->bc), B1, plan->exp2, pow3_extra,
+                                      &TwEdwards_minus1_opcost, verbose);
   }
   else
     FATAL_ERROR_CHECK (1, "Unknown parametrization");

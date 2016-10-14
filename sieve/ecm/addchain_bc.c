@@ -12,6 +12,14 @@
 #include "getprime.h"
 #include "gmp_aux.h" /* for nbits */
 
+#define ADDCHAIN_DICT_NRENTRIES 1
+static size_t addchain_dict_len[ADDCHAIN_DICT_NRENTRIES] = {2};
+static literal_t *addchain_dict_entry[ADDCHAIN_DICT_NRENTRIES] =
+                                           {ADDCHAIN_DBL_STR ADDCHAIN_DBL_STR };
+static code_t addchain_dict_code[ADDCHAIN_DICT_NRENTRIES] = {ADDCHAIN_2DBL};
+static bc_dict_t addchain_dict =
+  {ADDCHAIN_DICT_NRENTRIES, addchain_dict_len, addchain_dict_entry, addchain_dict_code};
+
 /* Only used with l <= 31 */
 #define mpz_mod_ui_2exp(n,l) (((n)->_mp_size) ? ((n)->_mp_d[0]&((1<<l)-1)) : 0)
 
@@ -249,15 +257,18 @@ addchain (mpz_srcptr E, const uint8_t q, const addchain_cost_t * opcost,
  *        E = prod (p^floor(log(B1)/log(p)) for f odd prime <= B1)
  */
 unsigned int
-addchain_bytecode (char **bc, const unsigned int B1, const unsigned int exp2,
-                   const addchain_cost_t * opcost, bc_dict_t *bc_dict,
+addchain_bytecode (char **bc, unsigned int B1, unsigned int pow2_nb,
+                   unsigned int pow3_extra, const addchain_cost_t * opcost,
                    int verbose)
 {
   mpz_t E;
 
   /* E = product of all primes between 3 and B1 */
   mpz_init (E);
-  mpz_set_ui (E, 1UL);
+  if (pow3_extra) /* we start with additional power of 3 */
+    mpz_ui_pow_ui (E, 3, pow3_extra);
+  else
+    mpz_set_ui (E, 1);
   prime_info pi;
   prime_info_init (pi);
   unsigned long p = getprime_mt (pi);
@@ -298,7 +309,7 @@ addchain_bytecode (char **bc, const unsigned int B1, const unsigned int exp2,
     printf ("## Addchain: best_q = %u mincost = %f\n", best_q, mincost);
 
   /* Put the best addchain into bytecode */
-  bc_state_t * bc_state = bytecoder_init (bc_dict);
+  bc_state_t * bc_state = bytecoder_init (&addchain_dict);
   double chaincost = addchain (E, best_q, opcost, bc_state, verbose);
   bytecoder_flush (bc_state);
   unsigned int bc_len = bytecoder_size (bc_state);
@@ -310,7 +321,7 @@ addchain_bytecode (char **bc, const unsigned int B1, const unsigned int exp2,
   if (verbose)
   {
     /* The cost of the initial doublings */
-    double power2cost = exp2 * opcost->dbl;
+    double power2cost = pow2_nb * opcost->dbl;
     if (verbose > 1)
     {
       printf ("Byte code for stage 1: ");
