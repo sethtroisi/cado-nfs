@@ -336,11 +336,11 @@ void mpfq_u64k4_field_init(mpfq_u64k4_dst_field f MAYBE_UNUSED)
 {
 }
 
-/* *Mpfq::defaults::flatdata::code_for_set, simd_flat */
+/* *simd_flat::code_for_set */
 static inline
 void mpfq_u64k4_set(mpfq_u64k4_dst_field K MAYBE_UNUSED, mpfq_u64k4_dst_elt r, mpfq_u64k4_src_elt s)
 {
-    if (r != s) memcpy(r,s,sizeof(mpfq_u64k4_elt));
+    mpfq_copy((mp_limb_t*)r,(const mp_limb_t*)s,sizeof(mpfq_u64k4_elt)/sizeof(mp_limb_t));
 }
 
 /* *simd_flat::code_for_set_zero */
@@ -389,11 +389,11 @@ int mpfq_u64k4_inv(mpfq_u64k4_dst_field K MAYBE_UNUSED, mpfq_u64k4_dst_elt r, mp
         return rc;
 }
 
-/* *Mpfq::defaults::flatdata::code_for_elt_ur_set, simd_flat */
+/* *simd_flat::code_for_elt_ur_set */
 static inline
 void mpfq_u64k4_elt_ur_set(mpfq_u64k4_dst_field K MAYBE_UNUSED, mpfq_u64k4_dst_elt_ur r, mpfq_u64k4_src_elt_ur s)
 {
-    if (r != s) memcpy(r,s,sizeof(mpfq_u64k4_elt_ur));
+    mpfq_copy((mp_limb_t*)r,(const mp_limb_t*)s,sizeof(mpfq_u64k4_elt_ur)/sizeof(mp_limb_t));
 }
 
 /* *Mpfq::defaults::flatdata::code_for_elt_ur_set_elt, simd_flat */

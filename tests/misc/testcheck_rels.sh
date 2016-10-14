@@ -2,15 +2,15 @@
 
 CHECK_RELS="$1"
 SOURCE_TEST_DIR="`dirname "$0"`"
-TMPDIR=`mktemp -d /tmp/cadotest.XXXXXXXX`
-chmod a+rx "${TMPDIR}"
+WORKDIR=`mktemp -d ${TMPDIR-/tmp}/cadotest.XXXXXXXX`
+chmod a+rx "${WORKDIR}"
 
 poly="${SOURCE_TEST_DIR}/c60.poly"
 rels1="${SOURCE_TEST_DIR}/c60.rels1"
 rels2="${SOURCE_TEST_DIR}/c60.rels2"
 
-out="$TMPDIR/out"
-fixed="$TMPDIR/fixed"
+out="$WORKDIR/out"
+fixed="$WORKDIR/fixed"
 
 
 ############## Check with correct relations
@@ -56,4 +56,4 @@ if [ $lpb != "1" ]; then
     exit 1
 fi
 
-rm -rf $TMPDIR
+rm -rf $WORKDIR

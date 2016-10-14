@@ -23,8 +23,6 @@
 #include "misc.h"
 #include "verbose.h"
 
-#define MATMUL_DEFAULT_IMPL "bucket"
-
 void matmul_decl_usage(param_list_ptr pl)
 {
     param_list_decl_usage(pl, "mm_impl",
@@ -133,7 +131,18 @@ matmul_ptr matmul_init(mpfq_vbase_ptr x, unsigned int nr, unsigned int nc, const
     memset(fake, 0, sizeof(fake));
 
     if (!impl) { impl = param_list_lookup_string(pl, "mm_impl"); }
-    if (!impl) { impl = MATMUL_DEFAULT_IMPL; }
+    if (!impl) {
+        const char * tmp = param_list_lookup_string(pl, "prime");
+        if (tmp && strcmp(tmp, "2") != 0) {
+#ifdef HAVE_CXX11
+            impl = "zone";
+#else   /* HAVE_CXX11 */
+            impl = "basicp";
+#endif  /* HAVE_CXX11 */
+        } else {
+            impl = "bucket";
+        }
+    }
 
     typedef void (*rebinder_t)(matmul_ptr mm);
     rebinder_t rebinder;

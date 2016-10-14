@@ -70,7 +70,8 @@ L2_lognorm_d (double_poly_srcptr p, double s)
     */
     n = a0 * a0 + a1 * a1;
     n = n * 0.785398163397448310; /* Pi/4 */
-    ASSERT_ALWAYS(n < DBL_MAX);
+    if (isnan (n) || isinf (n))
+      n = DBL_MAX;
     return 0.5 * log (n / s);
   }
   else if (d == 2)
@@ -89,7 +90,8 @@ L2_lognorm_d (double_poly_srcptr p, double s)
     */
     n = 3.0 * (a2 * a2 + a0 * a0) + 2.0 * a0 * a2 + a1 * a1;
     n = n * 0.130899693899574704; /* Pi/24 */
-    ASSERT_ALWAYS(n < DBL_MAX);
+    if (isnan (n) || isinf (n))
+      n = DBL_MAX;
     return 0.5 * log(n);
   }
   else if (d == 3)
@@ -110,7 +112,8 @@ L2_lognorm_d (double_poly_srcptr p, double s)
       n = 5.0 * (a3 * a3 + a0 * a0) + 2.0 * (a3 * a1 + a0 * a2)
         + a1 * a1 + a2 * a2;
       n = n * 0.049087385212340519352; /* Pi/64 */
-      ASSERT_ALWAYS(n < DBL_MAX);
+      if (isnan (n) || isinf (n))
+        n = DBL_MAX;
       return 0.5 * log(n * invs);
     }
   else if (d == 4)
@@ -134,7 +137,8 @@ L2_lognorm_d (double_poly_srcptr p, double s)
         + 5.0 * (a3 * a3 + a1 * a1) + 6.0 * (a4 * a0 + a3 * a1)
         + 3.0 * a2 * a2;
       n = n * 0.0049087385212340519352; /* Pi/640 */
-      ASSERT_ALWAYS(n < DBL_MAX);
+      if (isnan (n) || isinf (n))
+        n = DBL_MAX;
       return 0.5 * log(n);
     }
   else if (d == 5)
@@ -164,7 +168,8 @@ L2_lognorm_d (double_poly_srcptr p, double s)
         + 14.0 * (a0 * a2 + a3 * a5) + 63.0 * (a0 * a0 + a5 * a5)
         + 7.0 * (a4 * a4 + a1 * a1) + 3.0 * (a3 * a3 + a2 * a2);
       n = n * 0.0020453077171808549730; /* Pi/1536 */
-      ASSERT_ALWAYS(n < DBL_MAX);
+      if (isnan (n) || isinf (n))
+        n = DBL_MAX;
       return 0.5 * log(n * invs);
     }
   else if (d == 6)
@@ -194,7 +199,8 @@ L2_lognorm_d (double_poly_srcptr p, double s)
         + 14.0 * (a6 * a2 + a5 * a3 + a4 * a0 + a3 * a1)
         + 10.0 * (a6 * a0 + a5 * a1 + a4 * a2) + 5.0 * a3 * a3;
       n = n * 0.00043828022511018320850; /* Pi/7168 */
-      ASSERT_ALWAYS(n < DBL_MAX);
+      if (isnan (n) || isinf (n))
+        n = DBL_MAX;
       return 0.5 * log(n);
     }
   else /* d == 7 */
@@ -224,7 +230,8 @@ L2_lognorm_d (double_poly_srcptr p, double s)
         + 9*(a2*a2+a5*a5) + 18*(a1*a3+a0*a4+a4*a6+a3*a7) + 5*(a3*a3+a4*a4)
         + 10*(a2*a4+a1*a5+a3*a5+a0*a6+a2*a6+a1*a7);
       n = n * 0.000191747598485705154; /* Pi/16384 */
-      ASSERT_ALWAYS(n < DBL_MAX);
+      if (isnan (n) || isinf (n))
+        n = DBL_MAX;
       return 0.5 * log(n * invs);
     }
 }

@@ -15,7 +15,7 @@
    -M nnn : gives the size nnn of the hash table used; nnn should be 2*p where
             p is a prime. In addition for efficiency nnn should be at least
             two times larger than the maximal number of primes ideals, which
-            is about 2^lpba/log(2^lpba) + 2^lpbr/log(2^lpbr).
+            is about 2^lpb1/log(2^lpb1) + 2^lpb0/log(2^lpb0).
    -minpa nnn : considers only algebraic ideals >= nnn
    -minpr nnn : considers only rational ideals >= nnn
    -t nnn     : uses nnn threads

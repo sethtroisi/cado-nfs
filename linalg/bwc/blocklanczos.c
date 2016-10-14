@@ -11,7 +11,6 @@
 #include "misc.h"
 #include "bw-common.h"
 #include "async.h"
-#include "filenames.h"
 #include "xdotprod.h"
 #include "rolling.h"
 #include "matops.h"
@@ -204,7 +203,7 @@ void blstate_set_start(struct blstate * bl)
     }
     /* matmul_top_vec_init has already set V to zero */
     /* for bw->dir=0, mmt->n0[0] is the number of rows. */
-    mmt_vec_set_random_through_file(bl->V[0], "blstart", 0, mmt->n0[bw->dir], bl->rstate);
+    mmt_vec_set_random_through_file(bl->V[0], "blstart.0", mmt->n0[bw->dir], bl->rstate);
     mmt_own_vec_set(bl->y, bl->V[0]);
 }
 
@@ -462,7 +461,7 @@ void blstate_save_result(struct blstate * bl, unsigned int iter)
     pi_file_close(f);
     if (tcan_print) { printf("Saving %s...done\n", filename); fflush(stdout); }
 
-    mmt_vec_save(bl->y, "blsolution", 0, mmt->n0[bw->dir]);
+    mmt_vec_save(bl->y, "blsolution.0", mmt->n0[bw->dir]);
 }
 
 
@@ -559,7 +558,7 @@ void * bl_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSED
          *      Transpose(w) <- M' * v
          *      v <- P * Transpose(w) = P * M' * v
          *
-         * (in a nutshell, P transforms row index N*x+y to N*y+x -- but
+         * (in a nutshell, P transforms row index N*x+y to N*y+x -- but
          * it's slightly more complicated than this. This is because we
          * do communications with all-gather and reduce-scatter).
          *

@@ -570,7 +570,7 @@ main (int argc, char *argv[])
     const char * basepath = param_list_lookup_string(pl, "basepath");
     const char * outdir = param_list_lookup_string(pl, "outdir");
     const char * renumberfilename = param_list_lookup_string(pl, "renumber");
-    const char * badinfofile = param_list_lookup_string(pl, "badidealinfo");
+    const char * badidealinfofile = param_list_lookup_string(pl, "badidealinfo");
     const char * path_antebuffer = param_list_lookup_string(pl, "path_antebuffer");
     param_list_parse_ulong(pl, "nrels", &nrels_expected);
 
@@ -585,7 +585,7 @@ main (int argc, char *argv[])
       fprintf (stderr, "Error, missing -renumber command line argument\n");
       usage(pl, argv0);
     }
-    if (badinfofile == NULL && is_for_dl) {
+    if (badidealinfofile == NULL && is_for_dl) {
       fprintf (stderr, "Error, missing -badidealinfo command line argument\n");
       usage(pl, argv0);
     }
@@ -612,9 +612,9 @@ main (int argc, char *argv[])
       usage(pl, argv0);
     }
 
-    allbad_info_t badinfo;
+    allbad_info_t badidealinfo;
     if (is_for_dl)
-        read_bad_ideals_info(badinfofile, badinfo);
+        read_bad_ideals_info(badidealinfofile, badidealinfo);
 
     set_antebuffer_path (argv0, path_antebuffer);
 
@@ -703,7 +703,7 @@ main (int argc, char *argv[])
           { .f = NULL, },
       };
       if (is_for_dl)
-          desc[0].arg = (void *) &badinfo[0];
+          desc[0].arg = (void *) &badidealinfo[0];
       fprintf (stderr, "Reading new files"
               " (using %d auxiliary threads for roots mod p):\n",
               desc[0].n);
@@ -769,7 +769,7 @@ main (int argc, char *argv[])
   }
 
   if (is_for_dl)
-      free(badinfo->badid_info);
+      free(badidealinfo->badid_info);
   free (H);
   free (sanity_a);
   free (sanity_b);

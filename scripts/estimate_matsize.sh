@@ -24,6 +24,7 @@ if [ $# != 1 ]; then
 fi
 
 ## default parameters: can be overriden using env variables
+## these correspond more or less to a DLP-512.
 : ${I=15}
 : ${lim0=30000000}
 : ${lim1=30000000}
@@ -45,7 +46,7 @@ fi
 
 ## if wdir is not set, build one in /tmp
 if [ -z ${wdir+x} ]; then
-    wdir=`mktemp -d /tmp/est_mat.XXXXXXX`;
+    wdir=`mktemp -d ${TMPDIR-/tmp}/est_mat.XXXXXXX`;
 else
     mkdir -p $wdir || (echo "mkdir -p $wdir failed"; false) || exit 1
 fi

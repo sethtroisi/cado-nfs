@@ -16,24 +16,25 @@ name = c130
 tasks.polyselect.degree = 5
 
 tasks.polyselect.P = 80000
-tasks.polyselect.admax = 5e6
-tasks.polyselect.adrange = 5e4
+tasks.polyselect.admax = 1e6
+tasks.polyselect.adrange = 1e4
 tasks.polyselect.incr = 60
 tasks.polyselect.nq = 625
 tasks.polyselect.nrkeep = 100
+tasks.polyselect.ropteffort = 10
 
 ###########################################################################
 # Sieve
 ###########################################################################
 
-rlim = 5083739
-alim = 11269964
-lpbr = 27
-lpba = 27
-tasks.sieve.mfbr = 58
-tasks.sieve.mfba = 55
-tasks.sieve.rlambda = 2.210000003027068
-tasks.sieve.alambda = 2.140000007000899
+lim0 = 5083739
+lim1 = 11269964
+lpb0 = 27
+lpb1 = 27
+tasks.sieve.mfb0 = 58
+tasks.sieve.mfb1 = 55
+tasks.sieve.lambda0 = 2.210000003027068
+tasks.sieve.lambda1 = 2.140000007000899
 tasks.sieve.ncurves0 = 6
 tasks.sieve.ncurves1 = 16
 tasks.I = 13

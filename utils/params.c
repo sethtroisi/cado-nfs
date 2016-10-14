@@ -300,7 +300,7 @@ void param_list_remove_key(param_list pl, const char * key)
 int param_list_read_stream(param_list pl, FILE *f, int stop_on_empty_line)
 {
     int all_ok=1;
-    const int linelen = 512;
+    const int linelen = 2048;
     char line[linelen];
     char * newkey;
     char * newvalue;
@@ -493,7 +493,7 @@ static int param_list_update_cmdline_alias(param_list pl,
         if (strncmp(a, al->alias, strlen(al->alias)) != 0)
             return 0;
         a += strlen(al->alias);
-        if (a[1] == '\0')
+        if (a[0] == '\0')
             return 0;
         // no +1 , since the alias contains the = sign already.
         param_list_add_key(pl, al->key, a, PARAMETER_FROM_CMDLINE);
@@ -763,11 +763,56 @@ int param_list_parse_int_and_int(param_list pl, const char * key, int * r, const
 #endif
 }
 
+int param_list_parse_uint_and_uint(param_list pl, const char * key, unsigned int * r, const char * sep)
+{
+    long rr[2] = {0, 0};
+    if (r) {
+        rr[0] = r[0];
+        rr[1] = r[1];
+    }
+    int seen = param_list_parse_long_and_long(pl, key, rr, sep);
+    if (r) {
+        r[0] = rr[0];
+        r[1] = rr[1];
+    }
+    return seen;
+}
+
 int param_list_parse_intxint(param_list pl, const char * key, int * r)
 {
     return param_list_parse_int_and_int(pl, key, r, "x");
 }
 
+int param_list_parse_uint64_and_uint64(param_list pl, const char * key,
+    uint64_t * r, const char * sep)
+{
+    char *value;
+    int seen;
+    if (!get_assoc(pl, key, &value, &seen))
+        return 0;
+    char *orig_value = value, * end;
+    unsigned long long int res[2];
+    res[0] = strtoull(value, &end, 0);
+    if (strncmp(end, sep, strlen(sep)) != 0) {
+        fprintf(stderr, "Parse error: parameter for key %s"
+                " must match %%d%s%%d; got %s\n",
+                key, sep, orig_value);
+        exit(1);
+    }
+    value = end + strlen(sep);
+    res[1] = strtoull(value, &end, 0);
+    if (*end != '\0') {
+        fprintf(stderr, "Parse error: parameter for key %s"
+                " must match %%d%s%%d; got %s\n",
+                key, sep, orig_value);
+        exit(1);
+    }
+    if (r) {
+        r[0] = (uint64_t) res[0];
+        r[1] = (uint64_t) res[1];
+    }
+    return seen;
+}
 
 int param_list_parse_ulong(param_list pl, const char * key, unsigned long * r)
 {
@@ -856,6 +901,22 @@ int param_list_parse_uint(param_list pl, const char * key, unsigned int * r)
     return rc;
 }
 
+int param_list_parse_uchar(param_list pl, const char * key, unsigned char * r)
+{
+    unsigned long res;
+    int rc = param_list_parse_ulong(pl, key, &res);
+    if (rc == 0)
+        return 0;
+    if (res > UCHAR_MAX) {
+        fprintf(stderr, "Parse error:"
+                " parameter for key %s does not fit within an unsigned int: %ld\n",
+                key, res);
+        exit(1);
+    }
+    if (r)
+        *r  = (unsigned char) res;
+    return rc;
+}
 
 int param_list_parse_double(param_list pl, const char * key, double * r)
 {
@@ -873,6 +934,37 @@ int param_list_parse_double(param_list pl, const char * key, double * r)
     }
     if (r)
         *r = res;
+    return seen;
+}
+
+int param_list_parse_double_and_double(param_list pl, const char * key,
+    double * r, const char * sep)
+{
+    char *value;
+    int seen;
+    if (!get_assoc(pl, key, &value, &seen))
+        return 0;
+    char *orig_value = value, * end;
+    double res[2];
+    res[0] = strtod(value, &end);
+    if (strncmp(end, sep, strlen(sep)) != 0) {
+        fprintf(stderr, "Parse error: parameter for key %s"
+                " must match %%d%s%%d; got %s\n",
+                key, sep, orig_value);
+        exit(1);
+    }
+    value = end + strlen(sep);
+    res[1] = strtod(value, &end);
+    if (*end != '\0') {
+        fprintf(stderr, "Parse error: parameter for key %s"
+                " must match %%d%s%%d; got %s\n",
+                key, sep, orig_value);
+        exit(1);
+    }
+    if (r) {
+        r[0] = res[0];
+        r[1] = res[1];
+    }
     return seen;
 }
 
@@ -971,6 +1063,232 @@ int param_list_parse_int_list(param_list pl, const char * key, int * r, size_t n
     }
     free(res);
     return parsed;
+}
+
+int param_list_parse_uint_list(param_list pl, const char * key,
+    unsigned int * r, size_t n, const char * sep)
+{
+    char *value;
+    if (!get_assoc(pl, key, &value, NULL))
+        return 0;
+    char *orig_value = value, * end;
+    unsigned int * res = malloc(n * sizeof(unsigned int));
+    memset(res, 0, n * sizeof(unsigned int));
+    size_t parsed = 0;
+    for( ;; ) {
+        unsigned long int tmp = strtoul(value, &end, 0);
+        ASSERT(tmp <= UINT_MAX);
+        res[parsed] = tmp;
+        if (parsed++ == n)
+            break;
+        if (parsed && *end == '\0')
+            break;
+        if (strncmp(end, sep, strlen(sep)) != 0) {
+            fprintf(stderr, "Parse error: parameter for key %s"
+                    " must match %%d(%s%%d)*; got %s\n",
+                    key, sep, orig_value);
+            exit(1);
+        }
+        value = end + strlen(sep);
+    }
+    if (*end != '\0') {
+        fprintf(stderr, "Parse error: parameter for key %s"
+                " must match %%d(%s%%d){0,%zu}; got %s\n",
+                key, sep, n-1, orig_value);
+        exit(1);
+    }
+    if (r) {
+        memcpy(r, res, n * sizeof(unsigned int));
+    }
+    free(res);
+    return parsed;
+}
+
+int param_list_parse_uint64_list(param_list pl, const char * key,
+    uint64_t * r, size_t n, const char * sep)
+{
+    char *value;
+    if (!get_assoc(pl, key, &value, NULL))
+        return 0;
+    char *orig_value = value, * end;
+    uint64_t * res = malloc(n * sizeof(uint64_t));
+    memset(res, 0, n * sizeof(unsigned int));
+    size_t parsed = 0;
+    for( ;; ) {
+        res[parsed] = (uint64_t)strtoull(value, &end, 0);
+        if (parsed++ == n)
+            break;
+        if (parsed && *end == '\0')
+            break;
+        if (strncmp(end, sep, strlen(sep)) != 0) {
+            fprintf(stderr, "Parse error: parameter for key %s"
+                    " must match %%d(%s%%d)*; got %s\n",
+                    key, sep, orig_value);
+            exit(1);
+        }
+        value = end + strlen(sep);
+    }
+    if (*end != '\0') {
+        fprintf(stderr, "Parse error: parameter for key %s"
+                " must match %%d(%s%%d){0,%zu}; got %s\n",
+                key, sep, n-1, orig_value);
+        exit(1);
+    }
+    if (r) {
+        memcpy(r, res, n * sizeof(uint64_t));
+    }
+    free(res);
+    return parsed;
+}
+
+int param_list_parse_uchar_list(param_list pl, const char * key,
+    unsigned char * r, size_t n, const char * sep)
+{
+    char *value;
+    if (!get_assoc(pl, key, &value, NULL))
+        return 0;
+    char *orig_value = value, * end;
+    unsigned char * res = malloc(n * sizeof(unsigned char));
+    memset(res, 0, n * sizeof(unsigned char));
+    size_t parsed = 0;
+    for( ;; ) {
+        long int tmp = strtol(value, &end, 0);
+        ASSERT(tmp <= UCHAR_MAX);
+        res[parsed] = tmp;
+        if (parsed++ == n)
+            break;
+        if (parsed && *end == '\0')
+            break;
+        if (strncmp(end, sep, strlen(sep)) != 0) {
+            fprintf(stderr, "Parse error: parameter for key %s"
+                    " must match %%d(%s%%d)*; got %s\n",
+                    key, sep, orig_value);
+            exit(1);
+        }
+        value = end + strlen(sep);
+    }
+    if (*end != '\0') {
+        fprintf(stderr, "Parse error: parameter for key %s"
+                " must match %%d(%s%%d){0,%zu}; got %s\n",
+                key, sep, n-1, orig_value);
+        exit(1);
+    }
+    if (r) {
+        memcpy(r, res, n * sizeof(unsigned char));
+    }
+    free(res);
+    return parsed;
+}
+
+void param_list_parse_int_list_size(param_list pl, const char * key , int ** r ,
+    unsigned int * t)
+{
+  char *value;
+  if (!get_assoc(pl, key, &value, NULL))
+    return ;
+  char *tmp = value;
+  int i = 0;
+  * r = (int * ) malloc(sizeof(int) * 1);
+  * t = 1;
+  for (;;) {
+    int ret = sscanf(tmp, "%d", &i);
+    if (ret != 1) {
+      fprintf (stderr, "Error while parsing coffecient array %s[%d]\n", key, *t
+          - 1);
+      exit(1);
+    }
+    (*r)[*t - 1] = i;
+    if (*tmp == '-') {
+      tmp++;
+    }
+    while (isdigit(*tmp)) {
+      tmp++;
+    }
+    if(*tmp == '\0') {
+      break;
+    }
+    if (*tmp != ',') {
+      fprintf (stderr, "Error while parsing array %s\n", key);
+      exit(1);
+    }
+    tmp++;
+    *t = *t + 1;
+    * r = realloc(* r, sizeof(int) * (*t));
+  }
+}
+
+int param_list_parse_double_list(param_list pl, const char * key,
+    double * r, size_t n, const char * sep)
+{
+    char *value;
+    if (!get_assoc(pl, key, &value, NULL))
+        return 0;
+    char *orig_value = value, * end;
+    double * res = (double *) malloc(n * sizeof(double));
+    memset(res, 0, n * sizeof(double));
+    size_t parsed = 0;
+    for( ;; ) {
+        double tmp = strtod(value, &end);
+        ASSERT(tmp <= UCHAR_MAX);
+        res[parsed] = tmp;
+        if (parsed++ == n)
+            break;
+        if (parsed && *end == '\0')
+            break;
+        if (strncmp(end, sep, strlen(sep)) != 0) {
+            fprintf(stderr, "Parse error: parameter for key %s"
+                    " must match %%d(%s%%d)*; got %s\n",
+                    key, sep, orig_value);
+            exit(1);
+        }
+        value = end + strlen(sep);
+    }
+    if (*end != '\0') {
+        fprintf(stderr, "Parse error: parameter for key %s"
+                " must match %%d(%s%%d){0,%zu}; got %s\n",
+                key, sep, n-1, orig_value);
+        exit(1);
+    }
+    if (r) {
+        memcpy(r, res, n * sizeof(double));
+    }
+    free(res);
+    return parsed;
+}
+
+void param_list_parse_mpz_poly(param_list pl, const char * key,
+    mpz_poly_ptr f)
+{
+  char *value;
+  if (!get_assoc(pl, key, &value, NULL))
+    return ;
+  char *tmp = value;
+  mpz_t coeff;
+  mpz_init(coeff);
+  for(unsigned int j = 0; ; j++) {
+    int ret = gmp_sscanf(tmp, "%Zd", coeff);
+    if (ret != 1) {
+      fprintf (stderr, "Error while parsing coefficients of degree %u "
+          "of polynomial %s\n", j, key);
+      exit(1);
+    }
+    mpz_poly_setcoeff(f, j, coeff);
+    if (*tmp == '-') {
+      tmp++;
+    }
+    while (isdigit(*tmp)) {
+      tmp++;
+    }
+    if(*tmp == '\0') {
+      break;
+    }
+    if (*tmp != ',') {
+      fprintf (stderr, "Error while parsing polynomial %s\n", key);
+      exit(1);
+    }
+    tmp++;
+  }
+  mpz_clear(coeff);
 }
 
 const char * param_list_lookup_string(param_list pl, const char * key)

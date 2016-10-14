@@ -1,6 +1,9 @@
 #ifndef __FILTER_BADIDEALS_H__
 #define __FILTER_BADIDEALS_H__
 
+/* The information from this structure is the one found in the
+ * .badidealinfo filename
+ */
 
 // Let's assume we will never have polynomials of degree > 10.
 #define MAX_DEG 10

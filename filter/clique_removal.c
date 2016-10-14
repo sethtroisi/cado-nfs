@@ -68,6 +68,16 @@ comp_weight_function (weight_t w)
   else
     return 0.0;
 #else
+  /* We use here the weight function \Omega_{31} from "The filtering step of
+     discrete logarithm and integer factorization algorithms", Cyril Bouvier,
+     2013, https://hal.inria.fr/hal-00734654.
+     Indeed, we have \lambda_3(w) = (4/5)^{w-2}, and we add 0.125 when w=2.
+     If the clique has n(c) relations, it has n(c)-1 columns of weight 2.
+     Since those ideals of weight 2 appear in two relations, we count twice
+     0.125 for each of them, which gives in total (n(c)-1)/4.
+     To be rigorous we get \Omega_{31} - 1/4, but since we only consider the
+     relative (and not absolute) value of weights, this is equivalent to
+     \Omega_{31}. */
   if (w >= 3)
     return powf(0.8, (float) (w - 2));
   else if (w == 2)

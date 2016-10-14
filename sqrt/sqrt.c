@@ -453,7 +453,7 @@ TonelliShanks (mpz_poly res, const mpz_poly a, const mpz_poly F, unsigned long p
     mpz_urandomm(delta->coeff[i], state, myp);
       mpz_poly_cleandeg(delta, d-1);
       // raise it to power (q-1)/2
-      mpz_poly_power_mod_f_mod_ui(auxpol, delta, F, aux, p);
+      mpz_poly_pow_mod_f_mod_ui(auxpol, delta, F, aux, p);
     } while ((auxpol->deg != 0) || (mpz_cmp_ui(auxpol->coeff[0], p-1)!= 0));
     gmp_randclear (state);
   }
@@ -466,21 +466,21 @@ TonelliShanks (mpz_poly res, const mpz_poly a, const mpz_poly F, unsigned long p
     mpz_poly_init(A, d);
     mpz_poly_init(D, d);
     mpz_init_set_ui(m, 0);
-    mpz_poly_power_mod_f_mod_ui(A, a, F, t, p);
-    mpz_poly_power_mod_f_mod_ui(D, delta, F, t, p);
+    mpz_poly_pow_mod_f_mod_ui(A, a, F, t, p);
+    mpz_poly_pow_mod_f_mod_ui(D, delta, F, t, p);
     for (i = 0; i <= s-1; ++i) {
-      mpz_poly_power_mod_f_mod_ui(auxpol, D, F, m, p);
+      mpz_poly_pow_mod_f_mod_ui(auxpol, D, F, m, p);
       mpz_poly_mul_mod_f_mod_mpz(auxpol, auxpol, A, F, myp, NULL);
       mpz_ui_pow_ui(aux, 2, (s-1-i));
-      mpz_poly_power_mod_f_mod_ui(auxpol, auxpol, F, aux, p);
+      mpz_poly_pow_mod_f_mod_ui(auxpol, auxpol, F, aux, p);
       if ((auxpol->deg == 0) && (mpz_cmp_ui(auxpol->coeff[0], p-1)== 0))
     mpz_add_ui(m, m, 1UL<<i);
     }
     mpz_add_ui(t, t, 1);
     mpz_divexact_ui(t, t, 2);
-    mpz_poly_power_mod_f_mod_ui(res, a, F, t, p);
+    mpz_poly_pow_mod_f_mod_ui(res, a, F, t, p);
     mpz_divexact_ui(m, m, 2);
-    mpz_poly_power_mod_f_mod_ui(auxpol, D, F, m, p);
+    mpz_poly_pow_mod_f_mod_ui(auxpol, D, F, m, p);
 
     mpz_poly_mul_mod_f_mod_mpz(res, res, auxpol, F, myp, NULL);
     mpz_poly_clear(D);
@@ -609,11 +609,11 @@ polymodF_sqrt (polymodF_t res, polymodF_t AA, mpz_poly F, unsigned long p,
     mpz_mul_ui(aux, q, 3);
     mpz_sub_ui(aux, aux, 5);
     mpz_divexact_ui(aux, aux, 4);               // aux := (3q-5)/4
-    mpz_poly_power_mod_f_mod_ui(invsqrtA, a, F, aux, p);
+    mpz_poly_pow_mod_f_mod_ui(invsqrtA, a, F, aux, p);
 #else
     TonelliShanks(invsqrtA, a, F, p);
     mpz_sub_ui(aux, q, 2);
-    mpz_poly_power_mod_f_mod_ui(invsqrtA, invsqrtA, F, aux, p);
+    mpz_poly_pow_mod_f_mod_ui(invsqrtA, invsqrtA, F, aux, p);
 #endif
 
     mpz_clear(aux);

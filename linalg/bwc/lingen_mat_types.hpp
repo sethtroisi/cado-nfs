@@ -418,6 +418,38 @@ struct polmat { /* {{{ */
         }
         return mpn_scan1(y,0);
     }/*}}}*/
+    unsigned long valuation(unsigned int j) const {/*{{{*/
+        /* Same thing, but just for column j */
+        unsigned long y[stride() + 1];
+        for(size_t k = 0 ; k < stride() ; k++) {
+            y[k] = 0;
+        }
+        y[stride()] = 1;
+            const unsigned long * src = poly(0,j);
+            for(unsigned int i = 0 ; i < nrows ; i++) {
+                for(unsigned int k = 0 ; k < stride() ; k++) {
+                    y[k] |= src[k];
+                }
+                src += stride();
+            }
+        return mpn_scan1(y,0);
+    }/*}}}*/
+    unsigned long leading_zeros(unsigned int j, int d) const {/*{{{*/
+        /* Given a column which purportedly has degree d, return the
+         * actual degree */
+        if (d < 0) return 0;
+        ASSERT_ALWAYS((size_t) BITS_TO_WORDS(d, ULONG_BITS) <= (size_t) stride());
+        for(int c = d; c >= 0; c--) {
+            unsigned long offset = c / ULONG_BITS;
+            unsigned long mask = 1UL << (c % ULONG_BITS);
+            const unsigned long * src = poly(0,j);
+            for(unsigned int i = 0 ; i < nrows ; i++) {
+                if (src[offset] & mask) return d-c;
+                src += stride();
+            }
+        }
+        return d + 1;
+    }/*}}}*/
     void setdeg(unsigned int j) { /* {{{ */
         unsigned long y[stride()];
         for(unsigned int k = 0 ; k < stride() ; k++) {

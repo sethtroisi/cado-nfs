@@ -705,9 +705,9 @@ struct master_data_s {/*{{{*/
      * to keep all.
      */
     struct {
+        uint64_t w;
         uint32_t c;
         uint16_t n;
-        uint64_t w;
     } * colmap;
 };
 typedef struct master_data_s master_data[1];
@@ -1103,19 +1103,12 @@ typedef int (*sortfunc_t) (const void*, const void*);
 
 void slave_loop(slave_data s)
 {
-    char name[80];
-
-    int disp = verbose_enabled(CADO_VERBOSE_PRINT_BWC_DISPATCH_SLAVES)
-        && s->pi->m->jrank && s->pi->m->trank;
-
     // parallelizing_info_ptr pi = s->pi;
     // int gridpos = pi->m->jrank * pi->m->ncores + pi->m->trank;
     data_source_ptr input = (data_source_ptr) s->tp->src;
 
     data_dest_ptr output = slave_dest_alloc(s);
-    snprintf(name, sizeof(name),
-            "[J%uT%u] slave loop 1", s->pi->m->jrank, s->pi->m->trank);
-    mf_pipe(input, output, disp ? name : NULL);
+    mf_pipe(input, output, NULL);
 
     thread_source_rewind((thread_source_ptr) input);
     slave_dest_stats((slave_dest_ptr) output);
@@ -1125,9 +1118,7 @@ void slave_loop(slave_data s)
     if (verbose_enabled(CADO_VERBOSE_PRINT_BWC_DISPATCH_OUTER))
         printf("[J%uT%u] building local matrix\n",
                 s->pi->m->jrank, s->pi->m->trank);
-    snprintf(name, sizeof(name),
-            "[J%uT%u] slave loop 2", s->pi->m->jrank, s->pi->m->trank);
-    mf_pipe(input, output, disp ? name : NULL);
+    mf_pipe(input, output, NULL);
 
     // the thread source should be freed elsewhere.
     // thread_source_free(input);
@@ -1638,7 +1629,7 @@ void * do_loops(struct do_loops_arg * arg)
     return NULL;
 }
 
-void * balancing_get_matrix_u32(parallelizing_info_ptr pi, param_list pl, matrix_u32_ptr arg)
+void balancing_get_matrix_u32(parallelizing_info_ptr pi, param_list pl, matrix_u32_ptr arg)
 {
     master_data m;
     memset(m, 0, sizeof(master_data));
@@ -1744,6 +1735,4 @@ void * balancing_get_matrix_u32(parallelizing_info_ptr pi, param_list pl, matrix
     /* this also clears m->bal */
     clear_master_variables(m);
     shared_free(pi->m, slaves);
-
-    return arg;
 }

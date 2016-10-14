@@ -23,14 +23,14 @@ Y0: -10040119372014939875708192394943108
 
 Parameters:
 
-rlim: 250000000
-alim: 500000000
-lpbr: 33
-lpba: 33
-mfbr: 66
-mfba: 99
-rlambda: 2.1
-alambda: 3.2
+lim0: 250000000
+lim1: 500000000
+lpb0: 33
+lpb1: 33
+mfb0: 66
+mfb1: 99
+lambda0: 2.1
+lambda1: 3.2
 
 
 #select our factoring methods
@@ -96,7 +96,7 @@ mkdir res_matrix
 ./script_str.sh 250000000 66 500000000 99 res_precompt_st res_matrix
 
 #collect a sample of the distribution of the pairs of cofactors.
-./makefb -poly rsa704.poly -alim 500000000 -maxbits 15 -out rsa704.roots
+./makefb -poly rsa704.poly -lim 500000000 -maxbits 15 -out rsa704.roots
 ./las -I 16 -poly rsa704.poly -q0 1000000000 -q1 1000000700 -lim0 250000000 -lim1 500000000 -lpb0 33 -lpb1 33 -mfb0 66 -mfb1 99 -mt 1 -stats-cofact cofactors.stats -fb1 rsa704.roots
 # Total cpu time 2303.31s [norm 3.34+8.8, sieving 1849.9 (1121.3 + 106.4 + 622.2), factor 441.3 (357.5 + 83.8)]
 # Total elapsed time 2309.08s, per special-q 76.9694s, per relation 5.70143s

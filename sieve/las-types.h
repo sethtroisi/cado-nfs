@@ -9,7 +9,6 @@
 #include "bucket.h"
 #include "cado_poly.h"
 #include "ecm/facul.h"
-#include "relation.h"
 #include "las-forwardtypes.h"
 #include "las-unsieve.h"
 #include "las-qlattice.h"
@@ -38,8 +37,8 @@ struct siever_config_s {
     struct {
         unsigned long lim; /* factor base bound */
         unsigned long powlim; /* bound on powers in the factor base */
-        int lpb;           /* large prime bound is 2^lpbr */
-        int mfb;           /* bound for residuals is 2^mfbr */
+        int lpb;           /* large prime bound is 2^lpb */
+        int mfb;           /* bound for residuals is 2^mfb */
         int ncurves;       /* number of cofactorization curves */
         double lambda;     /* lambda sieve parameter */
         unsigned long qmax; /* largest q sieved on this side, for dup sup */
@@ -245,6 +244,7 @@ struct las_info_s {
     descent_tree * tree;
 
     int batch; /* batch mode for cofactorization */
+    int batch_print_survivors;
     cofac_list L; /* store (a,b) and corresponding cofactors in batch mode */
 };
 

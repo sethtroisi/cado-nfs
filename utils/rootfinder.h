@@ -27,11 +27,11 @@ typedef struct {
 } enumeratediv_t;
 
 
-unsigned long mpz_poly_roots_gen(mpz_t **r, mpz_poly F, const mpz_t p);
-int mpz_poly_roots(mpz_t * r, mpz_poly F, const mpz_t p);
-int mpz_poly_roots_ulong(unsigned long * r, mpz_poly F, unsigned long p);
-int mpz_poly_roots_uint64(uint64_t * r, mpz_poly F, uint64_t p);
-int mpz_poly_roots_mpz (mpz_t *r, mpz_poly f, const mpz_t p);
+unsigned long mpz_poly_roots_gen(mpz_t **r, mpz_poly_srcptr F, const mpz_t p);
+int mpz_poly_roots(mpz_t * r, mpz_poly_srcptr F, const mpz_t p);
+int mpz_poly_roots_ulong(unsigned long * r, mpz_poly_srcptr F, unsigned long p);
+int mpz_poly_roots_uint64(uint64_t * r, mpz_poly_srcptr F, uint64_t p);
+int mpz_poly_roots_mpz (mpz_t *r, mpz_poly_srcptr f, const mpz_t p);
 
 extern int roots_mod_uint64 (uint64_t * r, uint64_t a, int d, uint64_t p);
 

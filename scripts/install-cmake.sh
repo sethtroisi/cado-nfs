@@ -12,7 +12,7 @@ shift
 
 echo "installing ${name} ${version} in ${prefix}"
 
-tmpdir=`mktemp -d /tmp/${name}-build.XXXXXXXX`
+tmpdir=`mktemp -d ${TMPDIR-/tmp}/${name}-build.XXXXXXXX`
 cd $tmpdir
 rm -f ${package}
 wget="`which wget 2>/dev/null`"

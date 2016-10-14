@@ -34,8 +34,8 @@ then
 fi
 
 
-if [[ -z "$rlim" || -z "$alim" || -z "$lpbr" || -z "$lpba" || -z "$maxbits" \
-      || -z "$mfbr" || -z "$mfba" || -z "$rlambda" || -z "$alambda" || -z "$I" \
+if [[ -z "$lim0" || -z "$lim1" || -z "$lpb0" || -z "$lpb1" || -z "$maxbits" \
+      || -z "$mfb0" || -z "$mfb1" || -z "$lambda0" || -z "$lambda1" || -z "$I" \
       || -z "$q0" || ( -z "$q1" && -z "$rho" ) ]]
 then
   echo "Required shell environment variable not set" >&2
@@ -52,10 +52,10 @@ BASENAME="`basename "${POLY}"`"
 BASENAME="${BASENAME%%.*}"
 
 # Output files
-TMPDIR=`mktemp -d /tmp/cadotest.XXXXXXXXXX`
+WORKDIR=`mktemp -d ${TMPDIR-/tmp}/cadotest.XXXXXXXXXX`
 # Make temp direcotry world-readable for easier debugging
-chmod a+rx "${TMPDIR}"
-RELS="${TMPDIR}/${BASENAME}.rels"
+chmod a+rx "${WORKDIR}"
+RELS="${WORKDIR}/${BASENAME}.rels"
 
 if [ -n "$q1" ]
 then
@@ -68,12 +68,12 @@ fi
 
 bailout() {
     if [ "$EXPECTED_FAIL" ] && ! [ "$KEEP_SIEVETEST" ] ; then
-        rm -rf "$TMPDIR"
+        rm -rf "$WORKDIR"
     fi
     exit 1
 }
 
-run "$LAS" -poly "$POLY" -fb "${FB}" -I "$I" -rlim "$rlim" -lpbr "$lpbr" -mfbr "$mfbr" -rlambda "$rlambda" -alim "$alim" -lpba "$lpba" -mfba "$mfba" -alambda "$alambda" -q0 "$q0" "${end[@]}" -out "${RELS}" -batch "$@" || bailout
+run "$LAS" -poly "$POLY" -fb "${FB}" -I "$I" -lim0 "$lim0" -lpb0 "$lpb0" -mfb0 "$mfb0" -lambda0 "$lambda0" -lim1 "$lim1" -lpb1 "$lpb1" -mfb1 "$mfb1" -lambda1 "$lambda1" -q0 "$q0" "${end[@]}" -out "${RELS}" -batch "$@" || bailout
 
 
 SHA1BIN=sha1sum
@@ -99,7 +99,7 @@ then
   then
     REFMSG=", as created by Git revision ${REFERENCE_REVISION}"
   fi
-  echo "$0: Got SHA1 of ${SHA1} but expected ${REFERENCE_SHA1}${REFMSG}. Files remain in ${TMPDIR}"
+  echo "$0: Got SHA1 of ${SHA1} but expected ${REFERENCE_SHA1}${REFMSG}. Files remain in ${WORKDIR}"
   exit 1
 fi
 
@@ -120,7 +120,7 @@ then
   then
     rm -f "${MYCHECKSUM_FILE}"
   fi
-  rmdir "${TMPDIR}"
+  rmdir "${WORKDIR}"
 else
-  echo "Keeping files in ${TMPDIR}"
+  echo "Keeping files in ${WORKDIR}"
 fi

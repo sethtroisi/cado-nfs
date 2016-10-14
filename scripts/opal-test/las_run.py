@@ -47,19 +47,19 @@ def run(param_file, problem):
         "I": 11,
         "poly": "c59.polyselect2.poly",
         "fb": "c59.factorbase.roots.gz",
-        "rlim": 50000,
-        "alim": 100000,
-        "lpbr": 22,
-        "lpba": 22,
-        "mfbr": 22,
-        "mfba": 22,
+        "lim0": 50000,
+        "lim1": 100000,
+        "lpb0": 22,
+        "lpb1": 22,
+        "mfb0": 22,
+        "mfb1": 22,
         "ncurves0": 6,
         "ncurves1": 6,
         "t": 2 # number of threads for las
     }
     makefb_params = {
         "poly" : las_params["poly"],
-        "alim": las_params["alim"],
+        "lim": las_params["lim1"],
         "maxbits": las_params["I"],
         "t": 1
     }
@@ -68,13 +68,13 @@ def run(param_file, problem):
 
     # Update parameters for las
     update_existing(las_params, params)
-    las_params["mfbr"] = max(las_params["mfbr"], las_params["lpbr"])
-    las_params["mfba"] = max(las_params["mfba"], las_params["lpba"])
+    las_params["mfb0"] = max(las_params["mfb0"], las_params["lpb0"])
+    las_params["mfb1"] = max(las_params["mfb1"], las_params["lpb1"])
 
-    las_params["rlim"] = min(las_params["rlim"], 2 ** las_params["lpbr"])
-    las_params["alim"] = min(las_params["alim"], 2 ** las_params["lpba"])
+    las_params["lim0"] = min(las_params["lim0"], 2 ** las_params["lpb0"])
+    las_params["lim1"] = min(las_params["lim1"], 2 ** las_params["lpb1"])
     
-    to_print = ["I", "alim", "lpba", "mfba", "rlim", "lpbr", "mfbr", "ncurves0", "ncurves1"]
+    to_print = ["I", "lim1", "lpb1", "mfb1", "lim0", "lpb0", "mfb0", "ncurves0", "ncurves1"]
     sys.stderr.write("Using parameters %s\n" % " ".join(["%s:%s" % (key, las_params[key]) for key in to_print]))
 
     # Update parameters for makefb (which may depend on las parameters)
@@ -91,11 +91,11 @@ def run(param_file, problem):
     subprocess.check_call(makefb_cmd_line)
 
     stats = LasStats()
-    q0 = las_params["alim"]
+    q0 = las_params["lim1"]
     q_range = 1000
     q_inc = 0
     # since we remove duplicates, 80% of the total ideals should be enough
-    rels_wanted = int(0.8 * primepi(las_params["lpba"]) + 0.8 * primepi(las_params["lpbr"]))
+    rels_wanted = int(0.8 * primepi(las_params["lpb1"]) + 0.8 * primepi(las_params["lpb0"]))
     # read the best time so far (if any)
     best_time = get_best_time ("las.best")
     if best_time >= 1e308:

@@ -57,17 +57,21 @@ void balancing_write_inner(balancing_ptr bal, const char * filename)
     }
     int rc = 0;
     /* Any change to the balancing_header structure must propagate here */
-    ASSERT_ALWAYS(sizeof(struct balancing_header_s) == 48);
+    ASSERT_ALWAYS(sizeof(struct balancing_header_s) == 64);
+    rc += fwrite32_little(&bal->h->zero, 1, pfile);
+    rc += fwrite32_little(&bal->h->magic, 1, pfile);
     rc += fwrite32_little(&bal->h->nh, 1, pfile);
     rc += fwrite32_little(&bal->h->nv, 1, pfile);
     rc += fwrite32_little(&bal->h->nrows, 1, pfile);
     rc += fwrite32_little(&bal->h->ncols, 1, pfile);
+    rc += fwrite32_little(&bal->h->nzrows, 1, pfile);
+    rc += fwrite32_little(&bal->h->nzcols, 1, pfile);
     rc += fwrite64_little(&bal->h->ncoeffs, 1, pfile);
     rc += fwrite32_little(&bal->h->checksum, 1, pfile);
     rc += fwrite32_little(&bal->h->flags, 1, pfile);
     rc += fwrite32_little(bal->h->pshuf, 2, pfile);
     rc += fwrite32_little(bal->h->pshuf_inv, 2, pfile);
-    ASSERT_ALWAYS(rc == 11);
+    ASSERT_ALWAYS(rc == 15);
     if (bal->h->flags & FLAG_ROWPERM) {
         rc = fwrite32_little(bal->rowperm, bal->trows, pfile);
     }
@@ -125,17 +129,25 @@ void balancing_read_header_inner(balancing_ptr bal, FILE * pfile)
 {
     int rc = 0;
     ASSERT_ALWAYS(pfile);
-    ASSERT_ALWAYS(sizeof(struct balancing_header_s) == 48);
+    ASSERT_ALWAYS(sizeof(struct balancing_header_s) == 64);
+    rc += fread32_little(&bal->h->zero, 1, pfile);
+    rc += fread32_little(&bal->h->magic, 1, pfile);
     rc += fread32_little(&bal->h->nh, 1, pfile);
     rc += fread32_little(&bal->h->nv, 1, pfile);
     rc += fread32_little(&bal->h->nrows, 1, pfile);
     rc += fread32_little(&bal->h->ncols, 1, pfile);
+    rc += fread32_little(&bal->h->nzrows, 1, pfile);
+    rc += fread32_little(&bal->h->nzcols, 1, pfile);
     rc += fread64_little(&bal->h->ncoeffs, 1, pfile);
     rc += fread32_little(&bal->h->checksum, 1, pfile);
     rc += fread32_little(&bal->h->flags, 1, pfile);
     rc += fread32_little(bal->h->pshuf, 2, pfile);
     rc += fread32_little(bal->h->pshuf_inv, 2, pfile);
-    ASSERT_ALWAYS(rc == 11);
+    ASSERT_ALWAYS(rc == 15);
+    if (bal->h->zero != 0 || bal->h->magic != BALANCING_MAGIC) {
+        fprintf(stderr, "Incompatible balancing file\n");
+        exit(EXIT_FAILURE);
+    }
 }
 
 void balancing_read_header(balancing_ptr bal, const char * filename)
@@ -186,6 +198,7 @@ void balancing_read(balancing_ptr bal, const char * filename)
 void balancing_init(balancing_ptr bal)
 {
     memset(bal, 0, sizeof(balancing));
+    bal->h->magic = BALANCING_MAGIC;
 }
 void balancing_clear(balancing_ptr bal)
 {

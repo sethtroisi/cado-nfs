@@ -4,7 +4,7 @@
 # set (CMAKE_C_FLAGS   "-flax-vector-conversions ${CMAKE_C_FLAGS}")
 
 include_directories (ecm)
-include_directories (${CMAKE_CURRENT_BINARY_DIR})
+#include_directories (${CMAKE_CURRENT_BINARY_DIR})
 link_directories (${CMAKE_CURRENT_BINARY_DIR}/ecm)
 
 # ugly (copied from linalg/bwc/CMakeLists.txt...)
@@ -55,3 +55,5 @@ target_link_libraries(fake_rels utils_with_io)
 
 
 install(TARGETS makefb las freerel RUNTIME DESTINATION ${LIBSUFFIX}/sieve) 
+
+include(CMakeLists-nodist.txt OPTIONAL)

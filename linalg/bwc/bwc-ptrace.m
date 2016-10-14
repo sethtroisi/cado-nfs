@@ -1,4 +1,12 @@
 
+/* TODO: report this to Allan:
+ *
+ * > Vector(GF(11),Matrix(2,2,[GF(11)|1,2,3,4]));
+ * ( 1  2)
+ * ( 3  4)
+ *
+ */
+
 /* This magma script must be run from the directory containing the data files
  * from a bwc run (converted to magma format by bwc-ptrace.sh */
 
@@ -16,13 +24,17 @@ load "placemats.m";
 
 KP<X>:=PolynomialRing(GF(p));
 
-function group(nlimbs)
-    return func<var|[Seqint([x mod 2^64:x in var[i*k+1..i*k+k]],2^64):i in [0..#var div k - 1]] where k is nlimbs>;
-end function;
+if p eq 2 then
+    g:=func<var|Transpose(Matrix([Vector(GF(2),Intseq(x,2,64)):x in var]))>;
+else
+    function group(nlimbs)
+        return func<var|[Seqint([x mod 2^64:x in var[i*k+1..i*k+k]],2^64):i in [0..#var div k - 1]] where k is nlimbs>;
+    end function;
+    plimbs:=Ceiling(Log(2^64,p));
+    g:=group(plimbs);
+end if;
 
-plimbs:=Ceiling(Log(2^64,p));
-g:=group(plimbs);
-
+splitwidth:=p eq 2 select 64 else 1;
 
 // assert nc le nr;
 // nc:=nr;
@@ -36,6 +48,7 @@ nr_orig:=nr;
 nc_orig:=nc;
 nr:=tr;
 nc:=tc;
+load "vectorspace.m";
 
 /*
 //L:=[]; for i in [0..nh-1] do
@@ -108,8 +121,9 @@ Q:=PermutationMatrix(GF(p),q);
 q0:=SymmetricGroup(nc)![preshuf(x):x in [1..nc]];
 Q0:=PermutationMatrix(GF(p),q0);
 
-/* Does this hold, really ? */
-print Transpose(Pr*Sr)*Mt*Sc eq Mx*Q, " (this boolean may sometimes be wrong, I think)";
+/* XXX Does this hold, really ? */
+assert Transpose(Pr*Sr)*Mt*Sc eq Mx*Q;
+// , " (this boolean may sometimes be wrong, I think)";
 // t means twisted.
 
 /* Note that Mt being equal to Pr times Sr*Cr*M*Transpose(Cc)*Sc^-1 is a
@@ -148,75 +162,134 @@ assert IsZero(Transpose(Mx*Q)[nc_orig+1..nc]);
 
 /* The matrix by which we multiply, really */
 
-assert Submatrix(Transpose(Mx*Q),1,1,nr_orig,nr_orig) eq Submatrix(Transpose(Q),1,1,nr_orig,nr_orig)*Transpose(Matrix(M_orig));
+// assert Submatrix(Transpose(Mx*Q),1,1,nr_orig,nr_orig) eq Submatrix(Transpose(Q),1,1,nr_orig,nr_orig)*Transpose(Matrix(M_orig));
+
+assert Submatrix(Transpose(Mx*Q),1,1,nr_orig,nr_orig) eq Submatrix(Transpose(Q),1,1,nr_orig,nr_orig)*Transpose(Matrix(GF(p),nr_orig,nr_orig,Eltseq(M_orig)));
 
 
 Qsmall:=Submatrix(Q,1,1,nr_orig,nr_orig);
-Msmall:=Matrix(GF(p),Matrix(M_orig));
+// Msmall:=Matrix(GF(p),Matrix(M_orig));
+Msmall:=Matrix(GF(p),nr_orig,nr_orig,Eltseq(M_orig));
 
-MM:=Transpose(Msmall*Qsmall);
+MQsmall:=Msmall*Qsmall;
+
+/* MM is really the matrix with which we are going to work. It's MQsmall in
+ * the case nullspace=right, which was the first-class citizen being thought
+ * of as this script was written at first.
+ */
+if nullspace eq "left" then
+    MM:=Transpose(MQsmall);
+else
+    MM:=MQsmall;
+end if;
 
 
-load "R.m";
 
+// load "R.m";
 
 // truncvec:=func<x|Vector(Eltseq(x)[1..Maximum(nr_orig, nc_orig)])>;
 // expandvec:=func<x|Vector(xx cat [0:i in [#xx+1..nr]]) where xx is Eltseq(x)>;
 
 load "VV.m";
+RHS:=VV[1][1..nrhs];
 
 /* Only pick first X, since we only want to verify the check vector */
 load "x.m";
-Xt:=Matrix(GF(p),nr_orig,1,[]);
-for i in [1..1] do for u in var[i] do Xt[u][i] +:=1; end for; end for;
+nchecks:=splitwidth;
+Xt:=Matrix(GF(p),nchecks,nr_orig,[]);
+for i in [1..nchecks] do for u in var[i] do Xt[i,u] +:=1; end for; end for;
 
-Xfull:=Matrix(GF(p),nr_orig,#var,[]);
-for i in [1..#var] do for u in var[i] do Xfull[u][i] +:=1; end for; end for;
+function canvec(V,i) x:=V!0; x[i]:=1; return x; end function;
 
-x0:=Rows(Transpose(Xfull));
-print "Dimension of the span of the vectors of is X", Dimension(sub<Universe(x0)|x0>);
-xi:=[v*(Msmall*Qsmall) : v in x0];
+Xfull:=Matrix(GF(p),#var,nr_orig,[]);
+for i in [1..#var] do for u in var[i] do Xfull[i,u] +:=1; end for; end for;
+
+x0:=Rows(Xfull);
+print "Dimension of the span of the vectors of X is", Dimension(sub<Universe(x0)|x0>);
+xi:=[v*MM : v in x0];
+
 
 // if System("test -f C0.m") eq 0 then
 // magma can't do if (...) then load "..."; (sigh).
 load "C0.m";
 if Category(var) ne RngIntElt then
-    C0:=Vector(GF(p),nr_orig,g(var));
+    C0:=VS!g(var);
 elif assigned C0 then
     delete C0;
 end if;
-load "C1.m";
-if Category(var) ne RngIntElt then
-    C1:=Vector(GF(p),nr_orig,g(var));
-elif assigned C1 then
-    delete C1;
-end if;
+//load "C1.m";
+//if Category(var) ne RngIntElt then
+//    C1:=Vector(GF(p),nr_orig,g(var));
+//elif assigned C1 then
+//    delete C1;
+//end if;
 // load "C50.m"; C50:=Vector(GF(p),nr_orig,g(var));
 
-// interval:=50;
-interval:=1;
-
-if assigned C1 then
-    print "Checking consistency of check vector C1";
-    assert C1 eq xi[1];
-    // C1 eq Vector(Xt)*Transpose(Msmall*Qsmall);
-    print "Checking consistency of check vector C1: done";
-end if;
-// end if;
-
-// foo:=Vector(Xt);
-// for i in [1..interval] do print i; foo *:= Transpose(Transpose(Msmall*Qsmall)); end for;
-// // C50 eq foo;
-
-print "Checking that RHS vectors are in V[1]";
-for i in [1..#RHS] do
-    assert RHS[i] eq VV[1][i];
+/*
+M2:=MM*MM;
+M4:=M2*M2;
+M8:=M4*M4;
+xi:=x0;
+xblock:=[Universe(x0)|];
+for i in [1..8] do
+    xblock cat:= xi;
+    xi:=[v*MM : v in xi];
 end for;
-print "Checking that RHS vectors are in V[1]: done";
+MX:=Matrix(xblock);
+
+
+MXN:=MX;
+i:=0;
+rr:=[Universe(Rows(MX))|];
+while i * m lt Nrows(MM) do
+    rr cat:=Rows(MXN);
+    MXN:=MXN*M8;
+    i+:=8;
+    printf ".";
+    if i le 32 or i mod 128 eq 0 or (i ge 240 and i mod 32 eq 0) then
+        printf "\n";
+        time U:=sub<Universe(x0)|rr>;
+        time d:=Dimension(U);
+        print i, d, i*m-d;
+    end if;
+end while;
+
+*/
+
+
+// interval:=50;
+// interval:=1;
+
+//if assigned C1 then
+//    print "Checking consistency of check vector C1";
+//    assert C1 eq xi[1];
+//    // C1 eq Vector(Xt)*Transpose(MM);
+//    print "Checking consistency of check vector C1: done";
+//end if;
+//// end if;
+
+load "Ci.m";
+if assigned C0 then
+    print "Checking consistency of check vector C.0";
+    assert C0 eq VS!Xt;
+    print "Checking consistency of check vector C.0: done";
+    printf "Checking consistency of check vector C.%o\n", interval;
+    if Category(var) ne RngIntElt then
+        Ci:=VS!g(var);
+    elif assigned Ci then
+        delete Ci;
+    end if;
+    foo:=C0;
+    for i in [1..interval] do foo *:= MM; end for;
+    assert Ci eq foo;
+    printf "Checking consistency of check vector C.%o: done\n", interval;
+end if;
 
 print "Checking consistency of all vectors V_i";
 for i in [1..#VV-1] do
-    assert Matrix(VV[i])*Transpose(Msmall*Qsmall) eq Matrix(VV[i+1]);
+    vx:=VerticalJoin(VV[i]);
+    for j in [1..interval] do vx := vx*Transpose(MM); end for;
+    assert vx eq VerticalJoin(VV[i+1]);
 end for;
 print "Checking consistency of all vectors V_i: done";
 
@@ -224,17 +297,9 @@ print "Checking consistency of all vectors V_i: done";
 
 
 
-function matpol_from_sequence(seq, m, n)
-    assert #seq mod m*n eq 0;
-    deg:=#seq div (m*n)-1;
-    F:=&+[KP.1^i*      Matrix(KP,m,n,seq[i*m*n+1..(i+1)*m*n]):i in [0..deg]];
-    Fr:= &+[KP.1^(deg-i)*Matrix(KP,m,n,seq[i*m*n+1..(i+1)*m*n]):i in [0..deg]];
-    return F, Fr;
-end function;
-
 mcoeff:=func<M,k|
 ChangeRing(Parent(M)![Coefficient(x,k):x in Eltseq(M)],BaseRing(BaseRing(M)))>;
-mdiv:=func<M,k|Parent(M)![x div BaseRing(M).1^k: x in Eltseq(M)]>;
+mdiv:=func<M,k|Parent(M)![k ge 0 select x div BaseRing(M).1^k else x: x in Eltseq(M)]>;
 mmulx:=func<M,k|Parent(M)![x * BaseRing(M).1^k: x in Eltseq(M)]>;
 mmod:=func<M,k|Parent(M)![x mod BaseRing(M).1^k: x in Eltseq(M)]>;
 mval:=func<M|Minimum([Valuation(x):x in Eltseq(M)])>;
@@ -248,7 +313,7 @@ end function;
 
 function mpol_eval(y,M,P)
     /* compute y * P(M) */
-    assert CoefficientRing(P) eq CoefficientRing(M);
+    assert CoefficientRing(P) cmpeq CoefficientRing(M);
     s:=Parent(y)!0;
     if Degree(P) lt 0 then return s; end if;
     i:=Degree(P);
@@ -262,18 +327,25 @@ function mpol_eval(y,M,P)
 end function;
 
 /* Same, but for y a sequence of starting vectors (in the form of a matrix)
- * and P a vector of polynomials */
-function mpol_eval_several(y,M,P)
+ * and P a matrix of polynomials.
+ *
+ * We want the different vectors in y be matched with the rows of P, so that
+ * we'll do a Transpose() behind the scenes.
+ * */
+function mpol_eval_polmat(y,M,P)
+    if splitwidth eq 1 then
+        return mpol_eval(y,M,P[1,1]);
+    end if;
     /* compute y * P(M) */
-    assert BaseRing(CoefficientRing(P)) eq CoefficientRing(M);
+    assert BaseRing(CoefficientRing(P)) cmpeq CoefficientRing(M);
     s:=Parent(y)!0;
-    if Degree(P) lt 0 then return s; end if;
-    i:=Degree(P);
-    s:=mcoeff(P, i) * y;
+    if mdeg(P) lt 0 then return s; end if;
+    i:=mdeg(P);
+    s:=mcoeff(Transpose(P), i) * y;
     while i gt 0 do
         s:=s*M;
         i:=i-1;
-        s+:=mcoeff(P, i) * y;
+        s+:=mcoeff(Transpose(P), i) * y;
     end while;
     return s;
 end function;
@@ -281,32 +353,56 @@ end function;
 
 
 load "A.m";
+function matpol_from_sequence(seq, m, n)
+    if p gt 2 then
+        assert #seq mod m*n eq 0;
+        deg:=#seq div (m*n)-1;
+        F:=&+[KP.1^i*      Matrix(KP,m,n,seq[i*m*n+1..(i+1)*m*n]):i in [0..deg]];
+        // Fr:= &+[KP.1^(deg-i)*Matrix(KP,m,n,seq[i*m*n+1..(i+1)*m*n]):i in [0..deg]];
+    else
+        assert Nrows(seq)*Ncols(seq) mod m*n eq 0;
+        deg:=Nrows(seq)*Ncols(seq) div (m*n)-1;
+        // it's quite messy...
+        tmp:=Matrix((deg+1)*m, n, Eltseq(Transpose(seq)));
+        F:=&+[KP.1^i*Matrix(KP,Submatrix(tmp,i*m+1,1,m,n)):i in [0..deg]];
+    end if;
+    return F;
+end function;
 A:=matpol_from_sequence(g(var),m,n);
 
 print "Checking consistency of A";
 for k in [0..9] do
-    assert mcoeff(A, k) eq Matrix(n,n,[(x0[i],VV[k+1][j]):i,j in [1..n]]);
+    if k*interval gt mdeg(A) then break; end if;
+    vx:=VerticalJoin(VV[k+1]);
+    assert mcoeff(A, k*interval) eq Matrix(m,n,[(x0[i],vx[j]):j in [1..n], i in[1..m]]);
 end for;
 print "Checking consistency of A: done";
 
 
-
-load "F.m";
-// while IsZero(var[#var-n*n*plimbs+1..#var]) do var:=var[1..#var-n*n*plimbs]; end while;
-F,Fr:=matpol_from_sequence(g(var),n,n);
-F:=Transpose(F);
-Fr:=Transpose(Fr);
-assert #var mod (n*n*plimbs) eq 0;
-degF := #var div (n*n*plimbs) - 1;
-assert degF ge mdeg(F);
-// assert (1+mdeg(F))*n*n*plimbs eq #var;
-
+/* Note that bwc-ptrace already uses g() to parse data which goes to Fchunks
+ * and Rchunks */
 load "Fchunks.m";
-print "Checking consistency of big file F with chunks saved in F.*.sols*";
-for i,j in [1..n] do
-    assert Polynomial(Fchunks[i][j]) eq F[j,i];
-end for;
-print "Checking consistency of big file F with chunks saved in F.*.sols*: done";
+print "Reading generator saved in F.*.sols*";
+F:=BlockMatrix(
+        n div splitwidth,
+        n div splitwidth,
+        [matpol_from_sequence(Fchunks[i,j],splitwidth,splitwidth)
+            :i,j in [1..n div splitwidth]
+        ]);
+// F:=Matrix(n,n,[Polynomial(GF(p),Fchunks[i][j]): i,j in [1..n]]);
+if p gt 2 then
+degsF:={#Fchunks[i][j] div splitwidth -1:i,j in [1..n div splitwidth]};
+else
+degsF:={Ncols(Fchunks[i][j]) div splitwidth -1:i,j in [1..n div splitwidth]};
+end if;
+assert #degsF eq 1;
+degF:=Setseq(degsF)[1];
+Fr:=Parent(F)![reciprocal(x,degF):x in Eltseq(F)];
+rhscoeffs:=Matrix(GF(p),#RHS,n,[Polynomial(Rchunks[i][j]):
+j in [1..n],
+i in [1..#RHS]
+]);
+print "Reading generator saved in F.*.sols*: done";
 
 degA:=mdeg(A);
 coldegs:=[mdeg(mcol(Fr,j)):j in [1..n]];
@@ -315,20 +411,17 @@ coldegs:=[mdeg(mcol(Fr,j)):j in [1..n]];
  * plingen, the computed matrix F should be such that the following predicates
  * hold.
  */
-load "rhscoeffs.m";
-rhscoeffs:=Matrix(GF(p),#RHS,n,g(var));
-print "Checking generator computed by plingen";
+
 
 // degF:=mdeg(F);
 
 if #RHS eq 0 then
-    print "(homogeneous case)";
+    print "Checking generator computed by (p)lingen (homogeneous case)";
     AF:=mmod(mdiv(A,1)*Fr,degA);
-    for j in [1..n] do
-        assert IsZero(mdiv(mcol(AF,j),coldegs[j]));
-    end for;
+    assert exists(e) { e : e in [0..4] | &and[IsZero(mdiv(mcol(AF,j),e+coldegs[j])):j in [1..n]]};
+    print "Degree offset for generator is", e;
 else
-    print "(inhomogeneous case)";
+    print "Checking generator computed by (p)lingen (inhomogeneous case)";
     /* In this case, we have operated on a matrix A where only the last
      * columns have been chopped off in the computation.
      */
@@ -358,64 +451,10 @@ else
      * it's even O(X^degA).
      */
     AxFx:=mmod(Ax*Frx,degA);
-    for j in [1..n] do
-        assert IsZero(mdiv(mcol(AxFx,j),coldegs[j]));
-    end for;
-
-    /* Coefficient of degree coldegs[j] is column j of the product Ax*Frx */
-        /* We have a sum of r contributions related to the RHS, and n-r
-         * related to the random vectors */
-    // Here are two ways to make the check which is made in a simpler form
-    // further down. These are commented out because they really test the same
-    // thing, but we keep them nevertheless because these do have some
-    // interest regarding reverse engineering of the formula which is used for
-    // the simpler check which comes afterwards.
-    /*
-    for j in [1..n] do
-        d:=coldegs[j];
-        assert IsZero(mcoeff(mcol(Ax0*Frx0+Ax1*Frx1,j),d));
-
-        v:=Matrix(RHS);
-        summand1:=Transpose(rhscoeffs)*Matrix(RHS);
-        for k in [1..degF+1] do
-            v:=v*Transpose(Msmall*Qsmall);
-            assert mcoeff(Fx0,k) eq Submatrix(mcoeff(F,k-1),1,1,r, n);
-            summand1+:=Transpose(mcoeff(Fx0,k))*v;
-        end for;
-        summand2:=Parent(summand1)!0;
-        w:=Matrix(VV[1][r+1..n]);
-        for k in [1..degF+1] do
-            w:=w*Transpose(Msmall*Qsmall);
-            assert mcoeff(Fx1,k-1) eq Submatrix(mcoeff(F,k-1),r+1, 1, n-r, n);
-            summand2+:=Transpose(mcoeff(Fx1,k-1))*w;
-        end for;
-        IsZero(summand1 + summand2);
-    end for;
-    */
-
-        /*
-        summand1:=Transpose(rhscoeffs)*Matrix(RHS);
-        summand2:=Parent(summand1)!0;
-        // v := Matrix(VV[1][1..r]);
-        // w := Matrix(VV[1][r+1..n]);
-        z := Matrix(VV[1]);
-        for k in [1..degF+1] do
-            // v:=v*Transpose(Msmall*Qsmall);
-            // w:=w*Transpose(Msmall*Qsmall);
-            // assert mcoeff(Fx0,k) eq Submatrix(mcoeff(F,k-1),1,1,r, n);
-            // assert mcoeff(Fx1,k-1) eq Submatrix(mcoeff(F,k-1),r+1, 1, n-r, n);
-            // addend:=Transpose(mcoeff(Fx0,k))*v;
-            // addend+:=Transpose(mcoeff(Fx1,k-1))*w;
-            // addend eq 
-            summand2+:=Transpose(mcoeff(F,k-1))*z;
-            z:=z*Transpose(Msmall*Qsmall);
-        end for;
-        IsZero(summand1 + summand2 * Transpose(Msmall*Qsmall));
-        */
-
+    assert exists(e) { e : e in [0..4] | &and[IsZero(mdiv(mcol(AxFx,j),e+coldegs[j])):j in [1..n]]};
+    print "Degree offset for generator is", e;
 end if;
 print "Checking generator computed by plingen: done";
-
 
 /* ok. Now think about this a bit more. This means we have many zeroes. So
  * something ought to be the null vector, right ?
@@ -427,347 +466,152 @@ else
     images:=Matrix(GF(p),n, nr_orig, []);
 end if;
 solutions:=Parent(images)!0;
-z := Matrix(VV[1]);
+z := VerticalJoin(VV[1]);
 for k in [0..degF] do
     for j in [1..n] do
         solutions[j]+:=mcoeff(mcol(F,j),k)*z;
     end for;
-    z:=z*Transpose(Msmall*Qsmall);
+    z:=z*Transpose(MM);
 end for;
-for j in [1..n] do
-    printf "Checking that column %o (sols%o-%o) is indeed a solution... ", j, j-1, j;
-    assert IsZero(images[j] + solutions[j] * Transpose(Msmall*Qsmall));
+zz:=images + solutions * Transpose(MM);
+for j in [0..n div splitwidth - 1] do
+    j0:=j*splitwidth;
+    j1:=j0+splitwidth;
+    printf "Checking that sols%o-%o yields a solution... ", j0, j1;
+    assert IsZero(zz[j0+1..j1]);
     print " ok";
 end for;
 
-
 load "S.m";
-assert #vars mod (n*nblocks) eq 0;
-nsols:=#vars div (n*nblocks);
+nsols:=#vars * splitwidth;
 printf "Computed %o solution vectors with mksol\n", nsols;
 
 // we no longer impose that we compute #RHS solutions. One should be enough
 // for everybody.
 // assert nsols ge #RHS;
 
-SS:=[[[(Vector(GF(p),g(vars[(k*nsols+i)*n+j+1]))):j in [0..n-1]]:i in [0..nsols-1]]:k in [0..nblocks-1]];
+// SSblocks:=[[Vector(GF(p),g(v)):v in w]:w in vars];
+SSblocks:=[[VS!g(v):v in w]:w in vars];
+SS:=[&+[x:x in y]:y in SSblocks];
 
-SS:=[[&+[SS[k+1,i+1,j+1]:k in [0..nblocks-1]]:j in [0..n-1]]:i in [0..nsols-1]];
+function sub_vblock(vv,j)
+    if splitwidth eq 1 then
+        return vv[1+j];
+    else
+        return VS!vv[1+j*splitwidth..(j+1)*splitwidth];
+    end if;
+end function;
+
+function sub_polmat(F,i,j)
+    return Submatrix(F,1+i*splitwidth,1+j*splitwidth,splitwidth,splitwidth);
+end function;
 
 print "Checking that mksol has computed what we expect";
-for i in [1..nsols] do
-    for j in [1..n] do
-        assert SS[i,j] eq mpol_eval(V_0[j],Transpose(Msmall*Qsmall),F[j,i]);
+for i in [0..nsols div splitwidth - 1] do
+    vv:=VerticalJoin(V_0);
+    for k in [0..#SSblocks[i+1]-1] do
+        contribs:=VS!0;
+        for j in [0..n div splitwidth - 1] do
+            vb:=sub_vblock(vv,j);
+            pol:=mmod(mdiv(sub_polmat(F,j,i),k*interval),interval);
+            contribs+:=mpol_eval_polmat(vb, Transpose(MM), pol);
+        end for;
+        assert SSblocks[i+1][k+1] eq contribs;
+        for s in [1..interval] do
+            vv:=vv*Transpose(MM);
+        end for;
     end for;
+    assert SS[i+1] eq &+[mpol_eval_polmat(sub_vblock(VerticalJoin(V_0),j),Transpose(MM),sub_polmat(F,j,i)):j in [0..n div splitwidth-1]];
 end for;
 print "Checking that mksol has computed what we expect: done";
 
-all_rhs:=Transpose(rhscoeffs)*Matrix(RHS);
+/* all_rhs is the *contribution* of the RHS columns to the sum */
+all_rhs:=Transpose(rhscoeffs)*VerticalJoin(RHS);
+/* XXX so I think that all_rhs unconditionally has n rows... */
+assert Nrows(all_rhs) eq n;
 
-IsZero(all_rhs[1] + &+SS[1]*Transpose(Qsmall)*Transpose(Msmall));
+/* here, we're checking only nsols, since we have *computed* only nsols. But
+ * had we computed more, we could extend the check somewhat.
+ */
+for s in [0..nsols div splitwidth - 1] do
+    assert IsZero(sub_vblock(all_rhs,s) + (SS[s+1])*Transpose(MM));
+end for;
 
 // RHS has the RHS in rows.
-Mpad:=HorizontalJoin(Msmall, Transpose(Matrix(RHS)));
+Mpad:=HorizontalJoin(Msmall, Transpose(VerticalJoin(RHS)));
 ww:=[];
-for c in [1..nsols] do
-    // v:=&+[mpol_eval(V_0[j],Transpose(Msmall*Qsmall),F[j,c]): j in [1..n]];
-    v:=&+SS[c];
-    assert IsZero(all_rhs[c] + v * Transpose(Qsmall)*Transpose(Msmall));
-    w0:=v * Transpose(Qsmall);
-    w1:=Transpose(rhscoeffs)[c];
-    assert IsZero(w0 * Transpose(Msmall) + w1*Matrix(RHS));
-    w:=Vector(HorizontalJoin(w0,w1));
+for c in [0..nsols div splitwidth - 1] do
+    // v:=&+[mpol_eval(V_0[j],Transpose(MM),F[j,c]): j in [1..n]];
+    v:=SS[c+1];
+    assert IsZero(sub_vblock(all_rhs,c) + v * Transpose(MM));
+    if nullspace eq "right" then
+        w0:=v * Transpose(Qsmall);
+        if splitwidth eq 1 then
+            w1:=Transpose(rhscoeffs)[c+1];
+        else
+            w1:=Submatrix(Transpose(rhscoeffs),1+c*splitwidth,1,splitwidth,Nrows(rhscoeffs));
+        end if;
+        assert IsZero(w0 * Transpose(Msmall) + w1*VerticalJoin(RHS));
+        w:=Vector(HorizontalJoin(w0,w1));
+    else
+        // as we've defined things, the inhomogeneous systems are only though
+        // of as M*X=B, not X*M=B. 
+        assert #RHS eq 0;
+        w:=v;
+        assert IsZero(w * Msmall);
+    end if;
     Append(~ww, w);
 end for;
 
-print "Check that we have w such that (M||RHS) * w = 0: ",
-    IsZero(Matrix(ww) * Transpose(Mpad));
+tr:=nullspace eq "left" select func<x|x> else Transpose;
+if nullspace eq "left" then
+    equation:="w * M";
+elif #RHS gt 0 then
+    equation:="(M||RHS) * w";
+else
+    equation:="M * w";
+end if;
+printf "Check that we have w such that %o = 0: %o\n",
+    equation,
+    IsZero(VerticalJoin(ww) * tr(Mpad));
 
 
 print "Checking that gather has computed what we expect";
 load "K.m";
-// see above. this is no longer required.
-// assert #vars eq #RHS;
 ker:=[Vector(GF(p),g(x)):x in vars];
+
+if nullspace eq "right" then
+    /* There are two sets of asserts here, and it's admittedly somewhat
+     * confusing.  Depending on whether it succeeded or not, gather may put
+     * varying stuff in the K.sols file.
+     */
+    if Dimension(Parent(ker[1])) eq Ncols(Msmall) then
+        /* It may occur that gather wasn't happy with the solution it got for
+         * the inhomogenous linear system. In that case, the binary K file
+         * misses the rhs coefficients, which is weird. So then, we just have
+         * the following:
+         */
+        assert Matrix(ker) eq Matrix(SS)*Transpose(Qsmall);  
+        assert IsZero(
+            HorizontalJoin(Matrix(ker),Matrix(Transpose(rhscoeffs)[1..#ker])) *
+            VerticalJoin(Transpose(Msmall), Matrix(RHS)));
+    elif Dimension(Parent(ker[1])) eq Ncols(Msmall) + #RHS then
+        /* In contrast, when it is happy, the K file has nrhs extra
+         * coordinates, so that the following holds...
+         */
+        assert IsZero(Matrix(ker)*Transpose(HorizontalJoin(Msmall, Transpose(Matrix(RHS)))));
+    else
+        /* uh oh */
+        error "I don't understand the dimension of the sequence computed by gather in K.m";
+    end if;
+    /* For completeness, note that the ascii K file is almost identical to the
+     * above except that we acknowledge there the presence of zero columns in
+     * M, so that a handful of coefficients in ker are useless, and hence
+     * chopped out.
+     */
+else
+    /* Then it's simpler, because we have no RHS to mess things up */
+    assert IsZero(VerticalJoin(ker)*Msmall);
+end if;
 print "Checking that gather has computed what we expect: done";
 
-assert IsZero(Matrix(ker)*Transpose(HorizontalJoin(Msmall, Transpose(Matrix(RHS)))));
-
-
-// rest is utter crap.
-
-// load "K.sols0-1.0.m";    K0:=expandvec(Vector(GF(p), g(var)));
-
-/*
-W:=K0;
-for i in [1..10] do
-    if IsZero(W*Transpose(Mx*Q)) then break; end if;
-    printf "Now considering M^%o*W\n", i;
-    W:=W*Transpose(Mx*Q);
-end for;
-
-notinker:=false;
-if not IsZero(W*Transpose(Mx*Q)) then
-    print "W not in the kernel of Mx*Q !?";
-    System("sleep 1");
-    notinker:=true;
-end if;
-*/
-//        notinker:=true;
-//    
-//    assert Mt eq Pr*Sr*Mx*Q*Sc^-1;
-//    print Mt eq P*S*Mx*Q*S^-1, " (true only for shuffled product)";
-//    Transpose(Pr*Sr)*Mt*Sc eq Mx*Q;
-//    // Mx eq Cr*M*Transpose(Cc);
-//    Mx eq M;
-//    
-// IsZero(W*Transpose(Q)*Cc*Transpose(M)*Transpose(Cr));
-// sol:=Vector(Eltseq(W*Transpose(Q)*Cc)[1..nc]);
-
-
-
-
-
-
-
-
-
-
-
-
-
-/*
-if not notinker then
-IsZero(W*Transpose(Q)*Transpose(M));
-sol:=Vector(Eltseq(W*Transpose(Q))[1..nc]);
-IsZero(sol*Transpose(M));
-end if;
-*/
-
-
-// load "x.m";
-// C0:=Matrix(GF(p),nr,64,[]);
-// Xt:=Matrix(GF(p),nr,n,[]);
-// for i in [1..64] do for u in var[i] do C0[u][i] +:=1; end for; end for;
-// for i in [1..n] do for u in var[i] do Xt[u][i] +:=1; end for; end for;
-// 
-// 
-// function vblock(nr,var, nc)
-//     R:=Matrix(GF(p),nr,nc,[]);
-//     nb:=nc div 64;
-//     for i in [0..nr-1] do
-//         R[i+1]:=Vector(GF(p),Intseq(u,2,nc) where u is Seqint(var[1+i*nb..(i+1)*nb],2^64));
-//     end for;
-//   return R;
-// end function;
-// 
-// 
-// load "Y.0.m";      Y0:= vblock(nc, var, n);
-// load "V0-64.0.m";  V0:= vblock(nc, var, 64);
-// // load "V0-64.1.m";  V1:= vblock(nc, var, 64);
-// // load "V0-64.2.m";  V2:= vblock(nc, var, 64);
-// // load "V0-64.3.m";  V3:= vblock(nc, var, 64);
-// // load "V0-64.4.m";  V4:= vblock(nc, var, 64);
-// // load "V0-64.5.m";  V5:= vblock(nc, var, 64);
-// // load "V0-64.6.m";  V6:= vblock(nc, var, 64);
-// // load "V0-64.7.m";  V7:= vblock(nc, var, 64);
-// // load "V0-64.8.m";  V8:= vblock(nc, var, 64);
-// // load "V0-64.9.m";  V9:= vblock(nc, var, 64);
-// load "V0-64.10.m"; V10:=vblock(nc, var, 64);
-// load "V0-64.20.m"; V20:=vblock(nc, var, 64);
-// 
-// load "V64-128.0.m";  V0b:= vblock(nc, var, 64);
-// load "V64-128.10.m"; V10b:=vblock(nc, var, 64);
-// load "V64-128.20.m"; V20b:=vblock(nc, var, 64);
-// 
-// 
-// // load "V0-64.12.m"; V12:=vblock(nc, var, n);
-// // load "V0-64.13.m"; V13:=vblock(nc, var, n);
-// // load "V0-64.14.m"; V14:=vblock(nc, var, n);
-// // load "V0-64.15.m"; V15:=vblock(nc, var, n);
-// // load "V0-64.16.m"; V16:=vblock(nc, var, n);
-// // load "V0-64.17.m"; V17:=vblock(nc, var, n);
-// // load "V0-64.18.m"; V18:=vblock(nc, var, n);
-// load "C.0.m";    C0:=vblock(nr, var, 64);
-// load "C.10.m";   C10:=vblock(nr, var, 64);
-// 
-// load "H1.m";    H1:=vblock(nc, var, 64);
-// var:=[(p div j+q*j) mod 2^64:j in [1..nc]]
-//     where p is PreviousPrime(2^64)
-//     where q is PreviousPrime(2^63);
-// H0:=vblock(nc, var, 64);
-// assert M*Q0*H0 eq H1;
-// 
-// // v0z:=[Seqint(ChangeUniverse((Eltseq(V0[i])),Integers()),2):i in [1..nr]];
-// // v0bz:=[Seqint(ChangeUniverse((Eltseq(V0b[i])),Integers()),2):i in [1..nr]];
-// 
-// // it's somewhat misleading sometimes.
-// // [Index(Rows(Mt*V0),r):r in Rows(V1)];
-// 
-// Z:=Integers();
-// 
-// /*
-// Sort(rowweights(Matrix(Z,Transpose(Mt)*V0))) eq 
-// Sort(rowweights(Matrix(Z,V1)));
-// 
-// ([w[pr(i)]: i in [1..#w]] where w is rowweights(Matrix(Z,Transpose(Mt)*V0)))\
-//  eq rowweights(Matrix(Z,V1));
-// 
-// rowweights(Matrix(Z,Transpose(Mt)*V0)) eq
-// [w[prinv(i)]: i in [1..#w]] where w is rowweights(Matrix(Z,V1));
-// 
-// rowweights(Matrix(Z,Pr*Transpose(Mt)*V0)) eq rowweights(Matrix(Z,V1));;
-// */
-// 
-// TMt:=xtr(Pr^-1)*xtr(Mt);
-// 
-// TM:=xtr(M*Q0);
-// 
-// // equivalent to TMt:=Transpose(Mt*Pr^-1) for nullspace=left
-// // For nullspace=left:
-// // TMt eq Transpose(Mt*Pr^-1);
-// // TMt eq Transpose(Pr*Sr*Cr*M*Transpose(Cc)*Sc^-1*Pr^-1);
-// // TMt eq Transpose(Pr*Sr*Mx*Sc^-1*Pr^-1);
-// // TMt eq Transpose(Pr*Sc)^-1*Transpose(Mx)*Transpose(Pr*Sr);
-// // assert Sr eq Sc
-// // Transpose(Mx)*(Pr*Sr)^-1*V0 eq (Pr*Sr)^-1*V1;
-// //
-// // For nullspace=right
-// // TMt eq Pr^-1*Mt
-// // TMt eq Sr*Cr*M*Transpose(Cc)*Sc^-1
-// // TMt eq Sr*Mx*Sc^-1
-// // assert Sr eq Sc
-// // Mx*Sr^-1*V0 eq Sr^-1*V1
-// 
-// conj_if_left:=func<x|xtr(xtr(x)*Pr^-1)*xtr(Pr)>;
-// // for nullspace == left this is Pr*x*Pr^-1
-// 
-// // it's normal if one of the two is false. It would help chasing bugs, in
-// // fact !
-// TMt eq conj_if_left(Sc*Cc*TM*Transpose(Cr)*Sr^-1);
-// 
-// // Mtt eq Pr*Sc*Cr*M*Transpose(Cc)*Sr^-1*Pr^-1;
-// 
-// TM*V0 eq V1; assert TM*V0 eq V1;
-// TM*V1 eq V2; assert TM*V1 eq V2;
-// TM*V2 eq V3; assert TM*V2 eq V3;
-// TM*V3 eq V4; assert TM*V3 eq V4;
-// TM^10*V0 eq V10; assert TM^10*V0 eq V10;
-// TM^10*V0b eq V10b; assert TM^10*V0b eq V10b;
-// 
-// // (Pr^-1*Mt)^10*C0 eq C10;
-// //
-// // This one only valid for nullspace==left
-// // Pr*(Pr^-1*Mt)^10*Pr^-1*C0 eq C10;
-// //
-// print "check vectors:";
-// C0 eq Submatrix(Xt,1,1,Nrows(Xt),64); 
-// C10 eq Submatrix(Transpose(TM)^10*Xt,1,1,Nrows(Xt),64);
-// 
-// Transpose(TM)^10*C0 eq C10;
-// 
-// 
-// Transpose(V0)*C10 eq Transpose(V10)*C0;
-// Transpose(C10)*V0 eq Transpose(C0)*V10;
-// Transpose(C10)*V0b eq Transpose(C0)*V10b;
-// 
-// print "Checking krylov stuff: done";
-// 
-// load "A0-128.0-30.m";   // suited for matrix t100b
-// 
-// stride:=m*n div 64;
-// for i in [0..30-1] do
-//     vblock(m,var[i*stride+1..i*stride+stride],n) eq
-//     Transpose(Xt)*TM^i*Y0;
-// end for;
-// 
-
-//    K:=GF(p);
-//    b:=m+n;
-//    N:=nr;
-//    // KR<x>:=PowerSeriesRing(K);
-//    KR<x>:=PolynomialAlgebra(K);
-//    KRmn:=RMatrixSpace(KR,m,n);
-//    KRbb:=RMatrixSpace(KR,b,b);
-//    KRmb:=RMatrixSpace(KR,m,b);
-//    KRnb:=RMatrixSpace(KR,n,b);
-//    KRn1:=RMatrixSpace(KR,n,1);
-//    KRnn:=RMatrixSpace(KR,n,n);
-//    KRmn:=RMatrixSpace(KR,m,n);
-//    KRNm:=RMatrixSpace(KR,N,m);
-//    KRNn:=RMatrixSpace(KR,N,n);
-//    KRN:=RMatrixSpace(KR,N,N);
-//    KNn:=KMatrixSpace(K,N,n);
-//    
-
-// 
-// // beware -- we're using the sequence starting at 1.
-// // A_sequence:=&+[x^(i-1)*KRmn!(Transpose(Xt)*TM^i*V0):i in [1..100]];
-// A_sequence:=KRmn!0;
-// z:=Y0;
-// for i in [1..100] do
-//     A_sequence +:= x^(i-1)*KRmn!(Transpose(Xt)*z);
-//     z:=TM*z;
-// end for;
-// // assert A_sequence eq &+[x^(i-1)*KRmn!(Transpose(Xt)*TM^(i-1)*V0):i in [1..100]];
-// 
-// 
-// load "F.m";
-// 
-// degf:=#var div stride - 1;
-// 
-// F:=&+[x^(degf-i)*KRnn!vblock(n,var[i*stride+1..(i+1)*stride],n):i in [0..degf]];
-// Fr:=&+[x^i*      KRnn!vblock(n,var[i*stride+1..(i+1)*stride],n):i in [0..degf]];
-// 
-// printf "FYE: %o\n", IsZero(mycoeff(A_sequence*Transpose(F),degf));
-// for i in [degf+1..degf+5] cat [97..99] do
-//     // degf or degf+1 ? I'm seeing non-null at degf... It's pretty harmless.
-//     IsZero(mycoeff(A_sequence*Transpose(F),i));
-// end for;
-// 
-// not IsZero(mycoeff(A_sequence*Transpose(F),degf-1));
-// 
-// excess:=10;
-// 
-// V_sequence:=&+[x^i*KRNn!(TM^i*Y0):i in [0..degf+excess]];
-// 
-// assert IsZero(Transpose(Xt)*mycoeff(V_sequence*Transpose(F),degf+1));
-// 
-// // Transpose(Xt)*(KRN!TM)^4*(KRN!TM*V_sequence) eq mycoeff(A_sequence,3);
-// 
-// IsZero(mycoeff(Transpose(KRNm!Xt)*(&+[x^(i-1)*KRNn!(TM^(i-1)*Y0):i in [1..10\
-// 0]])*Transpose(F),degf+1));
-// 
-// 
-// for i in [0..excess-1] do
-//     IsZero(Transpose(Xt)*TM*mycoeff(V_sequence*Transpose(F),degf + i));
-//     IsZero(TM*mycoeff(V_sequence*Transpose(F),degf + i));
-// end for;
-// 
-// S:=&+[TM^i*Y0*mycoeff(Transpose(Fr),i):i in [0..degf]];
-// IsZero(TM*S);
-// 
-// // S:=&+[TM^i*V0*mycoeff(Transpose(F),i):i in [0..2]];
-// 
-// load "S0-64.10.m"; S10:=vblock(nc, var, n);
-// load "S0-64.20.m"; S20:=vblock(nc, var, n);
-// load "S64-128.10.m"; S10b:=vblock(nc, var, n);
-// load "S64-128.20.m"; S20b:=vblock(nc, var, n);
-// load "K.0.m";    K0:=vblock(nc, var, 64);
-// 
-// S eq S10+S20;
-// 
-// // K0 is basically S in column echelon form.
-// Rowspace(Transpose(S)) eq Rowspace(Transpose(K0));
-// IsZero(TM*K0);
-// 
-// 
-// 
-// load "W.m";    W:=vblock(nr, var, 64);    
-// 
-// 
-// // For our simple test cases, K0==W. In more subtle situations, things
-// // might differ a bit.
-// 
-// print "FYI: ", K0 eq W;
-// IsZero(TM*W);

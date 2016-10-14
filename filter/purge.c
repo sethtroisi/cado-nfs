@@ -27,7 +27,7 @@
  *
  * The filtering step of discrete logarithm and integer factorization
  * algorithms.
- * Cyril Bouvier, preprint, 22 pages. 2013.
+ * Cyril Bouvier, preprint, 2013, https://hal.inria.fr/hal-00734654.
  */
 
 /*

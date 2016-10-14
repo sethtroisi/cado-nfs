@@ -20,13 +20,9 @@ import cadoparams
 import cadocommand
 import wuserver
 import workunit
-import sys
 from struct import error as structerror
 from shutil import rmtree
 from workunit import Workunit
-
-
-
 # Patterns for floating-point numbers
 # They can be used with the string.format() function, e.g.,
 # re.compile("value = {cap_fp}".format(**REGEXES))
@@ -34,11 +30,6 @@ from workunit import Workunit
 RE_FP = r"[-+]?[0-9]*\.?[0-9]+(?:[eE][-+]?[0-9]+)?"
 CAP_FP = "(%s)" % RE_FP
 REGEXES = {"fp": RE_FP, "cap_fp": CAP_FP}
-
-class nb:
-    nb_sieving=0
-    nb_filter=0
-    nb_linalg=0
 
 def re_cap_n_fp(prefix, n, suffix=""):
     """ Generate a regular expression that starts with prefix, then captures
@@ -1049,14 +1040,16 @@ class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
         if "workdir" in self.params:
             self.workdir = WorkDir(self.params["workdir"], self.params["name"],
                                self.name)
-        # Request mediator to run this task, unless "run" parameter is set
-        # to false
-        if self.params["run"]:
-            self.send_notification(Notification.WANT_TO_RUN, None)
+        # Request mediator to run this task. It the "run" parameter is set
+        # to false, then run() below will abort.
+        self.send_notification(Notification.WANT_TO_RUN, None)
         self.logger.debug("Exit Task.__init__(%s)", self.name)
         return
 
     def run(self):
+        if not self.params["run"]:
+            self.logger.info("Stopping at %s", self.name)
+            raise Exception("Job aborted because of a forcibly disabled task")
         self.logger.info("Starting")
         self.logger.debug("%s.run(): Task state: %s", self.name, self.state)
         super().run()
@@ -1272,7 +1265,6 @@ class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
         result to updateObserver().
         '''
         wuname = self.make_wuname(identifier)
-        #self.logger.info(" created WUname %s" % wuname)
         process = cadocommand.Command(command)
         cputime_used = os.times()[2] # CPU time of child processes
         realtime_used = time.time()
@@ -1605,7 +1597,7 @@ class Polysel1Task(ClientServerTask, DoesImport, HasStatistics, patterns.Observe
     def paramnames(self):
         return self.join_params(super().paramnames, {
             "N": int, "adrange": int, "admin": 0, "admax": int,
-            "I": int, "alim": int, "rlim": int, "nrkeep": 20,
+            "I": int, "lim1": int, "lim0": int, "nrkeep": 20,
             "import_sopt": [str]})
     @staticmethod
     def update_lognorms(old_lognorm, new_lognorm):
@@ -2091,7 +2083,7 @@ class Polysel2Task(ClientServerTask, HasStatistics, DoesImport, patterns.Observe
     @property
     def paramnames(self):
         return self.join_params(super().paramnames, {
-            "N": int, "I": int, "alim": int, "rlim": int, "batch": [int],
+            "N": int, "I": int, "lim1": int, "lim0": int, "batch": [int],
             "import_ropt": [str]})
     @property
     def stat_conversions(self):
@@ -2131,10 +2123,11 @@ class Polysel2Task(ClientServerTask, HasStatistics, DoesImport, patterns.Observe
         if "bestpoly" in self.state:
             self.bestpoly = Polynomials(self.state["bestpoly"].splitlines())
         self.state.setdefault("nr_poly_submitted", 0)
+        # I don't understand why the area is based on one particular side.
         self.progparams[0].setdefault("area", 2.**(2*self.params["I"]-1) \
-                * self.params["alim"])
-        self.progparams[0].setdefault("Bf", float(self.params["alim"]))
-        self.progparams[0].setdefault("Bg", float(self.params["rlim"]))
+                * self.params["lim1"])
+        self.progparams[0].setdefault("Bf", float(self.params["lim1"]))
+        self.progparams[0].setdefault("Bg", float(self.params["lim0"]))
         if not "batch" in self.params:
             t = self.progparams[0].get("threads", 1)
             # batch = 5 rounded up to a multiple of t
@@ -2429,17 +2422,17 @@ class FactorBaseTask(Task):
     @property
     def paramnames(self):
         return self.join_params(super().paramnames,
-                {"gzip": True, "I": int, "rlim": int, "alim": int})
+                {"gzip": True, "I": int, "lim0": int, "lim1": int})
 
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator=mediator, db=db, parameters=parameters,
                          path_prefix=path_prefix)
         # Invariant: if we have a result (in self.state["outputfile"]) then we
-        # must also have a polynomial (in self.state["poly"] ) and the alim
-        # value used in self.state["alim"]
+        # must also have a polynomial (in self.state["poly"] ) and the
+        # lim1 value used in self.state["lim1"]
         if "outputfile" in self.state:
             assert "poly" in self.state
-            assert "alim" in self.state
+            assert "lim1" in self.state
             # The target file must correspond to the polynomial "poly"
         self.progparams[0].setdefault("maxbits", self.params["I"])
     
@@ -2453,7 +2446,7 @@ class FactorBaseTask(Task):
                             "received from PolyselTask")
         twoalgsides = self.send_request(Request.GET_HAVE_TWO_ALG_SIDES)
         check_params = {key: self.params[key]
-                        for key in ["alim", "rlim"][0:1 + twoalgsides]}
+                        for key in ["lim1", "lim0"][0:1 + twoalgsides]}
         
         # Check if we have already computed the outputfile for this polynomial
         # and fbb. If any of the inputs mismatch, we remove outputfile from
@@ -2493,7 +2486,7 @@ class FactorBaseTask(Task):
                     self.make_std_paths(cadoprograms.MakeFB.name)
             if not twoalgsides:
                 p = cadoprograms.MakeFB(out=str(outputfilename),
-                                    lim=self.params["alim"],
+                                    lim=self.params["lim1"],
                                     stdout=str(stdoutpath),
                                     stderr=str(stderrpath),
                                     **self.merged_args[0])
@@ -2503,7 +2496,7 @@ class FactorBaseTask(Task):
             else:
                 p = cadoprograms.MakeFB(out=str(outputfilename0),
                                     side=0,
-                                    lim=self.params["rlim"],
+                                    lim=self.params["lim0"],
                                     stdout=str(stdoutpath),
                                     stderr=str(stderrpath),
                                     **self.merged_args[0])
@@ -2512,7 +2505,7 @@ class FactorBaseTask(Task):
                     raise Exception("Program failed")
                 p = cadoprograms.MakeFB(out=str(outputfilename1),
                                     side=1,
-                                    lim=self.params["alim"],
+                                    lim=self.params["lim1"],
                                     stdout=str(stdoutpath),
                                     stderr=str(stderrpath),
                                     **self.merged_args[0])
@@ -2555,7 +2548,7 @@ class FreeRelTask(Task):
     def programs(self):
         input = {"poly": Request.GET_POLYNOMIAL_FILENAME}
         if self.params["dlp"]:
-            input["badideals"] = Request.GET_BADIDEAL_FILENAME
+            input["badideals"] = Request.GET_BADIDEALS_FILENAME
         return ((cadoprograms.FreeRel, ("renumber", "out"), input),)
     @property
     def paramnames(self):
@@ -2575,11 +2568,11 @@ class FreeRelTask(Task):
             self.progparams[0].setdefault("lcideals", True)
         # Invariant: if we have a result (in self.state["freerelfilename"])
         # then we must also have a polynomial (in self.state["poly"]) and
-        # the lpba/lpbr values used in self.state["lpba"] / ["lpbr"]
+        # the lpb0/lpb1 values used in self.state["lpb1"] / ["lpb0"]
         if "freerelfilename" in self.state:
             assert "poly" in self.state
-            assert "lpba" in self.state
-            assert "lpbr" in self.state
+            assert "lpb1" in self.state
+            assert "lpb0" in self.state
             # The target file must correspond to the polynomial "poly"
     
     def run(self):
@@ -2601,9 +2594,9 @@ class FreeRelTask(Task):
                 self.logger.warn("Received different polynomial, discarding "
                                  "old free relations file")
                 discard = True
-            elif self.state["lpba"] != self.progparams[0]["lpba"] or \
-                 self.state["lpbr"] != self.progparams[0]["lpbr"]:
-                self.logger.warn("Parameter lpba/lpbr changed, discarding old "
+            elif self.state["lpb1"] != self.progparams[0]["lpb1"] or \
+                 self.state["lpb0"] != self.progparams[0]["lpb0"]:
+                self.logger.warn("Parameter lpb1/lpb0 changed, discarding old "
                                  "free relations file")
                 discard = True
             if discard:
@@ -2612,8 +2605,8 @@ class FreeRelTask(Task):
         # If outputfile is not in state, because we never produced it or because
         # input parameters changed, we remember our current input parameters
         if not "freerelfilename" in self.state:
-            self.state.update({"poly": str(poly), "lpba": self.progparams[0]["lpba"],
-                               "lpbr": self.progparams[0]["lpbr"]})
+            self.state.update({"poly": str(poly), "lpb1": self.progparams[0]["lpb1"],
+                               "lpb0": self.progparams[0]["lpb0"]})
 
         if not "freerelfilename" in self.state or self.have_new_input_files():
             # Make file name for factor base/free relations file
@@ -2684,17 +2677,13 @@ class SievingTask(ClientServerTask, DoesImport, FilesCreator, HasStatistics,
         return "Lattice Sieving"
     @property
     def programs(self):
-        nb.nb_sieving+=1
-        if len(sys.argv)>2 and sys.argv[2]=="tasks.sieve.run=false" and nb.nb_sieving>=2:
-            self.logger.info("Not run (%s)", sys.argv[2])
-            sys.exit("Factorization stopped")
         override = ("q0", "q1", "factorbase", "out", "stats_stderr")
         input = {"poly": Request.GET_POLYNOMIAL_FILENAME}
         return ((cadoprograms.Las, override, input),)
     @property
     def paramnames(self):
         return self.join_params(super().paramnames, {
-            "qmin": 0, "qrange": int, "rels_wanted": 0, "alim": int,
+            "qmin": 0, "qrange": int, "rels_wanted": 0, "lim1": int,
             "gzip": True})
 
     @property
@@ -2752,18 +2741,18 @@ class SievingTask(ClientServerTask, DoesImport, FilesCreator, HasStatistics,
         if "qnext" in self.state:
             self.state["qnext"] = max(self.state["qnext"], qmin)
         else:
-            # qmin = 0 is magic value that uses alim instead. Not pretty.
-            self.state["qnext"] = qmin if qmin > 0 else self.params["alim"]
+            # qmin = 0 is magic value that uses lim1 instead. Not pretty.
+            self.state["qnext"] = qmin if qmin > 0 else self.params["lim1"]
         
         self.state.setdefault("rels_found", 0)
         self.state["rels_wanted"] = self.params["rels_wanted"]
         if self.state["rels_wanted"] == 0:
             # taking into account duplicates, the initial value
-            # 0.9 * (pi(2^lpbr) + pi(2^lpba)) should be good
-            nr = 2 ** self.progparams[0]["lpbr"]
-            na =  2 ** self.progparams[0]["lpba"]
-            nra = int(0.9 * nr / log (nr) + 0.9 * na / log (na))
-            self.state["rels_wanted"] = nra
+            # 0.9 * (pi(2^lpb0) + pi(2^lpb1)) should be good
+            n0 = 2 ** self.progparams[0]["lpb0"]
+            n1 =  2 ** self.progparams[0]["lpb1"]
+            n01 = int(0.9 * n0 / log (n0) + 0.9 * n1 / log (n1))
+            self.state["rels_wanted"] = n01
     
     def run(self):
         super().run()
@@ -2971,10 +2960,6 @@ class Duplicates1Task(Task, FilesCreator, HasStatistics):
         return "Filtering - Duplicate Removal, splitting pass"
     @property
     def programs(self):
-        nb.nb_filter+=1
-        if len(sys.argv)>2 and sys.argv[2]=="tasks.filter.run=false" and nb.nb_filter>=2:
-            self.logger.info("Not run (%s)", sys.argv[2])
-            sys.exit("Factorization stopped")
         return ((cadoprograms.Duplicates1, ("filelist", "prefix", "out"), {}),)
     @property
     def paramnames(self):
@@ -3710,7 +3695,19 @@ class MergeDLPTask(Task):
             message = self.submit_command(p, "", log_errors=True)
             if message.get_exitcode(0) != 0:
                 raise Exception("Program failed")
-            
+            stdout = message.read_stdout(0).decode("utf-8")
+            matsize = 0
+            matweight = 0
+            for line in stdout.splitlines():
+                match = re.match(r'Final matrix has N=(\d+) nc=\d+ \(\d+\) w\(M\)=(\d+)', line)
+                if match:
+                    matsize=int(match.group(1))
+                    matweight=int(match.group(2))
+            if (matsize == 0) or (matweight == 0):
+                raise Exception("Could not read matrix size and weight")
+            self.logger.info("Merged matrix has %d rows and total weight %d (%.1f entries per row on average)"
+                    % (matsize, matweight, float(matweight)/float(matsize)))
+
             indexfile = self.workdir.make_filename("index" + use_gz)
             mergedfile = self.workdir.make_filename("sparse.bin")
             (stdoutpath, stderrpath) = self.make_std_paths(cadoprograms.Replay.name)
@@ -3807,7 +3804,19 @@ class MergeTask(Task):
             message = self.submit_command(p, "", log_errors=True)
             if message.get_exitcode(0) != 0:
                 raise Exception("Program failed")
-            
+            stdout = message.read_stdout(0).decode("utf-8")
+            matsize = 0
+            matweight = 0
+            for line in stdout.splitlines():
+                match = re.match(r'Final matrix has N=(\d+) nc=\d+ \(\d+\) w\(M\)=(\d+)', line)
+                if match:
+                    matsize=int(match.group(1))
+                    matweight=int(match.group(2))
+            if (matsize == 0) or (matweight == 0):
+                raise Exception("Could not read matrix size and weight")
+            self.logger.info("Merged matrix has %d rows and total weight %d (%.1f entries per row on average)"
+                    % (matsize, matweight, float(matweight)/float(matsize)))
+
             indexfile = self.workdir.make_filename("index" + use_gz)
             mergedfile = self.workdir.make_filename("sparse.bin")
             (stdoutpath, stderrpath) = self.make_std_paths(cadoprograms.Replay.name)
@@ -3846,17 +3855,17 @@ class MergeTask(Task):
         return self.get_state_filename("densefile")
 
 
-class NmbrthryTask(Task):
+class NumberTheoryTask(Task):
     """ Number theory tasks for dlp"""
     @property
     def name(self):
-        return "magmanmbrthry"
+        return "numbertheory"
     @property
     def title(self):
         return "Number Theory for DLP"
     @property
     def programs(self):
-        return ((cadoprograms.MagmaNmbrthry, ("badidealinfo", "badideals"),
+        return ((cadoprograms.NumberTheory, ("badidealinfo", "badideals"),
                  {"poly": Request.GET_POLYNOMIAL_FILENAME}),)
     @property
     def paramnames(self):
@@ -3872,16 +3881,16 @@ class NmbrthryTask(Task):
         # Check if we already compute the bad ideals (we check only
         # one of the files, assuming everything was correct during the
         # first run).
-        if "badfile" in self.state:
-            self.logger.info("Nmbrthry task has already run, reusing the result.");
+        if "badidealsfile" in self.state:
+            self.logger.info("NumberTheory task has already run, reusing the result.");
             return True
 
         # Create output files and start the computation
-        badfile = self.workdir.make_filename("badideals")
-        badinfofile = self.workdir.make_filename("badidealinfo")
-        (stdoutpath, stderrpath) = self.make_std_paths(cadoprograms.MagmaNmbrthry.name)
-        p = cadoprograms.MagmaNmbrthry(badidealinfo=badinfofile,
-                               badideals=badfile,
+        badidealsfile = self.workdir.make_filename("badideals")
+        badidealinfofile = self.workdir.make_filename("badidealinfo")
+        (stdoutpath, stderrpath) = self.make_std_paths(cadoprograms.NumberTheory.name)
+        p = cadoprograms.NumberTheory(badidealinfo=badidealinfofile,
+                               badideals=badidealsfile,
                                stdout=str(stdoutpath),
                                stderr=str(stderrpath),
                                **self.merged_args[0])
@@ -3892,10 +3901,10 @@ class NmbrthryTask(Task):
         stdout = message.read_stdout(0).decode("utf-8")
         update = {}
         for line in stdout.splitlines():
-            match = re.match(r'nmaps0 (\d+)', line)
+            match = re.match(r'# nmaps0 (\d+)', line)
             if match:
                 update["nmaps0"] = int(match.group(1))
-            match = re.match(r'nmaps1 (\d+)', line)
+            match = re.match(r'# nmaps1 (\d+)', line)
             if match:
                 update["nmaps1"] = int(match.group(1))
         # Allow user-given parameter to override what we compute:
@@ -3903,84 +3912,31 @@ class NmbrthryTask(Task):
             update["nmaps0"] = self.params["nsm0"]
         if self.params["nsm1"] != -1:
             update["nmaps1"] = self.params["nsm1"]
-        update["badinfofile"] = badinfofile.get_wdir_relative()
-        update["badfile"] = badfile.get_wdir_relative()
+        update["badidealinfofile"] = badidealinfofile.get_wdir_relative()
+        update["badidealsfile"] = badidealsfile.get_wdir_relative()
         
         if not "nmaps0" in update:
             raise Exception("Stdout does not give nmaps0")
         if not "nmaps1" in update:
             raise Exception("Stdout does not give nmaps1")
-        if not badfile.isfile():
-            raise Exception("Output file %s does not exist" % badfile)
-        if not badinfofile.isfile():
-            raise Exception("Output file %s does not exist" % badinfofile)
+        if not badidealsfile.isfile():
+            raise Exception("Output file %s does not exist" % badidealsfile)
+        if not badidealinfofile.isfile():
+            raise Exception("Output file %s does not exist" % badidealinfofile)
         # Update the state entries atomically
         self.state.update(update)
 
-        self.logger.debug("Exit NmbrthryTask.run(" + self.name + ")")
+        self.logger.debug("Exit NumberTheoryTask.run(" + self.name + ")")
         return True
 
-    def get_badinfo_filename(self):
-        return self.get_state_filename("badinfofile")
+    def get_badidealinfo_filename(self):
+        return self.get_state_filename("badidealinfofile")
     
-    def get_bad_filename(self):
-        return self.get_state_filename("badfile")
+    def get_badideals_filename(self):
+        return self.get_state_filename("badidealsfile")
     
     def get_nmaps(self):
         return (self.state["nmaps0"], self.state["nmaps1"])
-
-
-class LinAlgDLPTask_Magma(Task):
-    """ Runs the linear algebra step for dlp"""
-    @property
-    def name(self):
-        return "magmalinalg"
-    @property
-    def title(self):
-        return "Linear Algebra for DLP"
-    @property
-    def programs(self):
-        return ((cadoprograms.MagmaLinalg, ("ker", "nmaps"),
-                 {"sparsemat": Request.GET_MERGED_FILENAME,
-                  "sm": Request.GET_SM_FILENAME}),)
-    @property
-    def paramnames(self):
-        return super().paramnames
-    
-    def __init__(self, *, mediator, db, parameters, path_prefix):
-        super().__init__(mediator=mediator, db=db, parameters=parameters,
-                         path_prefix=path_prefix)
-
-    def run(self):
-        super().run()
-
-        if not "kerfile" in self.state or self.have_new_input_files():
-            kerfile = self.workdir.make_filename("ker")
-            nmaps = self.send_request(Request.GET_NMAPS)
-            nn = nmaps[0] + nmaps[1];
-            (stdoutpath, stderrpath) = self.make_std_paths(cadoprograms.MagmaLinalg.name)
-            p = cadoprograms.MagmaLinalg(ker=kerfile,
-                                   nmaps=nn,
-                                   stdout=str(stdoutpath),
-                                   stderr=str(stderrpath),
-                                   **self.merged_args[0])
-            message = self.submit_command(p, "", log_errors=True)
-            if message.get_exitcode(0) != 0:
-                raise Exception("Program failed")
-            
-            if not kerfile.isfile():
-                raise Exception("Output file %s does not exist" % kerfile)
-            self.remember_input_versions(commit=False)
-            output_version = self.state.get("output_version", 0) + 1
-            update = {"kerfile": kerfile.get_wdir_relative(),
-                      "output_version": output_version}
-            self.state.update(update)
-            
-        self.logger.debug("Exit LinAlgDLPTask.run(" + self.name + ")")
-        return True
-    
-    def get_virtual_logs_filename(self):
-        return self.get_state_filename("kerfile")
 
 class bwc_output_filter(RealTimeOutputFilter):
     def filter(self, data):
@@ -4054,7 +4010,6 @@ class LinAlgDLPTask(Task):
                                  matrix=matrix,  wdir=wdir,
                                  rhs=smfile,
                                  prime=self.params["ell"],
-                                 mm_impl="basicp",
                                  nullspace="right",
                                  stdout=str(stdoutpath),
                                  stderr=str(stderrpath),
@@ -4064,7 +4019,7 @@ class LinAlgDLPTask(Task):
             message = self.submit_command(p, "", log_errors=True)
             if message.get_exitcode(0) != 0:
                 raise Exception("Program failed")
-            virtual_logs_filename = self.workdir.make_filename("K.sols0-1.0.truncated.txt", use_subdir=True)
+            virtual_logs_filename = self.workdir.make_filename("K.sols0-1.0.txt", use_subdir=True)
             if not virtual_logs_filename.isfile():
                 raise Exception("Kernel file %s does not exist" % virtual_logs_filename)
             self.remember_input_versions(commit=False)
@@ -4093,10 +4048,6 @@ class LinAlgTask(Task, HasStatistics):
         return "Linear Algebra"
     @property
     def programs(self):
-        nb.nb_linalg+=1
-        if len(sys.argv)>2 and sys.argv[2]=="tasks.linalg.run=false" and nb.nb_linalg>=2:
-            self.logger.info("Not run (%s)", sys.argv[2])
-            sys.exit("Factorization stopped")
         return ((cadoprograms.BWC, ("complete", "matrix",  "wdir", "nullspace"),
                  {"merged": Request.GET_MERGED_FILENAME}),)
     @property
@@ -4742,7 +4693,13 @@ class StartServerTask(DoesLogging, cadoparams.UseParameters, HasState):
         super().__init__(db=db, parameters=parameters, path_prefix=path_prefix)
         # self.logger.info("path_prefix = %s, parameters = %s", path_prefix, parameters)
         self.params = self.parameters.myparams(self.paramnames)
-        serveraddress = self.params.get("address", None)
+
+        # ------------------------------------------------------------------------------
+        # Temporary fix
+        # serveraddress = self.params.get("address", None)
+        serveraddress = "localhost"
+        # ------------------------------------------------------------------------------
+
         serverport = self.params["port"]
         basedir = self.params.get("workdir", default_workdir).rstrip(os.sep) + os.sep
         uploaddir = basedir + self.params["name"] + ".upload/"
@@ -5122,7 +5079,7 @@ class Request(Message):
     GET_RELSDEL_FILENAME = object()
     GET_SM_FILENAME = object()
     GET_UNITS_DIRNAME = object()
-    GET_BADIDEAL_FILENAME = object()
+    GET_BADIDEALS_FILENAME = object()
     GET_BADIDEALINFO_FILENAME = object()
     GET_SMEXP = object()
     GET_NMAPS = object()
@@ -5238,7 +5195,7 @@ class CompleteFactorization(HasState, wudb.DbAccess,
 
         if self.params["dlp"]:
             ## Tasks specific to dlp
-            self.nmbrthry = NmbrthryTask(mediator=self,
+            self.numbertheory = NumberTheoryTask(mediator=self,
                              db=db,
                              parameters=self.parameters,
                              path_prefix=parampath)
@@ -5293,7 +5250,7 @@ class CompleteFactorization(HasState, wudb.DbAccess,
                 self.tasks = (self.polysel1, self.polysel2)
             else:
                 self.tasks = (self.polyselgfpn,)
-            self.tasks = self.tasks + (self.nmbrthry, self.fb,
+            self.tasks = self.tasks + (self.numbertheory, self.fb,
                           self.freerel, self.sieving,
                           self.dup1, self.dup2,
                           self.filtergalois, self.purge, self.merge,
@@ -5304,17 +5261,6 @@ class CompleteFactorization(HasState, wudb.DbAccess,
             self.tasks = (self.polysel1, self.polysel2, self.fb, self.freerel,
                           self.sieving, self.dup1, self.dup2, self.purge,
                           self.merge, self.linalg, self.characters, self.sqrt)
-            if len(sys.argv)>2:
-                if sys.argv[2]=="tasks.sieve.run=false":
-                    self.tasks = (self.polysel1, self.polysel2, self.fb, self.freerel,
-                          self.sieving)
-                if sys.argv[2]=="tasks.filter.run=false":
-                    self.tasks = (self.polysel1, self.polysel2, self.fb, self.freerel,
-                          self.sieving, self.dup1)
-                if sys.argv[2]=="tasks.linalg.run=false":
-                    self.tasks = (self.polysel1, self.polysel2, self.fb, self.freerel,
-                          self.sieving, self.dup1, self.dup2, self.purge,
-                          self.merge, self.linalg)
 
         for (path, key, value) in parameters.get_unused_parameters():
             self.logger.warning("Parameter %s = %s was not used anywhere",
@@ -5358,9 +5304,9 @@ class CompleteFactorization(HasState, wudb.DbAccess,
         if self.params["dlp"]:
             self.request_map[Request.GET_IDEAL_FILENAME] = self.merge.get_ideal_filename
             self.request_map[Request.GET_GAL_UNIQUE_RELCOUNT] = self.filtergalois.get_nrels
-            self.request_map[Request.GET_BADIDEAL_FILENAME] = self.nmbrthry.get_bad_filename
-            self.request_map[Request.GET_BADIDEALINFO_FILENAME] = self.nmbrthry.get_badinfo_filename
-            self.request_map[Request.GET_NMAPS] = self.nmbrthry.get_nmaps
+            self.request_map[Request.GET_BADIDEALS_FILENAME] = self.numbertheory.get_badideals_filename
+            self.request_map[Request.GET_BADIDEALINFO_FILENAME] = self.numbertheory.get_badidealinfo_filename
+            self.request_map[Request.GET_NMAPS] = self.numbertheory.get_nmaps
             self.request_map[Request.GET_SM_FILENAME] = self.sm.get_sm_filename
             self.request_map[Request.GET_RELSDEL_FILENAME] = self.purge.get_relsdel_filename
             self.request_map[Request.GET_KERNEL_FILENAME] = self.linalg.get_virtual_logs_filename

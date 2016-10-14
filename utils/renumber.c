@@ -84,12 +84,12 @@ get_one_line (FILE *f, char *s)
 }
 
 static void
-parse_bad_ideals_file (FILE *badfile, renumber_ptr renum)
+parse_bad_ideals_file (FILE *badidealsfile, renumber_ptr renum)
 {
   renum->bad_ideals.n = 0;
   char s[RENUMBER_MAXLINE];
 
-  while (get_one_line (badfile, s) != 0)
+  while (get_one_line (badidealsfile, s) != 0)
   {
     renum->bad_ideals.n++;
     const char *ptr = s;
@@ -111,7 +111,7 @@ parse_bad_ideals_file (FILE *badfile, renumber_ptr renum)
     ASSERT_ALWAYS (*ptr == '\n');
     renum->size += nb;
   }
-  ASSERT_ALWAYS (feof (badfile));
+  ASSERT_ALWAYS (feof (badidealsfile));
 }
 
 static void
@@ -508,17 +508,17 @@ renumber_clear (renumber_ptr renumber_info)
  * poly = NULL is accepted. It will not print the polynomials on the file */
 void
 renumber_write_open (renumber_ptr tab, const char *tablefile, 
-		     const char *badfile, cado_poly poly)
+		     const char *badidealsfile, cado_poly poly)
 {
   printf ("# Opening %s to write the renumbering table\n", tablefile);
   fflush (stdout);
   tab->file = fopen_maybe_compressed (tablefile, "w");
   ASSERT_ALWAYS(tab->file != NULL);
   FILE *fbad = NULL;
-  if (badfile != NULL)
+  if (badidealsfile != NULL)
   {
-    printf ("# Opening %s to read the bad ideals\n", badfile);
-    fbad = fopen(badfile, "r"); /* never compressed, always small */
+    printf ("# Opening %s to read the bad ideals\n", badidealsfile);
+    fbad = fopen(badidealsfile, "r"); /* never compressed, always small */
     ASSERT_ALWAYS (fbad != NULL);
   }
 
@@ -526,7 +526,7 @@ renumber_write_open (renumber_ptr tab, const char *tablefile,
   tab->size = tab->naddcols;
 
   /* Read bad ideals files */
-  if (badfile != NULL)
+  if (badidealsfile != NULL)
     parse_bad_ideals_file (fbad, tab); /* update size et bad_ideals.n */
 
   /* Write the first line */
@@ -547,7 +547,7 @@ renumber_write_open (renumber_ptr tab, const char *tablefile,
   }
 
   /* Write first the bad ideals information at the beginning of file */
-  if (badfile != NULL)
+  if (badidealsfile != NULL)
   {
     char s[RENUMBER_MAXLINE];
     rewind (fbad);
@@ -748,7 +748,7 @@ renumber_write_buffer_p (char *out, renumber_ptr tab, unsigned long p,
 {
   size_t n = 0;
   /* The root on rat side becomes vp. If there is no rat side or not root on
-   * rat side for this prime (i.e., lpbr < p), then the largest root becomes vp.
+   * rat side for this prime (i.e., lpb < p), then the largest root becomes vp.
    */
   p_r_values_t vp = compute_vp_from_p (tab, (p_r_values_t) p);
   unsigned int replace_first = 0;

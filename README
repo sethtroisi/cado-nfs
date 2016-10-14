@@ -301,7 +301,7 @@ Big factorization (more than 200 digits):
 
 By default, to decrease memory usage, it is assumed than less than 2^32 (~ four
 billion) relations or ideals are needed and that the ideals will be less than
-2^32 (i.e., the lpba/lpbr parameters are less or equal to 32). In the case of
+2^32 (i.e., the lpb0/lpb1 parameters are less or equal to 32). In the case of
 factorizations of numbers of more than 200 digits, these assumptions may not
 hold. In this case, you have to set some variables in your local.sh script
 (see Configure section above for more information on local.sh and section on
@@ -383,7 +383,7 @@ Examples of basic usage:
 * Run a server on machine1, and a slave on machine2, disabling ssl:
 
 machine1$ ./cado-nfs.py --server 90377629292003121684002147101760858109247336549001090677693 server.port=4242 server.ssl=no server.whitelist=machine2
-machine2$ ./cado-nfs-client.py --server=http://machine1:4242
+machine2$ ./cado-nfs-client.py --server=http://machine1:4242 --bindir=...
 
 Note: if you are on an insecure network, you'll have to activate ssl, and
 then pass the appropriate sha1 certificate to the client (the server
@@ -425,29 +425,6 @@ Known problems:
   environment variable OBJECT_MODE, for example:
   export OBJECT_MODE=64
 
-Publications related to CADO-NFS:
-=================================
-
-Square Root Algorithms for the Number Field Sieve, Emmanuel Thomé, proceedings
-of WAIFI 2012, F. Özbudak and F. Rodriguez-Henriquez (Eds), LNCS 7369,
-pages 208-224, 2012.
-
-Factorisation of RSA-704 with CADO-NFS, Shi Bai, Emmanuel Thomé and Paul
-Zimmermann, preprint, http://eprint.iacr.org/2012/369, 2012.
-
-Better Polynomials for GNFS. Shi Bai, Cyril Bouvier, Alexander Kruppa and
-Paul Zimmermann. Mathematics of Computation, to appear.
-
-Root Optimization of Polynomials in the Number Field Sieve, Shi Bai, Richard
-Brent and Emmanuel Thomé. Mathematics of Computation, 2015.
-
-Non-Linear Polynomial Selection for the Number Field Sieve, Thomas Prest and
-Paul Zimmermann, Journal of Symbolic Computation, special issue in the honour
-of Joachim von zur Gathen, volume 47, number 4, pages 401-409, 2011.
-
-Améliorations de la multiplication et de la factorisation d'entier, Alexander
-Kruppa, PhD thesis, Université Henri Poincaré - Nancy I, 2010, available from
-http://tel.archives-ouvertes.fr/tel-00477005/en/.
 
 Contact, links:
 ===============

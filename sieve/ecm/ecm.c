@@ -2,10 +2,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include "portability.h"
 #include "facul_ecm.h"
 #include "ularith.h"
-#include "portability.h"
 #include "getprime.h"
+#include "addchain_bc.h"
 
 /* Do we want backtracking when processing factors of 2 in E? */
 #ifndef ECM_BACKTRACKING
@@ -92,7 +93,6 @@ ellM_swap (ellM_point_t Q, ellM_point_t P, const modulus_t m)
      - m : number to factor
      - b : (a+2)/4 mod n
   It is permissible to let P and Q use the same memory. */
-
 static void
 ellM_double (ellM_point_t Q, const ellM_point_t P, const modulus_t m, 
              const residue_t b)
@@ -143,7 +143,6 @@ ellM_double (ellM_point_t Q, const ellM_point_t P, const modulus_t m,
    is (0:0) although it shouldn't be (which actually is good for factoring!).
 
    R may be identical to P, Q and/or D. */
-
 static void
 ellM_add (ellM_point_t R, const ellM_point_t P, const ellM_point_t Q, 
           const ellM_point_t D, MAYBE_UNUSED const residue_t b, 
@@ -391,6 +390,13 @@ ellEe_swap (ellEe_point_t Q, ellEe_point_t P, const modulus_t m)
   mod_swap (Q->z, P->z, m);
 }
 
+static inline void
+ellEe_neg (ellEe_point_t P, const modulus_t m)
+{
+  mod_neg (P->x, P->x, m);
+  mod_neg (P->t, P->t, m);
+}
+
 /* 
    Computes Q=2P in E using dedicated doubling in Projective twisted Edwards
    coordinates from [Bernstein et al. 2008] 
@@ -537,7 +543,7 @@ ellEe_double (ellEe_point_t Q, const ellEe_point_t P, const modulus_t m,
 */
 static void
 ellEe_add (ellEe_point_t R, const ellEe_point_t P, const ellEe_point_t Q,
-	  const residue_t a, const modulus_t m)
+	   const modulus_t m, const residue_t a)
 {
   /* FIXME: optimize registers */
   residue_t A, B, C, D, E, F, G, H;
@@ -631,6 +637,23 @@ ellEe_add (ellEe_point_t R, const ellEe_point_t P, const ellEe_point_t Q,
   mod_clear (H, m);
 }
 
+/* Computes Q = 2P + R in projective coordinates,   */
+/* where P is given in projective coord. and R in extended coord. */
+MAYBE_UNUSED
+static void
+ellE_double_add (ellE_point_t Q, const ellE_point_t P, const ellEe_point_t R, const modulus_t m, const residue_t a)
+{
+  ellEe_point_t Qe;
+  ellEe_init (Qe, m);
+  /* TODO: optimize cost */
+  ellE_double (Q, P, m, a);
+  ellEe_set_from_E (Qe, Q, m);
+  ellEe_add (Qe, Qe, R, m, a);
+  ellE_set_from_Ee (Q, Qe, m);
+
+  ellEe_clear (Qe, m);
+}
+
 
 /* Computes R = [e]P (mod m) in homogeneous Edwards coordinates
 
@@ -696,7 +719,7 @@ ellE_mul_ul (ellE_point_t R, const ellE_point_t P, const unsigned long e,
     {
       ellEe_double (T, T, m, a);
       if (j & e)
-	ellEe_add (T, T, Pe, a, m);
+	ellEe_add (T, T, Pe, m, a);
       j >>= 1;
     }
 
@@ -787,7 +810,6 @@ ellW_double (ellW_point_t R, const ellW_point_t P, const residue_t a,
    in Weierstrass coordinates and puts result in R. 
    Returns 1 if the addition worked (i.e. the modular inverse existed) 
    and 0 otherwise (resulting point is point at infinity) */
-
 static int
 ellW_add (ellW_point_t R, const ellW_point_t P, const ellW_point_t Q, 
           const residue_t a, const modulus_t m)
@@ -892,7 +914,6 @@ ellW_mul_ui (ellW_point_t P, const unsigned long e, residue_t a,
 
 /* Interpret the bytecode located at "code" and do the 
    corresponding elliptic curve operations on (x::z) */
-
 /* static */ void
 ellM_interpret_bytecode (ellM_point_t P, const char *code,
 			 const modulus_t m, const residue_t b)
@@ -1000,10 +1021,102 @@ end_of_bytecode:
 }
 
 
+/* Interpret the addition chain written in bc */
+/* Computes Q = sP, where */
+/* - s is the primorial exponent depending only on B1 */
+/* - P is the initial point given in extended coord */
+/* - Q is returned in projective coord */
+static void
+ellE_interpret_bytecode (ellE_point_t P, const char *bc, const unsigned int bc_len,
+			 const modulus_t m, const residue_t a)
+{
+  unsigned char q;
+
+  q = bc[0];       /* 'q':  permet de remplacer les couilles en coquilles [PG, Oct. 2016] */
+  ASSERT (q & 1);  /* q is odd */
+
+  unsigned char rP_size = (q+1)/2;
+  ASSERT (rP_size <= 127);
+
+  /* Precomputation phase */
+  
+  /* _2Pe = [2]P in extended coord */
+  ellEe_point_t _2Pe;
+  ellEe_init (_2Pe, m);
+
+  ellEe_set_from_E (_2Pe, P, m);
+  ellEe_double (_2Pe, _2Pe, m, a);
+
+  /* _rP[i] = [2*i+1]P in extended coord */
+  ellEe_point_t *_rP;
+  _rP = (ellEe_point_t *) malloc (rP_size * sizeof (ellEe_point_t));
+
+  ASSERT (_rP != NULL);
+
+  for (int i=0 ; i < rP_size ; i++)
+    ellEe_init (_rP[i], m);
+
+  ellEe_set_from_E (_rP[0], P, m);
+
+  for (int i = 1 ; i < rP_size ; i++)
+    ellEe_add (_rP[i], _rP[i-1], _2Pe, m, a);
+
+  /* Addition chain */
+  
+  /* Starting point (depends on bc[1] and bc[2]) */
+  ellE_point_t Q;
+  ellEe_point_t Te;
+  ellE_init (Q, m);
+  ellEe_init (Te, m);
+
+  unsigned int i = bc[1] & 0x7F;
+  if (i == 0x7F)
+    ellEe_set (Te, _2Pe, m);
+  else
+    ellEe_set (Te, _rP[i], m);
+  
+  if (bc[1] & 0x80)
+    {
+      i = bc[2] & 0x7F;
+      ellEe_add (Te, Te, _rP[i], m, a);
+
+    }
+  ellE_set_from_Ee (Q, Te, m);
+
+  /* scan bc[i] for i >= 3 */
+  for (unsigned int i = 3; i < bc_len; i++)
+  {
+    char b = bc[i];
+    switch (b)
+    {
+      case ADDCHAIN_2DBL:
+        ellE_double (Q, Q, m, a);
+      case ADDCHAIN_DBL:
+        ellE_double (Q, Q, m, a);
+        break;
+      default:
+        ellEe_set (Te, _rP[b & 0x7f], m);
+	      if (b & 0x80)
+	        ellEe_neg (Te, m);
+	      ellE_double_add (Q, Q, Te, m, a);
+        break;
+    }
+  }
+  
+  ellE_set (P, Q, m);
+
+  ellE_clear (Q, m);
+  ellEe_clear (_2Pe, m);
+  ellEe_clear (Te, m);
+  for (i=0 ; i < rP_size ; i++)
+    ellEe_clear (_rP[i], m);
+  free (_rP);
+}
+
+
 /* Produces curve in Montgomery form from sigma value.
    Return 1 if it worked, 0 if a modular inverse failed.
    If modular inverse failed, return non-invertible value in x. */
-
 static int
 Brent12_curve_from_sigma (residue_t A, residue_t x, const residue_t sigma, 
 			  const modulus_t m)
@@ -1267,7 +1380,6 @@ clear_and_exit:
    Return 1 if it worked, 0 if a modular inverse failed.
    Currently can produce only one, hard-coded curve that is cheap 
    to initialise */
-
 static int
 Montgomery16_curve_from_k (residue_t b, residue_t x, const unsigned long k, 
 		           const modulus_t m)
@@ -1366,11 +1478,67 @@ Montgomery16_curve_from_k (residue_t b, residue_t x, const unsigned long k,
 
 
 
+static int 
+Twisted_Edwards16_curve_from_sigma (residue_t d, ellE_point_t P,
+				    MAYBE_UNUSED const unsigned long sigma, 
+				    const modulus_t m)
+{
+  residue_t u, f;
+  const Edwards_curve_t *E = &Ecurve14;
+
+  residue_t xn, xd, yn, yd, dd;
+  
+  mod_init (u, m);
+  mod_init (f, m);
+  
+  mod_set_ul (xn, E->x_numer, m);
+  mod_set_ul (xd, E->x_denom, m);
+  
+  /* (xn, yn) = P (mod m) */
+  if ( mod_inv (u, xd, m) == 0)
+    {
+      mod_gcd (f, xd, m);
+      mod_clear (u, m);
+      return 0;
+    }
+  mod_mul (P->x, xn, u, m);
+  
+  mod_set_ul (yn, E->y_numer, m);
+  mod_set_ul (yd, E->y_denom, m);
+  if (mod_inv (u, yd, m) == 0)
+    {
+      mod_gcd (f, yd, m);
+      mod_clear (u, m);
+      ellE_clear (P, m);
+      return 0;
+    }
+  mod_mul (P->y, yn, u, m);
+  
+  mod_set1 (P->z, m);
+  
+  /* Reduce d = dn/dd mod m */
+  mod_set_ul (d, E->d_numer, m);
+  mod_set_ul (dd, E->d_denom, m);
+  if (mod_inv (u, dd, m) == 0)
+    {
+      mod_gcd (f, dd, m);
+      mod_clear (u, m);
+      ellE_clear (P, m);
+      return 0;
+    }
+  mod_mul (d, d, u, m);
+  
+  mod_clear (u, m);
+  mod_clear (f, m);
+
+  return 1;
+}
+
+
 /* Make a curve of the form y^2 = x^3 + a*x^2 + b with a valid point
    (x, y) from a curve Y^2 = X^3 + A*X^2 + X. The value of b will not
    be computed. 
    x and X may be the same variable. */
-
 static int
 curveW_from_Montgomery (residue_t a, ellW_point_t P, const residue_t X, 
                         const residue_t A, const modulus_t m)
@@ -1900,10 +2068,14 @@ ecm_stage2 (residue_t r, const ellM_point_t P, const stage2_plan_t *plan,
 int 
 ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
 {
-  residue_t u, b, d;
+  residue_t u, b, d, a;
   ellM_point_t P, Pt;
+
   ellE_point_t Q;
-  ellM_init (P, m);
+
+  /* P is initialized here because the coordinates of P may be used as temporary
+     variables when constructing curves from sigma! (mouaif) */
+  ellM_init (P, m); 
 
   unsigned int i;
   int bt = 0;
@@ -1973,48 +2145,11 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
   }
   else if (plan->parameterization == TWED16)
   {
-    /* Construct Edwards16 curve [Barbulescu et. al 2012] */
-    /* Curve is constant for now */
-    
-    residue_t xn, xd, yn, yd, dd;
-
-    mod_set_ul (xn, Ecurve14.x_numer, m);
-    mod_set_ul (xd, Ecurve14.x_denom, m);
-    
-    /* (xn, yn) = P (mod m) */
-    if ( mod_inv (u, xd, m) == 0)
+    if (Twisted_Edwards16_curve_from_sigma (d, Q, plan->sigma, m) == 0)
       {
-	mod_gcd (f, xd, m);
-	mod_clear (u, m);
+	// TODO: check if factor found!
 	return 0;
       }
-    ellE_init (Q, m);
-    mod_mul (Q->x, xn, u, m);
-    
-    mod_set_ul (yn, Ecurve14.y_numer, m);
-    mod_set_ul (yd, Ecurve14.y_denom, m);
-    if (mod_inv (u, yd, m) == 0)
-      {
-	mod_gcd (f, yd, m);
-	mod_clear (u, m);
-	ellE_clear (Q, m);
-	return 0;
-      }
-    mod_mul (Q->y, yn, u, m);
-    
-    mod_set1 (Q->z, m);
-
-    /* Reduce d = dn/dd mod m */
-    mod_set_ul (d, Ecurve14.d_numer, m);
-    mod_set_ul (dd, Ecurve14.d_denom, m);
-    if (mod_inv (u, dd, m) == 0)
-      {
-	mod_gcd (f, dd, m);
-	mod_clear (u, m);
-	ellE_clear (Q, m);
-	return 0;
-      }
-    mod_mul (d, d, u, m);
   }
   else
   {
@@ -2083,29 +2218,33 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
   }
   else if (plan->parameterization == TWED16)
     {
-      residue_t a;
-      unsigned long p, q;
-
-      /* Naive scalar mult on Edwards curve */
       
-      mod_init (a, m);
       /* a = -1 */
+      mod_init (a, m);
       mod_set1 (a, m);
       mod_neg (a, a, m);
-
-      prime_info pi;
-      prime_info_init (pi);
-      for (p = 2; p <= plan->B1; p = getprime_mt (pi))
+      
+      ellE_interpret_bytecode (Q, plan->bc, plan->bc_len, m, a);
+      
+      ellE_point_t Qt;
+      ellE_init (Qt, m);
+      ellE_set (Qt, Q, m);
+      for (i = 0; i < plan->exp2; i++)
 	{
-	  for (q = p; q <= plan->B1 / p; q *= p);
-	  ellE_mul_ul (Q, Q, q, m, a);
+	  ellE_double (Q, Q, m, b);
+#if ECM_BACKTRACKING
+	  if (mod_is0 (Q[0].x, m))
+	    {
+	      ellE_set (Q, Qt, m);
+	      bt = 1;
+	      break;
+	    }
+	  ellE_set (Qt, Q, m);
+#endif
 	}
-      prime_info_clear (pi);
+      mod_gcd (f, Q[0].x, m);
 
-      mod_gcd (f, Q->z, m);
-
-      mod_clear (a, m);
-      ellE_clear (Q, m);
+      ellE_clear (Qt, m);
     }
   
 #if 0
@@ -2113,7 +2252,7 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
 	  mod_get_ul (P->x, m), mod_get_ul (P->z, m), bt, i, plan->exp2);
 #endif
   
-
+  
   if (bt == 0 && mod_intcmp_ul(f, 1UL) == 0 && plan->B1 < plan->stage2.B2)
     {
       bt = ecm_stage2 (u, P, &(plan->stage2), b, m);
@@ -2125,6 +2264,12 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
   ellM_clear (P, m);
   ellM_clear (Pt, m);
   
+  if (plan->parameterization & FULLTWED)
+  {
+    mod_clear (a, m);
+    ellE_clear (Q, m);
+  }
+
   return bt;
 }
 
@@ -2143,7 +2288,8 @@ ell_pointorder (const residue_t sigma, const int parameterization,
 		const modulus_t m, const int verbose)
 {
   ellW_point_t P, Pi, Pg;
-  residue_t A, x, a;
+  ellE_point_t Q;
+  residue_t A, x, a, d;
   unsigned long min, max, i, j, order, cof, p;
   unsigned long giant_step, giant_min, baby_len;
   modint_t tm;
@@ -2156,6 +2302,7 @@ ell_pointorder (const residue_t sigma, const int parameterization,
   mod_init (A, m);
   mod_init (x, m);
   mod_init (a, m);
+  mod_init (d, m);
   ellW_init (P, m);
   ellW_init (Pi, m);
   ellW_init (Pg, m);
@@ -2174,7 +2321,46 @@ ell_pointorder (const residue_t sigma, const int parameterization,
   {
     if (Montgomery16_curve_from_k (A, x, mod_get_ul (sigma, m), m) == 0)
       return 0;
+    //    printf ("Montg16 curve built\n");
   }
+  else if (parameterization == TWED16)
+    {
+      if (Twisted_Edwards16_curve_from_sigma (d, Q, mod_get_ul(sigma, m), m) == 0)
+	return 0;
+
+      //      printf ("Twed16 curve built\n");
+
+      // Montgomery16_curve_from_Edwards16...
+      // ax^2 + y^2 = 1 + dx^2y^2 ---> By^2 = x^3 + Ax^2 + x
+      // A = 2(a+d)/(a-d), B = 4/(a-d)
+      // u = (1+y)/(1-y)
+      // v = (1+y)/(1-y)x
+      // source: http://math.stackexchange.com/questions/1391732/birational-equvalence-of-twisted-edwards-and-montgomery-curves?noredirect=1&lq=1
+
+      //      A = 2(a+d)/(a-d) = 2(-1+d)/(-1-d)
+
+      mod_set1 (A, m);        // A = 1
+      mod_neg (A, A, m);         // A = -1
+      mod_set (x, A, m);      // x = -1
+      mod_add (x, x, d, m);   // x = (-1+d)
+      mod_add (x, x, x, m);   // x = 2(-1+d)
+      mod_sub (A, A, d, m);   // A = -1-d
+      mod_inv (A, A, m);      // A = 1/(-1-d)
+      mod_mul (A, A, x, m);   // A = 2(-1+d)/(-1-d)
+
+      //      x = (1+Q->y)/(1-Q->y)
+      //      we don't need y
+
+      mod_set1 (a, m);           // a = 1
+      mod_add (a, a, Q->y, m);   // a = (1+Q->y)
+      mod_set1 (x, m);           // x = 1
+      mod_sub (x, x, Q->y, m);   // x = (1-Q->y)
+      mod_inv (x, x, m);         // x = 1/(1-Q->y)
+      mod_mul (x, x, a, m);      // x = (1+Q->y)/(1-Q->y)
+
+      //      printf ("Twed16 curve and point converted to Montg16\n");
+      
+    }
   else
   {
     fprintf (stderr, "ecm: Unknown parameterization\n");
@@ -2197,6 +2383,8 @@ ell_pointorder (const residue_t sigma, const int parameterization,
 
   if (curveW_from_Montgomery (a, P, x, A, m) == 0)
     return 0UL;
+  
+  //  printf ("Montg16 curve and point converted to Weierstrass\n");
 
   if (verbose >= 2)
     {
@@ -2402,10 +2590,12 @@ found_inf:
   mod_clear (A, m);
   mod_clear (x, m);
   mod_clear (a, m);
+  mod_clear (d, m);
   mod_intclear (tm);
   ellW_clear (P, m);
   ellW_clear (Pi, m);
   ellW_clear (Pg, m);
+  ellE_clear (Q, m);
 
   return order;
 }

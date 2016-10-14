@@ -11,8 +11,8 @@
 /* structs of this type are passed, to decide what gets done with inputs.
  */
 struct mf_io_file {
-    uint64_t size;    // allow more than 4G elements.
-    uint64_t alloc;   // allow more than 4G elements.
+    uint64_t size;    // allow more than 4G elements.
+    uint64_t alloc;   // allow more than 4G elements.
     uint32_t * p;
     FILE * f;
     int ascii;

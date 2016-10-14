@@ -42,7 +42,7 @@ if __name__ == "__main__":
              "Multiple programs can be specified; each program is run for any file(s) that match the respective REGEX. " + \
              "If the exit status of the PROGRAMs is zero for all tested files of a WU, the WU is considered verified ok. " + \
              "If the exit status is non-zero for any tested file, the WU is considered verified with error. " + \
-             "The database is updated accordingly only if --update is given; otherwise only output to screen (and badfile if specified) happens."
+             "The database is updated accordingly only if --update is given; otherwise only output to screen (and badidealsfile if specified) happens."
 
     wudb_name = "wudb"
     parser = argparse.ArgumentParser(description=description, epilog = epilog)
@@ -53,7 +53,7 @@ if __name__ == "__main__":
                         help = "run PROGRAM on files whose names match REGEX")
     parser.add_argument('--wudb', action = 'store', default = wudb_name,
                         metavar = "FILE", help = "use FILE as Workunit DB")
-    parser.add_argument('--badfile', action = 'store', 
+    parser.add_argument('--badidealsfile', action = 'store', 
                         metavar = "FILE", help = "dump text of failed workunits to FILE")
     parser.add_argument('-r', '--received', action = 'store_true',
                         help = 'Process all workunits currently marked as received without error')
@@ -74,7 +74,7 @@ if __name__ == "__main__":
     if args.received:
         # Test all workunits whose status is RECEIVED_OK
         received = acc.query(eq={"status": wudb.WuStatus.RECEIVED_OK})
-        badfile = None
+        badidealsfile = None
         print ("Found " + str(len(received)) + " workunits")
         for wu in received:
             result = do_check(acc, wu, list(args.program))
@@ -86,11 +86,11 @@ if __name__ == "__main__":
                     print ("Workunit " + wu["wuid"] + " verified ok")
                 elif result == False:
                     print ("Workunit " + wu["wuid"] + " verified with error")
-                    if args.badfile:
-                        if badfile is None:
-                            badfile = open(args.badfile, "a")
-                        badfile.write(wu["wu"] + '\n')
+                    if args.badidealsfile:
+                        if badidealsfile is None:
+                            badidealsfile = open(args.badidealsfile, "a")
+                        badidealsfile.write(wu["wu"] + '\n')
             if args.update:
                 acc.verification(wu["wuid"], result)
-        if not badfile is None:
-            badfile.close()
+        if not badidealsfile is None:
+            badidealsfile.close()

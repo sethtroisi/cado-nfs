@@ -117,7 +117,7 @@ int main(int argc, char * argv[])
     ASSERT_ALWAYS(mm->store_transposed == !direction);
     matrix_u32 m;
     memset(m, 0, sizeof(matrix_u32));
-    m->mfile = strdup(matrixfile);
+    m->mfile = matrixfile;
     /* The bfile here makes very little sense -- we're working with the
      * local file anyway */
     m->bfile = NULL;
@@ -133,5 +133,4 @@ int main(int argc, char * argv[])
      */
     param_list_clear(pl);
     free(locfile);
-    if (m->mfile) free(m->mfile);
 }

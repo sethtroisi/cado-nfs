@@ -41,6 +41,12 @@ enable_testing()
 # Also allow testing with "make check", but building all required
 # dependencies (las for the sieve test, etc.) as well. We also add the
 # "verbose" command line option here to get more meaningful output
+
+# Note the $(ARGS) here. It is expanded by make, not by cmake, so that
+# the arguments which are present on the "make check" command line are
+# obeyed. This has the consequence that in order to pass a $, you need to
+# pass $$ ; well, plus quoting. So that gives, e.g.:
+#        make check ARGS="-R ^foo\$\$"
 add_custom_target(check COMMAND ${CMAKE_CTEST_COMMAND} -V $(ARGS))
 
 #####################################################################
@@ -71,6 +77,7 @@ get_override(BWC_GF2_MATMUL_BACKENDS    BWC_GF2_MATMUL_BACKENDS)
 get_override(BWC_GFP_ARITHMETIC_BACKENDS BWC_GFP_ARITHMETIC_BACKENDS)
 get_override(BWC_GFP_MATMUL_BACKENDS    BWC_GFP_MATMUL_BACKENDS)
 get_override(BWC_EXTRA_BACKENDS    BWC_EXTRA_BACKENDS)
+get_override(CHECKS_EXPENSIVE   CHECKS_EXPENSIVE)
 
 if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Darwin")
 	# sigh...
@@ -108,11 +115,12 @@ if(CMAKE_COMPILER_IS_GNUCC)
     # prevents the definition of __STRICT_ANSI__
     #
     # Ditto for C++, with the c++98/gnu++98 subtlety.
-    if (MINGW)
-        set (CMAKE_C_FLAGS   "-std=gnu99 -g -W -Wall ${CMAKE_C_FLAGS}")
-    else()
-        set (CMAKE_C_FLAGS   "-std=c99 -g -W -Wall ${CMAKE_C_FLAGS}")
-    endif()
+        if (MINGW)
+            set (CMAKE_C_FLAGS   "-std=gnu99 -g -W -Wall ${CMAKE_C_FLAGS}")
+        else()
+            set (CMAKE_C_FLAGS   "-std=c99 -g -W -Wall ${CMAKE_C_FLAGS}")
+        endif()
+    # Someday we'll enable c11. This will provide us aligned_alloc.
 endif()
 if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     if (NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS 4.7)
@@ -208,6 +216,8 @@ else()
     include("${CADO_NFS_SOURCE_DIR}/config/sse3.cmake")
     include("${CADO_NFS_SOURCE_DIR}/config/ssse3.cmake")
     include("${CADO_NFS_SOURCE_DIR}/config/sse41.cmake")
+    include("${CADO_NFS_SOURCE_DIR}/config/avx.cmake")
+    include("${CADO_NFS_SOURCE_DIR}/config/avx2.cmake")
     include("${CADO_NFS_SOURCE_DIR}/config/pclmul.cmake")
 endif()
 
@@ -350,6 +360,7 @@ add_custom_target(gf2x-build ALL
 # add_subdirectory (gf2x-fft)
 add_subdirectory (utils)
 add_subdirectory (polyselect)
+add_subdirectory (numbertheory)
 add_subdirectory (sieve)
 add_subdirectory (sqrt)
 add_subdirectory (linalg)
@@ -358,6 +369,7 @@ add_subdirectory (linalg/bwc)
 add_subdirectory (misc)
 add_subdirectory (scripts/cadofactor)
 add_subdirectory (tests EXCLUDE_FROM_ALL)
+#add_subdirectory (nfs-hd)
 
 add_custom_target(dist
     COMMAND scripts/dist.sh ${package_basename}
@@ -373,11 +385,8 @@ configure_file(cado-nfs-client.py cado-nfs-client.py ESCAPE_QUOTES @ONLY)
 install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/cado-nfs.py DESTINATION ${BINSUFFIX})
 install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/cado-nfs-client.py DESTINATION ${BINSUFFIX})
 
-# Copy magma scripts, to make our life easier; this should be removed 
-# once everything will be rewritten in C.
-foreach(script magma-linalg-wrapper.sh magma-nmbrthry-wrapper.sh
-        badideals.mag  linalg.mag
-        split.py descent.py)
+# Some scripts are handy to have also in the bin directory.
+foreach(script split.py descent.py)
     configure_file(
         ${CADO_NFS_SOURCE_DIR}/scripts/${script}
         ${CADO_NFS_BINARY_DIR}/scripts/${script}

@@ -7,7 +7,6 @@
 #include "params.h"
 #include "xvectors.h"
 #include "bw-common.h"
-#include "filenames.h"
 #include "mpfq/mpfq.h"
 #include "mpfq/mpfq_vbase.h"
 #include "portability.h"
@@ -23,10 +22,15 @@ void mmt_vec_set_0n(mmt_vec_ptr v, size_t items)
      * to set to the integer i, when in fact we're talking a simd
      * thing: IOW, we have set_ui_at, but no set_ui. So let's do a
      * dirty cast */
-    ASSERT_ALWAYS((size_t) v->abase->vec_elt_stride(v->abase, 1) <= sizeof(uint64_t));
+    // ASSERT_ALWAYS((size_t) v->abase->vec_elt_stride(v->abase, 1) <= sizeof(uint64_t));
+    ASSERT_ALWAYS(v->abase->vec_elt_stride(v->abase, 1) % sizeof(uint64_t) == 0);
+    // size_t nwords = (size_t) v->abase->vec_elt_stride(v->abase, 1) / sizeof(uint64_t);
     size_t off = mmt_my_own_offset_in_items(v);
     size_t sz = mmt_my_own_size_in_items(v);
     void * data = mmt_my_own_subvec(v);
+    /* Put 0's everywhere, and put i at other places (just with a dirty
+     * cast) */
+    memset(mmt_my_own_subvec(v), 0, v->abase->vec_elt_stride(v->abase, mmt_my_own_size_in_items(v)));
     for(size_t s = 0 ; s < sz ; s++) {
         uint64_t * ptr = v->abase->vec_coeff_ptr(v->abase, data, s);
         *ptr = (v->i0 + off + s < items) ? v->i0 + off + s : 0;
@@ -42,13 +46,19 @@ void mmt_vec_check_equal_0n(mmt_vec_ptr v, size_t items)
 {
     serialize(v->pi->m);
     ASSERT_ALWAYS(v->consistency == 2);
-    ASSERT_ALWAYS((size_t) v->abase->vec_elt_stride(v->abase, 1) <= sizeof(uint64_t));
+    // ASSERT_ALWAYS((size_t) v->abase->vec_elt_stride(v->abase, 1) <= sizeof(uint64_t));
+    ASSERT_ALWAYS(v->abase->vec_elt_stride(v->abase, 1) %  sizeof(uint64_t) == 0);
+    size_t nwords = (size_t) v->abase->vec_elt_stride(v->abase, 1) / sizeof(uint64_t);
     size_t off = mmt_my_own_offset_in_items(v);
     size_t sz = mmt_my_own_size_in_items(v);
     void * data = mmt_my_own_subvec(v);
     for(size_t s = 0 ; s < sz ; s++) {
         uint64_t * ptr = v->abase->vec_coeff_ptr(v->abase, data, s);
         ASSERT_ALWAYS(*ptr == (v->i0 + off + s < items ? v->i0 + off + s : 0));
+        /* check that we have zeroes elsewhere */
+        for(size_t i = 1 ; i < nwords ; i++) {
+            ASSERT_ALWAYS(ptr[i] == 0);
+        }
     }
 }
 
@@ -57,13 +67,19 @@ void mmt_vec_check_equal_0n_permuted(mmt_vec_ptr v, size_t items, uint32_t * p)
 {
     serialize(v->pi->m);
     ASSERT_ALWAYS(v->consistency == 2);
-    ASSERT_ALWAYS((size_t) v->abase->vec_elt_stride(v->abase, 1) <= sizeof(uint64_t));
+    // ASSERT_ALWAYS((size_t) v->abase->vec_elt_stride(v->abase, 1) <= sizeof(uint64_t));
+    ASSERT_ALWAYS(v->abase->vec_elt_stride(v->abase, 1) %  sizeof(uint64_t) == 0);
+    size_t nwords = (size_t) v->abase->vec_elt_stride(v->abase, 1) / sizeof(uint64_t);
     size_t off = mmt_my_own_offset_in_items(v);
     size_t sz = mmt_my_own_size_in_items(v);
     void * data = mmt_my_own_subvec(v);
     for(size_t s = 0 ; s < sz ; s++) {
         uint64_t * ptr = v->abase->vec_coeff_ptr(v->abase, data, s);
         ASSERT_ALWAYS(*ptr == (v->i0 + off + s < items ? p[v->i0 + off + s] : 0));
+        /* check that we have zeroes elsewhere */
+        for(size_t i = 1 ; i < nwords ; i++) {
+            ASSERT_ALWAYS(ptr[i] == 0);
+        }
     }
 }
 
@@ -71,7 +87,9 @@ void mmt_vec_check_equal_0n_permuted(mmt_vec_ptr v, size_t items, uint32_t * p)
 void mmt_vec_check_equal_0n_inv_permuted(mmt_vec_ptr v, size_t items, uint32_t * p)
 {
     serialize(v->pi->m);
-    ASSERT_ALWAYS((size_t) v->abase->vec_elt_stride(v->abase, 1) <= sizeof(uint64_t));
+    // ASSERT_ALWAYS((size_t) v->abase->vec_elt_stride(v->abase, 1) <= sizeof(uint64_t));
+    ASSERT_ALWAYS(v->abase->vec_elt_stride(v->abase, 1) %  sizeof(uint64_t) == 0);
+    size_t nwords = (size_t) v->abase->vec_elt_stride(v->abase, 1) / sizeof(uint64_t);
     size_t off = mmt_my_own_offset_in_items(v);
     size_t sz = mmt_my_own_size_in_items(v);
     void * data = mmt_my_own_subvec(v);
@@ -82,6 +100,10 @@ void mmt_vec_check_equal_0n_inv_permuted(mmt_vec_ptr v, size_t items, uint32_t *
         } else {
             ASSERT_ALWAYS(*ptr < items);
             ASSERT_ALWAYS(p[*ptr] == v->i0 + off + s);
+        }
+        /* check that we have zeroes elsewhere */
+        for(size_t i = 1 ; i < nwords ; i++) {
+            ASSERT_ALWAYS(ptr[i] == 0);
         }
     }
     serialize_threads(v->pi->wr[v->d]);
@@ -135,15 +157,16 @@ void * tst_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
         mmt_vec_set_0n(v, mmt->n0[0]);
         /* We save the Z files, although it's useless, the checking done
          * here is allright */
-        mmt_vec_save(v, "Z", 0, mmt->n0[0]);
+        mmt_vec_save(v, "Z.0", mmt->n0[0]);
         mmt_apply_identity(vi, v);
         mmt_vec_allreduce(vi);
+        mmt_vec_clear_padding(vi, mmt->n0[1], mmt->n0[0]);
         mmt_vec_check_equal_0n(vi, mmt->n0[1]);
-        mmt_vec_save(vi, "ZI", 0, mmt->n0[1]);
+        mmt_vec_save(vi, "ZI.0", mmt->n0[1]);
         mmt_apply_identity(vii, vi);
         mmt_vec_allreduce(vii);
-        mmt_vec_check_equal_0n(vii, mmt->n0[0]);
-        mmt_vec_save(vi, "ZII", 0, mmt->n0[0]);
+        mmt_vec_check_equal_0n(vii, MIN(mmt->n0[0], mmt->n0[1]));
+        mmt_vec_save(vi, "ZII.0", mmt->n0[0]);
         mmt_vec_clear(mmt, v);
         mmt_vec_clear(mmt, vi);
         mmt_vec_clear(mmt, vii);
@@ -307,7 +330,7 @@ void * tst_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
         mmt_vec_init(mmt,0,0, y,  1, /* shared ! */ 1, mmt->n[1]);
         mmt_vec_init(mmt,0,0, my, 0,                0, mmt->n[0]);
         serialize(pi->m);
-        mmt_vec_set_random_through_file(y, "Y", 0, mmt->n0[1], rstate);
+        mmt_vec_set_random_through_file(y, "Y.0", mmt->n0[1], rstate);
         /* recall that for all purposes, bwc operates with M*T^-1 and not M
          */
         mmt_vec_apply_T(mmt, y);
@@ -318,7 +341,7 @@ void * tst_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
          */
         mmt_vec_allreduce(my);
         mmt_vec_untwist(mmt, my);
-        mmt_vec_save(my, "MY", 0, mmt->n0[0]);
+        mmt_vec_save(my, "MY.0", mmt->n0[0]);
         mmt_vec_clear(mmt, y);
         mmt_vec_clear(mmt, my);
     }
@@ -331,7 +354,7 @@ void * tst_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
         mmt_vec_init(mmt,0,0, w,  0, /* shared ! */ 1, mmt->n[0]);
         mmt_vec_init(mmt,0,0, wm, 1,                0, mmt->n[1]);
         serialize(pi->m);
-        mmt_vec_set_random_through_file(w, "W", 0, mmt->n0[0], rstate);
+        mmt_vec_set_random_through_file(w, "W.0", mmt->n0[0], rstate);
         mmt_vec_twist(mmt, w);
         matmul_top_mul_cpu(mmt, 0, w->d, wm, w);
         /* It's not the same if we do allreduce+untwist, thus stay on the
@@ -346,7 +369,7 @@ void * tst_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
         mmt_vec_allreduce(wm);
         mmt_vec_untwist(mmt, wm);
         mmt_vec_unapply_T(mmt, wm);
-        mmt_vec_save(wm, "WM", 0, mmt->n0[1]);
+        mmt_vec_save(wm, "WM.0", mmt->n0[1]);
         mmt_vec_clear(mmt, w);
         mmt_vec_clear(mmt, wm);
     }
@@ -363,26 +386,41 @@ void * tst_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
         }
         pi_bcast(xx, m * nx * sizeof(uint32_t), BWC_PI_BYTE, 0, 0, pi->m);
         for(int d = 0 ; d < 2 ; d++)  {
+            char * tmp;
+            int rc;
+
             mmt_vec_init(mmt,0,0, x,  d, /* shared ! */ 1, mmt->n[d]);
 
             /* prepare a first vector */
             mmt_vec_set_x_indices(x, xx, m, nx);
-            mmt_vec_save(x, "Xa", d, mmt->n[d]);
+            rc = asprintf(&tmp, "Xa.%d", d);
+            ASSERT_ALWAYS(rc >= 0);
+            mmt_vec_save(x, tmp, mmt->n[d]);
+            free(tmp);
 
             /* and then a second vector, which should be equal */
             indices_twist(mmt, xx, nx * m, d);
             mmt_vec_set_x_indices(x, xx, m, nx);
             mmt_vec_untwist(mmt, x);
-            mmt_vec_save(x, "Xb", d, mmt->n[d]);
+            rc = asprintf(&tmp, "Xb.%d", d);
+            ASSERT_ALWAYS(rc >= 0);
+            mmt_vec_save(x, tmp, mmt->n[d]);
+            free(tmp);
 
             /* now for the twisted versions, too */
             mmt_vec_set_x_indices(x, xx, m, nx);
             mmt_vec_twist(mmt, x);
-            mmt_vec_save(x, "XTa", d, mmt->n[d]);
+            rc = asprintf(&tmp, "XTa.%d", d);
+            ASSERT_ALWAYS(rc >= 0);
+            mmt_vec_save(x, tmp, mmt->n[d]);
+            free(tmp);
 
             indices_twist(mmt, xx, nx * m, d);
             mmt_vec_set_x_indices(x, xx, m, nx);
-            mmt_vec_save(x, "XTb", d, mmt->n[d]);
+            rc = asprintf(&tmp, "XTb.%d", d);
+            ASSERT_ALWAYS(rc >= 0);
+            mmt_vec_save(x, tmp, mmt->n[d]);
+            free(tmp);
 
             mmt_vec_clear(mmt, x);
         }

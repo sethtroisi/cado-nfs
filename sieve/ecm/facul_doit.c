@@ -145,7 +145,6 @@ int
 facul_doit (mpz_t *factors, const modulus_t m, 
 	    const facul_strategy_t *strategy, const int method_start)
 {
-  residue_t r;
   modint_t n, f;
   struct modset_t fm, cfm;
   int i, found = 0, bt, fprime, cfprime;
@@ -154,7 +153,6 @@ facul_doit (mpz_t *factors, const modulus_t m,
   mod_intinit (f);
   mod_getmod_int (n, m);
   mod_intset_ul (f, 1UL);
-  mod_init (r, m);
   fm.arith = CHOOSE_NONE;
   cfm.arith = CHOOSE_NONE;
   
@@ -386,7 +384,6 @@ facul_doit (mpz_t *factors, const modulus_t m,
   ASSERT_ALWAYS(fm.arith == CHOOSE_NONE);
   ASSERT_ALWAYS(cfm.arith == CHOOSE_NONE);
   
-  mod_clear (r, m);
   mod_intclear (n);
   mod_intclear (f);
   return found;

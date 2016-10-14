@@ -39,7 +39,12 @@ macro(add_lingen_binary_test testname)
         TARGET_DEPENDENCIES lingen)
 endmacro()
 
-add_lingen_binary_test(test0 1dea0d8879d125aa280e26b8573f932f6bccea75,d0e758e619c8e81b3e28bbd4fe69c32826e9a4bd 64 64 160 1 lingen_threshold=10)
+# the sha1sums here are from the time were we were transposing the
+# output. Now we no longer do that.
+# add_lingen_binary_test(test0 1dea0d8879d125aa280e26b8573f932f6bccea75,d0e758e619c8e81b3e28bbd4fe69c32826e9a4bd 64 64 160 1 lingen_threshold=10)
+
+# todo presumably, on 32 bit, we get something different for the sha1sum.
+add_lingen_binary_test(test0 893801e0727d840353a35b2623430fb758e4d379 64 64 160 1 lingen_threshold=10)
 
 # The test below fails on 32bit. This should be investigated.
 # add_lingen_binary_test(test1 30b90451fb828f08caa160f96c585c4b1c0951a8 64 64 200 1 lingen_threshold=10)
@@ -194,10 +199,12 @@ add_dependencies(test-bwc-mod2-8k_dependencies mf_scan)
 add_bwc_test(mod2-oddthr bwc-trace.sh random_matrix_size=800 m=128 n=128 seed=1 thr=3)
 add_dependencies(test-bwc-mod2-oddthr_dependencies mf_scan)
 
-add_bwc_test(mod2-interleaving bwc-trace.sh random_matrix_size=800 m=128 n=128
-    interleaving=1 seed=1 thr=2)
-add_dependencies(test-bwc-mod2-oddthr_dependencies mf_scan)
-
+# temporarily disabling this test, until I get to re-enabling the
+# feature.
+# add_bwc_test(mod2-interleaving bwc-trace.sh random_matrix_size=800 m=128 n=128
+#     interleaving=1 seed=1 thr=2)
+# add_dependencies(test-bwc-mod2-oddthr_dependencies mf_scan)
+ 
 add_bwc_test(mod2-m-neq-n bwc-trace.sh random_matrix_size=400 m=128 n=64
     seed=1 thr=5)
 add_dependencies(test-bwc-mod2-m-neq-n_dependencies mf_scan)
@@ -260,23 +267,56 @@ target_link_libraries(spmv_test bwc_base)
 add_executable(short_matmul short_matmul.c)
 target_link_libraries(short_matmul bwc_base)
 
-cado_define_test(SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/test-spmv.sh
+set(test-spmv-binary-u64k1_alltests YES)
+set(test-spmv-binary-u64k4_alltests YES)
+set(test-spmv-prime-p_3_alltests YES)
+
+macro(create_test_spmv test_spmv_base)
+cado_define_test(
+    TEST_NAME test-spmv-${test_spmv_base}
+    SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/test-spmv.sh
     ARGUMENTS
     --matrix-size 1000 --density 10 --bindir ${CADO_NFS_BINARY_DIR}
+    ${ARGN}
     NO_DEFAULT_RUN
     TARGET_DEPENDENCIES
     random_matrix spmv_test short_matmul mf_scan mf_bal bwc_matmul)
 
-cado_divert_test(test-spmv 11 APPEND_ARGUMENTS thr=1x1)
-cado_divert_test(test-spmv 12 APPEND_ARGUMENTS thr=1x2)
-cado_divert_test(test-spmv 13 APPEND_ARGUMENTS thr=1x3)
-cado_divert_test(test-spmv 32 APPEND_ARGUMENTS thr=3x2)
-cado_divert_test(test-spmv 23 APPEND_ARGUMENTS thr=2x3)
+cado_divert_test(test-spmv-${test_spmv_base} 11 APPEND_ARGUMENTS thr=1x1)
+if(${test-spmv-${test_spmv_base}_alltests})
+cado_divert_test(test-spmv-${test_spmv_base} 12 APPEND_ARGUMENTS thr=1x2)
+cado_divert_test(test-spmv-${test_spmv_base} 22 APPEND_ARGUMENTS thr=2x2)
+cado_divert_test(test-spmv-${test_spmv_base} 13 APPEND_ARGUMENTS thr=1x3)
+cado_divert_test(test-spmv-${test_spmv_base} 32 APPEND_ARGUMENTS thr=3x2)
+cado_divert_test(test-spmv-${test_spmv_base} 23 APPEND_ARGUMENTS thr=2x3)
 if(HAVE_MPI)
-cado_divert_test(test-spmv 2122 APPEND_ARGUMENTS mpi=2x1 thr=2x2)
-cado_divert_test(test-spmv 1322 APPEND_ARGUMENTS mpi=1x3 thr=2x2)
-cado_divert_test(test-spmv 3222 APPEND_ARGUMENTS mpi=3x2 thr=2x2)
+cado_divert_test(test-spmv-${test_spmv_base} 2122 APPEND_ARGUMENTS mpi=2x1 thr=2x2)
+cado_divert_test(test-spmv-${test_spmv_base} 1322 APPEND_ARGUMENTS mpi=1x3 thr=2x2)
+cado_divert_test(test-spmv-${test_spmv_base} 3222 APPEND_ARGUMENTS mpi=3x2 thr=2x2)
 endif()
+endif()
+endmacro()
+
+foreach(arith_layer ${BWC_GF2_ARITHMETIC_BACKENDS})
+    string_join(mm_backends " " ${BWC_GF2_MATMUL_BACKENDS})
+
+    create_test_spmv(binary-${arith_layer}
+        --backends "${mm_backends}"
+        --arith-layer ${arith_layer})
+endforeach()
+
+foreach(arith_layer ${BWC_GFP_ARITHMETIC_BACKENDS})
+    set(extra)
+    string(REGEX MATCH "p_([0-9]+)" t "${arith_layer}")
+    if(t)
+        set(width ${CMAKE_MATCH_1})
+    endif()
+    string_join(mm_backends " " ${BWC_GFP_MATMUL_BACKENDS})
+    create_test_spmv(prime-${arith_layer}
+        --backends "${mm_backends}"
+        --arith-layer ${arith_layer}
+        --prime "${prime_${width}}")
+endforeach()
 
 cado_define_test(SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/test-matcache.sh
     --matrix-size 1000 --density 10 --bindir
@@ -364,7 +404,7 @@ cado_define_test(TEST_NAME test-lingen-crc
     ${CADO_NFS_SOURCE_DIR}/tests/linalg/bwc/test-lingen-crc.sh
     bindir=${CADO_NFS_BINARY_DIR}/linalg/bwc
     seed=0 m=64 n=64 random_stem=30000 sequence_length=200
-    expect_crc_pi=c29af350 expect_crc_F=4f4e167
+    expect_crc_pi=c29af350 expect_crc_F=04f4e167
     TARGET_DEPENDENCIES lingen)
 
 cado_define_test(test-arith-modp.cpp LIBRARIES tests utils)

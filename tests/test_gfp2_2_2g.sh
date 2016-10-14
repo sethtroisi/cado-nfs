@@ -7,7 +7,7 @@ CADO_NFS_BINARY_DIR=$2
 
 NCPUS=$("`dirname $0`"/ncpus.sh)
 
-t=`mktemp -d /tmp/cado-check.XXXXXXX`
+t=`mktemp -d ${TMPDIR-/tmp}/cado-check.XXXXXXX`
 
 POLYFILE=$t/p2dd10-JLSV1-moinsY-10-07-2015.poly
 PARAMFILE=$t/p2dd10-JLSV1-moinsY-10-07-2015.params
@@ -67,12 +67,12 @@ tasks.polyselect.adrange = 500
 tasks.polyselect.P = 420
 tasks.polyselect.nq = 1000
 
-rlim = 2000
-alim = 2000
-lpbr = 15
-lpba = 15
-tasks.sieve.mfbr = 17
-tasks.sieve.mfba = 17
+lim0 = 2000
+lim1 = 2000
+lpb0 = 15
+lpb1 = 15
+tasks.sieve.mfb0 = 17
+tasks.sieve.mfb1 = 17
 tasks.sieve.qrange = 100
 # tasks.sieve.rels_wanted = 10000
 
