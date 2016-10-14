@@ -99,8 +99,7 @@ class GeneralClass(object):
         parser.add_argument("--numbertheorydata",
                 help="File with numbertheory data",
                 type=str)
-        # This one applies to both las in the initial step, and
-        # reconstructlog in the final step
+        # This one applies to both las in the initial step
         parser.add_argument("--threads",
                 help="Number of threads to use",
                 type=int, default=4)
@@ -200,27 +199,8 @@ class GeneralClass(object):
         return self.__getfile("badidealinfo", "numbertheory.badidealinfo", "numbertheory", "badidealinfofile")
     def fb1(self):
         return self.__getfile("fb1", "factorbase.roots.gz", "factorbase", "outputfile")
-    def __read_numbertheorydata_file(self):
-        f = self.__getfile("numbertheorydata", "numbertheory.badideals.stdout", None, None)
-        self.numbertheorydata=dict()
-        with open(f, 'r') as file:
-            for line in file:
-                key,value=line.strip().split(" ")
-                self.numbertheorydata[key]=int(value)
-    def __get_numbertheory_data(self, key):
-        try:
-            return int(self.__getarg(key, "numbertheory", key))
-        except ValueError as e:
-            pass
-        if self.numbertheorydata is None:
-            self.__read_numbertheorydata_file()
-        return self.numbertheorydata[key]
     def ell(self):
         return int(args.ell)
-    def nmaps0(self):
-        return self.__get_numbertheory_data("nmaps0")
-    def nmaps1(self):
-        return self.__get_numbertheory_data("nmaps1")
     def lpb0(self):
         return args.lpb0
     def lpb1(self):
@@ -282,8 +262,6 @@ class GeneralClass(object):
         return os.path.join(args.cadobindir, "sieve", "las")
     def sm_simple_bin(self):
         return os.path.join(args.cadobindir, "filter", "sm_simple")
-    def reconstructlog_bin(self):
-        return os.path.join(args.cadobindir, "filter", "reconstructlog-dl")
 
     def lasMiddle_base_args(self):
         # TODO add threads once it's fixed.
@@ -299,17 +277,6 @@ class GeneralClass(object):
             "--poly", self.poly(),
           ]
         return [ str(x) for x in s ]
-    def reconstructlog_final_base_args(self):
-        s=[
-            self.reconstructlog_bin(),
-            "-ell", self.ell(),
-            "-sm0", self.nmaps0(),
-            "-sm1", self.nmaps1(),
-            "-poly", self.poly(),
-            "-logformat", "reconstruct",
-            "-mt", self.threads()
-          ]
-        return [ str(x) for x in s ]
 
     # There's no las_init_base_args, since DescentUpperClass uses only
     # its very own arguments.
@@ -323,8 +290,6 @@ class GeneralClass(object):
             errors.append("las not found (make las ?)")
         if not os.path.exists(self.las_bin() + "_descent"):
             errors.append("las_descent not found (make las_descent ?)")
-        if not os.path.exists(self.reconstructlog_bin()):
-            errors.append("reconstructlog-dl not found (make reconstructlog-dl ?)")
         if not os.path.exists(self.sm_simple_bin()):
             errors.append("sm_simple not found (make sm_simple ?)")
         for f in [ self.log(), self.badidealinfo(), self.poly(), self.renumber(), self.log(), self.fb1() ]:
@@ -449,9 +414,13 @@ def a_over_b_mod_p(a, b, p):
     return (a*ib) % p
 
 def is_a_over_b_equal_r_mod_pk(a, b, rk, p, pk):
-    if b%p != 0:
+    if b%p != 0:   # non-projective
+        if rk >= pk:
+            return False
         return (a-b*rk) % pk == 0
-    else:
+    else: # projective
+        if rk < pk:
+            return False
         return (b-a*rk) % pk == 0
 
 class ideals_above_p(object):
