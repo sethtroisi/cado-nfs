@@ -28,11 +28,12 @@ class Cado_NFS_toplevel(object):
     def find_default_hint_file(self):
         ''' return the full path of the default hint file which
         is appropriate for the given dlp problem.'''
-        assert self.args.dlp
-        assert self.args.gfpext == 1
+        assert self.parameters.get_simple("dlp", False)
+        assert self.parameters.get_simple("gfpext", 1) == 1
+        assert self.parameters.get_simple("N", 0) != 0
         default_param_dir = self.pathdict["data"]
         default_param_dir = os.path.join(default_param_dir, "dlp")
-        size_of_n=len(repr(self.args.N))
+        size_of_n=len(repr(self.parameters.get_simple("N", 0)))
         # also attempt nearest multiple of 5.
         attempts=["p%d"%x for x in [size_of_n, ((size_of_n+2)//5)*5]]
         if attempts[1]==attempts[0]:
@@ -881,6 +882,15 @@ class Cado_NFS_toplevel(object):
         parser.add_argument("--dlp", "-dlp",
                 help="Run discrete logarithm computation instead",
                 action='store_true')
+        parser.add_argument("--mysql", "-mysql",
+                help="Use a mysql db for tracking workunits etc",
+                action='store_true')
+        parser.add_argument("--mysql-user", "-mysql-user",
+                help="Use a mysql db for tracking workunits etc",
+                action='store')
+        parser.add_argument("--mysql-password", "-mysql-password",
+                help="Use a mysql db for tracking workunits etc",
+                action='store')
         parser.add_argument("--verboseparam",
                 help="Enable very verbose parameter parsing",
                 action='store_true')
@@ -901,8 +911,9 @@ class Cado_NFS_toplevel(object):
         
         screenlvl = getattr(cadologger, self.args.screenlog.upper())
         self.logger = logging.getLogger()
-        self.logger.addHandler(cadologger.ScreenHandler(lvl = screenlvl,
-            colour=not self.args.no_colors))
+        if not self.logger.handlers:
+            self.logger.addHandler(cadologger.ScreenHandler(lvl = screenlvl,
+                                                            colour=not self.args.no_colors))
         self.purge_files=[]
         self.pathdict=dict()
         # I have some fairly weird behaviour here in the doctests.
@@ -963,6 +974,12 @@ class Cado_NFS_toplevel(object):
             self.parameters.set_simple("dlp", self.args.dlp)
             if self.args.gfpext:
                 self.parameters.set_simple("gfpext", self.args.gfpext)
+        if self.args.mysql:
+            self.parameters.set_simple("mysql.use", self.args.mysql)
+        if self.args.mysql_user:
+            self.parameters.set_if_unset("mysql.username", self.args.mysql_user)
+        if self.args.mysql_password:
+            self.parameters.set_if_unset("mysql.password", self.args.mysql_password)
         # get default hint file if necessary
         if self.parameters.get_simple("dlp", False) and self.parameters.get_simple("gfpext", 1) == 1:
             if self.parameters.get_simple("target", 0):
