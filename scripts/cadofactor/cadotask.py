@@ -419,14 +419,14 @@ class WorkDir(object):
     workdir/jobname.taskname/subdir/file
     
     >>> f = WorkDir("/foo/bar", "jobname", "taskname")
-    >>> str(f.make_dirname()).replace(os.sep,'/')
-    '/foo/bar/jobname.taskname/'
+    >>> str(f.make_dirname("foo")).replace(os.sep,'/')
+    '/foo/bar/jobname.foo/'
     >>> str(f.make_filename('file')).replace(os.sep,'/')
-    '/foo/bar/jobname.taskname.file'
-    >>> str(f.make_filename('file', use_subdir=True)).replace(os.sep,'/')
-    '/foo/bar/jobname.taskname/file'
-    >>> str(f.make_filename('file', use_subdir=True, subdir='subdir')).replace(os.sep,'/')
-    '/foo/bar/jobname.taskname/subdir/file'
+    '/foo/bar/jobname.file'
+    >>> str(f.make_filename('file', subdir="foo")).replace(os.sep,'/')
+    '/foo/bar/jobname.foo/file'
+    >>> str(f.make_filename('file', prefix="bar", subdir='foo')).replace(os.sep,'/')
+    '/foo/bar/jobname.foo/jobname.bar.file'
     """
     def __init__(self, workdir, jobname=None, taskname=None):
         self.workdir = str(workdir).rstrip(os.sep)
