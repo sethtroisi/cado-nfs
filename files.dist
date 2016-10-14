@@ -1158,8 +1158,6 @@ numbertheory/ant.cpp
 numbertheory/CMakeLists.txt
 numbertheory/Makefile
 tests/numbertheory/CMakeLists.txt
-tests/numbertheory/test-p-maximal-order.sh
-tests/numbertheory/test-factorization-of-prime.sh
 tests/utils/test_cxx_mpz_mat.cpp
 utils/mpz_mat.cpp
 utils/mpz_mat.h
@@ -1181,3 +1179,16 @@ numbertheory/badideals.cpp
 tests/utils/test_mpz_poly_bivariate.c
 utils/mpz_poly_bivariate.c
 utils/mpz_poly_bivariate.h
+tests/numbertheory/badideals.p1024.badidealinfo
+tests/numbertheory/badideals.p1024.badideals
+tests/numbertheory/badideals.p1024.input
+tests/numbertheory/badideals.p1024.poly
+tests/numbertheory/badideals.p1024.stdout
+tests/numbertheory/badideals.rsa220.badidealinfo
+tests/numbertheory/badideals.rsa220.badideals
+tests/numbertheory/badideals.rsa220.input
+tests/numbertheory/badideals.rsa220.poly
+tests/numbertheory/badideals.rsa220.stdout
+tests/numbertheory/badideals.small-example.input
+tests/numbertheory/badideals.small-example.stdout
+tests/numbertheory/test-badideals.sh

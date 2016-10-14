@@ -127,7 +127,12 @@ istream& operator>>(istream& is, cxx_mpz_poly& f)/*{{{*/
 {
     vector<cxx_mpz> v;
     cxx_mpz a;
-    for( ; is >> a ; v.push_back(a)) ;
+    for( ; is >> a ; v.push_back(a)) {
+        for(int c ; (c = is.peek()) != EOF ; is.get()) {
+            if (!(isspace(c) || c == ','))
+                break;
+        }
+    }
     mpz_poly_realloc(f, v.size());
     for(unsigned int i = 0 ; i < v.size() ; i++) {
         mpz_set(f->coeff[i], v[i]);
