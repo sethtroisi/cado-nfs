@@ -127,12 +127,7 @@ istream& operator>>(istream& is, cxx_mpz_poly& f)/*{{{*/
 {
     vector<cxx_mpz> v;
     cxx_mpz a;
-    for( ; is >> a ; v.push_back(a)) {
-        for(int c ; (c = is.peek()) != EOF ; is.get()) {
-            if (!(isspace(c) || c == ','))
-                break;
-        }
-    }
+    for( ; is >> a ; v.push_back(a)) ;
     mpz_poly_realloc(f, v.size());
     for(unsigned int i = 0 ; i < v.size() ; i++) {
         mpz_set(f->coeff[i], v[i]);
@@ -524,7 +519,11 @@ int main(int argc, char * argv[])
     if ((tmp = param_list_lookup_string(pl, "polystr")) != NULL) {
         int side = 0;
         cxx_mpz_poly f;
-        istringstream is(tmp);
+        string stmp(tmp);
+        for(unsigned int i = 0 ; i < stmp.size() ; i++) {
+            if (stmp[i]==',') stmp[i]=' ';
+        }
+        istringstream is(stmp);
         if (!(is >> f))
             usage(pl, original_argv, "cannot parse polynomial");
 
