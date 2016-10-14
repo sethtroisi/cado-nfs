@@ -49,6 +49,7 @@ static int nb_curves95 (const unsigned int lpb);
 static int nb_curves99 (const unsigned int lpb);
 #endif
 
+/* don't use nb_curves90, nb_curves95 and nb_curves99, only use nb_curves */
 int nb_curves (const unsigned int lpb) { return nb_curves90(lpb); }
 
 static int
@@ -207,7 +208,7 @@ facul_make_strategy (const unsigned long fbb, const unsigned int lpb,
   facul_strategy_t *strategy;
 
   if (n == -1)
-    n = nb_curves90 (lpb);
+    n = nb_curves (lpb);
   strategy = (facul_strategy_t*) malloc (sizeof (facul_strategy_t));
   strategy->lpb = lpb;
   /* Store fbb^2 in assume_prime_thresh */
@@ -811,8 +812,8 @@ facul_make_strategies(const unsigned long rfbb, const unsigned int rlpb,
   if (file == NULL)
     {// make_default_strategy
       int ncurves[2];
-      ncurves[0] = (n0 > -1) ? n0 : nb_curves90 (rlpb);
-      ncurves[1] = (n1 > -1) ? n1 : nb_curves90 (alpb);
+      ncurves[0] = (n0 > -1) ? n0 : nb_curves (rlpb);
+      ncurves[1] = (n1 > -1) ? n1 : nb_curves (alpb);
       int max_ncurves = ncurves[0] > ncurves[1]? ncurves[0]: ncurves[1];
       max_curves_used_before_aux = max_ncurves + 4; // account for fixed methods.
       // There is an hardcoded bound on the number of methods.
