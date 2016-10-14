@@ -59,7 +59,7 @@ cado_define_test(
 endif()
 
 
-cado_define_test(badideals
+cado_define_test(test-badideals
     SCRIPT
         ${CADO_NFS_SOURCE_DIR}/tests/provide-wdir.sh --env wdir -- ${CMAKE_CURRENT_SOURCE_DIR}/test-badideals.sh --binary ${CADO_NFS_BINARY_DIR}/numbertheory/badideals
         ${CMAKE_CURRENT_SOURCE_DIR}/badideals.small-example
