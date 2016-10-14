@@ -448,6 +448,8 @@ vector<badideal> badideals_for_polynomial(cxx_mpz_poly const& f)/*{{{*/
 
     if (f->deg == 1) return badideals;
 
+    ASSERT_ALWAYS(f->deg > 1);
+
     cxx_mpz disc;
     mpz_poly_discriminant(disc, f);
     mpz_mul(disc, disc, f->coeff[f->deg]);
