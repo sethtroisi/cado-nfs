@@ -245,6 +245,15 @@ facul_make_strategy (const unsigned long fbb, const unsigned int lpb,
       unsigned int k;
 
       B1 += sqrt (B1);
+      /* The factor 50 was determined experimentally with testbench, to find
+	 factors of 40 bits:
+	 testbench -p -cof 1208925819614629174706189 -strat 549755813888 549755913888
+	 This finds 1908 factors (out of 3671 input numbers) with n=24 curves
+	 and 3.66s.
+	 With B2=17*B1, and 29 curves, we find 1898 factors in 4.07s.
+	 With B2=100*B1, and 21 curves we find 1856 factors in 3.76s.
+	 Thus 50 seems close to optimal.
+      */
       B2 = 50.0 * B1;
       /* we round B2 to (2k+1)*105, thus k is the integer nearest to
 	 B2/210-0.5 */
@@ -732,7 +741,16 @@ facul_make_default_strategy (int n, const int verbose)
       unsigned int k;
 
       B1 += sqrt (B1);
-      B2 = 17.0 * B1;
+      /* The factor 50 was determined experimentally with testbench, to find
+	 factors of 40 bits:
+	 testbench -p -cof 1208925819614629174706189 -strat 549755813888 549755913888
+	 This finds 1908 factors (out of 3671 input numbers) with n=24 curves
+	 and 3.66s.
+	 With B2=17*B1, and 29 curves, we find 1898 factors in 4.07s.
+	 With B2=100*B1, and 21 curves we find 1856 factors in 3.76s.
+	 Thus 50 seems close to optimal.
+      */
+      B2 = 50.0 * B1;
       /* we round B2 to (2k+1)*105, thus k is the integer nearest to
 	 B2/210-0.5 */
       k = B2 / 210.0;
