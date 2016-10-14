@@ -189,20 +189,12 @@ nb_curves99 (const unsigned int lpb)
 }
 #endif
 
-/* Make a simple minded strategy for factoring. We start with P-1 and
-   P+1 (with x0=2/7), then an ECM curve with low bounds, then a bunch of
-   ECM curves with larger bounds. How many methods to do in total is
-   controlled by the n parameter: P-1, P+1 and the first ECM curve
-   (with small bounds) are always done, then n ECM curves (with larger bounds)
-*/
-
+/* Wrapper around facul_make_default_strategy */
 facul_strategy_t *
 facul_make_strategy (const unsigned long fbb, const unsigned int lpb,
 		     int n, const int verbose)
 {
   facul_strategy_t *strategy;
-  facul_method_t *methods;
-  int i;
 
   if (n == -1)
     n = nb_curves90 (lpb);
@@ -212,60 +204,7 @@ facul_make_strategy (const unsigned long fbb, const unsigned int lpb,
   strategy->assume_prime_thresh = (double) fbb * (double) fbb;
   strategy->BBB = (double) fbb * strategy->assume_prime_thresh;
 
-  methods = (facul_method_t*) malloc ((n + 4) * sizeof (facul_method_t));
-  strategy->methods = methods;
-
-  /* run one P-1 curve with B1=315 and B2=2205 */
-  methods[0].method = PM1_METHOD;
-  methods[0].plan = (pm1_plan_t*) malloc (sizeof (pm1_plan_t));
-  pm1_make_plan ((pm1_plan_t*) methods[0].plan, 315, 2205, verbose);
-
-  /* run one P+1 curve with B1=525 and B2=3255 */
-  methods[1].method = PP1_27_METHOD;
-  methods[1].plan = (pp1_plan_t*) malloc (sizeof (pp1_plan_t));
-  pp1_make_plan ((pp1_plan_t*) methods[1].plan, 525, 3255, verbose);
-
-  /* run one ECM curve with Montgomery parametrization, B1=105, B2=3255 */
-  methods[2].method = EC_METHOD;
-  methods[2].plan = (ecm_plan_t*) malloc (sizeof (ecm_plan_t));
-  
-  ecm_make_plan ((ecm_plan_t*) methods[2].plan, 105, 3255, MONTY12, 2, 1, verbose);
-
-  if (n > 0)
-    {
-      methods[3].method = EC_METHOD;
-      methods[3].plan = (ecm_plan_t*) malloc (sizeof (ecm_plan_t));
-      ecm_make_plan ((ecm_plan_t*) methods[3].plan, 315, 5355, BRENT12, 11, 1, verbose);
-    }
-  /* heuristic strategy where B1 is increased by sqrt(B1) at each curve */
-  double B1 = 105.0;
-  for (i = 4; i < n + 3; i++)
-    {
-      double B2;
-      unsigned int k;
-
-      B1 += sqrt (B1);
-      /* The factor 50 was determined experimentally with testbench, to find
-	 factors of 40 bits:
-	 testbench -p -cof 1208925819614629174706189 -strat 549755813888 549755913888
-	 This finds 1908 factors (out of 3671 input numbers) with n=24 curves
-	 and 3.66s.
-	 With B2=17*B1, and 29 curves, we find 1898 factors in 4.07s.
-	 With B2=100*B1, and 21 curves we find 1856 factors in 3.76s.
-	 Thus 50 seems close to optimal.
-      */
-      B2 = 50.0 * B1;
-      /* we round B2 to (2k+1)*105, thus k is the integer nearest to
-	 B2/210-0.5 */
-      k = B2 / 210.0;
-      methods[i].method = EC_METHOD;
-      methods[i].plan = (ecm_plan_t*) malloc (sizeof (ecm_plan_t));
-      ecm_make_plan ((ecm_plan_t*) methods[i].plan, (unsigned int) B1, (2 * k + 1) * 105,
-		     MONTY12, i - 1, 1, 0);
-    }
-  methods[n + 3].method = 0;
-  methods[n + 3].plan = NULL;
-
+  strategy->methods = facul_make_default_strategy (n, verbose);
   return strategy;
 }
 
