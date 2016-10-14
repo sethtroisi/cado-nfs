@@ -444,34 +444,29 @@ class WorkDir(object):
         filename_arr = [s for s in [jobname, taskname, filename] if s]
         return FilePath(self.workdir, ".".join(filename_arr))
     
-    def _make_path(self, extra):
-        """ Make a path of the form: 'workdir/jobname.taskname''extra' """
-        return self.path_in_workdir("%s.%s%s" % (self.jobname, self.taskname,
-                                                 extra))
+    def make_dirname(self, subdir):
+        """ Make a directory name of the form workdir/jobname.prefix/ """
+        return self.path_in_workdir("".join([self.jobname, ".", subdir, os.sep]))
     
-    def make_dirname(self):
-        """ Make a directory name of the form workdir/jobname.taskname/ """
-        return self._make_path(os.sep)
-    
-    def make_filename(self, name, use_subdir=False, subdir=None):
-        """ If use_subdir is False, make a filename of the form
-        workdir/jobname.taskname.name
-        If use_subdir is True and subdir is None, make a filename of the form
-        workdir/jobname.taskname/name
-        If use_subdir is True and subdir is a string, make a filename of the
-        form
-        workdir/jobname.taskname/subdir/name
+    def make_filename(self, name, prefix=None, subdir=None):
+        """ If subdir is None, make a filename of the form
+        workdir/jobname.prefix.name or workdir/jobname.name depending on
+        whether prefix is None or not.
+        If subdir is not None, make a filename of the form
+        workdir/jobname.subdir/jobname.prefix.name
+        or workdir/jobname.subdir/name
         """
-        if use_subdir:
-            if subdir:
-                return self._make_path("%s%s%s%s" % (os.sep, subdir, os.sep,
-                                                     name))
-            else:
-                return self._make_path("%s%s" % (os.sep, name))
+        components=[self.jobname]
+        if subdir is not None:
+            components += [ ".", subdir, os.sep]
+            if prefix is not None:
+                components += [ self.jobname, ".", prefix, "." ]
+            components += [ name ]
         else:
-            assert subdir is None
-            return self._make_path(".%s" % name)
-
+            if prefix is not None:
+                    components += [ ".", prefix ]
+            components += [ ".", name ]
+        return self.path_in_workdir("".join(components))
 
 class Statistics(object):
     """ Class that holds statistics on program execution, and can merge two
@@ -734,7 +729,7 @@ class DoesLogging(HasTitle, metaclass=abc.ABCMeta):
 
 class MakesTablenames(HasName):
     @property
-    def tablename_prefix(self):
+    def database_state_table_name(self):
         """ Prefix string for table names
         
         By default, the table name prefix is the name attribute, but this can
@@ -746,7 +741,7 @@ class MakesTablenames(HasName):
         """ Return a name for a DB table """
         # Maybe replace SQL-disallowed characters here, like digits and '.' ?
         # Could be tricky to avoid collisions
-        name = self.tablename_prefix
+        name = self.database_state_table_name
         if extra:
             name = name + '_' + extra
         wudb.check_tablename(name)
@@ -977,7 +972,6 @@ class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
     
     Sub-classes must define class variables:
     """
-    
     # Properties that subclasses need to define
     @abc.abstractproperty
     def programs(self):
@@ -996,7 +990,14 @@ class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
             {"name": str, "workdir": str, "run": True})
     @property
     def param_nodename(self):
-        return self.name
+        # avoid segregating our parameters, which are user-visible
+        # things, underneath tree nodes whose name depends on some
+        # implementation detail which is the task name. Except in
+        # specific cases, a "task" does not (no longer) define a nesting
+        # level in the parameter hierarchy.
+        #
+        # return self.name
+        return None
     def __init__(self, *, mediator, db, parameters, path_prefix):
         ''' Sets up a database connection and a DB-backed dictionary for
         parameters. Reads parameters from DB, and merges with hierarchical
@@ -1346,7 +1347,7 @@ class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
             version = self.state.get("output_version", None)
         return self.workdir.path_in_workdir(self.state[key], version)
 
-    def make_std_paths(self, progname, do_increment=True):
+    def make_std_paths(self, progname, do_increment=True, prefix=None):
         count = self.state.get("stdiocount", 0)
         if do_increment:
             count += 1
@@ -1364,17 +1365,17 @@ class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
                                     "already exist", count)
             else:
                 break
-        stdoutpath = self.workdir.make_filename(stdoutname)
-        stderrpath = self.workdir.make_filename(stderrname)
+        stdoutpath = self.workdir.make_filename(stdoutname, prefix=prefix)
+        stderrpath = self.workdir.make_filename(stderrname, prefix=prefix)
         if did_increment:
             self.state["stdiocount"] = count
         return (stdoutpath, stderrpath)
 
-    def make_filelist(self, files):
+    def make_filelist(self, files, prefix=None):
         """ Create file file containing a list of files, one per line """
         filelist_idx = self.state.get("filelist_idx", 0) + 1
         self.state["filelist_idx"] = filelist_idx
-        filelistname = self.workdir.make_filename("filelist.%d" % filelist_idx)
+        filelistname = self.workdir.make_filename("filelist.%d" % filelist_idx, prefix=prefix)
         with filelistname.open("w") as filelistfile:
             filelistfile.write("\n".join(files) + "\n")
         return filelistname
@@ -2053,7 +2054,7 @@ class Polysel1Task(ClientServerTask, DoesImport, HasStatistics, patterns.Observe
         adend = adend - (adend % self.params["adrange"])
         assert adend > adstart
         adend = min(adend, self.params["admax"])
-        outputfile = self.workdir.make_filename("%d-%d" % (adstart, adend))
+        outputfile = self.workdir.make_filename("%d-%d" % (adstart, adend), prefix=self.name)
         if self.test_outputfile_exists(outputfile):
             self.logger.info("%s already exists, won't generate again",
                              outputfile)
@@ -2301,14 +2302,14 @@ class Polysel2Task(ClientServerTask, HasStatistics, DoesImport, patterns.Observe
         assert self.need_more_wus()
         to_submit = len(self.poly_to_submit)
         nr = self.state["nr_poly_submitted"]
-        inputfilename = self.workdir.make_filename("raw_%d" % nr)
+        inputfilename = self.workdir.make_filename("raw_%d" % nr, prefix=self.name)
         # Write one raw polynomial to inputfile
         batchsize = min(to_submit - nr, self.params["batch"])
         with inputfilename.open("w") as inputfile:
             for i in range(batchsize):
                 inputfile.write(str(self.poly_to_submit[nr + i]))
                 inputfile.write("\n")
-        outputfile = self.workdir.make_filename("opt_%d" % nr)
+        outputfile = self.workdir.make_filename("opt_%d" % nr, prefix=self.name)
         if self.test_outputfile_exists(outputfile):
             self.logger.info("%s already exists, won't generate again",
                              outputfile)
@@ -2332,7 +2333,7 @@ class Polysel2Task(ClientServerTask, HasStatistics, DoesImport, patterns.Observe
     def get_will_import(self):
         return "import" in self.params
 
-class PolyselGFpn(Task, DoesImport):
+class PolyselGFpnTask(Task, DoesImport):
     """ Polynomial selection for DL in extension fields """
     @property
     def name(self):
@@ -3053,7 +3054,7 @@ class Duplicates1Task(Task, FilesCreator, HasStatistics):
             else:
                 # Make a task-specific subdirectory name under out working
                 # directory
-                outputdir = self.workdir.make_dirname()
+                outputdir = self.workdir.make_dirname(subdir="dup1")
                 # Create this directory if it does not exist
                 # self.logger.info("Creating directory %s", outputdir)
                 outputdir.mkdir(parent=True)
@@ -3077,7 +3078,7 @@ class Duplicates1Task(Task, FilesCreator, HasStatistics):
                                                  stderr=str(stderrpath),
                                                  **self.progparams[0])
                 else:
-                    filelistname = self.make_filelist(newfiles)
+                    filelistname = self.make_filelist(newfiles, prefix="dup1")
                     p = cadoprograms.Duplicates1(filelist=filelistname,
                                                  prefix=prefix,
                                                  out=outputdir,
@@ -3244,7 +3245,7 @@ class Duplicates2Task(Task, FilesCreator, HasStatistics):
                                              stderr=str(stderrpath),
                                              **self.merged_args[0])
             else:
-                filelistname = self.make_filelist(files)
+                filelistname = self.make_filelist(files, prefix="dup1")
                 p = cadoprograms.Duplicates2(rel_count=rel_count,
                                              filelist=filelistname,
                                              stdout=str(stdoutpath),
@@ -3327,7 +3328,7 @@ class PurgeTask(Task):
     """ Removes singletons and computes excess """
     @property
     def name(self):
-        return "purgetask"
+        return "purge"
     @property
     def title(self):
         return "Filtering - Singleton removal"
@@ -3420,7 +3421,7 @@ class PurgeTask(Task):
                                    stderr=str(stderrpath),
                                    **self.progparams[0])
         else:
-            filelistname = self.make_filelist(files)
+            filelistname = self.make_filelist(files, prefix=self.name)
             p = cadoprograms.Purge(nrels=input_nrels,
                                    out=purgedfile,
                                    outdel=relsdelfile, keep=keep,
@@ -3586,7 +3587,7 @@ class FilterGaloisTask(Task):
     """ Galois Filtering """
     @property
     def name(self):
-        return "galfilter"
+        return "filtergalois"
     @property
     def title(self):
         return "Filtering - Galois"
@@ -3649,7 +3650,7 @@ class MergeDLPTask(Task):
     """ Merges relations """
     @property
     def name(self):
-        return "merge"
+        return "mergedlp"
     @property
     def title(self):
         return "Filtering - Merging"
@@ -3951,7 +3952,7 @@ class LinAlgDLPTask(Task):
     """ Runs the linear algebra step for DLP """
     @property
     def name(self):
-        return "bwc"
+        return "linalgdlp"
     @property
     def title(self):
         return "Linear Algebra"
@@ -3976,7 +3977,7 @@ class LinAlgDLPTask(Task):
         super().run()
 
         if not "virtual_logs" in self.state or self.have_new_input_files():
-            workdir = self.workdir.make_dirname()
+            workdir = self.workdir.make_dirname(subdir="bwc")
             workdir.mkdir(parent=True)
             mergedfile = self.merged_args[0].pop("merged")
             smfile = self.merged_args[0].pop("sm")
@@ -4019,7 +4020,7 @@ class LinAlgDLPTask(Task):
             message = self.submit_command(p, "", log_errors=True)
             if message.get_exitcode(0) != 0:
                 raise Exception("Program failed")
-            virtual_logs_filename = self.workdir.make_filename("K.sols0-1.0.txt", use_subdir=True)
+            virtual_logs_filename = self.workdir.make_filename("K.sols0-1.0.txt", subdir="bwc")
             if not virtual_logs_filename.isfile():
                 raise Exception("Kernel file %s does not exist" % virtual_logs_filename)
             self.remember_input_versions(commit=False)
@@ -4042,7 +4043,7 @@ class LinAlgTask(Task, HasStatistics):
     """ Runs the linear algebra step """
     @property
     def name(self):
-        return "bwc"
+        return "linalg"
     @property
     def title(self):
         return "Linear Algebra"
@@ -4186,7 +4187,7 @@ class LinAlgTask(Task, HasStatistics):
             if self.params["allow_wipeout"]:
                 self.logger.warn("Ran before, but input files have changed. "
                                  "Wiping out working directory")
-                self.workdir.make_dirname().rmtree()
+                self.workdir.make_dirname(subdir="bwc").rmtree()
                 self.state["ran_already"] = False
                 self.state.pop("dependency", None)
             else:
@@ -4200,7 +4201,7 @@ class LinAlgTask(Task, HasStatistics):
                 return False
 
         if not "dependency" in self.state or self.have_new_input_files():
-            workdir = self.workdir.make_dirname()
+            workdir = self.workdir.make_dirname(subdir="bwc")
             workdir.mkdir(parent=True)
             mergedfile = self.merged_args[0].pop("merged")
             if mergedfile is None:
@@ -4220,7 +4221,7 @@ class LinAlgTask(Task, HasStatistics):
                 message = self.submit_command(p, "", log_errors=True)
             if message.get_exitcode(0) != 0:
                 raise Exception("Program failed")
-            dependencyfilename = self.workdir.make_filename("W", use_subdir=True)
+            dependencyfilename = self.workdir.make_filename("W", subdir="bwc")
             if not dependencyfilename.isfile():
                 raise Exception("Kernel file %s does not exist" % dependencyfilename)
             self.logger.debug("Parsing stats from %s" % stdoutpath)
@@ -5149,6 +5150,7 @@ class CompleteFactorization(HasState, wudb.DbAccess,
         sievepath = parampath + ['sieve']
         filterpath = parampath + ['filter']
         linalgpath = parampath + ['linalg']
+        reconstructlogpath = parampath + ['reconstructlog']
         descentpath = parampath + ['descent']
         
         ## tasks that are common to factorization and dlp
@@ -5188,7 +5190,7 @@ class CompleteFactorization(HasState, wudb.DbAccess,
                                        parameters=self.parameters,
                                        path_prefix=polyselpath)
         else:
-            self.polyselgfpn = PolyselGFpn(mediator=self,
+            self.polyselgfpn = PolyselGFpnTask(mediator=self,
                     db=db,
                     parameters=self.parameters,
                     path_prefix=polyselpath)
@@ -5218,7 +5220,7 @@ class CompleteFactorization(HasState, wudb.DbAccess,
             self.reconstructlog = ReconstructLogTask(mediator=self,
                                      db=db,
                                      parameters=self.parameters,
-                                     path_prefix=parampath)
+                                     path_prefix=reconstructlogpath)
             if self.params["target"]:
                 self.descent = DescentTask(mediator=self,
                                          db=db,

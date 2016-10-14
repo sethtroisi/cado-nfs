@@ -732,6 +732,7 @@ class UseParameters(metaclass=abc.ABCMeta):
                 return self.path_prefix[:]
             else:
                 return self.path_prefix + [self.name]
+            return self.path_prefix
         
         def get_parameters(self):
             return self.parameters

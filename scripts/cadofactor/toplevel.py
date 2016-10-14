@@ -362,7 +362,7 @@ class Cado_NFS_toplevel(object):
                 if re.match("tasks.threads=(.*)", x):
                     if self.args.server_threads:
                         raise ValueError("--server-threads conflicts with " +x)
-                elif re.match("tasks\\.(sieve\\.sieving|polyselect)\\.threads=(.*)", x):
+                elif re.match("tasks\\.(sieve\\|polyselect)\\.threads=(.*)", x):
                     if self.args.client_threads:
                         raise ValueError("--client-threads conflicts with " + x)
                 equal_options.append(x)
@@ -591,7 +591,7 @@ class Cado_NFS_toplevel(object):
         ''' This function processes the --client-threads and
         --server-threads arguments, and sets the parameters
         tasks.threads, tasks.polyselect.threads, and
-        tasks.sieve.sieving.threads
+        tasks.sieve.threads
 
         >>> os.environ["NCPUS_FAKE"]="3"
         >>> t = Cado_NFS_toplevel(args=['12345', '-p', os.path.os.devnull, '--server-threads', 'all'])
@@ -606,7 +606,7 @@ class Cado_NFS_toplevel(object):
         >>> t.parameters.get_simple("tasks.sieve.threads",0)
         3
 
-        >>> t.parameters.get_simple("tasks.sieve.sieving.threads",0)
+        >>> t.parameters.get_simple("tasks.sieve.threads",0)
         2
 
         >>> t.parameters.get_simple("tasks.polyselect.threads",0)
@@ -622,7 +622,7 @@ class Cado_NFS_toplevel(object):
         >>> t.parameters.get_simple("tasks.threads",0)
         3
 
-        >>> t.parameters.get_simple("tasks.sieve.sieving.threads",0)
+        >>> t.parameters.get_simple("tasks.sieve.threads",0)
         1
 
         >>> t.parameters.get_simple("tasks.polyselect.threads",0)
@@ -637,7 +637,7 @@ class Cado_NFS_toplevel(object):
         >>> t.parameters.get_simple("tasks.threads",0)
         4
 
-        >>> t.parameters.get_simple("tasks.sieve.sieving.threads",0)
+        >>> t.parameters.get_simple("tasks.sieve.threads",0)
         2
 
         >>> t.parameters.get_simple("tasks.polyselect.threads",0)
@@ -652,7 +652,7 @@ class Cado_NFS_toplevel(object):
         >>> t.parameters.get_simple("tasks.threads",0)
         1
 
-        >>> t.parameters.get_simple("tasks.sieve.sieving.threads",0)
+        >>> t.parameters.get_simple("tasks.sieve.threads",0)
         1
 
         >>> t.parameters.get_simple("tasks.polyselect.threads",0)
@@ -668,7 +668,7 @@ class Cado_NFS_toplevel(object):
         >>> t.parameters.get_simple("tasks.threads",0)
         3
 
-        >>> t.parameters.get_simple("tasks.sieve.sieving.threads",0)
+        >>> t.parameters.get_simple("tasks.sieve.threads",0)
         2
 
         >>> t.parameters.get_simple("tasks.polyselect.threads",0)
@@ -714,11 +714,11 @@ class Cado_NFS_toplevel(object):
             t=int(self.args.server_threads)
             self.parameters.set_simple("tasks.threads", t)
         # We want to enforce a value for tasks.polyselect.threads and
-        # tasks.sieve.sieving.threads.
+        # tasks.sieve.threads.
         if self.args.client_threads:
             c=self.args.client_threads
             self.parameters.set_simple("tasks.polyselect.threads", c)
-            self.parameters.set_simple("tasks.sieve.sieving.threads", c)
+            self.parameters.set_simple("tasks.sieve.threads", c)
         else:
             # If there is no value set except by the side-effect
             # of having set tasks.threads or tasks.sieve.threads,
@@ -728,11 +728,11 @@ class Cado_NFS_toplevel(object):
             loc = self.parameters.locate(p)
             if loc == "tasks.threads":
                 self.parameters.set_simple(p, min(t, 2))
-            p="tasks.sieve.sieving.threads"
+            p="tasks.sieve.threads"
             loc = self.parameters.locate(p)
             if loc == "tasks.threads" or loc == "tasks.sieve.threads":
                 self.parameters.set_simple(p, min(t, 2))
-        for p in ["tasks.polyselect.threads", "tasks.sieve.sieving.threads"]:
+        for p in ["tasks.polyselect.threads", "tasks.sieve.threads"]:
             self.logger.info("%s = %s" % (p, self.parameters.get_simple(p)))
             assert self.parameters.locate(p) == p
         # last thing. For sqrt, more than 8 threads is slightly overkill.
@@ -796,7 +796,7 @@ class Cado_NFS_toplevel(object):
             # for.
             t = self.parameters.get_simple("tasks.threads", 0)
             tp = self.parameters.get_simple("tasks.polyselect.threads", 0)
-            ts = self.parameters.get_simple("tasks.sieve.sieving.threads", 0)
+            ts = self.parameters.get_simple("tasks.sieve.threads", 0)
             if t:
                 ct = max(tp,ts)
                 nrclients=int((t+ct-1)//ct)
@@ -866,7 +866,7 @@ class Cado_NFS_toplevel(object):
                 " --client-threads may also be passed, leading to"
                 " finer grain setting. When used to run the factorization"
                 " locally, set slaves.nrclient = tasks.threads /"
-                " max(task.sieve.sieving.threads, tasks.polyselect.threads)")
+                " max(task.sieve.threads, tasks.polyselect.threads)")
         parser.add_argument("--slaves", "-s",
                 type=int,
                 help="Aliases (and conflicts with) slaves.nrclients")
@@ -954,7 +954,7 @@ class Cado_NFS_toplevel(object):
         tasks.workdir = /tmp/a
         tasks.linalg.bwc.cpubinding = /tmp/misc/cpubinding.conf
         tasks.polyselect.threads = 2
-        tasks.sieve.sieving.threads = 2
+        tasks.sieve.threads = 2
 
         >>> del os.environ["NCPUS_FAKE"]
         '''
