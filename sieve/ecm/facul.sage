@@ -66,7 +66,7 @@ def cofactor_prime(p, n):
    B1 = 105.0
    for i in range(4,n+3):
       B1 += sqrt (B1)
-      B2 = 17.0 * B1
+      B2 = 50.0 * B1
       k = ZZ((B2 / 210.0).trunc())
       if monty12(p,ZZ(B1.trunc()), (2*k+1)*105, i-1, 1):
          return True
@@ -128,6 +128,7 @@ def do_table(lpbmin, lpbmax, **kwargs):
             printed=printed[-2:]
         print("/* lpb=%d */ %d, /* %s */" % (lpb, ncurves, ", ".join(printed)))
 
-do_table(10,64,ntries=10000)
+# to generate table T[] in nb_curves90():
+# do_table(10,64,ntries=10000)
 
 
