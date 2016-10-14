@@ -4,14 +4,14 @@
 
    $ primes 3 1000000 | ./testbench -inp /dev/stdin -cof 4294967311 \
                                     -ecm 315 5355 6
-   Strategy has 1 methods
+   Strategy has 1 method(s)
    Of 78498 tries there were 64684 with a factor found
    Ratio: 0.824021
    Total time: 4.25 s, per call: 54.095060 usec, per factor: 65.647672 usec
 
    $ primes 3 1000000 | ./testbench -inp /dev/stdin -cof 4294967311 -pm1 \
                                     315 3000 -ecm 315 5355 6 -ecm 315 5355 -2
-   Strategy has 3 methods
+   Strategy has 3 method(s)
    Of 78498 tries there were 77224 with a factor found
    Ratio: 0.983770
    Total time: 3.10 s, per call: 39.472700 usec, per factor: 40.123899 usec
@@ -147,6 +147,18 @@ void print_help (char *programname)
   printf ("-inpraw <f>  Read numbers in GMP raw format from file <f>\n");
   printf ("-inpstop <n> Stop after reading <n> numbers\n");
   printf ("-po <s>, -pom12 <s>, -pom16 <s>, -poe16 <s> Compute order of starting point. Use -vf\n");
+}
+
+unsigned long
+next_prime (unsigned long start)
+{
+  mpz_t p;
+
+  mpz_init_set_ui (p, start - 1);
+  mpz_nextprime (p, p);
+  start = mpz_get_ui (p);
+  mpz_clear (p);
+  return start;
 }
 
 int main (int argc, char **argv)
@@ -415,7 +427,7 @@ int main (int argc, char **argv)
     }
   else
     {
-      if (!quiet) printf ("Strategy has %d methods\n", nr_methods);
+      if (!quiet) printf ("Strategy has %d method(s)\n", nr_methods);
       strategy->lpb = lpb;
       strategy->methods[nr_methods].method = 0;
     }
@@ -434,14 +446,8 @@ int main (int argc, char **argv)
 	start++;
       stop = strtoul (argv[2], NULL, 10);
 
-      prime_info pi;
-      prime_info_init (pi);
       if (only_primes)
-	{
-	  do {
-            i = getprime_mt (pi);
-          } while (i < start);
-	}
+        i = next_prime (start);
       else
 	i = start;
       
@@ -468,11 +474,10 @@ int main (int argc, char **argv)
             }
 
 	  if (only_primes)
-	    i = getprime_mt (pi);
+            i = next_prime (i + 1);
 	  else
 	    i += 2;
 	}
-      prime_info_clear (pi);
   } else {
     inp = fopen (inp_fn, "r");
     if (inp == NULL)

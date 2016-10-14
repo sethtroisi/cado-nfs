@@ -11,7 +11,7 @@ shift 4
 
 # the checksum should not change in batch mode, which should find the maximum
 # number of relations (except if the order of primes changes)
-REFERENCE_SHA1="6acf11b0b7927bbc8cd350c7441f8ad028ef9adc" # 272 relations
+REFERENCE_SHA1="795d129e641e05f54db5ea2e855680927cfa57e1" # 272 relations
 
 lim0=2300000
 lim1=1200000
