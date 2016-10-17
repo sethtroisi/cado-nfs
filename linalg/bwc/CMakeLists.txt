@@ -131,13 +131,6 @@ if (HAVE_CURL)
 target_link_libraries(bwc_base curl)
 endif()
 
-if (MPI_OPENMPI_VERSION VERSION_GREATER 1.4)
-    # https://www.open-mpi.org/community/lists/users/2014/11/25891.php
-    message(STATUS "Enabling workaround for https://github.com/open-mpi/ompi/issues/299")
-    link_directories(${HAVE_MPI}/../lib)
-    target_link_libraries(bwc_base open-pal open-rte)
-endif()
-
 if(HAVE_CXX11 AND HAVE_HWLOC)
 target_link_libraries(bwc_base hwloc)
 endif()
