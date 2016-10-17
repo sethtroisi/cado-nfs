@@ -450,7 +450,10 @@ prac_bytecode_check (const char *bc, unsigned int len, mpz_srcptr E,
 
   mpz_t A, B, C, t, t2;
   mpz_init_set_ui (A, 1);
-  mpz_inits (B, C, t, t2, NULL);
+  mpz_init (B);
+  mpz_init (C);
+  mpz_init (t);
+  mpz_init (t2);
 
   int ret = 0;
   for (unsigned i = 0; i < len; i++)
@@ -560,6 +563,10 @@ prac_bytecode_check (const char *bc, unsigned int len, mpz_srcptr E,
   }
   if (ret == 0 && verbose)
     printf ("## PRAC: bytecode_check: chain is ok\n");
-  mpz_clears (A, B, C, t, t2, NULL);
+  mpz_clear (A);
+  mpz_clear (B);
+  mpz_clear (C);
+  mpz_clear (t);
+  mpz_clear (t2);
   return ret;
 }
