@@ -86,10 +86,11 @@ test_addchain (unsigned int B1min, unsigned int B1max, int compress,
 
 int main (int argc, const char **argv)
 {
-  int verbose = 0;
   unsigned int nerrors = 0;
 
   tests_common_cmdline (&argc, &argv, PARSE_SEED | PARSE_VERBOSE);
+
+  int verbose = tests_common_get_verbose ();
 
   { /* PRAC test */
     /* Random opcost (between 0 and 16) [ 0x1p60 == double 2^60 ] */
