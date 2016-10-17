@@ -56,7 +56,7 @@ int main(int argc, char **argv) {
   uint64_t *r1, *r2;
   unsigned long a, p, d;
   int n1, n2, i;
-  unsigned long minp = 100, maxp=10000, mina=1, maxa=100, mind=1, maxd=10;
+  unsigned long minp = 3, maxp=10000, mina=0, maxa=100, mind=1, maxd=10;
   int check = 1;
   
   if (argc > 1 && strcmp(argv[1], "-nc") == 0) {
