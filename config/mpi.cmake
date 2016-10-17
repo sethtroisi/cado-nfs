@@ -214,12 +214,3 @@ else()
     endif()
 endif()
 
-if(HAVE_MPI)
-    if(EXISTS ${HAVE_MPI}/ompi_info)
-        execute_process(COMMAND ${HAVE_MPI}/ompi_info OUTPUT_VARIABLE t ERROR_VARIABLE tx)
-        string(REGEX MATCH "Open MPI: ([0-9\\.]+(rc[0-9]*)?)" t "${t} ${tx}")
-        set(MPI_OPENMPI_VERSION t)
-        message(STATUS "Open MPI version ${MPI_OPENMPI_VERSION}")
-    endif()
-endif()
-
