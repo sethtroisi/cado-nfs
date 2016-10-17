@@ -1,9 +1,6 @@
 #ifndef CLIQUE_REMOVAL_H_
 #define CLIQUE_REMOVAL_H_
 
-/* Uncomment to use Cavallar's weight function during clique removal. */
-//#define USE_CAVALLAR_WEIGHT_FUNCTION
-
 /* A clique is a connected component of the graph where the nodes are the rows
    and the edges are the columns of weight 2.
    /!\ It is not a clique is the sense of graph theory.
