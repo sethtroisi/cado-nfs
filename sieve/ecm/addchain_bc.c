@@ -397,7 +397,7 @@ addchain_bytecode_check (const char *bc, unsigned int len, mpz_srcptr E,
 
   unsigned int k1 = ((bc[1] & 0x7f) == 0x7f) ? 2 :
                                             ((uint8_t) (bc[1] & 0x7f) << 1) + 1;
-  if (k1 > q)
+  if (k1 > q && k1 != 2)
   {
     printf ("## Addchain: bytecode_check failed: bc[1] = %u is larger than "
             "q = %u\n", k1, q);
