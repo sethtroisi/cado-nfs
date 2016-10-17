@@ -11,25 +11,19 @@
 #include "addchain_bc.h"
 #include "portability.h"
 
-#define PP1_DICT_NRENTRIES 6
-static size_t pp1_dict_len[PP1_DICT_NRENTRIES] = {1, 1, 2, 2, 3, 4};
-static literal_t *pp1_dict_entry[PP1_DICT_NRENTRIES] =
-  {"\xB", "\xA", "\xB\xA", "\x3\x0", "\x3\xB\xA", "\x3\x0\x3\x0"};
-static code_t pp1_dict_code[PP1_DICT_NRENTRIES] = {0, 0, 10, 11, 13, 14};
+/* By default we compress the bytecode chain.
+ * You can set it to 0 to disabled it.
+ */
+#define BYTECODE_COMPRESS 1
 
-static bc_dict_t pp1_dict =
-  {PP1_DICT_NRENTRIES, pp1_dict_len, pp1_dict_entry, pp1_dict_code};
+/* Costs of operations for P+1 (for Lucas chain computed with PRAC algorithm) */
+prac_cost_t pp1_opcost = { .dadd = 10., .dbl = 10.};
 
-
-#define ECM_PRAC_DICT_NRENTRIES 4
-static size_t ecm_prac_dict_len[ECM_PRAC_DICT_NRENTRIES] = {1, 1, 2, 2};
-static literal_t *ecm_prac_dict_entry[ECM_PRAC_DICT_NRENTRIES] =
-{"\xB", "\xA", "\xB\xA", "\x3\x0"};
-static code_t ecm_prac_dict_code[ECM_PRAC_DICT_NRENTRIES] = {0, 0, 10, 11};
-
-static bc_dict_t ecm_prac_dict =
-  {ECM_PRAC_DICT_NRENTRIES, ecm_prac_dict_len, ecm_prac_dict_entry,
-                                                ecm_prac_dict_code};
+/* Costs of operations for Montgomery curves used in ECM (for Lucas chain
+ * computed with PRAC algorithm)
+ * TODO: find good ratio between addcost and doublecost
+ */
+prac_cost_t ecm_montgomery_opcost = { .dadd = 6., .dbl = 5.};
 
 /* Costs of operations for Twisted Edwards Curves with a=-1
  *  For those curves, we use 3 different models:
@@ -50,57 +44,7 @@ static bc_dict_t ecm_prac_dict =
 addchain_cost_t TwEdwards_minus1_opcost = { .dbl=7. , .add=7. , .dbladd=15. ,
                                             .dbl_precomp=8. , .add_precomp=8. };
 
-/* Store already computed ECM stage 1 chains in a global variable.
- * WARNING: for the moment, this is not thread safe
- */
-static unsigned int nb_saved_chains = 0;
-static unsigned int * saved_chains_B1 = NULL;
-static unsigned int * saved_chains_len = NULL;
-static char ** saved_chains = NULL;
-
-void save_chain(unsigned int B1, unsigned int len, const char * ch)
-{
-  nb_saved_chains++;
-  saved_chains_B1 = (unsigned int *)realloc(saved_chains_B1,
-      nb_saved_chains*sizeof(unsigned int));
-  saved_chains_len = (unsigned int *)realloc(saved_chains_len,
-      nb_saved_chains*sizeof(unsigned int));
-  saved_chains = (char **)realloc(saved_chains, nb_saved_chains*sizeof(char *));
-  saved_chains_B1[nb_saved_chains-1] = B1;
-  saved_chains_len[nb_saved_chains-1] = len;
-  saved_chains[nb_saved_chains-1] = (char *)malloc(len);
-  memcpy(saved_chains[nb_saved_chains-1], ch, len);
-}
-
-// Return 0 if not found, len if found.
-// If successful, a new array is allocated in ch.
-unsigned int lookup_saved_chain(char ** ch, unsigned int B1)
-{
-  int found = 0;
-  unsigned int i;
-  for (i = 0; i < nb_saved_chains; ++i) {
-    if (B1 == saved_chains_B1[i]) {
-      found = 1;
-      break;
-    }
-  }
-  if (!found)
-    return 0;
-
-  unsigned int len = saved_chains_len[i];
-  *ch = (char *)malloc(len);
-  memcpy(*ch, saved_chains[i], len);
-  return len;
-}
-
-void free_saved_chains() {
-  for (unsigned int i = 0; i < nb_saved_chains; ++i)
-    free(saved_chains[i]);
-  free(saved_chains);
-  free(saved_chains_B1);
-  free(saved_chains_len);
-}
-
+/***************************** P-1 ********************************************/
 
 void
 pm1_make_plan (pm1_plan_t *plan, const unsigned int B1, const unsigned int B2,
@@ -162,6 +106,7 @@ pm1_clear_plan (pm1_plan_t *plan)
   plan->B1 = 0;
 }
 
+/***************************** P+1 ********************************************/
 
 /* Make byte code for addition chain for stage 1, and the parameters for
    stage 2 */
@@ -170,69 +115,19 @@ void
 pp1_make_plan (pp1_plan_t *plan, const unsigned int B1, const unsigned int B2,
 	       int verbose)
 {
-  unsigned int p;
-  const double addcost = 10, doublecost = 10, bytecost = 1, changecost = 1;
-  const unsigned int compress = 1;
-  bc_state_t *bc_state;
-
   if (verbose)
     printf("Making plan for P+1 with B1=%u, B2=%u\n", B1, B2);
 
   /* Make bytecode for stage 1 */
   plan->exp2 = 0;
-  for (p = 1; p <= B1 / 2; p *= 2)
+  for (unsigned int p = 1; p <= B1 / 2; p *= 2)
     plan->exp2++;
 
   plan->B1 = B1;
-  bc_state = bytecoder_init (compress ? &pp1_dict : NULL);
-  prime_info pi;
-  prime_info_init (pi);
-  p = (unsigned int) getprime_mt (pi);
-  ASSERT (p == 3);
-  for ( ; p <= B1; p = (unsigned int) getprime_mt (pi))
-    {
-      unsigned long q;
-      for (q = 1; q <= B1 / p; q *= p)
-	prac_bytecode (p, addcost, doublecost, bytecost, changecost, bc_state);
-    }
-  prime_info_clear (pi);
-  bytecoder ((literal_t) 12, bc_state);
-  bytecoder_flush (bc_state);
-  plan->bc_len = bytecoder_size (bc_state);
-  plan->bc = (char *) malloc (plan->bc_len);
-  ASSERT (plan->bc != NULL);
-  bytecoder_read (plan->bc, bc_state);
-  bytecoder_clear (bc_state);
 
-  if (!compress)
-    {
-      /* The very first chain init and very last chain end are hard-coded
-	 in the stage 1 code and must be removed from the byte code. */
-      size_t i;
-      ASSERT (plan->bc[0] == 10); /* check that first code is chain init */
-      ASSERT (plan->bc[plan->bc_len - 2] == 11); /* check that next-to-last
-						    code is chain end */
-      /* check that last code is bytecode end */
-      ASSERT (plan->bc[plan->bc_len - 1] == (literal_t) 12);
-      /* Remove first code 10 and last code 11 */
-      for (i = 1; i < plan->bc_len; i++)
-	plan->bc[i - 1] = plan->bc[i];
-      plan->bc[plan->bc_len - 3] = plan->bc[plan->bc_len - 2];
-      plan->bc_len -= 2;
-    }
-
-  if (verbose)
-    {
-      int changes = 0;
-      printf ("Byte code for stage 1: ");
-      for (p = 0; p < plan->bc_len; p++)
-        {
-	  printf ("%s%d", (p == 0) ? "" : ", ", (int) (plan->bc[p]));
-	  changes += (p > 0 && plan->bc[p-1] != plan->bc[p]);
-        }
-      printf ("\n");
-      printf ("Length %d, %d code changes\n", plan->bc_len, changes);
-    }
+  /* Allocates plan->bc, fills it and returns bc_len */
+  plan->bc_len = prac_bytecode (&(plan->bc), B1, plan->exp2, 0, &pp1_opcost,
+                                BYTECODE_COMPRESS, verbose);
 
   /* Make stage 2 plan */
   stage2_make_plan (&(plan->stage2), B1, B2, verbose);
@@ -246,8 +141,15 @@ pp1_clear_plan (pp1_plan_t *plan)
   plan->bc = NULL;
   plan->bc_len = 0;
   plan->B1 = 0;
+
+  /* Clear the cache for the chains computed by prac algorithm.
+   * The first call to this function will free the memory, the other calls will
+   * be nop.
+   */
+  prac_cache_free ();
 }
 
+/***************************** ECM ********************************************/
 
 /* Make byte code for addition chain for stage 1, and the parameters for
    stage 2. Parameterization chooses Brent-Suyama curves with order divisible
@@ -262,10 +164,7 @@ ecm_make_plan (ecm_plan_t *plan, const unsigned int B1, const unsigned int B2,
               const int parameterization, const unsigned long sigma,
               const int extra_primes, const int verbose)
 {
-  const unsigned int compress = 1;
   unsigned int pow3_extra;
-  bc_state_t *bc_state;
-  double totalcost = 0.;
 
   if (verbose)
     printf("Making plan for ECM with B1=%u, B2=%u, parameterization = %d, "
@@ -287,95 +186,31 @@ ecm_make_plan (ecm_plan_t *plan, const unsigned int B1, const unsigned int B2,
   if (verbose)
     printf ("Exponent of 2 in stage 1 primes: %u\n", plan->exp2);
 
-  /* If group order is divisible by 12, add another 3 to stage 1 primes */
-  pow3_extra = (extra_primes && (parameterization & ECM_TORSION12)) ? 1 : 0 ;
-  if (verbose && pow3_extra)
-    printf ("Add another 3 to stage 1 primes\n");
-
   /* Make bytecode for stage 1 */
   plan->B1 = B1;
   plan->parameterization = parameterization;
   plan->sigma = sigma;
 
+  /* If group order is divisible by 12, add another 3 to stage 1 primes */
+  pow3_extra = (extra_primes && (parameterization & ECM_TORSION12)) ? 1 : 0 ;
+  if (verbose && pow3_extra)
+    printf ("Add another 3 to stage 1 primes\n");
+
+  /* Allocates plan->bc, fills it and returns bc_len.
+   * For Montgomery curves: we use Lucas chains computed with PRAC algorithm.
+   * For Twisted Edwards curves: we use additions chains
+   */
   if (parameterization & FULLMONTY)
   {
-    /* TODO: find good ratio between addcost and doublecost */
-    const double addcost = 6., doublecost = 5., bytecost = 1, changecost = 1;
-    plan->bc_len = lookup_saved_chain(&plan->bc, B1);
-    if (plan->bc_len == 0)
-    {
-      bc_state = bytecoder_init (compress ? &ecm_prac_dict : NULL);
-      /* If group order is divisible by 12, add another 3 to stage 1 primes */
-      if (extra_primes && (parameterization & ECM_TORSION12))
-        totalcost += prac_bytecode (3, addcost, doublecost, bytecost,
-                                                          changecost, bc_state);
-
-      /* Then do all the other odd primes */
-      prime_info pi;
-      prime_info_init (pi);
-      unsigned int p = (unsigned int) getprime_mt (pi);
-      ASSERT (p == 3);
-      for ( ; p <= B1; p = (unsigned int) getprime_mt (pi))
-      {
-        for (unsigned int q = 1; q <= B1 / p; q *= p)
-          totalcost += prac_bytecode (p, addcost, doublecost, bytecost,
-                                                        changecost, bc_state);
-      }
-      prime_info_clear (pi);
-
-      /* Do not forget to add in totalcost, the cost of the initial doublings */
-      totalcost += plan->exp2 * doublecost;
-
-      bytecoder ((literal_t) 12, bc_state);
-      bytecoder_flush (bc_state);
-      plan->bc_len = bytecoder_size (bc_state);
-      plan->bc = (char *) malloc (plan->bc_len);
-      ASSERT (plan->bc);
-      bytecoder_read (plan->bc, bc_state);
-      bytecoder_clear (bc_state);
-      /* Save chain for future use (global variable).
-       * XXX: If this get multithreaded someday, we should have a mutex here
-       */
-      save_chain(B1, plan->bc_len, plan->bc);
-    }
-
-    if (!compress)
-    {
-      /* The very first chain init and very last chain end are hard-coded
-      in the stage 1 code and must be removed from the byte code. */
-      size_t i;
-      ASSERT (plan->bc[0] == 10); /* check that first code is chain init */
-      ASSERT (plan->bc[plan->bc_len - 2] == 11); /* check that next-to-last
-      code is chain end */
-      /* check that last code is bytecode end */
-      ASSERT (plan->bc[plan->bc_len - 1] == (literal_t) 12);
-      /* Remove first code 10 and last code 11 */
-      for (i = 1; i < plan->bc_len; i++)
-        plan->bc[i - 1] = plan->bc[i];
-      plan->bc[plan->bc_len - 3] = plan->bc[plan->bc_len - 2];
-      plan->bc_len -= 2;
-    }
-
-    if (verbose)
-    {
-      int changes = 0;
-      printf ("Exponent of 2 in stage 1 primes: %u\n", plan->exp2);
-      printf ("Byte code for stage 1: ");
-      for (unsigned int p = 0; p < plan->bc_len; p++)
-      {
-        printf ("%s%d", (p == 0) ? "" : ", ", (int) (plan->bc[p]));
-        changes += (p > 0 && plan->bc[p-1] != plan->bc[p]);
-      }
-      printf ("\n");
-      printf ("Length %d, %d code changes, total cost: %f\n",
-      plan->bc_len, changes, totalcost);
-    }
+    plan->bc_len = prac_bytecode (&(plan->bc), B1, plan->exp2, pow3_extra,
+                                  &ecm_montgomery_opcost, BYTECODE_COMPRESS,
+                                  verbose);
   }
   else if (parameterization & FULLTWED)
   {
-    /* Allocates plan->bc, fills it and returns bc_len */
     plan->bc_len = addchain_bytecode (&(plan->bc), B1, plan->exp2, pow3_extra,
-                                      &TwEdwards_minus1_opcost, verbose);
+                                      &TwEdwards_minus1_opcost,
+                                      BYTECODE_COMPRESS, verbose);
   }
   else
     FATAL_ERROR_CHECK (1, "Unknown parametrization");
@@ -397,4 +232,10 @@ ecm_clear_plan (ecm_plan_t *plan)
     plan->bc = NULL;
     plan->bc_len = 0;
   }
+
+  /* Clear the cache for the chains computed by prac algorithm.
+   * The first call to this function will free the memory, the other calls will
+   * be nop.
+   */
+  prac_cache_free ();
 }

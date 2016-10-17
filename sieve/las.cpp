@@ -3437,10 +3437,6 @@ int main (int argc0, char *argv0[])/*{{{*/
 
     las_info_clear(las);
 
-    // Clear the ecm addition chains that are stored as global variables
-    // to avoid re-computations.
-    free_saved_chains();
-
     param_list_clear(pl);
 
     return 0;
