@@ -4634,11 +4634,9 @@ class DescentTask(Task):
     @property
     def programs(self):
         input = {
-                # "db": Request.GET_DB_FILENAME,
                 "prefix": Request.GET_WORKDIR_JOBNAME,
                 "datadir": Request.GET_WORKDIR_PATH,
                 }
-        # input = { "db": self.get_db_uri(), }
         override = ("cadobindir",)
         return ((cadoprograms.Descent, override, input),)
     @property
@@ -5093,8 +5091,6 @@ class Request(Message):
     GET_SMEXP = object()
     GET_NMAPS = object()
     GET_WU_RESULT = object()
-    GET_DB_URI = object()
-    GET_DB_FILENAME = object()
     GET_WORKDIR_JOBNAME = object()
     GET_WORKDIR_PATH = object()
 
@@ -5125,10 +5121,6 @@ class CompleteFactorization(HasState, wudb.DbAccess,
         super().__init__(db=db, parameters=parameters, path_prefix=path_prefix)
         self.params = self.parameters.myparams(self.paramnames)
         self.db_listener = self.make_db_listener()
-
-        self.state["dburi"] = self.db.uri
-        if self.db.path:
-            self.state["dbfilename"] = self.db.path
 
         # Init WU BD
         self.wuar = self.make_wu_access()
@@ -5301,8 +5293,6 @@ class CompleteFactorization(HasState, wudb.DbAccess,
             Request.GET_INDEX_FILENAME: self.merge.get_index_filename,
             Request.GET_DENSE_FILENAME: self.merge.get_dense_filename,
             Request.GET_WU_RESULT: self.db_listener.send_result,
-            Request.GET_DB_URI: self.get_db_uri,
-            Request.GET_DB_FILENAME: self.get_db_filename,
             Request.GET_WORKDIR_JOBNAME: self.fb.workdir.get_workdir_jobname,
             Request.GET_WORKDIR_PATH: self.fb.workdir.get_workdir_path,
         }
@@ -5395,12 +5385,6 @@ class CompleteFactorization(HasState, wudb.DbAccess,
         else:
             return self.sqrt.get_factors()
     
-    def get_db_filename(self):
-        return self.state["dbfilename"]
-
-    def get_db_uri(self):
-        return self.state["dburi"]
-
     def start_all_clients(self):
         for clients in self.clients:
             clients.launch_clients(self.servertask)

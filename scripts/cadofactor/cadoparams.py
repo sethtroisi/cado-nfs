@@ -175,7 +175,7 @@ class Parameters(object):
         None.
 
         >>> p = Parameters()
-        >>> p.readparams(('a=1', 'b=2', 'c=3', 'foo.a=3', 'bar.a=4', 'bar.baz.a=5'))
+        >>> p.readparams(('b=2', 'c=3', 'foo.a=3', 'bar.a=4', 'bar.baz.a=5'))
         >>> p.locate('foo.x.y.a')
         'foo.a'
         >>> p.locate('bar.a')
@@ -196,7 +196,7 @@ class Parameters(object):
         d=self.data
         pp=[]
         if base in d:
-            found=pp
+            found=list(pp)
         for node in path:
             if node in d and isinstance(d[node], dict):
                 d=d[node]
@@ -211,6 +211,42 @@ class Parameters(object):
             x=".".join(found+[base])
             return x
 
+    def unset(self, key):
+        '''Set this parameter if it is not yet defined. Returns the value
+        of the parameter after the operation
+        >>> p = Parameters()
+        >>> p.readparams(('a=1', 'b=2', 'c=3', 'foo.a=3', 'bar.a=4', 'bar.baz.a=5'))
+        >>> p.unset('bar.a')
+        >>> p.get_simple('bar.a', 0)
+        1
+
+        >>> p.set_simple('bar.a', 2)
+        2
+
+        >>> p.get_simple('bar.a', 2)
+        2
+        '''
+        s = key.rsplit('.')
+        base=s[-1]
+        path=s[:-1]
+        d=self.data
+        pp=[]
+        found=None
+        if base in d:
+            found=d
+        for node in path:
+            if node in d and isinstance(d[node], dict):
+                d=d[node]
+            else:
+                break
+            if base in d:
+                found=d
+        if found:
+            del d[base]
+
+    def replace(self, key, value):
+        self.unset(key)
+        self.set_if_unset(key, value)
 
     def set_if_unset(self, key, value):
         '''Set this parameter if it is not yet defined. Returns the value

@@ -102,13 +102,31 @@ def conn_commit(conn):
     conn.commit()
 
 def conn_close(conn):
-    logger.transaction("Closing connection %d", id(conn))
-    if conn.in_transaction:
-        logger.warning("Connection %d being closed while in transaction", id(conn))
-    conn.close()
-
-
-
+    # I'm really having difficulties here. I can't see what's going on.
+    # Sometimes I have an uncaught exception popping up.
+    #target = 92800609832959449330691138186
+    #log(target) = 32359472153599817010011705
+    #Warning:Database: Connection 140584385754280 being closed while in transaction
+    #Exception ignored in: <bound method WuAccess.__del__ of <wudb.WuAccess object at 0x7fdc5a5fb470>>
+    #Traceback (most recent call last):
+    #  File "/home/thome/NFS/cado/scripts/cadofactor/wudb.py", line 1128, in __del__
+    #  File "/home/thome/NFS/cado/scripts/cadofactor/wudb.py", line 107, in conn_close
+    #  File "/usr/lib/python3.5/logging/__init__.py", line 1292, in warning
+    #  File "/usr/lib/python3.5/logging/__init__.py", line 1416, in _log
+    #  File "/usr/lib/python3.5/logging/__init__.py", line 1426, in handle
+    #  File "/usr/lib/python3.5/logging/__init__.py", line 1488, in callHandlers
+    #  File "/usr/lib/python3.5/logging/__init__.py", line 856, in handle
+    #  File "/usr/lib/python3.5/logging/__init__.py", line 1048, in emit
+    #  File "/usr/lib/python3.5/logging/__init__.py", line 1038, in _open
+    #NameError: name 'open' is not defined
+    #
+    try:
+        logger.transaction("Closing connection %d", id(conn))
+        if conn.in_transaction:
+            logger.warning("Connection %d being closed while in transaction", id(conn))
+        conn.close()
+    except:
+        pass
 
 
 # Dummy class for defining "constants" with reverse lookup
@@ -422,8 +440,10 @@ class DB_base(object):
         if not foo:
             raise ValueError("db URI %s does not match regexp %s" % (uri,self.general_pattern))
         self.hostname=foo.group(4)
+        self.host_ipv6=False
         if not self.hostname:
             self.hostname=foo.group(5)
+            self.host_ipv6=True
         self.backend=foo.group(1)
         if backend_pattern is not None and not re.match(backend_pattern, self.backend):
             raise ValueError("back-end type %s not supported, expected %s" % (self.backend, backend_pattern))
@@ -435,7 +455,26 @@ class DB_base(object):
         )
         self.db_name=foo.group(7)
         self.talked=False
-        logger.info("Database URI is %s" % self.uri)
+        # logger.info("Database URI is %s" % self.uri_without_credentials)
+    @property
+    def uri_without_credentials(self):
+        text="db:%s://" % self.backend
+        d=self.db_connect_args
+        if "host" in d:
+            if "user" in d:
+                text+="USERNAME"
+                if "password" in d:
+                    text+=":PASSWORD"
+                text+="@"
+            if self.host_ipv6:
+                text+="[%s]" % d["host"]
+            else:
+                text+=d["host"]
+            if "port" in d:
+                text+=":%s" % d["port"]
+            text+="/"
+        text+=self.db_name
+        return text
     def advertise_connection(self):
         if not self.talked:
             logger.info("Opened connection to database %s" % self.db_name)
@@ -574,6 +613,9 @@ class DBFactory(object):
             raise ValueError(msg)
     def connect(self):
         return self.base.connect()
+    @property
+    def uri_without_credentials(self):
+        return self.base.uri_without_credentials
     @property
     def path(self):
         # TODO: remove

@@ -594,9 +594,9 @@ class Cado_NFS_toplevel(object):
         db_stored_workdir = None
         db_state = None
         try:
-            uri = self.parameters.get_simple("tasks.database")
+            uri = self.parameters.get_simple("database")
             self.db = wudb.DBFactory(uri)
-            self.logger.info("Attempting database access for URI %s" % uri)
+            self.logger.info("Attempting database access for URI %s" % self.db.uri_without_credentials)
             db_state = query_db_path(db=self.db)
             db_stored_workdir = db_state.state["workdir"]
             self.logger.info("Found database, with stored workdir path %s" % db_stored_workdir)
@@ -629,7 +629,7 @@ class Cado_NFS_toplevel(object):
 
         if not db_state:
             name = self.parameters.get_simple("tasks.name", "cado-nfs")
-            uri = self.parameters.get_simple("tasks.database",
+            uri = self.parameters.get_simple("database",
                     "db:sqlite3://%s/%s.db" % (wdir, name))
             self.db = wudb.DBFactory(uri, create=True)
             db_state = query_db_path(db=self.db)

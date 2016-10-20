@@ -63,6 +63,18 @@ if __name__ == '__main__':
     logger = toplevel_params.logger
     parameters, db = toplevel_params.get_cooked_parameters()
 
+    # We have to remove the credential info from the database which gets
+    # stored in the parameter snapshot. We must also make sure that we
+    # store this info always at the root of the param tree, or we may end
+    # up do bizarre things with duplicated keys if we resume from a
+    # parameter snapshot file *and* we have something on the command
+    # line.
+    if parameters.get_simple("database", None):
+        parameters.replace("database", db.uri_without_credentials)
+        # do this so that the parameter does not appear unused.
+        parameters.get_simple("database")
+
+
     # well, this *must* exist, right ?
     name = parameters.get_simple("tasks.name")
     wdir = parameters.get_simple("tasks.workdir")
@@ -78,8 +90,9 @@ if __name__ == '__main__':
     logger.addHandler(filehandler)
 
     
-    logger.info("Command line parameters: %s", 
-                " ".join([shellquote(arg, idx == 0) for idx, arg in enumerate(sys.argv)]))
+    cmdline=" ".join([shellquote(arg, idx == 0) for idx, arg in enumerate(sys.argv)])
+    cmdline=cmdline.replace(db.uri, db.uri_without_credentials)
+    logger.info("Command line parameters: %s", cmdline)
 
 
     logger.debug("Root parameter dictionary:\n%s", parameters)
