@@ -876,7 +876,7 @@ roots_mod_uint64 (uint64_t *r, uint64_t a, int d, uint64_t p)
 
   ASSERT_ALWAYS(d <= MAX_DEGREE);
 
-  if (d == 1)
+  if (d == 1 || a == 0)
     {
       r[0] = a;
       return 1;
