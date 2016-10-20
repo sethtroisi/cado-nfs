@@ -84,37 +84,6 @@ get_one_line (FILE *f, char *s)
 }
 
 static void
-parse_bad_ideals_file (FILE *badidealsfile, renumber_ptr renum)
-{
-  renum->bad_ideals.n = 0;
-  char s[RENUMBER_MAXLINE];
-
-  while (get_one_line (badidealsfile, s) != 0)
-  {
-    renum->bad_ideals.n++;
-    const char *ptr = s;
-    int nb, t;
-    for (int count = 0 ; *ptr != '\n'; ptr++)
-    {
-      if (!(isspace(ptr[0])))
-      {
-        if (ptr[0] == ':')
-          count++;
-        else if (count >= 2)
-          break;
-      }
-    }
-
-    for (nb = 0; (t = ugly[(unsigned char) *ptr]) >= 0; ptr++)
-      nb = (nb * 10) + t;
-
-    ASSERT_ALWAYS (*ptr == '\n');
-    renum->size += nb;
-  }
-  ASSERT_ALWAYS (feof (badidealsfile));
-}
-
-static void
 parse_one_line_bad_ideals(struct bad_ideals_s * bad, const char * str, int k)
 {
   int t;
@@ -163,6 +132,42 @@ parse_one_line (char * str)
 
   ASSERT_ALWAYS(*p == '\n');
   return v;
+}
+
+static void
+parse_bad_ideals_file (FILE *badidealsfile, renumber_ptr renum)
+{
+  renum->bad_ideals.n = 0;
+  char s[RENUMBER_MAXLINE];
+
+  /* first count the number of lines, i.e., the number of bad ideals */
+  while (get_one_line (badidealsfile, s) != 0)
+    renum->bad_ideals.n++;
+  ASSERT_ALWAYS (feof (badidealsfile));
+
+  /* Allocate memory to store badideals information */
+  size_t badideals_pr_size = renum->bad_ideals.n * sizeof (p_r_values_t);
+  size_t badideals_int_size = renum->bad_ideals.n * sizeof (int);
+  renum->bad_ideals.p = (p_r_values_t *) malloc (badideals_pr_size);
+  renum->bad_ideals.r = (p_r_values_t *) malloc (badideals_pr_size);
+  renum->bad_ideals.side = (int *) malloc (badideals_int_size);
+  renum->bad_ideals.nb = (int *) malloc (badideals_int_size);
+  ASSERT_ALWAYS (renum->bad_ideals.p != NULL);
+  ASSERT_ALWAYS (renum->bad_ideals.r != NULL);
+  ASSERT_ALWAYS (renum->bad_ideals.nb != NULL);
+  ASSERT_ALWAYS (renum->bad_ideals.side != NULL);
+
+  /* Finally, read the information and store it */
+  rewind (badidealsfile);
+  int k = 0;
+  while (get_one_line (badidealsfile, s) != 0)
+  {
+    parse_one_line_bad_ideals (&(renum->bad_ideals), s, k);
+    renum->size += renum->bad_ideals.nb[k];
+    k++;
+  }
+  ASSERT_ALWAYS (k == renum->bad_ideals.n);
+  ASSERT_ALWAYS (feof (badidealsfile));
 }
 
 static void
