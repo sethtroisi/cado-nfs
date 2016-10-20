@@ -4,6 +4,7 @@ from logging import DEBUG, INFO, WARNING, ERROR, FATAL, CRITICAL
 MESSAGE = DEBUG - 1
 TRANSACTION = MESSAGE - 1
 COMMAND = DEBUG + 1
+# TRANSACTION = INFO
 logging.addLevelName(MESSAGE, "Message")
 logging.addLevelName(TRANSACTION, "Transaction")
 logging.addLevelName(COMMAND, "Command")

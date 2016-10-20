@@ -36,9 +36,9 @@ def analyze(level, name, obj):
 # it and store the path to the upload directory in the shell environment
 # variable specified here
 UPLOADDIRKEY = "UPLOADDIR"
-DBFILENAMEKEY = "DBFILENAME"
+DBURIKEY = "DBURI"
 
-def do_upload(dbfilename, uploaddir, inputfp=sys.stdin, output=sys.stdout, 
+def do_upload(dburi, uploaddir, inputfp=sys.stdin, output=sys.stdout, 
         environ=os.environ):
     diag(1, "Command line arguments:", sys.argv)
     diag(2, "Environment:", os.environ)
@@ -175,7 +175,7 @@ def do_upload(dbfilename, uploaddir, inputfp=sys.stdin, output=sys.stdout,
             if errorcode:
                 message += 'Error code = %d.\n' % errorcode
         diag(1, "Getting WuAccess object")
-        wuar = wudb.WuAccess(dbfilename)
+        wuar = wudb.WuAccess(dburi)
         diag(1, "Got WuAccess object. Calling .result()")
         try:
             wuar.result(wuid.value, clientid.value, filetuples, errorcode,
@@ -199,7 +199,7 @@ if __name__ == '__main__':
         import cgitb
         cgitb.enable(display=0, logdir="/tmp/cgitb/")
 
-    for key in (DBFILENAMEKEY, UPLOADDIRKEY):
+    for key in (DBURIKEY, UPLOADDIRKEY):
         if key not in os.environ:
             print ('Script error: Environment variable %s not set' % key)
             sys.exit(1)
@@ -209,8 +209,8 @@ if __name__ == '__main__':
         sys.stderr.write("upload.py: PID = %d\n" % os.getpid())
         logging.basicConfig(level=logging.DEBUG)
 
-    DBFILENAME = os.environ[DBFILENAMEKEY]
+    DBURI = os.environ[DBURIKEY]
     UPLOADDIR = os.environ[UPLOADDIRKEY]
 
     diag(1, "About to call do_upload()")
-    do_upload(DBFILENAME, UPLOADDIR)
+    do_upload(DBURI, UPLOADDIR)

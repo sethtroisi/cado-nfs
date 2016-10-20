@@ -7,7 +7,6 @@ import re
 import subprocess
 import locale
 
-
 pathdict=dict()
 if not re.search("^/", "@CMAKE_INSTALL_PREFIX@"):
     # We are not in the installed tree, but in the source tree. We need
@@ -45,8 +44,8 @@ import cadotask
 import cadologger
 import toplevel
 import itertools
+import wudb
 from cadocommand import shellquote
-
 
 if __name__ == '__main__':
     # Parse command line arguments
@@ -62,7 +61,7 @@ if __name__ == '__main__':
     for key, value in pathdict.items():
         toplevel_params.setpath(key, value)
     logger = toplevel_params.logger
-    parameters = toplevel_params.get_cooked_parameters()
+    parameters, db = toplevel_params.get_cooked_parameters()
 
     # well, this *must* exist, right ?
     name = parameters.get_simple("tasks.name")
@@ -99,12 +98,7 @@ if __name__ == '__main__':
 
     logger.info("If this computation gets interrupted, it can be resumed with %s %s", sys.argv[0], snapshot_filename)
 
-
-    use_mysql = parameters.get_simple("mysql.use",False)
-    
-    wudb_file = name if use_mysql else os.path.join(wdir, name + ".db")
-    
-    factorjob = cadotask.CompleteFactorization(db=wudb_file,
+    factorjob = cadotask.CompleteFactorization(db=db,
                                                parameters = parameters,
                                                path_prefix = [])
 

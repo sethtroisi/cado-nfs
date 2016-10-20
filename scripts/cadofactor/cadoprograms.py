@@ -1049,7 +1049,8 @@ class Descent(Program):
     subdir = "scripts"
     def __init__(self, *,
                  target: Parameter(prefix="--"),
-                 db: Parameter(prefix="--", is_input_file=True),
+                 prefix: Parameter(prefix="--"),
+                 datadir: Parameter(prefix="--"),
                  cadobindir: Parameter(prefix="--"),
                  descent_hint: Parameter("descent-hint", prefix="--",
                      is_input_file=True),

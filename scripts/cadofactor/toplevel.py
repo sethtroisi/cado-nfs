@@ -15,6 +15,17 @@ import argparse
 import cadologger
 import cadoparams
 import shutil
+import wudb
+import cadotask
+
+# This is a hack. We want to store some stuff in the tasks database for
+# later retrieval.
+class query_db_path(cadotask.HasState, wudb.DbAccess):
+    @property
+    def name(self):
+        return "tasks"
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
 # I'm having weird problems with the doctests, which seem to almost never obey
 # the log level I intend to set up. Manually setting the loglevel of the
@@ -427,12 +438,14 @@ class Cado_NFS_toplevel(object):
         >>> t.setpath("data", tempdir)
         >>> t.parameters = cadoparams.Parameters()
         >>> t.set_N_paramfile_workdir()
+        >>> t.access_or_create_workdir_and_db()
         >>> t.parameters.get_simple("N", 0)
         12345
 
         >>> t.parameters.get_simple("a.b.x.y.c", 0)
         32
 
+        >>> os.unlink(t.db.path)
         >>> os.rmdir(t.parameters.get_simple("tasks.workdir"))
         >>> t.using_default_parameter_file
         True
@@ -445,6 +458,7 @@ class Cado_NFS_toplevel(object):
         >>> t.setpath("data", tempdir)
         >>> t.parameters = cadoparams.Parameters()
         >>> t.set_N_paramfile_workdir()
+        >>> t.access_or_create_workdir_and_db()
         >>> t.parameters.get_simple("N", 0)
         12345
 
@@ -466,6 +480,7 @@ class Cado_NFS_toplevel(object):
         >>> t.parameters = cadoparams.Parameters()
         >>> try:
         ...  t.set_N_paramfile_workdir()
+        ...  t.access_or_create_workdir_and_db()
         ... except ValueError:
         ...  'ok'
         'ok'
@@ -477,6 +492,7 @@ class Cado_NFS_toplevel(object):
         >>> t.setpath("data", tempdir)
         >>> t.parameters = cadoparams.Parameters()
         >>> t.set_N_paramfile_workdir()
+        >>> t.access_or_create_workdir_and_db()
         >>> t.parameters.get_simple("N", 0)
         67890
 
@@ -492,6 +508,7 @@ class Cado_NFS_toplevel(object):
         >>> t.filter_out_N_paramfile_workdir()
         >>> t.parameters = cadoparams.Parameters()
         >>> t.set_N_paramfile_workdir()
+        >>> t.access_or_create_workdir_and_db()
         >>> t.parameters.get_simple('N', 0)
         67890
 
@@ -507,6 +524,7 @@ class Cado_NFS_toplevel(object):
         >>> t.parameters = cadoparams.Parameters()
         >>> try:
         ...  t.set_N_paramfile_workdir()
+        ...  t.access_or_create_workdir_and_db()
         ... except ValueError as e:
         ...  bool(re.search("must define N", str(e)))
         True
@@ -517,6 +535,7 @@ class Cado_NFS_toplevel(object):
         >>> t.filter_out_N_paramfile_workdir()
         >>> t.parameters = cadoparams.Parameters()
         >>> t.set_N_paramfile_workdir()
+        >>> t.access_or_create_workdir_and_db()
         >>> t.parameters.get_simple('tasks.workdir')
         '/tmp'
 
@@ -570,8 +589,30 @@ class Cado_NFS_toplevel(object):
             if not self.parameters.get_simple("N", 0):
                 raise ValueError("%s must define N" % self.args.parameters)
 
-        if self.args.workdir:
+    def access_or_create_workdir_and_db(self):
+        self.db = None
+        db_stored_workdir = None
+        db_state = None
+        try:
+            uri = self.parameters.get_simple("tasks.database")
+            self.db = wudb.DBFactory(uri)
+            self.logger.info("Attempting database access for URI %s" % uri)
+            db_state = query_db_path(db=self.db)
+            db_stored_workdir = db_state.state["workdir"]
+            self.logger.info("Found database, with stored workdir path %s" % db_stored_workdir)
+        except Exception as e:
+            # self.logger.info("No database exists yet (%s)" % str(e))
+            self.logger.info("No database exists yet")
+
+        a=self.args.workdir
+        b=db_stored_workdir
+        if a and b and a != b:
+            self.logger.critical("Cannot have workdir provided both by the command line and the database in two different ways")
+        elif self.args.workdir:
             self.parameters.set_simple("tasks.workdir", self.args.workdir)
+        elif db_stored_workdir:
+            self.parameters.set_simple("tasks.workdir", db_stored_workdir)
+    
         try:
             wdir=self.parameters.get_simple("tasks.workdir")
         except KeyError:
@@ -585,6 +626,16 @@ class Cado_NFS_toplevel(object):
         if not os.path.isdir(wdir):
             self.logger.debug("Created directory %s" % wdir)
             os.makedirs(wdir)
+
+        if not db_state:
+            name = self.parameters.get_simple("tasks.name", "cado-nfs")
+            uri = self.parameters.get_simple("tasks.database",
+                    "db:sqlite3://%s/%s.db" % (wdir, name))
+            self.db = wudb.DBFactory(uri, create=True)
+            db_state = query_db_path(db=self.db)
+
+        db_state.state["workdir"]=wdir
+
 
 
     def set_threads_and_client_threads(self):
@@ -750,7 +801,7 @@ class Cado_NFS_toplevel(object):
         >>> t = Cado_NFS_toplevel(args=['-p', os.path.os.devnull, '12345', 'slaves.hostnames=foo,bar', 'slaves.scriptpath=/tmp'])
         >>> t.setpath("lib", "/tmp")
         >>> t.setpath("data", "/tmp")
-        >>> p = t.get_cooked_parameters()
+        >>> p,db = t.get_cooked_parameters()
         >>> p.get_simple("slaves.nrclients", 0)
         0
 
@@ -760,7 +811,7 @@ class Cado_NFS_toplevel(object):
         >>> t = Cado_NFS_toplevel(args=['-p', os.path.os.devnull, '12345', 'slaves.scriptpath=/tmp'])
         >>> t.setpath("lib", "/tmp")
         >>> t.setpath("data", "/tmp")
-        >>> p = t.get_cooked_parameters()
+        >>> p,db = t.get_cooked_parameters()
         >>> p.get_simple("slaves.nrclients", 0)
         0
 
@@ -773,7 +824,7 @@ class Cado_NFS_toplevel(object):
         "factor.sh"-like way, see what happens if we read the old
         parameter file.
         >>> t.using_default_parameter_file=True
-        >>> p = t.get_cooked_parameters()
+        >>> p,db = t.get_cooked_parameters()
         >>> p.get_simple("slaves.nrclients", 0)
         2
 
@@ -911,6 +962,7 @@ class Cado_NFS_toplevel(object):
         
         screenlvl = getattr(cadologger, self.args.screenlog.upper())
         self.logger = logging.getLogger()
+
         if not self.logger.handlers:
             self.logger.addHandler(cadologger.ScreenHandler(lvl = screenlvl,
                                                             colour=not self.args.no_colors))
@@ -943,7 +995,7 @@ class Cado_NFS_toplevel(object):
         >>> t = Cado_NFS_toplevel(args=['-p', os.path.os.devnull, '12345', 'slaves.hostnames=foo,bar', 'tasks.workdir=/tmp/a', 'slaves.scriptpath=/tmp'])
         >>> t.setpath("lib", "/tmp")
         >>> t.setpath("data", "/tmp")
-        >>> p = t.get_cooked_parameters()
+        >>> p,db = t.get_cooked_parameters()
         >>> print(re.sub('(C:)?\\\\\\\\', '/', str(p)))
         N = 12345
         slaves.basepath = /tmp/a/client
@@ -965,6 +1017,7 @@ class Cado_NFS_toplevel(object):
         self.set_N_paramfile_workdir()
         # now use our options to override what is in the parameter file
         self.parameters.readparams(self.args.options)
+        self.access_or_create_workdir_and_db()
         self.set_threads_and_client_threads()
         self.set_slaves_parameters()
         # convert some more command-line args to parameters:
@@ -974,12 +1027,6 @@ class Cado_NFS_toplevel(object):
             self.parameters.set_simple("dlp", self.args.dlp)
             if self.args.gfpext:
                 self.parameters.set_simple("gfpext", self.args.gfpext)
-        if self.args.mysql:
-            self.parameters.set_simple("mysql.use", self.args.mysql)
-        if self.args.mysql_user:
-            self.parameters.set_if_unset("mysql.username", self.args.mysql_user)
-        if self.args.mysql_password:
-            self.parameters.set_if_unset("mysql.password", self.args.mysql_password)
         # get default hint file if necessary
         if self.parameters.get_simple("dlp", False) and self.parameters.get_simple("gfpext", 1) == 1:
             if self.parameters.get_simple("target", 0):
@@ -992,7 +1039,7 @@ class Cado_NFS_toplevel(object):
                 os.path.abspath(
                     os.path.join(self.pathdict["data"],
                         "misc", "cpubinding.conf")))
-        return self.parameters
+        return self.parameters,self.db
 
     def setpath(self, key, value):
         self.pathdict[key]=value
