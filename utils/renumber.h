@@ -36,6 +36,7 @@ struct bad_ideals_s
   p_r_values_t * r;  //
   int * side;
   int * nb;               // the number of ideals for each
+  p_r_values_t max_p;  // all badideals ahve p <= max_p
 };
 
 struct renumber_s
@@ -92,6 +93,8 @@ index_t renumber_get_random_index_from_p_side(renumber_srcptr renumber_info,
 void renumber_get_p_r_from_index (renumber_srcptr, p_r_values_t *, p_r_values_t *,
                                                     int *, index_t, cado_poly);
 int renumber_get_side_from_index (renumber_srcptr, index_t, cado_poly);
+int renumber_badideal_get_p_r_below (renumber_srcptr, p_r_values_t *,
+                                     p_r_values_t *, int *, index_t);
 
 #ifdef __cplusplus
 }

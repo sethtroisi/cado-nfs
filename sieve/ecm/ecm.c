@@ -915,8 +915,8 @@ ellW_mul_ui (ellW_point_t P, const unsigned long e, residue_t a,
 /* Interpret the bytecode located at "code" and do the 
    corresponding elliptic curve operations on (x::z) */
 /* static */ void
-ellM_interpret_bytecode (ellM_point_t P, const char *code,
-			 const modulus_t m, const residue_t b)
+ellM_interpret_bytecode (ellM_point_t P, const char *bc, unsigned int bc_len,
+                         const modulus_t m, const residue_t b)
 {
   ellM_point_t A, B, C, t, t2;
   
@@ -928,88 +928,99 @@ ellM_interpret_bytecode (ellM_point_t P, const char *code,
 
   ellM_set (A, P, m);
 
-  /* Implicit init of first subchain */
-  ellM_set (B, A, m);
-  ellM_set (C, A, m);
-  ellM_double (A, A, m, b);
-
-  while (1)
+  for (unsigned i = 0; i < bc_len; i++)
+  {
+    switch (bc[i])
     {
-      switch (*code++)
-        {
-          case 0: /* Swap A, B */
-            ellM_swap (A, B, m);
-            break;
-          case 1:
-            ellM_add (t, A, B, C, b, m);
-            ellM_add (t2, t, A, B, b, m);
-            ellM_add (B, B, t, A, b, m);
-            ellM_set (A, t2, m);
-            break;
-          case 2:
-            ellM_add (B, A, B, C, b, m);
-            ellM_double (A, A, m, b);
-            break;
-          case 3:
-            ellM_add (C, B, A, C, b, m);
-            ellM_swap (B, C, m);
-            break;
-          case 4:
-            ellM_add (B, B, A, C, b, m);
-            ellM_double (A, A, m, b);
-            break;
-          case 5:
-            ellM_add (C, C, A, B, b, m);
-            ellM_double (A, A, m, b);
-            break;
-          case 6:
-            ellM_double (t, A, m, b);
-            ellM_add (t2, A, B, C, b, m);
-            ellM_add (A, t, A, A, b, m);
-            ellM_add (C, t, t2, C, b, m);
-            ellM_swap (B, C, m);
-            break;
-          case 7:
-            ellM_add (t, A, B, C, b, m);
-            ellM_add (B, t, A, B, b, m);
-            ellM_double (t, A, m, b);
-            ellM_add (A, A, t, A, b, m);
-            break;
-          case 8:
-            ellM_add (t, A, B, C, b, m);
-            ellM_add (C, C, A, B, b, m);
-            ellM_swap (B, t, m);
-            ellM_double (t, A, m, b);
-            ellM_add (A, A, t, A, b, m);
-            break;
-          case 9:
-            ellM_add (C, C, B, A, b, m);
-            ellM_double (B, B, m, b);
-            break;
-	  case 10: 
-            /* Combined final add of old subchain and init of new subchain */
-            ellM_add (A, A, B, C, b, m);
-            ellM_set (B, A, m);
-            ellM_set (C, A, m);
-            ellM_double (A, A, m, b);
-	    break;
-	  case 11: /* Combined rule 3 and rule 0 */
-            ellM_add (C, B, A, C, b, m);
-            /* (B,C,A) := (A,B,C)  */
-            ellM_swap (B, C, m);
-            ellM_swap (A, B, m);
-	    break;
-	  case 12: /* End of bytecode */
-	    goto end_of_bytecode;
-          default:
-            abort ();
-        }
+      case 's': /* Swap A, B */
+        ellM_swap (A, B, m);
+        break;
+      case 'i': /* Start of a subchain */
+        ellM_set (B, A, m);
+        ellM_set (C, A, m);
+        ellM_double (A, A, m, b);
+        break;
+      case 'f': /* End of a subchain */
+        ellM_add (A, A, B, C, b, m);
+        break;
+      case 1:
+        ellM_add (t, A, B, C, b, m);
+        ellM_add (t2, t, A, B, b, m);
+        ellM_add (B, B, t, A, b, m);
+        ellM_set (A, t2, m);
+        break;
+      case 2:
+        ellM_add (B, A, B, C, b, m);
+        ellM_double (A, A, m, b);
+        break;
+      case 3:
+        ellM_add (C, B, A, C, b, m);
+        ellM_swap (B, C, m);
+        break;
+      case 4:
+        ellM_add (B, B, A, C, b, m);
+        ellM_double (A, A, m, b);
+        break;
+      case 5:
+        ellM_add (C, C, A, B, b, m);
+        ellM_double (A, A, m, b);
+        break;
+      case 6:
+        ellM_double (t, A, m, b);
+        ellM_add (t2, A, B, C, b, m);
+        ellM_add (A, t, A, A, b, m);
+        ellM_add (C, t, t2, C, b, m);
+        ellM_swap (B, C, m);
+        break;
+      case 7:
+        ellM_add (t, A, B, C, b, m);
+        ellM_add (B, t, A, B, b, m);
+        ellM_double (t, A, m, b);
+        ellM_add (A, A, t, A, b, m);
+        break;
+      case 8:
+        ellM_add (t, A, B, C, b, m);
+        ellM_add (C, C, A, B, b, m);
+        ellM_swap (B, t, m);
+        ellM_double (t, A, m, b);
+        ellM_add (A, A, t, A, b, m);
+        break;
+      case 9:
+        ellM_add (C, C, B, A, b, m);
+        ellM_double (B, B, m, b);
+        break;
+      case 10:
+        /* Combined final add of old subchain and init of new subchain [=fi] */
+        ellM_add (B, A, B, C, b, m);
+        ellM_set (C, B, m);
+        ellM_double (A, B, m, b);
+        break;
+      case 11:
+        /* Combined rule 3 and rule 0 [=\x3s] */
+        ellM_add (C, B, A, C, b, m);
+        /* (B,C,A) := (A,B,C)  */
+        ellM_swap (B, C, m);
+        ellM_swap (A, B, m);
+        break;
+      case 12:
+        /* Combined rule 3, then subchain end/start [=\x3fi] */
+        ellM_add (t, B, A, C, b, m);
+        ellM_add (C, A, t, B, b, m);
+        ellM_set (B, C, m);
+        ellM_double (A, C, m, b);
+        break;
+      case 13:
+        /* Combined rule 3, swap, rule 3 and swap, merged a bit [=\x3s\x3s] */
+        ellM_set (t, B, m);
+        ellM_add (B, B, A, C, b, m);
+        ellM_set (C, A, m);
+        ellM_add (A, A, B, t, b, m);
+        break;
+      default:
+        printf ("#Unknown bytecode %u\n", (unsigned int) bc[i]);
+        abort ();
     }
-
-end_of_bytecode:
-
-  /* Implicit final add of last subchain */
-  ellM_add (A, A, B, C, b, m); 
+  }
 
   ellM_set (P, A, m);
 
@@ -2178,7 +2189,7 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
   /* Do stage 1 */
   if (plan->parameterization & FULLMONTY)
   {
-    ellM_interpret_bytecode (P, plan->bc, m, b);
+    ellM_interpret_bytecode (P, plan->bc, plan->bc_len, m, b);
     
       /* Add prime 2 in the desired power. If a zero residue for the 
 	 Z-coordinate is encountered, we backtrack to previous point and stop.

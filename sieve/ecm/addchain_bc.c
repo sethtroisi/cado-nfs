@@ -259,7 +259,7 @@ addchain (mpz_srcptr E, const uint8_t q, const addchain_cost_t * opcost,
 unsigned int
 addchain_bytecode (char **bc, unsigned int B1, unsigned int pow2_nb,
                    unsigned int pow3_extra, const addchain_cost_t * opcost,
-                   int verbose)
+                   int compress, int verbose)
 {
   mpz_t E;
 
@@ -309,7 +309,7 @@ addchain_bytecode (char **bc, unsigned int B1, unsigned int pow2_nb,
     printf ("## Addchain: best_q = %u mincost = %f\n", best_q, mincost);
 
   /* Put the best addchain into bytecode */
-  bc_state_t * bc_state = bytecoder_init (&addchain_dict);
+  bc_state_t * bc_state = bytecoder_init ((compress) ? &addchain_dict : NULL);
   double chaincost = addchain (E, best_q, opcost, bc_state, verbose);
   bytecoder_flush (bc_state);
   unsigned int bc_len = bytecoder_size (bc_state);
@@ -322,12 +322,11 @@ addchain_bytecode (char **bc, unsigned int B1, unsigned int pow2_nb,
   {
     /* The cost of the initial doublings */
     double power2cost = pow2_nb * opcost->dbl;
-    if (verbose > 1)
-    {
-      printf ("Byte code for stage 1: ");
-      addchain_bytecode_fprintf (stdout, *bc, bc_len);
-      addchain_bytecode_check (*bc, bc_len, E, verbose);
-    }
+    /* Print the bytecode */
+    printf ("Byte code for stage 1: ");
+    addchain_bytecode_fprintf (stdout, *bc, bc_len);
+    /* Check the bytecode */
+    addchain_bytecode_check (*bc, bc_len, E, verbose);
     printf ("## Addchain: cost of power of 2: %f\n", power2cost);
     printf ("## Addchain: total cost: %f\n", chaincost + power2cost);
   }
@@ -340,7 +339,7 @@ void
 addchain_bytecode_fprintf (FILE *out, const char *bc, unsigned int len)
 {
   ASSERT_ALWAYS (len >= 3);
-  fprintf (out, "(len = %u) %x [m = %u]", len, bc[0], bc[0]);
+  fprintf (out, "(len=%u) %x [m = %u]", len, bc[0], bc[0]);
   fprintf (out, ", %x, %x", bc[1], bc[2]);
   unsigned int k = ((bc[1] & 0x7f) == 0x7f) ? 2 :
                                             ((uint8_t) (bc[1] & 0x7f) << 1) + 1;
@@ -398,7 +397,7 @@ addchain_bytecode_check (const char *bc, unsigned int len, mpz_srcptr E,
 
   unsigned int k1 = ((bc[1] & 0x7f) == 0x7f) ? 2 :
                                             ((uint8_t) (bc[1] & 0x7f) << 1) + 1;
-  if (k1 > q)
+  if (k1 > q && k1 != 2)
   {
     printf ("## Addchain: bytecode_check failed: bc[1] = %u is larger than "
             "q = %u\n", k1, q);

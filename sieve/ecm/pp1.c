@@ -29,8 +29,8 @@ pp1_double (residue_t r, const residue_t a, const residue_t two,
 }
 
 static void
-pp1_stage1 (residue_t X, const char *code, const residue_t two, 
-            const modulus_t m)
+pp1_stage1 (residue_t X, const char *code, unsigned int code_len,
+            const residue_t two, const modulus_t m)
 {
   residue_t A, B, C, t, t2;
   
@@ -42,109 +42,108 @@ pp1_stage1 (residue_t X, const char *code, const residue_t two,
 
   mod_set (A, X, m);
   
-  /* Implicit init of first subchain */
-  mod_set (B, A, m);
-  mod_set (C, A, m);
-  pp1_double (A, A, two, m);
 
-  while (1)
+  for (unsigned i = 0; i < code_len; i++)
+  {
+    switch (code[i])
     {
-      switch (*code++)
-        {
-	  case 0: /* Swap A, B */
-            mod_swap (A, B, m);
-            break;
-          case 1:
-            pp1_add (t, A, B, C, m);
-            pp1_add (t2, t, A, B, m);
-            pp1_add (B, B, t, A, m);
-            mod_set (A, t2, m);
-            break;
-          case 2:
-            pp1_add (B, A, B, C, m);
-            pp1_double (A, A, two, m);
-            break;
-          case 3:
-            pp1_add (t, B, A, C, m);
-	    mod_set (C, B, m);
-	    mod_set (B, t, m);
-            break;
-          case 4:
-            pp1_add (B, B, A, C, m);
-            pp1_double (A, A, two, m);
-            break;
-          case 5:
-            pp1_add (C, C, A, B, m);
-            pp1_double (A, A, two, m);
-            break;
-          case 6:
-            pp1_double (t, A, two, m);
-            pp1_add (t2, A, B, C, m);
-            pp1_add (t2, t, t2, C, m);
-	    mod_set (C, t2, m);
-            pp1_add (t2, t, A, A, m);
-	    mod_set (A, t2, m);
-            mod_swap (B, C, m);
-            break;
-          case 7:
-            pp1_add (t, A, B, C, m);
-            pp1_add (t2, t, A, B, m);
-	    mod_set (B, t2, m);
-            pp1_double (t, A, two, m);
-            mod_set (t2, A, m);
-            pp1_add (A, A, t, t2, m);
-            break;
-          case 8:
-            pp1_add (t, A, B, C, m);
-            pp1_add (C, C, A, B, m);
-            mod_swap (B, t, m);
-            pp1_double (t, A, two, m);
-            pp1_add (t2, A, t, A, m);
-	    mod_set (A, t2, m);
-            break;
-          case 9:
-            pp1_add (C, C, B, A, m);
-            pp1_double (B, B, two, m);
-            break;
-	  case 10:
-	    /* Combined final add of old subchain and init of new subchain */
-	    pp1_add (B, A, B, C, m);
-            mod_set (C, B, m);
-            pp1_double (A, B, two, m);
-            break;
-	  case 11:
-	    /* Rule 3, then rule 0 */
-	    mod_set (t, A, m);
-	    pp1_add (A, B, A, C, m);
-	    mod_set (C, B, m);
-	    mod_set (B, t, m);
-	    break;
-	  case 13:
-	    /* Rule 3, then subchain end/start */
-            pp1_add (t, B, A, C, m);
-            pp1_add (C, A, t, B, m);
-	    mod_set (B, C, m);
-            pp1_double (A, C, two, m);
-            break;
-          case 14:
-	    /* Rule 3, rule 0, rule 3 and rule 0, merged a bit */
-	    mod_set (t, B, m);
-	    pp1_add (B, B, A, C, m);
-	    mod_set (C, A, m);
-	    pp1_add (A, A, B, t, m);
-            break;
-	  case 12: /* End of bytecode */
-	    goto end_of_bytecode;
-	  default:
-            abort ();
-        }
+      case 's': /* Swap A, B */
+        mod_swap (A, B, m);
+        break;
+      case 'i': /* Start of a subchain */
+        mod_set (B, A, m);
+        mod_set (C, A, m);
+        pp1_double (A, A, two, m);
+        break;
+      case 'f': /* End of a subchain */
+        pp1_add (A, A, B, C, m);
+        break;
+      case 1:
+        pp1_add (t, A, B, C, m);
+        pp1_add (t2, t, A, B, m);
+        pp1_add (B, B, t, A, m);
+        mod_set (A, t2, m);
+        break;
+      case 2:
+        pp1_add (B, A, B, C, m);
+        pp1_double (A, A, two, m);
+        break;
+      case 3:
+        pp1_add (t, B, A, C, m);
+        mod_set (C, B, m);
+        mod_set (B, t, m);
+        break;
+      case 4:
+        pp1_add (B, B, A, C, m);
+        pp1_double (A, A, two, m);
+        break;
+      case 5:
+        pp1_add (C, C, A, B, m);
+        pp1_double (A, A, two, m);
+        break;
+      case 6:
+        pp1_double (t, A, two, m);
+        pp1_add (t2, A, B, C, m);
+        pp1_add (t2, t, t2, C, m);
+        mod_set (C, t2, m);
+        pp1_add (t2, t, A, A, m);
+        mod_set (A, t2, m);
+        mod_swap (B, C, m);
+        break;
+      case 7:
+        pp1_add (t, A, B, C, m);
+        pp1_add (t2, t, A, B, m);
+        mod_set (B, t2, m);
+        pp1_double (t, A, two, m);
+        mod_set (t2, A, m);
+        pp1_add (A, A, t, t2, m);
+        break;
+      case 8:
+        pp1_add (t, A, B, C, m);
+        pp1_add (C, C, A, B, m);
+        mod_swap (B, t, m);
+        pp1_double (t, A, two, m);
+        pp1_add (t2, A, t, A, m);
+        mod_set (A, t2, m);
+        break;
+      case 9:
+        pp1_add (C, C, B, A, m);
+        pp1_double (B, B, two, m);
+        break;
+      case 10:
+        /* Combined final add of old subchain and init of new subchain [=fi] */
+        pp1_add (B, A, B, C, m);
+        mod_set (C, B, m);
+        pp1_double (A, B, two, m);
+        break;
+      case 11:
+        /* Combined rule 3 and rule 0 [=\x3s] */
+        mod_set (t, A, m);
+        pp1_add (A, B, A, C, m);
+        mod_set (C, B, m);
+        mod_set (B, t, m);
+        break;
+      case 12:
+        /* Combined rule 3, then subchain end/start [=\x3fi] */
+        pp1_add (t, B, A, C, m);
+        pp1_add (C, A, t, B, m);
+        mod_set (B, C, m);
+        pp1_double (A, C, two, m);
+        break;
+      case 13:
+        /* Combined rule 3, swap, rule 3 and swap, merged a bit [=\x3s\x3s] */
+        mod_set (t, B, m);
+        pp1_add (B, B, A, C, m);
+        mod_set (C, A, m);
+        pp1_add (A, A, B, t, m);
+        break;
+      default:
+        printf ("Fatal error in %s at %s:%d -- Unknown bytecode %u\n", __func__,
+                                    __FILE__, __LINE__, (unsigned int) code[i]);
+        abort ();
     }
+  }
 
-end_of_bytecode:
-
-  /* Implicit final add */
-  pp1_add (A, A, B, C, m); /* Final add */
-  
   mod_set (X, A, m);
 
   mod_clear (A, m);
@@ -398,7 +397,7 @@ pp1_27 (modint_t f, const modulus_t m, const pp1_plan_t *plan)
   mod_set (b, two, m);
   mod_div7 (b, b, m);
   
-  pp1_stage1 (b, plan->bc, two, m);
+  pp1_stage1 (b, plan->bc, plan->bc_len, two, m);
   /* Backtracking for the 2's in the exponent */
   mod_set (t, b, m);
   for (i = 0; i < plan->exp2; i++)
@@ -451,7 +450,7 @@ pp1_65 (modint_t f, const modulus_t m, const pp1_plan_t *plan)
   mod_add (b, b, two, m);
   mod_div5 (b, b, m);
   
-  pp1_stage1 (b, plan->bc, two, m);
+  pp1_stage1 (b, plan->bc, plan->bc_len, two, m);
   /* Backtracking for the 2's in the exponent */
   mod_set (t, b, m);
   for (i = 0; i < plan->exp2; i++)

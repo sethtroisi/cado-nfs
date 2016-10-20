@@ -78,12 +78,22 @@ main (int argc, char *argv[])
   {
     if (tab->table[i] == RENUMBER_SPECIAL_VALUE)
     {
-      int side = renumber_get_side_from_index (tab, i, cpoly);
       if (renumber_is_additional_column (tab, i))
+      {
+        int side = renumber_get_side_from_index (tab, i, cpoly);
         printf ("i=%" PRid " tab[i]=#   added column for side %d\n", i, side);
+      }
       else
-        printf ("i=%" PRid " tab[i]=#   above a bad ideals on side %d\n",
-                i, side);
+      {
+        p_r_values_t p, r;
+        int side;
+        int not_bad = renumber_badideal_get_p_r_below (tab, &p, &r, &side, i);
+        if (!not_bad)
+          printf ("i=%" PRid " tab[i]=#   bad ideal above (%" PRpr ",%" PRpr ")"
+                  " on side %d\n", i, p, r, side);
+        else /* not a bad ideal => unknown type (index added by the user ?) */
+          printf ("i=%" PRid " tab[i]=#   [unknown]\n", i);
+      }
     }
     else
     {

@@ -50,3 +50,5 @@ add_order_test(m12 6 1000000 1001000)
 # add_order_test(m16 1 1000000 1001000)
 
 cado_define_test(test_mpqs.c LIBRARIES tests facul utils)
+
+cado_define_test(test_chains.c LIBRARIES tests facul utils)

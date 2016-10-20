@@ -30,7 +30,7 @@ typedef struct addchain_cost_s addchain_cost_t;
 #define ADDCHAIN_MAX_CONSECUTIVE_DBL 2
 
 unsigned int addchain_bytecode (char **, unsigned int, unsigned int,
-                                unsigned int, const addchain_cost_t *, int);
+                                unsigned int, const addchain_cost_t*, int, int);
 void addchain_bytecode_fprintf (FILE *, const char *, unsigned int);
 int addchain_bytecode_check (const char *, unsigned int, mpz_srcptr, int);
 #endif

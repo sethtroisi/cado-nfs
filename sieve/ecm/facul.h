@@ -146,10 +146,6 @@ int*
 facul_both (mpz_t**, mpz_t* ,
 	    const facul_strategies_t *, int*);
 
-// In ecm/makeplan.c
-// Should be called at the very end, to clear global variables.
-void free_saved_chains();
-
 #ifdef __cplusplus
 }
 #endif

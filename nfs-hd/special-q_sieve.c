@@ -3104,8 +3104,10 @@ void initialise_parameters(int argc, char * argv[], cado_poly_ptr f,
   * gal_version = 0;
   size_t size_gal_str = 1024;
   char * gal_str = (char * ) malloc(sizeof(char) * size_gal_str);
-  param_list_parse_string(pl, "gal", gal_str, size_gal_str);
-  sscanf(gal_str, "autom%u.%u", gal, gal_version);
+  int seen = param_list_parse_string(pl, "gal", gal_str, size_gal_str);
+  if (seen) {
+    sscanf(gal_str, "autom%u.%u", gal, gal_version);
+  }
   ASSERT(* gal == 1 || * gal == 6);
   if ((* gal != 6 || * gal_version != 0) && * gal != 1) {
     fprintf(* errstd, "# Galois action not implemented.\n");
@@ -3381,7 +3383,6 @@ ideals.\n", i, nb, nb_more);
   free(q_range);
   free(log2_base);
   cado_poly_clear(f);
-  free_saved_chains();
   fclose(outstd);
   fclose(errstd);
   if (qfile != NULL) {

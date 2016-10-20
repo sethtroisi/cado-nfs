@@ -56,35 +56,52 @@ comp_cmp_weight_for_qsort (const void *p, const void *q)
 }
 
 /* Contribution of each column of weight w to the weight of the connected
- * component. */
+   component.
+   Reference [1]: "The filtering step of discrete logarithm and integer
+   factorization algorithms", Cyril Bouvier, https://hal.inria.fr/hal-00734654,
+   2013, 27 pages.
+   Each weight is identified by LAMBDA (0 to 6) and NU (0 to 3),
+   the default one is \Omega_{31} (LAMBDA=3, NU=1).
+   Cavallar's weight function is \Omega_{23} (LAMBDA=2, NU=3).
+*/
 static inline float
 comp_weight_function (weight_t w)
 {
-#ifdef USE_CAVALLAR_WEIGHT_FUNCTION
+#define USE_WEIGHT_LAMBDA 3
+#define USE_WEIGHT_NU 3
   if (w >= 3)
-    return ldexpf(1, -(w - 1));
-  else if (w == 2)
-    return 0.25;
-  else
-    return 0.0;
+#if USE_WEIGHT_LAMBDA == 0
+    return 1.0;
+#elif USE_WEIGHT_LAMBDA == 1
+    return powf (2.0 / 3.0, (float) (w - 2));
+#elif USE_WEIGHT_LAMBDA == 2
+    return powf (0.5, (float) (w - 2));
+#elif USE_WEIGHT_LAMBDA == 3
+    return powf (0.8, (float) (w - 2));
+#elif USE_WEIGHT_LAMBDA == 4
+    return 1.0 / log2f ((float) (w - 2));
+#elif USE_WEIGHT_LAMBDA == 5
+    return 2.0 / (float) w;
+#elif USE_WEIGHT_LAMBDA == 6
+    return 4.0 / (float) (w * w);
 #else
-  /* We use here the weight function \Omega_{31} from "The filtering step of
-     discrete logarithm and integer factorization algorithms", Cyril Bouvier,
-     2013, https://hal.inria.fr/hal-00734654.
-     Indeed, we have \lambda_3(w) = (4/5)^{w-2}, and we add 0.125 when w=2.
-     If the clique has n(c) relations, it has n(c)-1 columns of weight 2.
-     Since those ideals of weight 2 appear in two relations, we count twice
-     0.125 for each of them, which gives in total (n(c)-1)/4.
-     To be rigorous we get \Omega_{31} - 1/4, but since we only consider the
-     relative (and not absolute) value of weights, this is equivalent to
-     \Omega_{31}. */
-  if (w >= 3)
-    return powf(0.8, (float) (w - 2));
-  else if (w == 2)
+#error "Invalid value of USE_WEIGHT_LAMBDA"
+#endif
+  else if (w == 2) /* since each ideal is counted twice, we put here half
+                      the values of \nu_i from reference [1] */
+#if USE_WEIGHT_NU == 0
+    return 0.0;
+#elif USE_WEIGHT_NU == 1
     return 0.125;
+#elif USE_WEIGHT_NU == 2
+    return 0.25;
+#elif USE_WEIGHT_NU == 3
+    return 0.5;
+#else
+#error "Invalid value of USE_WEIGHT_NU"
+#endif
   else
     return 0.0;
-#endif
 }
 
 /* print info on the weight function that is used */
