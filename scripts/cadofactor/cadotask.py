@@ -4694,13 +4694,7 @@ class StartServerTask(DoesLogging, cadoparams.UseParameters, HasState):
         super().__init__(db=db, parameters=parameters, path_prefix=path_prefix)
         # self.logger.info("path_prefix = %s, parameters = %s", path_prefix, parameters)
         self.params = self.parameters.myparams(self.paramnames)
-
-        # ------------------------------------------------------------------------------
-        # Temporary fix
-        # serveraddress = self.params.get("address", None)
-        serveraddress = "localhost"
-        # ------------------------------------------------------------------------------
-
+        serveraddress = self.params.get("address", None)
         serverport = self.params["port"]
         basedir = self.params.get("workdir", default_workdir).rstrip(os.sep) + os.sep
         uploaddir = basedir + self.params["name"] + ".upload/"
