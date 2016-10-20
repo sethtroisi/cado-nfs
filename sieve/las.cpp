@@ -353,7 +353,7 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
     /* This is a kludge, really. We don't get the chance to call the ctor
      * and dtor of sieve_info properly here. This ought to be fixed...
      * Someday */
-    mpz_init(si->qbasis.q);
+    si->qbasis.constructor();
 
     si->cpoly = las->cpoly;
     memcpy(si->conf, sc, sizeof(siever_config));
@@ -497,11 +497,10 @@ void sieve_info_pick_todo_item(sieve_info_ptr si, las_todo_stack * todo)
     todo->pop();
     ASSERT_ALWAYS(mpz_poly_is_root(si->cpoly->pols[si->doing->side],
                   si->doing->r, si->doing->p));
-    /* sanity check */
+    /* Sieving composite special-q, so warn the user if this occurs */
     if (!mpz_probab_prime_p(si->doing->p, 1)) {
-        verbose_output_vfprint(1, 0, gmp_vfprintf, "Error, %Zd is not prime\n",
-                               si->doing->p);
-        exit(1);
+        verbose_output_vfprint(1, 0, gmp_vfprintf,
+                "# Warning, q=%Zd is not prime\n", si->doing->p);
     }
     ASSERT_ALWAYS(si->conf->side == si->doing->side);
 }
@@ -570,7 +569,7 @@ static void sieve_info_clear (las_info_ptr las, sieve_info_ptr si)/*{{{*/
     /* This is a kludge, really. We don't get the chance to call the ctor
      * and dtor of sieve_info properly here. This ought to be fixed...
      * Someday */
-    mpz_clear(si->qbasis.q);
+    si->qbasis.destructor();
 }/*}}}*/
 
 /* las_info stuff */
@@ -1146,25 +1145,21 @@ parse_command_line_q0_q1(las_todo_stack *stack, mpz_ptr q0, mpz_ptr q1, param_li
         return;
     }
 
-    /* We don't have -q1. If we have -rho, we sieve only <q0, rho>. If we
-       don't have -rho, we sieve only q0, but all roots of it. If -q0 does
-       not give a legitimate special-q value, advance to the next legitimate
-       one and print a warning. */
+    /* We don't have -q1. If we have -rho, we sieve only <q0, rho>. */
     mpz_t t;
-    mpz_init_set(t, q0);
-    next_legitimate_specialq(q0, q0, 0);
-    /*
-    if (mpz_cmp(t, q0) != 0)
-        verbose_output_vfprint(1, 0, gmp_vfprintf, "Warning: fixing q=%Zd to next prime q=%Zd\n", t, q0);
-        */
-
-    mpz_set(q1, q0);
+    mpz_init(t);
     if (param_list_parse_mpz(pl, "rho", t)) {
         las_todo_push(stack, q0, t, qside);
         /* Set empty interval [q0 + 1, q0] as special-q interval */
+        mpz_set(q1, q0);
         mpz_add_ui (q0, q0, 1);
     } else {
-        /* Special-q are chosen from [q, q]. Nothing more to do here. */
+    /* If we don't have -rho, we sieve only q0, but all roots of it.
+       If -q0 does not give a legitimate special-q value, advance to the
+       next legitimate one. */
+        mpz_set(t, q0);
+        next_legitimate_specialq(q0, q0, 0);
+        mpz_set(q1, q0);
     }
     mpz_clear(t);
 }
@@ -3048,7 +3043,10 @@ int main (int argc0, char *argv0[])/*{{{*/
 
         if (SkewGauss (si->qbasis, si->doing->p, si->doing->r, si->cpoly->skew) != 0)
             continue;
-        si->qbasis.set_q(si->doing->p);
+        si->qbasis.set_q(si->doing->p, si->doing->prime_sq);
+        if (!si->qbasis.prime_sq) {
+            si->qbasis.set_vec_fac(si->doing->prime_factors);
+        }
 
         /* check |a0|, |a1| < 2^31 if we use fb_root_in_qlattice_31bits */
 #ifndef SUPPORT_LARGE_Q

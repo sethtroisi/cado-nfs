@@ -247,12 +247,11 @@ fill_in_buckets_toplevel(bucket_array_t<LEVEL, shorthint_t> &orig_BA,
   BA.add_slice_index(slice_index);
 
   typename FB_ENTRY_TYPE::transformed_entry_t transformed;
-  const unsigned long special_q = mpz_fits_ulong_p(si->qbasis.q) ? mpz_get_ui(si->qbasis.q) : 0;
 
   slice_offset_t i_entry = 0;
   const fb_slice<FB_ENTRY_TYPE> * const sl = (const fb_slice<FB_ENTRY_TYPE> * const) slice;
   for (const FB_ENTRY_TYPE *it = sl->begin(); it != sl->end(); it++, i_entry++) {
-    if (it->p == special_q) /* Assumes it->p != 0 */
+    if (!si->qbasis.is_coprime_to(it->p))
       continue;
     it->transform_roots(transformed, si->qbasis);
     for (unsigned char i_root = 0; i_root != transformed.nr_roots; i_root++) {

@@ -252,8 +252,8 @@ void small_sieve_init(small_sieve_data_t *ssd, las_info_ptr las,
             /* skip q: mark it in place of p to be recognized quickly.
                TODO: maybe use the SSP_DISCARD mechanism ?
                */
-            if (mpz_cmp_ui(si->qbasis.q, pp) == 0) {
-                tail->p = pp;
+            if (!si->doing->is_coprime_to(pp)) {
+                tail->p = mpz_get_ui(si->doing->p);
                 tail++;
                 continue;
             }

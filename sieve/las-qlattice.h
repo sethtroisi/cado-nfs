@@ -13,9 +13,20 @@
 struct qlattice_basis : private NonCopyable {
     int64_t a0, b0, a1, b1;
     mpz_t q;
-    qlattice_basis(){mpz_init(q);}
-    ~qlattice_basis(){mpz_clear(q);}
-    void set_q(const mpz_t special_q) {
+    unsigned long q_ulong; // q itself or 0 if q is too large to fit
+    bool prime_sq;
+    std::vector<uint64_t> * prime_factors;
+    qlattice_basis(){ constructor(); abort();} // this is not yet used!!!
+    ~qlattice_basis(){ destructor(); abort();}
+    void constructor() {
+        mpz_init(q);
+        prime_factors = new std::vector<uint64_t>;
+    }
+    void destructor() {
+        mpz_clear(q);
+        delete prime_factors;
+    }
+    void set_q(const mpz_t special_q, bool is_prime) {
       /* Currently requires prime special-q values.
          For powers, the base prime would have to be determined and stored in
          a variable, so that powers of that prime in the factor base can be
@@ -23,7 +34,24 @@ struct qlattice_basis : private NonCopyable {
          be stored and skipped. */
       ASSERT_ALWAYS(!mpz_perfect_power_p(special_q));
       mpz_set(q, special_q);
+      q_ulong = mpz_fits_ulong_p(q) ? mpz_get_ui(q) : 0;
+      prime_sq = is_prime;
     };
+    void set_vec_fac(const std::vector<uint64_t> & fac) {
+        *prime_factors = fac;
+    }
+    // Assumes ell is prime.
+    bool is_coprime_to(unsigned long ell) const {
+        if (prime_sq)
+            return (ell == q_ulong);
+        else {
+            for (unsigned int i = 0; i < prime_factors->size(); ++i) {
+                if ((*prime_factors)[i] == ell)
+                    return false;
+            }
+            return true;
+        }
+    }
 };
 
 int SkewGauss (qlattice_basis &, const mpz_t, const mpz_t, double);
