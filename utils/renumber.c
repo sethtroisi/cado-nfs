@@ -730,6 +730,29 @@ int renumber_is_bad (int *nb, index_t *first, renumber_srcptr rn, p_r_values_t p
   return bad;
 }
 
+/* Return 1 if i does not correspond to a bad ideal, else return 0 */
+int
+renumber_badideal_get_p_r_below (renumber_srcptr renumber_info, p_r_values_t *p,
+                                 p_r_values_t * r, int *side, index_t i)
+{
+  index_t bad = renumber_info->naddcols;
+  if (i < bad)
+    return 1; /* i is not a bad ideal, it is a additional column */
+  int k;
+  for (k = 0; k < renumber_info->bad_ideals.n; k++)
+  {
+    if (i < bad + renumber_info->bad_ideals.nb[k])
+      break;
+    bad += renumber_info->bad_ideals.nb[k];
+  }
+  if (k == renumber_info->bad_ideals.n)
+    return 1; /* i is not a bad ideal, it is a "normal" ideal */
+  *p = renumber_info->bad_ideals.p[k];
+  *r = renumber_info->bad_ideals.r[k];
+  *side = renumber_info->bad_ideals.side[k];
+  return 0;
+}
+
 int
 renumber_is_additional_column (renumber_srcptr tab, index_t h)
 {
