@@ -160,10 +160,12 @@ parse_bad_ideals_file (FILE *badidealsfile, renumber_ptr renum)
   /* Finally, read the information and store it */
   rewind (badidealsfile);
   int k = 0;
+  renum->bad_ideals.max_p = 0;
   while (get_one_line (badidealsfile, s) != 0)
   {
     parse_one_line_bad_ideals (&(renum->bad_ideals), s, k);
     renum->size += renum->bad_ideals.nb[k];
+    renum->bad_ideals.max_p=MAX(renum->bad_ideals.max_p,renum->bad_ideals.p[k]);
     k++;
   }
   ASSERT_ALWAYS (k == renum->bad_ideals.n);
@@ -181,8 +183,9 @@ print_info (FILE * f, renumber_srcptr r, int after_reading)
     fprintf (f, "%sThere is no rational side\n", pre);
   else
     fprintf (f, "%sPolynomial on side %d is rational\n", pre, r->rat);
-  fprintf (f, "%s#badideals = %d\n%s#additional columns = %u\n", pre,
-              r->bad_ideals.n, pre, r->naddcols);
+  fprintf (f, "%s#badideals = %d [max_p = %" PRpr "]\n", pre, r->bad_ideals.n,
+                                                         r->bad_ideals.max_p);
+  fprintf (f, "%s#additional columns = %u\n", pre, r->naddcols);
   if (r->nonmonic)
   {
     fprintf (f, "%sNon monic polynomial on side:", pre);
@@ -628,10 +631,12 @@ renumber_read_table (renumber_ptr tab, const char * filename)
     tab->table[i] = RENUMBER_SPECIAL_VALUE;
 
   /* Reading the bad ideals at the top of the renumbering file */
+  tab->bad_ideals.max_p = 0;
   for (int k = 0; k < tab->bad_ideals.n; k++)
   {
     bytes_read += get_one_line(tab->file, s);
     parse_one_line_bad_ideals (&tab->bad_ideals, s, k);
+    tab->bad_ideals.max_p = MAX (tab->bad_ideals.max_p, tab->bad_ideals.p[k]);
     for (int j = 0; j < tab->bad_ideals.nb[k]; j++)
     {
       tab->table[tab->size] = RENUMBER_SPECIAL_VALUE;

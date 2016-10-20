@@ -36,6 +36,7 @@ struct bad_ideals_s
   p_r_values_t * r;  //
   int * side;
   int * nb;               // the number of ideals for each
+  p_r_values_t max_p;  // all badideals ahve p <= max_p
 };
 
 struct renumber_s

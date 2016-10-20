@@ -393,6 +393,20 @@ pthread_primes_consumer (void *arg)
             roots[side][nroots[side]++] = roots[side][0];
             roots[side][0] = p;
           }
+          if (p <= my_data->tab->bad_ideals.max_p) /* can it be a bad ideal ? */
+          {
+            for (int i = 0; i < nroots[side]; i++)
+            {
+              unsigned long r = roots[side][i];
+              if (renumber_is_bad (NULL, NULL, my_data->tab, p, r, side))
+              {
+                /* bad ideals -> remove this root from the list */
+                for (int j = i+1; j < nroots[side]; j++)
+                  roots[side][j-1] = roots[side][j];
+                nroots[side]--;
+              }
+            }
+          }
         }
       }
 
