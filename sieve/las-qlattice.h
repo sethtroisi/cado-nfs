@@ -43,7 +43,7 @@ struct qlattice_basis : private NonCopyable {
     // Assumes ell is prime.
     bool is_coprime_to(unsigned long ell) const {
         if (prime_sq)
-            return (ell == q_ulong);
+            return (ell != q_ulong);
         else {
             for (unsigned int i = 0; i < prime_factors->size(); ++i) {
                 if ((*prime_factors)[i] == ell)
