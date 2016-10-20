@@ -296,8 +296,9 @@ compute_index_rel (earlyparsed_relation_ptr rel, allbad_info_t info)
       
       int nb; //number of ideals above the bad ideal
       index_t first_index; // first index of the ideals above a bad ideal
-      if (renumber_is_bad (&nb, &first_index, renumber_tab, pr[i].p, r,
-                           pr[i].side))
+      if (pr[i].p <= renumber_tab->bad_ideals.max_p
+          && renumber_is_bad (&nb, &first_index, renumber_tab, pr[i].p, r,
+                                                                    pr[i].side))
       {
         int exp_above[RENUMBER_MAX_ABOVE_BADIDEALS] = {0,};
         handle_bad_ideals (exp_above, rel->a, rel->b, pr[i].p, pr[i].e,
