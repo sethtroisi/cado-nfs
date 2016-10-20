@@ -410,23 +410,26 @@ class WorkDir(object):
     
     The directory layout is as follows:
     The current project (i.e., the factorization) has a jobname, e.g.,
-    "RSA512". Each task has a name, e.g., "sieving".
+    "RSA512". Each task may have a name, e.g., "sieving".
     A task can create various files under
     workdir/jobname.taskname.file
     or put them in a subdirectory
     workdir/jobname.taskname/file
     or, for multiple subdirectories,
     workdir/jobname.taskname/subdir/file
+
+    It is also ok for tasks to have no particular name that is
+    reflected in the filename hierarchy.
     
     >>> f = WorkDir("/foo/bar", "jobname", "taskname")
-    >>> str(f.make_dirname()).replace(os.sep,'/')
-    '/foo/bar/jobname.taskname/'
+    >>> str(f.make_dirname("foo")).replace(os.sep,'/')
+    '/foo/bar/jobname.foo/'
     >>> str(f.make_filename('file')).replace(os.sep,'/')
-    '/foo/bar/jobname.taskname.file'
-    >>> str(f.make_filename('file', use_subdir=True)).replace(os.sep,'/')
-    '/foo/bar/jobname.taskname/file'
-    >>> str(f.make_filename('file', use_subdir=True, subdir='subdir')).replace(os.sep,'/')
-    '/foo/bar/jobname.taskname/subdir/file'
+    '/foo/bar/jobname.file'
+    >>> str(f.make_filename('file', subdir="foo")).replace(os.sep,'/')
+    '/foo/bar/jobname.foo/file'
+    >>> str(f.make_filename('file', prefix="bar", subdir='foo')).replace(os.sep,'/')
+    '/foo/bar/jobname.foo/jobname.bar.file'
     """
     def __init__(self, workdir, jobname=None, taskname=None):
         self.workdir = str(workdir).rstrip(os.sep)
@@ -467,6 +470,12 @@ class WorkDir(object):
                     components += [ ".", prefix ]
             components += [ ".", name ]
         return self.path_in_workdir("".join(components))
+
+    def get_workdir_jobname(self):
+        return self.jobname
+
+    def get_workdir_path(self):
+        return self.workdir
 
 class Statistics(object):
     """ Class that holds statistics on program execution, and can merge two
@@ -4624,7 +4633,12 @@ class DescentTask(Task):
         return "Individual logarithm"
     @property
     def programs(self):
-        input = {"db": Request.GET_DB_FILENAME,}
+        input = {
+                # "db": Request.GET_DB_FILENAME,
+                "prefix": Request.GET_WORKDIR_JOBNAME,
+                "datadir": Request.GET_WORKDIR_PATH,
+                }
+        # input = { "db": self.get_db_uri(), }
         override = ("cadobindir",)
         return ((cadoprograms.Descent, override, input),)
     @property
@@ -4758,7 +4772,7 @@ class StartServerTask(DoesLogging, cadoparams.UseParameters, HasState):
 
         self.registered_filenames = self.make_db_dict('server_registered_filenames')
         self.server = wuserver.ServerLauncher(serveraddress, serverport,
-            threaded, self.get_db_filename(), self.registered_filenames,
+            threaded, db, self.registered_filenames,
             uploaddir, bg=True, only_registered=only_registered, cafile=cafilename,
             whitelist=server_whitelist,
             timeout_hint=servertimeout_hint)
@@ -5085,7 +5099,10 @@ class Request(Message):
     GET_SMEXP = object()
     GET_NMAPS = object()
     GET_WU_RESULT = object()
+    GET_DB_URI = object()
     GET_DB_FILENAME = object()
+    GET_WORKDIR_JOBNAME = object()
+    GET_WORKDIR_PATH = object()
 
 class CompleteFactorization(HasState, wudb.DbAccess, 
         DoesLogging, cadoparams.UseParameters, patterns.Mediator):
@@ -5110,11 +5127,14 @@ class CompleteFactorization(HasState, wudb.DbAccess,
         return []
     
     def __init__(self, db, parameters, path_prefix):
+        self.db=db
         super().__init__(db=db, parameters=parameters, path_prefix=path_prefix)
         self.params = self.parameters.myparams(self.paramnames)
         self.db_listener = self.make_db_listener()
 
-        self.state["dbfilename"] = db
+        self.state["dburi"] = self.db.uri
+        if self.db.path:
+            self.state["dbfilename"] = self.db.path
 
         # Init WU BD
         self.wuar = self.make_wu_access()
@@ -5286,7 +5306,11 @@ class CompleteFactorization(HasState, wudb.DbAccess,
             Request.GET_MERGED_FILENAME: self.merge.get_merged_filename,
             Request.GET_INDEX_FILENAME: self.merge.get_index_filename,
             Request.GET_DENSE_FILENAME: self.merge.get_dense_filename,
-            Request.GET_WU_RESULT: self.db_listener.send_result
+            Request.GET_WU_RESULT: self.db_listener.send_result,
+            Request.GET_DB_URI: self.get_db_uri,
+            Request.GET_DB_FILENAME: self.get_db_filename,
+            Request.GET_WORKDIR_JOBNAME: self.fb.workdir.get_workdir_jobname,
+            Request.GET_WORKDIR_PATH: self.fb.workdir.get_workdir_path,
         }
 
         ## Set requests related to polynomial selection
@@ -5313,7 +5337,6 @@ class CompleteFactorization(HasState, wudb.DbAccess,
             self.request_map[Request.GET_RELSDEL_FILENAME] = self.purge.get_relsdel_filename
             self.request_map[Request.GET_KERNEL_FILENAME] = self.linalg.get_virtual_logs_filename
             self.request_map[Request.GET_VIRTUAL_LOGS_FILENAME] = self.linalg.get_virtual_logs_filename
-            self.request_map[Request.GET_DB_FILENAME] = self.get_db_filename
         else:
             self.request_map[Request.GET_KERNEL_FILENAME] = self.characters.get_kernel_filename
             self.request_map[Request.GET_DEPENDENCY_FILENAME] = self.linalg.get_dependency_filename
@@ -5380,6 +5403,9 @@ class CompleteFactorization(HasState, wudb.DbAccess,
     
     def get_db_filename(self):
         return self.state["dbfilename"]
+
+    def get_db_uri(self):
+        return self.state["dburi"]
 
     def start_all_clients(self):
         for clients in self.clients:

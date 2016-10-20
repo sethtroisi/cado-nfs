@@ -19,6 +19,7 @@ import upload
 import select
 import errno
 from subprocess import check_output, CalledProcessError, STDOUT
+
 try:
     import ssl
     HAVE_SSL = True
@@ -375,7 +376,7 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
             # specificaton, such as CONTENT_LENGTH.
             # This is really slow if rbufsize == 0.
             env = self.create_env("cgi-bin/upload.py")
-            upload.do_upload(self.dbfilename, self.uploaddir, 
+            upload.do_upload(self.dbdata, self.uploaddir, 
                     inputfp=self.rfile, output=self.wfile, environ=env)
 
     def create_env(self, scriptname, source_env=os.environ, query=None):
@@ -504,7 +505,7 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
             wu_text = self.db_pool.assign(clientid,
                     timeout_hint=self.timeout_hint)
         else:
-            wu_text = wudb.WuAccess(self.dbfilename).assign(clientid,
+            wu_text = wudb.WuAccess(self.dbdata).assign(clientid,
                     timeout_hint=self.timeout_hint)
         if not wu_text:
             # This flag is to downgrade the logging level. Ugly.
@@ -563,7 +564,7 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
         if self.db_pool:
             wus = self.db_pool.query(**conditions)
         else:
-            wus = wudb.WuAccess(self.dbfilename).query(**conditions)
+            wus = wudb.WuAccess(self.dbdata).query(**conditions)
 
         body = HtmlGen()
 
@@ -614,7 +615,7 @@ subjectAltName=@altnames
 [altnames]
 {SAN:s}
 """
-    def __init__(self, address, port, threaded, dbfilename,
+    def __init__(self, address, port, threaded, dbdata,
                 registered_filenames, uploaddir, *, bg = False,
                 use_db_pool = True, scriptdir = None, only_registered=False,
                 cafile=None, whitelist=None, timeout_hint=None):
@@ -672,7 +673,7 @@ subjectAltName=@altnames
 
         self.bg = bg
         if use_db_pool:
-            self.db_pool = wudb.DbThreadPool(dbfilename, 1)
+            self.db_pool = wudb.DbThreadPool(dbdata, 1)
         else:
             self.db_pool = None
         # Generate a class with parameters stored in class variables
@@ -680,7 +681,7 @@ subjectAltName=@altnames
         handler_params = {
             "registered_filenames": registered_filenames,
             "logger": self.logger,
-            "dbfilename": dbfilename,
+            "dbdata": dbdata,
             "db_pool": self.db_pool, 
             "uploaddir": uploaddir,
             "cgi_directories" : ['/cgi-bin'],
@@ -701,7 +702,7 @@ subjectAltName=@altnames
 
         # Set shell environment variables which the upload.py script needs if
         # spawned as subprocess
-        os.environ[upload.DBFILENAMEKEY] = dbfilename
+        os.environ[upload.DBURIKEY] = dbdata.uri
         os.environ[upload.UPLOADDIRKEY] = uploaddir
         if not os.path.isdir(uploaddir):
             os.mkdir(uploaddir)
@@ -881,7 +882,7 @@ if __name__ == '__main__':
     parser.add_argument("-port", help="Listen port", default="8001")
     parser.add_argument("-uploaddir", help="Upload directory", 
                         default="upload/")
-    parser.add_argument("-dbfile", help="Database file name", required=True)
+    parser.add_argument("-dburi", help="Database URI", required=True)
     parser.add_argument("-cafile", help="Certificate file name", required=False)
     parser.add_argument("-threaded", help="Use threaded server", 
                         action="store_true", default=False)
@@ -891,14 +892,14 @@ if __name__ == '__main__':
 
     PORT = int(args.port)
     HTTP = args.address
-    dbfilename = args.dbfile
+    dbdata = wudb.DBFactory(args.dburi)
     cafile = args.cafile
     registered_filenames = {}
 
     logger = logging.getLogger()
     logger.setLevel(logging.NOTSET)
 
-    httpd = ServerLauncher(HTTP, PORT, args.threaded, dbfilename, 
+    httpd = ServerLauncher(HTTP, PORT, args.threaded, dbdata, 
                            registered_filenames, args.uploaddir,
                            only_registered=args.onlyreg, cafile=cafile)
     

@@ -120,7 +120,7 @@ class GeneralClass(object):
         self._conn = None
         self.args = args
         if bool(args.db) == bool(args.prefix and args.datadir):
-            raise ValueError("Either --db or the combo --prefix + --datadir must be specified")
+            raise ValueError("Either --db (with an sqlite db) or the combo --prefix + --datadir must be specified")
         if args.tmpdir:
             self._tmpdir = args.tmpdir
             # do mkdir ???
@@ -154,7 +154,7 @@ class GeneralClass(object):
         except KeyError:
             pass
         if args.db and table:
-            v=self.__getdb("select value from %s where key='%s'" % (table, key))
+            v=self.__getdb("select value from %s where kkey='%s'" % (table, key))
             if v is not None and len(v) > 0:
                 return os.path.join(os.path.dirname(args.db), v[0])
         elif args.datadir and args.prefix:
@@ -169,7 +169,7 @@ class GeneralClass(object):
         except KeyError:
             pass
         if args.db:
-            v=self.__getdb("select value from %s where key='%s'" % (table, key))
+            v=self.__getdb("select value from %s where kkey='%s'" % (table, key))
             if v is not None and len(v) > 0:
                 return v[0]
         raise ValueError("no %s parameter known" % shortname)
@@ -183,22 +183,24 @@ class GeneralClass(object):
     def datadir(self):
         if args.datadir:
             return args.datadir
-        else:
+        elif args.db:
             return os.path.dirname(args.db)
+        else:
+            raise ValueError("Need --datadir or --db with an sqlite db")
 
     def poly(self):
-        return self.__getfile("poly", "polyselect2.poly", "polyselect2", "polyfilename")
+        return self.__getfile("poly", "poly", "polyselect2", "polyfilename")
     def renumber(self):
-        return self.__getfile("renumber", "freerel.renumber.gz", "freerel", "renumberfilename")
+        return self.__getfile("renumber", "renumber.gz", "freerel", "renumberfilename")
 
     def log(self):
-        return self.__getfile("log", "reconstructlog.dlog", "reconstructlog", "dlog")
+        return self.__getfile("log", "dlog", "reconstructlog", "dlog")
     def badideals(self):
-        return self.__getfile("badideals", "numbertheory.badideals", "numbertheory", "badidealsfile")
+        return self.__getfile("badideals", "badideals", "numbertheory", "badidealsfile")
     def badidealinfo(self):
-        return self.__getfile("badidealinfo", "numbertheory.badidealinfo", "numbertheory", "badidealinfofile")
+        return self.__getfile("badidealinfo", "badidealinfo", "numbertheory", "badidealinfofile")
     def fb1(self):
-        return self.__getfile("fb1", "factorbase.roots.gz", "factorbase", "outputfile")
+        return self.__getfile("fb1", "roots.gz", "factorbase", "outputfile")
     def ell(self):
         return int(args.ell)
     def lpb0(self):

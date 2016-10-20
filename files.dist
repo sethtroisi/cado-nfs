@@ -1192,5 +1192,4 @@ tests/numbertheory/badideals.rsa220.stdout
 tests/numbertheory/badideals.small-example.input
 tests/numbertheory/badideals.small-example.stdout
 tests/numbertheory/test-badideals.sh
-scripts/cadofactor/wudb_mysql.py
-scripts/cadofactor/wudb_sqlite.py
+scripts/cadofactor/wudb.py
