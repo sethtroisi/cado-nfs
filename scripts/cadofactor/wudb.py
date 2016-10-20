@@ -493,8 +493,10 @@ if HAVE_MYSQL:
                 super().__init__(*args, **kwargs)
 
         class ConnectionWrapper(object):
-            def _reconnect(self, **kwargs):
-                self._conn = mysql.connector.connect(**self._db_factory.db_connect_args, **kwargs)
+            def _reconnect_anonymous(self):
+                self._conn = mysql.connector.connect(**self._db_factory.db_connect_args)
+            def _reconnect(self):
+                self._conn = mysql.connector.connect(database=self._db_factory.db_name, **self._db_factory.db_connect_args)
             def cursor(self):
                 # provide some retry capability. This must be done on the
                 # connection object, since reconnecting changes the
@@ -506,7 +508,7 @@ if HAVE_MYSQL:
                     except mysql.connector.errors.OperationalError as e:
                         logger.warning("Got exception connecting to the database, retrying (#%d)" % i)
                         if self.db:
-                            self._reconnect(database=self._db_factory.db_name)
+                            self._reconnect()
                         else:
                             raise
                 self._conn.commit()
@@ -516,20 +518,20 @@ if HAVE_MYSQL:
                 db_name = self._db_factory.db_name
                 if create:
                     try:
-                        self._reconnect(database=db_name)
+                        self._reconnect()
                     except mysql.connector.errors.ProgrammingError:
                         # need to create the database first. Do it by
                         # hand, with a connection which starts without a
                         # database name.
                         logger.info("Creating database %s" % db_name)
-                        self._reconnect()
+                        self._reconnect_anonymous()
                         cursor = self._conn.cursor()
                         cursor.execute("CREATE DATABASE %s;" % db_name)
                         cursor.execute("USE %s;" % db_name)
                         cursor.execute("SET autocommit = 1")
                         self._conn.commit()
                 else:
-                    self._reconnect(database=self._db_factory.db_name)
+                    self._reconnect()
             def rollback(self):
                 self._conn.rollback()
             def close(self):
