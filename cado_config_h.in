@@ -13,8 +13,8 @@
 /*
  * We no longer expose these. (gmp|mpir)xx ain't a real requirement, so
  * let's use the workarounds unconditionally.
-#cmakedefine    HAVE_GMPXX
-#cmakedefine    HAVE_MPIRXX
+   HAVE_GMPXX
+   HAVE_MPIRXX
 */
 
 #cmakedefine    HAVE_POSIX_MEMALIGN
