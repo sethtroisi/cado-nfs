@@ -68,7 +68,7 @@ static inline float
 comp_weight_function (weight_t w)
 {
 #define USE_WEIGHT_LAMBDA 3
-#define USE_WEIGHT_NU 3
+#define USE_WEIGHT_NU 1
   if (w >= 3)
 #if USE_WEIGHT_LAMBDA == 0
     return 1.0;
@@ -79,7 +79,7 @@ comp_weight_function (weight_t w)
 #elif USE_WEIGHT_LAMBDA == 3
     return powf (0.8, (float) (w - 2));
 #elif USE_WEIGHT_LAMBDA == 4
-    return 1.0 / log2f ((float) (w - 2));
+    return 1.0 / log2f ((float) w);
 #elif USE_WEIGHT_LAMBDA == 5
     return 2.0 / (float) w;
 #elif USE_WEIGHT_LAMBDA == 6
