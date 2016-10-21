@@ -10,8 +10,12 @@
 #define MPIR_LIBDIR    "@MPIR_LIBDIR@"
 
 #cmakedefine    HAVE_MPIR
+/*
+ * We no longer expose these. (gmp|mpir)xx ain't a real requirement, so
+ * let's use the workarounds unconditionally.
 #cmakedefine    HAVE_GMPXX
 #cmakedefine    HAVE_MPIRXX
+*/
 
 #cmakedefine    HAVE_POSIX_MEMALIGN
 #cmakedefine    HAVE_GCC_STYLE_AMD64_INLINE_ASM

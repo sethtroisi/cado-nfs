@@ -13,14 +13,16 @@ set (sources
         verbose.c 
         version_info.c
 	modified_files.c threadpool.cpp mpz_poly_bivariate.c
+        gmpxx.cpp
 )
 if (NOT MINGW)
     set (sources ${sources} cado_popen.c)
 endif()
 
-if (NOT HAVE_GMPXX AND NOT HAVE_MPIRXX)
-    set (sources ${sources} gmpxx.cpp)
-endif()
+# gmpxx.cpp now included unconditionally above.
+#if (NOT HAVE_GMPXX AND NOT HAVE_MPIRXX)
+#    set (sources ${sources} gmpxx.cpp)
+#endif()
 
 set (sources_io
         filter_io.cpp
