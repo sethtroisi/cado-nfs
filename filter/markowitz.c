@@ -240,6 +240,7 @@ MkzCheck(filter_matrix_t *mat)
   }
 }
 
+/* here we count a cost k for an ideal of weight k */
 static int
 Cavallar(filter_matrix_t *mat, int32_t j)
 {
@@ -337,6 +338,7 @@ MkzCount(filter_matrix_t *mat, int32_t j)
 	return pureMkz(mat, j);
     case 0:
     default:
+      /* for the double-matrix trick, we count k for an ideal of weight k */
 	return Cavallar(mat, j);
     }
 }
