@@ -15,7 +15,13 @@ Main changes between cado-nfs-2.2.0 and cado-nfs-2.3.0:
   has changed. Previously, the syntax was tasks.sieve.sieving.las.threads
   or tasks.sieve.factorbase.makefb.threads. Now it's simply
   tasks.sieve.las.threads or tasks.sieve.makefb.threads.
-
+* The database which stores the computation state can now also be backed
+  by a mysql server. This is optional, and requires the
+  python3-mysql.connector package (on Debian linux -- actual package name
+  depends on your OS distribution). To activate this feature, pass the
+  database URI as an extra parameter to cado-nfs.py, e.g.
+  "database=db:mysql://USER:PASS@host:port/foobar", where port, PASS, and
+  USER are optional.
 
 
 

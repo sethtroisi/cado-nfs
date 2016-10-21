@@ -214,19 +214,39 @@ The only crucial bit information is the line which gives the number of
 relations in the file, which has to match the following format:
 # Total $nrels reports [%.2fs/r, %.2fr/sq]
 
-File locking
-============
+File locking when using sqlite3 as a database backend
+=====================================================
 
-The SqLite database used by cadofactor makes extensive use of file locking.
-This requires that the underlying file system properly implements POSIX file
-locking. One example of a file system that claims to, but does not, is
-glusterfs, which leads to random SqLite errors. See the thread
+The SqLite database used by cadofactor by default makes extensive use of
+file locking.  This requires that the underlying file system properly
+implements POSIX file locking. One example of a file system that claims
+to, but does not, is glusterfs, which leads to random SqLite errors. See
+the thread
 
 http://gluster.org/pipermail/gluster-users/2011-September/031720.html
 
 If you encounter "Database corrupted" or similar errors, try if storing the
 working directory on a local (not network-mounted) file system resolves the
 problem.
+
+If you have no choice but to use a filesystem which does not handle
+locking correctly, you may specify the database location to an external
+place (see next)
+
+Storing the database elsewhere, or using a different database back-end
+======================================================================
+
+The database which stores the computation state can be backed by a mysql
+server. This is optional, and requires the python3-mysql.connector
+package (on Debian linux -- actual package name depends on your OS
+distribution).
+  
+To activate this feature, pass the database URI as an extra parameter to
+cado-nfs.py, e.g.  "database=db:mysql://USER:PASS@host:port/foobar",
+where port, PASS, and USER are optional.
+
+The same syntax can be used to force the use of an externally located
+sqlite3 database, e.g. with "database=db:sqlite3:///home/john/rsa1024.db"
 
 Controlling the filtering stage
 ===============================
