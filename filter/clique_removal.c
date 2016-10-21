@@ -68,7 +68,7 @@ static inline float
 comp_weight_function (weight_t w)
 {
 #define USE_WEIGHT_LAMBDA 3
-#define USE_WEIGHT_NU 3
+#define USE_WEIGHT_NU 1
   if (w >= 3)
 #if USE_WEIGHT_LAMBDA == 0
     return 1.0;
