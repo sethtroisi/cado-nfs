@@ -2150,6 +2150,18 @@ factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED)
            purge_bucket() that way */
     }
 
+#if defined(HAVE_SSE2) && defined(SMALLSET_PURGE)
+    bucket_update_t<1, shorthint_t>::br_index_t *survivor_list =
+      (bucket_update_t<1, shorthint_t>::br_index_t *)
+      malloc(sizeof(bucket_update_t<1, shorthint_t>::br_index_t) * surv);
+    size_t surv_written = 0;
+    for (size_t i = 0; i < (1U << LOG_BUCKET_REGION); i++) {
+        if (SS[i] != 255)
+            survivor_list[surv_written++] = i;
+    }
+    ASSERT_ALWAYS(surv_written <= (size_t) surv);
+#endif
+
     /* Copy those bucket entries that belong to sieving survivors and
        store them with the complete prime */
     /* FIXME: choose a sensible size here */
@@ -2165,7 +2177,11 @@ factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED)
         const bucket_array_t<1, shorthint_t> * const BA_end =
             th->ws->cend_BA<1, shorthint_t>(side);
         for (; BA != BA_end; BA++)  {
+#if defined(HAVE_SSE2) && defined(SMALLSET_PURGE)
+            purged[side].purge(*BA, bucket_index, SS, surv_written, survivor_list);
+#else
             purged[side].purge(*BA, bucket_index, SS);
+#endif
         }
 
         /* Add entries coming from downsorting, if any */
