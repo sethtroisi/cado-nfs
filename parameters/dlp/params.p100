@@ -1,0 +1,70 @@
+###########################################################################
+# See params/params.c90 for an example which contains some documentation.
+
+###########################################################################
+# General parameters
+###########################################################################
+
+name = p100
+
+###########################################################################
+# Polynomial selection
+###########################################################################
+
+tasks.polyselect.degree = 4
+tasks.polyselect.P = 10000
+tasks.polyselect.admax = 2e5
+tasks.polyselect.adrange = 2e4
+tasks.polyselect.incr = 60
+tasks.polyselect.nq = 200
+tasks.polyselect.nrkeep = 100
+
+###########################################################################
+# Sieve
+###########################################################################
+
+lim0 = 500000
+lim1 = 500000
+lpb0 = 21
+lpb1 = 21
+tasks.sieve.mfb0 = 44
+tasks.sieve.mfb1 = 44
+tasks.I = 13
+
+tasks.sieve.qrange = 1000
+tasks.sieve.rels_wanted = 500000
+
+###########################################################################
+# Filter 
+###########################################################################
+
+# use default
+
+###########################################################################
+# Linalg 
+###########################################################################
+
+tasks.linalg.bwc.interval=1000
+
+###########################################################################
+# Reconstructlog
+###########################################################################
+tasks.reconstructlog.partial=false
+
+###########################################################################
+# Individual logs
+###########################################################################
+
+tasks.descent.init_I = 14
+tasks.descent.init_ncurves = 30
+tasks.descent.init_lpb = 37
+tasks.descent.init_lim = 1000000
+tasks.descent.init_mfb = 111
+tasks.descent.init_tkewness = 2000000
+tasks.descent.I = 13
+tasks.descent.lim0 = 500000
+tasks.descent.lim1 = 500000
+tasks.descent.lpb0 = 21
+tasks.descent.lpb1 = 21
+tasks.descent.mfb0 = 42
+tasks.descent.mfb1 = 42

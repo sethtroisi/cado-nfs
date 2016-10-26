@@ -723,6 +723,8 @@ parameters/dlp/params.p30
 parameters/dlp/p30.hint
 parameters/dlp/p155.hint
 parameters/dlp/params.p155
+parameters/dlp/p100.hint
+parameters/dlp/params.p100
 filter/filter_badideals.c
 linalg/bwc/lingen-matpoly-ft.h
 linalg/bwc/lingen-matpoly-ft.c
