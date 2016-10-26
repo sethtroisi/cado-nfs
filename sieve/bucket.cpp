@@ -14,6 +14,7 @@
 #include "iqsort.h"
 #include "verbose.h"
 #include "ularith.h"
+#include "smallset.h"
 
 /* sz is the size of a bucket for an array of buckets. In bytes, a bucket
    size is sz * sr, with sr = sizeof of one element of the bucket (a record).
@@ -273,42 +274,109 @@ bucket_primes_t::purge (const bucket_array_t<1, shorthint_t> &BA,
   }
 }
 
-template <>
+template <typename HINT>
+static inline bucket_update_t<1, longhint_t>
+to_longhint(const bucket_update_t<1, HINT> &update, slice_index_t slice_index);
+
+template<>
+bucket_update_t<1, longhint_t>
+to_longhint<shorthint_t>(const bucket_update_t<1, shorthint_t> &update,
+                         const slice_index_t slice_index)
+{
+  return bucket_update_t<1, longhint_t> (update.x, 0, update.hint, slice_index);
+}
+
+template<>
+bucket_update_t<1, longhint_t>
+to_longhint<longhint_t>(const bucket_update_t<1, longhint_t> &update,
+                        const slice_index_t slice_index MAYBE_UNUSED)
+{
+  return update;
+}
+
+
+template <typename HINT>
 void
-bucket_array_complete::purge<shorthint_t>(
-    const bucket_array_t<1, shorthint_t> &BA,
+bucket_array_complete::purge(
+    const bucket_array_t<1, HINT> &BA,
     const int i, const unsigned char *S)
 {
   for (slice_index_t i_slice = 0; i_slice < BA.get_nr_slices(); i_slice++) {
     const slice_index_t slice_index = BA.get_slice_index(i_slice);
-    const bucket_update_t<1, shorthint_t> *it = BA.begin(i, i_slice);
-    const bucket_update_t<1, shorthint_t> * const end_it = BA.end(i, i_slice);
+    const bucket_update_t<1, HINT> *it = BA.begin(i, i_slice);
+    const bucket_update_t<1, HINT> * const end_it = BA.end(i, i_slice);
 
     for ( ; it != end_it ; it++) {
       if (UNLIKELY(S[it->x] != 255)) {
-        push_update(bucket_update_t<1, longhint_t> (it->x, 0, it->hint, slice_index));
+        push_update(to_longhint(*it, slice_index));
       }
     }
   }
 }
 
-template <>
-void
+template void
+bucket_array_complete::purge<shorthint_t>(
+    const bucket_array_t<1, shorthint_t> &BA,
+    const int i, const unsigned char *S);
+
+template void
 bucket_array_complete::purge<longhint_t>(
     const bucket_array_t<1, longhint_t> &BA,
-    const int i, const unsigned char *S)
+    const int i, const unsigned char *S);
+
+
+template <typename HINT, int SIZE>
+void
+bucket_array_complete::purge_1 (
+    const bucket_array_t<1, HINT> &BA, const int i,
+    const size_t nr_survivors,
+    const typename bucket_update_t<1, HINT>::br_index_t *survivors)
 {
+  smallset<SIZE, typename bucket_update_t<1, HINT>::br_index_t> surv_set(survivors, nr_survivors);
   for (slice_index_t i_slice = 0; i_slice < BA.get_nr_slices(); i_slice++) {
-    const bucket_update_t<1, longhint_t> *it = BA.begin(i, i_slice);
-    const bucket_update_t<1, longhint_t> * const end_it = BA.end(i, i_slice);
+    const slice_index_t slice_index = BA.get_slice_index(i_slice);
+    const bucket_update_t<1, HINT> *it = BA.begin(i, i_slice);
+    const bucket_update_t<1, HINT> * const end_it = BA.end(i, i_slice);
 
     for ( ; it != end_it ; it++) {
-      if (UNLIKELY(S[it->x] != 255)) {
-        push_update(*it);
+      if (UNLIKELY(surv_set.contains(it->x))) {
+        push_update(to_longhint(*it, slice_index));
       }
     }
   }
 }
+
+template <typename HINT>
+void
+bucket_array_complete::purge (
+    const bucket_array_t<1, HINT> &BA, const int i,
+    const unsigned char *S,
+    const size_t nr_survivors,
+    const typename bucket_update_t<1, HINT>::br_index_t *survivors)
+{
+  const size_t items_per_size = smallset<1, typename bucket_update_t<1, HINT>::br_index_t>::nr_items;
+  if (nr_survivors == 0)
+    return;
+  switch ((nr_survivors + items_per_size - 1) / items_per_size) {
+    case 1: purge_1<HINT, 1>(BA, i, nr_survivors, survivors); break;
+    case 2: purge_1<HINT, 2>(BA, i, nr_survivors, survivors); break;
+    case 3: purge_1<HINT, 3>(BA, i, nr_survivors, survivors); break;
+    case 4: purge_1<HINT, 4>(BA, i, nr_survivors, survivors); break;
+    case 5: purge_1<HINT, 5>(BA, i, nr_survivors, survivors); break;
+    case 6: purge_1<HINT, 6>(BA, i, nr_survivors, survivors); break;
+    case 7: purge_1<HINT, 7>(BA, i, nr_survivors, survivors); break;
+    case 8: purge_1<HINT, 8>(BA, i, nr_survivors, survivors); break;
+    default: purge(BA, i, S);
+  }
+}
+
+template
+void
+bucket_array_complete::purge<shorthint_t> (
+    const bucket_array_t<1, shorthint_t> &, int,
+    const unsigned char *,
+    size_t,
+    const bucket_update_t<1, shorthint_t>::br_index_t *survivors);
 
 template class bucket_single<1, primehint_t>;
 template class bucket_single<1, longhint_t>;

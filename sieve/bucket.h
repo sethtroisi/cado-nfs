@@ -126,8 +126,9 @@ class bucket_update_t;
 template <typename HINT>
 class bucket_update_t<1, HINT> : public HINT {
 public:
+  typedef XSIZE1 br_index_t;
   static const uint64_t bucket_region = BUCKET_REGION_1;
-  XSIZE1 x;
+  br_index_t x;
   bucket_update_t(){};
   bucket_update_t(const uint64_t _x, const fbprime_t p,
     const slice_offset_t slice_offset, const slice_index_t slice_index)
@@ -139,9 +140,10 @@ public:
 template <typename HINT>
 class bucket_update_t<2, HINT> : public HINT {
 public:
+  typedef XSIZE2 br_index_t;
   static const uint64_t bucket_region = BUCKET_REGION_2;
   /* TODO: create a fake 24-bit type as uint8_t[3]. */
-  XSIZE2 x;
+  br_index_t x;
   bucket_update_t(){};
   bucket_update_t(const uint64_t _x, const fbprime_t p,
     const slice_offset_t slice_offset, const slice_index_t slice_index)
@@ -153,8 +155,9 @@ public:
 template <typename HINT>
 class bucket_update_t<3, HINT> : public HINT {
 public:
+  typedef XSIZE2 br_index_t;
   static const uint64_t bucket_region = BUCKET_REGION_3;
-  XSIZE3 x;
+  br_index_t x;
   bucket_update_t(){};
   bucket_update_t(const uint64_t _x, const fbprime_t p,
     const slice_offset_t slice_offset, const slice_index_t slice_index)
@@ -386,6 +389,16 @@ public:
   ~bucket_array_complete(){}
   template <typename HINT>
   void purge (const bucket_array_t<1, HINT> &BA, int i, const unsigned char *S);
+  template <typename HINT>
+  void purge (const bucket_array_t<1, HINT> &BA, int i, 
+              const unsigned char *S, size_t nr_survivors,
+              const typename bucket_update_t<1, HINT>::br_index_t *survivors);
+private:
+  template <typename HINT, int SIZE>
+  void purge_1 (
+      const bucket_array_t<1, HINT> &BA, const int i,
+      const size_t nr_survivors,
+      const typename bucket_update_t<1, HINT>::br_index_t *survivors);
 };
 
 
