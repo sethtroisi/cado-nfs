@@ -325,6 +325,7 @@ bucket_array_complete::purge<longhint_t>(
     const int i, const unsigned char *S);
 
 
+#ifdef HAVE_SSE2
 template <typename HINT, int SIZE>
 void
 bucket_array_complete::purge_1 (
@@ -377,6 +378,7 @@ bucket_array_complete::purge<shorthint_t> (
     const unsigned char *,
     size_t,
     const bucket_update_t<1, shorthint_t>::br_index_t *survivors);
+#endif
 
 template class bucket_single<1, primehint_t>;
 template class bucket_single<1, longhint_t>;

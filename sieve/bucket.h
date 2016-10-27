@@ -394,11 +394,13 @@ public:
               const unsigned char *S, size_t nr_survivors,
               const typename bucket_update_t<1, HINT>::br_index_t *survivors);
 private:
+#ifdef HAVE_SSE2
   template <typename HINT, int SIZE>
   void purge_1 (
       const bucket_array_t<1, HINT> &BA, const int i,
       const size_t nr_survivors,
       const typename bucket_update_t<1, HINT>::br_index_t *survivors);
+#endif
 };
 
 
