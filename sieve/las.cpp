@@ -2132,7 +2132,8 @@ factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED)
 #endif /* }}} */
 
     std::vector<uint32_t> survivors;
-
+    survivors.reserve(128);
+    
     for (unsigned int j = 0; j < nr_lines; j++)
     {
         unsigned char * const both_S[2] = {
@@ -2143,24 +2144,25 @@ factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED)
             si->sides[0]->bound,
             si->sides[1]->bound,
         };
+        size_t old_size = survivors.size();
         search_survivors_in_line(both_S, both_bounds,
                                  si->conf->logI, j + first_j, N,
                                  si->j_div, si->conf->unsieve_thresh,
                                  si->us, survivors);
+        /* Survivors written by search_survivors_in_line() have index
+           relative to their j-line. We need to convert to index within
+           the bucket region by adding line offsets. */
+        for (size_t i_surv = old_size; i_surv < survivors.size(); i_surv++)
+            survivors[i_surv] += j << si->conf->logI;
     }
-    copr += survivors.size();
 
-#if defined(HAVE_SSE2) && defined(SMALLSET_PURGE)
-    bucket_update_t<1, shorthint_t>::br_index_t *survivor_list =
-      (bucket_update_t<1, shorthint_t>::br_index_t *)
-      malloc(sizeof(bucket_update_t<1, shorthint_t>::br_index_t) * copr);
-    size_t surv_written = 0;
-    for (size_t i = 0; i < (1U << LOG_BUCKET_REGION); i++) {
-        if (SS[i] != 255)
-            survivor_list[surv_written++] = i;
+    /* Convert data type of list from uint32_t to the correct br_index_t */
+    std::vector<typename bucket_update_t<1, shorthint_t>::br_index_t>
+        survivors2;
+    survivors2.reserve(survivors.size());
+    for (size_t i = 0; i < survivors.size(); i++) {
+        survivors2.push_back(survivors[i]);
     }
-    ASSERT_ALWAYS(surv_written <= (size_t) copr);
-#endif
 
     /* Copy those bucket entries that belong to sieving survivors and
        store them with the complete prime */
@@ -2178,7 +2180,7 @@ factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED)
             th->ws->cend_BA<1, shorthint_t>(side);
         for (; BA != BA_end; BA++)  {
 #if defined(HAVE_SSE2) && defined(SMALLSET_PURGE)
-            purged[side].purge(*BA, bucket_index, SS, surv_written, survivor_list);
+            purged[side].purge(*BA, bucket_index, SS, survivors2);
 #else
             purged[side].purge(*BA, bucket_index, SS);
 #endif

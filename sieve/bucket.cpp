@@ -330,10 +330,9 @@ template <typename HINT, int SIZE>
 void
 bucket_array_complete::purge_1 (
     const bucket_array_t<1, HINT> &BA, const int i,
-    const size_t nr_survivors,
-    const typename bucket_update_t<1, HINT>::br_index_t *survivors)
+    const std::vector<typename bucket_update_t<1, HINT>::br_index_t> &survivors)
 {
-  smallset<SIZE, typename bucket_update_t<1, HINT>::br_index_t> surv_set(survivors, nr_survivors);
+  smallset<SIZE, typename bucket_update_t<1, HINT>::br_index_t> surv_set(survivors);
   for (slice_index_t i_slice = 0; i_slice < BA.get_nr_slices(); i_slice++) {
     const slice_index_t slice_index = BA.get_slice_index(i_slice);
     const bucket_update_t<1, HINT> *it = BA.begin(i, i_slice);
@@ -352,21 +351,20 @@ void
 bucket_array_complete::purge (
     const bucket_array_t<1, HINT> &BA, const int i,
     const unsigned char *S,
-    const size_t nr_survivors,
-    const typename bucket_update_t<1, HINT>::br_index_t *survivors)
+    const std::vector<typename bucket_update_t<1, HINT>::br_index_t> &survivors)
 {
   const size_t items_per_size = smallset<1, typename bucket_update_t<1, HINT>::br_index_t>::nr_items;
-  if (nr_survivors == 0)
+  if (survivors.size() == 0)
     return;
-  switch ((nr_survivors + items_per_size - 1) / items_per_size) {
-    case 1: purge_1<HINT, 1>(BA, i, nr_survivors, survivors); break;
-    case 2: purge_1<HINT, 2>(BA, i, nr_survivors, survivors); break;
-    case 3: purge_1<HINT, 3>(BA, i, nr_survivors, survivors); break;
-    case 4: purge_1<HINT, 4>(BA, i, nr_survivors, survivors); break;
-    case 5: purge_1<HINT, 5>(BA, i, nr_survivors, survivors); break;
-    case 6: purge_1<HINT, 6>(BA, i, nr_survivors, survivors); break;
-    case 7: purge_1<HINT, 7>(BA, i, nr_survivors, survivors); break;
-    case 8: purge_1<HINT, 8>(BA, i, nr_survivors, survivors); break;
+  switch ((survivors.size() + items_per_size - 1) / items_per_size) {
+    case 1: purge_1<HINT, 1>(BA, i, survivors); break;
+    case 2: purge_1<HINT, 2>(BA, i, survivors); break;
+    case 3: purge_1<HINT, 3>(BA, i, survivors); break;
+    case 4: purge_1<HINT, 4>(BA, i, survivors); break;
+    case 5: purge_1<HINT, 5>(BA, i, survivors); break;
+    case 6: purge_1<HINT, 6>(BA, i, survivors); break;
+    case 7: purge_1<HINT, 7>(BA, i, survivors); break;
+    case 8: purge_1<HINT, 8>(BA, i, survivors); break;
     default: purge(BA, i, S);
   }
 }
@@ -376,8 +374,7 @@ void
 bucket_array_complete::purge<shorthint_t> (
     const bucket_array_t<1, shorthint_t> &, int,
     const unsigned char *,
-    size_t,
-    const bucket_update_t<1, shorthint_t>::br_index_t *survivors);
+    const std::vector<typename bucket_update_t<1, shorthint_t>::br_index_t> &);
 #endif
 
 template class bucket_single<1, primehint_t>;
