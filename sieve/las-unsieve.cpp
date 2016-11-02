@@ -406,7 +406,7 @@ sieve_info_test_lognorm_sse2(__m128i * S0, const __m128i pattern0,
     /* Logically AND the two masks: survivor only where both sided survived */
     m1 = _mm_and_si128(m1, m2);
 
-    /* m1 is 0xFF in those locations where there the sieve entry survived on
+    /* m1 is 0xFF in those locations where the sieve entry survived on
        both sides */
     /* For the OR mask we need the bit complement, via m1 XOR 0xFF */
     m2 = _mm_xor_si128(m1, ff);
@@ -618,7 +618,7 @@ search_survivors_in_line3(unsigned char * const SS[2],
 #ifdef HAVE_SSE2
 /* This function assumes j % 3 != 0 and j % 5 == 0. It uses an SSE bound 
    pattern where i-coordinates with i % 5 == 0 are set to a bound of 0,
-   and trial divies only by primes > 5. */
+   and trial divides only by primes > 5. */
 int
 search_survivors_in_line5(unsigned char * const SS[2], 
         const unsigned char bound[2], const unsigned int log_I,
