@@ -14,11 +14,10 @@
 
 static const int verify_gcd = 0; /* Enable slow but thorough test */
 
-static inline int 
-sieve_info_test_lognorm_sse2(__m128i * S0, const __m128i pattern0,
+static inline unsigned int
+sieve_info_test_lognorm_sse2_mask(__m128i * S0, const __m128i pattern0,
                              const __m128i *S1, const __m128i pattern1)
 {
-    const __m128i zero = _mm_set1_epi8(0);
     const __m128i ff = _mm_set1_epi8(0xff);
     const __m128i sign_conversion = _mm_set1_epi8(-128);
     __m128i a = *S0;
@@ -55,18 +54,8 @@ sieve_info_test_lognorm_sse2(__m128i * S0, const __m128i pattern0,
     /* Do we want to update this one? */
     // *S1 = _mm_or_si128(r, m2);
 
-    /* Compute number of non-zero bytes. We want 1 is those bytes that
-    survived, and 0 in the others. m1 has 0xFF in those bytes that
-    survived, 0 in the others. First sign flip: 0xFF -> 0x1 */
-    m1 = _mm_sub_epi8(zero, m1);
-    /* Using Sum of Absolute Differences with 0, which for us gives the
-    number of non-zero bytes. This Sum of Absolute Differences uses
-    unsigned arithmetic, thus we needed the sign flip first */
-    m1 = _mm_sad_epu8(m1, zero);
-    /* Sum is stored in two parts */
-    int nr_set = _mm_extract_epi16(m1, 0) + _mm_extract_epi16(m1, 4);
-    /* Return number of bytes that were not set to 255 */
-    return nr_set;
+    /* Compute mask of non-zero bytes */
+    return (unsigned int) _mm_movemask_epi8(m1);
 }
 
 
@@ -76,16 +65,17 @@ sieve_info_test_lognorm_sse2(__m128i * S0, const __m128i pattern0,
    divisibility of the resulting i value by the trial-divided primes.
    Return the number of survivors found. */
 static inline int
-search_single_survivors(unsigned char * const SS[2],
+search_single_survivors_mask(unsigned char * const SS[2],
         const unsigned char bound[2] MAYBE_UNUSED, const unsigned int log_I,
         const unsigned int j, const int N MAYBE_UNUSED,
-        const int x_start, const int x_step, const unsigned int nr_div,
-        unsigned int (*div)[2])
+        const int x_start, const unsigned int nr_div,
+        unsigned int (*div)[2], unsigned int bitmask)
 {
   int survivors = 0;
-  for (int x = x_start; x < x_start + x_step; x++) {
-      if (SS[0][x] == 255)
-          continue;
+  for (int x = x_start; UNLIKELY(bitmask != 0); x++) {
+      const int tz = ularith_ctz(bitmask);
+      x += tz;
+      bitmask >>= tz + 1;
       survivors++;
 
       /* The very small prime used in the bound pattern, and unsieving larger
@@ -129,9 +119,9 @@ search_single_survivors(unsigned char * const SS[2],
 }
 
 
-/* This function works for all j */
+/* This function works for all j. Uses SSE2. */
 static int
-search_survivors_in_line1(unsigned char * const SS[2],
+search_survivors_in_line1_sse2(unsigned char * const SS[2],
         const unsigned char bound[2], const unsigned int log_I,
         const unsigned int j, const int N MAYBE_UNUSED, j_div_srcptr j_div,
         const unsigned int td_max)
@@ -143,7 +133,7 @@ search_survivors_in_line1(unsigned char * const SS[2],
 
     const __m128i sse2_sign_conversion = _mm_set1_epi8(-128);
     /* The reason for the bound+1 here is documented in
-       sieve_info_test_lognorm_sse2() */
+       sieve_info_test_lognorm_sse2_mask() */
     __m128i patterns[2] = {
         _mm_xor_si128(_mm_set1_epi8(bound[0] + 1), sse2_sign_conversion),
         _mm_xor_si128(_mm_set1_epi8(bound[1] + 1), sse2_sign_conversion)
@@ -161,15 +151,11 @@ search_survivors_in_line1(unsigned char * const SS[2],
     {
         /* Do bounds check using SSE pattern, set non-survivors in SS[0] array
            to 255 */
-        int sse_surv = 
-            sieve_info_test_lognorm_sse2((__m128i*) (SS[0] + x_start), patterns[0],
+        const unsigned int mask =
+            sieve_info_test_lognorm_sse2_mask((__m128i*) (SS[0] + x_start), patterns[0],
                                          (__m128i*) (SS[1] + x_start), patterns[1]);
-        if (sse_surv == 0)
-            continue;
-        int surv = search_single_survivors(SS, bound, log_I, j, N, x_start,
-            x_step, nr_div, div);
-        ASSERT(sse_surv == surv);
-        survivors += surv;
+        survivors += search_single_survivors_mask(SS, bound, log_I, j, N, x_start,
+            nr_div, div, mask);
     }
     return survivors;
 }
@@ -178,7 +164,7 @@ search_survivors_in_line1(unsigned char * const SS[2],
 /* This function assumes j % 3 == 0. It uses an SSE bound pattern where 
    i-coordinates with i % 3 == 0 are set to a bound of 0. */
 int
-search_survivors_in_line3(unsigned char * const SS[2], 
+search_survivors_in_line3_sse2(unsigned char * const SS[2], 
         const unsigned char bound[2], const unsigned int log_I,
         const unsigned int j, const int N MAYBE_UNUSED, j_div_srcptr j_div,
         const unsigned int td_max)
@@ -221,17 +207,13 @@ search_survivors_in_line3(unsigned char * const SS[2],
 
     for (int x_start = 0; x_start < (1 << log_I); x_start += x_step)
     {
-        int sse_surv = 
-            sieve_info_test_lognorm_sse2((__m128i*) (SS[0] + x_start), patterns[0][next_pattern],
+        const unsigned int mask =
+            sieve_info_test_lognorm_sse2_mask((__m128i*) (SS[0] + x_start), patterns[0][next_pattern],
                                          (__m128i*) (SS[1] + x_start), patterns[1][next_pattern]);
         if (++next_pattern == 3)
             next_pattern = 0;
-        if (sse_surv == 0)
-            continue;
-        int surv = search_single_survivors(SS, bound, log_I, j, N, x_start,
-            x_step, nr_div, div);
-        ASSERT(sse_surv == surv);
-        survivors += surv;
+        survivors += search_single_survivors_mask(SS, bound, log_I, j, N, x_start,
+            nr_div, div, mask);
     }
     return survivors;
 }
@@ -241,7 +223,7 @@ search_survivors_in_line3(unsigned char * const SS[2],
    pattern where i-coordinates with i % 5 == 0 are set to a bound of 0,
    and trial divides only by primes > 5. */
 int
-search_survivors_in_line5(unsigned char * const SS[2], 
+search_survivors_in_line5_sse2(unsigned char * const SS[2], 
         const unsigned char bound[2], const unsigned int log_I,
         const unsigned int j, const int N MAYBE_UNUSED, 
         j_div_srcptr j_div, const unsigned int td_max)
@@ -286,17 +268,13 @@ search_survivors_in_line5(unsigned char * const SS[2],
 
     for (int x_start = 0; x_start < (1 << log_I); x_start += x_step)
     {
-        int sse_surv = 
-            sieve_info_test_lognorm_sse2((__m128i*) (SS[0] + x_start), patterns[0][next_pattern],
+        const unsigned int mask =
+            sieve_info_test_lognorm_sse2_mask((__m128i*) (SS[0] + x_start), patterns[0][next_pattern],
                                          (__m128i*) (SS[1] + x_start), patterns[1][next_pattern]);
         if (++next_pattern == nr_patterns)
             next_pattern = 0;
-        if (sse_surv == 0)
-            continue;
-        int surv = search_single_survivors(SS, bound, log_I, j, N, x_start,
-            x_step, nr_div, div);
-        ASSERT(sse_surv == surv);
-        survivors += surv;
+        survivors += search_single_survivors_mask(SS, bound, log_I, j, N, x_start,
+            nr_div, div, mask);
     }
     return survivors;
 }
@@ -304,6 +282,9 @@ search_survivors_in_line5(unsigned char * const SS[2],
 
 #define USE_PATTERN_3 1
 #define USE_PATTERN_5 1
+#if USE_PATTERN_5 && ! USE_PATTERN_3
+#error USE_PATTERN_5 requires USE_PATTERN_3
+#endif
 
 int
 search_survivors_in_line_sse2(unsigned char * const SS[2], 
@@ -313,14 +294,13 @@ search_survivors_in_line_sse2(unsigned char * const SS[2],
 {
 #if USE_PATTERN_3
     if (j % 3 == 0)
-      return search_survivors_in_line3(SS, bound, log_I, j, N, j_div, td_max);
+      return search_survivors_in_line3_sse2(SS, bound, log_I, j, N, j_div, td_max);
 #if USE_PATTERN_5
     else if (j % 5 == 0)
-      return search_survivors_in_line5(SS, bound, log_I, j, N, j_div, td_max);
+      return search_survivors_in_line5_sse2(SS, bound, log_I, j, N, j_div, td_max);
 #endif
-    else
 #endif
-      return search_survivors_in_line1(SS, bound, log_I, j, N, j_div, td_max);
+    return search_survivors_in_line1_sse2(SS, bound, log_I, j, N, j_div, td_max);
 }
 
 #endif /* HAVE_SSE2 */
