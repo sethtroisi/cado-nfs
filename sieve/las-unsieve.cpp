@@ -351,7 +351,7 @@ sieve_info_test_lognorm (const unsigned char C1, const unsigned char C2,
 /* In SS[2][x_start] ... SS[2][x_start * 2^log_I - 1], look for survivors.
    We test divisibility of the resulting i value by the trial-divided primes.
    Return the number of survivors found. This function works for all j */
-MAYBE_UNUSED static int
+MAYBE_UNUSED static void
 search_survivors_in_line1(unsigned char * const SS[2],
         const unsigned char bound[2], const unsigned int log_I,
         const unsigned int j, const int N MAYBE_UNUSED, j_div_srcptr j_div,
