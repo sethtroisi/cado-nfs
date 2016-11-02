@@ -5,6 +5,7 @@
 
 #include <xmmintrin.h>
 #include <cassert>
+#include <vector>
 
 template <int SIZE, typename ELEMENTTYPE>
 class smallset {
@@ -40,6 +41,21 @@ public:
       tmp_data[i] = tmp_data[i - 1];
 
     /* Copy everything to items */
+    for (i = 0; i < SIZE; i++)
+      items[i] = ((__m128i *)&tmp_data)[i];
+  }
+
+  smallset(const std::vector<ELEMENTTYPE> &data) {
+    ELEMENTTYPE tmp_data[nr_items];
+    assert((SIZE == 0 || 0 < data.size()) && data.size() <= nr_items);
+
+    size_t i;
+    for (i = 0; i < data.size(); i++)
+      tmp_data[i] = data[i];
+
+    for ( ; i < nr_items; i++)
+      tmp_data[i] = tmp_data[i - 1];
+
     for (i = 0; i < SIZE; i++)
       items[i] = ((__m128i *)&tmp_data)[i];
   }
