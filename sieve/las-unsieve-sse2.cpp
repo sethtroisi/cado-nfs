@@ -13,13 +13,17 @@
 #include "memory.h"
 
 static const int verify_gcd = 0; /* Enable slow but thorough test */
+static const __m128i sign_conversion = _mm_set1_epi8(-128);
+static const __m128i even_masks[2] = {
+  _mm_set_epi8(0xFF, 0, 0xFF, 0, 0xFF, 0, 0xFF, 0,
+               0xFF, 0, 0xFF, 0, 0xFF, 0, 0xFF, 0),
+  _mm_set1_epi8(0xff)};
+static const __m128i ff = _mm_set1_epi8(0xff);
 
 static inline unsigned int
 sieve_info_test_lognorm_sse2_mask(__m128i * S0, const __m128i pattern0,
                              const __m128i *S1, const __m128i pattern1)
 {
-    const __m128i ff = _mm_set1_epi8(0xff);
-    const __m128i sign_conversion = _mm_set1_epi8(-128);
     __m128i a = *S0;
     __m128i r = *S1;
     __m128i m1, m2;
@@ -131,20 +135,18 @@ search_survivors_in_line1_sse2(unsigned char * const SS[2],
     nr_div = extract_j_div(div, j, j_div, 3, td_max);
     ASSERT_ALWAYS(nr_div <= 6);
 
-    const __m128i sse2_sign_conversion = _mm_set1_epi8(-128);
+    /* If j is even, set all the even entries in the bound pattern to
+       unsigned 0 */
+    const __m128i even_mask = even_masks[j % 2];
+
     /* The reason for the bound+1 here is documented in
        sieve_info_test_lognorm_sse2_mask() */
     __m128i patterns[2] = {
-        _mm_xor_si128(_mm_set1_epi8(bound[0] + 1), sse2_sign_conversion),
-        _mm_xor_si128(_mm_set1_epi8(bound[1] + 1), sse2_sign_conversion)
+        _mm_xor_si128(_mm_and_si128(_mm_set1_epi8(bound[0] + 1), even_mask), sign_conversion),
+        _mm_xor_si128(_mm_and_si128(_mm_set1_epi8(bound[1] + 1), even_mask), sign_conversion)
     };
     const int x_step = sizeof(__m128i);
 
-    /* If j is even, set all the even entries on the bound pattern to
-       unsigned 0 -> signed -128 */
-    if (j % 2 == 0)
-        for (size_t i = 0; i < sizeof(__m128i); i += 2)
-            ((unsigned char *)&patterns[0])[i] = 0x80;
     int survivors = 0;
 
     for (int x_start = 0; x_start < (1 << log_I); x_start += x_step)
@@ -169,7 +171,6 @@ search_survivors_in_line3_sse2(unsigned char * const SS[2],
         const unsigned int j, const int N MAYBE_UNUSED, j_div_srcptr j_div,
         const unsigned int td_max)
 {
-    const __m128i sse2_sign_conversion = _mm_set1_epi8(-128);
     __m128i patterns[2][3];
     const int x_step = sizeof(__m128i);
     const int pmin = 5;
@@ -185,14 +186,14 @@ search_survivors_in_line3_sse2(unsigned char * const SS[2],
     nr_div = extract_j_div(div, j, j_div, pmin, td_max);
     ASSERT_ALWAYS(nr_div <= 5);
 
-    patterns[0][0] = patterns[0][1] = patterns[0][2] = 
-        _mm_xor_si128(_mm_set1_epi8(bound[0] + 1), sse2_sign_conversion);
-    patterns[1][0] = patterns[1][1] = patterns[1][2] = 
-        _mm_xor_si128(_mm_set1_epi8(bound[1] + 1), sse2_sign_conversion);
+    /* If j is even, set all the even entries in the bound pattern to
+       unsigned 0 */
+    const __m128i even_mask = even_masks[j % 2];
 
-    if (j % 2 == 0)
-        for (size_t i = 0; i < 3 * sizeof(__m128i); i += 2)
-            ((unsigned char *)&patterns[0][0])[i] = 0x80;
+    patterns[0][0] = patterns[0][1] = patterns[0][2] = 
+        _mm_xor_si128(_mm_and_si128(_mm_set1_epi8(bound[0] + 1), even_mask), sign_conversion);
+    patterns[1][0] = patterns[1][1] = patterns[1][2] = 
+        _mm_xor_si128(_mm_and_si128(_mm_set1_epi8(bound[1] + 1), even_mask), sign_conversion);
 
     /* Those locations in patterns[0] that correspond to i being a multiple
        of 3 are set to 0. Byte 0 of patterns[0][0] corresponds to i = -I/2.
@@ -228,7 +229,6 @@ search_survivors_in_line5_sse2(unsigned char * const SS[2],
         const unsigned int j, const int N MAYBE_UNUSED, 
         j_div_srcptr j_div, const unsigned int td_max)
 {
-    const __m128i sse2_sign_conversion = _mm_set1_epi8(-128);
     const int nr_patterns = 5;
     __m128i patterns[2][nr_patterns];
     const int x_step = sizeof(__m128i);
@@ -245,9 +245,13 @@ search_survivors_in_line5_sse2(unsigned char * const SS[2],
     nr_div = extract_j_div(div, j, j_div, pmin, td_max);
     ASSERT_ALWAYS(nr_div <= 5);
 
+    /* If j is even, set all the even entries in the bound pattern to
+       unsigned 0 */
+    const __m128i even_mask = even_masks[j % 2];
+
     for (int i = 0; i < nr_patterns; i++) {
-        patterns[0][i] = _mm_xor_si128(_mm_set1_epi8(bound[0] + 1), sse2_sign_conversion);
-        patterns[1][i] = _mm_xor_si128(_mm_set1_epi8(bound[1] + 1), sse2_sign_conversion);
+        patterns[0][i] = _mm_xor_si128(_mm_and_si128(_mm_set1_epi8(bound[0] + 1), even_mask), sign_conversion);
+        patterns[1][i] = _mm_xor_si128(_mm_and_si128(_mm_set1_epi8(bound[1] + 1), even_mask), sign_conversion);
     }
 
     if (j % 2 == 0)
