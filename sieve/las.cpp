@@ -2080,7 +2080,7 @@ factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED)
     sieve_info_ptr si = th->si;
     las_report_ptr rep = th->rep;
     int cpt = 0;
-    int surv = 0, copr = 0;
+    int copr = 0;
     mpz_t norm[2];
     factor_list_t factors[2];
     mpz_array_t *lps[2] = { NULL, };
@@ -2141,7 +2141,7 @@ factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED)
             si->sides[0]->bound,
             si->sides[1]->bound,
         };
-        surv += search_survivors_in_line(both_S, both_bounds,
+        copr += search_survivors_in_line(both_S, both_bounds,
                                          si->conf->logI, j + first_j, N,
                                          si->j_div, si->conf->unsieve_thresh,
                                          si->us);
@@ -2153,13 +2153,13 @@ factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED)
 #if defined(HAVE_SSE2) && defined(SMALLSET_PURGE)
     bucket_update_t<1, shorthint_t>::br_index_t *survivor_list =
       (bucket_update_t<1, shorthint_t>::br_index_t *)
-      malloc(sizeof(bucket_update_t<1, shorthint_t>::br_index_t) * surv);
+      malloc(sizeof(bucket_update_t<1, shorthint_t>::br_index_t) * copr);
     size_t surv_written = 0;
     for (size_t i = 0; i < (1U << LOG_BUCKET_REGION); i++) {
         if (SS[i] != 255)
             survivor_list[surv_written++] = i;
     }
-    ASSERT_ALWAYS(surv_written <= (size_t) surv);
+    ASSERT_ALWAYS(surv_written <= (size_t) copr);
 #endif
 
     /* Copy those bucket entries that belong to sieving survivors and
@@ -2464,8 +2464,8 @@ factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED)
 #endif
     }
 
-    verbose_output_print(0, 3, "# There were %d survivors in bucket %d\n", surv, N);
-    th->rep->survivors1 += surv;
+    verbose_output_print(0, 3, "# There were %d survivors in bucket %d\n", copr, N);
+    th->rep->survivors1 += copr;
     th->rep->survivors2 += copr;
 
     for(int side = 0 ; side < 2 ; side++) {

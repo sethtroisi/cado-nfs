@@ -80,7 +80,6 @@ search_single_survivors_mask(unsigned char * const SS[2],
       const int tz = ularith_ctz(bitmask);
       x += tz;
       bitmask >>= tz + 1;
-      survivors++;
 
       /* The very small prime used in the bound pattern, and unsieving larger
          primes have not identified this as gcd(i,j) > 1. It remains to check
@@ -109,6 +108,7 @@ search_single_survivors_mask(unsigned char * const SS[2],
 #endif
           SS[0][x] = 255;
       } else {
+          survivors++;
           if (verify_gcd)
               ASSERT_ALWAYS(bin_gcd_int64_safe (i, j) == 1);
 #ifdef TRACE_K
