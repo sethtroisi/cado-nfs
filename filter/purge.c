@@ -83,6 +83,8 @@
 #include "singleton_removal.h"
 #include "clique_removal.h"
 
+// #define TRACE_J 0x5b841 /* trace column J */
+
 /*****************************************************************************/
 
 /* write final values to stdout */
@@ -111,6 +113,11 @@ static void singletons_and_cliques_removal(purge_matrix_ptr mat, int nsteps,
   /* First step of singletons removal */
   fprintf(stdout, "\nStep 0: only singleton removal\n");
   excess = singleton_removal (mat, nthreads, verbose);
+
+#ifdef TRACE_J
+    printf ("# TRACE: weight of ideal 0x%x is %u\n",
+            TRACE_J, mat->cols_weight[TRACE_J]);
+#endif
 
   if (excess <= 0) /* covers case nrows = ncols = 0 */
   {
@@ -180,6 +187,11 @@ static void singletons_and_cliques_removal(purge_matrix_ptr mat, int nsteps,
     cliques_removal (mat, target_excess, nthreads, verbose);
     excess = singleton_removal (mat, nthreads, verbose);
 
+#ifdef TRACE_J
+    printf ("TRACE: weight of ideal 0x%x is %u\n",
+            TRACE_J, mat->cols_weight[TRACE_J]);
+#endif
+
     fprintf (stdout, "This step removed %" PRId64 " rows and decreased excess "
              "by %" PRId64 "\n", (int64_t) (oldnrows - mat->nrows),
              oldexcess - excess);
@@ -213,6 +225,11 @@ static void singletons_and_cliques_removal(purge_matrix_ptr mat, int nsteps,
 
     cliques_removal (mat, target_excess, nthreads, verbose);
     excess = singleton_removal (mat, nthreads, verbose);
+
+#ifdef TRACE_J
+    printf ("TRACE: weight of ideal 0x%x is %u\n",
+            TRACE_J, mat->cols_weight[TRACE_J]);
+#endif
 
     fprintf(stdout, "This step removed %" PRId64 " rows and decreased excess "
                     "by %" PRId64 "\nEach excess row deleted %2.2lf rows\n",
@@ -484,7 +501,6 @@ int main(int argc, char **argv)
     purge_matrix_init (mat, nrows_init_arg, col_min_index_arg,
                        col_max_index_arg);
 
-
     set_antebuffer_path(argv0, param_list_lookup_string(pl, "path_antebuffer"));
     /* }}} */
 
@@ -523,6 +539,11 @@ int main(int argc, char **argv)
       abort();
     }
 
+#ifdef TRACE_J
+    printf ("TRACE: weight of ideal 0x%x is %u\n",
+            TRACE_J, mat->cols_weight[TRACE_J]);
+#endif
+
     /* Take into account the memory allocated for all mat->row_compact[i] */
     purge_matrix_row_compact_update_mem_usage (mat);
 
@@ -536,6 +557,11 @@ int main(int argc, char **argv)
     /* MAIN FUNCTIONS: do singletons and cliques removal. */
     singletons_and_cliques_removal (mat, nsteps, keep, required_excess,
                                     nthreads, verbose);
+
+#ifdef TRACE_J
+    printf ("TRACE: weight of ideal 0x%x is %u\n",
+            TRACE_J, mat->cols_weight[TRACE_J]);
+#endif
 
     /* prints some stats on columns and rows weight if verbose > 0. */
     if (verbose > 0)
