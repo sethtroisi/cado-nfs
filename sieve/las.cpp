@@ -2206,152 +2206,131 @@ factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED)
         primes[side].sort();
     }
 
-    /* Scan array one long word at a time. If any byte is <255, i.e. if
-       the long word is != 0xFFFF...FF, examine the bytes 
-       FIXME: We can use SSE to scan 16 bytes at a time, but have to make 
-       sure that SS is 16-aligned first, thus currently disabled. */
-#if defined(HAVE_SSE41) && defined(SSE_SURVIVOR_SEARCH)
-    const size_t together = sizeof(__m128i);
-    __m128i ones128 = (__m128i) {-1,-1};
-    const __m128i * SS_lw = (const __m128i *)SS;
-#else
-    const int together = sizeof(unsigned long);
-    const unsigned long * SS_lw = (const unsigned long *)SS;
+#ifdef TRACE_K
+    if (trace_on_spot_Nx(N, trace_Nx.x)) {
+        verbose_output_print(TRACE_CHANNEL, 0, "# Slot [%u] in bucket %u has value %u\n",
+                trace_Nx.x, trace_Nx.N, SS[trace_Nx.x]);
+    }
 #endif
 
-    for ( ; (unsigned char *) SS_lw < SS + BUCKET_REGION; SS_lw++) {
+    for (size_t i_surv = 0 ; i_surv < survivors2.size(); i_surv++) {
 #ifdef DLP_DESCENT
       if (las->tree->must_take_decision())
 	break;
 #endif
-#ifdef TRACE_K
-        size_t trace_offset = (const unsigned char *) SS_lw - SS;
-        if ((unsigned int) N == trace_Nx.N && (unsigned int) trace_offset <= trace_Nx.x && 
-            (unsigned int) trace_offset + together > trace_Nx.x) {
-            verbose_output_print(TRACE_CHANNEL, 0, "# Slot [%u] in bucket %u has value %u\n",
-                    trace_Nx.x, trace_Nx.N, SS[trace_Nx.x]);
-        }
-#endif
-#if defined(HAVE_SSE41) && defined(SSE_SURVIVOR_SEARCH)
-        if (LIKELY(_mm_testc_si128(*SS_lw, ones128)))
-            continue;
-#else
-        if (LIKELY(*SS_lw == (unsigned long)(-1L)))
-            continue;
-#endif
-        size_t offset = (const unsigned char *) SS_lw - SS;
+      const size_t x = survivors2[i_surv];
+      ASSERT_ALWAYS (SS[x] != 255);
+
 #ifdef SUPPORT_LARGE_Q
         mpz_t az, bz;
         mpz_init(az);
         mpz_init(bz);
 #endif
-        for (size_t x = offset; x < offset + together; ++x) {
-            if (SS[x] == 255) continue;
 
-            th->rep->survivor_sizes[S[0][x]][S[1][x]]++;
-            
-            /* For factor_leftover_norm, we need to pass the information of the
-             * sieve bound. If a cofactor is less than the square of the sieve
-             * bound, it is necessarily prime. we implement this by keeping the
-             * log to base 2 of the sieve limits on each side, and compare the
-             * bitsize of the cofactor with their double.
-             */
-            int64_t a;
-            uint64_t b;
+        th->rep->survivor_sizes[S[0][x]][S[1][x]]++;
+        
+        /* For factor_leftover_norm, we need to pass the information of the
+         * sieve bound. If a cofactor is less than the square of the sieve
+         * bound, it is necessarily prime. we implement this by keeping the
+         * log to base 2 of the sieve limits on each side, and compare the
+         * bitsize of the cofactor with their double.
+         */
+        int64_t a;
+        uint64_t b;
 
-            // Compute algebraic and rational norms.
-            NxToAB (&a, &b, N, x, si);
+        // Compute algebraic and rational norms.
+        NxToAB (&a, &b, N, x, si);
 #ifdef SUPPORT_LARGE_Q
-            NxToABmpz (az, bz, N, x, si);
+        NxToABmpz (az, bz, N, x, si);
 #endif
 #ifdef TRACE_K
-            if (trace_on_spot_ab(a, b))
-              verbose_output_print(TRACE_CHANNEL, 0, "# about to start cofactorization for (%"
-                       PRId64 ",%" PRIu64 ")  %zu %u\n", a, b, x, SS[x]);
+        if (trace_on_spot_ab(a, b))
+          verbose_output_print(TRACE_CHANNEL, 0, "# about to start cofactorization for (%"
+                   PRId64 ",%" PRIu64 ")  %zu %u\n", a, b, x, SS[x]);
 #endif
-            /* since a,b both even were not sieved, either a or b should
-             * be odd. However, exceptionally small norms, even without
-             * sieving, may fall below the report bound (see tracker
-             * issue #15437). Therefore it is safe to continue here. */
-            // ASSERT((a | b) & 1);
+        /* since a,b both even were not sieved, either a or b should
+         * be odd. However, exceptionally small norms, even without
+         * sieving, may fall below the report bound (see tracker
+         * issue #15437). Therefore it is safe to continue here. */
+        // ASSERT((a | b) & 1);
 #ifndef SUPPORT_LARGE_Q
-            if (UNLIKELY(((a | b) & 1) == 0))
+        if (UNLIKELY(((a | b) & 1) == 0))
 #else
-            if (UNLIKELY(mpz_even_p(az) && mpz_even_p(bz)))
+        if (UNLIKELY(mpz_even_p(az) && mpz_even_p(bz)))
 #endif
-            {
-                th->rep->both_even++;
-                continue;
-            }
+        {
+            th->rep->both_even++;
+            continue;
+        }
 
-            /* Since the q-lattice is exactly those (a, b) with
-               a == rho*b (mod q), q|b  ==>  q|a  ==>  q | gcd(a,b) */
-            /* FIXME: fast divisibility test here! */
-            /* Dec 2014: on a c90, it takes 0.1 % of total sieving time*/
+        /* Since the q-lattice is exactly those (a, b) with
+           a == rho*b (mod q), q|b  ==>  q|a  ==>  q | gcd(a,b) */
+        /* FIXME: fast divisibility test here! */
+        /* Dec 2014: on a c90, it takes 0.1 % of total sieving time*/
 #ifndef SUPPORT_LARGE_Q
-            if (b == 0 || (mpz_cmp_ui(si->doing->p, b) <= 0 && b % mpz_get_ui(si->doing->p) == 0))
+        if (b == 0 || (mpz_cmp_ui(si->doing->p, b) <= 0 && b % mpz_get_ui(si->doing->p) == 0))
 #else
-            if ((mpz_cmp_ui(bz, 0) == 0) || 
-                (mpz_cmp(si->doing->p, bz) <= 0 &&
-                 mpz_divisible_p(bz, si->doing->p)))
+        if ((mpz_cmp_ui(bz, 0) == 0) || 
+            (mpz_cmp(si->doing->p, bz) <= 0 &&
+             mpz_divisible_p(bz, si->doing->p)))
 #endif
-            {
-                continue;
-            }
+        {
+            continue;
+        }
 
-            copr++;
+        copr++;
 
-            int pass = 1;
+        int pass = 1;
 
-            int i;
-            unsigned int j;
-            for(int side = 0 ; pass && side < 2 ; side++) {
-                // Trial divide norm on side 'side'
-                /* Compute the norms using the polynomials transformed to 
-                   i,j-coordinates. The transformed polynomial on the 
-                   special-q side is already divided by q */
-                NxToIJ (&i, &j, N, x, si);
+        int i;
+        unsigned int j;
+        for(int side = 0 ; pass && side < 2 ; side++) {
+            // Trial divide norm on side 'side'
+            /* Compute the norms using the polynomials transformed to 
+               i,j-coordinates. The transformed polynomial on the 
+               special-q side is already divided by q */
+            NxToIJ (&i, &j, N, x, si);
 		mpz_poly_homogeneous_eval_siui (norm[side], si->sides[side]->fij, i, j);
 
 #ifdef TRACE_K
-                if (trace_on_spot_ab(a, b)) {
-                    verbose_output_vfprint(TRACE_CHANNEL, 0,
-                            gmp_vfprintf, "# start trial division for norm=%Zd ", norm[side]);
-                    verbose_output_print(TRACE_CHANNEL, 0,
-                            "on %s side for (%" PRId64 ",%" PRIu64 ")\n", sidenames[side], a, b);
-                }
+            if (trace_on_spot_ab(a, b)) {
+                verbose_output_vfprint(TRACE_CHANNEL, 0,
+                        gmp_vfprintf, "# start trial division for norm=%Zd ", norm[side]);
+                verbose_output_print(TRACE_CHANNEL, 0,
+                        "on %s side for (%" PRId64 ",%" PRIu64 ")\n", sidenames[side], a, b);
+            }
 #endif
-                verbose_output_print(1, 2, "FIXME %s, line %d\n", __FILE__, __LINE__);
-                const bool handle_2 = true; /* FIXME */
-                const fb_factorbase *fb = th->si->sides[side]->fb;
-                trial_div (&factors[side], norm[side], N, x,
-                        handle_2,
-                        &primes[side], &purged[side],
-                        si->sides[side]->trialdiv_data,
-                        a, b, fb);
+            verbose_output_print(1, 2, "FIXME %s, line %d\n", __FILE__, __LINE__);
+            const bool handle_2 = true; /* FIXME */
+            const fb_factorbase *fb = th->si->sides[side]->fb;
+            trial_div (&factors[side], norm[side], N, x,
+                    handle_2,
+                    &primes[side], &purged[side],
+                    si->sides[side]->trialdiv_data,
+                    a, b, fb);
 
-                pass = check_leftover_norm (norm[side], si, side);
+            pass = check_leftover_norm (norm[side], si, side);
 #ifdef TRACE_K
-                if (trace_on_spot_ab(a, b)) {
-                    verbose_output_vfprint(TRACE_CHANNEL, 0, gmp_vfprintf,
-                            "# checked leftover norm=%Zd", norm[side]);
-                    verbose_output_print(TRACE_CHANNEL, 0,
-                            " on %s side for (%" PRId64 ",%" PRIu64 "): %d\n",
-                            sidenames[side], a, b, pass);
-                }
-#endif
+            if (trace_on_spot_ab(a, b)) {
+                verbose_output_vfprint(TRACE_CHANNEL, 0, gmp_vfprintf,
+                        "# checked leftover norm=%Zd", norm[side]);
+                verbose_output_print(TRACE_CHANNEL, 0,
+                        " on %s side for (%" PRId64 ",%" PRIu64 "): %d\n",
+                        sidenames[side], a, b, pass);
             }
-            if (!pass) continue;
+#endif
+        }
+        if (!pass) continue;
 
-            if (las->batch_print_survivors) {
+        if (las->batch_print_survivors) {
 #ifndef SUPPORT_LARGE_Q
-                gmp_printf("%" PRId64 " %" PRIu64 " %Zd %Zd\n", a, b,
-                        norm[0], norm[1]);
+            gmp_printf("%" PRId64 " %" PRIu64 " %Zd %Zd\n", a, b,
+                    norm[0], norm[1]);
 #else
-                gmp_printf("%Zd %Zd %Zd %Zd\n", az, bz, norm[0], norm[1]);
+            gmp_printf("%Zd %Zd %Zd %Zd\n", az, bz, norm[0], norm[1]);
 #endif
-                continue;
-            }
+            continue;
+        }
 	    if (las->batch)
 	      {
 		verbose_output_start_batch ();
@@ -2361,10 +2340,10 @@ factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED)
 		continue; /* we deal with all cofactors at the end of las */
 	      }
 
-            if (cof_stats == 1)
-            {
-                cof_bitsize[0] = mpz_sizeinbase (norm[0], 2);
-                cof_bitsize[1] = mpz_sizeinbase (norm[1], 2);
+        if (cof_stats == 1)
+        {
+            cof_bitsize[0] = mpz_sizeinbase (norm[0], 2);
+            cof_bitsize[1] = mpz_sizeinbase (norm[1], 2);
 		/* no need to use a mutex here: either we use one thread only
 		   to compute the cofactorization data and if several threads
 		   the order is irrelevant. The only problem that can happen
@@ -2372,76 +2351,76 @@ factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED)
 		   and it is increased by 1 instead of 2, but this should
 		   happen rarely. */
 		cof_call[cof_bitsize[0]][cof_bitsize[1]] ++;
-            }
+        }
 	    rep->ttcof -= microseconds_thread ();
-            pass = factor_both_leftover_norms(norm, lps, lps_m, si);
+        pass = factor_both_leftover_norms(norm, lps, lps_m, si);
 	    rep->ttcof += microseconds_thread ();
 #ifdef TRACE_K
-            if (trace_on_spot_ab(a, b) && pass == 0) {
-              verbose_output_print(TRACE_CHANNEL, 0,
-                      "# factor_leftover_norm failed for (%" PRId64 ",%" PRIu64 "), ", a, b);
-              verbose_output_vfprint(TRACE_CHANNEL, 0, gmp_vfprintf,
-                      "remains %Zd, %Zd unfactored\n", norm[0], norm[1]);
-            }
+        if (trace_on_spot_ab(a, b) && pass == 0) {
+          verbose_output_print(TRACE_CHANNEL, 0,
+                  "# factor_leftover_norm failed for (%" PRId64 ",%" PRIu64 "), ", a, b);
+          verbose_output_vfprint(TRACE_CHANNEL, 0, gmp_vfprintf,
+                  "remains %Zd, %Zd unfactored\n", norm[0], norm[1]);
+        }
 #endif
-            if (pass <= 0) continue; /* a factor was > 2^lpb, or some
-                                        factorization was incomplete */
+        if (pass <= 0) continue; /* a factor was > 2^lpb, or some
+                                    factorization was incomplete */
 
-            /* yippee: we found a relation! */
+        /* yippee: we found a relation! */
 
-            if (cof_stats == 1) /* learning phase */
-                cof_succ[cof_bitsize[0]][cof_bitsize[1]] ++;
+        if (cof_stats == 1) /* learning phase */
+            cof_succ[cof_bitsize[0]][cof_bitsize[1]] ++;
 	    
-            // ASSERT (bin_gcd_int64_safe (a, b) == 1);
+        // ASSERT (bin_gcd_int64_safe (a, b) == 1);
 
 #ifndef SUPPORT_LARGE_Q
-            relation rel(a, b);
+        relation rel(a, b);
 #else
-            relation rel(az, bz);
+        relation rel(az, bz);
 #endif
 
-            /* Note that we explicitly do not bother about storing r in
-             * the relations below */
-            for (int side = 0; side < 2; side++) {
-                for(int i = 0 ; i < factors[side].n ; i++)
-                    rel.add(side, factors[side].fac[i], 0);
+        /* Note that we explicitly do not bother about storing r in
+         * the relations below */
+        for (int side = 0; side < 2; side++) {
+            for(int i = 0 ; i < factors[side].n ; i++)
+                rel.add(side, factors[side].fac[i], 0);
 
-                for (unsigned int i = 0; i < lps[side]->length; ++i)
-                    rel.add(side, lps[side]->data[i], 0);
-            }
+            for (unsigned int i = 0; i < lps[side]->length; ++i)
+                rel.add(side, lps[side]->data[i], 0);
+        }
 
-            rel.add(si->conf->side, si->doing->p, 0);
+        rel.add(si->conf->side, si->doing->p, 0);
 
-            rel.compress();
+        rel.compress();
 
 #ifdef TRACE_K
-            if (trace_on_spot_ab(a, b)) {
-                verbose_output_print(TRACE_CHANNEL, 0, "# Relation for (%"
-                        PRId64 ",%" PRIu64 ") printed\n", a, b);
-            }
+        if (trace_on_spot_ab(a, b)) {
+            verbose_output_print(TRACE_CHANNEL, 0, "# Relation for (%"
+                    PRId64 ",%" PRIu64 ") printed\n", a, b);
+        }
 #endif
-            {
-                int do_check = th->las->suppress_duplicates;
-                /* note that if we have large primes which don't fit in
-                 * an unsigned long, then the duplicate check will
-                 * quickly return "no".
-                 */
-                int is_dup = do_check
-                    && relation_is_duplicate(rel, las->nb_threads, si);
-                const char *comment = is_dup ? "# DUPE " : "";
-                FILE *output;
-                if (!is_dup)
-                    cpt++;
-                verbose_output_start_batch();   /* lock I/O */
-                if (prepend_relation_time) {
-                    verbose_output_print(0, 1, "(%1.4f) ", seconds() - tt_qstart);
-                }
-                verbose_output_print(0, 3, "# i=%d, j=%u, lognorms = %hhu, %hhu\n",
-                        i, j, S[0][x], S[1][x]);
-                for (size_t i_output = 0;
-                     (output = verbose_output_get(0, 0, i_output)) != NULL;
-                     i_output++) {
-                    rel.print(output, comment);
+        {
+            int do_check = th->las->suppress_duplicates;
+            /* note that if we have large primes which don't fit in
+             * an unsigned long, then the duplicate check will
+             * quickly return "no".
+             */
+            int is_dup = do_check
+                && relation_is_duplicate(rel, las->nb_threads, si);
+            const char *comment = is_dup ? "# DUPE " : "";
+            FILE *output;
+            if (!is_dup)
+                cpt++;
+            verbose_output_start_batch();   /* lock I/O */
+            if (prepend_relation_time) {
+                verbose_output_print(0, 1, "(%1.4f) ", seconds() - tt_qstart);
+            }
+            verbose_output_print(0, 3, "# i=%d, j=%u, lognorms = %hhu, %hhu\n",
+                    i, j, S[0][x], S[1][x]);
+            for (size_t i_output = 0;
+                 (output = verbose_output_get(0, 0, i_output)) != NULL;
+                 i_output++) {
+                rel.print(output, comment);
 		    // once filtering is ok for all Galois cases, 
 		    // this entire block would have to disappear
 		    if(las->galois != NULL)
@@ -2449,17 +2428,16 @@ factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED)
 			add_relations_with_galois(las->galois, output, comment,
 						  &cpt, rel);
 		}
-                verbose_output_end_batch();     /* unlock I/O */
-            }
+            verbose_output_end_batch();     /* unlock I/O */
+        }
 
-            /* Build histogram of lucky S[x] values */
-            th->rep->report_sizes[S[0][x]][S[1][x]]++;
+        /* Build histogram of lucky S[x] values */
+        th->rep->report_sizes[S[0][x]][S[1][x]]++;
 
 #ifdef  DLP_DESCENT
-            if (register_contending_relation(las, si, rel))
-                break;
+        if (register_contending_relation(las, si, rel))
+            break;
 #endif  /* DLP_DESCENT */
-        }
 #ifdef SUPPORT_LARGE_Q
         mpz_clear(az);
         mpz_clear(bz);
