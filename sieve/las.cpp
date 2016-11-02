@@ -2157,7 +2157,7 @@ factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED)
     }
 
     /* Convert data type of list from uint32_t to the correct br_index_t */
-    std::vector<typename bucket_update_t<1, shorthint_t>::br_index_t>
+    std::vector<bucket_update_t<1, shorthint_t>::br_index_t>
         survivors2;
     survivors2.reserve(survivors.size());
     for (size_t i = 0; i < survivors.size(); i++) {
