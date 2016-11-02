@@ -2,6 +2,7 @@
 #define LAS_UNSIEVE_H_
 
 #include <stdint.h>
+#include <vector>
 #include "ularith.h"
 
 typedef struct {
@@ -74,12 +75,14 @@ void clear_unsieve_data(unsieve_aux_data_srcptr);
 
 j_div_srcptr init_j_div(uint32_t);
 void clear_j_div(j_div_srcptr);
-int  search_survivors_in_line(unsigned char * const restrict[2], const unsigned char[2], 
-        unsigned int, unsigned int, int, j_div_srcptr, unsigned int,
-        unsieve_aux_data_srcptr);
-#ifdef HAVE_SSE2
-int  search_survivors_in_line_sse2(unsigned char * const restrict[2], const unsigned char[2], 
-        unsigned int, unsigned int, int, j_div_srcptr, unsigned int);
+void search_survivors_in_line(unsigned char * const restrict[2],
+        const unsigned char[2], unsigned int, unsigned int, int,
+        j_div_srcptr, unsigned int, unsieve_aux_data_srcptr,
+        std::vector<uint32_t> &);
+#ifdef HAVE_SSE2 
+void search_survivors_in_line_sse2(unsigned char * const restrict[2],
+        const unsigned char[2], unsigned int, unsigned int, int, j_div_srcptr,
+        unsigned int, std::vector<uint32_t> &);
 #endif
 
 #endif	/* LAS_UNSIEVE_H_ */

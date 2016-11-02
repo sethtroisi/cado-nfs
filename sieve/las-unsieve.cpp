@@ -355,14 +355,12 @@ MAYBE_UNUSED static int
 search_survivors_in_line1(unsigned char * const SS[2],
         const unsigned char bound[2], const unsigned int log_I,
         const unsigned int j, const int N MAYBE_UNUSED, j_div_srcptr j_div,
-        const unsigned int td_max)
+        const unsigned int td_max, std::vector<uint32_t> &survivors)
 {
     unsigned int div[6][2], nr_div;
 
     nr_div = extract_j_div(div, j, j_div, 3, td_max);
     ASSERT_ALWAYS(nr_div <= 6);
-
-    int survivors = 0;
 
     for (int x = 0; x < (1 << log_I); x++) {
         if (!sieve_info_test_lognorm(bound[0], bound[1], SS[0][x], SS[1][x]))
@@ -397,7 +395,7 @@ search_survivors_in_line1(unsigned char * const SS[2],
   #endif
             SS[0][x] = 255;
         } else {
-            survivors++;
+            survivors.push_back(x);
             if (verify_gcd)
                 ASSERT_ALWAYS(bin_gcd_int64_safe (i, j) == 1);
   #ifdef TRACE_K
@@ -408,15 +406,15 @@ search_survivors_in_line1(unsigned char * const SS[2],
   #endif
         }
       }
-    return survivors;
 }
 
 
-int
+void
 search_survivors_in_line(unsigned char * const SS[2], 
         const unsigned char bound[2], const unsigned int log_I,
         const unsigned int j, const int N, j_div_srcptr j_div,
-        const unsigned int td_max, unsieve_aux_data_srcptr us)
+        const unsigned int td_max, unsieve_aux_data_srcptr us,
+        std::vector<uint32_t> &survivors)
 {
     /* In line j = 0, only the coordinate (i, j) = (-1, 0) may survive */
     if (j == 0) {
@@ -426,17 +424,19 @@ search_survivors_in_line(unsigned char * const SS[2],
         if (s0 <= bound[0] && s1 <= bound[1]) {
             SS[0][I / 2 - 1] = s0;
             SS[1][I / 2 - 1] = s1;
-            return 1;
+            survivors.push_back(I / 2 - 1);
         } else {
-            return 0;
+            return;
         }
     }
 
     unsieve_not_coprime_line(SS[0], j, td_max + 1, 1U<<log_I, us);
 
 #if defined(HAVE_SSE2)
-      return search_survivors_in_line_sse2(SS, bound, log_I, j, N, j_div, td_max);
+    search_survivors_in_line_sse2(SS, bound, log_I, j, N, j_div, td_max,
+            survivors);
 #else
-      return search_survivors_in_line1(SS, bound, log_I, j, N, j_div, td_max);
+    search_survivors_in_line1(SS, bound, log_I, j, N, j_div, td_max,
+            survivors);
 #endif
 }

@@ -2131,6 +2131,8 @@ factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED)
     }
 #endif /* }}} */
 
+    std::vector<uint32_t> survivors;
+
     for (unsigned int j = 0; j < nr_lines; j++)
     {
         unsigned char * const both_S[2] = {
@@ -2141,14 +2143,12 @@ factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED)
             si->sides[0]->bound,
             si->sides[1]->bound,
         };
-        copr += search_survivors_in_line(both_S, both_bounds,
-                                         si->conf->logI, j + first_j, N,
-                                         si->j_div, si->conf->unsieve_thresh,
-                                         si->us);
-        /* Make survivor search create a list of x-coordinates that survived
-           instead of changing sieve array? More localized accesses in
-           purge_bucket() that way */
+        search_survivors_in_line(both_S, both_bounds,
+                                 si->conf->logI, j + first_j, N,
+                                 si->j_div, si->conf->unsieve_thresh,
+                                 si->us, survivors);
     }
+    copr += survivors.size();
 
 #if defined(HAVE_SSE2) && defined(SMALLSET_PURGE)
     bucket_update_t<1, shorthint_t>::br_index_t *survivor_list =
