@@ -348,67 +348,9 @@ sieve_info_test_lognorm (const unsigned char C1, const unsigned char C2,
   return S1 <= C1 && S2 <= C2;
 }
 
-/* In SS[2][x_start] ... SS[2][x_start * x_step - 1], look for survivors.
+/* In SS[2][x_start] ... SS[2][x_start * 2^log_I - 1], look for survivors.
    We test divisibility of the resulting i value by the trial-divided primes.
-   Return the number of survivors found. */
-static inline int
-search_single_survivors(unsigned char * const SS[2],
-        const unsigned char bound[2] MAYBE_UNUSED, const unsigned int log_I,
-        const unsigned int j, const int N MAYBE_UNUSED,
-        const int x_start, const int x_step, const unsigned int nr_div,
-        unsigned int (*div)[2])
-{
-  int survivors = 0;
-  for (int x = x_start; x < x_start + x_step; x++) {
-      if (!sieve_info_test_lognorm(bound[0], bound[1], SS[0][x], SS[1][x]))
-      {
-          SS[0][x] = 255;
-          continue;
-      }
-
-      /* The very small prime used in the bound pattern, and unsieving larger
-         primes have not identified this as gcd(i,j) > 1. It remains to check
-         the trial-divided primes. */
-      const unsigned int i = abs (x - (1 << (log_I - 1)));
-      int divides = 0;
-      switch (nr_div) {
-          case 6: divides |= (i * div[5][0] <= div[5][1]);
-          case 5: divides |= (i * div[4][0] <= div[4][1]);
-          case 4: divides |= (i * div[3][0] <= div[3][1]);
-          case 3: divides |= (i * div[2][0] <= div[2][1]);
-          case 2: divides |= (i * div[1][0] <= div[1][1]);
-          case 1: divides |= (i * div[0][0] <= div[0][1]);
-          case 0: while(0){};
-      }
-
-      if (divides)
-      {
-          if (verify_gcd)
-              ASSERT_ALWAYS(bin_gcd_int64_safe (i, j) != 1);
-#ifdef TRACE_K
-          if (trace_on_spot_Nx(N, x)) {
-              verbose_output_print(TRACE_CHANNEL, 0, "# Slot [%u] in bucket %u has non coprime (i,j)=(%d,%u)\n",
-                      x, N, i, j);
-          }
-#endif
-          SS[0][x] = 255;
-      } else {
-          survivors++;
-          if (verify_gcd)
-              ASSERT_ALWAYS(bin_gcd_int64_safe (i, j) == 1);
-#ifdef TRACE_K
-          if (trace_on_spot_Nx(N, x)) {
-              verbose_output_print(TRACE_CHANNEL, 0, "# Slot [%u] in bucket %u is survivor with coprime (i,j)\n",
-                      x, N);
-          }
-#endif
-      }
-  }
-  return survivors;
-}
-
-
-/* This function works for all j */
+   Return the number of survivors found. This function works for all j */
 MAYBE_UNUSED static int
 search_survivors_in_line1(unsigned char * const SS[2],
         const unsigned char bound[2], const unsigned int log_I,
@@ -420,15 +362,52 @@ search_survivors_in_line1(unsigned char * const SS[2],
     nr_div = extract_j_div(div, j, j_div, 3, td_max);
     ASSERT_ALWAYS(nr_div <= 6);
 
-    const int x_step = 1;
     int survivors = 0;
 
-    for (int x_start = 0; x_start < (1 << log_I); x_start += x_step)
-    {
-        int surv = search_single_survivors(SS, bound, log_I, j, N, x_start,
-            x_step, nr_div, div);
-        survivors += surv;
-    }
+    for (int x = 0; x < (1 << log_I); x++) {
+        if (!sieve_info_test_lognorm(bound[0], bound[1], SS[0][x], SS[1][x]))
+        {
+            SS[0][x] = 255;
+            continue;
+        }
+
+        /* The very small prime used in the bound pattern, and unsieving larger
+           primes have not identified this as gcd(i,j) > 1. It remains to check
+           the trial-divided primes. */
+        const unsigned int i = abs (x - (1 << (log_I - 1)));
+        int divides = 0;
+        switch (nr_div) {
+            case 6: divides |= (i * div[5][0] <= div[5][1]);
+            case 5: divides |= (i * div[4][0] <= div[4][1]);
+            case 4: divides |= (i * div[3][0] <= div[3][1]);
+            case 3: divides |= (i * div[2][0] <= div[2][1]);
+            case 2: divides |= (i * div[1][0] <= div[1][1]);
+            case 1: divides |= (i * div[0][0] <= div[0][1]);
+            case 0: while(0){};
+        }
+
+        if (divides) {
+            if (verify_gcd)
+                ASSERT_ALWAYS(bin_gcd_int64_safe (i, j) != 1);
+  #ifdef TRACE_K
+            if (trace_on_spot_Nx(N, x)) {
+                verbose_output_print(TRACE_CHANNEL, 0, "# Slot [%u] in bucket %u has non coprime (i,j)=(%d,%u)\n",
+                        x, N, i, j);
+            }
+  #endif
+            SS[0][x] = 255;
+        } else {
+            survivors++;
+            if (verify_gcd)
+                ASSERT_ALWAYS(bin_gcd_int64_safe (i, j) == 1);
+  #ifdef TRACE_K
+            if (trace_on_spot_Nx(N, x)) {
+                verbose_output_print(TRACE_CHANNEL, 0, "# Slot [%u] in bucket %u is survivor with coprime (i,j)\n",
+                        x, N);
+            }
+  #endif
+        }
+      }
     return survivors;
 }
 
