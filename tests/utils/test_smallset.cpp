@@ -1,8 +1,20 @@
 #include "cado_config.h"
 #include <cstdio>
+#include <string.h>
 #include "smallset.h"
 
 #ifdef HAVE_SSE2
+
+
+template <int SIZE, typename ELEMENTTYPE, int IDX>
+void
+check_pattern(smallset<SIZE, ELEMENTTYPE> &set, size_t n, __m128i data, size_t i)
+{
+   if (n > IDX) {
+      __m128i pattern = smallset_tools::extract_pattern<sizeof(ELEMENTTYPE),IDX>(data);
+      assert(set.contains(pattern) == (i == IDX));
+    }
+}
 
 template <int SIZE, typename ELEMENTTYPE>
 void
@@ -23,6 +35,40 @@ test_smallset()
     assert(set.contains(0));
     assert(set.contains(i-1));
     assert(!set.contains(i));
+  }
+
+  if (SIZE > 0 && sizeof(ELEMENTTYPE) > 1) {
+    ELEMENTTYPE arr[sizeof(__m128i) / sizeof(ELEMENTTYPE)];
+    const size_t n = sizeof(__m128i) / sizeof(ELEMENTTYPE);
+    for (size_t i = 0; i < n; i++)
+      arr[i] = (ELEMENTTYPE) i;
+    smallset<SIZE, ELEMENTTYPE> set(arr, n);
+
+    for (size_t j = 0; j < n - 1; j++) {
+      for (size_t i = 0; i < n; i++) {
+        memset(arr, 255, sizeof(__m128i));
+        arr[i] = (ELEMENTTYPE) j;
+        __m128i data = *(__m128i *)arr;
+
+        check_pattern<SIZE, ELEMENTTYPE, 0>(set, n, data, i);
+        check_pattern<SIZE, ELEMENTTYPE, 1>(set, n, data, i);
+        check_pattern<SIZE, ELEMENTTYPE, 2>(set, n, data, i);
+        check_pattern<SIZE, ELEMENTTYPE, 3>(set, n, data, i);
+        check_pattern<SIZE, ELEMENTTYPE, 4>(set, n, data, i);
+        check_pattern<SIZE, ELEMENTTYPE, 5>(set, n, data, i);
+        check_pattern<SIZE, ELEMENTTYPE, 6>(set, n, data, i);
+        check_pattern<SIZE, ELEMENTTYPE, 7>(set, n, data, i);
+        check_pattern<SIZE, ELEMENTTYPE, 8>(set, n, data, i);
+        check_pattern<SIZE, ELEMENTTYPE, 9>(set, n, data, i);
+        check_pattern<SIZE, ELEMENTTYPE, 9>(set, n, data, i);
+        check_pattern<SIZE, ELEMENTTYPE, 10>(set, n, data, i);
+        check_pattern<SIZE, ELEMENTTYPE, 11>(set, n, data, i);
+        check_pattern<SIZE, ELEMENTTYPE, 12>(set, n, data, i);
+        check_pattern<SIZE, ELEMENTTYPE, 13>(set, n, data, i);
+        check_pattern<SIZE, ELEMENTTYPE, 14>(set, n, data, i);
+        check_pattern<SIZE, ELEMENTTYPE, 15>(set, n, data, i);
+      }
+    }
   }
 }
 

@@ -6,10 +6,41 @@
 #include <xmmintrin.h>
 #include <cassert>
 #include <vector>
+#include <stdint.h>
 #include "macros.h"
 
+/* Static methods that don't depend on smallset template parameters */
+class smallset_tools {
+public:
+  template <unsigned size_x, unsigned idx_x>
+  static inline __m128i
+  extract_pattern(const __m128i updates)
+  {
+    ASSERT_ALWAYS((idx_x + 1) + size_x <= 16);
+
+    if (size_x == 2) {
+      if (idx_x < 4) {
+        /* Fill lower 4 words with x */
+        __m128i pattern = _mm_shufflelo_epi16(updates, idx_x * 0x55);
+        /* Interleave lower 4 words with themselves to fill all 8 words */
+        return _mm_unpacklo_epi16 (pattern, pattern);
+      } else {
+        /* Fill upper 4 words with x */
+        __m128i pattern = _mm_shufflehi_epi16(updates, (idx_x - 4) * 0x55);
+        /* Interleave upper 4 words with themselves to fill all 8 words */
+        return _mm_unpackhi_epi16 (pattern, pattern);
+      }
+    } else if (size_x == 4) {
+        return _mm_shuffle_epi32(updates, idx_x * 0x55);
+    } else {
+      /* Not implemented for bytes atm. */
+      abort();
+    }
+  }
+};
+
 template <int SIZE, typename ELEMENTTYPE>
-class smallset {
+class smallset : public smallset_tools {
   /* Data type could be made a template parameter if desired */
   __m128i items[SIZE];
 
