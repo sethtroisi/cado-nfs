@@ -28,7 +28,7 @@ public:
     /* We cannot handle the empty set if SIZE > 0, as we use padding to fill
        unused slots in items, and in an empty set there is nothing we could
        use for the padding. */
-    assert((SIZE == 0 || 0 < len) && len <= nr_items);
+    ASSERT_ALWAYS((SIZE == 0 || 0 < len) && len <= nr_items);
 
     /* Copy the members of the set */
     size_t i;
