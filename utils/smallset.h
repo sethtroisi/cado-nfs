@@ -48,10 +48,17 @@ public:
 
   smallset(const std::vector<ELEMENTTYPE> &data) {
     ELEMENTTYPE tmp_data[nr_items];
-    assert((SIZE == 0 || 0 < data.size()) && data.size() <= nr_items);
+    /* We want the ASSERT_ALWAYS below to instruct gcc that we can't have
+     * an empty for loop below (the first one). gcc cannot infer that if
+     * we reason on data.size() only, because it does not propagate
+     * values the same way, it seems. So we store the length in a
+     * variable first.
+     */
+    size_t len = data.size();
+    ASSERT_ALWAYS((SIZE == 0 || 0 < len) && len <= nr_items);
 
     size_t i;
-    for (i = 0; i < data.size(); i++)
+    for (i = 0; i < len; i++)
       tmp_data[i] = data[i];
 
     for ( ; i < nr_items; i++)
