@@ -6,6 +6,7 @@
 #include <xmmintrin.h>
 #include <cassert>
 #include <vector>
+#include "macros.h"
 
 template <int SIZE, typename ELEMENTTYPE>
 class smallset {
