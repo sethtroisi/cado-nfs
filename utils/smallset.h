@@ -105,25 +105,38 @@ public:
       return false;
 
     if (sizeof(ELEMENTTYPE) == 1) {
-      const __m128i c = _mm_set1_epi8(item);
-      unsigned u = _mm_movemask_epi8(_mm_cmpeq_epi8(items[0], c));
+      return contains(_mm_set1_epi8(item));
+    } else if (sizeof(ELEMENTTYPE) == 2) {
+      return contains( _mm_set1_epi16(item));
+    } else if (sizeof(ELEMENTTYPE) == 4) {
+      return contains(_mm_set1_epi32(item));
+    } else {
+      abort();
+    }
+  }
+
+  /* Returns true if "item" is in the set, and false otherwise */
+  inline bool contains(const __m128i pattern) const {
+    if (SIZE == 0)
+      return false;
+
+    if (sizeof(ELEMENTTYPE) == 1) {
+      unsigned u = _mm_movemask_epi8(_mm_cmpeq_epi8(items[0], pattern));
       /* TODO: Unroll this */
       for (size_t i = 1; i < SIZE; i++)
-        u |= _mm_movemask_epi8(_mm_cmpeq_epi8(items[i], c));
+        u |= _mm_movemask_epi8(_mm_cmpeq_epi8(items[i], pattern));
       return u != 0;
     } else if (sizeof(ELEMENTTYPE) == 2) {
-      const __m128i c = _mm_set1_epi16(item);
-      unsigned u = _mm_movemask_epi8(_mm_cmpeq_epi16(items[0], c));
+      unsigned u = _mm_movemask_epi8(_mm_cmpeq_epi16(items[0], pattern));
       /* TODO: Unroll this */
       for (size_t i = 1; i < SIZE; i++)
-        u |= _mm_movemask_epi8(_mm_cmpeq_epi16(items[i], c));
+        u |= _mm_movemask_epi8(_mm_cmpeq_epi16(items[i], pattern));
       return u != 0;
     } else if (sizeof(ELEMENTTYPE) == 4) {
-      const __m128i c = _mm_set1_epi32(item);
-      unsigned u = _mm_movemask_epi8(_mm_cmpeq_epi32(items[0], c));
+      unsigned u = _mm_movemask_epi8(_mm_cmpeq_epi32(items[0], pattern));
       /* TODO: Unroll this */
       for (size_t i = 1; i < SIZE; i++)
-        u |= _mm_movemask_epi8(_mm_cmpeq_epi32(items[i], c));
+        u |= _mm_movemask_epi8(_mm_cmpeq_epi32(items[i], pattern));
       return u != 0;
     } else {
       abort();

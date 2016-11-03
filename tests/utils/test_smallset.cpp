@@ -30,11 +30,19 @@ test_smallset()
     assert(!set.contains(0));
   }
 
-  for (size_t i = 1; i <= nr_items; i++) {
+    for (size_t i = 1; i <= nr_items; i++) {
     smallset<SIZE, ELEMENTTYPE> set(items, i);
     assert(set.contains(0));
     assert(set.contains(i-1));
     assert(!set.contains(i));
+    __m128i pattern;
+    if (sizeof(ELEMENTTYPE) == 1)
+      pattern = _mm_set1_epi8(2);
+    else if(sizeof(ELEMENTTYPE) == 2)
+      pattern = _mm_set1_epi16(2);
+    else if(sizeof(ELEMENTTYPE) == 4)
+      pattern = _mm_set1_epi32(2);
+    assert(set.contains(pattern) != (i <= 2));
   }
 
   if (SIZE > 0 && sizeof(ELEMENTTYPE) > 1) {
