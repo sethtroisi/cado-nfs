@@ -59,6 +59,11 @@ print_nonlinear_poly_info ( mpz_t *f,
     gg->coeff = g;
     static double best_score = DBL_MAX;
 
+    ASSERT_ALWAYS(mpz_cmp_ui (f[df], 0) != 0);
+
+    if (mpz_cmp_ui (g[dg], 0) == 0 || mpz_cmp_ui (g[0], 0) == 0)
+      return;
+
     skew[0] = L2_skewness (ff, SKEWNESS_DEFAULT_PREC);
     logmu[0] = L2_lognorm (ff, skew[0]);
     alpha[0] = get_alpha (ff, ALPHA_BOUND);
@@ -67,6 +72,10 @@ print_nonlinear_poly_info ( mpz_t *f,
     alpha[1] = get_alpha (gg, ALPHA_BOUND);
 
     score = logmu[1] + alpha[1] + logmu[0] + alpha[0];
+
+    if (score < 0)
+      return; /* this might indicate that f is not irreducible */
+
     if (score >= best_score)
       return; /* only print record scores */
 
@@ -174,6 +183,10 @@ polygen_JL_f ( mpz_t n,
         nr = mpz_poly_roots_mpz (rf, ff, n);
         if (nr > 0)
             break;
+
+	/* Note: this is not enough for degree 4 or more, since f might
+	   have one factor of degree 2 and one factor of degree d-2.
+	   When this is the case, those factors will pop up in LLL. */
     }
 
     mpz_clear (t);
@@ -211,8 +224,7 @@ polygen_JL_g ( mpz_t N,
                     mpz_set (g.coeff[j][i], N);
                 }
                 else {
-                    mpz_set (g.coeff[j][i], r);
-                    mpz_neg (g.coeff[j][i], g.coeff[j][i]);
+                    mpz_neg (g.coeff[j][i], r);
                     mpz_mul (r, r, root);
                 }
             }
@@ -258,7 +270,7 @@ polygen_JL ( mpz_t n,
         }
     }
 
-    /* generate f of degree d of small coefficients */
+    /* generate f of degree d with small coefficients */
     nr = polygen_JL_f (n, df, bound, f, rf, ad);
 
     for (i = 0; i < nr; i ++) {
