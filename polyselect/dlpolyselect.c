@@ -20,6 +20,7 @@
 #include "portability.h"
 #include "murphyE.h"
 #include "ropt_param.h"
+#include <omp.h>
 #include <ctype.h>
 #include <stdlib.h>
 #include <time.h> 
@@ -130,7 +131,7 @@ polygen_JL_f ( mpz_t n,
         fint[d] = ad;
         mpz_set_ui (f[d], ad);
         for (i = 0; i < d; i ++) {
-            fint[i] = (2*rand()- RAND_MAX) % bound;
+	    fint[i] = (rand() % bound) - (bound / 2);
             mpz_set_si (f[i], fint[i]);
         }
 
@@ -281,7 +282,7 @@ polygen_JL ( mpz_t n,
 static void
 usage ()
 {
-    fprintf (stderr, "./dlpolyselect -N xxx -df xxx -dg xxx -ad xxx\n");
+    fprintf (stderr, "./dlpolyselect -N xxx -df xxx -dg xxx -ad xxx [-t xxx]\n");
     exit (1);
 }
 
@@ -292,6 +293,7 @@ main (int argc, char *argv[])
     int i, ad = 1;
     mpz_t N;
     unsigned int df = 0, dg = 0;
+    int nthreads = 1;
     mpz_init (N);
 
     /* printf command-line */
@@ -324,6 +326,11 @@ main (int argc, char *argv[])
             argv += 2;
             argc -= 2;
         }
+        else if (argc >= 3 && strcmp (argv[1], "-t") == 0) {
+            nthreads = atoi (argv[2]);
+            argv += 2;
+            argc -= 2;
+        }
         else {
             fprintf (stderr, "Invalid option: %s\n", argv[1]);
             usage();
@@ -352,12 +359,12 @@ main (int argc, char *argv[])
         usage (); 
     }
 
-    srand(time(NULL));
+    srand (time (NULL));
     unsigned int bound = 1000;
-    unsigned int c = 0;
-    while (c < bound*bound) {
-        polygen_JL(N, df, dg, bound, ad);
-        c++;
-    }
+
+    omp_set_num_threads (nthreads);
+#pragma omp parallel for
+    for (unsigned int c = 0; c < bound * bound; c++)
+        polygen_JL (N, df, dg, bound, ad);
     mpz_clear (N);
 }
