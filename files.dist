@@ -415,6 +415,7 @@ sieve/las-smallsieve.cpp
 sieve/las-smallsieve.h
 sieve/las-types.h
 sieve/las-unsieve.cpp
+sieve/las-unsieve-sse2.cpp
 sieve/las-unsieve.h
 sieve/las-cofactor.cpp
 sieve/las-cofactor.h
@@ -1180,8 +1181,10 @@ tests/numbertheory/gentest.m
 tests/numbertheory/test.data
 numbertheory/badideals.cpp
 tests/utils/test_mpz_poly_bivariate.c
+tests/utils/test_smallset.cpp
 utils/mpz_poly_bivariate.c
 utils/mpz_poly_bivariate.h
+utils/smallset.h
 tests/numbertheory/badideals.p1024.badidealinfo
 tests/numbertheory/badideals.p1024.badideals
 tests/numbertheory/badideals.p1024.input

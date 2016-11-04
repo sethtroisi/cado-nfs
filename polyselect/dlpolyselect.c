@@ -1,4 +1,4 @@
-/* 
+/*
    Test data
     P  = 31081938120519680804196101011964261019661412191103091971180537759
     (P - 1)/2 = 2 * Q where Q is a prime
@@ -6,7 +6,7 @@
 
     --run--
     ./dlpolyselect -df 3 -N 31081938120519680804196101011964261019661412191103091971180537759
-    
+
     ./dlpolyselect -df 4 -dg 3 -N 191147927718986609689229466631454649812986246276667354864188503638807260703436799058776201365135161278134258296128109200046702912984568752800330221777752773957404540495707851421851
 
     ./dlpolyselect -df 3 -dg 2 -N 191147927718986609689229466631454649812986246276667354864188503638807260703436799058776201365135161278134258296128109200046702912984568752800330221777752773957404540495707851421851
@@ -20,9 +20,12 @@
 #include "portability.h"
 #include "murphyE.h"
 #include "ropt_param.h"
+#ifdef HAVE_OPENMP
+#include <omp.h>
+#endif
 #include <ctype.h>
 #include <stdlib.h>
-#include <time.h> 
+#include <time.h>
 
 const double exp_rot[] = {0, 0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 0};
 #define SIZE(p) (((long *) (p))[1])
@@ -44,8 +47,7 @@ print_nonlinear_poly_info ( mpz_t *f,
                             unsigned int df,
                             unsigned int dg,
                             int format,
-                            mpz_t n,
-                            mpz_t m )
+                            mpz_t n )
 {
     unsigned int i;
     double skew[2], logmu[2], alpha[2], score;
@@ -57,6 +59,11 @@ print_nonlinear_poly_info ( mpz_t *f,
     gg->coeff = g;
     static double best_score = DBL_MAX;
 
+    ASSERT_ALWAYS(mpz_cmp_ui (f[df], 0) != 0);
+
+    if (mpz_cmp_ui (g[dg], 0) == 0 || mpz_cmp_ui (g[0], 0) == 0)
+      return;
+
     skew[0] = L2_skewness (ff, SKEWNESS_DEFAULT_PREC);
     logmu[0] = L2_lognorm (ff, skew[0]);
     alpha[0] = get_alpha (ff, ALPHA_BOUND);
@@ -65,46 +72,53 @@ print_nonlinear_poly_info ( mpz_t *f,
     alpha[1] = get_alpha (gg, ALPHA_BOUND);
 
     score = logmu[1] + alpha[1] + logmu[0] + alpha[0];
+
+    if (score < 0)
+      return; /* this might indicate that f is not irreducible */
+
     if (score >= best_score)
       return; /* only print record scores */
 
-    best_score = score;
+#ifdef HAVE_OPENMP
+#pragma omp critical
+#endif
+    {
+      best_score = score;
 
-    if (format == 1)
-      gmp_printf ("n: %Zd\n", n);
-    else
-      gmp_printf ("N %Zd\n", n);
+      if (format == 1)
+	gmp_printf ("n: %Zd\n", n);
+      else
+	gmp_printf ("N %Zd\n", n);
 
-    if (format == 1) {
+      if (format == 1) {
         for (i = df + 1; i -- != 0; )
-            gmp_printf ("c%u: %Zd\n", i, f[i]);
-    }
-    else {
+	  gmp_printf ("c%u: %Zd\n", i, f[i]);
+      }
+      else {
         for (i = df + 1; i -- != 0; )
-            gmp_printf ("X%u %Zd\n", i, f[i]);
-    }
-    if (format == 1) {
+	  gmp_printf ("X%u %Zd\n", i, f[i]);
+      }
+      if (format == 1) {
         for (i = dg + 1; i -- != 0; )
-            gmp_printf ("Y%u: %Zd\n", i, g[i]);
-    }
-    else {
+	  gmp_printf ("Y%u: %Zd\n", i, g[i]);
+      }
+      else {
         for (i = dg + 1; i -- != 0; )
-            gmp_printf ("Y%u %Zd\n", i, g[i]);
+	  gmp_printf ("Y%u %Zd\n", i, g[i]);
+      }
+      /* take the skewness of side 1 for sieving since it gives larger norms */
+      printf ("skew: %1.2f\n", skew[1]);
+      printf ("# f lognorm %1.2f, skew %1.2f, alpha %1.2f, E %1.2f, "	\
+	      "exp_E %1.2f\n",
+	      logmu[0], skew[0], alpha[0], logmu[0] + alpha[0],
+	      logmu[0] + exp_alpha(exp_rot[df] * log (skew[0])));
+      printf ("# g lognorm %1.2f, skew %1.2f, alpha %1.2f, E %1.2f, "	\
+	      "exp_E %1.2f\n",
+	      logmu[1], skew[1], alpha[1], logmu[1] + alpha[1],
+	      logmu[1] + exp_alpha(exp_rot[df] * log (skew[0])));
+      printf ("# f+g score %1.2f\n", score);
+      printf ("\n");
     }
-    printf ("# f lognorm %1.2f, skew %1.2f, alpha %1.2f, E %1.2f, " \
-            "exp_E %1.2f\n",
-            logmu[0], skew[0], alpha[0], logmu[0] + alpha[0],
-            logmu[0] + exp_alpha(exp_rot[df] * log (skew[0])));
-    printf ("# g lognorm %1.2f, skew %1.2f, alpha %1.2f, E %1.2f, " \
-            "exp_E %1.2f\n",
-            logmu[1], skew[1], alpha[1], logmu[1] + alpha[1],
-            logmu[1] + exp_alpha(exp_rot[df] * log (skew[0])));
-    printf ("# f+g score %1.2f\n", score);
-
-    if (format == 1)
-      gmp_printf ("m: %Zd\n", n);
-    else
-      gmp_printf ("M %Zd\n\n", m);
 }
 
 
@@ -133,7 +147,7 @@ polygen_JL_f ( mpz_t n,
         fint[d] = ad;
         mpz_set_ui (f[d], ad);
         for (i = 0; i < d; i ++) {
-            fint[i] = (2*rand()- RAND_MAX) % bound;
+	    fint[i] = (rand() % (2 * bound)) - bound;
             mpz_set_si (f[i], fint[i]);
         }
 
@@ -169,6 +183,10 @@ polygen_JL_f ( mpz_t n,
         nr = mpz_poly_roots_mpz (rf, ff, n);
         if (nr > 0)
             break;
+
+	/* Note: this is not enough for degree 4 or more, since f might
+	   have one factor of degree 2 and one factor of degree d-2.
+	   When this is the case, those factors will pop up in LLL. */
     }
 
     mpz_clear (t);
@@ -206,8 +224,7 @@ polygen_JL_g ( mpz_t N,
                     mpz_set (g.coeff[j][i], N);
                 }
                 else {
-                    mpz_set (g.coeff[j][i], r);
-                    mpz_neg (g.coeff[j][i], g.coeff[j][i]);
+                    mpz_neg (g.coeff[j][i], r);
                     mpz_mul (r, r, root);
                 }
             }
@@ -235,7 +252,7 @@ polygen_JL ( mpz_t n,
              int ad )
 {
     ASSERT_ALWAYS (df >= 3);
-    unsigned int i, j, nr, format=0;
+    unsigned int i, j, nr, format = 1;
     mpz_t *f, *rf;
     mat_Z g;
     f = (mpz_t *) malloc ((df + 1)*sizeof(mpz_t));
@@ -252,8 +269,8 @@ polygen_JL ( mpz_t n,
             mpz_init (g.coeff[i][j]);
         }
     }
-    
-    /* generate f of degree d of small coefficients */
+
+    /* generate f of degree d with small coefficients */
     nr = polygen_JL_f (n, df, bound, f, rf, ad);
 
     for (i = 0; i < nr; i ++) {
@@ -261,11 +278,10 @@ polygen_JL ( mpz_t n,
         polygen_JL_g (n, dg, g, rf[i]);
 
         for (j = 1; j <= dg + 1; j ++) {
-          print_nonlinear_poly_info (f, &((g.coeff[j])[1]), df, dg, format,
-                                     n, rf[i]);
+          print_nonlinear_poly_info (f, &((g.coeff[j])[1]), df, dg, format, n);
         }
     }
-    
+
     /* clear */
     for (i = 0; i <= df; i ++) {
         mpz_clear (f[i]);
@@ -285,7 +301,7 @@ polygen_JL ( mpz_t n,
 static void
 usage ()
 {
-    fprintf (stderr, "./dlpolyselect -N xxx -df xxx -dg xxx -ad xxx\n");
+    fprintf (stderr, "./dlpolyselect -N xxx -df xxx -dg xxx -ad xxx -bound xxx [-t xxx]\n");
     exit (1);
 }
 
@@ -296,6 +312,9 @@ main (int argc, char *argv[])
     int i, ad = 1;
     mpz_t N;
     unsigned int df = 0, dg = 0;
+    int nthreads = 1;
+    unsigned int bound = 1024; /* bound on the coefficients of f */
+    unsigned long maxtries;
     mpz_init (N);
 
     /* printf command-line */
@@ -328,6 +347,16 @@ main (int argc, char *argv[])
             argv += 2;
             argc -= 2;
         }
+        else if (argc >= 3 && strcmp (argv[1], "-bound") == 0) {
+            bound = atoi (argv[2]);
+            argv += 2;
+            argc -= 2;
+        }
+        else if (argc >= 3 && strcmp (argv[1], "-t") == 0) {
+            nthreads = atoi (argv[2]);
+            argv += 2;
+            argc -= 2;
+        }
         else {
             fprintf (stderr, "Invalid option: %s\n", argv[1]);
             usage();
@@ -353,15 +382,20 @@ main (int argc, char *argv[])
 
     if (ad <= 0) {
         fprintf (stderr, "Error, need ad > 0 (-ad option)\n");
-        usage (); 
+        usage ();
     }
 
-    srand(time(NULL));
-    unsigned int bound = 1000;
-    unsigned int c = 0;
-    while (c < bound*bound) {
-        polygen_JL(N, df, dg, bound, ad);
-        c++;
-    }
+    srand (time (NULL));
+
+    /* since each coefficient of f of degree 0 to df-1 is chosen randomly
+       in [-bound, bound-1], we have (2*bound)^df possible values for f */
+    maxtries = (unsigned long) pow (2.0 * (double) bound, (double) df);
+
+#ifdef HAVE_OPENMP
+    omp_set_num_threads (nthreads);
+#pragma omp parallel for schedule(dynamic)
+#endif
+    for (unsigned int c = 0; c < maxtries; c++)
+        polygen_JL (N, df, dg, bound, ad);
     mpz_clear (N);
 }

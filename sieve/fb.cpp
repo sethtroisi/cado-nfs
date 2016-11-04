@@ -483,7 +483,7 @@ fb_vector<FB_ENTRY_TYPE>::est_weight_max(const size_t start, const size_t end) c
   return data[start].weight() * (end - start);
 }
 
-/* Estimate weight by the average of the weight of the two endpoints, i.e.,
+/* Estimate weight by the average of the weights of the two endpoints, i.e.,
    by trapezoidal rule. */
 template <class FB_ENTRY_TYPE>
 double

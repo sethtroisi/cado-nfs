@@ -481,7 +481,7 @@ mergeForColumn (report_t *rep, double *tt, double *tfill, double *tMST,
 #if DEBUG >= 1
     printf (" %d", j);
     printf (" => the %d rows are:\n", m);
-    for(k = 0; k < m; k++){
+    for(int k = 0; k < m; k++){
 	printf ("row[%d]=", ind[k]);
 	print_row (mat, ind[k]);
 	printf ("\n");

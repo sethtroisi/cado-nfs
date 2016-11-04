@@ -1,6 +1,6 @@
 
 if(MINGW)
-    message(STATUS "OpenMP disabledfor MINGW")
+    message(STATUS "OpenMP disabled for MINGW")
 else()
     find_package(OpenMP)
     if (OPENMP_FOUND)
