@@ -1,4 +1,4 @@
-/* 
+/*
    Test data
     P  = 31081938120519680804196101011964261019661412191103091971180537759
     (P - 1)/2 = 2 * Q where Q is a prime
@@ -6,7 +6,7 @@
 
     --run--
     ./dlpolyselect -df 3 -N 31081938120519680804196101011964261019661412191103091971180537759
-    
+
     ./dlpolyselect -df 4 -dg 3 -N 191147927718986609689229466631454649812986246276667354864188503638807260703436799058776201365135161278134258296128109200046702912984568752800330221777752773957404540495707851421851
 
     ./dlpolyselect -df 3 -dg 2 -N 191147927718986609689229466631454649812986246276667354864188503638807260703436799058776201365135161278134258296128109200046702912984568752800330221777752773957404540495707851421851
@@ -20,10 +20,12 @@
 #include "portability.h"
 #include "murphyE.h"
 #include "ropt_param.h"
+#ifdef HAVE_OPENMP
 #include <omp.h>
+#endif
 #include <ctype.h>
 #include <stdlib.h>
-#include <time.h> 
+#include <time.h>
 
 const double exp_rot[] = {0, 0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 0};
 #define SIZE(p) (((long *) (p))[1])
@@ -250,7 +252,7 @@ polygen_JL ( mpz_t n,
             mpz_init (g.coeff[i][j]);
         }
     }
-    
+
     /* generate f of degree d of small coefficients */
     nr = polygen_JL_f (n, df, bound, f, rf, ad);
 
@@ -262,7 +264,7 @@ polygen_JL ( mpz_t n,
           print_nonlinear_poly_info (f, &((g.coeff[j])[1]), df, dg, format, n);
         }
     }
-    
+
     /* clear */
     for (i = 0; i <= df; i ++) {
         mpz_clear (f[i]);
@@ -356,13 +358,15 @@ main (int argc, char *argv[])
 
     if (ad <= 0) {
         fprintf (stderr, "Error, need ad > 0 (-ad option)\n");
-        usage (); 
+        usage ();
     }
 
     srand (time (NULL));
     unsigned int bound = 1000;
 
+#ifdef HAVE_OPENMP
     omp_set_num_threads (nthreads);
+#endif
 #pragma omp parallel for
     for (unsigned int c = 0; c < bound * bound; c++)
         polygen_JL (N, df, dg, bound, ad);
