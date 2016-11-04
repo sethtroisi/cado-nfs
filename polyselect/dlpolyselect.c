@@ -90,6 +90,8 @@ print_nonlinear_poly_info ( mpz_t *f,
         for (i = dg + 1; i -- != 0; )
             gmp_printf ("Y%u %Zd\n", i, g[i]);
     }
+    /* take the skewness of side 1 for sieving, since it gives larger norms */
+    printf ("skew: %1.2f\n", skew[1]);
     printf ("# f lognorm %1.2f, skew %1.2f, alpha %1.2f, E %1.2f, " \
             "exp_E %1.2f\n",
             logmu[0], skew[0], alpha[0], logmu[0] + alpha[0],
@@ -99,7 +101,6 @@ print_nonlinear_poly_info ( mpz_t *f,
             logmu[1], skew[1], alpha[1], logmu[1] + alpha[1],
             logmu[1] + exp_alpha(exp_rot[df] * log (skew[0])));
     printf ("# f+g score %1.2f\n", score);
-
     printf ("\n");
 }
 
