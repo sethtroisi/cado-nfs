@@ -2509,6 +2509,24 @@ void mpz_poly_discriminant(mpz_ptr res, mpz_poly_srcptr f)
     mpz_poly_clear(df);
 }
 
+/* returns non-zero iff f is square-free in Z[x] */
+int
+mpz_poly_squarefree_p (mpz_poly_srcptr f)
+{
+  mpz_poly df;
+  mpz_t res;
+  int ret;
+
+  mpz_poly_init (df, f->deg);
+  mpz_poly_derivative (df, f);
+  mpz_init (res);
+  mpz_poly_resultant (res, f, df);
+  ret = mpz_cmp_ui (res, 0);
+  mpz_clear (res);
+  mpz_poly_clear (df);
+  return ret;
+}
+
 
 /* factoring polynomials */
 
@@ -2574,7 +2592,7 @@ void mpz_poly_factor_list_fprintf(FILE* fp, mpz_poly_factor_list_srcptr l)
 }
 /* Squarefree factorization */
 
-/* This auxiliary functionp almost does the sqf. It fills
+/* This auxiliary function almost does the sqf. It fills
  * lf->factors[stride*i] (i from 1 to deg(f)) with the factors with
  * multiplicity i in f.  lf->factors[0] is filled with the product whose
  * multiplicity is a multiple of the field characteristic.  returns max

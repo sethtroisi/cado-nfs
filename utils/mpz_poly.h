@@ -174,6 +174,7 @@ void mpz_poly_homogeneous_eval_siui (mpz_t v, mpz_poly_srcptr f, const int64_t i
 void mpz_poly_content (mpz_t c, mpz_poly_srcptr F);
 void mpz_poly_resultant(mpz_ptr res, mpz_poly_srcptr p, mpz_poly_srcptr q);
 void mpz_poly_discriminant(mpz_ptr res, mpz_poly_srcptr f);
+int mpz_poly_squarefree_p(mpz_poly_srcptr f);
 
 int mpz_poly_number_of_real_roots(mpz_poly_srcptr f);
 

@@ -184,6 +184,9 @@ polygen_JL_f ( mpz_t n,
         if (nr > 0)
             break;
 
+        if (mpz_poly_squarefree_p (ff) == 0)
+          break;
+
 	/* Note: this is not enough for degree 4 or more, since f might
 	   have one factor of degree 2 and one factor of degree d-2.
 	   When this is the case, those factors will pop up in LLL. */
