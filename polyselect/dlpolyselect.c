@@ -44,8 +44,7 @@ print_nonlinear_poly_info ( mpz_t *f,
                             unsigned int df,
                             unsigned int dg,
                             int format,
-                            mpz_t n,
-                            mpz_t m )
+                            mpz_t n )
 {
     unsigned int i;
     double skew[2], logmu[2], alpha[2], score;
@@ -101,10 +100,7 @@ print_nonlinear_poly_info ( mpz_t *f,
             logmu[1] + exp_alpha(exp_rot[df] * log (skew[0])));
     printf ("# f+g score %1.2f\n", score);
 
-    if (format == 1)
-      gmp_printf ("m: %Zd\n", n);
-    else
-      gmp_printf ("M %Zd\n\n", m);
+    printf ("\n");
 }
 
 
@@ -235,7 +231,7 @@ polygen_JL ( mpz_t n,
              int ad )
 {
     ASSERT_ALWAYS (df >= 3);
-    unsigned int i, j, nr, format=0;
+    unsigned int i, j, nr, format = 1;
     mpz_t *f, *rf;
     mat_Z g;
     f = (mpz_t *) malloc ((df + 1)*sizeof(mpz_t));
@@ -261,8 +257,7 @@ polygen_JL ( mpz_t n,
         polygen_JL_g (n, dg, g, rf[i]);
 
         for (j = 1; j <= dg + 1; j ++) {
-          print_nonlinear_poly_info (f, &((g.coeff[j])[1]), df, dg, format,
-                                     n, rf[i]);
+          print_nonlinear_poly_info (f, &((g.coeff[j])[1]), df, dg, format, n);
         }
     }
     
