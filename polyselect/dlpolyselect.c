@@ -70,6 +70,9 @@ print_nonlinear_poly_info ( mpz_t *f,
     if (score >= best_score)
       return; /* only print record scores */
 
+#ifdef HAVE_OPENMP
+#pragma omp atomic write
+#endif
     best_score = score;
 
     if (format == 1)
@@ -133,7 +136,7 @@ polygen_JL_f ( mpz_t n,
         fint[d] = ad;
         mpz_set_ui (f[d], ad);
         for (i = 0; i < d; i ++) {
-	    fint[i] = (rand() % bound) - (bound / 2);
+	    fint[i] = (rand() % (2 * bound)) - bound;
             mpz_set_si (f[i], fint[i]);
         }
 
@@ -284,7 +287,7 @@ polygen_JL ( mpz_t n,
 static void
 usage ()
 {
-    fprintf (stderr, "./dlpolyselect -N xxx -df xxx -dg xxx -ad xxx [-t xxx]\n");
+    fprintf (stderr, "./dlpolyselect -N xxx -df xxx -dg xxx -ad xxx -bound xxx [-t xxx]\n");
     exit (1);
 }
 
@@ -296,6 +299,8 @@ main (int argc, char *argv[])
     mpz_t N;
     unsigned int df = 0, dg = 0;
     int nthreads = 1;
+    unsigned int bound = 1024; /* bound on the coefficients of f */
+    unsigned long maxtries;
     mpz_init (N);
 
     /* printf command-line */
@@ -325,6 +330,11 @@ main (int argc, char *argv[])
         }
         else if (argc >= 3 && strcmp (argv[1], "-ad") == 0) {
             ad = atoi (argv[2]);
+            argv += 2;
+            argc -= 2;
+        }
+        else if (argc >= 3 && strcmp (argv[1], "-bound") == 0) {
+            bound = atoi (argv[2]);
             argv += 2;
             argc -= 2;
         }
@@ -362,13 +372,16 @@ main (int argc, char *argv[])
     }
 
     srand (time (NULL));
-    unsigned int bound = 1000;
+
+    /* since each coefficient of f of degree 0 to df-1 is chosen randomly
+       in [-bound, bound-1], we have (2*bound)^df possible values for f */
+    maxtries = (unsigned long) pow (2.0 * (double) bound, (double) df);
 
 #ifdef HAVE_OPENMP
     omp_set_num_threads (nthreads);
+#pragma omp parallel for schedule(dynamic)
 #endif
-#pragma omp parallel for
-    for (unsigned int c = 0; c < bound * bound; c++)
+    for (unsigned int c = 0; c < maxtries; c++)
         polygen_JL (N, df, dg, bound, ad);
     mpz_clear (N);
 }
