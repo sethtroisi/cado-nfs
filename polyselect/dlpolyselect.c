@@ -58,6 +58,8 @@ print_nonlinear_poly_info ( mpz_t *f,
     gg->deg = dg;
     gg->coeff = g;
     static double best_score = DBL_MAX;
+    /* the coefficients of g are O(n^(1/df)) */
+    double target_score = log (mpz_get_d (n)) / (double) df;
 
     ASSERT_ALWAYS(mpz_cmp_ui (f[df], 0) != 0);
 
@@ -73,8 +75,9 @@ print_nonlinear_poly_info ( mpz_t *f,
 
     score = logmu[1] + alpha[1] + logmu[0] + alpha[0];
 
-    if (score < 0)
-      return; /* this might indicate that f is not irreducible */
+    if (score < target_score / 2.0)
+      /* this might indicate that f is not irreducible */
+      return;
 
     if (score >= best_score)
       return; /* only print record scores */
@@ -123,7 +126,17 @@ print_nonlinear_poly_info ( mpz_t *f,
 
 
 /*
-  Generate polynomial f(x) of degree d.
+  Generate polynomial f(x) of degree d with rank 'idx',
+  with coefficients in [-bound, bound].
+  The coefficient of degree d can be taken in [1, bound],
+  due to the symmetry f(x) -> -f(x).
+  The coefficient of degree d-1 can be taken in [0, bound],
+  due to the symmetry f(x) -> f(-x).
+  The coefficient of degree 0 should not be 0.
+  Thus there are bound*(bound+1)*(2*bound+1)^(d-2)*(2*bound) possible values.
+  Return 0 if the corresponding polynomial is not irreducible,
+  or has no roots modulo n, otherwise return the number of roots
+  modulo n.
 */
 static int
 polygen_JL_f ( mpz_t n,
@@ -131,36 +144,43 @@ polygen_JL_f ( mpz_t n,
                unsigned int bound,
                mpz_t *f,
                mpz_t *rf,
-               int ad )
+	       unsigned long idx MAYBE_UNUSED )
 {
     unsigned int i;
     unsigned long *rq;
-    int nr, *fint;
+    int nr = 0, *fint;
     mpz_t t;
     mpz_init (t);
     fint = (int *) malloc ((d + 1)*sizeof(int));
     rq = (unsigned long *) malloc ((d + 1)*sizeof(unsigned long));
 
     /* find irreducible polynomial f */
-    while (1)
     {
-        fint[d] = ad;
-        mpz_set_ui (f[d], ad);
-        for (i = 0; i < d; i ++) {
-	    fint[i] = (rand() % (2 * bound)) - bound;
+        /* we take 1 <= f[d] <= bound */
+        fint[d] = 1 + (idx % bound);
+	idx = idx / bound;
+        mpz_set_ui (f[d], fint[d]);
+	/* we take 0 <= f[d-1] <= bound */
+	fint[d-1] = idx % (bound + 1);
+	idx = idx / (bound + 1);
+        for (i = d-2; i > 0; i --) {
+	    fint[i] = (idx % (2 * bound + 1)) - bound;
+	    idx = idx / (2 * bound + 1);
             mpz_set_si (f[i], fint[i]);
         }
+	/* we take -bound <= f[0] < bound, f[0] <> 0,
+	   which makes 2*bound possible values */
+	ASSERT_ALWAYS(idx < 2 * bound);
+	fint[0] = (idx < bound) ? idx - bound : idx - (bound - 1);
+	mpz_set_si (f[0], fint[0]);
 
         /* content test (not necessary for now) */
         mpz_poly ff;
         ff->deg = d;
         ff->coeff = f;
         mpz_poly_content (t, ff);
-        if (mpz_cmp_ui(t, 1) != 0 ) {
-            for (i = 0; i < d+1; i ++) {
-                mpz_divexact (f[i], f[i], t);
-            }
-        }
+        if (mpz_cmp_ui(t, 1) != 0 )
+	  goto end; /* duplicate with f/t */
 
         /* irreducibility test */
         /*
@@ -176,22 +196,22 @@ polygen_JL_f ( mpz_t n,
             if (test == 0)
                 break;
         }
-        if (test != 0)
-            continue;
-
-        /* find roots */
-        nr = mpz_poly_roots_mpz (rf, ff, n);
-        if (nr > 0)
-            break;
+        if (test != 0) /* f has roots for all primes in QQ[], thus is
+			  probably not irreducible */
+	  goto end;
 
         if (mpz_poly_squarefree_p (ff) == 0)
-          break;
+	  goto end;
 
 	/* Note: this is not enough for degree 4 or more, since f might
 	   have one factor of degree 2 and one factor of degree d-2.
 	   When this is the case, those factors will pop up in LLL. */
+
+        /* find roots mod n */
+        nr = mpz_poly_roots_mpz (rf, ff, n);
     }
 
+ end:
     mpz_clear (t);
     free(fint);
     free(rq);
@@ -252,7 +272,7 @@ polygen_JL ( mpz_t n,
              unsigned int df,
              unsigned int dg,
              unsigned int bound,
-             int ad )
+	     unsigned long idx )
 {
     ASSERT_ALWAYS (df >= 3);
     unsigned int i, j, nr, format = 1;
@@ -274,7 +294,7 @@ polygen_JL ( mpz_t n,
     }
 
     /* generate f of degree d with small coefficients */
-    nr = polygen_JL_f (n, df, bound, f, rf, ad);
+    nr = polygen_JL_f (n, df, bound, f, rf, idx);
 
     for (i = 0; i < nr; i ++) {
         /* generate g of degree dg */
@@ -390,15 +410,22 @@ main (int argc, char *argv[])
 
     srand (time (NULL));
 
+    double maxtries_double = (double) bound;
+    maxtries_double *= (double) (bound + 1);
+    maxtries_double *= pow ((double) (2 * bound + 1), (double) (df - 2));
+    maxtries_double *= (double) (2 * bound);
     /* since each coefficient of f of degree 0 to df-1 is chosen randomly
        in [-bound, bound-1], we have (2*bound)^df possible values for f */
-    maxtries = (unsigned long) pow (2.0 * (double) bound, (double) df);
+    if (maxtries_double >= (double) ULONG_MAX)
+      maxtries = ULONG_MAX;
+    else
+      maxtries = (unsigned long) maxtries_double;
 
 #ifdef HAVE_OPENMP
     omp_set_num_threads (nthreads);
 #pragma omp parallel for schedule(dynamic)
 #endif
-    for (unsigned int c = 0; c < maxtries; c++)
-        polygen_JL (N, df, dg, bound, ad);
+    for (unsigned long c = 0; c < maxtries; c++)
+      polygen_JL (N, df, dg, bound, c);
     mpz_clear (N);
 }
