@@ -75,7 +75,6 @@ double L2_skewness (mpz_poly_ptr, int);
 double L2_skew_lognorm (mpz_poly_ptr, int);
 
 /* alpha */
-double special_val0 (mpz_poly_ptr, unsigned long);
 double special_valuation (mpz_poly_ptr f, unsigned long p, mpz_t disc);
 double special_valuation_affine (mpz_poly_ptr f, unsigned long p, mpz_t disc);
 double get_alpha (mpz_poly_ptr, unsigned long);
