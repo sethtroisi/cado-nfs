@@ -175,6 +175,20 @@ polygen_JL_f ( mpz_t n,
 	fint[0] = (idx < bound) ? idx - bound : idx - (bound - 1);
 	mpz_set_si (f[0], fint[0]);
 
+	/* since f and the reversed polynomial are equivalent, we can assume
+	   |f[d]| < |f[0]| or (|f[d]| = |f[0]| and |f[d-1]| < |f[1]|) or ... */
+
+	int ok = 1;
+	for (unsigned int i = 0; 2 * i < d && ok; i++)
+	  {
+	    if (abs(fint[d-i]) > abs(fint[i]))
+	      ok = 0;
+	    else if (abs(fint[d-i]) < abs(fint[i]))
+	      break;
+	  }
+	if (ok == 0)
+	  goto end;
+
         /* content test (not necessary for now) */
         mpz_poly ff;
         ff->deg = d;
