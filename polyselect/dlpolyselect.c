@@ -163,6 +163,7 @@ polygen_JL_f ( mpz_t n,
 	/* we take 0 <= f[d-1] <= bound */
 	fint[d-1] = idx % (bound + 1);
 	idx = idx / (bound + 1);
+        mpz_set_ui (f[d-1], fint[d-1]);
         for (i = d-2; i > 0; i --) {
 	    fint[i] = (idx % (2 * bound + 1)) - bound;
 	    idx = idx / (2 * bound + 1);
