@@ -52,8 +52,9 @@ save_f (mpz_t *f, unsigned int df)
 
   if (best_n == keep && alpha > best_alpha[best_n - 1])
     return;
-
+#ifdef HAVE_OPENMP
 #pragma omp critical
+#endif
   {
     for (i = best_n; i > 0 && alpha < best_alpha[i-1]; i--)
       {
