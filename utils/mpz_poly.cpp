@@ -1952,28 +1952,15 @@ mpz_poly_sizeinbase (mpz_poly_srcptr f, int b)
   return S;
 }
 
-static void mpz_max(mpz_ptr max, mpz_srcptr a, mpz_srcptr b)
+void
+mpz_poly_infinity_norm (mpz_ptr in, mpz_poly_srcptr f)
 {
-    if (mpz_cmp(a, b) < 0) {
-        mpz_set(max, b);
-    } else if (mpz_cmp(a, b) > 0) {
-        mpz_set(max, a);
-    } else {
-        mpz_set(max, a);
+  mpz_abs (in, f->coeff[0]);
+  for (int i = 1; i <= f->deg; i++)
+    {
+      if (mpz_cmpabs (f->coeff[i], in) > 0)
+	mpz_abs (in, f->coeff[i]);
     }
-}
-
-void mpz_poly_infinity_norm(mpz_ptr in, mpz_poly_srcptr f)
-{
-  int i = 1;
-  mpz_t tmp;
-  mpz_init(tmp);
-  mpz_abs(in, f->coeff[0]);
-  for ( ; i < f->deg + 1; i++) {
-    mpz_abs(tmp, f->coeff[i]);
-    mpz_max(in, in, tmp);
-  }
-  mpz_clear(tmp);
 }
 
 /* return the total size (in bytes) to store the polynomial f */
