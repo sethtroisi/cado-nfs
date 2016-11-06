@@ -45,6 +45,7 @@ mpz_poly_mul_basecase (mpz_t *f, mpz_t *g, int r, mpz_t *h, int s) {
   return r + s;
 }
 
+/* f <- g^2 where g has degree r */
 static int
 mpz_poly_sqr_basecase (mpz_t *f, mpz_t *g, int r) {
   int i, j;
@@ -330,6 +331,7 @@ mpz_poly_init_set_ab (mpz_poly_ptr rel, int64_t a, uint64_t b)
     mpz_poly_setcoeff_int64(rel, 1, -b);
 }
 
+/* rel <- a-b*x */
 void
 mpz_poly_init_set_mpz_ab (mpz_poly_ptr rel, mpz_t a, mpz_t b)
 {
@@ -457,6 +459,7 @@ void mpz_poly_setcoeff_uint64(mpz_poly_ptr f, int i, uint64_t z)
     mpz_poly_cleandeg (f, i);
 }
 
+/* f[i] <- z */
 void mpz_poly_setcoeff_double(mpz_poly_ptr f, int i, double z)
 {
   mpz_poly_realloc (f, i + 1);
@@ -484,6 +487,7 @@ void mpz_poly_set_xi(mpz_poly_ptr f, int i)
     f->deg = i;
 }
 
+/* g <- quo (f, x^i) */
 void mpz_poly_div_xi(mpz_poly_ptr g, mpz_poly_srcptr f, int i)
 {
     if (f->deg < i) {
@@ -538,6 +542,7 @@ mpz_poly_mul_xi (mpz_poly_ptr g, mpz_poly_srcptr f, int i)
     g->deg = f->deg + i;
 }
 
+/* g <- f * (x + a) */
 void mpz_poly_mul_xplusa(mpz_poly_ptr g, mpz_poly_srcptr f, mpz_srcptr a)
 {
     mpz_t aux;
@@ -561,6 +566,7 @@ void mpz_poly_mul_xplusa(mpz_poly_ptr g, mpz_poly_srcptr f, mpz_srcptr a)
     mpz_clear(aux);
 }
 
+/* return the valuation of f */
 int mpz_poly_valuation(mpz_poly_srcptr f)
 {
     int n = 0;
@@ -987,7 +993,7 @@ mpz_poly_translation (mpz_poly_ptr ft, mpz_poly_srcptr f, const mpz_t k)
       mpz_addmul (ft->coeff[j], ft->coeff[j+1], k);
 }
 
-/* Set h = fr + k * x^t * g such that t+deg(g) <= deg(f) and t >= 0 (those two
+/* Set fr = f + k * x^t * g such that t+deg(g) <= deg(f) and t >= 0 (those two
  * assumptions are not checked). fr and f can be the same poly */
 void mpz_poly_rotation (mpz_poly_ptr fr, mpz_poly_srcptr f, mpz_poly_srcptr g,
                         const mpz_t k, int t)
@@ -995,6 +1001,24 @@ void mpz_poly_rotation (mpz_poly_ptr fr, mpz_poly_srcptr f, mpz_poly_srcptr g,
   mpz_poly_set (fr, f);
   for (int i = 0; i <= g->deg; i++)
     mpz_addmul (fr->coeff[i+t], g->coeff[i], k);
+}
+
+/* Set f = f + k * g such that deg(g) <= deg(f) (this assumption is not
+   checked). */
+void
+mpz_poly_addmul_si (mpz_poly_ptr f, mpz_poly_srcptr g, long k)
+{
+  for (int i = 0; i <= g->deg; i++)
+    mpz_addmul_si (f->coeff[i], g->coeff[i], k);
+}
+
+/* Set f = k * g such that deg(g) <= deg(f) (this assumption is not
+   checked). */
+void
+mpz_poly_mul_si (mpz_poly_ptr f, mpz_poly_srcptr g, long k)
+{
+  for (int i = 0; i <= g->deg; i++)
+    mpz_mul_si (f->coeff[i], g->coeff[i], k);
 }
 
 /* Set h = fr + k * x^t * g such that t+deg(g) <= deg(f) and t >= 0 (those two

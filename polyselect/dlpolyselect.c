@@ -1,5 +1,5 @@
 /*
-   Test data
+   Test data:
     P  = 31081938120519680804196101011964261019661412191103091971180537759
     (P - 1)/2 = 2 * Q where Q is a prime
     Q = 15540969060259840402098050505982130509830706095551545985590268879
@@ -11,6 +11,15 @@
 
     ./dlpolyselect -df 3 -dg 2 -N 191147927718986609689229466631454649812986246276667354864188503638807260703436799058776201365135161278134258296128109200046702912984568752800330221777752773957404540495707851421851
 
+DLP768 record
+(https://listserv.nodak.edu/cgi-bin/wa.exe?A2=NMBRTHRY;a0c66b63.1606):
+
+./dlpolyselect 1219344858334286932696341909195796109526657386154251328029273656175766870980306505584577389125860826715201547225794072935883258868036433287217994721542199148182841505800433148410869683590659346847659519108393837414567892730579162319 -df 4 -dg 3
+Values of polynomial pair used for DLP768 record:
+# skew = 0.638
+# lognorm(f) = 4.05, alpha(f) = -1.96, score 2.09
+# lognorm(g) = 130.17, alpha(g) = -5.47, score 124.70
+# f+g score 126.79
 */
 
 #include "cado.h"
@@ -73,30 +82,25 @@ save_f (mpz_t *f, unsigned int df)
 }
 
 /*
-  Print two nonlinear poly info
+  Print two nonlinear poly info. Return non-zero for record polynomials.
 */
-static void
-print_nonlinear_poly_info ( mpz_t *f,
-                            mpz_t *g,
-                            unsigned int df,
-                            unsigned int dg,
-                            int format,
-                            mpz_t n )
+static int
+print_nonlinear_poly_info (mpz_t *f, unsigned int df, mpz_poly gg,
+                           int format, mpz_t n)
 {
     unsigned int i;
     double skew, logmu[2], alpha[2], score;
     mpz_poly ff;
     ff->deg = df;
     ff->coeff = f;
-    mpz_poly gg;
-    gg->deg = dg;
-    gg->coeff = g;
+    int dg = gg->deg;
+    mpz_t *g = gg->coeff;
     static double best_score = DBL_MAX;
     /* the coefficients of g are O(n^(1/df)) */
     double target_score = log (mpz_get_d (n)) / (double) df;
 
     if (mpz_cmp_ui (g[dg], 0) == 0 || mpz_cmp_ui (g[0], 0) == 0)
-      return;
+      return 0;
 
     /* we use the skewness of polynomial g with large coefficients */
     skew = L2_skewness (gg, SKEWNESS_DEFAULT_PREC);
@@ -111,7 +115,7 @@ print_nonlinear_poly_info ( mpz_t *f,
     /* otherwise this might indicate that f is not irreducible */
 
     if (score >= best_score)
-      return; /* only print record scores */
+      return 0; /* only print record scores */
 
 #ifdef HAVE_OPENMP
 #pragma omp critical
@@ -148,6 +152,7 @@ print_nonlinear_poly_info ( mpz_t *f,
       printf ("# f+g score %1.2f\n", score);
       printf ("\n");
     }
+    return 1;
 }
 
 /* Check that f is irreducible.
@@ -447,14 +452,16 @@ polygen_JL1 ( mpz_t n,
 /* JL method to generate d and d-1 polynomial.
    Second pass: try best 'keep' polynomials f with best alpha value. */
 static void
-polygen_JL2 ( mpz_t n,
-             unsigned int df,
-             unsigned int dg,
-	     unsigned long c )
+polygen_JL2 (mpz_t n, unsigned int df, unsigned int dg, unsigned int bound,
+             unsigned long c)
 {
     unsigned int i, j, nr, format = 1;
     mpz_t *rf;
     mat_Z g;
+    mpz_poly *v, u;
+    unsigned long nb_comb;
+    double nb_comb_f;
+    long *a;
 
     ASSERT_ALWAYS (df >= 3);
     rf = (mpz_t *) malloc (df * sizeof(mpz_t));
@@ -468,22 +475,65 @@ polygen_JL2 ( mpz_t n,
             mpz_init (g.coeff[i][j]);
         }
     }
+    v = malloc ((dg + 1) * sizeof (mpz_poly));
+    for (j = 0; j <= dg; j++)
+      {
+        v[j]->deg = dg;
+        v[j]->coeff = g.coeff[j + 1] + 1;
+      }
+    mpz_poly_init (u, dg);
+    u->deg = dg;
+    a = malloc ((dg + 1) * sizeof (long));
 
     /* compute number of roots of the c-th best polynomial f */
     nr = mpz_poly_roots_mpz (rf, best_f[c], n);
     ASSERT(0 < nr && nr <= df);
 
+    /* we try all combinations u = c[0]*v[0] + ... + c[dg]*v[dg] with
+       -bound <= c[j] <= bound, except 0 <= c[0] <= bound since u and -u
+       are equivalent, and except c[0] = ... = c[dg] = 0, this gives a total
+       of (bound+1)*(2*bound+1)^dg-1 */
+    nb_comb_f = (double) (bound + 1) * pow ((double) (2 * bound + 1),
+                                            (double) dg);
+    nb_comb = (nb_comb_f > (double) ULONG_MAX) ? ULONG_MAX
+      : (unsigned long) nb_comb_f;
+
     for (i = 0; i < nr; i ++) {
         /* generate g of degree dg */
         polygen_JL_g (n, dg, g, rf[i]);
 
-        for (j = 1; j <= dg + 1; j ++) {
-          print_nonlinear_poly_info (best_f[c]->coeff, &((g.coeff[j])[1]), df, dg,
-                                     format, n);
+        /* we skip idx = 0 which should correspond to c[0] = ... = c[dg] = 0 */
+        for (unsigned long idx = 1; idx < nb_comb; idx ++)
+          {
+            unsigned long k = idx;
+
+            /* compute first index */
+            a[0] = k % (bound + 1);
+            k = k / (bound + 1);
+            mpz_poly_mul_si (u, v[0], a[0]);
+            for (j = 1; j <= dg; j++)
+              {
+                a[j] = k % (2 * bound + 1);
+                k = k / (2 * bound + 1);
+                a[j] = (a[j] <= bound) ? a[j] : a[j] - (2 * bound + 1);
+                mpz_poly_addmul_si (u, v[j], a[j]);
+              }
+            ASSERT_ALWAYS(k == 0);
+            if (print_nonlinear_poly_info (best_f[c]->coeff, df, u, format, n))
+              {
+#ifdef DEBUG /* print coefficients of record combination */
+                for (j = 0; j <= dg; j++)
+                  printf ("%ld ", a[j]);
+                printf ("\n");
+#endif
+              }
         }
     }
 
     /* clear */
+    free (a);
+    mpz_poly_clear (u);
+    free (v);
     for (i = 0; i < df; i ++)
       mpz_clear (rf[i]);
     for (i = 0; i <= dg + 1; i ++) {
@@ -606,7 +656,7 @@ main (int argc, char *argv[])
 #pragma omp parallel for schedule(dynamic)
 #endif
     for (unsigned long c = 0; c < best_n; c++)
-      polygen_JL2 (N, df, dg, c);
+      polygen_JL2 (N, df, dg, bound, c);
 
     printf ("best alpha %1.2f: ", best_alpha[0]);
     mpz_poly_fprintf (stdout, best_f[0]);
