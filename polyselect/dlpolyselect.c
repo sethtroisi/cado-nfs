@@ -521,7 +521,7 @@ polygen_JL2 (mpz_t n, unsigned int df, unsigned int dg, long bound,
             ASSERT_ALWAYS(k == 0);
             if (print_nonlinear_poly_info (best_f[c]->coeff, df, u, format, n))
               {
-#ifdef DEBUG /* print coefficients of record combination */
+#if 0 /* print coefficients of record combination */
                 for (j = 0; j <= dg; j++)
                   printf ("%ld ", a[j]);
                 printf ("\n");
@@ -560,7 +560,7 @@ main (int argc, char *argv[])
     mpz_t N;
     unsigned int df = 0, dg = 0;
     int nthreads = 1;
-    unsigned int bound = 1024; /* bound on the coefficients of f */
+    unsigned int bound = 4; /* bound on the coefficients of f */
     unsigned long maxtries;
     mpz_init (N);
 
@@ -624,6 +624,8 @@ main (int argc, char *argv[])
 
     srand (time (NULL));
 
+    ASSERT_ALWAYS (bound >= 1);
+
     double maxtries_double = (double) bound;
     maxtries_double *= (double) (bound + 1);
     maxtries_double *= pow ((double) (2 * bound + 1), (double) (df - 2));
@@ -656,7 +658,7 @@ main (int argc, char *argv[])
 #pragma omp parallel for schedule(dynamic)
 #endif
     for (unsigned long c = 0; c < best_n; c++)
-      polygen_JL2 (N, df, dg, bound, c);
+      polygen_JL2 (N, df, dg, (bound + 1) / 2, c);
 
     printf ("best alpha %1.2f: ", best_alpha[0]);
     mpz_poly_fprintf (stdout, best_f[0]);
