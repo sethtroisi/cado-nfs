@@ -452,7 +452,7 @@ polygen_JL1 ( mpz_t n,
 /* JL method to generate d and d-1 polynomial.
    Second pass: try best 'keep' polynomials f with best alpha value. */
 static void
-polygen_JL2 (mpz_t n, unsigned int df, unsigned int dg, unsigned int bound,
+polygen_JL2 (mpz_t n, unsigned int df, unsigned int dg, long bound,
              unsigned long c)
 {
     unsigned int i, j, nr, format = 1;
