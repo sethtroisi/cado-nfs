@@ -1979,12 +1979,16 @@ mpz_poly_sizeinbase (mpz_poly_srcptr f, int b)
 void
 mpz_poly_infinity_norm (mpz_ptr in, mpz_poly_srcptr f)
 {
+  if (f->deg == -1) {
+    mpz_set_ui(in, 0);
+  } else {
   mpz_abs (in, f->coeff[0]);
   for (int i = 1; i <= f->deg; i++)
     {
       if (mpz_cmpabs (f->coeff[i], in) > 0)
 	mpz_abs (in, f->coeff[i]);
     }
+  }
 }
 
 /* return the total size (in bytes) to store the polynomial f */
