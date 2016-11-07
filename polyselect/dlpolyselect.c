@@ -1,24 +1,58 @@
-/*
-   Test data:
-    P  = 31081938120519680804196101011964261019661412191103091971180537759
-    (P - 1)/2 = 2 * Q where Q is a prime
-    Q = 15540969060259840402098050505982130509830706095551545985590268879
+/* dlpolyselect - discrete logarithm polynomial selection via Joux-Lercier's
+   algorithm
 
-    --run--
-    ./dlpolyselect -df 3 -N 31081938120519680804196101011964261019661412191103091971180537759
+Example with Apache 512-bit key (Table 1 of
+https://weakdh.org/imperfect-forward-secrecy-ccs15.pdf):
 
-    ./dlpolyselect -df 4 -dg 3 -N 191147927718986609689229466631454649812986246276667354864188503638807260703436799058776201365135161278134258296128109200046702912984568752800330221777752773957404540495707851421851
+# we first search a degree (3,2) pair
+$ ./dlpolyselect -df 3 -dg 2 -N 8372421755538377327377912526045445423027732035562313241965800453667849685158691589507936013805295187219621475007123900107532269487803598942841993804845107 -bound 8
+...
+c3: 4
+c2: 3
+c1: -6
+c0: -8
+Y2: 430506467754036192750431535685941771886700493958222
+Y1: 687078639517265884307374391507473735402330150842399
+Y0: -533201855944366475689054404823391134825953676216635
+skew: 1.11
+# f lognorm 1.32, alpha 0.62, score 1.95
+# g lognorm 116.58, alpha -2.18, score 114.40
+# f+g score 116.35
 
-    ./dlpolyselect -df 3 -dg 2 -N 191147927718986609689229466631454649812986246276667354864188503638807260703436799058776201365135161278134258296128109200046702912984568752800330221777752773957404540495707851421851
+# then we compare with a degree (4,3) pair
+$ ./dlpolyselect -df 4 -dg 3 -N 8372421755538377327377912526045445423027732035562313241965800453667849685158691589507936013805295187219621475007123900107532269487803598942841993804845107 -bound 8
+...
+c4: 6
+c3: 1
+c2: -8
+c1: -3
+c0: 6
+Y3: -64071264306884991611859009153886700616
+Y2: -115884379190374676852348454783130883186
+Y1: 382823080720299801084267253734861739469
+Y0: -14529492984288436819691699253895818591
+skew: 1.37
+# f lognorm 1.50, alpha -0.04, score 1.46
+# g lognorm 87.21, alpha -4.07, score 83.14
+# f+g score 84.60
 
-DLP768 record
+To recover the polynomial pair used for the DLP768 record
 (https://listserv.nodak.edu/cgi-bin/wa.exe?A2=NMBRTHRY;a0c66b63.1606):
 
-./dlpolyselect 1219344858334286932696341909195796109526657386154251328029273656175766870980306505584577389125860826715201547225794072935883258868036433287217994721542199148182841505800433148410869683590659346847659519108393837414567892730579162319 -df 4 -dg 3
-Values of polynomial pair used for DLP768 record:
-# skew = 0.638
-# lognorm(f) = 4.05, alpha(f) = -1.96, score 2.09
-# lognorm(g) = 130.17, alpha(g) = -5.47, score 124.70
+$ ./dlpolyselect -N 1219344858334286932696341909195796109526657386154251328029273656175766870980306505584577389125860826715201547225794072935883258868036433287217994721542199148182841505800433148410869683590659346847659519108393837414567892730579162319 -df 4 -dg 3 -bound 140 -keep 1000 -idx0 966230000 -idx1 966280000
+...
+c4: 55
+c3: 5
+c2: -86
+c1: 34
+c0: -140
+Y3: 277260730400349522890422618473498148528706115003337935150
+Y2: 217583293626947899787577441128333027617541095004734736415
+Y1: -1937981312833038778565617469829395544065255938015920309679
+Y0: -370863403886416141150505523919527677231932618184100095924
+skew: 1.57
+# f lognorm 4.05, alpha -1.96, score 2.09
+# g lognorm 130.17, alpha -5.47, score 124.70
 # f+g score 126.79
 */
 
@@ -35,46 +69,56 @@ Values of polynomial pair used for DLP768 record:
 #include <stdlib.h>
 #include <time.h>
 
-const double exp_rot[] = {0, 0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 0};
-#define SIZE(p) (((long *) (p))[1])
-#define DATA(p) ((mp_limb_t *) (((long *) (p)) + 2))
-#define LEN_QQ 11
-
-const unsigned int QQ[LEN_QQ] = {2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31};
+/* we assume a difference <= ALPHA_BOUND_GUARD between alpha computed
+   with ALPHA_BOUND_SMALL and ALPHA_BOUND */
+#define ALPHA_BOUND_GUARD 0.2
 
 mpz_poly *best_f = NULL;
-double *best_alpha = NULL;
-unsigned int keep = 100; /* number of polynomials f with best alpha to be kept */
-unsigned int best_n = 0;
+double *best_score = NULL;
+unsigned long keep = 0; /* number of polynomials f with best alpha to be kept */
+unsigned long best_n = 0;
+unsigned long f_irreducible = 0;
 
 static void
 save_f (mpz_t *f, unsigned int df)
 {
   mpz_poly ff;
-  double alpha;
+  double skew, logmu, alpha, score;
   int i;
 
   ff->deg = df;
   ff->coeff = f;
 
-  alpha = get_alpha (ff, ALPHA_BOUND);
+  skew = L2_skewness (ff, SKEWNESS_DEFAULT_PREC);
+  logmu = L2_lognorm (ff, skew);
+  alpha = get_alpha (ff, ALPHA_BOUND_SMALL);
+  score = logmu + alpha;
 
-  if (best_n == keep && alpha > best_alpha[best_n - 1])
+  if (best_n == keep && score > best_score[best_n - 1] + ALPHA_BOUND_GUARD)
     return;
+
+  /* refine alpha */
+  alpha = get_alpha (ff, ALPHA_BOUND);
+  score = logmu + alpha;
+
+  if (best_n == keep && score > best_score[best_n - 1])
+    return;
+
 #ifdef HAVE_OPENMP
 #pragma omp critical
 #endif
   {
-    for (i = best_n; i > 0 && alpha < best_alpha[i-1]; i--)
+    for (i = best_n; i > 0 && score < best_score[i-1]; i--)
       {
-        best_alpha[i] = best_alpha[i-1];
+        best_score[i] = best_score[i-1];
         mpz_poly_set (best_f[i], best_f[i-1]);
       }
-    best_alpha[i] = alpha;
+    best_score[i] = score;
     mpz_poly_set (best_f[i], ff);
     if (i == 0)
       {
-        printf ("best alpha %1.2f: ", alpha);
+        printf ("lognorm %1.2f, alpha %1.2f, score %1.2f: ",
+		logmu, alpha, score);
         mpz_poly_fprintf (stdout, ff);
       }
     best_n += (best_n < keep);
@@ -85,35 +129,34 @@ save_f (mpz_t *f, unsigned int df)
   Print two nonlinear poly info. Return non-zero for record polynomials.
 */
 static int
-print_nonlinear_poly_info (mpz_t *f, unsigned int df, mpz_poly gg,
-                           int format, mpz_t n)
+print_nonlinear_poly_info (mpz_poly ff, double alpha_f, mpz_poly gg,
+                           int format,  mpz_t n)
 {
     unsigned int i;
-    double skew, logmu[2], alpha[2], score;
-    mpz_poly ff;
-    ff->deg = df;
-    ff->coeff = f;
+    double skew, logmu[2], alpha_g, score;
+    int df = ff->deg;
+    mpz_t *f = ff->coeff;
     int dg = gg->deg;
     mpz_t *g = gg->coeff;
     static double best_score = DBL_MAX;
     /* the coefficients of g are O(n^(1/df)) */
-    double target_score = log (mpz_get_d (n)) / (double) df;
-
-    if (mpz_cmp_ui (g[dg], 0) == 0 || mpz_cmp_ui (g[0], 0) == 0)
-      return 0;
 
     /* we use the skewness of polynomial g with large coefficients */
     skew = L2_skewness (gg, SKEWNESS_DEFAULT_PREC);
     logmu[1] = L2_lognorm (gg, skew);
-    alpha[1] = get_alpha (gg, ALPHA_BOUND);
     logmu[0] = L2_lognorm (ff, skew);
-    alpha[0] = get_alpha (ff, ALPHA_BOUND);
+    /* first estimate alpha with a small bound */
+    alpha_g = get_alpha (gg, ALPHA_BOUND_SMALL);
 
-    score = logmu[1] + alpha[1] + logmu[0] + alpha[0];
+    score = logmu[1] + alpha_g + logmu[0] + alpha_f;
 
-    ASSERT_ALWAYS (0.5 * target_score < score && score < 1.5 * target_score);
-    /* otherwise this might indicate that f is not irreducible */
+    if (score >= best_score + ALPHA_BOUND_GUARD)
+      return 0;
 
+    /* now get a more precise alpha value */
+    alpha_g = get_alpha (gg, ALPHA_BOUND);
+
+    score = logmu[1] + alpha_g + logmu[0] + alpha_f;
     if (score >= best_score)
       return 0; /* only print record scores */
 
@@ -145,10 +188,10 @@ print_nonlinear_poly_info (mpz_t *f, unsigned int df, mpz_poly gg,
 	  gmp_printf ("Y%u %Zd\n", i, g[i]);
       }
       printf ("skew: %1.2f\n", skew);
-      printf ("# f lognorm %1.2f, alpha %1.2f, E %1.2f\n",
-	      logmu[0], alpha[0], logmu[0] + alpha[0]);
-      printf ("# g lognorm %1.2f, alpha %1.2f, E %1.2f\n",
-	      logmu[1], alpha[1], logmu[1] + alpha[1]);
+      printf ("# f lognorm %1.2f, alpha %1.2f, score %1.2f\n",
+	      logmu[0], alpha_f, logmu[0] + alpha_f);
+      printf ("# g lognorm %1.2f, alpha %1.2f, score %1.2f\n",
+	      logmu[1], alpha_g, logmu[1] + alpha_g);
       printf ("# f+g score %1.2f\n", score);
       printf ("\n");
     }
@@ -201,8 +244,8 @@ is_irreducible (mpz_poly f)
   }
 
   mpz_init (det);
-  mpz_init_set_ui (a, 3);
-  mpz_init_set_ui (b, 4);
+  mpz_init_set_ui (a, 1);
+  mpz_init_set_ui (b, 1);
   mpz_init_set (r, roots[0]);
   for (i = 0; i <= dg + 1; i ++) {
     for (j = 0; j <= dg + 1; j ++) {
@@ -327,32 +370,15 @@ polygen_JL_f ( mpz_t n,
 	if (ok == 0)
 	  goto end;
 
-        /* content test (not necessary for now) */
+        /* content test */
         mpz_poly ff;
         ff->deg = d;
         ff->coeff = f;
         mpz_poly_content (t, ff);
-        if (mpz_cmp_ui(t, 1) != 0 )
+        if (mpz_cmp_ui (t, 1) != 0 )
 	  goto end; /* duplicate with f/t */
 
         /* irreducibility test */
-        /*
-        f_ZZ.SetLength(d+1);
-        for (i = 0; i <= d; i ++)
-            SetCoeff(f_ZZ, i, fint[i]);
-        if (is_irreducible(f_ZZ) == 0)
-            continue;
-        */
-        int test = 0;
-        for (i = 0; i < LEN_QQ; i ++) {
-          test = mpz_poly_roots_ulong (rq, ff, QQ[i]);
-          ASSERT(test <= d);
-          if (test == 0)
-            break;
-        }
-        if (test != 0) /* f has roots for all primes in QQ[], thus is
-			  probably not irreducible */
-	  goto end;
 
         if (mpz_poly_squarefree_p (ff) == 0)
 	  goto end;
@@ -360,9 +386,10 @@ polygen_JL_f ( mpz_t n,
         if (is_irreducible (ff) == 0)
           goto end;
 
-	/* Note: this is not enough for degree 4 or more, since f might
-	   have one factor of degree 2 and one factor of degree d-2.
-	   When this is the case, those factors will pop up in LLL. */
+#ifdef HAVE_OPENMP
+#pragma omp critical
+        f_irreducible ++;
+#endif
 
         /* find roots mod n */
         nr = mpz_poly_roots_mpz (NULL, ff, n);
@@ -453,15 +480,14 @@ polygen_JL1 ( mpz_t n,
    Second pass: try best 'keep' polynomials f with best alpha value. */
 static void
 polygen_JL2 (mpz_t n, unsigned int df, unsigned int dg, long bound,
-             unsigned long c)
+	     unsigned long nb_comb, unsigned long c)
 {
     unsigned int i, j, nr, format = 1;
     mpz_t *rf;
     mat_Z g;
     mpz_poly *v, u;
-    unsigned long nb_comb;
-    double nb_comb_f;
     long *a;
+    double alpha_f;
 
     ASSERT_ALWAYS (df >= 3);
     rf = (mpz_t *) malloc (df * sizeof(mpz_t));
@@ -489,14 +515,7 @@ polygen_JL2 (mpz_t n, unsigned int df, unsigned int dg, long bound,
     nr = mpz_poly_roots_mpz (rf, best_f[c], n);
     ASSERT(0 < nr && nr <= df);
 
-    /* we try all combinations u = c[0]*v[0] + ... + c[dg]*v[dg] with
-       -bound <= c[j] <= bound, except 0 <= c[0] <= bound since u and -u
-       are equivalent, and except c[0] = ... = c[dg] = 0, this gives a total
-       of (bound+1)*(2*bound+1)^dg-1 */
-    nb_comb_f = (double) (bound + 1) * pow ((double) (2 * bound + 1),
-                                            (double) dg);
-    nb_comb = (nb_comb_f > (double) ULONG_MAX) ? ULONG_MAX
-      : (unsigned long) nb_comb_f;
+    alpha_f = get_alpha (best_f[c], ALPHA_BOUND);
 
     for (i = 0; i < nr; i ++) {
         /* generate g of degree dg */
@@ -506,20 +525,26 @@ polygen_JL2 (mpz_t n, unsigned int df, unsigned int dg, long bound,
         for (unsigned long idx = 1; idx < nb_comb; idx ++)
           {
             unsigned long k = idx;
+	    int64_t g;
 
             /* compute first index */
             a[0] = k % (bound + 1);
             k = k / (bound + 1);
-            mpz_poly_mul_si (u, v[0], a[0]);
+	    g = a[0];
             for (j = 1; j <= dg; j++)
               {
                 a[j] = k % (2 * bound + 1);
                 k = k / (2 * bound + 1);
                 a[j] = (a[j] <= bound) ? a[j] : a[j] - (2 * bound + 1);
-                mpz_poly_addmul_si (u, v[j], a[j]);
+		g = gcd_int64 (g, a[j]);
               }
             ASSERT_ALWAYS(k == 0);
-            if (print_nonlinear_poly_info (best_f[c]->coeff, df, u, format, n))
+	    if (g != 1)
+	      continue;
+            mpz_poly_mul_si (u, v[0], a[0]);
+	    for (j = 1; j <= dg; j++)
+	      mpz_poly_addmul_si (u, v[j], a[j]);
+            if (print_nonlinear_poly_info (best_f[c], alpha_f, u, format, n))
               {
 #if 0 /* print coefficients of record combination */
                 for (j = 0; j <= dg; j++)
@@ -548,7 +573,7 @@ polygen_JL2 (mpz_t n, unsigned int df, unsigned int dg, long bound,
 static void
 usage ()
 {
-    fprintf (stderr, "./dlpolyselect -N xxx -df xxx -dg xxx -bound xxx [-t xxx]\n");
+    fprintf (stderr, "./dlpolyselect -N xxx -df xxx -dg xxx -bound xxx [-keep xxx] [-t xxx]\n");
     exit (1);
 }
 
@@ -561,7 +586,10 @@ main (int argc, char *argv[])
     unsigned int df = 0, dg = 0;
     int nthreads = 1;
     unsigned int bound = 4; /* bound on the coefficients of f */
-    unsigned long maxtries;
+    unsigned long maxtries, idx0 = 0, idx1 = ULONG_MAX;
+    double t1, t2;
+
+    t1 = seconds ();
     mpz_init (N);
 
     /* printf command-line */
@@ -591,6 +619,21 @@ main (int argc, char *argv[])
         }
         else if (argc >= 3 && strcmp (argv[1], "-bound") == 0) {
             bound = atoi (argv[2]);
+            argv += 2;
+            argc -= 2;
+        }
+        else if (argc >= 3 && strcmp (argv[1], "-keep") == 0) {
+            keep = atoi (argv[2]);
+            argv += 2;
+            argc -= 2;
+        }
+        else if (argc >= 3 && strcmp (argv[1], "-idx0") == 0) {
+	    idx0 = strtoul (argv[2], NULL, 10);
+            argv += 2;
+            argc -= 2;
+        }
+        else if (argc >= 3 && strcmp (argv[1], "-idx1") == 0) {
+	    idx1 = strtoul (argv[2], NULL, 10);
             argv += 2;
             argc -= 2;
         }
@@ -637,39 +680,63 @@ main (int argc, char *argv[])
     else
       maxtries = (unsigned long) maxtries_double;
 
+    unsigned int bound2 = 1; /* bound on the coefficients of linear
+                                combinations from the LLL short vectors */
+    double nb_comb_f;
+    unsigned long nb_comb;
+    /* we try all combinations u = c[0]*v[0] + ... + c[dg]*v[dg] with
+       -bound2 <= c[j] <= bound2, except 0 <= c[0] <= bound2 since u and -u
+       are equivalent, and except c[0] = ... = c[dg] = 0, this gives a total
+       of (bound2+1)*(2*bound2+1)^dg-1 */
+    nb_comb_f = (double) (bound2 + 1) * pow ((double) (2 * bound2 + 1),
+                                            (double) dg);
+    nb_comb = (nb_comb_f > (double) ULONG_MAX) ? ULONG_MAX
+      : (unsigned long) nb_comb_f;
+
+    if (keep == 0)
+      keep = (10 * maxtries) / nb_comb;
+
+    printf ("maxtries %lu, nb_comb %lu, keep %lu\n", maxtries, nb_comb, keep);
+
     best_f = malloc ((keep + 1) * sizeof (mpz_poly));
-    best_alpha = malloc ((keep + 1) * sizeof (double));
+    best_score = malloc ((keep + 1) * sizeof (double));
     for (unsigned int i = 0; i <= keep; i++)
       mpz_poly_init (best_f[i], df);
+
+    if (idx1 == ULONG_MAX)
+      idx1 = maxtries;
 
 #ifdef HAVE_OPENMP
     omp_set_num_threads (nthreads);
 #pragma omp parallel for schedule(dynamic)
 #endif
-    for (unsigned long c = 0; c < maxtries; c++)
+    for (unsigned long c = idx0; c < idx1; c++)
       polygen_JL1 (N, df, bound, c);
 
-    printf ("best alpha %1.2f: ", best_alpha[0]);
-    mpz_poly_fprintf (stdout, best_f[0]);
-    printf ("worst alpha (%d) %1.2f: ", best_n, best_alpha[best_n-1]);
-    mpz_poly_fprintf (stdout, best_f[best_n-1]);
+    t1 = seconds () - t1;
+
+    printf ("best score %1.2f, worst %1.2f\n", best_score[0],
+	    best_score[best_n - 1]);
+
+    t2 = seconds ();
 
 #ifdef HAVE_OPENMP
 #pragma omp parallel for schedule(dynamic)
 #endif
     for (unsigned long c = 0; c < best_n; c++)
-      polygen_JL2 (N, df, dg, (bound + 1) / 2, c);
-
-    printf ("best alpha %1.2f: ", best_alpha[0]);
-    mpz_poly_fprintf (stdout, best_f[0]);
-    printf ("worst alpha (%d) %1.2f: ", best_n, best_alpha[best_n-1]);
-    mpz_poly_fprintf (stdout, best_f[best_n-1]);
+      polygen_JL2 (N, df, dg, bound2, nb_comb, c);
 
     mpz_clear (N);
     for (unsigned int i = 0; i <= keep; i++)
       mpz_poly_clear (best_f[i]);
     free (best_f);
-    free (best_alpha);
+    free (best_score);
+
+    t2 = seconds () - t2;
+
+    printf ("found %lu irreducible f-polynomials\n", f_irreducible);
+    printf ("maxtries %lu, nb_comb %lu, keep %lu\n", maxtries, nb_comb, keep);
+    printf ("Stage 1: %.0fs, Stage 2: %.0fs\n", t1, t2);
 
     return 0;
 }
