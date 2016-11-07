@@ -75,8 +75,8 @@ skew: 1.57
 
 mpz_poly *best_f = NULL;
 double *best_score = NULL;
-unsigned long keep = 0; /* number of polynomials f with best alpha to be kept */
-unsigned long best_n = 0;
+unsigned long keep = 0; /* target number of polynomials f with best alpha */
+unsigned long best_n = 0; /* number of kept polynomials so far */
 unsigned long f_irreducible = 0;
 
 static void
@@ -111,7 +111,7 @@ save_f (mpz_t *f, unsigned int df)
     for (i = best_n; i > 0 && score < best_score[i-1]; i--)
       {
         best_score[i] = best_score[i-1];
-        mpz_poly_set (best_f[i], best_f[i-1]);
+        mpz_poly_swap (best_f[i], best_f[i-1]);
       }
     best_score[i] = score;
     mpz_poly_set (best_f[i], ff);
@@ -694,7 +694,12 @@ main (int argc, char *argv[])
       : (unsigned long) nb_comb_f;
 
     if (keep == 0)
-      keep = (10 * maxtries) / nb_comb;
+      {
+        keep = (10 * maxtries) / nb_comb;
+        if (keep > 10000)
+          keep = 10000; /* avoids threads to be blocked in the critical
+                           part of save_f */
+      }
 
     printf ("maxtries %lu, nb_comb %lu, keep %lu\n", maxtries, nb_comb, keep);
 
@@ -734,7 +739,9 @@ main (int argc, char *argv[])
 
     t2 = seconds () - t2;
 
-    printf ("found %lu irreducible f-polynomials\n", f_irreducible);
+    printf ("found %lu irreducible f-polynomials, ", f_irreducible);
+    printf ("kept %lu, best score %1.2f, worst %1.2f\n", best_n, best_score[0],
+            best_score[best_n - 1]);
     printf ("maxtries %lu, nb_comb %lu, keep %lu\n", maxtries, nb_comb, keep);
     printf ("Stage 1: %.0fs, Stage 2: %.0fs\n", t1, t2);
 
