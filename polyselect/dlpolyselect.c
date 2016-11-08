@@ -108,10 +108,12 @@ heap_add (mpz_poly f, double score)
     }
   else /* heap is full, we replace the top element */
     {
+      if (score >= best_score[0])
+        return; /* this might happen with multiple threads */
+
       /* the new element should have a better (i.e., smaller) score than the
          top element of the heap */
-      ASSERT_ALWAYS (best_n == keep);
-      ASSERT_ALWAYS (score < best_score[0]);
+      ASSERT (best_n == keep);
       i = 0;
       while (LEFT(i) < keep)
         {
