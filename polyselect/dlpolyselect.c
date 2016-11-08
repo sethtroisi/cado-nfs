@@ -153,7 +153,7 @@ save_f (mpz_t *f, unsigned int df)
   alpha = get_alpha (ff, ALPHA_BOUND);
   score = logmu + alpha;
 
-  if (best_n == keep && score > best_score[0])
+  if (best_n == keep && score >= best_score[0])
     return;
 
 #ifdef HAVE_OPENMP
@@ -746,7 +746,7 @@ main (int argc, char *argv[])
     if (keep == 0)
       keep = (10 * (idx1 - idx0)) / nb_comb;
 
-    printf ("maxtries %lu, nb_comb %lu, keep %lu\n", maxtries, nb_comb, keep);
+    printf ("tries %lu, nb_comb %lu, keep %lu\n", idx1 - idx0, nb_comb, keep);
 
     best_f = malloc ((keep + 1) * sizeof (mpz_poly));
     best_score = malloc ((keep + 1) * sizeof (double));
@@ -775,7 +775,7 @@ main (int argc, char *argv[])
     printf ("found %lu irreducible f-polynomials, ", f_irreducible);
     printf ("kept %lu, best score %1.2f, worst score %1.2f\n",
             best_n, Best_score, best_score[0]);
-    printf ("maxtries %lu, nb_comb %lu, keep %lu\n", maxtries, nb_comb, keep);
+    printf ("tries %lu, nb_comb %lu, keep %lu\n", idx1 - idx0, nb_comb, keep);
     printf ("Stage 1: %.0fs, Stage 2: %.0fs\n", t1, t2);
 
     mpz_clear (N);
