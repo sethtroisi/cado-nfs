@@ -167,6 +167,7 @@ save_f (mpz_t *f, unsigned int df)
         printf ("lognorm %1.2f, alpha %1.2f, score %1.2f: ",
                 logmu, alpha, score);
         mpz_poly_fprintf (stdout, ff);
+        fflush (stdout);
       }
   }
 }
@@ -240,6 +241,7 @@ print_nonlinear_poly_info (mpz_poly ff, double alpha_f, mpz_poly gg,
 	      logmu[1], alpha_g, logmu[1] + alpha_g);
       printf ("# f+g score %1.2f\n", score);
       printf ("\n");
+      fflush (stdout);
     }
     return 1;
 }
