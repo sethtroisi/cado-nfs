@@ -548,6 +548,56 @@ L2_skewness_deg6 (mpz_poly_ptr f MAYBE_UNUSED, double_poly_srcptr ff,
   return s_min;
 }
 
+/* return the skewness giving the best Murphy-E value for two polynomials,
+   by using trichotomy between the optimal skewness of both polynomials */
+double
+L2_combined_skewness (cado_poly poly, int prec, double bound_f, double bound_g,
+                      double area)
+{
+  double a, b, c, d, va, vb, vc, vd;
+
+  a = L2_skewness (poly->pols[0], prec);
+  b = L2_skewness (poly->pols[1], prec);
+
+  if (b < a)
+    {
+      c = b;
+      b = a;
+      a = c;
+    }
+
+  ASSERT(a <= b);
+
+  poly->skew = a;
+  va = MurphyE (poly, bound_f, bound_g, area, MURPHY_K);
+
+  poly->skew = b;
+  vb = MurphyE (poly, bound_f, bound_g, area, MURPHY_K);
+
+  while (b - a > ldexp (a, -prec))
+    {
+      c = (2.0 * a + b) / 3.0;
+      poly->skew = c;
+      vc = MurphyE (poly, bound_f, bound_g, area, MURPHY_K);
+
+      d = (a + 2.0 * b) / 3.0;
+      poly->skew = d;
+      vd = MurphyE (poly, bound_f, bound_g, area, MURPHY_K);
+
+      if (va > vd && va > vb && vc > vd && vc > vb) /* maximum is in a or c */
+        {
+          b = d;
+          vb = vd;
+        }
+      else /* the minimum is in d or b */
+        {
+          a = c;
+          va = vc;
+        }
+    }
+  return (a + b) * 0.5;
+}
+
 /* Use derivative test, with ellipse regions */
 double
 L2_skewness (mpz_poly_ptr f, int prec)
