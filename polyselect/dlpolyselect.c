@@ -39,7 +39,10 @@ skew: 1.05
 To recover the polynomial pair used for the DLP768 record
 (https://listserv.nodak.edu/cgi-bin/wa.exe?A2=NMBRTHRY;a0c66b63.1606):
 
-$ ./dlpolyselect -N 1219344858334286932696341909195796109526657386154251328029273656175766870980306505584577389125860826715201547225794072935883258868036433287217994721542199148182841505800433148410869683590659346847659519108393837414567892730579162319 -df 4 -dg 3 -bound 140 -keep 1000 -idx0 966230000 -idx1 966280000
+# -modr r -modm m enables one to only consider polynomials f
+# with index r mod m in Stage 1 (default is r=0 and m=1).
+# This is useful to distribute the work among several machines.
+$ ./dlpolyselect -N 1219344858334286932696341909195796109526657386154251328029273656175766870980306505584577389125860826715201547225794072935883258868036433287217994721542199148182841505800433148410869683590659346847659519108393837414567892730579162319 -df 4 -dg 3 -bound 140 -keep 1000 -modr 66234274 -modm 100000000
 ...
 c4: 55
 c3: 5
@@ -646,8 +649,9 @@ main (int argc, char *argv[])
     unsigned int df = 0, dg = 0;
     int nthreads = 1;
     unsigned int bound = 4; /* bound on the coefficients of f */
-    unsigned long maxtries, idx0 = 0, idx1 = ULONG_MAX;
+    unsigned long maxtries;
     double t1, t2;
+    unsigned long modr = 0, modm = 1;
 
     t1 = seconds ();
     mpz_init (N);
@@ -687,13 +691,13 @@ main (int argc, char *argv[])
             argv += 2;
             argc -= 2;
         }
-        else if (argc >= 3 && strcmp (argv[1], "-idx0") == 0) {
-	    idx0 = strtoul (argv[2], NULL, 10);
+        else if (argc >= 3 && strcmp (argv[1], "-modm") == 0) {
+	    modm = strtoul (argv[2], NULL, 10);
             argv += 2;
             argc -= 2;
         }
-        else if (argc >= 3 && strcmp (argv[1], "-idx1") == 0) {
-	    idx1 = strtoul (argv[2], NULL, 10);
+        else if (argc >= 3 && strcmp (argv[1], "-modr") == 0) {
+	    modr = strtoul (argv[2], NULL, 10);
             argv += 2;
             argc -= 2;
         }
@@ -753,13 +757,11 @@ main (int argc, char *argv[])
     nb_comb = (nb_comb_f > (double) ULONG_MAX) ? ULONG_MAX
       : (unsigned long) nb_comb_f;
 
-    if (idx1 > maxtries)
-      idx1 = maxtries;
-
     if (keep == 0)
-      keep = (10 * (idx1 - idx0)) / nb_comb;
+      keep = (10 * (maxtries / modm)) / nb_comb;
 
-    printf ("tries %lu, nb_comb %lu, keep %lu\n", idx1 - idx0, nb_comb, keep);
+    printf ("tries %lu, nb_comb %lu, keep %lu\n",
+            maxtries / modm, nb_comb, keep);
 
     best_f = malloc ((keep + 1) * sizeof (mpz_poly));
     best_score = malloc ((keep + 1) * sizeof (double));
@@ -770,7 +772,7 @@ main (int argc, char *argv[])
     omp_set_num_threads (nthreads);
 #pragma omp parallel for schedule(dynamic)
 #endif
-    for (unsigned long c = idx0; c < idx1; c++)
+    for (unsigned long c = modr; c < maxtries; c += modm)
       polygen_JL1 (N, df, bound, c);
 
     t1 = seconds () - t1;
@@ -788,7 +790,8 @@ main (int argc, char *argv[])
     printf ("found %lu irreducible f-polynomials, ", f_irreducible);
     printf ("kept %lu, best score %1.2f, worst score %1.2f\n",
             best_n, Best_score, best_score[0]);
-    printf ("tries %lu, nb_comb %lu, keep %lu\n", idx1 - idx0, nb_comb, keep);
+    printf ("tries %lu, nb_comb %lu, keep %lu\n",
+            maxtries / modm, nb_comb, keep);
     printf ("Stage 1: %.0fs, Stage 2: %.0fs\n", t1, t2);
 
     mpz_clear (N);
