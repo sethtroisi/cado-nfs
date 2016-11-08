@@ -74,17 +74,67 @@ skew: 1.57
 #define ALPHA_BOUND_GUARD 0.2
 
 mpz_poly *best_f = NULL;
-double *best_score = NULL;
+double *best_score = NULL, Best_score = DBL_MAX;
 unsigned long keep = 0; /* target number of polynomials f with best alpha */
 unsigned long best_n = 0; /* number of kept polynomials so far */
 unsigned long f_irreducible = 0;
+
+#define PARENT(i) (((i)-1)/2) /* 1,2 -> 0, 3,4 -> 1, 5,6 -> 2, ... */
+#define LEFT(i) (2*(i)+1)
+#define RIGHT(i) (2*(i)+2)
+
+/* Add (f, score) to heap. The top element of the heap has the largest score
+   (i.e., it is the worst polynomial). */
+static void MAYBE_UNUSED
+heap_add (mpz_poly f, double score)
+{
+  unsigned long i, j;
+
+  if (best_n < keep)
+    {
+      i = best_n;
+      /* move towards top of heap to keep heap property */
+      while (i > 0 && score > best_score[PARENT(i)])
+        {
+          j = PARENT(i);
+          mpz_poly_swap (best_f[i], best_f[j]);
+          best_score[i] = best_score[j];
+          i = j;
+        }
+      mpz_poly_set (best_f[i], f);
+      best_score[i] = score;
+      best_n ++;
+      return;
+    }
+  else /* heap is full, we replace the top element */
+    {
+      /* the new element should have a better (i.e., smaller) score than the
+         top element of the heap */
+      ASSERT_ALWAYS (best_n == keep);
+      ASSERT_ALWAYS (score < best_score[0]);
+      i = 0;
+      while (LEFT(i) < keep)
+        {
+          j = i; /* invariant: j is the element with the largest score
+                    among i and its two sons, which should replace i */
+          if (best_score[LEFT(i)] > score)
+            j = LEFT(i);
+          if (RIGHT(i) < keep && best_score[RIGHT(i)] > best_score[j])
+            j = RIGHT(i);
+          if (j == i)
+            break; /* both sons have a smaller score */
+          mpz_poly_swap (best_f[i], best_f[j]);
+          best_score[i] = best_score[j];
+          i = j;
+        }
+    }
+}
 
 static void
 save_f (mpz_t *f, unsigned int df)
 {
   mpz_poly ff;
   double skew, logmu, alpha, score;
-  int i;
 
   ff->deg = df;
   ff->coeff = f;
@@ -94,34 +144,28 @@ save_f (mpz_t *f, unsigned int df)
   alpha = get_alpha (ff, ALPHA_BOUND_SMALL);
   score = logmu + alpha;
 
-  if (best_n == keep && score > best_score[best_n - 1] + ALPHA_BOUND_GUARD)
+  if (best_n == keep && score > best_score[0] + ALPHA_BOUND_GUARD)
     return;
 
   /* refine alpha */
   alpha = get_alpha (ff, ALPHA_BOUND);
   score = logmu + alpha;
 
-  if (best_n == keep && score > best_score[best_n - 1])
+  if (best_n == keep && score > best_score[0])
     return;
 
 #ifdef HAVE_OPENMP
 #pragma omp critical
 #endif
   {
-    for (i = best_n; i > 0 && score < best_score[i-1]; i--)
+    heap_add (ff, score);
+    if (score < Best_score)
       {
-        best_score[i] = best_score[i-1];
-        mpz_poly_swap (best_f[i], best_f[i-1]);
-      }
-    best_score[i] = score;
-    mpz_poly_set (best_f[i], ff);
-    if (i == 0)
-      {
+        Best_score = score;
         printf ("lognorm %1.2f, alpha %1.2f, score %1.2f: ",
-		logmu, alpha, score);
+                logmu, alpha, score);
         mpz_poly_fprintf (stdout, ff);
       }
-    best_n += (best_n < keep);
   }
 }
 
@@ -141,8 +185,8 @@ print_nonlinear_poly_info (mpz_poly ff, double alpha_f, mpz_poly gg,
     static double best_score = DBL_MAX;
     /* the coefficients of g are O(n^(1/df)) */
 
-    /* we use the skewness of polynomial g with large coefficients */
-    skew = L2_skewness (gg, SKEWNESS_DEFAULT_PREC);
+    /* we use the skewness minimizing the sum of lognorms */
+    skew = L2_combined_skewness2 (ff, gg, SKEWNESS_DEFAULT_PREC);
     logmu[1] = L2_lognorm (gg, skew);
     logmu[0] = L2_lognorm (ff, skew);
     /* first estimate alpha with a small bound */
@@ -403,21 +447,20 @@ polygen_JL_f ( mpz_t n,
     return nr;
 }
 
-/*
-  Generate polynomial g(x) of degree dg, given root
-*/
+/* Generate polynomial g(x) of degree dg, given root 'root' of f.
+   It might be better to take into account the skewness of f in the LLL
+   lattice, but experimentally this does not give better results (probably
+   because LLL is not very sensible to a small change of the skewness). */
 static void
-polygen_JL_g ( mpz_t N,
-               int dg,
-               mat_Z g,
-               mpz_t root )
+polygen_JL_g (mpz_t N, int dg, mat_Z g, mpz_t root)
 {
     int i, j;
     mpz_t a, b, det, r;
+
     mpz_init (det);
-    mpz_init_set_ui(a, 3);
-    mpz_init_set_ui(b, 4);
-    mpz_init_set(r, root);
+    mpz_init_set_ui (a, 1);
+    mpz_init_set_ui (b, 1);
+    mpz_init_set (r, root);
     for (i = 0; i <= dg + 1; i ++) {
         for (j = 0; j <= dg + 1; j ++) {
             mpz_set_ui (g.coeff[i][j], 0);
@@ -426,18 +469,18 @@ polygen_JL_g ( mpz_t N,
 
     for (i = 1;  i <= dg + 1; i++) {
         for (j = 1; j <= dg + 1; j++) {
-            if (i == 1) {
-                if (j == 1) {
+            if (i == 1)
+              {
+                if (j == 1)
                     mpz_set (g.coeff[j][i], N);
-                }
-                else {
+                else
+                  {
                     mpz_neg (g.coeff[j][i], r);
                     mpz_mul (r, r, root);
-                }
-            }
-            else {
-                mpz_set_ui (g.coeff[j][i], i==j);
-            }
+                  }
+              }
+            else
+              mpz_set_ui (g.coeff[j][i], i==j);
         }
     }
 
@@ -693,13 +736,11 @@ main (int argc, char *argv[])
     nb_comb = (nb_comb_f > (double) ULONG_MAX) ? ULONG_MAX
       : (unsigned long) nb_comb_f;
 
+    if (idx1 == ULONG_MAX)
+      idx1 = maxtries;
+
     if (keep == 0)
-      {
-        keep = (10 * maxtries) / nb_comb;
-        if (keep > 10000)
-          keep = 10000; /* avoids threads to be blocked in the critical
-                           part of save_f */
-      }
+      keep = (10 * (idx1 - idx0)) / nb_comb;
 
     printf ("maxtries %lu, nb_comb %lu, keep %lu\n", maxtries, nb_comb, keep);
 
@@ -707,9 +748,6 @@ main (int argc, char *argv[])
     best_score = malloc ((keep + 1) * sizeof (double));
     for (unsigned int i = 0; i <= keep; i++)
       mpz_poly_init (best_f[i], df);
-
-    if (idx1 == ULONG_MAX)
-      idx1 = maxtries;
 
 #ifdef HAVE_OPENMP
     omp_set_num_threads (nthreads);
@@ -720,9 +758,6 @@ main (int argc, char *argv[])
 
     t1 = seconds () - t1;
 
-    printf ("best score %1.2f, worst %1.2f\n", best_score[0],
-	    best_score[best_n - 1]);
-
     t2 = seconds ();
 
 #ifdef HAVE_OPENMP
@@ -731,19 +766,19 @@ main (int argc, char *argv[])
     for (unsigned long c = 0; c < best_n; c++)
       polygen_JL2 (N, df, dg, bound2, nb_comb, c);
 
+    t2 = seconds () - t2;
+
+    printf ("found %lu irreducible f-polynomials, ", f_irreducible);
+    printf ("kept %lu, best score %1.2f, worst score %1.2f\n",
+            best_n, Best_score, best_score[0]);
+    printf ("maxtries %lu, nb_comb %lu, keep %lu\n", maxtries, nb_comb, keep);
+    printf ("Stage 1: %.0fs, Stage 2: %.0fs\n", t1, t2);
+
     mpz_clear (N);
     for (unsigned int i = 0; i <= keep; i++)
       mpz_poly_clear (best_f[i]);
     free (best_f);
     free (best_score);
-
-    t2 = seconds () - t2;
-
-    printf ("found %lu irreducible f-polynomials, ", f_irreducible);
-    printf ("kept %lu, best score %1.2f, worst %1.2f\n", best_n, best_score[0],
-            best_score[best_n - 1]);
-    printf ("maxtries %lu, nb_comb %lu, keep %lu\n", maxtries, nb_comb, keep);
-    printf ("Stage 1: %.0fs, Stage 2: %.0fs\n", t1, t2);
 
     return 0;
 }

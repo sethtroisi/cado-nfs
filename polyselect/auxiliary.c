@@ -589,6 +589,50 @@ L2_combined_skewness (cado_poly poly, int prec, double bound_f, double bound_g,
           b = d;
           vb = vd;
         }
+      else /* the maximum is in d or b */
+        {
+          a = c;
+          va = vc;
+        }
+    }
+  return (a + b) * 0.5;
+}
+
+/* return the skewness giving the best lognorm sum for two polynomials,
+   by using trichotomy between the optimal skewness of both polynomials */
+double
+L2_combined_skewness2 (mpz_poly f, mpz_poly g, int prec)
+{
+  double a, b, c, d, va, vb, vc, vd;
+
+  a = L2_skewness (f, prec);
+  b = L2_skewness (g, prec);
+
+  if (b < a)
+    {
+      c = b;
+      b = a;
+      a = c;
+    }
+
+  ASSERT(a <= b);
+
+  va = L2_lognorm (f, a) + L2_lognorm (g, a);
+  vb = L2_lognorm (f, b) + L2_lognorm (g, b);
+
+  while (b - a > ldexp (a, -prec))
+    {
+      c = (2.0 * a + b) / 3.0;
+      vc = L2_lognorm (f, c) + L2_lognorm (g, c);
+
+      d = (a + 2.0 * b) / 3.0;
+      vd = L2_lognorm (f, d) + L2_lognorm (g, d);
+
+      if (va < vd && va < vb && vc < vd && vc < vb) /* minimum is in a or c */
+        {
+          b = d;
+          vb = vd;
+        }
       else /* the minimum is in d or b */
         {
           a = c;
