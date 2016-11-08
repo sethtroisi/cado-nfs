@@ -104,13 +104,9 @@ heap_add (mpz_poly f, double score)
       mpz_poly_set (best_f[i], f);
       best_score[i] = score;
       best_n ++;
-      return;
     }
   else /* heap is full, we replace the top element */
     {
-      if (score >= best_score[0])
-        return; /* this might happen with multiple threads */
-
       /* the new element should have a better (i.e., smaller) score than the
          top element of the heap */
       ASSERT (best_n == keep);
@@ -121,7 +117,8 @@ heap_add (mpz_poly f, double score)
                     among i and its two sons, which should replace i */
           if (best_score[LEFT(i)] > score)
             j = LEFT(i);
-          if (RIGHT(i) < keep && best_score[RIGHT(i)] > best_score[j])
+          if (RIGHT(i) < keep && best_score[RIGHT(i)] > score &&
+              best_score[RIGHT(i)] > best_score[LEFT(i)])
             j = RIGHT(i);
           if (j == i)
             break; /* both sons have a smaller score */
@@ -133,6 +130,19 @@ heap_add (mpz_poly f, double score)
       best_score[i] = score;
     }
 }
+
+#if 0
+static void
+check_heap (void)
+{
+  unsigned long i;
+
+  for (i = 0; LEFT(i) < best_n; i++)
+    ASSERT_ALWAYS(best_score[i] >= best_score[LEFT(i)]);
+  for (i = 0; RIGHT(i) < best_n; i++)
+    ASSERT_ALWAYS(best_score[i] >= best_score[RIGHT(i)]);
+}
+#endif
 
 static void
 save_f (mpz_t *f, unsigned int df)
@@ -163,6 +173,7 @@ save_f (mpz_t *f, unsigned int df)
 #endif
   {
     heap_add (ff, score);
+    // check_heap ();
     if (score < Best_score)
       {
         Best_score = score;
@@ -742,7 +753,7 @@ main (int argc, char *argv[])
     nb_comb = (nb_comb_f > (double) ULONG_MAX) ? ULONG_MAX
       : (unsigned long) nb_comb_f;
 
-    if (idx1 == ULONG_MAX)
+    if (idx1 > maxtries)
       idx1 = maxtries;
 
     if (keep == 0)
