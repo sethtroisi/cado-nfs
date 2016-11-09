@@ -325,20 +325,76 @@ bucket_array_complete::purge<longhint_t>(
     const int i, const unsigned char *S);
 
 
-#ifdef HAVE_SSE2
+#if defined(HAVE_SSE2) && defined(SMALLSET_PURGE)
+
+/* From an SSE2 word containing several bucket updates, extract an SSE2
+   word filled in all positions with the x-value of the idx-th update. */
+template <typename HINT, unsigned idx>
+static inline __m128i
+extract_pattern(const __m128i data)
+{
+  typedef typename bucket_update_t<1, HINT>::br_index_t br_index_t;
+  typedef bucket_update_t<1, HINT> update_t;
+  // Sadly, since bucket_update_t has a constructor, it is not standard
+  // layout, and thus offsetof() is techically not applicable. In
+  // practice, it happens to work, but this is not portable.
+  // ASSERT_ALWAYS(std::is_standard_layout<update_t>::value);
+  return smallset_tools::extract_pattern<sizeof(br_index_t),
+                                         (idx*sizeof(bucket_update_t<1, HINT>)
+                                          + offsetof(update_t, x)
+                                         ) / sizeof(br_index_t)>(data);
+}
+
 template <typename HINT, int SIZE>
 void
 bucket_array_complete::purge_1 (
     const bucket_array_t<1, HINT> &BA, const int i,
-    const size_t nr_survivors,
-    const typename bucket_update_t<1, HINT>::br_index_t *survivors)
+    const std::vector<typename bucket_update_t<1, HINT>::br_index_t> &survivors)
 {
-  smallset<SIZE, typename bucket_update_t<1, HINT>::br_index_t> surv_set(survivors, nr_survivors);
+  smallset<SIZE, typename bucket_update_t<1, HINT>::br_index_t> surv_set(survivors);
+  size_t together = sizeof(__m128i) / sizeof(bucket_update_t<1, HINT>);
+  ASSERT_ALWAYS(together <= 4);
+
   for (slice_index_t i_slice = 0; i_slice < BA.get_nr_slices(); i_slice++) {
     const slice_index_t slice_index = BA.get_slice_index(i_slice);
     const bucket_update_t<1, HINT> *it = BA.begin(i, i_slice);
     const bucket_update_t<1, HINT> * const end_it = BA.end(i, i_slice);
 
+    for ( ; it != end_it && (uintptr_t) it % sizeof(__m128i) != 0 ; it++) {
+      if (UNLIKELY(surv_set.contains(it->x))) {
+        push_update(to_longhint(*it, slice_index));
+      }
+    }
+    for ( ; it <= end_it - together ; it += together) {
+      const __m128i data = * (const __m128i *) it;
+      if (0 < together) {
+        const __m128i pattern = extract_pattern<HINT, 0>(data);
+        if (UNLIKELY(surv_set.contains(pattern))) {
+          push_update(to_longhint(*(it + 0), slice_index));
+        }
+      }
+      if (1 < together) {
+        const __m128i pattern = extract_pattern<HINT, 1>(data);
+        if (UNLIKELY(surv_set.contains(pattern))) {
+          push_update(to_longhint(*(it + 1), slice_index));
+        }
+      }
+      if (2 < together) {
+        const __m128i pattern = extract_pattern<HINT, 2>(data);
+        if (UNLIKELY(surv_set.contains(pattern))) {
+          push_update(to_longhint(*(it + 2), slice_index));
+        }
+      }
+      if (3 < together) {
+        const __m128i pattern = extract_pattern<HINT, 3>(data);
+        if (UNLIKELY(surv_set.contains(pattern))) {
+          push_update(to_longhint(*(it + 3), slice_index));
+        }
+      }
+      if (4 < together) {
+        abort(); /* more copy-paste needed first */
+      }
+    }
     for ( ; it != end_it ; it++) {
       if (UNLIKELY(surv_set.contains(it->x))) {
         push_update(to_longhint(*it, slice_index));
@@ -352,21 +408,20 @@ void
 bucket_array_complete::purge (
     const bucket_array_t<1, HINT> &BA, const int i,
     const unsigned char *S,
-    const size_t nr_survivors,
-    const typename bucket_update_t<1, HINT>::br_index_t *survivors)
+    const std::vector<typename bucket_update_t<1, HINT>::br_index_t> &survivors)
 {
   const size_t items_per_size = smallset<1, typename bucket_update_t<1, HINT>::br_index_t>::nr_items;
-  if (nr_survivors == 0)
+  if (survivors.size() == 0)
     return;
-  switch ((nr_survivors + items_per_size - 1) / items_per_size) {
-    case 1: purge_1<HINT, 1>(BA, i, nr_survivors, survivors); break;
-    case 2: purge_1<HINT, 2>(BA, i, nr_survivors, survivors); break;
-    case 3: purge_1<HINT, 3>(BA, i, nr_survivors, survivors); break;
-    case 4: purge_1<HINT, 4>(BA, i, nr_survivors, survivors); break;
-    case 5: purge_1<HINT, 5>(BA, i, nr_survivors, survivors); break;
-    case 6: purge_1<HINT, 6>(BA, i, nr_survivors, survivors); break;
-    case 7: purge_1<HINT, 7>(BA, i, nr_survivors, survivors); break;
-    case 8: purge_1<HINT, 8>(BA, i, nr_survivors, survivors); break;
+  switch ((survivors.size() + items_per_size - 1) / items_per_size) {
+    case 1: purge_1<HINT, 1>(BA, i, survivors); break;
+    case 2: purge_1<HINT, 2>(BA, i, survivors); break;
+    case 3: purge_1<HINT, 3>(BA, i, survivors); break;
+    case 4: purge_1<HINT, 4>(BA, i, survivors); break;
+    case 5: purge_1<HINT, 5>(BA, i, survivors); break;
+    case 6: purge_1<HINT, 6>(BA, i, survivors); break;
+    case 7: purge_1<HINT, 7>(BA, i, survivors); break;
+    case 8: purge_1<HINT, 8>(BA, i, survivors); break;
     default: purge(BA, i, S);
   }
 }
@@ -376,8 +431,7 @@ void
 bucket_array_complete::purge<shorthint_t> (
     const bucket_array_t<1, shorthint_t> &, int,
     const unsigned char *,
-    size_t,
-    const bucket_update_t<1, shorthint_t>::br_index_t *survivors);
+    const std::vector<typename bucket_update_t<1, shorthint_t>::br_index_t> &);
 #endif
 
 template class bucket_single<1, primehint_t>;

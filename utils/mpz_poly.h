@@ -106,6 +106,8 @@ void mpz_poly_mul_mpz(mpz_poly_ptr Q, mpz_poly_srcptr P, mpz_srcptr a);
 void mpz_poly_divexact_mpz (mpz_poly_ptr Q, mpz_poly_srcptr P, mpz_srcptr a);
 void mpz_poly_translation (mpz_poly_ptr, mpz_poly_srcptr, const mpz_t);
 void mpz_poly_rotation (mpz_poly_ptr, mpz_poly_srcptr, mpz_poly_srcptr, const mpz_t, int);
+void mpz_poly_addmul_si (mpz_poly_ptr, mpz_poly_srcptr, long);
+void mpz_poly_mul_si (mpz_poly_ptr, mpz_poly_srcptr, long);
 void mpz_poly_rotation_int64 (mpz_poly_ptr, mpz_poly_srcptr, mpz_poly_srcptr, const int64_t, int);
 void mpz_poly_makemonic_mod_mpz (mpz_poly_ptr Q, mpz_poly_srcptr P, mpz_srcptr m);
 int mpz_poly_mod_f_mod_mpz (mpz_poly_ptr R, mpz_poly_srcptr f, mpz_srcptr m,
@@ -174,6 +176,7 @@ void mpz_poly_homogeneous_eval_siui (mpz_t v, mpz_poly_srcptr f, const int64_t i
 void mpz_poly_content (mpz_t c, mpz_poly_srcptr F);
 void mpz_poly_resultant(mpz_ptr res, mpz_poly_srcptr p, mpz_poly_srcptr q);
 void mpz_poly_discriminant(mpz_ptr res, mpz_poly_srcptr f);
+int mpz_poly_squarefree_p(mpz_poly_srcptr f);
 
 int mpz_poly_number_of_real_roots(mpz_poly_srcptr f);
 

@@ -77,6 +77,8 @@ void matR_disable_cols (filter_matrix_t *, const char *);
 extern void remove_j_from_row(filter_matrix_t *mat, int i, int j);
 extern void print_row(filter_matrix_t *mat, int i);
 
+#define rowWeight(mat, i) matLengthRow(mat, i)
+
 #define isRowNull(mat, i) ((mat)->rows[(i)] == NULL)
 #ifdef FOR_DL
 #define matLengthRow(mat, i) (mat)->rows[(i)][0].id

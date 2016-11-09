@@ -42,6 +42,203 @@ freeRj (filter_matrix_t *mat, int j)
     mat->R[j] = NULL;
 }
 
+/****************************** heap management ******************************/
+
+/* we precompute the weights for w < 256 to avoid the cost of multiple calls
+   to comp_weight_function */
+static float comp_weight[256];
+
+static inline float
+comp_weight_function (int32_t w MAYBE_UNUSED)
+{
+#define USE_WEIGHT_LAMBDA 3
+#if USE_WEIGHT_LAMBDA == 0
+    return 1.0;
+#elif USE_WEIGHT_LAMBDA == 1
+    return powf (2.0 / 3.0, (float) (w - 2));
+#elif USE_WEIGHT_LAMBDA == 2
+    return powf (0.5, (float) (w - 2));
+#elif USE_WEIGHT_LAMBDA == 3
+    return powf (0.8, (float) (w - 2));
+#elif USE_WEIGHT_LAMBDA == 4
+    return 1.0 / log2f ((float) w);
+#elif USE_WEIGHT_LAMBDA == 5
+    return 2.0 / (float) w;
+#elif USE_WEIGHT_LAMBDA == 6
+    return 4.0 / (float) (w * w);
+#else
+#error "Invalid value of USE_WEIGHT_LAMBDA"
+#endif
+}
+
+static void
+heap_init (heap H, uint32_t nrows)
+{
+  H->list = malloc (nrows * sizeof (uint32_t));
+  H->size = 0;
+  H->alloc = nrows;
+  H->index = malloc (nrows * sizeof (uint32_t));
+  for (unsigned long i = 0; i < nrows; i++)
+    H->index[i] = UINT32_MAX;
+  for (int32_t w = 0; w < 256; w++)
+    comp_weight[w] = comp_weight_function (w);
+}
+
+static void
+heap_clear (heap H)
+{
+  free (H->list);
+  free (H->index);
+}
+
+static float
+heapRowWeight (uint32_t i, filter_matrix_t *mat)
+{
+  float W = 0.0;
+  int32_t w;
+  uint32_t j, k;
+
+  ASSERT(mat->rows[i] != NULL);
+  for (k = 1; k <= matLengthRow (mat, i); k++)
+    {
+      j = matCell (mat, i, k);
+      w = mat->wt[j];
+      ASSERT(w != 0);
+      if (w < 0)
+        w = -w;
+      if (w > 255)
+        w = 255; /* saturate to 255 */
+      W += comp_weight[w];
+    }
+  return W;
+}
+
+#if 0
+static void
+check_heap (heap H, filter_matrix_t *mat)
+{
+  for (unsigned int i = 0; i < H->size; i++)
+    {
+      uint32_t j = H->list[i];
+      ASSERT_ALWAYS(H->index[j] == i);
+      ASSERT_ALWAYS(mat->rows[j] != NULL);
+    }
+}
+#endif
+
+/* move down entry n of heap */
+static void
+moveDown (heap H, filter_matrix_t *mat, uint32_t n)
+{
+  uint32_t i = H->list[n], j;
+  float w;
+
+  w = heapRowWeight (i, mat);
+  while (2 * n + 1 < H->size)
+    {
+      uint32_t left = 2 * n + 1, right = 2 * n + 2, son;
+      if (right >= H->size ||
+          heapRowWeight (H->list[left], mat) > heapRowWeight (H->list[right], mat))
+        son = left; /* compare with left son */
+      else
+        son = right; /* compare with right son */
+      if (heapRowWeight (H->list[son], mat) > w)
+        {
+          j = H->list[son];
+          H->list[n] = j;
+          H->index[j] = n;
+          n = son;
+        }
+      else
+        break; /* i has larger weight */
+    }
+  H->list[n] = i;
+  H->index[i] = n;
+}
+
+/* remove relation i */
+void
+heap_delete (heap H, filter_matrix_t *mat, uint32_t i)
+{
+  uint32_t n = H->index[i];
+
+  ASSERT(H->size > 0);
+
+  /* here, the row of cell n of the heap is invalid */
+
+  /* put last entry in position n (if not already last) */
+  H->size --;
+  if (n < H->size)
+    {
+      H->list[n] = H->list[H->size];
+      /* adjust heap */
+      moveDown (H, mat, n);
+    }
+}
+
+/* 1,2 -> 0, 3,4 -> 1, 5,6 -> 2, ... */
+#define PARENT(i) (((i)+1)/2-1)
+
+/* add relation i */
+void
+heap_push (heap H, filter_matrix_t *mat, uint32_t i)
+{
+  uint32_t n, j;
+  float w;
+
+  if (H->index[i] == UINT32_MAX)
+    {
+      ASSERT(H->size < H->alloc);
+
+      w = heapRowWeight (i, mat);
+      n = H->size;
+
+      /* move parents down the tree as long as they have smaller weight */
+      while (n > 0 && heapRowWeight (H->list[PARENT(n)], mat) < w)
+        {
+          j = H->list[PARENT(n)];
+          H->list[n] = j;
+          H->index[j] = n;
+          n = PARENT(n);
+        }
+      /* insert new element */
+      H->list[n] = i;
+      H->index[i] = n;
+      H->size ++;
+    }
+  else /* relation was already in heap */
+    {
+      uint32_t j;
+      n = H->index[i];
+      w = heapRowWeight (i, mat);
+      /* if new weight is smaller than old one, move down the heap */
+      if ((2 * n + 1 < H->size && w < heapRowWeight (H->list[2 * n + 1], mat)) ||
+          (2 * n + 2 < H->size && w < heapRowWeight (H->list[2 * n + 2], mat)))
+        moveDown (H, mat, n);
+      else /* move up the heap */
+        {
+          while (n > 0 && w > heapRowWeight (H->list[PARENT(n)], mat))
+            {
+              j = H->list[PARENT(n)];
+              H->list[n] = j;
+              H->index[j] = n;
+              n = PARENT(n);
+            }
+          /* insert updated element */
+          H->list[n] = i;
+          H->index[i] = n;
+        }
+    }
+}
+
+/* return index i of relation with larger weight in heap H */
+uint32_t
+heap_pop (heap H, filter_matrix_t *mat MAYBE_UNUSED)
+{
+  ASSERT(H->size > 0);
+  return H->list[0];
+}
+
 /*****************************************************************************/
 
 int
@@ -65,7 +262,7 @@ initMat (filter_matrix_t *mat, int maxlevel, uint32_t keep,
   mat->keep  = keep;
   mat->mergelevelmax = maxlevel;
   mat->cwmax = maxlevel;
-  ASSERT_ALWAYS (mat->cwmax < 255);
+  ASSERT_ALWAYS (mat->cwmax < 255); /* 255 is reserved for saturated values */
   mat->nburied = nburied;
 
   mat->weight = 0;
@@ -78,6 +275,9 @@ initMat (filter_matrix_t *mat, int maxlevel, uint32_t keep,
   memset (mat->wt, 0, mat->ncols * sizeof (int32_t));
   mat->R = (index_t **) malloc (mat->ncols * sizeof(index_t *));
   ASSERT_ALWAYS(mat->R != NULL);
+
+  /* initialize the heap for heavy rows */
+  heap_init (mat->Heavy, mat->nrows);
 }
 
 void
@@ -92,6 +292,9 @@ clearMat (filter_matrix_t *mat)
   for (j = 0; j < mat->ncols; j++)
     freeRj (mat, j);
   free (mat->R);
+
+  /* free the memory for the heap of heavy rows */
+  heap_clear (mat->Heavy);
 }
 
 #ifndef FOR_DL

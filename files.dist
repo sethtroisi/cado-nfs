@@ -415,6 +415,7 @@ sieve/las-smallsieve.cpp
 sieve/las-smallsieve.h
 sieve/las-types.h
 sieve/las-unsieve.cpp
+sieve/las-unsieve-sse2.cpp
 sieve/las-unsieve.h
 sieve/las-cofactor.cpp
 sieve/las-cofactor.h

@@ -1077,6 +1077,33 @@ test_mpz_poly_discriminant (unsigned long iter)
     mpz_clear (D);
 }
 
+void test_mpz_poly_infinity_norm()
+{
+  mpz_poly f;
+  mpz_poly_init(f, -1);
+
+  mpz_t inf_norm;
+  mpz_init(inf_norm);
+
+  mpz_poly_infinity_norm(inf_norm, f);
+  ASSERT_ALWAYS(mpz_cmp_ui(inf_norm, 0) == 0);
+
+  mpz_poly_setcoeffs_si_var(f, 3, 4, 3, 0, 1);
+  mpz_poly_infinity_norm(inf_norm, f);
+  ASSERT_ALWAYS(mpz_cmp_ui(inf_norm, 4) == 0);
+
+  mpz_poly_setcoeffs_si_var(f, 5, -4, 3, -5, 1, 6, -8);
+  mpz_poly_infinity_norm(inf_norm, f);
+  ASSERT_ALWAYS(mpz_cmp_ui(inf_norm, 8) == 0);
+
+  mpz_poly_setcoeffs_si_var(f, 2, -4, 3, -5);
+  mpz_poly_infinity_norm(inf_norm, f);
+  ASSERT_ALWAYS(mpz_cmp_ui(inf_norm, 5) == 0);
+
+  mpz_clear(inf_norm);
+  mpz_poly_clear(f);
+}
+
 int
 main (int argc, const char *argv[])
 {
@@ -1098,6 +1125,7 @@ main (int argc, const char *argv[])
   test_mpz_poly_trivialities ();
   test_mpz_poly_resultant();
   test_mpz_poly_discriminant(20000);
+  test_mpz_poly_infinity_norm();
   tests_common_clear ();
   exit (EXIT_SUCCESS);
 }

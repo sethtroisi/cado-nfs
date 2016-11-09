@@ -45,6 +45,7 @@ mpz_poly_mul_basecase (mpz_t *f, mpz_t *g, int r, mpz_t *h, int s) {
   return r + s;
 }
 
+/* f <- g^2 where g has degree r */
 static int
 mpz_poly_sqr_basecase (mpz_t *f, mpz_t *g, int r) {
   int i, j;
@@ -72,9 +73,13 @@ mpz_poly_sqr_basecase (mpz_t *f, mpz_t *g, int r) {
 */
 static void
 mpz_poly_mul_tc_interpolate (mpz_t *f, int t) {
-#define MAX_T 13
+#define MAX_T 15
   uint64_t M[MAX_T+1][MAX_T+1], g, h;
-  int i, j, k;
+  int i, j, k, l;
+  /* this is the list of gcd's that appear in the forward Gauss loop, in the
+     order they appear (they don't depend on t, since we start with the low
+     triangular submatrix for t-1) */
+  static const uint64_t G[] = {1,1,1,1,1,2,1,1,2,6,1,1,2,6,24,1,1,2,6,24,120,1,1,2,6,24,120,720,1,1,2,6,24,120,720,5040,1,1,2,6,24,120,720,5040,40320,1,1,2,6,24,120,720,5040,40320,362880,1,1,2,6,24,120,720,5040,40320,362880,3628800,1,1,2,6,24,120,720,5040,40320,362880,3628800,39916800,1,1,2,6,24,120,720,5040,40320,362880,3628800,39916800,479001600,1,1,2,6,24,120,720,5040,40320,362880,3628800,39916800,479001600,6227020800,1,1,2,6,24,120,720,5040,40320,362880,3628800,39916800,479001600,6227020800,87178291200};
 
   ASSERT_ALWAYS (t <= MAX_T); /* Ensures that all M[i][j] fit in uint64_t,
                                  and similarly for all intermediate
@@ -87,19 +92,21 @@ mpz_poly_mul_tc_interpolate (mpz_t *f, int t) {
       M[i][j] = (j == 0) ? 1 : i * M[i][j-1];
 
   /* forward Gauss: zero the under-diagonal coefficients while going down */
-  for (i = 1; i <= t; i++)
-    for (j = 0; j < i; j++)
-      if (M[i][j] != 0)
-      {
-        g = gcd_uint64 (M[i][j], M[j][j]);
-        h = M[i][j] / g;
-        g = M[j][j] / g;
-        /* f[i] <- g*f[i] - h*f[j] */
-        mpz_mul_uint64 (f[i], f[i], g);
-        mpz_submul_uint64 (f[i], f[j], h);
-        for (k = j; k <= t; k++)
-          M[i][k] = g * M[i][k] - h * M[j][k];
-      }
+  for (i = 1, l = 0; i <= t; i++)
+    {
+      for (j = 0; j < i; j++)
+	if (M[i][j] != 0)
+	  {
+	    g = G[l++]; /* same as gcd_uint64 (M[i][j], M[j][j]) */
+	    h = M[i][j] / g;
+	    g = M[j][j] / g;
+	    /* f[i] <- g*f[i] - h*f[j] */
+	    mpz_mul_uint64 (f[i], f[i], g);
+	    mpz_submul_uint64 (f[i], f[j], h);
+	    for (k = j; k <= t; k++)
+	      M[i][k] = g * M[i][k] - h * M[j][k];
+	  }
+    }
 
   /* now zero upper-diagonal coefficients while going up */
   for (i = t; i >= 0; i--)
@@ -124,17 +131,42 @@ mpz_poly_mul_tc_interpolate (mpz_t *f, int t) {
 static int
 mpz_poly_mul_tc (mpz_t *f, mpz_t *g, int r, mpz_t *h, int s)
 {
-  int t = r + s; /* product has t+1 coefficients */
-  int i, j;
+  int t, i, j;
   mpz_t tmp;
 
   if ((r == -1) || (s == -1)) /* g or h is 0 */
     return -1;
 
+  if (r < s)
+    return mpz_poly_mul_tc (f, h, s, g, r);
+
+  /* now r >= s */
+
+  if (s == 0)
+    {
+      for (i = 0; i <= r; i++)
+	mpz_mul (f[i], g[i], h[0]);
+      return r;
+    }
+
+  t = r + s; /* degree of f, which has t+1 coefficients */
+
+  if (t == 2) /* necessary r = s = 1, use vanilla Karatsuba */
+    {
+      mpz_add (f[0], g[0], g[1]);
+      mpz_add (f[2], h[0], h[1]);
+      mpz_mul (f[1], f[0], f[2]);
+      mpz_mul (f[0], g[0], h[0]);
+      mpz_mul (f[2], g[1], h[1]);
+      mpz_sub (f[1], f[1], f[0]);
+      mpz_sub (f[1], f[1], f[2]);
+      return 2;
+    }
+
   if (t > MAX_T) {
     /* naive product */
     /* currently we have to resort to this for larger degree, because
-     * the generic toom implementation is bounded in degree.
+     * the generic Toom implementation is bounded in degree.
      */
     return mpz_poly_mul_basecase (f, g, r, h, s);
   }
@@ -330,6 +362,7 @@ mpz_poly_init_set_ab (mpz_poly_ptr rel, int64_t a, uint64_t b)
     mpz_poly_setcoeff_int64(rel, 1, -b);
 }
 
+/* rel <- a-b*x */
 void
 mpz_poly_init_set_mpz_ab (mpz_poly_ptr rel, mpz_t a, mpz_t b)
 {
@@ -457,6 +490,7 @@ void mpz_poly_setcoeff_uint64(mpz_poly_ptr f, int i, uint64_t z)
     mpz_poly_cleandeg (f, i);
 }
 
+/* f[i] <- z */
 void mpz_poly_setcoeff_double(mpz_poly_ptr f, int i, double z)
 {
   mpz_poly_realloc (f, i + 1);
@@ -484,6 +518,7 @@ void mpz_poly_set_xi(mpz_poly_ptr f, int i)
     f->deg = i;
 }
 
+/* g <- quo (f, x^i) */
 void mpz_poly_div_xi(mpz_poly_ptr g, mpz_poly_srcptr f, int i)
 {
     if (f->deg < i) {
@@ -538,6 +573,7 @@ mpz_poly_mul_xi (mpz_poly_ptr g, mpz_poly_srcptr f, int i)
     g->deg = f->deg + i;
 }
 
+/* g <- f * (x + a) */
 void mpz_poly_mul_xplusa(mpz_poly_ptr g, mpz_poly_srcptr f, mpz_srcptr a)
 {
     mpz_t aux;
@@ -561,6 +597,7 @@ void mpz_poly_mul_xplusa(mpz_poly_ptr g, mpz_poly_srcptr f, mpz_srcptr a)
     mpz_clear(aux);
 }
 
+/* return the valuation of f */
 int mpz_poly_valuation(mpz_poly_srcptr f)
 {
     int n = 0;
@@ -987,7 +1024,7 @@ mpz_poly_translation (mpz_poly_ptr ft, mpz_poly_srcptr f, const mpz_t k)
       mpz_addmul (ft->coeff[j], ft->coeff[j+1], k);
 }
 
-/* Set h = fr + k * x^t * g such that t+deg(g) <= deg(f) and t >= 0 (those two
+/* Set fr = f + k * x^t * g such that t+deg(g) <= deg(f) and t >= 0 (those two
  * assumptions are not checked). fr and f can be the same poly */
 void mpz_poly_rotation (mpz_poly_ptr fr, mpz_poly_srcptr f, mpz_poly_srcptr g,
                         const mpz_t k, int t)
@@ -995,6 +1032,24 @@ void mpz_poly_rotation (mpz_poly_ptr fr, mpz_poly_srcptr f, mpz_poly_srcptr g,
   mpz_poly_set (fr, f);
   for (int i = 0; i <= g->deg; i++)
     mpz_addmul (fr->coeff[i+t], g->coeff[i], k);
+}
+
+/* Set f = f + k * g such that deg(g) <= deg(f) (this assumption is not
+   checked). */
+void
+mpz_poly_addmul_si (mpz_poly_ptr f, mpz_poly_srcptr g, long k)
+{
+  for (int i = 0; i <= g->deg; i++)
+    mpz_addmul_si (f->coeff[i], g->coeff[i], k);
+}
+
+/* Set f = k * g such that deg(g) <= deg(f) (this assumption is not
+   checked). */
+void
+mpz_poly_mul_si (mpz_poly_ptr f, mpz_poly_srcptr g, long k)
+{
+  for (int i = 0; i <= g->deg; i++)
+    mpz_mul_si (f->coeff[i], g->coeff[i], k);
 }
 
 /* Set h = fr + k * x^t * g such that t+deg(g) <= deg(f) and t >= 0 (those two
@@ -1952,28 +2007,19 @@ mpz_poly_sizeinbase (mpz_poly_srcptr f, int b)
   return S;
 }
 
-static void mpz_max(mpz_ptr max, mpz_srcptr a, mpz_srcptr b)
+void
+mpz_poly_infinity_norm (mpz_ptr in, mpz_poly_srcptr f)
 {
-    if (mpz_cmp(a, b) < 0) {
-        mpz_set(max, b);
-    } else if (mpz_cmp(a, b) > 0) {
-        mpz_set(max, a);
-    } else {
-        mpz_set(max, a);
+  if (f->deg == -1) {
+    mpz_set_ui(in, 0);
+  } else {
+  mpz_abs (in, f->coeff[0]);
+  for (int i = 1; i <= f->deg; i++)
+    {
+      if (mpz_cmpabs (f->coeff[i], in) > 0)
+	mpz_abs (in, f->coeff[i]);
     }
-}
-
-void mpz_poly_infinity_norm(mpz_ptr in, mpz_poly_srcptr f)
-{
-  int i = 1;
-  mpz_t tmp;
-  mpz_init(tmp);
-  mpz_abs(in, f->coeff[0]);
-  for ( ; i < f->deg + 1; i++) {
-    mpz_abs(tmp, f->coeff[i]);
-    mpz_max(in, in, tmp);
   }
-  mpz_clear(tmp);
 }
 
 /* return the total size (in bytes) to store the polynomial f */
@@ -2509,6 +2555,24 @@ void mpz_poly_discriminant(mpz_ptr res, mpz_poly_srcptr f)
     mpz_poly_clear(df);
 }
 
+/* returns non-zero iff f is square-free in Z[x] */
+int
+mpz_poly_squarefree_p (mpz_poly_srcptr f)
+{
+  mpz_poly df;
+  mpz_t res;
+  int ret;
+
+  mpz_poly_init (df, f->deg);
+  mpz_poly_derivative (df, f);
+  mpz_init (res);
+  mpz_poly_resultant (res, f, df);
+  ret = mpz_cmp_ui (res, 0);
+  mpz_clear (res);
+  mpz_poly_clear (df);
+  return ret;
+}
+
 
 /* factoring polynomials */
 
@@ -2574,7 +2638,7 @@ void mpz_poly_factor_list_fprintf(FILE* fp, mpz_poly_factor_list_srcptr l)
 }
 /* Squarefree factorization */
 
-/* This auxiliary functionp almost does the sqf. It fills
+/* This auxiliary function almost does the sqf. It fills
  * lf->factors[stride*i] (i from 1 to deg(f)) with the factors with
  * multiplicity i in f.  lf->factors[0] is filled with the product whose
  * multiplicity is a multiple of the field characteristic.  returns max

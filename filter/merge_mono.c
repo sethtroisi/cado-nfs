@@ -182,7 +182,7 @@ removeRowAndUpdate(filter_matrix_t *mat, int i, int final)
     if(i == TRACE_ROW)
 	printf ("TRACE_ROW: removeRowAndUpdate i=%d\n", i);
 #endif
-    mat->weight -= matLengthRow(mat, i);
+    mat->weight -= rowWeight(mat, i);
     for(k = 1; k <= matLengthRow(mat, i); k++){
 #if TRACE_COL >= 0
 	if(matCell(mat, i, k) == TRACE_COL){
@@ -199,7 +199,7 @@ addOneRowAndUpdate(filter_matrix_t *mat, int i)
 {
   unsigned int k;
 
-  mat->weight += matLengthRow(mat, i);
+  mat->weight += rowWeight(mat, i);
   for(k = 1; k <= matLengthRow(mat, i); k++)
     addCellAndUpdate(mat, i, matCell(mat, i, k));
 }
@@ -463,7 +463,7 @@ mergeForColumn (report_t *rep, double *tt, double *tfill, double *tMST,
                  m, MERGE_LEVEL_MAX);
 	exit(1);
       }
-    printf ("Treating column %d of weight %d\n",j,mat->wt[j]);
+    printf ("Treating column %d of weight %d\n", j, mat->wt[j]);
 #if DEBUG >= 2
     printf ("Status before next j=%d to start\n", j);
     // the corresponding rows are in R[j], skipping 1st cell and -1's
