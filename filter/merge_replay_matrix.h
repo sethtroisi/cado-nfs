@@ -15,6 +15,13 @@
 #define cmp_typerow_t cmp_ideal_merge
 #endif
 
+typedef struct {
+  uint32_t *list;
+  unsigned long size;
+  unsigned long alloc;
+  uint32_t *index; /* relation i is stored at list[index[i]] */
+} heap_t;
+typedef heap_t heap[1];
 
 /* rows correspond to relations, and columns to primes (or prime ideals) */
 typedef struct {
@@ -50,7 +57,8 @@ typedef struct {
                             otherwise it is MKZ_INF if the column is inactive
                             (either too heavy initially or deleted) */
   int wmstmax;
-  int mkztype;       /* which type of count */
+  int mkztype;           /* which type of count */
+  heap Heavy;            /* heap for heavy rows */
 } filter_matrix_t;
 
 #ifdef __cplusplus
@@ -89,6 +97,9 @@ extern int incrS(int w);
 extern int weightSum(filter_matrix_t *mat, int i1, int i2, int32_t j);
 extern int fillTabWithRowsForGivenj(int32_t *ind, filter_matrix_t *mat, int32_t j);
 extern void destroyRow(filter_matrix_t *mat, int i);
+void heap_push (heap H, filter_matrix_t *mat, uint32_t i);
+void heap_delete (heap H, filter_matrix_t *mat, uint32_t i);
+uint32_t heap_pop (heap H, filter_matrix_t *mat);
 
 #ifdef __cplusplus
 }

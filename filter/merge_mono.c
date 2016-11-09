@@ -238,6 +238,8 @@ removeRowDefinitely(report_t *rep, filter_matrix_t *mat, int32_t i)
     destroyRow(mat, i);
     report1(rep, i, -1);
     mat->rem_nrows--;
+    /* delete the row from the heap of heavy rows */
+    heap_delete (mat->Heavy, mat, i);
 }
 
 /* Try all combinations of merging one row with all others (m-1) ones
@@ -481,7 +483,7 @@ mergeForColumn (report_t *rep, double *tt, double *tfill, double *tMST,
 #if DEBUG >= 1
     printf (" %d", j);
     printf (" => the %d rows are:\n", m);
-    for(k = 0; k < m; k++){
+    for(int k = 0; k < m; k++){
 	printf ("row[%d]=", ind[k]);
 	print_row (mat, ind[k]);
 	printf ("\n");
@@ -495,65 +497,15 @@ mergeForColumn (report_t *rep, double *tt, double *tfill, double *tMST,
     mat->rem_nrows--;
     mat->rem_ncols--;
     removeColumnAndUpdate (mat, j);
-}
 
-// It could be fun to find rows s.t. at least one j is of small weight.
-// Or components of rows with some sharing?
-// We could define sf(row) = sum_{j in row} w(j) and remove the
-// rows of smallest value of sf?
-// For the time being, remove heaviest rows.
-static int
-deleteScore(filter_matrix_t *mat, int32_t i)
-{
-#if 1
-    // plain weight to remove heaviest rows
-    return matLengthRow(mat, i);
-#endif
-#if 0
-    // -plain weight to remove lightest rows
-    return -lengthRow(mat, i);
-#endif
-#if 0
-    // not using rows with too many heavy column part
-    int k, s = 0;
-
-    for(k = 1; k <= lengthRow(mat, i); k++)
-	s += abs(mat->wt[GETJ(mat, mat->rows[i][k])]);
-    return s;
-#endif
-#if 0
-    // not using rows with too many light columns
-    int k, s = 0;
-
-    for(k = 1; k <= lengthRow(mat, i); k++)
-	s += abs(mat->wt[GETJ(mat, mat->rows[i][k])]);
-    return -s;
-#endif
-#if 0
-    // return the weight of the lightest column
-    int k, s = abs(mat->wt[GETJ(mat, mat->rows[i][1])]);
-
-    for(k = 2; k <= lengthRow(mat, i); k++)
-	if(abs(mat->wt[GETJ(mat, mat->rows[i][k])]) > s)
-	    s = abs(mat->wt[GETJ(mat, mat->rows[i][k])]);
-    return s;
-#endif
-}
-
-// this guy is linear => total is quadratic, be careful!
-static int
-findSuperfluousRows(int *tmp, int ntmp, filter_matrix_t *mat)
-{
-    index_t i, itmp;
-
-    for(i = 0, itmp = 0; i < mat->nrows; i++)
-        if(!isRowNull(mat, i)){
-	    tmp[itmp++] = deleteScore(mat, i);
-	    tmp[itmp++] = i;
-	}
-    // rows with largest score will be at the end
-    qsort(tmp, itmp>>1, 2 * sizeof(int), cmp_int2);
-    return itmp;
+    /* update the status of rows in heap of heavy rows */
+    for (ni = 0; ni < m; ni++)
+      {
+        if (mat->rows[ind[ni]] != NULL) /* row is still active */
+          heap_push (mat->Heavy, mat, ind[ni]);
+        else
+          heap_delete (mat->Heavy, mat, ind[ni]);
+      }
 }
 
 // Delete at most niremmax superfluous rows such that nrows-ncols >= keep.
@@ -564,7 +516,7 @@ deleteSuperfluousRows (report_t *rep, filter_matrix_t *mat,
                        int niremmax, int m)
 {
   int keep = mat->keep;
-  int nirem = 0, *tmp, ntmp, i;
+  int nirem = 0;
 
   if (m <= 2)
     return 0; /* it is not worth removing rows during level-2 merges */
@@ -575,17 +527,11 @@ deleteSuperfluousRows (report_t *rep, filter_matrix_t *mat,
   if (niremmax > (int) (mat->rem_nrows - mat->rem_ncols) - keep)
     niremmax = (mat->rem_nrows - mat->rem_ncols) - keep;
 
-  ntmp = mat->rem_nrows << 1;
-  tmp = (int *) malloc (ntmp * sizeof(int));
-  ntmp = findSuperfluousRows (tmp, ntmp, mat);
-  // remove rows with largest score
-  for (i = ntmp - 1; i >= 0 && nirem < niremmax; i -= 2)
-    if (mat->rows[tmp[i]] != NULL)
-      {
-        removeRowDefinitely(rep, mat, tmp[i]);
-        nirem++;
-      }
-  free (tmp);
+  for (nirem = 0; nirem < niremmax && mat->Heavy->size > 0; nirem++)
+    {
+      uint32_t i = heap_pop (mat->Heavy, mat);
+      removeRowDefinitely (rep, mat, i);
+    }
   return nirem;
 }
 
@@ -605,6 +551,7 @@ int
 number_of_superfluous_rows(filter_matrix_t *mat)
 {
     int kappa, ni2rem;
+
     if (mat->keep > 0)
       kappa = (mat->rem_nrows-mat->rem_ncols) / mat->keep;
     else
@@ -651,10 +598,11 @@ print_memory_usage (filter_matrix_t *mat)
 static inline void
 print_report (filter_matrix_t *mat)
 {
-  printf ("N=%" PRIu64 " (%" PRId64 ") W=%" PRIu64 " W*N=%" PRIu64 " "
-          "W/N=%.2f\n", mat->rem_nrows,
+  printf ("N=%" PRIu64 " (%" PRId64 ") W=%" PRIu64 " W*N=%.2e "
+          "W/N=%.2f #Q=%d\n", mat->rem_nrows,
           ((int64_t) mat->rem_nrows) - ((int64_t) mat->rem_ncols),
-          mat->weight, compute_WN(mat), compute_WoverN(mat));
+          mat->weight, (double) compute_WN (mat), compute_WoverN (mat),
+          MkzQueueCardinality (mat->MKZQ));
   if (mat->verbose)
     print_memory_usage (mat);
   fflush (stdout);
@@ -738,6 +686,13 @@ mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel,
 
   printf ("# Using %s to compute the merges\n", __func__);
 
+  /* initialize the heap of heavy rows */
+  for (unsigned long i = 0; i < mat->nrows; i++)
+    {
+      ASSERT_ALWAYS(mat->rows[i] != NULL);
+      heap_push (mat->Heavy, mat, i);
+    }
+
   // clean things
   njrem = removeSingletons(rep, mat);
 
@@ -782,11 +737,10 @@ mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel,
     {
       if (m > 1 && merge_stats_is_first_merge (merge_data, m))
       {
-        fprintf(rep->outfile, "## First %d-merge\n", m);
+        fprintf (rep->outfile, "## First %d-merge\n", m);
         print_report (mat);
-        printf ("First %d-merge, (estimated) cost %d (#Q=%d)\n", m, mkz,
-                MkzQueueCardinality(mat->MKZQ));
-        fflush(stdout);
+        printf ("First %d-merge, (estimated) cost %d\n", m, mkz);
+        fflush (stdout);
       }
       fprintf(rep->outfile, "#\n");
       mergeForColumn2(rep, mat, &njrem, &totopt, &totfill, &totMST, j);
