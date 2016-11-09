@@ -72,15 +72,17 @@ skew: 1.37
 #include <stdlib.h>
 #include <time.h>
 
-/* we assume a difference <= ALPHA_BOUND_GUARD between alpha computed
-   with ALPHA_BOUND_SMALL and ALPHA_BOUND */
-#define ALPHA_BOUND_GUARD 0.2
+/* We assume a difference <= ALPHA_BOUND_GUARD between alpha computed
+   with ALPHA_BOUND_SMALL and ALPHA_BOUND. In practice the largest value
+   observed is 0.79. */
+#define ALPHA_BOUND_GUARD 1.0
 
 mpz_poly *best_f = NULL;
 double *best_score = NULL, Best_score = DBL_MAX;
 unsigned long keep = 0; /* target number of polynomials f with best alpha */
 unsigned long best_n = 0; /* number of kept polynomials so far */
 unsigned long f_irreducible = 0;
+double max_guard = DBL_MIN;
 
 #define PARENT(i) (((i)-1)/2) /* 1,2 -> 0, 3,4 -> 1, 5,6 -> 2, ... */
 #define LEFT(i) (2*(i)+1)
@@ -196,7 +198,7 @@ print_nonlinear_poly_info (mpz_poly ff, double alpha_f, mpz_poly gg,
                            int format,  mpz_t n)
 {
     unsigned int i;
-    double skew, logmu[2], alpha_g, score;
+    double skew, logmu[2], alpha_g_approx, alpha_g, score, score_approx;
     int df = ff->deg;
     mpz_t *f = ff->coeff;
     int dg = gg->deg;
@@ -209,17 +211,23 @@ print_nonlinear_poly_info (mpz_poly ff, double alpha_f, mpz_poly gg,
     logmu[1] = L2_lognorm (gg, skew);
     logmu[0] = L2_lognorm (ff, skew);
     /* first estimate alpha with a small bound */
-    alpha_g = get_alpha (gg, ALPHA_BOUND_SMALL);
+    alpha_g_approx = get_alpha (gg, ALPHA_BOUND_SMALL);
 
-    score = logmu[1] + alpha_g + logmu[0] + alpha_f;
+    score_approx = logmu[1] + alpha_g_approx + logmu[0] + alpha_f;
 
-    if (score >= best_score + ALPHA_BOUND_GUARD)
+    if (score_approx >= best_score + ALPHA_BOUND_GUARD)
       return 0;
 
     /* now get a more precise alpha value */
     alpha_g = get_alpha (gg, ALPHA_BOUND);
 
     score = logmu[1] + alpha_g + logmu[0] + alpha_f;
+    if (score_approx - score > max_guard)
+#ifdef HAVE_OPENMP
+#pragma omp critical
+#endif
+      max_guard = score_approx - score;
+
     if (score >= best_score)
       return 0; /* only print record scores */
 
@@ -788,10 +796,11 @@ main (int argc, char *argv[])
     t2 = seconds () - t2;
 
     printf ("found %lu irreducible f-polynomials, ", f_irreducible);
-    printf ("kept %lu, best score %1.2f, worst score %1.2f\n",
-            best_n, Best_score, best_score[0]);
-    printf ("tries %lu, nb_comb %lu, keep %lu\n",
+    printf ("best score %1.2f, worst %1.2f\n",
+            Best_score, best_score[0]);
+    printf ("tries %lu, nb_comb %lu, keep %lu, ",
             maxtries / modm, nb_comb, keep);
+    printf ("max guard %1.2f\n", max_guard);
     printf ("Stage 1: %.0fs, Stage 2: %.0fs\n", t1, t2);
 
     mpz_clear (N);
