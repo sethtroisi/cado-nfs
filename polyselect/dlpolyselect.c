@@ -596,22 +596,17 @@ polygen_JL2 (mpz_t n, unsigned int df, unsigned int dg, long bound,
         for (unsigned long idx = 1; idx < nb_comb; idx ++)
           {
             unsigned long k = idx;
-	    int64_t g;
 
             /* compute first index */
             a[0] = k % (bound + 1);
             k = k / (bound + 1);
-	    g = a[0];
             for (j = 1; j <= dg; j++)
               {
                 a[j] = k % (2 * bound + 1);
                 k = k / (2 * bound + 1);
                 a[j] = (a[j] <= bound) ? a[j] : a[j] - (2 * bound + 1);
-		g = gcd_int64 (g, a[j]);
               }
             ASSERT_ALWAYS(k == 0);
-	    if (g != 1)
-	      continue;
             mpz_poly_mul_si (u, v[0], a[0]);
 	    for (j = 1; j <= dg; j++)
 	      mpz_poly_addmul_si (u, v[j], a[j]);
