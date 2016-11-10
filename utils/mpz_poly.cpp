@@ -652,7 +652,7 @@ int mpz_poly_asprintf(char ** res, mpz_poly_srcptr f)
             PUTS_FRAGMENT ("+");
         if (i && mpz_cmp_ui(f->coeff[i], 1) == 0) {
             PUTS_FRAGMENT ("x");
-        } else if (i && mpz_cmp_ui(f->coeff[i], -1) == 0) {
+        } else if (i && mpz_cmp_si(f->coeff[i], -1) == 0) {
             PUTS_FRAGMENT ("-x");
         } else {
             SNPRINTF_FRAGMENT ("%Zd", f->coeff[i]);
