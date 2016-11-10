@@ -190,86 +190,6 @@ save_f (mpz_t *f, unsigned int df)
   }
 }
 
-/*
-  Print two nonlinear poly info. Return non-zero for record polynomials.
-*/
-static int
-print_nonlinear_poly_info (mpz_poly ff, double alpha_f, mpz_poly gg,
-                           int format,  mpz_t n)
-{
-    unsigned int i;
-    double skew, logmu[2], alpha_g_approx, alpha_g, score, score_approx;
-    int df = ff->deg;
-    mpz_t *f = ff->coeff;
-    int dg = gg->deg;
-    mpz_t *g = gg->coeff;
-    static double best_score = DBL_MAX;
-    /* the coefficients of g are O(n^(1/df)) */
-
-    /* we use the skewness minimizing the sum of lognorms */
-    skew = L2_combined_skewness2 (ff, gg, SKEWNESS_DEFAULT_PREC);
-    logmu[1] = L2_lognorm (gg, skew);
-    logmu[0] = L2_lognorm (ff, skew);
-    /* first estimate alpha with a small bound */
-    alpha_g_approx = get_alpha (gg, ALPHA_BOUND_SMALL);
-
-    score_approx = logmu[1] + alpha_g_approx + logmu[0] + alpha_f;
-
-    if (score_approx >= best_score + ALPHA_BOUND_GUARD)
-      return 0;
-
-    /* now get a more precise alpha value */
-    alpha_g = get_alpha (gg, ALPHA_BOUND);
-
-    score = logmu[1] + alpha_g + logmu[0] + alpha_f;
-    if (score_approx - score > max_guard)
-#ifdef HAVE_OPENMP
-#pragma omp critical
-#endif
-      max_guard = score_approx - score;
-
-    if (score >= best_score)
-      return 0; /* only print record scores */
-
-#ifdef HAVE_OPENMP
-#pragma omp critical
-#endif
-    {
-      best_score = score;
-
-      if (format == 1)
-	gmp_printf ("n: %Zd\n", n);
-      else
-	gmp_printf ("N %Zd\n", n);
-
-      if (format == 1) {
-        for (i = df + 1; i -- != 0; )
-	  gmp_printf ("c%u: %Zd\n", i, f[i]);
-      }
-      else {
-        for (i = df + 1; i -- != 0; )
-	  gmp_printf ("X%u %Zd\n", i, f[i]);
-      }
-      if (format == 1) {
-        for (i = dg + 1; i -- != 0; )
-	  gmp_printf ("Y%u: %Zd\n", i, g[i]);
-      }
-      else {
-        for (i = dg + 1; i -- != 0; )
-	  gmp_printf ("Y%u %Zd\n", i, g[i]);
-      }
-      printf ("skew: %1.2f\n", skew);
-      printf ("# f lognorm %1.2f, alpha %1.2f, score %1.2f\n",
-	      logmu[0], alpha_f, logmu[0] + alpha_f);
-      printf ("# g lognorm %1.2f, alpha %1.2f, score %1.2f\n",
-	      logmu[1], alpha_g, logmu[1] + alpha_g);
-      printf ("# f+g score %1.2f\n", score);
-      printf ("\n");
-      fflush (stdout);
-    }
-    return 1;
-}
-
 /* Check that f is irreducible.
    Let p be a prime such that f has a root r modulo p.
    Search by LLL a small linear combination between 1, r, ..., r^(d-1).
@@ -292,6 +212,8 @@ is_irreducible (mpz_poly f)
   mpz_init (p);
   mpz_poly_infinity_norm (p, f);
   normf = mpz_sizeinbase (p, 2);
+  /* for d = 4 and bound = 4, MARGIN=5 is enough to select all 5451 irreducible
+     polynomials */
 #define MARGIN 16
   /* add some margin bits */
   mpz_mul_2exp (p, p, MARGIN);
@@ -380,6 +302,89 @@ is_irreducible (mpz_poly f)
 }
 
 /*
+  Print two nonlinear poly info. Return non-zero for record polynomials.
+*/
+static int
+print_nonlinear_poly_info (mpz_poly ff, double alpha_f, mpz_poly gg,
+                           int format,  mpz_t n)
+{
+    unsigned int i;
+    double skew, logmu[2], alpha_g_approx, alpha_g, score, score_approx;
+    int df = ff->deg;
+    mpz_t *f = ff->coeff;
+    int dg = gg->deg;
+    mpz_t *g = gg->coeff;
+    static double best_score = DBL_MAX;
+    /* the coefficients of g are O(n^(1/df)) */
+
+    /* we use the skewness minimizing the sum of lognorms */
+    skew = L2_combined_skewness2 (ff, gg, SKEWNESS_DEFAULT_PREC);
+    logmu[1] = L2_lognorm (gg, skew);
+    logmu[0] = L2_lognorm (ff, skew);
+    /* first estimate alpha with a small bound */
+    alpha_g_approx = get_alpha (gg, ALPHA_BOUND_SMALL);
+
+    score_approx = logmu[1] + alpha_g_approx + logmu[0] + alpha_f;
+
+    if (score_approx >= best_score + ALPHA_BOUND_GUARD)
+      return 0;
+
+    /* now get a more precise alpha value */
+    alpha_g = get_alpha (gg, ALPHA_BOUND);
+
+    score = logmu[1] + alpha_g + logmu[0] + alpha_f;
+    if (score_approx - score > max_guard)
+#ifdef HAVE_OPENMP
+#pragma omp critical
+#endif
+      max_guard = score_approx - score;
+
+    if (score >= best_score)
+      return 0; /* only print record scores */
+
+    if (is_irreducible (gg) == 0)
+      return 0;
+
+#ifdef HAVE_OPENMP
+#pragma omp critical
+#endif
+    {
+      best_score = score;
+
+      if (format == 1)
+	gmp_printf ("n: %Zd\n", n);
+      else
+	gmp_printf ("N %Zd\n", n);
+
+      if (format == 1) {
+        for (i = df + 1; i -- != 0; )
+	  gmp_printf ("c%u: %Zd\n", i, f[i]);
+      }
+      else {
+        for (i = df + 1; i -- != 0; )
+	  gmp_printf ("X%u %Zd\n", i, f[i]);
+      }
+      if (format == 1) {
+        for (i = dg + 1; i -- != 0; )
+	  gmp_printf ("Y%u: %Zd\n", i, g[i]);
+      }
+      else {
+        for (i = dg + 1; i -- != 0; )
+	  gmp_printf ("Y%u %Zd\n", i, g[i]);
+      }
+      printf ("skew: %1.2f\n", skew);
+      printf ("# f lognorm %1.2f, alpha %1.2f, score %1.2f\n",
+	      logmu[0], alpha_f, logmu[0] + alpha_f);
+      printf ("# g lognorm %1.2f, alpha %1.2f, score %1.2f\n",
+	      logmu[1], alpha_g, logmu[1] + alpha_g);
+      printf ("# f+g score %1.2f\n", score);
+      printf ("\n");
+      fflush (stdout);
+    }
+    return 1;
+}
+
+/*
   Generate polynomial f(x) of degree d with rank 'idx',
   with coefficients in [-bound, bound].
   The coefficient of degree d can be taken in [1, bound],
@@ -407,7 +412,7 @@ polygen_JL_f ( mpz_t n,
     fint = (int *) malloc ((d + 1)*sizeof(int));
     rq = (unsigned long *) malloc ((d + 1)*sizeof(unsigned long));
 
-    /* find irreducible polynomial f */
+    /* compute polynomial of index idx and check it is irreducible */
     {
         /* we take 1 <= f[d] <= bound */
         fint[d] = 1 + (idx % bound);
@@ -431,7 +436,7 @@ polygen_JL_f ( mpz_t n,
 	/* since f and the reversed polynomial are equivalent, we can assume
 	   |f[d]| < |f[0]| or (|f[d]| = |f[0]| and |f[d-1]| < |f[1]|) or ... */
 
-	int ok = 1;
+        int ok = 1;
 	for (int i = 0; 2 * i < d && ok; i++)
 	  {
 	    if (abs(fint[d-i]) > abs(fint[i]))
@@ -447,15 +452,18 @@ polygen_JL_f ( mpz_t n,
         ff->deg = d;
         ff->coeff = f;
         mpz_poly_content (t, ff);
-        if (mpz_cmp_ui (t, 1) != 0 )
+        ok = mpz_cmp_ui (t, 1) == 0;
+        if (ok == 0)
 	  goto end; /* duplicate with f/t */
 
         /* irreducibility test */
 
-        if (mpz_poly_squarefree_p (ff) == 0)
+        ok = mpz_poly_squarefree_p (ff);
+        if (ok == 0)
 	  goto end;
 
-        if (is_irreducible (ff) == 0)
+        ok = is_irreducible (ff);
+        if (ok == 0)
           goto end;
 
 #ifdef HAVE_OPENMP
@@ -582,7 +590,7 @@ polygen_JL2 (mpz_t n, unsigned int df, unsigned int dg, long bound,
     u->deg = dg;
     a = malloc ((dg + 1) * sizeof (long));
 
-    /* compute number of roots of the c-th best polynomial f */
+    /* compute roots of the c-th best polynomial f */
     nr = mpz_poly_roots_mpz (rf, best_f[c], n);
     ASSERT(0 < nr && nr <= df);
 
