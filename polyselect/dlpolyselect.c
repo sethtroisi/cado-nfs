@@ -435,7 +435,7 @@ polygen_JL_f ( mpz_t n,
 	for (int i = 0; 2 * i < d && ok; i++)
 	  {
 	    if (abs(fint[d-i]) > abs(fint[i]))
-	      ok = 0;
+              ok = 0;
 	    else if (abs(fint[d-i]) < abs(fint[i]))
 	      break;
 	  }
@@ -610,6 +610,11 @@ polygen_JL2 (mpz_t n, unsigned int df, unsigned int dg, long bound,
             mpz_poly_mul_si (u, v[0], a[0]);
 	    for (j = 1; j <= dg; j++)
 	      mpz_poly_addmul_si (u, v[j], a[j]);
+
+            /* adjust degree of u */
+            for (u->deg = dg; u->deg >= 0 && mpz_cmp_ui (u->coeff[u->deg], 0)
+                   == 0; u->deg--);
+
             if (print_nonlinear_poly_info (best_f[c], alpha_f, u, format, n))
               {
 #if 0 /* print coefficients of record combination */
