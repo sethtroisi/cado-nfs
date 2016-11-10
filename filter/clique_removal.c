@@ -478,7 +478,7 @@ clique_removal_core_mt_thread (void *pt)
         clique.i = i;
         unsigned int nb_rows = compute_one_connected_component (&(clique),
                                               data->mat, buf);
-        if (UNLIKELY (!nb_rows))
+        if (nb_rows == 0) /* this component was already found earlier */
           continue;
         comp_sorted_bin_tree_insert (data->comp_tree, clique);
       }
@@ -612,7 +612,7 @@ clique_removal_core_mono (purge_matrix_ptr mat, int64_t target_excess,
     {
       unsigned int nb_rows = compute_one_connected_component (&(clique),
                                             mat, buf);
-      if (UNLIKELY (!nb_rows))
+      if (nb_rows == 0) /* this component was already found earlier */
         continue;
       comp_sorted_bin_tree_insert (comp_tree, clique);
     }
