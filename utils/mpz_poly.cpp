@@ -1859,11 +1859,11 @@ void barrett_mod (mpz_ptr a, mpz_srcptr b, mpz_srcptr m, mpz_srcptr invm)
  */
 void
 mpz_poly_pow_mod_f_mod_mpz_barrett (mpz_poly_ptr Q, mpz_poly_srcptr P,
-                                      mpz_poly_srcptr f, mpz_srcptr a,
-                                      mpz_srcptr p, mpz_srcptr invp)
+				    mpz_poly_srcptr f, mpz_srcptr a,
+				    mpz_srcptr p, mpz_srcptr invp)
 {
-  int k = mpz_sizeinbase(a, 2);
-  mpz_poly R;
+  int k = mpz_sizeinbase(a, 2), l, L = 0, j;
+  mpz_poly R, *T = NULL;
 
   if (mpz_cmp_ui(a, 0) == 0) {
     mpz_poly_set_xi (Q, 0);
@@ -1875,18 +1875,58 @@ mpz_poly_pow_mod_f_mod_mpz_barrett (mpz_poly_ptr Q, mpz_poly_srcptr P,
   // Initialize R to P
   mpz_poly_set(R, P);
 
+  /* We use base-2^l exponentiation with sliding window,
+     thus we need to precompute P^2, P^3, ..., P^(2^l-1).
+     The expected average cost k squarings plus k/(l+1) + 2^(l-1) multiplies.
+  */
+
+  for (l = 1; k / (l + 1) + (1 << (l - 1)) > k / (l + 2) + (1 << l); l++);
+  /* this gives (roughly) l=1 for k < 8, l=2 for k < 27, l=3 for k < 84,
+     l=4 for k < 245 */
+  if (l > 1)
+    {
+      L = 1 << (l - 1);
+      T = (mpz_poly*) malloc (L * sizeof (mpz_poly));
+      /* we store P^2 in T[0], P^3 in T[1], ..., P^(2^l-1) in T[L-1] */
+      for (j = 0; j < L; j++)
+	mpz_poly_init (T[j], f ? 2*f->deg : -1);
+      mpz_poly_sqr_mod_f_mod_mpz (T[0], R, f, p, invp);       /* P^2 */
+      mpz_poly_mul_mod_f_mod_mpz (T[1], T[0], R, f, p, invp); /* P^3 */
+      for (j = 2; j < L; j++)
+	mpz_poly_mul_mod_f_mod_mpz (T[j], T[j-1], T[0], f, p, invp);
+    }
+
   // Horner
-  for (k -= 2; k >= 0; k--)
+  for (k -= 2; k >= 0;)
   {
-    mpz_poly_sqr_mod_f_mod_mpz(R, R, f, p, invp);  // R <- R^2
-    if (mpz_tstbit(a, k))
-      mpz_poly_mul_mod_f_mod_mpz(R, R, P, f, p, invp);  // R <- R*P
+    while (k >= 0 && mpz_tstbit (a, k) == 0)
+      {
+	mpz_poly_sqr_mod_f_mod_mpz (R, R, f, p, invp);
+	k --;
+      }
+    if (k < 0)
+      break;
+    j = mpz_scan1 (a, (k >= l) ? k - (l - 1) : 0);
+    /* new window starts at bit k, and ends at bit j <= k */
+    int e = 0;
+    while (k >= j)
+      {
+	mpz_poly_sqr_mod_f_mod_mpz (R, R, f, p, invp);
+	e = 2 * e + mpz_tstbit (a, k);
+	k --;
+      }
+    mpz_poly_mul_mod_f_mod_mpz (R, R, (e == 1) ? P : T[e/2], f, p, invp);
   }
 
   mpz_poly_swap(Q, R);
   mpz_poly_clear(R);
+  if (l > 1)
+    {
+      for (k = 0; k < L; k++)
+	mpz_poly_clear (T[k]);
+      free (T);
+    }
 }
-
 
 /* Return a list of polynomials P[0], P[1], ..., P[l] such that
    P0 = Q[l-1] + p^K[1]*P[l]
