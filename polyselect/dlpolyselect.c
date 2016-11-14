@@ -378,8 +378,8 @@ polygen_JL_f (int d, unsigned int bound, mpz_t *f, unsigned long idx)
 
 #ifdef HAVE_OPENMP
 #pragma omp critical
-    f_irreducible ++;
 #endif
+    f_irreducible ++;
 
  end:
     mpz_clear (t);
@@ -493,14 +493,14 @@ polygen_JL2 (mpz_t n, unsigned int df, unsigned int dg,
         if (score_f < best_score_f)
 #ifdef HAVE_OPENMP
 #pragma omp critical
-          best_score_f = score_f;
 #endif
+          best_score_f = score_f;
 
         if (score_f > worst_score_f)
 #ifdef HAVE_OPENMP
 #pragma omp critical
-          worst_score_f = score_f;
 #endif
+          worst_score_f = score_f;
       }
 
     for (i = 0; i < nr; i ++) {
