@@ -243,16 +243,6 @@ print_nonlinear_poly_info (mpz_poly ff, double alpha_f, mpz_poly gg,
     if (score >= best_score)
       return 0; /* only print record scores */
 
-#ifdef TIMINGS
-    t_irred -= seconds_thread ();
-#endif
-    int ok = is_irreducible (gg);
-#ifdef TIMINGS
-    t_irred += seconds_thread ();
-#endif
-    if (ok == 0)
-      return 0;
-
 #ifdef HAVE_OPENMP
 #pragma omp critical
 #endif
