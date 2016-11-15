@@ -22,7 +22,7 @@
 #define max(a,b) ((a)<(b) ? (b) : (a))
 #endif
 
-MAYBE_UNUSED static inline mpz_ptr mpz_poly_lc(mpz_poly_ptr f)
+static inline mpz_ptr mpz_poly_lc(mpz_poly_ptr f)
 {
     assert(f->deg >= 0);
     return f->coeff[f->deg];
@@ -65,74 +65,95 @@ mpz_poly_sqr_basecase (mpz_t *f, mpz_t *g, int r) {
   return 2 * r;
 }
 
+/* To interpolate a polynomial of degree <= MAX_TC_DEGREE, we use the following
+   MAX_TC_DEGREE evaluation points, plus the point at infinity.
+   The first point should always be 0. */
+static const long tc_points[MAX_TC_DEGREE] = {0, 1, -1, 2, -2, 3, -3, 4, -4,
+					    5, -5, 6, -6, 7, -7, 8, -8, 9, -9};
+
 /* Given f[0]...f[t] that contain respectively f(0), ..., f(t),
-   put in f[0]...f[t] the coefficients of f. Assumes t <= MAX_T.
+   put in f[0]...f[t] the coefficients of f. Assumes t <= MAX_TC_DEGREE.
 
    In the square root, with an algebraic polynomial of degree d,
    we have to multiply polynomials of degree d-1, thus we have t=2(d-1).
 */
 static void
 mpz_poly_mul_tc_interpolate (mpz_t *f, int t) {
-#define MAX_T 15
-  uint64_t M[MAX_T+1][MAX_T+1], g, h;
+  int64_t M[MAX_TC_DEGREE+1][MAX_TC_DEGREE+1], g, h;
   int i, j, k, l;
-  /* this is the list of gcd's that appear in the forward Gauss loop, in the
+  /* G[] is the list of gcd's that appear in the forward Gauss loop, in the
      order they appear (they don't depend on t, since we start with the low
      triangular submatrix for t-1) */
-  static const uint64_t G[] = {1,1,1,1,1,2,1,1,2,6,1,1,2,6,24,1,1,2,6,24,120,1,1,2,6,24,120,720,1,1,2,6,24,120,720,5040,1,1,2,6,24,120,720,5040,40320,1,1,2,6,24,120,720,5040,40320,362880,1,1,2,6,24,120,720,5040,40320,362880,3628800,1,1,2,6,24,120,720,5040,40320,362880,3628800,39916800,1,1,2,6,24,120,720,5040,40320,362880,3628800,39916800,479001600,1,1,2,6,24,120,720,5040,40320,362880,3628800,39916800,479001600,6227020800,1,1,2,6,24,120,720,5040,40320,362880,3628800,39916800,479001600,6227020800,87178291200};
+  static const int64_t G[] = {1,1,2,6,24,120,720,5040,40320,362880,3628800,39916800,479001600,6227020800,87178291200,1307674368000,20922789888000,355687428096000};
 
-  ASSERT_ALWAYS (t <= MAX_T); /* Ensures that all M[i][j] fit in uint64_t,
-                                 and similarly for all intermediate
-                                 computations on M[i][j]. This avoids the
-                                 use of mpz_t to store the M[i][j]. */
+  ASSERT (t <= MAX_TC_DEGREE); /* Ensures that all M[i][j] fit in uint64_t,
+				  and similarly for all intermediate
+				  computations on M[i][j]. This avoids the
+				  use of mpz_t to store the M[i][j]. */
 
-  /* initialize M[i][j] = i^j */
+  /* initialize M[i][j] = tc_points[i]^j */
   for (i = 0; i <= t; i++)
     for (j = 0; j <= t; j++)
-      M[i][j] = (j == 0) ? 1 : i * M[i][j-1];
+      {
+	if (i < t)
+	  M[i][j] = (j == 0) ? 1 : tc_points[i] * M[i][j-1];
+	else /* evaluation point is infinity */
+	  M[i][j] = (j == t);
+      }
 
-  /* forward Gauss: zero the under-diagonal coefficients while going down */
-  for (i = 1, l = 0; i <= t; i++)
+  /* Forward Gauss: zero the under-diagonal coefficients while going down.
+     Since the last point of evaluation is infinity, the last row is already
+     reduced, thus we go up to i=t-1. */
+  for (i = 1; i < t; i++)
     {
-      for (j = 0; j < i; j++)
-	if (M[i][j] != 0)
-	  {
-	    g = G[l++]; /* same as gcd_uint64 (M[i][j], M[j][j]) */
-	    h = M[i][j] / g;
-	    g = M[j][j] / g;
-	    /* f[i] <- g*f[i] - h*f[j] */
+      for (j = 0, l = 0; j < i; j++)
+	{
+	  g = G[l++]; /* same as gcd_int64 (M[i][j], M[j][j]) */
+	  h = M[i][j] / g;
+	  g = M[j][j] / g;
+	  /* f[i] <- g*f[i] - h*f[j] */
+	  ASSERT(g > 0);
+	  if (g != 1)
 	    mpz_mul_uint64 (f[i], f[i], g);
-	    mpz_submul_uint64 (f[i], f[j], h);
-	    for (k = j; k <= t; k++)
-	      M[i][k] = g * M[i][k] - h * M[j][k];
-	  }
+	  mpz_submul_int64 (f[i], f[j], h);
+	  for (k = j; k <= t; k++)
+	    M[i][k] = g * M[i][k] - h * M[j][k];
+	}
     }
 
   /* now zero upper-diagonal coefficients while going up */
-  for (i = t; i >= 0; i--)
+  for (i = t - 1; i >= 0; i--)
   {
     for (j = i + 1; j <= t; j++)
       /* f[i] = f[i] - M[i][j] * f[j] */
-      mpz_submul_uint64 (f[i], f[j], M[i][j]);
+      mpz_submul_int64 (f[i], f[j], M[i][j]);
     ASSERT (mpz_divisible_uint64_p (f[i], M[i][i]));
     mpz_divexact_uint64 (f[i], f[i], M[i][i]);
   }
+}
+
+/* v <- g(i) */
+static void
+mpz_poly_mul_eval_si (mpz_t v, mpz_t *g, int r, long i)
+{
+  mpz_set (v, g[r]);
+  for (int j = r - 1; j >= 0; j--)
+    {
+      mpz_mul_si (v, v, i);
+      mpz_add (v, v, g[j]);
+    }
 }
 
 /* Generic Toom-Cook implementation: stores in f[0..r+s] the coefficients
    of g*h, where g has degree r and h has degree s, and their coefficients
    are in g[0..r] and h[0..s].
    Assumes f differs from g and h, and f[0..r+s] are already allocated.
-   Assumes r + s <= MAX_T (MAX_T = 13 ensures all the matrix coefficients
-   in the inversion fit into uint64_t, and those used in mpz_mul_ui calls
-   fit into uint32_t).
    Returns the degree of f.
 */
 static int
 mpz_poly_mul_tc (mpz_t *f, mpz_t *g, int r, mpz_t *h, int s)
 {
-  int t, i, j;
-  mpz_t tmp;
+  int t, i;
 
   if ((r == -1) || (s == -1)) /* g or h is 0 */
     return -1;
@@ -151,7 +172,8 @@ mpz_poly_mul_tc (mpz_t *f, mpz_t *g, int r, mpz_t *h, int s)
 
   t = r + s; /* degree of f, which has t+1 coefficients */
 
-  if (t == 2) /* necessary r = s = 1, use vanilla Karatsuba */
+  if (t == 2) /* necessary r = s = 1, use vanilla Karatsuba with 3 MUL,
+		 this is always optimal */
     {
       mpz_add (f[0], g[0], g[1]);
       mpz_add (f[2], h[0], h[1]);
@@ -163,7 +185,65 @@ mpz_poly_mul_tc (mpz_t *f, mpz_t *g, int r, mpz_t *h, int s)
       return 2;
     }
 
-  if (t > MAX_T) {
+  if (t == 3) /* r = 2, s = 1, the following code in 4 MUL is optimal */
+    {
+      mpz_add (f[1], g[2], g[0]);
+      mpz_add (f[2], f[1], g[1]); /* g(1) */
+      mpz_sub (f[1], f[1], g[1]); /* g(-1) */
+      mpz_add (f[0], h[0], h[1]); /* h(1) */
+      mpz_mul (f[2], f[2], f[0]); /* f(1) = g(1)*h(1) */
+      mpz_sub (f[0], h[0], h[1]); /* h(-1) */
+      mpz_mul (f[0], f[1], f[0]); /* f(-1) = g(-1)*h(-1) */
+      mpz_sub (f[1], f[2], f[0]); /* f(1) - f(-1) = 2*g2*h1+2*g1*h0+2*g0*h1 */
+      mpz_add (f[2], f[2], f[0]); /* f(1) + f(-1) = 2*g2*h0+2*g1*h1+2*g0*h0 */
+      mpz_div_2exp (f[1], f[1], 1); /* g2*h1 + g1*h0 + g0*h1 */
+      mpz_div_2exp (f[2], f[2], 1); /* g2*h0 + g1*h1 + g0*h0 */
+      mpz_mul (f[0], g[0], h[0]);
+      mpz_sub (f[2], f[2], f[0]); /* g2*h0 + g1*h1 */
+      mpz_mul (f[3], g[2], h[1]);
+      mpz_sub (f[1], f[1], f[3]); /* g1*h0 + g0*h1 */
+      return 3;
+    }
+
+  if (r == 2) /* Necessarily s = 2 since r >= s and the cases s = 0 and
+		 (r,s) = (2,1) have already been treated. */
+    {
+      /* we use here the code from Appendix Z from "Towards Optimal Toom-Cook
+	 Multiplication for Univariate and Multivariate Polynomials in
+	 Characteristic 2 and 0" from Marco Bodrato, WAIFI 2007, LNCS 4547,
+	 with the change: W3 -> f[1], W2 -> f[3], W1 -> f[2]. */
+      mpz_add (f[0], g[2], g[0]); mpz_add (f[4], h[2], h[0]);
+      mpz_sub (f[3], f[0], g[1]); mpz_sub (f[2], f[4], h[1]);
+      mpz_add (f[0], f[0], g[1]); mpz_add (f[4], f[4], h[1]);
+      mpz_mul (f[1], f[3], f[2]); mpz_mul (f[2], f[0], f[4]);
+      mpz_add (f[0], f[0], g[2]);
+      mpz_mul_2exp (f[0], f[0], 1);
+      mpz_sub (f[0], f[0], g[0]);
+      mpz_add (f[4], f[4], h[2]);
+      mpz_mul_2exp (f[4], f[4], 1);
+      mpz_sub (f[4], f[4], h[0]);
+      mpz_mul (f[3], f[0], f[4]);
+      mpz_mul (f[0], g[0], h[0]);
+      mpz_mul (f[4], g[2], h[2]);
+      /* interpolation */
+      mpz_sub (f[3], f[3], f[1]);
+      ASSERT (mpz_divisible_ui_p (f[3], 3));
+      mpz_divexact_ui (f[3], f[3], 3);
+      mpz_sub (f[1], f[2], f[1]);
+      ASSERT (mpz_divisible_ui_p (f[1], 2));
+      mpz_div_2exp (f[1], f[1], 1); /* exact */
+      mpz_sub (f[2], f[2], f[0]);
+      mpz_sub (f[3], f[3], f[2]);
+      ASSERT (mpz_divisible_ui_p (f[3], 2));
+      mpz_div_2exp (f[3], f[3], 1); /* exact */
+      mpz_submul_ui (f[3], f[4], 2);
+      mpz_sub (f[2], f[2], f[1]);
+      mpz_sub (f[2], f[2], f[4]);
+      mpz_sub (f[1], f[1], f[3]);
+      return 4;
+    }
+
+  if (t > MAX_TC_DEGREE) {
     /* naive product */
     /* currently we have to resort to this for larger degree, because
      * the generic Toom implementation is bounded in degree.
@@ -171,48 +251,42 @@ mpz_poly_mul_tc (mpz_t *f, mpz_t *g, int r, mpz_t *h, int s)
     return mpz_poly_mul_basecase (f, g, r, h, s);
   }
 
-  ASSERT_ALWAYS (t <= MAX_T);
+  /* now t <= MAX_TC_DEGREE */
 
-  mpz_init (tmp);
+  /* store g(tc_points[i])*h(tc_points[i]) in f[i] for 0 <= i <= t */
 
-  /* first store g(i)*h(i) in f[i] for 0 <= i <= t */
-  for (i = 0; i <= t; i++)
+  /* the first evaluation point is 0 */
+  ASSERT(tc_points[0] == 0);
+  mpz_mul (f[0], g[0], h[0]);
+
+  for (i = 1; i < t; i++)
     {
       /* f[i] <- g(i) */
-      mpz_set (f[i], g[r]);
-      for (j = r - 1; j >= 0; j--)
-        {
-          mpz_mul_ui (f[i], f[i], i);
-          mpz_add (f[i], f[i], g[j]);
-        }
-      /* tmp <- h(i) */
-      mpz_set (tmp, h[s]);
-      for (j = s - 1; j >= 0; j--)
-        {
-          mpz_mul_ui (tmp, tmp, i);
-          mpz_add (tmp, tmp, h[j]);
-        }
+      mpz_poly_mul_eval_si (f[i], g, r, tc_points[i]);
+      /* f[t] <- h(i) */
+      mpz_poly_mul_eval_si (f[t], h, s, tc_points[i]);
       /* f[i] <- g(i)*h(i) */
-      mpz_mul (f[i], f[i], tmp);
+      mpz_mul (f[i], f[i], f[t]);
     }
+
+  /* last evaluation point is infinity */
+  mpz_mul (f[t], g[r], h[s]);
 
   mpz_poly_mul_tc_interpolate (f, t);
 
-  mpz_clear (tmp);
   return t;
 }
 
 /* Same as mpz_poly_mul_tc for the squaring: store in f[0..2r] the coefficients
-   of g^2, where g has degree r, and their coefficients are in g[0..r].
+   of g^2, where g has degree r, and its coefficients are in g[0..r].
    Assumes f differs from g, and f[0..2r] are already allocated.
-   Assumes 2r <= MAX_T (MAX_T = 17 ensures all the matrix coefficients
-   in the inversion fit into uint64_t).
    Returns the degree of f.
 */
 static int
 mpz_poly_sqr_tc (mpz_t *f, mpz_t *g, int r)
 {
-  int t, i, j;
+  int t, i;
+  size_t nbits;
 
   if (r == -1) /* g is 0 */
     return -1;
@@ -223,7 +297,7 @@ mpz_poly_sqr_tc (mpz_t *f, mpz_t *g, int r)
       return 0;
     }
 
-  if (r == 1) /* 3 SQR */
+  if (r == 1) /* 3 SQR: always optimal */
     {
       mpz_mul (f[0], g[0], g[0]);
       mpz_mul (f[2], g[1], g[1]);
@@ -234,9 +308,15 @@ mpz_poly_sqr_tc (mpz_t *f, mpz_t *g, int r)
       return 2;
     }
 
-  if (r == 2) /* (g2*x^2+g1*x+g0)^2 = g2^2*x^4 + (2*g2*g1)*x^3 +
-		 (g1^2+2*g2*g0)*x^2 + (2*g1*g0)*x + g0^2 in
-		 3 SQR + 2 MUL */
+  /* we assume the number of bits of f[0] is representative of the size of
+     the coefficients of f */
+  nbits = mpz_sizeinbase (f[0], 2);
+
+  if (r == 2 && nbits < 4096)
+    /* (g2*x^2+g1*x+g0)^2 = g2^2*x^4 + (2*g2*g1)*x^3 +
+       (g1^2+2*g2*g0)*x^2 + (2*g1*g0)*x + g0^2 in 3 SQR + 2 MUL.
+       Experimentally this is faster for less than 4096 bits than the
+       algorithm in 5 SQR from mpz_poly_mul_tc_interpolate. */
     {
       mpz_mul (f[4], g[2], g[2]); /* g2^2 */
       mpz_mul (f[3], g[2], g[1]);
@@ -254,11 +334,13 @@ mpz_poly_sqr_tc (mpz_t *f, mpz_t *g, int r)
       return 4;
     }
 
-  if (r == 3) /* (g3*x^3+g2*x^2+g1*x+g0)^2 = g3^2*x^6 + (2*g3*g2)*x^5
-		 + (g2^2+2*g3*g1)*x^4 + (2*g3*g0+2*g2*g1)*x^3
-		 + (g1^2+2*g2*g0)*x^2 + (2*g1*g0)*x + g0^2 */
+  if (r == 3 && nbits < 4096)
+    /* (g3*x^3+g2*x^2+g1*x+g0)^2 = g3^2*x^6 + (2*g3*g2)*x^5
+       + (g2^2+2*g3*g1)*x^4 + (2*g3*g0+2*g2*g1)*x^3
+       + (g1^2+2*g2*g0)*x^2 + (2*g1*g0)*x + g0^2 in 4 SQR + 6 MUL.
+       Experimentally this is faster for less than 4096 bits than the
+       algorithm in 7 SQR from mpz_poly_mul_tc_interpolate. */
     {
-      /* 4 SQR + 6 MUL */
       mpz_mul (f[6], g[3], g[3]); /* g3^2 */
       mpz_mul (f[5], g[3], g[2]);
       mpz_mul_2exp (f[5], f[5], 1); /* 2*g3*g2 */
@@ -279,7 +361,7 @@ mpz_poly_sqr_tc (mpz_t *f, mpz_t *g, int r)
     }
 
   t = 2 * r; /* product has degree t thus t+1 coefficients */
-  if (t > MAX_T) {
+  if (t > MAX_TC_DEGREE) {
     /* naive product */
     /* currently we have to resort to this for larger degree, because
      * the generic toom implementation is bounded in degree.
@@ -287,20 +369,23 @@ mpz_poly_sqr_tc (mpz_t *f, mpz_t *g, int r)
     return mpz_poly_sqr_basecase (f, g, r);
   }
 
-  ASSERT_ALWAYS (t <= MAX_T);
+  ASSERT (t <= MAX_TC_DEGREE);
 
-  /* first store g(i)^2 in f[i] for 0 <= i <= t */
-  for (i = 0; i <= t; i++)
-  {
-    /* f[i] <- g(i) */
-    mpz_set (f[i], g[r]);
-    for (j = r - 1; j >= 0; j--)
+  /* store g(tc_points[i])^2 in f[i] for 0 <= i <= t */
+
+  /* first evaluation point is 0 */
+  ASSERT(tc_points[0] == 0);
+  mpz_mul (f[0], g[0], g[0]);
+
+  for (i = 1; i < t; i++)
     {
-      mpz_mul_ui (f[i], f[i], i);
-      mpz_add (f[i], f[i], g[j]);
+      /* f[i] <- g(i) */
+      mpz_poly_mul_eval_si (f[i], g, r, tc_points[i]);
+      mpz_mul (f[i], f[i], f[i]);
     }
-    mpz_mul (f[i], f[i], f[i]);
-  }
+
+  /* last evaluation point is infinity */
+  mpz_mul (f[t], g[r], g[r]);
 
   mpz_poly_mul_tc_interpolate (f, t);
 
@@ -929,12 +1014,10 @@ mpz_poly_sub_mod_mpz (mpz_poly_ptr f, mpz_poly_srcptr g, mpz_poly_srcptr h, mpz_
     mpz_poly_mod_mpz(f, f, m, NULL);
 }
 
-/* Set f=g*h. Note: f might equal g or h. */
+/* Set f=g*h. Note: f might equal g or h.
+   Assumes the g[g->deg] and h[h->deg[] are not zero. */
 void
 mpz_poly_mul (mpz_poly_ptr f, mpz_poly_srcptr g, mpz_poly_srcptr h) {
-  int i, maxdeg;
-  mpz_poly prd;
-
   if (f == h || f == g)
     {
       mpz_poly aux;
@@ -945,10 +1028,20 @@ mpz_poly_mul (mpz_poly_ptr f, mpz_poly_srcptr g, mpz_poly_srcptr h) {
       return;
     }
 
+  /* now f differs from g and h */
+
   if ((g->deg == -1) || (h->deg == -1)) {
     f->deg = -1;
     return;
   }
+
+  mpz_poly_realloc (f, g->deg + h->deg + 1);
+
+  if (g == h) /* this is a square */
+    {
+      f->deg = mpz_poly_sqr_tc (f->coeff, g->coeff, g->deg);
+      return;
+    }
 
   if (g->deg == 0) {
     mpz_poly_mul_mpz (f, h, g->coeff[0]);
@@ -960,27 +1053,27 @@ mpz_poly_mul (mpz_poly_ptr f, mpz_poly_srcptr g, mpz_poly_srcptr h) {
     return;
   }
 
-  ASSERT_ALWAYS(mpz_cmp_ui (g->coeff[g->deg], 0) != 0);
-  ASSERT_ALWAYS(mpz_cmp_ui (h->coeff[h->deg], 0) != 0);
-  ASSERT_ALWAYS(f != g);
-  ASSERT_ALWAYS(f != h);
-
-  maxdeg = g->deg + h->deg;
-  mpz_poly_init(prd, maxdeg);
+  ASSERT(mpz_cmp_ui (g->coeff[g->deg], 0) != 0);
+  ASSERT(mpz_cmp_ui (h->coeff[h->deg], 0) != 0);
+  ASSERT(f != g);
+  ASSERT(f != h);
 
 #if 1
-  prd->deg = mpz_poly_mul_tc (prd->coeff, g->coeff, g->deg, h->coeff, h->deg);
+  f->deg = mpz_poly_mul_tc (f->coeff, g->coeff, g->deg, h->coeff, h->deg);
 #else /* segmentation, this code has problem with huge runs, for example
          degree 5 with lifting to 631516975 bits */
   {
     mpz_t G, H;
     size_t sg, sh, s;
+    int i;
+
     mpz_init (G);
     mpz_init (H);
     sg = mpz_poly_sizeinbase (g, 2);
     sh = mpz_poly_sizeinbase (h, 2);
     /* the +1 accounts for a possible sign */
-    for (s = sg + sh + 1, i = h->deg; i > 1; i = (i + 1) / 2, s++);
+    for (s = sg + sh + 1, i = (g->deg >= h->deg) ? h->deg + 1 : g->deg + 1;
+	 i > 1; i = (i + 1) / 2, s++);
     mpz_set (G, g->coeff[g->deg]);
     for (i = g->deg - 1; i >= 0; i--)
     {
@@ -989,8 +1082,8 @@ mpz_poly_mul (mpz_poly_ptr f, mpz_poly_srcptr g, mpz_poly_srcptr h) {
     }
     /* sanity check: G should have sizeinbase(lc(g))+d*s bits (or -1) */
     size_t size_g = mpz_sizeinbase (g->coeff[g->deg], 2) + g->deg * s;
-    ASSERT_ALWAYS(mpz_sizeinbase (G, 2) == size_g ||
-                  mpz_sizeinbase (G, 2) == size_g - 1);
+    ASSERT(mpz_sizeinbase (G, 2) == size_g ||
+	   mpz_sizeinbase (G, 2) == size_g - 1);
     mpz_set (H, h->coeff[h->deg]);
     for (i = h->deg - 1; i >= 0; i--)
     {
@@ -999,44 +1092,37 @@ mpz_poly_mul (mpz_poly_ptr f, mpz_poly_srcptr g, mpz_poly_srcptr h) {
     }
     /* sanity check: H should have sizeinbase(lc(h))+d*s bits (or -1) */
     size_t size_h = mpz_sizeinbase (h->coeff[h->deg], 2) + h->deg * s;
-    ASSERT_ALWAYS(mpz_sizeinbase (H, 2) == size_h ||
-                  mpz_sizeinbase (H, 2) == size_h - 1);
+    ASSERT(mpz_sizeinbase (H, 2) == size_h ||
+	   mpz_sizeinbase (H, 2) == size_h - 1);
     size_g = mpz_sizeinbase (G, 2);
     size_h = mpz_sizeinbase (H, 2);
     /* sanity check: we verify that the product agrees both mod B and B-1 */
-    mp_limb_t g0 = mpz_getlimbn (G, 0), h0 = mpz_getlimbn (H, 0);
-    mp_limb_t g1 = mod_base_minus_1 (G), h1 = mod_base_minus_1 (H);
+    mp_limb_t g0 = mpz_getlimbn (G, 0);
     mpz_mul (G, G, H);
-    ASSERT_ALWAYS (mpz_getlimbn (G, 0) == g0 * h0);
-    mpz_set_ui (H, g1);
-    mpz_mul_ui (H, H, h1);
-    ASSERT_ALWAYS (mod_base_minus_1 (G) == mod_base_minus_1 (H));
-    ASSERT_ALWAYS(mpz_sizeinbase (G, 2) == size_g + size_h ||
-                  mpz_sizeinbase (G, 2) == size_g + size_h - 1);
+    ASSERT(mpz_getlimbn (G, 0) == g0 * mpz_getlimbn (H, 0));
+    ASSERT(mpz_sizeinbase (G, 2) == size_g + size_h ||
+	   mpz_sizeinbase (G, 2) == size_g + size_h - 1);
     for (i = 0; i < g->deg + h->deg; i++)
     {
-      mpz_fdiv_r_2exp (prd->coeff[i], G, s);
-      if (mpz_sizeinbase (prd->coeff[i], 2) == s)
+      mpz_fdiv_r_2exp (f->coeff[i], G, s);
+      if (mpz_sizeinbase (f->coeff[i], 2) == s)
       {
-        mpz_cdiv_r_2exp (prd->coeff[i], G, s);
+        mpz_cdiv_r_2exp (f->coeff[i], G, s);
         mpz_cdiv_q_2exp (G, G, s);
       }
       else
         mpz_fdiv_q_2exp (G, G, s);
-      ASSERT_ALWAYS(mpz_sizeinbase (prd->coeff[i], 2) < s);
+      ASSERT(mpz_sizeinbase (f->coeff[i], 2) < s);
     }
-    mpz_set (prd->coeff[i], G);
+    mpz_set (f->coeff[i], G);
     mpz_clear (G);
     mpz_clear (H);
+    f->deg = g->deg + h->deg;
   }
 #endif
-
-  for (i = maxdeg; i >= 0; --i)
-    mpz_poly_setcoeff(f, i, prd->coeff[i]);
-  mpz_poly_cleandeg(f, maxdeg);
-  ASSERT_ALWAYS(mpz_cmp_ui (f->coeff[f->deg], 0) != 0);
-
-  mpz_poly_clear(prd);
+  /* there is no need to run mpz_poly_cleandeg since g[g->deg] <> 0
+     and h[h->deg] <> 0 */
+  ASSERT(mpz_cmp_ui (f->coeff[f->deg], 0) != 0);
 }
 
 /* Set Q=a*P, where a is an mpz_t */

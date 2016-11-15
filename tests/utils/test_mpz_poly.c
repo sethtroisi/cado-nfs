@@ -7,7 +7,8 @@
 #include "mpz_poly.h"
 #include "tests_common.h"
 
-/* put random coefficients of k bits in a polynomial (already initialized) */
+/* Put random coefficients of k bits in a polynomial (already initialized).
+   Ensure the coefficient of degree d is not zero. */
 static void
 mpz_poly_random (mpz_poly f, int d, int k)
 {
@@ -19,13 +20,13 @@ mpz_poly_random (mpz_poly f, int d, int k)
   mpz_init_set_ui (u, 1);
   mpz_mul_2exp (u, u, k - 1); /* u = 2^(k-1) */
   for (i = 0; i <= d; i++)
-    {
-      mpz_rrandomb (f->coeff[i], state, k); /* 0 to 2^k-1 */
-      mpz_sub (f->coeff[i], f->coeff[i], u); /* -2^(k-1) to 2^(k-1)-1 */
-    }
+    do
+      {
+        mpz_rrandomb (f->coeff[i], state, k); /* 0 to 2^k-1 */
+        mpz_sub (f->coeff[i], f->coeff[i], u); /* -2^(k-1) to 2^(k-1)-1 */
+      }
+    while (i == d && mpz_cmp_ui (f->coeff[i], 0) == 0);
   mpz_clear (u);
-  while (d >= 0 && mpz_cmp_ui (f->coeff[d], 0) == 0)
-    d--;
   f->deg = d;
 }
 
@@ -51,6 +52,96 @@ static void mpz_poly_setcoeffs_si_var(mpz_poly f, int d, ...)
     }
     mpz_poly_cleandeg(f, d);
     va_end(ap);
+}
+
+/* Return f=g*h, where g has degree r, and h has degree s. */
+static int
+mpz_poly_mul_basecase (mpz_t *f, mpz_t *g, int r, mpz_t *h, int s) {
+  int i, j;
+  assert(f != g && f != h);
+  for (i = 0; i <= r + s; i++)
+    mpz_set_ui (f[i], 0);
+  for (i = 0; i <= r; ++i)
+    for (j = 0; j <= s; ++j)
+      mpz_addmul(f[i+j], g[i], h[j]);
+  return r + s;
+}
+
+/* check mpz_poly_mul_tc against basecase code */
+static void
+test_mpz_poly_mul_tc (unsigned long iter)
+{
+  mpz_poly g, h, f0, f1;
+  int r, s;
+
+  mpz_poly_init (g, -1);
+  mpz_poly_init (h, -1);
+  mpz_poly_init (f0, -1);
+  mpz_poly_init (f1, -1);
+
+  while (iter--)
+    for (r = 0; r <= MAX_TC_DEGREE; r++)
+      for (s = 0; r + s <= MAX_TC_DEGREE; s++)
+        {
+          mpz_poly_random (g, r, 10);
+          mpz_poly_random (h, s, 10);
+          mpz_poly_mul (f0, g, h);
+          mpz_poly_realloc (f1, r + s + 1);
+          f1->deg = r + s;
+          mpz_poly_mul_basecase (f1->coeff, g->coeff, r, h->coeff, s);
+          if (mpz_poly_cmp (f0, f1) != 0)
+            {
+              printf ("Error, mpz_poly_mul and mpz_poly_mul_basecase differ\n");
+              printf ("g="); mpz_poly_fprintf (stdout, g);
+              printf ("h="); mpz_poly_fprintf (stdout, h);
+              printf ("mpz_poly_mul gives ");
+              mpz_poly_fprintf (stdout, f0);
+              printf ("mpz_poly_mul_basecase gives ");
+              mpz_poly_fprintf (stdout, f1);
+              abort ();
+            }
+        }
+
+  mpz_poly_clear (f0);
+  mpz_poly_clear (f1);
+  mpz_poly_clear (g);
+  mpz_poly_clear (h);
+}
+
+/* check mpz_poly_sqr_tc against basecase code */
+static void
+test_mpz_poly_sqr_tc (unsigned long iter)
+{
+  mpz_poly g, f0, f1;
+  int r;
+
+  mpz_poly_init (g, -1);
+  mpz_poly_init (f0, -1);
+  mpz_poly_init (f1, -1);
+
+  while (iter--)
+    for (r = 0; r <= MAX_TC_DEGREE; r++)
+      {
+        mpz_poly_random (g, r, 10);
+        mpz_poly_mul (f0, g, g);
+        mpz_poly_realloc (f1, r + r + 1);
+        f1->deg = r + r;
+        mpz_poly_mul_basecase (f1->coeff, g->coeff, r, g->coeff, r);
+        if (mpz_poly_cmp (f0, f1) != 0)
+          {
+            printf ("Error, mpz_poly_sqr and mpz_poly_sqr_basecase differ\n");
+            printf ("g="); mpz_poly_fprintf (stdout, g);
+            printf ("mpz_poly_mul gives ");
+            mpz_poly_fprintf (stdout, f0);
+            printf ("mpz_poly_mul_basecase gives ");
+            mpz_poly_fprintf (stdout, f1);
+            abort ();
+          }
+      }
+
+  mpz_poly_clear (f0);
+  mpz_poly_clear (f1);
+  mpz_poly_clear (g);
 }
 
 void
@@ -1111,6 +1202,8 @@ main (int argc, const char *argv[])
   tests_common_cmdline(&argc, &argv, PARSE_SEED | PARSE_ITER);
   tests_common_get_iter(&iter);
 
+  test_mpz_poly_mul_tc (iter / 5);
+  test_mpz_poly_sqr_tc (iter / 5);
   test_polymodF_mul ();
   /* test_mpz_poly_roots_mpz (iter); */
   test_mpz_poly_sqr_mod_f_mod_mpz (iter);
