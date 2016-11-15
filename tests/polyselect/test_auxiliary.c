@@ -146,6 +146,19 @@ test_L2_skewness (int t)
             }
         }
     }
+
+  /* non-regression test for -1+x-x^2+x^4+x^5+x^6 */
+  mpz_set_si (p->coeff[0], -1);
+  mpz_set_si (p->coeff[1], 1);
+  mpz_set_si (p->coeff[2], -1);
+  mpz_set_si (p->coeff[3], 0);
+  mpz_set_si (p->coeff[4], 1);
+  mpz_set_si (p->coeff[5], 1);
+  mpz_set_si (p->coeff[6], 1);
+  p->deg = 6;
+  s = L2_skewness (p, prec);
+  ASSERT_ALWAYS (s == 1.0);
+
   mpz_poly_clear (p);
 }
 

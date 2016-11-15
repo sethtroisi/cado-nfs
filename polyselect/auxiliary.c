@@ -407,6 +407,11 @@ L2_skewness_deg6_approx (mpz_poly_ptr f MAYBE_UNUSED, double_poly_ptr ff,
       /* invariant: q(smin) < 0 */
       oldv = v;
       v = (((((dfd[6]*t)+dfd[5])*t+dfd[4])*t*t+dfd[2])*t+dfd[1])*t+dfd[0];
+      if (v == 0.0)
+        {
+          best_s = t;
+          break;
+        }
       if (oldv < 0 && v > 0)
         {
           /* the derivative has a root in [smin,b] and is increasing, thus
