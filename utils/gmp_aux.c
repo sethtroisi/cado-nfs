@@ -263,6 +263,7 @@ ulong_nextprime (unsigned long q)
    with REPS=1, the smallest composite reported prime is 1537381
    with REPS=2, it is 1943521
    with REPS=3, it is 465658903
+   See also https://en.wikipedia.org/wiki/Miller–Rabin_primality_test
 */
 int
 ulong_isprime (unsigned long p)
