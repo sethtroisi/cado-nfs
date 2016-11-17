@@ -1427,15 +1427,47 @@ collision_on_batch_sq (header_t header,
   free (invqq);
 }
 
-/* collision on special-q, call collision_on_batch_sq */
-static inline void
-collision_on_sq (header_t header, proots_t R, unsigned long c )
+/* find suitable values of lq and k, where the special-q part in the degree-1
+   coefficient of the linear polynomial is made from k small primes among lq */
+static unsigned long
+find_suitable_lq (header_t header, qroots_t SQ_R, unsigned long *k)
 {
   unsigned long prod = 1;
   unsigned int i;
-  unsigned long k = 0UL, lq;
-  qroots_t SQ_R;
   double sq = 1.0;
+  unsigned long lq;
+
+  for (i = 0, *k = 0; prod < nq && i < SQ_R->size; i++) {
+    if (!check_parameters (header->m0, sq * (double) SQ_R->q[i]))
+      break;
+    prod *= header->d; /* We multiply by d instead of SQ_R->nr[i] to limit
+                          the number of primes and thus the Y1 value. */
+    sq *= (double) SQ_R->q[i];
+    *k += 1;
+  }
+
+  /* We force k <= 4 on a 32-bit machine, and k <= 8 on a 64-bit machine,
+     to ensure q fits on an "unsigned long". */
+  if (*k > (sizeof (unsigned long) * CHAR_BIT) / 8)
+    *k = (sizeof (unsigned long) * CHAR_BIT) / 8;
+  if (*k < 1)
+    *k = 1;
+
+  /* If all factors in sq have d roots, then a single special-q is enough.
+     Otherwise, we consider special-q's from combinations of k primes among lq,
+     so that the total number of combinations is at least nq. */
+  for (lq = *k; number_comb (SQ_R, *k, lq) < (unsigned long) nq &&
+         lq < SQ_R->size; lq++);
+
+  return lq;
+}
+
+/* collision on special-q, call collision_on_batch_sq */
+static inline void
+collision_on_sq (header_t header, proots_t R, unsigned long c)
+{
+  unsigned long k, lq;
+  qroots_t SQ_R;
 
   /* init special-q roots */
   qroots_init (SQ_R);
@@ -1443,27 +1475,7 @@ collision_on_sq (header_t header, proots_t R, unsigned long c )
   //qroots_print (SQ_R);
 
   /* find a suitable lq */
-  for (i = 0; prod < nq && i < SQ_R->size; i++) {
-    if (!check_parameters (header->m0, sq * (double) SQ_R->q[i]))
-      break;
-    prod *= header->d; /* We multiply by d instead of SQ_R->nr[i] to limit
-                          the number of primes and thus the Y1 value. */
-    sq *= (double) SQ_R->q[i];
-    k ++;
-  }
-
-  /* We force k <= 4 on a 32-bit machine, and k <= 8 on a 64-bit machine,
-     to ensure q fits on an "unsigned long". */
-  if (k > (sizeof (unsigned long) * CHAR_BIT) / 8)
-    k = (sizeof (unsigned long) * CHAR_BIT) / 8;
-  if (k < 1)
-    k = 1;
-
-  /* If all factors in sq have d roots, then a single special-q is enough.
-     Otherwise, we consider special-q's from combinations of k primes among lq,
-     so that the total number of combinations is at least nq. */
-  for (lq = k; number_comb (SQ_R, k, lq) < (unsigned long) nq &&
-         lq < SQ_R->size; lq++);
+  lq = find_suitable_lq (header, SQ_R, &k);
 
   unsigned long q, idx_q[lq], curr_nq = 0;
 
@@ -1729,13 +1741,16 @@ gmp_collision_on_sq ( header_t header,
 		      unsigned long c )
 {
   // init special-q roots
-  int lq = 2; // fixed for the moment
+  unsigned long K, lq;
   qroots_t SQ_R;
   qroots_init (SQ_R);
   comp_sq_roots (header, SQ_R);
   // qroots_print (SQ_R);
 
-  unsigned long K = lq, N = SQ_R->size, tot, i, l, idx_q[K];
+  /* find a suitable lq */
+  lq = find_suitable_lq (header, SQ_R, &K);
+
+  unsigned long N = SQ_R->size, tot, i, l, idx_q[K];
   uint64_t q[BATCH_SIZE];
   mpz_t *qqz, *rqqz;
 
