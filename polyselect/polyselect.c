@@ -844,7 +844,6 @@ collision_on_p ( header_t header,
   unsigned long j, nprimes, p, nrp, c = 0, tot_roots = 0;
   uint64_t *rp;
   int64_t ppl = 0, u, umax;
-  double pc1;
   mpz_t zero;
   int found = 0;
   shash_t H;
@@ -934,9 +933,8 @@ collision_on_p ( header_t header,
 
   mpz_clear (zero);
 
-  pc1 = expected_collisions (Primes[lenPrimes - 1]);
   pthread_mutex_lock (&lock);
-  potential_collisions += pc1;
+  potential_collisions ++;
   pthread_mutex_unlock (&lock);
   return c;
 }
@@ -953,7 +951,6 @@ collision_on_each_sq ( header_t header,
   shash_t H;
   uint64_t **cur1, **cur2, *ccur1, *ccur2;
   long *pc, *epc;
-  double pc2;
   uint64_t pp;
   int64_t ppl, neg_umax, umax, v1, v2, nv;
   unsigned long p, nprimes, c;
@@ -1144,9 +1141,8 @@ collision_on_each_sq ( header_t header,
   fprintf (stderr, "# hash table coll: %lu, all_coll: %lu\n", H->coll, H->coll_all);
 #endif
 
-  pc2 = expected_collisions (Primes[lenPrimes - 1]);
   pthread_mutex_lock (&lock);
-  potential_collisions += pc2;
+  potential_collisions ++;
   pthread_mutex_unlock (&lock);
 }
 
@@ -1496,7 +1492,6 @@ gmp_collision_on_p ( header_t header, proots_t R )
   unsigned long j, nprimes, p, nrp, c = 0;
   uint64_t *rp;
   int64_t ppl = 0, u, umax;
-  double pc1;
   mpz_t zero;
 
   /* init zero */
@@ -1554,9 +1549,8 @@ gmp_collision_on_p ( header_t header, proots_t R )
   free (rp);
   mpz_clear (zero);
 
-  pc1 = expected_collisions (Primes[lenPrimes - 1]);
   pthread_mutex_lock (&lock);
-  potential_collisions += pc1;
+  potential_collisions ++;
   pthread_mutex_unlock (&lock);
   return c;
 }
@@ -1574,7 +1568,6 @@ gmp_collision_on_each_sq ( header_t header,
   unsigned long nprimes, p, c = 0;
   uint64_t pp;
   int64_t ppl, u, v, umax;
-  double pc2;
 
 #ifdef DEBUG_POLYSELECT
   int st = milliseconds();
@@ -1619,9 +1612,8 @@ gmp_collision_on_each_sq ( header_t header,
 
   hash_clear (H);
 
-  pc2 = expected_collisions (Primes[lenPrimes - 1]);
   pthread_mutex_lock (&lock);
-  potential_collisions += pc2;
+  potential_collisions ++;
   pthread_mutex_unlock (&lock);
 }
 
@@ -2144,6 +2136,7 @@ main (int argc, char *argv[])
   /* finishing up statistics */
   if (verbose >= 0)
     {
+      potential_collisions *= expected_collisions (Primes[lenPrimes - 1]);
       printf ("# Stat: potential collisions=%1.2f (%1.2e/s)\n",
               potential_collisions, 1000.0 * potential_collisions
               / (double) milliseconds ());
