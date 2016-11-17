@@ -1734,7 +1734,7 @@ gmp_collision_on_batch_sq ( header_t header,
 }
 
 
-/* collision on special-q, call collisio_on_batch_sq */
+/* collision on special-q, call gmp_collision_on_batch_sq */
 static inline void
 gmp_collision_on_sq ( header_t header,
 		      proots_t R,
@@ -1750,7 +1750,7 @@ gmp_collision_on_sq ( header_t header,
   /* find a suitable lq */
   lq = find_suitable_lq (header, SQ_R, &K);
 
-  unsigned long N = SQ_R->size, tot, i, l, idx_q[K];
+  unsigned long N = lq, tot, i, l, idx_q[K];
   uint64_t q[BATCH_SIZE];
   mpz_t *qqz, *rqqz;
 
@@ -1795,17 +1795,17 @@ gmp_collision_on_sq ( header_t header,
       // enumerate first combination
       first_comb (K, idx_q);
       //print_comb (K, idx_q);
-      q[l] = return_q_rq (SQ_R, idx_q, K, qqz[l], rqqz[l], lq);
+      q[l] = return_q_rq (SQ_R, idx_q, K, qqz[l], rqqz[l]);
 
       for (l = 1; l < BATCH_SIZE; l++) {
         next_comb (N, K, idx_q);
-        q[l] = return_q_rq (SQ_R, idx_q, K, qqz[l], rqqz[l], lq);
+        q[l] = return_q_rq (SQ_R, idx_q, K, qqz[l], rqqz[l]);
       }
     }
     else {
       for (l = 0; l < BATCH_SIZE; l++) {
         next_comb (N, K, idx_q);
-        q[l] = return_q_rq (SQ_R, idx_q, K, qqz[l], rqqz[l], lq);
+        q[l] = return_q_rq (SQ_R, idx_q, K, qqz[l], rqqz[l]);
       }
     }
 
@@ -1824,7 +1824,7 @@ gmp_collision_on_sq ( header_t header,
   // tail batch
   for (l = 0; l < (tot % BATCH_SIZE); l++) {
     next_comb (N, K, idx_q);
-    q[l] = return_q_rq (SQ_R, idx_q, K, qqz[l], rqqz[l], lq);
+    q[l] = return_q_rq (SQ_R, idx_q, K, qqz[l], rqqz[l]);
 
 #ifdef DEBUG_POLYSELECT
     gmp_fprintf (stderr, "q: %lu, qq: %Zd, rqq: %Zd\n",
