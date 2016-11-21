@@ -36,7 +36,8 @@ tasks.sieve.ncurves1 = 23
 tasks.I = 15
 
 # if using Joux-Lercier with degrees 3 and 2 (dlpolyselect -df 3 -dg 2), use
-# the following parameters:
+# the following parameters to minimize the sieving time (without taking into
+# account the linear algebra time):
 # lim0 = 67687255
 # lim1 = 8025383
 # lpb0 = 29
