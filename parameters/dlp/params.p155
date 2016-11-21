@@ -35,6 +35,19 @@ tasks.sieve.ncurves0 = 13
 tasks.sieve.ncurves1 = 23
 tasks.I = 15
 
+# if using Joux-Lercier with degrees 3 and 2 (dlpolyselect -df 3 -dg 2), use
+# the following parameters:
+# lim0 = 67687255
+# lim1 = 8025383
+# lpb0 = 29
+# lpb1 = 28
+# tasks.sieve.mfb0 = 64
+# tasks.sieve.mfb1 = 87
+# tasks.sieve.ncurves0 = 18
+# tasks.sieve.ncurves1 = 23
+# tasks.I = 14
+# tasks.sieve.sqside = 0
+
 tasks.sieve.qrange = 2000
 tasks.sieve.rels_wanted = 40000000
 
