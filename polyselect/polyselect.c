@@ -619,10 +619,6 @@ match (unsigned long p1, unsigned long p2, const int64_t i, mpz_t m0,
   skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
   logmu = L2_lognorm (F, skew);
 
-  double g0 = mpz_get_d (g[0]);
-  g0 /= mpz_get_d (f[d-2]);
-  g0 = (g0 > 0)? g0 : -g0;
-
   mutex_lock (&lock);
   /* information on all polynomials */
   collisions ++;
@@ -787,10 +783,6 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
   /* old lognorm */
   skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
   logmu = L2_lognorm (F, skew);
-
-  double g0 = mpz_get_d (g[0]);
-  g0 /= mpz_get_d (f[d-2]);
-  g0 = (g0 > 0)? g0 : -g0;
 
   mutex_lock (&lock);
   /* information on all polynomials */
