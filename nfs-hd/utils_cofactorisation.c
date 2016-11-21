@@ -224,7 +224,7 @@ static void sort_factor(factor_ptr factor)
 static void printf_relation(factor_t * factor,
     mpz_poly_srcptr a, unsigned int t, unsigned int V,
     FILE * outstd, MAYBE_UNUSED unsigned int * assert_facto,
-    MAYBE_UNUSED mpz_vector_srcptr c)
+    MAYBE_UNUSED mpz_vector_srcptr c, int * smooth)
 {
   //Print a.
 #ifdef PRINT_POLY_RELATION
@@ -241,17 +241,11 @@ static void printf_relation(factor_t * factor,
 #ifdef ASSERT_FACTO
   fprintf(outstd, "# ");
   for (unsigned int i = 0; i < V - 1; i++) {
-    if (I[i] == 0 || I[i] == 1) {
-      fprintf(outstd, "%u:", assert_facto[index]);
-    } else {
-      ASSERT(I[i] == 2);
-      fprintf(outstd, ":");
-    }
+    ASSERT(assert_facto[i] < 3);
+    fprintf(outstd, "%u:", assert_facto[i]);
   }
-  if (I[V - 1] == 0 || I[V - 1] == 1) {
-    fprintf(outstd, "%u", assert_facto[index]);
-  }
-  fprintf(outstd, "\n");
+  ASSERT(assert_facto[V - 1] < 3);
+  fprintf(outstd, "%u\n", assert_facto[V - 1]);
 #endif // ASSERT_FACTO
 
   //Print the coefficient of a.
@@ -270,7 +264,7 @@ static void printf_relation(factor_t * factor,
 
   //Print the factorisation in the different number field.
   for (unsigned int i = 0; i < V - 1; i++) {
-    if (factor[i]->number != 0) {
+    if (factor[i]->number != 0 && smooth[i]) {
       for (unsigned int j = 0; j < factor[i]->number - 1; j++) {
 #ifdef PRINT_DECIMAL
         gmp_fprintf(outstd, "%Zd,", factor[i]->factorization[j]);
@@ -292,7 +286,7 @@ static void printf_relation(factor_t * factor,
     }
   }
 
-  if (factor[V - 1]->number != 0) {
+  if (factor[V - 1]->number != 0 && smooth[V - 1]) {
     for (unsigned int j = 0; j < factor[V - 1]->number - 1; j++) {
 #ifdef PRINT_DECIMAL
       gmp_fprintf(outstd, "%Zd,", factor[V - 1]->factorization[j]);
@@ -624,16 +618,19 @@ static void automorphism_6_0_2(mpz_poly_ptr b, mpz_poly_srcptr a)
   free(c);
 }
 
-static void rewrite_poly_6_0(mpz_poly_ptr b, factor_t * fac, unsigned int V)
+static void rewrite_poly_6_0(mpz_poly_ptr b, factor_t * fac, unsigned int V,
+    int * smooth)
 {
   mpz_t append;
   mpz_init(append);
   mpz_set_ui(append, 3);
   for (unsigned int i = 0; i < V; i++) {
-    for (unsigned int j = 0; j < 3 * (unsigned int)b->deg; j++) {
-      factor_append(fac[i], append);
+    if (fac[i]->number != 0 && smooth[i]) {
+      for (unsigned int j = 0; j < 3 * (unsigned int)b->deg; j++) {
+        factor_append(fac[i], append);
+      }
+      sort_factor(fac[i]);
     }
-    sort_factor(fac[i]);
   }
   mpz_clear(append);
 
@@ -652,10 +649,13 @@ static void rewrite_poly_6_0(mpz_poly_ptr b, factor_t * fac, unsigned int V)
 
     for (unsigned int j = 0; j < fac_tmp->number; j++) {
       for (unsigned int i = 0; i < V; i++) {
-        for (unsigned int k = 0; k < 6; k++) {
-          MAYBE_UNUSED unsigned int bo = factor_remove(fac[i],
-              fac_tmp->factorization[j]);
-          ASSERT(bo == 1);
+        if (fac[i]->number != 0 && smooth[i]) {
+          //TODO: why 6?
+          for (unsigned int k = 0; k < 6; k++) {
+            MAYBE_UNUSED unsigned int found = factor_remove(fac[i],
+                fac_tmp->factorization[j]);
+            ASSERT(found == 1);
+          }
         }
       }
     }
@@ -671,10 +671,12 @@ static void rewrite_poly_6_0(mpz_poly_ptr b, factor_t * fac, unsigned int V)
 }
 
 //TODO. assert facto is false: need to recompute.
+//TODO: galois is probably not compatible with MNFS.
 static void printf_relation_galois_6_0(factor_t * factor,
     mpz_poly_srcptr a, unsigned int t, unsigned int V,
     FILE * outstd, MAYBE_UNUSED unsigned int * assert_facto,
-    MAYBE_UNUSED mpz_vector_srcptr c)
+    MAYBE_UNUSED mpz_vector_srcptr c, int * smooth,
+    MAYBE_UNUSED const mpz_poly * f)
 {
   if (a->deg > 2) {
     fprintf(outstd, "# Can not use Galois 6.0.\n");
@@ -690,8 +692,19 @@ static void printf_relation_galois_6_0(factor_t * factor,
       } else if (a->deg == 1) {
         automorphism_6_0_1(b, b);
       }
-      rewrite_poly_6_0(b, factor, V);
-      printf_relation(factor, b, t, V, outstd, assert_facto, c);
+      rewrite_poly_6_0(b, factor, V, smooth);
+#ifdef ASSERT_FACTO
+      mpz_t res;
+      mpz_init(res);
+      for (unsigned int j = 0; j < V; j++) {
+        if (factor[j]->number != 0 && smooth[j]) {
+          norm_poly(res, f[j], b);
+          assert_facto[j] = factor_assert(factor[j], res);
+        }
+      }
+      mpz_clear(res);
+#endif // ASSERT_FACTO
+      printf_relation(factor, b, t, V, outstd, assert_facto, c, smooth);
     }
     mpz_poly_clear(b);
     fprintf(outstd, "# ----------\n");
@@ -722,6 +735,7 @@ static void good_polynomial(mpz_poly_srcptr a, const mpz_poly * f, unsigned int
   mpz_init(res);
 
   factor_t * factor = (factor_t * ) malloc(sizeof(factor_t) * V);
+  int * smooth = (int *) malloc(sizeof(int) * V);
 
   MAYBE_UNUSED unsigned int * assert_facto;
 #ifdef ASSERT_FACTO
@@ -757,7 +771,7 @@ static void good_polynomial(mpz_poly_srcptr a, const mpz_poly * f, unsigned int
           mpz_clear(spq);
         }
 
-        int is_smooth = call_facul(factor[i], res, &data[i]);
+        smooth[i] = call_facul(factor[i], res, &data[i]);
 
 #ifdef ASSERT_FACTO
         assert_facto[i] = factor_assert(factor[i], res_tmp);
@@ -771,7 +785,7 @@ static void good_polynomial(mpz_poly_srcptr a, const mpz_poly * f, unsigned int
         }
 #endif // ASSERT_FACTO
 
-        if (is_smooth) {
+        if (smooth[i]) {
           find++;
           sort_factor(factor[i]);
         }
@@ -792,7 +806,7 @@ static void good_polynomial(mpz_poly_srcptr a, const mpz_poly * f, unsigned int
     mpz_set(res_tmp, res);
 #endif // ASSERT_FACTO
 
-    int is_smooth = call_facul(factor[main], res, &data[main]);
+    smooth[main] = call_facul(factor[main], res, &data[main]);
 
 #ifdef ASSERT_FACTO
     assert_facto[main] = factor_assert(factor[main], res);
@@ -806,20 +820,20 @@ static void good_polynomial(mpz_poly_srcptr a, const mpz_poly * f, unsigned int
     }
 #endif // ASSERT_FACTO
 
-    if (is_smooth) {
+    if (smooth[main]) {
       find = 1;
 
       for (unsigned int i = 0; i < V; i++) {
         if (i != (unsigned int) main) {
           factor_init(factor[i], 10);
-          if (L[i]){
+          if (L[i]) {
             norm_poly(res, f[i], a);
 
 #ifdef ASSERT_FACTO
             mpz_set(res_tmp, res);
 #endif // ASSERT_FACTO
 
-            is_smooth = call_facul(factor[i], res, &data[i]);
+            smooth[i] = call_facul(factor[i], res, &data[i]);
 
 #ifdef ASSERT_FACTO
             assert_facto[i] = factor_assert(factor[i], res);
@@ -833,26 +847,31 @@ static void good_polynomial(mpz_poly_srcptr a, const mpz_poly * f, unsigned int
             }
 #endif // ASSERT_FACTO
 
-            if (is_smooth) {
+            if (smooth[i]) {
               find++;
               sort_factor(factor[i]);
             }
+          } else {
+#ifdef ASSERT_FACTO
+            assert_facto[i] = 2;
+#endif // ASSERT_FACTO
           }
-        }
+        } 
       }
     }
   }
 
   if (find >= 2) {
 #ifndef NOT_PRINT_RELATION
-    printf_relation(factor, a, t, V, outstd, assert_facto, c);
+    printf_relation(factor, a, t, V, outstd, assert_facto, c, smooth);
 #endif // NOT_PRINT_RELATION
     (* nb_rel_found)++;
 
     if (gal == 6) {
       if (gal_version == 0) {
 #ifndef NOT_PRINT_RELATION
-        printf_relation_galois_6_0(factor, a, t, V, outstd, assert_facto, c);
+        printf_relation_galois_6_0(factor, a, t, V, outstd, assert_facto, c,
+            smooth, f);
 #endif // NOT_PRINT_RELATION
       }
       (* nb_rel_gal) += 5;
@@ -868,6 +887,7 @@ static void good_polynomial(mpz_poly_srcptr a, const mpz_poly * f, unsigned int
     }
   }
   free(factor);
+  free(smooth);
 
 #ifdef ASSERT_FACTO
   mpz_clear(res_tmp);
@@ -945,6 +965,8 @@ static unsigned int find_indices_main(unsigned int ** L,
       if (target == indices[i]->array[index[i]]) {
         (*L)[i] = 1;
         size++;
+      } else {
+        (*L)[i] = 0;
       }
     }
   }
@@ -1026,7 +1048,7 @@ unsigned int find_relations(uint64_array_t * indices, uint64_t number_element,
   uint64_t max_indices = 0;
   for (unsigned int i = 0; i < V; i++) {
     index[i] = 0;
-    if (i == (unsigned int)main) {
+    if (i == (unsigned int) main) {
       ASSERT(main >= 0);
 
       length_tot = indices[main]->length;
@@ -1069,8 +1091,8 @@ unsigned int find_relations(uint64_array_t * indices, uint64_t number_element,
   }
   if (nb_rel_found != 0) {
     if (gal == 6) {
-      fprintf(outstd, "# Number of found relations: %u (with %u by Galois 6).\n", nb_rel_found +
-          nb_rel_gal, nb_rel_gal);
+      fprintf(outstd, "# Number of found relations: %u (with %u by Galois \
+6).\n", nb_rel_found + nb_rel_gal, nb_rel_gal);
     } else {
       fprintf(outstd, "# Number of found relations: %u.\n", nb_rel_found);
     }
@@ -1079,7 +1101,8 @@ unsigned int find_relations(uint64_array_t * indices, uint64_t number_element,
   }
 
 #ifdef ASSERT_FACTO
-  fprintf(outstd, "# Number of complete factorisations: %u.\n", number_factorisation[1]);
+  fprintf(outstd, "# Number of complete factorisations: %u.\n",
+      number_factorisation[1]);
   fprintf(outstd, "# Number of incomplete factorisations: %u.\n",
       number_factorisation[0]);
 #endif // ASSERT_FACTO
