@@ -1410,6 +1410,11 @@ class ClientServerTask(Task, wudb.UsesWorkunitDb, patterns.Observer):
         # start_real_time will be a float giving the number of seconds since
         # Jan 1 1900 at the beginning of the task
         self.state.update({"start_real_time": 0})
+        # start_achievement is a variable that tells us how far we were at
+        # the beginning of this run (for example if a factorization is
+        # restarted in the middle of a polyselect or sieve task.)
+        # It should be in [0,1], and if not initialized yet it is -1.
+        self.state.update({"start_achievement": -1})
         self.send_notification(Notification.SUBSCRIBE_WU_NOTIFICATIONS, None)
     
     def submit_wu(self, wu, commit=True):
@@ -1461,12 +1466,17 @@ class ClientServerTask(Task, wudb.UsesWorkunitDb, patterns.Observer):
     def get_eta(self):
         delta = datetime.datetime.now() - datetime.datetime(1900,1,1)
         seconds = delta.total_seconds() - self.state["start_real_time"]
-        remaining_time = seconds * (1.0 / self.get_achievement() - 1)
-        now = datetime.datetime.now()
+        a = self.get_achievement()
+        a0 = self.state["start_achievement"]
+        if a0 == -1:
+            self.state["start_achievement"] = a
+            a0 = a
         try:
+           remaining_time = seconds / (a - a0) * (1.0 - a)
+           now = datetime.datetime.now()
            arrival = now + datetime.timedelta(seconds=remaining_time)
            return arrival.ctime()
-        except OverflowError:
+        except (OverflowError,ZeroDivisionError):
            return "Unknown"
 
     def verification(self, wuid, ok, *, commit):
