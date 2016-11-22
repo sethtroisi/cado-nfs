@@ -536,7 +536,7 @@ match (unsigned long p1, unsigned long p2, const int64_t i, mpz_t m0,
     {
       if (d % p == 0 || mpz_divisible_ui_p (ad, p))
         continue;
-      if (mpz_divisible_ui_p (t, p * p))
+      while (mpz_divisible_ui_p (t, p * p))
         {
           mpz_mul_ui (l, l, p);
           mpz_divexact_ui (t, t, p * p);
