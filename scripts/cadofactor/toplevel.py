@@ -245,6 +245,50 @@ class Cado_NFS_toplevel(object):
         # not count hyperthreading. Does not work on openbsd5.3
         return max(int(backquote("getconf _NPROCESSORS_ONLN")[0]), 1)
 
+    @staticmethod
+    def number_of_logical_cores():
+        ''' return the number of logical cores on the current system, taking
+        into account hyperthreaded cores if any.
+
+        If the environment variable NCPUS_FAKE is set, use its value.
+        '''
+
+        try:
+            return int(os.environ["NCPUS_FAKE"])
+        except KeyError:
+            pass
+        if os.path.isfile("/proc/cpuinfo"):
+            f=open("/proc/cpuinfo")
+            lines=f.readlines()
+            f.close()
+            nlogical=len([x for x in lines if re.match("physical", x)])
+            if nlogical == 0:
+                return len([x for x in lines if re.match("processor", x)])
+            return nlogical
+        def backquote(cmd):
+            pipe = subprocess.Popen(cmd.split(" "), stdout=subprocess.PIPE)
+            loc = locale.getdefaultlocale()[1]
+            if not loc:
+                loc="ascii"
+            return [s.decode(loc) for s in pipe.stdout.readlines()]
+        if platform.uname()[0] == "OpenBSD":
+            # does this count hyperthreading or not ?
+            return int(backquote("sysctl -n hw.ncpu")[0])
+        if platform.uname()[0] == "Darwin":
+            # does this count hyperthreading or not ?
+            first_attempt=backquote("sysctl -n machdep.cpu.core_count")
+            if first_attempt:
+                return int(first_attempt[0])
+            return int(backquote("sysctl -n hw.ncpu")[0])
+        if platform.uname()[0] == "Windows":
+            # not clear whether it's physical or logical.
+            crap=backquote("wmic cpu get Caption")
+            return max(len(crap)-1,1)
+            # we don't believe mingw will support multithreading well.
+        # this would work as well on linux and darwin, but pretty surely does
+        # not count hyperthreading. Does not work on openbsd5.3
+        return max(int(backquote("getconf _NPROCESSORS_ONLN")[0]), 1)
+
     def filter_out_N_paramfile_workdir(self):
         ''' This function takes, and modifies, the namespace self.args
         which has been returned by parser.parse_args(). It looks for
@@ -759,9 +803,9 @@ class Cado_NFS_toplevel(object):
             self.args.server_threads = 'all'
         if self.args.server_threads:
             if self.args.server_threads == "all":
-                ncpus = self.number_of_physical_cores()
+                ncpus = self.number_of_logical_cores()
                 self.args.server_threads = ncpus
-                self.logger.info("Set tasks.threads=%d based on detected physical cpus" % ncpus)
+                self.logger.info("Set tasks.threads=%d based on detected logical cpus" % ncpus)
             t=int(self.args.server_threads)
             self.parameters.set_simple("tasks.threads", t)
         # We want to enforce a value for tasks.polyselect.threads and
