@@ -18,8 +18,6 @@
 
 static int verbose = 0;
 
-#define MAX_THREADS 32
-
 /* mutual exclusion lock for output */
 pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 
@@ -1411,7 +1409,6 @@ int main(int argc, char *argv[])
 
     param_list_parse_int (pl, "dep", &numdep);
     param_list_parse_int (pl, "t", &nthreads);
-    ASSERT_ALWAYS(nthreads <= MAX_THREADS);
     const char * purgedname = param_list_lookup_string(pl, "purged");
     const char * indexname = param_list_lookup_string(pl, "index");
     const char * kername = param_list_lookup_string(pl, "ker");
