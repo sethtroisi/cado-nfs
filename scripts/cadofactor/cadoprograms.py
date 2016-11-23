@@ -227,13 +227,10 @@ class Sha1Cache(object):
             logger = logging.getLogger("Sha1Cache")
             logger.debug("Computing SHA1 for file %s", realpath)
             sha1 = hashlib.sha1()
-            try:
-                with open(realpath, "rb") as inputfile:
-                    for data in self._read_file_in_blocks(inputfile):
-                        sha1.update(data)
-                    self._sha1[realpath] = (sha1.hexdigest(), file_id)
-            except:
-                raise Exception("Unable to open file %s, did you run make?" % realpath)
+            with open(realpath, "rb") as inputfile:
+                for data in self._read_file_in_blocks(inputfile):
+                    sha1.update(data)
+                self._sha1[realpath] = (sha1.hexdigest(), file_id)
             logger.debug("SHA1 for file %s is %s", realpath,
                          self._sha1[realpath])
         return self._sha1[realpath][0]
@@ -339,7 +336,7 @@ class Program(object, metaclass=InspectType):
                  stdout=None, append_stdout=False, stderr=None,
                  append_stderr=False, background=False, execpath=None,
                  execsubdir=None, execbin=None, execsuffix=defaultsuffix,
-                 runprefix=None):
+                 runprefix=None, skip_check_binary_exists=None):
         ''' Takes a dict of of command line options. Defaults are filled in
         from the cadoparams.Parameters instance parameters.
 
@@ -413,9 +410,10 @@ class Program(object, metaclass=InspectType):
             self.execfile = execfile
         else:
             self.execfile = binary
-            # Raising an exception here makes it impossible to run doctests
-            # for each Program subclass
-            # raise Exception("Binary executable file %s not found" % execfile)
+            if not skip_check_binary_exists:
+                # Raising an exception here makes it impossible to run
+                # doctests for each Program subclass
+                raise Exception("Binary executable file %s not found (did you run \"make\" ?)" % execfile)
 
     @classmethod
     def _get_option_annotations(cls):
@@ -639,10 +637,10 @@ class Program(object, metaclass=InspectType):
 
 class Polyselect(Program):
     """
-    >>> p = Polyselect(P=5, N=42, degree=4, verbose=True)
+    >>> p = Polyselect(P=5, N=42, degree=4, verbose=True, skip_check_binary_exists=True)
     >>> p.make_command_line().replace(defaultsuffix + " ", " ", 1)
     'polyselect -P 5 -N 42 -degree 4 -v'
-    >>> p = Polyselect(P=5, N=42, degree=4, verbose=True)
+    >>> p = Polyselect(P=5, N=42, degree=4, verbose=True, skip_check_binary_exists=True)
     >>> p.make_command_line().replace(defaultsuffix + " ", " ", 1)
     'polyselect -P 5 -N 42 -degree 4 -v'
     """
@@ -672,7 +670,7 @@ class Polyselect(Program):
 
 class PolyselectRopt(Program):
     """
-    >>> p = PolyselectRopt(ropteffort=5, inputpolys="foo.polys", verbose=True)
+    >>> p = PolyselectRopt(ropteffort=5, inputpolys="foo.polys", verbose=True, skip_check_binary_exists=True)
     >>> p.make_command_line().replace(defaultsuffix + " ", " ", 1)
     'polyselect_ropt -v -inputpolys foo.polys -ropteffort 5'
     """
@@ -706,10 +704,10 @@ class PolyselectGFpn(Program):
 
 class MakeFB(Program):
     """
-    >>> p = MakeFB(poly="foo.poly", lim=1)
+    >>> p = MakeFB(poly="foo.poly", lim=1, skip_check_binary_exists=True)
     >>> p.make_command_line().replace(defaultsuffix + " ", " ", 1)
     'makefb -poly foo.poly -lim 1'
-    >>> p = MakeFB(poly="foo.poly", lim=1, maxbits=5, stdout="foo.roots")
+    >>> p = MakeFB(poly="foo.poly", lim=1, maxbits=5, stdout="foo.roots", skip_check_binary_exists=True)
     >>> p.make_command_line().replace(defaultsuffix + " ", " ", 1)
     'makefb -poly foo.poly -lim 1 -maxbits 5 > foo.roots'
     """
@@ -730,10 +728,10 @@ class MakeFB(Program):
 
 class FreeRel(Program):
     """
-    >>> p = FreeRel(poly="foo.poly", renumber="foo.renumber", lpb0=1, lpb1=2, out="foo.freerel")
+    >>> p = FreeRel(poly="foo.poly", renumber="foo.renumber", lpb0=1, lpb1=2, out="foo.freerel", skip_check_binary_exists=True)
     >>> p.make_command_line().replace(defaultsuffix + " ", " ", 1)
     'freerel -poly foo.poly -renumber foo.renumber -lpb0 1 -lpb1 2 -out foo.freerel'
-    >>> p = FreeRel(poly="foo.poly", renumber="foo.renumber", lpb0=1, lpb1=2, out="foo.freerel", badideals="foo.bad", pmin=123, pmax=234)
+    >>> p = FreeRel(poly="foo.poly", renumber="foo.renumber", lpb0=1, lpb1=2, out="foo.freerel", badideals="foo.bad", pmin=123, pmax=234, skip_check_binary_exists=True)
     >>> p.make_command_line().replace(defaultsuffix + " ", " ", 1)
     'freerel -poly foo.poly -renumber foo.renumber -lpb0 1 -lpb1 2 -out foo.freerel -badideals foo.bad -pmin 123 -pmax 234'
     """
