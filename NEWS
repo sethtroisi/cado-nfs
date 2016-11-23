@@ -1,4 +1,6 @@
 Main changes between cado-nfs-2.2.0 and cado-nfs-2.3.0:
+* When tasks.threads is not given, it is set to the number of logical cores
+  (including hyperthreading if any) instead of the number of physical cores.
 * The estimated time of arrival (ETA) is now printed during the linear
   algebra phase too.
 * Speedup in the linear algebra phase (mksol) when m > n
