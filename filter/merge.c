@@ -31,6 +31,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 #include <stdlib.h>
 #include <fcntl.h>   /* for _O_BINARY */
 #include <string.h> /* for strcmp */
+#ifdef HAVE_OPENMP
+#include <omp.h>
+#endif
 
 #include "portability.h"
 
@@ -64,6 +67,7 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "force-posix-threads", "(switch)");
   param_list_decl_usage(pl, "path_antebuffer", "path to antebuffer program");
   param_list_decl_usage(pl, "v", "verbose level");
+  param_list_decl_usage(pl, "t", "number of threads");
 }
 
 static void
@@ -82,6 +86,7 @@ main (int argc, char *argv[])
     filter_matrix_t mat[1];
     report_t rep[1];
 
+    int nthreads = 1;
     int maxlevel = DEFAULT_MERGE_MAXLEVEL;
     uint32_t keep = DEFAULT_FILTER_EXCESS;
     uint32_t skip = DEFAULT_MERGE_SKIP;
@@ -129,6 +134,11 @@ main (int argc, char *argv[])
     const char * resumename = param_list_lookup_string (pl, "resume");
     const char *path_antebuffer = param_list_lookup_string(pl, "path_antebuffer");
     const char *forbidden_cols = param_list_lookup_string(pl, "forbidden-cols");
+
+    param_list_parse_int (pl, "t", &nthreads);
+#ifdef HAVE_OPENMP
+    omp_set_num_threads (nthreads);
+#endif
 
     param_list_parse_int (pl, "maxlevel", &maxlevel);
     param_list_parse_uint (pl, "keep", &keep);
@@ -201,7 +211,7 @@ main (int argc, char *argv[])
     mat->wmstmax = wmstmax;
     mat->mkztype = mkztype;
     tt = seconds();
-    MkzInit (mat);
+    MkzInit (mat, 1);
     printf ("Time for MkzInit: %2.2lfs\n", seconds()-tt);
 
     mergeOneByOne (rep, mat, maxlevel, target_density);
@@ -213,7 +223,7 @@ main (int argc, char *argv[])
             ((int64_t) mat->rem_nrows) - ((int64_t) mat->rem_ncols), mat->weight,
 	          mat->rem_nrows * mat->weight);
     fflush (stdout);
-    MkzClose (mat);
+    MkzClear (mat, 1);
     clearMat (mat);
 
     param_list_clear (pl);

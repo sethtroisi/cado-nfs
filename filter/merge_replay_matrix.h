@@ -74,7 +74,6 @@ extern void fillmat(filter_matrix_t *mat);
 extern void filter_matrix_read (filter_matrix_t *, const char *);
 void matR_disable_cols (filter_matrix_t *, const char *);
 
-extern void remove_j_from_row(filter_matrix_t *mat, int i, int j);
 extern void print_row(filter_matrix_t *mat, int i);
 
 #define rowWeight(mat, i) matLengthRow(mat, i)
@@ -102,6 +101,7 @@ extern void destroyRow(filter_matrix_t *mat, int i);
 void heap_push (heap H, filter_matrix_t *mat, uint32_t i);
 void heap_delete (heap H, filter_matrix_t *mat, uint32_t i);
 uint32_t heap_pop (heap H, filter_matrix_t *mat);
+void recomputeR (filter_matrix_t *mat);
 
 #ifdef __cplusplus
 }

@@ -26,8 +26,6 @@
 
 #define DEBUG 0
 
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-
 #if DEBUG >= 1
 /* total number of row additions in merge */
 static unsigned long row_additions = 0;
@@ -77,9 +75,7 @@ checkCoherence(filter_matrix_t *mat, int m, int j)
 {
     int nchk = 0, k;
 
-    for(k = 1; k <= mat->R[j][0]; k++)
-	if(mat->R[j][k] != -1)
-	    nchk++;
+    nchk = mat->R[j][0];
     ASSERT(nchk == (mat->wt[j] >= 0 ? mat->wt[j] : -mat->wt[j]));
     if(m != -1){
 	if(nchk != m){
@@ -96,30 +92,31 @@ checkCoherence(filter_matrix_t *mat, int m, int j)
 // making things independent of the real data structure used
 //////////////////////////////////////////////////////////////////////
 
-static void
-removeColDefinitely(report_t *rep, filter_matrix_t *mat, int32_t j)
-{
-  unsigned int k;
-
-    for(k = 1; k <= mat->R[j][0]; k++)
-	if(mat->R[j][k] != UMAX(index_t)){
-# if TRACE_COL >= 0
-	    if(j == TRACE_COL)
-		printf ("deleteAllCols: row is %d\n",mat->R[j][k]);
-# endif
-	    remove_j_from_row(mat, mat->R[j][k], j);
-	    removeRowDefinitely(rep, mat, mat->R[j][k]);
-	    mat->rem_ncols--;
-	}
-    mat->wt[j] = 0;
-}
-
 /* remove column j and update matrix */
 static void
 removeColumnAndUpdate(filter_matrix_t *mat, int j)
 {
     MkzRemoveJ (mat, j);
     freeRj (mat, j);
+}
+
+/* remove column j, and update the matrix */
+static void
+removeColDefinitely(report_t *rep, filter_matrix_t *mat, int32_t j)
+{
+  unsigned int k;
+
+  for (k = 1; k <= mat->R[j][0]; k++)
+    {
+# if TRACE_COL >= 0 || TRACE_ROW >= 0
+      if (j == TRACE_COL || mat->R[j][k] == TRACE_ROW)
+        printf ("TRACE: removeColDefinitely j=%d: remove row %d, weight %d\n",
+                j, mat->R[j][k], mat->wt[j]);
+# endif
+      removeRowDefinitely (rep, mat, mat->R[j][k]);
+      mat->rem_ncols--;
+    }
+  removeColumnAndUpdate (mat, j);
 }
 
 // The cell [i, j] may be incorporated to the data structure, at least
@@ -185,11 +182,14 @@ removeRowAndUpdate(filter_matrix_t *mat, int i, int final)
     mat->weight -= rowWeight(mat, i);
     for(k = 1; k <= matLengthRow(mat, i); k++){
 #if TRACE_COL >= 0
-	if(matCell(mat, i, k) == TRACE_COL){
-	    printf ("removeRowAndUpdate removes %d from R_%d\n", TRACE_COL, i);
-	}
+      unsigned int w = mat->wt[matCell(mat, i, k)];
 #endif
 	removeCellAndUpdate(mat, i, matCell(mat, i, k), final);
+#if TRACE_COL >= 0
+	if(matCell(mat, i, k) == TRACE_COL && final)
+          printf ("TRACE_COL: removeRowAndUpdate removes %d from R_%d (weight %d -> %d)\n",
+                  TRACE_COL, i, w, mat->wt[TRACE_COL]);
+#endif
     }
 }
 
@@ -201,7 +201,14 @@ addOneRowAndUpdate(filter_matrix_t *mat, int i)
 
   mat->weight += rowWeight(mat, i);
   for(k = 1; k <= matLengthRow(mat, i); k++)
-    addCellAndUpdate(mat, i, matCell(mat, i, k));
+    {
+#if TRACE_ROW >= 0
+      if (matCell(mat, i, k) == TRACE_ROW)
+        printf ("TRACE_ROW: addOneRowAndUpdate i=%d j=%d\n", i,
+                matCell(mat, i, k));
+#endif
+      addCellAndUpdate(mat, i, matCell(mat, i, k));
+    }
 }
 
 // realize mat[i1] += mat[i2] and update the data structure.
@@ -217,18 +224,14 @@ addRowsAndUpdate(filter_matrix_t *mat, int i1, int i2, int32_t j)
     addOneRowAndUpdate(mat, i1);
 }
 
-static int
+static void
 removeSingletons(report_t *rep, filter_matrix_t *mat)
 {
-    index_t j;
-    int njrem = 0;
+  index_t j;
 
-    for(j = 0; j < mat->ncols; j++)
-	if(mat->wt[j] == 1){
-	    removeColDefinitely(rep, mat, j);
-	    njrem++;
-	}
-    return njrem;
+  for (j = 0; j < mat->ncols; j++)
+    if (mat->wt[j] == 1)
+      removeColDefinitely (rep, mat, j);
 }
 
 void
@@ -266,14 +269,12 @@ tryAllCombinations(report_t *rep, filter_matrix_t *mat, int m, int32_t *ind,
 	    printf ("\n");
 #endif
 	}
-    if(i > 0){
-	// put ind[i] in front
-        // FIXME: can we simply swap ind[0] and ind[i]?
-	int itmp = ind[i];
-	for(k = i; k > 0; k--)
-	    ind[k] = ind[k-1];
-	ind[0] = itmp;
-    }
+
+    /* swap ind[0] and ind[i] */
+    int itmp = ind[i];
+    ind[i] = ind[0];
+    ind[0] = itmp;
+
 #if DEBUG >= 1
     printf ("=> new_ind: %d %d\n", ind[0], ind[1]);
 #endif
@@ -449,10 +450,9 @@ mergeForColumn (report_t *rep, double *tt, double *tfill, double *tMST,
                 filter_matrix_t *mat, int m, int32_t j)
 {
     int32_t ind[MERGE_LEVEL_MAX];
-    unsigned int k;
     int ni;
 
-    ASSERT_ALWAYS(mat->wt[j] == m);
+    ASSERT(mat->wt[j] == m);
 
     /* each m-merge leads to m-1 additions of rows */
 #if DEBUG >= 1
@@ -466,18 +466,13 @@ mergeForColumn (report_t *rep, double *tt, double *tfill, double *tMST,
     printf ("Treating column %d of weight %d\n", j, mat->wt[j]);
 #if DEBUG >= 2
     printf ("Status before next j=%d to start\n", j);
-    // the corresponding rows are in R[j], skipping 1st cell and -1's
+    // the corresponding rows are in R[j], skipping 1st cell
     checkCoherence(mat, m, j);
 #endif
 #endif
 
-    for(ni = 0, k = 1; k <= mat->R[j][0]; k++){
-	if(mat->R[j][k] != UMAX(index_t)){
-	    ind[ni++] = mat->R[j][k];
-      if (ni == m)
-              break; /* early abort, since we know there are m rows */
-	}
-    }
+    memcpy (ind, mat->R[j] + 1, mat->R[j][0] * sizeof (int32_t));
+
     /* now ind[0], ..., ind[m-1] are the m rows containing j */
 
 #if DEBUG >= 1
@@ -536,7 +531,7 @@ deleteSuperfluousRows (report_t *rep, filter_matrix_t *mat,
 }
 
 static void
-mergeForColumn2 (report_t *rep, filter_matrix_t *mat, int *njrem,
+mergeForColumn2 (report_t *rep, filter_matrix_t *mat,
                  double *totopt, double *totfill, double *totMST, int32_t j)
 {
     double tt, tfill, tMST;
@@ -667,7 +662,7 @@ merge_stats_print (merge_stats_t *data, int maxlevel)
     else
       printf ("Number of %d-merges: %" PRIu64 "\n", level, data[level].nb);
   }
-  printf ("Total number of merge: %" PRIu64 "\n", nbtot);
+  printf ("Total number of merges: %" PRIu64 "\n", nbtot);
 }
 
 void
@@ -675,7 +670,6 @@ mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel,
                double target_density)
 {
   double totopt = 0.0, totfill = 0.0, totMST = 0.0;
-  int njrem = 0;
   int ni2rem;
   int32_t j, mkz;
   uint64_t WN_prev, WN_cur, WN_min;
@@ -694,7 +688,7 @@ mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel,
     }
 
   // clean things
-  njrem = removeSingletons(rep, mat);
+  removeSingletons (rep, mat);
 
   merge_data = merge_stats_malloc (maxlevel);
 
@@ -743,7 +737,7 @@ mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel,
         fflush (stdout);
       }
       fprintf(rep->outfile, "#\n");
-      mergeForColumn2(rep, mat, &njrem, &totopt, &totfill, &totMST, j);
+      mergeForColumn2 (rep, mat, &totopt, &totfill, &totMST, j);
     }
 
     /* Update values and report if necessary */
@@ -762,9 +756,10 @@ mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel,
     {
       print_report (mat);
       report_next += report_incr;
-      njrem = removeSingletons (rep, mat);
+      removeSingletons (rep, mat);
       ni2rem = number_of_superfluous_rows (mat);
       deleteSuperfluousRows (rep, mat, ni2rem, m);
+      // recomputeR (mat);
     }
   }
 

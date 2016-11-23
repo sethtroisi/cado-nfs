@@ -1,5 +1,9 @@
 #include "cado.h"
 
+#ifdef HAVE_OPENMP
+#include <omp.h>
+#endif
+
 #include "portability.h"
 #include "filter_config.h"
 #include "utils_with_io.h"
@@ -221,6 +225,7 @@ MkzIsHeap(int32_t *Q)
 }
 #endif
 
+#if MKZ_DEBUG >= 1
 static void
 MkzCheck(filter_matrix_t *mat)
 {
@@ -239,6 +244,7 @@ MkzCheck(filter_matrix_t *mat)
     }
   }
 }
+#endif
 
 /* here we count a cost k for an ideal of weight k */
 static int
@@ -272,7 +278,8 @@ pureMkz(filter_matrix_t *mat, int32_t j)
 	   lightest row to all other rows */
         w0 = mat->ncols;
         for(k = 1; k <= mat->R[j][0]; k++)
-          if((i = mat->R[j][k]) != -1){
+          {
+            i = mat->R[j][k];
 	    // this should be the weight of row i
             if(matLengthRow(mat, i) < w0)
               w0 = matLengthRow(mat, i);
@@ -381,9 +388,9 @@ MkzPopQueue(int32_t *dj, int32_t *mkz, filter_matrix_t *mat)
 }
 
 void
-MkzInit(filter_matrix_t *mat)
+MkzInit (filter_matrix_t *mat, int verbose)
 {
-    int32_t mkz;
+    int32_t *mkz;
     index_t j;
     uint64_t sz = 0;
     int maxlevel = mat->mergelevelmax;
@@ -391,8 +398,12 @@ MkzInit(filter_matrix_t *mat)
 #if MKZ_TIMINGS
     tmkzup = tmkzdown = tmkzupdown = tmkzcount = 0.0;
 #endif
-    fprintf(stderr, "Entering initMarkowitz");
-    fprintf(stderr, " (wmstmax=%d, type=%d)\n", mat->wmstmax, mat->mkztype);
+    if (verbose)
+      {
+        fprintf (stderr, "Entering initMarkowitz");
+        fprintf (stderr, " (wmstmax=%d, type=%d)\n", mat->wmstmax, mat->mkztype);
+      }
+
     // compute number of eligible columns in the heap
     for(j = 0; j < mat->ncols; j++)
       if(0 < mat->wt[j] && mat->wt[j] <= maxlevel)
@@ -400,42 +411,53 @@ MkzInit(filter_matrix_t *mat)
     
     // Allocating heap MKZQ
     size_t tmp_alloc = (sz+1) * 2 * sizeof(int32_t);
-    fprintf(stderr, "Allocating heap for %" PRIu64 " columns (%zuMB)\n", sz,
-                                                             tmp_alloc >> 20);
+    if (verbose)
+      fprintf (stderr, "Allocating heap for %" PRIu64 " columns (%zuMB)\n", sz,
+               tmp_alloc >> 20);
     mat->MKZQ = (int32_t *) malloc (tmp_alloc);
     mat->MKZQ[0] = 0;
     mat->MKZQ[1] = (int32_t) sz; // why not?
     
     // every j needs a pointer (MKZA)
     tmp_alloc = (mat->ncols + 1) * sizeof(index_t);
-    fprintf(stderr, "Allocating pointers to heap: %zuMB\n", tmp_alloc >> 20);
+    if (verbose)
+      fprintf (stderr, "Allocating pointers to heap: %zuMB\n",
+               tmp_alloc >> 20);
     mat->MKZA = (index_t *) malloc (tmp_alloc);
 
-    // init
+    mkz = malloc (mat->ncols * sizeof (int32_t));
+
+    /* since the computation of the Markowitz cost is read-only,
+       we can perform it in parallel */
+#ifdef HAVE_OPENMP
+#pragma omp parallel for
+#endif
     for(j = 0; j < mat->ncols; j++)
       if (0 < mat->wt[j] && mat->wt[j] <= maxlevel)
-      {
-        mkz = MkzCount(mat, j);
-#if MKZ_DEBUG >= 1
-        printf("j=%d wt=%d", j, mat->wt[j]);
-        printf(" => mkz=%d\n", mkz);
-#endif
-        MkzInsert(mat->MKZQ, mat->MKZA, j, mkz);
-      }
+        mkz[j] = MkzCount(mat, j);
+      else
+        mkz[j] = INT32_MIN;
+
+    /* insertion in the heap cannot be done in parallel */
+    for(j = 0; j < mat->ncols; j++)
+      if (mkz[j] != INT32_MIN)
+        MkzInsert(mat->MKZQ, mat->MKZA, j, mkz[j]);
       else
         mat->MKZA[j] = MKZ_INF;
+
+    free (mkz);
     
-    // TODO: overflow in mkz???
-    MkzCheck(mat);
 #if MKZ_DEBUG >= 1
+    MkzCheck(mat);
     fprintf(stderr, "Initial queue is\n");
     MkzPrintQueue(mat->MKZQ);
 #endif
 }
 
 void
-MkzClose(filter_matrix_t *mat)
+MkzClear (filter_matrix_t *mat, int verbose)
 {
+  if (verbose)
     fprintf(stderr, "Max Markowitz count: %d\n",
 	    MkzGet(mat->MKZQ, mat->MKZQ[0], 1));
 #if MKZ_TIMINGS

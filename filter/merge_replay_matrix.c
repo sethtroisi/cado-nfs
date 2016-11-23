@@ -2,12 +2,16 @@
 
 #include <string.h>
 #include <stdio.h>
+#ifdef HAVE_OPENMP
+#include <omp.h>
+#endif
 
 #include "portability.h"
 #include "utils_with_io.h"
 #include "filter_config.h"
 #include "merge_replay_matrix.h"
 #include "sparse.h"
+#include "markowitz.h"
 
 /***************** memory allocation on R[j] *********************************/
 
@@ -320,6 +324,10 @@ renumber_columns (filter_matrix_t *mat)
     {
       /* index j is mapped to h, with h <= j */
       p[j] = h;
+#if TRACE_COL >= 0
+      if (TRACE_COL == h || TRACE_COL == j)
+        printf ("TRACE_COL: column %lu is renumbered into %u\n", j, h);
+#endif
       mat->wt[h] = mat->wt[j];
       h++;
     }
@@ -344,7 +352,7 @@ renumber_columns (filter_matrix_t *mat)
 #endif
 
 /* initialize Rj[j] for light columns, i.e., for those of weight <= cwmax */
-void
+static void
 InitMatR (filter_matrix_t *mat)
 {
   index_t h;
@@ -355,17 +363,107 @@ InitMatR (filter_matrix_t *mat)
   renumber_columns (mat);
 #endif
 
+#ifdef HAVE_OPENMP
+#pragma omp parallel for
+#endif
   for (h = 0; h < mat->ncols; h++)
-  {
-    w = mat->wt[h];
-    if (w <= wmax)
-      mallocRj (mat, h, w);
-    else /* weight is larger than cwmax */
     {
-      mat->wt[h] = -mat->wt[h]; // trick!!!
-      mat->R[h] = NULL;
+      w = mat->wt[h];
+      if (w <= wmax)
+        mallocRj (mat, h, w);
+      else /* weight is larger than cwmax */
+        {
+          mat->wt[h] = -mat->wt[h]; // trick!!!
+          mat->R[h] = NULL;
+        }
     }
-  }
+}
+
+static void
+recompute_weights (filter_matrix_t *mat)
+{
+  uint64_t i, h;
+
+  /* reset the weights to zero */
+  memset (mat->wt, 0, mat->ncols * sizeof (int32_t));
+
+  /* recompute the weights */
+  for (i = 0; i < mat->nrows; i++)
+    if (mat->rows[i] != NULL) /* row is still active */
+      for (unsigned int k = 1 ; k <= matLengthRow(mat, i); k++)
+        {
+          h = matCell(mat, i, k);
+          mat->wt[h] ++;
+#if TRACE_COL >= 0
+          if (h == TRACE_COL)
+            printf ("TRACE_COL: found ideal %lu in row %lu\n", h, i);
+#endif
+        }
+}
+
+static void
+reinitMatR (filter_matrix_t *mat)
+{
+  index_t h;
+  int32_t w;
+  int32_t wmax = mat->cwmax;
+
+  for (h = 0; h < mat->ncols; h++)
+    {
+      w = mat->wt[h];
+      if (w <= wmax)
+        {
+          reallocRj (mat, h, w);
+          mat->R[h][0] = 0; /* we reset the weights to 0 */
+        }
+      else /* weight is larger than cwmax */
+        {
+          mat->wt[h] = -mat->wt[h]; // trick!!!
+          mat->R[h] = NULL;
+        }
+    }
+}
+
+static void
+fillR (filter_matrix_t *mat)
+{
+  uint64_t i, h;
+
+  for (i = 0; i < mat->nrows; i++)
+    if (mat->rows[i] != NULL) /* row i is still active */
+      for (unsigned int k = 1 ; k <= matLengthRow(mat, i); k++)
+        {
+          h = matCell(mat, i, k);
+          if (mat->wt[h] > 0)
+            {
+              ASSERT_ALWAYS(mat->R[h] != NULL);
+              mat->R[h][0]++;
+              mat->R[h][mat->R[h][0]] = i;
+            }
+        }
+
+#if TRACE_COL >= 0
+  h = TRACE_COL;
+  printf ("TRACE_COL: weight of ideal %lu is %d\n", h, mat->wt[h]);
+  ASSERT_ALWAYS(mat->wt[h] <= 0 || (uint32_t) mat->wt[h] == mat->R[h][0]);
+#endif
+}
+
+void
+recomputeR (filter_matrix_t *mat)
+{
+  /* recompute the column weights */
+  recompute_weights (mat);
+
+  /* re-allocate the matrix R */
+  reinitMatR (mat);
+
+  /* fill the matrix R */
+  fillR (mat);
+
+  /* recompute the Markowitz structure */
+  MkzClear (mat, 0);
+  MkzInit (mat, 0);
 }
 
 void
@@ -510,7 +608,7 @@ filter_matrix_read (filter_matrix_t *mat, const char *purgedname)
     printf("# Weight of the buried part of the matrix: %" PRIu64 "\n",
            weight_buried);
 
-    /* Remove buried column from rows in mat structure */
+    /* Remove buried columns from rows in mat structure */
     printf("# Start to remove buried columns from rels...\n");
     fflush (stdout);
     for (i = 0; i < mat->nrows; i++)
@@ -565,18 +663,7 @@ filter_matrix_read (filter_matrix_t *mat, const char *purgedname)
   /* Re-read all rels (in memory) to fill-in mat->R */
   printf("# Start to fill-in columns of the matrix...\n");
   fflush (stdout);
-  for (i = 0; i < mat->nrows; i++)
-    {
-      for (unsigned int k = 1 ; k <= matLengthRow(mat, i); k++)
-        {
-          h = matCell(mat, i, k);
-          if (mat->wt[h] > 0)
-            {
-              mat->R[h][0]++;
-              mat->R[h][mat->R[h][0]] = i;
-            }
-        }
-    }
+  fillR (mat);
   printf ("# Done\n");
 }
 
@@ -593,11 +680,9 @@ destroyRow(filter_matrix_t *mat, int i)
     mat->rows[i] = NULL;
 }
 
-// Don't touch to R[j][0]!!!!
 void
 remove_i_from_Rj(filter_matrix_t *mat, index_t i, int j)
 {
-  // be dumb for a while
   unsigned int k, n = mat->R[j][0];
 
   /* R[j] should not be empty */
@@ -606,7 +691,8 @@ remove_i_from_Rj(filter_matrix_t *mat, index_t i, int j)
   for (k = 1; k <= n; k++)
     if (mat->R[j][k] == i)
       {
-        mat->R[j][k] = UMAX(index_t);
+        mat->R[j][k] = mat->R[j][n];
+        mat->R[j][0] = n - 1;
         return;
       }
   ASSERT_ALWAYS(0);
@@ -617,61 +703,10 @@ remove_i_from_Rj(filter_matrix_t *mat, index_t i, int j)
 void
 add_i_to_Rj(filter_matrix_t *mat, int i, int j)
 {
-  // be semi-dumb for a while
-  unsigned int k;
+  int l = mat->R[j][0] + 1;
 
-#if DEBUG >= 2
-  fprintf(stderr, "Adding row %d to R[%d]\n", i, j);
-#endif
-  for(k = 1; k <= mat->R[j][0]; k++)
-    if(mat->R[j][k] == UMAX(index_t))
-      break;
-  if(k <= mat->R[j][0])
-  {
-  // we have found a place where it is -1
-  mat->R[j][k] = i;
-  }
-  else
-  {
-#if DEBUG >= 2
-    fprintf(stderr, "WARNING: reallocing things in add_i_to_Rj for R[%d]\n", j);
-#endif
-    int l = mat->R[j][0] + 1;
-    reallocRj (mat, j, l);
-    mat->R[j][l] = i;
-  }
-}
-
-// Remove j from R[i] and crunch R[i].
-void
-remove_j_from_row(filter_matrix_t *mat, int i, int j)
-{
-  unsigned int k;
-
-#if TRACE_ROW >= 0
-    if(i == TRACE_ROW){
-	fprintf(stderr, "TRACE_ROW: remove_j_from_row i=%d j=%d\n", i, j);
-    }
-#endif
-#if DEBUG >= 2
-    fprintf(stderr, "row[%d]_b=", i);
-    print_row(mat, i);
-    fprintf(stderr, "\n");
-#endif
-    for(k = 1; k <= matLengthRow(mat, i); k++)
-	if((int) matCell(mat, i, k) == j)
-	    break;
-    ASSERT(k <= matLengthRow(mat, i));
-    // crunch
-    for(++k; k <= matLengthRow(mat, i); k++)
-        matCell(mat, i, k-1) = matCell(mat, i, k);
-    matLengthRow(mat, i) -= 1;
-    mat->weight--;
-#if DEBUG >= 2
-    fprintf(stderr, "row[%d]_a=", i);
-    print_row(mat, i);
-    fprintf(stderr, "\n");
-#endif
+  reallocRj (mat, j, l);
+  mat->R[j][l] = i;
 }
 
 /* return the weight of the relation obtained when adding relations i1 and i2
@@ -762,12 +797,10 @@ fillTabWithRowsForGivenj(int32_t *ind, filter_matrix_t *mat, int32_t j)
   index_t i;
 
   for (k = 1; k <= mat->R[j][0]; k++)
-    if ((i = mat->R[j][k]) != UMAX(index_t))
-      {
-        ind[ni++] = i;
-        w += matLengthRow(mat, i);
-        if (ni == mat->wt[j])
-          break;
-      }
+    {
+      i = mat->R[j][k];
+      ind[ni++] = i;
+      w += matLengthRow(mat, i);
+    }
   return w;
 }

@@ -8,8 +8,8 @@ extern "C" {
 #define MkzIsQueueEmpty(Q) ((Q)[0] == 0)
 #define MkzQueueCardinality(Q) ((Q)[0])
 
-extern void MkzInit(filter_matrix_t *mat);
-extern void MkzClose(filter_matrix_t *mat);
+extern void MkzInit(filter_matrix_t *mat, int verbose);
+extern void MkzClear(filter_matrix_t *mat, int verbose);
 
 extern int MkzIsAlive(index_t *A, int32_t dj);
 
@@ -20,7 +20,6 @@ extern void MkzUpdate(filter_matrix_t *mat, int32_t i, int32_t j);
 extern void MkzUpdateDown (filter_matrix_t *mat, int32_t j);
 extern void MkzDecreaseColWeight(filter_matrix_t *mat, int32_t j);
 extern void MkzRemoveJ(filter_matrix_t *mat, int32_t j);
-extern int MkzDeleteHeavyColumns(report_t *rep, filter_matrix_t *mat);
 
 #ifdef __cplusplus
 }
