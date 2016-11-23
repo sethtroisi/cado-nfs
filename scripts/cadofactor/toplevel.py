@@ -259,12 +259,10 @@ class Cado_NFS_toplevel(object):
             pass
         if os.path.isfile("/proc/cpuinfo"):
             f=open("/proc/cpuinfo")
-            lines=f.readlines()
-            f.close()
-            nlogical=len([x for x in lines if re.match("physical", x)])
-            if nlogical == 0:
-                return len([x for x in lines if re.match("processor", x)])
-            return nlogical
+            return len([x for x in f.readlines() if re.match("processor", x)])
+        # For the rest, we're copy-pasting number_of_physical_cores, but
+        # that is only by lack of a better insight of who does what to
+        # this regard.
         def backquote(cmd):
             pipe = subprocess.Popen(cmd.split(" "), stdout=subprocess.PIPE)
             loc = locale.getdefaultlocale()[1]
