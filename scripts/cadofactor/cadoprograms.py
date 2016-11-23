@@ -227,10 +227,13 @@ class Sha1Cache(object):
             logger = logging.getLogger("Sha1Cache")
             logger.debug("Computing SHA1 for file %s", realpath)
             sha1 = hashlib.sha1()
-            with open(realpath, "rb") as inputfile:
-                for data in self._read_file_in_blocks(inputfile):
-                    sha1.update(data)
-            self._sha1[realpath] = (sha1.hexdigest(), file_id)
+            try:
+                with open(realpath, "rb") as inputfile:
+                    for data in self._read_file_in_blocks(inputfile):
+                        sha1.update(data)
+                    self._sha1[realpath] = (sha1.hexdigest(), file_id)
+            except:
+                raise Exception("Unable to open file %s, did you run make?" % realpath)
             logger.debug("SHA1 for file %s is %s", realpath,
                          self._sha1[realpath])
         return self._sha1[realpath][0]
