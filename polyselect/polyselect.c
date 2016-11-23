@@ -536,7 +536,7 @@ match (unsigned long p1, unsigned long p2, const int64_t i, mpz_t m0,
     {
       if (d % p == 0 || mpz_divisible_ui_p (ad, p))
         continue;
-      if (mpz_divisible_ui_p (t, p * p))
+      while (mpz_divisible_ui_p (t, p * p))
         {
           mpz_mul_ui (l, l, p);
           mpz_divexact_ui (t, t, p * p);
@@ -545,7 +545,7 @@ match (unsigned long p1, unsigned long p2, const int64_t i, mpz_t m0,
   prime_info_clear (pi);
   /* end of small improvement */
 
-  /* we want mtilde = d*ad*m + a_{d-1}*l with 0 <= a_{d-1} < d*ad.
+  /* we want mtilde = d*ad*m + a_{d-1}*l with -d*ad/2 <= a_{d-1} < d*ad/2.
      We have a_{d-1} = mtilde/l mod (d*ad). */
   mpz_mul_ui (m, ad, d);
   if (mpz_invert (adm1, l, m) == 0)
