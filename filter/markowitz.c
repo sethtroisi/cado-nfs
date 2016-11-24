@@ -339,11 +339,11 @@ static int
 MkzCount(filter_matrix_t *mat, int32_t j)
 {
     switch(mat->mkztype){
-    case 2:
+    case MKZTYPE_LIGHT:
 	return lightColAndMkz(mat, j);
-    case 1:
+    case MKZTYPE_PURE:
 	return pureMkz(mat, j);
-    case 0:
+    case MKZTYPE_CAVALLAR:
     default:
       /* for the double-matrix trick, we count k for an ideal of weight k */
 	return Cavallar(mat, j);
@@ -400,8 +400,10 @@ MkzInit (filter_matrix_t *mat, int verbose)
 #endif
     if (verbose)
       {
-        fprintf (stderr, "Entering initMarkowitz");
-        fprintf (stderr, " (wmstmax=%d, type=%d)\n", mat->wmstmax, mat->mkztype);
+        fprintf (stderr, "Entering initMarkowitz (type=%d", mat->mkztype);
+        if (mat->mkztype == MKZTYPE_LIGHT)
+          fprintf (stderr, ", wmstmax=%d", mat->wmstmax);
+        fprintf (stderr, ")\n");
       }
 
     // compute number of eligible columns in the heap

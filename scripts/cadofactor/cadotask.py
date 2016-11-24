@@ -3723,7 +3723,7 @@ class MergeDLPTask(Task):
             matsize = 0
             matweight = 0
             for line in stdout.splitlines():
-                match = re.match(r'Final matrix has N=(\d+) nc=\d+ \(\d+\) w\(M\)=(\d+)', line)
+                match = re.match(r'Final matrix has N=(\d+) nc=\d+ \(\d+\) W=(\d+)', line)
                 if match:
                     matsize=int(match.group(1))
                     matweight=int(match.group(2))
@@ -3832,7 +3832,7 @@ class MergeTask(Task):
             matsize = 0
             matweight = 0
             for line in stdout.splitlines():
-                match = re.match(r'Final matrix has N=(\d+) nc=\d+ \(\d+\) w\(M\)=(\d+)', line)
+                match = re.match(r'Final matrix has N=(\d+) nc=\d+ \(\d+\) W=(\d+)', line)
                 if match:
                     matsize=int(match.group(1))
                     matweight=int(match.group(2))

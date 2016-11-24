@@ -1,6 +1,10 @@
 #ifndef CADO_MERGE_MARKOWITZ_H_
 #define CADO_MERGE_MARKOWITZ_H_
 
+#define MKZTYPE_CAVALLAR 0
+#define MKZTYPE_PURE 1
+#define MKZTYPE_LIGHT 2
+
 #ifdef __cplusplus
 extern "C" {
 #endif

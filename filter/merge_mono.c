@@ -193,6 +193,7 @@ removeRowAndUpdate(filter_matrix_t *mat, int i, int final)
     }
 }
 
+#ifdef NFS_DL
 // All entries M[i, j] are potentially added to the structure.
 static void
 addOneRowAndUpdate(filter_matrix_t *mat, int i)
@@ -213,7 +214,7 @@ addOneRowAndUpdate(filter_matrix_t *mat, int i)
 
 // realize mat[i1] += mat[i2] and update the data structure.
 // len could be the real length of row[i1]+row[i2] or -1.
-void
+static void
 addRowsAndUpdate(filter_matrix_t *mat, int i1, int i2, int32_t j)
 {
     // cleaner one, that shares addRowsData() to prepare the next move...!
@@ -223,6 +224,49 @@ addRowsAndUpdate(filter_matrix_t *mat, int i1, int i2, int32_t j)
     addRows(mat->rows, i1, i2, j);
     addOneRowAndUpdate(mat, i1);
 }
+#else
+/* special version for factorization */
+static void
+addRowsAndUpdate (filter_matrix_t *mat, int i1, int i2, int32_t j MAYBE_UNUSED)
+{
+    uint32_t k, k1, k2, l1, l2, len;
+    typerow_t **rows = mat->rows, *tmp, *r1 = rows[i1], *r2 = rows[i2];
+
+    l1 = rowLength (rows, i1);
+    l2 = rowLength (rows, i2);
+
+    /* removeRowAndUpdate(mat, i1, 0) */
+    mat->weight -= l1;
+    for (k1 = 1; k1 <= l1; k1++)
+      removeCellAndUpdate (mat, i1, r1[k1], 0);
+
+    /* addRows(mat->rows, i1, i2, j), i.e.,
+       addRowsUpdateIndex(mat->rows, NULL, i1, i2, j) */
+    len = 1 + l1 + l2;
+    tmp = (typerow_t *) malloc (len * sizeof(typerow_t));
+    k = k1 = k2 = 1;
+
+    while ((k1 <= l1) && (k2 <= l2))
+      if (r1[k1] < r2[k2])
+        tmp[k++] = r1[k1++];
+      else if (r1[k1] > r2[k2])
+        tmp[k++] = r2[k2++];
+      else
+        k1++, k2++;
+    for(; k1 <= l1;)
+      tmp[k++] = r1[k1++];
+    free (r1);
+    for(; k2 <= l2;)
+      tmp[k++] = r2[k2++];
+    tmp[0] = k - 1;
+    rows[i1] = (k == len) ? tmp : realloc (tmp, k * sizeof(typerow_t));
+
+    /* addOneRowAndUpdate(mat, i1) */
+    mat->weight += k - 1;
+    for (r1 = rows[i1], k1 = 1; k1 < k; k1++)
+      addCellAndUpdate (mat, i1, r1[k1]);
+}
+#endif
 
 static void
 removeSingletons(report_t *rep, filter_matrix_t *mat)

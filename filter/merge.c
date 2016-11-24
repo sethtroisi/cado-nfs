@@ -218,10 +218,11 @@ main (int argc, char *argv[])
 
     fclose_maybe_compressed (rep->outfile, outname);
     printf ("Final matrix has N=%" PRIu64 " nc=%" PRIu64 " (%" PRId64 ") "
-            "w(M)=%" PRIu64 " N*w(M)=%" PRIu64 "\n ",
+            "W=%" PRIu64 " W*N=%.2e W/N=%.2f\n",
             mat->rem_nrows, mat->rem_ncols,
             ((int64_t) mat->rem_nrows) - ((int64_t) mat->rem_ncols), mat->weight,
-	          mat->rem_nrows * mat->weight);
+            (double) mat->weight * (double) mat->rem_nrows,
+            (double) mat->weight / (double) mat->rem_nrows);
     fflush (stdout);
     MkzClear (mat, 1);
     clearMat (mat);

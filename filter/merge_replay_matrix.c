@@ -86,6 +86,8 @@ heap_init (heap H, uint32_t nrows)
     H->index[i] = UINT32_MAX;
   for (int32_t w = 0; w < 256; w++)
     comp_weight[w] = comp_weight_function (w);
+  printf ("Using weight function lambda=%d for clique removal\n",
+          USE_WEIGHT_LAMBDA);
 }
 
 static void
