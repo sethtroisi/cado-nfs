@@ -193,7 +193,7 @@ removeRowAndUpdate(filter_matrix_t *mat, int i, int final)
     }
 }
 
-#ifdef NFS_DL
+#ifdef FOR_DL
 // All entries M[i, j] are potentially added to the structure.
 static void
 addOneRowAndUpdate(filter_matrix_t *mat, int i)
