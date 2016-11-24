@@ -229,9 +229,21 @@ public:
          * a more concise way, based on alpha_hat for instance */
         string uniformizer = write_element_as_polynomial(theta_q, "alpha");
 
+        /* The following code mistakenly prints non-prime ideals :-(((
+         *
+         * That's just a bug with two-element repr though. The HNF form
+         * is correct.
+         *
+chocolat ~/NFS/cado $ ./build/chocolat/tests/numbertheory/test-ant  -test valuations-of-ideal  -polystr  "-571410 -196381 2487932 946439 -1142820 190470" -prime 2 -elements "1 1"
+# (p=2, k=0, f=1, e=1; ideal<O|2,95235*alpha+18139410450*alpha^2+1727506754205750*alpha^3>)^0;
+# (p=2, k=1, f=1, e=2; ideal<O|2,285705*alpha+1727506754205750*alpha^3>)^1;
+# (p=2, k=2, f=1, e=2; ideal<O|2,190470*alpha+18139410450*alpha^2>)^-1;
+         */
+
         int e = F[k].second;
-        o << "# I" << k << ":=ideal<O|"
-            << two.first << "," << uniformizer << ">;"
+        o << "# I" << k
+            // << ":=ideal<O|" << two.first << "," << uniformizer << ">;"
+            << ":=0/* two-element repr code is buggy, sorry */;"
             << " // f=" << prime_ideal_inertia_degree(fkp)
             << " e="<< e
             << endl;
