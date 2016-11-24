@@ -68,13 +68,13 @@ extern "C" {
 #define compute_WN(mat) ((mat)->rem_nrows * (mat)->weight)
 #define compute_WoverN(mat) (((double)(mat)->weight)/((double)(mat)->rem_nrows))
 
-extern void initMat(filter_matrix_t *, int, uint32_t, uint32_t);
-extern void clearMat (filter_matrix_t *mat);
-extern void fillmat(filter_matrix_t *mat);
-extern void filter_matrix_read (filter_matrix_t *, const char *);
+void initMat(filter_matrix_t *, int, uint32_t, uint32_t);
+void clearMat (filter_matrix_t *mat);
+void fillmat(filter_matrix_t *mat);
+void filter_matrix_read (filter_matrix_t *, const char *);
 void matR_disable_cols (filter_matrix_t *, const char *);
 
-extern void print_row(filter_matrix_t *mat, int i);
+void print_row(filter_matrix_t *mat, int i);
 
 #define rowWeight(mat, i) matLengthRow(mat, i)
 
@@ -90,14 +90,14 @@ extern void print_row(filter_matrix_t *mat, int i);
 #endif
 #define SPARSE_ITERATE(mat, i, k) for((k)=1; (k)<=lengthRow((mat),(i)); (k)++)
 
-extern void freeRj(filter_matrix_t *mat, int j);
-extern void remove_i_from_Rj(filter_matrix_t *mat, index_t i, int j);
-extern void add_i_to_Rj(filter_matrix_t *mat, int i, int j);
-extern int decrS(int w);
-extern int incrS(int w);
-extern int weightSum(filter_matrix_t *mat, int i1, int i2, int32_t j);
-extern int fillTabWithRowsForGivenj(int32_t *ind, filter_matrix_t *mat, int32_t j);
-extern void destroyRow(filter_matrix_t *mat, int i);
+void freeRj(filter_matrix_t *mat, int j);
+void remove_i_from_Rj(filter_matrix_t *mat, index_t i, int j);
+void add_i_to_Rj(filter_matrix_t *mat, int i, int j);
+int decrS(int w);
+int incrS(int w);
+int weightSum(filter_matrix_t *mat, int i1, int i2, int32_t j);
+void fillTabWithRowsForGivenj(int32_t *ind, filter_matrix_t *mat, int32_t j);
+void destroyRow(filter_matrix_t *mat, int i);
 void heap_push (heap H, filter_matrix_t *mat, uint32_t i);
 void heap_delete (heap H, filter_matrix_t *mat, uint32_t i);
 uint32_t heap_pop (heap H, filter_matrix_t *mat);

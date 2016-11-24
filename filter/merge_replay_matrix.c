@@ -55,7 +55,7 @@ static float comp_weight[256];
 static inline float
 comp_weight_function (int32_t w MAYBE_UNUSED)
 {
-#define USE_WEIGHT_LAMBDA 3
+#define USE_WEIGHT_LAMBDA 0 /* LAMBDA = 0 seems to be better */
 #if USE_WEIGHT_LAMBDA == 0
     return 1.0;
 #elif USE_WEIGHT_LAMBDA == 1
@@ -772,37 +772,27 @@ weightSum(filter_matrix_t *mat, int i1, int i2, MAYBE_UNUSED int32_t j)
             k2++;
         }
     }
+#ifdef FOR_DL
     // finish with k1
     for( ; k1 <= matLengthRow(mat, i1); k1++)
-#ifdef FOR_DL
-            w += (e2 * mat->rows[i1][k1].e == 0) ? 0 : 1;
-#else
-            w++;
-#endif
+      w += (e2 * mat->rows[i1][k1].e == 0) ? 0 : 1;
     // finish with k2
     for( ; k2 <= matLengthRow(mat, i2); k2++)
-#ifdef FOR_DL
-            w += (e1 * mat->rows[i2][k2].e == 0) ? 0 : 1;
+      w += (e1 * mat->rows[i2][k2].e == 0) ? 0 : 1;
 #else
-            w++;
+    w += matLengthRow(mat, i1) + 1 - k1;
+    w += matLengthRow(mat, i2) + 1 - k2;
 #endif
     return w;
 }
 
-/* put in ind[0]..ind[m-1] the indices of the m (active) rows containing j,
-   and return the total weight of all those rows */
-int
+/* put in ind[0]..ind[m-1] the indices of the m (active) rows containing j */
+void
 fillTabWithRowsForGivenj(int32_t *ind, filter_matrix_t *mat, int32_t j)
 {
-  int ni = 0, w = 0;
+  int ni = 0;
   unsigned int k;
-  index_t i;
 
   for (k = 1; k <= mat->R[j][0]; k++)
-    {
-      i = mat->R[j][k];
-      ind[ni++] = i;
-      w += matLengthRow(mat, i);
-    }
-  return w;
+    ind[ni++] = mat->R[j][k];
 }

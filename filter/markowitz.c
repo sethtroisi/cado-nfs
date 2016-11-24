@@ -248,12 +248,19 @@ MkzCheck(filter_matrix_t *mat)
 
 /* here we count a cost k for an ideal of weight k */
 static int
-Cavallar(filter_matrix_t *mat, int32_t j)
+Cavallar (filter_matrix_t *mat, int32_t j)
 {
-    return abs(mat->wt[j]);
+  return mat->wt[j];
 }
 
-/* Note: we could also take into account the "cancelled ideals", i.e., the
+/* This functions returns the difference in matrix element when we add the
+   lightest row with ideal j to all other rows. If ideal j has weight w,
+   and the lightest row has weight w0:
+   * we remove w elements corresponding to ideal j
+   * we remove w0-1 other elements for the lightest row
+   * we add w0-1 elements to the w-1 other rows
+   Thus the result is (w0-1)*(w-2) - w = (w0-2)*(w-2) - 2.
+   Note: we could also take into account the "cancelled ideals", i.e., the
    ideals apart the pivot j that got cancelled "by chance". However some
    experiments show that this does not improve (if any) the result of merge.
    A possible explanation is that the contribution of cancelled ideals follows
@@ -276,62 +283,39 @@ pureMkz(filter_matrix_t *mat, int32_t j)
 
         /* approximate traditional Markowitz count: we assume we add the
 	   lightest row to all other rows */
-        w0 = mat->ncols;
-        for(k = 1; k <= mat->R[j][0]; k++)
+        i = mat->R[j][1];
+        w0 = matLengthRow(mat, i);
+        for (k = 2; k <= mat->R[j][0]; k++)
           {
             i = mat->R[j][k];
-	    // this should be the weight of row i
-            if(matLengthRow(mat, i) < w0)
+            if (matLengthRow(mat, i) < w0)
               w0 = matLengthRow(mat, i);
           }
-        /* here we assume there is no cancellation other than for ideal j:
-	   the lightest row has weight w0, we add wt-1 times w0-1,
-	   remove once w0-1, and remove wt entries in the jth column */
-	return (w0 - 2) * (mat->wt[j] - 2) - 2;
+	return (w0 - 2) * (w - 2) - 2;
       }
 }
 
-// forcing lighter columns first.
+/* this function takes into account cancelled ideals "by chance" for
+   w <= mat->wmstmax, and is identical to pureMkz() for larger weights.
+   Thus for mat->wmstmax = 1, it should be identical to pureMkz(). */
 static int
-lightColAndMkz(filter_matrix_t *mat, int32_t j)
+lightColAndMkz (filter_matrix_t *mat, int32_t j)
 {
-    int i, wj, cte;
-    unsigned int k;
-    index_t mkz;
-    int32_t ind[MERGE_LEVEL_MAX];
-    double tfill, tMST;
+    int wj = mat->wt[j];
 
-#if MKZ_TIMINGS
-    double tt = seconds();
-#endif
-    // trick to be sure that columns with wt <= 2 are treated asap
-    wj = mat->wt[j];
-    cte = mat->ncols; // could be smaller
-    if(wj == 1)
-	return cte;
-    else if(wj == 2){
-	fillTabWithRowsForGivenj(ind, mat, j);
-	// the more this is < 0, the less the weight is
-	return 2 * cte + weightSum(mat, ind[0], ind[1], j);
-    }
-    else if(wj <= mat->wmstmax){
-	fillTabWithRowsForGivenj(ind, mat, j);
-	mkz = minCostUsingMST(mat, mat->wt[j], ind, j, &tfill, &tMST);
-	return wj * cte + mkz;
-    }
+    if (wj <= 1)
+      return -4; /* like pureMkz */
+    else if (wj <= mat->wmstmax)
+      {
+        int32_t *ind = (int32_t*) mat->R[j] + 1;
+        if (wj == 2)
+          return weightSum (mat, ind[0], ind[1], j)
+            - matLengthRow (mat, ind[0]) - matLengthRow (mat, ind[1]);
+        else
+          return minCostUsingMST (mat, mat->wt[j], ind, j);
+      }
     // real traditional Markowitz count
-    mkz = mat->nrows;
-    for(k = 1; k <= mat->R[j][0]; k++)
-	if((i = mat->R[j][k]) != -1){
-	    // this should be the weight of row i
-      if(matLengthRow(mat, i) < mkz)
-          mkz = matLengthRow(mat, i);
-	}
-    mkz = wj * cte + (mkz-1) * (wj-1);
-#if MKZ_TIMINGS
-    tmkzcount += (seconds()-tt);
-#endif
-    return mkz;
+    return pureMkz (mat, j);
 }
 
 /* return the cost of merging column j (the smaller, the better) */
@@ -370,7 +354,7 @@ MkzPopQueue(int32_t *dj, int32_t *mkz, filter_matrix_t *mat)
       MkzDelete (Q, A, 1);
       A[*dj] = MKZ_INF;
 
-      if (MkzQueueCardinality(mat->MKZQ) == 0)
+      if (MkzQueueCardinality (mat) == 0)
         return 0;
 
       *dj = MkzGet(Q, 1, 0);

@@ -193,7 +193,7 @@ removeRowAndUpdate(filter_matrix_t *mat, int i, int final)
     }
 }
 
-#ifdef NFS_DL
+#ifdef FOR_DL
 // All entries M[i, j] are potentially added to the structure.
 static void
 addOneRowAndUpdate(filter_matrix_t *mat, int i)
@@ -641,7 +641,7 @@ print_report (filter_matrix_t *mat)
           "W/N=%.2f #Q=%d\n", mat->rem_nrows,
           ((int64_t) mat->rem_nrows) - ((int64_t) mat->rem_ncols),
           mat->weight, (double) compute_WN (mat), compute_WoverN (mat),
-          MkzQueueCardinality (mat->MKZQ));
+          MkzQueueCardinality (mat));
   if (mat->verbose)
     print_memory_usage (mat);
   fflush (stdout);
@@ -737,28 +737,43 @@ mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel,
   merge_data = merge_stats_malloc (maxlevel);
 
   WN_min = WN_cur = compute_WN(mat);
-  WoverN = compute_WoverN(mat);
+  WoverN = compute_WoverN (mat);
 
   /* report lines are printed for each multiple of report_incr */
   double report_incr = 5.0;
   double report_next = ceil (WoverN / report_incr) * report_incr;
 
-  while(1)
+  int64_t excess;
+  /* stop when excess = keep and (WoverN >= target or queue is empty) */
+  while ((excess = mat->rem_nrows - mat->rem_ncols) > mat->keep ||
+         (WoverN < target_density || MkzQueueCardinality (mat) > 0))
   {
-    /* Do we need to stop */
-    if (WoverN >= target_density)
-    {
-      printf ("Reached target density W/N=%.2f.\n", WoverN);
-      break;
-    }
+    if (excess > mat->keep &&
+        (WoverN >= target_density || MkzQueueCardinality (mat) == 0))
+      { /* we hope removing the remaining excess will decrease the average
+           row density or will enable more merges */
+        printf ("Removing final excess, nrows=%" PRIu64 "\n",
+                mat->rem_nrows);
+        deleteSuperfluousRows (rep, mat, excess - mat->keep, INT_MAX);
+        printf ("Removing singletons, nrows=%" PRIu64 "\n", mat->rem_nrows);
+        removeSingletons (rep, mat);
+        recomputeR (mat);
+        WoverN = compute_WoverN (mat);
+        continue; /* this cannot loop forever since the excess decreases */
+      }
+
+    /* now excess = keep or (WoverN < target_density and #Q > 0) */
+
+    if (excess == mat->keep &&
+        (WoverN >= target_density || MkzQueueCardinality (mat) == 0))
+      break; /* we cannot do any more merge */
+
+    /* now WoverN < target_density and #Q > 0 */
 
     /* Do one merge */
-    if (MkzPopQueue(&j, &mkz, mat) == 0)
-    {
-      printf ("Heap is empty, stopping. Rerun with larger maxlevel if more "
-               "merges are needed\n");
-      break;
-    }
+    int ret = MkzPopQueue (&j, &mkz, mat);
+    ASSERT_ALWAYS(ret != 0);
+
     m = mat->wt[j];
 #if 0
     /* m=0 can happen for already merged ideals */ /* Really ??? */
@@ -786,7 +801,7 @@ mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel,
 
     /* Update values and report if necessary */
     merge_stats_update (merge_data, m, mkz);
-    WoverN = compute_WoverN(mat);
+    WoverN = compute_WoverN (mat);
     WN_prev = WN_cur;
     WN_cur = compute_WN(mat);
     if (WN_cur > WN_prev)
@@ -803,15 +818,17 @@ mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel,
       removeSingletons (rep, mat);
       ni2rem = number_of_superfluous_rows (mat);
       deleteSuperfluousRows (rep, mat, ni2rem, m);
-      // recomputeR (mat);
+      recomputeR (mat);
     }
   }
 
-  uint64_t excess = mat->rem_nrows - mat->rem_ncols;
-  printf ("Removing final excess, nrows=%" PRIu64 "\n", mat->rem_nrows);
-  deleteSuperfluousRows(rep, mat, excess - mat->keep, INT_MAX);
-  printf ("Removing singletons, nrows=%" PRIu64 "\n", mat->rem_nrows);
-  removeSingletons (rep, mat);
+  /* now excess = keep and (WoverN >= target or queue is empty) */
+
+  if (WoverN >= target_density)
+    printf ("Reached target density W/N=%.2f.\n", WoverN);
+  else
+    printf ("Heap is empty, stopping. Rerun with larger maxlevel if "
+            "more merges are needed\n");
 
 #if DEBUG >= 1
   checkWeights (mat);

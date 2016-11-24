@@ -10,7 +10,7 @@ extern "C" {
 #endif
 
 #define MkzIsQueueEmpty(Q) ((Q)[0] == 0)
-#define MkzQueueCardinality(Q) ((Q)[0])
+#define MkzQueueCardinality(mat) ((mat->MKZQ)[0])
 
 extern void MkzInit(filter_matrix_t *mat, int verbose);
 extern void MkzClear(filter_matrix_t *mat, int verbose);

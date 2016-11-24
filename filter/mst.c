@@ -252,7 +252,7 @@ fillRowAddMatrix(int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX], filter_matrix_t *mat,
 	A[i][i] = 0;
     for(i = 0; i < m; i++)
 	for(j = i+1; j < m; j++){
-	    A[i][j] = weightSum(mat, ind[i], ind[j], ideal);
+	    A[i][j] = weightSum (mat, ind[i], ind[j], ideal);
 	    A[j][i] = A[i][j];
 	}
 }
@@ -267,20 +267,18 @@ minimalSpanningTree(int *w, int *father, int *height,
 }
 
 int
-minCostUsingMST(filter_matrix_t *mat, int m, int32_t *ind, int32_t j, 
-                double *tfill, double *tMST)
+minCostUsingMST (filter_matrix_t *mat, int m, int32_t *ind, int32_t j)
 {
     int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX];
     int sons[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1];
     int father[MERGE_LEVEL_MAX], height[MERGE_LEVEL_MAX], w;
-    // int hmax;
 
-    *tfill = seconds();
-    fillRowAddMatrix(A, mat, m, ind, j);
-    *tfill = seconds()-*tfill;
-    *tMST = seconds();
-    /* hmax = */ minimalSpanningTree(&w, father, height, sons, m, A);
-    *tMST = seconds()-*tMST;
+    fillRowAddMatrix (A, mat, m, ind, j);
+    minimalSpanningTree (&w, father, height, sons, m, A);
+    /* w is the cost of all merges, we should subtract the cost of the
+       initial relations */
+    for (int i = 0; i < m; i++)
+      w -= matLengthRow(mat, ind[i]);
     return w;
 }
 
