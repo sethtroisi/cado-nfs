@@ -374,17 +374,15 @@ addFatherToSons(int history[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1],
     return addFatherToSonsRec(history, mat, m, ind, j, A, father, sons, 0, 0);
 }
 
-void
-MSTWithA(report_t *rep, filter_matrix_t *mat, int m, int32_t *ind, int32_t j, 
-         double *tMST, int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX])
+static void
+MSTWithA (report_t *rep, filter_matrix_t *mat, int m, int32_t *ind, int32_t j, 
+          int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX])
 {
     int history[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1];
     int sons[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1];
     int father[MERGE_LEVEL_MAX], height[MERGE_LEVEL_MAX], hmax, i, w;
 
-    *tMST = seconds();
     hmax = minimalSpanningTree(&w, father, height, sons, m, A);
-    *tMST = seconds()-*tMST;
 #if DEBUG >= 1
     printMST(father, sons, m);
 #endif
@@ -400,20 +398,18 @@ MSTWithA(report_t *rep, filter_matrix_t *mat, int m, int32_t *ind, int32_t j,
 }
 
 static void
-useMinimalSpanningTree(report_t *rep, filter_matrix_t *mat, int m, int32_t *ind,
-                       int32_t j, double *tfill, double *tMST)
+useMinimalSpanningTree (report_t *rep, filter_matrix_t *mat, int m,
+                        int32_t *ind, int32_t j)
 {
     int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX];
 
-    *tfill = seconds();
-    fillRowAddMatrix(A, mat, m, ind, j);
-    *tfill = seconds()-*tfill;
-    MSTWithA(rep, mat, m, ind, j, tMST, A);
+    fillRowAddMatrix (A, mat, m, ind, j);
+    MSTWithA (rep, mat, m, ind, j, A);
 }
 
 static void
-findOptimalCombination(report_t *rep, filter_matrix_t *mat, int m, int32_t *ind,
-                       int32_t j, double *tfill, double *tMST)
+findOptimalCombination (report_t *rep, filter_matrix_t *mat, int m,
+                        int32_t *ind, int32_t j)
 {
   /* we can use here two algorithms:
      (a) tryAllCombinations tries to merge row i with all other (m-1) rows,
@@ -422,12 +418,9 @@ findOptimalCombination(report_t *rep, filter_matrix_t *mat, int m, int32_t *ind,
      Both have complexity O(m^2), and useMinimalSpanningTree is always better
      or equal. */
   if (m <= 2)
-    {
-      *tfill = *tMST = 0;
-      tryAllCombinations (rep, mat, m, ind, j);
-    }
+    tryAllCombinations (rep, mat, m, ind, j);
   else
-    useMinimalSpanningTree (rep, mat, m, ind, j, tfill, tMST);
+    useMinimalSpanningTree (rep, mat, m, ind, j);
 }
 
 #if DEBUG >= 1
@@ -490,8 +483,7 @@ checkWeights (filter_matrix_t *mat)
 
 // j has weight m, which should coherent with mat->wt[j] == m
 static void
-mergeForColumn (report_t *rep, double *tt, double *tfill, double *tMST,
-                filter_matrix_t *mat, int m, int32_t j)
+mergeForColumn (report_t *rep, filter_matrix_t *mat, int m, int32_t j)
 {
     int32_t ind[MERGE_LEVEL_MAX];
     int ni;
@@ -530,9 +522,7 @@ mergeForColumn (report_t *rep, double *tt, double *tfill, double *tMST,
     printf ("\n");
 #endif
 
-    *tt = seconds();
-    findOptimalCombination (rep, mat, m, ind, j, tfill, tMST);
-    *tt = seconds()-(*tt);
+    findOptimalCombination (rep, mat, m, ind, j);
     mat->rem_nrows--;
     mat->rem_ncols--;
     removeColumnAndUpdate (mat, j);
@@ -574,41 +564,34 @@ deleteSuperfluousRows (report_t *rep, filter_matrix_t *mat,
   return nirem;
 }
 
-static void
-mergeForColumn2 (report_t *rep, filter_matrix_t *mat,
-                 double *totopt, double *totfill, double *totMST, int32_t j)
+static int
+number_of_superfluous_rows (filter_matrix_t *mat)
 {
-    double tt, tfill, tMST;
-    
-    mergeForColumn(rep, &tt, &tfill, &tMST, mat, mat->wt[j], j);
-    *totopt += tt;
-    *totfill += tfill;
-    *totMST += tMST;
-}
+    int kappa, ni2rem, excess;
 
-int
-number_of_superfluous_rows(filter_matrix_t *mat)
-{
-    int kappa, ni2rem;
+    excess = mat->rem_nrows - mat->rem_ncols;
+    ASSERT(excess >= 0);
 
     if (mat->keep > 0)
-      kappa = (mat->rem_nrows-mat->rem_ncols) / mat->keep;
+      kappa = excess / mat->keep;
     else
-      kappa = (mat->rem_nrows-mat->rem_ncols);
+      kappa = excess;
 
-    if(kappa <= (1<<4))
-      ni2rem = mat->keep / 2;
-    else if(kappa <= (1<<5))
-      ni2rem = mat->keep * (kappa/4);
-    else if(kappa <= (1<<10))
-      ni2rem = mat->keep * (kappa/8);
-    else if(kappa <= (1<<15))
-      ni2rem = mat->keep * (kappa/16);
-    else if(kappa <= (1<<20))
-      ni2rem = mat->keep * (kappa/32);
+    if (kappa <= (1<<4))
+      ni2rem = (excess + 1) / 2; /* ensures ni2rem <= excess, and 1 <= ni2rem
+                                    if excess > 0 */
+    else if (kappa <= (1<<5))
+      ni2rem = excess / 4;
+    else if (kappa <= (1<<10))
+      ni2rem = excess / 8;
+    else if (kappa <= (1<<15))
+      ni2rem = excess / 16;
+    else if (kappa <= (1<<20))
+      ni2rem = excess / 32;
     else
-      ni2rem = mat->keep * (kappa/64);
-    return ni2rem;
+      ni2rem = excess / 64;
+    return 2 * ni2rem; /* multiplying by 2 seems optimal experimentally
+                          for a target density of 170 */
 }
 
 static void
@@ -699,8 +682,8 @@ merge_stats_print (merge_stats_t *data, int maxlevel)
   {
     nbtot += data[level].nb;
     if (data[level].nb > 0)
-      printf ("Number of %d-merges: %" PRIu64 " (min_weight = %" PRId32 ", "
-              "max_weight = %" PRId32 ", av_weight = %.2f)\n", level,
+      printf ("Number of %d-merges: %" PRIu64 " (weight min %" PRId32 ", "
+              "max %" PRId32 ", avg %.2f)\n", level,
               data[level].nb, data[level].w_min, data[level].w_max,
               data[level].w_av / ((float) data[level].nb));
     else
@@ -713,7 +696,6 @@ void
 mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel,
                double target_density)
 {
-  double totopt = 0.0, totfill = 0.0, totMST = 0.0;
   int ni2rem;
   int32_t j, mkz;
   uint64_t WN_prev, WN_cur, WN_min;
@@ -784,23 +766,26 @@ mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel,
       continue;
     }
 #endif
+    uint64_t weight0 = mat->weight;
     if (m == 1) /* singleton ideal */
         removeColDefinitely(rep, mat, j);
     else if (m > 0)
     {
-      if (m > 1 && merge_stats_is_first_merge (merge_data, m))
+      fprintf(rep->outfile, "#\n");
+      mergeForColumn (rep, mat, m, j);
+    }
+    int32_t real_mkz = mat->weight - weight0;
+    if (m > 1 && merge_stats_is_first_merge (merge_data, m))
       {
         fprintf (rep->outfile, "## First %d-merge\n", m);
         print_report (mat);
-        printf ("First %d-merge, (estimated) cost %d\n", m, mkz);
+        printf ("First %d-merge, estimated cost %d, real cost %d\n",
+                m, mkz, real_mkz);
         fflush (stdout);
       }
-      fprintf(rep->outfile, "#\n");
-      mergeForColumn2 (rep, mat, &totopt, &totfill, &totMST, j);
-    }
 
     /* Update values and report if necessary */
-    merge_stats_update (merge_data, m, mkz);
+    merge_stats_update (merge_data, m, real_mkz);
     WoverN = compute_WoverN (mat);
     WN_prev = WN_cur;
     WN_cur = compute_WN(mat);
@@ -839,10 +824,6 @@ mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel,
 
   printf ("Total number of removed columns: %" PRId64 "\n",
           mat->ncols-mat->rem_ncols);
-
-  printf ("Time spent finding optimal combination: %.2fs (among which %.2fs "
-          "for filling the weight matrices and %.2fs for computing minimal "
-          "spanning tree)\n", totopt, totfill, totMST);
 }
 
 //////////////////////////////////////////////////////////////////////

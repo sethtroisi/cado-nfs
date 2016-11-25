@@ -613,6 +613,9 @@ filter_matrix_read (filter_matrix_t *mat, const char *purgedname)
     /* Remove buried columns from rows in mat structure */
     printf("# Start to remove buried columns from rels...\n");
     fflush (stdout);
+#ifdef HAVE_OPENMP
+#pragma omp parallel for
+#endif
     for (i = 0; i < mat->nrows; i++)
     {
       unsigned int k = 1;
@@ -637,16 +640,17 @@ filter_matrix_read (filter_matrix_t *mat, const char *purgedname)
           }
         }
         if (!is_buried) /* not a buried column */
-        {
-          mat->weight++;
           mat->rows[i][k++] = mat->rows[i][j];
-        }
       }
-
       matLengthRow(mat, i) = k-1;
       mat->rows[i] = (typerow_t*) realloc (mat->rows[i], k * sizeof (typerow_t));
     }
     printf ("# Done\n");
+
+    /* compute the matrix weight */
+    mat->weight = 0;
+    for (i = 0; i < mat->nrows; i++)
+      mat->weight += matLengthRow(mat, i);
 
     free (heaviest);
   }
