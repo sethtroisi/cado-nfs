@@ -3526,17 +3526,18 @@ std::string cxx_mpz_poly::print_poly(std::string const& var) const
         if (r == 0) continue;
         if (r > 0 && os.str().size())
             os << "+";
-        if (mpz_cmp_ui(x->coeff[i], 1) == 0) {
-        } else if (mpz_cmp_ui(x->coeff[i], -1) == 0) {
-            os << "-";
-        } else {
+        if (i == 0) {
             os << x->coeff[i];
-            if (i) os << "*";
-        }
-        if (i) {
+        } else {
+            if (mpz_cmp_ui(x->coeff[i], -1) == 0) {
+                os << "-";
+            } else {
+                os << x->coeff[i] << "*";
+            }
             os << var;
             if (i > 1) os << "^" << i;
         }
+
     }
     return os.str();
 }
