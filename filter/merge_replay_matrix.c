@@ -358,7 +358,6 @@ static void
 InitMatR (filter_matrix_t *mat)
 {
   index_t h;
-  int32_t w;
   int32_t wmax = mat->cwmax;
 
 #ifndef FOR_DL
@@ -370,6 +369,7 @@ InitMatR (filter_matrix_t *mat)
 #endif
   for (h = 0; h < mat->ncols; h++)
     {
+      int32_t w;
       w = mat->wt[h];
       if (w <= wmax)
         mallocRj (mat, h, w);
