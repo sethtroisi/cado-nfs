@@ -109,7 +109,7 @@ removeColDefinitely(report_t *rep, filter_matrix_t *mat, int32_t j)
   for (k = 1; k <= mat->R[j][0]; k++)
     {
 # if TRACE_COL >= 0 || TRACE_ROW >= 0
-      if (j == TRACE_COL || mat->R[j][k] == TRACE_ROW)
+      if (j == TRACE_COL || mat->R[j][k] == (index_t) TRACE_ROW)
         printf ("TRACE: removeColDefinitely j=%d: remove row %d, weight %d\n",
                 j, mat->R[j][k], mat->wt[j]);
 # endif
