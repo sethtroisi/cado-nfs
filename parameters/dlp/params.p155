@@ -49,6 +49,21 @@ tasks.I = 15
 # tasks.I = 14
 # tasks.sieve.sqside = 0
 
+# if using Joux-Lercier with degrees 4 and 3 (dlpolyselect -df 4 -dg 3), which
+# seems slightly better than degrees 3 and 2, use the following parameters to
+# minimize the sieving time (without taking into account the linear algebra
+# time):
+# lim0 = 50096275
+# lim1 = 8007076
+# lpb0 = 30
+# lpb1 = 29
+# tasks.sieve.mfb0 = 64
+# tasks.sieve.mfb1 = 81
+# tasks.sieve.ncurves0 = 13
+# tasks.sieve.ncurves1 = 24
+# tasks.I = 14
+# tasks.sieve.sqside = 0
+
 tasks.sieve.qrange = 2000
 tasks.sieve.rels_wanted = 40000000
 
