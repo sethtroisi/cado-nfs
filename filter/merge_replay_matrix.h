@@ -102,6 +102,7 @@ void heap_push (heap H, filter_matrix_t *mat, uint32_t i);
 void heap_delete (heap H, filter_matrix_t *mat, uint32_t i);
 uint32_t heap_pop (heap H, filter_matrix_t *mat);
 void recomputeR (filter_matrix_t *mat);
+void weight_count (filter_matrix_t *mat, uint64_t *nbm);
 
 #ifdef __cplusplus
 }

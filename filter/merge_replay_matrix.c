@@ -407,11 +407,14 @@ static void
 reinitMatR (filter_matrix_t *mat)
 {
   index_t h;
-  int32_t w;
   int32_t wmax = mat->cwmax;
 
+#ifdef HAVE_OPENMP
+#pragma omp parallel for
+#endif
   for (h = 0; h < mat->ncols; h++)
     {
+      int32_t w;
       w = mat->wt[h];
       if (w <= wmax)
         {
@@ -449,6 +452,19 @@ fillR (filter_matrix_t *mat)
   printf ("TRACE_COL: weight of ideal %lu is %d\n", h, mat->wt[h]);
   ASSERT_ALWAYS(mat->wt[h] <= 0 || (uint32_t) mat->wt[h] == mat->R[h][0]);
 #endif
+}
+
+/* put in nbm[w] for 0 <= w < 256, the number of ideals of weight w */
+void
+weight_count (filter_matrix_t *mat, uint64_t *nbm)
+{
+  uint64_t h;
+
+  for (h = 0; h < 256; h++)
+    nbm[h] = 0;
+  for (h = 0; h < mat->ncols; h++)
+    if (0 <= mat->wt[h] && mat->wt[h] < 256)
+      nbm[mat->wt[h]]++;
 }
 
 void
@@ -503,6 +519,25 @@ matR_disable_cols (filter_matrix_t *mat, const char *infilename)
   fclose_maybe_compressed (file, infilename);
 }
 
+/* sort row[0], row[1], ..., row[n-1] in non-decreasing order */
+static void
+sort_relation (index_t *row, unsigned int n)
+{
+  unsigned int i, j;
+
+  for (i = 1; i < n; i++)
+    {
+      index_t t = row[i];
+      if (t < row[i-1])
+        {
+          row[i] = row[i-1];
+          for (j = i - 1; j > 0 && t < row[j-1]; j--)
+            row[j] = row[j-1];
+          row[j] = t;
+        }
+    }
+}
+
 /* callback function called by filter_rels */
 void * insert_rel_into_table (void *context_data, earlyparsed_relation_ptr rel)
 {
@@ -521,21 +556,19 @@ void * insert_rel_into_table (void *context_data, earlyparsed_relation_ptr rel)
     /* For factorization, they should not be any multiplicity here.
        For DL we do not want to count multiplicity in mat->wt */
 #ifndef FOR_DL
-    ASSERT_ALWAYS (e == 1);
+    ASSERT (e == 1);
 #endif
-    if (mat->wt[h] == 0)
-    {
-      mat->wt[h] = 1;
-      mat->rem_ncols++;
-    }
-    else if (mat->wt[h] != SMAX(int32_t))
-      mat->wt[h]++;
-
-    setCell(mat->rows[rel->num][i+1], h, e);
+    mat->rem_ncols += (mat->wt[h] == 0);
+    mat->wt[h] += (mat->wt[h] != SMAX(int32_t));
+    setCell(mat->rows[rel->num][i+1], h, 1);
   }
 
   /* sort indices to ease row merges */
+#ifndef FOR_DL
+  sort_relation (&(mat->rows[rel->num][1]), rel->nb);
+#else
   qsort(&(mat->rows[rel->num][1]), rel->nb, sizeof(typerow_t), cmp_typerow_t);
+#endif
 
   return NULL;
 }
@@ -554,16 +587,11 @@ filter_matrix_read (filter_matrix_t *mat, const char *purgedname)
   mat->rem_nrows = nread;
 
   /* print weight count */
-  uint64_t *nbm;
-  nbm = (uint64_t *) malloc ((mat->mergelevelmax + 1) * sizeof (uint64_t));
-  memset (nbm, 0, (mat->mergelevelmax + 1) * sizeof (uint64_t));
-  for (h = 0; h < mat->ncols; h++)
-    if (mat->wt[h] <= mat->mergelevelmax)
-      nbm[mat->wt[h]]++;
+  uint64_t nbm[256];
+  weight_count (mat, nbm);
   for (h = 1; h <= (uint64_t) mat->mergelevelmax; h++)
     printf ("There are %" PRIu64 " column(s) of weight %" PRIu64 "\n", nbm[h], h);
   ASSERT_ALWAYS(mat->rem_ncols == mat->ncols - nbm[0]);
-  free (nbm);
 
   /* Bury heavy coloumns. The 'nburied' heaviest column are buried. */
   /* Buried columns are not took into account by merge. */
