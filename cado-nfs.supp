@@ -38,6 +38,8 @@
    fun:allocate_stack
    fun:pthread_create*
    ...
+   fun:GOMP_parallel
+   ...
    fun:main
 }
 {
