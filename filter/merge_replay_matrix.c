@@ -519,6 +519,7 @@ matR_disable_cols (filter_matrix_t *mat, const char *infilename)
   fclose_maybe_compressed (file, infilename);
 }
 
+#ifndef FOR_DL
 /* sort row[0], row[1], ..., row[n-1] in non-decreasing order */
 static void
 sort_relation (index_t *row, unsigned int n)
@@ -537,6 +538,7 @@ sort_relation (index_t *row, unsigned int n)
         }
     }
 }
+#endif
 
 /* callback function called by filter_rels */
 void * insert_rel_into_table (void *context_data, earlyparsed_relation_ptr rel)
@@ -552,22 +554,24 @@ void * insert_rel_into_table (void *context_data, earlyparsed_relation_ptr rel)
   for (unsigned int i = 0; i < rel->nb; i++)
   {
     index_t h = rel->primes[i].h;
+#ifdef FOR_DL
     exponent_t e = rel->primes[i].e;
     /* For factorization, they should not be any multiplicity here.
        For DL we do not want to count multiplicity in mat->wt */
-#ifndef FOR_DL
-    ASSERT (e == 1);
+    setCell (mat->rows[rel->num][i+1], h, e);
+#else
+    ASSERT(rel->primes[i].e == 1);
+    setCell (mat->rows[rel->num][i+1], h, 1);
 #endif
     mat->rem_ncols += (mat->wt[h] == 0);
     mat->wt[h] += (mat->wt[h] != SMAX(int32_t));
-    setCell(mat->rows[rel->num][i+1], h, 1);
   }
 
   /* sort indices to ease row merges */
 #ifndef FOR_DL
   sort_relation (&(mat->rows[rel->num][1]), rel->nb);
 #else
-  qsort(&(mat->rows[rel->num][1]), rel->nb, sizeof(typerow_t), cmp_typerow_t);
+  qsort (&(mat->rows[rel->num][1]), rel->nb, sizeof(typerow_t), cmp_typerow_t);
 #endif
 
   return NULL;
