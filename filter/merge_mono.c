@@ -24,6 +24,12 @@
 #include "markowitz.h"
 #include "merge_mono.h"
 
+#define TIMINGS
+
+#ifdef TIMINGS
+double tfill = 0, tmst = 0;
+#endif
+
 #define DEBUG 0
 
 #if DEBUG >= 1
@@ -100,25 +106,6 @@ removeColumnAndUpdate(filter_matrix_t *mat, int j)
     freeRj (mat, j);
 }
 
-/* remove column j, and update the matrix */
-static void
-removeColDefinitely(report_t *rep, filter_matrix_t *mat, int32_t j)
-{
-  unsigned int k;
-
-  for (k = 1; k <= mat->R[j][0]; k++)
-    {
-# if TRACE_COL >= 0 || TRACE_ROW >= 0
-      if (j == TRACE_COL || mat->R[j][k] == (index_t) TRACE_ROW)
-        printf ("TRACE: removeColDefinitely j=%d: remove row %d, weight %d\n",
-                j, mat->R[j][k], mat->wt[j]);
-# endif
-      removeRowDefinitely (rep, mat, mat->R[j][k]);
-      mat->rem_ncols--;
-    }
-  removeColumnAndUpdate (mat, j);
-}
-
 // The cell [i, j] may be incorporated to the data structure, at least
 // if j is not too heavy, etc.
 static void
@@ -186,7 +173,7 @@ removeRowAndUpdate(filter_matrix_t *mat, int i, int final)
 #endif
 	removeCellAndUpdate(mat, i, matCell(mat, i, k), final);
 #if TRACE_COL >= 0
-	if(matCell(mat, i, k) == TRACE_COL && final)
+	if(matCell(mat, i, k) == TRACE_COL)
           printf ("TRACE_COL: removeRowAndUpdate removes %d from R_%d (weight %d -> %d)\n",
                   TRACE_COL, i, w, mat->wt[TRACE_COL]);
 #endif
@@ -201,12 +188,17 @@ addOneRowAndUpdate(filter_matrix_t *mat, int i)
   unsigned int k;
 
   mat->weight += rowWeight(mat, i);
+#if TRACE_ROW >= 0
+  if (i == TRACE_ROW)
+    printf ("TRACE_ROW: addOneRowAndUpdate i=%d\n", i);
+#endif
   for(k = 1; k <= matLengthRow(mat, i); k++)
     {
-#if TRACE_ROW >= 0
-      if (matCell(mat, i, k) == TRACE_ROW)
-        printf ("TRACE_ROW: addOneRowAndUpdate i=%d j=%d\n", i,
-                matCell(mat, i, k));
+#if TRACE_COL >= 0
+      if (matCell(mat, i, k) == TRACE_COL)
+        printf ("TRACE_ROW: addOneRowAndUpdate i=%d j=%d (weight %d -> %d)\n",
+                i, matCell(mat, i, k), mat->wt[matCell(mat, i, k)],
+                mat->wt[matCell(mat, i, k)] + 1);
 #endif
       addCellAndUpdate(mat, i, matCell(mat, i, k));
     }
@@ -269,16 +261,6 @@ addRowsAndUpdate (filter_matrix_t *mat, int i1, int i2, int32_t j MAYBE_UNUSED)
 #endif
 
 static void
-removeSingletons(report_t *rep, filter_matrix_t *mat)
-{
-  index_t j;
-
-  for (j = 0; j < mat->ncols; j++)
-    if (mat->wt[j] == 1)
-      removeColDefinitely (rep, mat, j);
-}
-
-void
 removeRowDefinitely(report_t *rep, filter_matrix_t *mat, int32_t i)
 {
     removeRowAndUpdate(mat, i, 1);
@@ -287,6 +269,35 @@ removeRowDefinitely(report_t *rep, filter_matrix_t *mat, int32_t i)
     mat->rem_nrows--;
     /* delete the row from the heap of heavy rows */
     heap_delete (mat->Heavy, mat, i);
+}
+
+/* remove column j, and update the matrix */
+static void
+removeColDefinitely(report_t *rep, filter_matrix_t *mat, int32_t j)
+{
+  unsigned int k;
+
+  for (k = 1; k <= mat->R[j][0]; k++)
+    {
+# if TRACE_COL >= 0 || TRACE_ROW >= 0
+      if (j == TRACE_COL || mat->R[j][k] == (index_t) TRACE_ROW)
+        printf ("TRACE: removeColDefinitely j=%d: remove row %d, weight %d\n",
+                j, mat->R[j][k], mat->wt[j]);
+# endif
+      removeRowDefinitely (rep, mat, mat->R[j][k]);
+      mat->rem_ncols--;
+    }
+  removeColumnAndUpdate (mat, j);
+}
+
+static void
+removeSingletons(report_t *rep, filter_matrix_t *mat)
+{
+  index_t j;
+
+  for (j = 0; j < mat->ncols; j++)
+    if (mat->wt[j] == 1)
+      removeColDefinitely (rep, mat, j);
 }
 
 /* Try all combinations of merging one row with all others (m-1) ones
@@ -327,13 +338,14 @@ tryAllCombinations(report_t *rep, filter_matrix_t *mat, int m, int32_t *ind,
     destroyRow(mat, ind[0]);
 }
 
+#if 0
 // add u to its sons; we save the history in the history array, so that
 // we can report all at once
-// A[i][j] contains the estimated weight/length of R[ind[i]]+R[ind[j]].
+// return the number of internal nodes of the minimal spanning tree,
+// which corresponds to the number of lines in the history
 static int
 addFatherToSonsRec(int history[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1],
 		   filter_matrix_t *mat, int m, int *ind, int32_t j,
-		   int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX],
 		   int *father,
 		   int sons[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1],
 		   int u, int level0)
@@ -350,8 +362,8 @@ addFatherToSonsRec(int history[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1],
 	// the usual trick not to destroy row
 	history[level0][itab++] = -(i2+1);
     for(k = 1; k <= sons[u][0]; k++){
-	i1 = addFatherToSonsRec(history, mat, m, ind, j, A,
-				father, sons, sons[u][k], level+1);
+	i1 = addFatherToSonsRec (history, mat, m, ind, j, father, sons,
+                                 sons[u][k], level+1);
 	if(i1 != -1)
 	    level = i1;
 	i1 = ind[sons[u][k]];
@@ -366,13 +378,39 @@ addFatherToSonsRec(int history[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1],
 int
 addFatherToSons(int history[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1],
 		filter_matrix_t *mat, int m, int *ind, int32_t j,
-		int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX],
-		int *father,
-                int *height MAYBE_UNUSED, int hmax MAYBE_UNUSED,
-		int sons[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1])
+		int *father, int sons[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1])
 {
-    return addFatherToSonsRec(history, mat, m, ind, j, A, father, sons, 0, 0);
+  return addFatherToSonsRec (history, mat, m, ind, j, father, sons, 0, 0);
 }
+#else
+int
+addFatherToSons(int history[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1],
+		filter_matrix_t *mat, int m, int *ind, int32_t ideal,
+		int *father, int sons[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1])
+{
+  int i, s, t;
+
+  /* we process the entries in backward order, to avoid modifying a parent
+     before adding it to one of its sons, but we put the entries in history[]
+     in increasing order: history[] is processed backwards in MSTWithA() */
+  for (i = m - 2; i >= 0; i--)
+    {
+      s = father[i + 1];
+      t = sons[i + 1][0];
+      if (i == 0)
+        {
+          history[i][1] = ind[s]; /* to destroy root */
+          ASSERT(s == 0);
+        }
+      else
+        history[i][1] = -(ind[s] + 1); /* not to destroy row ind[s] */
+      addRowsAndUpdate (mat, ind[t], ind[s], ideal);
+      history[i][2] = ind[t];
+      history[i][0] = 2;
+    }
+  return m - 2;
+}
+#endif
 
 static void
 MSTWithA (report_t *rep, filter_matrix_t *mat, int m, int32_t *ind, int32_t j, 
@@ -380,13 +418,19 @@ MSTWithA (report_t *rep, filter_matrix_t *mat, int m, int32_t *ind, int32_t j,
 {
     int history[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1];
     int sons[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1];
-    int father[MERGE_LEVEL_MAX], height[MERGE_LEVEL_MAX], hmax, i, w;
+    int father[MERGE_LEVEL_MAX], hmax, i;
 
-    hmax = minimalSpanningTree(&w, father, height, sons, m, A);
-#if DEBUG >= 1
-    printMST(father, sons, m);
+#ifdef TIMINGS
+    tmst -= seconds ();
 #endif
-    hmax = addFatherToSons(history, mat, m, ind, j,A, father, height, hmax,sons);
+    minimalSpanningTree (father, sons, m, A);
+#ifdef TIMINGS
+    tmst += seconds ();
+#endif
+#if DEBUG >= 1
+    printMST (father, sons, m, ind);
+#endif
+    hmax = addFatherToSons (history, mat, m, ind, j, father, sons);
     for(i = hmax; i >= 0; i--)
 #if 0
 	reporthis(rep, history, i);
@@ -403,8 +447,18 @@ useMinimalSpanningTree (report_t *rep, filter_matrix_t *mat, int m,
 {
     int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX];
 
+#ifdef TIMINGS
+    tfill -= seconds ();
+#endif
     fillRowAddMatrix (A, mat, m, ind, j);
+#ifdef TIMINGS
+    tfill += seconds ();
+    tmst -= seconds ();
+#endif
     MSTWithA (rep, mat, m, ind, j, A);
+#ifdef TIMINGS
+    tmst += seconds ();
+#endif
 }
 
 static void
@@ -416,7 +470,8 @@ findOptimalCombination (report_t *rep, filter_matrix_t *mat, int m,
          for each i, 0 <= i < m, and keeps the best i
      (b) useMinimalSpanningTree computes a minimal spanning tree
      Both have complexity O(m^2), and useMinimalSpanningTree is always better
-     or equal. */
+     or equal. Moreover useMinimalSpanningTree is better to find cancellations
+     (if any) between rows. */
   if (m <= 2)
     tryAllCombinations (rep, mat, m, ind, j);
   else
@@ -824,6 +879,10 @@ mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel,
 
   printf ("Total number of removed columns: %" PRId64 "\n",
           mat->ncols-mat->rem_ncols);
+
+#ifdef TIMINGS
+  printf ("tfill=%.2f tmst=%.2f\n", tfill, tmst);
+#endif
 }
 
 //////////////////////////////////////////////////////////////////////
