@@ -338,55 +338,14 @@ tryAllCombinations(report_t *rep, filter_matrix_t *mat, int m, int32_t *ind,
     destroyRow(mat, ind[0]);
 }
 
-#if 0
-// add u to its sons; we save the history in the history array, so that
-// we can report all at once
-// return the number of internal nodes of the minimal spanning tree,
-// which corresponds to the number of lines in the history
-static int
-addFatherToSonsRec(int history[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1],
-		   filter_matrix_t *mat, int m, int *ind, int32_t j,
-		   int *father,
-		   int sons[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1],
-		   int u, int level0)
-{
-    int k, itab = 1, i1, i2, level = level0;
-
-    if(sons[u][0] == 0)
-	// nothing to do for a leaf...!
-	return -1;
-    i2 = ind[u];
-    if(u == father[u])
-	history[level0][itab++] = i2; // trick for the root!!!
-    else
-	// the usual trick not to destroy row
-	history[level0][itab++] = -(i2+1);
-    for(k = 1; k <= sons[u][0]; k++){
-	i1 = addFatherToSonsRec (history, mat, m, ind, j, father, sons,
-                                 sons[u][k], level+1);
-	if(i1 != -1)
-	    level = i1;
-	i1 = ind[sons[u][k]];
-	// add u to its son
-	addRowsAndUpdate(mat, i1, i2, j);
-	history[level0][itab++] = i1;
-    }
-    history[level0][0] = itab-1;
-    return level;
-}
-
-int
-addFatherToSons(int history[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1],
-		filter_matrix_t *mat, int m, int *ind, int32_t j,
-		int *father, int sons[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1])
-{
-  return addFatherToSonsRec (history, mat, m, ind, j, father, sons, 0, 0);
-}
-#else
+/*
+  Input: (father[i], sons[i]) for 1 <= i <= m-1 are the edges of the
+  minimal spanning tree.
+  Output: perform the corresponding merges, and stores them in the history. */
 int
 addFatherToSons(int history[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1],
 		filter_matrix_t *mat, int m, int *ind, int32_t ideal,
-		int *father, int sons[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1])
+		int *father, int *sons)
 {
   int i, s, t;
 
@@ -396,7 +355,7 @@ addFatherToSons(int history[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1],
   for (i = m - 2; i >= 0; i--)
     {
       s = father[i + 1];
-      t = sons[i + 1][0];
+      t = sons[i + 1];
       if (i == 0)
         {
           history[i][1] = ind[s]; /* to destroy root */
@@ -410,14 +369,13 @@ addFatherToSons(int history[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1],
     }
   return m - 2;
 }
-#endif
 
 static void
 MSTWithA (report_t *rep, filter_matrix_t *mat, int m, int32_t *ind, int32_t j, 
           int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX])
 {
     int history[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1];
-    int sons[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1];
+    int sons[MERGE_LEVEL_MAX];
     int father[MERGE_LEVEL_MAX], hmax, i;
 
 #ifdef TIMINGS

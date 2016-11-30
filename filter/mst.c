@@ -175,21 +175,17 @@ addAllEdges(int Q[MERGE_LEVEL_MAX*MERGE_LEVEL_MAX][3],
 	    addEdge(Q, u, v, A[u][v]);
 }
 
-/* if SIMPLE is defined, we simply put in father[i] and sons[i][0]
+/* we simply put in father[i] and sons[i][0]
    the values s and t of each edge (s, t) */
-#define SIMPLE
 
 /* naive implementation of Prim's algorithm */
 static int
-minimalSpanningTreePrimNaive (int *father,
-                              int sons[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1],
+minimalSpanningTreePrimNaive (int *father, int *sons,
                               int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX], int m)
 {
   int n, k, i, j, w = 0, imin, jmin, wmin;
   int S[MERGE_LEVEL_MAX], T[MERGE_LEVEL_MAX];
 
-  for(i = 0; i < m; i++)
-    sons[i][0] = 0;
   father[0] = 0; /* this is the root */
 
   /* S is the set of vertices in the current tree, T is the set of remaining
@@ -219,14 +215,8 @@ minimalSpanningTreePrimNaive (int *father,
       w += wmin;
       S[n] = t;
       T[jmin] = T[k - 1];
-#ifndef SIMPLE
-      father[t] = s;
-      sons[s][0] ++;
-      sons[s][sons[s][0]] = t;
-#else
       father[n] = s;
-      sons[n][0] = t;
-#endif
+      sons[n] = t;
       n++;
       k--;
     }
@@ -235,25 +225,15 @@ minimalSpanningTreePrimNaive (int *father,
 
 /* Return the weight of the minimal spanning tree.
    For each (s,t) which is part of the tree, we have
-   father[t] = s and sons[s][j] = t for some j, 1 <= j <= sons[s][0]. */
-#ifndef SIMPLE
+   father0[i] = s and sons0[i] = t for 1 <= i <= m-1. */
 static int
-minimalSpanningTreeWithPrim(int *father,
-			    int sons[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1],
+minimalSpanningTreeWithPrim(int *father0, int *sons0,
 			    int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX], int m)
-#else
-static int
-minimalSpanningTreeWithPrim(int *father0,
-			    int sons0[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1],
-			    int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX], int m)
-#endif
 {
     int Q[MERGE_LEVEL_MAX*MERGE_LEVEL_MAX][3]; // over-conservative
     int u, s, t, i, nV, w;
-#ifdef SIMPLE
     int father[MERGE_LEVEL_MAX];
     int sons[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1];
-#endif
 
     // nodes of T
     for(i = 0; i < m; i++){
@@ -261,9 +241,7 @@ minimalSpanningTreeWithPrim(int *father0,
 	sons[i][0] = 0; // last occupied position for a son of i
     }
     u = 0;
-#ifdef SIMPLE
     father0[u] = u;
-#endif
     father[u] = u; // for the root, isn't it?
     nV = m-1;
 #if QUEUE_TYPE == 0
@@ -296,10 +274,8 @@ minimalSpanningTreeWithPrim(int *father0,
 #endif
 	    w += A[s][t];
 	    father[t] = s;
-#ifdef SIMPLE
             father0[m - nV] = s;
-            sons0[m - nV][0] = t;
-#endif
+            sons0[m - nV] = t;
 	    // store new son for s
 	    sons[s][0]++;
 	    sons[s][sons[s][0]] = t;
@@ -439,7 +415,7 @@ fillRowAddMatrix(int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX], filter_matrix_t *mat,
 }
 
 int
-minimalSpanningTree(int *father, int sons[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1],
+minimalSpanningTree(int *father, int *sons,
 		    int m, int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX])
 {
   if (m <= 16)
@@ -452,7 +428,7 @@ int
 minCostUsingMST (filter_matrix_t *mat, int m, int32_t *ind, int32_t j)
 {
     int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX], w;
-    int sons[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1];
+    int sons[MERGE_LEVEL_MAX];
     int father[MERGE_LEVEL_MAX];
 
     fillRowAddMatrix (A, mat, m, ind, j);
@@ -468,23 +444,9 @@ void
 printMST (int father[MERGE_LEVEL_MAX],
           int sons[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1], int m, int32_t *ind)
 {
-    int i, k MAYBE_UNUSED;
-
-#ifdef SIMPLE
-    for(i = 0; i < m; i++)
-      printf ("father=%d(%d) son=%d(%d)\n", father[i], ind[father[i]],
-              sons[i][0], ind[sons[i][0]]);
-#else
-    for(i = 0; i < m; i++)
-      fprintf(stderr, "father[%d(%d)] = %d(%d)\n", i, ind[i],
-              father[i], ind[father[i]]);
-    for(i = 0; i < m; i++){
-      fprintf(stderr, "Sons of %d(%d):", i, ind[i]);
-	for(k = 1; k <= sons[i][0]; k++)
-          fprintf(stderr, " %d(%d)", sons[i][k], ind[sons[i][k]]);
-	fprintf(stderr, "\n");
-    }
-#endif
+  for (int i = 0; i < m; i++)
+    printf ("father=%d(%d) son=%d(%d)\n", father[i], ind[father[i]],
+            sons[i][0], ind[sons[i][0]]);
 }
 
 #if 0
