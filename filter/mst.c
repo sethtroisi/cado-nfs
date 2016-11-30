@@ -180,13 +180,11 @@ addAllEdges(int Q[MERGE_LEVEL_MAX*MERGE_LEVEL_MAX][3],
 
 /* naive implementation of Prim's algorithm */
 static int
-minimalSpanningTreePrimNaive (int *father, int *sons,
+minimalSpanningTreePrimNaive (int *start, int *end,
                               int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX], int m)
 {
   int n, k, i, j, w = 0, imin, jmin, wmin;
-  int S[MERGE_LEVEL_MAX], T[MERGE_LEVEL_MAX];
-
-  father[0] = 0; /* this is the root */
+  static int S[MERGE_LEVEL_MAX], T[MERGE_LEVEL_MAX];
 
   /* S is the set of vertices in the current tree, T is the set of remaining
      vertices */
@@ -215,8 +213,8 @@ minimalSpanningTreePrimNaive (int *father, int *sons,
       w += wmin;
       S[n] = t;
       T[jmin] = T[k - 1];
-      father[n] = s;
-      sons[n] = t;
+      start[n-1] = s;
+      end[n-1] = t;
       n++;
       k--;
     }
@@ -225,15 +223,15 @@ minimalSpanningTreePrimNaive (int *father, int *sons,
 
 /* Return the weight of the minimal spanning tree.
    For each (s,t) which is part of the tree, we have
-   father0[i] = s and sons0[i] = t for 1 <= i <= m-1. */
+   start[i] = s and end[i] = t for 0 <= i < m-1. */
 static int
-minimalSpanningTreeWithPrim(int *father0, int *sons0,
+minimalSpanningTreeWithPrim(int *start, int *end,
 			    int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX], int m)
 {
-    int Q[MERGE_LEVEL_MAX*MERGE_LEVEL_MAX][3]; // over-conservative
+    static int Q[MERGE_LEVEL_MAX*MERGE_LEVEL_MAX][3]; // over-conservative
     int u, s, t, i, nV, w;
-    int father[MERGE_LEVEL_MAX];
-    int sons[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1];
+    static int father[MERGE_LEVEL_MAX];
+    static int sons[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1];
 
     // nodes of T
     for(i = 0; i < m; i++){
@@ -241,7 +239,6 @@ minimalSpanningTreeWithPrim(int *father0, int *sons0,
 	sons[i][0] = 0; // last occupied position for a son of i
     }
     u = 0;
-    father0[u] = u;
     father[u] = u; // for the root, isn't it?
     nV = m-1;
 #if QUEUE_TYPE == 0
@@ -274,8 +271,8 @@ minimalSpanningTreeWithPrim(int *father0, int *sons0,
 #endif
 	    w += A[s][t];
 	    father[t] = s;
-            father0[m - nV] = s;
-            sons0[m - nV] = t;
+            start[m - 1 - nV] = s;
+            end[m - 1 - nV] = t;
 	    // store new son for s
 	    sons[s][0]++;
 	    sons[s][sons[s][0]] = t;
@@ -415,21 +412,21 @@ fillRowAddMatrix(int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX], filter_matrix_t *mat,
 }
 
 int
-minimalSpanningTree(int *father, int *sons,
+minimalSpanningTree(int *start, int *end,
 		    int m, int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX])
 {
   if (m <= 16)
-    return minimalSpanningTreePrimNaive (father, sons, A, m);
+    return minimalSpanningTreePrimNaive (start, end, A, m);
   else
-    return minimalSpanningTreeWithPrim (father, sons, A, m);
+    return minimalSpanningTreeWithPrim (start, end, A, m);
 }
 
 int
 minCostUsingMST (filter_matrix_t *mat, int m, int32_t *ind, int32_t j)
 {
-    int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX], w;
-    int sons[MERGE_LEVEL_MAX];
-    int father[MERGE_LEVEL_MAX];
+    static int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX], w;
+    static int sons[MERGE_LEVEL_MAX];
+    static int father[MERGE_LEVEL_MAX];
 
     fillRowAddMatrix (A, mat, m, ind, j);
     w = minimalSpanningTree (father, sons, m, A);

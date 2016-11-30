@@ -339,7 +339,7 @@ tryAllCombinations(report_t *rep, filter_matrix_t *mat, int m, int32_t *ind,
 }
 
 /*
-  Input: (father[i], sons[i]) for 1 <= i <= m-1 are the edges of the
+  Input: (father[i], sons[i]) for 0 <= i < m-1 are the edges of the
   minimal spanning tree.
   Output: perform the corresponding merges, and stores them in the history. */
 int
@@ -354,8 +354,8 @@ addFatherToSons(int history[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1],
      in increasing order: history[] is processed backwards in MSTWithA() */
   for (i = m - 2; i >= 0; i--)
     {
-      s = father[i + 1];
-      t = sons[i + 1];
+      s = father[i];
+      t = sons[i];
       if (i == 0)
         {
           history[i][1] = ind[s]; /* to destroy root */
@@ -375,20 +375,20 @@ MSTWithA (report_t *rep, filter_matrix_t *mat, int m, int32_t *ind, int32_t j,
           int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX])
 {
     int history[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1];
-    int sons[MERGE_LEVEL_MAX];
-    int father[MERGE_LEVEL_MAX], hmax, i;
+    int start[MERGE_LEVEL_MAX], end[MERGE_LEVEL_MAX];
+    int hmax, i;
 
 #ifdef TIMINGS
     tmst -= seconds ();
 #endif
-    minimalSpanningTree (father, sons, m, A);
+    minimalSpanningTree (start, end, m, A);
 #ifdef TIMINGS
     tmst += seconds ();
 #endif
 #if DEBUG >= 1
-    printMST (father, sons, m, ind);
+    printMST (start, end, m, ind);
 #endif
-    hmax = addFatherToSons (history, mat, m, ind, j, father, sons);
+    hmax = addFatherToSons (history, mat, m, ind, j, start, end);
     for(i = hmax; i >= 0; i--)
 #if 0
 	reporthis(rep, history, i);
