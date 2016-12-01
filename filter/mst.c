@@ -60,7 +60,7 @@ addEdge(int Q[MERGE_LEVEL_MAX*MERGE_LEVEL_MAX][3], int u, int v, int Auv)
     Q[0][1]++;
 }
 
-#else /* heap queue type */
+#elif QUEUE_TYPE == 1 /* heap queue type */
 
 // Q[0][0] contains the number of items in Q[], so that useful part of Q
 // is Q[1..Q[0][0]].
@@ -160,31 +160,30 @@ popQueue(int *s, int *t, int Q[MERGE_LEVEL_MAX*MERGE_LEVEL_MAX][3])
     Q[0][0]--;
     downQueue(Q, 1);
 }
-#endif /* QUEUE_TYPE == 0 */
+#elif QUEUE_TYPE == 2
+/* The queue is a heap of 32-bit entries, with the upper 16 bits being the
+   weight of the edge, the next 8 bits being the end vertex, and the last
+   8 bits the start vertex. In such a way by comparing two values we compare
+   the weight. */
+#endif
 
-// Add all neighbors of u, which is already in T; all edges with v in T
-// are not useful anymore.
+// Add all edges (u,v) with v in V
 static void
-addAllEdges(int Q[MERGE_LEVEL_MAX*MERGE_LEVEL_MAX][3],
-	    int u, int *father, int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX], int m)
+addAllEdges (int Q[MERGE_LEVEL_MAX*MERGE_LEVEL_MAX][3], int u,
+             int *V, int nV, int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX])
 {
-    int v;
-
-    for(v = 0; v < m; v++)
-	if((v != u) && (father[v] < 0))
-	    addEdge(Q, u, v, A[u][v]);
+  for (int i = 0; i < nV; i++)
+    addEdge (Q, u, V[i], A[u][V[i]]);
 }
 
-/* we simply put in father[i] and sons[i][0]
-   the values s and t of each edge (s, t) */
-
-/* naive implementation of Prim's algorithm */
+/* naive implementation of Prim's algorithm:
+   we put in start[i] and end[i] the values s and t of each edge (s, t) */
 static int
 minimalSpanningTreePrimNaive (int *start, int *end,
                               int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX], int m)
 {
   int n, k, i, j, w = 0, imin, jmin, wmin;
-  static int S[MERGE_LEVEL_MAX], T[MERGE_LEVEL_MAX];
+  int S[MERGE_LEVEL_MAX], T[MERGE_LEVEL_MAX];
 
   /* S is the set of vertices in the current tree, T is the set of remaining
      vertices */
@@ -228,29 +227,32 @@ static int
 minimalSpanningTreeWithPrim(int *start, int *end,
 			    int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX], int m)
 {
-    static int Q[MERGE_LEVEL_MAX*MERGE_LEVEL_MAX][3]; // over-conservative
-    int u, s, t, i, nV, w;
-    static int father[MERGE_LEVEL_MAX];
-    static int sons[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1];
+    int Q[MERGE_LEVEL_MAX*MERGE_LEVEL_MAX][3]; // over-conservative
+    int u, s, t, i, nU, nV, w;
+    int V[MERGE_LEVEL_MAX]; /* edges remaining to be dealt with */
+    int index[MERGE_LEVEL_MAX];
 
     // nodes of T
     for(i = 0; i < m; i++){
-	father[i] = -1;
-	sons[i][0] = 0; // last occupied position for a son of i
+        V[i] = i;
+        index[i] = i; /* V[index[i]] = i if i is in V, -1 otherwise */
     }
     u = 0;
-    father[u] = u; // for the root, isn't it?
-    nV = m-1;
+    index[u] = -1;
+    index[V[m-1]] = u;
+    V[u] = V[m-1];
+    nU = 1;   /* number of edges already in the MST */
+    nV = m-1; /* number of edges remaining to be dealt with */
 #if QUEUE_TYPE == 0
     Q[0][0] = 1;
     Q[0][1] = 1;
-    addAllEdges(Q, u, father, A, m);
+    addAllEdges (Q, u, V, nV, A);
     // active part of Q is Q[fQ..lQ[
     ASSERT(Q[0][0] == 1);
     ASSERT(Q[0][1] == m);
 #else /* heap */
     Q[0][0] = 0;
-    addAllEdges(Q, u, father, A, m);
+    addAllEdges (Q, u, V, nV, A);
 #endif
 #if DEBUG >= 1
     printQueue(Q);
@@ -259,27 +261,28 @@ minimalSpanningTreeWithPrim(int *start, int *end,
     while(! isQueueEmpty(Q)){
 	// while queue is non empty
 	// pop queue
-        popQueue(&s, &t, Q);
+        popQueue (&s, &t, Q);
 #if DEBUG >= 1
 	fprintf(stderr, "Popping a = (%d, %d) of weight %d\n", s, t, A[s][t]);
 #endif
-	if(father[t] == -1){
+	if (index[t] != -1){
 	    // t does not close a cycle
 	    // T[u] <- T[u] union (s, t)
 #if DEBUG >= 1
 	    fprintf(stderr, "new edge: (%d, %d) of weight %d\n",s,t,A[s][t]);
 #endif
 	    w += A[s][t];
-	    father[t] = s;
-            start[m - 1 - nV] = s;
-            end[m - 1 - nV] = t;
-	    // store new son for s
-	    sons[s][0]++;
-	    sons[s][sons[s][0]] = t;
+            start[nU - 1] = s;
+            end[nU - 1] = t;
+            ASSERT(V[index[t]] == t);
+            index[V[nV-1]] = index[t];
+            V[index[t]] = V[nV-1];
+            index[t] = -1;
 	    nV--;
+            nU++;
 	    if(nV == 0)
 		break;
-	    addAllEdges(Q, t, father, A, m);
+            addAllEdges (Q, t, V, nV, A);
 #if DEBUG >= 1
 	    printQueue(Q);
 #endif
@@ -424,9 +427,9 @@ minimalSpanningTree(int *start, int *end,
 int
 minCostUsingMST (filter_matrix_t *mat, int m, int32_t *ind, int32_t j)
 {
-    static int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX], w;
-    static int sons[MERGE_LEVEL_MAX];
-    static int father[MERGE_LEVEL_MAX];
+    int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX], w;
+    int sons[MERGE_LEVEL_MAX];
+    int father[MERGE_LEVEL_MAX];
 
     fillRowAddMatrix (A, mat, m, ind, j);
     w = minimalSpanningTree (father, sons, m, A);
@@ -438,12 +441,11 @@ minCostUsingMST (filter_matrix_t *mat, int m, int32_t *ind, int32_t j)
 }
 
 void
-printMST (int father[MERGE_LEVEL_MAX],
-          int sons[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1], int m, int32_t *ind)
+printMST (int *father, int *sons, int m, int32_t *ind)
 {
   for (int i = 0; i < m; i++)
     printf ("father=%d(%d) son=%d(%d)\n", father[i], ind[father[i]],
-            sons[i][0], ind[sons[i][0]]);
+            sons[i], ind[sons[i]]);
 }
 
 #if 0
