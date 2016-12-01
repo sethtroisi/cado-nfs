@@ -24,12 +24,6 @@
 #include "markowitz.h"
 #include "merge_mono.h"
 
-#define TIMINGS
-
-#ifdef TIMINGS
-double tfill = 0, tmst = 0;
-#endif
-
 #define DEBUG 0
 
 #if DEBUG >= 1
@@ -378,13 +372,7 @@ MSTWithA (report_t *rep, filter_matrix_t *mat, int m, int32_t *ind, int32_t j,
     int start[MERGE_LEVEL_MAX], end[MERGE_LEVEL_MAX];
     int hmax, i;
 
-#ifdef TIMINGS
-    tmst -= seconds ();
-#endif
     minimalSpanningTree (start, end, m, A);
-#ifdef TIMINGS
-    tmst += seconds ();
-#endif
 #if DEBUG >= 1
     printMST (start, end, m, ind);
 #endif
@@ -405,18 +393,8 @@ useMinimalSpanningTree (report_t *rep, filter_matrix_t *mat, int m,
 {
     int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX];
 
-#ifdef TIMINGS
-    tfill -= seconds ();
-#endif
     fillRowAddMatrix (A, mat, m, ind, j);
-#ifdef TIMINGS
-    tfill += seconds ();
-    tmst -= seconds ();
-#endif
     MSTWithA (rep, mat, m, ind, j, A);
-#ifdef TIMINGS
-    tmst += seconds ();
-#endif
 }
 
 static void
@@ -839,7 +817,17 @@ mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel,
           mat->ncols-mat->rem_ncols);
 
 #ifdef TIMINGS
-  printf ("tfill=%.2f tmst=%.2f\n", tfill, tmst);
+  for (int m = 2; m < MERGE_LEVEL_MAX; m++)
+    {
+      if (tfill[m] != 0 || tmst[m] != 0)
+        printf ("m=%d: ncalls=%.0f tfill=%.2f tmst=%.2f\n",
+                m, nfill[m], tfill[m], tmst[m]);
+      tfill[0] += tfill[m];
+      tmst[0] += tmst[m];
+      nfill[0] += nfill[m];
+    }
+  printf ("Total: ncalls=%.0f tfill=%.2f tmst=%.2f\n", nfill[0], tfill[0],
+          tmst[0]);
 #endif
 }
 

@@ -1,6 +1,11 @@
 #ifndef MERGE_MONO_H_
 #define MERGE_MONO_H_
 
+#ifdef TIMINGS
+extern double tfill[MERGE_LEVEL_MAX], tmst[MERGE_LEVEL_MAX];
+extern double nfill[MERGE_LEVEL_MAX];
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif

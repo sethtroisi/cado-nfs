@@ -8,6 +8,11 @@
 #include "sparse.h"
 #include "mst.h"
 
+#ifdef TIMINGS
+double tfill[MERGE_LEVEL_MAX] = {0,}, tmst[MERGE_LEVEL_MAX] = {0,};
+double nfill[MERGE_LEVEL_MAX] = {0,};
+#endif
+
 //////////////////////////////////////////////////////////////////////
 // heap data structure to store the remaining edges to be considered
 // in Prim's algorithm
@@ -219,7 +224,8 @@ minimalSpanningTreeWithPrim(int *start, int *end,
     return w;
 }
 
-#if 0
+#if !defined(FOR_DL) && 0
+/* special fillRowAddMatrix() code for factorization */
 /* return a list l of all (unique and sorted) ideals appearing in relations
    ind[0] to ind[j-1], and put in *n the length of l */
 static index_t*
@@ -261,7 +267,7 @@ get_ideals (int *n, index_t **rows, int32_t *ind, int j)
 /* for each ideal j in r[0] to r[k-1], find the unique u such that l[u] = j,
    and set bit u of t to 1 */
 static void
-mpz_set_bits (mpz_t t, index_t *r, int k, index_t *l, int n, int32_t ideal)
+mpz_set_bits (mpz_t t, index_t *r, int k, index_t *l, int n)
 {
   int i, u, v;
   index_t j;
@@ -281,31 +287,30 @@ mpz_set_bits (mpz_t t, index_t *r, int k, index_t *l, int n, int32_t ideal)
             u = w;
         }
       /* now l[u] = j */
-      if (l[u] != j)
-        {
-          printf ("ideal=%d u=%d v=%d l[u]=%u j=%u\n", ideal, u, v, l[u], j);
-        }
-      ASSERT_ALWAYS(l[u] == j);
+      ASSERT(l[u] == j);
       mpz_setbit (t, u);
     }
 }
 
-/* special code for factorization */
 void
-fillRowAddMatrix2(int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX], filter_matrix_t *mat,
+fillRowAddMatrix(int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX], filter_matrix_t *mat,
                  int m, int32_t *ind, int32_t ideal MAYBE_UNUSED)
 {
   int i, j, n;
-  index_t *l = get_ideals (&n, mat->rows, ind, m);
+  index_t *l;
   mpz_t *t, u;
 
+#ifdef TIMINGS
+  tfill[m] -= seconds ();
+  nfill[m] += 1.0;
+#endif
+  l = get_ideals (&n, mat->rows, ind, m);
   mpz_init (u);
   t = malloc (m * sizeof (mpz_t));
   for (i = 0; i < m; i++)
     {
-      mpz_init(t[i]); /* set to 0 */
-      mpz_set_bits (t[i], mat->rows[ind[i]] + 1, mat->rows[ind[i]][0], l, n,
-                    ideal);
+      mpz_init (t[i]); /* set to 0 */
+      mpz_set_bits (t[i], mat->rows[ind[i]] + 1, mat->rows[ind[i]][0], l, n);
     }
   for (i = 0; i < m; i++)
     {
@@ -322,9 +327,11 @@ fillRowAddMatrix2(int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX], filter_matrix_t *mat,
   free (t);
   free (l);
   mpz_clear (u);
-}
+#ifdef TIMINGS
+  tfill[m] += seconds ();
 #endif
-
+}
+#else
 /* given an ideal of weight m, fills the m x m matrix A so that
    A[i][j] is the weight of the sum of the i-th and j-th rows
    containing the ideal, for 0 <= i, j < m */
@@ -334,22 +341,39 @@ fillRowAddMatrix(int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX], filter_matrix_t *mat,
 {
     int i, j;
 
+#ifdef TIMINGS
+    tfill[m] -= seconds ();
+    nfill[m] += 1.0;
+#endif
     /* A[i][i] is not used, thus we don't initialize it. */
     for(i = 0; i < m; i++)
 	for(j = i+1; j < m; j++){
 	    A[i][j] = weightSum (mat, ind[i], ind[j], ideal);
 	    A[j][i] = A[i][j];
 	}
+#ifdef TIMINGS
+    tfill[m] += seconds ();
+#endif
 }
+#endif
 
 int
 minimalSpanningTree(int *start, int *end,
 		    int m, int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX])
 {
+  int ret;
+
+#ifdef TIMINGS
+  tmst[m] -= seconds ();
+#endif
   if (m <= 16)
-    return minimalSpanningTreePrimNaive (start, end, A, m);
+    ret = minimalSpanningTreePrimNaive (start, end, A, m);
   else
-    return minimalSpanningTreeWithPrim (start, end, A, m);
+    ret = minimalSpanningTreeWithPrim (start, end, A, m);
+#ifdef TIMINGS
+  tmst[m] += seconds ();
+#endif
+  return ret;
 }
 
 int
