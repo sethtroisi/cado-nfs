@@ -9,168 +9,102 @@
 #include "mst.h"
 
 //////////////////////////////////////////////////////////////////////
-// Prim
+// heap data structure to store the remaining edges to be considered
+// in Prim's algorithm
 
-#define QUEUE_TYPE 1 // 0 for naive, 1 for heap
+// #define DEBUG 1
 
-#if QUEUE_TYPE == 0
-
-// we put fQ in Q[0][0], lQ in Q[0][1].
-
-#define isQueueEmpty(Q) (Q[0][0] == Q[0][1])
-
-static void
-popQueue(int *s, int *t, int Q[MERGE_LEVEL_MAX*MERGE_LEVEL_MAX][3])
-{
-    int fQ = Q[0][0];
-
-    *s = Q[fQ][0];
-    *t = Q[fQ][1];
-    Q[0][0]++;
-}
-
-#if DEBUG >= 1
-static void
-printQueue(int Q[MERGE_LEVEL_MAX*MERGE_LEVEL_MAX][3])
-{
-    int i;
-
-    for(i = Q[0][0]; i < Q[0][1]; i++)
-	fprintf(stderr, "Q[%d] = [%d, %d, %d]\n", i,Q[i][0], Q[i][1], Q[i][2]);
-}
-#endif
-
-static void
-addEdge(int Q[MERGE_LEVEL_MAX*MERGE_LEVEL_MAX][3], int u, int v, int Auv)
-{
-    int i, j, fQ = Q[0][0], lQ = Q[0][1];
-
-    for(i = fQ; i < lQ; i++)
-	if(Auv < Q[i][2])
-	    break;
-    // shift everybody: Auv >= Q[i][2]
-    for(j = lQ; j > i; j--){
-	Q[j][0] = Q[j-1][0];
-	Q[j][1] = Q[j-1][1];
-	Q[j][2] = Q[j-1][2];
-    }
-    Q[i][0] = u;
-    Q[i][1] = v;
-    Q[i][2] = Auv;
-    Q[0][1]++;
-}
-
-#elif QUEUE_TYPE == 1 /* heap queue type */
-
-// Q[0][0] contains the number of items in Q[], so that useful part of Q
-// is Q[1..Q[0][0]].
-
-#define isQueueEmpty(Q) (Q[0][0] == 0)
-
-#if DEBUG >= 1
-static void
-printQueue(int Q[MERGE_LEVEL_MAX*MERGE_LEVEL_MAX][3])
-{
-    int level = 0, imax = 1, i;
-
-    fprintf(stderr, "L0:");
-    for(i = 1; i <= Q[0][0]; i++){
-	fprintf(stderr, " %d", Q[i][2]);
-	if(i == imax){
-	    imax = (imax<<1)+1;
-	    fprintf(stderr, "\nL%d:", ++level);
-	}
-    }
-    fprintf(stderr, "\n");
-}
-#endif
-
-static void
-upQueue(int Q[MERGE_LEVEL_MAX*MERGE_LEVEL_MAX][3], int k)
-{
-    int x = Q[k][0], y = Q[k][1], v = Q[k][2];
-
-    while((k > 1) && (Q[k/2][2] > v)){
-	// we are at level > 0 and the father is > son
-	// the father replaces the son
-	Q[k][0] = Q[k/2][0];
-	Q[k][1] = Q[k/2][1];
-	Q[k][2] = Q[k/2][2];
-	k /= 2;
-    }
-    // we found the place of (x, y, v)
-    Q[k][0] = x;
-    Q[k][1] = y;
-    Q[k][2] = v;
-}
-
-static void
-addEdge(int Q[MERGE_LEVEL_MAX*MERGE_LEVEL_MAX][3], int u, int v, int Auv)
-{
-    Q[0][0]++;
-    Q[Q[0][0]][0] = u;
-    Q[Q[0][0]][1] = v;
-    Q[Q[0][0]][2] = Auv;
-    upQueue(Q, Q[0][0]);
-#if DEBUG >= 1
-    if(Q[0][0] >= MERGE_LEVEL_MAX*MERGE_LEVEL_MAX-2)
-	fprintf(stderr, "size(Q) -> %d\n", Q[0][0]);
-#endif
-}
-
-// Move Q[1] down.
-static void
-downQueue(int Q[MERGE_LEVEL_MAX*MERGE_LEVEL_MAX][3], int k)
-{
-    int x = Q[k][0], y = Q[k][1], v = Q[k][2], j;
-
-    while(2*k <= Q[0][0]){
-	// k has at least a left son
-	j = 2*k;
-	if(j < Q[0][0])
-	    // k has a right son
-	    if(Q[j][2] > Q[j+1][2])
-		j++;
-	// at this point, Q[j] is the smallest son
-	if(v <= Q[j][2])
-	    break;
-	else{
-	    // the father takes the place of the son
-	    Q[k][0] = Q[j][0];
-	    Q[k][1] = Q[j][1];
-	    Q[k][2] = Q[j][2];
-	    k = j;
-	}
-    }
-    // we found the place of v
-    Q[k][0] = x;
-    Q[k][1] = y;
-    Q[k][2] = v;
-}
-
-// smallest edge (s, t) is always in Q[1]
-static void
-popQueue(int *s, int *t, int Q[MERGE_LEVEL_MAX*MERGE_LEVEL_MAX][3])
-{
-    *s = Q[1][0];
-    *t = Q[1][1];
-    Q[1][0] = Q[Q[0][0]][0];
-    Q[1][1] = Q[Q[0][0]][1];
-    Q[1][2] = Q[Q[0][0]][2];
-    Q[0][0]--;
-    downQueue(Q, 1);
-}
-#elif QUEUE_TYPE == 2
 /* The queue is a heap of 32-bit entries, with the upper 16 bits being the
    weight of the edge, the next 8 bits being the end vertex, and the last
    8 bits the start vertex. In such a way by comparing two values we compare
-   the weight. */
+   the weight. The heap starts at Q[1], Q[0] being the number of elements of
+   the heap, thus the heap values are Q[1]...Q[Q[0]]. */
+
+#define isQueueEmpty(Q) (Q[0] == 0)
+#define W(x) ((x) >> 16)
+#define S(x) ((x) & 255)
+#define T(x) (((x) >> 8) & 255)
+
+#define MAX_QUEUE_SIZE (MERGE_LEVEL_MAX*MERGE_LEVEL_MAX/2)
+
+#if DEBUG >= 1
+static void
+printQueue (uint32_t *Q)
+{
+  for (unsigned int i = 1; i <= Q[0]; i++)
+    fprintf (stderr, "w=%d s=%d t=%d\n", W(Q[i]), S(Q[i]), T(Q[i]));
+}
 #endif
+
+static void
+upQueue (uint32_t *Q, int k)
+{
+  uint32_t x = Q[k];
+
+  while ((k > 1) && (x < Q[k/2]))
+    {
+      // we are at level > 0 and the father is > son
+      // the father replaces the son
+      Q[k] = Q[k/2];
+      k /= 2;
+    }
+  // we found the place of x
+  Q[k] = x;
+}
+
+static void
+addEdge (uint32_t *Q, int s, int t, int Auv)
+{
+  Q[0] ++;
+  ASSERT(Q[0] < MAX_QUEUE_SIZE);
+  Q[Q[0]] = (Auv << 16) | (t << 8) | s;
+  upQueue (Q, Q[0]);
+}
+
+// Move Q[k] down.
+static void
+downQueue (uint32_t *Q, unsigned int k)
+{
+  uint32_t x = Q[k];
+  unsigned int j;
+
+  /* the left son of k is 2k, the right son is 2k+1 */
+  while (2*k <= Q[0])
+    {
+      // k has at least a left son
+      j = 2*k;
+      if (j < Q[0])
+        // k has a right son
+        if (Q[j] > Q[j+1])
+          j++;
+      // at this point, Q[j] is the smallest son
+      if (x <= Q[j])
+        break; /* x is smaller than smallest son */
+      else
+        {
+          // the father takes the place of the son
+          Q[k] = Q[j];
+          k = j;
+        }
+    }
+  // we found the place of x
+  Q[k] = x;
+}
+
+static void
+popQueue(int *s, int *t, uint32_t *Q)
+{
+  *s = S(Q[1]);
+  *t = T(Q[1]);
+  Q[1] = Q[Q[0]];
+  Q[0]--;
+  downQueue (Q, 1);
+}
 
 // Add all edges (u,v) with v in V
 static void
-addAllEdges (int Q[MERGE_LEVEL_MAX*MERGE_LEVEL_MAX][3], int u,
-             int *V, int nV, int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX])
+addAllEdges (uint32_t *Q, int u, int *V, int nV,
+             int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX])
 {
   for (int i = 0; i < nV; i++)
     addEdge (Q, u, V[i], A[u][V[i]]);
@@ -227,7 +161,11 @@ static int
 minimalSpanningTreeWithPrim(int *start, int *end,
 			    int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX], int m)
 {
-    int Q[MERGE_LEVEL_MAX*MERGE_LEVEL_MAX][3]; // over-conservative
+  /* the queue contains at most m-1 edges when nU=1 (those connected to the
+     root node), then at most 2*(m-2) when nU=2 (we remove one node and add
+     m-2), ... More generally whehn nU=k it is at most k*m - k*(k-1)/2 - (k-1).
+     The maximum is for k=m-2 or m-2 when it equals m^2/2-3/2*m+2 < m^2/2. */
+    uint32_t Q[MAX_QUEUE_SIZE];
     int u, s, t, i, nU, nV, w;
     int V[MERGE_LEVEL_MAX]; /* edges remaining to be dealt with */
     int index[MERGE_LEVEL_MAX];
@@ -243,25 +181,15 @@ minimalSpanningTreeWithPrim(int *start, int *end,
     V[u] = V[m-1];
     nU = 1;   /* number of edges already in the MST */
     nV = m-1; /* number of edges remaining to be dealt with */
-#if QUEUE_TYPE == 0
-    Q[0][0] = 1;
-    Q[0][1] = 1;
+    Q[0] = 0; /* heap is empty initially */
     addAllEdges (Q, u, V, nV, A);
-    // active part of Q is Q[fQ..lQ[
-    ASSERT(Q[0][0] == 1);
-    ASSERT(Q[0][1] == m);
-#else /* heap */
-    Q[0][0] = 0;
-    addAllEdges (Q, u, V, nV, A);
-#endif
 #if DEBUG >= 1
     printQueue(Q);
 #endif
     w = 0;
-    while(! isQueueEmpty(Q)){
-	// while queue is non empty
-	// pop queue
-        popQueue (&s, &t, Q);
+    while (!isQueueEmpty(Q)) /* while queue is non empty */
+      {
+        popQueue (&s, &t, Q); // pop queue
 #if DEBUG >= 1
 	fprintf(stderr, "Popping a = (%d, %d) of weight %d\n", s, t, A[s][t]);
 #endif
@@ -280,7 +208,7 @@ minimalSpanningTreeWithPrim(int *start, int *end,
             index[t] = -1;
 	    nV--;
             nU++;
-	    if(nV == 0)
+	    if (nV == 0)
 		break;
             addAllEdges (Q, t, V, nV, A);
 #if DEBUG >= 1
