@@ -1,5 +1,6 @@
 #include "cado.h"
 #include <stdio.h>
+#include <string.h>
 
 #include "portability.h"
 #include "filter_config.h"
@@ -226,50 +227,44 @@ minimalSpanningTreeWithPrim(int *start, int *end,
 
 #if !defined(FOR_DL) && 0
 /* special fillRowAddMatrix() code for factorization */
-/* return a list l of all (unique and sorted) ideals appearing in relations
+/* return a list l of all ideals appearing at least *twice* in relations
    ind[0] to ind[j-1], and put in *n the length of l */
 static index_t*
-get_ideals (int *n, index_t **rows, int32_t *ind, int j)
+get_ideals (int *n, index_t **rows, int32_t *ind, int m)
 {
-  if (j == 1)
+  int i, j, s = 0;
+
+  for (i = 0; i < m; i++)
+    s += rows[ind[i]][0];
+
+  index_t *l = malloc (s * sizeof (index_t));
+  for (i = j = 0; i < m; i++)
     {
-      *n = rowLength (rows, ind[0]);
-      return rows[ind[0]] + 1;
+      memcpy (l + j, rows[ind[i]] + 1, rows[ind[i]][0] * sizeof (index_t));
+      j += rows[ind[i]][0];
     }
-  int k = j / 2, n1, n2, k1, k2;
-  index_t *l1 = get_ideals (&n1, rows, ind, k);
-  index_t *l2 = get_ideals (&n2, rows, ind + k, j - k);
-  /* merge the two lists */
-  index_t *l;
-  l = malloc ((n1 + n2) * sizeof (index_t));
-  for (k1 = 0, k2 = 0, k = 0; k1 < n1 && k2 < n2;)
+
+  qsort (l, s, sizeof (index_t), cmp_index);
+
+  /* now remove ideals appearing only once, and make other ideals unique */
+  for (i = 0, *n = 0; i < s; )
     {
-      if (l1[k1] <= l2[k2])
-        {
-          k2 += (l1[k1] == l2[k2]);
-          l[k++] = l1[k1++];
-        }
-      else /* l2[k2] < l1[k1] */
-        l[k++] = l2[k2++];
+      for (j = i; j + 1 < s && l[i] == l[j + 1]; j++);
+      /* l[i] = l[i+1] = ... = l[j] */
+      if (i < j) /* ideal l[i] appears at least twice */
+        l[(*n)++] = l[i];
+      i = j + 1;
     }
-  while (k1 < n1)
-    l[k++] = l1[k1++];
-  while (k2 < n2)
-    l[k++] = l2[k2++];
-  *n = k;
-  if (j >= 4) /* then floor(j/2) >= 2 */
-    free (l1);
-  if (j >= 3) /* then ceil(j/2) >= 2 */
-    free (l2);
+
   return l; /* not need to reallocate since l will be freed right away */
 }
 
 /* for each ideal j in r[0] to r[k-1], find the unique u such that l[u] = j,
-   and set bit u of t to 1 */
-static void
+   if it is in l[0]..l[n-1], and set bit u of t to 1 */
+static int
 mpz_set_bits (mpz_t t, index_t *r, int k, index_t *l, int n)
 {
-  int i, u, v;
+  int i, u, v, ret = 0;
   index_t j;
 
   for (i = 0; i < k; i++)
@@ -286,10 +281,14 @@ mpz_set_bits (mpz_t t, index_t *r, int k, index_t *l, int n)
           else
             u = w;
         }
-      /* now l[u] = j */
-      ASSERT(l[u] == j);
-      mpz_setbit (t, u);
+      /* now l[u] <= j < l[u+1] */
+      if (l[u] == j)
+        {
+          mpz_setbit (t, u);
+          ret ++;
+        }
     }
+  return ret;
 }
 
 void
@@ -299,26 +298,31 @@ fillRowAddMatrix(int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX], filter_matrix_t *mat,
   int i, j, n;
   index_t *l;
   mpz_t *t, u;
+  int tot[MERGE_LEVEL_MAX], dup[MERGE_LEVEL_MAX];
 
 #ifdef TIMINGS
   tfill[m] -= seconds ();
   nfill[m] += 1.0;
 #endif
   l = get_ideals (&n, mat->rows, ind, m);
+  /* l is the list of ideals appearing at least twice */
   mpz_init (u);
   t = malloc (m * sizeof (mpz_t));
   for (i = 0; i < m; i++)
     {
+      tot[i] = mat->rows[ind[i]][0]; /* number of ideals of relation i */
       mpz_init (t[i]); /* set to 0 */
-      mpz_set_bits (t[i], mat->rows[ind[i]] + 1, mat->rows[ind[i]][0], l, n);
+      dup[i] = mpz_set_bits (t[i], mat->rows[ind[i]] + 1, tot[i], l, n);
+      /* dup[i] is the number of ideals of relation i which appears in at
+         least two relations */
     }
   for (i = 0; i < m; i++)
     {
-      A[i][i] = 0;
       for (j = i + 1; j < m; j++)
         {
           mpz_xor (u, t[i], t[j]);
-          A[i][j] = mpz_popcount (u);
+          /* if no cancellation, we expect u has dup[i] + dup[j] bits set */
+          A[i][j] = tot[i] + tot[j] - (dup[i] + dup[j] - mpz_popcount (u));
           A[j][i] = A[i][j];
         }
     }
@@ -366,7 +370,7 @@ minimalSpanningTree(int *start, int *end,
 #ifdef TIMINGS
   tmst[m] -= seconds ();
 #endif
-  if (m <= 16)
+  if (m <= 25)
     ret = minimalSpanningTreePrimNaive (start, end, A, m);
   else
     ret = minimalSpanningTreeWithPrim (start, end, A, m);
