@@ -555,6 +555,8 @@ deleteSuperfluousRows (report_t *rep, filter_matrix_t *mat,
   return nirem;
 }
 
+#define REPORT_INCR 3.0
+
 static int
 number_of_superfluous_rows (filter_matrix_t *mat)
 {
@@ -581,8 +583,9 @@ number_of_superfluous_rows (filter_matrix_t *mat)
       ni2rem = excess / 32;
     else
       ni2rem = excess / 64;
+    ni2rem = (int) ((double) ni2rem * REPORT_INCR / 5.0);
     return 2 * ni2rem; /* multiplying by 2 seems optimal experimentally
-                          for a target density of 170 */
+                          for a target density of 170 and REPORT_INCR = 5 */
 }
 
 static void
@@ -713,7 +716,7 @@ mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel,
   WoverN = compute_WoverN (mat);
 
   /* report lines are printed for each multiple of report_incr */
-  double report_incr = 5.0;
+  double report_incr = REPORT_INCR;
   double report_next = ceil (WoverN / report_incr) * report_incr;
 
   int64_t excess;
@@ -724,7 +727,7 @@ mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel,
     if (excess > mat->keep &&
         (WoverN >= target_density || MkzQueueCardinality (mat) == 0))
       { /* we hope removing the remaining excess will decrease the average
-           row density or will enable more merges */
+           row density and thus enable a few more merges */
         printf ("Removing final excess, nrows=%" PRIu64 "\n",
                 mat->rem_nrows);
         deleteSuperfluousRows (rep, mat, excess - mat->keep, INT_MAX);
@@ -791,11 +794,19 @@ mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel,
     {
       print_report (mat);
       report_next += report_incr;
-      removeSingletons (rep, mat);
       ni2rem = number_of_superfluous_rows (mat);
       deleteSuperfluousRows (rep, mat, ni2rem, m);
-      recomputeR (mat);
+      removeSingletons (rep, mat);
+      if (mat->cwmax == mat->mergelevelmax)
+        recomputeR (mat);
     }
+
+    if (MkzQueueCardinality (mat) == 0)
+      {
+        if (mat->cwmax < mat->mergelevelmax)
+          mat->cwmax ++;
+        recomputeR (mat);
+      }
   }
 
   /* now excess = keep and (WoverN >= target or queue is empty) */

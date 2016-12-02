@@ -268,7 +268,9 @@ initMat (filter_matrix_t *mat, int maxlevel, uint32_t keep,
 {
   mat->keep  = keep;
   mat->mergelevelmax = maxlevel;
-  mat->cwmax = maxlevel;
+  /* we start with cwmax = 2, and we increase it in mergeOneByOne() when
+     the Markowitz queue is empty */
+  mat->cwmax = 2;
   ASSERT_ALWAYS (mat->cwmax < 255); /* 255 is reserved for saturated values */
   mat->nburied = nburied;
 
@@ -356,7 +358,7 @@ renumber_columns (filter_matrix_t *mat)
 
 /* initialize Rj[j] for light columns, i.e., for those of weight <= cwmax */
 static void
-InitMatR (filter_matrix_t *mat)
+initMatR (filter_matrix_t *mat)
 {
   index_t h;
   int32_t wmax = mat->cwmax;
@@ -705,7 +707,7 @@ filter_matrix_read (filter_matrix_t *mat, const char *purgedname)
   ASSERT_ALWAYS (mat->weight + weight_buried == mat->tot_weight);
 
   /* Allocate mat->R[h] if necessary */
-  InitMatR (mat);
+  initMatR (mat);
 
   /* Re-read all rels (in memory) to fill-in mat->R */
   printf("# Start to fill-in columns of the matrix...\n");
