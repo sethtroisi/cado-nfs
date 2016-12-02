@@ -937,8 +937,13 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
     }
     /* }}} */
 
-    if (!las->default_config &&
-            !param_list_lookup_string(pl, "descent-hint-table")) {
+#ifdef DLP_DESCENT
+    int has_descent_hint = param_list_lookup_string(pl, "descent-hint-table") != NULL;
+#else
+    const int has_descent_hint = 0;
+#endif
+
+    if (!las->default_config && !has_descent_hint) {
         fprintf(stderr,
                 "Error: no default config set, and no hint table either\n");
         exit(EXIT_FAILURE);
@@ -952,9 +957,11 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
             fprintf(stderr, "Error: option stats-cofact works only "
                     "with a default config\n");
             exit(EXIT_FAILURE);
-        } else if (param_list_lookup_string(pl, "descent-hint-table")) {
+#ifdef DLP_DESCENT
+        } else if (has_descent_hint) {
             verbose_output_print(0, 1, "# Warning: option stats-cofact "
                     "only applies to the default siever config\n");
+#endif
         }
 
         cof_stats_file = fopen (statsfilename, "w");
