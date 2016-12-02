@@ -611,7 +611,7 @@ filter_matrix_read (filter_matrix_t *mat, const char *purgedname)
   total = weight_count (mat, nbm);
   for (h = 1; h <= (uint64_t) mat->mergelevelmax; h++)
     printf ("There are %" PRIu64 " column(s) of weight %" PRIu64 "\n", nbm[h], h);
-  printf ("Total %lu active columns\n", total);
+  printf ("Total %" PRIu64 " columns\n", total);
   ASSERT_ALWAYS(mat->rem_ncols == mat->ncols - nbm[0]);
 
   /* Bury heavy coloumns. The 'nburied' heaviest column are buried. */
