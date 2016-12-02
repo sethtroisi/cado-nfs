@@ -801,9 +801,16 @@ mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel,
         recomputeR (mat);
     }
 
-    if (MkzQueueCardinality (mat) == 0)
+    /* if we have not yet reached maxlevel:
+       (a) if we have reached the target excess, we increase cwmax to maxlevel
+       (b) if we have not yet reached keep, and the queue is empty, we increase
+           cwmax by 1 only */
+    if (mat->cwmax < mat->mergelevelmax &&
+        (MkzQueueCardinality (mat) == 0 || excess == mat->keep))
       {
-        if (mat->cwmax < mat->mergelevelmax)
+        if (excess == mat->keep)
+          mat->cwmax = mat->mergelevelmax;
+        else /* MkzQueueCardinality (mat) == 0 */
           mat->cwmax ++;
         recomputeR (mat);
       }
