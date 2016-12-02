@@ -8,10 +8,7 @@ extern "C" {
 struct mf_bal_args {
     const char * rwfile;
     const char * cwfile;
-    /* mf_prepare_matrix_u32 sets mfile with strdup, and there is no
-     * associated dtor... So we must allow inspection, otherwise we'll
-     * leak that */
-    char * mfile;
+    const char * mfile;
     const char * bfile;
     int quiet;
     int nh;
