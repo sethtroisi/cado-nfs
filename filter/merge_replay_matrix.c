@@ -12,6 +12,7 @@
 #include "merge_replay_matrix.h"
 #include "sparse.h"
 #include "markowitz.h"
+#include "mst.h"
 
 /***************** memory allocation on R[j] *********************************/
 
@@ -470,6 +471,10 @@ weight_count (filter_matrix_t *mat, uint64_t *nbm)
 void
 recomputeR (filter_matrix_t *mat)
 {
+#ifdef TIMINGS
+  trecomputeR -= seconds ();
+#endif
+
   /* recompute the column weights */
   recompute_weights (mat);
 
@@ -482,6 +487,10 @@ recomputeR (filter_matrix_t *mat)
   /* recompute the Markowitz structure */
   MkzClear (mat, 0);
   MkzInit (mat, 0);
+
+#ifdef TIMINGS
+  trecomputeR += seconds ();
+#endif
 }
 
 void

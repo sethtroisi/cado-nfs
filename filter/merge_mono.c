@@ -828,6 +828,7 @@ mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel,
     }
   printf ("Total: ncalls=%.0f tfill=%.2f tmst=%.2f\n", nfill[0], tfill[0],
           tmst[0]);
+  printf ("Time for recomputeR: %.2f\n", trecomputeR);
 #endif
 }
 

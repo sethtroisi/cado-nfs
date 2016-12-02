@@ -231,6 +231,7 @@ MkzCheck(filter_matrix_t *mat)
 {
   uint64_t dj;
   int maxlevel = mat->mergelevelmax;
+
   for(dj = 0; dj < mat->ncols; dj++)
   {
     if (0 < mat->wt[dj] && mat->wt[dj] <= maxlevel)
@@ -557,7 +558,7 @@ MkzRemoveJ(filter_matrix_t *mat, int32_t j)
 
     /* This can happen when maxlevel < weight[j] <= cwmax initially, thus
        A[j] was initialized to MKZ_INF, but because of a merge it becomes
-       larger than cwmax. FIXME: should we have maxlevel = cwmax? */
+       larger than cwmax. */
     if (mat->MKZA[j] == MKZ_INF)
       return;
 

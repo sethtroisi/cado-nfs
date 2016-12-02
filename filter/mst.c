@@ -12,6 +12,7 @@
 #ifdef TIMINGS
 double tfill[MERGE_LEVEL_MAX] = {0,}, tmst[MERGE_LEVEL_MAX] = {0,};
 double nfill[MERGE_LEVEL_MAX] = {0,};
+double trecomputeR = 0;
 #endif
 
 //////////////////////////////////////////////////////////////////////
