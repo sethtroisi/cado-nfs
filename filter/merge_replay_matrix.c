@@ -251,14 +251,17 @@ heap_pop (heap H, filter_matrix_t *mat MAYBE_UNUSED)
 int
 decrS (int w)
 {
-  return (w >= 0 ? w - 1 : w + 1);
+  /* since MkzDecreaseColWeight is only called for mat->wt[j] >= 0
+     in removeCellAndUpdate(), we always have w >= 0 here */
+  ASSERT(w >= 0);
+  return w - 1;
 }
 
 /* increment the absolute value of a signed number */
 int
 incrS (int w)
 {
-  return (w >= 0 ? w + 1 : w - 1);
+  return (w >= 0) ? w + 1 : w - 1;
 }
 
 /* initialize the sparse matrix mat */
@@ -325,7 +328,8 @@ renumber_columns (filter_matrix_t *mat)
   {
     /* at this point wt[j] = 0 if ideal j never appears in relations,
      * or wt[j] > 0 if ideal j appears in relations */
-    if (mat->wt[j] != 0)
+    ASSERT(mat->wt[j] >= 0);
+    if (mat->wt[j] > 0)
     {
       /* index j is mapped to h, with h <= j */
       p[j] = h;
@@ -339,7 +343,7 @@ renumber_columns (filter_matrix_t *mat)
   }
   /* h should be equal to rem_ncols, which is the number of columns with
    * non-zero weight */
-  ASSERT_ALWAYS(h == mat->rem_ncols);
+  ASSERT_ALWAYS(h + mat->nburied == mat->rem_ncols);
 
   /* Realloc mat->wt */
   mat->wt = realloc (mat->wt, h * sizeof (int32_t));
@@ -399,10 +403,6 @@ recompute_weights (filter_matrix_t *mat)
         {
           h = matCell(mat, i, k);
           mat->wt[h] ++;
-#if TRACE_COL >= 0
-          if (h == TRACE_COL)
-            printf ("TRACE_COL: found ideal %lu in row %lu\n", h, i);
-#endif
         }
 }
 
@@ -457,17 +457,22 @@ fillR (filter_matrix_t *mat)
 #endif
 }
 
-/* put in nbm[w] for 0 <= w < 256, the number of ideals of weight w */
-void
+/* Put in nbm[w] for 0 <= w < 256, the number of ideals of weight w.
+   Return the number of active columns (w > 0). */
+unsigned long
 weight_count (filter_matrix_t *mat, uint64_t *nbm)
 {
-  uint64_t h;
+  uint64_t h, active = 0;
 
   for (h = 0; h < 256; h++)
     nbm[h] = 0;
   for (h = 0; h < mat->ncols; h++)
-    if (0 <= mat->wt[h] && mat->wt[h] < 256)
-      nbm[mat->wt[h]]++;
+    {
+      if (0 <= mat->wt[h] && mat->wt[h] < 256)
+        nbm[mat->wt[h]]++;
+      active += mat->wt[h] > 0;
+    }
+  return active;
 }
 
 void
@@ -602,10 +607,11 @@ filter_matrix_read (filter_matrix_t *mat, const char *purgedname)
   mat->rem_nrows = nread;
 
   /* print weight count */
-  uint64_t nbm[256];
-  weight_count (mat, nbm);
+  uint64_t nbm[256], total;
+  total = weight_count (mat, nbm);
   for (h = 1; h <= (uint64_t) mat->mergelevelmax; h++)
     printf ("There are %" PRIu64 " column(s) of weight %" PRIu64 "\n", nbm[h], h);
+  printf ("Total %lu active columns\n", total);
   ASSERT_ALWAYS(mat->rem_ncols == mat->ncols - nbm[0]);
 
   /* Bury heavy coloumns. The 'nburied' heaviest column are buried. */
@@ -689,6 +695,10 @@ filter_matrix_read (filter_matrix_t *mat, const char *purgedname)
       mat->rows[i] = (typerow_t*) realloc (mat->rows[i], k * sizeof (typerow_t));
     }
     printf ("# Done\n");
+
+    /* reset to 0 the weight of the buried columns */
+    for (unsigned int j = 0; j < mat->nburied; j++)
+      mat->wt[j] = 0;
 
     /* compute the matrix weight */
     mat->weight = 0;

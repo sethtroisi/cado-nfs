@@ -313,7 +313,7 @@ lightColAndMkz (filter_matrix_t *mat, int32_t j)
           return weightSum (mat, ind[0], ind[1], j)
             - matLengthRow (mat, ind[0]) - matLengthRow (mat, ind[1]);
         else
-          return minCostUsingMST (mat, mat->wt[j], ind, j);
+          return minCostUsingMST (mat, wj, ind, j);
       }
     // real traditional Markowitz count
     return pureMkz (mat, j);
@@ -451,8 +451,8 @@ MkzClear (filter_matrix_t *mat, int verbose)
     fprintf(stderr, "MKZT: up=%d down=%d updown=%d count=%d\n",
 	    (int)tmkzup, (int)tmkzdown, (int)tmkzupdown, (int)tmkzcount);
 #endif
-    free(mat->MKZQ);
-    free(mat->MKZA);
+    free (mat->MKZQ);
+    free (mat->MKZA);
 }
 
 /* increment the weight of column j (in absolute value) */

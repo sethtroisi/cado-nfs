@@ -29,7 +29,8 @@ typedef struct {
   uint64_t nrows;
   uint64_t ncols;
   uint64_t rem_nrows;  /* number of remaining rows */
-  uint64_t rem_ncols;  /* number of remaining columns */
+  uint64_t rem_ncols;  /* number of remaining columns, including the buried
+                          columns */
   typerow_t **rows;    /* rows[i][k] contains indices of an ideal of row[i] 
                           with 1 <= k <= rows[i][0] */
                        /* FOR_DL: struct containing also the exponent */
@@ -102,7 +103,6 @@ void heap_push (heap H, filter_matrix_t *mat, uint32_t i);
 void heap_delete (heap H, filter_matrix_t *mat, uint32_t i);
 uint32_t heap_pop (heap H, filter_matrix_t *mat);
 void recomputeR (filter_matrix_t *mat);
-void weight_count (filter_matrix_t *mat, uint64_t *nbm);
 
 #ifdef __cplusplus
 }
