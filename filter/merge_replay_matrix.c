@@ -698,7 +698,7 @@ filter_matrix_read (filter_matrix_t *mat, const char *purgedname)
 
     /* reset to 0 the weight of the buried columns */
     for (unsigned int j = 0; j < mat->nburied; j++)
-      mat->wt[j] = 0;
+      mat->wt[heaviest[j]] = 0;
 
     /* compute the matrix weight */
     mat->weight = 0;
