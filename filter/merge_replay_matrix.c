@@ -444,7 +444,7 @@ fillR (filter_matrix_t *mat)
           h = matCell(mat, i, k);
           if (mat->wt[h] > 0)
             {
-              ASSERT_ALWAYS(mat->R[h] != NULL);
+              ASSERT(mat->R[h] != NULL);
               mat->R[h][0]++;
               mat->R[h][mat->R[h][0]] = i;
             }

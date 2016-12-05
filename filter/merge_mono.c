@@ -583,9 +583,9 @@ number_of_superfluous_rows (filter_matrix_t *mat)
       ni2rem = excess / 32;
     else
       ni2rem = excess / 64;
-    ni2rem = (int) ((double) ni2rem * REPORT_INCR / 5.0);
-    return 2 * ni2rem; /* multiplying by 2 seems optimal experimentally
-                          for a target density of 170 and REPORT_INCR = 5 */
+    /* the following formula is close to optimal experimentally for a target density
+       of 170 */
+    return (int) (2.0 * (double) ni2rem * REPORT_INCR / 5.0);
 }
 
 static void
@@ -690,7 +690,6 @@ void
 mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel,
                double target_density)
 {
-  int ni2rem;
   int32_t j, mkz;
   uint64_t WN_prev, WN_cur, WN_min;
   double WoverN;
@@ -792,6 +791,8 @@ mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel,
 
     if (WoverN >= report_next)
     {
+      int ni2rem;
+
       print_report (mat);
       report_next += report_incr;
       ni2rem = number_of_superfluous_rows (mat);
