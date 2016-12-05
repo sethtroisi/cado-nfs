@@ -1081,8 +1081,10 @@ renumber_get_p_r_from_index (renumber_srcptr renumber_info, p_r_values_t *p,
         *p > renumber_info->biggest_prime_below_lpb[renumber_info->rat])
     {
       *side = renumber_info->nb_polys - 1;
-      while (*side >= 0 && (*p > renumber_info->biggest_prime_below_lpb[*side] ||
-                            !get_largest_root_mod_p (r, pol->pols[*side], *p)))
+      while (*side >= 0 && (*p > renumber_info->biggest_prime_below_lpb[*side]
+                            || !get_largest_root_mod_p (r, pol->pols[*side], *p)
+                            || renumber_is_bad (NULL, NULL, renumber_info, *p,
+                                                                    *r, *side)))
         (*side)--;
       ASSERT_ALWAYS (*side >= 0);
     }
