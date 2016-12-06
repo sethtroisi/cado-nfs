@@ -73,7 +73,6 @@ void cpuid(uint32_t res[4], uint32_t op) {
     res[3] = pre_res[3];
 }
 
-
 // str should be 13 byte long, at least.
 void vendor(char *str) {
   uint32_t abcd[4], x;
@@ -82,17 +81,17 @@ void vendor(char *str) {
   str[0] = x & 255; x >>= 8;
   str[1] = x & 255; x >>= 8;
   str[2] = x & 255; x >>= 8;
-  str[3] = x & 255; 
+  str[3] = x & 255;
   x = abcd[3];
   str[4] = x & 255; x >>= 8;
   str[5] = x & 255; x >>= 8;
   str[6] = x & 255; x >>= 8;
-  str[7] = x & 255; 
+  str[7] = x & 255;
   x = abcd[2];
   str[8] = x & 255; x >>= 8;
   str[9] = x & 255; x >>= 8;
   str[10] = x & 255; x >>= 8;
-  str[11] = x & 255; 
+  str[11] = x & 255;
   str[12] = '\0';
 }
 
@@ -129,43 +128,44 @@ typedef struct {
 } cache_data_t;
 
 void init_cache_data(cache_data_t *data) {
-  data->L1Data_size = -1;  	
+  data->L1Data_size = -1;
   data->L1Data_assoc = -1;
-  data->L1Data_line = -1;  	
-  data->DataTLB_pagesize = -1; 
+  data->L1Data_line = -1;
+  data->DataTLB_pagesize = -1;
   data->DataTLB_entries = -1;
   data->DataTLB_assoc = -1;
-  data->L1Instr_size = -1;  	
+  data->L1Instr_size = -1;
   data->L1Instr_assoc = -1;
-  data->L1Instr_line = -1;  	
+  data->L1Instr_line = -1;
   data->InstrTLB_pagesize = -1;
   data->InstrTLB_entries = -1;
   data->InstrTLB_assoc = -1;
-  data->L2_size = -1; 		
-  data->L3_size = -1; 		
+  data->L2_size = -1;
+  data->L3_size = -1;
 }
 
 static void
 print_cache_data(cache_data_t *data) {
-  if (data->L1Data_size != -1) printf("L1Data_size (KB) = %d\n", data->L1Data_size);  	
+  if (data->L1Data_size != -1) printf("L1Data_size (KB) = %d\n", data->L1Data_size);
   if (data->L1Data_assoc != -1) printf("L1Data_assoc = %d\n", data->L1Data_assoc);
-  if (data->L1Data_line != -1) printf("L1Data_line (B) = %d\n", data->L1Data_line);  	
-  if (data->DataTLB_pagesize != -1) printf("DataTLB_pagesize (KB) = %d\n", data->DataTLB_pagesize); 
+  if (data->L1Data_line != -1) printf("L1Data_line (B) = %d\n", data->L1Data_line);
+  if (data->DataTLB_pagesize != -1) printf("DataTLB_pagesize (KB) = %d\n", data->DataTLB_pagesize);
   if (data->DataTLB_entries != -1) printf("DataTLB_entries = %d\n", data->DataTLB_entries);
   if (data->DataTLB_assoc != -1) printf("DataTLB_assoc = %d\n", data->DataTLB_assoc);
-  if (data->L1Instr_size != -1) printf("L1Instr_size (KB) = %d\n", data->L1Instr_size);  	
+  if (data->L1Instr_size != -1) printf("L1Instr_size (KB) = %d\n", data->L1Instr_size);
   if (data->L1Instr_assoc != -1) printf("L1Instr_assoc = %d\n", data->L1Instr_assoc);
-  if (data->L1Instr_line != -1) printf("L1Instr_line (B) = %d\n", data->L1Instr_line);  	
+  if (data->L1Instr_line != -1) printf("L1Instr_line (B) = %d\n", data->L1Instr_line);
   if (data->InstrTLB_pagesize != -1) printf("InstrTLB_pagesize (KB) = %d\n", data->InstrTLB_pagesize);
   if (data->InstrTLB_entries != -1) printf("InstrTLB_entries = %d\n", data->InstrTLB_entries);
   if (data->InstrTLB_assoc != -1) printf("InstrTLB_assoc = %d\n", data->InstrTLB_assoc);
-  if (data->L2_size != -1) printf("L2_size (KB) = %d\n", data->L2_size); 		
-  if (data->L3_size != -1) printf("L3_size (KB) = %d\n", data->L3_size); 		
+  if (data->L2_size != -1) printf("L2_size (KB) = %d\n", data->L2_size);
+  if (data->L3_size != -1) printf("L3_size (KB) = %d\n", data->L3_size);
 }
 
 
 // Taken from Table 3-25 in Intel ref manual number 253666
 // pages: 3-198 and following, in particular Table 3-22.
+// Updated with Intel ref manual number 325462, Table 3-12.
 void
 update_intel_byte (uint32_t c, cache_data_t *data) {
   if (c == 0)
@@ -308,6 +308,10 @@ update_intel_byte (uint32_t c, cache_data_t *data) {
     data->L1Data_assoc = 8;
     data->L1Data_line = 64;
     break;
+  case 0x63:
+    data->DataTLB_pagesize = 4;
+    data->DataTLB_entries = 32;
+    break;
    case 0x66:
     data->L1Data_size = 8;
     data->L1Data_assoc = 4;
@@ -327,6 +331,10 @@ update_intel_byte (uint32_t c, cache_data_t *data) {
    case 0x71:
    case 0x72:
     // trace cache
+    break;
+   case 0x76:
+    data->InstrTLB_pagesize = 4;
+    data->InstrTLB_entries = 8;
     break;
    case 0x78:
     data->L2_size = 1024;
@@ -385,6 +393,16 @@ update_intel_byte (uint32_t c, cache_data_t *data) {
     data->DataTLB_entries = 256;
     data->DataTLB_assoc = 4;
     break;
+   case 0xB6:
+     data->DataTLB_pagesize = 4;
+     data->DataTLB_assoc = 8;
+     data->DataTLB_entries = 128;
+     break;
+   case 0xC1:
+     data->DataTLB_pagesize = 4;
+     data->DataTLB_assoc = 8;
+     data->DataTLB_entries = 1024;
+     break;
    case 0xF0:
    case 0xF1:
     // for prefetching
@@ -406,7 +424,7 @@ update_intel_byte (uint32_t c, cache_data_t *data) {
      break;
    }
    default:
-    break;
+     break;
   }
 }
 
@@ -443,7 +461,7 @@ print_intel_cache (int verbose)
   if (verbose)
     print_cache_data (&data);
 
-  return ((&data)->L1Data_size);  	
+  return ((&data)->L1Data_size);
 }
 
 
@@ -478,10 +496,10 @@ static int print_amd_cache(int verbose) {
     data.L2_size = res[2]>>16;
     data.L3_size = 512*(res[3]>>18);
   }
-  
+
   if (verbose)
     print_cache_data(&data);
-  
+
   return ((&data)->L1Data_size);
 }
 
@@ -496,9 +514,17 @@ cachesize_cpuid (int verbose)
 
   brd = brand ();
   if (brd == AMD)
-    ret = print_amd_cache (verbose);
+    {
+      if (verbose)
+        printf ("Recognized Amd cpu\n");
+      ret = print_amd_cache (verbose);
+    }
   else if (brd == INTEL)
-    ret = print_intel_cache (verbose);
+    {
+      if (verbose)
+        printf ("Recognized Intel cpu\n");
+      ret = print_intel_cache (verbose);
+    }
   else
     {
       if (verbose) {
