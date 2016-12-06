@@ -178,6 +178,7 @@ void qroots_clear (qroots_t);
 
 void hash_init (hash_t, unsigned int);
 void shash_init (shash_t, unsigned int);
+void shash_reset (shash_t);
 void hash_add (hash_t, unsigned long, int64_t, mpz_t, mpz_t,
                unsigned long, mpz_t, unsigned long, mpz_t);
 int shash_find_collision (shash_t);

@@ -382,7 +382,6 @@ hash_init (hash_t H, unsigned int init_size)
 void
 shash_init (shash_t H, unsigned int init_size)
 {
-  int j;
   unsigned int init_size0 = init_size;
 
   /* round up to multiple of SHASH_NBUCKETS */
@@ -400,15 +399,19 @@ shash_init (shash_t H, unsigned int init_size)
       exit (1);
     }
   H->balloc = init_size;
+}
+
+void
+shash_reset (shash_t H)
+{
   H->base[0] = H->current[0] = H->mem;
-  for (j = 1; j <= SHASH_NBUCKETS; j++)
-    {
-      H->base[j] = H->current[j] = H->base[j-1] + H->balloc;
-    }
+  for (int j = 1; j <= SHASH_NBUCKETS; j++)
+    H->base[j] = H->current[j] = H->base[j-1] + H->balloc;
   /* Trick for prefetch T in shash_find_collision after the end
      of the last bucket. */
   memset (H->base[SHASH_NBUCKETS], 0, sizeof(**(H->base) * 8));
 }
+
 
 /* rq is a root of N = (m0 + rq)^d mod (q^2) */
 void

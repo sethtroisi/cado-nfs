@@ -851,6 +851,7 @@ collision_on_p ( header_t header,
   }
 
   shash_init (H, 4 * lenPrimes);
+  shash_reset (H);
   umax = (int64_t) Primes[lenPrimes - 1] * (int64_t) Primes[lenPrimes - 1];
   for (nprimes = 0; nprimes < lenPrimes; nprimes ++)
     {
@@ -938,9 +939,9 @@ collision_on_each_sq ( header_t header,
                        proots_t R,
                        unsigned long q,
                        mpz_t rqqz,
-                       unsigned long *inv_qq )
+                       unsigned long *inv_qq,
+                       shash_t H )
 {
-  shash_t H;
   uint64_t **cur1, **cur2, *ccur1, *ccur2;
   long *pc, *epc;
   uint64_t pp;
@@ -959,7 +960,7 @@ collision_on_each_sq ( header_t header,
 #define CURRENT(V) (H->current + ((V) & (SHASH_NBUCKETS - 1)))
 #endif
 
-  shash_init (H, 4 * lenPrimes);
+  shash_reset (H);
 
   pc = (long *) inv_qq;
   nv = *pc;
@@ -1092,7 +1093,6 @@ collision_on_each_sq ( header_t header,
   for (i = 0; i < SHASH_NBUCKETS; i++) assert (H->current[i] <= H->base[i+1]);
 
   found = shash_find_collision (H);
-  shash_clear (H);
 
   if (found) /* do the real work */
     {
@@ -1219,9 +1219,11 @@ collision_on_each_sq_r ( header_t header,
   }
 
   /* core function to find collisions */
-  for (k = 0; k < count; k ++) {
-    collision_on_each_sq (header, R, q, rqqz[k], tinv_qq[k]);
-  }
+  shash_t H;
+  shash_init (H, 4 * lenPrimes);
+  for (k = 0; k < count; k ++)
+    collision_on_each_sq (header, R, q, rqqz[k], tinv_qq[k], H);
+  shash_clear (H);
 
   if (verbose > 2)
     fprintf (stderr, "#  substage: collision-detection %d many rq took %lums\n",
