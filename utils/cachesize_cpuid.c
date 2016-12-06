@@ -73,6 +73,36 @@ void cpuid(uint32_t res[4], uint32_t op) {
     res[3] = pre_res[3];
 }
 
+/* variant which sets the ecx register to given value */
+void cpuid2(uint32_t res[4], uint32_t op, uint32_t ecx) {
+    volatile uint64_t saved[4];
+    volatile uint32_t pre_res[4];
+    __asm__ __volatile__(
+            "movq %%rax, 0(%[src])\n"
+            "movq %%rbx, 8(%[src])\n"
+            "movq %%rcx, 16(%[src])\n"
+            "movq %%rdx, 24(%[src])\n"
+            "movl %[op], %%eax\n"
+            "movl %[ecx], %%ecx\n"
+            "cpuid\n"
+            "movl %%eax, 0(%[res])\n"
+            "movl %%ebx, 4(%[res])\n"
+            "movl %%ecx, 8(%[res])\n"
+            "movl %%edx, 12(%[res])\n"
+            "movq 0(%[src]), %%rax\n"
+            "movq 8(%[src]), %%rbx\n"
+            "movq 16(%[src]), %%rcx\n"
+            "movq 24(%[src]), %%rdx\n"
+            :
+            : [op]"m"(op), [ecx]"m"(ecx), [res]"D"(pre_res), [src]"S"(saved)
+            : "memory"
+            );
+    res[0] = pre_res[0];
+    res[1] = pre_res[1];
+    res[2] = pre_res[2];
+    res[3] = pre_res[3];
+}
+
 // str should be 13 byte long, at least.
 void vendor(char *str) {
   uint32_t abcd[4], x;
@@ -411,7 +441,13 @@ update_intel_byte (uint32_t c, cache_data_t *data) {
    {
      // cpuid 4
      uint32_t res[4];
-     cpuid(res, 4);
+     /* according to Intel 64 and IA-32 Architectures Software Developer's Manual
+        Volume 2A: Instruction Set Reference, A-M, Order Number 253666-035US from
+        June 2010, page 3-199, we should call cpuid with EAX=4 and ECX=1 to get the
+        Data Cache parameters. Then res[2] + 1 is the number of sets, bits 31-22
+        of res[1] is the number of ways of associativity, bits 11-0 of res[1] is
+        the line size, and bits 21-12 is the number of physical line partitions. */
+     cpuid2(res, 4, 1);
 #ifdef DEBUG_CACHESIZE_CPUID
      int j = 0;
      for (j = 0; j < 4; j ++)
