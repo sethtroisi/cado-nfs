@@ -809,7 +809,7 @@ mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel,
     if (mat->cwmax < mat->mergelevelmax &&
         (MkzQueueCardinality (mat) == 0 || excess == mat->keep))
       {
-        if (excess == mat->keep)
+        if (excess == mat->keep || compute_WoverN (mat) > 0.68 * target_density)
           mat->cwmax = mat->mergelevelmax;
         else /* MkzQueueCardinality (mat) == 0 */
           mat->cwmax ++;
