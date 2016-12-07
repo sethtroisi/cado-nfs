@@ -214,7 +214,7 @@ ropt ( ropt_poly_t poly,
 
   /* print cache size */
   if (param->verbose == 2)
-    fprintf ( stderr, "# Info: L1_cachesize/2: %d, "
+    fprintf ( stderr, "# Info: L1_cachesize: %d, "
               "size_tune_sievearray: %d\n",
               L1_cachesize, size_tune_sievearray );
 

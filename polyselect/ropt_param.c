@@ -10,11 +10,11 @@
 
 
 /**
- * Default values for L1 cache size and tune sieve length. The code
- * will also try to auto-detect them.
+ * Default values for L1 cache size and tune sieve length (which should be half of
+ * the L1 cache size). The code will also try to auto-detect them.
  */
 unsigned int L1_cachesize = 16384;
-unsigned int size_tune_sievearray = 16384;
+unsigned int size_tune_sievearray = 8192;
 
 
 /* ------------------

@@ -480,9 +480,6 @@ main_adv (int argc, char **argv)
   argc -= 1;
   int i;
 
-  /* L1 cache size */
-  ropt_L1_cachesize ();
-
   ropt_param_t param;
   ropt_param_init (param);
 
@@ -702,10 +699,7 @@ main_basic (int argc, char **argv)
   printf ("# Info: Will use %u thread%s\n# Info: ropteffort = %.0f\n", nthreads,
           (nthreads > 1) ? "s": "", ropt_param->effort);
 
-  /* detect L1 cache size */
-  ropt_L1_cachesize ();
-
-  printf ("# Info: L1_cachesize/2 = %u, size_tune_sievearray = %u\n",
+  printf ("# Info: L1_cachesize = %u, size_tune_sievearray = %u\n",
           L1_cachesize, size_tune_sievearray);
 
   /* Open file containing polynomials. */
@@ -821,6 +815,10 @@ int
 main (int argc, char **argv)
 {
   /* usage */
+
+  /* detect L1 cache size */
+  ropt_L1_cachesize ();
+
   if (argc > 1 && strcmp(argv[1], "--adv") == 0)
     return main_adv (argc, argv);
   else
