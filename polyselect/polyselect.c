@@ -830,15 +830,13 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
 
 /* find collisions between "P" primes, return number of loops */
 static inline unsigned long
-collision_on_p ( header_t header,
-                 proots_t R )
+collision_on_p (header_t header, proots_t R, shash_t H)
 {
   unsigned long j, nprimes, p, nrp, c = 0, tot_roots = 0;
   uint64_t *rp;
   int64_t ppl = 0, u, umax;
   mpz_t zero;
   int found = 0;
-  shash_t H;
   int st = milliseconds ();
 
   /* init zero */
@@ -850,7 +848,6 @@ collision_on_p ( header_t header,
     exit (1);
   }
 
-  shash_init (H, 4 * lenPrimes);
   shash_reset (H);
   umax = (int64_t) Primes[lenPrimes - 1] * (int64_t) Primes[lenPrimes - 1];
   for (nprimes = 0; nprimes < lenPrimes; nprimes ++)
@@ -880,7 +877,6 @@ collision_on_p ( header_t header,
             }
         }
   found = shash_find_collision (H);
-  shash_clear (H);
   free (rp);
   st = milliseconds () - st;
 
@@ -1147,7 +1143,8 @@ collision_on_each_sq_r ( header_t header,
                          mpz_t *rqqz,
                          unsigned long *inv_qq,
                          unsigned long number_pr,
-                         int count )
+                         int count,
+                         shash_t H )
 {
   if (count == 0)
     return;
@@ -1219,11 +1216,9 @@ collision_on_each_sq_r ( header_t header,
   }
 
   /* core function to find collisions */
-  shash_t H;
-  shash_init (H, 4 * lenPrimes);
+  shash_reset (H);
   for (k = 0; k < count; k ++)
     collision_on_each_sq (header, R, q, rqqz[k], tinv_qq[k], H);
-  shash_clear (H);
 
   if (verbose > 2)
     fprintf (stderr, "#  substage: collision-detection %d many rq took %lums\n",
@@ -1295,7 +1290,8 @@ collision_on_batch_sq_r ( header_t header,
                           unsigned long *inv_qq,
                           unsigned long number_pr,
                           unsigned long *curr_nq,
-                          unsigned long k)
+                          unsigned long k,
+                          shash_t H)
 {
   int count;
   unsigned int ind_qr[k]; /* indices of roots for each small q */
@@ -1342,7 +1338,7 @@ collision_on_batch_sq_r ( header_t header,
     }
 
     /* core function for a fixed qq and several rqqz[] */
-    collision_on_each_sq_r (header, R, q, rqqz, inv_qq, number_pr, num_rq);
+    collision_on_each_sq_r (header, R, q, rqqz, inv_qq, number_pr, num_rq, H);
   }
 
   mpz_clear (qqz);
@@ -1362,7 +1358,8 @@ collision_on_batch_sq (header_t header,
                        unsigned long *idx_q,
                        unsigned long number_pr,
                        unsigned long k,
-                       unsigned long *curr_nq)
+                       unsigned long *curr_nq,
+                       shash_t H)
 {
   unsigned nr;
   uint64_t pp;
@@ -1413,7 +1410,7 @@ collision_on_batch_sq (header_t header,
   int st2 = milliseconds();
 
   collision_on_batch_sq_r (header, R, SQ_R, q, idx_q, invqq, number_pr,
-                           curr_nq, k);
+                           curr_nq, k, H);
   if (verbose > 2)
     fprintf (stderr, "#  stage (special-q) for %lu special-q's took %lums\n",
              *curr_nq, milliseconds() - st2);
@@ -1458,7 +1455,7 @@ find_suitable_lq (header_t header, qroots_t SQ_R, unsigned long *k)
 
 /* collision on special-q, call collision_on_batch_sq */
 static inline void
-collision_on_sq (header_t header, proots_t R, unsigned long c)
+collision_on_sq (header_t header, proots_t R, unsigned long c, shash_t H)
 {
   unsigned long k, lq;
   qroots_t SQ_R;
@@ -1479,7 +1476,7 @@ collision_on_sq (header_t header, proots_t R, unsigned long c)
       q = return_q_norq (SQ_R, idx_q, k);
 
       /* collision batch */
-      collision_on_batch_sq (header, R, SQ_R, q, idx_q, c, k, &curr_nq);
+      collision_on_batch_sq (header, R, SQ_R, q, idx_q, c, k, &curr_nq, H);
       next_comb (lq, k, idx_q);
     }
 
@@ -1849,9 +1846,12 @@ newAlgo (mpz_t N, unsigned long d, mpz_t ad)
   proots_init (R, lenPrimes);
 
   if (sizeof (unsigned long int) == 8) {
-    c = collision_on_p (header, R);
+    shash_t H;
+    shash_init (H, 4 * lenPrimes);
+    c = collision_on_p (header, R, H);
     if (nq > 0)
-      collision_on_sq (header, R, c);
+      collision_on_sq (header, R, c, H);
+    shash_clear (H);
   }
   else {
     c = gmp_collision_on_p (header, R);
