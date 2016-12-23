@@ -7,6 +7,7 @@
 #include <ostream>
 #include "mpz_mat.h"
 #include "portability.h"
+#include "utils.h"
 
 /*{{{ entry access*/
 mpz_ptr mpz_mat_entry(mpz_mat_ptr M, unsigned int i, unsigned int j)
@@ -1922,6 +1923,45 @@ void mpq_mat_inv(mpq_mat_ptr dst, mpq_mat_srcptr src)
     mpq_mat_clear(aux);
 }
 /* }}} */
+
+/*
+ * For now, it is just a wrapper to use utils/lll.c.
+ */
+void mpz_mat_LLL(mpz_ptr det, mpz_mat_ptr M, mpz_mat_ptr U, mpz_srcptr a,
+    mpz_srcptr b)
+{
+  mat_Z M_tmp;
+  LLL_init(&M_tmp, M->m, M->n);
+  for (unsigned int row = 1; row < M->m + 1; row++) {
+    for (unsigned int col = 1; col < M->n + 1; col++) {
+      mpz_set(M_tmp.coeff[row][col], mpz_mat_entry_const(M, row - 1, col - 1));
+    }
+  }
+
+  if (U) {
+    mat_Z U_tmp;
+    LLL_init(&U_tmp, U->m, U->m);
+
+    LLL(det, M_tmp, &U_tmp, a, b);
+
+    for (unsigned int row = 1; row < U->m + 1; row++) {
+      for (unsigned int col = 1; col < U->n + 1; col++) {
+        mpz_set(mpz_mat_entry(U, row - 1, col - 1), U_tmp.coeff[row][col]);
+      }
+    }
+    LLL_clear(&U_tmp);
+  } else {
+    LLL(det, M_tmp, NULL, a, b);
+  }
+
+  for (unsigned int row = 1; row < M->m + 1; row++) {
+    for (unsigned int col = 1; col < M->n + 1; col++) {
+      mpz_set(mpz_mat_entry(M, row - 1, col - 1), M_tmp.coeff[row][col]);
+    }
+  }
+
+  LLL_clear(&M_tmp);
+}
 
 using namespace std;
 

@@ -212,7 +212,7 @@ reduce ( long k, long l, mat_Z B, long *P, mpz_t *D,
 
 static long
 SwapTest (mpz_t d0, mpz_t d1, mpz_t d2, mpz_t lam,
-          mpz_t a, mpz_t b, mpz_t t1, mpz_t t2)
+          mpz_srcptr a, mpz_srcptr b, mpz_t t1, mpz_t t2)
 /* test if a*d1^2 > b*(d0*d2 + lam^2)
    t1 and t2 are temporary variables */
 {
@@ -406,14 +406,14 @@ swapLLL (long k, mat_Z B, long *P, mpz_t *D,
 
 /* LLL-reduce the matrix B (whose rows represent vectors, with indices
    starting at 1):
- * det (output) is the determinant
+ * det (output) is the square of the determinant
  * U (output) is the transformation matrix (NULL if not needed)
  * a, b are parameters (delta = a/b = 3/4 classically, we must have
    1/4 < delta < 1, the closer delta is from 1, the better is the reduction)
  m is the number of vectors (i.e., number of rows)
  n is the number of columns (i.e., length of each vector)
  */
-long LLL ( mpz_t det, mat_Z B, mat_Z* U, mpz_t a, mpz_t b )
+long LLL ( mpz_t det, mat_Z B, mat_Z* U, mpz_srcptr a, mpz_srcptr b )
 {
    long m, n, *P, j, s, k, max_k;
    mpz_t *D, **lam, tmp1, tmp2;

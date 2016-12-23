@@ -14,7 +14,7 @@ typedef struct {
 
 void LLL_init (mat_Z *, int, int);
 void LLL_clear (mat_Z *);
-long LLL (mpz_t det, mat_Z B, mat_Z* U, mpz_t a, mpz_t b);
+long LLL (mpz_t det, mat_Z B, mat_Z* U, mpz_srcptr a, mpz_srcptr b);
 
 #ifdef __cplusplus
 }

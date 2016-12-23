@@ -1199,3 +1199,4 @@ tests/numbertheory/badideals.small-example.input
 tests/numbertheory/badideals.small-example.stdout
 tests/numbertheory/test-badideals.sh
 scripts/cadofactor/wudb.py
+tests/utils/test_mpz_mat.c
