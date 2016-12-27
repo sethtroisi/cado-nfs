@@ -472,12 +472,16 @@ long LLL ( mpz_t det, mat_Z B, mat_Z* U, mpz_srcptr a, mpz_srcptr b )
       }
    }
 
-   mpz_set(det, D[s]);
-   for (j=0; j<=m; j++) mpz_clear(D[j]); free(D);
-   for (j = 0; j <= m; j++) {
-      for (k = 0; k <= m; k++) mpz_clear(lam[j][k]);
-      free (lam[j]);
-   }
+   mpz_set (det, D[s]);
+   for (j = 0; j <= m; j++)
+     mpz_clear (D[j]);
+   free (D);
+   for (j = 0; j <= m; j++)
+     {
+       for (k = 0; k <= m; k++)
+         mpz_clear (lam[j][k]);
+       free (lam[j]);
+     }
    free (lam);
 
    mpz_clear(tmp1);
