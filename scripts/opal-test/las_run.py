@@ -81,6 +81,7 @@ def run(param_file, problem):
     update_existing(makefb_params, params)
     # also update "maxbits" which depends on "I"
     makefb_params["maxbits"] = params["I"]
+    makefb_params["lim"] = las_params["lim1"]
     makefb_params["out"] = las_params["fb"]
     makefb_params["t"] = las_params["t"]
 
