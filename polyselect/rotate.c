@@ -8,7 +8,7 @@
 #include "area.h"
 
 static void usage_and_die(char *argv0) {
-    fprintf(stderr, "usage: %s [-area a] [-I nnn] [-Bf b] [-Bg c] poly j k\n", argv0);
+    fprintf(stderr, "usage: %s [-area a] [-I nnn] [-Bf b] [-Bg c] [-skew s] poly j k\n", argv0);
     fprintf(stderr, "  apply rotation f += (j*x+k)*g to poly.\n");
     fprintf(stderr, "  poly: filename of polynomial\n");
     fprintf(stderr, "  j,k : integers\n");
@@ -20,6 +20,7 @@ int main(int argc, char **argv) {
     long j, k;
     int I = 0;
     mpz_t b, m;
+    double skew = 0.0;
 
     mpz_init(b);
     mpz_init(m);
@@ -49,6 +50,12 @@ int main(int argc, char **argv) {
             argv += 2;
             argc -= 2;
           }
+        else if (strcmp (argv[1], "-skew") == 0)
+          {
+            skew = atof (argv [2]);
+            argv += 2;
+            argc -= 2;
+          }
         else
           break;
       }
@@ -65,6 +72,13 @@ int main(int argc, char **argv) {
     }
     j = strtol(argv[2], NULL, 10);
     k = strtol(argv[3], NULL, 10);
+
+    if (skew != 0.0)
+      poly->skew = skew; /* command-line overrides skewness given in file (if any) */
+
+    /* if skewness is not given in file nor in command line, compute it */
+    if (poly->skew == 0.0)
+      poly->skew = L2_skewness (poly->pols[ALG_SIDE], SKEWNESS_DEFAULT_PREC);
 
     mpz_set (b, poly->pols[RAT_SIDE]->coeff[1]);
     mpz_neg (m, poly->pols[RAT_SIDE]->coeff[0]);
