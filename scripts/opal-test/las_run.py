@@ -135,6 +135,10 @@ def run(param_file, problem):
         if q_inc == 0:
            v = stats.relations_int.lastvalue[0]
            q_inc = int(rels_wanted / (10.0 * v))
+        # but make sure q_inc is not too large: q_inc = 1.26*q gives about
+        # 10 sieving tests for [q0, 10*q0]
+        if q_inc > int(1.26 * q0):
+            q_inc = int(1.26 * q0)
         q0 += q_inc
     qmax = stats.get_qmax(rels_wanted)
     sievetime = stats.get_time(rels_wanted)
