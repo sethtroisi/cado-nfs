@@ -253,7 +253,7 @@ ropt_polyselect (cado_poly_ptr output_poly, cado_poly_ptr input_poly,
   ropt_bestpoly_init (bestpoly, poly->d);
   ropt_bestpoly_setup (bestpoly, poly->f, poly->g, poly->d);
 
-  /* cal main function */
+  /* call main function */
   ropt_do_both_stages (poly, bestpoly, param, info);
   
   /* bring bestpoly back to polyselect_ropt */

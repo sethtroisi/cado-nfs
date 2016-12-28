@@ -75,8 +75,8 @@ Thus the function to check for duplicates needs the following information:
 #include "las-norms.h"
 #include "las-cofactor.h"
 
-
-static const int verbose = 1;
+/* default verbose level of # DUPECHECK lines */
+#define VERBOSE_LEVEL 2
 
 static void
 compute_a_over_b_mod_p(mpz_t r, const int64_t a, const uint64_t b, const mpz_t p)
@@ -288,25 +288,20 @@ sq_finds_relation(const unsigned long sq, const int sq_side,
   /* If resulting optimal J is so small that it's not worth sieving,
      this special-q gets skipped, so relation is not a duplicate */
   if (sieve_info_adjust_IJ(si, nb_threads) == 0) {
-    if (verbose) {
-      verbose_output_print(0, 1, "# DUPECHECK J too small\n");
-    }
+    verbose_output_print(0, VERBOSE_LEVEL, "# DUPECHECK J too small\n");
     is_dupe = 0;
     goto clear_and_exit;
   }
 
   sieve_info_update_norm_data(si, nb_threads);
-  if (verbose) {
-    verbose_output_print(0, 1, "# DUPECHECK Checking if relation (a,b) = (%" PRId64 ",%" PRIu64 ") is a dupe of sieving special-q -q0 %lu -rho %lu\n", rel.a, rel.b, sq, r);
-    verbose_output_print(0, 1, "# DUPECHECK Using special-q basis a0=%" PRId64 "; b0=%" PRId64 "; a1=%" PRId64 "; b1=%" PRId64 "\n", si->qbasis.a0, si->qbasis.b0, si->qbasis.a1, si->qbasis.b1);
-  }
+  verbose_output_print(0, VERBOSE_LEVEL, "# DUPECHECK Checking if relation (a,b) = (%" PRId64 ",%" PRIu64 ") is a dupe of sieving special-q -q0 %lu -rho %lu\n", rel.a, rel.b, sq, r);
+  verbose_output_print(0, VERBOSE_LEVEL, "# DUPECHECK Using special-q basis a0=%" PRId64 "; b0=%" PRId64 "; a1=%" PRId64 "; b1=%" PRId64 "\n", si->qbasis.a0, si->qbasis.b0, si->qbasis.a1, si->qbasis.b1);
 
   I = si->I;
   J = si->J;
 
-  if (verbose && (oldI != I || oldJ != J)) {
-    verbose_output_print(0, 1, "# DUPECHECK oldI = %u, I = %u, oldJ = %u, J = %u\n", oldI, I, oldJ, J);
-  }
+  if (oldI != I || oldJ != J)
+    verbose_output_print(0, VERBOSE_LEVEL, "# DUPECHECK oldI = %u, I = %u, oldJ = %u, J = %u\n", oldI, I, oldJ, J);
   
   /* Compute i,j-coordinates of this relation in the special-q lattice when
      p was used as the special-q value. */
@@ -318,9 +313,7 @@ sq_finds_relation(const unsigned long sq, const int sq_side,
   /* If the coordinate is outside the i,j-region used when sieving
      the special-q described in si, then it's not a duplicate */
   if ((i < 0 && (uint32_t)(-i) > I/2) || (i > 0 && (uint32_t)i > I/2-1) || (j >= J)) {
-    if (verbose) {
-      verbose_output_print(0, 1, "# DUPECHECK (i,j) = (%d, %u) is outside sieve region\n", i, j);
-    }
+    verbose_output_print(0, VERBOSE_LEVEL, "# DUPECHECK (i,j) = (%d, %u) is outside sieve region\n", i, j);
     is_dupe = 0;
     goto clear_and_exit;
   }
@@ -330,12 +323,12 @@ sq_finds_relation(const unsigned long sq, const int sq_side,
     const uint8_t lognorm = estimate_lognorm(si, i, j, side);
     remaining_lognorm[side] = subtract_fb_log(lognorm, rel, si, side);
     if (remaining_lognorm[side] > si->sides[side]->bound) {
-      verbose_output_print(0, 1, "# DUPECHECK On side %d, remaining lognorm = %" PRId8 " > bound = %" PRId8 "\n",
+      verbose_output_print(0, VERBOSE_LEVEL, "# DUPECHECK On side %d, remaining lognorm = %" PRId8 " > bound = %" PRId8 "\n",
               side, remaining_lognorm[side], si->sides[side]->bound);
       is_dupe = 0;
     }
   }
-  verbose_output_print(0, 1, "# DUPECHECK relation had i=%d, j=%u, remaining lognorms %" PRId8 ", %" PRId8 "\n",
+  verbose_output_print(0, VERBOSE_LEVEL, "# DUPECHECK relation had i=%d, j=%u, remaining lognorms %" PRId8 ", %" PRId8 "\n",
            i, j, remaining_lognorm[0], remaining_lognorm[1]);
   if (!is_dupe) {
     goto clear_and_exit;
@@ -344,9 +337,7 @@ sq_finds_relation(const unsigned long sq, const int sq_side,
   /* Check that the cofactors are within the mfb bound */
   for (int side = 0; side < 2; ++side) {
     if (!check_leftover_norm (cof[side], si, side)) {
-      if (verbose) {
-        verbose_output_vfprint(0, 1, gmp_vfprintf, "# DUPECHECK cofactor %Zd is outside bounds\n", cof);
-      }
+      verbose_output_vfprint(0, VERBOSE_LEVEL, gmp_vfprintf, "# DUPECHECK cofactor %Zd is outside bounds\n", cof);
       is_dupe = 0;
       goto clear_and_exit;
     }
@@ -359,11 +350,8 @@ sq_finds_relation(const unsigned long sq, const int sq_side,
 
   pass = factor_both_leftover_norms(cof, f, m, si);
 
-  if (pass <= 0) {
-    if (verbose) {
-      verbose_output_vfprint(0, 1, gmp_vfprintf, "# DUPECHECK norms not both smooth, left over factors: %Zd, %Zd\n", cof[0], cof[1]);
-    }
-  }
+  if (pass <= 0)
+    verbose_output_vfprint(0, VERBOSE_LEVEL, gmp_vfprintf, "# DUPECHECK norms not both smooth, left over factors: %Zd, %Zd\n", cof[0], cof[1]);
 
   for(int side = 0 ; side < 2 ; side++) {
       clear_uint32_array (m[side]);
@@ -427,10 +415,8 @@ check_one_prime(mpz_srcptr zsq, const int side,
   int is_dupe = 0;
   if (sq_was_previously_sieved(sq, side, si)) {
     is_dupe = sq_finds_relation(sq, side, rel, nb_threads, si);
-    if (verbose) {
-      verbose_output_print(0, 1, "# DUPECHECK relation is probably%s a dupe\n",
-             is_dupe ? "" : " not");
-    }
+    verbose_output_print(0, VERBOSE_LEVEL, "# DUPECHECK relation is probably%s a dupe\n",
+			 is_dupe ? "" : " not");
   }
   return is_dupe;
 }
