@@ -71,6 +71,10 @@ fi
 ncurves1_max=`expr $ncurves1 + 3`
 I_min=`expr $I - 1`
 I_max=`expr $I + 1`
+# limit I_max to 16 while cado-nfs does not handle I>16 efficiently
+if [ $I_max -gt 16 ]; then
+    I_max=16
+fi
 sed "s/lim0_def/$lim0/g" las_decl_template.py | \
 sed "s/lim0_min/$lim0_min/g" | sed "s/lim0_max/$lim0_max/g" | \
 sed "s/lim1_def/$lim1/g" | sed "s/lim1_min/$lim1_min/g" | \
