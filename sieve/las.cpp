@@ -879,6 +879,11 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
             fprintf(stderr, "Error: as long as per-qrange factor bases are not fully supported, we need to know at least the I and lim[01] fields\n");
             exit(EXIT_FAILURE);
         }
+	if (sc->sides[0]->lim > 2147483647UL || sc->sides[1]->lim > 2147483647UL)
+	  {
+	    fprintf (stderr, "Error, lim0/lim1 should not exceed 2^31 (bug #21094)\n");
+	    exit (EXIT_FAILURE);
+	  }
 
         complete &= param_list_parse_int(pl, "lpb0",  &(sc->sides[0]->lpb));
         complete &= param_list_parse_int(pl, "mfb0",  &(sc->sides[0]->mfb));
