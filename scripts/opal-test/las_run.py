@@ -127,8 +127,9 @@ def run(param_file, problem):
            cur_time = stats.get_time(cur_rels)
         # sys.stderr.write("   Up to q=%u, estimate %u/%u relations in %.0f seconds\n" % (q0, cur_rels, rels_wanted, cur_time))
 
-        # if the total time so far exceeds 1.5*best_time, we can stop here
-        if cur_time > 1.5 * best_time:
+        # if the total time so far exceeds best_time, and we don't have enough
+        # relations, we can stop here
+        if cur_time > best_time and cur_rels < rels_wanted:
            break
 
         # set q_inc so that we do about 10 sieving tests of length q_range
