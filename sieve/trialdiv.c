@@ -52,6 +52,7 @@ trialdiv_init_divisor (trialdiv_divisor_t *d, const unsigned long p)
   d->plim = ULONG_MAX / p;
 }
 
+#if TRIALDIV_MAXLEN >= 2
 /* Trial division for integers with 2 unsigned long */
 static inline int
 trialdiv_div2 (const unsigned long *n, const trialdiv_divisor_t *d)
@@ -71,7 +72,9 @@ trialdiv_div2 (const unsigned long *n, const trialdiv_divisor_t *d)
   x0 *= d->pinv;
   return x0 <= d->plim;
 }
+#endif
 
+#if TRIALDIV_MAXLEN >= 3
 /* Trial division for integers with 3 unsigned long */
 static inline int
 trialdiv_div3 (const unsigned long *n, const trialdiv_divisor_t *d)
@@ -103,7 +106,9 @@ trialdiv_div3 (const unsigned long *n, const trialdiv_divisor_t *d)
   x0 *= d->pinv;
   return x0 <= d->plim;
 }
+#endif
 
+#if TRIALDIV_MAXLEN >= 4
 /* Trial division for integers with 4 unsigned long */
 static inline int
 trialdiv_div4 (const unsigned long *n, const trialdiv_divisor_t *d)
@@ -127,7 +132,9 @@ trialdiv_div4 (const unsigned long *n, const trialdiv_divisor_t *d)
   x0 *= d->pinv;
   return x0 <= d->plim;
 }
+#endif
 
+#if TRIALDIV_MAXLEN >= 5
 /* Trial division for integers with 5 unsigned long */
 static inline int
 trialdiv_div5 (const unsigned long *n, const trialdiv_divisor_t *d)
@@ -153,7 +160,9 @@ trialdiv_div5 (const unsigned long *n, const trialdiv_divisor_t *d)
   x0 *= d->pinv;
   return x0 <= d->plim;
 }
+#endif
 
+#if TRIALDIV_MAXLEN >= 6
 /* Trial division for integers with 6 unsigned long */
 static inline int
 trialdiv_div6 (const unsigned long *n, const trialdiv_divisor_t *d)
@@ -181,7 +190,9 @@ trialdiv_div6 (const unsigned long *n, const trialdiv_divisor_t *d)
   x0 *= d->pinv;
   return x0 <= d->plim;
 }
+#endif
 
+#if TRIALDIV_MAXLEN >= 7
 /* Trial division for integers with 7 unsigned long */
 static inline int
 trialdiv_div7 (const unsigned long *n, const trialdiv_divisor_t *d)
@@ -211,7 +222,9 @@ trialdiv_div7 (const unsigned long *n, const trialdiv_divisor_t *d)
   x0 *= d->pinv;
   return x0 <= d->plim;
 }
+#endif
 
+#if TRIALDIV_MAXLEN >= 8
 /* Trial division for integers with 8 unsigned long */
 static inline int
 trialdiv_div8 (const unsigned long *n, const trialdiv_divisor_t *d)
@@ -243,6 +256,7 @@ trialdiv_div8 (const unsigned long *n, const trialdiv_divisor_t *d)
   x0 *= d->pinv;
   return x0 <= d->plim;
 }
+#endif
 
 /* Divide exactly N = {n, 2} in place by p, where pinv = 1/p mod W,
    using Hensel division. The algorithm is the following for N of k limbs:
