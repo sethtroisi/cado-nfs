@@ -235,6 +235,12 @@ public:
             << " // f=" << prime_ideal_inertia_degree(fkp)
             << " e="<< e
             << endl;
+        o << "# I_" << two.first << "_" << k
+            << " " << two.first
+            << " " << prime_ideal_inertia_degree(fkp)
+            << " " << e
+            << " " << theta_q
+            << endl;
     }/*}}}*/
     void print_info(ostream& o) const {/*{{{*/
         for(unsigned int k = 0 ; k < F.size() ; k++) {
