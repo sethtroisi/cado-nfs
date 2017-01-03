@@ -48,7 +48,7 @@ if ENABLE_FFT_INTERFACE
 # default which gets shipped
 libgf2x_la_CFLAGS=$(AM_CFLAGS) -DCANTOR_BASE_FIELD_SIZE=128
 endif
-libgf2x_la_SOURCES=gf2x.c toom.c toom-gpl.c $(FFT_SOURCES)
+libgf2x_la_SOURCES=gf2x.c toom.c toom128.c toom-gpl.c $(FFT_SOURCES)
 
 
 

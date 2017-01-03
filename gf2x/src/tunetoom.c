@@ -68,7 +68,7 @@
       (see instructions in tunefft.c).
 */
 
-#define _BSD_SOURCE
+#define _DEFAULT_SOURCE /* _BSD_SOURCE is deprecated */
 #define _POSIX_C_SOURCE 200112L /* solaris needs >= 199506L for ctime_r */
 #include <stdio.h>
 #include <stdlib.h>
@@ -78,24 +78,30 @@
 #include <time.h>
 #include <ctype.h>
 #include <sys/utsname.h>        /* for uname */
+#include <math.h>
 #include "gf2x.h"
 #include "gf2x/gf2x-impl.h"
 #include "gf2x/gf2x-small.h"
 #include "timing.h"
 #include "tuning-common.h"
 
+/* those values are the minimal thresholds for each routine */
+#define MINI_GF2X_MUL_KARAX_THRESHOLD 	2
 #define MINI_GF2X_MUL_TOOM_THRESHOLD 	17
 #define MINI_GF2X_MUL_TOOMW_THRESHOLD	8
 #define MINI_GF2X_MUL_TOOM4_THRESHOLD	30
 #define MINI_GF2X_MUL_TOOMU_THRESHOLD	33
+#define MINI_GF2X_MUL_TC3X_THRESHOLD 	15
 
 #define BESTMIN (GF2X_MUL_KARA_THRESHOLD-1)
 #define BESTMINU (GF2X_MUL_TOOMU_THRESHOLD-1)
 
 const char * gf2x_toom_select_string[] = {
     [GF2X_SELECT_KARA] = "TC2",
+    [GF2X_SELECT_KARAX] = "TC2X",
     [GF2X_SELECT_TC3]  = "TC3",
     [GF2X_SELECT_TC3W] = "TC3W",
+    [GF2X_SELECT_TC3X] = "TC3X",
     [GF2X_SELECT_TC4]  = "TC4",
 };
 
@@ -110,7 +116,7 @@ void tunetoom(long tablesz)
 {
     long high, n;
     int k;
-    double T3[1], TK[1], TW[1], T4[1];
+    double T3[1], TK[1], TKX[1], TW[1], T3X[1], T4[1];
     double mint;
     unsigned long *a, *b, *c, *d, *t;
 
@@ -131,31 +137,82 @@ void tunetoom(long tablesz)
     d = (unsigned long *) malloc(2 * high * sizeof(unsigned long));
     t = (unsigned long *) malloc(gf2x_toomspace(high) * sizeof(unsigned long));
 
-    for (n = BESTMIN + 1; n <= high; ) {
-	srandom(1);
-	TK[0] = T3[0] = TW[0] = T4[0] = 0.0;
+    int count = 0;
+
+    /* S[i] is the sum of the log of the timing for method 'i', and nb[i] is
+       the # of times method 'i' was tuned. We use i=255 for the best times. */
+    double S[256] = {0, };
+    int nb[256] = {0, };
+
+    for (n = BESTMIN + 1; n <= high;) {
+      if (count++ % 10 == 0)
+#ifdef HAVE_KARAX
+          printf ("     TC2      TC2X     TC3      TC3W     TC3X      TC4      best\n");
+#else
+          printf ("     TC2      TC3      TC3W     TC4      best\n");
+#endif
+	TK[0] = TKX[0] = T3[0] = TW[0] = T3X[0] = T4[0] = 0.0;
 	printf("%ld ", n);
 	fflush(stdout);
+	srandom(1);
 	random_wordstring(a, n);
 	random_wordstring(b, n);
 	if (n >= GF2X_MUL_KARA_THRESHOLD)
+          {
 	    TIME(TK[0], gf2x_mul_kara(c, a, b, n, t));
+            nb[GF2X_SELECT_KARA] ++;
+            S[GF2X_SELECT_KARA] += log (TK[0]);
+          }
+#ifdef HAVE_KARAX
+	if (n >= MINI_GF2X_MUL_KARAX_THRESHOLD)
+          {
+	    TIME(TKX[0], gf2x_mul_karax(d, a, b, n, t));
+            check(a, n, b, n, "Kara", c, "TC2X", d);
+            nb[GF2X_SELECT_KARAX] ++;
+            S[GF2X_SELECT_KARAX] += log (TKX[0]);
+          }
+#endif
 	if (n >= MINI_GF2X_MUL_TOOM_THRESHOLD) {
 	    TIME(T3[0], gf2x_mul_tc3(d, a, b, n, t));
 	    check(a, n, b, n, "Kara", c, "TC3", d);
+            nb[GF2X_SELECT_TC3] ++;
+            S[GF2X_SELECT_TC3] += log (T3[0]);
 	}
 	if (n >= MINI_GF2X_MUL_TOOMW_THRESHOLD) {
 	    TIME(TW[0], gf2x_mul_tc3w(d, a, b, n, t));
 	    check(a, n, b, n, "Kara", c, "TC3W", d);
+            nb[GF2X_SELECT_TC3W] ++;
+            S[GF2X_SELECT_TC3W] += log (TW[0]);
 	}
+#ifdef HAVE_KARAX
+	if (n >= MINI_GF2X_MUL_TC3X_THRESHOLD)
+          {
+	    TIME(T3X[0], gf2x_mul_tc3x(d, a, b, n, t));
+            check(a, n, b, n, "Kara", c, "TC3X", d);
+            nb[GF2X_SELECT_TC3X] ++;
+            S[GF2X_SELECT_TC3X] += log (T3X[0]);
+          }
+#endif
 	if (n >= MINI_GF2X_MUL_TOOM4_THRESHOLD) {
 	    TIME(T4[0], gf2x_mul_tc4(d, a, b, n, t));
 	    check(a, n, b, n, "Kara", c, "TC4", d);
+            nb[GF2X_SELECT_TC4] ++;
+            S[GF2X_SELECT_TC4] += log (T4[0]);
 	}
-	printf("TC2:%1.2e TC3:%1.2e TC3W:%1.2e TC4:%1.2e ",
-	       TK[0], T3[0], TW[0], T4[0]);
+#ifdef HAVE_KARAX
+	printf ("%1.2e %1.2e %1.2e %1.2e %1.2e %1.2e ",
+                TK[0], TKX[0], T3[0], TW[0], T3X[0], T4[0]);
+#else
+	printf ("%1.2e %1.2e %1.2e %1.2e ", TK[0], T3[0], TW[0], T4[0]);
+#endif
 	mint = TK[0];
 	k = GF2X_SELECT_KARA;
+#ifdef HAVE_KARAX
+	if ((TKX[0] < mint) && (n >= MINI_GF2X_MUL_KARAX_THRESHOLD)) {
+	    mint = TKX[0];
+	    k = GF2X_SELECT_KARAX;
+	}
+#endif
 	if ((T3[0] < mint) && (n >= MINI_GF2X_MUL_TOOM_THRESHOLD)) {
 	    mint = T3[0];
 	    k = GF2X_SELECT_TC3;
@@ -164,18 +221,42 @@ void tunetoom(long tablesz)
 	    mint = TW[0];
 	    k = GF2X_SELECT_TC3W;
 	}
+#ifdef HAVE_KARAX
+	if ((T3X[0] < mint) && (n >= MINI_GF2X_MUL_TC3X_THRESHOLD)) {
+	    mint = T3X[0];
+	    k = GF2X_SELECT_TC3X;
+	}
+#endif
 	if ((T4[0] < mint) && (n >= MINI_GF2X_MUL_TOOM4_THRESHOLD)) {
 	    mint = T4[0];
 	    k = GF2X_SELECT_TC4;
 	}
-	printf("best:%1.2e %s\n", mint, gf2x_toom_select_string[k]);
+        nb[255] ++;
+        S[255] += log (mint);
+	printf("%1.2e %s\n", mint, gf2x_toom_select_string[k]);
         fprintf(rp, "toom %ld %d\n", n, k);
 	fflush(stdout);
         long nn = MAX(n * mulstep, n + 1);
-        for( ; n < nn && n <= high ; n++) {
-            best_tab[n - 1] = k;
-        }
+        for( ; n < nn && n <= high ; n++)
+          best_tab[n - 1] = k;
     }
+#ifdef HAVE_KARAX
+	printf ("avg %1.2e %1.2e %1.2e %1.2e %1.2e %1.2e %1.2e\n",
+                exp (S[GF2X_SELECT_KARA] / nb[GF2X_SELECT_KARA]),
+                exp (S[GF2X_SELECT_KARAX] / nb[GF2X_SELECT_KARAX]),
+                exp (S[GF2X_SELECT_TC3] / nb[GF2X_SELECT_TC3]),
+                exp (S[GF2X_SELECT_TC3W] / nb[GF2X_SELECT_TC3W]),
+                exp (S[GF2X_SELECT_TC3X] / nb[GF2X_SELECT_TC3X]),
+                exp (S[GF2X_SELECT_TC4] / nb[GF2X_SELECT_TC4]),
+                exp (S[255] / nb[255]));
+#else
+	printf ("avg %1.2e %1.2e %1.2e %1.2e %1.2e\n",
+                exp (S[GF2X_SELECT_KARA] / nb[GF2X_SELECT_KARA]),
+                exp (S[GF2X_SELECT_TC3] / nb[GF2X_SELECT_TC3]),
+                exp (S[GF2X_SELECT_TC3W] / nb[GF2X_SELECT_TC3W]),
+                exp (S[GF2X_SELECT_TC4] / nb[GF2X_SELECT_TC4]),
+                exp (S[255] / nb[255]));
+#endif
 
     free(a);
     free(b);
@@ -306,9 +387,8 @@ void tuneutoom(long tabsz)
 	fflush(stdout);
         fprintf(rp, "utoom %ld %d\n", sa, k);
         long nn = MAX(sa * mulstep, sa + 1);
-        for( ; sa < nn && sa <= high ; sa++) {
-            best_utab[sa - 1] = k;
-        }
+        for( ; sa < nn && sa <= high ; sa++)
+          best_utab[sa - 1] = k;
     }
 
     free(a);
@@ -370,6 +450,9 @@ int main(int argc, char *argv[])
     if (nsz == 0)
         usage(1);
 
+    set_clock_resolution ();
+    if (MINTIME >= 0.5 && mulstep == 1.0)
+      mulstep = 1.05;
     set_tuning_output();
 
     {
@@ -399,6 +482,8 @@ int main(int argc, char *argv[])
     tuneutoom(tabsz2);		// Tune unbalanced routines
 
     fflush(stdout);
+
+    close_tuning_output ();
 
     return 0;
 }

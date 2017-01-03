@@ -171,7 +171,7 @@ am__installdirs = "$(DESTDIR)$(libdir)" "$(DESTDIR)$(gf2x_includedir)" \
 	"$(DESTDIR)$(includedir)" "$(DESTDIR)$(includedir)"
 LTLIBRARIES = $(lib_LTLIBRARIES)
 libgf2x_la_LIBADD =
-am__libgf2x_la_SOURCES_DIST = gf2x.c toom.c toom-gpl.c \
+am__libgf2x_la_SOURCES_DIST = gf2x.c toom.c toom128.c toom-gpl.c \
 	fft/gf2x-ternary-fft.c fft/gf2x-fake-fft.c \
 	fft/gf2x-cantor-fft.c
 am__dirstamp = $(am__leading_dot)dirstamp
@@ -180,7 +180,7 @@ am__dirstamp = $(am__leading_dot)dirstamp
 @ENABLE_FFT_INTERFACE_TRUE@	fft/libgf2x_la-gf2x-cantor-fft.lo
 am__objects_2 = fft/libgf2x_la-gf2x-ternary-fft.lo $(am__objects_1)
 am_libgf2x_la_OBJECTS = libgf2x_la-gf2x.lo libgf2x_la-toom.lo \
-	libgf2x_la-toom-gpl.lo $(am__objects_2)
+	libgf2x_la-toom128.lo libgf2x_la-toom-gpl.lo $(am__objects_2)
 libgf2x_la_OBJECTS = $(am_libgf2x_la_OBJECTS)
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
@@ -323,6 +323,7 @@ am__distuninstallcheck_listfiles = $(distuninstallcheck_listfiles) \
   | sed 's|^\./|$(prefix)/|' | grep -v '$(infodir)/dir$$'
 distcleancheck_listfiles = find . -type f -print
 ACLOCAL = @ACLOCAL@
+ALLOCA = @ALLOCA@
 AMTAR = @AMTAR@
 AM_DEFAULT_VERBOSITY = @AM_DEFAULT_VERBOSITY@
 AR = @AR@
@@ -467,7 +468,7 @@ FFT_SOURCES = fft/gf2x-ternary-fft.c $(am__append_2)
 lib_LTLIBRARIES = libgf2x.la
 # default which gets shipped
 @ENABLE_FFT_INTERFACE_TRUE@libgf2x_la_CFLAGS = $(AM_CFLAGS) -DCANTOR_BASE_FIELD_SIZE=128
-libgf2x_la_SOURCES = gf2x.c toom.c toom-gpl.c $(FFT_SOURCES)
+libgf2x_la_SOURCES = gf2x.c toom.c toom128.c toom-gpl.c $(FFT_SOURCES)
 nobase_include_HEADERS = gf2x.h	\
 		gf2x/gf2x-impl.h		\
 		gf2x/gf2x-impl-export.h		\
@@ -629,6 +630,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgf2x_la-gf2x.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgf2x_la-toom-gpl.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgf2x_la-toom.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgf2x_la-toom128.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@fft/$(DEPDIR)/libgf2x_la-gf2x-cantor-fft.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@fft/$(DEPDIR)/libgf2x_la-gf2x-fake-fft.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@fft/$(DEPDIR)/libgf2x_la-gf2x-ternary-fft.Plo@am__quote@
@@ -670,6 +672,13 @@ libgf2x_la-toom.lo: toom.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='toom.c' object='libgf2x_la-toom.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgf2x_la_CFLAGS) $(CFLAGS) -c -o libgf2x_la-toom.lo `test -f 'toom.c' || echo '$(srcdir)/'`toom.c
+
+libgf2x_la-toom128.lo: toom128.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgf2x_la_CFLAGS) $(CFLAGS) -MT libgf2x_la-toom128.lo -MD -MP -MF $(DEPDIR)/libgf2x_la-toom128.Tpo -c -o libgf2x_la-toom128.lo `test -f 'toom128.c' || echo '$(srcdir)/'`toom128.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgf2x_la-toom128.Tpo $(DEPDIR)/libgf2x_la-toom128.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='toom128.c' object='libgf2x_la-toom128.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgf2x_la_CFLAGS) $(CFLAGS) -c -o libgf2x_la-toom128.lo `test -f 'toom128.c' || echo '$(srcdir)/'`toom128.c
 
 libgf2x_la-toom-gpl.lo: toom-gpl.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgf2x_la_CFLAGS) $(CFLAGS) -MT libgf2x_la-toom-gpl.lo -MD -MP -MF $(DEPDIR)/libgf2x_la-toom-gpl.Tpo -c -o libgf2x_la-toom-gpl.lo `test -f 'toom-gpl.c' || echo '$(srcdir)/'`toom-gpl.c

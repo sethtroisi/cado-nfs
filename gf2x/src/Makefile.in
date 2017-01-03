@@ -1059,6 +1059,7 @@ am__DIST_COMMON = $(srcdir)/Makefile.in $(top_srcdir)/config/depcomp \
 	$(top_srcdir)/config/test-driver README TODO
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
 ACLOCAL = @ACLOCAL@
+ALLOCA = @ALLOCA@
 AMTAR = @AMTAR@
 AM_DEFAULT_VERBOSITY = @AM_DEFAULT_VERBOSITY@
 AR = @AR@
@@ -1532,7 +1533,7 @@ check_mul9k2_SOURCES = check_small_size.c
 noinst_HEADERS = timing.h tuning-common.h replace.h
 modify_thresholds_SOURCES = modify-thresholds.c replace.c
 tunetoom_SOURCES = tunetoom.c tuning-common.c
-tunetoom_LDADD = libtiming.la ../libgf2x.la
+tunetoom_LDADD = libtiming.la ../libgf2x.la -lm
 TOOM_TUNING_LIMIT = 2048
 tunefft_SOURCES = tunefft.c tuning-common.c
 tunefft_LDADD = libtiming.la ../libgf2x.la
@@ -4086,7 +4087,7 @@ tune-lowlevel: $(LOWLEVEL)
 	perl $(srcdir)/tune-lowlevel.pl $(LOWLEVEL)
 
 @GPL_CODE_PRESENT_TRUE@tunetoom.res: tunetoom$(EXEEXT)
-@GPL_CODE_PRESENT_TRUE@	./tunetoom -s 1.05 $(TOOM_TUNING_LIMIT) -o tunetoom.res
+@GPL_CODE_PRESENT_TRUE@	./tunetoom $(TOOM_TUNING_LIMIT) -o tunetoom.res
 
 @GPL_CODE_PRESENT_TRUE@tune-toom: tunetoom.res modify-thresholds$(EXEEXT)
 @GPL_CODE_PRESENT_TRUE@	cd $(top_builddir) ; $(MAKE)

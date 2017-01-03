@@ -39,7 +39,7 @@ AC_CANONICAL_TARGET
 
 AC_LANG([C])
 
-AC_CHECK_HEADERS([sys/resource.h])
+AC_FUNC_ALLOCA
 
 AC_SUBST([gf2x_lib_version], [1:2:0])
 

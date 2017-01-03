@@ -39,7 +39,7 @@ extern FILE * rp;
 #define MIN(a,b)        ((a)<(b) ? (b) : (a))
 #endif
 
-#define MINTIME 0.5		/* time resolution */
+extern double MINTIME;
 
 #define TIME(x, i)				\
   { long j, k = 1;				\
@@ -56,6 +56,7 @@ extern FILE * rp;
 extern "C" {
 #endif
 
+extern void set_clock_resolution ();
 extern void random_wordstring(unsigned long * a, long n);
 
 extern void check(const unsigned long *a, long m,
@@ -64,6 +65,7 @@ extern void check(const unsigned long *a, long m,
            const char * dname, const unsigned long *d);
 
 extern void set_tuning_output();
+extern void close_tuning_output();
 extern int handle_tuning_mulstep(int * p_argc, char *** p_argv);
 extern int handle_tuning_outfile(int * p_argc, char *** p_argv);
 #ifdef __cplusplus

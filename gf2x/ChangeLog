@@ -959,7 +959,7 @@ commit cf186c14f5f462b948bc859408066ec1246deddc
 Author: thome <thome@e5c1114b-a573-4582-9dac-f72f410959ce>
 Date:   Tue Oct 5 15:26:13 2010 +0000
 
-    disabling mul3k3, as it's really a time bomb. As is, if it wins, it
+    disabling mul3k3, as it's really a time bomb. As is, if it wins, it
     breaks the code.
     
     git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@107 e5c1114b-a573-4582-9dac-f72f410959ce

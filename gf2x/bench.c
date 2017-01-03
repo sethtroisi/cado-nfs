@@ -26,20 +26,17 @@
 */
 
 #include <stdio.h>
-#include <sys/resource.h>
+#include <time.h>
 #include <sys/types.h>
 #include <stdlib.h>
 #include "gf2x.h"
 
 /* Usage: ./bench <limit size> */
 
+/* return runtime in seconds */
 double runtime(void)
 {
-   struct rusage used;
-
-   getrusage(RUSAGE_SELF, &used);
-   return (used.ru_utime.tv_sec + used.ru_stime.tv_sec +
-      (used.ru_utime.tv_usec + used.ru_stime.tv_usec) / 1e6);
+  return (double) clock () / CLOCKS_PER_SEC;
 }
 
 int main(int argc, char * argv[])

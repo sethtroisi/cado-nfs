@@ -780,13 +780,13 @@ modify_thresholds_SOURCES=modify-thresholds.c replace.c
 ######################################################################
 EXTRA_PROGRAMS+=tunetoom$(EXEEXT)
 tunetoom_SOURCES=tunetoom.c tuning-common.c
-tunetoom_LDADD=libtiming.la ../libgf2x.la
+tunetoom_LDADD=libtiming.la ../libgf2x.la -lm
 
 TOOM_TUNING_LIMIT=2048
 
 if GPL_CODE_PRESENT
 tunetoom.res: tunetoom$(EXEEXT)
-	./tunetoom -s 1.05 $(TOOM_TUNING_LIMIT) -o tunetoom.res
+	./tunetoom $(TOOM_TUNING_LIMIT) -o tunetoom.res
 
 tune-toom: tunetoom.res modify-thresholds$(EXEEXT)
 	cd $(top_builddir) ; $(MAKE)

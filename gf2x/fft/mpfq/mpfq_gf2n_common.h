@@ -36,13 +36,13 @@ typedef mpfq_2_field_struct * mpfq_2_dst_field;
         )
 /* _m128i from 1 int64_t's */
 #define _mpfq_mm_set1_epi64(u) _mm_set1_epi64( _mpfq_mm_cvtsi64_m64((int64_t) (u)))
-/* _m128i from 2 int64_t CONSTANTS (and try to get suffix right) */
+/* _m128i from 2 int64_t CONSTANTS (and try to get suffix right) */
 #define _mpfq_mm_setr_epi64_c(lo, hi)                                   \
     _mm_setr_epi64(                                                     \
             _mpfq_mm_cvtsi64_m64(INT64_C(lo)),                          \
             _mpfq_mm_cvtsi64_m64(INT64_C(hi))                           \
         )
-/* _m128i from 1 int64_t CONSTANT (and try to get suffix right) */
+/* _m128i from 1 int64_t CONSTANT (and try to get suffix right) */
 #define _mpfq_mm_set1_epi64_c(u) _mm_set1_epi64( _mpfq_mm_cvtsi64_m64(INT64_C(u)))
 /* and same for 32-bits (which, for some, have SSE-2) */
 #define _mpfq_mm_setr_epi32(a0, a1, a2, a3)                             \

@@ -55,7 +55,7 @@
        ln -sf already_tuned/tuned/gf2x-thresholds.h ../
 */
 
-#define _BSD_SOURCE
+#define _DEFAULT_SOURCE /* _BSD_SOURCE is deprecated */
 #define _POSIX_C_SOURCE 200112L /* solaris needs >= 199506L for ctime_r */
 #include <stdio.h>
 #include <stdlib.h>

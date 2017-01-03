@@ -28,25 +28,30 @@
 #include "gf2x/gf2x-config.h"
 
 #include <sys/types.h>
-#ifdef HAVE_SYS_RESOURCE_H
-#include <sys/resource.h>
-#else
 #include <time.h>
-#endif  /* HAVE_SYS_RESOURCE_H */
 #include <stdint.h>
 #include "timing.h"
 
 uint64_t microseconds()
 {
-#ifdef HAVE_SYS_RESOURCE_H
-        struct rusage res[1];
-        getrusage(RUSAGE_SELF,res);
-        uint64_t r;
-        r  = (uint64_t) res->ru_utime.tv_sec;
-        r *= (uint64_t) 1000000UL;
-        r += (uint64_t) res->ru_utime.tv_usec;
-        return r;
-#else
-        return clock () / (CLOCKS_PER_SEC / 1000000);
-#endif
+  if (CLOCKS_PER_SEC < 1000000)
+    return clock () * (1000000 / CLOCKS_PER_SEC);
+  else
+    return clock () / (CLOCKS_PER_SEC / 1000000);
+}
+
+/* returns the clock() resolution in seconds */
+double
+clock_resolution ()
+{
+  clock_t c0, c1, c2;
+  int i, iter = 100; /* with 100 iterations we expect an accuracy of 1% */
+
+  c0 = c1 = clock ();
+  for (i = 0; i < iter; i++)
+    {
+      do { c2 = clock (); } while (c2 == c1);
+      c1 = c2;
+    }
+  return (double) (c2 - c0) / iter;
 }

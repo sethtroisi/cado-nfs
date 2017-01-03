@@ -711,6 +711,12 @@ void print_hex (char *s, GF2X a, int flip)
   *s = '\0';
 }
 
+_ntl_ulong
+get_certificate (GF2X a)
+{
+  return a.xrep.elts()[0];
+}
+
 void
 fastmulmod (GF2X& c, const GF2X& a, const GF2X& b, const GF2XModulus& F,
 	         _ntl_ulong r, _ntl_ulong s)
@@ -1117,6 +1123,7 @@ main (int argc, char *argv[])
 	  char *fact;
 	  double f0;
 	  int usefastsqr;
+	  _ntl_ulong certificate;
 
 	  fact = (char*) malloc ((2 + (r / 4)) * sizeof (char));
 
@@ -1467,6 +1474,9 @@ main (int argc, char *argv[])
                     else
                       {
                         st = GetTime ();
+			if (m == 1 && q == 1 && f == 0.0 && skipd == r-1)
+			  /* mimic irred */
+			  certificate = get_certificate (a);
                         FastGCD(a, a, p);
                         if (verbose)
                           {
@@ -1550,7 +1560,8 @@ main (int argc, char *argv[])
               if (k1 != 0)
                 printf ("%ld %ld", ss, k1);
               else
-                printf ("%ld non-irreducible", ss);
+                printf ("%ld non-irreducible (LOG %lx)", ss,
+			(certificate ^ 0x2) & 0xFFFFFFFF);
 	      if (k1 >= b0)
 	        printf (" p%s", fact);
 	      printf("\n");

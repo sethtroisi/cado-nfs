@@ -35,7 +35,7 @@
 
 */
 
-#define _BSD_SOURCE
+#define _DEFAULT_SOURCE /* _BSD_SOURCE is deprecated */
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>             /* int64_t */
@@ -125,7 +125,7 @@ void read_table()
             }
             continue;
         }
-        r = sscanf(buf, "%16s %" SCNd64 " %d", token, &sz, &m);
+        r = sscanf(buf, "%15s %" SCNd64 " %d", token, &sz, &m);
         if (r != 3) {
             fprintf(stderr, "Bad input line: %s", buf);
             exit(1);

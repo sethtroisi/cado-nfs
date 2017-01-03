@@ -32,9 +32,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <sys/types.h>
-#ifdef  HAVE_SYS_RESOURCE_H
-#include <sys/resource.h>
-#endif  /*  HAVE_SYS_RESOURCE_H */
+#include <time.h>
 
 #include "gf2x/gf2x-impl.h"
 #include "gf2x/gf2x-thresholds.h"
@@ -47,13 +45,7 @@ static long init_extra_arg = ENGINE_EXTRA_ARG_DEFAULT;
 // cputime in millisec.
 static int cputime()
 {
-#ifdef  HAVE_SYS_RESOURCE_H
-    struct rusage rus;
-    getrusage(0, &rus);
-    return rus.ru_utime.tv_sec * 1000 + rus.ru_utime.tv_usec / 1000;
-#else
-    return 0;
-#endif
+  return (int) (clock () / ((double) CLOCKS_PER_SEC / 1000.0));
 }
 
 int time_total;
