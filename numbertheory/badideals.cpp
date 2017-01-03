@@ -213,7 +213,7 @@ public:
         }
         return res;
     }/*}}}*/
-    void print_info(ostream& o, cxx_mpz const& r, int k) const {/*{{{*/
+    void print_info(ostream& o, int k, cxx_mpz const& r, int side) const {/*{{{*/
         cxx_mpz_mat const& fkp(F[k].first);
         pair<cxx_mpz, cxx_mpz_mat> two = prime_ideal_two_element(O, f, M, fkp);
         /* Write the uniformizer as a polynomial with respect to the
@@ -227,20 +227,23 @@ public:
         /* That's only for debugging, so it's not terribly important.
          * But we may have a preference towards giving ideal info in
          * a more concise way, based on alpha_hat for instance */
-        string uniformizer = write_element_as_polynomial(theta_q, "alpha");
+        ostringstream alpha;
+        alpha << "alpha" << side;
+        string uniformizer = write_element_as_polynomial(theta_q, alpha.str());
 
         int e = F[k].second;
         o << "# I" << k
-            << ":=ideal<O|" << two.first << "," << uniformizer << ">;"
+            << ":=ideal<O" << side << "|" << two.first << "," << uniformizer << ">;"
             << " // f=" << prime_ideal_inertia_degree(fkp)
             << " e="<< e
             << endl;
-        o << "# I_" << two.first << "_" << r << "_" << k
+        o << "# I_" << two.first << "_" << r << "_" << side << "_" << k
             << " " << two.first
             << " " << r
-            << " " << prime_ideal_inertia_degree(fkp)
-            << " " << e
+            << " " << side
             << " " << theta_q
+            << " // " << prime_ideal_inertia_degree(fkp)
+            << " " << e
             << endl;
     }/*}}}*/
     pair<cxx_mpz_mat, cxx_mpz> generate_ideal(cxx_mpq_mat const& gens) const {/*{{{*/
@@ -382,7 +385,7 @@ vector<cxx_mpz> projective_roots_modp(cxx_mpz_poly const& f, cxx_mpz const& p)/*
     return roots;
 }/*}}}*/
 
-vector<badideal> badideals_above_p(cxx_mpz_poly const& f, cxx_mpz const& p)/*{{{*/
+vector<badideal> badideals_above_p(cxx_mpz_poly const& f, int side, cxx_mpz const& p)/*{{{*/
 {
     vector<badideal> badideals;
 
@@ -409,7 +412,7 @@ vector<badideal> badideals_above_p(cxx_mpz_poly const& f, cxx_mpz const& p)/*{{{
         ostringstream cmt;
         cmt << "# p=" << p << ", r=" << roots[i] << " : " << nonzero.size() << " ideals among " << vals.size() << " are bad\n";
         for(unsigned int j = 0 ; j < nonzero.size() ; j++) {
-            A.print_info(cmt, roots[i], nonzero[j]);
+            A.print_info(cmt, nonzero[j], roots[i], side);
         }
         cmt << "# " << lifts.size() << " branch"
             << (lifts.size() == 1 ? "" : "es") << " found\n";
@@ -431,7 +434,7 @@ vector<badideal> badideals_above_p(cxx_mpz_poly const& f, cxx_mpz const& p)/*{{{
     return badideals;
 }/*}}}*/
 
-vector<badideal> badideals_for_polynomial(cxx_mpz_poly const& f)/*{{{*/
+vector<badideal> badideals_for_polynomial(cxx_mpz_poly const& f, int side)/*{{{*/
 {
     vector<badideal> badideals;
 
@@ -450,7 +453,7 @@ vector<badideal> badideals_for_polynomial(cxx_mpz_poly const& f)/*{{{*/
 
 
     for(vzci_t it = small_primes.begin() ; it != small_primes.end() ; it++) {
-        vector<badideal> tmp = badideals_above_p(f, it->first);
+        vector<badideal> tmp = badideals_above_p(f, side, it->first);
         badideals.insert(badideals.end(), tmp.begin(), tmp.end());
     }
 
@@ -521,7 +524,7 @@ int main(int argc, char * argv[])
         if (!(is >> f))
             usage(pl, original_argv, "cannot parse polynomial");
 
-        vector<badideal> badideals = badideals_for_polynomial(f);
+        vector<badideal> badideals = badideals_for_polynomial(f, side);
         cout << "--- .badideals data ---\n";
         for(vbci_t it = badideals.begin() ; it != badideals.end() ; it++) {
             badideal const& b(*it);
@@ -549,7 +552,7 @@ int main(int argc, char * argv[])
         for(int side = 0 ; side < cpoly->nb_polys ; side++) {
             cxx_mpz_poly f(cpoly->pols[side]);
             if (f->deg == 1) continue;
-            vector<badideal> badideals = badideals_for_polynomial(f);
+            vector<badideal> badideals = badideals_for_polynomial(f, side);
             for(vbci_t it = badideals.begin() ; it != badideals.end() ; it++) {
                 badideal const& b(*it);
                 b.print_dot_badideals_file(fb, side);
