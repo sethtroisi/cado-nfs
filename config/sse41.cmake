@@ -4,7 +4,9 @@ message(STATUS "Testing whether sse-4.1 code can be used")
 if (HAVE_SSSE3)
     try_run(sse41_runs sse41_compiles
         ${PROJECT_BINARY_DIR}/config
-        ${PROJECT_SOURCE_DIR}/config/sse41.c)
+        ${PROJECT_SOURCE_DIR}/config/sse41.c
+        ARGS 17 42
+        )
     if(sse41_compiles)
         if (sse41_runs MATCHES FAILED_TO_RUN)
             message(STATUS "Testing whether sse-4.1 code can be used -- No")
@@ -17,7 +19,9 @@ if (HAVE_SSSE3)
         try_run(sse41_runs sse41_compiles
             ${PROJECT_BINARY_DIR}/config
             ${PROJECT_SOURCE_DIR}/config/sse41.c
-            COMPILE_DEFINITIONS -msse4.1)
+            COMPILE_DEFINITIONS -msse4.1
+            ARGS 17 42
+            )
         if(sse41_compiles)
             if (sse41_runs MATCHES FAILED_TO_RUN)
                 message(STATUS "Testing whether sse-4.1 code can be used -- No")
