@@ -213,7 +213,7 @@ public:
         }
         return res;
     }/*}}}*/
-    void print_info(ostream& o, int k) const {/*{{{*/
+    void print_info(ostream& o, cxx_mpz const& r, int k) const {/*{{{*/
         cxx_mpz_mat const& fkp(F[k].first);
         pair<cxx_mpz, cxx_mpz_mat> two = prime_ideal_two_element(O, f, M, fkp);
         /* Write the uniformizer as a polynomial with respect to the
@@ -235,25 +235,13 @@ public:
             << " // f=" << prime_ideal_inertia_degree(fkp)
             << " e="<< e
             << endl;
-        o << "# I_" << two.first << "_" << k
+        o << "# I_" << two.first << "_" << r << "_" << k
             << " " << two.first
+            << " " << r
             << " " << prime_ideal_inertia_degree(fkp)
             << " " << e
             << " " << theta_q
             << endl;
-    }/*}}}*/
-    void print_info(ostream& o) const {/*{{{*/
-        for(unsigned int k = 0 ; k < F.size() ; k++) {
-            print_info(o, k);
-        }
-
-        vector<int> valvec = (*this)(jjinv);
-
-        o << p << "-valuation vector for J:";
-        for(unsigned int k = 0 ; k < F.size() ; k++) {
-            o << " " << valvec[k];
-        }
-        o << endl;
     }/*}}}*/
     pair<cxx_mpz_mat, cxx_mpz> generate_ideal(cxx_mpq_mat const& gens) const {/*{{{*/
         return ::generate_ideal(O, M, gens);
@@ -421,7 +409,7 @@ vector<badideal> badideals_above_p(cxx_mpz_poly const& f, cxx_mpz const& p)/*{{{
         ostringstream cmt;
         cmt << "# p=" << p << ", r=" << roots[i] << " : " << nonzero.size() << " ideals among " << vals.size() << " are bad\n";
         for(unsigned int j = 0 ; j < nonzero.size() ; j++) {
-            A.print_info(cmt, nonzero[j]);
+            A.print_info(cmt, roots[i], nonzero[j]);
         }
         cmt << "# " << lifts.size() << " branch"
             << (lifts.size() == 1 ? "" : "es") << " found\n";
