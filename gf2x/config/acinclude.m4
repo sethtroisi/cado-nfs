@@ -89,10 +89,12 @@ AC_DEFUN([SSE2_EXAMPLE],[AC_LANG_SOURCE([
 #include <emmintrin.h>
 
 int main(int argc, char * argv[[]]) {
+    volatile int a0 = 17;
+    volatile int a1 = 42;
     __m128i foo = _mm_setr_epi32(argc, argc + 1, argc + 2, argc + 3);
     __m128i bar = _mm_setr_epi32(argc + 3, argc + 2, argc + 1, argc);
-    __m128i x = _mm_setr_epi32(42, 0, 17, 0);
-    __m128d g = _mm_set_pd(42.0, 17.0);
+    __m128i x = _mm_setr_epi32(a1, 0, a0, 0);
+    __m128d g = _mm_set_pd((double) a1, (double) a0);
     x = _mm_srl_epi64(x, _mm_setr_epi32(2,0,0,0));
     foo = _mm_mullo_epi16(foo, bar);
     foo = _mm_slli_epi64(foo, 1);
@@ -116,8 +118,10 @@ AC_DEFUN([SSE3_EXAMPLE],[AC_LANG_SOURCE([
 
 int main()
 {
-    __m128d x = _mm_setr_pd(12.34, 34.12);
-    __m128d y = _mm_setr_pd(78.56, 56.78);
+    volatile double a0 = 12.34;
+    volatile double a1 = 56.78;
+    __m128d x = _mm_setr_pd(a0, 34.12);
+    __m128d y = _mm_setr_pd(78.56, a1);
     double a[[2]], b[[2]] = { 78.56 + 56.78, 12.34 + 34.12 };
 
     y = _mm_hadd_pd(y, x);
@@ -134,8 +138,10 @@ AC_DEFUN([SSSE3_EXAMPLE],[AC_LANG_SOURCE([
 
 int main()
 {
-    __m128i x = _mm_setr_epi32(0x03020100, 0x07060504, 0x0B0A0908, 0x0F0E0D0C);
-    __m128i y = _mm_setr_epi32(0x13121110, 0x17161514, 0x1B1A1918, 0x1F1E1D1C);
+    volatile uint32_t a0 = 0x03020100;
+    volatile uint32_t a1 = 0x1F1E1D1C;
+    __m128i x = _mm_setr_epi32(a0, 0x07060504, 0x0B0A0908, 0x0F0E0D0C);
+    __m128i y = _mm_setr_epi32(0x13121110, 0x17161514, 0x1B1A1918, a1);
     uint64_t a[[2]], b[[2]] = { 0x0C0B0A0908070605, 0x14131211100F0E0D };
     y = _mm_alignr_epi8(y, x, 0x5);
     memcpy (a, &y, 16);
@@ -149,26 +155,22 @@ AC_DEFUN([SSE41_EXAMPLE],[AC_LANG_SOURCE([
 #include <smmintrin.h>
 
 int main() {
-    __m128i x = _mm_setr_epi32(42, 0, 17, 0);
-    __m128i y = _mm_setr_epi32(41, 0, 17, 0);
-    x = _mm_cmpeq_epi64(x, y);
-    // x = 0....0 1....1
-    y =  _mm_insert_epi64(y, _mm_extract_epi64(x, 1), 0); 
-    // y = 1....1 0x11
-    y = _mm_andnot_si128(y, y);
-    // y = 0....0 0x11
-    x = _mm_cmpeq_epi64(x, y);
-    // x = 1....1 1....1
     /* the following test is for emulated 32-bit on physical 64-bit */
     if (sizeof(unsigned long) != 8)
       abort ();
-    unsigned int z = _mm_extract_epi32(x, 2);
-    return
-        (
-       (_mm_extract_epi32(x, 0) != 0)
-    && (_mm_extract_epi32(x, 1) != 0)
-    && (_mm_extract_epi32(x, 2) == 0)
-    && (_mm_extract_epi32(x, 3) == 0)) ? EXIT_SUCCESS : EXIT_FAILURE;
+    volatile int a0 = 17;
+    volatile int a1 = 42;
+    __m128i x = _mm_setr_epi32(a1, 0, a0, 0);
+    // x = 0 0x2a 0 0x11
+    __m128i y = _mm_setr_epi32(42, 0, 17, 0);
+    // y = 0 0x2a 0 0x11
+    __m128i ma = _mm_max_epi32(x, y);
+    __m128i mi = _mm_min_epi32(x, y);
+    __m128i z = _mm_xor_si128(mi, ma);
+    int ok0 = _mm_testz_si128(z, z);
+    __m128i c = _mm_cmpeq_epi64(x, y);
+    int ok1 = _mm_extract_epi32(c, 0) && _mm_extract_epi32(c, 1);
+    return (ok0 && ok1) ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 ])])
 AC_DEFUN([PCLMUL_EXAMPLE],[AC_LANG_SOURCE([
@@ -191,8 +193,10 @@ int main() {
             )
     /* _m128i from 1 int64_t's */
 #define _gf2x_mm_set1_epi64(u) _mm_set1_epi64( _gf2x_mm_cvtsi64_m64((int64_t) (u)))
-    __m128i a = _gf2x_mm_set1_epi64(17);
-    __m128i b = _gf2x_mm_set1_epi64(42);
+    volatile int a0 = 17;
+    volatile int a1 = 42;
+    __m128i a = _gf2x_mm_set1_epi64(a0);
+    __m128i b = _gf2x_mm_set1_epi64(a1);
     union { __m128i s; unsigned long x[[2]]; } proxy;
     proxy.s = _mm_clmulepi64_si128(a, b, 0);
     return proxy.x[[0]] - 650;

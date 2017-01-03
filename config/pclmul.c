@@ -17,8 +17,10 @@ int main() {
             )
     /* _m128i from 1 int64_t's */
 #define _gf2x_mm_set1_epi64(u) _mm_set1_epi64( _gf2x_mm_cvtsi64_m64((int64_t) (u)))
-    __m128i a = _gf2x_mm_set1_epi64(17);
-    __m128i b = _gf2x_mm_set1_epi64(42);
+    volatile int a0 = 17;
+    volatile int a1 = 42;
+    __m128i a = _gf2x_mm_set1_epi64(a0);
+    __m128i b = _gf2x_mm_set1_epi64(a1);
     union { __m128i s; unsigned long x[2]; } proxy;
     proxy.s = _mm_clmulepi64_si128(a, b, 0);
     return proxy.x[0] - 650;
