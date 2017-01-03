@@ -132,12 +132,26 @@ bool sl_equivalent_matrices(cxx_mpq_mat const& M, cxx_mpq_mat const& A, cxx_mpz 
     return true;
 }/*}}}*/
 
+#if 0
 bool sl_equivalent_matrices(cxx_mpq_mat const& M, cxx_mpq_mat const& A)/*{{{*/
 {
-    cxx_mpq_mat Mq(M);
-    cxx_mpq_mat Aq(A);
-    return sl_equivalent_matrices(Mq, Aq);
+    /* unimplemented for the moment, since unneeded.  We would compute
+     * A*M^-1, and see whether we have a denominator. */
+    if (M->m != A->m) return false;
+    if (M->n != A->n) return false;
+    cxx_mpq_mat Mi;
+    mpq_mat_inv(Mi, M);
+    cxx_mpq_mat AMi;
+    mpq_mat_mul(AMi, A, Mi);
+    for(unsigned int i = 0 ; i < AMi->m ; i++) {
+        for(unsigned int j = 0 ; j < AMi->n ; j++) {
+            mpq_srcptr mij = mpq_mat_entry_const(AMi, i, j);
+            if (mpz_cmp_ui(mpq_denref(mij), 1) != 0) return false;
+        }
+    }
+    return true;
 }/*}}}*/
+#endif
 
 cxx_mpq_mat batch_read_order_basis(istream & in, unsigned int n)/*{{{*/
 {
