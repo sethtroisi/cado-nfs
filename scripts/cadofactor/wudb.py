@@ -557,7 +557,7 @@ class DictDbAccess(collections.MutableMapping):
         '''
         
         if isinstance(db, str):
-            self._conn = sqlite3.connect(db)
+            self._conn = sqlite3.connect(db, isolation_level=None)
             self._ownconn = True
         else:
             self._conn = db
@@ -823,7 +823,7 @@ class WuAccess(object): # {
     
     def __init__(self, db):
         if isinstance(db, str):
-            self.conn = sqlite3.connect(db)
+            self.conn = sqlite3.connect(db, isolation_level=None)
             self._ownconn = True
         else:
             self.conn = db
@@ -1301,7 +1301,7 @@ class DbAccess(object):
         self.__db = db
     
     def get_db_connection(self):
-        return sqlite3.connect(self.__db)
+        return sqlite3.connect(self.__db, isolation_level=None)
     
     def get_db_filename(self):
         return self.__db
