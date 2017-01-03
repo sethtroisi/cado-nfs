@@ -8,11 +8,9 @@ int main(int argc, char * argv[])
     /* the following test is for emulated 32-bit on physical 64-bit */
     if (sizeof(unsigned long) != 8)
       abort ();
-    if (argc < 3) {
-        fprintf(stderr, "This code must be called with arguments 17 and 42\n");
-        exit(EXIT_FAILURE);
-    }
-    __m128i x = _mm_setr_epi32(atoi(argv[2]), 0, atoi(argv[1]), 0);
+    volatile int a0 = 17;
+    volatile int a1 = 42;
+    __m128i x = _mm_setr_epi32(a1, 0, a0, 0);
     // x = 0 0x2a 0 0x11
     __m128i y = _mm_setr_epi32(42, 0, 17, 0);
     // y = 0 0x2a 0 0x11

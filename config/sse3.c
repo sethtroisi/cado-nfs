@@ -5,8 +5,10 @@
 
 int main()
 {
-    __m128d x = _mm_setr_pd(12.34, 34.12);
-    __m128d y = _mm_setr_pd(78.56, 56.78);
+    volatile double a0 = 12.34;
+    volatile double a1 = 56.78;
+    __m128d x = _mm_setr_pd(a0, 34.12);
+    __m128d y = _mm_setr_pd(78.56, a1);
     double a[2], b[2] = { 78.56 + 56.78, 12.34 + 34.12 };
 
     y = _mm_hadd_pd(y, x);

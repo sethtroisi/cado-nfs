@@ -5,8 +5,10 @@
 
 int main()
 {
-    __m128i x = _mm_setr_epi32(0x03020100, 0x07060504, 0x0B0A0908, 0x0F0E0D0C);
-    __m128i y = _mm_setr_epi32(0x13121110, 0x17161514, 0x1B1A1918, 0x1F1E1D1C);
+    volatile uint32_t a0 = 0x03020100;
+    volatile uint32_t a1 = 0x1F1E1D1C;
+    __m128i x = _mm_setr_epi32(a0, 0x07060504, 0x0B0A0908, 0x0F0E0D0C);
+    __m128i y = _mm_setr_epi32(0x13121110, 0x17161514, 0x1B1A1918, a1);
     uint64_t a[2], b[2] = { 0x0C0B0A0908070605, 0x14131211100F0E0D };
     y = _mm_alignr_epi8(y, x, 0x5);
     memcpy (a, &y, 16);
