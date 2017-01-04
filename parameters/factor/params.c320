@@ -1,4 +1,5 @@
-# those parameters are experimental
+# those parameters are experimental, the sieving parameters were optimized
+# using the polynomial used to factor RSA-768
 
 ###########################################################################
 #     Parameter file for Cado-NFS
@@ -9,7 +10,7 @@
 # General parameters
 ###########################################################################
 
-name = c310
+name = c320
 
 ###########################################################################
 # Polynomial selection
