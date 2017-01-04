@@ -495,7 +495,7 @@ class DB_SQLite(DB_base):
         def cursor(self):
             return DB_SQLite.CursorWrapper(super().cursor())
         def __init__(self, *args, **kwargs):
-            super().__init__(isolation_level=None, *args, **kwargs)
+            super().__init__(*args, **kwargs)
     def connect(self):
         c=self.ConnectionWrapper(self.path)
         self.advertise_connection()
