@@ -41,8 +41,15 @@ fi
 I=`grep "I.*=" $params | cut -d= -f2`
 lim0_min=`expr $lim0 / 2`
 lim0_max=`expr $lim0 \* 2`
+# integer parameters are limited to 2147483645 in OPAL
+if [ $lim0_max -gt 2147483645 ]; then
+   lim0_max=2147483645
+fi
 lim1_min=`expr $lim1 / 2`
 lim1_max=`expr $lim1 \* 2`
+if [ $lim1_max -gt 2147483645 ]; then
+   lim1_max=2147483645
+fi
 lpb0_min=`expr $lpb0 - 1`
 lpb0_max=`expr $lpb0 + 1`
 lpb1_min=`expr $lpb1 - 1`
