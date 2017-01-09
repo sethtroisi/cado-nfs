@@ -32,8 +32,8 @@ void fibonacci_sphere(point3d_t * point, unsigned int N)
   }
 }
 
-double murphyE3d(cado_poly_srcptr f, double * lpb, double area,
-    unsigned int N, int q_side, double Q, unsigned int s,
+double murphyE3d(cado_poly_srcptr f, double * lpb, double volume,
+    unsigned int N, int q_side, double Q, double s,
     unsigned long p, unsigned int N_alpha)
 {
   double * alpha = (double *) malloc(sizeof(double) * f->nb_polys);
@@ -42,9 +42,9 @@ double murphyE3d(cado_poly_srcptr f, double * lpb, double area,
   }
 
   double E = 0.0;
-  double sx = pow(area, 1.0 / 3.0) / sqrt((double)s);
-  double sy = pow(area, 1.0 / 3.0);
-  double sz = pow(area, 1.0 / 3.0) * sqrt((double)s);
+  double sx = pow(volume, 1.0 / 3.0) / sqrt(s);
+  double sy = pow(volume, 1.0 / 3.0);
+  double sz = pow(volume, 1.0 / 3.0) * sqrt(s);
 
   point3d_t * points = (point3d_t *) malloc(sizeof(point3d_t) * N);
   fibonacci_sphere(points, N);
@@ -103,7 +103,7 @@ void declare_usage(param_list pl)
 {
   param_list_decl_usage(pl, "poly", "path to the polynomial file");
   param_list_decl_usage(pl, "lpb", "large prime bounds");
-  param_list_decl_usage(pl, "area", "size of the area");
+  param_list_decl_usage(pl, "V", "size of the volume of the sphere");
   param_list_decl_usage(pl, "N", "number of points on the sphere");
   param_list_decl_usage(pl, "q", "size of special-q");
   param_list_decl_usage(pl, "q_side", "side of the special-q");
@@ -113,8 +113,8 @@ void declare_usage(param_list pl)
 }
 
 void initialise_parameters(int argc, char * argv[], cado_poly_ptr f,
-    double ** lpb, double * area, unsigned int * N, double * Q,
-    int * q_side, unsigned int * s, unsigned long * p, unsigned * N_alpha)
+    double ** lpb, double * volume, unsigned int * N, double * Q,
+    int * q_side, double * s, unsigned long * p, unsigned * N_alpha)
 {
   param_list pl;
   param_list_init(pl);
@@ -155,22 +155,22 @@ void initialise_parameters(int argc, char * argv[], cado_poly_ptr f,
   }
   free(lpb_size);
 
-  double area_size = 40.0;
-  param_list_parse_double(pl, "area", &area_size);
-  * area = pow(2.0, (double) area_size);
+  double volume_size = 40.0;
+  param_list_parse_double(pl, "V", &volume_size);
+  * volume = pow(2.0, (double) volume_size);
 
   param_list_parse_uint(pl, "N", N);
 
-  unsigned int qsize = 0;
-  param_list_parse_uint(pl, "q", &qsize);
+  double qsize = 0;
+  param_list_parse_double(pl, "q", &qsize);
   * Q = pow(2.0, (double)qsize);
 
   * q_side = -1;
   param_list_parse_int(pl, "q_side", q_side);
   ASSERT(* q_side < (int)V);
 
-  * s = 1;
-  param_list_parse_uint(pl, "s", s);
+  * s = 1.0;
+  param_list_parse_double(pl, "s", s);
 
   * p = 10000;
   param_list_parse_ulong(pl, "p", p);
@@ -185,18 +185,18 @@ int main(int argc, char ** argv)
 {
   cado_poly f;
   double * lpb;
-  double area;
+  double volume;
   unsigned int N;
   double Q;
   int q_side;
-  unsigned int s;
+  double s;
   unsigned long p;
   unsigned int N_alpha;
 
-  initialise_parameters(argc, argv, f, &lpb, &area, &N, &Q, &q_side, &s, &p,
+  initialise_parameters(argc, argv, f, &lpb, &volume, &N, &Q, &q_side, &s, &p,
       &N_alpha);
 
-  printf("%le\n", murphyE3d(f, lpb, area, N, q_side, Q, s, p, N_alpha));
+  printf("%le\n", murphyE3d(f, lpb, volume, N, q_side, Q, s, p, N_alpha));
 
   free(lpb);
   cado_poly_clear(f);
