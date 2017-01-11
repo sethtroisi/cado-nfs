@@ -29,16 +29,14 @@ tasks.wutimeout = 24000 # required for rootsieve in degree 6
 # Sieve
 ###########################################################################
 
-lim0 = 100000000000
-lim1 = 100000000000
-lpb0 = 34
-lpb1 = 35
-tasks.sieve.mfb0 = 77
-tasks.sieve.mfb1 = 102
-tasks.sieve.lambda0 = 2.4
-tasks.sieve.lambda1 = 3.4
-tasks.sieve.ncurves0 = 26
-tasks.sieve.ncurves1 = 21
+lim0 = 1073741822
+lim1 = 2147483645
+lpb0 = 38
+lpb1 = 39
+tasks.sieve.mfb0 = 110
+tasks.sieve.mfb1 = 120
+tasks.sieve.ncurves0 = 31
+tasks.sieve.ncurves1 = 31
 tasks.I = 16
 
 tasks.sieve.qrange = 10000

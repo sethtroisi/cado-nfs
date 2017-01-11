@@ -408,7 +408,8 @@ cado_define_test(full_c30
             target=92800609832959449330691138186
             191907783019725260605646959711
             TARGET_DEPENDENCIES full_c30_dependencies debug_renumber
-            plingen_pz sm sm_simple las_descent reconstructlog-dl merge-dl replay-dl)
+            plingen_pz sm sm_simple las_descent reconstructlog-dl
+            merge-dl replay-dl badideals)
     endif()
 endif()
 if(DEFINED ENV{CHECKS_EXPENSIVE})
