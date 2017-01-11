@@ -128,7 +128,7 @@ def alpha_p_projective(f,disc,p):
         s = float((-e)*log(p))
     else:
         fp= GF(p)['x'](f)
-        assert(fp != 0)
+        assert fp != 0, "fp <> 0"
         assert(f.degree()-fp.degree() <= 1)
         s = float((-(f.degree()-fp.degree())*p/(p+1))*log(p)/(p-1))
     return s
