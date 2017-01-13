@@ -1890,9 +1890,9 @@ expected_growth (rotation_space *r, mpz_poly_ptr f, mpz_poly_ptr g, int i)
       rotate_auxg_z (f->coeff, g->coeff[1], g->coeff[0], k, i);
       n2 = L2_lognorm (f, s);
       if (n2 > n + NORM_MARGIN)
-        mpz_set (kmin, k);
-      else
         mpz_set (kmax, k);
+      else
+        mpz_set (kmin, k);
     }
   r->jmax[i] = mpz_get_d (kmin);
 
