@@ -529,6 +529,7 @@ echo "Saving krylov sequence to magma format" # {{{
 afile=(`find $wdir -name 'A*[0-9]'`)
 if [ "${#afile[@]}" != 1 ] ; then
     echo "########## FAILURE ! Krylov sequence not finished #############"
+    find $wdir -name 'A*[0-9]' | xargs -n 1 echo "### Found file "
     exit 1
 fi
 afile=$(basename "${afile[0]}")
