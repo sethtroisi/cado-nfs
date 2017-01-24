@@ -15,8 +15,13 @@
 #include <string.h>
 #include <gmp.h>
 #include <sstream>
-#include "utils.h"
 #include "portability.h"
+#include "mpz_poly.h"
+#include "gmp_aux.h"
+#include "misc.h"
+/* and just because we expose a proxy to usp.c's root finding... */
+#include "usp.h"
+#include "double_poly.h"
 
 #ifndef max
 #define max(a,b) ((a)<(b) ? (b) : (a))

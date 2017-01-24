@@ -66,7 +66,6 @@ B) to use within another program: compile without -DMAIN, the main function
 #include "double_poly.h"
 #include "portability.h"
 #include "macros.h"
-#include "cado_poly.h"
 
 /* #define DEBUG */
 
