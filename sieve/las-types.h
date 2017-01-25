@@ -28,6 +28,7 @@ struct siever_config_s {
     unsigned int bitsize;  /* bitsize == 0 indicates end of table */
     int side;
     int logI;
+    sublat_t sublat;
     unsigned long bucket_thresh;    // bucket sieve primes >= bucket_thresh
     unsigned long bucket_thresh1;   // primes above are 2-level bucket-sieved
     unsigned int td_thresh;
@@ -232,6 +233,11 @@ struct las_info_s {
 
     int random_sampling;
     gmp_randstate_t rstate;
+
+    /* For composite special-q */
+    bool allow_composite_q;
+    uint64_t qfac_min;
+    uint64_t qfac_max;
 
     /* These are used for reading the todo list */
     mpz_t todo_q0;

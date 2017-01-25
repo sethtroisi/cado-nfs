@@ -261,7 +261,7 @@ fill_in_buckets_toplevel(bucket_array_t<LEVEL, shorthint_t> &orig_BA,
          locations with p | gcd(i,j). */
       if (LIKELY(!proj || r == 0)) {
         plattice_info_t pli = plattice_info_t(transformed.get_q(), r, proj, si->conf->logI);
-        plattice_enumerate_t ple = plattice_enumerate_t(pli, i_entry, si->conf->logI);
+        plattice_enumerate_t ple = plattice_enumerate_t(pli, i_entry, si->conf->logI, si->conf->sublat);
         // Skip (0,0).
         ple.next();
         if (LIKELY(pli.a0 != 0)) {

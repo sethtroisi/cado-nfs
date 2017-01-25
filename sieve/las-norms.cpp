@@ -1523,8 +1523,16 @@ sieve_info_update_norm_data (sieve_info_ptr si, int nb_threads)
               mpz_divexact(s->fij->coeff[i], s->fij->coeff[i], si->doing->p);
           }
       }
+      // Take sublat into account: multiply all coefs by m^deg.
+      // We do it only for the floating point version, that is used to
+      // compute a bound on the norms, and in the norm_init phase.
+      double sublat_factor = 1.0;
+      if (si->conf->sublat.m > 0) {
+          for (int k = 0; k < ps->deg; ++k)
+              sublat_factor *= si->conf->sublat.m;
+      }
       for (int k = 0; k <= ps->deg; k++)
-          s->fijd[k] = mpz_get_d (s->fij->coeff[k]);
+          s->fijd[k] = mpz_get_d (s->fij->coeff[k])*sublat_factor;
   }
 
 

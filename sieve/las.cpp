@@ -894,6 +894,20 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
 
         }
 
+        // Sublattices?
+        sc->sublat.m = 0; // no sublattices by default.
+        param_list_parse_uint(pl, "sublat", &(sc->sublat.m));
+        if (sc->sublat.m) {
+            int ok = 1;
+            ok &= param_list_parse_uint(pl, "sublat-i0", &(sc->sublat.i0));
+            ok &= param_list_parse_uint(pl, "sublat-j0", &(sc->sublat.j0));
+            ok &= (sc->sublat.i0 < sc->sublat.m);
+            ok &= (sc->sublat.j0 < sc->sublat.m);
+            if (!ok) {
+                fprintf(stderr, "Error: with sublat mod m, please provide i0 and j0 in [0,m[");
+                ASSERT_ALWAYS(0);
+            }
+        }
 
         /* Parse optional siever configuration parameters */
         sc->td_thresh = 1024;	/* default value */
@@ -2160,7 +2174,7 @@ factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED)
         search_survivors_in_line(both_S, both_bounds,
                                  si->conf->logI, j + first_j, N,
                                  si->j_div, si->conf->unsieve_thresh,
-                                 si->us, survivors);
+                                 si->us, survivors, si->conf->sublat.m);
         /* Survivors written by search_survivors_in_line() have index
            relative to their j-line. We need to convert to index within
            the bucket region by adding line offsets. */
@@ -2301,6 +2315,8 @@ factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED)
             /* Compute the norms using the polynomials transformed to 
                i,j-coordinates. The transformed polynomial on the 
                special-q side is already divided by q */
+            // Note that are, (i,j) are the true coordinates, not the
+            // ones reduced to (-I/2, I/2) using sublattices.
             NxToIJ (&i, &j, N, x, si);
 		mpz_poly_homogeneous_eval_siui (norm[side], si->sides[side]->fij, i, j);
 
@@ -2362,11 +2378,11 @@ factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED)
 		   is when two threads increase the value at the same time,
 		   and it is increased by 1 instead of 2, but this should
 		   happen rarely. */
-		cof_call[cof_bitsize[0]][cof_bitsize[1]] ++;
+            cof_call[cof_bitsize[0]][cof_bitsize[1]] ++;
         }
-	    rep->ttcof -= microseconds_thread ();
+        rep->ttcof -= microseconds_thread ();
         pass = factor_both_leftover_norms(norm, lps, lps_m, si);
-	    rep->ttcof += microseconds_thread ();
+        rep->ttcof += microseconds_thread ();
 #ifdef TRACE_K
         if (trace_on_spot_ab(a, b) && pass == 0) {
           verbose_output_print(TRACE_CHANNEL, 0,
@@ -2618,7 +2634,10 @@ void * process_bucket_region(thread_data *th)
 	    init_norms_bucket_region(S[side], i, si, side, 0);
 #endif
             // Invalidate the first row except (1,0)
-            if (side == 0 && i == 0) {
+            // TODO: in sublat mod, we keep all the (i0,0), which is useless.
+            if (side == 0 && i == 0 && 
+                 ((si->conf->sublat.m == 0) || si->conf->sublat.j0 == 0))
+            {
                 int pos10 = 1+((si->I)>>1);
                 unsigned char n10 = S[side][pos10];
                 memset(S[side], 255, si->I);
@@ -2763,12 +2782,17 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "q0",   "left bound of special-q range");
   param_list_decl_usage(pl, "q1",   "right bound of special-q range");
   param_list_decl_usage(pl, "rho",  "sieve only root r mod q0");
+  param_list_decl_usage(pl, "qfac-min", "factors of q must be at least that");
+  param_list_decl_usage(pl, "qfac-max", "factors of q must be at most that");
   param_list_decl_usage(pl, "v",    "(switch) verbose mode, also prints sieve-area checksums");
   param_list_decl_usage(pl, "out",  "filename where relations are written, instead of stdout");
   param_list_decl_usage(pl, "t",   "number of threads to use");
   param_list_decl_usage(pl, "sqside", "put special-q on this side");
 
   param_list_decl_usage(pl, "I",    "set sieving region to 2^I");
+  param_list_decl_usage(pl, "sublat", "modulus for sublattice sieving");
+  param_list_decl_usage(pl, "sublat-i0", "i-congruence for sublattice");
+  param_list_decl_usage(pl, "sublat-j0", "j-congruence for sublattice");
   param_list_decl_usage(pl, "skew", "(alias S) skewness");
   param_list_decl_usage(pl, "lim0", "factor base bound on side 0");
   param_list_decl_usage(pl, "lim1", "factor base bound on side 1");
@@ -3204,7 +3228,7 @@ int main (int argc0, char *argv0[])/*{{{*/
                             (slice = fb->get_slice(slice_index)) != NULL; 
                             slice_index++) {  
                         precomp_plattice[side][level].push_back(
-                                slice->make_lattice_bases(si->qbasis, si->conf->logI));
+                                slice->make_lattice_bases(si->qbasis, si->conf->logI, si->conf->sublat));
                     }
                 }
             }

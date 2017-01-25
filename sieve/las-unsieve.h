@@ -78,7 +78,7 @@ void clear_j_div(j_div_srcptr);
 void search_survivors_in_line(unsigned char * const restrict[2],
         const unsigned char[2], unsigned int, unsigned int, int,
         j_div_srcptr, unsigned int, unsieve_aux_data_srcptr,
-        std::vector<uint32_t> &);
+        std::vector<uint32_t> &, bool);
 #ifdef HAVE_SSE2 
 void search_survivors_in_line_sse2(unsigned char * const restrict[2],
         const unsigned char[2], unsigned int, unsigned int, int, j_div_srcptr,
