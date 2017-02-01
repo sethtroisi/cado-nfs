@@ -79,7 +79,8 @@ skew: 1.37
 #define ALPHA_BOUND_GUARD 1.0
 
 double best_score_f = DBL_MAX, worst_score_f = DBL_MIN;
-unsigned long f_irreducible = 0;
+unsigned long f_candidate = 0;   /* number of irreducibility tests */
+unsigned long f_irreducible = 0; /* number of irreducible polynomials */
 double max_guard = DBL_MIN;
 // #define TIMINGS
 #ifdef TIMINGS
@@ -391,6 +392,11 @@ polygen_JL_f (int d, unsigned int bound, mpz_t *f, unsigned long idx)
 
     if (ok == 0)
       goto end;
+
+#ifdef HAVE_OPENMP
+#pragma omp critical
+#endif
+    f_candidate ++;
 
     mpz_poly ff;
     ff->deg = d;
@@ -756,8 +762,8 @@ main (int argc, char *argv[])
 
     t = seconds () - t;
 
-    printf ("found %lu irreducible f out of %lu\n", f_irreducible,
-            maxtries / modm);
+    printf ("found %lu irreducible f out of %lu candidates out of %lu\n",
+            f_irreducible, f_candidate, maxtries / modm);
     printf ("best score %1.2f, worst %1.2f, max guard %1.2f\n",
             best_score_f, worst_score_f, max_guard);
     if (max_guard > ALPHA_BOUND_GUARD)
