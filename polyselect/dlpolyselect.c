@@ -37,7 +37,8 @@ skew: 1.05
 # f+g score 84.32
 
 To recover the polynomial pair used for the DLP768 record
-(https://listserv.nodak.edu/cgi-bin/wa.exe?A2=NMBRTHRY;a0c66b63.1606):
+(https://listserv.nodak.edu/cgi-bin/wa.exe?A2=NMBRTHRY;a0c66b63.1606 and
+http://eprint.iacr.org/2017/067.pdf):
 
 # -modr r -modm m enables one to only consider polynomials f
 # with index r mod m in Stage 1 (default is r=0 and m=1).
@@ -331,20 +332,71 @@ polygen_JL_f (int d, unsigned int bound, mpz_t *f, unsigned long idx)
        |f[d]| < |f[0]| or (|f[d]| = |f[0]| and |f[d-1]| < |f[1]|) or ... */
 
     ok = 1;
-    for (int i = 0; 2 * i < d && ok; i++)
+    for (int i = 0; 2 * i < d; i++)
       {
-        if (abs(fint[d-i]) > abs(fint[i]))
-          ok = 0;
-        else if (abs(fint[d-i]) < abs(fint[i]))
-          break;
+        if (abs(fint[d-i]) != abs(fint[i]))
+          {
+            /* we want |f[d-i]| < |f[i]| */
+            ok = abs(fint[d-i]) < abs(fint[i]);
+            break;
+          }
       }
+
+    /* since f(x) is equivalent to (-1)^d*f(-x), if f[d-1] = 0, then the
+       largest i = d-3, d-5, ..., such that f[i] <> 0 should have f[i] > 0 */
+    if (ok && fint[d-1] == 0)
+      {
+        for (int i = d - 3; i >= 0; i -= 2)
+          {
+            if (fint[i])
+              {
+                ok = fint[i] > 0;
+                break;
+              }
+          }
+      }
+
+    /* if |f[i]| = |f[d-i]| for all i, then [f[d], f[d-1], ..., f[1], f[0]]
+       is equivalent to [s*f[0], s*t*f[1], s*t^2*f[2], ...], where
+       s = sign(f[0]), and s*t^i is the sign of f[i] where i is the smallest
+       odd index > 0 such that f[i] <> 0.  */
+    if (ok && fint[d] == abs(fint[0])) /* f[d] > 0 */
+      {
+        int s = (fint[0] > 0) ? 1 : -1, t = 0, i;
+        for (i = 1; i <= d; i++)
+          {
+            if (2 * i < d && abs(fint[d-i]) != abs(fint[i]))
+              break;
+            if (t == 0 && fint[i] != 0 && (i & 1))
+              t = (fint[i] > 0) ? s : -s;
+          }
+        if (2 * i >= d) /* |f[i]| = |f[d-i]| for all i */
+          {
+            /* if t=0, then all odd coefficients are zero, but since
+               |f[d-i]| = |f[i]| this can only occur for d even, but then
+               we can set t to 1, since t only affects the odd coefficients */
+            if (t == 0)
+              t = 1;
+            for (i = 0; i <= d; i++)
+              {
+                if (fint[d-i] != s * fint[i])
+                  {
+                    ok = fint[d-i] > s * fint[i];
+                    break;
+                  }
+                s = s * t;
+              }
+          }
+      }
+
     if (ok == 0)
       goto end;
 
-    /* content test */
     mpz_poly ff;
     ff->deg = d;
     ff->coeff = f;
+
+    /* content test */
     mpz_poly_content (t, ff);
     ok = mpz_cmp_ui (t, 1) == 0;
     if (ok == 0)
