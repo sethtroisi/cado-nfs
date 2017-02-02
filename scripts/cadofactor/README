@@ -192,7 +192,7 @@ Adjust the tasks.sieve.qmin parameter accordingly to prevent
 already-sieved special-q ranges from being sieved again. To do that:
 
 * go into the cxx.upload directory
-* list the cxx.sieving.xxx-yyy.*.gz files
+* list the cxx.xxx-yyy.*.gz files
 * find the largest yyy value, and use it as new qmin
 
 Be aware that importing relation files that were not produced by
@@ -204,8 +204,8 @@ so we don't even try to list them here.
 When importing relations, some statistics are gathered by parsing the
 relation files. This is a costly operation, especially when relations
 from a large number of files are gathered. An expedient for this problem
-is to create, for each file cxx.sieving.xxx-yyy.zzzzzzz.gz, a file
-cxx.sieving.xxx-yyy.zzzzzzz.gz.stats.txt, which contain the relevant
+is to create, for each file cxx.xxx-yyy.zzzzzzz.gz, a file
+cxx.xxx-yyy.zzzzzzz.gz.stats.txt, which contain the relevant
 statistics. The format of this file should match the format of the
 statistics files produced by the cado-nfs siever with the -stats-stderr
 option. Examples of such statistics files are found as the files
@@ -213,6 +213,13 @@ option. Examples of such statistics files are found as the files
 The only crucial bit information is the line which gives the number of
 relations in the file, which has to match the following format:
 # Total $nrels reports [%.2fs/r, %.2fr/sq]
+
+Here is an example of how to produce such files:
+
+#!/bin/csh
+foreach f (`ls $workdir/cxx.upload/cxx*gz`)
+   zcat $f | tail -1 > $f.stats.txt
+end
 
 File locking when using sqlite3 as a database backend
 =====================================================
