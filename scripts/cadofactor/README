@@ -320,18 +320,11 @@ Re-running the linear algebra step
 ==================================
 
 If the linear algebra step was already started, and you want to run it again
-with a different set of relations (for example with more sieving), you need
-to add the following to the cado-nfs.py command line, to allow removing the
-previous linear algebra subdirectory:
+with different parameters or with a different set of relations (for example
+with more sieving), you need to add the following to the cado-nfs.py command
+line, to allow removing the previous linear algebra subdirectory:
 
-tasks.linalg.bwc.allow_wipeout = True
-
-Note added 02.02.2017: the above does not seem to work currently. Instead:
-
-1) remove the workdir/*.bwc directory
-2) run again the bwc.pl command line (first line of workdir/*.bwc.stdout.1)
-3) however this will only run the (new) linear algebra, you will need to run
-   the final steps by hand (see workdir/*.cmd)
+tasks.linalg.allow_wipeout = True
 
 Debugging
 =========

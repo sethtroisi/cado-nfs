@@ -4206,22 +4206,12 @@ class LinAlgTask(Task, HasStatistics):
     def run(self):
         super().run()
 
-        if self.state["ran_already"] and self.have_new_input_files():
-            if self.params["allow_wipeout"]:
-                self.logger.warn("Ran before, but input files have changed. "
-                                 "Wiping out working directory")
+        if self.state["ran_already"] and self.params["allow_wipeout"]:
+                self.logger.warn("Ran before, but allow_wipeout is set. "
+                                 "Wiping out working directory.")
                 self.workdir.make_dirname(subdir="bwc").rmtree()
                 self.state["ran_already"] = False
                 self.state.pop("dependency", None)
-            else:
-                self.logger.critical(
-                    "Ran before, but input files have changed. The "
-                    "allow_wipeout parameter is not set, aborting.")
-                self.logger.critical(
-                    "If it is ok to discard the previous linear algebra run "
-                    "and start it from scratch, please add the "
-                    "allow_wipeout=True parameter and re-run cadofactor.")
-                return False
 
         if not "dependency" in self.state or self.have_new_input_files():
             workdir = self.workdir.make_dirname(subdir="bwc")
