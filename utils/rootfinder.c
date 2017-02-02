@@ -340,13 +340,10 @@ int
 mpz_poly_roots_mpz (mpz_t *r, mpz_poly_srcptr f, const mpz_t p)
 {
   int nr = 0;
-  mpz_t tmp;
   mpz_poly fp, g, h;
   int d = f->deg;
 
   ASSERT(d >= 1);
-
-  mpz_init (tmp);
 
   mpz_poly_init (fp, d);
   mpz_poly_init (g, 2*d-1);
@@ -357,8 +354,7 @@ mpz_poly_roots_mpz (mpz_t *r, mpz_poly_srcptr f, const mpz_t p)
   if (fp->deg <= 0)
     goto clear_and_exit;
   /* h=x^p-x (mod mpz_poly_fp) */
-  mpz_set_ui (tmp, 1UL);
-  mpz_poly_setcoeff (g, 1, tmp);
+  mpz_poly_setcoeff_ui (g, 1, 1);
   mpz_poly_pow_mod_f_mod_mpz (h, g, fp, p, p);
   mpz_poly_sub (h, h, g);
   /* g = gcd (mpz_poly_fp, h) */
@@ -378,7 +374,6 @@ mpz_poly_roots_mpz (mpz_t *r, mpz_poly_srcptr f, const mpz_t p)
   mpz_poly_clear(fp);
   mpz_poly_clear(g);
   mpz_poly_clear(h);
-  mpz_clear (tmp);
 
   /* Sort the roots */
   if (r && nr)
