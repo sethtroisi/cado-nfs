@@ -115,6 +115,10 @@ if __name__ == '__main__':
                                                parameters = parameters,
                                                path_prefix = [])
 
+    if toplevel_params.args.verboseparam:
+        logger.info("Summary of all recognized parameters\n" +
+                factorjob.parameter_help)
+
     factors = factorjob.run()
     
     dlp_param = parameters.myparams({"dlp": False,}, "")

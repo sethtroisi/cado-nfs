@@ -1389,6 +1389,29 @@ class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
             filelistfile.write("\n".join(files) + "\n")
         return filelistname
 
+    def collect_usable_parameters(self, rl):
+        message=[]
+        message.append("Parameters used by Task %s" % self.name)
+        prefix = '.'.join(self.parameters.get_param_path())
+        for p in self.paramnames:
+            message.append("  %s.%s" % (prefix, p))
+            rl[p].append(prefix)
+        for prog, override, needed_input in self.programs:
+            message.append("  Parameters for program %s (general form %s.%s.*)" % (
+                    prog.name, prefix, prog.name))
+            for p in sorted(prog.get_accepted_keys()):
+                t = "%s.%s.%s" % (prefix, prog.name, p)
+                rl[p].append("%s.%s" % (prefix, prog.name))
+                if p in set(override):
+                    message.append("    [excluding internal parameter %s]" % t)
+                elif p in set(needed_input):
+                    message.append("    [excluding internal file name %s]" % t)
+                else:
+                    message.append("    %s" % t)
+        message.append("")
+        return "\n".join(message)
+
+
 class ClientServerTask(Task, wudb.UsesWorkunitDb, patterns.Observer):
     @abc.abstractproperty
     def paramnames(self):
@@ -3990,7 +4013,8 @@ class LinAlgDLPTask(Task):
     def paramnames(self):
         # the default value for m and n is to use the number of SMs for
         # n, and then m=2*n
-        return self.join_params(super().paramnames, {"m": 0, "n": 0, "ell": int})
+        return self.join_params(super().paramnames,
+                {"m": 0, "n": 0, "ell": int, "allow_wipeout": False})
     
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator=mediator, db=db, parameters=parameters,
@@ -3998,6 +4022,13 @@ class LinAlgDLPTask(Task):
     
     def run(self):
         super().run()
+
+        if self.state["ran_already"] and self.params["allow_wipeout"]:
+                self.logger.warn("Ran before, but allow_wipeout is set. "
+                                 "Wiping out working directory.")
+                self.workdir.make_dirname(subdir="bwc").rmtree()
+                self.state["ran_already"] = False
+                self.state.pop("virtual_logs", None)
 
         if not "virtual_logs" in self.state or self.have_new_input_files():
             workdir = self.workdir.make_dirname(subdir="bwc")
@@ -4010,6 +4041,7 @@ class LinAlgDLPTask(Task):
             (stdoutpath, stderrpath) = self.make_std_paths(cadoprograms.BWC.name)
             matrix = mergedfile.realpath()
             wdir = workdir.realpath()
+            self.state["ran_already"] = True
             nmaps = self.send_request(Request.GET_NMAPS)
             nsm = nmaps[0] + nmaps[1]
             if self.params["n"] == 0:
@@ -5274,9 +5306,25 @@ class CompleteFactorization(HasState, wudb.DbAccess,
                           self.sieving, self.dup1, self.dup2, self.purge,
                           self.merge, self.linalg, self.characters, self.sqrt)
 
+        reverse_lookup=defaultdict(list)
+        self.parameter_help=""
+        for t in self.tasks:
+            self.parameter_help += t.collect_usable_parameters(reverse_lookup)
+
         for (path, key, value) in parameters.get_unused_parameters():
             self.logger.warning("Parameter %s = %s was not used anywhere",
                                 ".".join(path + [key]), value)
+            if key in reverse_lookup.keys():
+                l = reverse_lookup[key]
+                if len(l) == 1:
+                    self.logger.warning("Perhaps you meant %s.%s ?" % (l[0], key))
+                else:
+                    self.logger.warning("Perhaps you meant one of the following ?")
+                    for x in l:
+                        self.logger.warning("  %s.%s ?" % (x, key))
+                    prefix = ".".join(os.path.commonprefix([x.split(".") for x in l]))
+                    self.logger.warning("(If you wish to set all of these consistently, you may set %s.%s)" % (prefix, key))
+
 
         self.request_map = {
             Request.GET_FACTORBASE_FILENAME: self.fb.get_filename,

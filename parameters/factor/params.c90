@@ -22,6 +22,12 @@
 # path, so long as no two parameters of the same key with different values
 # occur. In this file we specify most parameters will full path to clarify
 # which part of the computation they affect.
+#
+# Note that an automatically generated, and by construction comprehensive
+# list of the recognized parameters can be obtained by starting (and
+# quickly aborting, if needed) the cado-nfs.py script with the
+# --verboseparam option. It will do a couple of things, but it will also
+# print this list.
 
 # Some variable substitution occurs in the values specified in the parameters:
 # A string of the form "${FOO}" is substituted by the value of the shell

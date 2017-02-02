@@ -23,6 +23,11 @@ Main changes between cado-nfs-2.2.0 and cado-nfs-2.3.0:
   tasks.sieve.sieving.las.threads or
   tasks.sieve.factorbase.makefb.threads used to work, now these become
   simply tasks.sieve.las.threads or tasks.sieve.makefb.threads.
+* The --verboseparam option to cado-nfs.py now also prints an
+  automatically generated, and by default comprehensive list of
+  parameters that cado-nfs recognizes (among other things
+  which this option still does as it always has). Note that the lists for
+  factoring and DLP differ slightly.
 * The database which stores the computation state can now also be backed
   by a mysql server. This is optional, and requires the
   python3-mysql.connector package (on Debian linux -- actual package name

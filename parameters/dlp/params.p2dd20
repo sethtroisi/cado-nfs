@@ -1,6 +1,7 @@
 ###########################################################################
 #     Parameter file for Cado-NFS ; DLP version in GF(p^2)
 ###########################################################################
+# See params/params.c90 for an example which contains some documentation.
 
 ###########################################################################
 # General parameters
