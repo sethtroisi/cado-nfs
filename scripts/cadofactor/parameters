@@ -76,7 +76,7 @@ tasks.workdir = /tmp/work/
 # order. Defaults for these parameters are defined for each program in
 # cadoprograms.py.
 # The Program instances use parameter path, e.g., "tasks.sieve.las", or
-# "tasks.filter.merge.merge", but of course can find their parameter from 
+# "tasks.filter.merge", but of course can find their parameter from
 # further up the parameter tree, such as in "tasks".
 
 tasks.execpath=$(builddir)
