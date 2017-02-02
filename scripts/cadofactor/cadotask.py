@@ -4019,6 +4019,7 @@ class LinAlgDLPTask(Task):
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator=mediator, db=db, parameters=parameters,
                          path_prefix=path_prefix)
+        self.state.setdefault("ran_already", False)
     
     def run(self):
         super().run()
