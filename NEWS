@@ -11,12 +11,18 @@ Main changes between cado-nfs-2.2.0 and cado-nfs-2.3.0:
   the form cxxx.TASKNAME.PROGRAMNAME.foo, where TASKNAME was actually an
   implementation detail. In cado-nfs-2.3.0, TASKNAME goes away.
 * In parallel to the change above, the parameter hierarchy no longer
-  includes the TASKNAME, which is an implementation detail. As before,
-  setting tasks.sieve.threads works for setting a parameter which is
-  obeyed by las (and actually makefb too), only the finest grain for that
-  has changed. Previously, the syntax was tasks.sieve.sieving.las.threads
-  or tasks.sieve.factorbase.makefb.threads. Now it's simply
-  tasks.sieve.las.threads or tasks.sieve.makefb.threads.
+  includes the TASKNAME, which is an implementation detail. Previously,
+  the finest grain to which one could specify parameters was
+  tasks.PATH_PREFIX.TASKNAME.PROGRAMNAME.foo where PATH_PREFIX is set in
+  scripts/cadofactor/cadotask.py (among polyselect, sieve, filter,
+  linalg, reconstructlog, descent -- some toplevel relevant parameters
+  have no PATH_PREFIX). Now the TASKNAME goes away. This
+  means that as before, setting tasks.sieve.threads works for setting a
+  parameter which is obeyed by las (and actually makefb too), but changes
+  happen when one specifies parameters on a finer grain.  While
+  tasks.sieve.sieving.las.threads or
+  tasks.sieve.factorbase.makefb.threads used to work, now these become
+  simply tasks.sieve.las.threads or tasks.sieve.makefb.threads.
 * The database which stores the computation state can now also be backed
   by a mysql server. This is optional, and requires the
   python3-mysql.connector package (on Debian linux -- actual package name
