@@ -11,6 +11,12 @@
 # "tasks.sieve", and the las siever run in the Sieving task uses
 # "tasks.sieve.las". When looking for a parameter, we start at the object's 
 # path, then work towards to root of the tree until the key is found.
+#
+# Note that an automatically generated, and by construction comprehensive
+# list of the recognized parameters can be obtained by starting (and
+# quickly aborting, if needed) the cado-nfs.py script with the
+# --verboseparam option. It will do a couple of things, but it will also
+# print this list.
 
 # Some variable substitution occurs in the values specified in a parameter file:
 # A string of the form "${FOO}" is substituted by the value of the shell
