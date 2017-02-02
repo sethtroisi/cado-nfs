@@ -277,11 +277,11 @@ tasks.sieve.rels_wanted=1000001
 
 If not enough relations are collected after the filtering step, the sieve
 is executed again with an additional number of wanted relations.  The
-parameter tasks.filter.purge.add_ratio controls the number of additional
+parameter tasks.filter.add_ratio controls the number of additional
 required relations as a ratio of the number of unique relations already
 collected:
 
-tasks.filter.purge.add_ratio=0.05
+tasks.filter.add_ratio=0.05
 
 specifies that you want 5% more relations before next filtering step.
 The default value is 0.01 (i.e. 1% more relations).

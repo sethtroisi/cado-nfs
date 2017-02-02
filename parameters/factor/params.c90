@@ -299,7 +299,7 @@ tasks.sieve.qrange = 10000		# The size of an elementary sieving task
 ###########################################################################
 
 tasks.filter.purge.keep = 160		# minimal excess wanted after purge
-tasks.filter.purge.add_ratio = 0.1
+tasks.filter.add_ratio = 0.1
     # Number of additional required relations before next filtering step
     # expressed as a ratio of the number of unique relations already collected
     # Default value is 0.1 (i.e. number of additional relation is equal to 10% of number of unique relations)
