@@ -4598,6 +4598,7 @@ class ReconstructLogTask(Task):
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator=mediator, db=db, parameters=parameters,
                          path_prefix=path_prefix)
+        # TODO: I'm almost sure that this mechanism is wrong.
         self.progparams[0].setdefault("partial", self.params["partial"])
     
     def run(self):
@@ -4678,6 +4679,10 @@ class DescentTask(Task):
         return ((cadoprograms.Descent, override, input),)
     @property
     def paramnames(self):
+        # TODO: It's a bit odd that we define lim0 and pals (which I
+        # concur are specific, here) at the Task level if the only
+        # purpose is to forward the stuff to the Program level, no ? Or
+        # maybe we should list them as overrides ?
         return self.join_params(super().paramnames,
                 {"target": int, "descent_hint": str, "init_I": int,
                     "init_ncurves": int, "init_lpb": int,
