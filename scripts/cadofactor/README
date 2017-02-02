@@ -319,12 +319,14 @@ tasks.sqrt.threads = 16
 Re-running the linear algebra step
 ==================================
 
-If the linear algebra step was already started, and you want to run it again
-with different parameters or with a different set of relations (for example
-with more sieving), you need to add the following to the cado-nfs.py command
-line, to allow removing the previous linear algebra subdirectory:
+If the linear algebra step was already started, and you want to run it
+again with different parameters or with a different set of relations (for
+example with more sieving), or just because you'd like to run it again
+from scratch, then you need to add the following to the cado-nfs.py
+command line, in order to force the previous linear algebra subdirectory
+to be removed:
 
-tasks.linalg.allow_wipeout = True
+tasks.linalg.force_wipeout = True
 
 Debugging
 =========

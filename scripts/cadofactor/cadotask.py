@@ -4014,7 +4014,7 @@ class LinAlgDLPTask(Task):
         # the default value for m and n is to use the number of SMs for
         # n, and then m=2*n
         return self.join_params(super().paramnames,
-                {"m": 0, "n": 0, "ell": int, "allow_wipeout": False})
+                {"m": 0, "n": 0, "ell": int, "force_wipeout": False})
     
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator=mediator, db=db, parameters=parameters,
@@ -4023,8 +4023,8 @@ class LinAlgDLPTask(Task):
     def run(self):
         super().run()
 
-        if self.state["ran_already"] and self.params["allow_wipeout"]:
-                self.logger.warn("Ran before, but allow_wipeout is set. "
+        if self.state["ran_already"] and self.params["force_wipeout"]:
+                self.logger.warn("Ran before, but force_wipeout is set. "
                                  "Wiping out working directory.")
                 self.workdir.make_dirname(subdir="bwc").rmtree()
                 self.state["ran_already"] = False
@@ -4108,7 +4108,7 @@ class LinAlgTask(Task, HasStatistics):
                  {"merged": Request.GET_MERGED_FILENAME}),)
     @property
     def paramnames(self):
-        return self.join_params(super().paramnames, {"allow_wipeout": False})
+        return self.join_params(super().paramnames, {"force_wipeout": False})
 
     @property
     def stat_conversions(self):
@@ -4238,8 +4238,8 @@ class LinAlgTask(Task, HasStatistics):
     def run(self):
         super().run()
 
-        if self.state["ran_already"] and self.params["allow_wipeout"]:
-                self.logger.warn("Ran before, but allow_wipeout is set. "
+        if self.state["ran_already"] and self.params["force_wipeout"]:
+                self.logger.warn("Ran before, but force_wipeout is set. "
                                  "Wiping out working directory.")
                 self.workdir.make_dirname(subdir="bwc").rmtree()
                 self.state["ran_already"] = False
