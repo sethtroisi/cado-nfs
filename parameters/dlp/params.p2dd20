@@ -60,7 +60,7 @@ tasks.sieve.rels_wanted = 1
 # so we need to put the special-q on that side 
 tasks.sieve.sqside = 0
 
-tasks.allow_zero_on_rhs=1
+tasks.linalg.allow_zero_on_rhs=1
 
 
 #############
