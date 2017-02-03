@@ -1042,9 +1042,11 @@ class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
                                  'generated at run time and cannot be '
                                  'supplied through the parameter file',
                                  param, prog.name)
-                self.logger.error('Ignoring %s, we rely on %s only',
+                self.logger.error('Ignoring %s, we rely on %s to compute it '
+                                  'based on parameters at level %s only',
                                  '.'.join(path_prefix+[prog.name, param]),
-                                 '.'.join(path_prefix+[param]))
+                                 self.__class__,
+                                 '.'.join(path_prefix))
                 del(progparams[param])
             
             self.progparams.append(progparams)
@@ -2464,7 +2466,9 @@ class FactorBaseTask(Task):
         return "Generate Factor Base"
     @property
     def programs(self):
-        return ((cadoprograms.MakeFB, ("out", "side"), {"poly": Request.GET_POLYNOMIAL_FILENAME}),)
+        return ((cadoprograms.MakeFB,
+            ("out", "side", "lim"),
+            {"poly": Request.GET_POLYNOMIAL_FILENAME}),)
     @property
     def paramnames(self):
         return self.join_params(super().paramnames,
