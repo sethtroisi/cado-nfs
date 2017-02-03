@@ -5203,6 +5203,8 @@ class CompleteFactorization(HasState, wudb.DbAccess,
         linalgpath = parampath + ['linalg']
         reconstructlogpath = parampath + ['reconstructlog']
         descentpath = parampath + ['descent']
+        sqrtpath = parampath + ['sqrt']
+        numbertheorypath = parampath + ['numbertheory']
         
         ## tasks that are common to factorization and dlp
         self.fb = FactorBaseTask(mediator=self,
@@ -5251,7 +5253,7 @@ class CompleteFactorization(HasState, wudb.DbAccess,
             self.numbertheory = NumberTheoryTask(mediator=self,
                              db=db,
                              parameters=self.parameters,
-                             path_prefix=parampath)
+                             path_prefix=numbertheorypath)
             self.filtergalois = FilterGaloisTask(mediator=self,
                              db=db,
                              parameters=self.parameters,
@@ -5294,7 +5296,7 @@ class CompleteFactorization(HasState, wudb.DbAccess,
             self.sqrt = SqrtTask(mediator=self,
                                  db=db,
                                  parameters=self.parameters,
-                                 path_prefix=parampath)
+                                 path_prefix=sqrtpath)
         
         # Defines an order on tasks in which tasks that want to run should be
         # run
