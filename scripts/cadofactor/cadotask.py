@@ -1645,7 +1645,7 @@ class Polysel1Task(ClientServerTask, DoesImport, HasStatistics, patterns.Observe
     def paramnames(self):
         return self.join_params(super().paramnames, {
             "N": int, "adrange": int, "admin": 0, "admax": int,
-            "I": int, "lim1": int, "lim0": int, "nrkeep": 20,
+            "nrkeep": 20,
             "import_sopt": [str]})
     @staticmethod
     def update_lognorms(old_lognorm, new_lognorm):
