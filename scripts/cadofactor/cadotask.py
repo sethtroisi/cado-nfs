@@ -1038,10 +1038,13 @@ class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
             progparams = self.parameters.myparams(prog.get_accepted_keys(),
                                                   prog.name)
             for param in set(override) & set(progparams):
-                self.logger.warn('Parameter "%s" for program "%s" is '
+                self.logger.error('Parameter "%s" for program "%s" is '
                                  'generated at run time and cannot be '
                                  'supplied through the parameter file',
                                  param, prog.name)
+                self.logger.error('Ignoring %s, we rely on %s only',
+                                 '.'.join(path_prefix+[prog.name, param]),
+                                 '.'.join(path_prefix+[param]))
                 del(progparams[param])
             
             self.progparams.append(progparams)
@@ -3003,7 +3006,9 @@ class Duplicates1Task(Task, FilesCreator, HasStatistics):
         return "Filtering - Duplicate Removal, splitting pass"
     @property
     def programs(self):
-        return ((cadoprograms.Duplicates1, ("filelist", "prefix", "out"), {}),)
+        return ((cadoprograms.Duplicates1,
+            ("filelist", "prefix", "out", "nslices_log"),
+            {}),)
     @property
     def paramnames(self):
         return self.join_params(super().paramnames, {"nslices_log": 1})
@@ -3030,6 +3035,9 @@ class Duplicates1Task(Task, FilesCreator, HasStatistics):
         super().__init__(mediator=mediator, db=db, parameters=parameters,
                          path_prefix=path_prefix)
         self.nr_slices = 2**self.params["nslices_log"]
+        # Enforce the fact that our children *MUST* use the same
+        # nslices_log value as the one we have.
+        self.progparams[0]["nslices_log"]=self.params["nslices_log"]
         tablename = self.make_tablename("infiles")
         self.already_split_input = self.make_db_dict(tablename,
                                                      connection=self.db_connection)
