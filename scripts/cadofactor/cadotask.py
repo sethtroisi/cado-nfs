@@ -1645,8 +1645,7 @@ class Polysel1Task(ClientServerTask, DoesImport, HasStatistics, patterns.Observe
     def paramnames(self):
         return self.join_params(super().paramnames, {
             "N": int, "adrange": int, "admin": 0, "admax": int,
-            "nrkeep": 20,
-            "import_sopt": [str]})
+            "nrkeep": 20, "import_sopt": [str]})
     @staticmethod
     def update_lognorms(old_lognorm, new_lognorm):
         lognorm = [0, 0, 0, 0, 0]
@@ -4596,21 +4595,23 @@ class ReconstructLogTask(Task):
         return "Logarithms Reconstruction"
     @property
     def programs(self):
-        input = {"ker": Request.GET_KERNEL_FILENAME,}
-        override = ("dlog", "nmaps0", "nmaps1", "nrels",
-                "poly", "renumber",
-                "purged", "ideals", "relsdel")
+        input = {
+                "ker": Request.GET_KERNEL_FILENAME,
+                "poly": Request.GET_POLYNOMIAL_FILENAME,
+                "renumber": Request.GET_RENUMBER_FILENAME,
+                "purged": Request.GET_PURGED_FILENAME,
+                "ideals": Request.GET_IDEAL_FILENAME,
+                "relsdel": Request.GET_RELSDEL_FILENAME,
+                }
+        override = ("dlog", "nrels")
         return ((cadoprograms.ReconstructLog, override, input),)
     @property
     def paramnames(self):
-        return self.join_params(super().paramnames,
-                {"checkdlp": True, "partial": True})
+        return self.join_params(super().paramnames, {"checkdlp": True})
 
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator=mediator, db=db, parameters=parameters,
                          path_prefix=path_prefix)
-        # TODO: I'm almost sure that this mechanism is wrong.
-        self.progparams[0].setdefault("partial", self.params["partial"])
     
     def run(self):
         super().run()
@@ -4621,19 +4622,13 @@ class ReconstructLogTask(Task):
 
             nfree = self.send_request(Request.GET_FREEREL_RELCOUNT)
             nunique = self.send_request(Request.GET_UNIQUE_RELCOUNT)
-            nrels = nfree+nunique
 
             (stdoutpath, stderrpath) = \
                     self.make_std_paths(cadoprograms.ReconstructLog.name)
             p = cadoprograms.ReconstructLog(
                     dlog=dlogfilename,
-                    poly=self.send_request(Request.GET_POLYNOMIAL_FILENAME),
-                    renumber=self.send_request(Request.GET_RENUMBER_FILENAME),
-                    purged=self.send_request(Request.GET_PURGED_FILENAME),
-                    ideals=self.send_request(Request.GET_IDEAL_FILENAME),
-                    relsdel=self.send_request(Request.GET_RELSDEL_FILENAME),
                     nsm=str(nmaps[0])+","+str(nmaps[1]),
-                    nrels=nrels,
+                    nrels=nfree+nunique,
                     stdout=str(stdoutpath),
                     stderr=str(stderrpath),
                     **self.merged_args[0])
@@ -4672,6 +4667,10 @@ class ReconstructLogTask(Task):
         else:
             return [ 0, 0 ]
 
+# TODO: This is a bit ugly. We're leaning on the functionality that
+# descent.py infers the complete set of file names from the prefix (or
+# from the database, if it so wishes). However, the cadofactor way would
+# be to pass each and every needed file name as provided by the mediator.
 class DescentTask(Task):
     """ Individual logarithm Task """
     @property
@@ -4690,18 +4689,8 @@ class DescentTask(Task):
         return ((cadoprograms.Descent, override, input),)
     @property
     def paramnames(self):
-        # TODO: It's a bit odd that we define lim0 and pals (which I
-        # concur are specific, here) at the Task level if the only
-        # purpose is to forward the stuff to the Program level, no ? Or
-        # maybe we should list them as overrides ?
         return self.join_params(super().paramnames,
-                {"target": int, "descent_hint": str, "init_I": int,
-                    "init_ncurves": int, "init_lpb": int,
-                    "init_lim": int, "init_mfb": int, "init_tkewness": int,
-                    "I": int, "lpb0": int, "lpb1": int, "mfb0": int,
-                    "mfb1": int, "lim0": int, "lim1": int,
-                    "execpath": str
-                    })
+                {"target": int, "execpath": str})
 
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator=mediator, db=db, parameters=parameters,
@@ -4712,9 +4701,8 @@ class DescentTask(Task):
 
         (stdoutpath, stderrpath) = \
                 self.make_std_paths(cadoprograms.Descent.name)
-        cadobindir = self.params["execpath"]
         p = cadoprograms.Descent(
-                cadobindir=cadobindir,
+                cadobindir=self.params["execpath"],
                 stdout=str(stdoutpath),
                 stderr=str(stderrpath),
                 **self.merged_args[0])
@@ -4730,6 +4718,9 @@ class DescentTask(Task):
                 break
         return True
 
+    # XXX I'm not sure that self.state really is the place to store
+    # logtarget. Especially given that we're storing it detached from the
+    # target, which surely looks odd.
     def get_logtarget(self):
         return self.state["logtarget"]
     
