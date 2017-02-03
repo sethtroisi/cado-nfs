@@ -5137,6 +5137,7 @@ class Request(Message):
     GET_WU_RESULT = object()
     GET_WORKDIR_JOBNAME = object()
     GET_WORKDIR_PATH = object()
+    GET_DLOG_FILENAME = object()
 
 class CompleteFactorization(HasState, wudb.DbAccess, 
         DoesLogging, cadoparams.UseParameters, patterns.Mediator):
@@ -5379,6 +5380,7 @@ class CompleteFactorization(HasState, wudb.DbAccess,
             self.request_map[Request.GET_NMAPS] = self.numbertheory.get_nmaps
             self.request_map[Request.GET_SM_FILENAME] = self.sm.get_sm_filename
             self.request_map[Request.GET_RELSDEL_FILENAME] = self.purge.get_relsdel_filename
+            self.request_map[Request.GET_DLOG_FILENAME] = self.reconstructlog.get_dlog_filename
             self.request_map[Request.GET_KERNEL_FILENAME] = self.linalg.get_virtual_logs_filename
             self.request_map[Request.GET_VIRTUAL_LOGS_FILENAME] = self.linalg.get_virtual_logs_filename
         else:

@@ -227,7 +227,7 @@ Equivalent shell line:
 Note: The mf_scan binary can also handle DL matrices, but the
 --withcoeffs option must be added.
 
-File XXX.reconstructlog.dlog
+File XXX.dlog
 ============================
 
 This file is meant to be the most useful form of the log database, for
