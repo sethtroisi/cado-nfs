@@ -433,7 +433,7 @@ if(DEFINED ENV{CHECKS_EXPENSIVE})
         SCRIPT
             ${CADO_NFS_SOURCE_DIR}/cado-nfs.py
             22381151342911794563007770625342242843893411711318155026160427871
-            tasks.linalg.bwc.m=128 tasks.linalg.bwc.n=128 --server-threads 2
+            tasks.linalg.m=128 tasks.linalg.n=128 --server-threads 2
         TARGET_DEPENDENCIES
             full_c30_dependencies
             )

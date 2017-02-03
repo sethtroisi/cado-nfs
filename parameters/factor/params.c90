@@ -330,8 +330,8 @@ tasks.filter.purge.required_excess=0.0 # Controls extra sieving:
 					# integer is given, a split close to sqrt(mn) is chosen
 tasks.linalg.bwc.interval = 100		# checkpointing interval for bwc.
 tasks.linalg.bwc.interleaving = 0
-tasks.linalg.bwc.m = 64
-tasks.linalg.bwc.n = 64
+tasks.linalg.m = 64
+tasks.linalg.n = 64
 tasks.linalg.characters.nchar = 50		# number of characters
 #tasks.linalg.characters.threads = 2
 

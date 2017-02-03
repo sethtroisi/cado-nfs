@@ -55,8 +55,8 @@ tasks.filter.target_density = 170.0
 
 tasks.linalg.bwc.interval = 100
 tasks.linalg.bwc.interleaving = 0
-tasks.linalg.bwc.m = 64
-tasks.linalg.bwc.n = 64
+tasks.linalg.m = 64
+tasks.linalg.n = 64
 
 ###########################################################################
 # Characters

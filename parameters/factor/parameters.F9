@@ -47,6 +47,6 @@ tasks.sieve.qrange = 5000
 tasks.sieve.sqside = 0
 
 # linear algebra
-tasks.linalg.bwc.m = 64
-tasks.linalg.bwc.n = 64
+tasks.linalg.m = 64
+tasks.linalg.n = 64
 tasks.linalg.characters.nchar = 50
