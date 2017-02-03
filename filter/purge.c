@@ -121,6 +121,8 @@ static void singletons_and_cliques_removal(purge_matrix_ptr mat, int nsteps,
 
   if (excess <= 0) /* covers case nrows = ncols = 0 */
   {
+      /* XXX Warning: This output line gets ***PARSED*** (eek!) by the
+       * Python script to decide whether we have enough excess */
     fprintf (stdout, "number of rows < number of columns + keep\n");
     print_final_values (mat, 0);
     exit(2);
@@ -128,6 +130,8 @@ static void singletons_and_cliques_removal(purge_matrix_ptr mat, int nsteps,
 
   if ((double) excess < required_excess * ((double) mat->ncols))
   {
+      /* XXX Warning: This output line gets ***PARSED*** (eek!) by the
+       * Python script to decide whether we have enough excess */
     fprintf (stdout, "(excess / ncols) = %.2f < %.2f. See -required_excess "
                      "argument.\n", ((double) excess / (double) mat->ncols),
                      required_excess);
@@ -572,6 +576,8 @@ int main(int argc, char **argv)
 
     if (mat->nrows < mat->ncols + keep)
     {
+      /* XXX Warning: This output line gets ***PARSED*** (eek!) by the
+       * Python script to decide whether we have enough excess */
       fprintf (stdout, "number of rows < number of columns + keep\n");
       print_final_values (mat, 0);
       exit(2);
