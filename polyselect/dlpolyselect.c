@@ -122,13 +122,7 @@ is_irreducible (mpz_poly f)
 
   do {
     mpz_nextprime (p, p);
-#ifdef TIMINGS
-    t_roots -= seconds_thread ();
-#endif
     nr = mpz_poly_roots_mpz (roots, f, p);
-#ifdef TIMINGS
-    t_roots += seconds_thread ();
-#endif
   } while (nr == 0);
 
   g.coeff = (mpz_t **) malloc ((dg + 2)*sizeof(mpz_t*));

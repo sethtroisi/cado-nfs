@@ -468,7 +468,7 @@ TonelliShanks (mpz_poly res, const mpz_poly a, const mpz_poly F, unsigned long p
     mpz_poly_pow_mod_f_mod_ui(D, delta, F, t, p);
     for (i = 0; i <= s-1; ++i) {
       mpz_poly_pow_mod_f_mod_ui(auxpol, D, F, m, p);
-      mpz_poly_mul_mod_f_mod_mpz(auxpol, auxpol, A, F, myp, NULL);
+      mpz_poly_mul_mod_f_mod_mpz(auxpol, auxpol, A, F, myp, NULL, NULL);
       mpz_ui_pow_ui(aux, 2, (s-1-i));
       mpz_poly_pow_mod_f_mod_ui(auxpol, auxpol, F, aux, p);
       if ((auxpol->deg == 0) && (mpz_cmp_ui(auxpol->coeff[0], p-1)== 0))
@@ -480,7 +480,7 @@ TonelliShanks (mpz_poly res, const mpz_poly a, const mpz_poly F, unsigned long p
     mpz_divexact_ui(m, m, 2);
     mpz_poly_pow_mod_f_mod_ui(auxpol, D, F, m, p);
 
-    mpz_poly_mul_mod_f_mod_mpz(res, res, auxpol, F, myp, NULL);
+    mpz_poly_mul_mod_f_mod_mpz(res, res, auxpol, F, myp, NULL, NULL);
     mpz_poly_clear(D);
     mpz_poly_clear(A);
     mpz_clear(m);
@@ -675,7 +675,7 @@ polymodF_sqrt (polymodF_t res, polymodF_t AA, mpz_poly F, unsigned long p,
 
     // now, do the Newton operation x <- 1/2(3*x-a*x^3)
     st = seconds ();
-    mpz_poly_sqr_mod_f_mod_mpz (tmp, invsqrtA, F, pk, invpk); /* tmp = invsqrtA^2 */
+    mpz_poly_sqr_mod_f_mod_mpz (tmp, invsqrtA, F, pk, invpk, NULL); /* tmp = invsqrtA^2 */
     if (verbose)
       {
 	pthread_mutex_lock (&lock);
@@ -690,7 +690,7 @@ polymodF_sqrt (polymodF_t res, polymodF_t AA, mpz_poly F, unsigned long p,
        However I don't see how to use the fact that the coefficients
        if 1-a*x^2 are divisible by p^(k/2). */
     st = seconds ();
-    mpz_poly_mul_mod_f_mod_mpz (tmp, tmp, a, F, pk, invpk); /* tmp=a*invsqrtA^2 */
+    mpz_poly_mul_mod_f_mod_mpz (tmp, tmp, a, F, pk, invpk, NULL); /* tmp=a*invsqrtA^2 */
     if (verbose)
       {
 	pthread_mutex_lock (&lock);
@@ -703,7 +703,7 @@ polymodF_sqrt (polymodF_t res, polymodF_t AA, mpz_poly F, unsigned long p,
     mpz_poly_sub_ui (tmp, tmp, 1); /* a*invsqrtA^2-1 */
     mpz_poly_div_2_mod_mpz (tmp, tmp, pk); /* (a*invsqrtA^2-1)/2 */
     st = seconds ();
-    mpz_poly_mul_mod_f_mod_mpz (tmp, tmp, invsqrtA, F, pk, invpk);
+    mpz_poly_mul_mod_f_mod_mpz (tmp, tmp, invsqrtA, F, pk, invpk, NULL);
     if (verbose)
       {
 	pthread_mutex_lock (&lock);
@@ -728,7 +728,7 @@ polymodF_sqrt (polymodF_t res, polymodF_t AA, mpz_poly F, unsigned long p,
 
   /* multiply by a to get an approximation of the square root */
   st = seconds ();
-  mpz_poly_mul_mod_f_mod_mpz (tmp, invsqrtA, a, F, pk, invpk);
+  mpz_poly_mul_mod_f_mod_mpz (tmp, invsqrtA, a, F, pk, invpk, NULL);
   if (verbose)
     {
       pthread_mutex_lock (&lock);
