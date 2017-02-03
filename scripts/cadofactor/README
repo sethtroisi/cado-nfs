@@ -134,9 +134,9 @@ the imported ones and the ones it computes by itself.
 If you want to import size-optimized polynomials into phase 1 of polynomial
 selection and then continue polynomial search, use
 
-tasks.polyselect.polyselect1.import_sopt=file
+tasks.polyselect.import_sopt=file
 or
-tasks.polyselect.polyselect1.import_sopt=@file
+tasks.polyselect.import_sopt=@file
 
 With @file, file should contain a list of files to import, one file name
 per line. All polynomials from the given file(s) are imported and added to
@@ -145,7 +145,7 @@ selection phase 1 then continues normally. For example, if an earlier run
 completed ad values up to ad=200000 and you want to resume the search from
 there, you could use
 
-tasks.polyselect.polyselect1.import_sopt=@list_of_existing_files tasks.polyselect.admin=200000
+tasks.polyselect.import_sopt=@list_of_existing_files tasks.polyselect.admin=200000
 
 which imports the existing files, then resumes searching at ad=200000 up to
 the admax value given in the parameter file.
@@ -154,9 +154,9 @@ the admax value given in the parameter file.
 If you want to import root-optimized polynomials into phase 2 of polynomial
 selection and then continue polynomial search, use
 
-tasks.polyselect.polyselect2.import_ropt=file
+tasks.polyselect.import_ropt=file
 or
-tasks.polyselect.polyselect2.import_ropt=@file
+tasks.polyselect.import_ropt=@file
 
 This reads the polynomial(s) in the given file(s), then root-optimizes any
 polynomials found in phase 1; the best polynomial (rated by the Murphy E
