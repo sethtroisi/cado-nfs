@@ -1556,7 +1556,7 @@ void mpz_poly_eval_mod_mpz_barrett(mpz_t res, mpz_poly_srcptr f, mpz_srcptr x,
     mpz_set_ui(res, 0);
     return;
   }
-  mpz_mod(res, f->coeff[d], m);
+  barrett_mod(res, f->coeff[d], m, mx);
   for (i = d-1; i>=0; --i) {
     mpz_mul(res, res, x);
     mpz_add(res, res, f->coeff[i]);
@@ -1735,7 +1735,7 @@ mpz_poly_mod_f_mod_mpz (mpz_poly_ptr R, mpz_poly_srcptr f, mpz_srcptr m,
 #else
       /* invf = 1/lc(f) mod m */
       mpz_mul (c, R->coeff[R->deg], (invf == NULL) ? aux : invf);
-      mpz_mod (c, c, m);
+      barrett_mod (c, c, m, invm);
       /* c = lc(R)/lc(f) mod m thus R - c*x^(deg(R)-deg(f))*f = 0 mod m */
 #endif
       for (int i = R->deg - 1; i >= R->deg - f->deg; --i)
