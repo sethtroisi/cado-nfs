@@ -12,8 +12,9 @@ extern "C" {
 
 /* If INVF=0, mpz_poly_mod_f_mod_mpz requires invf = 1/m mod lc(f),
    otherwise invf = 1/lc(f) mod m.
-   INVF = 1 seems marginally better for dlpolyselect. */
-#define INVF 1
+   INVF = 1 seems marginally better for dlpolyselect, but much worse for sqrt.
+*/
+#define INVF 0
 
 /* maximum degree we can reconstruct using mpz_poly_mul_tc_interpolate */
 #define MAX_TC_DEGREE 19
