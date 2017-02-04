@@ -660,7 +660,9 @@ class Polyselect(Program):
                  incr : Parameter(checktype=int)=None,
                  nq : Parameter(checktype=int)=None,
                  maxtime : Parameter(checktype=float)=None,
-                 out : Parameter(is_output_file=True)=None,
+                 # -out is filename for msieve-format output ; absolutely
+                 # no reason to have it here.
+                 # out : Parameter(is_output_file=True)=None,
                  printdelay : Parameter("s", checktype=int)=None,
                  keep: Parameter(checktype=int)=None,
                  sopteffort: Parameter(checktype=int)=None,

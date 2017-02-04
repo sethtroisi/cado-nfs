@@ -1029,24 +1029,54 @@ class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
         # The progparams entries should not be modified after a class'
         # constuctor (within __init__() is fine tho)
         self.progparams = []
+        maindict = self.parameters.parameters
         for prog, override, needed_input in self.programs:
             # Parameters listed in needed_input are assumed to be overridden
             for key in (set(override) & set(needed_input)):
                 self.logger.warning("Parameter %s listed in both overridden "
                                     "parameters and in input files for %s, "
                                     "only one is needed", key, prog.name)
+            prog_param_path = self.parameters.get_param_path() + [prog.name]
             progparams = self.parameters.myparams(prog.get_accepted_keys(),
                                                   prog.name)
-            for param in set(override) & set(progparams):
-                self.logger.error('Parameter "%s" for program "%s" is '
-                                 'generated at run time and cannot be '
-                                 'supplied through the parameter file',
-                                 param, prog.name)
-                self.logger.error('Ignoring %s, we rely on %s to compute it '
-                                  'based on parameters at level %s only',
-                                 '.'.join(path_prefix+[prog.name, param]),
-                                 self.__class__,
-                                 '.'.join(path_prefix))
+            for c in progparams:
+                finergrain = '.'.join(prog_param_path+[c])
+                coarsegrain = maindict.locate(finergrain)
+                self.logger.debug("%s found from %s" % (finergrain, coarsegrain))
+            for param in (set(needed_input)|set(override)) & set(progparams):
+                finergrain = '.'.join(prog_param_path+[param])
+                coarsegrain = maindict.locate(finergrain)
+                # Whenever we see a parameter that is marked as override,
+                # we will discard it and let the task level fill data for
+                # this parameter. There are cases where this really is a
+                # user error and we want to complain:
+                #  - when the parameter file *explicitly* sets this
+                #    parameter at this level. This does not make sense
+                #    and is a troubling no-op. Typical example is
+                #    specifying tasks.linalg.bwc.m in dlp mode.
+                #  - when the parameter file sets it at a level above,
+                #    but the task level does *not* know about this
+                #    parameter anyway. This is ignored as well, and the
+                #    task level with fill that parameter based on data it
+                #    knows. But leaving the user with the feeling that he
+                #    might be able to control that parameter is
+                #    inelegant. A typical example is
+                #    tasks.sieve.makefb.lim (which the tasks.sieve level
+                #    sets based on the lim0 and lim1 parameters it knows
+                #    about). Likewise, many "out" parameters behave
+                #    similarly.
+                if finergrain == coarsegrain or param not in set(self.paramnames):
+                    self.logger.error('Parameter "%s" for program "%s" is '
+                                     'generated at run time and cannot be '
+                                     'supplied through the parameter file',
+                                     param, prog.name)
+                    self.logger.error('Ignoring %s, we rely on %s to compute it '
+                                      'based on parameters at level %s only',
+                                     '.'.join(path_prefix+[prog.name, param]),
+                                     self.__class__,
+                                     '.'.join(path_prefix))
+                # We'll anyway discard it, but it's normal if we
+                # inherited the parameter from a level above.
                 del(progparams[param])
             
             self.progparams.append(progparams)
@@ -1640,7 +1670,7 @@ class Polysel1Task(ClientServerTask, DoesImport, HasStatistics, patterns.Observe
         # task has itself admin, admax parameters, which specify the total
         # size of the search range. Thus we don't include admin, admax here,
         # or PolyselTask would incorrectly warn about them not being used.
-        return ((cadoprograms.Polyselect, (), {}),)
+        return ((cadoprograms.Polyselect, ("out"), {}),)
     @property
     def paramnames(self):
         return self.join_params(super().paramnames, {
@@ -3823,7 +3853,7 @@ class MergeTask(Task):
     def programs(self):
         input = {"purged": Request.GET_PURGED_FILENAME}
         return ((cadoprograms.Merge, ("out",), input),
-                (cadoprograms.Replay, ("history", "index"), input))
+                (cadoprograms.Replay, ("out", "history", "index"), input))
     @property
     def paramnames(self):
         return self.join_params(super().paramnames,  \
