@@ -2433,7 +2433,7 @@ class PolyselGFpnTask(Task, DoesImport):
     def run(self):
         super().run()
 
-        if not "polyfile" in self.state:
+        if not "polyfilename" in self.state:
             polyfilename = self.workdir.make_filename("poly")
             # Import mode
             if self.did_import():
@@ -2441,8 +2441,10 @@ class PolyselGFpnTask(Task, DoesImport):
                     raise Exception("Import failed?")
                 with open(str(polyfilename), "w") as outfile:
                     outfile.write(self.state["imported_poly"])
-                update = {"poly": self.state["imported_poly"],
-                        "polyfile": str(polyfilename)}
+                update = {
+                        "poly": self.state["imported_poly"],
+                        "polyfilename": polyfilename.get_wdir_relative()
+                        }
                 self.state.update(update)
                 return True
 
@@ -2464,7 +2466,10 @@ class PolyselGFpnTask(Task, DoesImport):
                 raise Exception("Program failed")
             with open(str(polyfilename), "r") as inputfile:
                 poly = Polynomials(list(inputfile))
-            update = {"poly": str(poly), "polyfile": str(polyfilename)}
+            update = {
+                    "poly": str(poly),
+                    "polyfilename": polyfilename.get_wdir_relative()
+                    }
             self.state.update(update)
         return True
 
@@ -2478,7 +2483,7 @@ class PolyselGFpnTask(Task, DoesImport):
         return self.state["poly"];
 
     def get_poly_filename(self):
-        return self.state["polyfile"];
+        return self.get_state_filename("polyfilename")
 
     def get_have_two_alg_sides(self):
         P = Polynomials(self.state["poly"].splitlines())
