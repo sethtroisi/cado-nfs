@@ -10,12 +10,6 @@
 extern "C" {
 #endif
 
-/* If INVF=0, mpz_poly_mod_f_mod_mpz requires invf = 1/m mod lc(f),
-   otherwise invf = 1/lc(f) mod m.
-   INVF = 1 seems marginally better for dlpolyselect, but much worse for sqrt.
-*/
-#define INVF 0
-
 /* maximum degree we can reconstruct using mpz_poly_mul_tc_interpolate */
 #define MAX_TC_DEGREE 19
 
@@ -122,6 +116,7 @@ void mpz_poly_makemonic_mod_mpz (mpz_poly_ptr Q, mpz_poly_srcptr P, mpz_srcptr m
 int mpz_poly_mod_f_mod_mpz (mpz_poly_ptr R, mpz_poly_srcptr f, mpz_srcptr m,
                             mpz_srcptr invm, mpz_srcptr invf);
 int mpz_poly_mod_mpz (mpz_poly_ptr R, mpz_poly_srcptr A, mpz_srcptr m, mpz_srcptr invm);
+int mpz_poly_mod_mpz_lazy (mpz_poly_ptr R, mpz_poly_srcptr A, mpz_srcptr m, mpz_srcptr invm);
 void mpz_poly_mul_mod_f_mod_mpz(mpz_poly_ptr Q, mpz_poly_srcptr P1, mpz_poly_srcptr P2,
                                 mpz_poly_srcptr f, mpz_srcptr m,
                                 mpz_srcptr invm, mpz_srcptr invf);

@@ -1685,6 +1685,29 @@ mpz_poly_mod_mpz (mpz_poly_ptr R, mpz_poly_srcptr A, mpz_srcptr m, mpz_srcptr in
   mpz_poly_cleandeg(R, A->deg);
   return R->deg;
 }
+
+/* reduce non-negative coefficients in [0, p-1], negative ones in [1-p, -1] */
+int
+mpz_poly_mod_mpz_lazy (mpz_poly_ptr R, mpz_poly_srcptr A, mpz_srcptr m,
+		       mpz_srcptr invm)
+{
+  mpz_poly_realloc(R, A->deg + 1);
+  for (int i = 0; i <= A->deg; ++i)
+    {
+      if (mpz_sgn (A->coeff[i]) >= 0)
+	barrett_mod (R->coeff[i], A->coeff[i], m, invm);
+      else
+	{
+	  mpz_neg (R->coeff[i], A->coeff[i]);
+	  barrett_mod (R->coeff[i], R->coeff[i], m, invm);
+	  mpz_neg (R->coeff[i], R->coeff[i]);
+	}
+    }
+
+  mpz_poly_cleandeg(R, A->deg);
+  return R->deg;
+}
+
 /* Reduce R[d]*x^d + ... + R[0] mod f[df]*x^df + ... + f[0] modulo m.
    Return the degree of the remainder.
    Assume invm = floor(B^(2k)/m), m having k limbs, and B is the limb base.
@@ -1692,8 +1715,7 @@ mpz_poly_mod_mpz (mpz_poly_ptr R, mpz_poly_srcptr A, mpz_srcptr m, mpz_srcptr in
    Coefficients of R need not be reduced mod m on input, but are reduced
    on output.
    invm may be NULL (or computed by barrett_init).
-   If invf is not NULL, invf should be 1/m mod lc(f) or 1/lc(f) mod m,
-   depending on the INVF macro. */
+   If invf is not NULL, it should be 1/m mod lc(f). */
 int
 mpz_poly_mod_f_mod_mpz (mpz_poly_ptr R, mpz_poly_srcptr f, mpz_srcptr m,
 			mpz_srcptr invm, mpz_srcptr invf)
@@ -1706,38 +1728,27 @@ mpz_poly_mod_f_mod_mpz (mpz_poly_ptr R, mpz_poly_srcptr f, mpz_srcptr m,
   if (invf == NULL)
     {
       mpz_init (aux);
-#if INVF == 0
       /* aux = 1/m mod lc(f) */
       mpz_invert (aux, m, f->coeff[f->deg]);
-#else
-      /* aux = 1/lc(f) mod m */
-      mpz_invert (aux, f->coeff[f->deg], m);
-#endif
     }
 
   mpz_init (c);
   // FIXME: write a subquadratic variant
   while (R->deg >= f->deg)
     {
-      /* Here m is large (typically several million bits) and lc(f) is small
+      /* Here m is large (thousand to million bits) and lc(f) is small
        * (typically one word). We first add to R lambda * m * x^(dR-df) ---
        * which is zero mod m --- such that the new coefficient of degree dR
        * is divisible by lc(f), i.e., lambda = -lc(R)/m mod lc(f). Then if
        * c = (lc(R) + lambda * m) / lc(f), we subtract c * x^(dR-df) * f. */
-      barrett_mod (R->coeff[R->deg], R->coeff[R->deg], m, invm);
-#if INVF == 0 /* invf = 1/m mod lc(f) */
       mpz_mod (c, R->coeff[R->deg], f->coeff[f->deg]); /* lc(R) mod lc(f) */
       mpz_mul (c, c, (invf == NULL) ? aux : invf);
       mpz_mod (c, c, f->coeff[f->deg]);    /* lc(R)/m mod lc(f) */
       mpz_submul (R->coeff[R->deg], m, c);  /* lc(R) - m * (lc(R) / m mod lc(f)) */
       ASSERT (mpz_divisible_p (R->coeff[R->deg], f->coeff[f->deg]));
       mpz_divexact (c, R->coeff[R->deg], f->coeff[f->deg]);
-#else
-      /* invf = 1/lc(f) mod m */
-      mpz_mul (c, R->coeff[R->deg], (invf == NULL) ? aux : invf);
-      barrett_mod (c, c, m, invm);
-      /* c = lc(R)/lc(f) mod m thus R - c*x^(deg(R)-deg(f))*f = 0 mod m */
-#endif
+      /* If R[deg] has initially size 2n, and f[deg] = O(1), then c has size
+	 2n here. */
       for (int i = R->deg - 1; i >= R->deg - f->deg; --i)
 	mpz_submul (R->coeff[i], c, f->coeff[f->deg-R->deg+i]);
       R->deg--;
@@ -2053,11 +2064,7 @@ mpz_poly_pow_mod_f_mod_mpz_barrett (mpz_poly_ptr Q, mpz_poly_srcptr P,
   if (f != NULL)
     {
       mpz_init (invf);
-#if INVF == 0
       mpz_invert (invf, p, f->coeff[f->deg]);
-#else
-      mpz_invert (invf, f->coeff[f->deg], p);
-#endif
     }
 
   /* We use base-2^l exponentiation with sliding window,
@@ -2291,7 +2298,7 @@ void mpz_poly_gcd_mpz(mpz_poly_ptr f, mpz_poly_srcptr a, mpz_poly_srcptr b, mpz_
     } else {
         mpz_poly_init(hh, b->deg);
         mpz_poly_set(hh, b);
-        mpz_poly_set(f, a);
+        mpz_poly_set(f, a); /* will do nothing if f = a */
     }
     mpz_poly_gcd_mpz_clobber(f, hh, p);
     mpz_poly_clear(hh);

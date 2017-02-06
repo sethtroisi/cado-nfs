@@ -280,10 +280,10 @@ mpz_poly_cantor_zassenhaus (mpz_t *r, mpz_poly_srcptr f, const mpz_t p, int dept
     goto clear_a;
   }
 
-  /* if f has degree d, then q,h may have up to degree 2d-1 in the
+  /* if f has degree d, then q,h may have up to degree 2d-2 in the
      powering algorithm */
-  mpz_poly_init (q, 2 * d - 1);
-  mpz_poly_init (h, 2 * d - 1);
+  mpz_poly_init (q, 2 * d - 2);
+  mpz_poly_init (h, 2 * d - 2);
 
   /* random polynomial by a */
   mpz_set_ui (a, lrand48());
@@ -349,8 +349,14 @@ mpz_poly_roots_mpz (mpz_t *r, mpz_poly_srcptr f, const mpz_t p)
   mpz_poly_init (g, 2*d-1);
   mpz_poly_init (h, 2*d-1);
 
-  /* reduce f to monic and modulo p */
-  mpz_poly_makemonic_mod_mpz (fp, f, p);
+  /* If f has small coefficients (like in Joux-Lercier polynomial selection)
+     don't make f monic, since it might make the coefficients of fp blow up.
+     In that case we only reduce coefficients in [-p+1, p-1], to keep
+     negative coefficients small in absolute value. */
+  if (mpz_poly_sizeinbase (f, 2) < mpz_sizeinbase (p, 2))
+    mpz_poly_mod_mpz_lazy (fp, f, p, NULL);
+  else
+    mpz_poly_makemonic_mod_mpz (fp, f, p);
   if (fp->deg <= 0)
     goto clear_and_exit;
   /* h=x^p-x (mod mpz_poly_fp) */
@@ -359,7 +365,7 @@ mpz_poly_roots_mpz (mpz_t *r, mpz_poly_srcptr f, const mpz_t p)
   mpz_poly_sub (h, h, g);
   /* g = gcd (mpz_poly_fp, h) */
   mpz_poly_gcd_mpz (fp, fp, h, p);
-  /* mpz_poly_fp contains gcd(x^p-x, f) */
+  /* fp contains gcd(x^p-x, f) */
   nr = fp->deg;
   ASSERT (nr >= 0);
 
