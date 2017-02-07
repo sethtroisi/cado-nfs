@@ -1,5 +1,3 @@
-# those parameters are experimental
-
 ###########################################################################
 #     Parameter file for Cado-NFS
 ###########################################################################
@@ -29,16 +27,14 @@ tasks.wutimeout = 24000 # required for rootsieve in degree 6
 # Sieve
 ###########################################################################
 
-lim0 = 200000000
-lim1 = 1100000000
-lpb0 = 34
-lpb1 = 35
-tasks.sieve.mfb0 = 77
-tasks.sieve.mfb1 = 102
-tasks.sieve.lambda0 = 2.4
-tasks.sieve.lambda1 = 3.4
-tasks.sieve.ncurves0 = 26
-tasks.sieve.ncurves1 = 21
+lim0 = 980000000
+lim1 = 1644872548
+lpb0 = 35
+lpb1 = 36
+tasks.sieve.mfb0 = 79
+tasks.sieve.mfb1 = 111
+tasks.sieve.ncurves0 = 33
+tasks.sieve.ncurves1 = 31
 tasks.I = 16
 
 tasks.sieve.qrange = 10000
