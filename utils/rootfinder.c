@@ -362,6 +362,9 @@ mpz_poly_roots_mpz (mpz_t *r, mpz_poly_srcptr f, const mpz_t p)
   /* h=x^p-x (mod mpz_poly_fp) */
   mpz_poly_setcoeff_ui (g, 1, 1);
   mpz_poly_pow_mod_f_mod_mpz (h, g, fp, p, p);
+  /* FIXME: instead of computing x^p-x, we could compute x^(p-1) - 1 while
+     saving the value of h = x^((p-1)/2). If several roots, gcd(h-1, f)
+     might help to split them. */
   mpz_poly_sub (h, h, g);
   /* g = gcd (mpz_poly_fp, h) */
   mpz_poly_gcd_mpz (fp, fp, h, p);
