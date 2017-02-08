@@ -484,6 +484,7 @@ collision_on_p ( header_t header,
   }
 
   shash_init (H, 4 * lenPrimes);
+  shash_reset (H);
   umax = (int64_t) Primes[lenPrimes - 1] * (int64_t) Primes[lenPrimes - 1];
   for (nprimes = 0; nprimes < lenPrimes; nprimes ++)
     {
@@ -602,6 +603,7 @@ collision_on_each_sq ( header_t header,
   */
 
   shash_init (H, 4 * lenPrimes);
+  shash_reset (H);
 
   pc = (long *) inv_qq;
   nv = *pc;
@@ -1143,14 +1145,13 @@ declare_usage(param_list pl)
   param_list_decl_usage(pl, "degree", "(alias d) polynomial degree (2 or 3, "
                                       "default is 3)");
   param_list_decl_usage(pl, "n", "(required, alias N) input number");
-  param_list_decl_usage(pl, "n", "(required, alias N) input number");
   param_list_decl_usage(pl, "P", "(required) deg-1 coeff of g(x) has two prime factors in [P,2P]\n");
 
   param_list_decl_usage(pl, "admax", "max value for ad (+1)");
   param_list_decl_usage(pl, "admin", "min value for ad (default 0)");
   param_list_decl_usage(pl, "incr", "(alias i) increment of ad (default 60)");
   param_list_decl_usage(pl, "skewness", "maximun skewness possible "
-                                        "(default N^(1/9)");
+                                        "(default N^(1/9))");
   param_list_decl_usage(pl, "maxtime", "stop the search after maxtime seconds");
 
   char str[200];
@@ -1305,10 +1306,10 @@ main (int argc, char *argv[])
   /* set cpoly */
   mpz_set (best_poly->n, N);
   mpz_set (curr_poly->n, N);
-  best_poly->alg->deg = d;
-  best_poly->rat->deg = d;
-  curr_poly->alg->deg = d;
-  curr_poly->rat->deg = d;
+  best_poly->pols[ALG_SIDE]->deg = d;
+  best_poly->pols[RAT_SIDE]->deg = d;
+  curr_poly->pols[ALG_SIDE]->deg = d;
+  curr_poly->pols[RAT_SIDE]->deg = d;
 
   /* Compute maxS: use maxS if maxS argument is greater than 0 and lesser than
      default value */
@@ -1365,6 +1366,7 @@ main (int argc, char *argv[])
   for (i = 0; i < nthreads ; i++)
   {
     mpz_init_set (T[i]->N, N);
+    mpz_init (T[i]->ad);
     T[i]->d = d;
     T[i]->thread = i;
   }
@@ -1444,7 +1446,10 @@ main (int argc, char *argv[])
   }
 
   for (i = 0; i < nthreads ; i++)
-    mpz_clear (T[i]->N);
+    {
+      mpz_clear (T[i]->N);
+      mpz_clear (T[i]->ad);
+    }
   free (T);
   mpz_clear (N);
   mpz_clear (admin);
