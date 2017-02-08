@@ -46,14 +46,12 @@ static int verbose = 0;
 static unsigned long incr = DEFAULT_INCR;
 cado_poly best_poly, curr_poly;
 double best_E = DBL_MAX; /* combined score E (the smaller the better) */
+double aver_E = 0.0;
+unsigned long found = 0; /* number of polynomials found so far */
 
 /* read-write global variables */
 pthread_mutex_t lock=PTHREAD_MUTEX_INITIALIZER; /* used as mutual exclusion
                                                    lock for those variables */
-int tot_found = 0; /* total number of polynomials */
-double potential_collisions = 0.0;
-unsigned long collisions = 0;
-unsigned long collisions_good = 0;
 
 mpz_t maxS; /* maximun skewness. O for default max */
 
@@ -61,6 +59,18 @@ mpz_t maxS; /* maximun skewness. O for default max */
 extern void shash_add (shash_t, uint64_t);
 
 /* -- functions starts here -- */
+
+static void
+mutex_lock(pthread_mutex_t *lock)
+{
+  pthread_mutex_lock (lock);
+}
+
+static void
+mutex_unlock(pthread_mutex_t *lock)
+{
+  pthread_mutex_unlock (lock);
+}
 
 /* crt, set r and qqz */
 void
@@ -127,14 +137,6 @@ check_parameters (mpz_t m0, unsigned long d, unsigned long lq)
   return 1;
 }
 
-
-/* the number of expected collisions is 8*lenPrimes^2/2/(2P)^2 */
-static double
-expected_collisions (uint32_t twoP)
-{
-  double m = (lenPrimes << 1) / (double) twoP;
-  return m * m;
-}
 
 /* Compute maximun skewness, which in floor(N^(1/d^2)) */
 void
@@ -357,8 +359,12 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
   alpha[1] = get_alpha (f, ALPHA_BOUND_SMALL);
   E = logmu[1] + alpha[1] + logmu[0] + alpha[0];
 
+  found ++;
+  aver_E += E;
+
   if (E < best_E)
     {
+      mutex_lock (&lock);
       best_E = E;
       gmp_printf("n: %Zd\n", N);
       for (int i = 0; i <= f->deg; i++)
@@ -371,11 +377,14 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
       printf ("# g lognorm %1.2f, alpha %1.2f, score %1.2f\n",
               logmu[0], alpha[0], logmu[0] + alpha[0]);
       printf ("# f+g score %1.2f\n", E);
+      printf ("# found %lu polynomial(s) so far, aver. E = %1.2f\n",
+              found, aver_E / (double) found);
 #ifdef DEBUG_POLYSELECT
       printf ("## End poly file\n");
 #else
       printf ("\n");
 #endif
+      mutex_unlock (&lock);
     }
   
   mpz_clear (root);
@@ -419,11 +428,10 @@ collision_on_p ( header_t header,
   unsigned long i, j, nprimes, p, nrp, c = 0, tot_roots = 0;
   uint64_t *rp;
   int64_t ppl = 0, u, umax;
-  double pc1;
   mpz_t *f, tmp;
   int found = 0;
   shash_t H;
-  int st = 0;
+  int st = milliseconds ();
 
   /* init f for roots computation */
   mpz_init_set_ui (tmp, 0);
@@ -458,10 +466,8 @@ collision_on_p ( header_t header,
           continue;
         }
 
-      st -= milliseconds ();
       nrp = roots_mod_uint64 (rp, mpz_fdiv_ui (header->Ntilde, p), header->d,
                               p);
-      st += milliseconds ();
       tot_roots += nrp;
       roots_lift (rp, header->Ntilde, header->d, header->m0, p, nrp);
       proots_add (R, nrp, rp, nprimes);
@@ -521,10 +527,6 @@ collision_on_p ( header_t header,
   free (f);
   mpz_clear (tmp);
 
-  pc1 = expected_collisions (Primes[lenPrimes - 1]);
-  pthread_mutex_lock (&lock);
-  potential_collisions += pc1;
-  pthread_mutex_unlock (&lock);
   return c;
 }
 
@@ -540,7 +542,6 @@ collision_on_each_sq ( header_t header,
   shash_t H;
   uint64_t **cur1, **cur2, *ccur1, *ccur2;
   long *pc, *epc;
-  double pc2;
   uint64_t pp;
   int64_t ppl, neg_umax, umax, v1, v2, nv;
   unsigned long p, nprimes, c;
@@ -735,11 +736,6 @@ collision_on_each_sq ( header_t header,
   printf ("# p hash_size: %u, hash_alloc: %u\n", H->size, H->alloc);
   printf ("# hash table coll: %lu, all_coll: %lu\n", H->coll, H->coll_all);
 #endif
-
-  pc2 = expected_collisions (Primes[lenPrimes - 1]);
-  pthread_mutex_lock (&lock);
-  potential_collisions += pc2;
-  pthread_mutex_unlock (&lock);
 }
 
 
@@ -1148,7 +1144,7 @@ main (int argc, char *argv[])
   unsigned int d = 3;
   unsigned long P = 0;
   int quiet = 0, tries = 0, i, nthreads = 1, st,
-    target_time = TARGET_TIME, incr_target_time = TARGET_TIME;
+    target_time = TARGET_TIME;
   tab_t *T;
   pthread_t *tid;
 
@@ -1201,7 +1197,6 @@ main (int argc, char *argv[])
   param_list_parse_int (pl, "t", &nthreads);
   param_list_parse_int (pl, "nq", &nq);
   param_list_parse_int (pl, "s", &target_time);
-  incr_target_time = target_time;
   param_list_parse_uint (pl, "degree", &d);
   ASSERT_ALWAYS (2 <= d && d <= 3);
   if (param_list_parse_double (pl, "area", &area) == 0) /* no -area */
@@ -1328,9 +1323,11 @@ main (int argc, char *argv[])
       exit (1);
     }
 
-  /* if admin = 0, start from incr */
+  /* ensure admin > 0 and admin is a multiple of incr */
   if (mpz_cmp_ui (admin, 0) == 0)
     mpz_set_ui (admin, incr);
+  else if (mpz_fdiv_ui (admin, incr) != 0)
+    mpz_add_ui (admin, admin, incr - mpz_fdiv_ui (admin, incr));
 
   while (mpz_cmp (admin, admax) < 0 && seconds () - st0 <= maxtime)
   {
@@ -1345,28 +1342,10 @@ main (int argc, char *argv[])
     }
     for (i = 0 ; i < nthreads ; i++)
       pthread_join(tid[i], NULL);
-
-    if (milliseconds () > (unsigned long) target_time || verbose > 0)
-    {
-      gmp_printf ("# Stat: ad=%Zd, exp. coll.=%1.2f (%0.2e/s), got %lu with "
-              "%lu good ones, time=%lums\n", admin, potential_collisions,
-              1000.0 * (double) potential_collisions / milliseconds (),
-              collisions, collisions_good, milliseconds () );
-      fflush (stdout);
-      target_time += incr_target_time;
-    }
   }
 
-  /* finishing up statistics */
-  if (verbose >= 0)
-  {
-    printf ("# Stat: potential collisions=%1.2f (%1.2e/s)\n",
-            potential_collisions, 1000.0 * potential_collisions
-            / (double) milliseconds ());
-  }
-
-  printf ("# Stat: tried %d ad-value(s), found %d polynomial(s)\n", tries,
-          tot_found);
+  printf ("# Stat: tried %d ad-value(s), found %lu polynomial(s)\n", tries,
+          found);
 
   /* print total time (this gets parsed by the scripts) */
   printf ("# Stat: total phase took %.2fs\n", seconds () - st0);
