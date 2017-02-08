@@ -382,27 +382,35 @@ static plattice_x_t plattice_starting_point(const plattice_info_t &pli,
 
     // first FK vector a
     int64_t a0 = pli.get_a0();
-    uint64_t a1 = pli.get_a1();
+    int64_t a1 = pli.get_a1();
     // second FK vector b
     int64_t b0 = pli.get_b0();
-    uint64_t b1 = pli.get_b1();
+    int64_t b1 = pli.get_b1();
+
+    // FIXME: should have a better understanding of those cases
+    // (and not only in the sublat case, to be honest)
+    // Right now, we desactivate them, but putting a starting point
+    // higher than the limit.
+    if ((b0 == 0) || (b1 == 0)) {
+        return plattice_x_t(I*I);
+    }
 
     // Look for alpha and beta such that
     //   alpha*a + beta*b == (i0,j0) mod m
     // This is a 2x2 system of determinant p, coprime to m.
-    int64_t det = pli.det();
-    det = det % m;
+    int64_t det = pli.det(); // det() returns the opposite of what we want
+    det = (-det) % m;
     if (det < 0)
         det += m;
     det = invmod(det, m);
     int64_t al = ( b1*i0 - b0*j0) % m;
-    int64_t be = (-a1*i0 - a1*j0) % m;
+    int64_t be = (-a1*i0 + a0*j0) % m;
     al = (al*det) % m;
     be = (be*det) % m;
     if (al < 0)
-        al -= m;
+        al += m;
     if (be < 0)
-        be -= m;
+        be += m;
 
     // Now, compute this potential starting point:
     int64_t ii = (al*a0 + be*b0 - i0) / m; // exact divisions
@@ -425,11 +433,12 @@ static plattice_x_t plattice_starting_point(const plattice_info_t &pli,
     // But now, jj might be negative! So let's start the FK walk until we
     // go positive.
     while (jj < 0) {
-        if (ii >= I/2 - b0) {
+        int64_t aux = ii;
+        if (aux >= I/2 - b0) {
             ii += a0;
             jj += a1;
         }
-        if (ii < -I/2 - a0) {
+        if (aux < -I/2 - a0) {
             ii += b0;
             jj += b1;
         }

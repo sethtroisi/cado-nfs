@@ -181,7 +181,11 @@ static inline void ssp_init_oa(ssp_t * tail, fbprime_t p, fbprime_t r, unsigned 
 {
     tail->p = p;
     tail->r = r;
-    tail->r = (r * sublatm) % p;
+    if (sublatm == 0) {
+        tail->rm = tail->r;
+    } else {
+        tail->rm = (r * sublatm) % p;
+    }
     tail->offset = (r * skip) % p;
 }/*}}}*/
 
