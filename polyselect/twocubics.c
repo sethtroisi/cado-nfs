@@ -37,17 +37,15 @@ char *phash = "";
 #endif
 
 #define BATCH_SIZE 20 /* number of special (q, r) per batch */
-#define KEEP 10       /* number of best raw polynomials kept */
 
 /* Read-Only */
 uint32_t *Primes = NULL;
 unsigned long lenPrimes = 1; // length of Primes[]
 int nq = INT_MAX;
-int keep = KEEP;
 static int verbose = 0;
 static unsigned long incr = DEFAULT_INCR;
 cado_poly best_poly, curr_poly;
-double best_E = 0.0; /* Murphy's E (the larger the better) */
+double best_E = DBL_MAX; /* combined score E (the smaller the better) */
 
 /* read-write global variables */
 pthread_mutex_t lock=PTHREAD_MUTEX_INITIALIZER; /* used as mutual exclusion
@@ -56,7 +54,6 @@ int tot_found = 0; /* total number of polynomials */
 double potential_collisions = 0.0;
 unsigned long collisions = 0;
 unsigned long collisions_good = 0;
-double best_raw_logmu[KEEP];
 
 mpz_t maxS; /* maximun skewness. O for default max */
 
@@ -187,16 +184,20 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
   mpz_poly_init (f, d);
   mpz_poly_init (g, d);
 
+#ifdef DEBUG_POLYSELECT
   gmp_printf ("#### MATCH ######\nN = %Zd\nd = %d\nad = %Zd\n"
               "p1 = %lu\np2 = %lu\nq = %" PRIu64 "\ni = %" PRId64 "\n"
               "rq = %Zd\n", N, d, ad, p1, p2, q, i, rq);
+#endif
 
   /* l = p1*p2*q */
   mpz_set_ui (l, p1);
   mpz_mul_ui (l, l, p2);
   mpz_mul_ui (l, l, q);
+#ifdef DEBUG_POLYSELECT
   gmp_printf ("l = p1 * p2 * q\nl == %Zd # has %lu bits\n", l,
               mpz_sizeinbase(l, 2));
+#endif
   mpz_mul (l2, l, l); /* l2 = l^2 */
 
   /* r = rq + i*q^2 */
@@ -204,28 +205,38 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
   mpz_mul_ui (r, r, q);
   mpz_mul_ui (r, r, q);
   mpz_add (r, r, rq);
+#ifdef DEBUG_POLYSELECT
   gmp_printf ("r = rq + i * q^2 \nr == %Zd # has %lu bits\n", r,
               mpz_sizeinbase(r, 2));
+#endif
 
   /* k = d^d * ad^(d-1) */
   mpz_mul_ui (k, ad, d);
   mpz_pow_ui (k, k, d-1);
   mpz_mul_ui (k, k, d);
+#ifdef DEBUG_POLYSELECT
   gmp_printf ("k = d^d * ad^(d-1)\nk == %Zd\n", k);
+#endif
 
   /* Nprime = k * N */
   mpz_mul (Nprime, k, N);
+#ifdef DEBUG_POLYSELECT
   gmp_printf ("Nprime = k * N\nNprime == %Zd\n", Nprime);
+#endif
 
   /* mprime = m0 + r */
   mpz_add (mprime, m0, r);
+#ifdef DEBUG_POLYSELECT
   gmp_printf ("m0 = %Zd\nmprime = m0 + r\nmprime == %Zd\n", m0, mprime);
+#endif
 
   /* C = mprime^d - Nprime */
   mpz_pow_ui (C, mprime, d);
   mpz_sub (C, C, Nprime);
   ASSERT_ALWAYS (mpz_divisible_p (C, l2));
+#ifdef DEBUG_POLYSELECT
   gmp_printf ("(mprime^d - Nprime) %% l^2 == 0\n");
+#endif
 
   /* adm1 is such that mprime = d*ad*m + adm1*l and -d*ad/2 <= adm1 < d*ad/2
      We have adm1 = mprime/l mod (d*ad). */
@@ -240,7 +251,9 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
   mpz_mul_2exp (t, adm1, 1);
   if (mpz_cmp (t, tmp) >= 0)
     mpz_sub (adm1, adm1, tmp);
+#ifdef DEBUG_POLYSELECT
   gmp_printf ("adm1 = %Zd\n", adm1);
+#endif
 
   /* m = (mprime - adm1 * l)/ (d * ad) */
   mpz_mul (m, adm1, l);
@@ -249,8 +262,9 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
   mpz_divexact_ui (m, m, d);
   ASSERT_ALWAYS (mpz_divisible_p (m, ad));
   mpz_divexact (m, m, ad);
+#ifdef DEBUG_POLYSELECT
   gmp_printf ("m = (mprime - adm1*l) / (d*ad)\nm == %Zd\n", m);
-
+#endif
 
   /* Set vector a = (-m, l, 0, ..., 0) */
   mpz_neg (tmp, m);
@@ -306,38 +320,63 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
 
   mpz_vector_get_mpz_poly(f, a);
   mpz_vector_get_mpz_poly(g, b);
+#ifdef DEBUG_POLYSELECT
   printf ("a = ");
   mpz_poly_fprintf (stdout, f);
   printf ("b = ");
   mpz_poly_fprintf (stdout, g);
-
-
+#endif
 
   mpz_vector_reduce_with_max_skew (reduced_a, reduced_b, skew, a, b, maxS, d);
 
   mpz_vector_get_mpz_poly(f, reduced_a);
   mpz_vector_get_mpz_poly(g, reduced_b);
-   
+
+#ifdef DEBUG_POLYSELECT
   gmp_printf ("skew = %Zd\nf = ", skew);
   mpz_poly_fprintf (stdout, f);
   printf ("g = ");
   mpz_poly_fprintf (stdout, g);
+#endif
 
   mpz_invert (root, l, N);
   mpz_mul (root, root, m);
   mpz_mod (root, root, N);
+#ifdef DEBUG_POLYSELECT
   gmp_printf ("root = (m / l) %% N\nroot == %Zd\n", root);
 
-  gmp_fprintf (stderr, "## Begin poly file for ad = %Zd and l = %Zd\n",
-               ad, l);
-  gmp_fprintf(stderr, "n: %Zd\nm: %Zd\nskew: %Zd\n", N, root, skew);
-  for (int i = 0; i <= f->deg; i++)
-    gmp_fprintf (stderr, "c%d: %Zd\n", i, f->coeff[i]);
-  for (int i = 0; i <= g->deg; i++)
-    gmp_fprintf (stderr, "Y%d: %Zd\n", i, g->coeff[i]);
-  fprintf (stderr, "## End poly file\n");
+  gmp_printf ("## Begin poly file for ad = %Zd and l = %Zd\n", ad, l);
+#endif
 
+  double skewness, logmu[2], alpha[2], E;
 
+  skewness = L2_combined_skewness2 (f, g, SKEWNESS_DEFAULT_PREC);
+  logmu[0] = L2_lognorm (g, skewness);
+  logmu[1] = L2_lognorm (f, skewness);
+  alpha[0] = get_alpha (g, ALPHA_BOUND_SMALL);
+  alpha[1] = get_alpha (f, ALPHA_BOUND_SMALL);
+  E = logmu[1] + alpha[1] + logmu[0] + alpha[0];
+
+  if (E < best_E)
+    {
+      best_E = E;
+      gmp_printf("n: %Zd\n", N);
+      for (int i = 0; i <= f->deg; i++)
+        gmp_printf ("c%d: %Zd\n", i, f->coeff[i]);
+      for (int i = 0; i <= g->deg; i++)
+        gmp_printf ("Y%d: %Zd\n", i, g->coeff[i]);
+      printf ("skew: %1.2f\n", skewness);
+      printf ("# f lognorm %1.2f, alpha %1.2f, score %1.2f\n",
+              logmu[1], alpha[1], logmu[1] + alpha[1]);
+      printf ("# g lognorm %1.2f, alpha %1.2f, score %1.2f\n",
+              logmu[0], alpha[0], logmu[0] + alpha[0]);
+      printf ("# f+g score %1.2f\n", E);
+#ifdef DEBUG_POLYSELECT
+      printf ("## End poly file\n");
+#else
+      printf ("\n");
+#endif
+    }
   
   mpz_clear (root);
   mpz_clear (skew);
@@ -362,86 +401,6 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
   mpz_vector_clear (b);
   mpz_vector_clear (reduced_a);
   mpz_vector_clear (reduced_b);
-#if 0
-
-  logmu = L2_lognorm (F, skew);
-
-  pthread_mutex_lock (&lock);
-  /* information on all polynomials */
-  collisions ++;
-  tot_found ++;
-  pthread_mutex_unlock (&lock);
-
-  mpz_poly_content (t, F);
-  /* if the polynomial has small norm, and content 1 we keep it */
-  if (logmu < best_raw_logmu[keep - 1] && mpz_cmp_ui (t, 1) == 0)
-  {
-    for (j = keep - 1; j > 0 && logmu < best_raw_logmu[j-1]; j--)
-      best_raw_logmu[j] = best_raw_logmu[j-1];
-    best_raw_logmu[j] = logmu;
-
-    pthread_mutex_lock (&lock);
-    /* MurphyE */
-    mpz_set (curr_poly->rat->coeff[0], g[0]);
-    mpz_set (curr_poly->rat->coeff[1], g[1]);
-    for (j = d + 1; j -- != 0; )
-      mpz_set (curr_poly->alg->coeff[j], f[j]);
-    curr_poly->skew = skew;
-    E =  MurphyE (curr_poly, bound_f, bound_g, area, MURPHY_K);
-
-    mpz_neg (m, g[0]);
-
-    if (E > best_E)
-    {
-      best_E = E;
-      cado_poly_set (best_poly, curr_poly);
-    }
-    pthread_mutex_unlock (&lock);
-
-    /* print polynomial */
-    if (verbose >= 0)
-      {
-        pthread_mutex_lock (&lock);
-        printf ("# Raw polynomial:\n");
-        gmp_printf ("%sn: %Zd\n", phash, N);
-        //print_poly_info (fold, d, gold, 1, phash);
-        gmp_printf ("# Optimized polynomial:\n");
-        gmp_printf ("%sn: %Zd\n", phash, N);
-        //print_poly_info (f, d, g, 0, phash);
-        printf ("# Murphy's E(Bf=%.2e,Bg=%.2e,area=%.2e)=%.2e (best so far %.2e)\n",
-                bound_f, bound_g, area, E, best_E);
-        printf ("\n");
-        fflush (stdout);
-        pthread_mutex_unlock (&lock);
-      }
-  }
-  else /* otherwise we skip it */
-  {
-    if (verbose >= 1)
-    {
-      pthread_mutex_lock (&lock);
-      gmp_printf ("# Skip polynomial: %.2f, ad: %Zd, l: %Zd, m: %Zd\n",
-                    logmu, ad, l, m);
-      pthread_mutex_unlock (&lock);
-    }
-  }
-
-  mpz_clear (l);
-  mpz_clear (m);
-  mpz_clear (t);
-  mpz_clear (k);
-  mpz_clear (adm1);
-  mpz_clear (adz);
-  mpz_clear (mtilde);
-  mpz_clear (g[0]);
-  mpz_clear (g[1]);
-  mpz_clear (gold[0]);
-  mpz_clear (gold[1]);
-  mpz_poly_clear (F);
-  for (j = 0; j <= d; j++)
-    mpz_clear (fold[j]);
-  free (fold);
-#endif
 }
 
 void
@@ -519,7 +478,7 @@ collision_on_p ( header_t header,
   free (rp);
 
   if (verbose > 2)
-    fprintf (stderr, "# computing %lu p-roots took %dms\n", tot_roots, st);
+    printf ("# computing %lu p-roots took %dms\n", tot_roots, st);
 
   if (found) /* do the real work */
     {
@@ -546,13 +505,13 @@ collision_on_p ( header_t header,
             }
         }
 #ifdef DEBUG_POLYSELECT
-      fprintf (stderr, "# collision_on_p took %lums\n", milliseconds () - st);
-      gmp_fprintf (stderr, "# p hash_size: %u for ad = %Zd\n", H->size, header->ad);
+      printf ("# collision_on_p took %lums\n", milliseconds () - st);
+      gmp_printf ("# p hash_size: %u for ad = %Zd\n", H->size, header->ad);
 #endif
 
 #ifdef DEBUG_HASH_TABLE
-      fprintf (stderr, "# p hash_size: %u, hash_alloc: %u\n", H->size, H->alloc);
-      fprintf (stderr, "# hash table coll: %lu, all_coll: %lu\n", H->coll, H->coll_all);
+      printf ("# p hash_size: %u, hash_alloc: %u\n", H->size, H->alloc);
+      printf ("# hash table coll: %lu, all_coll: %lu\n", H->coll, H->coll_all);
 #endif
       hash_clear (H);
     }
@@ -768,23 +727,19 @@ collision_on_each_sq ( header_t header,
     }
 
 #ifdef DEBUG_POLYSELECT
-  fprintf (stderr, "# inner collision_on_each_sq took %lums\n", milliseconds () - st);
-  fprintf (stderr, "# - q hash_alloc (q=%lu): %u\n", q, H->alloc);
+  printf ("# inner collision_on_each_sq took %lums\n", milliseconds () - st);
+  printf ("# - q hash_alloc (q=%lu): %u\n", q, H->alloc);
 #endif
 
 #ifdef DEBUG_HASH_TABLE
-  fprintf (stderr, "# p hash_size: %u, hash_alloc: %u\n", H->size, H->alloc);
-  fprintf (stderr, "# hash table coll: %lu, all_coll: %lu\n", H->coll, H->coll_all);
+  printf ("# p hash_size: %u, hash_alloc: %u\n", H->size, H->alloc);
+  printf ("# hash table coll: %lu, all_coll: %lu\n", H->coll, H->coll_all);
 #endif
 
   pc2 = expected_collisions (Primes[lenPrimes - 1]);
   pthread_mutex_lock (&lock);
   potential_collisions += pc2;
   pthread_mutex_unlock (&lock);
-
-  /*
-  fprintf (stderr, "%lu %lu\n", sum1 / 3000000, sum2 / 3000000);
-  */
 }
 
 
@@ -862,8 +817,8 @@ collision_on_each_sq_r ( header_t header,
   }
 
   if (verbose > 2) {
-    fprintf (stderr, "#  substage: batch %d many (rp-rq)*1/q^2 took %lums\n",
-             count, milliseconds () - st);
+    printf ("#  substage: batch %d many (rp-rq)*1/q^2 took %lums\n",
+            count, milliseconds () - st);
     st = milliseconds();
   }
 
@@ -873,8 +828,8 @@ collision_on_each_sq_r ( header_t header,
   }
 
   if (verbose > 2)
-    fprintf (stderr, "#  substage: collision-detection %d many rq took %lums\n",
-             count, milliseconds () - st);
+    printf ("#  substage: collision-detection %d many rq took %lums\n",
+            count, milliseconds () - st);
 
   for (k = 0; k < count; k++)
     free (tinv_qq[k]);
@@ -960,13 +915,13 @@ collision_on_batch_sq_r ( header_t header,
   }
 
 #if 0
-  fprintf (stderr, "q: %lu, ", q);
+  printf ("q: %lu, ", q);
   for (i = 0; i < lq; i ++)
-    fprintf (stderr, "%u ", SQ_R->q[idx_q[i]]);
-  fprintf (stderr, ", ");
+    printf ("%u ", SQ_R->q[idx_q[i]]);
+  printf (", ");
   for (i = 0; i < lq; i ++)
-    fprintf (stderr, "%u ", SQ_R->nr[idx_q[i]]);
-  fprintf (stderr, "\n");
+    printf ("%u ", SQ_R->nr[idx_q[i]]);
+  printf ("\n");
 #endif
 
   /* we proceed with BATCH_SIZE many rq for each time */
@@ -1049,8 +1004,8 @@ collision_on_batch_sq ( header_t header,
   }
 
   if (verbose > 2)
-    fprintf (stderr, "# stage (1/q^2 inversion) for %lu primes took %lums\n",
-             lenPrimes, milliseconds () - st);
+    printf ("# stage (1/q^2 inversion) for %lu primes took %lums\n",
+            lenPrimes, milliseconds () - st);
 
   /* Step 2: find collisions on q. */
   int st2 = milliseconds();
@@ -1058,8 +1013,8 @@ collision_on_batch_sq ( header_t header,
   collision_on_batch_sq_r ( header, R, SQ_R, q, idx_q, invqq, number_pr,
                             &curr_nq, lq );
   if (verbose > 2)
-    fprintf (stderr, "#  stage (special-q) for %d special-q's took %lums\n",
-             curr_nq, milliseconds() - st2);
+    printf ("#  stage (special-q) for %d special-q's took %lums\n",
+            curr_nq, milliseconds() - st2);
 
   free (invqq);
 }
@@ -1187,7 +1142,6 @@ usage (const char *argv, const char * missing, param_list pl)
 int
 main (int argc, char *argv[])
 {
-  int argc0 = argc;
   char **argv0 = argv;
   double st0 = seconds (), maxtime = DBL_MAX;
   mpz_t N, admin, admax;
@@ -1229,7 +1183,7 @@ main (int argc, char *argv[])
   int have_n = param_list_parse_mpz(pl, "n", N);
 
   if (!have_n) {
-    fprintf(stderr, "# Reading n from stdin\n");
+    printf ("# Reading n from stdin\n");
     param_list_read_stream(pl, stdin, 0);
     have_n = param_list_parse_mpz(pl, "n", N);
   }
@@ -1246,12 +1200,6 @@ main (int argc, char *argv[])
 
   param_list_parse_int (pl, "t", &nthreads);
   param_list_parse_int (pl, "nq", &nq);
-  param_list_parse_int (pl, "keep", &keep);
-  if (keep <= 0 || keep > KEEP)
-    {
-      fprintf (stderr, "Error, keep should be in [1,%d]\n", KEEP);
-      exit (1);
-    }
   param_list_parse_int (pl, "s", &target_time);
   incr_target_time = target_time;
   param_list_parse_uint (pl, "degree", &d);
@@ -1319,10 +1267,6 @@ main (int argc, char *argv[])
   if (mpz_cmp_ui(maxS, 0) == 0 || mpz_cmp(maxS, tmp) > 0)
     mpz_set (maxS, tmp);
   mpz_clear (tmp);
-
-  /* initialize best norms */
-  for (i = 0; i < keep; i++)
-    best_raw_logmu[i] = 999.99; /* best logmu before size optimization */
 
   /* init primes */
   double Pd;
@@ -1421,29 +1365,15 @@ main (int argc, char *argv[])
             / (double) milliseconds ());
   }
 
-  printf ("# Stat: tried %d ad-value(s), found %d polynomial(s)", tries,
+  printf ("# Stat: tried %d ad-value(s), found %d polynomial(s)\n", tries,
           tot_found);
-
-  /* print best keep values of logmu */
-  if (collisions_good > 0)
-  {
-    printf ("# Stat: best raw logmu:");
-    for (i = 0; i < keep; i++)
-      printf (" %1.2f", best_raw_logmu[i]);
-    printf ("\n");
-  }
 
   /* print total time (this gets parsed by the scripts) */
   printf ("# Stat: total phase took %.2fs\n", seconds () - st0);
 
-  if (best_E == 0.0)
+  if (best_E == DBL_MAX)
     /* This line is required by the script: */
     printf ("# No polynomial found, please increase the ad range or decrease P\n");
-  else {
-    /* This line is required by the script: */
-    printf ("# Best polynomial found:\n");
-    print_cadopoly_extra (stdout, best_poly, argc0, argv0, st0);
-  }
 
   for (i = 0; i < nthreads ; i++)
     {
