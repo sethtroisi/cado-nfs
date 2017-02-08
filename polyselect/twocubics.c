@@ -149,7 +149,7 @@ compute_default_max_skew (mpz_t skew, mpz_t N, int d)
 /* rq is a root of N = (m0 + rq)^d mod (q^2) */
 void
 match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
-       mpz_t ad, unsigned long d, mpz_t N, uint64_t q, mpz_t rq)
+       mpz_t ad, unsigned long d, mpz_t N, unsigned long q, mpz_t rq)
 {
 #if 0
   unsigned long j;
@@ -188,7 +188,7 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
 
 #ifdef DEBUG_POLYSELECT
   gmp_printf ("#### MATCH ######\nN = %Zd\nd = %d\nad = %Zd\n"
-              "p1 = %lu\np2 = %lu\nq = %" PRIu64 "\ni = %" PRId64 "\n"
+              "p1 = %lu\np2 = %lu\nq = %lu\ni = %" PRId64 "\n"
               "rq = %Zd\n", N, d, ad, p1, p2, q, i, rq);
 #endif
 
