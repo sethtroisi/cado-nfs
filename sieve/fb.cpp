@@ -18,7 +18,7 @@
 #include "getprime.h"
 #include "gmp_aux.h"
 #include "gzip.h"
-#include "threadpool.h"
+#include "threadpool.hpp"
 
 
 static unsigned int fb_log_2 (fbprime_t);
@@ -1294,7 +1294,7 @@ public:
 };
 
 static task_result *
-process_one_task(const task_parameters *_param)
+process_one_task(const worker_thread * worker MAYBE_UNUSED, const task_parameters *_param)
 {
   const make_linear_thread_param *param =
     static_cast<const make_linear_thread_param *>(_param);

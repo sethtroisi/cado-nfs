@@ -5,7 +5,7 @@
 #include "bucket.h"
 #include "modredc_ul.h"
 #include "modredc_2ul2.h"
-#include "threadpool.h"
+#include "threadpool.hpp"
 #include "las-config.h"
 #include "las-types.h"
 #include "las-coordinates.h"
@@ -22,7 +22,9 @@
 #endif
 
 // FIXME: this function of las.cpp should be somewhere
-void * process_bucket_region(thread_data *th);
+void * process_bucket_region(timetree_t&, thread_data *th);
+
+
 
 
 /***************************************************************************/
@@ -397,9 +399,11 @@ public:
 // top-level, since the plattices have already been precomputed.
 template<int LEVEL>
 task_result *
-fill_in_buckets_one_slice_internal(const task_parameters *const _param)
+fill_in_buckets_one_slice_internal(const worker_thread * worker, const task_parameters * _param)
 {
     const fill_in_buckets_parameters *param = static_cast<const fill_in_buckets_parameters *>(_param);
+    ACTIVATE_TIMER(worker->timer);
+    SIMPLE_CHILD_TIMER(worker->timer, __func__);
     where_am_I w;
     WHERE_AM_I_UPDATE(w, si, param->si);
     WHERE_AM_I_UPDATE(w, side, param->side);
@@ -425,9 +429,12 @@ fill_in_buckets_one_slice_internal(const task_parameters *const _param)
 // At some point, the code should be re-organized, I'm afraid.
 template<int LEVEL>
 task_result *
-fill_in_buckets_one_slice(const task_parameters *const _param)
+fill_in_buckets_one_slice(const worker_thread * worker MAYBE_UNUSED, const task_parameters * _param)
 {
     const fill_in_buckets_parameters *param = static_cast<const fill_in_buckets_parameters *>(_param);
+    ACTIVATE_TIMER(worker->timer);
+    SIMPLE_CHILD_TIMER(worker->timer, __func__);
+
     where_am_I w;
     WHERE_AM_I_UPDATE(w, si, param->si);
     WHERE_AM_I_UPDATE(w, side, param->side);
@@ -616,7 +623,7 @@ downsort_tree(uint32_t bucket_index,
     for (int i = 0; i < ws.thrs[0].las->nb_threads; ++i) {
       ws.thrs[i].first_region0_index = first_region0_index;
     }
-    ws.thread_do(&process_bucket_region);
+    ws.thread_do_using_pool(pool, &process_bucket_region);
   }
 }
 

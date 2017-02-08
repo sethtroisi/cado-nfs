@@ -2,7 +2,7 @@
 #define LAS_FILL_IN_BUCKETS_H_
 
 #include "las-types.h"
-#include "las-threads.h"
+#include "las-threads.hpp"
 
 typedef std::vector<plattices_vector_t *> precomp_plattice_t [2][FB_MAX_PARTS];
 

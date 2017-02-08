@@ -8,6 +8,7 @@
 #include <errno.h>
 
 #include "macros.h"
+#include "tdict.hpp"
 
 class ThreadNonCopyable {
  protected:
@@ -94,19 +95,31 @@ class task_result {
   virtual ~task_result(){};
 };
 
-typedef task_result *(*task_function_t)(const task_parameters *);
-
 class thread_task;
 class worker_thread;
 class tasks_queue;
 class results_queue;
+class thread_pool;
+
+typedef task_result *(*task_function_t)(const worker_thread * worker, const task_parameters *);
+
+class worker_thread : private ThreadNonCopyable {
+  friend class thread_pool;
+  thread_pool &pool;
+  pthread_t thread;
+  const size_t preferred_queue;
+public:
+  mutable timetree_t timer;
+  int rank() const;
+  worker_thread(thread_pool &, size_t);
+  ~worker_thread();
+};
 
 
 class thread_pool : private monitor, private ThreadNonCopyable {
   friend class worker_thread;
-  typedef worker_thread *worker_thread_ptr;
 
-  worker_thread_ptr *threads;
+  worker_thread * threads;
   tasks_queue *tasks;
   results_queue *results;
 
@@ -121,8 +134,16 @@ class thread_pool : private monitor, private ThreadNonCopyable {
 public:
   thread_pool(size_t _nr_threads, size_t nr_queues = 1);
   ~thread_pool();
-  void add_task(task_function_t func, const task_parameters *const params, const int id, const size_t queue = 0, double cost = 0.0);
+  void add_task(task_function_t func, const task_parameters * params, const int id, const size_t queue = 0, double cost = 0.0);
   task_result *get_result(size_t queue = 0, bool blocking = true);
+
+  void accumulate(timetree_t & rep) {
+      for (size_t i = 0; i < nr_threads; ++i) {
+          ASSERT_ALWAYS(!threads[i].timer.running());
+          rep += threads[i].timer;
+          threads[i].timer = timetree_t ();
+      }
+  }
 };
 
 #endif

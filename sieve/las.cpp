@@ -11,7 +11,7 @@
 #include <stdarg.h> /* Required so that GMP defines gmp_vfprintf() */
 #include <algorithm>
 #include <vector>
-#include "threadpool.h"
+#include "threadpool.hpp"
 #include "fb.h"
 #include "portability.h"
 #include "utils.h"           /* lots of stuff */
@@ -34,9 +34,10 @@
 #include "las-descent-trees.h"
 #include "las-cofactor.h"
 #include "las-fill-in-buckets.h"
-#include "las-threads.h"
+#include "las-threads.hpp"
 #include "las-todo.h"
 #include "memusage.h"
+#include "tdict.hpp"
 #ifdef  DLP_DESCENT
 #include "las-dlog-base.h"
 #endif
@@ -2556,8 +2557,11 @@ void SminusS (unsigned char *S1, unsigned char *EndS1, unsigned char *S2) {
  * The other threads are accessed by combining the thread pointer th and
  * the thread id: the i-th thread is at th - id + i
  */
-void * process_bucket_region(thread_data *th)
+void * process_bucket_region(timetree_t& timer, thread_data *th)
 {
+    ACTIVATE_TIMER(timer);
+    SIMPLE_SIBLING_TIMER(timer, __func__);
+
     where_am_I w MAYBE_UNUSED;
     las_info_srcptr las = th->las;
     sieve_info_ptr si = th->si;
@@ -2591,6 +2595,8 @@ void * process_bucket_region(thread_data *th)
             continue;
         WHERE_AM_I_UPDATE(w, N, i);
 
+        SIMPLE_CHILD_TIMER(timer, "one bucket");
+
         if (recursive_descent) {
             /* For the descent mode, we bail out as early as possible. We
              * need to do so in a multithread-compatible way, though.
@@ -2610,6 +2616,7 @@ void * process_bucket_region(thread_data *th)
             sieve_side_info_ptr s = si->sides[side];
             thread_side_data &ts = th->sides[side];
         
+            SIMPLE_SIBLING_TIMER(timer, "init norms");
             /* Init norms */
             rep->tn[side] -= seconds_thread ();
 #ifdef SMART_NORM
@@ -2631,6 +2638,7 @@ void * process_bucket_region(thread_data *th)
                        sidenames[side], w->N, trace_Nx.x, S[side][trace_Nx.x]);
 #endif
 
+            SIMPLE_SIBLING_TIMER(timer, "apply buckets");
             /* Apply buckets */
             rep->ttbuckets_apply -= seconds_thread();
             const bucket_array_t<1, shorthint_t> *BA =
@@ -2643,6 +2651,7 @@ void * process_bucket_region(thread_data *th)
 
             /* Apply downsorted buckets, if necessary. */
             if (si->toplevel > 1) {
+                SIMPLE_SIBLING_TIMER(timer, "apply downsorted buckets");
                 const bucket_array_t<1, longhint_t> *BAd =
                     th->ws->cbegin_BA<1, longhint_t>(side);
                 const bucket_array_t<1, longhint_t> * const BAd_end =
@@ -2658,8 +2667,11 @@ void * process_bucket_region(thread_data *th)
 	    SminusS(S[side], S[side] + BUCKET_REGION, SS);
             rep->ttbuckets_apply += seconds_thread();
 
+            SIMPLE_SIBLING_TIMER(timer, "small sieve");
             /* Sieve small primes */
             sieve_small_bucket_region(SS, i, s->ssd, ts.ssdpos, si, side, w);
+
+            SIMPLE_SIBLING_TIMER(timer, "S minus S");
 	    SminusS(S[side], S[side] + BUCKET_REGION, SS);
 #if defined(TRACE_K) 
             if (trace_on_spot_N(w->N))
@@ -2667,13 +2679,18 @@ void * process_bucket_region(thread_data *th)
                       "# Final value on %s side, N=%u rat_S[%u]=%u\n",
                       sidenames[side], w->N, trace_Nx.x, S[side][trace_Nx.x]);
 #endif
+
+            BOOKKEEPING_TIMER(timer);
         }
+
+        SIMPLE_SIBLING_TIMER(timer, "factor survivors");
 
         /* Factor survivors */
         rep->ttf -= seconds_thread ();
         rep->reports += factor_survivors (th, i, w);
         rep->ttf += seconds_thread ();
 
+        SIMPLE_SIBLING_TIMER(timer, "reset resieving");
         /* Reset resieving data */
         for(int side = 0 ; side < 2 ; side++) {
             sieve_side_info_ptr s = si->sides[side];
@@ -2683,7 +2700,6 @@ void * process_bucket_region(thread_data *th)
             memcpy(ts.rsdpos, ts.ssdpos + b[0], (b[1]-b[0]) * sizeof(int64_t));
         }
     }
-
     return NULL;
 }/*}}}*/
 
@@ -2941,6 +2957,10 @@ int main (int argc0, char *argv0[])/*{{{*/
     where_am_I w MAYBE_UNUSED;
     WHERE_AM_I_UPDATE(w, las, las);
 
+    timetree_t global_timer;
+
+    global_timer.start();
+
     /* This is used only for the descent. It's harmless otherwise. */
     las->tree = new descent_tree();
 
@@ -2958,6 +2978,8 @@ int main (int argc0, char *argv0[])/*{{{*/
      * _blocking_ read on the file, until EOF. This mode is also used for
      * the descent, which has the implication that the read occurs if and
      * only if the todo list is empty. }}} */
+
+    thread_pool *pool = new thread_pool(las->nb_threads);
 
     /* pop() is achieved by sieve_info_pick_todo_item */
     for( ; las_todo_feed(las, pl) ; ) {
@@ -3046,6 +3068,12 @@ int main (int argc0, char *argv0[])/*{{{*/
             }
         }
 
+        timetree_t timer_special_q;
+
+        ACTIVATE_TIMER(timer_special_q);
+
+        SIMPLE_SIBLING_TIMER(timer_special_q, "skew Gauss");
+
         double qt0 = seconds();
         tt_qstart = seconds();
 
@@ -3110,6 +3138,9 @@ int main (int argc0, char *argv0[])/*{{{*/
             mpz_poly_fprintf(las->output, si->sides[1]->fij);
         }
 
+        /* done with skew gauss ! */
+        BOOKKEEPING_TIMER(timer_special_q);
+
 #ifdef TRACE_K
         init_trace_k(si, pl);
 #endif
@@ -3123,16 +3154,17 @@ int main (int argc0, char *argv0[])/*{{{*/
          * las_report_accumulate_threads_and_display further down, hence
          * this hack).
          */
-
+    
         workspaces->thrs[0].rep->ttbuckets_fill -= seconds();
 
         /* Allocate buckets */
         workspaces->pickup_si(si);
 
-        thread_pool *pool = new thread_pool(las->nb_threads);
-
+        SIMPLE_SIBLING_TIMER(timer_special_q, "fill_in_buckets outer container");
         /* Fill in buckets on both sides at top level */
         fill_in_buckets_both(*pool, *workspaces, si);
+
+        pool->accumulate(*timer_special_q.current);
 
         /* Check that buckets are not more than full.
          * Due to templates and si->toplevel being not constant, need a
@@ -3159,6 +3191,8 @@ int main (int argc0, char *argv0[])/*{{{*/
         
         workspaces->thrs[0].rep->ttbuckets_fill += seconds();
 
+        SIMPLE_SIBLING_TIMER(timer_special_q, "prepare small sieve");
+
         /* Prepare small sieve and re-sieve */
         for(int side = 0 ; side < 2 ; side++) {
             sieve_side_info_ptr s = si->sides[side];
@@ -3182,11 +3216,15 @@ int main (int argc0, char *argv0[])/*{{{*/
                         s->fb_parts_x->rs);
             }
         }
+        BOOKKEEPING_TIMER(timer_special_q);
 
         if (si->toplevel == 1) {
+            SIMPLE_SIBLING_TIMER(timer_special_q, "process_bucket_region outer container");
             /* Process bucket regions in parallel */
-            workspaces->thread_do(&process_bucket_region);
+            workspaces->thread_do_using_pool(*pool, &process_bucket_region);
+            pool->accumulate(*timer_special_q.current);
         } else {
+            SIMPLE_SIBLING_TIMER(timer_special_q, "process_bucket_region outer container (non-MT)");
             // Prepare plattices at internal levels
             // TODO: this could be multi-threaded
             plattice_x_t max_area = plattice_x_t(si->J)<<si->conf->logI;
@@ -3209,24 +3247,29 @@ int main (int argc0, char *argv0[])/*{{{*/
                 }
             }
 
+            {
+                SIMPLE_CHILD_TIMER(timer_special_q, "process_bucket_region outer container (MT)");
+                // Prepare plattices at internal levels
 
-            // Visit the downsorting tree depth-first.
-            // If toplevel = 1, then this is just processing all bucket
-            // regions.
-            uint64_t BRS[FB_MAX_PARTS] = BUCKET_REGIONS;
-            for (uint32_t i = 0; i < si->nb_buckets[si->toplevel]; i++) {
-                switch (si->toplevel) {
-                    case 2:
-                        downsort_tree<1>(i, i*BRS[2]/BRS[1],
-                                *workspaces, *pool, si, precomp_plattice);
-                        break;
-                    case 3:
-                        downsort_tree<2>(i, i*BRS[3]/BRS[1],
-                                *workspaces, *pool, si, precomp_plattice);
-                        break;
-                    default:
-                        ASSERT_ALWAYS(0);
+                // Visit the downsorting tree depth-first.
+                // If toplevel = 1, then this is just processing all bucket
+                // regions.
+                uint64_t BRS[FB_MAX_PARTS] = BUCKET_REGIONS;
+                for (uint32_t i = 0; i < si->nb_buckets[si->toplevel]; i++) {
+                    switch (si->toplevel) {
+                        case 2:
+                            downsort_tree<1>(i, i*BRS[2]/BRS[1],
+                                    *workspaces, *pool, si, precomp_plattice);
+                            break;
+                        case 3:
+                            downsort_tree<2>(i, i*BRS[3]/BRS[1],
+                                    *workspaces, *pool, si, precomp_plattice);
+                            break;
+                        default:
+                            ASSERT_ALWAYS(0);
+                    }
                 }
+                pool->accumulate(*timer_special_q.current);
             }
 
             // Cleanup precomputed lattice bases.
@@ -3244,7 +3287,7 @@ int main (int argc0, char *argv0[])/*{{{*/
             }
         }
 
-        delete pool;
+        BOOKKEEPING_TIMER(timer_special_q);
 
         // Cleanup smallsieve data
         for (int i = 0; i < las->nb_threads; ++i) {
@@ -3258,6 +3301,7 @@ int main (int argc0, char *argv0[])/*{{{*/
 
 
 #ifdef  DLP_DESCENT
+        SIMPLE_SIBLING_TIMER(timer_special_q, "descent");
         descent_tree::candidate_relation const& winner(las->tree->current_best_candidate());
         if (winner) {
             /* Even if not going for recursion, store this as being a
@@ -3316,12 +3360,21 @@ int main (int argc0, char *argv0[])/*{{{*/
         }
 #endif  /* DLP_DESCENT */
 
+        BOOKKEEPING_TIMER(timer_special_q);
+
         /* clear */
         for(int side = 0 ; side < 2 ; side++) {
             small_sieve_clear(si->sides[side]->ssd);
             small_sieve_clear(si->sides[side]->rsd);
         }
         qt0 = seconds() - qt0;
+
+        pool->accumulate(timer_special_q);
+        timer_special_q.stop();
+        verbose_output_print (0, 1, timer_special_q.display().c_str());
+
+        global_timer += timer_special_q;
+
         las_report_accumulate_threads_and_display(las, si, report, workspaces, qt0);
 
 #ifdef TRACE_K
@@ -3331,6 +3384,8 @@ int main (int argc0, char *argv0[])/*{{{*/
             break;
       } // end of loop over special q ideals.
 
+    delete pool;
+
     if (recursive_descent) {
         verbose_output_print(0, 1, "# Now displaying again the results of all descents\n");
         las->tree->display_all_trees(las->output);
@@ -3339,6 +3394,7 @@ int main (int argc0, char *argv0[])/*{{{*/
 
     if (las->batch)
       {
+        SIMPLE_SIBLING_TIMER(global_timer, "batch cofactorization");
 	const char *batch0_file, *batch1_file;
 	batch0_file = param_list_lookup_string (pl, "batch0");
 	batch1_file = param_list_lookup_string (pl, "batch1");
@@ -3377,6 +3433,9 @@ int main (int argc0, char *argv0[])/*{{{*/
     tts -= report->tn[0];
     tts -= report->tn[1];
     tts -= report->ttf;
+
+    global_timer.stop();
+    verbose_output_print (0, 1, global_timer.display().c_str());
 
     if (las->verbose)
         facul_print_stats (las->output);

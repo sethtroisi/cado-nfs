@@ -2,7 +2,7 @@
 #include <pthread.h>
 #include <string.h>
 #include "tests_common.h"
-#include "threadpool.h"
+#include "threadpool.hpp"
 
 class print_parameter : public task_parameters {
 public:
