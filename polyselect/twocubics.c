@@ -1073,7 +1073,6 @@ newAlgo (mpz_t N, unsigned long d, mpz_t ad)
   header_init (header, N, d, ad);
   proots_init (R, lenPrimes);
 
-  ASSERT_ALWAYS (sizeof (unsigned long int) == 8);
   c = collision_on_p (header, R);
   if (nq > 0)
     collision_on_sq (header, R, c);
@@ -1261,15 +1260,20 @@ main (int argc, char *argv[])
   compute_default_max_skew (tmp, N, 2);
   if (mpz_cmp_ui(maxS, 0) == 0 || mpz_cmp(maxS, tmp) > 0)
     mpz_set (maxS, tmp);
-  mpz_clear (tmp);
 
-  /* init primes */
+  /* Initialize primes. Since we use modredc to perform computations mod p^2
+     for p < 2P, we need that 4P^2 fits in an unsigned long. */
   double Pd;
   Pd = (double) P;
-  if (Pd > (double) UINT_MAX) {
-    fprintf (stderr, "Error, too large value of P\n");
-    exit (1);
-  }
+  if (4.0 * Pd * Pd >= (double) ULONG_MAX)
+    {
+      mpz_set_ui (tmp, ULONG_MAX >> 2);
+      mpz_sqrt (tmp, tmp);
+      gmp_fprintf (stderr, "Error, too large value of P, maximum is %Zd\n",
+                   tmp);
+      exit (1);
+    }
+  mpz_clear (tmp);
   if (P <= (unsigned long) SPECIAL_Q[LEN_SPECIAL_Q - 2]) {
     fprintf (stderr, "Error, too small value of P, need P > %u\n",
              SPECIAL_Q[LEN_SPECIAL_Q - 2]);
