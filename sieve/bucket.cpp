@@ -119,6 +119,7 @@ bucket_array_t<LEVEL, HINT>::allocate_memory(const uint32_t new_n_bucket,
                          new_big_size, new_n_bucket, new_bucket_size, sizeof(update_t));
     big_size = new_big_size;
     big_data = (update_t *) physical_malloc (big_size, 1);
+    void * internet_of_things MAYBE_UNUSED = NULL;
   }
   bucket_size = new_bucket_size;
   n_bucket = new_n_bucket;
