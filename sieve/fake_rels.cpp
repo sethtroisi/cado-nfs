@@ -185,8 +185,30 @@ void read_sample_file(vector<unsigned int> &nrels, vector<fake_rel> &rels,
 }
 
 
+void reduce_mod_2(vector <index_t> &frel) {
+    vector <index_t> res;
+    index_t current = frel[0];
+    unsigned int nb = 1;
+    for (unsigned int i = 1; i < frel.size(); ++i) {
+        if (frel[i] != current) {
+            if (nb & 1) {
+                res.push_back(current);
+            }
+            current = frel[i];
+            nb = 1;
+        } else {
+            nb++;
+        }
+    }
+    if (nb & 1) {
+        res.push_back(current);
+    }
+    frel = res;
+}
+
 void print_random_fake_rel(renumber_ptr ren_info, uint64_t q,
-        uint64_t r, int sqside, vector<fake_rel> rels, indexrange *Ind)
+        uint64_t r, int sqside, vector<fake_rel> rels, indexrange *Ind,
+        int dl)
 {
     index_t indq = renumber_get_index_from_p_r(ren_info, q, r, sqside);
     int i = random() % rels.size();
@@ -201,6 +223,9 @@ void print_random_fake_rel(renumber_ptr ren_info, uint64_t q,
         }
     }
     sort(frel.begin(), frel.end());
+    if (!dl) {
+        reduce_mod_2(frel);
+    }
     for (unsigned int i = 0; i < frel.size(); ++i) {
         printf("%" PRid, frel[i]);
         if (i != frel.size()-1) 
@@ -235,6 +260,7 @@ static void declare_usage(param_list pl)
     param_list_decl_usage(pl, "sqside", "side of the special-q");
     param_list_decl_usage(pl, "sample", "file where to find a sample of relations");
     param_list_decl_usage(pl, "renumber", "renumber table");
+    param_list_decl_usage(pl, "dl", "(switch) dl mode");
     verbose_decl_usage(pl);
 }
 
@@ -248,9 +274,12 @@ main (int argc, char *argv[])
   int lpb[2] = {0, 0};
   uint64_t q0 = 0;
   uint64_t q1 = 0;
+  int dl = 0;
 
   param_list_init(pl);
   declare_usage(pl);
+  param_list_configure_switch(pl, "-dl", &dl);
+  
   cado_poly_init(cpoly);
 
   argv++, argc--;
@@ -361,7 +390,7 @@ main (int argc, char *argv[])
       for (int i = 0; i < mult; ++i) {
           int n = random()%nrels.size();
           for (unsigned int j = 0; j < nrels[n]; ++j)
-              print_random_fake_rel(ren_table, q, roots[i], sqside, rels, Ind);
+              print_random_fake_rel(ren_table, q, roots[i], sqside, rels, Ind, dl);
       }
       advance_prime_in_fb(&mult, &q, roots, cpoly, sqside, pdata);
   } while (q < q1);
