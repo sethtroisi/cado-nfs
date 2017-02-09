@@ -306,16 +306,16 @@ tasks.filter.add_ratio = 0.1
 tasks.filter.maxlevel = 20		# perform up to <maxlevel>-way merges
 tasks.filter.target_density = 170       # stop merging when the average density
 				        # per row attains target_density
-tasks.filter.purge.required_excess=0.0 # Controls extra sieving:
-                                       # completes the filtering only when
-                                       # the relative excess (excess divided
-                                       # by number of ideals) is larger than
-                                       # the given value after all singletons
-                                       # have been removed.
-                                       # Default is required_excess=0.0 and
-                                       # completes the factorization as soon
-                                       # as a positive excess is obtained
-                                       # (>= tasks.filter.purge.keep).
+tasks.filter.required_excess=0.0        # Controls extra sieving:
+                                        # completes the filtering only when
+                                        # the relative excess (excess divided
+                                        # by number of ideals) is larger than
+                                        # the given value after all singletons
+                                        # have been removed.
+                                        # Default is required_excess=0.0 and
+                                        # completes the factorization as soon
+                                        # as a positive excess is obtained
+                                        # (>= tasks.filter.purge.keep).
 
 ###########################################################################
 # Linear algebra and characters tasks

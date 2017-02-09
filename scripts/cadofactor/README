@@ -261,12 +261,12 @@ Controlling the filtering stage
 By default CADO-NFS requires an excess (after the first singleton removal)
 of 0% more relations than ideals. This is controlled by:
 
-tasks.filter.purge.required_excess=0.0
+tasks.filter.required_excess=0.0
 
 If you want a larger excess, say 20%, just add on the cado-nfs.py command
 line (or in the parameter file):
 
-tasks.filter.purge.required_excess=0.2
+tasks.filter.required_excess=0.2
 
 Note: if your factorization already started the linear algebra step, and you
 want to do more sieving, you can restart it with a larger "rels_wanted" than
