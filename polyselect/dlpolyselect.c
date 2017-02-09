@@ -84,7 +84,7 @@ unsigned long f_irreducible = 0; /* number of irreducible polynomials */
 double max_guard = DBL_MIN;
 // #define TIMINGS
 #ifdef TIMINGS
-double t_roots = 0.0, t_irred = 0.0;
+double t_roots = 0.0, t_irred = 0.0, t_lll = 0.0;
 #endif
 
 /* Check that f is irreducible.
@@ -468,7 +468,13 @@ polygen_JL_g (mpz_t N, int dg, mat_Z g, mpz_t root)
         }
     }
 
+#ifdef TIMINGS
+    t_lll -= seconds_thread ();
+#endif
     LLL (det, g, NULL, a, b);
+#ifdef TIMINGS
+    t_lll += seconds_thread ();
+#endif
 
     mpz_clear (det);
     mpz_clear (a);
@@ -765,7 +771,7 @@ main (int argc, char *argv[])
               "have missed some polynomials\n");
     printf ("Time %.2fs", t);
 #ifdef TIMINGS
-    printf (" (roots %.2fs, irred %.2fs)", t_roots, t_irred);
+    printf (" (roots %.2fs, irred %.2fs, lll %.2fs)", t_roots, t_irred, t_lll);
 #endif
     printf ("\n");
 
