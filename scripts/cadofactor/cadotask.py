@@ -3422,12 +3422,13 @@ class PurgeTask(Task):
         return "Filtering - Singleton removal"
     @property
     def programs(self):
-        override = ("nrels", "out", "outdel", "nprimes", "filelist")
+        override = ("nrels", "out", "outdel", "nprimes", "filelist", "required_excess")
         return ((cadoprograms.Purge, override, {"_freerel": Request.GET_FREEREL_FILENAME}),)
     @property
     def paramnames(self):
         return self.join_params(super().paramnames, 
-            {"dlp": False, "galois": "none", "gzip": True, "add_ratio": 0.01})
+            {"dlp": False, "galois": "none", "gzip": True, "add_ratio": 0.01,
+                "required_excess": 0.0})
 
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator=mediator, db=db, parameters=parameters,
@@ -3438,6 +3439,10 @@ class PurgeTask(Task):
     
     def run(self):
         super().run()
+
+        # Enforce the fact that our children *MUST* use the same
+        # required_excess value as the one we have.
+        self.progparams[0]["required_excess"]=self.params["required_excess"]
 
         if not (self.params["galois"] in ["1/y", "_y", "autom3.1g", "autom3.2g"]):
             nfree = self.send_request(Request.GET_FREEREL_RELCOUNT)
