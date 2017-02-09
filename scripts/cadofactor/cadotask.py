@@ -3565,6 +3565,13 @@ class PurgeTask(Task):
         # if the excess is negative, we need at least -excess new relations
         if excess < 0:
            additional = max(additional, -excess)
+        else: # excess >= 0 but need more due to required_excess
+           nprimes = nunique - excess
+           # we have nprimes ideals, and we want an excess of at least
+           # required_excess * nprimes
+           required_excess = self.params["required_excess"]
+           target_excess = int(required_excess * nprimes)
+           additional = max(additional, target_excess - excess)
         # Always request at least 10k more
         additional = max(additional, 10000)
         
@@ -3608,7 +3615,7 @@ class PurgeTask(Task):
                     assert input_nrels == nrels
                     input_nprimes = nprimes
         
-        # At this point we shoud have:
+        # At this point we should have:
         # input_nrels, input_nprimes: rels and primes among input
         # nrels, nprimes, excess: rels and primes when purging stopped
         if not input_nprimes is None:
