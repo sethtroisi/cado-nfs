@@ -38,10 +38,12 @@
 
 #if __SIZEOF_INDEX__ == 4
 #define index_t uint32_t
+#define index_signed_t int32_t
 #define PRid PRIx32
 #define SCNid SCNx32
 #else /* __SIZEOF_INDEX__ == 8 */
 #define index_t uint64_t
+#define index_signed_t int64_t
 #define PRid PRIx64
 #define SCNid SCNx64
 #endif 

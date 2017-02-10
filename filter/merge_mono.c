@@ -38,7 +38,7 @@ static unsigned long row_additions = 0;
    for m=4 the best possible merge might be: 0-1, 1-2, 2-3 which is not
    of this shape (but for m <= 3 all possible merges are of this shape). */
 static int
-findBestIndex(filter_matrix_t *mat, int m, int32_t *ind, int32_t ideal)
+findBestIndex(filter_matrix_t *mat, int m, index_t *ind, index_t ideal)
 {
     /* not mallocing A[][] to speed up things */
     int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX], i, j, imin, wmin, w;
@@ -298,8 +298,8 @@ removeSingletons(report_t *rep, filter_matrix_t *mat)
    to find the smaller one; resists to m==1.
  */
 static void
-tryAllCombinations(report_t *rep, filter_matrix_t *mat, int m, int32_t *ind,
-                   int32_t j)
+tryAllCombinations(report_t *rep, filter_matrix_t *mat, int m, index_t *ind,
+                   index_t j)
 {
     int i, k;
 
@@ -327,7 +327,7 @@ tryAllCombinations(report_t *rep, filter_matrix_t *mat, int m, int32_t *ind,
 #if DEBUG >= 1
     printf ("=> new_ind: %d %d\n", ind[0], ind[1]);
 #endif
-    reportn(rep, ind, m, j);
+    reportn(rep, (index_signed_t*) ind, m, j);
     removeRowAndUpdate(mat, ind[0], 1);
     destroyRow(mat, ind[0]);
 }
@@ -337,8 +337,8 @@ tryAllCombinations(report_t *rep, filter_matrix_t *mat, int m, int32_t *ind,
   minimal spanning tree.
   Output: perform the corresponding merges, and stores them in the history. */
 int
-addFatherToSons(int history[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1],
-		filter_matrix_t *mat, int m, int *ind, int32_t ideal,
+addFatherToSons(index_t history[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1],
+		filter_matrix_t *mat, int m, index_t *ind, index_t ideal,
 		int *father, int *sons)
 {
   int i, s, t;
@@ -365,10 +365,10 @@ addFatherToSons(int history[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1],
 }
 
 static void
-MSTWithA (report_t *rep, filter_matrix_t *mat, int m, int32_t *ind, int32_t j, 
+MSTWithA (report_t *rep, filter_matrix_t *mat, int m, index_t *ind, index_t j,
           int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX])
 {
-    int history[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1];
+    index_t history[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1];
     int start[MERGE_LEVEL_MAX], end[MERGE_LEVEL_MAX];
     int hmax, i;
 
@@ -381,7 +381,7 @@ MSTWithA (report_t *rep, filter_matrix_t *mat, int m, int32_t *ind, int32_t j,
 #if 0
 	reporthis(rep, history, i);
 #else
-        reportn(rep, history[i]+1, history[i][0], j);
+    reportn(rep, (index_signed_t*) (history[i]+1), history[i][0], j);
 #endif
     removeRowAndUpdate(mat, ind[0], 1);
     destroyRow(mat, ind[0]);
@@ -389,7 +389,7 @@ MSTWithA (report_t *rep, filter_matrix_t *mat, int m, int32_t *ind, int32_t j,
 
 static void
 useMinimalSpanningTree (report_t *rep, filter_matrix_t *mat, int m,
-                        int32_t *ind, int32_t j)
+                        index_t *ind, index_t j)
 {
     int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX];
 
@@ -399,7 +399,7 @@ useMinimalSpanningTree (report_t *rep, filter_matrix_t *mat, int m,
 
 static void
 findOptimalCombination (report_t *rep, filter_matrix_t *mat, int m,
-                        int32_t *ind, int32_t j)
+                        index_t *ind, index_t j)
 {
   /* we can use here two algorithms:
      (a) tryAllCombinations tries to merge row i with all other (m-1) rows,
@@ -476,10 +476,11 @@ checkWeights (filter_matrix_t *mat)
 static void
 mergeForColumn (report_t *rep, filter_matrix_t *mat, int m, int32_t j)
 {
-    int32_t ind[MERGE_LEVEL_MAX];
+    index_t ind[MERGE_LEVEL_MAX];
     int ni;
 
     ASSERT(mat->wt[j] == m);
+    ASSERT(sizeof(index_t) == sizeof(mat->R[j][0]));
 
     /* each m-merge leads to m-1 additions of rows */
 #if DEBUG >= 1
@@ -498,7 +499,7 @@ mergeForColumn (report_t *rep, filter_matrix_t *mat, int m, int32_t j)
 #endif
 #endif
 
-    memcpy (ind, mat->R[j] + 1, mat->R[j][0] * sizeof (int32_t));
+    memcpy (ind, mat->R[j] + 1, mat->R[j][0] * sizeof (index_t));
 
     /* now ind[0], ..., ind[m-1] are the m rows containing j */
 
@@ -615,10 +616,10 @@ static inline void
 print_report (filter_matrix_t *mat)
 {
   printf ("N=%" PRIu64 " (%" PRId64 ") W=%" PRIu64 " W*N=%.2e "
-          "W/N=%.2f #Q=%d\n", mat->rem_nrows,
+          "W/N=%.2f #Q=%lu\n", mat->rem_nrows,
           ((int64_t) mat->rem_nrows) - ((int64_t) mat->rem_ncols),
           mat->weight, (double) compute_WN (mat), compute_WoverN (mat),
-          MkzQueueCardinality (mat));
+          (unsigned long) MkzQueueCardinality (mat));
   if (mat->verbose)
     print_memory_usage (mat);
   fflush (stdout);
@@ -690,7 +691,7 @@ void
 mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel,
                double target_density)
 {
-  int32_t j, mkz;
+  index_t j, mkz;
   uint64_t WN_prev, WN_cur, WN_min;
   double WoverN;
   unsigned int ncost = 0;
@@ -772,8 +773,8 @@ mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel,
       {
         fprintf (rep->outfile, "## First %d-merge\n", m);
         print_report (mat);
-        printf ("First %d-merge, estimated cost %d, real cost %d\n",
-                m, mkz, real_mkz);
+        printf ("First %d-merge, estimated cost %lu, real cost %d\n",
+                m, (unsigned long) mkz, real_mkz);
         fflush (stdout);
       }
 
@@ -868,8 +869,8 @@ mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel,
 static void
 doAllAdds(report_t *rep, filter_matrix_t *mat, char *str)
 {
-  int32_t j;
-  int32_t ind[MERGE_LEVEL_MAX], i0;
+  index_t j;
+  index_signed_t ind[MERGE_LEVEL_MAX], i0;
   int ni, sg, k;
 
   ni = parse_hisfile_line (ind, str, &j);  

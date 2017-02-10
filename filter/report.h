@@ -7,11 +7,10 @@ typedef struct{
     // '0' for the standard stuff
     FILE *outfile;
     // '1' for MPI
-    int32_t **history;
+    index_t **history;
     int mark;
     int bufsize; // says it!
 } report_t;
 
-extern void report1(report_t *rep, int32_t i, int32_t j);
-extern void report2(report_t *rep, int32_t i1, int32_t i2, int32_t j);
-extern void reportn(report_t *rep, int32_t *ind, int n, int32_t j);
+extern void report1(report_t *rep, index_signed_t i, index_t j);
+extern void reportn(report_t *rep, index_signed_t *ind, int n, index_t j);

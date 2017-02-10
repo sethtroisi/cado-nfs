@@ -30,7 +30,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 /* terrific hack: everybody on the same line
    the first is to be destroyed in replay!!! */
 void
-reportn (report_t *rep, int32_t *ind, int n, MAYBE_UNUSED int32_t j)
+reportn (report_t *rep, index_signed_t *ind, int n, MAYBE_UNUSED index_t j)
 {
     int i;
 
@@ -57,27 +57,18 @@ reportn (report_t *rep, int32_t *ind, int n, MAYBE_UNUSED int32_t j)
 	rep->mark += 1;
 	if(rep->history[rep->mark] == NULL)
 	    rep->history[rep->mark] = 
-		(int32_t *)malloc((rep->bufsize+1)*sizeof(int32_t));
+		(index_t *)malloc((rep->bufsize+1)*sizeof(index_t));
 	rep->history[rep->mark][0] = n;
 	for(i = 0; i < n; i++)
 	    rep->history[rep->mark][i+1] = ind[i];
     }
 }
 
-/* print a new line "i" in the history file */
+/* Print a new line "i" in the history file.
+   This function is always called with i >= 0. */
 void
-report1 (report_t *rep, int32_t i, int32_t j)
+report1 (report_t *rep, index_signed_t i, index_t j)
 {
+  ASSERT(i >= 0);
   reportn (rep, &i, 1, j);
-}
-
-/* print a new line "i1 i2" in the history file */
-void
-report2 (report_t *rep, int32_t i1, int32_t i2, int32_t j)
-{
-    int32_t tmp[2];
-
-    tmp[0] = i1;
-    tmp[1] = i2;
-    reportn (rep, tmp, 2, j);
 }

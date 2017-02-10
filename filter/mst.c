@@ -36,7 +36,7 @@ double trecomputeR = 0;
 
 #if DEBUG >= 1
 static void
-printQueue (uint32_t *Q)
+printQueue (index_t *Q)
 {
   for (unsigned int i = 1; i <= Q[0]; i++)
     fprintf (stderr, "w=%d s=%d t=%d\n", W(Q[i]), S(Q[i]), T(Q[i]));
@@ -44,9 +44,9 @@ printQueue (uint32_t *Q)
 #endif
 
 static void
-upQueue (uint32_t *Q, int k)
+upQueue (index_t *Q, int k)
 {
-  uint32_t x = Q[k];
+  index_t x = Q[k];
 
   while ((k > 1) && (x < Q[k/2]))
     {
@@ -60,7 +60,7 @@ upQueue (uint32_t *Q, int k)
 }
 
 static void
-addEdge (uint32_t *Q, int s, int t, int Auv)
+addEdge (index_t *Q, int s, int t, int Auv)
 {
   Q[0] ++;
   ASSERT(Q[0] < MAX_QUEUE_SIZE);
@@ -70,9 +70,9 @@ addEdge (uint32_t *Q, int s, int t, int Auv)
 
 // Move Q[k] down.
 static void
-downQueue (uint32_t *Q, unsigned int k)
+downQueue (index_t *Q, unsigned int k)
 {
-  uint32_t x = Q[k];
+  index_t x = Q[k];
   unsigned int j;
 
   /* the left son of k is 2k, the right son is 2k+1 */
@@ -99,7 +99,7 @@ downQueue (uint32_t *Q, unsigned int k)
 }
 
 static void
-popQueue(int *s, int *t, uint32_t *Q)
+popQueue(int *s, int *t, index_t *Q)
 {
   *s = S(Q[1]);
   *t = T(Q[1]);
@@ -110,7 +110,7 @@ popQueue(int *s, int *t, uint32_t *Q)
 
 // Add all edges (u,v) with v in V
 static void
-addAllEdges (uint32_t *Q, int u, int *V, int nV,
+addAllEdges (index_t *Q, int u, int *V, int nV,
              int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX])
 {
   for (int i = 0; i < nV; i++)
@@ -172,7 +172,7 @@ minimalSpanningTreeWithPrim(int *start, int *end,
      root node), then at most 2*(m-2) when nU=2 (we remove one node and add
      m-2), ... More generally whehn nU=k it is at most k*m - k*(k-1)/2 - (k-1).
      The maximum is for k=m-2 or m-2 when it equals m^2/2-3/2*m+2 < m^2/2. */
-    uint32_t Q[MAX_QUEUE_SIZE];
+    index_t Q[MAX_QUEUE_SIZE];
     int u, s, t, i, nU, nV, w;
     int V[MERGE_LEVEL_MAX]; /* edges remaining to be dealt with */
     int index[MERGE_LEVEL_MAX];
@@ -231,7 +231,7 @@ minimalSpanningTreeWithPrim(int *start, int *end,
 /* return a list l of all ideals appearing at least *twice* in relations
    ind[0] to ind[j-1], and put in *n the length of l */
 static index_t*
-get_ideals (int *n, index_t **rows, int32_t *ind, int m)
+get_ideals (int *n, index_t **rows, index_t *ind, int m)
 {
   int i, j, s = 0;
 
@@ -294,7 +294,7 @@ mpz_set_bits (mpz_t t, index_t *r, int k, index_t *l, int n)
 
 void
 fillRowAddMatrix(int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX], filter_matrix_t *mat,
-                 int m, int32_t *ind, int32_t ideal MAYBE_UNUSED)
+                 int m, index_t *ind, index_t ideal MAYBE_UNUSED)
 {
   int i, j, n;
   index_t *l;
@@ -342,7 +342,7 @@ fillRowAddMatrix(int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX], filter_matrix_t *mat,
    containing the ideal, for 0 <= i, j < m */
 void
 fillRowAddMatrix(int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX], filter_matrix_t *mat,
-                 int m, int32_t *ind, int32_t ideal)
+                 int m, index_t *ind, index_t ideal)
 {
     int i, j;
 
@@ -382,7 +382,7 @@ minimalSpanningTree(int *start, int *end,
 }
 
 int
-minCostUsingMST (filter_matrix_t *mat, int m, int32_t *ind, int32_t j)
+minCostUsingMST (filter_matrix_t *mat, int m, index_t *ind, index_t j)
 {
     int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX], w;
     int sons[MERGE_LEVEL_MAX];
@@ -398,11 +398,12 @@ minCostUsingMST (filter_matrix_t *mat, int m, int32_t *ind, int32_t j)
 }
 
 void
-printMST (int *father, int *sons, int m, int32_t *ind)
+printMST (int *father, int *sons, int m, index_t *ind)
 {
   for (int i = 0; i < m; i++)
-    printf ("father=%d(%d) son=%d(%d)\n", father[i], ind[father[i]],
-            sons[i], ind[sons[i]]);
+    printf ("father=%d(%lu) son=%d(%lu)\n", father[i],
+            (unsigned long) ind[father[i]], sons[i],
+            (unsigned long) ind[sons[i]]);
 }
 
 #if 0
@@ -412,10 +413,10 @@ printMST (int *father, int *sons, int m, int32_t *ind)
 void
 finalOptimize (filter_matrix_t *mat)
 {
-  uint32_t h, n;
+  index_t h, n;
   index_t i, j, k;
   unsigned int w;
-  uint32_t *ind;
+  index_t *ind;
   typerow_t **rows = mat->rows;
   static unsigned int diff = 0;
 
