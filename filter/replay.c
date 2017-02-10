@@ -371,8 +371,8 @@ renumber (unsigned int small_ncols, int *colweight, uint64_t ncols,
 static void
 doAllAdds(typerow_t **newrows, char *str, index_data_t index_data)
 {
-  int32_t j;
-  int32_t ind[MERGE_LEVEL_MAX], i0;
+  index_t j;
+  index_signed_t ind[MERGE_LEVEL_MAX], i0;
   int ni, destroy;
 
   ni = parse_hisfile_line (ind, str, &j);
