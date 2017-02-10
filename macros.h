@@ -175,6 +175,14 @@ LEXLE3(OMPI_MAJOR_VERSION,OMPI_MINOR_VERSION,OMPI_RELEASE_VERSION,X,Y,Z))
 #endif
 #endif
 
+#ifndef ATTRIBUTE_DEPRECATED
+#if GNUC_VERSION_ATLEAST(3,1,1)
+#define ATTRIBUTE_DEPRECATED __attribute__ ((deprecated))
+#else
+#define ATTRIBUTE_DEPRECATED
+#endif
+#endif
+
 #if defined(__GNUC__)
 
 #ifndef NO_INLINE
