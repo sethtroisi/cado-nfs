@@ -46,8 +46,7 @@ reportn (report_t *rep, index_signed_t *ind, int n, MAYBE_UNUSED index_t j)
 		fprintf(rep->outfile, " ");
 	}
 #ifdef FOR_DL
-    if (j >= 0)
-        fprintf(rep->outfile, " #%d", j);
+        fprintf(rep->outfile, " #%lu", (unsigned long) j);
 #endif
 	fprintf(rep->outfile, "\n");
     }
