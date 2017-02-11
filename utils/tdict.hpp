@@ -1,10 +1,11 @@
 #ifndef TDICT_HPP_
 #define TDICT_HPP_
 
-#include <iostream>
+#include <ostream>
 #include <map>
 #include <string>
 #include <sstream>
+#include "params.h"
 #include "timing.h"
 
 /* This header file defines objects for a "timing dictionary".
@@ -64,6 +65,9 @@
  * so use with extreme care. Also, having it scope-limited is not thread-safe.
  */
 namespace tdict {
+
+    extern int global_enable;
+
     class key {
         int magic;
         public:
@@ -169,7 +173,12 @@ namespace tdict {
 
     struct timer_seconds_thread {
         typedef double type;
-        type operator()() const { return seconds_thread(); }
+        type operator()() const {
+            if (tdict::global_enable)
+                return seconds_thread();
+            else
+                return 0;
+        }
     };
 
     /*
@@ -249,11 +258,12 @@ namespace tdict {
 
             struct accounting_debug {
                 tree& t;
-                inline accounting_debug(tree& t): t(t) {}
+                std::ostream& o;
+                inline accounting_debug(tree& t, std::ostream&o): t(t), o(o) {}
                 inline ~accounting_debug() {
-                    std::cout << "# debug print\n";
-                    std::cout << t.display();
-                    std::cout << "# --\n";
+                    o << "# debug print\n";
+                    o << t.display();
+                    o << "# --\n";
                 }
             };
 
@@ -364,9 +374,12 @@ class : public tdict::slot_base {
     timetree_t::accounting_bookkeeping UNIQUE_ID(sentry) (T);
 #define ACTIVATE_TIMER(T)						\
     timetree_t::accounting_activate UNIQUE_ID(sentry) (T);
-#define DEBUG_DISPLAY_TIMER_AT_DTOR(T)					\
-    timetree_t::accounting_debug UNIQUE_ID(sentry) (T);
+#define DEBUG_DISPLAY_TIMER_AT_DTOR(T,o)				\
+    timetree_t::accounting_debug UNIQUE_ID(sentry) (T, o);
 
+
+void tdict_decl_usage(param_list pl);
+void tdict_configure_switch(param_list pl);
 
 
 #endif	/* TDICT_HPP_ */

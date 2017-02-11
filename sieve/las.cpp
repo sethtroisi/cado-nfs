@@ -2910,6 +2910,7 @@ static void declare_usage(param_list pl)
   las_dlog_base::declare_parameter_usage(pl);
 #endif /* DLP_DESCENT */
   verbose_decl_usage(pl);
+  tdict_decl_usage(pl);
 }
 
 int main (int argc0, char *argv0[])/*{{{*/
@@ -2955,6 +2956,7 @@ int main (int argc0, char *argv0[])/*{{{*/
     param_list_configure_switch(pl, "-recursive-descent", &recursive_descent);
     param_list_configure_switch(pl, "-never-discard", &never_discard);
 #endif
+    tdict_configure_switch(pl);
 
     argv++, argc--;
     for( ; argc ; ) {
@@ -3443,7 +3445,9 @@ int main (int argc0, char *argv0[])/*{{{*/
 
         pool->accumulate(timer_special_q);
         timer_special_q.stop();
-        verbose_output_print (0, 1, timer_special_q.display().c_str());
+
+        if (tdict::global_enable >= 2)
+            verbose_output_print (0, 1, timer_special_q.display().c_str());
 
         global_timer += timer_special_q;
 
@@ -3509,7 +3513,8 @@ int main (int argc0, char *argv0[])/*{{{*/
     tts -= report->ttf;
 
     global_timer.stop();
-    verbose_output_print (0, 1, global_timer.display().c_str());
+    if (tdict::global_enable >= 1)
+        verbose_output_print (0, 1, global_timer.display().c_str());
 
     if (las->verbose)
         facul_print_stats (las->output);
