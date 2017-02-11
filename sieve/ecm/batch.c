@@ -119,6 +119,7 @@ cofac_list_init (cofac_list l)
   l->R0 = NULL;
   l->A0 = NULL;
   l->sq = NULL;
+  l->side = NULL;
   l->perm = NULL;
   l->alloc = 0;
   l->size = 0;
@@ -233,6 +234,7 @@ cofac_list_realloc (cofac_list l, size_t newsize)
   l->R0 = realloc (l->R0, newsize * sizeof (mpz_t));
   l->A0 = realloc (l->A0, newsize * sizeof (mpz_t));
   l->sq = realloc (l->sq, newsize * sizeof (mpz_t));
+  l->side = realloc (l->side, newsize * sizeof (int));
   l->perm = realloc (l->perm, newsize * sizeof (uint32_t));
   l->alloc = newsize;
   if (newsize < l->size)
@@ -241,7 +243,7 @@ cofac_list_realloc (cofac_list l, size_t newsize)
 
 void
 cofac_list_add (cofac_list l, long a, unsigned long b, mpz_t R, mpz_t A,
-                mpz_t sq)
+                int side, mpz_t sq)
 {
   if (l->size == l->alloc)
     cofac_list_realloc (l, 2 * l->alloc + 1);
@@ -252,6 +254,7 @@ cofac_list_add (cofac_list l, long a, unsigned long b, mpz_t R, mpz_t A,
   mpz_init_set (l->R0[l->size], R);
   mpz_init_set (l->A0[l->size], A);
   mpz_init_set (l->sq[l->size], sq);
+  l->side[l->size] = side;
   l->perm[l->size] = l->size;
   (l->size)++;
 }
@@ -275,6 +278,7 @@ cofac_list_clear (cofac_list l)
   free (l->R0);
   free (l->A0);
   free (l->sq);
+  free (l->side);
   free (l->perm);
 }
 
@@ -735,7 +739,7 @@ strip (unsigned long *l, unsigned long n, mpz_t P)
 static void
 factor_one (cofac_list L, cado_poly pol, unsigned long *lim, int *lpb,
             FILE *out, facul_method_t *methods, unsigned long *sp[],
-            unsigned long spsize[], int sqside, unsigned long i)
+            unsigned long spsize[], unsigned long i)
 {
   mpz_t norm;
   mpz_t factors[2];
@@ -756,14 +760,14 @@ factor_one (cofac_list L, cado_poly pol, unsigned long *lim, int *lpb,
 
   s = print_smooth (factors, norm, methods, &fm, &cfm, lpb[0], (double) lim[0],
                     sp[0], spsize[0], L->R0[perm[i]],
-                    (sqside == 0) ? L->sq[perm[i]] : NULL, s, sizeof(s0)-(s-s0));
+                    (L->side[perm[i]] == 0) ? L->sq[perm[i]] : NULL, s, sizeof(s0)-(s-s0));
   s += snprintf (s, sizeof(s0)-(s-s0), ":");
 
   mpz_poly_homogeneous_eval_siui (norm, pol->pols[1],
                                   L->a[perm[i]], L->b[perm[i]]);
   s = print_smooth (factors, norm, methods, &fm, &cfm, lpb[1], (double) lim[1],
                     sp[1], spsize[1], L->A0[perm[i]],
-                    (sqside == 1) ? L->sq[perm[i]] : NULL, s, sizeof(s0)-(s-s0));
+                    (L->side[perm[i]] == 1) ? L->sq[perm[i]] : NULL, s, sizeof(s0)-(s-s0));
 
   /* avoid two threads writing a relation simultaneously */
 #ifdef  HAVE_OPENMP
@@ -784,7 +788,7 @@ factor_one (cofac_list L, cado_poly pol, unsigned long *lim, int *lpb,
    n is the number of bi-smooth cofactors in L.
 */
 void
-factor (cofac_list L, unsigned long n, cado_poly pol, int lpb[], int sqside,
+factor (cofac_list L, unsigned long n, cado_poly pol, int lpb[],
         FILE *out, int nthreads MAYBE_UNUSED)
 {
   unsigned long i, *sp[2], spsize[2], B[2];
@@ -820,7 +824,7 @@ factor (cofac_list L, unsigned long n, cado_poly pol, int lpb[], int sqside,
 #pragma omp parallel for schedule(static)
 #endif
   for (i = 0; i < n; i++)
-    factor_one (L, pol, B, lpb, out, methods, sp, spsize, sqside, i);
+    factor_one (L, pol, B, lpb, out, methods, sp, spsize, i);
 
   ulong_list_clear (SP0);
   ulong_list_clear (SP1);

@@ -2414,7 +2414,7 @@ void factor_survivors_data::cofactoring (timetree_t& timer)
         {
             verbose_output_start_batch ();
             cofac_list_add ((cofac_list_t*) las->L, a, b, norm[0], norm[1],
-                    si->qbasis.q);
+                    si->doing->side, si->doing->p);
             verbose_output_end_batch ();
             cpt++;
             continue; /* we deal with all cofactors at the end of las */
@@ -3513,7 +3513,7 @@ int main (int argc0, char *argv0[])/*{{{*/
 	mpz_clear (batchP[0]);
 	mpz_clear (batchP[1]);
 	factor (las->L, report->reports, las->cpoly, lpb,
-		las->default_config->side, las->output, las->nb_threads);
+		las->output, las->nb_threads);
 	tcof_batch = seconds () - tcof_batch;
 	report->ttcof += tcof_batch;
 	/* add to ttf since the remaining time will be computed as ttf-ttcof */
