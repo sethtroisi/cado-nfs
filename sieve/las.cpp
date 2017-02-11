@@ -2083,147 +2083,73 @@ bool register_contending_relation(las_info_srcptr las, sieve_info_srcptr si, rel
 }
 #endif /* DLP_DESCENT */
 
-/* Adds the number of sieve reports to *survivors,
-   number of survivors with coprime a, b to *coprimes */
-// FIXME NOPROFILE_STATIC
-int
-factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED)
+struct factor_survivors_data {
+    thread_data * th;
+    std::vector<uint32_t> survivors;
+    std::vector<bucket_update_t<1, shorthint_t>::br_index_t> survivors2;
+    unsigned char * SS;
+    int N;
+    where_am_I_ptr w;
+    int cpt;
+    int copr;
+    uint32_t cof_bitsize[2];
+
+    struct side_data {
+        unsigned char * S;
+        bucket_primes_t primes;
+        bucket_array_complete purged;
+        side_data() :
+            primes(bucket_primes_t(BUCKET_REGION)),
+            purged(bucket_array_complete(BUCKET_REGION))
+        {}
+    };
+
+    side_data sdata[2];
+
+    factor_survivors_data(thread_data *th, int N, where_am_I_ptr w)
+        : th(th), N(N), w(w)
+    {
+        cpt = 0;
+        copr = 0;
+        for(int side = 0 ; side < 2 ; side++) {
+            sdata[side].S = th->sides[side].bucket_region;
+            cof_bitsize[side]=0;
+        }
+        /* This is the one which gets the merged information in the end */
+        SS = sdata[0].S;
+    }
+    ~factor_survivors_data() {
+    }
+    void search_survivors (timetree_t& timer);
+    void convert_survivors (timetree_t& timer);
+    void purge_buckets (timetree_t& timer);
+    void cofactoring (timetree_t& timer);
+};
+
+void factor_survivors_data::cofactoring (timetree_t& timer)
 {
+    SIMPLE_CHILD_TIMER(timer, __func__);
+
     las_info_srcptr las = th->las;
     sieve_info_ptr si = th->si;
     las_report_ptr rep = th->rep;
-    int cpt = 0;
-    int copr = 0;
+
     mpz_t norm[2];
     factor_list_t factors[2];
     mpz_array_t *lps[2] = { NULL, };
     uint32_array_t *lps_m[2] = { NULL, }; /* corresponding multiplicities */
-    bucket_primes_t primes[2] = {bucket_primes_t(BUCKET_REGION), bucket_primes_t(BUCKET_REGION)};
-    bucket_array_complete purged[2] = {bucket_array_complete(BUCKET_REGION), bucket_array_complete(BUCKET_REGION)};
-    uint32_t cof_bitsize[2] = {0, 0}; /* placate gcc */
-    const unsigned int first_j = N << (LOG_BUCKET_REGION - si->conf->logI);
-    const unsigned long nr_lines = 1U << (LOG_BUCKET_REGION - si->conf->logI);
-    unsigned char * S[2] = {th->sides[0].bucket_region, th->sides[1].bucket_region};
 
     for(int side = 0 ; side < 2 ; side++) {
         lps[side] = alloc_mpz_array (1);
         lps_m[side] = alloc_uint32_array (1);
-
         factor_list_init(&factors[side]);
         mpz_init (norm[side]);
     }
 
-#ifdef TRACE_K /* {{{ */
-    if (trace_on_spot_Nx(N, trace_Nx.x)) {
-        verbose_output_print(TRACE_CHANNEL, 0,
-                "# When entering factor_survivors for bucket %u, "
-                "S[0][%u]=%u, S[1][%u]=%u\n",
-                trace_Nx.N, trace_Nx.x, S[0][trace_Nx.x], trace_Nx.x, S[1][trace_Nx.x]);
-        verbose_output_vfprint(TRACE_CHANNEL, 0, gmp_vfprintf,
-                "# Remaining norms which have not been accounted for in sieving: (%Zd, %Zd)\n",
-                traced_norms[0], traced_norms[1]);
-    }
-#endif  /* }}} */
-
-    if (las->verbose >= 2)
-        th->update_checksums();
-
-    /* This is the one which gets the merged information in the end */
-    unsigned char * SS = S[0];
-
-#ifdef TRACE_K /* {{{ */
-    sieve_side_info_ptr side0 = si->sides[0];
-    sieve_side_info_ptr side1 = si->sides[1];
-    for (int x = 0; x < 1 << LOG_BUCKET_REGION; x++) {
-        if (trace_on_spot_Nx(N, x)) {
-            verbose_output_print(TRACE_CHANNEL, 0,
-                    "# side0->Bound[%u]=%u, side1t->Bound[%u]=%u\n",
-                    S[0][trace_Nx.x], S[0][x] <= side0->bound ? 0 : side0->bound,
-                    S[1][trace_Nx.x], S[1][x] <= side0->bound ? 0 : side1->bound);
-        }
-    }
-#endif /* }}} */
-
-    std::vector<uint32_t> survivors;
-    survivors.reserve(128);
-    
-    for (unsigned int j = 0; j < nr_lines; j++)
-    {
-        unsigned char * const both_S[2] = {
-            S[0] + (j << si->conf->logI), 
-            S[1] + (j << si->conf->logI)
-        };
-        const unsigned char both_bounds[2] = {
-            si->sides[0]->bound,
-            si->sides[1]->bound,
-        };
-        size_t old_size = survivors.size();
-        search_survivors_in_line(both_S, both_bounds,
-                                 si->conf->logI, j + first_j, N,
-                                 si->j_div, si->conf->unsieve_thresh,
-                                 si->us, survivors);
-        /* Survivors written by search_survivors_in_line() have index
-           relative to their j-line. We need to convert to index within
-           the bucket region by adding line offsets. */
-        for (size_t i_surv = old_size; i_surv < survivors.size(); i_surv++)
-            survivors[i_surv] += j << si->conf->logI;
-    }
-
-    /* Convert data type of list from uint32_t to the correct br_index_t */
-    std::vector<bucket_update_t<1, shorthint_t>::br_index_t>
-        survivors2;
-    survivors2.reserve(survivors.size());
-    for (size_t i = 0; i < survivors.size(); i++) {
-        survivors2.push_back(survivors[i]);
-    }
-
-    /* Copy those bucket entries that belong to sieving survivors and
-       store them with the complete prime */
-    /* FIXME: choose a sensible size here */
-
-    for(int side = 0 ; side < 2 ; side++) {
-        WHERE_AM_I_UPDATE(w, side, side);
-        // From N we can deduce the bucket_index. They are not the same
-        // when there are multiple-level buckets.
-        uint32_t bucket_index = N % si->nb_buckets[1];
-
-        const bucket_array_t<1, shorthint_t> *BA =
-            th->ws->cbegin_BA<1, shorthint_t>(side);
-        const bucket_array_t<1, shorthint_t> * const BA_end =
-            th->ws->cend_BA<1, shorthint_t>(side);
-        for (; BA != BA_end; BA++)  {
-#if defined(HAVE_SSE2) && defined(SMALLSET_PURGE)
-            purged[side].purge(*BA, bucket_index, SS, survivors2);
-#else
-            purged[side].purge(*BA, bucket_index, SS);
-#endif
-        }
-
-        /* Add entries coming from downsorting, if any */
-        const bucket_array_t<1, longhint_t> *BAd =
-            th->ws->cbegin_BA<1, longhint_t>(side);
-        const bucket_array_t<1, longhint_t> * const BAd_end =
-            th->ws->cend_BA<1, longhint_t>(side);
-        for (; BAd != BAd_end; BAd++)  {
-            purged[side].purge(*BAd, bucket_index, SS);
-        }
-
-        /* Resieve small primes for this bucket region and store them 
-           together with the primes recovered from the bucket updates */
-        resieve_small_bucket_region (&primes[side], N, SS,
-                th->si->sides[side]->rsd, th->sides[side].rsdpos, si, w);
-
-        /* Sort the entries to avoid O(n^2) complexity when looking for
-           primes during trial division */
-        purged[side].sort();
-        primes[side].sort();
-    }
-
-#ifdef TRACE_K
-    if (trace_on_spot_Nx(N, trace_Nx.x)) {
-        verbose_output_print(TRACE_CHANNEL, 0, "# Slot [%u] in bucket %u has value %u\n",
-                trace_Nx.x, trace_Nx.N, SS[trace_Nx.x]);
-    }
+#ifdef SUPPORT_LARGE_Q
+        mpz_t az, bz;
+        mpz_init(az);
+        mpz_init(bz);
 #endif
 
     for (size_t i_surv = 0 ; i_surv < survivors2.size(); i_surv++) {
@@ -2234,13 +2160,7 @@ factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED)
       const size_t x = survivors2[i_surv];
       ASSERT_ALWAYS (SS[x] != 255);
 
-#ifdef SUPPORT_LARGE_Q
-        mpz_t az, bz;
-        mpz_init(az);
-        mpz_init(bz);
-#endif
-
-        th->rep->survivor_sizes[S[0][x]][S[1][x]]++;
+        th->rep->survivor_sizes[sdata[0].S[x]][sdata[1].S[x]]++;
         
         /* For factor_leftover_norm, we need to pass the information of the
          * sieve bound. If a cofactor is less than the square of the sieve
@@ -2318,7 +2238,8 @@ factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED)
             const fb_factorbase *fb = th->si->sides[side]->fb;
             trial_div (&factors[side], norm[side], N, x,
                     handle_2,
-                    &primes[side], &purged[side],
+                    &sdata[side].primes,
+                    &sdata[side].purged,
                     si->sides[side]->trialdiv_data,
                     a, b, fb);
 
@@ -2429,7 +2350,7 @@ factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED)
                 verbose_output_print(0, 1, "(%1.4f) ", seconds() - tt_qstart);
             }
             verbose_output_print(0, 3, "# i=%d, j=%u, lognorms = %hhu, %hhu\n",
-                    i, j, S[0][x], S[1][x]);
+                    i, j, sdata[0].S[x], sdata[1].S[x]);
             for (size_t i_output = 0;
                  (output = verbose_output_get(0, 0, i_output)) != NULL;
                  i_output++) {
@@ -2445,21 +2366,18 @@ factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED)
         }
 
         /* Build histogram of lucky S[x] values */
-        th->rep->report_sizes[S[0][x]][S[1][x]]++;
+        th->rep->report_sizes[sdata[0].S[x]][sdata[1].S[x]]++;
 
 #ifdef  DLP_DESCENT
         if (register_contending_relation(las, si, rel))
             break;
 #endif  /* DLP_DESCENT */
+    }
+
 #ifdef SUPPORT_LARGE_Q
         mpz_clear(az);
         mpz_clear(bz);
 #endif
-    }
-
-    verbose_output_print(0, 3, "# There were %d survivors in bucket %d\n", copr, N);
-    th->rep->survivors1 += copr;
-    th->rep->survivors2 += copr;
 
     for(int side = 0 ; side < 2 ; side++) {
         mpz_clear(norm[side]);
@@ -2467,8 +2385,160 @@ factor_survivors (thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED)
         clear_uint32_array (lps_m[side]);
         clear_mpz_array (lps[side]);
     }
+}
 
-    return cpt;
+void factor_survivors_data::search_survivors(timetree_t& timer)
+{
+    SIMPLE_CHILD_TIMER(timer, __func__);
+    las_info_srcptr las = th->las;
+    sieve_info_ptr si = th->si;
+    const unsigned int first_j = N << (LOG_BUCKET_REGION - si->conf->logI);
+    const unsigned long nr_lines = 1U << (LOG_BUCKET_REGION - si->conf->logI);
+
+#ifdef TRACE_K /* {{{ */
+    if (trace_on_spot_Nx(N, trace_Nx.x)) {
+        verbose_output_print(TRACE_CHANNEL, 0,
+                "# When entering factor_survivors for bucket %u, "
+                "S[0][%u]=%u, S[1][%u]=%u\n",
+                trace_Nx.N, trace_Nx.x, S[0][trace_Nx.x], trace_Nx.x, S[1][trace_Nx.x]);
+        verbose_output_vfprint(TRACE_CHANNEL, 0, gmp_vfprintf,
+                "# Remaining norms which have not been accounted for in sieving: (%Zd, %Zd)\n",
+                traced_norms[0], traced_norms[1]);
+    }
+#endif  /* }}} */
+
+    if (las->verbose >= 2)
+        th->update_checksums();
+
+
+#ifdef TRACE_K /* {{{ */
+    sieve_side_info_ptr side0 = si->sides[0];
+    sieve_side_info_ptr side1 = si->sides[1];
+    for (int x = 0; x < 1 << LOG_BUCKET_REGION; x++) {
+        if (trace_on_spot_Nx(N, x)) {
+            verbose_output_print(TRACE_CHANNEL, 0,
+                    "# side0->Bound[%u]=%u, side1t->Bound[%u]=%u\n",
+                    S[0][trace_Nx.x], S[0][x] <= side0->bound ? 0 : side0->bound,
+                    S[1][trace_Nx.x], S[1][x] <= side0->bound ? 0 : side1->bound);
+        }
+    }
+#endif /* }}} */
+
+    survivors.reserve(128);
+    for (unsigned int j = 0; j < nr_lines; j++)
+    {
+        unsigned char * const both_S[2] = {
+            sdata[0].S + (j << si->conf->logI), 
+            sdata[1].S + (j << si->conf->logI)
+        };
+        const unsigned char both_bounds[2] = {
+            si->sides[0]->bound,
+            si->sides[1]->bound,
+        };
+        size_t old_size = survivors.size();
+        search_survivors_in_line(both_S, both_bounds,
+                                 si->conf->logI, j + first_j, N,
+                                 si->j_div, si->conf->unsieve_thresh,
+                                 si->us, survivors);
+        /* Survivors written by search_survivors_in_line() have index
+           relative to their j-line. We need to convert to index within
+           the bucket region by adding line offsets. */
+        for (size_t i_surv = old_size; i_surv < survivors.size(); i_surv++)
+            survivors[i_surv] += j << si->conf->logI;
+    }
+}
+
+void factor_survivors_data::convert_survivors(timetree_t& timer)
+{
+    SIMPLE_CHILD_TIMER(timer, __func__);
+    /* Convert data type of list from uint32_t to the correct br_index_t */
+    survivors2.reserve(survivors.size());
+    for (size_t i = 0; i < survivors.size(); i++) {
+        survivors2.push_back(survivors[i]);
+    }
+    survivors.clear();
+}
+
+void factor_survivors_data::purge_buckets(timetree_t& timer)
+{
+    SIMPLE_CHILD_TIMER(timer, __func__);
+
+    sieve_info_ptr si = th->si;
+
+    /* Copy those bucket entries that belong to sieving survivors and
+       store them with the complete prime */
+    /* FIXME: choose a sensible size here */
+
+    for(int side = 0 ; side < 2 ; side++) {
+        WHERE_AM_I_UPDATE(w, side, side);
+        // From N we can deduce the bucket_index. They are not the same
+        // when there are multiple-level buckets.
+        uint32_t bucket_index = N % si->nb_buckets[1];
+
+        SIMPLE_SIBLING_TIMER(timer, "purge buckets");
+
+        const bucket_array_t<1, shorthint_t> *BA =
+            th->ws->cbegin_BA<1, shorthint_t>(side);
+        const bucket_array_t<1, shorthint_t> * const BA_end =
+            th->ws->cend_BA<1, shorthint_t>(side);
+        for (; BA != BA_end; BA++)  {
+#if defined(HAVE_SSE2) && defined(SMALLSET_PURGE)
+            sdata[side].purged.purge(*BA, bucket_index, SS, survivors2);
+#else
+            sdata[side].purged.purge(*BA, bucket_index, SS);
+#endif
+        }
+
+        /* Add entries coming from downsorting, if any */
+        const bucket_array_t<1, longhint_t> *BAd =
+            th->ws->cbegin_BA<1, longhint_t>(side);
+        const bucket_array_t<1, longhint_t> * const BAd_end =
+            th->ws->cend_BA<1, longhint_t>(side);
+        for (; BAd != BAd_end; BAd++)  {
+            sdata[side].purged.purge(*BAd, bucket_index, SS);
+        }
+
+        SIMPLE_SIBLING_TIMER(timer, "resieve");
+        /* Resieve small primes for this bucket region and store them 
+           together with the primes recovered from the bucket updates */
+        resieve_small_bucket_region (&sdata[side].primes, N, SS,
+                th->si->sides[side]->rsd, th->sides[side].rsdpos, si, w);
+
+        SIMPLE_SIBLING_TIMER(timer, "sort primes in purged buckets");
+        /* Sort the entries to avoid O(n^2) complexity when looking for
+           primes during trial division */
+        sdata[side].purged.sort();
+        sdata[side].primes.sort();
+    }
+
+#ifdef TRACE_K
+    if (trace_on_spot_Nx(N, trace_Nx.x)) {
+        verbose_output_print(TRACE_CHANNEL, 0, "# Slot [%u] in bucket %u has value %u\n",
+                trace_Nx.x, trace_Nx.N, SS[trace_Nx.x]);
+    }
+#endif
+}
+
+/* Adds the number of sieve reports to *survivors,
+   number of survivors with coprime a, b to *coprimes */
+// FIXME NOPROFILE_STATIC
+int
+factor_survivors (timetree_t& timer, thread_data *th, int N, where_am_I_ptr w MAYBE_UNUSED)
+{
+    SIMPLE_CHILD_TIMER(timer, __func__);
+    factor_survivors_data F(th, N, w);
+
+    F.search_survivors(timer);
+    F.convert_survivors(timer);
+
+    F.purge_buckets(timer);
+
+    F.cofactoring(timer);
+
+    verbose_output_print(0, 3, "# There were %d survivors in bucket %d\n", F.copr, N);
+    th->rep->survivors1 += F.copr;
+    th->rep->survivors2 += F.copr;
+    return F.cpt;
 }
 
 /* }}} */
@@ -2560,7 +2630,7 @@ void SminusS (unsigned char *S1, unsigned char *EndS1, unsigned char *S2) {
 void * process_bucket_region(timetree_t& timer, thread_data *th)
 {
     ACTIVATE_TIMER(timer);
-    SIMPLE_SIBLING_TIMER(timer, __func__);
+    SIMPLE_CHILD_TIMER(timer, __func__);
 
     where_am_I w MAYBE_UNUSED;
     las_info_srcptr las = th->las;
@@ -2594,8 +2664,6 @@ void * process_bucket_region(timetree_t& timer, thread_data *th)
         if ((i % las->nb_threads) != (uint32_t)th->id)
             continue;
         WHERE_AM_I_UPDATE(w, N, i);
-
-        SIMPLE_CHILD_TIMER(timer, "one bucket");
 
         if (recursive_descent) {
             /* For the descent mode, we bail out as early as possible. We
@@ -2664,6 +2732,8 @@ void * process_bucket_region(timetree_t& timer, thread_data *th)
                 }
             }
 
+            SIMPLE_SIBLING_TIMER(timer, "S minus S (1)");
+
 	    SminusS(S[side], S[side] + BUCKET_REGION, SS);
             rep->ttbuckets_apply += seconds_thread();
 
@@ -2671,7 +2741,7 @@ void * process_bucket_region(timetree_t& timer, thread_data *th)
             /* Sieve small primes */
             sieve_small_bucket_region(SS, i, s->ssd, ts.ssdpos, si, side, w);
 
-            SIMPLE_SIBLING_TIMER(timer, "S minus S");
+            SIMPLE_SIBLING_TIMER(timer, "S minus S (2)");
 	    SminusS(S[side], S[side] + BUCKET_REGION, SS);
 #if defined(TRACE_K) 
             if (trace_on_spot_N(w->N))
@@ -2683,14 +2753,12 @@ void * process_bucket_region(timetree_t& timer, thread_data *th)
             BOOKKEEPING_TIMER(timer);
         }
 
-        SIMPLE_SIBLING_TIMER(timer, "factor survivors");
-
         /* Factor survivors */
         rep->ttf -= seconds_thread ();
-        rep->reports += factor_survivors (th, i, w);
+        rep->reports += factor_survivors (timer, th, i, w);
         rep->ttf += seconds_thread ();
 
-        SIMPLE_SIBLING_TIMER(timer, "reset resieving");
+        SIMPLE_SIBLING_TIMER(timer, "reposition small (re)sieve data");
         /* Reset resieving data */
         for(int side = 0 ; side < 2 ; side++) {
             sieve_side_info_ptr s = si->sides[side];
@@ -2957,9 +3025,11 @@ int main (int argc0, char *argv0[])/*{{{*/
     where_am_I w MAYBE_UNUSED;
     WHERE_AM_I_UPDATE(w, las, las);
 
+    /* This timer is not active for now. While most of the accounting is
+     * done through timer_special_q, it will be used mostly for
+     * collecting the info on the time spent.
+     */
     timetree_t global_timer;
-
-    global_timer.start();
 
     /* This is used only for the descent. It's harmless otherwise. */
     las->tree = new descent_tree();
@@ -3117,8 +3187,10 @@ int main (int argc0, char *argv0[])/*{{{*/
         verbose_output_vfprint(0, 1, gmp_vfprintf, "# " HILIGHT_START "Sieving %s q=%Zd; rho=%Zd;" HILIGHT_END,
                                sidenames[si->conf->side], si->doing->p, si->doing->r);
 
-        verbose_output_print(0, 1, " a0=%" PRId64 "; b0=%" PRId64 "; a1=%" PRId64 "; b1=%" PRId64 ";",
-                             si->qbasis.a0, si->qbasis.b0, si->qbasis.a1, si->qbasis.b1);
+        verbose_output_print(0, 1, " a0=%" PRId64 "; b0=%" PRId64 "; a1=%" PRId64 "; b1=%" PRId64 "; J=%u;",
+                             si->qbasis.a0, si->qbasis.b0,
+                             si->qbasis.a1, si->qbasis.b1,
+                             si->J);
         if (si->doing->depth) {
             verbose_output_print(0, 1, " # within descent, currently at depth %d", si->doing->depth);
         }
@@ -3245,30 +3317,30 @@ int main (int argc0, char *argv0[])/*{{{*/
                 }
             }
 
-            {
-                SIMPLE_CHILD_TIMER(timer_special_q, "process_bucket_region outer container (MT)");
-                // Prepare plattices at internal levels
+            SIMPLE_SIBLING_TIMER(timer_special_q, "process_bucket_region outer container (MT)");
+            // Prepare plattices at internal levels
 
-                // Visit the downsorting tree depth-first.
-                // If toplevel = 1, then this is just processing all bucket
-                // regions.
-                uint64_t BRS[FB_MAX_PARTS] = BUCKET_REGIONS;
-                for (uint32_t i = 0; i < si->nb_buckets[si->toplevel]; i++) {
-                    switch (si->toplevel) {
-                        case 2:
-                            downsort_tree<1>(timer_special_q, i, i*BRS[2]/BRS[1],
-                                    *workspaces, *pool, si, precomp_plattice);
-                            break;
-                        case 3:
-                            downsort_tree<2>(timer_special_q, i, i*BRS[3]/BRS[1],
-                                    *workspaces, *pool, si, precomp_plattice);
-                            break;
-                        default:
-                            ASSERT_ALWAYS(0);
-                    }
+            // Visit the downsorting tree depth-first.
+            // If toplevel = 1, then this is just processing all bucket
+            // regions.
+            uint64_t BRS[FB_MAX_PARTS] = BUCKET_REGIONS;
+            for (uint32_t i = 0; i < si->nb_buckets[si->toplevel]; i++) {
+                switch (si->toplevel) {
+                    case 2:
+                        downsort_tree<1>(timer_special_q, i, i*BRS[2]/BRS[1],
+                                *workspaces, *pool, si, precomp_plattice);
+                        break;
+                    case 3:
+                        downsort_tree<2>(timer_special_q, i, i*BRS[3]/BRS[1],
+                                *workspaces, *pool, si, precomp_plattice);
+                        break;
+                    default:
+                        ASSERT_ALWAYS(0);
                 }
-                pool->accumulate(*timer_special_q.current);
             }
+            pool->accumulate(*timer_special_q.current);
+
+            BOOKKEEPING_TIMER(timer_special_q);
 
             // Cleanup precomputed lattice bases.
             for(int side = 0 ; side < 2 ; side++) {
@@ -3389,6 +3461,8 @@ int main (int argc0, char *argv0[])/*{{{*/
         las->tree->display_all_trees(las->output);
     }
     delete las->tree;
+
+    global_timer.start();
 
     if (las->batch)
       {

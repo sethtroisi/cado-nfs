@@ -394,10 +394,13 @@ public:
   {}
 };
 
+#if __cplusplus >= 201103L
 /* short of a better solution. I know some exist, but it seems way
  * overkill to me.
+ *
+ * This needs constexpr, though... So maybe I could use a more powerful
+ * C++11 trick after all.
  */
-
 #define PREPARE_TEMPLATE_INST_NAMES(F)					\
     template<int>							\
     struct CADO_CONCATENATE(F, _name) {};				\
@@ -424,6 +427,9 @@ PREPARE_TEMPLATE_INST_NAMES(fill_in_buckets_one_side);
 PREPARE_TEMPLATE_INST_NAMES(downsort_tree);
 
 #define TEMPLATE_INST_NAME(x,y) CADO_CONCATENATE(x, _name)<y>::value
+#else
+#define TEMPLATE_INST_NAME(x,y) x " (template)"
+#endif
 
 // For internal levels, the fill-in is not exactly the same as for
 // top-level, since the plattices have already been precomputed.
