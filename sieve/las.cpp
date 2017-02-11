@@ -2126,6 +2126,138 @@ struct factor_survivors_data {
     void cofactoring (timetree_t& timer);
 };
 
+void factor_survivors_data::search_survivors(timetree_t& timer)
+{
+    CHILD_TIMER(timer, __func__);
+    las_info_srcptr las = th->las;
+    sieve_info_ptr si = th->si;
+    const unsigned int first_j = N << (LOG_BUCKET_REGION - si->conf->logI);
+    const unsigned long nr_lines = 1U << (LOG_BUCKET_REGION - si->conf->logI);
+
+#ifdef TRACE_K /* {{{ */
+    if (trace_on_spot_Nx(N, trace_Nx.x)) {
+        verbose_output_print(TRACE_CHANNEL, 0,
+                "# When entering factor_survivors for bucket %u, "
+                "S[0][%u]=%u, S[1][%u]=%u\n",
+                trace_Nx.N, trace_Nx.x, S[0][trace_Nx.x], trace_Nx.x, S[1][trace_Nx.x]);
+        verbose_output_vfprint(TRACE_CHANNEL, 0, gmp_vfprintf,
+                "# Remaining norms which have not been accounted for in sieving: (%Zd, %Zd)\n",
+                traced_norms[0], traced_norms[1]);
+    }
+#endif  /* }}} */
+
+    if (las->verbose >= 2)
+        th->update_checksums();
+
+
+#ifdef TRACE_K /* {{{ */
+    sieve_side_info_ptr side0 = si->sides[0];
+    sieve_side_info_ptr side1 = si->sides[1];
+    for (int x = 0; x < 1 << LOG_BUCKET_REGION; x++) {
+        if (trace_on_spot_Nx(N, x)) {
+            verbose_output_print(TRACE_CHANNEL, 0,
+                    "# side0->Bound[%u]=%u, side1t->Bound[%u]=%u\n",
+                    S[0][trace_Nx.x], S[0][x] <= side0->bound ? 0 : side0->bound,
+                    S[1][trace_Nx.x], S[1][x] <= side0->bound ? 0 : side1->bound);
+        }
+    }
+#endif /* }}} */
+
+    survivors.reserve(128);
+    for (unsigned int j = 0; j < nr_lines; j++)
+    {
+        unsigned char * const both_S[2] = {
+            sdata[0].S + (j << si->conf->logI), 
+            sdata[1].S + (j << si->conf->logI)
+        };
+        const unsigned char both_bounds[2] = {
+            si->sides[0]->bound,
+            si->sides[1]->bound,
+        };
+        size_t old_size = survivors.size();
+        search_survivors_in_line(both_S, both_bounds,
+                                 si->conf->logI, j + first_j, N,
+                                 si->j_div, si->conf->unsieve_thresh,
+                                 si->us, survivors);
+        /* Survivors written by search_survivors_in_line() have index
+           relative to their j-line. We need to convert to index within
+           the bucket region by adding line offsets. */
+        for (size_t i_surv = old_size; i_surv < survivors.size(); i_surv++)
+            survivors[i_surv] += j << si->conf->logI;
+    }
+}
+
+void factor_survivors_data::convert_survivors(timetree_t& timer)
+{
+    CHILD_TIMER(timer, __func__);
+    /* Convert data type of list from uint32_t to the correct br_index_t */
+    survivors2.reserve(survivors.size());
+    for (size_t i = 0; i < survivors.size(); i++) {
+        survivors2.push_back(survivors[i]);
+    }
+    survivors.clear();
+}
+
+void factor_survivors_data::purge_buckets(timetree_t& timer)
+{
+    CHILD_TIMER(timer, __func__);
+
+    sieve_info_ptr si = th->si;
+
+    /* Copy those bucket entries that belong to sieving survivors and
+       store them with the complete prime */
+    /* FIXME: choose a sensible size here */
+
+    for(int side = 0 ; side < 2 ; side++) {
+        WHERE_AM_I_UPDATE(w, side, side);
+        // From N we can deduce the bucket_index. They are not the same
+        // when there are multiple-level buckets.
+        uint32_t bucket_index = N % si->nb_buckets[1];
+
+        SIBLING_TIMER(timer, "purge buckets");
+
+        const bucket_array_t<1, shorthint_t> *BA =
+            th->ws->cbegin_BA<1, shorthint_t>(side);
+        const bucket_array_t<1, shorthint_t> * const BA_end =
+            th->ws->cend_BA<1, shorthint_t>(side);
+        for (; BA != BA_end; BA++)  {
+#if defined(HAVE_SSE2) && defined(SMALLSET_PURGE)
+            sdata[side].purged.purge(*BA, bucket_index, SS, survivors2);
+#else
+            sdata[side].purged.purge(*BA, bucket_index, SS);
+#endif
+        }
+
+        /* Add entries coming from downsorting, if any */
+        const bucket_array_t<1, longhint_t> *BAd =
+            th->ws->cbegin_BA<1, longhint_t>(side);
+        const bucket_array_t<1, longhint_t> * const BAd_end =
+            th->ws->cend_BA<1, longhint_t>(side);
+        for (; BAd != BAd_end; BAd++)  {
+            sdata[side].purged.purge(*BAd, bucket_index, SS);
+        }
+
+        SIBLING_TIMER(timer, "resieve");
+        /* Resieve small primes for this bucket region and store them 
+           together with the primes recovered from the bucket updates */
+        resieve_small_bucket_region (&sdata[side].primes, N, SS,
+                th->si->sides[side]->rsd, th->sides[side].rsdpos, si, w);
+
+        SIBLING_TIMER(timer, "sort primes in purged buckets");
+        /* Sort the entries to avoid O(n^2) complexity when looking for
+           primes during trial division */
+        sdata[side].purged.sort();
+        sdata[side].primes.sort();
+    }
+
+#ifdef TRACE_K
+    if (trace_on_spot_Nx(N, trace_Nx.x)) {
+        verbose_output_print(TRACE_CHANNEL, 0, "# Slot [%u] in bucket %u has value %u\n",
+                trace_Nx.x, trace_Nx.N, SS[trace_Nx.x]);
+    }
+#endif
+}
+
 void factor_survivors_data::cofactoring (timetree_t& timer)
 {
     CHILD_TIMER(timer, __func__);
@@ -2387,138 +2519,6 @@ void factor_survivors_data::cofactoring (timetree_t& timer)
         clear_uint32_array (lps_m[side]);
         clear_mpz_array (lps[side]);
     }
-}
-
-void factor_survivors_data::search_survivors(timetree_t& timer)
-{
-    CHILD_TIMER(timer, __func__);
-    las_info_srcptr las = th->las;
-    sieve_info_ptr si = th->si;
-    const unsigned int first_j = N << (LOG_BUCKET_REGION - si->conf->logI);
-    const unsigned long nr_lines = 1U << (LOG_BUCKET_REGION - si->conf->logI);
-
-#ifdef TRACE_K /* {{{ */
-    if (trace_on_spot_Nx(N, trace_Nx.x)) {
-        verbose_output_print(TRACE_CHANNEL, 0,
-                "# When entering factor_survivors for bucket %u, "
-                "S[0][%u]=%u, S[1][%u]=%u\n",
-                trace_Nx.N, trace_Nx.x, S[0][trace_Nx.x], trace_Nx.x, S[1][trace_Nx.x]);
-        verbose_output_vfprint(TRACE_CHANNEL, 0, gmp_vfprintf,
-                "# Remaining norms which have not been accounted for in sieving: (%Zd, %Zd)\n",
-                traced_norms[0], traced_norms[1]);
-    }
-#endif  /* }}} */
-
-    if (las->verbose >= 2)
-        th->update_checksums();
-
-
-#ifdef TRACE_K /* {{{ */
-    sieve_side_info_ptr side0 = si->sides[0];
-    sieve_side_info_ptr side1 = si->sides[1];
-    for (int x = 0; x < 1 << LOG_BUCKET_REGION; x++) {
-        if (trace_on_spot_Nx(N, x)) {
-            verbose_output_print(TRACE_CHANNEL, 0,
-                    "# side0->Bound[%u]=%u, side1t->Bound[%u]=%u\n",
-                    S[0][trace_Nx.x], S[0][x] <= side0->bound ? 0 : side0->bound,
-                    S[1][trace_Nx.x], S[1][x] <= side0->bound ? 0 : side1->bound);
-        }
-    }
-#endif /* }}} */
-
-    survivors.reserve(128);
-    for (unsigned int j = 0; j < nr_lines; j++)
-    {
-        unsigned char * const both_S[2] = {
-            sdata[0].S + (j << si->conf->logI), 
-            sdata[1].S + (j << si->conf->logI)
-        };
-        const unsigned char both_bounds[2] = {
-            si->sides[0]->bound,
-            si->sides[1]->bound,
-        };
-        size_t old_size = survivors.size();
-        search_survivors_in_line(both_S, both_bounds,
-                                 si->conf->logI, j + first_j, N,
-                                 si->j_div, si->conf->unsieve_thresh,
-                                 si->us, survivors);
-        /* Survivors written by search_survivors_in_line() have index
-           relative to their j-line. We need to convert to index within
-           the bucket region by adding line offsets. */
-        for (size_t i_surv = old_size; i_surv < survivors.size(); i_surv++)
-            survivors[i_surv] += j << si->conf->logI;
-    }
-}
-
-void factor_survivors_data::convert_survivors(timetree_t& timer)
-{
-    CHILD_TIMER(timer, __func__);
-    /* Convert data type of list from uint32_t to the correct br_index_t */
-    survivors2.reserve(survivors.size());
-    for (size_t i = 0; i < survivors.size(); i++) {
-        survivors2.push_back(survivors[i]);
-    }
-    survivors.clear();
-}
-
-void factor_survivors_data::purge_buckets(timetree_t& timer)
-{
-    CHILD_TIMER(timer, __func__);
-
-    sieve_info_ptr si = th->si;
-
-    /* Copy those bucket entries that belong to sieving survivors and
-       store them with the complete prime */
-    /* FIXME: choose a sensible size here */
-
-    for(int side = 0 ; side < 2 ; side++) {
-        WHERE_AM_I_UPDATE(w, side, side);
-        // From N we can deduce the bucket_index. They are not the same
-        // when there are multiple-level buckets.
-        uint32_t bucket_index = N % si->nb_buckets[1];
-
-        SIBLING_TIMER(timer, "purge buckets");
-
-        const bucket_array_t<1, shorthint_t> *BA =
-            th->ws->cbegin_BA<1, shorthint_t>(side);
-        const bucket_array_t<1, shorthint_t> * const BA_end =
-            th->ws->cend_BA<1, shorthint_t>(side);
-        for (; BA != BA_end; BA++)  {
-#if defined(HAVE_SSE2) && defined(SMALLSET_PURGE)
-            sdata[side].purged.purge(*BA, bucket_index, SS, survivors2);
-#else
-            sdata[side].purged.purge(*BA, bucket_index, SS);
-#endif
-        }
-
-        /* Add entries coming from downsorting, if any */
-        const bucket_array_t<1, longhint_t> *BAd =
-            th->ws->cbegin_BA<1, longhint_t>(side);
-        const bucket_array_t<1, longhint_t> * const BAd_end =
-            th->ws->cend_BA<1, longhint_t>(side);
-        for (; BAd != BAd_end; BAd++)  {
-            sdata[side].purged.purge(*BAd, bucket_index, SS);
-        }
-
-        SIBLING_TIMER(timer, "resieve");
-        /* Resieve small primes for this bucket region and store them 
-           together with the primes recovered from the bucket updates */
-        resieve_small_bucket_region (&sdata[side].primes, N, SS,
-                th->si->sides[side]->rsd, th->sides[side].rsdpos, si, w);
-
-        SIBLING_TIMER(timer, "sort primes in purged buckets");
-        /* Sort the entries to avoid O(n^2) complexity when looking for
-           primes during trial division */
-        sdata[side].purged.sort();
-        sdata[side].primes.sort();
-    }
-
-#ifdef TRACE_K
-    if (trace_on_spot_Nx(N, trace_Nx.x)) {
-        verbose_output_print(TRACE_CHANNEL, 0, "# Slot [%u] in bucket %u has value %u\n",
-                trace_Nx.x, trace_Nx.N, SS[trace_Nx.x]);
-    }
-#endif
 }
 
 /* Adds the number of sieve reports to *survivors,
