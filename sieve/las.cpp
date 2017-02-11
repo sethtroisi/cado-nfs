@@ -3466,7 +3466,7 @@ int main (int argc0, char *argv0[])/*{{{*/
         timer_special_q.stop();
 
         if (tdict::global_enable >= 2)
-            verbose_output_print (0, 1, timer_special_q.display().c_str());
+            verbose_output_print (0, 1, "%s", timer_special_q.display().c_str());
 
         global_timer += timer_special_q;
 
@@ -3533,7 +3533,7 @@ int main (int argc0, char *argv0[])/*{{{*/
 
     global_timer.stop();
     if (tdict::global_enable >= 1)
-        verbose_output_print (0, 1, global_timer.display().c_str());
+        verbose_output_print (0, 1, "%s", global_timer.display().c_str());
 
     if (las->verbose)
         facul_print_stats (las->output);
