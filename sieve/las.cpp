@@ -2303,7 +2303,8 @@ void factor_survivors_data::cofactoring (timetree_t& timer)
         int64_t a;
         uint64_t b;
 
-        // Compute algebraic and rational norms.
+        SIBLING_TIMER(timer, "check_coprime");
+
         NxToAB (&a, &b, N, x, si);
 #ifdef SUPPORT_LARGE_Q
         NxToABmpz (az, bz, N, x, si);
@@ -2313,6 +2314,7 @@ void factor_survivors_data::cofactoring (timetree_t& timer)
           verbose_output_print(TRACE_CHANNEL, 0, "# about to start cofactorization for (%"
                    PRId64 ",%" PRIu64 ")  %zu %u\n", a, b, x, SS[x]);
 #endif
+
         /* since a,b both even were not sieved, either a or b should
          * be odd. However, exceptionally small norms, even without
          * sieving, may fall below the report bound (see tracker
@@ -2350,6 +2352,9 @@ void factor_survivors_data::cofactoring (timetree_t& timer)
         int i;
         unsigned int j;
         for(int side = 0 ; pass && side < 2 ; side++) {
+
+            SIBLING_TIMER(timer, "recompute complete norm");
+
             // Trial divide norm on side 'side'
             /* Compute the norms using the polynomials transformed to 
                i,j-coordinates. The transformed polynomial on the 
@@ -2365,6 +2370,9 @@ void factor_survivors_data::cofactoring (timetree_t& timer)
                         "on %s side for (%" PRId64 ",%" PRIu64 ")\n", sidenames[side], a, b);
             }
 #endif
+
+            SIBLING_TIMER(timer, "trial division");
+
             verbose_output_print(1, 2, "FIXME %s, line %d\n", __FILE__, __LINE__);
             const bool handle_2 = true; /* FIXME */
             const fb_factorbase *fb = th->si->sides[side]->fb;
@@ -2374,6 +2382,8 @@ void factor_survivors_data::cofactoring (timetree_t& timer)
                     &sdata[side].purged,
                     si->sides[side]->trialdiv_data,
                     a, b, fb);
+
+            SIBLING_TIMER(timer, "check_leftover_norm");
 
             pass = check_leftover_norm (norm[side], si, side);
 #ifdef TRACE_K
@@ -2396,6 +2406,7 @@ void factor_survivors_data::cofactoring (timetree_t& timer)
 #else
             gmp_printf("%Zd %Zd %Zd %Zd\n", az, bz, norm[0], norm[1]);
 #endif
+            cpt++;
             continue;
         }
 
@@ -2405,6 +2416,7 @@ void factor_survivors_data::cofactoring (timetree_t& timer)
             cofac_list_add ((cofac_list_t*) las->L, a, b, norm[0], norm[1],
                     si->qbasis.q);
             verbose_output_end_batch ();
+            cpt++;
             continue; /* we deal with all cofactors at the end of las */
         }
 
@@ -2419,6 +2431,8 @@ void factor_survivors_data::cofactoring (timetree_t& timer)
 		   happen rarely. */
 		cof_call[cof_bitsize[0]][cof_bitsize[1]] ++;
         }
+
+        SIBLING_TIMER(timer, "factor_both_leftover_norms");
 
         rep->ttcof -= microseconds_thread ();
         pass = factor_both_leftover_norms(norm, lps, lps_m, si);
@@ -2435,6 +2449,7 @@ void factor_survivors_data::cofactoring (timetree_t& timer)
                                     factorization was incomplete */
 
         /* yippee: we found a relation! */
+        SIBLING_TIMER(timer, "print relations");
 
         if (cof_stats == 1) /* learning phase */
             cof_succ[cof_bitsize[0]][cof_bitsize[1]] ++;
@@ -2796,8 +2811,12 @@ void las_report_accumulate_threads_and_display(las_info_ptr las,
     verbose_output_print(0, 2, "%lu survivors after algebraic sieve, ", rep->survivors1);
     verbose_output_print(0, 2, "coprime: %lu\n", rep->survivors2);
     verbose_output_print(0, 2, "# Checksums over sieve region: after all sieving: %u, %u\n", checksum_post_sieve[0].get_checksum(), checksum_post_sieve[1].get_checksum());
-    if (!las->batch) /* makes no sense in batch mode */
-      verbose_output_vfprint(0, 1, gmp_vfprintf, "# %lu relation(s) for %s (%Zd,%Zd)\n", rep->reports, sidenames[si->conf->side], si->doing->p, si->doing->r);
+    verbose_output_vfprint(0, 1, gmp_vfprintf, "# %lu %s for %s (%Zd,%Zd)\n",
+              rep->reports,
+              las->batch ? "survivor(s) saved" : "relation(s)",
+              sidenames[si->conf->side],
+              si->doing->p,
+              si->doing->r);
     double qtts = qt0 - rep->tn[0] - rep->tn[1] - rep->ttf;
     if (rep->both_even) {
         verbose_output_print(0, 1, "# Warning: found %lu hits with i,j both even (not a bug, but should be very rare)\n", rep->both_even);
