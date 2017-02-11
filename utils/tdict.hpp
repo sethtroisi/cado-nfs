@@ -307,9 +307,9 @@ namespace tdict {
                 // o << prefix << self << " (self)\n";
                 std::ostringstream ss;
                 ss << prefix << " ";
-                for(auto const& a : M) {
-                    o << prefix << a.second.self << " " << a.first << "\n";
-                    a.second._display(o, ss.str());
+                for(M_t::const_iterator a = M.begin() ; a != M.end() ; a++) {
+                    o << prefix << a->second.self << " " << a->first << "\n";
+                    a->second._display(o, ss.str());
                 }
                 return o;
             }
@@ -324,8 +324,8 @@ namespace tdict {
             }
             tree& operator+=(tree const& t) {
                 self += t.self;
-                for(auto const& a : t.M) {
-                    M[a.first] += a.second;
+                for(M_t::const_iterator a = M.begin() ; a != M.end() ; a++) {
+                    M[a->first] += a->second;
                 }
                 return *this;
             }
