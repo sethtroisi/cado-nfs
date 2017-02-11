@@ -428,7 +428,7 @@ PREPARE_TEMPLATE_INST_NAMES(downsort_tree);
 
 #define TEMPLATE_INST_NAME(x,y) CADO_CONCATENATE(x, _name)<y>::value
 #else
-#define TEMPLATE_INST_NAME(x,y) x " (template)"
+#define TEMPLATE_INST_NAME(x,y) #x " (template)"
 #endif
 
 // For internal levels, the fill-in is not exactly the same as for
