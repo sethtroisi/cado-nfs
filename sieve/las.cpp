@@ -33,7 +33,7 @@
 #include "las-smallsieve.h"
 #include "las-descent-trees.h"
 #include "las-cofactor.h"
-#include "las-fill-in-buckets.h"
+#include "las-fill-in-buckets.hpp"
 #include "las-threads.hpp"
 #include "las-todo.h"
 #include "memusage.h"
@@ -3160,9 +3160,7 @@ int main (int argc0, char *argv0[])/*{{{*/
         /* Allocate buckets */
         workspaces->pickup_si(si);
 
-        SIMPLE_SIBLING_TIMER(timer_special_q, "fill_in_buckets outer container");
-        /* Fill in buckets on both sides at top level */
-        fill_in_buckets_both(*pool, *workspaces, si);
+        fill_in_buckets_both(timer_special_q, *pool, *workspaces, si);
 
         pool->accumulate(*timer_special_q.current);
 
@@ -3258,11 +3256,11 @@ int main (int argc0, char *argv0[])/*{{{*/
                 for (uint32_t i = 0; i < si->nb_buckets[si->toplevel]; i++) {
                     switch (si->toplevel) {
                         case 2:
-                            downsort_tree<1>(i, i*BRS[2]/BRS[1],
+                            downsort_tree<1>(timer_special_q, i, i*BRS[2]/BRS[1],
                                     *workspaces, *pool, si, precomp_plattice);
                             break;
                         case 3:
-                            downsort_tree<2>(i, i*BRS[3]/BRS[1],
+                            downsort_tree<2>(timer_special_q, i, i*BRS[3]/BRS[1],
                                     *workspaces, *pool, si, precomp_plattice);
                             break;
                         default:

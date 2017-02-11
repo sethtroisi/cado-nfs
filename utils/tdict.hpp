@@ -285,9 +285,11 @@ namespace tdict {
                 accounting_bookkeeping(tree& t) {
                     ASSERT_ALWAYS(t.running());
                     typename T::type v = T()();
-                    t.current->self += v;
-                    t.current = t.current->parent;
-                    t.current->self -= v;
+                    if (!t.current->scoping) {
+                        t.current->self += v;
+                        t.current = t.current->parent;
+                        t.current->self -= v;
+                    }
                 }
             };
 
@@ -343,10 +345,8 @@ class : public tdict::slot_base {
 } TT_INNER_LOOP;
 #endif
 
-#define TDICT_CAT2(a,b) a##b // actually concatenate
-#define TDICT_CAT(a,b) TDICT_CAT2(a,b) // force expand
-#define UNIQUE_ID() TDICT_CAT(_uid_,__LINE__)
-#define UNIQUE_ID2() TDICT_CAT(_uid2_,__LINE__)
+#define UNIQUE_ID() CADO_CONCATENATE(_uid_,__LINE__)
+#define UNIQUE_ID2() CADO_CONCATENATE(_uid2_,__LINE__)
 
 #define CHILD_TIMER(T,b) timetree_t::accounting_child UNIQUE_ID()(T,b);
 #define SIBLING_TIMER(T,b) timetree_t::accounting_sibling UNIQUE_ID() (T,b);
