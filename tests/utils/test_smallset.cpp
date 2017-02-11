@@ -8,10 +8,10 @@
 
 template <int SIZE, typename ELEMENTTYPE, int IDX>
 void
-check_pattern(smallset<SIZE, ELEMENTTYPE> &set, size_t n, __m128i data, size_t i)
+check_pattern(smallset<SIZE, ELEMENTTYPE> &set MAYBE_UNUSED, size_t n, __m128i data, size_t i MAYBE_UNUSED)
 {
    if (n > IDX) {
-      __m128i pattern = smallset_tools::extract_pattern<sizeof(ELEMENTTYPE),IDX>(data);
+      __m128i pattern MAYBE_UNUSED = smallset_tools::extract_pattern<sizeof(ELEMENTTYPE),IDX>(data);
       assert(set.contains(pattern) == (i == IDX));
     }
 }
@@ -35,7 +35,7 @@ test_smallset()
     assert(set.contains(0));
     assert(set.contains(i-1));
     assert(!set.contains(i));
-    __m128i pattern;
+    __m128i pattern MAYBE_UNUSED;
     if (sizeof(ELEMENTTYPE) == 1)
       pattern = _mm_set1_epi8(2);
     else if(sizeof(ELEMENTTYPE) == 2)

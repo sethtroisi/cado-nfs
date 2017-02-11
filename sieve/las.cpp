@@ -2139,7 +2139,7 @@ void factor_survivors_data::search_survivors(timetree_t& timer)
         verbose_output_print(TRACE_CHANNEL, 0,
                 "# When entering factor_survivors for bucket %u, "
                 "S[0][%u]=%u, S[1][%u]=%u\n",
-                trace_Nx.N, trace_Nx.x, S[0][trace_Nx.x], trace_Nx.x, S[1][trace_Nx.x]);
+                trace_Nx.N, trace_Nx.x, sdata[0].S[trace_Nx.x], trace_Nx.x, sdata[1].S[trace_Nx.x]);
         verbose_output_vfprint(TRACE_CHANNEL, 0, gmp_vfprintf,
                 "# Remaining norms which have not been accounted for in sieving: (%Zd, %Zd)\n",
                 traced_norms[0], traced_norms[1]);
@@ -2157,8 +2157,8 @@ void factor_survivors_data::search_survivors(timetree_t& timer)
         if (trace_on_spot_Nx(N, x)) {
             verbose_output_print(TRACE_CHANNEL, 0,
                     "# side0->Bound[%u]=%u, side1t->Bound[%u]=%u\n",
-                    S[0][trace_Nx.x], S[0][x] <= side0->bound ? 0 : side0->bound,
-                    S[1][trace_Nx.x], S[1][x] <= side0->bound ? 0 : side1->bound);
+                    sdata[0].S[trace_Nx.x], sdata[0].S[x] <= side0->bound ? 0 : side0->bound,
+                    sdata[1].S[trace_Nx.x], sdata[1].S[x] <= side0->bound ? 0 : side1->bound);
         }
     }
 #endif /* }}} */
