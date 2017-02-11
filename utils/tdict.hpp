@@ -345,26 +345,28 @@ class : public tdict::slot_base {
 } TT_INNER_LOOP;
 #endif
 
-#define UNIQUE_ID() CADO_CONCATENATE(_uid_,__LINE__)
-#define UNIQUE_ID2() CADO_CONCATENATE(_uid2_,__LINE__)
+#define UNIQUE_ID(t) CADO_CONCATENATE3(uid_,t,__LINE__)
 
-#define CHILD_TIMER(T,b) timetree_t::accounting_child UNIQUE_ID()(T,b);
-#define SIBLING_TIMER(T,b) timetree_t::accounting_sibling UNIQUE_ID() (T,b);
-#define BOOKKEEPING_TIMER(T) timetree_t::accounting_bookkeeping UNIQUE_ID() (T);
-#define ACTIVATE_TIMER(T) timetree_t::accounting_activate UNIQUE_ID() (T);
-#define DEBUG_DISPLAY_TIMER_AT_DTOR(T) timetree_t::accounting_debug UNIQUE_ID() (T);
-
-/* Note that we *can't* play do-while(0) here, because that would scope
- * the timer object, which is precisely what we want to avoid.
+/* Note that in most cases we *can't* play do-while(0) here, because that
+ * would scope the timer object, which is precisely what we want to
+ * avoid. In cases where the dtor is trivial, we can, since it makes no
+ * difference.
  */
-#define SIMPLE_CHILD_TIMER(T, name)                                     \
-        static tdict::slot UNIQUE_ID2()(name);		        	\
-        CHILD_TIMER(T, UNIQUE_ID2());						
+#define CHILD_TIMER(T, name)                                            \
+        static tdict::slot UNIQUE_ID(slot)(name);		       	\
+        timetree_t::accounting_child UNIQUE_ID(sentry)(T,UNIQUE_ID(slot));
 
-#define SIMPLE_SIBLING_TIMER(T, name) do {				\
+#define SIBLING_TIMER(T, name) do {				        \
         static tdict::slot x(name);			        	\
-        SIBLING_TIMER(T, x);						\
+        timetree_t::accounting_sibling UNIQUE_ID(sentry) (T,x);         \
     } while (0)
+#define BOOKKEEPING_TIMER(T)						\
+    timetree_t::accounting_bookkeeping UNIQUE_ID(sentry) (T);
+#define ACTIVATE_TIMER(T)						\
+    timetree_t::accounting_activate UNIQUE_ID(sentry) (T);
+#define DEBUG_DISPLAY_TIMER_AT_DTOR(T)					\
+    timetree_t::accounting_debug UNIQUE_ID(sentry) (T);
+
 
 
 #endif	/* TDICT_HPP_ */

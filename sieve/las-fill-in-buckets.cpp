@@ -318,7 +318,7 @@ fill_in_buckets(const worker_thread * worker,
                 bool first_reg,
                 where_am_I_ptr w)
 {
-  SIMPLE_CHILD_TIMER(worker->timer, __func__);
+  CHILD_TIMER(worker->timer, __func__);
   const slice_index_t slice_index = plattices_vector->get_index();
   bucket_array_t<LEVEL, shorthint_t> BA;  /* local copy. Gain a register + use stack */
   BA.move(orig_BA);
@@ -439,7 +439,7 @@ fill_in_buckets_one_slice_internal(const worker_thread * worker, const task_para
 {
     const fill_in_buckets_parameters *param = static_cast<const fill_in_buckets_parameters *>(_param);
     ACTIVATE_TIMER(worker->timer);
-    SIMPLE_CHILD_TIMER(worker->timer, TEMPLATE_INST_NAME(fill_in_buckets_one_slice_internal, LEVEL));
+    CHILD_TIMER(worker->timer, TEMPLATE_INST_NAME(fill_in_buckets_one_slice_internal, LEVEL));
     where_am_I w;
     WHERE_AM_I_UPDATE(w, si, param->si);
     WHERE_AM_I_UPDATE(w, side, param->side);
@@ -469,7 +469,7 @@ fill_in_buckets_one_slice(const worker_thread * worker MAYBE_UNUSED, const task_
 {
     const fill_in_buckets_parameters *param = static_cast<const fill_in_buckets_parameters *>(_param);
     ACTIVATE_TIMER(worker->timer);
-    SIMPLE_CHILD_TIMER(worker->timer, TEMPLATE_INST_NAME(fill_in_buckets_one_slice, LEVEL));
+    CHILD_TIMER(worker->timer, TEMPLATE_INST_NAME(fill_in_buckets_one_slice, LEVEL));
 
     where_am_I w;
     WHERE_AM_I_UPDATE(w, si, param->si);
@@ -516,7 +516,7 @@ template <int LEVEL>
 static void
 fill_in_buckets_one_side(timetree_t& timer, thread_pool &pool, thread_workspaces &ws, const fb_part *fb, sieve_info_srcptr const si, const int side)
 {
-  SIMPLE_CHILD_TIMER(timer, __func__);
+  CHILD_TIMER(timer, __func__);
     /* Process all slices in this factor base part */
     const fb_slice_interface *slice;
     slice_index_t slices_pushed = 0;
@@ -536,7 +536,7 @@ fill_in_buckets_one_side(timetree_t& timer, thread_pool &pool, thread_workspaces
 
 void fill_in_buckets_both(timetree_t& timer, thread_pool &pool, thread_workspaces &ws, sieve_info_srcptr si)
 {
-  SIMPLE_CHILD_TIMER(timer, __func__);
+  CHILD_TIMER(timer, __func__);
   plattice_enumerate_t::set_masks(si->conf->logI);
   for (int side = 0; side < 2; ++side) {
     switch (si->toplevel) {
@@ -579,7 +579,7 @@ downsort_tree(
     sieve_info_ptr si,
     precomp_plattice_t precomp_plattice)
 {
-  SIMPLE_CHILD_TIMER(timer, TEMPLATE_INST_NAME(downsort_tree, LEVEL));
+  CHILD_TIMER(timer, TEMPLATE_INST_NAME(downsort_tree, LEVEL));
   ASSERT_ALWAYS(LEVEL > 0);
 
   where_am_I w;
