@@ -3491,7 +3491,7 @@ int main (int argc0, char *argv0[])/*{{{*/
 
     if (las->batch)
       {
-        SIBLING_TIMER(global_timer, "batch cofactorization");
+        SIBLING_TIMER(global_timer, "batch cofactorization (time is wrong because of openmp)");
 	const char *batch0_file, *batch1_file;
 	batch0_file = param_list_lookup_string (pl, "batch0");
 	batch1_file = param_list_lookup_string (pl, "batch1");
