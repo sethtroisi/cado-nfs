@@ -1,5 +1,6 @@
 #include "cado.h"
 #include <stdio.h>
+#include <math.h>
 #ifdef  HAVE_OPENMP
 #include <omp.h>
 #endif
@@ -864,6 +865,16 @@ create_batch_file (const char *f, mpz_t P, unsigned long B, unsigned long L,
   FILE *fp;
   double s = seconds (), wct = wct_seconds ();
   size_t ret;
+
+  // the product of primes up to B takes \log2(B)-\log\log 2 / \log 2
+  // bits. The added constant is 0.5287.
+  if (log2(B/GMP_LIMB_BITS) + 0.5287 >= 31) {
+      fprintf(stderr, "Gnu MP cannot deal with primes product that large (max 37 bits)\n");
+      abort();
+  } else if (log2(B) + 0.5287 >= 34) {
+      fprintf(stderr, "Gnu MP's mpz_inp_raw and mpz_out_raw functions are limited to integers of at most 34 bits\n");
+      abort();
+  }
 
 #ifdef HAVE_OPENMP
   omp_set_num_threads (nthreads);

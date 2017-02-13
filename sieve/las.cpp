@@ -790,6 +790,7 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
 
     las->suppress_duplicates = param_list_parse_switch(pl, "-dup");
     las->batch = param_list_parse_switch(pl, "-batch");
+
     las->batch_print_survivors = param_list_parse_switch(pl, "-batch-print-survivors");
     las->nb_threads = 1;		/* default value */
     param_list_parse_int(pl, "t", &las->nb_threads);
@@ -3037,6 +3038,21 @@ int main (int argc0, char *argv0[])/*{{{*/
        so we use only one bucket array. */
     const size_t nr_workspaces = las->nb_threads + ((las->nb_threads > 1)?1:0);
     thread_workspaces *workspaces = new thread_workspaces(nr_workspaces, 2, las);
+
+    if (las->batch) {
+        for(int side = 0 ; side < 2 ; side++) {
+            int lpb = las->default_config->sides[side]->lpb;
+            // the product of primes up to B takes \log2(B)-\log\log 2 /
+            // \log 2 bits. The added constant is 0.5287.
+            if (lpb + 0.5287 >= 31 + log2(GMP_LIMB_BITS)) {
+                fprintf(stderr, "Gnu MP cannot deal with primes product that large (max 37 bits, asked for lpb%d=%d)\n", side, lpb);
+                abort();
+            } else if (lpb + 0.5287 >= 34) {
+                fprintf(stderr, "Gnu MP's mpz_inp_raw and mpz_out_raw functions are limited to integers of at most 34 bits (asked for lpb%d=%d)\n",side,lpb);
+                abort();
+            }
+        }
+    }
 
     las_report report;
     las_report_init(report);
