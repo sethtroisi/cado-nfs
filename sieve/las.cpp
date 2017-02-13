@@ -3524,28 +3524,43 @@ int main (int argc0, char *argv0[])/*{{{*/
 				las->default_config->sides[1]->lim};
 	int lpb[2] = {las->default_config->sides[0]->lpb,
 		      las->default_config->sides[1]->lpb};
-	int mfb[2] = {las->default_config->sides[0]->lpb,
+	int batchlpb[2] = {lpb[0], lpb[1]};
+	int batchmfb[2] = {las->default_config->sides[0]->lpb,
 		      las->default_config->sides[1]->lpb};
-        param_list_parse_int(pl, "batchlpb0", &(lpb[0]));
-        param_list_parse_int(pl, "batchlpb1", &(lpb[1]));
-        param_list_parse_int(pl, "batchmfb0", &(mfb[0]));
-        param_list_parse_int(pl, "batchmfb1", &(mfb[1]));
+        param_list_parse_int(pl, "batchlpb0", &(batchlpb[0]));
+        param_list_parse_int(pl, "batchlpb1", &(batchlpb[1]));
+        param_list_parse_int(pl, "batchmfb0", &(batchmfb[0]));
+        param_list_parse_int(pl, "batchmfb1", &(batchmfb[1]));
 	mpz_t batchP[2];
 	mpz_init (batchP[0]);
 	mpz_init (batchP[1]);
-	create_batch_file (batch0_file, batchP[0], lim[0], 1UL << lpb[0],
+	create_batch_file (batch0_file, batchP[0], lim[0], 1UL << batchlpb[0],
 			   las->cpoly->pols[0], las->output, las->nb_threads);
-	create_batch_file (batch1_file, batchP[1], lim[1], 1UL << lpb[1],
+	create_batch_file (batch1_file, batchP[1], lim[1], 1UL << batchlpb[1],
 			   las->cpoly->pols[1], las->output, las->nb_threads);
 	double tcof_batch = seconds ();
 	cofac_list_realloc (las->L, las->L->size);
-        int side = las->default_config->side;
-        if (las->L->size)
-            side = las->L->side[0];
-	report->reports = find_smooth (las->L, batchP, mfb[side], las->output,
+
+        mpz_t B[2], L[2], M[2];
+
+        for(int side = 0 ; side < 2 ; side++) {
+            mpz_init(B[side]);
+            mpz_init(L[side]);
+            mpz_init(M[side]);
+            mpz_ui_pow_ui(B[side], 2, batchlpb[side]);
+            mpz_ui_pow_ui(L[side], 2, lpb[side]);
+            mpz_ui_pow_ui(M[side], 2, batchmfb[side]);
+        }
+
+	report->reports = find_smooth (las->L, batchP, B, L, M, las->output,
 				       las->nb_threads);
-	mpz_clear (batchP[0]);
-	mpz_clear (batchP[1]);
+
+        for(int side = 0 ; side < 2 ; side++) {
+            mpz_clear (batchP[side]);
+            mpz_clear (B[side]);
+            mpz_clear (L[side]);
+            mpz_clear (M[side]);
+        }
 	factor (las->L, report->reports, las->cpoly, lpb,
 		las->output, las->nb_threads);
 	tcof_batch = seconds () - tcof_batch;

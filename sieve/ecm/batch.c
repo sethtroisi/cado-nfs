@@ -492,14 +492,24 @@ smoothness_test (mpz_t *R, uint32_t *perm, unsigned long n, mpz_t P, FILE *out)
    relations 0 to *nb_smooth-1 are smooth
    relations *nb_smooth to *nb_unknown-1 are unknown
    relations >= *nb_unknown are non-smooth (useless).
+
+   on input, we know that n has no factor<=B. 
+   We're willing to accept prime cofactors <= L,
+   and to try harder to factor composites which are <= M
 */
 static void
 update_status (mpz_t *R, uint32_t *perm,
                unsigned char *b_status_r, unsigned char *b_status_a,
-               int mfb,
+               mpz_srcptr B,
+               mpz_srcptr L,
+               mpz_srcptr M,
                unsigned long *nb_smooth, unsigned long *nb_unknown)
 {
   unsigned long i, j;
+
+  mpz_t BB;
+  mpz_init(BB);
+  mpz_mul(BB,B,B);
 
   for (j = *nb_smooth; j < *nb_unknown; j++)
     {
@@ -509,8 +519,12 @@ update_status (mpz_t *R, uint32_t *perm,
         /* relation i is smooth iff R[i]=1 ; another option is in case
          * the remaining cofactor is below the mfb we've been given. */
         if (mpz_cmp_ui (R[i], 1) == 0
-                || (int) mpz_sizeinbase(R[i], 2) <= mfb
-                )
+                || mpz_cmp(R[i], L) <= 0
+                || (
+                    mpz_cmp(R[i], BB) >= 0
+                    && mpz_cmp(R[i], M) <= 0
+                    && !mpz_probab_prime_p(R[i], 1)
+                ))
           {
             b_status_r[i] = STATUS_SMOOTH;
             if (b_status_a[i] == STATUS_SMOOTH)
@@ -531,12 +545,13 @@ update_status (mpz_t *R, uint32_t *perm,
           }
       }
     }
+  mpz_clear(BB);
 }
 
 /* return the number n of smooth relations in l,
    which should be at the end in locations perm[0], perm[1], ..., perm[n-1] */
 unsigned long
-find_smooth (cofac_list l, mpz_t batchP[2], int mfb, FILE *out,
+find_smooth (cofac_list l, mpz_t batchP[2], mpz_t B[2], mpz_t L[2], mpz_t M[2], FILE *out,
              int nthreads MAYBE_UNUSED)
 {
   unsigned long nb_rel_read = l->size;
@@ -574,10 +589,10 @@ find_smooth (cofac_list l, mpz_t batchP[2], int mfb, FILE *out,
 
       /* we only need to update relations in [nb_smooth, nb_unknown-1] */
       if (z == 0)
-        update_status (l->R, l->perm, b_status_r, b_status_a, mfb,
+        update_status (l->R, l->perm, b_status_r, b_status_a, B[0], L[0], M[0],
                        &nb_smooth, &nb_unknown);
       else
-        update_status (l->A, l->perm, b_status_a, b_status_r, mfb,
+        update_status (l->A, l->perm, b_status_a, b_status_r, B[1], L[1], M[1],
                        &nb_smooth, &nb_unknown);
     }
 
@@ -606,6 +621,14 @@ print_smooth_aux (mpz_t *factors, mpz_t n, facul_method_t *methods,
     {
       res_fac = facul_doit_onefm_mpz (factors, n, methods[i], fm, cfm,
                                       lpb, BB, BBB);
+
+      /* Could happen if we allowed a cofactor bound after batch
+       * cofactorization */
+      if (res_fac == FACUL_NOT_SMOOTH) {
+          gmp_fprintf(stderr, "# C=%Zd not smooth\n", n);
+          return str;
+      }
+
 
       ASSERT_ALWAYS(res_fac != FACUL_NOT_SMOOTH);
 
