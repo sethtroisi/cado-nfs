@@ -496,6 +496,7 @@ smoothness_test (mpz_t *R, uint32_t *perm, unsigned long n, mpz_t P, FILE *out)
 static void
 update_status (mpz_t *R, uint32_t *perm,
                unsigned char *b_status_r, unsigned char *b_status_a,
+               int mfb,
                unsigned long *nb_smooth, unsigned long *nb_unknown)
 {
   unsigned long i, j;
@@ -505,8 +506,11 @@ update_status (mpz_t *R, uint32_t *perm,
       i = perm[j];
       if (b_status_r[i] == STATUS_UNKNOWN)
       {
-        /* relation i is smooth iff R[i]=1 */
-        if (mpz_cmp_ui (R[i], 1) == 0)
+        /* relation i is smooth iff R[i]=1 ; another option is in case
+         * the remaining cofactor is below the mfb we've been given. */
+        if (mpz_cmp_ui (R[i], 1) == 0
+                || (int) mpz_sizeinbase(R[i], 2) <= mfb
+                )
           {
             b_status_r[i] = STATUS_SMOOTH;
             if (b_status_a[i] == STATUS_SMOOTH)
@@ -532,7 +536,7 @@ update_status (mpz_t *R, uint32_t *perm,
 /* return the number n of smooth relations in l,
    which should be at the end in locations perm[0], perm[1], ..., perm[n-1] */
 unsigned long
-find_smooth (cofac_list l, mpz_t batchP[2], FILE *out,
+find_smooth (cofac_list l, mpz_t batchP[2], int mfb, FILE *out,
              int nthreads MAYBE_UNUSED)
 {
   unsigned long nb_rel_read = l->size;
@@ -566,14 +570,14 @@ find_smooth (cofac_list l, mpz_t batchP[2], FILE *out,
                          batchP[0], out);
       else
         smoothness_test (l->A, l->perm + nb_smooth, nb_unknown - nb_smooth,
-                         batchP[1], out);
+                         batchP[1],  out);
 
       /* we only need to update relations in [nb_smooth, nb_unknown-1] */
       if (z == 0)
-        update_status (l->R, l->perm, b_status_r, b_status_a,
+        update_status (l->R, l->perm, b_status_r, b_status_a, mfb,
                        &nb_smooth, &nb_unknown);
       else
-        update_status (l->A, l->perm, b_status_a, b_status_r,
+        update_status (l->A, l->perm, b_status_a, b_status_r, mfb,
                        &nb_smooth, &nb_unknown);
     }
 

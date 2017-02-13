@@ -2908,6 +2908,10 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "batch", "(switch) use batch cofactorization");
   param_list_decl_usage(pl, "batch0", "side-0 batch file");
   param_list_decl_usage(pl, "batch1", "side-1 batch file");
+  param_list_decl_usage(pl, "batchlpb0", "large prime bound on side 0 to be considered by batch cofactorization");
+  param_list_decl_usage(pl, "batchlpb1", "large prime bound on side 1 to be considered by batch cofactorization");
+  param_list_decl_usage(pl, "batchmfb0", "cofactor bound on side 0 to be considered after batch cofactorization");
+  param_list_decl_usage(pl, "batchmfb1", "cofactor bound on side 1 to be considered after batch cofactorization");
   param_list_decl_usage(pl, "batch-print-survivors", "(switch) just print survivros for an external cofactorization");
   param_list_decl_usage(pl, "galois", "(switch) for reciprocal polynomials, sieve only half of the q's");
 #ifdef TRACE_K
@@ -3040,15 +3044,20 @@ int main (int argc0, char *argv0[])/*{{{*/
     thread_workspaces *workspaces = new thread_workspaces(nr_workspaces, 2, las);
 
     if (las->batch) {
+        int lpb[2] = {
+            las->default_config->sides[0]->lpb,
+            las->default_config->sides[1]->lpb,
+        };
+        param_list_parse_int(pl, "batchlpb0", &(lpb[0]));
+        param_list_parse_int(pl, "batchlpb1", &(lpb[1]));
         for(int side = 0 ; side < 2 ; side++) {
-            int lpb = las->default_config->sides[side]->lpb;
             // the product of primes up to B takes \log2(B)-\log\log 2 /
             // \log 2 bits. The added constant is 0.5287.
-            if (lpb + 0.5287 >= 31 + log2(GMP_LIMB_BITS)) {
-                fprintf(stderr, "Gnu MP cannot deal with primes product that large (max 37 bits, asked for lpb%d=%d)\n", side, lpb);
+            if (lpb[side] + 0.5287 >= 31 + log2(GMP_LIMB_BITS)) {
+                fprintf(stderr, "Gnu MP cannot deal with primes product that large (max 37 bits, asked for batchlpb%d=%d)\n", side, lpb[side]);
                 abort();
-            } else if (lpb + 0.5287 >= 34) {
-                fprintf(stderr, "Gnu MP's mpz_inp_raw and mpz_out_raw functions are limited to integers of at most 34 bits (asked for lpb%d=%d)\n",side,lpb);
+            } else if (lpb[side] + 0.5287 >= 34) {
+                fprintf(stderr, "Gnu MP's mpz_inp_raw and mpz_out_raw functions are limited to integers of at most 34 bits (asked for batchlpb%d=%d)\n",side,lpb[side]);
                 abort();
             }
         }
@@ -3515,6 +3524,12 @@ int main (int argc0, char *argv0[])/*{{{*/
 				las->default_config->sides[1]->lim};
 	int lpb[2] = {las->default_config->sides[0]->lpb,
 		      las->default_config->sides[1]->lpb};
+	int mfb[2] = {las->default_config->sides[0]->lpb,
+		      las->default_config->sides[1]->lpb};
+        param_list_parse_int(pl, "batchlpb0", &(lpb[0]));
+        param_list_parse_int(pl, "batchlpb1", &(lpb[1]));
+        param_list_parse_int(pl, "batchmfb0", &(mfb[0]));
+        param_list_parse_int(pl, "batchmfb1", &(mfb[1]));
 	mpz_t batchP[2];
 	mpz_init (batchP[0]);
 	mpz_init (batchP[1]);
@@ -3524,7 +3539,10 @@ int main (int argc0, char *argv0[])/*{{{*/
 			   las->cpoly->pols[1], las->output, las->nb_threads);
 	double tcof_batch = seconds ();
 	cofac_list_realloc (las->L, las->L->size);
-	report->reports = find_smooth (las->L, batchP, las->output,
+        int side = las->default_config->side;
+        if (las->L->size)
+            side = las->L->side[0];
+	report->reports = find_smooth (las->L, batchP, mfb[side], las->output,
 				       las->nb_threads);
 	mpz_clear (batchP[0]);
 	mpz_clear (batchP[1]);
