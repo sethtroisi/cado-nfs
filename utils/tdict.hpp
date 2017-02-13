@@ -324,7 +324,7 @@ namespace tdict {
             }
             tree& operator+=(tree const& t) {
                 self += t.self;
-                for(typename M_t::const_iterator a = M.begin() ; a != M.end() ; a++) {
+                for(typename M_t::const_iterator a = t.M.begin() ; a != t.M.end() ; a++) {
                     M[a->first] += a->second;
                 }
                 return *this;
