@@ -2063,7 +2063,7 @@ int MATMUL_NAME(reload_cache)(matmul_ptr mm0)/* {{{ */
     FILE * f;
 
     f = matmul_common_reload_cache_fopen(sizeof(abelt), mm->public_, MM_MAGIC);
-    if (f == NULL) { return 0; }
+    if (!f) return 0;
 
     for( ;; ) {
         slice_header_t hdr[1];
@@ -2108,6 +2108,8 @@ void MATMUL_NAME(save_cache)(matmul_ptr mm0)/*{{{*/
     FILE * f;
 
     f = matmul_common_save_cache_fopen(sizeof(abelt), mm->public_, MM_MAGIC);
+    if (!f) return;
+
     for(unsigned int h = 0 ; h < mm->headers.size() ; h++) {
         slice_header_t * hdr = & (mm->headers[h]);
         MATMUL_COMMON_WRITE_ONE16(hdr->t, f);

@@ -319,7 +319,7 @@ int MATMUL_NAME(reload_cache)(matmul_ptr mm0)
 
     struct matmul_sliced_data_s * mm = (struct matmul_sliced_data_s *) mm0;
     f = matmul_common_reload_cache_fopen(sizeof(abelt), mm->public_, MM_MAGIC);
-    if (f == NULL) return 0;
+    if (!f) return 0;
 
     size_t n;
     MATMUL_COMMON_READ_ONE32(n, f);
@@ -340,6 +340,7 @@ void MATMUL_NAME(save_cache)(matmul_ptr mm0)
 
     struct matmul_sliced_data_s * mm = (struct matmul_sliced_data_s *) mm0;
     f = matmul_common_save_cache_fopen(sizeof(abelt), mm->public_, MM_MAGIC);
+    if (!f) return;
 
     size_t n = mm->data.size();
     MATMUL_COMMON_WRITE_ONE32(n, f);

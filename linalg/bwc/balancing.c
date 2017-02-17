@@ -97,6 +97,10 @@ void balancing_write(balancing_ptr bal, const char * mfile, const char * suggest
 
     if (suggest && strlen(suggest) && !suggestion_is_directory) {
         balancing_write_inner(bal, suggest);
+        /* If we received "-out", don't store the balancing file with the
+         * default name -- that would be rather odd.
+         */
+        return;
     }
 
     char * dup_prefix=strdup(mfile);

@@ -131,7 +131,7 @@ int MATMUL_NAME(reload_cache)(matmul_ptr mm0)
     FILE * f;
     struct matmul_basicp_data_s * mm = (struct matmul_basicp_data_s *) mm0;
     f = matmul_common_reload_cache_fopen(sizeof(abelt), mm->public_, MM_MAGIC);
-    if (f == NULL) { return 0; }
+    if (!f) return 0;
 
     MATMUL_COMMON_READ_ONE32(mm->datasize, f);
     mm->q = (uint32_t *) malloc(mm->datasize * sizeof(uint32_t));
@@ -147,6 +147,7 @@ void MATMUL_NAME(save_cache)(matmul_ptr mm0)
 
     struct matmul_basicp_data_s * mm = (struct matmul_basicp_data_s *) mm0;
     f = matmul_common_save_cache_fopen(sizeof(abelt), mm->public_, MM_MAGIC);
+    if (!f) return;
 
     MATMUL_COMMON_WRITE_ONE32(mm->datasize, f);
     MATMUL_COMMON_WRITE_MANY32(mm->q, mm->datasize, f);

@@ -814,7 +814,7 @@ template<typename gfp, typename fast_gfp>
 int matmul_zone_data<gfp, fast_gfp>::reload_cache()
 {
     FILE * f = matmul_common_reload_cache_fopen(sizeof(abelt), public_, MM_MAGIC);
-    if (f == NULL) { return 0; }
+    if (!f) return 0;
     cachefile c(f);
     c >> blocks;
 #ifdef DISPATCHERS_AND_COMBINERS
@@ -834,6 +834,7 @@ template<typename gfp, typename fast_gfp>
 void matmul_zone_data<gfp, fast_gfp>::save_cache()
 {
     FILE * f = matmul_common_save_cache_fopen(sizeof(abelt), public_, MM_MAGIC);
+    if (!f) return;
     cachefile c(f);
     c << blocks;
     fclose(f);

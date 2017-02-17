@@ -291,7 +291,7 @@ int MATMUL_NAME(reload_cache)(matmul_ptr mm0)
 
     struct matmul_threaded_data_s * mm = (struct matmul_threaded_data_s *) mm0;
     f = matmul_common_reload_cache_fopen(sizeof(abelt), mm->public_, MM_MAGIC);
-    if (f == NULL) return 0;
+    if (!f) return 0;
 
     MATMUL_COMMON_READ_ONE32(mm->dense->weight, f);
     MATMUL_COMMON_READ_ONE32(mm->sgrp_size, f);
@@ -335,6 +335,7 @@ void MATMUL_NAME(save_cache)(matmul_ptr mm0)
 
     struct matmul_threaded_data_s * mm = (struct matmul_threaded_data_s *) mm0;
     f = matmul_common_save_cache_fopen(sizeof(abelt), mm->public_, MM_MAGIC);
+    if (!f) return;
 
     MATMUL_COMMON_WRITE_ONE32(mm->dense->weight, f);
     MATMUL_COMMON_WRITE_ONE32(mm->sgrp_size, f);

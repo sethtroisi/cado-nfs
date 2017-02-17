@@ -183,6 +183,7 @@ my $nv;
 
 my $wdir;
 my $matrix;
+my $random_matrix;
 my $rhs;
 my $nrhs=0;
 
@@ -200,6 +201,8 @@ my $nrhs=0;
 ## be sometimes). For virbr0, it's again some local mess, but each machine 
 ## having this class C network defined, openmpi can't really tell whether 
 ## they're connected or not -- and of course they're not.
+##
+## Note that we also obey the $MPI_EXTRA_ARGS environment variable.
 my $mpi_extra_args;
  
 my ($m, $n);
@@ -262,8 +265,12 @@ my $my_verbose_flags = {
 };
 
 while (my ($k,$v) = each %$param) {
-    # Filter out parameters which are _not_ relevant to the bwc programs.
-    if ($k eq 'matrix') { $matrix=$v; next; }
+    # Some parameters are relevant to us just like they're relevant to
+    # the bwc programs, so we'll set a variable based on their value, and
+    # also copy them to the @main_args array.
+    if ($k eq 'matrix') { $matrix=$v; }
+    if ($k eq 'random_matrix') { $random_matrix=$v; }
+    # Some parameters which are simply _not_ relevant to the bwc programs.
     if ($k eq 'hostfile') { $hostfile=$v; next; }
     if ($k eq 'mpi_extra_args') { $mpi_extra_args=$v; next; }
     ## if ($k eq 'force_complete') { $force_complete=$v; next; }
@@ -340,15 +347,21 @@ if ($main eq ':mpirun') {
 
 # {{{ Some important argument checks
 {
-    my @miss = grep { !defined $param->{$_}; } (qw/prime matrix interval/);
+    my @miss = grep { !defined $param->{$_}; } (qw/prime interval/);
     die "Missing argument(s): @miss" if @miss;
+    if (!defined($param->{'matrix'}) && !defined($param->{'random_matrix'})) {
+        die "Missing parameter: matrix (or random_matrix)";
+    }
     if (!defined($m) || !defined($n)) {
         die "Missing parameters: m and/or n";
     }
 }
 
-$param->{'matrix'} =~ s/~/$ENV{HOME}/g;
-die "$param->{'matrix'}: $!" unless -f $param->{'matrix'};
+if (defined($param->{'matrix'})) {
+    $param->{'matrix'} =~ s/~/$ENV{HOME}/g;
+    die "$param->{'matrix'}: $!" unless -f $param->{'matrix'};
+}
+
 if ($prime == 2 && (($m % 64 != 0) || ($n % 64 != 0))) {
     die "Currently for p=2 bwc supports only block sizes which are multiples of 64";
 }
@@ -396,15 +409,18 @@ if ($m % $lingen_mpi_split[0] != 0 || $n % $lingen_mpi_split[0] != 0) {
 # own named 'wdir', or inferred from the basename of the matrix file,
 # appended with some information on the splitting, e.g.  c160-4x4.
 
+# Note that when doing random matrices, we don't even need a wdir.
 
-if (!defined($param->{'wdir'}) && defined($param->{'matrix'})) {
-    # ok, we're doing this a bit ahead of time
-    $wdir=$param->{'wdir'}="$param->{'matrix'}-${nh}x${nv}";
-    push @main_args, "wdir=$wdir";
-}
+if (!defined($random_matrix)) {
+    if (!defined($param->{'wdir'}) && defined($param->{'matrix'})) {
+        # ok, we're doing this a bit ahead of time
+        $wdir=$param->{'wdir'}="$param->{'matrix'}-${nh}x${nv}";
+        push @main_args, "wdir=$wdir";
+    }
 
-if ($main !~ /^:(?:complete|bench)$/ && !-d $param->{'wdir'}) {
-    die "$param->{'wdir'}: no such directory";
+    if ($main !~ /^:(?:complete|bench)$/ && !-d $param->{'wdir'}) {
+        die "$param->{'wdir'}: no such directory";
+    }
 }
 # }}}
 
@@ -506,7 +522,7 @@ sub ssh_program
 }
 # }}}
 
-if (!-d $wdir) {        # create $wdir on script node.
+if (!defined($random_matrix) && !-d $wdir) {        # create $wdir on script node.
     if ($show_only) {
         print "mkdir $wdir\n";
     } else {
@@ -837,11 +853,12 @@ if ($mpi_needed) {
     }
 
     if (scalar @hosts) {
-        # Don't use an uppercase filename.
-        $hostfile = "$wdir/hosts";
-        open F, ">$hostfile" or die "$hostfile: $!";
-        for my $h (@hosts) { print F "$h\n"; }
-        close F;
+        # I think that when doing so, the file will get deleted at
+        # program exit only.
+        my ($fh, $filename) = File::Temp->new(UNLINK=>1, TEMPLATE=>'hosts_XXXXXXXX');
+        $hostfile = $filename;
+        for my $h (@hosts) { print $fh "$h\n"; }
+        close $fh;
         print STDERR "Created $hostfile\n";
     }
     if (defined($hostfile)) {
@@ -901,6 +918,7 @@ if ($mpi_needed) {
         push @mpi_precmd, split(' ', $mpi_extra_args);
     }
     push @mpi_precmd, split(' ', '@MPIEXEC_EXTRA_STANZAS@');
+    push @mpi_precmd, split(' ', $ENV{'MPI_EXTRA_ARGS'});
 
     @mpi_precmd_single = @mpi_precmd;
     @mpi_precmd_lingen = @mpi_precmd;
@@ -936,7 +954,8 @@ if ($mpi_needed) {
     # mkdir must not be marked fatal, because if the command terminates
     # without having ever tried to join in an mpi collective like
     # mpi_init(), there's potential for the mpirun command to complain.
-    dosystem('-nofatal', @mpi_precmd, split(' ', "mkdir -p $wdir"));
+    dosystem('-nofatal', @mpi_precmd, split(' ', "mkdir -p $wdir"))
+        unless defined $random_matrix;
 }
 
 if ($main eq ':mpirun') {
@@ -951,7 +970,6 @@ if ($main eq ':mpirun') {
 # print "main_args:\n", join("\n", @main_args), "\n";
 
 push @main_args, splice @extra_args;
-push @main_args, "matrix=$matrix";
 
 # Now we have one function for each of the following macroscopic steps of
 # the program
@@ -1084,6 +1102,7 @@ sub rename_file_on_leader {
 # {{{ get_cached_bfile -> check for balancing file.
 sub get_cached_bfile {
     my $key = 'balancing';
+    return undef if defined($random_matrix);
     if ($param->{$key}) {
         $cache->{$key}=[$param->{$key}];
     }
@@ -1108,9 +1127,10 @@ sub get_cached_bfile {
 # }}}
 
 sub get_cached_balancing_header {
+    return undef if defined $random_matrix;
     my $key = 'balancing_header';
     if (defined(my $z = $cache->{$key})) { return @$z; }
-    my $balancing = get_cached_bfile or confess "\$balancing undefined";
+    defined(my $balancing = get_cached_bfile) or confess "\$balancing undefined";
     sysopen(my $fh, $balancing, O_RDONLY) or die "$balancing: $!";
     sysread($fh, my $bhdr, 24);
     my @x = unpack("LLLLLL", $bhdr);
@@ -1127,6 +1147,23 @@ sub get_nrows_ncols {
     if (defined(my $z = $cache->{$key})) {
         return @$z;
     }
+    if (defined($random_matrix)) {
+        my $nrows;
+        my $ncols;
+        my @tokens = split(',', $random_matrix);
+        if ($tokens[0] =~ /^(\d+)/) {
+            $nrows = $1;
+            $ncols = $1;
+        }
+        if ($tokens[1] =~ /^(\d+)/) {
+            $ncols = $1;
+        }
+        die "parameter random_matrix does not give nrows and ncols ??" unless defined($nrows) && defined($ncols);
+        $cache->{$key} = [ $nrows, $ncols ];
+        return @{$cache->{$key}};
+    }
+
+
     if (defined(my $z = $cache->{'balancing_header'})) {
         my @x = @$z;
         shift @x;
@@ -1190,7 +1227,9 @@ sub list_files_generic {
 sub list_vfiles {
     my ($f, $filesize) = list_files_generic(2, qr/V(\d+)-(\d+)\.(\d+)/);
     if ($filesize) {    # take the occasion to store it.
-        my ($bnh, $bnv, $bnrows, $bncols) = get_cached_balancing_header;
+        # Note that it might happen that we haven't computed the
+        # balancing file yet.
+        my ($bnrows, $bncols) = get_nrows_ncols;
         my $N = $bncols > $bnrows ? $bncols : $bnrows;
         eval {store_cached_entry('nbytes_per_splitwidth', $filesize / $N);};
         die "Problem with the size of V files ($filesize bytes, $N rows):\n$@" if $@;
@@ -1364,6 +1403,10 @@ sub subtask_krylov_todo {
     # We unconditionally do a check of the latest V checkpoint found in
     # $wdir, for all vectors.
     my @all_ys = map { [ $_*$splitwidth, ($_+1)*$splitwidth ] } (0..$n/$splitwidth - 1);
+
+    if (defined($random_matrix)) {
+        return map { "ys=$_->[0]..$_->[1] start=0"} @all_ys;
+    }
 
     my $vfiles = list_vfiles;
     my $vstarts = {};
@@ -1543,7 +1586,7 @@ sub task_krylov {
     #   - A${x0}-${x1}.* ; dot product files which are fed to lingen.
     #   These are write-only as far as this task is concerned.
 
-    subtask_secure;
+    subtask_secure unless defined $random_matrix;
 
     my $length = max_krylov_iteration;
     print "## krylov max iteration is $length\n";
@@ -1731,7 +1774,7 @@ sub task_mksol {
     #   - S.sols*-*.*-*.* ; partial sum which are fed to gather.
     #   These are write-only as far as this task is concerned.
 
-    subtask_secure;
+    subtask_secure unless defined $random_matrix;
 
     # We choose to require the S files for considering checkpoints as
     # valid. This is because in all likelihood, the V files from krylov

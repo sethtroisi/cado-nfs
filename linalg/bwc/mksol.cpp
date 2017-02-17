@@ -418,7 +418,7 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
             // FIXME. serialize here ??
             // serialize(pi->m);
 
-            {
+            if (!fake) {
                 char * s_name;
                 int rc = asprintf(&s_name, "S.sols%u-%u.%u-%u",
                         solutions[0] + j * As_width,
