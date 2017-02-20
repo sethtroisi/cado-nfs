@@ -561,32 +561,14 @@ deleteSuperfluousRows (report_t *rep, filter_matrix_t *mat,
 static int
 number_of_superfluous_rows (filter_matrix_t *mat)
 {
-    int kappa, ni2rem, excess;
+    int excess = mat->rem_nrows - mat->rem_ncols;
 
-    excess = mat->rem_nrows - mat->rem_ncols;
     ASSERT(excess >= 0);
 
-    if (mat->keep > 0)
-      kappa = excess / mat->keep;
-    else
-      kappa = excess;
-
-    if (kappa <= (1<<4))
-      ni2rem = (excess + 1) / 2; /* ensures ni2rem <= excess, and 1 <= ni2rem
-                                    if excess > 0 */
-    else if (kappa <= (1<<5))
-      ni2rem = excess / 4;
-    else if (kappa <= (1<<10))
-      ni2rem = excess / 8;
-    else if (kappa <= (1<<15))
-      ni2rem = excess / 16;
-    else if (kappa <= (1<<20))
-      ni2rem = excess / 32;
-    else
-      ni2rem = excess / 64;
-    /* the following formula is close to optimal experimentally for a target density
-       of 170 */
-    return (int) (2.0 * (double) ni2rem * REPORT_INCR / 5.0);
+    /* the following formula is close to optimal experimentally for RSA-100,
+       with an initial excess of abut 100%, maxlevel=20 and a target density
+       of 170 (with USE_WEIGHT_LAMBDA = 0) */
+    return (int) (0.145 * (double) excess * REPORT_INCR / 3.0);
 }
 
 static void
@@ -810,7 +792,7 @@ mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel,
     if (mat->cwmax < mat->mergelevelmax &&
         (MkzQueueCardinality (mat) == 0 || excess == mat->keep))
       {
-        if (excess == mat->keep || compute_WoverN (mat) > 0.68 * target_density)
+        if (excess == mat->keep)
           mat->cwmax = mat->mergelevelmax;
         else /* MkzQueueCardinality (mat) == 0 */
           mat->cwmax ++;
