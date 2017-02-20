@@ -337,7 +337,7 @@ MkzCount(filter_matrix_t *mat, index_t j)
 
 /* pop the top element from the heap, return 0 iff heap is empty */
 int
-MkzPopQueue(index_t *dj, index_t *mkz, filter_matrix_t *mat)
+MkzPopQueue(index_t *dj, index_signed_t *mkz, filter_matrix_t *mat)
 {
   index_t *Q = mat->MKZQ;
   uint32_t *A = mat->MKZA;

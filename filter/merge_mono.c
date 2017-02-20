@@ -673,7 +673,8 @@ void
 mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel,
                double target_density)
 {
-  index_t j, mkz;
+  index_t j;
+  index_signed_t mkz;
   uint64_t WN_prev, WN_cur, WN_min;
   double WoverN;
   unsigned int ncost = 0;
@@ -750,13 +751,13 @@ mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel,
       fprintf(rep->outfile, "#\n");
       mergeForColumn (rep, mat, m, j);
     }
-    int32_t real_mkz = mat->weight - weight0;
+    index_signed_t real_mkz = mat->weight - weight0;
     if (m > 1 && merge_stats_is_first_merge (merge_data, m))
       {
         fprintf (rep->outfile, "## First %d-merge\n", m);
         print_report (mat);
-        printf ("First %d-merge, estimated cost %lu, real cost %d\n",
-                m, (unsigned long) mkz, real_mkz);
+        printf ("First %d-merge, estimated cost %ld, real cost %ld\n",
+                m, (long) mkz, (long) real_mkz);
         fflush (stdout);
       }
 
