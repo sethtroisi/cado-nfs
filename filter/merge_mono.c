@@ -683,12 +683,8 @@ mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel,
 
   printf ("# Using %s to compute the merges\n", __func__);
 
-  /* initialize the heap of heavy rows */
-  for (unsigned long i = 0; i < mat->nrows; i++)
-    {
-      ASSERT_ALWAYS(mat->rows[i] != NULL);
-      heap_push (mat->Heavy, mat, i);
-    }
+  /* fill the heap of heavy rows */
+  heap_fill (mat);
 
   // clean things
   removeSingletons (rep, mat);
