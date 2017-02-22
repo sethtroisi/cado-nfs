@@ -123,6 +123,14 @@ is_irreducible (mpz_poly f)
   do {
     mpz_nextprime (p, p);
     nr = mpz_poly_roots_mpz (roots, f, p);
+    /* If f has no root mod p and degree <= 3, it is irreducible,
+       since a degree 2 polynomial can only factor into 1+1 or 2,
+       and a degree 3 polynomial can only factor into 1+2 or 3. */
+    if (nr == 0 && d <= 3)
+      {
+        ret = 1;
+        goto clear_and_exit;
+      }
   } while (nr == 0);
 
   g.coeff = (mpz_t **) malloc ((dg + 2)*sizeof(mpz_t*));
@@ -186,13 +194,14 @@ is_irreducible (mpz_poly f)
   }
   free (g.coeff);
 
-  for (i = 0; i < d; i++)
-    mpz_clear (roots[i]);
-  free (roots);
   mpz_clear (det);
   mpz_clear (a);
   mpz_clear (b);
   mpz_clear (r);
+ clear_and_exit:
+  for (i = 0; i < d; i++)
+    mpz_clear (roots[i]);
+  free (roots);
   mpz_clear (p);
 
   return ret;
