@@ -99,6 +99,7 @@ int incrS(int w);
 int weightSum(filter_matrix_t *mat, int i1, int i2, int32_t j);
 void fillTabWithRowsForGivenj(int32_t *ind, filter_matrix_t *mat, int32_t j);
 void destroyRow(filter_matrix_t *mat, int i);
+void heap_fill (filter_matrix_t *mat);
 void heap_push (heap H, filter_matrix_t *mat, uint32_t i);
 void heap_delete (heap H, filter_matrix_t *mat, uint32_t i);
 uint32_t heap_pop (heap H, filter_matrix_t *mat);

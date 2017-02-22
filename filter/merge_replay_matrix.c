@@ -93,6 +93,17 @@ heap_init (heap H, uint32_t nrows, int maxlevel)
           USE_WEIGHT_LAMBDA);
 }
 
+/* fill the heap of heavy rows */
+void
+heap_fill (filter_matrix_t *mat)
+{
+  for (unsigned long i = 0; i < mat->nrows; i++)
+    {
+      ASSERT_ALWAYS(mat->rows[i] != NULL);
+      heap_push (mat->Heavy, mat, i);
+    }
+}
+
 static void
 heap_clear (heap H)
 {
