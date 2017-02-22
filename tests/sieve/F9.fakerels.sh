@@ -31,7 +31,7 @@ nfake=`$cmd | grep -v "^#" | wc -l`
 
 # remove leading spaces (for openbsd 5.3)
 let nfake=nfake
-if [ "$nfake" != "117" ]; then
+if [ "$nfake" != "110" ]; then
     echo "Wrong number of fake relations"
     exit 1
 fi
