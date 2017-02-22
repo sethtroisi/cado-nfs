@@ -39,24 +39,15 @@ using namespace std;
 // A global mutex for I/O
 pthread_mutex_t io_mutex = PTHREAD_MUTEX_INITIALIZER;
 
-// We need a fast random, re-entrant, not necessarily with a good period.
-// It must be of the same size as index_t.
-// Let us rely on glibc's random_r(), but if we have 64-bit index_t, then we'll
-// have to call it twice.
-
+// We need a re-entrant random. Let's take GMP.
 static inline
-uint64_t long_random(struct random_data * buf) {
-#if __SIZEOF_INDEX__ == 4
-    int32_t res;
-    random_r(buf, &res);
-    return uint64_t(res);
-#else
-    int32_t res1, res2;
-    random_r(buf, &res1);
-    random_r(buf, &res2);
-    // manpage is unclear about the size of the output of random_r()
-    return uint64_t(res1) ^ (uint64_t(res2) << 30);
-#endif
+uint64_t long_random(gmp_randstate_t buf) {
+    mpz_t z;
+    mpz_init(z);
+    mpz_urandomb(z, buf, 64);
+    uint64_t res = mpz_get_uint64(z);
+    mpz_clear(z);
+    return res;
 }
 
 // Structure that contains indices (in the sense of renumber.[ch]) for
@@ -67,6 +58,7 @@ uint64_t long_random(struct random_data * buf) {
 //  - do many append() (increasing order of indices)
 //  - finalize()
 //  - can call random_index()
+//  - can call iterator_from_index()
 
 struct indexrange {
     vector <index_t>ind;
@@ -78,7 +70,7 @@ struct indexrange {
         ind.push_back(z);
     }
 
-    index_t random_index(index_t z, struct random_data * buf) {
+    index_t random_index(index_t z, gmp_randstate_t buf) {
         // Find position of z
         // Exact version:
         //  vector<index_t>::iterator it;
@@ -92,6 +84,12 @@ struct indexrange {
         if (high == low)
             high++;
         return ind[low + uint64_t(long_random(buf)%(high-low))];
+    }
+
+    vector <index_t>::iterator iterator_from_index(index_t z) {
+        vector<index_t>::iterator it;
+        it = lower_bound(ind.begin(), ind.end(), z);
+        return it;
     }
 };
 
@@ -245,31 +243,11 @@ void reduce_mod_2(index_t *frel, int *nf) {
     *nf = j;
 }
 
-void reduce_mod_2(vector <index_t> &frel) {
-    vector <index_t> res;
-    index_t current = frel[0];
-    unsigned int nb = 1;
-    for (unsigned int i = 1; i < frel.size(); ++i) {
-        if (frel[i] != current) {
-            if (nb & 1) {
-                res.push_back(current);
-            }
-            current = frel[i];
-            nb = 1;
-        } else {
-            nb++;
-        }
-    }
-    if (nb & 1) {
-        res.push_back(current);
-    }
-    frel = res;
-}
-
-void print_fake_rel_manyq(vector<pair<index_t,int>>::iterator list_q,
-        uint64_t nq,
-        vector<fake_rel> *rels, indexrange *Ind, int dl,
-        struct random_data * buf)
+void print_fake_rel_manyq(
+        vector<index_t>::iterator list_q, uint64_t nq,
+        vector<fake_rel> *rels, vector<unsigned int> *nrels,
+        indexrange *Ind, int dl,
+        gmp_randstate_t buf)
 {
     index_t frel[MAXFACTORS];
 #define MAX_STR 256  // string containing a printable relation.
@@ -277,8 +255,8 @@ void print_fake_rel_manyq(vector<pair<index_t,int>>::iterator list_q,
     char *pstr;
     int len = MAX_STR;
     for (uint64_t ii = 0; ii < nq; ++ii) {
-        index_t indq = get<0>(list_q[ii]);
-        int nr = get<1>(list_q[ii]);
+        index_t indq = list_q[ii];
+        int nr = int((*nrels)[long_random(buf)%nrels->size()]);
         for (; nr > 0; --nr) {
             pstr = str;
             len = MAX_STR;
@@ -326,51 +304,22 @@ void print_fake_rel_manyq(vector<pair<index_t,int>>::iterator list_q,
 }
 
 struct th_args {
-    vector<pair<index_t,int>>::iterator list_q;
+    vector<index_t>::iterator list_q;
     uint64_t nq;
     vector<fake_rel> *rels;
+    vector<unsigned int> *nrels;
     indexrange *Ind;
     int dl;
-    struct random_data * buf;
+    __gmp_randstate_struct *buf;
 };
 
 
 void * do_thread(void * rgs) {
     struct th_args * args = (struct th_args *) rgs;
-    print_fake_rel_manyq(args->list_q, args->nq, args->rels,
+    print_fake_rel_manyq(args->list_q, args->nq, args->rels, args->nrels,
             args->Ind, args->dl, args->buf);
     return NULL;
 }
-
-#if 0
-void print_random_fake_rel(renumber_ptr ren_info, uint64_t q,
-        uint64_t r, int sqside, vector<fake_rel> rels, indexrange *Ind,
-        int dl)
-{
-    index_t indq = renumber_get_index_from_p_r(ren_info, q, r, sqside);
-    int i = random() % rels.size();
-    printf("%ld,%lu:", (long)random(), (unsigned long)random());
-    vector <index_t> frel;
-    frel.push_back(indq);
-    for (int side = 0; side < 2; ++side) {
-        int np = rels[i].nb_ind[side];
-        for (int j = 0; j < np; ++j) {
-            index_t ind = Ind[side].random_index(rels[i].ind[side][j]);
-            frel.push_back(ind);
-        }
-    }
-    sort(frel.begin(), frel.end());
-    if (!dl) {
-        reduce_mod_2(frel);
-    }
-    for (unsigned int i = 0; i < frel.size(); ++i) {
-        printf("%" PRid, frel[i]);
-        if (i != frel.size()-1) 
-            printf(",");
-    }
-    printf("\n");
-}
-#endif
 
 void advance_prime_in_fb(int *mult, uint64_t *q, uint64_t *roots,
         cado_poly cpoly, int sqside, prime_info pdata)
@@ -524,37 +473,43 @@ main (int argc, char *argv[])
   while (q < q0) {
       q = getprime_mt(pdata);
   }
-  vector<pair<index_t,int>> list_q;
   uint64_t roots[MAXDEGREE];
   int mult = mpz_poly_roots_uint64(roots, cpoly->pols[sqside], q); 
-  // loop until q1
-  do {
-      for (int i = 0; i < mult; ++i) {
-          index_t indq = renumber_get_index_from_p_r(ren_table, q, roots[i], sqside);
-          int n = random()%nrels.size();
-          list_q.push_back(make_pair(indq, int(nrels[n])));
-      }
+  while (mult == 0) {
       advance_prime_in_fb(&mult, &q, roots, cpoly, sqside, pdata);
-  } while (q < q1);
+  }
+  index_t indq = renumber_get_index_from_p_r(ren_table, q, roots[0], sqside);
+  vector<index_t>::iterator first_indq = Ind[sqside].iterator_from_index(indq);
+  // Same for q1:
+  while (q < q1) {
+      q = getprime_mt(pdata);
+  }
+  mult = mpz_poly_roots_uint64(roots, cpoly->pols[sqside], q); 
+  while (mult == 0) {
+      advance_prime_in_fb(&mult, &q, roots, cpoly, sqside, pdata);
+  }
+  indq = renumber_get_index_from_p_r(ren_table, q, roots[0], sqside);
+  vector<index_t>::iterator last_indq = Ind[sqside].iterator_from_index(indq);
 
   // go multi-thread
-  uint64_t block = list_q.size() / mt;
+  uint64_t block = (last_indq - first_indq) / mt;
   pthread_t * thid = (pthread_t *)malloc(mt*sizeof(pthread_t));
-  struct random_data * buf = (struct random_data *)calloc(mt,sizeof(struct random_data));
-  char *statebuf = (char *)calloc(mt*64, sizeof(char));
+  gmp_randstate_t *buf = (gmp_randstate_t *)malloc(mt*sizeof(gmp_randstate_t));
   struct th_args * args = (struct th_args *)malloc(mt*sizeof(struct th_args));
   for (int i = 0; i < mt; ++i) {
-      args[i].list_q = list_q.begin() + block*i;
+      args[i].list_q = first_indq + block*i;
       if (i < mt-1) {
           args[i].nq = block;
       } else {
-          args[i].nq = list_q.end() - args[i].list_q;
+          args[i].nq = last_indq - args[i].list_q;
       }
       args[i].rels = &rels;
+      args[i].nrels = &nrels;
       args[i].Ind = &Ind[0];
       args[i].dl = dl;
-      initstate_r(1416364+i, statebuf + 64*i, 64, &buf[i]);
-      args[i].buf = &buf[i];
+      gmp_randinit_default(buf[i]);
+      gmp_randseed_ui(buf[i], 171717+i);
+      args[i].buf = buf[i];
 
       pthread_create(&thid[i], NULL, do_thread, (void *)(&args[i]));
   }
@@ -562,7 +517,6 @@ main (int argc, char *argv[])
       pthread_join(thid[i], NULL);
   }
 
-  free(statebuf);
   free(thid);
   free(buf);
   free(args);
