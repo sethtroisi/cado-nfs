@@ -67,7 +67,7 @@ int main()
     ASSERT_ALWAYS(index == i);
     array_index_mpz_vector(v, index, H, nb);
     for (unsigned int j = 0; j < t; j++) {
-      ASSERT_ALWAYS(mpz_cmp_si(v->c[j], vector->c[j] == 0));
+      ASSERT_ALWAYS(mpz_cmp_si(v->c[j], vector->c[j]) == 0);
     }
     index1 = array_mpz_vector_index(v, H, nb);
     ASSERT_ALWAYS(index == index1);
