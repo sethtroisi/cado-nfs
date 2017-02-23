@@ -326,9 +326,9 @@ polygen_JL_f (int d, unsigned int bound, mpz_t *f, unsigned long idx)
         mpz_set_si (f[i], fint[i]);
       }
 
-    /* we take -bound <= f[0] < bound, f[0] <> 0,
+    /* we take -bound <= f[0] <= bound, f[0] <> 0,
        which makes 2*bound possible values */
-    ASSERT_ALWAYS(idx < 2 * bound);
+    ASSERT(idx < 2 * bound);
     fint[0] = (idx < bound) ? idx - bound : idx - (bound - 1);
     mpz_set_si (f[0], fint[0]);
 
