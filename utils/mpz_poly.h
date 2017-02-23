@@ -75,6 +75,10 @@ void mpz_poly_setcoeff_int64(mpz_poly_ptr f, int i, int64_t z);
 void mpz_poly_setcoeff_uint64(mpz_poly_ptr f, int i, uint64_t z);
 void mpz_poly_setcoeff_double(mpz_poly_ptr f, int i, double z);
 void mpz_poly_getcoeff(mpz_t res, int i, mpz_poly_srcptr f);
+
+/* functions for Joux--Lercier and Generalized Joux--Lercier */
+int mpz_poly_setcoeffs_counter(mpz_poly_ptr f, int* max_abs_coeffs, int deg, unsigned long counter, unsigned int bound);
+
 static inline mpz_srcptr mpz_poly_lc_const(mpz_poly_srcptr f) {
     ASSERT(f->deg >= 0);
     return f->coeff[f->deg];

@@ -3588,3 +3588,161 @@ std::string cxx_mpz_poly::print_poly(std::string const& var) const
     }
     return os.str();
 }
+
+/* functions for Joux--Lercier and Generalized Joux--Lercier */
+/**
+ * \brief set the (mpz_t) coefficients of f from ::counter
+ * \param[out] f               polynomial
+ * \param[out] max_abs_coeffs  largest absolute value of coefficients of f
+ * \param[in]  idx             counter
+ * \param[in]  bound           max absolute value of coefficients of f
+ *
+ * \return 1 if the poly is valid (content = 1, not a duplicate, and +/-1 is not a root)
+ * \return 0 if the poly corresponding to the counter is a duplicate
+ *
+ * Given ::counter, compute the coefficients of ::f.
+ * Assume that the leading coefficient of f is > 0, the next one is >= 0, and the last one is not 0
+ * 1 <= f[deg] <= bound
+ * 0 <= f[deg-1] <= bound
+ * -bound <= f[i] <= bound for 0 < i < deg-1
+ * no other test is made: you need to check after if the poly is square-free, irreducible, etc.
+ */
+int mpz_poly_setcoeffs_counter(mpz_poly_ptr f, int* max_abs_coeffs, int deg, unsigned long idx, unsigned int bound){
+    unsigned int i;
+    int j, eval_at1;
+    int *fint, ok = 1;
+    mpz_t content;
+    fint = (int *) malloc ((deg + 1)*sizeof(int));
+   
+    /* compute polynomial f and fint of index idx */
+    /* assume that f was already initialized with mpz_poly_init(f, deg) */
+    f->deg = deg;
+    
+    /* we take 1 <= f[deg] <= bound */
+    fint[deg] = 1 + (idx % bound);
+    idx = idx / bound;
+    mpz_set_ui (f->coeff[deg], fint[deg]);
+    /* we take 0 <= f[deg-1] <= bound */
+    fint[deg-1] = idx % (bound + 1);
+    idx = idx / (bound + 1);
+    mpz_set_ui (f->coeff[deg-1], fint[deg-1]);
+    for (i = deg-2; i > 0; i --)
+      {
+	/* we take -bound <= f[i] <= bound */
+	fint[i] = (idx % (2 * bound + 1)) - bound;
+        idx = idx / (2 * bound + 1);
+        mpz_set_si (f->coeff[i], fint[i]);
+    }
+    
+    /* we take -bound <= f[0] <= bound, f[0] <> 0,
+       which makes 2*bound possible values */
+    ASSERT(idx < 2 * bound);
+    fint[0] = (idx < bound) ? idx - bound : idx - (bound - 1);
+    mpz_set_si (f->coeff[0], fint[0]);
+    
+    
+    /* since f and the reversed polynomial are equivalent, we can assume
+       |f[deg]| < |f[0]| or (|f[deg]| = |f[0]| and |f[deg-1]| < |f[1]|) or ... */
+
+    ok = 1;
+    for (int i = 0; 2 * i < deg; i++)
+      {
+        if (abs(fint[deg-i]) != abs(fint[i]))
+          {
+            /* we want |f[deg-i]| < |f[i]| */
+            ok = abs(fint[deg-i]) < abs(fint[i]);
+            break;
+          }
+      }
+
+    /* since f(x) is equivalent to (-1)^deg*f(-x), if f[deg-1] = 0, then the
+       largest i = deg-3, deg-5, ..., such that f[i] <> 0 should have f[i] > 0 */
+    if (ok && fint[deg-1] == 0)
+      {
+        for (int i = deg - 3; i >= 0; i -= 2)
+          {
+            if (fint[i])
+              {
+                ok = fint[i] > 0;
+                break;
+              }
+          }
+      }
+
+    /* if |f[i]| = |f[deg-i]| for all i, then [f[deg], f[deg-1], ..., f[1], f[0]]
+       is equivalent to [s*f[0], s*t*f[1], s*t^2*f[2], ...], where
+       s = sign(f[0]), and s*t^i is the sign of f[i] where i is the smallest
+       odd index > 0 such that f[i] <> 0.  */
+    if (ok && fint[deg] == abs(fint[0])) /* f[deg] > 0 */
+      {
+        int s = (fint[0] > 0) ? 1 : -1, t = 0, i;
+        for (i = 1; i <= deg; i++)
+          {
+            if (2 * i < deg && abs(fint[deg-i]) != abs(fint[i]))
+              break;
+            if (t == 0 && fint[i] != 0 && (i & 1))
+              t = (fint[i] > 0) ? s : -s;
+          }
+        if (2 * i >= deg) /* |f[i]| = |f[deg-i]| for all i */
+          {
+            /* if t=0, then all odd coefficients are zero, but since
+               |f[deg-i]| = |f[i]| this can only occur for deg even, but then
+               we can set t to 1, since t only affects the odd coefficients */
+            if (t == 0)
+              t = 1;
+            for (i = 0; i <= deg; i++)
+              {
+                if (fint[deg-i] != s * fint[i])
+                  {
+                    ok = fint[deg-i] > s * fint[i];
+                    break;
+                  }
+                s = s * t;
+              }
+          }
+      }
+
+    if (ok){
+      /* check if +-1 is a root of f (very common): compute the sum of the coefficients, and the alterned sum: it should be != 0 */
+      eval_at1 = 0; // evaluating at 1 means sum the coefficients
+      for(j=0; j<=deg; j++){
+	eval_at1 += fint[j];
+      }
+      ok = eval_at1 != 0;
+    }
+
+    if (ok){ // eval at -1: alterning sum of coefficients
+      eval_at1 = 0;
+      for(j=0; j<=deg; j += 2){
+	eval_at1 += fint[j];
+      }
+      for(j=1; j <= deg; j += 2){
+	eval_at1 -= fint[j];
+      }
+      ok = eval_at1 != 0;
+    }
+    
+    if (ok){
+      /* content test */
+      mpz_init (content);
+      mpz_poly_content (content, f);
+      ok = mpz_cmp_ui (content, 1) == 0; /* duplicate with f/t */
+      mpz_clear (content);
+    }
+
+    // compute the max absolute value of coefficients,
+    // usefull for computing the lognorm after
+    *max_abs_coeffs = fint[0]; // this is positive anyway
+    for(j=0; j <= deg; j++){
+      if ((fint[j] < 0) && (*max_abs_coeffs < -fint[j])){
+	*max_abs_coeffs = -fint[j];
+      }else{// fint[i] >= 0
+	if (*max_abs_coeffs < fint[j]){
+	  *max_abs_coeffs = fint[j];
+	}
+      }
+    }
+
+    free(fint);
+    return ok;
+}
