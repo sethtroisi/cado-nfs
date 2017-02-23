@@ -33,38 +33,40 @@ static double expect_val_p(mpz_poly_srcptr f, unsigned long p, gmp_randstate_t s
   return val_1 + val_2;
 }
 
-static unsigned int mpz_valuation(mpz_srcptr n, unsigned long p)
+/* Return the largest integer i such that p^i divides n.
+   Warning: this function modifies n (powers of p are removed).
+   FIXME: if/when a function mpz_remove_ui exists in GMP
+   (analogous to mpz_remove for an unsigned long p) we should use it. */
+static unsigned int
+mpz_valuation (mpz_ptr n, unsigned long p)
 {
-  mpz_t n_tmp;
-  mpz_init(n_tmp);
-  mpz_set(n_tmp, n);
   unsigned int i = 0;
 
-  while(mpz_divisible_ui_p(n_tmp, p)) {
-    mpz_divexact_ui(n_tmp, n_tmp, p);
+  while (mpz_divisible_ui_p (n, p)) {
+    mpz_divexact_ui (n, n, p);
     i++;
   }
 
-  mpz_clear(n_tmp);
-  
   return i;
 }
 
+/* a is a degree-2 polynomial */
 static unsigned int is_irreducible(mpz_poly_srcptr a)
 {
   mpz_t delta;
+  int res;
+
+  ASSERT(a->deg == 2);
   mpz_init(delta);
-  mpz_submul_ui(delta, a->coeff[0], 4);
-  mpz_mul(delta, delta, a->coeff[2]);
+  mpz_mul (delta, a->coeff[2], a->coeff[0]);
+  mpz_mul_2exp (delta, delta, 2);
+  mpz_neg (delta, delta);
   mpz_addmul(delta, a->coeff[1], a->coeff[1]);
 
-  if (mpz_perfect_square_p(delta) == 0) {
-    mpz_clear(delta);
-    return 1;
-  }
+  res = mpz_perfect_square_p(delta) == 0;
 
   mpz_clear(delta);
-  return 0;
+  return res;
 }
 
 //Generate a random number between [offset, offset + length[
@@ -114,7 +116,7 @@ static void mpz_poly_irred(mpz_poly_ptr a, mpz_srcptr one, mpz_srcptr B,
   do {
     random_mpz_poly(a, 2, one, B, state);
     mpz_poly_content(content, a);
-  } while (!is_irreducible(a) || mpz_cmp_ui(content, 1) != 0);
+  } while (mpz_cmp_ui(content, 1) != 0 || !is_irreducible(a));
 
 #ifndef NDEBUG
   mpz_poly_content(content, a);
@@ -148,15 +150,29 @@ static void monte_carlo_average_value(double * V, mpz_poly_srcptr f,
   mpz_t resultant;
   mpz_init(resultant);
 
+  mpz_t prod; /* product of all bad primes */
+  mpz_t g;
+  mpz_init_set_ui (prod, 1);
+  mpz_init (g);
+  for (unsigned int j = 0; j < length; j++)
+    mpz_mul_ui (prod, prod, bad_p[j]);
+
   for (unsigned int i = 0; i < N; i++) {
     mpz_poly_irred(a, one, B, state);
     mpz_poly_resultant(resultant, f, a);
-    for (unsigned int j = 0; j < length; j++) {
+    mpz_gcd (g, resultant, prod);
+    /* if g=1, no bad prime can divide the resultant */
+    for (unsigned int j = 0; j < length && mpz_cmp_ui (g, 1) > 0; j++) {
       unsigned int v = mpz_valuation(resultant, bad_p[j]);
       V[j] += (double)v;
+      if (v)
+        mpz_divexact_ui (g, g, bad_p[j]);
+      /* now g is the gcd of 'resultant' and the remaining bad primes */
     }
   }
 
+  mpz_clear (g);
+  mpz_clear (prod);
   mpz_clear(resultant);
   mpz_poly_clear(a);
   mpz_clear(one);
@@ -167,6 +183,8 @@ static void monte_carlo_average_value(double * V, mpz_poly_srcptr f,
   }
 }
 
+/* p_end is the bound on primes, N is the number of iterations in
+   monte_carlo_average_value */
 double alpha3d(mpz_poly_srcptr f, unsigned long p_end, unsigned int N)
 {
   mpz_t discriminant;
