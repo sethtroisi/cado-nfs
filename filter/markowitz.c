@@ -20,9 +20,6 @@
 double tmkzup, tmkzdown, tmkzupdown, tmkzcount;
 #endif
 
-/* mat->MKZA[j] becomes MKZ_INF when column j is deleted */
-#define MKZ_INF UMAX(uint32_t)
-
 // Again, a priority queue as a heap...!
 // Q[0] contains the number of items in Q[], so that useful part of Q
 // is Q[1..Q[0]]
@@ -468,68 +465,20 @@ MkzIncrCol(filter_matrix_t *mat, index_t j)
     return ind;
 }
 
-// Row[i] has been adjoined to column j, so that we can incrementally
-// change the Markowitz count.
+/* update the Markowitz cost of column j */
 void
-MkzUpdate(filter_matrix_t *mat, index_t i MAYBE_UNUSED, index_t j)
+MkzUpdate (filter_matrix_t *mat, index_t j)
 {
     uint32_t adr = mat->MKZA[j];
     index_t mkz;
 
-    if(adr == MKZ_INF){
-#if MKZ_DEBUG >= 1
-	fprintf(stderr, "Prevented use of adr[%d]=MKZ_INF in MkzUpdate\n", j);
-#endif
-	return;
-    }
-#if MKZ_DEBUG >= 1
-    if((mat->wt[j] == 0) || (mat->wt[j] == 1))
-	fprintf(stderr, "W: wt[%d] = %d\n", j, mat->wt[j]);
-#endif
-#if 1
-    // costly?
-    mkz = MkzCount(mat, j);
-#else
-    // old_count = min (r_ii-1)*(w-2) = mu * (w-2)
-    // new_count = min(mu, r_i-1)*(w-1)
-    mkz = MkzGet(mat->MKZQ, adr, 1)/(mat->wt[j]-2); // mu
-    if(matLengthRow(mat,i) < mkz+1)
-      mkz = matLengthRow(mat,i)-1;
-    mkz *= (mat->wt[j]-1);
-#endif
-#if MKZ_DEBUG >= 1
-    fprintf(stderr, "Updating j=%d (old=%d, new=%d)\n", j,
-	    MkzGet(mat->MKZQ, adr, 1), mkz);
-#endif
-    // nothing to do if new count == old count
-    if (mkz != MkzGet(mat->MKZQ, adr, 1))
-      {
-        // add new count
-        MkzSet(mat->MKZQ, adr, 1, mkz);
-        // a variant of delete is needed...!
-        MkzMoveUpOrDown(mat->MKZQ, mat->MKZA, adr);
-      }
-}
-
-// Row[i] has been removed for column j, so that we need to update
-// the Markowitz count.
-void
-MkzUpdateDown (filter_matrix_t *mat, index_t j)
-{
-  index_t adr = mat->MKZA[j];
-  index_t mkz;
-
-  if (adr == MKZ_INF) /* column too heavy or already removed */
-    return;
-
-  mkz = MkzCount(mat, j);
-  if (mkz != MkzGet(mat->MKZQ, adr, 1))
-    {
-      // update count
-      MkzSet(mat->MKZQ, adr, 1, mkz);
-      // a variant of delete is needed...!
-      MkzMoveUpOrDown(mat->MKZQ, mat->MKZA, adr);
-    }
+    ASSERT(adr != MKZ_INF);
+    /* compute the new Markowitz cost */
+    mkz = MkzCount (mat, j);
+    /* update new cost */
+    MkzSet (mat->MKZQ, adr, 1, mkz);
+    /* move it up or down in the heap */
+    MkzMoveUpOrDown (mat->MKZQ, mat->MKZA, adr);
 }
 
 /*

@@ -118,8 +118,8 @@ addCellAndUpdate(filter_matrix_t *mat, int i, int32_t j)
 	else
           {
 	    // update R[j] by adding i
-	    add_i_to_Rj(mat, i, j);
-	    MkzUpdate(mat, i, j);
+	    add_i_to_Rj (mat, i, j);
+	    MkzUpdate (mat, j);
           }
       }
 }
@@ -142,8 +142,8 @@ removeCellAndUpdate(filter_matrix_t *mat, int i, int32_t j, int final)
     MkzDecreaseColWeight(mat, j);
     // update R[j] by removing i
     remove_i_from_Rj(mat, i, j);
-    if (final)
-      MkzUpdateDown (mat, j);
+    if (final && mat->MKZA[j] != MKZ_INF)
+      MkzUpdate (mat, j);
 }
 
 //////////////////////////////////////////////////////////////////////
