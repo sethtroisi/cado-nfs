@@ -176,7 +176,7 @@ moveDown (heap H, filter_matrix_t *mat, uint32_t n)
   H->index[i] = n;
 }
 
-/* remove relation i */
+/* remove relation i from heap */
 void
 heap_delete (heap H, filter_matrix_t *mat, uint32_t i)
 {
@@ -746,10 +746,11 @@ print_row(filter_matrix_t *mat, int i)
 }
 
 void
-destroyRow(filter_matrix_t *mat, int i)
+destroyRow (filter_matrix_t *mat, int i)
 {
-    free(mat->rows[i]);
+    free (mat->rows[i]);
     mat->rows[i] = NULL;
+    mat->rem_nrows--;
 }
 
 void

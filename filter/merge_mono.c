@@ -150,7 +150,8 @@ removeCellAndUpdate(filter_matrix_t *mat, int i, int32_t j, int final)
 // now, these guys are generic...!
 
 // for all j in row[i], removes j and update data
-// if final, also update the Markowitz counts
+// if final, also update the Markowitz counts, free memory, and remove from
+// heap of heavy rows
 static void
 removeRowAndUpdate(filter_matrix_t *mat, int i, int final)
 {
@@ -172,6 +173,14 @@ removeRowAndUpdate(filter_matrix_t *mat, int i, int final)
                   TRACE_COL, i, w, mat->wt[TRACE_COL]);
 #endif
     }
+
+    if (final)
+      {
+        /* free the memory occupied by row i */
+        destroyRow (mat, i);
+        /* remove row i from the heap of heavy rows */
+        heap_delete (mat->Heavy, mat, i);
+      }
 }
 
 #ifdef FOR_DL
@@ -205,7 +214,7 @@ addRowsAndUpdate(filter_matrix_t *mat, int i1, int i2, int32_t j)
 {
     // cleaner one, that shares addRowsData() to prepare the next move...!
     // i1 is to disappear, replaced by a new one
-    removeRowAndUpdate(mat, i1, 0);
+    removeRowAndUpdate(mat, i1, 0); /* fake removal */
     // we know the length of row[i1]+row[i2]
     addRows(mat->rows, i1, i2, j);
     addOneRowAndUpdate(mat, i1);
@@ -257,12 +266,8 @@ addRowsAndUpdate (filter_matrix_t *mat, int i1, int i2, int32_t j MAYBE_UNUSED)
 static void
 removeRowDefinitely(report_t *rep, filter_matrix_t *mat, int32_t i)
 {
-    removeRowAndUpdate(mat, i, 1);
-    destroyRow(mat, i);
     report1(rep, i, -1);
-    mat->rem_nrows--;
-    /* delete the row from the heap of heavy rows */
-    heap_delete (mat->Heavy, mat, i);
+    removeRowAndUpdate(mat, i, 1);
 }
 
 /* remove column j, and update the matrix */
@@ -329,7 +334,6 @@ tryAllCombinations(report_t *rep, filter_matrix_t *mat, int m, index_t *ind,
 #endif
     reportn(rep, (index_signed_t*) ind, m, j);
     removeRowAndUpdate(mat, ind[0], 1);
-    destroyRow(mat, ind[0]);
 }
 
 /*
@@ -384,7 +388,6 @@ MSTWithA (report_t *rep, filter_matrix_t *mat, int m, index_t *ind, index_t j,
     reportn(rep, (index_signed_t*) (history[i]+1), history[i][0], j);
 #endif
     removeRowAndUpdate(mat, ind[0], 1);
-    destroyRow(mat, ind[0]);
 }
 
 static void
@@ -515,18 +518,13 @@ mergeForColumn (report_t *rep, filter_matrix_t *mat, int m, int32_t j)
 #endif
 
     findOptimalCombination (rep, mat, m, ind, j);
-    mat->rem_nrows--;
     mat->rem_ncols--;
     removeColumnAndUpdate (mat, j);
 
     /* update the status of rows in heap of heavy rows */
     for (ni = 0; ni < m; ni++)
-      {
-        if (mat->rows[ind[ni]] != NULL) /* row is still active */
-          heap_push (mat->Heavy, mat, ind[ni]);
-        else
-          heap_delete (mat->Heavy, mat, ind[ni]);
-      }
+      if (mat->rows[ind[ni]] != NULL) /* row is still active */
+        heap_push (mat->Heavy, mat, ind[ni]);
 }
 
 // Delete at most niremmax superfluous rows such that nrows-ncols >= keep.
@@ -871,11 +869,7 @@ doAllAdds(report_t *rep, filter_matrix_t *mat, char *str)
   reportn(rep, ind, ni, j);
   
   if (sg > 0)
-    {
-      removeRowAndUpdate(mat, i0, 1);
-      destroyRow(mat, i0);
-      mat->rem_nrows--;
-    }
+    removeRowAndUpdate(mat, i0, 1);
 }
 
 // resumename is a file of the type mergehis.
