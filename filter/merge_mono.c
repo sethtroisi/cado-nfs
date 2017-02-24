@@ -429,7 +429,7 @@ get_alive_ideals (filter_matrix_t *mat, int m, index_t *ind, index_t j,
       n = matLengthRow (mat, i);
       for (t = 1; t <= n; t++)
         {
-          jj = mat->rows[i][t];
+          jj = matCell(mat, i, t);
           if (jj != j && MkzIsAlive (mat->MKZA, jj))
             l[s++] = jj;
         }
