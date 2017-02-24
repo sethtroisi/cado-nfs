@@ -3594,11 +3594,14 @@ std::string cxx_mpz_poly::print_poly(std::string const& var) const
  * \brief set the (mpz_t) coefficients of f from ::counter
  * \param[out] f               polynomial
  * \param[out] max_abs_coeffs  largest absolute value of coefficients of f
- * \param[in]  idx             counter
+ * \param[out] next_counter    the next counter to try after the present one, larger than counter+1 sometimes
+ * \param[in]  counter         counter storing the coefficients of f
  * \param[in]  bound           max absolute value of coefficients of f
  *
- * \return 1 if the poly is valid (content = 1, not a duplicate, and +/-1 is not a root)
- * \return 0 if the poly corresponding to the counter is a duplicate
+ * \return 1 if the poly is valid (content = 1, not a duplicate, and +/-1 is not a root) and in this case,
+ *           max_abs_coeffs is set to the largest absolute value of the coefficients of f
+ * \return 0 if the poly corresponding to the counter is a duplicate, and in that case,
+ *           max_abs_coeffs is set to an error_code (poly duplicate, +/- 1 root, content != 1...)
  *
  * Given ::counter, compute the coefficients of ::f.
  * Assume that the leading coefficient of f is > 0, the next one is >= 0, and the last one is not 0
@@ -3607,43 +3610,58 @@ std::string cxx_mpz_poly::print_poly(std::string const& var) const
  * -bound <= f[i] <= bound for 0 < i < deg-1
  * no other test is made: you need to check after if the poly is square-free, irreducible, etc.
  */
-int mpz_poly_setcoeffs_counter(mpz_poly_ptr f, int* max_abs_coeffs, int deg, unsigned long idx, unsigned int bound){
+int mpz_poly_setcoeffs_counter(mpz_poly_ptr f, int* max_abs_coeffs, unsigned long *next_counter, int deg, unsigned long counter, unsigned int bound){
     unsigned int i;
+    unsigned long idx = counter;
     int j, eval_at1;
     int *fint, ok = 1;
     mpz_t content;
+    //unsigned long idx_next_poly_ok = idx;
+    int error_code = 0; // because I want to know what is the pb
+#define POLY_EQUIV_INV_X -1 // the poly is the same as (+/-)f(1/x)
+#define POLY_EQUIV_MINUS_X -2 // the poly is the same as (+/-)f(-x)
+#define POLY_EQUIV_MINUS_COEFFS -3
+#define POLY_ROOT_ONE -4
+#define POLY_ROOT_MINUS_ONE -5
+#define POLY_CONTENT -6
+
     fint = (int *) malloc ((deg + 1)*sizeof(int));
-   
+    *next_counter = counter+1;
+
     /* compute polynomial f and fint of index idx */
     /* assume that f was already initialized with mpz_poly_init(f, deg) */
     f->deg = deg;
-    
+
     /* we take 1 <= f[deg] <= bound */
     fint[deg] = 1 + (idx % bound);
     idx = idx / bound;
-    mpz_set_ui (f->coeff[deg], fint[deg]);
     /* we take 0 <= f[deg-1] <= bound */
     fint[deg-1] = idx % (bound + 1);
     idx = idx / (bound + 1);
-    mpz_set_ui (f->coeff[deg-1], fint[deg-1]);
     for (i = deg-2; i > 0; i --)
       {
 	/* we take -bound <= f[i] <= bound */
 	fint[i] = (idx % (2 * bound + 1)) - bound;
         idx = idx / (2 * bound + 1);
-        mpz_set_si (f->coeff[i], fint[i]);
     }
     
     /* we take -bound <= f[0] <= bound, f[0] <> 0,
        which makes 2*bound possible values */
     ASSERT(idx < 2 * bound);
     fint[0] = (idx < bound) ? idx - bound : idx - (bound - 1);
-    mpz_set_si (f->coeff[0], fint[0]);
     
     
     /* since f and the reversed polynomial are equivalent, we can assume
        |f[deg]| < |f[0]| or (|f[deg]| = |f[0]| and |f[deg-1]| < |f[1]|) or ... */
 
+    /* other point of view
+    ok = 1;
+    j = 0;
+    while ((abs(fint[deg-j]) == abs(fint[j])) && (2*j < deg)){
+      j++;
+    }
+    ok = ((j*2 >= deg) || (abs(fint[deg-j]) < abs(fint[j])));
+    */
     ok = 1;
     for (int i = 0; 2 * i < deg; i++)
       {
@@ -3654,6 +3672,36 @@ int mpz_poly_setcoeffs_counter(mpz_poly_ptr f, int* max_abs_coeffs, int deg, uns
             break;
           }
       }
+    if(!ok){
+      error_code = POLY_EQUIV_INV_X; // the poly is an equivalent to (+/-)x^d*f(1/x)
+    }
+    if(abs(fint[deg]) >= abs(fint[0])){
+      // next valid poly: the next one is an increment of the leading coefficient.
+      // but either leading coeff  = |constant coeff|, and incrementing by one will lead to
+      // leading coeff > |constant coeff|, and this is not a valid poly,
+      // or we already are in the case:
+      // leading coeff > |constant coeff|. In both cases,
+      // since the leading coefficient is > 0, it means:
+      // set the leading coeff to 1 and increment the next coefficient.
+      *next_counter = counter - (counter % bound) + bound;
+      /* NOT TESTED:
+      // then, what if f[0] = +/- 1?
+      if(abs(fint[0]) == 1){
+	if(abs(fint[deg-1]+1) > abs(fint[1])){
+	  // setting ld=1 then incrementing the second high deg coeff is not enough
+	  idx = *next_counter;
+	  // set the second high deg coeff to 0 and increment the third high deg coeff
+	  *next_counter = idx - (idx % bound*(bound+1)) + bound*(bound+1);
+	  if((deg > 3) && (fint[1] == 0)){//setting the second high deg to 0 and incrementing the next coeff migh not be enough
+	    if (abs(fint[deg-2]+1) > 0){
+	      idx = *next_counter;
+	      // set the third coeff to 0 instead of -bound
+	      *next_counter = idx - (idx % bound*(bound+1)*(2*bound+1)) + bound*(bound+1)*(2*bound+1)*bound;
+	    }
+	  }
+	}
+	}*/
+    }
 
     /* since f(x) is equivalent to (-1)^deg*f(-x), if f[deg-1] = 0, then the
        largest i = deg-3, deg-5, ..., such that f[i] <> 0 should have f[i] > 0 */
@@ -3668,6 +3716,9 @@ int mpz_poly_setcoeffs_counter(mpz_poly_ptr f, int* max_abs_coeffs, int deg, uns
               }
           }
       }
+    if((!ok) && (error_code == 0)){
+      error_code = POLY_EQUIV_MINUS_X; // the poly is an equivalent to (-1)^deg*f(-x)
+    }
 
     /* if |f[i]| = |f[deg-i]| for all i, then [f[deg], f[deg-1], ..., f[1], f[0]]
        is equivalent to [s*f[0], s*t*f[1], s*t^2*f[2], ...], where
@@ -3701,6 +3752,9 @@ int mpz_poly_setcoeffs_counter(mpz_poly_ptr f, int* max_abs_coeffs, int deg, uns
               }
           }
       }
+    if((!ok) && (error_code == 0)){
+      error_code = POLY_EQUIV_MINUS_COEFFS;
+    }
 
     if (ok){
       /* check if +-1 is a root of f (very common): compute the sum of the coefficients, and the alterned sum: it should be != 0 */
@@ -3709,6 +3763,9 @@ int mpz_poly_setcoeffs_counter(mpz_poly_ptr f, int* max_abs_coeffs, int deg, uns
 	eval_at1 += fint[j];
       }
       ok = eval_at1 != 0;
+      if (!ok){
+	error_code = POLY_ROOT_ONE;
+      }
     }
 
     if (ok){ // eval at -1: alterning sum of coefficients
@@ -3720,29 +3777,89 @@ int mpz_poly_setcoeffs_counter(mpz_poly_ptr f, int* max_abs_coeffs, int deg, uns
 	eval_at1 -= fint[j];
       }
       ok = eval_at1 != 0;
+      if (!ok){
+	error_code = POLY_ROOT_MINUS_ONE;
+      }
     }
+
+    /* set mpz_poly */
+    f->deg = deg;
+    for (j = 0; j <= deg; j ++)
+      mpz_set_si (f->coeff[j], fint[j]);
     
     if (ok){
       /* content test */
       mpz_init (content);
       mpz_poly_content (content, f);
       ok = mpz_cmp_ui (content, 1) == 0; /* duplicate with f/t */
+      if (ok == 0){
+	error_code = POLY_CONTENT;
+      }
       mpz_clear (content);
     }
 
     // compute the max absolute value of coefficients,
     // usefull for computing the lognorm after
-    *max_abs_coeffs = fint[0]; // this is positive anyway
-    for(j=0; j <= deg; j++){
-      if ((fint[j] < 0) && (*max_abs_coeffs < -fint[j])){
-	*max_abs_coeffs = -fint[j];
-      }else{// fint[i] >= 0
-	if (*max_abs_coeffs < fint[j]){
-	  *max_abs_coeffs = fint[j];
+    if(ok){
+      *max_abs_coeffs = fint[0]; // this is positive anyway
+      for(j=0; j <= deg; j++){
+	if ((fint[j] < 0) && (*max_abs_coeffs < -fint[j])){
+	  *max_abs_coeffs = -fint[j];
+	}else{// fint[i] >= 0
+	  if (*max_abs_coeffs < fint[j]){
+	    *max_abs_coeffs = fint[j];
+	  }
 	}
       }
+    }else{
+      *max_abs_coeffs = error_code;
     }
 
     free(fint);
     return ok;
+
+#undef POLY_EQUIV_INV_X
+#undef POLY_EQUIV_MINUS_X
+#undef POLY_EQUIV_MINUS_COEFFS
+#undef POLY_ROOT_ONE
+#undef POLY_ROOT_MINUS_ONE
+#undef POLY_CONTENT
+}
+
+/**
+ * return the counter in basis ::bound corresponding to f
+ *
+ */
+unsigned long mpz_poly_getcounter(mpz_poly_ptr f, unsigned int bound){
+  unsigned int counter;
+  int i;
+  // leading coeff: 1 <= f->coeff[deg] <= bound
+  counter = mpz_get_ui(f->coeff[f->deg]);
+  counter *= bound;
+  // next leading coeff: 0 <= f->coeff[deg-1] <= bound
+  counter += mpz_get_ui(f->coeff[f->deg -1]);
+  counter *= (bound+1);
+  // next coeffs: -bound <= f->coeff[i] <= bound
+  for(i=f->deg-2; i > 0; i--){
+    counter += mpz_get_si(f->coeff[i]) + bound;
+    counter *= 2*bound + 1;
+  }
+  if(mpz_sgn(f->coeff[0]) < 0){
+    counter += mpz_get_si(f->coeff[0]) + bound;
+  }else{// f->coeff[0] > 0
+    counter += mpz_get_ui(f->coeff[0]) + bound - 1;
+  }
+  return counter;
+}
+
+void  mpz_poly_setcoeffs_counter_print_error_code(int error_code){
+  switch(error_code){
+  case -1: printf("-1: f <-> +/- x^d f(1/x) \n"); break;
+  case -2: printf("-2: f <-> +/- f(-x) \n"); break;
+  case -3: printf("-3: f <-> another one with permuted/sign coeffs\n"); break;
+  case -4: printf("-4: f(1) = 0\n"); break;
+  case -5: printf("-5: f(-1) = 0\n"); break;
+  case -6: printf("-6: content(f) > 1\n"); break;
+  default: printf(" 0: undetermined error.\n");
+  }
 }
