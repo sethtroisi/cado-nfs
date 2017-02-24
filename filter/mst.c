@@ -170,8 +170,8 @@ minimalSpanningTreeWithPrim(int *start, int *end,
 {
   /* the queue contains at most m-1 edges when nU=1 (those connected to the
      root node), then at most 2*(m-2) when nU=2 (we remove one node and add
-     m-2), ... More generally whehn nU=k it is at most k*m - k*(k-1)/2 - (k-1).
-     The maximum is for k=m-2 or m-2 when it equals m^2/2-3/2*m+2 < m^2/2. */
+     m-2), ... More generally when nU=k it is at most k*(m-k) + (k-1)*(k-2)/2.
+     The maximum is for k=m-1 or m-2 when it equals m^2/2-3/2*m+2 < m^2/2. */
     index_t Q[MAX_QUEUE_SIZE];
     int u, s, t, i, nU, nV, w;
     int V[MERGE_LEVEL_MAX]; /* edges remaining to be dealt with */

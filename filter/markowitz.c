@@ -481,6 +481,39 @@ MkzUpdate (filter_matrix_t *mat, index_t j)
     MkzMoveUpOrDown (mat->MKZQ, mat->MKZA, adr);
 }
 
+#if 0 /* parallel version */
+/* update in parallel j[0], j[1], ..., j[n-1] */
+void
+MkzUpdateN (filter_matrix_t *mat, index_t *j, int n)
+{
+  index_t *mkz;
+  int i;
+
+  mkz = malloc (n * sizeof (index_t));
+#ifdef HAVE_OPENMP
+#pragma omp parallel for
+#endif
+  for (i = 0; i < n; i++)
+    mkz[i] = MkzCount (mat, j[i]);
+  /* the following is sequential */
+  for (i = 0; i < n; i++)
+    {
+      uint32_t adr = mat->MKZA[j[i]];
+      MkzSet (mat->MKZQ, adr, 1, mkz[i]);
+      MkzMoveUpOrDown (mat->MKZQ, mat->MKZA, adr);
+    }
+  free (mkz);
+}
+#else
+/* update in parallel j[0], j[1], ..., j[n-1] */
+void
+MkzUpdateN (filter_matrix_t *mat, index_t *j, int n)
+{
+  for (int i = 0; i < n; i++)
+    MkzUpdate (mat, j[i]);
+}
+#endif
+
 /*
    Updates:
    - mat->wt[j] (weight of column j)

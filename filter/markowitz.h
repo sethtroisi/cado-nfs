@@ -24,6 +24,7 @@ extern int  MkzPopQueue(index_t *dj, index_signed_t *mkz, filter_matrix_t *mat);
 extern void MkzRemove(index_t *dj, index_t *mkz, index_t *Q, uint32_t *A, index_t k);
 extern int MkzIncrCol(filter_matrix_t *mat, index_t j);
 extern void MkzUpdate(filter_matrix_t *mat, index_t j);
+extern void MkzUpdateN(filter_matrix_t *mat, index_t *j, int n);
 extern void MkzDecreaseColWeight(filter_matrix_t *mat, index_t j);
 extern void MkzRemoveJ(filter_matrix_t *mat, index_t j);
 

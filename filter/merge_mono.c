@@ -454,7 +454,7 @@ findOptimalCombination (report_t *rep, filter_matrix_t *mat, int m,
                         index_t *ind, index_t j)
 {
   index_t *l;
-  int len;
+  int len, i, k;
 
   /* get the list of all alive ideals involved in this merge */
   l = get_alive_ideals (mat, m, ind, j, &len);
@@ -472,10 +472,12 @@ findOptimalCombination (report_t *rep, filter_matrix_t *mat, int m,
   else
     useMinimalSpanningTree (rep, mat, m, ind, j);
 
-  /* update the Markowitz cost of all (still alive) ideals in l */
-  for (int i = 0; i < len; i++)
-    if (MkzIsAlive (mat->MKZA, l[i]))
-      MkzUpdate (mat, l[i]);
+  /* compute all still alive ideals in l */
+  for (i = k = 0; k < len; k++)
+    if (MkzIsAlive (mat->MKZA, l[k]))
+      l[i++] = l[k];
+  /* update the Markowitz costs of the remaining ideals */
+  MkzUpdateN (mat, l, i);
 
   free (l);
 }
