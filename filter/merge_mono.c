@@ -105,7 +105,16 @@ removeColumnAndUpdate(filter_matrix_t *mat, int j)
 static void
 addCellAndUpdate(filter_matrix_t *mat, int i, int32_t j)
 {
+#if TRACE_COL >= 0
+    int oldw = mat->wt[j];
+#endif
     int w = MkzIncrCol(mat, j);
+
+    /* FIXME: if an ideal has weight exactly cwmax before a merge,
+       and keeps the same weight afterwards, depending on the order in which
+       we apply the row[i1] += row[i2] operations, it might be that its weight
+       exceeds cwmax in the middle of the merge, and thus it will be disabled,
+       and we will lose a possible merge. */
 
     if (w >= 0)
       {
@@ -115,19 +124,19 @@ addCellAndUpdate(filter_matrix_t *mat, int i, int32_t j)
 	    removeColumnAndUpdate(mat, j);
 	    mat->wt[j] = -w;
           }
-	else
-          {
-	    // update R[j] by adding i
-	    add_i_to_Rj (mat, i, j);
-	    MkzUpdate (mat, j);
-          }
+	else // update R[j] by adding i
+          add_i_to_Rj (mat, i, j);
       }
+#if TRACE_COL >= 0
+    if (j == TRACE_COL && mat->wt[j] != oldw)
+      printf ("TRACE_COL: addCellAndUpdate changed weight of %d from %d to %d\n",
+              j, oldw, mat->wt[j]);
+#endif
 }
 
 // remove the cell (i,j), and updates matrix correspondingly.
-// if final, also update the Markowitz counts
 static void
-removeCellAndUpdate(filter_matrix_t *mat, int i, int32_t j, int final)
+removeCellAndUpdate(filter_matrix_t *mat, int i, int32_t j)
 {
 #if TRACE_ROW >= 0
     if(i == TRACE_ROW){
@@ -139,11 +148,17 @@ removeCellAndUpdate(filter_matrix_t *mat, int i, int32_t j, int final)
 	// decreasing, updating, etc. except when > 2
 	return;
     }
+#if TRACE_COL >= 0
+    int oldw = mat->wt[j];
+#endif
     MkzDecreaseColWeight(mat, j);
+#if TRACE_COL >= 0
+    if (j == TRACE_COL && mat->wt[j] != oldw)
+      printf ("TRACE_COL: removeCellAndUpdate changed weight of %d from %d to %d\n",
+              j, oldw, mat->wt[j]);
+#endif
     // update R[j] by removing i
     remove_i_from_Rj(mat, i, j);
-    if (final && mat->MKZA[j] != MKZ_INF)
-      MkzUpdate (mat, j);
 }
 
 //////////////////////////////////////////////////////////////////////
@@ -166,7 +181,7 @@ removeRowAndUpdate(filter_matrix_t *mat, int i, int final)
 #if TRACE_COL >= 0
       unsigned int w = mat->wt[matCell(mat, i, k)];
 #endif
-	removeCellAndUpdate(mat, i, matCell(mat, i, k), final);
+	removeCellAndUpdate(mat, i, matCell(mat, i, k));
 #if TRACE_COL >= 0
 	if(matCell(mat, i, k) == TRACE_COL)
           printf ("TRACE_COL: removeRowAndUpdate removes %d from R_%d (weight %d -> %d)\n",
@@ -178,6 +193,7 @@ removeRowAndUpdate(filter_matrix_t *mat, int i, int final)
       {
         /* free the memory occupied by row i */
         destroyRow (mat, i);
+        mat->rem_nrows--;
         /* remove row i from the heap of heavy rows */
         heap_delete (mat->Heavy, mat, i);
       }
@@ -233,7 +249,7 @@ addRowsAndUpdate (filter_matrix_t *mat, int i1, int i2, int32_t j MAYBE_UNUSED)
     /* removeRowAndUpdate(mat, i1, 0) */
     mat->weight -= l1;
     for (k1 = 1; k1 <= l1; k1++)
-      removeCellAndUpdate (mat, i1, r1[k1], 0);
+      removeCellAndUpdate (mat, i1, r1[k1]);
 
     /* addRows(mat->rows, i1, i2, j), i.e.,
        addRowsUpdateIndex(mat->rows, NULL, i1, i2, j) */
@@ -270,23 +286,21 @@ removeRowDefinitely(report_t *rep, filter_matrix_t *mat, int32_t i)
     removeRowAndUpdate(mat, i, 1);
 }
 
-/* remove column j, and update the matrix */
+/* Remove column j, and update the matrix.
+   This function is only called for singleton ideals. */
 static void
 removeColDefinitely(report_t *rep, filter_matrix_t *mat, int32_t j)
 {
-  unsigned int k;
+  ASSERT(mat->R[j][0] == 1);
 
-  for (k = 1; k <= mat->R[j][0]; k++)
-    {
-# if TRACE_COL >= 0 || TRACE_ROW >= 0
-      if (j == TRACE_COL || mat->R[j][k] == (index_t) TRACE_ROW)
-        printf ("TRACE: removeColDefinitely j=%d: remove row %d, weight %d\n",
-                j, mat->R[j][k], mat->wt[j]);
-# endif
-      removeRowDefinitely (rep, mat, mat->R[j][k]);
-      mat->rem_ncols--;
-    }
+#if TRACE_COL >= 0 || TRACE_ROW >= 0
+  if (j == TRACE_COL || mat->R[j][1] == (index_t) TRACE_ROW)
+    printf ("TRACE: removeColDefinitely j=%d: remove row %d, weight %d\n",
+            j, mat->R[j][1], mat->wt[j]);
+#endif
+  removeRowDefinitely (rep, mat, mat->R[j][1]);
   removeColumnAndUpdate (mat, j);
+  mat->rem_ncols --;
 }
 
 static void
@@ -382,11 +396,7 @@ MSTWithA (report_t *rep, filter_matrix_t *mat, int m, index_t *ind, index_t j,
 #endif
     hmax = addFatherToSons (history, mat, m, ind, j, start, end);
     for(i = hmax; i >= 0; i--)
-#if 0
-	reporthis(rep, history, i);
-#else
-    reportn(rep, (index_signed_t*) (history[i]+1), history[i][0], j);
-#endif
+      reportn (rep, (index_signed_t*) (history[i]+1), history[i][0], j);
     removeRowAndUpdate(mat, ind[0], 1);
 }
 
@@ -400,10 +410,55 @@ useMinimalSpanningTree (report_t *rep, filter_matrix_t *mat, int m,
     MSTWithA (rep, mat, m, ind, j, A);
 }
 
+/* return the list of all alive ideals involved in merge of column j, and
+   put its length in 'len' */
+static index_t*
+get_alive_ideals (filter_matrix_t *mat, int m, index_t *ind, index_t j,
+                  int *len)
+{
+  index_t *l, jj;
+  int i, k, s, t, n;
+
+  *len = -m; /* we don't consider ideal j */
+  for (k = 0; k < m; k++)
+    *len += matLengthRow (mat, ind[k]);
+  l = malloc (*len * sizeof (index_t));
+  for (s = k = 0; k < m; k++)
+    {
+      i = ind[k];
+      n = matLengthRow (mat, i);
+      for (t = 1; t <= n; t++)
+        {
+          jj = mat->rows[i][t];
+          if (jj != j && MkzIsAlive (mat->MKZA, jj))
+            l[s++] = jj;
+        }
+    }
+  ASSERT_ALWAYS(s <= *len);
+
+  /* sort list elements */
+  qsort (l, s, sizeof(index_t), cmp_index);
+
+  /* remove duplicates */
+  for (k = i = 0; i < s; i++)
+    /* invariant: l[0] < l[1] < ... < l[k-1] */
+    if (k == 0 || l[k-1] < l[i])
+      l[k++] = l[i];
+
+  *len = k;
+  return l;
+}
+
 static void
 findOptimalCombination (report_t *rep, filter_matrix_t *mat, int m,
                         index_t *ind, index_t j)
 {
+  index_t *l;
+  int len;
+
+  /* get the list of all alive ideals involved in this merge */
+  l = get_alive_ideals (mat, m, ind, j, &len);
+
   /* we can use here two algorithms:
      (a) tryAllCombinations tries to merge row i with all other (m-1) rows,
          for each i, 0 <= i < m, and keeps the best i
@@ -411,10 +466,18 @@ findOptimalCombination (report_t *rep, filter_matrix_t *mat, int m,
      Both have complexity O(m^2), and useMinimalSpanningTree is always better
      or equal. Moreover useMinimalSpanningTree is better to find cancellations
      (if any) between rows. */
+
   if (m <= 2)
     tryAllCombinations (rep, mat, m, ind, j);
   else
     useMinimalSpanningTree (rep, mat, m, ind, j);
+
+  /* update the Markowitz cost of all (still alive) ideals in l */
+  for (int i = 0; i < len; i++)
+    if (MkzIsAlive (mat->MKZA, l[i]))
+      MkzUpdate (mat, l[i]);
+
+  free (l);
 }
 
 #if DEBUG >= 1
@@ -728,23 +791,22 @@ mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel,
     ASSERT_ALWAYS(ret != 0);
 
     m = mat->wt[j];
-#if 0
-    /* m=0 can happen for already merged ideals */ /* Really ??? */
+    ASSERT_ALWAYS(m >= 0);
+
+    /* m=0 can happen if two ideals have weight 2, and are in the same 2
+       relations: when we merge one of them, the other one will have weight
+       0 after the merge */
     if (m == 0)
-    {
-      printf("Warning, ideal j=%" PRId32 " was proposed for a merge but it has "
-             "weight 0\n", j);
-      continue;
-    }
-#endif
+      goto next_merge;
+
     uint64_t weight0 = mat->weight;
     if (m == 1) /* singleton ideal */
         removeColDefinitely(rep, mat, j);
-    else if (m > 0)
-    {
-      fprintf(rep->outfile, "#\n");
-      mergeForColumn (rep, mat, m, j);
-    }
+    else /* m >= 2 */
+      {
+        fprintf(rep->outfile, "#\n");
+        mergeForColumn (rep, mat, m, j);
+      }
     index_signed_t real_mkz = mat->weight - weight0;
     if (m > 1 && merge_stats_is_first_merge (merge_data, m))
       {
@@ -780,6 +842,7 @@ mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel,
         recomputeR (mat);
     }
 
+  next_merge:
     /* if we have not yet reached maxlevel:
        (a) if we have reached the target excess, we increase cwmax to maxlevel
        (b) if we have not yet reached keep, and the queue is empty, we increase
@@ -811,7 +874,7 @@ mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel,
   free (merge_data);
 
   printf ("Total number of removed columns: %" PRId64 "\n",
-          mat->ncols-mat->rem_ncols);
+          mat->ncols - mat->rem_ncols);
 
 #ifdef TIMINGS
   for (int m = 2; m < MERGE_LEVEL_MAX; m++)
@@ -914,5 +977,5 @@ resume(report_t *rep, filter_matrix_t *mat, const char *resumename)
     mat->rem_ncols = nactivej;
     printf ("At the end of resume, we have");
     printf (" nrows=%" PRIu64 " ncols=%" PRIu64 " (%" PRIu64 ")\n",
-            mat->rem_nrows, mat->rem_ncols, mat->rem_nrows-mat->rem_ncols);
+            mat->rem_nrows, mat->rem_ncols, mat->rem_nrows - mat->rem_ncols);
 }

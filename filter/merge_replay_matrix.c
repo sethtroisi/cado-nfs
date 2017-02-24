@@ -750,7 +750,6 @@ destroyRow (filter_matrix_t *mat, int i)
 {
     free (mat->rows[i]);
     mat->rows[i] = NULL;
-    mat->rem_nrows--;
 }
 
 void
@@ -776,8 +775,11 @@ remove_i_from_Rj(filter_matrix_t *mat, index_t i, int j)
 void
 add_i_to_Rj(filter_matrix_t *mat, int i, int j)
 {
-  int l = mat->R[j][0] + 1;
+  int l;
 
+  ASSERT(mat->R[j] != NULL);
+
+  l = mat->R[j][0] + 1;
   reallocRj (mat, j, l);
   mat->R[j][l] = i;
 }
