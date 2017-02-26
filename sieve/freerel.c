@@ -395,7 +395,7 @@ pthread_primes_consumer (void *arg)
           }
           if (p <= my_data->tab->bad_ideals.max_p) /* can it be a bad ideal ? */
           {
-            for (int i = 0; i < nroots[side]; i++)
+            for (int i = 0; i < nroots[side]; )
             {
               unsigned long r = roots[side][i];
               if (renumber_is_bad (NULL, NULL, my_data->tab, p, r, side))
@@ -405,6 +405,8 @@ pthread_primes_consumer (void *arg)
                   roots[side][j-1] = roots[side][j];
                 nroots[side]--;
               }
+              else
+                i++;
             }
           }
         }
