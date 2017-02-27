@@ -899,7 +899,7 @@ calculateSqrtAlg (const char *prefix, int numdep,
       prd_tab[0]->p->deg = 0;
       prd_tab[0]->v = 0;
       while(fscanf(depfile, "%ld %lu", &a, &b) != EOF){
-        if(!(nab % 100000))
+        if(!(nab % 1000000))
           {
             pthread_mutex_lock (&lock);
             fprintf(stderr, "Alg(%d): reading ab pair #%d at %.2lfs (peak %luM)\n",
