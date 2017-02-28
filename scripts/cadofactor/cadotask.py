@@ -1494,7 +1494,7 @@ class ClientServerTask(Task, wudb.UsesWorkunitDb, patterns.Observer):
         if not self.state[key] < maxtimedout:
             self.logger.error("Exceeded maximum number of timed out "
                               "workunits, maxtimedout=%d ", maxtimedout)
-            raise Exception("Too many timed out work units")
+            raise Exception("Too many timed out work units. Please increase tasks.maxtimedout (current value is %d)" % maxtimedout)
         self.state.update({key: self.state[key] + 1}, commit=False)
         self.wuar.cancel(wuid, commit=commit)
     
