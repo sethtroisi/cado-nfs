@@ -2810,7 +2810,7 @@ mpz_poly_squarefree_p (mpz_poly_srcptr f)
 }
 
 /**
- * \brief test if the poly f is irreducible over Z.
+ * Quick-and-dirty test if the polynomial f is irreducible over Z.
  * This function is extracted from dlpolyselect.c written by PZ
  *
  * Let p be a prime such that f has a root r modulo p.
