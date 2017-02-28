@@ -36,6 +36,20 @@
 
 using namespace std;
 
+// A global mutex for I/O
+pthread_mutex_t io_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+// We need a re-entrant random. Let's take GMP.
+static inline
+uint64_t long_random(gmp_randstate_t buf) {
+    mpz_t z;
+    mpz_init(z);
+    mpz_urandomb(z, buf, 64);
+    uint64_t res = mpz_get_uint64(z);
+    mpz_clear(z);
+    return res;
+}
+
 // Structure that contains indices (in the sense of renumber.[ch]) for
 // one side, with the possibility to get a randomized ideal on the same
 // side, and more or less of the same size.
@@ -44,6 +58,7 @@ using namespace std;
 //  - do many append() (increasing order of indices)
 //  - finalize()
 //  - can call random_index()
+//  - can call iterator_from_index()
 
 struct indexrange {
     vector <index_t>ind;
@@ -55,17 +70,26 @@ struct indexrange {
         ind.push_back(z);
     }
 
-    index_t random_index(index_t z) {
+    index_t random_index(index_t z, gmp_randstate_t buf) {
         // Find position of z
-        vector<index_t>::iterator it;
-        it = lower_bound (ind.begin(), ind.end(), z);
-        uint64_t position = it - ind.begin();
+        // Exact version:
+        //  vector<index_t>::iterator it;
+        //  it = lower_bound (ind.begin(), ind.end(), z);
+        //  uint64_t position = it - ind.begin();
+        // Fast, approximate version:
+        uint64_t position = z >> 1; // half of indices on each side
         uint64_t range = uint64_t((double(position))*0.2);
         uint64_t low = MAX((int64_t)(position - range), 0);
         uint64_t high = MIN(position + range, ind.size());
         if (high == low)
             high++;
-        return ind[low + uint64_t(random()%(high-low))];
+        return ind[low + uint64_t(long_random(buf)%(high-low))];
+    }
+
+    vector <index_t>::iterator iterator_from_index(index_t z) {
+        vector<index_t>::iterator it;
+        it = lower_bound(ind.begin(), ind.end(), z);
+        return it;
     }
 };
 
@@ -184,31 +208,118 @@ void read_sample_file(vector<unsigned int> &nrels, vector<fake_rel> &rels,
     fclose(file);
 }
 
-
-void print_random_fake_rel(renumber_ptr ren_info, uint64_t q,
-        uint64_t r, int sqside, vector<fake_rel> rels, indexrange *Ind)
+static
+int index_cmp(const void *p1, const void *p2)
 {
-    index_t indq = renumber_get_index_from_p_r(ren_info, q, r, sqside);
-    int i = random() % rels.size();
-    printf("%ld,%lu:", (long)random(), (unsigned long)random());
-    vector <index_t> frel;
-    frel.push_back(indq);
-    for (int side = 0; side < 2; ++side) {
-        int np = rels[i].nb_ind[side];
-        for (int j = 0; j < np; ++j) {
-            index_t ind = Ind[side].random_index(rels[i].ind[side][j]);
-            frel.push_back(ind);
-        }
-    }
-    sort(frel.begin(), frel.end());
-    for (unsigned int i = 0; i < frel.size(); ++i) {
-        printf("%" PRid, frel[i]);
-        if (i != frel.size()-1) 
-            printf(",");
-    }
-    printf("\n");
+    index_t pp1 = ((index_t *)(p1))[0];
+    index_t pp2 = ((index_t *)(p2))[0];
+    if (pp1 == pp2)
+        return 0;
+    if (pp1 < pp2)
+        return -1;
+    return 1;
 }
 
+void reduce_mod_2(index_t *frel, int *nf) {
+    int i = 1;
+    index_t curr = frel[0];
+    int nb = 1;
+    int j = 0;
+    while (i < *nf) {
+        if (frel[i] != curr) {
+            if (nb & 1) {
+                frel[j++] = curr;
+            }
+            curr = frel[i];
+            nb = 1;
+        } else {
+            nb++;
+        }
+        i++;
+    }
+    if (nb & 1) {
+        frel[j++] = curr;
+    }
+    *nf = j;
+}
+
+void print_fake_rel_manyq(
+        vector<index_t>::iterator list_q, uint64_t nq,
+        vector<fake_rel> *rels, vector<unsigned int> *nrels,
+        indexrange *Ind, int dl,
+        gmp_randstate_t buf)
+{
+    index_t frel[MAXFACTORS];
+#define MAX_STR 256  // string containing a printable relation.
+    char str[MAX_STR];
+    char *pstr;
+    int len = MAX_STR;
+    for (uint64_t ii = 0; ii < nq; ++ii) {
+        index_t indq = list_q[ii];
+        int nr = int((*nrels)[long_random(buf)%nrels->size()]);
+        for (; nr > 0; --nr) {
+            pstr = str;
+            len = MAX_STR;
+            // pick fake a,b
+            int nc = snprintf(pstr, len, "%ld,%lu:",
+                    (long)long_random(buf), (unsigned long)long_random(buf));
+            pstr += nc;
+            len -= nc;
+            // pick a random relation as a model and prepare a string to
+            // be printed.
+            int i = random() % rels->size();
+            frel[0] = indq;
+            int nf = 1;
+            for (int side = 0; side < 2; ++side) {
+                int np = (*rels)[i].nb_ind[side];
+                for (int j = 0; j < np; ++j) {
+                    index_t ind = Ind[side].random_index((*rels)[i].ind[side][j], buf);
+                    frel[nf] = ind;
+                    nf++;
+                    ASSERT(nf < MAXFACTORS);
+                }
+            }
+            qsort(frel, nf, sizeof(index_t), index_cmp);
+            if (!dl) {
+                reduce_mod_2(frel, &nf); // update nf
+            }
+            for (int i = 0; i < nf; ++i) {
+                nc = snprintf(pstr, len, "%" PRid, frel[i]);
+                pstr += nc;
+                len -= nc;
+                if (i != nf-1) {
+                    snprintf(pstr, len, ",");
+                    pstr++; len--;
+                }
+
+            }
+            snprintf(pstr, len, "\n");
+            // Get the mutex and print
+            pthread_mutex_lock(&io_mutex);
+            printf("%s", str);
+            pthread_mutex_unlock(&io_mutex);
+        }
+    }
+#undef MAX_STR
+}
+
+struct th_args {
+    vector<index_t>::iterator list_q;
+    uint64_t nq;
+    vector<fake_rel> *rels;
+    vector<unsigned int> *nrels;
+    indexrange *Ind;
+    int dl;
+    __gmp_randstate_struct *buf;
+};
+
+
+void * do_thread(void * rgs) {
+    struct th_args * args = (struct th_args *) rgs;
+    print_fake_rel_manyq(args->list_q, args->nq, args->rels, args->nrels,
+            args->Ind, args->dl, args->buf);
+    return NULL;
+}
 
 void advance_prime_in_fb(int *mult, uint64_t *q, uint64_t *roots,
         cado_poly cpoly, int sqside, prime_info pdata)
@@ -235,6 +346,8 @@ static void declare_usage(param_list pl)
     param_list_decl_usage(pl, "sqside", "side of the special-q");
     param_list_decl_usage(pl, "sample", "file where to find a sample of relations");
     param_list_decl_usage(pl, "renumber", "renumber table");
+    param_list_decl_usage(pl, "dl", "(switch) dl mode");
+    param_list_decl_usage(pl, "t", "number of threads to use");
     verbose_decl_usage(pl);
 }
 
@@ -248,9 +361,13 @@ main (int argc, char *argv[])
   int lpb[2] = {0, 0};
   uint64_t q0 = 0;
   uint64_t q1 = 0;
+  int dl = 0;
+  int mt = 1;
 
   param_list_init(pl);
   declare_usage(pl);
+  param_list_configure_switch(pl, "-dl", &dl);
+  
   cado_poly_init(cpoly);
 
   argv++, argc--;
@@ -307,6 +424,8 @@ main (int argc, char *argv[])
       exit(EXIT_FAILURE);
   }
 
+  param_list_parse_int(pl, "t", &mt);
+
   if (!cado_poly_read(cpoly, filename))
     {
       fprintf (stderr, "Error reading polynomial file %s\n", filename);
@@ -346,7 +465,7 @@ main (int argc, char *argv[])
   indexrange Ind[2];
   prepare_indexrange(Ind, ren_table, cpoly);
 
-  // Loop on [q0-q1]
+  // Precompute ideals in [q0-q1]
   prime_info pdata;
   prime_info_init(pdata);
   // fast forward until we reach q0
@@ -355,17 +474,52 @@ main (int argc, char *argv[])
       q = getprime_mt(pdata);
   }
   uint64_t roots[MAXDEGREE];
-  // loop until q1
-  do {
-      int mult = mpz_poly_roots_uint64(roots, cpoly->pols[sqside], q); 
-      for (int i = 0; i < mult; ++i) {
-          int n = random()%nrels.size();
-          for (unsigned int j = 0; j < nrels[n]; ++j)
-              print_random_fake_rel(ren_table, q, roots[i], sqside, rels, Ind);
-      }
+  int mult = mpz_poly_roots_uint64(roots, cpoly->pols[sqside], q); 
+  while (mult == 0) {
       advance_prime_in_fb(&mult, &q, roots, cpoly, sqside, pdata);
-  } while (q < q1);
+  }
+  index_t indq = renumber_get_index_from_p_r(ren_table, q, roots[0], sqside);
+  vector<index_t>::iterator first_indq = Ind[sqside].iterator_from_index(indq);
+  // Same for q1:
+  while (q < q1) {
+      q = getprime_mt(pdata);
+  }
+  mult = mpz_poly_roots_uint64(roots, cpoly->pols[sqside], q); 
+  while (mult == 0) {
+      advance_prime_in_fb(&mult, &q, roots, cpoly, sqside, pdata);
+  }
+  indq = renumber_get_index_from_p_r(ren_table, q, roots[0], sqside);
+  vector<index_t>::iterator last_indq = Ind[sqside].iterator_from_index(indq);
 
+  // go multi-thread
+  uint64_t block = (last_indq - first_indq) / mt;
+  pthread_t * thid = (pthread_t *)malloc(mt*sizeof(pthread_t));
+  gmp_randstate_t *buf = (gmp_randstate_t *)malloc(mt*sizeof(gmp_randstate_t));
+  struct th_args * args = (struct th_args *)malloc(mt*sizeof(struct th_args));
+  for (int i = 0; i < mt; ++i) {
+      args[i].list_q = first_indq + block*i;
+      if (i < mt-1) {
+          args[i].nq = block;
+      } else {
+          args[i].nq = last_indq - args[i].list_q;
+      }
+      args[i].rels = &rels;
+      args[i].nrels = &nrels;
+      args[i].Ind = &Ind[0];
+      args[i].dl = dl;
+      gmp_randinit_default(buf[i]);
+      gmp_randseed_ui(buf[i], 171717+i);
+      args[i].buf = buf[i];
+
+      pthread_create(&thid[i], NULL, do_thread, (void *)(&args[i]));
+  }
+  for (int i = 0; i < mt; ++i) {
+      pthread_join(thid[i], NULL);
+  }
+
+  free(thid);
+  free(buf);
+  free(args);
   prime_info_clear(pdata);
   renumber_clear(ren_table);
   cado_poly_clear(cpoly);

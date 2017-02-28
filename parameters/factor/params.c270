@@ -29,15 +29,15 @@ tasks.wutimeout = 24000 # required for rootsieve in degree 6
 # Sieve
 ###########################################################################
 
-lim0 = 1073741822
-lim1 = 2147483645
+lim0 = 1071225238
+lim1 = 2146644785
 lpb0 = 38
 lpb1 = 39
-tasks.sieve.mfb0 = 110
+tasks.sieve.mfb0 = 109
 tasks.sieve.mfb1 = 120
-tasks.sieve.ncurves0 = 31
+tasks.sieve.ncurves0 = 28
 tasks.sieve.ncurves1 = 31
-tasks.I = 16
+tasks.I = 18
 
 tasks.sieve.qrange = 10000
 
@@ -55,8 +55,8 @@ tasks.filter.target_density = 170.0
 
 tasks.linalg.bwc.interval = 1000
 tasks.linalg.bwc.interleaving = 0
-tasks.linalg.bwc.m = 64
-tasks.linalg.bwc.n = 64
+tasks.linalg.m = 64
+tasks.linalg.n = 64
 
 ###########################################################################
 # Characters

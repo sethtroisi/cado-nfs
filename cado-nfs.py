@@ -115,6 +115,10 @@ if __name__ == '__main__':
                                                parameters = parameters,
                                                path_prefix = [])
 
+    if toplevel_params.args.verboseparam:
+        logger.info("Summary of all recognized parameters\n" +
+                factorjob.parameter_help)
+
     factors = factorjob.run()
     
     dlp_param = parameters.myparams({"dlp": False,}, "")
@@ -145,11 +149,11 @@ if __name__ == '__main__':
             print("log2 = " + str(log2))
             print("log3 = " + str(log3))
             print("The other logarithms of the factor base elements are in %s" %
-                    os.path.join(wdir, name + ".reconstructlog.dlog"))
+                    factorjob.request_map[cadotask.Request.GET_DLOG_FILENAME]())
             if target != 0:
                 logtarget = int(factors[4])
                 assert pow(target, log2*((p-1) // ell), p) == pow(2, logtarget*((p-1) // ell), p)
                 print("target = " + str(target))
                 print("log(target) = " + str(logtarget))
         else:
-            print("No check was performed. Logarithms of the factor base elements are in %s" % os.path.join(wdir, name + ".reconstructlog.dlog"))
+            print("No check was performed. Logarithms of the factor base elements are in %s" % factorjob.request_map[cadotask.Request.GET_DLOG_FILENAME]())

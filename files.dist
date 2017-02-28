@@ -68,6 +68,7 @@ filter/purge_matrix.c
 filter/purge_matrix.h
 filter/singleton_removal.c
 filter/singleton_removal.h
+filter/singleton_simple.cpp
 filter/clique_removal.c
 filter/clique_removal.h
 filter/markowitz.c
@@ -421,7 +422,7 @@ sieve/las-unsieve.h
 sieve/las-cofactor.cpp
 sieve/las-cofactor.h
 sieve/las-fill-in-buckets.cpp
-sieve/las-fill-in-buckets.h
+sieve/las-fill-in-buckets.hpp
 sieve/las-todo.h
 sieve/las.cpp
 sieve/makefb.c
@@ -829,7 +830,7 @@ utils/version_info.c.in
 sieve/las-base.hpp
 sieve/las-forwardtypes.h
 sieve/las-threads.cpp
-sieve/las-threads.h
+sieve/las-threads.hpp
 scripts/hintfile-helper.py
 sieve/las-dlog-base.cpp
 sieve/las-dlog-base.h
@@ -838,7 +839,7 @@ utils/relation-tools.h
 scripts/descent.py
 sieve/ecm/facul.sage
 utils/threadpool.cpp
-utils/threadpool.h
+utils/threadpool.hpp
 misc/extra_renumber.c
 cado-nfs.supp
 gf2x/AUTHORS
@@ -1202,3 +1203,5 @@ tests/numbertheory/test-badideals.sh
 scripts/cadofactor/wudb.py
 tests/utils/test_mpz_mat.c
 gf2x/toom128.c
+utils/tdict.hpp
+utils/tdict.cpp

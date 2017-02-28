@@ -5,6 +5,9 @@
 #define MKZTYPE_PURE 1
 #define MKZTYPE_LIGHT 2
 
+/* mat->MKZA[j] becomes MKZ_INF when column j is deleted */
+#define MKZ_INF UMAX(uint32_t)
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -15,15 +18,15 @@ extern "C" {
 extern void MkzInit(filter_matrix_t *mat, int verbose);
 extern void MkzClear(filter_matrix_t *mat, int verbose);
 
-extern int MkzIsAlive(index_t *A, int32_t dj);
+extern int MkzIsAlive(uint32_t *A, index_t dj);
 
-extern int  MkzPopQueue(int32_t *dj, int32_t *mkz, filter_matrix_t *mat);
-extern void MkzRemove(int32_t *dj, int32_t *mkz, int32_t *Q, index_t *A, int32_t k);
-extern int MkzIncrCol(filter_matrix_t *mat, int32_t j);
-extern void MkzUpdate(filter_matrix_t *mat, int32_t i, int32_t j);
-extern void MkzUpdateDown (filter_matrix_t *mat, int32_t j);
-extern void MkzDecreaseColWeight(filter_matrix_t *mat, int32_t j);
-extern void MkzRemoveJ(filter_matrix_t *mat, int32_t j);
+extern int  MkzPopQueue(index_t *dj, index_signed_t *mkz, filter_matrix_t *mat);
+extern void MkzRemove(index_t *dj, index_t *mkz, index_t *Q, uint32_t *A, index_t k);
+extern int MkzIncrCol(filter_matrix_t *mat, index_t j);
+extern void MkzUpdate(filter_matrix_t *mat, index_t j);
+extern void MkzUpdateN(filter_matrix_t *mat, index_t *j, int n);
+extern void MkzDecreaseColWeight(filter_matrix_t *mat, index_t j);
+extern void MkzRemoveJ(filter_matrix_t *mat, index_t j);
 
 #ifdef __cplusplus
 }

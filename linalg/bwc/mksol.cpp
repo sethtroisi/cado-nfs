@@ -21,6 +21,7 @@
 void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSED)
 {
     int fake = param_list_lookup_string(pl, "random_matrix") != NULL;
+    if (fake) bw->skip_online_checks = 1;
     int tcan_print = bw->can_print && pi->m->trank == 0;
     matmul_top_data mmt;
     struct timing_data timing[1];
@@ -417,7 +418,7 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
             // FIXME. serialize here ??
             // serialize(pi->m);
 
-            {
+            if (!fake) {
                 char * s_name;
                 int rc = asprintf(&s_name, "S.sols%u-%u.%u-%u",
                         solutions[0] + j * As_width,

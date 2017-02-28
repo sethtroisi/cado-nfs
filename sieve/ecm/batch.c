@@ -1,5 +1,6 @@
 #include "cado.h"
 #include <stdio.h>
+#include <math.h>
 #ifdef  HAVE_OPENMP
 #include <omp.h>
 #endif
@@ -119,6 +120,7 @@ cofac_list_init (cofac_list l)
   l->R0 = NULL;
   l->A0 = NULL;
   l->sq = NULL;
+  l->side = NULL;
   l->perm = NULL;
   l->alloc = 0;
   l->size = 0;
@@ -233,6 +235,7 @@ cofac_list_realloc (cofac_list l, size_t newsize)
   l->R0 = realloc (l->R0, newsize * sizeof (mpz_t));
   l->A0 = realloc (l->A0, newsize * sizeof (mpz_t));
   l->sq = realloc (l->sq, newsize * sizeof (mpz_t));
+  l->side = realloc (l->side, newsize * sizeof (int));
   l->perm = realloc (l->perm, newsize * sizeof (uint32_t));
   l->alloc = newsize;
   if (newsize < l->size)
@@ -241,7 +244,7 @@ cofac_list_realloc (cofac_list l, size_t newsize)
 
 void
 cofac_list_add (cofac_list l, long a, unsigned long b, mpz_t R, mpz_t A,
-                mpz_t sq)
+                int side, mpz_t sq)
 {
   if (l->size == l->alloc)
     cofac_list_realloc (l, 2 * l->alloc + 1);
@@ -252,6 +255,7 @@ cofac_list_add (cofac_list l, long a, unsigned long b, mpz_t R, mpz_t A,
   mpz_init_set (l->R0[l->size], R);
   mpz_init_set (l->A0[l->size], A);
   mpz_init_set (l->sq[l->size], sq);
+  l->side[l->size] = side;
   l->perm[l->size] = l->size;
   (l->size)++;
 }
@@ -275,6 +279,7 @@ cofac_list_clear (cofac_list l)
   free (l->R0);
   free (l->A0);
   free (l->sq);
+  free (l->side);
   free (l->perm);
 }
 
@@ -487,21 +492,39 @@ smoothness_test (mpz_t *R, uint32_t *perm, unsigned long n, mpz_t P, FILE *out)
    relations 0 to *nb_smooth-1 are smooth
    relations *nb_smooth to *nb_unknown-1 are unknown
    relations >= *nb_unknown are non-smooth (useless).
+
+   on input, we know that n has no factor<=B. 
+   We're willing to accept prime cofactors <= L,
+   and to try harder to factor composites which are <= M
 */
 static void
 update_status (mpz_t *R, uint32_t *perm,
                unsigned char *b_status_r, unsigned char *b_status_a,
+               mpz_srcptr B,
+               mpz_srcptr L,
+               mpz_srcptr M,
                unsigned long *nb_smooth, unsigned long *nb_unknown)
 {
   unsigned long i, j;
+
+  mpz_t BB;
+  mpz_init(BB);
+  mpz_mul(BB,B,B);
 
   for (j = *nb_smooth; j < *nb_unknown; j++)
     {
       i = perm[j];
       if (b_status_r[i] == STATUS_UNKNOWN)
       {
-        /* relation i is smooth iff R[i]=1 */
-        if (mpz_cmp_ui (R[i], 1) == 0)
+        /* relation i is smooth iff R[i]=1 ; another option is in case
+         * the remaining cofactor is below the mfb we've been given. */
+        if (mpz_cmp_ui (R[i], 1) == 0
+                || mpz_cmp(R[i], L) <= 0
+                || (
+                    mpz_cmp(R[i], BB) >= 0
+                    && mpz_cmp(R[i], M) <= 0
+                    && !mpz_probab_prime_p(R[i], 1)
+                ))
           {
             b_status_r[i] = STATUS_SMOOTH;
             if (b_status_a[i] == STATUS_SMOOTH)
@@ -522,12 +545,13 @@ update_status (mpz_t *R, uint32_t *perm,
           }
       }
     }
+  mpz_clear(BB);
 }
 
 /* return the number n of smooth relations in l,
    which should be at the end in locations perm[0], perm[1], ..., perm[n-1] */
 unsigned long
-find_smooth (cofac_list l, mpz_t batchP[2], FILE *out,
+find_smooth (cofac_list l, mpz_t batchP[2], mpz_t B[2], mpz_t L[2], mpz_t M[2], FILE *out,
              int nthreads MAYBE_UNUSED)
 {
   unsigned long nb_rel_read = l->size;
@@ -561,14 +585,14 @@ find_smooth (cofac_list l, mpz_t batchP[2], FILE *out,
                          batchP[0], out);
       else
         smoothness_test (l->A, l->perm + nb_smooth, nb_unknown - nb_smooth,
-                         batchP[1], out);
+                         batchP[1],  out);
 
       /* we only need to update relations in [nb_smooth, nb_unknown-1] */
       if (z == 0)
-        update_status (l->R, l->perm, b_status_r, b_status_a,
+        update_status (l->R, l->perm, b_status_r, b_status_a, B[0], L[0], M[0],
                        &nb_smooth, &nb_unknown);
       else
-        update_status (l->A, l->perm, b_status_a, b_status_r,
+        update_status (l->A, l->perm, b_status_a, b_status_r, B[1], L[1], M[1],
                        &nb_smooth, &nb_unknown);
     }
 
@@ -597,6 +621,14 @@ print_smooth_aux (mpz_t *factors, mpz_t n, facul_method_t *methods,
     {
       res_fac = facul_doit_onefm_mpz (factors, n, methods[i], fm, cfm,
                                       lpb, BB, BBB);
+
+      /* Could happen if we allowed a cofactor bound after batch
+       * cofactorization */
+      if (res_fac == FACUL_NOT_SMOOTH) {
+          gmp_fprintf(stderr, "# C=%Zd not smooth\n", n);
+          return str;
+      }
+
 
       ASSERT_ALWAYS(res_fac != FACUL_NOT_SMOOTH);
 
@@ -735,7 +767,7 @@ strip (unsigned long *l, unsigned long n, mpz_t P)
 static void
 factor_one (cofac_list L, cado_poly pol, unsigned long *lim, int *lpb,
             FILE *out, facul_method_t *methods, unsigned long *sp[],
-            unsigned long spsize[], int sqside, unsigned long i)
+            unsigned long spsize[], unsigned long i)
 {
   mpz_t norm;
   mpz_t factors[2];
@@ -756,14 +788,14 @@ factor_one (cofac_list L, cado_poly pol, unsigned long *lim, int *lpb,
 
   s = print_smooth (factors, norm, methods, &fm, &cfm, lpb[0], (double) lim[0],
                     sp[0], spsize[0], L->R0[perm[i]],
-                    (sqside == 0) ? L->sq[perm[i]] : NULL, s, sizeof(s0)-(s-s0));
+                    (L->side[perm[i]] == 0) ? L->sq[perm[i]] : NULL, s, sizeof(s0)-(s-s0));
   s += snprintf (s, sizeof(s0)-(s-s0), ":");
 
   mpz_poly_homogeneous_eval_siui (norm, pol->pols[1],
                                   L->a[perm[i]], L->b[perm[i]]);
   s = print_smooth (factors, norm, methods, &fm, &cfm, lpb[1], (double) lim[1],
                     sp[1], spsize[1], L->A0[perm[i]],
-                    (sqside == 1) ? L->sq[perm[i]] : NULL, s, sizeof(s0)-(s-s0));
+                    (L->side[perm[i]] == 1) ? L->sq[perm[i]] : NULL, s, sizeof(s0)-(s-s0));
 
   /* avoid two threads writing a relation simultaneously */
 #ifdef  HAVE_OPENMP
@@ -784,7 +816,7 @@ factor_one (cofac_list L, cado_poly pol, unsigned long *lim, int *lpb,
    n is the number of bi-smooth cofactors in L.
 */
 void
-factor (cofac_list L, unsigned long n, cado_poly pol, int lpb[], int sqside,
+factor (cofac_list L, unsigned long n, cado_poly pol, int lpb[],
         FILE *out, int nthreads MAYBE_UNUSED)
 {
   unsigned long i, *sp[2], spsize[2], B[2];
@@ -820,7 +852,7 @@ factor (cofac_list L, unsigned long n, cado_poly pol, int lpb[], int sqside,
 #pragma omp parallel for schedule(static)
 #endif
   for (i = 0; i < n; i++)
-    factor_one (L, pol, B, lpb, out, methods, sp, spsize, sqside, i);
+    factor_one (L, pol, B, lpb, out, methods, sp, spsize, i);
 
   ulong_list_clear (SP0);
   ulong_list_clear (SP1);
@@ -860,6 +892,16 @@ create_batch_file (const char *f, mpz_t P, unsigned long B, unsigned long L,
   FILE *fp;
   double s = seconds (), wct = wct_seconds ();
   size_t ret;
+
+  // the product of primes up to B takes \log2(B)-\log\log 2 / \log 2
+  // bits. The added constant is 0.5287.
+  if (log2(B/GMP_LIMB_BITS) + 0.5287 >= 31) {
+      fprintf(stderr, "Gnu MP cannot deal with primes product that large (max 37 bits)\n");
+      abort();
+  } else if (log2(B) + 0.5287 >= 34) {
+      fprintf(stderr, "Gnu MP's mpz_inp_raw and mpz_out_raw functions are limited to integers of at most 34 bits\n");
+      abort();
+  }
 
 #ifdef HAVE_OPENMP
   omp_set_num_threads (nthreads);

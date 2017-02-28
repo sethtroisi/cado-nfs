@@ -218,9 +218,10 @@ hasCol(int32_t **rows, int i, int32_t j)
 }
 
 // A line is "[-]i i1 ... ik [#j]"
-int parse_hisfile_line (int32_t *ind, const char *t, int32_t *j)
+int parse_hisfile_line (index_signed_t *ind, const char *t, index_t *j)
 {
-  int ni = 0, sg = 1;
+  int ni = 0;
+  index_signed_t sg = 1;
 
   if(*t == '-')
     {

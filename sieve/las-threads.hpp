@@ -3,12 +3,13 @@
 
 #include <pthread.h>
 #include <algorithm>
-#include "threadpool.h"
+#include "threadpool.hpp"
 #include "las-forwardtypes.h"
 #include "bucket.h"
 #include "fb.h"
 #include "las-report-stats.h"
 #include "las-base.hpp"
+#include "tdict.hpp"
 
 class thread_workspaces;
 
@@ -33,12 +34,15 @@ struct thread_side_data : private NonCopyable {
 };
 
 struct thread_data : private NonCopyable {
-  const thread_workspaces *ws;
+  const thread_workspaces *ws;  /* a pointer to the parent structure, really */
   int id;
   thread_side_data sides[2];
   las_info_srcptr las;
   sieve_info_ptr si;
-  las_report rep;
+  las_report rep;       /* XXX obsolete, will be removed once the
+                           timetree_t things absorbs everything. We still
+                           need to decide what we do with the non-timer
+                           (a.k.a. counter) data. */
   unsigned char *SS;
   bool is_initialized;
   uint32_t first_region0_index;
@@ -47,6 +51,11 @@ struct thread_data : private NonCopyable {
   void init(const thread_workspaces &_ws, int id, las_info_srcptr las);
   void pickup_si(sieve_info_ptr si);
   void update_checksums();
+};
+
+struct thread_data_task_wrapper : public task_parameters {
+    thread_data * th;
+    void * (*f)(timetree_t&, thread_data *);
 };
 
 /* A set of n bucket arrays, all of the same type, and methods to reserve one
@@ -131,11 +140,13 @@ public:
   thread_workspaces(size_t nr_workspaces, unsigned int nr_sides, las_info_ptr _las);
   ~thread_workspaces();
   void pickup_si(sieve_info_ptr si);
+  void thread_do_using_pool(thread_pool&, void * (*) (timetree_t&, thread_data *));
   void thread_do(void * (*) (thread_data *));
   void buckets_alloc();
   void buckets_free();
   template <int LEVEL, typename HINT>
   double buckets_max_full();
+
   void accumulate(las_report_ptr, sieve_checksum *);
 
   template <int LEVEL, typename HINT>

@@ -22,6 +22,12 @@
 # path, so long as no two parameters of the same key with different values
 # occur. In this file we specify most parameters will full path to clarify
 # which part of the computation they affect.
+#
+# Note that an automatically generated, and by construction comprehensive
+# list of the recognized parameters can be obtained by starting (and
+# quickly aborting, if needed) the cado-nfs.py script with the
+# --verboseparam option. It will do a couple of things, but it will also
+# print this list.
 
 # Some variable substitution occurs in the values specified in the parameters:
 # A string of the form "${FOO}" is substituted by the value of the shell
@@ -293,23 +299,23 @@ tasks.sieve.qrange = 10000		# The size of an elementary sieving task
 ###########################################################################
 
 tasks.filter.purge.keep = 160		# minimal excess wanted after purge
-tasks.filter.purge.add_ratio = 0.1
+tasks.filter.add_ratio = 0.1
     # Number of additional required relations before next filtering step
     # expressed as a ratio of the number of unique relations already collected
     # Default value is 0.1 (i.e. number of additional relation is equal to 10% of number of unique relations)
 tasks.filter.maxlevel = 20		# perform up to <maxlevel>-way merges
-tasks.filter.merge.target_density = 170 # stop merging when the average density
+tasks.filter.target_density = 170       # stop merging when the average density
 				        # per row attains target_density
-tasks.filter.purge.required_excess=0.0 # Controls extra sieving:
-                                       # completes the filtering only when
-                                       # the relative excess (excess divided
-                                       # by number of ideals) is larger than
-                                       # the given value after all singletons
-                                       # have been removed.
-                                       # Default is required_excess=0.0 and
-                                       # completes the factorization as soon
-                                       # as a positive excess is obtained
-                                       # (>= tasks.filter.purge.keep).
+tasks.filter.required_excess=0.0        # Controls extra sieving:
+                                        # completes the filtering only when
+                                        # the relative excess (excess divided
+                                        # by number of ideals) is larger than
+                                        # the given value after all singletons
+                                        # have been removed.
+                                        # Default is required_excess=0.0 and
+                                        # completes the factorization as soon
+                                        # as a positive excess is obtained
+                                        # (>= tasks.filter.purge.keep).
 
 ###########################################################################
 # Linear algebra and characters tasks
@@ -324,8 +330,8 @@ tasks.filter.purge.required_excess=0.0 # Controls extra sieving:
 					# integer is given, a split close to sqrt(mn) is chosen
 tasks.linalg.bwc.interval = 100		# checkpointing interval for bwc.
 tasks.linalg.bwc.interleaving = 0
-tasks.linalg.bwc.m = 64
-tasks.linalg.bwc.n = 64
+tasks.linalg.m = 64
+tasks.linalg.n = 64
 tasks.linalg.characters.nchar = 50		# number of characters
 #tasks.linalg.characters.threads = 2
 

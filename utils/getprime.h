@@ -1,5 +1,6 @@
 #ifndef CADO_UTILS_GETPRIME_H_
 #define CADO_UTILS_GETPRIME_H_
+#include "macros.h"
 
 struct prime_info_s {
   unsigned long offset;  /* offset for current primes */
@@ -17,10 +18,11 @@ extern "C" {
 #endif
 
 /* The getprime function returns successive odd primes, starting with 3. */
-void prime_info_init (prime_info);
-void prime_info_clear (prime_info);
-unsigned long getprime_mt (prime_info);
-unsigned long getprime (unsigned long);
+extern void prime_info_init (prime_info);
+extern void prime_info_clear (prime_info);
+extern unsigned long getprime_mt (prime_info);
+
+extern unsigned long getprime (unsigned long) ATTRIBUTE_DEPRECATED;
 
 
 #ifdef __cplusplus

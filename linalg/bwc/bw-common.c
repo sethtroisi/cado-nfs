@@ -52,7 +52,7 @@ void bw_common_decl_usage(param_list pl)/*{{{*/
     /* }}} */
 
     /* {{{ Parameters related to checkpoints for krylov/mksol */
-    param_list_decl_usage(pl, "interval", "frequency of the checkpoints within kkrylov/mksol");
+    param_list_decl_usage(pl, "interval", "frequency of the checkpoints within krylov/mksol");
     param_list_decl_usage(pl, "start", "start krylov or mksol at this checkpoint");
     param_list_decl_usage(pl, "end", "end krylov or mksol at this checkpoint");
     param_list_decl_usage(pl, "skip_online_checks", "skip consistency checks after each iteration. Use at your own risk.");

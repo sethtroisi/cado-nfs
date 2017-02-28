@@ -134,9 +134,9 @@ the imported ones and the ones it computes by itself.
 If you want to import size-optimized polynomials into phase 1 of polynomial
 selection and then continue polynomial search, use
 
-tasks.polyselect.polyselect1.import_sopt=file
+tasks.polyselect.import_sopt=file
 or
-tasks.polyselect.polyselect1.import_sopt=@file
+tasks.polyselect.import_sopt=@file
 
 With @file, file should contain a list of files to import, one file name
 per line. All polynomials from the given file(s) are imported and added to
@@ -145,7 +145,7 @@ selection phase 1 then continues normally. For example, if an earlier run
 completed ad values up to ad=200000 and you want to resume the search from
 there, you could use
 
-tasks.polyselect.polyselect1.import_sopt=@list_of_existing_files tasks.polyselect.admin=200000
+tasks.polyselect.import_sopt=@list_of_existing_files tasks.polyselect.admin=200000
 
 which imports the existing files, then resumes searching at ad=200000 up to
 the admax value given in the parameter file.
@@ -154,9 +154,9 @@ the admax value given in the parameter file.
 If you want to import root-optimized polynomials into phase 2 of polynomial
 selection and then continue polynomial search, use
 
-tasks.polyselect.polyselect2.import_ropt=file
+tasks.polyselect.import_ropt=file
 or
-tasks.polyselect.polyselect2.import_ropt=@file
+tasks.polyselect.import_ropt=@file
 
 This reads the polynomial(s) in the given file(s), then root-optimizes any
 polynomials found in phase 1; the best polynomial (rated by the Murphy E
@@ -192,7 +192,7 @@ Adjust the tasks.sieve.qmin parameter accordingly to prevent
 already-sieved special-q ranges from being sieved again. To do that:
 
 * go into the cxx.upload directory
-* list the cxx.sieving.xxx-yyy.*.gz files
+* list the cxx.xxx-yyy.*.gz files
 * find the largest yyy value, and use it as new qmin
 
 Be aware that importing relation files that were not produced by
@@ -204,8 +204,8 @@ so we don't even try to list them here.
 When importing relations, some statistics are gathered by parsing the
 relation files. This is a costly operation, especially when relations
 from a large number of files are gathered. An expedient for this problem
-is to create, for each file cxx.sieving.xxx-yyy.zzzzzzz.gz, a file
-cxx.sieving.xxx-yyy.zzzzzzz.gz.stats.txt, which contain the relevant
+is to create, for each file cxx.xxx-yyy.zzzzzzz.gz, a file
+cxx.xxx-yyy.zzzzzzz.gz.stats.txt, which contain the relevant
 statistics. The format of this file should match the format of the
 statistics files produced by the cado-nfs siever with the -stats-stderr
 option. Examples of such statistics files are found as the files
@@ -213,6 +213,13 @@ option. Examples of such statistics files are found as the files
 The only crucial bit information is the line which gives the number of
 relations in the file, which has to match the following format:
 # Total $nrels reports [%.2fs/r, %.2fr/sq]
+
+Here is an example of how to produce such files:
+
+#!/bin/csh
+foreach f (`ls $workdir/cxx.upload/cxx*gz`)
+   zcat $f | tail -1 > $f.stats.txt
+end
 
 File locking when using sqlite3 as a database backend
 =====================================================
@@ -254,12 +261,12 @@ Controlling the filtering stage
 By default CADO-NFS requires an excess (after the first singleton removal)
 of 0% more relations than ideals. This is controlled by:
 
-tasks.filter.purge.required_excess=0.0
+tasks.filter.required_excess=0.0
 
 If you want a larger excess, say 20%, just add on the cado-nfs.py command
 line (or in the parameter file):
 
-tasks.filter.purge.required_excess=0.2
+tasks.filter.required_excess=0.2
 
 Note: if your factorization already started the linear algebra step, and you
 want to do more sieving, you can restart it with a larger "rels_wanted" than
@@ -270,11 +277,11 @@ tasks.sieve.rels_wanted=1000001
 
 If not enough relations are collected after the filtering step, the sieve
 is executed again with an additional number of wanted relations.  The
-parameter tasks.filter.purge.add_ratio controls the number of additional
+parameter tasks.filter.add_ratio controls the number of additional
 required relations as a ratio of the number of unique relations already
 collected:
 
-tasks.filter.purge.add_ratio=0.05
+tasks.filter.add_ratio=0.05
 
 specifies that you want 5% more relations before next filtering step.
 The default value is 0.01 (i.e. 1% more relations).
@@ -312,12 +319,14 @@ tasks.sqrt.threads = 16
 Re-running the linear algebra step
 ==================================
 
-If the linear algebra step was already started, and you want to run it again
-with a different set of relations (for example with more sieving), you need
-to add the following to the cado-nfs.py command line, to allow removing the
-previous linear algebra subdirectory:
+If the linear algebra step was already started, and you want to run it
+again with different parameters or with a different set of relations (for
+example with more sieving), or just because you'd like to run it again
+from scratch, then you need to add the following to the cado-nfs.py
+command line, in order to force the previous linear algebra subdirectory
+to be removed:
 
-tasks.linalg.bwc.allow_wipeout = True
+tasks.linalg.force_wipeout = True
 
 Debugging
 =========

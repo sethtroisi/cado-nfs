@@ -73,6 +73,7 @@ linalg/bwc/CMakeLists-nodist.txt
 linalg/bwc/bench_polmatmul.cpp
 polyselect/CMakeLists-nodist.txt
 filter/debug-tools.sh
+parameters/polynomials/README
 parameters/polynomials/rsa155.poly
 parameters/polynomials/rsa155.poly2
 parameters/polynomials/rsa155.poly3

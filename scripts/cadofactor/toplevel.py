@@ -773,10 +773,10 @@ class Cado_NFS_toplevel(object):
         >>> t.set_N_paramfile_workdir()
         >>> t.parameters.readparams(t.args.options)
         >>> t.set_threads_and_client_threads()
-        >>> t.parameters.get_simple("tasks.sqrt.sqrt.threads",0)
+        >>> t.parameters.get_simple("tasks.sqrt.threads",0)
         3
 
-        >>> t.parameters.locate("tasks.sqrt.sqrt.threads")
+        >>> t.parameters.locate("tasks.sqrt.threads")
         'tasks.threads'
 
         >>> os.environ["NCPUS_FAKE"]="16"
@@ -786,11 +786,11 @@ class Cado_NFS_toplevel(object):
         >>> t.set_N_paramfile_workdir()
         >>> t.parameters.readparams(t.args.options)
         >>> t.set_threads_and_client_threads()
-        >>> t.parameters.get_simple("tasks.sqrt.sqrt.threads",0)
+        >>> t.parameters.get_simple("tasks.sqrt.threads",0)
         8
 
-        >>> t.parameters.locate("tasks.sqrt.sqrt.threads")
-        'tasks.sqrt.sqrt.threads'
+        >>> t.parameters.locate("tasks.sqrt.threads")
+        'tasks.sqrt.threads'
 
         >>> del os.environ["NCPUS_FAKE"]
 
@@ -833,7 +833,7 @@ class Cado_NFS_toplevel(object):
         # server.threads).
         # Note: for a c180, 8 threads is still too large for 64Gb (we need
         # about 16Gb per thread).
-        p="tasks.sqrt.sqrt.threads"
+        p="tasks.sqrt.threads"
         t=self.parameters.get_simple(p, 0)
         if t > 8 and self.parameters.locate(p) == "tasks.threads":
             self.parameters.set_simple(p, 8)

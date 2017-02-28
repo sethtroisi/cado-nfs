@@ -331,10 +331,10 @@ test_mpz_poly_sqr_mod_f_mod_mpz (unsigned long iter)
       else
         P->deg = -1; /* P=0 */
       mpz_poly_init (Q, d - 1);
-      mpz_poly_sqr_mod_f_mod_mpz (Q, P, f, m, invm);
+      mpz_poly_sqr_mod_f_mod_mpz (Q, P, f, m, invm, NULL);
       if (iter == 0)
         ASSERT_ALWAYS(Q->deg == -1);
-      mpz_poly_mul_mod_f_mod_mpz (Q, P, P, f, m, invm);
+      mpz_poly_mul_mod_f_mod_mpz (Q, P, P, f, m, invm, NULL);
       if (iter == 0)
         ASSERT_ALWAYS(Q->deg == -1);
       mpz_poly_clear (f);

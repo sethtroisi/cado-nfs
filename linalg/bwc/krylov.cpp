@@ -19,6 +19,7 @@
 void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSED)
 {
     int fake = param_list_lookup_string(pl, "random_matrix") != NULL;
+    if (fake) bw->skip_online_checks = 1;
     int tcan_print = bw->can_print && pi->m->trank == 0;
     matmul_top_data mmt;
     struct timing_data timing[1];
@@ -296,10 +297,9 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
                 bw->m * bw->interval,
                 mmt->pitype, BWC_PI_SUM, pi->m);
 
-        if (pi->m->trank == 0 && pi->m->jrank == 0) {
+        if (pi->m->trank == 0 && pi->m->jrank == 0 && !fake) {
             char * tmp;
-            int rc;
-            rc = asprintf(&tmp, "A%u-%u.%u-%u", ys[0], ys[1], s, s+bw->interval);
+            int rc = asprintf(&tmp, "A%u-%u.%u-%u", ys[0], ys[1], s, s+bw->interval);
             FILE * f = fopen(tmp, "wb");
             rc = fwrite(xymats, A->vec_elt_stride(A, 1), bw->m*bw->interval, f);
             if (rc != bw->m*bw->interval) {
@@ -312,14 +312,16 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
             free(tmp);
         }
 
-        int rc = asprintf(&v_name, "V%u-%u.%u", ys[0], ys[1], s + bw->interval);
-        ASSERT_ALWAYS(rc >= 0);
-        mmt_vec_save(ymy[0], v_name, unpadded);
-        free(v_name);
+        if (!fake) {
+            int rc = asprintf(&v_name, "V%u-%u.%u", ys[0], ys[1], s + bw->interval);
+            ASSERT_ALWAYS(rc >= 0);
+            mmt_vec_save(ymy[0], v_name, unpadded);
+            free(v_name);
+        }
 
         if (pi->m->trank == 0 && pi->m->jrank == 0) {
             char * v_stem;
-            rc = asprintf(&v_stem, "V%u-%u", ys[0], ys[1]);
+            int rc = asprintf(&v_stem, "V%u-%u", ys[0], ys[1]);
             ASSERT_ALWAYS(rc >= 0);
             keep_rolling_checkpoints(v_stem, s + bw->interval);
             free(v_stem);

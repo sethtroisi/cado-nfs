@@ -37,7 +37,8 @@ skew: 1.05
 # f+g score 84.32
 
 To recover the polynomial pair used for the DLP768 record
-(https://listserv.nodak.edu/cgi-bin/wa.exe?A2=NMBRTHRY;a0c66b63.1606):
+(https://listserv.nodak.edu/cgi-bin/wa.exe?A2=NMBRTHRY;a0c66b63.1606 and
+http://eprint.iacr.org/2017/067.pdf):
 
 # -modr r -modm m enables one to only consider polynomials f
 # with index r mod m in Stage 1 (default is r=0 and m=1).
@@ -78,11 +79,12 @@ skew: 1.37
 #define ALPHA_BOUND_GUARD 1.0
 
 double best_score_f = DBL_MAX, worst_score_f = DBL_MIN;
-unsigned long f_irreducible = 0;
+unsigned long f_candidate = 0;   /* number of irreducibility tests */
+unsigned long f_irreducible = 0; /* number of irreducible polynomials */
 double max_guard = DBL_MIN;
 // #define TIMINGS
 #ifdef TIMINGS
-double t_roots = 0.0, t_irred = 0.0;
+double t_roots = 0.0, t_irred = 0.0, t_lll = 0.0;
 #endif
 
 /* Check that f is irreducible.
@@ -120,13 +122,15 @@ is_irreducible (mpz_poly f)
 
   do {
     mpz_nextprime (p, p);
-#ifdef TIMINGS
-    t_roots -= seconds_thread ();
-#endif
     nr = mpz_poly_roots_mpz (roots, f, p);
-#ifdef TIMINGS
-    t_roots += seconds_thread ();
-#endif
+    /* If f has no root mod p and degree <= 3, it is irreducible,
+       since a degree 2 polynomial can only factor into 1+1 or 2,
+       and a degree 3 polynomial can only factor into 1+2 or 3. */
+    if (nr == 0 && d <= 3)
+      {
+        ret = 1;
+        goto clear_and_exit;
+      }
   } while (nr == 0);
 
   g.coeff = (mpz_t **) malloc ((dg + 2)*sizeof(mpz_t*));
@@ -190,13 +194,14 @@ is_irreducible (mpz_poly f)
   }
   free (g.coeff);
 
-  for (i = 0; i < d; i++)
-    mpz_clear (roots[i]);
-  free (roots);
   mpz_clear (det);
   mpz_clear (a);
   mpz_clear (b);
   mpz_clear (r);
+ clear_and_exit:
+  for (i = 0; i < d; i++)
+    mpz_clear (roots[i]);
+  free (roots);
   mpz_clear (p);
 
   return ret;
@@ -321,9 +326,9 @@ polygen_JL_f (int d, unsigned int bound, mpz_t *f, unsigned long idx)
         mpz_set_si (f[i], fint[i]);
       }
 
-    /* we take -bound <= f[0] < bound, f[0] <> 0,
+    /* we take -bound <= f[0] <= bound, f[0] <> 0,
        which makes 2*bound possible values */
-    ASSERT_ALWAYS(idx < 2 * bound);
+    ASSERT(idx < 2 * bound);
     fint[0] = (idx < bound) ? idx - bound : idx - (bound - 1);
     mpz_set_si (f[0], fint[0]);
 
@@ -331,20 +336,76 @@ polygen_JL_f (int d, unsigned int bound, mpz_t *f, unsigned long idx)
        |f[d]| < |f[0]| or (|f[d]| = |f[0]| and |f[d-1]| < |f[1]|) or ... */
 
     ok = 1;
-    for (int i = 0; 2 * i < d && ok; i++)
+    for (int i = 0; 2 * i < d; i++)
       {
-        if (abs(fint[d-i]) > abs(fint[i]))
-          ok = 0;
-        else if (abs(fint[d-i]) < abs(fint[i]))
-          break;
+        if (abs(fint[d-i]) != abs(fint[i]))
+          {
+            /* we want |f[d-i]| < |f[i]| */
+            ok = abs(fint[d-i]) < abs(fint[i]);
+            break;
+          }
       }
+
+    /* since f(x) is equivalent to (-1)^d*f(-x), if f[d-1] = 0, then the
+       largest i = d-3, d-5, ..., such that f[i] <> 0 should have f[i] > 0 */
+    if (ok && fint[d-1] == 0)
+      {
+        for (int i = d - 3; i >= 0; i -= 2)
+          {
+            if (fint[i])
+              {
+                ok = fint[i] > 0;
+                break;
+              }
+          }
+      }
+
+    /* if |f[i]| = |f[d-i]| for all i, then [f[d], f[d-1], ..., f[1], f[0]]
+       is equivalent to [s*f[0], s*t*f[1], s*t^2*f[2], ...], where
+       s = sign(f[0]), and s*t^i is the sign of f[i] where i is the smallest
+       odd index > 0 such that f[i] <> 0.  */
+    if (ok && fint[d] == abs(fint[0])) /* f[d] > 0 */
+      {
+        int s = (fint[0] > 0) ? 1 : -1, t = 0, i;
+        for (i = 1; i <= d; i++)
+          {
+            if (2 * i < d && abs(fint[d-i]) != abs(fint[i]))
+              break;
+            if (t == 0 && fint[i] != 0 && (i & 1))
+              t = (fint[i] > 0) ? s : -s;
+          }
+        if (2 * i >= d) /* |f[i]| = |f[d-i]| for all i */
+          {
+            /* if t=0, then all odd coefficients are zero, but since
+               |f[d-i]| = |f[i]| this can only occur for d even, but then
+               we can set t to 1, since t only affects the odd coefficients */
+            if (t == 0)
+              t = 1;
+            for (i = 0; i <= d; i++)
+              {
+                if (fint[d-i] != s * fint[i])
+                  {
+                    ok = fint[d-i] > s * fint[i];
+                    break;
+                  }
+                s = s * t;
+              }
+          }
+      }
+
     if (ok == 0)
       goto end;
 
-    /* content test */
+#ifdef HAVE_OPENMP
+#pragma omp critical
+#endif
+    f_candidate ++;
+
     mpz_poly ff;
     ff->deg = d;
     ff->coeff = f;
+
+    /* content test */
     mpz_poly_content (t, ff);
     ok = mpz_cmp_ui (t, 1) == 0;
     if (ok == 0)
@@ -416,7 +477,13 @@ polygen_JL_g (mpz_t N, int dg, mat_Z g, mpz_t root)
         }
     }
 
+#ifdef TIMINGS
+    t_lll -= seconds_thread ();
+#endif
     LLL (det, g, NULL, a, b);
+#ifdef TIMINGS
+    t_lll += seconds_thread ();
+#endif
 
     mpz_clear (det);
     mpz_clear (a);
@@ -704,8 +771,8 @@ main (int argc, char *argv[])
 
     t = seconds () - t;
 
-    printf ("found %lu irreducible f out of %lu\n", f_irreducible,
-            maxtries / modm);
+    printf ("found %lu irreducible f out of %lu candidates out of %lu\n",
+            f_irreducible, f_candidate, maxtries / modm);
     printf ("best score %1.2f, worst %1.2f, max guard %1.2f\n",
             best_score_f, worst_score_f, max_guard);
     if (max_guard > ALPHA_BOUND_GUARD)
@@ -713,7 +780,7 @@ main (int argc, char *argv[])
               "have missed some polynomials\n");
     printf ("Time %.2fs", t);
 #ifdef TIMINGS
-    printf (" (roots %.2fs, irred %.2fs)", t_roots, t_irred);
+    printf (" (roots %.2fs, irred %.2fs, lll %.2fs)", t_roots, t_irred, t_lll);
 #endif
     printf ("\n");
 

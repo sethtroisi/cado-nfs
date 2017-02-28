@@ -204,10 +204,10 @@ macro(cado_define_test)
     endif()
     if(nSCRIPT GREATER 0)
         if (nSOURCES GREATER 0)
-            message(FATAL "SCRIPT and SOURCES incompatible")
+            message(FATAL_ERROR "SCRIPT and SOURCES incompatible")
         endif()
         if (nLIBRARIES GREATER 0)
-            message(FATAL "SCRIPT and LIBRARIES incompatible")
+            message(FATAL_ERROR "SCRIPT and LIBRARIES incompatible")
         endif()
     endif()
     if(nWORKING_DIRECTORY GREATER 1)
@@ -433,7 +433,7 @@ if(DEFINED ENV{CHECKS_EXPENSIVE})
         SCRIPT
             ${CADO_NFS_SOURCE_DIR}/cado-nfs.py
             22381151342911794563007770625342242843893411711318155026160427871
-            tasks.linalg.bwc.m=128 tasks.linalg.bwc.n=128 --server-threads 2
+            tasks.linalg.m=128 tasks.linalg.n=128 --server-threads 2
         TARGET_DEPENDENCIES
             full_c30_dependencies
             )

@@ -225,7 +225,7 @@ if __name__ == '__main__':
         las_args["--fb1"]  = args.datadir+"/"+args.prefix+".factorbase.roots.gz"
         if args.uselogtable:
             las_args["--renumber"] = args.datadir+"/"+args.prefix+".freerel.renumber.gz"
-            las_args["--log"] = args.datadir+"/"+args.prefix+".reconstructlog.dlog"
+            las_args["--log"] = args.datadir+"/"+args.prefix+".dlog"
     elif args.poly and args.fb:
         if (args.datadir or args.prefix):
             raise ValueError("Please specify either datadir&prefix or poly&fb")

@@ -20,9 +20,6 @@
 double tmkzup, tmkzdown, tmkzupdown, tmkzcount;
 #endif
 
-/* mat->MKZA[j] becomes MKZ_INF when column j is deleted */
-#define MKZ_INF UMAX(index_t) 
-
 // Again, a priority queue as a heap...!
 // Q[0] contains the number of items in Q[], so that useful part of Q
 // is Q[1..Q[0]]
@@ -38,23 +35,23 @@ double tmkzup, tmkzdown, tmkzupdown, tmkzcount;
 
 #if 0
 static int
-MkzGetCount(int32_t *Q, int32_t *A, int32_t dj)
+MkzGetCount(index_t *Q, index_t *A, index_t dj)
 {
     return MkzGet(Q, A[dj], 1);
 }
 #endif
 
 inline int
-MkzIsAlive(index_t *A, int32_t dj)
+MkzIsAlive(uint32_t *A, index_t dj)
 {
   return A[dj] != MKZ_INF;
 }
 
 // (Q, A)[k1] <- (Q, A)[k2]
 static void
-MkzAssign(int32_t *Q, index_t *A, int32_t k1, int32_t k2)
+MkzAssign(index_t *Q, uint32_t *A, index_t k1, index_t k2)
 {
-    int32_t dj = MkzGet(Q, k2, 0);
+    index_t dj = MkzGet(Q, k2, 0);
 
     MkzSet(Q, k1, 0, dj);
     MkzSet(Q, k1, 1, MkzGet(Q, k2, 1)); // could be simplified...!
@@ -63,7 +60,7 @@ MkzAssign(int32_t *Q, index_t *A, int32_t k1, int32_t k2)
 
 #if MKZ_DEBUG
 static void MAYBE_UNUSED
-MkzPrintQueue(int32_t *Q)
+MkzPrintQueue(index_t *Q)
 {
     int level = 0, imax = 1, i;
 
@@ -80,9 +77,9 @@ MkzPrintQueue(int32_t *Q)
 #endif
 
 static void
-MkzUpQueue(int32_t *Q, index_t *A, int32_t k)
+MkzUpQueue(index_t *Q, uint32_t *A, index_t k)
 {
-    int32_t dj = MkzGet(Q, k, 0), count = MkzGet(Q, k, 1);
+    index_t dj = MkzGet(Q, k, 0), count = MkzGet(Q, k, 1);
 #if MKZ_TIMINGS
     double tt = seconds();
 #endif
@@ -103,7 +100,7 @@ MkzUpQueue(int32_t *Q, index_t *A, int32_t k)
 }
 
 static void
-MkzInsert(int32_t *Q, index_t *A, int32_t dj, int32_t count)
+MkzInsert(index_t *Q, uint32_t *A, index_t dj, index_t count)
 {
     Q[0]++;
     MkzSet(Q, Q[0], 0, dj);
@@ -115,9 +112,9 @@ MkzInsert(int32_t *Q, index_t *A, int32_t dj, int32_t count)
 // Move Q[k] down, by keeping the structure of Q as a heap, i.e.,
 // each node has a smaller cost than its two left and right nodes
 static void
-MkzDownQueue(int32_t *Q, index_t *A, int32_t k)
+MkzDownQueue(index_t *Q, uint32_t *A, index_t k)
 {
-    int32_t dj = MkzGet(Q, k, 0), count = MkzGet(Q, k, 1), j;
+    index_t dj = MkzGet(Q, k, 0), count = MkzGet(Q, k, 1), j;
 #if MKZ_TIMINGS
     double tt = seconds();
 #endif
@@ -148,7 +145,7 @@ MkzDownQueue(int32_t *Q, index_t *A, int32_t k)
 // (Q, A)[k] has just arrived, but we have to move it in the heap, so that
 // it finds its place.
 static void
-MkzMoveUpOrDown(int32_t *Q, index_t *A, int32_t k)
+MkzMoveUpOrDown(index_t *Q, uint32_t *A, index_t k)
 {
 #if MKZ_TIMINGS
     double tt = seconds();
@@ -173,7 +170,7 @@ MkzMoveUpOrDown(int32_t *Q, index_t *A, int32_t k)
 
 // Remove (Q, A)[k].
 static void
-MkzDelete(int32_t *Q, index_t *A, int32_t k)
+MkzDelete(index_t *Q, uint32_t *A, index_t k)
 {
 #if MKZ_DEBUG >= 1
     fprintf(stderr, "MKZ: deleting (Q, A)[%d]=[%d, %d]\n", k,
@@ -188,7 +185,7 @@ MkzDelete(int32_t *Q, index_t *A, int32_t k)
 #if 0
 // Remove (Q, A)[k].
 void
-MkzRemove(int32_t *dj, int32_t *mkz, int32_t *Q, index_t *A, int32_t k)
+MkzRemove(index_t *dj, index_t *mkz, index_t *Q, uint32_t *A, index_t k)
 {
     *dj = MkzGet(Q, k, 0);
     *mkz = MkzGet(Q, k, 1);
@@ -201,7 +198,7 @@ MkzRemove(int32_t *dj, int32_t *mkz, int32_t *Q, index_t *A, int32_t k)
 
 #if MKZ_DEBUG >= 1
 static int MAYBE_UNUSED
-MkzIsHeap(int32_t *Q)
+MkzIsHeap(index_t *Q)
 {
     int k;
 
@@ -236,7 +233,7 @@ MkzCheck(filter_matrix_t *mat)
   {
     if (0 < mat->wt[dj] && mat->wt[dj] <= maxlevel)
 	  {
-      if(MkzGet(mat->MKZQ, mat->MKZA[dj], 0) != (int32_t) dj)
+      if(MkzGet(mat->MKZQ, mat->MKZA[dj], 0) != (index_t) dj)
       {
         fprintf(stderr, "GASP: %" PRId32 " <> %" PRIu64 " in MkzCheck\n",
                         MkzGet(mat->MKZQ, mat->MKZA[dj], 0), dj);
@@ -249,7 +246,7 @@ MkzCheck(filter_matrix_t *mat)
 
 /* here we count a cost k for an ideal of weight k */
 static int
-Cavallar (filter_matrix_t *mat, int32_t j)
+Cavallar (filter_matrix_t *mat, index_t j)
 {
   return mat->wt[j];
 }
@@ -268,7 +265,7 @@ Cavallar (filter_matrix_t *mat, int32_t j)
    a normal distribution, and that on the long run we mainly see the average.
 */
 static int
-pureMkz(filter_matrix_t *mat, int32_t j)
+pureMkz(filter_matrix_t *mat, index_t j)
 {
     int i;
     unsigned int k;
@@ -300,7 +297,7 @@ pureMkz(filter_matrix_t *mat, int32_t j)
    w <= mat->wmstmax, and is identical to pureMkz() for larger weights.
    Thus for mat->wmstmax = 1, it should be identical to pureMkz(). */
 static int
-lightColAndMkz (filter_matrix_t *mat, int32_t j)
+lightColAndMkz (filter_matrix_t *mat, index_t j)
 {
     int wj = mat->wt[j];
 
@@ -308,7 +305,7 @@ lightColAndMkz (filter_matrix_t *mat, int32_t j)
       return -4; /* like pureMkz */
     else if (wj <= mat->wmstmax)
       {
-        int32_t *ind = (int32_t*) mat->R[j] + 1;
+        index_t *ind = (index_t*) mat->R[j] + 1;
         if (wj == 2)
           return weightSum (mat, ind[0], ind[1], j)
             - matLengthRow (mat, ind[0]) - matLengthRow (mat, ind[1]);
@@ -320,8 +317,8 @@ lightColAndMkz (filter_matrix_t *mat, int32_t j)
 }
 
 /* return the cost of merging column j (the smaller, the better) */
-static int
-MkzCount(filter_matrix_t *mat, int32_t j)
+static int32_t
+MkzCount(filter_matrix_t *mat, index_t j)
 {
     switch(mat->mkztype){
     case MKZTYPE_LIGHT:
@@ -337,10 +334,10 @@ MkzCount(filter_matrix_t *mat, int32_t j)
 
 /* pop the top element from the heap, return 0 iff heap is empty */
 int
-MkzPopQueue(int32_t *dj, int32_t *mkz, filter_matrix_t *mat)
+MkzPopQueue(index_t *dj, index_signed_t *mkz, filter_matrix_t *mat)
 {
-  int32_t *Q = mat->MKZQ;
-  index_t *A = mat->MKZA;
+  index_t *Q = mat->MKZQ;
+  uint32_t *A = mat->MKZA;
 
   if (Q[0] == 0)
     return 0;
@@ -397,20 +394,20 @@ MkzInit (filter_matrix_t *mat, int verbose)
         sz++;
     
     // Allocating heap MKZQ
-    size_t tmp_alloc = (sz+1) * 2 * sizeof(int32_t);
+    size_t tmp_alloc = (sz+1) * 2 * sizeof(index_t);
     if (verbose)
       fprintf (stderr, "Allocating heap for %" PRIu64 " columns (%zuMB)\n", sz,
                tmp_alloc >> 20);
-    mat->MKZQ = (int32_t *) malloc (tmp_alloc);
+    mat->MKZQ = (index_t *) malloc (tmp_alloc);
     mat->MKZQ[0] = 0;
-    mat->MKZQ[1] = (int32_t) sz; // why not?
+    mat->MKZQ[1] = (index_t) sz; // why not?
     
     // every j needs a pointer (MKZA)
     tmp_alloc = (mat->ncols + 1) * sizeof(index_t);
     if (verbose)
       fprintf (stderr, "Allocating pointers to heap: %zuMB\n",
                tmp_alloc >> 20);
-    mat->MKZA = (index_t *) malloc (tmp_alloc);
+    mat->MKZA = (uint32_t*) malloc (tmp_alloc);
 
     mkz = malloc (mat->ncols * sizeof (int32_t));
 
@@ -445,8 +442,8 @@ void
 MkzClear (filter_matrix_t *mat, int verbose)
 {
   if (verbose)
-    fprintf(stderr, "Max Markowitz count: %d\n",
-	    MkzGet(mat->MKZQ, mat->MKZQ[0], 1));
+    fprintf(stderr, "Max Markowitz count: %lu\n",
+	    (unsigned long) MkzGet(mat->MKZQ, mat->MKZQ[0], 1));
 #if MKZ_TIMINGS
     fprintf(stderr, "MKZT: up=%d down=%d updown=%d count=%d\n",
 	    (int)tmkzup, (int)tmkzdown, (int)tmkzupdown, (int)tmkzcount);
@@ -457,7 +454,7 @@ MkzClear (filter_matrix_t *mat, int verbose)
 
 /* increment the weight of column j (in absolute value) */
 int
-MkzIncrCol(filter_matrix_t *mat, int32_t j)
+MkzIncrCol(filter_matrix_t *mat, index_t j)
 {
     int ind;
 
@@ -468,69 +465,54 @@ MkzIncrCol(filter_matrix_t *mat, int32_t j)
     return ind;
 }
 
-// Row[i] has been adjoined to column j, so that we can incrementally
-// change the Markowitz count.
+/* update the Markowitz cost of column j */
 void
-MkzUpdate(filter_matrix_t *mat, int32_t i MAYBE_UNUSED, int32_t j)
+MkzUpdate (filter_matrix_t *mat, index_t j)
 {
-    int32_t adr = mat->MKZA[j];
-    int mkz;
+    uint32_t adr = mat->MKZA[j];
+    index_t mkz;
 
-    if(adr == -1){
-#if MKZ_DEBUG >= 1
-	fprintf(stderr, "Prevented use of adr[%d]=-1 in MkzUpdate\n", j);
-#endif
-	return;
-    }
-#if MKZ_DEBUG >= 1
-    if((mat->wt[j] == 0) || (mat->wt[j] == 1))
-	fprintf(stderr, "W: wt[%d] = %d\n", j, mat->wt[j]);
-#endif
-#if 1
-    // costly?
-    mkz = MkzCount(mat, j);
-#else
-    // old_count = min (r_ii-1)*(w-2) = mu * (w-2)
-    // new_count = min(mu, r_i-1)*(w-1)
-    mkz = MkzGet(mat->MKZQ, adr, 1)/(mat->wt[j]-2); // mu
-    if(matLengthRow(mat,i) < mkz+1)
-      mkz = matLengthRow(mat,i)-1;
-    mkz *= (mat->wt[j]-1);
-#endif
-#if MKZ_DEBUG >= 1
-    fprintf(stderr, "Updating j=%d (old=%d, new=%d)\n", j,
-	    MkzGet(mat->MKZQ, adr, 1), mkz);
-#endif
-    // nothing to do if new count == old count
-    if (mkz != MkzGet(mat->MKZQ, adr, 1))
-      {
-        // add new count
-        MkzSet(mat->MKZQ, adr, 1, mkz);
-        // a variant of delete is needed...!
-        MkzMoveUpOrDown(mat->MKZQ, mat->MKZA, adr);
-      }
+    ASSERT(adr != MKZ_INF);
+    /* compute the new Markowitz cost */
+    mkz = MkzCount (mat, j);
+    /* update new cost */
+    MkzSet (mat->MKZQ, adr, 1, mkz);
+    /* move it up or down in the heap */
+    MkzMoveUpOrDown (mat->MKZQ, mat->MKZA, adr);
 }
 
-// Row[i] has been removed for column j, so that we need to update
-// the Markowitz count.
+#if 0 /* parallel version */
+/* update in parallel j[0], j[1], ..., j[n-1] */
 void
-MkzUpdateDown (filter_matrix_t *mat, int32_t j)
+MkzUpdateN (filter_matrix_t *mat, index_t *j, int n)
 {
-  int32_t adr = mat->MKZA[j];
-  int mkz;
+  index_t *mkz;
+  int i;
 
-  if (adr == -1) /* column too heavy or already removed */
-    return;
-
-  mkz = MkzCount(mat, j);
-  if (mkz != MkzGet(mat->MKZQ, adr, 1))
+  mkz = malloc (n * sizeof (index_t));
+#ifdef HAVE_OPENMP
+#pragma omp parallel for
+#endif
+  for (i = 0; i < n; i++)
+    mkz[i] = MkzCount (mat, j[i]);
+  /* the following is sequential */
+  for (i = 0; i < n; i++)
     {
-      // update count
-      MkzSet(mat->MKZQ, adr, 1, mkz);
-      // a variant of delete is needed...!
-      MkzMoveUpOrDown(mat->MKZQ, mat->MKZA, adr);
+      uint32_t adr = mat->MKZA[j[i]];
+      MkzSet (mat->MKZQ, adr, 1, mkz[i]);
+      MkzMoveUpOrDown (mat->MKZQ, mat->MKZA, adr);
     }
+  free (mkz);
 }
+#else
+/* update in parallel j[0], j[1], ..., j[n-1] */
+void
+MkzUpdateN (filter_matrix_t *mat, index_t *j, int n)
+{
+  for (int i = 0; i < n; i++)
+    MkzUpdate (mat, j[i]);
+}
+#endif
 
 /*
    Updates:
@@ -540,9 +522,9 @@ MkzUpdateDown (filter_matrix_t *mat, int32_t j)
 
 */
 void
-MkzDecreaseColWeight(filter_matrix_t *mat, int32_t j)
+MkzDecreaseColWeight(filter_matrix_t *mat, index_t j)
 {
-    int32_t dj = j;
+    index_t dj = j;
 
 #if MKZ_DEBUG >= 1
     fprintf(stderr, "Decreasing col %d; was %d\n", j, mat->wt[dj]);
@@ -552,7 +534,7 @@ MkzDecreaseColWeight(filter_matrix_t *mat, int32_t j)
 
 /* remove column j from and update matrix */
 void
-MkzRemoveJ(filter_matrix_t *mat, int32_t j)
+MkzRemoveJ(filter_matrix_t *mat, index_t j)
 {
     mat->wt[j] = 0;
 

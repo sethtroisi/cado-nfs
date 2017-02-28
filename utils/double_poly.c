@@ -6,9 +6,9 @@
 #include <limits.h>
 #include <math.h>   /* for fabs */
 #include <float.h> /* for DBL_MAX */
-#include "utils.h"
 #include "portability.h"
 #include "gcd.h"
+#include "double_poly.h"
 
 /* Initialize a polynomial of degree d */
 void

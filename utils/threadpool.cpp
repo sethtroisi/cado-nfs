@@ -1,7 +1,7 @@
 #include "cado.h"
 #include <string.h>
 #include <stdio.h>
-#include "threadpool.h"
+#include "threadpool.hpp"
 
 /*
   With multiple queues, when new work is added to a queue, we need to be able
@@ -21,16 +21,6 @@
   We use a simple size_t variable as the semaphore; accesses are mutex-protected.
 */
 
-class worker_thread : private ThreadNonCopyable {
-  friend class thread_pool;
-  thread_pool &pool;
-  pthread_t thread;
-  const size_t preferred_queue;
-public:
-  worker_thread(thread_pool &, size_t);
-  ~worker_thread();
-};
-
 worker_thread::worker_thread(thread_pool &_pool, const size_t _preferred_queue)
   : pool(_pool), preferred_queue(_preferred_queue)
 {
@@ -43,11 +33,13 @@ worker_thread::~worker_thread() {
   ASSERT_ALWAYS(rc == 0);
 }
 
+int worker_thread::rank() const { return this - pool.threads; }
+
 class thread_task {
 public:
   const task_function_t func;
   const int id;
-  const task_parameters * const parameters;
+  const task_parameters * parameters;
   const bool please_die;
   const size_t queue;
   const double cost; // costly tasks are scheduled first.
@@ -95,9 +87,9 @@ thread_pool::thread_pool(const size_t _nr_threads, const size_t _nr_queues)
   tasks = new tasks_queue[nr_queues];
   results = new results_queue[nr_queues];
 
-  threads = new worker_thread_ptr[nr_threads];
+  threads = reinterpret_cast<worker_thread *>(malloc(nr_threads * sizeof(worker_thread)));
   for (size_t i = 0; i < nr_threads; i++)
-    threads[i] = new worker_thread(*this, 0);
+    new (threads + i) worker_thread(*this, 0);
 };
 
 thread_pool::~thread_pool() {
@@ -108,8 +100,8 @@ thread_pool::~thread_pool() {
     broadcast(tasks[i].not_empty);
   leave();
   for (size_t i = 0; i < nr_threads; i++)
-    delete threads[i];
-  delete[] threads;
+      threads[i].~worker_thread();
+  free(reinterpret_cast<void*>(threads));
   for (size_t i = 0; i < nr_queues; i++)
     ASSERT_ALWAYS(tasks[i].empty());
   delete[] tasks;
@@ -130,7 +122,7 @@ thread_pool::thread_work_on_tasks(void *arg)
     }
     task_function_t func = task->func;
     const task_parameters *params = task->parameters;
-    task_result *result = func(params);
+    task_result *result = func(I, params);
     if (result != NULL)
       I->pool.add_result(task->queue, result);
     delete task;
@@ -149,7 +141,7 @@ thread_pool::all_task_queues_empty() const
 
 
 void
-thread_pool::add_task(task_function_t func, const task_parameters *const params,
+thread_pool::add_task(task_function_t func, const task_parameters * params,
                       const int id, const size_t queue, double cost)
 {
     ASSERT_ALWAYS(queue < nr_queues);

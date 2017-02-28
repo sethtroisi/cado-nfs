@@ -17,18 +17,26 @@ static void mpz_poly_setcoeffs_si_var(mpz_poly f, int d, ...)
     va_end(ap);
 }
 
-int main()
+int
+main (int argc, char *argv[])
 {
   mpz_poly f;
+  unsigned int N = 10000;
+
+  if (argc >= 2)
+    N = atoi (argv[1]);
+
   mpz_poly_init(f, 6);
 
   mpz_poly_setcoeffs_si_var(f, 6, 1, -91348, -228385, -20, 228370, 91354, 1);
-  double alpha = alpha3d(f, 2000, 10000);
+  double alpha = alpha3d(f, 2000, N);
+  printf ("alpha = %f\n", alpha);
   ASSERT_ALWAYS(-2.0 < alpha && alpha < -1.6);
 
   mpz_poly_setcoeffs_si_var(f, 6, 23667000, 135452818, -16372955, -473340000,
       -338632045, 6549182, 23667000);
-  alpha = alpha3d(f, 2000, 10000);
+  alpha = alpha3d(f, 2000, N);
+  printf ("alpha = %f\n", alpha);
   ASSERT_ALWAYS(-11.7 < alpha && alpha < -11.3);
 
   mpz_poly_clear(f);

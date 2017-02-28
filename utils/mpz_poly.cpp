@@ -15,8 +15,13 @@
 #include <string.h>
 #include <gmp.h>
 #include <sstream>
-#include "utils.h"
 #include "portability.h"
+#include "mpz_poly.h"
+#include "gmp_aux.h"
+#include "misc.h"
+/* and just because we expose a proxy to usp.c's root finding... */
+#include "usp.h"
+#include "double_poly.h"
 
 #ifndef max
 #define max(a,b) ((a)<(b) ? (b) : (a))
@@ -1551,7 +1556,7 @@ void mpz_poly_eval_mod_mpz_barrett(mpz_t res, mpz_poly_srcptr f, mpz_srcptr x,
     mpz_set_ui(res, 0);
     return;
   }
-  mpz_mod(res, f->coeff[d], m);
+  barrett_mod(res, f->coeff[d], m, mx);
   for (i = d-1; i>=0; --i) {
     mpz_mul(res, res, x);
     mpz_add(res, res, f->coeff[i]);
@@ -1680,57 +1685,83 @@ mpz_poly_mod_mpz (mpz_poly_ptr R, mpz_poly_srcptr A, mpz_srcptr m, mpz_srcptr in
   mpz_poly_cleandeg(R, A->deg);
   return R->deg;
 }
+
+/* reduce non-negative coefficients in [0, p-1], negative ones in [1-p, -1] */
+int
+mpz_poly_mod_mpz_lazy (mpz_poly_ptr R, mpz_poly_srcptr A, mpz_srcptr m,
+		       mpz_srcptr invm)
+{
+  mpz_poly_realloc(R, A->deg + 1);
+  for (int i = 0; i <= A->deg; ++i)
+    {
+      if (mpz_sgn (A->coeff[i]) >= 0)
+	barrett_mod (R->coeff[i], A->coeff[i], m, invm);
+      else
+	{
+	  mpz_neg (R->coeff[i], A->coeff[i]);
+	  barrett_mod (R->coeff[i], R->coeff[i], m, invm);
+	  mpz_neg (R->coeff[i], R->coeff[i]);
+	}
+    }
+
+  mpz_poly_cleandeg(R, A->deg);
+  return R->deg;
+}
+
 /* Reduce R[d]*x^d + ... + R[0] mod f[df]*x^df + ... + f[0] modulo m.
    Return the degree of the remainder.
-   Assume invm = floor(B^(2k)/m), m having k limbs, and B is the limb base */
-/* Coefficients of f must be reduced mod m on input
- * Coefficients of R need not be reduced mod m on input, but are reduced
- * on output
- */
-/* invm may be NULL (or computed by barrett_init) */
+   Assume invm = floor(B^(2k)/m), m having k limbs, and B is the limb base.
+   Coefficients of f must be reduced mod m on input.
+   Coefficients of R need not be reduced mod m on input, but are reduced
+   on output.
+   invm may be NULL (or computed by barrett_init).
+   If invf is not NULL, it should be 1/m mod lc(f). */
 int
 mpz_poly_mod_f_mod_mpz (mpz_poly_ptr R, mpz_poly_srcptr f, mpz_srcptr m,
-                    mpz_srcptr invm)
+			mpz_srcptr invm, mpz_srcptr invf)
 {
-    if (f) {
-        /* f == NULL is another way to eventually use mpz_poly_mod_mpz */
-        mpz_t aux, c;
-        mpz_init (aux);
-        mpz_init (c);
-        /* aux = 1/m mod lc(f). We could precompute it but it should not cost
-         * much anyway. */
-        mpz_invert (aux, m, f->coeff[f->deg]);
-        // FIXME: write a subquadratic variant
-        while (R->deg >= f->deg)
-        {
-            /* First reduce the leading coefficient of R mod m. However
-             * this is quite expensive, since it costs O(D(n)) where m
-             * has size n, whereas if we leave lc(R) to size 2n, we have
-             * an overhead of O(n) only. */
-            // barrett_mod (lc(R), lc(R), m, invm);
-            /* Here m is large (typically several million bits) and lc(f)
-             * is small (typically one word). We first add to R lambda *
-             * m * x^(dR-df) --- which is zero mod m --- such that the
-             * new coefficient of degree dR is divisible by lc(f), i.e.,
-             * lambda = -lc(R)/m mod lc(f).  Then if c = (lc(R) + lambda
-             * * m) / lc(f), we simply subtract c * x^(dR-df) * f.
-             */
-            mpz_mod (c, R->coeff[R->deg], f->coeff[f->deg]); /* lc(R) mod lc(f) */
-            mpz_mul (c, c, aux);
-            mpz_mod (c, c, f->coeff[f->deg]);    /* lc(R)/m mod lc(f) */
-            mpz_submul (R->coeff[R->deg], m, c);  /* lc(R) - m * (lc(R) / m mod lc(f)) */
-            ASSERT (mpz_divisible_p (R->coeff[R->deg], f->coeff[f->deg]));
-            mpz_divexact (c, R->coeff[R->deg], f->coeff[f->deg]);
-            for (int i = R->deg - 1; i >= R->deg - f->deg; --i)
-                mpz_submul (R->coeff[i], c, f->coeff[f->deg-R->deg+i]);
-            R->deg--;
-        }
-        mpz_clear (aux);
-        mpz_clear (c);
-    }
-    mpz_poly_mod_mpz(R, R, m, invm);
+  mpz_t aux, c;
 
-    return R->deg;
+  if (f == NULL)
+    goto reduce_R;
+
+  if (invf == NULL)
+    {
+      mpz_init (aux);
+      /* aux = 1/m mod lc(f) */
+      mpz_invert (aux, m, f->coeff[f->deg]);
+    }
+
+  mpz_init (c);
+  // FIXME: write a subquadratic variant
+  while (R->deg >= f->deg)
+    {
+      /* Here m is large (thousand to million bits) and lc(f) is small
+       * (typically one word). We first add to R lambda * m * x^(dR-df) ---
+       * which is zero mod m --- such that the new coefficient of degree dR
+       * is divisible by lc(f), i.e., lambda = -lc(R)/m mod lc(f). Then if
+       * c = (lc(R) + lambda * m) / lc(f), we subtract c * x^(dR-df) * f. */
+      mpz_mod (c, R->coeff[R->deg], f->coeff[f->deg]); /* lc(R) mod lc(f) */
+      mpz_mul (c, c, (invf == NULL) ? aux : invf);
+      mpz_mod (c, c, f->coeff[f->deg]);    /* lc(R)/m mod lc(f) */
+      mpz_submul (R->coeff[R->deg], m, c);  /* lc(R) - m * (lc(R) / m mod lc(f)) */
+      ASSERT (mpz_divisible_p (R->coeff[R->deg], f->coeff[f->deg]));
+      mpz_divexact (c, R->coeff[R->deg], f->coeff[f->deg]);
+      /* If R[deg] has initially size 2n, and f[deg] = O(1), then c has size
+	 2n here. */
+      for (int i = R->deg - 1; i >= R->deg - f->deg; --i)
+	mpz_submul (R->coeff[i], c, f->coeff[f->deg-R->deg+i]);
+      R->deg--;
+    }
+  
+  mpz_clear (c);
+  if (invf == NULL)
+    mpz_clear (aux);
+
+ reduce_R:
+  mpz_poly_mod_mpz (R, R, m, invm);
+
+  return R->deg;
 }
 
 /* Stores in g the polynomial linked to f by:
@@ -1784,7 +1815,7 @@ mpz_poly_reduce_frac_mod_f_mod_mpz (mpz_poly_ptr num, mpz_poly_ptr denom,
     mpz_poly_init (V, 0);
     mpz_poly_xgcd_mpz (g, F, denom, U, V, m);
     mpz_poly_mul (num, num, V);
-    mpz_poly_mod_f_mod_mpz (num, F, m, invm);
+    mpz_poly_mod_f_mod_mpz (num, F, m, invm, NULL);
     mpz_poly_clear (g);
     mpz_poly_clear (U);
     mpz_poly_clear (V);
@@ -1796,13 +1827,14 @@ mpz_poly_reduce_frac_mod_f_mod_mpz (mpz_poly_ptr num, mpz_poly_ptr denom,
 
 /* Q = P1*P2 mod f, mod m
    f is the original algebraic polynomial (non monic but small coefficients)
-   Assume invm = floor(B^(2k)/m), m having k limbs, and B is the limb base */
-/* Coefficients of P1 and P2 need not be reduced mod m.
- * Coefficients of Q are reduced mod m
- */
+   Assume invm = floor(B^(2k)/m), m having k limbs, and B is the limb base.
+   Coefficients of P1 and P2 need not be reduced mod m.
+   Coefficients of Q are reduced mod m.
+   If invf is not NULL, it is 1/m mod lc(f). */
 void
 mpz_poly_mul_mod_f_mod_mpz (mpz_poly_ptr Q, mpz_poly_srcptr P1, mpz_poly_srcptr P2,
-                        mpz_poly_srcptr f, mpz_srcptr m, mpz_srcptr invm)
+			    mpz_poly_srcptr f, mpz_srcptr m, mpz_srcptr invm,
+			    mpz_srcptr invf)
 {
   int d1 = P1->deg;
   int d2 = P2->deg;
@@ -1815,7 +1847,7 @@ mpz_poly_mul_mod_f_mod_mpz (mpz_poly_ptr Q, mpz_poly_srcptr P1, mpz_poly_srcptr 
   mpz_poly_cleandeg(R, d);
 
   // reduce mod f
-  mpz_poly_mod_f_mod_mpz (R, f, m, invm);
+  mpz_poly_mod_f_mod_mpz (R, f, m, invm, invf);
 
   mpz_poly_set(Q, R);
   mpz_poly_clear(R);
@@ -1832,13 +1864,13 @@ mpz_poly_mul_mod_f (mpz_poly_ptr Q, mpz_poly_srcptr P1, mpz_poly_srcptr P2,
 
 /* Q = P^2 mod f, mod m
    f is the original algebraic polynomial (non monic but small coefficients)
-   Assume invm = floor(B^(2k)/m), m having k limbs, and B is the limb base */
-/* Coefficients of P need not be reduced mod m.
- * Coefficients of Q are reduced mod m
- */
+   Assume invm = floor(B^(2k)/m), m having k limbs, and B is the limb base.
+   Coefficients of P need not be reduced mod m.
+   Coefficients of Q are reduced mod m.
+   If not NULL, invf = 1/m mod lc(f). */
 void
 mpz_poly_sqr_mod_f_mod_mpz (mpz_poly_ptr Q, mpz_poly_srcptr P, mpz_poly_srcptr f,
-                        mpz_srcptr m, mpz_srcptr invm)
+			    mpz_srcptr m, mpz_srcptr invm, mpz_srcptr invf)
 {
   int d1 = P->deg;
   int d = d1 + d1;
@@ -1852,7 +1884,7 @@ mpz_poly_sqr_mod_f_mod_mpz (mpz_poly_ptr Q, mpz_poly_srcptr P, mpz_poly_srcptr f
   mpz_poly_cleandeg(R, d);
 
   // reduce mod f
-  mpz_poly_mod_f_mod_mpz (R, f, m, invm);
+  mpz_poly_mod_f_mod_mpz (R, f, m, invm, invf);
 
   mpz_poly_set(Q, R);
   mpz_poly_clear(R);
@@ -1925,7 +1957,12 @@ void
 mpz_poly_pow_mod_f_mod_mpz (mpz_poly_ptr Q, mpz_poly_srcptr P, mpz_poly_srcptr f,
                           mpz_srcptr a, mpz_srcptr p)
 {
-    mpz_poly_pow_mod_f_mod_mpz_barrett(Q, P, f, a, p, NULL);
+  mpz_t invp;
+
+  mpz_init (invp);
+  barrett_init (invp, p);
+  mpz_poly_pow_mod_f_mod_mpz_barrett(Q, P, f, a, p, invp);
+  mpz_clear (invp);
 }
 
 /* Coefficients of f must be reduced mod m on input
@@ -2011,6 +2048,7 @@ mpz_poly_pow_mod_f_mod_mpz_barrett (mpz_poly_ptr Q, mpz_poly_srcptr P,
 {
   int k = mpz_sizeinbase(a, 2), l, L = 0, j;
   mpz_poly R, *T = NULL;
+  mpz_t invf;
 
   if (mpz_cmp_ui(a, 0) == 0) {
     mpz_poly_set_xi (Q, 0);
@@ -2021,6 +2059,13 @@ mpz_poly_pow_mod_f_mod_mpz_barrett (mpz_poly_ptr Q, mpz_poly_srcptr P,
 
   // Initialize R to P
   mpz_poly_set(R, P);
+
+  /* compute invf = 1/p mod lc(f) */
+  if (f != NULL)
+    {
+      mpz_init (invf);
+      mpz_invert (invf, p, f->coeff[f->deg]);
+    }
 
   /* We use base-2^l exponentiation with sliding window,
      thus we need to precompute P^2, P^3, ..., P^(2^l-1).
@@ -2037,10 +2082,10 @@ mpz_poly_pow_mod_f_mod_mpz_barrett (mpz_poly_ptr Q, mpz_poly_srcptr P,
       /* we store P^2 in T[0], P^3 in T[1], ..., P^(2^l-1) in T[L-1] */
       for (j = 0; j < L; j++)
 	mpz_poly_init (T[j], f ? 2*f->deg : -1);
-      mpz_poly_sqr_mod_f_mod_mpz (T[0], R, f, p, invp);       /* P^2 */
-      mpz_poly_mul_mod_f_mod_mpz (T[1], T[0], R, f, p, invp); /* P^3 */
+      mpz_poly_sqr_mod_f_mod_mpz (T[0], R, f, p, invp, invf);       /* P^2 */
+      mpz_poly_mul_mod_f_mod_mpz (T[1], T[0], R, f, p, invp, invf); /* P^3 */
       for (j = 2; j < L; j++)
-	mpz_poly_mul_mod_f_mod_mpz (T[j], T[j-1], T[0], f, p, invp);
+	mpz_poly_mul_mod_f_mod_mpz (T[j], T[j-1], T[0], f, p, invp, invf);
     }
 
   // Horner
@@ -2048,7 +2093,7 @@ mpz_poly_pow_mod_f_mod_mpz_barrett (mpz_poly_ptr Q, mpz_poly_srcptr P,
   {
     while (k >= 0 && mpz_tstbit (a, k) == 0)
       {
-	mpz_poly_sqr_mod_f_mod_mpz (R, R, f, p, invp);
+	mpz_poly_sqr_mod_f_mod_mpz (R, R, f, p, invp, invf);
 	k --;
       }
     if (k < 0)
@@ -2058,15 +2103,17 @@ mpz_poly_pow_mod_f_mod_mpz_barrett (mpz_poly_ptr Q, mpz_poly_srcptr P,
     int e = 0;
     while (k >= j)
       {
-	mpz_poly_sqr_mod_f_mod_mpz (R, R, f, p, invp);
+	mpz_poly_sqr_mod_f_mod_mpz (R, R, f, p, invp, invf);
 	e = 2 * e + mpz_tstbit (a, k);
 	k --;
       }
-    mpz_poly_mul_mod_f_mod_mpz (R, R, (e == 1) ? P : T[e/2], f, p, invp);
+    mpz_poly_mul_mod_f_mod_mpz (R, R, (e == 1) ? P : T[e/2], f, p, invp, invf);
   }
 
   mpz_poly_swap(Q, R);
   mpz_poly_clear(R);
+  if (f != NULL)
+    mpz_clear (invf);
   if (l > 1)
     {
       for (k = 0; k < L; k++)
@@ -2251,7 +2298,7 @@ void mpz_poly_gcd_mpz(mpz_poly_ptr f, mpz_poly_srcptr a, mpz_poly_srcptr b, mpz_
     } else {
         mpz_poly_init(hh, b->deg);
         mpz_poly_set(hh, b);
-        mpz_poly_set(f, a);
+        mpz_poly_set(f, a); /* will do nothing if f = a */
     }
     mpz_poly_gcd_mpz_clobber(f, hh, p);
     mpz_poly_clear(hh);
@@ -3288,7 +3335,7 @@ static void mpz_poly_factor_edf_pre(mpz_poly g[2], mpz_poly_srcptr f, int k, mpz
             /* oh, we're lucky. x+a is a factor ! */
             int s = g[0]->deg > g[1]->deg;
             /* multiply g[s] by (x+a) */
-            mpz_poly_mul_mod_f_mod_mpz(g[s], g[s], xplusa, f, p, NULL);
+            mpz_poly_mul_mod_f_mod_mpz(g[s], g[s], xplusa, f, p, NULL, NULL);
         }
         assert(g[0]->deg + g[1]->deg == f->deg);
         assert(g[0]->deg % k == 0);
@@ -3453,7 +3500,7 @@ int mpz_poly_factor_list_lift(mpz_poly_factor_list_ptr fac, mpz_poly_srcptr f, m
     mpz_poly_set_xi(f1, 0);
     for(int i = 0 ; i < fac->size ; i++) {
         mpz_poly_srcptr g0 = fac->factors[i]->f;
-        mpz_poly_mul_mod_f_mod_mpz(f1, f1, g0, 0, ell2, NULL);
+        mpz_poly_mul_mod_f_mod_mpz(f1, f1, g0, 0, ell2, NULL, NULL);
     }
     mpz_poly_sub_mod_mpz(f1, f, f1, ell2);
     mpz_poly_divexact_mpz(f1, f1, ell);
@@ -3481,7 +3528,7 @@ int mpz_poly_factor_list_lift(mpz_poly_factor_list_ptr fac, mpz_poly_srcptr f, m
         ASSERT_ALWAYS(mpz_cmp_ui(d->coeff[0], 1) == 0);
 
         /* b*f1 = b*g1*h0+b*h1*g0 = g1 mod g0 */
-        mpz_poly_mul_mod_f_mod_mpz(g1, f1, b, g0, ell, NULL);
+        mpz_poly_mul_mod_f_mod_mpz(g1, f1, b, g0, ell, NULL, NULL);
 
         /* now update g */
         mpz_poly_mul_mpz(g1, g1, ell);
@@ -3540,4 +3587,279 @@ std::string cxx_mpz_poly::print_poly(std::string const& var) const
 
     }
     return os.str();
+}
+
+/* functions for Joux--Lercier and Generalized Joux--Lercier */
+/**
+ * \brief set the (mpz_t) coefficients of f from ::counter
+ * \param[out] f               polynomial
+ * \param[out] max_abs_coeffs  largest absolute value of coefficients of f
+ * \param[out] next_counter    the next counter to try after the present one, larger than counter+1 sometimes
+ * \param[in]  counter         counter storing the coefficients of f
+ * \param[in]  bound           max absolute value of coefficients of f
+ *
+ * \return 1 if the poly is valid (content = 1, not a duplicate, and +/-1 is not a root) and in this case,
+ *           max_abs_coeffs is set to the largest absolute value of the coefficients of f
+ * \return 0 if the poly corresponding to the counter is a duplicate, and in that case,
+ *           max_abs_coeffs is set to an error_code (poly duplicate, +/- 1 root, content != 1...)
+ *
+ * Given ::counter, compute the coefficients of ::f.
+ * Assume that the leading coefficient of f is > 0, the next one is >= 0, and the last one is not 0
+ * 1 <= f[deg] <= bound
+ * 0 <= f[deg-1] <= bound
+ * -bound <= f[i] <= bound for 0 < i < deg-1
+ * no other test is made: you need to check after if the poly is square-free, irreducible, etc.
+ */
+int mpz_poly_setcoeffs_counter(mpz_poly_ptr f, int* max_abs_coeffs, unsigned long *next_counter, int deg, unsigned long counter, unsigned int bound){
+    unsigned int i;
+    unsigned long idx = counter;
+    int j, eval_at1;
+    int *fint, ok = 1;
+    mpz_t content;
+    //unsigned long idx_next_poly_ok = idx;
+    int error_code = 0; // because I want to know what is the pb
+#define POLY_EQUIV_INV_X -1 // the poly is the same as (+/-)f(1/x)
+#define POLY_EQUIV_MINUS_X -2 // the poly is the same as (+/-)f(-x)
+#define POLY_EQUIV_MINUS_COEFFS -3
+#define POLY_ROOT_ONE -4
+#define POLY_ROOT_MINUS_ONE -5
+#define POLY_CONTENT -6
+
+    fint = (int *) malloc ((deg + 1)*sizeof(int));
+    *next_counter = counter+1;
+
+    /* compute polynomial f and fint of index idx */
+    /* assume that f was already initialized with mpz_poly_init(f, deg) */
+    f->deg = deg;
+
+    /* we take 1 <= f[deg] <= bound */
+    fint[deg] = 1 + (idx % bound);
+    idx = idx / bound;
+    /* we take 0 <= f[deg-1] <= bound */
+    fint[deg-1] = idx % (bound + 1);
+    idx = idx / (bound + 1);
+    for (i = deg-2; i > 0; i --)
+      {
+	/* we take -bound <= f[i] <= bound */
+	fint[i] = (idx % (2 * bound + 1)) - bound;
+        idx = idx / (2 * bound + 1);
+    }
+    
+    /* we take -bound <= f[0] <= bound, f[0] <> 0,
+       which makes 2*bound possible values */
+    ASSERT(idx < 2 * bound);
+    fint[0] = (idx < bound) ? idx - bound : idx - (bound - 1);
+    
+    
+    /* since f and the reversed polynomial are equivalent, we can assume
+       |f[deg]| < |f[0]| or (|f[deg]| = |f[0]| and |f[deg-1]| < |f[1]|) or ... */
+
+    /* other point of view
+    ok = 1;
+    j = 0;
+    while ((abs(fint[deg-j]) == abs(fint[j])) && (2*j < deg)){
+      j++;
+    }
+    ok = ((j*2 >= deg) || (abs(fint[deg-j]) < abs(fint[j])));
+    */
+    ok = 1;
+    for (int i = 0; 2 * i < deg; i++)
+      {
+        if (abs(fint[deg-i]) != abs(fint[i]))
+          {
+            /* we want |f[deg-i]| < |f[i]| */
+            ok = abs(fint[deg-i]) < abs(fint[i]);
+            break;
+          }
+      }
+    if(!ok){
+      error_code = POLY_EQUIV_INV_X; // the poly is an equivalent to (+/-)x^d*f(1/x)
+    }
+    if(abs(fint[deg]) >= abs(fint[0])){
+      // next valid poly: the next one is an increment of the leading coefficient.
+      // but either leading coeff  = |constant coeff|, and incrementing by one will lead to
+      // leading coeff > |constant coeff|, and this is not a valid poly,
+      // or we already are in the case:
+      // leading coeff > |constant coeff|. In both cases,
+      // since the leading coefficient is > 0, it means:
+      // set the leading coeff to 1 and increment the next coefficient.
+      *next_counter = counter - (counter % bound) + bound;
+      /* NOT TESTED:
+      // then, what if f[0] = +/- 1?
+      if(abs(fint[0]) == 1){
+	if(abs(fint[deg-1]+1) > abs(fint[1])){
+	  // setting ld=1 then incrementing the second high deg coeff is not enough
+	  idx = *next_counter;
+	  // set the second high deg coeff to 0 and increment the third high deg coeff
+	  *next_counter = idx - (idx % bound*(bound+1)) + bound*(bound+1);
+	  if((deg > 3) && (fint[1] == 0)){//setting the second high deg to 0 and incrementing the next coeff migh not be enough
+	    if (abs(fint[deg-2]+1) > 0){
+	      idx = *next_counter;
+	      // set the third coeff to 0 instead of -bound
+	      *next_counter = idx - (idx % bound*(bound+1)*(2*bound+1)) + bound*(bound+1)*(2*bound+1)*bound;
+	    }
+	  }
+	}
+	}*/
+    }
+
+    /* since f(x) is equivalent to (-1)^deg*f(-x), if f[deg-1] = 0, then the
+       largest i = deg-3, deg-5, ..., such that f[i] <> 0 should have f[i] > 0 */
+    if (ok && fint[deg-1] == 0)
+      {
+        for (int i = deg - 3; i >= 0; i -= 2)
+          {
+            if (fint[i])
+              {
+                ok = fint[i] > 0;
+                break;
+              }
+          }
+      }
+    if((!ok) && (error_code == 0)){
+      error_code = POLY_EQUIV_MINUS_X; // the poly is an equivalent to (-1)^deg*f(-x)
+    }
+
+    /* if |f[i]| = |f[deg-i]| for all i, then [f[deg], f[deg-1], ..., f[1], f[0]]
+       is equivalent to [s*f[0], s*t*f[1], s*t^2*f[2], ...], where
+       s = sign(f[0]), and s*t^i is the sign of f[i] where i is the smallest
+       odd index > 0 such that f[i] <> 0.  */
+    if (ok && fint[deg] == abs(fint[0])) /* f[deg] > 0 */
+      {
+        int s = (fint[0] > 0) ? 1 : -1, t = 0, i;
+        for (i = 1; i <= deg; i++)
+          {
+            if (2 * i < deg && abs(fint[deg-i]) != abs(fint[i]))
+              break;
+            if (t == 0 && fint[i] != 0 && (i & 1))
+              t = (fint[i] > 0) ? s : -s;
+          }
+        if (2 * i >= deg) /* |f[i]| = |f[deg-i]| for all i */
+          {
+            /* if t=0, then all odd coefficients are zero, but since
+               |f[deg-i]| = |f[i]| this can only occur for deg even, but then
+               we can set t to 1, since t only affects the odd coefficients */
+            if (t == 0)
+              t = 1;
+            for (i = 0; i <= deg; i++)
+              {
+                if (fint[deg-i] != s * fint[i])
+                  {
+                    ok = fint[deg-i] > s * fint[i];
+                    break;
+                  }
+                s = s * t;
+              }
+          }
+      }
+    if((!ok) && (error_code == 0)){
+      error_code = POLY_EQUIV_MINUS_COEFFS;
+    }
+
+    if (ok){
+      /* check if +-1 is a root of f (very common): compute the sum of the coefficients, and the alterned sum: it should be != 0 */
+      eval_at1 = 0; // evaluating at 1 means sum the coefficients
+      for(j=0; j<=deg; j++){
+	eval_at1 += fint[j];
+      }
+      ok = eval_at1 != 0;
+      if (!ok){
+	error_code = POLY_ROOT_ONE;
+      }
+    }
+
+    if (ok){ // eval at -1: alterning sum of coefficients
+      eval_at1 = 0;
+      for(j=0; j<=deg; j += 2){
+	eval_at1 += fint[j];
+      }
+      for(j=1; j <= deg; j += 2){
+	eval_at1 -= fint[j];
+      }
+      ok = eval_at1 != 0;
+      if (!ok){
+	error_code = POLY_ROOT_MINUS_ONE;
+      }
+    }
+
+    /* set mpz_poly */
+    f->deg = deg;
+    for (j = 0; j <= deg; j ++)
+      mpz_set_si (f->coeff[j], fint[j]);
+    
+    if (ok){
+      /* content test */
+      mpz_init (content);
+      mpz_poly_content (content, f);
+      ok = mpz_cmp_ui (content, 1) == 0; /* duplicate with f/t */
+      if (ok == 0){
+	error_code = POLY_CONTENT;
+      }
+      mpz_clear (content);
+    }
+
+    // compute the max absolute value of coefficients,
+    // usefull for computing the lognorm after
+    if(ok){
+      *max_abs_coeffs = fint[0]; // this is positive anyway
+      for(j=0; j <= deg; j++){
+	if ((fint[j] < 0) && (*max_abs_coeffs < -fint[j])){
+	  *max_abs_coeffs = -fint[j];
+	}else{// fint[i] >= 0
+	  if (*max_abs_coeffs < fint[j]){
+	    *max_abs_coeffs = fint[j];
+	  }
+	}
+      }
+    }else{
+      *max_abs_coeffs = error_code;
+    }
+
+    free(fint);
+    return ok;
+
+#undef POLY_EQUIV_INV_X
+#undef POLY_EQUIV_MINUS_X
+#undef POLY_EQUIV_MINUS_COEFFS
+#undef POLY_ROOT_ONE
+#undef POLY_ROOT_MINUS_ONE
+#undef POLY_CONTENT
+}
+
+/**
+ * return the counter in basis ::bound corresponding to f
+ *
+ */
+unsigned long mpz_poly_getcounter(mpz_poly_ptr f, unsigned int bound){
+  unsigned int counter;
+  int i;
+  // leading coeff: 1 <= f->coeff[deg] <= bound
+  counter = mpz_get_ui(f->coeff[f->deg]);
+  counter *= bound;
+  // next leading coeff: 0 <= f->coeff[deg-1] <= bound
+  counter += mpz_get_ui(f->coeff[f->deg -1]);
+  counter *= (bound+1);
+  // next coeffs: -bound <= f->coeff[i] <= bound
+  for(i=f->deg-2; i > 0; i--){
+    counter += mpz_get_si(f->coeff[i]) + bound;
+    counter *= 2*bound + 1;
+  }
+  if(mpz_sgn(f->coeff[0]) < 0){
+    counter += mpz_get_si(f->coeff[0]) + bound;
+  }else{// f->coeff[0] > 0
+    counter += mpz_get_ui(f->coeff[0]) + bound - 1;
+  }
+  return counter;
+}
+
+void  mpz_poly_setcoeffs_counter_print_error_code(int error_code){
+  switch(error_code){
+  case -1: printf("-1: f <-> +/- x^d f(1/x) \n"); break;
+  case -2: printf("-2: f <-> +/- f(-x) \n"); break;
+  case -3: printf("-3: f <-> another one with permuted/sign coeffs\n"); break;
+  case -4: printf("-4: f(1) = 0\n"); break;
+  case -5: printf("-5: f(-1) = 0\n"); break;
+  case -6: printf("-6: content(f) > 1\n"); break;
+  default: printf(" 0: undetermined error.\n");
+  }
 }

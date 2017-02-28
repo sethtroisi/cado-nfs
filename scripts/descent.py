@@ -904,9 +904,9 @@ class DescentMiddleClass(object):
                 "--lim0", self.args.lim0,
                 "--lim1", self.args.lim1,
                 "--lpb0", general.lpb0(),
-                # "--mfb0", self.args.mfb0,
+                "--mfb0", self.args.mfb0,
                 "--lpb1", general.lpb1(),
-                # "--mfb1", self.args.mfb1,
+                "--mfb1", self.args.mfb1,
              ]
         s += [ "--todo", todofile ]
         call_that=[str(x) for x in s]

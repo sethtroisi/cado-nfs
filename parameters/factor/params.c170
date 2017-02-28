@@ -16,10 +16,10 @@ name = c170
 tasks.polyselect.degree = 5
 
 tasks.polyselect.P = 1500000
-tasks.polyselect.admax = 2e7
-tasks.polyselect.adrange = 1e4
+tasks.polyselect.admax = 3e6
+tasks.polyselect.adrange = 1e3
 tasks.polyselect.incr = 60
-tasks.polyselect.nq = 1000
+tasks.polyselect.nq = 3125
 tasks.polyselect.nrkeep = 100
 
 ###########################################################################
@@ -52,8 +52,8 @@ tasks.filter.target_density = 170.0
 
 tasks.linalg.bwc.interval = 1000
 tasks.linalg.bwc.interleaving = 0
-tasks.linalg.bwc.m = 64
-tasks.linalg.bwc.n = 64
+tasks.linalg.m = 64
+tasks.linalg.n = 64
 
 ###########################################################################
 # Characters

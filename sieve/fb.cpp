@@ -18,7 +18,7 @@
 #include "getprime.h"
 #include "gmp_aux.h"
 #include "gzip.h"
-#include "threadpool.h"
+#include "threadpool.hpp"
 
 
 static unsigned int fb_log_2 (fbprime_t);
@@ -1172,9 +1172,12 @@ class fb_powers {
 fb_powers::fb_powers (const fbprime_t lim)
 {
   fbprime_t p;
+  static prime_info pi;
   powers = new std::vector<fb_power_t>;
   
-  for (p = 2; p <= lim / p; p = getprime(1)) {
+  prime_info_init(pi);
+
+  for (p = 2; p <= lim / p; p = getprime_mt(pi)) {
     fbprime_t q = p;
     unsigned char k = 1;
     do {
@@ -1184,7 +1187,7 @@ fb_powers::fb_powers (const fbprime_t lim)
       powers->push_back(new_entry);
     } while (q <= lim / p);
   }
-  getprime(0);
+  prime_info_clear(pi);
   
   std::sort (powers->begin(), powers->end(), cmp_powers);
 }
@@ -1210,6 +1213,8 @@ fb_factorbase::make_linear (const mpz_t *poly)
   fb_powers *powers = new fb_powers(powlim);
   size_t next_pow = 0;
 
+  prime_info(pi);
+
   verbose_output_vfprint(0, 1, gmp_vfprintf,
                "# Making factor base for polynomial g(x) = %Zd*x%s%Zd,\n"
                "# including primes up to %" FBPRIME_FORMAT
@@ -1229,7 +1234,7 @@ fb_factorbase::make_linear (const mpz_t *poly)
     } else {
       fb_cur.q = fb_cur.p = next_prime;
       fb_cur.k = 1;
-      next_prime = getprime(1);
+      next_prime = getprime_mt(pi);
     }
     fb_cur.nr_roots = 1;
     fb_cur.roots[0].exp = fb_cur.k;
@@ -1239,7 +1244,7 @@ fb_factorbase::make_linear (const mpz_t *poly)
     append(fb_cur);
   }
 
-  getprime (0); /* free prime iterator */
+  prime_info_clear(pi);
 
   delete (powers);
   finalize();
@@ -1289,7 +1294,7 @@ public:
 };
 
 static task_result *
-process_one_task(const task_parameters *_param)
+process_one_task(const worker_thread * worker MAYBE_UNUSED, const task_parameters *_param)
 {
   const make_linear_thread_param *param =
     static_cast<const make_linear_thread_param *>(_param);
@@ -1305,7 +1310,7 @@ process_one_task(const task_parameters *_param)
 // Prepare a new task. Return 0 if there are no new task to schedule.
 // Otherwise, return the number of ideals put in the task.
 static int
-get_new_task(task_info_t &T, fbprime_t &next_prime, const fbprime_t maxp,
+get_new_task(task_info_t &T, fbprime_t &next_prime, prime_info& pi, const fbprime_t maxp,
     size_t &next_pow, const fb_powers &powers)
 {
   unsigned int i;
@@ -1319,7 +1324,7 @@ get_new_task(task_info_t &T, fbprime_t &next_prime, const fbprime_t maxp,
     } else {
       T.q[i] = T.p[i] = next_prime;
       T.k[i] = 1;
-      next_prime = getprime(next_prime);
+      next_prime = getprime_mt(pi);
     }
   }
   T.n = i;
@@ -1376,6 +1381,9 @@ fb_factorbase::make_linear_threadpool (const mpz_t *poly,
   
   fbprime_t maxp = thresholds[FB_MAX_PARTS-1];
   fbprime_t next_prime = 2;
+  prime_info pi;
+
+  prime_info_init(pi);
 
   thread_pool pool(nb_threads);
 
@@ -1383,7 +1391,7 @@ fb_factorbase::make_linear_threadpool (const mpz_t *poly,
   unsigned int active_task = 0;
   for (unsigned int i = 0; i < nb_tab; ++i) {
     int ret;
-    ret = get_new_task(T[i], next_prime, maxp, next_pow, powers);
+    ret = get_new_task(T[i], next_prime, pi, maxp, next_pow, powers);
     if (!ret)
       break;
     pool.add_task(process_one_task, &params[i], 0);
@@ -1401,7 +1409,7 @@ fb_factorbase::make_linear_threadpool (const mpz_t *poly,
     active_task--;
     task_info_t * curr_T = res->T;
     store_task_result(this, curr_T);
-    cont = get_new_task(*curr_T, next_prime, maxp, next_pow, powers);
+    cont = get_new_task(*curr_T, next_prime, pi, maxp, next_pow, powers);
     if (cont) {
       active_task++;
       pool.add_task(process_one_task, res->orig_param, 0);
@@ -1421,7 +1429,7 @@ fb_factorbase::make_linear_threadpool (const mpz_t *poly,
 
   delete [] T;
   delete [] params;
-  getprime (0); /* free prime iterator */
+  prime_info_clear(pi);
   finalize();
 }
 

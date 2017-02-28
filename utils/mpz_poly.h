@@ -75,6 +75,12 @@ void mpz_poly_setcoeff_int64(mpz_poly_ptr f, int i, int64_t z);
 void mpz_poly_setcoeff_uint64(mpz_poly_ptr f, int i, uint64_t z);
 void mpz_poly_setcoeff_double(mpz_poly_ptr f, int i, double z);
 void mpz_poly_getcoeff(mpz_t res, int i, mpz_poly_srcptr f);
+
+/* functions for Joux--Lercier and Generalized Joux--Lercier */
+int mpz_poly_setcoeffs_counter(mpz_poly_ptr f, int* max_abs_coeffs, unsigned long *next_counter, int deg, unsigned long counter, unsigned int bound);
+void  mpz_poly_setcoeffs_counter_print_error_code(int error_code);
+unsigned long mpz_poly_getcounter(mpz_poly_ptr f, unsigned int bound);
+
 static inline mpz_srcptr mpz_poly_lc_const(mpz_poly_srcptr f) {
     ASSERT(f->deg >= 0);
     return f->coeff[f->deg];
@@ -114,11 +120,12 @@ void mpz_poly_mul_si (mpz_poly_ptr, mpz_poly_srcptr, long);
 void mpz_poly_rotation_int64 (mpz_poly_ptr, mpz_poly_srcptr, mpz_poly_srcptr, const int64_t, int);
 void mpz_poly_makemonic_mod_mpz (mpz_poly_ptr Q, mpz_poly_srcptr P, mpz_srcptr m);
 int mpz_poly_mod_f_mod_mpz (mpz_poly_ptr R, mpz_poly_srcptr f, mpz_srcptr m,
-                        mpz_srcptr invm);
+                            mpz_srcptr invm, mpz_srcptr invf);
 int mpz_poly_mod_mpz (mpz_poly_ptr R, mpz_poly_srcptr A, mpz_srcptr m, mpz_srcptr invm);
+int mpz_poly_mod_mpz_lazy (mpz_poly_ptr R, mpz_poly_srcptr A, mpz_srcptr m, mpz_srcptr invm);
 void mpz_poly_mul_mod_f_mod_mpz(mpz_poly_ptr Q, mpz_poly_srcptr P1, mpz_poly_srcptr P2,
-                            mpz_poly_srcptr f, mpz_srcptr m,
-                            mpz_srcptr invm);
+                                mpz_poly_srcptr f, mpz_srcptr m,
+                                mpz_srcptr invm, mpz_srcptr invf);
 void mpz_poly_mul_mod_f (mpz_poly_ptr Q, mpz_poly_srcptr P1, mpz_poly_srcptr P2,
                         mpz_poly_srcptr f);
 void mpz_poly_reduce_frac_mod_f_mod_mpz (mpz_poly_ptr num, mpz_poly_ptr denom,
@@ -148,7 +155,7 @@ void mpz_poly_eval_several_mod_mpz_barrett(mpz_ptr * res, mpz_poly_srcptr * f, i
 void polymodF_mul(polymodF_t Q, const polymodF_t P1, const polymodF_t P2,
                   mpz_poly_srcptr F);
 void mpz_poly_sqr_mod_f_mod_mpz(mpz_poly_ptr Q, mpz_poly_srcptr P, mpz_poly_srcptr f,
-                            mpz_srcptr m, mpz_srcptr invm);
+                                mpz_srcptr m, mpz_srcptr invm, mpz_srcptr invf);
 void mpz_poly_pow_ui_mod_f(mpz_poly_ptr B, mpz_poly_srcptr A, unsigned long n, mpz_poly_srcptr f);
 void mpz_poly_pow_mod_f_mod_ui(mpz_poly_ptr Q, mpz_poly_srcptr P, mpz_poly_srcptr f,
                              mpz_srcptr a, unsigned long p);

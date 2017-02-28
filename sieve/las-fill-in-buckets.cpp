@@ -5,14 +5,14 @@
 #include "bucket.h"
 #include "modredc_ul.h"
 #include "modredc_2ul2.h"
-#include "threadpool.h"
+#include "threadpool.hpp"
 #include "las-config.h"
 #include "las-types.h"
 #include "las-coordinates.h"
 #include "las-debug.h"
 #include "las-arith.h"
 #include "las-qlattice.h"
-#include "las-fill-in-buckets.h"
+#include "las-fill-in-buckets.hpp"
 #include "las-norms.h"
 #include "las-smallsieve.h"
 #include "las-plattice.h"
@@ -22,8 +22,7 @@
 #endif
 
 // FIXME: this function of las.cpp should be somewhere
-void * process_bucket_region(thread_data *th);
-
+void * process_bucket_region(timetree_t&, thread_data *th);
 
 /***************************************************************************/
 /********        Main bucket sieving functions                    **********/
@@ -325,12 +324,14 @@ fill_in_buckets_toplevel(bucket_array_t<LEVEL, shorthint_t> &orig_BA,
 /* {{{ */
 template <int LEVEL>
 void
-fill_in_buckets(bucket_array_t<LEVEL, shorthint_t> &orig_BA,
+fill_in_buckets(const worker_thread * worker,
+                bucket_array_t<LEVEL, shorthint_t> &orig_BA,
                 sieve_info_srcptr const si MAYBE_UNUSED,
                 plattices_vector_t *plattices_vector,
                 bool first_reg,
                 where_am_I_ptr w)
 {
+  CHILD_TIMER(worker->timer, __func__);
   const slice_index_t slice_index = plattices_vector->get_index();
   bucket_array_t<LEVEL, shorthint_t> BA;  /* local copy. Gain a register + use stack */
   BA.move(orig_BA);
@@ -406,13 +407,52 @@ public:
   {}
 };
 
+#if __cplusplus >= 201103L
+/* short of a better solution. I know some exist, but it seems way
+ * overkill to me.
+ *
+ * This needs constexpr, though... So maybe I could use a more powerful
+ * C++11 trick after all.
+ */
+#define PREPARE_TEMPLATE_INST_NAMES(F)					\
+    template<int>							\
+    struct CADO_CONCATENATE(F, _name) {};				\
+    PREPARE_TEMPLATE_INST_NAME(F, 0);					\
+    PREPARE_TEMPLATE_INST_NAME(F, 1);					\
+    PREPARE_TEMPLATE_INST_NAME(F, 2);					\
+    PREPARE_TEMPLATE_INST_NAME(F, 3);					\
+    PREPARE_TEMPLATE_INST_NAME(F, 4);					\
+    PREPARE_TEMPLATE_INST_NAME(F, 5);					\
+    PREPARE_TEMPLATE_INST_NAME(F, 6);					\
+    PREPARE_TEMPLATE_INST_NAME(F, 7);					\
+    PREPARE_TEMPLATE_INST_NAME(F, 8);					\
+    PREPARE_TEMPLATE_INST_NAME(F, 9)
+
+#define PREPARE_TEMPLATE_INST_NAME(F, k)				\
+    template<>								\
+    struct CADO_CONCATENATE(F, _name)<k> {				\
+        static constexpr const char * value = #F "<" #k ">";		\
+    }
+
+PREPARE_TEMPLATE_INST_NAMES(fill_in_buckets_one_slice_internal);
+PREPARE_TEMPLATE_INST_NAMES(fill_in_buckets_one_slice);
+PREPARE_TEMPLATE_INST_NAMES(fill_in_buckets_one_side);
+PREPARE_TEMPLATE_INST_NAMES(downsort_tree);
+
+#define TEMPLATE_INST_NAME(x,y) CADO_CONCATENATE(x, _name)<y>::value
+#else
+#define TEMPLATE_INST_NAME(x,y) #x " (template)"
+#endif
+
 // For internal levels, the fill-in is not exactly the same as for
 // top-level, since the plattices have already been precomputed.
 template<int LEVEL>
 task_result *
-fill_in_buckets_one_slice_internal(const task_parameters *const _param)
+fill_in_buckets_one_slice_internal(const worker_thread * worker, const task_parameters * _param)
 {
     const fill_in_buckets_parameters *param = static_cast<const fill_in_buckets_parameters *>(_param);
+    ACTIVATE_TIMER(worker->timer);
+    CHILD_TIMER(worker->timer, TEMPLATE_INST_NAME(fill_in_buckets_one_slice_internal, LEVEL));
     where_am_I w;
     WHERE_AM_I_UPDATE(w, si, param->si);
     WHERE_AM_I_UPDATE(w, side, param->side);
@@ -422,7 +462,7 @@ fill_in_buckets_one_slice_internal(const task_parameters *const _param)
     bucket_array_t<LEVEL, shorthint_t> &BA =
         param->ws.reserve_BA<LEVEL, shorthint_t>(param->side);
     /* Fill the buckets */
-    fill_in_buckets<LEVEL>(BA, param->si, param->plattices_vector,
+    fill_in_buckets<LEVEL>(worker, BA, param->si, param->plattices_vector,
             (param->first_region0_index == 0), w);
     /* Release bucket array again */
     param->ws.release_BA(param->side, BA);
@@ -438,9 +478,12 @@ fill_in_buckets_one_slice_internal(const task_parameters *const _param)
 // At some point, the code should be re-organized, I'm afraid.
 template<int LEVEL>
 task_result *
-fill_in_buckets_one_slice(const task_parameters *const _param)
+fill_in_buckets_one_slice(const worker_thread * worker MAYBE_UNUSED, const task_parameters * _param)
 {
     const fill_in_buckets_parameters *param = static_cast<const fill_in_buckets_parameters *>(_param);
+    ACTIVATE_TIMER(worker->timer);
+    CHILD_TIMER(worker->timer, TEMPLATE_INST_NAME(fill_in_buckets_one_slice, LEVEL));
+
     where_am_I w;
     WHERE_AM_I_UPDATE(w, si, param->si);
     WHERE_AM_I_UPDATE(w, side, param->side);
@@ -484,8 +527,9 @@ fill_in_buckets_one_slice(const task_parameters *const _param)
 
 template <int LEVEL>
 static void
-fill_in_buckets_one_side(thread_pool &pool, thread_workspaces &ws, const fb_part *fb, sieve_info_srcptr const si, const int side)
+fill_in_buckets_one_side(timetree_t& timer, thread_pool &pool, thread_workspaces &ws, const fb_part *fb, sieve_info_srcptr const si, const int side)
 {
+  CHILD_TIMER(timer, __func__);
     /* Process all slices in this factor base part */
     const fb_slice_interface *slice;
     slice_index_t slices_pushed = 0;
@@ -500,26 +544,28 @@ fill_in_buckets_one_side(thread_pool &pool, thread_workspaces &ws, const fb_part
       task_result *result = pool.get_result();
       delete result;
     }
+  pool.accumulate(*timer.current);
 }
 
-void fill_in_buckets_both(thread_pool &pool, thread_workspaces &ws, sieve_info_srcptr si)
+void fill_in_buckets_both(timetree_t& timer, thread_pool &pool, thread_workspaces &ws, sieve_info_srcptr si)
 {
+  CHILD_TIMER(timer, __func__);
   plattice_enumerate_t::set_masks(si->conf->logI);
   for (int side = 0; side < 2; ++side) {
     switch (si->toplevel) {
       case 1:
         plattice_enumerate_area<1>::value = plattice_x_t(si->J) << si->conf->logI;
-        fill_in_buckets_one_side<1>(pool, ws,
+        fill_in_buckets_one_side<1>(timer, pool, ws,
             si->sides[side]->fb->get_part(si->toplevel), si, side);
         break;
       case 2:
         plattice_enumerate_area<2>::value = plattice_x_t(si->J) << si->conf->logI;
-        fill_in_buckets_one_side<2>(pool, ws,
+        fill_in_buckets_one_side<2>(timer, pool, ws,
             si->sides[side]->fb->get_part(si->toplevel), si, side);
         break;
       case 3:
         plattice_enumerate_area<3>::value = plattice_x_t(si->J) << si->conf->logI;
-        fill_in_buckets_one_side<3>(pool, ws,
+        fill_in_buckets_one_side<3>(timer, pool, ws,
             si->sides[side]->fb->get_part(si->toplevel), si, side);
         break;
       default:
@@ -537,13 +583,16 @@ void fill_in_buckets_both(thread_pool &pool, thread_workspaces &ws, sieve_info_s
 // where we are. This is what is called N by WHERE_AM_I and friends.
 template <int LEVEL>
 void
-downsort_tree(uint32_t bucket_index,
+downsort_tree(
+    timetree_t& timer,
+    uint32_t bucket_index,
     uint32_t first_region0_index,
     thread_workspaces &ws,
     thread_pool &pool,
     sieve_info_ptr si,
     precomp_plattice_t precomp_plattice)
 {
+  CHILD_TIMER(timer, TEMPLATE_INST_NAME(downsort_tree, LEVEL));
   ASSERT_ALWAYS(LEVEL > 0);
 
   where_am_I w;
@@ -622,22 +671,24 @@ downsort_tree(uint32_t bucket_index,
     for (unsigned int i = 0; i < si->nb_buckets[LEVEL]; ++i) {
       uint64_t BRS[FB_MAX_PARTS] = BUCKET_REGIONS;
       uint32_t N = first_region0_index + i*(BRS[LEVEL]/BRS[1]);
-      downsort_tree<LEVEL-1>(i, N, ws, pool, si, precomp_plattice);
+      downsort_tree<LEVEL-1>(timer, i, N, ws, pool, si, precomp_plattice);
     }
   } else {
     /* PROCESS THE REGIONS AT LEVEL 0 */
     for (int i = 0; i < ws.thrs[0].las->nb_threads; ++i) {
       ws.thrs[i].first_region0_index = first_region0_index;
     }
-    ws.thread_do(&process_bucket_region);
+    ws.thread_do_using_pool(pool, &process_bucket_region);
   }
+  pool.accumulate(*timer.current);
 }
 
 /* Instances to be compiled */
 
 // A fake level 0, to avoid infinite loop during compilation.
 template <>
-void downsort_tree<0>(uint32_t bucket_index MAYBE_UNUSED,
+void downsort_tree<0>(timetree_t&,
+        uint32_t bucket_index MAYBE_UNUSED,
   uint32_t first_region0_index MAYBE_UNUSED,
   thread_workspaces &ws MAYBE_UNUSED,
   thread_pool &pool MAYBE_UNUSED,
@@ -677,11 +728,11 @@ reservation_group::cget<3, longhint_t>() const
 // Now the two exported instances
 
 template 
-void downsort_tree<1>(uint32_t bucket_index, uint32_t first_region0_index,
+void downsort_tree<1>(timetree_t&, uint32_t bucket_index, uint32_t first_region0_index,
   thread_workspaces &ws, thread_pool &pool, sieve_info_ptr si,
   precomp_plattice_t precomp_plattice);
 
 template
-void downsort_tree<2>(uint32_t bucket_index, uint32_t first_region0_index,
+void downsort_tree<2>(timetree_t&, uint32_t bucket_index, uint32_t first_region0_index,
   thread_workspaces &ws, thread_pool &pool, sieve_info_ptr si,
   precomp_plattice_t precomp_plattice);

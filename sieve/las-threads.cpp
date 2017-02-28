@@ -1,6 +1,6 @@
 #include "cado.h"
 #include "memory.h"
-#include "las-threads.h"
+#include "las-threads.hpp"
 #include "las-types.h"
 #include "las-config.h"
 
@@ -297,6 +297,33 @@ thread_workspaces::pickup_si(sieve_info_ptr _si)
     for (unsigned int i_side = 0; i_side < nr_sides; i_side++)
       groups[i_side]->allocate_buckets(si->nb_buckets_max,
               multiplier, si->sides[i_side]->max_bucket_fill_ratio);
+}
+
+task_result * thread_do_task_wrapper(const worker_thread * worker, const task_parameters *_param)
+{
+    const thread_data_task_wrapper *th = static_cast<const thread_data_task_wrapper *>(_param);
+    (*th->f)(worker->timer, th->th);
+    return new task_result;
+}
+
+void
+thread_workspaces::thread_do_using_pool(thread_pool &pool, void * (*f)(timetree_t&, thread_data *))
+{
+    thread_data_task_wrapper * ths = new thread_data_task_wrapper[nr_workspaces];
+    for (size_t i = 0; i < nr_workspaces; ++i) {
+        ths[i].th = &thrs[i];
+        ths[i].f = f;
+    }
+
+    for (size_t i = 0; i < nr_workspaces; ++i) {
+        pool.add_task(thread_do_task_wrapper, &ths[i], i);
+    }
+    for (size_t i = 0; i < nr_workspaces; ++i) {
+        task_result *result = pool.get_result();
+        delete result;
+        // verbose_output_print(0, 1, "# thread_do task %zu/%zu completed\n", i, nr_workspaces);
+    }
+    delete[] ths;
 }
 
 void

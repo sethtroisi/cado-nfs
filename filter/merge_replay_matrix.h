@@ -52,8 +52,8 @@ typedef struct {
                           R[j][k] = UMAX(index_t) if the corresponding row has
                                                                   been deleted.
                         R[j]=NULL for weight(j) > cwmax. */
-  int32_t *MKZQ;         /* priority queue for Markowitz stuff */    
-  index_t *MKZA;         /* MKZA[j] gives u s.t. MKZQ[2*u] = j and
+  index_t *MKZQ;         /* priority queue for Markowitz stuff */
+  uint32_t *MKZA;        /* MKZA[j] gives u s.t. MKZQ[2*u] = j and
                             MKZQ[2*u+1] is the Markowitz cost of column j,
                             otherwise it is MKZ_INF if the column is inactive
                             (either too heavy initially or deleted) */
@@ -99,6 +99,7 @@ int incrS(int w);
 int weightSum(filter_matrix_t *mat, int i1, int i2, int32_t j);
 void fillTabWithRowsForGivenj(int32_t *ind, filter_matrix_t *mat, int32_t j);
 void destroyRow(filter_matrix_t *mat, int i);
+void heap_fill (filter_matrix_t *mat);
 void heap_push (heap H, filter_matrix_t *mat, uint32_t i);
 void heap_delete (heap H, filter_matrix_t *mat, uint32_t i);
 uint32_t heap_pop (heap H, filter_matrix_t *mat);

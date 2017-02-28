@@ -33,8 +33,6 @@ lpb0 = 24
 lpb1 = 24
 tasks.sieve.mfb0 = 49
 tasks.sieve.mfb1 = 50
-tasks.sieve.lambda0 = 2.060000000033302
-tasks.sieve.lambda1 = 2.099999999634129
 tasks.sieve.ncurves0 = 11
 tasks.sieve.ncurves1 = 17
 tasks.I = 11
@@ -55,8 +53,8 @@ tasks.filter.target_density = 170.0
 
 tasks.linalg.bwc.interval = 1000
 tasks.linalg.bwc.interleaving = 0
-tasks.linalg.bwc.m = 64
-tasks.linalg.bwc.n = 64
+tasks.linalg.m = 64
+tasks.linalg.n = 64
 
 ###########################################################################
 # Characters

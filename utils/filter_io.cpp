@@ -749,6 +749,15 @@ earlyparser_index(earlyparsed_relation_ptr rel, ringbuf_ptr r)
 }
 
 static int
+earlyparser_indexline(earlyparsed_relation_ptr rel, ringbuf_ptr r)
+{
+    const char * p = r->rhead;
+    earlyparser_index_maybeabhexa(rel, r, 0, 0);
+    r->rhead = p; // rewind ringbuf
+    return earlyparser_line(rel, r);
+}
+
+static int
 earlyparser_abindex_hexa (earlyparsed_relation_ptr rel, ringbuf_ptr r)
 {
     return earlyparser_index_maybeabhexa(rel, r, 1, 0);
@@ -939,6 +948,9 @@ uint64_t filter_rels2_inner(char ** input_files,
         case _(LINE):
             /* e.g. for purge/2 */
             earlyparser = earlyparser_line;
+            break;
+        case _(LINE) | _(INDEX):
+            earlyparser = earlyparser_indexline;
             break;
         default:
             fprintf(stderr, "Unexpected bitmask in %s, please fix\n", __func__);

@@ -526,9 +526,12 @@ fi
 # }}}
 
 echo "Saving krylov sequence to magma format" # {{{
-afile=(`find $wdir -name 'A*[0-9]'`)
+# in case $(basename $wdir) matches the format string, we want to also
+# check for being a regular file.
+afile=(`find $wdir -name 'A*[0-9]' -a -type f`)
 if [ "${#afile[@]}" != 1 ] ; then
     echo "########## FAILURE ! Krylov sequence not finished #############"
+    find $wdir -name 'A*[0-9]' -a -type f | xargs -n 1 echo "### Found file "
     exit 1
 fi
 afile=$(basename "${afile[0]}")

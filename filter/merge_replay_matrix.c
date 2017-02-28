@@ -54,11 +54,13 @@ freeRj (filter_matrix_t *mat, int j)
 static float comp_weight[256];
 
 static inline float
-comp_weight_function (int32_t w MAYBE_UNUSED)
+comp_weight_function (int32_t w MAYBE_UNUSED, int maxlevel MAYBE_UNUSED)
 {
 #define USE_WEIGHT_LAMBDA 0 /* LAMBDA = 0 seems to be better */
 #if USE_WEIGHT_LAMBDA == 0
-    return 1.0;
+  /* we only count ideals of weight > maxlevel, assuming all those of weight
+     <= maxlevel will be merged */
+    return (w <= maxlevel) ? 0.0 : 1.0;
 #elif USE_WEIGHT_LAMBDA == 1
     return powf (2.0 / 3.0, (float) (w - 2));
 #elif USE_WEIGHT_LAMBDA == 2
@@ -77,7 +79,7 @@ comp_weight_function (int32_t w MAYBE_UNUSED)
 }
 
 static void
-heap_init (heap H, uint32_t nrows)
+heap_init (heap H, uint32_t nrows, int maxlevel)
 {
   H->list = malloc (nrows * sizeof (uint32_t));
   H->size = 0;
@@ -86,9 +88,20 @@ heap_init (heap H, uint32_t nrows)
   for (unsigned long i = 0; i < nrows; i++)
     H->index[i] = UINT32_MAX;
   for (int32_t w = 0; w < 256; w++)
-    comp_weight[w] = comp_weight_function (w);
+    comp_weight[w] = comp_weight_function (w, maxlevel);
   printf ("Using weight function lambda=%d for clique removal\n",
           USE_WEIGHT_LAMBDA);
+}
+
+/* fill the heap of heavy rows */
+void
+heap_fill (filter_matrix_t *mat)
+{
+  for (unsigned long i = 0; i < mat->nrows; i++)
+    {
+      ASSERT_ALWAYS(mat->rows[i] != NULL);
+      heap_push (mat->Heavy, mat, i);
+    }
 }
 
 static void
@@ -163,7 +176,7 @@ moveDown (heap H, filter_matrix_t *mat, uint32_t n)
   H->index[i] = n;
 }
 
-/* remove relation i */
+/* remove relation i from heap */
 void
 heap_delete (heap H, filter_matrix_t *mat, uint32_t i)
 {
@@ -289,7 +302,7 @@ initMat (filter_matrix_t *mat, int maxlevel, uint32_t keep,
   ASSERT_ALWAYS(mat->R != NULL);
 
   /* initialize the heap for heavy rows */
-  heap_init (mat->Heavy, mat->nrows);
+  heap_init (mat->Heavy, mat->nrows, mat->mergelevelmax);
 }
 
 void
@@ -733,9 +746,9 @@ print_row(filter_matrix_t *mat, int i)
 }
 
 void
-destroyRow(filter_matrix_t *mat, int i)
+destroyRow (filter_matrix_t *mat, int i)
 {
-    free(mat->rows[i]);
+    free (mat->rows[i]);
     mat->rows[i] = NULL;
 }
 
@@ -762,8 +775,11 @@ remove_i_from_Rj(filter_matrix_t *mat, index_t i, int j)
 void
 add_i_to_Rj(filter_matrix_t *mat, int i, int j)
 {
-  int l = mat->R[j][0] + 1;
+  int l;
 
+  ASSERT(mat->R[j] != NULL);
+
+  l = mat->R[j][0] + 1;
   reallocRj (mat, j, l);
   mat->R[j][l] = i;
 }

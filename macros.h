@@ -175,6 +175,14 @@ LEXLE3(OMPI_MAJOR_VERSION,OMPI_MINOR_VERSION,OMPI_RELEASE_VERSION,X,Y,Z))
 #endif
 #endif
 
+#ifndef ATTRIBUTE_DEPRECATED
+#if GNUC_VERSION_ATLEAST(3,1,1)
+#define ATTRIBUTE_DEPRECATED __attribute__ ((deprecated))
+#else
+#define ATTRIBUTE_DEPRECATED
+#endif
+#endif
+
 #if defined(__GNUC__)
 
 #ifndef NO_INLINE
@@ -235,6 +243,15 @@ LEXLE3(OMPI_MAJOR_VERSION,OMPI_MINOR_VERSION,OMPI_RELEASE_VERSION,X,Y,Z))
 #endif
 #ifndef	UNLIKELY
 #define UNLIKELY(x)	EXPECT(x,0)
+#endif
+
+#ifndef CADO_CONCATENATE
+#define CADO_CONCATENATE_SUB(a,b) a##b // actually concatenate
+#define CADO_CONCATENATE(a,b) CADO_CONCATENATE_SUB(a,b) // force expand
+#define CADO_CONCATENATE3_SUB(a,b,c) a##b##c
+#define CADO_CONCATENATE3(a,b,c) CADO_CONCATENATE3_SUB(a,b,c)
+#define CADO_CONCATENATE4_SUB(a,b,c,d) a##b##c##d
+#define CADO_CONCATENATE4(a,b,c,d) CADO_CONCATENATE4_SUB(a,b,c,d)
 #endif
 
 #endif	/* CADO_MACROS_H_ */

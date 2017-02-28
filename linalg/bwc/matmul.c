@@ -197,8 +197,12 @@ matmul_ptr matmul_init(mpfq_vbase_ptr x, unsigned int nr, unsigned int nc, const
     mm->locfile = locfile;
     param_list_parse_int(pl, "no_save_cache", &mm->no_save_cache);
 
-    int rc = asprintf(&mm->cachefile_name, "%s-%s%s.bin", locfile, mm->bind->impl, mm->store_transposed ? "T" : "");
-    FATAL_ERROR_CHECK(rc < 0, "out of memory");
+    if (locfile) {
+        int rc = asprintf(&mm->cachefile_name, "%s-%s%s.bin", locfile, mm->bind->impl, mm->store_transposed ? "T" : "");
+        FATAL_ERROR_CHECK(rc < 0, "out of memory");
+    } else {
+        mm->cachefile_name = NULL;
+    }
 
     mm->local_cache_copy = NULL;
 
@@ -206,20 +210,20 @@ matmul_ptr matmul_init(mpfq_vbase_ptr x, unsigned int nr, unsigned int nc, const
         return mm;
 
     const char * local_cache_copy_dir = param_list_lookup_string(pl, "local_cache_copy_dir");
-    if (local_cache_copy_dir) {
+    if (local_cache_copy_dir && mm->cachefile_name) {
         char * basename;
         basename = strrchr(mm->cachefile_name, '/');
         if (basename == NULL) {
             basename = mm->cachefile_name;
         }
         struct stat sbuf[1];
-        rc = stat(local_cache_copy_dir, sbuf);
+        int rc = stat(local_cache_copy_dir, sbuf);
         if (rc < 0) {
             fprintf(stderr, "Warning: accessing %s is not possible: %s\n",
                     local_cache_copy_dir, strerror(errno));
             return mm;
         }
-        int rc = asprintf(&mm->local_cache_copy, "%s/%s", local_cache_copy_dir, basename);
+        rc = asprintf(&mm->local_cache_copy, "%s/%s", local_cache_copy_dir, basename);
         FATAL_ERROR_CHECK(rc < 0, "out of memory");
     }
 
@@ -240,8 +244,9 @@ void matmul_build_cache(matmul_ptr mm, matrix_u32_ptr m)
 
 static void save_to_local_copy(matmul_ptr mm)
 {
-    if (mm->no_save_cache) return;
-    if (mm->local_cache_copy == NULL)
+    if (mm->no_save_cache ||
+        !mm->local_cache_copy ||
+        !mm->cachefile_name)
         return;
 
     struct stat sbuf[1];
@@ -299,6 +304,8 @@ int matmul_reload_cache(matmul_ptr mm)
 {
     struct stat sbuf[2][1];
     int rc;
+    if (!mm->cachefile_name)
+        return 0;
     rc = stat(mm->cachefile_name, sbuf[0]);
     if (rc < 0) {
         return 0;

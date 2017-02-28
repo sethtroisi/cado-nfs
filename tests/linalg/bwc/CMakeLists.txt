@@ -1,4 +1,3 @@
-
 # NOTE: most GF(p) checks here depend on plingen_pz ; this is artifical,
 # and caused by the fact that bwc.pl is for the moment unable to call
 # anything else than plingen_pz
@@ -282,6 +281,7 @@ cado_define_test(
     TARGET_DEPENDENCIES
     random_matrix spmv_test short_matmul mf_scan mf_bal bwc_matmul)
 
+
 cado_divert_test(test-spmv-${test_spmv_base} 11 APPEND_ARGUMENTS thr=1x1)
 if(${test-spmv-${test_spmv_base}_alltests})
 cado_divert_test(test-spmv-${test_spmv_base} 12 APPEND_ARGUMENTS thr=1x2)
@@ -296,6 +296,13 @@ cado_divert_test(test-spmv-${test_spmv_base} 3222 APPEND_ARGUMENTS mpi=3x2 thr=2
 endif()
 endif()
 endmacro()
+
+cado_define_test(test_random_matrix
+    PROGRAM ${CADO_NFS_BINARY_DIR}/linalg/bwc/krylov --random_matrix 20000,density=100 m=64 n=64 ys=0..64 prime=2 interval=100 end=200
+    TARGET_DEPENDENCIES bwc_full
+    )
+cado_divert_test(test_random_matrix thr22 APPEND_ARGUMENTS thr=2x2)
+
 
 foreach(arith_layer ${BWC_GF2_ARITHMETIC_BACKENDS})
     string_join(mm_backends " " ${BWC_GF2_MATMUL_BACKENDS})
@@ -358,6 +365,15 @@ if (HAVE_MPI)
     test_hello_mpi(2122 mpi=2x1 thr=2x2)
     test_hello_mpi(1322 mpi=1x3 thr=2x2)
     test_hello_mpi(3222 mpi=3x2 thr=2x2)
+
+cado_define_test(test_random_matrix_mpi
+    PROGRAM
+    ${CADO_NFS_BINARY_DIR}/linalg/bwc/bwc.pl krylov --random_matrix 20000,density=100 m=64 n=64 ys=0..64 prime=2 interval=100 end=200
+    TARGET_DEPENDENCIES bwc_full
+    TEST_DEPENDENCIES test_random_matrix
+    )
+    cado_divert_test(test_random_matrix_mpi 22 APPEND_ARGUMENTS mpi=2x2)
+    cado_divert_test(test_random_matrix_mpi 23 APPEND_ARGUMENTS mpi=2x3)
 endif()
 
 cado_define_test(test_bl_extraction.c LIBRARIES bwc_base bitlinalg)
