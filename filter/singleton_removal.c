@@ -75,7 +75,7 @@ singleton_removal_mt_thread (void *arg)
 #ifdef HAVE_SYNC_FETCH
             if (*w < UMAX(*w) && !__sync_sub_and_fetch(w, 1))
               (data->sup_ncol)++;
-#else /* else we use mutex to protect the substraction on w */
+#else /* else we use mutex to protect the subtraction on w */
             pthread_mutex_lock (&lock);
             if (*w < UMAX(*w) && !(--(*w)))
               (data->sup_ncol)++;

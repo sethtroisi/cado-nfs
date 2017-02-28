@@ -22,7 +22,7 @@
 #include "utils_cofactorisation.h"
 #include "ecm/facul.h"
 
-//TODO: change % in test + add or substract.
+//TODO: change % in test + add or subtract.
 
 /*
  * Different mode:
