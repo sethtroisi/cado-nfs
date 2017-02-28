@@ -68,6 +68,7 @@ filter/purge_matrix.c
 filter/purge_matrix.h
 filter/singleton_removal.c
 filter/singleton_removal.h
+filter/singleton_simple.cpp
 filter/clique_removal.c
 filter/clique_removal.h
 filter/markowitz.c

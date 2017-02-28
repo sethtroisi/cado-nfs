@@ -41,6 +41,9 @@ target_link_libraries(reconstructlog-dl utils_with_io)
 add_executable(sm_simple sm_simple.cpp)
 target_link_libraries(sm_simple utils)
 
+add_executable(singleton_simple singleton_simple.cpp)
+target_link_libraries(singleton_simple utils_with_io)
+
 if (${WITH_MPI})
     add_definitions(-DWITH_MPI)
 endif()
