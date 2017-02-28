@@ -17,6 +17,8 @@
 #include <sstream>
 #include "portability.h"
 #include "mpz_poly.h"
+#include "lll.h"
+#include "rootfinder.h"
 #include "gmp_aux.h"
 #include "misc.h"
 /* and just because we expose a proxy to usp.c's root finding... */
@@ -2807,7 +2809,121 @@ mpz_poly_squarefree_p (mpz_poly_srcptr f)
   return ret;
 }
 
+/**
+ * \brief test if the poly f is irreducible over Z.
+ * This function is extracted from dlpolyselect.c written by PZ
+ *
+ * Let p be a prime such that f has a root r modulo p.
+ * Search by LLL a small linear combination between 1, r, ..., r^(d-1).
+ * If f is not irreducible, then p will be root of a factor of degree <= d-1,
+ * which will yield a linear dependency of the same order as the coefficients
+ * of f, otherwise if f is irreducible the linear dependency will be of order
+ * p^(1/d). 
+ */
+int mpz_poly_is_irreducible_z(mpz_poly_srcptr f)
+{
+  mpz_t p;
+  int d = f->deg;
+  int dg = d - 1;
+  int i, j, nr;
+  mpz_t a, b, det, r, *roots;
+  size_t normf;
+  int ret;
+  mat_Z g;
 
+  mpz_init (p);
+  mpz_poly_infinity_norm (p, f);
+  normf = mpz_sizeinbase (p, 2);
+  /* for d = 4 and bound = 4, MARGIN=5 is enough to select all 5451 irreducible
+     polynomials */
+#define MARGIN 16
+  /* add some margin bits */
+  mpz_mul_2exp (p, p, MARGIN);
+  mpz_pow_ui (p, p, d);
+
+  roots = (mpz_t*) malloc (d * sizeof (mpz_t));
+  for (i = 0; i < d; i++)
+    mpz_init (roots[i]);
+
+  do {
+    mpz_nextprime (p, p);
+    nr = mpz_poly_roots_mpz (roots, f, p);
+  } while (nr == 0);
+
+  g.coeff = (mpz_t **) malloc ((dg + 2)*sizeof(mpz_t*));
+  g.NumRows = g.NumCols = dg + 1;
+  for (i = 0; i <= dg + 1; i ++) {
+    g.coeff[i] = (mpz_t *) malloc ((dg + 2)*sizeof(mpz_t));
+    for (j = 0; j <= dg + 1; j ++) {
+      mpz_init (g.coeff[i][j]);
+    }
+  }
+
+  mpz_init (det);
+  mpz_init_set_ui (a, 1);
+  mpz_init_set_ui (b, 1);
+  mpz_init_set (r, roots[0]);
+  for (i = 0; i <= dg + 1; i ++) {
+    for (j = 0; j <= dg + 1; j ++) {
+      mpz_set_ui (g.coeff[i][j], 0);
+    }
+  }
+
+  for (i = 1;  i <= dg + 1; i++) {
+    for (j = 1; j <= dg + 1; j++) {
+      if (i == 1) {
+        if (j == 1) {
+          mpz_set (g.coeff[j][i], p);
+        }
+        else {
+          mpz_neg (g.coeff[j][i], r);
+          mpz_mul (r, r, roots[0]);
+        }
+      }
+      else
+        mpz_set_ui (g.coeff[j][i], i==j);
+    }
+  }
+
+  LLL (det, g, NULL, a, b);
+
+  for (j = 1; j <= dg + 1; j ++)
+    {
+      /* the coefficients of vector j are in g.coeff[j][i], 1 <= i <= dg + 1 */
+      mpz_abs (a, g.coeff[j][1]);
+      for (i = 2; i <= dg + 1; i++)
+        if (mpz_cmpabs (g.coeff[j][i], a) > 0)
+          mpz_abs (a, g.coeff[j][i]);
+      /* now a = max (|g.coeff[j][i]|, 1 <= i <= dg+1) */
+      if (j == 1 || mpz_cmpabs (a, b) < 0)
+        mpz_set (b, a);
+    }
+  /* now b is the smallest infinity norm */
+  if (mpz_sizeinbase (b, 2) < normf + MARGIN / 2)
+    ret = 0;
+  else
+    ret = 1;
+
+  for (i = 0; i <= dg + 1; i ++) {
+    for (j = 0; j <= dg + 1; j ++)
+      mpz_clear (g.coeff[i][j]);
+    free(g.coeff[i]);
+  }
+  free (g.coeff);
+
+  for (i = 0; i < d; i++)
+    mpz_clear (roots[i]);
+  free (roots);
+  mpz_clear (det);
+  mpz_clear (a);
+  mpz_clear (b);
+  mpz_clear (r);
+  mpz_clear (p);
+
+  return ret;
+}
+
+  
 /* factoring polynomials */
 
 void mpz_poly_factor_list_init(mpz_poly_factor_list_ptr l)
@@ -3626,6 +3742,7 @@ int mpz_poly_setcoeffs_counter(mpz_poly_ptr f, int* max_abs_coeffs, unsigned lon
 #define POLY_CONTENT -6
 
     fint = (int *) malloc ((deg + 1)*sizeof(int));
+    // by default the next counter is counter+1
     *next_counter = counter+1;
 
     /* compute polynomial f and fint of index idx */
@@ -3684,24 +3801,42 @@ int mpz_poly_setcoeffs_counter(mpz_poly_ptr f, int* max_abs_coeffs, unsigned lon
       // since the leading coefficient is > 0, it means:
       // set the leading coeff to 1 and increment the next coefficient.
       *next_counter = counter - (counter % bound) + bound;
-      /* NOT TESTED:
       // then, what if f[0] = +/- 1?
       if(abs(fint[0]) == 1){
+	// means that setting ld=1 might not be enough: what if f[d-1] > |f[1]| now ?
+	// in that case, counter++ is not enough because f[d]=1 is the only possibility,
+	// so the next counter we are looking for is with f[d-1]++
 	if(abs(fint[deg-1]+1) > abs(fint[1])){
 	  // setting ld=1 then incrementing the second high deg coeff is not enough
 	  idx = *next_counter;
-	  // set the second high deg coeff to 0 and increment the third high deg coeff
-	  *next_counter = idx - (idx % bound*(bound+1)) + bound*(bound+1);
-	  if((deg > 3) && (fint[1] == 0)){//setting the second high deg to 0 and incrementing the next coeff migh not be enough
-	    if (abs(fint[deg-2]+1) > 0){
-	      idx = *next_counter;
-	      // set the third coeff to 0 instead of -bound
-	      *next_counter = idx - (idx % bound*(bound+1)*(2*bound+1)) + bound*(bound+1)*(2*bound+1)*bound;
+	  // set the second high deg coeff to 0
+	  *next_counter = idx - (idx % (bound*(bound+1))) + (idx % bound);
+	  // and increment the third high deg coeff
+	  *next_counter += bound*(bound+1);
+	  j = 2;
+	  unsigned long mod_j = bound*(bound+1)*(2*bound+1);
+	  unsigned long mod_k = mod_j*(2*bound+1);
+	  while ((deg-j > j) && (fint[j-1] == 0)) {
+	    //setting the deg-j+1 coeff to 0 and incrementing the next deg-j coeff migh not be enough
+	    if (abs(fint[deg-j]+1) > abs(fint[j])){
+	      if ((fint[deg-j]+1) < fint[j]){// negative values
+		//set fint[deg-j] to fint[j]
+		idx = *next_counter;
+		*next_counter = idx - (idx % mod_j) + (-abs(fint[j])+bound)*mod_j;
+	      }else{//(fint[deg-j]+1) is too large anyway: set it to its minimal value which is -|fint[j]| and do fint[d-j-1]++
+		// set fint[deg-j] to -|fint[j]| and
+		// fint[deg-j-1]++
+		idx = *next_counter;
+		*next_counter = idx - (idx % mod_j) + (-abs(fint[j])+bound)*mod_j + mod_k;
+	      }
 	    }
-	  }
+	    j++;
+	    mod_j = mod_k;
+	    mod_k *= (2*bound+1);
+	  }// end while
 	}
-	}*/
-    }
+      }
+    }// end of the computation of the next valid counter
 
     /* since f(x) is equivalent to (-1)^deg*f(-x), if f[deg-1] = 0, then the
        largest i = deg-3, deg-5, ..., such that f[i] <> 0 should have f[i] > 0 */
@@ -3824,6 +3959,35 @@ int mpz_poly_setcoeffs_counter(mpz_poly_ptr f, int* max_abs_coeffs, unsigned lon
 #undef POLY_ROOT_ONE
 #undef POLY_ROOT_MINUS_ONE
 #undef POLY_CONTENT
+}
+
+/**
+ return the total number of polys f that satisfy:
+ deg(f) = deg exactly (leading coefficient != 0)
+ |f_i| <= bound: the coefficients are bounded by bound
+ f_deg > 0: leading coeff strictly positive
+ f_{deg-1} > 0
+ f_0 != 0: constant coeff non-zero
+
+This corresponds to the number of polynomials that can be enumerated with the function 
+mpz_poly_setcoeffs_counter
+*/
+unsigned long mpz_poly_cardinality(int deg, unsigned int bound){
+  /* we take 1 <= f[d] <= bound */
+  /* we take 0 <= f[d-1] <= bound */
+  /* we take -bound <= f[i] <= bound for d-2 >= i > 0 */
+  /* we take -bound <= f[0] < bound, f[0] <> 0,
+     which makes 2*bound possible values */
+  unsigned long number_polys=0;
+  int i;
+  if(deg >= 3){
+    number_polys = bound*(bound+1);
+    for (i = deg-2; i > 0; i --){
+      number_polys *= 2*bound + 1;
+    }
+    number_polys *= 2*bound;
+  }
+  return number_polys;
 }
 
 /**

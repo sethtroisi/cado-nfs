@@ -80,6 +80,7 @@ void mpz_poly_getcoeff(mpz_t res, int i, mpz_poly_srcptr f);
 int mpz_poly_setcoeffs_counter(mpz_poly_ptr f, int* max_abs_coeffs, unsigned long *next_counter, int deg, unsigned long counter, unsigned int bound);
 void  mpz_poly_setcoeffs_counter_print_error_code(int error_code);
 unsigned long mpz_poly_getcounter(mpz_poly_ptr f, unsigned int bound);
+unsigned long mpz_poly_cardinality(int deg, unsigned int bound);
 
 static inline mpz_srcptr mpz_poly_lc_const(mpz_poly_srcptr f) {
     ASSERT(f->deg >= 0);
@@ -187,6 +188,7 @@ void mpz_poly_content (mpz_t c, mpz_poly_srcptr F);
 void mpz_poly_resultant(mpz_ptr res, mpz_poly_srcptr p, mpz_poly_srcptr q);
 void mpz_poly_discriminant(mpz_ptr res, mpz_poly_srcptr f);
 int mpz_poly_squarefree_p(mpz_poly_srcptr f);
+int mpz_poly_is_irreducible_z(mpz_poly_srcptr f);
 
 int mpz_poly_number_of_real_roots(mpz_poly_srcptr f);
 
