@@ -7,6 +7,7 @@
 /*  Forward declarations of conversion functions */
 void xToIJ(int *i, unsigned int *j, const uint64_t X, sieve_info_srcptr si);
 void NxToIJ(int *i, unsigned int *j, const unsigned int N, const unsigned int x, sieve_info_srcptr si);
+void adjustIJsublat(int *i, unsigned int *j, sieve_info_srcptr si);
 
 void IJTox(uint64_t * x, int i, unsigned int j, sieve_info_srcptr si);
 void IJToNx(unsigned int *N, unsigned int * x, int i, unsigned int j, sieve_info_srcptr si);

@@ -414,7 +414,7 @@ search_survivors_in_line(unsigned char * const SS[2],
         const unsigned char bound[2], const unsigned int log_I,
         const unsigned int j, const int N, j_div_srcptr j_div,
         const unsigned int td_max, unsieve_aux_data_srcptr us,
-        std::vector<uint32_t> &survivors, bool sublat)
+        std::vector<uint32_t> &survivors, sublat_t sublat)
 {
     /* In line j = 0, only the coordinate (i, j) = (-1, 0) may survive */
     if (j == 0) {
@@ -430,8 +430,25 @@ search_survivors_in_line(unsigned char * const SS[2],
         }
     }
 
-    if (!sublat)
-        unsieve_not_coprime_line(SS[0], j, td_max + 1, 1U<<log_I, us);
+    // Naive version when we have sublattices, because unsieving is
+    // harder. TODO: implement a fast version
+    if (sublat.m) {
+        for (int x = 0; x < (1 << log_I); x++) {
+            if (!sieve_info_test_lognorm(bound[0], bound[1], SS[0][x], SS[1][x])) {
+                SS[0][x] = 255;
+                continue;
+            }
+            const unsigned int i = abs (int(sublat.m)*(x - (1 << (log_I - 1)))+int(sublat.i0));
+            if (bin_gcd_int64_safe (i, sublat.m*j+sublat.j0) != 1) {
+                SS[0][x] = 255;
+            } else {
+                survivors.push_back(x);
+            }
+        }
+        return;
+    }
+
+    unsieve_not_coprime_line(SS[0], j, td_max + 1, 1U<<log_I, us);
 
 #if defined(HAVE_SSE2)
     search_survivors_in_line_sse2(SS, bound, log_I, j, N, j_div, td_max,

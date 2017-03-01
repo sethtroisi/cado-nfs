@@ -2193,7 +2193,7 @@ void factor_survivors_data::search_survivors(timetree_t& timer)
         search_survivors_in_line(both_S, both_bounds,
                                  si->conf->logI, j + first_j, N,
                                  si->j_div, si->conf->unsieve_thresh,
-                                 si->us, survivors, si->conf->sublat.m);
+                                 si->us, survivors, si->conf->sublat);
         /* Survivors written by search_survivors_in_line() have index
            relative to their j-line. We need to convert to index within
            the bucket region by adding line offsets. */
@@ -2374,10 +2374,11 @@ void factor_survivors_data::cofactoring (timetree_t& timer)
             /* Compute the norms using the polynomials transformed to 
                i,j-coordinates. The transformed polynomial on the 
                special-q side is already divided by q */
-            // Note that are, (i,j) are the true coordinates, not the
+            // Note that are, (i,j) must be true coordinates, not the
             // ones reduced to (-I/2, I/2) using sublattices.
             NxToIJ (&i, &j, N, x, si);
-		mpz_poly_homogeneous_eval_siui (norm[side], si->sides[side]->fij, i, j);
+            adjustIJsublat(&i, &j, si);
+            mpz_poly_homogeneous_eval_siui (norm[side], si->sides[side]->fij, i, j);
 
 #ifdef TRACE_K
             if (trace_on_spot_ab(a, b)) {
