@@ -206,7 +206,7 @@ polygen_JL_f (int d, unsigned int bound, mpz_t *f, unsigned long idx)
     // #define POLY_CONTENT -6
     // if ((ok == 1) || ((ok == 0) && (max_abs_coeffs == POLY_CONTENT))){
     // #undef POLY_CONTENT
-    if ((ok == 1)){
+    if (ok == 1){
 #ifdef HAVE_OPENMP
 #pragma omp critical
 #endif
