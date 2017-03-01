@@ -58,11 +58,17 @@ skew: 1.37
 # f lognorm 3.93, alpha -1.96, score 1.97
 # g lognorm 130.19, alpha -5.47, score 124.73
 # f+g score 126.69
+
+aurore bug:
+$ ./dlpolyselect -N 1219344858334286932696341909195796109526657386154251328029273656175766870980306505584577389125860826715201547225794072935883258868036433287217994721542199148182841505800433148410869683590659346847659519108393837414567892730579162319 -df 4 -dg 3 -bound 140 -modr 144566234274 -modm 100000000
+
+
 */
 
 #include "cado.h"
 #include "auxiliary.h"
 #include "utils.h"
+#include "mpz_poly.h"
 #include "portability.h"
 #include "murphyE.h"
 #include "ropt_param.h"
@@ -86,126 +92,6 @@ double max_guard = DBL_MIN;
 #ifdef TIMINGS
 double t_roots = 0.0, t_irred = 0.0, t_lll = 0.0;
 #endif
-
-/* Check that f is irreducible.
-   Let p be a prime such that f has a root r modulo p.
-   Search by LLL a small linear combination between 1, r, ..., r^(d-1).
-   If f is not irreducible, then p will be root of a factor of degree <= d-1,
-   which will yield a linear dependency of the same order as the coefficients
-   of f, otherwise if f is irreducible the linear dependency will be of order
-   p^(1/d). */
-static int
-is_irreducible (mpz_poly f)
-{
-  mpz_t p;
-  int d = f->deg;
-  int dg = d - 1;
-  int i, j, nr;
-  mpz_t a, b, det, r, *roots;
-  size_t normf;
-  int ret;
-  mat_Z g;
-
-  mpz_init (p);
-  mpz_poly_infinity_norm (p, f);
-  normf = mpz_sizeinbase (p, 2);
-  /* for d = 4 and bound = 4, MARGIN=5 is enough to select all 5451 irreducible
-     polynomials */
-#define MARGIN 16
-  /* add some margin bits */
-  mpz_mul_2exp (p, p, MARGIN);
-  mpz_pow_ui (p, p, d);
-
-  roots = malloc (d * sizeof (mpz_t));
-  for (i = 0; i < d; i++)
-    mpz_init (roots[i]);
-
-  do {
-    mpz_nextprime (p, p);
-    nr = mpz_poly_roots_mpz (roots, f, p);
-    /* If f has no root mod p and degree <= 3, it is irreducible,
-       since a degree 2 polynomial can only factor into 1+1 or 2,
-       and a degree 3 polynomial can only factor into 1+2 or 3. */
-    if (nr == 0 && d <= 3)
-      {
-        ret = 1;
-        goto clear_and_exit;
-      }
-  } while (nr == 0);
-
-  g.coeff = (mpz_t **) malloc ((dg + 2)*sizeof(mpz_t*));
-  g.NumRows = g.NumCols = dg + 1;
-  for (i = 0; i <= dg + 1; i ++) {
-    g.coeff[i] = (mpz_t *) malloc ((dg + 2)*sizeof(mpz_t));
-    for (j = 0; j <= dg + 1; j ++) {
-      mpz_init (g.coeff[i][j]);
-    }
-  }
-
-  mpz_init (det);
-  mpz_init_set_ui (a, 1);
-  mpz_init_set_ui (b, 1);
-  mpz_init_set (r, roots[0]);
-  for (i = 0; i <= dg + 1; i ++) {
-    for (j = 0; j <= dg + 1; j ++) {
-      mpz_set_ui (g.coeff[i][j], 0);
-    }
-  }
-
-  for (i = 1;  i <= dg + 1; i++) {
-    for (j = 1; j <= dg + 1; j++) {
-      if (i == 1) {
-        if (j == 1) {
-          mpz_set (g.coeff[j][i], p);
-        }
-        else {
-          mpz_neg (g.coeff[j][i], r);
-          mpz_mul (r, r, roots[0]);
-        }
-      }
-      else
-        mpz_set_ui (g.coeff[j][i], i==j);
-    }
-  }
-
-  LLL (det, g, NULL, a, b);
-
-  for (j = 1; j <= dg + 1; j ++)
-    {
-      /* the coefficients of vector j are in g.coeff[j][i], 1 <= i <= dg + 1 */
-      mpz_abs (a, g.coeff[j][1]);
-      for (i = 2; i <= dg + 1; i++)
-        if (mpz_cmpabs (g.coeff[j][i], a) > 0)
-          mpz_abs (a, g.coeff[j][i]);
-      /* now a = max (|g.coeff[j][i]|, 1 <= i <= dg+1) */
-      if (j == 1 || mpz_cmpabs (a, b) < 0)
-        mpz_set (b, a);
-    }
-  /* now b is the smallest infinity norm */
-  if (mpz_sizeinbase (b, 2) < normf + MARGIN / 2)
-    ret = 0;
-  else
-    ret = 1;
-
-  for (i = 0; i <= dg + 1; i ++) {
-    for (j = 0; j <= dg + 1; j ++)
-      mpz_clear (g.coeff[i][j]);
-    free(g.coeff[i]);
-  }
-  free (g.coeff);
-
-  mpz_clear (det);
-  mpz_clear (a);
-  mpz_clear (b);
-  mpz_clear (r);
- clear_and_exit:
-  for (i = 0; i < d; i++)
-    mpz_clear (roots[i]);
-  free (roots);
-  mpz_clear (p);
-
-  return ret;
-}
 
 /*
   Print two nonlinear poly info. Return non-zero for record polynomials.
@@ -297,146 +183,55 @@ print_nonlinear_poly_info (mpz_poly ff, double alpha_f, mpz_poly gg,
   The coefficient of degree 0 should not be 0.
   Thus there are bound*(bound+1)*(2*bound+1)^(d-2)*(2*bound) possible values.
   Return 0 if the corresponding polynomial is not irreducible.
+  Return !=0 if the poly is valid.
 */
 static int
 polygen_JL_f (int d, unsigned int bound, mpz_t *f, unsigned long idx)
 {
-    unsigned int i;
-    unsigned long *rq;
-    int *fint, ok = 1;
-    mpz_t t;
-    mpz_init (t);
-    fint = (int *) malloc ((d + 1)*sizeof(int));
-    rq = (unsigned long *) malloc ((d + 1)*sizeof(unsigned long));
-
+    int ok = 1;
     /* compute polynomial of index idx and check it is irreducible */
-
-    /* we take 1 <= f[d] <= bound */
-    fint[d] = 1 + (idx % bound);
-    idx = idx / bound;
-    mpz_set_ui (f[d], fint[d]);
-    /* we take 0 <= f[d-1] <= bound */
-    fint[d-1] = idx % (bound + 1);
-    idx = idx / (bound + 1);
-    mpz_set_ui (f[d-1], fint[d-1]);
-    for (i = d-2; i > 0; i --)
-      {
-        fint[i] = (idx % (2 * bound + 1)) - bound;
-        idx = idx / (2 * bound + 1);
-        mpz_set_si (f[i], fint[i]);
-      }
-
-    /* we take -bound <= f[0] <= bound, f[0] <> 0,
-       which makes 2*bound possible values */
-    ASSERT(idx < 2 * bound);
-    fint[0] = (idx < bound) ? idx - bound : idx - (bound - 1);
-    mpz_set_si (f[0], fint[0]);
-
-    /* since f and the reversed polynomial are equivalent, we can assume
-       |f[d]| < |f[0]| or (|f[d]| = |f[0]| and |f[d-1]| < |f[1]|) or ... */
-
-    ok = 1;
-    for (int i = 0; 2 * i < d; i++)
-      {
-        if (abs(fint[d-i]) != abs(fint[i]))
-          {
-            /* we want |f[d-i]| < |f[i]| */
-            ok = abs(fint[d-i]) < abs(fint[i]);
-            break;
-          }
-      }
-
-    /* since f(x) is equivalent to (-1)^d*f(-x), if f[d-1] = 0, then the
-       largest i = d-3, d-5, ..., such that f[i] <> 0 should have f[i] > 0 */
-    if (ok && fint[d-1] == 0)
-      {
-        for (int i = d - 3; i >= 0; i -= 2)
-          {
-            if (fint[i])
-              {
-                ok = fint[i] > 0;
-                break;
-              }
-          }
-      }
-
-    /* if |f[i]| = |f[d-i]| for all i, then [f[d], f[d-1], ..., f[1], f[0]]
-       is equivalent to [s*f[0], s*t*f[1], s*t^2*f[2], ...], where
-       s = sign(f[0]), and s*t^i is the sign of f[i] where i is the smallest
-       odd index > 0 such that f[i] <> 0.  */
-    if (ok && fint[d] == abs(fint[0])) /* f[d] > 0 */
-      {
-        int s = (fint[0] > 0) ? 1 : -1, t = 0, i;
-        for (i = 1; i <= d; i++)
-          {
-            if (2 * i < d && abs(fint[d-i]) != abs(fint[i]))
-              break;
-            if (t == 0 && fint[i] != 0 && (i & 1))
-              t = (fint[i] > 0) ? s : -s;
-          }
-        if (2 * i >= d) /* |f[i]| = |f[d-i]| for all i */
-          {
-            /* if t=0, then all odd coefficients are zero, but since
-               |f[d-i]| = |f[i]| this can only occur for d even, but then
-               we can set t to 1, since t only affects the odd coefficients */
-            if (t == 0)
-              t = 1;
-            for (i = 0; i <= d; i++)
-              {
-                if (fint[d-i] != s * fint[i])
-                  {
-                    ok = fint[d-i] > s * fint[i];
-                    break;
-                  }
-                s = s * t;
-              }
-          }
-      }
-
-    if (ok == 0)
-      goto end;
-
-#ifdef HAVE_OPENMP
-#pragma omp critical
-#endif
-    f_candidate ++;
-
     mpz_poly ff;
     ff->deg = d;
     ff->coeff = f;
+    //mpz_poly_init(ff, d);
+    int max_abs_coeffs;
+    unsigned long next_counter;
+    ok = mpz_poly_setcoeffs_counter(ff, &max_abs_coeffs, &next_counter, d, idx, bound);
 
-    /* content test */
-    mpz_poly_content (t, ff);
-    ok = mpz_cmp_ui (t, 1) == 0;
-    if (ok == 0)
-      goto end; /* duplicate with f/t */
-
-    /* irreducibility test */
-
-    ok = mpz_poly_squarefree_p (ff);
-    if (ok == 0)
-      goto end;
-
-#ifdef TIMINGS
-    t_irred -= seconds_thread ();
-#endif
-    ok = is_irreducible (ff);
-#ifdef TIMINGS
-    t_irred += seconds_thread ();
-#endif
-    if (ok == 0)
-      goto end;
-
+    // to be compatible with the previous version, the count on the number of valid polys was before
+    // the content test.
+    // Now the content test is included in mpz_poly_setcoeffs_counter()
+    // so the number of candidates will be lower than before.
+    // to get the previous value, use
+    // #define POLY_CONTENT -6
+    // if ((ok == 1) || ((ok == 0) && (max_abs_coeffs == POLY_CONTENT))){
+    // #undef POLY_CONTENT
+    if ((ok == 1)){
 #ifdef HAVE_OPENMP
 #pragma omp critical
 #endif
-    f_irreducible ++;
-
- end:
-    mpz_clear (t);
-    free(fint);
-    free(rq);
-
+      f_candidate ++;
+    }
+    
+    /* irreducibility test */
+    if(ok){
+      ok = mpz_poly_squarefree_p (ff);
+#ifdef TIMINGS
+      t_irred -= seconds_thread ();
+#endif
+      if(ok){
+	ok = mpz_poly_is_irreducible_z (ff);
+#ifdef TIMINGS
+	t_irred += seconds_thread ();
+#endif
+	if(ok){
+#ifdef HAVE_OPENMP
+#pragma omp critical
+#endif
+	  f_irreducible ++;
+	}
+      }
+    }
     return ok;
 }
 
