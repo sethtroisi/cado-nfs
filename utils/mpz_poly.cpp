@@ -2872,8 +2872,11 @@ int mpz_poly_is_irreducible_z(mpz_poly_srcptr f)
   mpz_init (p);
   mpz_poly_infinity_norm (p, f);
   normf = mpz_sizeinbase (p, 2);
-  /* for d = 4 and bound = 4, MARGIN=5 is enough to select all 5451 irreducible
-     polynomials */
+  /* The following table might be useful to optimize the value of MARGIN:
+     degree d    infinity_norm(f)    optimal MARGIN
+        3               8                 5
+        4               4                 5
+  */
 #define MARGIN 16
   /* add some margin bits */
   mpz_mul_2exp (p, p, MARGIN);
