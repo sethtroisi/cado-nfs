@@ -881,6 +881,40 @@ mpz_poly_fprintf_cado_format (FILE *fp, mpz_poly_srcptr f, const char letter,
   }
 }
 
+void mpz_poly_print_raw(mpz_poly_srcptr f){
+  int i, sgn;
+  gmp_printf ("%Zd*x^%d", f->coeff[f->deg], f->deg);
+  for (i = f->deg -1; i>1; i--){
+    sgn = mpz_sgn(f->coeff[i]);
+    if(sgn > 0){
+      gmp_printf (" + %Zd*x^%d", f->coeff[i], i);
+    }else{
+      if(sgn < 0){
+	gmp_printf (" %Zd*x^%d", f->coeff[i], i);
+      }
+    }
+  }
+  i=1;
+  sgn = mpz_sgn(f->coeff[i]);
+  if(sgn > 0){
+    gmp_printf (" + %Zd*x", f->coeff[i]);
+  }else{
+    if(sgn < 0){
+      gmp_printf (" %Zd*x", f->coeff[i]);
+    }
+  }
+  i=0;
+  sgn = mpz_sgn(f->coeff[i]);
+  if(sgn > 0){
+    gmp_printf (" + %Zd", f->coeff[i]);
+  }else{
+    if(sgn < 0){
+      gmp_printf (" %Zd", f->coeff[i]);
+    }
+  }
+  printf("\n");
+}
+
 /* -------------------------------------------------------------------------- */
 
 /* Tests and comparison functions */
@@ -2819,6 +2853,10 @@ mpz_poly_squarefree_p (mpz_poly_srcptr f)
  * which will yield a linear dependency of the same order as the coefficients
  * of f, otherwise if f is irreducible the linear dependency will be of order
  * p^(1/d). 
+ *
+ * \return 0 by default, 1 if the poly is irreducible.
+ * 
+ * this function is without any warranty and at your own risk
  */
 int mpz_poly_is_irreducible_z(mpz_poly_srcptr f)
 {
@@ -2828,14 +2866,17 @@ int mpz_poly_is_irreducible_z(mpz_poly_srcptr f)
   int i, j, nr;
   mpz_t a, b, det, r, *roots;
   size_t normf;
-  int ret;
+  int ret = 0; // init
   mat_Z g;
 
   mpz_init (p);
   mpz_poly_infinity_norm (p, f);
   normf = mpz_sizeinbase (p, 2);
-  /* for d = 4 and bound = 4, MARGIN=5 is enough to select all 5451 irreducible
-     polynomials */
+  /* The following table might be useful to optimize the value of MARGIN:
+     degree d    infinity_norm(f)    optimal MARGIN
+        3               8                 5
+        4               4                 5
+  */
 #define MARGIN 16
   /* add some margin bits */
   mpz_mul_2exp (p, p, MARGIN);
@@ -2848,6 +2889,14 @@ int mpz_poly_is_irreducible_z(mpz_poly_srcptr f)
   do {
     mpz_nextprime (p, p);
     nr = mpz_poly_roots_mpz (roots, f, p);
+    /* If f has no root mod p and degree <= 3, it is irreducible,
+       since a degree 2 polynomial can only factor into 1+1 or 2,
+       and a degree 3 polynomial can only factor into 1+2 or 3. */
+    if (nr == 0 && d <= 3)
+      {
+        ret = 1;
+        goto clear_and_exit;
+      }
   } while (nr == 0);
 
   g.coeff = (mpz_t **) malloc ((dg + 2)*sizeof(mpz_t*));
@@ -2911,13 +2960,14 @@ int mpz_poly_is_irreducible_z(mpz_poly_srcptr f)
   }
   free (g.coeff);
 
-  for (i = 0; i < d; i++)
-    mpz_clear (roots[i]);
-  free (roots);
   mpz_clear (det);
   mpz_clear (a);
   mpz_clear (b);
   mpz_clear (r);
+ clear_and_exit:
+  for (i = 0; i < d; i++)
+    mpz_clear (roots[i]);
+  free (roots);
   mpz_clear (p);
 
   return ret;
@@ -3714,7 +3764,8 @@ std::string cxx_mpz_poly::print_poly(std::string const& var) const
  * \param[in]  counter         counter storing the coefficients of f
  * \param[in]  bound           max absolute value of coefficients of f
  *
- * \return 1 if the poly is valid (content = 1, not a duplicate, and +/-1 is not a root) and in this case,
+ * \return 1 if the poly is valid (content = 1, not a duplicate, and +/-1 is not a root) 
+ *           (in fact the value returned is != 0) and in this case,
  *           max_abs_coeffs is set to the largest absolute value of the coefficients of f
  * \return 0 if the poly corresponding to the counter is a duplicate, and in that case,
  *           max_abs_coeffs is set to an error_code (poly duplicate, +/- 1 root, content != 1...)
@@ -3836,7 +3887,7 @@ int mpz_poly_setcoeffs_counter(mpz_poly_ptr f, int* max_abs_coeffs, unsigned lon
 	  }// end while
 	}
       }
-    }// end of the computation of the next valid counter
+    }// end of the computation of the next valid non-duplicate counter
 
     /* since f(x) is equivalent to (-1)^deg*f(-x), if f[deg-1] = 0, then the
        largest i = deg-3, deg-5, ..., such that f[i] <> 0 should have f[i] > 0 */
@@ -3921,7 +3972,13 @@ int mpz_poly_setcoeffs_counter(mpz_poly_ptr f, int* max_abs_coeffs, unsigned lon
     f->deg = deg;
     for (j = 0; j <= deg; j ++)
       mpz_set_si (f->coeff[j], fint[j]);
-    
+
+    /* there were these instructions in dlpolyselect.c
+#ifdef HAVE_OPENMP
+#pragma omp critical
+#endif
+    */
+
     if (ok){
       /* content test */
       mpz_init (content);

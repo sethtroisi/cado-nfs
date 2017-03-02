@@ -20,7 +20,6 @@ mod_intget_mpz(mpz_t z, const modint_t x) {
 #endif
 }
 
-
 static inline void 
 modset_init (struct modset_t *modset, modint_t m)
 {

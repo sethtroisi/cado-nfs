@@ -907,7 +907,8 @@ renumber_get_first_index_from_p(renumber_srcptr renumber_info,
       i = min;
     else /* We have to look for i such that tab[i] == vp between min and max. */
     {
-      i = (min + max) / 2;
+      i = min + (max - min) / 2; /* avoids overflow when
+                                    min + max >= UMAX(index_t) */
 
       /* Looking for vp: the values of vp are ordered in increasing order and are
         always at the beginning of a decreasing sequence */
@@ -952,7 +953,7 @@ renumber_get_first_index_from_p(renumber_srcptr renumber_info,
           }
         }
 
-        i = (min + max)/2;
+        i = min + (max - min) / 2; /* avoids overflow (see above) */
       }
     }
   }

@@ -1,53 +1,236 @@
 #ifndef SMALLSET_H_
 #define SMALLSET_H_
 
-#ifdef HAVE_SSE2
+#if defined(HAVE_SSE2)
 
-#include <xmmintrin.h>
+#include <immintrin.h>
 #include <cassert>
 #include <vector>
 #include <stdint.h>
 #include "macros.h"
 
-/* Static methods that don't depend on smallset template parameters */
-class smallset_tools {
-public:
-  template <unsigned size_x, unsigned idx_x>
-  static inline __m128i
-  extract_pattern(const __m128i updates)
-  {
-    ASSERT_ALWAYS((idx_x + 1) + size_x <= 16);
+template <typename RT, typename ST>
+static inline
+RT mm_set1_m(const ST & d);
 
-    if (size_x == 2) {
-      if (idx_x < 4) {
-        /* Fill lower 4 words with x */
-        __m128i pattern = _mm_shufflelo_epi16(updates, idx_x * 0x55);
-        /* Interleave lower 4 words with themselves to fill all 8 words */
-        return _mm_unpacklo_epi16 (pattern, pattern);
-      } else {
-        /* Fill upper 4 words with x */
-        __m128i pattern = _mm_shufflehi_epi16(updates, (idx_x - 4) * 0x55);
-        /* Interleave upper 4 words with themselves to fill all 8 words */
-        return _mm_unpackhi_epi16 (pattern, pattern);
-      }
-    } else if (size_x == 4) {
-        return _mm_shuffle_epi32(updates, idx_x * 0x55);
-    } else {
-      /* Not implemented for bytes atm. */
-      abort();
-    }
-  }
-};
+template <typename T>
+static inline
+unsigned mm_movemask_epi8(const T d);
+
+template <>
+inline
+unsigned mm_movemask_epi8<__m128i>(const __m128i d)
+{
+  return _mm_movemask_epi8(d);
+}
+
+template <int S, typename T>
+T mm_cmpeq_epi(const T a, const T b);
+
+template<>
+__m128i mm_cmpeq_epi<1, __m128i>(const __m128i a, const __m128i b)
+{
+  return _mm_cmpeq_epi8(a, b);
+}
+
+template<>
+__m128i mm_cmpeq_epi<2, __m128i>(const __m128i a, const __m128i b)
+{
+  return _mm_cmpeq_epi16(a, b);
+}
+
+template<>
+__m128i mm_cmpeq_epi<4, __m128i>(const __m128i a, const __m128i b)
+{
+  return _mm_cmpeq_epi32(a, b);
+}
+
+#if defined(HAVE_AVX2)
+
+template <>
+inline
+unsigned mm_movemask_epi8<__m256i>(const __m256i d)
+{
+  return _mm256_movemask_epi8(d);
+}
+
+template<>
+__m256i mm_cmpeq_epi<1, __m256i>(const __m256i a, const __m256i b)
+{
+  return _mm256_cmpeq_epi8(a, b);
+}
+
+template<>
+__m256i mm_cmpeq_epi<2, __m256i>(const __m256i a, const __m256i b)
+{
+  return _mm256_cmpeq_epi16(a, b);
+}
+
+template<>
+__m256i mm_cmpeq_epi<4, __m256i>(const __m256i a, const __m256i b)
+{
+  return _mm256_cmpeq_epi32(a, b);
+}
+
+/* Inline assembly functions for the VPBROADCAST{B,W,D,Q} instructions with
+   a memory operand as source. The GCC intrinsics appear to be implemented
+   in a way that causes GCC to use only VPBROADCAST? instructions with an
+   SSE2 register as operand, so it generates additional code to fetch the
+   source data from memory, writes this data to a second memory location,
+   loads the SSE2 register from that second memory location (with store
+   forwarding stall due to width increase), and then does the broadcast.
+   Naturally, this ruins performance. */
+
+template <>
+inline
+__m128i mm_set1_m<__m128i, uint8_t>(const uint8_t & d)
+{
+  __m128i r;
+  __asm__(
+    "vpbroadcastb %1, %0"
+    : "=x" (r)
+    : "m" (d)
+  );
+  return r;
+}
+
+template <>
+inline
+__m128i mm_set1_m<__m128i, uint16_t>(const uint16_t & d)
+{
+  __m128i r;
+  __asm__(
+    "vpbroadcastw %1, %0"
+    : "=x" (r)
+    : "m" (d)
+  );
+  return r;
+}
+
+template <>
+inline
+__m128i mm_set1_m<__m128i, uint32_t>(const uint32_t & d)
+{
+  __m128i r;
+  __asm__(
+    "vpbroadcastd %1, %0"
+    : "=x" (r)
+    : "m" (d)
+  );
+  return r;
+}
+
+template <>
+inline
+__m128i mm_set1_m<__m128i, uint64_t>(const uint64_t & d)
+{
+  __m128i r;
+  __asm__(
+    "vpbroadcastq %1, %0"
+    : "=x" (r)
+    : "m" (d)
+  );
+  return r;
+}
+
+template <>
+inline
+__m256i mm_set1_m<__m256i, uint8_t>(const uint8_t & d)
+{
+  __m256i r;
+  __asm__(
+    "vpbroadcastb %1, %0"
+    : "=x" (r)
+    : "m" (d)
+  );
+  return r;
+}
+
+template <>
+inline
+__m256i mm_set1_m<__m256i, uint16_t>(const uint16_t & d)
+{
+  __m256i r;
+  __asm__(
+    "vpbroadcastw %1, %0"
+    : "=x" (r)
+    : "m" (d)
+  );
+  return r;
+}
+
+template <>
+inline
+__m256i mm_set1_m<__m256i, uint32_t>(const uint32_t & d)
+{
+  __m256i r;
+  __asm__(
+    "vpbroadcastd %1, %0"
+    : "=x" (r)
+    : "m" (d)
+  );
+  return r;
+}
+
+template <>
+inline
+__m256i mm_set1_m<__m256i, uint64_t>(const uint64_t & d)
+{
+  __m256i r;
+  __asm__(
+    "vpbroadcastq %1, %0"
+    : "=x" (r)
+    : "m" (d)
+  );
+  return r;
+}
+
+#else
+
+/* Without AVX2, there's no VPBROADCAST instruction, and we use the SSE2
+   intrinsics as a (slow) fallback, so the code still runs on SSE2-only
+   machines. */
+
+template <>
+inline
+__m128i mm_set1_m<__m128i, uint8_t>(const uint8_t & d)
+{
+  return _mm_set1_epi8(d);
+}
+
+template <>
+inline
+__m128i mm_set1_m<__m128i, uint16_t>(const uint16_t & d)
+{
+  return _mm_set1_epi16(d);
+}
+
+template <>
+inline
+__m128i mm_set1_m<__m128i, uint32_t>(const uint32_t & d)
+{
+  return _mm_set1_epi32(d);
+}
+
+#endif /* if defined(HAVE_AVX2) else */
+
 
 template <int SIZE, typename ELEMENTTYPE>
-class smallset : public smallset_tools {
-  /* Data type could be made a template parameter if desired */
-  __m128i items[SIZE];
+class smallset {
+public:
+#if defined(HAVE_AVX2)
+  typedef __m256i storagetype;
+#else
+  typedef __m128i storagetype;
+#endif
+
+private:
+  storagetype items[SIZE];
 
 public:
   /* The maximum number of items, each of type ELEMENTTYPE, which we can
      store in "items" */
-  static const size_t nr_items = SIZE * sizeof(__m128i) / sizeof(ELEMENTTYPE);
+  static const size_t nr_items = SIZE * sizeof(storagetype) / sizeof(ELEMENTTYPE);
 
   /* "data" contains "len" entries, each of type ELEMENTTYPE */
   smallset(const ELEMENTTYPE *data, const size_t len) {
@@ -74,7 +257,7 @@ public:
 
     /* Copy everything to items */
     for (i = 0; i < SIZE; i++)
-      items[i] = ((__m128i *)&tmp_data)[i];
+      items[i] = ((storagetype *)&tmp_data)[i];
   }
 
   smallset(const std::vector<ELEMENTTYPE> &data) {
@@ -85,7 +268,7 @@ public:
      * values the same way, it seems. So we store the length in a
      * variable first.
      */
-    size_t len = data.size();
+    const size_t len = data.size();
     ASSERT_ALWAYS((SIZE == 0 || 0 < len) && len <= nr_items);
 
     size_t i;
@@ -96,53 +279,40 @@ public:
       tmp_data[i] = tmp_data[i - 1];
 
     for (i = 0; i < SIZE; i++)
-      items[i] = ((__m128i *)&tmp_data)[i];
+      items[i] = ((storagetype *)&tmp_data)[i];
   }
 
   /* Returns true if "item" is in the set, and false otherwise */
-  inline bool contains(const ELEMENTTYPE item) const {
+  inline bool contains(const ELEMENTTYPE &item) const {
     if (SIZE == 0)
       return false;
 
-    if (sizeof(ELEMENTTYPE) == 1) {
-      return contains(_mm_set1_epi8(item));
-    } else if (sizeof(ELEMENTTYPE) == 2) {
-      return contains( _mm_set1_epi16(item));
-    } else if (sizeof(ELEMENTTYPE) == 4) {
-      return contains(_mm_set1_epi32(item));
-    } else {
-      abort();
-    }
+    return contains(mm_set1_m<storagetype, ELEMENTTYPE>(item));
   }
 
   /* Returns true if "item" is in the set, and false otherwise */
-  inline bool contains(const __m128i pattern) const {
-    if (SIZE == 0)
+  __attribute__((optimize("unroll-all-loops")))
+  inline bool contains(const storagetype pattern) const {
+    if (SIZE == 0) {
       return false;
-
-    if (sizeof(ELEMENTTYPE) == 1) {
-      unsigned u = _mm_movemask_epi8(_mm_cmpeq_epi8(items[0], pattern));
-      /* TODO: Unroll this */
-      for (size_t i = 1; i < SIZE; i++)
-        u |= _mm_movemask_epi8(_mm_cmpeq_epi8(items[i], pattern));
+    } else if (SIZE <= 8) {
+      unsigned u = mm_movemask_epi8(mm_cmpeq_epi<sizeof(ELEMENTTYPE)>(items[0], pattern));
+      if (SIZE > 1) {u |= mm_movemask_epi8(mm_cmpeq_epi<sizeof(ELEMENTTYPE)>(items[1], pattern));}
+      if (SIZE > 2) {u |= mm_movemask_epi8(mm_cmpeq_epi<sizeof(ELEMENTTYPE)>(items[2], pattern));}
+      if (SIZE > 3) {u |= mm_movemask_epi8(mm_cmpeq_epi<sizeof(ELEMENTTYPE)>(items[3], pattern));}
+      if (SIZE > 4) {u |= mm_movemask_epi8(mm_cmpeq_epi<sizeof(ELEMENTTYPE)>(items[4], pattern));}
+      if (SIZE > 5) {u |= mm_movemask_epi8(mm_cmpeq_epi<sizeof(ELEMENTTYPE)>(items[5], pattern));}
+      if (SIZE > 6) {u |= mm_movemask_epi8(mm_cmpeq_epi<sizeof(ELEMENTTYPE)>(items[6], pattern));}
+      if (SIZE > 7) {u |= mm_movemask_epi8(mm_cmpeq_epi<sizeof(ELEMENTTYPE)>(items[7], pattern));}
       return u != 0;
-    } else if (sizeof(ELEMENTTYPE) == 2) {
-      unsigned u = _mm_movemask_epi8(_mm_cmpeq_epi16(items[0], pattern));
-      /* TODO: Unroll this */
+    } else /* SIZE > 8 */ {
+      unsigned u = mm_movemask_epi8(mm_cmpeq_epi<sizeof(ELEMENTTYPE)>(items[0], pattern));
       for (size_t i = 1; i < SIZE; i++)
-        u |= _mm_movemask_epi8(_mm_cmpeq_epi16(items[i], pattern));
+        u |= mm_movemask_epi8(mm_cmpeq_epi<sizeof(ELEMENTTYPE)>(items[i], pattern));
       return u != 0;
-    } else if (sizeof(ELEMENTTYPE) == 4) {
-      unsigned u = _mm_movemask_epi8(_mm_cmpeq_epi32(items[0], pattern));
-      /* TODO: Unroll this */
-      for (size_t i = 1; i < SIZE; i++)
-        u |= _mm_movemask_epi8(_mm_cmpeq_epi32(items[i], pattern));
-      return u != 0;
-    } else {
-      abort();
     }
   }
 };
 
-#endif
-#endif
+#endif /* if defined(HAVE_SSE2) */
+#endif /* ifndef SMALLSET_H_ */
