@@ -65,7 +65,7 @@ char *argv0; /* = argv[0] */
 renumber_t renumber_tab;
 
 static uint32_t *H; /* H contains the hash table */
-static unsigned long K = 0; /* Size of the hash table */
+static uint64_t K = 0; /* Size of the hash table */
 static unsigned long nrels_expected = 0;
 static double cost = 0.0; /* Cost to insert all rels in the hash table */
 /* Number of duplicates and rels on the current file */
@@ -218,17 +218,27 @@ insert_relation_in_dup_hashtable (earlyparsed_relation_srcptr rel, unsigned int 
   uint32_t i, j;
 
   h = CA_DUP2 * (uint64_t) rel->a + CB_DUP2 * rel->b;
-  i = h % K;
+
+  /* We put j = floor(h/2^32) in cell H[i] where i = h % K (or the first
+     available cell after i if H[i] is already occupied). We have extraneous
+     duplicates when:
+     (a) either we have a collision on h: this should happen with probability
+         2^(-64)
+     (b) j = j' and |i-i'| is small, in particular i=i'. If K is at least twice
+         the number of relations, then |i-i'| is bounded by say 2 on average,
+         thus this happens when h' = h + n*K or h' = h + n*K + 1. This happens
+         with probability 2/K. Moreover we should have j = j', which happens
+         with probability 2^(-32). Since K is an odd prime, the global
+         probability is about 2^(-31)/K.
+     In case K > 2^32, the analysis is the same, except we can have collisions
+     on i: i and i + t*2^32 will give the same value modulo 2^32. This
+     increases the probability by a factor K/2^32, thus we get 2^(-63). */
+
+  i = (uint32_t) (h % K);
   j = (uint32_t) (h >> 32);
 #ifdef TRACE_HASH_TABLE
   uint32_t old_i = i;
 #endif
-/* Note: in the case where K > 2^32, i and j share some bits.
- * The high bits of i are in j. These bits correspond therefore to far away
- * positions in the tables, and keeping them in j can only help.
- * FIXME: TODO: that's wrong!!! it would be better do take i from high
-   bits instead!
- */
   while (H[i] != 0 && H[i] != j)
   {
     i++;
@@ -597,7 +607,7 @@ main (int argc, char *argv[])
       usage(pl, argv0);
     }
     K = 100 + nrels_expected + (nrels_expected / 5);
-    K = ulong_nextprime (K);
+    K = uint64_nextprime (K);
 
     if (basepath && !filelist)
     {
@@ -650,8 +660,8 @@ main (int argc, char *argv[])
       exit (1);
     }
   memset (H, 0, K * sizeof (uint32_t));
-  fprintf (stderr, "Allocated hash table of %lu entries (%luMb)\n", K,
-           (K * sizeof (uint32_t)) >> 20);
+  fprintf (stderr, "Allocated hash table of %lu entries (%luMb)\n",
+           (unsigned long) K, (K * sizeof (uint32_t)) >> 20);
 
   /* Construct the two filelists : new files and already renumbered files */
   char ** files_already_renumbered, ** files_new;

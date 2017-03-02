@@ -257,6 +257,19 @@ ulong_nextprime (unsigned long q)
   return q;
 }
 
+uint64_t
+uint64_nextprime (uint64_t q)
+{
+  mpz_t z;
+
+  mpz_init (z);
+  mpz_set_uint64 (z, q);
+  mpz_nextprime (z, z);
+  q = mpz_get_uint64 (z);
+  mpz_clear (z);
+  return q;
+}
+
 #define REPS 3 /* number of Miller-Rabin tests in isprime */
 
 /* For GMP 6.0.0:
