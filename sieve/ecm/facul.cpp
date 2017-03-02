@@ -1287,7 +1287,7 @@ facul_both_src (mpz_t **factors, const modset_t* m,
 	{
 	  /*
             Indeed, if using only one factoring method we found two
-            primes factors of m (f, m/f) then m is factored and work is
+            prime factors of m (f, m/f) then m is factored and work is
             finished for this cofactor.
 	  */
 	  is_smooth[side] = FACUL_SMOOTH;
