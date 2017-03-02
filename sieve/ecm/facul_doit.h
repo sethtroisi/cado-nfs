@@ -11,9 +11,6 @@
 extern "C" {
 #endif
 
-int primetest_ul (const modulusredcul_t m);
-int primetest_15ul (const modulusredc15ul_t m);
-int primetest_2ul2 (const modulusredc2ul2_t m);
 int facul_doit_ul (mpz_t *, const modulusredcul_t, 
 		   const facul_strategy_t *, const int);
 int facul_doit_15ul (mpz_t *, const modulusredc15ul_t, 

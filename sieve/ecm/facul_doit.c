@@ -21,28 +21,6 @@ mod_intget_mpz(mpz_t z, const modint_t x) {
 }
 
 
-int
-primetest (const modulus_t m)
-{
-  residue_t one, r;
-  int isprime;
-  
-  isprime = mod_sprp2 (m);
-  if (isprime)
-    {
-      mod_init_noset0 (one, m);
-      mod_init_noset0 (r, m);
-      mod_set1 (one, m);
-      mod_add (r, one, one, m);
-      mod_add (r, r, one, m);   /* r = 3 */
-      isprime = mod_sprp (r, m);
-      mod_clear (one, m);
-      mod_clear (r, m);
-    }
-  
-  return isprime;
-}
-
 static inline void 
 modset_init (struct modset_t *modset, modint_t m)
 {
@@ -91,24 +69,24 @@ modset_init (struct modset_t *modset, modint_t m)
 }
 
 
-/* Run the primetest() function, using the arithmetic selected in the modset */
+/* Run the relevant mod_isprime() function, using the arithmetic selected in the modset */
 static inline int 
-modset_primetest (struct modset_t *modset)
+modset_isprime (struct modset_t *modset)
 {
   switch (modset->arith) {
     case CHOOSE_UL:
-      return primetest_ul (modset->m_ul);
+      return modredcul_isprime (modset->m_ul);
 #if     MOD_MAXBITS > MODREDCUL_MAXBITS
     case CHOOSE_15UL:
-      return primetest_15ul (modset->m_15ul);
+      return modredc15ul_isprime (modset->m_15ul);
 #endif
 #if     MOD_MAXBITS > MODREDC15UL_MAXBITS
     case CHOOSE_2UL2:
-        return primetest_2ul2 (modset->m_2ul2);
+        return modredc2ul2_isprime (modset->m_2ul2);
 #endif
 #if     MOD_MAXBITS > MODREDC2UL2_MAXBITS
     case CHOOSE_MPZ:
-        return primetest_mpz (modset->m_mpz);
+        return modmpz_isprime (modset->m_mpz);
 #endif
     default:
         abort();
@@ -308,7 +286,7 @@ facul_doit (mpz_t *factors, const modulus_t m,
       if (!fprime)
 	{
 	  modset_init (&fm, f);
-	  fprime = modset_primetest (&fm);
+	  fprime = modset_isprime (&fm);
           if (fprime) 
             modset_clear (&fm);
 	  if (fprime && mod_intbits (f) > strategy->lpb)
@@ -322,7 +300,7 @@ facul_doit (mpz_t *factors, const modulus_t m,
       if (!cfprime)
 	{
 	  modset_init (&cfm, n);
-	  cfprime = modset_primetest (&cfm);
+	  cfprime = modset_isprime (&cfm);
 
           if (cfprime)
             modset_clear (&cfm);
@@ -561,7 +539,7 @@ facul_doit_onefm (mpz_t *factors, const modulus_t m,
   if (!fprime)
     {
       modset_init (fm, f);
-      fprime = modset_primetest (fm);
+      fprime = modset_isprime (fm);
       if (fprime)
         modset_clear (fm);
       if (fprime && mod_intbits (f) > lpb)
@@ -575,7 +553,7 @@ facul_doit_onefm (mpz_t *factors, const modulus_t m,
   if (!cfprime)
     {
       modset_init (cfm, n);
-      cfprime = modset_primetest (cfm);
+      cfprime = modset_isprime (cfm);
       if (cfprime)
         modset_clear (cfm);
       if (cfprime && mod_intbits (n) > lpb)
