@@ -660,8 +660,8 @@ main (int argc, char *argv[])
       exit (1);
     }
   memset (H, 0, K * sizeof (uint32_t));
-  fprintf (stderr, "Allocated hash table of %lu entries (%luMb)\n",
-           (unsigned long) K, (K * sizeof (uint32_t)) >> 20);
+  fprintf (stderr, "Allocated hash table of %" PRIu64 " entries (%luMb)\n",
+           K, (K * sizeof (uint32_t)) >> 20);
 
   /* Construct the two filelists : new files and already renumbered files */
   char ** files_already_renumbered, ** files_new;
