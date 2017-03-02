@@ -20,27 +20,11 @@ mod_intget_mpz(mpz_t z, const modint_t x) {
 #endif
 }
 
-
+/* here we need a complete prime test, to avoid composites in relations */
 int
 primetest (const modulus_t m)
 {
-  residue_t one, r;
-  int isprime;
-  
-  isprime = mod_sprp2 (m);
-  if (isprime)
-    {
-      mod_init_noset0 (one, m);
-      mod_init_noset0 (r, m);
-      mod_set1 (one, m);
-      mod_add (r, one, one, m);
-      mod_add (r, r, one, m);   /* r = 3 */
-      isprime = mod_sprp (r, m);
-      mod_clear (one, m);
-      mod_clear (r, m);
-    }
-  
-  return isprime;
+  return mod_isprime (m);
 }
 
 static inline void 

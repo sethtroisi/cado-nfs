@@ -63,6 +63,11 @@ check_leftover_norm (const mpz_t n, sieve_info_srcptr si, int side)
 	return 0;
     }
 
+  /* Here we have L < n < 2^mfb. If n is composite and we wrongly consider
+     it prime, we'll return 0, thus we'll potentially miss a relation, but
+     we won't output a relation with a composite ideal, thus a base-2 strong
+     prime test is enough. */
+
   // TODO: maybe we should pass the modulus to the facul machinery
   // instead of reconstructing it.
   int prime=0;
