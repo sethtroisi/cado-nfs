@@ -3779,8 +3779,8 @@ std::string cxx_mpz_poly::print_poly(std::string const& var) const
  */
 int mpz_poly_setcoeffs_counter(mpz_poly_ptr f, int* max_abs_coeffs, unsigned long *next_counter, int deg, unsigned long counter, unsigned int bound){
     unsigned int i;
-    unsigned long idx = counter;
-    int j, eval_at1;
+    unsigned long idx = counter, mod_j=0, mod_k=0;
+    int j;
     int *fint, ok = 1;
     mpz_t content;
     //unsigned long idx_next_poly_ok = idx;
@@ -3843,7 +3843,7 @@ int mpz_poly_setcoeffs_counter(mpz_poly_ptr f, int* max_abs_coeffs, unsigned lon
     if(!ok){
       error_code = POLY_EQUIV_INV_X; // the poly is an equivalent to (+/-)x^d*f(1/x)
     }
-    if(abs(fint[deg]) >= abs(fint[0])){
+    if(abs(fint[deg]) >= abs(fint[0]) && (bound > 1)){
       // next valid poly: the next one is an increment of the leading coefficient.
       // but either leading coeff  = |constant coeff|, and incrementing by one will lead to
       // leading coeff > |constant coeff|, and this is not a valid poly,
@@ -3865,8 +3865,8 @@ int mpz_poly_setcoeffs_counter(mpz_poly_ptr f, int* max_abs_coeffs, unsigned lon
 	  // and increment the third high deg coeff
 	  *next_counter += bound*(bound+1);
 	  j = 2;
-	  unsigned long mod_j = bound*(bound+1)*(2*bound+1);
-	  unsigned long mod_k = mod_j*(2*bound+1);
+	  mod_j = bound*(bound+1)*(2*bound+1);
+	  mod_k = mod_j*(2*bound+1);
 	  while ((deg-j > j) && (fint[j-1] == 0)) {
 	    //setting the deg-j+1 coeff to 0 and incrementing the next deg-j coeff migh not be enough
 	    if (abs(fint[deg-j]+1) > abs(fint[j])){
@@ -3944,27 +3944,23 @@ int mpz_poly_setcoeffs_counter(mpz_poly_ptr f, int* max_abs_coeffs, unsigned lon
 
     if (ok){
       /* check if +-1 is a root of f (very common): compute the sum of the coefficients, and the alterned sum: it should be != 0 */
-      eval_at1 = 0; // evaluating at 1 means sum the coefficients
-      for(j=0; j<=deg; j++){
-	eval_at1 += fint[j];
+      // evaluating at 1 means sum the coefficients
+      int sum_even_coeffs = 0;
+      int sum_odd_coeffs = 0;
+      for(j=0; j<=deg; j += 2){
+	sum_even_coeffs += fint[j];
       }
-      ok = eval_at1 != 0;
+      for(j=1; j<=deg; j += 2){
+	sum_odd_coeffs += fint[j];
+      }
+      ok = (sum_even_coeffs + sum_odd_coeffs) != 0;
       if (!ok){
 	error_code = POLY_ROOT_ONE;
-      }
-    }
-
-    if (ok){ // eval at -1: alterning sum of coefficients
-      eval_at1 = 0;
-      for(j=0; j<=deg; j += 2){
-	eval_at1 += fint[j];
-      }
-      for(j=1; j <= deg; j += 2){
-	eval_at1 -= fint[j];
-      }
-      ok = eval_at1 != 0;
-      if (!ok){
-	error_code = POLY_ROOT_MINUS_ONE;
+      }else{// eval at -1: alterning sum of coefficients
+	ok = (sum_even_coeffs - sum_odd_coeffs) != 0;
+	if (!ok){
+	  error_code = POLY_ROOT_MINUS_ONE;
+	}
       }
     }
 
@@ -3972,12 +3968,6 @@ int mpz_poly_setcoeffs_counter(mpz_poly_ptr f, int* max_abs_coeffs, unsigned lon
     f->deg = deg;
     for (j = 0; j <= deg; j ++)
       mpz_set_si (f->coeff[j], fint[j]);
-
-    /* there were these instructions in dlpolyselect.c
-#ifdef HAVE_OPENMP
-#pragma omp critical
-#endif
-    */
 
     if (ok){
       /* content test */
