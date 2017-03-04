@@ -34,7 +34,7 @@
 
 /* Maximum level for a merge. Such a large value is only useful when not using
  * BW. */
-#define MERGE_LEVEL_MAX 32
+#define MERGE_LEVEL_MAX 64
 
 #define DEFAULT_MERGE_MAXLEVEL 10
 #ifndef FOR_DL
