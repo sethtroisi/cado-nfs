@@ -118,3 +118,49 @@ def check_rho(a,b,N):
       if err>maxerr:
          maxerr=err
          print x, err
+
+def expected_growth(f, g, i):
+   s = skew_l2norm_tk_circular(f)
+   n = l2norm_tk_circular(ff,s)
+   # negative side
+   kmin = -1
+   NORM_MARGIN = 0.2
+   while True:
+      ff = f + kmin*x^i*f
+      n2 = l2norm_tk_circular(ff,s)
+      if n2 > n + NORM_MARGIN:
+         break
+      kmin = 2*kmin
+   kmax = kmin/2 # larger than kmin since kmin < 0
+   # dichotomy on [kmin,kmax]
+   while kmin + 1 < kmax:
+      k = (kmin + kmax) // 2
+      ff = f + k*x^i*f
+      n2 = l2norm_tk_circular(ff,s)
+      if n2 > n + NORM_MARGIN: # k is too large (in absolute value)
+         kmin = k
+      else:
+         kmax = k
+   rmin = kmax
+   # positive side
+   kmax = 1
+   while True:
+      ff = f + kmax*x^i*f
+      n2 = l2norm_tk_circular(ff,s)
+      if n2 > n + NORM_MARGIN:
+         break
+      kmin = 2*kmin
+   kmin = kmax/2
+   # dichotomy on [kmin,kmax]
+   while kmin + 1 < kmax:
+      k = (kmin + kmax) // 2
+      ff = f + k*x^i*f
+      n2 = l2norm_tk_circular(ff,s)
+      if n2 > n + NORM_MARGIN: # k is too large (in absolute value)
+         kmax = k
+      else:
+         kmin = k
+      rmax = kmin
+
+def expected_rotation_gain (f, g):
+   S = 1.0
