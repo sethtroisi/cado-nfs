@@ -93,7 +93,12 @@ void las_dlog_base::read()
     }
 
     uint64_t nprimes = renumber_table->size;
-    known_logs.reserve(nprimes);
+    known_logs.assign(nprimes + 32, false);
+    /* 32 is because the SM columns are here, too ! We would like to
+     * avoid reallocation, so let's be generous (anyway we'll
+     * reallocate if needed)
+     */
+
     /* format of the log table: there are FIVE different line types.
      *
      * [index] added column [log]
@@ -120,6 +125,11 @@ void las_dlog_base::read()
         if (errno) {
             fprintf(stderr, "Parse error at line %d in %s: %s\n", lnum, logfilename, line);
             break;
+        }
+        if (z >= known_logs.size()) {
+            /* happens for SM columns: we have more than the size of the
+             * renumber table ! */
+            known_logs.resize(z + 1);
         }
 	nlogs+=!known_logs[z];
         known_logs[z] = true;
