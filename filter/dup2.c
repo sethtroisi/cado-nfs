@@ -487,6 +487,13 @@ int check_whether_file_is_renumbered(const char * filename, unsigned int npoly)
       char *ret = fgets (s, 1024, f_tmp);
       if (ret == NULL)
       {
+        /* fgets returns NULL when the end of file occurs or when there is an
+           error */
+        if (feof (f_tmp))
+          {
+            fclose_maybe_compressed (f_tmp, filename);
+            return 1;
+          }
         fprintf (stderr, "Error while reading %s\n", filename);
         exit (1);
       }
