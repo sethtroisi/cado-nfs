@@ -403,8 +403,10 @@ hash_renumbered_rels (void * context_data MAYBE_UNUSED, earlyparsed_relation_ptr
     nrels_tot++;
     uint32_t i = insert_relation_in_dup_hashtable (rel, &is_dup);
 
+    static unsigned long count = 0;
+
     // They should be no duplicate in already renumbered file
-    if (is_dup)
+    if (is_dup && count++ < 10)
     {
       fprintf (stderr, "Warning, duplicate relation in already renumbered files:"
                        "\na = %s%" PRIx64 "\nb = %" PRIx64 "\ni = %" PRIu32
