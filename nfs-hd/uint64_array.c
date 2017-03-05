@@ -1,3 +1,4 @@
+#include "cado.h"
 #include "uint64_array.h"
 #include <stdio.h>
 #include <stdlib.h>

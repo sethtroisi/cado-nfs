@@ -1,3 +1,4 @@
+#include "cado.h"
 #define BL_TESTING
 #include "blocklanczos.c"
 

@@ -1,3 +1,4 @@
+#include "cado.h"
 #include "generate_strategies.h"
 #include "facul.h"
 #include "facul_ecm.h"

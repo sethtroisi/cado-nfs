@@ -1,10 +1,10 @@
+#include "cado.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <inttypes.h>
 #include <math.h>
 #include <time.h>
 #include <float.h>
-#include "cado.h"
 #include "utils.h"
 #include "polynomials.h"
 #include "utils_cofactorisation.h"

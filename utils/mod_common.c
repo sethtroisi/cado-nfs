@@ -1,3 +1,4 @@
+#include "cado.h"
 #include "ularith.h"
 
 /* Some functions that are implemented entirely on mod_*() functions, and which 

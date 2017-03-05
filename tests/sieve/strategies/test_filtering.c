@@ -1,3 +1,4 @@
+#include "cado.h"
 #include "generate_factoring_method.h"
 
 #include <stdlib.h>

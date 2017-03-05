@@ -1,3 +1,4 @@
+#include "cado.h"
 #include "tab_point.h"
 
 #include <stdio.h>

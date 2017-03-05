@@ -1,3 +1,4 @@
+#include "cado.h"
 #include "macros.h"
 #include "mat_Z.h"
 #include <stdio.h>

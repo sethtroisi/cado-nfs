@@ -1,3 +1,4 @@
+#include "cado.h"
 #include <stdint.h>
 #include <stdlib.h>
 #include "factor_base.h"

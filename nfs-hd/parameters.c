@@ -1,10 +1,10 @@
+#include "cado.h"
 // TODO: did not work.
 
 #include <stdint.h>
 #include <math.h>
 #include <time.h>
 #include <stdlib.h>
-#include "cado.h"
 #include "utils.h"
 #include "sieving_bound.h"
 #include "parameters.h"

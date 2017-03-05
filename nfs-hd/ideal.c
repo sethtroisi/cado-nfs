@@ -1,3 +1,4 @@
+#include "cado.h"
 #include "ideal.h"
 #include <stdlib.h>
 #include <stdio.h>

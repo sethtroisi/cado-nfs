@@ -1,3 +1,4 @@
+#include "cado.h"
 #include "utils_mpz.h"
 #include <stdint.h>
 #include <stdlib.h>

@@ -1,7 +1,7 @@
+#include "cado.h"
 // TODO: did not work.
 
 #include <stdlib.h>
-#include "cado.h"
 #include "utils.h"
 #include "parameters.h"
 

@@ -1,8 +1,8 @@
+#include "cado.h"
 #include <stdio.h>
 #include <stdint.h>
 #include <inttypes.h>
 #include <time.h>
-#include "cado.h"
 #include "utils.h"
 #include "polynomials.h"
 #include "sieving_bound.h"

@@ -1,3 +1,4 @@
+#include "cado.h"
 #include "utils_cofactorisation.h"
 #include "utils_norm.h"
 

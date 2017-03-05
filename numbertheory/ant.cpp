@@ -1,3 +1,4 @@
+#include "cado.h"
 /* 
  * Authors: Joshua Peignier and Emmanuel Thomé
  */

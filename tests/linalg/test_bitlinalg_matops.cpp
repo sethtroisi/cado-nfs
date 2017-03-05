@@ -518,7 +518,6 @@ int main(int argc, char * argv[])
     printf("## VALGRIND\n");
 #endif /* VALGRIND */
     printf("## ULONG_BITS=%d\n", ULONG_BITS);
-#include "cado.h"       /* HAVE_* macros ! */
 
     if (1) {
         uint64_t * r = (uint64_t *) malloc(64 * sizeof(uint64_t));
