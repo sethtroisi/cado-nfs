@@ -2460,10 +2460,10 @@ mpz_poly_homography (mpz_poly_ptr Fij, mpz_poly_ptr F, int64_t H[4])
   mpz_t f0;
   mpz_t *f = F->coeff;
   int d = F->deg;
-  mpz_t *fij = Fij->coeff;
 
   mpz_poly_realloc (Fij, d + 1);
 
+  mpz_t *fij = Fij->coeff;
   for (k = 0; k <= d; k++)
     mpz_set (fij[k], f[k]);
 
