@@ -1205,3 +1205,4 @@ tests/utils/test_mpz_mat.c
 gf2x/toom128.c
 utils/tdict.hpp
 utils/tdict.cpp
+scripts/check_compilation_units_policy.pl

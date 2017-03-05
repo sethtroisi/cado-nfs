@@ -1,4 +1,4 @@
-#include "cado_config.h"
+#include "cado.h"
 #include <cstdio>
 #include <string.h>
 #include "smallset.h"

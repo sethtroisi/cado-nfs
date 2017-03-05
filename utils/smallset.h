@@ -1,6 +1,8 @@
 #ifndef SMALLSET_H_
 #define SMALLSET_H_
 
+#include "macros.h"
+
 #if defined(HAVE_SSE2) && GNUC_VERSION_ATLEAST(4,7,0)
 /* Disclaimer: the comment below is only based on a surface analysis, I
  * might be wrong.
@@ -27,7 +29,6 @@
 #include <cassert>
 #include <vector>
 #include <stdint.h>
-#include "macros.h"
 
 template <typename RT, typename ST>
 static inline
