@@ -124,10 +124,16 @@ if(CMAKE_COMPILER_IS_GNUCC)
 endif()
 if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     if (NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS 4.7)
-        # only gcc-4.8 is supposed to be c++11-complete. BUt for what we
-        # use, that'll be ok.
+        # only gcc-4.8 is supposed to be c++11-complete. But for what we
+        # use, gcc-4.7 will be ok.
         message(STATUS "Enabling C++11 support")
         set(HAVE_CXX11 1)
+    endif()
+    if (NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS 4.7 AND
+        CMAKE_CXX_COMPILER_VERSION VERSION_LESS 5.0)
+        # see comment in utils/smallset.h
+        message(STATUS "Forcing -fabi-version=6 for g++-4.[789]")
+        set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fabi-version=6")
     endif()
     if(HAVE_CXX11)
         if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 4.8)

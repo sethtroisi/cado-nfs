@@ -1,7 +1,27 @@
 #ifndef SMALLSET_H_
 #define SMALLSET_H_
 
-#if defined(HAVE_SSE2)
+#if defined(HAVE_SSE2) && GNUC_VERSION_ATLEAST(4,7,0)
+/* Disclaimer: the comment below is only based on a surface analysis, I
+ * might be wrong.
+ *
+ * There's (apparently) a name mangling bug with g++ up to c++ that
+ * incorrectly confuses template functions with packed arguments (i.o.w
+ * vector types like __m128 and __m256). Alas, this is very precisely
+ * what we use here. This was fixed by version 6 of the c++ abi,
+ * introduced in g++ 4.7 ; alas, it's not until g++-5.0 that the default
+ * was changed to use the latest abi always (until g++-4.9, the default
+ * abi was version 2, which was introduced with g++-3.4).
+ *
+ * So for g++-4.[789], we might be satisfied by adding -fabi-version=6.
+ * For g++-5.0 and later, we have nothing to do, because the default is
+ * fine.
+ *
+ * Since this code is experimental, let's live with making it dependent
+ * on g++-4.7 or later, since I don't know how to proceed otherwise. In
+ * addition to the conditional above, the top level CMakelists.txt adds
+ * -fabi-version for gcc-4.[789]
+ */
 
 #include <immintrin.h>
 #include <cassert>
