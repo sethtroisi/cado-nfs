@@ -1,5 +1,5 @@
-#ifndef LAS_SMALLSIEVE_H_
-#define LAS_SMALLSIEVE_H_
+#ifndef LAS_SMALLSIEVE_HPP_
+#define LAS_SMALLSIEVE_HPP_
 
 #include <stdarg.h>
 #include "fb-types.h"
@@ -43,27 +43,27 @@ typedef struct {
 /* Include this only now, as there's a cross dependency between the two
  * (our prototypes need sieve_info_t, which needs our datatypes...)
  */
-#include "las-types.h"
-#include "bucket.h"
+#include "las-types.hpp"
+#include "bucket.hpp"
 
 extern void small_sieve_info(const char * what, int side, small_sieve_data_t * r);
 extern int small_sieve_dump(FILE *, const char *, va_list);
 extern void small_sieve_clear(small_sieve_data_t * ssd);
 extern void small_sieve_extract_interval(small_sieve_data_t * r, small_sieve_data_t * s, int bounds[2]);
-extern void small_sieve_init(small_sieve_data_t *ssd, las_info_ptr las, const std::vector<fb_general_entry> *fb,
-                      sieve_info_srcptr si, int side);
+extern void small_sieve_init(small_sieve_data_t *ssd, las_info& las, const std::vector<fb_general_entry> *fb,
+                      sieve_info const & si, int side);
 extern int64_t * small_sieve_copy_start(int64_t * base, int bounds[2]);
-extern int64_t * small_sieve_start(small_sieve_data_t *ssd, unsigned int j0, sieve_info_srcptr si);
-extern void small_sieve_skip_stride(small_sieve_data_t *ssd, int64_t * ssdpos, unsigned int skip, sieve_info_srcptr si);
+extern int64_t * small_sieve_start(small_sieve_data_t *ssd, unsigned int j0, sieve_info const & si);
+extern void small_sieve_skip_stride(small_sieve_data_t *ssd, int64_t * ssdpos, unsigned int skip, sieve_info const & si);
 extern void sieve_small_bucket_region(unsigned char *S, int N,
-			       small_sieve_data_t * ssd, int64_t * ssdpos, sieve_info_ptr si,
+			       small_sieve_data_t * ssd, int64_t * ssdpos, sieve_info& si,
                                int side,
-			       where_am_I_ptr w MAYBE_UNUSED);
+			       where_am_I& w MAYBE_UNUSED);
 
 extern void
 resieve_small_bucket_region (bucket_primes_t *BP, int N, unsigned char *S,
         small_sieve_data_t *ssd, int64_t * ssdpos,
-        sieve_info_srcptr si, where_am_I_ptr w MAYBE_UNUSED);
+        sieve_info const & si, where_am_I& w MAYBE_UNUSED);
 
 
-#endif	/* LAS_SMALLSIEVE_H_ */
+#endif	/* LAS_SMALLSIEVE_HPP_ */

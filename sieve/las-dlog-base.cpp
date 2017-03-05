@@ -1,6 +1,6 @@
 #include "cado.h"
-#include "las-dlog-base.h"
-#include "las-types.h"
+#include "las-dlog-base.hpp"
+#include "las-types.hpp"
 
 #include <cstdio>
 #include <stdint.h>     /* cstdint is c++11-only */

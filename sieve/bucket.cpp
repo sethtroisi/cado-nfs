@@ -6,15 +6,15 @@
 #if defined(HAVE_SSE2)
 #include <emmintrin.h>
 #endif
-#include "bucket.h"
+#include "bucket.hpp"
 #include "portability.h"
 #include "memory.h"
 #include "las-config.h"
-#include "las-debug.h"
+#include "las-debug.hpp"
 #include "iqsort.h"
 #include "verbose.h"
 #include "ularith.h"
-#include "smallset.h"
+#include "smallset.hpp"
 
 /* sz is the size of a bucket for an array of buckets. In bytes, a bucket
    size is sz * sr, with sr = sizeof of one element of the bucket (a record).
@@ -190,29 +190,29 @@ bucket_array_t<LEVEL, HINT>::log_this_update (
     const update_t update MAYBE_UNUSED,
     const uint64_t offset MAYBE_UNUSED,
     const uint64_t bucket_number MAYBE_UNUSED,
-    where_am_I_ptr w MAYBE_UNUSED) const
+    where_am_I & w MAYBE_UNUSED) const
 {
 #if defined(TRACE_K)
     uint64_t BRS[FB_MAX_PARTS] = BUCKET_REGIONS;
-    unsigned int saveN = w->N;
+    unsigned int saveN = w.N;
     unsigned int x = update.x % BUCKET_REGION_1;
-    unsigned int N = w->N +
+    unsigned int N = w.N +
         bucket_number*BRS[LEVEL]/BRS[1] + (update.x / BUCKET_REGION_1);
 
     WHERE_AM_I_UPDATE(w, x, x);
     WHERE_AM_I_UPDATE(w, N, N);
 
-    if (trace_on_spot_Nx(w->N, w->x)) {
+    if (trace_on_spot_Nx(w.N, w.x)) {
         verbose_output_print (TRACE_CHANNEL, 0,
-            "# Pushed hit at location (x=%u, %s), from factor base entry "
+            "# Pushed hit at location (x=%u, side %d), from factor base entry "
             "(slice_index=%u, slice_offset=%u, p=%" FBPRIME_FORMAT "), "
             "to BA<%d>[%u]\n",
-            (unsigned int) w->x, sidenames[w->side], (unsigned int) w->i,
-            (unsigned int) w->h, w->p, LEVEL, (unsigned int) w->N);
+            (unsigned int) w.x, w.side, (unsigned int) w.i,
+            (unsigned int) w.h, w.p, LEVEL, (unsigned int) w.N);
         if (is_same<HINT,longhint_t>::value) {
           verbose_output_print (TRACE_CHANNEL, 0,
              "# Warning: did not check divisibility during downsorting p=%"
-             FBPRIME_FORMAT "\n", w->p);
+             FBPRIME_FORMAT "\n", w.p);
         } else {
           ASSERT_ALWAYS(test_divisible(w));
         }
@@ -387,7 +387,7 @@ template<int INPUT_LEVEL>
 void
 downsort(bucket_array_t<INPUT_LEVEL - 1, longhint_t> &BA_out,
          const bucket_array_t<INPUT_LEVEL, shorthint_t> &BA_in,
-         uint32_t bucket_number, where_am_I_ptr w)
+         uint32_t bucket_number, where_am_I & w)
 {
   /* Rather similar to purging, except it doesn't purge */
   for (slice_index_t i_slice = 0; i_slice < BA_in.get_nr_slices(); i_slice++) {
@@ -398,7 +398,7 @@ downsort(bucket_array_t<INPUT_LEVEL - 1, longhint_t> &BA_out,
 
     for ( ; it != end_it ; it++) {
       WHERE_AM_I_UPDATE(w, p,
-          w->si->sides[w->side]->fb->get_slice(slice_index)->get_prime(it->hint));
+          w.psi->sides[w.side].fb->get_slice(slice_index)->get_prime(it->hint));
       BA_out.push_update(it->x, 0, it->hint, slice_index, w);
     }
   }
@@ -408,7 +408,7 @@ template<int INPUT_LEVEL>
 void
 downsort(bucket_array_t<INPUT_LEVEL - 1, longhint_t> &BA_out,
          const bucket_array_t<INPUT_LEVEL, longhint_t> &BA_in,
-         uint32_t bucket_number, where_am_I_ptr w) 
+         uint32_t bucket_number, where_am_I & w) 
 {
   /* longhint updates don't write slice end pointers, so there must be
      exactly 1 slice per bucket */
@@ -428,19 +428,19 @@ template
 void
 downsort<2>(bucket_array_t<1, longhint_t> &BA_out,
             const bucket_array_t<2, shorthint_t> &BA_in,
-            uint32_t bucket_number, where_am_I_ptr w);
+            uint32_t bucket_number, where_am_I & w);
 
 template
 void
 downsort<3>(bucket_array_t<2, longhint_t> &BA_out,
             const bucket_array_t<3, shorthint_t> &BA_in,
-            uint32_t bucket_numbe, where_am_I_ptr wr);
+            uint32_t bucket_numbe, where_am_I & wr);
 
 template
 void
 downsort<2>(bucket_array_t<1, longhint_t> &BA_out,
             const bucket_array_t<2, longhint_t> &BA_in,
-            uint32_t bucket_number, where_am_I_ptr w);
+            uint32_t bucket_number, where_am_I & w);
 
 void
 sieve_checksum::update(const unsigned int other)

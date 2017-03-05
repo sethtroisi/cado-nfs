@@ -454,12 +454,12 @@ L2_skewness_deg6 (mpz_poly_ptr f MAYBE_UNUSED, double_poly_srcptr ff,
 {
   double s, logmu, logmu_min = DBL_MAX, s_min = 1.0;
   mpz_poly df;
-  root_struct Roots[6];
+  usp_root_data Roots[6];
   int i, k;
 
   mpz_poly_init (df, 6);
   for (i = 0; i < 6; i++)
-    root_struct_init (Roots + i);
+    usp_root_data_init (Roots + i);
 
   /* Sage code:
      var('r,s,t,y')
@@ -548,7 +548,7 @@ L2_skewness_deg6 (mpz_poly_ptr f MAYBE_UNUSED, double_poly_srcptr ff,
 
   mpz_poly_clear (df);
   for (i = 0; i < 6; i++)
-    root_struct_clear (Roots + i);
+    usp_root_data_clear (Roots + i);
 
   return s_min;
 }

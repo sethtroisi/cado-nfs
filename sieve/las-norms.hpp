@@ -1,8 +1,8 @@
-#ifndef LAS_NORMS_H_
-#define LAS_NORMS_H_
+#ifndef LAS_NORMS_HPP_
+#define LAS_NORMS_HPP_
 
 #include <stdint.h>
-#include "las-types.h"
+#include "las-types.hpp"
 #include "double_poly.h"
 
 
@@ -13,22 +13,31 @@
  * MEMSET_MIN) space. Indeed, the algorithm that is used might write a
  * bit beyond the meaningful area.
  */
-void init_norms_bucket_region (unsigned char *S, uint32_t J, sieve_info_ptr si, unsigned int side, unsigned int smart);
+void init_norms_bucket_region (unsigned char *S, uint32_t J, sieve_info& si, unsigned int side, unsigned int smart);
 
 double get_maxnorm_alg (double_poly_srcptr src_poly, const double X, const double Y);
 
-/* This prepares the auxiliary data which is used by
- * init_rat_norms_bucket_region and init_alg_norms_bucket_region
+/* Should this business be part of sieve_info or not ?
+ *
+ * In a sense, it can lead to working with various values of logI, so
+ * perhaps it should not.
  */
-void sieve_info_init_norm_data(sieve_info_ptr si);
+int adjust_IJ(int& logI, uint32_t& J, qlattice_basis& qbasis, cado_poly_srcptr cpoly, las_todo_entry const& doing, int logA, int nb_threads);
+/* handy alias */
+inline int adjust_IJ(sieve_info& si, int nb_threads = 1) {
+#if 0
+    int logA = si.conf.logA;
+#else
+    int logA = 2 * si.conf.logI - 1;
+#endif
+    int c = adjust_IJ(si.logI, si.J, si.qbasis, si.cpoly, si.doing, logA, nb_threads);
+    si.I = 1UL << si.logI;
+    return c;
+}
 
-void sieve_info_clear_norm_data(sieve_info_ptr si);
+void sieve_info_update_norm_data (sieve_info&, int);
 
-void sieve_info_update_norm_data (sieve_info_ptr, int);
-
-int sieve_info_adjust_IJ(sieve_info_ptr si, int nb_threads);
-
-void sieve_info_init_norm_data_sq (sieve_info_ptr si, unsigned long q);
+void sieve_info_init_norm_data_sq (sieve_info& si, unsigned long q);
 
 /* To use this LAS_MEMSET, you have to:
  *  1. Define LAS_MEMSET in sieve/las-config.h and have a x86 64 bits.
@@ -241,8 +250,8 @@ extern void tune_las_memset();
    It's need to declare them here for units & coverage tests.
  */
 void init_degree_one_norms_bucket_region_internal     (unsigned char *S, uint32_t J, uint32_t I, double scale, double u0, double u1, double *cexp2);
-void init_exact_degree_X_norms_bucket_region_internal (unsigned char *S, uint32_t J, uint32_t I, double scale, unsigned int d, double *fijd);
-void init_smart_degree_X_norms_bucket_region_internal (unsigned char *S, uint32_t J, uint32_t I, double scale, unsigned int d, double *fijd, unsigned int nroots, root_ptr roots);
-void init_norms_roots_internal (unsigned int degree, double *coeff, double max_abs_root, double precision, unsigned int *nroots, root_ptr roots);
+void init_exact_degree_X_norms_bucket_region_internal (unsigned char *S, uint32_t J, uint32_t I, double scale, unsigned int d, std::vector<double> const & fijd);
+void init_smart_degree_X_norms_bucket_region_internal (unsigned char *S, uint32_t J, uint32_t I, double scale, unsigned int d, std::vector<double> const & fijd, std::vector<smart_norm_root> const & roots);
+void init_norms_roots_internal (unsigned int degree, std::vector<double> & coeff, double max_abs_root, double precision, std::vector<smart_norm_root> & roots);
 
-#endif	/* LAS_NORMS_H_ */
+#endif	/* LAS_NORMS_HPP_ */

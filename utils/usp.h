@@ -10,16 +10,16 @@ typedef struct {
   int ka;
   mpz_t b;
   int kb;
-} root_struct;
+} usp_root_data;
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-int numberOfRealRoots (mpz_t *p, int n, double T, int verbose, root_struct *R);
-double rootRefine (root_struct *r, mpz_t *p, int n, double precision);
-void root_struct_init (root_struct *R);
-void root_struct_clear (root_struct *R);
+int numberOfRealRoots (mpz_t *p, int n, double T, int verbose, usp_root_data *R);
+double rootRefine (usp_root_data *r, mpz_t *p, int n, double precision);
+void usp_root_data_init (usp_root_data *R);
+void usp_root_data_clear (usp_root_data *R);
 
 #ifdef __cplusplus
 }

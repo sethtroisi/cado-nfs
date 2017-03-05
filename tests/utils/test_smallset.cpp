@@ -1,7 +1,7 @@
 #include "cado.h"
 #include <cstdio>
 #include <string.h>
-#include "smallset.h"
+#include "smallset.hpp"
 
 #if defined(HAVE_SSE2) && GNUC_VERSION_ATLEAST(4,7,0)
 /* see utils/smallset.h */

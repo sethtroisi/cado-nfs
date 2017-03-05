@@ -1,12 +1,8 @@
-#ifndef LAS_DLOG_BASE_H_
-#define LAS_DLOG_BASE_H_
+#ifndef LAS_DLOG_BASE_HPP_
+#define LAS_DLOG_BASE_HPP_
 
 #include "utils.h"
-#include "las-types.h"
-
-#ifndef __cplusplus
-#error "This file is C++ only"
-#endif
+#include "las-types.hpp"
 
 #include <vector>
 
@@ -29,4 +25,4 @@ public:
     static void declare_parameter_usage(param_list pl);
 };
 
-#endif	/* LAS_DLOG_BASE_H_ */
+#endif	/* LAS_DLOG_BASE_HPP_ */

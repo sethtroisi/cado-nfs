@@ -16,8 +16,8 @@
 #include "las-config.h"
 #include "cado_poly.h" // for MAXDEGREE
 #include "fb-types.h"
-#include "las-qlattice.h"
-#include "las-plattice.h"
+#include "las-qlattice.hpp"
+#include "las-plattice.hpp"
 #include "las-base.hpp"
 
 // If a plain-old data type T inherits from _padded_pod<T>, it ensures that all

@@ -1,19 +1,18 @@
-#ifndef LAS_THREADS_H_
-#define LAS_THREADS_H_
+#ifndef LAS_THREADS_HPP_
+#define LAS_THREADS_HPP_
 
 #include <pthread.h>
 #include <algorithm>
 #include "threadpool.hpp"
-#include "las-forwardtypes.h"
-#include "bucket.h"
-#include "fb.h"
-#include "las-report-stats.h"
+#include "las-forwardtypes.hpp"
+#include "bucket.hpp"
+#include "fb.hpp"
+#include "las-report-stats.hpp"
 #include "las-base.hpp"
 #include "tdict.hpp"
 
 class thread_workspaces;
 
-/* {{{ thread-related defines */
 /* All of this exists _for each thread_ */
 struct thread_side_data : private NonCopyable {
   const fb_factorbase *fb;
@@ -37,8 +36,8 @@ struct thread_data : private NonCopyable {
   const thread_workspaces *ws;  /* a pointer to the parent structure, really */
   int id;
   thread_side_data sides[2];
-  las_info_srcptr las;
-  sieve_info_ptr si;
+  las_info const * plas;
+  sieve_info * psi;
   las_report rep;       /* XXX obsolete, will be removed once the
                            timetree_t things absorbs everything. We still
                            need to decide what we do with the non-timer
@@ -48,8 +47,8 @@ struct thread_data : private NonCopyable {
   uint32_t first_region0_index;
   thread_data();
   ~thread_data();
-  void init(const thread_workspaces &_ws, int id, las_info_srcptr las);
-  void pickup_si(sieve_info_ptr si);
+  void init(const thread_workspaces &_ws, int id, las_info const & las);
+  void pickup_si(sieve_info& si);
   void update_checksums();
 };
 
@@ -128,7 +127,7 @@ public:
 class thread_workspaces : private NonCopyable {
   typedef reservation_group * reservation_group_ptr;
   const size_t nr_workspaces;
-  sieve_info_ptr si;
+  sieve_info * psi;
   const unsigned int nr_sides; /* Usually 2 */
   reservation_group_ptr *groups; /* one per side. Need pointer array due to
     lacking new[] without default constructor prior to C++11 :( */
@@ -137,9 +136,9 @@ public:
   // FIXME: thrs should be private!
   thread_data *thrs;
 
-  thread_workspaces(size_t nr_workspaces, unsigned int nr_sides, las_info_ptr _las);
+  thread_workspaces(size_t nr_workspaces, unsigned int nr_sides, las_info& _las);
   ~thread_workspaces();
-  void pickup_si(sieve_info_ptr si);
+  void pickup_si(sieve_info& si);
   void thread_do_using_pool(thread_pool&, void * (*) (timetree_t&, thread_data *));
   void thread_do(void * (*) (thread_data *));
   void buckets_alloc();

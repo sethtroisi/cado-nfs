@@ -2,7 +2,7 @@
 #include <pthread.h>
 
 #include "utils.h"
-#include "las-cofactor.h"
+#include "las-cofactor.hpp"
 #include "modredc_ul.h"
 #include "modredc_15ul.h"
 #include "modredc_2ul2.h"
@@ -37,11 +37,11 @@
                         -> cannot yield a relation
 */
 int
-check_leftover_norm (const mpz_t n, sieve_info_srcptr si, int side)
+check_leftover_norm (const mpz_t n, sieve_info const & si, int side)
 {
   size_t s = mpz_sizeinbase (n, 2);
-  unsigned int lpb = si->conf->sides[side]->lpb;
-  unsigned int mfb = si->conf->sides[side]->mfb;
+  unsigned int lpb = si.conf.sides[side].lpb;
+  unsigned int mfb = si.conf.sides[side].mfb;
   unsigned int klpb;
   double nd, kB, B;
 
@@ -54,7 +54,7 @@ check_leftover_norm (const mpz_t n, sieve_info_srcptr si, int side)
      course, but we have no guarantee that our cofactor is prime... */
 
   nd = mpz_get_d (n);
-  B = (double) si->conf->sides[side]->lim;
+  B = (double) si.conf.sides[side].lim;
   kB = B * B;
   for (klpb = lpb; klpb < s; klpb += lpb, kB *= B)
     {
@@ -136,7 +136,7 @@ check_leftover_norm (const mpz_t n, sieve_info_srcptr si, int side)
 int
 factor_both_leftover_norms(mpz_t* n, mpz_array_t** factors,
 			       uint32_array_t** multis,
-			       sieve_info_srcptr si)
+			       sieve_info const & si)
 {
   int is_smooth[2] = {FACUL_MAYBE, FACUL_MAYBE};
   /* To remember if a cofactor is already factored.*/
@@ -162,14 +162,14 @@ factor_both_leftover_norms(mpz_t* n, mpz_array_t** factors,
       factors[side]->length = 0;
       multis[side]->length = 0;
 
-      double B = (double) si->conf->sides[side]->lim;
+      double B = (double) si.conf.sides[side].lim;
       /* If n < B^2, then n is prime, since all primes < B have been removed */
       if (mpz_get_d (n[side]) < B * B)
 	is_smooth[side] = FACUL_SMOOTH;
     }
 
   /* call the facul library */
-  int* facul_code = facul_both (mpz_factors, n, si->strategies, is_smooth);
+  int* facul_code = facul_both (mpz_factors, n, si.strategies.get(), is_smooth);
 
   if (is_smooth[0] != FACUL_SMOOTH || is_smooth[1] != FACUL_SMOOTH)
     {
@@ -211,5 +211,46 @@ factor_both_leftover_norms(mpz_t* n, mpz_array_t** factors,
 
 
 /*}}}*/
+/*}}}*/
 
 
+/*  sieve_info::{init,clear,share}_strategies */
+void sieve_info::init_strategies(param_list_ptr pl)
+{
+    /* TODO: We may also build a strategy book, given that several
+     * strategies will be similar. Presently we spend some time creating
+     * each of them for the descent case.
+     */
+    const char *cofactfilename = param_list_lookup_string (pl, "file-cofact");
+    /*
+     * We create our strategy book from the file given by
+     * 'file-cofact'. Otherwise, we use a default strategy given by
+     * the function facul_make_default_strategy ().
+     */
+
+    FILE* file = NULL;
+    if (cofactfilename != NULL) /* a file was given */
+        file = fopen (cofactfilename, "r");
+    double time_strat = seconds();
+
+    strategies = std::shared_ptr<facul_strategies_t>(
+        facul_make_strategies (conf.sides[0].lim,
+            conf.sides[0].lpb,
+            conf.sides[0].mfb,
+            conf.sides[1].lim,
+            conf.sides[1].lpb,
+            conf.sides[1].mfb,
+            conf.sides[0].ncurves,
+            conf.sides[1].ncurves,
+            file, 0), facul_clear_strategies);
+
+    verbose_output_print(0, 1, "# Building/reading strategies took %1.1fs\n",
+            seconds() - time_strat);
+
+    if (!strategies) {
+        fprintf (stderr, "impossible to read %s\n", cofactfilename);
+        abort ();
+    }
+    if (file)
+        fclose (file);
+}

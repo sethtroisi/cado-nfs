@@ -38,9 +38,9 @@ static const double smart_err_max[(MAX_SMART_ERR<<1)+1] = {
 #include "portability.h"
 #include "tests/tests_common.h"
 #include "sieve/las-config.h"
-#include "sieve/las-types.h"
-#include "sieve/las-debug.h"
-#include "sieve/las-norms.h"
+#include "sieve/las-types.hpp"
+#include "sieve/las-debug.hpp"
+#include "sieve/las-norms.hpp"
 
 static inline void
 my_poly_scale (double *u, const double *t, unsigned int d, double h)
@@ -102,10 +102,11 @@ main(int argc, const char *argv[]) {
     const double didiv2 = (double) (I >> 1);
     for (d = MAX_DEGREE + 1; d--;) {
       poly->deg = d;
-      double coeff[poly->deg + 1] __attribute__((aligned(16))), u[poly->deg + 1];
-      struct root_s roots[4 * poly->deg + 1];
-      unsigned int nroots;
-      poly->coeff = coeff;
+      // std::vector<double, aligned_allocator<double, 16> > coeff(poly->deg + 1);
+      std::vector<double> coeff(poly->deg + 1);
+      double u[poly->deg + 1];
+      std::vector<smart_norm_root> roots;
+      poly->coeff = &coeff[0];
       for (k = iter; k--;) {
 	J = ((uint32_t) random_uint64()) << 2;    /* 0 <= J < 2^30 at least */
 	J &= (I >> 1) - 1;                        /* Original J; 0 <= J < I/2 */
@@ -122,9 +123,9 @@ main(int argc, const char *argv[]) {
 	memset (S1, 0, 1U<<LOG_BUCKET_REGION); /* To be sure S1 will be computed */
 	memset (S2, 0, 1U<<LOG_BUCKET_REGION); /* To be sure S2 will be computed */
 	if (poly->deg > 1) {
-	  init_norms_roots_internal (poly->deg, poly->coeff, (double) ((I + 16) >> 1), 1. / (double) (I >> 1), &nroots, roots);
-	  init_smart_degree_X_norms_bucket_region_internal (S1, J, I, scale, poly->deg, poly->coeff, nroots, roots);
-	  init_exact_degree_X_norms_bucket_region_internal (S2, J, I, scale, poly->deg, poly->coeff);
+	  init_norms_roots_internal (poly->deg, coeff, (double) ((I + 16) >> 1), 1. / (double) (I >> 1), roots);
+	  init_smart_degree_X_norms_bucket_region_internal (S1, J, I, scale, poly->deg, coeff, roots);
+	  init_exact_degree_X_norms_bucket_region_internal (S2, J, I, scale, poly->deg, coeff);
 	} else if (poly->deg == 1) {
 	  double cexp2[257], step, iter;
 	  step = 1. / scale;

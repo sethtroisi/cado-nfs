@@ -1,7 +1,7 @@
 #include "cado.h"
 #include <math.h>
 
-#include "las-arith.h"
+#include "las-arith.hpp"
 
 /* utility : is_prime_power *//*{{{*/
 /* Assume q is a prime power p^k with k>=1, return p if k > 1, 0 otherwise. */

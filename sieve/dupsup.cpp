@@ -18,17 +18,19 @@
 #include "params.h"
 #include "cado_poly.h"
 #include "gzip.h"
-#include "las-duplicate.h"
-#include "las-coordinates.h"
-#include "las-norms.h"
+#include "las-duplicate.hpp"
+#include "las-coordinates.hpp"
+#include "las-norms.hpp"
 #include "verbose.h"
 
 
 static void *
-dupsup (FILE *output, relation & rel, const mpz_t sq, const mpz_t rho, const int side, const int is_dupe)
+dupsup (FILE *output, relation & rel, las_todo_entry const& doing, const int is_dupe)
 {
   if (0)
-    gmp_fprintf (output, "# sq = %Zd, rho = %Zd, side = %d\n", sq, rho, side);
+    gmp_fprintf (output, "# sq = %Zd, rho = %Zd, side = %d\n",
+            (mpz_srcptr) doing.p,
+            (mpz_srcptr) doing.r, doing.side);
   rel.print(output, is_dupe ? "# DUPE " : "");
   return NULL;
 }
@@ -36,17 +38,19 @@ dupsup (FILE *output, relation & rel, const mpz_t sq, const mpz_t rho, const int
 /* If the line is a special-q comment, sets sq and rho and returns 1.
    Otherwise returns 0. */
 static int
-read_sq_comment(mpz_t sq, mpz_t rho, int *side, const char *line)
+read_sq_comment(las_todo_entry & doing, const char *line)
 {
   if (gmp_sscanf(line, "# Sieving side-%d q=%Zd; rho=%Zd;",
-              side, sq, rho) == 3) {
+              &doing.side,
+              (mpz_ptr) doing.p,
+              (mpz_ptr) doing.r) == 3) {
     return 1;
   }
   return 0;
 }
 
 static void
-read_poly(cado_poly_ptr cpoly, param_list pl)
+read_poly(cado_poly_ptr cpoly, param_list_ptr pl)
 {
     cado_poly_init(cpoly);
     const char *cpoly_filename;
@@ -67,39 +71,60 @@ read_poly(cado_poly_ptr cpoly, param_list pl)
 }
 
 static int
-parse_config(siever_config_ptr sc, param_list pl)
+parse_config(siever_config & sc, param_list_ptr pl)
 {
-    sc->side = 1; // Legacy default.
-    param_list_parse_int(pl, "-sqside", &sc->side);
+    sc.side = 1; // Legacy default.
+    param_list_parse_int(pl, "-sqside", &sc.side);
     int seen = 1;
-    seen  = param_list_parse_int   (pl, "I",     &(sc->logI));
-    seen &= param_list_parse_ulong (pl, "lim0",  &(sc->sides[0]->lim));
-    seen &= param_list_parse_int   (pl, "lpb0",  &(sc->sides[0]->lpb));
-    seen &= param_list_parse_int   (pl, "mfb0",  &(sc->sides[0]->mfb));
-    seen &= param_list_parse_double(pl, "lambda0", &(sc->sides[0]->lambda));
-    seen &= param_list_parse_int   (pl, "ncurves0",  &(sc->sides[0]->ncurves));
-    seen &= param_list_parse_ulong (pl, "lim1",  &(sc->sides[1]->lim));
-    seen &= param_list_parse_int   (pl, "lpb1",  &(sc->sides[1]->lpb));
-    seen &= param_list_parse_int   (pl, "mfb1",  &(sc->sides[1]->mfb));
-    seen &= param_list_parse_double(pl, "lambda1", &(sc->sides[1]->lambda));
-    seen &= param_list_parse_int   (pl, "ncurves1",  &(sc->sides[1]->ncurves));
+#if 0
+    if (param_list_lookup_string(pl, "A")) {
+        seen &= param_list_parse_int  (pl, "A",    &(sc.logA));
+        if (param_list_lookup_string(pl, "I")) {
+            fprintf(stderr, "# -A and -I are incompatible\n");
+            exit(EXIT_FAILURE);
+        }
+    } else if (param_list_lookup_string(pl, "I")) {
+        int I;
+        seen &= param_list_parse_int  (pl, "I", &I);
+        sc.logA = 2 * I - 1;
+        printf("# Interpreting -I %d as meaning -A %d\n", I, sc.logA);
+    }
+#else
+    seen &= param_list_parse_int  (pl, "I", &sc.logI);
+#endif
+    seen &= param_list_parse_ulong (pl, "lim0",  &(sc.sides[0].lim));
+    seen &= param_list_parse_int   (pl, "lpb0",  &(sc.sides[0].lpb));
+    seen &= param_list_parse_int   (pl, "mfb0",  &(sc.sides[0].mfb));
+    seen &= param_list_parse_double(pl, "lambda0", &(sc.sides[0].lambda));
+    seen &= param_list_parse_int   (pl, "ncurves0",  &(sc.sides[0].ncurves));
+    seen &= param_list_parse_ulong (pl, "lim1",  &(sc.sides[1].lim));
+    seen &= param_list_parse_int   (pl, "lpb1",  &(sc.sides[1].lpb));
+    seen &= param_list_parse_int   (pl, "mfb1",  &(sc.sides[1].mfb));
+    seen &= param_list_parse_double(pl, "lambda1", &(sc.sides[1].lambda));
+    seen &= param_list_parse_int   (pl, "ncurves1",  &(sc.sides[1].ncurves));
     long dupqmax[2] = {0, 0};
     param_list_parse_long_and_long(pl, "dup-qmax", dupqmax, ",");
-    sc->sides[0]->qmax = dupqmax[0];
-    sc->sides[1]->qmax = dupqmax[1];
-    if (!param_list_parse_ulong(pl, "powlim0", &sc->sides[0]->powlim))
-        sc->sides[0]->powlim = (1<<sc->logI) - 1;
-    if (!param_list_parse_ulong(pl, "powlim1", &sc->sides[1]->powlim))
-        sc->sides[1]->powlim = (1<<sc->logI) - 1;
+    sc.sides[0].qmax = dupqmax[0];
+    sc.sides[1].qmax = dupqmax[1];
+#if 0
+    int logI = (sc.logA+1)/2;
+#else
+    int logI = sc.logI;
+#endif
+    if (!param_list_parse_ulong(pl, "powlim0", &sc.sides[0].powlim))
+        sc.sides[0].powlim = (1<<logI) - 1;
+    if (!param_list_parse_ulong(pl, "powlim1", &sc.sides[1].powlim))
+        sc.sides[1].powlim = (1<<logI) - 1;
     return seen;
 }
 
 
-static void declare_usage(param_list pl)
+static void declare_usage(param_list_ptr pl)
 {
   param_list_decl_usage(pl, "path_antebuffer", "path to antebuffer program");
   param_list_decl_usage(pl, "poly", "polynomial file");
-  param_list_decl_usage(pl, "I",    "set sieving region to 2^I");
+  param_list_decl_usage(pl, "I",    "set sieving region to 2^I times J");
+  param_list_decl_usage(pl, "A",    "set sieving region to 2^A");
   param_list_decl_usage(pl, "skew", "skewness");
   param_list_decl_usage(pl, "lim0", "rational factor base bound");
   param_list_decl_usage(pl, "lim1", "algebraic factor base bound");
@@ -120,7 +145,7 @@ static void declare_usage(param_list pl)
 }
 
 static void
-usage (param_list pl, char *argv0)
+usage (param_list_ptr pl, char *argv0)
 {
     param_list_print_usage(pl, argv0, stderr);
     exit(EXIT_FAILURE);
@@ -183,16 +208,16 @@ main (int argc, char * argv[])
 
     tune_las_memset();
 
-    facul_strategies_t* strategies = facul_make_strategies (
-            conf->sides[0]->lim,
-            conf->sides[0]->lpb,
-            conf->sides[0]->mfb,
-            conf->sides[1]->lim,
-            conf->sides[1]->lpb,
-            conf->sides[1]->mfb,
-            conf->sides[0]->ncurves,
-            conf->sides[1]->ncurves,
-            NULL, 0);
+    std::shared_ptr<facul_strategies_t> strategies(facul_make_strategies(
+            conf.sides[0].lim,
+            conf.sides[0].lpb,
+            conf.sides[0].mfb,
+            conf.sides[1].lim,
+            conf.sides[1].lpb,
+            conf.sides[1].mfb,
+            conf.sides[0].ncurves,
+            conf.sides[1].ncurves,
+            NULL, 0), facul_clear_strategies);
 
     mpz_t sq, rho;
     mpz_init(sq);
@@ -204,31 +229,35 @@ main (int argc, char * argv[])
           perror(argv[argi]);
           abort();
       }
-      sieve_info_ptr si = NULL;
-      while (!feof(f)) {
+      sieve_info * psi = NULL;
+      for (int row = 0 ; !feof(f) ; row++) {
         char line[1024];
-        int side = 0;
         if (fgets(line, sizeof(line), f) == NULL)
           break;
-        if (read_sq_comment(sq, rho, &side, line)) {
-          if (si != NULL)
-            clear_sieve_info(si);
-          si = fill_in_sieve_info(sq, rho, side, 1U << conf->logI, 1U << (conf->logI - 1),
-                                  strategies, cpoly, conf);
+        las_todo_entry doing;
+        if (read_sq_comment(doing, line)) {
+            if (psi) delete psi;
+#if 0
+            uint32_t I = 1UL << ((conf.logA+1)/2);
+            uint32_t J = 1UL << ((conf.logA-1)/2);
+#else
+            uint32_t I = 1UL << conf.logI;
+            uint32_t J = I >> 1;
+#endif
+            psi = fill_in_sieve_info(doing, I, J, cpoly, conf);
+            psi->strategies = strategies;
         } else {
             relation rel;
             if (rel.parse(line)) {
-                ASSERT_ALWAYS(si != NULL);
-                int is_dupe = relation_is_duplicate(rel, nb_threads, si);
-                dupsup(stdout, rel, sq, rho, side, is_dupe);
+                int is_dupe = relation_is_duplicate(rel, nb_threads, *psi);
+                dupsup(stdout, rel, doing, is_dupe);
             }
         }
       }
       fclose_maybe_compressed(f, argv[argi]);
-      clear_sieve_info(si);
+      if (psi) delete psi;
     }
     
-    facul_clear_strategies(strategies);
     cado_poly_clear(cpoly);
     mpz_clear(sq);
     mpz_clear(rho);

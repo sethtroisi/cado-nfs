@@ -1,5 +1,5 @@
-#ifndef LAS_QLATTICE_H_
-#define LAS_QLATTICE_H_
+#ifndef LAS_QLATTICE_HPP_
+#define LAS_QLATTICE_HPP_
 
 #include <stdint.h>
 #include <gmp.h>
@@ -8,25 +8,22 @@
 #include "portability.h"
 
 /* implementations for inlines */
-#include "las-arith.h"
+#include "las-arith.hpp"
 
-struct qlattice_basis : private NonCopyable {
+struct qlattice_basis {
     int64_t a0, b0, a1, b1;
-    mpz_t q;
+    cxx_mpz q;
     unsigned long q_ulong; // q itself or 0 if q is too large to fit
     bool prime_sq;
-    std::vector<uint64_t> * prime_factors;
-    qlattice_basis(){ constructor(); abort();} // this is not yet used!!!
-    ~qlattice_basis(){ destructor(); abort();}
-    void constructor() {
-        mpz_init(q);
-        prime_factors = new std::vector<uint64_t>;
+    std::vector<uint64_t> prime_factors;
+    qlattice_basis() {
+        a0 = a1 = b0 = b1 = 0;
+        q_ulong = 0;
+        prime_sq = true;
     }
-    void destructor() {
-        mpz_clear(q);
-        delete prime_factors;
-    }
-    void set_q(const mpz_t special_q, bool is_prime) {
+    inline double skewed_norm0(double s) const { return a0*a0/s+b0*b0*s; }
+    inline double skewed_norm1(double s) const { return a1*a1/s+b1*b1*s; }
+    void set_q(mpz_srcptr special_q, bool is_prime) {
       /* Currently requires prime special-q values.
          For powers, the base prime would have to be determined and stored in
          a variable, so that powers of that prime in the factor base can be
@@ -37,16 +34,13 @@ struct qlattice_basis : private NonCopyable {
       q_ulong = mpz_fits_ulong_p(q) ? mpz_get_ui(q) : 0;
       prime_sq = is_prime;
     };
-    void set_vec_fac(const std::vector<uint64_t> & fac) {
-        *prime_factors = fac;
-    }
     // Assumes ell is prime.
     bool is_coprime_to(unsigned long ell) const {
         if (prime_sq)
             return (ell != q_ulong);
         else {
-            for (unsigned int i = 0; i < prime_factors->size(); ++i) {
-                if ((*prime_factors)[i] == ell)
+            for (unsigned int i = 0; i < prime_factors.size(); ++i) {
+                if (prime_factors[i] == ell)
                     return false;
             }
             return true;
@@ -249,4 +243,4 @@ static inline fbprime_t fb_root_in_qlattice_po2 (const fbprime_t p, const fbprim
       }
 }
 
-#endif	/* LAS_QLATTICE_H_ */
+#endif	/* LAS_QLATTICE_HPP_ */

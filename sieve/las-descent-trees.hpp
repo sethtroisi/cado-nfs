@@ -1,5 +1,5 @@
-#ifndef LAS_DESCENT_DESCENT_TREES_H_
-#define LAS_DESCENT_DESCENT_TREES_H_
+#ifndef LAS_DESCENT_DESCENT_TREES_HPP_
+#define LAS_DESCENT_DESCENT_TREES_HPP_
 
 #include <string>
 #include <sstream>
@@ -21,12 +21,8 @@
 #endif
 
 #include "relation.h"
-#include "las-forwardtypes.h"
-#include "las-types.h"
-
-#ifndef __cplusplus
-#error "This is C++-only"
-#endif
+#include "las-forwardtypes.hpp"
+#include "las-types.hpp"
 
 struct descent_tree {
     private:
@@ -151,10 +147,10 @@ struct descent_tree {
         forest.clear();
     }
 
-    void new_node(las_todo_entry const * doing) {
-        int level = doing->depth;
+    void new_node(las_todo_entry const & doing) {
+        int level = doing.depth;
         ASSERT_ALWAYS(level == (int) current.size());
-        tree * kid = new tree(tree_label(doing->side, doing->p, doing->r));
+        tree * kid = new tree(tree_label(doing.side, doing.p, doing.r));
         kid->spent = -seconds();
         if (current.empty()) {
             forest.push_back(kid);
@@ -259,4 +255,4 @@ struct descent_tree {
 
     void display_all_trees(FILE * o);
 };
-#endif	/* LAS_DESCENT_DESCENT_TREES_H_ */
+#endif	/* LAS_DESCENT_DESCENT_TREES_HPP_ */

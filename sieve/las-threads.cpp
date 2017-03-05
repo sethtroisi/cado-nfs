@@ -1,7 +1,7 @@
 #include "cado.h"
 #include "memory.h"
 #include "las-threads.hpp"
-#include "las-types.h"
+#include "las-types.hpp"
 #include "las-config.h"
 
 thread_side_data::thread_side_data()
@@ -32,20 +32,21 @@ thread_data::~thread_data()
   las_report_clear(rep);
 }
 
-void thread_data::init(const thread_workspaces &_ws, const int _id, las_info_srcptr _las)
+void thread_data::init(const thread_workspaces &_ws, const int _id, las_info const & _las)
 {
   ASSERT_ALWAYS(!is_initialized);
   ws = &_ws;
   id = _id;
-  las = _las;
+  plas = & _las;
   is_initialized = true;
 }
 
-void thread_data::pickup_si(sieve_info_ptr _si)
+void thread_data::pickup_si(sieve_info & _si)
 {
-  si = _si;
+  psi = & _si;
+  sieve_info & si(*psi);
   for (int side = 0 ; side < 2 ; side++) {
-    sides[side].set_fb(si->sides[side]->fb);
+    sides[side].set_fb(si.sides[side].fb.get());
   }
 }
 
@@ -242,7 +243,7 @@ reservation_group::cget() const
 
 
 thread_workspaces::thread_workspaces(const size_t _nr_workspaces,
-  const unsigned int _nr_sides, las_info_ptr las)
+  const unsigned int _nr_sides, las_info & las)
   : nr_workspaces(_nr_workspaces), nr_sides(_nr_sides)
 {
     thrs = new thread_data[_nr_workspaces];
@@ -269,9 +270,10 @@ thread_workspaces::~thread_workspaces()
    This implies allocating all the memory we need for bucket arrays,
    sieve regions, etc. */
 void
-thread_workspaces::pickup_si(sieve_info_ptr _si)
+thread_workspaces::pickup_si(sieve_info & _si)
 {
-    si = _si;
+    psi = & _si;
+    sieve_info & si(*psi);
     for (size_t i = 0; i < nr_workspaces; ++i) {
         thrs[i].pickup_si(_si);
     }
@@ -280,23 +282,23 @@ thread_workspaces::pickup_si(sieve_info_ptr _si)
        basis */
     /* Take some margin depending on parameters */
     /* Multithreading perturbates the fill-in ratio */
-    double multiplier = si->conf->bk_multiplier;
+    double multiplier = si.conf.bk_multiplier;
     if (multiplier == 0.0) {
         multiplier = 1.1 + double(nr_workspaces)/20.0;
         /* Using bkthresh1 as well... */
-        if (si->conf->bucket_thresh1 != 0) {
+        if (si.conf.bucket_thresh1 != 0) {
             double rat =
-                double(si->conf->bucket_thresh1- si->conf->bucket_thresh) /
-                double(MAX(si->conf->sides[0]->lim, si->conf->sides[1]->lim) - 
-                        si->conf->bucket_thresh);
+                double(si.conf.bucket_thresh1- si.conf.bucket_thresh) /
+                double(MAX(si.conf.sides[0].lim, si.conf.sides[1].lim) - 
+                        si.conf.bucket_thresh);
             multiplier *= 1.0 + rat*1.0;
         }
     }
     verbose_output_print(0, 2, "# Reserving buckets with a multiplier of %f\n",
             multiplier);
     for (unsigned int i_side = 0; i_side < nr_sides; i_side++)
-      groups[i_side]->allocate_buckets(si->nb_buckets_max,
-              multiplier, si->sides[i_side]->max_bucket_fill_ratio);
+      groups[i_side]->allocate_buckets(si.nb_buckets_max,
+              multiplier, si.sides[i_side].max_bucket_fill_ratio);
 }
 
 task_result * thread_do_task_wrapper(const worker_thread * worker, const task_parameters *_param)

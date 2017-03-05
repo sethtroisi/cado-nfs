@@ -1,5 +1,5 @@
 #include "cado.h"
-#include "las-norms.h"
+#include "las-norms.hpp"
 #include "utils.h"
 
 int main()

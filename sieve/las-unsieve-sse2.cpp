@@ -5,10 +5,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "las-unsieve.h"
+#include "las-unsieve.hpp"
 #include "ularith.h"
-#include "las-norms.h"
-#include "las-debug.h"
+#include "las-norms.hpp"
+#include "las-debug.hpp"
 #include "gcd.h"
 #include "memory.h"
 
@@ -124,7 +124,7 @@ search_single_survivors_mask(unsigned char * const SS[2],
 static void
 search_survivors_in_line1_sse2(unsigned char * const SS[2],
         const unsigned char bound[2], const unsigned int log_I,
-        const unsigned int j, const int N MAYBE_UNUSED, j_div_srcptr j_div,
+        const unsigned int j, const int N MAYBE_UNUSED, j_divisibility_helper const & j_div,
         const unsigned int td_max, std::vector<uint32_t> &survivors)
 {
     unsigned int div[6][2], nr_div;
@@ -162,7 +162,7 @@ search_survivors_in_line1_sse2(unsigned char * const SS[2],
 static void
 search_survivors_in_line3_sse2(unsigned char * const SS[2], 
         const unsigned char bound[2], const unsigned int log_I,
-        const unsigned int j, const int N MAYBE_UNUSED, j_div_srcptr j_div,
+        const unsigned int j, const int N MAYBE_UNUSED, j_divisibility_helper const & j_div,
         const unsigned int td_max, std::vector<uint32_t> &survivors)
 {
     __m128i patterns[2][3];
@@ -218,7 +218,7 @@ search_survivors_in_line3_sse2(unsigned char * const SS[2],
 static void
 search_survivors_in_line5_sse2(unsigned char * const SS[2], 
         const unsigned char bound[2], const unsigned int log_I,
-        const unsigned int j, const int N MAYBE_UNUSED, j_div_srcptr j_div,
+        const unsigned int j, const int N MAYBE_UNUSED, j_divisibility_helper const & j_div,
         const unsigned int td_max, std::vector<uint32_t> &survivors)
 {
     const int nr_patterns = 5;
@@ -283,7 +283,7 @@ search_survivors_in_line5_sse2(unsigned char * const SS[2],
 void
 search_survivors_in_line_sse2(unsigned char * const SS[2], 
         const unsigned char bound[2], const unsigned int log_I,
-        const unsigned int j, const int N, j_div_srcptr j_div,
+        const unsigned int j, const int N, j_divisibility_helper const & j_div,
         const unsigned int td_max, std::vector<uint32_t> &survivors)
 {
 #if USE_PATTERN_3

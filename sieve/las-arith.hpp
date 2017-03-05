@@ -1,5 +1,5 @@
-#ifndef LAS_ARITH_H_
-#define LAS_ARITH_H_
+#ifndef LAS_ARITH_HPP_
+#define LAS_ARITH_HPP_
 
 #include <stdint.h>
 #include <inttypes.h>
@@ -489,4 +489,4 @@ invmod_redc_64(uint64_t a, uint64_t b)
 
 fbprime_t is_prime_power(fbprime_t q);
 
-#endif	/* LAS_ARITH_H_ */
+#endif	/* LAS_ARITH_HPP_ */

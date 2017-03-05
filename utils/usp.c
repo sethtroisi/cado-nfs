@@ -70,13 +70,13 @@ B) to use within another program: compile without -DMAIN, the main function
 /* #define DEBUG */
 
 void
-root_struct_init (root_struct *R) {
+usp_root_data_init (usp_root_data *R) {
   mpz_init (R->a);
   mpz_init (R->b);
 }
 
 void
-root_struct_clear (root_struct *R) {
+usp_root_data_clear (usp_root_data *R) {
   mpz_clear (R->a);
   mpz_clear (R->b);
 }
@@ -143,7 +143,7 @@ divide (mpz_t a, int k, int n, mpz_t *p)
 
 /* isolating interval is [a/2^ka, b/2^kb] */
 static void
-printInt (mpz_t a, int ka, mpz_t b, int kb, int *nroots, root_struct *R,
+printInt (mpz_t a, int ka, mpz_t b, int kb, int *nroots, usp_root_data *R,
           int verbose)
 {
   if (verbose)
@@ -222,7 +222,7 @@ printPol (mpz_t *p, int n)
 */
 static int
 usp (mpz_t a, mpz_t b, int m, int up, int va, int vb, int n, int *nroots,
-     mpz_t *p, mpz_t *r, int verbose, root_struct *R)
+     mpz_t *p, mpz_t *r, int verbose, usp_root_data *R)
 {
    int lmi, i, k, c, s, smi, last, d;
    mpz_t mi, u, v, w;
@@ -412,7 +412,7 @@ usp (mpz_t a, mpz_t b, int m, int up, int va, int vb, int n, int *nroots,
    If Roots is not NULL, put the isolating intervals in Roots[0..nroots-1].
 */
 int
-numberOfRealRoots (mpz_t *p, const int orig_n, double T, int verbose, root_struct *Roots)
+numberOfRealRoots (mpz_t *p, const int orig_n, double T, int verbose, usp_root_data *Roots)
 {
   int i, nroots, n = orig_n;
   mpz_t a, R, R1, *r;
@@ -497,7 +497,7 @@ numberOfRealRoots (mpz_t *p, const int orig_n, double T, int verbose, root_struc
    Use it only if you know what you do!
 */
 double
-rootRefine (root_struct *r, mpz_t *p, int n, double precision)
+rootRefine (usp_root_data *r, mpz_t *p, int n, double precision)
 {
   double a, b, c;
   double sa, sb, sc;
@@ -611,14 +611,14 @@ main (int argc, char *argv[])
       int a = atoi(argv[1]), ka = atoi(argv[2]);
       int b = atoi(argv[3]), kb = atoi(argv[4]);
       double precision = atof(argv[5]);
-      root_struct r;
-      root_struct_init(&r);
+      usp_root_data r;
+      usp_root_data_init(&r);
       mpz_init_set_ui(r.a, a);
       r.ka = ka;
       mpz_init_set_ui(r.b, b);
       r.kb = kb;
       printf("rf=%lf\n", rootRefine(&r, p, n, precision));
-      root_struct_clear(&r);
+      usp_root_data_clear(&r);
   }
   else{
       if (argc >= 2){

@@ -6,8 +6,8 @@
 // #include <iostream>
 #include <sstream>
 
-#include "las-types.h"
-#include "las-descent-trees.h"
+#include "las-types.hpp"
+#include "las-descent-trees.hpp"
 
 using namespace std;
 

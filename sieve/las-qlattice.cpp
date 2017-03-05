@@ -1,8 +1,8 @@
 #include "cado.h"
 #include <math.h>       /* rint etc */
-#include "las-types.h"
-#include "las-qlattice.h"
-#include "las-arith.h"
+#include "las-types.hpp"
+#include "las-qlattice.hpp"
+#include "las-arith.hpp"
 
 /* check that the double x fits into an int32_t */
 #define fits_int32_t(x) \

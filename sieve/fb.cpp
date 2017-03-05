@@ -12,7 +12,7 @@
 #else
 #define MAP_FAILED ((void *) -1)
 #endif
-#include "fb.h"
+#include "fb.hpp"
 #include "mod_ul.h"
 #include "verbose.h"
 #include "getprime.h"

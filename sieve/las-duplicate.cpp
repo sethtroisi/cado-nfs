@@ -69,11 +69,11 @@ Thus the function to check for duplicates needs the following information:
 #include <string.h>
 #include "gmp_aux.h"
 #include "mpz_array.h"
-#include "las-duplicate.h"
-#include "las-qlattice.h"
-#include "las-coordinates.h"
-#include "las-norms.h"
-#include "las-cofactor.h"
+#include "las-duplicate.hpp"
+#include "las-qlattice.hpp"
+#include "las-coordinates.hpp"
+#include "las-norms.hpp"
+#include "las-cofactor.hpp"
 
 /* default verbose level of # DUPECHECK lines */
 #define VERBOSE_LEVEL 2
@@ -87,59 +87,46 @@ compute_a_over_b_mod_p(mpz_t r, const int64_t a, const uint64_t b, const mpz_t p
   mpz_mod(r, r, p);
 }
 
-sieve_info_ptr
-fill_in_sieve_info(const mpz_t q, const mpz_t rho,
-                   const int sq_side, const uint32_t I, const uint32_t J,
-                   facul_strategies_t *strategies,
-                   cado_poly_ptr cpoly, siever_config_srcptr conf)
+sieve_info *
+fill_in_sieve_info(las_todo_entry const & doing,
+                   uint32_t I, uint32_t J,
+                   cado_poly_ptr cpoly, siever_config const & conf)
 {
-  sieve_info_ptr new_si;
+  sieve_info * x = new sieve_info;
 
-  new_si = (sieve_info_ptr) malloc(sizeof(sieve_info));
-  ASSERT_ALWAYS(new_si != NULL);
-  new_si->I = I;
-  new_si->J = J;
+  sieve_info & new_si(*x);
 
-  // memset(new_si, 0, sizeof(sieve_info));
-  new_si->cpoly = cpoly; /* A pointer, and polynomial not get modified */
+  new_si.I = I;
+  new_si.J = J;
+  new_si.cpoly = cpoly;
+  new_si.conf = conf;
+  new_si.conf.side = doing.side;
+  for(int side = 0 ; side < 2 ; side++) {
+      new_si.init_norm_data(side);
+  }
+  new_si.doing = doing;
+  SkewGauss(new_si.qbasis, new_si.doing.p, new_si.doing.r, new_si.cpoly->skew);
+  adjust_IJ(new_si);
 
-  memmove(new_si->conf, conf, sizeof(new_si->conf));
-  new_si->conf->side = sq_side;
-
-  /* Allocate memory */
-  sieve_info_init_norm_data(new_si);
-
-  new_si->doing = new las_todo_entry();
-  mpz_init_set(new_si->doing->p, q);
-  mpz_init_set(new_si->doing->r, rho);
-  new_si->doing->side = sq_side;
-
-  new_si->strategies = strategies;
-  SkewGauss(new_si->qbasis, new_si->doing->p, new_si->doing->r, new_si->cpoly->skew);
-  return new_si;
+  return x;
 }
 
 
-static sieve_info_ptr
+static sieve_info *
 fill_in_sieve_info_from_si(const unsigned long p, int side,
-        const int64_t a, const uint64_t b, sieve_info_srcptr old_si)
+        const int64_t a, const uint64_t b, sieve_info & old_si)
 {
   mpz_t sq, rho;
   mpz_init_set_ui(sq, p);
   mpz_init(rho);
   compute_a_over_b_mod_p(rho, a, b, sq);
-  return fill_in_sieve_info(sq, rho, side, old_si->I, old_si->J,
-                            old_si->strategies, old_si->cpoly, old_si->conf);
+  las_todo_entry doing(sq, rho, side);
   mpz_clear(sq);
   mpz_clear(rho);
-}
-
-void
-clear_sieve_info(sieve_info_ptr new_si)
-{
-  sieve_info_clear_norm_data(new_si);
-  delete new_si->doing; // this clears doing->p and doing->r as well
-  free (new_si);
+  sieve_info * x = fill_in_sieve_info(doing, old_si.I, old_si.J,
+                            old_si.cpoly, old_si.conf);
+  x->strategies = old_si.strategies;
+  return x;
 }
 
 /* Compute the product of the nr_lp large primes in large_primes,
@@ -168,13 +155,13 @@ compute_cofactor(mpz_t cof, const unsigned long sq,
   function for the correct bucket region and pick the entry corresponding to
   this i,j-coordinate. */
 static unsigned char
-estimate_lognorm(sieve_info_srcptr si, const int i, const unsigned int j,
+estimate_lognorm(sieve_info const & si, const int i, const unsigned int j,
                   const int side)
 {
   mpz_t norm;
   mpz_init (norm);
-  mpz_poly_homogeneous_eval_siui(norm, si->sides[side]->fij, i, j);
-  return fb_log(mpz_get_d(norm), si->sides[side]->scale * LOG_SCALE, 0.) + GUARD;
+  mpz_poly_homogeneous_eval_siui(norm, si.sides[side].fij, i, j);
+  return fb_log(mpz_get_d(norm), si.sides[side].scale * LOG_SCALE, 0.) + GUARD;
   mpz_clear (norm);
 }
 
@@ -211,9 +198,9 @@ bounded_pow(const unsigned long b, const unsigned long e, const unsigned long li
 */
 static unsigned char
 subtract_fb_log(const unsigned char lognorm, relation const& rel,
-                sieve_info_srcptr si, const int side)
+                sieve_info const & si, const int side)
 {
-  const unsigned long fbb = si->conf->sides[side]->lim;
+  const unsigned long fbb = si.conf.sides[side].lim;
   const unsigned int nb_p = rel.sides[side].size();
   unsigned char new_lognorm = lognorm;
 
@@ -222,8 +209,8 @@ subtract_fb_log(const unsigned char lognorm, relation const& rel,
     const int e = rel.sides[side][i].e;
     ASSERT_ALWAYS(e > 0);
     if (p <= fbb) {
-      const unsigned long p_pow = bounded_pow(p, e, si->conf->sides[side]->powlim);
-      const unsigned char p_pow_log = fb_log(p_pow, si->sides[side]->scale * LOG_SCALE, 0.);
+      const unsigned long p_pow = bounded_pow(p, e, si.conf.sides[side].powlim);
+      const unsigned char p_pow_log = fb_log(p_pow, si.sides[side].scale * LOG_SCALE, 0.);
       if (p_pow_log > new_lognorm) {
         if (0)
           fprintf(stderr, "Warning: lognorm underflow for relation a,b = %" PRId64 ", %" PRIu64 "\n",
@@ -243,13 +230,13 @@ subtract_fb_log(const unsigned char lognorm, relation const& rel,
 int
 sq_finds_relation(const unsigned long sq, const int sq_side,
                   relation const& rel,
-                  const int nb_threads, sieve_info_srcptr old_si)
+                  const int nb_threads, sieve_info & old_si)
 {
   mpz_array_t *f[2] = { NULL, }; /* Factors of the relation's norms */
   uint32_array_t *m[2] = { NULL, }; /* corresponding multiplicities */
   mpz_t cof[2];
   int is_dupe = 1; /* Assumed dupe until proven innocent */
-  sieve_info_ptr si;
+  sieve_info * psi;
   const size_t max_large_primes = 10;
   unsigned long large_primes[2][max_large_primes];
   unsigned int nr_lp[2] = {0, 0};
@@ -261,7 +248,7 @@ sq_finds_relation(const unsigned long sq, const int sq_side,
   for (int side = 0; side < 2; side++) {
     unsigned int nb_p = rel.sides[side].size();
     for (unsigned int i = 0; i < nb_p; i++) {
-      const unsigned long fbb = old_si->conf->sides[side]->lim;
+      const unsigned long fbb = old_si.conf.sides[side].lim;
       const unsigned long p = mpz_get_ui(rel.sides[side][i].p);
       const int e = rel.sides[side][i].e;
       ASSERT_ALWAYS(e > 0);
@@ -280,25 +267,29 @@ sq_finds_relation(const unsigned long sq, const int sq_side,
   // si = get_sieve_info_from_config(las, sc, pl);
   /* Create a dummy sieve_info struct with just enough info to let us use
      the lattice-reduction and coordinate-conversion functions */
-  si = fill_in_sieve_info_from_si (sq, sq_side, rel.a, rel.b, old_si);
-  const unsigned long r = mpz_get_ui(si->doing->r);
+  psi = fill_in_sieve_info_from_si (sq, sq_side, rel.a, rel.b, old_si);
+  sieve_info & si(*psi);
+  const unsigned long r = mpz_get_ui(si.doing.r);
 
-  const uint32_t oldI = si->I, oldJ = si->J;
+  const uint32_t oldI = si.I, oldJ = si.J;
   uint32_t I, J; /* Can't declare further down due to goto :( */
+
   /* If resulting optimal J is so small that it's not worth sieving,
      this special-q gets skipped, so relation is not a duplicate */
-  if (sieve_info_adjust_IJ(si, nb_threads) == 0) {
+  if (adjust_IJ(si, nb_threads) == 0)
+  {
     verbose_output_print(0, VERBOSE_LEVEL, "# DUPECHECK J too small\n");
     is_dupe = 0;
     goto clear_and_exit;
   }
 
   sieve_info_update_norm_data(si, nb_threads);
-  verbose_output_print(0, VERBOSE_LEVEL, "# DUPECHECK Checking if relation (a,b) = (%" PRId64 ",%" PRIu64 ") is a dupe of sieving special-q -q0 %lu -rho %lu\n", rel.a, rel.b, sq, r);
-  verbose_output_print(0, VERBOSE_LEVEL, "# DUPECHECK Using special-q basis a0=%" PRId64 "; b0=%" PRId64 "; a1=%" PRId64 "; b1=%" PRId64 "\n", si->qbasis.a0, si->qbasis.b0, si->qbasis.a1, si->qbasis.b1);
 
-  I = si->I;
-  J = si->J;
+  verbose_output_print(0, VERBOSE_LEVEL, "# DUPECHECK Checking if relation (a,b) = (%" PRId64 ",%" PRIu64 ") is a dupe of sieving special-q -q0 %lu -rho %lu\n", rel.a, rel.b, sq, r);
+  verbose_output_print(0, VERBOSE_LEVEL, "# DUPECHECK Using special-q basis a0=%" PRId64 "; b0=%" PRId64 "; a1=%" PRId64 "; b1=%" PRId64 "\n", si.qbasis.a0, si.qbasis.b0, si.qbasis.a1, si.qbasis.b1);
+
+  I = si.I;
+  J = si.J;
 
   if (oldI != I || oldJ != J)
     verbose_output_print(0, VERBOSE_LEVEL, "# DUPECHECK oldI = %u, I = %u, oldJ = %u, J = %u\n", oldI, I, oldJ, J);
@@ -322,9 +313,9 @@ sq_finds_relation(const unsigned long sq, const int sq_side,
   for (int side = 0; side < 2; side++) {
     const uint8_t lognorm = estimate_lognorm(si, i, j, side);
     remaining_lognorm[side] = subtract_fb_log(lognorm, rel, si, side);
-    if (remaining_lognorm[side] > si->sides[side]->bound) {
+    if (remaining_lognorm[side] > si.sides[side].bound) {
       verbose_output_print(0, VERBOSE_LEVEL, "# DUPECHECK On side %d, remaining lognorm = %" PRId8 " > bound = %" PRId8 "\n",
-              side, remaining_lognorm[side], si->sides[side]->bound);
+              side, remaining_lognorm[side], si.sides[side].bound);
       is_dupe = 0;
     }
   }
@@ -364,7 +355,7 @@ sq_finds_relation(const unsigned long sq, const int sq_side,
   }
 
 clear_and_exit:
-  clear_sieve_info(si);
+  delete psi;
   mpz_clear(cof[0]);
   mpz_clear(cof[1]);
 
@@ -373,25 +364,25 @@ clear_and_exit:
 
 
 /* This function decides whether the given (sq,side) was previously
- * sieved (compared to the current sq stored in si->doing).
+ * sieved (compared to the current sq stored in si.doing).
  * This takes qmax into account.
  */
 static int
-sq_was_previously_sieved(const unsigned long sq, int side, sieve_info_srcptr si){
-  if (side == si->doing->side) {
-    int cmp = mpz_cmp_ui(si->doing->p, sq);
+sq_was_previously_sieved(const unsigned long sq, int side, sieve_info const & si){
+  if (side == si.doing.side) {
+    int cmp = mpz_cmp_ui(si.doing.p, sq);
     if (cmp <= 0)
       return 0;
-    return (sq > si->conf->sides[side]->lim);
+    return (sq > si.conf.sides[side].lim);
   } else {
     // Did we sieve other sides?
-    if (si->conf->sides[side]->qmax == 0)
+    if (si.conf.sides[side].qmax == 0)
       return 0;
     // Is q smaller than current, and within the bounds for this side?
-    int cmp = mpz_cmp_ui(si->doing->p, sq);
+    int cmp = mpz_cmp_ui(si.doing.p, sq);
     if (cmp <= 0)
       return 0;
-    return (sq > si->conf->sides[side]->lim && sq < si->conf->sides[side]->qmax);
+    return (sq > si.conf.sides[side].lim && sq < si.conf.sides[side].qmax);
   }
 }
 
@@ -400,12 +391,12 @@ sq_was_previously_sieved(const unsigned long sq, int side, sieve_info_srcptr si)
    relation is a duplicate of sieving that special-q: check whether 
    (sq, side) was sieved before the special-q specified in si, and
    whether sieving (sq, side) can find the relation with the sieving
-   parameters specified in si->conf. */ 
+   parameters specified in si.conf. */ 
 
 int
 check_one_prime(mpz_srcptr zsq, const int side,
                 relation const & rel, const int nb_threads,
-                sieve_info_srcptr si)
+                sieve_info & si)
 {
   if (!mpz_fits_ulong_p(zsq)) {
       /* move on. Probably not a duplicate */
@@ -425,11 +416,11 @@ check_one_prime(mpz_srcptr zsq, const int side,
    "earlier", and 0 if it is probably not a duplicate */
 int
 relation_is_duplicate(relation const& rel, const int nb_threads,
-                      sieve_info_srcptr si)
+                      sieve_info & si)
 {
   /* If the special-q does not fit in an unsigned long, we assume it's not a
      duplicate and just move on */
-  if (!mpz_fits_ulong_p(si->doing->p)) {
+  if (!mpz_fits_ulong_p(si.doing.p)) {
     return 0;
   }
 

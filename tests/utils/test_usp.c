@@ -11,7 +11,7 @@ test_usp ()
 {
   mpz_t p[MAX_DEGREE], u;
   int n, i, d;
-  root_struct R[MAX_DEGREE];
+  usp_root_data R[MAX_DEGREE];
   double root;
 
   for (i = 0; i < MAX_DEGREE; i++)

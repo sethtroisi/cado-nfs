@@ -24,11 +24,6 @@ typedef struct cado_poly_s cado_poly[1];
 typedef struct cado_poly_s * cado_poly_ptr;
 typedef const struct cado_poly_s * cado_poly_srcptr;
 
-// TODO: deprecate this entirely. Uncomment the following, and hunt down
-// the 32 or so occurences of sidenames... Boring but needs no brain.
-// extern const char * sidenames [NB_POLYS_MAX] ATTRIBUTE_DEPRECATED;
-extern const char * sidenames [NB_POLYS_MAX];
-
 #ifdef __cplusplus
 extern "C" {
 #endif

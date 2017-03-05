@@ -109,7 +109,7 @@ malloc_hugepages(const size_t size)
 }
 
 void
-free_hugepages(const void *m, const size_t size MAYBE_UNUSED)
+free_hugepages(void *m, const size_t size MAYBE_UNUSED)
 {
   ASSERT_ALWAYS(inited_lists);
   if (m == NULL)
@@ -166,7 +166,7 @@ void
 }
 
 void
-physical_free(const void *m, const size_t size)
+physical_free(void *m, const size_t size)
 {
   free_hugepages(m, size);
 }
@@ -235,7 +235,7 @@ realloc_aligned(void * p, const size_t old_size, const size_t new_size,
 }
 
 
-void free_aligned(const void * p)
+void free_aligned(void * p)
 {
 #ifdef HAVE_POSIX_MEMALIGN
     free((void *) p);
@@ -258,7 +258,7 @@ void *malloc_pagealigned(size_t sz)
     return p;
 }
 
-void free_pagealigned(const void * p)
+void free_pagealigned(void * p)
 {
     free_aligned(p);
 }
@@ -344,7 +344,7 @@ void *contiguous_malloc(const size_t size)
   return free_ptr;
 }
 
-void contiguous_free(const void *ptr)
+void contiguous_free(void *ptr)
 {
   ASSERT_ALWAYS(chunks_inited);
   dllist_ptr node;

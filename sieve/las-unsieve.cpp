@@ -2,39 +2,33 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "las-unsieve.h"
+#include "las-unsieve.hpp"
 #include "ularith.h"
-#include "las-norms.h"
-#include "las-debug.h"
+#include "las-norms.hpp"
+#include "las-debug.hpp"
 #include "gcd.h"
 #include "memory.h"
 
 static const int verify_gcd = 0; /* Enable slow but thorough test */
 
 /* Set every stride-th byte, starting at index 0, to 255 in an array of
-   stride unsieve_pattern_t's, and set all other bytes to 0. */
+   stride unsieve_data::pattern_t's, and set all other bytes to 0. */
 static void
-minisieve(unsieve_pattern_t * const array, const size_t stride)
+minisieve(unsieve_data::pattern_t * const array, const size_t stride)
 {
-    memset (array, 0, stride * sizeof(unsieve_pattern_t));
-    for (size_t i = 0; i < stride * sizeof(unsieve_pattern_t); i += stride)
+    memset (array, 0, stride * sizeof(unsieve_data::pattern_t));
+    for (size_t i = 0; i < stride * sizeof(unsieve_data::pattern_t); i += stride)
       ((unsigned char *) array)[i] = 255;
 }
 
-unsieve_aux_data_srcptr
-init_unsieve_data(uint32_t I)
+unsieve_data::unsieve_data(uint32_t I) : I(I)
 {
-  unsieve_aux_data_ptr us;
-  us = (unsieve_aux_data_ptr) malloc_aligned(sizeof(unsieve_aux_data), 16);
-  /* Store largest prime factor of k in us->lpf[k], 0 for k=0, 1 for k=1 */
-  us->entries = (unsieve_entry_t *) malloc (sizeof (unsieve_entry_t) * I);
-  FATAL_ERROR_CHECK(us->entries == NULL, "malloc failed");
-  us->entries[0].lpf = 0U;
-  us->entries[0].cof = 0U;
-  us->entries[0].start = 0U;
-  us->entries[1].lpf = 1U;
-  us->entries[1].cof = 1U;
-  us->entries[1].start = 0U;
+  entries = NULL;
+  if (I == 0) return;
+  /* Store largest prime factor of k in us.lpf[k], 0 for k=0, 1 for k=1 */
+  entries = new entry[I];
+  entries[0] = entry(0,0,0);
+  entries[1] = entry(1,1,0);
   for (unsigned int k = 2U; k < I; k++)
     {
       unsigned int p, c = k;
@@ -47,25 +41,41 @@ init_unsieve_data(uint32_t I)
         }
       p = (c == 1U) ? p : c;
       c = k; do {c /= p;} while (c % p == 0);
-      us->entries[k].lpf = p;
-      us->entries[k].cof = c;
-      us->entries[k].start = (I / 2U) % p;
+      entries[k] = entry(p, c, (I / 2U) % p);
     }
 
-    /* Create pattern for sieving 3 */
-    minisieve(us->pattern3, 3);
-    /* Create pattern for sieving 5 */
-    minisieve(us->pattern5, 5);
-    /* Create pattern for sieving 7 */
-    minisieve(us->pattern7, 7);
-
-  return us;
+    minisieve(pattern3, 3);
+    minisieve(pattern5, 5);
+    minisieve(pattern7, 7);
 }
 
-void clear_unsieve_data(unsieve_aux_data_srcptr us)
+unsieve_data::unsieve_data(unsieve_data const & o) : I(o.I)
 {
-  free (us->entries);
-  free_aligned (us);
+    entries = NULL;
+    if (I == 0) return;
+    entries = new entry[I];
+    memcpy(entries, o.entries, I * sizeof(entry));
+    memcpy(pattern3, o.pattern3, sizeof(pattern3));
+    memcpy(pattern5, o.pattern5, sizeof(pattern5));
+    memcpy(pattern7, o.pattern7, sizeof(pattern7));
+}
+
+unsieve_data & unsieve_data::operator=(unsieve_data const & o)
+{
+    if (I) delete[] entries;
+    I = o.I;
+    entries = new entry[I];
+    memcpy(entries, o.entries, I * sizeof(entry));
+    memcpy(pattern3, o.pattern3, sizeof(pattern3));
+    memcpy(pattern5, o.pattern5, sizeof(pattern5));
+    memcpy(pattern7, o.pattern7, sizeof(pattern7));
+    return *this;
+}
+
+unsieve_data::~unsieve_data()
+{
+    if (I == 0) return;
+    delete[] entries;
 }
 
 static inline void
@@ -89,28 +99,28 @@ unsieve_one_prime (unsigned char *line_start, const unsigned int p,
 
 static inline void
 unsieve_3(unsigned char *line_start, const unsigned int start_idx,
-          const unsigned int I, unsieve_aux_data_srcptr us)
+          const unsigned int I, unsieve_data const & us)
 {
-  const unsigned int I_upt  = I / sizeof (unsieve_pattern_t);
+  const unsigned int I_upt  = I / sizeof (unsieve_data::pattern_t);
   unsigned int i, pattern_idx;
-  unsieve_pattern_t p0, p1, p2;
-  unsieve_pattern_t * ul_line_start = (unsieve_pattern_t *) line_start;
+  unsieve_data::pattern_t p0, p1, p2;
+  unsieve_data::pattern_t * ul_line_start = (unsieve_data::pattern_t *) line_start;
 
-  if (sizeof(unsieve_pattern_t) == 4) {
+  if (sizeof(unsieve_data::pattern_t) == 4) {
     /* -4^(-1) == 2 (mod 3) */
     pattern_idx = (2 * start_idx) % 3;
-  } else if (sizeof(unsieve_pattern_t) == 8) {
+  } else if (sizeof(unsieve_data::pattern_t) == 8) {
     /* -8^(-1) == 1 (mod 3) */
     pattern_idx = start_idx;
-  } else if (sizeof(unsieve_pattern_t) == 16) {
+  } else if (sizeof(unsieve_data::pattern_t) == 16) {
     /* -16^(-1) == 2 (mod 3) */
     pattern_idx = (2 * start_idx) % 3;
   } else
     abort();
   
-  p0 = us->pattern3[pattern_idx];
-  p1 = us->pattern3[(pattern_idx + 1) % 3];
-  p2 = us->pattern3[(pattern_idx + 2) % 3];
+  p0 = us.pattern3[pattern_idx];
+  p1 = us.pattern3[(pattern_idx + 1) % 3];
+  p2 = us.pattern3[(pattern_idx + 2) % 3];
 
   ASSERT_ALWAYS(((unsigned char *)&p0)[start_idx] == 255);
   
@@ -130,31 +140,31 @@ unsieve_3(unsigned char *line_start, const unsigned int start_idx,
 
 static inline void
 unsieve_5(unsigned char *line_start, const unsigned int start_idx,
-          const unsigned int I, unsieve_aux_data_srcptr us)
+          const unsigned int I, unsieve_data const & us)
 {
-  const unsigned int I_upt  = I / sizeof (unsieve_pattern_t);
+  const unsigned int I_upt  = I / sizeof (unsieve_data::pattern_t);
   unsigned int i;
-  unsieve_pattern_t p0, p1, p2, p3, p4;
-  unsieve_pattern_t * ul_line_start = (unsieve_pattern_t *) line_start;
+  unsieve_data::pattern_t p0, p1, p2, p3, p4;
+  unsieve_data::pattern_t * ul_line_start = (unsieve_data::pattern_t *) line_start;
   size_t pattern_idx;
 
-  if (sizeof(unsieve_pattern_t) == 4) {
+  if (sizeof(unsieve_data::pattern_t) == 4) {
     /* -4^(-1) == 1 (mod 5) */
     pattern_idx = start_idx;
-  } else if (sizeof(unsieve_pattern_t) == 8) {
+  } else if (sizeof(unsieve_data::pattern_t) == 8) {
     /* -8^(-1) == 3 (mod 5) */
     pattern_idx = (3 * start_idx) % 5;
-  } else if (sizeof(unsieve_pattern_t) == 16) {
+  } else if (sizeof(unsieve_data::pattern_t) == 16) {
     /* -16^(-1) == -1 (mod 5) */
     pattern_idx = (5 - start_idx) % 5;
   } else
     abort();
   
-  p0 = us->pattern5[pattern_idx];
-  p1 = us->pattern5[(pattern_idx + 1) % 5];
-  p2 = us->pattern5[(pattern_idx + 2) % 5];
-  p3 = us->pattern5[(pattern_idx + 3) % 5];
-  p4 = us->pattern5[(pattern_idx + 4) % 5];
+  p0 = us.pattern5[pattern_idx];
+  p1 = us.pattern5[(pattern_idx + 1) % 5];
+  p2 = us.pattern5[(pattern_idx + 2) % 5];
+  p3 = us.pattern5[(pattern_idx + 3) % 5];
+  p4 = us.pattern5[(pattern_idx + 4) % 5];
 
   if (start_idx < sizeof(p0)) {
       ASSERT_ALWAYS(((unsigned char *)&p0)[start_idx] == 255);
@@ -184,33 +194,33 @@ unsieve_5(unsigned char *line_start, const unsigned int start_idx,
 
 static inline void
 unsieve_7(unsigned char *line_start, const unsigned int start_idx,
-          const unsigned int I, unsieve_aux_data_srcptr us)
+          const unsigned int I, unsieve_data const & us)
 {
-  const unsigned int I_upt  = I / sizeof (unsieve_pattern_t);
+  const unsigned int I_upt  = I / sizeof (unsieve_data::pattern_t);
   unsigned int i;
-  unsieve_pattern_t p0, p1, p2, p3, p4, p5, p6;
-  unsieve_pattern_t * ul_line_start = (unsieve_pattern_t *) line_start;
+  unsieve_data::pattern_t p0, p1, p2, p3, p4, p5, p6;
+  unsieve_data::pattern_t * ul_line_start = (unsieve_data::pattern_t *) line_start;
   size_t pattern_idx;
 
-  if (sizeof(unsieve_pattern_t) == 4) {
+  if (sizeof(unsieve_data::pattern_t) == 4) {
     /* -4^(-1) == 5 (mod 7) */
     pattern_idx = (5 * start_idx) % 7;
-  } else if (sizeof(unsieve_pattern_t) == 8) {
+  } else if (sizeof(unsieve_data::pattern_t) == 8) {
     /* -8^(-1) == -1 (mod 7) */
     pattern_idx = (7 - start_idx) % 7;
-  } else if (sizeof(unsieve_pattern_t) == 16) {
+  } else if (sizeof(unsieve_data::pattern_t) == 16) {
     /* -16^(-1) == 3 (mod 7) */
     pattern_idx = (3 * start_idx) % 7;
   } else
     abort();
   
-  p0 = us->pattern7[pattern_idx];
-  p1 = us->pattern7[(pattern_idx + 1) % 7];
-  p2 = us->pattern7[(pattern_idx + 2) % 7];
-  p3 = us->pattern7[(pattern_idx + 3) % 7];
-  p4 = us->pattern7[(pattern_idx + 4) % 7];
-  p5 = us->pattern7[(pattern_idx + 5) % 7];
-  p6 = us->pattern7[(pattern_idx + 6) % 7];
+  p0 = us.pattern7[pattern_idx];
+  p1 = us.pattern7[(pattern_idx + 1) % 7];
+  p2 = us.pattern7[(pattern_idx + 2) % 7];
+  p3 = us.pattern7[(pattern_idx + 3) % 7];
+  p4 = us.pattern7[(pattern_idx + 4) % 7];
+  p5 = us.pattern7[(pattern_idx + 5) % 7];
+  p6 = us.pattern7[(pattern_idx + 6) % 7];
 
   if (start_idx < sizeof(p0)) {
       ASSERT_ALWAYS(((unsigned char *)&p0)[start_idx] == 255);
@@ -248,7 +258,7 @@ unsieve_7(unsigned char *line_start, const unsigned int start_idx,
 static void
 unsieve_not_coprime_line(unsigned char * line_start,
                          const unsigned int j, const unsigned int min_p,
-                         const unsigned int I, unsieve_aux_data_srcptr us)
+                         const unsigned int I, unsieve_data const & us)
 {
   unsigned int p, start_idx, c = j;
 
@@ -260,9 +270,9 @@ unsieve_not_coprime_line(unsigned char * line_start,
 
   while (1)
     {
-      p = us->entries[c].lpf; /* set p to largest prime factor of c */
-      start_idx = us->entries[c].start;
-      c = us->entries[c].cof;
+      p = us.entries[c].lpf; /* set p to largest prime factor of c */
+      start_idx = us.entries[c].start;
+      c = us.entries[c].cof;
       if (p < min_p)
         return;
       if (p <= 7)
@@ -273,9 +283,9 @@ unsieve_not_coprime_line(unsigned char * line_start,
   if (p == 7U)
     {
       unsieve_7(line_start, start_idx, I, us);
-      p = us->entries[c].lpf;
-      start_idx = us->entries[c].start;
-      c = us->entries[c].cof;
+      p = us.entries[c].lpf;
+      start_idx = us.entries[c].start;
+      c = us.entries[c].cof;
     }
 
   if (p < min_p)
@@ -284,9 +294,9 @@ unsieve_not_coprime_line(unsigned char * line_start,
   if (p == 5U)
     {
       unsieve_5(line_start, start_idx, I, us);
-      p = us->entries[c].lpf;
-      start_idx = us->entries[c].start;
-      c = us->entries[c].cof;
+      p = us.entries[c].lpf;
+      start_idx = us.entries[c].start;
+      c = us.entries[c].cof;
     }
 
   if (p < min_p)
@@ -300,21 +310,22 @@ unsieve_not_coprime_line(unsigned char * line_start,
 }
 
 
-j_div_srcptr
-init_j_div(uint32_t J)
+j_divisibility_helper::j_divisibility_helper(uint32_t J) : J(J)
 {
   /* Store largest prime factor of k in j_div[k].p, for 1 < k < J,
      and store 0 for k=0, 1 for k=1 */
-  j_div_ptr j_div = (j_div_ptr) malloc (sizeof (struct j_div_s) * J);
-  FATAL_ERROR_CHECK(j_div == NULL, "malloc failed");
-  j_div[0].p   = 0U;
-  j_div[0].cof = 0U;
-  j_div[0].inv = 0U;
-  j_div[0].bound = 0U;
-  j_div[1].p   = 1U;
-  j_div[1].cof = 1U;
-  j_div[1].inv = 1U;
-  j_div[1].inv = UINT_MAX;
+  entries = NULL;
+  if (!J) return;
+  ASSERT_ALWAYS(J >= 2);
+  entries = new entry[J];
+  entries[0].p   = 0U;
+  entries[0].cof = 0U;
+  entries[0].inv = 0U;
+  entries[0].bound = 0U;
+  entries[1].p   = 1U;
+  entries[1].cof = 1U;
+  entries[1].inv = 1U;
+  entries[1].inv = UINT_MAX;
   for (unsigned int k = 2U; k < J; k++) {
     /* Find largest prime factor of k */
     unsigned int p, c = k;
@@ -327,18 +338,35 @@ init_j_div(uint32_t J)
       }
     p = (c == 1U) ? p : c;
     c = k; do {c /= p;} while (c % p == 0);
-    j_div[k].p = p;
-    j_div[k].cof = c;
-    j_div[k].inv = p == 2 ? 0 : (unsigned int)ularith_invmod(p);
-    j_div[k].bound = UINT_MAX / p;
+    entries[k].p = p;
+    entries[k].cof = c;
+    entries[k].inv = p == 2 ? 0 : (unsigned int)ularith_invmod(p);
+    entries[k].bound = UINT_MAX / p;
   }
-  return (j_div_srcptr) j_div;
 }
 
-void
-clear_j_div(j_div_srcptr j_div)
+j_divisibility_helper::j_divisibility_helper(j_divisibility_helper const & o) : J(o.J)
 {
-  free((void *)j_div);
+    entries = NULL;
+    if (J == 0) return;
+    entries = new entry[J];
+    memcpy(entries, o.entries, J * sizeof(entry));
+}
+
+j_divisibility_helper & j_divisibility_helper::operator=(j_divisibility_helper const & o)
+{
+    if (J) delete[] entries;
+    J = o.J;
+    entries = new entry[J];
+    memcpy(entries, o.entries, J * sizeof(entry));
+    return *this;
+}
+
+
+j_divisibility_helper::~j_divisibility_helper()
+{
+    if (!J) return;
+    delete[] entries;
 }
 
 static inline int
@@ -354,7 +382,7 @@ sieve_info_test_lognorm (const unsigned char C1, const unsigned char C2,
 MAYBE_UNUSED static void
 search_survivors_in_line1(unsigned char * const SS[2],
         const unsigned char bound[2], const unsigned int log_I,
-        const unsigned int j, const int N MAYBE_UNUSED, j_div_srcptr j_div,
+        const unsigned int j, const int N MAYBE_UNUSED, j_divisibility_helper const & j_div,
         const unsigned int td_max, std::vector<uint32_t> &survivors)
 {
     unsigned int div[6][2], nr_div;
@@ -412,8 +440,8 @@ search_survivors_in_line1(unsigned char * const SS[2],
 void
 search_survivors_in_line(unsigned char * const SS[2], 
         const unsigned char bound[2], const unsigned int log_I,
-        const unsigned int j, const int N, j_div_srcptr j_div,
-        const unsigned int td_max, unsieve_aux_data_srcptr us,
+        const unsigned int j, const int N, j_divisibility_helper const & j_div,
+        const unsigned int td_max, unsieve_data const & us,
         std::vector<uint32_t> &survivors)
 {
     /* In line j = 0, only the coordinate (i, j) = (-1, 0) may survive */

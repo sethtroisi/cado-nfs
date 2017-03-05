@@ -1,5 +1,5 @@
-#ifndef LAS_REPORT_STATS_H_
-#define LAS_REPORT_STATS_H_
+#ifndef LAS_REPORT_STATS_HPP_
+#define LAS_REPORT_STATS_HPP_
 
 /* las_report: Structure for gathering reports and stats on sieving */
 
@@ -27,4 +27,4 @@ void las_report_clear(las_report_ptr p);
 void las_report_accumulate(las_report_ptr p, las_report_ptr q);
 void las_report_copy(las_report_ptr p, las_report_ptr q);
 
-#endif	/* LAS_REPORT_STATS_H_ */
+#endif	/* LAS_REPORT_STATS_HPP_ */

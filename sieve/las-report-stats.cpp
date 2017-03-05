@@ -1,7 +1,7 @@
 #include "cado.h"
 #include <stdlib.h>
 #include <string.h>
-#include "las-report-stats.h"
+#include "las-report-stats.hpp"
 
 void las_report_init(las_report_ptr p)
 {

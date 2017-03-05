@@ -1,5 +1,5 @@
-#ifndef BUCKET_H_
-#define BUCKET_H_
+#ifndef BUCKET_HPP_
+#define BUCKET_HPP_
 
 /*
  * Bucket sieving: radix-sort sieve updates as they are created.
@@ -15,8 +15,8 @@
 #endif
 #include "misc.h"
 #include "fb-types.h"
-#include "fb.h"
-#include "las-debug.h"
+#include "fb.hpp"
+#include "las-debug.hpp"
 
 /*
  * This bucket module provides a way to store elements (that are called
@@ -214,7 +214,7 @@ class bucket_array_t : private NonCopyable {
   }
   void realloc_slice_start(size_t);
   void log_this_update (const update_t update, uint64_t offset,
-                        uint64_t bucket_number, where_am_I_ptr w) const;
+                        uint64_t bucket_number, where_am_I& w) const;
 public:
   /* Constructor sets everything to zero, and does not allocate memory.
      allocate_memory() does all the allocation. */
@@ -286,7 +286,7 @@ public:
      coresponding bucket */
   void push_update(const uint64_t offset, const fbprime_t p,
       const slice_offset_t slice_offset, const slice_index_t slice_index,
-      where_am_I_ptr w MAYBE_UNUSED)
+      where_am_I& w MAYBE_UNUSED)
   {
     const uint64_t bucket_number = offset / bucket_region;
     ASSERT_EXPENSIVE(bucket_number < n_bucket);
@@ -307,13 +307,13 @@ template <int INPUT_LEVEL>
 void
 downsort(bucket_array_t<INPUT_LEVEL - 1, longhint_t> &BA_out,
          const bucket_array_t<INPUT_LEVEL, shorthint_t> &BA_in,
-         uint32_t bucket_index, where_am_I_ptr w);
+         uint32_t bucket_index, where_am_I& w);
 
 template <int INPUT_LEVEL>
 void
 downsort(bucket_array_t<INPUT_LEVEL - 1, longhint_t> &BA_out,
          const bucket_array_t<INPUT_LEVEL, longhint_t> &BA_in,
-         uint32_t bucket_index, where_am_I_ptr w);
+         uint32_t bucket_index, where_am_I& w);
 
 /* A class that stores updates in a single "bucket".
    It's really just a container class with pre-allocated array for storage,
@@ -433,4 +433,4 @@ class sieve_checksum {
   void update(const unsigned char *, size_t);
 };
 
-#endif	/* BUCKET_H_ */
+#endif	/* BUCKET_HPP_ */

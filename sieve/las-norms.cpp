@@ -3,6 +3,7 @@
 #include <limits.h>
 #include <cmath>               /* ceil signbit */
 #include <pthread.h>
+#include <algorithm>
 
 #ifdef HAVE_SSE41
 #include <smmintrin.h>
@@ -17,9 +18,9 @@
 #include "portability.h"
 
 #include "las-config.h"
-#include "las-types.h"
-#include "las-debug.h"
-#include "las-norms.h"
+#include "las-types.hpp"
+#include "las-debug.hpp"
+#include "las-norms.hpp"
 #include "utils.h"
 #include "verbose.h"
 
@@ -181,8 +182,8 @@ static inline double lg2 (double i, double add, double scale) {
 #ifdef HAVE_GCC_STYLE_AMD64_INLINE_ASM
   __asm__ __volatile__ (
             "psrlq $0x20,  %0    \n"
-	    "cvtdq2pd      %0, %0\n" /* Mandatory in packed double even it's non packed! */
-	    : "+&x" (i));            /* Really need + here! i is not modified in C code! */
+            "cvtdq2pd      %0, %0\n" /* Mandatory in packed double even it's non packed! */
+            : "+&x" (i));            /* Really need + here! i is not modified in C code! */
   return (i - add) * scale;
 #else
   /* Same function, but in x86 gcc needs to transfer the input i from a
@@ -204,8 +205,8 @@ static inline double lg2abs (double i, double add, double scale) {
   __asm__ __volatile__ (
             "psllq $0x01,  %0    \n"
             "psrlq $0x21,  %0    \n"
-	    "cvtdq2pd      %0, %0\n" /* Mandatory in packed double even it's non packed! */
-	    : "+&x" (i));            /* Really need + here! i is not modified in C code! */
+            "cvtdq2pd      %0, %0\n" /* Mandatory in packed double even it's non packed! */
+            : "+&x" (i));            /* Really need + here! i is not modified in C code! */
   return (i - add) * scale;
 #else
   void *tg = &i;
@@ -225,14 +226,14 @@ MAYBE_UNUSED static inline void w64lg2abs(double i, double add, double scale, ui
   __asm__ __volatile__ (
             "psllq $0x01,  %0                 \n"
             "psrlq $0x21,  %0                 \n"
-	    "cvtdq2pd      %0,              %0\n"
-	    : "+&x" (i));
+            "cvtdq2pd      %0,              %0\n"
+            : "+&x" (i));
   i = (i - add) * scale;
   __asm__ __volatile__ (
-	    "cvttpd2dq     %0,       %0       \n" /* 0000 0000 0000 000Y */
-	    "punpcklbw     %0,       %0       \n" /* 0000 0000 0000 00YY */
-	    "pshuflw    $0x00,       %0,    %0\n" /* 0000 0000 YYYY YYYY */
-	    : "+&x" (i));
+            "cvttpd2dq     %0,       %0       \n" /* 0000 0000 0000 000Y */
+            "punpcklbw     %0,       %0       \n" /* 0000 0000 0000 00YY */
+            "pshuflw    $0x00,       %0,    %0\n" /* 0000 0000 YYYY YYYY */
+            : "+&x" (i));
   *(double *)&addr[decal] = i;
 #else
   void *tg = &i;
@@ -251,19 +252,19 @@ MAYBE_UNUSED static inline void w64lg2abs(double i, double add, double scale, ui
 */
 MAYBE_UNUSED static inline void w128lg2abs(__m128d i, const __m128d add, const __m128d scale, uint8_t *addr, const ssize_t decal) {
   __asm__ __volatile__ (
-	   "psllq     $0x01,    %0       \n" /* Dont use pabsd! */
-	   "psrlq     $0x01,    %0       \n" /* i = fast_abs(i) */
-	   "shufps    $0xED,    %0,    %0\n"
-	   "cvtdq2pd  %0,       %0       \n"
-	   : "+&x"(i));
+           "psllq     $0x01,    %0       \n" /* Dont use pabsd! */
+           "psrlq     $0x01,    %0       \n" /* i = fast_abs(i) */
+           "shufps    $0xED,    %0,    %0\n"
+           "cvtdq2pd  %0,       %0       \n"
+           : "+&x"(i));
   i = _mm_mul_pd(_mm_sub_pd(i, add), scale);
   __asm__ __volatile__ (
-	   "cvttpd2dq %0,       %0       \n" /* 0000 0000 000X 000Y */
-	   "packssdw  %0,       %0       \n" /* 0000 0000 0000 0X0Y */
-	   "punpcklbw %0,       %0       \n" /* 0000 0000 00XX 00YY */
-	   "punpcklwd %0,       %0       \n" /* 0000 XXXX 0000 YYYY */
-	   "pshufd    $0xA0,    %0,    %0\n" /* XXXX XXXX YYYY YYYY */
-	   : "+&x"(i));
+           "cvttpd2dq %0,       %0       \n" /* 0000 0000 000X 000Y */
+           "packssdw  %0,       %0       \n" /* 0000 0000 0000 0X0Y */
+           "punpcklbw %0,       %0       \n" /* 0000 0000 00XX 00YY */
+           "punpcklwd %0,       %0       \n" /* 0000 XXXX 0000 YYYY */
+           "pshufd    $0xA0,    %0,    %0\n" /* XXXX XXXX YYYY YYYY */
+           : "+&x"(i));
   *(__m128d *)&addr[decal] = i; /* addr and decal are 16 bytes aligned: MOVAPD */
 }
 
@@ -275,17 +276,17 @@ MAYBE_UNUSED static inline void w128lg2abs(__m128d i, const __m128d add, const _
 */
 static inline __m128i _mm_lg2abs(__m128d *i, const __m128d add, const __m128d scale) {
   __asm__ __volatile__ (
-	   "psllq     $0x01,    %0       \n" /* Dont use pabsd! */
-	   "psrlq     $0x01,    %0       \n"
-	   "shufps    $0xED,    %0,    %0\n"
-	   "cvtdq2pd  %0,       %0       \n"
-	   : "+&x"(*i));
+           "psllq     $0x01,    %0       \n" /* Dont use pabsd! */
+           "psrlq     $0x01,    %0       \n"
+           "shufps    $0xED,    %0,    %0\n"
+           "cvtdq2pd  %0,       %0       \n"
+           : "+&x"(*i));
   *i = _mm_mul_pd(_mm_sub_pd(*i, add), scale);
   __asm__ __volatile__ (
-	   "cvttpd2dq %0,       %0       \n" /* 0000 0000 000X 000Y */
-	   "packssdw  %0,       %0       \n" /* 0000 0000 0000 0X0Y */
-	   "packuswb  %0,       %0       \n" /* 0000 0000 0000 00XY */
-	   : "+&x"(*i));
+           "cvttpd2dq %0,       %0       \n" /* 0000 0000 000X 000Y */
+           "packssdw  %0,       %0       \n" /* 0000 0000 0000 0X0Y */
+           "packuswb  %0,       %0       \n" /* 0000 0000 0000 00XY */
+           : "+&x"(*i));
   return *(__m128i *) i;
 }
 #endif  /* defined(HAVE_SSE2) && defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM) */
@@ -310,7 +311,7 @@ static inline double compute_f (const unsigned int d, const double *u, const dou
 }
 
 /* This function computes the roots of the polynome F(i,1) = ln2(f(i))
-   and the roots of the first and second derivates of F.
+   and the roots of the first and second derivatives of F.
    These roots are useful to begin the smart initialization of the normalization.
    cf las-config.h, SMART_NORM.
 
@@ -321,7 +322,6 @@ static inline double compute_f (const unsigned int d, const double *u, const dou
    max_abs_root = Absolute maximum value of a root (before and after, the root is useless).
    precision = minimal need precision for each root (usually 1/J = 2/I).
    Output:
-   nroots = number of roots.
    roots = the roots of F, F', F", and pseudo root 0.0 added in F roots.
 
    NEED:
@@ -331,9 +331,9 @@ static inline double compute_f (const unsigned int d, const double *u, const dou
    So, p size is 2 * degree - 1, and Roots size is 2 * degree - 2.
 */
 
-/* Only for qsort. MacOSX doesn't accept a function is declared into another. Odd... */
-static int cmp_root (const void *a, const void *b) {
-  return (((root_ptr) a)->value > ((root_ptr)b)->value) ? 1 : -1;
+bool operator<(smart_norm_root const & a, smart_norm_root const & b)
+{
+  return a.value < b.value;
 }
 
 /* The norm initialisation code needs the page size; we set it here as this
@@ -344,48 +344,52 @@ static void set_lg_page()
     lg_page = pagesize();
 }
 
-void init_norms_roots_internal (unsigned int degree, double *coeff, double max_abs_root, double precision, unsigned int *nroots, root_ptr roots)
+void init_norms_roots_internal (unsigned int degree, std::vector<double> & coeff, double max_abs_root, double precision, std::vector<smart_norm_root> & roots)
 {
 
-  const double_poly_t f = {{ (int) degree, coeff }};
+  const double_poly_t f = {{ (int) degree, &(coeff[0]) }};
   double_poly_t df, ddf, f_ddf, df_df, d2f;
   mpz_t           p[(degree << 1) + 1];
-  root_struct Roots[degree << 1];
-  unsigned int n, cumul_nroots;
-  size_t k;
+  usp_root_data Roots[degree << 1];
+  unsigned int n;
 
   set_lg_page();
-  for (k = degree << 1, mpz_init (p[k]); k--; mpz_init (p[k]), root_struct_init (&(Roots[k])));
-  for (k = degree + 1; k--; mpz_set_d (p[k], coeff[k]));
+  for (unsigned int k = 0 ; k <= (degree << 1) ; k++)
+      mpz_init (p[k]);
+  for (unsigned int k = 0 ; k < (degree << 1) ; k++)
+      usp_root_data_init (&(Roots[k]));
+  for (unsigned int k = 0 ; k <= degree; k++)
+      mpz_set_d (p[k], coeff[k]);
 
+  roots.clear();
+  roots.reserve(4 * degree + 1);
   /* Pseudo root 0.0 is inserted first as a root of F */
-  roots[0].derivate = 0;
-  roots[0].value = 0.;
-  cumul_nroots = 1;
+  roots.push_back(smart_norm_root());
 
   if (degree) {
     /* The roots of F are inserted in roots */
     n = numberOfRealRoots (p, degree, max_abs_root, 0, Roots);
-    for (k = n; k--; ) {
-        roots[k + cumul_nroots].derivate = 0;
-        roots[k + cumul_nroots].value = rootRefine (&(Roots[k]), p, degree, precision);
+    for (unsigned int k = 0 ; k < n ; k++) {
+        smart_norm_root s(0, rootRefine (&(Roots[k]), p, degree, precision));
+        roots.push_back(s);
     }
-    cumul_nroots += n;
 
     /* Computation of F' */
+    /* XXX should use mpz_poly_derivative instead */
     double_poly_init (df, MAX(0,((int)degree - 1)));
     double_poly_derivative (df, f);
 
     /* The roots of F' are inserted in roots */
-    for (k = df->deg + 1; k--; mpz_set_d (p[k], df->coeff[k]));
+    for (unsigned int k = df->deg + 1; k--; mpz_set_d (p[k], df->coeff[k]));
     n = numberOfRealRoots (p, df->deg, max_abs_root, 0, Roots);
-    for (k = n; k--; ) {
-        roots[k + cumul_nroots].derivate = 1;
-        roots[k + cumul_nroots].value = rootRefine (&(Roots[k]), p, df->deg, precision);
+    for (unsigned int k = 0 ; k < n ; k++) {
+        smart_norm_root s(1, rootRefine (&(Roots[k]), p, df->deg, precision));
+        roots.push_back(s);
     }
-    cumul_nroots += n;
 
     /* Computation of F" */
+    /* XXX Hmm. We're computing (f/f')', here...
+     */
     double_poly_init (df_df, df->deg + df->deg);
     double_poly_init (ddf, MAX(0,((int)df->deg - 1)));
     double_poly_init (f_ddf, f->deg + ddf->deg);
@@ -396,13 +400,12 @@ void init_norms_roots_internal (unsigned int degree, double *coeff, double max_a
     double_poly_subtract (d2f, f_ddf, df_df);
 
     /* The roots of F" are inserted in roots */
-    for (k = d2f->deg + 1; k--; mpz_set_d (p[k], d2f->coeff[k]));
+    for (unsigned int k = d2f->deg + 1; k--; mpz_set_d (p[k], d2f->coeff[k]));
     n = numberOfRealRoots (p, d2f->deg, max_abs_root, 0, Roots);
-    for (k = n; k--; ) {
-        roots[k + cumul_nroots].derivate = 2;
-        roots[k + cumul_nroots].value = rootRefine (&(Roots[k]), p, d2f->deg, precision);
+    for (unsigned int k = 0 ; k < n ; k++) {
+        smart_norm_root s(2, rootRefine (&(Roots[k]), p, d2f->deg, precision));
+        roots.push_back(s);
     }
-    cumul_nroots += n;
 
     /* Clear double poly */
     double_poly_clear(df);
@@ -411,20 +414,22 @@ void init_norms_roots_internal (unsigned int degree, double *coeff, double max_a
     double_poly_clear(df_df);
     double_poly_clear(d2f);
 
-    /* roots must be sort */
-    qsort (roots, cumul_nroots, sizeof(root_t), cmp_root);
+    std::sort(roots.begin(), roots.end());
   }
-  *nroots = cumul_nroots;
 
-  for (k = degree << 1, mpz_clear (p[k]); k--; mpz_clear (p[k]), root_struct_clear (&(Roots[k])));
+  for (unsigned int k = 0 ; k <= (degree << 1) ; k++)
+      mpz_clear (p[k]);
+  for (unsigned int k = 0 ; k < (degree << 1) ; k++)
+      usp_root_data_clear (&(Roots[k]));
 }
 
 /* A wrapper for the function above */
-void init_norms_roots (sieve_info_ptr si, unsigned int side)
+void init_norms_roots (sieve_info & si, unsigned int side)
 {
-  init_norms_roots_internal (si->cpoly->pols[side]->deg, si->sides[side]->fijd,
-			     (double) ((si->I + 16) >> 1), 1. / (double) ((si->I) >> 1),
-			     &(si->sides[side]->nroots), si->sides[side]->roots);
+  init_norms_roots_internal (si.cpoly->pols[side]->deg, si.sides[side].fijd,
+                             (double) ((si.I + 16) >> 1),
+                             1. / (double) ((si.I) >> 1),
+                             si.sides[side].roots);
 }
 
 /* Initialize lognorms of the bucket region S[] number J, for F(i,j) with
@@ -485,13 +490,13 @@ void init_degree_one_norms_bucket_region_internal (unsigned char *S, uint32_t J,
     */
     if (LIKELY(fabs(g) * (1ULL << 51) >= fabs(u0J)))
       if (signbit(g)) {
-	g = -g;
-	y = COMPUTE_Y(g);
-	if (rac >= -Idiv2) goto cas3; else goto cas2;
+        g = -g;
+        y = COMPUTE_Y(g);
+        if (rac >= -Idiv2) goto cas3; else goto cas2;
       }
       else {
-	y = COMPUTE_Y(g);
-	if (rac >= -Idiv2) goto cas1; else goto cas4;
+        y = COMPUTE_Y(g);
+        if (rac >= -Idiv2) goto cas1; else goto cas4;
       }
     else {
       y = GUARD;
@@ -508,13 +513,13 @@ void init_degree_one_norms_bucket_region_internal (unsigned char *S, uint32_t J,
     for (i = rac + cexp2[y] * invu1, inc = 1;; y--) {
       ts = -int_i;
       if (UNLIKELY(i >= Idiv2_double)) {
-	ts += Idiv2;
+        ts += Idiv2;
 #ifdef DEBUG_INIT_RAT
-	fprintf (stderr, "A1.END : i1=%ld i2=%d, ts=%ld, y=%u, rac=%e\n", Idiv2 - ts, Idiv2, ts, y, rac);
+        fprintf (stderr, "A1.END : i1=%ld i2=%d, ts=%ld, y=%u, rac=%e\n", Idiv2 - ts, Idiv2, ts, y, rac);
 #endif
-	memset(S, y, ts);
-	S += ts;
-	goto nextj;
+        memset(S, y, ts);
+        S += ts;
+        goto nextj;
       }
       int_i = (int) i; /* Overflow is not possible here */
       ts += int_i;
@@ -522,8 +527,8 @@ void init_degree_one_norms_bucket_region_internal (unsigned char *S, uint32_t J,
       fprintf (stderr, "A1 : i1=%ld, i2=%d, ts=%ld, y=%u, rac=%e\n", int_i - ts, int_i, ts, y, rac);
 #endif
       if (LIKELY(ts <= MEMSET_MIN)) {
-	if (!(ts + inc)) goto np1;
-	memset(S, y, MEMSET_MIN);
+        if (!(ts + inc)) goto np1;
+        memset(S, y, MEMSET_MIN);
       }
       else memset(S, y, ts);
       S += ts;
@@ -534,12 +539,12 @@ void init_degree_one_norms_bucket_region_internal (unsigned char *S, uint32_t J,
     g = u0J + u1 * int_i;
     if (UNLIKELY(trunc(rac) >= Idiv2_double_minus_one)) {
       for ( ; int_i < Idiv2; int_i++) {
-	y = COMPUTE_Y(g);
+        y = COMPUTE_Y(g);
 #ifdef DEBUG_INIT_RAT
-	fprintf (stderr, "A2.1 : i=%d, y=%u, rac=%e\n", int_i, y, rac);
+        fprintf (stderr, "A2.1 : i=%d, y=%u, rac=%e\n", int_i, y, rac);
 #endif
-	*S++ = y;
-	g += u1;
+        *S++ = y;
+        g += u1;
       }
       goto nextj;
     }
@@ -572,13 +577,13 @@ void init_degree_one_norms_bucket_region_internal (unsigned char *S, uint32_t J,
     for (;; y++) {
       ts = -int_i;
       if (UNLIKELY(i >= Idiv2_double)) {
-	ts += Idiv2;
+        ts += Idiv2;
 #ifdef DEBUG_INIT_RAT
-	fprintf (stderr, "A4.END : i1=%ld, i2=%d, ts=%ld, y=%u, rac=%e\n", Idiv2 - ts, Idiv2, ts, y, rac);
+        fprintf (stderr, "A4.END : i1=%ld, i2=%d, ts=%ld, y=%u, rac=%e\n", Idiv2 - ts, Idiv2, ts, y, rac);
 #endif
-	memset(S, y, ts);
-	S += ts;
-	goto nextj;
+        memset(S, y, ts);
+        S += ts;
+        goto nextj;
       }
       int_i = (int) i; /* Overflow is not possible here */
       ts += int_i;
@@ -586,9 +591,9 @@ void init_degree_one_norms_bucket_region_internal (unsigned char *S, uint32_t J,
       fprintf (stderr, "A4 : i1=%ld, i2=%d, ts=%ld, y=%u, rac=%e\n", int_i - ts, int_i, ts, y, rac);
 #endif
       if (LIKELY(ts <= MEMSET_MIN))
-	memset (S, y, MEMSET_MIN);
+        memset (S, y, MEMSET_MIN);
       else
-	memset(S, y, ts);
+        memset(S, y, ts);
       S += ts;
       i = i * d0 + d1;
     }
@@ -598,13 +603,13 @@ void init_degree_one_norms_bucket_region_internal (unsigned char *S, uint32_t J,
     for (i = rac - cexp2[y] * invu1, inc = 1;; y--) {
       ts = -int_i;
       if (UNLIKELY(i >= Idiv2_double)) {
-	ts += Idiv2;
+        ts += Idiv2;
 #ifdef DEBUG_INIT_RAT
-	fprintf (stderr, "B1.END : i1=%ld, i2=%d, ts=%ld, y=%u, rac=%e\n", Idiv2 - ts, Idiv2, ts, y, rac);
+        fprintf (stderr, "B1.END : i1=%ld, i2=%d, ts=%ld, y=%u, rac=%e\n", Idiv2 - ts, Idiv2, ts, y, rac);
 #endif
-	memset(S, y, ts);
-	S += ts;
-	goto nextj;
+        memset(S, y, ts);
+        S += ts;
+        goto nextj;
       }
       int_i = (int) i; /* Overflow is not possible here */
       ts += int_i;
@@ -612,8 +617,8 @@ void init_degree_one_norms_bucket_region_internal (unsigned char *S, uint32_t J,
       fprintf (stderr, "B1 : i1=%ld, i2=%d, ts=%ld, y=%u, rac=%e\n", int_i - ts, int_i, ts, y, rac);
 #endif
       if (LIKELY(ts <= MEMSET_MIN)) {
-	if (!(ts + inc)) goto np2;
-	memset(S, y, MEMSET_MIN);
+        if (!(ts + inc)) goto np2;
+        memset(S, y, MEMSET_MIN);
       }
       else memset(S, y, ts);
       S += ts;
@@ -624,12 +629,12 @@ void init_degree_one_norms_bucket_region_internal (unsigned char *S, uint32_t J,
     g = -(u0J + u1 * int_i);
     if (UNLIKELY(trunc(rac) >= Idiv2_double_minus_one)) {
       for ( ; int_i < Idiv2; int_i++) {
-	y = COMPUTE_Y(g);
+        y = COMPUTE_Y(g);
 #ifdef DEBUG_INIT_RAT
-	fprintf (stderr, "B2.1 : i=%d, y=%u, rac=%e\n", int_i, y, rac);
+        fprintf (stderr, "B2.1 : i=%d, y=%u, rac=%e\n", int_i, y, rac);
 #endif
-	*S++ = y;
-	g -= u1;
+        *S++ = y;
+        g -= u1;
       }
       goto nextj;
     }
@@ -662,13 +667,13 @@ void init_degree_one_norms_bucket_region_internal (unsigned char *S, uint32_t J,
     for (;; y++) {
       ts = -int_i;
       if (UNLIKELY(i >= Idiv2_double)) {
-	ts += Idiv2;
+        ts += Idiv2;
 #ifdef DEBUG_INIT_RAT
-	fprintf (stderr, "B4.END : i1=%ld i2=%d, ts=%ld, y=%u, rac=%e\n", Idiv2 - ts, Idiv2, ts, y, rac);
+        fprintf (stderr, "B4.END : i1=%ld i2=%d, ts=%ld, y=%u, rac=%e\n", Idiv2 - ts, Idiv2, ts, y, rac);
 #endif
-	memset(S, y, ts);
-	S += ts;
-	goto nextj;
+        memset(S, y, ts);
+        S += ts;
+        goto nextj;
       }
       int_i = (int) i; /* Overflow is not possible here */
       ts += int_i;
@@ -676,9 +681,9 @@ void init_degree_one_norms_bucket_region_internal (unsigned char *S, uint32_t J,
       fprintf (stderr, "B4 : i1=%ld i2=%d, ts=%ld, y=%u, rac=%e\n", int_i - ts, int_i, ts, y, rac);
 #endif
       if (LIKELY(ts <= MEMSET_MIN))
-	memset(S, y, MEMSET_MIN);
+        memset(S, y, MEMSET_MIN);
       else
-	memset(S, y, ts);
+        memset(S, y, ts);
       S += ts;
       i = i * d0 + d1;
     }
@@ -705,7 +710,7 @@ poly_scale_m128d (__m128d  *u, const double *t, unsigned int d, const double h)
 
 /* Exact initialisation of F(i,j) with degre >= 2 (not mandatory). Slow.
    Internal function, only with simple types, for unit/integration testing. */
-void init_exact_degree_X_norms_bucket_region_internal (unsigned char *S, uint32_t J, uint32_t I, double scale, unsigned int d, double *fijd)
+void init_exact_degree_X_norms_bucket_region_internal (unsigned char *S, uint32_t J, uint32_t I, double scale, unsigned int d, std::vector<double> const & fijd)
 {
   unsigned char *beginS = S;
   uint32_t beginJ, endJ = LOG_BUCKET_REGION - cado_ctz (I);
@@ -742,22 +747,22 @@ void init_exact_degree_X_norms_bucket_region_internal (unsigned char *S, uint32_
 #define U2 "mulpd %[h],%[f]\n addpd %[u2],%[f]\n"
 #define U1 "mulpd %[h],%[f]\n addpd %[u1],%[f]\n"
 #define U0 "mulpd %[h],%[f]\n addpd %[u0],%[f]\n"
-#define LG2ABS							       \
-  "psllq $1,%[f]\n"						       \
-    "psrlq $1,%[f]\n"						       \
-    "shufps $0xED,%[f],%[f]\n"					       \
-    "cvtdq2pd %[f],%[f]\n"					       \
-    "subpd %[_add],%[f]\n"					       \
-    "mulpd %[_scale],%[f]\n"					       \
-    "cvttpd2dq %[f],%[f]\n"					       \
-    "packssdw %[f],%[f]\n"					       \
-    "packuswb %[f],%[f]\n"					       \
-    "palignr $2,%[cumul],%[f]\n"				       \
-    "movapd %[f],%[cumul]\n"					       \
+#define LG2ABS                                                         \
+  "psllq $1,%[f]\n"                                                    \
+    "psrlq $1,%[f]\n"                                                  \
+    "shufps $0xED,%[f],%[f]\n"                                         \
+    "cvtdq2pd %[f],%[f]\n"                                             \
+    "subpd %[_add],%[f]\n"                                             \
+    "mulpd %[_scale],%[f]\n"                                           \
+    "cvttpd2dq %[f],%[f]\n"                                            \
+    "packssdw %[f],%[f]\n"                                             \
+    "packuswb %[f],%[f]\n"                                             \
+    "palignr $2,%[cumul],%[f]\n"                                       \
+    "movapd %[f],%[cumul]\n"                                           \
     "addpd %[_two],%[h]\n"
-#define END					\
-  "cmp %[endS],%[S]\n"				\
-    "movapd %[f],-0x10(%[S])\n"			\
+#define END                                     \
+  "cmp %[endS],%[S]\n"                          \
+    "movapd %[f],-0x10(%[S])\n"                 \
     "jl 0b\n"
 
   for (; J < endJ; J++) {
@@ -765,7 +770,7 @@ void init_exact_degree_X_norms_bucket_region_internal (unsigned char *S, uint32_
     __m128d f, h, u[d+1];
     __m128i cumul;
     unsigned char *endS = S + I;
-    poly_scale_m128d (u, fijd, d, (double) J);
+    poly_scale_m128d (u, &fijd[0], d, (double) J);
     h = _mm_set_pd ((double) (1 - (int32_t) (I >> 1)), (double) (- (int32_t) (I >> 1)));
 
     /* These ASM & switch are really ugly. But it's the ONLY way to
@@ -773,7 +778,7 @@ void init_exact_degree_X_norms_bucket_region_internal (unsigned char *S, uint32_
     switch (d) {
 #if !defined(__ICC) || (__ICC >= 1600)
       /* the Intel compiler icpc fails with "internal error" with the code
-	 below (version 14.0.3 20140422), version 16.0.0 works */
+         below (version 14.0.3 20140422), version 16.0.0 works */
     case 2:
       __asm__ __volatile__ ( BEGIN
       FU(2) U1 U0 LG2ABS FU(2) U1 U0 LG2ABS
@@ -782,7 +787,7 @@ void init_exact_degree_X_norms_bucket_region_internal (unsigned char *S, uint32_
       FU(2) U1 U0 LG2ABS FU(2) U1 U0 LG2ABS END
       : [f]"=&x"(f), [cumul]"=&x"(cumul), [h]"+&x"(h), [S]"+&r"(S)
       : [endS]"r"(endS), [_two]"x"(_two), [_scale]"x"(_scale), [_add]"x"(_add),
-	[u0]"x"(u[0]), [u1]"x"(u[1]), [u2]"x"(u[2]));
+        [u0]"x"(u[0]), [u1]"x"(u[1]), [u2]"x"(u[2]));
       break;
     case 3:
       __asm__ __volatile__ ( BEGIN
@@ -792,7 +797,7 @@ void init_exact_degree_X_norms_bucket_region_internal (unsigned char *S, uint32_
       FU(3) U2 U1 U0 LG2ABS FU(3) U2 U1 U0 LG2ABS END
       : [f]"=&x"(f), [cumul]"=&x"(cumul), [h]"+&x"(h), [S]"+&r"(S)
       : [endS]"r"(endS), [_two]"x"(_two), [_scale]"x"(_scale), [_add]"x"(_add),
-	[u0]"x"(u[0]), [u1]"x"(u[1]), [u2]"x"(u[2]), [u3]"x"(u[3]));
+        [u0]"x"(u[0]), [u1]"x"(u[1]), [u2]"x"(u[2]), [u3]"x"(u[3]));
       break;
     case 4:
       __asm__ __volatile__ ( BEGIN
@@ -802,7 +807,7 @@ void init_exact_degree_X_norms_bucket_region_internal (unsigned char *S, uint32_
       FU(4) U3 U2 U1 U0 LG2ABS FU(4) U3 U2 U1 U0 LG2ABS END
       : [f]"=&x"(f), [cumul]"=&x"(cumul), [h]"+&x"(h), [S]"+&r"(S)
       : [endS]"r"(endS), [_two]"x"(_two), [_scale]"x"(_scale), [_add]"x"(_add),
-	[u0]"x"(u[0]), [u1]"x"(u[1]), [u2]"x"(u[2]), [u3]"x"(u[3]), [u4]"x"(u[4]));
+        [u0]"x"(u[0]), [u1]"x"(u[1]), [u2]"x"(u[2]), [u3]"x"(u[3]), [u4]"x"(u[4]));
       break;
     case 5:
       __asm__ __volatile__ ( BEGIN
@@ -812,7 +817,7 @@ void init_exact_degree_X_norms_bucket_region_internal (unsigned char *S, uint32_
       FU(5) U4 U3 U2 U1 U0 LG2ABS FU(5) U4 U3 U2 U1 U0 LG2ABS END
       : [f]"=&x"(f), [cumul]"=&x"(cumul), [h]"+&x"(h), [S]"+&r"(S)
       : [endS]"r"(endS), [_two]"x"(_two), [_scale]"x"(_scale), [_add]"x"(_add),
-	[u0]"x"(u[0]), [u1]"x"(u[1]), [u2]"x"(u[2]), [u3]"x"(u[3]), [u4]"x"(u[4]),
+        [u0]"x"(u[0]), [u1]"x"(u[1]), [u2]"x"(u[2]), [u3]"x"(u[3]), [u4]"x"(u[4]),
         [u5]"x"(u[5]));
       break;
     case 6:
@@ -823,7 +828,7 @@ void init_exact_degree_X_norms_bucket_region_internal (unsigned char *S, uint32_
       FU(6) U5 U4 U3 U2 U1 U0 LG2ABS FU(6) U5 U4 U3 U2 U1 U0 LG2ABS END
       : [f]"=&x"(f), [cumul]"=&x"(cumul), [h]"+&x"(h), [S]"+&r"(S)
       : [endS]"r"(endS), [_two]"x"(_two), [_scale]"x"(_scale), [_add]"x"(_add),
-	[u0]"x"(u[0]), [u1]"x"(u[1]), [u2]"x"(u[2]), [u3]"x"(u[3]), [u4]"x"(u[4]),
+        [u0]"x"(u[0]), [u1]"x"(u[1]), [u2]"x"(u[2]), [u3]"x"(u[3]), [u4]"x"(u[4]),
         [u5]"x"(u[5]), [u6]"x"(u[6]));
       break;
     case 7:
@@ -834,7 +839,7 @@ void init_exact_degree_X_norms_bucket_region_internal (unsigned char *S, uint32_
       FU(7) U6 U5 U4 U3 U2 U1 U0 LG2ABS FU(7) U6 U5 U4 U3 U2 U1 U0 LG2ABS END
       : [f]"=&x"(f), [cumul]"=&x"(cumul), [h]"+&x"(h), [S]"+&r"(S)
       : [endS]"r"(endS), [_two]"x"(_two), [_scale]"x"(_scale), [_add]"x"(_add),
-	[u0]"x"(u[0]), [u1]"x"(u[1]), [u2]"x"(u[2]), [u3]"x"(u[3]), [u4]"x"(u[4]),
+        [u0]"x"(u[0]), [u1]"x"(u[1]), [u2]"x"(u[2]), [u3]"x"(u[3]), [u4]"x"(u[4]),
         [u5]"x"(u[5]), [u6]"x"(u[6]), [u7]"x"(u[7]));
       break;
     case 8:
@@ -845,7 +850,7 @@ void init_exact_degree_X_norms_bucket_region_internal (unsigned char *S, uint32_
       FU(8) U7 U6 U5 U4 U3 U2 U1 U0 LG2ABS FU(8) U7 U6 U5 U4 U3 U2 U1 U0 LG2ABS END
       : [f]"=&x"(f), [cumul]"=&x"(cumul), [h]"+&x"(h), [S]"+&r"(S)
       : [endS]"r"(endS), [_two]"x"(_two), [_scale]"x"(_scale), [_add]"x"(_add),
-	[u0]"x"(u[0]), [u1]"x"(u[1]), [u2]"x"(u[2]), [u3]"x"(u[3]), [u4]"x"(u[4]),
+        [u0]"x"(u[0]), [u1]"x"(u[1]), [u2]"x"(u[2]), [u3]"x"(u[3]), [u4]"x"(u[4]),
         [u5]"x"(u[5]), [u6]"x"(u[6]), [u7]"x"(u[7]), [u8]"x"(u[8]));
       break;
     case 9:
@@ -856,30 +861,30 @@ void init_exact_degree_X_norms_bucket_region_internal (unsigned char *S, uint32_
       FU(9) U8 U7 U6 U5 U4 U3 U2 U1 U0 LG2ABS FU(9) U8 U7 U6 U5 U4 U3 U2 U1 U0 LG2ABS END
       : [f]"=&x"(f), [cumul]"=&x"(cumul), [h]"+&x"(h), [S]"+&r"(S)
       : [endS]"r"(endS), [_two]"x"(_two), [_scale]"x"(_scale), [_add]"x"(_add),
-	[u0]"x"(u[0]), [u1]"x"(u[1]), [u2]"x"(u[2]), [u3]"x"(u[3]), [u4]"x"(u[4]),
+        [u0]"x"(u[0]), [u1]"x"(u[1]), [u2]"x"(u[2]), [u3]"x"(u[3]), [u4]"x"(u[4]),
         [u5]"x"(u[5]), [u6]"x"(u[6]), [u7]"x"(u[7]), [u8]"x"(u[8]), [u9]"x"(u[9]));
       break;
 #endif
     default:
       do {
-	f = u[d]; for (size_t k = d; k; f = _mm_add_pd(_mm_mul_pd(f,h),u[--k]));
-	h = _mm_add_pd(h, _two); cumul = _mm_alignr_epi8 (_mm_lg2abs (&f, _add, _scale), cumul, 2);
-	f = u[d]; for (size_t k = d; k; f = _mm_add_pd(_mm_mul_pd(f,h),u[--k]));
-	h = _mm_add_pd(h, _two); cumul = _mm_alignr_epi8 (_mm_lg2abs (&f, _add, _scale), cumul, 2);
-	f = u[d]; for (size_t k = d; k; f = _mm_add_pd(_mm_mul_pd(f,h),u[--k]));
-	h = _mm_add_pd(h, _two); cumul = _mm_alignr_epi8 (_mm_lg2abs (&f, _add, _scale), cumul, 2);
-	f = u[d]; for (size_t k = d; k; f = _mm_add_pd(_mm_mul_pd(f,h),u[--k]));
-	h = _mm_add_pd(h, _two); cumul = _mm_alignr_epi8 (_mm_lg2abs (&f, _add, _scale), cumul, 2);
-	f = u[d]; for (size_t k = d; k; f = _mm_add_pd(_mm_mul_pd(f,h),u[--k]));
-	h = _mm_add_pd(h, _two); cumul = _mm_alignr_epi8 (_mm_lg2abs (&f, _add, _scale), cumul, 2);
-	f = u[d]; for (size_t k = d; k; f = _mm_add_pd(_mm_mul_pd(f,h),u[--k]));
-	h = _mm_add_pd(h, _two); cumul = _mm_alignr_epi8 (_mm_lg2abs (&f, _add, _scale), cumul, 2);
-	f = u[d]; for (size_t k = d; k; f = _mm_add_pd(_mm_mul_pd(f,h),u[--k]));
-	h = _mm_add_pd(h, _two); cumul = _mm_alignr_epi8 (_mm_lg2abs (&f, _add, _scale), cumul, 2);
-	f = u[d]; for (size_t k = d; k; f = _mm_add_pd(_mm_mul_pd(f,h),u[--k]));
-	h = _mm_add_pd(h, _two); cumul = _mm_alignr_epi8 (_mm_lg2abs (&f, _add, _scale), cumul, 2);
-	*(__m128i *) S = cumul;
-	S += 16;
+        f = u[d]; for (size_t k = d; k; f = _mm_add_pd(_mm_mul_pd(f,h),u[--k]));
+        h = _mm_add_pd(h, _two); cumul = _mm_alignr_epi8 (_mm_lg2abs (&f, _add, _scale), cumul, 2);
+        f = u[d]; for (size_t k = d; k; f = _mm_add_pd(_mm_mul_pd(f,h),u[--k]));
+        h = _mm_add_pd(h, _two); cumul = _mm_alignr_epi8 (_mm_lg2abs (&f, _add, _scale), cumul, 2);
+        f = u[d]; for (size_t k = d; k; f = _mm_add_pd(_mm_mul_pd(f,h),u[--k]));
+        h = _mm_add_pd(h, _two); cumul = _mm_alignr_epi8 (_mm_lg2abs (&f, _add, _scale), cumul, 2);
+        f = u[d]; for (size_t k = d; k; f = _mm_add_pd(_mm_mul_pd(f,h),u[--k]));
+        h = _mm_add_pd(h, _two); cumul = _mm_alignr_epi8 (_mm_lg2abs (&f, _add, _scale), cumul, 2);
+        f = u[d]; for (size_t k = d; k; f = _mm_add_pd(_mm_mul_pd(f,h),u[--k]));
+        h = _mm_add_pd(h, _two); cumul = _mm_alignr_epi8 (_mm_lg2abs (&f, _add, _scale), cumul, 2);
+        f = u[d]; for (size_t k = d; k; f = _mm_add_pd(_mm_mul_pd(f,h),u[--k]));
+        h = _mm_add_pd(h, _two); cumul = _mm_alignr_epi8 (_mm_lg2abs (&f, _add, _scale), cumul, 2);
+        f = u[d]; for (size_t k = d; k; f = _mm_add_pd(_mm_mul_pd(f,h),u[--k]));
+        h = _mm_add_pd(h, _two); cumul = _mm_alignr_epi8 (_mm_lg2abs (&f, _add, _scale), cumul, 2);
+        f = u[d]; for (size_t k = d; k; f = _mm_add_pd(_mm_mul_pd(f,h),u[--k]));
+        h = _mm_add_pd(h, _two); cumul = _mm_alignr_epi8 (_mm_lg2abs (&f, _add, _scale), cumul, 2);
+        *(__m128i *) S = cumul;
+        S += 16;
       } while (S < endS);
     } /* End of the switch */
   } /* End of the line */
@@ -931,10 +936,10 @@ static inline void Fill_S (unsigned char *S, int x, double fx, int y, double fy)
   memset (S + x, next_f, (size_t) (y - x));
 }
 
-/* This functions sets all the segments of the contiguous unset values of the line S
-   with F(i, const j) by a polygonal approximation on these segments.
-   Derecursivate optimal version.
-*/
+/* This functions sets all the segments of the contiguous unset values of
+ * the line S with F(i, const j) by a polygonal approximation on these
+ * segments.  Derecursivate optimal version.
+ */
 static inline void poly_approx_on_S (unsigned char *S, const unsigned int degree, const double *coeff, const double my_scale MAYBE_UNUSED, const double scale MAYBE_UNUSED, const double add MAYBE_UNUSED, const unsigned int nsg, const sg_t *sg) {
 #define SIZE_STACK 256 /* In fact, on RSA704 benchmark, the max is... 10 */
   typedef struct x_fx_s {
@@ -954,22 +959,22 @@ static inline void poly_approx_on_S (unsigned char *S, const unsigned int degree
     current_stack = 0;
     for (;;) {
       if (LIKELY((unsigned int) (current.x - begin.x) >= SMART_NORM_LENGTH)) {
-	x_fx_t possible_new;
-	possible_new.x = (begin.x + current.x) >> 1;
-	possible_new.fx = compute_f (degree, coeff, (double) possible_new.x);
-	possible_new.fx = lg2abs (possible_new.fx, add, scale);
-	if (UNLIKELY(fabs (possible_new.fx + possible_new.fx - current.fx - begin.fx)) > (2 * SMART_NORM_DISTANCE)) {
-	  stack[current_stack++] = current;
-	  current = possible_new;
-	  if (UNLIKELY(current_stack == max_stack)) {
-	    max_stack += (max_stack >> 1);
-	    if ((stack = (x_fx_t *) realloc (stack, sizeof(*stack) * max_stack)) == NULL) {
-	      fprintf (stderr, "Error, realloc of %zu bytes failed\n", sizeof(*stack) * max_stack);
-	      abort ();
-	    }
-	  }
-	  continue;
-	}
+        x_fx_t possible_new;
+        possible_new.x = (begin.x + current.x) >> 1;
+        possible_new.fx = compute_f (degree, coeff, (double) possible_new.x);
+        possible_new.fx = lg2abs (possible_new.fx, add, scale);
+        if (UNLIKELY(fabs (possible_new.fx + possible_new.fx - current.fx - begin.fx)) > (2 * SMART_NORM_DISTANCE)) {
+          stack[current_stack++] = current;
+          current = possible_new;
+          if (UNLIKELY(current_stack == max_stack)) {
+            max_stack += (max_stack >> 1);
+            if ((stack = (x_fx_t *) realloc (stack, sizeof(*stack) * max_stack)) == NULL) {
+              fprintf (stderr, "Error, realloc of %zu bytes failed\n", sizeof(*stack) * max_stack);
+              abort ();
+            }
+          }
+          continue;
+        }
       }
       Fill_S (S, begin.x, begin.fx, current.x, current.fx);
       if (!current_stack) break;
@@ -984,12 +989,12 @@ static inline void poly_approx_on_S (unsigned char *S, const unsigned int degree
    Cf las-config.h, SMART_INIT for the algorithm.
    No SSE version: it's completly unreadable, and the gain is not really interesting.
    Internal function, only with simple types, for unit/integration testing */
-void init_smart_degree_X_norms_bucket_region_internal (unsigned char *S, uint32_t J, uint32_t I, double original_scale, unsigned int d, double *fijd, unsigned int nroots, root_ptr roots)
+void init_smart_degree_X_norms_bucket_region_internal (unsigned char *S, uint32_t J, uint32_t I, double original_scale, unsigned int d, std::vector<double> const & fijd, std::vector<smart_norm_root> const & roots)
 {
   ASSERT (d >= 2);
   /* F, F' and F" roots needs stability for their neighbourhood ?
      F roots, sure; F', sure not; F"... maybe. */
-  const unsigned char stability_for_derivate[3] =
+  const unsigned char stability_for_derivative[3] =
     { SMART_NORM_STABILITY, 0, SMART_NORM_STABILITY };
   const ssize_t Idiv2 = (ssize_t) (I >> 1);
   sg_t sg[d * 4 + 3]; /* For (F, F', F") roots, -Idiv2, Idiv2 - 1, 0 */
@@ -1014,7 +1019,7 @@ void init_smart_degree_X_norms_bucket_region_internal (unsigned char *S, uint32_
       ASSERT_ALWAYS(lg_page != 0);
       for (ssize_t k = I; (k -= lg_page) >= 0; __builtin_prefetch (S + k, 1));
     }
-    poly_scale_double (u, fijd, d, (double) J);
+    poly_scale_double (u, &fijd[0], d, (double) J);
 
     /* Insertion of point (-Idiv2, F(-Idiv2)) in sg[0] : an artificial one-point segment. */
     g = compute_f (d, u, (double) -Idiv2);
@@ -1024,128 +1029,129 @@ void init_smart_degree_X_norms_bucket_region_internal (unsigned char *S, uint32_
     nsg = 1;
     S[-Idiv2] = (uint8_t) g;
 
-    for (size_t r = 0; r < nroots; r++) {
+    for (size_t r = 0; r < roots.size(); r++) {
+      ASSERT_ALWAYS(nsg < d * 4 + 3);
       hl = floor((double)J * roots[r].value);
       ih = (ssize_t) hl;
       /* Need stability for this root ? */
-      if (UNLIKELY(!stability_for_derivate[roots[r].derivate])) {
-	/* No. It's an one-point segment. */
-	/* Is it not in the interesting region or in the last segment ? Yes -> next root */
-	if (ih <= -Idiv2 || ih >= Idiv2 - 1 || ih <= sg[nsg - 1].end) continue;
-	/* Ok, we insert this one-point segment */
-	sg[nsg].begin = sg[nsg].end = ih;
-	g = compute_f (d, u, hl);
-	g = lg2abs (g, add, scale);
-	sg[nsg].f_begin = sg[nsg].f_end = g;
-	S[ih] = (unsigned char) g;
+      if (UNLIKELY(!stability_for_derivative[roots[r].derivative])) {
+        /* No. It's an one-point segment. */
+        /* Is it not in the interesting region or in the last segment ? Yes -> next root */
+        if (ih <= -Idiv2 || ih >= Idiv2 - 1 || ih <= sg[nsg - 1].end) continue;
+        /* Ok, we insert this one-point segment */
+        sg[nsg].begin = sg[nsg].end = ih;
+        g = compute_f (d, u, hl);
+        g = lg2abs (g, add, scale);
+        sg[nsg].f_begin = sg[nsg].f_end = g;
+        S[ih] = (unsigned char) g;
       }
       else {
-	/* It's a real (non an one-point) segment. */
-	/* Is the root really far after the interesting zone ? Yes -> end of roots */
-	if (ih > Idiv2 - 1 + SMART_NORM_INFLUENCE) break;
+        /* It's a real (non an one-point) segment. */
+        /* Is the root really far after the interesting zone ? Yes -> end of roots */
+        if (ih > Idiv2 - 1 + SMART_NORM_INFLUENCE) break;
 
-	/* Is the root really far before the interesting zone or is this segment is
-	   included (in all sides) in the previous segment ? Yes -> next root */
-	if (ih < -Idiv2 - SMART_NORM_INFLUENCE ||
-	    ih <= sg[nsg - 1].end - SMART_NORM_STABILITY) continue;
+        /* Is the root really far before the interesting zone or is this segment is
+           included (in all sides) in the previous segment ? Yes -> next root */
+        if (ih < -Idiv2 - SMART_NORM_INFLUENCE ||
+            ih <= sg[nsg - 1].end - SMART_NORM_STABILITY) continue;
 
-	/* OK, we have the right side to compute, and maybe the left side */
-	hr = hl;
+        /* OK, we have the right side to compute, and maybe the left side */
+        hr = hl;
 
-	/* Special case for left side. Is the root :
-	   1. Near and before the interesting zone OR
-	   2. in the previous segment AND [the beginning of the previous segment
-   	   is far enough of the root OR this previous segment is the first, so
+        /* Special case for left side. Is the root :
+           1. Near and before the interesting zone OR
+           2. in the previous segment AND [the beginning of the previous segment
+           is far enough of the root OR this previous segment is the first, so
               its beginning is the beginning of the interesting zone] ? */
-	if (UNLIKELY(ih <= -Idiv2 || (sg[nsg - 1].end >= ih &&
-				      (nsg == 1 || sg[nsg - 1].begin + SMART_NORM_STABILITY <= ih)))) {
-	  /* OK, this segment and the previous could be fusionned on this left side.
-	     It's not 100% true in fact, but really very probable. */
-	  sg[nsg].begin   = sg[nsg - 1].begin;
-	  sg[nsg].f_begin = sg[nsg - 1].f_begin;
-	  fg = (ih >= -Idiv2 && ih < Idiv2) ? S[ih] : 0;
-	} else {
+        if (UNLIKELY(ih <= -Idiv2 || (sg[nsg - 1].end >= ih &&
+                                      (nsg == 1 || sg[nsg - 1].begin + SMART_NORM_STABILITY <= ih)))) {
+          /* OK, this segment and the previous could be fusionned on this left side.
+             It's not 100% true in fact, but really very probable. */
+          sg[nsg].begin   = sg[nsg - 1].begin;
+          sg[nsg].f_begin = sg[nsg - 1].f_begin;
+          fg = (ih >= -Idiv2 && ih < Idiv2) ? S[ih] : 0;
+        } else {
 
-	  /* Here we compute the left side. -Idiv2 < ih <= Idiv2 - 1 + SMART_NORM_INFLUENCE */
-	  /* First, we compute the root itself */
-	  g = compute_f (d, u, hl);
-	  g = lg2abs (g, add, scale);
-	  fg = (unsigned char) g;
-	  if (LIKELY(ih < Idiv2)) S[ih] = fg;    /* Right guard for the write */
+          /* Here we compute the left side. -Idiv2 < ih <= Idiv2 - 1 + SMART_NORM_INFLUENCE */
+          /* First, we compute the root itself */
+          g = compute_f (d, u, hl);
+          g = lg2abs (g, add, scale);
+          fg = (unsigned char) g;
+          if (LIKELY(ih < Idiv2)) S[ih] = fg;    /* Right guard for the write */
 
-	  /* The loop on the left side */
-	  for (f1 = fg, f2 = 0, cpt = 0; ; ) {
-	    --ih; hl -= 1.;
-	    if (UNLIKELY(ih <= -Idiv2)) {        /* Left guard: in fact ==, not <= */
-	      ASSERT(ih == -Idiv2);
-	      sg[nsg].begin = sg[0].begin;
-	      sg[nsg].f_begin = sg[0].f_begin;
-	      break;
-	    }
-	    g = compute_f (d, u, hl);
-	    g = lg2abs (g, add, scale);
-	    f1 = (unsigned char) g;
-	    if (LIKELY(ih < Idiv2)) S[ih] = f1;  /* Right guard for the write */
-	    if (LIKELY(f1 == f2)) {
-	      if (++cptf2id >= SMART_NORM_STABILITY) goto end_left;
-	    } else {
-	      cptf2id = 0;
-	      f2 = f1;
-	    }
-	    if (UNLIKELY(++cpt >= SMART_NORM_INFLUENCE)) {
-	    end_left:
-	      sg[nsg].begin = ih;
-	      sg[nsg].f_begin = g;
-	      break;
-	    }
-	  }
-	}
-	/* If the left side is totally out of the interesting region ? -> next root */
-	if (sg[nsg].begin > Idiv2 - 1) continue;
+          /* The loop on the left side */
+          for (f1 = fg, f2 = 0, cpt = 0; ; ) {
+            --ih; hl -= 1.;
+            if (UNLIKELY(ih <= -Idiv2)) {        /* Left guard: in fact ==, not <= */
+              ASSERT(ih == -Idiv2);
+              sg[nsg].begin = sg[0].begin;
+              sg[nsg].f_begin = sg[0].f_begin;
+              break;
+            }
+            g = compute_f (d, u, hl);
+            g = lg2abs (g, add, scale);
+            f1 = (unsigned char) g;
+            if (LIKELY(ih < Idiv2)) S[ih] = f1;  /* Right guard for the write */
+            if (LIKELY(f1 == f2)) {
+              if (++cptf2id >= SMART_NORM_STABILITY) goto end_left;
+            } else {
+              cptf2id = 0;
+              f2 = f1;
+            }
+            if (UNLIKELY(++cpt >= SMART_NORM_INFLUENCE)) {
+            end_left:
+              sg[nsg].begin = ih;
+              sg[nsg].f_begin = g;
+              break;
+            }
+          }
+        }
+        /* If the left side is totally out of the interesting region ? -> next root */
+        if (sg[nsg].begin > Idiv2 - 1) continue;
 
-	/* Now, the right side. */
-	ih = (ssize_t) hr; /* -Idiv2-SMART_NORM_INFLUENCE <= ih <= Idiv2-1+SMART_NORM_INFLUENCE */
+        /* Now, the right side. */
+        ih = (ssize_t) hr; /* -Idiv2-SMART_NORM_INFLUENCE <= ih <= Idiv2-1+SMART_NORM_INFLUENCE */
 
-	/* Immediate right guard for -Idiv2-SMART_NORM_INFLUENCE <= ih < Idiv2-1 */
-	if (UNLIKELY(ih >= Idiv2 - 1)) {
-	  ih = Idiv2 - 1;
-	  hr = (double) ih;
-	  g = compute_f (d, u, hr);
-	  g = lg2abs (g, add, scale);
-	} else {
-	  /* The loop on the right side */
-	  for (f1 = fg, f2 = 0, cpt = 0;;) {
-	    ++ih; hr += 1.;
-	    g = compute_f (d, u, hr);
-	    g = lg2abs (g, add, scale);
-	    f1 = (unsigned char) g;
-	    if (LIKELY(ih > -Idiv2)) S[ih] = f1; /* Left guard for the write */
-	    if (UNLIKELY(ih >= Idiv2 - 1)) {     /* Right guard: in fact ==, not >= */
-	      ASSERT(ih == Idiv2 - 1);
-	      break;
-	    }
-	    if (LIKELY (f1 == f2)) {
-	      if (++cptf2id >= SMART_NORM_STABILITY) break;
-	    } else {
-	      cptf2id = 0;
-	      f2 = f1;
-	    }
-	    if (++cpt >= SMART_NORM_INFLUENCE) break;
-	  }
-	  /* If the right side is totally out of the interesting region ? -> next root */
-	  if (ih <= -Idiv2) continue;
-	}
-	sg[nsg].end = ih;
-	sg[nsg].f_end = g;
-	S[ih] = (unsigned char) g;
+        /* Immediate right guard for -Idiv2-SMART_NORM_INFLUENCE <= ih < Idiv2-1 */
+        if (UNLIKELY(ih >= Idiv2 - 1)) {
+          ih = Idiv2 - 1;
+          hr = (double) ih;
+          g = compute_f (d, u, hr);
+          g = lg2abs (g, add, scale);
+        } else {
+          /* The loop on the right side */
+          for (f1 = fg, f2 = 0, cpt = 0;;) {
+            ++ih; hr += 1.;
+            g = compute_f (d, u, hr);
+            g = lg2abs (g, add, scale);
+            f1 = (unsigned char) g;
+            if (LIKELY(ih > -Idiv2)) S[ih] = f1; /* Left guard for the write */
+            if (UNLIKELY(ih >= Idiv2 - 1)) {     /* Right guard: in fact ==, not >= */
+              ASSERT(ih == Idiv2 - 1);
+              break;
+            }
+            if (LIKELY (f1 == f2)) {
+              if (++cptf2id >= SMART_NORM_STABILITY) break;
+            } else {
+              cptf2id = 0;
+              f2 = f1;
+            }
+            if (++cpt >= SMART_NORM_INFLUENCE) break;
+          }
+          /* If the right side is totally out of the interesting region ? -> next root */
+          if (ih <= -Idiv2) continue;
+        }
+        sg[nsg].end = ih;
+        sg[nsg].f_end = g;
+        S[ih] = (unsigned char) g;
       }
       /* We have to do the possible fusions */
       while (nsg && sg[nsg - 1].end + 1 >= sg[nsg].begin) {
-	if (sg[nsg - 1].begin > sg[nsg].begin) {
-	  sg[nsg - 1].begin = sg[nsg].begin; sg[nsg - 1].f_begin = sg[nsg].f_begin; }
-	if (sg[nsg - 1].end   < sg[nsg].end  ) {
-	  sg[nsg - 1].end   = sg[nsg].end;   sg[nsg - 1].f_end   = sg[nsg].f_end;   }
-	--nsg;
+        if (sg[nsg - 1].begin > sg[nsg].begin) {
+          sg[nsg - 1].begin = sg[nsg].begin; sg[nsg - 1].f_begin = sg[nsg].f_begin; }
+        if (sg[nsg - 1].end   < sg[nsg].end  ) {
+          sg[nsg - 1].end   = sg[nsg].end;   sg[nsg - 1].f_end   = sg[nsg].f_end;   }
+        --nsg;
       }
       ++nsg;
     } /* End of the roots */
@@ -1157,17 +1163,17 @@ void init_smart_degree_X_norms_bucket_region_internal (unsigned char *S, uint32_
       g = lg2abs (g, add, scale);
       S[Idiv2 - 1] = (unsigned char) g;
       if (LIKELY(sg[nsg - 1].end != Idiv2 - 2)) {
-	sg[nsg].begin = Idiv2 - 1;
-	sg[nsg].f_begin = g;
-	++nsg;
+        sg[nsg].begin = Idiv2 - 1;
+        sg[nsg].f_begin = g;
+        ++nsg;
       }
       sg[nsg - 1].end = Idiv2 - 1;
       sg[nsg - 1].f_end = g;
     }
 
 #if 0
-    for (size_t k = 0; k < nroots; k++)
-      fprintf (stderr, "Racine %zu (derivate=%u): %e - %u\n", k, roots[k].derivate, roots[k].value * J, J);
+    for (size_t k = 0; k < roots.size(); k++)
+      fprintf (stderr, "Racine %zu (derivative=%u): %e - %u\n", k, roots[k].derivative, roots[k].value * J, J);
     for (size_t k = 0; k < nsg; k++)
       fprintf (stderr, "Segments %zu: (%d, %e) - (%d, %e)\n", k, sg[k].begin, sg[k].f_begin, sg[k].end, sg[k].f_end);
 #endif
@@ -1196,27 +1202,27 @@ void init_smart_degree_X_norms_bucket_region_internal (unsigned char *S, uint32_
    It's ~10 times faster than the exact init.
 
    This smart algo needs :
-   -> The roots of d^2(F(i,1)/d(i)^2 must be in si->sides[side]->roots;
-   -> si->sides[side]->nroots is the number of roots + 1;
-   -> si->roots[si->sides[side]->nroots - 1] must be = 0.0 : it's a "pseudo" root
+   -> The roots of d^2(F(i,1)/d(i)^2 must be in si.sides[side].roots;
+   -> si.sides[side].roots.size() is the number of roots + 1;
+   -> si.roots[si.sides[side].nroots - 1] must be = 0.0 : it's a "pseudo" root
       in order to correct the neigborhood of F(0, const j).
-   Of course, if si->sides[side]->nroots = 0, no correction is done.
+   Of course, if si.sides[side].nroots = 0, no correction is done.
 */
-void init_norms_bucket_region (unsigned char *S, uint32_t J, sieve_info_ptr si, unsigned int side, unsigned int smart)
+void init_norms_bucket_region (unsigned char *S, uint32_t J, sieve_info& si, unsigned int side, unsigned int smart)
 {
-  unsigned int degree = si->sides[side]->fij->deg;
+  unsigned int degree = si.sides[side].fij->deg;
   switch (degree) {
   case 0 :
-    memset (S, (int) (log2(1.+fabs(si->sides[side]->fijd[0])) * si->sides[side]->scale) + GUARD, 1U << LOG_BUCKET_REGION);
+    memset (S, (int) (log2(1.+fabs(si.sides[side].fijd[0])) * si.sides[side].scale) + GUARD, 1U << LOG_BUCKET_REGION);
     break;
   case 1 :
-    init_degree_one_norms_bucket_region_internal (S, J, si->I, si->sides[side]->scale, si->sides[side]->fijd[0], si->sides[side]->fijd[1], si->sides[side]->cexp2);
+    init_degree_one_norms_bucket_region_internal (S, J, si.I, si.sides[side].scale, si.sides[side].fijd[0], si.sides[side].fijd[1], si.sides[side].cexp2);
     break;
   default:
     if (smart)
-      init_smart_degree_X_norms_bucket_region_internal (S, J, si->I, si->sides[side]->scale, degree, si->sides[side]->fijd, si->sides[side]->nroots, si->sides[side]->roots);
+      init_smart_degree_X_norms_bucket_region_internal (S, J, si.I, si.sides[side].scale, degree, si.sides[side].fijd, si.sides[side].roots);
     else
-      init_exact_degree_X_norms_bucket_region_internal (S, J, si->I, si->sides[side]->scale, degree, si->sides[side]->fijd);
+      init_exact_degree_X_norms_bucket_region_internal (S, J, si.I, si.sides[side].scale, degree, si.sides[side].fijd);
     break;
   }
 }
@@ -1307,35 +1313,9 @@ get_maxnorm_alg (double_poly_srcptr src_poly, const double X, const double Y)
   return max_norm;
 }
 
-/*
-   Allocates:
-     si->sides[side]->fij
-     si->sides[side]->fijd
-*/
-
-void sieve_info_init_norm_data(sieve_info_ptr si)
+void sieve_info::init_norm_data(int side)
 {
-  for (size_t side = 2; side--; ) {
-    unsigned int d = si->cpoly->pols[side]->deg;
-    sieve_side_info_ptr s = si->sides[side];
-    mpz_poly_init (s->fij, d);
-    s->fijd = (double *) malloc_aligned((d + 1) * sizeof(*(s->fijd)), 16);
-    FATAL_ERROR_CHECK(s->fijd == NULL, "malloc failed");
-    s->roots = (root_ptr) malloc_aligned((d * 4 + 1) * sizeof(*(s->roots)), 16);
-    FATAL_ERROR_CHECK(s->roots == NULL, "malloc failed");
-    s->nroots = 0;
-  }
-}
-
-void sieve_info_clear_norm_data(sieve_info_ptr si)
-{
-  for(size_t side = 2 ; side-- ; ) {
-    sieve_side_info_ptr s = si->sides[side];
-    mpz_poly_clear (s->fij);
-    free(s->fijd);
-    free(s->roots);
-    s->nroots = 0;
-  }
+    sides[side].fij = cxx_mpz_poly(cpoly->pols[side]->deg);
 }
 
 /* return largest possible J by simply bounding the Fij and Gij polynomials
@@ -1356,7 +1336,7 @@ void sieve_info_clear_norm_data(sieve_info_ptr si)
   factor.
 */
 static unsigned int
-sieve_info_update_norm_data_Jmax (sieve_info_ptr si)
+sieve_info_update_norm_data_Jmax (sieve_info & si)
 {
   // The following parameter controls the scaling on the norm.
   // Relevant values are between 1.0 and 3.0. A higher value means we
@@ -1366,17 +1346,17 @@ sieve_info_update_norm_data_Jmax (sieve_info_ptr si)
   // time per relation and number of relations by about 1.5% on a typical
   // RSA704 benchmark.
   const double fudge_factor = 2.0;
-  const double I = (double) (si->I);
-  const double q = mpz_get_d(si->doing->p);
-  const double skew = si->cpoly->skew;
+  const double I = (double) (si.I);
+  const double q = mpz_get_d(si.doing.p);
+  const double skew = si.cpoly->skew;
   const double A = I*sqrt(q*skew);
   const double B = A/2./skew;
   double Jmax = I/2.;
 
   for (int side = 0; side < 2; side++)
     {
-      sieve_side_info_ptr s = si->sides[side];
-      mpz_poly_ptr ps = si->cpoly->pols[side];
+      sieve_info::side_info& s(si.sides[side]);
+      mpz_poly_ptr ps = si.cpoly->pols[side];
 
       /* Compute the best possible maximum norm, i.e., assuming a nice
          rectangular sieve region in the a,b-plane */
@@ -1386,12 +1366,12 @@ sieve_info_update_norm_data_Jmax (sieve_info_ptr si)
       double maxnorm = get_maxnorm_alg (dpoly, fudge_factor*A/2.,
               fudge_factor*B);
       double_poly_clear (dpoly);
-      if (side == si->doing->side)
+      if (side == si.doing.side)
         maxnorm /= q;
 
       double_poly_t F;
       F->deg = ps->deg;
-      F->coeff = s->fijd;
+      F->coeff = &(s.fijd[0]);
 
       double v = get_maxnorm_alg (F, I/2, Jmax);
 
@@ -1416,10 +1396,9 @@ sieve_info_update_norm_data_Jmax (sieve_info_ptr si)
   return (unsigned int) Jmax;
 }
 
-
 /* return 0 if we should discard that special-q because the rounded
  * region in the (a,b)-plane is flat to the point of having height 0.
- * For diagnostic, we set si->J to the unrounded value (rounding would
+ * For diagnostic, we set si.J to the unrounded value (rounding would
  * give 0) and then we return "false".
  *
  * The current check for discarding is whether we do fill one bucket or
@@ -1428,63 +1407,151 @@ sieve_info_update_norm_data_Jmax (sieve_info_ptr si)
  * Now for efficiency reasons, the ``minimum reasonable'' number of
  * buckets should be more than that.
  */
-int sieve_info_adjust_IJ(sieve_info_ptr si, int nb_threads)/*{{{*/
+int adjust_IJ(int & logI, uint32_t & J, qlattice_basis& qbasis, cado_poly_srcptr cpoly, las_todo_entry const& doing, int logA, int nb_threads)/*{{{*/
 {
-    /* compare skewed max-norms: let u = [a0, b0] and v = [a1, b1],
-       and u' = [a0, s*b0], v' = [a1, s*b1] where s is the skewness.
-       Assume |u'| <= |v'|.
-       We know from Gauss reduction that u' and v' form an angle of at
-       least pi/3, thus since their determinant is q*s, we have
-       |u'|^2 <= |u'| * |v'| <= q*s/sin(pi/3) = 2*q*s/sqrt(3).
-       Define B := sqrt(2/sqrt(3)*q/s), then |a0| <= s*B and |b0| <= B.
+    using namespace std;
+    /* compare skewed max-norms: let u0 = [a0, b0] and u1 = [a1, b1],
+     * and u'0 = [a0/sqrt(s), sqrt(s)*b0],
+     * u'1 = [a1/sqrt(s), sqrt(s)*b1] where s is the skewness.
+     * Assume |u'0| <= |u'1|, so that |u'0|^2 <= |u'0|.|u'1|.
 
-       If we take J <= I/2*min(s*B/|a1|, B/|b1|), then for any j <= J:
-       |a1|*J <= I/2*s*B and |b1|*J <= I/2*B, thus
-       |a| = |a0*i+a1*j| <= s*B*I and |b| <= |b0*i+b1*j| <= B*I.
-    */
-    const double skewness = si->cpoly->skew;
+     * We know from Gauss reduction that u'0 and u'1 form an angle of at
+     * least pi/3, thus since their determinant is q, we have
+     * q = |u'0|*|u'1|*sin(angle(u'0,u'1))>=|u'0|*|u'1|*sqrt(3)/2
+
+     * So that
+     *  |u'0|^2 <= |u'0|.|u'1| <= 2*q/sqrt(3)
+
+     * Define B := sqrt(q)*sqrt(2/sqrt(3)), then we have:
+     *      |a0|/sqrt(s) <= B
+     *  and |b0|*sqrt(s) <= B
+
+     * If we take J <= I/2*min(sqrt(s)*B/|a1|, B/sqrt(s)/|b1|), then for
+     * any j <= J we have
+     *     |a1|/sqrt(s)*J <= I/2*B
+     * and |b1|*sqrt(s)*J <= I/2*B,
+
+     * thus for any i,j with |i|<=I/2 and 0<=j<J, we have:
+     *     |a|/sqrt(s) = |a0*i+a1*j|/sqrt(s) <= sqrt(q)*I*sqrt(2/sqrt(3))
+     * and |b|*sqrt(s) = |b0*i+b1*j|*sqrt(s) <= sqrt(q)*I*sqrt(2/sqrt(3)).
+     */
+
+    /*
+     * So the strategy above is cado-nfs's legacy strategy for choosing
+     * J, based on I.
+     *
+     * We now design another strategy. Let A be the target sieve area
+     * size. We would like to reach the conditions:
+     *
+     *     for any i,j with |i|<=I/2 and 0<=j<J:
+     *     |a|/sqrt(s) = |a0*i+a1*j|/sqrt(s) <= sqrt(q)*sqrt(A)*sqrt(2/sqrt(3))
+     *     |b|*sqrt(s) = |b0*i+b1*j|*sqrt(s) <= sqrt(q)*sqrt(A)*sqrt(2/sqrt(3))
+     *     I*J = A
+     *
+     * The geometrical reasoning given above would be the same. However,
+     * to achieve I*J=A, we will have to bump I and J slightly.
+     *
+     * So we're going to start by the previous approach, and adjust it in
+     * a second step.
+     */
+    const double skew = cpoly->skew;
+    const double rt_skew = sqrt(skew);
     const int verbose = 0;
     if (verbose) {
-        printf("# Called sieve_info_adjust_IJ((a0=%" PRId64 "; b0=%" PRId64
-               "; a1=%" PRId64 "; b1=%" PRId64 "), p=%lu, skew=%f, nb_threads=%d)\n",
-               si->qbasis.a0, si->qbasis.b0, si->qbasis.a1, si->qbasis.b1,
-               mpz_get_ui(si->doing->p), skewness, nb_threads);
+        gmp_printf("# Called sieve_info_adjust_IJ((a0=%" PRId64 "; b0=%" PRId64
+               "; a1=%" PRId64 "; b1=%" PRId64 "), p=%Zd, skew=%f, nb_threads=%d)\n",
+               qbasis.a0, qbasis.b0, qbasis.a1, qbasis.b1,
+               (mpz_srcptr) doing.p, skew, nb_threads);
     }
-    double maxab1, maxab0;
-    maxab1 = si->qbasis.b1 * skewness;
-    maxab1 = maxab1 * maxab1 + si->qbasis.a1 * si->qbasis.a1;
-    maxab0 = si->qbasis.b0 * skewness;
-    maxab0 = maxab0 * maxab0 + si->qbasis.a0 * si->qbasis.a0;
-    if (maxab0 > maxab1) { /* exchange u and v, thus I and J */
-        int64_t oa[2] = { si->qbasis.a0, si->qbasis.a1 };
-        int64_t ob[2] = { si->qbasis.b0, si->qbasis.b1 };
-        si->qbasis.a0 = oa[1]; si->qbasis.a1 = oa[0];
-        si->qbasis.b0 = ob[1]; si->qbasis.b1 = ob[0];
+    if (qbasis.skewed_norm0(skew) > qbasis.skewed_norm1(skew)) {
+        /* exchange u0 and u1, thus I and J */
+        swap(qbasis.a0, qbasis.a1);
+        swap(qbasis.b0, qbasis.b1);
     }
-    maxab1 = MAX(std::abs(si->qbasis.a1), std::abs(si->qbasis.b1) * skewness);
-    /* make sure J does not exceed I/2 */
-    /* FIXME: We should not have to compute this B a second time. It
-     * appears in sieve_info_init_norm_data already */
-    double B = sqrt (2.0 * mpz_get_d(si->doing->p) / (skewness * sqrt (3.0)));
-    if (maxab1 >= B * skewness)
-        si->J = (uint32_t) (B * skewness / maxab1 * (double) (si->I >> 1));
-    else
-        si->J = si->I >> 1;
+    double maxab1 = MAX(abs(qbasis.a1) / rt_skew, abs(qbasis.b1) * rt_skew);
+    double B = sqrt (2.0 * mpz_get_d(doing.p) / sqrt (3.0));
+
+    uint32_t I = 1UL << ((logA+1)/2);
+    J = 1UL << ((logA-1)/2);
+    J = (uint32_t) (B / maxab1 * (double) J);
+
+    const enum { IJ_OLD, IJ_NEW } ij_strategy = IJ_OLD;
+
+    if (ij_strategy == IJ_NEW) {
+        double Id = I;
+        double Jd = J;
+
+        double scale = sqrt(pow(2,logA)/Id/Jd);
+        Id *= scale;
+        Jd *= scale;
+
+        printf("# We would like to set I=%f and J=%f so as to get a %d-bit sieve area\n", Id, Jd, logA);
+
+        /* We're going to adjust one of the two to the nearest power of
+         * two, and let that be the new I.
+         *
+         * Not clear what we want to do with the adjustment of the other
+         * dimension, though.
+         *
+         * We want both I and J to be smaller than 2^16, eventually
+         * (given the present limitation of the code).
+         */
+
+        int IJadj[4][3]={
+            { (int) ceil(log2(Id)),  (int) Jd, 0},
+            { (int) floor(log2(Id)), (int) Jd, 0},
+            { (int) ceil(log2(Jd)),  (int) Id, 1},
+            { (int) floor(log2(Jd)), (int) Id, 1},
+        };
+        int nij=0;
+            
+        printf("# candidates:");
+        for(int i = 0 ; i < 4 ; i++) {
+            int logI = IJadj[i][0];
+            int J = IJadj[i][1];
+            int swap = IJadj[i][2];
+
+            printf(" %d*%d%s", 1<<logI, J, swap ? ",swapped" : "");
+            if (logI > 16) {
+                printf("(too large)");
+                continue;
+            }
+            memcpy(IJadj + nij, IJadj + i, sizeof(IJadj[i]));
+            nij++;
+        }
+        printf("\n");
+
+        memset(IJadj + nij, 0, (4-nij) * sizeof(IJadj[0]));
+        {
+            int i = 2;
+            if (IJadj[i][2]) {
+                swap(qbasis.a0, qbasis.a1);
+                swap(qbasis.b0, qbasis.b1);
+            }
+            J = IJadj[i][1];
+            logI = IJadj[i][0];
+            I = 1 << logI;
+        }
+    } else {
+        /* make sure J does not exceed I/2 */
+        J = MIN(J, I >> 1);
+        logI = (logA + 1) / 2;
+    }
 
     /* Make sure the bucket region size divides the sieve region size,
        partly covered bucket regions may lead to problems when
        reconstructing p from half-empty buckets. */
     /* Compute number of i-lines per bucket region, must be integer */
-    ASSERT_ALWAYS(LOG_BUCKET_REGION >= si->conf->logI);
-    uint32_t i = 1U << (LOG_BUCKET_REGION - si->conf->logI);
+    ASSERT_ALWAYS(LOG_BUCKET_REGION >= logI);
+    uint32_t i = 1U << (LOG_BUCKET_REGION - logI);
     i *= nb_threads;  /* ensures nb of bucket regions divisible by nb_threads */
 
     /* Bug 15617: if we round up, we are not true to our promises */
-    uint32_t nJ = (si->J / i) * i; /* Round down to multiple of i */
+    uint32_t nJ = (J / i) * i; /* Round down to multiple of i */
 
     if (verbose) printf("# %s(): Final J=%" PRIu32 "\n", __func__, nJ);
     /* XXX No rounding if we intend to abort */
-    if (nJ > 0) si->J = nJ;
+    if (nJ > 0) J = nJ;
     return nJ > 0;
 }/*}}}*/
 
@@ -1493,17 +1560,17 @@ int sieve_info_adjust_IJ(sieve_info_ptr si, int nb_threads)/*{{{*/
    rational and algebraic sides */
 /*
    Updates:
-     si->sides[side]->logmax
-     si->sides[side]->scale
-     si->sides[side]->cexp2[]
-     si->sides[side]->bound
+     si.sides[side].logmax
+     si.sides[side].scale
+     si.sides[side].cexp2[]
+     si.sides[side].bound
 
 */
 
 void
-sieve_info_update_norm_data (sieve_info_ptr si, int nb_threads)
+sieve_info_update_norm_data (sieve_info& si, int nb_threads)
 {
-  int64_t H[4] = { si->qbasis.a0, si->qbasis.b0, si->qbasis.a1, si->qbasis.b1 };
+  int64_t H[4] = { si.qbasis.a0, si.qbasis.b0, si.qbasis.a1, si.qbasis.b1 };
 
   double step, begin;
   double r, maxlog2;
@@ -1512,24 +1579,25 @@ sieve_info_update_norm_data (sieve_info_ptr si, int nb_threads)
   /* Update floating point version of both polynomials. They will be used in
    * get_maxnorm_alg(). */
   for (int side = 0; side < 2; side++) {
-      sieve_side_info_ptr s = si->sides[side];
-      mpz_poly_ptr ps = si->cpoly->pols[side];
-      mpz_poly_homography (s->fij, ps, H);
+      sieve_info::side_info& s(si.sides[side]);
+      mpz_poly_ptr ps = si.cpoly->pols[side];
+      mpz_poly_homography (s.fij, ps, H);
       /* On the special-q side, divide all the coefficients of the
          transformed polynomial by q */
-      if (si->conf->side == side) {
+      if (si.conf.side == side) {
           for (int i = 0; i <= ps->deg; i++) {
-              ASSERT_ALWAYS(mpz_divisible_p(s->fij->coeff[i], si->doing->p));
-              mpz_divexact(s->fij->coeff[i], s->fij->coeff[i], si->doing->p);
+              ASSERT_ALWAYS(mpz_divisible_p(s.fij->coeff[i], si.doing.p));
+              mpz_divexact(s.fij->coeff[i], s.fij->coeff[i], si.doing.p);
           }
       }
+      s.fijd.assign(ps->deg + 1, 0);
       for (int k = 0; k <= ps->deg; k++)
-          s->fijd[k] = mpz_get_d (s->fij->coeff[k]);
+          s.fijd[k] = mpz_get_d (s.fij->coeff[k]);
   }
 
 
   for (int side = 0; side < 2; ++side) {
-    sieve_side_info_ptr sideptr = si->sides[side];
+      sieve_info::side_info& sis(si.sides[side]);
 
     /* Compute the roots of the polynomial F(i,1) and the roots of its
        inflexion points d^2(F(i,1))/d(i)^2.  These roots and 0.0 are need to
@@ -1537,49 +1605,49 @@ sieve_info_update_norm_data (sieve_info_ptr si, int nb_threads)
        init_smart_degree_X_norms_bucket_region_internal.  */
 
 #ifdef SMART_NORM
-    if (si->cpoly->pols[side]->deg >= 2)
+    if (si.cpoly->pols[side]->deg >= 2)
       init_norms_roots (si, side);
 #endif
 
     /* Compute the maximum norm of the polynomial over the sieve region.
        The polynomial coefficient in fijd are already divided by q
-       on the special-q side. */
-    poly->deg = si->cpoly->pols[side]->deg;
-    poly->coeff = si->sides[side]->fijd;
-    sideptr->logmax = log2(get_maxnorm_alg (poly, (double)si->I/2, (double)si->I/2));
+       on the special-q sis. */
+    poly->deg = si.cpoly->pols[side]->deg;
+    poly->coeff = &(si.sides[side].fijd[0]);
+    sis.logmax = log2(get_maxnorm_alg (poly, (double)si.I/2, (double)si.I/2));
 
     /* we know that |F(a,b)| < 2^(logmax) or |F(a,b)/q| < 2^(logmax)
-       depending on sqside. 0 */
+       depending on sqsis. 0 */
     /* we increase artificially 'logmax', to allow larger values of J */
-    sideptr->logmax += 2.0;
-    maxlog2 = sideptr->logmax;
+    sis.logmax += 2.0;
+    maxlog2 = sis.logmax;
 
     /* we want to map 0 <= x < maxlog2 to GUARD <= y < UCHAR_MAX,
        thus y = GUARD + x * (UCHAR_MAX-GUARD)/maxlog2.
        We require that scale is of the form (int) * 0.025, so that only a small
        number of different factor base slicings can occur. */
-    sideptr->scale = (int)(((double) UCHAR_MAX - GUARD) / maxlog2 * 40.)*0.025;
+    sis.scale = (int)(((double) UCHAR_MAX - GUARD) / maxlog2 * 40.)*0.025;
     verbose_output_start_batch();
     verbose_output_print (0, 1,
         "# Side %d: log2(maxnorm)=%1.2f scale=%1.2f, logbase=%1.6f",
-        side, maxlog2, sideptr->scale, exp2 (1. / sideptr->scale));
-    step = 1. / sideptr->scale;
+        side, maxlog2, sis.scale, exp2 (1. / sis.scale));
+    step = 1. / sis.scale;
     begin = -step * GUARD;
     for (unsigned int inc = 0; inc < 257; begin += step)
-      sideptr->cexp2[inc++] = exp2(begin);
+      sis.cexp2[inc++] = exp2(begin);
     /* we want to select relations with a cofactor of less than r bits */
     {
-      double max_lambda = (maxlog2 - GUARD / sideptr->scale) /
-        si->conf->sides[side]->lpb;
-      double lambda = si->conf->sides[side]->lambda;
+      double max_lambda = (maxlog2 - GUARD / sis.scale) /
+        si.conf.sides[side].lpb;
+      double lambda = si.conf.sides[side].lambda;
       if (lambda == 0) {
-        r = MIN(si->conf->sides[side]->mfb, maxlog2 - GUARD / sideptr->scale);
+        r = MIN(si.conf.sides[side].mfb, maxlog2 - GUARD / sis.scale);
       } else {
-        r = MIN(lambda * (double) si->conf->sides[side]->lpb,
-            maxlog2 - GUARD / sideptr->scale);
+        r = MIN(lambda * (double) si.conf.sides[side].lpb,
+            maxlog2 - GUARD / sis.scale);
       }
-      sideptr->bound = (unsigned char) (r * sideptr->scale + GUARD);
-      verbose_output_print (0, 1, " bound=%u\n", sideptr->bound);
+      sis.bound = (unsigned char) (r * sis.scale + GUARD);
+      verbose_output_print (0, 1, " bound=%u\n", sis.bound);
       verbose_output_end_batch();
       if (lambda > max_lambda)
         verbose_output_print (0, 1, "# Warning, lambda>%.1f on side %d does "
@@ -1590,14 +1658,14 @@ sieve_info_update_norm_data (sieve_info_ptr si, int nb_threads)
   /* improve bound on J if possible */
   unsigned int Jmax;
   Jmax = sieve_info_update_norm_data_Jmax (si);
-  if (Jmax > si->J)
+  if (Jmax > si.J)
     {
       /* see sieve_info_adjust_IJ */
-      ASSERT_ALWAYS(LOG_BUCKET_REGION >= si->conf->logI);
-      uint32_t i = 1U << (LOG_BUCKET_REGION - si->conf->logI);
+      ASSERT_ALWAYS(LOG_BUCKET_REGION >= si.logI);
+      uint32_t i = 1U << (LOG_BUCKET_REGION - si.logI);
       i *= nb_threads;
-      si->J = (Jmax / i) * i; /* cannot be zero since the previous value
-                                 of si->J was already a multiple of i,
+      si.J = (Jmax / i) * i; /* cannot be zero since the previous value
+                                 of si.J was already a multiple of i,
                                  and this new value is larger */
     }
 }

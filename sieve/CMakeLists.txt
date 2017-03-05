@@ -13,8 +13,9 @@ target_link_libraries (makefb utils)
 
 set (las_sources las.cpp fb.cpp las-plattice.cpp
   las-coordinates.cpp las-debug.cpp las-report-stats.cpp las-duplicate.cpp
-  las-config.cpp bucket.cpp las-smallsieve.cpp las-unsieve.cpp
+  las-config.c bucket.cpp las-smallsieve.cpp las-unsieve.cpp
   las-unsieve-sse2.cpp las-arith.cpp
+  las-trialdiv.cpp las-fb.cpp
   las-qlattice.cpp las-descent-trees.cpp las-cofactor.cpp
   las-fill-in-buckets.cpp las-threads.cpp)
 set (las_libraries las-norms trialdiv facul utils ${pthread_libs})
@@ -48,7 +49,14 @@ add_subdirectory(ecm)
 add_subdirectory(strategies)
 
 add_executable(dupsup dupsup.cpp las-duplicate.cpp las-qlattice.cpp
-    las-plattice.cpp las-coordinates.cpp las-cofactor.cpp fb.cpp)
+    las-plattice.cpp las-coordinates.cpp las-cofactor.cpp fb.cpp
+    las-norms.cpp
+    las-unsieve.cpp
+    las-unsieve-sse2.cpp
+    las-smallsieve.cpp
+    las-trialdiv.cpp las-fb.cpp
+    trialdiv.c
+    )
 target_link_libraries(dupsup utils_with_io facul las-norms)
 
 add_executable(fake_rels EXCLUDE_FROM_ALL fake_rels.cpp)
