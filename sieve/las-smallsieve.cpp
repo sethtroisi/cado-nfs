@@ -177,15 +177,10 @@ void small_sieve_extract_interval(small_sieve_data_t * r, small_sieve_data_t * s
 
 /* Initialization procedures for the ssp data */
 
-static inline void ssp_init_oa(ssp_t * tail, fbprime_t p, fbprime_t r, unsigned int skip, unsigned int sublatm, where_am_I & w MAYBE_UNUSED)/*{{{*/
+static inline void ssp_init_oa(ssp_t * tail, fbprime_t p, fbprime_t r, unsigned int skip, where_am_I & w MAYBE_UNUSED)/*{{{*/
 {
     tail->p = p;
     tail->r = r;
-    if (sublatm == 0) {
-        tail->rm = tail->r;
-    } else {
-        tail->rm = (r * sublatm) % p;
-    }
     tail->offset = (r * skip) % p;
 }/*}}}*/
 
@@ -313,7 +308,7 @@ void small_sieve_init(small_sieve_data_t *ssd, las_info & las,
                     event |= SSP_DISCARD;
                 }
             } else {
-                ssp_init_oa(tail, p, r_q, skiprows, si.conf.sublat.m, w);
+                ssp_init_oa(tail, p, r_q, skiprows, w);
             }
             tail++;
             if (event)
@@ -520,9 +515,19 @@ void sieve_small_bucket_region(unsigned char *S, int N,
      * large as the sieve region. The row number corresponding to a given
      * i0 is i0/I, but we also need to add bucket_nr*bucket_size/I to
      * this, which is what this flag is for.
+     * Sublat must also be taken into account.
      */
-    const int row0_is_oddj = (N << (LOG_BUCKET_REGION - si.logI)) & 1;
-
+    int row0_is_oddj;
+    if (si.conf.sublat.m == 0) {
+        row0_is_oddj = (N << (LOG_BUCKET_REGION - si.conf.logI)) & 1;
+    } else {
+        int row0 = (N << (LOG_BUCKET_REGION - si.conf.logI));
+        row0_is_oddj = (row0 * si.conf.sublat.m + si.conf.sublat.j0) & 1;
+        // Odd/even property of j is the same as for j+2, even with
+        // sublat, unless sublat.m is even, which is not handled right
+        // now. Same for i.
+        ASSERT_ALWAYS((si.conf.sublat.m & 1) == 1);
+    }
 
     /* Handle powers of 2 up to 2 * sizeof(long) separately. 
      * TODO: use SSE2 */
@@ -801,21 +806,28 @@ void sieve_small_bucket_region(unsigned char *S, int N,
 	 * it's projective, but in this branch we have no projective
 	 * primes. */
 	if (p == 3) continue;
-	const fbprime_t r =  ssd->ssp[k].rm;
+	const fbprime_t r =  ssd->ssp[k].r;
 	WHERE_AM_I_UPDATE(w, p, p);
 	const unsigned char logp = ssd->logp[k];
 	unsigned char *S_ptr = S;
 	size_t p_or_2p = p;
 	unsigned int i0 = ssdpos[k]; ASSERT(i0 < p);
+        unsigned int i_compens_sublat = 0;
+        if (si.conf.sublat.m != 0) {
+            i_compens_sublat = si.conf.sublat.i0 & 1;
+        }
 	j = 0;
-	if (nj & N & 1) goto j_odd; /* !((nj*N+j)%2) */
+	if (row0_is_oddj) goto j_odd;
 	do {
 	  unsigned char *pi;
 	  WHERE_AM_I_UPDATE(w, j, j);
 	  pi = S_ptr + i0;
 	  S_ptr += I;
 	  /* for j even, we sieve only odd pi, so step = 2p. */
-	  p_or_2p += p_or_2p; if (!(i0 & 1)) pi += p;
+	  p_or_2p += p_or_2p;
+          if (!((i_compens_sublat + i0) & 1)) {
+              pi += p;
+          }
 	  U;
 	  i0 += r; if (i0 >= p) i0 -= p; 
 	  /* Next line */
@@ -966,7 +978,7 @@ void sieve_small_bucket_region(unsigned char *S, int N,
             /* Don't sieve powers of 2 again that were pattern-sieved */
             ssp_t * ssp = &(ssd->ssp[k]);
             const fbprime_t p = ssp->p;
-            const fbprime_t r = ssp->rm;
+            const fbprime_t r = ssp->r;
             WHERE_AM_I_UPDATE(w, p, p);
 
             if (p <= pattern2_size)
@@ -1022,7 +1034,19 @@ resieve_small_bucket_region (bucket_primes_t *BP, int N, unsigned char *S,
     unsigned long j, nj;
     const int resieve_very_verbose = 0, resieve_very_verbose_bad = 0;
     /* See comment above about the variable of the same name */
-    const int row0_is_oddj = (N << (LOG_BUCKET_REGION - si.logI)) & 1;
+    int row0_is_oddj;
+    unsigned int i_compens_sublat = 0;
+    if (si.conf.sublat.m == 0) {
+        row0_is_oddj = (N << (LOG_BUCKET_REGION - si.conf.logI)) & 1;
+    } else {
+        int row0 = (N << (LOG_BUCKET_REGION - si.conf.logI));
+        row0_is_oddj = (row0 * si.conf.sublat.m + si.conf.sublat.j0) & 1;
+        i_compens_sublat = si.conf.sublat.i0 & 1;
+        // Odd/even property of j is the same as for j+2, even with
+        // sublat, unless sublat.m is even, which is not handled right
+        // now. Same for i.
+        ASSERT_ALWAYS((si.conf.sublat.m & 1) == 1);
+    }
 
     nj = (bucket_region >> si.logI);
 
@@ -1066,7 +1090,7 @@ resieve_small_bucket_region (bucket_primes_t *BP, int N, unsigned char *S,
             unsigned int q = p&-!row0_is_oddj;
             for (j = 0; j < nj; j ++) {
                 WHERE_AM_I_UPDATE(w, j, j);
-                for (unsigned int i = i0 + (q& -!(i0&1)) ; i < I; i += p+q) {
+                for (unsigned int i = i0 + (q& -!((i0+i_compens_sublat)&1)) ; i < I; i += p+q) {
                     if (LIKELY(S_ptr[i] == 255)) continue;
                     bucket_update_t<1, primehint_t> prime;
                     unsigned int x = (j << (si.logI)) + i;

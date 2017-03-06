@@ -9,7 +9,6 @@
 typedef struct {
     fbprime_t p;
     fbprime_t r;        // in [ 0, p [
-    fbprime_t rm;        // in [ 0, p [
     fbprime_t offset;   // in [ 0, p [
 } ssp_t;
 
@@ -19,7 +18,7 @@ typedef struct {
  * need to store them with the ssp_marker_t structure.
  */
 typedef struct {
-    fbprime_t g, q, U, dummy;
+    fbprime_t g, q, U;
 } ssp_bad_t;
 
 #define SSP_POW2        (1u<<0)

@@ -30,6 +30,10 @@ void xToIJ(int *i, unsigned int *j, const uint64_t X, sieve_info const & si)
 {
     *i = (X % (si.I)) - (si.I >> 1);
     *j = X / si.I;
+}
+
+void adjustIJsublat(int *i, unsigned int *j, sieve_info const & si) 
+{
     if (si.conf.sublat.m != 0) {
         *i = (*i)*si.conf.sublat.m + si.conf.sublat.i0;
         *j = (*j)*si.conf.sublat.m + si.conf.sublat.j0;
@@ -42,8 +46,6 @@ void NxToIJ(int *i, unsigned int *j, const unsigned int N, const unsigned int x,
     return xToIJ(i, j, X, si);
 }
 
-// FIXME: broken for sublat (but used in where_i_am, which is also
-// broken... (and also maybe duplicate suppression)
 void IJTox(uint64_t * x, int i, unsigned int j, sieve_info const & si)
 {
     *x = (int64_t)i + ((uint64_t)si.I)*(uint64_t)j + (uint64_t)(si.I>>1);
@@ -57,9 +59,14 @@ void IJToNx(unsigned int *N, unsigned int * x, int i, unsigned int j, sieve_info
     *x = xx & (uint64_t)((1 << LOG_BUCKET_REGION) - 1);
 }
 
-void IJToAB(int64_t *a, uint64_t *b, const int i, const unsigned int j, 
+void IJToAB(int64_t *a, uint64_t *b, int i, unsigned int j, 
        sieve_info const & si)
 {
+    if (si.conf.sublat.m != 0) {
+        i = i*si.conf.sublat.m+si.conf.sublat.i0;
+        j = j*si.conf.sublat.m+si.conf.sublat.j0;
+    }
+
     int64_t s, t;
     s = (int64_t)i * (int64_t) si.qbasis.a0 + (int64_t)j * (int64_t)si.qbasis.a1;
     t = (int64_t)i * (int64_t) si.qbasis.b0 + (int64_t)j * (int64_t)si.qbasis.b1;
@@ -75,6 +82,7 @@ void IJToAB(int64_t *a, uint64_t *b, const int i, const unsigned int j,
       }
 }
 
+//////////// FIXME: sublat broken
 int ABToIJ(int *i, unsigned int *j, const int64_t a, const uint64_t b, sieve_info const & si)
 {
     /* Both a,b and the coordinates of the lattice basis can be quite

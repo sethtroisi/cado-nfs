@@ -259,10 +259,12 @@ fill_in_buckets_toplevel(bucket_array_t<LEVEL, shorthint_t> &orig_BA,
       /* If proj and r > 0, then r == 1/p (mod p^2), so all hits would be in
          locations with p | gcd(i,j). */
       if (LIKELY(!proj || r == 0)) {
-        plattice_info_t pli = plattice_info_t(transformed.get_q(), r, proj, si.logI);
-        plattice_enumerate_t ple = plattice_enumerate_t(pli, i_entry, si.logI, si.conf.sublat);
-        // Skip (0,0). FIXME: in sublat mode, this is not wanted.
-        ple.next();
+        plattice_info_t pli = plattice_info_t(transformed.get_q(), r, proj, si.conf.logI);
+        plattice_enumerate_t ple = plattice_enumerate_t(pli, i_entry, si.conf.logI, si.conf.sublat);
+
+        // Skip (i,j)=(0,0) unless we have sublattices.
+        if (!si.conf.sublat.m)
+            ple.next();
         if (plattice_enumerate_finished<LEVEL>(ple.get_x()))
             continue;
         if (LIKELY(pli.a0 != 0)) {
@@ -376,7 +378,7 @@ fill_in_buckets(const worker_thread * worker,
 
     /* Now, do the real work: the filling of the buckets */
     while (!plattice_enumerate_finished<LEVEL>(pl.get_x())) {
-      if (LIKELY(pl.probably_coprime()))
+      if (LIKELY(pl.probably_coprime())) // FIXME: sublat !
         BA.push_update(pl.get_x(), p, hint, slice_index, w);
       pl.next();
     }
