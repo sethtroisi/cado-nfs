@@ -5,6 +5,7 @@
 #include "fb.hpp"
 #include "trialdiv.h"
 #include "las-config.h"
+#include "las-base.hpp"
 #include "las-report-stats.hpp"
 #include "bucket.hpp"
 #include "cado_poly.h"
@@ -62,7 +63,43 @@ struct siever_config {
     };
     side_config sides[2];
     siever_config() { memset(this, 0, sizeof(*this)); }
+
+    /* The comparator functions below also exist as function objects in
+     * las.cpp -- the reason we don't write the comparator code here is
+     * that there's some inherently verbose code attached to the
+     * function objects (in pre-c++11, at least). */
     bool operator==(siever_config const & o) const { return memcmp(this, &o, sizeof(*this)) == 0; }
+
+    bool has_same_config_q(siever_config const & o) const {
+        return side == o.side && bitsize == o.bitsize;
+    }
+
+    bool has_same_sieving(siever_config const & o) const {
+        bool ok = true;
+        ok = ok && logI == o.logI;
+        ok = ok && bucket_thresh == o.bucket_thresh;
+        ok = ok && bucket_thresh1 == o.bucket_thresh1;
+        ok = ok && td_thresh == o.td_thresh;
+        ok = ok && skipped == o.skipped;
+        ok = ok && bk_multiplier == o.bk_multiplier;
+        ok = ok && unsieve_thresh == o.unsieve_thresh;
+        for(int side = 0 ; side < 2 ; side++) {
+            ok = ok && sides[side].lim == o.sides[side].lim;
+            ok = ok && sides[side].powlim == o.sides[side].powlim;
+            ok = ok && sides[side].lambda == o.sides[side].lambda;
+        }
+        return ok;
+    }
+    bool has_same_cofactoring(siever_config const & o) const {
+        bool ok = true;
+        for(int side = 0 ; side < 2 ; side++) {
+            ok = ok && sides[side].lpb == o.sides[side].lpb;
+            ok = ok && sides[side].mfb == o.sides[side].mfb;
+            ok = ok && sides[side].ncurves == o.sides[side].ncurves;
+        }
+        return ok;
+    }
+
 };
 
 /* }}} */
@@ -249,7 +286,7 @@ struct sieve_info {
  * lives outside the choice of one particular way to configure the siever
  * versus another.
  */
-struct las_info {
+struct las_info : private NonCopyable {
     // ----- general operational flags
     int nb_threads;
     FILE *output;
@@ -329,6 +366,8 @@ struct las_info {
 
     las_info(param_list_ptr);
     ~las_info();
+
+    siever_config get_config_for_q(las_todo_entry const&);
 };
 /* }}} */
 

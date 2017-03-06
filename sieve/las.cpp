@@ -56,6 +56,7 @@
 int recursive_descent = 0;
 int prepend_relation_time = 0;
 int exit_after_rel_found = 0;
+int allow_largesq = 0;
 
 double general_grace_time_ratio = DESCENT_DEFAULT_GRACE_TIME_RATIO;
 
@@ -66,8 +67,38 @@ double tt_qstart;
 
 /* siever_config stuff */
 
+struct has_same_config {/*{{{*/
+    siever_config const & sc;
+    has_same_config(siever_config const & sc) : sc(sc) {}
+    bool operator()(siever_config const& o) const { return o == sc; }
+    bool operator()(sieve_info const& o) const { return (*this)(o.conf); }
+};
+/*}}}*/
+struct has_same_config_q {/*{{{*/
+    siever_config const & sc;
+    has_same_config_q(siever_config const & sc) : sc(sc) {}
+    bool operator()(siever_config const& o) const { return sc.has_same_config_q(o); }
+    bool operator()(sieve_info const& o) const { return (*this)(o.conf); }
+};
+/*}}}*/
+struct has_same_sieving {/*{{{*/
+    siever_config const & sc;
+    has_same_sieving(siever_config const & sc) : sc(sc) {}
+    bool operator()(siever_config const& o) const { return sc.has_same_sieving(o); }
+    bool operator()(sieve_info const& o) const { return (*this)(o.conf); }
+};
+/*}}}*/
+struct has_same_cofactoring {/*{{{*/
+    siever_config const & sc;
+    has_same_cofactoring(siever_config const & sc) : sc(sc) {}
+    bool operator()(siever_config const& o) const { return sc.has_same_cofactoring(o); }
+    bool operator()(sieve_info const& o) const { return (*this)(o.conf); }
+};
+/*}}}*/
 void siever_config_display(siever_config const & sc)/*{{{*/
 {
+    if (sc.bitsize == 0) return;
+
     verbose_output_print(0, 1, "# Sieving parameters for q~2^%d on side %d\n",
             sc.bitsize, sc.side);
     /* Strive to keep these output lines untouched */
@@ -85,10 +116,58 @@ void siever_config_display(siever_config const & sc)/*{{{*/
     }
 }/*}}}*/
 
+siever_config las_info::get_config_for_q(las_todo_entry const & doing)/*{{{*/
+{
+    // arrange so that we don't have the same header line as the one
+    // which prints the q-lattice basis
+    verbose_output_vfprint(0, 1, gmp_vfprintf,
+                         "#\n"
+                         "# "
+                         "Now sieving side-%d q=%Zd; rho=%Zd\n",
+                         doing.side,
+                         (mpz_srcptr) doing.p,
+                         (mpz_srcptr) doing.r);
+    siever_config config = config_base;
+    config.bitsize = mpz_sizeinbase(doing.p, 2);
+    config.side = doing.side;
+
+    // note that we inherit logA (or logI) from config_base.
+ 
+    /* Do we have a hint table with specifically tuned parameters,
+     * well suited to this problem size ? */
+    for(unsigned int i = 0 ; i < hint_table.size() ; i++) {
+        siever_config & sc(hint_table[i].conf);
+        if (!sc.has_same_config_q(config)) continue;
+        verbose_output_print(0, 1, "# Using parameters from hint list for q~2^%d on side %d [%d@%d]\n", sc.bitsize, sc.side, sc.bitsize, sc.side);
+        config = sc;
+    }
+
+    /* Check whether q is larger than the large prime bound.
+     * This can create some problems, for instance in characters.
+     * By default, this is not allowed, but the parameter
+     * -allow-largesq is a by-pass to this test.
+     */
+    if (!allow_largesq) {
+        if ((int)mpz_sizeinbase(doing.p, 2) >
+                config.sides[config.side].lpb) {
+            fprintf(stderr, "ERROR: The special q (%d bits) is larger than the "
+                    "large prime bound on side %d (%d bits).\n",
+                    (int) mpz_sizeinbase(doing.p, 2),
+                    config.side,
+                    config.sides[config.side].lpb);
+            fprintf(stderr, "       You can disable this check with "
+                    "the -allow-largesq argument,\n");
+            fprintf(stderr, "       It is for instance useful for the "
+                    "descent.\n");
+            exit(EXIT_FAILURE);
+        }
+    }
+    return config;
+}/*}}}*/
+
 /* sieve_info stuff */
 
-/* {{{ sieve_info_init_... */
-sieve_info::sieve_info(las_info & las, siever_config const & sc, param_list pl, int is_default)
+sieve_info::sieve_info(las_info & las, siever_config const & sc, param_list pl, int is_default)/*{{{*/
 {
     cpoly = las.cpoly;
     conf = sc;
@@ -187,12 +266,9 @@ sieve_info::sieve_info(las_info & las, siever_config const & sc, param_list pl, 
         sides[side].fb->get_part(0)->count_entries(NULL, &nr_roots, NULL);
         verbose_output_print(0, 2, " (total %zu)\n", nr_roots);
     }
-}
+}/*}}}*/
 
-/* }}} */
-
-static void sieve_info_update (sieve_info & si, int nb_threads,
-    const size_t nr_workspaces)/*{{{*/
+static void sieve_info_update (sieve_info & si, int nb_threads, const size_t nr_workspaces)/*{{{*/
 {
   /* essentially update the fij polynomials and J value */
   sieve_info_update_norm_data(si, nb_threads);
@@ -782,59 +858,6 @@ void las_info::clear_cof_stats()
     cof_stats_file = NULL;
 }
 //}}}
-
-struct has_same_config {
-    siever_config const & sc;
-    has_same_config(siever_config const & sc) : sc(sc) {}
-    bool operator()(sieve_info const& o) const {
-        return o.conf == sc;
-    }
-};
-
-#if 0
-struct has_same_config_q_A_logI {
-    siever_config const & sc;
-    has_same_config_q_A_logI(siever_config const & sc) : sc(sc) {}
-    bool operator()(sieve_info const& o) const {
-        return o.conf.bitsize == sc.bitsize &&
-               o.conf.side == sc.side &&
-               o.conf.logA == sc.logA &&
-               o.logI == sc.logI_adjusted;
-        /* FIXME: this remaining logI_adjusted should go, I guess */
-    }
-};
-
-struct has_same_config_q_A {
-    siever_config const & sc;
-    has_same_config_q_A(siever_config const & sc) : sc(sc) {}
-    bool operator()(sieve_info const& o) const {
-        return o.conf.bitsize == sc.bitsize &&
-               o.conf.side == sc.side &&
-               o.conf.logA == sc.logA;
-    }
-};
-#else
-struct has_same_config_q_logI {
-    siever_config const & sc;
-    has_same_config_q_logI(siever_config const & sc) : sc(sc) {}
-    bool operator()(sieve_info const& o) const {
-        return o.conf.bitsize == sc.bitsize &&
-               o.conf.side == sc.side &&
-               o.logI == sc.logI;
-    }
-};
-#endif
-
-
-struct has_same_config_q {
-    siever_config const & sc;
-    has_same_config_q(siever_config const & sc) : sc(sc) {}
-    bool operator()(siever_config const& o) const {
-        return o.bitsize == sc.bitsize &&
-               o.side == sc.side;
-    }
-    bool operator()(sieve_info const& o) const { return (*this)(o.conf); }
-};
 
 
 /* Look for an existing sieve_info in las.sievers with configuration matching
@@ -2697,7 +2720,6 @@ int main (int argc0, char *argv0[])/*{{{*/
     double t0, tts, wct;
     unsigned long nr_sq_processed = 0;
     unsigned long nr_sq_discarded = 0;
-    int allow_largesq = 0;
     int never_discard = 0;      /* only enabled for las_descent */
     double totJ = 0.0;
     int argc = argc0;
@@ -2784,6 +2806,7 @@ int main (int argc0, char *argv0[])/*{{{*/
             descent_hint & h(las.hint_table[i]);
             get_sieve_info_from_config(las, h.conf, pl);
         }
+        verbose_output_print(0, 1, "# Done creating cached siever configurations\n");
     }
 
     tune_las_memset();
@@ -2819,7 +2842,6 @@ int main (int argc0, char *argv0[])/*{{{*/
 
     t0 = seconds ();
     wct = wct_seconds();
-    verbose_output_print(0, 1, "#\n");
 
     where_am_I w MAYBE_UNUSED;
     WHERE_AM_I_UPDATE(w, plas, &las);
@@ -2873,6 +2895,11 @@ int main (int argc0, char *argv0[])/*{{{*/
 
         ASSERT_ALWAYS(mpz_poly_is_root(las.cpoly->pols[doing.side], doing.r, doing.p));
 
+        /* See whether for this size of special-q, we have predefined
+         * parameters (note: we're copying the default config, and then
+         * we replace by an adjusted one if needed). */
+        siever_config current_config = las.get_config_for_q(doing);
+
         SIBLING_TIMER(timer_special_q, "skew Gauss");
 
         qlattice_basis qbasis;
@@ -2894,35 +2921,6 @@ int main (int argc0, char *argv0[])/*{{{*/
             continue;
         }
 #endif
-
-        /* Now we have: a bitsize for q, a side.  In most common cases,
-         * we also have an area size. But in the descent case, we might
-         * not. We need to try and see whether we have a hint file which
-         * advises us to choose a special one.
-         *
-         * We're going to pre-fill a siever_config info for checking the
-         * list of configurations we already know of.
-         */
-
-        siever_config current_config = las.config_base;
-
-        current_config.bitsize = mpz_sizeinbase(doing.p, 2);
-        current_config.side = doing.side;
-#if 0
-        current_config.logA = las.config_base.logA;
-#else
-        current_config.logI = las.config_base.logI;
-#endif
-
-        /* Do we have a hint table with specifically tuned parameters,
-         * well suited to this problem size ? */
-        for(unsigned int i = 0 ; i < las.hint_table.size() ; i++) {
-            descent_hint & h(las.hint_table[i]);
-            siever_config & sc(h.conf);
-            if (!has_same_config_q(current_config)(sc)) continue;
-            verbose_output_print(0, 1, "# Using existing sieving parameters from hint list for q~2^%d on side %d [%d@%d]\n", sc.bitsize, sc.side, sc.bitsize, sc.side);
-            current_config = sc;
-        }
 
         int logI, A;
 #if 0
@@ -2998,33 +2996,18 @@ int main (int argc0, char *argv0[])/*{{{*/
             si.qbasis.prime_factors = doing.prime_factors;
         }
 
+        /* checks the value of J,
+         * precompute the skewed polynomials of f(x) and g(x), and also
+         * their floating-point versions */
+        sieve_info_update (si, las.nb_threads, nr_workspaces);
+        totJ += (double) si.J;
+
         WHERE_AM_I_UPDATE(w, psi, &si);
 
         las.tree.new_node(si.doing);
         las_todo_push_closing_brace(las, si.doing.depth);
 
-        /* Check whether q is larger than the large prime bound.
-         * This can create some problems, for instance in characters.
-         * By default, this is not allowed, but the parameter
-         * -allow-largesq is a by-pass to this test.
-         */
-        if (!allow_largesq) {
-            if ((int)mpz_sizeinbase(si.doing.p, 2) >
-                    si.conf.sides[si.conf.side].lpb) {
-                fprintf(stderr, "ERROR: The special q (%d bits) is larger than the "
-                        "large prime bound on side %d (%d bits).\n",
-                        (int)mpz_sizeinbase(si.doing.p, 2),
-                        si.conf.side,
-                        si.conf.sides[si.conf.side].lpb);
-                fprintf(stderr, "       You can disable this check with "
-                        "the -allow-largesq argument,\n");
-                fprintf(stderr, "       It is for instance useful for the "
-                        "descent.\n");
-                exit(EXIT_FAILURE);
-            }
-        }
-
-
+        nr_sq_processed ++;
         verbose_output_vfprint(0, 1, gmp_vfprintf,
                              "# "
                              HILIGHT_START
@@ -3049,13 +3032,6 @@ int main (int argc0, char *argv0[])/*{{{*/
                     (mpz_srcptr) doing.p);
         }
 
-        nr_sq_processed ++;
-
-        /* checks the value of J,
-         * precompute the skewed polynomials of f(x) and g(x), and also
-         * their floating-point versions */
-        sieve_info_update (si, las.nb_threads, nr_workspaces);
-        totJ += (double) si.J;
         verbose_output_print(0, 2, "# I=%u; J=%u\n", si.I, si.J);
         if (las.verbose >= 2) {
             verbose_output_print (0, 1, "# f_0'(x) = ");
