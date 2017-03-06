@@ -414,7 +414,7 @@ hash_renumbered_rels (void * context_data MAYBE_UNUSED, earlyparsed_relation_ptr
                        (uint64_t) ((rel->a < 0) ? -rel->a : rel->a),
                        rel->b, i, H[i]);
       fprintf (stderr, "This warning may be due to a collision on the hash "
-                       "table or to an actual duplicate\nrelation. If it "
+                       "function or to an actual duplicate\nrelation. If it "
                        "appears often you should check the input set of "
                        "relations.\n\n");
     }
