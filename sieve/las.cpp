@@ -2910,9 +2910,9 @@ int main (int argc0, char *argv0[])/*{{{*/
         /* check |a0|, |a1| < 2^31 if we use fb_root_in_qlattice_31bits */
 #ifndef SUPPORT_LARGE_Q
         if (qbasis.a0 <= INT64_C(-2147483648) ||
-            qbasis.a0 >= INT64_C(2147483648)  ||
+            qbasis.a0 >= INT64_C( 2147483648) ||
             qbasis.a1 <= INT64_C(-2147483648) ||
-            qbasis.a1 >= INT64_C(2147483648))
+            qbasis.a1 >= INT64_C( 2147483648))
         {
             fprintf (stderr,
                     "Warning, special-q basis is too skewed,"
@@ -3017,10 +3017,10 @@ int main (int argc0, char *argv0[])/*{{{*/
                              (mpz_srcptr) si.doing.p,
                              (mpz_srcptr) si.doing.r);
 
-        verbose_output_print(0, 1, " a0=%" PRId64 "; b0=%" PRId64 "; a1=%" PRId64 "; b1=%" PRId64 "; J=%u;",
+        verbose_output_print(0, 1, " a0=%" PRId64 "; b0=%" PRId64 "; a1=%" PRId64 "; b1=%" PRId64 "; raw_J=%u; J=%u;",
                              si.qbasis.a0, si.qbasis.b0,
                              si.qbasis.a1, si.qbasis.b1,
-                             si.J);
+                             J, si.J);
         if (si.doing.depth) {
             verbose_output_print(0, 1, " # within descent, currently at depth %d", si.doing.depth);
         }
