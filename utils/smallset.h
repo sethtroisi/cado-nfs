@@ -259,7 +259,8 @@ public:
     /* Temp array so we can apply padding if necessary. We could also pad with
        clever SSE mixing operations, but don't. Doing so would probably be
        cleaner. */
-    ELEMENTTYPE tmp_data[nr_items];
+    /* TODO: alignment should be set not only for gcc ! */
+    ELEMENTTYPE tmp_data[nr_items] ATTRIBUTE((aligned(sizeof(storagetype))));
 
     /* We cannot handle the empty set if SIZE > 0, as we use padding to fill
        unused slots in items, and in an empty set there is nothing we could
@@ -282,7 +283,8 @@ public:
   }
 
   smallset(const std::vector<ELEMENTTYPE> &data) {
-    ELEMENTTYPE tmp_data[nr_items];
+    /* TODO: alignment should be set not only for gcc ! */
+    ELEMENTTYPE tmp_data[nr_items] ATTRIBUTE((aligned(sizeof(storagetype))));
     /* We want the ASSERT_ALWAYS below to instruct gcc that we can't have
      * an empty for loop below (the first one). gcc cannot infer that if
      * we reason on data.size() only, because it does not propagate
