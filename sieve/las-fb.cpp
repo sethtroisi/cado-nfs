@@ -47,6 +47,7 @@ void sieve_info::init_factor_bases(las_info & las, param_list_ptr pl)
 
         if (pol->deg > 1) {
             double tfb = seconds ();
+            double tfb_wct = wct_seconds ();
             char fbparamname[4];
             snprintf(fbparamname, sizeof(fbparamname), "fb%d", side);
             const char * fbfilename = param_list_lookup_string(pl, fbparamname);
@@ -55,12 +56,13 @@ void sieve_info::init_factor_bases(las_info & las, param_list_ptr pl)
                 exit(EXIT_FAILURE);
             }
             verbose_output_print(0, 1, "# Reading side-%d factor base from %s\n", side, fbfilename);
-            tfb = seconds () - tfb;
             if (!fb[side]->read(fbfilename))
                 exit(EXIT_FAILURE);
+            tfb = seconds () - tfb;
+            tfb_wct = wct_seconds () - tfb_wct;
             verbose_output_print(0, 1,
-                    "# Reading side-%d factor base of %zuMb took %1.1fs\n",
-                    side, fb[side]->size() >> 20, tfb);
+                    "# Reading side-%d factor base of %zuMb took %1.1fs (%1.1f real)\n",
+                    side, fb[side]->size() >> 20, tfb, tfb_wct);
         } else {
             double tfb = seconds ();
             double tfb_wct = wct_seconds ();
