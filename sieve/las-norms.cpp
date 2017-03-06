@@ -1656,6 +1656,11 @@ sieve_info_update_norm_data (sieve_info& si, int nb_threads)
           mpz_poly_divexact_mpz(s.fij, s.fij, si.doing.p);
       }
       double_poly_set_mpz_poly(s.fijd, s.fij);
+      // Take sublat into account: multiply all coefs by m^deg.
+      // We do it only for the floating point version, that is used to
+      // compute a bound on the norms, and in the norm_init phase.
+      if (si.conf.sublat.m > 0)
+          double_poly_mul_double(s.fijd, s.fijd, pow(si.conf.sublat.m, s.fijd->deg));
   }
 
 

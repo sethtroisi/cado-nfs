@@ -260,9 +260,11 @@ fill_in_buckets_toplevel(bucket_array_t<LEVEL, shorthint_t> &orig_BA,
          locations with p | gcd(i,j). */
       if (LIKELY(!proj || r == 0)) {
         plattice_info_t pli = plattice_info_t(transformed.get_q(), r, proj, si.logI);
-        plattice_enumerate_t ple = plattice_enumerate_t(pli, i_entry, si.logI);
-        // Skip (0,0).
+        plattice_enumerate_t ple = plattice_enumerate_t(pli, i_entry, si.logI, si.conf.sublat);
+        // Skip (0,0). FIXME: in sublat mode, this is not wanted.
         ple.next();
+        if (plattice_enumerate_finished<LEVEL>(ple.get_x()))
+            continue;
         if (LIKELY(pli.a0 != 0)) {
           const slice_offset_t hint = ple.get_hint();
           WHERE_AM_I_UPDATE(w, h, hint);
@@ -293,12 +295,20 @@ fill_in_buckets_toplevel(bucket_array_t<LEVEL, shorthint_t> &orig_BA,
           }
 
           /* Now, do the real work: the filling of the buckets */
-          while (!plattice_enumerate_finished<LEVEL>(ple.get_x())) {
-            if (LIKELY(ple.probably_coprime()))
-              BA.push_update(ple.get_x(), p, hint, slice_index, w);
-            ple.next();
+          // Without sublattices, we test (very basic) coprimality,
+          // otherwise not atm. FIXME!
+          if (!si.conf.sublat.m) {
+              while (!plattice_enumerate_finished<LEVEL>(ple.get_x())) {
+                  if (LIKELY(ple.probably_coprime()))
+                      BA.push_update(ple.get_x(), p, hint, slice_index, w);
+                  ple.next();
+              }
+          } else {
+              while (!plattice_enumerate_finished<LEVEL>(ple.get_x())) {
+                  BA.push_update(ple.get_x(), p, hint, slice_index, w);
+                  ple.next();
+              }
           }
-
         } 
       }
     }

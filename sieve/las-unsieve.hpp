@@ -92,7 +92,7 @@ void clear_j_div(j_divisibility_helper *);
 void search_survivors_in_line(unsigned char * const restrict[2],
         const unsigned char[2], unsigned int, unsigned int, int,
         j_divisibility_helper const &, unsigned int, unsieve_data const &,
-        std::vector<uint32_t> &);
+        std::vector<uint32_t> &, bool);
 #ifdef HAVE_SSE2 
 void search_survivors_in_line_sse2(unsigned char * const restrict[2],
         const unsigned char[2], unsigned int, unsigned int, int,

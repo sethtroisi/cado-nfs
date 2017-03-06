@@ -30,6 +30,10 @@ void xToIJ(int *i, unsigned int *j, const uint64_t X, sieve_info const & si)
 {
     *i = (X % (si.I)) - (si.I >> 1);
     *j = X / si.I;
+    if (si.conf.sublat.m != 0) {
+        *i = (*i)*si.conf.sublat.m + si.conf.sublat.i0;
+        *j = (*j)*si.conf.sublat.m + si.conf.sublat.j0;
+    }
 }
 
 void NxToIJ(int *i, unsigned int *j, const unsigned int N, const unsigned int x, sieve_info const & si)
@@ -38,6 +42,8 @@ void NxToIJ(int *i, unsigned int *j, const unsigned int N, const unsigned int x,
     return xToIJ(i, j, X, si);
 }
 
+// FIXME: broken for sublat (but used in where_i_am, which is also
+// broken... (and also maybe duplicate suppression)
 void IJTox(uint64_t * x, int i, unsigned int j, sieve_info const & si)
 {
     *x = (int64_t)i + ((uint64_t)si.I)*(uint64_t)j + (uint64_t)(si.I>>1);

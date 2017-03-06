@@ -46,6 +46,8 @@ struct siever_config {
 #else
     int logI;
 #endif
+    sublat_t sublat;
+
     unsigned long bucket_thresh;    // bucket sieve primes >= bucket_thresh
     unsigned long bucket_thresh1;   // primes above are 2-level bucket-sieved
     unsigned int td_thresh;
@@ -344,6 +346,11 @@ struct las_info : private NonCopyable {
     cxx_mpz todo_q0;
     cxx_mpz todo_q1;
     FILE * todo_list_fd;
+ 
+    /* For composite special-q */
+    bool allow_composite_q;
+    uint64_t qfac_min;
+    uint64_t qfac_max;
 
     // ----- batch mode
     int batch; /* batch mode for cofactorization */

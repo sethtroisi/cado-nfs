@@ -27,6 +27,10 @@ static inline void xToAB(int64_t *a, uint64_t *b, const uint64_t x, sieve_info c
 
     i = (x & (I - 1)) - (I >> 1);
     j = x >> si.logI;
+    if (si.conf.sublat.m != 0) {
+        i = i*si.conf.sublat.m + si.conf.sublat.i0;
+        j = j*si.conf.sublat.m + si.conf.sublat.j0;
+    }
     *a = (int64_t) i * si.qbasis.a0 + (int64_t) j * si.qbasis.a1;
     c =  (int64_t) i * si.qbasis.b0 + (int64_t) j * si.qbasis.b1;
     if (c >= 0)
@@ -52,6 +56,11 @@ static inline void xToABmpz(mpz_t a, mpz_t b,
 
     i = (x & (I - 1)) - (I >> 1);
     j = x >> si.logI;
+    if (si.conf.sublat.m != 0) {
+        i = i*si.conf.sublat.m + si.conf.sublat.i0;
+        j = j*si.conf.sublat.m + si.conf.sublat.j0;
+    }
+
     
     mpz_t aux_i, aux_j;
     mpz_t aux;

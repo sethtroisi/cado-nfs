@@ -177,15 +177,21 @@ void small_sieve_extract_interval(small_sieve_data_t * r, small_sieve_data_t * s
 
 /* Initialization procedures for the ssp data */
 
-static inline void ssp_init_oa(ssp_t * tail, fbprime_t p, fbprime_t r, unsigned int skip, where_am_I & w MAYBE_UNUSED)/*{{{*/
+static inline void ssp_init_oa(ssp_t * tail, fbprime_t p, fbprime_t r, unsigned int skip, unsigned int sublatm, where_am_I & w MAYBE_UNUSED)/*{{{*/
 {
     tail->p = p;
     tail->r = r;
+    if (sublatm == 0) {
+        tail->rm = tail->r;
+    } else {
+        tail->rm = (r * sublatm) % p;
+    }
     tail->offset = (r * skip) % p;
 }/*}}}*/
 
 static inline void ssp_init_op(ssp_bad_t * tail, fbprime_t p, fbprime_t r, unsigned int skip MAYBE_UNUSED, where_am_I & w MAYBE_UNUSED)/*{{{*/
 {
+    // FIXME: this is probably broken with sublattices.
     unsigned int v = r; /* have consistent notations */
     unsigned int g = gcd_ul(p, v);
     fbprime_t q = p / g;
@@ -233,7 +239,12 @@ void small_sieve_init(small_sieve_data_t *ssd, las_info & las,
     // For typical primes, this jump is easily precomputed and goes into
     // the ssp struct.
     
-    const unsigned int skiprows = (bucket_region >> si.logI)*(las.nb_threads-1);
+    // If we are doing sublattices modulo m, then we jump virutally m
+    // times faster.
+    unsigned int sublatm = si.conf.sublat.m;
+    if (sublatm == 0)
+        sublatm = 1;
+    const unsigned int skiprows = sublatm*(bucket_region >> si.conf.logI)*(las.nb_threads-1);
     for (std::vector<fb_general_entry>::const_iterator iter = fb->begin() ; iter != fb->end() && index < size ; iter++) {
         /* p=pp^k, the prime or prime power in this entry, and pp is prime */
         const fbprime_t p = iter->q, pp = iter->p;
@@ -302,7 +313,7 @@ void small_sieve_init(small_sieve_data_t *ssd, las_info & las,
                     event |= SSP_DISCARD;
                 }
             } else {
-                ssp_init_oa(tail, p, r_q, skiprows, w);
+                ssp_init_oa(tail, p, r_q, skiprows, si.conf.sublat.m, w);
             }
             tail++;
             if (event)
@@ -328,6 +339,9 @@ int64_t *small_sieve_start(small_sieve_data_t *ssd, unsigned int j0,
 {
     ssp_marker_t * next_marker = ssd->markers;
     int64_t * ssdpos = (int64_t *) malloc(ssd->nb_ssp * sizeof(int64_t));
+    const uint64_t sublatm = si.conf.sublat.m;
+    const uint64_t sublati0 = si.conf.sublat.i0;
+    const uint64_t sublatj0 = si.conf.sublat.j0;
 
     for(int i = 0 ; i < ssd->nb_ssp ; i++) {
         int fence;
@@ -337,15 +351,27 @@ int64_t *small_sieve_start(small_sieve_data_t *ssd, unsigned int j0,
         next_marker++;
         for( ; i < fence ; i++) {
             ssp_t * ssp = &(ssd->ssp[i]);
-            uint64_t compensate = si.I / 2;
-            compensate += (uint64_t)j0 * (uint64_t)ssp->r;
-            ssdpos[i] = compensate % (uint64_t)ssp->p;
+            if (!sublatm) {
+                uint64_t compensate = si.I / 2;
+                compensate += (uint64_t)j0 * (uint64_t)ssp->r;
+                ssdpos[i] = compensate % (uint64_t)ssp->p;
+            } else {
+                uint64_t jj = j0*sublatm + sublatj0;
+                uint64_t ii = (jj*uint64_t(ssp->r)) % uint64_t(ssp->p);
+                while ((ii % sublatm) != sublati0) {
+                    ii += ssp->p;
+                }
+                ii = (ii-sublati0) / sublatm; // exact division
+                uint64_t compensate = (si.I / 2) + ii;
+                ssdpos[i] = compensate % (uint64_t)ssp->p;
+            }
         }
         if (event & SSP_END) break;
         // Remark: even in the case of discard, we want to precompute the
         // data (we are in the projective case), for the (rare) case
         // where we have to update the (i,j)=(1,0) position.
         if (event & SSP_PROJ) {
+            // FIXME: this is probably broken with sublattices.
             ssp_bad_t * ssp = (ssp_bad_t *) &(ssd->ssp[i]);
             /* Compute the next multiple of g above j0 */
             unsigned int j1 = j0 - (j0 % ssp->g);
@@ -367,6 +393,7 @@ int64_t *small_sieve_start(small_sieve_data_t *ssd, unsigned int j0,
             ssdpos[i] = (((uint64_t)(j1 - j0))<<si.logI)
                 + compensate % (uint64_t)ssp->q;
         } else if (event & SSP_POW2) {
+            // FIXME: this is probably broken with sublattices.
             /* For powers of 2, we sieve only odd lines (*) and 
              * ssdpos needs to point at line j=1. We assume
              * that in this case (si.I/2) % p == 0
@@ -412,6 +439,7 @@ void small_sieve_skip_stride(small_sieve_data_t *ssd, int64_t * ssdpos,
         if (event & SSP_DISCARD) continue;
         if (event & SSP_END) break;
         if (event & SSP_PROJ) {
+            // FIXME: this is probably broken with sublattices.
             /* Don't bother. Pay attention to the fact that we have offsets to
              * the (current) bucket base. */
             ssp_bad_t * ssp = (ssp_bad_t *) &(ssd->ssp[i]);
@@ -440,6 +468,7 @@ void small_sieve_skip_stride(small_sieve_data_t *ssd, int64_t * ssdpos,
             }
             ssdpos[i] = x;
         } else if (event & SSP_POW2) {
+            // FIXME: this is probably broken with sublattices.
             ssp_t * ssp = &(ssd->ssp[i]);
             ssdpos[i] += ssp->offset;
             // If there is only one line per bucket region, we should
@@ -772,7 +801,7 @@ void sieve_small_bucket_region(unsigned char *S, int N,
 	 * it's projective, but in this branch we have no projective
 	 * primes. */
 	if (p == 3) continue;
-	const fbprime_t r =  ssd->ssp[k].r;
+	const fbprime_t r =  ssd->ssp[k].rm;
 	WHERE_AM_I_UPDATE(w, p, p);
 	const unsigned char logp = ssd->logp[k];
 	unsigned char *S_ptr = S;
@@ -937,7 +966,7 @@ void sieve_small_bucket_region(unsigned char *S, int N,
             /* Don't sieve powers of 2 again that were pattern-sieved */
             ssp_t * ssp = &(ssd->ssp[k]);
             const fbprime_t p = ssp->p;
-            const fbprime_t r = ssp->r;
+            const fbprime_t r = ssp->rm;
             WHERE_AM_I_UPDATE(w, p, p);
 
             if (p <= pattern2_size)
