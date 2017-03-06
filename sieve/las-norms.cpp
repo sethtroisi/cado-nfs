@@ -1437,6 +1437,15 @@ sieve_info_update_norm_data_Jmax (sieve_info & si)
       double_poly dpoly;
       double_poly_init (dpoly, ps->deg);
       double_poly_set_mpz_poly (dpoly, ps);
+      // Need again to multiply by sublat.m^deg to be consistent.
+      if (si.conf.sublat.m > 0) {
+          double sublat_factor = 1.0;
+          for (int k = 0; k < ps->deg; ++k)
+              sublat_factor *= si.conf.sublat.m;
+          for (int k = 0; k <= ps->deg; k++)
+              dpoly->coeff[k] *= sublat_factor;
+      }
+
       double maxnorm = get_maxnorm_alg (dpoly, fudge_factor*A/2.,
               fudge_factor*B);
       double_poly_clear (dpoly);
