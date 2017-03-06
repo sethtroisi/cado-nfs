@@ -506,6 +506,14 @@ void mpz_poly_set(mpz_poly_ptr g, mpz_poly_srcptr f)
     mpz_poly_setcoeff (g, i, f->coeff[i]);
 }
 
+void mpz_poly_set_double_poly(mpz_poly_ptr g, double_poly_srcptr f) 
+{
+  mpz_poly_realloc (g, f->deg + 1);
+  g->deg = f->deg;
+  for (int i = f->deg; i >= 0; --i)
+    mpz_set_d (g->coeff[i], f->coeff[i]);
+}
+
 /* Init polynomial rel and set it to a - b*x */
 void
 mpz_poly_init_set_ab (mpz_poly_ptr rel, int64_t a, uint64_t b)
@@ -1197,6 +1205,15 @@ mpz_poly_divexact_mpz (mpz_poly_ptr Q, mpz_poly_srcptr P, mpz_srcptr a)
       mpz_poly_setcoeff (Q, i, aux);
     }
   mpz_clear (aux);
+}
+
+/* Test whether a divides P, where a is an mpz_t. */
+int
+mpz_poly_divisible_mpz (mpz_poly_srcptr P, mpz_srcptr a)
+{
+  for (int i = 0; i <= P->deg; ++i)
+      if (!mpz_divisible_p(P->coeff[i], a)) return 0;
+  return 1;
 }
 
 /* Set ft(x) = f(x+k) where k is an mpz_t, ft and f can be the same poly. */

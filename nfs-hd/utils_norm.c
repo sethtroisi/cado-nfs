@@ -341,7 +341,7 @@ unsigned char log_norm_double(const int * current_indexes,
   ASSERT(size == M->NumRows);
   ASSERT(size == M->NumCols);
 
-  double_poly_t poly;
+  double_poly poly;
   double_poly_init(poly, M->NumRows);
 
   int deg = -1;
@@ -668,9 +668,9 @@ void init_norm(array_ptr array, unsigned int * max_norm,
   bottom_left_cube[0] = -(int) H->h[0] - (int)length[0];
   bottom_left_cube[H->t - 1] = 0;
 
-  double_poly_t f_d;
+  double_poly f_d;
   double_poly_init(f_d, f->deg);
-  double_poly_set_const_mpz_poly(f_d, f);
+  double_poly_set_mpz_poly(f_d, f);
 
   mat_int64_t Mq;
   mat_int64_init(Mq, matrix->NumRows, matrix->NumCols);

@@ -501,7 +501,7 @@ rootRefine (usp_root_data *r, mpz_t *p, int n, double precision)
 {
   double a, b, c;
   double sa, sb, sc;
-  double_poly_t q;
+  double_poly q;
   mpz_poly P;
 
   /* Note: if precision = 0.0, rootRefine will stop when the bound a and b

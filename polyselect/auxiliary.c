@@ -248,7 +248,7 @@ double
 L2_lognorm (mpz_poly_ptr f, double s)
 {
   double res;
-  double_poly_t a;
+  double_poly a;
   double_poly_init(a, f->deg);
   double_poly_set_mpz_poly (a, f);
 
@@ -651,7 +651,7 @@ L2_combined_skewness2 (mpz_poly f, mpz_poly g, int prec)
 double
 L2_skewness (mpz_poly_ptr f, int prec)
 {
-  double_poly_t ff, df;
+  double_poly ff, df;
   double s = 0.0, a = 0.0, b = 0.0, c, nc, *fd, *dfd,
     s1, s2, s3, s4, s5, s6, s7;
   unsigned int d = f->deg;

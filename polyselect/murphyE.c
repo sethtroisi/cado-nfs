@@ -53,7 +53,7 @@ MurphyE (cado_poly cpoly, double Bf, double Bg, double area, int K)
   double E = 0, x, y, ti;
   double alpha_f, alpha_g, xi, yi, vf, vg;
   double one_over_logBf, one_over_logBg;
-  double_poly_t f, g;
+  double_poly f, g;
 
   x = sqrt (area * cpoly->skew);
   y = sqrt (area / cpoly->skew);

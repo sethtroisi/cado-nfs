@@ -13,56 +13,7 @@
  * This imposes NORM_BITS >= 8, or even >= 9 for large factorizations. */
 #define NORM_BITS 10
 
-/* Smart norm computation.
-   These are two initializations of the algebraics/rationnals.
-   These 2 initializations compute F(i, const j)=f(i) for each line.
-   f(i)=log2(abs(sum[k=0...d] Ak i^k)+1.)*scale+GUARD = [GUARD...254],
-   where Ak are the coefficients of the polynomial.
-
-   The classical initialization is slow; the only optimization is done
-   by the fast computation of the log2. The associated error guarantees
-   the precision of the results +/- 1.
-   This initialization is done if SMART_NORM is undefined.
-
-   The smart initialization is very fast, and done if SMART_NORM is defined.
-   This initialization computes first the roots of F, F', F" which each defined
-   a line which intercepts (0, 0.).
-   For each j, the roots of f, f' and f" are computed : there are F, F', F" roots * j.
-   Because the absolute value, the roots of f have an unstable neighbourhood :
-   f "bounces" on the horizontal axis.
-   The roots of f" have also an unstable neighbourhood (inflexion points of f).
-   The roots of f have a stable neighbourhood.
-   So, the neighbourhoods of f(root(f)) and f(root(f")) are computed until
-   on each side of the root there are SMART_NORM_STABILITY identical values,
-   so until f has a local horizontal stability on the left and on the right of
-   the root.
-   A root has a maximal influence of SMART_NORM_INFLUENCE values on its
-   neighbourhood (on each sides).
-   
-   These roots defined some segments of contiguous values of f(i). Some of them are
-   reduced to a point (f(roots(f')); the lenght of the others is between 
-   SMART_NORM_STABILITY * 2 + 1 and SMART_NORM_MAX_INFLUENCE * 2 + 1.
-
-   3 artificials roots are inserted: -I/2 and (I/2)-1 as two roots of f' (two
-   one-point segment), and 0.0 as a root of f, because near the neighbourhood of 0.
-   f is very unstable.
-
-   To compute all missing values of f(i) between ]-I/2,(I/2)-1[, a polygonal
-   approximation is done between all these segments.
-   The polygonal approximation between (i0,f(i0)-(i1,f(i1)) has 2 parameters :
-   - The minimal lenght between i0 and i1, SMART_NORM_LENGTH. Below this
-   value, the values f(i0...i1) are approximated by a line.
-   - The maximal acceptable distance between f((i0+i1)/2) and (f(i0)+f(i1))/2,
-   SMART_NORM_DISTANCE. Above this value, (i0,f(i0)-(i1,f(i1)) is approximated
-   by the polygonal approximations of (i0,f(i0)-((i0+i1)/2,(f(i0)+f(i1))/2) and
-   ((i0+i1)/2,(f(i0)+f(i1))/2)-(i1,f(i1)).
-
-   The maximal error of the smart initialization depends on its four parameters,
-   but should be less or egal to the double of SMART_NORM_DISTANCE.
-   Modify the parameters of the smart norm algorithm is not a good idea. If you try
-   it, use test_init_norm_bucket_region in the tests part in order to have an idea
-   of the corresponding errors.
-*/ 
+/* Smart norm computation. See las-norms.cpp. SMART_NORM is faster. */
 #define SMART_NORM
 
 #define SMART_NORM_STABILITY 3      /* Min:2; No max. Optimal: 3-4 */

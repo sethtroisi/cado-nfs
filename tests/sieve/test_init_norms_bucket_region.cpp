@@ -70,7 +70,12 @@ bug_18810 (void)
   cexp2[249] = 2.5470884718018755e+36;
   cexp2[250] = 3.5714337210011752e+36;
 
-  init_degree_one_norms_bucket_region_internal (S, J, I, scale, u0, u1, cexp2);
+  double_poly u;
+  double_poly_init(u,1);
+  u->coeff[0] = u0;
+  u->coeff[1] = u1;
+  init_degree_one_norms_bucket_region_internal (S, J, I, scale, u, cexp2);
+  double_poly_clear(u);
 }
 
 int
@@ -81,7 +86,6 @@ main(int argc, const char *argv[]) {
   unsigned char *S1 = (unsigned char *) malloc_pagealigned((1U<<LOG_BUCKET_REGION) + MEMSET_MIN),
     *S2 = (unsigned char *) malloc_pagealigned((1U<<LOG_BUCKET_REGION) + MEMSET_MIN),
     *S3 = (unsigned char *) malloc_pagealigned((1U<<LOG_BUCKET_REGION) + MEMSET_MIN), *cS3;
-  double_poly_t poly;
   unsigned long long count, smart_err[(MAX_SMART_ERR<<1)+1], exact_err[(MAX_EXACT_ERR<<1)+1];
   unsigned long iter = NB_TESTS;
   int smart_err_found = 0;
@@ -101,12 +105,10 @@ main(int argc, const char *argv[]) {
     const uint32_t I = 1U << logI;
     const double didiv2 = (double) (I >> 1);
     for (d = MAX_DEGREE + 1; d--;) {
-      poly->deg = d;
-      // std::vector<double, aligned_allocator<double, 16> > coeff(poly->deg + 1);
-      std::vector<double> coeff(poly->deg + 1);
+        cxx_double_poly poly(d);
+      
       double u[poly->deg + 1];
       std::vector<smart_norm_root> roots;
-      poly->coeff = &coeff[0];
       for (k = iter; k--;) {
 	J = ((uint32_t) random_uint64()) << 2;    /* 0 <= J < 2^30 at least */
 	J &= (I >> 1) - 1;                        /* Original J; 0 <= J < I/2 */
@@ -123,15 +125,15 @@ main(int argc, const char *argv[]) {
 	memset (S1, 0, 1U<<LOG_BUCKET_REGION); /* To be sure S1 will be computed */
 	memset (S2, 0, 1U<<LOG_BUCKET_REGION); /* To be sure S2 will be computed */
 	if (poly->deg > 1) {
-	  init_norms_roots_internal (poly->deg, coeff, (double) ((I + 16) >> 1), 1. / (double) (I >> 1), roots);
-	  init_smart_degree_X_norms_bucket_region_internal (S1, J, I, scale, poly->deg, coeff, roots);
-	  init_exact_degree_X_norms_bucket_region_internal (S2, J, I, scale, poly->deg, coeff);
+	  init_norms_roots_internal (poly, (double) ((I + 16) >> 1), 1. / (double) (I >> 1), roots);
+	  init_smart_degree_X_norms_bucket_region_internal (S1, J, I, scale, poly, roots);
+	  init_exact_degree_X_norms_bucket_region_internal (S2, J, I, scale, poly);
 	} else if (poly->deg == 1) {
 	  double cexp2[257], step, iter;
 	  step = 1. / scale;
 	  iter = -step * GUARD;
 	  for (l = 0; l < 257; iter += step) cexp2[l++] = exp2 (iter);
-	  init_degree_one_norms_bucket_region_internal (S1, J, I, scale, poly->coeff[0], poly->coeff[1], cexp2);
+	  init_degree_one_norms_bucket_region_internal (S1, J, I, scale, poly, cexp2);
 	  memcpy (S2, S1, 1U<<LOG_BUCKET_REGION);
 	} else {
 	  memset (S1, (int) (log2(1.+fabs(poly->coeff[0]))*scale)+GUARD, 1U<<LOG_BUCKET_REGION);

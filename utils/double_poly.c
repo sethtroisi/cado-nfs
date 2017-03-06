@@ -26,6 +26,16 @@ double_poly_clear (double_poly_ptr p)
   free (p->coeff);
 }
 
+/*
+ * Set the degree of f.
+ */
+static void double_poly_set_degree(double_poly_ptr f, int deg)
+{
+  f->coeff = (double *) realloc(f->coeff, sizeof(double) * (deg + 1));
+  f->deg = deg;
+}
+
+
 /* Set r = s. Assumes r has enough memory allocated. */
 void
 double_poly_set (double_poly_ptr r, double_poly_srcptr s)
@@ -352,7 +362,7 @@ double
 double_poly_bound_roots (double_poly_srcptr p)
 {
   unsigned int d = p->deg, i;
-  double_poly_t q;
+  double_poly q;
   double s;
 
   s = p->coeff[d] > 0 ? 1.0 : -1.0;
@@ -373,7 +383,7 @@ unsigned int
 double_poly_compute_roots(double *roots, double_poly_srcptr poly, double s)
 {
   const unsigned int d = poly->deg;
-  double_poly_t *dg; /* derivatives of poly */
+  double_poly *dg; /* derivatives of poly */
   
   /* The roots of the zero polynomial are ill-defined. Bomb out */
   ASSERT_ALWAYS(d > 0 || poly->coeff[0] != 0.);
@@ -382,7 +392,7 @@ double_poly_compute_roots(double *roots, double_poly_srcptr poly, double s)
   if (d == 0)
     return 0; /* Constant non-zero poly -> no roots */
 
-  dg = (double_poly_t *) malloc (d * sizeof (double_poly_t));
+  dg = (double_poly *) malloc (d * sizeof (double_poly));
   FATAL_ERROR_CHECK(dg == NULL, "malloc failed");
 
   dg[0]->deg = poly->deg;
@@ -418,7 +428,7 @@ double_poly_compute_all_roots_with_bound (double *roots,
     bound = B;
   unsigned int nr_roots_pos = double_poly_compute_roots (roots, poly, bound);
   /* Negative roots */
-  double_poly_t t; /* Copy of poly which gets sign-flipped */
+  double_poly t; /* Copy of poly which gets sign-flipped */
   double_poly_init (t, poly->deg);
   double_poly_neg_x (t, poly);
   bound = double_poly_bound_roots (t);
@@ -475,35 +485,12 @@ double_poly_print (FILE *stream, double_poly_srcptr p, char *name)
 }
 
 void
-double_poly_set_mpz_poly (double_poly_ptr p, mpz_poly_ptr q)
+double_poly_set_mpz_poly (double_poly_ptr p, mpz_poly_srcptr q)
 {
-  unsigned int d = q->deg, i;
-
-  for (i = 0; i <= d; i++)
+  double_poly_set_degree(p, q->deg);
+  for (int i = 0; i <= q->deg; i++)
     p->coeff[i] = mpz_get_d (q->coeff[i]);
-  p->deg = d;
 }
-
-void
-double_poly_set_const_mpz_poly (double_poly_ptr p, mpz_poly_srcptr q)
-{
-  unsigned int d = q->deg, i;
-
-  for (i = 0; i <= d; i++)
-    p->coeff[i] = mpz_get_d (q->coeff[i]);
-  p->deg = d;
-}
-
-void mpz_poly_set_double_poly(mpz_poly_ptr f, double_poly_srcptr g)
-{
-  ASSERT(f->alloc - 1 == g->deg);
-
-  for (int i = 0; i <= g->deg; i++) {
-    mpz_set_d(f->coeff[i], g->coeff[i]);
-  }
-  f->deg = g->deg;
-}
-
 
 /*
  * Other printf function.
@@ -623,7 +610,7 @@ static double double_poly_lc(double_poly_srcptr f)
 static void double_poly_multiplication(double_poly_ptr h, double_poly_srcptr f,
     double_poly_srcptr g)
 {
-  double_poly_t h_tmp;
+  double_poly h_tmp;
   double_poly_init(h_tmp, f->deg + g->deg);
   double_poly_product(h_tmp, f, g);
   double_poly_degree(h_tmp);
@@ -638,7 +625,7 @@ static void double_poly_multiplication(double_poly_ptr h, double_poly_srcptr f,
 static void double_poly_addition(double_poly_ptr h, double_poly_srcptr f,
     double_poly_srcptr g)
 {
-  double_poly_t h_tmp;
+  double_poly h_tmp;
   double_poly_init(h_tmp, MAX(f->deg,g->deg));
   double_poly_sum(h_tmp, f, g);
   double_poly_degree(h_tmp);
@@ -653,35 +640,13 @@ static void double_poly_addition(double_poly_ptr h, double_poly_srcptr f,
 static void double_poly_subtraction(double_poly_ptr h, double_poly_srcptr f,
     double_poly_srcptr g)
 {
-  double_poly_t h_tmp;
+  double_poly h_tmp;
   double_poly_init(h_tmp, MAX(f->deg, g->deg));
   double_poly_subtract(h_tmp, f, g);
   double_poly_degree(h_tmp);
   h->coeff = (double * ) realloc(h->coeff, sizeof(double) * (h_tmp->deg + 1));
   double_poly_set(h, h_tmp);
   double_poly_clear(h_tmp);
-}
-
-static void double_poly_swap(double_poly_ptr f, double_poly_ptr g)
-{
-  int i;
-  double * t;
-
-  i = f->deg;
-  f->deg = g->deg;
-  g->deg = i;
-  t = f->coeff;
-  f->coeff = g->coeff;
-  g->coeff = t;
-}
-
-/*
- * Set the degree of f.
- */
-static void double_poly_set_degree(double_poly_ptr f, int deg)
-{
-  f->coeff = (double *) realloc(f->coeff, sizeof(double) * (deg + 1));
-  f->deg = deg;
 }
 
 /*
@@ -725,10 +690,10 @@ static int double_poly_pseudo_division(double_poly_ptr q, double_poly_ptr r,
   int n = b->deg;
   double d = double_poly_lc(b);
   int e = m - n + 1;
-  double_poly_t s;
+  double_poly s;
 
 /*#ifndef NDEBUG*/
-  /*MAYBE_UNUSED double_poly_t q_tmp;*/
+  /*MAYBE_UNUSED double_poly q_tmp;*/
 /*#endif // NDEBUG*/
 
   if (q != NULL) {
@@ -793,7 +758,7 @@ static int double_poly_pseudo_division(double_poly_ptr q, double_poly_ptr r,
   double_poly_mul_double(r, r, d);
 
 /*#ifndef NDEBUG*/
-  /*double_poly_t f, g;*/
+  /*double_poly f, g;*/
   /*double_poly_init(f, a->deg);*/
   /*double_poly_init(g, a->deg);*/
   /*double_poly_set(f, a);*/
@@ -844,9 +809,9 @@ double double_poly_resultant(double_poly_srcptr p, double_poly_srcptr q)
 
   ASSERT(q->coeff[q->deg] != 0);
 
-  double_poly_t a;
-  double_poly_t b;
-  double_poly_t r;
+  double_poly a;
+  double_poly b;
+  double_poly r;
   double_poly_init(a, p->deg);
   double_poly_init(b, q->deg);
   double_poly_init(r, MAX(p->deg, q->deg));
@@ -947,4 +912,20 @@ double double_poly_resultant(double_poly_srcptr p, double_poly_srcptr q)
   }
 
   return h;
+}
+
+/* swap f and g */
+void
+double_poly_swap (double_poly_ptr f, double_poly_ptr g)
+{
+  int i;
+  double *t;
+
+  i = f->deg;
+  f->deg = g->deg;
+  g->deg = i;
+
+  t = f->coeff;
+  f->coeff = g->coeff;
+  g->coeff = t;
 }

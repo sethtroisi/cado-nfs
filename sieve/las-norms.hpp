@@ -249,9 +249,9 @@ extern void tune_las_memset();
 /* These functions are internals. Don't use them. Use the wrapper above.
    It's need to declare them here for units & coverage tests.
  */
-void init_degree_one_norms_bucket_region_internal     (unsigned char *S, uint32_t J, uint32_t I, double scale, double u0, double u1, double *cexp2);
-void init_exact_degree_X_norms_bucket_region_internal (unsigned char *S, uint32_t J, uint32_t I, double scale, unsigned int d, std::vector<double> const & fijd);
-void init_smart_degree_X_norms_bucket_region_internal (unsigned char *S, uint32_t J, uint32_t I, double scale, unsigned int d, std::vector<double> const & fijd, std::vector<smart_norm_root> const & roots);
-void init_norms_roots_internal (unsigned int degree, std::vector<double> & coeff, double max_abs_root, double precision, std::vector<smart_norm_root> & roots);
+void init_degree_one_norms_bucket_region_internal     (unsigned char *S, uint32_t J, uint32_t I, double scale, cxx_double_poly const &, double *cexp2);
+void init_exact_degree_X_norms_bucket_region_internal (unsigned char *S, uint32_t J, uint32_t I, double scale, cxx_double_poly const & fijd);
+void init_smart_degree_X_norms_bucket_region_internal (unsigned char *S, uint32_t J, uint32_t I, double scale, cxx_double_poly const & fijd, std::vector<smart_norm_root> const & roots);
+void init_norms_roots_internal (cxx_double_poly const &, double max_abs_root, double precision, std::vector<smart_norm_root> & roots);
 
 #endif	/* LAS_NORMS_HPP_ */

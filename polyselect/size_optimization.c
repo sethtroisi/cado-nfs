@@ -176,7 +176,7 @@ sopt_find_translations_deg6 (list_mpz_t list_k, mpz_poly_srcptr f,
         SR(r.coefficient({q3:0})).factor()
   */
 
-  double_poly_t res;
+  double_poly res;
   double roots_q3[3]; /* roots for res */
   double_poly_init (res, 3);
 
@@ -214,7 +214,7 @@ sopt_find_translations_deg6 (list_mpz_t list_k, mpz_poly_srcptr f,
     fprintf (stderr, "}\n");
   }
 
-  double_poly_t C;
+  double_poly C;
   double_poly_init (C, 4);
   int a = 1, b = 1;
   /* for an average of 2 roots per polynomial, using sopt_effort > 0 will increase
@@ -345,7 +345,7 @@ sopt_find_translations_deg6 (list_mpz_t list_k, mpz_poly_srcptr f,
 #if 0
     double_poly_init (C, 4);
     int n, i, j, t, m, ret = 0;
-    //double_poly_t R, C;
+    //double_poly R, C;
 #define MAX_ROOTSK 40
     //double roots_k[MAX_ROOTSK];
     //double *r, roots_q[5];
@@ -446,7 +446,7 @@ sopt_find_translations_deg5 (list_mpz_t list_k, mpz_poly_srcptr f,
         SR(r.coefficient({q2:0})).factor()
   */
 
-  double_poly_t res;
+  double_poly res;
   double roots_q2[3]; /* 3 = 2 roots for res + 1 roots for the derivative */
   double_poly_init (res, 2);
 
@@ -474,7 +474,7 @@ sopt_find_translations_deg5 (list_mpz_t list_k, mpz_poly_srcptr f,
     fprintf (stderr, "}\n");
   }
 
-  double_poly_t C;
+  double_poly C;
   double_poly_init (C, 2);
   int a = 1, b = 1;
   /* for an average of 1 root per polynomial, using sopt_effort > 0 will increase
@@ -854,7 +854,7 @@ best_norm2 (mpz_poly_ptr fopt, mpz_poly_ptr gopt,
             const int max_rot, double min_norm)
 {
   double norm, roots[3];
-  double_poly_t eq;
+  double_poly eq;
   int d = f_raw->deg, nroots;
   mpz_t best_k;
   mpz_poly ft, gt;

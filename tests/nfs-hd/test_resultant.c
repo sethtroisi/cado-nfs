@@ -54,10 +54,10 @@ void resultant()
   mpz_poly_setcoeff_si(f_Z, 5, 12476);
   mpz_poly_setcoeff_si(f_Z, 6, 56035);
 
-  double_poly_t a_d;
+  double_poly a_d;
   double_poly_init(a_d, dim);
 
-  double_poly_t f_d;
+  double_poly f_d;
   double_poly_init(f_d, 6);
 
   f_d->coeff[0] = (double) 56035;

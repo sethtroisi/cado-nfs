@@ -6,6 +6,15 @@
 #include <gmp.h>
 #include "macros.h"
 
+/* forward-declare our type before inclusion by double_poly.h, since we
+ * include eachother
+ */
+struct mpz_poly_s;
+typedef struct mpz_poly_s * mpz_poly_ptr;
+typedef const struct mpz_poly_s * mpz_poly_srcptr;
+
+#include "double_poly.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -17,15 +26,13 @@ extern "C" {
 /* Note, deg = -1 means P=0; otherwise, one should have coeff[deg] != 0.
    Warning: a polynomial of degree d needs d+1 allocation. */
 
-typedef struct {
+struct mpz_poly_s {
   int alloc;
   int deg;
   mpz_t *coeff;
-} mpz_poly_struct_t;
+};
 
-typedef mpz_poly_struct_t mpz_poly[1];
-typedef mpz_poly_struct_t * mpz_poly_ptr;
-typedef const mpz_poly_struct_t * mpz_poly_srcptr;
+typedef struct mpz_poly_s mpz_poly[1];
 
 /* -------------------------------------------------------------------------- */
 
@@ -64,6 +71,7 @@ void mpz_poly_cleandeg(mpz_poly_ptr f, int deg);
 void mpz_poly_setcoeffs(mpz_poly_ptr f, mpz_t * coeffs, int d);
 void mpz_poly_set_zero(mpz_poly_ptr f);
 void mpz_poly_set_xi(mpz_poly_ptr f, int i);
+void mpz_poly_set_double_poly(mpz_poly_ptr g, double_poly_srcptr f);
 
 void mpz_poly_init_set_ab (mpz_poly_ptr rel, int64_t a, uint64_t b);
 void mpz_poly_init_set_mpz_ab (mpz_poly_ptr rel, mpz_t a, mpz_t b);
@@ -115,6 +123,7 @@ void mpz_poly_sub_mod_mpz(mpz_poly_ptr f, mpz_poly_srcptr g, mpz_poly_srcptr h,
 void mpz_poly_mul(mpz_poly_ptr f, mpz_poly_srcptr g, mpz_poly_srcptr h);
 void mpz_poly_mul_mpz(mpz_poly_ptr Q, mpz_poly_srcptr P, mpz_srcptr a);
 void mpz_poly_divexact_mpz (mpz_poly_ptr Q, mpz_poly_srcptr P, mpz_srcptr a);
+int mpz_poly_divisible_mpz (mpz_poly_srcptr P, mpz_srcptr a);
 void mpz_poly_translation (mpz_poly_ptr, mpz_poly_srcptr, const mpz_t);
 void mpz_poly_rotation (mpz_poly_ptr, mpz_poly_srcptr, mpz_poly_srcptr, const mpz_t, int);
 void mpz_poly_addmul_si (mpz_poly_ptr, mpz_poly_srcptr, long);

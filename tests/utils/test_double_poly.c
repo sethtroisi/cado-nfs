@@ -54,7 +54,7 @@ test_double_poly_compute_roots1(const char *poly_str, const char *roots_str,
                                const double err_margin, const double s,
                                const int verbose)
 {
-  double_poly_t poly, roots1, roots2;
+  double_poly poly, roots1, roots2;
   int nr_roots, i;
   parse_poly(poly, poly_str);
   parse_poly(roots1, roots_str);
@@ -133,7 +133,7 @@ test_double_poly_compute_roots(const int verbose)
 void
 test_double_poly_set (void)
 {
-  double_poly_t s, r;
+  double_poly s, r;
 
   double_poly_init (s, 2);
   double_poly_init (r, 3);
@@ -158,7 +158,7 @@ test_double_poly_set (void)
 void
 test_double_poly_eval (void)
 {
-  double_poly_t s;
+  double_poly s;
   unsigned int deg;
   double v, w;
 
@@ -180,7 +180,7 @@ test_double_poly_eval (void)
 void
 test_double_poly_derivative (void)
 {
-  double_poly_t f, df;
+  double_poly f, df;
 
   double_poly_init (f, 1);
   double_poly_init (df, 0);
@@ -210,7 +210,7 @@ test_double_poly_derivative (void)
 void
 test_double_poly_revert (void)
 {
-  double_poly_t f;
+  double_poly f;
 
   double_poly_init (f, 2);
 
@@ -232,7 +232,7 @@ test_double_poly_revert (void)
 void
 test_double_poly_print ()
 {
-  double_poly_t poly;
+  double_poly poly;
 
   parse_poly (poly, "17");
   double_poly_print (stdout, poly, "17: ");
@@ -258,7 +258,7 @@ test_double_poly_print ()
 void
 test_double_poly_set_mpz_poly (void)
 {
-  double_poly_t p;
+  double_poly p;
   mpz_poly q;
 
   mpz_poly_init (q, 2);
@@ -290,7 +290,7 @@ unsigned int resultant_error(double true_val, double exp_val,
 }
 
 MAYBE_UNUSED void test_double_poly_resultant() {
-  double_poly_t f, g;
+  double_poly f, g;
   double res = 0.0;
   /*f=x^6+13*x^5+13*x^4+9*x^3+7*x+6*/
   /*g=128*x^2+128*x+128*/

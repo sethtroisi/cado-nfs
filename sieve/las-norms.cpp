@@ -26,6 +26,23 @@
 
 using namespace std;
 
+
+/*
+ * These are two initializations of the algebraic and rational norms.
+ * These 2 initializations compute F(i, const j)=f(i) for each line.
+ * f(i)=log2(abs(sum[k=0...d] Ak i^k)+1.)*scale+GUARD = [GUARD...254],
+ * where Ak are the coefficients of the polynomial.
+ *
+ * The classical initialization is slow; the only optimization is done
+ * by the fast computation of the log2. The associated error guarantees
+ * the precision of the results +/- 1.
+ * This initialization is done if SMART_NORM is undefined.
+ *
+ * The SMART_NORM version is faster.
+ *
+ * Both versions are implemented further down in this file.
+ */
+
 static long lg_page;
 
 #if defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM) && defined(LAS_MEMSET)
@@ -310,24 +327,75 @@ static inline double compute_f (const unsigned int d, const double *u, const dou
   return f;
 }
 
-/* This function computes the roots of the polynome F(i,1) = ln2(f(i))
-   and the roots of the first and second derivatives of F.
-   These roots are useful to begin the smart initialization of the normalization.
-   cf las-config.h, SMART_NORM.
 
-   This function is internal. Don't use it. Use the wrapper below.
+
+/* Details of the smart norms algorithms.
+ *
+ * This initialization computes first the roots of F, F', F". Each of
+ * these defines a line which intercepts (0, 0.).  For each j, the roots
+ * of f, f' and f" are computed : there are F, F', F" roots * j.
+ *
+ * Because of the absolute value, the roots of f have an unstable
+ * neighbourhood : f "bounces" on the horizontal axis.
+ *
+ * The roots of f" have also an unstable neighbourhood (inflexion points of f).
+ *
+ * The roots of f have a stable neighbourhood.
+ *
+ * So, the neighbourhoods of f(root(f)) and f(root(f")) are computed
+ * until on each side of the root there are SMART_NORM_STABILITY
+ * identical values, so until f has a local horizontal stability on the
+ * left and on the right of the root.
+ * A root has a maximal influence of SMART_NORM_INFLUENCE values on its
+ * neighbourhood (on each sides).
+ * 
+ * These roots define some segments of contiguous values of f(i). Some of
+ * them are reduced to a point (f(roots(f')); the length of the others is
+ * between SMART_NORM_STABILITY * 2 + 1 and SMART_NORM_MAX_INFLUENCE * 2
+ * + 1.
+
+ * 3 artificials roots are inserted: -I/2 and (I/2)-1 as two roots of f'
+ * (two one-point segment), and 0.0 as a root of f, because near the
+ * neighbourhood of 0, f is very unstable.
+
+ * To compute all missing values of f(i) between ]-I/2,(I/2)-1[, a polygonal
+ * approximation is done between all these segments.
+ * The polygonal approximation between (i0,f(i0)-(i1,f(i1)) has 2
+ * parameters :
+ * - The minimal lenght between i0 and i1, SMART_NORM_LENGTH. Below this
+ *   value, the values f(i0...i1) are approximated by a line.
+ * - The maximal acceptable distance between f((i0+i1)/2) and
+ *   (f(i0)+f(i1))/2, SMART_NORM_DISTANCE. Above this value,
+ *   (i0,f(i0)-(i1,f(i1)) is approximated by the polygonal approximations
+ *   of (i0,f(i0)-((i0+i1)/2,(f(i0)+f(i1))/2) and
+ *   ((i0+i1)/2,(f(i0)+f(i1))/2)-(i1,f(i1)).
+
+ * The maximal error of the smart initialization depends on its four
+ * parameters, but should be less or egal to the double of
+ * SMART_NORM_DISTANCE.  Modifying the parameters of the smart norm
+ * algorithm is not a good idea. If you try it, use
+ * test_init_norm_bucket_region in the tests part in order to have an
+ * idea of the corresponding errors.
+ */ 
+
+
+/* This function computes the roots of the polynomial F(i,1) = ln2(f(i))
+   and the roots of the first and second derivatives of F.
+   These roots are useful to begin the smart initialization of the norms.
+   The algorithm is described below
 
    Inputs :
+
    F(i,1): degree and coeff(icients)
    max_abs_root = Absolute maximum value of a root (before and after, the root is useless).
    precision = minimal need precision for each root (usually 1/J = 2/I).
    Output:
    roots = the roots of F, F', F", and pseudo root 0.0 added in F roots.
 
-   NEED:
+   NEEDED:
    1. roots size must >= 1 + degree  + max (0, degree - 1) + max (0, 2 * degree - 2)
    so degree * 4 + 1.
-   2. p & Roots: the biggest polynome is F", degree = 2 * (degree - 1).
+   2. p & Roots: the biggest polynomial is F", degree = 2 * (degree - 1).
    So, p size is 2 * degree - 1, and Roots size is 2 * degree - 2.
 */
 
@@ -344,22 +412,25 @@ static void set_lg_page()
     lg_page = pagesize();
 }
 
-void init_norms_roots_internal (unsigned int degree, std::vector<double> & coeff, double max_abs_root, double precision, std::vector<smart_norm_root> & roots)
+/* This works on the integer polynomial obtained by converting
+ * the double polynomial obtained by converting the integer polynomial.
+ *
+ * So we're truncating the input integer coefficients to 53 bits.
+ *
+ * It's weird, and quite probably needlessly complicated.
+ */
+void init_norms_roots_internal (cxx_double_poly const & f, double max_abs_root, double precision, std::vector<smart_norm_root> & roots)
 {
-
-  const double_poly_t f = {{ (int) degree, &(coeff[0]) }};
-  double_poly_t df, ddf, f_ddf, df_df, d2f;
-  mpz_t           p[(degree << 1) + 1];
+  unsigned int degree = f->deg;
+  double_poly df, ddf, f_ddf, df_df, d2f;
+  cxx_mpz_poly fz;
   usp_root_data Roots[degree << 1];
   unsigned int n;
 
   set_lg_page();
-  for (unsigned int k = 0 ; k <= (degree << 1) ; k++)
-      mpz_init (p[k]);
   for (unsigned int k = 0 ; k < (degree << 1) ; k++)
       usp_root_data_init (&(Roots[k]));
-  for (unsigned int k = 0 ; k <= degree; k++)
-      mpz_set_d (p[k], coeff[k]);
+  mpz_poly_set_double_poly(fz, f);
 
   roots.clear();
   roots.reserve(4 * degree + 1);
@@ -368,28 +439,26 @@ void init_norms_roots_internal (unsigned int degree, std::vector<double> & coeff
 
   if (degree) {
     /* The roots of F are inserted in roots */
-    n = numberOfRealRoots (p, degree, max_abs_root, 0, Roots);
+    n = numberOfRealRoots (fz->coeff, fz->deg, max_abs_root, 0, Roots);
     for (unsigned int k = 0 ; k < n ; k++) {
-        smart_norm_root s(0, rootRefine (&(Roots[k]), p, degree, precision));
+        smart_norm_root s(0, rootRefine (&(Roots[k]), fz->coeff, degree, precision));
         roots.push_back(s);
     }
 
     /* Computation of F' */
-    /* XXX should use mpz_poly_derivative instead */
     double_poly_init (df, MAX(0,((int)degree - 1)));
     double_poly_derivative (df, f);
 
     /* The roots of F' are inserted in roots */
-    for (unsigned int k = df->deg + 1; k--; mpz_set_d (p[k], df->coeff[k]));
-    n = numberOfRealRoots (p, df->deg, max_abs_root, 0, Roots);
+    mpz_poly_set_double_poly(fz, df);
+    n = numberOfRealRoots (fz->coeff, fz->deg, max_abs_root, 0, Roots);
     for (unsigned int k = 0 ; k < n ; k++) {
-        smart_norm_root s(1, rootRefine (&(Roots[k]), p, df->deg, precision));
+        smart_norm_root s(1, rootRefine (&(Roots[k]), fz->coeff, df->deg, precision));
         roots.push_back(s);
     }
 
     /* Computation of F" */
-    /* XXX Hmm. We're computing (f/f')', here...
-     */
+    /* XXX Hmm. We're computing (f/f')', here...  */
     double_poly_init (df_df, df->deg + df->deg);
     double_poly_init (ddf, MAX(0,((int)df->deg - 1)));
     double_poly_init (f_ddf, f->deg + ddf->deg);
@@ -400,10 +469,10 @@ void init_norms_roots_internal (unsigned int degree, std::vector<double> & coeff
     double_poly_subtract (d2f, f_ddf, df_df);
 
     /* The roots of F" are inserted in roots */
-    for (unsigned int k = d2f->deg + 1; k--; mpz_set_d (p[k], d2f->coeff[k]));
-    n = numberOfRealRoots (p, d2f->deg, max_abs_root, 0, Roots);
+    mpz_poly_set_double_poly(fz, d2f);
+    n = numberOfRealRoots (fz->coeff, fz->deg, max_abs_root, 0, Roots);
     for (unsigned int k = 0 ; k < n ; k++) {
-        smart_norm_root s(2, rootRefine (&(Roots[k]), p, d2f->deg, precision));
+        smart_norm_root s(2, rootRefine (&(Roots[k]), fz->coeff, d2f->deg, precision));
         roots.push_back(s);
     }
 
@@ -417,8 +486,6 @@ void init_norms_roots_internal (unsigned int degree, std::vector<double> & coeff
     std::sort(roots.begin(), roots.end());
   }
 
-  for (unsigned int k = 0 ; k <= (degree << 1) ; k++)
-      mpz_clear (p[k]);
   for (unsigned int k = 0 ; k < (degree << 1) ; k++)
       usp_root_data_clear (&(Roots[k]));
 }
@@ -426,7 +493,7 @@ void init_norms_roots_internal (unsigned int degree, std::vector<double> & coeff
 /* A wrapper for the function above */
 void init_norms_roots (sieve_info & si, unsigned int side)
 {
-  init_norms_roots_internal (si.cpoly->pols[side]->deg, si.sides[side].fijd,
+  init_norms_roots_internal (si.sides[side].fijd,
                              (double) ((si.I + 16) >> 1),
                              1. / (double) ((si.I) >> 1),
                              si.sides[side].roots);
@@ -438,7 +505,10 @@ void init_norms_roots (sieve_info & si, unsigned int side)
  * not coprime, except for the line j=0.
  */
 /* Internal function, only with simple types, for unit/integration testing */
-void init_degree_one_norms_bucket_region_internal (unsigned char *S, uint32_t J, uint32_t I, double scale, double u0, double u1, double *cexp2) {
+void init_degree_one_norms_bucket_region_internal (unsigned char *S, uint32_t J, uint32_t I, double scale, cxx_double_poly const & u, double *cexp2)
+{
+    double u0 = u->coeff[0];
+    double u1 = u->coeff[1];
 
   /* The computation of the log2 by inttruncfastlog2 needs a value >= 1.
      Here, in the classical rational initialization, the degree of the used
@@ -710,8 +780,9 @@ poly_scale_m128d (__m128d  *u, const double *t, unsigned int d, const double h)
 
 /* Exact initialisation of F(i,j) with degre >= 2 (not mandatory). Slow.
    Internal function, only with simple types, for unit/integration testing. */
-void init_exact_degree_X_norms_bucket_region_internal (unsigned char *S, uint32_t J, uint32_t I, double scale, unsigned int d, std::vector<double> const & fijd)
+void init_exact_degree_X_norms_bucket_region_internal (unsigned char *S, uint32_t J, uint32_t I, double scale, cxx_double_poly const & fijd)
 {
+  unsigned int d = fijd->deg;
   unsigned char *beginS = S;
   uint32_t beginJ, endJ = LOG_BUCKET_REGION - cado_ctz (I);
   scale *= 1./0x100000;
@@ -725,7 +796,7 @@ void init_exact_degree_X_norms_bucket_region_internal (unsigned char *S, uint32_
   for (; J < endJ; J++) {
     const unsigned char *endS = S + I;
     double f, h, u[d+1];
-    poly_scale_double (u, fijd, d, (double) J);
+    poly_scale_double (u, fijd->coeff, d, (double) J);
     h = (double) (-(int32_t) (I >> 1));
     do {
       f = compute_f (d, u, h);
@@ -770,7 +841,7 @@ void init_exact_degree_X_norms_bucket_region_internal (unsigned char *S, uint32_
     __m128d f, h, u[d+1];
     __m128i cumul;
     unsigned char *endS = S + I;
-    poly_scale_m128d (u, &fijd[0], d, (double) J);
+    poly_scale_m128d (u, fijd->coeff, d, (double) J);
     h = _mm_set_pd ((double) (1 - (int32_t) (I >> 1)), (double) (- (int32_t) (I >> 1)));
 
     /* These ASM & switch are really ugly. But it's the ONLY way to
@@ -989,8 +1060,9 @@ static inline void poly_approx_on_S (unsigned char *S, const unsigned int degree
    Cf las-config.h, SMART_INIT for the algorithm.
    No SSE version: it's completly unreadable, and the gain is not really interesting.
    Internal function, only with simple types, for unit/integration testing */
-void init_smart_degree_X_norms_bucket_region_internal (unsigned char *S, uint32_t J, uint32_t I, double original_scale, unsigned int d, std::vector<double> const & fijd, std::vector<smart_norm_root> const & roots)
+void init_smart_degree_X_norms_bucket_region_internal (unsigned char *S, uint32_t J, uint32_t I, double original_scale, cxx_double_poly const & fijd, std::vector<smart_norm_root> const & roots)
 {
+  unsigned int d = fijd->deg;
   ASSERT (d >= 2);
   /* F, F' and F" roots needs stability for their neighbourhood ?
      F roots, sure; F', sure not; F"... maybe. */
@@ -1019,7 +1091,7 @@ void init_smart_degree_X_norms_bucket_region_internal (unsigned char *S, uint32_
       ASSERT_ALWAYS(lg_page != 0);
       for (ssize_t k = I; (k -= lg_page) >= 0; __builtin_prefetch (S + k, 1));
     }
-    poly_scale_double (u, &fijd[0], d, (double) J);
+    poly_scale_double (u, fijd->coeff, d, (double) J);
 
     /* Insertion of point (-Idiv2, F(-Idiv2)) in sg[0] : an artificial one-point segment. */
     g = compute_f (d, u, (double) -Idiv2);
@@ -1213,16 +1285,16 @@ void init_norms_bucket_region (unsigned char *S, uint32_t J, sieve_info& si, uns
   unsigned int degree = si.sides[side].fij->deg;
   switch (degree) {
   case 0 :
-    memset (S, (int) (log2(1.+fabs(si.sides[side].fijd[0])) * si.sides[side].scale) + GUARD, 1U << LOG_BUCKET_REGION);
+    memset (S, (int) (log2(1.+fabs(si.sides[side].fijd->coeff[0])) * si.sides[side].scale) + GUARD, 1U << LOG_BUCKET_REGION);
     break;
   case 1 :
-    init_degree_one_norms_bucket_region_internal (S, J, si.I, si.sides[side].scale, si.sides[side].fijd[0], si.sides[side].fijd[1], si.sides[side].cexp2);
+    init_degree_one_norms_bucket_region_internal (S, J, si.I, si.sides[side].scale, si.sides[side].fijd, si.sides[side].cexp2);
     break;
   default:
     if (smart)
-      init_smart_degree_X_norms_bucket_region_internal (S, J, si.I, si.sides[side].scale, degree, si.sides[side].fijd, si.sides[side].roots);
+      init_smart_degree_X_norms_bucket_region_internal (S, J, si.I, si.sides[side].scale, si.sides[side].fijd, si.sides[side].roots);
     else
-      init_exact_degree_X_norms_bucket_region_internal (S, J, si.I, si.sides[side].scale, degree, si.sides[side].fijd);
+      init_exact_degree_X_norms_bucket_region_internal (S, J, si.I, si.sides[side].scale, si.sides[side].fijd);
     break;
   }
 }
@@ -1232,7 +1304,7 @@ void init_norms_bucket_region (unsigned char *S, uint32_t J, sieve_info& si, uns
 static double
 get_maxnorm_aux (double_poly_srcptr poly, double s)
 {
-  double_poly_t derivative;
+  double_poly derivative;
   const int d = poly->deg;
 
   ASSERT_ALWAYS(d >= 0);
@@ -1275,19 +1347,19 @@ get_maxnorm_aux_pm (double_poly_srcptr poly, double s)
 }
 
 /* returns the maximal norm of |F(x,y)| for -X <= x <= X, 0 <= y <= Y,
-   where F(x,y) is a homogeneous polynomial of degree d.
-   Let F(x,y) = f(x/y)*y^d, and F(x,y) = rev(F)(y,x).
-   Since F is homogeneous, we know M = max |F(x,y)| is attained on the border
-   of the rectangle, i.e.:
-   (a) either on F(X,y) for -Y <= y <= Y (right-hand-side border, and the
-       mirrored image of the left-hand-side border); We want the maximum of
-       rev(F)(y,X) = rev(f)(y/X) * X^d for -Y <= j <= Y;
-       this is rev(f)(t) * X^d for -Y/X <= t <= Y/X.
-   (b) either on F(x,Y) for -X <= x <= X (top border)
-       = f(x/Y) * Y^d; this is f(t) * Y^d for -X/Y <= t <= X/J.
-   (d) or on F(x,0) for -X <= x <= X (lower border, on the abscissa), but this
-       maximum is f[d]*X^d, and is attained in (a).
-*/
+ * where F(x,y) is a homogeneous polynomial of degree d.
+ * Let F(x,y) = f(x/y)*y^d, and F(x,y) = rev(F)(y,x).
+ * Since F is homogeneous, we know M = max |F(x,y)| is attained on the border
+ * of the rectangle, i.e.:
+ * (a) either on F(X,y) for -Y <= y <= Y (right-hand-side border, and the
+ *     mirrored image of the left-hand-side border); We want the maximum of
+ *     rev(F)(y,X) = rev(f)(y/X) * X^d for -Y <= j <= Y;
+ *     this is rev(f)(t) * X^d for -Y/X <= t <= Y/X.
+ * (b) either on F(x,Y) for -X <= x <= X (top border)
+ *     = f(x/Y) * Y^d; this is f(t) * Y^d for -X/Y <= t <= X/J.
+ * (d) or on F(x,0) for -X <= x <= X (lower border, on the abscissa), but this
+ *     maximum is f[d]*X^d, and is attained in (a).
+ */
 double
 get_maxnorm_alg (double_poly_srcptr src_poly, const double X, const double Y)
 {
@@ -1295,7 +1367,7 @@ get_maxnorm_alg (double_poly_srcptr src_poly, const double X, const double Y)
   double norm, max_norm;
 
   /* Make copy of polynomial as we need to revert the coefficients */
-  double_poly_t poly;
+  double_poly poly;
   double_poly_init (poly, d);
   double_poly_set (poly, src_poly);
 
@@ -1318,30 +1390,32 @@ void sieve_info::init_norm_data(int side)
     sides[side].fij = cxx_mpz_poly(cpoly->pols[side]->deg);
 }
 
-/* return largest possible J by simply bounding the Fij and Gij polynomials
-
-  The image in the a,b-plane of the sieve region might be slanted at an angle
-  against the abscissa, thus even though it has the correct skewness, it
-  might include larger a,b-coordinates than a non-slanted image would.
-
-  We compute the maximum norm that would occur if we had a perfect lattice
-  basis in the sense that its image forms a rectangle A/2 <= a < A/2,
-  0 <= b < B, with A/2/B = skew, and A*B = I*J*q (assuming J=I/2 here).
-  Thus we have B = A/2/skew, A*A/2/skew = I*I/2*q, A = I*sqrt(q*skew).
-  The optimal maximum norm is then the maximum of |F(a,b)| in this rectangle,
-  divided by q on the special-q side.
-
-  Then we reduce J so that the maximum norm in the image of the actual sieve
-  region is no larger than this optimal maximum, times some constant fudge
-  factor.
-*/
+/* return largest possible J by simply bounding the Fij and Gij
+ * polynomials
+ * 
+ * The image in the a,b-plane of the sieve region might be slanted at an
+ * angle against the abscissa, thus even though it has the correct
+ * skewness, it might include larger a,b-coordinates than a non-slanted
+ * image would.
+ * 
+ * We compute the maximum norm that would occur if we had a perfect
+ * lattice basis in the sense that its image forms a rectangle A/2 <= a <
+ * A/2, 0 <= b < B, with A/2/B = skew, and A*B = I*J*q (assuming J=I/2
+ * here).  Thus we have B = A/2/skew, A*A/2/skew = I*I/2*q, A =
+ * I*sqrt(q*skew).  The optimal maximum norm is then the maximum of
+ * |F(a,b)| in this rectangle, divided by q on the special-q side.
+ * 
+ * Then we reduce J so that the maximum norm in the image of the actual
+ * sieve region is no larger than this optimal maximum, times some
+ * constant fudge factor.
+ */
 static unsigned int
 sieve_info_update_norm_data_Jmax (sieve_info & si)
 {
   // The following parameter controls the scaling on the norm.
   // Relevant values are between 1.0 and 3.0. A higher value means we
   // select higher values of J, and therefore we find more relations, but
-  // this increases the time per relations.
+  // this increases the time per relation.
   // The value 2.0 seems to be a good compromise. Setting 1.5 reduces the
   // time per relation and number of relations by about 1.5% on a typical
   // RSA704 benchmark.
@@ -1360,7 +1434,7 @@ sieve_info_update_norm_data_Jmax (sieve_info & si)
 
       /* Compute the best possible maximum norm, i.e., assuming a nice
          rectangular sieve region in the a,b-plane */
-      double_poly_t dpoly;
+      double_poly dpoly;
       double_poly_init (dpoly, ps->deg);
       double_poly_set_mpz_poly (dpoly, ps);
       double maxnorm = get_maxnorm_alg (dpoly, fudge_factor*A/2.,
@@ -1369,11 +1443,7 @@ sieve_info_update_norm_data_Jmax (sieve_info & si)
       if (side == si.doing.side)
         maxnorm /= q;
 
-      double_poly_t F;
-      F->deg = ps->deg;
-      F->coeff = &(s.fijd[0]);
-
-      double v = get_maxnorm_alg (F, I/2, Jmax);
+      double v = get_maxnorm_alg (s.fijd, I/2, Jmax);
 
       if (v > maxnorm)
         { /* use dichotomy to determine largest Jmax */
@@ -1383,7 +1453,7 @@ sieve_info_update_norm_data_Jmax (sieve_info & si)
           while (trunc (a) != trunc (b))
             {
               c = (a + b) * 0.5;
-              v = get_maxnorm_alg (F, I/2, c);
+              v = get_maxnorm_alg (s.fijd, I/2, c);
               if (v < maxnorm)
                 a = c;
               else
@@ -1574,7 +1644,6 @@ sieve_info_update_norm_data (sieve_info& si, int nb_threads)
 
   double step, begin;
   double r, maxlog2;
-  double_poly_t poly;
 
   /* Update floating point version of both polynomials. They will be used in
    * get_maxnorm_alg(). */
@@ -1582,39 +1651,29 @@ sieve_info_update_norm_data (sieve_info& si, int nb_threads)
       sieve_info::side_info& s(si.sides[side]);
       mpz_poly_ptr ps = si.cpoly->pols[side];
       mpz_poly_homography (s.fij, ps, H);
-      /* On the special-q side, divide all the coefficients of the
-         transformed polynomial by q */
       if (si.conf.side == side) {
-          for (int i = 0; i <= ps->deg; i++) {
-              ASSERT_ALWAYS(mpz_divisible_p(s.fij->coeff[i], si.doing.p));
-              mpz_divexact(s.fij->coeff[i], s.fij->coeff[i], si.doing.p);
-          }
+          ASSERT_ALWAYS(mpz_poly_divisible_mpz(s.fij, si.doing.p));
+          mpz_poly_divexact_mpz(s.fij, s.fij, si.doing.p);
       }
-      s.fijd.assign(ps->deg + 1, 0);
-      for (int k = 0; k <= ps->deg; k++)
-          s.fijd[k] = mpz_get_d (s.fij->coeff[k]);
+      double_poly_set_mpz_poly(s.fijd, s.fij);
   }
 
 
   for (int side = 0; side < 2; ++side) {
       sieve_info::side_info& sis(si.sides[side]);
 
-    /* Compute the roots of the polynomial F(i,1) and the roots of its
-       inflexion points d^2(F(i,1))/d(i)^2.  These roots and 0.0 are need to
-       be corrected the norms initialization on their neighboroods in
-       init_smart_degree_X_norms_bucket_region_internal.  */
-
 #ifdef SMART_NORM
+    /* Compute the roots of the polynomial F(i,1) and the roots of its
+     * inflection points d^2(F(i,1))/d(i)^2. Used in
+     * init_smart_degree_X_norms_bucket_region_internal.  */
     if (si.cpoly->pols[side]->deg >= 2)
       init_norms_roots (si, side);
 #endif
 
     /* Compute the maximum norm of the polynomial over the sieve region.
        The polynomial coefficient in fijd are already divided by q
-       on the special-q sis. */
-    poly->deg = si.cpoly->pols[side]->deg;
-    poly->coeff = &(si.sides[side].fijd[0]);
-    sis.logmax = log2(get_maxnorm_alg (poly, (double)si.I/2, (double)si.I/2));
+       on the special-q side. */
+    sis.logmax = log2(get_maxnorm_alg (si.sides[side].fijd, (double)si.I/2, (double)si.I/2));
 
     /* we know that |F(a,b)| < 2^(logmax) or |F(a,b)/q| < 2^(logmax)
        depending on sqsis. 0 */
@@ -1660,7 +1719,7 @@ sieve_info_update_norm_data (sieve_info& si, int nb_threads)
   Jmax = sieve_info_update_norm_data_Jmax (si);
   if (Jmax > si.J)
     {
-      /* see sieve_info_adjust_IJ */
+      /* see adjust_IJ */
       ASSERT_ALWAYS(LOG_BUCKET_REGION >= si.logI);
       uint32_t i = 1U << (LOG_BUCKET_REGION - si.logI);
       i *= nb_threads;

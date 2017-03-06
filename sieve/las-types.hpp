@@ -203,8 +203,8 @@ struct sieve_info {
         double logmax;     /* norms on the alg-> side are < 2^alg->logmax */
         cxx_mpz_poly fij;  /* coefficients of F(a0*i+a1*j, b0*i+b1*j)
                             * (divided by q on the special-q side) */
-        std::vector<double> fijd;      /* coefficients of F_q (divided by q
-                                        * on the special q side) */
+        cxx_double_poly fijd;      /* coefficients of F_q (divided by q
+                                    * on the special q side) */
         std::vector<smart_norm_root> roots;     /* roots of F, F', F"
                                                  * and maybe F'" - cf
                                                  * init_norms* in 
