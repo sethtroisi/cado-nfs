@@ -26,7 +26,7 @@ static inline void xToAB(int64_t *a, uint64_t *b, const uint64_t x, sieve_info c
     uint32_t I = si.I;
 
     i = (x & (I - 1)) - (I >> 1);
-    j = x >> si.logI;
+    j = x >> si.conf.logI_adjusted;
     *a = (int64_t) i * si.qbasis.a0 + (int64_t) j * si.qbasis.a1;
     c =  (int64_t) i * si.qbasis.b0 + (int64_t) j * si.qbasis.b1;
     if (c >= 0)
@@ -51,7 +51,7 @@ static inline void xToABmpz(mpz_t a, mpz_t b,
     uint32_t I = si.I;
 
     i = (x & (I - 1)) - (I >> 1);
-    j = x >> si.logI;
+    j = x >> si.conf.logI_adjusted;
     
     mpz_t aux_i, aux_j;
     mpz_t aux;

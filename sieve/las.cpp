@@ -131,8 +131,6 @@ siever_config las_info::get_config_for_q(las_todo_entry const & doing) const /*{
     config.bitsize = mpz_sizeinbase(doing.p, 2);
     config.side = doing.side;
 
-    // note that we inherit logA (or logI) from config_base.
- 
     /* Do we have a hint table with specifically tuned parameters,
      * well suited to this problem size ? */
     for(unsigned int i = 0 ; i < hint_table.size() ; i++) {
@@ -184,59 +182,49 @@ siever_config las_info::get_config_for_q(las_todo_entry const & doing) const /*{
                 config.sides[1].mfb);
     }
 
-
     return config;
 }/*}}}*/
 
 /* sieve_info stuff */
 
-sieve_info::sieve_info(las_info & las, siever_config const & sc, param_list pl, int is_default)/*{{{*/
+/* This function creates a new sieve_info structure, taking advantage of
+ * structures which might already exist in las.sievers
+ *  - for sieving, if factor base parameters are similar, we're going to
+ *    share_factor_bases()
+ *  - for cofactoring, if large prime bounds and mfbs are similar, we're
+ *    going to reuse the strategies.
+ * 
+ * The siever_config structure to be passed to this function is not
+ * permitted to lack anything.
+ *
+ * This function differs from las_info::get_sieve_info_from_config(),
+ * since the latters also registers the returned object within
+ * las.sievers (while the function here only *reads* this list).
+ */
+sieve_info::sieve_info(las_info & las, siever_config const & sc, param_list pl)/*{{{*/
 {
     cpoly = las.cpoly;
     conf = sc;
 
-#if 0
-    /* These will be set from the values computed by adjust_IJ */
-    I = J = logI = 0;
+    I = 1UL << sc.logI_adjusted;
 
-    if (is_default) {
-        logI = (1 + sc.logA) / 2;
-        I = 1UL << logI;
-        J = I >> 1;
-    }
-#else
-    logI = sc.logI;
-    I = 1UL << logI;
-    J = I >> 1;
-#endif
+    std::list<sieve_info>::iterator psi;
+    
+    /*** Sieving ***/
 
-    /* This function in itself is too expensive if called often.
-     * In the descent, where we initialize a sieve_info for each pair
-     * (bitsize_of_q, side), we would call it dozens of time.
-     * For the moment, we will assume that all along the hint file, the
-     * values of I, lim0, lim1 are constant, so that the factor bases
-     * are exactly the same and can be shared.
-     */
-    if (is_default) {
+    psi = find_if(las.sievers.begin(), las.sievers.end(), has_same_sieving(sc));
+
+    if (psi != las.sievers.end()) {
+        sieve_info & other(*psi);
+        verbose_output_print(0, 1, "# copy factor base data from previous siever\n");
+        share_factor_bases(other);
+    } else {
         verbose_output_print(0, 1, "# bucket_region = %" PRIu64 "\n",
                 BUCKET_REGION);
         init_factor_bases(las, pl);
         for (int side = 0; side < 2; side++) {
             print_fb_statistics(side);
         }
-    } else {
-        // We are in descent mode, it seems, so let's not duplicate the
-        // factor base data.
-        // TODO fix that mess.
-        ASSERT_ALWAYS(!las.sievers.empty());
-        sieve_info & default_sieve(las.sievers.front());
-        // A few sanity checks, first.
-        ASSERT_ALWAYS(default_sieve.logI == logI);
-        ASSERT_ALWAYS(default_sieve.conf.bucket_thresh == conf.bucket_thresh);
-        ASSERT_ALWAYS(default_sieve.conf.bucket_thresh1 == conf.bucket_thresh1);
-        // Then, copy relevant data from the first sieve_info
-        verbose_output_print(0, 1, "# Do not regenerate factor base data: copy it from first siever\n");
-        share_factor_bases(default_sieve);
     }
 
     // Now that fb have been initialized, we can set the toplevel.
@@ -249,21 +237,21 @@ sieve_info::sieve_info(las_info & las, siever_config const & sc, param_list pl, 
      * in sieve_small_bucket_region and resieve_small_bucket_region, where
      * we want to differentiate on the parity on j.
      */
-    ASSERT_ALWAYS(LOG_BUCKET_REGION >= logI);
+    ASSERT_ALWAYS(LOG_BUCKET_REGION >= conf.logI_adjusted);
 
-    /* set the maximal value of the number of buckets (might be less
-       for a given special-q if J is smaller) */
+    /* set the maximal value of the number of buckets. This directly
+     * depends on A */
     uint32_t XX[FB_MAX_PARTS] = { 0, NB_BUCKETS_2, NB_BUCKETS_3, 0};
     uint64_t BRS[FB_MAX_PARTS] = BUCKET_REGIONS;
     XX[toplevel] = 1 +
-      ((((uint64_t)J) << logI) - UINT64_C(1)) / BRS[toplevel];
+      ((UINT64_C(1) << conf.logA) - UINT64_C(1)) / BRS[toplevel];
     for (int i = toplevel+1; i < FB_MAX_PARTS; ++i)
         XX[i] = 0;
     // For small Jmax, the number of buckets at toplevel-1 could also
     // be less than the maximum allowed.
     if (toplevel > 1 && XX[toplevel] == 1) {
         XX[toplevel-1] = 1 +
-            ((((uint64_t)J) << logI) - UINT64_C(1))
+            ((UINT64_C(1) << conf.logA) - UINT64_C(1))
             / BRS[toplevel-1];
         ASSERT_ALWAYS(XX[toplevel-1] != 1);
     }
@@ -271,10 +259,6 @@ sieve_info::sieve_info(las_info & las, siever_config const & sc, param_list pl, 
         nb_buckets_max[i] = XX[i];
         nb_buckets[i] = XX[i];
     }
-
-    init_j_div();
-    init_unsieve_data();
-    init_strategies(pl);
 
     for(int side = 0 ; side < 2 ; side++) {
 	init_trialdiv(side); /* Init refactoring stuff */
@@ -284,7 +268,36 @@ sieve_info::sieve_info(las_info & las, siever_config const & sc, param_list pl, 
         sides[side].fb->get_part(0)->count_entries(NULL, &nr_roots, NULL);
         verbose_output_print(0, 2, " (total %zu)\n", nr_roots);
     }
-}/*}}}*/
+
+    /*** Cofactoring ***/
+
+    psi = find_if(las.sievers.begin(), las.sievers.end(), has_same_cofactoring(sc));
+
+    if (psi != las.sievers.end()) {
+        sieve_info & other(*psi);
+        verbose_output_print(0, 1, "# copy cofactoring strategies from previous siever\n");
+        strategies = other.strategies;
+    } else {
+        init_strategies(pl);
+    }
+}
+/*}}}*/
+
+void sieve_info::recover_per_sq_values(sieve_range_adjust const & Adj)
+{
+    doing = Adj.doing;
+    qbasis = Adj.Q;
+    qbasis.set_q(doing.p, doing.prime_sq);
+    if (!qbasis.prime_sq) {
+        qbasis.prime_factors = doing.prime_factors;
+    }
+    ASSERT_ALWAYS(conf.logI_adjusted == Adj.logI);
+    ASSERT_ALWAYS(I == (1UL << Adj.logI));
+    J = Adj.J;
+
+    init_j_div();
+    init_unsieve_data();
+}
 
 void sieve_info::update (size_t nr_workspaces)/*{{{*/
 {
@@ -303,14 +316,14 @@ void sieve_info::update (size_t nr_workspaces)/*{{{*/
   /* update number of buckets at toplevel */
   uint64_t BRS[FB_MAX_PARTS] = BUCKET_REGIONS;
   si.nb_buckets[si.toplevel] = 1 +
-      ((((uint64_t)si.J) << si.logI) - UINT64_C(1)) / 
+      ((((uint64_t)si.J) << si.conf.logI_adjusted) - UINT64_C(1)) / 
       BRS[si.toplevel];
   // maybe there is only 1 bucket at toplevel and less than 256 at
   // toplevel-1, due to a tiny J.
   if (si.toplevel > 1) {
       if (si.nb_buckets[si.toplevel] == 1) {
         si.nb_buckets[si.toplevel-1] = 1 +
-            ((((uint64_t)si.J) << si.logI) - UINT64_C(1)) /
+            ((((uint64_t)si.J) << si.conf.logI_adjusted) - UINT64_C(1)) /
             BRS[si.toplevel-1]; 
         // we forbid skipping two levels.
         ASSERT_ALWAYS(si.nb_buckets[si.toplevel-1] != 1);
@@ -526,41 +539,24 @@ bool parse_default_siever_config(siever_config & sc, param_list_ptr pl)
     int complete = 1;
     complete &= param_list_parse_ulong(pl, "lim0", &(sc.sides[0].lim));
     complete &= param_list_parse_ulong(pl, "lim1", &(sc.sides[1].lim));
-#if 0
     if (param_list_lookup_string(pl, "A")) {
         complete &= param_list_parse_int  (pl, "A",    &(sc.logA));
         if (param_list_lookup_string(pl, "I")) {
             fprintf(stderr, "# -A and -I are incompatible\n");
             exit(EXIT_FAILURE);
         }
+        // This is useful for a default config
+        sc.logI_adjusted = (sc.logA+1)/2;
     } else if (param_list_lookup_string(pl, "I")) {
         int I;
         complete &= param_list_parse_int  (pl, "I", &I);
         sc.logA = 2 * I - 1;
         printf("# Interpreting -I %d as meaning -A %d\n", I, sc.logA);
+        // This is useful for a default config
+        sc.logI_adjusted = I;
     }
-#else
-    complete &= param_list_parse_int  (pl, "I", &sc.logI);
-#endif
 
-    if (!complete) {
-        /* ok. Now in fact, for the moment we really need these to be
-         * specified, because the call to "new fb_interface" of
-         * course depends on the factor base limits. For the very
-         * reason that presently, we want these to be common across
-         * several siever config values in the hint table, we cannot
-         * leave default_config half-baked.
-         *
-         * since bucket_thresh depends on I, we need I too.
-         *
-         * XXX XXX XXX -- we're going to seriously consider waiving
-         * this requirement.
-         */
-        fprintf(stderr, "Error: as long as per-qrange factor bases are not fully supported, we need to know at least the I and lim[01] fields\n");
-        exit(EXIT_FAILURE);
-    }
-    if (sc.sides[0].lim > 2147483647UL ||
-            sc.sides[1].lim > 2147483647UL)
+    if (sc.sides[0].lim > 2147483647UL || sc.sides[1].lim > 2147483647UL)
     {
         fprintf (stderr, "Error, lim0/lim1 must be < 2^31 (bug #21094)\n");
         exit (EXIT_FAILURE);
@@ -575,7 +571,6 @@ bool parse_default_siever_config(siever_config & sc, param_list_ptr pl)
 
     }
 
-
     /* Parse optional siever configuration parameters */
     sc.td_thresh = 1024;	/* default value */
     sc.skipped = 1;	/* default value */
@@ -588,11 +583,13 @@ bool parse_default_siever_config(siever_config & sc, param_list_ptr pl)
                 sc.unsieve_thresh);
     }
 
-#if 0
+    // XXX note that when the sieving range size varies with the
+    // special-q, we need to accept that the bucket threshold varies,
+    // too.
+    //
+    // As a consequence, we should make it possible to specify extra
+    // parameters in the hint file format (not just I,lim,lpb,mfb).
     sc.bucket_thresh = 1 << ((sc.logA+1)/2);	/* default value */
-#else
-    sc.bucket_thresh = 1 << sc.logI;	/* default value */
-#endif
     sc.bucket_thresh1 = 0;	/* default value */
     sc.bk_multiplier = 0.0;
     /* overrides default only if parameter is given */
@@ -708,10 +705,10 @@ las_info::las_info(param_list_ptr pl)/*{{{*/
     // }}}
 
     // ----- default config and adaptive configs {{{
+    // perhaps the set of parameters passed is not complete.
     if (parse_default_siever_config(config_base, pl)) {
         default_config_ptr = &config_base;
-        // The extra 1 means: construct the default siever.
-        sievers.push_back(sieve_info(*this, config_base, pl, 1));
+        sievers.push_back(sieve_info(*this, config_base, pl));
     }
     // }}}
 
@@ -906,7 +903,7 @@ sieve_info & get_sieve_info_from_config(las_info & las, siever_config const & sc
     las.sievers.push_back(sieve_info(las, sc, pl));
     sieve_info & si(las.sievers.back());
     verbose_output_print(0, 1, "# Creating new sieve configuration for q~2^%d on side %d (logI=%d)\n",
-            sc.bitsize, sc.side, si.logI);
+            sc.bitsize, sc.side, si.conf.logI_adjusted);
     siever_config_display(sc);
     return las.sievers.back();
 }/*}}}*/
@@ -1932,8 +1929,8 @@ void factor_survivors_data::search_survivors(timetree_t & timer)
     CHILD_TIMER(timer, __func__);
     las_info const & las(*th->plas);
     sieve_info & si(*th->psi);
-    const unsigned int first_j = N << (LOG_BUCKET_REGION - si.logI);
-    const unsigned long nr_lines = 1U << (LOG_BUCKET_REGION - si.logI);
+    const unsigned int first_j = N << (LOG_BUCKET_REGION - si.conf.logI_adjusted);
+    const unsigned long nr_lines = 1U << (LOG_BUCKET_REGION - si.conf.logI_adjusted);
 
 #ifdef TRACE_K /* {{{ */
     if (trace_on_spot_Nx(N, trace_Nx.x)) {
@@ -1971,8 +1968,8 @@ void factor_survivors_data::search_survivors(timetree_t & timer)
     for (unsigned int j = 0; j < nr_lines; j++)
     {
         unsigned char * const both_S[2] = {
-            sdata[0].S + (j << si.logI), 
-            sdata[1].S + (j << si.logI)
+            sdata[0].S + (j << si.conf.logI_adjusted), 
+            sdata[1].S + (j << si.conf.logI_adjusted)
         };
         const unsigned char both_bounds[2] = {
             si.sides[0].bound,
@@ -1980,14 +1977,14 @@ void factor_survivors_data::search_survivors(timetree_t & timer)
         };
         size_t old_size = survivors.size();
         search_survivors_in_line(both_S, both_bounds,
-                                 si.logI, j + first_j, N,
+                                 si.conf.logI_adjusted, j + first_j, N,
                                  si.j_div, si.conf.unsieve_thresh,
                                  si.us, survivors);
         /* Survivors written by search_survivors_in_line() have index
            relative to their j-line. We need to convert to index within
            the bucket region by adding line offsets. */
         for (size_t i_surv = old_size; i_surv < survivors.size(); i_surv++)
-            survivors[i_surv] += j << si.logI;
+            survivors[i_surv] += j << si.conf.logI_adjusted;
     }
 }
 
@@ -2467,7 +2464,7 @@ void * process_bucket_region(timetree_t & timer, thread_data *th)
 
     unsigned char * S[2];
 
-    unsigned int skiprows = (BUCKET_REGION >> si.logI)*(las.nb_threads-1);
+    unsigned int skiprows = (BUCKET_REGION >> si.conf.logI_adjusted)*(las.nb_threads-1);
 
     /* This is local to this thread */
     for(int side = 0 ; side < 2 ; side++) {
@@ -2968,31 +2965,25 @@ int main (int argc0, char *argv0[])/*{{{*/
 
         Adj.sieve_info_update_norm_data_Jmax();
 
+        // Adj.estimated_yield();
+
+        siever_config conf = Adj.config();
+        conf.logI_adjusted = Adj.logI;
+
         /* done with skew gauss ! */
 
         BOOKKEEPING_TIMER(timer_special_q);
 
         /* Maybe create a new siever ? */
-        sieve_info & si(get_sieve_info_from_config(las, Adj.config(), pl));
+        sieve_info & si(get_sieve_info_from_config(las, conf, pl));
 
-        /* This mess should be cleaned! XXX */
-        si.doing = doing;
-        si.qbasis = Adj.Q;
-        si.qbasis.set_q(doing.p, doing.prime_sq);
-        si.logI = Adj.logI;
-        si.I = 1UL << Adj.logI;
-        si.J = Adj.J;
-
-        if (!si.qbasis.prime_sq) {
-            si.qbasis.prime_factors = doing.prime_factors;
-        }
+        si.recover_per_sq_values(Adj);
 
         /* checks the value of J,
          * precompute the skewed polynomials of f(x) and g(x), and also
          * their floating-point versions */
 
         totJ += (double) si.J;
-
 
 
         WHERE_AM_I_UPDATE(w, psi, &si);
@@ -3110,7 +3101,7 @@ int main (int argc0, char *argv0[])/*{{{*/
                 sieve_info::side_info & s(si.sides[side]);
                 thread_side_data & ts = th->sides[side];
 
-                uint32_t my_row0 = (BUCKET_REGION >> si.logI) * th->id;
+                uint32_t my_row0 = (BUCKET_REGION >> si.conf.logI_adjusted) * th->id;
                 ts.ssdpos = small_sieve_start(s.ssd, my_row0, si);
                 ts.rsdpos = small_sieve_copy_start(ts.ssdpos,
                         s.fb_parts_x->rs);
@@ -3127,7 +3118,7 @@ int main (int argc0, char *argv0[])/*{{{*/
             SIBLING_TIMER(timer_special_q, "process_bucket_region outer container (non-MT)");
             // Prepare plattices at internal levels
             // TODO: this could be multi-threaded
-            plattice_x_t max_area = plattice_x_t(si.J)<<si.logI;
+            plattice_x_t max_area = plattice_x_t(si.J)<<si.conf.logI_adjusted;
             plattice_enumerate_area<1>::value =
                 MIN(max_area, plattice_x_t(BUCKET_REGION_2));
             plattice_enumerate_area<2>::value =
@@ -3142,7 +3133,7 @@ int main (int argc0, char *argv0[])/*{{{*/
                             (slice = fb->get_slice(slice_index)) != NULL; 
                             slice_index++) {  
                         precomp_plattice[side][level].push_back(
-                                slice->make_lattice_bases(si.qbasis, si.logI));
+                                slice->make_lattice_bases(si.qbasis, si.conf.logI_adjusted));
                     }
                 }
             }

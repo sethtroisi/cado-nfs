@@ -1640,7 +1640,7 @@ B:=[bestrep(a):a in {{a*b*c*x:a in {1,-1},b in {1,d},c in {1,s}}:x in MM}];
                 best_squeeze = squeeze;
                 best_sum = sum;
             }
-            // printf("# estimated yield for rectangle #%d,%d : %e\n",r,squeeze,sum);
+            if (verbose>1) printf("# estimated yield for rectangle #%d,%d : %e\n",r,squeeze,sum);
         }
     }
 

@@ -27,6 +27,10 @@
 namespace std { using boost::shared_ptr; using boost::make_shared; }
 #endif
 
+struct siever_config;
+struct sieve_info;
+struct las_info;
+struct sieve_range_adjust;
 
 /* {{{ siever_config */
 /* The following structure lists the fields with an impact on the siever.
@@ -38,14 +42,12 @@ struct siever_config {
      * we could imagine being more accurate */
     unsigned int bitsize;  /* bitsize == 0 indicates end of table */
     int side;
-#if 0
-    /* For a given logA, we may trigger configurations for various logI
-     * values */
-    int logI_adjusted;
     int logA;
-#else
-    int logI;
-#endif
+
+
+    /* For a given logA, we may trigger configurations for various logI
+     * values. logI_adjusted is a sieving-only parameter. */
+    int logI_adjusted;
     unsigned long bucket_thresh;    // bucket sieve primes >= bucket_thresh
     unsigned long bucket_thresh1;   // primes above are 2-level bucket-sieved
     unsigned int td_thresh;
@@ -76,7 +78,7 @@ struct siever_config {
 
     bool has_same_sieving(siever_config const & o) const {
         bool ok = true;
-        ok = ok && logI == o.logI;
+        ok = ok && logI_adjusted == o.logI_adjusted;
         ok = ok && bucket_thresh == o.bucket_thresh;
         ok = ok && bucket_thresh1 == o.bucket_thresh1;
         ok = ok && td_thresh == o.td_thresh;
@@ -150,10 +152,10 @@ struct sieve_info {
 
     las_todo_entry doing;
 
-    // sieving area. Note that in the (conf) member struct, we find logA
+    // sieving area. Note that in the (conf) member struct, we find
+    // logI_adjusted (will be renamed eventually), as well as logA.
     uint32_t J;
     uint32_t I;
-    int logI;
 
     // description of the q-lattice. The values here should remain
     // compatible with those in ->conf (this concerns notably the bit
@@ -261,15 +263,15 @@ struct sieve_info {
     void update_norm_data();
     void update (size_t nr_workspaces);
 
-    sieve_info(las_info &, siever_config const &, param_list_ptr, int is_default = 0);
+    sieve_info(las_info &, siever_config const &, param_list_ptr);
     sieve_info() {
         cpoly = NULL;
         I = J = 0;
-        logI = 0;
         memset(nb_buckets, 0, sizeof(nb_buckets));
         memset(nb_buckets_max, 0, sizeof(nb_buckets_max));
         toplevel = 0;
     }
+    void recover_per_sq_values(sieve_range_adjust const&);
 };
 
 /* }}} */
@@ -367,7 +369,9 @@ struct las_info : private NonCopyable {
 /* }}} */
 
 class sieve_range_adjust {
-    static const int verbose = 0;
+    static const int verbose = 2;
+
+    friend struct sieve_info;
 
     las_todo_entry doing;
     siever_config conf;         /* This "conf" field is only used for a
@@ -393,7 +397,7 @@ public:
          * we replace by an adjusted one if needed). */
         conf = las.get_config_for_q(doing);
         /* These two will be adjusted in the process */
-        logA = 2*conf.logI-1;
+        logA = conf.logA;
         logI = J = 0;
     }
     /* This is only for desperate cases. In las-duplicates, for the
@@ -401,7 +405,7 @@ public:
     sieve_range_adjust(las_todo_entry const & doing, cado_poly_srcptr cpoly, siever_config const & conf, int nb_threads = 1)
         : doing(doing), conf(conf), cpoly(cpoly), nb_threads(nb_threads)
     {
-        logA = 2*conf.logI-1;
+        logA = conf.logA;
         logI = J = 0;
     }
 

@@ -81,6 +81,10 @@ void sieve_info::init_factor_bases(las_info & las, param_list_ptr pl)
         fb_dump_fbc(fb, fbcfilename);
         verbose_output_print(0, 1, "# Finished writing memory image of factor base\n");
     }
+
+    /* Note that max_bucket_fill_ratio and friends are set from within
+     * print_fb_statistics, which is a bit ugly.
+     */
 }
 
 void sieve_info::share_factor_bases(sieve_info& other)
@@ -91,9 +95,8 @@ void sieve_info::share_factor_bases(sieve_info& other)
         sieve_info::side_info & sis(sides[side]);
         sieve_info::side_info & sis0(other.sides[side]);
         sis.fb = sis0.fb;
-        for (int i = 0; i < FB_MAX_PARTS; i++) {
+        for (int i = 0; i < FB_MAX_PARTS; i++)
             sis.max_bucket_fill_ratio[i] = sis0.max_bucket_fill_ratio[i];
-        }
     }
 }
 
