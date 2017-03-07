@@ -1534,8 +1534,8 @@ static double estimate_yield_in_sieve_area(cxx_double_poly const f[2], int lpb[2
             sum += prod;
         }
     }
-    sum *= 1 << A;
-    sum /= 1 << (2*N - 1);
+    sum *= 1UL << A;
+    sum /= 1UL << (2*N - 1);
     return sum;
 }//}}}
 
@@ -1766,7 +1766,7 @@ int sieve_range_adjust::adapt_threads(const char * origin)
     /* Bug 15617: if we round up, we are not true to our promises */
     uint32_t nJ = (J / i) * i; /* Round down to multiple of i */
 
-    if (verbose) printf("# %s(): Final J=%" PRIu32 "\n", origin, nJ);
+    if (verbose) printf("# %s(): Final logI=%d J=%" PRIu32 "\n", origin, logI, nJ);
     /* XXX No rounding if we intend to abort */
     if (nJ > 0) J = nJ;
     return nJ > 0;

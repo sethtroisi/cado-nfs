@@ -349,7 +349,7 @@ sq_finds_relation(const unsigned long sq, const int sq_side,
   pass = factor_both_leftover_norms((mpz_t*)cof, f, m, si);
 
   if (pass <= 0)
-    verbose_output_vfprint(0, VERBOSE_LEVEL, gmp_vfprintf, "# DUPECHECK norms not both smooth, left over factors: %Zd, %Zd\n", cof[0], cof[1]);
+    verbose_output_vfprint(0, VERBOSE_LEVEL, gmp_vfprintf, "# DUPECHECK norms not both smooth, left over factors: %Zd, %Zd\n", (mpz_srcptr) cof[0], (mpz_srcptr) cof[1]);
 
   for(int side = 0 ; side < 2 ; side++) {
       clear_uint32_array (m[side]);

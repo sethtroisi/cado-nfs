@@ -247,7 +247,7 @@ struct sieve_info {
     /* Data for unsieving locations where gcd(i,j) > 1 */
     /* This gets initialized only when I is finally decided */
     unsieve_data us;
-    void init_unsieve_data() { us = unsieve_data(I); }
+    void init_unsieve_data() { us = unsieve_data(conf.logI_adjusted, conf.logA); }
 
     /* in las-unsieve.cpp */
     /* Data for divisibility tests p|i in lines where p|j */
@@ -369,7 +369,7 @@ struct las_info : private NonCopyable {
 /* }}} */
 
 class sieve_range_adjust {
-    static const int verbose = 2;
+    static const int verbose = 1;
 
     friend struct sieve_info;
 

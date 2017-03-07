@@ -21,15 +21,23 @@ minisieve(unsieve_data::pattern_t * const array, const size_t stride)
       ((unsigned char *) array)[i] = 255;
 }
 
-unsieve_data::unsieve_data(uint32_t I) : I(I)
+unsieve_data::unsieve_data()
 {
   entries = NULL;
-  if (I == 0) return;
+  Jmax = 0;
+}
+
+unsieve_data::unsieve_data(int logI, int logA)
+{
+  unsigned long I = 1UL << logI;
+  ASSERT_ALWAYS(logI >= 0);
+  ASSERT_ALWAYS(logA >= logI);
+  Jmax = 1UL << (logA - logI);
   /* Store largest prime factor of k in us.lpf[k], 0 for k=0, 1 for k=1 */
-  entries = new entry[I];
+  entries = new entry[Jmax];
   entries[0] = entry(0,0,0);
   entries[1] = entry(1,1,0);
-  for (unsigned int k = 2U; k < I; k++)
+  for (unsigned int k = 2U; k < Jmax; k++)
     {
       unsigned int p, c = k;
       for (p = 2U; p * p <= c; p += 1U + p % 2U)
@@ -49,12 +57,12 @@ unsieve_data::unsieve_data(uint32_t I) : I(I)
     minisieve(pattern7, 7);
 }
 
-unsieve_data::unsieve_data(unsieve_data const & o) : I(o.I)
+unsieve_data::unsieve_data(unsieve_data const & o) : Jmax(o.Jmax)
 {
     entries = NULL;
-    if (I == 0) return;
-    entries = new entry[I];
-    memcpy(entries, o.entries, I * sizeof(entry));
+    if (Jmax == 0) return;
+    entries = new entry[Jmax];
+    memcpy(entries, o.entries, Jmax * sizeof(entry));
     memcpy(pattern3, o.pattern3, sizeof(pattern3));
     memcpy(pattern5, o.pattern5, sizeof(pattern5));
     memcpy(pattern7, o.pattern7, sizeof(pattern7));
@@ -62,10 +70,10 @@ unsieve_data::unsieve_data(unsieve_data const & o) : I(o.I)
 
 unsieve_data & unsieve_data::operator=(unsieve_data const & o)
 {
-    if (I) delete[] entries;
-    I = o.I;
-    entries = new entry[I];
-    memcpy(entries, o.entries, I * sizeof(entry));
+    if (Jmax) delete[] entries;
+    Jmax = o.Jmax;
+    entries = new entry[Jmax];
+    memcpy(entries, o.entries, Jmax * sizeof(entry));
     memcpy(pattern3, o.pattern3, sizeof(pattern3));
     memcpy(pattern5, o.pattern5, sizeof(pattern5));
     memcpy(pattern7, o.pattern7, sizeof(pattern7));
@@ -74,7 +82,7 @@ unsieve_data & unsieve_data::operator=(unsieve_data const & o)
 
 unsieve_data::~unsieve_data()
 {
-    if (I == 0) return;
+    if (Jmax == 0) return;
     delete[] entries;
 }
 

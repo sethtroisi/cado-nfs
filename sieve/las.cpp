@@ -2965,7 +2965,7 @@ int main (int argc0, char *argv0[])/*{{{*/
 
         Adj.sieve_info_update_norm_data_Jmax();
 
-        // Adj.estimated_yield();
+        Adj.estimated_yield();
 
         siever_config conf = Adj.config();
         conf.logI_adjusted = Adj.logI;

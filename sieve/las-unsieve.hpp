@@ -26,15 +26,16 @@ typedef __m128i pattern_t;
 typedef unsigned long pattern_t;
 #define UNSIEVE_OR(a,b) do{(a) |= (b);}while(0)
 #endif
-    /* entry[i].lpf is largest prime factor of i, for i < I,
+    /* entry[i].lpf is largest prime factor of i, for i < Jmax,
        cof is the cofactor i/lpf^k s.t. lfp^k || i,
        start is (I/2) % lpf */
-    uint32_t I;
+    uint32_t Jmax;
     entry *entries;
     pattern_t pattern3[3];
     pattern_t pattern5[5];
     pattern_t pattern7[7];
-    unsieve_data(uint32_t I = 0);
+    unsieve_data();
+    unsieve_data(int logI, int logA);
     unsieve_data(unsieve_data const &);
     unsieve_data& operator=(unsieve_data const &);
     ~unsieve_data();
