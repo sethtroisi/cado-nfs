@@ -578,13 +578,12 @@ void * insert_rel_into_table (void *context_data, earlyparsed_relation_ptr rel)
 {
   filter_matrix_t *mat = (filter_matrix_t *) context_data;
   unsigned int j = 0;
+  typerow_t buf[256];
 #ifdef BURY_FIRST
   uint64_t nburied = mat->nburied;
 #endif
 
-  /* XXX For now can't use my_malloc, because rows are realloc later */
-  mat->rows[rel->num] = (typerow_t*) malloc ((rel->nb + 1) * sizeof (typerow_t));
-  FATAL_ERROR_CHECK(mat->rows[rel->num] == NULL, "Cannot allocate memory");
+  ASSERT(rel->nb < 256);
 
   for (unsigned int i = 0; i < rel->nb; i++)
   {
@@ -597,32 +596,32 @@ void * insert_rel_into_table (void *context_data, earlyparsed_relation_ptr rel)
     exponent_t e = rel->primes[i].e;
     /* For factorization, they should not be any multiplicity here.
        For DL we do not want to count multiplicity in mat->wt */
-    setCell (mat->rows[rel->num][++j], h, e);
+    setCell (buf[++j], h, e);
 #else
     ASSERT(rel->primes[i].e == 1);
-    setCell (mat->rows[rel->num][++j], h, 1);
+    setCell (buf[++j], h, 1);
 #endif
     mat->rem_ncols += (mat->wt[h] == 0);
     mat->wt[h] += (mat->wt[h] != SMAX(int32_t));
   }
 
 #ifdef BURY_FIRST
-  if (j < rel->nb)
-    {
-      mat->rows[rel->num] = realloc (mat->rows[rel->num],
-                                     (rel->nb + 1) * sizeof (typerow_t));
-      rel->nb = j;
-    }
+  rel->nb = j;
 #endif
-  matLengthRow(mat, rel->num) = rel->nb;
+  setCell (buf[0], rel->nb, 0);
   mat->tot_weight += rel->nb;
+
+  mat->rows[rel->num] = (typerow_t*) malloc ((rel->nb + 1) * sizeof (typerow_t));
+  FATAL_ERROR_CHECK(mat->rows[rel->num] == NULL, "Cannot allocate memory");
 
   /* sort indices to ease row merges */
 #ifndef FOR_DL
-  sort_relation (&(mat->rows[rel->num][1]), rel->nb);
+  sort_relation (&(buf[1]), rel->nb);
 #else
-  qsort (&(mat->rows[rel->num][1]), rel->nb, sizeof(typerow_t), cmp_typerow_t);
+  qsort (&(buf[1]), rel->nb, sizeof(typerow_t), cmp_typerow_t);
 #endif
+
+  memcpy (mat->rows[rel->num], buf, (rel->nb + 1) * sizeof (typerow_t));
 
   return NULL;
 }
