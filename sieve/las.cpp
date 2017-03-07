@@ -3231,6 +3231,11 @@ int main (int argc0, char *argv0[])/*{{{*/
             }
         }
 
+        /* checks the value of J,
+         * precompute the skewed polynomials of f(x) and g(x), and also
+         * their floating-point versions */
+        sieve_info_update (si, las->nb_threads, nr_workspaces);
+        totJ += (double) si->J;
 
         verbose_output_vfprint(0, 1, gmp_vfprintf, "# " HILIGHT_START "Sieving %s q=%Zd; rho=%Zd;" HILIGHT_END,
                                sidenames[si->conf->side], si->doing->p, si->doing->r);
@@ -3245,12 +3250,6 @@ int main (int argc0, char *argv0[])/*{{{*/
         verbose_output_print(0, 1, "\n");
         nr_sq_processed ++;
 
-        /* checks the value of J,
-         * precompute the skewed polynomials of f(x) and g(x), and also
-         * their floating-point versions */
-        sieve_info_update (si, las->nb_threads, nr_workspaces);
-        totJ += (double) si->J;
-        verbose_output_print(0, 2, "# I=%u; J=%u\n", si->I, si->J);
         if (las->verbose >= 2) {
             verbose_output_print (0, 1, "# f_0'(x) = ");
             mpz_poly_fprintf(las->output, si->sides[0]->fij);
