@@ -578,12 +578,10 @@ void * insert_rel_into_table (void *context_data, earlyparsed_relation_ptr rel)
 {
   filter_matrix_t *mat = (filter_matrix_t *) context_data;
   unsigned int j = 0;
-  typerow_t buf[256];
+  typerow_t buf[UMAX(weight_t)]; /* rel->nb is of type weight_t */
 #ifdef BURY_FIRST
   uint64_t nburied = mat->nburied;
 #endif
-
-  ASSERT(rel->nb < 256);
 
   for (unsigned int i = 0; i < rel->nb; i++)
   {
