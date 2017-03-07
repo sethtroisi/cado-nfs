@@ -288,8 +288,8 @@ polyselect/polyselect_arith.c
 polyselect/polyselect_arith.h
 polyselect/polyselect_str.c
 polyselect/polyselect_str.h
-polyselect/rho.c
-polyselect/rho.h
+utils/rho.c
+utils/rho.h
 polyselect/ropt.c
 polyselect/ropt.h
 polyselect/ropt_arith.c

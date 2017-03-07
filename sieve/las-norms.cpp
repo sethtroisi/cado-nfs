@@ -1387,10 +1387,33 @@ get_maxnorm_alg (double_poly_srcptr src_poly, const double X, const double Y)
 
 void sieve_info::init_norm_data(int side)
 {
+    abort();    // we should probably get rid of that function, I guess.
     sides[side].fij = cxx_mpz_poly(cpoly->pols[side]->deg);
 }
 
-/* return largest possible J by simply bounding the Fij and Gij
+/* {{{ various strategies to adjust the sieve area */
+
+void sieve_range_adjust::prepare_fijd()
+{
+    int64_t H[4] = { Q.a0, Q.b0, Q.a1, Q.b1 };
+    /* We need to get the floating point polynomials. Yes, it will be
+     * done several times in the computation, but that's a trivial
+     * computation anyway.
+     */
+    for (int side = 0; side < 2; side++) {
+        cxx_mpz_poly fz;
+        mpz_poly_homography (fz, cpoly->pols[side], H);
+        if (doing.side == side) {
+            ASSERT_ALWAYS(mpz_poly_divisible_mpz(fz, doing.p));
+            mpz_poly_divexact_mpz(fz, fz, doing.p);
+        }
+        double_poly_set_mpz_poly(fijd[side], fz);
+    }
+}
+
+/* sieve_range_adjust::sieve_info_update_norm_data_Jmax {{{
+ *
+ * choose the largest possible J by simply bounding the Fij and Gij
  * polynomials
  * 
  * The image in the a,b-plane of the sieve region might be slanted at an
@@ -1409,8 +1432,8 @@ void sieve_info::init_norm_data(int side)
  * sieve region is no larger than this optimal maximum, times some
  * constant fudge factor.
  */
-static unsigned int
-sieve_info_update_norm_data_Jmax (sieve_info & si)
+int
+sieve_range_adjust::sieve_info_update_norm_data_Jmax ()
 {
   // The following parameter controls the scaling on the norm.
   // Relevant values are between 1.0 and 3.0. A higher value means we
@@ -1420,50 +1443,235 @@ sieve_info_update_norm_data_Jmax (sieve_info & si)
   // time per relation and number of relations by about 1.5% on a typical
   // RSA704 benchmark.
   const double fudge_factor = 2.0;
-  const double I = (double) (si.I);
-  const double q = mpz_get_d(si.doing.p);
-  const double skew = si.cpoly->skew;
+  logI = (logA+1)/2;
+  const double I = (double) (1 << logI);
+  const double q = mpz_get_d(doing.p);
+  const double skew = cpoly->skew;
   const double A = I*sqrt(q*skew);
   const double B = A/2./skew;
   double Jmax = I/2.;
 
+  prepare_fijd();
+
   for (int side = 0; side < 2; side++)
     {
-      sieve_info::side_info& s(si.sides[side]);
-      mpz_poly_ptr ps = si.cpoly->pols[side];
-
       /* Compute the best possible maximum norm, i.e., assuming a nice
          rectangular sieve region in the a,b-plane */
       double_poly dpoly;
-      double_poly_init (dpoly, ps->deg);
-      double_poly_set_mpz_poly (dpoly, ps);
+      double_poly_init (dpoly, cpoly->pols[side]->deg);
+      double_poly_set_mpz_poly (dpoly, cpoly->pols[side]);
       double maxnorm = get_maxnorm_alg (dpoly, fudge_factor*A/2.,
               fudge_factor*B);
       double_poly_clear (dpoly);
-      if (side == si.doing.side)
+      if (side == doing.side)
         maxnorm /= q;
 
-      double v = get_maxnorm_alg (s.fijd, I/2, Jmax);
+      double v = get_maxnorm_alg (fijd[side], I/2, Jmax);
 
       if (v > maxnorm)
-        { /* use dichotomy to determine largest Jmax */
+      { /* use dichotomy to determine largest Jmax */
           double a, b, c;
           a = 0.0;
           b = Jmax;
           while (trunc (a) != trunc (b))
-            {
+          {
               c = (a + b) * 0.5;
-              v = get_maxnorm_alg (s.fijd, I/2, c);
+              v = get_maxnorm_alg (fijd[side], I/2, c);
               if (v < maxnorm)
-                a = c;
+                  a = c;
               else
-                b = c;
-            }
+                  b = c;
+          }
           Jmax = trunc (a) + 1; /* +1 since we don't sieve for j = Jmax */
+      }
+    }
+
+  J = (unsigned int) Jmax;
+
+  return adapt_threads(__func__);
+}//}}}
+
+/* estimate_yield_in_sieve_area {{{ 
+ *
+ * Approximate the integral of
+ * dickman_rho(log2(F(x,y))/lpb)*dickman_rho(log2(G(x,y))/lpb), which
+ * supposedly gives an idea of the expected yield over this sieve area
+ *
+ * The integral is taken over a range of size 2^A by integrating over
+ * 2^(2N-1) points.
+ *
+ * The range is taken with width 2^(ceil(A/2)-squeeze)) times
+ * 2^(floor(A/2)+squeeze) -- actually 0-centered
+ * 
+ * Integration points are chosen as centers of *rectangles* (not
+ * squares) which are proportional to the sieve area.
+ *
+ * The shuffle[] argument can be used to specify an alternative basis
+ * (just to see)
+ */
+static double estimate_yield_in_sieve_area(cxx_double_poly const f[2], int lpb[2], int A, int shuffle[4], int squeeze, int N)
+{
+    int nx = 1 << (N - squeeze);
+    int ny = 1 << (N + squeeze);
+    double X = 1 << ((A-A/2) - squeeze);
+    double Y = 1 << (A/2     + squeeze);
+
+    double sum = 0;
+    for(int i = 0 ; i < nx ; i++) {
+        double x = -X/2 + X/nx * (i + 0.5);
+        /* We're doing half of the computation on the y axis, since
+         * it's symmetric anyway */
+        for(int j = ny / 2 ; j < ny ; j++) {
+            double y = -Y/2 + Y/ny * (j + 0.5);
+            double xs = x * shuffle[0] + y * shuffle[2];
+            double ys = x * shuffle[1] + y * shuffle[3];
+
+            // printf(" %.1f %.1f", x, y);
+            double prod = 1;
+            for(int side = 0 ; side < 2 ; side++) {
+                double z = double_poly_eval_homogeneous(f[side], xs, ys);
+                double a = log2(fabs(z));
+                double d = dickman_rho(a/lpb[side]);
+                // printf(" %d %e %e", side, z, d);
+                prod *= d;
+            }
+            // printf(" %e\n", prod);
+
+            sum += prod;
+        }
+    }
+    sum *= 1 << A;
+    sum /= 1 << (2*N - 1);
+    return sum;
+}//}}}
+
+int sieve_range_adjust::estimated_yield()
+{
+    prepare_fijd(); // side-effect of the above
+
+    /* List a few candidate matrices which can be used for distorting the
+     * sieving range.
+     *
+     * Because we are including the "swapped" matrices here, we will not
+     * investigate negative values of the squeeze parameter.
+     *
+     * It is important, though, that matrices come here in swapped pairs,
+     * since we use that to avoid part of the computation (for squeeze==0,
+     * the range is square when A is even, so swapping makes no sense).
+     */
+    int shuffle_matrices[][4] = {
+        { 1, 0, 0, 1 },
+        { 0, 1, 1, 0 },
+
+        { 1, 1, 1, 0 },
+        { 1, 0, 1, 1 },
+
+        { 1, 1, 0, -1 },
+        { 0, -1, 1, 1 },
+
+        { 1, -1, 0, 1 },
+        { 0, 1, 1, -1 },
+
+        { 1, -1, 1, 0 },
+        { 1, 0, 1, -1 },
+
+        /* We're also adding matrices with twos, although we're not really
+         * convinced it's worth it. It depends on the polynomial, anyway.
+         *
+         * On the hsnfs dlp-1024, only 15% of the special-q's among a test
+         * of 1000 find a better estimated yield with the matrices below than
+         * without.
+         */
+        { 1, 2, 0, 1 },
+        { 0, 1, 1, 2 },
+
+        { 1, -2, -1, 1 },
+        { -1, 1, 1, -2 },
+
+        { 2, 1, 1, 1 },
+        { 1, 1, 2, 1 },
+
+        { -2, 1, 1, 0 },
+        { 1, 0, -2, 1 },
+
+        { 1, 0, 2, 1 },
+        { 2, 1, 1, 0 },
+
+        { 1, 2, 1, 1 },
+        { 1, 1, 1, 2 },
+
+        { 2, -1, 1, -1 },
+        { 1, -1, 2, -1 },
+
+        { -1, 2, 0, 1 },
+        { 0, 1, -1, 2 },
+    };
+    const int nmatrices = sizeof(shuffle_matrices)/sizeof(shuffle_matrices[0]);
+#if 0
+    /*
+     * The following magma code can be used to generate the list of matrices
+     * above. I'm only slightly editing the result so that the identity
+     * matrix comes first.
+MM:=[Matrix(2,2,[a,b,c,d]):a,b,c,d in [-2..2]];
+MM:=[M:M in MM|IsUnit(Determinant(M))];
+d:=DiagonalMatrix([1,-1]);
+s:=Matrix(2,2,[0,1,1,0]);
+npos:=func<v|#[a:a in Eltseq(v)|a gt 0]>;
+bestrep:=func<s|x[i] where _,i is Max([npos(v):v in x]) where x is Setseq(s)>;
+prepr:=func<m|[Eltseq(m),Eltseq(s*m)]>;
+B:=[bestrep(a):a in {{a*b*c*x:a in {1,-1},b in {1,d},c in {1,s}}:x in MM}];
+  &cat [prepr(x):x in B];
+     */
+#endif
+
+    int lpbs[2] = { conf.sides[0].lpb, conf.sides[1].lpb };
+
+    double best_sum = 0;
+    int best_r = -1;
+    int best_squeeze = -1;
+
+    /* We integrate on 2^(2*N-1) points (well, morally 2^(2N), but we halve
+     * that by homogeneity */
+    int N = 4;
+
+    double reference = estimate_yield_in_sieve_area(fijd, lpbs,
+            logA, shuffle_matrices[0], 0, N);
+    for(int squeeze = 0 ; squeeze <= 3 ; squeeze++) {
+        for(int r = 0 ; r < nmatrices ; r++) {
+            if (squeeze == 0 && (r & 1)) continue;
+            double sum = estimate_yield_in_sieve_area(fijd, lpbs,
+                    logA, shuffle_matrices[r], squeeze, N);
+            if (sum > best_sum) {
+                best_r = r;
+                best_squeeze = squeeze;
+                best_sum = sum;
+            }
+            // printf("# estimated yield for rectangle #%d,%d : %e\n",r,squeeze,sum);
         }
     }
 
-  return (unsigned int) Jmax;
+    if (verbose)
+    printf("# adjusting rectangle by [%d,%d,%d,%d], squeeze factor %d : (%e, gain %+.2f%% over standard)\n",
+            shuffle_matrices[best_r][0],
+            shuffle_matrices[best_r][1],
+            shuffle_matrices[best_r][2],
+            shuffle_matrices[best_r][3],
+            best_squeeze,
+            best_sum, 100.0*(best_sum/ reference-1));
+
+    int *shuffle = shuffle_matrices[best_r];
+
+    int64_t na0 = shuffle[0] * Q.a0 + shuffle[1] * Q.a1;
+    int64_t na1 = shuffle[2] * Q.a0 + shuffle[3] * Q.a1;
+    int64_t nb0 = shuffle[0] * Q.b0 + shuffle[1] * Q.b1;
+    int64_t nb1 = shuffle[2] * Q.b0 + shuffle[3] * Q.b1;
+    Q.a0 = na0;
+    Q.a1 = na1;
+    Q.b0 = nb0;
+    Q.b1 = nb1;
+    logI = ((logA-logA/2) - best_squeeze);
+    J = 1 << (logA/2    + best_squeeze);
+    return adapt_threads(__func__);
 }
 
 /* return 0 if we should discard that special-q because the rounded
@@ -1477,7 +1685,7 @@ sieve_info_update_norm_data_Jmax (sieve_info & si)
  * Now for efficiency reasons, the ``minimum reasonable'' number of
  * buckets should be more than that.
  */
-int adjust_IJ(int & logI, uint32_t & J, qlattice_basis& qbasis, cado_poly_srcptr cpoly, las_todo_entry const& doing, int logA, int nb_threads)/*{{{*/
+int sieve_range_adjust::ab_plane()/*{{{*/
 {
     using namespace std;
     /* compare skewed max-norms: let u0 = [a0, b0] and u1 = [a1, b1],
@@ -1526,88 +1734,33 @@ int adjust_IJ(int & logI, uint32_t & J, qlattice_basis& qbasis, cado_poly_srcptr
      */
     const double skew = cpoly->skew;
     const double rt_skew = sqrt(skew);
-    const int verbose = 0;
     if (verbose) {
         gmp_printf("# Called sieve_info_adjust_IJ((a0=%" PRId64 "; b0=%" PRId64
                "; a1=%" PRId64 "; b1=%" PRId64 "), p=%Zd, skew=%f, nb_threads=%d)\n",
-               qbasis.a0, qbasis.b0, qbasis.a1, qbasis.b1,
+               Q.a0, Q.b0, Q.a1, Q.b1,
                (mpz_srcptr) doing.p, skew, nb_threads);
     }
-    if (qbasis.skewed_norm0(skew) > qbasis.skewed_norm1(skew)) {
+    if (Q.skewed_norm0(skew) > Q.skewed_norm1(skew)) {
         /* exchange u0 and u1, thus I and J */
-        swap(qbasis.a0, qbasis.a1);
-        swap(qbasis.b0, qbasis.b1);
+        swap(Q.a0, Q.a1);
+        swap(Q.b0, Q.b1);
     }
-    double maxab1 = MAX(abs(qbasis.a1) / rt_skew, abs(qbasis.b1) * rt_skew);
+    double maxab1 = MAX(abs(Q.a1) / rt_skew, abs(Q.b1) * rt_skew);
     double B = sqrt (2.0 * mpz_get_d(doing.p) / sqrt (3.0));
 
     uint32_t I = 1UL << ((logA+1)/2);
     J = 1UL << ((logA-1)/2);
     J = (uint32_t) (B / maxab1 * (double) J);
 
-    const enum { IJ_OLD, IJ_NEW } ij_strategy = IJ_OLD;
+    /* make sure J does not exceed I/2 */
+    J = MIN((uint32_t) J, I >> 1);
+    logI = (logA + 1) / 2;
 
-    if (ij_strategy == IJ_NEW) {
-        double Id = I;
-        double Jd = J;
+    return adapt_threads(__func__);
+}/*}}}*/
 
-        double scale = sqrt(pow(2,logA)/Id/Jd);
-        Id *= scale;
-        Jd *= scale;
-
-        printf("# We would like to set I=%f and J=%f so as to get a %d-bit sieve area\n", Id, Jd, logA);
-
-        /* We're going to adjust one of the two to the nearest power of
-         * two, and let that be the new I.
-         *
-         * Not clear what we want to do with the adjustment of the other
-         * dimension, though.
-         *
-         * We want both I and J to be smaller than 2^16, eventually
-         * (given the present limitation of the code).
-         */
-
-        int IJadj[4][3]={
-            { (int) ceil(log2(Id)),  (int) Jd, 0},
-            { (int) floor(log2(Id)), (int) Jd, 0},
-            { (int) ceil(log2(Jd)),  (int) Id, 1},
-            { (int) floor(log2(Jd)), (int) Id, 1},
-        };
-        int nij=0;
-            
-        printf("# candidates:");
-        for(int i = 0 ; i < 4 ; i++) {
-            int logI = IJadj[i][0];
-            int J = IJadj[i][1];
-            int swap = IJadj[i][2];
-
-            printf(" %d*%d%s", 1<<logI, J, swap ? ",swapped" : "");
-            if (logI > 16) {
-                printf("(too large)");
-                continue;
-            }
-            memcpy(IJadj + nij, IJadj + i, sizeof(IJadj[i]));
-            nij++;
-        }
-        printf("\n");
-
-        memset(IJadj + nij, 0, (4-nij) * sizeof(IJadj[0]));
-        {
-            int i = 2;
-            if (IJadj[i][2]) {
-                swap(qbasis.a0, qbasis.a1);
-                swap(qbasis.b0, qbasis.b1);
-            }
-            J = IJadj[i][1];
-            logI = IJadj[i][0];
-            I = 1 << logI;
-        }
-    } else {
-        /* make sure J does not exceed I/2 */
-        J = MIN(J, I >> 1);
-        logI = (logA + 1) / 2;
-    }
-
+int sieve_range_adjust::adapt_threads(const char * origin)
+{
     /* Make sure the bucket region size divides the sieve region size,
        partly covered bucket regions may lead to problems when
        reconstructing p from half-empty buckets. */
@@ -1619,12 +1772,11 @@ int adjust_IJ(int & logI, uint32_t & J, qlattice_basis& qbasis, cado_poly_srcptr
     /* Bug 15617: if we round up, we are not true to our promises */
     uint32_t nJ = (J / i) * i; /* Round down to multiple of i */
 
-    if (verbose) printf("# %s(): Final J=%" PRIu32 "\n", __func__, nJ);
+    if (verbose) printf("# %s(): Final J=%" PRIu32 "\n", origin, nJ);
     /* XXX No rounding if we intend to abort */
     if (nJ > 0) J = nJ;
     return nJ > 0;
-}/*}}}*/
-
+}
 
 /* this function initializes the scaling factors and report bounds on the
    rational and algebraic sides */
@@ -1638,8 +1790,9 @@ int adjust_IJ(int & logI, uint32_t & J, qlattice_basis& qbasis, cado_poly_srcptr
 */
 
 void
-sieve_info_update_norm_data (sieve_info& si, int nb_threads)
+sieve_info::update_norm_data()
 {
+  sieve_info& si(*this);
   int64_t H[4] = { si.qbasis.a0, si.qbasis.b0, si.qbasis.a1, si.qbasis.b1 };
 
   double step, begin;
@@ -1649,8 +1802,7 @@ sieve_info_update_norm_data (sieve_info& si, int nb_threads)
    * get_maxnorm_alg(). */
   for (int side = 0; side < 2; side++) {
       sieve_info::side_info& s(si.sides[side]);
-      mpz_poly_ptr ps = si.cpoly->pols[side];
-      mpz_poly_homography (s.fij, ps, H);
+      mpz_poly_homography (s.fij, si.cpoly->pols[side], H);
       if (si.conf.side == side) {
           ASSERT_ALWAYS(mpz_poly_divisible_mpz(s.fij, si.doing.p));
           mpz_poly_divexact_mpz(s.fij, s.fij, si.doing.p);
@@ -1658,25 +1810,15 @@ sieve_info_update_norm_data (sieve_info& si, int nb_threads)
       double_poly_set_mpz_poly(s.fijd, s.fij);
   }
 
-
   for (int side = 0; side < 2; ++side) {
       sieve_info::side_info& sis(si.sides[side]);
-
-#ifdef SMART_NORM
-    /* Compute the roots of the polynomial F(i,1) and the roots of its
-     * inflection points d^2(F(i,1))/d(i)^2. Used in
-     * init_smart_degree_X_norms_bucket_region_internal.  */
-    if (si.cpoly->pols[side]->deg >= 2)
-      init_norms_roots (si, side);
-#endif
-
     /* Compute the maximum norm of the polynomial over the sieve region.
        The polynomial coefficient in fijd are already divided by q
        on the special-q side. */
     sis.logmax = log2(get_maxnorm_alg (si.sides[side].fijd, (double)si.I/2, (double)si.I/2));
 
     /* we know that |F(a,b)| < 2^(logmax) or |F(a,b)/q| < 2^(logmax)
-       depending on sqsis. 0 */
+       depending on the special-q side. */
     /* we increase artificially 'logmax', to allow larger values of J */
     sis.logmax += 2.0;
     maxlog2 = sis.logmax;
@@ -1713,18 +1855,11 @@ sieve_info_update_norm_data (sieve_info& si, int nb_threads)
             "not make sense (capped to limit)\n", max_lambda, side);
     }
   }
-
-  /* improve bound on J if possible */
-  unsigned int Jmax;
-  Jmax = sieve_info_update_norm_data_Jmax (si);
-  if (Jmax > si.J)
-    {
-      /* see adjust_IJ */
-      ASSERT_ALWAYS(LOG_BUCKET_REGION >= si.logI);
-      uint32_t i = 1U << (LOG_BUCKET_REGION - si.logI);
-      i *= nb_threads;
-      si.J = (Jmax / i) * i; /* cannot be zero since the previous value
-                                 of si.J was already a multiple of i,
-                                 and this new value is larger */
-    }
 }
+
+void sieve_range_adjust::set_minimum_J_anyway()
+{
+    J = nb_threads << (LOG_BUCKET_REGION - logI);
+}
+
+/*}}}*/

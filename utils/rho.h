@@ -1,3 +1,6 @@
+#ifndef RHO_H_
+#define RHO_H_
+
 /* Header file for rho.c.
 
 Copyright 2010 Paul Zimmermann
@@ -19,5 +22,15 @@ along with CADO-NFS; see the file COPYING.  If not, write to the Free Software
 Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 */
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 double dickman_rho (double x);
 double dickman_rho_local (double x, double N);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif	/* RHO_H_ */

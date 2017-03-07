@@ -53,9 +53,10 @@ double_poly_eval (double_poly_srcptr p, const double x)
   double r;
   unsigned int k;
   const double *f = p->coeff;
-  const unsigned int deg = p->deg;
+  int deg = p->deg;
 
   switch (deg) {
+  case -1: return 0;
   case 0: return f[0];
   case 1: return f[0]+x*f[1];
   case 2: return f[0]+x*(f[1]+x*f[2]);
@@ -68,6 +69,29 @@ double_poly_eval (double_poly_srcptr p, const double x)
   case 9: return f[0]+x*(f[1]+x*(f[2]+x*(f[3]+x*(f[4]+x*(f[5]+x*(f[6]+x*(f[7]+x*(f[8]+x*f[9]))))))));
   default: for (r = f[deg], k = deg - 1; k != UINT_MAX; r = r * x + f[k--]); return r;
   }
+}
+
+/* Evaluate the polynomial p at x:y */
+double
+double_poly_eval_homogeneous (double_poly_srcptr p, double x, double y)
+{
+  const double * f = p->coeff;
+  int deg = p->deg;
+ 
+  switch (deg) {
+  case -1: return 0;
+  case 0: return f[0];
+  case 1: return y*f[0]+x*f[1];
+  case 2: return y*y*f[0]+x*(y*f[1]+x*f[2]);
+  }
+
+  double s = 0;
+  double px = 1;
+  for(int k = 0 ; k <= deg ; k++) {
+      s = s * y + f[k] * px;
+      px = px * x;
+  }
+  return s;
 }
 
 /* return e and set r such that r*2^e = x */
@@ -90,7 +114,7 @@ mpz_set_d_exp (mpz_t r, double x)
 /* Same as double_poly_eval, but uses arbitrary precision to avoid
    cancellations */
 double
-double_poly_eval_safe (double_poly_srcptr p, const double x)
+double_poly_eval_safe (double_poly_srcptr p, double x)
 {
   mpz_t xm, vm, fm;
   long xe, ve, fe;

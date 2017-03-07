@@ -150,6 +150,5 @@ SkewGauss (qlattice_basis &basis, const mpz_t p, const mpz_t r,
     mpz_clear (a[1]);
     mpz_clear (b[0]);
     mpz_clear (b[1]);
-    /* FIXME: That error convention looks odd */
-    return fits ? 0 : 1;
+    return fits ? 1 : 0;
 }

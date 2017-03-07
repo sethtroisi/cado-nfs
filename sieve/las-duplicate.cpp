@@ -90,7 +90,7 @@ compute_a_over_b_mod_p(mpz_t r, const int64_t a, const uint64_t b, const mpz_t p
 sieve_info *
 fill_in_sieve_info(las_todo_entry const & doing,
                    uint32_t I, uint32_t J,
-                   cado_poly_ptr cpoly, siever_config const & conf)
+                   cado_poly_ptr cpoly, siever_config const & conf, int nb_threads)
 {
   sieve_info * x = new sieve_info;
 
@@ -105,8 +105,16 @@ fill_in_sieve_info(las_todo_entry const & doing,
       new_si.init_norm_data(side);
   }
   new_si.doing = doing;
-  SkewGauss(new_si.qbasis, new_si.doing.p, new_si.doing.r, new_si.cpoly->skew);
-  adjust_IJ(new_si);
+
+  sieve_range_adjust Adj(doing, cpoly, conf, nb_threads);
+  Adj.SkewGauss();
+  if (!Adj.ab_plane()) {
+      delete x;
+      return NULL;
+  }
+  Adj.sieve_info_update_norm_data_Jmax();
+  new_si.I = 1UL << Adj.logI;
+  new_si.J = Adj.J;
 
   return x;
 }
@@ -114,7 +122,8 @@ fill_in_sieve_info(las_todo_entry const & doing,
 
 static sieve_info *
 fill_in_sieve_info_from_si(const unsigned long p, int side,
-        const int64_t a, const uint64_t b, sieve_info & old_si)
+        const int64_t a, const uint64_t b, sieve_info & old_si,
+        int nb_threads)
 {
   mpz_t sq, rho;
   mpz_init_set_ui(sq, p);
@@ -124,7 +133,9 @@ fill_in_sieve_info_from_si(const unsigned long p, int side,
   mpz_clear(sq);
   mpz_clear(rho);
   sieve_info * x = fill_in_sieve_info(doing, old_si.I, old_si.J,
-                            old_si.cpoly, old_si.conf);
+                            old_si.cpoly, old_si.conf, nb_threads);
+  if (x == NULL)
+      return NULL;
   x->strategies = old_si.strategies;
   return x;
 }
@@ -234,7 +245,7 @@ sq_finds_relation(const unsigned long sq, const int sq_side,
 {
   mpz_array_t *f[2] = { NULL, }; /* Factors of the relation's norms */
   uint32_array_t *m[2] = { NULL, }; /* corresponding multiplicities */
-  mpz_t cof[2];
+  cxx_mpz cof[2];
   int is_dupe = 1; /* Assumed dupe until proven innocent */
   sieve_info * psi;
   const size_t max_large_primes = 10;
@@ -259,7 +270,6 @@ sq_finds_relation(const unsigned long sq, const int sq_side,
         }
       }
     }
-    mpz_init(cof[side]);
     /* Compute the cofactor, dividing by sq on the special-q side */
     compute_cofactor(cof[side], side == sq_side ? sq : 0, large_primes[side], nr_lp[side]);
   }
@@ -267,23 +277,22 @@ sq_finds_relation(const unsigned long sq, const int sq_side,
   // si = get_sieve_info_from_config(las, sc, pl);
   /* Create a dummy sieve_info struct with just enough info to let us use
      the lattice-reduction and coordinate-conversion functions */
-  psi = fill_in_sieve_info_from_si (sq, sq_side, rel.a, rel.b, old_si);
+  psi = fill_in_sieve_info_from_si (sq, sq_side, rel.a, rel.b, old_si, nb_threads);
+  if (!psi) {
+      /* If resulting optimal J is so small that it's not worth sieving,
+         this special-q gets skipped, so relation is not a duplicate */
+      verbose_output_print(0, VERBOSE_LEVEL, "# DUPECHECK J too small\n");
+      is_dupe = 0;
+      return is_dupe;
+  }
+
   sieve_info & si(*psi);
   const unsigned long r = mpz_get_ui(si.doing.r);
 
   const uint32_t oldI = si.I, oldJ = si.J;
   uint32_t I, J; /* Can't declare further down due to goto :( */
 
-  /* If resulting optimal J is so small that it's not worth sieving,
-     this special-q gets skipped, so relation is not a duplicate */
-  if (adjust_IJ(si, nb_threads) == 0)
-  {
-    verbose_output_print(0, VERBOSE_LEVEL, "# DUPECHECK J too small\n");
-    is_dupe = 0;
-    goto clear_and_exit;
-  }
-
-  sieve_info_update_norm_data(si, nb_threads);
+  si.update_norm_data();
 
   verbose_output_print(0, VERBOSE_LEVEL, "# DUPECHECK Checking if relation (a,b) = (%" PRId64 ",%" PRIu64 ") is a dupe of sieving special-q -q0 %lu -rho %lu\n", rel.a, rel.b, sq, r);
   verbose_output_print(0, VERBOSE_LEVEL, "# DUPECHECK Using special-q basis a0=%" PRId64 "; b0=%" PRId64 "; a1=%" PRId64 "; b1=%" PRId64 "\n", si.qbasis.a0, si.qbasis.b0, si.qbasis.a1, si.qbasis.b1);
@@ -339,7 +348,8 @@ sq_finds_relation(const unsigned long sq, const int sq_side,
       m[side] = alloc_uint32_array (1);
   }
 
-  pass = factor_both_leftover_norms(cof, f, m, si);
+  // ok, the cast is despicable
+  pass = factor_both_leftover_norms((mpz_t*)cof, f, m, si);
 
   if (pass <= 0)
     verbose_output_vfprint(0, VERBOSE_LEVEL, gmp_vfprintf, "# DUPECHECK norms not both smooth, left over factors: %Zd, %Zd\n", cof[0], cof[1]);
@@ -356,8 +366,6 @@ sq_finds_relation(const unsigned long sq, const int sq_side,
 
 clear_and_exit:
   delete psi;
-  mpz_clear(cof[0]);
-  mpz_clear(cof[1]);
 
   return is_dupe;
 }

@@ -116,7 +116,7 @@ void siever_config_display(siever_config const & sc)/*{{{*/
     }
 }/*}}}*/
 
-siever_config las_info::get_config_for_q(las_todo_entry const & doing)/*{{{*/
+siever_config las_info::get_config_for_q(las_todo_entry const & doing) const /*{{{*/
 {
     // arrange so that we don't have the same header line as the one
     // which prints the q-lattice basis
@@ -136,7 +136,7 @@ siever_config las_info::get_config_for_q(las_todo_entry const & doing)/*{{{*/
     /* Do we have a hint table with specifically tuned parameters,
      * well suited to this problem size ? */
     for(unsigned int i = 0 ; i < hint_table.size() ; i++) {
-        siever_config & sc(hint_table[i].conf);
+        siever_config const & sc(hint_table[i].conf);
         if (!sc.has_same_config_q(config)) continue;
         verbose_output_print(0, 1, "# Using parameters from hint list for q~2^%d on side %d [%d@%d]\n", sc.bitsize, sc.side, sc.bitsize, sc.side);
         config = sc;
@@ -162,6 +162,29 @@ siever_config las_info::get_config_for_q(las_todo_entry const & doing)/*{{{*/
             exit(EXIT_FAILURE);
         }
     }
+
+    if (doing.iteration) {
+        verbose_output_print(0, 1, "#\n# NOTE:"
+                " we are re-playing this special-q because of"
+                " %d previous failed attempt(s)\n", doing.iteration);
+        /* update sieving parameters here */
+        double ratio = double(config.sides[0].mfb) /
+            double(config.sides[0].lpb);
+        config.sides[0].lpb += doing.iteration;
+        config.sides[0].mfb = ratio*config.sides[0].lpb;
+        ratio = double(config.sides[1].mfb) /
+            double(config.sides[1].lpb);
+        config.sides[1].lpb += doing.iteration;
+        config.sides[1].mfb = ratio*config.sides[1].lpb;
+        verbose_output_print(0, 1,
+                "# NOTE: current values of lpb/mfb: %d,%d %d,%d\n#\n", 
+                config.sides[0].lpb,
+                config.sides[0].mfb,
+                config.sides[1].lpb,
+                config.sides[1].mfb);
+    }
+
+
     return config;
 }/*}}}*/
 
@@ -268,10 +291,19 @@ sieve_info::sieve_info(las_info & las, siever_config const & sc, param_list pl, 
     }
 }/*}}}*/
 
-static void sieve_info_update (sieve_info & si, int nb_threads, const size_t nr_workspaces)/*{{{*/
+void sieve_info::update (size_t nr_workspaces)/*{{{*/
 {
-  /* essentially update the fij polynomials and J value */
-  sieve_info_update_norm_data(si, nb_threads);
+    sieve_info & si(*this);
+
+#ifdef SMART_NORM
+        /* Compute the roots of the polynomial F(i,1) and the roots of its
+         * inflection points d^2(F(i,1))/d(i)^2. Used in
+         * init_smart_degree_X_norms_bucket_region_internal.  */
+        for(int side = 0 ; side < 2 ; side++) {
+            if (si.cpoly->pols[side]->deg >= 2)
+                init_norms_roots (si, side);
+        }
+#endif
 
   /* update number of buckets at toplevel */
   uint64_t BRS[FB_MAX_PARTS] = BUCKET_REGIONS;
@@ -306,7 +338,6 @@ static void sieve_info_update (sieve_info & si, int nb_threads, const size_t nr_
       }
       sis.fb->make_slices(sis.scale * LOG_SCALE, max_weight);
   }
-
 }/*}}}*/
 
 /* las_info stuff */
@@ -2895,25 +2926,15 @@ int main (int argc0, char *argv0[])/*{{{*/
 
         ASSERT_ALWAYS(mpz_poly_is_root(las.cpoly->pols[doing.side], doing.r, doing.p));
 
-        /* See whether for this size of special-q, we have predefined
-         * parameters (note: we're copying the default config, and then
-         * we replace by an adjusted one if needed). */
-        siever_config current_config = las.get_config_for_q(doing);
-
         SIBLING_TIMER(timer_special_q, "skew Gauss");
 
-        qlattice_basis qbasis;
+        sieve_range_adjust Adj(doing, las);
 
-        if (SkewGauss (qbasis, doing.p, doing.r, las.cpoly->skew) != 0)
+        if (!Adj.SkewGauss())
             continue;
 
-        /* check |a0|, |a1| < 2^31 if we use fb_root_in_qlattice_31bits */
 #ifndef SUPPORT_LARGE_Q
-        if (qbasis.a0 <= INT64_C(-2147483648) ||
-            qbasis.a0 >= INT64_C( 2147483648) ||
-            qbasis.a1 <= INT64_C(-2147483648) ||
-            qbasis.a1 >= INT64_C( 2147483648))
-        {
+        if (!Adj.Q.fits_31bits()) { // for fb_root_in_qlattice_31bits
             fprintf (stderr,
                     "Warning, special-q basis is too skewed,"
                     " skipping this special-q."
@@ -2922,16 +2943,13 @@ int main (int argc0, char *argv0[])/*{{{*/
         }
 #endif
 
-        int logI, A;
-#if 0
-        A = current_config.logA;
-#else
-        A = 2 * current_config.logI - 1;
-#endif
-        uint32_t J;
-        if (adjust_IJ(logI, J, qbasis, las.cpoly, doing, A, las.nb_threads) == 0) {
+        /* Try strategies for adopting the sieving range */
+
+        int should_discard = !Adj.ab_plane();
+
+        if (should_discard) {
             if (never_discard) {
-                J = las.nb_threads << (LOG_BUCKET_REGION - logI);
+                Adj.set_minimum_J_anyway();
             } else {
                 verbose_output_vfprint(0, 1, gmp_vfprintf,
                         "# "
@@ -2947,51 +2965,29 @@ int main (int argc0, char *argv0[])/*{{{*/
                         "; a1=%" PRId64
                         "; b1=%" PRId64
                         "; raw_J=%u;\n", 
-                        qbasis.a0, qbasis.b0, qbasis.a1, qbasis.b1, J);
+                        Adj.Q.a0, Adj.Q.b0, Adj.Q.a1, Adj.Q.b1, Adj.J);
                 nr_sq_discarded++;
                 continue;
             }
         }
-#if 0
-        current_config.logI_adjusted = logI;
-#else
-        current_config.logI = logI;
-#endif
+
+        Adj.sieve_info_update_norm_data_Jmax();
 
         /* done with skew gauss ! */
+
         BOOKKEEPING_TIMER(timer_special_q);
 
-        if (doing.iteration) {
-            verbose_output_print(0, 1, "#\n# NOTE:"
-                    " we are re-playing this special-q because of"
-                    " %d previous failed attempt(s)\n", doing.iteration);
-            /* update sieving parameters here */
-            double ratio = double(current_config.sides[0].mfb) /
-                double(current_config.sides[0].lpb);
-            current_config.sides[0].lpb += doing.iteration;
-            current_config.sides[0].mfb = ratio*current_config.sides[0].lpb;
-            ratio = double(current_config.sides[1].mfb) /
-                double(current_config.sides[1].lpb);
-            current_config.sides[1].lpb += doing.iteration;
-            current_config.sides[1].mfb = ratio*current_config.sides[1].lpb;
-            verbose_output_print(0, 1,
-                    "# NOTE: current values of lpb/mfb: %d,%d %d,%d\n#\n", 
-                    current_config.sides[0].lpb,
-                    current_config.sides[0].mfb,
-                    current_config.sides[1].lpb,
-                    current_config.sides[1].mfb);
-        }
-
         /* Maybe create a new siever ? */
-        sieve_info & si(get_sieve_info_from_config(las, current_config, pl));
+        sieve_info & si(get_sieve_info_from_config(las, Adj.config(), pl));
 
         /* This mess should be cleaned! XXX */
         si.doing = doing;
-        si.qbasis = qbasis;
+        si.qbasis = Adj.Q;
         si.qbasis.set_q(doing.p, doing.prime_sq);
-        si.logI = logI;
-        si.I = 1UL << logI;
-        si.J = J;
+        si.logI = Adj.logI;
+        si.I = 1UL << Adj.logI;
+        si.J = Adj.J;
+
         if (!si.qbasis.prime_sq) {
             si.qbasis.prime_factors = doing.prime_factors;
         }
@@ -2999,8 +2995,10 @@ int main (int argc0, char *argv0[])/*{{{*/
         /* checks the value of J,
          * precompute the skewed polynomials of f(x) and g(x), and also
          * their floating-point versions */
-        sieve_info_update (si, las.nb_threads, nr_workspaces);
+
         totJ += (double) si.J;
+
+
 
         WHERE_AM_I_UPDATE(w, psi, &si);
 
@@ -3017,10 +3015,10 @@ int main (int argc0, char *argv0[])/*{{{*/
                              (mpz_srcptr) si.doing.p,
                              (mpz_srcptr) si.doing.r);
 
-        verbose_output_print(0, 1, " a0=%" PRId64 "; b0=%" PRId64 "; a1=%" PRId64 "; b1=%" PRId64 "; raw_J=%u; J=%u;",
+        verbose_output_print(0, 1, " a0=%" PRId64 "; b0=%" PRId64 "; a1=%" PRId64 "; b1=%" PRId64 "; J=%u;",
                              si.qbasis.a0, si.qbasis.b0,
                              si.qbasis.a1, si.qbasis.b1,
-                             J, si.J);
+                             si.J);
         if (si.doing.depth) {
             verbose_output_print(0, 1, " # within descent, currently at depth %d", si.doing.depth);
         }
@@ -3039,6 +3037,16 @@ int main (int argc0, char *argv0[])/*{{{*/
             verbose_output_print (0, 1, "# f_1'(x) = ");
             mpz_poly_fprintf(las.output, si.sides[1].fij);
         }
+
+        /* essentially update the fij polynomials and the max log bounds */
+        si.update_norm_data();
+
+        /* Now we're ready to sieve. We have to refresh some fields
+         * in the sieve_info structure, otherwise we'll be polluted by
+         * the leftovers from earlier runs.
+         */
+        si.update(nr_workspaces);
+
 
 #ifdef TRACE_K
         init_trace_k(si, pl);

@@ -257,14 +257,17 @@ struct sieve_info {
 
     /* in las-unsieve.cpp */
     /* Data for divisibility tests p|i in lines where p|j */
-    /* This gets initialized only when J is finally decided (after
-     * sieve_info_update) */
+    /* This gets initialized only when J is finally decided. */
     j_divisibility_helper j_div;
     void init_j_div() { j_div = j_divisibility_helper(J); }
 
     /* in las-cofactor.cpp */
     std::shared_ptr<facul_strategies_t> strategies;
     void init_strategies(param_list_ptr pl);
+
+    /* These functions must be called before actually sieving */
+    void update_norm_data();
+    void update (size_t nr_workspaces);
 
     sieve_info(las_info &, siever_config const &, param_list_ptr, int is_default = 0);
     sieve_info() {
@@ -367,9 +370,72 @@ struct las_info : private NonCopyable {
     las_info(param_list_ptr);
     ~las_info();
 
-    siever_config get_config_for_q(las_todo_entry const&);
+    siever_config get_config_for_q(las_todo_entry const&) const;
 };
 /* }}} */
+
+class sieve_range_adjust {
+    static const int verbose = 0;
+
+    las_todo_entry doing;
+    siever_config conf;         /* This "conf" field is only used for a
+                                 * few fields. In particular the
+                                 * large prime bounds. We're specifically
+                                 * *not* using the sieving fields, since
+                                 * by design these can be decided *after*
+                                 * the adjustment.  */
+    cado_poly_srcptr cpoly;
+    int nb_threads;
+    cxx_double_poly fijd[2];
+    int logA;
+public:
+    int logI;
+    int J;
+    qlattice_basis Q;
+
+    sieve_range_adjust(las_todo_entry const & doing, las_info const & las)
+        : doing(doing), cpoly(las.cpoly), nb_threads(las.nb_threads)
+    {
+        /* See whether for this size of special-q, we have predefined
+         * parameters (note: we're copying the default config, and then
+         * we replace by an adjusted one if needed). */
+        conf = las.get_config_for_q(doing);
+        /* These two will be adjusted in the process */
+        logA = 2*conf.logI-1;
+        logI = J = 0;
+    }
+    /* This is only for desperate cases. In las-duplicates, for the
+     * moment it seems that we're lacking the las_info structure... */
+    sieve_range_adjust(las_todo_entry const & doing, cado_poly_srcptr cpoly, siever_config const & conf, int nb_threads = 1)
+        : doing(doing), conf(conf), cpoly(cpoly), nb_threads(nb_threads)
+    {
+        logA = 2*conf.logI-1;
+        logI = J = 0;
+    }
+
+
+    int SkewGauss() { return ::SkewGauss(Q, doing.p, doing.r, cpoly->skew); }
+
+    /* There are three strategies to do a post-SkewGauss adjustment of
+     * the q-lattice basis.  */
+
+    /* implementation is in las-norms.cpp */
+    // all these functions return 0 if they feel that the special-q
+    // should be discarded.
+    int ab_plane();    // "raw" J.
+    int sieve_info_update_norm_data_Jmax();
+    int estimated_yield();
+
+    // a fall-back measure for desperate cases.
+    // XXX when estimated_yield() wins, this will probably no longer be
+    // necessary.
+    void set_minimum_J_anyway();
+
+    siever_config const& config() const { return conf; }
+private:
+    void prepare_fijd();
+    int adapt_threads(const char *);
+};
 
 enum {
   OUTPUT_CHANNEL,
