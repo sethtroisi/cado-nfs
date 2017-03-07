@@ -101,9 +101,6 @@ fill_in_sieve_info(las_todo_entry const & doing,
   new_si.cpoly = cpoly;
   new_si.conf = conf;
   new_si.conf.side = doing.side;
-  for(int side = 0 ; side < 2 ; side++) {
-      new_si.init_norm_data(side);
-  }
   new_si.doing = doing;
 
   sieve_range_adjust Adj(doing, cpoly, conf, nb_threads);

@@ -210,11 +210,6 @@ sieve_info::sieve_info(las_info & las, siever_config const & sc, param_list pl, 
     J = I >> 1;
 #endif
 
-    /* Allocate memory for transformed polynomials */
-    for(int s = 0 ; s < 2 ; s++) {
-        init_norm_data(s);
-    }
-
     /* This function in itself is too expensive if called often.
      * In the descent, where we initialize a sieve_info for each pair
      * (bitsize_of_q, side), we would call it dozens of time.

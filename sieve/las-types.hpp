@@ -241,14 +241,6 @@ struct sieve_info {
     /* in las-trialdiv.cpp */
     void init_trialdiv(int side);
 
-    /* in las-norms.cpp */
-    /* This prepares the auxiliary data which is used by
-     * init_rat_norms_bucket_region and init_alg_norms_bucket_region
-     *
-     * should move to side_info.
-     */
-    void init_norm_data(int side);
-
     /* in las-unsieve.cpp */
     /* Data for unsieving locations where gcd(i,j) > 1 */
     /* This gets initialized only when I is finally decided */

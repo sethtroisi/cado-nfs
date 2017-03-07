@@ -1385,12 +1385,6 @@ get_maxnorm_alg (double_poly_srcptr src_poly, const double X, const double Y)
   return max_norm;
 }
 
-void sieve_info::init_norm_data(int side)
-{
-    abort();    // we should probably get rid of that function, I guess.
-    sides[side].fij = cxx_mpz_poly(cpoly->pols[side]->deg);
-}
-
 /* {{{ various strategies to adjust the sieve area */
 
 void sieve_range_adjust::prepare_fijd()
