@@ -959,16 +959,16 @@ void sieve_small_bucket_region(unsigned char *S, int N,
                 i0 -= I; linestart += I; S_ptr += I;
                 j++;
             }
+            if (j < nj) i0 &= (p-1);
             for( ; j < nj ; j+= 2) {
-                i0 &= (p-1);
                 for (unsigned int i = i0; i < I; i += p) {
                     WHERE_AM_I_UPDATE(w, x, (j << si.conf.logI_adjusted) + i);
                     sieve_increase (S_ptr + i, logp, w);
                 }
                 // odd lines only.
-                i0 = ((i0 + (r << 1)) & (p - 1)) + (2 << si.conf.logI_adjusted);
-                i0 -= I; linestart += I; S_ptr += I;
-                i0 -= I; linestart += I; S_ptr += I;
+                i0 = (i0 + (r << 1)) & (p - 1);
+                linestart += I; S_ptr += I;
+                linestart += I; S_ptr += I;
             }
             if (j > nj) i0 += I;
             ssdpos[k] = i0;
