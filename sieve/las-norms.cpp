@@ -1842,7 +1842,7 @@ sieve_info::update_norm_data()
     /* Compute the maximum norm of the polynomial over the sieve region.
        The polynomial coefficient in fijd are already divided by q
        on the special-q side. */
-    sis.logmax = log2(get_maxnorm_alg (si.sides[side].fijd, (double)si.I/2, (double)si.I/2));
+    sis.logmax = log2(get_maxnorm_alg (si.sides[side].fijd, (double)si.I/2, (double)si.J));
 
     /* we know that |F(a,b)| < 2^(logmax) or |F(a,b)/q| < 2^(logmax)
        depending on the special-q side. */
