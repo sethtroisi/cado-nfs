@@ -57,6 +57,7 @@ int recursive_descent = 0;
 int prepend_relation_time = 0;
 int exit_after_rel_found = 0;
 int allow_largesq = 0;
+int adjust_strategy = 0;
 
 double general_grace_time_ratio = DESCENT_DEFAULT_GRACE_TIME_RATIO;
 
@@ -409,7 +410,6 @@ void las_info::init_hint_table(param_list_ptr pl)/*{{{*/
         char letter MAYBE_UNUSED = *x;
         for( ; *x && !isdigit(*x) ; x++) ;
         z = strtoul(x, &x, 10); ASSERT_ALWAYS(z > 0);
-#if 0
         if (letter == 'I') {
             sc.logA = 2*z-1;
         } else if (letter == 'A') {
@@ -418,9 +418,6 @@ void las_info::init_hint_table(param_list_ptr pl)/*{{{*/
             fprintf(stderr, "%s: parse error (want I= or A=) at %s\n", filename, line);
             exit(EXIT_FAILURE);
         }
-#else
-        sc.logI = z;
-#endif
         
         for(int s = 0 ; s < 2 ; s++) {
             for( ; *x && isspace(*x) ; x++) ;
@@ -2701,6 +2698,7 @@ static void declare_usage(param_list pl)/*{{{*/
   param_list_decl_usage(pl, "bkmult", "multiplier to use for taking margin in the bucket allocation\n");
   param_list_decl_usage(pl, "unsievethresh", "Unsieve all p > unsievethresh where p|gcd(a,b)");
 
+  param_list_decl_usage(pl, "adjust-strategy", "strategy used to adapt the sieving range to the q-lattice basis (0 = logI constant, J so that bounday is capped; 1 = logI constant, (a,b) plane norm capped; 2 = logI dynamic, skewed basis) ; default=0");
   param_list_decl_usage(pl, "allow-largesq", "(switch) allows large special-q, e.g. for a DL descent");
   param_list_decl_usage(pl, "exit-early", "once a relation has been found, go to next special-q (value==1), or exit (value==2)");
   param_list_decl_usage(pl, "stats-stderr", "(switch) print stats to stderr in addition to stdout/out file");
@@ -2750,6 +2748,7 @@ int main (int argc0, char *argv0[])/*{{{*/
     unsigned long nr_sq_discarded = 0;
     int never_discard = 0;      /* only enabled for las_descent */
     double totJ = 0.0;
+    double totlogI = 0.0;
     int argc = argc0;
     char **argv = argv0;
     double max_full = 0.;
@@ -2802,6 +2801,7 @@ int main (int argc0, char *argv0[])/*{{{*/
         exit(EXIT_FAILURE);
     }
 
+    param_list_parse_int(pl, "adjust-strategy", &adjust_strategy);
     param_list_parse_int(pl, "exit-early", &exit_after_rel_found);
 #if DLP_DESCENT
     param_list_parse_double(pl, "grace-time-ratio", &general_grace_time_ratio);
@@ -2968,9 +2968,14 @@ int main (int argc0, char *argv0[])/*{{{*/
             }
         }
 
-        Adj.sieve_info_update_norm_data_Jmax();
+        /* With adjust_strategy == 2, we want to display the other
+         * values, too. Also, strategy 0 wants strategy 1 to run first.
+         */
+        if (adjust_strategy != 1)
+            Adj.sieve_info_update_norm_data_Jmax();
 
-        // Adj.estimated_yield();
+        if (adjust_strategy == 2)
+            Adj.estimated_yield();
 
         siever_config conf = Adj.config();
         conf.logI_adjusted = Adj.logI;
@@ -2989,6 +2994,7 @@ int main (int argc0, char *argv0[])/*{{{*/
          * their floating-point versions */
 
         totJ += (double) si.J;
+        totlogI += (double) si.conf.logI_adjusted;
 
 
         WHERE_AM_I_UPDATE(w, psi, &si);
@@ -3353,8 +3359,13 @@ int main (int argc0, char *argv0[])/*{{{*/
 
     t0 = seconds () - t0;
     wct = wct_seconds() - wct;
-    verbose_output_print (2, 1, "# Average J=%1.0f for %lu special-q's, max bucket fill %f\n",
-            totJ / (double) nr_sq_processed, nr_sq_processed, max_full);
+    if (adjust_strategy < 2) {
+        verbose_output_print (2, 1, "# Average J=%1.0f for %lu special-q's, max bucket fill %f\n",
+                totJ / (double) nr_sq_processed, nr_sq_processed, max_full);
+    } else {
+        verbose_output_print (2, 1, "# Average logI=%1.0f for %lu special-q's, max bucket fill %f\n",
+                totlogI / (double) nr_sq_processed, nr_sq_processed, max_full);
+    }
     verbose_output_print (2, 1, "# Discarded %lu special-q's out of %u pushed\n",
             nr_sq_discarded, las.nq_pushed);
     tts = t0;

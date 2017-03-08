@@ -61,7 +61,7 @@ void sieve_info::init_factor_bases(las_info & las, param_list_ptr pl)
             tfb = seconds () - tfb;
             tfb_wct = wct_seconds () - tfb_wct;
             verbose_output_print(0, 1,
-                    "# Reading side-%d factor base of %zuMb took %1.1fs (%1.1f real)\n",
+                    "# Reading side-%d factor base of %zuMb took %1.1fs (%1.1fs real)\n",
                     side, fb[side]->size() >> 20, tfb, tfb_wct);
         } else {
             double tfb = seconds ();
