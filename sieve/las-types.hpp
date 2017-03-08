@@ -78,7 +78,7 @@ struct siever_config {
 
     bool has_same_fb_parameters(siever_config const & o) const {
         bool ok = true;
-        ok = ok && logI_adjusted == o.logI_adjusted;
+        // ok = ok && logI_adjusted == o.logI_adjusted;
         ok = ok && bucket_thresh == o.bucket_thresh;
         ok = ok && bucket_thresh1 == o.bucket_thresh1;
         ok = ok && td_thresh == o.td_thresh;
