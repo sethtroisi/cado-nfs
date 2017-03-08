@@ -116,11 +116,7 @@ fill_in_sieve_info(las_todo_entry const & doing,
   return x;
 }
 
-
-static sieve_info *
-fill_in_sieve_info_from_si(const unsigned long p, int side,
-        const int64_t a, const uint64_t b, sieve_info & old_si,
-        int nb_threads)
+las_todo_entry special_q_from_ab(const int64_t a, const uint64_t b, const unsigned long p, int side)
 {
   mpz_t sq, rho;
   mpz_init_set_ui(sq, p);
@@ -129,13 +125,9 @@ fill_in_sieve_info_from_si(const unsigned long p, int side,
   las_todo_entry doing(sq, rho, side);
   mpz_clear(sq);
   mpz_clear(rho);
-  sieve_info * x = fill_in_sieve_info(doing, old_si.I, old_si.J,
-                            old_si.cpoly, old_si.conf, nb_threads);
-  if (x == NULL)
-      return NULL;
-  x->strategies = old_si.strategies;
-  return x;
+  return doing;
 }
+
 
 /* Compute the product of the nr_lp large primes in large_primes,
    skipping sq. If sq occurs multiple times in large_primes, it is
@@ -232,9 +224,9 @@ subtract_fb_log(const unsigned char lognorm, relation const& rel,
   return new_lognorm;
 }
 
-/* Return 1 if the relation is probably a duplicate of an relation found
-   when sieving the sq described by si. Return 0 if it is probably not a
-   duplicate */
+/* Return 1 if the relation is probably a duplicate of a relation found
+ * when sieving the sq described by si. Return 0 if it is probably not a
+ * duplicate */
 int
 sq_finds_relation(const unsigned long sq, const int sq_side,
                   relation const& rel,
@@ -244,7 +236,6 @@ sq_finds_relation(const unsigned long sq, const int sq_side,
   uint32_array_t *m[2] = { NULL, }; /* corresponding multiplicities */
   cxx_mpz cof[2];
   int is_dupe = 1; /* Assumed dupe until proven innocent */
-  sieve_info * psi;
   const size_t max_large_primes = 10;
   unsigned long large_primes[2][max_large_primes];
   unsigned int nr_lp[2] = {0, 0};
@@ -271,20 +262,34 @@ sq_finds_relation(const unsigned long sq, const int sq_side,
     compute_cofactor(cof[side], side == sq_side ? sq : 0, large_primes[side], nr_lp[side]);
   }
 
-  // si = get_sieve_info_from_config(las, sc, pl);
-  /* Create a dummy sieve_info struct with just enough info to let us use
-     the lattice-reduction and coordinate-conversion functions */
-  psi = fill_in_sieve_info_from_si (sq, sq_side, rel.a, rel.b, old_si, nb_threads);
-  if (!psi) {
-      /* If resulting optimal J is so small that it's not worth sieving,
-         this special-q gets skipped, so relation is not a duplicate */
-      verbose_output_print(0, VERBOSE_LEVEL, "# DUPECHECK J too small\n");
-      is_dupe = 0;
-      return is_dupe;
+  las_todo_entry doing = special_q_from_ab(rel.a, rel.b, sq, sq_side);
+
+  sieve_range_adjust Adj(doing, old_si.cpoly, old_si.conf, nb_threads);
+
+  if (!Adj.SkewGauss() || !Adj.Q.fits_31bits() || !Adj.ab_plane()) {
+      verbose_output_print(0, VERBOSE_LEVEL, "# DUPECHECK q-lattice discarded\n");
+      return 0;
   }
 
-  sieve_info & si(*psi);
-  const unsigned long r = mpz_get_ui(si.doing.r);
+  /* We have no info as to which adjustment option is being used for the
+   * current project...
+   */
+  Adj.sieve_info_update_norm_data_Jmax();
+  siever_config conf = Adj.config();
+  conf.logI_adjusted = Adj.logI;
+
+  /* We don't have a constructor which is well adapted to our needs here.
+   * We're going to play dirty tricks, and fill out the stuff by
+   * ourselves.
+   */
+  sieve_info si;
+  si.cpoly = old_si.cpoly;
+  si.conf = conf;
+  si.I = 1UL << conf.logI_adjusted;
+  si.recover_per_sq_values(Adj);
+  si.strategies = old_si.strategies;
+
+  const unsigned long r = mpz_get_ui(doing.r);
 
   const uint32_t oldI = si.I, oldJ = si.J;
   uint32_t I, J; /* Can't declare further down due to goto :( */
@@ -362,7 +367,6 @@ sq_finds_relation(const unsigned long sq, const int sq_side,
   }
 
 clear_and_exit:
-  delete psi;
 
   return is_dupe;
 }

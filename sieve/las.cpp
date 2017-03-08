@@ -289,22 +289,6 @@ sieve_info::sieve_info(las_info & las, siever_config const & sc, param_list pl)/
 }
 /*}}}*/
 
-void sieve_info::recover_per_sq_values(sieve_range_adjust const & Adj)
-{
-    doing = Adj.doing;
-    qbasis = Adj.Q;
-    qbasis.set_q(doing.p, doing.prime_sq);
-    if (!qbasis.prime_sq) {
-        qbasis.prime_factors = doing.prime_factors;
-    }
-    ASSERT_ALWAYS(conf.logI_adjusted == Adj.logI);
-    ASSERT_ALWAYS(I == (1UL << Adj.logI));
-    J = Adj.J;
-
-    init_j_div();
-    init_unsieve_data();
-}
-
 void sieve_info::update (size_t nr_workspaces)/*{{{*/
 {
     sieve_info & si(*this);
@@ -2974,8 +2958,14 @@ int main (int argc0, char *argv0[])/*{{{*/
         if (adjust_strategy != 1)
             Adj.sieve_info_update_norm_data_Jmax();
 
-        if (adjust_strategy == 2)
+        if (adjust_strategy >= 2)
             Adj.estimated_yield();
+
+        if (adjust_strategy >= 3) {
+            /* Let's change that again. We tell the code to keep logI as
+             * it is currently. */
+            Adj.sieve_info_update_norm_data_Jmax(true);
+        }
 
         siever_config conf = Adj.config();
         conf.logI_adjusted = Adj.logI;
@@ -2988,6 +2978,9 @@ int main (int argc0, char *argv0[])/*{{{*/
         sieve_info & si(get_sieve_info_from_config(las, conf, pl));
 
         si.recover_per_sq_values(Adj);
+
+        si.init_j_div();
+        si.init_unsieve_data();
 
         /* checks the value of J,
          * precompute the skewed polynomials of f(x) and g(x), and also

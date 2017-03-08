@@ -1427,7 +1427,7 @@ void sieve_range_adjust::prepare_fijd()/*{{{*/
  * constant fudge factor.
  */
 int
-sieve_range_adjust::sieve_info_update_norm_data_Jmax ()
+sieve_range_adjust::sieve_info_update_norm_data_Jmax (bool keep_logI)
 {
   // The following parameter controls the scaling on the norm.
   // Relevant values are between 1.0 and 3.0. A higher value means we
@@ -1437,13 +1437,14 @@ sieve_range_adjust::sieve_info_update_norm_data_Jmax ()
   // time per relation and number of relations by about 1.5% on a typical
   // RSA704 benchmark.
   const double fudge_factor = 2.0;
-  logI = (logA+1)/2;
+  if (!keep_logI)
+      logI = (logA+1)/2;
   const double I = (double) (1 << logI);
   const double q = mpz_get_d(doing.p);
   const double skew = cpoly->skew;
-  const double A = I*sqrt(q*skew);
-  const double B = A/2./skew;
-  double Jmax = I/2.;
+  const double A = (1 << logI)*sqrt(q*skew);
+  const double B = (1 << (logA - logI))*sqrt(q/skew);
+  double Jmax = (1 << (logA - logI));
 
   prepare_fijd();
 
@@ -1511,24 +1512,29 @@ qlattice_basis operator*(sieve_range_adjust::mat<int> const& m, qlattice_basis c
  * The integral is taken over a range of size 2^A by integrating over
  * 2^(2N-1) points.
  *
- * The range is taken with width 2^(ceil(A/2)-squeeze)) times
- * 2^(floor(A/2)+squeeze) -- actually 0-centered
+ * The range is taken as one half of the 0-centered range whose width and
+ * height are 2^(ceil(A/2)-squeeze)) times 2^(floor(A/2)+squeeze+1) --
+ * this larger range as size 2^(A+1).
  * 
  * Integration points are chosen as centers of *rectangles* (not
  * squares) which are proportional to the sieve area.
  *
- * The shuffle[] argument can be used to specify an alternative basis
- * (just to see)
+ * The shuffle[] argument can be used to specify an alternate basis
  */
 double sieve_range_adjust::estimate_yield_in_sieve_area(mat<int> const& shuffle, int squeeze, int N)
 {
     int lpbs[2] = { conf.sides[0].lpb, conf.sides[1].lpb };
     int nx = 1 << (N - squeeze);
     int ny = 1 << (N + squeeze);
-    double X = 1UL << ((logA-logA/2) - squeeze);
-    double Y = 1UL << (logA/2     + squeeze);
 
-    /* Beware, we're really using (nx+1)*(ny/2+1) points */
+    /* We'll integrate over [-X/2,X/2] times [0,Y/2], which has to have
+     * size 2^A */
+    double X = 1UL << ((logA-logA/2) - squeeze);
+    double Y = 1UL << (logA/2     + squeeze + 1);
+    /* In other words, X is I, and Jmax is Y/2. We can see that X*Y/2 =
+     * 2^A as desired */
+
+    /* Beware, we're really using (nx+1)*(ny/2+1) points, but weighted. */
 
     double weightsum = 0;
 
@@ -1888,3 +1894,17 @@ void sieve_range_adjust::set_minimum_J_anyway()
 {
     J = nb_threads << (LOG_BUCKET_REGION - logI);
 }
+
+void sieve_info::recover_per_sq_values(sieve_range_adjust const & Adj)
+{
+    doing = Adj.doing;
+    qbasis = Adj.Q;
+    qbasis.set_q(doing.p, doing.prime_sq);
+    if (!qbasis.prime_sq) {
+        qbasis.prime_factors = doing.prime_factors;
+    }
+    ASSERT_ALWAYS(conf.logI_adjusted == Adj.logI);
+    ASSERT_ALWAYS(I == (1UL << Adj.logI));
+    J = Adj.J;
+}
+

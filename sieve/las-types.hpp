@@ -423,7 +423,7 @@ public:
     // all these functions return 0 if they feel that the special-q
     // should be discarded.
     int ab_plane();    // "raw" J.
-    int sieve_info_update_norm_data_Jmax();
+    int sieve_info_update_norm_data_Jmax(bool keep_logI = false);
     int estimated_yield();
 
     // a fall-back measure for desperate cases.
