@@ -76,7 +76,6 @@ parse_config(siever_config & sc, param_list_ptr pl)
     sc.side = 1; // Legacy default.
     param_list_parse_int(pl, "-sqside", &sc.side);
     int seen = 1;
-#if 0
     if (param_list_lookup_string(pl, "A")) {
         seen &= param_list_parse_int  (pl, "A",    &(sc.logA));
         if (param_list_lookup_string(pl, "I")) {
@@ -89,9 +88,6 @@ parse_config(siever_config & sc, param_list_ptr pl)
         sc.logA = 2 * I - 1;
         printf("# Interpreting -I %d as meaning -A %d\n", I, sc.logA);
     }
-#else
-    seen &= param_list_parse_int  (pl, "I", &sc.logI);
-#endif
     seen &= param_list_parse_ulong (pl, "lim0",  &(sc.sides[0].lim));
     seen &= param_list_parse_int   (pl, "lpb0",  &(sc.sides[0].lpb));
     seen &= param_list_parse_int   (pl, "mfb0",  &(sc.sides[0].mfb));
@@ -106,11 +102,7 @@ parse_config(siever_config & sc, param_list_ptr pl)
     param_list_parse_long_and_long(pl, "dup-qmax", dupqmax, ",");
     sc.sides[0].qmax = dupqmax[0];
     sc.sides[1].qmax = dupqmax[1];
-#if 0
     int logI = (sc.logA+1)/2;
-#else
-    int logI = sc.logI;
-#endif
     if (!param_list_parse_ulong(pl, "powlim0", &sc.sides[0].powlim))
         sc.sides[0].powlim = (1<<logI) - 1;
     if (!param_list_parse_ulong(pl, "powlim1", &sc.sides[1].powlim))
@@ -236,15 +228,12 @@ main (int argc, char * argv[])
           break;
         las_todo_entry doing;
         if (read_sq_comment(doing, line)) {
+            /* TODO we need to fix that for dynamic I */
             if (psi) delete psi;
-#if 0
             uint32_t I = 1UL << ((conf.logA+1)/2);
             uint32_t J = 1UL << ((conf.logA-1)/2);
-#else
-            uint32_t I = 1UL << conf.logI;
-            uint32_t J = I >> 1;
-#endif
-            psi = fill_in_sieve_info(doing, I, J, cpoly, conf);
+            int nb_threads = 1;
+            psi = fill_in_sieve_info(doing, I, J, cpoly, conf, nb_threads);
             psi->strategies = strategies;
         } else {
             relation rel;
