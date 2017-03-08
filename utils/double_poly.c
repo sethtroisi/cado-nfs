@@ -40,7 +40,7 @@ static void double_poly_set_degree(double_poly_ptr f, int deg)
 void
 double_poly_set (double_poly_ptr r, double_poly_srcptr s)
 {
-  r->deg = s->deg;
+  double_poly_set_degree(r, s->deg);
   for (int i = 0; i <= s->deg; i++) {
     r->coeff[i] = s->coeff[i];
   }
