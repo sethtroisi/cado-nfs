@@ -373,8 +373,6 @@ struct las_info : private NonCopyable {
 /* }}} */
 
 class sieve_range_adjust {
-    static const int verbose = 0;
-
     friend struct sieve_info;
 
     las_todo_entry doing;

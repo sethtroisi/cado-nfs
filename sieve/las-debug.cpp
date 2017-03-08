@@ -11,6 +11,7 @@
 #include "las-coordinates.hpp"
 #include "portability.h"
 
+using namespace std;
 #if defined(__GLIBC__) && (defined(TRACE_K) || defined(CHECK_UNDERFLOW))
 #include <execinfo.h>   /* For backtrace. Since glibc 2.1 */
 #endif
@@ -145,6 +146,36 @@ int test_divisible(where_am_I& w)
 
 /* {{{ helper: sieve_increase */
 
+string remove_trailing_address_suffix(string const& a, string& suffix)
+{
+    size_t pos = a.find('+');
+    if (pos == a.npos) {
+        suffix.clear();
+        return a;
+    }
+    suffix = a.substr(pos);
+    return a.substr(0, pos);
+}
+
+string get_parenthesized_arg(string const& a, string& prefix, string& suffix)
+{
+    size_t pos = a.find('(');
+    if (pos == a.npos) {
+        prefix=a;
+        suffix.clear();
+        return string();
+    }
+    size_t pos2 = a.find(')', pos + 1);
+    if (pos2 == a.npos) {
+        prefix=a;
+        suffix.clear();
+        return string();
+    }
+    prefix = a.substr(0, pos);
+    suffix = a.substr(pos2 + 1);
+    return a.substr(pos+1, pos2-pos-1);
+}
+
 /* Do this so that the _real_ caller is always 2 floors up */
 void sieve_increase_logging_backend(unsigned char *S, const unsigned char logp, where_am_I& w)
 {
@@ -153,68 +184,56 @@ void sieve_increase_logging_backend(unsigned char *S, const unsigned char logp, 
 
     ASSERT_ALWAYS(test_divisible(w));
 
+    string caller;
+
 #ifdef __GLIBC__
-    void * callers_addresses[3];
-    char ** callers = NULL;
-    backtrace(callers_addresses, 3);
-    callers = backtrace_symbols(callers_addresses, 3);
-    char * freeme = strdup(callers[2]);
-    const char * caller = freeme;
-    free(callers);
-    char * opening = strchr(freeme, '(');
-    if (opening) {
-        char * closing = strchr(opening + 1, ')');
-        if (closing) {
-            *closing='\0';
-            caller = opening + 1;
-        }
+    {
+        void * callers_addresses[3];
+        char ** callers = NULL;
+        backtrace(callers_addresses, 3);
+        callers = backtrace_symbols(callers_addresses, 3);
+        caller = callers[2];
+        free(callers);
     }
-    if (!*caller) {
+
+    string xx,yy,zz;
+    yy = get_parenthesized_arg(caller, xx, zz);
+    if (!yy.empty()) caller = yy;
+
+    if (caller.empty()) {
         caller="<no symbol (static?)>";
     } else {
 #ifdef HAVE_CXXABI_H
-        char * p = strrchr(freeme, '+');
-        if (p) {
-            /* strip out the address offset, because the name demangled
-             * won't grok it.
-             */
-            *p='\0';
-        }
+        string address_suffix;
+        caller = remove_trailing_address_suffix(caller, address_suffix);
         int demangle_status;
-        char * demangled = abi::__cxa_demangle(caller, 0, 0, &demangle_status);
-        if (demangle_status == 0) {
-            free(freeme);
-            if (p) {
-                /* pick the address offset while we're at it */
-                int rc = asprintf(&freeme, "%s+%s", demangled, p+1);
-                ASSERT_ALWAYS(rc >= 0);
-                free(demangled);
-            } else {
-                freeme = demangled;
+        {
+            char * freeme = abi::__cxa_demangle(caller.c_str(), 0, 0, &demangle_status);
+            if (demangle_status == 0) {
+                caller = freeme;
+                free(freeme);
             }
-            caller = freeme;
-        } else {
-            // fprintf(stderr, "Cannot demangle name %s\n", caller);
-            /* put address offset separator back in if there is one */
-            if (p)
-                *p='+';
         }
+
+        /* Get rid of the type signature, it rather useless */
+        yy = get_parenthesized_arg(caller, xx, zz);
+        caller = xx;
+
+        /* could it be that we have the return type in the name
+         * as well ? */
+
+        caller+=address_suffix;
 #endif
     }
-#else
-    const char * caller = "";
 #endif
     if (w.p) 
         verbose_output_print(TRACE_CHANNEL, 0, "# Add log(%" FBPRIME_FORMAT ",side %d) = %hhu to "
             "S[%u] = %hhu, from BA[%u] -> %hhu [%s]\n",
-            w.p, w.side, logp, w.x, *S, w.N, (unsigned char)(*S+logp), caller);
+            w.p, w.side, logp, w.x, *S, w.N, (unsigned char)(*S+logp), caller.c_str());
     else
         verbose_output_print(TRACE_CHANNEL, 0, "# Add log(hint=%lu,side %d) = %hhu to "
             "S[%u] = %hhu, from BA[%u] -> %hhu [%s]\n",
-            (unsigned long) w.h, w.side, logp, w.x, *S, w.N, (unsigned char)(*S+logp), caller);
-#ifdef __GLIBC__
-    free(freeme);
-#endif
+            (unsigned long) w.h, w.side, logp, w.x, *S, w.N, (unsigned char)(*S+logp), caller.c_str());
 }
 
 void sieve_increase_logging(unsigned char *S, const unsigned char logp, where_am_I& w)
