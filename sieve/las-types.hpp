@@ -372,9 +372,9 @@ struct las_info : private NonCopyable {
 };
 /* }}} */
 
-class sieve_range_adjust {
+struct sieve_range_adjust {
     friend struct sieve_info;
-
+private:
     las_todo_entry doing;
     siever_config conf;         /* This "conf" field is only used for a
                                  * few fields. In particular the
