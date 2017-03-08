@@ -3356,7 +3356,7 @@ int main (int argc0, char *argv0[])/*{{{*/
         verbose_output_print (2, 1, "# Average J=%1.0f for %lu special-q's, max bucket fill %f\n",
                 totJ / (double) nr_sq_processed, nr_sq_processed, max_full);
     } else {
-        verbose_output_print (2, 1, "# Average logI=%1.0f for %lu special-q's, max bucket fill %f\n",
+        verbose_output_print (2, 1, "# Average logI=%1.1f for %lu special-q's, max bucket fill %f\n",
                 totlogI / (double) nr_sq_processed, nr_sq_processed, max_full);
     }
     verbose_output_print (2, 1, "# Discarded %lu special-q's out of %u pushed\n",
