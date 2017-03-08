@@ -260,6 +260,7 @@ IF (NOT DEFINED ENV{NO_PYTHON_CHECK})
   include("${CADO_NFS_SOURCE_DIR}/config/python.cmake")
 endif()
 include("${CADO_NFS_SOURCE_DIR}/config/shared_ptr.cmake")
+include("${CADO_NFS_SOURCE_DIR}/config/cxxabi.cmake")
 
 set(CADO_SHARED)
 

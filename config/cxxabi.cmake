@@ -1,0 +1,4 @@
+
+INCLUDE (CheckIncludeFileCXX)
+CHECK_INCLUDE_FILE_CXX (cxxabi.h HAVE_CXXABI_H)
+

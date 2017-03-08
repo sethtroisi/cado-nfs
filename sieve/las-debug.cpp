@@ -14,6 +14,10 @@
 #if defined(__GLIBC__) && (defined(TRACE_K) || defined(CHECK_UNDERFLOW))
 #include <execinfo.h>   /* For backtrace. Since glibc 2.1 */
 #endif
+#ifdef HAVE_CXXABI_H
+/* We use that to demangle C++ names */
+#include <cxxabi.h>
+#endif
 
 /* The trivial calls for when TRACE_K is *not* defined are inlines in
  * las-debug.h */
@@ -71,10 +75,13 @@ void trace_per_sq_init(sieve_info const & si, const struct trace_Nx_t *Nx,
         IJToAB(&trace_ab.a, &trace_ab.b, trace_ij.i, trace_ij.j, si);
     }
 
-    if (trace_ij.j < UINT_MAX && trace_ij.j >= si.J) {
+    if ((trace_ij.j < UINT_MAX && trace_ij.j >= si.J)
+         || (trace_ij.i < -(1L << (si.conf.logI_adjusted-1)))
+         || (trace_ij.i >= (1L << (si.conf.logI_adjusted-1))))
+    {
         verbose_output_print(TRACE_CHANNEL, 0, "# Relation (%" PRId64 ",%" PRIu64 ") to be traced is "
-                "outside of the current (i,j)-rectangle (j=%u)\n",
-                trace_ab.a, trace_ab.b, trace_ij.j);
+                "outside of the current (i,j)-rectangle (i=%d j=%u)\n",
+                trace_ab.a, trace_ab.b, trace_ij.i, trace_ij.j);
         trace_ij.i=0;
         trace_ij.j=UINT_MAX;
         trace_Nx.N=0;
@@ -112,11 +119,7 @@ int test_divisible(where_am_I& w)
     fbprime_t p = w.p;
     if (p==0) return 1;
 
-#if 0
     const unsigned int logI = w.psi->conf.logI_adjusted;
-#else
-    const unsigned int logI = w.psi->conf.logI;
-#endif
     const unsigned int I = 1U << logI;
 
     const unsigned long X = w.x + (w.N << LOG_BUCKET_REGION);
@@ -168,6 +171,35 @@ void sieve_increase_logging_backend(unsigned char *S, const unsigned char logp, 
     }
     if (!*caller) {
         caller="<no symbol (static?)>";
+    } else {
+#ifdef HAVE_CXXABI_H
+        char * p = strrchr(freeme, '+');
+        if (p) {
+            /* strip out the address offset, because the name demangled
+             * won't grok it.
+             */
+            *p='\0';
+        }
+        int demangle_status;
+        char * demangled = abi::__cxa_demangle(caller, 0, 0, &demangle_status);
+        if (demangle_status == 0) {
+            free(freeme);
+            if (p) {
+                /* pick the address offset while we're at it */
+                int rc = asprintf(&freeme, "%s+%s", demangled, p+1);
+                ASSERT_ALWAYS(rc >= 0);
+                free(demangled);
+            } else {
+                freeme = demangled;
+            }
+            caller = freeme;
+        } else {
+            // fprintf(stderr, "Cannot demangle name %s\n", caller);
+            /* put address offset separator back in if there is one */
+            if (p)
+                *p='+';
+        }
+#endif
     }
 #else
     const char * caller = "";

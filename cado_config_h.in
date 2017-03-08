@@ -63,6 +63,7 @@
 #cmakedefine    HAVE_CXX11
 #cmakedefine    HAVE_STD_SHARED_PTR
 #cmakedefine    HAVE_BOOST_SHARED_PTR
+#cmakedefine    HAVE_CXXABI_H
 #define    ULONG_BITS   @ULONG_BITS@
 #define    ULONGLONG_BITS   @ULONGLONG_BITS@
 /* In the C source files, we may of course check MPI_VERSION and
