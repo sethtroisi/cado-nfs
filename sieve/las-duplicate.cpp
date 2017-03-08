@@ -105,7 +105,7 @@ fill_in_sieve_info(las_todo_entry const & doing,
 
   sieve_range_adjust Adj(doing, cpoly, conf, nb_threads);
   Adj.SkewGauss();
-  if (!Adj.ab_plane()) {
+  if (!Adj.sieve_info_adjust_IJ()) {
       delete x;
       return NULL;
   }
@@ -266,7 +266,7 @@ sq_finds_relation(const unsigned long sq, const int sq_side,
 
   sieve_range_adjust Adj(doing, old_si.cpoly, old_si.conf, nb_threads);
 
-  if (!Adj.SkewGauss() || !Adj.Q.fits_31bits() || !Adj.ab_plane()) {
+  if (!Adj.SkewGauss() || !Adj.Q.fits_31bits() || !Adj.sieve_info_adjust_IJ()) {
       verbose_output_print(0, VERBOSE_LEVEL, "# DUPECHECK q-lattice discarded\n");
       return 0;
   }

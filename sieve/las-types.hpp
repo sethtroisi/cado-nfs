@@ -373,7 +373,7 @@ struct las_info : private NonCopyable {
 /* }}} */
 
 class sieve_range_adjust {
-    static const int verbose = 1;
+    static const int verbose = 0;
 
     friend struct sieve_info;
 
@@ -422,9 +422,9 @@ public:
     /* implementation is in las-norms.cpp */
     // all these functions return 0 if they feel that the special-q
     // should be discarded.
-    int ab_plane();    // "raw" J.
+    int sieve_info_adjust_IJ();    // "raw" J.
     int sieve_info_update_norm_data_Jmax(bool keep_logI = false);
-    int estimated_yield();
+    int adjust_with_estimated_yield();
 
     // a fall-back measure for desperate cases.
     // XXX when estimated_yield() wins, this will probably no longer be

@@ -1571,19 +1571,21 @@ double sieve_range_adjust::estimate_yield_in_sieve_area(mat<int> const& shuffle,
     return sum;
 }//}}}
 
-int sieve_range_adjust::estimated_yield()/*{{{*/
+int sieve_range_adjust::adjust_with_estimated_yield()/*{{{*/
 {
-    if (verbose >= 2) {
+    {
         std::ostringstream os;
-        for(int side = 0 ; side < 2 ; side++) {
-            cxx_mpz_poly f;
-            mpz_poly_set(f,cpoly->pols[side]);
-            os << "# f"<<side<<"="<<f.print_poly("x")<<"\n";
-            if (side == doing.side)
-                os << "# q"<<side<<"="<<doing.p<<"\n";
+        if (verbose >= 2) {
+            for(int side = 0 ; side < 2 ; side++) {
+                cxx_mpz_poly f;
+                mpz_poly_set(f,cpoly->pols[side]);
+                os << "# f"<<side<<"="<<f.print_poly("x")<<"\n";
+                if (side == doing.side)
+                    os << "# q"<<side<<"="<<doing.p<<"\n";
+            }
+            os << "# skew="<<cpoly->skew<<"\n";
         }
-        os << "# a0="<<Q.a0<<"; b0="<<Q.b0<<"; a1="<<Q.a1<<"; b1="<<Q.b1<<";\n";
-        os << "# skew="<<cpoly->skew<<"\n";
+        os << "# Initial q-lattice: a0="<<Q.a0<<"; b0="<<Q.b0<<"; a1="<<Q.a1<<"; b1="<<Q.b1<<";\n";
         printf("%s",os.str().c_str());
     }
     prepare_fijd(); // side-effect of the above
@@ -1688,17 +1690,14 @@ B:=[bestrep(a):a in {{a*b*c*x:a in {1,-1},b in {1,d},c in {1,s}}:x in MM}];
 
     mat<int> const& shuffle (shuffle_matrices[best_r]);
 
-    if (verbose)
-    printf("# adjusting rectangle by [%d,%d,%d,%d], squeeze factor %d : (%e, gain %+.2f%% over standard)\n",
-            shuffle(0,0),
-            shuffle(0,1),
-            shuffle(1,0),
-            shuffle(1,1),
-            best_squeeze,
-            best_sum, 100.0*(best_sum/ reference-1));
+    logI = ((logA-logA/2) - best_squeeze);
+
+    printf("# Adjusting by [%d,%d,%d,%d], logI=%d (%+.2f%%)\n",
+            shuffle(0,0), shuffle(0,1), shuffle(1,0), shuffle(1,1),
+            logI,
+            100.0*(best_sum/reference-1));
 
     Q = shuffle * Q;
-    logI = ((logA-logA/2) - best_squeeze);
     J = 1 << (logA/2    + best_squeeze);
     reference = estimate_yield_in_sieve_area(shuffle_matrices[0], 0, N);
     if (verbose>=2)
@@ -1717,7 +1716,7 @@ B:=[bestrep(a):a in {{a*b*c*x:a in {1,-1},b in {1,d},c in {1,s}}:x in MM}];
  * Now for efficiency reasons, the ``minimum reasonable'' number of
  * buckets should be more than that.
  */
-int sieve_range_adjust::ab_plane()/*{{{*/
+int sieve_range_adjust::sieve_info_adjust_IJ()/*{{{*/
 {
     using namespace std;
     /* compare skewed max-norms: let u0 = [a0, b0] and u1 = [a1, b1],

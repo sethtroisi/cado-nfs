@@ -57,7 +57,7 @@ int recursive_descent = 0;
 int prepend_relation_time = 0;
 int exit_after_rel_found = 0;
 int allow_largesq = 0;
-int adjust_strategy = 0;
+int adjust_strategy = 3;
 
 double general_grace_time_ratio = DESCENT_DEFAULT_GRACE_TIME_RATIO;
 
@@ -2682,7 +2682,7 @@ static void declare_usage(param_list pl)/*{{{*/
   param_list_decl_usage(pl, "bkmult", "multiplier to use for taking margin in the bucket allocation\n");
   param_list_decl_usage(pl, "unsievethresh", "Unsieve all p > unsievethresh where p|gcd(a,b)");
 
-  param_list_decl_usage(pl, "adjust-strategy", "strategy used to adapt the sieving range to the q-lattice basis (0 = logI constant, J so that bounday is capped; 1 = logI constant, (a,b) plane norm capped; 2 = logI dynamic, skewed basis) ; default=0");
+  param_list_decl_usage(pl, "adjust-strategy", "strategy used to adapt the sieving range to the q-lattice basis (0 = logI constant, J so that bounday is capped; 1 = logI constant, (a,b) plane norm capped; 2 = logI dynamic, skewed basis; 3 = combine 2 and then 0) ; default=3");
   param_list_decl_usage(pl, "allow-largesq", "(switch) allows large special-q, e.g. for a DL descent");
   param_list_decl_usage(pl, "exit-early", "once a relation has been found, go to next special-q (value==1), or exit (value==2)");
   param_list_decl_usage(pl, "stats-stderr", "(switch) print stats to stderr in addition to stdout/out file");
@@ -2926,7 +2926,7 @@ int main (int argc0, char *argv0[])/*{{{*/
 
         /* Try strategies for adopting the sieving range */
 
-        int should_discard = !Adj.ab_plane();
+        int should_discard = !Adj.sieve_info_adjust_IJ();
 
         if (should_discard) {
             if (never_discard) {
@@ -2959,7 +2959,7 @@ int main (int argc0, char *argv0[])/*{{{*/
             Adj.sieve_info_update_norm_data_Jmax();
 
         if (adjust_strategy >= 2)
-            Adj.estimated_yield();
+            Adj.adjust_with_estimated_yield();
 
         if (adjust_strategy >= 3) {
             /* Let's change that again. We tell the code to keep logI as
@@ -2986,8 +2986,8 @@ int main (int argc0, char *argv0[])/*{{{*/
          * precompute the skewed polynomials of f(x) and g(x), and also
          * their floating-point versions */
 
-        totJ += (double) si.J;
-        totlogI += (double) si.conf.logI_adjusted;
+        totJ += si.J;
+        totlogI += si.conf.logI_adjusted;
 
 
         WHERE_AM_I_UPDATE(w, psi, &si);
