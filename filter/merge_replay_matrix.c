@@ -82,9 +82,11 @@ static void
 heap_init (heap H, uint32_t nrows, int maxlevel)
 {
   H->list = malloc (nrows * sizeof (uint32_t));
+  FATAL_ERROR_CHECK(H->list == NULL, "Cannot allocate memory");
   H->size = 0;
   H->alloc = nrows;
   H->index = malloc (nrows * sizeof (uint32_t));
+  FATAL_ERROR_CHECK(H->index == NULL, "Cannot allocate memory");
   for (unsigned long i = 0; i < nrows; i++)
     H->index[i] = UINT32_MAX;
   for (int32_t w = 0; w < 256; w++)
@@ -297,6 +299,7 @@ initMat (filter_matrix_t *mat, int maxlevel, uint32_t keep,
   mat->rows = (typerow_t **) malloc (mat->nrows * sizeof (typerow_t *));
   ASSERT_ALWAYS (mat->rows != NULL);
   mat->wt = (int32_t *) malloc (mat->ncols * sizeof (int32_t));
+  ASSERT_ALWAYS (mat->wt != NULL);
   memset (mat->wt, 0, mat->ncols * sizeof (int32_t));
   mat->R = (index_t **) malloc (mat->ncols * sizeof(index_t *));
   ASSERT_ALWAYS(mat->R != NULL);
@@ -364,6 +367,7 @@ renumber_columns (filter_matrix_t *mat)
 
   /* Realloc mat->wt */
   mat->wt = realloc (mat->wt, h * sizeof (int32_t));
+  ASSERT_ALWAYS(mat->wt != 0);
   /* Reset mat->ncols to behave as if they were no non-zero columns. */
   mat->ncols = h;
 
@@ -654,6 +658,7 @@ filter_matrix_read (filter_matrix_t *mat, const char *purgedname)
   {
     uint64_t *heaviest = NULL;
     heaviest = (uint64_t *) malloc (mat->nburied * sizeof (uint64_t));
+    ASSERT_ALWAYS(heaviest != NULL);
     for (i = 0; i < mat->nburied; i++)
       heaviest[i] = UMAX(uint64_t);
 
@@ -726,6 +731,7 @@ filter_matrix_read (filter_matrix_t *mat, const char *purgedname)
       }
       matLengthRow(mat, i) = k-1;
       mat->rows[i] = (typerow_t*) realloc (mat->rows[i], k * sizeof (typerow_t));
+      ASSERT_ALWAYS(mat->rows[i] != NULL);
     }
     printf ("# Done\n");
 
