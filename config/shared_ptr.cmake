@@ -33,5 +33,5 @@ CHECK_CXX_SOURCE_COMPILES("
 endif()
 
 if (NOT HAVE_STD_SHARED_PTR AND NOT HAVE_BOOST_SHARED_PTR)
-    message(FATAL_ERROR "Need either a C++11 compiler, or boost libraries installed. You may simply unpack the boost headers at the root of the cado tree, that will probably do")
+    message(FATAL_ERROR "Need either a C++11 compiler, or boost libraries installed. You may simply unpack the boost headers at the root of the cado tree, that will probably do. Also, most OS distributions include packages for boost, which can be easily installed (names may vary, e.g.  libboost-dev or boost-devel")
 endif()
