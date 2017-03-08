@@ -4,6 +4,7 @@
 #include <cmath>               /* ceil signbit */
 #include <pthread.h>
 #include <algorithm>
+#include <stdarg.h> /* Required so that GMP defines gmp_vfprintf() */
 
 #ifdef HAVE_SSE41
 #include <smmintrin.h>
@@ -1550,17 +1551,17 @@ double sieve_range_adjust::estimate_yield_in_sieve_area(mat<int> const& shuffle,
             double weight = 1;
             if (i == -nx/2 || i == nx/2) weight /= 2;
             if (j == 0 || j == ny/2) weight /= 2;
-            if (verbose >= 3) printf("# %d %d (%.2f) %.1f %.1f", i, j, weight, xys[0], xys[1]);
+            verbose_output_print(0, 4, "# %d %d (%.2f) %.1f %.1f", i, j, weight, xys[0], xys[1]);
 
             double prod = 1;
             for(int side = 0 ; side < 2 ; side++) {
                 double z = double_poly_eval_homogeneous(fijd[side], xys[0], xys[1]);
                 double a = log2(fabs(z));
                 double d = dickman_rho(a/lpbs[side]);
-                if (verbose >= 3) printf(" %d %e %e", side, z, d);
+                verbose_output_print(0, 4, " %d %e %e", side, z, d);
                 prod *= d;
             }
-            if (verbose >= 3) printf(" %e\n", prod);
+            verbose_output_print(0, 4, " %e\n", prod);
 
             weightsum += weight;
             sum += weight*prod;
@@ -1575,18 +1576,20 @@ int sieve_range_adjust::adjust_with_estimated_yield()/*{{{*/
 {
     {
         std::ostringstream os;
-        if (verbose >= 2) {
-            for(int side = 0 ; side < 2 ; side++) {
-                cxx_mpz_poly f;
-                mpz_poly_set(f,cpoly->pols[side]);
-                os << "# f"<<side<<"="<<f.print_poly("x")<<"\n";
-                if (side == doing.side)
-                    os << "# q"<<side<<"="<<doing.p<<"\n";
-            }
-            os << "# skew="<<cpoly->skew<<"\n";
+        for(int side = 0 ; side < 2 ; side++) {
+            cxx_mpz_poly f;
+            mpz_poly_set(f,cpoly->pols[side]);
+            os << "# f"<<side<<"="<<f.print_poly("x")<<"\n";
+            if (side == doing.side)
+                os << "# q"<<side<<"="<<doing.p<<"\n";
         }
+        os << "# skew="<<cpoly->skew<<"\n";
+        verbose_output_print(0, 2, "%s",os.str().c_str());
+    }
+    {
+        std::ostringstream os;
         os << "# Initial q-lattice: a0="<<Q.a0<<"; b0="<<Q.b0<<"; a1="<<Q.a1<<"; b1="<<Q.b1<<";\n";
-        printf("%s",os.str().c_str());
+        verbose_output_print(0, 1, "%s",os.str().c_str());
     }
     prepare_fijd(); // side-effect of the above
 
@@ -1684,24 +1687,22 @@ B:=[bestrep(a):a in {{a*b*c*x:a in {1,-1},b in {1,d},c in {1,s}}:x in MM}];
                 best_squeeze = squeeze;
                 best_sum = sum;
             }
-            if (verbose >= 2) printf("# estimated yield for rectangle #%d,%d: %e\n", r, squeeze, sum);
+            verbose_output_print(0, 2, "# estimated yield for rectangle #%d,%d: %e\n", r, squeeze, sum);
         }
     }
 
     mat<int> const& shuffle (shuffle_matrices[best_r]);
 
     logI = ((logA-logA/2) - best_squeeze);
+    Q = shuffle * Q;
+    J = 1 << (logA/2    + best_squeeze);
 
-    printf("# Adjusting by [%d,%d,%d,%d], logI=%d (%+.2f%%)\n",
+    verbose_output_print(0, 1,
+            "# Adjusting by [%d,%d,%d,%d], logI=%d (%+.2f%%)\n",
             shuffle(0,0), shuffle(0,1), shuffle(1,0), shuffle(1,1),
             logI,
             100.0*(best_sum/reference-1));
 
-    Q = shuffle * Q;
-    J = 1 << (logA/2    + best_squeeze);
-    reference = estimate_yield_in_sieve_area(shuffle_matrices[0], 0, N);
-    if (verbose>=2)
-        printf("# %e\n", reference);
     return adapt_threads(__func__);
 }/*}}}*/
 
@@ -1765,12 +1766,11 @@ int sieve_range_adjust::sieve_info_adjust_IJ()/*{{{*/
      */
     const double skew = cpoly->skew;
     const double rt_skew = sqrt(skew);
-    if (verbose) {
-        gmp_printf("# Called sieve_info_adjust_IJ((a0=%" PRId64 "; b0=%" PRId64
-               "; a1=%" PRId64 "; b1=%" PRId64 "), p=%Zd, skew=%f, nb_threads=%d)\n",
-               Q.a0, Q.b0, Q.a1, Q.b1,
-               (mpz_srcptr) doing.p, skew, nb_threads);
-    }
+    verbose_output_vfprint(0, 2, gmp_vfprintf,
+            "# Called sieve_info_adjust_IJ((a0=%" PRId64 "; b0=%" PRId64
+            "; a1=%" PRId64 "; b1=%" PRId64 "), p=%Zd, skew=%f, nb_threads=%d)\n",
+            Q.a0, Q.b0, Q.a1, Q.b1,
+            (mpz_srcptr) doing.p, skew, nb_threads);
     if (Q.skewed_norm0(skew) > Q.skewed_norm1(skew)) {
         /* exchange u0 and u1, thus I and J */
         swap(Q.a0, Q.a1);
@@ -1803,7 +1803,7 @@ int sieve_range_adjust::adapt_threads(const char * origin)/*{{{*/
     /* Bug 15617: if we round up, we are not true to our promises */
     uint32_t nJ = (J / i) * i; /* Round down to multiple of i */
 
-    if (verbose) printf("# %s(): Final logI=%d J=%" PRIu32 "\n", origin, logI, nJ);
+    verbose_output_print(0, 2, "# %s(): Final logI=%d J=%" PRIu32 "\n", origin, logI, nJ);
     /* XXX No rounding if we intend to abort */
     if (nJ > 0) J = nJ;
     return nJ > 0;

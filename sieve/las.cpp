@@ -537,7 +537,7 @@ bool parse_default_siever_config(siever_config & sc, param_list_ptr pl)
         int I;
         complete &= param_list_parse_int  (pl, "I", &I);
         sc.logA = 2 * I - 1;
-        printf("# Interpreting -I %d as meaning -A %d\n", I, sc.logA);
+        verbose_output_print(0, 1, "# Interpreting -I %d as meaning -A %d\n", I, sc.logA);
         // This is useful for a default config
         sc.logI_adjusted = I;
     }
