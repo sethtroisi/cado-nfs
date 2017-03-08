@@ -76,25 +76,29 @@ struct siever_config {
         return side == o.side && bitsize == o.bitsize;
     }
 
-    bool has_same_sieving(siever_config const & o) const {
+    bool has_same_fb_parameters(siever_config const & o) const {
         bool ok = true;
         ok = ok && logI_adjusted == o.logI_adjusted;
         ok = ok && bucket_thresh == o.bucket_thresh;
         ok = ok && bucket_thresh1 == o.bucket_thresh1;
         ok = ok && td_thresh == o.td_thresh;
         ok = ok && skipped == o.skipped;
-        ok = ok && bk_multiplier == o.bk_multiplier;
+        // ok = ok && bk_multiplier == o.bk_multiplier;
         ok = ok && unsieve_thresh == o.unsieve_thresh;
         for(int side = 0 ; side < 2 ; side++) {
             ok = ok && sides[side].lim == o.sides[side].lim;
             ok = ok && sides[side].powlim == o.sides[side].powlim;
-            ok = ok && sides[side].lambda == o.sides[side].lambda;
         }
+        return ok;
+    }
+    bool has_same_sieving(siever_config const & o) const {
+        bool ok = has_same_fb_parameters(o);
         return ok;
     }
     bool has_same_cofactoring(siever_config const & o) const {
         bool ok = true;
         for(int side = 0 ; side < 2 ; side++) {
+            ok = ok && sides[side].lambda == o.sides[side].lambda;
             ok = ok && sides[side].lpb == o.sides[side].lpb;
             ok = ok && sides[side].mfb == o.sides[side].mfb;
             ok = ok && sides[side].ncurves == o.sides[side].ncurves;
@@ -429,8 +433,27 @@ public:
 
     siever_config const& config() const { return conf; }
 private:
+    template<typename T> struct mat {
+        T x[4];
+        T const& operator()(int i, int j) const { return x[2*i+j]; }
+        T & operator()(int i, int j) { return x[2*i+j]; }
+        mat(T a, T b, T c, T d) { x[0]=a; x[1]=b; x[2]=c; x[3]=d; }
+        mat(T y[4]) { x[0]=y[0]; x[1]=y[1]; x[2]=y[2]; x[3]=y[3]; }
+    };
+    template<typename T> struct vec {
+        T x[2];
+        vec(T a, T b) { x[0] = a; x[1] = b; }
+        vec(T y[2]) { x[0] = y[0]; x[1] = y[1]; }
+        T const& operator[](int i) const { return x[i]; }
+        T & operator[](int i) { return x[i]; }
+        T const& operator()(int i) const { return x[i]; }
+        T & operator()(int i) { return x[i]; }
+    };
+    friend sieve_range_adjust::vec<double> operator*(sieve_range_adjust::vec<double> const& a, sieve_range_adjust::mat<int> const& m) ;
+    friend qlattice_basis operator*(sieve_range_adjust::mat<int> const& m, qlattice_basis const& Q) ;
     void prepare_fijd();
     int adapt_threads(const char *);
+    double estimate_yield_in_sieve_area(mat<int> const& shuffle, int squeeze, int N);
 };
 
 enum {

@@ -88,6 +88,13 @@ struct has_same_sieving {/*{{{*/
     bool operator()(sieve_info const& o) const { return (*this)(o.conf); }
 };
 /*}}}*/
+struct has_same_fb_parameters {/*{{{*/
+    siever_config const & sc;
+    has_same_fb_parameters(siever_config const & sc) : sc(sc) {}
+    bool operator()(siever_config const& o) const { return sc.has_same_fb_parameters(o); }
+    bool operator()(sieve_info const& o) const { return (*this)(o.conf); }
+};
+/*}}}*/
 struct has_same_cofactoring {/*{{{*/
     siever_config const & sc;
     has_same_cofactoring(siever_config const & sc) : sc(sc) {}
@@ -212,7 +219,7 @@ sieve_info::sieve_info(las_info & las, siever_config const & sc, param_list pl)/
     
     /*** Sieving ***/
 
-    psi = find_if(las.sievers.begin(), las.sievers.end(), has_same_sieving(sc));
+    psi = find_if(las.sievers.begin(), las.sievers.end(), has_same_fb_parameters(sc));
 
     if (psi != las.sievers.end()) {
         sieve_info & other(*psi);
@@ -247,8 +254,6 @@ sieve_info::sieve_info(las_info & las, siever_config const & sc, param_list pl)/
       ((UINT64_C(1) << conf.logA) - UINT64_C(1)) / BRS[toplevel];
     for (int i = toplevel+1; i < FB_MAX_PARTS; ++i)
         XX[i] = 0;
-    // For small Jmax, the number of buckets at toplevel-1 could also
-    // be less than the maximum allowed.
     if (toplevel > 1 && XX[toplevel] == 1) {
         XX[toplevel-1] = 1 +
             ((UINT64_C(1) << conf.logA) - UINT64_C(1))
@@ -2965,7 +2970,7 @@ int main (int argc0, char *argv0[])/*{{{*/
 
         Adj.sieve_info_update_norm_data_Jmax();
 
-        Adj.estimated_yield();
+        // Adj.estimated_yield();
 
         siever_config conf = Adj.config();
         conf.logI_adjusted = Adj.logI;

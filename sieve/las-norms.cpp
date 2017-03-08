@@ -1387,7 +1387,7 @@ get_maxnorm_alg (double_poly_srcptr src_poly, const double X, const double Y)
 
 /* {{{ various strategies to adjust the sieve area */
 
-void sieve_range_adjust::prepare_fijd()
+void sieve_range_adjust::prepare_fijd()/*{{{*/
 {
     int64_t H[4] = { Q.a0, Q.b0, Q.a1, Q.b1 };
     /* We need to get the floating point polynomials. Yes, it will be
@@ -1403,7 +1403,7 @@ void sieve_range_adjust::prepare_fijd()
         }
         double_poly_set_mpz_poly(fijd[side], fz);
     }
-}
+}/*}}}*/
 
 /* sieve_range_adjust::sieve_info_update_norm_data_Jmax {{{
  *
@@ -1485,6 +1485,23 @@ sieve_range_adjust::sieve_info_update_norm_data_Jmax ()
   return adapt_threads(__func__);
 }//}}}
 
+/* {{{ a few helpers (otherwise I'll menage to get things wrong
+ * eventually)
+ */
+sieve_range_adjust::vec<double> operator*(sieve_range_adjust::vec<double> const& a, sieve_range_adjust::mat<int> const& m) {
+    return sieve_range_adjust::vec<double>(a[0]*m(0,0)+a[1]*m(1,0),a[0]*m(0,1)+a[1]*m(1,1));
+}
+
+qlattice_basis operator*(sieve_range_adjust::mat<int> const& m, qlattice_basis const& Q) {
+    qlattice_basis R;
+    R.a0 = m(0,0) * Q.a0 + m(0,1) * Q.a1;
+    R.a1 = m(1,0) * Q.a0 + m(1,1) * Q.a1;
+    R.b0 = m(0,0) * Q.b0 + m(0,1) * Q.b1;
+    R.b1 = m(1,0) * Q.b0 + m(1,1) * Q.b1;
+    return R;
+}
+//}}}
+
 /* estimate_yield_in_sieve_area {{{ 
  *
  * Approximate the integral of
@@ -1503,44 +1520,66 @@ sieve_range_adjust::sieve_info_update_norm_data_Jmax ()
  * The shuffle[] argument can be used to specify an alternative basis
  * (just to see)
  */
-static double estimate_yield_in_sieve_area(cxx_double_poly const f[2], int lpb[2], int A, int shuffle[4], int squeeze, int N)
+double sieve_range_adjust::estimate_yield_in_sieve_area(mat<int> const& shuffle, int squeeze, int N)
 {
+    int lpbs[2] = { conf.sides[0].lpb, conf.sides[1].lpb };
     int nx = 1 << (N - squeeze);
     int ny = 1 << (N + squeeze);
-    double X = 1 << ((A-A/2) - squeeze);
-    double Y = 1 << (A/2     + squeeze);
+    double X = 1UL << ((logA-logA/2) - squeeze);
+    double Y = 1UL << (logA/2     + squeeze);
+
+    /* Beware, we're really using (nx+1)*(ny/2+1) points */
+
+    double weightsum = 0;
 
     double sum = 0;
-    for(int i = 0 ; i < nx ; i++) {
-        double x = -X/2 + X/nx * (i + 0.5);
+    for(int i = -nx/2 ; i <= nx/2 ; i++) {
+        double x = X/nx * i;
         /* We're doing half of the computation on the y axis, since
          * it's symmetric anyway */
-        for(int j = ny / 2 ; j < ny ; j++) {
-            double y = -Y/2 + Y/ny * (j + 0.5);
-            double xs = x * shuffle[0] + y * shuffle[2];
-            double ys = x * shuffle[1] + y * shuffle[3];
+        for(int j = 0 ; j <= ny/2 ; j++) {
+            double y = Y/ny * j;
+            vec<double> xys = vec<double>(x,y) * shuffle;
 
-            // printf(" %.1f %.1f", x, y);
+            double weight = 1;
+            if (i == -nx/2 || i == nx/2) weight /= 2;
+            if (j == 0 || j == ny/2) weight /= 2;
+            if (verbose >= 3) printf("# %d %d (%.2f) %.1f %.1f", i, j, weight, xys[0], xys[1]);
+
             double prod = 1;
             for(int side = 0 ; side < 2 ; side++) {
-                double z = double_poly_eval_homogeneous(f[side], xs, ys);
+                double z = double_poly_eval_homogeneous(fijd[side], xys[0], xys[1]);
                 double a = log2(fabs(z));
-                double d = dickman_rho(a/lpb[side]);
-                // printf(" %d %e %e", side, z, d);
+                double d = dickman_rho(a/lpbs[side]);
+                if (verbose >= 3) printf(" %d %e %e", side, z, d);
                 prod *= d;
             }
-            // printf(" %e\n", prod);
+            if (verbose >= 3) printf(" %e\n", prod);
 
-            sum += prod;
+            weightsum += weight;
+            sum += weight*prod;
         }
     }
-    sum *= 1UL << A;
-    sum /= 1UL << (2*N - 1);
+    sum /= weightsum;
+    sum *= 1UL << logA;
     return sum;
 }//}}}
 
-int sieve_range_adjust::estimated_yield()
+int sieve_range_adjust::estimated_yield()/*{{{*/
 {
+    if (verbose >= 2) {
+        std::ostringstream os;
+        for(int side = 0 ; side < 2 ; side++) {
+            cxx_mpz_poly f;
+            mpz_poly_set(f,cpoly->pols[side]);
+            os << "# f"<<side<<"="<<f.print_poly("x")<<"\n";
+            if (side == doing.side)
+                os << "# q"<<side<<"="<<doing.p<<"\n";
+        }
+        os << "# a0="<<Q.a0<<"; b0="<<Q.b0<<"; a1="<<Q.a1<<"; b1="<<Q.b1<<";\n";
+        os << "# skew="<<cpoly->skew<<"\n";
+        printf("%s",os.str().c_str());
+    }
     prepare_fijd(); // side-effect of the above
 
     /* List a few candidate matrices which can be used for distorting the
@@ -1553,21 +1592,21 @@ int sieve_range_adjust::estimated_yield()
      * since we use that to avoid part of the computation (for squeeze==0,
      * the range is square when A is even, so swapping makes no sense).
      */
-    int shuffle_matrices[][4] = {
-        { 1, 0, 0, 1 },
-        { 0, 1, 1, 0 },
+    mat<int> shuffle_matrices[] = {
+        mat<int>( 1, 0, 0, 1 ),
+        mat<int>( 0, 1, 1, 0 ),
 
-        { 1, 1, 1, 0 },
-        { 1, 0, 1, 1 },
+        mat<int>( 1, 1, 1, 0 ),
+        mat<int>( 1, 0, 1, 1 ),
 
-        { 1, 1, 0, -1 },
-        { 0, -1, 1, 1 },
+        mat<int>( 1, 1, 0, -1 ),
+        mat<int>( 0, -1, 1, 1 ),
 
-        { 1, -1, 0, 1 },
-        { 0, 1, 1, -1 },
+        mat<int>( 1, -1, 0, 1 ),
+        mat<int>( 0, 1, 1, -1 ),
 
-        { 1, -1, 1, 0 },
-        { 1, 0, 1, -1 },
+        mat<int>( 1, -1, 1, 0 ),
+        mat<int>( 1, 0, 1, -1 ),
 
         /* We're also adding matrices with twos, although we're not really
          * convinced it's worth it. It depends on the polynomial, anyway.
@@ -1576,29 +1615,29 @@ int sieve_range_adjust::estimated_yield()
          * of 1000 find a better estimated yield with the matrices below than
          * without.
          */
-        { 1, 2, 0, 1 },
-        { 0, 1, 1, 2 },
+        mat<int>( 1, 2, 0, 1 ),
+        mat<int>( 0, 1, 1, 2 ),
 
-        { 1, -2, -1, 1 },
-        { -1, 1, 1, -2 },
+        mat<int>( 1, -2, -1, 1 ),
+        mat<int>( -1, 1, 1, -2 ),
 
-        { 2, 1, 1, 1 },
-        { 1, 1, 2, 1 },
+        mat<int>( 2, 1, 1, 1 ),
+        mat<int>( 1, 1, 2, 1 ),
 
-        { -2, 1, 1, 0 },
-        { 1, 0, -2, 1 },
+        mat<int>( -2, 1, 1, 0 ),
+        mat<int>( 1, 0, -2, 1 ),
 
-        { 1, 0, 2, 1 },
-        { 2, 1, 1, 0 },
+        mat<int>( 1, 0, 2, 1 ),
+        mat<int>( 2, 1, 1, 0 ),
 
-        { 1, 2, 1, 1 },
-        { 1, 1, 1, 2 },
+        mat<int>( 1, 2, 1, 1 ),
+        mat<int>( 1, 1, 1, 2 ),
 
-        { 2, -1, 1, -1 },
-        { 1, -1, 2, -1 },
+        mat<int>( 2, -1, 1, -1 ),
+        mat<int>( 1, -1, 2, -1 ),
 
-        { -1, 2, 0, 1 },
-        { 0, 1, -1, 2 },
+        mat<int>( -1, 2, 0, 1 ),
+        mat<int>( 0, 1, -1, 2 ),
     };
     const int nmatrices = sizeof(shuffle_matrices)/sizeof(shuffle_matrices[0]);
 #if 0
@@ -1618,55 +1657,48 @@ B:=[bestrep(a):a in {{a*b*c*x:a in {1,-1},b in {1,d},c in {1,s}}:x in MM}];
      */
 #endif
 
-    int lpbs[2] = { conf.sides[0].lpb, conf.sides[1].lpb };
-
     double best_sum = 0;
     int best_r = -1;
     int best_squeeze = -1;
 
     /* We integrate on 2^(2*N-1) points (well, morally 2^(2N), but we halve
      * that by homogeneity */
-    int N = 4;
+    int N = 5;
 
-    double reference = estimate_yield_in_sieve_area(fijd, lpbs,
-            logA, shuffle_matrices[0], 0, N);
+    double reference = estimate_yield_in_sieve_area(shuffle_matrices[0], 0, N);
     for(int squeeze = 0 ; squeeze <= 3 ; squeeze++) {
         for(int r = 0 ; r < nmatrices ; r++) {
             if (squeeze == 0 && (r & 1)) continue;
-            double sum = estimate_yield_in_sieve_area(fijd, lpbs,
-                    logA, shuffle_matrices[r], squeeze, N);
+            mat<int> const & Sr(shuffle_matrices[r]);
+            double sum = estimate_yield_in_sieve_area(Sr, squeeze, N);
             if (sum > best_sum) {
                 best_r = r;
                 best_squeeze = squeeze;
                 best_sum = sum;
             }
-            if (verbose>1) printf("# estimated yield for rectangle #%d,%d : %e\n",r,squeeze,sum);
+            if (verbose >= 2) printf("# estimated yield for rectangle #%d,%d: %e\n", r, squeeze, sum);
         }
     }
 
+    mat<int> const& shuffle (shuffle_matrices[best_r]);
+
     if (verbose)
     printf("# adjusting rectangle by [%d,%d,%d,%d], squeeze factor %d : (%e, gain %+.2f%% over standard)\n",
-            shuffle_matrices[best_r][0],
-            shuffle_matrices[best_r][1],
-            shuffle_matrices[best_r][2],
-            shuffle_matrices[best_r][3],
+            shuffle(0,0),
+            shuffle(0,1),
+            shuffle(1,0),
+            shuffle(1,1),
             best_squeeze,
             best_sum, 100.0*(best_sum/ reference-1));
 
-    int *shuffle = shuffle_matrices[best_r];
-
-    int64_t na0 = shuffle[0] * Q.a0 + shuffle[1] * Q.a1;
-    int64_t na1 = shuffle[2] * Q.a0 + shuffle[3] * Q.a1;
-    int64_t nb0 = shuffle[0] * Q.b0 + shuffle[1] * Q.b1;
-    int64_t nb1 = shuffle[2] * Q.b0 + shuffle[3] * Q.b1;
-    Q.a0 = na0;
-    Q.a1 = na1;
-    Q.b0 = nb0;
-    Q.b1 = nb1;
+    Q = shuffle * Q;
     logI = ((logA-logA/2) - best_squeeze);
     J = 1 << (logA/2    + best_squeeze);
+    reference = estimate_yield_in_sieve_area(shuffle_matrices[0], 0, N);
+    if (verbose>=2)
+        printf("# %e\n", reference);
     return adapt_threads(__func__);
-}
+}/*}}}*/
 
 /* return 0 if we should discard that special-q because the rounded
  * region in the (a,b)-plane is flat to the point of having height 0.
@@ -1753,7 +1785,7 @@ int sieve_range_adjust::ab_plane()/*{{{*/
     return adapt_threads(__func__);
 }/*}}}*/
 
-int sieve_range_adjust::adapt_threads(const char * origin)
+int sieve_range_adjust::adapt_threads(const char * origin)/*{{{*/
 {
     /* Make sure the bucket region size divides the sieve region size,
        partly covered bucket regions may lead to problems when
@@ -1770,7 +1802,9 @@ int sieve_range_adjust::adapt_threads(const char * origin)
     /* XXX No rounding if we intend to abort */
     if (nJ > 0) J = nJ;
     return nJ > 0;
-}
+}/*}}}*/
+
+/*}}}*/
 
 /* this function initializes the scaling factors and report bounds on the
    rational and algebraic sides */
@@ -1782,7 +1816,6 @@ int sieve_range_adjust::adapt_threads(const char * origin)
      si.sides[side].bound
 
 */
-
 void
 sieve_info::update_norm_data()
 {
@@ -1855,5 +1888,3 @@ void sieve_range_adjust::set_minimum_J_anyway()
 {
     J = nb_threads << (LOG_BUCKET_REGION - logI);
 }
-
-/*}}}*/
