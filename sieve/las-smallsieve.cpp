@@ -455,7 +455,7 @@ void small_sieve_skip_stride(small_sieve_data_t *ssd, int64_t * ssdpos,
             // ssdpos[i] &= ssp->p - 1;
 
             // However, when p == I, we might get something >= 2*I, which
-            // is just an artefact.
+            // is just an artifact.
             // See bug #18814
             const unsigned int I = 1U << si.conf.logI_adjusted;
             if ((ssp->p == I) && ((unsigned int)ssdpos[i] >= 2*I)) {
@@ -948,27 +948,29 @@ void sieve_small_bucket_region(unsigned char *S, int N,
             unsigned int linestart = 0;
 
             unsigned int i0 = ssdpos[k];
-            for (j = 0; j < nj; j++) {
-                WHERE_AM_I_UPDATE(w, j, j);
-                if (i0 < I) {
-                    // At the start of the bucket region, we are not sure
-                    // that i0 is reduced mod p when we enter here.
-                    // (see comment at the end of small_sieve_skip_stride()).
-                    // Hence, we have to do this reduction here:
-                    i0 &= (p-1);
-                    ASSERT(i0 < p);
-                    ASSERT ((nj * N + j) % 2 == 1);
-                    for (unsigned int i = i0; i < I; i += p) {
-     		        WHERE_AM_I_UPDATE(w, x, (j << si.conf.logI_adjusted) + i);
-                        sieve_increase (S_ptr + i, logp, w);
-                    }
-                    // odd lines only.
-                    i0 = ((i0 + (r << 1)) & (p - 1)) + (2 << si.conf.logI_adjusted);
-                }
-                i0 -= I;
-                linestart += I;
-                S_ptr += I;
+
+            j=0;
+            /* Our encoding is that when the first row is even, the
+             * i0 we keep in the ssdpos array deliberately includes an
+             * additional quantity I to mean ``next row''. Compensate
+             * that, move on to an odd row, and proceed. */
+            if ((nj * N + j) % 2 == 0) {
+                ASSERT(i0 >= I);
+                i0 -= I; linestart += I; S_ptr += I;
+                j++;
             }
+            for( ; j < nj ; j+= 2) {
+                i0 &= (p-1);
+                for (unsigned int i = i0; i < I; i += p) {
+                    WHERE_AM_I_UPDATE(w, x, (j << si.conf.logI_adjusted) + i);
+                    sieve_increase (S_ptr + i, logp, w);
+                }
+                // odd lines only.
+                i0 = ((i0 + (r << 1)) & (p - 1)) + (2 << si.conf.logI_adjusted);
+                i0 -= I; linestart += I; S_ptr += I;
+                i0 -= I; linestart += I; S_ptr += I;
+            }
+            if (j > nj) i0 += I;
             ssdpos[k] = i0;
         }
     }
@@ -1081,7 +1083,7 @@ resieve_small_bucket_region (bucket_primes_t *BP, int N, unsigned char *S,
                 BP->push_update(prime);
             }
             // Same as in sieving: we discard after checking for row 0.
-            if (event == SSP_DISCARD)
+            if (event & SSP_DISCARD)
                 continue;
 
             unsigned int ii;
