@@ -87,10 +87,9 @@ namespace tdict {
         key k;
         private:
         static dict_t* get_dict(int x MAYBE_UNUSED = 0) {
-            /* The #if'0 branch below leaks, I know. Unfortunately I
-             * can't stow the static member initialization in an other
-             * compilation unit, or SIOF will kill me. See also "Meyers
-             * Singleton".
+            /* The code below leaks, I know. Unfortunately I can't stow
+             * the static member initialization in an other compilation
+             * unit, or SIOF will kill me. See also "Meyers Singleton".
              *
              * #else branch is an ad hoc hack which kinda works here.
              * We destroy the singleton on the last tdict::slot_base
@@ -98,7 +97,7 @@ namespace tdict {
              * make sure the tdict::key objects never escape the
              * scope of existence of the associated tdict::slot_base
              * object themselves -- which is not guaranteed by the
-             * interface. Also the ctor/dtor code for slot_base() 
+             * interface.
              */
 #if 1
             static dict_t * d = new dict_t();   /* trusty leaky */
