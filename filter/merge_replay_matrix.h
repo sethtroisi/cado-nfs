@@ -22,10 +22,10 @@
 #endif
 
 typedef struct {
-  uint32_t *list;
+  index_t *list;
   unsigned long size;
   unsigned long alloc;
-  uint32_t *index; /* relation i is stored at list[index[i]] */
+  index_t *index; /* relation i is stored at list[index[i]] */
 } heap_t;
 typedef heap_t heap[1];
 
@@ -62,7 +62,9 @@ typedef struct {
   uint32_t *MKZA;        /* MKZA[j] gives u s.t. MKZQ[2*u] = j and
                             MKZQ[2*u+1] is the Markowitz cost of column j,
                             otherwise it is MKZ_INF if the column is inactive
-                            (either too heavy initially or deleted) */
+                            (either too heavy initially or deleted). It is safe
+                            to have a 32-bit table as long as the Markowitz
+                            queue has less than 2^32 entries. */
   int wmstmax;
   int mkztype;           /* which type of count */
   heap Heavy;            /* heap for heavy rows */
@@ -81,7 +83,7 @@ void fillmat(filter_matrix_t *mat);
 void filter_matrix_read (filter_matrix_t *, const char *);
 void matR_disable_cols (filter_matrix_t *, const char *);
 
-void print_row(filter_matrix_t *mat, int i);
+void print_row(filter_matrix_t *mat, index_t i);
 
 #define rowWeight(mat, i) matLengthRow(mat, i)
 
@@ -97,14 +99,14 @@ void print_row(filter_matrix_t *mat, int i);
 #endif
 #define SPARSE_ITERATE(mat, i, k) for((k)=1; (k)<=lengthRow((mat),(i)); (k)++)
 
-void freeRj(filter_matrix_t *mat, int j);
-void remove_i_from_Rj(filter_matrix_t *mat, index_t i, int j);
-void add_i_to_Rj(filter_matrix_t *mat, int i, int j);
+void freeRj(filter_matrix_t *mat, index_t j);
+void remove_i_from_Rj(filter_matrix_t *mat, index_t i, index_t j);
+void add_i_to_Rj(filter_matrix_t *mat, index_t i, index_t j);
 int decrS(int w);
 int incrS(int w);
-int weightSum(filter_matrix_t *mat, int i1, int i2, int32_t j);
-void fillTabWithRowsForGivenj(int32_t *ind, filter_matrix_t *mat, int32_t j);
-void destroyRow(filter_matrix_t *mat, int i);
+int weightSum(filter_matrix_t *mat, index_t i1, index_t i2, index_t j);
+void fillTabWithRowsForGivenj(index_t *ind, filter_matrix_t *mat, index_t j);
+void destroyRow(filter_matrix_t *mat, index_t i);
 void heap_fill (filter_matrix_t *mat);
 void heap_push (heap H, filter_matrix_t *mat, uint32_t i);
 void heap_delete (heap H, filter_matrix_t *mat, uint32_t i);

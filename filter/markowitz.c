@@ -103,6 +103,7 @@ static void
 MkzInsert(index_t *Q, uint32_t *A, index_t dj, index_t count)
 {
     Q[0]++;
+    ASSERT_ALWAYS(Q[0] < 2147483647UL);
     MkzSet(Q, Q[0], 0, dj);
     MkzSet(Q, Q[0], 1, count);
     A[dj] = Q[0];
@@ -389,16 +390,21 @@ MkzInit (filter_matrix_t *mat, int verbose)
       }
 
     // compute number of eligible columns in the heap
-    for(j = 0; j < mat->ncols; j++)
-      if(0 < mat->wt[j] && mat->wt[j] <= maxlevel)
+    for (j = 0; j < mat->ncols; j++)
+      if (0 < mat->wt[j] && mat->wt[j] <= maxlevel)
         sz++;
+
+    /* since u=MKZA[j] is a 32-bit entry, such that MKZQ[2*u] = j,
+       MKZQ[] should have less than 2^31-1 entries */
+    ASSERT_ALWAYS(sz < 2147483647UL);
     
     // Allocating heap MKZQ
-    size_t tmp_alloc = (sz+1) * 2 * sizeof(index_t);
+    size_t tmp_alloc = (sz + 1) * 2 * sizeof(index_t);
     if (verbose)
       fprintf (stderr, "Allocating heap for %" PRIu64 " columns (%zuMB)\n", sz,
                tmp_alloc >> 20);
     mat->MKZQ = (index_t *) malloc (tmp_alloc);
+    ASSERT_ALWAYS(mat->MKZQ != NULL);
     mat->MKZQ[0] = 0;
     mat->MKZQ[1] = (index_t) sz; // why not?
     
@@ -408,8 +414,10 @@ MkzInit (filter_matrix_t *mat, int verbose)
       fprintf (stderr, "Allocating pointers to heap: %zuMB\n",
                tmp_alloc >> 20);
     mat->MKZA = (uint32_t*) malloc (tmp_alloc);
+    ASSERT_ALWAYS(mat->MKZA != NULL);
 
     mkz = malloc (mat->ncols * sizeof (int32_t));
+    ASSERT_ALWAYS(mkz != NULL);
 
     /* since the computation of the Markowitz cost is read-only,
        we can perform it in parallel */
@@ -490,6 +498,7 @@ MkzUpdateN (filter_matrix_t *mat, index_t *j, int n)
   int i;
 
   mkz = malloc (n * sizeof (index_t));
+  ASSERT_ALWAYS(mkz != NULL);
 #ifdef HAVE_OPENMP
 #pragma omp parallel for
 #endif
