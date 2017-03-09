@@ -44,8 +44,8 @@ typedef struct {
                           else <= 0 for a deleted column
                           (trick: we store -w if w > cwmax) */
                        /* 32 bits is sufficient as we only want precise weight
-                          for column of low weight. If the weight exceed 2^32-1,
-                          we saturate */
+                          for column of low weight. If the weight exceeds
+                          2^32-1, we saturate */
   uint64_t nburied;    /* the number of buried columns */
   uint64_t weight;     /* number of non-zero coefficients in the active part */
   uint64_t tot_weight; /* Initial total number of non-zero coefficients */
@@ -108,9 +108,9 @@ int weightSum(filter_matrix_t *mat, index_t i1, index_t i2, index_t j);
 void fillTabWithRowsForGivenj(index_t *ind, filter_matrix_t *mat, index_t j);
 void destroyRow(filter_matrix_t *mat, index_t i);
 void heap_fill (filter_matrix_t *mat);
-void heap_push (heap H, filter_matrix_t *mat, uint32_t i);
-void heap_delete (heap H, filter_matrix_t *mat, uint32_t i);
-uint32_t heap_pop (heap H, filter_matrix_t *mat);
+void heap_push (heap H, filter_matrix_t *mat, index_t i);
+void heap_delete (heap H, filter_matrix_t *mat, index_t i);
+index_t heap_pop (heap H, filter_matrix_t *mat);
 void recomputeR (filter_matrix_t *mat);
 
 #ifdef __cplusplus
