@@ -210,13 +210,16 @@ print_relation (FILE * file, earlyparsed_relation_srcptr rel)
 }
 
 /* if duplicate is_dup = 1, else is_dup = 0
- * return i for sanity check
+ * return i for sanity check, which is the place in the hash table where
+ * the relation is stored: more precisely we store in H[i] the value
+ * of floor(h/2^32), where h(a,b) is a 64-bit value.
  */
 static inline uint32_t
 insert_relation_in_dup_hashtable (earlyparsed_relation_srcptr rel, unsigned int *is_dup)
 {
   uint64_t h;
   uint32_t i, j;
+  double local_cost = 0;
 
   h = CA_DUP2 * (uint64_t) rel->a + CB_DUP2 * rel->b;
 
@@ -245,8 +248,22 @@ insert_relation_in_dup_hashtable (earlyparsed_relation_srcptr rel, unsigned int 
     i++;
     if (UNLIKELY(i == K))
       i = 0;
-    cost++;
+    local_cost++;
   }
+
+  if (local_cost > 100)
+    {
+      static int count = 0;
+      if (count++ < 10)
+        fprintf (stderr, "Warning, insertion cost %1.0f for a=%" PRId64
+                 " b=%" PRIu64 " h=%" PRIu64 " i=%u j=%u\n",
+                 local_cost, rel->a, rel->b, h, i, j);
+    }
+
+  cost += local_cost;
+
+  /* Note: since we use 0 for uninitialized entries, entries with j=0
+     will get always marked as 'duplicate' and be lost. */
 
   if (H[i] == j)
     *is_dup = 1;
