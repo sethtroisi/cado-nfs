@@ -116,7 +116,8 @@ print_warning_size ()
 {
   uint64_t nodup = nrels_tot - ndup_tot;
   double full_table = 100.0 * (double) nodup / (double) K;
-  fprintf(stderr, "Warning, hash table is %1.0f%% full\n", full_table);
+  fprintf (stderr, "Warning, hash table is %1.0f%% full (avg cost %1.2f)\n",
+           full_table, cost / (double) nrels_tot);
   if (full_table >= 99.0)
   {
     fprintf(stderr, "Error, hash table is full\n");
