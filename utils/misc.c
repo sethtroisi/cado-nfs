@@ -255,22 +255,26 @@ int mkdir_with_parents(const char * dir, int fatal)
 
 char * path_resolve(const char * progname, char * resolved)
 {
-  char * path = getenv("PATH");
+  const char * path = getenv("PATH");
   if (!path) return 0;
-  char * next_path;
+  const char * next_path;
   for( ; *path ; path = next_path) {
       next_path = strchr(path, ':');
+      char * segment;
       if (next_path) {
-          *next_path++ = '\0';
+          segment = strndup(path, next_path - path);
+          next_path++;
       } else {
+          segment = strdup(path);
           next_path = path + strlen(path);
       }
       char dummy2[PATH_MAX];
 #ifdef EXECUTABLE_SUFFIX
-      snprintf(dummy2, PATH_MAX, "%s/%s" EXECUTABLE_SUFFIX, path, progname);
+      snprintf(dummy2, PATH_MAX, "%s/%s" EXECUTABLE_SUFFIX, segment, progname);
 #else
-      snprintf(dummy2, PATH_MAX, "%s/%s", path, progname);
+      snprintf(dummy2, PATH_MAX, "%s/%s", segment, progname);
 #endif
+      free(segment);
       if (realpath(dummy2, resolved))
           return resolved;
   }
