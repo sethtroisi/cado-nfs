@@ -17,7 +17,7 @@
 
 static pthread_mutex_t mutex[1] = {PTHREAD_MUTEX_INITIALIZER};
 
-void param_list_init(param_list pl)
+void param_list_init(param_list_ptr pl)
 {
     memset(pl, 0, sizeof(param_list));
     pl->ndocs_alloc = 16;
@@ -74,7 +74,7 @@ static void param_list_switch_set(param_list_switch dst, param_list_switch src)
     }									\
 } while (0)
 
-void param_list_set(param_list_ptr pl, param_list pl0)
+void param_list_set(param_list_ptr pl, param_list_srcptr pl0)
 {
     memcpy(pl, pl0, sizeof(param_list));
     if (pl->usage_hdr) pl->usage_hdr = strdup(pl->usage_hdr);
@@ -84,7 +84,15 @@ void param_list_set(param_list_ptr pl, param_list pl0)
     COPY_LIST(pl, pl0, switches, nswitches, nswitches_alloc, param_list_switch);
 }
 
-void param_list_clear(param_list pl)
+void param_list_swap(param_list_ptr pl, param_list_ptr pl0)
+{
+    param_list x;
+    memcpy(x, pl, sizeof(param_list));
+    memcpy(pl, pl0, sizeof(param_list));
+    memcpy(pl0, x, sizeof(param_list));
+}
+
+void param_list_clear(param_list_ptr pl)
 {
     free(pl->usage_hdr);
     for(int i = 0 ; i < pl->ndocs ; i++) {
@@ -108,7 +116,7 @@ void param_list_clear(param_list pl)
     memset(pl, 0, sizeof(pl[0]));
 }
 
-void param_list_usage_header(param_list pl, const char * hdr, ...)
+void param_list_usage_header(param_list_ptr pl, const char * hdr, ...)
 {
     va_list ap;
     va_start(ap, hdr);
@@ -118,7 +126,7 @@ void param_list_usage_header(param_list pl, const char * hdr, ...)
 }
 
 
-void param_list_decl_usage(param_list pl, const char * key, const char * doc)
+void param_list_decl_usage(param_list_ptr pl, const char * key, const char * doc)
 {
     if (pl->ndocs == pl->ndocs_alloc) {
         pl->ndocs_alloc += 16;
@@ -134,7 +142,7 @@ void param_list_decl_usage(param_list pl, const char * key, const char * doc)
     pl->use_doc = 1;
 }
 
-static int is_documented_key(param_list pl, const char *key) {
+static int is_documented_key(param_list_ptr pl, const char *key) {
     for (int i = 0; i < pl->ndocs; ++i) {
         if (strcmp(key, pl->docs[i]->key) == 0)
             return 1;
@@ -142,7 +150,7 @@ static int is_documented_key(param_list pl, const char *key) {
     return 0;
 }
 
-void param_list_print_usage(param_list pl, const char * argv0, FILE *f)
+void param_list_print_usage(param_list_ptr pl, const char * argv0, FILE *f)
 {
     if (argv0 != NULL)
         fprintf(f, "Usage: %s <parameters>\n", argv0);
@@ -161,7 +169,7 @@ void param_list_print_usage(param_list pl, const char * argv0, FILE *f)
     }
 }
 
-static void make_room(param_list pl, unsigned int more)
+static void make_room(param_list_ptr pl, unsigned int more)
 {
     if (pl->size + more <= pl->alloc) {
         return;
@@ -174,7 +182,7 @@ static void make_room(param_list pl, unsigned int more)
     pl->p = (parameter *) realloc(pl->p, pl->alloc * sizeof(parameter));
 }
 
-static int param_list_add_key_nostrdup(param_list pl,
+static int param_list_add_key_nostrdup(param_list_ptr pl,
         char * key, char * value, enum parameter_origin o)
 {
     make_room(pl, 1);
@@ -191,7 +199,7 @@ static int param_list_add_key_nostrdup(param_list pl,
     return r;
 }
 
-int param_list_add_key(param_list pl,
+int param_list_add_key(param_list_ptr pl,
         const char * key, const char * value, enum parameter_origin o)
 {
     int r = param_list_add_key_nostrdup(pl,
@@ -225,7 +233,7 @@ int paramcmp(const struct sorting_data * a, const struct sorting_data * b)
 }
 
 /* Sort (for searching), and remove duplicates. */
-static void param_list_consolidate(param_list pl)
+static void param_list_consolidate(param_list_ptr pl)
 {
     if (pl->consolidated) {
         return;
@@ -273,7 +281,7 @@ static void param_list_consolidate(param_list pl)
     pl->consolidated = 0;
 }
 
-void param_list_remove_key(param_list pl, const char * key)
+void param_list_remove_key(param_list_ptr pl, const char * key)
 {
     unsigned int j = 0;
     for(unsigned int i = 0 ; i < pl->size ; i++) {
@@ -297,7 +305,7 @@ void param_list_remove_key(param_list pl, const char * key)
  * to read a file contaning more than one polynomial.
  * Otherwise the function reads the whole file.
  */
-int param_list_read_stream(param_list pl, FILE *f, int stop_on_empty_line)
+int param_list_read_stream(param_list_ptr pl, FILE *f, int stop_on_empty_line)
 {
     int all_ok=1;
     const int linelen = 2048;
@@ -384,7 +392,7 @@ int param_list_read_stream(param_list pl, FILE *f, int stop_on_empty_line)
     return all_ok;
 }
 
-int param_list_read_file(param_list pl, const char * name)
+int param_list_read_file(param_list_ptr pl, const char * name)
 {
     FILE * f;
     f = fopen(name, "r");
@@ -397,7 +405,7 @@ int param_list_read_file(param_list pl, const char * name)
     return r;
 }
 
-int param_list_configure_alias(param_list pl, const char * key, const char * alias)
+int param_list_configure_alias(param_list_ptr pl, const char * key, const char * alias)
 {
     if (pl->use_doc) {
         const char *k = key;
@@ -440,7 +448,7 @@ int param_list_configure_alias(param_list pl, const char * key, const char * ali
     return 0;
 }
 
-int param_list_configure_switch(param_list pl, const char * switchname, int * ptr)
+int param_list_configure_switch(param_list_ptr pl, const char * switchname, int * ptr)
 {
     /* Some switches are passed as switchname = "switch", some as "-switch",
        and some as "--switch" ... */
@@ -478,7 +486,7 @@ int param_list_configure_switch(param_list pl, const char * switchname, int * pt
 }
 
 
-static int param_list_update_cmdline_alias(param_list pl,
+static int param_list_update_cmdline_alias(param_list_ptr pl,
         param_list_alias al,
         int * p_argc, char *** p_argv)
 {
@@ -529,7 +537,7 @@ static int param_list_update_cmdline_alias(param_list pl,
     return 0;
 }
 
-static int param_list_update_cmdline_switch(param_list pl,
+static int param_list_update_cmdline_switch(param_list_ptr pl,
         param_list_switch switchpar,
         int * p_argc, char *** p_argv)
 {
@@ -562,7 +570,7 @@ static int param_list_update_cmdline_switch(param_list pl,
     return 0;
 }
 
-int param_list_update_cmdline(param_list pl,
+int param_list_update_cmdline(param_list_ptr pl,
         int * p_argc, char *** p_argv)
 {
     if (!pl->cmdline_argv0) {
@@ -630,7 +638,7 @@ int param_strcmp(const char * a, parameter_srcptr b)
     return strcmp_or_null(a, b->key);
 }
 
-static int assoc(param_list pl, const char * key)
+static int assoc(param_list_ptr pl, const char * key)
 {
     if (pl->use_doc) {
         const char *k = (key[0] == '-') ? (1+key) : key;
@@ -653,7 +661,7 @@ static int assoc(param_list pl, const char * key)
    mutex locking to make look-ups thread safe; the caller must not access
    any param_list entries by itself. */
 static int
-get_assoc(param_list pl, const char * const key, char ** const value, int * const seen)
+get_assoc(param_list_ptr pl, const char * const key, char ** const value, int * const seen)
 {
     pthread_mutex_lock(mutex);
     const int v = assoc(pl, key);
@@ -671,7 +679,7 @@ get_assoc(param_list pl, const char * const key, char ** const value, int * cons
     return found;
 }
 
-int param_list_parse_long(param_list pl, const char * key, long * r)
+int param_list_parse_long(param_list_ptr pl, const char * key, long * r)
 {
     char *value;
     int seen;
@@ -690,7 +698,7 @@ int param_list_parse_long(param_list pl, const char * key, long * r)
     return seen;
 }
 
-int param_list_parse_int(param_list pl, const char * key, int * r)
+int param_list_parse_int(param_list_ptr pl, const char * key, int * r)
 {
     long res;
     int rc;
@@ -708,7 +716,7 @@ int param_list_parse_int(param_list pl, const char * key, int * r)
     return rc;
 }
 
-int param_list_parse_long_and_long(param_list pl, const char * key, long * r, const char * sep)
+int param_list_parse_long_and_long(param_list_ptr pl, const char * key, long * r, const char * sep)
 {
     char *value;
     int seen;
@@ -738,7 +746,7 @@ int param_list_parse_long_and_long(param_list pl, const char * key, long * r, co
     return seen;
 }
 
-int param_list_parse_int_and_int(param_list pl, const char * key, int * r, const char * sep)
+int param_list_parse_int_and_int(param_list_ptr pl, const char * key, int * r, const char * sep)
 {
 #if 1
   long rr[2] = {0, 0};
@@ -763,7 +771,7 @@ int param_list_parse_int_and_int(param_list pl, const char * key, int * r, const
 #endif
 }
 
-int param_list_parse_uint_and_uint(param_list pl, const char * key, unsigned int * r, const char * sep)
+int param_list_parse_uint_and_uint(param_list_ptr pl, const char * key, unsigned int * r, const char * sep)
 {
     long rr[2] = {0, 0};
     if (r) {
@@ -778,12 +786,12 @@ int param_list_parse_uint_and_uint(param_list pl, const char * key, unsigned int
     return seen;
 }
 
-int param_list_parse_intxint(param_list pl, const char * key, int * r)
+int param_list_parse_intxint(param_list_ptr pl, const char * key, int * r)
 {
     return param_list_parse_int_and_int(pl, key, r, "x");
 }
 
-int param_list_parse_uint64_and_uint64(param_list pl, const char * key,
+int param_list_parse_uint64_and_uint64(param_list_ptr pl, const char * key,
     uint64_t * r, const char * sep)
 {
     char *value;
@@ -814,7 +822,7 @@ int param_list_parse_uint64_and_uint64(param_list pl, const char * key,
     return seen;
 }
 
-int param_list_parse_ulong(param_list pl, const char * key, unsigned long * r)
+int param_list_parse_ulong(param_list_ptr pl, const char * key, unsigned long * r)
 {
     char *value;
     int seen;
@@ -834,7 +842,7 @@ int param_list_parse_ulong(param_list pl, const char * key, unsigned long * r)
     return seen;
 }
 
-int param_list_parse_size_t(param_list pl, const char * key, size_t * r)
+int param_list_parse_size_t(param_list_ptr pl, const char * key, size_t * r)
 {
     unsigned long t;
     int res;
@@ -844,7 +852,7 @@ int param_list_parse_size_t(param_list pl, const char * key, size_t * r)
 }
 
 
-int param_list_parse_int64(param_list pl, const char * key, int64_t * r)
+int param_list_parse_int64(param_list_ptr pl, const char * key, int64_t * r)
 {
     char *value;
     int seen;
@@ -864,7 +872,7 @@ int param_list_parse_int64(param_list pl, const char * key, int64_t * r)
     return seen;
 }
 
-int param_list_parse_uint64(param_list pl, const char * key, uint64_t * r)
+int param_list_parse_uint64(param_list_ptr pl, const char * key, uint64_t * r)
 {
     char *value;
     int seen;
@@ -884,7 +892,7 @@ int param_list_parse_uint64(param_list pl, const char * key, uint64_t * r)
     return seen;
 }
 
-int param_list_parse_uint(param_list pl, const char * key, unsigned int * r)
+int param_list_parse_uint(param_list_ptr pl, const char * key, unsigned int * r)
 {
     unsigned long res;
     int rc = param_list_parse_ulong(pl, key, &res);
@@ -901,7 +909,7 @@ int param_list_parse_uint(param_list pl, const char * key, unsigned int * r)
     return rc;
 }
 
-int param_list_parse_uchar(param_list pl, const char * key, unsigned char * r)
+int param_list_parse_uchar(param_list_ptr pl, const char * key, unsigned char * r)
 {
     unsigned long res;
     int rc = param_list_parse_ulong(pl, key, &res);
@@ -918,7 +926,7 @@ int param_list_parse_uchar(param_list pl, const char * key, unsigned char * r)
     return rc;
 }
 
-int param_list_parse_double(param_list pl, const char * key, double * r)
+int param_list_parse_double(param_list_ptr pl, const char * key, double * r)
 {
     char *value;
     int seen;
@@ -937,7 +945,7 @@ int param_list_parse_double(param_list pl, const char * key, double * r)
     return seen;
 }
 
-int param_list_parse_double_and_double(param_list pl, const char * key,
+int param_list_parse_double_and_double(param_list_ptr pl, const char * key,
     double * r, const char * sep)
 {
     char *value;
@@ -968,7 +976,7 @@ int param_list_parse_double_and_double(param_list pl, const char * key,
     return seen;
 }
 
-int param_list_parse_string(param_list pl, const char * key, char * r, size_t n)
+int param_list_parse_string(param_list_ptr pl, const char * key, char * r, size_t n)
 {
     char *value;
     int seen;
@@ -985,7 +993,7 @@ int param_list_parse_string(param_list pl, const char * key, char * r, size_t n)
     return seen;
 }
 
-int param_list_parse_string_list_alloc(param_list pl, const char * key, char *** r, int * n, const char * sep)
+int param_list_parse_string_list_alloc(param_list_ptr pl, const char * key, char *** r, int * n, const char * sep)
 {
     char * value;
     *r = NULL;
@@ -1029,7 +1037,7 @@ int param_list_get_list_count(param_list_ptr pl, const char * key)
 }
 
 
-int param_list_parse_int_list(param_list pl, const char * key, int * r, size_t n, const char * sep)
+int param_list_parse_int_list(param_list_ptr pl, const char * key, int * r, size_t n, const char * sep)
 {
     char *value;
     if (!get_assoc(pl, key, &value, NULL))
@@ -1065,7 +1073,7 @@ int param_list_parse_int_list(param_list pl, const char * key, int * r, size_t n
     return parsed;
 }
 
-int param_list_parse_uint_list(param_list pl, const char * key,
+int param_list_parse_uint_list(param_list_ptr pl, const char * key,
     unsigned int * r, size_t n, const char * sep)
 {
     char *value;
@@ -1104,7 +1112,7 @@ int param_list_parse_uint_list(param_list pl, const char * key,
     return parsed;
 }
 
-int param_list_parse_uint64_list(param_list pl, const char * key,
+int param_list_parse_uint64_list(param_list_ptr pl, const char * key,
     uint64_t * r, size_t n, const char * sep)
 {
     char *value;
@@ -1141,7 +1149,7 @@ int param_list_parse_uint64_list(param_list pl, const char * key,
     return parsed;
 }
 
-int param_list_parse_uchar_list(param_list pl, const char * key,
+int param_list_parse_uchar_list(param_list_ptr pl, const char * key,
     unsigned char * r, size_t n, const char * sep)
 {
     char *value;
@@ -1180,7 +1188,7 @@ int param_list_parse_uchar_list(param_list pl, const char * key,
     return parsed;
 }
 
-void param_list_parse_int_list_size(param_list pl, const char * key , int ** r ,
+void param_list_parse_int_list_size(param_list_ptr pl, const char * key , int ** r ,
     unsigned int * t)
 {
   char *value;
@@ -1217,7 +1225,7 @@ void param_list_parse_int_list_size(param_list pl, const char * key , int ** r ,
   }
 }
 
-int param_list_parse_double_list(param_list pl, const char * key,
+int param_list_parse_double_list(param_list_ptr pl, const char * key,
     double * r, size_t n, const char * sep)
 {
     char *value;
@@ -1256,7 +1264,7 @@ int param_list_parse_double_list(param_list pl, const char * key,
     return parsed;
 }
 
-void param_list_parse_mpz_poly(param_list pl, const char * key,
+void param_list_parse_mpz_poly(param_list_ptr pl, const char * key,
     mpz_poly_ptr f)
 {
   char *value;
@@ -1291,7 +1299,7 @@ void param_list_parse_mpz_poly(param_list pl, const char * key,
   mpz_clear(coeff);
 }
 
-const char * param_list_lookup_string(param_list pl, const char * key)
+const char * param_list_lookup_string(param_list_ptr pl, const char * key)
 {
     char *value;
     int seen;
@@ -1300,7 +1308,7 @@ const char * param_list_lookup_string(param_list pl, const char * key)
     return value;
 }
 
-int param_list_parse_mpz(param_list pl, const char * key, mpz_ptr r)
+int param_list_parse_mpz(param_list_ptr pl, const char * key, mpz_ptr r)
 {
     char *value;
     int seen;
@@ -1322,7 +1330,7 @@ int param_list_parse_mpz(param_list pl, const char * key, mpz_ptr r)
     return seen;
 }
 
-int param_list_parse_switch(param_list pl, const char * key)
+int param_list_parse_switch(param_list_ptr pl, const char * key)
 {
     char *value;
     int seen;
@@ -1335,7 +1343,7 @@ int param_list_parse_switch(param_list pl, const char * key)
     return seen;
 }
 
-int param_list_all_consumed(param_list pl, char ** extraneous)
+int param_list_all_consumed(param_list_ptr pl, char ** extraneous)
 {
     for(unsigned int i = 0 ; i < pl->size ; i++) {
         if (!pl->p[i]->parsed) {
@@ -1349,7 +1357,7 @@ int param_list_all_consumed(param_list pl, char ** extraneous)
     return 1;
 }
 
-int param_list_warn_unused(param_list pl)
+int param_list_warn_unused(param_list_ptr pl)
 {
     int u = 0;
     for(unsigned int i = 0 ; i < pl->size ; i++) {
@@ -1362,7 +1370,7 @@ int param_list_warn_unused(param_list pl)
     return u;
 }
 
-void param_list_display(param_list pl, FILE *f)
+void param_list_display(param_list_ptr pl, FILE *f)
 {
     param_list_consolidate(pl);
     for(unsigned int i = 0 ; i < pl->size ; i++) {
@@ -1370,7 +1378,7 @@ void param_list_display(param_list pl, FILE *f)
     }
 }
 
-void param_list_save(param_list pl, const char * filename)
+void param_list_save(param_list_ptr pl, const char * filename)
 {
     FILE * f = fopen(filename, "w");
     if (f == NULL) {
@@ -1382,7 +1390,7 @@ void param_list_save(param_list pl, const char * filename)
     fclose(f);
 }
 
-int param_list_save_parameter(param_list pl, enum parameter_origin o, 
+int param_list_save_parameter(param_list_ptr pl, enum parameter_origin o, 
         const char * key, const char * format, ...)
 {
     va_list ap;
@@ -1398,7 +1406,7 @@ int param_list_save_parameter(param_list pl, enum parameter_origin o,
 }
 
 
-void param_list_print_command_line(FILE * stream, param_list pl)
+void param_list_print_command_line(FILE * stream, param_list_ptr pl)
 {
     /* remember that the API for calling param_list functions mandates
      * that the binary name $0 is stripped from the provided lists */

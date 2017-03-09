@@ -2743,8 +2743,7 @@ int main (int argc0, char *argv0[])/*{{{*/
     setbuf(stdout, NULL);
     setbuf(stderr, NULL);
 
-    param_list pl;
-    param_list_init(pl);
+    cxx_param_list pl;
 
     declare_usage(pl);
 
@@ -3419,8 +3418,6 @@ int main (int argc0, char *argv0[])/*{{{*/
     delete workspaces;
 
     las_report_clear(report);
-
-    param_list_clear(pl);
 
     return 0;
 }/*}}}*/
