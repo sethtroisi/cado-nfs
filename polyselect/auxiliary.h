@@ -58,14 +58,6 @@ typedef struct
   double jmin[MAX_DEGREE], jmax[MAX_DEGREE];
 } rotation_space;
 
-#define mpz_add_si(a,b,c)                       \
-  if (c >= 0) mpz_add_ui (a, b, c);             \
-  else mpz_sub_ui (a, b, -(c))
-
-#define mpz_submul_si(a,b,c)                    \
-  if (c >= 0) mpz_submul_ui (a, b, c);          \
-  else mpz_addmul_ui (a, b, -(c))
-  
 #ifdef __cplusplus
 extern "C" {
 #endif

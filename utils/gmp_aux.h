@@ -5,7 +5,7 @@
 #include <stdint.h>
 #include <macros.h>
 
-/* the following function is missing in GMP */
+/* the following function are missing in GMP */
 #ifndef mpz_addmul_si
 #define mpz_addmul_si(a, b, c)                  \
   do {                                          \
@@ -17,6 +17,18 @@
   while (0)
 #endif
 
+#ifndef mpz_add_si
+#define mpz_add_si(a,b,c)                       \
+  if (c >= 0) mpz_add_ui (a, b, c);             \
+  else mpz_sub_ui (a, b, -(c))
+#endif
+
+#ifndef mpz_submul_si
+#define mpz_submul_si(a,b,c)                    \
+  if (c >= 0) mpz_submul_ui (a, b, c);          \
+  else mpz_addmul_ui (a, b, -(c))
+#endif
+  
 #ifdef __cplusplus
 extern "C" {
 #endif
