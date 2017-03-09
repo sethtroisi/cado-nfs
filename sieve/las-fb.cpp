@@ -1,4 +1,6 @@
 #include "cado.h"
+#include <stdarg.h>
+#include <gmp.h>
 #include "las-types.hpp"
 #include "fb.hpp"
 
@@ -43,12 +45,18 @@ void sieve_info::init_factor_bases(las_info & las, param_list_ptr pl)
     }
 
     for(int side = 0 ; side < 2 ; side++) {
-        mpz_poly_ptr pol = cpoly->pols[side];
+        cxx_mpz_poly pol;
+        mpz_poly_set(pol, cpoly->pols[side]);
 
         if (pol->deg > 1) {
             double tfb = seconds ();
             double tfb_wct = wct_seconds ();
             char fbparamname[4];
+            std::string polystring = pol.print_poly("x");
+            verbose_output_vfprint(0, 1, gmp_vfprintf,
+                    "# Reading side-%d factor base from disk"
+                    " for polynomial f%d(x) = %s\n",
+                    side, side, polystring.c_str());
             snprintf(fbparamname, sizeof(fbparamname), "fb%d", side);
             const char * fbfilename = param_list_lookup_string(pl, fbparamname);
             if (!fbfilename) {
@@ -66,13 +74,12 @@ void sieve_info::init_factor_bases(las_info & las, param_list_ptr pl)
         } else {
             double tfb = seconds ();
             double tfb_wct = wct_seconds ();
-            fb[side]->make_linear_threadpool ((const mpz_t *) pol->coeff,
-                    las.nb_threads);
+            fb[side]->make_linear_threadpool (pol->coeff, las.nb_threads);
             tfb = seconds () - tfb;
             tfb_wct = wct_seconds() - tfb_wct;
             verbose_output_print(0, 1,
-                    "# Creating rational factor base of %zuMb took %1.1fs (%1.1fs real)\n",
-                    fb[side]->size() >> 20, tfb, tfb_wct);
+                    "# Creating side-%d rational factor base of %zuMb took %1.1fs (%1.1fs real)\n",
+                    side, fb[side]->size() >> 20, tfb, tfb_wct);
         }
     }
 
