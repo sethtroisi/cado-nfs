@@ -660,8 +660,8 @@ main (int argc, char *argv[])
      one 32-bit word for the hash table, taking K/100 will use 2.5% extra
      memory */
   sanity_size = 1 + (K / 100);
-  fprintf (stderr, "[checking true duplicates on sample of %lu cells]\n",
-           sanity_size);
+  fprintf (stderr, "[checking true duplicates on sample of %" PRIu64
+           " cells]\n", sanity_size);
   sanity_a = (int64_t*)  malloc (sanity_size * sizeof (int64_t));
   if (sanity_a == NULL)
     {
