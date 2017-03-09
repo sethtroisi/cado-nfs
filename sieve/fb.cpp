@@ -156,7 +156,7 @@ fb_general_entry::read_roots (const char *lineptr, const unsigned char nexp,
     nr_roots = 0;
     while (*lineptr != '\0')
     {
-        if (nr_roots == MAXDEGREE) {
+        if (nr_roots == MAX_DEGREE) {
             verbose_output_print (1, 0,
                     "# Error, too many roots for prime (power) %" FBPRIME_FORMAT
                     " in factor base line %lu\n", q, linenr);
@@ -289,7 +289,7 @@ fb_general_entry::merge (const fb_general_entry &other)
 {
   ASSERT_ALWAYS(p == other.p && q == other.q && k == other.k);
   for (unsigned char i_root = 0; i_root < other.nr_roots; i_root++) {
-    ASSERT_ALWAYS(nr_roots < MAXDEGREE);
+    ASSERT_ALWAYS(nr_roots < MAX_DEGREE);
     roots[nr_roots++] = other.roots[i_root];
   }
 }
@@ -806,7 +806,7 @@ void
 fb_part::finalize()
 {
   if (!only_general) {
-    for (int i_roots = 0; i_roots <= MAXDEGREE; i_roots++) {
+    for (int i_roots = 0; i_roots <= MAX_DEGREE; i_roots++) {
       get_slices(i_roots)->finalize();
     }
   }
@@ -817,7 +817,7 @@ void
 fb_part::fprint(FILE *out) const
 {
   if (!only_general) {
-    for (int i_roots = 0; i_roots <= MAXDEGREE; i_roots++) {
+    for (int i_roots = 0; i_roots <= MAX_DEGREE; i_roots++) {
       fprintf(out, "#   Entries with %d roots:\n", i_roots);
       cget_slices(i_roots)->fprint(out);
     }
@@ -833,7 +833,7 @@ void
 fb_part::_count_entries(size_t *nprimes, size_t *nroots, double *weight) const
 {
   if (!only_general) {
-    for (int i_roots = 0; i_roots <= MAXDEGREE; i_roots++)
+    for (int i_roots = 0; i_roots <= MAX_DEGREE; i_roots++)
       cget_slices(i_roots)->_count_entries(nprimes, nroots, weight);
   }
   general_vector._count_entries(nprimes, nroots, weight);
@@ -844,7 +844,7 @@ void
 fb_part::extract_bycost(std::vector<unsigned long> &p, fbprime_t pmax, fbprime_t td_thresh) const
 {
   if (!only_general) {
-    for (int i_roots = 0; i_roots <= MAXDEGREE; i_roots++)
+    for (int i_roots = 0; i_roots <= MAX_DEGREE; i_roots++)
       cget_slices(i_roots)->extract_bycost(p, pmax, td_thresh);
   }
 
@@ -857,7 +857,7 @@ fb_part::make_slices(const double scale, const double max_weight,
                      slice_index_t &next_index)
 {
   if (!only_general) {
-    for (int i_roots = 0; i_roots <= MAXDEGREE; i_roots++)
+    for (int i_roots = 0; i_roots <= MAX_DEGREE; i_roots++)
       get_slices(i_roots)->make_slices(scale, max_weight, next_index);
     /* If we store all entries as general entries, we don't slice them,
        as those are the small primes in part 0 which get line sieved */
@@ -878,7 +878,7 @@ void *
 fb_part::mmap_fbc(void *p, void * const end)
 {
   if (!only_general) {
-    for (int i_roots = 0; p != NULL && i_roots <= MAXDEGREE; ++i_roots)
+    for (int i_roots = 0; p != NULL && i_roots <= MAX_DEGREE; ++i_roots)
       p = get_slices(i_roots)->mmap_fbc(p, end);
   }
   if (p != NULL)
@@ -891,7 +891,7 @@ fb_part::dump_fbc(FILE *f) const
 {
   bool rc = true;
   if (!only_general) {
-    for (int i_roots = 0; rc && i_roots <= MAXDEGREE; ++i_roots)
+    for (int i_roots = 0; rc && i_roots <= MAX_DEGREE; ++i_roots)
       rc = cget_slices(i_roots)->dump_fbc(f);
   }
   if (rc)
@@ -903,7 +903,7 @@ void
 fb_part::clear()
 {
   if (!only_general) {
-    for (int i_roots = 0; i_roots <= MAXDEGREE; ++i_roots)
+    for (int i_roots = 0; i_roots <= MAX_DEGREE; ++i_roots)
       get_slices(i_roots)->clear();
   }
   general_vector.clear();

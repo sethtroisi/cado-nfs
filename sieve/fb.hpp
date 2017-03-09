@@ -14,7 +14,7 @@
 #include <vector>
 #include <map>
 #include "las-config.h"
-#include "cado_poly.h" // for MAXDEGREE
+#include "cado_poly.h" // for MAX_DEGREE
 #include "fb-types.h"
 #include "las-qlattice.hpp"
 #include "las-plattice.hpp"
@@ -107,7 +107,7 @@ public:
   fbprime_t q, p; /* q = p^k */
   redc_invp_t invq; /* invq = -1/q (mod 2^32), or (mod 2^64), depending on
 		       the size of redc_invp_t */
-  fb_general_root roots[MAXDEGREE];
+  fb_general_root roots[MAX_DEGREE];
   unsigned char k, nr_roots;
   /* Static class members to allow fb_vector<> to distinguish between and
      operate on both kind of entries */
@@ -426,7 +426,7 @@ class fb_part: public fb_interface, private NonCopyable {
 
   /* These vectors are filled when we read or generate the factor base.
      The slices point into the vectors' storage. */
-  fb_vector<fb_entry_x_roots<0> > fb0_slices; /* From 0 to MAXDEGREE */
+  fb_vector<fb_entry_x_roots<0> > fb0_slices; /* From 0 to MAX_DEGREE */
   fb_vector<fb_entry_x_roots<1> > fb1_slices;
   fb_vector<fb_entry_x_roots<2> > fb2_slices;
   fb_vector<fb_entry_x_roots<3> > fb3_slices;
@@ -440,7 +440,7 @@ class fb_part: public fb_interface, private NonCopyable {
   fb_vector<fb_general_entry> general_vector;
 
   fb_vector_interface *get_slices(const unsigned int n) {
-    ASSERT_ALWAYS(n <= MAXDEGREE);
+    ASSERT_ALWAYS(n <= MAX_DEGREE);
     
     if (only_general)
      return NULL;
@@ -462,7 +462,7 @@ class fb_part: public fb_interface, private NonCopyable {
   }
   /* (^$#&$@! C++ */
   const fb_vector_interface *cget_slices(const unsigned int n) const {
-    ASSERT_ALWAYS(n <= MAXDEGREE);
+    ASSERT_ALWAYS(n <= MAX_DEGREE);
     
     if (only_general)
      return NULL;
@@ -501,7 +501,7 @@ public:
        or return NULL if all are empty */
     const fb_slice_interface *slice = NULL;
     if (!only_general) {
-      for (unsigned int nr_roots = 0; slice == NULL && nr_roots <= MAXDEGREE; nr_roots++) {
+      for (unsigned int nr_roots = 0; slice == NULL && nr_roots <= MAX_DEGREE; nr_roots++) {
         const fb_vector_interface *slices = cget_slices(nr_roots);
         if (slices != NULL)
           slice = slices->get_first_slice();
@@ -519,7 +519,7 @@ public:
     return (slice == NULL) ? 0 : slice->get_index();
   }
   const fb_slice_interface *get_slice(const slice_index_t slice_idx) const {
-    for (unsigned int nr_roots = 0; nr_roots <= MAXDEGREE; nr_roots++) {
+    for (unsigned int nr_roots = 0; nr_roots <= MAX_DEGREE; nr_roots++) {
       const fb_vector_interface *slices = cget_slices(nr_roots);
       if (slices != NULL) {
         const fb_slice_interface *slice;

@@ -179,7 +179,7 @@ ropt_on_stdin_readpoly ( mpz_t N,
     }
     /* ci: coeff of degree i */
     else if (sscanf (s, "c%d:", &i) == 1) {
-      if (i > MAXDEGREE) {
+      if (i > MAX_DEGREE) {
         fprintf (stderr, "Error, too large degree %d\n", i);
         exit (1);
       }
@@ -209,7 +209,7 @@ ropt_on_stdin_readpoly ( mpz_t N,
     }
   }
 
-  for (d = MAXDEGREE; d > 0 && mpz_cmp_ui (f[d], 0) == 0; d --);
+  for (d = MAX_DEGREE; d > 0 && mpz_cmp_ui (f[d], 0) == 0; d --);
   *degree = d;
   if (mpz_cmp_ui (M, 0) == 0) {
     mpz_t t;

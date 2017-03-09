@@ -24,6 +24,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 
 #include <float.h>  /* for DBL_MAX */
 #include <string.h>
+#include "cado_poly.h"
+#include "mpz_poly.h"
+
 
 /* The polynomial selection algorithms that use a linear polynomial will
  * put it on the side given by the following. */
@@ -45,7 +48,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 
 extern double bound_f, bound_g, area;
 
-#define MAX_DEGREE 10
+/* The maximum degree supported is MAX_DEGREE, as defined in cado_poly.h */
 
 #define NORM_MARGIN 0.2
 
@@ -63,9 +66,6 @@ typedef struct
   if (c >= 0) mpz_submul_ui (a, b, c);          \
   else mpz_addmul_ui (a, b, -(c))
   
-#include "cado_poly.h"
-#include "mpz_poly.h"
-
 #ifdef __cplusplus
 extern "C" {
 #endif

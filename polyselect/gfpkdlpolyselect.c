@@ -74,7 +74,7 @@ void eval_mpz_phi_mpz_uv(mpz_poly g, mpz_t** phi_coeff, unsigned int deg_phi, mp
     // ff.phi[i][1] * u
     // phi_i = phi_i0 + phi_i1 * Y
     // the function does not use modular arithmetic but exact integer arithmetic
-void eval_si_phi_mpz_uv(mpz_poly g, const long int phi_coeff[MAXDEGREE + 1][DEG_PY], unsigned int deg_phi, mpz_t u, mpz_t v)
+void eval_si_phi_mpz_uv(mpz_poly g, const long int phi_coeff[MAX_DEGREE + 1][DEG_PY], unsigned int deg_phi, mpz_t u, mpz_t v)
 {
   unsigned int i;
   for (i=0; i <= deg_phi; i++){
@@ -85,7 +85,7 @@ void eval_si_phi_mpz_uv(mpz_poly g, const long int phi_coeff[MAXDEGREE + 1][DEG_
   mpz_poly_cleandeg(g, deg_phi); // set deg to deg_phi at most (check that coeff is not 0)
 }
 
-void eval_si_phi_mpz_y(mpz_poly g, const long int phi_coeff[MAXDEGREE + 1][DEG_PY], unsigned int deg_phi, mpz_t y)
+void eval_si_phi_mpz_y(mpz_poly g, const long int phi_coeff[MAX_DEGREE + 1][DEG_PY], unsigned int deg_phi, mpz_t y)
 {
   unsigned int i;
   for (i=0; i <= deg_phi; i++){
@@ -796,7 +796,7 @@ static void print_coeff_Y_phi(FILE *fp, const long int phi_coeff_y[DEG_PY], unsi
 }
 
 
-void mpz_phi_poly_fprintf_cado_format_line (FILE *fp, const long int phi_coeff[MAXDEGREE + 1][DEG_PY], unsigned int deg_phi, unsigned int deg_Py, int j, const char *label_poly)
+void mpz_phi_poly_fprintf_cado_format_line (FILE *fp, const long int phi_coeff[MAX_DEGREE + 1][DEG_PY], unsigned int deg_phi, unsigned int deg_Py, int j, const char *label_poly)
 {
   if (label_poly != NULL){
     fprintf (fp, "# ");

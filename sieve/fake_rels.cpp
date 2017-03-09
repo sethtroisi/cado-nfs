@@ -473,7 +473,7 @@ main (int argc, char *argv[])
   while (q < q0) {
       q = getprime_mt(pdata);
   }
-  uint64_t roots[MAXDEGREE];
+  uint64_t roots[MAX_DEGREE];
   int mult = mpz_poly_roots_uint64(roots, cpoly->pols[sqside], q); 
   while (mult == 0) {
       advance_prime_in_fb(&mult, &q, roots, cpoly, sqside, pdata);
