@@ -1,7 +1,6 @@
 #include "cado.h"
 #include <math.h>
 #include "utils.h"
-#include "polyselect/rho.h"
 #include "tests_common.h"
 
 /* check relative error is less than emax */

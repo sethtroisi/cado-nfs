@@ -28,6 +28,6 @@ q0=1200000
 q1=1200200
 
 export lim0 lim1 lpb0 lpb1 maxbits mfb0 mfb1 lambda0 lambda1 I q0 q1
-"${SOURCE_TEST_DIR}"/batchtest.sh "${FB}" "${LAS}" "${SRCDIR}/parameters/polynomials/F9.poly" "${REFERENCE_SHA1}" "${REFERENCE_REVISION}" "${CHECKSUM_FILE}" "$@" || exit 1
+"${SOURCE_TEST_DIR}"/batchtest.sh "${FB}" "${LAS}" "${SRCDIR}/parameters/polynomials/F9.poly" "${REFERENCE_SHA1}" "${REFERENCE_REVISION}" "${CHECKSUM_FILE}" --adjust-strategy 0 "$@" || exit 1
 
 exit 0

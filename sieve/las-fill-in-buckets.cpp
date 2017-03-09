@@ -259,8 +259,8 @@ fill_in_buckets_toplevel(bucket_array_t<LEVEL, shorthint_t> &orig_BA,
       /* If proj and r > 0, then r == 1/p (mod p^2), so all hits would be in
          locations with p | gcd(i,j). */
       if (LIKELY(!proj || r == 0)) {
-        plattice_info_t pli = plattice_info_t(transformed.get_q(), r, proj, si.conf.logI);
-        plattice_enumerate_t ple = plattice_enumerate_t(pli, i_entry, si.conf.logI, si.conf.sublat);
+        plattice_info_t pli = plattice_info_t(transformed.get_q(), r, proj, si.conf.logI_adjusted);
+        plattice_enumerate_t ple = plattice_enumerate_t(pli, i_entry, si.conf.logI_adjusted, si.conf.sublat);
 
         // Skip (i,j)=(0,0) unless we have sublattices.
         if (!si.conf.sublat.m)
@@ -549,21 +549,21 @@ fill_in_buckets_one_side(timetree_t& timer, thread_pool &pool, thread_workspaces
 void fill_in_buckets_both(timetree_t& timer, thread_pool &pool, thread_workspaces &ws, sieve_info const & si)
 {
   CHILD_TIMER(timer, __func__);
-  plattice_enumerate_t::set_masks(si.logI);
+  plattice_enumerate_t::set_masks(si.conf.logI_adjusted);
   for (int side = 0; side < 2; ++side) {
     switch (si.toplevel) {
       case 1:
-        plattice_enumerate_area<1>::value = plattice_x_t(si.J) << si.logI;
+        plattice_enumerate_area<1>::value = plattice_x_t(si.J) << si.conf.logI_adjusted;
         fill_in_buckets_one_side<1>(timer, pool, ws,
             si.sides[side].fb->get_part(si.toplevel), si, side);
         break;
       case 2:
-        plattice_enumerate_area<2>::value = plattice_x_t(si.J) << si.logI;
+        plattice_enumerate_area<2>::value = plattice_x_t(si.J) << si.conf.logI_adjusted;
         fill_in_buckets_one_side<2>(timer, pool, ws,
             si.sides[side].fb->get_part(si.toplevel), si, side);
         break;
       case 3:
-        plattice_enumerate_area<3>::value = plattice_x_t(si.J) << si.logI;
+        plattice_enumerate_area<3>::value = plattice_x_t(si.J) << si.conf.logI_adjusted;
         fill_in_buckets_one_side<3>(timer, pool, ws,
             si.sides[side].fb->get_part(si.toplevel), si, side);
         break;

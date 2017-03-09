@@ -15,6 +15,7 @@ set (sources
         version_info.c
 	modified_files.c threadpool.cpp mpz_poly_bivariate.c
         gmpxx.cpp
+        rho.c
 )
 if (NOT MINGW)
     set (sources ${sources} cado_popen.c)

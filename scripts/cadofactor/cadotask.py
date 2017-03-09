@@ -1693,11 +1693,6 @@ class Polysel1Task(ClientServerTask, DoesImport, HasStatistics, patterns.Observe
     # Stat: potential collisions=124.92 (2.25e+00/s)
     # Stat: raw lognorm (nr/min/av/max/std): 132/18.87/21.83/24.31/0.48
     # Stat: optimized lognorm (nr/min/av/max/std): 125/20.10/22.73/24.42/0.69
-    # Stat: av. g0/adm2 ratio: 8.594e+04
-    # Stat: tried 83 ad-value(s), found 132 polynomial(s), 125 below maxnorm
-    # Stat: best raw logmu: 20.25 20.88
-    # Stat: best opt logmu: 19.68 20.25
-    # Stat: best logmu: 19.68 20.25
     # Stat: total phase took 55.47s
     @property
     def stat_conversions(self):
@@ -1734,27 +1729,6 @@ class Polysel1Task(ClientServerTask, DoesImport, HasStatistics, patterns.Observe
             re.compile(r"# Stat: tried (\d+) ad-value\(s\), found (\d+) polynomial\(s\), (\d+) below maxnorm"),
             False
         ),
-        # Note for "best raw logmu" pattern: a regex like (%s )* does not work;
-        # the number of the capture group is determined by the parentheses
-        # in the regex string, so trying to repeat a group like this will
-        # always capture to the *same* group, overwriting previous matches,
-        # so that in the end, only the last match is in the capture group.
-        (
-            "stats_raw_logmu",
-            float,
-            "",
-            Statistics.smallest_n,
-            re.compile(re_cap_n_fp("# Stat: best raw logmu:", 10)),
-            False
-        ),
-        (
-            "stats_opt_logmu",
-            float,
-            "",
-            Statistics.smallest_n,
-            re.compile(re_cap_n_fp("# Stat: best opt logmu:", 10)),
-            False
-        ),
         (
             "stats_total_time",
             float,
@@ -1772,10 +1746,6 @@ class Polysel1Task(ClientServerTask, DoesImport, HasStatistics, patterns.Observe
                 ["/{stats_rawlognorm[%d]:.3f}" % i for i in range(1, 5)],
             ["optimized lognorm (nr/min/av/max/std): {stats_optlognorm[0]:d}"] +
                 ["/{stats_optlognorm[%d]:.3f}" % i for i in range(1, 5)],
-            ["10 best raw logmu:"] +
-                [" {stats_raw_logmu[%d]}" % i for i in range(10)],
-            ["10 best opt logmu:"] +
-                [" {stats_opt_logmu[%d]}" % i for i in range(10)],
             ["Total time: {stats_total_time[0]:g}"],
             )
     

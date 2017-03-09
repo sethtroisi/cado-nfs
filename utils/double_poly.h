@@ -36,8 +36,9 @@ typedef struct double_poly_s double_poly[1];
 void double_poly_init (double_poly_ptr, unsigned int);
 void double_poly_clear (double_poly_ptr);
 void double_poly_set (double_poly_ptr, double_poly_srcptr);
-double double_poly_eval (double_poly_srcptr, const double);
-double double_poly_eval_safe (double_poly_srcptr, const double);
+double double_poly_eval (double_poly_srcptr, double);
+double double_poly_eval_homogeneous (double_poly_srcptr p, double x, double y);
+double double_poly_eval_safe (double_poly_srcptr, double);
 double double_poly_dichotomy (double_poly_srcptr, double, double, double,
                               unsigned int);
 void double_poly_derivative(double_poly_ptr, double_poly_srcptr);

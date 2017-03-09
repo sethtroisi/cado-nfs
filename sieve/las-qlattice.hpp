@@ -46,6 +46,18 @@ struct qlattice_basis {
             return true;
         }
     }
+    inline bool fits_31bits() const {
+        return !(
+                 a0 <= INT64_C(-2147483648) ||
+                 a0 >= INT64_C( 2147483648) ||
+                 a1 <= INT64_C(-2147483648) ||
+                 a1 >= INT64_C( 2147483648) ||
+                 b0 <= INT64_C(-2147483648) ||
+                 b0 >= INT64_C( 2147483648) ||
+                 b1 <= INT64_C(-2147483648) ||
+                 b1 >= INT64_C( 2147483648)
+                 );
+    }
 };
 
 int SkewGauss (qlattice_basis &, const mpz_t, const mpz_t, double);

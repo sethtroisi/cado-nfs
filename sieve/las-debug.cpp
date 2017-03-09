@@ -11,8 +11,13 @@
 #include "las-coordinates.hpp"
 #include "portability.h"
 
+using namespace std;
 #if defined(__GLIBC__) && (defined(TRACE_K) || defined(CHECK_UNDERFLOW))
 #include <execinfo.h>   /* For backtrace. Since glibc 2.1 */
+#endif
+#ifdef HAVE_CXXABI_H
+/* We use that to demangle C++ names */
+#include <cxxabi.h>
 #endif
 
 /* The trivial calls for when TRACE_K is *not* defined are inlines in
@@ -71,10 +76,13 @@ void trace_per_sq_init(sieve_info const & si, const struct trace_Nx_t *Nx,
         IJToAB(&trace_ab.a, &trace_ab.b, trace_ij.i, trace_ij.j, si);
     }
 
-    if (trace_ij.j < UINT_MAX && trace_ij.j >= si.J) {
+    if ((trace_ij.j < UINT_MAX && trace_ij.j >= si.J)
+         || (trace_ij.i < -(1L << (si.conf.logI_adjusted-1)))
+         || (trace_ij.i >= (1L << (si.conf.logI_adjusted-1))))
+    {
         verbose_output_print(TRACE_CHANNEL, 0, "# Relation (%" PRId64 ",%" PRIu64 ") to be traced is "
-                "outside of the current (i,j)-rectangle (j=%u)\n",
-                trace_ab.a, trace_ab.b, trace_ij.j);
+                "outside of the current (i,j)-rectangle (i=%d j=%u)\n",
+                trace_ab.a, trace_ab.b, trace_ij.i, trace_ij.j);
         trace_ij.i=0;
         trace_ij.j=UINT_MAX;
         trace_Nx.N=0;
@@ -115,11 +123,7 @@ int test_divisible(where_am_I& w)
     fbprime_t p = w.p;
     if (p==0) return 1;
 
-#if 0
     const unsigned int logI = w.psi->conf.logI_adjusted;
-#else
-    const unsigned int logI = w.psi->conf.logI;
-#endif
     const unsigned int I = 1U << logI;
 
     const unsigned long X = w.x + (w.N << LOG_BUCKET_REGION);
@@ -145,6 +149,36 @@ int test_divisible(where_am_I& w)
 
 /* {{{ helper: sieve_increase */
 
+string remove_trailing_address_suffix(string const& a, string& suffix)
+{
+    size_t pos = a.find('+');
+    if (pos == a.npos) {
+        suffix.clear();
+        return a;
+    }
+    suffix = a.substr(pos);
+    return a.substr(0, pos);
+}
+
+string get_parenthesized_arg(string const& a, string& prefix, string& suffix)
+{
+    size_t pos = a.find('(');
+    if (pos == a.npos) {
+        prefix=a;
+        suffix.clear();
+        return string();
+    }
+    size_t pos2 = a.find(')', pos + 1);
+    if (pos2 == a.npos) {
+        prefix=a;
+        suffix.clear();
+        return string();
+    }
+    prefix = a.substr(0, pos);
+    suffix = a.substr(pos2 + 1);
+    return a.substr(pos+1, pos2-pos-1);
+}
+
 /* Do this so that the _real_ caller is always 2 floors up */
 void sieve_increase_logging_backend(unsigned char *S, const unsigned char logp, where_am_I& w)
 {
@@ -153,39 +187,56 @@ void sieve_increase_logging_backend(unsigned char *S, const unsigned char logp, 
 
     ASSERT_ALWAYS(test_divisible(w));
 
+    string caller;
+
 #ifdef __GLIBC__
-    void * callers_addresses[3];
-    char ** callers = NULL;
-    backtrace(callers_addresses, 3);
-    callers = backtrace_symbols(callers_addresses, 3);
-    char * freeme = strdup(callers[2]);
-    const char * caller = freeme;
-    free(callers);
-    char * opening = strchr(freeme, '(');
-    if (opening) {
-        char * closing = strchr(opening + 1, ')');
-        if (closing) {
-            *closing='\0';
-            caller = opening + 1;
-        }
+    {
+        void * callers_addresses[3];
+        char ** callers = NULL;
+        backtrace(callers_addresses, 3);
+        callers = backtrace_symbols(callers_addresses, 3);
+        caller = callers[2];
+        free(callers);
     }
-    if (!*caller) {
+
+    string xx,yy,zz;
+    yy = get_parenthesized_arg(caller, xx, zz);
+    if (!yy.empty()) caller = yy;
+
+    if (caller.empty()) {
         caller="<no symbol (static?)>";
+    } else {
+#ifdef HAVE_CXXABI_H
+        string address_suffix;
+        caller = remove_trailing_address_suffix(caller, address_suffix);
+        int demangle_status;
+        {
+            char * freeme = abi::__cxa_demangle(caller.c_str(), 0, 0, &demangle_status);
+            if (demangle_status == 0) {
+                caller = freeme;
+                free(freeme);
+            }
+        }
+
+        /* Get rid of the type signature, it rather useless */
+        yy = get_parenthesized_arg(caller, xx, zz);
+        caller = xx;
+
+        /* could it be that we have the return type in the name
+         * as well ? */
+
+        caller+=address_suffix;
+#endif
     }
-#else
-    const char * caller = "";
 #endif
     if (w.p) 
         verbose_output_print(TRACE_CHANNEL, 0, "# Add log(%" FBPRIME_FORMAT ",side %d) = %hhu to "
             "S[%u] = %hhu, from BA[%u] -> %hhu [%s]\n",
-            w.p, w.side, logp, w.x, *S, w.N, (unsigned char)(*S+logp), caller);
+            w.p, w.side, logp, w.x, *S, w.N, (unsigned char)(*S+logp), caller.c_str());
     else
         verbose_output_print(TRACE_CHANNEL, 0, "# Add log(hint=%lu,side %d) = %hhu to "
             "S[%u] = %hhu, from BA[%u] -> %hhu [%s]\n",
-            (unsigned long) w.h, w.side, logp, w.x, *S, w.N, (unsigned char)(*S+logp), caller);
-#ifdef __GLIBC__
-    free(freeme);
-#endif
+            (unsigned long) w.h, w.side, logp, w.x, *S, w.N, (unsigned char)(*S+logp), caller.c_str());
 }
 
 void sieve_increase_logging(unsigned char *S, const unsigned char logp, where_am_I& w)

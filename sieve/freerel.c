@@ -806,6 +806,14 @@ main (int argc, char *argv[])
   fprintf (stderr, "Renumbering struct: nprimes=%" PRIu64 "\n",
                    renumber_table->size);
 
+  /* produce an error when index_t is too small to represent all ideals */
+  if (renumber_table->size >> (8 * __SIZEOF_INDEX__))
+    {
+      fprintf (stderr, "Error, please increase __SIZEOF_INDEX__\n");
+      fprintf (stderr, "(see local.sh.example)\n");
+      exit (1);
+    }
+
   renumber_write_close (renumber_table, renumberfilename);
   renumber_clear (renumber_table);
   cado_poly_clear (cpoly);

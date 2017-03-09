@@ -82,9 +82,11 @@ static void
 heap_init (heap H, uint32_t nrows, int maxlevel)
 {
   H->list = malloc (nrows * sizeof (uint32_t));
+  FATAL_ERROR_CHECK(H->list == NULL, "Cannot allocate memory");
   H->size = 0;
   H->alloc = nrows;
   H->index = malloc (nrows * sizeof (uint32_t));
+  FATAL_ERROR_CHECK(H->index == NULL, "Cannot allocate memory");
   for (unsigned long i = 0; i < nrows; i++)
     H->index[i] = UINT32_MAX;
   for (int32_t w = 0; w < 256; w++)
@@ -297,6 +299,7 @@ initMat (filter_matrix_t *mat, int maxlevel, uint32_t keep,
   mat->rows = (typerow_t **) malloc (mat->nrows * sizeof (typerow_t *));
   ASSERT_ALWAYS (mat->rows != NULL);
   mat->wt = (int32_t *) malloc (mat->ncols * sizeof (int32_t));
+  ASSERT_ALWAYS (mat->wt != NULL);
   memset (mat->wt, 0, mat->ncols * sizeof (int32_t));
   mat->R = (index_t **) malloc (mat->ncols * sizeof(index_t *));
   ASSERT_ALWAYS(mat->R != NULL);
@@ -356,10 +359,15 @@ renumber_columns (filter_matrix_t *mat)
   }
   /* h should be equal to rem_ncols, which is the number of columns with
    * non-zero weight */
+#ifndef BURY_FIRST
   ASSERT_ALWAYS(h + mat->nburied == mat->rem_ncols);
+#else
+  ASSERT_ALWAYS(h == mat->rem_ncols);
+#endif
 
   /* Realloc mat->wt */
   mat->wt = realloc (mat->wt, h * sizeof (int32_t));
+  ASSERT_ALWAYS(mat->wt != 0);
   /* Reset mat->ncols to behave as if they were no non-zero columns. */
   mat->ncols = h;
 
@@ -573,35 +581,49 @@ sort_relation (index_t *row, unsigned int n)
 void * insert_rel_into_table (void *context_data, earlyparsed_relation_ptr rel)
 {
   filter_matrix_t *mat = (filter_matrix_t *) context_data;
-
-  /* XXX For now can't use my_malloc, because rows are realloc later */
-  mat->rows[rel->num] = (typerow_t*) malloc ((rel->nb + 1) * sizeof (typerow_t));
-  FATAL_ERROR_CHECK(mat->rows[rel->num] == NULL, "Cannot allocate memory");
-  matLengthRow(mat, rel->num) = rel->nb;
-  mat->tot_weight += rel->nb;
+  unsigned int j = 0;
+  typerow_t buf[UMAX(weight_t)]; /* rel->nb is of type weight_t */
+#ifdef BURY_FIRST
+  uint64_t nburied = mat->nburied;
+#endif
 
   for (unsigned int i = 0; i < rel->nb; i++)
   {
     index_t h = rel->primes[i].h;
+#ifdef BURY_FIRST
+    if (h < nburied)
+      continue;
+#endif
 #ifdef FOR_DL
     exponent_t e = rel->primes[i].e;
     /* For factorization, they should not be any multiplicity here.
        For DL we do not want to count multiplicity in mat->wt */
-    setCell (mat->rows[rel->num][i+1], h, e);
+    setCell (buf[++j], h, e);
 #else
     ASSERT(rel->primes[i].e == 1);
-    setCell (mat->rows[rel->num][i+1], h, 1);
+    setCell (buf[++j], h, 1);
 #endif
     mat->rem_ncols += (mat->wt[h] == 0);
     mat->wt[h] += (mat->wt[h] != SMAX(int32_t));
   }
 
+#ifdef BURY_FIRST
+  rel->nb = j;
+#endif
+  setCell (buf[0], rel->nb, 0);
+  mat->tot_weight += rel->nb;
+
+  mat->rows[rel->num] = (typerow_t*) malloc ((rel->nb + 1) * sizeof (typerow_t));
+  FATAL_ERROR_CHECK(mat->rows[rel->num] == NULL, "Cannot allocate memory");
+
   /* sort indices to ease row merges */
 #ifndef FOR_DL
-  sort_relation (&(mat->rows[rel->num][1]), rel->nb);
+  sort_relation (&(buf[1]), rel->nb);
 #else
-  qsort (&(mat->rows[rel->num][1]), rel->nb, sizeof(typerow_t), cmp_typerow_t);
+  qsort (&(buf[1]), rel->nb, sizeof(typerow_t), cmp_typerow_t);
 #endif
+
+  memcpy (mat->rows[rel->num], buf, (rel->nb + 1) * sizeof (typerow_t));
 
   return NULL;
 }
@@ -610,7 +632,7 @@ void * insert_rel_into_table (void *context_data, earlyparsed_relation_ptr rel)
 void
 filter_matrix_read (filter_matrix_t *mat, const char *purgedname)
 {
-  uint64_t nread, i, h;
+  uint64_t nread, h;
   char *fic[2] = {(char *) purgedname, NULL};
 
   /* read all rels */
@@ -627,13 +649,16 @@ filter_matrix_read (filter_matrix_t *mat, const char *purgedname)
   printf ("Total %" PRIu64 " columns\n", total);
   ASSERT_ALWAYS(mat->rem_ncols == mat->ncols - nbm[0]);
 
+  uint64_t weight_buried = 0;
+#ifndef BURY_FIRST
+  uint64_t i;
   /* Bury heavy coloumns. The 'nburied' heaviest column are buried. */
   /* Buried columns are not took into account by merge. */
-  uint64_t weight_buried = 0;
   if (mat->nburied)
   {
     uint64_t *heaviest = NULL;
     heaviest = (uint64_t *) malloc (mat->nburied * sizeof (uint64_t));
+    ASSERT_ALWAYS(heaviest != NULL);
     for (i = 0; i < mat->nburied; i++)
       heaviest[i] = UMAX(uint64_t);
 
@@ -706,6 +731,7 @@ filter_matrix_read (filter_matrix_t *mat, const char *purgedname)
       }
       matLengthRow(mat, i) = k-1;
       mat->rows[i] = (typerow_t*) realloc (mat->rows[i], k * sizeof (typerow_t));
+      ASSERT_ALWAYS(mat->rows[i] != NULL);
     }
     printf ("# Done\n");
 
@@ -721,6 +747,7 @@ filter_matrix_read (filter_matrix_t *mat, const char *purgedname)
     free (heaviest);
   }
   else
+#endif
   {
     printf("# No columns were buried.\n");
     mat->weight = mat->tot_weight;

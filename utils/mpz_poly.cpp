@@ -890,37 +890,10 @@ mpz_poly_fprintf_cado_format (FILE *fp, mpz_poly_srcptr f, const char letter,
 }
 
 void mpz_poly_print_raw(mpz_poly_srcptr f){
-  int i, sgn;
-  gmp_printf ("%Zd*x^%d", f->coeff[f->deg], f->deg);
-  for (i = f->deg -1; i>1; i--){
-    sgn = mpz_sgn(f->coeff[i]);
-    if(sgn > 0){
-      gmp_printf (" + %Zd*x^%d", f->coeff[i], i);
-    }else{
-      if(sgn < 0){
-	gmp_printf (" %Zd*x^%d", f->coeff[i], i);
-      }
-    }
-  }
-  i=1;
-  sgn = mpz_sgn(f->coeff[i]);
-  if(sgn > 0){
-    gmp_printf (" + %Zd*x", f->coeff[i]);
-  }else{
-    if(sgn < 0){
-      gmp_printf (" %Zd*x", f->coeff[i]);
-    }
-  }
-  i=0;
-  sgn = mpz_sgn(f->coeff[i]);
-  if(sgn > 0){
-    gmp_printf (" + %Zd", f->coeff[i]);
-  }else{
-    if(sgn < 0){
-      gmp_printf (" %Zd", f->coeff[i]);
-    }
-  }
-  printf("\n");
+    cxx_mpz_poly F;
+    mpz_poly_set(F, f);
+    std::string s = F.print_poly("x");
+    printf("%s\n", s.c_str());
 }
 
 /* -------------------------------------------------------------------------- */
@@ -2464,7 +2437,7 @@ mpz_poly_xgcd_mpz (mpz_poly_ptr d, mpz_poly_srcptr f, mpz_poly_srcptr g, mpz_pol
    Assumes the coefficients of fij[] are initialized.
 */
 void
-mpz_poly_homography (mpz_poly_ptr Fij, mpz_poly_ptr F, int64_t H[4])
+mpz_poly_homography (mpz_poly_ptr Fij, mpz_poly_srcptr F, int64_t H[4])
 {
   int k, l;
   mpz_t *g; /* will contain the coefficients of (b0*i+b1)^l */

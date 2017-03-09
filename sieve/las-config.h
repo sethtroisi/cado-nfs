@@ -32,9 +32,11 @@
  * are reconciled.
  *
  * This activates new command lines arguments: -traceab, -traceij, -traceNx.
- * (see las-coordinates.c for the description of these)
+ * (see las-coordinates.cpp for the description of these)
  */
+#ifndef TRACE_K
 #define xxxTRACE_K
+#endif
 
 /* Define CHECK_UNDERFLOW to check for underflow when subtracting
    the rounded log(p) from sieve array locations */

@@ -106,9 +106,14 @@ set(DATASUFFIX share/${package_basename} CACHE STRING "subpath below PREFIX for 
 set (CMAKE_C_FLAGS      "${CMAKE_C_FLAGS} ${CMAKE_FLAGS_SIZE}")
 set (CMAKE_CXX_FLAGS    "${CMAKE_CXX_FLAGS} ${CMAKE_FLAGS_SIZE}")
 
+# It's redundant with something that CMake prints the first time it
+# detects the compiler. Alas, it's within a cached if, so we often don't
+# see it.
+message(STATUS "C compiler: ${CMAKE_C_COMPILER_ID} ${CMAKE_C_COMPILER_VERSION}")
+message(STATUS "C++ compiler: ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}")
+
 # oh my... this is really ugly. I'd love to have more usable control
 # structures in cmake...
-
 if(CMAKE_COMPILER_IS_GNUCC)
     # gcc defines __STRICT_ANSI__ with -std=c99, which under MinGW
     # causes many prototypes and macros not to be defined. Using gnu99
@@ -260,6 +265,7 @@ IF (NOT DEFINED ENV{NO_PYTHON_CHECK})
   include("${CADO_NFS_SOURCE_DIR}/config/python.cmake")
 endif()
 include("${CADO_NFS_SOURCE_DIR}/config/shared_ptr.cmake")
+include("${CADO_NFS_SOURCE_DIR}/config/cxxabi.cmake")
 
 set(CADO_SHARED)
 

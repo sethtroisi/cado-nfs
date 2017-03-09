@@ -41,6 +41,7 @@
 #include "verbose.h"
 #include "mpz_poly.h"
 #include "mpz_mat.h"
+#include "rho.h"
 #include "version_info.h"
 #ifdef __cplusplus
 #include "cxx_mpz.hpp"

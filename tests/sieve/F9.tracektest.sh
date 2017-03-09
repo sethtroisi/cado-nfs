@@ -27,6 +27,6 @@ REFERENCE_REVISION="9253f54766c5438fe3198053f9edd811ee254a17"
 : ${rho:=554209}
 
 export lim0 lim1 lpb0 lpb1 maxbits mfb0 mfb1 lambda0 lambda1 I q0 rho
-"${SOURCE_TEST_DIR}"/sievetest.sh "${FB}" "${LAS}" "${SRCDIR}/parameters/polynomials/F9.poly" "${REFERENCE_SHA1}" "${REFERENCE_REVISION}" "" "$@" || exit 1
+"${SOURCE_TEST_DIR}"/sievetest.sh "${FB}" "${LAS}" "${SRCDIR}/parameters/polynomials/F9.poly" "${REFERENCE_SHA1}" "${REFERENCE_REVISION}" "" --adjust-strategy 0 "$@" || exit 1
 
 exit 0
