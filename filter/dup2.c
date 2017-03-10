@@ -447,7 +447,7 @@ static void *
 thread_dup2 (void * context_data, earlyparsed_relation_ptr rel)
 {
     unsigned int is_dup;
-    uint32_t i;
+    uint64_t i;
     FILE * output = (FILE*) context_data;
     nrels++;
     nrels_tot++;
