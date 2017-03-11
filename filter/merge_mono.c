@@ -649,7 +649,7 @@ print_memory_usage (filter_matrix_t *mat)
     if (mat->R[j] != NULL)
       mem_cols += (mat->R[j][0] + 1) * sizeof (index_t);
   mem_MKZ = (mat->MKZQ[0] + 1) * 2 * sizeof(index_t); /* memory for MKZQ */
-  mem_MKZ += (mat->ncols + 1) * sizeof(uint32_t); /* memory for MKZA */
+  mem_MKZ += (mat->ncols + 1) * sizeof(index_t); /* memory for MKZA */
   printf ("# memory usage: rows %luMB, cols %luMB, wt %luMB, MKZ %luMB, "
           "tot %lu MB (VmPeak %ld)\n",
           mem_rows >> 20, mem_cols >> 20, mem_wt >> 20, mem_MKZ >> 20,

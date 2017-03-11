@@ -59,7 +59,7 @@ typedef struct {
                                                                   been deleted.
                         R[j]=NULL for weight(j) > cwmax. */
   index_t *MKZQ;         /* priority queue for Markowitz stuff */
-  uint32_t *MKZA;        /* MKZA[j] gives u s.t. MKZQ[2*u] = j and
+  index_t *MKZA;         /* MKZA[j] gives u s.t. MKZQ[2*u] = j and
                             MKZQ[2*u+1] is the Markowitz cost of column j,
                             otherwise it is MKZ_INF if the column is inactive
                             (either too heavy initially or deleted). It is safe

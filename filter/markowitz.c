@@ -42,14 +42,14 @@ MkzGetCount(index_t *Q, index_t *A, index_t dj)
 #endif
 
 inline int
-MkzIsAlive(uint32_t *A, index_t dj)
+MkzIsAlive(index_t *A, index_t dj)
 {
   return A[dj] != MKZ_INF;
 }
 
 // (Q, A)[k1] <- (Q, A)[k2]
 static void
-MkzAssign(index_t *Q, uint32_t *A, index_t k1, index_t k2)
+MkzAssign(index_t *Q, index_t *A, index_t k1, index_t k2)
 {
     index_t dj = MkzGet(Q, k2, 0);
 
@@ -77,7 +77,7 @@ MkzPrintQueue(index_t *Q)
 #endif
 
 static void
-MkzUpQueue(index_t *Q, uint32_t *A, index_t k)
+MkzUpQueue(index_t *Q, index_t *A, index_t k)
 {
     index_t dj = MkzGet(Q, k, 0), count = MkzGet(Q, k, 1);
 #if MKZ_TIMINGS
@@ -100,7 +100,7 @@ MkzUpQueue(index_t *Q, uint32_t *A, index_t k)
 }
 
 static void
-MkzInsert(index_t *Q, uint32_t *A, index_t dj, index_t count)
+MkzInsert(index_t *Q, index_t *A, index_t dj, index_t count)
 {
     Q[0]++;
     ASSERT_ALWAYS(Q[0] < 2147483647UL);
@@ -113,7 +113,7 @@ MkzInsert(index_t *Q, uint32_t *A, index_t dj, index_t count)
 // Move Q[k] down, by keeping the structure of Q as a heap, i.e.,
 // each node has a smaller cost than its two left and right nodes
 static void
-MkzDownQueue(index_t *Q, uint32_t *A, index_t k)
+MkzDownQueue(index_t *Q, index_t *A, index_t k)
 {
     index_t dj = MkzGet(Q, k, 0), count = MkzGet(Q, k, 1), j;
 #if MKZ_TIMINGS
@@ -130,7 +130,7 @@ MkzDownQueue(index_t *Q, uint32_t *A, index_t k)
 	    break;
 	else{
 	    // the father takes the place of the "smaller" son
-          MkzAssign(Q, A, k, j);
+            MkzAssign(Q, A, k, j);
 	    k = j;
 	}
     }
@@ -146,7 +146,7 @@ MkzDownQueue(index_t *Q, uint32_t *A, index_t k)
 // (Q, A)[k] has just arrived, but we have to move it in the heap, so that
 // it finds its place.
 static void
-MkzMoveUpOrDown(index_t *Q, uint32_t *A, index_t k)
+MkzMoveUpOrDown(index_t *Q, index_t *A, index_t k)
 {
 #if MKZ_TIMINGS
     double tt = seconds();
@@ -171,7 +171,7 @@ MkzMoveUpOrDown(index_t *Q, uint32_t *A, index_t k)
 
 // Remove (Q, A)[k].
 static void
-MkzDelete(index_t *Q, uint32_t *A, index_t k)
+MkzDelete(index_t *Q, index_t *A, index_t k)
 {
 #if MKZ_DEBUG >= 1
     fprintf(stderr, "MKZ: deleting (Q, A)[%d]=[%d, %d]\n", k,
@@ -201,7 +201,7 @@ MkzRemove(index_t *dj, index_t *mkz, index_t *Q, uint32_t *A, index_t k)
 static int MAYBE_UNUSED
 MkzIsHeap(index_t *Q)
 {
-    int k;
+    index_t k;
 
     for(k = 1; k <= Q[0]/2; k++){
 	// k has a left son
@@ -338,7 +338,7 @@ int
 MkzPopQueue(index_t *dj, index_signed_t *mkz, filter_matrix_t *mat)
 {
   index_t *Q = mat->MKZQ;
-  uint32_t *A = mat->MKZA;
+  index_t *A = mat->MKZA;
 
   if (Q[0] == 0)
     return 0;
@@ -394,10 +394,6 @@ MkzInit (filter_matrix_t *mat, int verbose)
       if (0 < mat->wt[j] && mat->wt[j] <= maxlevel)
         sz++;
 
-    /* since u=MKZA[j] is a 32-bit entry, such that MKZQ[2*u] = j,
-       MKZQ[] should have less than 2^31-1 entries */
-    ASSERT_ALWAYS(sz < 2147483647UL);
-    
     // Allocating heap MKZQ
     size_t tmp_alloc = (sz + 1) * 2 * sizeof(index_t);
     if (verbose)
@@ -413,7 +409,7 @@ MkzInit (filter_matrix_t *mat, int verbose)
     if (verbose)
       fprintf (stderr, "Allocating pointers to heap: %zuMB\n",
                tmp_alloc >> 20);
-    mat->MKZA = (uint32_t*) malloc (tmp_alloc);
+    mat->MKZA = (index_t *) malloc (tmp_alloc);
     ASSERT_ALWAYS(mat->MKZA != NULL);
 
     mkz = malloc (mat->ncols * sizeof (int32_t));
@@ -477,7 +473,7 @@ MkzIncrCol(filter_matrix_t *mat, index_t j)
 void
 MkzUpdate (filter_matrix_t *mat, index_t j)
 {
-    uint32_t adr = mat->MKZA[j];
+    index_t adr = mat->MKZA[j];
     index_t mkz;
 
     ASSERT(adr != MKZ_INF);

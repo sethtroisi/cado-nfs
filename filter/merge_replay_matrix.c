@@ -652,7 +652,7 @@ filter_matrix_read (filter_matrix_t *mat, const char *purgedname)
 #ifndef BURY_FIRST
   uint64_t i;
   /* Bury heavy coloumns. The 'nburied' heaviest column are buried. */
-  /* Buried columns are not took into account by merge. */
+  /* Buried columns are not taken into account by merge. */
   if (mat->nburied)
   {
     uint64_t *heaviest = NULL;
