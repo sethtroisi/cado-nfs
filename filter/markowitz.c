@@ -103,7 +103,6 @@ static void
 MkzInsert(index_t *Q, index_t *A, index_t dj, index_t count)
 {
     Q[0]++;
-    ASSERT_ALWAYS(Q[0] < 2147483647UL);
     MkzSet(Q, Q[0], 0, dj);
     MkzSet(Q, Q[0], 1, count);
     A[dj] = Q[0];
