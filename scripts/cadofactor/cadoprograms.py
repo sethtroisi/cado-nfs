@@ -760,6 +760,7 @@ class Las(Program):
     subdir = "sieve"
     def __init__(self,
                  I: Parameter(checktype=int),
+                 A: Parameter(checktype=int),
                  poly: Parameter(is_input_file=True),
                  q0: Parameter(checktype=int),
                  q1: Parameter(checktype=int)=None,
@@ -792,6 +793,7 @@ class Las(Program):
                  sqside: Parameter(checktype=int)=None,
                  dup: Toggle()=None,
                  galois: Parameter() = None,
+                 adjust_strategy: Parameter("adjust-strategy", checktype=int)=None,
                  allow_largesq: Toggle("allow-largesq")=None,
                  stats_stderr: Toggle("stats-stderr")=None,
                  # We have no checktype for parameters of the form <int>,<int>,
@@ -1066,6 +1068,7 @@ class Descent(Program):
                  init_mfb: Parameter("init-mfb", prefix="--"),
                  init_tkewness: Parameter("init-tkewness", prefix="--"),
                  I: Parameter(prefix="--"),
+                 A: Parameter(prefix="--"),
                  lpb0: Parameter(prefix="--"),
                  lpb1: Parameter(prefix="--"),
                  mfb0: Parameter(prefix="--"),
