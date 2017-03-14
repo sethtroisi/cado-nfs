@@ -103,7 +103,7 @@ removeColumnAndUpdate(filter_matrix_t *mat, int j)
 // The cell [i, j] may be incorporated to the data structure, at least
 // if j is not too heavy, etc.
 static void
-addCellAndUpdate(filter_matrix_t *mat, int i, int32_t j)
+addCellAndUpdate(filter_matrix_t *mat, int i, index_t j)
 {
 #if TRACE_COL >= 0
     int oldw = mat->wt[j];
@@ -136,7 +136,7 @@ addCellAndUpdate(filter_matrix_t *mat, int i, int32_t j)
 
 // remove the cell (i,j), and updates matrix correspondingly.
 static void
-removeCellAndUpdate(filter_matrix_t *mat, int i, int32_t j)
+removeCellAndUpdate(filter_matrix_t *mat, int i, index_t j)
 {
 #if TRACE_ROW >= 0
     if(i == TRACE_ROW){
@@ -226,7 +226,7 @@ addOneRowAndUpdate(filter_matrix_t *mat, int i)
 // realize mat[i1] += mat[i2] and update the data structure.
 // len could be the real length of row[i1]+row[i2] or -1.
 static void
-addRowsAndUpdate(filter_matrix_t *mat, int i1, int i2, int32_t j)
+addRowsAndUpdate(filter_matrix_t *mat, int i1, int i2, index_t j)
 {
     // cleaner one, that shares addRowsData() to prepare the next move...!
     // i1 is to disappear, replaced by a new one
@@ -238,7 +238,7 @@ addRowsAndUpdate(filter_matrix_t *mat, int i1, int i2, int32_t j)
 #else
 /* special version for factorization */
 static void
-addRowsAndUpdate (filter_matrix_t *mat, int i1, int i2, int32_t j MAYBE_UNUSED)
+addRowsAndUpdate (filter_matrix_t *mat, int i1, int i2, index_t j MAYBE_UNUSED)
 {
     uint32_t k, k1, k2, l1, l2, len;
     typerow_t **rows = mat->rows, *tmp, *r1 = rows[i1], *r2 = rows[i2];
@@ -280,7 +280,7 @@ addRowsAndUpdate (filter_matrix_t *mat, int i1, int i2, int32_t j MAYBE_UNUSED)
 #endif
 
 static void
-removeRowDefinitely(report_t *rep, filter_matrix_t *mat, int32_t i)
+removeRowDefinitely(report_t *rep, filter_matrix_t *mat, index_t i)
 {
     report1(rep, i, -1);
     removeRowAndUpdate(mat, i, 1);
@@ -289,7 +289,7 @@ removeRowDefinitely(report_t *rep, filter_matrix_t *mat, int32_t i)
 /* Remove column j, and update the matrix.
    This function is only called for singleton ideals. */
 static void
-removeColDefinitely(report_t *rep, filter_matrix_t *mat, int32_t j)
+removeColDefinitely(report_t *rep, filter_matrix_t *mat, index_t j)
 {
   ASSERT(mat->R[j][0] == 1);
 
@@ -542,7 +542,7 @@ checkWeights (filter_matrix_t *mat)
 
 // j has weight m, which should coherent with mat->wt[j] == m
 static void
-mergeForColumn (report_t *rep, filter_matrix_t *mat, int m, int32_t j)
+mergeForColumn (report_t *rep, filter_matrix_t *mat, int m, index_t j)
 {
     index_t ind[MERGE_LEVEL_MAX];
     int ni;
@@ -613,7 +613,7 @@ deleteSuperfluousRows (report_t *rep, filter_matrix_t *mat,
 
   for (nirem = 0; nirem < niremmax && mat->Heavy->size > 0; nirem++)
     {
-      uint32_t i = heap_pop (mat->Heavy, mat);
+      index_t i = heap_pop (mat->Heavy, mat);
       removeRowDefinitely (rep, mat, i);
     }
   return nirem;
