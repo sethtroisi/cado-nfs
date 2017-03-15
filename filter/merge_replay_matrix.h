@@ -85,23 +85,12 @@ void matR_disable_cols (filter_matrix_t *, const char *);
 
 void print_row(filter_matrix_t *mat, index_t i);
 
-#define rowWeight(mat, i) matLengthRow(mat, i)
-
+#define matCell(mat, i, k) rowCell(mat->rows[i], k)
+#define rowLength(row, i) rowCell(row[i], 0)
+#define setRowLength(row, v) setCell(row, 0, v, 1)
+#define matLengthRow(mat, i) matCell(mat, i, 0)
 #define isRowNull(mat, i) ((mat)->rows[(i)] == NULL)
-#ifdef FOR_DL
-#define matLengthRow(mat, i) (mat)->rows[(i)][0].id
-#define matCell(mat, i, k) (mat)->rows[(i)][(k)].id
-#define setCell(row, k, v, c) row[k] = (ideal_merge_t) {.id = v, .e = c}
-#else
-#define matLengthRow(mat, i) (mat)->rows[(i)][0]
-#if __SIZEOF_INDEX__ == 4 || __SIZEOF_INDEX__ == 8
-#define matCell(mat, i, k) (mat)->rows[(i)][(k)]
-#define setCell(row, k, v, c) row[k] = v
-#else /* experimental code for 5 <= __SIZEOF_INDEX__ <= 7 */
-index_t matCell (filter_matrix_t *mat, index_t i, int k);
-void setCell(index_t *row, int k, index_t j, exponent_t e);
-#endif
-#endif
+
 #define SPARSE_ITERATE(mat, i, k) for((k)=1; (k)<=lengthRow((mat),(i)); (k)++)
 
 void freeRj(filter_matrix_t *mat, index_t j);

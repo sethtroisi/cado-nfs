@@ -373,8 +373,12 @@ renumber_columns (filter_matrix_t *mat)
   /* apply mapping to the rows. As p is a non decreasing function, the rows are
    * still sorted after this operation. */
   for (uint64_t i = 0; i < mat->nrows; i++)
-    for (index_t j = 1; j <= mat->rows[i][0]; j++)
-      mat->rows[i][j] = p[mat->rows[i][j]];
+    for (index_t j = 1; j <= matLengthRow(mat, i); j++)
+      {
+        index_t h = matCell (mat, i, j);
+        setCell (mat->rows[i], j, p[h], 1); /* for factorization, the exponent
+                                               does not matter */
+      }
 
   free (p);
 }
@@ -593,15 +597,14 @@ void * insert_rel_into_table (void *context_data, earlyparsed_relation_ptr rel)
     if (h < nburied)
       continue;
 #endif
-    j++;
 #ifdef FOR_DL
     exponent_t e = rel->primes[i].e;
     /* For factorization, they should not be any multiplicity here.
        For DL we do not want to count multiplicity in mat->wt */
-    setCell (buf, j, h, e);
+    buf[++j] = (ideal_merge_t) {.id = h, .e = e};
 #else
     ASSERT(rel->primes[i].e == 1);
-    setCell (buf, j, h, 1);
+    buf[++j] = h;
 #endif
     mat->rem_ncols += (mat->wt[h] == 0);
     mat->wt[h] += (mat->wt[h] != SMAX(int32_t));
@@ -610,11 +613,12 @@ void * insert_rel_into_table (void *context_data, earlyparsed_relation_ptr rel)
 #ifdef BURY_FIRST
   rel->nb = j;
 #endif
-  setCell (buf, 0, rel->nb, 0);
+#ifdef FOR_DL
+  buf[0].id = rel->nb;
+#else
+  buf[0] = rel->nb;
+#endif
   mat->tot_weight += rel->nb;
-
-  mat->rows[rel->num] = (typerow_t*) malloc ((rel->nb + 1) * sizeof (typerow_t));
-  FATAL_ERROR_CHECK(mat->rows[rel->num] == NULL, "Cannot allocate memory");
 
   /* sort indices to ease row merges */
 #ifndef FOR_DL
@@ -623,7 +627,8 @@ void * insert_rel_into_table (void *context_data, earlyparsed_relation_ptr rel)
   qsort (&(buf[1]), rel->nb, sizeof(typerow_t), cmp_typerow_t);
 #endif
 
-  memcpy (mat->rows[rel->num], buf, (rel->nb + 1) * sizeof (typerow_t));
+  mat->rows[rel->num] = mallocRow (rel->nb + 1);
+  compressRow (mat->rows[rel->num], buf, rel->nb);
 
   return NULL;
 }
@@ -727,11 +732,14 @@ filter_matrix_read (filter_matrix_t *mat, const char *purgedname)
           }
         }
         if (!is_buried) /* not a buried column */
-          mat->rows[i][k++] = mat->rows[i][j];
+          {
+            /* we can put any exponent since we don't bury columns in DL */
+            setCell(mat->rows[i], k, cur_id, 1);
+            k ++;
+          }
       }
-      matLengthRow(mat, i) = k-1;
-      mat->rows[i] = (typerow_t*) realloc (mat->rows[i], k * sizeof (typerow_t));
-      ASSERT_ALWAYS(mat->rows[i] != NULL);
+      setCell(mat->rows[i], 0, k - 1, 1);
+      mat->rows[i] = reallocRow (mat->rows[i], k);
     }
     printf ("# Done\n");
 

@@ -176,7 +176,7 @@ removeRowAndUpdate(filter_matrix_t *mat, int i, int final)
     if(i == TRACE_ROW)
 	printf ("TRACE_ROW: removeRowAndUpdate i=%d\n", i);
 #endif
-    mat->weight -= rowWeight(mat, i);
+    mat->weight -= matLengthRow(mat, i);
     for(k = 1; k <= matLengthRow(mat, i); k++){
 #if TRACE_COL >= 0
       unsigned int w = mat->wt[matCell(mat, i, k)];
@@ -206,7 +206,7 @@ addOneRowAndUpdate(filter_matrix_t *mat, int i)
 {
   unsigned int k;
 
-  mat->weight += rowWeight(mat, i);
+  mat->weight += matLengthRow(mat, i);
 #if TRACE_ROW >= 0
   if (i == TRACE_ROW)
     printf ("TRACE_ROW: addOneRowAndUpdate i=%d\n", i);
@@ -249,7 +249,7 @@ addRowsAndUpdate (filter_matrix_t *mat, int i1, int i2, index_t j MAYBE_UNUSED)
     /* removeRowAndUpdate(mat, i1, 0) */
     mat->weight -= l1;
     for (k1 = 1; k1 <= l1; k1++)
-      removeCellAndUpdate (mat, i1, r1[k1]);
+      removeCellAndUpdate (mat, i1, rowCell(r1, k1));
 
     /* addRows(mat->rows, i1, i2, j), i.e.,
        addRowsUpdateIndex(mat->rows, NULL, i1, i2, j) */
@@ -258,24 +258,31 @@ addRowsAndUpdate (filter_matrix_t *mat, int i1, int i2, index_t j MAYBE_UNUSED)
     k = k1 = k2 = 1;
 
     while ((k1 <= l1) && (k2 <= l2))
-      if (r1[k1] < r2[k2])
-        tmp[k++] = r1[k1++];
-      else if (r1[k1] > r2[k2])
-        tmp[k++] = r2[k2++];
+      if (rowCell(r1, k1) < rowCell(r2, k2))
+        tmp[k++] = rowCell(r1, k1), k1++;
+      else if (rowCell(r1, k1) > rowCell(r2, k2))
+        tmp[k++] = rowCell(r2, k2), k2++;
       else
         k1++, k2++;
     for(; k1 <= l1;)
-      tmp[k++] = r1[k1++];
-    free (r1);
+      tmp[k++] = rowCell(r1, k1), k1++;
     for(; k2 <= l2;)
-      tmp[k++] = r2[k2++];
+      tmp[k++] = rowCell(r2, k2), k2++;
     tmp[0] = k - 1;
+#if defined(FOR_DLP) || __SIZEOF_INDEX__ == 4 || __SIZEOF_INDEX__ == 8
+    free (r1);
     rows[i1] = (k == len) ? tmp : realloc (tmp, k * sizeof(typerow_t));
+#else
+    if (k-1 != l1)
+      rows[i1] = realloc (rows[i1], k * sizeof(typerow_t));
+    compressRow (rows[i1], tmp, k - 1);
+    free (tmp);
+#endif
 
     /* addOneRowAndUpdate(mat, i1) */
     mat->weight += k - 1;
     for (r1 = rows[i1], k1 = 1; k1 < k; k1++)
-      addCellAndUpdate (mat, i1, r1[k1]);
+      addCellAndUpdate (mat, i1, rowCell(r1, k1));
 }
 #endif
 

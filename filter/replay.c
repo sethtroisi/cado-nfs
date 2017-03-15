@@ -174,7 +174,7 @@ flushSparse(const char *sparsename, typerow_t **sparsemat, int small_nrows,
             uint32_t dw = 0;
             uint32_t sw = 0;
 	    for(unsigned int j = 1; j <= rowLength(sparsemat, i); j++){
-		if (code[rowCell(sparsemat, i, j)]-1 < skip) {
+		if (code[rowCell(sparsemat[i], j)]-1 < skip) {
                     dw++;
                     DW++;
                 } else {
@@ -200,8 +200,8 @@ flushSparse(const char *sparsename, typerow_t **sparsemat, int small_nrows,
         {
           for (int l = k+1; l <= rowLength(sparsemat, i); l++)
             {
-              uint32_t x = code[rowCell(sparsemat, i, k)]-1;
-              uint32_t y = code[rowCell(sparsemat, i, l)]-1;
+              uint32_t x = code[rowCell(sparsemat[i], k)]-1;
+              uint32_t y = code[rowCell(sparsemat[i], l)]-1;
               if (x > y)
                 {
                   typerow_t tmp = sparsemat[i][k];
@@ -214,9 +214,9 @@ flushSparse(const char *sparsename, typerow_t **sparsemat, int small_nrows,
 
 	    for(unsigned int j = 1; j <= rowLength(sparsemat, i); j++){
 #if DEBUG >= 1
-		ASSERT(code[rowCell(sparsemat, i, j)] > 0);
+		ASSERT(code[rowCell(sparsemat[i], j)] > 0);
 #endif
-		uint32_t x = code[rowCell(sparsemat, i, j)]-1;
+		uint32_t x = code[rowCell(sparsemat[i], j)]-1;
                 if (srwfile) weights[x]++;
                 if ((int) x < skip) {
                     ASSERT_ALWAYS(skip);
@@ -480,22 +480,31 @@ typedef struct
 void * fill_in_rows (void *context_data, earlyparsed_relation_ptr rel)
 {
   replay_read_data_t *data = (replay_read_data_t *) context_data;
+  typerow_t buf[UMAX(weight_t)];
 
-  data->mat[rel->num] = (typerow_t*) malloc ((rel->nb + 1) * sizeof (typerow_t));
-  FATAL_ERROR_CHECK(data->mat[rel->num] == NULL, "Cannot allocate memory");
-
-  rowLength(data->mat, rel->num) = rel->nb;
   for (unsigned int j = 0; j < rel->nb; j++)
   {
     index_t h = rel->primes[j].h;
+#ifdef FOR_DL
     exponent_t e = rel->primes[j].e;
-#ifndef FOR_DL
-    ASSERT_ALWAYS (e == 1);
+    buf[j+1] = (ideal_merge_t) {.id = h, .e = e};
+#else
+    ASSERT_ALWAYS (rel->primes[j].e == 1);
+    buf[j+1] = h;
 #endif
     ASSERT (h < data->ncols);
-    setCell(data->mat[rel->num], j+1, h, e);
   }
-  qsort(&(data->mat[rel->num][1]), rel->nb, sizeof(typerow_t), cmp_typerow_t);
+#ifdef FOR_DL
+  buf[0].id = rel->nb;
+#else
+  buf[0] = rel->nb;
+#endif
+
+  qsort (&(buf[1]), rel->nb, sizeof(typerow_t), cmp_typerow_t);
+
+  data->mat[rel->num] = mallocRow (rel->nb + 1);
+  compressRow (data->mat[rel->num], buf, rel->nb);
+
   return NULL;
 }
 
@@ -537,8 +546,8 @@ read_purgedfile (typerow_t **mat, const char* filename, uint64_t nrows,
     for (uint64_t i = 0; i < nrows; i++)
     {
       mat[i] = (typerow_t *) malloc(2 * sizeof(typerow_t));
-      rowCell(mat, i, 1) = i;
-      rowLength(mat, i) = 1;
+      setCell(mat[i], 1, i, 1);
+      setCell(mat[i], 0, 1, 1);
     }
   }
 }
@@ -556,12 +565,12 @@ writeIndex(const char *indexname, index_data_t index_data, uint64_t small_nrows)
         fprintf(indexfile, "%d", index_data[i].n);
         for (unsigned int j = 0; j < index_data[i].n; ++j) {
 #ifdef FOR_DL
-            fprintf(indexfile, " %" PRIx32 ":%d",
-                    index_data[i].rels[j].ind_row,
+            fprintf(indexfile, " %" PRIx64 ":%d",
+                    (uint64_t) index_data[i].rels[j].ind_row,
                     index_data[i].rels[j].e);
 #else
-            fprintf(indexfile, " %" PRIx32 "",
-                    index_data[i].rels[j].ind_row);
+            fprintf(indexfile, " %" PRIx64 "",
+                    (uint64_t) index_data[i].rels[j].ind_row);
 #endif
         }
         fprintf(indexfile, "\n");
@@ -591,7 +600,7 @@ generate_cyc (const char *outname, typerow_t **rows, uint32_t nrows)
       fwrite (&t, sizeof(uint32_t), 1, outfile);
       for (k = 1; k <= t; k++)
         {
-          u = rowCell(rows, i, k);
+          u = rowCell(rows[i], k);
           fwrite (&u, sizeof(uint32_t), 1, outfile);
         }
     }
@@ -674,7 +683,7 @@ fasterVersion (typerow_t **newrows, const char *sparsename,
   for (uint64_t i = small_ncols = 0; i < small_nrows; i++)
     for(unsigned int k = 1; k <= rowLength(newrows, i); k++)
     {
-      int j = rowCell(newrows, i, k);
+      int j = rowCell(newrows[i], k);
       small_ncols += (colweight[j] == 0);
       colweight[j] ++;
     }
