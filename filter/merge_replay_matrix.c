@@ -593,14 +593,15 @@ void * insert_rel_into_table (void *context_data, earlyparsed_relation_ptr rel)
     if (h < nburied)
       continue;
 #endif
+    j++;
 #ifdef FOR_DL
     exponent_t e = rel->primes[i].e;
     /* For factorization, they should not be any multiplicity here.
        For DL we do not want to count multiplicity in mat->wt */
-    setCell (buf[++j], h, e);
+    setCell (buf, j, h, e);
 #else
     ASSERT(rel->primes[i].e == 1);
-    setCell (buf[++j], h, 1);
+    setCell (buf, j, h, 1);
 #endif
     mat->rem_ncols += (mat->wt[h] == 0);
     mat->wt[h] += (mat->wt[h] != SMAX(int32_t));
@@ -609,7 +610,7 @@ void * insert_rel_into_table (void *context_data, earlyparsed_relation_ptr rel)
 #ifdef BURY_FIRST
   rel->nb = j;
 #endif
-  setCell (buf[0], rel->nb, 0);
+  setCell (buf, 0, rel->nb, 0);
   mat->tot_weight += rel->nb;
 
   mat->rows[rel->num] = (typerow_t*) malloc ((rel->nb + 1) * sizeof (typerow_t));

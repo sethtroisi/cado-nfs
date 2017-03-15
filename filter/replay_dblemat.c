@@ -88,7 +88,7 @@ void * fill_in_rows (void *context_data, earlyparsed_relation_ptr rel) {
     exponent_t e = rel->primes[j].e;
     ASSERT_ALWAYS (e == 1);
     ASSERT_ALWAYS (h < data->ncols);
-    setCell(data->mat[rel->num][j+1], h, e);
+    setCell(data->mat[rel->num], j+1, h, e);
   }
   qsort(&(data->mat[rel->num][1]), rel->nb, sizeof(typerow_t), cmp_typerow_t);
   return NULL;
@@ -740,7 +740,7 @@ int main(int argc, char *argv[])
     M1[i] = (typerow_t*) malloc(2*sizeof(typerow_t));
     ASSERT_ALWAYS(M1[i] != NULL);
     rowLength(M1, i) = 1;
-    setCell(M1[i][1], i, 1);
+    setCell(M1[i], 1, i, 1);
   }
   for(uint64_t i = 0; i < nr; ++i) {
     M2[i] = NULL;

@@ -91,11 +91,16 @@ void print_row(filter_matrix_t *mat, index_t i);
 #ifdef FOR_DL
 #define matLengthRow(mat, i) (mat)->rows[(i)][0].id
 #define matCell(mat, i, k) (mat)->rows[(i)][(k)].id
-#define setCell(cell, v, c) cell = (ideal_merge_t) {.id = v, .e = c}
+#define setCell(row, k, v, c) row[k] = (ideal_merge_t) {.id = v, .e = c}
 #else
 #define matLengthRow(mat, i) (mat)->rows[(i)][0]
+#if __SIZEOF_INDEX__ == 4 || __SIZEOF_INDEX__ == 8
 #define matCell(mat, i, k) (mat)->rows[(i)][(k)]
-#define setCell(cell, v, c) cell = v
+#define setCell(row, k, v, c) row[k] = v
+#else /* experimental code for 5 <= __SIZEOF_INDEX__ <= 7 */
+index_t matCell (filter_matrix_t *mat, index_t i, int k);
+void setCell(index_t *row, int k, index_t j, exponent_t e);
+#endif
 #endif
 #define SPARSE_ITERATE(mat, i, k) for((k)=1; (k)<=lengthRow((mat),(i)); (k)++)
 

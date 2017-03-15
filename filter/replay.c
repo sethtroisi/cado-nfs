@@ -493,7 +493,7 @@ void * fill_in_rows (void *context_data, earlyparsed_relation_ptr rel)
     ASSERT_ALWAYS (e == 1);
 #endif
     ASSERT (h < data->ncols);
-    setCell(data->mat[rel->num][j+1], h, e);
+    setCell(data->mat[rel->num], j+1, h, e);
   }
   qsort(&(data->mat[rel->num][1]), rel->nb, sizeof(typerow_t), cmp_typerow_t);
   return NULL;
