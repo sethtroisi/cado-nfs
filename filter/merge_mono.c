@@ -94,7 +94,7 @@ checkCoherence(filter_matrix_t *mat, int m, int j)
 
 /* remove column j and update matrix */
 static void
-removeColumnAndUpdate(filter_matrix_t *mat, int j)
+removeColumnAndUpdate(filter_matrix_t *mat, index_t j)
 {
     MkzRemoveJ (mat, j);
     freeRj (mat, j);
@@ -103,7 +103,7 @@ removeColumnAndUpdate(filter_matrix_t *mat, int j)
 // The cell [i, j] may be incorporated to the data structure, at least
 // if j is not too heavy, etc.
 static void
-addCellAndUpdate(filter_matrix_t *mat, int i, index_t j)
+addCellAndUpdate(filter_matrix_t *mat, index_t i, index_t j)
 {
 #if TRACE_COL >= 0
     int oldw = mat->wt[j];
@@ -136,7 +136,7 @@ addCellAndUpdate(filter_matrix_t *mat, int i, index_t j)
 
 // remove the cell (i,j), and updates matrix correspondingly.
 static void
-removeCellAndUpdate(filter_matrix_t *mat, int i, index_t j)
+removeCellAndUpdate(filter_matrix_t *mat, index_t i, index_t j)
 {
 #if TRACE_ROW >= 0
     if(i == TRACE_ROW){
@@ -168,7 +168,7 @@ removeCellAndUpdate(filter_matrix_t *mat, int i, index_t j)
 // if final, also update the Markowitz counts, free memory, and remove from
 // heap of heavy rows
 static void
-removeRowAndUpdate(filter_matrix_t *mat, int i, int final)
+removeRowAndUpdate(filter_matrix_t *mat, index_t i, int final)
 {
     unsigned int k;
 
@@ -202,7 +202,7 @@ removeRowAndUpdate(filter_matrix_t *mat, int i, int final)
 #ifdef FOR_DL
 // All entries M[i, j] are potentially added to the structure.
 static void
-addOneRowAndUpdate(filter_matrix_t *mat, int i)
+addOneRowAndUpdate(filter_matrix_t *mat, index_t i)
 {
   unsigned int k;
 
@@ -226,7 +226,7 @@ addOneRowAndUpdate(filter_matrix_t *mat, int i)
 // realize mat[i1] += mat[i2] and update the data structure.
 // len could be the real length of row[i1]+row[i2] or -1.
 static void
-addRowsAndUpdate(filter_matrix_t *mat, int i1, int i2, index_t j)
+addRowsAndUpdate(filter_matrix_t *mat, index_t i1, index_t i2, index_t j)
 {
     // cleaner one, that shares addRowsData() to prepare the next move...!
     // i1 is to disappear, replaced by a new one
@@ -238,7 +238,8 @@ addRowsAndUpdate(filter_matrix_t *mat, int i1, int i2, index_t j)
 #else
 /* special version for factorization */
 static void
-addRowsAndUpdate (filter_matrix_t *mat, int i1, int i2, index_t j MAYBE_UNUSED)
+addRowsAndUpdate (filter_matrix_t *mat, index_t i1, index_t i2,
+        index_t j MAYBE_UNUSED)
 {
     uint32_t k, k1, k2, l1, l2, len;
     typerow_t **rows = mat->rows, *tmp, *r1 = rows[i1], *r2 = rows[i2];
