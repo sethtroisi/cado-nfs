@@ -475,7 +475,9 @@ search_survivors_in_line(unsigned char * const SS[2],
                 continue;
             }
             const unsigned int i = abs (int(sublat.m)*(x - (1 << (log_I - 1)))+int(sublat.i0));
-            if (bin_gcd_int64_safe (i, sublat.m*j+sublat.j0) != 1) {
+            const unsigned int jj = sublat.m*j+sublat.j0;
+            if ((((jj % 2) == 0) && ((i % 2) == 0)) ||
+                    (bin_gcd_int64_safe (i, jj) != 1)) {
                 SS[0][x] = 255;
             } else {
                 survivors.push_back(x);
