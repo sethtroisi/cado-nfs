@@ -777,7 +777,7 @@ renumber_is_additional_column (renumber_srcptr tab, index_t h)
  */
 size_t
 renumber_write_buffer_p (char *out, renumber_ptr tab, unsigned long p,
-                         unsigned long roots[][MAXDEGREE], int nroots[])
+                         unsigned long roots[][MAX_DEGREE], int nroots[])
 {
   size_t n = 0;
   /* The root on rat side becomes vp. If there is no rat side or not root on
@@ -855,7 +855,7 @@ renumber_write_buffer_p (char *out, renumber_ptr tab, unsigned long p,
 
 void
 renumber_write_p (renumber_ptr tab, unsigned long p,
-                  unsigned long r[][MAXDEGREE], int k[])
+                  unsigned long r[][MAX_DEGREE], int k[])
 {
   size_t size_buffer;
   char buffer[2048];
@@ -984,14 +984,14 @@ renumber_get_random_index_from_p_side(renumber_srcptr renumber_info,
   }
 
   // Find list of valid indices
-  index_t valid_i[MAXDEGREE];
+  index_t valid_i[MAX_DEGREE];
   int n = 0;
   do {
     p_r_values_t r;
     int s;
     compute_r_side_from_p_vr (&r, &s, renumber_info, p, tab[i]);
     if (s == side) {
-      ASSERT_ALWAYS(n < MAXDEGREE);
+      ASSERT_ALWAYS(n < MAX_DEGREE);
       valid_i[n] = i;
       n++;
     }

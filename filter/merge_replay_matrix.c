@@ -17,7 +17,7 @@
 /***************** memory allocation on R[j] *********************************/
 
 static void
-mallocRj (filter_matrix_t *mat, int j, int32_t w)
+mallocRj (filter_matrix_t *mat, index_t j, int32_t w)
 {
   if (w == 0)
     {
@@ -33,7 +33,7 @@ mallocRj (filter_matrix_t *mat, int j, int32_t w)
 }
 
 static void
-reallocRj (filter_matrix_t *mat, int j, int32_t w)
+reallocRj (filter_matrix_t *mat, index_t j, int32_t w)
 {
   mat->R[j] = (index_t *) realloc (mat->R[j], (w + 1) * sizeof(index_t));
   FATAL_ERROR_CHECK(mat->R[j] == NULL, "Cannot reallocate memory");
@@ -41,7 +41,7 @@ reallocRj (filter_matrix_t *mat, int j, int32_t w)
 }
 
 void
-freeRj (filter_matrix_t *mat, int j)
+freeRj (filter_matrix_t *mat, index_t j)
 {
     free (mat->R[j]);
     mat->R[j] = NULL;
@@ -79,17 +79,17 @@ comp_weight_function (int32_t w MAYBE_UNUSED, int maxlevel MAYBE_UNUSED)
 }
 
 static void
-heap_init (heap H, uint32_t nrows, int maxlevel)
+heap_init (heap H, index_t nrows, int maxlevel)
 {
-  H->list = malloc (nrows * sizeof (uint32_t));
+  H->list = malloc (nrows * sizeof (index_t));
   FATAL_ERROR_CHECK(H->list == NULL, "Cannot allocate memory");
   H->size = 0;
   H->alloc = nrows;
-  H->index = malloc (nrows * sizeof (uint32_t));
+  H->index = malloc (nrows * sizeof (index_t));
   FATAL_ERROR_CHECK(H->index == NULL, "Cannot allocate memory");
   for (unsigned long i = 0; i < nrows; i++)
     H->index[i] = UINT32_MAX;
-  for (int32_t w = 0; w < 256; w++)
+  for (int w = 0; w < 256; w++)
     comp_weight[w] = comp_weight_function (w, maxlevel);
   printf ("Using weight function lambda=%d for clique removal\n",
           USE_WEIGHT_LAMBDA);
@@ -114,14 +114,14 @@ heap_clear (heap H)
 }
 
 static float
-heapRowWeight (uint32_t i, filter_matrix_t *mat)
+heapRowWeight (index_t i, filter_matrix_t *mat)
 {
   float W = 0.0;
   int32_t w;
-  uint32_t j, k;
+  index_t j;
 
   ASSERT(mat->rows[i] != NULL);
-  for (k = 1; k <= matLengthRow (mat, i); k++)
+  for (uint32_t k = 1; k <= matLengthRow (mat, i); k++)
     {
       j = matCell (mat, i, k);
       w = mat->wt[j];
@@ -139,9 +139,9 @@ heapRowWeight (uint32_t i, filter_matrix_t *mat)
 static void
 check_heap (heap H, filter_matrix_t *mat)
 {
-  for (unsigned int i = 0; i < H->size; i++)
+  for (unsigned long i = 0; i < H->size; i++)
     {
-      uint32_t j = H->list[i];
+      index_t j = H->list[i];
       ASSERT_ALWAYS(H->index[j] == i);
       ASSERT_ALWAYS(mat->rows[j] != NULL);
     }
@@ -150,15 +150,15 @@ check_heap (heap H, filter_matrix_t *mat)
 
 /* move down entry n of heap */
 static void
-moveDown (heap H, filter_matrix_t *mat, uint32_t n)
+moveDown (heap H, filter_matrix_t *mat, index_t n)
 {
-  uint32_t i = H->list[n], j;
+  index_t i = H->list[n], j;
   float w;
 
   w = heapRowWeight (i, mat);
   while (2 * n + 1 < H->size)
     {
-      uint32_t left = 2 * n + 1, right = 2 * n + 2, son;
+      index_t left = 2 * n + 1, right = 2 * n + 2, son;
       if (right >= H->size ||
           heapRowWeight (H->list[left], mat) > heapRowWeight (H->list[right], mat))
         son = left; /* compare with left son */
@@ -180,9 +180,9 @@ moveDown (heap H, filter_matrix_t *mat, uint32_t n)
 
 /* remove relation i from heap */
 void
-heap_delete (heap H, filter_matrix_t *mat, uint32_t i)
+heap_delete (heap H, filter_matrix_t *mat, index_t i)
 {
-  uint32_t n = H->index[i];
+  index_t n = H->index[i];
 
   ASSERT(H->size > 0);
 
@@ -203,9 +203,9 @@ heap_delete (heap H, filter_matrix_t *mat, uint32_t i)
 
 /* add relation i */
 void
-heap_push (heap H, filter_matrix_t *mat, uint32_t i)
+heap_push (heap H, filter_matrix_t *mat, index_t i)
 {
-  uint32_t n, j;
+  index_t n, j;
   float w;
 
   if (H->index[i] == UINT32_MAX)
@@ -230,7 +230,6 @@ heap_push (heap H, filter_matrix_t *mat, uint32_t i)
     }
   else /* relation was already in heap */
     {
-      uint32_t j;
       n = H->index[i];
       w = heapRowWeight (i, mat);
       /* if new weight is smaller than old one, move down the heap */
@@ -254,7 +253,7 @@ heap_push (heap H, filter_matrix_t *mat, uint32_t i)
 }
 
 /* return index i of relation with larger weight in heap H */
-uint32_t
+index_t
 heap_pop (heap H, filter_matrix_t *mat MAYBE_UNUSED)
 {
   ASSERT(H->size > 0);
@@ -374,8 +373,12 @@ renumber_columns (filter_matrix_t *mat)
   /* apply mapping to the rows. As p is a non decreasing function, the rows are
    * still sorted after this operation. */
   for (uint64_t i = 0; i < mat->nrows; i++)
-    for (index_t j = 1; j <= mat->rows[i][0]; j++)
-      mat->rows[i][j] = p[mat->rows[i][j]];
+    for (index_t j = 1; j <= matLengthRow(mat, i); j++)
+      {
+        index_t h = matCell (mat, i, j);
+        setCell (mat->rows[i], j, p[h], 1); /* for factorization, the exponent
+                                               does not matter */
+      }
 
   free (p);
 }
@@ -598,10 +601,10 @@ void * insert_rel_into_table (void *context_data, earlyparsed_relation_ptr rel)
     exponent_t e = rel->primes[i].e;
     /* For factorization, they should not be any multiplicity here.
        For DL we do not want to count multiplicity in mat->wt */
-    setCell (buf[++j], h, e);
+    buf[++j] = (ideal_merge_t) {.id = h, .e = e};
 #else
     ASSERT(rel->primes[i].e == 1);
-    setCell (buf[++j], h, 1);
+    buf[++j] = h;
 #endif
     mat->rem_ncols += (mat->wt[h] == 0);
     mat->wt[h] += (mat->wt[h] != SMAX(int32_t));
@@ -610,11 +613,12 @@ void * insert_rel_into_table (void *context_data, earlyparsed_relation_ptr rel)
 #ifdef BURY_FIRST
   rel->nb = j;
 #endif
-  setCell (buf[0], rel->nb, 0);
+#ifdef FOR_DL
+  buf[0].id = rel->nb;
+#else
+  buf[0] = rel->nb;
+#endif
   mat->tot_weight += rel->nb;
-
-  mat->rows[rel->num] = (typerow_t*) malloc ((rel->nb + 1) * sizeof (typerow_t));
-  FATAL_ERROR_CHECK(mat->rows[rel->num] == NULL, "Cannot allocate memory");
 
   /* sort indices to ease row merges */
 #ifndef FOR_DL
@@ -623,7 +627,8 @@ void * insert_rel_into_table (void *context_data, earlyparsed_relation_ptr rel)
   qsort (&(buf[1]), rel->nb, sizeof(typerow_t), cmp_typerow_t);
 #endif
 
-  memcpy (mat->rows[rel->num], buf, (rel->nb + 1) * sizeof (typerow_t));
+  mat->rows[rel->num] = mallocRow (rel->nb + 1);
+  compressRow (mat->rows[rel->num], buf, rel->nb);
 
   return NULL;
 }
@@ -653,7 +658,7 @@ filter_matrix_read (filter_matrix_t *mat, const char *purgedname)
 #ifndef BURY_FIRST
   uint64_t i;
   /* Bury heavy coloumns. The 'nburied' heaviest column are buried. */
-  /* Buried columns are not took into account by merge. */
+  /* Buried columns are not taken into account by merge. */
   if (mat->nburied)
   {
     uint64_t *heaviest = NULL;
@@ -727,11 +732,14 @@ filter_matrix_read (filter_matrix_t *mat, const char *purgedname)
           }
         }
         if (!is_buried) /* not a buried column */
-          mat->rows[i][k++] = mat->rows[i][j];
+          {
+            /* we can put any exponent since we don't bury columns in DL */
+            setCell(mat->rows[i], k, cur_id, 1);
+            k ++;
+          }
       }
-      matLengthRow(mat, i) = k-1;
-      mat->rows[i] = (typerow_t*) realloc (mat->rows[i], k * sizeof (typerow_t));
-      ASSERT_ALWAYS(mat->rows[i] != NULL);
+      setCell(mat->rows[i], 0, k - 1, 1);
+      mat->rows[i] = reallocRow (mat->rows[i], k);
     }
     printf ("# Done\n");
 
@@ -767,20 +775,20 @@ filter_matrix_read (filter_matrix_t *mat, const char *purgedname)
 }
 
 void
-print_row(filter_matrix_t *mat, int i)
+print_row(filter_matrix_t *mat, index_t i)
 {
     fprintRow (stdout, mat->rows[i]);
 }
 
 void
-destroyRow (filter_matrix_t *mat, int i)
+destroyRow (filter_matrix_t *mat, index_t i)
 {
     free (mat->rows[i]);
     mat->rows[i] = NULL;
 }
 
 void
-remove_i_from_Rj(filter_matrix_t *mat, index_t i, int j)
+remove_i_from_Rj(filter_matrix_t *mat, index_t i, index_t j)
 {
   unsigned int k, n = mat->R[j][0];
 
@@ -800,7 +808,7 @@ remove_i_from_Rj(filter_matrix_t *mat, index_t i, int j)
 // cell M[i, j] is incorporated in the data structure. It is used
 // later on in cases where i is not already present in row[j].
 void
-add_i_to_Rj(filter_matrix_t *mat, int i, int j)
+add_i_to_Rj(filter_matrix_t *mat, index_t i, index_t j)
 {
   int l;
 
@@ -814,7 +822,7 @@ add_i_to_Rj(filter_matrix_t *mat, int i, int j)
 /* return the weight of the relation obtained when adding relations i1 and i2
 */
 int
-weightSum(filter_matrix_t *mat, int i1, int i2, MAYBE_UNUSED int32_t j)
+weightSum(filter_matrix_t *mat, index_t i1, index_t i2, MAYBE_UNUSED index_t j)
 {
   unsigned int k1, k2, w, len1, len2;
 
@@ -829,10 +837,10 @@ weightSum(filter_matrix_t *mat, int i1, int i2, MAYBE_UNUSED int32_t j)
     int d;
     unsigned int l;
     for (l = 1 ; l <= len1 ; l++)
-        if ((int) matCell(mat, i1, l) == j)
+        if (matCell(mat, i1, l) == j)
             e1 = mat->rows[i1][l].e;
     for (l = 1 ; l <= len2 ; l++)
-        if ((int) matCell(mat, i2, l) == j)
+        if (matCell(mat, i2, l) == j)
             e2 = mat->rows[i2][l].e;
 
     ASSERT (e1 != 0 && e2 != 0);
@@ -888,7 +896,7 @@ weightSum(filter_matrix_t *mat, int i1, int i2, MAYBE_UNUSED int32_t j)
 
 /* put in ind[0]..ind[m-1] the indices of the m (active) rows containing j */
 void
-fillTabWithRowsForGivenj(int32_t *ind, filter_matrix_t *mat, int32_t j)
+fillTabWithRowsForGivenj(index_t *ind, filter_matrix_t *mat, index_t j)
 {
   int ni = 0;
   unsigned int k;

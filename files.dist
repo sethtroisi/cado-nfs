@@ -1211,3 +1211,4 @@ sieve/las-trialdiv.cpp
 sieve/las-fb.cpp
 config/shared_ptr.cmake
 config/cxxabi.cmake
+sieve/display-lattice-adjust.sage

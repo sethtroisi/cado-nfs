@@ -334,7 +334,7 @@ pthread_primes_consumer (void *arg)
 {
   freerel_th_data_t *my_data = arg;
   int nroots[NB_POLYS_MAX];
-  unsigned long roots[NB_POLYS_MAX][MAXDEGREE];
+  unsigned long roots[NB_POLYS_MAX][MAX_DEGREE];
 
   /* Make local copy of some global (read only) variables and set some pointer
    * to global (read only) data.

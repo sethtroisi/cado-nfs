@@ -15,7 +15,7 @@ void cado_poly_init(cado_poly poly)
     /* By default allocate 2 polynomials */
     poly->nb_polys = 2;
     for(int side = 0 ; side < poly->nb_polys ; side++)
-      mpz_poly_init (poly->pols[side], MAXDEGREE);
+      mpz_poly_init (poly->pols[side], MAX_DEGREE);
 
     mpz_init_set_ui(poly->n, 0);
 }
@@ -63,10 +63,10 @@ int cado_poly_set_plist(cado_poly poly, param_list pl)
     if(param_list_parse_string(pl, tag, buf, BUF_MAX))
     {
       if(i >= 2) {
-        mpz_poly_init (poly->pols[i], MAXDEGREE);
+        mpz_poly_init (poly->pols[i], MAX_DEGREE);
       }
       param_list_parse_mpz_poly(pl, tag, poly->pols[i]);
-      ASSERT(poly->pols[i]->deg <= MAXDEGREE);
+      ASSERT(poly->pols[i]->deg <= MAX_DEGREE);
     }
     else
     {
@@ -80,7 +80,7 @@ int cado_poly_set_plist(cado_poly poly, param_list pl)
   {
     poly->nb_polys = 2;
     /* reading polynomials coefficient by coefficient */
-    for (unsigned int i = 0; i <= MAXDEGREE; i++)
+    for (unsigned int i = 0; i <= MAX_DEGREE; i++)
     {
       char tag[4];
       snprintf(tag, sizeof(tag), "c%d", i);
@@ -96,7 +96,7 @@ int cado_poly_set_plist(cado_poly poly, param_list pl)
   }
   /* setting degrees */
   for(int side = 0 ; side < poly->nb_polys ; side++)
-    mpz_poly_cleandeg(poly->pols[side], MAXDEGREE);
+    mpz_poly_cleandeg(poly->pols[side], MAX_DEGREE);
 
   /* Parse value of N. Two keys possible: n or None. Return 0 if not found. */
   if (!param_list_parse_mpz(pl, "n", poly->n) &&

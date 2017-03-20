@@ -15,10 +15,10 @@ test_modul_poly_is_irreducible (unsigned long iter)
   modulusul_t p;
   int d, i, irred, n;
   unsigned long q;
-  residueul_t r[MAXDEGREE];
+  residueul_t r[MAX_DEGREE];
 
   /* first try some hard-coded polynomials */
-  modul_poly_init (f, MAXDEGREE);
+  modul_poly_init (f, MAX_DEGREE);
 
   modul_initmod_ul (p, 3);
   modul_poly_set_immediate (f, 0, p, 1);
@@ -63,7 +63,7 @@ test_modul_poly_is_irreducible (unsigned long iter)
 
   while (iter--)
     {
-      d = 1 + lrand48 () % (MAXDEGREE - 1);
+      d = 1 + lrand48 () % (MAX_DEGREE - 1);
       q = lrand48 ();
       q = ulong_nextprime (q);
       /* modul_poly_cantor_zassenhaus only works for odd primes */
@@ -96,14 +96,14 @@ test_modul_poly_is_irreducible (unsigned long iter)
 void
 test_modul_poly_roots_ulong (unsigned long iter)
 {
-  unsigned long r[MAXDEGREE];
-  mpz_t f[MAXDEGREE + 1];
+  unsigned long r[MAX_DEGREE];
+  mpz_t f[MAX_DEGREE + 1];
   int d, i, n;
   modulusul_t p;
   residueul_t y, x;
   modul_poly_t fp;
 
-  for (i = 0; i <= MAXDEGREE; i++)
+  for (i = 0; i <= MAX_DEGREE; i++)
     mpz_init (f[i]);
 
   /* hard-coded examples */
@@ -133,7 +133,7 @@ test_modul_poly_roots_ulong (unsigned long iter)
 
   while (iter--)
     {
-      d = 1 + lrand48 () % (MAXDEGREE - 1);
+      d = 1 + lrand48 () % (MAX_DEGREE - 1);
       F->deg = d;
       for (i = 0; i <= d; i++)
         mpz_urandomb (f[i], state, 64);
@@ -160,7 +160,7 @@ test_modul_poly_roots_ulong (unsigned long iter)
       modul_poly_clear (fp);
       modul_clearmod (p);
     }
-  for (i = 0; i <= MAXDEGREE; i++)
+  for (i = 0; i <= MAX_DEGREE; i++)
     mpz_clear (f[i]);
 }
 

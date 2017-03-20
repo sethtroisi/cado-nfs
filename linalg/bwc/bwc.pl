@@ -5,7 +5,7 @@ use strict;
 use POSIX qw/getcwd/;
 use File::Basename;
 use File::Temp qw/tempdir tempfile mktemp/;
-use List::Util qw[max];
+use List::Util qw/max/;
 use Data::Dumper;
 use Fcntl;
 use Carp;
@@ -112,6 +112,10 @@ if (!defined($bindir=$ENV{'BWC_BINDIR'})) {
         $bindir='.';
     }
 }
+
+# It's only used so that we can keep a non-zero reference count on
+# temporary filenames which we would like to keep until program exit.
+my @tempfiles;
 
 
 ##################################################
@@ -759,6 +763,18 @@ sub check_mpd_daemons
     dosystem "$mpi/mpdboot -n $n -r $ssh -f $hostfile -v";
 }
 
+sub get_mpi_hosts_oar {
+    my @x = split /^/, eval {
+		local $/=undef;
+		open F, "$ENV{OAR_NODEFILE}";
+		<F> };
+    @hosts=();
+    my %h=();
+    for (@x) {
+        push @hosts, $_ unless $h{$_}++;
+    }
+}
+
 sub get_mpi_hosts_torque {
     my @x = split /^/, eval {
 		local $/=undef;
@@ -839,14 +855,17 @@ if ($mpi_needed) {
 
     push @mpi_precmd, "$mpi/mpiexec";
 
-    # Need hosts.
+    my $auto_hostfile_pattern="/tmp/hosts_XXXXXXXX";
+
+    # Need hosts. Put that to the list @hosts first.
     if (exists($ENV{'OAR_JOBID'}) && !defined($hostfile) && !scalar @hosts) {
 	    print STDERR "OAR environment detected, setting hostfile.\n";
-	    $hostfile = mktemp("/tmp/HOSTS.$ENV{'OAR_JOBID'}.XXXXXXX");
-	    system "uniq $ENV{'OAR_NODEFILE'} > $hostfile";
+	    get_mpi_hosts_oar;
+	    $auto_hostfile_pattern="/tmp/hosts.$ENV{'OAR_JOBID'}.XXXXXXX";
     } elsif (exists($ENV{'PBS_JOBID'}) && !defined($hostfile) && !scalar @hosts ) {
 	    print STDERR "Torque/OpenPBS environment detected, setting hostfile.\n";
 	    get_mpi_hosts_torque;
+	    $auto_hostfile_pattern="/tmp/hosts.$ENV{'PBS_JOBID'}.XXXXXXX";
     } elsif (exists($ENV{'PE_HOSTFILE'}) && exists($ENV{'NSLOTS'})) {
             print STDERR "Oracle/SGE environment detected, setting hostfile.\n";
 	    get_mpi_hosts_sge;
@@ -855,12 +874,13 @@ if ($mpi_needed) {
     if (scalar @hosts) {
         # I think that when doing so, the file will get deleted at
         # program exit only.
-        my ($fh, $filename) = File::Temp->new(UNLINK=>1, TEMPLATE=>'hosts_XXXXXXXX');
-        $hostfile = $filename;
+        my $fh = File::Temp->new(TEMPLATE=>$auto_hostfile_pattern);
+        $hostfile = $fh->filename;
+        push @tempfiles, $fh;
         for my $h (@hosts) { print $fh "$h\n"; }
         close $fh;
-        print STDERR "Created $hostfile\n";
     }
+
     if (defined($hostfile)) {
         if ($needs_mpd) {
             # Assume daemons do the job.
@@ -918,7 +938,7 @@ if ($mpi_needed) {
         push @mpi_precmd, split(' ', $mpi_extra_args);
     }
     push @mpi_precmd, split(' ', '@MPIEXEC_EXTRA_STANZAS@');
-    push @mpi_precmd, split(' ', $ENV{'MPI_EXTRA_ARGS'});
+    push @mpi_precmd, split(' ', $ENV{'MPI_EXTRA_ARGS'}) if $ENV{'MPI_EXTRA_ARGS'};
 
     @mpi_precmd_single = @mpi_precmd;
     @mpi_precmd_lingen = @mpi_precmd;

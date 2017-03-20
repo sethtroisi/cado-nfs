@@ -23,7 +23,7 @@ test_L2_lognorm (void)
   mpz_poly p;
   double n;
 
-  mpz_poly_init (p, MAXDEGREE);
+  mpz_poly_init (p, MAX_DEGREE);
 
   /* degree 1 */
   mpz_set_ui (p->coeff[0], 1);
@@ -96,7 +96,7 @@ test_L2_skewness (int t)
   double s, n, sl, nl, sh, nh, eps;
   int prec = 10;
 
-  mpz_poly_init (p, MAXDEGREE);
+  mpz_poly_init (p, MAX_DEGREE);
   if (t == 0)
     mpz_set_ui (p->coeff[0], 1);
   else if (t == 1)

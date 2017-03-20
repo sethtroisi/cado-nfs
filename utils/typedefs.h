@@ -14,8 +14,8 @@
 /* data type to store the renumber table */
 #ifndef __SIZEOF_INDEX__
 #define __SIZEOF_INDEX__ 4
-#elif __SIZEOF_INDEX__ != 4 && __SIZEOF_INDEX__ != 8
-#error "Defined constant __SIZEOF_INDEX__ should be 4 or 8"
+#elif __SIZEOF_INDEX__ < 4 || 8 < __SIZEOF_INDEX__
+#error "Defined constant __SIZEOF_INDEX__ should be in [4..8]"
 #endif
 
 #if __SIZEOF_INDEX__ > __SIZEOF_P_R_VALUES__

@@ -3728,7 +3728,7 @@ std::string cxx_mpz_poly::print_poly(std::string const& var) const
         } else {
             if (mpz_cmp_ui(x->coeff[i], -1) == 0) {
                 os << "-";
-            } else {
+            } else if (mpz_cmp_ui(x->coeff[i], 1) != 0) {
                 os << x->coeff[i] << "*";
             }
             os << var;

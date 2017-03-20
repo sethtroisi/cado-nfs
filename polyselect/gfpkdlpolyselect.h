@@ -38,7 +38,7 @@
 typedef struct {
   long int t;     // parameter t
   long int PY[DEG_PY + 1]; // no --> use one of the poly stuct of cado-nfs!
-  long int f[MAXDEGREE + 1];  // polynomial f of degree at most MAXDEGREE 
+  long int f[MAX_DEGREE + 1];  // polynomial f of degree at most MAX_DEGREE 
                          // set to 10 at the moment in utils/cado_poly.h
 }tPyf_t;
 
@@ -50,7 +50,7 @@ typedef struct {
   unsigned int deg_phi;
   int size; // nb of elements f in table
   const tPyf_t* tab; // la table de {f, Py, phi}
-  long int phi[MAXDEGREE + 1][DEG_PY]; // poly whose coefficients are themselves poly in Y 
+  long int phi[MAX_DEGREE + 1][DEG_PY]; // poly whose coefficients are themselves poly in Y 
   //(a root of PY) modulo PY so of degree at most DEG_PY-1 --> of DEG_PY coeffs.
 }tPyf_poly_t;
 
@@ -59,10 +59,10 @@ typedef tPyf_poly_t* tPyf_poly_ptr_t;
 // table structure for CONJ with Fp2 (and JLSV1 Fp4 ?).
 
 typedef struct {
-  long int f[MAXDEGREE + 1];  // polynomial f of degree at most MAXDEGREE 
+  long int f[MAX_DEGREE + 1];  // polynomial f of degree at most MAX_DEGREE 
                               // set to 10 at the moment in utils/cado_poly.h
   long int Py[DEG_PY + 1];    // no --> use one of the poly stuct of cado-nfs!
-  long int phi[MAXDEGREE + 1][DEG_PY]; // poly whose coefficients are themselves poly in Y 
+  long int phi[MAX_DEGREE + 1][DEG_PY]; // poly whose coefficients are themselves poly in Y 
 }fPyphi_t;
 
 typedef struct {
@@ -105,13 +105,13 @@ void mpz_poly_set_sli(mpz_poly f, const long int * h, int deg_h);
 
 // works only if PY is of degree 2
 void eval_mpz_phi_mpz_uv(mpz_poly g, mpz_t** phi_coeff, unsigned int deg_phi, mpz_t u, mpz_t v);
-void eval_si_phi_mpz_y(mpz_poly g, const long int phi_coeff[MAXDEGREE + 1][DEG_PY], unsigned int deg_phi, mpz_t y);
-void eval_si_phi_mpz_uv(mpz_poly g, const long int phi_coeff[MAXDEGREE + 1][DEG_PY], unsigned int deg_phi, mpz_t u, mpz_t v);
+void eval_si_phi_mpz_y(mpz_poly g, const long int phi_coeff[MAX_DEGREE + 1][DEG_PY], unsigned int deg_phi, mpz_t y);
+void eval_si_phi_mpz_uv(mpz_poly g, const long int phi_coeff[MAX_DEGREE + 1][DEG_PY], unsigned int deg_phi, mpz_t u, mpz_t v);
 // works only if PY is of degree 2
 
 void init_eval_mpz_phi_mpz_uv(mpz_poly g, mpz_t** phi_coeff, unsigned int deg_phi, mpz_t u, mpz_t v);
-void init_eval_si_phi_mpz_y(mpz_poly g, const long int phi_coeff[MAXDEGREE + 1][DEG_PY], unsigned int deg_phi, mpz_t y);
-void init_eval_si_phi_mpz_uv(mpz_poly g, const long int phi_coeff[MAXDEGREE + 1][DEG_PY], unsigned int deg_phi, mpz_t u, mpz_t v);
+void init_eval_si_phi_mpz_y(mpz_poly g, const long int phi_coeff[MAX_DEGREE + 1][DEG_PY], unsigned int deg_phi, mpz_t y);
+void init_eval_si_phi_mpz_uv(mpz_poly g, const long int phi_coeff[MAX_DEGREE + 1][DEG_PY], unsigned int deg_phi, mpz_t u, mpz_t v);
 
 
 bool is_irreducible_ZZ(mpz_poly_srcptr phi);
@@ -139,7 +139,7 @@ bool get_g_CONJ(mpz_poly g[], mpz_poly phi, ppf_t params_g, int f_id, mpz_t * ta
 
 void mpz_poly_fprintf_cado_format_line (FILE *fp, mpz_poly f, 
 					const int j, const char* label_poly);
-void mpz_phi_poly_fprintf_cado_format_line (FILE *fp, const long int phi_coeff[MAXDEGREE + 1][DEG_PY], unsigned int deg_phi, unsigned int deg_Py, int j, const char *label_poly);
+void mpz_phi_poly_fprintf_cado_format_line (FILE *fp, const long int phi_coeff[MAX_DEGREE + 1][DEG_PY], unsigned int deg_phi, unsigned int deg_Py, int j, const char *label_poly);
 void fprintf_gfpn_poly_info (FILE* fp, mpz_poly f, const char *label_poly);
 void gfpk_print_params(unsigned int n, mpz_srcptr p, mpz_srcptr ell);
 

@@ -1239,7 +1239,7 @@ int las_todo_feed_qrange(las_info & las, param_list pl)
     int qside = las.config_base.side;
 
     mpz_poly_ptr f = las.cpoly->pols[qside];
-    cxx_mpz roots[MAXDEGREE];
+    cxx_mpz roots[MAX_DEGREE];
 
     if (mpz_cmp_ui(q0, 0) == 0) {
         parse_command_line_q0_q1(las, q0, q1, pl, qside);

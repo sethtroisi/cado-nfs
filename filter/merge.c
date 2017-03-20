@@ -221,8 +221,7 @@ main (int argc, char *argv[])
             "W=%" PRIu64 " W*N=%.2e W/N=%.2f\n",
             mat->rem_nrows, mat->rem_ncols,
             ((int64_t) mat->rem_nrows) - ((int64_t) mat->rem_ncols), mat->weight,
-            (double) mat->weight * (double) mat->rem_nrows,
-            (double) mat->weight / (double) mat->rem_nrows);
+            compute_WN (mat), compute_WoverN (mat));
     fflush (stdout);
     MkzClear (mat, 1);
     clearMat (mat);

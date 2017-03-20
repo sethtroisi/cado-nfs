@@ -8,8 +8,8 @@
 #include "mpz_poly.h"
 
 /* The maximum degree of polynomials supported. Used for statically 
-   allocating storage (i.e. "mpz_t poly[MAXDEGREE]") */
-#define MAXDEGREE 10
+   allocating storage (i.e. "mpz_t poly[MAX_DEGREE]") */
+#define MAX_DEGREE 10
 
 #define NB_POLYS_MAX 8 /* maximal number of polynomials in multiple fields */
 

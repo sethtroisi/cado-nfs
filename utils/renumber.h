@@ -18,14 +18,14 @@
 #define RENUMBER_DEFAULT_SIZE (1 << 22)
 #define RENUMBER_ROOT_ON_RAT_SIDE ((p_r_values_t) -1)
 /* Max number of char necessary to write all the roots in hexa for ONE prime p.
- * Must be greater than (max_nb_char_per_roots+1)*MAXDEGREE*NB_POLYS_MAX.
+ * Must be greater than (max_nb_char_per_roots+1)*MAX_DEGREE*NB_POLYS_MAX.
  * max_nb_char_per_roots is 8 (a root is always smaller than a prime and a
  * prime is smaller than 2^64 (this bound is not tight at all, in practice a
  * prime is smaller 2^32~2^34 at most)), and the +1 is here to take into account
  * the '\n' at the end of each entry of the table
  */
 #define RENUMBER_MAX_SIZE_PER_PRIME (1<<10)
-#if RENUMBER_MAX_SIZE_PER_PRIME < (8+1)*MAXDEGREE*NB_POLYS_MAX
+#if RENUMBER_MAX_SIZE_PER_PRIME < (8+1)*MAX_DEGREE*NB_POLYS_MAX
   #error "RENUMBER_MAX_SIZE_PER_PRIME is too small."
 #endif
 
@@ -74,10 +74,10 @@ void renumber_init_for_writing (renumber_ptr, unsigned int, int, int,
 /* Last argument of renumber_write_open can be NULL. It will not print the
    polynomials on the file */
 void renumber_write_open (renumber_ptr, const char *, const char *, cado_poly);
-void renumber_write_p (renumber_ptr, unsigned long, unsigned long [][MAXDEGREE],
+void renumber_write_p (renumber_ptr, unsigned long, unsigned long [][MAX_DEGREE],
                        int []);
 size_t renumber_write_buffer_p (char *, renumber_ptr, unsigned long,
-                                unsigned long [][MAXDEGREE], int []);
+                                unsigned long [][MAX_DEGREE], int []);
 void renumber_write_close (renumber_ptr, const char*);
 
 void renumber_init_for_reading (renumber_ptr);

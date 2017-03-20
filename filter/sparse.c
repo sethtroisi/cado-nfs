@@ -30,9 +30,9 @@ fprintRow(FILE *file, typerow_t *row)
     for(i = 1; i <= row[0].id; i++)
         fprintf(file, " %" PRid "(%" PRId32 ")", row[i].id, row[i].e);
 #else
-    fprintf(file, "[%" PRid "]", row[0]);
-    for(i = 1; i <= row[0]; i++)
-        fprintf(file, " %" PRid "", row[i]);
+    fprintf(file, "[%" PRid "]", rowCell (row, 0));
+    for(i = 1; i <= rowCell (row, 0); i++)
+        fprintf(file, " %" PRid "", rowCell (row, i));
 #endif
 }
 
@@ -49,8 +49,8 @@ fprintRow(FILE *file, typerow_t *row)
 // Also update the data for the index file, if needed (i.e. if the given
 // pointer is not NULL).
 void
-addRowsUpdateIndex(typerow_t **rows, index_data_t index_data, int i1, int i2,
-        MAYBE_UNUSED int32_t j)
+addRowsUpdateIndex(typerow_t **rows, index_data_t index_data,
+                   index_t i1, index_t i2, MAYBE_UNUSED index_t j)
 {
     uint32_t k1, k2, k, len;
     typerow_t *tmp;
@@ -64,18 +64,17 @@ addRowsUpdateIndex(typerow_t **rows, index_data_t index_data, int i1, int i2,
     fprintf(stderr, "\n");
 #endif
     len = 1 + rowLength(rows, i1) + rowLength(rows, i2);
-    tmp = (typerow_t *)malloc(len * sizeof(typerow_t));
-    k = k1 = k2 = 1;
+    tmp = (typerow_t *) malloc (len * sizeof(typerow_t));
 
 #ifdef FOR_DL /* look for the exponents of j in i1 i2*/
     int e1 = 0, e2 = 0;
     int d;
     unsigned int l;
     for (l = 1 ; l <= rowLength(rows, i1) ; l++)
-        if ((int) rowCell(rows, i1, l) == j)
+        if (rowCell(rows[i1], l) == j)
             e1 = rows[i1][l].e;
     for (l = 1 ; l <= rowLength(rows, i2) ; l++)
-        if ((int) rowCell(rows, i2, l) == j)
+        if (rowCell(rows[i2], l) == j)
             e2 = rows[i2][l].e;
 
     ASSERT (e1 != 0 && e2 != 0);
@@ -98,11 +97,18 @@ addRowsUpdateIndex(typerow_t **rows, index_data_t index_data, int i1, int i2,
 
 
     // loop while everybody is here
+    k = k1 = k2 = 1;
     while((k1 <= rowLength(rows, i1)) && (k2 <= rowLength(rows, i2))){
-        if(rowCell(rows, i1, k1) < rowCell(rows, i2, k2))
-            tmp[k++] = rows[i1][k1++];
-        else if(rowCell(rows, i1, k1) > rowCell(rows, i2, k2))
-            tmp[k++] = rows[i2][k2++];
+        if (rowCell(rows[i1], k1) < rowCell(rows[i2], k2))
+          {
+            tmp[k++] = rowFullCell(rows[i1], k1);
+            k1 ++;
+          }
+        else if (rowCell(rows[i1], k1) > rowCell(rows[i2], k2))
+          {
+            tmp[k++] = rowFullCell(rows[i2], k2);
+            k2 ++;
+          }
         else{
 #ifdef FOR_DL
             if (rows[i1][k1].e + rows[i2][k2].e != 0)
@@ -121,23 +127,27 @@ addRowsUpdateIndex(typerow_t **rows, index_data_t index_data, int i1, int i2,
     }
     // finish with k1
     for( ; k1 <= rowLength(rows, i1); k1++)
-	tmp[k++] = rows[i1][k1];
+        tmp[k++] = rowFullCell(rows[i1], k1);
     // finish with k2
     for( ; k2 <= rowLength(rows, i2); k2++)
-	tmp[k++] = rows[i2][k2];
+        tmp[k++] = rowFullCell(rows[i2], k2);
     ASSERT(k <= len);
 
+    setRawCell(tmp, 0, k-1, 1);
+
     // copy back
+#if defined(FOR_DL) || __SIZEOF_INDEX__ == 4 || __SIZEOF_INDEX__ == 8
     free(rows[i1]);
-#ifdef FOR_DL
-        tmp[0].id = k-1;
+    if(k == len)
+      rows[i1] = tmp;
+    else
+      rows[i1] = reallocRow (tmp, k);
 #else
-        tmp[0] = k-1;
+    if (k-1 != rowLength(rows, i1))
+      rows[i1] = reallocRow (rows[i1], k);
+    compressRow (rows[i1], tmp, k-1);
+    free (tmp);
 #endif
-	if(k == len)
-	    rows[i1] = tmp;
-	else
-	    rows[i1] = realloc(tmp, k * sizeof(typerow_t));
 #ifdef FOR_DL
     /* restore old coeff for row i2 */
     for (l = 1 ; l <= rowLength(rows, i2) ; l++)
@@ -206,17 +216,6 @@ addRowsUpdateIndex(typerow_t **rows, index_data_t index_data, int i1, int i2,
 #endif
 }
 
-int
-hasCol(int32_t **rows, int i, int32_t j)
-{
-    int32_t k;
-
-    for(k = 1; k <= rows[i][0]; k++)
-	if(rows[i][k] == j)
-	    return 1;
-    return 0;
-}
-
 // A line is "[-]i i1 ... ik [#j]"
 int parse_hisfile_line (index_signed_t *ind, const char *t, index_t *j)
 {
@@ -259,3 +258,84 @@ int parse_hisfile_line (index_signed_t *ind, const char *t, index_t *j)
 
   return ni;
 }
+
+/* allocates memory for a row of n elements (including the length which is
+   element 0) */
+typerow_t*
+mallocRow (uint32_t n)
+{
+  typerow_t *row;
+
+#if defined(FOR_DL) || __SIZEOF_INDEX__ == 4 || __SIZEOF_INDEX__ == 8
+  row = (typerow_t*) malloc (n * sizeof (typerow_t));
+#else
+  /* for 5 <= __SIZEOF_INDEX__ <= 7, we need n*__SIZEOF_INDEX__ bytes */
+  row = (typerow_t*) malloc (n * __SIZEOF_INDEX__);
+#endif
+  FATAL_ERROR_CHECK(row == NULL, "Cannot allocate memory");
+  return row;
+}
+
+/* reallocates memory for a row of n elements */
+typerow_t*
+reallocRow (typerow_t *row, uint32_t n)
+{
+#if defined(FOR_DL) || __SIZEOF_INDEX__ == 4 || __SIZEOF_INDEX__ == 8
+  row = (typerow_t*) realloc (row, n * sizeof (typerow_t));
+#else
+  /* for 5 <= __SIZEOF_INDEX__ <= 7, we need n*__SIZEOF_INDEX__ bytes */
+  row = (typerow_t*) realloc (row, n * __SIZEOF_INDEX__);
+#endif
+  FATAL_ERROR_CHECK(row == NULL, "Cannot allocate memory");
+  if (n * __SIZEOF_INDEX__ == 50) printf ("row=%lx\n", (unsigned long) row);
+  return row;
+}
+
+
+/* experimental code for factorization with 5 <= __SIZEOF_INDEX__ <= 7 */
+#if !defined(FOR_DL) && 5 <= __SIZEOF_INDEX__ && __SIZEOF_INDEX__ <= 7
+
+/* We use the following data structure for a matrix row:
+
+ * each entry has __SIZEOF_INDEX__ bytes which are stored consecutively
+   (little endian, i.e., smallest byte first)
+ * the first entry represents the length (say n) of the row
+ * thus we have in total (n+1)*__SIZEOF_INDEX__ bytes */
+
+index_t
+rowCell (index_t *row, int k)
+{
+  index_t res = 0;
+  uint8_t *ptr = ((uint8_t*) row) + k * __SIZEOF_INDEX__;
+
+  for (int t = 0; t < __SIZEOF_INDEX__; t++)
+    res += ((index_t) ptr[t]) << (t * 8);
+  return res;
+}
+
+/* this function is only used for factorization, where the exponent e is not
+   used */
+void setCell(index_t *row, int k, index_t j, exponent_t e MAYBE_UNUSED)
+{
+  uint8_t *ptr = ((uint8_t*) row) + k * __SIZEOF_INDEX__;
+  index_t j0 = j;
+
+  for (int t = 0; t < __SIZEOF_INDEX__; t++)
+    {
+      ptr[t] = (uint8_t) j;
+      j >>= 8;
+    }
+  /* we should have used all bits of j */
+  if (j != 0) printf ("j0=%lu\n", j0);
+  ASSERT_ALWAYS(j == 0);
+}
+
+/* set (compressed) row[0..n] from buf[0..n] */
+void compressRow (index_t *row, index_t *buf, int n)
+{
+  for (int k = 0; k <= n; k++)
+    setCell (row, k, buf[k], 1);
+}
+
+#endif
+

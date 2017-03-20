@@ -75,7 +75,7 @@ static uint64_t ndup_tot = 0, nrels_tot = 0;
 
 /* sanity check: we store (a,b) pairs for 0 <= i < sanity_size,
    and check for hash collisions */
-unsigned long sanity_size;
+uint64_t sanity_size;
 int64_t  *sanity_a;
 uint64_t *sanity_b;
 unsigned long sanity_checked = 0;
@@ -94,7 +94,7 @@ static int is_for_dl; /* Do we reduce mod 2 or not */
 #endif
 
 static inline void
-sanity_check (uint32_t i, int64_t a, uint64_t b)
+sanity_check (uint64_t i, int64_t a, uint64_t b)
 {
   sanity_checked++;
   if (sanity_a[i] == 0)
@@ -116,7 +116,8 @@ print_warning_size ()
 {
   uint64_t nodup = nrels_tot - ndup_tot;
   double full_table = 100.0 * (double) nodup / (double) K;
-  fprintf(stderr, "Warning, hash table is %1.0f%% full\n", full_table);
+  fprintf (stderr, "Warning, hash table is %1.0f%% full (avg cost %1.2f)\n",
+           full_table, cost / (double) nrels_tot);
   if (full_table >= 99.0)
   {
     fprintf(stderr, "Error, hash table is full\n");
@@ -209,13 +210,16 @@ print_relation (FILE * file, earlyparsed_relation_srcptr rel)
 }
 
 /* if duplicate is_dup = 1, else is_dup = 0
- * return i for sanity check
+ * return i for sanity check, which is the place in the hash table where
+ * the relation is stored: more precisely we store in H[i] the value
+ * of floor(h/2^32), where h(a,b) is a 64-bit value.
  */
-static inline uint32_t
+static inline uint64_t
 insert_relation_in_dup_hashtable (earlyparsed_relation_srcptr rel, unsigned int *is_dup)
 {
-  uint64_t h;
-  uint32_t i, j;
+  uint64_t h, i;
+  uint32_t j;
+  double local_cost = 0;
 
   h = CA_DUP2 * (uint64_t) rel->a + CB_DUP2 * rel->b;
 
@@ -229,23 +233,34 @@ insert_relation_in_dup_hashtable (earlyparsed_relation_srcptr rel, unsigned int 
          thus this happens when h' = h + n*K or h' = h + n*K + 1. This happens
          with probability 2/K. Moreover we should have j = j', which happens
          with probability 2^(-32). Since K is an odd prime, the global
-         probability is about 2^(-31)/K.
-     In case K > 2^32, the analysis is the same, except we can have collisions
-     on i: i and i + t*2^32 will give the same value modulo 2^32. This
-     increases the probability by a factor K/2^32, thus we get 2^(-63). */
+         probability is about 2^(-31)/K. */
 
-  i = (uint32_t) (h % K);
+  i = h % K;
   j = (uint32_t) (h >> 32);
 #ifdef TRACE_HASH_TABLE
-  uint32_t old_i = i;
+  uint64_t old_i = i;
 #endif
   while (H[i] != 0 && H[i] != j)
   {
     i++;
     if (UNLIKELY(i == K))
       i = 0;
-    cost++;
+    local_cost++;
   }
+
+  if (local_cost > 100)
+    {
+      static int count = 0;
+      if (count++ < 10)
+        fprintf (stderr, "Warning, insertion cost %1.0f for a=%" PRId64
+                 " b=%" PRIu64 " h=%" PRIu64 " i=%" PRIu64 " j=%u\n",
+                 local_cost, rel->a, rel->b, h, i, j);
+    }
+
+  cost += local_cost;
+
+  /* Note: since we use 0 for uninitialized entries, entries with j=0
+     will get always marked as 'duplicate' and be lost. */
 
   if (H[i] == j)
     *is_dup = 1;
@@ -259,8 +274,8 @@ insert_relation_in_dup_hashtable (earlyparsed_relation_srcptr rel, unsigned int 
   if (i == TRACE_I && j == TRACE_J)
   {
     fprintf (stderr, "TRACE: a = %s%" PRIx64 "\nTRACE: b = %" PRIx64 "\n"
-                     "TRACE: i = %" PRIu32 "\nTRACE: j = %" PRIu32 "\n"
-                     "TRACE: initial value of i was %" PRIu32 "\n"
+                     "TRACE: i = %" PRIu64 "\nTRACE: j = %" PRIu32 "\n"
+                     "TRACE: initial value of i was %" PRIu64 "\n"
                      "TRACE: h = %" PRIx64 "\nTRACE: is_dup = %u\n",
                      (rel->a < 0) ? "-" : "",
                      (uint64_t) ((rel->a < 0) ? -rel->a : rel->a),
@@ -401,7 +416,7 @@ hash_renumbered_rels (void * context_data MAYBE_UNUSED, earlyparsed_relation_ptr
 
     nrels++;
     nrels_tot++;
-    uint32_t i = insert_relation_in_dup_hashtable (rel, &is_dup);
+    uint64_t i = insert_relation_in_dup_hashtable (rel, &is_dup);
 
     static unsigned long count = 0;
 
@@ -409,7 +424,7 @@ hash_renumbered_rels (void * context_data MAYBE_UNUSED, earlyparsed_relation_ptr
     if (is_dup && count++ < 10)
     {
       fprintf (stderr, "Warning, duplicate relation in already renumbered files:"
-                       "\na = %s%" PRIx64 "\nb = %" PRIx64 "\ni = %" PRIu32
+                       "\na = %s%" PRIx64 "\nb = %" PRIx64 "\ni = %" PRIu64
                        "\nj = %" PRIu32 "\n", (rel->a < 0) ? "-" : "",
                        (uint64_t) ((rel->a < 0) ? -rel->a : rel->a),
                        rel->b, i, H[i]);
@@ -420,7 +435,7 @@ hash_renumbered_rels (void * context_data MAYBE_UNUSED, earlyparsed_relation_ptr
     }
 
     if (i < sanity_size)
-        sanity_check(i, rel->a, rel->b);
+        sanity_check (i, rel->a, rel->b);
 
     if (cost >= factor * (double) (nrels_tot - ndup_tot))
         print_warning_size ();
@@ -432,7 +447,7 @@ static void *
 thread_dup2 (void * context_data, earlyparsed_relation_ptr rel)
 {
     unsigned int is_dup;
-    uint32_t i;
+    uint64_t i;
     FILE * output = (FILE*) context_data;
     nrels++;
     nrels_tot++;
@@ -645,8 +660,8 @@ main (int argc, char *argv[])
      one 32-bit word for the hash table, taking K/100 will use 2.5% extra
      memory */
   sanity_size = 1 + (K / 100);
-  fprintf (stderr, "[checking true duplicates on sample of %lu cells]\n",
-           sanity_size);
+  fprintf (stderr, "[checking true duplicates on sample of %" PRIu64
+           " cells]\n", sanity_size);
   sanity_a = (int64_t*)  malloc (sanity_size * sizeof (int64_t));
   if (sanity_a == NULL)
     {
