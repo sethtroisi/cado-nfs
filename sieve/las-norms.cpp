@@ -1704,6 +1704,11 @@ B:=[bestrep(a):a in {{a*b*c*x:a in {1,-1},b in {1,d},c in {1,s}}:x in MM}];
             shuffle(0,0), shuffle(0,1), shuffle(1,0), shuffle(1,1),
             logI,
             100.0*(best_sum/reference-1));
+    {
+        std::ostringstream os;
+        os << "# New q-lattice: a0="<<Q.a0<<"; b0="<<Q.b0<<"; a1="<<Q.a1<<"; b1="<<Q.b1<<";\n";
+        verbose_output_print(0, 1, "%s",os.str().c_str());
+    }
 
     return adapt_threads(__func__);
 }/*}}}*/
