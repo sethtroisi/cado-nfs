@@ -392,7 +392,7 @@ static plattice_x_t plattice_starting_point(const plattice_info_t &pli,
     // Right now, we desactivate them, but putting a starting point
     // higher than the limit.
     if ((b0 == 0) || (b1 == 0)) {
-        return plattice_x_t(I*I);
+        return plattice_x_t(UMAX(plattice_x_t));
     }
 
     // Look for alpha and beta such that
