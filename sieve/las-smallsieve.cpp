@@ -186,7 +186,6 @@ static inline void ssp_init_oa(ssp_t * tail, fbprime_t p, fbprime_t r, unsigned 
 
 static inline void ssp_init_op(ssp_bad_t * tail, fbprime_t p, fbprime_t r, unsigned int skip MAYBE_UNUSED, where_am_I & w MAYBE_UNUSED)/*{{{*/
 {
-    // FIXME: this is probably broken with sublattices.
     unsigned int v = r; /* have consistent notations */
     unsigned int g = gcd_ul(p, v);
     fbprime_t q = p / g;
@@ -367,17 +366,21 @@ int64_t *small_sieve_start(small_sieve_data_t *ssd, unsigned int j0,
         // data (we are in the projective case), for the (rare) case
         // where we have to update the (i,j)=(1,0) position.
         if (event & SSP_PROJ) {
-            // FIXME: this is probably broken with sublattices.
+            uint64_t jj0;
+            if (!sublatm) {
+                jj0 = j0;
+            } else {
+                jj0 = j0*sublatm + sublatj0;
+            }
             ssp_bad_t * ssp = (ssp_bad_t *) &(ssd->ssp[i]);
             /* Compute the next multiple of g above j0 */
-            unsigned int j1 = j0 - (j0 % ssp->g);
-            uint64_t compensate = si.I / 2;
-            // FIXME: is it (j1<j0) the right condition ?
-            if (j1<j0) { /* most often j1 is < j0 -- in this case,
+            uint64_t j1 = jj0 - (jj0 % ssp->g);
+            // FIXME: is it (j1<jj0) the right condition ?
+            if (j1<jj0) { /* most often j1 is < jj0 -- in this case,
                          the j1 we're looking for needs +g */
                 j1 += ssp->g;
             }
-            ASSERT(j1 >= j0);
+            ASSERT(j1 >= jj0);
             ASSERT(j1 % ssp->g == 0);
             /* Now we'd like to avoid row number 0 (so j1 == 0).  */
             /* The position (1,0) is updated with a special code in the */
@@ -385,7 +388,27 @@ int64_t *small_sieve_start(small_sieve_data_t *ssd, unsigned int j0,
             if (j1 == 0) {
                 j1 += ssp->g;
             }
-            compensate += (uint64_t)(j1 / ssp->g) * (uint64_t)ssp->U;
+            // In sublat mode, we also need j1 congruent to sublatj0 mod m.
+            if (sublatm) {
+                while ((j1 % sublatm) != sublatj0) {
+                    j1 += ssp->g;
+                }
+            }
+            // Find the corresponding i
+            uint64_t ii = uint64_t(j1/ssp->g)*uint64_t(ssp->U);
+            if (sublatm) {
+                while ((ii % sublatm) != sublati0) {
+                    ii += ssp->q;
+                }
+            }
+            // In the sublat mode, switch back to reduced convention
+            // (exact divisions)
+            if (sublatm) {
+                j1 = (j1-sublatj0) / sublatm;
+                ii = (ii-sublati0) / sublatm;
+            }
+            uint64_t compensate = si.I / 2;
+            compensate += ii;
             ssdpos[i] = (((uint64_t)(j1 - j0))<<si.conf.logI_adjusted)
                 + compensate % (uint64_t)ssp->q;
         } else if (event & SSP_POW2) {
