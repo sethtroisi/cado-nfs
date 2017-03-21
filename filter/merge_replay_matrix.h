@@ -7,12 +7,6 @@
 #define TRACE_COL -1 // 253224 // 231 // put to -1 if not...!
 #define TRACE_ROW -1 // 59496 // put to -1 if not...!
 
-/* If BURY_FIRST is defined, we bury the 'nburied' columns of smallest index
-   while reading the matrix. This might not be optimal, since this might not
-   be the 'nburied' heaviest columns, but this should decrease the memory
-   usage. This feature is experimental. */
-// #define BURY_FIRST
-
 #ifndef FOR_DL
 #define typerow_t index_t
 #define cmp_typerow_t cmp_index
