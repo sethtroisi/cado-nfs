@@ -609,18 +609,6 @@ bool parse_default_siever_config(siever_config & sc, param_list_ptr pl)
         }
     }
 
-    // Adjust skip and powlim if we are in sublat mode.
-    if (sc.sublat.m) {
-        if (sc.skipped < sc.sublat.m) {
-            sc.skipped = sc.sublat.m + 1;
-        }
-        for (int side = 0; side < 2; side++) {
-            if (sc.sides[side].powlim > sc.sublat.m) {
-                sc.sides[side].powlim = sc.sublat.m;
-            }
-        }
-    }
-
     const char *ncurves_params[2] = {"ncurves0", "ncurves1"};
     for (int side = 0; side < 2; side++)
         if (!param_list_parse_int(pl, ncurves_params[side],

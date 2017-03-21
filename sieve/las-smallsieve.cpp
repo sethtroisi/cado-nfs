@@ -264,6 +264,15 @@ void small_sieve_init(small_sieve_data_t *ssd, las_info & las,
                 continue;
             }
             unsigned int event = 0;
+
+            if (sublatm) {
+                // In sublat mode, disable pattern sieving and primes
+                // dividing m.
+                if (pp == 2 || pp == 3 || (sublatm % pp) == 0) {
+                    event |= SSP_DISCARD;
+                }
+            }
+
             if ((p & 1)==0) event |= SSP_POW2;
 
             /* p may already have occurred before, and was taken into account
@@ -286,7 +295,7 @@ void small_sieve_init(small_sieve_data_t *ssd, las_info & las,
                         r_q >= p ? "1/" : "", r_q % p);
 
             /* Handle projective roots */
-            if (r_q >= p) {
+            if (r_q >= p && !(event & SSP_DISCARD)) {
                 /* Compute the init data in any case, since the gcd
                  * dominates (and anyway we won't be doing this very
                  * often). */
@@ -307,9 +316,10 @@ void small_sieve_init(small_sieve_data_t *ssd, las_info & las,
                     }
                     event |= SSP_DISCARD;
                 }
-            } else {
+            } else if (!(event & SSP_DISCARD)) {
                 ssp_init_oa(tail, p, r_q, skiprows, w);
             }
+
             tail++;
             if (event)
                 push_ssp_marker(ssd, nmarkers, index, event);
@@ -361,6 +371,7 @@ int64_t *small_sieve_start(small_sieve_data_t *ssd, unsigned int j0,
                 ssdpos[i] = compensate % (uint64_t)ssp->p;
             }
         }
+        if (event & SSP_DISCARD) continue;
         if (event & SSP_END) break;
         // Remark: even in the case of discard, we want to precompute the
         // data (we are in the projective case), for the (rare) case
@@ -871,7 +882,10 @@ void sieve_small_bucket_region(unsigned char *S, int N,
 #undef U2
 #undef U
         unsigned int event = (next_marker++)->event;
-        if (event == SSP_END) {
+        if (event & SSP_DISCARD) {
+            continue;
+        }
+        if (event & SSP_END) {
             ASSERT_ALWAYS(fence == ssd->nb_ssp);
             break;
         }
