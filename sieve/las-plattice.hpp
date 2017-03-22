@@ -184,6 +184,13 @@ struct plattice_info_t {
     }
   }
 
+  plattice_info_t(int32_t aa0, uint32_t aa1, int32_t bb0, uint32_t bb1) {
+      a0 = aa0;
+      a1 = aa1;
+      b0 = bb0;
+      b1 = bb1;
+  }
+
   /* Return the four coordinates, but multiplied by 2 if we use mod 2 classes */
   int32_t get_a0() const {return a0 << shift;}
   uint32_t get_a1() const {return a1 << shift;}
@@ -551,6 +558,42 @@ public:
     plattices_vector_t(const slice_index_t index) : index(index) {}
     slice_index_t get_index() const {return index;};
 };
+
+
+/* Dense version of plattice_info_t and friends for long-term storage in
+ * sublat mode. */
+
+struct plattice_info_dense_t {
+    uint16_t minus_a0;  // a0 is always non-positive, so we store its opposite
+    uint16_t b0;        // in order to fit in 16 bits.
+    uint16_t a1;
+    uint16_t b1;
+
+    plattice_info_dense_t(const plattice_info_t & pli) {
+        ASSERT(pli.b0 >= 0);
+        ASSERT(pli.a0 <= 0);
+        ASSERT(uint32_t(-pli.a0) <= UMAX(uint16_t));
+        minus_a0 = -pli.a0;
+        a1 = pli.a1;
+        b0 = pli.b0;
+        b1 = pli.b1;
+    }
+
+    plattice_info_t unpack() const {
+        plattice_info_t pli(-int32_t(minus_a0), uint32_t(a1),
+        int32_t(b0), uint32_t(b1));
+        return pli;
+    }
+};
+
+class plattices_dense_vector_t:
+        public std::vector<plattice_info_dense_t>, private NonCopyable {
+    slice_index_t index;
+public:
+    plattices_dense_vector_t(const slice_index_t index) : index(index) {}
+    slice_index_t get_index() const {return index;};
+};
+
 
 
 /* This is for working with congruence classes only */

@@ -16,6 +16,7 @@
 #include "las-todo.hpp"
 #include "las-smallsieve.hpp"
 #include "las-dlog-base.hpp"
+#include "las-plattice.hpp"
 #include "ecm/batch.h"
 #include <list>
 #include <vector>
@@ -27,6 +28,8 @@
 #include <boost/make_shared.hpp>
 namespace std { using boost::shared_ptr; using boost::make_shared; }
 #endif
+
+typedef std::vector<plattices_dense_vector_t *> precomp_plattice_dense_t;
 
 struct siever_config;
 struct sieve_info;
@@ -198,6 +201,9 @@ struct sieve_info {
          */
         
         std::shared_ptr<fb_factorbase> fb;
+
+        /* Caching of the FK-basis in sublat mode */
+        precomp_plattice_dense_t precomp_plattice_dense;
 
         /* When threads pick up this sieve_info structure, they should check
          * their bucket allocation */
