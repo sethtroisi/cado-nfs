@@ -453,7 +453,8 @@ search_survivors_in_line(unsigned char * const SS[2],
         std::vector<uint32_t> &survivors, sublat_t sublat)
 {
     /* In line j = 0, only the coordinate (i, j) = (-1, 0) may survive */
-    if (j == 0) {
+    // FIXME: in sublat mode, this is broken!
+    if (j == 0 && (!sublat.m)) {
         const size_t I = (size_t) 1 << log_I;
         const unsigned char s0 = SS[0][I / 2 - 1], s1 = SS[1][I / 2 - 1];
         memset(SS[0], 255, I);

@@ -567,26 +567,29 @@ public:
 struct plattice_info_dense_t {
     uint16_t minus_a0;  // a0 is always non-positive, so we store its opposite
     uint16_t b0;        // in order to fit in 16 bits.
-    uint16_t a1;
-    uint16_t b1;
+    uint32_t a1;
+    uint32_t b1;
+    uint16_t hint; // FIXME: this could be recovered for free...
 
-    plattice_info_dense_t(const plattice_info_t & pli) {
+    plattice_info_dense_t(const plattice_info_t & pli, uint16_t _hint) {
+        hint = _hint;
         // Handle orthogonal lattices (proj and r=0 cases)
         if (pli.b0 == 1 && pli.b1 == 0) {
             b0 = 1;
             b1 = 0;
             minus_a0 = UMAX(uint16_t);
-            a1 = UMAX(uint16_t);
+            a1 = pli.a1;
         } else if (pli.b0 == 0 && pli.b1 == 1) {
             b0 = 0;
             b1 = 1;
             minus_a0 = UMAX(uint16_t);
-            a1 = UMAX(uint16_t);
+            a1 = pli.a1;
         } else {
             // generic case: true FK-basis
             ASSERT(pli.b0 >= 0);
             ASSERT(pli.a0 <= 0);
             ASSERT(uint32_t(-pli.a0) <= UMAX(uint16_t));
+            ASSERT(uint32_t(pli.b0) <= UMAX(uint16_t));
             minus_a0 = -pli.a0;
             a1 = pli.a1;
             b0 = pli.b0;

@@ -235,7 +235,8 @@ transform_n_roots(unsigned long *p, unsigned long *r, fb_iterator t,
 //   - process the given slice, and store the corresponding FK-basis in
 //     precomp_slice for later use.
 //   - use the pre-processed precomputed FK_basis.
-// If (and only if) the given slice is NULL, we are in the second mode.
+// If (and only if) we are dealing with (i,j) == (0,1) mod m,
+// we are in the second mode.
 template <int LEVEL, class FB_ENTRY_TYPE>
 void
 fill_in_buckets_toplevel(bucket_array_t<LEVEL, shorthint_t> &orig_BA,
@@ -244,23 +245,25 @@ fill_in_buckets_toplevel(bucket_array_t<LEVEL, shorthint_t> &orig_BA,
                 plattices_dense_vector_t * precomp_slice,
                 where_am_I & w)
 {
+  bool first_sublat = !si.conf.sublat.m ||
+    (si.conf.sublat.i0 == 0 && si.conf.sublat.j0 == 1);
+  ASSERT(slice != NULL);
   bool first_reg = true;
   bucket_array_t<LEVEL, shorthint_t> BA;  /* local copy. Gain a register + use stack */
   BA.move(orig_BA);
 
-  slice_index_t slice_index;
-  if (slice != NULL) {
-    slice_index = slice->get_index();
-  } else {
-    slice_index = precomp_slice->get_index();
+  slice_index_t slice_index = slice->get_index();
+  if (!first_sublat) {
+    ASSERT(slice_index == precomp_slice->get_index());
   }
+
   /* Write new set of pointers for the new slice */
   BA.add_slice_index(slice_index);
 
   typename FB_ENTRY_TYPE::transformed_entry_t transformed;
 
   // FIXME: A LOT OF DUPLICATED CODE, HERE!!!
-  if (slice != NULL) {
+  if (first_sublat) {
     slice_offset_t i_entry = 0;
     const fb_slice<FB_ENTRY_TYPE> * const sl = (const fb_slice<FB_ENTRY_TYPE> * const) slice;
     for (const FB_ENTRY_TYPE *it = sl->begin(); it != sl->end(); it++, i_entry++) {
@@ -276,7 +279,7 @@ fill_in_buckets_toplevel(bucket_array_t<LEVEL, shorthint_t> &orig_BA,
           plattice_info_t pli = plattice_info_t(transformed.get_q(), r, proj, si.conf.logI_adjusted);
           // In sublat mode, save it for later use
           if (si.conf.sublat.m) {
-            plattice_info_dense_t plid(pli);
+            plattice_info_dense_t plid(pli, i_entry);
             precomp_slice->push_back(plid);
           }
 
@@ -338,8 +341,8 @@ fill_in_buckets_toplevel(bucket_array_t<LEVEL, shorthint_t> &orig_BA,
   } else { // Use precomputed FK-basis
     for (unsigned int i = 0; i < precomp_slice->size(); ++i) {
       plattice_info_t pli = (*precomp_slice)[i].unpack(si.conf.logI_adjusted);
+      slice_offset_t i_entry = (*precomp_slice)[i].hint;
 
-      slice_offset_t i_entry = i / transformed.nr_roots; // FIXME: fragile due to skipped entries
       plattice_enumerate_t ple = plattice_enumerate_t(pli, i_entry, si.conf.logI_adjusted, si.conf.sublat);
 
       // Skip (i,j)=(0,0) unless we have sublattices.
@@ -635,7 +638,7 @@ fill_in_buckets_one_side(timetree_t& timer, thread_pool &pool, thread_workspaces
         for (unsigned int i=0; i < si.sides[side].precomp_plattice_dense.size(); i++){
             plattices_dense_vector_t * pre = si.sides[side].precomp_plattice_dense[i];
             const fb_slice_interface * slice = fb->get_slice(pre->get_index());
-            fill_in_buckets_parameters *param = new fill_in_buckets_parameters(ws, side, si, NULL,
+            fill_in_buckets_parameters *param = new fill_in_buckets_parameters(ws, side, si, slice,
                     NULL, pre, 0);
             pool.add_task(fill_in_buckets_one_slice<LEVEL>, param, 0, 0, (double)slice->get_weight());
             slices_pushed++;

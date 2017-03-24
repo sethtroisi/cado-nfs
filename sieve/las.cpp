@@ -560,17 +560,6 @@ bool parse_default_siever_config(siever_config & sc, param_list_ptr pl)
     // Sublattices?
     sc.sublat.m = 0; // no sublattices by default.
     param_list_parse_uint(pl, "sublat", &(sc.sublat.m));
-    if (sc.sublat.m) {
-        int ok = 1;
-        ok &= param_list_parse_uint(pl, "sublat-i0", &(sc.sublat.i0));
-        ok &= param_list_parse_uint(pl, "sublat-j0", &(sc.sublat.j0));
-        ok &= (sc.sublat.i0 < sc.sublat.m);
-        ok &= (sc.sublat.j0 < sc.sublat.m);
-        if (!ok) {
-            fprintf(stderr, "Error: with sublat mod m, please provide i0 and j0 in [0,m[");
-            ASSERT_ALWAYS(0);
-        }
-    }
 
     /* Parse optional siever configuration parameters */
     sc.td_thresh = 1024;	/* default value */
@@ -2686,8 +2675,6 @@ static void declare_usage(param_list pl)/*{{{*/
   param_list_decl_usage(pl, "I",    "set sieving region to 2^I times J");
   param_list_decl_usage(pl, "A",    "set sieving region to 2^A");
   param_list_decl_usage(pl, "sublat", "modulus for sublattice sieving");
-  param_list_decl_usage(pl, "sublat-i0", "i-congruence for sublattice");
-  param_list_decl_usage(pl, "sublat-j0", "j-congruence for sublattice");
   param_list_decl_usage(pl, "skew", "(alias S) skewness");
   param_list_decl_usage(pl, "lim0", "factor base bound on side 0");
   param_list_decl_usage(pl, "lim1", "factor base bound on side 1");
@@ -3053,6 +3040,24 @@ int main (int argc0, char *argv0[])/*{{{*/
             mpz_poly_fprintf(las.output, si.sides[1].fij);
         }
 
+/* XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX */
+unsigned int sublat_bound = si.conf.sublat.m;
+if (sublat_bound == 0)
+    sublat_bound = 1;
+for (unsigned int i_cong = 0; i_cong < sublat_bound; ++i_cong) {
+for (unsigned int j_cong = 0; j_cong < sublat_bound; ++j_cong) {
+    if (si.conf.sublat.m) {
+        if (i_cong == 0 && j_cong == 0)
+            continue;
+        si.conf.sublat.i0 = i_cong;
+        si.conf.sublat.j0 = j_cong;
+        verbose_output_print(0, 1, "# Sublattice (i,j) == (%u, %u) mod %u\n",
+                si.conf.sublat.i0, si.conf.sublat.j0, si.conf.sublat.m);
+    }
+/* XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX */
+/* The loop on different (i,j) mod m starts here (?) */
+        
+
         /* essentially update the fij polynomials and the max log bounds */
         si.update_norm_data();
 
@@ -3219,6 +3224,10 @@ int main (int argc0, char *argv0[])/*{{{*/
             }
         }
 
+/* XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX */
+/* The loop on different (i,j) mod m ends here (?) */
+}
+}
 
 #ifdef  DLP_DESCENT
         SIBLING_TIMER(timer_special_q, "descent");
