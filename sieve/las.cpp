@@ -3223,11 +3223,24 @@ for (unsigned int j_cong = 0; j_cong < sublat_bound; ++j_cong) {
                 free(ts.rsdpos);
             }
         }
+        for(int side = 0 ; side < 2 ; side++) {
+            small_sieve_clear(si.sides[side].ssd);
+            small_sieve_clear(si.sides[side].rsd);
+        }
+
 
 /* XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX */
 /* The loop on different (i,j) mod m ends here (?) */
 }
 }
+if (si.conf.sublat.m) {
+    for (int side = 0 ; side < 2 ; side++) {
+        for (unsigned int i = 0; i < si.sides[side].precomp_plattice_dense.size(); ++i) {
+            delete si.sides[side].precomp_plattice_dense[i];
+        }
+    }
+}
+
 
 #ifdef  DLP_DESCENT
         SIBLING_TIMER(timer_special_q, "descent");
@@ -3297,11 +3310,6 @@ for (unsigned int j_cong = 0; j_cong < sublat_bound; ++j_cong) {
 
         BOOKKEEPING_TIMER(timer_special_q);
 
-        /* clear */
-        for(int side = 0 ; side < 2 ; side++) {
-            small_sieve_clear(si.sides[side].ssd);
-            small_sieve_clear(si.sides[side].rsd);
-        }
         qt0 = seconds() - qt0;
 
         pool->accumulate(timer_special_q);
