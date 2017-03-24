@@ -337,7 +337,7 @@ fill_in_buckets_toplevel(bucket_array_t<LEVEL, shorthint_t> &orig_BA,
     }
   } else { // Use precomputed FK-basis
     for (unsigned int i = 0; i < precomp_slice->size(); ++i) {
-      plattice_info_t pli = (*precomp_slice)[i].unpack();
+      plattice_info_t pli = (*precomp_slice)[i].unpack(si.conf.logI_adjusted);
 
       slice_offset_t i_entry = i / transformed.nr_roots; // FIXME: fragile due to skipped entries
       plattice_enumerate_t ple = plattice_enumerate_t(pli, i_entry, si.conf.logI_adjusted, si.conf.sublat);
@@ -622,7 +622,7 @@ fill_in_buckets_one_side(timetree_t& timer, thread_pool &pool, thread_workspaces
             plattices_dense_vector_t * pre = NULL;
             if (si.conf.sublat.m) {
                 pre = new plattices_dense_vector_t(slice_index);
-                si.sides[side].precomp_plattice_dense[slices_pushed] = pre;
+                si.sides[side].precomp_plattice_dense.push_back(pre);
             }
             fill_in_buckets_parameters *param = new fill_in_buckets_parameters(ws, side, si, slice, 
                     NULL, pre, 0);

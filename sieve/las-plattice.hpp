@@ -163,6 +163,7 @@ struct plattice_info_t {
       /* This lattice basis might work in principle, but it generates hits in
          all locations i=1, ..., I/2-1, j = 0, all of which are useless except
          i=1, j=0.  */
+      // Note: if J>p, we are missing some hits, here.
       a1 = p;
       a0 = -((int32_t)1 << logI) + 1;
       b1 = 0;
@@ -570,18 +571,38 @@ struct plattice_info_dense_t {
     uint16_t b1;
 
     plattice_info_dense_t(const plattice_info_t & pli) {
-        ASSERT(pli.b0 >= 0);
-        ASSERT(pli.a0 <= 0);
-        ASSERT(uint32_t(-pli.a0) <= UMAX(uint16_t));
-        minus_a0 = -pli.a0;
-        a1 = pli.a1;
-        b0 = pli.b0;
-        b1 = pli.b1;
+        // Handle orthogonal lattices (proj and r=0 cases)
+        if (pli.b0 == 1 && pli.b1 == 0) {
+            b0 = 1;
+            b1 = 0;
+            minus_a0 = UMAX(uint16_t);
+            a1 = UMAX(uint16_t);
+        } else if (pli.b0 == 0 && pli.b1 == 1) {
+            b0 = 0;
+            b1 = 1;
+            minus_a0 = UMAX(uint16_t);
+            a1 = UMAX(uint16_t);
+        } else {
+            // generic case: true FK-basis
+            ASSERT(pli.b0 >= 0);
+            ASSERT(pli.a0 <= 0);
+            ASSERT(uint32_t(-pli.a0) <= UMAX(uint16_t));
+            minus_a0 = -pli.a0;
+            a1 = pli.a1;
+            b0 = pli.b0;
+            b1 = pli.b1;
+        }
     }
 
-    plattice_info_t unpack() const {
+    plattice_info_t unpack(const int logI) const {
         plattice_info_t pli(-int32_t(minus_a0), uint32_t(a1),
         int32_t(b0), uint32_t(b1));
+        // Orthogonal bases
+        if (pli.b0 == 1 && pli.b1 == 0) {
+            pli.a0 = -((int32_t)1 << logI) + 1;
+        } else if (pli.b0 == 0 && pli.b1 == 1) {
+            pli.a1 = ((int32_t)1 << logI) + 1;
+        }
         return pli;
     }
 };
