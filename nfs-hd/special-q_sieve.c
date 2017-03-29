@@ -2841,7 +2841,7 @@ void declare_usage(param_list pl)
   param_list_decl_usage(pl, "Ha", "sieving region for a");
   param_list_decl_usage(pl, "base", "specify the bases");
   param_list_decl_usage(pl, "g", "polynomial associated with q");
-  param_list_decl_usage(pl, "gal", "type of Galois action (autom<order>.<version>");
+  param_list_decl_usage(pl, "gal", "type of Galois action (autom<order>.<version>)");
   param_list_decl_usage(pl, "qfile", "path to a qfile");
   param_list_decl_usage(pl, "qfilespq", "path to a qfile");
 }
@@ -3109,12 +3109,12 @@ void initialise_parameters(int argc, char * argv[], cado_poly_ptr f,
     sscanf(gal_str, "autom%u.%u", gal, gal_version);
   }
   ASSERT(* gal == 1 || * gal == 6);
-  if ((* gal != 6 || * gal_version != 0) && * gal != 1) {
+  if ((* gal != 6 || * gal_version != 1) && * gal != 1) {
     fprintf(* errstd, "# Galois action not implemented.\n");
     * gal = 1;
     * gal_version = 0;
   }
-  if (* gal == 6 && * gal_version == 0 && H->t > 3) {
+  if (* gal == 6 && * gal_version == 1 && H->t > 3) {
     fprintf(* errstd, "# Galois action not fully implemented.\n");
   }
   free(gal_str);
