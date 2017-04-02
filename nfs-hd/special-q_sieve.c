@@ -3110,12 +3110,15 @@ void initialise_parameters(int argc, char * argv[], cado_poly_ptr f,
   }
   ASSERT(* gal == 1 || * gal == 6);
   if ((* gal != 6 || * gal_version != 1) && * gal != 1) {
-    fprintf(* errstd, "# Galois action not implemented.\n");
+    fprintf(* errstd, "# Galois action %u.%u not implemented.\n", * gal,
+        * gal_version);
     * gal = 1;
     * gal_version = 0;
   }
   if (* gal == 6 && * gal_version == 1 && H->t > 3) {
-    fprintf(* errstd, "# Galois action not fully implemented.\n");
+    fprintf(* errstd, "# Galois action 6.1 not fully implemented.\n");
+  } else if (* gal == 6 && * gal_version == 1) {
+    fprintf(* outstd, "# Galois action 6.1 activated.\n");
   }
   free(gal_str);
 
