@@ -447,7 +447,9 @@ reinitMatR (filter_matrix_t *mat)
       else /* weight is larger than cwmax */
         {
           mat->wt[h] = -mat->wt[h]; // trick!!!
-          mat->R[h] = NULL;
+          /* If w > wmax, since wmax is only increasing, we have already
+             destroyed the column before, thus mat->R[h] should be NULL. */
+          ASSERT(mat->R[h] == NULL);
         }
     }
 }
