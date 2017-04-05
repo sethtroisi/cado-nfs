@@ -236,9 +236,7 @@ void small_sieve_init(small_sieve_data_t *ssd, las_info & las,
     // If we are doing sublattices modulo m, then we jump virutally m
     // times faster.
     unsigned int sublatm = si.conf.sublat.m;
-    if (sublatm == 0)
-        sublatm = 1;
-    const unsigned int skiprows = sublatm*(bucket_region >> si.conf.logI_adjusted)*(las.nb_threads-1);
+    const unsigned int skiprows = (bucket_region >> si.conf.logI_adjusted)*(las.nb_threads-1);
 
     for (std::vector<fb_general_entry>::const_iterator iter = fb->begin() ; iter != fb->end() && index < size ; iter++) {
         /* p=pp^k, the prime or prime power in this entry, and pp is prime */
