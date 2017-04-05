@@ -459,10 +459,19 @@ fill_in_buckets(const worker_thread * worker,
     }
 
     /* Now, do the real work: the filling of the buckets */
-    while (!plattice_enumerate_finished<LEVEL>(pl.get_x())) {
-      if (LIKELY(pl.probably_coprime())) // FIXME: sublat !
-        BA.push_update(pl.get_x(), p, hint, slice_index, w);
-      pl.next();
+    // Without sublattices, we test (very basic) coprimality,
+    // otherwise not atm. FIXME!
+    if (!si.conf.sublat.m) {
+        while (!plattice_enumerate_finished<LEVEL>(pl.get_x())) {
+            if (LIKELY(pl.probably_coprime()))
+                BA.push_update(pl.get_x(), p, hint, slice_index, w);
+            pl.next();
+        }
+    } else {
+        while (!plattice_enumerate_finished<LEVEL>(pl.get_x())) {
+            BA.push_update(pl.get_x(), p, hint, slice_index, w);
+            pl.next();
+        }
     }
 
     // save current position, and prepare for next area.
