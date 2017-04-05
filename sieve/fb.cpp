@@ -426,8 +426,9 @@ fb_slice<FB_ENTRY_TYPE>::make_lattice_bases(const qlattice_basis &basis,
       if (LIKELY(!proj || r == 0)) {
         plattice_info_t pli = plattice_info_t(transformed.get_q(), r, proj, logI);
         plattice_enumerate_t ple = plattice_enumerate_t(pli, i_entry, logI, sublat);
-        // Skip (0,0).
-        ple.next();
+        // Skip (0,0) unless we have sublattices.
+        if (!sublat.m)
+          ple.next();
         if (LIKELY(pli.a0 != 0)) {
           result->push_back(ple);
         }
