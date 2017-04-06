@@ -7,12 +7,6 @@
 #define TRACE_COL -1 // 253224 // 231 // put to -1 if not...!
 #define TRACE_ROW -1 // 59496 // put to -1 if not...!
 
-/* If BURY_FIRST is defined, we bury the 'nburied' columns of smallest index
-   while reading the matrix. This might not be optimal, since this might not
-   be the 'nburied' heaviest columns, but this should decrease the memory
-   usage. This feature is experimental. */
-// #define BURY_FIRST
-
 #ifndef FOR_DL
 #define typerow_t index_t
 #define cmp_typerow_t cmp_index
@@ -45,7 +39,7 @@ typedef struct {
                           (trick: we store -w if w > cwmax) */
                        /* 32 bits is sufficient as we only want precise weight
                           for column of low weight. If the weight exceeds
-                          2^32-1, we saturate */
+                          2^31-1, we saturate at 2^31-1 */
   uint64_t nburied;    /* the number of buried columns */
   uint64_t weight;     /* number of non-zero coefficients in the active part */
   uint64_t tot_weight; /* Initial total number of non-zero coefficients */
