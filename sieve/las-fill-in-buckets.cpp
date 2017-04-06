@@ -304,7 +304,7 @@ fill_in_buckets_toplevel(bucket_array_t<LEVEL, shorthint_t> &orig_BA,
             const uint32_t I = si.I;
             if (UNLIKELY(ple.get_inc_c() == 1 && ple.get_bound1() == I - 1)) {
               // Projective root: only update is at (1,0).
-              if (first_reg) {
+              if (!si.conf.sublat.m && first_reg) {
                 uint64_t x = 1 + (I >> 1);
                 BA.push_update(x, p, hint, slice_index, w);
               }
@@ -312,7 +312,7 @@ fill_in_buckets_toplevel(bucket_array_t<LEVEL, shorthint_t> &orig_BA,
             }
             if (UNLIKELY(ple.get_inc_c() == I && ple.get_bound1() == I)) {
               // Root=0: only update is at (0,1).
-              if (first_reg) {
+              if (!si.conf.sublat.m && first_reg) {
                 uint64_t x = I + (I >> 1);
                 BA.push_update(x, p, hint, slice_index, w);
               }
@@ -362,20 +362,9 @@ fill_in_buckets_toplevel(bucket_array_t<LEVEL, shorthint_t> &orig_BA,
 
         // Handle the rare special cases
         const uint32_t I = si.I;
-        if (UNLIKELY(ple.get_inc_c() == 1 && ple.get_bound1() == I - 1)) {
-          // Projective root: only update is at (1,0).
-          if (first_reg) {
-            uint64_t x = 1 + (I >> 1);
-            BA.push_update(x, p, hint, slice_index, w);
-          }
-          continue;
-        }
-        if (UNLIKELY(ple.get_inc_c() == I && ple.get_bound1() == I)) {
-          // Root=0: only update is at (0,1).
-          if (first_reg) {
-            uint64_t x = I + (I >> 1);
-            BA.push_update(x, p, hint, slice_index, w);
-          }
+        if ((UNLIKELY(ple.get_inc_c() == 1 && ple.get_bound1() == I - 1))
+                ||
+                (UNLIKELY(ple.get_inc_c() == I && ple.get_bound1() == I))) {
           continue;
         }
 
@@ -443,7 +432,7 @@ fill_in_buckets(const worker_thread * worker,
     const uint32_t I = si.I;
     if (UNLIKELY(pl.get_inc_c() == 1 && pl.get_bound1() == I - 1)) {
         // Projective root: only update is at (1,0).
-        if (first_reg) {
+        if (!si.conf.sublat.m && first_reg) {
             uint64_t x = 1 + (I >> 1);
             BA.push_update(x, p, hint, slice_index, w);
         }
@@ -451,7 +440,7 @@ fill_in_buckets(const worker_thread * worker,
     }
     if (UNLIKELY(pl.get_inc_c() == I && pl.get_bound1() == I)) {
         // Root=0: only update is at (0,1).
-        if (first_reg) {
+        if (!si.conf.sublat.m && first_reg) {
             uint64_t x = I + (I >> 1);
             BA.push_update(x, p, hint, slice_index, w);
         }
