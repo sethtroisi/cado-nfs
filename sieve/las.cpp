@@ -2692,7 +2692,7 @@ static void declare_usage(param_list pl)/*{{{*/
   param_list_decl_usage(pl, "skipped", "primes below this bound are not sieved at all");
   param_list_decl_usage(pl, "bkthresh", "bucket-sieve primes p >= bkthresh");
   param_list_decl_usage(pl, "bkthresh1", "2-level bucket-sieve primes p >= bkthresh1");
-  param_list_decl_usage(pl, "bkmult", "multiplier to use for taking margin in the bucket allocation\n");
+  param_list_decl_usage(pl, "bkmult", "multiplier to use for taking margin in the bucket allocation");
   param_list_decl_usage(pl, "unsievethresh", "Unsieve all p > unsievethresh where p|gcd(a,b)");
 
   param_list_decl_usage(pl, "adjust-strategy", "strategy used to adapt the sieving range to the q-lattice basis (0 = logI constant, J so that bounday is capped; 1 = logI constant, (a,b) plane norm capped; 2 = logI dynamic, skewed basis; 3 = combine 2 and then 0) ; default=2");
