@@ -491,13 +491,24 @@ public:
         inc_c = basis.get_inc_c(logI);
         bound0 = basis.get_bound0(logI);
         bound1 = basis.get_bound1(logI);
-        x = plattice_x_t(1) << (logI-1);
         if (!sublat.m) 
             x = plattice_x_t(1) << (logI-1);
         else {
             x = plattice_starting_point(basis, logI, sublat);
         }
     }
+
+    plattice_enumerate_t(const plattice_info_t &basis,
+            const slice_offset_t hint, const int logI)
+        : hint(hint)
+    {
+        inc_a = basis.get_inc_a(logI);
+        inc_c = basis.get_inc_c(logI);
+        bound0 = basis.get_bound0(logI);
+        bound1 = basis.get_bound1(logI);
+        x = plattice_x_t(1) << (logI-1);
+    }
+
 
     plattice_enumerate_t(const plattice_enumerate_t& src)
         : hint(src.hint)

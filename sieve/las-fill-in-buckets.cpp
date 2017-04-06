@@ -237,18 +237,22 @@ transform_n_roots(unsigned long *p, unsigned long *r, fb_iterator t,
 //   - use the pre-processed precomputed FK_basis.
 // If (and only if) we are dealing with (i,j) == (0,1) mod m,
 // we are in the second mode.
+//
+//
+// FIXME FIXME FIXME: tons of duplicated code, here!!!
+// But putting if() in critical loops can kill performance (I tried...)
+
 template <int LEVEL, class FB_ENTRY_TYPE>
 void
-fill_in_buckets_toplevel(bucket_array_t<LEVEL, shorthint_t> &orig_BA,
+fill_in_buckets_toplevel_sublat(bucket_array_t<LEVEL, shorthint_t> &orig_BA,
                 sieve_info const & si MAYBE_UNUSED,
                 const fb_slice_interface * const slice,
                 plattices_dense_vector_t * precomp_slice,
                 where_am_I & w)
 {
-  bool first_sublat = !si.conf.sublat.m ||
-    (si.conf.sublat.i0 == 0 && si.conf.sublat.j0 == 1);
+  ASSERT_ALWAYS(si.conf.sublat.m != 0);
+  bool first_sublat = si.conf.sublat.i0 == 0 && si.conf.sublat.j0 == 1;
   ASSERT(slice != NULL);
-  bool first_reg = true;
   bucket_array_t<LEVEL, shorthint_t> BA;  /* local copy. Gain a register + use stack */
   BA.move(orig_BA);
 
@@ -278,16 +282,11 @@ fill_in_buckets_toplevel(bucket_array_t<LEVEL, shorthint_t> &orig_BA,
         if (LIKELY(!proj || r == 0)) {
           plattice_info_t pli = plattice_info_t(transformed.get_q(), r, proj, si.conf.logI_adjusted);
           // In sublat mode, save it for later use
-          if (si.conf.sublat.m) {
-            plattice_info_dense_t plid(pli, i_entry);
-            precomp_slice->push_back(plid);
-          }
+          plattice_info_dense_t plid(pli, i_entry);
+          precomp_slice->push_back(plid);
 
           plattice_enumerate_t ple = plattice_enumerate_t(pli, i_entry, si.conf.logI_adjusted, si.conf.sublat);
 
-          // Skip (i,j)=(0,0) unless we have sublattices.
-          if (!si.conf.sublat.m)
-            ple.next();
           if (plattice_enumerate_finished<LEVEL>(ple.get_x()))
             continue;
           if (LIKELY(pli.a0 != 0)) {
@@ -299,40 +298,19 @@ fill_in_buckets_toplevel(bucket_array_t<LEVEL, shorthint_t> &orig_BA,
 #else
             const fbprime_t p = 0;
 #endif
-
             // Handle the rare special cases
             const uint32_t I = si.I;
-            if (UNLIKELY(ple.get_inc_c() == 1 && ple.get_bound1() == I - 1)) {
-              // Projective root: only update is at (1,0).
-              if (!si.conf.sublat.m && first_reg) {
-                uint64_t x = 1 + (I >> 1);
-                BA.push_update(x, p, hint, slice_index, w);
-              }
-              continue;
-            }
-            if (UNLIKELY(ple.get_inc_c() == I && ple.get_bound1() == I)) {
-              // Root=0: only update is at (0,1).
-              if (!si.conf.sublat.m && first_reg) {
-                uint64_t x = I + (I >> 1);
-                BA.push_update(x, p, hint, slice_index, w);
-              }
+            if ((UNLIKELY(ple.get_inc_c() == 1 && ple.get_bound1() == I - 1))
+                ||
+                (UNLIKELY(ple.get_inc_c() == I && ple.get_bound1() == I))) {
               continue;
             }
 
             /* Now, do the real work: the filling of the buckets */
             // Without sublattices, we test (very basic) coprimality,
-            // otherwise not atm. FIXME!
-            if (!si.conf.sublat.m) {
-              while (!plattice_enumerate_finished<LEVEL>(ple.get_x())) {
-                if (LIKELY(ple.probably_coprime()))
-                  BA.push_update(ple.get_x(), p, hint, slice_index, w);
-                ple.next();
-              }
-            } else {
-              while (!plattice_enumerate_finished<LEVEL>(ple.get_x())) {
-                BA.push_update(ple.get_x(), p, hint, slice_index, w);
-                ple.next();
-              }
+            while (!plattice_enumerate_finished<LEVEL>(ple.get_x())) {
+              BA.push_update(ple.get_x(), p, hint, slice_index, w);
+              ple.next();
             }
           } 
         }
@@ -345,9 +323,6 @@ fill_in_buckets_toplevel(bucket_array_t<LEVEL, shorthint_t> &orig_BA,
 
       plattice_enumerate_t ple = plattice_enumerate_t(pli, i_entry, si.conf.logI_adjusted, si.conf.sublat);
 
-      // Skip (i,j)=(0,0) unless we have sublattices.
-      if (!si.conf.sublat.m)
-        ple.next();
       if (plattice_enumerate_finished<LEVEL>(ple.get_x()))
         continue;
       if (LIKELY(pli.a0 != 0)) {
@@ -363,23 +338,105 @@ fill_in_buckets_toplevel(bucket_array_t<LEVEL, shorthint_t> &orig_BA,
         // Handle the rare special cases
         const uint32_t I = si.I;
         if ((UNLIKELY(ple.get_inc_c() == 1 && ple.get_bound1() == I - 1))
-                ||
-                (UNLIKELY(ple.get_inc_c() == I && ple.get_bound1() == I))) {
+            ||
+            (UNLIKELY(ple.get_inc_c() == I && ple.get_bound1() == I))) {
           continue;
         }
 
         /* Now, do the real work: the filling of the buckets */
         // Without sublattices, we test (very basic) coprimality,
         // otherwise not atm. FIXME!
-        if (!si.conf.sublat.m) {
+        while (!plattice_enumerate_finished<LEVEL>(ple.get_x())) {
+          BA.push_update(ple.get_x(), p, hint, slice_index, w);
+          ple.next();
+        }
+      } 
+    }
+  }
+  orig_BA.move(BA);
+}
+
+template <int LEVEL, class FB_ENTRY_TYPE>
+void
+fill_in_buckets_toplevel(bucket_array_t<LEVEL, shorthint_t> &orig_BA,
+                sieve_info const & si MAYBE_UNUSED,
+                const fb_slice_interface * const slice,
+                plattices_dense_vector_t * precomp_slice,
+                where_am_I & w)
+{
+  if (si.conf.sublat.m) {
+    // TODO: two function calls might yield a penalty, due to 
+    // instruction cache pollution (due to templating, we are talking
+    // about many, many functions, here).
+    // Could worth investigating...
+    fill_in_buckets_toplevel_sublat<LEVEL,FB_ENTRY_TYPE>(orig_BA, si, slice, 
+        precomp_slice, w);
+    return;
+  }
+
+  ASSERT(slice != NULL);
+  bool first_reg = true;
+  bucket_array_t<LEVEL, shorthint_t> BA;  /* local copy. Gain a register + use stack */
+  BA.move(orig_BA);
+
+  slice_index_t slice_index = slice->get_index();
+
+  /* Write new set of pointers for the new slice */
+  BA.add_slice_index(slice_index);
+
+  typename FB_ENTRY_TYPE::transformed_entry_t transformed;
+
+  slice_offset_t i_entry = 0;
+  const fb_slice<FB_ENTRY_TYPE> * const sl = (const fb_slice<FB_ENTRY_TYPE> * const) slice;
+  for (const FB_ENTRY_TYPE *it = sl->begin(); it != sl->end(); it++, i_entry++) {
+    if (!si.qbasis.is_coprime_to(it->p))
+      continue;
+    it->transform_roots(transformed, si.qbasis);
+    for (unsigned char i_root = 0; i_root != transformed.nr_roots; i_root++) {
+      const fbroot_t r = transformed.get_r(i_root);
+      const bool proj = transformed.get_proj(i_root);
+      /* If proj and r > 0, then r == 1/p (mod p^2), so all hits would be in
+         locations with p | gcd(i,j). */
+      if (LIKELY(!proj || r == 0)) {
+        plattice_info_t pli = plattice_info_t(transformed.get_q(), r, proj, si.conf.logI_adjusted);
+  
+        plattice_enumerate_t ple = plattice_enumerate_t(pli, i_entry, si.conf.logI_adjusted);
+
+        // Skip (i,j)=(0,0)
+        ple.next();
+        if (LIKELY(pli.a0 != 0)) {
+          const slice_offset_t hint = ple.get_hint();
+          WHERE_AM_I_UPDATE(w, h, hint);
+#ifdef TRACE_K
+          const fbprime_t p = slice->get_prime(hint); 
+          WHERE_AM_I_UPDATE(w, p, p);
+#else
+          const fbprime_t p = 0;
+#endif
+
+          // Handle the rare special cases
+          const uint32_t I = si.I;
+          if (UNLIKELY(ple.get_inc_c() == 1 && ple.get_bound1() == I - 1)) {
+            // Projective root: only update is at (1,0).
+            if (first_reg) {
+              uint64_t x = 1 + (I >> 1);
+              BA.push_update(x, p, hint, slice_index, w);
+            }
+            continue;
+          }
+          if (UNLIKELY(ple.get_inc_c() == I && ple.get_bound1() == I)) {
+            // Root=0: only update is at (0,1).
+            if (first_reg) {
+              uint64_t x = I + (I >> 1);
+              BA.push_update(x, p, hint, slice_index, w);
+            }
+            continue;
+          }
+
+          /* Now, do the real work: the filling of the buckets */
           while (!plattice_enumerate_finished<LEVEL>(ple.get_x())) {
             if (LIKELY(ple.probably_coprime()))
               BA.push_update(ple.get_x(), p, hint, slice_index, w);
-            ple.next();
-          }
-        } else {
-          while (!plattice_enumerate_finished<LEVEL>(ple.get_x())) {
-            BA.push_update(ple.get_x(), p, hint, slice_index, w);
             ple.next();
           }
         }
