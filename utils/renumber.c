@@ -92,12 +92,12 @@ parse_one_line_bad_ideals(struct bad_ideals_s * bad, const char * str, int k)
   int side = 0, nb = 0;
 
   for ( ; (t=ugly[(unsigned char) *ptr]) >= 0; ptr++)
-    p = (p << 4) + t;
+    p = (p * 10) + t;
   ASSERT_ALWAYS(*ptr == ',');
   ptr++;
 
   for ( ; (t=ugly[(unsigned char) *ptr]) >= 0; ptr++)
-    r = (r << 4) + t;
+    r = (r * 10) + t;
   ASSERT_ALWAYS(*ptr == ':');
   ptr++;
 
