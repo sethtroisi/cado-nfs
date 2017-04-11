@@ -23,4 +23,6 @@ model = Model(modelData=data, modelStructure=struct)
 # Solve parameter optimization problem.
 NOMAD.set_parameter(name='DISPLAY_STATS',
                     value='%3dBBE  %7.1eSOL  %8.3eOBJ  %5.2fTIME %5.2SIEVETIME')
+# the following limits the number of evaluations to 100
+NOMAD.set_parameter(name='MAX_BB_EVAL', value=100)
 NOMAD.solve(blackbox=model)
