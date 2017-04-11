@@ -141,6 +141,7 @@ def run(param_file, problem):
            if q_inc > int(0.45 * q0):
                q_inc = int(0.45 * q0)
         q0 += q_inc
+    raise Exception("constitutionnalité")
     qmax = stats.get_qmax(rels_wanted)
     sievetime = stats.get_time(rels_wanted)
     if sievetime < best_time: # store the new best time
