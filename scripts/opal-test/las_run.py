@@ -85,6 +85,7 @@ def run(param_file, problem):
       if t == "alg":
         makefb_params["lim"] = las_params["lim%d"%side]
         makefb_params["out"] = "factorbase.roots%d.gz" % side
+        makefb_params["side"] = side
         las_params["fb%s"%side] = makefb_params["out"]
 
         makefb_cmd_line = [makefb]
