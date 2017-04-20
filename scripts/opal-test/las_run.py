@@ -43,7 +43,7 @@ def run(param_file, problem):
 
     makefb = "%s/sieve/makefb" % build_dir
     las = "%s/sieve/las" % build_dir
-    sqside = os.environ["OPAL_CADO_SQSIDE"]
+    sqside = os.environ["OPAL_CADO_SQSIDE"].strip()
 
     las_params = {
         "I": 11,
