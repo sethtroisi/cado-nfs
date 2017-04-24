@@ -260,13 +260,15 @@ def estimate_alpha_p(f, p, nt):
     x=f.parent().gen()
     l=log(p)
     for i in range(nt):
-        a=randrange(0,nt^2)
-        b=randrange(0,nt^2)
-        c=randrange(0,nt^2)
-        if gcd(a,b) == 1:
-             s+=valuation(c,p)-valuation(f.resultant(a*x-b), p)
-             n+=1
-             sys.stdout.write("%f\r" % float(s*l/n))
+        while True:
+           a=randrange(0,nt^2)
+           b=randrange(0,nt^2)
+           c=randrange(0,nt^2)
+           if gcd(a,b)==1 and c<>0:
+              break
+        s+=valuation(c,p)-valuation(f.resultant(a*x-b), p)
+        n+=1
+        # sys.stdout.write("%f\r" % float(s*l/n))
     return float(s*l/n) if n > 0 else Infinity
 
 # auxiliary
