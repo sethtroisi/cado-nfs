@@ -25,6 +25,40 @@ def MurphyE(f,g,s=1.0,Bf=1e7,Bg=5e6,area=1e16,K=1000):
        E += v1
     return E/K
 
+# special code when p divides Res(f,g)
+def MurphyE_p(f,g,p,s=1.0,Bf=1e7,Bg=5e6,area=1e16,K=1000):
+    df = f.degree()
+    dg = g.degree()
+    alpha_f = alpha(f,2000) + float(log(p)/(p-1))
+    alpha_g = alpha(g,2000) + float(log(p)/(p-1))
+    E = 0
+    sx = sqrt(area*s)/p
+    sy = sqrt(area/s)/p
+    y = var('y')
+    F = (f(x=x/y)*y^df).expand()
+    G = (g(x=x/y)*y^dg).expand()
+    for xp in range(p): # x -> x*p+xp
+       for yp in range(p): # y -> y*p+yp
+          if xp == 0 and yp == 0:
+             continue
+          Fp = F(x=x*p+xp,y=y*p+yp).expand()
+          while ZZ(Fp.content(x)) % p == 0:
+             Fp = Fp/p
+          Gp = G(x=x*p+xp,y=y*p+yp).expand()
+          while ZZ(Gp.content(x)) % p == 0:
+             Gp = Gp/p
+	  for i in range(K):
+	     theta_i = float(pi/K*(i+0.5))
+	     xi = cos(theta_i)*sx
+	     yi = sin(theta_i)*sy
+	     fi = Fp(x=xi,y=yi)
+	     gi = Gp(x=xi,y=yi)
+	     ui = (log(abs(fi))+alpha_f)/log(Bf)
+	     vi = (log(abs(gi))+alpha_g)/log(Bg)
+	     v1 = dickman_rho(ui) * dickman_rho(vi)
+	     E += v1
+    return E/K/(p^2-1)
+
 # example: RSA-768 polynomials
 # skewness 44204.72 norm 1.35e+28 alpha -7.30 Murphy_E 3.79e-09
 # used Bf = Bg = 1e11 and area = 1e18
