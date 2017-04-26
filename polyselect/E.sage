@@ -26,6 +26,25 @@ def MurphyE(f,g,s=1.0,Bf=1e7,Bg=5e6,area=1e16,K=1000,sq=1):
        E += v1
     return E/K
 
+# same as MurphyE, but using numerical integration instead of sampling
+def MurphyE_int(f,g,s=1.0,Bf=1e7,Bg=5e6,area=1e16,K=1000,sq=1):
+    df = f.degree()
+    dg = g.degree()
+    alpha_f = alpha(f,2000)
+    alpha_g = alpha(g,2000)
+    sx = sqrt(area*s)
+    sy = sqrt(area/s)
+    var('y,theta')
+    xi = cos(theta)*sx
+    yi = sin(theta)*sy
+    fi = f(x=xi/yi)*yi^df/sq
+    gi = g(x=xi/yi)*yi^dg
+    ui = (log(abs(fi))+alpha_f)/log(Bf)
+    vi = (log(abs(gi))+alpha_g)/log(Bg)
+    v1 = dickman_rho(ui) * dickman_rho(vi)
+    v1 = v1 / pi # normalization to get same values as MurphyE if v1=1
+    return numerical_integral(v1, 0, pi)[0]
+
 # special code when p divides Res(f,g)
 def MurphyE_p(f,g,p,s=1.0,Bf=1e7,Bg=5e6,area=1e16,K=1000):
     df = f.degree()
