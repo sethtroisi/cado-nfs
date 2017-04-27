@@ -70,8 +70,12 @@ def MurphyE_int2(f,g,s=1.0,Bf=1e7,Bg=5e6,area=1e16,sq=1):
 def MurphyE_p(f,g,p,s=1.0,Bf=1e7,Bg=5e6,area=1e16,K=1000,verbose=False):
     df = f.degree()
     dg = g.degree()
-    alpha_f = alpha(f,2000) + float(log(p)/(p-1))
-    alpha_g = alpha(g,2000) + float(log(p)/(p-1))
+    # Since we count separately the contribution of p below, we must subtract
+    # it in alpha. Now alpha_p = log(p)/(p-1) - x where x is the real
+    # contribution mod p, thus subtracting alpha_p and adding log(p)/(p-1),
+    # we add x back to alpha.
+    alpha_f = alpha(f,2000) - alpha_p_nodisc(f,p) + float(log(p)/(p-1))
+    alpha_g = alpha(g,2000) - alpha_p_nodisc(g,p) + float(log(p)/(p-1))
     E = 0
     sx = sqrt(area*s)/p
     sy = sqrt(area/s)/p
