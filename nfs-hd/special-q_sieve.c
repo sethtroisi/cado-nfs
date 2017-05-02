@@ -2421,7 +2421,7 @@ call_plane_sieve[2], (double)call_plane_sieve[2] * 100 /
 /* ----- Collect indices with norm less or equal to threshold ----- */
 
 void find_index(uint64_array_ptr indexes, array_srcptr array,
-    unsigned char thresh)
+    unsigned char thresh, unsigned int * percent_length_indexes)
 {
   uint64_t ind = 0;
   for (uint64_t i = 0; i < array->number_element; i++) {
@@ -2430,8 +2430,14 @@ void find_index(uint64_array_ptr indexes, array_srcptr array,
       ASSERT(ind < indexes->length);
       indexes->array[ind] = i;
       ind++;
+      if (ind == indexes->length) {
+        * percent_length_indexes = * percent_length_indexes + 10;
+        uint64_array_realloc(indexes, * percent_length_indexes *
+            array->number_element / 100);
+      }
     }
   }
+  ASSERT(ind <= array->number_element);
   uint64_array_realloc(indexes, ind);
 }
 
@@ -2535,7 +2541,9 @@ void do_all_for_spq(array_spq_ptr spq, int64_t q, cado_poly_srcptr f,
 #endif // TRACE_POS
 
       sec = seconds();
-      uint64_array_init(indexes[j], array->number_element);
+      unsigned int percent_length_indexes = 10;
+      uint64_array_init(indexes[j], percent_length_indexes *
+          array->number_element / 100);
       array_set_all_elements(array, UCHAR_MAX);
 #ifndef OLD_NORM
       init_norm(array, max_norm + j, file_trace_pos, H, spq->MqLLL[i],
@@ -2581,7 +2589,8 @@ void do_all_for_spq(array_spq_ptr spq, int64_t q, cado_poly_srcptr f,
       time[j][1] = seconds() - sec;
       sec = seconds();
       find_index(indexes[j], array,
-          (unsigned char) ceil(thresh[j] / log2_base[j]));
+          (unsigned char) ceil(thresh[j] / log2_base[j]),
+          &percent_length_indexes);
       time[j][2] = seconds() - sec;
 
 #ifdef TRACE_POS
@@ -3140,7 +3149,7 @@ int main(int argc, char * argv[])
   unsigned int * lpb;
   array_t array;
   factor_base_t * fb;
-  uint64_t q;
+  uint64_t q = 0;
   int main_side;
   double * log2_base;
   FILE * outstd;
@@ -3235,8 +3244,9 @@ int main(int argc, char * argv[])
   prime_info pi;
   prime_info_init(pi);
   //Pass all the prime less than q_range[0].
-  for (q = 2; q < q_range[0]; q = getprime_mt(pi)) {}
-
+  if (q_range[1] - q_range[0] > 2) {
+    for (q = 2; q < q_range[0]; q = getprime_mt(pi)) {}
+  }
 #ifdef SPQ_IDEAL_U
   int deg_bound_factorise = (int)H->t;
 #else // SPQ_IDEAL_U
@@ -3255,13 +3265,32 @@ int main(int argc, char * argv[])
   }
 
   if (qfilespq == 0) {
-    for ( ; q <= q_range[1]; q = getprime_mt(pi)) {
+    if (q_range[1] - q_range[0] > 2) {
+      ASSERT(q >= q_range[0]);
       ASSERT(qfile == NULL);
-      //Use fonction here.
-      do_all_for_spq(spq, q, f, q_side, H, state, deg_bound_factorise, skewness,
-          gal, gal_version, c, nb_vec, g, outstd, file_trace_pos, max_norm, V,
-          log2_base, indexes, array, time, errstd, sieve_start, fb, thresh, lpb,
-          main_side, &nb_rel, &spq_tot, &total_time, file_space_sieve_stat);
+      for ( ; q <= q_range[1]; q = getprime_mt(pi)) {
+        //Use fonction here.
+        do_all_for_spq(spq, q, f, q_side, H, state, deg_bound_factorise,
+            skewness, gal, gal_version, c, nb_vec, g, outstd, file_trace_pos,
+            max_norm, V, log2_base, indexes, array, time, errstd, sieve_start,
+            fb, thresh, lpb, main_side, &nb_rel, &spq_tot, &total_time,
+            file_space_sieve_stat);
+      }
+    } else {
+      fprintf(outstd, "# Assume that %" PRIu64 " is prime.\n", q_range[0]);
+#ifndef NDEBUG
+      mpz_t tmp;
+      mpz_init(tmp);
+      mpz_set_ui(tmp, q_range[0]);
+      ASSERT(!mpz_probab_prime_p(tmp, 15));
+      mpz_clear(tmp);
+#endif // NDEBUG
+
+      do_all_for_spq(spq, q_range[0], f, q_side, H, state,
+          deg_bound_factorise, skewness, gal, gal_version, c, nb_vec, g,
+          outstd, file_trace_pos, max_norm, V, log2_base, indexes, array,
+          time, errstd, sieve_start, fb, thresh, lpb, main_side, &nb_rel,
+          &spq_tot, &total_time, file_space_sieve_stat);
     }
   } else if (qfilespq == 1){
     read_q_file(qfile, spq, f, H, state, deg_bound_factorise, skewness, gal,
