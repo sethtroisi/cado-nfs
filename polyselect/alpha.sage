@@ -402,3 +402,34 @@ def expected_alpha_est(bound=150):
             print
         print('%8.3f,' % E),
 
+# compute some kind of "combined" alpha-value for two polynomials:
+# for each prime p < B, and for each common root r mod p, add e*log(p)
+# where e is the least multiplicity of the root for f and g
+def combined_alpha(f,g,B):
+   s = 0
+   for p in prime_range(B):
+      lf = f.roots(ring=GF(p))
+      lg = g.roots(ring=GF(p))
+      i = j = 0
+      while i < len(lf) and j < len(lg):
+         if lf[i][0] == lg[j][0]:
+            s += min(lf[i][1],lg[j][1])*log(1.0*p)
+            i += 1
+            j += 1
+         elif lf[i][0] < lg[j][0]:
+            i += 1
+         else:
+            j += 1
+   # roots at infinity
+   lf = f.reverse().roots(ring=GF(p))
+   lg = g.reverse().roots(ring=GF(p))
+   i = j = 0
+   while i < len(lf) and lf[i][0] != 0:
+      i += 1
+   while j < len(lg) and lg[j][0] != 0:
+      j += 1
+   if i < len(lf) and j < len(lg):
+      assert lf[i][0] == 0
+      assert lg[i][0] == 0
+      s += min(lf[i][1],lg[i][1])*log(1.0*p)
+   return s
