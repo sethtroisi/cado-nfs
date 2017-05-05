@@ -271,6 +271,26 @@ def estimate_alpha_p(f, p, nt):
         # sys.stdout.write("%f\r" % float(s*l/n))
     return float(s*l/n) if n > 0 else Infinity
 
+# same as estimate_alpha_p, but for a degree-2 polynomial
+def estimate_alpha_p_2(f, p, nt):
+    """
+    Should compute the same thing as alpha_p, but experimentally
+    """
+    s=0
+    n=0
+    x,y=f.variables()
+    l=log(p)
+    for i in range(nt):
+        while True:
+           a=randrange(0,nt^2)
+           b=randrange(0,nt^2)
+           c=randrange(0,nt^2)
+           if gcd(a,b)==1 and c<>0:
+              break
+        s+=valuation(c,p)-valuation(f(x=a,y=b), p)
+        n+=1
+    return float(s*l/n)
+
 # auxiliary
 def alpha_p_simplistic(f,p):
     """
@@ -382,3 +402,34 @@ def expected_alpha_est(bound=150):
             print
         print('%8.3f,' % E),
 
+# compute some kind of "combined" alpha-value for two polynomials:
+# for each prime p < B, and for each common root r mod p, add e*log(p)
+# where e is the least multiplicity of the root for f and g
+def combined_alpha(f,g,B):
+   s = 0
+   for p in prime_range(B):
+      lf = f.roots(ring=GF(p))
+      lg = g.roots(ring=GF(p))
+      i = j = 0
+      while i < len(lf) and j < len(lg):
+         if lf[i][0] == lg[j][0]:
+            s += min(lf[i][1],lg[j][1])*log(1.0*p)
+            i += 1
+            j += 1
+         elif lf[i][0] < lg[j][0]:
+            i += 1
+         else:
+            j += 1
+   # roots at infinity
+   lf = f.reverse().roots(ring=GF(p))
+   lg = g.reverse().roots(ring=GF(p))
+   i = j = 0
+   while i < len(lf) and lf[i][0] != 0:
+      i += 1
+   while j < len(lg) and lg[j][0] != 0:
+      j += 1
+   if i < len(lf) and j < len(lg):
+      assert lf[i][0] == 0
+      assert lg[i][0] == 0
+      s += min(lf[i][1],lg[i][1])*log(1.0*p)
+   return s
