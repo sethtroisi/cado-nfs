@@ -2438,7 +2438,12 @@ void find_index(uint64_array_ptr indexes, array_srcptr array,
     }
   }
   ASSERT(ind <= array->number_element);
-  uint64_array_realloc(indexes, ind);
+  if (ind != 0) {
+    uint64_array_realloc(indexes, ind);
+  } else {
+    indexes->array = realloc(indexes->array, 0);
+    indexes->length = 0;
+  }
 }
 
 #ifdef PRINT_ARRAY_NORM
@@ -2498,13 +2503,14 @@ int Ha_defined(sieving_bound_srcptr Ha)
 void do_all_for_spq(array_spq_ptr spq, int64_t q, cado_poly_srcptr f,
     unsigned int q_side, sieving_bound_srcptr H, gmp_randstate_t state,
     int deg_bound_factorise, mpz_vector_srcptr skewness, unsigned int gal,
-    unsigned int gal_version, mpz_vector_t * c, unsigned int nb_vec, mpz_poly_srcptr g,
-    FILE * outstd, FILE * file_trace_pos, unsigned int * max_norm,
-    unsigned int V, double * log2_base, uint64_array_t * indexes,
-    array_ptr array, double ** time, FILE * errstd, uint64_t * sieve_start,
-    factor_base_t * fb, unsigned char * thresh, unsigned int * lpb,
-    int main_side, uint64_t * nb_rel, uint64_t * spq_tot, double * total_time,
-    FILE * file_space_sieve_stat)
+    unsigned int gal_version, mpz_vector_t * c, unsigned int nb_vec,
+    mpz_poly_srcptr g, FILE * outstd, FILE * file_trace_pos,
+    unsigned int * max_norm, unsigned int V, double * log2_base,
+    uint64_array_t * indexes, array_ptr array, double ** time, FILE * errstd,
+    uint64_t * sieve_start, factor_base_t * fb, unsigned char * thresh,
+    unsigned int * lpb, int main_side, uint64_t * nb_rel, uint64_t * spq_tot,
+    double * total_time, FILE * file_space_sieve_stat,
+    factor_t * gal_norm_denom)
 {
   double sec_tot;
   double sec_cofact;
@@ -2607,7 +2613,7 @@ void do_all_for_spq(array_spq_ptr spq, int64_t q, cado_poly_srcptr f,
     sec = seconds();
     * nb_rel += (uint64_t) find_relations(indexes, array->number_element, lpb,
         spq->MqLLL[i], f->pols, H, V, spq->spq[i], q_side, main_side,
-        outstd, gal, gal_version);
+        outstd, gal, gal_version, gal_norm_denom);
     sec_cofact = seconds() - sec;
 
     for (unsigned j = 0; j < V; j++) {
@@ -2645,13 +2651,14 @@ void do_all_for_spq(array_spq_ptr spq, int64_t q, cado_poly_srcptr f,
 void read_q_file(FILE * qfile, array_spq_ptr spq, cado_poly_srcptr f,
     sieving_bound_srcptr H, gmp_randstate_t state,
     int deg_bound_factorise, mpz_vector_srcptr skewness, unsigned int gal,
-    unsigned int gal_version, mpz_vector_t * c, unsigned int nb_vec, mpz_poly_srcptr g,
-    FILE * outstd, FILE * file_trace_pos, unsigned int * max_norm,
-    unsigned int V, double * log2_base, uint64_array_t * indexes,
-    array_ptr array, double ** time, FILE * errstd, uint64_t * sieve_start,
-    factor_base_t * fb, unsigned char * thresh, unsigned int * lpb,
-    int main_side, uint64_t * nb_rel, uint64_t * spq_tot, double * total_time,
-    FILE * file_space_sieve_stat)
+    unsigned int gal_version, mpz_vector_t * c, unsigned int nb_vec,
+    mpz_poly_srcptr g, FILE * outstd, FILE * file_trace_pos,
+    unsigned int * max_norm, unsigned int V, double * log2_base,
+    uint64_array_t * indexes, array_ptr array, double ** time, FILE * errstd,
+    uint64_t * sieve_start, factor_base_t * fb, unsigned char * thresh,
+    unsigned int * lpb, int main_side, uint64_t * nb_rel, uint64_t * spq_tot,
+    double * total_time, FILE * file_space_sieve_stat,
+    factor_t * gal_norm_denom)
 {
   ASSERT(g->deg == -1);
 
@@ -2682,7 +2689,8 @@ void read_q_file(FILE * qfile, array_spq_ptr spq, cado_poly_srcptr f,
     do_all_for_spq(spq, q, f, q_side, H, state, deg_bound_factorise, skewness,
         gal, gal_version, c, nb_vec, g, outstd, file_trace_pos, max_norm, V,
         log2_base, indexes, array, time, errstd, sieve_start, fb, thresh, lpb,
-        main_side, nb_rel, spq_tot, total_time, file_space_sieve_stat);
+        main_side, nb_rel, spq_tot, total_time, file_space_sieve_stat,
+        gal_norm_denom);
   }
   free(line);
 }
@@ -2791,7 +2799,7 @@ void read_q_file_spq(FILE * qfile, array_spq_ptr spq, cado_poly_srcptr f,
     array_ptr array, double ** time, FILE * errstd, uint64_t * sieve_start,
     factor_base_t * fb, unsigned char * thresh, unsigned int * lpb,
     int main_side, uint64_t * nb_rel, uint64_t * spq_tot, double * total_time,
-    FILE * file_space_sieve_stat)
+    FILE * file_space_sieve_stat, factor_t * gal_norm_denom)
 {
   size_t len = 1024;
   char * line = (char * ) malloc(sizeof(char) * len);
@@ -2827,7 +2835,8 @@ void read_q_file_spq(FILE * qfile, array_spq_ptr spq, cado_poly_srcptr f,
     do_all_for_spq(spq, q, f, q_side, H, state, deg_bound_factorise, skewness,
         gal, gal_version, c, nb_vec, g, outstd, file_trace_pos, max_norm, V,
         log2_base, indexes, array, time, errstd, sieve_start, fb, thresh, lpb,
-        main_side, nb_rel, spq_tot, total_time, file_space_sieve_stat);
+        main_side, nb_rel, spq_tot, total_time, file_space_sieve_stat,
+        gal_norm_denom);
   }
   mpz_poly_clear(g);
   free(line);
@@ -2877,7 +2886,7 @@ void initialise_parameters(int argc, char * argv[], cado_poly_ptr f,
     int * main_side, double ** log2_base, FILE ** outstd, FILE ** errstd,
     uint64_t ** sieve_start, sieving_bound_ptr Ha, mpz_poly_ptr g,
     unsigned int * gal, unsigned int * gal_version, FILE ** qfile,
-    unsigned int * qfilespq)
+    unsigned int * qfilespq, factor_t ** gal_norm_denom)
 {
   param_list pl;
   param_list_init(pl);
@@ -2944,6 +2953,7 @@ void initialise_parameters(int argc, char * argv[], cado_poly_ptr f,
   * q_range = (uint64_t *) malloc(sizeof(uint64_t) * 2);
   * sieve_start = (uint64_t *) malloc(sizeof(uint64_t) * (* V));
   * log2_base = (double *) malloc(sizeof(double) * (* V));
+  * gal_norm_denom = (factor_t *) malloc(sizeof(factor_t) * (* V));
 
   param_list_parse_uint64_list(pl, "fbb", * fbb, (size_t) * V, ",");
 
@@ -3128,6 +3138,23 @@ void initialise_parameters(int argc, char * argv[], cado_poly_ptr f,
     fprintf(* errstd, "# Galois action 6.1 not fully implemented.\n");
   } else if (* gal == 6 && * gal_version == 1) {
     fprintf(* outstd, "# Galois action 6.1 activated.\n");
+    mpz_t tmp;
+    mpz_init(tmp);
+    for (unsigned int i = 0; i < * V; i++) {
+      factor_init((*gal_norm_denom)[i], 10);
+      // Compute the norm of (x-1).resultant(f[i]).
+      mpz_poly_eval_ui(tmp, f->pols[i], 1);
+      mpz_abs(tmp, tmp);
+      mpz_divexact(tmp, tmp, mpz_poly_lc_const(f->pols[i]));
+      brute_force_factorize_ul((*gal_norm_denom)[i], tmp, tmp, 1000);
+      ASSERT(mpz_cmp_ui(tmp, 1) == 0);
+#ifndef NDEBUG
+      for (unsigned k = 0; k < (*gal_norm_denom)[i]->number; k++) {
+        ASSERT(mpz_cmp_ui((*gal_norm_denom)[i]->factorization[k], 3) == 0);
+      }
+#endif // NDEBUG
+    }
+    mpz_clear(tmp);
   }
   free(gal_str);
 
@@ -3161,10 +3188,12 @@ int main(int argc, char * argv[])
   unsigned int gal_version;
   FILE * qfile;
   unsigned int qfilespq;
+  factor_t * gal_norm_denom;
 
   initialise_parameters(argc, argv, f, &fbb, &fb, H, &q_range, &thresh, &lpb,
       array, &q_side, &V, &main_side, &log2_base, &outstd, &errstd,
-      &sieve_start, Ha, g, &gal, &gal_version, &qfile, &qfilespq);
+      &sieve_start, Ha, g, &gal, &gal_version, &qfile, &qfilespq,
+      &gal_norm_denom);
 
   //Store all the index of array with resulting norm less than thresh.
   uint64_array_t * indexes =
@@ -3244,7 +3273,7 @@ int main(int argc, char * argv[])
   prime_info pi;
   prime_info_init(pi);
   //Pass all the prime less than q_range[0].
-  if (q_range[1] - q_range[0] > 2) {
+  if (q_range[1] - q_range[0] != 1 || g->deg <= 0) {
     for (q = 2; q < q_range[0]; q = getprime_mt(pi)) {}
   }
 #ifdef SPQ_IDEAL_U
@@ -3265,7 +3294,22 @@ int main(int argc, char * argv[])
   }
 
   if (qfilespq == 0) {
-    if (q_range[1] - q_range[0] > 2) {
+    if (q_range[1] - q_range[0] == 1 && g->deg > 0) {
+      fprintf(outstd, "# Assume that %" PRIu64 " is prime.\n", q_range[0]);
+#ifndef NDEBUG
+      mpz_t tmp;
+      mpz_init(tmp);
+      mpz_set_ui(tmp, q_range[0]);
+      ASSERT(mpz_probab_prime_p(tmp, 15) > 0);
+      mpz_clear(tmp);
+#endif // NDEBUG
+
+      do_all_for_spq(spq, q_range[0], f, q_side, H, state,
+          deg_bound_factorise, skewness, gal, gal_version, c, nb_vec, g,
+          outstd, file_trace_pos, max_norm, V, log2_base, indexes, array,
+          time, errstd, sieve_start, fb, thresh, lpb, main_side, &nb_rel,
+          &spq_tot, &total_time, file_space_sieve_stat, gal_norm_denom);
+    } else {
       ASSERT(q >= q_range[0]);
       ASSERT(qfile == NULL);
       for ( ; q <= q_range[1]; q = getprime_mt(pi)) {
@@ -3274,36 +3318,22 @@ int main(int argc, char * argv[])
             skewness, gal, gal_version, c, nb_vec, g, outstd, file_trace_pos,
             max_norm, V, log2_base, indexes, array, time, errstd, sieve_start,
             fb, thresh, lpb, main_side, &nb_rel, &spq_tot, &total_time,
-            file_space_sieve_stat);
+            file_space_sieve_stat, gal_norm_denom);
       }
-    } else {
-      fprintf(outstd, "# Assume that %" PRIu64 " is prime.\n", q_range[0]);
-#ifndef NDEBUG
-      mpz_t tmp;
-      mpz_init(tmp);
-      mpz_set_ui(tmp, q_range[0]);
-      ASSERT(!mpz_probab_prime_p(tmp, 15));
-      mpz_clear(tmp);
-#endif // NDEBUG
-
-      do_all_for_spq(spq, q_range[0], f, q_side, H, state,
-          deg_bound_factorise, skewness, gal, gal_version, c, nb_vec, g,
-          outstd, file_trace_pos, max_norm, V, log2_base, indexes, array,
-          time, errstd, sieve_start, fb, thresh, lpb, main_side, &nb_rel,
-          &spq_tot, &total_time, file_space_sieve_stat);
     }
   } else if (qfilespq == 1){
     read_q_file(qfile, spq, f, H, state, deg_bound_factorise, skewness, gal,
         gal_version, c, nb_vec, g, outstd, file_trace_pos, max_norm, V,
         log2_base, indexes, array, time, errstd, sieve_start, fb, thresh, lpb,
-        main_side, &nb_rel, &spq_tot, &total_time, file_space_sieve_stat);
+        main_side, &nb_rel, &spq_tot, &total_time, file_space_sieve_stat,
+        gal_norm_denom);
   } else {
     ASSERT(qfilespq == 2);
 
     read_q_file_spq(qfile, spq, f, H, state, deg_bound_factorise, skewness, gal,
         gal_version, c, nb_vec, outstd, file_trace_pos, max_norm, V, log2_base,
         indexes, array, time, errstd, sieve_start, fb, thresh, lpb, main_side,
-        &nb_rel, &spq_tot, &total_time, file_space_sieve_stat);
+        &nb_rel, &spq_tot, &total_time, file_space_sieve_stat, gal_norm_denom);
   }
 
   fprintf(outstd, "# Total time: %fs.\n", total_time);
@@ -3378,6 +3408,10 @@ ideals.\n", i, nb, nb_more);
       mpz_vector_clear(c[i]);
     }
     free(c);
+    for (unsigned int i = 0; i < V; i++) {
+      factor_clear(gal_norm_denom[i]);
+    }
+    free(gal_norm_denom);
   }
   array_spq_clear(spq, H->t);
   gmp_randclear(state);
