@@ -271,25 +271,40 @@ def estimate_alpha_p(f, p, nt):
         # sys.stdout.write("%f\r" % float(s*l/n))
     return float(s*l/n) if n > 0 else Infinity
 
-# same as estimate_alpha_p, but for a degree-2 polynomial
-def estimate_alpha_p_2(f, p, nt):
-    """
-    Should compute the same thing as alpha_p, but experimentally
-    """
-    s=0
+# same as estimate_alpha_p, but for (a,b) = (r,s) mod p
+def estimate_alpha_p_2(f, p, nt, r, s):
+    S=0
     n=0
-    x,y=f.variables()
+    x = f.variables()[0]
+    var('y')
+    F = (f(x=x/y)*y^f.degree()).expand()
     l=log(p)
     for i in range(nt):
         while True:
-           a=randrange(0,nt^2)
-           b=randrange(0,nt^2)
+           a=randrange(r,nt^2,p)
+           b=randrange(s,nt^2,p)
            c=randrange(0,nt^2)
            if gcd(a,b)==1 and c<>0:
               break
-        s+=valuation(c,p)-valuation(f(x=a,y=b), p)
+        S+=valuation(c,p)-valuation(F(x=a,y=b), p)
         n+=1
-    return float(s*l/n)
+    return float(S*l/n)
+
+def estimate_average_valuation_p_2(f, p, nt, r, s):
+    S=0
+    n=0
+    x = f.variables()[0]
+    var('y')
+    F = (f(x=x/y)*y^f.degree()).expand()
+    for i in range(nt):
+        while True:
+           a=randrange(r,nt^2,p)
+           b=randrange(s,nt^2,p)
+           if gcd(a,b)==1:
+              break
+        S+=valuation(F(x=a,y=b), p)
+        n+=1
+    return float(S/n)
 
 # auxiliary
 def alpha_p_simplistic(f,p):

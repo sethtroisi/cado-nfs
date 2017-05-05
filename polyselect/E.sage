@@ -90,13 +90,16 @@ def MurphyE_combined_aux(f,g,B):
    # alpha_f is the alpha value of f for this class
    # alpha_g is the alpha value of g for this class
    l = [[1,alpha(f,2000),alpha(g,2000)]]
+   x = f.variables()[0]
    for p in prime_range(B):
-      lf = allroots(f,p)
-      lg = allroots(g,p)
       lp = []
       for r in [0..p]:
-         ef = lf[r]
-         eg = lg[r]
+         if r < p:
+            ef = estimate_average_valuation_p_2(f,p,1000,r,1)
+            eg = estimate_average_valuation_p_2(g,p,1000,r,1)
+         else: # r = p: projective root
+            ef = estimate_average_valuation_p_2(f,p,1000,1,0)
+            eg = estimate_average_valuation_p_2(g,p,1000,1,0)
          # if there was already a class with the same exponents, accumulate
          found = false
          for i in range(len(lp)):
