@@ -8,7 +8,7 @@ echo 'CFLAGS="-O3 -DNDEBUG"' > local.sh
 echo 'CXXFLAGS="-O3 -DNDEBUG"' >> local.sh
 echo "Compile nfs-hd part of cado-nfs."
 sleep 0.5
-make makefb-hd special-q_sieve
+make cmake makefb-hd special-q_sieve
 cp parameters/nfs-hd/p6bd40.poly build/`hostname`/nfs-hd/.
 cd build/`hostname`/nfs-hd
 echo
