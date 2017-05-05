@@ -545,11 +545,10 @@ static void automorphism_6_1_1(mpz_poly_ptr b, mpz_poly_srcptr a)
     mpz_init(c[i]);
   }
 
-  mpz_sub(c[0], c[0], a->coeff[0]);
-  mpz_sub(c[0], c[0], a->coeff[1]);
+  mpz_add(c[1], a->coeff[0], a->coeff[1]);
 
-  mpz_set(c[1], a->coeff[0]);
-  mpz_submul_ui(c[1], a->coeff[1], 2);
+  mpz_addmul_ui(c[0], a->coeff[0], 2);
+  mpz_sub(c[0], c[0], a->coeff[1]);
 
 
   mpz_poly_setcoeffs(b, c, 1);
@@ -566,16 +565,16 @@ static void automorphism_6_1_2(mpz_poly_ptr b, mpz_poly_srcptr a)
     mpz_init(c[i]);
   }
 
-  mpz_add(c[0], a->coeff[0], a->coeff[1]);
-  mpz_add(c[0], c[0], a->coeff[2]);
+  mpz_add(c[2], a->coeff[0], a->coeff[1]);
+  mpz_add(c[2], c[2], a->coeff[2]);
 
-  mpz_submul_ui(c[1], a->coeff[0], 2);
+  mpz_addmul_ui(c[1], a->coeff[0], 4);
   mpz_add(c[1], c[1], a->coeff[1]);
-  mpz_addmul_ui(c[1], a->coeff[2], 4);
+  mpz_submul_ui(c[1], a->coeff[2], 2);
 
-  mpz_set(c[2], a->coeff[0]);
-  mpz_submul_ui(c[2], a->coeff[1], 2);
-  mpz_addmul_ui(c[2], a->coeff[2], 4);
+  mpz_set(c[0], a->coeff[2]);
+  mpz_submul_ui(c[0], a->coeff[1], 2);
+  mpz_addmul_ui(c[0], a->coeff[0], 4);
 
 
   mpz_poly_setcoeffs(b, c, 2);
