@@ -115,6 +115,9 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #ifdef  __GNUC__
 #pragma GCC diagnostic error "-Wextra"
 #pragma GCC diagnostic error "-Wall"
+/* there is an implicit and wanted fallthrough in polyselect_str.c
+   around lines 514-518 */
+#pragma GCC diagnostic ignored "-Wimplicit-fallthrough"
 #endif
 
 #include "cado_config.h"
