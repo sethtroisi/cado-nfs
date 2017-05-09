@@ -290,6 +290,7 @@ def estimate_alpha_p_2(f, p, nt, r, s):
         n+=1
     return float(S*l/n)
 
+# same as above, but only counts the average valuation at p
 def estimate_average_valuation_p_2(f, p, nt, r, s):
     S=0
     n=0
@@ -305,6 +306,33 @@ def estimate_average_valuation_p_2(f, p, nt, r, s):
         S+=valuation(F(x=a,y=b), p)
         n+=1
     return float(S/n)
+
+def special_valuation_2(F, p, max_depth):
+   c = F.content()
+   e = c.valuation(p)
+   F = F//c
+   Rp.<xx,yy> = GF(p)[]
+   Fp = Rp(F)
+   if Fp.degree(xx)==0 and Fp.degree(yy)==0 and Fp<>0:
+      # Fp is a non-zero constant polynomial: valuation is zero
+      return 0
+   if max_depth==0:
+      print F.change_ring(Integers(p^2))
+      return 0
+   x, y = F.variables()
+   for r in range(p):
+      for s in range(p):
+         e += special_valuation_2(F(x=p*x+r,y=p*y+s), p, max_depth-1)/p^2
+   return e
+
+def estimate_average_valuation_p_3(f, p, r, s, max_depth=2):
+   x = f.variables()[0]
+   y = var('y')
+   F = (f(x=x/y)*y^f.degree()).expand()
+   F = F(x=p*x+r,y=p*y+s).expand()
+   R.<x,y> = ZZ[]
+   F = R(F)
+   return special_valuation_2(F, p, max_depth)
 
 # auxiliary
 def alpha_p_simplistic(f,p):
