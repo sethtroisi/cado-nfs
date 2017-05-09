@@ -24,6 +24,25 @@ def number_of_roots(f,p):
         s=f.degree()
     return s
 
+def number_of_roots_sub(f,p,r,s):
+    """
+    Counts the roots of f equal to r/s mod p, without multiplicities.
+    Projective roots are also counted (without multiplicities).
+    """
+    fp = GF(p)['x'](f)
+    t = 0
+    if s != 0: # r/s is non-projective
+        r = (r/s) % p
+        for x,_ in fp.roots():
+            if x == r:
+                return 1
+        return 0
+    else: # we are looking for projective roots
+        if fp.degree() < f.degree():
+            return 1
+        else:
+            return 0
+
 def average_valuation_affine(f,p):
     """
     returns the average p-valuation of the polynomial f. Works recursively.
@@ -35,10 +54,38 @@ def average_valuation_affine(f,p):
     Q = GF(p)['x'](fv.derivative())
     for r in fv.roots(GF(p)):
         if Q(r[0]) != 0:
+            # we count an extra 1 when p divides (with probability 1/p)
+            # + 1 when p^2 divides (with probability 1/p^2), and so on,
+            # thus 1/p + 1/p^2 + ... = 1/(p-1)
             v += 1/(p-1)
         else:
+            # we expand fv(r0+p*x) and divide by p since here we consider
+            # only one of the p classes r0+p*x for 0 <= r0 < p
             f2 = fv(Integers()(r[0])+p*x)
             v += average_valuation_affine(f2, p)/p
+    return v
+
+# same as average_valuation_affine, but for the class a/b = r mod p
+def average_valuation_affine_sub(f,p,r):
+    v = valuation (f.content(), p)
+    ZP= f.parent()
+    x = ZP.gen()
+    fv = ZP(f/p^v)
+    Q = GF(p)['x'](fv.derivative())
+    for t,_ in fv.roots(GF(p)):
+        t = ZZ(t)
+        if t != r:
+           continue
+        if Q(t) != 0: # single root
+            # we count 1 for this root (with probability 1 since we are
+            # in the residue class of this root), plus 1 when p^2 divides
+            # (with probability 1/p), ..., thus 1 + 1/p + ... = p/(p-1)
+            v += p/(p-1)
+        else:
+            f2 = fv(t+p*x)
+            # since we are in this case in the general case (no restriction
+            # any more on x), we call average_valuation_affine() [no _sub]
+            v += average_valuation_affine(f2, p)
     return v
 
 #def ava_deviation(f,p):
@@ -69,7 +116,7 @@ def average_valuation_homogeneous_coprime(f,p):
         # account the non-coprime pairs.
         return number_of_roots(f,p)/(p-1)*p/(p+1)
     # modulo p^n, roots touch one class having p^n*(1-1/p) representatives,
-    # amongst the p^2n*(1-1/p^2) coprime representative pairs for
+    # amongst the p^(2n)*(1-1/p^2) coprime representative pairs for
     # P^1(Z/p^n). So the contribution is, for p^n, p/(p+1) * p^-n
     r = average_valuation_affine(f, p) * p
     ZP= f.parent()
@@ -80,6 +127,24 @@ def average_valuation_homogeneous_coprime(f,p):
     r += average_valuation_affine((f.reverse())(p*x), p)
     r /= p+1
     return r
+
+# same as average_valuation_homogeneous_coprime, but for a/b = r/s mod p
+def average_valuation_homogeneous_coprime_sub(f,p,r,s):
+    if disc(f) % p > 0:
+        # Then we know that the average valuation is
+        # number_of_roots/(p-1), multiplied by p/(p+1) so as to take into
+        # account the non-coprime pairs.
+        return number_of_roots_sub(f,p,r,s)/(p-1)*p
+    # modulo p^n, roots touch one class having p^n*(1-1/p) representatives,
+    # amongst the p^2n*(1-1/p^2) coprime representative pairs for
+    # P^1(Z/p^n). So the contribution is, for p^n, p/(p+1) * p^-n
+    if s <> 0:
+        # we consider the class a/b = r/s mod p
+        return average_valuation_affine_sub(f, p, (r/s) % p)
+    else: # we consider the projective class
+       ZP = f.parent()
+       x = ZP.gen()
+       return average_valuation_affine_sub((f.reverse())(p*x), p, 0)
 
 def alpha_p(f,disc,p):
     """
@@ -315,10 +380,9 @@ def special_valuation_2(F, p, max_depth):
    Fp = Rp(F)
    if Fp.degree(xx)==0 and Fp.degree(yy)==0 and Fp<>0:
       # Fp is a non-zero constant polynomial: valuation is zero
-      return 0
+      return e
    if max_depth==0:
-      print F.change_ring(Integers(p^2))
-      return 0
+      return e
    x, y = F.variables()
    for r in range(p):
       for s in range(p):

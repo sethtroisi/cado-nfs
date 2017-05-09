@@ -95,11 +95,11 @@ def MurphyE_combined_aux(f,g,B):
       lp = []
       for r in [0..p]:
          if r < p:
-            ef = estimate_average_valuation_p_2(f,p,1000,r,1)
-            eg = estimate_average_valuation_p_2(g,p,1000,r,1)
+            ef = average_valuation_homogeneous_coprime_sub(f,p,r,1)
+            eg = average_valuation_homogeneous_coprime_sub(g,p,r,1)
          else: # r = p: projective root
-            ef = estimate_average_valuation_p_2(f,p,1000,1,0)
-            eg = estimate_average_valuation_p_2(g,p,1000,1,0)
+            ef = average_valuation_homogeneous_coprime_sub(f,p,1,0)
+            eg = average_valuation_homogeneous_coprime_sub(g,p,1,0)
          # if there was already a class with the same exponents, accumulate
          found = false
          for i in range(len(lp)):
