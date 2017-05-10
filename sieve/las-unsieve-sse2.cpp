@@ -84,6 +84,9 @@ search_single_survivors_mask(unsigned char * const SS[2],
          the trial-divided primes. */
       const unsigned int i = abs (x - (1 << (log_I - 1)));
       int divides = 0;
+#if __GNUC__ >= 7
+#pragma GCC diagnostic ignored "-Wimplicit-fallthrough"
+#endif
       switch (nr_div) {
           case 6: divides |= (i * div[5][0] <= div[5][1]);
           case 5: divides |= (i * div[4][0] <= div[4][1]);
