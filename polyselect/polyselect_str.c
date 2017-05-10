@@ -1005,6 +1005,9 @@ shash_find_collision (shash_t H)
       SHASH_RESEARCH(Th4, i4); SHASH_TH_I(Th4, i4, 4);
       Hj += 5;
     }
+#if __GNUC__ >= 7
+#pragma GCC diagnostic ignored "-Wimplicit-fallthrough"
+#endif
     switch (Hj - Hjm) { /* no break: it's NOT an error! */
     case 0: SHASH_RESEARCH(Th4, i4); no_break();
     case 1: SHASH_RESEARCH(Th3, i3); no_break();

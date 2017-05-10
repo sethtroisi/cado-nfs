@@ -3114,6 +3114,9 @@ static inline void matmul_bucket_mul_loop(struct matmul_bucket_data_s * mm, abel
     for(hdr = mm->headers.begin() ; hdr != mm->headers.end() ; hdr++) {
         unsigned int hidx = hdr - mm->headers.begin();
         mm->slice_timings[hidx].t -= wct_seconds();
+#if __GNUC__ >= 7
+#pragma GCC diagnostic ignored "-Wimplicit-fallthrough"
+#endif
         switch(hdr->t) {
             case SLICE_TYPE_SMALL2:
                 matmul_bucket_mul_small2(mm, &*hdr, dst, src, d, pos);

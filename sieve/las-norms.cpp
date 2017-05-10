@@ -293,6 +293,9 @@ static inline __m128i _mm_lg2abs(__m128d *i, const __m128d add, const __m128d sc
 static inline double compute_f (const unsigned int d, const double *u, const double h) {
   size_t k = (size_t) d;
   double f = u[k];
+#if __GNUC__ >= 7
+#pragma GCC diagnostic ignored "-Wimplicit-fallthrough"
+#endif
   switch (k) {
   default: do { f = f * h + u[--k]; } while (k > 9);
   case 9: f = f * h + u[8]; no_break();
