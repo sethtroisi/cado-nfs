@@ -1098,14 +1098,11 @@ ellE_interpret_bytecode (ellE_point_t P, const char *bc, const unsigned int bc_l
   for (unsigned int i = 3; i < bc_len; i++)
   {
     char b = bc[i];
-#if __GNUC__ >= 7
-#pragma GCC diagnostic ignored "-Wimplicit-fallthrough"
-#endif
     switch (b)
     {
       case ADDCHAIN_2DBL:
         ellE_double (Q, Q, m, a);
-        /* no break here: fall through */
+        no_break();
       case ADDCHAIN_DBL:
         ellE_double (Q, Q, m, a);
         break;
