@@ -39,23 +39,32 @@ extern "C" {
 #define LEXLE3(X,Y,Z,A,B,C) LEXGE3(A,B,C,X,Y,Z)
 
 #ifndef GMP_VERSION_ATLEAST
+#ifndef __GNU_MP_VERSION
+#define GMP_VERSION_ATLEAST(X,Y,Z) 0
+#else
 #define GMP_VERSION_ATLEAST(X,Y,Z)     \
-    (defined(__GNU_MP__) &&        \
-LEXGE3(__GNU_MP_VERSION,__GNU_MP_VERSION_MINOR,__GNU_MP_VERSION_PATCHLEVEL,X,Y,Z))
+LEXGE3(__GNU_MP_VERSION,__GNU_MP_VERSION_MINOR,__GNU_MP_VERSION_PATCHLEVEL,X,Y,Z)
+#endif
 #endif
 
 #ifndef GMP_VERSION_ATMOST
+#ifndef __GNU_MP_VERSION
+#define GMP_VERSION_ATMOST(X,Y,Z) 1
+#else
 #define GMP_VERSION_ATMOST(X,Y,Z)     \
-    (defined(__GNU_MP__) &&        \
-LEXLE3(__GNU_MP_VERSION,__GNU_MP_VERSION_MINOR,__GNU_MP_VERSION_PATCHLEVEL,X,Y,Z))
+LEXLE3(__GNU_MP_VERSION,__GNU_MP_VERSION_MINOR,__GNU_MP_VERSION_PATCHLEVEL,X,Y,Z)
+#endif
 #endif
 
 
 
 #ifndef GNUC_VERSION
+#ifndef __GNUC__
+#define GNUC_VERSION(X,Y,Z) 0
+#else
 #define GNUC_VERSION(X,Y,Z)     \
-    defined(__GNUC__) &&        \
 (__GNUC__ == X && __GNUC_MINOR__ == Y && __GNUC_PATCHLEVEL__ == Z)
+#endif
 #endif
 
 #ifndef GNUC_VERSION_ATLEAST
