@@ -176,11 +176,11 @@ LEXLE3(__GNU_MP_VERSION,__GNU_MP_VERSION_MINOR,__GNU_MP_VERSION_PATCHLEVEL,X,Y,Z
 #ifndef OMPI_VERSION_IS
 #ifdef OPEN_MPI
 #define OMPI_VERSION_IS(X,Y,Z)          \
-    ((X) == OMPI_MAJOR_VERSION) &&      \
+    (((X) == OMPI_MAJOR_VERSION) &&     \
     ((Y) == OMPI_MINOR_VERSION) &&      \
-    ((Z) == OMPI_RELEASE_VERSION)
+    ((Z) == OMPI_RELEASE_VERSION))
 #else
-#define OMPI_VERSION_IS(X,Y,Z) 0
+#define OMPI_VERSION_IS(X,Y,Z)          0
 #endif
 #endif  /* OMPI_VERSION_IS */
 
