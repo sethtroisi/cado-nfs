@@ -170,8 +170,7 @@ struct sieve_info {
     // parameters for bucket sieving
     /* Actual number of buckets at toplevel used by current special-q */
     uint32_t nb_buckets[FB_MAX_PARTS];
-    /* Max number of buckets if J=I/2, at each level */
-    uint32_t nb_buckets_max[FB_MAX_PARTS];
+
     /* Largest level for which the corresponding fb_part is not empty */
     int toplevel;
 
@@ -273,7 +272,6 @@ struct sieve_info {
         cpoly = NULL;
         I = J = 0;
         memset(nb_buckets, 0, sizeof(nb_buckets));
-        memset(nb_buckets_max, 0, sizeof(nb_buckets_max));
         toplevel = 0;
     }
     void recover_per_sq_values(sieve_range_adjust const&);
