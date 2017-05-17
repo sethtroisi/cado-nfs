@@ -133,8 +133,6 @@ cado_define_test(F9_fakereltest
     TARGET_DEPENDENCIES fake_rels
     TEST_DEPENDENCIES F9_makefbtest)
 
-cado_define_test(test_memset_things.cpp LIBRARIES las-norms utils)
-
 # Try with default TRIALDIV_MAXLEN, whatever it may be
 cado_define_test(test_trialdiv.c ${CADO_NFS_SOURCE_DIR}/sieve/trialdiv.c LIBRARIES utils tests trialdiv)
 

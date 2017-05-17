@@ -817,7 +817,6 @@ tests/sieve/strategies/test_main_script.sh
 sieve/strategies/script_gen_dec.sh
 sieve/strategies/README.rsa704
 sieve/iqsort.h
-tests/sieve/test_memset_things.cpp
 linalg/bwc/tree_stats.cpp
 linalg/bwc/tree_stats.hpp
 tests/linalg/bwc/perlrandom.pl

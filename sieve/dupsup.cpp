@@ -213,8 +213,6 @@ main (int argc, char * argv[])
       usage(pl, argv0);
     }
 
-    tune_las_memset();
-
     std::shared_ptr<facul_strategies_t> strategies(facul_make_strategies(
             conf.sides[0].lim,
             conf.sides[0].lpb,

@@ -144,10 +144,6 @@
 // #define USE_CACHEBUFFER 1
 #endif 
 
-/* A special ultrafast memset for las. Independant of MEMSET_MIN.
-   Only for x86 64. */
-// #define LAS_MEMSET
-
 #include <stdio.h>
 
 #ifdef __cplusplus

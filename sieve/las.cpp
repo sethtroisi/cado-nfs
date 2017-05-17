@@ -2934,8 +2934,6 @@ int main (int argc0, char *argv0[])/*{{{*/
         verbose_output_print(0, 1, "# Done creating cached siever configurations\n");
     }
 
-    tune_las_memset();
-    
     /* We allocate one more workspace per kind of bucket than there are
        threads, so that threads have some freedom in avoiding the fullest
        bucket array. With only one thread, no balancing needs to be done,
