@@ -140,6 +140,9 @@ bucket_array_t<LEVEL, HINT>::allocate_memory(const uint32_t new_n_bucket,
     bucket_start[i_bucket] = big_data + i_bucket * bucket_size;
   }
   reset_pointers();
+#ifdef SAFE_BUCKETS
+  verbose_output_print(0, 0, "# WARNING: SAFE_BUCKETS is on !\n");
+#endif
 }
 
 template <int LEVEL, typename HINT>
