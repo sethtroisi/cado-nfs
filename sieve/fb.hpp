@@ -460,8 +460,7 @@ class fb_part: public fb_interface, private NonCopyable {
       default: abort();
     }
   }
-  /* (^$#&$@! C++ */
-  const fb_vector_interface *cget_slices(const unsigned int n) const {
+  const fb_vector_interface *get_slices(const unsigned int n) const {
     ASSERT_ALWAYS(n <= MAX_DEGREE);
     
     if (only_general)
@@ -502,7 +501,7 @@ public:
     const fb_slice_interface *slice = NULL;
     if (!only_general) {
       for (unsigned int nr_roots = 0; slice == NULL && nr_roots <= MAX_DEGREE; nr_roots++) {
-        const fb_vector_interface *slices = cget_slices(nr_roots);
+        const fb_vector_interface *slices = get_slices(nr_roots);
         if (slices != NULL)
           slice = slices->get_first_slice();
       }
@@ -520,7 +519,7 @@ public:
   }
   const fb_slice_interface *get_slice(const slice_index_t slice_idx) const {
     for (unsigned int nr_roots = 0; nr_roots <= MAX_DEGREE; nr_roots++) {
-      const fb_vector_interface *slices = cget_slices(nr_roots);
+      const fb_vector_interface *slices = get_slices(nr_roots);
       if (slices != NULL) {
         const fb_slice_interface *slice;
         if ((slice = slices->get_slice(slice_idx)) != NULL) return slice;
