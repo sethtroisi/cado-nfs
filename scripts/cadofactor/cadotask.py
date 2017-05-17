@@ -2796,7 +2796,7 @@ class SievingTask(ClientServerTask, DoesImport, FilesCreator, HasStatistics,
             self.state["qnext"] = max(self.state["qnext"], qmin)
         else:
             # qmin = 0 is a magic value (undefined)
-            self.state["qnext"] = qmin if qmin > 0 else self.params["lim1"]/2 if self.params["sqside"] == 1 else self.params["lim0"]/2
+            self.state["qnext"] = qmin if qmin > 0 else int(self.params["lim1"]/2) if self.params["sqside"] == 1 else int(self.params["lim0"]/2)
         
         self.state.setdefault("rels_found", 0)
         self.state["rels_wanted"] = self.params["rels_wanted"]
