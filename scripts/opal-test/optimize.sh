@@ -89,6 +89,12 @@ echo "OPAL_CADO_SQSIDE=${OPAL_CADO_SQSIDE}"
 ### Get parameters from params file and set _min and _max
 lim0=`grep "^lim0.*=" $params | cut -d= -f2`
 lim1=`grep "^lim1.*=" $params | cut -d= -f2`
+grep "qmin.*=" $params > /dev/null
+if [ $? -eq 0 ]; then
+   qmin=`grep "qmin.*=" $params | cut -d= -f2`
+else
+   qmin=$lim1
+fi
 lpb0=`grep "^lpb0.*=" $params | cut -d= -f2`
 lpb1=`grep "^lpb1.*=" $params | cut -d= -f2`
 mfb0=`grep "mfb0.*=" $params | cut -d= -f2`
@@ -110,6 +116,12 @@ else
    has_ncurves1=0
 fi
 I=`grep "I.*=" $params | cut -d= -f2`
+qmin_min=`expr $qmin / 2`
+qmin_max=`expr $qmin \* 2`
+# integer parameters are limited to 2147483645 in OPAL
+if [ $qmin_max -gt 2147483645 ]; then
+   qmin_max=2147483645
+fi
 lim0_min=`expr $lim0 / 2`
 lim0_max=`expr $lim0 \* 2`
 # integer parameters are limited to 2147483645 in OPAL
@@ -157,6 +169,8 @@ fi
 ### Replace parameters values in template
 sed "s/lim0_def/$lim0/g" las_decl_template.py | \
 sed "s/lim0_min/$lim0_min/g" | sed "s/lim0_max/$lim0_max/g" | \
+sed "s/qmin_def/$qmin/g" | sed "s/qmin_min/$qmin_min/g" | \
+sed "s/qmin_max/$qmin_max/g" | \
 sed "s/lim1_def/$lim1/g" | sed "s/lim1_min/$lim1_min/g" | \
 sed "s/lim1_max/$lim1_max/g" | \
 sed "s/lpb0_def/$lpb0/g" | sed "s/lpb0_min/$lpb0_min/g" | \
@@ -190,6 +204,7 @@ mfb1_opt=`head -6 $f | tail -1`
 ncurves0_opt=`head -7 $f | tail -1`
 ncurves1_opt=`head -8 $f | tail -1`
 I_opt=`head -9 $f | tail -1`
+qmin_opt=`head -10 $f | tail -1`
 echo "Optimal parameters:"
 echo "lim0=" $lim0_opt " min=" $lim0_min " max=" $lim0_max
 echo "lim1=" $lim1_opt " min=" $lim1_min " max=" $lim1_max
@@ -200,9 +215,11 @@ echo "mfb1=" $mfb1_opt " min=" $mfb1_min " max=" $mfb1_max
 echo "ncurves0=" $ncurves0_opt " min=" $ncurves0_min " max=" $ncurves0_max
 echo "ncurves1=" $ncurves1_opt " min=" $ncurves1_min " max=" $ncurves1_max
 echo "I=" $I_opt " min=" $I_min " max=" $I_max
+echo "qmin=" $qmin_opt " min=" $qmin_min " max=" $qmin_max
 cd $cwd
 sed "s/lim0.*=.*$/lim0 = $lim0_opt/g" $params | \
 sed "s/lim1.*=.*$/lim1 = $lim1_opt/g" | \
+sed "s/qmin.*=.*$/qmin = $qmin_opt/g" | \
 sed "s/lpb0.*=.*$/lpb0 = $lpb0_opt/g" | \
 sed "s/lpb1.*=.*$/lpb1 = $lpb1_opt/g" | \
 sed "s/mfb0.*=.*$/mfb0 = $mfb0_opt/g" | \
