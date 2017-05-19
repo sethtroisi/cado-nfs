@@ -92,8 +92,10 @@ lim1=`grep "^lim1.*=" $params | cut -d= -f2`
 grep "qmin.*=" $params > /dev/null
 if [ $? -eq 0 ]; then
    qmin=`grep "qmin.*=" $params | cut -d= -f2`
+   has_qmin=1
 else
    qmin=$lim1
+   has_qmin=0
 fi
 lpb0=`grep "^lpb0.*=" $params | cut -d= -f2`
 lpb1=`grep "^lpb1.*=" $params | cut -d= -f2`
@@ -227,6 +229,9 @@ sed "s/mfb1.*=.*$/mfb1 = $mfb1_opt/g" | \
 sed "s/ncurves0.*=.*$/ncurves0 = $ncurves0_opt/g" | \
 sed "s/ncurves1.*=.*$/ncurves1 = $ncurves1_opt/g" | \
 sed "s/I.*=.*$/I = $I_opt/g" > $params.opt
+if [ $has_qmin -eq 0 ]; then
+   echo "tasks.sieve.qmin = $qmin_opt" >> $params.opt
+fi
 if [ $has_ncurves0 -eq 0 ]; then
    echo "tasks.sieve.ncurves0 = $ncurves0_opt" >> $params.opt
 fi
