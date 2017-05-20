@@ -382,6 +382,7 @@ sq_was_previously_sieved(const unsigned long sq, int side, sieve_info const & si
     int cmp = mpz_cmp_ui(si.doing.p, sq);
     if (cmp <= 0)
       return 0;
+    /* FIXME: we should consider qmin instead of si.conf.sides[side].lim */
     return (sq > si.conf.sides[side].lim);
   } else {
     // Did we sieve other sides?
@@ -391,6 +392,7 @@ sq_was_previously_sieved(const unsigned long sq, int side, sieve_info const & si
     int cmp = mpz_cmp_ui(si.doing.p, sq);
     if (cmp <= 0)
       return 0;
+    /* FIXME: we should consider qmin instead of si.conf.sides[side].lim */
     return (sq > si.conf.sides[side].lim && sq < si.conf.sides[side].qmax);
   }
 }
