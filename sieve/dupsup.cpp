@@ -102,6 +102,16 @@ parse_config(siever_config & sc, param_list_ptr pl)
     param_list_parse_long_and_long(pl, "dup-qmin", dupqmin, ",");
     sc.sides[0].qmin = dupqmin[0];
     sc.sides[1].qmin = dupqmin[1];
+
+    /* Change 0 (not initialized) into LONG_MAX */
+    for (int side = 0; side < 2; side ++)
+      if (sc.sides[side].qmin == 0)
+	sc.sides[side].qmin = LONG_MAX;
+
+    /* If qmin is not given, use lim on the special-q side by default. */
+    if (sc.sides[sc.side].qmin == LONG_MAX)
+      sc.sides[sc.side].qmin = sc.sides[sc.side].lim;
+
     int logI = (sc.logA+1)/2;
     if (!param_list_parse_ulong(pl, "powlim0", &sc.sides[0].powlim))
         sc.sides[0].powlim = (1<<logI) - 1;
