@@ -273,7 +273,7 @@ void * check_prog(param_list pl MAYBE_UNUSED, int argc, char * argv[])
 
     int nok=0;
 
-    for(unsigned int i0 = 0 ; i0 < Cfiles.size() ; i0++) {
+    for(unsigned int i0 = 0 ; i0 < Cfiles.size() - 1 ; i0++) {
         Cfile& C_i0(Cfiles[i0]);
         void * Cv_i0;
         vec_alloc(Ac, Cv_i0, vsize);
@@ -330,7 +330,7 @@ void * check_prog(param_list pl MAYBE_UNUSED, int argc, char * argv[])
 
                 unsigned int j = 0;
                 for(unsigned int i = 0 ; i < Vs.size() ; i++) {
-                    for( ; j < Vs.size() ; j++) {
+                    for(j = i + 1 ; j < Vs.size() ; j++) {
                         if (Vs[j].n + C_i0.stretch == Vs[i].n + C_i1.stretch)
                             break;
                     }
