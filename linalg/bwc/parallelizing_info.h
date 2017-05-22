@@ -393,12 +393,13 @@ extern void pi_dictionary_clear(pi_dictionary_ptr);
             while (0);							\
         }								\
     }									\
+    serialize_threads(comm);                                            \
 } while (0)
 #else
 #define SEVERAL_THREADS_PLAY_MPI_BEGIN(comm)     /**/
 #define SEVERAL_THREADS_PLAY_MPI_END()           /**/
 #define SEVERAL_THREADS_PLAY_MPI_BEGIN2(comm, t) /**/
-#define SEVERAL_THREADS_PLAY_MPI_END2()          /**/
+#define SEVERAL_THREADS_PLAY_MPI_END2(comm)      /**/
 #endif
 
 #endif	/* PARALLELIZING_INFO_H_ */

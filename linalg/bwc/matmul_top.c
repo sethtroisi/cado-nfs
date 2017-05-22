@@ -1337,7 +1337,7 @@ mmt_vec_allreduce(mmt_vec_ptr v)
      */
     SEVERAL_THREADS_PLAY_MPI_BEGIN2(v->pi->m, peer) {
         void * dv = v->abase->vec_subvec(v->abase, v->mpals[peer]->v,
-                wr->trank * thread_chunk);
+                v->mpals[peer]->pi->wr[v->d]->trank * thread_chunk);
         MPI_Allreduce(MPI_IN_PLACE,
                 dv,
                 thread_chunk,
@@ -1345,7 +1345,7 @@ mmt_vec_allreduce(mmt_vec_ptr v)
                 BWC_PI_SUM->custom,
                 wr->pals);
     }
-    SEVERAL_THREADS_PLAY_MPI_END2();
+    SEVERAL_THREADS_PLAY_MPI_END2(v->pi->m);
     if (v->siblings) {
         void * sv = v->abase->vec_subvec(v->abase, v->v,
                 wr->trank * thread_chunk);
