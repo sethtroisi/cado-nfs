@@ -598,10 +598,15 @@ bool parse_default_siever_config(siever_config & sc, param_list_ptr pl)
                     &sc.sides[side].ncurves))
             sc.sides[side].ncurves = -1;
 
-    long dupqmax[2] = {0, 0};
-    param_list_parse_long_and_long(pl, "dup-qmax", dupqmax, ",");
-    sc.sides[0].qmax = dupqmax[0];
-    sc.sides[1].qmax = dupqmax[1];
+    long dupqmin[2] = {0, 0};
+    param_list_parse_long_and_long(pl, "dup-qmin", dupqmin, ",");
+    sc.sides[0].qmin = dupqmin[0];
+    sc.sides[1].qmin = dupqmin[1];
+
+    /* if qmin is not given, use lim on the sqside by default */
+    for (int side = 0; side < 2; side++)
+      if (sc.sides[side].qmin == 0)
+	sc.sides[side].qmin = sc.sides[sc.side].lim;
 
     return complete;
 }
@@ -2690,7 +2695,7 @@ static void declare_usage(param_list pl)/*{{{*/
   param_list_decl_usage(pl, "prepend-relation-time", "prefix all relation produced with time offset since beginning of special-q processing");
   param_list_decl_usage(pl, "ondemand-siever-config", "(switch) defer initialization of siever precomputed structures (one per special-q side) to time of first actual use");
   param_list_decl_usage(pl, "dup", "(switch) suppress duplicate relations");
-  param_list_decl_usage(pl, "dup-qmax", "limits of q-sieving for 2-sided duplicate removal");
+  param_list_decl_usage(pl, "dup-qmin", "limits of q-sieving for 2-sided duplicate removal");
   param_list_decl_usage(pl, "batch", "(switch) use batch cofactorization");
   param_list_decl_usage(pl, "batch0", "side-0 batch file");
   param_list_decl_usage(pl, "batch1", "side-1 batch file");

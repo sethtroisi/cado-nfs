@@ -242,7 +242,6 @@ sq_finds_relation(const unsigned long sq, const int sq_side,
   int i, pass, ok;
   unsigned int j;
 
-
   /* Extract the list of large primes for each side */
   for (int side = 0; side < 2; side++) {
     unsigned int nb_p = rel.sides[side].size();
@@ -254,7 +253,7 @@ sq_finds_relation(const unsigned long sq, const int sq_side,
       if (p > fbb) {
         for (int i = 0; i < e; i++) {
           if (nr_lp[side] < max_large_primes)
-            large_primes[side][nr_lp[side]++] = p;
+	    large_primes[side][nr_lp[side]++] = p;
         }
       }
     }
@@ -373,28 +372,22 @@ clear_and_exit:
 
 
 /* This function decides whether the given (sq,side) was previously
- * sieved (compared to the current sq stored in si.doing).
- * This takes qmax into account.
+ * sieved (compared to the current special-q stored in si.doing).
+ * This takes qmin into account.
  */
 static int
-sq_was_previously_sieved(const unsigned long sq, int side, sieve_info const & si){
-  if (side == si.doing.side) {
-    int cmp = mpz_cmp_ui(si.doing.p, sq);
-    if (cmp <= 0)
-      return 0;
-    /* FIXME: we should consider qmin instead of si.conf.sides[side].lim */
-    return (sq > si.conf.sides[side].lim);
-  } else {
-    // Did we sieve other sides?
-    if (si.conf.sides[side].qmax == 0)
-      return 0;
-    // Is q smaller than current, and within the bounds for this side?
-    int cmp = mpz_cmp_ui(si.doing.p, sq);
-    if (cmp <= 0)
-      return 0;
-    /* FIXME: we should consider qmin instead of si.conf.sides[side].lim */
-    return (sq > si.conf.sides[side].lim && sq < si.conf.sides[side].qmax);
-  }
+sq_was_previously_sieved (const unsigned long sq, int side, sieve_info const & si){
+  /* whatever the side, if sq is larger than the current special-q, it was
+     previously sieved:
+     (i) either sq is on the same side, and it is clear;
+     (ii) or sq is on the other side, and we consider the relation was found
+          while sieving the current side */
+  if (mpz_cmp_ui (si.doing.p, sq) <= 0) /* we use <= and not < since this
+					   function is also called with the
+					   current special-q */
+    return 0;
+
+  return sq >= si.conf.sides[side].qmin;
 }
 
 /* For one special-q identified by (sq, side) (the root r is given
