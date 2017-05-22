@@ -115,9 +115,9 @@ def run(param_file, problem):
 
         las_cmd_line = [las, "-allow-largesq", "-dup", "-dup-qmin"]
         if sqside == 0:
-            las_cmd_line += ["%s,0" % str(q0)]
+            las_cmd_line += ["%s,0" % str(las_params["qmin"])]
         else:
-            las_cmd_line += ["0,%s" % str(q0)]
+            las_cmd_line += ["0,%s" % str(las_params["qmin"])]
         for (key, value) in las_params.items():
             if key == "qmin":
                continue
