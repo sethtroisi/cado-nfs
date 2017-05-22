@@ -333,7 +333,6 @@ void * check_prog(param_list pl MAYBE_UNUSED, int argc, char * argv[])
 
                 unsigned int j = 0;
                 for(unsigned int i = 0 ; i < Vs.size() ; i++) {
-                    j++;
                     for( ; j < Vs.size() ; j++) {
                         if (Vs[j].n + C_i0.stretch == Vs[i].n + C_i1.stretch)
                             break;
