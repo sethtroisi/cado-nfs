@@ -274,6 +274,8 @@ void * check_prog(param_list pl MAYBE_UNUSED, int argc, char * argv[])
     ASSERT_ALWAYS(Cfiles[0].stretch == 0);
 
 
+    int nok=0;
+
     for(unsigned int i0 = 0 ; i0 < Cfiles.size() ; i0++) {
         Cfile& C_i0(Cfiles[i0]);
         void * Cv_i0;
@@ -370,12 +372,12 @@ void * check_prog(param_list pl MAYBE_UNUSED, int argc, char * argv[])
                     int cmp = Av->vec_cmp(Av, dotprod_scratch[0], dotprod_scratch[1], nchecks);
 
                     printf("  check %s against %s -> %s\n",
-                            vi, vj, cmp == 0 ? "ok" : "NOK");
+                            vi, vj, cmp == 0 ? "ok" : "NOK NOK NOK NOK NOK");
 
                     if (cmp != 0) {
+                        nok++;
                         fprintf(stderr, " check %s against %s -> %s\n",
-                                vi, vj, cmp == 0 ? "ok" : "NOK");
-                        exit(EXIT_FAILURE);
+                                vi, vj, cmp == 0 ? "ok" : "NOK NOK NOK NOK NOK");
                     }
                 }
                 vec_free(Av, dotprod_scratch[0], nchecks);
@@ -395,6 +397,11 @@ void * check_prog(param_list pl MAYBE_UNUSED, int argc, char * argv[])
         vec_free(Ac, Cv_i0, vsize);
     }
 
+    if (nok) {
+        printf("%d checks FAILED !!!!!!!!!!!!!!!!!\n", nok);
+        fprintf(stderr, "%d checks FAILED !!!!!!!!!!!!!!!!!\n", nok);
+        exit(EXIT_FAILURE);
+    }
 
 
 #if 0
