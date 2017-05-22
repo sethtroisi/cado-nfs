@@ -113,8 +113,14 @@ def run(param_file, problem):
         outputfile = "las.%d.out" % q0
         las_params.update({"q0": q0, "q1": q0 + q_range, "out": outputfile})
 
-        las_cmd_line = [las, "-allow-largesq", "-dup"]
+        las_cmd_line = [las, "-allow-largesq", "-dup", "-dup-qmin"]
+        if sqside == 0:
+            las_cmd_line += ["%s,0" % str(q0)]
+        else:
+            las_cmd_line += ["0,%s" % str(q0)]
         for (key, value) in las_params.items():
+            if key == "qmin":
+               continue
             las_cmd_line += ["-%s" % key, str(value)]
         # sys.stderr.write("Running: %s\n" % " ".join(las_cmd_line))
         las_process = subprocess.Popen(las_cmd_line)
