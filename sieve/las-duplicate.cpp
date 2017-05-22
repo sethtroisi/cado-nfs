@@ -244,9 +244,9 @@ sq_finds_relation(const unsigned long sq, const int sq_side,
 
   /* Extract the list of large primes for each side */
   for (int side = 0; side < 2; side++) {
+    const unsigned long fbb = old_si.conf.sides[side].lim;
     unsigned int nb_p = rel.sides[side].size();
     for (unsigned int i = 0; i < nb_p; i++) {
-      const unsigned long fbb = old_si.conf.sides[side].lim;
       const unsigned long p = mpz_get_ui(rel.sides[side][i].p);
       const int e = rel.sides[side][i].e;
       ASSERT_ALWAYS(e > 0);
@@ -257,7 +257,12 @@ sq_finds_relation(const unsigned long sq, const int sq_side,
         }
       }
     }
-    /* Compute the cofactor, dividing by sq on the special-q side */
+
+    /* In case we are on the sq_side and sq <= fbb, add sq */
+    if (side == sq_side && sq <= fbb)
+      large_primes[side][nr_lp[side]++] = sq;
+
+    /* Compute the cofactor, dividing by sq on the special-q side. */
     compute_cofactor(cof[side], side == sq_side ? sq : 0, large_primes[side], nr_lp[side]);
   }
 
@@ -276,6 +281,7 @@ sq_finds_relation(const unsigned long sq, const int sq_side,
   Adj.sieve_info_update_norm_data_Jmax();
   siever_config conf = Adj.config();
   conf.logI_adjusted = Adj.logI;
+  conf.side = sq_side;
 
   /* We don't have a constructor which is well adapted to our needs here.
    * We're going to play dirty tricks, and fill out the stuff by
@@ -338,7 +344,7 @@ sq_finds_relation(const unsigned long sq, const int sq_side,
   /* Check that the cofactors are within the mfb bound */
   for (int side = 0; side < 2; ++side) {
     if (!check_leftover_norm (cof[side], si, side)) {
-      verbose_output_vfprint(0, VERBOSE_LEVEL, gmp_vfprintf, "# DUPECHECK cofactor %Zd is outside bounds\n", cof);
+      verbose_output_vfprint(0, VERBOSE_LEVEL, gmp_vfprintf, "# DUPECHECK cofactor %Zd is outside bounds\n", cof[side]);
       is_dupe = 0;
       goto clear_and_exit;
     }
