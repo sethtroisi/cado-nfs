@@ -93,16 +93,32 @@ void * sec_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
 
     serialize(pi->m);
 
-    uint32_t * gxvecs = NULL;
-    unsigned int nx = 0;
+    if (bw->start == 0) {
+        if (tcan_print)
+            printf("We have start=0: creating C.0 as an expanded copy of X\n");
+        uint32_t * gxvecs = NULL;
+        unsigned int nx = 0;
 
-    if (!fake) {
-        load_x(&gxvecs, bw->m, &nx, pi);
+        if (!fake) {
+            load_x(&gxvecs, bw->m, &nx, pi);
+        } else {
+            set_x_fake(&gxvecs, bw->m, &nx, pi);
+        }
+
+        mmt_vec_set_x_indices(my, gxvecs, MIN(nchecks, bw->m), nx);
+        mmt_vec_save(my, "C.0", unpadded);
+
+        free(gxvecs);
     } else {
-        set_x_fake(&gxvecs, bw->m, &nx, pi);
+        char * tmp;
+        int rc = asprintf(&tmp, "C.%d", bw->start);
+        ASSERT_ALWAYS(rc >= 0);
+        mmt_vec_load(my, tmp, unpadded);
+        if (tcan_print) {
+            printf("loaded %s\n", tmp);
+        }
+        free(tmp);
     }
-
-    mmt_vec_set_x_indices(my, gxvecs, MIN(nchecks, bw->m), nx);
 
     /*
     for(int j = 0 ; j < nchecks ; j++) {
@@ -122,7 +138,6 @@ void * sec_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
     // matmul_top_twist_vector(mmt, !bw->dir);
     // mmt_vec_save(mmt, NULL, "ux", !bw->dir, 0);
     // save_untwisted_transposed_vector(mmt, "tx", !bw->dir, 0);
-    mmt_vec_save(my, "C.0", unpadded);
 
 
     if (tcan_print) {
@@ -149,7 +164,7 @@ void * sec_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
         mmt->matrices[i]->mm->iteration[!bw->dir] = INT_MIN;
     }
 
-    int k = 0;
+    int k = bw->start;
     for(int s = 0 ; s < bw->number_of_check_stops ; s++) {
         int next = bw->check_stops[s];
         mmt_vec_twist(mmt, my);
@@ -182,8 +197,6 @@ void * sec_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
     matmul_top_clear(mmt);
 
     A->oo_field_clear(A);
-
-    free(gxvecs);
 
 #if 0
     pi_log_clear(pi->m);
