@@ -224,18 +224,19 @@ void mmt_vec_init(matmul_top_data_ptr mmt, mpfq_vbase_ptr abase, pi_datatype_ptr
     }
     /* Vectors begin initialized to zero, so we have full consistency */
     v->consistency = 2;
-    serialize_threads(wr);
+    serialize_threads(v->pi->m);
 
+    // pi_log_op(v->pi->m, "Hello, world");
     /* fill wrpals and mpals */
     v->wrpals[0] = shared_malloc(v->pi->wr[0], v->pi->wr[0]->ncores * sizeof(void *));
     v->wrpals[0][v->pi->wr[0]->trank] = v;
-    serialize(v->pi->wr[0]);
+    serialize_threads(v->pi->m);
     v->wrpals[1] = shared_malloc(v->pi->wr[1], v->pi->wr[1]->ncores * sizeof(void *));
     v->wrpals[1][v->pi->wr[1]->trank] = v;
-    serialize(v->pi->wr[1]);
+    serialize_threads(v->pi->m);
     v->mpals = shared_malloc(v->pi->m, v->pi->m->ncores * sizeof(void *));
     v->mpals[v->pi->m->trank] = v;
-    serialize(v->pi->m);
+    serialize_threads(v->pi->m);
 
 }
 
@@ -1330,8 +1331,12 @@ mmt_vec_allreduce(mmt_vec_ptr v)
             v->abase->vec_add(v->abase, dv, dv, sv, thread_chunk);
         }
     }
-    SEVERAL_THREADS_PLAY_MPI_BEGIN(v->pi->m) {
-        void * dv = v->abase->vec_subvec(v->abase, v->v,
+    /* Compared to the SEVERAL_THREADS_PLAY_MPI_BEGIN() approach, this
+     * one has thread 0 do the work for all other threads, while other
+     * threads are waiting.
+     */
+    SEVERAL_THREADS_PLAY_MPI_BEGIN2(v->pi->m, peer) {
+        void * dv = v->abase->vec_subvec(v->abase, v->mpals[peer]->v,
                 wr->trank * thread_chunk);
         MPI_Allreduce(MPI_IN_PLACE,
                 dv,
@@ -1340,7 +1345,7 @@ mmt_vec_allreduce(mmt_vec_ptr v)
                 BWC_PI_SUM->custom,
                 wr->pals);
     }
-    SEVERAL_THREADS_PLAY_MPI_END();
+    SEVERAL_THREADS_PLAY_MPI_END2();
     if (v->siblings) {
         void * sv = v->abase->vec_subvec(v->abase, v->v,
                 wr->trank * thread_chunk);
