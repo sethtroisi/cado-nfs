@@ -271,9 +271,6 @@ void * check_prog(param_list pl MAYBE_UNUSED, int argc, char * argv[])
     }
     printf("C files have %zu coordinates\n", vsize);
 
-    ASSERT_ALWAYS(Cfiles[0].stretch == 0);
-
-
     int nok=0;
 
     for(unsigned int i0 = 0 ; i0 < Cfiles.size() ; i0++) {
