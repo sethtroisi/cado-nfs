@@ -344,7 +344,7 @@ sq_finds_relation(const unsigned long sq, const int sq_side,
   /* Check that the cofactors are within the mfb bound */
   for (int side = 0; side < 2; ++side) {
     if (!check_leftover_norm (cof[side], si, side)) {
-      verbose_output_vfprint(0, VERBOSE_LEVEL, gmp_vfprintf, "# DUPECHECK cofactor %Zd is outside bounds\n", cof[side]);
+      verbose_output_vfprint(0, VERBOSE_LEVEL, gmp_vfprintf, "# DUPECHECK cofactor %Zd is outside bounds\n", (__mpz_struct*) cof[side]);
       is_dupe = 0;
       goto clear_and_exit;
     }
