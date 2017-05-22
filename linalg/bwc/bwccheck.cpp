@@ -277,7 +277,8 @@ void * check_prog(param_list pl MAYBE_UNUSED, int argc, char * argv[])
         Cfile& C_i0(Cfiles[i0]);
         void * Cv_i0;
         vec_alloc(Ac, Cv_i0, vsize);
-        vec_read(Ac, Cv_i0, C_i0, vsize, " ");
+
+        int has_read_Cv_i0 = 0;
 
         for(unsigned int i1 = i0 + 1 ; i1 < Cfiles.size() ; i1++) {
             Cfile& C_i1(Cfiles[i1]);
@@ -290,7 +291,8 @@ void * check_prog(param_list pl MAYBE_UNUSED, int argc, char * argv[])
 
             void * Cv_i1;
             vec_alloc(Ac, Cv_i1, vsize);
-            vec_read(Ac, Cv_i1, C_i1, vsize, " ");
+
+            int has_read_Cv_i1 = 0;
 
             /* {{{ check all V files together */
             for(vseq_t::iterator it = Vsequences.begin(); it != Vsequences.end(); it++)
@@ -335,6 +337,12 @@ void * check_prog(param_list pl MAYBE_UNUSED, int argc, char * argv[])
                             break;
                     }
                     if (j == Vs.size()) continue;
+
+                    if (!has_read_Cv_i0++)
+                        vec_read(Ac, Cv_i0, C_i0, vsize, " ");
+
+                    if (!has_read_Cv_i1++)
+                        vec_read(Ac, Cv_i1, C_i1, vsize, " ");
 
                     Vs[j].checks++;
                     const char * vi = Vs[i].c_str();
