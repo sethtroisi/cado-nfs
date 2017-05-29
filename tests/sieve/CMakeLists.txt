@@ -81,8 +81,8 @@ cado_define_test(sievetest_I
     PROGRAM
         ${las_path} -poly ${CMAKE_CURRENT_SOURCE_DIR}/c120.poly -I 12
         -fb1 ${CMAKE_CURRENT_SOURCE_DIR}/c120.roots1.gz -lim0 10000
-        -lim1 10000 -lpb0 26 -lpb1 26 -mfb0 28 -mfb1 28 -q0 15350028 -q1
-        15350029 -t 2 -powlim0 8000 -powlim1 8000
+        -lim1 10000 -lpb0 26 -lpb1 26 -mfb0 28 -mfb1 28 -q0 15350029 -rho
+        14463285 -t 2 -powlim0 8000 -powlim1 8000
     TARGET_DEPENDENCIES las)
 
 # Try a too-large lambda value

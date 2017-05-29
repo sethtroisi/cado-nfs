@@ -39,14 +39,15 @@ def run(param_file, problem):
     "Run las with given parameters until the required number of relations is found."
 
     build_dir = os.environ["CADO_BUILD"]
+    cado_poly_type = os.environ["OPAL_CADO_TYPE"].split(',')
 
     makefb = "%s/sieve/makefb" % build_dir
     las = "%s/sieve/las" % build_dir
+    sqside = os.environ["OPAL_CADO_SQSIDE"].strip()
 
     las_params = {
         "I": 11,
         "poly": "c59.polyselect2.poly",
-        "fb": "c59.factorbase.roots.gz",
         "lim0": 50000,
         "lim1": 100000,
         "lpb0": 22,
@@ -55,14 +56,12 @@ def run(param_file, problem):
         "mfb1": 22,
         "ncurves0": 6,
         "ncurves1": 6,
+        "qmin": 100000,
         "t": 2 # number of threads for las
     }
-    makefb_params = {
-        "poly" : las_params["poly"],
-        "lim": las_params["lim1"],
-        "maxbits": las_params["I"],
-        "t": 1
-    }
+    if sqside != "":
+      las_params["sqside"] = sqside
+
 
     params = read_params_from_file(param_file)
 
@@ -74,25 +73,30 @@ def run(param_file, problem):
     las_params["lim0"] = min(las_params["lim0"], 2 ** las_params["lpb0"])
     las_params["lim1"] = min(las_params["lim1"], 2 ** las_params["lpb1"])
     
-    to_print = ["I", "lim1", "lpb1", "mfb1", "lim0", "lpb0", "mfb0", "ncurves0", "ncurves1"]
+    to_print = ["I", "lim1", "lpb1", "mfb1", "lim0", "lpb0", "mfb0", "ncurves0", "ncurves1", "qmin"]
     sys.stderr.write("Using parameters %s\n" % " ".join(["%s:%s" % (key, las_params[key]) for key in to_print]))
 
-    # Update parameters for makefb (which may depend on las parameters)
-    update_existing(makefb_params, params)
-    # also update "maxbits" which depends on "I"
-    makefb_params["maxbits"] = params["I"]
-    makefb_params["lim"] = las_params["lim1"]
-    makefb_params["out"] = las_params["fb"]
-    makefb_params["t"] = las_params["t"]
+    ### Call makefb on all algebraic polynomials
+    makefb_params = {
+      "poly" : las_params["poly"],
+      "maxbits": las_params["I"],
+      "t": las_params["t"]
+    }
+    for side, t in enumerate(cado_poly_type):
+      if t == "alg":
+        makefb_params["lim"] = las_params["lim%d"%side]
+        makefb_params["out"] = "factorbase.roots%d.gz" % side
+        makefb_params["side"] = side
+        las_params["fb%s"%side] = makefb_params["out"]
 
-    makefb_cmd_line = [makefb]
-    for (key, value) in makefb_params.items():
-        makefb_cmd_line += ["-%s" % key, str(value)]
-    # sys.stderr.write("Running: %s\n" % " ".join(makefb_cmd_line))
-    subprocess.check_call(makefb_cmd_line)
+        makefb_cmd_line = [makefb]
+        for (key, value) in makefb_params.items():
+          makefb_cmd_line += ["-%s" % key, str(value)]
+        # sys.stderr.write("Running: %s\n" % " ".join(makefb_cmd_line))
+        subprocess.check_call(makefb_cmd_line)
 
     stats = LasStats()
-    q0 = las_params["lim1"]
+    q0 = las_params["qmin"]
     q_range = 1000
     q_inc = 0
     # since we remove duplicates, 80% of the total ideals should be enough
@@ -109,8 +113,14 @@ def run(param_file, problem):
         outputfile = "las.%d.out" % q0
         las_params.update({"q0": q0, "q1": q0 + q_range, "out": outputfile})
 
-        las_cmd_line = [las, "-allow-largesq", "-dup"]
+        las_cmd_line = [las, "-allow-largesq", "-dup", "-dup-qmin"]
+        if sqside == 0:
+            las_cmd_line += ["%s,0" % str(las_params["qmin"])]
+        else:
+            las_cmd_line += ["0,%s" % str(las_params["qmin"])]
         for (key, value) in las_params.items():
+            if key == "qmin":
+               continue
             las_cmd_line += ["-%s" % key, str(value)]
         # sys.stderr.write("Running: %s\n" % " ".join(las_cmd_line))
         las_process = subprocess.Popen(las_cmd_line)

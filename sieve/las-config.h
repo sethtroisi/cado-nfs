@@ -69,17 +69,6 @@
 #define TRACK_CODE_PATH
 #endif
 
-/* This triggers code which fills bucket in several passes, one for each
- * congruence class mod 2 (three such, the trivial one leading to
- * spurious reports). It's currently only part of the story, and at the
- * moment it is almost neutral in terms of efficiency (small slowdown
- * because of access pattern).  But it's the way to go if one wants to
- * support I=16. There are many other places where changes must be made.
- * This particular flag affects only the treatment of the ``bucket
- * sieved'' primes, not the pattern-sieved, or small-sieved.
- */
-#define MOD2_CLASSES_BS 0       /* define to 0 or 1 */
-
 /* un-sieving of locations where gcd(i,j)>1 instead of testing gcd for
  * each survivor. Appears slower than default. This code has always been
  * #ifdef'd out, but maybe can be improved enough to make it worthwhile

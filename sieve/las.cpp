@@ -57,7 +57,7 @@ int recursive_descent = 0;
 int prepend_relation_time = 0;
 int exit_after_rel_found = 0;
 int allow_largesq = 0;
-int adjust_strategy = 2;
+int adjust_strategy = 0;
 
 double general_grace_time_ratio = DESCENT_DEFAULT_GRACE_TIME_RATIO;
 
@@ -238,8 +238,6 @@ sieve_info::sieve_info(las_info & las, siever_config const & sc, param_list pl)/
     // Now that fb have been initialized, we can set the toplevel.
     toplevel = MAX(sides[0].fb->get_toplevel(), sides[1].fb->get_toplevel());
 
-    /* Initialize the number of buckets */
-
     /* If LOG_BUCKET_REGION == sc.logI, then one bucket (whose size is the
      * L1 cache size) is actually one line. This changes some assumptions
      * in sieve_small_bucket_region and resieve_small_bucket_region, where
@@ -247,24 +245,25 @@ sieve_info::sieve_info(las_info & las, siever_config const & sc, param_list pl)/
      */
     ASSERT_ALWAYS(LOG_BUCKET_REGION >= conf.logI_adjusted);
 
+#if 0
+    /* Initialize the number of buckets */
+    /* (it's now done in sieve_info::update, which is more timely) */
     /* set the maximal value of the number of buckets. This directly
      * depends on A */
     uint32_t XX[FB_MAX_PARTS] = { 0, NB_BUCKETS_2, NB_BUCKETS_3, 0};
     uint64_t BRS[FB_MAX_PARTS] = BUCKET_REGIONS;
-    XX[toplevel] = 1 +
-      ((UINT64_C(1) << conf.logA) - UINT64_C(1)) / BRS[toplevel];
+    uint64_t A = UINT64_C(1) << conf.logA;
+    XX[toplevel] = iceildiv(A, BRS[toplevel]);
     for (int i = toplevel+1; i < FB_MAX_PARTS; ++i)
         XX[i] = 0;
     if (toplevel > 1 && XX[toplevel] == 1) {
-        XX[toplevel-1] = 1 +
-            ((UINT64_C(1) << conf.logA) - UINT64_C(1))
-            / BRS[toplevel-1];
+        XX[toplevel-1] = iceildiv(A, BRS[toplevel-1]);
         ASSERT_ALWAYS(XX[toplevel-1] != 1);
     }
     for (int i = 0; i < FB_MAX_PARTS; ++i) {
-        nb_buckets_max[i] = XX[i];
         nb_buckets[i] = XX[i];
     }
+#endif
 
     for(int side = 0 ; side < 2 ; side++) {
 	init_trialdiv(side); /* Init refactoring stuff */
@@ -291,34 +290,33 @@ sieve_info::sieve_info(las_info & las, siever_config const & sc, param_list pl)/
 
 void sieve_info::update (size_t nr_workspaces)/*{{{*/
 {
-    sieve_info & si(*this);
-
 #ifdef SMART_NORM
         /* Compute the roots of the polynomial F(i,1) and the roots of its
          * inflection points d^2(F(i,1))/d(i)^2. Used in
          * init_smart_degree_X_norms_bucket_region_internal.  */
         for(int side = 0 ; side < 2 ; side++) {
-            if (si.cpoly->pols[side]->deg >= 2)
-                init_norms_roots (si, side);
+            if (cpoly->pols[side]->deg >= 2)
+                init_norms_roots (*this, side);
         }
 #endif
 
   /* update number of buckets at toplevel */
   uint64_t BRS[FB_MAX_PARTS] = BUCKET_REGIONS;
-  si.nb_buckets[si.toplevel] = 1 +
-      ((((uint64_t)si.J) << si.conf.logI_adjusted) - UINT64_C(1)) / 
-      BRS[si.toplevel];
+
+  /* wondering whether having the "local A" at hand would be a plus. */
+  uint64_t A = ((uint64_t)J) << conf.logI_adjusted;
+
+  nb_buckets[toplevel] = iceildiv(A, BRS[toplevel]);
+
   // maybe there is only 1 bucket at toplevel and less than 256 at
   // toplevel-1, due to a tiny J.
-  if (si.toplevel > 1) {
-      if (si.nb_buckets[si.toplevel] == 1) {
-        si.nb_buckets[si.toplevel-1] = 1 +
-            ((((uint64_t)si.J) << si.conf.logI_adjusted) - UINT64_C(1)) /
-            BRS[si.toplevel-1]; 
+  if (toplevel > 1) {
+      if (nb_buckets[toplevel] == 1) {
+        nb_buckets[toplevel-1] = iceildiv(A, BRS[toplevel - 1]);
         // we forbid skipping two levels.
-        ASSERT_ALWAYS(si.nb_buckets[si.toplevel-1] != 1);
+        ASSERT_ALWAYS(nb_buckets[toplevel-1] != 1);
       } else {
-        si.nb_buckets[si.toplevel-1] = BRS[si.toplevel]/BRS[si.toplevel-1];
+        nb_buckets[toplevel-1] = BRS[toplevel]/BRS[toplevel-1];
       }
   }
 
@@ -328,7 +326,7 @@ void sieve_info::update (size_t nr_workspaces)/*{{{*/
          bucket array at most, i.e., with .5, a single slice should never fill
          a bucket array more than half-way. */
       const double safety_factor = .5;
-      sieve_info::side_info & sis(si.sides[side]);
+      sieve_info::side_info & sis(sides[side]);
       double max_weight[FB_MAX_PARTS];
       for (int i_part = 0; i_part < FB_MAX_PARTS; i_part++) {
         max_weight[i_part] = sis.max_bucket_fill_ratio[i_part] / nr_workspaces
@@ -604,10 +602,19 @@ bool parse_default_siever_config(siever_config & sc, param_list_ptr pl)
                     &sc.sides[side].ncurves))
             sc.sides[side].ncurves = -1;
 
-    long dupqmax[2] = {0, 0};
-    param_list_parse_long_and_long(pl, "dup-qmax", dupqmax, ",");
-    sc.sides[0].qmax = dupqmax[0];
-    sc.sides[1].qmax = dupqmax[1];
+    long dupqmin[2] = {0, 0};
+    param_list_parse_long_and_long(pl, "dup-qmin", dupqmin, ",");
+    sc.sides[0].qmin = dupqmin[0];
+    sc.sides[1].qmin = dupqmin[1];
+
+    /* Change 0 (not initialized) into LONG_MAX */
+    for (int side = 0; side < 2; side ++)
+      if (sc.sides[side].qmin == 0)
+	sc.sides[side].qmin = LONG_MAX;
+
+    /* If qmin is not given, use lim on the special-q side by default. */
+    if (sc.sides[sc.side].qmin == LONG_MAX)
+      sc.sides[sc.side].qmin = sc.sides[sc.side].lim;
 
     return complete;
 }
@@ -2695,7 +2702,7 @@ static void declare_usage(param_list pl)/*{{{*/
   param_list_decl_usage(pl, "bkmult", "multiplier to use for taking margin in the bucket allocation");
   param_list_decl_usage(pl, "unsievethresh", "Unsieve all p > unsievethresh where p|gcd(a,b)");
 
-  param_list_decl_usage(pl, "adjust-strategy", "strategy used to adapt the sieving range to the q-lattice basis (0 = logI constant, J so that bounday is capped; 1 = logI constant, (a,b) plane norm capped; 2 = logI dynamic, skewed basis; 3 = combine 2 and then 0) ; default=2");
+  param_list_decl_usage(pl, "adjust-strategy", "strategy used to adapt the sieving range to the q-lattice basis (0 = logI constant, J so that boundary is capped; 1 = logI constant, (a,b) plane norm capped; 2 = logI dynamic, skewed basis; 3 = combine 2 and then 0) ; default=0");
   param_list_decl_usage(pl, "allow-largesq", "(switch) allows large special-q, e.g. for a DL descent");
   param_list_decl_usage(pl, "exit-early", "once a relation has been found, go to next special-q (value==1), or exit (value==2)");
   param_list_decl_usage(pl, "stats-stderr", "(switch) print stats to stderr in addition to stdout/out file");
@@ -2705,7 +2712,7 @@ static void declare_usage(param_list pl)/*{{{*/
   param_list_decl_usage(pl, "prepend-relation-time", "prefix all relation produced with time offset since beginning of special-q processing");
   param_list_decl_usage(pl, "ondemand-siever-config", "(switch) defer initialization of siever precomputed structures (one per special-q side) to time of first actual use");
   param_list_decl_usage(pl, "dup", "(switch) suppress duplicate relations");
-  param_list_decl_usage(pl, "dup-qmax", "limits of q-sieving for 2-sided duplicate removal");
+  param_list_decl_usage(pl, "dup-qmin", "limits of q-sieving for 2-sided duplicate removal");
   param_list_decl_usage(pl, "batch", "(switch) use batch cofactorization");
   param_list_decl_usage(pl, "batch0", "side-0 batch file");
   param_list_decl_usage(pl, "batch1", "side-1 batch file");

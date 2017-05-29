@@ -2737,8 +2737,8 @@ class SievingTask(ClientServerTask, DoesImport, FilesCreator, HasStatistics,
     @property
     def paramnames(self):
         return self.join_params(super().paramnames, {
-            "qmin": 0, "qrange": int, "rels_wanted": 0, "lim1": int,
-            "gzip": True})
+            "qmin": 0, "qrange": int, "rels_wanted": 0, "lim0": int,
+            "lim1": int, "gzip": True, "sqside": 1})
 
     @property
     def stat_conversions(self):
@@ -2795,8 +2795,8 @@ class SievingTask(ClientServerTask, DoesImport, FilesCreator, HasStatistics,
         if "qnext" in self.state:
             self.state["qnext"] = max(self.state["qnext"], qmin)
         else:
-            # qmin = 0 is magic value that uses lim1 instead. Not pretty.
-            self.state["qnext"] = qmin if qmin > 0 else self.params["lim1"]
+            # qmin = 0 is a magic value (undefined)
+            self.state["qnext"] = qmin if qmin > 0 else int(self.params["lim1"]/2) if self.params["sqside"] == 1 else int(self.params["lim0"]/2)
         
         self.state.setdefault("rels_found", 0)
         self.state["rels_wanted"] = self.params["rels_wanted"]

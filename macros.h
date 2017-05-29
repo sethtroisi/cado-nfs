@@ -31,6 +31,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <gmp.h> /* for __GNU_MP_VERSION */
 
 #define ASSERT(x)	assert(x)
 
@@ -98,33 +99,48 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #define LEXLE3(X,Y,Z,A,B,C) LEXGE3(A,B,C,X,Y,Z)
 
 #ifndef GNUC_VERSION
+#ifndef __GNUC__
+#define GNUC_VERSION(X,Y,Z) 0
+#else
 #define GNUC_VERSION(X,Y,Z)     \
-    (defined(__GNUC__) &&        \
-(__GNUC__ == X && __GNUC_MINOR__ == Y && __GNUC_PATCHLEVEL__ == Z))
+(__GNUC__ == X && __GNUC_MINOR__ == Y && __GNUC_PATCHLEVEL__ == Z)
+#endif
 #endif
 
 #ifndef GNUC_VERSION_ATLEAST
+#ifndef __GNUC__
+#define GNUC_VERSION_ATLEAST(X,Y,Z) 0
+#else
 #define GNUC_VERSION_ATLEAST(X,Y,Z)     \
-    (defined(__GNUC__) &&        \
-LEXGE3(__GNUC__,__GNUC_MINOR__,__GNUC_PATCHLEVEL__,X,Y,Z))
+LEXGE3(__GNUC__,__GNUC_MINOR__,__GNUC_PATCHLEVEL__,X,Y,Z)
+#endif
 #endif
 
 #ifndef GNUC_VERSION_ATMOST
+#ifndef __GNUC__
+#define GNUC_VERSION_ATMOST(X,Y,Z) 0
+#else
 #define GNUC_VERSION_ATMOST(X,Y,Z)     \
-    (defined(__GNUC__) &&        \
-LEXLE3(__GNUC__,__GNUC_MINOR__,__GNUC_PATCHLEVEL__,X,Y,Z))
+LEXLE3(__GNUC__,__GNUC_MINOR__,__GNUC_PATCHLEVEL__,X,Y,Z)
+#endif
 #endif
 
 #ifndef GMP_VERSION_ATLEAST
+#ifndef __GNU_MP_VERSION
+#define GMP_VERSION_ATLEAST(X,Y,Z) 0
+#else
 #define GMP_VERSION_ATLEAST(X,Y,Z)     \
-    (defined(__GNU_MP__) &&        \
-LEXGE3(__GNU_MP_VERSION,__GNU_MP_VERSION_MINOR,__GNU_MP_VERSION_PATCHLEVEL,X,Y,Z))
+LEXGE3(__GNU_MP_VERSION,__GNU_MP_VERSION_MINOR,__GNU_MP_VERSION_PATCHLEVEL,X,Y,Z)
+#endif
 #endif
 
 #ifndef GMP_VERSION_ATMOST
+#ifndef __GNU_MP_VERSION
+#define GMP_VERSION_ATMOST(X,Y,Z) 1
+#else
 #define GMP_VERSION_ATMOST(X,Y,Z)     \
-    (defined(__GNU_MP__) &&        \
-LEXLE3(__GNU_MP_VERSION,__GNU_MP_VERSION_MINOR,__GNU_MP_VERSION_PATCHLEVEL,X,Y,Z))
+LEXLE3(__GNU_MP_VERSION,__GNU_MP_VERSION_MINOR,__GNU_MP_VERSION_PATCHLEVEL,X,Y,Z)
+#endif
 #endif
 
 #ifndef MPI_VERSION_ATLEAST
@@ -140,23 +156,32 @@ LEXLE3(__GNU_MP_VERSION,__GNU_MP_VERSION_MINOR,__GNU_MP_VERSION_PATCHLEVEL,X,Y,Z
 #endif  /* MPI_VERSION_IS */
 
 #ifndef OMPI_VERSION_ATLEAST
+#ifdef OPEN_MPI
 #define OMPI_VERSION_ATLEAST(X,Y,Z)     \
-    (defined(OPEN_MPI) &&        \
-LEXGE3(OMPI_MAJOR_VERSION,OMPI_MINOR_VERSION,OMPI_RELEASE_VERSION,X,Y,Z))
+    (LEXGE3(OMPI_MAJOR_VERSION,OMPI_MINOR_VERSION,OMPI_RELEASE_VERSION,X,Y,Z))
+#else
+#define OMPI_VERSION_ATLEAST(X,Y,Z) 0
+#endif
 #endif  /* OMPI_VERSION_ATLEAST */
 
 #ifndef OMPI_VERSION_ATMOST
+#ifdef OPEN_MPI
 #define OMPI_VERSION_ATMOST(X,Y,Z)     \
-    (defined(OPEN_MPI) &&        \
-LEXLE3(OMPI_MAJOR_VERSION,OMPI_MINOR_VERSION,OMPI_RELEASE_VERSION,X,Y,Z))
+    (LEXLE3(OMPI_MAJOR_VERSION,OMPI_MINOR_VERSION,OMPI_RELEASE_VERSION,X,Y,Z))
+#else
+#define OMPI_VERSION_ATMOST(X,Y,Z) 0
+#endif
 #endif  /* OMPI_VERSION_ATMOST */
 
 #ifndef OMPI_VERSION_IS
+#ifdef OPEN_MPI
 #define OMPI_VERSION_IS(X,Y,Z)          \
-    (defined(OPEN_MPI) &&                \
-    ((X) == OMPI_MAJOR_VERSION) &&      \
+    (((X) == OMPI_MAJOR_VERSION) &&     \
     ((Y) == OMPI_MINOR_VERSION) &&      \
     ((Z) == OMPI_RELEASE_VERSION))
+#else
+#define OMPI_VERSION_IS(X,Y,Z)          0
+#endif
 #endif  /* OMPI_VERSION_IS */
 
 
@@ -223,6 +248,12 @@ LEXLE3(OMPI_MAJOR_VERSION,OMPI_MINOR_VERSION,OMPI_RELEASE_VERSION,X,Y,Z))
 #define ATTRIBUTE(x)
 #endif
 #endif /* if defined(__GNUC__) */
+
+#if GNUC_VERSION_ATLEAST(7,0,0)
+#define no_break() __attribute__ ((fallthrough))
+#else
+#define no_break()
+#endif
 
 /* On 64 bit gcc (Ubuntu/Linaro 4.6.3-1ubuntu5) with -O3, the inline
    asm in ularith_div_2ul_ul_ul_r() is wrongly optimized (Alex Kruppa

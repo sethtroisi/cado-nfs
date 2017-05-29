@@ -242,23 +242,27 @@ sq_finds_relation(const unsigned long sq, const int sq_side,
   int i, pass, ok;
   unsigned int j;
 
-
   /* Extract the list of large primes for each side */
   for (int side = 0; side < 2; side++) {
+    const unsigned long fbb = old_si.conf.sides[side].lim;
     unsigned int nb_p = rel.sides[side].size();
     for (unsigned int i = 0; i < nb_p; i++) {
-      const unsigned long fbb = old_si.conf.sides[side].lim;
       const unsigned long p = mpz_get_ui(rel.sides[side][i].p);
       const int e = rel.sides[side][i].e;
       ASSERT_ALWAYS(e > 0);
       if (p > fbb) {
         for (int i = 0; i < e; i++) {
           if (nr_lp[side] < max_large_primes)
-            large_primes[side][nr_lp[side]++] = p;
+	    large_primes[side][nr_lp[side]++] = p;
         }
       }
     }
-    /* Compute the cofactor, dividing by sq on the special-q side */
+
+    /* In case we are on the sq_side and sq <= fbb, add sq */
+    if (side == sq_side && sq <= fbb)
+      large_primes[side][nr_lp[side]++] = sq;
+
+    /* Compute the cofactor, dividing by sq on the special-q side. */
     compute_cofactor(cof[side], side == sq_side ? sq : 0, large_primes[side], nr_lp[side]);
   }
 
@@ -277,6 +281,7 @@ sq_finds_relation(const unsigned long sq, const int sq_side,
   Adj.sieve_info_update_norm_data_Jmax();
   siever_config conf = Adj.config();
   conf.logI_adjusted = Adj.logI;
+  conf.side = sq_side;
 
   /* We don't have a constructor which is well adapted to our needs here.
    * We're going to play dirty tricks, and fill out the stuff by
@@ -339,7 +344,7 @@ sq_finds_relation(const unsigned long sq, const int sq_side,
   /* Check that the cofactors are within the mfb bound */
   for (int side = 0; side < 2; ++side) {
     if (!check_leftover_norm (cof[side], si, side)) {
-      verbose_output_vfprint(0, VERBOSE_LEVEL, gmp_vfprintf, "# DUPECHECK cofactor %Zd is outside bounds\n", cof);
+      verbose_output_vfprint(0, VERBOSE_LEVEL, gmp_vfprintf, "# DUPECHECK cofactor %Zd is outside bounds\n", (__mpz_struct*) cof[side]);
       is_dupe = 0;
       goto clear_and_exit;
     }
@@ -373,26 +378,22 @@ clear_and_exit:
 
 
 /* This function decides whether the given (sq,side) was previously
- * sieved (compared to the current sq stored in si.doing).
- * This takes qmax into account.
+ * sieved (compared to the current special-q stored in si.doing).
+ * This takes qmin into account.
  */
 static int
-sq_was_previously_sieved(const unsigned long sq, int side, sieve_info const & si){
-  if (side == si.doing.side) {
-    int cmp = mpz_cmp_ui(si.doing.p, sq);
-    if (cmp <= 0)
-      return 0;
-    return (sq > si.conf.sides[side].lim);
-  } else {
-    // Did we sieve other sides?
-    if (si.conf.sides[side].qmax == 0)
-      return 0;
-    // Is q smaller than current, and within the bounds for this side?
-    int cmp = mpz_cmp_ui(si.doing.p, sq);
-    if (cmp <= 0)
-      return 0;
-    return (sq > si.conf.sides[side].lim && sq < si.conf.sides[side].qmax);
-  }
+sq_was_previously_sieved (const unsigned long sq, int side, sieve_info const & si){
+  /* whatever the side, if sq is larger than the current special-q, it was
+     previously sieved:
+     (i) either sq is on the same side, and it is clear;
+     (ii) or sq is on the other side, and we consider the relation was found
+          while sieving the current side */
+  if (mpz_cmp_ui (si.doing.p, sq) <= 0) /* we use <= and not < since this
+					   function is also called with the
+					   current special-q */
+    return 0;
+
+  return sq >= si.conf.sides[side].qmin;
 }
 
 /* For one special-q identified by (sq, side) (the root r is given

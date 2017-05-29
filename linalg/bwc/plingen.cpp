@@ -2880,6 +2880,13 @@ int main(int argc, char *argv[])
     bmstatus_init(bm, bw->m, bw->n);
 
     const char * rhs_name = param_list_lookup_string(pl, "rhs");
+    if (!random_input_length) {
+        if (!rhs_name) {
+            fprintf(stderr, "When using plingen, you must either supply --random-input-with-length, or provide a rhs, or possibly provide rhs=none\n");
+        } else if (strcmp(rhs_name, "none") == 0) {
+            rhs_name = NULL;
+        }
+    }
     if ((rhs_name != NULL) && param_list_parse_uint(pl, "nrhs", &(bm->d->nrhs))) {
         fprintf(stderr, "the command line arguments rhs= and nrhs= are incompatible\n");
         exit(EXIT_FAILURE);

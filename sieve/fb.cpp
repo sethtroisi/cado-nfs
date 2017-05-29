@@ -820,7 +820,7 @@ fb_part::fprint(FILE *out) const
   if (!only_general) {
     for (int i_roots = 0; i_roots <= MAX_DEGREE; i_roots++) {
       fprintf(out, "#   Entries with %d roots:\n", i_roots);
-      cget_slices(i_roots)->fprint(out);
+      get_slices(i_roots)->fprint(out);
     }
   }
 
@@ -835,7 +835,7 @@ fb_part::_count_entries(size_t *nprimes, size_t *nroots, double *weight) const
 {
   if (!only_general) {
     for (int i_roots = 0; i_roots <= MAX_DEGREE; i_roots++)
-      cget_slices(i_roots)->_count_entries(nprimes, nroots, weight);
+      get_slices(i_roots)->_count_entries(nprimes, nroots, weight);
   }
   general_vector._count_entries(nprimes, nroots, weight);
 }
@@ -846,7 +846,7 @@ fb_part::extract_bycost(std::vector<unsigned long> &p, fbprime_t pmax, fbprime_t
 {
   if (!only_general) {
     for (int i_roots = 0; i_roots <= MAX_DEGREE; i_roots++)
-      cget_slices(i_roots)->extract_bycost(p, pmax, td_thresh);
+      get_slices(i_roots)->extract_bycost(p, pmax, td_thresh);
   }
 
   general_vector.extract_bycost(p, pmax, td_thresh);
@@ -893,7 +893,7 @@ fb_part::dump_fbc(FILE *f) const
   bool rc = true;
   if (!only_general) {
     for (int i_roots = 0; rc && i_roots <= MAX_DEGREE; ++i_roots)
-      rc = cget_slices(i_roots)->dump_fbc(f);
+      rc = get_slices(i_roots)->dump_fbc(f);
   }
   if (rc)
     rc = general_vector.dump_fbc(f);

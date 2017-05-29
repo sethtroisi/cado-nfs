@@ -6,7 +6,7 @@
 #include "cxx_mpz.hpp"
 
 struct las_todo_entry {
-    cxx_mpz p;
+  cxx_mpz p; /* this is the 'special-q', despite the 'p' name... */
     /* even for a rational side, the field below is used, since
      * it is needed for the initialization of the q-lattice. All callers
      * of las_todo_push must therefore make sure that a proper argument

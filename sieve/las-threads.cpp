@@ -297,7 +297,7 @@ thread_workspaces::pickup_si(sieve_info & _si)
     verbose_output_print(0, 2, "# Reserving buckets with a multiplier of %f\n",
             multiplier);
     for (unsigned int i_side = 0; i_side < nr_sides; i_side++)
-      groups[i_side]->allocate_buckets(si.nb_buckets_max,
+      groups[i_side]->allocate_buckets(si.nb_buckets,
               multiplier, si.sides[i_side].max_bucket_fill_ratio);
 }
 
