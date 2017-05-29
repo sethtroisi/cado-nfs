@@ -2159,7 +2159,13 @@ void factor_survivors_data::cofactoring (timetree_t & timer)
 
         int i;
         unsigned int j;
-        for(int side = 0 ; pass && side < 2 ; side++) {
+
+        /* This can be changed (and should be a command line parameter)
+         */
+        static const int trialdiv_first_side = 0;
+
+        for(int pside = 0 ; pass && pside < 2 ; pside++) {
+            int side = trialdiv_first_side ^ pside;
             CHILD_TIMER_PARAMETRIC(timer, "checks on side ", side, "");
             TIMER_CATEGORY(timer, cofactoring(side));
 
