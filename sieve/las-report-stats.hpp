@@ -14,6 +14,9 @@ struct las_report_s {
         unsigned long not_both_multiples_of_p;
         unsigned long trial_divided_on_side[2];
         unsigned long check_leftover_norm_on_side[2];
+        unsigned long enter_cofactoring;
+        unsigned long cofactored;
+        unsigned long smooth;
     } survivors;
     unsigned long reports;
     double tn[2];            /* norms */
@@ -23,7 +26,6 @@ struct las_report_s {
     double ttcof;                /* cofactorisation */
     unsigned long (*survivor_sizes)[256]; /* First index: rational side */
     unsigned long (*report_sizes)[256];
-    unsigned long both_even;
 };
 typedef struct las_report_s las_report[1];
 typedef struct las_report_s * las_report_ptr;

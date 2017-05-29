@@ -2221,6 +2221,8 @@ void factor_survivors_data::cofactoring (timetree_t & timer)
 
         if (!pass) continue;
 
+        th->rep->survivors.enter_cofactoring++;
+
         if (las.batch_print_survivors) {
 #ifndef SUPPORT_LARGE_Q
             gmp_printf("%" PRId64 " %" PRIu64 " %Zd %Zd\n", a, b,
@@ -2259,6 +2261,7 @@ void factor_survivors_data::cofactoring (timetree_t & timer)
 
         rep->ttcof -= microseconds_thread ();
         pass = factor_both_leftover_norms(norm, lps, lps_m, si);
+        th->rep->survivors.cofactored += (pass != 0);
         rep->ttcof += microseconds_thread ();
 #ifdef TRACE_K
         if (trace_on_spot_ab(a, b) && pass == 0) {
@@ -2270,6 +2273,8 @@ void factor_survivors_data::cofactoring (timetree_t & timer)
 #endif
         if (pass <= 0) continue; /* a factor was > 2^lpb, or some
                                     factorization was incomplete */
+
+        th->rep->survivors.smooth++;
 
         /* yippee: we found a relation! */
         SIBLING_TIMER(timer, "print relations");
@@ -2648,6 +2653,9 @@ void las_report_display_counters(las_report_ptr rep)
     verbose_output_print(0, 2, "# survivors check_leftover_norm_on_side[0]: %lu (%.1f%%)\n", S.check_leftover_norm_on_side[0], 100 * ratio(S.check_leftover_norm_on_side[0], S.trial_divided_on_side[0]));
     verbose_output_print(0, 2, "# survivors trial_divided_on_side[1]: %lu\n", S.trial_divided_on_side[1]);
     verbose_output_print(0, 2, "# survivors check_leftover_norm_on_side[1]: %lu (%.1f%%)\n", S.check_leftover_norm_on_side[1], 100 * ratio(S.check_leftover_norm_on_side[1], S.trial_divided_on_side[1]));
+    verbose_output_print(0, 2, "# survivors enter_cofactoring: %lu\n", S.enter_cofactoring);
+    verbose_output_print(0, 2, "# survivors cofactored: %lu (%.1f%%)\n", S.cofactored, 100.0 * ratio(S.cofactored, S.enter_cofactoring));
+    verbose_output_print(0, 2, "# survivors smooth: %lu\n", S.smooth);
 }
 
 /* {{{ las_report_accumulate_threads_and_display
@@ -2677,8 +2685,8 @@ void las_report_accumulate_threads_and_display(las_info & las,
               (mpz_srcptr) si.doing.p,
               (mpz_srcptr) si.doing.r);
     double qtts = qt0 - rep->tn[0] - rep->tn[1] - rep->ttf;
-    if (rep->both_even) {
-        verbose_output_print(0, 1, "# Warning: found %lu hits with i,j both even (not a bug, but should be very rare)\n", rep->both_even);
+    if (rep->survivors.after_sieve != rep->survivors.not_both_even) {
+        verbose_output_print(0, 1, "# Warning: found %ld hits with i,j both even (not a bug, but should be very rare)\n", rep->survivors.after_sieve - rep->survivors.not_both_even);
     }
 #ifdef HAVE_RUSAGE_THREAD
     int dont_print_tally = 0;
