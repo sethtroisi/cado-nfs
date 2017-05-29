@@ -3191,7 +3191,7 @@ for (unsigned int j_cong = 0; j_cong < sublat_bound; ++j_cong) {
         BOOKKEEPING_TIMER(timer_special_q);
 
         if (si.toplevel == 1) {
-            SIBLING_TIMER(timer_special_q, "process_bucket_region outer container");
+            CHILD_TIMER(timer_special_q, "process_bucket_region outer container");
             TIMER_CATEGORY(timer_special_q, bookkeeping());
 
             /* Process bucket regions in parallel */
@@ -3254,11 +3254,12 @@ for (unsigned int j_cong = 0; j_cong < sublat_bound; ++j_cong) {
                         ASSERT_ALWAYS(0);
                 }
             }
-            /* should this go to downsort_tree ? */
+            /* Done in downsort_tree already, right ?
             pool->accumulate_and_clear_active_time(*timer_special_q.current);
             SIBLING_TIMER(timer_special_q, "worker thread wait time");
             TIMER_CATEGORY(timer_special_q, thread_wait());
             pool->accumulate_and_reset_wait_time(*timer_special_q.current);
+            */
 
             BOOKKEEPING_TIMER(timer_special_q);
 
