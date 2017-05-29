@@ -349,7 +349,7 @@ void cachefile_close(cachefile_ptr c)
     if (c->writing == 0)
         return;
     snprintf(tname, sizeof(tname), CACHEDIR "/.pre." CACHEPREFIX "%s", c->basename);
-    snprintf(fname, sizeof(tname), CACHEDIR "/" CACHEPREFIX "%s", c->basename);
+    snprintf(fname, sizeof(fname), CACHEDIR "/" CACHEPREFIX "%s", c->basename);
     rename(tname, fname);
 }
 /* }}} */
