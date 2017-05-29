@@ -594,7 +594,8 @@ task_result *
 fill_in_buckets_one_slice_internal(const worker_thread * worker, const task_parameters * _param)
 {
     const fill_in_buckets_parameters *param = static_cast<const fill_in_buckets_parameters *>(_param);
-    ACTIVATE_TIMER(worker->timer);
+    // ACTIVATE_TIMER(worker->timer);
+    ASSERT_ALWAYS(worker->timer.running());
     // we're declaring the timer here, but really the work happens below
     // in fill_in_buckets_lowlevel. We happen to have access to
     // param->side here, so we use it to provide a nicer timing report.
@@ -628,7 +629,8 @@ task_result *
 fill_in_buckets_one_slice(const worker_thread * worker MAYBE_UNUSED, const task_parameters * _param)
 {
     const fill_in_buckets_parameters *param = static_cast<const fill_in_buckets_parameters *>(_param);
-    ACTIVATE_TIMER(worker->timer);
+    // ACTIVATE_TIMER(worker->timer);
+    ASSERT_ALWAYS(worker->timer.running());
     CHILD_TIMER(worker->timer, TEMPLATE_INST_NAME(fill_in_buckets_one_slice, LEVEL));
     // TIMER_CATEGORY(worker->timer, sieving(param->side));
 
@@ -714,7 +716,9 @@ fill_in_buckets_one_side(timetree_t& timer, thread_pool &pool, thread_workspaces
           task_result *result = pool.get_result();
           delete result;
     }
-    pool.accumulate_and_clear(*timer.current);
+    pool.accumulate_and_clear_active_time(*timer.current);
+    SIBLING_TIMER(timer, "worker thread wait time");
+    pool.accumulate_and_reset_wait_time(*timer.current);
 }
 
 void fill_in_buckets(timetree_t& timer, thread_pool &pool, thread_workspaces &ws, sieve_info & si, int side)
@@ -833,7 +837,9 @@ downsort_tree(
       task_result *result = pool.get_result();
       delete result;
     }
-    pool.accumulate_and_clear(*timer.current);
+    pool.accumulate_and_clear_active_time(*timer.current);
+    SIBLING_TIMER(timer, "worker thread wait time");
+    pool.accumulate_and_reset_wait_time(*timer.current);
 
     max_full = std::max(max_full, ws.buckets_max_full<LEVEL,shorthint_t>());
     ASSERT_ALWAYS(max_full <= 1.0);
@@ -853,7 +859,9 @@ downsort_tree(
     }
     ws.thread_do_using_pool(pool, &process_bucket_region);
   }
-  pool.accumulate_and_clear(*timer.current);
+  pool.accumulate_and_clear_active_time(*timer.current);
+  SIBLING_TIMER(timer, "worker thread wait time");
+  pool.accumulate_and_reset_wait_time(*timer.current);
 }
 
 /* Instances to be compiled */

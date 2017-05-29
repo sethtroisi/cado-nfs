@@ -209,11 +209,7 @@ namespace tdict {
             void stop() {
                 if (!running()) return;
                 typename T::type v = T()();
-                if (current == this) {
-                    self += v;
-                } else {
-                    current->self += v;
-                }
+                current->self += v;
                 current = NULL;
                 return;
             }
@@ -223,7 +219,13 @@ namespace tdict {
                 self -= v;
                 current = this;
             }
-
+            typename T::type stop_and_start() {
+                ASSERT_ALWAYS(running());
+                typename T::type v = T()();
+                typename T::type res = current->self + v;
+                current->self = -v;
+                return res;
+            }
             struct accounting_child {
                 tree& t;
                 accounting_child(tree& t, tdict::key k): t(t) {
@@ -354,6 +356,16 @@ public:
                 for(typename M_t::const_iterator a = t.M.begin() ; a != t.M.end() ; a++) {
                     M[a->first] += a->second;
                 }
+                return *this;
+            }
+            tree& steal_children_timings(tree & t) {
+                ASSERT_ALWAYS(t.running());
+                ASSERT_ALWAYS(t.current = &t);
+                ASSERT_ALWAYS(t.coarse_flag < 0);
+                for(typename M_t::iterator a = t.M.begin() ; a != t.M.end() ; a++) {
+                    M[a->first] += a->second;
+                }
+                t.M.clear();
                 return *this;
             }
         };

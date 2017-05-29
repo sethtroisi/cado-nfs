@@ -140,7 +140,7 @@ public:
   ~thread_workspaces();
   void pickup_si(sieve_info& si);
   void thread_do_using_pool(thread_pool&, void * (*) (timetree_t&, thread_data *));
-  void thread_do(void * (*) (thread_data *));
+  // void thread_do(void * (*) (thread_data *));
   void buckets_alloc();
   void buckets_free();
   template <int LEVEL, typename HINT>

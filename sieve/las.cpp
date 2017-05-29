@@ -2459,7 +2459,7 @@ void SminusS (unsigned char *S1, unsigned char *EndS1, unsigned char *S2) {/*{{{
  */
 void * process_bucket_region(timetree_t & timer, thread_data *th)
 {
-    ACTIVATE_TIMER(timer);
+    ASSERT_ALWAYS(timer.running());
     CHILD_TIMER(timer, __func__);
 
     where_am_I w MAYBE_UNUSED;
@@ -2951,7 +2951,6 @@ int main (int argc0, char *argv0[])/*{{{*/
         timetree_t timer_special_q;
         double qt0 = seconds();
         tt_qstart = seconds();
-
         ACTIVATE_TIMER(timer_special_q);
 
         /* pick a new entry from the stack, and do a few sanity checks */
@@ -3128,10 +3127,13 @@ for (unsigned int j_cong = 0; j_cong < sublat_bound; ++j_cong) {
         workspaces->pickup_si(si);
 
         for(int side = 0 ; side < 2 ; side++) {
+            /* This uses the thread pool, and stores the time spent under
+             * timer_special_q (with wait time stored separately */
             fill_in_buckets(timer_special_q, *pool, *workspaces, si, side);
         }
 
-        pool->accumulate_and_clear(*timer_special_q.current);
+        // useless
+        // pool->accumulate_and_clear_active_time(*timer_special_q.current);
 
         /* Check that buckets are not more than full.
          * Due to templates and si.toplevel being not constant, need a
@@ -3194,7 +3196,13 @@ for (unsigned int j_cong = 0; j_cong < sublat_bound; ++j_cong) {
 
             /* Process bucket regions in parallel */
             workspaces->thread_do_using_pool(*pool, &process_bucket_region);
-            pool->accumulate_and_clear(*timer_special_q.current);
+
+            /* In a way, this timer handling should go to
+             * thread_do_using_pool, I believe */
+            pool->accumulate_and_clear_active_time(*timer_special_q.current);
+            SIBLING_TIMER(timer_special_q, "worker thread wait time");
+            pool->accumulate_and_reset_wait_time(*timer_special_q.current);
+
         } else {
             SIBLING_TIMER(timer_special_q, "process_bucket_region outer container (non-MT)");
             TIMER_CATEGORY(timer_special_q, bookkeeping());
@@ -3245,7 +3253,10 @@ for (unsigned int j_cong = 0; j_cong < sublat_bound; ++j_cong) {
                         ASSERT_ALWAYS(0);
                 }
             }
-            pool->accumulate_and_clear(*timer_special_q.current);
+            /* should this go to downsort_tree ? */
+            pool->accumulate_and_clear_active_time(*timer_special_q.current);
+            SIBLING_TIMER(timer_special_q, "worker thread wait time");
+            pool->accumulate_and_reset_wait_time(*timer_special_q.current);
 
             BOOKKEEPING_TIMER(timer_special_q);
 
@@ -3366,7 +3377,15 @@ if (si.conf.sublat.m) {
 
         qt0 = seconds() - qt0;
 
-        pool->accumulate_and_clear(timer_special_q);
+        /*
+         * I think it's useless now. All routines which use the thread
+         * pool properly report their time use with the equivalent of
+         * these functions.
+        pool->accumulate_and_clear_active_time(timer_special_q);
+        SIBLING_TIMER(timer_special_q, "worker thread wait time");
+        pool->accumulate_and_reset_wait_time(*timer_special_q.current);
+        */
+
         timer_special_q.stop();
         
         if (tdict::global_enable >= 2) {

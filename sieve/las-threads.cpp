@@ -328,6 +328,8 @@ thread_workspaces::thread_do_using_pool(thread_pool &pool, void * (*f)(timetree_
     delete[] ths;
 }
 
+#if 0
+/* now unused */
 void
 thread_workspaces::thread_do(void * (*f) (thread_data *))
 {
@@ -363,6 +365,7 @@ thread_workspaces::thread_do(void * (*f) (thread_data *))
 
     free(th);
 }
+#endif
 
 template <int LEVEL, typename HINT>
 double
