@@ -312,6 +312,7 @@ private:
                 ss << prefix << " ";
                 for(typename M_t::const_iterator a = M.begin() ; a != M.end() ; a++) {
                     o << prefix << a->second.self << " " << a->first;
+#define DEBUG_CATEGORY
 #ifdef DEBUG_CATEGORY
                     if (a->second.coarse_flag >= 0)
                         o << " ; category " << a->second.coarse_flag;

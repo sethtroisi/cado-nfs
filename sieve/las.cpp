@@ -3201,6 +3201,7 @@ for (unsigned int j_cong = 0; j_cong < sublat_bound; ++j_cong) {
              * thread_do_using_pool, I believe */
             pool->accumulate_and_clear_active_time(*timer_special_q.current);
             SIBLING_TIMER(timer_special_q, "worker thread wait time");
+            TIMER_CATEGORY(timer_special_q, thread_wait());
             pool->accumulate_and_reset_wait_time(*timer_special_q.current);
 
         } else {
@@ -3256,6 +3257,7 @@ for (unsigned int j_cong = 0; j_cong < sublat_bound; ++j_cong) {
             /* should this go to downsort_tree ? */
             pool->accumulate_and_clear_active_time(*timer_special_q.current);
             SIBLING_TIMER(timer_special_q, "worker thread wait time");
+            TIMER_CATEGORY(timer_special_q, thread_wait());
             pool->accumulate_and_reset_wait_time(*timer_special_q.current);
 
             BOOKKEEPING_TIMER(timer_special_q);

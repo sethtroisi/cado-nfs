@@ -718,6 +718,7 @@ fill_in_buckets_one_side(timetree_t& timer, thread_pool &pool, thread_workspaces
     }
     pool.accumulate_and_clear_active_time(*timer.current);
     SIBLING_TIMER(timer, "worker thread wait time");
+    TIMER_CATEGORY(timer, thread_wait());
     pool.accumulate_and_reset_wait_time(*timer.current);
 }
 
@@ -839,6 +840,7 @@ downsort_tree(
     }
     pool.accumulate_and_clear_active_time(*timer.current);
     SIBLING_TIMER(timer, "worker thread wait time");
+    TIMER_CATEGORY(timer, thread_wait());
     pool.accumulate_and_reset_wait_time(*timer.current);
 
     max_full = std::max(max_full, ws.buckets_max_full<LEVEL,shorthint_t>());
@@ -861,6 +863,7 @@ downsort_tree(
   }
   pool.accumulate_and_clear_active_time(*timer.current);
   SIBLING_TIMER(timer, "worker thread wait time");
+  TIMER_CATEGORY(timer, thread_wait());
   pool.accumulate_and_reset_wait_time(*timer.current);
 }
 

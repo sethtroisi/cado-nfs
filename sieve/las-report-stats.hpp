@@ -39,6 +39,7 @@ struct coarse_las_timers {
     static int cofactoring_mixed() { return 7; }
     static int batch(int side) { return 8 + side; }
     static int batch_mixed() { return 10; }
+    static int thread_wait() { return 11; }
     static std::string explain(int x) {
         switch(x) {
             case -1: return "uncounted";
@@ -53,6 +54,7 @@ struct coarse_las_timers {
             case 8: return "product trees on side 0";
             case 9: return "product trees on side 1";
             case 10: return "product trees (not differentiated)";
+            case 11: return "worker thread wait";
             default: ASSERT_ALWAYS(0);
         }
     }
