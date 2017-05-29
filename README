@@ -24,7 +24,7 @@ Other architectures are checked regularly, and should work. Please refer to
 http://ci.inria.fr/cado for the status of the currently tested platforms
 for the development branch.
 
-Release 2.2 has undergone regular testing for the following
+Release 2.3 has undergone regular testing for the following
 hardware/software configurations.
 
     - i386, CentOS 6.3

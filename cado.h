@@ -112,7 +112,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  * them fixed.
  * (useful to enable temporarily before releases, at least)
  */
-#ifdef  __GNUC__
+#ifdef  __GNUC__xxx
 #pragma GCC diagnostic error "-Wextra"
 #pragma GCC diagnostic error "-Wall"
 #endif
