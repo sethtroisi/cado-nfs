@@ -146,7 +146,7 @@ public:
   template <int LEVEL, typename HINT>
   double buckets_max_full();
 
-  void accumulate(las_report_ptr, sieve_checksum *);
+  void accumulate_and_clear(las_report_ptr, sieve_checksum *);
 
   template <int LEVEL, typename HINT>
   void reset_all_pointers(int side);

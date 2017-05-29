@@ -386,10 +386,10 @@ template double thread_workspaces::buckets_max_full<1, longhint_t>();
 template double thread_workspaces::buckets_max_full<2, longhint_t>();
 
 void
-thread_workspaces::accumulate(las_report_ptr rep, sieve_checksum *checksum)
+thread_workspaces::accumulate_and_clear(las_report_ptr rep, sieve_checksum *checksum)
 {
     for (size_t i = 0; i < nr_workspaces; ++i) {
-        las_report_accumulate(rep, thrs[i].rep);
+        las_report_accumulate_and_clear(rep, thrs[i].rep);
         for (unsigned int side = 0; side < nr_sides; side++)
             checksum[side].update(thrs[i].sides[side].checksum_post_sieve);
     }

@@ -199,11 +199,12 @@ namespace tdict {
         struct tree {
             typename T::type self;
             bool scoping;
+            int coarse_flag;
             typedef std::map<tdict::key, tree<T> > M_t;
             M_t M;
             tree<T> * current;   /* could be NULL */
             tree<T> * parent;   /* could be NULL */
-            tree() : self(typename T::type()), scoping(true), current(NULL), parent(this) { }
+            tree() : self(typename T::type()), scoping(true), coarse_flag(-1), current(NULL), parent(this) { }
             bool running() const { return current != NULL; }
             void stop() {
                 if (!running()) return;
@@ -302,15 +303,39 @@ namespace tdict {
                 }
             };
 
+private:
             std::ostream& _display(std::ostream& o, std::string const& prefix) const {
                 // o << prefix << self << " (self)\n";
                 std::ostringstream ss;
                 ss << prefix << " ";
                 for(typename M_t::const_iterator a = M.begin() ; a != M.end() ; a++) {
-                    o << prefix << a->second.self << " " << a->first << "\n";
+                    o << prefix << a->second.self << " " << a->first;
+#ifdef DEBUG_CATEGORY
+                    if (a->second.coarse_flag >= 0)
+                        o << " ; category " << a->second.coarse_flag;
+#endif
+                    o << "\n";
                     a->second._display(o, ss.str());
                 }
                 return o;
+            }
+
+            void filter_by_category(std::map<int, typename T::type> & D, int inherited) const {
+                int flag = inherited;
+                if (coarse_flag >= 0)
+                    flag = coarse_flag;
+                D[flag] += self;
+                for(typename M_t::const_iterator a = M.begin() ; a != M.end() ; a++) {
+                    a->second.filter_by_category(D, flag);
+
+                }
+            }
+
+public:
+            std::map<int, typename T::type> filter_by_category() const {
+                std::map<int, typename T::type> res;
+                filter_by_category(res, -1);
+                return res;
             }
 
             std::string display(double bookkeeping_cutoff = 1e-5) const {
@@ -323,6 +348,9 @@ namespace tdict {
             }
             tree& operator+=(tree const& t) {
                 self += t.self;
+                ASSERT_ALWAYS(coarse_flag < 0 || t.coarse_flag < 0 || coarse_flag == t.coarse_flag);
+                if (t.coarse_flag >= 0)
+                    coarse_flag = t.coarse_flag;
                 for(typename M_t::const_iterator a = t.M.begin() ; a != t.M.end() ; a++) {
                     M[a->first] += a->second;
                 }
@@ -363,11 +391,17 @@ class : public tdict::slot_base {
  */
 #define CHILD_TIMER(T, name)                                            \
         static tdict::slot UNIQUE_ID(slot)(name);		       	\
-        timetree_t::accounting_child UNIQUE_ID(sentry)(T,UNIQUE_ID(slot));
-
+        timetree_t::accounting_child UNIQUE_ID(sentry)(T,UNIQUE_ID(slot))
+#define CHILD_TIMER_PARAMETRIC(T, name, arg, suffix)                    \
+        static tdict::slot_parametric UNIQUE_ID(slot)(name, suffix);\
+        timetree_t::accounting_child UNIQUE_ID(sentry)(T,UNIQUE_ID(slot)(arg))
 #define SIBLING_TIMER(T, name) do {				        \
         static tdict::slot x(name);			        	\
         timetree_t::accounting_sibling UNIQUE_ID(sentry) (T,x);         \
+    } while (0)
+#define SIBLING_TIMER_PARAMETRIC(T, name, arg, suffix) do {	        \
+        static tdict::slot_parametric x(name, suffix);                  \
+        timetree_t::accounting_sibling UNIQUE_ID(sentry) (T,x(arg));    \
     } while (0)
 #define BOOKKEEPING_TIMER(T)						\
     timetree_t::accounting_bookkeeping UNIQUE_ID(sentry) (T);

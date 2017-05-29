@@ -437,7 +437,7 @@ template
 void
 downsort<3>(bucket_array_t<2, longhint_t> &BA_out,
             const bucket_array_t<3, shorthint_t> &BA_in,
-            uint32_t bucket_numbe, where_am_I & wr);
+            uint32_t bucket_number, where_am_I & wr);
 
 template
 void

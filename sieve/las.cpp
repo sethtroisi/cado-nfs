@@ -1917,13 +1917,15 @@ struct factor_survivors_data {
     }
     void search_survivors (timetree_t & timer);
     void convert_survivors (timetree_t & timer);
-    void purge_buckets (timetree_t & timer);
+    void prepare_cofactoring (timetree_t & timer);
     void cofactoring (timetree_t & timer);
 };
 
 void factor_survivors_data::search_survivors(timetree_t & timer)
 {
     CHILD_TIMER(timer, __func__);
+    TIMER_CATEGORY(timer, search_survivors());
+
     las_info const & las(*th->plas);
     sieve_info & si(*th->psi);
     const unsigned int first_j = N << (LOG_BUCKET_REGION - si.conf.logI_adjusted);
@@ -1987,7 +1989,7 @@ void factor_survivors_data::search_survivors(timetree_t & timer)
 
 void factor_survivors_data::convert_survivors(timetree_t & timer)
 {
-    CHILD_TIMER(timer, __func__);
+    BOOKKEEPING_TIMER(timer);
     /* Convert data type of list from uint32_t to the correct br_index_t */
     survivors2.reserve(survivors.size());
     for (size_t i = 0; i < survivors.size(); i++) {
@@ -1996,10 +1998,8 @@ void factor_survivors_data::convert_survivors(timetree_t & timer)
     survivors.clear();
 }
 
-void factor_survivors_data::purge_buckets(timetree_t & timer)
+void factor_survivors_data::prepare_cofactoring(timetree_t & timer)
 {
-    CHILD_TIMER(timer, __func__);
-
     sieve_info & si(*th->psi);
 
     /* Copy those bucket entries that belong to sieving survivors and
@@ -2008,6 +2008,10 @@ void factor_survivors_data::purge_buckets(timetree_t & timer)
 
     for(int side = 0 ; side < 2 ; side++) {
         WHERE_AM_I_UPDATE(w, side, side);
+
+        CHILD_TIMER_PARAMETRIC(timer, "prepare_cofactoring on side ", side, "");
+        TIMER_CATEGORY(timer, cofactoring(side));
+
         // From N we can deduce the bucket_index. They are not the same
         // when there are multiple-level buckets.
         uint32_t bucket_index = N % si.nb_buckets[1];
@@ -2036,12 +2040,14 @@ void factor_survivors_data::purge_buckets(timetree_t & timer)
         }
 
         SIBLING_TIMER(timer, "resieve");
+        
         /* Resieve small primes for this bucket region and store them 
            together with the primes recovered from the bucket updates */
         resieve_small_bucket_region (&sdata[side].primes, N, SS,
                 th->psi->sides[side].rsd, th->sides[side].rsdpos, si, w);
 
         SIBLING_TIMER(timer, "sort primes in purged buckets");
+
         /* Sort the entries to avoid O(n^2) complexity when looking for
            primes during trial division */
         sdata[side].purged.sort();
@@ -2059,6 +2065,7 @@ void factor_survivors_data::purge_buckets(timetree_t & timer)
 void factor_survivors_data::cofactoring (timetree_t & timer)
 {
     CHILD_TIMER(timer, __func__);
+    TIMER_CATEGORY(timer, cofactoring_mixed());
 
     las_info const & las(*th->plas);
     sieve_info & si(*th->psi);
@@ -2102,6 +2109,7 @@ void factor_survivors_data::cofactoring (timetree_t & timer)
         uint64_t b;
 
         SIBLING_TIMER(timer, "check_coprime");
+        TIMER_CATEGORY(timer, cofactoring_mixed());
 
         NxToAB (&a, &b, N, x, si);
 #ifdef SUPPORT_LARGE_Q
@@ -2145,11 +2153,14 @@ void factor_survivors_data::cofactoring (timetree_t & timer)
 
         copr++;
 
+        BOOKKEEPING_TIMER(timer);
         int pass = 1;
 
         int i;
         unsigned int j;
         for(int side = 0 ; pass && side < 2 ; side++) {
+            CHILD_TIMER_PARAMETRIC(timer, "checks on side ", side, "");
+            TIMER_CATEGORY(timer, cofactoring(side));
 
             SIBLING_TIMER(timer, "recompute complete norm");
 
@@ -2234,6 +2245,7 @@ void factor_survivors_data::cofactoring (timetree_t & timer)
         }
 
         SIBLING_TIMER(timer, "factor_both_leftover_norms");
+        TIMER_CATEGORY(timer, cofactoring_mixed());
 
         rep->ttcof -= microseconds_thread ();
         pass = factor_both_leftover_norms(norm, lps, lps_m, si);
@@ -2251,6 +2263,7 @@ void factor_survivors_data::cofactoring (timetree_t & timer)
 
         /* yippee: we found a relation! */
         SIBLING_TIMER(timer, "print relations");
+        TIMER_CATEGORY(timer, bookkeeping());
 
         if (las.cof_stats_file) /* learning phase */
             las.cof_succ[cof_bitsize[0]][cof_bitsize[1]] ++;
@@ -2349,8 +2362,7 @@ factor_survivors (timetree_t & timer, thread_data *th, int N, where_am_I & w MAY
     F.search_survivors(timer);
     F.convert_survivors(timer);
 
-    F.purge_buckets(timer);
-
+    F.prepare_cofactoring(timer);
     F.cofactoring(timer);
 
     verbose_output_print(0, 3, "# There were %d survivors in bucket %d\n", F.copr, N);
@@ -2369,7 +2381,7 @@ MAYBE_UNUSED static inline void subusb(unsigned char *S1, unsigned char *S2, ssi
   if (UNLIKELY(ex < 0)) S1[offset] = 0; else S1[offset] = ex;	     
 }
 
-/* S1 = S1 - S2, with "-" in saturated arithmetical,
+/* S1 = S1 - S2, with "-" in saturated arithmetic,
  * and memset(S2, 0, EndS1-S1).
  */
 void SminusS (unsigned char *S1, unsigned char *EndS1, unsigned char *S2) {/*{{{*/
@@ -2498,49 +2510,58 @@ void * process_bucket_region(timetree_t & timer, thread_data *th)
         for (int side = 0; side < 2; side++)
           {
             WHERE_AM_I_UPDATE(w, side, side);
+            SIBLING_TIMER_PARAMETRIC(timer, "side ", side, "");
+            TIMER_CATEGORY(timer, sieving(side));
 
             sieve_info::side_info & s(si.sides[side]);
             thread_side_data & ts = th->sides[side];
-        
-            SIBLING_TIMER(timer, "init norms");
-            /* Init norms */
-            rep->tn[side] -= seconds_thread ();
-#ifdef SMART_NORM
-	    init_norms_bucket_region(S[side], i, si, side, 1);
-#else
-	    init_norms_bucket_region(S[side], i, si, side, 0);
-#endif
-            // Invalidate the first row except (1,0)
-            // TODO: in sublat mod, we keep all the (i0,0), which is useless.
-            if (side == 0 && i == 0 && 
-                 ((si.conf.sublat.m == 0) || si.conf.sublat.j0 == 0))
-            {
-                int pos10 = 1+((si.I)>>1);
-                unsigned char n10 = S[side][pos10];
-                memset(S[side], 255, si.I);
-                S[side][pos10] = n10;
-            }
-            rep->tn[side] += seconds_thread ();
-#if defined(TRACE_K) 
-            if (trace_on_spot_N(w.N))
-              verbose_output_print(TRACE_CHANNEL, 0, "# After side %d init_norms_bucket_region, N=%u S[%u]=%u\n",
-                       side, w.N, trace_Nx.x, S[side][trace_Nx.x]);
-#endif
 
-            SIBLING_TIMER(timer, "apply buckets");
-            /* Apply buckets */
-            rep->ttbuckets_apply -= seconds_thread();
-            const bucket_array_t<1, shorthint_t> *BA =
-                th->ws->cbegin_BA<1, shorthint_t>(side);
-            const bucket_array_t<1, shorthint_t> * const BA_end =
-                th->ws->cend_BA<1, shorthint_t>(side);
-            for (; BA != BA_end; BA++)  {
-                apply_one_bucket(SS, *BA, ii, ts.fb->get_part(1), w);
+            {
+                CHILD_TIMER(timer, "init norms");
+
+                /* Init norms */
+                rep->tn[side] -= seconds_thread ();
+#ifdef SMART_NORM
+                init_norms_bucket_region(S[side], i, si, side, 1);
+#else
+                init_norms_bucket_region(S[side], i, si, side, 0);
+#endif
+                // Invalidate the first row except (1,0)
+                // TODO: in sublat mod, we keep all the (i0,0), which is useless.
+                if (side == 0 && i == 0 && 
+                        ((si.conf.sublat.m == 0) || si.conf.sublat.j0 == 0))
+                {
+                    int pos10 = 1+((si.I)>>1);
+                    unsigned char n10 = S[side][pos10];
+                    memset(S[side], 255, si.I);
+                    S[side][pos10] = n10;
+                }
+                rep->tn[side] += seconds_thread ();
+#if defined(TRACE_K) 
+                if (trace_on_spot_N(w.N))
+                    verbose_output_print(TRACE_CHANNEL, 0, "# After side %d init_norms_bucket_region, N=%u S[%u]=%u\n",
+                            side, w.N, trace_Nx.x, S[side][trace_Nx.x]);
+#endif
+            }
+
+            {
+                CHILD_TIMER(timer, "apply buckets");
+
+                /* Apply buckets */
+                rep->ttbuckets_apply -= seconds_thread();
+                const bucket_array_t<1, shorthint_t> *BA =
+                    th->ws->cbegin_BA<1, shorthint_t>(side);
+                const bucket_array_t<1, shorthint_t> * const BA_end =
+                    th->ws->cend_BA<1, shorthint_t>(side);
+                for (; BA != BA_end; BA++)  {
+                    apply_one_bucket(SS, *BA, ii, ts.fb->get_part(1), w);
+                }
             }
 
             /* Apply downsorted buckets, if necessary. */
             if (si.toplevel > 1) {
-                SIBLING_TIMER(timer, "apply downsorted buckets");
+                CHILD_TIMER(timer, "apply downsorted buckets");
+
                 const bucket_array_t<1, longhint_t> *BAd =
                     th->ws->cbegin_BA<1, longhint_t>(side);
                 const bucket_array_t<1, longhint_t> * const BAd_end =
@@ -2553,23 +2574,33 @@ void * process_bucket_region(timetree_t & timer, thread_data *th)
                 }
             }
 
-            SIBLING_TIMER(timer, "S minus S (1)");
+            /* hmmm, really, is this useful at all ? */
+            if (0) {
+                CHILD_TIMER(timer, "S minus S (1)");
 
-	    SminusS(S[side], S[side] + BUCKET_REGION, SS);
+                SminusS(S[side], S[side] + BUCKET_REGION, SS);
+            }
+
             rep->ttbuckets_apply += seconds_thread();
 
-            SIBLING_TIMER(timer, "small sieve");
-            /* Sieve small primes */
-            sieve_small_bucket_region(SS, i, s.ssd, ts.ssdpos, si, side, w);
+            {
+                CHILD_TIMER(timer, "small sieve");
 
-            SIBLING_TIMER(timer, "S minus S (2)");
-	    SminusS(S[side], S[side] + BUCKET_REGION, SS);
+                /* Sieve small primes */
+                sieve_small_bucket_region(SS, i, s.ssd, ts.ssdpos, si, side, w);
+            }
+
+            {
+                CHILD_TIMER(timer, "S minus S (2)");
+
+                SminusS(S[side], S[side] + BUCKET_REGION, SS);
 #if defined(TRACE_K) 
-            if (trace_on_spot_N(w.N))
-              verbose_output_print(TRACE_CHANNEL, 0,
-                      "# Final value on side %d, N=%u rat_S[%u]=%u\n",
-                      side, w.N, trace_Nx.x, S[side][trace_Nx.x]);
+                if (trace_on_spot_N(w.N))
+                    verbose_output_print(TRACE_CHANNEL, 0,
+                            "# Final value on side %d, N=%u rat_S[%u]=%u\n",
+                            side, w.N, trace_Nx.x, S[side][trace_Nx.x]);
 #endif
+            }
 
             BOOKKEEPING_TIMER(timer);
         }
@@ -2580,6 +2611,8 @@ void * process_bucket_region(timetree_t & timer, thread_data *th)
         rep->ttf += seconds_thread ();
 
         SIBLING_TIMER(timer, "reposition small (re)sieve data");
+        TIMER_CATEGORY(timer, bookkeeping());
+
         /* Reset resieving data */
         for(int side = 0 ; side < 2 ; side++) {
             sieve_info::side_info & s(si.sides[side]);
@@ -2608,7 +2641,7 @@ void las_report_accumulate_threads_and_display(las_info & las,
     las_report_init(rep);
     sieve_checksum checksum_post_sieve[2];
     
-    ws->accumulate(rep, checksum_post_sieve);
+    ws->accumulate_and_clear(rep, checksum_post_sieve);
 
     verbose_output_print(0, 2, "# ");
     /* verbose_output_print(0, 2, "%lu survivors after rational sieve,", rep->survivors0); */
@@ -2646,7 +2679,7 @@ void las_report_accumulate_threads_and_display(las_info & las,
 	    qtts-rep->ttbuckets_fill-rep->ttbuckets_apply,
 	    rep->ttf, rep->ttf - rep->ttcof, rep->ttcof);
     }
-    las_report_accumulate(report, rep);
+    las_report_accumulate_and_clear(report, rep);
     las_report_clear(rep);
 }/*}}}*/
 
@@ -3094,9 +3127,11 @@ for (unsigned int j_cong = 0; j_cong < sublat_bound; ++j_cong) {
         /* Allocate buckets */
         workspaces->pickup_si(si);
 
-        fill_in_buckets_both(timer_special_q, *pool, *workspaces, si);
+        for(int side = 0 ; side < 2 ; side++) {
+            fill_in_buckets(timer_special_q, *pool, *workspaces, si, side);
+        }
 
-        pool->accumulate(*timer_special_q.current);
+        pool->accumulate_and_clear(*timer_special_q.current);
 
         /* Check that buckets are not more than full.
          * Due to templates and si.toplevel being not constant, need a
@@ -3123,7 +3158,10 @@ for (unsigned int j_cong = 0; j_cong < sublat_bound; ++j_cong) {
         
         workspaces->thrs[0].rep->ttbuckets_fill += seconds();
 
-        SIBLING_TIMER(timer_special_q, "prepare small sieve");
+        // this timing slot is insignificant, let's put it with the
+        // bookkeeping crop
+        // SIBLING_TIMER(timer_special_q, "prepare small sieve");
+        BOOKKEEPING_TIMER(timer_special_q);
 
         /* Prepare small sieve and re-sieve */
         for(int side = 0 ; side < 2 ; side++) {
@@ -3152,11 +3190,15 @@ for (unsigned int j_cong = 0; j_cong < sublat_bound; ++j_cong) {
 
         if (si.toplevel == 1) {
             SIBLING_TIMER(timer_special_q, "process_bucket_region outer container");
+            TIMER_CATEGORY(timer_special_q, bookkeeping());
+
             /* Process bucket regions in parallel */
             workspaces->thread_do_using_pool(*pool, &process_bucket_region);
-            pool->accumulate(*timer_special_q.current);
+            pool->accumulate_and_clear(*timer_special_q.current);
         } else {
             SIBLING_TIMER(timer_special_q, "process_bucket_region outer container (non-MT)");
+            TIMER_CATEGORY(timer_special_q, bookkeeping());
+
             // Prepare plattices at internal levels
             // TODO: this could be multi-threaded
             plattice_x_t max_area = plattice_x_t(si.J)<<si.conf.logI_adjusted;
@@ -3167,6 +3209,7 @@ for (unsigned int j_cong = 0; j_cong < sublat_bound; ++j_cong) {
             plattice_enumerate_area<3>::value = max_area;
             precomp_plattice_t precomp_plattice;
             for (int side = 0; side < 2; ++side) {
+                CHILD_TIMER_PARAMETRIC(timer_special_q, "side ", side, "");
                 for (int level = 1; level < si.toplevel; ++level) {
                     const fb_part * fb = si.sides[side].fb->get_part(level);
                     const fb_slice_interface *slice;
@@ -3180,6 +3223,8 @@ for (unsigned int j_cong = 0; j_cong < sublat_bound; ++j_cong) {
             }
 
             SIBLING_TIMER(timer_special_q, "process_bucket_region outer container (MT)");
+            TIMER_CATEGORY(timer_special_q, bookkeeping());
+
             // Prepare plattices at internal levels
 
             // Visit the downsorting tree depth-first.
@@ -3200,7 +3245,7 @@ for (unsigned int j_cong = 0; j_cong < sublat_bound; ++j_cong) {
                         ASSERT_ALWAYS(0);
                 }
             }
-            pool->accumulate(*timer_special_q.current);
+            pool->accumulate_and_clear(*timer_special_q.current);
 
             BOOKKEEPING_TIMER(timer_special_q);
 
@@ -3251,6 +3296,8 @@ if (si.conf.sublat.m) {
 
 #ifdef  DLP_DESCENT
         SIBLING_TIMER(timer_special_q, "descent");
+        TIMER_CATEGORY(timer_special_q, bookkeeping());
+
         descent_tree::candidate_relation const & winner(las.tree.current_best_candidate());
         if (winner) {
             /* Even if not going for recursion, store this as being a
@@ -3319,11 +3366,21 @@ if (si.conf.sublat.m) {
 
         qt0 = seconds() - qt0;
 
-        pool->accumulate(timer_special_q);
+        pool->accumulate_and_clear(timer_special_q);
         timer_special_q.stop();
-
-        if (tdict::global_enable >= 2)
+        
+        if (tdict::global_enable >= 2) {
             verbose_output_print (0, 1, "%s", timer_special_q.display().c_str());
+
+            double t = 0;
+            for(auto const &c : timer_special_q.filter_by_category()) {
+                verbose_output_print (0, 1, "# %s: %.2f\n", 
+                        coarse_las_timers::explain(c.first).c_str(),
+                        c.second);
+                t += c.second;
+            }
+            verbose_output_print (0, 1, "# total counted time: %.2f\n", t);
+        }
 
         global_timer += timer_special_q;
 
@@ -3350,6 +3407,8 @@ if (si.conf.sublat.m) {
         ASSERT_ALWAYS(las.default_config_ptr);
         siever_config const & sc0(*las.default_config_ptr);
         SIBLING_TIMER(global_timer, "batch cofactorization (time is wrong because of openmp)");
+        TIMER_CATEGORY(global_timer, batch_mixed());
+
 	const char *batch0_file, *batch1_file;
 	batch0_file = param_list_lookup_string (pl, "batch0");
 	batch1_file = param_list_lookup_string (pl, "batch1");
@@ -3416,8 +3475,19 @@ if (si.conf.sublat.m) {
     tts -= report->ttf;
 
     global_timer.stop();
-    if (tdict::global_enable >= 1)
+    if (tdict::global_enable >= 1) {
         verbose_output_print (0, 1, "%s", global_timer.display().c_str());
+
+        double t = 0;
+        for(auto const &c : global_timer.filter_by_category()) {
+            verbose_output_print (0, 1, "# %s: %.2f\n", 
+                    coarse_las_timers::explain(c.first).c_str(),
+                    c.second);
+            t += c.second;
+        }
+        verbose_output_print (0, 1, "# total counted time: %.2f\n", t);
+    }
+
 
     if (las.verbose)
         facul_print_stats (las.output);

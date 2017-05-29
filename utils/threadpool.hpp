@@ -137,7 +137,7 @@ public:
   void add_task(task_function_t func, const task_parameters * params, const int id, const size_t queue = 0, double cost = 0.0);
   task_result *get_result(size_t queue = 0, bool blocking = true);
 
-  void accumulate(timetree_t & rep) {
+  void accumulate_and_clear(timetree_t & rep) {
       for (size_t i = 0; i < nr_threads; ++i) {
           ASSERT_ALWAYS(!threads[i].timer.running());
           rep += threads[i].timer;
