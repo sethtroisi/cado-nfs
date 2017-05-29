@@ -1963,6 +1963,8 @@ void factor_survivors_data::search_survivors(timetree_t & timer)
     }
 #endif /* }}} */
 
+    th->rep->survivors.before_sieve += 1U << LOG_BUCKET_REGION;
+
     survivors.reserve(128);
     for (unsigned int j = 0; j < nr_lines; j++)
     {
@@ -2097,6 +2099,8 @@ void factor_survivors_data::cofactoring (timetree_t & timer)
       const size_t x = survivors2[i_surv];
       ASSERT_ALWAYS (SS[x] != 255);
 
+      th->rep->survivors.after_sieve++;
+
         th->rep->survivor_sizes[sdata[0].S[x]][sdata[1].S[x]]++;
         
         /* For factor_leftover_norm, we need to pass the information of the
@@ -2131,10 +2135,9 @@ void factor_survivors_data::cofactoring (timetree_t & timer)
 #else
         if (UNLIKELY(mpz_even_p(az) && mpz_even_p(bz)))
 #endif
-        {
-            th->rep->both_even++;
             continue;
-        }
+
+        th->rep->survivors.not_both_even++;
 
         /* Since the q-lattice is exactly those (a, b) with
            a == rho*b (mod q), q|b  ==>  q|a  ==>  q | gcd(a,b) */
@@ -2147,11 +2150,9 @@ void factor_survivors_data::cofactoring (timetree_t & timer)
             (mpz_cmp(si.doing.p, bz) <= 0 &&
              mpz_divisible_p(bz, si.doing.p)))
 #endif
-        {
             continue;
-        }
 
-        copr++;
+        th->rep->survivors.not_both_multiples_of_p++;
 
         BOOKKEEPING_TIMER(timer);
         int pass = 1;
@@ -2161,6 +2162,8 @@ void factor_survivors_data::cofactoring (timetree_t & timer)
         for(int side = 0 ; pass && side < 2 ; side++) {
             CHILD_TIMER_PARAMETRIC(timer, "checks on side ", side, "");
             TIMER_CATEGORY(timer, cofactoring(side));
+
+            th->rep->survivors.trial_divided_on_side[side]++;
 
             SIBLING_TIMER(timer, "recompute complete norm");
 
@@ -2207,6 +2210,7 @@ void factor_survivors_data::cofactoring (timetree_t & timer)
                         side, a, b, pass);
             }
 #endif
+            th->rep->survivors.check_leftover_norm_on_side[side] += pass;
         }
 
         if (!pass) continue;
@@ -2365,9 +2369,6 @@ factor_survivors (timetree_t & timer, thread_data *th, int N, where_am_I & w MAY
     F.prepare_cofactoring(timer);
     F.cofactoring(timer);
 
-    verbose_output_print(0, 3, "# There were %d survivors in bucket %d\n", F.copr, N);
-    th->rep->survivors1 += F.copr;
-    th->rep->survivors2 += F.copr;
     return F.cpt;
 }
 
@@ -2625,6 +2626,24 @@ void * process_bucket_region(timetree_t & timer, thread_data *th)
     return NULL;
 }/*}}}*/
 
+static double ratio(double a, unsigned long b)
+{
+    return b ? a/b : 0;
+}
+
+void las_report_display_counters(las_report_ptr rep)
+{
+    auto const& S(rep->survivors);
+    verbose_output_print(0, 2, "# survivors before_sieve: %lu\n", S.before_sieve);
+    verbose_output_print(0, 2, "# survivors after_sieve: %lu (ratio %.2e)\n", S.after_sieve, ratio(S.after_sieve, S.before_sieve));
+    verbose_output_print(0, 2, "# survivors not_both_even: %lu\n", S.not_both_even);
+    verbose_output_print(0, 2, "# survivors not_both_multiples_of_p: %lu\n", S.not_both_multiples_of_p);
+    verbose_output_print(0, 2, "# survivors trial_divided_on_side[0]: %lu\n", S.trial_divided_on_side[0]);
+    verbose_output_print(0, 2, "# survivors check_leftover_norm_on_side[0]: %lu (%.1f%%)\n", S.check_leftover_norm_on_side[0], 100 * ratio(S.check_leftover_norm_on_side[0], S.trial_divided_on_side[0]));
+    verbose_output_print(0, 2, "# survivors trial_divided_on_side[1]: %lu\n", S.trial_divided_on_side[1]);
+    verbose_output_print(0, 2, "# survivors check_leftover_norm_on_side[1]: %lu (%.1f%%)\n", S.check_leftover_norm_on_side[1], 100 * ratio(S.check_leftover_norm_on_side[1], S.trial_divided_on_side[1]));
+}
+
 /* {{{ las_report_accumulate_threads_and_display
  * This function does three distinct things.
  *  - accumulates the timing reports for all threads into a collated report
@@ -2643,10 +2662,7 @@ void las_report_accumulate_threads_and_display(las_info & las,
     
     ws->accumulate_and_clear(rep, checksum_post_sieve);
 
-    verbose_output_print(0, 2, "# ");
-    /* verbose_output_print(0, 2, "%lu survivors after rational sieve,", rep->survivors0); */
-    verbose_output_print(0, 2, "%lu survivors after algebraic sieve, ", rep->survivors1);
-    verbose_output_print(0, 2, "coprime: %lu\n", rep->survivors2);
+    las_report_display_counters(rep);
     verbose_output_print(0, 2, "# Checksums over sieve region: after all sieving: %u, %u\n", checksum_post_sieve[0].get_checksum(), checksum_post_sieve[1].get_checksum());
     verbose_output_vfprint(0, 1, gmp_vfprintf, "# %lu %s for side-%d (%Zd,%Zd)\n",
               rep->reports,
@@ -3184,8 +3200,7 @@ for (unsigned int j_cong = 0; j_cong < sublat_bound; ++j_cong) {
 
                 uint32_t my_row0 = (BUCKET_REGION >> si.conf.logI_adjusted) * th->id;
                 ts.ssdpos = small_sieve_start(s.ssd, my_row0, si);
-                ts.rsdpos = small_sieve_copy_start(ts.ssdpos,
-                        s.fb_parts_x->rs);
+                ts.rsdpos = small_sieve_copy_start(ts.ssdpos, s.fb_parts_x->rs);
             }
         }
         BOOKKEEPING_TIMER(timer_special_q);
@@ -3509,6 +3524,7 @@ if (si.conf.sublat.m) {
         }
         verbose_output_print (0, 1, "# total counted time: %.2f\n", t);
     }
+    las_report_display_counters(report);
 
 
     if (las.verbose)

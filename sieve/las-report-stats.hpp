@@ -7,10 +7,15 @@
 /* las_report: Structure for gathering reports and stats on sieving */
 
 struct las_report_s {
+    struct {
+        unsigned long before_sieve;
+        unsigned long after_sieve;
+        unsigned long not_both_even;
+        unsigned long not_both_multiples_of_p;
+        unsigned long trial_divided_on_side[2];
+        unsigned long check_leftover_norm_on_side[2];
+    } survivors;
     unsigned long reports;
-  /* unsigned long survivors0; */ /* Obsolete */
-    unsigned long survivors1;
-    unsigned long survivors2;
     double tn[2];            /* norms */
     double ttbuckets_fill;
     double ttbuckets_apply;
