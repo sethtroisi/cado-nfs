@@ -2707,7 +2707,7 @@ static void declare_usage(param_list pl)/*{{{*/
   param_list_decl_usage(pl, "batchlpb1", "large prime bound on side 1 to be considered by batch cofactorization");
   param_list_decl_usage(pl, "batchmfb0", "cofactor bound on side 0 to be considered after batch cofactorization");
   param_list_decl_usage(pl, "batchmfb1", "cofactor bound on side 1 to be considered after batch cofactorization");
-  param_list_decl_usage(pl, "batch-print-survivors", "(switch) just print survivros for an external cofactorization");
+  param_list_decl_usage(pl, "batch-print-survivors", "(switch) just print survivors for an external cofactorization");
   param_list_decl_usage(pl, "galois", "(switch) for reciprocal polynomials, sieve only half of the q's");
 #ifdef TRACE_K
   param_list_decl_usage(pl, "traceab", "Relation to trace, in a,b format");
