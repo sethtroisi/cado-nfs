@@ -654,15 +654,6 @@ public:
     slice_index_t get_index() const {return index;};
 };
 
-#if 0
-/* MOD2_CLASSES_BS was an attempt, at some point, to support bucket
- * sieving in several passes for congruence classes mod 2. It was never
- * finished, and has never been tested. The last traces of that code may
- * be found in the git history perhaps. To date, the only remaining bit
- * that can still be considered interesting is the comment fragment below
- * in plattice_starting_vector
- */
-
 /* Dense version of plattice_info_t and friends for long-term storage in
  * sublat mode. */
 
@@ -720,6 +711,15 @@ public:
     slice_index_t get_index() const {return index;};
 };
 
+
+#if 0
+/* MOD2_CLASSES_BS was an attempt, at some point, to support bucket
+ * sieving in several passes for congruence classes mod 2. It was never
+ * finished, and has never been tested. The last traces of that code may
+ * be found in the git history perhaps. To date, the only remaining bit
+ * that can still be considered interesting is the comment fragment below
+ * in plattice_starting_vector
+ */
 
 
 /* This is for working with congruence classes only */
