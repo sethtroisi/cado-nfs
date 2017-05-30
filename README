@@ -214,6 +214,15 @@ with different parameters for different machines), please use the
 --server mode (see scripts/cadofactor/README and
 scripts/cadofactor/parameters).
 
+Check that your network configuration is correct:
+=================================================
+
+In case you run a factorization on the local machine, the clients should be able
+to connect to the server. Under Linux, CADO-NFS uses 'localhost' to identify the
+server, thus you should have the following line in your /etc/hosts file:
+
+127.0.0.1   localhost
+
 Check that your SSH configuration is correct:
 =============================================
 
