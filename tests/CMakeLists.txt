@@ -267,7 +267,6 @@ macro(cado_define_test)
     if(nTARGET_DEPENDENCIES GREATER 0)
         add_dependencies(${TEST_NAME}_dependencies ${TARGET_DEPENDENCIES})
         add_test(builddep_${TEST_NAME} ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target ${TEST_NAME}_dependencies)
-        # set(${TEST_NAME}_has_build_depends 1)
     endif()
 
     if (nSCRIPT EQUAL 0)
@@ -280,13 +279,14 @@ macro(cado_define_test)
         set(${TEST_NAME}_EXECUTABLE ${binary})
     endif()
 
+    set(${TEST_NAME}_ARGUMENTS ${ARGUMENTS})
+
     if(NOT NO_DEFAULT_RUN)
         set(add_test_args NAME ${TEST_NAME} COMMAND ${${TEST_NAME}_EXECUTABLE} ${ARGUMENTS})
         if(nWORKING_DIRECTORY GREATER 0)
             list(APPEND add_test_args WORKING_DIRECTORY ${WORKING_DIRECTORY})
         endif()
         add_test(${add_test_args})
-        set(${TEST_NAME}_ARGUMENTS ${ARGUMENTS})
         set(${TEST_NAME}_TEST_EXISTS 1)
         if(nTARGET_DEPENDENCIES GREATER 0)
             # seems that we need set_tests_properties to take only a
@@ -295,10 +295,6 @@ macro(cado_define_test)
             string_join(all_deps ";" ${deps})
             set_tests_properties (${TEST_NAME} PROPERTIES DEPENDS "${all_deps}")
         endif()
-    else()
-        # just in case we defined default arguments.
-        list(LENGTH ARGUMENTS nARGUMENTS)
-        set(${TEST_NAME}_ARGUMENTS ${ARGUMENTS})
     endif()
 endmacro()
 
@@ -313,6 +309,7 @@ macro(cado_divert_test TEST_BASE DIVERSION)
     #           TARGET_DEPENDENCIES
     #           ARGUMENTS
     #           APPEND_ARGUMENTS
+    #           NO_DEFAULT_RUN (useful if we want to divert further !)
     #
     # example use:
     #
@@ -334,6 +331,7 @@ macro(cado_divert_test TEST_BASE DIVERSION)
     set(APPEND_ARGUMENTS)
     set(TEST_DEPENDENCIES)
     set(TARGET_DEPENDENCIES)
+    set(NO_DEFAULT_RUN)
     set(current ARGUMENTS)
     foreach(x ${ARGN})
         if (x STREQUAL "ARGUMENTS")
@@ -344,6 +342,10 @@ macro(cado_divert_test TEST_BASE DIVERSION)
             SET(current TEST_DEPENDENCIES)
         elseif (x STREQUAL "TARGET_DEPENDENCIES")
             SET(current TARGET_DEPENDENCIES)
+        elseif (x STREQUAL "NO_DEFAULT_RUN")
+            SET(current NO_DEFAULT_RUN)
+            # special, because it's a flag, really
+            set(NO_DEFAULT_RUN 1)
         else()
             list(APPEND ${current} ${x})
         endif()
@@ -352,37 +354,43 @@ macro(cado_divert_test TEST_BASE DIVERSION)
     list(LENGTH TARGET_DEPENDENCIES nTARGET_DEPENDENCIES)
     list(LENGTH ARGUMENTS nARGUMENTS)
     list(LENGTH APPEND_ARGUMENTS nAPPEND_ARGUMENTS)
+    list(LENGTH NO_DEFAULT_RUN nNO_DEFAULT_RUN)
     if ((nAPPEND_ARGUMENTS GREATER 0) AND (nARGUMENTS GREATER 0))
         message(FATAL_ERROR "ARGUMENTS and APPEND_ARGUMENTS are incompatible")
     endif()
 
     set(TEST_NAME "${TEST_BASE}_${DIVERSION}")
+
     if (nAPPEND_ARGUMENTS GREATER 0)
         set(ARGUMENTS ${${TEST_BASE}_ARGUMENTS} ${APPEND_ARGUMENTS})
         list(LENGTH ARGUMENTS nARGUMENTS)
     endif()
-    add_test(${TEST_NAME} ${${TEST_BASE}_EXECUTABLE} ${ARGUMENTS})
-
     # we want to define builddep_X unconditionally, depending at least on
     # the dependencies of the base test.
     add_custom_target(${TEST_NAME}_dependencies)
+    add_dependencies(all_test_dependencies ${TEST_NAME}_dependencies)
+    add_dependencies(${TEST_NAME}_dependencies ${TEST_BASE}_dependencies ${TARGET_DEPENDENCIES})
     add_test(builddep_${TEST_NAME} ${CMAKE_COMMAND} --build
         ${CMAKE_BINARY_DIR} --target ${TEST_NAME}_dependencies)
 
-    add_dependencies(${TEST_NAME}_dependencies ${TEST_BASE}_dependencies ${TARGET_DEPENDENCIES})
-    # set("${TEST_NAME}_has_build_depends" 1)
 
-    # prepare a ;-separated list for set_tests_properties
-    # note that we do not need to make the test depend on
-    # builddep_${TEST_BASE}, since we have made ${TEST_NAME}_dependencies
-    # depend on ${TEST_BASE}_dependencies. It's in fact relieving, given
-    # that builddep_${TEST_BASE} does not necessarily exist.
-    set(deps builddep_${TEST_NAME} ${TEST_DEPENDENCIES})
-    if(${TEST_BASE}_TEST_EXISTS)
-        list(APPEND deps ${TEST_BASE})
+    set(${TEST_NAME}_EXECUTABLE ${${TEST_BASE}_EXECUTABLE})
+    set(${TEST_NAME}_ARGUMENTS ${ARGUMENTS})
+
+    if(NOT NO_DEFAULT_RUN)
+        add_test(${TEST_NAME} ${${TEST_BASE}_EXECUTABLE} ${ARGUMENTS})
+        # prepare a ;-separated list for set_tests_properties
+        # note that we do not need to make the test depend on
+        # builddep_${TEST_BASE}, since we have made ${TEST_NAME}_dependencies
+        # depend on ${TEST_BASE}_dependencies. It's in fact relieving, given
+        # that builddep_${TEST_BASE} does not necessarily exist.
+        set(deps builddep_${TEST_NAME} ${TEST_DEPENDENCIES})
+        if(${TEST_BASE}_TEST_EXISTS)
+            list(APPEND deps ${TEST_BASE})
+        endif()
+        string_join(all_deps ";" ${deps})
+        set_tests_properties (${TEST_NAME} PROPERTIES DEPENDS "${all_deps}")
     endif()
-    string_join(all_deps ";" ${deps})
-    set_tests_properties (${TEST_NAME} PROPERTIES DEPENDS "${all_deps}")
 endmacro()
 
 
