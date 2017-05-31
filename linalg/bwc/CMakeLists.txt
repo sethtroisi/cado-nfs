@@ -420,6 +420,7 @@ foreach(v ${BWC_GFP_ARITHMETIC_BACKENDS})
     # make plingen_pz a default target, but not the others.
     if(v STREQUAL "pz")
         add_executable(plingen_${v} ${plingen_${v}_sources})
+        install(TARGETS plingen_${v} RUNTIME DESTINATION ${LIBSUFFIX}/linalg/bwc)
     else()
         add_executable(plingen_${v} EXCLUDE_FROM_ALL ${plingen_${v}_sources})
     endif()
@@ -450,4 +451,4 @@ bwc_program_extra(bench_matcache bench_matcache.c worker-threads.c)
 target_link_libraries(bench_matcache matmul_mf)
 
 
-include(CMakeLists-nodist.txt OPTIONAL)
+include(CMakeLists-nodist.txt ONAL)
