@@ -640,7 +640,8 @@ static void printf_relation_galois_6_1(factor_t * factor,
     mpz_poly_srcptr a, unsigned int t, unsigned int V,
     FILE * outstd, MAYBE_UNUSED unsigned int * assert_facto,
     MAYBE_UNUSED mpz_vector_srcptr c, int * smooth,
-    const mpz_poly * f, factor_t * gal_norm_denom, ideal_spq_t * spqs)
+    const mpz_poly * f, factor_t * gal_norm_denom,
+    MAYBE_UNUSED ideal_spq_t * spqs)
 {
   if (a->deg > 2) {
     fprintf(outstd, "# Can not use Galois 6.1.\n");
@@ -670,6 +671,7 @@ static void printf_relation_galois_6_1(factor_t * factor,
 #endif // ASSERT_FACTO
       printf_relation(factor, b, t, V, outstd, assert_facto, c, smooth);
 
+#if !defined(NOT_PRINT_RELATION) && defined(PRINT_SPQ)
 #ifndef NDEBUG
       gmp_randstate_t state;
       gmp_randinit_default(state);
@@ -699,6 +701,7 @@ static void printf_relation_galois_6_1(factor_t * factor,
       mpz_clear(q);
       gmp_randclear(state);
 #endif // NDEBUG
+#endif // !defined(NOT_PRINT_RELATION) && defined(PRINT_SPQ)
 
     }
     mpz_poly_clear(b);
@@ -725,7 +728,7 @@ static void good_polynomial(mpz_poly_srcptr a, const mpz_poly * f, unsigned int
     q_side, unsigned int size, MAYBE_UNUSED FILE * outstd, MAYBE_UNUSED unsigned
     int * number_factorisation, MAYBE_UNUSED mpz_vector_srcptr c,
     unsigned int gal, unsigned int * nb_rel_gal, unsigned int gal_version,
-    factor_t * gal_norm_denom, MAYBE_UNUSED ideal_spq_t * spqs)
+    MAYBE_UNUSED factor_t * gal_norm_denom, MAYBE_UNUSED ideal_spq_t * spqs)
 {
   mpz_t res;
   mpz_init(res);
@@ -1037,6 +1040,7 @@ static void find_relation(uint64_array_t * indices, uint64_t * index,
  * Output: spq = (q, h1 + x)
  * h1 = (2 * h0 - 1) / (h0 + 1) mod q
  */
+#if !defined(NOT_PRINT_RELATION) && defined(PRINT_SPQ)
 static void spq_6_1(ideal_spq_ptr spq, unsigned int t)
 {
   mpz_t q_Z;
@@ -1057,6 +1061,7 @@ static void spq_6_1(ideal_spq_ptr spq, unsigned int t)
   mpz_clear(q_Z);
   mpz_poly_clear(g);
 }
+#endif // !defined(NOT_PRINT_RELATION) && defined(PRINT_SPQ)
 
 unsigned int find_relations(uint64_array_t * indices, uint64_t number_element,
     unsigned int * lpb, mat_Z_srcptr matrix, const mpz_poly * f,
@@ -1067,7 +1072,7 @@ unsigned int find_relations(uint64_array_t * indices, uint64_t number_element,
   ideal_spq_t * spqs;
   if (gal == 6) {
     if (gal_version == 1) {
-#ifndef NOT_PRINT_RELATION
+#if !defined(NOT_PRINT_RELATION) && defined(PRINT_SPQ)
     spqs = (ideal_spq_t *) malloc(sizeof(ideal_spq_t) * 5);
     ideal_spq_t spq;
     ideal_spq_init(spq);
@@ -1082,9 +1087,43 @@ unsigned int find_relations(uint64_array_t * indices, uint64_t number_element,
       ideal_spq_fprintf_q_g(outstd, spq);
     }
     ideal_spq_clear(spq, H->t);
-#else // NOT_PRINT_RELATION
+
+#ifndef NDEBUG
+    gmp_randstate_t state;
+    gmp_randinit_default(state);
+    gmp_randseed_ui(state, time(NULL));
+    srand(time(NULL));
+
+    mpz_t q;
+    mpz_init(q);
+    mpz_poly g;
+    mpz_poly_init(g, 1);
+    mpz_set_ui(q, ideal_spq_get_q(spqs[0]));
+    mpz_poly_factor_list lf;
+    mpz_poly_factor_list_init(lf);
+    mpz_poly_factor(lf, f[q_side], q, state);
+
+    for (unsigned int i = 0; i < 5; i++) {
+      ideal_spq_get_g(g, spqs[i]);
+      int found = 0;
+      for (int k = 0; k < lf->size; k++) {
+        if (!mpz_poly_cmp(lf->factors[k]->f, g)) {
+          ASSERT(found == 0);
+          found = 1;
+        }
+      }
+      ASSERT(found == 1);
+    }
+
+    mpz_poly_factor_list_clear(lf);
+    mpz_poly_clear(g);
+    mpz_clear(q);
+    gmp_randclear(state);
+#endif // NDEBUG
+
+#else // !defined(NOT_PRINT_RELATION) && defined(PRINT_SPQ)
     spqs = NULL;
-#endif // NOT_PRINT_RELATION
+#endif // !defined(NOT_PRINT_RELATION) && defined(PRINT_SPQ)
     } else {
       spqs = NULL;
     }
