@@ -451,4 +451,4 @@ bwc_program_extra(bench_matcache bench_matcache.c worker-threads.c)
 target_link_libraries(bench_matcache matmul_mf)
 
 
-include(CMakeLists-nodist.txt ONAL)
+include(CMakeLists-nodist.txt OPTIONAL)
