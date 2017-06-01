@@ -102,6 +102,10 @@ parse_config(siever_config & sc, param_list_ptr pl)
     param_list_parse_long_and_long(pl, "dup-qmin", dupqmin, ",");
     sc.sides[0].qmin = dupqmin[0];
     sc.sides[1].qmin = dupqmin[1];
+    long dupqmax[2] = {LONG_MAX, LONG_MAX};
+    param_list_parse_long_and_long(pl, "dup-qmax", dupqmax, ",");
+    sc.sides[0].qmax = dupqmax[0];
+    sc.sides[1].qmax = dupqmax[1];
 
     /* Change 0 (not initialized) into LONG_MAX */
     for (int side = 0; side < 2; side ++)
@@ -140,7 +144,8 @@ static void declare_usage(param_list_ptr pl)
   param_list_decl_usage(pl, "lambda1", "algebraic lambda value");
   param_list_decl_usage(pl, "powlim0", "limit on powers on rat side");
   param_list_decl_usage(pl, "powlim1", "limit on powers on alg side");
-  param_list_decl_usage(pl, "dup-qmin", "limits of q-sieving for 2-sided duplicate removal");
+  param_list_decl_usage(pl, "dup-qmin", "lower limit of global q-range for 2-sided duplicate removal");
+  param_list_decl_usage(pl, "dup-qmax", "upper limit of global q-range for 2-sided duplicate removal");
   param_list_decl_usage(pl, "sqside", "side of special-q (default=1)");
   param_list_decl_usage(pl, "mt",   "number of threads to use");
   verbose_decl_usage(pl);
