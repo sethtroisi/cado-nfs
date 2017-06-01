@@ -26,5 +26,6 @@ Checklist for making a release of CADO-NFS:
 15. Once the release is made, re-enable -Werror in cado.h for GCC.
 
 Files which contain the CADO version number and which need to be updated for a release:
+CMakeLists.txt
 README
 AUTHORS
