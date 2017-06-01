@@ -68,6 +68,7 @@ struct siever_config {
         int ncurves;       /* number of cofactorization curves */
         double lambda;     /* lambda sieve parameter */
         unsigned long qmin; /* smallest q sieved on this side, for dup sup */
+        unsigned long qmax; /* largest q sieved on this side, for dup sup */
     };
     side_config sides[2];
     siever_config() { memset(this, 0, sizeof(*this)); }

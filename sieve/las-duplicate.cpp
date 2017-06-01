@@ -259,8 +259,10 @@ sq_finds_relation(const unsigned long sq, const int sq_side,
     }
 
     /* In case we are on the sq_side and sq <= fbb, add sq */
-    if (side == sq_side && sq <= fbb)
+    if (side == sq_side && sq <= fbb) {
+      ASSERT_ALWAYS(nr_lp[side] < max_large_primes);
       large_primes[side][nr_lp[side]++] = sq;
+    }
 
     /* Compute the cofactor, dividing by sq on the special-q side. */
     compute_cofactor(cof[side], side == sq_side ? sq : 0, large_primes[side], nr_lp[side]);
@@ -276,7 +278,8 @@ sq_finds_relation(const unsigned long sq, const int sq_side,
   }
 
   /* We have no info as to which adjustment option is being used for the
-   * current project...
+   * current project... Let's assume the default adjust_strategy = 0
+   * FIXME !
    */
   Adj.sieve_info_update_norm_data_Jmax();
   siever_config conf = Adj.config();
@@ -379,7 +382,7 @@ clear_and_exit:
 
 /* This function decides whether the given (sq,side) was previously
  * sieved (compared to the current special-q stored in si.doing).
- * This takes qmin into account.
+ * This takes qmin and qmax into account.
  */
 static int
 sq_was_previously_sieved (const unsigned long sq, int side, sieve_info const & si){
@@ -388,8 +391,8 @@ sq_was_previously_sieved (const unsigned long sq, int side, sieve_info const & s
 					   current special-q */
     return 0;
 
-  return sq >= si.conf.sides[side].qmin;
-  //  && sq <  si.conf.sides[side].qmax;   FIXME!!!
+  return (sq >= si.conf.sides[side].qmin)
+      && (sq <  si.conf.sides[side].qmax);
 }
 
 /* For one special-q identified by (sq, side) (the root r is given
