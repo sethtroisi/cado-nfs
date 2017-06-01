@@ -311,17 +311,18 @@ void compute_all_spq(array_spq_ptr array_spq, uint64_t q, cado_poly_srcptr f,
   mpz_poly_factor(l, f->pols[q_side], q_Z, state);
   mpz_clear(q_Z);
 
+
   for (int i = 0; i < l->size; i++) {
     if (l->factors[i]->f->deg < deg_bound_factorise) {
       if (l->factors[i]->f->deg == 1) {
-        if (g->deg == 1 && mpz_poly_cmp(g, l->factors[i]->f)) {
+        if (g->deg == 1 && mpz_poly_cmp(g, l->factors[i]->f) != 0) {
           continue;
         }
         ideal_spq_set_part(array_spq_tmp->spq[array_spq_tmp->number], q,
             l->factors[i]->f, H->t, 0);
       } else {
         ASSERT(l->factors[i]->f->deg > 1);
-        if (g->deg > 1 && mpz_poly_cmp(g, l->factors[i]->f)) {
+        if (g->deg > 1 && mpz_poly_cmp(g, l->factors[i]->f) != 0) {
           continue;
         }
         ideal_spq_set_part(array_spq_tmp->spq[array_spq_tmp->number], q,
@@ -352,6 +353,17 @@ void compute_all_spq(array_spq_ptr array_spq, uint64_t q, cado_poly_srcptr f,
     }
   }
   mpz_poly_factor_list_clear(l);
+
+#ifndef NDEBUG
+  if (g->deg > 0) {
+    mpz_poly g_tmp;
+    mpz_poly_init(g_tmp, g->deg);
+    ASSERT(array_spq_tmp->number == 1);
+    ideal_spq_get_g(g_tmp, array_spq_tmp->spq[0]);
+    ASSERT(mpz_poly_cmp(g, g_tmp) == 0);
+    mpz_poly_clear(g_tmp);
+  }
+#endif // NDEBUG
 
   array_spq_swap(array_spq_tmp, array_spq);
   array_spq_clear(array_spq_tmp, H->t);
@@ -1143,7 +1155,7 @@ void find_new_vs(int64_vector_ptr vs, list_int64_vector_ptr v_refresh,
 void plane_sieve_1(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
     ideal_1_srcptr r, mat_int64_srcptr Mqr, sieving_bound_srcptr H,
     MAYBE_UNUSED mat_Z_srcptr matrix, MAYBE_UNUSED mpz_poly_srcptr f,
-    MAYBE_UNUSED uint64_t * nb_hit)
+    MAYBE_UNUSED uint64_t * nb_hit, MAYBE_UNUSED FILE * errstd)
 {
   ASSERT(Mqr->NumRows == Mqr->NumCols);
 
@@ -1161,8 +1173,8 @@ void plane_sieve_1(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
 
   if (!boolean) {
 #ifdef PLANE_SIEVE_ORTHO
-    fprintf(stderr, "# Plane sieve does not support this type of Mqr.\n");
-    mat_int64_fprintf_comment(stderr, Mqr);
+    fprintf(errstd, "# Plane sieve does not support this type of Mqr.\n");
+    mat_int64_fprintf_comment(errstd, Mqr);
     for (unsigned int i = 0; i < Mqr->NumCols; i++) {
       int64_vector_clear(vec[i]);
     }
@@ -1935,7 +1947,7 @@ void special_q_sieve(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
 #ifdef ASSERT_SIEVE
     printf("# Line sieve.\n");
     printf("# ");
-    ideal_fprintf(stdout, r->ideal);
+    ideal_fprintf(outstd, r->ideal);
     /*fprintf(stdout, "# Tqr = [");*/
     /*for (unsigned int i = 0; i < H->t - 1; i++) {*/
     /*fprintf(stdout, "%" PRIu64 ", ", Tqr[i]);*/
@@ -2082,7 +2094,7 @@ void special_q_sieve(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
 #ifdef ASSERT_SIEVE
     printf("# Plane sieve.\n");
     printf("# ");
-    ideal_fprintf(stdout, r->ideal);
+    ideal_fprintf(outstd, r->ideal);
     /*fprintf(stdout, "# Tqr = [");*/
     /*for (unsigned int i = 0; i < H->t - 1; i++) {*/
     /*fprintf(stdout, "%" PRIu64 ", ", Tqr[i]);*/
@@ -2102,14 +2114,15 @@ void special_q_sieve(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
     mat_int64_t Mqr_test;
     mat_int64_init(Mqr_test, H->t, H->t);
     compute_Mqr_1(Mqr_test, Tqr, H->t, r);
-    mat_int64_fprintf_comment(stdout, Mqr_test);
+    mat_int64_fprintf_comment(outstd, Mqr_test);
     mat_int64_clear(Mqr_test);
 #endif // TEST_MQR
 
     compute_Mqr_1(Mqr, Tqr, H->t, r);
 
     if (Mqr->coeff[1][1] != 1) {
-      plane_sieve_1(array, file_trace_pos, r, Mqr, H, matrix, f, &number_hit);
+      plane_sieve_1(array, file_trace_pos, r, Mqr, H, matrix, f, &number_hit,
+        errstd);
     } else {
       fprintf(errstd, "# Tqr = [");
       for (unsigned int i = 0; i < H->t - 1; i++) {
@@ -2189,7 +2202,7 @@ void special_q_sieve(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
     printf("# Space sieve.\n");
 #endif
     printf("# ");
-    ideal_fprintf(stdout, r->ideal);
+    ideal_fprintf(outstd, r->ideal);
     /*fprintf(stdout, "# Tqr = [");*/
     /*for (unsigned int i = 0; i < H->t - 1; i++) {*/
     /*fprintf(stdout, "%" PRIu64 ", ", Tqr[i]);*/
@@ -2209,7 +2222,7 @@ void special_q_sieve(array_ptr array, MAYBE_UNUSED FILE * file_trace_pos,
     mat_int64_t Mqr_test;
     mat_int64_init(Mqr_test, H->t, H->t);
     compute_Mqr_1(Mqr_test, Tqr, H->t, r);
-    mat_int64_fprintf_comment(stdout, Mqr_test);
+    mat_int64_fprintf_comment(outstd, Mqr_test);
     mat_int64_clear(Mqr_test);
 #endif // TEST_MQR
 
@@ -3038,6 +3051,12 @@ void initialise_parameters(int argc, char * argv[], cado_poly_ptr f,
 #ifndef NDEBUG
   if (g->deg > 0) {
     ASSERT((* q_range)[1] - (* q_range)[0] == 1);
+    mpz_t lc_tmp;
+    mpz_init(lc_tmp);
+    mpz_set(lc_tmp, mpz_poly_lc_const(g));
+    ASSERT(mpz_cmp_ui(lc_tmp, 1) == 0);
+    mpz_clear(lc_tmp);
+    ASSERT((unsigned int) g->deg < H->t);
   }
 #endif // NDEBUG
 
@@ -3273,7 +3292,7 @@ int main(int argc, char * argv[])
   prime_info pi;
   prime_info_init(pi);
   //Pass all the prime less than q_range[0].
-  if (q_range[1] - q_range[0] != 1 || g->deg <= 0) {
+  if (q_range[1] - q_range[0] != 1) {
     for (q = 2; q < q_range[0]; q = getprime_mt(pi)) {}
   }
 #ifdef SPQ_IDEAL_U
@@ -3294,7 +3313,7 @@ int main(int argc, char * argv[])
   }
 
   if (qfilespq == 0) {
-    if (q_range[1] - q_range[0] == 1 && g->deg > 0) {
+    if (q_range[1] - q_range[0] == 1) {
       fprintf(outstd, "# Assume that %" PRIu64 " is prime.\n", q_range[0]);
 #ifndef NDEBUG
       mpz_t tmp;

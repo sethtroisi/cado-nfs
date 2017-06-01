@@ -2,8 +2,8 @@
 project(CADO_NFS)
 
 set(CADO_VERSION_MAJOR  2)
-set(CADO_VERSION_MINOR  2)
-set(CADO_VERSION_PATCHLEVEL  1)
+set(CADO_VERSION_MINOR  3)
+set(CADO_VERSION_PATCHLEVEL 0-rc1)
 set(CADO_VERSION_STRING  "${CADO_VERSION_MAJOR}.${CADO_VERSION_MINOR}.${CADO_VERSION_PATCHLEVEL}")
 
 # CADO_DIST_ARCHIVE_NAME may be overridden by environment.
@@ -412,6 +412,8 @@ foreach(script split.py descent.py)
         ${CADO_NFS_BINARY_DIR}/scripts/${script}
         COPYONLY)
 endforeach(script)
+
+install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/scripts/descent.py DESTINATION ${LIBSUFFIX}/scripts)
 
 
 message(STATUS "Main scripts will go to ${CMAKE_INSTALL_PREFIX}/${BINSUFFIX}")
