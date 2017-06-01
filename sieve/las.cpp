@@ -1759,7 +1759,15 @@ divide_hints_from_bucket (factor_list_t *fl, mpz_t norm, const unsigned int N, c
   }
 }
 
-
+/* Extract all known primes (from bucket and small sieves) from the norm.
+ * It also removes all the tiny factors that were not resieved and are
+ * therefore trial-divided. (see -ththresh parameter)
+ *
+ * Note: there is another function trialdiv() without underscore that
+ * does just the second step.
+ *
+ * TODO: find a better name for this function.
+ */
 NOPROFILE_STATIC void
 trial_div (factor_list_t *fl, mpz_t norm, const unsigned int N, unsigned int x,
            const bool handle_2, bucket_primes_t *primes,
