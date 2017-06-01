@@ -393,9 +393,11 @@ void las_info::init_hint_table(param_list_ptr pl)/*{{{*/
         for( ; *x && !isdigit(*x) ; x++) ;
         z = strtoul(x, &x, 10); ASSERT_ALWAYS(z > 0);
         if (letter == 'I') {
+            sc.logI_adjusted = z;
             sc.logA = 2*z-1;
         } else if (letter == 'A') {
             sc.logA = z;
+            sc.logI_adjusted = (z+1)/2;
         } else {
             fprintf(stderr, "%s: parse error (want I= or A=) at %s\n", filename, line);
             exit(EXIT_FAILURE);
@@ -723,6 +725,18 @@ las_info::las_info(param_list_ptr pl)/*{{{*/
     descent_helper = NULL;
 #ifdef  DLP_DESCENT
     init_hint_table(pl);
+    // the I value in the default siever config must be at least the max
+    // of the I's found in the hint table, because it creates the
+    // fb_parts. Let's just gently abort in that case.
+    for(unsigned int i = 0 ; i < hint_table.size() ; i++) {
+        descent_hint & h(hint_table[i]);
+        int logI_adjusted = h.conf.logI_adjusted;
+        if (logI_adjusted > config_base.logI_adjusted) {
+            fprintf(stderr, "Error: the I value passed in command-line must be at least"
+                    " the ones found in the hint file\n");
+            exit (EXIT_FAILURE);
+        }
+    }
 
     dlog_base = new las_dlog_base();
     dlog_base->lookup_parameters(pl);
