@@ -1206,12 +1206,12 @@ unsigned int find_relations(uint64_array_t * indices, uint64_t number_element,
 
   if (gal == 6) {
     if (gal_version == 1) {
-#ifndef NOT_PRINT_RELATION
+#if !defined(NOT_PRINT_RELATION) && defined(PRINT_SPQ)
     for (unsigned int i = 0; i < 5; i++) {
       ideal_spq_clear(spqs[i], H->t);
     }
     free(spqs);
-#endif // NOT_PRINT_RELATION
+#endif // !defined(NOT_PRINT_RELATION) && defined(PRINT_SPQ)
     }
   }
   return nb_rel_found + nb_rel_gal;
