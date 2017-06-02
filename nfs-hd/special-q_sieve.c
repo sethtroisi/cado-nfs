@@ -2523,7 +2523,7 @@ void do_all_for_spq(array_spq_ptr spq, int64_t q, cado_poly_srcptr f,
     uint64_t * sieve_start, factor_base_t * fb, unsigned char * thresh,
     unsigned int * lpb, int main_side, uint64_t * nb_rel, uint64_t * spq_tot,
     double * total_time, FILE * file_space_sieve_stat,
-    factor_t * gal_norm_denom)
+    factor_t * gal_norm_denom, int * nb_curves)
 {
   double sec_tot;
   double sec_cofact;
@@ -2626,7 +2626,7 @@ void do_all_for_spq(array_spq_ptr spq, int64_t q, cado_poly_srcptr f,
     sec = seconds();
     * nb_rel += (uint64_t) find_relations(indexes, array->number_element, lpb,
         spq->MqLLL[i], f->pols, H, V, spq->spq[i], q_side, main_side,
-        outstd, gal, gal_version, gal_norm_denom);
+        outstd, gal, gal_version, gal_norm_denom, nb_curves);
     sec_cofact = seconds() - sec;
 
     for (unsigned j = 0; j < V; j++) {
@@ -2671,7 +2671,7 @@ void read_q_file(FILE * qfile, array_spq_ptr spq, cado_poly_srcptr f,
     uint64_t * sieve_start, factor_base_t * fb, unsigned char * thresh,
     unsigned int * lpb, int main_side, uint64_t * nb_rel, uint64_t * spq_tot,
     double * total_time, FILE * file_space_sieve_stat,
-    factor_t * gal_norm_denom)
+    factor_t * gal_norm_denom, int * nb_curves)
 {
   ASSERT(g->deg == -1);
 
@@ -2703,7 +2703,7 @@ void read_q_file(FILE * qfile, array_spq_ptr spq, cado_poly_srcptr f,
         gal, gal_version, c, nb_vec, g, outstd, file_trace_pos, max_norm, V,
         log2_base, indexes, array, time, errstd, sieve_start, fb, thresh, lpb,
         main_side, nb_rel, spq_tot, total_time, file_space_sieve_stat,
-        gal_norm_denom);
+        gal_norm_denom, nb_curves);
   }
   free(line);
 }
@@ -2812,7 +2812,7 @@ void read_q_file_spq(FILE * qfile, array_spq_ptr spq, cado_poly_srcptr f,
     array_ptr array, double ** time, FILE * errstd, uint64_t * sieve_start,
     factor_base_t * fb, unsigned char * thresh, unsigned int * lpb,
     int main_side, uint64_t * nb_rel, uint64_t * spq_tot, double * total_time,
-    FILE * file_space_sieve_stat, factor_t * gal_norm_denom)
+    FILE * file_space_sieve_stat, factor_t * gal_norm_denom, int * nb_curves)
 {
   size_t len = 1024;
   char * line = (char * ) malloc(sizeof(char) * len);
@@ -2849,7 +2849,7 @@ void read_q_file_spq(FILE * qfile, array_spq_ptr spq, cado_poly_srcptr f,
         gal, gal_version, c, nb_vec, g, outstd, file_trace_pos, max_norm, V,
         log2_base, indexes, array, time, errstd, sieve_start, fb, thresh, lpb,
         main_side, nb_rel, spq_tot, total_time, file_space_sieve_stat,
-        gal_norm_denom);
+        gal_norm_denom, nb_curves);
   }
   mpz_poly_clear(g);
   free(line);
@@ -2875,6 +2875,7 @@ void declare_usage(param_list pl)
   param_list_decl_usage(pl, "gal", "type of Galois action (autom<order>.<version>)");
   param_list_decl_usage(pl, "qfile", "path to a qfile");
   param_list_decl_usage(pl, "qfilespq", "path to a qfile");
+  param_list_decl_usage(pl, "nb_curves", "number of curves for the cofactorization");
 }
 
 /*
@@ -2899,7 +2900,7 @@ void initialise_parameters(int argc, char * argv[], cado_poly_ptr f,
     int * main_side, double ** log2_base, FILE ** outstd, FILE ** errstd,
     uint64_t ** sieve_start, sieving_bound_ptr Ha, mpz_poly_ptr g,
     unsigned int * gal, unsigned int * gal_version, FILE ** qfile,
-    unsigned int * qfilespq, factor_t ** gal_norm_denom)
+    unsigned int * qfilespq, factor_t ** gal_norm_denom, int ** nb_curves)
 {
   param_list pl;
   param_list_init(pl);
@@ -2982,6 +2983,7 @@ void initialise_parameters(int argc, char * argv[], cado_poly_ptr f,
   * sieve_start = (uint64_t *) malloc(sizeof(uint64_t) * (* V));
   * log2_base = (double *) malloc(sizeof(double) * (* V));
   * gal_norm_denom = (factor_t *) malloc(sizeof(factor_t) * (* V));
+  * nb_curves = (int *) malloc(sizeof(int) * (* V));
 
   param_list_parse_uint64_list(pl, "fbb", * fbb, (size_t) * V, ",");
 
@@ -3196,6 +3198,11 @@ void initialise_parameters(int argc, char * argv[], cado_poly_ptr f,
   }
   free(gal_str);
 
+  for (unsigned int i = 0; i < * V; i++) {
+    (*nb_curves)[i] = -1;
+  }
+  param_list_parse_int_list(pl, "nb_curves", * nb_curves, (size_t) * V, ",");
+
   param_list_clear(pl);
 }
 
@@ -3227,12 +3234,12 @@ int main(int argc, char * argv[])
   FILE * qfile;
   unsigned int qfilespq;
   factor_t * gal_norm_denom;
-
+  int * nb_curves;
 
   initialise_parameters(argc, argv, f, &fbb, &fb, H, &q_range, &thresh, &lpb,
       array, &q_side, &V, &main_side, &log2_base, &outstd, &errstd,
       &sieve_start, Ha, g, &gal, &gal_version, &qfile, &qfilespq,
-      &gal_norm_denom);
+      &gal_norm_denom, &nb_curves);
 
   //Store all the index of array with resulting norm less than thresh.
   uint64_array_t * indexes =
@@ -3347,7 +3354,8 @@ int main(int argc, char * argv[])
           deg_bound_factorise, skewness, gal, gal_version, c, nb_vec, g,
           outstd, file_trace_pos, max_norm, V, log2_base, indexes, array,
           time, errstd, sieve_start, fb, thresh, lpb, main_side, &nb_rel,
-          &spq_tot, &total_time, file_space_sieve_stat, gal_norm_denom);
+          &spq_tot, &total_time, file_space_sieve_stat, gal_norm_denom,
+          nb_curves);
     } else {
       ASSERT(q >= q_range[0]);
       ASSERT(qfile == NULL);
@@ -3357,7 +3365,7 @@ int main(int argc, char * argv[])
             skewness, gal, gal_version, c, nb_vec, g, outstd, file_trace_pos,
             max_norm, V, log2_base, indexes, array, time, errstd, sieve_start,
             fb, thresh, lpb, main_side, &nb_rel, &spq_tot, &total_time,
-            file_space_sieve_stat, gal_norm_denom);
+            file_space_sieve_stat, gal_norm_denom, nb_curves);
       }
     }
   } else if (qfilespq == 1){
@@ -3365,14 +3373,15 @@ int main(int argc, char * argv[])
         gal_version, c, nb_vec, g, outstd, file_trace_pos, max_norm, V,
         log2_base, indexes, array, time, errstd, sieve_start, fb, thresh, lpb,
         main_side, &nb_rel, &spq_tot, &total_time, file_space_sieve_stat,
-        gal_norm_denom);
+        gal_norm_denom, nb_curves);
   } else {
     ASSERT(qfilespq == 2);
 
     read_q_file_spq(qfile, spq, f, H, state, deg_bound_factorise, skewness, gal,
         gal_version, c, nb_vec, outstd, file_trace_pos, max_norm, V, log2_base,
         indexes, array, time, errstd, sieve_start, fb, thresh, lpb, main_side,
-        &nb_rel, &spq_tot, &total_time, file_space_sieve_stat, gal_norm_denom);
+        &nb_rel, &spq_tot, &total_time, file_space_sieve_stat, gal_norm_denom,
+        nb_curves);
   }
 
   fprintf(outstd, "# Total time: %fs.\n", total_time);
@@ -3495,6 +3504,7 @@ ideals.\n", i, nb, nb_more);
   }
   mpz_vector_clear(skewness);
   mpz_poly_clear(g);
+  free(nb_curves);
 
   return 0;
 }

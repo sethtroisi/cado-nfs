@@ -1067,7 +1067,7 @@ unsigned int find_relations(uint64_array_t * indices, uint64_t number_element,
     unsigned int * lpb, mat_Z_srcptr matrix, const mpz_poly * f,
     sieving_bound_srcptr H, unsigned int V, ideal_spq_srcptr special_q,
     unsigned int q_side, int main, FILE * outstd, unsigned int gal,
-    unsigned int gal_version, factor_t * gal_norm_denom)
+    unsigned int gal_version, factor_t * gal_norm_denom, int * nb_curves)
 {
   ideal_spq_t * spqs;
   if (gal == 6) {
@@ -1161,7 +1161,11 @@ unsigned int find_relations(uint64_array_t * indices, uint64_t number_element,
     data[i].fbb = B;
     data[i].BB = ((double)B) * ((double)B);
     data[i].BBB = ((double)B) * data[i].BB;
-    data[i].methods = facul_make_default_strategy(nb_curves95(lpb[i]), 0);
+    if (nb_curves[i] == -1) {
+      data[i].methods = facul_make_default_strategy(nb_curves95(lpb[i]), 0);
+    } else {
+      data[i].methods = facul_make_default_strategy(nb_curves[i], 0);
+    }
   }
 
   MAYBE_UNUSED unsigned int * number_factorisation =
