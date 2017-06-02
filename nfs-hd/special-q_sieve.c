@@ -2906,6 +2906,21 @@ void initialise_parameters(int argc, char * argv[], cado_poly_ptr f,
   declare_usage(pl);
   FILE * fpl;
   char * argv0 = argv[0];
+  char * orig_param;
+  int len = 3;
+  orig_param = (char *) malloc(len * sizeof(char));
+  orig_param[0] = '\0';
+  strcat(orig_param, "# ");
+
+  for (int i = 0; i < argc - 1; i++) {
+    len = len + strlen(argv[i]) + 1;
+    orig_param = (char *) realloc(orig_param, len * sizeof(char));
+    strcat(orig_param, argv[i]);
+    strcat(orig_param, " ");
+  }
+  len = len + strlen(argv[argc - 1]);
+  orig_param = (char *) realloc(orig_param, len * sizeof(char));
+  strcat(orig_param, argv[argc - 1]);
 
   argv++, argc--;
   for( ; argc ; ) {
@@ -2983,6 +2998,10 @@ void initialise_parameters(int argc, char * argv[], cado_poly_ptr f,
   } else {
     * outstd = fopen(path, "w");
   }
+
+  // Print command line.
+  fprintf(* outstd, "%s\n", orig_param);
+  free(orig_param);
 
   path[0] = '\0';
   param_list_parse_string(pl, "err", path, size_path);
@@ -3208,6 +3227,7 @@ int main(int argc, char * argv[])
   FILE * qfile;
   unsigned int qfilespq;
   factor_t * gal_norm_denom;
+
 
   initialise_parameters(argc, argv, f, &fbb, &fb, H, &q_range, &thresh, &lpb,
       array, &q_side, &V, &main_side, &log2_base, &outstd, &errstd,
