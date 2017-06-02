@@ -276,6 +276,9 @@ static void printf_relation(factor_t * factor,
 #endif // NOT_PRINT_RELATION
 
 
+// FIXME: This has been duplicated from facul.cpp
+// (September 2015).
+// Maybe merge again, at some point.
 typedef struct {
   unsigned long lpb;            // large prime bound = 2^lpb
   unsigned long fbb;            // fbb (the real bound, not its log)
@@ -317,14 +320,14 @@ nb_curves95 (const unsigned int lpb)
 /* lpb=32 */ 26, /* 25:0.940000, 26:0.950000 */
 /* lpb=33 */ 29, /* 28:0.942000, 29:0.952000 */
 /* lpb=34 */ 33, /* 32:0.948000, 33:0.956000 */
+/* lpb=35 */ 37, /* 36:0.938000, 37:0.952000 */
+/* lpb=36 */ 42, /* 41:0.946000, 42:0.952000 */
+/* lpb=37 */ 45, /* 44:0.946000, 45:0.958000 */
   };
   const unsigned int nT = sizeof(T)/sizeof(int) - 1;
   return (lpb <= nT) ? T[lpb] : T[nT];
 }
 
-// FIXME: This has been duplicated from facul.cpp
-// (September 2015).
-// Maybe merge again, at some point.
 // It returns -1 if the factor is not smooth, otherwise the number of
 // factors.
 // Remark: FACUL_NOT_SMOOTH is just -1.
