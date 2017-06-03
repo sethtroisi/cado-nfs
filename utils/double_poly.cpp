@@ -330,7 +330,7 @@ double_poly_mul(double_poly_ptr h, double_poly_srcptr f, double_poly_srcptr g)
  */
 /* cleans up leading coefficients too */
 void
-MAYBE_UNUSED double_poly_add(double_poly_ptr h, double_poly_srcptr f, double_poly_srcptr g)
+double_poly_add(double_poly_ptr h, double_poly_srcptr f, double_poly_srcptr g)
 {
     double_poly_realloc(h, MAX(f->deg, g->deg) + 1);
     int i = 0;
@@ -340,13 +340,13 @@ MAYBE_UNUSED double_poly_add(double_poly_ptr h, double_poly_srcptr f, double_pol
         h->coeff[i] = f->coeff[i];
     for (; i <= g->deg ; ++i)
         h->coeff[i] = g->coeff[i];
-    double_poly_cleandeg(h, f->deg + g->deg);
+    double_poly_cleandeg(h, MAX(f->deg, g->deg));
 }
 
 /* subtract */
 /* cleans up leading coefficients too */
 void
-MAYBE_UNUSED double_poly_sub(double_poly_ptr h, double_poly_srcptr f, double_poly_srcptr g)
+double_poly_sub(double_poly_ptr h, double_poly_srcptr f, double_poly_srcptr g)
 {
     double_poly_realloc(h, MAX(f->deg, g->deg) + 1);
     int i = 0;
@@ -356,11 +356,11 @@ MAYBE_UNUSED double_poly_sub(double_poly_ptr h, double_poly_srcptr f, double_pol
         h->coeff[i] = f->coeff[i];
     for (; i <= g->deg ; ++i)
         h->coeff[i] = -g->coeff[i];
-    double_poly_cleandeg(h, f->deg + g->deg);
+    double_poly_cleandeg(h, MAX(f->deg, g->deg));
 }
 
 void
-MAYBE_UNUSED double_poly_neg(double_poly_ptr h, double_poly_srcptr f)
+double_poly_neg(double_poly_ptr h, double_poly_srcptr f)
 {
     double_poly_realloc(h, f->deg + 1);
     for (int i = 0; i <= f->deg ; ++i)
@@ -460,16 +460,17 @@ recurse_roots(double_poly_srcptr poly, double *roots,
 double
 double_poly_bound_roots (double_poly_srcptr p)
 {
-    ASSERT_ALWAYS(0);
-  unsigned int d = p->deg, i;
+    ASSERT_ALWAYS(p->deg >= 0);
+  int d = p->deg;
   double_poly q;
   double s;
 
   s = p->coeff[d] > 0 ? 1.0 : -1.0;
   double_poly_init (q, d);
-  for (i = 0; i < d; i++)
+  for (int i = 0; i < d; i++)
     q->coeff[i] = (s * p->coeff[i] < 0) ? s * p->coeff[i] : 0.0;
   q->coeff[d] = fabs (p->coeff[d]);
+  double_poly_cleandeg(q, d);
   s = 1.0;
   while (double_poly_eval (q, s) < 0)
     s = s + s;
@@ -482,11 +483,11 @@ double_poly_bound_roots (double_poly_srcptr p)
 unsigned int
 double_poly_compute_roots(double *roots, double_poly_srcptr poly, double s)
 {
-    const unsigned int d = poly->deg;
+    const int d = poly->deg;
     double_poly *dg; /* derivatives of poly */
 
     /* The roots of the zero polynomial are ill-defined. Bomb out */
-    ASSERT_ALWAYS(d > 0 || poly->coeff[0] != 0.);
+    ASSERT_ALWAYS(d>=0);
 
     /* Handle constant polynomials separately */
     if (d == 0)
@@ -498,7 +499,7 @@ double_poly_compute_roots(double *roots, double_poly_srcptr poly, double s)
     dg[0]->deg = poly->deg;
     dg[0]->coeff = poly->coeff;
 
-    for (unsigned int k = 1; k < d; k++) {
+    for (int k = 1; k < d; k++) {
         /* dg[k] is the k-th derivative, thus has degree d-k, i.e., d-k+1
            coefficients */
         double_poly_init (dg[k], d - k);
@@ -506,10 +507,10 @@ double_poly_compute_roots(double *roots, double_poly_srcptr poly, double s)
     }
 
     unsigned int sign_changes = 0;
-    for (unsigned int k = d; k > 0; k--)
+    for (int k = d; k > 0; k--)
         sign_changes = recurse_roots(dg[k - 1], roots, sign_changes, s);
 
-    for (unsigned int k = 1; k < d; k++)
+    for (int k = 1; k < d; k++)
         double_poly_clear (dg[k]);
     free (dg);
 
@@ -522,7 +523,6 @@ double_poly_compute_all_roots_with_bound (double *roots,
                                           double_poly_srcptr poly,
                                           double B)
 {
-    ASSERT_ALWAYS(0);
   /* Positive roots */
   double bound = double_poly_bound_roots (poly);
   if (B < bound)
@@ -547,7 +547,6 @@ double_poly_compute_all_roots_with_bound (double *roots,
 unsigned int
 double_poly_compute_all_roots (double *roots, double_poly_srcptr poly)
 {
-    ASSERT_ALWAYS(0);
   return double_poly_compute_all_roots_with_bound (roots, poly, DBL_MAX);
 }
 
@@ -610,6 +609,15 @@ double_poly_set_mpz_poly (double_poly_ptr p, mpz_poly_srcptr q)
 /*
  * set the degree to deg, or maybe less given the possibly zero leading
  * coeffs.
+ *
+ * This will not zero out coefficients which have been written to beyond
+ * the stored degree for the polynomial. Of course, those need to be in
+ * the allocated range.
+ *
+ * When cleandeg is called with a degree more than the allocated range,
+ * the polynomial is reallocated to the requested degree, but the degree
+ * is set only to the largest possible degree given the previous
+ * allocated amount.
  */
 void double_poly_cleandeg(double_poly_ptr f, int deg)
 {
@@ -618,7 +626,7 @@ void double_poly_cleandeg(double_poly_ptr f, int deg)
         memset(f->coeff + f->deg + 1, 0, (deg - f->deg) * sizeof(double));
         /* we're not increasing f->deg, since we know that the rest is
          * made of zeroes */
-        deg = f->deg;
+        deg = f->alloc-1;
     }
     for( ; deg >= 0 && f->coeff[deg] == 0 ; deg--);
     f->deg = deg;

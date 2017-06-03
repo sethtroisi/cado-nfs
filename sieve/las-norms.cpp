@@ -446,7 +446,7 @@ void init_norms_roots_internal (cxx_double_poly const & f, double max_abs_root, 
     }
 
     /* Computation of F' */
-    double_poly_init (df, MAX(0,((int)degree - 1)));
+    double_poly_init (df, -1);
     double_poly_derivative (df, f);
 
     /* The roots of F' are inserted in roots */
@@ -459,10 +459,11 @@ void init_norms_roots_internal (cxx_double_poly const & f, double max_abs_root, 
 
     /* Computation of F" */
     /* XXX Hmm. We're computing (f/f')', here...  */
-    double_poly_init (df_df, df->deg + df->deg);
-    double_poly_init (ddf, MAX(0,((int)df->deg - 1)));
-    double_poly_init (f_ddf, f->deg + ddf->deg);
-    double_poly_init (d2f, MAX(f_ddf->deg, df_df->deg));
+    double_poly_init (df_df, -1);
+    double_poly_init (ddf, -1);
+    double_poly_init (f_ddf, -1);
+    double_poly_init (d2f, -1);
+
     double_poly_mul (df_df, df, df);
     double_poly_derivative (ddf, df);
     double_poly_mul (f_ddf, f, ddf);
