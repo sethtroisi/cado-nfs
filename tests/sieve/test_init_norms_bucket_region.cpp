@@ -74,6 +74,7 @@ bug_18810 (void)
   double_poly_init(u,1);
   u->coeff[0] = u0;
   u->coeff[1] = u1;
+  double_poly_cleandeg(u,1);
   init_degree_one_norms_bucket_region_internal (S, J, I, scale, u, cexp2);
   double_poly_clear(u);
 }
@@ -107,15 +108,16 @@ main(int argc, const char *argv[]) {
     for (d = MAX_DEGREE + 1; d--;) {
         cxx_double_poly poly(d);
       
-      double u[poly->deg + 1];
+      double u[d + 1];
       std::vector<smart_norm_root> roots;
       for (k = iter; k--;) {
 	J = ((uint32_t) random_uint64()) << 2;    /* 0 <= J < 2^30 at least */
 	J &= (I >> 1) - 1;                        /* Original J; 0 <= J < I/2 */
-	for (l = poly->deg + 1; l--;) {           /* (-2^63)^2 <= coeff <= (2^63-1)^2 */
+	for (l = d + 1; l--;) {           /* (-2^63)^2 <= coeff <= (2^63-1)^2 */
 	  poly->coeff[l] = (double) random_int64 () * (double) random_int64 ();
 	  if (UNLIKELY(poly->coeff[l] == 0.)) ++l; /* coef must be != 0. */
 	}
+        double_poly_cleandeg(poly, d);
 	endJ = (LOG_BUCKET_REGION - logI);
 	J >>= endJ;                 /* In order to be able to compute a complete region */
 	log2max = log2(fabs(get_maxnorm_alg (poly, didiv2, didiv2) + 1.));

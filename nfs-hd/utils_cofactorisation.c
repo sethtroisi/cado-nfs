@@ -276,6 +276,9 @@ static void printf_relation(factor_t * factor,
 #endif // NOT_PRINT_RELATION
 
 
+// FIXME: This has been duplicated from facul.cpp
+// (September 2015).
+// Maybe merge again, at some point.
 typedef struct {
   unsigned long lpb;            // large prime bound = 2^lpb
   unsigned long fbb;            // fbb (the real bound, not its log)
@@ -317,14 +320,14 @@ nb_curves95 (const unsigned int lpb)
 /* lpb=32 */ 26, /* 25:0.940000, 26:0.950000 */
 /* lpb=33 */ 29, /* 28:0.942000, 29:0.952000 */
 /* lpb=34 */ 33, /* 32:0.948000, 33:0.956000 */
+/* lpb=35 */ 37, /* 36:0.938000, 37:0.952000 */
+/* lpb=36 */ 42, /* 41:0.946000, 42:0.952000 */
+/* lpb=37 */ 45, /* 44:0.946000, 45:0.958000 */
   };
   const unsigned int nT = sizeof(T)/sizeof(int) - 1;
   return (lpb <= nT) ? T[lpb] : T[nT];
 }
 
-// FIXME: This has been duplicated from facul.cpp
-// (September 2015).
-// Maybe merge again, at some point.
 // It returns -1 if the factor is not smooth, otherwise the number of
 // factors.
 // Remark: FACUL_NOT_SMOOTH is just -1.
@@ -1067,7 +1070,7 @@ unsigned int find_relations(uint64_array_t * indices, uint64_t number_element,
     unsigned int * lpb, mat_Z_srcptr matrix, const mpz_poly * f,
     sieving_bound_srcptr H, unsigned int V, ideal_spq_srcptr special_q,
     unsigned int q_side, int main, FILE * outstd, unsigned int gal,
-    unsigned int gal_version, factor_t * gal_norm_denom)
+    unsigned int gal_version, factor_t * gal_norm_denom, int * nb_curves)
 {
   ideal_spq_t * spqs;
   if (gal == 6) {
@@ -1161,7 +1164,11 @@ unsigned int find_relations(uint64_array_t * indices, uint64_t number_element,
     data[i].fbb = B;
     data[i].BB = ((double)B) * ((double)B);
     data[i].BBB = ((double)B) * data[i].BB;
-    data[i].methods = facul_make_default_strategy(nb_curves95(lpb[i]), 0);
+    if (nb_curves[i] == -1) {
+      data[i].methods = facul_make_default_strategy(nb_curves95(lpb[i]), 0);
+    } else {
+      data[i].methods = facul_make_default_strategy(nb_curves[i], 0);
+    }
   }
 
   MAYBE_UNUSED unsigned int * number_factorisation =
@@ -1206,12 +1213,12 @@ unsigned int find_relations(uint64_array_t * indices, uint64_t number_element,
 
   if (gal == 6) {
     if (gal_version == 1) {
-#ifndef NOT_PRINT_RELATION
+#if !defined(NOT_PRINT_RELATION) && defined(PRINT_SPQ)
     for (unsigned int i = 0; i < 5; i++) {
       ideal_spq_clear(spqs[i], H->t);
     }
     free(spqs);
-#endif // NOT_PRINT_RELATION
+#endif // !defined(NOT_PRINT_RELATION) && defined(PRINT_SPQ)
     }
   }
   return nb_rel_found + nb_rel_gal;

@@ -3,7 +3,7 @@ set (sources
         cado_poly.c timing.cpp getprime.c mod_ul.c relation.cpp
         relation-tools.c
         modredc_ul.c modredc_15ul.c modredc_2ul2.c modul_poly.c gmp_aux.c
-        double_poly.c rootfinder.c params.c gcd.c
+        double_poly.cpp rootfinder.c params.c gcd.c
         mpz_array.c gzip.c misc.c
         mpz_mat.cpp mpz_poly.cpp crc.c purgedfile.c bit_vector.c
         barrier.c usp.c fix-endianness.c memusage.c
@@ -11,6 +11,7 @@ set (sources
         ringbuf.c sm_utils.c galois_utils.c memalloc.c 
 	mpz_vector.c memory.c stats.c lll.c
         verbose.c 
+        polyroots.c 
         tdict.cpp
         version_info.c
 	modified_files.c threadpool.cpp mpz_poly_bivariate.c

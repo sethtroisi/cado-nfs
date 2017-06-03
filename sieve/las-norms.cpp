@@ -27,7 +27,6 @@
 
 using namespace std;
 
-
 /*
  * These are two initializations of the algebraic and rational norms.
  * These 2 initializations compute F(i, const j)=f(i) for each line.
@@ -447,7 +446,7 @@ void init_norms_roots_internal (cxx_double_poly const & f, double max_abs_root, 
     }
 
     /* Computation of F' */
-    double_poly_init (df, MAX(0,((int)degree - 1)));
+    double_poly_init (df, -1);
     double_poly_derivative (df, f);
 
     /* The roots of F' are inserted in roots */
@@ -460,14 +459,15 @@ void init_norms_roots_internal (cxx_double_poly const & f, double max_abs_root, 
 
     /* Computation of F" */
     /* XXX Hmm. We're computing (f/f')', here...  */
-    double_poly_init (df_df, df->deg + df->deg);
-    double_poly_init (ddf, MAX(0,((int)df->deg - 1)));
-    double_poly_init (f_ddf, f->deg + ddf->deg);
-    double_poly_init (d2f, MAX(f_ddf->deg, df_df->deg));
-    double_poly_product (df_df, df, df);
+    double_poly_init (df_df, -1);
+    double_poly_init (ddf, -1);
+    double_poly_init (f_ddf, -1);
+    double_poly_init (d2f, -1);
+
+    double_poly_mul (df_df, df, df);
     double_poly_derivative (ddf, df);
-    double_poly_product (f_ddf, f, ddf);
-    double_poly_subtract (d2f, f_ddf, df_df);
+    double_poly_mul (f_ddf, f, ddf);
+    double_poly_sub (d2f, f_ddf, df_df);
 
     /* The roots of F" are inserted in roots */
     mpz_poly_set_double_poly(fz, d2f);
@@ -1376,7 +1376,7 @@ get_maxnorm_alg (double_poly_srcptr src_poly, const double X, const double Y)
   max_norm = get_maxnorm_aux_pm (poly, X/Y) * pow(Y, (double)d);
 
   /* (a) determine the maximum of |g(y)| for -1 <= y <= 1, with g(y) = F(s,y) */
-  double_poly_revert(poly);
+  double_poly_revert(poly, poly);
   norm = get_maxnorm_aux_pm (poly, Y/X) * pow(X, (double)d);
   if (norm > max_norm)
     max_norm = norm;
