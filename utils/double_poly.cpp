@@ -14,7 +14,7 @@
 void
 double_poly_init (double_poly_ptr p, int d)
 {
-  p->coeff = malloc ((d + 1) * sizeof (double));
+  p->coeff = (double*) malloc ((d + 1) * sizeof (double));
   FATAL_ERROR_CHECK(p->coeff == NULL, "malloc failed");
   p->deg = d;
 }

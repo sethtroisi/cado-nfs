@@ -17,7 +17,7 @@ add_definitions(-DWITH_PTHREADS)
 
 if (HAVE_CABSL)
 add_executable(crtalgsqrt ${EXCLUDE_FROM_RELEASE_BUILD} crtalgsqrt.c powers_of_p.cpp
-    polyroots.c knapsack.c)
+    knapsack.c)
 target_link_libraries(crtalgsqrt utils ${pthread_libs})
 
 set_target_properties(crtalgsqrt PROPERTIES

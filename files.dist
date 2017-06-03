@@ -438,8 +438,8 @@ sqrt/crtalgsqrt.c
 utils/gmp-hacks.h
 sqrt/knapsack.c
 sqrt/knapsack.h
-sqrt/polyroots.c
-sqrt/polyroots.h
+utils/polyroots.c
+utils/polyroots.h
 sqrt/powers_of_p.cpp
 sqrt/powers_of_p.h
 sqrt/sqrt.c
@@ -466,7 +466,7 @@ utils/fakempi.h
 utils/fakepthread.h
 utils/fix-endianness.c
 utils/fix-endianness.h
-utils/double_poly.c
+utils/double_poly.cpp
 utils/double_poly.h
 utils/mpz_vector.h
 utils/mpz_vector.c
