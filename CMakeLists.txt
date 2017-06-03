@@ -413,6 +413,8 @@ foreach(script split.py descent.py)
         COPYONLY)
 endforeach(script)
 
+install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/scripts/descent.py DESTINATION ${LIBSUFFIX}/scripts)
+
 
 message(STATUS "Main scripts will go to ${CMAKE_INSTALL_PREFIX}/${BINSUFFIX}")
 message(STATUS "Libraries and binaries will go to ${CMAKE_INSTALL_PREFIX}/${LIBSUFFIX}")

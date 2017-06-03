@@ -383,17 +383,13 @@ clear_and_exit:
  */
 static int
 sq_was_previously_sieved (const unsigned long sq, int side, sieve_info const & si){
-  /* whatever the side, if sq is larger than the current special-q, it was
-     previously sieved:
-     (i) either sq is on the same side, and it is clear;
-     (ii) or sq is on the other side, and we consider the relation was found
-          while sieving the current side */
   if (mpz_cmp_ui (si.doing.p, sq) <= 0) /* we use <= and not < since this
 					   function is also called with the
 					   current special-q */
     return 0;
 
   return sq >= si.conf.sides[side].qmin;
+  //  && sq <  si.conf.sides[side].qmax;   FIXME!!!
 }
 
 /* For one special-q identified by (sq, side) (the root r is given
@@ -431,7 +427,7 @@ relation_is_duplicate(relation const& rel, const int nb_threads,
   /* If the special-q does not fit in an unsigned long, we assume it's not a
      duplicate and just move on */
   if (!mpz_fits_ulong_p(si.doing.p)) {
-    return 0;
+    return false;
   }
 
   /* If any large prime doesn't fit in an unsigned long, then we assume
