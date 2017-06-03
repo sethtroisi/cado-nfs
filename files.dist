@@ -439,7 +439,6 @@ utils/gmp-hacks.h
 sqrt/knapsack.c
 sqrt/knapsack.h
 utils/polyroots.c
-utils/polyroots.h
 sqrt/powers_of_p.cpp
 sqrt/powers_of_p.h
 sqrt/sqrt.c

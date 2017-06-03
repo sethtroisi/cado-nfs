@@ -1,11 +1,18 @@
 /* arithmetic on polynomial with double-precision coefficients */
 #include "cado.h"
+#include <ostream>
+#include <sstream>
+#include <string>
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <limits.h>
 #include <math.h>   /* for fabs */
 #include <float.h> /* for DBL_MAX */
+#include <ctype.h> /* isspace */
+
+#define DOUBLE_POLY_EXPOSE_COMPLEX_FUNCTIONS
+
 #include "portability.h"
 #include "gcd.h"
 #include "double_poly.h"
@@ -14,101 +21,155 @@
 void
 double_poly_init (double_poly_ptr p, int d)
 {
-  p->coeff = (double*) malloc ((d + 1) * sizeof (double));
-  FATAL_ERROR_CHECK(p->coeff == NULL, "malloc failed");
-  p->deg = d;
+    if (d < 0) {
+        p->deg = -1;
+        p->alloc = 0;
+        p->coeff = NULL;
+    } else {
+        p->alloc = d + 1;
+        p->deg = -1;
+        p->coeff = (double*) malloc ((d + 1) * sizeof (double));
+        FATAL_ERROR_CHECK(p->coeff == NULL, "malloc failed");
+    }
 }
 
 /* Clear a polynomial */
 void
 double_poly_clear (double_poly_ptr p)
 {
-  free (p->coeff);
+    free(p->coeff);
+    memset(p, 0, sizeof(*p));
 }
+
+/* realloc to at least nc coefficients */
+/* This never shrinks (as in mpz_poly) */
+void
+double_poly_realloc (double_poly_ptr p, int nc)
+{
+    if (p->alloc >= nc) return;
+    p->alloc = nc;
+    p->coeff = (double*) realloc(p->coeff, p->alloc * sizeof(double));
+}
+
+
 
 /*
  * Set the degree of f.
  */
-static void double_poly_set_degree(double_poly_ptr f, int deg)
+#if 0
+void double_poly_set_degree(double_poly_ptr f, int deg)
 {
-  f->coeff = (double *) realloc(f->coeff, sizeof(double) * (deg + 1));
-  f->deg = deg;
+    ASSERT_ALWAYS(0);
+    /* do we really need this one, like this ? */
+    double_poly_realloc(f, deg + 1);
+    f->deg = deg;
 }
+#endif
 
-
-/* Set r = s. Assumes r has enough memory allocated. */
+/* Set r = s. */
 void
 double_poly_set (double_poly_ptr r, double_poly_srcptr s)
 {
-  double_poly_set_degree(r, s->deg);
-  for (int i = 0; i <= s->deg; i++) {
-    r->coeff[i] = s->coeff[i];
-  }
+    double_poly_realloc(r, s->deg + 1);
+    memcpy(r->coeff, s->coeff, (s->deg+1) * sizeof(double));
+    r->deg = s->deg;
+}
+void double_poly_set_xi(double_poly_ptr s, int i)
+{
+    ASSERT_ALWAYS(i >= -1);
+    double_poly_realloc(s, i+1);
+    s->deg = i;
+    if (i<0) return;
+    if (i) memset(s->coeff, 0, sizeof(double) * i);
+    s->coeff[i]=1;
+}
+
+void
+double_poly_set_zero (double_poly_ptr r)
+{
+    r->deg = -1;
 }
 
 /* Evaluate the polynomial p at point x */
 double
 double_poly_eval (double_poly_srcptr p, const double x)
 {
-  double r;
-  unsigned int k;
-  const double *f = p->coeff;
-  int deg = p->deg;
+    double r;
+    unsigned int k;
+    const double *f = p->coeff;
+    int deg = p->deg;
 
-  switch (deg) {
-  case -1: return 0;
-  case 0: return f[0];
-  case 1: return f[0]+x*f[1];
-  case 2: return f[0]+x*(f[1]+x*f[2]);
-  case 3: return f[0]+x*(f[1]+x*(f[2]+x*f[3]));
-  case 4: return f[0]+x*(f[1]+x*(f[2]+x*(f[3]+x*f[4])));
-  case 5: return f[0]+x*(f[1]+x*(f[2]+x*(f[3]+x*(f[4]+x*f[5]))));
-  case 6: return f[0]+x*(f[1]+x*(f[2]+x*(f[3]+x*(f[4]+x*(f[5]+x*f[6])))));
-  case 7: return f[0]+x*(f[1]+x*(f[2]+x*(f[3]+x*(f[4]+x*(f[5]+x*(f[6]+x*f[7]))))));
-  case 8: return f[0]+x*(f[1]+x*(f[2]+x*(f[3]+x*(f[4]+x*(f[5]+x*(f[6]+x*(f[7]+x*f[8])))))));
-  case 9: return f[0]+x*(f[1]+x*(f[2]+x*(f[3]+x*(f[4]+x*(f[5]+x*(f[6]+x*(f[7]+x*(f[8]+x*f[9]))))))));
-  default: for (r = f[deg], k = deg - 1; k != UINT_MAX; r = r * x + f[k--]); return r;
-  }
+    switch (deg) {
+        case -1: return 0;
+        case 0: return f[0];
+        case 1: return f[0]+x*f[1];
+        case 2: return f[0]+x*(f[1]+x*f[2]);
+        case 3: return f[0]+x*(f[1]+x*(f[2]+x*f[3]));
+        case 4: return f[0]+x*(f[1]+x*(f[2]+x*(f[3]+x*f[4])));
+        case 5: return f[0]+x*(f[1]+x*(f[2]+x*(f[3]+x*(f[4]+x*f[5]))));
+        case 6: return f[0]+x*(f[1]+x*(f[2]+x*(f[3]+x*(f[4]+x*(f[5]+x*f[6])))));
+        case 7: return f[0]+x*(f[1]+x*(f[2]+x*(f[3]+x*(f[4]+x*(f[5]+x*(f[6]+x*f[7]))))));
+        case 8: return f[0]+x*(f[1]+x*(f[2]+x*(f[3]+x*(f[4]+x*(f[5]+x*(f[6]+x*(f[7]+x*f[8])))))));
+        case 9: return f[0]+x*(f[1]+x*(f[2]+x*(f[3]+x*(f[4]+x*(f[5]+x*(f[6]+x*(f[7]+x*(f[8]+x*f[9]))))))));
+        default: for (r = f[deg], k = deg - 1; k != UINT_MAX; r = r * x + f[k--]); return r;
+    }
 }
+
+/* divide f by x-r, and return the quotient (which is f(r)) */
+double double_poly_div_linear(double_poly_ptr q, double_poly_srcptr p, const double r)
+{
+    /* supports self-assignment */
+    const double *f = p->coeff;
+    int deg = p->deg;
+    double u = f[deg];
+    for (int k = p->deg - 1; k >= 0; k--) {
+        double c = f[k];
+        q->coeff[k] = u;
+        u = u * r + c;
+    }
+    q->deg = p->deg - 1;
+    return u;
+}
+
 
 /* Evaluate the polynomial p at x:y */
 double
 double_poly_eval_homogeneous (double_poly_srcptr p, double x, double y)
 {
-  const double * f = p->coeff;
-  int deg = p->deg;
- 
-  switch (deg) {
-  case -1: return 0;
-  case 0: return f[0];
-  case 1: return y*f[0]+x*f[1];
-  case 2: return y*y*f[0]+x*(y*f[1]+x*f[2]);
-  }
+    const double * f = p->coeff;
+    int deg = p->deg;
 
-  double s = 0;
-  double px = 1;
-  for(int k = 0 ; k <= deg ; k++) {
-      s = s * y + f[k] * px;
-      px = px * x;
-  }
-  return s;
+    switch (deg) {
+        case -1: return 0;
+        case 0: return f[0];
+        case 1: return y*f[0]+x*f[1];
+        case 2: return y*y*f[0]+x*(y*f[1]+x*f[2]);
+    }
+
+    double s = 0;
+    double px = 1;
+    for(int k = 0 ; k <= deg ; k++) {
+        s = s * y + f[k] * px;
+        px = px * x;
+    }
+    return s;
 }
 
 /* return e and set r such that r*2^e = x */
 static long
 mpz_set_d_exp (mpz_t r, double x)
 {
-  long e;
+    long e;
 
-  if (x == 0.0)
+    if (x == 0.0)
     {
-      mpz_set_ui (r, 0);
-      return 0;
+        mpz_set_ui (r, 0);
+        return 0;
     }
 
-  e = ilogb (x) - 52;
-  mpz_set_d (r, ldexp (x, -e));
-  return e;
+    e = ilogb (x) - 52;
+    mpz_set_d (r, ldexp (x, -e));
+    return e;
 }
 
 /* Same as double_poly_eval, but uses arbitrary precision to avoid
@@ -230,94 +291,107 @@ double_poly_falseposition (double_poly_srcptr p, double a, double b, double pa)
 
 /* Stores the derivative of f in df. f and df may be identical.
    Assumes df has been initialized with degree at least f->deg-1. */
-void
+    void
 double_poly_derivative(double_poly_ptr df, double_poly_srcptr f)
 {
-  int n;
-  if (f->deg == 0) {
-    df->deg = 0; /* How do we store deg -\infty polynomials? */
-    df->coeff[0] = 0.;
-    return;
-  }
-  // at this point, f->deg >=1
-  for (n = 1; n <= f->deg; n++)
-    df->coeff[n - 1] = f->coeff[n] * (double) n;
-  df->deg = f->deg - 1;
+    double_poly_realloc(df, f->deg);      /* number of coefficients ! */
+    /* supports self-assignment */
+    for (int n = 1; n <= f->deg; n++)
+        df->coeff[n - 1] = f->coeff[n] * (double) n;
+    df->deg = f->deg - 1;
 }
 
 /* Stores the product of f and g in h (h = f * g).
-   Assumes h != f && h != g (f *= g is not accepted for example).
-   Assumes h has been initialized with degree at least f->deg + g->deg.
-*/
+ * supports self-assignment
+ */
 void
-double_poly_product(double_poly_ptr h, double_poly_srcptr f, double_poly_srcptr g)
+double_poly_mul(double_poly_ptr h, double_poly_srcptr f, double_poly_srcptr g)
 {
-  ASSERT(h->coeff != f->coeff && h->coeff != g->coeff);
-  ASSERT(h->deg >= f->deg + g->deg);
-  h->deg = f->deg + g->deg;
-  memset (h->coeff, 0, sizeof(double) * (h->deg + 1));
-  for (size_t i_f = f->deg + 1; i_f--; ) {
-    double fcoeff = f->coeff[i_f], *hcoeff = h->coeff + i_f;
-    for (size_t i_g = g->deg + 1; i_g--; )
-      hcoeff[i_g] += fcoeff * g->coeff[i_g];
-  }
+    if (h == f || h == g) {
+        double_poly nh;
+        double_poly_init(nh, f->deg + g->deg);
+        double_poly_mul(nh, f, g);
+        double_poly_swap(nh, h);
+        double_poly_clear(nh);
+        return;
+    }
+    double_poly_realloc(h, f->deg + g->deg + 1);
+    h->deg = f->deg + g->deg;
+    memset (h->coeff, 0, sizeof(double) * (h->deg + 1));
+    for (int i = 0 ; i <= f->deg ; i++) {
+        for(int j = 0 ; j <= g->deg ; j++) {
+            h->coeff[i+j] += f->coeff[i] * g->coeff[j];
+        }
+    }
 }
 
 /* Stores the sum of f and g in h (h = f + g).
-   Assumes h has been initialized with degree at least MAX(f->deg, g->deg).
-*/
+ * supports self-assignment (realloc does not invalidate)
+ */
+/* cleans up leading coefficients too */
 void
-MAYBE_UNUSED double_poly_sum(double_poly_ptr h, double_poly_srcptr f, double_poly_srcptr g)
+MAYBE_UNUSED double_poly_add(double_poly_ptr h, double_poly_srcptr f, double_poly_srcptr g)
 {
-  int i;
-  if (f->deg <= g->deg) {
-    ASSERT(h->deg >= g->deg);
-    h->deg = g->deg;
-    for (i = 0; i <= f->deg; ++i) h->coeff[i] = f->coeff[i] + g->coeff[i];
-    for (     ; i <= g->deg; ++i) h->coeff[i] = g->coeff[i];
-  } else {
-    ASSERT(h->deg >= f->deg);
-    h->deg = f->deg;
-    for (i = 0; i <= g->deg; ++i) h->coeff[i] = f->coeff[i] + g->coeff[i];
-    for (     ; i <= f->deg; ++i) h->coeff[i] = f->coeff[i];
-  }
+    double_poly_realloc(h, MAX(f->deg, g->deg) + 1);
+    int i = 0;
+    for (; i <= f->deg && i <= g->deg; ++i)
+        h->coeff[i] = f->coeff[i] + g->coeff[i];
+    for (; i <= f->deg ; ++i)
+        h->coeff[i] = f->coeff[i];
+    for (; i <= g->deg ; ++i)
+        h->coeff[i] = g->coeff[i];
+    double_poly_cleandeg(h, f->deg + g->deg);
 }
 
-/* Stores the subtraction of g to f in h (h = f - g).
-   Assumes h has been initialized with degree at least MAX(f->deg, g->deg).
-*/
+/* subtract */
+/* cleans up leading coefficients too */
 void
-double_poly_subtract(double_poly_ptr h, double_poly_srcptr f, double_poly_srcptr g)
+MAYBE_UNUSED double_poly_sub(double_poly_ptr h, double_poly_srcptr f, double_poly_srcptr g)
 {
-  int i;
-  if (f->deg <= g->deg) {
-    ASSERT(h->deg >= g->deg);
-    h->deg = g->deg;
-    for (i = 0; i <= f->deg; ++i) h->coeff[i] = f->coeff[i] - g->coeff[i];
-    for (     ; i <= g->deg; ++i) h->coeff[i] =             - g->coeff[i];
-  } else {
-    ASSERT(h->deg >= f->deg);
-    h->deg = f->deg;
-    for (i = 0; i <= g->deg; ++i) h->coeff[i] = f->coeff[i] - g->coeff[i];
-    for (     ; i <= f->deg; ++i) h->coeff[i] = f->coeff[i];
-  }
+    double_poly_realloc(h, MAX(f->deg, g->deg) + 1);
+    int i = 0;
+    for (; i <= f->deg && i <= g->deg; ++i)
+        h->coeff[i] = f->coeff[i] - g->coeff[i];
+    for (; i <= f->deg ; ++i)
+        h->coeff[i] = f->coeff[i];
+    for (; i <= g->deg ; ++i)
+        h->coeff[i] = -g->coeff[i];
+    double_poly_cleandeg(h, f->deg + g->deg);
 }
 
-/* Revert the coefficients in-place: f(x) => f(1/x) * x^degree */
 void
-double_poly_revert (double_poly_ptr f)
+MAYBE_UNUSED double_poly_neg(double_poly_ptr h, double_poly_srcptr f)
 {
-  const int d = f->deg;
+    double_poly_realloc(h, f->deg + 1);
+    for (int i = 0; i <= f->deg ; ++i)
+        h->coeff[i] = -f->coeff[i];
+    h->deg = f->deg;
+}
 
-  if (d <= 0)
-    return;
+/* Revert the coefficients: g(x) => f(1/x) * x^degree */
+/* cleans up leading coefficients too */
+void
+double_poly_revert (double_poly_ptr g, double_poly_srcptr f)
+{
+    if (g == f) {
+        const int d = f->deg;
 
-  /* if d is even, nothing to do for k=d/2 */
-  for (int k = 0; k <= (d - 1) / 2; k++)
-    {
-      double tmp = f->coeff[k];
-      f->coeff[k] = f->coeff[d - k];
-      f->coeff[d - k] = tmp;
+        if (d <= 0)
+            return;
+
+        /* if d is even, nothing to do for k=d/2 */
+        for (int k = 0; k <= (d - 1) / 2; k++)
+        {
+            double tmp = f->coeff[k];
+            f->coeff[k] = f->coeff[d - k];
+            f->coeff[d - k] = tmp;
+        }
+    } else {
+        double_poly_realloc(g, f->deg + 1);
+        for(int i = 0 ; i <= f->deg ; i++) {
+            g->coeff[f->deg-i] = f->coeff[i];
+        }
+        double_poly_cleandeg(g, f->deg);
     }
 }
 
@@ -325,14 +399,15 @@ double_poly_revert (double_poly_ptr f)
 static void
 double_poly_neg_x (double_poly_ptr r, double_poly_srcptr s)
 {
-  int i;
-  r->deg = s->deg;
-  for (i = 0; i < s->deg; i += 2) {
-    r->coeff[i]     = s->coeff[i]; /* Even power coeff */
-    r->coeff[i + 1] = -s->coeff[i + 1]; /* Odd power */
-  }
-  if (i == s->deg) /* iff deg is even */
-    r->coeff[i] = s->coeff[i];
+    int i;
+    double_poly_realloc(r, s->deg + 1);
+    r->deg = s->deg;
+    for (i = 0; i < s->deg; i += 2) {
+        r->coeff[i]     = s->coeff[i]; /* Even power coeff */
+        r->coeff[i + 1] = -s->coeff[i + 1]; /* Odd power */
+    }
+    if (i == s->deg) /* iff deg is even */
+        r->coeff[i] = s->coeff[i];
 }
 
 static unsigned int
@@ -385,6 +460,7 @@ recurse_roots(double_poly_srcptr poly, double *roots,
 double
 double_poly_bound_roots (double_poly_srcptr p)
 {
+    ASSERT_ALWAYS(0);
   unsigned int d = p->deg, i;
   double_poly q;
   double s;
@@ -406,38 +482,38 @@ double_poly_bound_roots (double_poly_srcptr p)
 unsigned int
 double_poly_compute_roots(double *roots, double_poly_srcptr poly, double s)
 {
-  const unsigned int d = poly->deg;
-  double_poly *dg; /* derivatives of poly */
-  
-  /* The roots of the zero polynomial are ill-defined. Bomb out */
-  ASSERT_ALWAYS(d > 0 || poly->coeff[0] != 0.);
+    const unsigned int d = poly->deg;
+    double_poly *dg; /* derivatives of poly */
 
-  /* Handle constant polynomials separately */
-  if (d == 0)
-    return 0; /* Constant non-zero poly -> no roots */
+    /* The roots of the zero polynomial are ill-defined. Bomb out */
+    ASSERT_ALWAYS(d > 0 || poly->coeff[0] != 0.);
 
-  dg = (double_poly *) malloc (d * sizeof (double_poly));
-  FATAL_ERROR_CHECK(dg == NULL, "malloc failed");
+    /* Handle constant polynomials separately */
+    if (d == 0)
+        return 0; /* Constant non-zero poly -> no roots */
 
-  dg[0]->deg = poly->deg;
-  dg[0]->coeff = poly->coeff;
-  
-  for (unsigned int k = 1; k < d; k++) {
-    /* dg[k] is the k-th derivative, thus has degree d-k, i.e., d-k+1
-       coefficients */
-    double_poly_init (dg[k], d - k);
-    double_poly_derivative (dg[k], dg[k - 1]);
-  }
-  
-  unsigned int sign_changes = 0;
-  for (unsigned int k = d; k > 0; k--)
-    sign_changes = recurse_roots(dg[k - 1], roots, sign_changes, s);
+    dg = (double_poly *) malloc (d * sizeof (double_poly));
+    FATAL_ERROR_CHECK(dg == NULL, "malloc failed");
 
-  for (unsigned int k = 1; k < d; k++)
-    double_poly_clear (dg[k]);
-  free (dg);
+    dg[0]->deg = poly->deg;
+    dg[0]->coeff = poly->coeff;
 
-  return sign_changes;
+    for (unsigned int k = 1; k < d; k++) {
+        /* dg[k] is the k-th derivative, thus has degree d-k, i.e., d-k+1
+           coefficients */
+        double_poly_init (dg[k], d - k);
+        double_poly_derivative (dg[k], dg[k - 1]);
+    }
+
+    unsigned int sign_changes = 0;
+    for (unsigned int k = d; k > 0; k--)
+        sign_changes = recurse_roots(dg[k - 1], roots, sign_changes, s);
+
+    for (unsigned int k = 1; k < d; k++)
+        double_poly_clear (dg[k]);
+    free (dg);
+
+    return sign_changes;
 }
 
 /* compute all roots whose absolute value is <= B */
@@ -446,6 +522,7 @@ double_poly_compute_all_roots_with_bound (double *roots,
                                           double_poly_srcptr poly,
                                           double B)
 {
+    ASSERT_ALWAYS(0);
   /* Positive roots */
   double bound = double_poly_bound_roots (poly);
   if (B < bound)
@@ -470,210 +547,160 @@ double_poly_compute_all_roots_with_bound (double *roots,
 unsigned int
 double_poly_compute_all_roots (double *roots, double_poly_srcptr poly)
 {
+    ASSERT_ALWAYS(0);
   return double_poly_compute_all_roots_with_bound (roots, poly, DBL_MAX);
 }
+
+std::string cxx_double_poly::print_poly(std::string const& var) const
+{
+    std::ostringstream os;
+    for(int i = 0 ; i <= x->deg ; i++) {
+        if (x->coeff[i] == 0) continue;
+        if (x->coeff[i] > 0 && os.str().size())
+            os << "+";
+        if (i == 0) {
+            os << x->coeff[i];
+        } else {
+            if (x->coeff[i] == -1) {
+                os << "-";
+            } else if (x->coeff[i] != 1) {
+                os << x->coeff[i] << "*";
+            }
+            os << var;
+            if (i > 1) os << "^" << i;
+        }
+
+    }
+    return os.str();
+}
+
 
 /* Print polynomial with floating point coefficients. Assumes f[deg] != 0
    if deg > 0. */
 void 
 double_poly_print (FILE *stream, double_poly_srcptr p, char *name)
 {
-  int i;
-  const double *f = p->coeff;
-  const int deg = p->deg;
+    cxx_double_poly F;
+    double_poly_set(F, p);
+    std::string s = F.print_poly(name);
+    fputs(s.c_str(), stream);
+}
 
-  fprintf (stream, "%s", name);
-
-  if (deg == -1)
-    fprintf(stream, "0");
-
-  if (deg == 0)
-    fprintf (stream, "%.16e", f[0]);
-
-  if (deg == 1)
-    fprintf (stream, "%.16e*x", f[1]);
-
-  if (deg > 1)
-    fprintf (stream, "%.16e*x^%d", f[deg], deg);
-
-  for (i = deg - 1; i >= 0; i--)
-    {
-      if (f[i] == 0.)
-	continue;
-      if (i == 0)
-	fprintf (stream, " %s %.16e", (f[i] > 0) ? "+" : "-", fabs(f[i]));
-      else if (i == 1)
-	fprintf (stream, " %s %.16e*x", (f[i] > 0) ? "+" : "-", fabs(f[i]));
-      else 
-	fprintf (stream, " %s %.16e*x^%d", (f[i] > 0) ? "+" : "-", fabs(f[i]), i);
-    }
-
-  fprintf (stream, "\n");
+int
+double_poly_asprint (char **t, double_poly_srcptr p, char *name)
+{
+    cxx_double_poly F;
+    double_poly_set(F, p);
+    std::string s = F.print_poly(name);
+    int n = s.size();
+    *t = (char*) malloc(n + 1);
+    memcpy(*t, s.c_str(), n + 1);
+    return n;
 }
 
 void
 double_poly_set_mpz_poly (double_poly_ptr p, mpz_poly_srcptr q)
 {
-  double_poly_set_degree(p, q->deg);
-  for (int i = 0; i <= q->deg; i++)
-    p->coeff[i] = mpz_get_d (q->coeff[i]);
+    double_poly_realloc(p, q->deg + 1);
+    for (int i = 0; i <= q->deg; i++)
+        p->coeff[i] = mpz_get_d (q->coeff[i]);
+    p->deg = q->deg;
 }
 
 /*
- * Other printf function.
+ * set the degree to deg, or maybe less given the possibly zero leading
+ * coeffs.
  */
-//TODO: remove that when resultant is done.
-MAYBE_UNUSED static void double_poly_fprintf(FILE *fp, double_poly_srcptr f)
+void double_poly_cleandeg(double_poly_ptr f, int deg)
 {
-  int i;
-
-  if (f->deg == -1)
-    {
-      fprintf(fp, "0\n");
-      return;
+    if (f->alloc < deg + 1) {
+        double_poly_realloc(f, deg + 1);
+        memset(f->coeff + f->deg + 1, 0, (deg - f->deg) * sizeof(double));
+        /* we're not increasing f->deg, since we know that the rest is
+         * made of zeroes */
+        deg = f->deg;
     }
-  else if (f->deg == 0)
-    {
-      fprintf(fp, "%f\n", f->coeff[0]);
-      return;
-    }
-  fprintf(fp, "%f", f->coeff[0]);
-  for (i = 1; i <= f->deg; ++i)
-    if (f->coeff[i] >= 0)
-      fprintf(fp, "+%f*x^%d", f->coeff[i], i);
-    else
-      fprintf(fp, "%f*x^%d", f->coeff[i], i);
-  fprintf(fp, "\n");
+    for( ; deg >= 0 && f->coeff[deg] == 0 ; deg--);
+    f->deg = deg;
 }
 
 /*
- * Compute the real degree of the polynomial and realloc coeff.
- */
-void double_poly_degree(double_poly_ptr f)
-{
-  while (f->deg >= 0 && f->coeff[f->deg] == 0) {
-    f->deg = f->deg - 1;
-  }
-  f->coeff = (double *) realloc(f->coeff, sizeof(double) * (f->deg + 1));
-}
-
-/*
- * Compare two polynomials.
+ * Compare two polynomials. Returns -1, 0, or 1 depending on whether a<b,
+ * a==b, or a>b.
  *
- * Assume that the polynomial is normalized.
+ * Assume that the polynomials are both normalized.
  */
-MAYBE_UNUSED static int double_poly_cmp(double_poly_ptr a, double_poly_ptr b)
+int double_poly_cmp(double_poly_srcptr a, double_poly_srcptr b)
 {
+    ASSERT_ALWAYS(0);
 #ifndef NDEBUG
-  if (a->deg > -1) {
-    ASSERT(a->coeff[a->deg] != 0);
-  }
-  if (b->deg > -1) {
-    ASSERT(b->coeff[b->deg] != 0);
-  }
+    if (a->deg > -1) {
+        ASSERT(a->coeff[a->deg] != 0);
+    }
+    if (b->deg > -1) {
+        ASSERT(b->coeff[b->deg] != 0);
+    }
 #endif // NDEBUG
 
-  int r = (a->deg > b->deg) - (b->deg > a->deg);
-  if (r) return r;
-  for(int d = a->deg; d >= 0 ; d--) {
-    double s = a->coeff[d] - b->coeff[d];
-    if (s != 0.0) return 1;
-  }
-  return 0;
+    int r = (a->deg > b->deg) - (b->deg > a->deg);
+    for(int d = a->deg; !r && d >= 0 ; d--) {
+        double s = a->coeff[d] - b->coeff[d];
+        r = (s >= 0) - (s <= 0);
+    }
+    return r;
 }
 
 /*
  * f = mul * g.
  */
-static void double_poly_mul_double(double_poly_ptr f, double_poly_srcptr g,
+void double_poly_mul_double(double_poly_ptr f, double_poly_srcptr g,
     double mul)
 {
-  if (g->deg < 0) {
-    f->deg = -1;
-    return;
-  }
+    if (g->deg < 0) {
+        f->deg = -1;
+        return;
+    }
 
-  ASSERT(mul != 0.0);
-  ASSERT(g->deg >= 0);
-  ASSERT(f->deg >= g->deg);
+    ASSERT(mul != 0.0);
+    ASSERT(g->deg >= 0);
+    ASSERT(f->deg >= g->deg);
 
-  double_poly_set(f, g);
+    double_poly_set(f, g);
 
-  for (int i = 0; i <= f->deg; i++) {
-    f->coeff[i] = f->coeff[i] * mul;
-  }
-  double_poly_degree( f);
+    for (int i = 0; i <= f->deg; i++) {
+        f->coeff[i] = f->coeff[i] * mul;
+    }
+    double_poly_cleandeg(f, f->deg);
 }
 
+#if 0
 /*
  * Return the content of f.
  */
 static double double_poly_content(double_poly_srcptr f)
 {
-  ASSERT(f->deg > -1);
+    ASSERT_ALWAYS(0);
+    ASSERT(f->deg > -1);
 
-  int64_t gcd = (int64_t)f->coeff[0];
-  for (int i = 1; i <= f->deg; i++) {
-    gcd = gcd_int64(gcd, (int64_t)f->coeff[i]);
-  }
-  return fabs((double) gcd);
+    int64_t gcd = (int64_t)f->coeff[0];
+    for (int i = 1; i <= f->deg; i++) {
+        gcd = gcd_int64(gcd, (int64_t)f->coeff[i]);
+    }
+    return fabs((double) gcd);
 }
+#endif
 
 /*
- * Return the leading coefficient of f.
+ * Return the leading coefficient of f, even with f not normalized.
+ * Returns 0 for the null polynomial.
  */
 static double double_poly_lc(double_poly_srcptr f)
 {
-  int deg = f->deg;
-  while (deg >= 0 && f->coeff[deg] == 0) {
-    deg = deg - 1;
-  }
-  return f->coeff[deg];
-}
-
-/*
- * This function can execute f = f * g.
- */
-static void double_poly_multiplication(double_poly_ptr h, double_poly_srcptr f,
-    double_poly_srcptr g)
-{
-  double_poly h_tmp;
-  double_poly_init(h_tmp, f->deg + g->deg);
-  double_poly_product(h_tmp, f, g);
-  double_poly_degree(h_tmp);
-  h->coeff = (double * ) realloc(h->coeff, sizeof(double) * (h_tmp->deg + 1));
-  double_poly_set(h, h_tmp);
-  double_poly_clear(h_tmp);
-}
-
-/*
- * This function can execute f = f + g.
- */
-static void double_poly_addition(double_poly_ptr h, double_poly_srcptr f,
-    double_poly_srcptr g)
-{
-  double_poly h_tmp;
-  double_poly_init(h_tmp, MAX(f->deg,g->deg));
-  double_poly_sum(h_tmp, f, g);
-  double_poly_degree(h_tmp);
-  h->coeff = (double * ) realloc(h->coeff, sizeof(double) * (h_tmp->deg + 1));
-  double_poly_set(h, h_tmp);
-  double_poly_clear(h_tmp);
-}
-
-/*
- * This function can execute f = f - g.
- */
-static void double_poly_subtraction(double_poly_ptr h, double_poly_srcptr f,
-    double_poly_srcptr g)
-{
-  double_poly h_tmp;
-  double_poly_init(h_tmp, MAX(f->deg, g->deg));
-  double_poly_subtract(h_tmp, f, g);
-  double_poly_degree(h_tmp);
-  h->coeff = (double * ) realloc(h->coeff, sizeof(double) * (h_tmp->deg + 1));
-  double_poly_set(h, h_tmp);
-  double_poly_clear(h_tmp);
+    for(int deg = f->deg ; deg >= 0 ; deg--) {
+        if (f->coeff[deg] != 0)
+            return f->coeff[deg];
+    }
+    return 0;
 }
 
 /*
@@ -681,12 +708,12 @@ static void double_poly_subtraction(double_poly_ptr h, double_poly_srcptr f,
  */
 static int double_poly_isnan_or_isinf(double_poly_srcptr f)
 {
-  for (int i = 0; i <= f->deg; i++) {
-    if (isnan(f->coeff[i]) || isinf(f->coeff[i])) {
-      return 1;
+    for (int i = 0; i <= f->deg; i++) {
+        if (isnan(f->coeff[i]) || isinf(f->coeff[i])) {
+            return 1;
+        }
     }
-  }
-  return 0;
+    return 0;
 }
 
 /*
@@ -697,262 +724,234 @@ static int double_poly_isnan_or_isinf(double_poly_srcptr f)
  *
  * Assume that deg(a) >= deg(b) and b is not the zero polynomial.
  *
- * Return 0 if fail, 1 otherwise.
+ * Return 0 on failure, 1 otherwise.
+ *
+ * No overlap allowed.
  */
 static int double_poly_pseudo_division(double_poly_ptr q, double_poly_ptr r,
     double_poly_srcptr a, double_poly_srcptr b)
 {
-  ASSERT(a->deg >= b->deg);
-  ASSERT(b->deg != -1);
+    ASSERT(a->deg >= b->deg);
+    ASSERT(b->deg != -1);
 
-#ifndef NDEBUG
-  if (q != NULL) {
-    ASSERT(q->deg >= a->deg - b->deg);
-  }
-#endif // NDEBUG
+    if (q) double_poly_realloc(q, a->deg - b->deg + 1);
 
-  ASSERT(r->deg == a->deg);
+    int m = a->deg;
+    int n = b->deg;
+    double d = double_poly_lc(b);
+    int e = m - n + 1;
+    double_poly s;
+    double_poly_init(s, m-n);
 
-  int m = a->deg;
-  int n = b->deg;
-  double d = double_poly_lc(b);
-  int e = m - n + 1;
-  double_poly s;
+    if (q) double_poly_set_zero(q);
 
-/*#ifndef NDEBUG*/
-  /*MAYBE_UNUSED double_poly q_tmp;*/
-/*#endif // NDEBUG*/
+    double_poly_set(r, a);
 
-  if (q != NULL) {
-    for (int i = 0; i <= q->deg; i++) {
-      q->coeff[i] = 0;
+    while (r->deg >= n) {
+        double_poly_cleandeg(r, r->deg);
+        double_poly_set_xi(s, r->deg - n);
+        s->coeff[r->deg - n] = double_poly_lc(r);
+
+        if (q) {
+            double_poly_mul_double(q, q, d);
+            double_poly_add(q, s, q);
+        }
+        double_poly_mul_double(r, r, d);
+
+        double_poly_mul(s, b, s);
+        int nrdeg = r->deg - 1;
+        double_poly_sub(r, r, s);
+        /* We'd like to enforce this because the subtraction may miss the
+         * cancellation of the leading term due to rounding.
+         */
+        double_poly_cleandeg(r, nrdeg);
+        e--;
+        //TODO: is it necessary?
+        if (double_poly_isnan_or_isinf(r) || r->deg == -1) {
+            return 0;
+        }
     }
-  }
-
-/*#ifndef NDEBUG*/
-  /*else {*/
-    /*double_poly_init(q_tmp, a->deg - b->deg);*/
-    /*for (int i = 0; i <= q_tmp->deg; i++) {*/
-      /*q_tmp->coeff[i] = 0;*/
-    /*}*/
-  /*}*/
-/*#endif // NDEBUG*/
-
-  double_poly_set(r, a);
-
-  while (r->deg >= n) {
-    double_poly_degree(r);
-    double_poly_init(s, r->deg - n);
-    memset(s->coeff, 0, sizeof(double) * (s->deg + 1));
-    s->coeff[r->deg - n] = double_poly_lc(r);
-
-    if (q != NULL) {
-      double_poly_mul_double(q, q, d);
-      double_poly_addition(q, s, q);
-    }
-
-/*#ifndef NDEBUG*/
-    /*else {*/
-      /*double_poly_mul_double(q_tmp, q_tmp, d);*/
-      /*double_poly_addition(q_tmp, s, q_tmp);*/
-    /*}*/
-/*#endif // NDEBUG*/
-
-    double_poly_mul_double(r, r, d);
-    double_poly_multiplication(s, b, s);
-    double_poly_subtraction(r, r, s);
     double_poly_clear(s);
-    e--;
-    //TODO: is it necessary?
-    if (double_poly_isnan_or_isinf(r) || r->deg == -1) {
-      return 0;
-    }
-  }
 
-  ASSERT(e >= 0);
+    ASSERT(e >= 0);
 
-  d = pow(d, (double) e);
-  if (q != NULL) {
-    double_poly_mul_double(q, q, d);
-  }
+    d = pow(d, (double) e);
+    if (q) double_poly_mul_double(q, q, d);
+    double_poly_mul_double(r, r, d);
 
-/*#ifndef NDEBUG*/
-  /*else {*/
-    /*double_poly_mul_double(q_tmp, q_tmp, d);*/
-  /*}*/
-/*#endif // NDEBUG*/
-
-  double_poly_mul_double(r, r, d);
-
-/*#ifndef NDEBUG*/
-  /*double_poly f, g;*/
-  /*double_poly_init(f, a->deg);*/
-  /*double_poly_init(g, a->deg);*/
-  /*double_poly_set(f, a);*/
-  /*double_poly_set(g, b);*/
-
-  /*d = double_poly_lc(g);*/
-
-  /*ASSERT(m - n + 1 >= 0);*/
-
-  /*d = pow(d, (double) (m - n + 1));*/
-  /*double_poly_mul_double(f, f, d);*/
-
-  /*if (q != NULL) {*/
-    /*double_poly_multiplication(g, g, q);*/
-  /*} else {*/
-    /*double_poly_multiplication(g, g, q_tmp);*/
-  /*}*/
-  /*double_poly_addition(g, g, r);*/
-
-  /*double_poly_degree(g);*/
-
-  /*ASSERT(double_poly_cmp(f, g) == 0);*/
-
-  /*double_poly_clear(f);*/
-  /*double_poly_clear(g);*/
-  /*if (q == NULL) {*/
-    /*double_poly_clear(q_tmp);*/
-  /*}*/
-/*#endif // NDEBUG*/
-
-  return 1;
+    return 1;
 }
 
 static int double_poly_pseudo_remainder(double_poly_ptr r,
     double_poly_srcptr a, double_poly_srcptr b)
 {
-  return double_poly_pseudo_division(NULL, r, a, b);
+    return double_poly_pseudo_division(NULL, r, a, b);
 }
 
 //TODO: follow the modification of mpz_poly_resultant.
 double double_poly_resultant(double_poly_srcptr p, double_poly_srcptr q)
 {
-  if (p->deg == -1 || q->deg == -1) {
-    return 0;
-  }
-
-  ASSERT(p->coeff[p->deg] != 0);
-
-  ASSERT(q->coeff[q->deg] != 0);
-
-  double_poly a;
-  double_poly b;
-  double_poly r;
-  double_poly_init(a, p->deg);
-  double_poly_init(b, q->deg);
-  double_poly_init(r, MAX(p->deg, q->deg));
-  double_poly_set(a, p);
-  double_poly_set(b, q);
-
-  int s = 1;
-  double g = double_poly_content(a);
-  double h = double_poly_content(b);
-  int d;
-
-  double_poly_mul_double(a, a, 1 / g);
-  double_poly_mul_double(b, b, 1 / h);
-
-  double t = pow(g, (double) b->deg) * pow(h, (double) a->deg);
-
-  int pseudo_div = 1;
-
-  g = 1;
-  h = 1;
-
-  if (a->deg < b->deg) {
-    double_poly_swap(a, b);
-
-    if ((a->deg % 2) == 1 && (b->deg % 2) == 1) {
-      s = -1;
+    if (p->deg == -1 || q->deg == -1) {
+        return 0;
     }
-  }
 
-  while (b->deg > 0) {
-    //TODO: verify if it is necessary.
-    d = a->deg - b->deg;;
+    ASSERT(p->coeff[p->deg] != 0);
 
-    if ((a->deg % 2) == 1 && (b->deg % 2) == 1) {
-      s = -s;
+    ASSERT(q->coeff[q->deg] != 0);
+
+    double_poly a;
+    double_poly b;
+    double_poly r;
+    double_poly_init(a, p->deg);
+    double_poly_init(b, q->deg);
+    double_poly_init(r, MAX(p->deg, q->deg));
+    double_poly_set(a, p);
+    double_poly_set(b, q);
+
+    int s = 1;
+    int d;
+
+    /* This does not really make sense on double_poly, does it ?
+     *
+    double g = double_poly_content(a);
+    double h = double_poly_content(b);
+    double_poly_mul_double(a, a, 1 / g);
+    double_poly_mul_double(b, b, 1 / h);
+    double t = pow(g, (double) b->deg) * pow(h, (double) a->deg);
+    */
+
+    int pseudo_div = 1;
+
+    double g = 1;
+    double h = 1;
+
+    if (a->deg < b->deg) {
+        double_poly_swap(a, b);
+
+        if ((a->deg % 2) == 1 && (b->deg % 2) == 1) {
+            s = -1;
+        }
     }
-    double_poly_set_degree(r, a->deg);
-    pseudo_div = double_poly_pseudo_remainder(r, a, b);
-    if (!pseudo_div) {
-      break;
-    }
-    /*double_poly_degree(r);*/
-    double_poly_set(a, b);
 
-    ASSERT(d >= 0);
+    while (b->deg > 0) {
+        //TODO: verify if it is necessary.
+        d = a->deg - b->deg;;
 
-    double_poly_mul_double(b, r, 1 / (g * pow(h, (double) d)));
-    //TODO: a is normalized, so g = a->coeff[a->deg].
-    g = double_poly_lc(a);
+        if ((a->deg % 2) == 1 && (b->deg % 2) == 1) {
+            s = -s;
+        }
+        pseudo_div = double_poly_pseudo_remainder(r, a, b);
+        if (!pseudo_div)
+            break;
+        /*double_poly_degree(r);*/
+        double_poly_set(a, b);
+
+        ASSERT(d >= 0);
+
+        double_poly_mul_double(b, r, 1 / (g * pow(h, (double) d)));
+        //TODO: a is normalized, so g = a->coeff[a->deg].
+        g = double_poly_lc(a);
 
 #ifdef NDEBUG
-    if (d == 0) {
-      ASSERT(h == 1);
-    }
+        if (d == 0) {
+            ASSERT(h == 1);
+        }
 #endif // NDEBUG
 
-    h = pow(h, (double) (d - 1));
-    h = pow(g, (double) d) / h;
-  }
-
-  if (pseudo_div) {
-    ASSERT(a->deg > 0);
-
-    //For now, if b->deg == -1, pseudo_div == 0.
-    if (b->deg == -1) {
-      ASSERT(0);
-    } else {
-
-      ASSERT(a->deg >= 0);
-
-      h = pow(b->coeff[0], (double) a->deg) / pow(h, (double) (a->deg - 1));
-
-      double_poly_clear(a);
-      double_poly_clear(b);
-      double_poly_clear(r);
-
-      h = (double)s * t * h;
+        h = pow(h, (double) (d - 1));
+        h = pow(g, (double) d) / h;
     }
-  } else {
-    //TODO: use last version of a and b in pseudo_division.
-    mpz_t res;
-    mpz_init(res);
-    mpz_poly f, g;
-    mpz_poly_init(f, p->deg);
-    mpz_poly_init(g, q->deg);
-    mpz_poly_set_double_poly(f, p);
-    mpz_poly_set_double_poly(g, q);
 
-    mpz_poly_resultant(res, f, g);
-    h = mpz_get_d(res);
+    if (pseudo_div) {
+        ASSERT(a->deg > 0);
 
-    mpz_poly_clear(f);
-    mpz_poly_clear(g);
+        //For now, if b->deg == -1, pseudo_div == 0.
+        if (b->deg == -1) {
+            ASSERT(0);
+        } else {
+
+            ASSERT(a->deg >= 0);
+
+            h = pow(b->coeff[0], (double) a->deg) / pow(h, (double) (a->deg - 1));
+
+            // h = (double)s * t * h;
+            // see further above: got rid of t.
+            h *= s;
+        }
+    } else {
+        // fall back. Why is it needed ? Is it covered by tests or not ?
+        //
+        //TODO: use last version of a and b in pseudo_division.
+        mpz_t res;
+        mpz_init(res);
+        mpz_poly f, g;
+        mpz_poly_init(f, p->deg);
+        mpz_poly_init(g, q->deg);
+        mpz_poly_set_double_poly(f, p);
+        mpz_poly_set_double_poly(g, q);
+
+        mpz_poly_resultant(res, f, g);
+        h = mpz_get_d(res);
+
+        mpz_poly_clear(f);
+        mpz_poly_clear(g);
+        mpz_clear(res);
+    }
     double_poly_clear(a);
     double_poly_clear(b);
     double_poly_clear(r);
-    mpz_clear(res);
-  }
 
-  return h;
+    return h;
 }
 
 /* swap f and g */
 void
 double_poly_swap (double_poly_ptr f, double_poly_ptr g)
 {
-  int i;
-  double *t;
-
-  i = f->deg;
-  f->deg = g->deg;
-  g->deg = i;
-
-  t = f->coeff;
-  f->coeff = g->coeff;
-  g->coeff = t;
+    int i = f->deg; f->deg = g->deg; g->deg = i;
+    int j = f->alloc; f->alloc = g->alloc; g->alloc = j;
+    double * t = f->coeff; f->coeff = g->coeff; g->coeff = t;
 }
+
+/* Parse a space-separated string as polynomial coefficients.
+ * Exactly one space between coefficients, none at start or end of string.
+ * If poly is NULL, nothing is written, but number of coefficients is
+ * returned.
+ */
+void double_poly_set_string(double_poly_ptr poly, const char *str)
+{
+    int n = 0;
+    /* parse a first time to find n */
+    for(const char * next = str ; next ; n++) {
+        int dx;
+        double coeff;
+        if (sscanf(next, "%lf%n", &coeff, &dx) != 1)
+            break;
+        next += dx;
+        ASSERT_ALWAYS(!*next || isspace(*next));
+        for( ; *next && isspace(*next) ; next++);
+    }
+    double_poly_realloc (poly, n); /* number of coefficients ! */
+    n = 0;
+    for(const char * next = str ; next ; n++) {
+        int dx;
+        if (sscanf(next, "%lf%n", &poly->coeff[n], &dx) != 1)
+            break;
+        next += dx;
+        for( ; *next && isspace(*next) ; next++);
+    }
+    double_poly_cleandeg(poly, n-1);
+}
+
+
+void double_poly_complex_roots(double _Complex *roots, double_poly_srcptr f)
+{
+    poly_roots_double(f->coeff, f->deg, roots);
+}
+
+void double_poly_complex_roots_long(long double _Complex *roots, double_poly_srcptr f)
+{
+    poly_roots_longdouble(f->coeff, f->deg, roots);
+}
+
+

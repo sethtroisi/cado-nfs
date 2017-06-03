@@ -11,7 +11,7 @@ set (sources
         ringbuf.c sm_utils.c galois_utils.c memalloc.c 
 	mpz_vector.c memory.c stats.c lll.c
         verbose.c 
-        polyroots.c
+        polyroots.c 
         tdict.cpp
         version_info.c
 	modified_files.c threadpool.cpp mpz_poly_bivariate.c
