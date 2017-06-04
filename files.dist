@@ -500,7 +500,6 @@ tests/tests_common.c
 tests/test_iceildiv.c
 tests/test_tests_common.c
 tests/sieve/CMakeLists.txt
-tests/sieve/test_init_norms_bucket_region.cpp
 tests/sieve/README
 tests/sieve/F9.sievetest.sh
 tests/sieve/F9.batchtest.sh
@@ -1220,4 +1219,3 @@ tests/sieve/rsa220.poly
 sieve/logapprox.cpp
 sieve/logapprox.hpp
 tests/sieve/test_logapprox.cpp
-sieve/las-norms-oldsmart.cpp

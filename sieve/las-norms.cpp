@@ -248,9 +248,9 @@ get_maxnorm_alg (double_poly_srcptr src_poly, const double X, const double Y)
  * The classical initialization is slow; the only optimization is done
  * by the fast computation of the log2. The associated error guarantees
  * the precision of the results +/- 1.
- * This initialization is done if SMART_NORM is undefined.
  *
- * The SMART_NORM version is faster.
+ * The "smart" version is faster (more than 10* for the rational side,
+ * almost 100* for the algebraic side).
  *
  * Both versions are implemented further down in this file.
  */
@@ -1162,5 +1162,3 @@ void sieve_range_adjust::set_minimum_J_anyway()
 {
     J = nb_threads << (LOG_BUCKET_REGION - logI);
 }
-
-#include "las-norms-oldsmart.cpp"

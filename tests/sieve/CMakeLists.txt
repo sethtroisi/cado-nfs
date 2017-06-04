@@ -153,11 +153,6 @@ cado_define_test(test_logapprox.cpp
     ${PROJECT_SOURCE_DIR}/sieve/logapprox.cpp
     LIBRARIES utils tests)
 
-cado_define_test(test_init_norms_bucket_region.cpp
-    ${PROJECT_SOURCE_DIR}/sieve/las-norms.cpp
-    ${PROJECT_SOURCE_DIR}/sieve/logapprox.cpp
-    LIBRARIES utils tests)
-
 # This one is a different test, meant to check speed and correctness, and
 # yet allow a run to simulate real polynomials because well, I can't be
 # sure with the current code... */

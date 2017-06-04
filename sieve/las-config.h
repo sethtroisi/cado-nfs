@@ -14,14 +14,6 @@
  * This imposes NORM_BITS >= 8, or even >= 9 for large factorizations. */
 #define NORM_BITS 10
 
-/* Smart norm computation. See las-norms.cpp. SMART_NORM is faster. */
-#define SMART_NORM
-
-#define SMART_NORM_STABILITY 3      /* Min:2; No max. Optimal: 3-4 */
-#define SMART_NORM_INFLUENCE 10     /* Min:4; > SMART_NORM_STABILITY. No max. Optimal: 8-12 */
-#define SMART_NORM_LENGTH    8      /* Min:3; no max. Optimal: 8-16 */
-#define SMART_NORM_DISTANCE  1.     /* Min:1.; no max. Optimal: 1.0-1.5; NB: float. */
-
 /* define PROFILE to keep certain functions from being inlined, in order to
    make them show up on profiler output */
 //#define PROFILE

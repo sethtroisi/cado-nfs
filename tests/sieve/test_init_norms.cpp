@@ -231,7 +231,6 @@ int main (int argc0, char *argv0[])/*{{{*/
     std::vector<std::string> impls;
     impls.push_back("reference");
     impls.push_back("smart");
-    impls.push_back("oldsmart");
 
     char ** opt_impls;
     int nopt_impls;
@@ -244,6 +243,9 @@ int main (int argc0, char *argv0[])/*{{{*/
         free(opt_impls);
     }
 
+    /* That's a maximum only. Currently we have only two lognorm
+     * implementations defined. 
+     */
 #define NCODES  3
     
     ASSERT_ALWAYS(impls.size() <= NCODES);
@@ -389,8 +391,6 @@ int main (int argc0, char *argv0[])/*{{{*/
                 } else if (s == "smart") {
                     /* For the moment we keep the "smart" code... */
                     lognorms[c][side] = std::make_shared<lognorm_smart>(conf, cpoly, side, Adj.Q, Adj.J);
-                } else if (s == "oldsmart") {
-                    lognorms[c][side] = std::make_shared<lognorm_oldsmart>(conf, cpoly, side, Adj.Q, Adj.J);
                 } else {
                     fprintf(stderr, "no such implementation: %s\n", s.c_str());
                     exit(EXIT_FAILURE);
