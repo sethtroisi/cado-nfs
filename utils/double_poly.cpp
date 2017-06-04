@@ -359,6 +359,42 @@ double_poly_sub(double_poly_ptr h, double_poly_srcptr f, double_poly_srcptr g)
     double_poly_cleandeg(h, MAX(f->deg, g->deg));
 }
 
+void double_poly_addmul(double_poly_ptr h, double_poly_srcptr f, double_poly_srcptr g)
+{
+    cxx_double_poly fg;
+    double_poly_mul(fg, f, g);
+    double_poly_add(h, h, fg);
+}
+
+void double_poly_submul(double_poly_ptr h, double_poly_srcptr f, double_poly_srcptr g)
+{
+    cxx_double_poly fg;
+    double_poly_mul(fg, f, g);
+    double_poly_sub(h, h, fg);
+}
+void double_poly_addmul_double(double_poly_ptr h, double_poly_srcptr g, double m)
+{
+    double_poly_realloc(h, MAX(h->deg, g->deg) + 1);
+    int i = 0;
+    for (; i <= h->deg && i <= g->deg; ++i)
+        h->coeff[i] += m * g->coeff[i];
+    for (; i <= g->deg ; ++i)
+        h->coeff[i] = m * g->coeff[i];
+    double_poly_cleandeg(h, MAX(h->deg, g->deg));
+}
+
+void double_poly_submul_double(double_poly_ptr h, double_poly_srcptr g, double m)
+{
+    double_poly_realloc(h, MAX(h->deg, g->deg) + 1);
+    int i = 0;
+    for (; i <= h->deg && i <= g->deg; ++i)
+        h->coeff[i] -= m * g->coeff[i];
+    for (; i <= g->deg ; ++i)
+        h->coeff[i] = -m * g->coeff[i];
+    double_poly_cleandeg(h, MAX(h->deg, g->deg));
+}
+
+
 void
 double_poly_neg(double_poly_ptr h, double_poly_srcptr f)
 {
