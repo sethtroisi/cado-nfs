@@ -103,7 +103,7 @@ T &reservation_array<T>::reserve()
     }
     if (!(best_i != n && best_full < 1.)) {
         fprintf(stderr, "Error: buckets are full!\n"
-                "This may occurr if you have set too many threads compared to the sizes of the factor bases.\n"
+                "This may occur if you have set too many threads compared to the sizes of the factor bases.\n"
                 "Please try again with less threads, and report bug if the problem is still there.\n");
         ASSERT_ALWAYS(0);
     }
