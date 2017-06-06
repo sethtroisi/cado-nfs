@@ -296,7 +296,7 @@ void compute_all_spq(array_spq_ptr array_spq, uint64_t q, cado_poly_srcptr f,
     sieving_bound_srcptr H, gmp_randstate_t state, int deg_bound_factorise,
     MAYBE_UNUSED mpz_vector_srcptr skewness, unsigned int gal,
     mpz_vector_t * c, unsigned int nb_vec, MAYBE_UNUSED mpz_poly_srcptr g,
-    unsigned int q_side)
+    unsigned int q_side, MAYBE_UNUSED FILE * errstd)
 {
   array_spq_t array_spq_tmp;
   array_spq_init(array_spq_tmp, f->pols[q_side]->deg, H->t);
@@ -352,19 +352,37 @@ void compute_all_spq(array_spq_ptr array_spq, uint64_t q, cado_poly_srcptr f,
       array_spq_tmp->number++;
     }
   }
-  mpz_poly_factor_list_clear(l);
 
-#ifndef NDEBUG
+#if !defined(NDEBUG) || defined(DESCENT)
   if (g->deg > 0) {
     mpz_poly g_tmp;
     mpz_poly_init(g_tmp, g->deg);
+
+#if NDEBUG
     ASSERT(array_spq_tmp->number == 1);
+#endif // NDEBUG
+#if DESCENT
+    fprintf(errstd, "# Polynomial g is false.\n");
+    fprintf(errstd, "# Should be a polynomial of ");
+    mpz_poly_factor_list_fprintf(stderr, l);
+#endif // DESCENT
+
     ideal_spq_get_g(g_tmp, array_spq_tmp->spq[0]);
+
+#if NDEBUG
     ASSERT(mpz_poly_cmp(g, g_tmp) == 0);
+#endif // NDEBUG
+#if DESCENT
+    fprintf(errstd, "# Polynomial g is false.\n");
+    fprintf(errstd, "# Should be a polynomial of ");
+    mpz_poly_factor_list_fprintf(stderr, l);
+#endif // DESCENT
+
     mpz_poly_clear(g_tmp);
   }
-#endif // NDEBUG
+#endif // !defined(NDEBUG) || defined(DESCENT)
 
+  mpz_poly_factor_list_clear(l);
   array_spq_swap(array_spq_tmp, array_spq);
   array_spq_clear(array_spq_tmp, H->t);
 
@@ -2531,7 +2549,7 @@ void do_all_for_spq(array_spq_ptr spq, int64_t q, cado_poly_srcptr f,
 
   //TODO: print time to build MqLLL.
   compute_all_spq(spq, q, f, H, state, deg_bound_factorise,
-      skewness, gal, c, nb_vec, g, q_side);
+      skewness, gal, c, nb_vec, g, q_side, errstd);
 
   for (unsigned int i = 0; i < spq->number; i++) {
     sec = seconds();
