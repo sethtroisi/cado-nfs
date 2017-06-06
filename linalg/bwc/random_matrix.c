@@ -1102,7 +1102,12 @@ void random_matrix_get_u32_bycolumns(gmp_randstate_t rstate, random_matrix_ddata
     last_printed->z = 0;
 
         size_t size0 = 0;
-        uint32_t * ptr = malloc(F->ncols * sizeof(uint32_t));
+        /* this will be used as a temporary buffer for the columns being
+         * created, before they get pushed to the main matrix (temp area
+         * is without coefficients -- those are generated on the second
+         * pass).
+         */
+        uint32_t * ptr = malloc(F->nrows * sizeof(uint32_t));
         random_matrix_ddata G;
         random_matrix_ddata_init(G);
         /* use a special ddata, for our specially simple process (which
