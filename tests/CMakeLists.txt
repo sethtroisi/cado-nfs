@@ -446,6 +446,7 @@ if(DEFINED ENV{CHECKS_EXPENSIVE})
         TARGET_DEPENDENCIES
             full_c30_dependencies
         )
+        if (BWC_GFP_ARITHMETIC_BACKENDS)
 #        this test is probably not very useful, given that the other
 #        (quicker) tests cover everything covered by this test.
 #        cado_define_test(full_p59
@@ -475,6 +476,7 @@ if(DEFINED ENV{CHECKS_EXPENSIVE})
             TARGET_DEPENDENCIES full_c30_dependencies debug_renumber
             plingen_pz sm reconstructlog-dl merge-dl replay-dl
 	    filter_galois)
+    endif()
 endif()
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
