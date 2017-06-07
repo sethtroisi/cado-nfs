@@ -198,7 +198,7 @@ bounded_pow(const unsigned long b, const unsigned long e, const unsigned long li
 */
 static unsigned char
 subtract_fb_log(const unsigned char lognorm, relation const& rel,
-                sieve_info const & si, const int side)
+                sieve_info const & si, const int side, unsigned long sq)
 {
   const unsigned long fbb = si.conf.sides[side].lim;
   const unsigned int nb_p = rel.sides[side].size();
@@ -206,8 +206,15 @@ subtract_fb_log(const unsigned char lognorm, relation const& rel,
 
   for (unsigned int i = 0; i < nb_p; i++) {
     const unsigned long p = mpz_get_ui(rel.sides[side][i].p);
-    const int e = rel.sides[side][i].e;
+    int e = rel.sides[side][i].e;
     ASSERT_ALWAYS(e > 0);
+
+    /* if p is the special-q, we should subtract only p^(e-1) */
+    if (p == sq)
+      e --;
+    if (e == 0)
+      continue;
+
     if (p <= fbb) {
       const unsigned long p_pow = bounded_pow(p, e, si.conf.sides[side].powlim);
       const unsigned char p_pow_log = fb_log(p_pow, si.sides[side].scale * LOG_SCALE, 0.);
@@ -328,7 +335,8 @@ sq_finds_relation(const unsigned long sq, const int sq_side,
   uint8_t remaining_lognorm[2];
   for (int side = 0; side < 2; side++) {
     const uint8_t lognorm = estimate_lognorm(si, i, j, side);
-    remaining_lognorm[side] = subtract_fb_log(lognorm, rel, si, side);
+    remaining_lognorm[side] = subtract_fb_log(lognorm, rel, si, side,
+					      (side == sq_side) ? sq : 0);
     if (remaining_lognorm[side] > si.sides[side].bound) {
       verbose_output_print(0, VERBOSE_LEVEL, "# DUPECHECK On side %d, remaining lognorm = %" PRId8 " > bound = %" PRId8 "\n",
               side, remaining_lognorm[side], si.sides[side].bound);
