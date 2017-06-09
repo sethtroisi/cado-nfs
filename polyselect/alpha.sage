@@ -68,24 +68,13 @@ def average_valuation_affine(f,p):
 # same as average_valuation_affine, but for the class a/b = r mod p
 def average_valuation_affine_sub(f,p,r):
     v = valuation (f.content(), p)
-    ZP= f.parent()
-    x = ZP.gen()
-    fv = ZP(f/p^v)
-    Q = GF(p)['x'](fv.derivative())
-    for t,_ in fv.roots(GF(p)):
-        t = ZZ(t)
-        if t != r:
-           continue
-        if Q(t) != 0: # single root
-            # we count 1 for this root (with probability 1 since we are
-            # in the residue class of this root), plus 1 when p^2 divides
-            # (with probability 1/p), ..., thus 1 + 1/p + ... = p/(p-1)
-            v += p/(p-1)
-        else:
-            f2 = fv(t+p*x)
-            # since we are in this case in the general case (no restriction
-            # any more on x), we call average_valuation_affine() [no _sub]
-            v += average_valuation_affine(f2, p)
+    fv = f//p^v
+    if fv(r) % p == 0:
+        x = f.parent().0
+        f2 = fv(r+p*x)
+        # since we are in this case in the general case (no restriction
+        # any more on x), we call average_valuation_affine() [no _sub]
+        v += average_valuation_affine(f2, p)
     return v
 
 #def ava_deviation(f,p):
