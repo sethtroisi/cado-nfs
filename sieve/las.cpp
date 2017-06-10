@@ -1123,9 +1123,9 @@ void factor_survivors_data::search_survivors(timetree_t & timer)
             verbose_output_print(TRACE_CHANNEL, 0,
                     "# side0.Bound[%u]=%u, side1.Bound[%u]=%u\n",
                     sdata[0].S[trace_Nx.x],
-                    sdata[0].S[x] <= side0.bound ? 0 : side0.bound,
+                    sdata[0].S[x] <= side0.lognorms->bound ? 0 : side0.lognorms->bound,
                     sdata[1].S[trace_Nx.x],
-                    sdata[1].S[x] <= side0.bound ? 0 : side1.bound);
+                    sdata[1].S[x] <= side0.lognorms->bound ? 0 : side1.lognorms->bound);
             /* Hmmm, is that right ? side0.bound 3 times, really ? XXX */
         }
     }
@@ -1141,8 +1141,8 @@ void factor_survivors_data::search_survivors(timetree_t & timer)
             sdata[1].S + (j << si.conf.logI_adjusted)
         };
         const unsigned char both_bounds[2] = {
-            si.sides[0].bound,
-            si.sides[1].bound,
+            si.sides[0].lognorms->bound,
+            si.sides[1].lognorms->bound,
         };
         size_t old_size = survivors.size();
         search_survivors_in_line(both_S, both_bounds,
@@ -1349,7 +1349,7 @@ void factor_survivors_data::cofactoring (timetree_t & timer)
             // ones reduced to (-I/2, I/2) using sublattices.
             NxToIJ (&i, &j, N, x, si);
             adjustIJsublat(&i, &j, si);
-            mpz_poly_homogeneous_eval_siui (norm[side], si.sides[side].fij, i, j);
+            si.sides[side].lognorms->norm(norm[side], i, j);
 
 #ifdef TRACE_K
             if (trace_on_spot_ab(a, b)) {
@@ -1701,21 +1701,9 @@ void * process_bucket_region(timetree_t & timer, thread_data *th)
 
                 /* Init norms */
                 rep->tn[side] -= seconds_thread ();
-#ifdef SMART_NORM
-                init_norms_bucket_region(S[side], i, si, side, 1);
-#else
-                init_norms_bucket_region(S[side], i, si, side, 0);
-#endif
-                // Invalidate the first row except (1,0)
-                // TODO: in sublat mod, we keep all the (i0,0), which is useless.
-                if (side == 0 && i == 0 && 
-                        ((si.conf.sublat.m == 0) || si.conf.sublat.j0 == 0))
-                {
-                    int pos10 = 1+((si.I)>>1);
-                    unsigned char n10 = S[side][pos10];
-                    memset(S[side], 255, si.I);
-                    S[side][pos10] = n10;
-                }
+
+                si.sides[side].lognorms->fill(S[side], i);
+
                 rep->tn[side] += seconds_thread ();
 #if defined(TRACE_K) 
                 if (trace_on_spot_N(w.N))
@@ -2302,13 +2290,6 @@ int main (int argc0, char *argv0[])/*{{{*/
         }
 
         verbose_output_print(0, 2, "# I=%u; J=%u\n", si.I, si.J);
-        if (las.verbose >= 2) {
-            verbose_output_print (0, 1, "# f_0'(x) = ");
-            mpz_poly_fprintf(las.output, si.sides[0].fij);
-            verbose_output_print (0, 1, "# f_1'(x) = ");
-            mpz_poly_fprintf(las.output, si.sides[1].fij);
-        }
-
 /* XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX */
 unsigned int sublat_bound = si.conf.sublat.m;
 if (sublat_bound == 0)
@@ -2329,6 +2310,13 @@ for (unsigned int j_cong = 0; j_cong < sublat_bound; ++j_cong) {
 
         /* essentially update the fij polynomials and the max log bounds */
         si.update_norm_data();
+
+        if (las.verbose >= 2) {
+            verbose_output_print (0, 1, "# f_0'(x) = ");
+            mpz_poly_fprintf(las.output, si.sides[0].lognorms->fij);
+            verbose_output_print (0, 1, "# f_1'(x) = ");
+            mpz_poly_fprintf(las.output, si.sides[1].lognorms->fij);
+        }
 
         /* Now we're ready to sieve. We have to refresh some fields
          * in the sieve_info structure, otherwise we'll be polluted by

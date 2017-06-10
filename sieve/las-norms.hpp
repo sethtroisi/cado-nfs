@@ -2,46 +2,93 @@
 #define LAS_NORMS_HPP_
 
 #include <stdint.h>
-#include "las-forwardtypes.hpp"
 #include "las-siever-config.hpp"
-#include "las-types.hpp"
+#include "las-qlattice.hpp"
+#include "mpz_poly.h"
 #include "double_poly.h"
-
-
-/* Initialize lognorms for the bucket_region number J. It's a wrapper.
- * For the moment, nothing clever, wrt discarding (a,b) pairs that are
- * not coprime.
- * The sieve area S must be preallocated with at least (BUCKET_REGION +
- * MEMSET_MIN) space. Indeed, the algorithm that is used might write a
- * bit beyond the meaningful area.
- */
-void init_norms_bucket_region (unsigned char *S, uint32_t J, sieve_info& si, unsigned int side, unsigned int smart);
+#include "cado_poly.h"
+#include "logapprox.hpp"
 
 double get_maxnorm_alg (double_poly_srcptr src_poly, const double X, const double Y);
 
-void sieve_info_init_norm_data_sq (sieve_info& si, unsigned long q);
+struct lognorm_base {/*{{{*/
+    int logI, J;
 
-  
-struct smart_norm_root {
-  unsigned char derivative; /* 0 = root of F; 1 = root of F'; and so on */
-  double value;             /* root of F(i,1) or derivatives of F. */
-  smart_norm_root(unsigned char derivative = 0, double value = 0) : derivative(derivative), value(value) {}
+    unsigned char bound; /* A sieve array entry is a sieve survivor if it is
+                            at most "bound" on each side */
+
+    protected:
+    double maxlog2;      /* Bound on the log in base 2. This is
+                            intermediary data, really. */
+    public:
+    cxx_mpz_poly fij;  /* coefficients of F(a0*i+a1*j, b0*i+b1*j)
+                        * (divided by q on the special-q side) */
+
+    cxx_double_poly fijd;      /* coefficients of F_q (divided by q
+                                * on the special q side) */
+
+    double scale;      /* scale used for logarithms for fb and norm.
+                        * must be of form (int)x * 0.1 */
+
+    lognorm_base(siever_config const & sc, cado_poly_srcptr cpoly, int side, qlattice_basis const & Q, int J);
+
+    void norm(mpz_ptr x, int i, unsigned int j) const;
+    unsigned char lognorm(int i, unsigned int j) const;
+
+    virtual void fill(unsigned char * S, int N MAYBE_UNUSED) const {
+        /* Whether we put something or not here is not really important.
+         * A no-op would do as well. */
+        memset(S, 255, 1U << LOG_BUCKET_REGION);
+    }
 };
 
-/* These segments ((x, F(x)), (y, F(y))) are used in the smart normalization */
-typedef struct sg_s {
-  int begin, end;
-  double f_begin, f_end;
-} sg_t;
+/*}}}*/
+struct lognorm_reference : public lognorm_base {/*{{{*/
+    /* See init_degree_X_norms_bucket_region_referencecode for the
+     * explanation of this table. */
+    unsigned char lognorm_table[1 << NORM_BITS];
 
-/* These functions are internals. Don't use them. Use the wrapper above.
-   It's need to declare them here for units & coverage tests.
- */
-void init_degree_one_norms_bucket_region_internal     (unsigned char *S, uint32_t J, uint32_t I, double scale, cxx_double_poly const &, double *cexp2);
-void init_exact_degree_X_norms_bucket_region_internal (unsigned char *S, uint32_t J, uint32_t I, double scale, cxx_double_poly const & fijd);
-void init_smart_degree_X_norms_bucket_region_internal (unsigned char *S, uint32_t J, uint32_t I, double scale, cxx_double_poly const & fijd, std::vector<smart_norm_root> const & roots);
-void init_norms_roots_internal (cxx_double_poly const &, double max_abs_root, double precision, std::vector<smart_norm_root> & roots);
-void init_norms_roots (sieve_info & si, unsigned int side);
+    lognorm_reference(siever_config const & sc, cado_poly_srcptr cpoly, int side, qlattice_basis const & Q, int J);
+    virtual void fill(unsigned char * S, int N) const;
+};
+
+/*}}}*/
+struct lognorm_smart : public lognorm_base {/*{{{*/
+    /* This table depends on the scale of the logarithm, so clearly it
+     * can't be shared between sides.
+     */
+    double cexp2[257];
+    /* For degree>1 only: a piecewise linear approximation of the
+     * polynomial, which is within an multiplicative factor of the
+     * original one on the segment [-I,I]x{1}.
+     */
+    piecewise_linear_function G;
+    lognorm_smart(siever_config const & sc, cado_poly_srcptr cpoly, int side, qlattice_basis const & Q, int J);
+    virtual void fill(unsigned char * S, int N) const;
+};
+
+/*}}}*/
+struct lognorm_oldsmart : public lognorm_base {/*{{{*/
+    double cexp2[257]; /* "almost" 2^X * scale + GUARD, but not exactly */
+
+    struct smart_norm_root {
+        unsigned char derivative; /* 0 = root of F; 1 = root of F'; and so on */
+        double value;             /* root of F(i,1) or derivatives of F. */
+        smart_norm_root(unsigned char derivative = 0, double value = 0) : derivative(derivative), value(value) {}
+    };
+
+    /* This is auxiliary data for the compuation of algebraic norms */
+    std::vector<smart_norm_root> roots;     /* roots of F, F', F"
+                                             * and maybe F'" - cf
+                                             * init_norms* in 
+                                             * las-norms.cpp */
+
+    lognorm_oldsmart(siever_config const & sc, cado_poly_srcptr cpoly, int side, qlattice_basis const & Q, int J);
+
+    virtual void fill(unsigned char * S, int N) const;
+};
+
+/*}}}*/
 
 struct sieve_range_adjust {/*{{{*/
     friend struct sieve_info;
@@ -108,6 +155,7 @@ public:
     // XXX when estimated_yield() wins, this will probably no longer be
     // necessary.
     void set_minimum_J_anyway();
+
     siever_config const& config() const { return conf; }
 private:
     template<typename T> struct mat {
@@ -132,4 +180,31 @@ private:
     int adapt_threads(const char *);
     double estimate_yield_in_sieve_area(mat<int> const& shuffle, int squeeze, int N);
 };/*}}}*/
+
+#if 0
+/* Initialize lognorms for the bucket_region number J. It's a wrapper.
+ * For the moment, nothing clever, wrt discarding (a,b) pairs that are
+ * not coprime.
+ * The sieve area S must be preallocated with at least (BUCKET_REGION +
+ * MEMSET_MIN) space. Indeed, the algorithm that is used might write a
+ * bit beyond the meaningful area.
+ */
+void init_norms_bucket_region (unsigned char *S, uint32_t J, sieve_info& si, unsigned int side, unsigned int smart);
+
+
+/* We expose too much, here */
+  
+/* These functions are internals. Don't use them. Use the wrapper above.
+   It's need to declare them here for units & coverage tests.
+ */
+void init_norms_roots (sieve_info & si, unsigned int side);
+#endif
+/* Until we get rid of the messy tests, we have to keep these
+ * prototypes...
+ */
+void init_norms_roots_internal (cxx_double_poly const &, double max_abs_root, double precision, std::vector<lognorm_oldsmart::smart_norm_root> & roots);
+void lognorm_fill_rat_oldsmart     (unsigned char *S, uint32_t N, int logI, double scale, cxx_double_poly const &, const double *cexp2);
+void lognorm_fill_alg_reference (unsigned char *S, uint32_t N, int logI, double scale, cxx_double_poly const & fijd);
+void lognorm_fill_alg_oldsmart (unsigned char *S, uint32_t N, int logI, double scale, cxx_double_poly const & fijd, std::vector<lognorm_oldsmart::smart_norm_root> const & roots);
+
 #endif	/* LAS_NORMS_HPP_ */

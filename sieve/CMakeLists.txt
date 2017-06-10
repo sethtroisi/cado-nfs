@@ -16,11 +16,11 @@ set (las_sources
     las-siever-config.cpp
     las-arith.cpp
     las-qlattice.cpp
-    las-norms.cpp
+    las-norms.cpp logapprox.cpp
     las-coordinates.cpp
 
     las-types.cpp
-  las.cpp fb.cpp las-plattice.cpp
+    las.cpp fb.cpp las-plattice.cpp
   las-debug.cpp las-report-stats.cpp las-duplicate.cpp
   las-config.c bucket.cpp las-smallsieve.cpp las-unsieve.cpp
   las-unsieve-sse2.cpp
@@ -60,12 +60,11 @@ add_executable(dupsup
     las-todo-entry.cpp
     las-siever-config.cpp
     las-qlattice.cpp
-    las-norms.cpp
+    las-norms.cpp logapprox.cpp
     las-coordinates.cpp
 
     dupsup.cpp las-duplicate.cpp
-    las-plattice.cpp
-    las-cofactor.cpp fb.cpp
+    las-plattice.cpp las-cofactor.cpp fb.cpp
     las-config.c
     las-types.cpp
     las-unsieve.cpp

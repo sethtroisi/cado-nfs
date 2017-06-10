@@ -149,22 +149,6 @@ compute_cofactor(mpz_t cof, const unsigned long sq,
   ASSERT_ALWAYS(sq == 0 || saw_sq);
 }
 
-/* Here, we assume for now that the log norm estimate is exact, i.e., that
-  it produces the correctly rounded l = log_b(F(a,b)).
-  To make the estimate more precise, we should call the norm calculation
-  function for the correct bucket region and pick the entry corresponding to
-  this i,j-coordinate. */
-static unsigned char
-estimate_lognorm(sieve_info const & si, const int i, const unsigned int j,
-                  const int side)
-{
-  mpz_t norm;
-  mpz_init (norm);
-  mpz_poly_homogeneous_eval_siui(norm, si.sides[side].fij, i, j);
-  return fb_log(mpz_get_d(norm), si.sides[side].scale * LOG_SCALE, 0.) + GUARD;
-  mpz_clear (norm);
-}
-
 /* If e == 0, returns 1. Otherwise, if b > lim, returns b.
    Otherwise returns the largest b^k with k <= e and b^k <= lim. */
 static unsigned long
@@ -205,6 +189,7 @@ subtract_fb_log(const unsigned char lognorm, relation const& rel,
   unsigned char new_lognorm = lognorm;
 
   for (unsigned int i = 0; i < nb_p; i++) {
+      lognorm_base & L(*si.sides[side].lognorms);
     const unsigned long p = mpz_get_ui(rel.sides[side][i].p);
     int e = rel.sides[side][i].e;
     ASSERT_ALWAYS(e > 0);
@@ -217,7 +202,7 @@ subtract_fb_log(const unsigned char lognorm, relation const& rel,
 
     if (p <= fbb) {
       const unsigned long p_pow = bounded_pow(p, e, si.conf.sides[side].powlim);
-      const unsigned char p_pow_log = fb_log(p_pow, si.sides[side].scale * LOG_SCALE, 0.);
+      const unsigned char p_pow_log = fb_log(p_pow, L.scale, 0);
       if (p_pow_log > new_lognorm) {
         if (0)
           fprintf(stderr, "Warning: lognorm underflow for relation a,b = %" PRId64 ", %" PRIu64 "\n",
@@ -337,14 +322,21 @@ sq_finds_relation(const unsigned long sq, const int sq_side,
 
   uint8_t remaining_lognorm[2];
   for (int side = 0; side < 2; side++) {
-    const uint8_t lognorm = estimate_lognorm(si, i, j, side);
-    remaining_lognorm[side] = subtract_fb_log(lognorm, rel, si, side,
+      lognorm_base & L(*si.sides[side].lognorms);
+      /* Here, we assume for now that the log norm estimate is exact,
+       * i.e., that it produces the correctly rounded l = log_b(F(a,b)).
+       * So we're using a straightforward function designed precisely for
+       * that in las-norms. Now, in fact, it would be better to call the
+       * _real_ function and pick the entry corresponding to this
+       * i,j-coordinate. */
+      const uint8_t lognorm = L.lognorm(i,j);
+      remaining_lognorm[side] = subtract_fb_log(lognorm, rel, si, side,
 					      (side == sq_side) ? sq : 0);
-    if (remaining_lognorm[side] > si.sides[side].bound) {
-      verbose_output_print(0, VERBOSE_LEVEL, "# DUPECHECK On side %d, remaining lognorm = %" PRId8 " > bound = %" PRId8 "\n",
-              side, remaining_lognorm[side], si.sides[side].bound);
-      is_dupe = 0;
-    }
+      if (remaining_lognorm[side] > L.bound) {
+          verbose_output_print(0, VERBOSE_LEVEL, "# DUPECHECK On side %d, remaining lognorm = %" PRId8 " > bound = %" PRId8 "\n",
+                  side, remaining_lognorm[side], L.bound);
+          is_dupe = 0;
+      }
   }
   verbose_output_print(0, VERBOSE_LEVEL, "# DUPECHECK relation had i=%d, j=%u, remaining lognorms %" PRId8 ", %" PRId8 "\n",
            i, j, remaining_lognorm[0], remaining_lognorm[1]);

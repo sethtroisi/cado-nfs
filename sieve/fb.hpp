@@ -232,7 +232,10 @@ class fb_vector_interface: public fb_interface {
   virtual void extract_bycost(std::vector<unsigned long> &extracted, fbprime_t pmax, fbprime_t td_thresh) const = 0;
   virtual void finalize() = 0;
   /* Create slices so that one slice contains at most max_slice_len entries,
-     and all entries in a slice have the same round(fb_log(p, scale)) */
+   * and all entries in a slice have the same round(fb_log(p, scale)).
+   * scale is the quantity by which we multiply the log_2 of the primes we
+   * consider.
+   */
   virtual void make_slices(double scale, double max_weight,
                            slice_index_t &next_index) = 0;
   virtual const fb_slice_interface *get_first_slice() const = 0;
@@ -555,7 +558,8 @@ class fb_factorbase: public fb_interface, private NonCopyable {
 };
 
 
-unsigned char	fb_log (double, double, double);
+/* round(x*y-z) */
+unsigned char	fb_log (double x, double y, double z);
 fbprime_t       fb_pow (fbprime_t, unsigned long);
 fbprime_t       fb_is_power (fbprime_t, unsigned long *);
 void print_worst_weight_errors();

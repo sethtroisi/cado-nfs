@@ -6,20 +6,23 @@
 #include "las-base.hpp"
 #include "las-todo-entry.hpp"
 #include "las-siever-config.hpp"
+#include "las-norms.hpp"
 #ifdef DLP_DESCENT
 #include "las-dlog-base.hpp"
 #endif
 #include "fb.hpp"
 #include "trialdiv.h"
+// #include "bucket.hpp"
 #include "cado_poly.h"
 #include "ecm/facul.h"
+#include "fb-types.h"
+#include "las-plattice.hpp"
+#include "las-fill-in-buckets.hpp"
 #include "las-forwardtypes.hpp"
-#include "las-norms.hpp"
+#include "las-report-stats.hpp"
 #include "las-unsieve.hpp"
 #include "las-qlattice.hpp"
 #include "las-smallsieve.hpp"
-#include "las-dlog-base.hpp"
-#include "las-plattice.hpp"
 #include "ecm/batch.h"
 #include <list>
 #include <vector>
@@ -32,31 +35,8 @@
 namespace std { using boost::shared_ptr; using boost::make_shared; }
 #endif
 
-typedef std::vector<plattices_dense_vector_t *> precomp_plattice_dense_t;
-
-struct siever_config;
-struct sieve_info;
-struct las_info;
-struct sieve_range_adjust;
-
 /* This one wants to have siever_config defined */
 #include "las-descent-trees.hpp"
-
-/* {{{ descent_hint
- *
- * This is used for the descent. For each factor size, we provide a
- * reasonable siever_config value
- *
- * We also provide, based on experience, info relative to how long it
- * takes to finish the smoothing process for a prime factor of this size.
- */
-struct descent_hint {
-    siever_config conf;
-    double expected_time;
-    double expected_success;
-};
-
-/* }}} */
 
 /* {{{ sieve_info
  *
@@ -92,8 +72,8 @@ struct sieve_info {
 
     /* {{{ sieve_side_info */
     struct side_info {
-        unsigned char bound; /* A sieve array entry is a sieve survivor if it is
-                                at most "bound" on each side */
+        std::shared_ptr<lognorm_base> lognorms;
+
         std::shared_ptr<trialdiv_divisor_t> trialdiv_data;
         std::shared_ptr<std::vector<fb_general_entry> > fb_smallsieved;
         struct {
@@ -109,7 +89,6 @@ struct sieve_info {
          * factor base in several pieces: small primes, and large primes split
          * into one piece for each thread.
          */
-        
         std::shared_ptr<fb_factorbase> fb;
 
         /* Caching of the FK-basis in sublat mode */
@@ -119,24 +98,8 @@ struct sieve_info {
          * their bucket allocation */
         double max_bucket_fill_ratio[FB_MAX_PARTS];
 
-        /* These fields are used for the norm initialization essentially.
-         * Only the scale is also relevant to part of the rest, since it
-         * determines the logp contributions for factor base primes */
-        double scale;      /* scale used for logarithms for fb and norm.
-                              must be of form (int)x * 0.1 */
-        double cexp2[257]; /* for 2^X * scale + GUARD */
-        double logmax;     /* norms on the alg-> side are < 2^alg->logmax */
-        cxx_mpz_poly fij;  /* coefficients of F(a0*i+a1*j, b0*i+b1*j)
-                            * (divided by q on the special-q side) */
-        cxx_double_poly fijd;      /* coefficients of F_q (divided by q
-                                    * on the special q side) */
-        std::vector<smart_norm_root> roots;     /* roots of F, F', F"
-                                                 * and maybe F'" - cf
-                                                 * init_norms* in 
-                                                 * las-norms.cpp */
-
-        /* This updated by applying the special-q lattice transform to the
-         * factor base. */
+        /* This is updated by applying the special-q lattice transform to
+         * the factor base. */
         small_sieve_data_t ssd[1];
         /* And this is just created as an extraction of the above */
         small_sieve_data_t rsd[1];
@@ -204,7 +167,17 @@ struct sieve_info {
      */
     static sieve_info & get_sieve_info_from_config(siever_config const & sc, cado_poly_srcptr cpoly, std::list<sieve_info> & registry, cxx_param_list & pl);
 
-    void recover_per_sq_values(sieve_range_adjust const& Adj);
+    void recover_per_sq_values(sieve_range_adjust const& Adj) {
+        doing = Adj.doing;
+        qbasis = Adj.Q;
+        qbasis.set_q(doing.p, doing.prime_sq);
+        if (!qbasis.prime_sq) {
+            qbasis.prime_factors = doing.prime_factors;
+        }
+        ASSERT_ALWAYS(conf.logI_adjusted == Adj.logI);
+        ASSERT_ALWAYS(I == (1UL << Adj.logI));
+        J = Adj.J;
+    }
 };
 
 /* }}} */

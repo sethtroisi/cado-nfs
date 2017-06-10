@@ -1210,8 +1210,14 @@ sieve/las-fb.cpp
 config/shared_ptr.cmake
 config/cxxabi.cmake
 sieve/display-lattice-adjust.sage
+tests/sieve/test_init_norms.cpp
 sieve/las-types.cpp
 sieve/las-siever-config.cpp
 sieve/las-siever-config.hpp
 sieve/las-todo-entry.cpp
 sieve/las-todo-entry.hpp
+tests/sieve/rsa220.poly
+sieve/logapprox.cpp
+sieve/logapprox.hpp
+tests/sieve/test_logapprox.cpp
+sieve/las-norms-oldsmart.cpp

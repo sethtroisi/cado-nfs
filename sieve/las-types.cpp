@@ -124,64 +124,58 @@ sieve_info::sieve_info(siever_config const & sc, cado_poly_srcptr cpoly, cxx_par
 }
 /*}}}*/
 
+void sieve_info::update_norm_data ()/*{{{*/
+{
+    for(int side = 0 ; side < 2 ; side++) {
+        sides[side].lognorms = std::make_shared<lognorm_smart>(conf, cpoly, side, qbasis, J);
+    }
+}
 
-
-
+/*}}}*/
 void sieve_info::update (size_t nr_workspaces)/*{{{*/
 {
-#ifdef SMART_NORM
-        /* Compute the roots of the polynomial F(i,1) and the roots of its
-         * inflection points d^2(F(i,1))/d(i)^2. Used in
-         * init_smart_degree_X_norms_bucket_region_internal.  */
-        for(int side = 0 ; side < 2 ; side++) {
-            if (cpoly->pols[side]->deg >= 2)
-                init_norms_roots (*this, side);
+    /* wondering whether having the "local A" at hand would be a plus. */
+    uint64_t A = ((uint64_t)J) << conf.logI_adjusted;
+    /* update number of buckets at toplevel */
+    uint64_t BRS[FB_MAX_PARTS] = BUCKET_REGIONS;
+    nb_buckets[toplevel] = iceildiv(A, BRS[toplevel]);
+
+    // maybe there is only 1 bucket at toplevel and less than 256 at
+    // toplevel-1, due to a tiny J.
+    if (toplevel > 1) {
+        if (nb_buckets[toplevel] == 1) {
+            nb_buckets[toplevel-1] = iceildiv(A, BRS[toplevel - 1]);
+            // we forbid skipping two levels.
+            ASSERT_ALWAYS(nb_buckets[toplevel-1] != 1);
+        } else {
+            nb_buckets[toplevel-1] = BRS[toplevel]/BRS[toplevel-1];
         }
-#endif
+    }
 
-  /* update number of buckets at toplevel */
-  uint64_t BRS[FB_MAX_PARTS] = BUCKET_REGIONS;
-
-  /* wondering whether having the "local A" at hand would be a plus. */
-  uint64_t A = ((uint64_t)J) << conf.logI_adjusted;
-
-  nb_buckets[toplevel] = iceildiv(A, BRS[toplevel]);
-
-  // maybe there is only 1 bucket at toplevel and less than 256 at
-  // toplevel-1, due to a tiny J.
-  if (toplevel > 1) {
-      if (nb_buckets[toplevel] == 1) {
-        nb_buckets[toplevel-1] = iceildiv(A, BRS[toplevel - 1]);
-        // we forbid skipping two levels.
-        ASSERT_ALWAYS(nb_buckets[toplevel-1] != 1);
-      } else {
-        nb_buckets[toplevel-1] = BRS[toplevel]/BRS[toplevel-1];
-      }
-  }
-
-  /* Update the slices of the factor base according to new log base */
-  for(int side = 0 ; side < 2 ; side++) {
-      /* The safety factor controls by how much a single slice should fill a
-         bucket array at most, i.e., with .5, a single slice should never fill
-         a bucket array more than half-way. */
-      const double safety_factor = .5;
-      sieve_info::side_info & sis(sides[side]);
-      double max_weight[FB_MAX_PARTS];
-      for (int i_part = 0; i_part < FB_MAX_PARTS; i_part++) {
-        max_weight[i_part] = sis.max_bucket_fill_ratio[i_part] / nr_workspaces
-            * safety_factor;
-      }
-      sis.fb->make_slices(sis.scale * LOG_SCALE, max_weight);
-  }
+    /* Update the slices of the factor base according to new log base */
+    for(int side = 0 ; side < 2 ; side++) {
+        /* The safety factor controls by how much a single slice should fill a
+           bucket array at most, i.e., with .5, a single slice should never fill
+           a bucket array more than half-way. */
+        const double safety_factor = .5;
+        sieve_info::side_info & sis(sides[side]);
+        double max_weight[FB_MAX_PARTS];
+        for (int i_part = 0; i_part < FB_MAX_PARTS; i_part++) {
+            max_weight[i_part] = sis.max_bucket_fill_ratio[i_part] / nr_workspaces
+                * safety_factor;
+        }
+        sis.fb->make_slices(sis.lognorms->scale, max_weight);
+    }
 }/*}}}*/
 
 /* las_info stuff */
 
-las_info::las_info(cxx_param_list & pl)/*{{{*/
+las_info::las_info(cxx_param_list & pl)
     : config_pool(pl)
 #ifdef  DLP_DESCENT
       , dlog_base(pl)
 #endif
+      /*{{{*/
 {
     /* We strive to initialize things in the exact order they're written
      * in the struct */
@@ -419,4 +413,3 @@ sieve_info & sieve_info::get_sieve_info_from_config(siever_config const & sc, ca
     sc.display();
     return registry.back();
 }/*}}}*/
-

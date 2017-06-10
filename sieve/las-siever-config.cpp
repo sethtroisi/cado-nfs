@@ -208,7 +208,7 @@ siever_config siever_config_pool::get_config_for_q(las_todo_entry const & doing)
     if (adapted) {
         config = *adapted;
         verbose_output_print(0, 1, "# Using parameters from hint list for q~2^%d on side %d [%d@%d]\n", config.bitsize, config.side, config.bitsize, config.side);
-     }
+    }
 
     if (doing.iteration) {
         verbose_output_print(0, 1, "#\n# NOTE:"

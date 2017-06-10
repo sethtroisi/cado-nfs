@@ -149,9 +149,80 @@ add_trialdiv_test(4)
 add_trialdiv_test(5)
 add_trialdiv_test(6)
 
+cado_define_test(test_logapprox.cpp 
+    ${PROJECT_SOURCE_DIR}/sieve/logapprox.cpp
+    LIBRARIES utils tests)
+
 cado_define_test(test_init_norms_bucket_region.cpp
     ${PROJECT_SOURCE_DIR}/sieve/las-norms.cpp
+    ${PROJECT_SOURCE_DIR}/sieve/logapprox.cpp
     LIBRARIES utils tests)
+
+# This one is a different test, meant to check speed and correctness, and
+# yet allow a run to simulate real polynomials because well, I can't be
+# sure with the current code... */
+cado_define_test(test_init_norms.cpp
+    ${PROJECT_SOURCE_DIR}/sieve/las-norms.cpp
+    ${PROJECT_SOURCE_DIR}/sieve/logapprox.cpp
+    ${PROJECT_SOURCE_DIR}/sieve/las-siever-config.cpp
+    ${PROJECT_SOURCE_DIR}/sieve/las-todo-entry.cpp
+    ${PROJECT_SOURCE_DIR}/sieve/las-qlattice.cpp
+    NO_DEFAULT_RUN
+    LIBRARIES utils tests
+)
+set_target_properties(test_init_norms PROPERTIES 
+    COMPILE_FLAGS "${OpenMP_C_FLAGS}"
+    LINK_FLAGS "${OpenMP_CXX_FLAGS}")
+
+
+cado_divert_test(test_init_norms c120_basic
+    ARGUMENTS
+        -poly ${CMAKE_CURRENT_SOURCE_DIR}/c120.poly
+        -I 12 -lpb0 26 -lpb1 26
+        -mfb0 28 -mfb1 28
+        -q0 15350000 -q1 15360000
+        -random-sample 10
+        -random-seed 0
+        -sqside 1
+        -t 2
+        --hush-max-jitter 1
+)
+
+cado_divert_test(test_init_norms c120_torture
+    ARGUMENTS
+        -poly ${CMAKE_CURRENT_SOURCE_DIR}/c120.poly
+        -I 12 -lpb0 26 -lpb1 26
+        -mfb0 28 -mfb1 28
+        -t 2
+        --hush-max-jitter 1
+        --abort-on-jitter 1,5
+        --nfills-speed-test 0
+    NO_DEFAULT_RUN
+)
+
+# a couple of hard cases encountered during testing.
+cado_divert_test(test_init_norms_c120_torture 1 APPEND_ARGUMENTS
+    --norm-sides 0 -sqside 1 -q0 15359089 -rho 4697045 -check-bucket 74)
+cado_divert_test(test_init_norms_c120_torture 2 APPEND_ARGUMENTS
+    --norm-sides 0 -sqside 1 -q0 15351793 -rho 6002387 -check-bucket 30)
+cado_divert_test(test_init_norms_c120_torture 3 APPEND_ARGUMENTS
+    --norm-sides 0 -sqside 1 -q0 15356527 -rho 2085523 -check-bucket 87)
+cado_divert_test(test_init_norms_c120_torture 4 APPEND_ARGUMENTS
+    --norm-sides 0 -sqside 1 -q0 15355589 -rho 4854502 -check-bucket 67)
+
+cado_divert_test(test_init_norms rsa220
+    ARGUMENTS
+        -poly ${CMAKE_CURRENT_SOURCE_DIR}/rsa220.poly
+        -I 16 -lpb0 34 -lpb1 34 -mfb0 68 -mfb1 102
+        -q0 4000000000
+        -q1 4001000000
+        -random-sample 10
+        -random-seed 0
+        -sqside 1
+        -t 2
+        --hush-max-jitter 1
+        --abort-on-jitter 1,5
+)
 
 add_subdirectory (ecm)
 add_subdirectory (strategies)
