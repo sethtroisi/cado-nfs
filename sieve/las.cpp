@@ -1917,12 +1917,9 @@ static void declare_usage(param_list pl)/*{{{*/
   param_list_decl_usage(pl, "stats-stderr", "(switch) print stats to stderr in addition to stdout/out file");
   param_list_decl_usage(pl, "stats-cofact", "write statistics about the cofactorization step in file xxx");
   param_list_decl_usage(pl, "file-cofact", "provide file with strategies for the cofactorization step");
-  param_list_decl_usage(pl, "todo", "provide file with a list of special-q to sieve instead of qrange");
   param_list_decl_usage(pl, "prepend-relation-time", "prefix all relation produced with time offset since beginning of special-q processing");
   param_list_decl_usage(pl, "ondemand-siever-config", "(switch) defer initialization of siever precomputed structures (one per special-q side) to time of first actual use");
   param_list_decl_usage(pl, "dup", "(switch) suppress duplicate relations");
-  param_list_decl_usage(pl, "dup-qmin", "lower limit of global q-range for 2-sided duplicate removal");
-  param_list_decl_usage(pl, "dup-qmax", "upper limit of global q-range for 2-sided duplicate removal");
   param_list_decl_usage(pl, "batch", "(switch) use batch cofactorization");
   param_list_decl_usage(pl, "batch0", "side-0 batch file");
   param_list_decl_usage(pl, "batch1", "side-1 batch file");
@@ -1938,11 +1935,9 @@ static void declare_usage(param_list pl)/*{{{*/
   param_list_decl_usage(pl, "traceNx", "Relation to trace, in N,x format");
   param_list_decl_usage(pl, "traceout", "Output file for trace output, default: stderr");
 #endif
-  param_list_decl_usage(pl, "random-sample", "Sample this number of special-q's at random, within the range [q0,q1]");
-  param_list_decl_usage(pl, "seed", "Use this seed for the random sampling of special-q's (see random-sample)");
-  param_list_decl_usage(pl, "nq", "Process this number of special-q's and stop");
+  param_list_decl_usage(pl, "hint-table", "filename with per-special q sieving data");
 #ifdef  DLP_DESCENT
-  param_list_decl_usage(pl, "descent-hint-table", "filename with tuned data for the descent, for each special-q bitsize");
+  param_list_decl_usage(pl, "descent-hint-table", "Alias to hint-table");
   param_list_decl_usage(pl, "recursive-descent", "descend primes recursively");
   /* given that this option is dangerous, we enable it only for
    * las_descent
