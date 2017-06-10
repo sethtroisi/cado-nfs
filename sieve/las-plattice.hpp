@@ -29,16 +29,16 @@
  */
 
 // Proposition 1 of [FrKl05]:
-// Compute a basis <(alpha, beta), (gamma, delta)> of the p-lattice
+// Compute a basis <(a0, a1), (b0, b1)> of the p-lattice
 // inside the q-lattice, such that
-//    beta, delta > 0
-//    -I < alpha <= 0 <= gamma < I
-//    gamma-alpha >= I
+//    a1, b1 > 0
+//    -I < a0 <= 0 <= b0 < I
+//    b0-a0 >= I
 //
 // Sizes:
 //    p is less than 32 bits and I fits easily in 32 bits.
-//    So, alpha and beta fit easily in 32 bits, since they are less than I
-//    Now, gamma and delta are also bounded by p, so 32 bits is enough
+//    So, a0 and a1 fit easily in 32 bits, since they are less than I
+//    Now, b0 and b1 are also bounded by p, so 32 bits is enough
 //    However: a and c can be as large as p*I (not both ?).
 //    We still store them in 32 bits, since if they are larger, it means
 //    that as soon as they are added to the offset for S, the index will
@@ -114,7 +114,17 @@ struct plattice_info_t {
       b0 = 0; /* Thus bound1 = I - b0 = I, inc_a is never added */
     } else {
       ASSERT_ALWAYS(!proj);
+      /* One essential condition of proposition 1 in FrKl05 is that p >= I */
+      ASSERT(p >> logI);
       int rc = reduce_plattice (this, p, r, 1U << logI);
+      /* These are the constraints which reduce_plattice should meet */
+      ASSERT(-(INT32_C(1) << logI) < a0);
+      ASSERT(a0 <= 0);
+      ASSERT(b0 >= 0);
+      ASSERT(b0 < (INT32_C(1) << logI));
+      ASSERT((b0-a0) >= (INT32_C(1) << logI));
+      ASSERT(a1 > 0);
+      ASSERT(b1 > 0);
       if (UNLIKELY(rc == 0)) {
         /* gcd(r, p) > I. We currently can't handle this case. Set everything
            to zero to signal to calling code that this is not a valid basis.
