@@ -1401,9 +1401,7 @@ fb_factorbase::make_linear_threadpool (const mpz_t *poly,
 
   // Stage 1: while there are still primes, wait for a result and
   // schedule a new task.
-  int cont = 1;
-  do {
-    ASSERT_ALWAYS(active_task > 0);
+  for(int cont = 1 ; cont && active_task ; ) {
     task_result *result = pool.get_result();
     make_linear_thread_result *res =
       static_cast<make_linear_thread_result *>(result);
@@ -1416,7 +1414,7 @@ fb_factorbase::make_linear_threadpool (const mpz_t *poly,
       pool.add_task(process_one_task, res->orig_param, 0);
     }
     delete result;
-  } while (cont);
+  }
 
   // Stage 2: purge last tasks
   for (unsigned int i = 0; i < active_task; ++i) {
