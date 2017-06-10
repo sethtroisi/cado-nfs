@@ -2254,6 +2254,13 @@ int main (int argc0, char *argv0[])/*{{{*/
         totlogI += si.conf.logI_adjusted;
 
 
+        /* Now we're ready to sieve. We have to refresh some fields
+         * in the sieve_info structure, otherwise we'll be polluted by
+         * the leftovers from earlier runs.
+         */
+        si.update_norm_data();
+        si.update(nr_workspaces);
+
         WHERE_AM_I_UPDATE(w, psi, &si);
 
         las.tree.new_node(si.doing);
