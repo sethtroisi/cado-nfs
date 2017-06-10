@@ -2,6 +2,8 @@
 #define LAS_FILL_IN_BUCKETS_HPP_
 
 #include "las-types.hpp"
+#include "fb-types.h"
+#include "las-plattice.hpp"
 #include "las-threads.hpp"
 #include "tdict.hpp"
 

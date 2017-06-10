@@ -731,7 +731,6 @@ public:
  * in plattice_starting_vector
  */
 
-
 /* This is for working with congruence classes only */
 NOPROFILE_INLINE
 plattice_x_t plattice_starting_vector(const plattice_info_t * pli, sieve_info_srcptr si, unsigned int par )
@@ -759,8 +758,8 @@ plattice_x_t plattice_starting_vector(const plattice_info_t * pli, sieve_info_sr
      * nonnegative.
      *
      * The last ingredient is that (2a, 2b) forms an adapted basis for
-     * the band of width I with respect to the lattice 2p. It's just an
-     * homothety.
+     * the band of width I with respect to the lattice 2p. It's just a
+     * homothetic transformation.
      *
      * To find (k,l), we proceed like this. First look at the (a,b)
      * matrix mod 2:
