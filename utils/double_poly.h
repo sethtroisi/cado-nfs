@@ -105,8 +105,7 @@ uint32_t poly_roots_longdouble(double *poly, uint32_t degree, long double _Compl
  */
 struct cxx_double_poly {
     double_poly x;
-    cxx_double_poly() { double_poly_init(x, -1); }
-    cxx_double_poly(int deg) { double_poly_init(x, deg); }
+    cxx_double_poly(int deg = -1) { double_poly_init(x, deg); }
     cxx_double_poly(double_poly_srcptr f) { double_poly_init(x, -1); double_poly_set(x, f); }
     ~cxx_double_poly() { double_poly_clear(x); }
     cxx_double_poly(cxx_double_poly const & o) {
