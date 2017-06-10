@@ -45,6 +45,7 @@ struct siever_config : public _padded_pod<siever_config> {
 
     void display() const;
 
+    static void declare_usage(param_list_ptr pl);
     static bool parse_default(siever_config & sc, param_list_ptr pl);
 
     /*{{{ has_same_config */

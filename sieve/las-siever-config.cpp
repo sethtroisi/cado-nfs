@@ -2,12 +2,34 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <gmp.h>
-#include "las-forwardtypes.hpp"
 #include "las-siever-config.hpp"
-#include "las-types.hpp"
 #include "verbose.h"
 
 /* siever_config stuff */
+
+void siever_config::declare_usage(param_list_ptr pl)
+{
+    param_list_decl_usage(pl, "sublat", "modulus for sublattice sieving");
+    param_list_decl_usage(pl, "lim0", "factor base bound on side 0");
+    param_list_decl_usage(pl, "lim1", "factor base bound on side 1");
+    param_list_decl_usage(pl, "lpb0", "set large prime bound on side 0 to 2^lpb0");
+    param_list_decl_usage(pl, "lpb1", "set large prime bound on side 1 to 2^lpb1");
+    param_list_decl_usage(pl, "mfb0", "set rational cofactor bound on side 0 2^mfb0");
+    param_list_decl_usage(pl, "mfb1", "set rational cofactor bound on side 1 2^mfb1");
+    param_list_decl_usage(pl, "lambda0", "lambda value on side 0");
+    param_list_decl_usage(pl, "lambda1", "lambda value on side 1");
+    param_list_decl_usage(pl, "powlim0", "limit on powers on side 0");
+    param_list_decl_usage(pl, "powlim1", "limit on powers on side 1");
+    param_list_decl_usage(pl, "ncurves0", "controls number of curves on side 0");
+    param_list_decl_usage(pl, "ncurves1", "controls number of curves on side 1");
+    param_list_decl_usage(pl, "tdthresh", "trial-divide primes p/r <= ththresh (r=number of roots)");
+    param_list_decl_usage(pl, "skipped", "primes below this bound are not sieved at all");
+    param_list_decl_usage(pl, "bkthresh", "bucket-sieve primes p >= bkthresh");
+    param_list_decl_usage(pl, "bkthresh1", "2-level bucket-sieve primes p >= bkthresh1");
+    param_list_decl_usage(pl, "bkmult", "multiplier to use for taking margin in the bucket allocation\n");
+    param_list_decl_usage(pl, "unsievethresh", "Unsieve all p > unsievethresh where p|gcd(a,b)");
+  param_list_decl_usage(pl, "dup-qmin", "limits of q-sieving for 2-sided duplicate removal");
+}
 
 void siever_config::display() const /*{{{*/
 {
@@ -152,17 +174,14 @@ bool siever_config::parse_default(siever_config & sc, param_list_ptr pl)
     sc.sides[0].qmax = dupqmax[0];
     sc.sides[1].qmax = dupqmax[1];
 
-    /* Change qmin = 0 (not initialized) into LONG_MAX */
+    /* Change 0 (not initialized) into LONG_MAX */
     for (int side = 0; side < 2; side ++)
-      if (sc.sides[side].qmin == 0)
-	sc.sides[side].qmin = LONG_MAX;
+        if (sc.sides[side].qmin == 0)
+            sc.sides[side].qmin = LONG_MAX;
 
-    /* On the special-q side, if qmin is not given, use
-     *   qmin = lim
-     * by default.
-     */
+    /* if qmin is not given, use lim on the sqside by default */
     if (sc.sides[sc.side].qmin == LONG_MAX)
-      sc.sides[sc.side].qmin = sc.sides[sc.side].lim;
+        sc.sides[sc.side].qmin = sc.sides[sc.side].lim;
 
     return complete;
 }

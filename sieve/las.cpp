@@ -1897,41 +1897,31 @@ static void declare_usage(param_list pl)/*{{{*/
   );
 
   param_list_decl_usage(pl, "poly", "polynomial file");
+  param_list_decl_usage(pl, "skew", "(alias S) skewness");
+
   param_list_decl_usage(pl, "fb0",   "factor base file on the rational side");
   param_list_decl_usage(pl, "fb1",   "(alias fb) factor base file on the algebraic side");
   param_list_decl_usage(pl, "fbc",  "factor base cache file (not yet functional)");
+
   param_list_decl_usage(pl, "q0",   "left bound of special-q range");
   param_list_decl_usage(pl, "q1",   "right bound of special-q range");
   param_list_decl_usage(pl, "rho",  "sieve only root r mod q0");
+  param_list_decl_usage(pl, "sqside", "put special-q on this side");
+  param_list_decl_usage(pl, "random-sample", "Sample this number of special-q's at random, within the range [q0,q1]");
+  param_list_decl_usage(pl, "seed", "Use this seed for the random sampling of special-q's (see random-sample)");
+  param_list_decl_usage(pl, "nq", "Process this number of special-q's and stop");
+  param_list_decl_usage(pl, "todo", "provide file with a list of special-q to sieve instead of qrange");
   param_list_decl_usage(pl, "qfac-min", "factors of q must be at least that");
   param_list_decl_usage(pl, "qfac-max", "factors of q must be at most that");
+
   param_list_decl_usage(pl, "v",    "(switch) verbose mode, also prints sieve-area checksums");
   param_list_decl_usage(pl, "out",  "filename where relations are written, instead of stdout");
   param_list_decl_usage(pl, "t",   "number of threads to use");
-  param_list_decl_usage(pl, "sqside", "put special-q on this side");
 
   param_list_decl_usage(pl, "I",    "set sieving region to 2^I times J");
   param_list_decl_usage(pl, "A",    "set sieving region to 2^A");
-  param_list_decl_usage(pl, "sublat", "modulus for sublattice sieving");
-  param_list_decl_usage(pl, "skew", "(alias S) skewness");
-  param_list_decl_usage(pl, "lim0", "factor base bound on side 0");
-  param_list_decl_usage(pl, "lim1", "factor base bound on side 1");
-  param_list_decl_usage(pl, "lpb0", "set large prime bound on side 0 to 2^lpb0");
-  param_list_decl_usage(pl, "lpb1", "set large prime bound on side 1 to 2^lpb1");
-  param_list_decl_usage(pl, "mfb0", "set rational cofactor bound on side 0 2^mfb0");
-  param_list_decl_usage(pl, "mfb1", "set rational cofactor bound on side 1 2^mfb1");
-  param_list_decl_usage(pl, "lambda0", "lambda value on side 0");
-  param_list_decl_usage(pl, "lambda1", "lambda value on side 1");
-  param_list_decl_usage(pl, "powlim0", "limit on powers on side 0");
-  param_list_decl_usage(pl, "powlim1", "limit on powers on side 1");
-  param_list_decl_usage(pl, "ncurves0", "controls number of curves on side 0");
-  param_list_decl_usage(pl, "ncurves1", "controls number of curves on side 1");
-  param_list_decl_usage(pl, "tdthresh", "trial-divide primes p/r <= ththresh (r=number of roots)");
-  param_list_decl_usage(pl, "skipped", "primes below this bound are not sieved at all");
-  param_list_decl_usage(pl, "bkthresh", "bucket-sieve primes p >= bkthresh");
-  param_list_decl_usage(pl, "bkthresh1", "2-level bucket-sieve primes p >= bkthresh1");
-  param_list_decl_usage(pl, "bkmult", "multiplier to use for taking margin in the bucket allocation");
-  param_list_decl_usage(pl, "unsievethresh", "Unsieve all p > unsievethresh where p|gcd(a,b)");
+
+  siever_config::declare_usage(pl);
 
   param_list_decl_usage(pl, "adjust-strategy", "strategy used to adapt the sieving range to the q-lattice basis (0 = logI constant, J so that boundary is capped; 1 = logI constant, (a,b) plane norm capped; 2 = logI dynamic, skewed basis; 3 = combine 2 and then 0) ; default=0");
   param_list_decl_usage(pl, "allow-largesq", "(switch) allows large special-q, e.g. for a DL descent");
