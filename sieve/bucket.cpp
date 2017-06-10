@@ -6,6 +6,7 @@
 #if defined(HAVE_SSE2)
 #include <emmintrin.h>
 #endif
+#include "las-types.hpp"
 #include "bucket.hpp"
 #include "portability.h"
 #include "memory.h"
