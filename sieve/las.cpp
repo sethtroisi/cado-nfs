@@ -35,7 +35,7 @@
 #include "las-cofactor.hpp"
 #include "las-fill-in-buckets.hpp"
 #include "las-threads.hpp"
-#include "las-todo.hpp"
+#include "las-todo-entry.hpp"
 #include "memusage.h"
 #include "tdict.hpp"
 #ifdef  DLP_DESCENT

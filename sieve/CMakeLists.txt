@@ -11,7 +11,9 @@ link_directories (${CMAKE_CURRENT_BINARY_DIR}/ecm)
 add_executable (makefb makefb.c)
 target_link_libraries (makefb utils)
 
-set (las_sources las.cpp fb.cpp las-plattice.cpp
+set (las_sources
+    las-todo-entry.cpp
+  las.cpp fb.cpp las-plattice.cpp
   las-coordinates.cpp las-debug.cpp las-report-stats.cpp las-duplicate.cpp
   las-config.c bucket.cpp las-smallsieve.cpp las-unsieve.cpp
   las-unsieve-sse2.cpp las-arith.cpp
@@ -48,7 +50,9 @@ target_link_libraries(freerel utils)
 add_subdirectory(ecm)
 add_subdirectory(strategies)
 
-add_executable(dupsup dupsup.cpp las-duplicate.cpp las-qlattice.cpp
+add_executable(dupsup
+    las-todo-entry.cpp
+    dupsup.cpp las-duplicate.cpp las-qlattice.cpp
     las-plattice.cpp las-coordinates.cpp las-cofactor.cpp fb.cpp
     las-norms.cpp
     las-unsieve.cpp

@@ -423,7 +423,6 @@ sieve/las-cofactor.cpp
 sieve/las-cofactor.hpp
 sieve/las-fill-in-buckets.cpp
 sieve/las-fill-in-buckets.hpp
-sieve/las-todo.hpp
 sieve/las.cpp
 sieve/makefb.c
 sieve/makefb.sage
@@ -1211,3 +1210,5 @@ sieve/las-fb.cpp
 config/shared_ptr.cmake
 config/cxxabi.cmake
 sieve/display-lattice-adjust.sage
+sieve/las-todo-entry.hpp
+sieve/las-todo-entry.cpp
