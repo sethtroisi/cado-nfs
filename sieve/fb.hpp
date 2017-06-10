@@ -20,28 +20,6 @@
 #include "las-plattice.hpp"
 #include "las-base.hpp"
 
-// If a plain-old data type T inherits from _padded_pod<T>, it ensures that all
-// the sizeof(T) bytes of any instance of T will be initialized, even if its
-// data members do not occupy the whole memory region.
-// For instance, this allows one to write `fwrite(&x, sizeof(T), 1, f)' without
-// Valgrind complaining because of uninitialized memory reads.
-template <typename T>
-class _padded_pod {
-  public:
-    _padded_pod() {
-      memset(this,  0, sizeof(T));
-    }
-
-    _padded_pod(const _padded_pod &x) {
-      memcpy(this, &x, sizeof(T));
-    }
-
-    const _padded_pod &operator=(const _padded_pod &x) {
-      memcpy(this, &x, sizeof(T));
-      return *this;
-    }
-};
-
 /* Forward declaration so fb_general_entry can use it in constructors */
 template <int Nr_roots>
 class fb_entry_x_roots;
