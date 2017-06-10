@@ -2,6 +2,7 @@
 #define LAS_NORMS_HPP_
 
 #include <stdint.h>
+#include "las-siever-config.hpp"
 #include "las-types.hpp"
 #include "double_poly.h"
 

@@ -66,133 +66,6 @@ double tt_qstart;
 
 /*****************************/
 
-/* siever_config stuff */
-
-struct has_same_config {/*{{{*/
-    siever_config const & sc;
-    has_same_config(siever_config const & sc) : sc(sc) {}
-    bool operator()(siever_config const& o) const { return o == sc; }
-    bool operator()(sieve_info const& o) const { return (*this)(o.conf); }
-};
-/*}}}*/
-struct has_same_config_q {/*{{{*/
-    siever_config const & sc;
-    has_same_config_q(siever_config const & sc) : sc(sc) {}
-    bool operator()(siever_config const& o) const { return sc.has_same_config_q(o); }
-    bool operator()(sieve_info const& o) const { return (*this)(o.conf); }
-};
-/*}}}*/
-struct has_same_sieving {/*{{{*/
-    siever_config const & sc;
-    has_same_sieving(siever_config const & sc) : sc(sc) {}
-    bool operator()(siever_config const& o) const { return sc.has_same_sieving(o); }
-    bool operator()(sieve_info const& o) const { return (*this)(o.conf); }
-};
-/*}}}*/
-struct has_same_fb_parameters {/*{{{*/
-    siever_config const & sc;
-    has_same_fb_parameters(siever_config const & sc) : sc(sc) {}
-    bool operator()(siever_config const& o) const { return sc.has_same_fb_parameters(o); }
-    bool operator()(sieve_info const& o) const { return (*this)(o.conf); }
-};
-/*}}}*/
-struct has_same_cofactoring {/*{{{*/
-    siever_config const & sc;
-    has_same_cofactoring(siever_config const & sc) : sc(sc) {}
-    bool operator()(siever_config const& o) const { return sc.has_same_cofactoring(o); }
-    bool operator()(sieve_info const& o) const { return (*this)(o.conf); }
-};
-/*}}}*/
-void siever_config_display(siever_config const & sc)/*{{{*/
-{
-    if (sc.bitsize == 0) return;
-
-    verbose_output_print(0, 1, "# Sieving parameters for q~2^%d on side %d\n",
-            sc.bitsize, sc.side);
-    /* Strive to keep these output lines untouched */
-    verbose_output_print(0, 1,
-	    "# Sieving parameters: lim0=%lu lim1=%lu lpb0=%d lpb1=%d\n",
-	    sc.sides[0].lim, sc.sides[1].lim,
-            sc.sides[0].lpb, sc.sides[1].lpb);
-    verbose_output_print(0, 1,
-	    "#                     mfb0=%d mfb1=%d\n",
-	    sc.sides[0].mfb, sc.sides[1].mfb);
-    if (sc.sides[0].lambda != 0 || sc.sides[1].lambda != 0) {
-        verbose_output_print(0, 1,
-                "#                     lambda0=%1.1f lambda1=%1.1f\n",
-            sc.sides[0].lambda, sc.sides[1].lambda);
-    }
-}/*}}}*/
-
-siever_config las_info::get_config_for_q(las_todo_entry const & doing) const /*{{{*/
-{
-    // arrange so that we don't have the same header line as the one
-    // which prints the q-lattice basis
-    verbose_output_vfprint(0, 1, gmp_vfprintf,
-                         "#\n"
-                         "# "
-                         "Now sieving side-%d q=%Zd; rho=%Zd\n",
-                         doing.side,
-                         (mpz_srcptr) doing.p,
-                         (mpz_srcptr) doing.r);
-    siever_config config = config_base;
-    config.bitsize = mpz_sizeinbase(doing.p, 2);
-    config.side = doing.side;
-
-    /* Do we have a hint table with specifically tuned parameters,
-     * well suited to this problem size ? */
-    for(unsigned int i = 0 ; i < hint_table.size() ; i++) {
-        siever_config const & sc(hint_table[i].conf);
-        if (!sc.has_same_config_q(config)) continue;
-        verbose_output_print(0, 1, "# Using parameters from hint list for q~2^%d on side %d [%d@%d]\n", sc.bitsize, sc.side, sc.bitsize, sc.side);
-        config = sc;
-    }
-
-    /* Check whether q is larger than the large prime bound.
-     * This can create some problems, for instance in characters.
-     * By default, this is not allowed, but the parameter
-     * -allow-largesq is a by-pass to this test.
-     */
-    if (!allow_largesq) {
-        if ((int)mpz_sizeinbase(doing.p, 2) >
-                config.sides[config.side].lpb) {
-            fprintf(stderr, "ERROR: The special q (%d bits) is larger than the "
-                    "large prime bound on side %d (%d bits).\n",
-                    (int) mpz_sizeinbase(doing.p, 2),
-                    config.side,
-                    config.sides[config.side].lpb);
-            fprintf(stderr, "       You can disable this check with "
-                    "the -allow-largesq argument,\n");
-            fprintf(stderr, "       It is for instance useful for the "
-                    "descent.\n");
-            exit(EXIT_FAILURE);
-        }
-    }
-
-    if (doing.iteration) {
-        verbose_output_print(0, 1, "#\n# NOTE:"
-                " we are re-playing this special-q because of"
-                " %d previous failed attempt(s)\n", doing.iteration);
-        /* update sieving parameters here */
-        double ratio = double(config.sides[0].mfb) /
-            double(config.sides[0].lpb);
-        config.sides[0].lpb += doing.iteration;
-        config.sides[0].mfb = ratio*config.sides[0].lpb;
-        ratio = double(config.sides[1].mfb) /
-            double(config.sides[1].lpb);
-        config.sides[1].lpb += doing.iteration;
-        config.sides[1].mfb = ratio*config.sides[1].lpb;
-        verbose_output_print(0, 1,
-                "# NOTE: current values of lpb/mfb: %d,%d %d,%d\n#\n", 
-                config.sides[0].lpb,
-                config.sides[0].mfb,
-                config.sides[1].lpb,
-                config.sides[1].mfb);
-    }
-
-    return config;
-}/*}}}*/
-
 /* sieve_info stuff */
 
 /* This function creates a new sieve_info structure, taking advantage of
@@ -3014,6 +2887,28 @@ int main (int argc0, char *argv0[])/*{{{*/
 
         /* pick a new entry from the stack, and do a few sanity checks */
         las_todo_entry doing = las_todo_pop(las);
+
+        /* Check whether q is larger than the large prime bound.
+         * This can create some problems, for instance in characters.
+         * By default, this is not allowed, but the parameter
+         * -allow-largesq is a by-pass to this test.
+         */
+        if (!allow_largesq) {
+            siever_config const & config = las.config_base;
+            if ((int)mpz_sizeinbase(doing.p, 2) >
+                    config.sides[config.side].lpb) {
+                fprintf(stderr, "ERROR: The special q (%d bits) is larger than the "
+                        "large prime bound on side %d (%d bits).\n",
+                        (int) mpz_sizeinbase(doing.p, 2),
+                        config.side,
+                        config.sides[config.side].lpb);
+                fprintf(stderr, "       You can disable this check with "
+                        "the -allow-largesq argument,\n");
+                fprintf(stderr, "       It is for instance useful for the "
+                        "descent.\n");
+                exit(EXIT_FAILURE);
+            }
+        }
 
         ASSERT_ALWAYS(mpz_poly_is_root(las.cpoly->pols[doing.side], doing.r, doing.p));
 

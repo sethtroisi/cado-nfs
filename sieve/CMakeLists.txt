@@ -13,6 +13,7 @@ target_link_libraries (makefb utils)
 
 set (las_sources
     las-todo-entry.cpp
+    las-siever-config.cpp
   las.cpp fb.cpp las-plattice.cpp
   las-coordinates.cpp las-debug.cpp las-report-stats.cpp las-duplicate.cpp
   las-config.c bucket.cpp las-smallsieve.cpp las-unsieve.cpp
@@ -52,6 +53,7 @@ add_subdirectory(strategies)
 
 add_executable(dupsup
     las-todo-entry.cpp
+    las-siever-config.cpp
     dupsup.cpp las-duplicate.cpp las-qlattice.cpp
     las-plattice.cpp las-coordinates.cpp las-cofactor.cpp fb.cpp
     las-norms.cpp
