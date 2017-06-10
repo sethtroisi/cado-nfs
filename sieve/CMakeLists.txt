@@ -19,6 +19,7 @@ set (las_sources
     las-norms.cpp
     las-coordinates.cpp
 
+    las-types.cpp
   las.cpp fb.cpp las-plattice.cpp
   las-debug.cpp las-report-stats.cpp las-duplicate.cpp
   las-config.c bucket.cpp las-smallsieve.cpp las-unsieve.cpp
@@ -61,9 +62,12 @@ add_executable(dupsup
     las-qlattice.cpp
     las-norms.cpp
     las-coordinates.cpp
+
     dupsup.cpp las-duplicate.cpp
     las-plattice.cpp
     las-cofactor.cpp fb.cpp
+    las-config.c
+    las-types.cpp
     las-unsieve.cpp
     las-unsieve-sse2.cpp
     las-smallsieve.cpp
@@ -72,6 +76,7 @@ add_executable(dupsup
     trialdiv.c
     )
 target_link_libraries(dupsup utils_with_io facul)
+set_target_properties(dupsup PROPERTIES LINK_FLAGS "${OpenMP_CXX_FLAGS}")
 
 add_executable(fake_rels EXCLUDE_FROM_ALL fake_rels.cpp)
 target_link_libraries(fake_rels utils_with_io)

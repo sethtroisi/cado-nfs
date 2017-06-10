@@ -1210,6 +1210,7 @@ sieve/las-fb.cpp
 config/shared_ptr.cmake
 config/cxxabi.cmake
 sieve/display-lattice-adjust.sage
+sieve/las-types.cpp
 sieve/las-siever-config.cpp
 sieve/las-siever-config.hpp
 sieve/las-todo-entry.cpp

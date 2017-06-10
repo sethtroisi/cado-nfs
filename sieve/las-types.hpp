@@ -305,6 +305,8 @@ struct las_info : private NonCopyable {
 };
 /* }}} */
 
+sieve_info & get_sieve_info_from_config(las_info & las, siever_config const & sc, param_list pl);
+
 struct sieve_range_adjust {
     friend struct sieve_info;
 private:
