@@ -167,7 +167,7 @@ struct sieve_info {
      */
 
     /* in las-fb.cpp */
-    void init_factor_bases(las_info & las, param_list_ptr pl);
+    void init_factor_bases( param_list_ptr pl);
     void share_factor_bases(sieve_info & other);
 
     void init_fb_smallsieved(int side);

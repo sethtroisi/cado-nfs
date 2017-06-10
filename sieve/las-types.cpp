@@ -44,7 +44,7 @@ sieve_info::sieve_info(las_info & las, siever_config const & sc, param_list pl)/
     } else {
         verbose_output_print(0, 1, "# bucket_region = %" PRIu64 "\n",
                 BUCKET_REGION);
-        init_factor_bases(las, pl);
+        init_factor_bases(pl);
         for (int side = 0; side < 2; side++) {
             print_fb_statistics(side);
         }
