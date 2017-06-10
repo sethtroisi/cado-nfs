@@ -7,7 +7,7 @@
 
 #include <stdint.h>
 #include "cado-endian.h"
-// #define SAFE_BUCKETS
+#define xxxSAFE_BUCKETS
 #ifdef SAFE_BUCKETS
 #include <stdio.h>
 #include <limits>
@@ -277,6 +277,7 @@ public:
 #ifdef SAFE_BUCKETS
       if (bucket_start[i] + bucket_size == bucket_write[i]) {
           fprintf(stderr, "# Warning: hit end of bucket nb %d\n", i);
+          ASSERT_ALWAYS(0);
           return;
       }
 #endif
