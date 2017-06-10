@@ -50,4 +50,5 @@ private:
   void set(const mpz_t _p, const mpz_t _r, const int _side, const int _depth, const int _iteration);
 };
 
-#endif  /* LAS_TODO_ENTRY_HPP_ */
+#endif	/* LAS_TODO_ENTRY_HPP_ */
+
