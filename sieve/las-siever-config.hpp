@@ -8,7 +8,7 @@
 #include <map>
 #include "params.h"
 
-/* {{{ siever_config */
+/*  siever_config */
 /* The following structure lists the fields with an impact on the siever.
  * Different values for these fields will correspond to different siever
  * structures.
@@ -25,7 +25,6 @@ struct siever_config : public _padded_pod<siever_config> {
      * values. logI_adjusted is a sieving-only parameter. */
     int logI_adjusted;
     sublat_t sublat;
-
     unsigned long bucket_thresh;    // bucket sieve primes >= bucket_thresh
     unsigned long bucket_thresh1;   // primes above are 2-level bucket-sieved
     unsigned int td_thresh;
@@ -116,7 +115,7 @@ struct siever_config : public _padded_pod<siever_config> {
         has_same_cofactoring(siever_config const & sc) : sc(sc) {}
         template<typename OtherLasType>
         bool operator()(OtherLasType const& o) const { return (*this)(o.conf); }
-        bool operator()(siever_config const& o) const {
+        bool operator()(siever_config const& o) const { 
             bool ok = true;
             for(int side = 0 ; side < 2 ; side++) {
                 ok = ok && sc.sides[side].lambda == o.sides[side].lambda;
@@ -131,6 +130,56 @@ struct siever_config : public _padded_pod<siever_config> {
     /*}}}*/
 };
 
+/* {{{ descent_hint
+ *
+ * This is used for the descent. For each factor size, we provide a
+ * reasonable siever_config value
+ *
+ * We also provide, based on experience, info relative to how long it
+ * takes to finish the smoothing process for a prime factor of this size.
+ */
 /* }}} */
+
+struct siever_config_pool {
+    typedef std::pair<int, unsigned int> key_type;
+
+    struct descent_hint : public siever_config {
+        double expected_time;
+        double expected_success;
+    };
+
+    typedef std::map<key_type, descent_hint> hint_table_t;
+    hint_table_t hints;
+
+    descent_hint const * get_hint(int side, unsigned int bitsize) const {
+        hint_table_t::const_iterator it = hints.find(key_type(side, bitsize));
+        if (it == hints.end())
+            return NULL;
+        else
+            return &it->second;
+    }
+
+    siever_config const * default_config_ptr;
+
+    /* This needs not be complete. The default_config_ptr field points
+     * here if it is complete. If not, the fields here are just used as a
+     * base for initializing the other configurations */
+    siever_config base;
+
+    siever_config get_config_for_q(las_todo_entry const& doing) const;
+
+    siever_config_pool(cxx_param_list& pl);
+
+    double hint_expected_time(key_type const &K) const {
+        if (hints.find(K) == hints.end())
+            return -1;
+        return hints.at(K).expected_time;
+    }
+    double hint_expected_success(key_type const &K) const {
+        if (hints.find(K) == hints.end())
+            return -1;
+        return hints.at(K).expected_success;
+    }
+};
 
 #endif	/* LAS_SIEVER_CONFIG_HPP_ */

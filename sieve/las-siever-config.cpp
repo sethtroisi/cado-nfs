@@ -168,7 +168,7 @@ bool siever_config::parse_default(siever_config & sc, param_list_ptr pl)
 }
 /* }}} */
 
-siever_config las_info::get_config_for_q(las_todo_entry const & doing) const /*{{{*/
+siever_config siever_config_pool::get_config_for_q(las_todo_entry const & doing) const /*{{{*/
 {
     // arrange so that we don't have the same header line as the one
     // which prints the q-lattice basis
@@ -179,18 +179,17 @@ siever_config las_info::get_config_for_q(las_todo_entry const & doing) const /*{
                          doing.side,
                          (mpz_srcptr) doing.p,
                          (mpz_srcptr) doing.r);
-    siever_config config = config_base;
+    siever_config config = base;
     config.bitsize = mpz_sizeinbase(doing.p, 2);
     config.side = doing.side;
 
     /* Do we have a hint table with specifically tuned parameters,
      * well suited to this problem size ? */
-    for(unsigned int i = 0 ; i < hint_table.size() ; i++) {
-        siever_config const & sc(hint_table[i].conf);
-        if (!sc.same_config_q()(config)) continue;
-        verbose_output_print(0, 1, "# Using parameters from hint list for q~2^%d on side %d [%d@%d]\n", sc.bitsize, sc.side, sc.bitsize, sc.side);
-        config = sc;
-    }
+    siever_config const * adapted = get_hint(config.side, config.bitsize);
+    if (adapted) {
+        config = *adapted;
+        verbose_output_print(0, 1, "# Using parameters from hint list for q~2^%d on side %d [%d@%d]\n", config.bitsize, config.side, config.bitsize, config.side);
+     }
 
     if (doing.iteration) {
         verbose_output_print(0, 1, "#\n# NOTE:"
@@ -216,11 +215,31 @@ siever_config las_info::get_config_for_q(las_todo_entry const & doing) const /*{
     return config;
 }/*}}}*/
 
-#ifdef  DLP_DESCENT
-void las_info::init_hint_table(param_list_ptr pl)/*{{{*/
+siever_config_pool::siever_config_pool(cxx_param_list & pl)/*{{{*/
 {
-    const char * filename = param_list_lookup_string(pl, "descent-hint-table");
-    if (filename == NULL) return;
+    default_config_ptr = NULL;
+    if (siever_config::parse_default(base, pl))
+        default_config_ptr = &base;
+
+    /* support both, since we've got to realize it's not that much
+     * attached to sieving. */
+    const char * filename = param_list_lookup_string(pl, "hint-table");
+#if DLP_DESCENT
+    const char * filename2 = param_list_lookup_string(pl, "descent-hint-table");
+    if (!filename) {
+        filename = filename2;
+    }
+    if (!filename) {
+        if (!default_config_ptr) {
+            fprintf(stderr,
+                    "Error: no default config set, and no hint table either\n");
+            exit(EXIT_FAILURE);
+        }
+        return;
+    }
+#endif
+    if (!filename) return;
+
     char line[1024];
     FILE * f;
     f = fopen(filename, "r");
@@ -230,8 +249,6 @@ void las_info::init_hint_table(param_list_ptr pl)/*{{{*/
          * the behaviour of the program to do so */
         exit(1);
     }
-    max_hint_bitsize[0] = 0;
-    max_hint_bitsize[1] = 0;
     for(;;) {
         char * x = fgets(line, sizeof(line), f);
         double t;
@@ -243,10 +260,10 @@ void las_info::init_hint_table(param_list_ptr pl)/*{{{*/
         if (!*x) continue;
 
         descent_hint h;
-        siever_config & sc(h.conf);
+        siever_config & sc(h);
 
         /* start with the global defaults */
-        sc = config_base;
+        sc = base;
 
         z = strtoul(x, &x, 10);
         ASSERT_ALWAYS(z > 0);
@@ -271,11 +288,9 @@ void las_info::init_hint_table(param_list_ptr pl)/*{{{*/
         for( ; *x && !isdigit(*x) ; x++) ;
         z = strtoul(x, &x, 10); ASSERT_ALWAYS(z > 0);
         if (letter == 'I') {
-            sc.logI_adjusted = z;
             sc.logA = 2*z-1;
         } else if (letter == 'A') {
             sc.logA = z;
-            sc.logI_adjusted = (z+1)/2;
         } else {
             fprintf(stderr, "%s: parse error (want I= or A=) at %s\n", filename, line);
             exit(EXIT_FAILURE);
@@ -313,59 +328,15 @@ void las_info::init_hint_table(param_list_ptr pl)/*{{{*/
         }
         for( ; *x ; x++) ASSERT_ALWAYS(isspace(*x));
 
-        if (sc.bitsize > max_hint_bitsize[sc.side])
-            max_hint_bitsize[sc.side] = sc.bitsize;
+        key_type K(sc.side, sc.bitsize);
 
-        hint_table.push_back(h);
-    }
-    if (hint_table.empty()) {
-        fprintf(stderr, "%s: no data ??\n", filename);
-        exit(EXIT_FAILURE);
-    }
-
-    /* Allocate the quick lookup tables */
-
-    for(int s = 0 ; s < 2 ; s++) {
-        unsigned int n = max_hint_bitsize[s] + 1;
-        hint_lookups[s] = (int *)malloc(n * sizeof(int));
-        for(unsigned int i = 0 ; i < n ; i++) {
-            hint_lookups[s][i] = -1;
-        }
-    }
-    for(unsigned int i = 0 ; i < hint_table.size() ; i++) {
-        descent_hint & h(hint_table[i]);
-        siever_config & sc = h.conf;
-        int d = hint_lookups[sc.side][sc.bitsize];
-        if (d >= 0) {
+        if (hints.find(K) != hints.end()) {
             fprintf(stderr, "Error: two hints found for %d@%d\n",
                     sc.bitsize, sc.side);
-            exit(1);
+            exit(EXIT_FAILURE);
         }
-        hint_lookups[sc.side][sc.bitsize] = i;
-        /* We must make sure that the default factor base bounds are
-         * larger than what we have for all the hint cases, so that it
-         * remains reasonable to base our work on the larger factor base
-         * (thus doing incomplete sieving).
-         */
-        /* But now, the .poly file does not contain lim data anymore.
-         * This is up to the user to do this check, anyway, because
-         * it is not sure that makefb was run with the lim given in the
-         * poly file.
-         */
-        /*
-        for(int s = 0 ; s < 2 ; s++) {
-            ASSERT_ALWAYS(sc.sides[s]->lim <= cpoly->pols[s]->lim);
-        }
-        */
-    }
 
+        hints[K] = h;
+    }
     fclose(f);
 }/*}}}*/
-
-void las_info::clear_hint_table()
-{
-    free(hint_lookups[0]);
-    free(hint_lookups[1]);
-}
-
-#endif /* DLP_DESCENT */

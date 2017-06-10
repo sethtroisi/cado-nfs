@@ -6,6 +6,9 @@
 #include "las-base.hpp"
 #include "las-todo-entry.hpp"
 #include "las-siever-config.hpp"
+#ifdef DLP_DESCENT
+#include "las-dlog-base.hpp"
+#endif
 #include "fb.hpp"
 #include "trialdiv.h"
 #include "cado_poly.h"
@@ -62,7 +65,7 @@ struct descent_hint {
  * file names, or verbosity flags, which do not affect the output).
  */
 struct sieve_info {
-    cado_poly_ptr cpoly; /* The polynomial pair */
+    cado_poly_srcptr cpoly; /* The polynomial pair */
 
     /* This conditions the validity of the sieve_info_side members
      * sides[0,1], as well as some other members */
@@ -180,17 +183,28 @@ struct sieve_info {
     void init_strategies(param_list_ptr pl);
 
     /* These functions must be called before actually sieving */
-    void update_norm_data();
+    void update_norm_data ();
     void update (size_t nr_workspaces);
 
-    sieve_info(las_info &, siever_config const &, param_list_ptr);
+    sieve_info(siever_config const & sc, cado_poly_srcptr cpoly, std::list<sieve_info> & sievers, cxx_param_list & pl);
+    sieve_info(siever_config const & sc, cado_poly_srcptr cpoly, cxx_param_list & pl);
+
     sieve_info() {
         cpoly = NULL;
         I = J = 0;
         memset(nb_buckets, 0, sizeof(nb_buckets));
         toplevel = 0;
     }
-    void recover_per_sq_values(sieve_range_adjust const&);
+
+    /* This constructor is meant to cover the case where we want to store
+     * all that to a common registry. It would be cleaner if the registry
+     * were a hidden feature of the class, buried in las-types.cpp. The
+     * danger is with the static initialization order fiasco which lurks
+     * near, so I've been refraining so far.
+     */
+    static sieve_info & get_sieve_info_from_config(siever_config const & sc, cado_poly_srcptr cpoly, std::list<sieve_info> & registry, cxx_param_list & pl);
+
+    void recover_per_sq_values(sieve_range_adjust const& Adj);
 };
 
 /* }}} */
@@ -216,12 +230,7 @@ struct las_info : private NonCopyable {
     gmp_randstate_t rstate;
 
     // ----- default config and adaptive configs
-    siever_config const * default_config_ptr;
-
-    /* This needs not be complete. The default_config field points here
-     * if it is complete. If not, the fields here are just used as a base
-     * for initializing the other configurations */
-    siever_config config_base;
+    siever_config_pool config_pool;
 
     /* There may be several configured sievers. This is used mostly for
      * the descent.
@@ -254,7 +263,6 @@ struct las_info : private NonCopyable {
     uint64_t qfac_max;
 
     // ----- stuff roughly related to the descent
-    std::vector<descent_hint> hint_table;
     unsigned int max_hint_bitsize[2];
     int * hint_lookups[2]; /* quick access indices into hint_table */
     /* This is an opaque pointer to C++ code. */
@@ -284,14 +292,10 @@ struct las_info : private NonCopyable {
     void print_cof_stats();
 
 
-    las_info(param_list_ptr);
+    las_info(cxx_param_list &);
     ~las_info();
-
-    siever_config get_config_for_q(las_todo_entry const&) const;
 };
 /* }}} */
-
-sieve_info & get_sieve_info_from_config(las_info & las, siever_config const & sc, param_list pl);
 
 enum {
   OUTPUT_CHANNEL,

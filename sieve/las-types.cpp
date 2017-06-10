@@ -5,9 +5,6 @@
 #include "las-types.hpp"
 #include "las-config.h"
 #include "las-norms.hpp"
-
-/*****************************/
-
 /* sieve_info stuff */
 
 /* This function creates a new sieve_info structure, taking advantage of
@@ -24,20 +21,18 @@
  * since the latters also registers the returned object within
  * las.sievers (while the function here only *reads* this list).
  */
-sieve_info::sieve_info(las_info & las, siever_config const & sc, param_list pl)/*{{{*/
+sieve_info::sieve_info(siever_config const & sc, cado_poly_srcptr cpoly, std::list<sieve_info> & sievers, cxx_param_list & pl) /*{{{*/
+    : cpoly(cpoly), conf(sc)
 {
-    cpoly = las.cpoly;
-    conf = sc;
-
     I = 1UL << sc.logI_adjusted;
 
     std::list<sieve_info>::iterator psi;
     
     /*** Sieving ***/
 
-    psi = find_if(las.sievers.begin(), las.sievers.end(), sc.same_fb_parameters());
+    psi = find_if(sievers.begin(), sievers.end(), sc.same_fb_parameters());
 
-    if (psi != las.sievers.end()) {
+    if (psi != sievers.end()) {
         sieve_info & other(*psi);
         verbose_output_print(0, 1, "# copy factor base data from previous siever\n");
         share_factor_bases(other);
@@ -91,9 +86,9 @@ sieve_info::sieve_info(las_info & las, siever_config const & sc, param_list pl)/
 
     /*** Cofactoring ***/
 
-    psi = find_if(las.sievers.begin(), las.sievers.end(), sc.same_cofactoring());
+    psi = find_if(sievers.begin(), sievers.end(), sc.same_cofactoring());
 
-    if (psi != las.sievers.end()) {
+    if (psi != sievers.end()) {
         sieve_info & other(*psi);
         verbose_output_print(0, 1, "# copy cofactoring strategies from previous siever\n");
         strategies = other.strategies;
@@ -102,6 +97,35 @@ sieve_info::sieve_info(las_info & las, siever_config const & sc, param_list pl)/
     }
 }
 /*}}}*/
+/* This ctor is a simplified version of the former. Of course I'd be
+ * happy to use delegated constructors here.
+ */
+sieve_info::sieve_info(siever_config const & sc, cado_poly_srcptr cpoly, cxx_param_list & pl) /*{{{*/
+    : cpoly(cpoly), conf(sc)
+{
+    I = 1UL << sc.logI_adjusted;
+    std::list<sieve_info>::iterator psi;
+    verbose_output_print(0, 1, "# bucket_region = %" PRIu64 "\n",
+            BUCKET_REGION);
+    init_factor_bases(pl);
+    for (int side = 0; side < 2; side++) {
+        print_fb_statistics(side);
+    }
+    toplevel = MAX(sides[0].fb->get_toplevel(), sides[1].fb->get_toplevel());
+    for(int side = 0 ; side < 2 ; side++) {
+        init_trialdiv(side); /* Init refactoring stuff */
+        init_fb_smallsieved(side);
+        verbose_output_print(0, 2, "# small side-%d factor base", side);
+        size_t nr_roots;
+        sides[side].fb->get_part(0)->count_entries(NULL, &nr_roots, NULL);
+        verbose_output_print(0, 2, " (total %zu)\n", nr_roots);
+    }
+    init_strategies(pl);
+}
+/*}}}*/
+
+
+
 
 void sieve_info::update (size_t nr_workspaces)/*{{{*/
 {
@@ -153,9 +177,10 @@ void sieve_info::update (size_t nr_workspaces)/*{{{*/
 
 /* las_info stuff */
 
-las_info::las_info(param_list_ptr pl)/*{{{*/
+las_info::las_info(cxx_param_list & pl)/*{{{*/
+    : config_pool(pl)
 #ifdef  DLP_DESCENT
-      : dlog_base(pl)
+      , dlog_base(pl)
 #endif
 {
     /* We strive to initialize things in the exact order they're written
@@ -237,44 +262,9 @@ las_info::las_info(param_list_ptr pl)/*{{{*/
         gmp_randseed_ui(rstate, seed);
     // }}}
 
-    // ----- default config and adaptive configs {{{
-    // perhaps the set of parameters passed is not complete.
-    if (siever_config::parse_default(config_base, pl)) {
-        default_config_ptr = &config_base;
-        sievers.push_back(sieve_info(*this, config_base, pl));
-    }
-    // }}}
-
-    // ----- stuff roughly related to the descent {{{
-#ifdef DLP_DESCENT
-    int has_descent_hint = param_list_lookup_string(pl, "descent-hint-table") != NULL;
-#else
-    const int has_descent_hint = 0;
-#endif
-
-    if (!default_config_ptr && !has_descent_hint) {
-        fprintf(stderr,
-                "Error: no default config set, and no hint table either\n");
-        exit(EXIT_FAILURE);
-    }
-
-    memset(max_hint_bitsize, 0, sizeof(max_hint_bitsize));
-    memset(hint_lookups, 0, sizeof(hint_lookups));
-    descent_helper = NULL;
 #ifdef  DLP_DESCENT
-    init_hint_table(pl);
-    // the I value in the default siever config must be at least the max
-    // of the I's found in the hint table, because it creates the
-    // fb_parts. Let's just gently abort in that case.
-    for(unsigned int i = 0 ; i < hint_table.size() ; i++) {
-        descent_hint & h(hint_table[i]);
-        int logI_adjusted = h.conf.logI_adjusted;
-        if (logI_adjusted > config_base.logI_adjusted) {
-            fprintf(stderr, "Error: the I value passed in command-line must be at least"
-                    " the ones found in the hint file\n");
-            exit (EXIT_FAILURE);
-        }
-    }
+    // ----- stuff roughly related to the descent {{{
+    descent_helper = NULL;
 #endif
     // }}}
 
@@ -329,14 +319,6 @@ las_info::~las_info()/*{{{*/
     cado_poly_clear(cpoly);
     // }}}
 
-    // ----- default config and adaptive configs: nothing
-
-    // ----- stuff roughly related to the descent {{{
-#ifdef  DLP_DESCENT
-    clear_hint_table();
-#endif
-    // }}}
- 
     // ----- todo list and such {{{
     if (todo_list_fd) {
         fclose(todo_list_fd);
@@ -355,7 +337,7 @@ void las_info::init_cof_stats(param_list_ptr pl)
 {
     const char *statsfilename = param_list_lookup_string (pl, "stats-cofact");
     if (statsfilename != NULL) { /* a file was given */
-        if (default_config_ptr == NULL) {
+        if (config_pool.default_config_ptr == NULL) {
             fprintf(stderr, "Error: option stats-cofact works only "
                     "with a default config\n");
             exit(EXIT_FAILURE);
@@ -365,7 +347,7 @@ void las_info::init_cof_stats(param_list_ptr pl)
                     "only applies to the default siever config\n");
 #endif
         }
-        siever_config const & sc(*default_config_ptr);
+        siever_config const & sc(*config_pool.default_config_ptr);
 
         cof_stats_file = fopen (statsfilename, "w");
         if (cof_stats_file == NULL)
@@ -394,8 +376,8 @@ void las_info::init_cof_stats(param_list_ptr pl)
 void las_info::print_cof_stats()
 {
     if (!cof_stats_file) return;
-    ASSERT_ALWAYS(default_config_ptr);
-    siever_config const & sc0(*default_config_ptr);
+    ASSERT_ALWAYS(config_pool.default_config_ptr);
+    siever_config const & sc0(*config_pool.default_config_ptr);
     int mfb0 = sc0.sides[0].mfb;
     int mfb1 = sc0.sides[1].mfb;
     for (int i = 0; i <= mfb0; i++) {
@@ -409,8 +391,8 @@ void las_info::print_cof_stats()
 void las_info::clear_cof_stats()
 {
     if (!cof_stats_file) return;
-    ASSERT_ALWAYS(default_config_ptr);
-    siever_config const & sc0(*default_config_ptr);
+    ASSERT_ALWAYS(config_pool.default_config_ptr);
+    siever_config const & sc0(*config_pool.default_config_ptr);
     for (int i = 0; i <= sc0.sides[0].mfb; i++) {
         free (cof_call[i]);
         free (cof_succ[i]);
@@ -422,29 +404,19 @@ void las_info::clear_cof_stats()
 }
 //}}}
 
-
-/* Look for an existing sieve_info in las.sievers with configuration matching
-   that in sc; if none exists, create one. */
-sieve_info & get_sieve_info_from_config(las_info & las, siever_config const & sc, param_list pl)/*{{{*/
+sieve_info & sieve_info::get_sieve_info_from_config(siever_config const & sc, cado_poly_srcptr cpoly, std::list<sieve_info> & registry, cxx_param_list & pl)/*{{{*/
 {
     std::list<sieve_info>::iterator psi;
-#if 0
-#if 0
-    psi = find_if(las.sievers.begin(), las.sievers.end(), sc.same_config_q_A_logI());
-#else
-    psi = find_if(las.sievers.begin(), las.sievers.end(), sc.same_config_q_logI());
-#endif
-#endif
-    psi = find_if(las.sievers.begin(), las.sievers.end(), sc.same_config());
-    if (psi != las.sievers.end()) {
+    psi = find_if(registry.begin(), registry.end(), sc.same_config());
+    if (psi != registry.end()) {
         sc.display();
         return *psi;
     }
-    las.sievers.push_back(sieve_info(las, sc, pl));
-    sieve_info & si(las.sievers.back());
+    registry.push_back(sieve_info(sc, cpoly, registry, pl));
+    sieve_info & si(registry.back());
     verbose_output_print(0, 1, "# Creating new sieve configuration for q~2^%d on side %d (logI=%d)\n",
             sc.bitsize, sc.side, si.conf.logI_adjusted);
     sc.display();
-    return las.sievers.back();
+    return registry.back();
 }/*}}}*/
 

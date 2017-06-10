@@ -9,7 +9,7 @@ struct sieve_info;
 struct sieve_range_adjust;
 struct las_info;
 struct where_am_I;;
-struct siever_config;;
+// struct siever_config;;
 #ifdef  DLP_DESCENT
 // struct las_dlog_base;
 struct descent_tree;

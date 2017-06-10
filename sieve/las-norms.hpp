@@ -69,7 +69,7 @@ public:
         /* See whether for this size of special-q, we have predefined
          * parameters (note: we're copying the default config, and then
          * we replace by an adjusted one if needed). */
-        conf = las.get_config_for_q(doing);
+        conf = las.config_pool.get_config_for_q(doing);
         /* These two will be adjusted in the process */
         logA = conf.logA;
         logI = J = 0;

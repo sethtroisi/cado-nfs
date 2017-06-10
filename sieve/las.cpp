@@ -391,7 +391,7 @@ int las_todo_feed_qrange(las_info & las, param_list pl)
     mpz_ptr q0 = las.todo_q0;
     mpz_ptr q1 = las.todo_q1;
 
-    int qside = las.config_base.side;
+    int qside = las.config_pool.base.side;
 
     mpz_poly_ptr f = las.cpoly->pols[qside];
     cxx_mpz roots[MAX_DEGREE];
@@ -1019,8 +1019,9 @@ bool register_contending_relation(las_info const & las, sieve_info const & si, r
             }
 
             unsigned int n = mpz_sizeinbase(v.p, 2);
-            int k = (n <= las.max_hint_bitsize[side] ? las.hint_lookups[side][n] : -1);
-            if (k < 0) {
+            siever_config_pool::key_type K(side, n);
+            double e = las.config_pool.hint_expected_time(K);
+            if (e < 0) {
                 /* This is not worrysome per se. We just do
                  * not have the info in the descent hint table,
                  * period.
@@ -1029,7 +1030,7 @@ bool register_contending_relation(las_info const & las, sieve_info const & si, r
                 time_left = INFINITY;
             } else {
                 if (std::isfinite(time_left))
-                    time_left += las.hint_table[k].expected_time;
+                    time_left += e;
             }
             contender.outstanding.push_back(std::make_pair(side, v));
         }
@@ -2059,14 +2060,15 @@ int main (int argc0, char *argv0[])/*{{{*/
 
     if (!param_list_parse_switch(pl, "-ondemand-siever-config")) {
         /* Create a default siever instance among las.sievers if needed */
-        if (las.default_config_ptr)
-            get_sieve_info_from_config(las, *las.default_config_ptr, pl);
-
+        if (las.config_pool.default_config_ptr) {
+            siever_config const & sc(*las.config_pool.default_config_ptr);
+            sieve_info::get_sieve_info_from_config(sc, las.cpoly, las.sievers, pl);
+        }
         /* Create all siever configurations from the preconfigured hints */
         /* This can also be done dynamically if needed */
-        for(unsigned int i = 0 ; i < las.hint_table.size() ; i++) {
-            descent_hint & h(las.hint_table[i]);
-            get_sieve_info_from_config(las, h.conf, pl);
+        for(siever_config_pool::hint_table_t::const_iterator it = las.config_pool.hints.begin() ; it != las.config_pool.hints.end() ; ++it) {
+            siever_config const & sc(it->second);
+            sieve_info::get_sieve_info_from_config(sc, las.cpoly, las.sievers, pl);
         }
         verbose_output_print(0, 1, "# Done creating cached siever configurations\n");
     }
@@ -2079,8 +2081,8 @@ int main (int argc0, char *argv0[])/*{{{*/
     thread_workspaces *workspaces = new thread_workspaces(nr_workspaces, 2, las);
 
     if (las.batch) {
-        ASSERT_ALWAYS(las.default_config_ptr);
-        siever_config const & sc0(*las.default_config_ptr);
+        ASSERT_ALWAYS(las.config_pool.default_config_ptr);
+        siever_config const & sc0(*las.config_pool.default_config_ptr);
         int lpb[2] = { sc0.sides[0].lpb, sc0.sides[1].lpb, };
         param_list_parse_int(pl, "batchlpb0", &(lpb[0]));
         param_list_parse_int(pl, "batchlpb1", &(lpb[1]));
@@ -2158,7 +2160,7 @@ int main (int argc0, char *argv0[])/*{{{*/
          * -allow-largesq is a by-pass to this test.
          */
         if (!allow_largesq) {
-            siever_config const & config = las.config_base;
+            siever_config const & config = las.config_pool.base;
             if ((int)mpz_sizeinbase(doing.p, 2) >
                     config.sides[config.side].lpb) {
                 fprintf(stderr, "ERROR: The special q (%d bits) is larger than the "
@@ -2178,10 +2180,11 @@ int main (int argc0, char *argv0[])/*{{{*/
 
         SIBLING_TIMER(timer_special_q, "skew Gauss");
 
-        sieve_range_adjust Adj(doing, 
+        sieve_range_adjust Adj(doing,
                 las.cpoly,
-                las.get_config_for_q(doing),
+                las.config_pool.get_config_for_q(doing),
                 las.nb_threads);
+
 
         if (!Adj.SkewGauss())
             continue;
@@ -2242,12 +2245,28 @@ int main (int argc0, char *argv0[])/*{{{*/
         siever_config conf = Adj.config();
         conf.logI_adjusted = Adj.logI;
 
+        /* It's a bit of a hack, yes. If we tinker with I, then we are
+         * varying the notion of bucket-sieved primes. So the "default"
+         * setting varies, and if there's a user-supplied value, it
+         * should by no means fall below the minimum admissible value.
+         */
+        conf.bucket_thresh = 1UL << conf.logI_adjusted;
+        param_list_parse_ulong(pl, "bkthresh", &(conf.bucket_thresh));
+        if (conf.bucket_thresh < (1UL << conf.logI_adjusted)) {
+            verbose_output_print(0, 1, "# Warning: with logI = %d,"
+                    " we can't have %lu as the bucket threshold. Using %lu\n",
+                    conf.logI_adjusted,
+                    conf.bucket_thresh,
+                    1UL << conf.logI_adjusted);
+            conf.bucket_thresh = 1UL << conf.logI_adjusted;
+        }
+
         /* done with skew gauss ! */
 
         BOOKKEEPING_TIMER(timer_special_q);
 
         /* Maybe create a new siever ? */
-        sieve_info & si(get_sieve_info_from_config(las, conf, pl));
+        sieve_info & si(sieve_info::get_sieve_info_from_config(conf, las.cpoly, las.sievers, pl));
 
         si.recover_per_sq_values(Adj);
 
@@ -2646,8 +2665,8 @@ if (si.conf.sublat.m) {
 
     if (las.batch)
       {
-        ASSERT_ALWAYS(las.default_config_ptr);
-        siever_config const & sc0(*las.default_config_ptr);
+        ASSERT_ALWAYS(las.config_pool.default_config_ptr);
+        siever_config const & sc0(*las.config_pool.default_config_ptr);
         SIBLING_TIMER(global_timer, "batch cofactorization (time is wrong because of openmp)");
         TIMER_CATEGORY(global_timer, batch_mixed());
 
