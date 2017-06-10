@@ -150,7 +150,8 @@ add_trialdiv_test(5)
 add_trialdiv_test(6)
 
 cado_define_test(test_init_norms_bucket_region.cpp
-    LIBRARIES las-norms utils tests)
+    ${PROJECT_SOURCE_DIR}/sieve/las-norms.cpp
+    LIBRARIES utils tests)
 
 add_subdirectory (ecm)
 add_subdirectory (strategies)

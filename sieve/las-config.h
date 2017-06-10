@@ -87,7 +87,6 @@
 #define NB_BUCKETS_2 256
 #define NB_BUCKETS_3 256
 
-// Portability of ULL suffix?
 #define BUCKET_REGION (UINT64_C(1) << LOG_BUCKET_REGION)
 
 #define BUCKET_REGION_1 BUCKET_REGION
@@ -130,12 +129,12 @@
 #define NOPROFILE_STATIC static
 #endif
 
-/* A memset with less MEMSET_MIN bytes is slower than an fixed memset
-   (which is inlined with special code). So, if it's possible, the optimal
-   memset is
-   if (LIKELY(ts <= MEMSET_MIN)) memset (S, i, MEMSET_MIN); else memset (S, i, ts);
-   S += ts;
-   So, all S' malloc must be increased of MEMSET_MIN. */
+/* A memset with less than MEMSET_MIN bytes is slower than an fixed
+ * memset (which is inlined with special code). So, if possible, it is
+ * worthwhile to write:
+ *   if (LIKELY(ts <= MEMSET_MIN)) memset (S, i, MEMSET_MIN); else memset (S, i, ts);
+ * Some write-ahead allocation has to be provided for at malloc() time.
+ */
 #define MEMSET_MIN 64
 
 /* Should we use a cache-line buffer when converting kilo-bucket updates to
