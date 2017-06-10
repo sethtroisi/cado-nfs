@@ -291,8 +291,8 @@ public:
     const uint64_t bucket_number = offset / bucket_region;
     ASSERT_EXPENSIVE(bucket_number < n_bucket);
     update_t update(offset % bucket_region, p, slice_offset, slice_index);
-#if defined(TRACE_K)
     WHERE_AM_I_UPDATE(w, i, slice_index);
+#if defined(TRACE_K)
     log_this_update(update, offset, bucket_number, w);
 #endif
     push_update(bucket_number, update);
