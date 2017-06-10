@@ -31,13 +31,24 @@ void cado_poly_clear(cado_poly poly)
 
 /* p <- q */
 void
-cado_poly_set (cado_poly p, cado_poly q)
+cado_poly_set (cado_poly_ptr p, cado_poly_srcptr q)
 {
     mpz_set (p->n, q->n);
     p->skew = q->skew;
     p->nb_polys = q->nb_polys;
     for(int side = 0 ; side < q->nb_polys ; side++)
       mpz_poly_set (p->pols[side], q->pols[side]);
+}
+
+void
+cado_poly_swap (cado_poly_ptr p, cado_poly_ptr q)
+{
+    mpz_swap (p->n, q->n);
+    p->skew = q->skew;
+    p->nb_polys = q->nb_polys;
+    q->nb_polys = 0;
+    for(int side = 0 ; side < q->nb_polys ; side++)
+      mpz_poly_swap (p->pols[side], q->pols[side]);
 }
 
 // This function is no longer exported
