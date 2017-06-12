@@ -731,14 +731,14 @@ sieve_info & get_sieve_info_from_config(las_info & las, siever_config const & sc
 #endif
     psi = find_if(las.sievers.begin(), las.sievers.end(), sc.same_config());
     if (psi != las.sievers.end()) {
-        siever_config_display(sc);
+        sc.display();
         return *psi;
     }
     las.sievers.push_back(sieve_info(las, sc, pl));
     sieve_info & si(las.sievers.back());
     verbose_output_print(0, 1, "# Creating new sieve configuration for q~2^%d on side %d (logI=%d)\n",
             sc.bitsize, sc.side, si.conf.logI_adjusted);
-    siever_config_display(sc);
+    sc.display();
     return las.sievers.back();
 }/*}}}*/
 

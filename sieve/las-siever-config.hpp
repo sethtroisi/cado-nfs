@@ -44,9 +44,11 @@ struct siever_config : public _padded_pod<siever_config> {
     };
     side_config sides[2];
 
-    bool operator==(siever_config const & o) const { return memcmp(this, &o, sizeof(*this)) == 0; }
+    void display() const;
 
     /*{{{ has_same_config */
+    bool operator==(siever_config const & o) const { return memcmp(this, &o, sizeof(*this)) == 0; }
+
     struct has_same_config {
         siever_config const & sc;
         has_same_config(siever_config const & sc) : sc(sc) {}
@@ -128,7 +130,5 @@ struct siever_config : public _padded_pod<siever_config> {
 };
 
 /* }}} */
-
-void siever_config_display(siever_config const & sc);
 
 #endif	/* LAS_SIEVER_CONFIG_HPP_ */

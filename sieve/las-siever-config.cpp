@@ -9,24 +9,24 @@
 
 /* siever_config stuff */
 
-void siever_config_display(siever_config const & sc)/*{{{*/
+void siever_config::display() const /*{{{*/
 {
-    if (sc.bitsize == 0) return;
+    if (bitsize == 0) return;
 
     verbose_output_print(0, 1, "# Sieving parameters for q~2^%d on side %d\n",
-            sc.bitsize, sc.side);
+            bitsize, side);
     /* Strive to keep these output lines untouched */
     verbose_output_print(0, 1,
 	    "# Sieving parameters: lim0=%lu lim1=%lu lpb0=%d lpb1=%d\n",
-	    sc.sides[0].lim, sc.sides[1].lim,
-            sc.sides[0].lpb, sc.sides[1].lpb);
+	    sides[0].lim, sides[1].lim,
+            sides[0].lpb, sides[1].lpb);
     verbose_output_print(0, 1,
 	    "#                     mfb0=%d mfb1=%d\n",
-	    sc.sides[0].mfb, sc.sides[1].mfb);
-    if (sc.sides[0].lambda != 0 || sc.sides[1].lambda != 0) {
+	    sides[0].mfb, sides[1].mfb);
+    if (sides[0].lambda != 0 || sides[1].lambda != 0) {
         verbose_output_print(0, 1,
                 "#                     lambda0=%1.1f lambda1=%1.1f\n",
-            sc.sides[0].lambda, sc.sides[1].lambda);
+            sides[0].lambda, sides[1].lambda);
     }
 }/*}}}*/
 
