@@ -20,7 +20,19 @@ double get_maxnorm_alg (double_poly_srcptr src_poly, const double X, const doubl
 
 void sieve_info_init_norm_data_sq (sieve_info& si, unsigned long q);
 
-  
+
+struct smart_norm_root {
+  unsigned char derivative; /* 0 = root of F; 1 = root of F'; and so on */
+  double value;             /* root of F(i,1) or derivatives of F. */
+  smart_norm_root(unsigned char derivative = 0, double value = 0) : derivative(derivative), value(value) {}
+};
+
+/* These segments ((x, F(x)), (y, F(y))) are used in the smart normalization */
+typedef struct sg_s {
+  int begin, end;
+  double f_begin, f_end;
+} sg_t;
+
 /* These functions are internals. Don't use them. Use the wrapper above.
    It's need to declare them here for units & coverage tests.
  */
@@ -30,7 +42,7 @@ void init_smart_degree_X_norms_bucket_region_internal (unsigned char *S, uint32_
 void init_norms_roots_internal (cxx_double_poly const &, double max_abs_root, double precision, std::vector<smart_norm_root> & roots);
 void init_norms_roots (sieve_info & si, unsigned int side);
 
-struct sieve_range_adjust {
+struct sieve_range_adjust {/*{{{*/
     friend struct sieve_info;
 private:
     las_todo_entry doing;
@@ -49,6 +61,7 @@ public:
     int J;
     qlattice_basis Q;
 
+#if 0
     sieve_range_adjust(las_todo_entry const & doing, las_info const & las)
         : doing(doing), cpoly(las.cpoly), nb_threads(las.nb_threads)
     {
@@ -60,6 +73,7 @@ public:
         logA = conf.logA;
         logI = J = 0;
     }
+#endif
     /* This is only for desperate cases. In las-duplicates, for the
      * moment it seems that we're lacking the las_info structure... */
     sieve_range_adjust(las_todo_entry const & doing, cado_poly_srcptr cpoly, siever_config const & conf, int nb_threads = 1)
@@ -110,6 +124,6 @@ private:
     void prepare_fijd();
     int adapt_threads(const char *);
     double estimate_yield_in_sieve_area(mat<int> const& shuffle, int squeeze, int N);
-};
+};/*}}}*/
 
 #endif	/* LAS_NORMS_HPP_ */

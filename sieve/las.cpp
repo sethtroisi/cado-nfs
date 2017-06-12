@@ -2178,7 +2178,10 @@ int main (int argc0, char *argv0[])/*{{{*/
 
         SIBLING_TIMER(timer_special_q, "skew Gauss");
 
-        sieve_range_adjust Adj(doing, las);
+        sieve_range_adjust Adj(doing, 
+                las.cpoly,
+                las.get_config_for_q(doing),
+                las.nb_threads);
 
         if (!Adj.SkewGauss())
             continue;

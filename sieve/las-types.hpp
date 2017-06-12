@@ -2,17 +2,16 @@
 #define LAS_TYPES_HPP_
 
 #include <stdint.h>
-#include "fb.hpp"
-#include "trialdiv.h"
 #include "las-config.h"
 #include "las-base.hpp"
 #include "las-todo-entry.hpp"
 #include "las-siever-config.hpp"
-#include "las-report-stats.hpp"
-#include "bucket.hpp"
+#include "fb.hpp"
+#include "trialdiv.h"
 #include "cado_poly.h"
 #include "ecm/facul.h"
 #include "las-forwardtypes.hpp"
+#include "las-norms.hpp"
 #include "las-unsieve.hpp"
 #include "las-qlattice.hpp"
 #include "las-smallsieve.hpp"
@@ -55,18 +54,6 @@ struct descent_hint {
 };
 
 /* }}} */
-
-struct smart_norm_root {
-  unsigned char derivative; /* 0 = root of F; 1 = root of F'; and so on */
-  double value;             /* root of F(i,1) or derivatives of F. */
-  smart_norm_root(unsigned char derivative = 0, double value = 0) : derivative(derivative), value(value) {}
-};
-
-/* These segments ((x, F(x)), (y, F(y))) are used in the smart normalization */
-typedef struct sg_s {
-  int begin, end;
-  double f_begin, f_end;
-} sg_t;
 
 /* {{{ sieve_info
  *
