@@ -35,7 +35,7 @@ sieve_info::sieve_info(las_info & las, siever_config const & sc, param_list pl)/
     
     /*** Sieving ***/
 
-    psi = find_if(las.sievers.begin(), las.sievers.end(), has_same_fb_parameters(sc));
+    psi = find_if(las.sievers.begin(), las.sievers.end(), sc.same_fb_parameters());
 
     if (psi != las.sievers.end()) {
         sieve_info & other(*psi);
@@ -91,7 +91,7 @@ sieve_info::sieve_info(las_info & las, siever_config const & sc, param_list pl)/
 
     /*** Cofactoring ***/
 
-    psi = find_if(las.sievers.begin(), las.sievers.end(), has_same_cofactoring(sc));
+    psi = find_if(las.sievers.begin(), las.sievers.end(), sc.same_cofactoring());
 
     if (psi != las.sievers.end()) {
         sieve_info & other(*psi);
@@ -724,12 +724,12 @@ sieve_info & get_sieve_info_from_config(las_info & las, siever_config const & sc
     std::list<sieve_info>::iterator psi;
 #if 0
 #if 0
-    psi = find_if(las.sievers.begin(), las.sievers.end(), has_same_config_q_A_logI(sc));
+    psi = find_if(las.sievers.begin(), las.sievers.end(), sc.same_config_q_A_logI());
 #else
-    psi = find_if(las.sievers.begin(), las.sievers.end(), has_same_config_q_logI(sc));
+    psi = find_if(las.sievers.begin(), las.sievers.end(), sc.same_config_q_logI());
 #endif
 #endif
-    psi = find_if(las.sievers.begin(), las.sievers.end(), has_same_config(sc));
+    psi = find_if(las.sievers.begin(), las.sievers.end(), sc.same_config());
     if (psi != las.sievers.end()) {
         siever_config_display(sc);
         return *psi;

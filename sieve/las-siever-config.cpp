@@ -49,7 +49,7 @@ siever_config las_info::get_config_for_q(las_todo_entry const & doing) const /*{
      * well suited to this problem size ? */
     for(unsigned int i = 0 ; i < hint_table.size() ; i++) {
         siever_config const & sc(hint_table[i].conf);
-        if (!sc.has_same_config_q(config)) continue;
+        if (!sc.same_config_q()(config)) continue;
         verbose_output_print(0, 1, "# Using parameters from hint list for q~2^%d on side %d [%d@%d]\n", sc.bitsize, sc.side, sc.bitsize, sc.side);
         config = sc;
     }

@@ -13,11 +13,11 @@
  * Different values for these fields will correspond to different siever
  * structures.
  */
-struct siever_config {
+struct siever_config : public _padded_pod<siever_config> {
     /* The bit size of the special-q. Counting in bits is no necessity,
      * we could imagine being more accurate */
     unsigned int bitsize;  /* bitsize == 0 indicates end of table */
-    int side;
+    int side;   /* special-q side */
     int logA;
 
 
@@ -43,92 +43,91 @@ struct siever_config {
         unsigned long qmax; /* largest q sieved on this side, for dup sup */
     };
     side_config sides[2];
-    siever_config() { memset(this, 0, sizeof(*this)); }
 
-    /* The comparator functions below also exist as function objects in
-     * las.cpp -- the reason we don't write the comparator code here is
-     * that there's some inherently verbose code attached to the
-     * function objects (in pre-c++11, at least). */
     bool operator==(siever_config const & o) const { return memcmp(this, &o, sizeof(*this)) == 0; }
 
-    bool has_same_config_q(siever_config const & o) const {
-        return side == o.side && bitsize == o.bitsize;
-    }
-
-    bool has_same_fb_parameters(siever_config const & o) const {
-        bool ok = true;
-        // ok = ok && logI_adjusted == o.logI_adjusted;
-        ok = ok && bucket_thresh == o.bucket_thresh;
-        ok = ok && bucket_thresh1 == o.bucket_thresh1;
-        ok = ok && td_thresh == o.td_thresh;
-        ok = ok && skipped == o.skipped;
-        // ok = ok && bk_multiplier == o.bk_multiplier;
-        ok = ok && unsieve_thresh == o.unsieve_thresh;
-        for(int side = 0 ; side < 2 ; side++) {
-            ok = ok && sides[side].lim == o.sides[side].lim;
-            ok = ok && sides[side].powlim == o.sides[side].powlim;
+    /*{{{ has_same_config */
+    struct has_same_config {
+        siever_config const & sc;
+        has_same_config(siever_config const & sc) : sc(sc) {}
+        bool operator()(siever_config const& o) const { return o == sc; }
+        template<typename OtherLasType>
+        bool operator()(OtherLasType const& o) const { return (*this)(o.conf); }
+    };
+    has_same_config same_config() const { return has_same_config(*this); }
+    /*}}}*/
+    /*{{{ has_same_config_q */
+    struct has_same_config_q {
+        siever_config const & sc;
+        has_same_config_q(siever_config const & sc) : sc(sc) {}
+        template<typename OtherLasType>
+        bool operator()(OtherLasType const& o) const { return (*this)(o.conf); }
+        bool operator()(siever_config const& o) const {
+            return sc.side == o.side && sc.bitsize == o.bitsize;
         }
-        return ok;
+    };
+    has_same_config_q same_config_q() const {
+        return has_same_config_q(*this);
     }
-    bool has_same_sieving(siever_config const & o) const {
-        bool ok = has_same_fb_parameters(o);
-        return ok;
-    }
-    bool has_same_cofactoring(siever_config const & o) const {
-        bool ok = true;
-        for(int side = 0 ; side < 2 ; side++) {
-            ok = ok && sides[side].lambda == o.sides[side].lambda;
-            ok = ok && sides[side].lpb == o.sides[side].lpb;
-            ok = ok && sides[side].mfb == o.sides[side].mfb;
-            ok = ok && sides[side].ncurves == o.sides[side].ncurves;
+    /*}}}*/
+    /* {{{ has_same_fb_parameters */
+    struct has_same_fb_parameters {
+        siever_config const & sc;
+        has_same_fb_parameters(siever_config const & sc) : sc(sc) {}
+        template<typename OtherLasType>
+        bool operator()(OtherLasType const& o) const { return (*this)(o.conf); }
+        bool operator()(siever_config const& o) const {
+            bool ok = true;
+            // ok = ok && sc.logI_adjusted == o.logI_adjusted;
+            ok = ok && sc.bucket_thresh == o.bucket_thresh;
+            ok = ok && sc.bucket_thresh1 == o.bucket_thresh1;
+            ok = ok && sc.td_thresh == o.td_thresh;
+            ok = ok && sc.skipped == o.skipped;
+            // ok = ok && sc.bk_multiplier == o.bk_multiplier;
+            ok = ok && sc.unsieve_thresh == o.unsieve_thresh;
+            for(int side = 0 ; side < 2 ; side++) {
+                ok = ok && sc.sides[side].lim == o.sides[side].lim;
+                ok = ok && sc.sides[side].powlim == o.sides[side].powlim;
+            }
+            return ok;
         }
-        return ok;
-    }
-
+    };
+    has_same_fb_parameters same_fb_parameters() const { return has_same_fb_parameters(*this); }
+    /*}}}*/
+    /*{{{ has_same_sieving -- currently duplicates has_same_fb_parameters */
+    struct has_same_sieving {
+        siever_config const & sc;
+        has_same_sieving(siever_config const & sc) : sc(sc) {}
+        template<typename OtherLasType>
+        bool operator()(OtherLasType const& o) const { return (*this)(o.conf); }
+        bool operator()(siever_config const& o) const {
+            return has_same_fb_parameters(sc)(o);
+        }
+    };
+    has_same_sieving same_sieving() const { return has_same_sieving(*this); }
+    /*}}}*/
+    /*{{{ has_same_cofactoring */
+    struct has_same_cofactoring {
+        siever_config const & sc;
+        has_same_cofactoring(siever_config const & sc) : sc(sc) {}
+        template<typename OtherLasType>
+        bool operator()(OtherLasType const& o) const { return (*this)(o.conf); }
+        bool operator()(siever_config const& o) const {
+            bool ok = true;
+            for(int side = 0 ; side < 2 ; side++) {
+                ok = ok && sc.sides[side].lambda == o.sides[side].lambda;
+                ok = ok && sc.sides[side].lpb == o.sides[side].lpb;
+                ok = ok && sc.sides[side].mfb == o.sides[side].mfb;
+                ok = ok && sc.sides[side].ncurves == o.sides[side].ncurves;
+            }
+            return ok;
+        }
+    };
+    has_same_cofactoring same_cofactoring() const { return has_same_cofactoring(*this); }
+    /*}}}*/
 };
 
 /* }}} */
-
-struct has_same_config {/*{{{*/
-    siever_config const & sc;
-    has_same_config(siever_config const & sc) : sc(sc) {}
-    bool operator()(siever_config const& o) const { return o == sc; }
-    template<typename OtherLasType>
-    bool operator()(OtherLasType const& o) const { return (*this)(o.conf); }
-};
-/*}}}*/
-struct has_same_config_q {/*{{{*/
-    siever_config const & sc;
-    has_same_config_q(siever_config const & sc) : sc(sc) {}
-    bool operator()(siever_config const& o) const { return sc.has_same_config_q(o); }
-    template<typename OtherLasType>
-    bool operator()(OtherLasType const& o) const { return (*this)(o.conf); }
-};
-/*}}}*/
-struct has_same_sieving {/*{{{*/
-    siever_config const & sc;
-    has_same_sieving(siever_config const & sc) : sc(sc) {}
-    bool operator()(siever_config const& o) const { return sc.has_same_sieving(o); }
-    template<typename OtherLasType>
-    bool operator()(OtherLasType const& o) const { return (*this)(o.conf); }
-};
-/*}}}*/
-struct has_same_fb_parameters {/*{{{*/
-    siever_config const & sc;
-    has_same_fb_parameters(siever_config const & sc) : sc(sc) {}
-    bool operator()(siever_config const& o) const { return sc.has_same_fb_parameters(o); }
-    template<typename OtherLasType>
-    bool operator()(OtherLasType const& o) const { return (*this)(o.conf); }
-};
-/*}}}*/
-struct has_same_cofactoring {/*{{{*/
-    siever_config const & sc;
-    has_same_cofactoring(siever_config const & sc) : sc(sc) {}
-    bool operator()(siever_config const& o) const { return sc.has_same_cofactoring(o); }
-    template<typename OtherLasType>
-    bool operator()(OtherLasType const& o) const { return (*this)(o.conf); }
-};
-/*}}}*/
 
 void siever_config_display(siever_config const & sc);
 
