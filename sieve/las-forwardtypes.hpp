@@ -6,6 +6,7 @@
 
 class bucket_primes_t;
 struct sieve_info;
+struct sieve_range_adjust;
 struct las_info;
 struct where_am_I;;
 struct siever_config;;
