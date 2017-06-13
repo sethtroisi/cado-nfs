@@ -21,7 +21,7 @@ double get_maxnorm_alg (double_poly_srcptr src_poly, const double X, const doubl
 
 void sieve_info_init_norm_data_sq (sieve_info& si, unsigned long q);
 
-
+  
 struct smart_norm_root {
   unsigned char derivative; /* 0 = root of F; 1 = root of F'; and so on */
   double value;             /* root of F(i,1) or derivatives of F. */
@@ -102,7 +102,6 @@ public:
     // XXX when estimated_yield() wins, this will probably no longer be
     // necessary.
     void set_minimum_J_anyway();
-
     siever_config const& config() const { return conf; }
 private:
     template<typename T> struct mat {
@@ -127,5 +126,4 @@ private:
     int adapt_threads(const char *);
     double estimate_yield_in_sieve_area(mat<int> const& shuffle, int squeeze, int N);
 };/*}}}*/
-
 #endif	/* LAS_NORMS_HPP_ */
