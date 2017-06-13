@@ -1014,7 +1014,7 @@ bool register_contending_relation(las_info const & las, sieve_info const & si, r
             unsigned long p = mpz_get_ui(v.p);
             if (mpz_fits_ulong_p(v.p)) {
                 unsigned long r = mpz_get_ui(v.r);
-                if (las.dlog_base->is_known(side, p, r))
+                if (las.dlog_base.is_known(side, p, r))
                     continue;
             }
 

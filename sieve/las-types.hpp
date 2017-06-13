@@ -238,19 +238,6 @@ struct las_info : private NonCopyable {
      * part is that we really don't want to copy the factor bases */
     std::list<sieve_info> sievers;
 
-    // ----- stuff roughly related to the descent
-    std::vector<descent_hint> hint_table;
-    unsigned int max_hint_bitsize[2];
-    int * hint_lookups[2]; /* quick access indices into hint_table */
-    /* This is an opaque pointer to C++ code. */
-    void * descent_helper;
-#ifdef  DLP_DESCENT
-    las_dlog_base * dlog_base;
-#endif
-    mutable descent_tree tree;
-    void init_hint_table(param_list_ptr);
-    void clear_hint_table();
-
     // ----- todo list and various specification of what the siever will
     // be doing.
     std::stack<las_todo_entry> todo;
@@ -266,6 +253,18 @@ struct las_info : private NonCopyable {
     uint64_t qfac_min;
     uint64_t qfac_max;
 
+    // ----- stuff roughly related to the descent
+    std::vector<descent_hint> hint_table;
+    unsigned int max_hint_bitsize[2];
+    int * hint_lookups[2]; /* quick access indices into hint_table */
+    /* This is an opaque pointer to C++ code. */
+    void * descent_helper;
+#ifdef  DLP_DESCENT
+    las_dlog_base dlog_base;
+#endif
+    mutable descent_tree tree;
+    void init_hint_table(param_list_ptr);
+    void clear_hint_table();
     // ----- batch mode
     int batch; /* batch mode for cofactorization */
     int batch_print_survivors;

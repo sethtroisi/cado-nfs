@@ -154,6 +154,9 @@ void sieve_info::update (size_t nr_workspaces)/*{{{*/
 /* las_info stuff */
 
 las_info::las_info(param_list_ptr pl)/*{{{*/
+#ifdef  DLP_DESCENT
+      : dlog_base(pl)
+#endif
 {
     /* We strive to initialize things in the exact order they're written
      * in the struct */
@@ -272,10 +275,6 @@ las_info::las_info(param_list_ptr pl)/*{{{*/
             exit (EXIT_FAILURE);
         }
     }
-
-    dlog_base = new las_dlog_base();
-    dlog_base->lookup_parameters(pl);
-    dlog_base->read();
 #endif
     // }}}
 
@@ -335,7 +334,6 @@ las_info::~las_info()/*{{{*/
     // ----- stuff roughly related to the descent {{{
 #ifdef  DLP_DESCENT
     clear_hint_table();
-    delete dlog_base;
 #endif
     // }}}
  
