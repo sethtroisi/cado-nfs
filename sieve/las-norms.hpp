@@ -86,7 +86,13 @@ public:
     }
 
 
-    int SkewGauss() { return ::SkewGauss(Q, doing.p, doing.r, cpoly->skew); }
+    int SkewGauss() {
+        int ret = ::SkewGauss(Q, doing.p, doing.r, cpoly->skew);
+        Q.set_q(doing.p, doing.prime_sq);
+        if (!Q.prime_sq)
+            Q.prime_factors = Q.prime_factors;
+        return ret;
+    }
 
     /* There are three strategies to do a post-SkewGauss adjustment of
      * the q-lattice basis.  */
