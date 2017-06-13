@@ -2,6 +2,7 @@
 #define LAS_NORMS_HPP_
 
 #include <stdint.h>
+#include "las-forwardtypes.hpp"
 #include "las-siever-config.hpp"
 #include "las-types.hpp"
 #include "double_poly.h"
@@ -74,6 +75,7 @@ public:
         logI = J = 0;
     }
 #endif
+
     /* This is only for desperate cases. In las-duplicates, for the
      * moment it seems that we're lacking the las_info structure... */
     sieve_range_adjust(las_todo_entry const & doing, cado_poly_srcptr cpoly, siever_config const & conf, int nb_threads = 1)

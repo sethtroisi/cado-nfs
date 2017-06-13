@@ -1779,4 +1779,3 @@ void sieve_info::recover_per_sq_values(sieve_range_adjust const & Adj)
     ASSERT_ALWAYS(I == (1UL << Adj.logI));
     J = Adj.J;
 }
-
