@@ -580,8 +580,10 @@ static void automorphism_6_1_2(mpz_poly_ptr b, mpz_poly_srcptr a)
   mpz_submul_ui(c[0], a->coeff[1], 2);
   mpz_addmul_ui(c[0], a->coeff[0], 4);
 
-
   mpz_poly_setcoeffs(b, c, 2);
+
+  ASSERT(b->deg > -1);
+
   for (int i = 0; i < 3; i++) {
     mpz_clear(c[i]);
   }
@@ -658,6 +660,7 @@ static void printf_relation_galois_6_1(factor_t * factor,
       if (a->deg == 2) {
         automorphism_6_1_2(b, b);
       } else if (a->deg == 1) {
+        //TODO: not clear if we should enter here or not.
         automorphism_6_1_1(b, b);
       }
       rewrite_poly_6_1(b, factor, V, smooth, gal_norm_denom, f);
