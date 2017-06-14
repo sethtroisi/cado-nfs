@@ -28,7 +28,8 @@ void siever_config::declare_usage(param_list_ptr pl)
     param_list_decl_usage(pl, "bkthresh1", "2-level bucket-sieve primes p >= bkthresh1");
     param_list_decl_usage(pl, "bkmult", "multiplier to use for taking margin in the bucket allocation\n");
     param_list_decl_usage(pl, "unsievethresh", "Unsieve all p > unsievethresh where p|gcd(a,b)");
-  param_list_decl_usage(pl, "dup-qmin", "limits of q-sieving for 2-sided duplicate removal");
+    param_list_decl_usage(pl, "dup-qmin", "lower limit of global q-range for 2-sided duplicate removal");
+    param_list_decl_usage(pl, "dup-qmax", "upper limit of global q-range for 2-sided duplicate removal");
 }
 
 void siever_config::display() const /*{{{*/
