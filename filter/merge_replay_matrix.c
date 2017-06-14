@@ -645,11 +645,13 @@ filter_matrix_read (filter_matrix_t *mat, const char *purgedname)
   int weight_buried_is_exact = 1;
   uint64_t weight_buried = 0;
   uint64_t i;
+  uint64_t smallest_non_buried = UMAX(uint64_t);
   /* Bury heavy coloumns. The 'nburied' heaviest column are buried. */
   /* Buried columns are not taken into account by merge. */
   if (mat->nburied)
   {
     uint64_t *heaviest = NULL;
+
     heaviest = (uint64_t *) malloc (mat->nburied * sizeof (uint64_t));
     ASSERT_ALWAYS(heaviest != NULL);
     for (i = 0; i < mat->nburied; i++)
@@ -669,7 +671,19 @@ filter_matrix_read (filter_matrix_t *mat, const char *purgedname)
         j--;
       }
       if (j < mat->nburied)
-        heaviest[j] = i;
+        {
+          if (j == mat->nburied - 1) /* column heaviest[j] will disappear */
+            {
+              if (heaviest[j] < smallest_non_buried)
+                smallest_non_buried = heaviest[j];
+            }
+          heaviest[j] = i;
+        }
+      else /* column i is not buried */
+        {
+          if (i < smallest_non_buried)
+            smallest_non_buried = i;
+        }
     }
 
     int32_t buried_max = mat->wt[heaviest[0]];
@@ -693,6 +707,9 @@ filter_matrix_read (filter_matrix_t *mat, const char *purgedname)
     }
     printf("# Number of buried columns is %" PRIu64 " (min_weight=%" PRId32 ", "
            "max_weight=%" PRId32 ")\n", mat->nburied, buried_min, buried_max);
+    if (smallest_non_buried != UMAX(uint64_t))
+      printf ("# Index of the first non-buried column is %" PRIu64 "\n",
+              smallest_non_buried);
     if (weight_buried_is_exact)
       printf("# Weight of the buried part of the matrix: %" PRIu64 "\n",
              weight_buried);
