@@ -1214,7 +1214,8 @@ void factor_survivors_data::prepare_cofactoring(timetree_t & timer)
         /* Resieve small primes for this bucket region and store them 
            together with the primes recovered from the bucket updates */
         resieve_small_bucket_region (&sdata[side].primes, N, SS,
-                th->psi->sides[side].rsd, th->sides[side].rsdpos, si, w);
+                th->psi->sides[side].rsd, th->sides[side].rsdpos,
+                si, w);
 
         SIBLING_TIMER(timer, "sort primes in purged buckets");
 
@@ -1645,18 +1646,27 @@ void * process_bucket_region(timetree_t & timer, thread_data *th)
     where_am_I w MAYBE_UNUSED;
     las_info const & las(*th->plas);
     sieve_info & si(*th->psi);
+    /* I _think_ that first_region0_index is really the "smallest N" (N
+     * as in trace_Nx, that is, the bucket number) which is being
+     * processed here. Of course when si.toplevel==1, we have only one
+     * level of buckets, so we don't need that */
     uint32_t first_region0_index = th->first_region0_index;
     if (si.toplevel == 1) {
         first_region0_index = 0;
     }
+    /* meanwhile, I'd like to say that I'll get confirmation of this
+     * later. It seems murky for now */
+    ASSERT_ALWAYS(first_region0_index == 0);
+    /* hmm, re-reading it, I'm almost convinced that this assert may be
+     * removed safely. But move on to testing with toplevel=1 first
+     * anyway.
+     */
 
     WHERE_AM_I_UPDATE(w, psi, &si);
 
     las_report_ptr rep = th->rep;
 
     unsigned char * S[2];
-
-    unsigned int skiprows = (BUCKET_REGION >> si.conf.logI_adjusted)*(las.nb_threads-1);
 
     /* This is local to this thread */
     for(int side = 0 ; side < 2 ; side++) {
@@ -1670,10 +1680,13 @@ void * process_bucket_region(timetree_t & timer, thread_data *th)
     /* loop over appropriate set of sieve regions */
     for (uint32_t ii = 0; ii < si.nb_buckets[1]; ii ++)
       {
-        uint32_t i = first_region0_index + ii;
-        if ((i % las.nb_threads) != (uint32_t)th->id)
+        /* N is the region index */
+        uint32_t N = first_region0_index + ii;
+        if ((N % las.nb_threads) != (uint32_t)th->id)
             continue;
-        WHERE_AM_I_UPDATE(w, N, i);
+        WHERE_AM_I_UPDATE(w, N, N);
+        // unsigned int first_i = (N & ((1 << log_buckets_per_line) - 1)) << LOG_BUCKET_REGION;
+        // unsigned int first_j = (N >> log_buckets_per_line) << log_lines_per_bucket;
 
         if (recursive_descent) {
             /* For the descent mode, we bail out as early as possible. We
@@ -1702,7 +1715,7 @@ void * process_bucket_region(timetree_t & timer, thread_data *th)
                 /* Init norms */
                 rep->tn[side] -= seconds_thread ();
 
-                si.sides[side].lognorms->fill(S[side], i);
+                si.sides[side].lognorms->fill(S[side], N);
 
                 rep->tn[side] += seconds_thread ();
 #if defined(TRACE_K) 
@@ -1755,7 +1768,10 @@ void * process_bucket_region(timetree_t & timer, thread_data *th)
                 CHILD_TIMER(timer, "small sieve");
 
                 /* Sieve small primes */
-                sieve_small_bucket_region(SS, i, s.ssd, ts.ssdpos, si, side, w);
+                sieve_small_bucket_region(SS, N, s.ssd,
+                        ts.ssdpos, si, side,
+                        las.nb_threads,
+                        w);
             }
 
             {
@@ -1775,7 +1791,7 @@ void * process_bucket_region(timetree_t & timer, thread_data *th)
 
         /* Factor survivors */
         rep->ttf -= seconds_thread ();
-        rep->reports += factor_survivors (timer, th, i, w);
+        rep->reports += factor_survivors (timer, th, N, w);
         rep->ttf += seconds_thread ();
 
         SIBLING_TIMER(timer, "reposition small (re)sieve data");
@@ -1785,7 +1801,7 @@ void * process_bucket_region(timetree_t & timer, thread_data *th)
         for(int side = 0 ; side < 2 ; side++) {
             sieve_info::side_info & s(si.sides[side]);
             thread_side_data & ts = th->sides[side];
-            small_sieve_skip_stride(s.ssd, ts.ssdpos, skiprows, si);
+            small_sieve_skip_stride(s.ssd, ts.ssdpos, th->plas->nb_threads, si);
             int * b = s.fb_parts_x->rs;
             memcpy(ts.rsdpos, ts.ssdpos + b[0], (b[1]-b[0]) * sizeof(int64_t));
         }
@@ -2389,7 +2405,7 @@ for (unsigned int j_cong = 0; j_cong < sublat_bound; ++j_cong) {
         for(int side = 0 ; side < 2 ; side++) {
             sieve_info::side_info & s(si.sides[side]);
 
-            small_sieve_init(s.ssd, las, s.fb_smallsieved.get(), si, side);
+            small_sieve_init(s.ssd, las.nb_threads, s.fb_smallsieved.get(), si, side);
             small_sieve_info("small sieve", side, s.ssd);
 
             small_sieve_extract_interval(s.rsd, s.ssd, s.fb_parts_x->rs);
@@ -2402,8 +2418,11 @@ for (unsigned int j_cong = 0; j_cong < sublat_bound; ++j_cong) {
                 sieve_info::side_info & s(si.sides[side]);
                 thread_side_data & ts = th->sides[side];
 
-                uint32_t my_row0 = (BUCKET_REGION >> si.conf.logI_adjusted) * th->id;
-                ts.ssdpos = small_sieve_start(s.ssd, my_row0, si);
+                /* because bucket regions are interleaved across threads,
+                 * the first region index considered by thread of index
+                 * th->id is simply th->id.
+                 */
+                ts.ssdpos = small_sieve_start(s.ssd, th->id, si);
                 ts.rsdpos = small_sieve_copy_start(ts.ssdpos, s.fb_parts_x->rs);
             }
         }

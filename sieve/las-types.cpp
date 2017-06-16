@@ -1,3 +1,4 @@
+
 #include "cado.h"
 #include <stdio.h>
 #include <stdarg.h>
@@ -47,13 +48,6 @@ sieve_info::sieve_info(siever_config const & sc, cado_poly_srcptr cpoly, std::li
 
     // Now that fb have been initialized, we can set the toplevel.
     toplevel = MAX(sides[0].fb->get_toplevel(), sides[1].fb->get_toplevel());
-
-    /* If LOG_BUCKET_REGION == sc.logI, then one bucket (whose size is the
-     * L1 cache size) is actually one line. This changes some assumptions
-     * in sieve_small_bucket_region and resieve_small_bucket_region, where
-     * we want to differentiate on the parity on j.
-     */
-    ASSERT_ALWAYS(LOG_BUCKET_REGION >= conf.logI_adjusted);
 
 #if 0
     /* Initialize the number of buckets */
