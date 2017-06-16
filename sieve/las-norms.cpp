@@ -760,7 +760,7 @@ void sieve_range_adjust::prepare_fijd()/*{{{*/
  * image would.
  * 
  * We compute the maximum norm that would occur if we had a perfect
- * lattice basis in the sense that its image forms a rectangle A/2 <= a <
+ * lattice basis in the sense that its image forms a rectangle -A/2 <= a <
  * A/2, 0 <= b < B, with A/2/B = skew, and A*B = I*J*q (assuming J=I/2
  * here).  Thus we have B = A/2/skew, A*A/2/skew = I*I/2*q, A =
  * I*sqrt(q*skew).  The optimal maximum norm is then the maximum of
