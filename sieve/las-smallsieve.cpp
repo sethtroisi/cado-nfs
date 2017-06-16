@@ -675,7 +675,7 @@ struct small_sieve_context {
     do {} while (0)
 
 /* Only compute the initial ssdpos fields. */
-int64_t *small_sieve_new_start(small_sieve_data_t *ssd,
+int64_t *small_sieve_start(small_sieve_data_t *ssd,
         unsigned int first_region_index,
         sieve_info const & si)
 {
@@ -709,112 +709,14 @@ int64_t *small_sieve_new_start(small_sieve_data_t *ssd,
             ssp_t * ssp = &(ssd->ssp[index]);
             ssdpos[index] = C.first_position_ordinary_prime(ssp);
         }
-        if (event & SSP_END) break;
-    }
-    return ssdpos;
-}
-/* Only compute the initial ssdpos fields. */
-int64_t *small_sieve_start(small_sieve_data_t *ssd, unsigned int first_region_index,
-        sieve_info const & si)
-{
-    const unsigned long nj = bucket_region >> si.conf.logI_adjusted;
-    unsigned int j0 = first_region_index * nj;
-
-    ssp_marker_t * next_marker = ssd->markers;
-    int64_t * ssdpos = (int64_t *) malloc(ssd->nb_ssp * sizeof(int64_t));
-    const uint64_t sublatm = si.conf.sublat.m;
-    const uint64_t sublati0 = si.conf.sublat.i0;
-    const uint64_t sublatj0 = si.conf.sublat.j0;
-
-    for(int i = 0 ; i < ssd->nb_ssp ; i++) {
-        int fence;
-        unsigned int event;
-        event = next_marker->event;
-        fence = next_marker->index;
-        next_marker++;
-        for( ; i < fence ; i++) {
-            ssp_t * ssp = &(ssd->ssp[i]);
-            if (!sublatm) {
-                uint64_t compensate = si.I / 2;
-                compensate += (uint64_t)j0 * (uint64_t)ssp->r;
-                ssdpos[i] = compensate % (uint64_t)ssp->p;
-            } else {
-                uint64_t jj = j0*sublatm + sublatj0;
-                uint64_t ii = (jj*uint64_t(ssp->r)) % uint64_t(ssp->p);
-                while ((ii % sublatm) != sublati0) {
-                    ii += ssp->p;
-                }
-                ii = (ii-sublati0) / sublatm; // exact division
-                uint64_t compensate = (si.I / 2) + ii;
-                ssdpos[i] = compensate % (uint64_t)ssp->p;
-            }
-        }
         if (event & SSP_DISCARD) continue;
         if (event & SSP_END) break;
-        // Remark: even in the case of discard, we want to precompute the
-        // data (we are in the projective case), for the (rare) case
-        // where we have to update the (i,j)=(1,0) position.
         if (event & SSP_PROJ) {
-            uint64_t jj0;
-            if (!sublatm) {
-                jj0 = j0;
-            } else {
-                jj0 = j0*sublatm + sublatj0;
-            }
-            ssp_proj_t * ssp = (ssp_proj_t *) &(ssd->ssp[i]);
-            /* Compute the next multiple of g above j0 */
-            uint64_t j1 = jj0 - (jj0 % ssp->g);
-            // FIXME: is it (j1<jj0) the right condition ?
-            if (j1<jj0) { /* most often j1 is < jj0 -- in this case,
-                         the j1 we're looking for needs +g */
-                j1 += ssp->g;
-            }
-            ASSERT(j1 >= jj0);
-            ASSERT(j1 % ssp->g == 0);
-            /* Now we'd like to avoid row number 0 (so j1 == 0).  */
-            /* The position (1,0) is updated with a special code in the */
-            /* sieving code below */
-            if (j1 == 0) {
-                j1 += ssp->g;
-            }
-            // In sublat mode, we also need j1 congruent to sublatj0 mod m.
-            if (sublatm) {
-                while ((j1 % sublatm) != sublatj0) {
-                    j1 += ssp->g;
-                }
-            }
-            // Find the corresponding i
-            uint64_t ii = uint64_t(j1/ssp->g)*uint64_t(ssp->U);
-            if (sublatm) {
-                while ((ii % sublatm) != sublati0) {
-                    ii += ssp->q;
-                }
-            }
-            // In the sublat mode, switch back to reduced convention
-            // (exact divisions)
-            if (sublatm) {
-                j1 = (j1-sublatj0) / sublatm;
-                ii = (ii-sublati0) / sublatm;
-            }
-            uint64_t compensate = si.I / 2;
-            compensate += ii;
-            ssdpos[i] = (((uint64_t)(j1 - j0))<<si.conf.logI_adjusted)
-                + compensate % (uint64_t)ssp->q;
+            ssp_proj_t * ssp = (ssp_proj_t *) &(ssd->ssp[index]);
+            ssdpos[index] = C.first_position_projective_prime(ssp);
         } else if (event & SSP_POW2) {
-            // FIXME: this is probably broken with sublattices.
-            /* For powers of 2, we sieve only odd lines (*) and 
-             * ssdpos needs to point at line j=1. We assume
-             * that in this case (si.I/2) % p == 0
-             * (*) for lines with j even, we have a root mod the prime
-             * power for i-j*r multiple of our power of 2, which means
-             * i even too. Thus a useless report.
-             */
-            ssp_t * ssp = &(ssd->ssp[i]);
-            /* Note that j0 may perfectly be odd, in the case I==16 ! */
-            unsigned int j1 = j0 | 1;
-            unsigned int compensate = si.I / 2;
-            compensate += j1 * ssp->r;
-            ssdpos[i] = (j1-j0) * si.I + compensate % ssp->p;
+            ssp_t * ssp = &(ssd->ssp[index]);
+            ssdpos[index] = C.first_position_power_of_two(ssp);
         }
     }
     return ssdpos;
