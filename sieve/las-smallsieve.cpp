@@ -992,6 +992,10 @@ void sieve_small_bucket_region(unsigned char *S, int N,
         WHERE_AM_I_UPDATE(w, j, j);
         unsigned long pattern[2] = {0,0};
 
+        /* TODO: Errr. It seems rather ridiculous to do all this work
+         * even for even rows, where we know that we don't want to sieve
+         * affine roots ! */
+
         /* Prepare the pattern */
 
         ssp_marker_t * next_marker = ssd->markers;
@@ -1411,7 +1415,8 @@ void sieve_small_bucket_region(unsigned char *S, int N,
                 ssdpos[index] = pos - (1U << LOG_BUCKET_REGION);
             } else {
                 /* q > 1, more general sieving code. */
-                const uint64_t pos = ssdpos[index];
+                //oldpos const uint64_t pos = ssdpos[index];
+                uint64_t pos = C.first_position_projective_prime(ssp);
                 const fbprime_t evenq = (q % 2 == 0) ? q : 2 * q;
                 size_t lineoffset = pos & (I - 1U),
                        linestart = pos - lineoffset;

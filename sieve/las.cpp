@@ -671,6 +671,11 @@ apply_one_bucket (unsigned char *S,
     const slice_index_t slice_index = BA.get_slice_index(i_slice);
     const unsigned char logp = fb->get_slice(slice_index)->get_logp();
 
+    /* TODO: the code below is quite possibly correct, except perhaps for the
+     * treatment of where_am_I stuff. I get inconsistent
+     * reports, esp when I vary the number of threads.
+     */
+#if 1
     const bucket_update_t<1, HINT> *next_align;
     if (sizeof(bucket_update_t<1, HINT>) == 4) {
       next_align = (bucket_update_t<1, HINT> *) (((size_t) it + 0x3F) & ~((size_t) 0x3F));
@@ -722,6 +727,7 @@ apply_one_bucket (unsigned char *S,
       INSERT_2_VALUES(x0); INSERT_2_VALUES(x1); INSERT_2_VALUES(x2); INSERT_2_VALUES(x3);
       INSERT_2_VALUES(x4); INSERT_2_VALUES(x5); INSERT_2_VALUES(x6); INSERT_2_VALUES(x7);
     }
+#endif
     while (it != it_end)
       apply_one_update<HINT> (S, it++, logp, w);
   }
