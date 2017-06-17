@@ -237,7 +237,7 @@ void small_sieve_init(small_sieve_data_t *ssd, unsigned int interleaving,
     // If we are doing sublattices modulo m, then we jump virutally m
     // times faster.
     unsigned int sublatm = si.conf.sublat.m;
-    const unsigned int skiprows = (bucket_region >> si.conf.logI_adjusted)*(interleaving-1);
+    const unsigned int skiprows = ((interleaving-1) << LOG_BUCKET_REGION) >> si.conf.logI_adjusted;
 
     for (std::vector<fb_general_entry>::const_iterator iter = fb->begin() ; iter != fb->end() && index < size ; iter++) {
         /* p=pp^k, the prime or prime power in this entry, and pp is prime */
@@ -642,7 +642,8 @@ struct small_sieve_context {
             /* For the case of several bucket regions per line, it's
              * clear that this position will be outside the current
              * bucket region. Note that some special care is needed
-             * within small_sieve_skip_stride.
+             * when we want to incrementally update the position, but we
+             * rarely (if ever) want to do that anyway.
              */
         }
         return x;
@@ -720,102 +721,6 @@ int64_t *small_sieve_start(small_sieve_data_t *ssd,
         }
     }
     return ssdpos;
-}
-/* }}} */
-
-/* {{{ Skip stride -- used in multithreaded context only */
-void small_sieve_skip_stride(small_sieve_data_t *ssd MAYBE_UNUSED,
-        int64_t * ssdpos MAYBE_UNUSED,
-        int interleaving MAYBE_UNUSED,
-        sieve_info const & si MAYBE_UNUSED)
-{
-    return;
-#if 0
-    unsigned int skip = (BUCKET_REGION >> si.conf.logI_adjusted)*(interleaving-1);
-
-    if (skip == 0) return;
-
-    ssp_marker_t * next_marker = ssd->markers;
-    unsigned int skipI = skip << si.conf.logI_adjusted;
-
-    for(int i = 0 ; i < ssd->nb_ssp ; i++) {
-        int fence;
-        unsigned int event;
-        event = next_marker->event;
-        fence = next_marker->index;
-        next_marker++;
-        for( ; i < fence ; i++) {
-            ssp_t * ssp = &(ssd->ssp[i]);
-            ssdpos[i] += ssp->offset;
-            if (ssdpos[i] >= (int) ssp->p)
-                ssdpos[i] -= ssp->p;
-        }
-        if (event & SSP_DISCARD) continue;
-        if (event & SSP_END) break;
-        if (event & SSP_PROJ) {
-            // FIXME: this is probably broken with sublattices.
-            /* Don't bother. Pay attention to the fact that we have offsets to
-             * the (current) bucket base. */
-            ssp_proj_t * ssp = (ssp_proj_t *) &(ssd->ssp[i]);
-            uint64_t x = ssdpos[i];
-            const unsigned int I = 1U << si.conf.logI_adjusted;
-            unsigned int imask = I-1;
-            unsigned int j = x >> si.conf.logI_adjusted;
-            if (j >= skip) {
-                /* The ``ssdpos'' is still ahead of us, so there's
-                 * no adjustment to make */
-              x -= skipI;
-            } else {
-                /* We've hit something in this bucket, but the
-                 * ssdpos field lands in the blank space between
-                 * this bucket and the next one to be handled. So we must
-                 * advance: add g to j enough times so that j>=skip.
-                 * Which means j+g*ceil((skip-j)/g)
-                 */
-                uint64_t i = x & imask;
-                uint64_t jI = x - i;
-                uint64_t nskip = iceildiv(skip-j, ssp->g);
-                jI = jI
-                    + (((uint64_t)(nskip * ssp->g - skip)) << si.conf.logI_adjusted);
-                i = (i + nskip * (uint64_t)ssp->U) % ssp->q;
-                x = jI + i;
-            }
-            ssdpos[i] = x;
-        } else if (event & SSP_POW2) {
-            // FIXME: this is probably broken with sublattices.
-            ssp_t * ssp = &(ssd->ssp[i]);
-            ssdpos[i] += ssp->offset;
-#if 0
-            // If there is only one line per bucket region, we should
-            // skip the even lines. So we add I to ensure that we start
-            // at the next odd line.
-            const unsigned long nj = bucket_region >> si.conf.logI_adjusted;
-            if (nj == 1)
-                ssdpos[i] += bucket_region;
-#else
-            /* more generally, if the next row is even we need to skip a
-             * full row !
-             *
-             * This is not yet implemented (need to know about the next
-             * row index first).
-             */
-#endif
-            /* Pay attention to the fact that at the moment, ssdpos
-             * may still point to the _second line_ in the area. So we
-             * must not cancel the high bits.
-             */
-            // ssdpos[i] &= ssp->p - 1;
-
-            // However, when p == I, we might get something >= 2*I, which
-            // is just an artifact.
-            // See bug #18814
-            const unsigned int I = 1U << si.conf.logI_adjusted;
-            if ((ssp->p == I) && ((unsigned int)ssdpos[i] >= 2*I)) {
-                ssdpos[i] -= I;
-            }
-        }
-    }
-#endif
 }
 /* }}} */
 
@@ -1282,7 +1187,7 @@ void sieve_small_bucket_region(unsigned char *S, int N,
 	const unsigned char logp = ssd->logp[index];
 	unsigned char *S_ptr = S;
 	size_t p_or_2p = p;
-	unsigned int i0 = ssdpos[index]; ASSERT(i0 < p);
+	unsigned int pos = ssdpos[index]; ASSERT(pos < p);
         unsigned int i_compens_sublat = 0;
         if (si.conf.sublat.m != 0) {
             i_compens_sublat = si.conf.sublat.i0 & 1;
@@ -1292,26 +1197,26 @@ void sieve_small_bucket_region(unsigned char *S, int N,
 	do {
 	  unsigned char *pi;
 	  WHERE_AM_I_UPDATE(w, j, j);
-	  pi = S_ptr + i0;
+	  pi = S_ptr + pos;
 	  S_ptr += I;
 	  /* for j even, we sieve only odd pi, so step = 2p. */
 	  p_or_2p += p_or_2p;
-          if (!((i_compens_sublat + i0) & 1)) {
+          if (!((i_compens_sublat + pos) & 1)) {
               pi += p;
           }
 	  U;
-	  i0 += r; if (i0 >= p) i0 -= p; 
+	  pos += r; if (pos >= p) pos -= p; 
 	  /* Next line */
 	  if (++j >= nj) break;
 	  p_or_2p >>= 1;
 	j_odd:
 	  WHERE_AM_I_UPDATE(w, j, j);
-	  pi = S_ptr + i0;
+	  pi = S_ptr + pos;
 	  S_ptr += I;
 	  U;
-	  i0 += r; if (i0 >= p) i0 -= p;
+	  pos += r; if (pos >= p) pos -= p;
 	} while (++j < nj);
-	ssdpos[index] = i0;
+	ssdpos[index] = pos;
             ssdpos[index] += ssp->offset;
             if (ssdpos[index] >= (int) ssp->p)
                 ssdpos[index] -= ssp->p;
@@ -1676,6 +1581,7 @@ resieve_small_bucket_region (bucket_primes_t *BP, int N, unsigned char *S,
                 }
                 pos += gI;
             }
+#if 0
             ssdpos[index] = pos - bucket_region;
             if (resieve_very_verbose_bad) {
                 verbose_output_print(0, 1, "# resieving: new pos = %" PRIu64
@@ -1683,6 +1589,7 @@ resieve_small_bucket_region (bucket_primes_t *BP, int N, unsigned char *S,
                         "new ssdpos = %" PRIu64 "\n",
                         pos, bucket_region, ssdpos[index]);
             }
+#endif
         }
     }
 }

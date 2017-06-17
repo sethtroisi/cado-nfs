@@ -36,6 +36,7 @@
 #include "las-fill-in-buckets.hpp"
 #include "las-threads.hpp"
 #include "las-todo-entry.hpp"
+
 #include "memusage.h"
 #include "tdict.hpp"
 #ifdef  DLP_DESCENT
@@ -63,6 +64,8 @@ double general_grace_time_ratio = DESCENT_DEFAULT_GRACE_TIME_RATIO;
 
 
 double tt_qstart;
+
+/*****************************/
 
 void las_todo_push_withdepth(las_info & las, mpz_srcptr p, mpz_srcptr r, int side, int depth, int iteration = 0)/*{{{*/
 {
@@ -1807,7 +1810,7 @@ void * process_bucket_region(timetree_t & timer, thread_data *th)
         for(int side = 0 ; side < 2 ; side++) {
             sieve_info::side_info & s(si.sides[side]);
             thread_side_data & ts = th->sides[side];
-            small_sieve_skip_stride(s.ssd, ts.ssdpos, th->plas->nb_threads, si);
+            // small_sieve_skip_stride(s.ssd, ts.ssdpos, th->plas->nb_threads, si);
             int * b = s.fb_parts_x->rs;
             memcpy(ts.rsdpos, ts.ssdpos + b[0], (b[1]-b[0]) * sizeof(int64_t));
         }
