@@ -608,7 +608,7 @@ struct small_sieve_context {
         return x;
     }
 
-    int64_t first_position_power_of_two(const ssp_t * ssp)
+    int64_t first_position_power_of_two(const ssp_t * ssp, unsigned int dj = 0)
     {
         /* equation here: i-r*j = 0 mod p, p a power of 2. */
         /* only difference with ordinary case is that we want to
@@ -623,20 +623,23 @@ struct small_sieve_context {
          * power for i-j*r multiple of our power of 2, which means
          * i even too. Thus a useless report.
          */
-        uint64_t jj = j0*sublatm + sublatj0;
+        unsigned int j = j0 + dj;
+        uint64_t jj = j*sublatm + sublatj0;
         // uint64_t ii = i0*sublatm + sublati0;
         /* next odd line */
         jj |= 1;
-        int i0ref = (j0 == jj) ? i0 : (-I/2);
+        int i0ref = (j == jj) ? i0 : (-I/2);
         int64_t x = (int64_t)jj * (int64_t)ssp->r;
-        for( ; x % sublatm != sublati0 ; x += ssp->p);
-        x = (x - sublati0) / sublatm;
-        x = (x - i0ref) % ssp->p;
+        if (sublatm > 1) {
+            for( ; x % sublatm != sublati0 ; x += ssp->p);
+            x = (x - sublati0) / sublatm;
+        }
+        x = (x - i0ref) & (ssp->p - 1);
         if (x < 0) x += ssp->p;
         /* our target is position x in the bucket region which starts
          * at coordinates (i0ref, jj). How far is that from us ?
          */
-        if (jj > j0) {
+        if (jj > j) {
             x -= region_rank_in_line << LOG_BUCKET_REGION;
             x += (((uint64_t)(jj - j0))<<logI);
             /* For the case of several bucket regions per line, it's
@@ -915,8 +918,9 @@ void sieve_small_bucket_region(unsigned char *S, int N,
                 // patterns ahead of time, instead of recomputing them
                 // for all lines.
 
-                int pos = ssdpos[index];
-                //newpos uint64_t pos = C.first_position_power_of_two(ssp);
+                // int pos = ssdpos[index];
+                //newpos uint64_t
+                int pos = C.first_position_power_of_two(ssp, j - j0);
                 //newpos ASSERT_ALWAYS(pos == (uint64_t) ssdpos[index]);
 
                 if (pos < (i1 - i0)) {
