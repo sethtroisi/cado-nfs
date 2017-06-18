@@ -809,7 +809,7 @@ int64_t *small_sieve_start(small_sieve_data_t *ssd,
 } while(0)
 #endif
 
-size_t sieve_full_line(unsigned char * S0, unsigned char * S1, size_t x0 MAYBE_UNUSED, size_t pos, size_t p_or_2p, unsigned char logp, where_am_I w MAYBE_UNUSED)
+inline size_t sieve_full_line(unsigned char * S0, unsigned char * S1, size_t x0 MAYBE_UNUSED, size_t pos, size_t p_or_2p, unsigned char logp, where_am_I w MAYBE_UNUSED)
 {
     unsigned char * pi = S0 + pos;
 #ifdef SMALLSIEVE_CRITICAL_UGLY_ASSEMBLY
@@ -1085,79 +1085,6 @@ void sieve_small_bucket_region(unsigned char *S, int N,
     /* use size_t for k, i and twop to speed up in x86 with LEA asm instructions */
     for(size_t index = 0 ; index < (size_t) ssd->nb_ssp ; index++) {
       int fence = next_marker->index;
-      /* Some defines for the critical part of small sieve.
-	 0. The C code and the asm X86 code have the same algorithm.
-	 Read first the C code to understand easily the asm code.
-	 1. If there are less than 12 "T" in the line, the goal is to do
-	 only one jump (pipe-line breaks) and of course the instructions
-	 minimal number.
-	 2. 12 "T" seems the best in the critical loop. Before, gcc tries
-	 to optimize in a bad way the loop. For gcc generated code, the
-	 best is here a systematic code (12*2 instructions), like the C code.
-	 3. The asm X86 optimization uses addb logp,(pi+p_or_2p*[0,1,2])
-	 & three_p_or_2p = 3 * p_or_2p; the lea (add simulation) & real
-	 add interlace seems a bit interesting.
-	 So, the loop is smaller & faster (19 instructions versus 27 for
-	 gcc best X86 asm).
-	 4. Of course, the gain between the 2 versions is light, because
-	 the main problem is the access time of the L0 cache: read + write
-	 with sieve_increase(pi,logp,w), or *pi += logp in fact.
-      */
-#if defined( HAVE_SSE2 ) && !defined( TRACK_CODE_PATH ) /* x86 optimized code */
-#define T
-#define U1								\
-        "addb %4,(%1)\n"                /* sieve_increase(pi,logp,w) */	\
-	"addb %4,(%1,%3,1)\n"   /* sieve_increase(p_or_2p+pi,logp,w) */ \
-	"addb %4,(%1,%3,2)\n" /* sieve_increase(p_or_2p*2+pi,logp,w) */ \
-	"lea (%1,%2,1),%1\n"                    /* pi += p_or_2p * 3 */
-#define U2								\
-        "cmp %5, %1\n"		          /* if (pi >= S_ptr) break; */	\
-	"jae 2f\n"							\
-        "addb %4,(%1)\n"		/* sieve_increase(pi,logp,w) */	\
-        "lea (%1,%3,1),%1\n"	                    /* pi += p_or_2p */		       
-#define U do {								\
-	unsigned char *pi_end;						\
-	size_t three_p_or_2p;						\
-	__asm__ __volatile__ (						\
-        "lea (%3,%3,2), %2\n"         /* three_p_or_2p = p_or_2p * 3 */ \
-	"lea (%1,%2,4), %0\n"            /* pi_end = pi + p_or_2p*12 */ \
-	"cmp %5, %0\n"	              /* if (pi_end > S_ptr) no loop */	\
-	"jbe 0f\n"							\
-	"1:\n"								\
-        U2 U2 U2 U2 U2 U2 U2 U2 U2 U2 U2				\
-	"cmp %5, %1\n"							\
-	"jae 2f\n"							\
-        "addb %4,(%1)\n"						\
-	"jmp 2f\n"							\
-	".balign 8\n 0:\n"                              /* Main loop */	\
-	U1 U1	        /* sieve_increase(p_or_2p*[0..11]+pi,logp,w) */ \
-        U1 U1		                         /* pi += p_or_2p*12 */	\
-        "lea (%1,%2,4), %0\n"	 /* if (pi+p_or_2p*12 > S_ptr) break */	\
-	"cmp %5, %0\n"							\
-	"jbe 0b\n"							\
-	"jmp 1b\n"							\
-	".balign 8\n 2:\n"						\
-	: "=&r"(pi_end), "+&r"(pi), "=&r"(three_p_or_2p)		\
-	: "r"(p_or_2p), "q"(logp), "r"(S_ptr) : "cc");			\
-      } while (0)
-#else
-#define T do {							\
-	WHERE_AM_I_UPDATE(w, x, (j-j0) * I + pi + I - S_ptr);	\
-	sieve_increase (pi, logp, w); pi += p_or_2p;		\
-      } while(0)
-#define U1
-#define U2
-#define U do {								\
-	while (UNLIKELY(pi + p_or_2p * 12 <= S_ptr))			\
-	  { T; T; T; T; T; T; T; T; T; T; T; T; }			\
-	if (pi >= S_ptr) break; T; if (pi >= S_ptr) break; T;		\
-	if (pi >= S_ptr) break; T; if (pi >= S_ptr) break; T;		\
-	if (pi >= S_ptr) break; T; if (pi >= S_ptr) break; T;		\
-	if (pi >= S_ptr) break; T; if (pi >= S_ptr) break; T;		\
-	if (pi >= S_ptr) break; T; if (pi >= S_ptr) break; T;		\
-	if (pi >= S_ptr) break; T; if (pi >= S_ptr) break; T;		\
-      } while (0)
-#endif
       for( ; index < (size_t) fence ; index++) {
         ssp_t * ssp = &(ssd->ssp[index]);
 	const fbprime_t p = ssp->p;
@@ -1180,38 +1107,39 @@ void sieve_small_bucket_region(unsigned char *S, int N,
             i_compens_sublat = si.conf.sublat.i0 & 1;
         }
         unsigned int j = j0;
+        size_t overrun MAYBE_UNUSED;
+        unsigned int xpos;
 	if (j & 1) goto j_odd;
 	do {
-	  unsigned char *pi;
 	  WHERE_AM_I_UPDATE(w, j, j - j0);
-	  pi = S_ptr + pos;
-	  S_ptr += I;
 	  /* for j even, we sieve only odd pi, so step = 2p. */
 	  p_or_2p += p_or_2p;
-          if (!((i_compens_sublat + pos) & 1)) {
-              pi += p;
-          }
-	  U;
+          xpos = pos;
+          if (!((i_compens_sublat + pos) & 1))
+              xpos += p;
+          overrun = sieve_full_line(S_ptr, S_ptr + I, (j-j0) * I, xpos, p_or_2p, logp, w);
+          S_ptr += I;
+
 	  pos += r; if (pos >= p) pos -= p; 
+
 	  /* Next line */
 	  if (++j >= j1) break;
+
 	  p_or_2p >>= 1;
 	j_odd:
 	  WHERE_AM_I_UPDATE(w, j, j - j0);
-	  pi = S_ptr + pos;
+          overrun = sieve_full_line(S_ptr, S_ptr + I, (j-j0) * I, pos, p_or_2p, logp, w);
 	  S_ptr += I;
-	  U;
+
 	  pos += r; if (pos >= p) pos -= p;
+
 	} while (++j < j1);
+        /* skip stride */
+        pos += ssp->offset;
+        if (pos >= ssp->p)
+            pos -= ssp->p;
 	ssdpos[index] = pos;
-            ssdpos[index] += ssp->offset;
-            if (ssdpos[index] >= (int) ssp->p)
-                ssdpos[index] -= ssp->p;
       }
-#undef T
-#undef U1
-#undef U2
-#undef U
         unsigned int event = (next_marker++)->event;
         if (event & SSP_DISCARD) {
             continue;
