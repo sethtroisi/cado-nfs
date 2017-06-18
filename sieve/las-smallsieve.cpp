@@ -1253,38 +1253,30 @@ void sieve_small_bucket_region(unsigned char *S, int N,
                 //oldpos const uint64_t pos = ssdpos[index];
                 uint64_t pos = C.first_position_projective_prime(ssp);
                 const fbprime_t evenq = (q % 2 == 0) ? q : 2 * q;
-                size_t lineoffset = pos & (I - 1U),
-                       linestart = pos - lineoffset;
+                unsigned char * S_ptr = S;
+                S_ptr += pos - (pos & (I - 1U));
+                unsigned int j = j0 + (pos >> logI);
+                pos = pos & (I - 1U);
                 ASSERT (U < q);
-                while (linestart < (1U << LOG_BUCKET_REGION))
-                {
-                    WHERE_AM_I_UPDATE(w, j, linestart / I);
-                    int i = lineoffset;
-                    if (((linestart & I) == 0) ^ row0_is_oddj) /* Is j even? */
-                    {
-                        /* Yes, sieve only odd i values */
+                for( ; j < j1 ; S_ptr += gI, j+=g) {
+                    WHERE_AM_I_UPDATE(w, j, j - j0);
+                    unsigned int q_or_2q = q;
+                    int i = pos;
+                    if (!(j&1)) {
+                        /* j even: sieve only odd i values */
                         if (i % 2 == 0) /* Make i odd */
                             i += q;
-                        if (i % 2 == 1) /* If not both i,q are even */
-                            for ( ; i < (i1 - i0); i += evenq)
-                            {
-                                WHERE_AM_I_UPDATE(w, x, linestart + i);
-                                sieve_increase (S + linestart + i, logp, w);
-                            }
+                        q_or_2q = evenq;
                     }
-                    else
-                    {
-                        for ( ; i < (i1 - i0); i += q)
-                        {
-                            WHERE_AM_I_UPDATE(w, x, linestart + i);
-                            sieve_increase (S + linestart + i, logp, w);
+                    if ((i|j) & 1) { /* odd j, or not i and q both even */
+                        for ( ; i < (i1 - i0); i += q_or_2q) {
+                            WHERE_AM_I_UPDATE(w, x, (S_ptr - S) + i);
+                            sieve_increase (S_ptr + i, logp, w);
                         }
                     }
 
-                    linestart += gI;
-                    lineoffset += U;
-                    if (lineoffset >= q)
-                        lineoffset -= q;
+                    pos += U;
+                    if (pos >= q) pos -= q;
                 }
 #if 0
                 ssdpos[index] = linestart + lineoffset - (1U << LOG_BUCKET_REGION);
