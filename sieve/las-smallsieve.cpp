@@ -473,7 +473,7 @@ struct small_sieve_context {
         has_origin = has_haxis && has_vaxis;              
     }
 
-    int64_t first_position_ordinary_prime(const ssp_t * ssp)
+    int64_t first_position_ordinary_prime(const ssp_t * ssp, unsigned int dj = 0)
     {
         /* equation here: i-r*j = 0 mod p */
 
@@ -501,7 +501,7 @@ struct small_sieve_context {
          *
          * and finally we take pos0 mod p.
          */
-        int64_t x = (int64_t)j0 * (int64_t)ssp->r - i0;
+        int64_t x = (int64_t)(j0 + dj) * (int64_t)ssp->r - i0;
         if (sublatm > 1) {
             ASSERT(ssp->p % sublatm);
             /* alternative code. not clear it's better.
@@ -715,6 +715,7 @@ int64_t *small_sieve_start(small_sieve_data_t *ssd,
         }
         if (event & SSP_DISCARD) continue;
         if (event & SSP_END) break;
+        /* no longer useful to compute these 
         if (event & SSP_PROJ) {
             ssp_proj_t * ssp = (ssp_proj_t *) &(ssd->ssp[index]);
             ssdpos[index] = C.first_position_projective_prime(ssp);
@@ -722,6 +723,7 @@ int64_t *small_sieve_start(small_sieve_data_t *ssd,
             ssp_t * ssp = &(ssd->ssp[index]);
             ssdpos[index] = C.first_position_power_of_two(ssp);
         }
+        */
     }
     return ssdpos;
 }
@@ -736,6 +738,14 @@ int64_t *small_sieve_start(small_sieve_data_t *ssd,
 // #define xxxSMALLSIEVE_CRITICAL_MANUAL_UNROLL
 // #define SMALLSIEVE_CRITICAL_PLAIN
 
+/* on an rsa155 test with I=14, the UGLY_ASSEMBLY version gains
+ * practically nothing over the plain C version. The MANUAL_UNROLL
+ * version is slower.
+ *
+ * On an rsa220 test with I=16, the UGLY_ASSEMBLY version gains about 3%
+ * on the small sieve part strictly speaking, and then less than 1%
+ * overall.
+ */
 #if 1
 #if defined( HAVE_SSE2 ) && !defined( TRACK_CODE_PATH ) /* x86 optimized code */
 #define SMALLSIEVE_CRITICAL_UGLY_ASSEMBLY
@@ -875,14 +885,19 @@ void sieve_small_bucket_region(unsigned char *S, int N,
     /* First collect updates for powers of two in a pattern,
        then apply pattern to sieve line.
        Repeat for each line in bucket region. */
-    for (unsigned int j = j0; j < j1; j++)
+
+    /* We can afford doing this only for odd lines because *affine*
+     * powers of two are relevant only for odd lines anyway: indeed, if
+     * i-j*r=0 mod 2^k and j even, then i even too, so useless.
+     *
+     * On the other hand *projective* powers of two *may* pattern-hit
+     * every so often, and that would be on even lines only. But for now,
+     * those are not considered at all, and this is admittedly a TODO.
+     */
+    for (unsigned int j = j0|1; j < j1; j+=2)
     {
         WHERE_AM_I_UPDATE(w, j, j - j0);
         unsigned long pattern[2] = {0,0};
-
-        /* TODO: Errr. It seems rather ridiculous to do all this work
-         * even for even rows, where we know that we don't want to sieve
-         * affine roots ! */
 
         /* Prepare the pattern */
 
@@ -906,22 +921,8 @@ void sieve_small_bucket_region(unsigned char *S, int N,
                 if (mpz_cmp_ui(si.qbasis.q, p) == 0) {
                     continue;
                 }
-                // attention -- it's important that we avoid recomputing
-                // the start position for all lines -- it could be pretty
-                // wasteful. As such, this also means that we have an
-                // interest in keeping track of the position for
-                // pattern-sieved primes, too.
-                //
-                // TODO: if there are many lines in the bucket region
-                // (which means small I, so it's not clear there's any
-                // criticality here), we could precompute several
-                // patterns ahead of time, instead of recomputing them
-                // for all lines.
 
-                // int pos = ssdpos[index];
-                //newpos uint64_t
                 int pos = C.first_position_power_of_two(ssp, j - j0);
-                //newpos ASSERT_ALWAYS(pos == (uint64_t) ssdpos[index]);
 
                 if (pos < (i1 - i0)) {
                     // At the start of the bucket region, we are not sure
@@ -941,17 +942,21 @@ void sieve_small_bucket_region(unsigned char *S, int N,
                         S[x] += ssd->logp[index];
                     }
 #endif
+#if 0
                     /* Skip two lines above, since we sieve only odd lines.
                      * Even lines would correspond to useless reports.
                      */
                     pos = ((pos + 2 * ssp->r) & (p - 1)) + (2 << logI);
+#endif
                 }
+#if 0
                 /* In this loop, ssdpos gets updated to the first 
                    index to sieve relative to the start of the next line, 
                    but after all lines of this bucket region are processed, 
                    it will point to the first position to sieve relative
                    to the start of the next bucket region, as required */
                 ssdpos[index] = pos - (i1 - i0);
+#endif
             } else {
                 /* nothing. It's a (presumably) projective power of 2,
                  * but for the moment these are not pattern-sieved. */
@@ -1019,17 +1024,19 @@ void sieve_small_bucket_region(unsigned char *S, int N,
                 WHERE_AM_I_UPDATE(w, p, p);
 
                 // same remark as for previous pattern-sieve
-                unsigned int pos = ssdpos[index];
-                //newpos int pos = C.first_position_ordinary_prime(ssp);
+                // unsigned int pos = ssdpos[index];
+                int pos = C.first_position_ordinary_prime(ssp, j - j0);
                 //newpos ASSERT_ALWAYS(pos == ssdpos[index]);
 
-                ASSERT (pos < p);
-                for (unsigned int i = pos; i < 3 * sizeof(unsigned long); i += p)
-                    ((unsigned char *)pattern)[i] += ssd->logp[index];
+                ASSERT (pos < (int) p);
+                for (unsigned int x = pos; x < 3 * sizeof(unsigned long); x += p)
+                    ((unsigned char *)pattern)[x] += ssd->logp[index];
                 pos += ssp->r;
-                if (pos >= p)
+                if (pos >= (int) p)
                     pos -= p;
+#if 0
                 ssdpos[index] = pos;
+#endif
             } else {
                 /* index points to a power of 3, and we have an exceptional
                  * event. Sure it can neither be SSP_END nor SSP_POW2.
@@ -1045,8 +1052,8 @@ void sieve_small_bucket_region(unsigned char *S, int N,
         
         if (!(j&1)) {
             /* We have an even j. There, we must not sieve even i's either ! */
-            for (unsigned int i = 0; i < 3 * sizeof(unsigned long); i += 2)
-                ((unsigned char *)pattern)[i] = 0;
+            for (unsigned int x = 0; x < 3 * sizeof(unsigned long); x += 2)
+                ((unsigned char *)pattern)[x] = 0;
         }
 
         /* We want to test if there is a non-zero entry in the pattern
@@ -1107,42 +1114,35 @@ void sieve_small_bucket_region(unsigned char *S, int N,
 
 	WHERE_AM_I_UPDATE(w, p, p);
 	const unsigned char logp = ssd->logp[index];
-	unsigned char *S_ptr = S;
-	size_t p_or_2p = p;
+	unsigned char *S0 = S;
 	unsigned int pos = ssdpos[index];
         ASSERT(pos < p);
-        unsigned int i_compens_sublat = 0;
-        if (si.conf.sublat.m != 0) {
-            i_compens_sublat = si.conf.sublat.i0 & 1;
-        }
+        unsigned int i_compens_sublat = si.conf.sublat.i0 & 1;
         unsigned int j = j0;
         size_t overrun MAYBE_UNUSED;
-        unsigned int xpos;
-	if (j & 1) goto j_odd;
-	do {
+	if (j & 1) {
 	  WHERE_AM_I_UPDATE(w, j, j - j0);
-	  /* for j even, we sieve only odd pi, so step = 2p. */
-	  p_or_2p += p_or_2p;
-          xpos = pos;
-          if (!((i_compens_sublat + pos) & 1))
-              xpos += p;
-          overrun = sieve_full_line(S_ptr, S_ptr + I, (j-j0) * I, xpos, p_or_2p, logp, w);
-          S_ptr += I;
-
-	  pos += r; if (pos >= p) pos -= p; 
-
-	  /* Next line */
-	  if (++j >= j1) break;
-
-	  p_or_2p >>= 1;
-	j_odd:
-	  WHERE_AM_I_UPDATE(w, j, j - j0);
-          overrun = sieve_full_line(S_ptr, S_ptr + I, (j-j0) * I, pos, p_or_2p, logp, w);
-	  S_ptr += I;
-
+          overrun = sieve_full_line(S0, S0 + I, S0 - S, pos, p, logp, w);
+	  S0 += I;
+          j++;
 	  pos += r; if (pos >= p) pos -= p;
+        }
+        for( ; j < j1 ; ) {
+            /* for j even, we sieve only odd pi, so step = 2p. */
+            unsigned int xpos = ((i_compens_sublat + pos) & 1) ? pos : (pos+p);
+            overrun = sieve_full_line(S0, S0 + I, S0 - S, xpos, p+p, logp, w);
+            S0 += I;
+            if (++j >= j1) break;
+            pos += r; if (pos >= p) pos -= p; 
 
-	} while (++j < j1);
+            /* now j odd again */
+            WHERE_AM_I_UPDATE(w, j, j - j0);
+            overrun = sieve_full_line(S0, S0 + I, S0 - S, pos, p, logp, w);
+            S0 += I;
+            j++;
+            pos += r; if (pos >= p) pos -= p;
+        }
+
         /* skip stride */
         pos += ssp->offset;
         if (pos >= p) pos -= p;
@@ -1245,7 +1245,9 @@ void sieve_small_bucket_region(unsigned char *S, int N,
                     pos += gI;
                     j += g;
                 }
+#if 0
                 ssdpos[index] = pos - (1U << LOG_BUCKET_REGION);
+#endif
             } else {
                 /* q > 1, more general sieving code. */
                 //oldpos const uint64_t pos = ssdpos[index];
@@ -1284,8 +1286,9 @@ void sieve_small_bucket_region(unsigned char *S, int N,
                     if (lineoffset >= q)
                         lineoffset -= q;
                 }
-                ssdpos[index] = linestart + lineoffset - 
-                    (1U << LOG_BUCKET_REGION);
+#if 0
+                ssdpos[index] = linestart + lineoffset - (1U << LOG_BUCKET_REGION);
+#endif
             }
         } else if (event & SSP_POW2) {
             /* Powers of 2 are treated separately */
@@ -1337,10 +1340,12 @@ void sieve_small_bucket_region(unsigned char *S, int N,
                 linestart += I; S_ptr += I;
                 linestart += I; S_ptr += I;
             }
+#if 0
             /* see above. Because we do j+=2, we have either j==j1 or
              * j==j1+1 */
             if (j > j1) pos += I;
             ssdpos[index] = pos;
+#endif
         }
     }
 }
