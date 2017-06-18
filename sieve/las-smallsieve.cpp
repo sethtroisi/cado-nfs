@@ -880,22 +880,14 @@ void sieve_small_bucket_region(unsigned char *S, int N,
     const int test_divisibility = 0; /* very slow, but nice for debugging */
 
     /* Pattern-sieve powers of 2 up to 2 * sizeof(long). {{{
-     * TODO: use SSE2 */
+     * TODO: use SSE2 (well, cost does not seem to be significant anyway).
+     */
     WHERE_AM_I_UPDATE(w, p, 2);
+
     /* First collect updates for powers of two in a pattern,
        then apply pattern to sieve line.
        Repeat for each line in bucket region. */
-
-    /* We can afford doing this only for odd lines because *affine*
-     * powers of two are relevant only for odd lines anyway: indeed, if
-     * i-j*r=0 mod 2^k and j even, then i even too, so useless.
-     *
-     * On the other hand *projective* powers of two *may* pattern-hit
-     * every so often, and that would be on even lines only. But for now,
-     * those are not considered at all, and this is admittedly a TODO.
-     */
-    for (unsigned int j = j0|1; j < j1; j+=2)
-    {
+    for (unsigned int j = j0; j < j1; j++) {
         WHERE_AM_I_UPDATE(w, j, j - j0);
         unsigned long pattern[2] = {0,0};
 
@@ -915,7 +907,11 @@ void sieve_small_bucket_region(unsigned char *S, int N,
                 event = next_marker->event;
                 fence = next_marker->index;
             }
-            if (index < fence) {
+            /* *affine* powers of two are relevant only for odd lines anyway:
+             * indeed, if i-j*r=0 mod 2^k and j even, then i even too, so
+             * useless.
+             */
+            if (index < fence && (j&1)) {
                 ssp_t * ssp = &(ssd->ssp[index]);
                 const fbprime_t p = ssp->p;
                 if (mpz_cmp_ui(si.qbasis.q, p) == 0) {
@@ -957,7 +953,7 @@ void sieve_small_bucket_region(unsigned char *S, int N,
                    to the start of the next bucket region, as required */
                 ssdpos[index] = pos - (i1 - i0);
 #endif
-            } else {
+            } else if (!(j&1)) {
                 /* nothing. It's a (presumably) projective power of 2,
                  * but for the moment these are not pattern-sieved. */
             }
@@ -1031,10 +1027,11 @@ void sieve_small_bucket_region(unsigned char *S, int N,
                 ASSERT (pos < (int) p);
                 for (unsigned int x = pos; x < 3 * sizeof(unsigned long); x += p)
                     ((unsigned char *)pattern)[x] += ssd->logp[index];
+
+#if 0
                 pos += ssp->r;
                 if (pos >= (int) p)
                     pos -= p;
-#if 0
                 ssdpos[index] = pos;
 #endif
             } else {
