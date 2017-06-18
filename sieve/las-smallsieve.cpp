@@ -1110,37 +1110,46 @@ void sieve_small_bucket_region(unsigned char *S, int N,
 	WHERE_AM_I_UPDATE(w, p, p);
 	const unsigned char logp = ssd->logp[index];
 	unsigned char *S0 = S;
-	unsigned int pos = ssdpos[index];
-        ASSERT(pos < p);
+	int pos = ssdpos[index];
+        ASSERT(pos < (int) p);
         unsigned int i_compens_sublat = si.conf.sublat.i0 & 1;
         unsigned int j = j0;
+
+        /* we sieve over the area [S0..S0+(i1-i0)], which may
+         * actually be just a fragment of a line. After that, if
+         * (i1-i0) is different from I, we'll break anyway. So
+         * whether we add I or (i1-i0) to S0 does not matter much.
+         */
         size_t overrun MAYBE_UNUSED;
-	if (j & 1) {
-	  WHERE_AM_I_UPDATE(w, j, j - j0);
-          overrun = sieve_full_line(S0, S0 + I, S0 - S, pos, p, logp, w);
-	  S0 += I;
-          j++;
-	  pos += r; if (pos >= p) pos -= p;
+        if (j & 1) {
+            WHERE_AM_I_UPDATE(w, j, j - j0);
+            overrun = sieve_full_line(S0, S0 + (i1 - i0), S0 - S,
+                    pos, p, logp, w);
+            S0 += I;
+            j++;
+            pos += r; if (pos >= (int) p) pos -= p;
         }
         for( ; j < j1 ; ) {
             /* for j even, we sieve only odd pi, so step = 2p. */
             unsigned int xpos = ((i_compens_sublat + pos) & 1) ? pos : (pos+p);
-            overrun = sieve_full_line(S0, S0 + I, S0 - S, xpos, p+p, logp, w);
+            overrun = sieve_full_line(S0, S0 + (i1 - i0), S0 - S,
+                    xpos, p+p, logp, w);
             S0 += I;
+            pos += r; if (pos >= (int) p) pos -= p; 
             if (++j >= j1) break;
-            pos += r; if (pos >= p) pos -= p; 
 
             /* now j odd again */
             WHERE_AM_I_UPDATE(w, j, j - j0);
-            overrun = sieve_full_line(S0, S0 + I, S0 - S, pos, p, logp, w);
+            overrun = sieve_full_line(S0, S0 + (i1 - i0), S0 - S,
+                    pos, p, logp, w);
             S0 += I;
-            j++;
-            pos += r; if (pos >= p) pos -= p;
+            pos += r; if (pos >= (int) p) pos -= p;
+            ++j;
         }
 
         /* skip stride */
         pos += ssp->offset;
-        if (pos >= p) pos -= p;
+        if (pos >= (int) p) pos -= p;
 
 	ssdpos[index] = pos;
       }
