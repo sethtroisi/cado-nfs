@@ -69,12 +69,19 @@ sieve_info_test_lognorm_sse2_mask(__m128i * S0, const __m128i pattern0,
    trial-divided primes. Return the number of survivors found. */
 static inline void
 search_single_survivors_mask(unsigned char * const SS[2],
-        const unsigned char bound[2] MAYBE_UNUSED, const unsigned int log_I,
-        const unsigned int j, const int N MAYBE_UNUSED,
-        const int x_start, const unsigned int nr_div,
-        unsigned int (*div)[2], unsigned int bitmask,
+        const unsigned char bound[2] MAYBE_UNUSED,
+        unsigned int log_I,
+        unsigned int j,
+        unsigned int linefragment,
+        int N MAYBE_UNUSED,
+        int x_start,
+        unsigned int nr_div,
+        unsigned int (*div)[2],
+        unsigned int bitmask,
         std::vector<uint32_t> &survivors)
 {
+    ASSERT_ALWAYS(linefragment == 0);
+
   for (int x = x_start; UNLIKELY(bitmask != 0); x++) {
       const int tz = ularith_ctz(bitmask);
       x += tz;
@@ -124,11 +131,18 @@ search_single_survivors_mask(unsigned char * const SS[2],
 /* This function works for all j. Uses SSE2. */
 static void
 search_survivors_in_line1_sse2(unsigned char * const SS[2],
-        const unsigned char bound[2], const unsigned int log_I,
-        const unsigned int j, const int N MAYBE_UNUSED, j_divisibility_helper const & j_div,
-        const unsigned int td_max, std::vector<uint32_t> &survivors)
+        const unsigned char bound[2],
+        unsigned int log_I,
+        unsigned int j,
+        unsigned int linefragment,
+        int N MAYBE_UNUSED,
+        j_divisibility_helper const & j_div,
+        unsigned int td_max,
+        std::vector<uint32_t> &survivors)
 {
     unsigned int div[6][2], nr_div;
+
+    ASSERT_ALWAYS(linefragment == 0);
 
     nr_div = extract_j_div(div, j, j_div, 3, td_max);
     ASSERT_ALWAYS(nr_div <= 6);
@@ -152,7 +166,7 @@ search_survivors_in_line1_sse2(unsigned char * const SS[2],
         const unsigned int mask =
             sieve_info_test_lognorm_sse2_mask((__m128i*) (SS[0] + x_start), patterns[0],
                                          (__m128i*) (SS[1] + x_start), patterns[1]);
-        search_single_survivors_mask(SS, bound, log_I, j, N, x_start,
+        search_single_survivors_mask(SS, bound, log_I, j, linefragment, N, x_start,
             nr_div, div, mask, survivors);
     }
 }
@@ -162,10 +176,17 @@ search_survivors_in_line1_sse2(unsigned char * const SS[2],
    i-coordinates with i % 3 == 0 are set to a bound of 0. */
 static void
 search_survivors_in_line3_sse2(unsigned char * const SS[2], 
-        const unsigned char bound[2], const unsigned int log_I,
-        const unsigned int j, const int N MAYBE_UNUSED, j_divisibility_helper const & j_div,
-        const unsigned int td_max, std::vector<uint32_t> &survivors)
+        const unsigned char bound[2], 
+        unsigned int log_I,
+        unsigned int j,
+        unsigned int linefragment,
+        int N MAYBE_UNUSED,
+        j_divisibility_helper const & j_div,
+        unsigned int td_max,
+        std::vector<uint32_t> &survivors)
 {
+    ASSERT_ALWAYS(linefragment == 0);
+
     __m128i patterns[2][3];
     const int x_step = sizeof(__m128i);
     const int pmin = 5;
@@ -207,7 +228,7 @@ search_survivors_in_line3_sse2(unsigned char * const SS[2],
                                          (__m128i*) (SS[1] + x_start), patterns[1][next_pattern]);
         if (++next_pattern == 3)
             next_pattern = 0;
-        search_single_survivors_mask(SS, bound, log_I, j, N, x_start,
+        search_single_survivors_mask(SS, bound, log_I, j, linefragment, N, x_start,
             nr_div, div, mask, survivors);
     }
 }
@@ -218,10 +239,17 @@ search_survivors_in_line3_sse2(unsigned char * const SS[2],
    and trial divides only by primes > 5. */
 static void
 search_survivors_in_line5_sse2(unsigned char * const SS[2], 
-        const unsigned char bound[2], const unsigned int log_I,
-        const unsigned int j, const int N MAYBE_UNUSED, j_divisibility_helper const & j_div,
-        const unsigned int td_max, std::vector<uint32_t> &survivors)
+        const unsigned char bound[2],
+        unsigned int log_I,
+        unsigned int j,
+        unsigned int linefragment,
+        int N MAYBE_UNUSED,
+        j_divisibility_helper const & j_div,
+        unsigned int td_max,
+        std::vector<uint32_t> &survivors)
 {
+    ASSERT_ALWAYS(linefragment == 0);
+
     const int nr_patterns = 5;
     __m128i patterns[2][nr_patterns];
     const int x_step = sizeof(__m128i);
@@ -269,7 +297,7 @@ search_survivors_in_line5_sse2(unsigned char * const SS[2],
                                          (__m128i*) (SS[1] + x_start), patterns[1][next_pattern]);
         if (++next_pattern == nr_patterns)
             next_pattern = 0;
-        search_single_survivors_mask(SS, bound, log_I, j, N, x_start,
+        search_single_survivors_mask(SS, bound, log_I, j, linefragment, N, x_start,
             nr_div, div, mask, survivors);
     }
 }
@@ -283,22 +311,26 @@ search_survivors_in_line5_sse2(unsigned char * const SS[2],
 
 void
 search_survivors_in_line_sse2(unsigned char * const SS[2], 
-        const unsigned char bound[2], const unsigned int log_I,
-        const unsigned int j, const int N, j_divisibility_helper const & j_div,
+        const unsigned char bound[2],
+        unsigned int log_I,
+        unsigned int j,
+        unsigned int linefragment,
+        int N,
+        j_divisibility_helper const & j_div,
         const unsigned int td_max, std::vector<uint32_t> &survivors)
 {
 #if USE_PATTERN_3
     if (j % 3 == 0)
-      search_survivors_in_line3_sse2(SS, bound, log_I, j, N, j_div,
+      search_survivors_in_line3_sse2(SS, bound, log_I, j, linefragment, N, j_div,
               td_max, survivors);
 #if USE_PATTERN_5
     else if (j % 5 == 0)
-      search_survivors_in_line5_sse2(SS, bound, log_I, j, N, j_div,
+      search_survivors_in_line5_sse2(SS, bound, log_I, j, linefragment, N, j_div,
               td_max, survivors);
 #endif
     else
 #endif
-      search_survivors_in_line1_sse2(SS, bound, log_I, j, N, j_div,
+      search_survivors_in_line1_sse2(SS, bound, log_I, j, linefragment, N, j_div,
               td_max, survivors);
 }
 

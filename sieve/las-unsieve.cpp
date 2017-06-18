@@ -267,10 +267,14 @@ unsieve_7(unsigned char *line_start, const unsigned int start_idx,
 
 static void
 unsieve_not_coprime_line(unsigned char * line_start,
-                         const unsigned int j, const unsigned int min_p,
-                         const unsigned int I, unsieve_data const & us)
+                         unsigned int j,
+                         unsigned int linefragment,
+                         unsigned int min_p,
+                         unsigned int I, unsieve_data const & us)
 {
   unsigned int p, start_idx, c = j;
+
+  ASSERT_ALWAYS(linefragment == 0);
 
   if (j == 0)
     return;
@@ -391,11 +395,15 @@ sieve_info_test_lognorm (const unsigned char C1, const unsigned char C2,
    Return the number of survivors found. This function works for all j */
 MAYBE_UNUSED static void
 search_survivors_in_line1(unsigned char * const SS[2],
-        const unsigned char bound[2], const unsigned int log_I,
-        const unsigned int j, const int N MAYBE_UNUSED, j_divisibility_helper const & j_div,
-        const unsigned int td_max, std::vector<uint32_t> &survivors)
+        const unsigned char bound[2], unsigned int log_I,
+        unsigned int j, 
+        unsigned int linefragment,
+        int N MAYBE_UNUSED, j_divisibility_helper const & j_div,
+        unsigned int td_max, std::vector<uint32_t> &survivors)
 {
     unsigned int div[6][2], nr_div;
+
+    ASSERT_ALWAYS(linefragment == 0);
 
     nr_div = extract_j_div(div, j, j_div, 3, td_max);
     ASSERT_ALWAYS(nr_div <= 6);
@@ -447,31 +455,44 @@ search_survivors_in_line1(unsigned char * const SS[2],
 }
 
 
+/* linefragment is used when log_I > LOG_BUCKET_REGION ; it is a positive
+ * integer multiple of 2^LOG_BUCKET_REGION ; so the sub-line is actually
+ * for:
+ * -I/2 + linefragment <= i < -I/2 + MIN(2^LOG_BUCKET_REGION, I)
+ */
 void
 search_survivors_in_line(unsigned char * const SS[2], 
-        const unsigned char bound[2], const unsigned int log_I,
-        const unsigned int j, const int N, j_divisibility_helper const & j_div,
-        const unsigned int td_max, unsieve_data const & us,
+        const unsigned char bound[2], unsigned int log_I,
+        unsigned int j, unsigned int linefragment,
+        int N, j_divisibility_helper const & j_div,
+        unsigned int td_max, unsieve_data const & us,
         std::vector<uint32_t> &survivors, sublat_t sublat)
 {
+    size_t I = (size_t) 1 << log_I;
+
     /* In line j = 0, only the coordinate (i, j) = (-1, 0) may survive */
     // FIXME: in sublat mode, this is broken!
     if (j == 0 && (!sublat.m)) {
-        const size_t I = (size_t) 1 << log_I;
-        const unsigned char s0 = SS[0][I / 2 - 1], s1 = SS[1][I / 2 - 1];
-        memset(SS[0], 255, I);
-        if (s0 <= bound[0] && s1 <= bound[1]) {
-            SS[0][I / 2 - 1] = s0;
-            SS[1][I / 2 - 1] = s1;
-            survivors.push_back(I / 2 - 1);
+        size_t subI = MAX(I, 1 << LOG_BUCKET_REGION);
+        if ((linefragment <= I/2) && (I/2 <= linefragment + subI)) {
+            unsigned char s0 = SS[0][I / 2 - 1];
+            unsigned char s1 = SS[1][I / 2 - 1];
+            memset(SS[0], 255, I);
+            if (s0 <= bound[0] && s1 <= bound[1]) {
+                SS[0][I / 2 - 1] = s0;
+                SS[1][I / 2 - 1] = s1;
+                survivors.push_back(I / 2 - 1);
+            }
         } else {
-            return;
+            memset(SS[0], 255, I);
         }
+        return;
     }
 
     // Naive version when we have sublattices, because unsieving is
     // harder. TODO: implement a fast version
     if (sublat.m) {
+        ASSERT_ALWAYS(!linefragment);   // TODO
         for (int x = 0; x < (1 << log_I); x++) {
             if (!sieve_info_test_lognorm(bound[0], bound[1], SS[0][x], SS[1][x])) {
                 SS[0][x] = 255;
@@ -489,13 +510,13 @@ search_survivors_in_line(unsigned char * const SS[2],
         return;
     }
 
-    unsieve_not_coprime_line(SS[0], j, td_max + 1, 1U<<log_I, us);
+    unsieve_not_coprime_line(SS[0], j, linefragment, td_max + 1, I, us);
 
 #if defined(HAVE_SSE2)
-    search_survivors_in_line_sse2(SS, bound, log_I, j, N, j_div, td_max,
+    search_survivors_in_line_sse2(SS, bound, log_I, j, linefragment, N, j_div, td_max,
             survivors);
 #else
-    search_survivors_in_line1(SS, bound, log_I, j, N, j_div, td_max,
+    search_survivors_in_line1(SS, bound, log_I, j, linefragment, N, j_div, td_max,
             survivors);
 #endif
 }

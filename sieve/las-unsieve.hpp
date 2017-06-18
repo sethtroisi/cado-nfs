@@ -87,19 +87,23 @@ extract_j_div(unsigned int (*div)[2], const unsigned int j, j_divisibility_helpe
     }
     return nr_div;
 }
-
+/* }}} */
 
 j_divisibility_helper * init_j_div(uint32_t);
 void clear_j_div(j_divisibility_helper *);
-void search_survivors_in_line(unsigned char * const restrict[2],
-        const unsigned char[2], unsigned int, unsigned int, int,
-        j_divisibility_helper const &, unsigned int, unsieve_data const &,
-        std::vector<uint32_t> &, sublat_t);
+void search_survivors_in_line(unsigned char * const SS[2], 
+        const unsigned char bound[2], unsigned int log_I,
+        unsigned int j, unsigned int linefragment,
+        int N, j_divisibility_helper const & j_div,
+        unsigned int td_max, unsieve_data const & us,
+        std::vector<uint32_t> &survivors, sublat_t);
 #ifdef HAVE_SSE2 
-void search_survivors_in_line_sse2(unsigned char * const restrict[2],
-        const unsigned char[2], unsigned int, unsigned int, int,
-        j_divisibility_helper const &,
-        unsigned int, std::vector<uint32_t> &);
+void search_survivors_in_line_sse2(unsigned char * const SS[2],
+        const unsigned char bound[2], unsigned int log_I,
+        unsigned int j, unsigned int linefragment, 
+        int N, j_divisibility_helper const & j_div,
+        unsigned int td_max,
+        std::vector<uint32_t> &survivors);
 #endif
 
 #endif	/* LAS_UNSIEVE_HPP_ */

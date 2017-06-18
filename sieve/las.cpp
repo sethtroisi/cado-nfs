@@ -1105,8 +1105,18 @@ void factor_survivors_data::search_survivors(timetree_t & timer)
 
     las_info const & las(*th->plas);
     sieve_info & si(*th->psi);
-    const unsigned int first_j = N << (LOG_BUCKET_REGION - si.conf.logI_adjusted);
-    const unsigned long nr_lines = 1U << (LOG_BUCKET_REGION - si.conf.logI_adjusted);
+
+    /* change N, which is a bucket number, to
+     * (first_i, first_j, nr_lines)
+     */
+    unsigned int log_lines_per_bucket = MAX(0, LOG_BUCKET_REGION - si.conf.logI_adjusted);
+    unsigned int log_buckets_per_line = MAX(0, si.conf.logI_adjusted - LOG_BUCKET_REGION);
+    unsigned int first_i = (N & ((1 << log_buckets_per_line) - 1)) << LOG_BUCKET_REGION;
+    unsigned int first_j = (N >> log_buckets_per_line) << log_lines_per_bucket;
+    unsigned int nr_lines = 1 << log_lines_per_bucket;
+    /* even when we have a line fragment */
+    ASSERT_ALWAYS(nr_lines >= 1);
+
 
 #ifdef TRACE_K /* {{{ */
     if (trace_on_spot_Nx(N, trace_Nx.x)) {
@@ -1155,12 +1165,25 @@ void factor_survivors_data::search_survivors(timetree_t & timer)
         };
         size_t old_size = survivors.size();
         search_survivors_in_line(both_S, both_bounds,
-                                 si.conf.logI_adjusted, j + first_j, N,
-                                 si.j_div, si.conf.unsieve_thresh,
+                                 si.conf.logI_adjusted,
+                                 j + first_j,
+                                 first_i,
+                                 N,
+                                 si.j_div,
+                                 si.conf.unsieve_thresh,
                                  si.us, survivors, si.conf.sublat);
+
         /* Survivors written by search_survivors_in_line() have index
-           relative to their j-line. We need to convert to index within
-           the bucket region by adding line offsets. */
+         * relative to their j-line. We need to convert to index within
+         * the bucket region by adding line offsets.
+         * 
+         * When several bucket regions are in a line, we have nothing to
+         * change.
+         */
+
+        ASSERT_ALWAYS(first_i == 0 || j == 0);
+        if (!j) continue;
+
         for (size_t i_surv = old_size; i_surv < survivors.size(); i_surv++)
             survivors[i_surv] += j << si.conf.logI_adjusted;
     }
@@ -1810,10 +1833,12 @@ void * process_bucket_region(timetree_t & timer, thread_data *th)
         for(int side = 0 ; side < 2 ; side++) {
             sieve_info::side_info & s(si.sides[side]);
             thread_side_data & ts = th->sides[side];
-            // small_sieve_skip_stride(s.ssd, ts.ssdpos, th->plas->nb_threads, si);
+            // small_sieve_skip_stride(s.ssd, ts.ssdpos, N, las.nb_threads, si);
             int * b = s.fb_parts_x->rs;
             memcpy(ts.rsdpos, ts.ssdpos + b[0], (b[1]-b[0]) * sizeof(int64_t));
         }
+
+        BOOKKEEPING_TIMER(timer);
     }
     return NULL;
 }/*}}}*/
