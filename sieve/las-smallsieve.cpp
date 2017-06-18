@@ -1303,7 +1303,6 @@ void sieve_small_bucket_region(unsigned char *S, int N,
 
             const unsigned char logp = ssd->logp[index];
             unsigned char *S_ptr = S;
-            size_t linestart = 0;
 
             //oldpos unsigned int pos = ssdpos[index];
             int pos = C.first_position_power_of_two(ssp);
@@ -1326,7 +1325,7 @@ void sieve_small_bucket_region(unsigned char *S, int N,
 
             if (j % 2 == 0) {
                 ASSERT(pos >= (i1 - i0));
-                pos -= (i1 - i0); linestart += (i1 - i0); S_ptr += (i1 - i0);
+                pos -= (i1 - i0); S_ptr += (i1 - i0);
                 j++;
             }
             if (j < j1) pos &= (p-1);
@@ -1337,8 +1336,8 @@ void sieve_small_bucket_region(unsigned char *S, int N,
                 }
                 // odd lines only.
                 pos = (pos + (r << 1)) & (p - 1);
-                linestart += I; S_ptr += I;
-                linestart += I; S_ptr += I;
+                S_ptr += I;
+                S_ptr += I;
             }
 #if 0
             /* see above. Because we do j+=2, we have either j==j1 or
