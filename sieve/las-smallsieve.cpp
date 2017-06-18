@@ -965,8 +965,8 @@ void sieve_small_bucket_region(unsigned char *S, int N,
 
         /* Apply the pattern */
         if (pattern[0] || pattern[1]) {
-          unsigned long *S_ptr = (unsigned long *) (S + ((size_t) (j-j0) << logI));
-          const unsigned long *end = (unsigned long *)(S + ((size_t) (j-j0) << logI) + (i1-i0));
+            unsigned long *S_ptr = (unsigned long *) (S + ((size_t) (j-j0) << logI));
+            const unsigned long *S_end = (unsigned long *)(S + ((size_t) (j-j0) << logI) + (i1-i0));
 
 #ifdef TRACE_K /* {{{ */
             if (trace_on_range_Nx(w.N, w.j*I, w.j*I+I)) {
@@ -980,13 +980,13 @@ void sieve_small_bucket_region(unsigned char *S, int N,
             }
 #endif /* }}} */
 
-            while (S_ptr < end)
-            {
-                *(S_ptr) += pattern[0];
-                *(S_ptr + 1) += pattern[1];
-                *(S_ptr + 2) += pattern[0];
-                *(S_ptr + 3) += pattern[1];
-                S_ptr += 4;
+            ASSERT((S_end - S_ptr) % 4 == 0);
+
+            for ( ; S_ptr < S_end ; S_ptr += 4) {
+                S_ptr[0] += pattern[0];
+                S_ptr[1] += pattern[1];
+                S_ptr[2] += pattern[0];
+                S_ptr[3] += pattern[1];
             }
         }
     }
@@ -1062,7 +1062,7 @@ void sieve_small_bucket_region(unsigned char *S, int N,
          * pattern unsigned longs */
         if (pattern[0] || pattern[1]) {
           unsigned long *S_ptr = (unsigned long *) (S + ((size_t) (j-j0) << logI));
-          const unsigned long *end = (unsigned long *)(S + ((size_t) (j-j0) << logI) + (i1-i0)) - 2;
+          const unsigned long *S_end = (unsigned long *)(S + ((size_t) (j-j0) << logI) + (i1-i0)) - 2;
             
 #ifdef TRACE_K /* {{{ */
             if (trace_on_range_Nx(w.N, w.j*I, w.j*I+I)) {
@@ -1076,18 +1076,16 @@ void sieve_small_bucket_region(unsigned char *S, int N,
             }
 #endif /* }}} */
 
-            while (S_ptr < end)
-            {
-                *(S_ptr) += pattern[0];
-                *(S_ptr + 1) += pattern[1];
-                *(S_ptr + 2) += pattern[2];
-                S_ptr += 3;
+            for( ; S_ptr < S_end ; S_ptr += 3) {
+                S_ptr[0] += pattern[0];
+                S_ptr[1] += pattern[1];
+                S_ptr[2] += pattern[2];
             }
 
-            end += 2;
-            if (S_ptr < end)
+            S_end += 2;
+            if (S_ptr < S_end)
                 *(S_ptr++) += pattern[0];
-            if (S_ptr < end)
+            if (S_ptr < S_end)
                 *(S_ptr) += pattern[1];
         }
     }
@@ -1186,9 +1184,7 @@ void sieve_small_bucket_region(unsigned char *S, int N,
                 /* q = 1, therefore U = 0, and we sieve all entries in lines
                    with g|j, beginning with the line starting at S[ssdpos] */
                 unsigned long logps;
-                //oldpos uint64_t pos = ssdpos[index];
                 uint64_t pos = C.first_position_projective_prime(ssp);
-                //checkpos ASSERT_ALWAYS(pos == (uint64_t) ssdpos[index]);
 
                 // The following is for the case where p divides the norm
                 // at the position (i,j) = (1,0).
@@ -1217,7 +1213,7 @@ void sieve_small_bucket_region(unsigned char *S, int N,
                 unsigned int j = (pos >> MIN(LOG_BUCKET_REGION, logI)) + j0;
                 for( ; j < j1 ; ) {
                     unsigned long *S_ptr = (unsigned long *) (S + pos);
-                    unsigned long *end = (unsigned long *) (S + i1 - i0);
+                    unsigned long *S_end = (unsigned long *) (S + i1 - i0);
                     unsigned long logps2 = logps;
                     if (!(j&1)) {
                         /* j is even. We update only odd i-coordinates */
@@ -1234,13 +1230,11 @@ void sieve_small_bucket_region(unsigned char *S, int N,
                         sieve_increase_logging(S + w.x, v, w);
                     }
 #endif
-                    while (S_ptr < end)
-                    {
-                        *(S_ptr) += logps2;
-                        *(S_ptr + 1) += logps2;
-                        *(S_ptr + 2) += logps2;
-                        *(S_ptr + 3) += logps2;
-                        S_ptr += 4;
+                    for( ; S_ptr < S_end ; S_ptr += 4) {
+                        S_ptr[0] += logps2;
+                        S_ptr[1] += logps2;
+                        S_ptr[2] += logps2;
+                        S_ptr[3] += logps2;
                     }
                     pos += gI;
                     j += g;
