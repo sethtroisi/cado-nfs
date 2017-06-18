@@ -925,8 +925,8 @@ void sieve_small_bucket_region(unsigned char *S, int N,
                     for (int x = pos; x < (int) pattern2_size; x += p)
                         ((unsigned char *)pattern)[x] += ssd->logp[index];
 #ifdef UGLY_DEBUGGING
-                    for (int x = pos; x < I ; x+= p) {
-                        WHERE_AM_I_UPDATE(w, x, (w.x << logI) + x);
+                    for (int x = pos; x < (i1 - i0) ; x+= p) {
+                        WHERE_AM_I_UPDATE(w, x, (w.j << logI) + x);
                         sieve_increase(S + x, ssd->logp[index], w);
                         /* cancel the above action */
                         S[x] += ssd->logp[index];
@@ -977,7 +977,6 @@ void sieve_small_bucket_region(unsigned char *S, int N,
         }
     }
     /* }}} */
-
 
     /* {{{ Pattern-sieve 3 */
     /* For the time being, it's really 3. But the only thing we care about is
@@ -1163,12 +1162,13 @@ void sieve_small_bucket_region(unsigned char *S, int N,
         ssp_t * ssp = &(ssd->ssp[index]);
 	const fbprime_t p = ssp->p;
 	const fbprime_t r = ssp->r;
-        if (mpz_cmp_ui(si.qbasis.q, p) == 0) {
-            continue;
-        }
+
+        if (mpz_cmp_ui(si.qbasis.q, p) == 0) continue;
+
 	/* Don't sieve 3 again as it was pattern-sieved -- unless
-	 * it's projective, see TODO above */
+	 * it's projective, see TODO above. */
 	if (p == 3) continue;
+
 	WHERE_AM_I_UPDATE(w, p, p);
 	const unsigned char logp = ssd->logp[index];
 	unsigned char *S_ptr = S;
