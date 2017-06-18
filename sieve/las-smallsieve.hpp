@@ -65,8 +65,8 @@ extern void small_sieve_init(small_sieve_data_t *ssd, unsigned int interleaving,
                       sieve_info const & si, int side);
 extern int64_t * small_sieve_copy_start(int64_t * base, int bounds[2]);
 extern int64_t * small_sieve_start(small_sieve_data_t *ssd, unsigned int N, sieve_info const & si);
-extern void small_sieve_skip_stride(small_sieve_data_t *ssd, int64_t * ssdpos, int interleaving, sieve_info const & si);
 /*
+extern void small_sieve_skip_stride(small_sieve_data_t *ssd, int64_t * ssdpos, unsigned int N, unsigned int interleaving, sieve_info const & si);
 */
 extern void sieve_small_bucket_region(unsigned char *S, int N,
 			       small_sieve_data_t * ssd, int64_t * ssdpos, sieve_info& si,
@@ -78,6 +78,7 @@ extern void
 resieve_small_bucket_region (bucket_primes_t *BP, int N, unsigned char *S,
         small_sieve_data_t *ssd, int64_t * ssdpos,
         sieve_info const & si,
+        int interleaving,
         where_am_I& w MAYBE_UNUSED);
 
 

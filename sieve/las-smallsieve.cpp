@@ -888,6 +888,11 @@ void sieve_small_bucket_region(unsigned char *S, int N,
         unsigned int event = 0;
         int * interval = si.sides[side].fb_parts_x->pow2;
         for(int index = interval[0] ; index < interval[1] ; index++) {
+            /* It's a power of two because it's in the right interval,
+             * but besides that, do we have an event stored for this
+             * prime (powe) ? (beyond the fact that it's simply a power
+             * of two, naturally)
+             */
             for( ; fence < index || event == SSP_POW2 ; next_marker++) {
                 event = next_marker->event;
                 fence = next_marker->index;
@@ -1136,8 +1141,8 @@ void sieve_small_bucket_region(unsigned char *S, int N,
 	} while (++j < j1);
         /* skip stride */
         pos += ssp->offset;
-        if (pos >= ssp->p)
-            pos -= ssp->p;
+        if (pos >= p) pos -= p;
+
 	ssdpos[index] = pos;
       }
         unsigned int event = (next_marker++)->event;
@@ -1149,6 +1154,7 @@ void sieve_small_bucket_region(unsigned char *S, int N,
             break;
         }
         if (event & SSP_PROJ) {
+            /* This code also covers projective powers of 2 */
             ssp_proj_t * ssp = (ssp_proj_t *) &(ssd->ssp[index]);
             const fbprime_t g = ssp->g;
             const uint64_t gI = (uint64_t)ssp->g << logI;
@@ -1204,14 +1210,13 @@ void sieve_small_bucket_region(unsigned char *S, int N,
                 ASSERT ((i1 - i0) % (4 * sizeof (unsigned long)) == 0);
                 for (size_t x = 0; x < sizeof (unsigned long); x++)
                     ((unsigned char *)&logps)[x] = logp;
-                while (pos < (unsigned int) bucket_region)
-                {
+                unsigned int j = (pos >> MIN(LOG_BUCKET_REGION, logI)) + j0;
+                for( ; j < j1 ; ) {
                     unsigned long *S_ptr = (unsigned long *) (S + pos);
-                    unsigned long *end = S_ptr + (i1 - i0) / sizeof (unsigned long);
+                    unsigned long *end = (unsigned long *) (S + i1 - i0);
                     unsigned long logps2 = logps;
-                    /* Check whether the j coordinate is even. */
-                    if (((pos & (i1 - i0)) == 0) ^ row0_is_oddj) {
-                        /* Yes, j is even. We update only odd i-coordinates */
+                    if (!(j&1)) {
+                        /* j is even. We update only odd i-coordinates */
                         /* Use array indexing to avoid endianness issues. */
                         for (size_t x = 0; x < sizeof (unsigned long); x += 2)
                             ((unsigned char *)&logps2)[x] = 0;
@@ -1234,6 +1239,7 @@ void sieve_small_bucket_region(unsigned char *S, int N,
                         S_ptr += 4;
                     }
                     pos += gI;
+                    j += g;
                 }
                 ssdpos[index] = pos - (1U << LOG_BUCKET_REGION);
             } else {
@@ -1347,29 +1353,23 @@ void sieve_small_bucket_region(unsigned char *S, int N,
 void
 resieve_small_bucket_region (bucket_primes_t *BP, int N, unsigned char *S,
         small_sieve_data_t *ssd, int64_t * ssdpos,
-        sieve_info const & si, where_am_I & w MAYBE_UNUSED)
+        sieve_info const & si, int interleaving MAYBE_UNUSED, where_am_I & w MAYBE_UNUSED)
 {
-    const uint32_t I = si.I;
-    small_sieve_context C(si.conf.logI_adjusted, N, si.conf.sublat);
+    int logI = si.conf.logI_adjusted;
+    SMALLSIEVE_COMMON_DEFS();
+    small_sieve_context C(logI, N, si.conf.sublat);
+
     unsigned char *S_ptr;
-    unsigned long j, nj;
     const int resieve_very_verbose = 0, resieve_very_verbose_bad = 0;
-    /* See comment above about the variable of the same name */
-    int row0_is_oddj;
-    unsigned int i_compens_sublat = 0;
-    if (si.conf.sublat.m == 0) {
-        row0_is_oddj = (N << (LOG_BUCKET_REGION - si.conf.logI_adjusted)) & 1;
-    } else {
-        int row0 = (N << (LOG_BUCKET_REGION - si.conf.logI_adjusted));
-        row0_is_oddj = (row0 * si.conf.sublat.m + si.conf.sublat.j0) & 1;
-        i_compens_sublat = si.conf.sublat.i0 & 1;
+
+    unsigned int i_compens_sublat = sublati0 & 1;
+
+    if (sublatm>1) {
         // Odd/even property of j is the same as for j+2, even with
         // sublat, unless sublat.m is even, which is not handled right
         // now. Same for i.
-        ASSERT_ALWAYS((si.conf.sublat.m & 1) == 1);
+        ASSERT_ALWAYS((sublatm & 1) == 1);
     }
-
-    nj = (bucket_region >> si.conf.logI_adjusted);
 
     ssp_marker_t * next_marker = ssd->markers;
 
@@ -1409,17 +1409,17 @@ resieve_small_bucket_region (bucket_primes_t *BP, int N, unsigned char *S,
              * starting value is correct.
              */
             unsigned int q = p&-!row0_is_oddj;
-            for (j = 0; j < nj; j ++) {
+            for (unsigned int j = j0; j < j1; j ++) {
                 WHERE_AM_I_UPDATE(w, j, j);
-                for (unsigned int index = pos + (q& -!((pos+i_compens_sublat)&1)) ; index < I; index += p+q) {
-                    if (LIKELY(S_ptr[index] == 255)) continue;
+                for (int i = pos + (q& -!((pos+i_compens_sublat)&1)) ; i < I; i += p+q) {
+                    if (LIKELY(S_ptr[i] == 255)) continue;
                     bucket_update_t<1, primehint_t> prime;
-                    unsigned int x = (j << (si.conf.logI_adjusted)) + index;
+                    unsigned int x = ((size_t) (j-j0) << logI) + i;
                     if (resieve_very_verbose) {
                         verbose_output_print(0, 1, "resieve_small_bucket_region: root %"
                                 FBROOT_FORMAT ",%d divides at x = "
-                                "%d = %lu * %u + %d\n",
-                                p, r, x, j, 1 << si.conf.logI_adjusted, index);
+                                "%d = %u * %u + %d\n",
+                                p, r, x, j, I, i);
                     }
                     prime.p = p;
                     prime.x = x;
@@ -1432,7 +1432,11 @@ resieve_small_bucket_region (bucket_primes_t *BP, int N, unsigned char *S,
                 S_ptr += I;
                 q ^= p;
             }
+            pos += ssp->offset;
+            if (pos >= p) pos -= p;
+
             ssdpos[index] = pos;
+
         }
         if (event == SSP_END) {
             break;
@@ -1440,16 +1444,12 @@ resieve_small_bucket_region (bucket_primes_t *BP, int N, unsigned char *S,
         if (event & SSP_PROJ) {
             ssp_proj_t * ssp = (ssp_proj_t * ) &(ssd->ssp[index]);
             const fbprime_t g = ssp->g;
-            const uint64_t gI = (uint64_t)g << si.conf.logI_adjusted;
+            const uint64_t gI = (uint64_t)g << logI;
 
             WHERE_AM_I_UPDATE(w, p, g * ssp->q);
 
             /* Test every p-th line, starting at S[ssdpos] */
-            //oldpos uint64_t i0 = ssdpos[index];
             uint64_t pos = C.first_position_projective_prime(ssp);
-            // note: the validity check is further down, because it's not
-            // meant for the DISCARD case.
-
             // This block is for the case where p divides at (1,0).
             if (UNLIKELY(N == 0 && pos == gI)) {
                 bucket_update_t<1, primehint_t> prime;
@@ -1462,20 +1462,17 @@ resieve_small_bucket_region (bucket_primes_t *BP, int N, unsigned char *S,
             if (event & SSP_DISCARD)
                 continue;
 
-            //checkpos ASSERT_ALWAYS(pos == (uint64_t) ssdpos[index]);
-
-            unsigned int ii;
             ASSERT (pos % I == 0); /* make sure ssdpos points at start
                                      of line */
             if (resieve_very_verbose_bad) {
-                verbose_output_print(0, 1, "# resieving bad prime %" FBPRIME_FORMAT
-                        ", pos = %" PRIu64 "\n", g, pos);
+                verbose_output_print(0, 1, "# resieving projective prime %" FBPRIME_FORMAT
+                        ", i0 = %" PRIu64 "\n", g, i0 + pos);
             }
             while (pos < (unsigned int) bucket_region) {
                 unsigned char *S_ptr = S + pos;
                 if (((pos & I) == 0) ^ row0_is_oddj) { /* Even j coordinate? */
                     /* Yes, test only odd ii-coordinates */
-                    for (ii = 1; ii < I; ii += 2) {
+                    for (int ii = 1; ii < I; ii += 2) {
                         if (S_ptr[ii] != 255) {
                             bucket_update_t<1, primehint_t> prime;
                             const unsigned int x = pos + ii;
@@ -1492,7 +1489,7 @@ resieve_small_bucket_region (bucket_primes_t *BP, int N, unsigned char *S,
                     }
                 } else {
                     /* No, test all ii-coordinates */
-                    for (ii = 0; ii < I; ii++) {
+                    for (int ii = 0; ii < I; ii++) {
                         if (S_ptr[ii] != 255) {
                             bucket_update_t<1, primehint_t> prime;
                             const unsigned int x = pos + ii;

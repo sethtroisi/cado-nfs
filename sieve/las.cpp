@@ -1224,7 +1224,7 @@ void factor_survivors_data::prepare_cofactoring(timetree_t & timer)
            together with the primes recovered from the bucket updates */
         resieve_small_bucket_region (&sdata[side].primes, N, SS,
                 th->psi->sides[side].rsd, th->sides[side].rsdpos,
-                si, w);
+                si, th->plas->nb_threads, w);
 
         SIBLING_TIMER(timer, "sort primes in purged buckets");
 
