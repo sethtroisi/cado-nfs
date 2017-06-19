@@ -15,7 +15,7 @@
  */
 void init_norms_bucket_region (unsigned char *S, uint32_t J, sieve_info& si, unsigned int side, unsigned int smart);
 
-double get_maxnorm_alg (double_poly_srcptr src_poly, const double X, const double Y);
+double get_maxnorm_rectangular (double_poly_srcptr src_poly, const double X, const double Y);
 
 void sieve_info_init_norm_data_sq (sieve_info& si, unsigned long q);
 
