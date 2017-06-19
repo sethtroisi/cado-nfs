@@ -756,6 +756,7 @@ int64_t *small_sieve_start(small_sieve_data_t *ssd,
 #define SMALLSIEVE_CRITICAL_MANUAL_UNROLL
 #endif
 #else
+#warning "using plain C code for critical part of small sieve"
 #define SMALLSIEVE_CRITICAL_PLAIN
 #endif
 
@@ -1111,6 +1112,11 @@ void sieve_small_bucket_region(unsigned char *S, int N,
             const unsigned char logp = ssd->logp[index];
             unsigned char *S0 = S;
             int pos = ssdpos[index];
+#ifdef TRACE_K
+            /* we're keeping track of it with ssdpos, but just in case,
+             * make sure we get it right ! */
+            ASSERT_ALWAYS(pos == C.first_position_ordinary_prime (ssp));
+#endif
             ASSERT(pos < (int) p);
             unsigned int i_compens_sublat = si.conf.sublat.i0 & 1;
             unsigned int j = j0;
@@ -1120,7 +1126,7 @@ void sieve_small_bucket_region(unsigned char *S, int N,
              * (i1-i0) is different from I, we'll break anyway. So
              * whether we add I or (i1-i0) to S0 does not matter much.
              */
-            size_t overrun MAYBE_UNUSED;
+            size_t overrun = 0; /* tame gcc */
             if (j & 1) {
                 WHERE_AM_I_UPDATE(w, j, j - j0);
                 overrun = sieve_full_line(S0, S0 + (i1 - i0), S0 - S,
@@ -1147,11 +1153,68 @@ void sieve_small_bucket_region(unsigned char *S, int N,
                 ++j;
             }
 
-            /* skip stride */
-            pos += ssp->offset;
-            if (pos >= (int) p) pos -= p;
+            if (logI > LOG_BUCKET_REGION) {
+                /* quick notes for incremental adjustment in case I>B (B =
+                 * LOG_BUCKET_REGION).
+                 *
+                 * Let q = 2^(I-B).
+                 * Let N = a*q+b, and N'=N+interleaving=a'*q+b' ; N' is the
+                 * next bucket region we'll handle.
+                 *
+                 * Let interleaving = u*q+v
+                 *
+                 * The row increase is dj = (N' div q) - (N div q) = a'-a
+                 * The fragment increase is di = (N' mod q) - (N mod q) = b'-b
+                 *
+                 * Of course we have -q < b'-b < q
+                 *
 
-            ssdpos[index] = pos;
+                 * dj can be written as (N'-N-(b'-b)) div q, which is an
+                 * exact division. we rewrite that as:
+                 *
+                 * dj = u + (v - (b'-b)) div q
+                 *
+                 * where the division is again exact. Now (v-(b'-b))
+                 * satisfies:
+                 * -q < v-(b'-b) < 2*q-1
+                 *
+                 * so that the quotient may only be 0 or 1.
+                 *
+                 * It is 1 if and only if v >= q + b'-b, which sounds like a
+                 * reasonable thing to check.
+                 */
+                int N1 = N + interleaving;
+                int Q = logI - LOG_BUCKET_REGION;
+                int dj = (N1>>Q) - j0;
+                int di = (N1&((1<<Q)-1)) - (N&((1<<Q)-1));
+                /* Note that B_mod p is not reduced. It may be <0, and
+                 * may also be >= p if we sieved with 2p because of even j
+                 */
+                int B_mod_p = overrun - ssdpos[index];
+                /* We may avoid some of the cost for the modular
+                 * reduction, here:
+                 *
+                 * dj is either always the same thing, or that same thing
+                 * + 1.
+                 *
+                 * di is within a small interval (albeit a centered one).
+                 * 
+                 * So it seems feasible to get by with a fixed number of
+                 * conditional subtractions.
+                 */
+                pos = (ssdpos[index] + B_mod_p * di + dj * r) % p;
+                if (pos < 0) pos += p;
+#ifndef NDEBUG
+                small_sieve_context C1(logI, N1, si.conf.sublat);
+                ASSERT(pos == C1.first_position_ordinary_prime(ssp));
+#endif
+                ssdpos[index] = pos;
+            } else {
+                /* skip stride */
+                pos += ssp->offset;
+                if (pos >= (int) p) pos -= p;
+                ssdpos[index] = pos;
+            }
         }
         unsigned int event = (next_marker++)->event;
 
