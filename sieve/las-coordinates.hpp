@@ -5,7 +5,6 @@
 #include "las-types.hpp"
 
 /*  Forward declarations of conversion functions */
-void xToIJ(int *i, unsigned int *j, const uint64_t X, sieve_info const & si);
 void NxToIJ(int *i, unsigned int *j, const unsigned int N, const unsigned int x, sieve_info const & si);
 void adjustIJsublat(int *i, unsigned int *j, sieve_info const & si);
 
