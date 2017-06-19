@@ -71,13 +71,11 @@ small_sieve_dump(FILE *f, const char *header, va_list va)
         fprintf(f, "# p = %" FBPRIME_FORMAT ", r = %" FBROOT_FORMAT ", offset = %" FBPRIME_FORMAT ", logp = %hhu",
             ssp[i].p, ssp[i].r, ssp[i].offset, logp[i]);
         for ( ; next_marker->index == i; next_marker++) {
-            switch (next_marker->event) {
-                case SSP_POW2 : fprintf(f, " (power of 2)"); break;
-                case SSP_PROJ : fprintf(f, " (projective root)"); break;
-                case SSP_DISCARD : fprintf(f, "(discarded)"); break;
-                case SSP_DISCARD_SUBLAT : fprintf(f, "(discarded because not compatible with sub lattices)"); break;
-                default: abort();
-            }
+            int e = next_marker->event;
+            if (e & SSP_POW2) fprintf(f, " (power of 2)");
+            if (e & SSP_PROJ) fprintf(f, " (projective root)");
+            if (e & SSP_DISCARD) fprintf(f, "(discarded)");
+            if (e & SSP_DISCARD_SUBLAT) fprintf(f, "(discarded because not compatible with sub lattices)");
         }
         fprintf(f, "\n");
     }
@@ -1468,7 +1466,7 @@ resieve_small_bucket_region (bucket_primes_t *BP, int N, unsigned char *S,
             unsigned int q = p&-!row0_is_oddj;
             for (unsigned int j = j0; j < j1; j ++) {
                 WHERE_AM_I_UPDATE(w, j, j);
-                for (int i = pos + (q& -!((pos+i_compens_sublat)&1)) ; i < I; i += p+q) {
+                for (int i = pos + (q& -!((pos+i_compens_sublat)&1)) ; i < (i1-i0); i += p+q) {
                     if (LIKELY(S_ptr[i] == 255)) continue;
                     bucket_update_t<1, primehint_t> prime;
                     unsigned int x = ((size_t) (j-j0) << logI) + i;
@@ -1519,47 +1517,49 @@ resieve_small_bucket_region (bucket_primes_t *BP, int N, unsigned char *S,
             if (event & SSP_DISCARD)
                 continue;
 
-            ASSERT (pos % I == 0); /* make sure ssdpos points at start
-                                     of line */
+            /* make sure ssdpos points at start of line or region */
+            ASSERT(!(pos % (1 << MIN(logI, LOG_BUCKET_REGION))));
+
             if (resieve_very_verbose_bad) {
                 verbose_output_print(0, 1, "# resieving projective prime %" FBPRIME_FORMAT
                         ", i0 = %" PRIu64 "\n", g, i0 + pos);
             }
-            while (pos < (unsigned int) bucket_region) {
+            if (pos >> LOG_BUCKET_REGION)
+                continue;
+            unsigned int j = j0 + (pos >> logI);
+            for (; j < j1; j += g) {
                 unsigned char *S_ptr = S + pos;
-                if (((pos & I) == 0) ^ row0_is_oddj) { /* Even j coordinate? */
-                    /* Yes, test only odd ii-coordinates */
-                    for (int ii = 1; ii < I; ii += 2) {
-                        if (S_ptr[ii] != 255) {
-                            bucket_update_t<1, primehint_t> prime;
-                            const unsigned int x = pos + ii;
-                            if (resieve_very_verbose_bad) {
-                                verbose_output_print(0, 1, "# resieve_small_bucket_region even j: root %"
-                                        FBROOT_FORMAT ",inf divides at x = %u\n",
-                                        g, x);
-                            }
-                            prime.p = g;
-                            prime.x = x;
-                            ASSERT(prime.p >= si.conf.td_thresh);
-                            BP->push_update(prime);
+                if (!(j & 1)) {
+                    /* Even j: test only odd ii-coordinates */
+                    for (int ii = 1; ii < (i1 - i0); ii += 2) {
+                        if (S_ptr[ii] == 255) continue;
+                        bucket_update_t<1, primehint_t> prime;
+                        const unsigned int x = pos + ii;
+                        if (resieve_very_verbose_bad) {
+                            verbose_output_print(0, 1, "# resieve_small_bucket_region even j: root %"
+                                    FBROOT_FORMAT ",inf divides at x = %u\n",
+                                    g, x);
                         }
+                        prime.p = g;
+                        prime.x = x;
+                        ASSERT(prime.p >= si.conf.td_thresh);
+                        BP->push_update(prime);
                     }
                 } else {
-                    /* No, test all ii-coordinates */
-                    for (int ii = 0; ii < I; ii++) {
-                        if (S_ptr[ii] != 255) {
-                            bucket_update_t<1, primehint_t> prime;
-                            const unsigned int x = pos + ii;
-                            if (resieve_very_verbose_bad) {
-                                verbose_output_print(0, 1, "# resieve_small_bucket_region odd j: root %"
-                                        FBROOT_FORMAT ",inf divides at x = %u\n",
-                                        g, x);
-                            }
-                            prime.p = g;
-                            prime.x = x;
-                            ASSERT(prime.p >= si.conf.td_thresh);
-                            BP->push_update(prime);
+                    /* Odd j: test all ii-coordinates */
+                    for (int ii = 0; ii < (i1 - i0); ii++) {
+                        if (S_ptr[ii] == 255) continue;
+                        bucket_update_t<1, primehint_t> prime;
+                        const unsigned int x = pos + ii;
+                        if (resieve_very_verbose_bad) {
+                            verbose_output_print(0, 1, "# resieve_small_bucket_region odd j: root %"
+                                    FBROOT_FORMAT ",inf divides at x = %u\n",
+                                    g, x);
                         }
+                        prime.p = g;
+                        prime.x = x;
+                        ASSERT(prime.p >= si.conf.td_thresh);
+                        BP->push_update(prime);
                     }
                 }
                 pos += gI;

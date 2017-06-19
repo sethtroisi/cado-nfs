@@ -89,7 +89,13 @@ malloc_hugepages(const size_t size)
     size_t nr_pages = iceildiv(size, LARGE_PAGE_SIZE);
     size_t rounded_up_size = nr_pages * LARGE_PAGE_SIZE; 
     /* If mmap() didn't work, try aligned malloc() with madvise() */
+#if defined(__linux) && defined(HAVE_POSIX_MEMALIGN)
+    /* add a fence a la electric fence from the good old days */
+    void *m = malloc_aligned(rounded_up_size + 0x1000, LARGE_PAGE_SIZE);
+    mprotect(m + rounded_up_size, 0x1000, PROT_NONE);
+#else
     void *m = malloc_aligned(rounded_up_size, LARGE_PAGE_SIZE);
+#endif
     dll_append(malloced_regions, m);
     int r;
     static int printed_error = 0;
