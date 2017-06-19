@@ -1107,15 +1107,20 @@ void factor_survivors_data::search_survivors(timetree_t & timer)
     sieve_info & si(*th->psi);
 
     /* change N, which is a bucket number, to
-     * (first_i, first_j, nr_lines)
-     */
-    unsigned int log_lines_per_bucket = MAX(0, LOG_BUCKET_REGION - si.conf.logI_adjusted);
-    unsigned int log_buckets_per_line = MAX(0, si.conf.logI_adjusted - LOG_BUCKET_REGION);
-    unsigned int first_i = (N & ((1 << log_buckets_per_line) - 1)) << LOG_BUCKET_REGION;
-    unsigned int first_j = (N >> log_buckets_per_line) << log_lines_per_bucket;
-    unsigned int nr_lines = 1 << log_lines_per_bucket;
-    /* even when we have a line fragment */
-    ASSERT_ALWAYS(nr_lines >= 1);
+     * (i0, i1, j0, j1) */
+    int logI = si.conf.logI_adjusted;
+    /* This bit of code is replicated from las-smallsieve.cpp */
+    const unsigned int log_lines_per_region = MAX(0, LOG_BUCKET_REGION - logI);
+    const unsigned int log_regions_per_line = MAX(0, logI - LOG_BUCKET_REGION);
+    const unsigned int regions_per_line = 1 << log_regions_per_line;           
+    const unsigned int region_rank_in_line = N & (regions_per_line - 1);       
+    const unsigned int j0 = (N >> log_regions_per_line) << log_lines_per_region;    
+    const unsigned int j1 MAYBE_UNUSED = j0 + (1 << log_lines_per_region);    
+    const int I = 1 << logI;                                            
+    const int i0 = (region_rank_in_line << LOG_BUCKET_REGION) - I/2;          
+    const int i1 = i0 + (1 << MIN(LOG_BUCKET_REGION, logI));     
+
+    ASSERT(j1 > j0); /* even when we have a line fragment */
 
 
 #ifdef TRACE_K /* {{{ */
@@ -1153,11 +1158,13 @@ void factor_survivors_data::search_survivors(timetree_t & timer)
     th->rep->survivors.before_sieve += 1U << LOG_BUCKET_REGION;
 
     survivors.reserve(128);
-    for (unsigned int j = 0; j < nr_lines; j++)
+    for (unsigned int j = j0; j < j1; j++)
     {
+        int offset = (j-j0) << logI;
+
         unsigned char * const both_S[2] = {
-            sdata[0].S + (j << si.conf.logI_adjusted), 
-            sdata[1].S + (j << si.conf.logI_adjusted)
+            sdata[0].S + offset, 
+            sdata[1].S + offset
         };
         const unsigned char both_bounds[2] = {
             si.sides[0].lognorms->bound,
@@ -1165,9 +1172,8 @@ void factor_survivors_data::search_survivors(timetree_t & timer)
         };
         size_t old_size = survivors.size();
         search_survivors_in_line(both_S, both_bounds,
-                                 si.conf.logI_adjusted,
-                                 j + first_j,
-                                 first_i,
+                                 j,
+                                 i0, i1,
                                  N,
                                  si.j_div,
                                  si.conf.unsieve_thresh,
@@ -1176,16 +1182,19 @@ void factor_survivors_data::search_survivors(timetree_t & timer)
         /* Survivors written by search_survivors_in_line() have index
          * relative to their j-line. We need to convert to index within
          * the bucket region by adding line offsets.
-         * 
-         * When several bucket regions are in a line, we have nothing to
-         * change.
          */
 
-        ASSERT_ALWAYS(first_i == 0 || j == 0);
-        if (!j) continue;
+
+        /* When several bucket regions are in a line, we have nothing to
+         * change. Note in particular that we must not adjust with
+         * respect to the starting i -- this info is already encoded with
+         * the bucket number N.
+         */
+
+        if (!offset) continue;
 
         for (size_t i_surv = old_size; i_surv < survivors.size(); i_surv++)
-            survivors[i_surv] += j << si.conf.logI_adjusted;
+            survivors[i_surv] += offset;
     }
 }
 
@@ -1299,6 +1308,7 @@ void factor_survivors_data::cofactoring (timetree_t & timer)
 #endif
       const size_t x = survivors2[i_surv];
       ASSERT_ALWAYS (SS[x] != 255);
+      ASSERT(x < ((size_t) 1 << LOG_BUCKET_REGION));
 
       th->rep->survivors.after_sieve++;
 
