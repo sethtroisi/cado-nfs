@@ -1406,12 +1406,15 @@ get_maxnorm_circular (double_poly_srcptr src_poly, const double X,
   double_poly_init (poly, d + 1);
 
   /* first compute X * f'(u*X/Y) * (1+u^2) */
-  poly->coeff[d + 1] = 0.0;
+  poly->coeff[0] = 0.0;
+  poly->coeff[1] = 0.0;
   for (i = 1; i <= d; i++)
     {
       t = pow (X / Y, (double) i - 1.0);
-      poly->coeff[i - 1] = X * (double) i * src_poly->coeff[i] * t;
-      poly->coeff[i + 1] += X * (double) i * src_poly->coeff[i] * t;
+      /* the following will set coefficients of degree 2, 3, ..., d+1 */
+      poly->coeff[i + 1] = X * (double) i * src_poly->coeff[i] * t;
+      /* the following will add to coefficients of degree 0, 1, ..., d-1 */
+      poly->coeff[i - 1] += X * (double) i * src_poly->coeff[i] * t;
     }
 
   /* now subtract d * Y * u * f(u*X/Y) */

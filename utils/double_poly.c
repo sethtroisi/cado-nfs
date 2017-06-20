@@ -401,7 +401,7 @@ double_poly_bound_roots (double_poly_srcptr p)
   return s;
 }
 
-/* put in roots[0], roots[1], ..., roots[k-1] all k roots of poly in [0, s],
+/* put in roots[0], roots[1], ..., roots[k-1] all k roots of poly in (0, s],
    and return the number k of roots */
 unsigned int
 double_poly_compute_roots(double *roots, double_poly_srcptr poly, double s)
@@ -464,6 +464,11 @@ double_poly_compute_all_roots_with_bound (double *roots,
   /* Flip sign of negative roots */
   for (unsigned int i = 0; i < nr_roots_neg; i++)
     roots[nr_roots_pos + i] *= -1.;
+
+  /* check if zero is a root */
+  if (poly->coeff[0] == 0.0)
+    roots[nr_roots_pos + nr_roots_neg++] = 0.0;
+
   return nr_roots_pos + nr_roots_neg;
 }
 
