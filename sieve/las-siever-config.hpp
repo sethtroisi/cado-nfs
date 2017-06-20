@@ -169,6 +169,13 @@ struct siever_config_pool {
 
     siever_config get_config_for_q(las_todo_entry const& doing) const;
 
+    void change_bk_multiplier(double d) {
+        for(auto & c : hints)
+            c.second.bk_multiplier = d;
+        base.bk_multiplier = d;
+    }
+
+
     siever_config_pool(cxx_param_list& pl);
 
     double hint_expected_time(key_type const &K) const {

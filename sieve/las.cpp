@@ -2124,6 +2124,10 @@ int main (int argc0, char *argv0[])/*{{{*/
         tt_qstart = seconds();
         ACTIVATE_TIMER(timer_special_q);
 
+        /* We set this aside because we may have to rollback our changes
+         * if we catch an exception because of full buckets */
+        std::stack<las_todo_entry> saved_todo(las.todo);
+
         /* pick a new entry from the stack, and do a few sanity checks */
         las_todo_entry doing = las_todo_pop(las);
 
@@ -2261,9 +2265,10 @@ int main (int argc0, char *argv0[])/*{{{*/
         si.update_norm_data();
         si.update(nr_workspaces);
 
+        try {
+
         WHERE_AM_I_UPDATE(w, psi, &si);
 
-        las.tree.new_node(si.doing);
         las_todo_push_closing_brace(las, si.doing.depth);
 
         nr_sq_processed ++;
@@ -2359,22 +2364,23 @@ for (unsigned int j_cong = 0; j_cong < sublat_bound; ++j_cong) {
          * Due to templates and si.toplevel being not constant, need a
          * switch. (really?)
          */
+        double this_max_full;
         switch(si.toplevel) {
             case 1:
-                max_full = std::max(max_full,
-                        workspaces->buckets_max_full<1, shorthint_t>());
+                this_max_full = workspaces->buckets_max_full<1, shorthint_t>();
                 break;
             case 2:
-                max_full = std::max(max_full,
-                        workspaces->buckets_max_full<2, shorthint_t>());
+                this_max_full = workspaces->buckets_max_full<2, shorthint_t>();
                 break;
             case 3:
-                max_full = std::max(max_full,
-                        workspaces->buckets_max_full<3, shorthint_t>());
+                this_max_full = workspaces->buckets_max_full<3, shorthint_t>();
                 break;
             default:
                 ASSERT_ALWAYS(0);
         }
+        if (this_max_full >= max_full)
+            max_full = this_max_full;
+
         ASSERT_ALWAYS(max_full <= 1.0 ||
                 fprintf (stderr, "max_full=%f, see #14987\n", max_full) == 0);
         
@@ -2527,6 +2533,8 @@ if (si.conf.sublat.m) {
 }
 
 
+        las.tree.new_node(si.doing);
+
 #ifdef  DLP_DESCENT
         SIBLING_TIMER(timer_special_q, "descent");
         TIMER_CATEGORY(timer_special_q, bookkeeping());
@@ -2632,6 +2640,25 @@ if (si.conf.sublat.m) {
 #endif
         if (exit_after_rel_found > 1 && report->reports > 0)
             break;
+
+
+        } catch (buckets_are_full const & e) {
+            fprintf(stderr, "# %s\n", e.what());
+            printf("# redoing this q because buckets are full.\n");
+
+            double new_bk_multiplier = conf.bk_multiplier * (double) e.reached_size / e.theoretical_max_size * 1.01;
+            printf("# Updating bucket multiplier to %.3f*%d/%d*1.01=%.3f\n",
+                    conf.bk_multiplier,
+                    e.reached_size,
+                    e.theoretical_max_size,
+                    new_bk_multiplier
+                  );
+            max_full = 0;
+            las.config_pool.change_bk_multiplier(new_bk_multiplier);
+            /* we have to roll back the updates we made to
+             * this structure. */
+            std::swap(las.todo, saved_todo);
+        }
       } // end of loop over special q ideals.
 
     delete pool;

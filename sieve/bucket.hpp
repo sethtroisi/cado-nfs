@@ -9,6 +9,7 @@
 #include "cado-endian.h"
 #define xxxSAFE_BUCKETS
 #ifdef SAFE_BUCKETS
+#include <exception>
 #include <stdio.h>
 #include <limits>
 #include "portability.h"
@@ -17,6 +18,7 @@
 #include "fb-types.h"
 #include "fb.hpp"
 #include "las-debug.hpp"
+#include "threadpool.hpp"
 
 /*
  * This bucket module provides a way to store elements (that are called
@@ -174,6 +176,9 @@ public:
 /******** Bucket array implementation **************/
 template <int LEVEL, typename HINT>
 class bucket_array_t : private NonCopyable {
+    public:
+  static const int level = LEVEL;
+    private:
   typedef bucket_update_t<LEVEL, HINT> update_t;
   static const uint64_t bucket_region = update_t::bucket_region;
   update_t *big_data;
@@ -192,8 +197,10 @@ class bucket_array_t : private NonCopyable {
                                       // tells where in the corresponding 
                                       // bucket the updates from that slice
                                       // start
+public:
   uint32_t           n_bucket;        // Number of buckets
   uint64_t           bucket_size;     // The allocated size of one bucket.
+private:
   size_t             size_b_align;    // (sizeof(void *) * n_bucket + 63) & ~63
                                       // to align bucket_* on cache line
   slice_index_t      nr_slices;       // Number of different slices
@@ -209,13 +216,13 @@ class bucket_array_t : private NonCopyable {
     ASSERT_ALWAYS(size_b_align % sizeof(update_t *) == 0);
     return (slice_start + i_slice * size_b_align / sizeof(update_t *));
   }
-  size_t nb_of_updates(const int i) const {
-      return (bucket_write[i] - bucket_start[i]);
-  }
   void realloc_slice_start(size_t);
   void log_this_update (const update_t update, uint64_t offset,
                         uint64_t bucket_number, where_am_I& w) const;
 public:
+  size_t nb_of_updates(const int i) const {
+      return (bucket_write[i] - bucket_start[i]);
+  }
   /* Constructor sets everything to zero, and does not allocate memory.
      allocate_memory() does all the allocation. */
   bucket_array_t();
@@ -270,7 +277,7 @@ public:
     aligned_medium_memcpy((uint8_t *)slice_start + size_b_align * nr_slices, bucket_write, size_b_align);
     slice_index[nr_slices++] = new_slice_index;
   }
-  double max_full () const;
+  double max_full (unsigned int * fullest_index = NULL) const;
   /* Push an update to the designated bucket. Also check for overflow, if
      SAFE_BUCKETS is defined. */
   void push_update(const int i, const update_t &update) {
@@ -413,7 +420,7 @@ private:
    the bucket region. Note that the selection of the sieve region, i.e., of J
    depends somewhat on the number of threads, as we want an equal number of
    bucket regions per thread. Thus the checksums are not necessarily
-   comparable between runs with different numbers of threads. */
+   clonable between runs with different numbers of threads. */
 
 class sieve_checksum {
   static const unsigned int checksum_prime = 4294967291u; /* < 2^32 */
@@ -432,6 +439,20 @@ class sieve_checksum {
   }
   /* Update checksum with the pointed-to data */
   void update(const unsigned char *, size_t);
+};
+
+struct buckets_are_full : public clonable_exception {
+    int level;
+    int bucket_number;
+    int reached_size;
+    int theoretical_max_size;
+    std::string message;
+    buckets_are_full(int l, int b, int r, int t);
+    virtual const char * what() const noexcept { return message.c_str(); }
+    bool operator<(buckets_are_full const& o) const {
+        return (double) reached_size / theoretical_max_size < (double) o.reached_size / o.theoretical_max_size;
+    }
+    virtual clonable_exception * clone() const { return new buckets_are_full(*this); }
 };
 
 #endif	/* BUCKET_HPP_ */

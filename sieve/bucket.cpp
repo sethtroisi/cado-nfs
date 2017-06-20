@@ -166,13 +166,16 @@ bucket_array_t<LEVEL, HINT>::realloc_slice_start(const size_t extra_space)
 /* Returns how full the fullest bucket is, as a fraction of its size */
 template <int LEVEL, typename HINT>
 double
-bucket_array_t<LEVEL, HINT>::max_full () const
+bucket_array_t<LEVEL, HINT>::max_full (unsigned int * fullest_index) const
 {
   unsigned int max = 0;
   for (unsigned int i = 0; i < n_bucket; ++i)
     {
       unsigned int j = nb_of_updates (i);
-      if (max < j) max = j;
+      if (max < j) {
+          max = j;
+          if (fullest_index) *fullest_index = i;
+      }
     }
   return (double) max / (double) bucket_size;
 }
@@ -465,4 +468,10 @@ sieve_checksum::update(const unsigned char *data, const size_t len)
     new_checksum = mpz_tdiv_ui(mb, checksum_prime);
     mpz_clear(mb);
     this->update(new_checksum);
+}
+
+buckets_are_full::buckets_are_full(int l, int b, int r, int t) : level(l), bucket_number(b), reached_size(r), theoretical_max_size(t) {
+    std::ostringstream os;
+    os << "buckets (level "<<level<<") are full. Fullest is bucket #"<<r<<", wrote "<<reached_size<<"/"<<theoretical_max_size<<"";
+    message = os.str();
 }

@@ -353,6 +353,7 @@ fill_in_buckets_toplevel_sublat(bucket_array_t<LEVEL, shorthint_t> &orig_BA,
       } 
     }
   }
+  // printf("%.3f\n", BA.max_full());
   orig_BA.move(BA);
 }
 
@@ -443,6 +444,7 @@ fill_in_buckets_toplevel(bucket_array_t<LEVEL, shorthint_t> &orig_BA,
       } 
     }
   }
+  // printf("%.3f\n", BA.max_full());
   orig_BA.move(BA);
 }
 
@@ -524,6 +526,7 @@ fill_in_buckets_lowlevel(
     pl_it->set_x(pl.get_x());
     pl_it->advance_to_next_area(LEVEL);
   } 
+  // printf("%.3f\n", BA.max_full());
   orig_BA.move(BA);
 }
 
@@ -712,10 +715,27 @@ fill_in_buckets_one_side(timetree_t& timer, thread_pool &pool, thread_workspaces
             slices_pushed++;
         }
     }
+
+    /* we need to check for exceptions due to bucket updates. Because
+     * we've pushed all slides at this point, we have no option but to
+     * wait for all threads to finish. (or maybe pull back some of the
+     * tasks before they're grabbed by worker threads -- that could be an
+     * optimization).
+     */
+    std::vector<buckets_are_full> exceptions_to_throw;
+
     for (slice_index_t slices_completed = 0; slices_completed < slices_pushed; slices_completed++) {
           task_result *result = pool.get_result();
           delete result;
+          /* want to check possible exceptions, too */
+          buckets_are_full * e = dynamic_cast<buckets_are_full*>(pool.get_exception());
+          if (e) {
+              exceptions_to_throw.push_back(*e);
+              delete e;
+          }
     }
+    if (!exceptions_to_throw.empty())
+        throw *std::max_element(exceptions_to_throw.begin(), exceptions_to_throw.end());
     pool.accumulate_and_clear_active_time(*timer.current);
     SIBLING_TIMER(timer, "worker thread wait time");
     TIMER_CATEGORY(timer, thread_wait());
@@ -832,12 +852,23 @@ downsort_tree(
       pool.add_task(fill_in_buckets_one_slice_internal<LEVEL>, param, 0);
       slices_pushed++;
     }
+
+    std::vector<buckets_are_full> exceptions_to_throw;
     for (slice_index_t slices_completed = 0;
         slices_completed < slices_pushed;
         slices_completed++) {
       task_result *result = pool.get_result();
       delete result;
+      /* want to check possible exceptions, too */
+      buckets_are_full * e = dynamic_cast<buckets_are_full*>(pool.get_exception());
+      if (e) {
+          exceptions_to_throw.push_back(*e);
+          delete e;
+      }
     }
+    if (!exceptions_to_throw.empty())
+        throw *std::max_element(exceptions_to_throw.begin(), exceptions_to_throw.end());
+
     pool.accumulate_and_clear_active_time(*timer.current);
     SIBLING_TIMER(timer, "worker thread wait time");
     TIMER_CATEGORY(timer, thread_wait());
