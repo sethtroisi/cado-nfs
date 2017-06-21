@@ -2980,6 +2980,9 @@ int main (int argc0, char *argv0[])/*{{{*/
             }
         }
 
+	/* at this point, (a0,b0) is the smallest vector in skew-norm,
+	   i.e., a0^2 + (b0*skew)^2 <= a1^2 + (b1*skew)^2 */
+
         /* With adjust_strategy == 2, we want to display the other
          * values, too. Also, strategy 0 wants strategy 1 to run first.
          */
