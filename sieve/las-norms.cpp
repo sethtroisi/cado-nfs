@@ -1950,9 +1950,14 @@ sieve_info::update_norm_data()
   }
 }
 
+int sieve_range_adjust::get_minimum_J()
+{
+    return nb_threads << (LOG_BUCKET_REGION - logI);
+}
+
 void sieve_range_adjust::set_minimum_J_anyway()
 {
-    J = nb_threads << (LOG_BUCKET_REGION - logI);
+  J = sieve_range_adjust::get_minimum_J();
 }
 
 void sieve_info::recover_per_sq_values(sieve_range_adjust const & Adj)
