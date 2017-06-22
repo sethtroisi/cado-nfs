@@ -881,7 +881,7 @@ downsort_tree(
   /* RECURSE */
   if (LEVEL > 1) {
     for (unsigned int i = 0; i < si.nb_buckets[LEVEL]; ++i) {
-      uint64_t BRS[FB_MAX_PARTS] = BUCKET_REGIONS;
+      size_t (&BRS)[FB_MAX_PARTS] = BUCKET_REGIONS;
       uint32_t N = first_region0_index + i*(BRS[LEVEL]/BRS[1]);
       downsort_tree<LEVEL-1>(timer, i, N, ws, pool, si, precomp_plattice);
     }

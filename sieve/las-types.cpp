@@ -38,7 +38,7 @@ sieve_info::sieve_info(siever_config const & sc, cado_poly_srcptr cpoly, std::li
         verbose_output_print(0, 1, "# copy factor base data from previous siever\n");
         share_factor_bases(other);
     } else {
-        verbose_output_print(0, 1, "# bucket_region = %" PRIu64 "\n",
+        verbose_output_print(0, 1, "# bucket_region = %zu\n",
                 BUCKET_REGION);
         init_factor_bases(pl);
         for (int side = 0; side < 2; side++) {
@@ -99,8 +99,7 @@ sieve_info::sieve_info(siever_config const & sc, cado_poly_srcptr cpoly, cxx_par
 {
     I = 1UL << sc.logI_adjusted;
     std::list<sieve_info>::iterator psi;
-    verbose_output_print(0, 1, "# bucket_region = %" PRIu64 "\n",
-            BUCKET_REGION);
+    verbose_output_print(0, 1, "# bucket_region = %zu\n", BUCKET_REGION);
     init_factor_bases(pl);
     for (int side = 0; side < 2; side++) {
         print_fb_statistics(side);
@@ -131,7 +130,7 @@ void sieve_info::update (size_t nr_workspaces)/*{{{*/
     /* wondering whether having the "local A" at hand would be a plus. */
     uint64_t A = ((uint64_t)J) << conf.logI_adjusted;
     /* update number of buckets at toplevel */
-    uint64_t BRS[FB_MAX_PARTS] = BUCKET_REGIONS;
+    size_t (&BRS)[FB_MAX_PARTS] = BUCKET_REGIONS;
     nb_buckets[toplevel] = iceildiv(A, BRS[toplevel]);
 
     // maybe there is only 1 bucket at toplevel and less than 256 at

@@ -1966,6 +1966,7 @@ static void declare_usage(param_list pl)/*{{{*/
   param_list_decl_usage(pl, "out",  "filename where relations are written, instead of stdout");
   param_list_decl_usage(pl, "t",   "number of threads to use");
 
+  param_list_decl_usage(pl, "log-bucket-region", "set bucket region to 2^x");
   param_list_decl_usage(pl, "I",    "set sieving region to 2^I times J");
   param_list_decl_usage(pl, "A",    "set sieving region to 2^A");
 
@@ -2074,6 +2075,8 @@ int main (int argc0, char *argv0[])/*{{{*/
 #if DLP_DESCENT
     param_list_parse_double(pl, "grace-time-ratio", &general_grace_time_ratio);
 #endif
+    param_list_parse_int(pl, "log-bucket-region", &LOG_BUCKET_REGION);
+    set_LOG_BUCKET_REGION();
 
     las_info las(pl);    /* side effects: prints cmdline and flags */
 
@@ -2500,9 +2503,9 @@ for (unsigned int j_cong = 0; j_cong < sublat_bound; ++j_cong) {
             // TODO: this could be multi-threaded
             plattice_x_t max_area = plattice_x_t(si.J)<<si.conf.logI_adjusted;
             plattice_enumerate_area<1>::value =
-                MIN(max_area, plattice_x_t(BUCKET_REGION_2));
+                MIN(max_area, plattice_x_t(BUCKET_REGIONS[2]));
             plattice_enumerate_area<2>::value =
-                MIN(max_area, plattice_x_t(BUCKET_REGION_3));
+                MIN(max_area, plattice_x_t(BUCKET_REGIONS[3]));
             plattice_enumerate_area<3>::value = max_area;
             precomp_plattice_t precomp_plattice;
             for (int side = 0; side < 2; ++side) {
@@ -2527,7 +2530,7 @@ for (unsigned int j_cong = 0; j_cong < sublat_bound; ++j_cong) {
             // Visit the downsorting tree depth-first.
             // If toplevel = 1, then this is just processing all bucket
             // regions.
-            uint64_t BRS[FB_MAX_PARTS] = BUCKET_REGIONS;
+            size_t (&BRS)[FB_MAX_PARTS] = BUCKET_REGIONS;
             for (uint32_t i = 0; i < si.nb_buckets[si.toplevel]; i++) {
                 switch (si.toplevel) {
                     case 2:

@@ -132,7 +132,6 @@ class bucket_update_t;
     class bucket_update_t<1, HINT> : public HINT {			\
     public:								\
       typedef XSIZE1 br_index_t;					\
-      static const uint64_t bucket_region = BUCKET_REGION_1;		\
       br_index_t x;							\
       bucket_update_t(){};						\
       bucket_update_t(const uint64_t _x, const fbprime_t p,		\
@@ -157,7 +156,6 @@ template <typename HINT>
 class bucket_update_t<2, HINT> : public HINT {
 public:
   typedef XSIZE2 br_index_t;
-  static const uint64_t bucket_region = BUCKET_REGION_2;
   /* TODO: create a fake 24-bit type as uint8_t[3]. */
   br_index_t x;
   bucket_update_t(){};
@@ -172,7 +170,6 @@ template <typename HINT>
 class bucket_update_t<3, HINT> : public HINT {
 public:
   typedef XSIZE2 br_index_t;
-  static const uint64_t bucket_region = BUCKET_REGION_3;
   br_index_t x;
   bucket_update_t(){};
   bucket_update_t(const uint64_t _x, const fbprime_t p,
@@ -194,7 +191,6 @@ class bucket_array_t : private NonCopyable {
   static const int level = LEVEL;
     private:
   typedef bucket_update_t<LEVEL, HINT> update_t;
-  static const uint64_t bucket_region = update_t::bucket_region;
   update_t *big_data;
   size_t big_size;                    // size of bucket update memory
 
@@ -310,9 +306,10 @@ public:
       const slice_offset_t slice_offset, const slice_index_t slice_index,
       where_am_I& w MAYBE_UNUSED)
   {
-    const uint64_t bucket_number = offset / bucket_region;
+      int logB = LOG_BUCKET_REGIONS[LEVEL];
+    const uint64_t bucket_number = offset >> logB;
     ASSERT_EXPENSIVE(bucket_number < n_bucket);
-    update_t update(offset % bucket_region, p, slice_offset, slice_index);
+    update_t update(offset & ((UINT64_C(1) << logB) - 1), p, slice_offset, slice_index);
     WHERE_AM_I_UPDATE(w, i, slice_index);
 #if defined(TRACE_K)
     log_this_update(update, offset, bucket_number, w);

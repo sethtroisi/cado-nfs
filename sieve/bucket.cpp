@@ -109,7 +109,7 @@ bucket_array_t<LEVEL, HINT>::allocate_memory(const uint32_t new_n_bucket,
   if (fill_ratio == 0.)
     return;
 
-  const size_t min_bucket_size = fill_ratio * bucket_region;
+  const size_t min_bucket_size = fill_ratio * BUCKET_REGIONS[LEVEL];
   const size_t new_bucket_size = bucket_misalignment(min_bucket_size, sizeof(update_t));
   const size_t new_big_size = new_bucket_size * new_n_bucket * sizeof(update_t);
   const size_t new_size_b_align = ((sizeof(void *) * new_n_bucket + 0x3F) & ~((size_t) 0x3F));
