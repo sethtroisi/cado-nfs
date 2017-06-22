@@ -20,6 +20,8 @@
 #include "las-debug.hpp"
 #include "threadpool.hpp"
 
+#include "electric_alloc.h"
+
 /*
  * This bucket module provides a way to store elements (that are called
  * updates), while partially sorting them, according to some criterion (to
@@ -125,19 +127,31 @@ public:
 template <int LEVEL, typename HINT>
 class bucket_update_t;
 
-template <typename HINT>
-class bucket_update_t<1, HINT> : public HINT {
-public:
-  typedef XSIZE1 br_index_t;
-  static const uint64_t bucket_region = BUCKET_REGION_1;
-  br_index_t x;
-  bucket_update_t(){};
-  bucket_update_t(const uint64_t _x, const fbprime_t p,
-    const slice_offset_t slice_offset, const slice_index_t slice_index)
-    : HINT(p, slice_offset, slice_index),
-      x(limit_cast<XSIZE1>(_x))
-    {}
-};
+#define explicit_instantiate1(HINT, ALIGNMENT_ATTRIBUTE)		\
+    template <>								\
+    class bucket_update_t<1, HINT> : public HINT {			\
+    public:								\
+      typedef XSIZE1 br_index_t;					\
+      static const uint64_t bucket_region = BUCKET_REGION_1;		\
+      br_index_t x;							\
+      bucket_update_t(){};						\
+      bucket_update_t(const uint64_t _x, const fbprime_t p,		\
+        const slice_offset_t slice_offset, const slice_index_t slice_index)     \
+        : HINT(p, slice_offset, slice_index),				\
+          x(limit_cast<XSIZE1>(_x))					\
+        {}								\
+    } ALIGNMENT_ATTRIBUTE
+
+/* it's admittedly somewhat unsatisfactory. I wish I could find a better
+ * way. Maybe with alignas ? Is it a trick I can play at template scope
+ * with CRTP or so ?
+ */
+explicit_instantiate1(shorthint_t, ATTR_ALIGNED(4));
+static_assert(sizeof(bucket_update_t<1, shorthint_t>) == 4, "wrong size");
+explicit_instantiate1(longhint_t, ATTR_ALIGNED(16));
+static_assert(sizeof(bucket_update_t<1, longhint_t>) == 16, "wrong size");
+explicit_instantiate1(primehint_t, ATTR_ALIGNED(8));
+static_assert(sizeof(bucket_update_t<1, primehint_t>) == 8, "wrong size");
 
 template <typename HINT>
 class bucket_update_t<2, HINT> : public HINT {
@@ -336,13 +350,15 @@ class bucket_single {
 public:
   bucket_single (const size_t size) : _size(size)
   {
-    start = new update_t[size];
+    start = electric_new<update_t>(size);
+    // start = new update_t[size];
     read = start;
     write = start;
   }
 
   ~bucket_single() {
-    delete[] start;
+    electric_delete(start,_size);
+    // delete[] start;
     start = read  = write = NULL;
     _size = 0;
   }

@@ -23,6 +23,10 @@
 #error "Please define _GNU_SOURCE or _BSD_SOURCE on top of the translation unit"
 #endif
 
+#ifdef __cplusplus
+#include <new>  /* for std::bad_alloc */
+#endif
+
 static inline
 void * electric_alloc(size_t s)
 {
@@ -82,7 +86,10 @@ void electric_free_nosize(void * p0)
 
 #ifdef  __cplusplus
 template<typename T> inline T * electric_new(size_t s) {
-    return (T*) electric_alloc(sizeof(T)*s);
+    T * res = (T*) electric_alloc(sizeof(T)*s);
+    if (!res)
+        throw std::bad_alloc();
+    return res;
 }
 template<typename T> inline void electric_delete(T * p, size_t s) {
     electric_free(p, sizeof(T)*s);

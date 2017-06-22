@@ -2,6 +2,7 @@
 #include <inttypes.h>
 #include <stdlib.h>   // for malloc and friends
 #include <string.h>   // for memcpy
+#include <new>        // for std::bad_alloc
 #include <gmp.h>
 #if defined(HAVE_SSE2)
 #include <emmintrin.h>
@@ -122,6 +123,10 @@ bucket_array_t<LEVEL, HINT>::allocate_memory(const uint32_t new_n_bucket,
     big_data = (update_t *) physical_malloc (big_size, 1);
     void * internet_of_things MAYBE_UNUSED = NULL;
   }
+
+  if (!big_data)
+      throw std::bad_alloc();
+
   bucket_size = new_bucket_size;
   n_bucket = new_n_bucket;
 
