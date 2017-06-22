@@ -359,13 +359,14 @@ public:
    */
   void push_update (const update_t &update)
   {
-      *(write++) = update;
 #ifdef SAFE_BUCKETS
       if (start + _size <= write) {
           fprintf(stderr, "# Warning: hit end of bucket\n");
+          ASSERT_ALWAYS(0);
           write--;
       }
 #endif
+      *(write++) = update;
   }
   const update_t &get_next_update () {
 #ifdef SAFE_BUCKETS
