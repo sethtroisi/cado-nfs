@@ -1696,13 +1696,6 @@ void * process_bucket_region(timetree_t & timer, thread_data *th)
     if (si.toplevel == 1) {
         first_region0_index = 0;
     }
-    /* meanwhile, I'd like to say that I'll get confirmation of this
-     * later. It seems murky for now */
-    ASSERT_ALWAYS(first_region0_index == 0);
-    /* hmm, re-reading it, I'm almost convinced that this assert may be
-     * removed safely. But move on to testing with toplevel=1 first
-     * anyway.
-     */
 
     WHERE_AM_I_UPDATE(w, psi, &si);
 
