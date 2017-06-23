@@ -118,7 +118,7 @@ main(int argc, const char *argv[]) {
 	}
 	endJ = (LOG_BUCKET_REGION - logI);
 	J >>= endJ;                 /* In order to be able to compute a complete region */
-	log2max = log2(fabs(get_maxnorm_alg (poly, didiv2, didiv2) + 1.));
+	log2max = log2(fabs(get_maxnorm_rectangular (poly, didiv2, didiv2) + 1.));
 	scale = (UCHAR_MAX - 1 - GUARD) / log2max; /* In order to have [GUARD, UCHAR_MAX-1] */
 	
 	/* Phase 1: compute S1 & S2 */
