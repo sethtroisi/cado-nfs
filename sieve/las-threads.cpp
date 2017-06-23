@@ -60,7 +60,7 @@ template <typename T>
 void
 reservation_array<T>::allocate_buckets(const uint32_t n_bucket, const double fill_ratio)
 {
-  /* We estimate that the updates will be evenly distrubuted among the n
+  /* We estimate that the updates will be evenly distributed among the n
      different bucket arrays, so each gets fill_ratio / n.
      However, for a large number of threads, we need a bit of margin.
      In principle, one should check that the number of threads asked by the user
@@ -85,29 +85,47 @@ T &reservation_array<T>::reserve()
 
   if (choose_least_full) {
     /* Find the least-full bucket array */
-    size_t best_i = n;
-    double best_full = 1.;
+    double least_full = 1.;
+    double most_full = 0;
+    /* We want indices too. For most full buckets, we even want to report
+     * the exact index of the overflowing buckets */
+    size_t least_full_index = n;
+    std::pair<size_t, unsigned int> most_full_index;
     if (verbose)
       verbose_output_print(0, 3, "# Looking for least full bucket\n");
     for (size_t j = 0; j < n; j++) {
       if (in_use[j])
         continue;
-      double full = BAs[j].max_full();
+      unsigned int index;
+      double full = BAs[j].max_full(&index);
       if (verbose)
         verbose_output_print(0, 3, "# Bucket %zu is %.0f%% full\n",
                              j, full * 100.);
-      if (full < best_full) {
-        best_full = full;
-        best_i = j;
+      if (full > most_full) {
+          most_full = full;
+          most_full_index = std::make_pair(j, index);
+      }
+      if (full < least_full) {
+        least_full = full;
+        least_full_index = j;
       }
     }
-    if (!(best_i != n && best_full < 1.)) {
-        fprintf(stderr, "Error: buckets are full!\n"
-                "This may occur if you have set too many threads compared to the sizes of the factor bases.\n"
-                "Please try again with less threads, and report bug if the problem is still there.\n");
-        ASSERT_ALWAYS(0);
+    if (!(least_full_index != n && least_full < 1.)) {
+        fprintf(stderr,
+                "# Error: buckets are full!\n"
+                "# This may occur if you have set too many threads compared to the sizes of the factor bases.\n"
+                "# Please try again with less threads, or with larger -bkmult parameter (at some cost!). Report bug if the problem is still there.\n"
+                "# Now throwing exception, and attempt recovery.\n"
+                );
+        ASSERT_ALWAYS(most_full > 1);
+        size_t j = most_full_index.first;
+        unsigned int i = most_full_index.second;
+        /* important ! */
+        leave();
+        throw buckets_are_full(T::level, i,
+                BAs[j].nb_of_updates(i), BAs[j].bucket_size);
     }
-    i = best_i;
+    i = least_full_index;
   }
   in_use[i] = true;
   leave();
@@ -376,8 +394,12 @@ thread_workspaces::buckets_max_full()
     for(unsigned int side = 0 ; side < nr_sides ; side++) {
       for (const bucket_array_t<LEVEL, HINT> *it_BA = cbegin_BA<LEVEL, HINT>(side);
            it_BA != cend_BA<LEVEL, HINT>(side); it_BA++) {
-        const double mf = it_BA->max_full();
+        unsigned int fullest;
+        const double mf = it_BA->max_full(&fullest);
         if (mf > mf0) mf0 = mf;
+        if (mf > 1)
+            throw buckets_are_full(LEVEL, fullest,
+                    it_BA->nb_of_updates(fullest), it_BA->bucket_size);
       }
     }
     return mf0;

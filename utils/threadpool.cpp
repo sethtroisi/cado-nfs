@@ -87,6 +87,11 @@ class results_queue : public std::queue<task_result *>, private ThreadNonCopyabl
   condition_variable not_empty;
 };
 
+class exceptions_queue : public std::queue<clonable_exception *>, private ThreadNonCopyable {
+  public:
+  condition_variable not_empty;
+};
+
 
 thread_pool::thread_pool(const size_t _nr_threads, const size_t _nr_queues)
   : nr_threads(_nr_threads), nr_queues(_nr_queues), kill_threads(false)
@@ -94,6 +99,7 @@ thread_pool::thread_pool(const size_t _nr_threads, const size_t _nr_queues)
   /* Threads start accessing the queues as soon as they run */
   tasks = new tasks_queue[nr_queues];
   results = new results_queue[nr_queues];
+  exceptions = new exceptions_queue[nr_queues];
 
   threads = reinterpret_cast<worker_thread *>(malloc(nr_threads * sizeof(worker_thread)));
   for (size_t i = 0; i < nr_threads; i++)
@@ -117,6 +123,9 @@ thread_pool::~thread_pool() {
   for (size_t i = 0; i < nr_queues; i++)
     ASSERT_ALWAYS(results[i].empty());
   delete[] results;
+  for (size_t i = 0; i < nr_queues; i++)
+    ASSERT_ALWAYS(exceptions[i].empty());
+  delete[] exceptions;
 }
 
 void *
@@ -132,9 +141,15 @@ thread_pool::thread_work_on_tasks(void *arg)
     }
     task_function_t func = task->func;
     const task_parameters *params = task->parameters;
-    task_result *result = func(I, params);
-    if (result != NULL)
-      I->pool.add_result(task->queue, result);
+    try {
+        task_result *result = func(I, params);
+        if (result != NULL)
+            I->pool.add_result(task->queue, result);
+    } catch (clonable_exception const& e) {
+        I->pool.add_exception(task->queue, e.clone());
+        /* We need to wake the listener... */
+        I->pool.add_result(task->queue, NULL);
+    }
     delete task;
   }
   return NULL;
@@ -211,6 +226,16 @@ thread_pool::add_result(const size_t queue, task_result *const result) {
   leave();
 }
 
+void
+thread_pool::add_exception(const size_t queue, clonable_exception * e) {
+  ASSERT_ALWAYS(queue < nr_queues);
+  enter();
+  exceptions[queue].push(e);
+  // do we use it ?
+  signal(results[queue].not_empty);
+  leave();
+}
+
 /* Get a result from the specified results queue. If no result is available,
    waits with blocking=true, and returns NULL with blocking=false. */
 task_result *
@@ -228,6 +253,25 @@ thread_pool::get_result(const size_t queue, const bool blocking) {
   }
   leave();
   return result;
+}
+
+/* get an exception from the specified exceptions queue. This is
+ * obviously non-blocking, because exceptions are exceptional. So when no
+ * exception is there, we return NULL. When there is one, we return a
+ * pointer to a newly allocated copy of it.
+ */
+clonable_exception * thread_pool::get_exception(const size_t queue) {
+    clonable_exception * e;
+    ASSERT_ALWAYS(queue < nr_queues);
+    enter();
+    if (exceptions[queue].empty()) {
+        e = NULL;
+    } else {
+        e = exceptions[queue].front();
+        exceptions[queue].pop();
+    }
+    leave();
+    return e;
 }
 
 void thread_pool::accumulate_and_clear_active_time(timetree_t & rep) {
