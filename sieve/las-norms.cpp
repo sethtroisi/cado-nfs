@@ -1934,12 +1934,14 @@ sieve_info::update_norm_data()
       double max_lambda = (maxlog2 - GUARD / sis.scale) /
         si.conf.sides[side].lpb;
       double lambda = si.conf.sides[side].lambda;
-      if (lambda == 0) {
-        r = MIN(si.conf.sides[side].mfb, maxlog2 - GUARD / sis.scale);
-      } else {
-        r = MIN(lambda * (double) si.conf.sides[side].lpb,
-            maxlog2 - GUARD / sis.scale);
-      }
+      /* when lambda = 0 (automatic), we take mfb/lpb + 0.3, which is
+	 experimentally close to optimal in terms of seconds per relation
+	 (+ 0.2 might be even better on the rational side) */
+      if (lambda == 0.0)
+	lambda = 0.3 + (double) si.conf.sides[side].mfb /
+	  (double) si.conf.sides[side].lpb ;
+      r = MIN(lambda * (double) si.conf.sides[side].lpb,
+	      maxlog2 - GUARD / sis.scale);
       sis.bound = (unsigned char) (r * sis.scale + GUARD);
       verbose_output_print (0, 1, " bound=%u\n", sis.bound);
       verbose_output_end_batch();
