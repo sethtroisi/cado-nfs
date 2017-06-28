@@ -309,7 +309,7 @@ void cachefile_init(cachefile_ptr c, const char * fmt, ...)
 
 int cachefile_open_w(cachefile_ptr c)
 {
-    char tname[149];
+    char tname[256];
     snprintf(tname, sizeof(tname), CACHEDIR "/.pre." CACHEPREFIX "%s", c->basename);
     c->f = fopen(tname, "w");
     c->writing = 0;
@@ -322,7 +322,7 @@ int cachefile_open_w(cachefile_ptr c)
 
 int cachefile_open_r(cachefile_ptr c)
 {
-    char tname[144];
+    char tname[256];
     snprintf(tname, sizeof(tname), CACHEDIR "/" CACHEPREFIX "%s", c->basename);
     c->f = fopen(tname, "r");
     c->writing = 0;
@@ -332,7 +332,7 @@ int cachefile_open_r(cachefile_ptr c)
 int cachefile_exists(const char * fmt, ...)
 {
     cachefile c;
-    char tname[144];
+    char tname[256];
     va_list ap;
     va_start(ap, fmt);
     cachefile_vinit(c, fmt, ap);
@@ -343,8 +343,8 @@ int cachefile_exists(const char * fmt, ...)
 
 void cachefile_close(cachefile_ptr c)
 {
-    char tname[149];
-    char fname[128];
+    char tname[256];
+    char fname[256];
     fclose(c->f);
     if (c->writing == 0)
         return;
