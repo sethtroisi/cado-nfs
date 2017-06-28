@@ -1174,6 +1174,9 @@ void factor_survivors_data::search_survivors(timetree_t & timer)
             si.sides[1].lognorms->bound,
         };
         size_t old_size = survivors.size();
+
+        ASSERT((j + first_j) < si.J);
+
         search_survivors_in_line(both_S, both_bounds,
                                  j,
                                  i0, i1,
@@ -1725,6 +1728,15 @@ void * process_bucket_region(timetree_t & timer, thread_data *th)
         WHERE_AM_I_UPDATE(w, N, N);
         // unsigned int first_i = (N & ((1 << log_buckets_per_line) - 1)) << LOG_BUCKET_REGION;
         // unsigned int first_j = (N >> log_buckets_per_line) << log_lines_per_bucket;
+
+        int logI = si.conf.logI_adjusted;
+        /* This bit of code is replicated from las-smallsieve.cpp */
+        const unsigned int log_lines_per_region = MAX(0, LOG_BUCKET_REGION - logI);
+        const unsigned int log_regions_per_line = MAX(0, logI - LOG_BUCKET_REGION);
+        const unsigned int j0 = (i >> log_regions_per_line) << log_lines_per_region;    
+        if (j0 >= si.J) /* that's enough -- see bug #21382 */
+            break;
+
 
         if (recursive_descent) {
             /* For the descent mode, we bail out as early as possible. We
