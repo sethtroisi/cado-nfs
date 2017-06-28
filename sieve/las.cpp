@@ -1148,6 +1148,9 @@ void factor_survivors_data::search_survivors(timetree_t & timer)
             si.sides[1].lognorms->bound,
         };
         size_t old_size = survivors.size();
+
+        ASSERT((j + first_j) < si.J);
+
         search_survivors_in_line(both_S, both_bounds,
                                  si.conf.logI_adjusted, j + first_j, N,
                                  si.j_div, si.conf.unsieve_thresh,
