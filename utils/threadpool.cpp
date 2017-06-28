@@ -282,7 +282,7 @@ void thread_pool::accumulate_and_clear_active_time(timetree_t & rep) {
          * time, while we are interested in the time the thread has spent
          * on the tasks it was assigned.
          *
-         * On the other hand, there's a fairlly simple use case of
+         * On the other hand, there's a fairly simple use case of
          * merging with a stopped timer. In that case, we'll simply use
          * the += operator.
          *
@@ -294,7 +294,7 @@ void thread_pool::accumulate_and_clear_active_time(timetree_t & rep) {
             ASSERT_ALWAYS(&threads[i].timer == threads[i].timer.current);
             rep.steal_children_timings(threads[i].timer);
         } else {
-            ASSERT_ALWAYS(0);
+            // ASSERT_ALWAYS(0);
             rep += threads[i].timer;
             threads[i].timer = timetree_t ();
         }
