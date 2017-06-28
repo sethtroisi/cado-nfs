@@ -2338,10 +2338,12 @@ static void matmul_top_init_fill_balancing_header(matmul_top_data_ptr mmt, int i
                         .bfile = Mloc->bname,
                         .nh = pi->wr[1]->totalsize,
                         .nv = pi->wr[0]->totalsize,
-                        .withcoeffs = !is_char2(mmt->abase),
                         .do_perm = { MF_BAL_PERM_AUTO, MF_BAL_PERM_AUTO },
                     };
                     mf_bal_adjust_from_option_string(&mba, param_list_lookup_string(pl, "balancing_options"));
+                    /* withcoeffs being a switch for param_list, it is
+                     * clobbered by the configure_switch mechanism */
+                    mba.withcoeffs = !is_char2(mmt->abase);
                     mf_bal(&mba);
                 } else {
                     fprintf(stderr, "Cannot access balancing file %s: %s\n", Mloc->bname, strerror(errno));
