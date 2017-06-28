@@ -458,9 +458,12 @@ int las_todo_feed_qrange(las_info & las, param_list pl)
             if (las.galois != NULL)
                 nroots = skip_galois_roots(nroots, q, (mpz_t*)roots, las.galois);
 
-            for(int i = 0 ; i < nroots && las.nq_pushed < las.nq_max; i++) {
+            int push_here = nroots;
+            if (las.nq_max < UINT_MAX)
+                push_here = std::min(push_here, int(las.nq_max - las.nq_pushed));
+            for(int i = 0 ; i < push_here ; i++) {
                 las.nq_pushed++;
-                las_todo_push(las, q, roots[nroots-1-i], qside);
+                las_todo_push(las, q, roots[push_here-1-i], qside);
             }
 
             next_legitimate_specialq(q, q, 1);
