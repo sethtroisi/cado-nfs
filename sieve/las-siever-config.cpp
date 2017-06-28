@@ -2,6 +2,8 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <gmp.h>
+#include <cctype>
+#include <cerrno>
 #include "las-siever-config.hpp"
 #include "verbose.h"
 
