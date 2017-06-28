@@ -471,7 +471,8 @@ void lognorm_fill_rat_reference(
 	double z = u0 * j + u1 * i0;
 	for (int i = i0; i < i1; i++) {
             uint64_t y;
-#if defined(HAVE_SSE2) && defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM)
+            /* clang doesn't seem to like this one */
+#if defined(HAVE_SSE2) && defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM) && !defined(__clang__)
             /* This does: y = *(uint64_t*)&z */
             asm("":"=x"(y):"0"(z));
 #else
