@@ -332,7 +332,20 @@ lognorm_base::lognorm_base(siever_config const & sc, cado_poly_srcptr cpoly, int
     double lambda = sc.sides[side].lambda;
     double r = maxlog2 - GUARD / scale;
 
-    r = std::min(r, lambda ? lambda * sc.sides[side].lpb : sc.sides[side].mfb);
+    /* when lambda = 0 (automatic), we take mfb/lpb + 0.3, which is
+       experimentally close to optimal in terms of seconds per relation
+       (+ 0.2 might be even better on the rational side) */
+    if (lambda == 0.0)
+        lambda = 0.3 + (double) sc.sides[side].mfb /
+            (double) sc.sides[side].lpb ;
+
+    r = std::min(r, lambda * sc.sides[side].lpb);
+
+    /* other option is to ditch this +0.3 and define r (and hence the
+     * bound) from mfb directly. Maybe a constant offse would be better
+     * than a multiplicative one...
+     * r = std::min(r, lambda ? lambda * sc.sides[side].lpb : sc.sides[side].mfb);
+     */
 
     bound = (unsigned char) (r * scale + GUARD);
 
