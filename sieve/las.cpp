@@ -2219,6 +2219,32 @@ int main (int argc0, char *argv0[])/*{{{*/
             Adj.sieve_info_update_norm_data_Jmax(true);
         }
 
+        /* check whether J is too small after the adjustments */
+        if (Adj.J < Adj.get_minimum_J())
+        {
+            if (never_discard) {
+                Adj.set_minimum_J_anyway();
+            } else {
+                verbose_output_vfprint(0, 1, gmp_vfprintf,
+                        "# "
+                        HILIGHT_START
+                        "Discarding side-%d q=%Zd; rho=%Zd;"
+                        HILIGHT_END,
+                        doing.side,
+                        (mpz_srcptr) doing.p,
+                        (mpz_srcptr) doing.r);
+                verbose_output_print(0, 1,
+                        " a0=%" PRId64
+                        "; b0=%" PRId64
+                        "; a1=%" PRId64
+                        "; b1=%" PRId64
+                        "; raw_J=%u;\n",
+                        Adj.Q.a0, Adj.Q.b0, Adj.Q.a1, Adj.Q.b1, Adj.J);
+                nr_sq_discarded++;
+                continue;
+            }
+        }
+
         siever_config conf = Adj.config();
         conf.logI_adjusted = Adj.logI;
 

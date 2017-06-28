@@ -131,6 +131,7 @@ public:
     // a fall-back measure for desperate cases.
     // XXX when estimated_yield() wins, this will probably no longer be
     // necessary.
+    int get_minimum_J();
     void set_minimum_J_anyway();
 
     siever_config const& config() const { return conf; }

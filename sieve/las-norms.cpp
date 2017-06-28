@@ -1221,7 +1221,13 @@ int sieve_range_adjust::adapt_threads(const char * origin)/*{{{*/
 
 /*}}}*/
 
+ 
+int sieve_range_adjust::get_minimum_J()
+{
+    return nb_threads << (LOG_BUCKET_REGION - logI);
+}
+
 void sieve_range_adjust::set_minimum_J_anyway()
 {
-    J = nb_threads << (LOG_BUCKET_REGION - logI);
+    J = get_minimum_J();
 }
