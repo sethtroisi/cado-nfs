@@ -209,7 +209,7 @@ def MurphyE_combined_aux2(f,g,B,verbose=false):
 # computes a "combined" MurphyE value by taking into account correlation
 # between the roots of f and g for all primes < B (B=2 should give the same
 # value than MurphyE)
-def MurphyE_combined(f,g,B,s=1.0,Bf=1e7,Bg=5e6,area=1e16,K=1000,verbose=false):
+def MurphyE_combined(f,g,B,s=1.0,Bf=1e7,Bg=5e6,area=1e16,K=1000,sq=1,method='sample',verbose=false):
     l = MurphyE_combined_aux2(f,g,B,verbose)
     print "number of residue classes:", len(l)
     df = f.degree()
@@ -223,18 +223,33 @@ def MurphyE_combined(f,g,B,s=1.0,Bf=1e7,Bg=5e6,area=1e16,K=1000,verbose=false):
        pr = entry[0]
        alpha_f = entry[1]
        alpha_g = entry[2]
-       Ej = 0
-       for i in range(K):
-	  theta_i = float(pi/K*(i+0.5))
-	  xi = cos(theta_i)*sx
-	  yi = sin(theta_i)*sy
-	  fi = f(x=xi/yi)*yi^df
+       if method == 'sample':
+	  Ej = 0
+	  for i in range(K):
+	     theta_i = float(pi/K*(i+0.5))
+	     xi = cos(theta_i)*sx
+	     yi = sin(theta_i)*sy
+	     fi = f(x=xi/yi)*yi^df/sq
+	     gi = g(x=xi/yi)*yi^dg
+	     ui = (log(abs(fi))+alpha_f)/log(Bf)
+	     vi = (log(abs(gi))+alpha_g)/log(Bg)
+	     v1 = dickman_rho(ui) * dickman_rho(vi)
+	     Ej += v1
+	  Ej = Ej/K
+       elif method == 'integrate':
+          var('theta')
+          xi = cos(theta)*sx
+          yi = sin(theta)*sy
+	  fi = f(x=xi/yi)*yi^df/sq
 	  gi = g(x=xi/yi)*yi^dg
 	  ui = (log(abs(fi))+alpha_f)/log(Bf)
 	  vi = (log(abs(gi))+alpha_g)/log(Bg)
 	  v1 = dickman_rho(ui) * dickman_rho(vi)
-	  Ej += v1
-       Ej = Ej/K
+          v1 = v1 / pi
+          Ej = numerical_integral(v1, 0, pi)[0]
+       else:
+          print "Unknown method:", method
+          raise ValueError
        if Ej < smallest[0]:
           smallest = Ej,entry
        if Ej > largest[0]:
@@ -243,8 +258,8 @@ def MurphyE_combined(f,g,B,s=1.0,Bf=1e7,Bg=5e6,area=1e16,K=1000,verbose=false):
           print Ej,entry
        E += Ej*pr
     if verbose:
-       print smallest
-       print largest
+       print "smallest:", smallest
+       print "largest:", largest
     return E
 
 # example: RSA-768 polynomials

@@ -46,6 +46,7 @@ cado_define_test(F9_batchtest
         TEST_DEPENDENCIES F9_sievetest_cleanup F9_makefbtest
         )
 
+if(0)
 cado_define_test(F9_sublattest
         SCRIPT
         ${CMAKE_CURRENT_SOURCE_DIR}/F9.sublat.sh
@@ -53,6 +54,7 @@ cado_define_test(F9_sublattest
         TARGET_DEPENDENCIES las
         TEST_DEPENDENCIES F9_sievetest_cleanup F9_makefbtest
         )
+endif()
 
 # We make these depend on sievetest, for checking the checksum file.
 # Since sievetest depends on makefbtest, we don't have to specify it

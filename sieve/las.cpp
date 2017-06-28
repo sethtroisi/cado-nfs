@@ -461,9 +461,12 @@ int las_todo_feed_qrange(las_info & las, param_list pl)
             if (las.galois != NULL)
                 nroots = skip_galois_roots(nroots, q, (mpz_t*)roots, las.galois);
 
-            for(int i = 0 ; i < nroots && las.nq_pushed < las.nq_max; i++) {
+            int push_here = nroots;
+            if (las.nq_max < UINT_MAX)
+                push_here = std::min(push_here, int(las.nq_max - las.nq_pushed));
+            for(int i = 0 ; i < push_here ; i++) {
                 las.nq_pushed++;
-                las_todo_push(las, q, roots[nroots-1-i], qside);
+                las_todo_push(las, q, roots[push_here-1-i], qside);
             }
 
             next_legitimate_specialq(q, q, 1);
@@ -2275,6 +2278,32 @@ int main (int argc0, char *argv0[])/*{{{*/
             Adj.sieve_info_update_norm_data_Jmax(true);
         }
 
+        /* check whether J is too small after the adjustments */
+        if (Adj.J < Adj.get_minimum_J())
+        {
+            if (never_discard) {
+                Adj.set_minimum_J_anyway();
+            } else {
+                verbose_output_vfprint(0, 1, gmp_vfprintf,
+                        "# "
+                        HILIGHT_START
+                        "Discarding side-%d q=%Zd; rho=%Zd;"
+                        HILIGHT_END,
+                        doing.side,
+                        (mpz_srcptr) doing.p,
+                        (mpz_srcptr) doing.r);
+                verbose_output_print(0, 1,
+                        " a0=%" PRId64
+                        "; b0=%" PRId64
+                        "; a1=%" PRId64
+                        "; b1=%" PRId64
+                        "; raw_J=%u;\n",
+                        Adj.Q.a0, Adj.Q.b0, Adj.Q.a1, Adj.Q.b1, Adj.J);
+                nr_sq_discarded++;
+                continue;
+            }
+        }
+
         siever_config conf = Adj.config();
         conf.logI_adjusted = Adj.logI;
 
@@ -2325,6 +2354,7 @@ int main (int argc0, char *argv0[])/*{{{*/
 
         WHERE_AM_I_UPDATE(w, psi, &si);
 
+        las.tree.new_node(si.doing);
         las_todo_push_closing_brace(las, si.doing.depth);
 
         nr_sq_processed ++;
@@ -2591,8 +2621,25 @@ if (si.conf.sublat.m) {
     }
 }
 
+        } catch (buckets_are_full const & e) {
+            fprintf(stderr, "# %s\n", e.what());
+            printf("# redoing this q because buckets are full.\n");
 
-        las.tree.new_node(si.doing);
+            double new_bk_multiplier = conf.bk_multiplier * (double) e.reached_size / e.theoretical_max_size * 1.01;
+            printf("# Updating bucket multiplier to %.3f*%d/%d*1.01=%.3f\n",
+                    conf.bk_multiplier,
+                    e.reached_size,
+                    e.theoretical_max_size,
+                    new_bk_multiplier
+                  );
+            max_full = 0;
+            las.config_pool.change_bk_multiplier(new_bk_multiplier);
+            /* we have to roll back the updates we made to
+             * this structure. */
+            std::swap(las.todo, saved_todo);
+            las.tree.ditch_node();
+            continue;
+        }
 
 #ifdef  DLP_DESCENT
         SIBLING_TIMER(timer_special_q, "descent");
@@ -2701,23 +2748,6 @@ if (si.conf.sublat.m) {
             break;
 
 
-        } catch (buckets_are_full const & e) {
-            fprintf(stderr, "# %s\n", e.what());
-            printf("# redoing this q because buckets are full.\n");
-
-            double new_bk_multiplier = conf.bk_multiplier * (double) e.reached_size / e.theoretical_max_size * 1.01;
-            printf("# Updating bucket multiplier to %.3f*%d/%d*1.01=%.3f\n",
-                    conf.bk_multiplier,
-                    e.reached_size,
-                    e.theoretical_max_size,
-                    new_bk_multiplier
-                  );
-            max_full = 0;
-            las.config_pool.change_bk_multiplier(new_bk_multiplier);
-            /* we have to roll back the updates we made to
-             * this structure. */
-            std::swap(las.todo, saved_todo);
-        }
       } // end of loop over special q ideals.
 
     delete pool;

@@ -1990,6 +1990,7 @@ void bm_io_compute_final_F(bm_io_ptr aa, Reader& pi, unsigned int * delta)/*{{{*
                                 aa->output_file, i, i+1, j, j+1);
                         ASSERT_ALWAYS(rc >= 0);
                         fw[i*d->nrhs+j] = fopen(tmp, aa->ascii ? "w" : "wb");
+                        ASSERT_ALWAYS(fw[i*d->nrhs+j]);
                         free(tmp);
                     }
                 }
@@ -2005,6 +2006,7 @@ void bm_io_compute_final_F(bm_io_ptr aa, Reader& pi, unsigned int * delta)/*{{{*
                 int rc = asprintf(&tmp, "%s.rhs", aa->output_file);
                 ASSERT_ALWAYS(rc >= 0);
                 FILE * f = fopen(tmp, aa->ascii ? "w" : "wb");
+                ASSERT_ALWAYS(f);
                 matpoly_write(ab, f, rhs, 0, 1, aa->ascii, 0);
                 fclose(f);
                 printf("Note: contributions to RHS coefficients saved to the rhs file %s\n", tmp);

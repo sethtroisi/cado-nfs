@@ -9,14 +9,13 @@
 #include "cado_poly.h"
 #include "logapprox.hpp"
 
-double get_maxnorm_alg (double_poly_srcptr src_poly, const double X, const double Y);
+double get_maxnorm_rectangular (double_poly_srcptr src_poly, const double X, const double Y);
 
 struct lognorm_base {/*{{{*/
     int logI, J;
 
     unsigned char bound; /* A sieve array entry is a sieve survivor if it is
                             at most "bound" on each side */
-
     protected:
     double maxlog2;      /* Bound on the log in base 2. This is
                             intermediary data, really. */
@@ -132,6 +131,7 @@ public:
     // a fall-back measure for desperate cases.
     // XXX when estimated_yield() wins, this will probably no longer be
     // necessary.
+    int get_minimum_J();
     void set_minimum_J_anyway();
 
     siever_config const& config() const { return conf; }
