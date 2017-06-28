@@ -321,6 +321,13 @@ def estimate_alpha_p(f, p, nt):
         # sys.stdout.write("%f\r" % float(s*l/n))
     return float(s*l/n) if n > 0 else Infinity
 
+# same as alpha(f, B), but experimentally
+def estimate_alpha(f, B, nt):
+   s = 0
+   for p in prime_range(B):
+      s += estimate_alpha_p (f, p, nt)
+   return s
+
 # same as estimate_alpha_p, but for (a,b) = (r,s) mod p
 def estimate_alpha_p_2(f, p, nt, r, s):
     S=0

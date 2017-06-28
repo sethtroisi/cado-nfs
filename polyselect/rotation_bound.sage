@@ -129,8 +129,15 @@ def l2norm_tk_circular(f,s):
       n = 3 * (a2 * a2 + a0 * a0) + 2 * a0 * a2 + a1 * a1
       n = n * pi / 24
       return RealField(PRECISION)(1/2 * log(n / (s * s)))
+   elif f.degree()==1:
+      a0 = f[0]
+      a1 = f[1] * s
+      n = a0 * a0 + a1 * a1
+      n = n * pi / 24
+      return RealField(PRECISION)(1/2 * log(n / s))
    else:
-      raise ValueError, "circular norm not yet implemented for this degree"
+      raise ValueError, "circular norm not yet implemented for degree %d" % \
+            f.degree()
 
 ##### Optimizing norms.
 
@@ -302,9 +309,32 @@ def skew_l2norm_tk_circular(f, verbose=false):
          raise ValueError, "number of positive roots <> 1"
       return root_pos[0]
    elif f.degree()==2:
-      return abs(f[0]/f[2])
+      return float(sqrt(abs(f[0]/f[2])))
+   elif f.degree()==1:
+      return float(abs(f[0]/f[1]))
    else:
-      raise ValueError, "circular norm not yet implemented for this degree"
+      raise ValueError, "skew_l2norm_tk_circular not yet implemented for degree %d" % f.degree()
+
+def L2_combined_skewness (f, g, Bf, Bg, area):
+   a = skew_l2norm_tk_circular (f)
+   b = skew_l2norm_tk_circular (g)
+   if b < a:
+      a, b = b, a
+   # now a <= b
+   va = MurphyE (f, g, a, Bf, Bg, area)
+   vb = MurphyE (f, g, b, Bf, Bg, area)
+   while b - a > a * 0.001:
+      c = (2 * a + b) / 3.0
+      vc = MurphyE (f, g, c, Bf, Bg, area)
+      d = (a + 2 * b) / 3.0
+      vd = MurphyE (f, g, d, Bf, Bg, area)
+      max_left = max(va, vc)
+      max_right = max(vd, vb)
+      if max_left > max_right: # maximum in a or c
+         b, vb = d, vd
+      else:
+         a, va = c, vc
+   return (a + b) * 0.5
 
 def square_l2norm_tk_sym(f,s):
     d=f.degree()
