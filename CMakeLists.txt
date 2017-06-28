@@ -190,6 +190,10 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "AppleClang")
     endif()
 endif()
 
+if(NOT HAVE_CXX11)
+    message(FATAL_ERROR "C++11 is now required to build cado-nfs")
+endif()
+
 #####################################################################
 # Set dependencies for external software.
 include(${CADO_NFS_SOURCE_DIR}/config/utilities.cmake)
