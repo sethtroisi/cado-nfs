@@ -195,8 +195,8 @@ get_maxnorm_aux_pm (double_poly_srcptr poly, double s)
 }
 /* }}} */
 
-/* {{{ get_maxnorm_alg */
-/* returns the maximal norm of |F(x,y)| for -X <= x <= X, 0 <= y <= Y,
+/* {{{ get_maxnorm_rectangular */
+/* returns the maximal value of |F(x,y)| for -X <= x <= X, 0 <= y <= Y,
  * where F(x,y) is a homogeneous polynomial of degree d.
  * Let F(x,y) = f(x/y)*y^d, and F(x,y) = rev(F)(y,x).
  * Since F is homogeneous, we know M = max |F(x,y)| is attained on the border
@@ -211,7 +211,8 @@ get_maxnorm_aux_pm (double_poly_srcptr poly, double s)
  *     maximum is f[d]*X^d, and is attained in (a).
  */
 double
-get_maxnorm_alg (double_poly_srcptr src_poly, const double X, const double Y)
+get_maxnorm_rectangular (double_poly_srcptr src_poly, const double X,
+			 const double Y)
 {
   const unsigned int d = src_poly->deg;
   double norm, max_norm;
@@ -287,7 +288,8 @@ lognorm_base::lognorm_base(siever_config const & sc, cado_poly_srcptr cpoly, int
 {
     int64_t H[4] = { Q.a0, Q.b0, Q.a1, Q.b1 };
 
-    /* Update floating point of polynomial (used in get_maxnorm_alg) */
+    /* Update floating point version of polynomial. They will be used in
+     * get_maxnorm_rectangular(). */
 
     mpz_poly_homography (fij, cpoly->pols[side], H);
     if (sc.side == side) {
@@ -303,7 +305,7 @@ lognorm_base::lognorm_base(siever_config const & sc, cado_poly_srcptr cpoly, int
 
     int I = 1 << logI;
 
-    maxlog2 = log2(get_maxnorm_alg (fijd, (double)(I/2), (double)J));
+    maxlog2 = log2(get_maxnorm_rectangular (fijd, (double)(I/2), (double)J));
 
     /* we know that |F(a,b)| < 2^(maxlog2) or |F(a,b)/q| < 2^(maxlog2)
        depending on the special-q side. */
@@ -729,6 +731,66 @@ void lognorm_smart::fill(unsigned char * S, int N) const/*{{{*/
 /* TODO: some of the sieve_range_adjust stuff can quite probably be
  * refactored on top of lognorm_base */
 
+/* returns the maximal value of |F(X*cos(t),Y*sin(t))|,
+   where F(x,y) is a homogeneous polynomial of degree d, 0 <= t <= pi.
+   Let cos(t) = u/sqrt(1+u^2) and sin(t) = 1/sqrt(1+u^2) for -Inf < u < Inf,
+   we have F^2(X*cos(t),Y*sin(t)) = F^2(X*u,Y)/(1+u^2)^d where d = deg(F),
+   thus its derivative with respect to u is (up to a factor):
+   X * f'(u*X/Y) * (1+u^2) - d * Y * u * f(u*X/Y).
+*/
+double
+get_maxnorm_circular (double_poly_srcptr src_poly, const double X,
+		      const double Y)
+{
+  const unsigned int d = src_poly->deg;
+  double_poly poly;
+  double *roots, x, y, v, max_norm, t;
+  unsigned int nr, i;
+
+  double_poly_init (poly, d + 1);
+
+  /* first compute X * f'(u*X/Y) * (1+u^2) */
+  poly->coeff[0] = 0.0;
+  poly->coeff[1] = 0.0;
+  for (i = 1; i <= d; i++)
+    {
+      t = pow (X / Y, (double) i - 1.0);
+      /* the following will set coefficients of degree 2, 3, ..., d+1 */
+      poly->coeff[i + 1] = X * (double) i * src_poly->coeff[i] * t;
+      /* the following will add to coefficients of degree 0, 1, ..., d-1 */
+      poly->coeff[i - 1] += X * (double) i * src_poly->coeff[i] * t;
+    }
+
+  /* now subtract d * Y * u * f(u*X/Y) */
+  for (i = 0; i <= d; i++)
+    {
+      t = src_poly->coeff[i] * pow (X / Y, (double) i);
+      poly->coeff[i + 1] -= (double) d * Y * t;
+    }
+  double_poly_cleandeg(poly, d + 1);
+
+  roots = (double*) malloc ((d + 2) * sizeof (double));
+  nr = double_poly_compute_all_roots (roots, poly);
+
+  /* evaluate at y=0 */
+  max_norm = fabs (src_poly->coeff[d] * pow (X, (double) d));
+  for (i = 0; i < nr; i++)
+    {
+      double u = roots[i];
+      x = X * u / sqrt (1.0 + u * u);
+      y = Y / sqrt (1.0 + u * u);
+      v = double_poly_eval (src_poly, x / y) * pow (y, (double) d);
+      v = fabs (v);
+      if (v > max_norm)
+	max_norm = v;
+    }
+
+  free (roots);
+  double_poly_clear(poly);
+
+  return max_norm;
+}
+
 /* {{{ various strategies to adjust the sieve area */
 
 void sieve_range_adjust::prepare_fijd()/*{{{*/
@@ -795,19 +857,20 @@ sieve_range_adjust::sieve_info_update_norm_data_Jmax (bool keep_logI)
   for (int side = 0; side < 2; side++)
     {
       /* Compute the best possible maximum norm, i.e., assuming a nice
-         rectangular sieve region in the a,b-plane */
+         circular sieve region in the a,b-plane */
       double_poly dpoly;
       double_poly_init (dpoly, cpoly->pols[side]->deg);
       double_poly_set_mpz_poly (dpoly, cpoly->pols[side]);
       if (conf.sublat.m > 0)
           double_poly_mul_double(dpoly, dpoly, pow(conf.sublat.m, cpoly->pols[side]->deg));
-      double maxnorm = get_maxnorm_alg (dpoly, fudge_factor*A/2.,
+      double maxnorm = get_maxnorm_circular (dpoly, fudge_factor*A/2.,
               fudge_factor*B);
       double_poly_clear (dpoly);
       if (side == doing.side)
         maxnorm /= q;
 
-      double v = get_maxnorm_alg (fijd[side], I/2, Jmax);
+      /* in the (i,j)-plane, the sieving region is rectangular */
+      double v = get_maxnorm_rectangular (fijd[side], I/2, Jmax);
 
       if (v > maxnorm)
       { /* use dichotomy to determine largest Jmax */
@@ -817,7 +880,7 @@ sieve_range_adjust::sieve_info_update_norm_data_Jmax (bool keep_logI)
           while (trunc (a) != trunc (b))
           {
               c = (a + b) * 0.5;
-              v = get_maxnorm_alg (fijd[side], I/2, c);
+              v = get_maxnorm_rectangular (fijd[side], I/2, c);
               if (v < maxnorm)
                   a = c;
               else
