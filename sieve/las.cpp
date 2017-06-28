@@ -2298,6 +2298,7 @@ int main (int argc0, char *argv0[])/*{{{*/
 
         WHERE_AM_I_UPDATE(w, psi, &si);
 
+        las.tree.new_node(si.doing);
         las_todo_push_closing_brace(las, si.doing.depth);
 
         nr_sq_processed ++;
@@ -2561,8 +2562,25 @@ if (si.conf.sublat.m) {
     }
 }
 
+        } catch (buckets_are_full const & e) {
+            fprintf(stderr, "# %s\n", e.what());
+            printf("# redoing this q because buckets are full.\n");
 
-        las.tree.new_node(si.doing);
+            double new_bk_multiplier = conf.bk_multiplier * (double) e.reached_size / e.theoretical_max_size * 1.01;
+            printf("# Updating bucket multiplier to %.3f*%d/%d*1.01=%.3f\n",
+                    conf.bk_multiplier,
+                    e.reached_size,
+                    e.theoretical_max_size,
+                    new_bk_multiplier
+                  );
+            max_full = 0;
+            las.config_pool.change_bk_multiplier(new_bk_multiplier);
+            /* we have to roll back the updates we made to
+             * this structure. */
+            std::swap(las.todo, saved_todo);
+            las.tree.ditch_node();
+            continue;
+        }
 
 #ifdef  DLP_DESCENT
         SIBLING_TIMER(timer_special_q, "descent");
@@ -2671,23 +2689,6 @@ if (si.conf.sublat.m) {
             break;
 
 
-        } catch (buckets_are_full const & e) {
-            fprintf(stderr, "# %s\n", e.what());
-            printf("# redoing this q because buckets are full.\n");
-
-            double new_bk_multiplier = conf.bk_multiplier * (double) e.reached_size / e.theoretical_max_size * 1.01;
-            printf("# Updating bucket multiplier to %.3f*%d/%d*1.01=%.3f\n",
-                    conf.bk_multiplier,
-                    e.reached_size,
-                    e.theoretical_max_size,
-                    new_bk_multiplier
-                  );
-            max_full = 0;
-            las.config_pool.change_bk_multiplier(new_bk_multiplier);
-            /* we have to roll back the updates we made to
-             * this structure. */
-            std::swap(las.todo, saved_todo);
-        }
       } // end of loop over special q ideals.
 
     delete pool;

@@ -164,6 +164,15 @@ struct descent_tree {
         }
     }
 
+    void ditch_node() {
+        tree * kid = current.back();
+        current.pop_back();
+        if (!current.empty()) {
+            ASSERT_ALWAYS(current.back()->children.back() == kid);
+            current.back()->children.pop_back();
+        }
+        delete kid;
+    }
     void done_node() {
         current.back()->spent += seconds();
         current.pop_back();
