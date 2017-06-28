@@ -182,7 +182,8 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Intel")
     endif()
 endif()
 
-if(CMAKE_CXX_COMPILER_ID MATCHES "AppleClang")
+if(CMAKE_CXX_COMPILER_ID MATCHES "AppleClang" OR CMAKE_HOST_SYSTEM_NAME
+        STREQUAL "Darwin" AND CMAKE_CXX_COMPILER_ID MATCHES "Clang" )
     # Not the slightest idea when apple's clang became c++11-compliant.
     if (NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS "8.0.0")
         set(HAVE_CXX11 1)
@@ -191,7 +192,7 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "AppleClang")
 endif()
 
 if(NOT HAVE_CXX11)
-    message(FATAL_ERROR "C++11 is now required to build cado-nfs")
+    message(FATAL_ERROR "C++11 is now required to build cado-nfs (your compiler is ${CMAKE_CXX_COMPILER_ID} version ${CMAKE_CXX_COMPILER_VERSION})")
 endif()
 
 #####################################################################
