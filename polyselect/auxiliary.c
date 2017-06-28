@@ -952,46 +952,13 @@ L2_skewness (mpz_poly_ptr f, int prec)
          v = (24*v/pi).expand()
          dv = v.diff(s)
          dv = (dv*s^3).expand().collect(s)
+         We get dv = 6*a_2^2*s^4 - 6*a_0^2
+         thus the optimal skewness is sqrt(|a0|/|a2|).
       */
-      dfd[2] = 6.0 * fd[2] * fd[2];
-      dfd[1] = 0.0;
-      dfd[0] = 6.0 * fd[0] * fd[0];
-      s = 1.0;
-      nc = dfd[2] + dfd[1] - dfd[0];
-      /* first isolate the minimum in an interval [s, 2s] by dichotomy */
-      while (nc > 0)
-        {
-          s = 0.5 * s;
-          s1 = s * s;   /* s^2 */
-          s2 = s1 * s1; /* s^4 */
-          nc = dfd[2] * s2 + dfd[1] - dfd[0];
-        }
-      do
-        {
-          s = 2.0 * s;
-          s1 = s * s;   /* s^2 */
-          s2 = s1 * s1; /* s^4 */
-          nc = dfd[2] * s2 + dfd[1] - dfd[0];
-        }
-      while (nc < 0);
-      /* now dv(s/2) < 0 < dv(s) thus the minimum is in [s/2, s] */
-      a = (s == 2.0) ? 1.0 : 0.5 * s;
-      b = s;
-      /* use dichotomy to refine the root */
-      while (prec--)
-        {
-          c = (a + b) * 0.5;
-          s1 = c * c;   /* s^2 */
-          s2 = s1 * s1; /* s^4 */
-          nc = dfd[2] * s2 + dfd[1] - dfd[0];
-          if (nc > 0)
-            b = c;
-          else
-            a = c;
-        }
+      a = b = sqrt (fabs (fd[0] / fd[2]));
     }
   else /* d == 1 */
-    a = b = (fd[0] / fd[1] >= 0) ? fd[0] / fd[1] : -fd[0] / fd[1];
+    a = b = fabs (fd[0] / fd[1]);
 
   s = (a + b) * 0.5;
 
