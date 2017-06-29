@@ -17,6 +17,15 @@
 #include "gcd.h"
 #include "double_poly.h"
 
+#ifdef __OpenBSD__
+/* This is a kludge. For some reason, on our openbsd 5.3 box with egcc
+ * (4.7) installed, math.h does not expose isnan and isinf, but leaves
+ * them in std::. It should normally be harmless to expose all of the std
+ * namespace in this case, and spares me the need for a cmake test
+ */
+using namespace std;
+#endif
+
 /* Initialize a polynomial of degree d */
 void
 double_poly_init (double_poly_ptr p, int d)
