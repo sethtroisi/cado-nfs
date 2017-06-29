@@ -1733,7 +1733,7 @@ void * process_bucket_region(timetree_t & timer, thread_data *th)
         /* This bit of code is replicated from las-smallsieve.cpp */
         const unsigned int log_lines_per_region = MAX(0, LOG_BUCKET_REGION - logI);
         const unsigned int log_regions_per_line = MAX(0, logI - LOG_BUCKET_REGION);
-        const unsigned int j0 = (i >> log_regions_per_line) << log_lines_per_region;    
+        const unsigned int j0 = (N >> log_regions_per_line) << log_lines_per_region;    
         if (j0 >= si.J) /* that's enough -- see bug #21382 */
             break;
 
