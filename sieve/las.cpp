@@ -1175,7 +1175,7 @@ void factor_survivors_data::search_survivors(timetree_t & timer)
         };
         size_t old_size = survivors.size();
 
-        ASSERT((j + first_j) < si.J);
+        ASSERT(j < si.J);
 
         search_survivors_in_line(both_S, both_bounds,
                                  j,
