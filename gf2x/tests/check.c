@@ -40,6 +40,13 @@
 #include "test-tools.h"
 #include "check-and-bench-common.h"
 
+#ifdef  MULCOUNT
+extern int mulcount;
+#else
+static const int mulcount = 0;
+#endif
+
+
 int print_crc = 0;
 
 /* n32bitwords is a number of 32-bit words ; k is a matrix dimension */

@@ -28,4 +28,5 @@ sed -e "/^AM_MAINTAINER_MODE/ s/enable/disable/" -i gf2x/configure.ac
 (cd gf2x/ ; autoreconf -i)
 (cd gf2x/ ; xargs -r rm -f < no-distribute.txt)
 # find gf2x/ -type f | xargs -r git add
+rm -rf gf2x/jenkins
 git add gf2x/
