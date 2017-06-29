@@ -8,8 +8,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
 #ifndef GF2X_WORDSIZE
-#error "This file has been modified for use within gf2x. Please arrange so that gf2x-config-export.h is included sooner"
+#error "This file has been modified for use within gf2x. Please arrange so that gf2x-small.h is included before this file"
 #endif
 
 #ifdef __cplusplus

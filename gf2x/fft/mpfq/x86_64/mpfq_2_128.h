@@ -3,6 +3,9 @@
 
 /* MPFQ generated file -- do not edit */
 
+#include "gf2x.h"
+#include "gf2x/gf2x-small.h"
+
 #include "mpfq.h"
 #include "mpfq_gf2n_common.h"
 #include <stdio.h>
@@ -13,8 +16,6 @@
 #include <ctype.h>
 #include <stddef.h>
 #include <stdio.h>
-#include "gf2x.h"
-#include "gf2x/gf2x-small.h"
 
 #include "assert.h"
 #ifdef	MPFQ_LAST_GENERATED_TAG
