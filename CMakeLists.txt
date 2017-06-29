@@ -161,6 +161,12 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
             set (CMAKE_CXX_FLAGS "-std=c++98 -g -W -Wall ${CMAKE_CXX_FLAGS}")
         endif()
     endif()
+    # It seems that even g++-4.6.3, as shipped in ubuntu 12.04, is
+    # sufficient for the little we use, provided we use the -std=c++0x
+    # flag (-std=c++11 replaced it with gcc-4.7.0).
+    if (NOT HAVE_CXX11 AND NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS 4.6.3)
+        set (CMAKE_CXX_FLAGS "-std=c++0x -g -W -Wall ${CMAKE_CXX_FLAGS}")
+    endif()
 endif()
 
 if(CMAKE_C_COMPILER_ID MATCHES "Intel")
