@@ -1164,7 +1164,6 @@ special_val0 (mpz_poly_ptr f, unsigned long p)
 {
   double v;
   mpz_t c,  *h;
-  int v0;
   unsigned long *roots, r, r0;
   int i, d = f->deg, nroots;
   mpz_poly g, H;
@@ -1172,7 +1171,6 @@ special_val0 (mpz_poly_ptr f, unsigned long p)
   mpz_init (c);
   mpz_poly_content (c, f);
   for (v = 0.0; mpz_divisible_ui_p (c, p); v++, mpz_divexact_ui (c, c, p));
-  v0 = (int) v;
 
   mpz_poly_init(g, d);
   g->deg = d;
@@ -1209,29 +1207,25 @@ special_val0 (mpz_poly_ptr f, unsigned long p)
       r = roots[i];
       mpz_poly_eval_diff_ui (c, g, r);
       if (mpz_divisible_ui_p (c, p) == 0) /* g'(r) <> 0 mod p */
-  v += 1.0 / (double) (p - 1);
+        v += 1.0 / (double) (p - 1);
       else /* hard case */
-  {
-    /* g(px+r) = h(x + r/p), thus we can go from h0(x)=g(px+r0)
-       to h1(x)=g(px+r1) by computing h0(x + (r1-r0)/p).
-       Warning: we can have h = f, and thus an infinite loop, when
-       the p-valuation of f is d, and f has a single root r/(1-p) of
-       multiplicity d.
-       Moreover if f(x) = c*p^d*(x-r+b*p)^d, where c is coprime to p,
-       then h(x) = f(p*x+r)/p^d = c*p^d*(x+b)^d, and most likely after
-       at most p iterations we'll go back to f(x), thus we should avoid
-       all cases where f(x) has a root of multiplicity d, but how to
-       check that efficiently? And which value to return in such a case?
-    */
-    ASSERT_ALWAYS (r >= r0); /* the roots are sorted */
-    poly_shift_divp (h, d, r - r0, p);
-    r0 = r;
-    if (v0 != d) /* this should catch all the cases where f(x) has a
-        root of multiplicity d, but also more cases.
-        In those cases we avoid an infinite loop, but the
-        result is probably wrong. */
-      v += special_val0 (H, p) / (double) p;
-  }
+        {
+          /* g(px+r) = h(x + r/p), thus we can go from h0(x)=g(px+r0)
+             to h1(x)=g(px+r1) by computing h0(x + (r1-r0)/p).
+             Warning: we can have h = f, and thus an infinite loop, when
+             the p-valuation of f is d, and f has a single root r/(1-p) of
+             multiplicity d.
+             Moreover if f(x) = c*p^d*(x-r+b*p)^d, where c is coprime to p,
+             then h(x) = f(p*x+r)/p^d = c*p^d*(x+b)^d, and most likely after
+             at most p iterations we'll go back to f(x), thus we should avoid
+             all cases where f(x) has a root of multiplicity d, but how to
+             check that efficiently? And which value to return in such a case?
+          */
+          ASSERT_ALWAYS (r >= r0); /* the roots are sorted */
+          poly_shift_divp (h, d, r - r0, p);
+          r0 = r;
+          v += special_val0 (H, p) / (double) p;
+        }
     }
   free (roots);
   mpz_poly_clear (H);
