@@ -78,7 +78,8 @@ int main(int argc, char **argv) {
 
     /* If skewness is not given in file nor in command line, compute it. */
     if (poly->skew == 0.0)
-      poly->skew = L2_skewness (poly->pols[ALG_SIDE], SKEWNESS_DEFAULT_PREC);
+      poly->skew = L2_combined_skewness2 (poly->pols[0], poly->pols[1],
+                                          SKEWNESS_DEFAULT_PREC);
 
     mpz_set (b, poly->pols[RAT_SIDE]->coeff[1]);
     mpz_neg (m, poly->pols[RAT_SIDE]->coeff[0]);
