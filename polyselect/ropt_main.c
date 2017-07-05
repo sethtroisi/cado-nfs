@@ -741,7 +741,7 @@ main_basic (int argc, char **argv)
     abort ();
   }
   fclose (polys_file);
-  printf ("# %u polynomials read.\n", nb_input_polys);
+  printf ("# %u polynomial(s) read.\n", nb_input_polys);
 
   /* Main loop: do root-optimization on input_polys. */
 #ifdef HAVE_OPENMP

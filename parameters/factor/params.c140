@@ -34,9 +34,9 @@ lpb1 = 29
 tasks.sieve.mfb0 = 60
 tasks.sieve.mfb1 = 58
 tasks.sieve.ncurves0 = 11
-tasks.sieve.ncurves1 = 19
+tasks.sieve.ncurves1 = 20
 tasks.I = 13
-tasks.sieve.qmin = 14230849
+tasks.sieve.qmin = 12096222
 
 tasks.sieve.qrange = 10000
 
