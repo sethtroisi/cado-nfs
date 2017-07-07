@@ -36,7 +36,6 @@ polyselect/gfp2dlpolyselect_notes.txt
 polyselect/gfpkdlpolyselect_test.c
 polyselect/makefile_gfpkdl.make
 polyselect/template-header.c
-polyselect/alpha.mpl
 polyselect/alpha.sage
 polyselect/debug_rootsieve.sage
 polyselect/dlpolyselect.c
