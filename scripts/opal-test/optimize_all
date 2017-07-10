@@ -1,8 +1,10 @@
 #!/bin/csh
 setenv NOMAD_MAX_BB_EVAL 100
 foreach f (c60 c65 c70 c75 c80 c85 c90 c95 c100 c105 c110 c115 c120 c125 c130 c135 c140 c145 c150 c155)
+   echo "Optimizing parameters for ${f}:"
    cp ../../parameters/factor/params.$f .
    cp ../../parameters/polynomials/$f.poly .
-   ./optimize.sh params.$f $f.poly
+   ./optimize.sh params.$f $f.poly >& /dev/null
+   diff params.$f params.$f.opt
    cp params.$f.opt ../../parameters/factor/params.$f
 end
