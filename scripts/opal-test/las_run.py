@@ -113,7 +113,7 @@ def run(param_file, problem):
         outputfile = "las.%d.out" % q0
         las_params.update({"q0": q0, "q1": q0 + q_range, "out": outputfile})
 
-        las_cmd_line = [las, "-allow-largesq", "-dup", "-dup-qmin"]
+        las_cmd_line = [las, "-allow-largesq", "-never-discard", "-dup", "-dup-qmin"]
         if sqside == 0:
             las_cmd_line += ["%s,0" % str(las_params["qmin"])]
         else:

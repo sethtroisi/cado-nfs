@@ -2808,8 +2808,8 @@ int main (int argc0, char *argv0[])/*{{{*/
     param_list_configure_alias(pl, "fb1", "fb");
 #ifdef  DLP_DESCENT
     param_list_configure_switch(pl, "-recursive-descent", &recursive_descent);
-    param_list_configure_switch(pl, "-never-discard", &never_discard);
 #endif
+    param_list_configure_switch(pl, "-never-discard", &never_discard);
     tdict_configure_switch(pl);
 
     argv++, argc--;
