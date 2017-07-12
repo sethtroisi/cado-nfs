@@ -1731,9 +1731,10 @@ expected_alpha (double S)
 }
 
 /* compute largest interval kmin <= k <= kmax such that when we add k*x^i*g(x)
-   to f(x), the lognorm does not increase more than NORM_MARGIN */
-static void
-expected_growth (rotation_space *r, mpz_poly_ptr f, mpz_poly_ptr g, int i)
+   to f(x), the lognorm does not increase more than margin */
+void
+expected_growth (rotation_space *r, mpz_poly_ptr f, mpz_poly_ptr g, int i,
+                 double margin)
 {
   double s = L2_skewness (f, SKEWNESS_DEFAULT_PREC);
   double n = L2_lognorm (f, s), n2;
@@ -1753,7 +1754,7 @@ expected_growth (rotation_space *r, mpz_poly_ptr f, mpz_poly_ptr g, int i)
       mpz_set (f->coeff[i+1], fip1);
       rotate_auxg_z (f->coeff, g->coeff[1], g->coeff[0], kmin, i);
       n2 = L2_lognorm (f, s);
-      if (n2 > n + NORM_MARGIN)
+      if (n2 > n + margin)
         break;
       mpz_mul_2exp (kmin, kmin, 1);
     }
@@ -1769,7 +1770,7 @@ expected_growth (rotation_space *r, mpz_poly_ptr f, mpz_poly_ptr g, int i)
       mpz_set (f->coeff[i+1], fip1);
       rotate_auxg_z (f->coeff, g->coeff[1], g->coeff[0], k, i);
       n2 = L2_lognorm (f, s);
-      if (n2 > n + NORM_MARGIN)
+      if (n2 > n + margin)
         mpz_set (kmin, k);
       else
         mpz_set (kmax, k);
@@ -1784,7 +1785,7 @@ expected_growth (rotation_space *r, mpz_poly_ptr f, mpz_poly_ptr g, int i)
       mpz_set (f->coeff[i+1], fip1);
       rotate_auxg_z (f->coeff, g->coeff[1], g->coeff[0], kmax, i);
       n2 = L2_lognorm (f, s);
-      if (n2 > n + NORM_MARGIN)
+      if (n2 > n + margin)
         break;
       mpz_mul_2exp (kmax, kmax, 1);
     }
@@ -1800,7 +1801,7 @@ expected_growth (rotation_space *r, mpz_poly_ptr f, mpz_poly_ptr g, int i)
       mpz_set (f->coeff[i+1], fip1);
       rotate_auxg_z (f->coeff, g->coeff[1], g->coeff[0], k, i);
       n2 = L2_lognorm (f, s);
-      if (n2 > n + NORM_MARGIN)
+      if (n2 > n + margin)
         mpz_set (kmax, k);
       else
         mpz_set (kmin, k);
@@ -1829,7 +1830,7 @@ expected_rotation_gain (mpz_poly_ptr f, mpz_poly_ptr g)
 
   for (int i = 0; 2 * i < f->deg; i++)
     {
-      expected_growth (&r, f, g, i);
+      expected_growth (&r, f, g, i, NORM_MARGIN);
       s = r.jmax[i] - r.jmin[i] + 1.0;
       S *= s;
       /* assume each non-zero rotation increases on average by NORM_MARGIN/2 */

@@ -88,6 +88,8 @@ double cado_poly_fprintf_with_info_and_MurphyE (FILE *fp, cado_poly_ptr,
                                                 double, double, double, double,
                                                 const char *);
 double expected_rotation_gain (mpz_poly_ptr f, mpz_poly_ptr g);
+void expected_growth (rotation_space *r, mpz_poly_ptr f, mpz_poly_ptr g,
+                      int i, double margin);
 
 #ifdef __cplusplus
 }
