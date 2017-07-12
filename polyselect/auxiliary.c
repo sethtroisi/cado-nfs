@@ -1775,7 +1775,7 @@ expected_growth (rotation_space *r, mpz_poly_ptr f, mpz_poly_ptr g, int i,
       else
         mpz_set (kmax, k);
     }
-  r->jmin[i] = mpz_get_d (kmax);
+  r->kmin = mpz_get_d (kmax);
 
   /* positive side */
   mpz_set_ui (kmax, 1);
@@ -1806,7 +1806,7 @@ expected_growth (rotation_space *r, mpz_poly_ptr f, mpz_poly_ptr g, int i,
       else
         mpz_set (kmin, k);
     }
-  r->jmax[i] = mpz_get_d (kmin);
+  r->kmax = mpz_get_d (kmin);
 
   /* reset f[i] and f[i+1] */
   mpz_set (f->coeff[i], fi);
@@ -1831,7 +1831,7 @@ expected_rotation_gain (mpz_poly_ptr f, mpz_poly_ptr g)
   for (int i = 0; 2 * i < f->deg; i++)
     {
       expected_growth (&r, f, g, i, NORM_MARGIN);
-      s = r.jmax[i] - r.jmin[i] + 1.0;
+      s = r.kmax - r.kmin + 1.0;
       S *= s;
       /* assume each non-zero rotation increases on average by NORM_MARGIN/2 */
       if (s >= 2.0)

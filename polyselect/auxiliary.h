@@ -55,7 +55,6 @@ extern double bound_f, bound_g, area;
 typedef struct
 {
   double kmin, kmax;
-  double jmin[MAX_DEGREE], jmax[MAX_DEGREE];
 } rotation_space;
 
 #ifdef __cplusplus
