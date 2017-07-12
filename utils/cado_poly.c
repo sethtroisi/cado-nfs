@@ -31,7 +31,7 @@ void cado_poly_clear(cado_poly poly)
 
 /* p <- q */
 void
-cado_poly_set (cado_poly p, cado_poly q)
+cado_poly_set (cado_poly p, cado_poly_srcptr q)
 {
     mpz_set (p->n, q->n);
     p->skew = q->skew;

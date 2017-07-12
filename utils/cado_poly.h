@@ -34,7 +34,7 @@ extern "C" {
 extern int cado_poly_read (cado_poly_ptr, const char *filename);
 extern int cado_poly_read_stream (cado_poly_ptr, FILE *);
 extern int cado_poly_read_next_poly_from_stream (cado_poly_ptr, FILE *);
-extern void cado_poly_set (cado_poly_ptr p, cado_poly_ptr q);
+extern void cado_poly_set (cado_poly_ptr p, cado_poly_srcptr q);
 
 void cado_poly_fprintf (FILE *, cado_poly_srcptr, const char *);
 void cado_poly_fprintf_info (FILE *, double, double, double, double,
