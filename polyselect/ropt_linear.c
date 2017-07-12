@@ -999,5 +999,5 @@ ropt_linear ( ropt_poly_t poly,
   else if (poly->d == 5 || poly->d == 4)
     ropt_linear_deg5 (poly, bestpoly, param, info);
   else 
-    fprintf (stderr, "Error: ropt_linear() only support deg 4 and 5.");
+    fprintf (stderr, "Error: ropt_linear() only supports degrees 3-5.");
 }

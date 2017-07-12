@@ -7,7 +7,7 @@
 #include "portability.h"
 
 /* Be conservative and allocate two polynomials by default. */
-void cado_poly_init(cado_poly poly)
+void cado_poly_init(cado_poly_ptr poly)
 {
     /* ALL fields are zero upon init, EXCEPT the degree field (which is -1) */
     memset(poly, 0, sizeof(poly[0]));
@@ -20,7 +20,7 @@ void cado_poly_init(cado_poly poly)
     mpz_init_set_ui(poly->n, 0);
 }
 
-void cado_poly_clear(cado_poly poly)
+void cado_poly_clear(cado_poly_ptr poly)
 {
     for(int side = 0 ; side < poly->nb_polys ; side++)
       mpz_poly_clear (poly->pols[side]);
@@ -56,7 +56,7 @@ cado_poly_swap (cado_poly_ptr p, cado_poly_ptr q)
 
 // returns 0 on failure, 1 on success.
 static
-int cado_poly_set_plist(cado_poly poly, param_list pl)
+int cado_poly_set_plist(cado_poly_ptr poly, param_list pl)
 {
   int ret = 1;
 
@@ -158,7 +158,7 @@ int cado_poly_read_next_poly_from_stream (cado_poly_ptr poly, FILE * f)
 }
 
 // returns 0 on failure, 1 on success.
-int cado_poly_read(cado_poly poly, const char *filename)
+int cado_poly_read(cado_poly_ptr poly, const char *filename)
 {
     FILE *file;
     int r;
