@@ -43,8 +43,11 @@ ropt_quadratic_tune_stage1 ( ropt_poly_t poly,
 {
   const int numw = 3;
   int i, j, k, r, w, old_verbose, old_i, used, *w_good, w_top[numw];
-  const unsigned int size_alpha_pqueue_all_w =
+  unsigned int size_alpha_pqueue_all_w =
     s1param->nbest_sl * TUNE_RATIO_STAGE1_FULL_ALPHA * param->effort;
+  /* new_alpha_pq requires len >= 2 */
+  if (size_alpha_pqueue_all_w < 2)
+    size_alpha_pqueue_all_w = 2;
   double score;
 #if TUNE_LOGNORM_INCR
   double incr;
@@ -209,6 +212,9 @@ ropt_quadratic ( ropt_poly_t poly,
      more sublattices to be tuned */
   unsigned long len_full_alpha = s1param->nbest_sl *
     TUNE_RATIO_STAGE1_FULL_ALPHA * param->effort;
+  /* new_alpha_pq requires len_full_alpha >= 2 */
+  if (len_full_alpha < 2)
+    len_full_alpha = 2;
   new_alpha_pq (&alpha_pqueue, len_full_alpha);
 
   /* [Step 1] find w first and do ropt_stage1() there */
