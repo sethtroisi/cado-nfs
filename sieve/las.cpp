@@ -2761,10 +2761,10 @@ static void declare_usage(param_list pl)/*{{{*/
   /* given that this option is dangerous, we enable it only for
    * las_descent
    */
-  param_list_decl_usage(pl, "never-discard", "Disable the discarding process for special-q's. This is dangerous. See bug #15617");
   param_list_decl_usage(pl, "grace-time-ratio", "Fraction of the estimated further descent time which should be spent processing the current special-q, to find a possibly better relation");
   las_dlog_base::declare_parameter_usage(pl);
 #endif /* DLP_DESCENT */
+  param_list_decl_usage(pl, "never-discard", "Disable the discarding process for special-q's. This is dangerous. See bug #15617");
   verbose_decl_usage(pl);
   tdict_decl_usage(pl);
 }/*}}}*/
