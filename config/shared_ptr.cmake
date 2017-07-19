@@ -60,7 +60,7 @@ std::shared_ptr<foo> blah()
         const int val = 65536;
         return std::make_shared<foo>(val);
 }
-" HAS_BUG_21397)
-if(HAS_BUG_21397)
+" HAS_NOT_BUG_21397)
+if(NOT HAS_NOT_BUG_21397)
     message(FATAL_ERROR "Error, see bug #21397")
 endif()
