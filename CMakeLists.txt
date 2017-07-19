@@ -56,7 +56,7 @@ macro(get_override extname intname)
 string(COMPARE NOTEQUAL "$ENV{${extname}}" "" HAS_${intname}_OVERRIDE)
 if(HAS_${intname}_OVERRIDE)
     set(${intname} "$ENV{${extname}}" CACHE STRING "" FORCE)
-    message(STATUS "${extname}=${${intname}}")
+    message(STATUS "${extname}=${${intname}} (from environment)")
 endif()
 endmacro()
 
@@ -183,7 +183,7 @@ if(CMAKE_C_COMPILER_ID MATCHES "Intel")
     endif()
 endif()
 
-if(CMAKE_CXX_COMPILER_ID MATCHES "AppleClang")
+if(CMAKE_CXX_COMPILER_ID MATCHES "(Apple)?Clang")
     # Not the slightest idea when apple's clang became c++11-compliant.
     if (NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS "8.0.0")
         set (CMAKE_CXX_FLAGS   "-std=c++11 ${CMAKE_CXX_FLAGS}")
@@ -191,6 +191,8 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "AppleClang")
         message(STATUS "Enabling C++11 support")
     endif()
 endif()
+message(STATUS "CFLAGS=${CMAKE_C_FLAGS} (synthetized)")
+message(STATUS "CXXFLAGS=${CMAKE_CXX_FLAGS} (synthetized)")
 
 #####################################################################
 # Set dependencies for external software.
