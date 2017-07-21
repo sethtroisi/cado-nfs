@@ -1502,12 +1502,12 @@ average_valuation_affine_root (mpz_poly_ptr f, unsigned long p, unsigned long r 
 
 /**************************** rotation ***************************************/
 
-/* replace f + k0 * x^t * (b*x - m) by f + k * x^t * (b*x - m), and return k */
+/* replace f + k0 * x^t * (b*x + m) by f + k * x^t * (b*x + m), and return k */
 long
 rotate_aux (mpz_t *f, mpz_t b, mpz_t m, long k0, long k, unsigned int t)
 {
   mpz_addmul_si (f[t + 1], b, k - k0);
-  mpz_submul_si (f[t], m, k - k0);
+  mpz_addmul_si (f[t], m, k - k0);
   return k;
 }
 
