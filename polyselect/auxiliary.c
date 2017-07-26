@@ -1506,8 +1506,20 @@ average_valuation_affine_root (mpz_poly_ptr f, unsigned long p, unsigned long r 
 long
 rotate_aux (mpz_t *f, mpz_t b, mpz_t m, long k0, long k, unsigned int t)
 {
-  mpz_addmul_si (f[t + 1], b, k - k0);
-  mpz_addmul_si (f[t], m, k - k0);
+  /* Warning: k - k0 might not be representable in a long! */
+  unsigned long diff;
+  if (k >= k0)
+    {
+      diff = k - k0; /* k - k0 always fits in an unsigned long */
+      mpz_addmul_ui (f[t + 1], b, diff);
+      mpz_addmul_ui (f[t], m, diff);
+    }
+  else
+    {
+      diff = k0 - k;
+      mpz_submul_ui (f[t + 1], b, diff);
+      mpz_submul_ui (f[t], m, diff);
+    }
   return k;
 }
 
