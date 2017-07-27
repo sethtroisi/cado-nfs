@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 # this script automatically optimizes sieving parameters
 # Usage: optimize.sh params.cxx cxx.polyselect2.poly
 # Puts the optimized file in params.cxx.opt in the current directory.
@@ -9,8 +9,10 @@
 # Important: if lpb0 and/or lpb1 change, you need to recompute rels_wanted,
 # which should be near from prime_pi(2^lpb0) + prime_pi(2^lpb1)
 
-# To limit the number of black-box evaluations to say 100:
-# NOMAD_MAX_BB_EVAL=100 ./optimize.sh ...
+# To limit the number of black-box evaluations to say 50:
+# NOMAD_MAX_BB_EVAL=50 ./optimize.sh ...
+
+: ${NOMAD_MAX_BB_EVAL=100}
 
 cwd=`pwd`
 
