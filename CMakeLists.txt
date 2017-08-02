@@ -188,7 +188,7 @@ endif()
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "(Apple)?Clang")
     # Not the slightest idea when apple's clang became c++11-compliant.
-    if (NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS "8.0.0")
+    if (NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS "6.0.0")
         set (CMAKE_CXX_FLAGS   "-std=c++11 ${CMAKE_CXX_FLAGS}")
         set (HAVE_CXX11 1)
         message(STATUS "Enabling C++11 support")
