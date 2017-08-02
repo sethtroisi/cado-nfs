@@ -155,17 +155,18 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
             set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-literal-suffix")
         endif()
     else()
-        if(MINGW)
-            set (CMAKE_CXX_FLAGS "-std=gnu++98 ${CMAKE_CXX_FLAGS}")
+        # It seems that even g++-4.6.3, as shipped in ubuntu 12.04, is
+        # sufficient for the little we use, provided we use the -std=c++0x
+        # flag (-std=c++11 replaced it with gcc-4.7.0).
+        if (NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS 4.6.3)
+            set (CMAKE_CXX_FLAGS "-std=c++0x -g -W -Wall ${CMAKE_CXX_FLAGS}")
         else()
-            set (CMAKE_CXX_FLAGS "-std=c++98 ${CMAKE_CXX_FLAGS}")
+            if(MINGW)
+                set (CMAKE_CXX_FLAGS "-std=gnu++98 ${CMAKE_CXX_FLAGS}")
+            else()
+                set (CMAKE_CXX_FLAGS "-std=c++98 ${CMAKE_CXX_FLAGS}")
+            endif()
         endif()
-    endif()
-    # It seems that even g++-4.6.3, as shipped in ubuntu 12.04, is
-    # sufficient for the little we use, provided we use the -std=c++0x
-    # flag (-std=c++11 replaced it with gcc-4.7.0).
-    if (NOT HAVE_CXX11 AND NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS 4.6.3)
-        set (CMAKE_CXX_FLAGS "-std=c++0x -g -W -Wall ${CMAKE_CXX_FLAGS}")
     endif()
 endif()
 
