@@ -109,6 +109,9 @@ set (CMAKE_CXX_FLAGS    "${CMAKE_CXX_FLAGS} ${CMAKE_FLAGS_SIZE}")
 # It's redundant with something that CMake prints the first time it
 # detects the compiler. Alas, it's within a cached if, so we often don't
 # see it.
+
+# Hmmm, how delicious. cmake-2.8.7 does not have
+# CMAKE_CXX_COMPILER_VERSION
 message(STATUS "C compiler: ${CMAKE_C_COMPILER_ID} ${CMAKE_C_COMPILER_VERSION}")
 message(STATUS "C++ compiler: ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}")
 
