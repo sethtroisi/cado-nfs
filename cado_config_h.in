@@ -32,6 +32,7 @@
 #cmakedefine    HAVE_ALLOCA_H
 #cmakedefine    HAVE_CABSL
 #cmakedefine    HAVE_LOG2
+#cmakedefine    HAVE_CLOG
 #cmakedefine    HAVE_EXP2
 #cmakedefine    HAVE_RESOURCE_H
 #cmakedefine    HAVE_UTSNAME_H

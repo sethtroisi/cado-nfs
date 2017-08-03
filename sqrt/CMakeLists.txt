@@ -15,7 +15,7 @@ install(TARGETS sqrt RUNTIME DESTINATION ${LIBSUFFIX}/sqrt)
 if(${WITH_PTHREADS})
 add_definitions(-DWITH_PTHREADS)
 
-if (HAVE_CABSL)
+if (HAVE_CABSL AND HAVE_CLOG)
 add_executable(crtalgsqrt ${EXCLUDE_FROM_RELEASE_BUILD} crtalgsqrt.c powers_of_p.cpp
     polyroots.c knapsack.c)
 target_link_libraries(crtalgsqrt utils ${pthread_libs})
