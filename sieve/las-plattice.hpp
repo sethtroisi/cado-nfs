@@ -436,6 +436,11 @@ public:
     static plattice_x_t value;
 };
 
+/* see bug #21405 */
+template <> plattice_x_t plattice_enumerate_area<1>::value;
+template <> plattice_x_t plattice_enumerate_area<2>::value;
+template <> plattice_x_t plattice_enumerate_area<3>::value;
+
 template <int LEVEL>
 bool
 plattice_enumerate_finished(plattice_x_t x)
