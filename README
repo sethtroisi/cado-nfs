@@ -62,7 +62,7 @@ Required software tools:
    is required to get thread-safe operations.
 *) The GCC compiler works ; some others might, but it is untested. C and
    C++ are required, with C99 support.
-*) GNU make and CMake >= 2.8 for building (CMake is installed on the fly if
+*) GNU make and CMake >= 2.8.11 for building (CMake is installed on the fly if
    missing (requires an Internet connection))
 *) Support for posix threads.
 *) The main cado-nfs.py script uses a lot of unix tools: Python3, ssh,

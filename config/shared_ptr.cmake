@@ -67,5 +67,5 @@ int main()
 }
 " HAS_NOT_BUG_21397)
 if(NOT HAS_NOT_BUG_21397)
-    message(FATAL_ERROR "Error, see bug #21397")
+    message(FATAL_ERROR "Error, see bug #21397 ; URL is https://gforge.inria.fr/tracker/index.php?func=detail&aid=21397&group_id=2065&atid=7442")
 endif()

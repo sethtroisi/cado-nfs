@@ -109,6 +109,9 @@ set (CMAKE_CXX_FLAGS    "${CMAKE_CXX_FLAGS} ${CMAKE_FLAGS_SIZE}")
 # It's redundant with something that CMake prints the first time it
 # detects the compiler. Alas, it's within a cached if, so we often don't
 # see it.
+
+# Hmmm, how delicious. cmake-2.8.7 does not have
+# CMAKE_CXX_COMPILER_VERSION
 message(STATUS "C compiler: ${CMAKE_C_COMPILER_ID} ${CMAKE_C_COMPILER_VERSION}")
 message(STATUS "C++ compiler: ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}")
 
@@ -152,17 +155,18 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
             set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-literal-suffix")
         endif()
     else()
-        if(MINGW)
-            set (CMAKE_CXX_FLAGS "-std=gnu++98 ${CMAKE_CXX_FLAGS}")
+        # It seems that even g++-4.6.3, as shipped in ubuntu 12.04, is
+        # sufficient for the little we use, provided we use the -std=c++0x
+        # flag (-std=c++11 replaced it with gcc-4.7.0).
+        if (NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS 4.6.3)
+            set (CMAKE_CXX_FLAGS "-std=c++0x -g -W -Wall ${CMAKE_CXX_FLAGS}")
         else()
-            set (CMAKE_CXX_FLAGS "-std=c++98 ${CMAKE_CXX_FLAGS}")
+            if(MINGW)
+                set (CMAKE_CXX_FLAGS "-std=gnu++98 ${CMAKE_CXX_FLAGS}")
+            else()
+                set (CMAKE_CXX_FLAGS "-std=c++98 ${CMAKE_CXX_FLAGS}")
+            endif()
         endif()
-    endif()
-    # It seems that even g++-4.6.3, as shipped in ubuntu 12.04, is
-    # sufficient for the little we use, provided we use the -std=c++0x
-    # flag (-std=c++11 replaced it with gcc-4.7.0).
-    if (NOT HAVE_CXX11 AND NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS 4.6.3)
-        set (CMAKE_CXX_FLAGS "-std=c++0x -g -W -Wall ${CMAKE_CXX_FLAGS}")
     endif()
 endif()
 
@@ -185,7 +189,7 @@ endif()
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "(Apple)?Clang")
     # Not the slightest idea when apple's clang became c++11-compliant.
-    if (NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS "8.0.0")
+    if (NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS "6.0.0")
         set (CMAKE_CXX_FLAGS   "-std=c++11 ${CMAKE_CXX_FLAGS}")
         set (HAVE_CXX11 1)
         message(STATUS "Enabling C++11 support")

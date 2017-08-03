@@ -99,8 +99,8 @@ if [ "$?" != "0" ] || ! [ -x "$cmake_path" ] ; then
     echo "CMake not found" >&2
     cmake_path=
 # Recall that (some versions of) bash do not want quoting for regex patterns.
-elif [[ "`"$cmake_path" --version`" =~ ^cmake\ version\ [012] ]] && ! [[ "`"$cmake_path" --version`" =~ ^cmake\ version\ 2.[89] ]] ; then
-    echo "CMake found, but not with version 2.8 or newer" >&2
+elif [[ "`"$cmake_path" --version`" =~ ^cmake\ version\ [012] ]] && ! ( [[ "`"$cmake_path" --version`" =~ ^cmake\ version\ 2.(9|8.11|8.12) ]]) ; then
+    echo "CMake found, but not with version 2.8.11 or newer" >&2
     cmake_path=
 fi
 if ! [ "$cmake_path" ] ; then
