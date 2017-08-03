@@ -144,6 +144,8 @@ trialdiv_div5 (const unsigned long *n, const trialdiv_divisor_t *d)
   ularith_add_2ul_2ul (&r0, &r1, x0, x1);
   ularith_mul_ul_ul_2ul (&x0, &x1, n[3], d->w[2]); /* n_3 * (w^3 % p) */
   ularith_add_2ul_2ul (&r0, &r1, x0, x1);
+  ASSERT(TRIALDIV_MAXLEN >= 5); /* ensures d->w[] has at least 4 elements,
+                                   thus d->w[3] is well defined */
   ularith_mul_ul_ul_2ul (&x0, &x1, n[4], d->w[3]); /* n_4 * (w^4 % p) */
   ularith_add_2ul_2ul (&r0, &r1, x0, x1);
   x0 = r1 * d->w[0];
