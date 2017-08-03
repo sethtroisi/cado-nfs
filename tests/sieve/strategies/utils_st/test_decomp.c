@@ -85,7 +85,7 @@ int main()
 	}
     fseek(file, 0, SEEK_SET);
     tabular_decomp_t* t2 = tabular_decomp_fscan (file);
-    if (tab2 == NULL)
+    if (t2 == NULL)
 	{
 	    fprintf (stderr, "read error on temp file\n");
 	    exit (EXIT_FAILURE);
