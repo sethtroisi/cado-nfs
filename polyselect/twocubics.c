@@ -50,7 +50,7 @@ cado_poly best_poly, curr_poly;
 double best_E = 0.0; /* Murphy's E (the larger the better) */
 
 /* read-write global variables */
-pthread_mutex_t lock=PTHREAD_MUTEX_INITIALIZER; /* used as mutual exclusion
+static pthread_mutex_t lock=PTHREAD_MUTEX_INITIALIZER; /* used as mutual exclusion
                                                    lock for those variables */
 int tot_found = 0; /* total number of polynomials */
 double potential_collisions = 0.0;
