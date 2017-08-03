@@ -187,9 +187,18 @@ if(CMAKE_C_COMPILER_ID MATCHES "Intel")
     endif()
 endif()
 
-if(CMAKE_CXX_COMPILER_ID MATCHES "(Apple)?Clang")
+if(CMAKE_CXX_COMPILER_ID MATCHES "^AppleClang")
     # Not the slightest idea when apple's clang became c++11-compliant.
     if (NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS "6.0.0")
+        set (CMAKE_CXX_FLAGS   "-std=c++11 ${CMAKE_CXX_FLAGS}")
+        set (HAVE_CXX11 1)
+        message(STATUS "Enabling C++11 support")
+    endif()
+endif()
+if(CMAKE_CXX_COMPILER_ID MATCHES "^Clang")
+    # Not the slightest idea either. Icing on the cake, Apple's clang
+    # identifies itself as plain Clang on some occasions...
+    if (NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS "4.0.0")
         set (CMAKE_CXX_FLAGS   "-std=c++11 ${CMAKE_CXX_FLAGS}")
         set (HAVE_CXX11 1)
         message(STATUS "Enabling C++11 support")
