@@ -98,6 +98,7 @@ static size_t col_dispatcher_cutoff = 262144;
 static size_t colbatch1 = 65536;
 #endif
 
+#if 0
 static inline uint64_t cputicks()
 {
         uint64_t r;
@@ -110,6 +111,7 @@ static inline uint64_t cputicks()
                 : "rdx");
         return r;
 }
+#endif
 
 /* {{{ some boilerplate related to saving cache files */
 
