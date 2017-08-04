@@ -15,9 +15,12 @@ set(CADO_DIST_ARCHIVE_NAME "cado-nfs-${CADO_VERSION_STRING}")
 cmake_minimum_required(VERSION 2.8.11)
 if(COMMAND cmake_policy)
     cmake_policy(SET CMP0003 NEW)
-    # does this get in the way with cmake tests ?? We used to have
-    # CMP0054 OLD at some point.
-    cmake_policy(SET CMP0054 NEW)
+    # VERSION_GREATER_EQUAL is newish
+    if (NOT CMAKE_VERSION VERSION_LESS 3.1)
+        # does this get in the way with cmake tests ?? We used to have
+        # CMP0054 OLD at some point.
+        cmake_policy(SET CMP0054 NEW)
+    endif()
 endif()
 
 if (MINGW)
