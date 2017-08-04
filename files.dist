@@ -1221,3 +1221,4 @@ tests/utils/test_mpz_vector.c
 scripts/build_environment.sh
 scripts/cadofactor/toplevel.py
 scripts/realpath.sh
+config/perl.cmake

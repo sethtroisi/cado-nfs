@@ -227,6 +227,7 @@ include("${CADO_NFS_SOURCE_DIR}/config/numa.cmake")
 IF (NOT DEFINED ENV{NO_PYTHON_CHECK})
   include("${CADO_NFS_SOURCE_DIR}/config/python.cmake")
 endif()
+include("${CADO_NFS_SOURCE_DIR}/config/perl.cmake")
 
 set(CADO_SHARED)
 
