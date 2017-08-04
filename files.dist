@@ -1190,3 +1190,5 @@ config/shared_ptr.cmake
 config/cxxabi.cmake
 sieve/display-lattice-adjust.sage
 config/perl.cmake
+config/gmp_randstate.c
+config/gmp_randstate.cmake

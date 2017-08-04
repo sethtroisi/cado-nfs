@@ -8,6 +8,7 @@
 #include "utils.h"
 #include <vector>
 #include <algorithm>
+#include "cxx_mpz.hpp"
 
 /*
  * The goal of this binary is to produce relations that try to be good
@@ -41,7 +42,13 @@ pthread_mutex_t io_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 // We need a re-entrant random. Let's take GMP.
 static inline uint64_t long_random(gmp_randstate_t buf) {
+#if ULONG_BITS == 64
     return gmp_urandomb_ui(buf, 64);
+#elif ULONG_BITS == 32
+    cxx_mpz z;
+    mpz_urandomb(z, buf, 64);
+    return mpz_get_uint64(z);
+#endif
 }
 
 gmp_randstate_t global_rstate_non_mt;

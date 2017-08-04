@@ -12,12 +12,13 @@ set(CADO_DIST_ARCHIVE_NAME "cado-nfs-${CADO_VERSION_STRING}")
 #####################################################################
 
 # If you change the min version, also change scripts/call_cmake.sh
-cmake_minimum_required(VERSION 2.8.0)
+cmake_minimum_required(VERSION 2.8.11)
 if(COMMAND cmake_policy)
-        cmake_policy(SET CMP0003 NEW)
+    cmake_policy(SET CMP0003 NEW)
+    # does this get in the way with cmake tests ?? We used to have
+    # CMP0054 OLD at some point.
+    cmake_policy(SET CMP0054 NEW)
 endif()
-
-set(CMAKE_LEGACY_CYGWIN_WIN32 0) # Remove when CMake >= 2.8.4 is required
 
 if (MINGW)
     # we could do this as well in other cases.
@@ -226,6 +227,7 @@ string_join(GF2X_C_FLAGS " " ${CMAKE_C_FLAGS} "-I${GMP_INCDIR}" "-I${CADO_NFS_SO
 string_join(GF2X_CXX_FLAGS " " ${CMAKE_CXX_FLAGS} "-I${GMP_INCDIR}" "-I${CADO_NFS_SOURCE_DIR}")
 string_join(GF2X_LDFLAGS " " ${CMAKE_SHARED_LINKER_FLAGS} "-Wl,-rpath,${GMP_LIBDIR}" "-L${GMP_LIBDIR}")
 endif()
+include(${CADO_NFS_SOURCE_DIR}/config/gmp_randstate.cmake)
 
 #####
 include(CheckTypeSize)

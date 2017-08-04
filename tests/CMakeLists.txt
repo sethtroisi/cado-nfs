@@ -37,9 +37,6 @@ add_custom_target(all_test_dependencies)
 # Note that for test X, there are some use cases where it is nice to know
 # about X_dependencies (for adding extra dependencies late), or the
 # targets X (for setting compile time definitions).
-if(CMAKE_VERSION VERSION_GREATER 3.1)
-    cmake_policy(SET CMP0054 OLD)
-endif()
 
 macro(cado_define_test)
     # This macro is appropriate for a test which consists in running a
