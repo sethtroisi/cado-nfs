@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <inttypes.h>
-#if HAVE_MPIR
+#ifdef HAVE_MPIR
 #include <mpir.h>
 #else
 #include <gmp.h>
