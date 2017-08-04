@@ -218,6 +218,9 @@ class Cado_NFS_toplevel(object):
         if platform.uname()[0] == "OpenBSD":
             # does this count hyperthreading or not ?
             return int(backquote("sysctl -n hw.ncpu")[0])
+        if platform.uname()[0] == "FreeBSD":
+            # does this count hyperthreading or not ?
+            return int(backquote("sysctl -n hw.ncpu")[0])
         if platform.uname()[0] == "Darwin":
             # does this count hyperthreading or not ?
             first_attempt=backquote("sysctl -n machdep.cpu.core_count")
