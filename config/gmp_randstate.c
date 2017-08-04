@@ -14,7 +14,7 @@
 gmp_randstate_t rstate;
 
 static inline uint64_t long_random() {
-#ifdef __x86_64
+#if ULONG_BITS == 64
     return gmp_urandomb_ui(rstate, 64);
 #else
     mpz_t z;

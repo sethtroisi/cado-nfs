@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+set -x
 ########################################################################
 # This script is responsible of handing over the build process, in a
 # proper out of source build directory. It takes care of calling cmake
@@ -148,7 +149,7 @@ if [ "$1" = "cmake" ] || [ ! -f "$build_tree/Makefile" ] ; then
     else
       unset CMAKE_GENERATOR_OPT
     fi
-    (cd "$absolute_path_of_build_tree" ; "$cmake_path" "$CMAKE_GENERATOR_OPT" "$absolute_path_of_source")
+    (cd "$absolute_path_of_build_tree" ; "$cmake_path" "$CMAKE_GENERATOR_OPT" $CMAKE_EXTRA_ARGS "$absolute_path_of_source")
 fi
 
 if [ "$1" = "cmake" ] ; then

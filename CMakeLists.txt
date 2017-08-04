@@ -230,7 +230,6 @@ string_join(GF2X_C_FLAGS " " ${CMAKE_C_FLAGS} "-I${GMP_INCDIR}" "-I${CADO_NFS_SO
 string_join(GF2X_CXX_FLAGS " " ${CMAKE_CXX_FLAGS} "-I${GMP_INCDIR}" "-I${CADO_NFS_SOURCE_DIR}")
 string_join(GF2X_LDFLAGS " " ${CMAKE_SHARED_LINKER_FLAGS} "-Wl,-rpath,${GMP_LIBDIR}" "-L${GMP_LIBDIR}")
 endif()
-include(${CADO_NFS_SOURCE_DIR}/config/gmp_randstate.cmake)
 
 #####
 include(CheckTypeSize)
@@ -240,6 +239,8 @@ math (EXPR ULONG_BITS "8*${ulong_size}")
 math (EXPR ULONGLONG_BITS "8*${ulonglong_size}")
 message(STATUS "bits in unsigned long: ${ULONG_BITS}")
 message(STATUS "bits in unsigned long long: ${ULONGLONG_BITS}")
+
+include(${CADO_NFS_SOURCE_DIR}/config/gmp_randstate.cmake)
 
 set(GF2X_CONFIGURE_FLAGS --disable-shared --disable-dependency-tracking --enable-fft-interface CC=${CMAKE_C_COMPILER} CXX=${CMAKE_CXX_COMPILER} CFLAGS=${GF2X_C_FLAGS} CXXFLAGS=${GF2X_CXX_FLAGS} LDFLAGS=${GF2X_LDFLAGS} $ENV{GF2X_CONFIGURE_EXTRA_FLAGS})
 

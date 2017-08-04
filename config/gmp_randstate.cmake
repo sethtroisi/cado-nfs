@@ -1,12 +1,24 @@
 
+if(HAVE_GMP)
+    set(_my_incdir ${GMP_INCDIR})
+    set(_my_libdir ${GMP_LIBDIR})
+elseif(HAVE_MPIR)
+    set(_my_incdir ${MPIR_INCDIR})
+    set(_my_libdir ${MPIR_LIBDIR})
+endif()
 message(STATUS "Testing for gmp_random predictability")
 try_run(gmp_randstate_runs gmp_randstate_compiles
         ${PROJECT_BINARY_DIR}/config
         ${PROJECT_SOURCE_DIR}/config/gmp_randstate.c
+        CMAKE_FLAGS
+        -DINCLUDE_DIRECTORIES=${_my_incdir}
+        -DLINK_DIRECTORIES=${_my_libdir}
+        COMPILE_DEFINITIONS -DULONG_BITS=${ULONG_BITS}
         LINK_LIBRARIES ${gmp_libname}
         COMPILE_OUTPUT_VARIABLE compilevar
         RUN_OUTPUT_VARIABLE outvar
         )
+
 
 if(NOT gmp_randstate_runs EQUAL 0)
     message(FATAL_ERROR "Cannot run a simple gmp program\nCompile output (${gmp_randstate_compiles}): ${compilevar}\nRun output (${gmp_randstate_runs}): ${outvar}")
