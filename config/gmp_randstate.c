@@ -1,7 +1,11 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <inttypes.h>
+#if HAVE_MPIR
+#include <mpir.h>
+#else
 #include <gmp.h>
+#endif
 
 /* We expect that this program prints exactly:
  *

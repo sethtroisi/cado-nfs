@@ -13,7 +13,10 @@ try_run(gmp_randstate_runs gmp_randstate_compiles
         CMAKE_FLAGS
         -DINCLUDE_DIRECTORIES=${_my_incdir}
         -DLINK_DIRECTORIES=${_my_libdir}
-        COMPILE_DEFINITIONS -DULONG_BITS=${ULONG_BITS}
+        COMPILE_DEFINITIONS
+	-DULONG_BITS=${ULONG_BITS}
+	-DHAVE_MPIR=${HAVE_MPIR}
+	-DHAVE_GMP=${HAVE_GMP}
         LINK_LIBRARIES ${gmp_libname}
         COMPILE_OUTPUT_VARIABLE compilevar
         RUN_OUTPUT_VARIABLE outvar
