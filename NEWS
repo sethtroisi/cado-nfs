@@ -76,7 +76,7 @@ Main changes between cado-nfs-2.1.1 and cado-nfs-2.2.0:
   Now it should be build_tree="${up_path}/some/sub/path", as $up_path no
   longer embodies a trailing /
 * The polynomial file now supports another format. For giving a
-  polynomial, a line like 
+  polynomial, a line like
     poly0=17,42,34,55
   can be written, to set the polynomial 17+42*x+34*x^2+55*x^3 on side 0.
   The old format with X, c, Y,... is still supported, with c and X for
