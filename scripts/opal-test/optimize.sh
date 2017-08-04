@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/usr/bin/env bash
 # this script automatically optimizes sieving parameters
 # Usage: optimize.sh params.cxx cxx.polyselect2.poly
 # Puts the optimized file in params.cxx.opt in the current directory.
