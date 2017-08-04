@@ -1,10 +1,13 @@
 
+set(_compdefs -DULONG_BITS=${ULONG_BITS})
 if(HAVE_GMP)
     set(_my_incdir ${GMP_INCDIR})
     set(_my_libdir ${GMP_LIBDIR})
+    set(_compdefs ${_compdefs} -DHAVE_GMP=${HAVE_GMP})
 elseif(HAVE_MPIR)
     set(_my_incdir ${MPIR_INCDIR})
     set(_my_libdir ${MPIR_LIBDIR})
+    set(_compdefs ${_compdefs} -DHAVE_MPIR=${HAVE_MPIR})
 endif()
 message(STATUS "Testing for gmp_random predictability")
 try_run(gmp_randstate_runs gmp_randstate_compiles
@@ -13,10 +16,7 @@ try_run(gmp_randstate_runs gmp_randstate_compiles
         CMAKE_FLAGS
         -DINCLUDE_DIRECTORIES=${_my_incdir}
         -DLINK_DIRECTORIES=${_my_libdir}
-        COMPILE_DEFINITIONS
-	-DULONG_BITS=${ULONG_BITS}
-	-DHAVE_MPIR=${HAVE_MPIR}
-	-DHAVE_GMP=${HAVE_GMP}
+        COMPILE_DEFINITIONS ${_compdefs}
         LINK_LIBRARIES ${gmp_libname}
         COMPILE_OUTPUT_VARIABLE compilevar
         RUN_OUTPUT_VARIABLE outvar
