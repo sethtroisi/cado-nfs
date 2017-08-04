@@ -123,7 +123,7 @@ cado_define_test(F9_fakereltest
     SCRIPT
     ${CMAKE_CURRENT_SOURCE_DIR}/F9.fakerels.sh
     ${F9_roots} ${las_path} ${CADO_NFS_SOURCE_DIR}
-    TARGET_DEPENDENCIES fake_rels
+    TARGET_DEPENDENCIES fake_rels freerel
     TEST_DEPENDENCIES F9_makefbtest)
 
 cado_define_test(test_memset_things.cpp LIBRARIES las-norms utils)
