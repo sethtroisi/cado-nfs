@@ -212,14 +212,14 @@ static inline void vaddmul_tiny_64K_64L(
                 __m128i one = _mpfq_mm_set1_epi64_c(1);
                 for (unsigned int i = 0; i < 64; i++) {
                     __m128i zw = _mpfq_mm_set1_epi64(*vv);
-                    r = _mm_xor_si128(r, _mm_and_si128(zw, _mm_sub_epi64(_mm_setzero_si128(), __mm_and_si128(a, one))));
+                    r = _mm_xor_si128(r, _mm_and_si128(zw, _mm_sub_epi64(_mm_setzero_si128(), _mm_and_si128(a, one))));
                     a = _mm_srli_epi64(a, 1);
                     vv += L;
                 }
             }
             /* Because L > 1, the destination words are not contiguous */
-            w0[l] = _mm_xor_si128(w0[l], _mm_cvtsi128_si64(r));
-            w1[l] = _mm_xor_si128(w1[l], _mm_cvtsi128_si64(_mm_srli_si128(r, 8)));
+            w0[l] ^= _mm_cvtsi128_si64(r);
+            w1[l] ^= _mm_cvtsi128_si64(_mm_srli_si128(r, 8));
             v0++; /* next column in v */
         }
         u0 += 2 * K; u1 += 2 * K;
