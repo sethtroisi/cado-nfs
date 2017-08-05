@@ -39,6 +39,12 @@ endif()
 # See bug #21397
 CHECK_CXX_SOURCE_COMPILES("
 #include <memory>
+#ifdef HAVE_BOOST_SHARED_PTR
+#include <boost/shared_ptr.hpp>
+#include <boost/make_shared.hpp>
+namespace std { using boost::shared_ptr; using boost::make_shared; }
+#endif
+
 class nocopy {
         protected:
                 nocopy() {}
