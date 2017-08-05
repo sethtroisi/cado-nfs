@@ -314,7 +314,7 @@ public:
   }
 
   /* Returns true if "item" is in the set, and false otherwise */
-#ifdef __GNUC__
+#if defined(__GNUC__) && !defined(__INTEL_COMPILER)
   __attribute__((optimize("unroll-all-loops")))
 #endif
   inline bool contains(const storagetype pattern) const {
