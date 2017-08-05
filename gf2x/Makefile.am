@@ -106,6 +106,7 @@ untaint:
 	cp $(srcdir)/toom-gpl-placeholder.c $(srcdir)/toom-gpl.c
 
 dist-hook:
+	-find $(distdir)/already_tuned/tuned \! -type d -a \! -name README | xargs rm
 	-git log --boundary 29b13131cfaf95132f6a0602d3e0575694359d11..HEAD > $(distdir)/ChangeLog
 
 # This one is simply taken from the generated Makefile. I agree it's a

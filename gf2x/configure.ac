@@ -114,6 +114,13 @@ AM_CONDITIONAL([WORDSIZE_IS_64],[test "x$gf2x_wordsize" = x64])
 
 if test "x${enable_hardware_specific_code}" = xno ; then
  echo "Not using hardware-specific code due to --disable-hardware-specific-code flag"
+ gf2x_cv_cc_supports_sse2=no
+ gf2x_cv_cc_supports_sse3=no
+ gf2x_cv_cc_supports_ssse3=no
+ gf2x_cv_cc_supports_sse41=no
+ gf2x_cv_cc_supports_pclmul=no
+ gf2x_cv_cc_supports_march_native=no
+ gf2x_cv_cc_supports_mtune_native=no
 else
  # It is necessary to make all tests. We do encounter in the wild
  # binutils (openbsd binutils 2.15, namely) which are buggy with ssse3,

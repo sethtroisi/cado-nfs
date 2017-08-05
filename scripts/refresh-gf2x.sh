@@ -4,7 +4,7 @@ set -e
 set -x
 
 : ${gf2x_url:=https://gforge.inria.fr/git/gf2x/gf2x.git}
-: ${gf2x_rev:=HEAD}
+: ${gf2x_rev:=gf2x-1.2.x}
 rm -rf gf2x
 
 checkout_that() {
