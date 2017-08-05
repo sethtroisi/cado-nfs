@@ -1520,7 +1520,7 @@ int main(int argc, char *argv[])
 
 #ifdef __OpenBSD__
     if (nthreads > 1) {
-        fptintf(stderr, "Warning: reducing number of threads to 1 for openbsd (unexplained failure https://ci.inria.fr/cado/job/compile-openbsd-59-amd64-random-integer/2775/console\n");
+        fprintf(stderr, "Warning: reducing number of threads to 1 for openbsd (unexplained failure https://ci.inria.fr/cado/job/compile-openbsd-59-amd64-random-integer/2775/console\n");
         nthreads=1;
     }
 #endif
