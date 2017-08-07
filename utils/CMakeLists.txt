@@ -66,13 +66,11 @@ if(ENABLE_SHARED)
 install(TARGETS utils utils_with_io DESTINATION ${LIBSUFFIX}/utils)
 endif()
 
-# To avoid the warning: implicit declaration of function nanosleep. It's POSIX, non c99.
-set (CMAKE_OLD_C_FLAGS "${CMAKE_C_FLAGS}")
-set (CMAKE_C_FLAGS "prout -D _POSIX_C_SOURCE=200809L ${CMAKE_C_FLAGS}")
-add_executable(antebuffer antebuffer.c timing.cpp memusage.c)
-set (CMAKE_C_FLAGS "${CMAKE_OLD_C_FLAGS}")
-
-target_link_libraries(antebuffer pthread)
+if(NOT CMAKE_SYSTEM_NAME EQUAL "FreeBSD")
+    # https://gforge.inria.fr/tracker/index.php?func=detail&aid=21410&group_id=2065&atid=7442
+    add_executable(antebuffer antebuffer.c timing.cpp memusage.c)
+    target_link_libraries(antebuffer pthread)
+endif()
 
 install(TARGETS antebuffer RUNTIME DESTINATION ${LIBSUFFIX}/utils)
 
