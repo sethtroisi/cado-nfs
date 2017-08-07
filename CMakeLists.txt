@@ -291,6 +291,7 @@ endif()
 include("${CADO_NFS_SOURCE_DIR}/config/perl.cmake")
 include("${CADO_NFS_SOURCE_DIR}/config/shared_ptr.cmake")
 include("${CADO_NFS_SOURCE_DIR}/config/cxxabi.cmake")
+include("${CADO_NFS_SOURCE_DIR}/config/regex.cmake")
 
 set(CADO_SHARED)
 
