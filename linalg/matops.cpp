@@ -179,7 +179,8 @@ void mul_6464_6464_sse(mat64_ptr C, mat64_srcptr A, mat64_srcptr B)
 	__m128i one = _cado_mm_set1_epi64_c(1);
 	for (i = 0; i < 64; i++) {
 	    __m128i bw = _cado_mm_set1_epi64(B[i]);
-            c = _mm_xor_si128(c,_mm_and_si128(bw,_mm_sub_epi64(_mm_setzero_si128(),_mm_and_si128(a, one))));
+	    // c ^= (bw & -(a & one));
+            c = _mm_xor_si128(c, _mm_and_si128(bw, _mm_sub_epi64(_mm_setzero_si128(), _mm_and_si128(a, one))));
 	    a = _mm_srli_epi64(a, 1);
 	}
 	*Cw++ = c;
@@ -810,7 +811,7 @@ void addmul_N64_6464_sse(uint64_t *C,
 	for (int i = 0; i < 64; i++) {
 	    __m128i bw = _cado_mm_set1_epi64(B[i]);
 	    // c ^= (bw & -(a & one));
-            c = _mm_xor_si128(c,_mm_and_si128(bw,_mm_sub_epi64(_mm_setzero_si128(),_mm_and_si128(a, one))));
+            c = _mm_xor_si128(c, _mm_and_si128(bw, _mm_sub_epi64(_mm_setzero_si128(), _mm_and_si128(a, one))));
 	    a = _mm_srli_epi64(a, 1);
 	}
 	*Cw = _mm_xor_si128(*Cw, c);
@@ -848,7 +849,8 @@ void mul_N64_6464_sse(uint64_t *C,
         __m128i one = _cado_mm_set1_epi64_c(1);
 	for (int i = 0; i < 64; i++) {
 	    __m128i bw = _cado_mm_set1_epi64(B[i]);
-	    c ^= (bw & -(a & one));
+            // c ^= (bw & -(a & one));
+            c = _mm_xor_si128(c, _mm_and_si128(bw, _mm_sub_epi64(_mm_setzero_si128(), _mm_and_si128(a, one))));
 	    a = _mm_srli_epi64(a, 1);
 	}
 	*Cw++ = c;
