@@ -201,9 +201,10 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "^AppleClang")
     endif()
 endif()
 if(CMAKE_CXX_COMPILER_ID MATCHES "^Clang")
-    # Not the slightest idea either. Icing on the cake, Apple's clang
-    # identifies itself as plain Clang on some occasions...
-    if (NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS "4.0.0")
+    # According to http://clang.llvm.org/cxx_status.html
+    # Caveat: Apple's clang identifies itself as plain Clang on some
+    # occasions...
+    if (NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS "3.3")
         set (CMAKE_CXX_FLAGS   "-std=c++11 ${CMAKE_CXX_FLAGS}")
         set (HAVE_CXX11 1)
         message(STATUS "Enabling C++11 support")
