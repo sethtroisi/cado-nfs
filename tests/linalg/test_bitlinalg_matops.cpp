@@ -504,6 +504,8 @@ int main(int argc, char * argv[])
             exit(EXIT_FAILURE);
         }
     }
+    if (!seed) seed = rand();
+    printf("# seeding with seed %d\n", seed);
 #if !defined(HAVE_USUAL_SRAND_DETERMINISTIC_BEHAVIOR) && defined(HAVE_SRAND_DETERMINISTIC)
     if (seed) srand_deterministic(seed);
 #else
