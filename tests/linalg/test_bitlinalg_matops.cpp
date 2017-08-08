@@ -5,6 +5,8 @@
 #include <string.h>
 #include <time.h>
 #include <assert.h>
+#include <stdint.h>
+#include <inttypes.h>
 
 #include "portability.h"
 #include "macros.h"
@@ -485,6 +487,7 @@ void level3_gauss_tests_N(int n __attribute__((unused)))
 int main(int argc, char * argv[])
 {
     unsigned int n = 2 * 1000 * 1000;
+    int seed = 0;
     argc--,argv++;
     for( ; argc ; argc--, argv++) {
         if (strcmp(argv[0], "--test-fast") == 0 && argc >= 2) {
@@ -493,11 +496,22 @@ int main(int argc, char * argv[])
         } else if (strcmp(argv[0], "--n") == 0 && argc >= 2) {
             n = atoi(argv[1]);
             argc--,argv++;
+        } else if (strcmp(argv[0], "-seed") == 0 && argc >= 2) {
+            seed = atoi(argv[1]);
+            argc--,argv++;
         } else {
             fprintf(stderr, "arguments: [--test-fast <x>] [--n <n>]\n");
             exit(EXIT_FAILURE);
         }
     }
+#if !defined(HAVE_USUAL_SRAND_DETERMINISTIC_BEHAVIOR) && defined(HAVE_SRAND_DETERMINISTIC)
+    if (seed) srand_deterministic(seed);
+#else
+    /* won't be deterministic if
+     * !defined(HAVE_USUAL_SRAND_DETERMINISTIC_BEHAVIOR), but so be it.
+     */
+    if (seed) srand(seed);
+#endif
     printf("## compile-time features\n");
 #ifdef HAVE_M4RI
     printf("## HAVE_M4RI\n");
@@ -558,8 +572,6 @@ int main(int argc, char * argv[])
 
     if (1) {
         mat64 m[4],l[4],u[4];
-        srand(1728);
-
         {
             pmat p,q;
             pmat_init(p, 64);

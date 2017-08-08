@@ -64,6 +64,8 @@
 #cmakedefine    HAVE_CXX11
 #cmakedefine    HAVE_STD_SHARED_PTR
 #cmakedefine    HAVE_BOOST_SHARED_PTR
+#cmakedefine    HAVE_USUAL_SRAND_DETERMINISTIC_BEHAVIOR
+#cmakedefine    HAVE_SRAND_DETERMINISTIC
 #cmakedefine    HAVE_CXXABI_H
 #define    ULONG_BITS   @ULONG_BITS@
 #define    ULONGLONG_BITS   @ULONGLONG_BITS@
