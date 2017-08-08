@@ -1826,6 +1826,9 @@ void pmattab_complete(int * phi, uint64_t * bits, int nbits)
     }
 }
 
+/* Given phi as in PLUQ64_inner below, return two permutation matrices
+ * such that p*u*transpose(q) is a diagonal matrix.
+ */
 void pqperms_from_phi(pmat_ptr p, pmat_ptr q, int * phi, int m, int n)
 {
     int ip = 0;ASSERT_ALWAYS((m%64)==0);ASSERT_ALWAYS(p->n==m);
@@ -1853,8 +1856,19 @@ void mat64_copy(mat64_ptr b, mat64_srcptr a)
 {
     memcpy(b,a,sizeof(mat64));
 }
+void mat64_set_zero(mat64_ptr m)
+{
+    memset(m,0,sizeof(mat64));
+}
 
-/* {{{ PLUQ stuff */
+/* {{{ PLUQ stuff -- well we're not computing exactly PLUQ */
+
+/* Compute matrices l and u such that l*a = u. phi[] is filled with the
+ * column indices (shifted by col_offset) of he pivots in u: entry
+ * (i,phi(i)-col_offset) is u is one. When row i in u has no important
+ * non-zero coefficient, then phi[i] < 0.
+ * In column phi[i]-col_offset of u, entries of row index >i are zero.
+ */
 int PLUQ64_inner(int * phi, mat64 l, mat64 u, mat64 a, int col_offset)
 {
     const int m = 64;
@@ -1921,12 +1935,25 @@ int PLUQ64_inner(int * phi, mat64 l, mat64 u, mat64 a, int col_offset)
     return rank;
 }
 
+/* PLUQ -- well we're not computing exactly PLUQ 
+ * PLUQ says: Any m*n matrix A with rank r , can be written A = P*L*U*Q
+ * where P and Q are two permutation matrices, of dimension respectively
+ * m*m and n*n, L is m*r unit lower triangular and U is r*n upper
+ * triangular.
+ *
+ * Here we compute p,l,u,q such that p*l*a*transpose(q) = an upper
+ * triangular matrix, whose diagonal has r one and n-r zeros.
+ */
 /* outer routine */
 int PLUQ64(pmat_ptr p, mat64 * l, mat64 * u, pmat_ptr q, mat64 * m)
 {
     int phi[64];
     for(int i = 0 ; i < 64 ; i++) phi[i]=-1;
     int r = PLUQ64_inner(phi,l[0],u[0],m[0],0);
+    /* l*m = u */
+    /* p*u*transpose(q) = diagonal.
+     * p*l*m*transpose(q) = diagonal.
+     */
     pqperms_from_phi(p,q,phi,64,64);
     return r;
 }
@@ -1974,7 +2001,7 @@ int PLUQ64_n(int * phi, mat64 l, mat64 * u, mat64 * a, int n)
     }
 #endif
     for( ; b < nb ; b++)
-        mul_6464_6464(u[b], l, u[b]);
+        mul_6464_6464(u[b], l, a[b]);
     return nspins*m+b;
 }
 
@@ -2026,6 +2053,13 @@ static inline void bli_64x64N_clobber(mat64 h, mat64 * us, int * phi, int nb)
 #endif
 }
 
+/* Given a 64x128 matrix u that is upper triangular up to some
+ * permutation, written as a sequence of two 64x64 matrices,
+ * and given a table phi such that either phi[i]<0, or entry (i,phi[i])
+ * of u is non-zero, and the nonnegative values taken by phi are all
+ * distinct, compute a matrix H such that H*U has exactly one non-zero
+ * entry in each column whose index is a value taken by phi.
+ */
 void bli_64x128(mat64 h, mat64 * us, int * phi)
 {
     mat64 uc[2];
@@ -2096,6 +2130,11 @@ void extract_cols_64_from_128(mat64 t, mat64 * m, int * phi)
     }
     */
 
+/* This code is here because someday, I vaguely had the idea of using it
+ * as a building block for the binary lingen. In fact, the code fragments
+ * here for PLUQ and such have never been put in production, so I'm
+ * pretty sure they're quite fragile.
+ */
 int PLUQ128(pmat_ptr p, mat64 * l, mat64 * u, pmat_ptr q, mat64 * m)
 {
     /* This is really an outer routine. An inner routine will not have p
@@ -2106,31 +2145,63 @@ int PLUQ128(pmat_ptr p, mat64 * l, mat64 * u, pmat_ptr q, mat64 * m)
     int phi[128];
     for(int i = 0 ; i < 128 ; i++) phi[i]=-1;
 
+    mat64_set_zero(l[0]);
+    mat64_set_zero(l[1]);
+    mat64_set_zero(l[2]);
+    mat64_set_identity(l[3]);
+
     int r1 = PLUQ64_n(phi,l[0],u,m,128);
     r1 = r1 % 64;
 
     // andouille 7.65
 
+    /* l[0] * m = u */
+
     mat64 h;
     bli_64x128(h, u, phi);
+    /* h * u is "sort of" identity, at least up to permutation */
+
     mat64 l21;
+    mat64_ptr S = l21;
 
     /* This is __very__ expensive w.r.t. what it really does :-(( */
-    extract_cols_64_from_128(l21, m+2, phi);
+    extract_cols_64_from_128(S, m+2, phi);
+
+    /* Column i of S is column phi[i] in Mlow. Now by bli_64x128, in
+     * column phi[i] of h*u, only the coefficient of row i is equal to 1,
+     * so that column phi[i] of S*H*U is equal to column phi[i] of Mlow
+     */
 
     // andouille 16.7 -- 17.5
-    mul_6464_6464(l21, l21, h);
+    mul_6464_6464(l21, S, h);
     mul_6464_6464(l[2], l21, l[0]);
 
+    // The matrix below has many zero columns (as many as the rank of
+    // Mhigh).
+    // Mlow+S*H*l[0]*Mhigh;
+
+    /* The matrix [ l[0] 0 ] = L
+     *            [ l[2] 1 ]
+     * is equal to [ 1   0 ]   [ l[0]  0 ]
+     *             [ l21 1 ] * [  0    1 ]
+     *
+     * Now based on l[0] * mhigh, compute t2 = (L*M)_low
+     */
     mat64 t2[2];
     mul_6464_6464(t2[0], l21, u[0]); add_6464_6464(t2[0], m[2], t2[0]);
     mul_6464_6464(t2[1], l21, u[1]); add_6464_6464(t2[1], m[3], t2[1]);
 
+    /* And do pluq again on this low part. Most of it is zero. */
     int r2 = PLUQ64_n(phi + 64,l[3],u+2,t2,128);
     r2 = r2 % 64;
+
+    /* need to adjust l[3] */
     mul_6464_6464(l[2], l[3], l[2]);
 
     pqperms_from_phi(p,q,phi,128,128);
+
+    /* At this point P*L*M*Tranpose(Q) should be upper triangular with
+     * unit diagonal */
     
     return r1 + r2;
 }

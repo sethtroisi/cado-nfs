@@ -396,6 +396,17 @@ void level1_mul_tests_64()
 }
 /* }}} */
 
+/* PLUQ -- well we're not computing exactly PLUQ 
+ * PLUQ says: Any m*n matrix A with rank r , can be written A = P*L*U*Q
+ * where P and Q are two permutation matrices, of dimension respectively
+ * m*m and n*n, L is m*r unit lower triangular and U is r*n upper
+ * triangular.
+ *
+ * Here we compute p,l,u,q such that p*l*a*transpose(q) = an upper
+ * triangular matrix (and u is l*a).
+ *
+ * p*l is lower triangular.
+ */
 void check_pluq(pmat_ptr p, mat64 * l, mat64 * u, pmat_ptr q, mat64 * m, int n)
 {
     mat64 pm[(n/64)*(n/64)];
@@ -408,7 +419,7 @@ void check_pluq(pmat_ptr p, mat64 * l, mat64 * u, pmat_ptr q, mat64 * m, int n)
     mat64 qmt[(n/64)*(n/64)];
     pmat_get_matrix(qmt, qt);
 
-    /* compute p*u*q^-1 */
+    /* compute p*u*transpose(q) */
     mat64 pu[(n/64)*(n/64)];
     memset(pu, 0, (n/64)*(n/64)*sizeof(mat64));
 
@@ -430,6 +441,12 @@ void check_pluq(pmat_ptr p, mat64 * l, mat64 * u, pmat_ptr q, mat64 * m, int n)
         mul_6464_6464(tmp, pu[i*(n/64)+k], qmt[k*(n/64)+j]);
         add_6464_6464(puq[i*(n/64)+j], puq[i*(n/64)+j], tmp);
     }
+    
+    /* at this point puq = p*u*transpose(q) should be a upper triangular,
+     * with normalized diagonal. */
+    for(int i = 0 ; i < (n/64) ; i++ ) {
+        ASSERT_ALWAYS(mat64_is_uppertriangular(puq[i*(n/64)+i]));
+    }
 
     mat64 lm[(n/64)*(n/64)];
     memset(lm, 0, (n/64)*(n/64)*sizeof(mat64));
@@ -448,9 +465,6 @@ void check_pluq(pmat_ptr p, mat64 * l, mat64 * u, pmat_ptr q, mat64 * m, int n)
         for(int j = 0 ; j < (n/64) ; j++ ) {
             ASSERT_ALWAYS(mat64_eq(lm[i*(n/64)+j], u[i*(n/64)+j]));
         }
-    }
-    for(int i = 0 ; i < (n/64) ; i++ ) {
-        ASSERT_ALWAYS(mat64_is_uppertriangular(puq[i*(n/64)+i]));
     }
     pmat_clear(qt);
 }
