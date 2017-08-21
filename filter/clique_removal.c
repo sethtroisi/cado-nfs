@@ -61,6 +61,11 @@ static inline float
 comp_weight_function (weight_t w)
 {
 #ifdef USE_CAVALLAR_WEIGHT_FUNCTION
+  /* If W is the original definition of Cavallar's weight, i.e.,
+     the sum of 1/2^(w-2) for all ideals of weight 3, plus the
+     number of relations of the clique, we return here 0.5*(W-1)
+     which is equivalent since we only compare weights.
+     Cf https://lists.gforge.inria.fr/pipermail/cado-nfs-discuss/2017-August/000763.html */
   if (w >= 3)
     return ldexpf(1, -(w - 1));
   else if (w == 2)
