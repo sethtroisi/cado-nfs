@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 
-set -x
+# For debug, uncomment:
+# set -x
+
 ########################################################################
 # This script is responsible of handing over the build process, in a
 # proper out of source build directory. It takes care of calling cmake
