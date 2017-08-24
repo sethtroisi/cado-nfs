@@ -232,6 +232,9 @@ Some more internal parameters.
   background by another process. Use of this option is conjunction with
   skip_online_checks=1 is dangerous, since it leaves open the possibility
   of a failure which stands no chance to be eventually detected.
+* checkpoint_precious=<n>. When keep_rolling_checkpoints is defined, this
+  will keep checkpoints of index multiple of n (where n is intended to be a
+  multiple of 'interval').
 * save_submatrices=[0|1] save the sub-matrices used by each node in
   simple binary files. These files are not used by the computation, so
   this option is not enabled by default.
