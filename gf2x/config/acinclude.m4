@@ -89,10 +89,12 @@ AC_DEFUN([SSE2_EXAMPLE],[AC_LANG_SOURCE([
 #include <emmintrin.h>
 
 int main(int argc, char * argv[[]]) {
+    volatile int a0 = 17;
+    volatile int a1 = 42;
     __m128i foo = _mm_setr_epi32(argc, argc + 1, argc + 2, argc + 3);
     __m128i bar = _mm_setr_epi32(argc + 3, argc + 2, argc + 1, argc);
-    __m128i x = _mm_setr_epi32(42, 0, 17, 0);
-    __m128d g = _mm_set_pd(42.0, 17.0);
+    __m128i x = _mm_setr_epi32(a1, 0, a0, 0);
+    __m128d g = _mm_set_pd((double) a1, (double) a0);
     x = _mm_srl_epi64(x, _mm_setr_epi32(2,0,0,0));
     foo = _mm_mullo_epi16(foo, bar);
     foo = _mm_slli_epi64(foo, 1);
@@ -116,8 +118,10 @@ AC_DEFUN([SSE3_EXAMPLE],[AC_LANG_SOURCE([
 
 int main()
 {
-    __m128d x = _mm_setr_pd(12.34, 34.12);
-    __m128d y = _mm_setr_pd(78.56, 56.78);
+    volatile double a0 = 12.34;
+    volatile double a1 = 56.78;
+    __m128d x = _mm_setr_pd(a0, 34.12);
+    __m128d y = _mm_setr_pd(78.56, a1);
     double a[[2]], b[[2]] = { 78.56 + 56.78, 12.34 + 34.12 };
 
     y = _mm_hadd_pd(y, x);
@@ -134,8 +138,10 @@ AC_DEFUN([SSSE3_EXAMPLE],[AC_LANG_SOURCE([
 
 int main()
 {
-    __m128i x = _mm_setr_epi32(0x03020100, 0x07060504, 0x0B0A0908, 0x0F0E0D0C);
-    __m128i y = _mm_setr_epi32(0x13121110, 0x17161514, 0x1B1A1918, 0x1F1E1D1C);
+    volatile uint32_t a0 = 0x03020100;
+    volatile uint32_t a1 = 0x1F1E1D1C;
+    __m128i x = _mm_setr_epi32(a0, 0x07060504, 0x0B0A0908, 0x0F0E0D0C);
+    __m128i y = _mm_setr_epi32(0x13121110, 0x17161514, 0x1B1A1918, a1);
     uint64_t a[[2]], b[[2]] = { 0x0C0B0A0908070605, 0x14131211100F0E0D };
     y = _mm_alignr_epi8(y, x, 0x5);
     memcpy (a, &y, 16);
@@ -145,16 +151,26 @@ int main()
 
 AC_DEFUN([SSE41_EXAMPLE],[AC_LANG_SOURCE([
 #include <stdint.h>
+#include <stdlib.h>
 #include <smmintrin.h>
 
 int main() {
-    __m128i x = _mm_setr_epi32(42, 0, 17, 0);
-    __m128i y = _mm_setr_epi32(41, 0, 17, 0);
-    x = _mm_cmpeq_epi64(x, y);
     /* the following test is for emulated 32-bit on physical 64-bit */
     if (sizeof(unsigned long) != 8)
       abort ();
-    return 0;
+    volatile int a0 = 17;
+    volatile int a1 = 42;
+    __m128i x = _mm_setr_epi32(a1, 0, a0, 0);
+    // x = 0 0x2a 0 0x11
+    __m128i y = _mm_setr_epi32(42, 0, 17, 0);
+    // y = 0 0x2a 0 0x11
+    __m128i ma = _mm_max_epi32(x, y);
+    __m128i mi = _mm_min_epi32(x, y);
+    __m128i z = _mm_xor_si128(mi, ma);
+    int ok0 = _mm_testz_si128(z, z);
+    __m128i c = _mm_cmpeq_epi64(x, y);
+    int ok1 = _mm_extract_epi32(c, 0) && _mm_extract_epi32(c, 1);
+    return (ok0 && ok1) ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 ])])
 AC_DEFUN([PCLMUL_EXAMPLE],[AC_LANG_SOURCE([
@@ -177,8 +193,10 @@ int main() {
             )
     /* _m128i from 1 int64_t's */
 #define _gf2x_mm_set1_epi64(u) _mm_set1_epi64( _gf2x_mm_cvtsi64_m64((int64_t) (u)))
-    __m128i a = _gf2x_mm_set1_epi64(17);
-    __m128i b = _gf2x_mm_set1_epi64(42);
+    volatile int a0 = 17;
+    volatile int a1 = 42;
+    __m128i a = _gf2x_mm_set1_epi64(a0);
+    __m128i b = _gf2x_mm_set1_epi64(a1);
     union { __m128i s; unsigned long x[[2]]; } proxy;
     proxy.s = _mm_clmulepi64_si128(a, b, 0);
     return proxy.x[[0]] - 650;
@@ -492,6 +510,63 @@ AC_DEFUN([CHECK_PCLMUL_SUPPORT],[
  fi
 ])# CHECK_PCLMUL_SUPPORT
 
+AC_DEFUN([HELLO_WORLD_EXAMPLE],[AC_LANG_SOURCE([
+#include <stdio.h>
+
+int main() {
+    printf("hello\n");
+    return 0;
+}
+])])
+
+
+AC_DEFUN([CHECK_MARCH_NATIVE_SUPPORT],[
+ ac_save_CFLAGS=$CFLAGS
+ special_double_setting="yes, via -march=x86-64 -march=native"
+ AC_CACHE_CHECK([whether $CC understands -march=native], [gf2x_cv_cc_supports_march_native],[
+  gf2x_cv_cc_supports_march_native=no
+  CFLAGS="$ac_save_CFLAGS -march=native"
+  AC_COMPILE_IFELSE(
+      [HELLO_WORLD_EXAMPLE()],
+      [
+      gf2x_cv_cc_supports_march_native=yes
+      ],
+      [
+      CFLAGS="$ac_save_CFLAGS -march=x86-64 -march=native"
+      AC_COMPILE_IFELSE(
+          [HELLO_WORLD_EXAMPLE()],
+          [
+          gf2x_cv_cc_supports_march_native="$special_double_setting"
+          ],
+          [AC_MSG_RESULT(no)])
+      ]
+  )
+  CFLAGS=$ac_save_CFLAGS
+  ])
+  if test "$gf2x_cv_cc_supports_march_native" = "$special_double_setting" ;then
+    CFLAGS="$CFLAGS -march=x86-64 -march=native"
+  elif test "$gf2x_cv_cc_supports_march_native" = "yes" ;then
+    CFLAGS="$CFLAGS -march=native"
+  fi
+])# CHECK_MARCH_NATIVE_SUPPORT
+
+AC_DEFUN([CHECK_MTUNE_NATIVE_SUPPORT],[
+ ac_save_CFLAGS=$CFLAGS
+ AC_CACHE_CHECK([whether $CC understands -mtune=native], [gf2x_cv_cc_supports_mtune_native],[
+  gf2x_cv_cc_supports_mtune_native=no
+  CFLAGS="$ac_save_CFLAGS -mtune=native"
+  AC_COMPILE_IFELSE(
+      [HELLO_WORLD_EXAMPLE()],
+      [
+      gf2x_cv_cc_supports_mtune_native=yes
+      ])
+  CFLAGS=$ac_save_CFLAGS
+  ])
+  if test "$gf2x_cv_cc_supports_mtune_native" = "yes" ;then
+    CFLAGS="$CFLAGS -mtune=native"
+  fi
+])# CHECK_MTUNE_NATIVE_SUPPORT
+
 
 # It is necessary to make all tests. We do encounter in the wild binutils
 # (openbsd binutils 2.15, namely) which are buggy with ssse3, and that
@@ -534,84 +609,6 @@ AC_MSG_CHECKING([warning verbosity option])
   AC_MSG_RESULT([$ac_compile_warnings_msg])
   unset ac_compile_warnings_msg
   unset ac_compile_warnings_opt
-])
-
-
-dnl check gmp
-AC_DEFUN([GF2X_CHECK_FOR_GMP],[
-	AC_ARG_WITH([gmp],
-		    [AS_HELP_STRING([--with-gmp=DIR],[GMP installation directory])],
-		    [
-		    CPPFLAGS="$CPPFLAGS -I$withval/include"
-		    LDFLAGS="$LDFLAGS -L$withval/lib"
-                    check_specifically_for=gmp
-		    ])
-	AC_ARG_WITH([mpir],
-		    [AS_HELP_STRING([--with-mpir=DIR],[MPIR installation directory])],
-		    [
-		    CPPFLAGS="$CPPFLAGS -I$withval/include"
-		    LDFLAGS="$LDFLAGS -L$withval/lib"
-                    check_specifically_for=mpir
-		    ])
-	AC_MSG_CHECKING(for GMP or MPIR)
-        save_LIBS="$LIBS"
-        found_gmp=
-        if ! [[ "$check_specifically_for" ]] || [[ "$check_specifically_for" = "gmp" ]] ; then
-            LIBS="-lgmp $save_LIBS"
-            AC_LINK_IFELSE(
-                    [AC_LANG_PROGRAM(
-                            [[#include "gmp.h"]],
-                            [[mpz_t x;  mpz_init(x) ; mpz_clear(x);]]
-                    )],
-                    [
-                    AC_MSG_RESULT(yes)
-                    AC_DEFINE([GF2X_HAVE_GMP_H], [1], [Define to 1 if the gmp.h header exists])
-                    found_gmp=gmp
-                    ],
-                    [
-                    AC_MSG_RESULT(no)
-                    if [[ "$check_specifically_for" ]] ; then
-                    AC_MSG_ERROR([libgmp not found or uses a different API. Please see the README file for issues with missing dependencies.])
-                    fi
-                    ])
-        fi
-        if ! [[ "$found_gmp" ]] && [[ "$check_specifically_for" != "gmp" ]] ; then
-            LIBS="-lmpir $save_LIBS"
-            AC_LINK_IFELSE(
-                    [AC_LANG_PROGRAM(
-                            [[#include "mpir.h"]],
-                            [[mpz_t x;  mpz_init(x) ; mpz_clear(x);]]
-                    )],
-                    [
-                    AC_MSG_RESULT(yes)
-                    AC_DEFINE([GF2X_HAVE_MPIR_H], [1], [Define to 1 if the mpir.h header exists])
-                    found_gmp=mpir
-                    ],
-                    [
-                    AC_MSG_RESULT(no)
-                    if [[ "$check_specifically_for" ]] ; then
-                    AC_MSG_ERROR([libmpir not found or uses a different API. Please see the README file for issues with missing dependencies.])
-                    fi
-                    ])
-        fi
-        if ! [[ "$found_gmp" ]] ; then
-                AC_MSG_ERROR([neither GMP nor MPIR could be found, or perhaps there is one but which uses a different API. Please see the README file for issues with missing dependencies.])
-        fi
-	AC_MSG_CHECKING(for recent GMP or MPIR)
-	AC_COMPILE_IFELSE(
-		[AC_LANG_SOURCE(
-		[[
-	#include <$found_gmp.h>
-	#if (__GNU_MP_VERSION*100 + __GNU_MP_VERSION_MINOR*10 + __GNU_MP_VERSION_PATCHLEVEL < 432)
-	# error "Minimal GMP version is 4.3.2"
-	error
-	#endif
-		]])],
-		[AC_MSG_RESULT(yes)],
-		[
-		AC_MSG_RESULT(no)
-		AC_MSG_ERROR([GMP version >= 4.3.2 required])
-		])
 ])
 
 

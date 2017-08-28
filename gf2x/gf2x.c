@@ -57,7 +57,7 @@ void gf2x_mul_basecase(unsigned long * c, const unsigned long * a,
 	case 8: gf2x_mul8(c, a, b); return;
 	case 9: gf2x_mul9(c, a, b); return;
 	default:
-	    fprintf(stderr, "basecase.c: ran off end of switch\n"
+	    fprintf (stderr, "gf2x_mul_basecase: ran off end of switch\n"
 		    "na=nb=%ld ; decrease GF2X_MUL_KARA_THRESHOLD\n", na);
             abort();
 	}
@@ -128,7 +128,7 @@ void gf2x_mul_r(unsigned long * c,
 #ifdef GF2X_MUL_FFT_TABLE
     long ix, K, sab = sc / 2;
     long max_ix = sizeof(T_FFT_TAB)/sizeof(T_FFT_TAB[0]);
-    for (ix = 0; T_FFT_TAB[ix + 1][0] <= sab && ix + 1 < max_ix; ix++);
+    for (ix = 0; ix + 1 < max_ix && T_FFT_TAB[ix + 1][0] <= sab; ix++);
     /* now T_FFT_TAB[ix][0] <= sab < T_FFT_TAB[ix+1][0] */
     K = T_FFT_TAB[ix][1];
 
@@ -143,16 +143,18 @@ void gf2x_mul_r(unsigned long * c,
     }
 #endif
 
-    unsigned long sp1, sp2, sp3, sp;
-    sp1 = gf2x_toomspace(sa);	// Space for balanced TC routines
-    sp2 = gf2x_toomuspace(2 * sa);	// Space for unbalanced TC routines
-    sp3 = 2 * sa + gf2x_toomspace(sa);	// Space for unbalanced TC routines w/ lazy cut
+    unsigned long sp, sp2;
+    sp = gf2x_toomspace(sa); // Space for balanced TC routines
 
-    sp = sp1;
-    if (sp < sp2)
-        sp = sp2;
-    if (sp < sp3)
-        sp = sp3;		// Worst-case space required
+    if (sa != sb)
+      {
+        sp2 = gf2x_toomuspace(2 * sa); // Space for unbalanced TC routines
+        if (sp < sp2)
+          sp = sp2; /* worst-case required */
+        sp2 = 2 * sa + gf2x_toomspace(sa); // Space for unbalanced TC routines w/ lazy cut
+        if (sp < sp2)
+          sp = sp2; /* worst-case required */
+      }
 
     gf2x_mul_pool_t xxpool;
     struct gf2x_mul_pool_s * xpool;

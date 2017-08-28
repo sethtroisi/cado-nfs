@@ -1,11 +1,12 @@
+set -ex
+
 unset `locale | cut -d= -f1`
 export LANG=C
 
 for f in autoconf automake libtool ; do
-    if [ -d $HOME/Packages/$m ] ; then
+    if [ -d $HOME/Packages/$f ] ; then
         export PATH=$HOME/Packages/$f/bin:$PATH
-    fi
-done
+        if [ $f = libtool ] ; then
 # Note: for libtool, we also have to add its aclocal search path to the
 # automake aclocal search path (which is
 # [automake_prefix]/share/aclocal/dirlist); this is done on all ci nodes.
@@ -15,6 +16,13 @@ done
 #  ls -d /usr/share/aclocal >> ~/Packages/automake-1.15/share/aclocal/dirlist
 #
 # although, almost by definition, your mileage may vary.
+
+            # a convenient way to do that is ACLOCAL_PATH
+            ACLOCAL_PATH=$HOME/Packages/$f/share/aclocal:$ACLOCAL_PATH
+            export ACLOCAL_PATH
+        fi
+    fi
+done
 
 
 # openbsd has wrappers which strictly require the AUTOCONF_VERSION and
@@ -34,14 +42,15 @@ else
     exit 1
 fi
 
+# The undocumented environment variable DISABLE_MARCH_NATIVE_TEST can be
+# used to avoid any attempt to add -march=native flag to gcc. This is
+# unfortunately mandatory on some virtual machines for which the cpuid
+# capabilities are incorrectly reported (leading to i386 guests with
+# BMI2, or other similar absurdities).
+export DISABLE_MARCH_NATIVE_TEST=yes
+
 # By default, we do check the FFT interface, but as an option, we also
 # allow not checking it.
 if ! [ "$DISABLE_FFT" ] ; then
     configure_extra="$configure_extra --enable-fft-interface"
-fi
-
-if [ -d "$HOME/Packages/gmp-6.0.0" ] ; then
-    configure_extra="$configure_extra --with-gmp=$HOME/Packages/gmp-6.0.0"
-elif [ -f "/usr/local/include/gmp.h" ] ; then
-    configure_extra="$configure_extra --with-gmp=/usr/local"
 fi

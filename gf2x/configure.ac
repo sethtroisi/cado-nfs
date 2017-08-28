@@ -24,8 +24,14 @@
 #  Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
 #  02110-1301, USA.
 
+AC_INIT([gf2x], [1.3])
 
-AC_INIT([gf2x], [1.2])
+if test "x$CFLAGS" != x ; then
+ has_CFLAGS_from_env=yes
+else
+ has_CFLAGS_from_env=no
+fi
+
 : ${CFLAGS=-g -O4}
 AC_CONFIG_AUX_DIR([config])
 AC_CONFIG_MACRO_DIR([config])
@@ -33,7 +39,7 @@ AC_CANONICAL_TARGET
 
 AC_LANG([C])
 
-AC_CHECK_HEADERS([sys/resource.h])
+AC_FUNC_ALLOCA
 
 AC_SUBST([gf2x_lib_version], [1:2:0])
 
@@ -90,10 +96,10 @@ AC_PROG_CC
 AC_PROG_CXX
 AC_COMPILE_WARNINGS
 AC_PROG_CC_C99
+AC_PROG_CPP
 
 GF2X_PROG_CC_FOR_BUILD
 GF2X_PROG_EXEEXT_FOR_BUILD
-GF2X_CHECK_FOR_GMP
 
 # This macro is used for tuning
 AM_PROG_CC_C_O
@@ -117,6 +123,19 @@ else
  CHECK_SSSE3_SUPPORT()
  CHECK_SSE41_SUPPORT()
  CHECK_PCLMUL_SUPPORT()
+ # The undocumented environment variable DISABLE_MARCH_NATIVE_TEST can be
+ # used to avoid any attempt to add -march=native flag to gcc. This is
+ # unfortunately mandatory on some virtual machines for which the cpuid
+ # capabilities are incorrectly reported (leading to i386 guests with
+ # BMI2, or other similar absurdities).
+ if test "x$DISABLE_MARCH_NATIVE_TEST" = x ; then
+  if test "x$has_CFLAGS_from_env" = xno ; then
+   CHECK_MARCH_NATIVE_SUPPORT()
+   CHECK_MTUNE_NATIVE_SUPPORT()
+  fi
+ else
+   echo "Not doing test for -march=native as per environment variable $DISABLE_MARCH_NATIVE_TEST"
+  fi
 fi
 
 : ${ABI='default'}
@@ -164,18 +183,17 @@ if test x$hwdir = x ; then
       hwdir=x86_sse2
      fi
     elif test x$ABI = xdefault ; then
-     RUNTIME_ULONG_BITS()
-     case x$gf2x_cv_ulongbits in
+     case x$gf2x_wordsize in
       x64|xdontknow) true ;;
       x32)
-        AC_MSG_WARN([The default ABI for this compiler has $gf2x_cv_ulongbits-bit unsigned longs, not 64-bit as the CPU supports. Using $gf2x_cv_ulongbits-bit])
+        AC_MSG_WARN([The default ABI for this compiler has $gf2x_wordsize-bit unsigned longs, not 64-bit as the CPU supports. Using $gf2x_wordsize-bit])
         if test "$gf2x_cv_cc_supports_sse2" = "no" ; then
          hwdir=generic$gf2x_wordsize
         else
          hwdir=x86_sse2
         fi;;
       *)
-       AC_MSG_ERROR([The default ABI for this compiler has $gf2x_cv_ulongbits-bit unsigned longs, this is not supported])
+       AC_MSG_ERROR([The default ABI for this compiler has $gf2x_wordsize-bit unsigned longs, this is not supported])
        ;;
      esac
     fi
@@ -238,8 +256,8 @@ fi
 # This is used in src/Makefile.am
 AM_CONDITIONAL([GF2X_32BIT_SOURCES],[test "x$tuned_nbits" = x32])
 AM_CONDITIONAL([GF2X_64BIT_SOURCES],[test "x$tuned_nbits" = x64])
-AM_CONDITIONAL([GF2X_SSE2_AVAILABLE],[test "x$gf2x_cv_cc_supports_sse2" != xno])
-AM_CONDITIONAL([GF2X_PCLMUL_AVAILABLE],[test "x$gf2x_cv_cc_supports_pclmul" != xno])
+AM_CONDITIONAL([GF2X_SSE2_AVAILABLE],[expr "x$gf2x_cv_cc_supports_sse2" : "xyes.*"])
+AM_CONDITIONAL([GF2X_PCLMUL_AVAILABLE],[expr "x$gf2x_cv_cc_supports_pclmul" : "xyes"])
 AM_CONDITIONAL([GPL_CODE_PRESENT],[grep -q "released under the GPL" "$srcdir/toom-gpl.c"])
 if grep -q "released under the GPL" "$srcdir/toom-gpl.c" ; then
  echo "File $srcdir/toom-gpl.c is present, using a GPL-licensed gf2x"

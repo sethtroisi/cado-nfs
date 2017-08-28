@@ -36,11 +36,16 @@
 #include "gf2x/gf2x-config.h"
 #include "gf2x/gf2x-thresholds.h"
 
-/* These flags are for internal use */
+/* These flags are for internal use. When a new routine is added, don't
+   change the flags, otherwise the tuning in the already_tuned directory
+   will become invalid. */
 #define	GF2X_SELECT_KARA	0	/* do not change ! */
 #define	GF2X_SELECT_TC3		1
 #define	GF2X_SELECT_TC3W	2
 #define	GF2X_SELECT_TC4		3
+#define	GF2X_SELECT_KARAX	4
+#define	GF2X_SELECT_TC3X	5
+
 #define	GF2X_SELECT_UNB_DFLT	0
 #define	GF2X_SELECT_UNB_TC3U	1	/* do not change ! */
 
@@ -63,6 +68,13 @@ extern void gf2x_mul_toom(unsigned long *c, const unsigned long *a,
 			const unsigned long *b, long n, unsigned long *stk);
 extern void gf2x_mul_kara(unsigned long *c, const unsigned long *a, const unsigned long *b,
 			long n, unsigned long *stk);
+#if GF2X_HAVE_SSE2_SUPPORT && (GF2X_WORDSIZE == 64)
+#define HAVE_KARAX
+extern void gf2x_mul_karax(unsigned long *c, const unsigned long *a, const unsigned long *b,
+                           long n, unsigned long *stk);
+extern void gf2x_mul_tc3x(unsigned long *c, const unsigned long *a, const unsigned long *b,
+                          long n, unsigned long *stk);
+#endif
 #if GPL_CODE_PRESENT
 extern void gf2x_mul_tc3(unsigned long *c, const unsigned long *a, const unsigned long *b,
 		 	long n, unsigned long *stk);

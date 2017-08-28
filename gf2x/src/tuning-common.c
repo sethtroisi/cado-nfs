@@ -25,23 +25,51 @@
    02110-1301, USA.
 */
 
-#define _BSD_SOURCE
+#define _DEFAULT_SOURCE /* _BSD_SOURCE is deprecated */
+#define _XOPEN_SOURCE 500 /* for random() */
 #define _POSIX_C_SOURCE 200112L
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
+#include <time.h>
 #include "tuning-common.h"
 
-double mulstep = 1;
+double mulstep = 1.0;
 FILE * rp;
 const char * outfile = NULL;
+double MINTIME = 0.5; /* timer resolution */
+
+/* sets the clock() resolution in seconds */
+void
+set_clock_resolution ()
+{
+  clock_t c0, c1, c2;
+  int i, iter = 1000; /* with 1000 iterations we expect an accuracy of 0.1% */
+  double resolution;
+
+  c0 = c1 = clock ();
+  for (i = 0; i < iter; i++)
+    {
+      do { c2 = clock (); } while (c2 == c1);
+      c1 = c2;
+    }
+  resolution = (double) (c2 - c0) / (double) CLOCKS_PER_SEC;
+  MINTIME = (resolution > 0.5) ? 0.5 : resolution;
+  printf ("Using MINTIME = %.2es with clock() resolution of %.2es\n",
+          MINTIME, resolution / (double) iter);
+}
 
 void random_wordstring(unsigned long *a, long n)
 {
     long i;
     for (i = 0; i < n; i++)
-	a[i] = random();
+      {
+        /* random () returns a value between 0 and RAND_MAX = 2^31-1 */
+	a[i] = random () | (random () << 31);
+        if (sizeof (long) > sizeof (int))
+          a[i] = (a[1] << 31) | random ();
+      }
 }
 
 void dump(const unsigned long *a, long m, const unsigned long *b, long n,
@@ -86,17 +114,25 @@ void check(const unsigned long *a, long m,
            const char * dname, const unsigned long *d)
 {
     long i = 0;
+    int error = 0;
     for(i = 0 ; i < m + n ; i++) {
         if (c[i] != d[i]) {
-            fprintf(stderr,
-                    "Error: %s and %s differ for %ldx%ld at word %ld\n",
-                    cname, dname, m, n, i);
-            if (m + n < 1000) {
-                dump(a, m, b, n, c, d);
-            }
-            abort();
+            if (error++ < 10)
+              {
+                fprintf(stderr,
+                        "Error: %s and %s differ for %ldx%ld at word %ld\n",
+                        cname, dname, m, n, i);
+                fprintf (stderr, "expected %lx, got %lx\n", c[i], d[i]);
+              }
         }
     }
+    if (error)
+      {
+        if (m + n < 1000) {
+          dump(a, m, b, n, c, d);
+        }
+        abort();
+      }
 }
 
 
@@ -121,6 +157,12 @@ void set_tuning_output()
 
     setbuf(rp, NULL);
     setbuf(stdout, NULL);
+}
+
+void close_tuning_output()
+{
+  if (outfile)
+    fclose (rp);
 }
 
 int handle_tuning_mulstep(int * p_argc, char *** p_argv)

@@ -21,43 +21,51 @@
 
 /* Finds smallest irreducible factor of trinomial over GF(2) */
 
-#define VERSION 1.72
+#define VERSION 2.01
+
+#define USE_PDEP /* -mbmi2 should be added to CFLAGS */
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <limits.h> /* for CHAR_BIT */
 #include <NTL/GF2XFactoring.h>
 #include <NTL/ZZXFactoring.h>
+#include <NTL/version.h>
+#include <NTL/GF2XVec.h>
 #include <signal.h>
 #include <string.h>
+#include <assert.h>
+#include <omp.h>
+#include <sys/time.h>
+#ifdef USE_PDEP
+#include <x86intrin.h> /* for _pdep_u64 */
+#endif
 
 #include "halfgcd.hpp"
 
 NTL_CLIENT
 
-/* Usage: factor [options] r < file [see usage() function for options]
-   where file contains lines of the form
+double
+WctTime (void)
+{
+    struct timeval tv[1];
+    gettimeofday (tv, NULL);
+    return (double)tv->tv_sec + (double)tv->tv_usec*1.0e-6;
+}
 
-      s nnn
-   or s u.
+/* Usage: factor [options] -s0 s0 -s1 s1 r [see usage() function for options]
 
-   "s nnn" means that x^r+x^s+1 has a factor of degree nnn,
-   and this is output as is. In fact anything except "s uxxx" is output as is
-   and "s uxxx" is treated like "s u".
-
-   "s u" means that the status of x^r+x^s+1 is unknown;
-   it is checked and "s k px..y" is output if it has a factor of degree k
+   Check every trinomial x^r+x^s+1 for s0 <= s < s1, with 0 < s0 and s1 <= r,
+   and "s k px..y" is output if it has a factor of degree k
    (the factor is x..y in hex encoding);
    otherwise "s irreducible" (or "s primitive") is output.
    If the "-z" option is used then "s u" may be output (in this case
    we need to check the trinomial with another program, e.g. irred).
-
-   r and s should satisfy r > s > 0.
 */
 
 #define BITS_PER_LONG2 (2*NTL_BITS_PER_LONG)
 
-void fastsqr(GF2X& b, GF2X& a, _ntl_ulong r, _ntl_ulong s)
+void fastsqr_old(GF2X& b, GF2X& a, _ntl_ulong r, _ntl_ulong s)
 
 /* Returns b = a*a mod (x^r + x^s + 1)
 
@@ -401,6 +409,166 @@ void fastsqr(GF2X& b, GF2X& a, _ntl_ulong r, _ntl_ulong s)
 
 #endif
 
+void
+print_gf2x (GF2X& a)
+{
+  _ntl_ulong *ap = a.xrep.elts();
+  for (long j = 0; j < 64 * a.xrep.length(); j++)
+    if (ap[j / 64] >> (j % 64) & 1)
+      printf ("+x^%lu", j);
+  printf ("\n");
+}
+
+#ifdef USE_PDEP
+/* b <- a^2 mod (x^r + x^s + 1)
+   Assumes r and s are odd, and NTL_BITS_PER_LONG = 64.
+   Assumes r-s >= 128.
+   Destroys the value in a.
+ */
+void
+fastsqr_pdep (GF2X& b, GF2X& a, _ntl_ulong r, _ntl_ulong s)
+{
+  assert (r & 1);
+  assert (s & 1);
+  assert (NTL_BITS_PER_LONG == 64);
+
+  unsigned long smax = (r + 63) / 64; /* ceil(r/64) */
+
+  unsigned long j, sa = a.xrep.length ();    /* size in words */
+  if (sa < smax)
+    a.xrep.SetLength (smax);	/* Always use length smax for a */
+
+  _ntl_ulong *ap = a.xrep.elts();
+  for (j = sa; j < smax; j++)
+    ap[j] = 0;  	/* Clear high words of a if necessary */
+
+  b.xrep.SetLength (smax);
+
+  unsigned long alpha = (r - 1) / 2;
+  unsigned long delta = (r - s) / 2;
+
+  assert (delta >= 64); /* to avoid word-overlap between b_j and b_{j+delta} */
+
+  /* first loop (Section 4.1 of "A fast algorithm ...", Math. Comp., 2002):
+
+     for j <- r-1 downto alpha+1 do
+        b_{j - delta} <- b_{j - delta} xor b_j
+
+     for j <- r-1-delta downto alpha+1-delta do
+        b_j <- b_j xor b_{j+delta}
+  */
+  unsigned long jmin, jmax, deltaq, deltar;
+  jmin = (alpha + 1 - delta) / 64;  /* floor((alpha+1-delta)/64 */
+  jmax = (r - 1 - delta) / 64;      /* floor((r-1-delta)/64 */
+  deltaq = delta / 64;
+  deltar = delta % 64;
+  assert (jmax + deltaq < smax);
+  assert (jmin + deltaq >= 1);
+  /* separate case for j = jmax, since jmax + deltaq + 1 might
+     equal smax */
+  ap[jmax] ^= ap[jmax + deltaq] >> deltar;
+  if (jmax + deltaq + 1 < smax && deltar != 0)
+    ap[jmax] ^= ap[jmax + deltaq + 1] << (64 - deltar);
+  if (deltar != 0)
+    {
+      for (j = jmax - 1; j > jmin; j--)
+	{
+	  /* add the 64 - deltar least significant bits of ap[j + deltaq],
+	     after shift right by deltar */
+	  ap[j] ^= ap[j + deltaq] >> deltar;
+	  /* add the deltar least significant bits of ap[j + deltaq + 1],
+	     after shift left by 64-deltar */
+	  ap[j] ^= ap[j + deltaq + 1] << (64 - deltar);
+	}
+    }
+  else /* special case for deltar = 0 */
+    {
+      for (j = jmax - 1; j > jmin; j--)
+	ap[j] ^= ap[j + deltaq];
+    }
+  /* separate case for j = jmin, we should only modify bits x..64 where
+     x = (alpha+1-delta) % 64 */
+  unsigned long x = (alpha + 1 - delta) % 64;
+  _ntl_ulong mask = (~0UL >> x) << x;
+  ap[jmin] ^= mask & (ap[jmin + deltaq] >> deltar);
+  if (deltar != 0)
+    ap[jmin] ^= mask & (ap[jmin + deltaq + 1] << (64 - deltar));
+
+  /* truncate the upper bits */
+  ap[r / 64] &= (1UL << (r % 64)) - 1UL;
+
+  /* now we have the bits of the result interleaved in 'a' (cf "A fast ..."):
+     b_0 b_2 b_4 b_6 ... b_{r-1} b_1 b_3 b_5 b_7 ... b_{r-2} */
+  jmax = (alpha + 1) / 64; /* floor(((r-1)/2+1)/64) */
+  deltar = (alpha + 1) % 64;
+  _ntl_ulong *bp = b.xrep.elts(), even, odd;
+  if (deltar != 0)
+    {
+      for (j = 0; j < jmax; j++)
+	{
+	  even = ap[j];
+	  odd = (ap[j + jmax] >> deltar) ^ (ap[j + jmax + 1] << (64 - deltar));
+	  bp[2 * j] = _pdep_u64 (even, 0x5555555555555555) ^
+	    _pdep_u64 (odd, 0xaaaaaaaaaaaaaaaa);
+	  bp[2 * j + 1] = _pdep_u64 (even >> 32, 0x5555555555555555) ^
+	    _pdep_u64 (odd >> 32, 0xaaaaaaaaaaaaaaaa);
+	}
+    }
+  else /* case deltar = 0 */
+    {
+      for (j = 0; j < jmax; j++)
+	{
+	  even = ap[j];
+	  odd = ap[j + jmax];
+	  bp[2 * j] = _pdep_u64 (even, 0x5555555555555555) ^
+	    _pdep_u64 (odd, 0xaaaaaaaaaaaaaaaa);
+	  bp[2 * j + 1] = _pdep_u64 (even >> 32, 0x5555555555555555) ^
+	    _pdep_u64 (odd >> 32, 0xaaaaaaaaaaaaaaaa);
+	}
+    }
+  /* special case for j = jmax */
+  even = ap[jmax];
+  odd = (2 * jmax < smax) ? ap[2 * jmax] >> deltar : 0;
+  if (2 * jmax + 1 < smax && deltar != 0)
+    odd ^= ap[2 * jmax + 1] << (64 - deltar);
+  if (2 * jmax < smax)
+    bp[2 * jmax] = _pdep_u64 (even, 0x5555555555555555) ^
+      _pdep_u64 (odd, 0xaaaaaaaaaaaaaaaa);
+  if (2 * jmax + 1 < smax)
+      bp[2 * jmax + 1] = _pdep_u64 (even >> 32, 0x5555555555555555) ^
+	_pdep_u64 (odd >> 32, 0xaaaaaaaaaaaaaaaa);
+  /* truncate the upper bits */
+  bp[r / 64] &= (1UL << (r % 64)) - 1UL;
+  b.normalize();
+}
+#endif
+
+void
+fastsqr (GF2X& b, GF2X& a, _ntl_ulong r, _ntl_ulong s)
+{
+#if 0 /* debug code */
+  GF2X copy_a = a, c;
+
+  fastsqr_old (b, a, r, s);
+  a = copy_a;
+  fastsqr_pdep (c, a, r, s);
+  if (b != c)
+    {
+      printf ("error for r=%lu s=%lu\n", r, s);
+      printf ("a="); print_gf2x (copy_a);
+      printf ("fastsqr_old:  "); print_gf2x (b);
+      printf ("fastsqr_pdep: "); print_gf2x (c);
+      exit (1);
+    }
+#else
+#ifdef USE_PDEP
+  return fastsqr_pdep (b, a, r, s);
+#else
+  return fastsqr_old (b, a, r, s);
+#endif
+#endif
+}
+
 void fastrem (GF2X& a, _ntl_ulong r, _ntl_ulong s)
 
 // Sets a := a mod (x^r + x^s + 1) using a word operations where possible.
@@ -543,6 +711,12 @@ void print_hex (char *s, GF2X a, int flip)
   *s = '\0';
 }
 
+_ntl_ulong
+get_certificate (GF2X a)
+{
+  return a.xrep.elts()[0];
+}
+
 void
 fastmulmod (GF2X& c, const GF2X& a, const GF2X& b, const GF2XModulus& F,
 	         _ntl_ulong r, _ntl_ulong s)
@@ -603,7 +777,7 @@ void copy_h (vec_GF2X& hold, vec_GF2X& h, long m)
 void init_h (vec_GF2X& h, long k, long m, const GF2XModulus& F,
  	_ntl_ulong r, _ntl_ulong s, int usefs)
 
-/* initialize h[j] to sum (x^(s*2^k), 0 <= s < 2^m, hw(s)=j+1),
+/* initialize h[j] to sum ((x^(2^k))^s, 0 <= s < 2^m, hw(s)=j+1),
    for 0 <= j < m */
 
 {
@@ -666,11 +840,12 @@ void init_h (vec_GF2X& h, long k, long m, const GF2XModulus& F,
 void
 usage ()
 {
-  fprintf (stderr, "Usage: factor [options] r < file\n");
+  fprintf (stderr, "Usage: factor [options] r\n");
   fprintf (stderr, "Options:\n");
   fprintf (stderr, "   -b d    - omit hex encoding of factor if degree < d\n");
   fprintf (stderr, "   -f f    - use interval bounds of f^j (default is f=1);\n");
   fprintf (stderr, "             if f=1 then intervals increase linearly in size\n");
+  fprintf (stderr, "             if f=0 then intervals do not increase\n");
   fprintf (stderr, "   -m m    - use double-blocking size of m\n");
   				// default is as for s if r small, or try to
   				// estimate if r large
@@ -682,93 +857,60 @@ usage ()
   fprintf (stderr, "   -skip d - skip degrees <= d (input trinomials are known to have no\n");
   fprintf (stderr, "             factor of degree <= d)\n");
   fprintf (stderr, "   -maxd d - skip degrees > d\n");
-  fprintf (stderr, "   -t      - print cumulative times for GCD etc at end\n");
   fprintf (stderr, "   -v      - verbose\n");
   fprintf (stderr, "   -z q1   - output 'u' if number of blocks of length m would be > q1\n");
   fprintf (stderr, "             (default is 'infinity')\n");
+  fprintf (stderr, "   -s0 s0  - start with x^r + x^s0 + 1, default 1\n");
+  fprintf (stderr, "   -s1 s1  - ends with x^r + x^(s1-1) + 1, default floor(r/2)+1\n");
+  fprintf (stderr, "   -mt n   - use n threads (default 1)\n");
   exit (1);
 }
 
-/* copied from GMP-ECM, main.c */
-static long last_degree = 0;
-static long last_s = 0;
-static int exit_asap_signalnr = 0; /* Remembers which signal we received */
-
-void
-signal_handler (int sig)
+/* a <- C[0] * C[1] * ... * C[z-1] mod F := (x^r+x^s+1) */
+static void
+accumulate (GF2X& a, GF2XVec& C, const GF2XModulus& F, long r, long s)
 {
-  fprintf (stderr, "Interrupted s=%ld after degree %ld\n",
-           last_s, last_degree);
-  fflush (stderr);
-  if (sig == SIGINT || sig == SIGTERM)
+  long z = C.length();
+
+  /* invariant: z is the number of cells C[0]...C[z-1] to accumulate in a */
+  while (z > 1)
     {
-      exit_asap_signalnr = sig;
-      /* If one of these two signals arrives again, we'll let the default
-         handler take over,  which will usually terminate the process
-         immediately. */
-      signal (SIGINT, SIG_DFL);
-      signal (SIGTERM, SIG_DFL);
+      /* uncomment this pragma when only one trinomial has to be checked */
+#pragma omp parallel for schedule(static)
+      for (long j = 0; j < z/2; j++)
+	fastmulmod (C[j], C[j], C[z-1-j], F, r, s);
+      z = (z + 1) / 2;
     }
-}
-
-void
-save_state (long s, long k2)
-{
-  last_s = s;
-  last_degree = k2;
+  fastmulmod (a, a, C[0], F, r, s);
 }
 
 int
 main (int argc, char *argv[])
 {
-  long r, rhigh, maxd = LONG_MAX, k = 0, k1, k2, s, ss, i, q, r3;
-  long m = 0, k0 = 0, b0 = 2, q0 = 4, q1 = 0, q2 = 0;
+  long r; /* degree of trinomials */
+  long maxd = LONG_MAX; /* skip degrees > maxd */
+  long m = 0, k0 = 0, b0 = 2, q0 = 4, q1 = 0;
   long skipd = 0, fineDDFtol;
-  long tkt = 0;
-  int fineDDF, flip, swan;
-  char c, *fact;
   double f = 1.0; /* scaling factor, default 1.0 */
-  double f0;
+  long s0 = 1, s1 = 1;
 
-  int verbose = 0, verbose_t = 0, primitive = 0, choose_m = 0;
-  int usefastsqr;
+  int verbose = 0, primitive = 0, choose_m = 0;
 
-  double CanZass_t, GCD_t, SqrMul_t, Exp_t, Total_t;
-  double SqrMul_kt1, SqrMul_kt2;
-  double GCD_kt1, GCD_kt2;
-
-  /* to catch interrupts */
-  signal (SIGINT, &signal_handler);
-  signal (SIGTERM, &signal_handler);
+  int mt = 1;
 
   /* print whole command line */
-  for (i = 0; i < argc; i++)
+  for (int i = 0; i < argc; i++)
     fprintf (stderr, "%s ", argv[i]);
   fprintf (stderr, "\n");
 
   fprintf (stderr, "This is factor version %1.2f\n", VERSION);
-
-  CanZass_t = (double) 0.0;
-  GCD_t = (double) 0.0;
-  SqrMul_t = (double) 0.0;
-  Exp_t = (double) 0.0;
-  Total_t = (double) 0.0;
-  SqrMul_kt1 = (double) 0.0;
-  SqrMul_kt2 = (double) 0.0;
-  GCD_kt1 = (double) 0.0;
-  GCD_kt2 = (double) 0.0;
+  fprintf (stderr, "based on NTL version %s\n", NTL_VERSION);
 
   while (argc > 1 && argv[1][0] == '-')
     {
       if (strcmp (argv[1], "-v") == 0)
         {
           verbose ++;
-          argc --;
-          argv ++;
-        }
-      else if (strcmp (argv[1], "-t") == 0)
-        {
-          verbose_t = 1;
           argc --;
           argv ++;
         }
@@ -831,6 +973,24 @@ main (int argc, char *argv[])
           argv += 2;
           argc -= 2;
         }
+      else if (argc > 2 && strcmp (argv[1], "-s0") == 0)
+        {
+          s0 = atoi (argv[2]);
+          argv += 2;
+          argc -= 2;
+        }
+      else if (argc > 2 && strcmp (argv[1], "-s1") == 0)
+        {
+          s1 = atoi (argv[2]);
+          argv += 2;
+          argc -= 2;
+        }
+      else if (argc > 2 && strcmp (argv[1], "-mt") == 0)
+        {
+          mt = atoi (argv[2]);
+          argv += 2;
+          argc -= 2;
+        }
       else
         {
           fprintf (stderr, "Error, invalid option: %s\n", argv[1]);
@@ -849,6 +1009,10 @@ main (int argc, char *argv[])
       exit (1);
     }
 
+  /* check s0 and s1 */
+  assert (0 < s0 && s0 < r);
+  assert (0 < s1 && s1 <= r);
+
   if ((primitive) && (!ProbPrime(r, 2)))
     {
       fprintf (stderr,
@@ -866,10 +1030,12 @@ main (int argc, char *argv[])
 
   if (m == 0)
     {
-      choose_m = (r > 10000);	 // Later try to find optimal m
+      choose_m = (r > 1000);	 // Later try to find optimal m
       for ( ; (2 << m) < r; m++) // Reasonable though probably not optimal.
 	;
     }
+  /* we cannot determine m at runtime if mt > 1 */
+  assert (choose_m == 0 || mt == 1);
 
   if (r < 17) 			// Tiny case, this avoids a problem
     m = 1;			// with e.g. r = 11, s = 1.
@@ -884,12 +1050,6 @@ main (int argc, char *argv[])
       exit (1);
     }
 
-  if (f < (double)1.0)
-    {
-      fprintf (stderr, "Error, f < 1.0\n");
-      exit (1);
-    }
-
   if (q0 < 1)
     {
       fprintf (stderr, "Error, q0 < 1\n");
@@ -899,6 +1059,7 @@ main (int argc, char *argv[])
   if (q1 == 0)
     q1 = r;				// Effectively infinity
 
+  long r3;
   for (r3 = 0; r3*r3*r3 < r; r3++) ;	// r3 = r^(1/3)
   fineDDFtol = 2*r3*r3;			// 2*r^(2/3)
 
@@ -915,49 +1076,58 @@ main (int argc, char *argv[])
       fflush (stdout);
     }
 
-  fact = (char*) malloc ((2 + (r / 4)) * sizeof (char));
-
   /* since all degree k factors divide x^(2^k)-x, if x^r+x^s+1 has a degree
      k factor, then so has x^r+x^(s+2^k-1)+1, thus if 2^k-1 <= floor(r/2)-1,
      i.e. 2^(k+1) <= r, then we can save some computations */
 
-  long j, l;
-
-  while (1)
+  /* NTL is thread-safe up from version 7 */
+  if (mt > 1 && NTL_MAJOR_VERSION < 7)
     {
-      s = -1;		/* In case no positive integer found */
-      if (scanf ("%ld ", &s) == EOF)
-        break;
+      fprintf (stderr, "Error, use NTL version >= 7 with multiple threads\n");
+      exit (1);
+    }
 
-      c = getchar ();
+  /* prepare inputs */
+  long *todo, ntodo = 0;
+  todo = (long*) malloc (r * sizeof (long));
+  /* fill todo[] with entries in [s0, s1-1] */
+  for (long s = s0; s < s1; s++)
+    todo[ntodo++] = s;
+  /* read entries from stdin (only when s0 >= s1) */
+  if (ntodo == 0)
+    while (1)
+      {
+	long s;
+	int ret = scanf ("%ld", &s);
+	if (ret != 1)
+	  break;
+	assert (0 < s && s < r);
+	todo[ntodo++] = s;
+	assert (ntodo <= r);
+      }
 
-      if (c != 'u') 	/* just copies rest of line */
+  omp_set_num_threads (mt);
+#pragma omp parallel
+#pragma omp master
+  printf ("Using %d thread(s)\n", omp_get_num_threads ());
+
+  /* uncomment this pragma when several trinomials are checked in parallel */
+  // #pragma omp parallel for schedule(dynamic)
+  for (long idx = 0; idx < ntodo; idx++)
         {
-          if (s != -1)
-            printf ("%ld ", s);
-	  printf ("%c", c);
+	  long input_s = todo[idx];
+	  int divisible, skip;
+	  long s = input_s, j, l;
+	  long ss, rhigh, k = 0, k1, k2, q, q2 = 0;
+	  int fineDDF, flip, swan;
+	  char *fact;
+	  double f0;
+	  int usefastsqr;
+	  _ntl_ulong certificate;
 
-          do
-            {
-              c = getchar ();
-	      putchar (c);
-            }
-          while (c != '\n');
-        }
-      else /* unknown status */
-        {
-          int divisible, skip;
-	  double ts;
+	  fact = (char*) malloc ((2 + (r / 4)) * sizeof (char));
 
-	  ts = GetTime ();
 	  skip = 0;
-	  tkt++;		/* count trinomials not skipped */
-          do
-            {
-              c = getchar ();	/* discard rest of line */
-            }
-          while (c != '\n');
-          scanf ("\n");
 
 	  GF2X p;
 	  SetCoeff(p, r);
@@ -1082,7 +1252,7 @@ main (int argc, char *argv[])
 	    fastmulmod (htemp, htemp, htemp, F, r, s);
 	    timem = GetTime ();
 	    for (jt = 0; (GetTime() - timem) < (double)1.0; jt++)
-	      fastmulmod (htemp, htemp, htemp, F, r, s);
+	      fastmulmod (htemp, htemp, htemp2, F, r, s);
 	    timem = (GetTime () - timem)/(double)jt;
 	    // Prefer even m to avoid copying overhead
 	    mopt = 2*(long)((double)0.5*sqrt(timem/times) + (double)0.5);
@@ -1105,8 +1275,6 @@ main (int argc, char *argv[])
 	  fineDDF = 0;  /* 0 as long as GCDs are trivial */
 	  for (a = 1; (deg (a) == 0 && k2 < rhigh) || fineDDF != 0;)
 	    {
-              save_state (ss, k2);
-
 	      if (fineDDF == 0)
 		k = k2 + 1; /* next degree to check */
 	      else /* fineDDF mode */
@@ -1147,7 +1315,6 @@ main (int argc, char *argv[])
                       SetCoeff (c, s % K, coeff (c, s % K) == 0);
                       st = GetTime ();
                       GCD (a, a, c);
-		      GCD_t += (GetTime () - st);
                       if (verbose)
                         {
                           printf ("gcd took %f sec\n", GetTime () - st);
@@ -1166,18 +1333,17 @@ main (int argc, char *argv[])
 		  /* initialize h-table */
 		  if (k == k0 + 1)
 		    {
-		      if (fineDDF == 0)
-		        GCD_kt1 += (double) 1.0; // have to do one GCD
 		      st = GetTime ();
 		      init_h (h, k, m, F, r, s, usefastsqr);
-                      Exp_t += (GetTime () - st);
 		      if (verbose)
 			printf ("Exponentiation took %f\n", GetTime () - st);
 		    }
 
 		  if (fineDDF == 0)
 		    {
-		      if (f > (double) 1.0)
+		      if (f == 0.0)
+			q = q0; /* no increase */
+		      else if (f > (double) 1.0)
 		 	q = (long) (f0 * (double) q0 + (double) 0.5); // round
 		      else
 		        q = q + q0;		// linear increase if f = 1
@@ -1221,31 +1387,16 @@ main (int argc, char *argv[])
 		  else
 		    {
 		    st = GetTime ();
-		    for (i = k; i + m - 1 <= k2 ; i += m) /* do i .. i+m-1 */
+		    double wct = WctTime ();
+		    long i;
+		    /* we can't easily parallelize this loop since the h[j]
+		       are updated at each loop on i */
+		    GF2XVec C;
+		    C.SetSize ((k2 - k + m) / m,
+			       (r + NTL_BITS_PER_LONG - 1) / NTL_BITS_PER_LONG);
+		    long z = 0;
+		    for (i = k; i + m - 1 <= k2 ; i += m, z++) /* i .. i+m-1 */
 		      {
-                    	SqrMul_kt2 += (double)m; // Count m^2 squares as m
-		        c = 1;
-		        for (j = 0; j < m; j++)
-			  {
-			    fastmulbyxmod (c, c, r, s);
-			    add (c, c, h[j]);
-			    if (usefastsqr)
-			      {			// Can use fastsqr here
-			      for (l = 0; l < m/2; l++)
-			        {
-			        fastsqr (htemp, h[j], r, s);
-			        fastsqr (h[j], htemp, r, s);
-			        }
-			      if (m&1)		// Last square if m odd
-			        {
-			        fastsqr (htemp, h[j], r, s);
-			        h[j] = htemp;	// Copy result to h[j]
-			        }
-			      }
-			    else		// Have to use SqrMod here
-			      for (l = 0; l < m; l++)
-			        SqrMod (h[j], h[j], F);
-			  }
                         if (i + m - 1 <= skipd)
                           {
                             if (verbose >= 2)
@@ -1253,18 +1404,65 @@ main (int argc, char *argv[])
                                       i, i + m - 1);
                           }
                         else
-                          fastmulmod (a, a, c, F, r, s);
+			  {
+			    C[z] = 1; /* s_{0,m} = 1 */
+			    /* first compute the polynomial p_m(X,x) from head of
+			       page 51 in "A multi-level blocking distinct-degree
+			       factorization algorithm" */
+			    for (j = 0; j < m; j++)
+			      {
+				fastmulbyxmod (C[z], C[z], r, s);
+				add (C[z], C[z], h[j]);
+			      }
+			  }
+
+			/* update the h[j] values */
+			for (j = 0; j < m; j++)
+			  {
+			    if (usefastsqr)
+			      {			// Can use fastsqr here
+				for (l = 0; l < m/2; l++)
+				  {
+				    fastsqr (htemp, h[j], r, s);
+				    fastsqr (h[j], htemp, r, s);
+				  }
+				if (m&1)		// Last square if m odd
+				  {
+				    fastsqr (htemp, h[j], r, s);
+				    h[j] = htemp;	// Copy result to h[j]
+				  }
+			      }
+			    else		// Have to use SqrMod here
+			      for (l = 0; l < m; l++)
+			        SqrMod (h[j], h[j], F);
+			  }
 		      }
+
+		    assert (z == (k2 - k + m) / m);
+
+		    if (k2 <= skipd)
+		      {
+                        if (verbose)
+                          {
+                            printf ("   skip products\n");
+                            fflush (stdout);
+                          }
+			goto gcds;
+		      }
+
+		    /* accumulate the C[z] values */
+		    accumulate (a, C, F, r, s);
                     st = GetTime () - st;
-                    SqrMul_t += st;
 
 		    if (verbose)
                       {
-                        printf ("   squares/products took %f, per term %f\n",
-                                st, st/(double)(q*m));
+			double wt = WctTime () - wct;
+                        printf ("   squares/products took %.1f (wct %.1f), per term %.3f (wct %.3f)\n",
+                                st, wt, st/(double)(q*m), wt/(double)(q*m));
                         fflush (stdout);
                       }
 
+		    gcds:
                     if (k2 <= skipd)
                       {
                         if (verbose)
@@ -1276,9 +1474,10 @@ main (int argc, char *argv[])
                     else
                       {
                         st = GetTime ();
+			if (m == 1 && q == 1 && f == 0.0 && skipd == r-1)
+			  /* mimic irred */
+			  certificate = get_certificate (a);
                         FastGCD(a, a, p);
-			GCD_t += (GetTime () - st);
-			GCD_kt2 += (double)1.0;		// Count FastGCD calls
                         if (verbose)
                           {
                             printf ("   gcd took %f\n", GetTime () - st);
@@ -1289,8 +1488,8 @@ main (int argc, char *argv[])
 			    /* check for GCD error */
 			    if (deg(a) < k)
 			      {
-			      printf ("Error: GCD degree %ld < %ld\n",
-			      	deg(a), k);
+			      printf ("Error: GCD degree %ld<%ld for s=%ld\n",
+				      deg(a), k, input_s);
 			      exit (1);
 			      }
 			    /* exit the loop if we isolated a single factor
@@ -1322,11 +1521,10 @@ main (int argc, char *argv[])
 		  vec_pair_GF2X_long factors;
 		  st = GetTime ();
 		  CanZass (factors, a, 0);
-		  CanZass_t += GetTime () - st;
 		  long i0 = 0;
 		  // find lexicographically least factor of smallest degree
 		  // (except if flipped)
-		  for (i = 1; i < factors.length(); i++)
+		  for (long i = 1; i < factors.length(); i++)
 		    if (lex_less(factors[i].a, factors[i0].a, flip))
 		      i0 = i;
 		  a = factors[i0].a; // the lex least factor of smallest
@@ -1337,7 +1535,8 @@ main (int argc, char *argv[])
 		  k1 = deg(a);       // the smallest degree
 		  if (k1 < k)
 		    {
-		    printf ("Error: GCD degree %ld < %ld \n", k1, k);
+		    printf ("Error: GCD degree %ld < %ld for s=%ld\n",
+			    k1, k, input_s);
 		    exit (1);
 		    }
 		}
@@ -1345,9 +1544,10 @@ main (int argc, char *argv[])
                 print_hex (fact, a, flip);
 	    }
 
+#pragma omp critical
+	  {
           if (!divisible || k1 == r)
             {
-              SqrMul_kt1 += (double) (rhigh-k0);	// best possible
               if (skip)
                 printf ("%ld u\n", ss);
               else if (primitive)
@@ -1357,45 +1557,21 @@ main (int argc, char *argv[])
             }
           else
             {
-              if (k1 > k0)
-                SqrMul_kt1 += (double) (k1-k0);		// best possible
               if (k1 != 0)
                 printf ("%ld %ld", ss, k1);
               else
-                printf ("%ld non-irreducible", ss);
+                printf ("%ld non-irreducible (LOG %lx)", ss,
+			(certificate ^ 0x2) & 0xFFFFFFFF);
 	      if (k1 >= b0)
 	        printf (" p%s", fact);
 	      printf("\n");
             }
-	  Total_t += (GetTime () - ts);
+	  }
+	  fflush (stdout);
+	  free (fact);
         }
-      fflush (stdout);
-    }
 
-  free (fact);
-
-  if (verbose_t && (GCD_kt2 > (double) 0.0) && (Total_t > (double) 0.0))
-    {
-      printf ("Normal end of run for r = %ld, m = %ld, version %1.2f\n",
-        r, m, VERSION);
-      printf ("Total Exp time        %f = %2.2f %%\n",
-	       Exp_t, 100.0*Exp_t/Total_t);
-      printf ("Total Sqr/Mul time    %f = %2.2f %%\n",
-	       SqrMul_t, 100.0*SqrMul_t/Total_t);
-      printf ("Total GCD time        %f = %2.2f %%\n",
-	       GCD_t, 100.0*GCD_t/Total_t);
-      printf ("Total CanZass time    %f = %2.2f %%\n",
-	       CanZass_t, 100.0*CanZass_t/Total_t);
-      printf ("Total computation     %f\n", Total_t);
-      if (tkt > 0)
-        printf ("Time/trinomial        %f for %ld trinomials\n",
-        	 Total_t/tkt, tkt);
-      printf ("Efficiency of Sqr/Mul %f\n", SqrMul_kt1/SqrMul_kt2);
-      printf ("Efficiency of GCD     %f\n", GCD_kt1/GCD_kt2);
-      printf ("Overall efficiency    %f\n",
-        (Exp_t + GCD_t*(GCD_kt1/GCD_kt2) + SqrMul_t*(SqrMul_kt1/SqrMul_kt2))/
-        (Exp_t + GCD_t + SqrMul_t + CanZass_t));
-    }
+  free (todo);
 
   return 0;
 }

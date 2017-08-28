@@ -19,7 +19,7 @@ gf2x-1.1: (bugfix release)
     - Added a faster mul4
     - Added some support for cross compilation (might also have been
       broken in the meantime, we don't have regression testing for this).
-    
+
     The interface is unchanged, so the shared library version has not
     changed and still is 1.0.0
 

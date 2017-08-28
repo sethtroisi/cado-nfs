@@ -28,8 +28,10 @@
 /* General Toom_Cook multiplication, calls KarMul, Toom3Mul, Toom3WMul
    or Toom4Mul depending on which is expected to be the fastest. */
 
+#include <stdio.h>
 #include <limits.h>
 #include <string.h>
+#include <stdlib.h>
 
 #include "gf2x.h"
 #include "gf2x/gf2x-impl.h"
@@ -41,6 +43,10 @@
 short best_tab[GF2X_TOOM_TUNING_LIMIT] = GF2X_BEST_TOOM_TABLE;
 short best_utab[GF2X_TOOM_TUNING_LIMIT] = GF2X_BEST_UTOOM_TABLE;
 #endif /* GPL_CODE_PRESENT */
+
+#if GF2X_MUL_TOOM4_ALWAYS_THRESHOLD < 30
+#error "GF2X_MUL_TOOM4_ALWAYS_THRESHOLD must be >= 30"
+#endif
 
 /* Returns 0 for KarMul, 1 for Toom3Mul, 2 for Toom3WMul, 3 for Toom4Mul
    depending on which is predicted to be fastest for the given degree n.
@@ -57,19 +63,22 @@ short gf2x_best_toom(unsigned long n GF2X_MAYBE_UNUSED)
 // would be reasonable if Toom3Mul was fastest for n = 18, 21, 24.
 
 #if GPL_CODE_PRESENT
-    if (n < GF2X_MUL_TOOMW_THRESHOLD)
-	return GF2X_SELECT_KARA;		// KarMul
+    if (n < GF2X_MUL_KARA_THRESHOLD)
+      return GF2X_SELECT_KARA;
 
-#if GF2X_MUL_TOOM4_ALWAYS_THRESHOLD < 30
-#error "GF2X_MUL_TOOM4_ALWAYS_THRESHOLD must be >= 30"
-#endif
-    if (n >= GF2X_MUL_TOOM4_ALWAYS_THRESHOLD)
-	return GF2X_SELECT_TC4;		// Toom4Mul
+    if (n > GF2X_TOOM_TUNING_LIMIT)
+      return GF2X_SELECT_TC4;		// Toom4Mul
 
-    /* This would be a tuning bug */
-    ASSERT (n <= GF2X_TOOM_TUNING_LIMIT);
+    /* now n <= GF2X_TOOM_TUNING_LIMIT */
+    /* In case the tuning table was built only with a pretty low
+     * TOOM_TUNING_LIMIT, then best_tab[n-1] might be -1; we should
+     * interpret that as meaning the default, asymptotic behaviour. Even
+     * if that doesn't seem right.
+     */
+    if (best_tab[n-1] < 0)
+        return GF2X_SELECT_TC4;
 
-    return best_tab[n - 1];	// Return table entry
+    return best_tab[n-1];	// Return table entry
 #else /* GPL_CODE_PRESENT */
     return GF2X_SELECT_KARA;
 #endif /* GPL_CODE_PRESENT */
@@ -88,12 +97,16 @@ short gf2x_best_utoom(unsigned long n GF2X_MAYBE_UNUSED)
 	return GF2X_SELECT_UNB_DFLT;		// Default
 
     if (n >= GF2X_MUL_TOOMU_ALWAYS_THRESHOLD)
-	    return GF2X_SELECT_UNB_TC3U;
+        return GF2X_SELECT_UNB_TC3U;
 
     /* This would be a tuning bug */
     ASSERT (n <= GF2X_TOOM_TUNING_LIMIT);
 
-    return best_utab[n - 1];	// Return table entry
+    /* same as above */
+    if (best_utab[n-1] < 0)
+        return GF2X_SELECT_UNB_TC3U;
+
+    return best_utab[n-1];	// Return table entry
 #else /* GPL_CODE_PRESENT */
     return GF2X_SELECT_UNB_DFLT;
 #endif /* GPL_CODE_PRESENT */
@@ -108,12 +121,12 @@ short gf2x_best_utoom(unsigned long n GF2X_MAYBE_UNUSED)
 /*
  The memory sp(n) necessary for Toom3WMul satisfies
  sp(n) <== (n lt 8) ? 19 : 8*(floor(n/3) + 3) + sp(floor(n/3) + 2),
- sp(7) <= 19.
+ sp(7) <= 21.
 
  It is assumed that KarMul is called for n < 8 <= GF2X_MUL_TOOMW_THRESHOLD
- and requires space KarMulMem(n) <= 4*ceil(n/2) + KarMulMem(ceil(n/2)),
- KarMulMem(7) <= 19.  The memory for Toom3Mul and Toom4Mul is no larger
- than that for Toom3WMul.
+ and requires space KarMulMem(n) <= 3*ceil(n/2) + KarMulMem(ceil(n/2)),
+ KarMulMem(7) <= 21.  The memory for Toom3Mul and Toom4Mul is no larger
+ than that for Toom3WMul. We use here the simpler bound 5*n+29 (cf toom-gpl.c).
 
  Note: KarMulMem(7) is now 0, but would increase if GF2X_MUL_KARA_THRESHOLD
        were reduced. We have not changed gf2x_ToomSpace as a small overestimate
@@ -130,17 +143,15 @@ short gf2x_best_utoom(unsigned long n GF2X_MAYBE_UNUSED)
 
 long gf2x_toomspace(long n)
 {
-    long sp;
     long low = (GF2X_MUL_KARA_THRESHOLD < GF2X_MUL_TOOMW_THRESHOLD) ?
-	GF2X_MUL_KARA_THRESHOLD : GF2X_MUL_TOOMW_THRESHOLD;
+      GF2X_MUL_KARA_THRESHOLD : GF2X_MUL_TOOMW_THRESHOLD;
     if (n < low)
 	return 0;
-    sp = 19;			// KarMulMem (7) <= 19
-    while (n >= 8) {
-	n = n / 3 + 2;
-	sp += 8 * (n + 1);
-    }
-    return sp;
+#ifdef HAVE_KARAX
+    return 5 * n + 30; /* allocate an extra word for 128-bit alignement */
+#else
+    return 5 * n + 29;
+#endif
 }
 
 /* Returns upper bound on space required by Toom3uMul (c, a, sa, b, stk):
@@ -173,19 +184,41 @@ void gf2x_mul_toom(unsigned long *c, const unsigned long *a,
 
 #if GPL_CODE_PRESENT
     switch (gf2x_best_toom(n)) {
-    case 0:
+    case GF2X_SELECT_KARA:
 	gf2x_mul_kara(c, a, b, n, stk);
 	break;
-        /* 1 2 3 are GPL'ed code */
-    case 1:
+#ifdef HAVE_KARAX
+        /* gf2x_mul_karax is LGPL, but for simplicity we put it only here */
+    case GF2X_SELECT_KARAX:
+	gf2x_mul_karax(c, a, b, n, stk);
+	break;
+        /* gf2x_mul_tc3x is copied from gf2x_mul_tc3, thus GPL only */
+    case GF2X_SELECT_TC3X:
+	gf2x_mul_tc3x(c, a, b, n, stk);
+	break;
+#else
+    case GF2X_SELECT_KARAX:
+    case GF2X_SELECT_TC3X:
+        fprintf (stderr, "We should never reach here. gf2x_best_toom(%ld)=%d, while this method is not supported with the present code. Please report.\n",
+                 n, gf2x_best_toom(n));
+        abort();
+#endif
+        /* TC3, TC3W, TC4 are GPL'ed code */
+    case GF2X_SELECT_TC3:
 	gf2x_mul_tc3(c, a, b, n, stk);
 	break;
-    case 2:
+    case GF2X_SELECT_TC3W:
 	gf2x_mul_tc3w(c, a, b, n, stk);
 	break;
-    case 3:
+    case GF2X_SELECT_TC4:
 	gf2x_mul_tc4(c, a, b, n, stk);
 	break;
+    default:
+      {
+        fprintf (stderr, "Unhandled case gf2x_best_toom(%ld)=%d in gf2x_mul_toom\n",
+                 n, gf2x_best_toom(n));
+        abort();
+      }
     }
 #else /* GPL_CODE_PRESENT */
     gf2x_mul_kara(c, a, b, n, stk);

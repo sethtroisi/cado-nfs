@@ -41,7 +41,6 @@
 #include "gf2x/gf2x-impl.h"
 #include "gf2x-ternary-fft.h"
 
-
 // #define DEBUG
 // #define DEBUG_LSHIFT
 // #define DEBUG_MULMOD
@@ -147,7 +146,7 @@ static inline void Zero(unsigned long *a, size_t n)
 static inline void Clear(unsigned long *a, size_t low, size_t high)
 {
     if (high > low)
-	memset(a + low, 0, (high - low) * sizeof(unsigned long));
+       memset (a + low, 0, (high - low) * sizeof(unsigned long));
 }
 
 /** Now the specific things */
@@ -158,15 +157,22 @@ static void AddMod(unsigned long *a, unsigned long *b, unsigned long *c,
 		   size_t n)
 {
     for (size_t i = 0; i < n; i++)
-	a[i] = b[i] ^ c[i];
+       a[i] = b[i] ^ c[i];
+}
+
+/* a <- b + c + d */
+static void
+AddMod3 (unsigned long *a, unsigned long *b, unsigned long *c,
+         unsigned long *d, size_t n)
+{
+  for (size_t i = 0; i < n; i++)
+    a[i] = b[i] ^ c[i] ^ d[i];
 }
 
 /* c <- a * x^k, return carry out, 0 <= k < WLEN */
-
-static unsigned long Lsh(unsigned long *c, unsigned long *a, size_t n, size_t k)
+static unsigned long
+Lsh (unsigned long *c, unsigned long *a, size_t n, size_t k)
 {
-    unsigned long t, cy = 0;
-
     if (k == 0) {
 	if (c != a)
 	    Copy(c, a, n);
@@ -175,9 +181,9 @@ static unsigned long Lsh(unsigned long *c, unsigned long *a, size_t n, size_t k)
 
     /* {c, n} and {a, n} should not overlap */
     ASSERT(c <= a || a + n <= c);
-
     ASSERT(k > 0);
 
+    unsigned long t, cy = 0;
     for (size_t i = 0; i < n; i++) {
 	t = (a[i] << k) | cy;
 	cy = a[i] >> (WLEN - k);
@@ -212,12 +218,9 @@ static unsigned long AddLsh(unsigned long *c, unsigned long *a, size_t n,
 }
 
 /* c <- a / x^k, return carry out, 0 <= k < WLEN */
-
-static unsigned long Rsh(unsigned long *c, const unsigned long *a, size_t n,
-			 size_t k)
+static unsigned long
+Rsh (unsigned long *c, const unsigned long *a, size_t n, size_t k)
 {
-    unsigned long t, cy = 0;
-
     if (k == 0) {
 	if (c != a)
 	    Copy(c, a, n);
@@ -226,6 +229,7 @@ static unsigned long Rsh(unsigned long *c, const unsigned long *a, size_t n,
 
     ASSERT(k > 0);
 
+    unsigned long t, cy = 0;
     for (size_t i = n; i-- ; ) {
 	t = (a[i] >> k) | cy;
 	cy = a[i] << (WLEN - k);
@@ -255,22 +259,6 @@ static unsigned long AddRsh(unsigned long *c, unsigned long *a, size_t n,
     }
     return cy;
 }
-
-#if 0
-// unused
-/* c <- x^j * a / x^k */
-
-static unsigned long LshRsh(unsigned long *c, unsigned long *a, size_t n,
-			    size_t j, size_t k)
-{
-    ASSERT(n >= 0);
-    if (j > k)
-	Lsh(c, a, n, j - k);
-    else
-	Rsh(c, a, n, k - j);
-}
-
-#endif
 
 #if (defined(DEBUG) || defined(DEBUG_LSHIFT) || defined(DEBUG_MULMOD))
 
@@ -539,21 +527,24 @@ static void fft(unsigned long **A, uint64_t K, uint64_t j, size_t Np, size_t str
 #define a A[3*i*stride]
 #define b A[(3*i+1)*stride]
 #define c A[(3*i+2)*stride]
+    unsigned long *t4 = malloc (twonp * sizeof (unsigned long)); /* extra */
     for (i = 0; i < k; i++) {
 	ii = p[3 * stride * i];	/* bitrev(i,K/3) = bitrev(3*stride*i,K) */
+        /* a <- a + b * w^(ii*j) + c * w^(2*ii*j)
+           b <- a + b * w^((ii + K / 3) * j) + c * w^((2 * ii + 2 * K / 3) * j
+           c <- a + b ^ w^((ii+2*K/3) * j) + c * w^((2 * ii + 4 * K / 3) * j)
+         */
 	Lshift(t1, b, ii * j, Np);	/* t1 = w^ii*b */
 	Lshift(t2, b, (ii + 2 * K / 3) * j, Np);	/* t2 = w^(ii+2K/3)*b */
 	Lshift(t3, b, (ii + K / 3) * j, Np);
-	AddMod(b, a, t3, twonp);
-	Lshift(t3, c, (2 * ii + 2 * K / 3) * j, Np);
-	AddMod(b, b, t3, twonp);
-	Lshift(t3, c, (2 * ii + 4 * K / 3) * j, Np);
-	AddMod(t2, t2, t3, twonp);
+	Lshift(t4, c, (2 * ii + 2 * K / 3) * j, Np);
+        AddMod3(b, a, t3, t4, twonp);
+	Lshift(t4, c, (2 * ii + 4 * K / 3) * j, Np);
 	Lshift(t3, c, 2 * ii * j, Np);	/* t3 = w^(2ii)*c */
-	AddMod(c, a, t2, twonp);
-	AddMod(a, a, t1, twonp);
-	AddMod(a, a, t3, twonp);
+        AddMod3(c, a, t2, t4, twonp);
+        AddMod3(a, a, t1, t3, twonp);
     }
+    free (t4);
 #undef a
 #undef b
 #undef c
@@ -710,9 +701,10 @@ static void split_reconstruct(unsigned long * c, unsigned long * c1, unsigned lo
 
 // Now extract the result. First do a partial word bit-by-bit.
 
+#if defined(DEBUG) || !defined(NDEBUG)
     size_t m2 = m1 - 1;
-
     size_t n2 = K * m2;		// n2 smallest possible multiple of K
+#endif
     size_t n1 = K * m1;		// next possible multiple of K
     size_t j;
 
@@ -765,12 +757,14 @@ static void split_reconstruct(unsigned long * c, unsigned long * c1, unsigned lo
     }
 #endif
 
+#ifndef NDEBUG
     t = c2[0] ^ c1[0] ^ (c1[n2 / WLEN] >> n2 % WLEN) ^
 	((c1[n2 / WLEN + 1] << 1) << (WLEN - 1 - n2 % WLEN));
     if (t != 0) {
 	fprintf(stderr, "Consistency check failed in gf2x_mul_fft2, low word %lx\n", t);
         abort();
     }
+#endif
 
     Copy(c, c1, cn);	// Copy result
 }
@@ -935,12 +929,19 @@ void gf2x_ternary_fft_add(gf2x_ternary_fft_info_srcptr o, gf2x_ternary_fft_ptr t
     }
 }
 
-void gf2x_ternary_fft_addcompose(gf2x_ternary_fft_info_srcptr o, gf2x_ternary_fft_ptr tc, gf2x_ternary_fft_srcptr ta, gf2x_ternary_fft_srcptr tb)
+void gf2x_ternary_fft_addcompose_n(gf2x_ternary_fft_info_srcptr o, gf2x_ternary_fft_ptr tc, gf2x_ternary_fft_srcptr * ta, gf2x_ternary_fft_srcptr * tb, size_t n)
 {
     gf2x_ternary_fft_t * t = gf2x_ternary_fft_alloc(o, 1);
-    gf2x_ternary_fft_compose(o, t, ta, tb);
-    gf2x_ternary_fft_add(o, tc, tc, t);
+    for(size_t k = 0 ; k < n ; k++) {
+        gf2x_ternary_fft_compose(o, t, ta[k], tb[k]);
+        gf2x_ternary_fft_add(o, tc, tc, t);
+    }
     gf2x_ternary_fft_free(o, t, 1);
+}
+
+void gf2x_ternary_fft_addcompose(gf2x_ternary_fft_info_srcptr o, gf2x_ternary_fft_ptr tc, gf2x_ternary_fft_srcptr ta, gf2x_ternary_fft_srcptr tb)
+{
+    gf2x_ternary_fft_addcompose_n(o, tc, &ta, &tb, 1);
 }
 
 void gf2x_ternary_fft_ift_inner(gf2x_ternary_fft_info_srcptr o, unsigned long * a, size_t bits_a, gf2x_ternary_fft_ptr tr, size_t M)

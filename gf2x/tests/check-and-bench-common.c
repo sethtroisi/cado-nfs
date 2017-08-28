@@ -32,9 +32,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <sys/types.h>
-#ifdef  HAVE_SYS_RESOURCE_H
-#include <sys/resource.h>
-#endif  /*  HAVE_SYS_RESOURCE_H */
+#include <time.h>
 
 #include "gf2x/gf2x-impl.h"
 #include "gf2x/gf2x-thresholds.h"
@@ -47,13 +45,7 @@ static long init_extra_arg = ENGINE_EXTRA_ARG_DEFAULT;
 // cputime in millisec.
 static int cputime()
 {
-#ifdef  HAVE_SYS_RESOURCE_H
-    struct rusage rus;
-    getrusage(0, &rus);
-    return rus.ru_utime.tv_sec * 1000 + rus.ru_utime.tv_usec / 1000;
-#else
-    return 0;
-#endif
+  return (int) (clock () / ((double) CLOCKS_PER_SEC / 1000.0));
 }
 
 int time_total;
@@ -92,15 +84,16 @@ long ENGINE_mul(unsigned long ** H, unsigned long ** F, size_t Fl, unsigned long
     t=cputime(); time_conv -= t;
     for(int i = 0 ; i < n ; i++)
         for(int j = 0 ; j < n ; j++) {
-            ENGINE_compose(order,
-                    ENGINE_get(order, h, i*n+j),
-                    ENGINE_get_const(order, (ENGINE_srcptr) f, i*n/*+k*/),
-                    ENGINE_get_const(order, (ENGINE_srcptr) g, /*k*n+*/j));
-            for(int k = 1 ; k < n ; k++)
-                ENGINE_addcompose(order,
-                        ENGINE_get(order, h, i*n+j),
-                        ENGINE_get_const(order, (ENGINE_srcptr) f, i*n+k),
-                        ENGINE_get_const(order, (ENGINE_srcptr) g, k*n+j));
+            ENGINE_srcptr * ff = malloc(n * sizeof(ENGINE_srcptr));
+            ENGINE_srcptr * gg = malloc(n * sizeof(ENGINE_srcptr));
+            for(int k = 0 ; k < n ; k++) {
+                ff[k] = ENGINE_get_const(order, (ENGINE_srcptr) f, i*n+k);
+                gg[k] = ENGINE_get_const(order, (ENGINE_srcptr) g, k*n+j);
+            }
+            ENGINE_zero(order, ENGINE_get(order, h, i*n+j), 1);
+            ENGINE_addcompose_n(order, ENGINE_get(order, h, i*n+j), ff, gg, n);
+            free(ff);
+            free(gg);
         }
     t=cputime(); time_conv += t;
 
@@ -164,7 +157,7 @@ void set_extra_arg_from_n32bitwords(size_t n32 GF2X_MAYBE_UNUSED, long supplied)
     }
     max_ix = j;
     int i;
-    for (i = 0; T_FFT_TAB[i + 1][0] <= nwords && i + 1 < max_ix; i++);
+    for (i = 0; i + 1 < max_ix && T_FFT_TAB[i + 1][0] <= nwords; i++);
     /* now T_FFT_TAB[i][0] <= nwords < T_FFT_TAB[i+1][0] */
     init_extra_arg = T_FFT_TAB[i][1];
 #endif  /* ENGINE_TERNARY */
