@@ -258,6 +258,8 @@ char * path_resolve(const char * progname, char * resolved)
   char * path = getenv("PATH");
   if (!path) return 0;
   char * next_path;
+  char * path0 = strdup(path);
+  path = path0;
   for( ; *path ; path = next_path) {
       next_path = strchr(path, ':');
       if (next_path) {
@@ -271,9 +273,12 @@ char * path_resolve(const char * progname, char * resolved)
 #else
       snprintf(dummy2, PATH_MAX, "%s/%s", path, progname);
 #endif
-      if (realpath(dummy2, resolved))
+      if (realpath(dummy2, resolved)) {
+	  free(path0);
           return resolved;
+      }
   }
+  free(path0);
   return NULL;
 }
 
