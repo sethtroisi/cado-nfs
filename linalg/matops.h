@@ -32,10 +32,12 @@ extern void pqperms_from_phi(pmat_ptr p, pmat_ptr q, int * phi, int m, int n);
 static inline int pmat_get(pmat_srcptr x, int k) { return x->v[k]; }
 static inline void pmat_set(pmat_srcptr x, int k, int w) { x->v[k]=w; }
 
+extern void mat64_set_identity(mat64_ptr m);
 extern int mat64_is_uppertriangular(mat64_srcptr u);
 extern int mat64_is_lowertriangular(mat64_srcptr u);
 extern int mat64_triangular_is_unit(mat64_srcptr u);
 extern int mat64_eq(mat64_srcptr a, mat64_srcptr b);
+extern void mat64_copy(mat64_ptr a, mat64_srcptr b);
 
 /* These are the only important entry points. These functions
  * are meant to be accessors for tuned implementations (ok, for now
