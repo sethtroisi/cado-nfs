@@ -164,6 +164,7 @@ int set_antebuffer_path (const char *executable_filename, const char *path_anteb
   }
   *antebuffer = 0;
   fprintf(stderr, "No antebuffer configured\n");
+  *antebuffer='\0';
   return 0;
 }
 
