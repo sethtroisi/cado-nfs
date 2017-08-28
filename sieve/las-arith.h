@@ -462,7 +462,7 @@ invmod_redc_64(uint64_t a, uint64_t b)
                       case 4: T3; no_break();
                       case 3: T3; no_break();
                       case 2: T3; no_break();
-                      case 1: T3; no_break();
+                      case 1: T3;
                   } while (--n > 0);
       }
     } else {
@@ -475,7 +475,7 @@ invmod_redc_64(uint64_t a, uint64_t b)
                       case 4: T4; no_break();
                       case 3: T4; no_break();
                       case 2: T4; no_break();
-                      case 1: T4; no_break();
+                      case 1: T4;
                   } while (--n > 0);
       }
     }
