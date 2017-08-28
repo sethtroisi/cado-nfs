@@ -272,6 +272,7 @@ set(test-spmv-binary-u64k4_alltests YES)
 set(test-spmv-prime-p_3_alltests YES)
 
 macro(create_test_spmv test_spmv_base)
+if(HAVE_PERL_DIGEST_MD5)
 cado_define_test(
     TEST_NAME test-spmv-${test_spmv_base}
     SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/test-spmv.sh
@@ -295,6 +296,9 @@ cado_divert_test(test-spmv-${test_spmv_base} 2122 APPEND_ARGUMENTS mpi=2x1 thr=2
 cado_divert_test(test-spmv-${test_spmv_base} 1322 APPEND_ARGUMENTS mpi=1x3 thr=2x2)
 cado_divert_test(test-spmv-${test_spmv_base} 3222 APPEND_ARGUMENTS mpi=3x2 thr=2x2)
 endif()
+endif()
+else()
+    # Then this macro will expand to nothing, that's life.
 endif()
 endmacro()
 
