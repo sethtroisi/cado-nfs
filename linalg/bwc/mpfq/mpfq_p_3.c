@@ -98,7 +98,7 @@ void mpfq_p_3_field_clear(mpfq_p_3_dst_field k)
 }
 
 /* *Mpfq::gfp::field::code_for_field_specify, Mpfq::gfp */
-void mpfq_p_3_field_specify(mpfq_p_3_dst_field k, unsigned long dummy MAYBE_UNUSED, void * vp)
+void mpfq_p_3_field_specify(mpfq_p_3_dst_field k, unsigned long dummy MAYBE_UNUSED, const void * vp)
 {
         if (dummy == MPFQ_PRIME_MPN) {
             fprintf(stderr, "MPFQ_PRIME_MPN is deprecated\n");
@@ -354,7 +354,7 @@ int mpfq_p_3_fscan(mpfq_p_3_dst_field k, FILE * file, mpfq_p_3_dst_elt z)
     int allocated, len=0;
     int c, start=0;
     allocated=100;
-    tmp = (char *)mpfq_malloc_check(allocated*sizeof(char));
+    tmp = (char *)mpfq_malloc_check(allocated);
     for(;;) {
         c = fgetc(file);
         if (c==EOF)
@@ -367,7 +367,7 @@ int mpfq_p_3_fscan(mpfq_p_3_dst_field k, FILE * file, mpfq_p_3_dst_elt z)
         } else {
             if (len==allocated) {
                 allocated+=100 + allocated / 4;
-                tmp = (char*)realloc(tmp, allocated*sizeof(char));
+                tmp = (char*)realloc(tmp, allocated);
             }
             tmp[len]=c;
             len++;
@@ -376,7 +376,7 @@ int mpfq_p_3_fscan(mpfq_p_3_dst_field k, FILE * file, mpfq_p_3_dst_elt z)
     }
     if (len==allocated) {
         allocated+=1;
-        tmp = (char*)realloc(tmp, allocated*sizeof(char));
+        tmp = (char*)realloc(tmp, allocated);
     }
     tmp[len]='\0';
     int ret=mpfq_p_3_sscan(k,z,tmp);
@@ -424,13 +424,13 @@ void mpfq_p_3_vec_clear(mpfq_p_3_dst_field K MAYBE_UNUSED, mpfq_p_3_vec * v, uns
 int mpfq_p_3_vec_asprint(mpfq_p_3_dst_field K MAYBE_UNUSED, char * * pstr, mpfq_p_3_src_vec w, unsigned int n)
 {
     if (n == 0) {
-        *pstr = (char *)mpfq_malloc_check(4*sizeof(char));
+        *pstr = (char *)mpfq_malloc_check(4);
         sprintf(*pstr, "[ ]");
         return strlen(*pstr);
     }
     int alloc = 100;
     int len = 0;
-    *pstr = (char *)mpfq_malloc_check(alloc*sizeof(char));
+    *pstr = (char *)mpfq_malloc_check(alloc);
     char *str = *pstr;
     *str++ = '[';
     *str++ = ' ';
@@ -446,7 +446,7 @@ int mpfq_p_3_vec_asprint(mpfq_p_3_dst_field K MAYBE_UNUSED, char * * pstr, mpfq_
         int ltmp = strlen(tmp);
         if (len+ltmp+4 > alloc) {
             alloc = len+ltmp+100 + alloc / 4;
-            *pstr = (char *)realloc(*pstr, alloc*sizeof(char));
+            *pstr = (char *)realloc(*pstr, alloc);
         }
         strncpy(*pstr+len, tmp, ltmp+4);
         len += ltmp;
@@ -531,7 +531,7 @@ int mpfq_p_3_vec_fscan(mpfq_p_3_dst_field K MAYBE_UNUSED, FILE * file, mpfq_p_3_
     int c;
     int allocated, len=0;
     allocated=100;
-    tmp = (char *)mpfq_malloc_check(allocated*sizeof(char));
+    tmp = (char *)mpfq_malloc_check(allocated);
     int nest = 0, mnest = 0;
     for(;;) {
         c = fgetc(file);
@@ -544,7 +544,7 @@ int mpfq_p_3_vec_fscan(mpfq_p_3_dst_field K MAYBE_UNUSED, FILE * file, mpfq_p_3_
         }
         if (len==allocated) {
             allocated = len + 10 + allocated / 4;
-            tmp = (char*)realloc(tmp, allocated*sizeof(char));
+            tmp = (char*)realloc(tmp, allocated);
         }
         tmp[len]=c;
         len++;
@@ -556,7 +556,7 @@ int mpfq_p_3_vec_fscan(mpfq_p_3_dst_field K MAYBE_UNUSED, FILE * file, mpfq_p_3_
     }
     if (len==allocated) {
         allocated+=1;
-        tmp = (char*)realloc(tmp, allocated*sizeof(char));
+        tmp = (char*)realloc(tmp, allocated);
     }
     tmp[len]='\0';
     int ret=mpfq_p_3_vec_sscan(K,w,n,tmp);
@@ -1724,8 +1724,8 @@ static void mpfq_p_3_wrapper_field_setopt(mpfq_vbase_ptr vbase MAYBE_UNUSED, uns
     mpfq_p_3_field_setopt(vbase->obj, x, y);
 }
 
-static void mpfq_p_3_wrapper_field_specify(mpfq_vbase_ptr, unsigned long, void *);
-static void mpfq_p_3_wrapper_field_specify(mpfq_vbase_ptr vbase MAYBE_UNUSED, unsigned long dummy MAYBE_UNUSED, void * vp MAYBE_UNUSED)
+static void mpfq_p_3_wrapper_field_specify(mpfq_vbase_ptr, unsigned long, const void *);
+static void mpfq_p_3_wrapper_field_specify(mpfq_vbase_ptr vbase MAYBE_UNUSED, unsigned long dummy MAYBE_UNUSED, const void * vp MAYBE_UNUSED)
 {
     mpfq_p_3_field_specify(vbase->obj, dummy, vp);
 }
@@ -1793,7 +1793,7 @@ void mpfq_p_3_oo_field_init(mpfq_vbase_ptr vbase)
     vbase->field_degree = (int (*) (mpfq_vbase_ptr)) mpfq_p_3_wrapper_field_degree;
     vbase->field_init = (void (*) (mpfq_vbase_ptr)) mpfq_p_3_wrapper_field_init;
     vbase->field_clear = (void (*) (mpfq_vbase_ptr)) mpfq_p_3_wrapper_field_clear;
-    vbase->field_specify = (void (*) (mpfq_vbase_ptr, unsigned long, void *)) mpfq_p_3_wrapper_field_specify;
+    vbase->field_specify = (void (*) (mpfq_vbase_ptr, unsigned long, const void *)) mpfq_p_3_wrapper_field_specify;
     vbase->field_setopt = (void (*) (mpfq_vbase_ptr, unsigned long, void *)) mpfq_p_3_wrapper_field_setopt;
     vbase->init = (void (*) (mpfq_vbase_ptr, void *)) mpfq_p_3_wrapper_init;
     vbase->clear = (void (*) (mpfq_vbase_ptr, void *)) mpfq_p_3_wrapper_clear;

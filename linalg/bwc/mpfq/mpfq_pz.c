@@ -97,7 +97,7 @@ void mpfq_pz_field_clear(mpfq_pz_dst_field k)
 }
 
 /* *pz::code_for_field_specify */
-void mpfq_pz_field_specify(mpfq_pz_dst_field k, unsigned long dummy MAYBE_UNUSED, void * vp)
+void mpfq_pz_field_specify(mpfq_pz_dst_field k, unsigned long dummy MAYBE_UNUSED, const void * vp)
 {
         if (dummy == MPFQ_PRIME_MPN) {
             fprintf(stderr, "MPFQ_PRIME_MPN is deprecated\n");
@@ -759,7 +759,7 @@ int mpfq_pz_vec_fscan(mpfq_pz_dst_field K MAYBE_UNUSED, FILE * file, mpfq_pz_vec
     int c;
     int allocated, len=0;
     allocated=100;
-    tmp = (char *)mpfq_malloc_check(allocated*sizeof(char));
+    tmp = (char *)mpfq_malloc_check(allocated);
     int nest = 0, mnest = 0;
     for(;;) {
         c = fgetc(file);
@@ -772,7 +772,7 @@ int mpfq_pz_vec_fscan(mpfq_pz_dst_field K MAYBE_UNUSED, FILE * file, mpfq_pz_vec
         }
         if (len==allocated) {
             allocated = len + 10 + allocated / 4;
-            tmp = (char*)realloc(tmp, allocated*sizeof(char));
+            tmp = (char*)realloc(tmp, allocated);
         }
         tmp[len]=c;
         len++;
@@ -784,7 +784,7 @@ int mpfq_pz_vec_fscan(mpfq_pz_dst_field K MAYBE_UNUSED, FILE * file, mpfq_pz_vec
     }
     if (len==allocated) {
         allocated+=1;
-        tmp = (char*)realloc(tmp, allocated*sizeof(char));
+        tmp = (char*)realloc(tmp, allocated);
     }
     tmp[len]='\0';
     int ret=mpfq_pz_vec_sscan(K,w,n,tmp);
@@ -2009,8 +2009,8 @@ static void mpfq_pz_wrapper_field_setopt(mpfq_vbase_ptr vbase MAYBE_UNUSED, unsi
     mpfq_pz_field_setopt(vbase->obj, x, y);
 }
 
-static void mpfq_pz_wrapper_field_specify(mpfq_vbase_ptr, unsigned long, void *);
-static void mpfq_pz_wrapper_field_specify(mpfq_vbase_ptr vbase MAYBE_UNUSED, unsigned long dummy MAYBE_UNUSED, void * vp MAYBE_UNUSED)
+static void mpfq_pz_wrapper_field_specify(mpfq_vbase_ptr, unsigned long, const void *);
+static void mpfq_pz_wrapper_field_specify(mpfq_vbase_ptr vbase MAYBE_UNUSED, unsigned long dummy MAYBE_UNUSED, const void * vp MAYBE_UNUSED)
 {
     mpfq_pz_field_specify(vbase->obj, dummy, vp);
 }
@@ -2078,7 +2078,7 @@ void mpfq_pz_oo_field_init(mpfq_vbase_ptr vbase)
     vbase->field_degree = (int (*) (mpfq_vbase_ptr)) mpfq_pz_wrapper_field_degree;
     vbase->field_init = (void (*) (mpfq_vbase_ptr)) mpfq_pz_wrapper_field_init;
     vbase->field_clear = (void (*) (mpfq_vbase_ptr)) mpfq_pz_wrapper_field_clear;
-    vbase->field_specify = (void (*) (mpfq_vbase_ptr, unsigned long, void *)) mpfq_pz_wrapper_field_specify;
+    vbase->field_specify = (void (*) (mpfq_vbase_ptr, unsigned long, const void *)) mpfq_pz_wrapper_field_specify;
     vbase->field_setopt = (void (*) (mpfq_vbase_ptr, unsigned long, void *)) mpfq_pz_wrapper_field_setopt;
     vbase->init = (void (*) (mpfq_vbase_ptr, void *)) mpfq_pz_wrapper_init;
     vbase->clear = (void (*) (mpfq_vbase_ptr, void *)) mpfq_pz_wrapper_clear;

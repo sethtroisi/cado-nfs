@@ -148,7 +148,7 @@ unsigned long mpfq_pz_field_characteristic_bits(mpfq_pz_dst_field);
 static inline
 void mpfq_pz_field_init(mpfq_pz_dst_field);
 void mpfq_pz_field_clear(mpfq_pz_dst_field);
-void mpfq_pz_field_specify(mpfq_pz_dst_field, unsigned long, void *);
+void mpfq_pz_field_specify(mpfq_pz_dst_field, unsigned long, const void *);
 /* *pz::code_for_field_setopt */
 #define mpfq_pz_field_setopt(k, x, y)	/**/
 
@@ -371,9 +371,9 @@ void mpfq_pz_dotprod(mpfq_pz_dst_field, mpfq_pz_dst_vec, mpfq_pz_src_vec, mpfq_p
 /* Member templates related to SIMD operation */
 
 /* Object-oriented interface */
-void mpfq_pz_oo_field_init(mpfq_vbase_ptr);
 static inline
 void mpfq_pz_oo_field_clear(mpfq_vbase_ptr);
+void mpfq_pz_oo_field_init(mpfq_vbase_ptr);
 #ifdef  __cplusplus
 }
 #endif

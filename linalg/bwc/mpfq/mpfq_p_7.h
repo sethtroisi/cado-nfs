@@ -149,7 +149,7 @@ unsigned long mpfq_p_7_field_characteristic_bits(mpfq_p_7_dst_field);
 static inline
 void mpfq_p_7_field_init(mpfq_p_7_dst_field);
 void mpfq_p_7_field_clear(mpfq_p_7_dst_field);
-void mpfq_p_7_field_specify(mpfq_p_7_dst_field, unsigned long, void *);
+void mpfq_p_7_field_specify(mpfq_p_7_dst_field, unsigned long, const void *);
 /* *Mpfq::gfp::field::code_for_field_setopt, Mpfq::gfp */
 #define mpfq_p_7_field_setopt(f, x, y)	/**/
 

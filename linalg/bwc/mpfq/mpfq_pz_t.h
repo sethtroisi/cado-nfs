@@ -107,8 +107,11 @@
 /* Member templates related to SIMD operation */
 
 /* Object-oriented interface */
+void mpfq_pz_pz_wrapper_dotprod(mpfq_vbase_ptr, mpfq_vbase_ptr, mpfq_pz_dst_vec, mpfq_pz_src_vec, mpfq_pz_src_vec, unsigned int);
 void mpfq_pz_pz_dotprod(mpfq_pz_dst_field, mpfq_pz_dst_field, mpfq_pz_dst_vec, mpfq_pz_src_vec, mpfq_pz_src_vec, unsigned int);
+void mpfq_pz_pz_wrapper_addmul_tiny(mpfq_vbase_ptr, mpfq_vbase_ptr, mpfq_pz_dst_vec, mpfq_pz_src_vec, mpfq_pz_dst_vec, unsigned int);
 void mpfq_pz_pz_addmul_tiny(mpfq_pz_dst_field, mpfq_pz_dst_field, mpfq_pz_dst_vec, mpfq_pz_src_vec, mpfq_pz_dst_vec, unsigned int);
+void mpfq_pz_pz_wrapper_transpose(mpfq_vbase_ptr, mpfq_vbase_ptr, mpfq_pz_dst_vec, mpfq_pz_src_vec);
 void mpfq_pz_pz_transpose(mpfq_pz_dst_field, mpfq_pz_dst_field, mpfq_pz_dst_vec, mpfq_pz_src_vec);
 
 #endif  /* MPFQ_PZ_T_H_ */

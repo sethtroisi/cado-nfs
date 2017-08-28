@@ -149,7 +149,7 @@ unsigned long mpfq_p_2_field_characteristic_bits(mpfq_p_2_dst_field);
 static inline
 void mpfq_p_2_field_init(mpfq_p_2_dst_field);
 void mpfq_p_2_field_clear(mpfq_p_2_dst_field);
-void mpfq_p_2_field_specify(mpfq_p_2_dst_field, unsigned long, void *);
+void mpfq_p_2_field_specify(mpfq_p_2_dst_field, unsigned long, const void *);
 /* *Mpfq::gfp::field::code_for_field_setopt, Mpfq::gfp */
 #define mpfq_p_2_field_setopt(f, x, y)	/**/
 
@@ -434,9 +434,9 @@ void mpfq_p_2_dotprod(mpfq_p_2_dst_field, mpfq_p_2_dst_vec, mpfq_p_2_src_vec, mp
 /* Member templates related to SIMD operation */
 
 /* Object-oriented interface */
-void mpfq_p_2_oo_field_init(mpfq_vbase_ptr);
 static inline
 void mpfq_p_2_oo_field_clear(mpfq_vbase_ptr);
+void mpfq_p_2_oo_field_init(mpfq_vbase_ptr);
 #ifdef  __cplusplus
 }
 #endif

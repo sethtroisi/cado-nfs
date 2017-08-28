@@ -141,7 +141,7 @@ static inline
 void mpfq_u64k4_field_init(mpfq_u64k4_dst_field);
 /* *simd_u64k::code_for_field_clear */
 #define mpfq_u64k4_field_clear(K)	/**/
-void mpfq_u64k4_field_specify(mpfq_u64k4_dst_field, unsigned long, void *);
+void mpfq_u64k4_field_specify(mpfq_u64k4_dst_field, unsigned long, const void *);
 /* *simd_u64k::code_for_field_setopt */
 #define mpfq_u64k4_field_setopt(f, x, y)	/**/
 
@@ -168,6 +168,10 @@ void mpfq_u64k4_add(mpfq_u64k4_dst_field, mpfq_u64k4_dst_elt, mpfq_u64k4_src_elt
 #define mpfq_u64k4_sub(K, r, s1, s2)	mpfq_u64k4_add(K,r,s1,s2)
 /* *simd_char2::code_for_neg */
 #define mpfq_u64k4_neg(K, r, s)	mpfq_u64k4_set(K,r,s)
+static inline
+void mpfq_u64k4_mul(mpfq_u64k4_dst_field, mpfq_u64k4_dst_elt, mpfq_u64k4_src_elt, mpfq_u64k4_src_elt);
+static inline
+int mpfq_u64k4_inv(mpfq_u64k4_dst_field, mpfq_u64k4_dst_elt, mpfq_u64k4_src_elt);
 
 /* Operations involving unreduced elements */
 /* *Mpfq::defaults::flatdata::code_for_elt_ur_init, simd_flat */
@@ -224,7 +228,8 @@ static inline
 void mpfq_u64k4_vec_rev(mpfq_u64k4_dst_field, mpfq_u64k4_dst_vec, mpfq_u64k4_src_vec, unsigned int);
 static inline
 void mpfq_u64k4_vec_sub(mpfq_u64k4_dst_field, mpfq_u64k4_dst_vec, mpfq_u64k4_src_vec, mpfq_u64k4_src_vec, unsigned int);
-/* missing vec_scal_mul */
+static inline
+void mpfq_u64k4_vec_scal_mul(mpfq_u64k4_dst_field, mpfq_u64k4_dst_vec, mpfq_u64k4_src_vec, mpfq_u64k4_src_elt, unsigned int);
 static inline
 void mpfq_u64k4_vec_random(mpfq_u64k4_dst_field, mpfq_u64k4_dst_vec, unsigned int, gmp_randstate_t);
 /* missing vec_random2 */
@@ -305,9 +310,9 @@ void mpfq_u64k4_dotprod(mpfq_u64k4_dst_field, mpfq_u64k4_dst_vec, mpfq_u64k4_src
 /* Member templates related to SIMD operation */
 
 /* Object-oriented interface */
-void mpfq_u64k4_oo_field_init(mpfq_vbase_ptr);
 static inline
 void mpfq_u64k4_oo_field_clear(mpfq_vbase_ptr);
+void mpfq_u64k4_oo_field_init(mpfq_vbase_ptr);
 #ifdef  __cplusplus
 }
 #endif
@@ -319,11 +324,11 @@ void mpfq_u64k4_field_init(mpfq_u64k4_dst_field f MAYBE_UNUSED)
 {
 }
 
-/* *Mpfq::defaults::flatdata::code_for_set, simd_flat */
+/* *simd_flat::code_for_set */
 static inline
 void mpfq_u64k4_set(mpfq_u64k4_dst_field K MAYBE_UNUSED, mpfq_u64k4_dst_elt r, mpfq_u64k4_src_elt s)
 {
-    if (r != s) memcpy(r,s,sizeof(mpfq_u64k4_elt));
+    mpfq_copy((mp_limb_t*)r,(const mp_limb_t*)s,sizeof(mpfq_u64k4_elt)/sizeof(mp_limb_t));
 }
 
 /* *simd_flat::code_for_set_zero */
@@ -351,11 +356,32 @@ void mpfq_u64k4_add(mpfq_u64k4_dst_field K MAYBE_UNUSED, mpfq_u64k4_dst_elt r, m
         }
 }
 
-/* *Mpfq::defaults::flatdata::code_for_elt_ur_set, simd_flat */
+/* *simd_char2::code_for_mul */
+static inline
+void mpfq_u64k4_mul(mpfq_u64k4_dst_field K MAYBE_UNUSED, mpfq_u64k4_dst_elt r, mpfq_u64k4_src_elt s1, mpfq_u64k4_src_elt s2)
+{
+        for(unsigned int i = 0 ; i < sizeof(mpfq_u64k4_elt)/sizeof(*r) ; i++) {
+            r[i] = s1[i] & s2[i];
+        }
+}
+
+/* *simd_char2::code_for_inv */
+static inline
+int mpfq_u64k4_inv(mpfq_u64k4_dst_field K MAYBE_UNUSED, mpfq_u64k4_dst_elt r, mpfq_u64k4_src_elt s)
+{
+        int rc = 0;
+        for(unsigned int i = 0 ; i < sizeof(mpfq_u64k4_elt)/sizeof(*r) ; i++) {
+            r[i] = s[i];
+            if (r[i]) rc = 1;
+        }
+        return rc;
+}
+
+/* *simd_flat::code_for_elt_ur_set */
 static inline
 void mpfq_u64k4_elt_ur_set(mpfq_u64k4_dst_field K MAYBE_UNUSED, mpfq_u64k4_dst_elt_ur r, mpfq_u64k4_src_elt_ur s)
 {
-    if (r != s) memcpy(r,s,sizeof(mpfq_u64k4_elt_ur));
+    mpfq_copy((mp_limb_t*)r,(const mp_limb_t*)s,sizeof(mpfq_u64k4_elt_ur)/sizeof(mp_limb_t));
 }
 
 /* *Mpfq::defaults::flatdata::code_for_elt_ur_set_elt, simd_flat */
@@ -470,6 +496,15 @@ void mpfq_u64k4_vec_sub(mpfq_u64k4_dst_field K MAYBE_UNUSED, mpfq_u64k4_dst_vec 
     unsigned int i;
     for(i = 0; i < n; ++i)
         mpfq_u64k4_sub(K, w[i], u[i], v[i]);
+}
+
+/* *Mpfq::defaults::vec::mul::code_for_vec_scal_mul, Mpfq::defaults::vec */
+static inline
+void mpfq_u64k4_vec_scal_mul(mpfq_u64k4_dst_field K MAYBE_UNUSED, mpfq_u64k4_dst_vec w, mpfq_u64k4_src_vec u, mpfq_u64k4_src_elt x, unsigned int n)
+{
+        unsigned int i;
+    for(i = 0; i < n; i+=1)
+        mpfq_u64k4_mul(K, w[i], u[i], x);
 }
 
 /* *Mpfq::defaults::vec::getset::code_for_vec_random, Mpfq::defaults::vec */
