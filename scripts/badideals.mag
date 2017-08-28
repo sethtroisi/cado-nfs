@@ -40,8 +40,7 @@ else
         if #l gt 4 and l[1..4] eq "poly" then
 	    // assuming l = "poly%d: c0,c1,..."
 	    tmp:=Split(l, ":");
-	    ind:=Split(tmp[1], "poly");
-	    ind:=StringToInteger(ind[2]);
+	    ind:=StringToInteger(Substring(tmp[1], 5, #tmp[1]));
 	    pol:=ZP![StringToInteger(x) : x in Split(tmp[2], ",")];
 	    polys[ind +1]:=pol;
 	end if;
@@ -910,3 +909,4 @@ else
     exit;
 end if;
 
+quit;
