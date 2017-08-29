@@ -22,14 +22,19 @@ the most common processor being Intel core2-like or more recent.
 
 Other architectures are checked regularly, and should work. Please refer
 to the CI page for the list of regularly tested platforms, and their
-current staus. Those machines, compared to the base install, are equipped
-with the necessary dependencies (see below).
+current status. Those machines, compared to the base install, are equipped
+with the necessary dependencies (see below). The console outputs for the
+different builds contain information related to the compiler versions
+being used.
 
 Anything beyond that set of regularly tested machines perhaps works,
 perhaps does not:
 
- - x86_64 with icc 15, 16, 17, and 18 did work once, but are not checked
-   regularly (icc <= 14 is not able to compile cado-nfs).
+ - Older gcc versions, but no older than gcc-4.4, should work, but are
+   not considered as important build targets.
+ - x86_64 with icc 14, 15, 16, 17, and 18 did work once, but are not checked
+   regularly (part of cado-nfs uses C++11, and is not available with icc
+   <= 14)
  - Mac OS X Mavericks have been successfully tested with both Apple's gcc
    and clang. (see local.sh.macosx.x86_64)
  - Max OS X Leopard and Snow Leopard have been tested to work at least
