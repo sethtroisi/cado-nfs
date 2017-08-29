@@ -491,7 +491,7 @@ class DictDbAccess(collections.MutableMapping):
     are always served from the in-memory dict. Write accesses write through
     to the DB.
     
-    >>> conn = sqlite3.connect(':memory:')
+    >>> conn = sqlite3.connect(':memory:', isolation_level=None)
     >>> d = DictDbAccess(conn, 'test')
     >>> d == {}
     True
