@@ -14,6 +14,11 @@
 
 : ${NOMAD_MAX_BB_EVAL=100}
 
+# To use say 4 threads:
+# NUM_THREADS=4 ./optimize.sh ...
+
+: ${NUM_THREADS=2}
+
 cwd=`pwd`
 
 ### Set params file from first argument
@@ -51,7 +56,8 @@ trap cleanup EXIT
 
 ### Copy las_optimize, report and poly file and replace its name in las_run
 cp $2 las_optimize.py report.py $d
-sed "s/c59.polyselect2.poly/$poly/g" las_run.py > $d/las_run.py
+sed "s/c59.polyselect2.poly/$poly/g" las_run.py | \
+sed "s/2 # number of threads for las/$NUM_THREADS/g" > $d/las_run.py
 
 ### Parsing poly file (number of poly and rat/alg) (for now assume npoly == 2)
 npoly=`grep -c "^poly[0-9]" $d/$poly`
