@@ -29,7 +29,7 @@ Anything beyond that set of regularly tested machines perhaps works,
 perhaps does not:
 
  - x86_64 with icc 15, 16, 17, and 18 did work once, but are not checked
-   regularly.
+   regularly (icc <= 14 is not able to compile cado-nfs).
  - Mac OS X Mavericks have been successfully tested with both Apple's gcc
    and clang. (see local.sh.macosx.x86_64)
  - Max OS X Leopard and Snow Leopard have been tested to work at least
