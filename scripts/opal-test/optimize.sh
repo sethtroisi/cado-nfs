@@ -37,12 +37,17 @@ if [ -d "${CADO_BUILD}" ] ; then
   echo "CADO_BUILD = ${CADO_BUILD}"
 else
   echo "CADO_BUILD does not contain the name of a directory: '${CADO_BUILD}'"
+  ls -ld "${CADO_BUILD}"
+  ls -l "${CADO_BUILD}"
   exit 1
 fi
 
 ### Set working directory
 d=`mktemp -d`
 echo "Working directory:" $d
+
+cleanup() { rm -rf "$d" ; }
+trap cleanup EXIT
 
 ### Copy las_optimize, report and poly file and replace its name in las_run
 cp $2 las_optimize.py report.py $d
