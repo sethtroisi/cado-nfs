@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-typedef uint64_t mat64[64];
+typedef uint64_t mat64[64] ATTRIBUTE(aligned(64));
 typedef uint64_t * mat64_ptr;
 typedef const uint64_t * mat64_srcptr;
 

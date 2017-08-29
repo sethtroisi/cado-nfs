@@ -127,7 +127,7 @@ using namespace M4RIE;
 /* The following is **only** for 64 * 64 matrices */
 
 #define WBITS   64
-typedef uint64_t mat64[64];
+typedef uint64_t mat64[64] ATTRIBUTE(aligned(64));
 typedef uint64_t * mat64_ptr;
 typedef const uint64_t * mat64_srcptr;
 
@@ -1542,7 +1542,7 @@ int full_echelon_6464_imm(mat64 mm, mat64 e, mat64 m)
 
 int gauss_128128_C(uint64_t * m)
 {
-    mat64 mm[4]; /* handy, even though it does not properly reflect how data is used */
+    mat64 mm[4] ATTRIBUTE(aligned(64)); /* handy, even though it does not properly reflect how data is used */
     memcpy(mm,m,4*sizeof(mat64));
     int r = kernel((mp_limb_t*)mm, NULL, 128, 128, 128/ULONG_BITS, 128/ULONG_BITS);
     return r;
@@ -1551,7 +1551,7 @@ int gauss_128128_C(uint64_t * m)
 #if 0
 int gauss_128128_imm(uint64_t * m)
 {
-    mat64 mm[4];
+    mat64 mm[4] ATTRIBUTE(aligned(64));
     uint64_t * pm = m;
     for(int j = 0 ; j < 64 ; j++, pm+=2) {
         mm[0][j] = pm[0];
@@ -1970,7 +1970,7 @@ int PLUQ64_n(int * phi, mat64 l, mat64 * u, mat64 * a, int n)
 #ifdef ALLOC_LS
     mat64 ** ls = (mat64**) malloc(nb * sizeof(mat64*));
 #else
-    mat64 ls[nb];
+    mat64 ls[nb] ATTRIBUTE(aligned(64));
 #endif
     mat64 tl;
     for( ; b < nb && rank < m ; b++) {
@@ -2062,7 +2062,7 @@ static inline void bli_64x64N_clobber(mat64 h, mat64 * us, int * phi, int nb)
  */
 void bli_64x128(mat64 h, mat64 * us, int * phi)
 {
-    mat64 uc[2];
+    mat64 uc[2] ATTRIBUTE(aligned(64));
     memcpy(uc,us,2*sizeof(mat64));
     bli_64x64N_clobber(h,uc,phi,2);
 }
@@ -2187,7 +2187,7 @@ int PLUQ128(pmat_ptr p, mat64 * l, mat64 * u, pmat_ptr q, mat64 * m)
      *
      * Now based on l[0] * mhigh, compute t2 = (L*M)_low
      */
-    mat64 t2[2];
+    mat64 t2[2] ATTRIBUTE(aligned(64));
     mul_6464_6464(t2[0], l21, u[0]); add_6464_6464(t2[0], m[2], t2[0]);
     mul_6464_6464(t2[1], l21, u[1]); add_6464_6464(t2[1], m[3], t2[1]);
 
