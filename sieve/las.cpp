@@ -303,8 +303,7 @@ void sieve_info::update (size_t nr_workspaces)/*{{{*/
   /* update number of buckets at toplevel */
   uint64_t BRS[FB_MAX_PARTS] = BUCKET_REGIONS;
 
-  /* wondering whether having the "local A" at hand would be a plus. */
-  uint64_t A = ((uint64_t)J) << conf.logI_adjusted;
+  uint64_t A = UINT64_C(1) << conf.logA;
 
   nb_buckets[toplevel] = iceildiv(A, BRS[toplevel]);
 

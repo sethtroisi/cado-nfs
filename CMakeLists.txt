@@ -182,10 +182,12 @@ if(CMAKE_C_COMPILER_ID MATCHES "Intel")
     set (CMAKE_C_FLAGS   "-std=c99 ${CMAKE_C_FLAGS}")
 
     # only icc>=15 is full c++11 compliant, it seems. But 14 will do.
-    if (NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS 14)
+    if (NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS 15)
         set (CMAKE_CXX_FLAGS   "-std=c++11 ${CMAKE_CXX_FLAGS}")
         set(HAVE_CXX11 1)
         message(STATUS "Enabling C++11 support")
+    elseif (NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS 14)
+        message(STATUS "Not enabling C++11 support for ICC 14, see bug #21416")
     else()
         # don't set standard flags explicitly. The default seems fine.
         # set (CMAKE_CXX_FLAGS   "-std=gnu++98 -g -W -Wall ${CMAKE_CXX_FLAGS}")
