@@ -1,5 +1,6 @@
 /* arithmetic on polynomial with double-precision coefficients */
 #include "cado.h"
+#include <cmath>        /* see below. Must come early, it seems. */
 #include <ostream>
 #include <sstream>
 #include <string>
@@ -7,7 +8,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <limits.h>
-#include <cmath>        /* see below */
 #include <float.h> /* for DBL_MAX */
 #include <ctype.h> /* isspace */
 
