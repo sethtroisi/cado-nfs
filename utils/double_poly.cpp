@@ -16,9 +16,15 @@
  * https://sourceware.org/bugzilla/show_bug.cgi?id=19439
  *
  */
-#if defined(__GNU_LIBRARY__) && !__GLIBC_PREREQ(2, 23)
+#if defined(__GNU_LIBRARY__)
+#if __GLIBC_PREREQ(2, 23)
+#include <cmath>
+using std::isnan;
+using std::isinf;
+#else
 /* not "the right way", but happens to work.  */
 #include <math.h>
+#endif
 #else
 /* this one is the right way */
 #include <cmath>
