@@ -69,7 +69,7 @@ endif()
 
 if(CMAKE_SYSTEM_NAME STREQUAL "FreeBSD")
     message(STATUS "Disabling antebuffer on ${CMAKE_SYSTEM_NAME}, see #21410")
-    # https://gforge.inria.fr/tracker/index.php?func=detail&aid=21410&group_id=2065&atid=7442
+    # http://cado-nfs.gforge.inria.fr/bug.php?21410
 else()
     add_executable(antebuffer antebuffer.c timing.cpp memusage.c)
     target_link_libraries(antebuffer pthread)

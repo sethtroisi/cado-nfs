@@ -144,7 +144,7 @@ else:
 # and we have to use a different work-around...
 #
 # Update:
-# https://gforge.inria.fr/tracker/index.php?func=detail&aid=21408&group_id=2065&atid=7442
+# http://cado-nfs.gforge.inria.fr/bug.php?21408
 #
 #
 # Rather than keep a list of faulty versions, we'll try to auto-detect
@@ -290,7 +290,7 @@ def find_working_bytesgenerator():
 
     logging.error("None of our byte generators work")
     logging.error("See bug #21408")
-    logging.error("https://gforge.inria.fr/tracker/index.php?func=detail&aid=21408&group_id=2065&atid=7442")
+    logging.error("http://cado-nfs.gforge.inria.fr/bug.php?21408")
     for gtp in wrong:
         byte_generator, test_bytes, postdata = gtp
         logging.error("Example of a failing test with %s:" % str(byte_generator))
