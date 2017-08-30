@@ -405,7 +405,7 @@ fb_vector<FB_ENTRY_TYPE>::extract_bycost(std::vector<unsigned long> &p,
 template <class FB_ENTRY_TYPE>
 plattices_vector_t *
 fb_slice<FB_ENTRY_TYPE>::make_lattice_bases(const qlattice_basis &basis,
-    const int logI) const
+    const int logI, const sublat_t &sublat) const
 {
   typename FB_ENTRY_TYPE::transformed_entry_t transformed;
   /* Create a transformed vector and store the index of the slice we currently
@@ -425,9 +425,10 @@ fb_slice<FB_ENTRY_TYPE>::make_lattice_bases(const qlattice_basis &basis,
          locations with p | gcd(i,j). */
       if (LIKELY(!proj || r == 0)) {
         plattice_info_t pli = plattice_info_t(transformed.get_q(), r, proj, logI);
-        plattice_enumerate_t ple = plattice_enumerate_t(pli, i_entry, logI);
-        // Skip (0,0).
-        ple.next();
+        plattice_enumerate_t ple = plattice_enumerate_t(pli, i_entry, logI, sublat);
+        // Skip (0,0) unless we have sublattices.
+        if (!sublat.m)
+          ple.next();
         if (LIKELY(pli.a0 != 0)) {
           result->push_back(ple);
         }
@@ -602,6 +603,8 @@ fb_vector<fb_general_entry>::est_weight(const size_t start, const size_t end) co
   return est_weight_sum(start, end);
 }
 
+/* scale is the quantity by which we multiply the log_2 of the primes we
+ * consider */
 template <class FB_ENTRY_TYPE>
 void
 fb_vector<FB_ENTRY_TYPE>::make_slices(const double scale, const double max_weight,
@@ -852,6 +855,8 @@ fb_part::extract_bycost(std::vector<unsigned long> &p, fbprime_t pmax, fbprime_t
 }
 
 
+/* scale is the quantity by which we multiply the log_2 of the primes we
+ * consider */
 void
 fb_part::make_slices(const double scale, const double max_weight,
                      slice_index_t &next_index)
@@ -1083,11 +1088,21 @@ fb_log_2 (fbprime_t n)
   return k;
 }
 
-
+/* the idea here is that we want to return the rounding of log(p^k) minus
+ * the rounding of log(p^(k-1)). So it's close, in spirit, to log(p)...
+ *
+ * Note that the old fb_log function was taking log_scale as something
+ * relative to natural logarithm. So while we had a precomputed scale so
+ * that the-log-we-want(p) = log2(p) * scale, here we were feedint
+ * scale/log(2), which is pretty awkward.
+ *
+ * (log2 is C99. I do recall that some bsd libm lacks it. It's a bug,
+ * period).
+ */
 unsigned char
 fb_log (double n, double log_scale, double offset)
 {
-  const long l = floor (log (n) * log_scale + offset + 0.5);
+  const long l = floor (log2 (n) * log_scale + offset + 0.5);
   return static_cast<unsigned char>(l);
 }
 
@@ -1400,9 +1415,7 @@ fb_factorbase::make_linear_threadpool (const mpz_t *poly,
 
   // Stage 1: while there are still primes, wait for a result and
   // schedule a new task.
-  int cont = 1;
-  do {
-    ASSERT_ALWAYS(active_task > 0);
+  for(int cont = 1 ; cont && active_task ; ) {
     task_result *result = pool.get_result();
     make_linear_thread_result *res =
       static_cast<make_linear_thread_result *>(result);
@@ -1415,7 +1428,7 @@ fb_factorbase::make_linear_threadpool (const mpz_t *poly,
       pool.add_task(process_one_task, res->orig_param, 0);
     }
     delete result;
-  } while (cont);
+  }
 
   // Stage 2: purge last tasks
   for (unsigned int i = 0; i < active_task; ++i) {
@@ -1467,6 +1480,8 @@ fb_factorbase::extract_bycost(std::vector<unsigned long> &extracted, fbprime_t p
   }
 }
 
+/* scale is the quantity by which we multiply the log_2 of the primes we
+ * consider */
 void
 fb_factorbase::make_slices(const double scale, const double max_weight[FB_MAX_PARTS])
 {
@@ -1629,7 +1644,7 @@ int main(int argc, char **argv)
   mpz_set_ui(poly[1], 210); /* Bunch of projective primes */
 
   fb1->make_linear(poly);
-  fb1->make_slices(2.0, 0.5);
+  fb1->make_slices(2.0 * M_LN2, 0.5);
   output(fb1, "from linear polynomial");
 
   // This line does (and should) fail to compile, as fb_factorbase is
@@ -1638,7 +1653,7 @@ int main(int argc, char **argv)
 
   if (argc > 1) {
     fb2->read(argv[1]);
-    fb2->make_slices(2.0, 0.5);
+    fb2->make_slices(2.0 * M_LN2, 0.5);
     output(fb2, "from file");
   }
 
@@ -1647,7 +1662,7 @@ int main(int argc, char **argv)
   bool only_general[4] = {false, false, false, false};
   fb1 = new fb_factorbase(thresholds, powbound, only_general);
   fb1->make_linear(poly);
-  fb1->make_slices(2.0, 0.5);
+  fb1->make_slices(2.0 * M_LN2, 0.5);
   output(fb1, "from linear polynomial, only_general = false");
 
   printf("Trialdiv primes:\n");

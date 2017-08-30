@@ -78,12 +78,13 @@
 #include <sys/stat.h>
 #include <errno.h>
 
+#define DOUBLE_POLY_EXPOSE_COMPLEX_FUNCTIONS
+
 #include "macros.h"
 #include "utils.h"
 #include "portability.h"
 #include "modul_poly.h"
 #include "powers_of_p.h"
-#include "polyroots.h"
 #include "knapsack.h"
 
 #include "select_mpi.h"

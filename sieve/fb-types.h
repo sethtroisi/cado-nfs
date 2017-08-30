@@ -32,9 +32,15 @@ typedef uint64_t redc_invp_t;
 typedef uint32_t redc_invp_t;
 #endif
 
-#define LOG_SCALE 1.4426950408889634 /* 1/log(2) to 17 digits, rounded to
-                                        nearest. This is enough to uniquely
-                                        identify the corresponding IEEE 754
-                                        double precision number */
+// FIXME: could probably go somewhere else...
+// Small struct for sublattice info:
+// One sieves only positions congrent to (i0,j0) mod m
+struct sublat_s {
+    uint32_t m; // 0 means no sublattices.
+    uint32_t i0;
+    uint32_t j0;
+};
+typedef struct sublat_s sublat_t;
+
 
 #endif

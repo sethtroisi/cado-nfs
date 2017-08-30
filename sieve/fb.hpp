@@ -20,28 +20,6 @@
 #include "las-plattice.hpp"
 #include "las-base.hpp"
 
-// If a plain-old data type T inherits from _padded_pod<T>, it ensures that all
-// the sizeof(T) bytes of any instance of T will be initialized, even if its
-// data members do not occupy the whole memory region.
-// For instance, this allows one to write `fwrite(&x, sizeof(T), 1, f)' without
-// Valgrind complaining because of uninitialized memory reads.
-template <typename T>
-class _padded_pod {
-  public:
-    _padded_pod() {
-      memset(this,  0, sizeof(T));
-    }
-
-    _padded_pod(const _padded_pod &x) {
-      memcpy(this, &x, sizeof(T));
-    }
-
-    const _padded_pod &operator=(const _padded_pod &x) {
-      memcpy(this, &x, sizeof(T));
-      return *this;
-    }
-};
-
 /* Forward declaration so fb_general_entry can use it in constructors */
 template <int Nr_roots>
 class fb_entry_x_roots;
@@ -234,7 +212,7 @@ class fb_slice_interface {
   virtual ~fb_slice_interface(){}
   virtual int get_nr_roots() const = 0;
   virtual bool is_general() const = 0;
-  virtual plattices_vector_t * make_lattice_bases(const qlattice_basis &, int) const = 0;
+  virtual plattices_vector_t * make_lattice_bases(const qlattice_basis &, int, const sublat_t &) const = 0;
   virtual unsigned char get_logp() const = 0;
   virtual slice_index_t get_index() const = 0;
   virtual fbprime_t get_prime(slice_offset_t offset) const = 0;
@@ -254,7 +232,10 @@ class fb_vector_interface: public fb_interface {
   virtual void extract_bycost(std::vector<unsigned long> &extracted, fbprime_t pmax, fbprime_t td_thresh) const = 0;
   virtual void finalize() = 0;
   /* Create slices so that one slice contains at most max_slice_len entries,
-     and all entries in a slice have the same round(fb_log(p, scale)) */
+   * and all entries in a slice have the same round(fb_log(p, scale)).
+   * scale is the quantity by which we multiply the log_2 of the primes we
+   * consider.
+   */
   virtual void make_slices(double scale, double max_weight,
                            slice_index_t &next_index) = 0;
   virtual const fb_slice_interface *get_first_slice() const = 0;
@@ -307,7 +288,7 @@ class fb_slice : public fb_slice_interface {
     ASSERT_ALWAYS(_begin + offset < _end);
     return _begin[offset].k;
   }
-  plattices_vector_t * make_lattice_bases(const qlattice_basis &, int) const;
+  plattices_vector_t * make_lattice_bases(const qlattice_basis &, int, const sublat_t &) const;
 };
 
 /* A predicate to test whether an fb_slice has weight at most x, for use with
@@ -577,7 +558,8 @@ class fb_factorbase: public fb_interface, private NonCopyable {
 };
 
 
-unsigned char	fb_log (double, double, double);
+/* round(x*y-z) */
+unsigned char	fb_log (double x, double y, double z);
 fbprime_t       fb_pow (fbprime_t, unsigned long);
 fbprime_t       fb_is_power (fbprime_t, unsigned long *);
 void print_worst_weight_errors();
