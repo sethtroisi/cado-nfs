@@ -28,6 +28,7 @@
 #include "gf2x.h"
 
 #include "matops.h"
+#include "utils/memory.h"
 #include "utils/misc.h"
 
 #if defined(HAVE_SSE2) && ULONG_BITS == 64
@@ -1070,7 +1071,7 @@ void m64pol_mul_kara(m64pol_ptr r, m64pol_srcptr a1, m64pol_srcptr a2, unsigned 
     m64pol_add(r, a1, a1 + h, h);
     m64pol_add(r + 2 * h, a2, a2 + h, h);
 
-    mat64 * t = (mat64 *) malloc((2*h-1) * sizeof(mat64));
+    mat64 * t = (mat64 *) malloc_aligned((2*h-1) * sizeof(mat64), 64);
     m64pol_mul_kara(t, r, r + 2 * h, h, h);
 
     m64pol_mul_kara(r, a1, a2, h, h);
@@ -1078,22 +1079,22 @@ void m64pol_mul_kara(m64pol_ptr r, m64pol_srcptr a1, m64pol_srcptr a2, unsigned 
     m64pol_add(t, t, r, 2 * h - 1);
     m64pol_add(t, t, r + 2 * h, 2 * h - 1);
     m64pol_add(r + h, r + h, t, 2 * h - 1);
-    free(t);
+    free_aligned(t);
 }
 
 void m64pol_addmul_kara(m64pol_ptr r, m64pol_srcptr a1, m64pol_srcptr a2, unsigned int n1, unsigned int n2)
 {
-    mat64 * t = (mat64 *) malloc((n1 + n2 -1) * sizeof(mat64));
+    mat64 * t = (mat64 *) malloc_aligned((n1 + n2 -1) * sizeof(mat64), 64);
     m64pol_mul_kara(t, a1, a2, n1, n2);
     m64pol_add(r, r, t, n1 + n2 - 1);
-    free(t);
+    free_aligned(t);
 }
 
 void m64pol_mul_gf2_64_bitslice(m64pol_ptr r, m64pol_srcptr a1, m64pol_srcptr a2)
 {
     unsigned int n1 = 64;
     unsigned int n2 = 64;
-    mat64 * t = (mat64 *) malloc((n1 + n2 -1) * sizeof(mat64));
+    mat64 * t = (mat64 *) malloc_aligned((n1 + n2 -1) * sizeof(mat64), 64);
     m64pol_mul_kara(t, a1, a2, n1, n2);
     /* This reduces modulo the polynomial x^64+x^4+x^3+x+1 */
     for(unsigned int i = n1 + n2 - 2 ; i >= 64 ; i--) {
@@ -1103,14 +1104,14 @@ void m64pol_mul_gf2_64_bitslice(m64pol_ptr r, m64pol_srcptr a1, m64pol_srcptr a2
         add_6464_6464(t[i-64  ], t[i-64  ], t[i]);
     }
     memcpy(r, t, 64 * sizeof(mat64));
-    free(t);
+    free_aligned(t);
 }
 
 void m64pol_scalmul_gf2_64_bitslice(m64pol_ptr r, m64pol_srcptr a, uint64_t * s)
 {
     unsigned int n1 = 64;
     unsigned int n2 = 64;
-    mat64 * t = (mat64 *) malloc((n1 + n2 -1) * sizeof(mat64));
+    mat64 * t = (mat64 *) malloc_aligned((n1 + n2 -1) * sizeof(mat64), 64);
     memset(t, 0, (n1 + n2 -1) * sizeof(mat64));
     for(unsigned int i = 0 ; i < 64 ; i++) {
         if (((s[0]>>i)&UINT64_C(1))==0) continue;
@@ -1125,7 +1126,7 @@ void m64pol_scalmul_gf2_64_bitslice(m64pol_ptr r, m64pol_srcptr a, uint64_t * s)
         add_6464_6464(t[i-64  ], t[i-64  ], t[i]);
     }
     memcpy(r, t, 64 * sizeof(mat64));
-    free(t);
+    free_aligned(t);
 }
 
 void m64pol_scalmul_gf2_64_bitslice2(m64pol_ptr r, m64pol_srcptr a, uint64_t * s)
@@ -1134,7 +1135,7 @@ void m64pol_scalmul_gf2_64_bitslice2(m64pol_ptr r, m64pol_srcptr a, uint64_t * s
      * them to start with. */
     unsigned int n1 = 64;
     unsigned int n2 = 64;
-    mat64 * t = (mat64 *) malloc((n1 + n2 -1) * sizeof(mat64));
+    mat64 * t = (mat64 *) malloc_aligned((n1 + n2 -1) * sizeof(mat64), 64);
     memset(t, 0, (n1 + n2 -1) * sizeof(mat64));
 
     /* Precompute multiples of a */
@@ -1143,7 +1144,7 @@ void m64pol_scalmul_gf2_64_bitslice2(m64pol_ptr r, m64pol_srcptr a, uint64_t * s
      * be looked at (since presently 4 wins over 2).
      */
 #define NMULTS  2
-    mat64 * am_area = (mat64 *) malloc((1 << NMULTS) * (64 + NMULTS - 1) * sizeof(mat64));
+    mat64 * am_area = (mat64 *) malloc_aligned((1 << NMULTS) * (64 + NMULTS - 1) * sizeof(mat64), 64);
     mat64 * am[1 << NMULTS];
 
     for(unsigned int i = 0 ; i < (1 << NMULTS) ; i++) {
@@ -1164,7 +1165,7 @@ void m64pol_scalmul_gf2_64_bitslice2(m64pol_ptr r, m64pol_srcptr a, uint64_t * s
     for(unsigned int i = 0 ; i < 64 ; i+=NMULTS, v>>=NMULTS) {
         m64pol_add(t + i, t + i, am[v & ((1<<NMULTS)-1)], 64+(NMULTS-1));
     }
-    free(am_area);
+    free_aligned(am_area);
 
     /* This reduces modulo the polynomial x^64+x^4+x^3+x+1 */
     for(unsigned int i = n1 + n2 - 2 ; i >= 64 ; i--) {
@@ -1174,7 +1175,7 @@ void m64pol_scalmul_gf2_64_bitslice2(m64pol_ptr r, m64pol_srcptr a, uint64_t * s
         add_6464_6464(t[i-64  ], t[i-64  ], t[i]);
     }
     memcpy(r, t, 64 * sizeof(mat64));
-    free(t);
+    free_aligned(t);
 }
 
 void m64pol_mul_gf2_64_nobitslice(uint64_t * r, uint64_t * a1, uint64_t * a2)
@@ -1215,7 +1216,7 @@ void m64pol_mul_gf2_128_bitslice(m64pol_ptr r, m64pol_srcptr a1, m64pol_srcptr a
 {
     unsigned int n1 = 128;
     unsigned int n2 = 128;
-    mat64 * t = (mat64 *) malloc((n1 + n2 -1) * sizeof(mat64));
+    mat64 * t = (mat64 *) malloc_aligned((n1 + n2 -1) * sizeof(mat64), 64);
     m64pol_mul_kara(t, a1, a2, n1, n2);
     /* This reduces modulo the polynomial x^128+x^7+x^2+x+1 */
     for(unsigned int i = n1 + n2 - 2 ; i >= 128; i--) {
@@ -1225,14 +1226,14 @@ void m64pol_mul_gf2_128_bitslice(m64pol_ptr r, m64pol_srcptr a1, m64pol_srcptr a
         add_6464_6464(t[i-128  ], t[i-128  ], t[i]);
     }
     memcpy(r, t, 128 * sizeof(mat64));
-    free(t);
+    free_aligned(t);
 }
 
 void m64pol_scalmul_gf2_128_bitslice(m64pol_ptr r, m64pol_srcptr a, uint64_t * s)
 {
     unsigned int n1 = 128;
     unsigned int n2 = 128;
-    mat64 * t = (mat64 *) malloc((n1 + n2 -1) * sizeof(mat64));
+    mat64 * t = (mat64 *) malloc_aligned((n1 + n2 -1) * sizeof(mat64), 64);
     memset(t, 0, (n1 + n2 -1) * sizeof(mat64));
     for(unsigned int i = 0 ; i < 128 ; i++) {
         if (((s[i/64]>>(i&63))&UINT64_C(1))==0) continue;
@@ -1248,7 +1249,7 @@ void m64pol_scalmul_gf2_128_bitslice(m64pol_ptr r, m64pol_srcptr a, uint64_t * s
         add_6464_6464(t[i-128  ], t[i-128  ], t[i]);
     }
     memcpy(r, t, 128 * sizeof(mat64));
-    free(t);
+    free_aligned(t);
 }
 
 
@@ -1980,7 +1981,7 @@ int PLUQ64_n(int * phi, mat64 l, mat64 * u, mat64 * a, int n)
         rank += PLUQ64_inner(phi, tl, u[b], ta, b*m);
         mul_6464_6464(l, tl, l);
 #ifdef  ALLOC_LS
-        ls[b]=(mat64*) malloc(sizeof(mat64));
+        ls[b]=(mat64*) malloc_aligned(sizeof(mat64), 64);
         mat64_copy(*ls[b], tl);
 #else
         mat64_copy(ls[b], tl);
@@ -1992,7 +1993,7 @@ int PLUQ64_n(int * phi, mat64 l, mat64 * u, mat64 * a, int n)
     for(int c = b-2 ; c >= 0 ; c--) {
         mul_6464_6464(u[c], tl, u[c]);
         mul_6464_6464(tl, *ls[c], tl);
-        free(ls[c]);
+        free_aligned(ls[c]);
     }
     free(ls);
 #else
