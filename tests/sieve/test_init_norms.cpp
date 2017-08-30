@@ -19,19 +19,6 @@
 
 int adjust_strategy = 0;
 
-static inline uint64_t cputicks()/*{{{*/
-{
-        uint64_t r;
-        __asm__ __volatile__(
-                "rdtsc\n\t"
-                "shlq $32, %%rdx\n\t"
-                "orq %%rdx, %%rax\n\t"
-                : "=a"(r)
-                :
-                : "rdx");
-        return r;
-}
-/*}}}*/
 /*{{{ stuff copied from las.cpp */
 /* Put in r the smallest legitimate special-q value that it at least
    s + diff (note that if s+diff is already legitimate, then r = s+diff
