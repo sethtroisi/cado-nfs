@@ -7,7 +7,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <limits.h>
-#include <math.h>   /* for fabs */
+#include <cmath>        /* see below */
 #include <float.h> /* for DBL_MAX */
 #include <ctype.h> /* isspace */
 
@@ -17,14 +17,12 @@
 #include "gcd.h"
 #include "double_poly.h"
 
-#ifdef __OpenBSD__
-/* This is a kludge. For some reason, on our openbsd 5.3 box with egcc
- * (4.7) installed, math.h does not expose isnan and isinf, but leaves
- * them in std::. It should normally be harmless to expose all of the std
- * namespace in this case, and spares me the need for a cmake test
+/* By including cmath and not math.h, we get some prototypes in std:: ;
+ * This happens to *also* be the case with math.h on some boxes, and that
+ * may perhaps be a bug. Anyway, it seems that the cmath way is better.
  */
-using namespace std;
-#endif
+using std::isnan;
+using std::isinf;
 
 /* Initialize a polynomial of degree d */
 void
