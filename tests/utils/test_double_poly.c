@@ -285,7 +285,7 @@ unsigned int check_absolute_error(double value, double expected,
         value = 1.0;
     if (expected == 0.0)
         expected = 1.0;
-    if ((int)fabs(log2(fabs(value)) - log2(fabs(expected))) <= error)
+    if ((int)(fabs(log2(fabs(value)) - log2(fabs(expected)))) <= (int) error)
         return 1;
     return 0;
 }
