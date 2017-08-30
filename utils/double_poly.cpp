@@ -1,6 +1,5 @@
 /* arithmetic on polynomial with double-precision coefficients */
 #include "cado.h"
-#include <cmath>        /* see below. Must come early, it seems. */
 #include <ostream>
 #include <sstream>
 #include <string>
@@ -13,16 +12,29 @@
 
 #define DOUBLE_POLY_EXPOSE_COMPLEX_FUNCTIONS
 
-#include "portability.h"
-#include "gcd.h"
-#include "double_poly.h"
+/* it's a bit nasty here. See
+ * https://sourceware.org/bugzilla/show_bug.cgi?id=19439
+ *
+ */
+#if defined(__GNU_LIBRARY__) && !__GLIBC_PREREQ(2, 23)
+/* not "the right way", but happens to work.  */
+#include <math.h>
+#else
+/* this one is the right way */
+#include <cmath>
+using std::isnan;
+using std::isinf;
+#endif
+
 
 /* By including cmath and not math.h, we get some prototypes in std:: ;
  * This happens to *also* be the case with math.h on some boxes, and that
  * may perhaps be a bug. Anyway, it seems that the cmath way is better.
  */
-using std::isnan;
-using std::isinf;
+
+#include "portability.h"
+#include "gcd.h"
+#include "double_poly.h"
 
 /* Initialize a polynomial of degree d */
 void
