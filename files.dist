@@ -391,6 +391,7 @@ sieve/ecm/mpqs_2ul2.c
 sieve/ecm/mpqs_mpz.c
 sieve/ecm/batch.h
 sieve/ecm/batch.c
+sieve/ecm/finishbatch.c
 sieve/fb.cpp
 sieve/fb.hpp
 sieve/fb-types.h
