@@ -63,7 +63,7 @@ sed "s/c59.polyselect2.poly/$poly/g" las_run.py | \
 sed "s/2 # number of threads for las/$NUM_THREADS/g" > $d/las_run.py
 
 ### Parsing poly file (number of poly and rat/alg) (for now assume npoly == 2)
-npoly=`grep -c "^poly[0-9]" $d/$poly`
+npoly=`grep -c "^poly[0-9]" $d/$poly || :`
 if [ $npoly -eq 0 ] ; then # polys are given by Y[0-9] and (c[0-9] or X[0-9])
   grep -q "^Y[2-9]" $d/$poly
   if [ $? -eq 0 ] ; then
@@ -78,12 +78,12 @@ if [ $npoly -eq 0 ] ; then # polys are given by Y[0-9] and (c[0-9] or X[0-9])
     poly0="rat"
   fi
 elif [ $npoly -eq 2 ] ; then # polys are given by 'poly[0-9]:c0,c1,...'
-  if [ `grep -c "^poly0" $d/$poly | tr -cd , | wc -c` -eq 1 ] ; then
+  if [ `grep "^poly0" $d/$poly | tr -cd , | wc -c` -eq 1 ] ; then
     poly0="rat"
   else
     poly0="alg"
   fi
-  if [ `grep -c "^poly1" $d/$poly | tr -cd , | wc -c` -eq 1 ] ; then
+  if [ `grep "^poly1" $d/$poly | tr -cd , | wc -c` -eq 1 ] ; then
     poly1="rat"
   else
     poly1="alg"
