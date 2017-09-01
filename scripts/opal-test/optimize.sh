@@ -10,7 +10,7 @@
 # which should be near from prime_pi(2^lpb0) + prime_pi(2^lpb1)
 
 # Force the shell to bomb out in case a command fails in the script.
-set -e
+set -ex
 
 # To limit the number of black-box evaluations to say 50:
 # NOMAD_MAX_BB_EVAL=50 ./optimize.sh ...
