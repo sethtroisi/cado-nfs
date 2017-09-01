@@ -65,14 +65,12 @@ sed "s/2 # number of threads for las/$NUM_THREADS/g" > $d/las_run.py
 ### Parsing poly file (number of poly and rat/alg) (for now assume npoly == 2)
 npoly=`grep -c "^poly[0-9]" $d/$poly || :`
 if [ $npoly -eq 0 ] ; then # polys are given by Y[0-9] and (c[0-9] or X[0-9])
-  grep -q "^Y[2-9]" $d/$poly
-  if [ $? -eq 0 ] ; then
+  if grep -q "^Y[2-9]" $d/$poly ; then
     poly0="alg"
   else
     poly0="rat"
   fi
-  grep -q "^[cX][2-9]" $d/$poly
-  if [ $? -eq 0 ] ; then
+  if grep -q "^[cX][2-9]" $d/$poly ; then
     poly1="alg"
   else
     poly0="rat"
@@ -105,8 +103,7 @@ echo "OPAL_CADO_SQSIDE=${OPAL_CADO_SQSIDE}"
 ### Get parameters from params file and set _min and _max
 lim0=`grep "^lim0.*=" $params | cut -d= -f2`
 lim1=`grep "^lim1.*=" $params | cut -d= -f2`
-grep "qmin.*=" $params > /dev/null
-if [ $? -eq 0 ]; then
+if grep -q "qmin.*=" $params ; then
    qmin=`grep "qmin.*=" $params | cut -d= -f2`
    has_qmin=1
 else
@@ -117,16 +114,14 @@ lpb0=`grep "^lpb0.*=" $params | cut -d= -f2`
 lpb1=`grep "^lpb1.*=" $params | cut -d= -f2`
 mfb0=`grep "mfb0.*=" $params | cut -d= -f2`
 mfb1=`grep "mfb1.*=" $params | cut -d= -f2`
-grep "ncurves0.*=" $params > /dev/null
-if [ $? -eq 0 ]; then
+if grep -q "ncurves0.*=" $params ; then
    ncurves0=`grep "ncurves0.*=" $params | cut -d= -f2`
    has_ncurves0=1
 else
    ncurves0=10
    has_ncurves0=0
 fi
-grep "ncurves1.*=" $params > /dev/null
-if [ $? -eq 0 ]; then
+if grep -q "ncurves1.*=" $params ; then
    ncurves1=`grep "ncurves1.*=" $params | cut -d= -f2`
    has_ncurves1=1
 else
