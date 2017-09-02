@@ -1,0 +1,8 @@
+/* silly script, for a start */
+
+node {
+    checkout scm
+    sh 'env'
+}
+
+/* vim: set ft=groovy: */
