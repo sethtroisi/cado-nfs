@@ -1,4 +1,8 @@
 /* silly script, for a start */
+/* Documentation sources:
+ * https://github.com/jenkinsci/pipeline-plugin/blob/master/TUTORIAL.md#understanding-flow-scripts
+ * https://jenkins.io/doc/book/pipeline/
+ */
 
 node {
     checkout scm
