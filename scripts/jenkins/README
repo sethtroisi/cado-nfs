@@ -1,4 +1,0 @@
-
-These files are commodity scripts for use by the jenkins multibranch
-pipeline plugin. We still rely on our preferred external repository for
-test scripts, but we need some glue here.
