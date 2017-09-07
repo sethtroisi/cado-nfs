@@ -765,7 +765,6 @@ FindSuitableModP (mpz_poly F, mpz_t N)
 {
   unsigned long p = 2;
   int dF = F->deg;
-  int ntries = 0;
 
   modul_poly_t fp;
 
@@ -777,7 +776,6 @@ FindSuitableModP (mpz_poly F, mpz_t N)
     int d;
 
     p = getprime_mt (pi);
-    ntries ++;
     if (mpz_gcd_ui(NULL, N, p) != 1)
       continue;
 
