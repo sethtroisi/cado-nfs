@@ -113,10 +113,8 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  * (useful to enable temporarily before releases, at least)
  */
 #ifdef  __GNUC__
-/* disabled for releases
 #pragma GCC diagnostic error "-Wextra"
 #pragma GCC diagnostic error "-Wall"
-*/
 #endif
 
 #include "cado_config.h"
