@@ -53,8 +53,8 @@ Required software tools
    that a shared library is installed (libgmp.so under Linux) otherwise
    CADO-NFS might not compile.
  - C and C++ compilers, with C99 support. For C++, as of release
-   cado-nfs-2.3, only C++98 is required. However all tested platforms
-   automatically enable C++11. If you have only a C++11 compiler, you
+   cado-nfs-2.3.0, only C++98 is required. However all tested platforms
+   automatically enable C++11. If you have only a C++98 compiler, you
    will need the boost libraries installed.
    In practice, your probability of success is best with either GCC
    version 4.7 or newer, LLVM Clang 4.0.0 or newer, Apple Clang 6.0.0 or
