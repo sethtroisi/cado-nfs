@@ -273,7 +273,7 @@ calculateSqrtRat (const char *prefix, int numdep, cado_poly pol,
 
   if (mpz_cmp_ui (v, 0) != 0)
     {
-      unsigned long p = 2, e;
+      unsigned long p = 2, e, errors = 0;
       mpz_t pp;
 
       mpz_init (pp);
@@ -295,8 +295,9 @@ calculateSqrtRat (const char *prefix, int numdep, cado_poly pol,
                     mpz_sizeinbase (prd[0], 2));
           if ((e % 2) != 0)
             {
+              errors ++;
               fprintf (stderr, "Prime %lu appears to odd power %lu\n", p, e);
-              if (verbose)
+              if (verbose || errors >= 10)
                 break;
             }
           p = getprime_mt (pi);
