@@ -391,6 +391,7 @@ sieve/ecm/mpqs_2ul2.c
 sieve/ecm/mpqs_mpz.c
 sieve/ecm/batch.h
 sieve/ecm/batch.c
+sieve/ecm/finishbatch.c
 sieve/fb.cpp
 sieve/fb.hpp
 sieve/fb-types.h
@@ -1186,6 +1187,10 @@ sieve/las-fb.cpp
 config/shared_ptr.cmake
 config/cxxabi.cmake
 sieve/display-lattice-adjust.sage
+config/perl.cmake
+config/gmp_randstate.c
+config/gmp_randstate.cmake
+config/regex.cmake
 tests/sieve/test_init_norms.cpp
 sieve/las-types.cpp
 sieve/las-siever-config.cpp

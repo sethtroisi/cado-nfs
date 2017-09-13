@@ -24,7 +24,7 @@
 #  Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
 #  02110-1301, USA.
 
-AC_INIT([gf2x], [1.2])
+AC_INIT([gf2x], [1.2.1])
 
 if test "x$CFLAGS" != x ; then
  has_CFLAGS_from_env=yes
@@ -256,8 +256,8 @@ fi
 # This is used in src/Makefile.am
 AM_CONDITIONAL([GF2X_32BIT_SOURCES],[test "x$tuned_nbits" = x32])
 AM_CONDITIONAL([GF2X_64BIT_SOURCES],[test "x$tuned_nbits" = x64])
-AM_CONDITIONAL([GF2X_SSE2_AVAILABLE],[test "x$gf2x_cv_cc_supports_sse2" != xno])
-AM_CONDITIONAL([GF2X_PCLMUL_AVAILABLE],[test "x$gf2x_cv_cc_supports_pclmul" != xno])
+AM_CONDITIONAL([GF2X_SSE2_AVAILABLE],[expr "x$gf2x_cv_cc_supports_sse2" : "xyes.*"])
+AM_CONDITIONAL([GF2X_PCLMUL_AVAILABLE],[expr "x$gf2x_cv_cc_supports_pclmul" : "xyes"])
 AM_CONDITIONAL([GPL_CODE_PRESENT],[grep -q "released under the GPL" "$srcdir/toom-gpl.c"])
 if grep -q "released under the GPL" "$srcdir/toom-gpl.c" ; then
  echo "File $srcdir/toom-gpl.c is present, using a GPL-licensed gf2x"

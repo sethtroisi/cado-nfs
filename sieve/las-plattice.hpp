@@ -98,6 +98,10 @@ struct plattice_info_t {
   uint32_t b1;
 
   plattice_info_t(const fbprime_t p, const fbroot_t r, const bool proj, const int logI) {
+    /* placate compiler. Sure, we shouldn't need it really, but
+     * admittedly the control flow through reduce_plattice is contrived.
+     */
+    a0 = a1 = b0 = b1 = 0;
     if (UNLIKELY(proj && r == 0)) {
       /* This lattice basis might work in principle, but it generates hits in
          all locations i=1, ..., I/2-1, j = 0, all of which are useless except
@@ -453,6 +457,11 @@ class plattice_enumerate_area {
 public:
     static plattice_x_t value;
 };
+
+/* see bug #21405 */
+template <> plattice_x_t plattice_enumerate_area<1>::value;
+template <> plattice_x_t plattice_enumerate_area<2>::value;
+template <> plattice_x_t plattice_enumerate_area<3>::value;
 
 template <int LEVEL>
 bool

@@ -47,7 +47,12 @@ sieve_info::sieve_info(siever_config const & sc, cado_poly_srcptr cpoly, std::li
     }
 
     // Now that fb have been initialized, we can set the toplevel.
-    toplevel = MAX(sides[0].fb->get_toplevel(), sides[1].fb->get_toplevel());
+    toplevel = -1;
+    for(int side = 0 ; side < 2 ; side++) {
+        if (!sides[side].fb) continue;
+        int level = sides[0].fb->get_toplevel();
+        if (level > toplevel) toplevel = level;
+    }
 
 #if 0
     /* Initialize the number of buckets */
@@ -71,6 +76,7 @@ sieve_info::sieve_info(siever_config const & sc, cado_poly_srcptr cpoly, std::li
 
     for(int side = 0 ; side < 2 ; side++) {
 	init_trialdiv(side); /* Init refactoring stuff */
+        if (!sides[side].fb) continue;
         init_fb_smallsieved(side);
         verbose_output_print(0, 2, "# small side-%d factor base", side);
         size_t nr_roots;
@@ -127,8 +133,8 @@ void sieve_info::update_norm_data ()/*{{{*/
 /*}}}*/
 void sieve_info::update (size_t nr_workspaces)/*{{{*/
 {
-    /* wondering whether having the "local A" at hand would be a plus. */
-    uint64_t A = ((uint64_t)J) << conf.logI_adjusted;
+    uint64_t A = UINT64_C(1) << conf.logA;
+
     /* update number of buckets at toplevel */
     size_t (&BRS)[FB_MAX_PARTS] = BUCKET_REGIONS;
     nb_buckets[toplevel] = iceildiv(A, BRS[toplevel]);
@@ -157,6 +163,7 @@ void sieve_info::update (size_t nr_workspaces)/*{{{*/
             max_weight[i_part] = sis.max_bucket_fill_ratio[i_part] / nr_workspaces
                 * safety_factor;
         }
+        if (!sis.fb) continue;
         sis.fb->make_slices(sis.lognorms->scale, max_weight);
     }
 }/*}}}*/

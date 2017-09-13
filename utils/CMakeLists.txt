@@ -61,21 +61,21 @@ endif()
 
 add_library (utils_with_io ${CADO_SHARED} ${sources_io})
 target_link_libraries(utils_with_io utils)
-add_dependencies(utils_with_io antebuffer)
 
-if(ENABLE_SHARED)
-install(TARGETS utils utils_with_io DESTINATION ${LIBSUFFIX}/utils)
+if(CMAKE_SYSTEM_NAME STREQUAL "FreeBSD")
+    message(STATUS "Disabling antebuffer on ${CMAKE_SYSTEM_NAME}, see #21410")
+    # http://cado-nfs.gforge.inria.fr/bug.php?21410
+else()
+    add_executable(antebuffer antebuffer.c timing.cpp memusage.c)
+    target_link_libraries(antebuffer pthread)
+    install(TARGETS antebuffer RUNTIME DESTINATION ${LIBSUFFIX}/utils)
+    add_dependencies(utils_with_io antebuffer)
 endif()
 
-# To avoid the warning: implicit declaration of function nanosleep. It's POSIX, non c99.
-set (CMAKE_OLD_C_FLAGS "${CMAKE_C_FLAGS}")
-set (CMAKE_C_FLAGS "prout -D _POSIX_C_SOURCE=200809L ${CMAKE_C_FLAGS}")
-add_executable(antebuffer antebuffer.c timing.cpp memusage.c)
-set (CMAKE_C_FLAGS "${CMAKE_OLD_C_FLAGS}")
+if(ENABLE_SHARED)
+    install(TARGETS utils utils_with_io DESTINATION ${LIBSUFFIX}/utils)
+endif()
 
-target_link_libraries(antebuffer pthread)
-
-install(TARGETS antebuffer RUNTIME DESTINATION ${LIBSUFFIX}/utils)
 
 include(CMakeLists-nodist.txt OPTIONAL)
 

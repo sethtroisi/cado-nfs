@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/usr/bin/env bash
 # this script automatically optimizes sieving parameters
 # Usage: optimize.sh params.cxx cxx.polyselect2.poly
 # Puts the optimized file in params.cxx.opt in the current directory.
@@ -9,8 +9,31 @@
 # Important: if lpb0 and/or lpb1 change, you need to recompute rels_wanted,
 # which should be near from prime_pi(2^lpb0) + prime_pi(2^lpb1)
 
-# To limit the number of black-box evaluations to say 100:
-# NOMAD_MAX_BB_EVAL=100 ./optimize.sh ...
+# Force the shell to bomb out in case a command fails in the script.
+set -ex
+
+# To limit the number of black-box evaluations to say 50:
+# NOMAD_MAX_BB_EVAL=50 ./optimize.sh ...
+
+: ${NOMAD_MAX_BB_EVAL=100}
+
+# To use say 8 threads:
+# NUM_THREADS=8 ./optimize.sh ...
+# Note that when the number of threads increases, the estimated time reported
+# by OPAL does increase. This is not really a problem if this time increases
+# by the same factor between two sets of parameters. However this is no longer
+# the case for a number of threads larger than 4. Here are examples on rsa140,
+# with two different sets of parameters, lpb[01]=28 and lpb[01]=29:
+#                  lpb[01]=28                     lpb[01]=29
+# NUM_THREADS=2      1.31e6                         1.35e6
+# NUM_THREADS=4      1.32e6                         1.35e6
+# NUM_THREADS=8      1.40e6                         1.43e6
+# NUM_THREADS=16     1.82e6                         1.78e6
+# We thus see the estimated time indeed increases with NUM_THREADS, and
+# with NUM_THREADS=16 the first set of parameters is worse than the second one.
+# Thus for production use we recommend to use NUM_THREADS <= 4.
+
+: ${NUM_THREADS=4}
 
 cwd=`pwd`
 
@@ -35,6 +58,8 @@ if [ -d "${CADO_BUILD}" ] ; then
   echo "CADO_BUILD = ${CADO_BUILD}"
 else
   echo "CADO_BUILD does not contain the name of a directory: '${CADO_BUILD}'"
+  ls -ld "${CADO_BUILD}"
+  ls -l "${CADO_BUILD}"
   exit 1
 fi
 
@@ -42,32 +67,34 @@ fi
 d=`mktemp -d`
 echo "Working directory:" $d
 
+cleanup() { rm -rf "$d" ; }
+trap cleanup EXIT
+
 ### Copy las_optimize, report and poly file and replace its name in las_run
 cp $2 las_optimize.py report.py $d
-sed "s/c59.polyselect2.poly/$poly/g" las_run.py > $d/las_run.py
+sed "s/c59.polyselect2.poly/$poly/g" las_run.py | \
+sed "s/2 # number of threads for las/$NUM_THREADS/g" > $d/las_run.py
 
 ### Parsing poly file (number of poly and rat/alg) (for now assume npoly == 2)
-npoly=`grep -c "^poly[0-9]" $d/$poly`
+npoly=`grep -c "^poly[0-9]" $d/$poly || :`
 if [ $npoly -eq 0 ] ; then # polys are given by Y[0-9] and (c[0-9] or X[0-9])
-  grep -q "^Y[2-9]" $d/$poly
-  if [ $? -eq 0 ] ; then
+  if grep -q "^Y[2-9]" $d/$poly ; then
     poly0="alg"
   else
     poly0="rat"
   fi
-  grep -q "^[cX][2-9]" $d/$poly
-  if [ $? -eq 0 ] ; then
+  if grep -q "^[cX][2-9]" $d/$poly ; then
     poly1="alg"
   else
     poly0="rat"
   fi
 elif [ $npoly -eq 2 ] ; then # polys are given by 'poly[0-9]:c0,c1,...'
-  if [ `grep -c "^poly0" $d/$poly | tr -cd , | wc -c` -eq 1 ] ; then
+  if [ `grep "^poly0" $d/$poly | tr -cd , | wc -c` -eq 1 ] ; then
     poly0="rat"
   else
     poly0="alg"
   fi
-  if [ `grep -c "^poly1" $d/$poly | tr -cd , | wc -c` -eq 1 ] ; then
+  if [ `grep "^poly1" $d/$poly | tr -cd , | wc -c` -eq 1 ] ; then
     poly1="rat"
   else
     poly1="alg"
@@ -89,8 +116,7 @@ echo "OPAL_CADO_SQSIDE=${OPAL_CADO_SQSIDE}"
 ### Get parameters from params file and set _min and _max
 lim0=`grep "^lim0.*=" $params | cut -d= -f2`
 lim1=`grep "^lim1.*=" $params | cut -d= -f2`
-grep "qmin.*=" $params > /dev/null
-if [ $? -eq 0 ]; then
+if grep -q "qmin.*=" $params ; then
    qmin=`grep "qmin.*=" $params | cut -d= -f2`
    has_qmin=1
 else
@@ -101,16 +127,14 @@ lpb0=`grep "^lpb0.*=" $params | cut -d= -f2`
 lpb1=`grep "^lpb1.*=" $params | cut -d= -f2`
 mfb0=`grep "mfb0.*=" $params | cut -d= -f2`
 mfb1=`grep "mfb1.*=" $params | cut -d= -f2`
-grep "ncurves0.*=" $params > /dev/null
-if [ $? -eq 0 ]; then
+if grep -q "ncurves0.*=" $params ; then
    ncurves0=`grep "ncurves0.*=" $params | cut -d= -f2`
    has_ncurves0=1
 else
    ncurves0=10
    has_ncurves0=0
 fi
-grep "ncurves1.*=" $params > /dev/null
-if [ $? -eq 0 ]; then
+if grep -q "ncurves1.*=" $params ; then
    ncurves1=`grep "ncurves1.*=" $params | cut -d= -f2`
    has_ncurves1=1
 else

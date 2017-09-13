@@ -7,24 +7,40 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <limits.h>
-#include <math.h>   /* for fabs */
 #include <float.h> /* for DBL_MAX */
 #include <ctype.h> /* isspace */
 
 #define DOUBLE_POLY_EXPOSE_COMPLEX_FUNCTIONS
 
+/* it's a bit nasty here. See
+ * https://sourceware.org/bugzilla/show_bug.cgi?id=19439
+ *
+ */
+#if defined(__GNU_LIBRARY__)
+#if __GLIBC_PREREQ(2, 23)
+#include <cmath>
+using std::isnan;
+using std::isinf;
+#else
+/* not "the right way", but happens to work.  */
+#include <math.h>
+#endif
+#else
+/* this one is the right way */
+#include <cmath>
+using std::isnan;
+using std::isinf;
+#endif
+
+
+/* By including cmath and not math.h, we get some prototypes in std:: ;
+ * This happens to *also* be the case with math.h on some boxes, and that
+ * may perhaps be a bug. Anyway, it seems that the cmath way is better.
+ */
+
 #include "portability.h"
 #include "gcd.h"
 #include "double_poly.h"
-
-#ifdef __OpenBSD__
-/* This is a kludge. For some reason, on our openbsd 5.3 box with egcc
- * (4.7) installed, math.h does not expose isnan and isinf, but leaves
- * them in std::. It should normally be harmless to expose all of the std
- * namespace in this case, and spares me the need for a cmake test
- */
-using namespace std;
-#endif
 
 /* Initialize a polynomial of degree d */
 void

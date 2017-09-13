@@ -245,7 +245,7 @@ L2_lognorm_d (double_poly_srcptr p, double s)
    Circular method: integrate over the unit circle.
 */
 double
-L2_lognorm (mpz_poly_ptr f, double s)
+L2_lognorm (mpz_poly_srcptr f, double s)
 {
   double res;
   double_poly a;
@@ -342,7 +342,7 @@ L2_lognorm_mp (mpz_poly_ptr f, mpz_t s, mpz_t norm)
 #endif
 
 static double
-L2_skewness_deg6_approx (mpz_poly_ptr f MAYBE_UNUSED, double_poly_ptr ff,
+L2_skewness_deg6_approx (mpz_poly_srcptr f MAYBE_UNUSED, double_poly_ptr ff,
                          double_poly_ptr dff, int prec)
 {
   double *dfd = dff->coeff;
@@ -556,7 +556,7 @@ L2_skewness_deg6 (mpz_poly_ptr f MAYBE_UNUSED, double_poly_srcptr ff,
 /* return the skewness giving the best lognorm sum for two polynomials,
    by using trichotomy between the optimal skewness of both polynomials */
 double
-L2_combined_skewness2 (mpz_poly f, mpz_poly g, int prec)
+L2_combined_skewness2 (mpz_poly_srcptr f, mpz_poly_srcptr g, int prec)
 {
   double a, b, c, d, va, vb, vc, vd;
 
@@ -599,7 +599,7 @@ L2_combined_skewness2 (mpz_poly f, mpz_poly g, int prec)
 
 /* Use derivative test, with ellipse regions */
 double
-L2_skewness (mpz_poly_ptr f, int prec)
+L2_skewness (mpz_poly_srcptr f, int prec)
 {
   double_poly ff, df;
   double s = 0.0, a = 0.0, b = 0.0, c, nc, *fd, *dfd,
@@ -914,7 +914,7 @@ L2_skewness (mpz_poly_ptr f, int prec)
   return s;
 }
 
-double L2_skew_lognorm (mpz_poly_ptr f, int prec)
+double L2_skew_lognorm (mpz_poly_srcptr f, int prec)
 {
   return L2_lognorm (f, L2_skewness (f, prec));
 }
@@ -1105,7 +1105,7 @@ poly_shift_divp (mpz_t *h, unsigned int d, unsigned long r, unsigned long p)
 /* Auxiliary routine for special_valuation(), see below. It returns the
    average p-valuation of the polynomial f. Works recursively. */
 static double
-special_val0 (mpz_poly_ptr f, unsigned long p)
+special_val0 (mpz_poly_srcptr f, unsigned long p)
 {
   double v;
   mpz_t c,  *h;
@@ -1215,7 +1215,7 @@ always returns 0 in val(f,p).
 Assumes p divides disc = disc(f), d is the degree of f.
 */
 double
-special_valuation (mpz_poly_ptr f, unsigned long p, mpz_t disc)
+special_valuation (mpz_poly_srcptr f, unsigned long p, mpz_t disc)
 {
     double v;
     int p_divides_lc;
@@ -1292,7 +1292,7 @@ special_valuation (mpz_poly_ptr f, unsigned long p, mpz_t disc)
    absolute value. Typical good values are alpha=-4, -5, ...
 */
 double
-get_alpha (mpz_poly_ptr f, unsigned long B)
+get_alpha (mpz_poly_srcptr f, unsigned long B)
 {
   double alpha, e;
   unsigned long p;
@@ -1327,7 +1327,7 @@ get_alpha (mpz_poly_ptr f, unsigned long B)
 
 /* affine part of the special valution for polynomial f over p. */
 double
-special_valuation_affine (mpz_poly_ptr f, unsigned long p, mpz_t disc )
+special_valuation_affine (mpz_poly_srcptr f, unsigned long p, mpz_t disc )
 {
    double v;
    int pvaluation_disc = 0;
@@ -1378,7 +1378,7 @@ special_valuation_affine (mpz_poly_ptr f, unsigned long p, mpz_t disc )
   this to our affine part.
 */
 double
-get_biased_alpha_projective (mpz_poly_ptr f, unsigned long B)
+get_biased_alpha_projective (mpz_poly_srcptr f, unsigned long B)
 {
    double alpha, e;
    unsigned long p;
@@ -1502,12 +1502,24 @@ average_valuation_affine_root (mpz_poly_ptr f, unsigned long p, unsigned long r 
 
 /**************************** rotation ***************************************/
 
-/* replace f + k0 * x^t * (b*x - m) by f + k * x^t * (b*x - m), and return k */
+/* replace f + k0 * x^t * (b*x + m) by f + k * x^t * (b*x + m), and return k */
 long
 rotate_aux (mpz_t *f, mpz_t b, mpz_t m, long k0, long k, unsigned int t)
 {
-  mpz_addmul_si (f[t + 1], b, k - k0);
-  mpz_submul_si (f[t], m, k - k0);
+  /* Warning: k - k0 might not be representable in a long! */
+  unsigned long diff;
+  if (k >= k0)
+    {
+      diff = k - k0; /* k - k0 always fits in an unsigned long */
+      mpz_addmul_ui (f[t + 1], b, diff);
+      mpz_addmul_ui (f[t], m, diff);
+    }
+  else
+    {
+      diff = k0 - k;
+      mpz_submul_ui (f[t + 1], b, diff);
+      mpz_submul_ui (f[t], m, diff);
+    }
   return k;
 }
 
@@ -1623,7 +1635,7 @@ print_cadopoly_extra (FILE *fp, cado_poly cpoly, int argc, char *argv[], double 
   Call print_cadopoly, given f, g and return MurphyE.
 */
 double
-print_poly_fg (mpz_poly_ptr f, mpz_t *g, mpz_t N, int mode)
+print_poly_fg (mpz_poly_srcptr f, mpz_t *g, mpz_t N, int mode)
 {
    double e;
    int i;
@@ -1731,9 +1743,10 @@ expected_alpha (double S)
 }
 
 /* compute largest interval kmin <= k <= kmax such that when we add k*x^i*g(x)
-   to f(x), the lognorm does not increase more than NORM_MARGIN */
-static void
-expected_growth (rotation_space *r, mpz_poly_ptr f, mpz_poly_ptr g, int i)
+   to f(x), the lognorm does not increase more than margin */
+void
+expected_growth (rotation_space *r, mpz_poly_srcptr f, mpz_poly_srcptr g, int i,
+                 double margin)
 {
   double s = L2_skewness (f, SKEWNESS_DEFAULT_PREC);
   double n = L2_lognorm (f, s), n2;
@@ -1753,7 +1766,7 @@ expected_growth (rotation_space *r, mpz_poly_ptr f, mpz_poly_ptr g, int i)
       mpz_set (f->coeff[i+1], fip1);
       rotate_auxg_z (f->coeff, g->coeff[1], g->coeff[0], kmin, i);
       n2 = L2_lognorm (f, s);
-      if (n2 > n + NORM_MARGIN)
+      if (n2 > n + margin)
         break;
       mpz_mul_2exp (kmin, kmin, 1);
     }
@@ -1769,12 +1782,12 @@ expected_growth (rotation_space *r, mpz_poly_ptr f, mpz_poly_ptr g, int i)
       mpz_set (f->coeff[i+1], fip1);
       rotate_auxg_z (f->coeff, g->coeff[1], g->coeff[0], k, i);
       n2 = L2_lognorm (f, s);
-      if (n2 > n + NORM_MARGIN)
+      if (n2 > n + margin)
         mpz_set (kmin, k);
       else
         mpz_set (kmax, k);
     }
-  r->jmin[i] = mpz_get_d (kmax);
+  r->kmin = mpz_get_d (kmax);
 
   /* positive side */
   mpz_set_ui (kmax, 1);
@@ -1784,7 +1797,7 @@ expected_growth (rotation_space *r, mpz_poly_ptr f, mpz_poly_ptr g, int i)
       mpz_set (f->coeff[i+1], fip1);
       rotate_auxg_z (f->coeff, g->coeff[1], g->coeff[0], kmax, i);
       n2 = L2_lognorm (f, s);
-      if (n2 > n + NORM_MARGIN)
+      if (n2 > n + margin)
         break;
       mpz_mul_2exp (kmax, kmax, 1);
     }
@@ -1800,12 +1813,12 @@ expected_growth (rotation_space *r, mpz_poly_ptr f, mpz_poly_ptr g, int i)
       mpz_set (f->coeff[i+1], fip1);
       rotate_auxg_z (f->coeff, g->coeff[1], g->coeff[0], k, i);
       n2 = L2_lognorm (f, s);
-      if (n2 > n + NORM_MARGIN)
+      if (n2 > n + margin)
         mpz_set (kmax, k);
       else
         mpz_set (kmin, k);
     }
-  r->jmax[i] = mpz_get_d (kmin);
+  r->kmax = mpz_get_d (kmin);
 
   /* reset f[i] and f[i+1] */
   mpz_set (f->coeff[i], fi);
@@ -1821,7 +1834,7 @@ expected_growth (rotation_space *r, mpz_poly_ptr f, mpz_poly_ptr g, int i)
 /* for a given pair (f,g), tries to estimate the value of alpha one might
    expect from rotation (including the projective alpha) */
 double
-expected_rotation_gain (mpz_poly_ptr f, mpz_poly_ptr g)
+expected_rotation_gain (mpz_poly_srcptr f, mpz_poly_srcptr g)
 {
   double S = 1.0, s, incr = 0.0;
   rotation_space r;
@@ -1829,8 +1842,8 @@ expected_rotation_gain (mpz_poly_ptr f, mpz_poly_ptr g)
 
   for (int i = 0; 2 * i < f->deg; i++)
     {
-      expected_growth (&r, f, g, i);
-      s = r.jmax[i] - r.jmin[i] + 1.0;
+      expected_growth (&r, f, g, i, NORM_MARGIN);
+      s = r.kmax - r.kmin + 1.0;
       S *= s;
       /* assume each non-zero rotation increases on average by NORM_MARGIN/2 */
       if (s >= 2.0)
