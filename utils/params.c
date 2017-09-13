@@ -679,6 +679,42 @@ get_assoc(param_list_ptr pl, const char * const key, char ** const value, int * 
     return found;
 }
 
+long strtol_expanded(const char *nptr, char **endptr, int base)
+{
+    long res;
+    char * eptr;
+    res = strtol(nptr, &eptr, base);
+    if (endptr) *endptr = eptr;
+    if (*eptr != '\0' && (*eptr == '.' || *eptr == 'e')) {
+        /* try to recognize something which is written as a floating
+         * point integer. We require the representation to be exact. */
+        double d = strtod(nptr, &eptr);
+        if (d == (long) d) {
+            if (endptr) *endptr = eptr;
+            return (long) d;
+        }
+    }
+    return res;
+}
+
+unsigned long strtoul_expanded(const char *nptr, char **endptr, int base)
+{
+    unsigned long res;
+    char * eptr;
+    res = strtoul(nptr, &eptr, base);
+    if (endptr) *endptr = eptr;
+    if (*eptr != '\0' && (*eptr == '.' || *eptr == 'e')) {
+        /* try to recognize something which is written as a floating
+         * point integer. We require the representation to be exact. */
+        double d = strtod(nptr, &eptr);
+        if (d == (unsigned long) d) {
+            if (endptr) *endptr = eptr;
+            return (unsigned long) d;
+        }
+    }
+    return res;
+}
+
 int param_list_parse_long(param_list_ptr pl, const char * key, long * r)
 {
     char *value;
@@ -687,7 +723,7 @@ int param_list_parse_long(param_list_ptr pl, const char * key, long * r)
         return 0;
     char * end;
     long res;
-    res = strtol(value, &end, 0);
+    res = strtol_expanded(value, &end, 0);
     if (*end != '\0') {
         fprintf(stderr, "Parse error: parameter for key %s is not a long: %s\n",
                 key, value);
@@ -799,7 +835,7 @@ int param_list_parse_uint64_and_uint64(param_list_ptr pl, const char * key,
     if (!get_assoc(pl, key, &value, &seen))
         return 0;
     char *orig_value = value, * end;
-    unsigned long long int res[2];
+    unsigned long long res[2];
     res[0] = strtoull(value, &end, 0);
     if (strncmp(end, sep, strlen(sep)) != 0) {
         fprintf(stderr, "Parse error: parameter for key %s"
@@ -830,7 +866,7 @@ int param_list_parse_ulong(param_list_ptr pl, const char * key, unsigned long * 
         return 0;
     char * end;
     unsigned long res;
-    res = strtoul(value, &end, 0);
+    res = strtoul_expanded(value, &end, 0);
     if (*end != '\0') {
         fprintf(stderr, "Parse error:"
                 " parameter for key %s is not an ulong: %s\n",
@@ -1084,7 +1120,7 @@ int param_list_parse_uint_list(param_list_ptr pl, const char * key,
     memset(res, 0, n * sizeof(unsigned int));
     size_t parsed = 0;
     for( ;; ) {
-        unsigned long int tmp = strtoul(value, &end, 0);
+        unsigned long tmp = strtoul(value, &end, 0);
         ASSERT(tmp <= UINT_MAX);
         res[parsed] = tmp;
         if (parsed++ == n)
@@ -1160,7 +1196,7 @@ int param_list_parse_uchar_list(param_list_ptr pl, const char * key,
     memset(res, 0, n * sizeof(unsigned char));
     size_t parsed = 0;
     for( ;; ) {
-        long int tmp = strtol(value, &end, 0);
+        long tmp = strtol(value, &end, 0);
         ASSERT(tmp <= UCHAR_MAX);
         res[parsed] = tmp;
         if (parsed++ == n)
@@ -1325,6 +1361,18 @@ int param_list_parse_mpz(param_list_ptr pl, const char * key, mpz_ptr r)
         rc = gmp_sscanf(value, "%*Zi%n", &nread);
     }
     if (rc != 1 || value[nread] != '\0') {
+        /* also recognize integers written as floating-point, like 6.3e8
+         */
+        if (value[nread] == '.' || value[nread] == 'e') {
+            mpf_t zf;
+            mpf_init(zf);
+            rc = gmp_sscanf(value, "%Ff%n", zf, &nread);
+            rc = (rc == 1 && value[nread] == '\0' && mpf_integer_p(zf));
+            if (rc && r) mpz_set_f(r, zf);
+            mpf_clear(zf);
+            if (rc) return seen;
+        }
+
         fprintf(stderr, "Parse error: parameter for key %s is not an mpz: %s\n",
                 key, value);
         exit(1);
