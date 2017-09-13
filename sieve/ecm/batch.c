@@ -7,6 +7,8 @@
 #include "batch.h"
 #include "utils.h"
 
+#define STATUS_SMOOTH  0
+#define STATUS_UNKNOWN 1
 
 static void
 ulong_list_init (ulong_list L)
