@@ -160,6 +160,7 @@ cado_define_test(test_logapprox.cpp
 # sure with the current code... */
 cado_define_test(test_init_norms.cpp
     ${PROJECT_SOURCE_DIR}/sieve/las-norms.cpp
+    ${PROJECT_SOURCE_DIR}/sieve/las-config.c
     ${PROJECT_SOURCE_DIR}/sieve/logapprox.cpp
     ${PROJECT_SOURCE_DIR}/sieve/las-siever-config.cpp
     ${PROJECT_SOURCE_DIR}/sieve/las-todo-entry.cpp
