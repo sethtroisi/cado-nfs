@@ -957,6 +957,7 @@ trial_div (factor_list_t *fl, mpz_t norm, const unsigned int N, unsigned int x,
 
     // remove primes in "primes" that map to x
     divide_primes_from_bucket (fl, norm, N, x, primes, trial_div_very_verbose);
+    if (fb)
     divide_hints_from_bucket (fl, norm, N, x, purged, fb, trial_div_very_verbose);
     if (trial_div_very_verbose)
         verbose_output_vfprint(TRACE_CHANNEL, 0, gmp_vfprintf, "# x = %d, after dividing out bucket/resieved norm = %Zd\n", x, norm);
@@ -1705,10 +1706,12 @@ void * process_bucket_region(timetree_t & timer, thread_data *th)
         for (int side = 0; side < 2; side++)
           {
             WHERE_AM_I_UPDATE(w, side, side);
+            sieve_info::side_info & s(si.sides[side]);
+            if (!s.fb) continue;
+
             SIBLING_TIMER_PARAMETRIC(timer, "side ", side, "");
             TIMER_CATEGORY(timer, sieving(side));
 
-            sieve_info::side_info & s(si.sides[side]);
             thread_side_data & ts = th->sides[side];
 
             {
@@ -1799,6 +1802,7 @@ void * process_bucket_region(timetree_t & timer, thread_data *th)
         /* Reset resieving data */
         for(int side = 0 ; side < 2 ; side++) {
             sieve_info::side_info & s(si.sides[side]);
+            if (!s.fb) continue;
             thread_side_data & ts = th->sides[side];
             small_sieve_skip_stride(s.ssd, ts.ssdpos, skiprows, si);
             int * b = s.fb_parts_x->rs;
@@ -2396,6 +2400,7 @@ for (unsigned int j_cong = 0; j_cong < sublat_bound; ++j_cong) {
         for(int side = 0 ; side < 2 ; side++) {
             /* This uses the thread pool, and stores the time spent under
              * timer_special_q (with wait time stored separately */
+            if (!si.sides[side].fb) continue;
             fill_in_buckets(timer_special_q, *pool, *workspaces, si, side);
         }
 
@@ -2436,6 +2441,8 @@ for (unsigned int j_cong = 0; j_cong < sublat_bound; ++j_cong) {
         /* Prepare small sieve and re-sieve */
         for(int side = 0 ; side < 2 ; side++) {
             sieve_info::side_info & s(si.sides[side]);
+
+            if (!s.fb) continue;
 
             small_sieve_init(s.ssd, las, s.fb_smallsieved.get(), si, side);
             small_sieve_info("small sieve", side, s.ssd);
@@ -2485,6 +2492,7 @@ for (unsigned int j_cong = 0; j_cong < sublat_bound; ++j_cong) {
             plattice_enumerate_area<3>::value = max_area;
             precomp_plattice_t precomp_plattice;
             for (int side = 0; side < 2; ++side) {
+                if (!si.sides[side].fb) continue;
                 CHILD_TIMER_PARAMETRIC(timer_special_q, "side ", side, "");
                 for (int level = 1; level < si.toplevel; ++level) {
                     const fb_part * fb = si.sides[side].fb->get_part(level);
@@ -2557,8 +2565,10 @@ for (unsigned int j_cong = 0; j_cong < sublat_bound; ++j_cong) {
             }
         }
         for(int side = 0 ; side < 2 ; side++) {
-            small_sieve_clear(si.sides[side].ssd);
-            small_sieve_clear(si.sides[side].rsd);
+            sieve_info::side_info & s(si.sides[side]);
+            if (!s.fb) continue;
+            small_sieve_clear(s.ssd);
+            small_sieve_clear(s.rsd);
         }
 
 
