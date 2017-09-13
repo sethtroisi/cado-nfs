@@ -855,7 +855,7 @@ divide_primes_from_bucket (factor_list_t *fl, mpz_t norm, const unsigned int N, 
                   abort();
               } else {
                   verbose_output_print(0, 2,
-                           "# Note: p = %lu does not divide at (N,x) = (%u,%d), was divided out before\n",
+                           "# Note (harmless): p = %lu does not divide at (N,x) = (%u,%d), was divided out before\n",
                            p, N, x);
               }
           } else do {
