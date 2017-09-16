@@ -48,8 +48,8 @@ struct relation : public relation_ab {
         /* we don't want to use mpz_class, so this is a little bit touchy
          */
         pr() {
-            mpz_init(p);
-            mpz_init(r);
+            mpz_init_set_ui(p, 0);
+            mpz_init_set_ui(r, 0);
             e=0;
         }
         pr(mpz_srcptr ap, mpz_srcptr ar, int ae=1) {
@@ -88,8 +88,8 @@ struct relation : public relation_ab {
             return *this;
         }
     };
-    int rational_side;    /* index of the rational side, if any */
-    int nb_polys;         /* number of polynoms, default = 2 */
+    int rational_side = -1;    /* index of the rational side, if any */
+    int nb_polys = 0;         /* number of polynoms, default = 2 */
     std::vector<pr> sides[NB_POLYS_MAX]; /* pr's are stored w.r.t. side */
 
     relation() {}

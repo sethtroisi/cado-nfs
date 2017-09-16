@@ -50,7 +50,7 @@ sieve_info::sieve_info(siever_config const & sc, cado_poly_srcptr cpoly, std::li
     toplevel = -1;
     for(int side = 0 ; side < 2 ; side++) {
         if (!sides[side].fb) continue;
-        int level = sides[0].fb->get_toplevel();
+        int level = sides[side].fb->get_toplevel();
         if (level > toplevel) toplevel = level;
     }
 
@@ -256,8 +256,8 @@ las_info::las_info(cxx_param_list & pl)
         gmp_randseed_ui(rstate, seed);
     // }}}
 
-#ifdef  DLP_DESCENT
     // ----- stuff roughly related to the descent {{{
+#ifdef  DLP_DESCENT
     descent_helper = NULL;
 #endif
     // }}}

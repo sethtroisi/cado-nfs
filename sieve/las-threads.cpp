@@ -4,15 +4,21 @@
 #include "las-types.hpp"
 #include "las-config.h"
 
-thread_side_data::thread_side_data()
+void thread_side_data::allocate_bucket_region()
 {
-  /* Allocate memory for each side's bucket region */
+  /* Allocate memory for each side's bucket region. Our intention is to
+   * avoid doing it in case we have no factor base. Not that much because
+   * of the spared memory, but rather because it's a useful way to trim
+   * the irrelevant parts of the code in that case.
+   */
   bucket_region = (unsigned char *) contiguous_malloc(BUCKET_REGION + MEMSET_MIN);
 }
 
+thread_side_data::thread_side_data() { }
+
 thread_side_data::~thread_side_data()
 {
-  contiguous_free(bucket_region);
+  if (bucket_region) contiguous_free(bucket_region);
   bucket_region = NULL;
 }
 
@@ -46,7 +52,8 @@ void thread_data::pickup_si(sieve_info & _si)
   psi = & _si;
   sieve_info & si(*psi);
   for (int side = 0 ; side < 2 ; side++) {
-    sides[side].set_fb(si.sides[side].fb.get());
+      if (si.sides[side].fb)
+          sides[side].set_fb(si.sides[side].fb.get());
   }
 }
 

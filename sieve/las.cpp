@@ -909,7 +909,7 @@ divide_hints_from_bucket (factor_list_t *fl, mpz_t norm, const unsigned int N, c
                   abort();
               } else {
                   verbose_output_print(0, 2,
-                           "# Note: p = %lu does not divide at (N,x) = (%u,%d), was divided out before\n",
+                           "# Note (harmless): p = %lu does not divide at (N,x) = (%u,%d), was divided out before\n",
                            p, N, x);
               }
           } else do {
@@ -1087,12 +1087,15 @@ struct factor_survivors_data {
     {
         cpt = 0;
         copr = 0;
+        SS = NULL;
         for(int side = 0 ; side < 2 ; side++) {
             sdata[side].S = th->sides[side].bucket_region;
+            if (!SS && sdata[side].S)
+                SS = sdata[side].S;
             cof_bitsize[side]=0;
         }
-        /* This is the one which gets the merged information in the end */
-        SS = sdata[0].S;
+        /* SS gets the merged information in the end. This is the first
+         * non-null sdata[x].S array */
     }
     ~factor_survivors_data() {
     }
@@ -1167,9 +1170,14 @@ void factor_survivors_data::search_survivors(timetree_t & timer)
         int offset = (j-j0) << logI;
 
         unsigned char * const both_S[2] = {
-            sdata[0].S + offset, 
-            sdata[1].S + offset
+            sdata[0].S ? sdata[0].S + offset : NULL,
+            sdata[1].S ? sdata[1].S + offset : NULL,
         };
+        /* TODO FIXME XXX that's weird. How come don't we merge that with
+         * the lognorm computation that goes in the si.sides[side]
+         * regions before apply_buckets + small_sieve ?? Could it help
+         * save a bit of time in search_survivors_in_line ?
+         */
         const unsigned char both_bounds[2] = {
             si.sides[0].lognorms->bound,
             si.sides[1].lognorms->bound,
@@ -1225,6 +1233,8 @@ void factor_survivors_data::prepare_cofactoring(timetree_t & timer)
     /* FIXME: choose a sensible size here */
 
     for(int side = 0 ; side < 2 ; side++) {
+        if (!si.sides[side].fb) continue;
+
         WHERE_AM_I_UPDATE(w, side, side);
 
         CHILD_TIMER_PARAMETRIC(timer, "prepare_cofactoring on side ", side, "");
@@ -1319,6 +1329,7 @@ void factor_survivors_data::cofactoring (timetree_t & timer)
 
       th->rep->survivors.after_sieve++;
 
+      if (sdata[0].S && sdata[1].S)
         th->rep->survivor_sizes[sdata[0].S[x]][sdata[1].S[x]]++;
         
         /* For factor_leftover_norm, we need to pass the information of the
@@ -1716,6 +1727,23 @@ void * process_bucket_region(timetree_t & timer, thread_data *th)
         S[side] = ts.bucket_region;
     }
 
+    /* A note on SS versus S[side]
+     *
+     * SS is temp data. It's only used here, and it could well be defined
+     * here only. We declare in at the thread_data level to avoid
+     * constant malloc()/free().
+     *
+     * S[side] is where we compute the norm initialization. Some
+     * tolerance is subtracted from these lognorms to account for
+     * accepted cofactors.
+     *
+     * SS is the bucket region where we apply the buckets, and also later
+     * where we do the small sieve.
+     *
+     * as long as SS[x] >= S[side][x], we are good.
+     *
+     */
+
     unsigned char *SS = th->SS;
     memset(SS, 0, BUCKET_REGION);
 
@@ -1808,12 +1836,9 @@ void * process_bucket_region(timetree_t & timer, thread_data *th)
                 }
             }
 
-            /* hmmm, really, is this useful at all ? */
-            if (0) {
-                CHILD_TIMER(timer, "S minus S (1)");
-
-                SminusS(S[side], S[side] + BUCKET_REGION, SS);
-            }
+            /* previous code has one SminusS here. It's useless, we can
+             * certainly do with a single one.
+             */
 
             rep->ttbuckets_apply += seconds_thread();
 
@@ -1827,6 +1852,8 @@ void * process_bucket_region(timetree_t & timer, thread_data *th)
                         w);
             }
 
+            /* compute S[side][x] = max(S[side][x] - SS[x], 0),
+             * and clear SS.  */
             {
                 CHILD_TIMER(timer, "S minus S (2)");
 

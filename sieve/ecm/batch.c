@@ -466,6 +466,11 @@ smoothness_test (mpz_t *R, uint32_t *perm, unsigned long n, mpz_t P, FILE *out)
   if (n == 0)
     return;
 
+  if (mpz_cmp_ui(P, 1) == 0) {
+      /* XXX do we have something to do with perm[] ? */
+      return;
+  }
+
   st = seconds ();
   wct = wct_seconds ();
   T = product_tree (R, perm, n, w);
@@ -627,12 +632,12 @@ print_smooth_aux (mpz_t *factors, mpz_t n, facul_method_t *methods,
       /* Could happen if we allowed a cofactor bound after batch
        * cofactorization */
       if (res_fac == FACUL_NOT_SMOOTH) {
-          gmp_fprintf(stderr, "# C=%Zd not smooth\n", n);
+          gmp_fprintf(stderr, "# C=%Zd not smooth (uppercase %ZX below)\n", n, n);
+          if (str > str0)
+            str += snprintf (str, str0size - (str - str0), ",");
+          str += gmp_snprintf (str, str0size - (str - str0), "%ZX", n);
           return str;
       }
-
-
-      ASSERT_ALWAYS(res_fac != FACUL_NOT_SMOOTH);
 
       /* factors[0..res_fac-1] are prime factors of n, 0 <= res_fac <= 2 */
 
@@ -658,7 +663,7 @@ print_smooth_aux (mpz_t *factors, mpz_t n, facul_method_t *methods,
           modset_clear (fm);
           fm->arith = CHOOSE_NONE;
           mpz_clear (t);
-        }
+       }
 
       if (cfm->arith != CHOOSE_NONE)
         {
@@ -679,10 +684,18 @@ print_smooth_aux (mpz_t *factors, mpz_t n, facul_method_t *methods,
 
   if (mpz_cmp_ui (n, 1) > 0)
     {
-      ASSERT (mpz_cmp_d (n, BB) < 0);
-      if (str > str0)
-        str += snprintf (str, str0size - (str - str0), ",");
-      str += gmp_snprintf (str, str0size - (str - str0), "%Zx", n);
+      if (mpz_cmp_d(n, BB) >= 0) {
+          /* we ran out of factoring methods */
+          ASSERT_ALWAYS(!methods[i].method);
+          gmp_fprintf(stderr, "# Could not factor smooth integer %Zd (uppercase %ZX below)\n", n, n);
+          if (str > str0)
+            str += snprintf (str, str0size - (str - str0), ",");
+          str += gmp_snprintf (str, str0size - (str - str0), "%ZX", n);
+      } else {
+          if (str > str0)
+            str += snprintf (str, str0size - (str - str0), ",");
+          str += gmp_snprintf (str, str0size - (str - str0), "%Zx", n);
+      }
     }
 
   return str;
@@ -736,6 +749,17 @@ print_smooth (mpz_t *factors, mpz_t n, facul_method_t *methods,
 
   /* remove small primes */
   str = trial_divide (n, sp, spsize, str, strsize - (str - str0));
+
+  /* the cofactor that we found with the product tree will have primes
+   * between lim and 2^batchlpb. We typically have batchlpb < lpb, and
+   * lim > sqrt(2^lpb), so that we know that [cofac] has no prime factor
+   * below B=sqrt(2^lpb). It is not guaranteed, though: we may have
+   * elected to get rid of sieving on that side, in which case [cofac]
+   * may very well contain small primes.
+   */
+  if (str[-1] != ':') *str++=',';
+  str = trial_divide (cofac, sp, spsize, str, strsize - (str - str0));
+  if (str[-1] == ',') str--;
 
   /* factor the cofactor */
   str = print_smooth_aux (factors, cofac, methods, fm, cfm, lpb, B, str0, str, strsize - (str - str0));
@@ -894,6 +918,14 @@ create_batch_file (const char *f, mpz_t P, unsigned long B, unsigned long L,
   FILE *fp;
   double s = seconds (), wct = wct_seconds ();
   size_t ret;
+
+  if (L <= B) {
+      /* We may be content with having a product tree on one side only.
+       * In which case we'll quietly return. The product is over an empty
+       * set of primes, so it's best defined as being 1. */
+      mpz_set_ui(P, 1);
+      return;
+  }
 
   // the product of primes up to B takes \log2(B)-\log\log 2 / \log 2
   // bits. The added constant is 0.5287.

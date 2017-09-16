@@ -661,31 +661,47 @@ facul_make_default_strategy (int n, const int verbose)
   ASSERT_ALWAYS (n >= 0);  
   facul_method_t *methods = (facul_method_t*) malloc ((n+4) * sizeof (facul_method_t));
 
+  int i = 0;
+
+#if 0
+  /* This is relevant only for very weird experiments where we have small
+   * factors that stick together.  */
+  /* run one P-1 curve with B1=30 and B2=100 */
+  methods[i].method = PM1_METHOD;
+  methods[i].plan = (pm1_plan_t*) malloc (sizeof (pm1_plan_t));
+  pm1_make_plan ((pm1_plan_t*) methods[i].plan, 30, 100, verbose);
+  i++;
+#endif
+
   /* run one P-1 curve with B1=315 and B2=2205 */
-  methods[0].method = PM1_METHOD;
-  methods[0].plan = (pm1_plan_t*) malloc (sizeof (pm1_plan_t));
-  pm1_make_plan ((pm1_plan_t*) methods[0].plan, 315, 2205, verbose);
+  methods[i].method = PM1_METHOD;
+  methods[i].plan = (pm1_plan_t*) malloc (sizeof (pm1_plan_t));
+  pm1_make_plan ((pm1_plan_t*) methods[i].plan, 315, 2205, verbose);
+  i++;
 
   /* run one P+1 curve with B1=525 and B2=3255 */
-  methods[1].method = PP1_27_METHOD;
-  methods[1].plan = (pp1_plan_t*) malloc (sizeof (pp1_plan_t));
-  pp1_make_plan ((pp1_plan_t*) methods[1].plan, 525, 3255, verbose);
+  methods[i].method = PP1_27_METHOD;
+  methods[i].plan = (pp1_plan_t*) malloc (sizeof (pp1_plan_t));
+  pp1_make_plan ((pp1_plan_t*) methods[i].plan, 525, 3255, verbose);
+  i++;
 
   /* run one ECM curve with Montgomery parametrization, B1=105, B2=3255 */
-  methods[2].method = EC_METHOD;
-  methods[2].plan = (ecm_plan_t*) malloc (sizeof (ecm_plan_t));
-  ecm_make_plan ((ecm_plan_t*) methods[2].plan, 105, 3255, MONTY12, 2, 1, verbose);
+  methods[i].method = EC_METHOD;
+  methods[i].plan = (ecm_plan_t*) malloc (sizeof (ecm_plan_t));
+  ecm_make_plan ((ecm_plan_t*) methods[i].plan, 105, 3255, MONTY12, 2, 1, verbose);
+  i++;
 
   if (n > 0)
     {
-      methods[3].method = EC_METHOD;
-      methods[3].plan = (ecm_plan_t*) malloc (sizeof (ecm_plan_t));
-      ecm_make_plan ((ecm_plan_t*) methods[3].plan, 315, 5355, BRENT12, 11, 1, verbose);
+      methods[i].method = EC_METHOD;
+      methods[i].plan = (ecm_plan_t*) malloc (sizeof (ecm_plan_t));
+      ecm_make_plan ((ecm_plan_t*) methods[i].plan, 315, 5355, BRENT12, 11, 1, verbose);
+      i++;
     }
 
   /* heuristic strategy where B1 is increased by c*sqrt(B1) at each curve */
   double B1 = 105.0;
-  for (int i = 4; i < n + 3; i++)
+  for (; i < n + 3; i++)
     {
       double B2;
       unsigned int k;
