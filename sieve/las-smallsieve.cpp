@@ -601,7 +601,6 @@ struct small_sieve_context {
         int i0ref = (j0 == jj) ? i0 : (-I/2);
         int64_t x = (ii-i0ref) % (uint64_t)ssp->q;
         if (x < 0) x += ssp->q;
-        ASSERT(!(x >> LOG_BUCKET_REGION));
         if (jj > j0) {
             x -= region_rank_in_line << LOG_BUCKET_REGION;
             x += (((uint64_t)(jj - j0))<<logI);
