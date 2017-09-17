@@ -1320,17 +1320,17 @@ void factor_survivors_data::cofactoring (timetree_t & timer)
 
     for (size_t i_surv = 0 ; i_surv < survivors2.size(); i_surv++) {
 #ifdef DLP_DESCENT
-      if (las.tree.must_take_decision())
-	break;
+        if (las.tree.must_take_decision())
+            break;
 #endif
-      const size_t x = survivors2[i_surv];
-      ASSERT_ALWAYS (SS[x] != 255);
-      ASSERT(x < ((size_t) 1 << LOG_BUCKET_REGION));
+        const size_t x = survivors2[i_surv];
+        ASSERT_ALWAYS (SS[x] != 255);
+        ASSERT(x < ((size_t) 1 << LOG_BUCKET_REGION));
 
-      th->rep->survivors.after_sieve++;
+        th->rep->survivors.after_sieve++;
 
-      if (sdata[0].S && sdata[1].S)
-        th->rep->survivor_sizes[sdata[0].S[x]][sdata[1].S[x]]++;
+        if (sdata[0].S && sdata[1].S)
+            th->rep->survivor_sizes[sdata[0].S[x]][sdata[1].S[x]]++;
         
         /* For factor_leftover_norm, we need to pass the information of the
          * sieve bound. If a cofactor is less than the square of the sieve
