@@ -1135,7 +1135,10 @@ void factor_survivors_data::search_survivors(timetree_t & timer)
         verbose_output_print(TRACE_CHANNEL, 0,
                 "# When entering factor_survivors for bucket %u, "
                 "S[0][%u]=%u, S[1][%u]=%u\n",
-                trace_Nx.N, trace_Nx.x, sdata[0].S[trace_Nx.x], trace_Nx.x, sdata[1].S[trace_Nx.x]);
+                trace_Nx.N, trace_Nx.x,
+                sdata[0].S ? sdata[0].S[trace_Nx.x] : ~0u,
+                trace_Nx.x,
+                sdata[1].S ? sdata[1].S[trace_Nx.x] : ~0u);
         verbose_output_vfprint(TRACE_CHANNEL, 0, gmp_vfprintf,
                 "# Remaining norms which have not been accounted for in sieving: (%Zd, %Zd)\n",
                 traced_norms[0], traced_norms[1]);
@@ -1153,10 +1156,10 @@ void factor_survivors_data::search_survivors(timetree_t & timer)
         if (trace_on_spot_Nx(N, x)) {
             verbose_output_print(TRACE_CHANNEL, 0,
                     "# side0.Bound[%u]=%u, side1.Bound[%u]=%u\n",
-                    sdata[0].S[trace_Nx.x],
-                    sdata[0].S[x] <= side0.lognorms->bound ? 0 : side0.lognorms->bound,
-                    sdata[1].S[trace_Nx.x],
-                    sdata[1].S[x] <= side0.lognorms->bound ? 0 : side1.lognorms->bound);
+                    sdata[0].S ? sdata[0].S[trace_Nx.x] : ~0u,
+                    sdata[0].S ? (sdata[0].S[x] <= side0.lognorms->bound ? 0 : side0.lognorms->bound) : ~0u,
+                    sdata[1].S ? sdata[1].S[trace_Nx.x] : ~0u,
+                    sdata[1].S ? (sdata[1].S[x] <= side0.lognorms->bound ? 0 : side1.lognorms->bound) : ~0u);
             /* Hmmm, is that right ? side0.bound 3 times, really ? XXX */
         }
     }
