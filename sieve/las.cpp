@@ -2859,7 +2859,7 @@ if (si.conf.sublat.m) {
             mpz_clear (L[side]);
             mpz_clear (M[side]);
         }
-	factor (las.L, report->reports, las.cpoly, lpb,
+	report->reports = factor (las.L, report->reports, las.cpoly, lpb,
 		las.output, las.nb_threads);
 	tcof_batch = seconds () - tcof_batch;
 	report->ttcof += tcof_batch;

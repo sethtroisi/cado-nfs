@@ -735,7 +735,7 @@ strip (unsigned long *l, unsigned long n, mpz_t P)
 }
 
 /* sqside = 1 if the special-q is on side 1 (algebraic) */
-static void
+static bool
 factor_one (cofac_list L, cado_poly pol, unsigned long *lim, int *lpb,
             FILE *out, facul_method_t *methods,
             std::vector<unsigned long> (&SP)[2],
@@ -784,13 +784,15 @@ factor_one (cofac_list L, cado_poly pol, unsigned long *lim, int *lpb,
         }
         fflush (out);
     }
+
+    return smooth;
 }
 
 /* Given a list L of bi-smooth cofactors, print the corresponding relations
    on "out".
    n is the number of bi-smooth cofactors in L.
 */
-void
+unsigned long
 factor (cofac_list L, unsigned long n, cado_poly pol, int lpb[],
         FILE *out, int nthreads MAYBE_UNUSED)
 {
@@ -813,17 +815,21 @@ factor (cofac_list L, unsigned long n, cado_poly pol, int lpb[],
     nb_methods = NB_MAX_METHODS - 1;
   methods = facul_make_default_strategy (nb_methods - 3, 0);
 
+  unsigned long rep = 0;
 #ifdef HAVE_OPENMP
   omp_set_num_threads (nthreads);
 #pragma omp parallel for schedule(static)
 #endif
   for (i = 0; i < n; i++)
-    factor_one (L, pol, B, lpb, out, methods, SP, i);
+    rep += factor_one (L, pol, B, lpb, out, methods, SP, i);
 
   facul_clear_methods (methods);
 
-  fprintf (out, "# batch: took %.2fs (wct %.2fs) to factor %lu smooth relations\n",
-           seconds () - start, wct_seconds () - wct_start, n);
+  fprintf (out,
+          "# batch: took %.2fs (wct %.2fs) to factor %lu smooth relations (%lu final cofac misses)\n",
+           seconds () - start, wct_seconds () - wct_start, rep, n-rep);
+
+  return rep;
 }
 
 static void
