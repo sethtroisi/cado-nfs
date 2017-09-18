@@ -603,15 +603,15 @@ trial_divide (std::vector<cxx_mpz>& factors, cxx_mpz & n, std::vector<unsigned l
     }
 }
 
-/* Print the prime factors of the input 'n' separated by spaces.
-   The list sp[] contains small primes (less than B).
-   B is the small prime bound: any factor < B^2 is necessarily prime.
-   'cofac' is the initial cofactor (without special-q).
-   factors[2] is a scratch space to store factors.
-   Return the pointer to the next character to write.
-*/
+/* Puts in factors[] the prime factors of n. Additional info provided:
+ *  - cofac must be a divisor of n (possibly composite)
+ *  - sq, if not null, must be a prime divisor of n.
+ *
+ * The list SP contains small primes (less than B).
+ * B is the small prime bound: any factor < B^2 is necessarily prime.
+ */
 static bool
-print_smooth (std::vector<cxx_mpz> &factors,
+factor_simpleminded (std::vector<cxx_mpz> &factors,
               cxx_mpz & n,
               facul_method_t *methods,
               unsigned int lpb, double B,
@@ -679,7 +679,7 @@ print_smooth (std::vector<cxx_mpz> &factors,
         /* Could happen if we allowed a cofactor bound after batch
          * cofactorization */
         if (nf == FACUL_NOT_SMOOTH) {
-            gmp_fprintf(stderr, "# C=%Zd not smooth\n", (mpz_srcptr) n);
+            mpz_set(cofac, n0);
             return false;
         }
 
@@ -741,46 +741,49 @@ factor_one (cofac_list L, cado_poly pol, unsigned long *lim, int *lpb,
             std::vector<unsigned long> (&SP)[2],
             unsigned long i)
 {
-  uint32_t *perm = L->perm;
-  std::ostringstream os;
+    uint32_t *perm = L->perm;
+    std::ostringstream os;
 
-  int64_t a = L->a[perm[i]];
-  uint64_t b = L->b[perm[i]];
+    int64_t a = L->a[perm[i]];
+    uint64_t b = L->b[perm[i]];
 
-  os << a << "," << b;
-  
-  bool smooth = true;
-  std::vector<cxx_mpz> factors[2];
-  for(int side = 0 ; smooth && side < 2 ; side++) {
-      cxx_mpz norm, cofac;
-      mpz_set(cofac,(side ? L->A0 : L->R0)[perm[i]]);
-      mpz_poly_homogeneous_eval_siui (norm, pol->pols[side], a, b);
-      smooth = smooth && print_smooth (factors[side], norm, methods,
-              lpb[side], (double) lim[side], SP[side],
-              cofac,
-              (L->side[perm[i]] == side) ? L->sq[perm[i]] : NULL);
-  }
+    os << a << "," << b;
 
-  /* avoid two threads writing a relation simultaneously */
+    bool smooth = true;
+    std::vector<cxx_mpz> factors[2];
+    cxx_mpz norm, cofac;
+    int side;
+    for(side = 0 ; smooth && side < 2 ; side++) {
+        mpz_set(cofac,(side ? L->A0 : L->R0)[perm[i]]);
+        mpz_poly_homogeneous_eval_siui (norm, pol->pols[side], a, b);
+        smooth = smooth && factor_simpleminded (factors[side], norm, methods,
+                lpb[side], (double) lim[side], SP[side],
+                cofac,
+                (L->side[perm[i]] == side) ? L->sq[perm[i]] : NULL);
+    }
+
+    /* avoid two threads writing a relation simultaneously */
 #ifdef  HAVE_OPENMP
 #pragma omp critical
 #endif
-  {
-      if (!smooth) {
-          fprintf(out, "# failed on %s, while we thought we would succeed\n", os.str().c_str());
-      } else {
-          for(int side = 0 ; smooth && side < 2 ; side++) {
-              os << ":";
-              auto it = factors[side].begin();
-              os << std::hex << *it++;
-              for( ; it < factors[side].end() ; ++it) {
-                  os << "," << std::hex << *it;
-              }
-          }
-          fprintf (out, "%s\n", os.str().c_str());
-      }
-      fflush (out);
-  }
+    {
+        if (!smooth) {
+            gmp_fprintf(out,
+                    "# failed on %s on side %d; non-smooth cofactor %Zd\n",
+                    os.str().c_str(), --side, (mpz_srcptr) cofac);
+        } else {
+            for(int side = 0 ; smooth && side < 2 ; side++) {
+                os << ":";
+                auto it = factors[side].begin();
+                os << std::hex << *it++;
+                for( ; it < factors[side].end() ; ++it) {
+                    os << "," << std::hex << *it;
+                }
+            }
+            fprintf (out, "%s\n", os.str().c_str());
+        }
+        fflush (out);
+    }
 }
 
 /* Given a list L of bi-smooth cofactors, print the corresponding relations
