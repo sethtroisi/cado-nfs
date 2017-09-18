@@ -713,6 +713,9 @@ factor_simpleminded (std::vector<cxx_mpz> &factors,
             composites.push_back(t);
         }
     }
+    if (!composites.empty())
+        return false;
+
     if (sq) {
         cxx_mpz tz;
         mpz_set(tz, sq);
