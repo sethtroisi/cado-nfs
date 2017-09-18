@@ -464,8 +464,15 @@ smoothness_test (mpz_t *R, uint32_t *perm, unsigned long n, mpz_t P, FILE *out)
   /* now T[0][j] = P mod R[j] for 0 <= j < n */
   for (j = 0; j < n; j++)
     {
-      mpz_gcd (T[0][j], T[0][j], R[perm[j]]);
-      mpz_divexact (R[perm[j]], R[perm[j]], T[0][j]);
+        /* Divide out R by gcd(P, R) as much as we can. The first gcd may
+         * have some cost, the subsequent ones are supposedly cheap
+         * enough */
+        for(;;) {
+            mpz_gcd (T[0][j], T[0][j], R[perm[j]]);
+            if (mpz_cmp_ui(T[0][j], 1) == 0)
+                break;
+            mpz_divexact (R[perm[j]], R[perm[j]], T[0][j]);
+        }
     }
 
   clear_product_tree (T, n, w);
@@ -488,15 +495,13 @@ update_status (mpz_t *R, uint32_t *perm,
                mpz_srcptr M,
                unsigned long *nb_smooth, unsigned long *nb_unknown)
 {
-  unsigned long i, j;
-
   mpz_t BB;
   mpz_init(BB);
   mpz_mul(BB,B,B);
 
-  for (j = *nb_smooth; j < *nb_unknown; j++)
+  for (unsigned long j = *nb_smooth; j < *nb_unknown; j++)
     {
-      i = perm[j];
+      unsigned long i = perm[j];
       if (b_status_r[i] == STATUS_UNKNOWN)
       {
         /* relation i is smooth iff R[i]=1 ; another option is in case
