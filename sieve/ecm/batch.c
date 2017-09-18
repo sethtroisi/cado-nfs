@@ -83,7 +83,10 @@ mpz_product_tree_add_ui (mpz_product_tree t, unsigned long n)
               mpz_set_ui (t->l[i], 1);
             }
           else /* accumulate */
-            mpz_mul (t->l[i+1], t->l[i+1], t->l[i]);
+            {
+              mpz_mul (t->l[i+1], t->l[i+1], t->l[i]);
+              mpz_set_ui (t->l[i], 1);
+            }
           t->n[i+1] += t->n[i];
           t->n[i] = 0;
         }
