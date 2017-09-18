@@ -4,40 +4,16 @@
 #ifdef  HAVE_OPENMP
 #include <omp.h>
 #endif
+#include <vector>
+#include <deque>
+#include <sstream>
 #include "batch.h"
 #include "utils.h"
 
 #define STATUS_SMOOTH  0
 #define STATUS_UNKNOWN 1
 
-static void
-ulong_list_init (ulong_list L)
-{
-  L->l = NULL;
-  L->alloc = L->size = 0;
-}
-
-/* at any point, all values up to L->alloc should be mpz_init()'ed,
-   even beyond L->size */
-static void
-ulong_list_add (ulong_list L, unsigned long n)
-{
-  if (L->size == L->alloc)
-    {
-      L->alloc = 3 * (L->alloc / 2) + 2;
-      L->l = realloc (L->l, L->alloc * sizeof (mpz_t));
-    }
-  ASSERT(L->size < L->alloc);
-  L->l[L->size] = n;
-  L->size ++;
-}
-
-static void
-ulong_list_clear (ulong_list L)
-{
-  free (L->l);
-  L->alloc = L->size = 0;
-}
+using namespace std;
 
 static void
 mpz_product_tree_init (mpz_product_tree t)
@@ -53,9 +29,9 @@ mpz_product_tree_add_ui (mpz_product_tree t, unsigned long n)
 {
   if (t->size == 0) /* tree was empty */
     {
-      t->l = malloc (sizeof (mpz_t));
+      t->l = (mpz_t *) malloc (sizeof (mpz_t));
       mpz_init_set_ui (t->l[0], n);
-      t->n = malloc (sizeof (unsigned long));
+      t->n = (unsigned long *) malloc (sizeof (unsigned long));
       t->n[0] = 1;
       t->size = 1;
     }
@@ -71,9 +47,9 @@ mpz_product_tree_add_ui (mpz_product_tree t, unsigned long n)
         {
           if (i+1 == t->size) /* realloc */
             {
-              t->l = realloc (t->l, (t->size + 1) * sizeof (mpz_t));
+              t->l = (mpz_t *) realloc (t->l, (t->size + 1) * sizeof (mpz_t));
               mpz_init_set_ui (t->l[t->size], 1);
-              t->n = realloc (t->n, (t->size + 1) * sizeof (unsigned long));
+              t->n = (unsigned long *) realloc (t->n, (t->size + 1) * sizeof (unsigned long));
               t->n[t->size] = 0;
               t->size++;
             }
@@ -129,18 +105,18 @@ cofac_list_init (cofac_list l)
 }
 
 static unsigned long
-prime_list (ulong_list L, prime_info pi, unsigned long pmin,
+prime_list (std::vector<unsigned long> & L, prime_info pi, unsigned long pmin,
             unsigned long pmax)
 {
   unsigned long p;
 
   for (p = pmin; p < pmax; p = getprime_mt (pi))
-    ulong_list_add (L, p);
+      L.push_back(p);
   return p;
 }
 
 static unsigned long
-prime_list_poly (ulong_list L, prime_info pi, unsigned long pmin,
+prime_list_poly (std::vector<unsigned long> & L, prime_info pi, unsigned long pmin,
                  unsigned long pmax, mpz_poly f)
 {
   unsigned long p;
@@ -151,7 +127,7 @@ prime_list_poly (ulong_list L, prime_info pi, unsigned long pmin,
   for (p = pmin; p < pmax; p = getprime_mt (pi))
     if (mpz_divisible_ui_p (f->coeff[f->deg], p) ||
         mpz_poly_roots_ulong (NULL, f, p) > 0)
-      ulong_list_add (L, p);
+        L.push_back(p);
   return p;
 }
 
@@ -188,7 +164,7 @@ prime_tree_poly (mpz_product_tree L, prime_info pi, unsigned long pmin,
   nthreads = omp_get_num_threads ();
 #endif
   nthreads *= 10; /* to amortize the varying cost of mpz_poly_roots_ulong */
-  q = malloc (nthreads * sizeof (unsigned long));
+  q = (unsigned long *) malloc (nthreads * sizeof (unsigned long));
 
   for (p = pmin; p < pmax;)
     {
@@ -230,15 +206,15 @@ cofac_list_realloc (cofac_list l, size_t newsize)
       mpz_clear (l->A0[i]);
       mpz_clear (l->sq[i]);
     }
-  l->a = realloc (l->a, newsize * sizeof (int64_t));
-  l->b = realloc (l->b, newsize * sizeof (uint64_t));
-  l->R = realloc (l->R, newsize * sizeof (mpz_t));
-  l->A = realloc (l->A, newsize * sizeof (mpz_t));
-  l->R0 = realloc (l->R0, newsize * sizeof (mpz_t));
-  l->A0 = realloc (l->A0, newsize * sizeof (mpz_t));
-  l->sq = realloc (l->sq, newsize * sizeof (mpz_t));
-  l->side = realloc (l->side, newsize * sizeof (int));
-  l->perm = realloc (l->perm, newsize * sizeof (uint32_t));
+  l->a = (int64_t*) realloc (l->a, newsize * sizeof (int64_t));
+  l->b = (uint64_t*) realloc (l->b, newsize * sizeof (uint64_t));
+  l->R = (mpz_t*) realloc (l->R, newsize * sizeof (mpz_t));
+  l->A = (mpz_t*) realloc (l->A, newsize * sizeof (mpz_t));
+  l->R0 = (mpz_t*) realloc (l->R0, newsize * sizeof (mpz_t));
+  l->A0 = (mpz_t*) realloc (l->A0, newsize * sizeof (mpz_t));
+  l->sq = (mpz_t*) realloc (l->sq, newsize * sizeof (mpz_t));
+  l->side = (int*) realloc (l->side, newsize * sizeof (int));
+  l->perm = (uint32_t*) realloc (l->perm, newsize * sizeof (uint32_t));
   l->alloc = newsize;
   if (newsize < l->size)
     l->size = newsize;
@@ -391,10 +367,10 @@ remainder_tree (mpz_t **T, unsigned long n, unsigned long *w, mpz_t P,
   mpz_t Q;
 
   guard = h;
-  nbits = malloc ((h + 1) * sizeof (unsigned long*));
+  nbits = (unsigned long**) malloc ((h + 1) * sizeof (unsigned long*));
   for (i = 0; i <= h; i++)
     {
-      nbits[i] = malloc (w[i] * sizeof (unsigned long));
+      nbits[i] = (unsigned long *) malloc (w[i] * sizeof (unsigned long));
       for (j = 0; j < w[i]; j++)
         nbits[i][j] = mpz_sizeinbase (T[i][j], 2);
     }
@@ -611,115 +587,15 @@ find_smooth (cofac_list l, mpz_t batchP[2], mpz_t B[2], mpz_t L[2], mpz_t M[2], 
   return nb_smooth;
 }
 
-/* print all factors of n into 'str', where 'str0' is the string start.
-   B is the small prime bound: n contain no prime factor <= B
-   lpb is the large prime bound: all prime factor of n are < 2^lpb */
-static char*
-print_smooth_aux (mpz_t *factors, mpz_t n, facul_method_t *methods,
-                  struct modset_t *fm, struct modset_t *cfm,
-                  int lpb, double B, char *str0, char *str, size_t str0size)
+static void
+trial_divide (std::vector<cxx_mpz>& factors, cxx_mpz & n, std::vector<unsigned long> const& SP)
 {
-  unsigned long i;
-  int j, res_fac;
-  double BB = B * B, BBB = B * B * B;
-
-  /* any factor < B^2 is necessarily prime */
-  for (i = 0; methods[i].method != 0 && mpz_cmp_d (n, BB) >= 0; i++)
-    {
-      res_fac = facul_doit_onefm_mpz (factors, n, methods[i], fm, cfm,
-                                      lpb, BB, BBB);
-
-      /* Could happen if we allowed a cofactor bound after batch
-       * cofactorization */
-      if (res_fac == FACUL_NOT_SMOOTH) {
-          gmp_fprintf(stderr, "# C=%Zd not smooth (uppercase %ZX below)\n", n, n);
-          if (str > str0)
-            str += snprintf (str, str0size - (str - str0), ",");
-          str += gmp_snprintf (str, str0size - (str - str0), "%ZX", n);
-          return str;
-      }
-
-      /* factors[0..res_fac-1] are prime factors of n, 0 <= res_fac <= 2 */
-
-      for (j = 0; j < res_fac; j++)
-        {
-          if (str > str0)
-            str += snprintf (str, str0size - (str - str0), ",");
-          str += gmp_snprintf (str, str0size - (str - str0), "%Zx", factors[j]);
-          mpz_divexact (n, n, factors[j]);
-        }
-
-      if (fm->arith != CHOOSE_NONE) /* fm is a non-trivial composite factor */
-        {
-          mpz_t t;
-          struct modset_t cfm2;
-          mpz_init (t);
-          modset_get_z (t, fm);
-          /* t should be composite, i.e., t >= BB */
-          ASSERT(mpz_cmp_d (t, BB) >= 0);
-          mpz_divexact (n, n, t);
-          str = print_smooth_aux (factors, t, methods + i + 1, fm, &cfm2,
-                                  lpb, B, str0, str, str0size);
-          modset_clear (fm);
-          fm->arith = CHOOSE_NONE;
-          mpz_clear (t);
-       }
-
-      if (cfm->arith != CHOOSE_NONE)
-        {
-          mpz_t t;
-          struct modset_t fm2;
-          mpz_init (t);
-          modset_get_z (t, cfm);
-          /* t should be composite, i.e., t >= BB */
-          ASSERT(mpz_cmp_d (t, BB) >= 0);
-          mpz_divexact (n, n, t);
-          str = print_smooth_aux (factors, t, methods + i + 1, &fm2, cfm,
-                                  lpb, B, str0, str, str0size);
-          modset_clear (cfm);
-          cfm->arith = CHOOSE_NONE;
-          mpz_clear (t);
+    for (auto p : SP) {
+        while (mpz_divisible_ui_p (n, p)) {
+            factors.push_back(p);
+            mpz_divexact_ui (n, n, p);
         }
     }
-
-  if (mpz_cmp_ui (n, 1) > 0)
-    {
-      if (mpz_cmp_d(n, BB) >= 0) {
-          /* we ran out of factoring methods */
-          ASSERT_ALWAYS(!methods[i].method);
-          gmp_fprintf(stderr, "# Could not factor smooth integer %Zd (uppercase %ZX below)\n", n, n);
-          if (str > str0)
-            str += snprintf (str, str0size - (str - str0), ",");
-          str += gmp_snprintf (str, str0size - (str - str0), "%ZX", n);
-      } else {
-          if (str > str0)
-            str += snprintf (str, str0size - (str - str0), ",");
-          str += gmp_snprintf (str, str0size - (str - str0), "%Zx", n);
-      }
-    }
-
-  return str;
-}
-
-/* return the end of the written string */
-static char*
-trial_divide (mpz_t n, unsigned long *sp, unsigned long spsize, char *str, size_t strsize)
-{
-  unsigned long i;
-  char *str0 = str;
-
-  for (i = 0; i < spsize; i++)
-    {
-      while (mpz_divisible_ui_p (n, sp[i]))
-        {
-          if (str > str0)
-            str += snprintf (str, strsize - (str - str0), ",");
-          str += snprintf (str, strsize - (str - str0), "%lx", sp[i]);
-          mpz_divexact_ui (n, n, sp[i]);
-        }
-    }
-
-  return str;
 }
 
 /* Print the prime factors of the input 'n' separated by spaces.
@@ -729,52 +605,115 @@ trial_divide (mpz_t n, unsigned long *sp, unsigned long spsize, char *str, size_
    factors[2] is a scratch space to store factors.
    Return the pointer to the next character to write.
 */
-static char*
-print_smooth (mpz_t *factors, mpz_t n, facul_method_t *methods,
-              struct modset_t *fm, struct modset_t *cfm,
-              unsigned int lpb, double B, unsigned long *sp,
-              unsigned long spsize, mpz_t cofac, mpz_ptr sq,
-              char *str, size_t strsize)
+static bool
+print_smooth (std::vector<cxx_mpz> &factors,
+              cxx_mpz & n,
+              facul_method_t *methods,
+              unsigned int lpb, double B,
+              std::vector<unsigned long> const& SP,
+              cxx_mpz& cofac, mpz_ptr sq)
 {
-  char *str0 = str;
+    double BB = B * B, BBB = B * B * B;
+    ASSERT(mpz_divisible_p (n, cofac));
+    mpz_divexact (n, n, cofac);
 
-  ASSERT(mpz_divisible_p (n, cofac));
-  mpz_divexact (n, n, cofac);
-
-  if (sq != NULL)
-    {
-      ASSERT(mpz_divisible_p (n, sq));
-      mpz_divexact (n, n, sq);
+    if (sq) {
+        ASSERT(mpz_divisible_p (n, sq));
+        mpz_divexact (n, n, sq);
     }
 
-  /* remove small primes */
-  str = trial_divide (n, sp, spsize, str, strsize - (str - str0));
+    /* remove small primes */
+    trial_divide (factors, n, SP);
 
-  /* the cofactor that we found with the product tree will have primes
-   * between lim and 2^batchlpb. We typically have batchlpb < lpb, and
-   * lim > sqrt(2^lpb), so that we know that [cofac] has no prime factor
-   * below B=sqrt(2^lpb). It is not guaranteed, though: we may have
-   * elected to get rid of sieving on that side, in which case [cofac]
-   * may very well contain small primes.
-   */
-  if (str[-1] != ':') *str++=',';
-  str = trial_divide (cofac, sp, spsize, str, strsize - (str - str0));
-  if (str[-1] == ',') str--;
+    /* the cofactor that we found with the product tree will have primes
+     * between lim and 2^batchlpb. We typically have batchlpb < lpb, and
+     * lim > sqrt(2^lpb), so that we know that [cofac] has no prime factor
+     * below B=sqrt(2^lpb). It is not guaranteed, though: we may have
+     * elected to get rid of sieving on that side, in which case [cofac]
+     * may very well contain small primes.
+     */
+    trial_divide (factors, cofac, SP);
 
-  /* factor the cofactor */
-  str = print_smooth_aux (factors, cofac, methods, fm, cfm, lpb, B, str0, str, strsize - (str - str0));
+    struct temp_t {
+        mpz_t temp[2];
+        temp_t() {
+            mpz_init(temp[0]);
+            mpz_init(temp[1]);
+        }
+        ~temp_t() {
+            mpz_clear(temp[0]);
+            mpz_clear(temp[1]);
+        }
+    };
+    temp_t temp;
 
-  /* factor rest of factor base primes */
-  str = print_smooth_aux (factors, n, methods, fm, cfm, lpb, B, str0, str, strsize - (str - str0));
+    std::deque<cxx_mpz> composites;
+    if (mpz_cmp_ui(n, 1) > 0) composites.push_back(std::move(n));
+    if (mpz_cmp_ui(cofac, 1) > 0) composites.push_back(std::move(cofac));
 
-  if (sq != NULL)
-    {
-      if (str > str0)
-        str += snprintf (str, strsize - (str - str0), ",");
-      str += gmp_snprintf (str, strsize - (str - str0), "%Zx", sq);
+    facul_method_t * pm = methods;
+    struct modset_t fm[2];
+
+    for (; !composites.empty() ; ) {
+        cxx_mpz & n0 = composites.front();
+        if (mpz_cmp_d (n0, BB) < 0) {
+            factors.push_back(move(n0));
+            composites.pop_front();
+            continue;
+        }
+        if (!pm->method)
+            break;
+
+        /* We're not going to try this method mode than once */
+        fm[0].arith = modset_t::CHOOSE_NONE;
+        fm[1].arith = modset_t::CHOOSE_NONE;
+        int nf = facul_doit_onefm_mpz (temp.temp, n0, *pm, &fm[0], &fm[1], lpb, BB, BBB);
+        pm++;
+
+        /* Could happen if we allowed a cofactor bound after batch
+         * cofactorization */
+        if (nf == FACUL_NOT_SMOOTH) {
+            gmp_fprintf(stderr, "# C=%Zd not smooth\n", (mpz_srcptr) n);
+            return false;
+        }
+
+        /* In this case, no prime factor was stored, no composite was
+         * stored: the input number has not been changed, we move on to
+         * the next method */
+        if (nf == 0) continue;
+
+        /* factors[] contains the primes, and fm[] the composite
+         * cofactors found */
+        composites.pop_front();
+
+        /* temp[0..nf-1] are prime factors of n, 0 <= nf <= 2 */
+        for (int j = 0; j < nf; j++) {
+            cxx_mpz tz;
+            mpz_swap(tz, temp.temp[j]);
+            factors.push_back(std::move(tz));
+        }
+
+        /* we may also have composites */
+        for (int j = 0; j < 2; j++) {
+            if (fm[j].arith == modset_t::CHOOSE_NONE) continue;
+
+            /* fm is a non-trivial composite factor */
+            cxx_mpz t;
+            modset_get_z (t, &fm[j]);
+
+            /* t should be composite, i.e., t >= BB */
+            ASSERT(mpz_cmp_d (t, BB) >= 0);
+
+            composites.push_back(t);
+        }
+    }
+    if (sq) {
+        cxx_mpz tz;
+        mpz_set(tz, sq);
+        factors.push_back(std::move(tz));
     }
 
-  return str;
+    return true;
 }
 
 /* strip integers in l[0..n-1] which do not divide P */
@@ -792,49 +731,50 @@ strip (unsigned long *l, unsigned long n, mpz_t P)
 /* sqside = 1 if the special-q is on side 1 (algebraic) */
 static void
 factor_one (cofac_list L, cado_poly pol, unsigned long *lim, int *lpb,
-            FILE *out, facul_method_t *methods, unsigned long *sp[],
-            unsigned long spsize[], unsigned long i)
+            FILE *out, facul_method_t *methods,
+            std::vector<unsigned long> (&SP)[2],
+            unsigned long i)
 {
-  mpz_t norm;
-  mpz_t factors[2];
   uint32_t *perm = L->perm;
-  struct modset_t fm, cfm;
-  char s0[1024];        /* output relation */
-  char *s = s0;
+  std::ostringstream os;
 
-  mpz_init (norm);
-  mpz_init (factors[0]);
-  mpz_init (factors[1]);
+  int64_t a = L->a[perm[i]];
+  uint64_t b = L->b[perm[i]];
 
-  /* compute norms F(a,b) and G(a,b) */
-  mpz_poly_homogeneous_eval_siui (norm, pol->pols[0],
-                                  L->a[perm[i]], L->b[perm[i]]);
-
-  s += snprintf (s, sizeof(s0)-(s-s0), "%" PRId64 ",%" PRIu64 ":", L->a[perm[i]], L->b[perm[i]]);
-
-  s = print_smooth (factors, norm, methods, &fm, &cfm, lpb[0], (double) lim[0],
-                    sp[0], spsize[0], L->R0[perm[i]],
-                    (L->side[perm[i]] == 0) ? L->sq[perm[i]] : NULL, s, sizeof(s0)-(s-s0));
-  s += snprintf (s, sizeof(s0)-(s-s0), ":");
-
-  mpz_poly_homogeneous_eval_siui (norm, pol->pols[1],
-                                  L->a[perm[i]], L->b[perm[i]]);
-  s = print_smooth (factors, norm, methods, &fm, &cfm, lpb[1], (double) lim[1],
-                    sp[1], spsize[1], L->A0[perm[i]],
-                    (L->side[perm[i]] == 1) ? L->sq[perm[i]] : NULL, s, sizeof(s0)-(s-s0));
+  os << a << "," << b;
+  
+  bool smooth = true;
+  std::vector<cxx_mpz> factors[2];
+  for(int side = 0 ; smooth && side < 2 ; side++) {
+      cxx_mpz norm, cofac;
+      mpz_set(cofac,(side ? L->A0 : L->R0)[perm[i]]);
+      mpz_poly_homogeneous_eval_siui (norm, pol->pols[side], a, b);
+      smooth = smooth && print_smooth (factors[side], norm, methods,
+              lpb[side], (double) lim[side], SP[side],
+              cofac,
+              (L->side[perm[i]] == side) ? L->sq[perm[i]] : NULL);
+  }
 
   /* avoid two threads writing a relation simultaneously */
 #ifdef  HAVE_OPENMP
 #pragma omp critical
 #endif
   {
-    fprintf (out, "%s\n", s0);
-    fflush (out);
+      if (!smooth) {
+          fprintf(out, "# failed on %s, while we thought we would succeed\n", os.str().c_str());
+      } else {
+          for(int side = 0 ; smooth && side < 2 ; side++) {
+              os << ":";
+              auto it = factors[side].begin();
+              os << std::hex << *it++;
+              for( ; it < factors[side].end() ; ++it) {
+                  os << "," << std::hex << *it;
+              }
+          }
+          fprintf (out, "%s\n", os.str().c_str());
+      }
+      fflush (out);
   }
-
-  mpz_clear (norm);
-  mpz_clear (factors[0]);
-  mpz_clear (factors[1]);
 }
 
 /* Given a list L of bi-smooth cofactors, print the corresponding relations
@@ -845,28 +785,19 @@ void
 factor (cofac_list L, unsigned long n, cado_poly pol, int lpb[],
         FILE *out, int nthreads MAYBE_UNUSED)
 {
-  unsigned long i, *sp[2], spsize[2], B[2];
+  unsigned long i, B[2];
   int nb_methods;
   facul_method_t *methods;
-  ulong_list SP0, SP1;
+  std::vector<unsigned long> SP[2];
   prime_info pi;
   double start = seconds (), wct_start = wct_seconds ();
 
-  ulong_list_init (SP0);
-  prime_info_init (pi);
-  B[0] = (unsigned long) ceil (pow (2.0, (double) lpb[0] / 2.0));
-  prime_list_poly (SP0, pi, 2, B[0], pol->pols[0]);
-  spsize[0] = SP0->size;
-  sp[0] = SP0->l;
-  prime_info_clear (pi);
-
-  ulong_list_init (SP1);
-  prime_info_init (pi);
-  B[1] = (unsigned long) ceil (pow (2.0, (double) lpb[1] / 2.0));
-  prime_list_poly (SP1, pi, 2, B[1], pol->pols[1]);
-  spsize[1] = SP1->size;
-  sp[1] = SP1->l;
-  prime_info_clear (pi);
+  for(int side = 0 ; side < 2 ; side++) {
+      prime_info_init (pi);
+      B[side] = (unsigned long) ceil (pow (2.0, (double) lpb[side] / 2.0));
+      prime_list_poly (SP[side], pi, 2, B[side], pol->pols[side]);
+      prime_info_clear (pi);
+  }
 
   nb_methods = 30;
   if (nb_methods >= NB_MAX_METHODS)
@@ -878,10 +809,7 @@ factor (cofac_list L, unsigned long n, cado_poly pol, int lpb[],
 #pragma omp parallel for schedule(static)
 #endif
   for (i = 0; i < n; i++)
-    factor_one (L, pol, B, lpb, out, methods, sp, spsize, i);
-
-  ulong_list_clear (SP0);
-  ulong_list_clear (SP1);
+    factor_one (L, pol, B, lpb, out, methods, SP, i);
 
   facul_clear_methods (methods);
 

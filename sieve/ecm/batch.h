@@ -8,13 +8,6 @@
 #include "facul_doit.h"
 #include "utils.h"
 
-typedef struct {
-  unsigned long *l;
-  size_t alloc;
-  size_t size;
-} ulong_list_t;
-typedef ulong_list_t ulong_list[1];
-
 /* structure to compute on-line a product tree, avoiding to first compute a
    list of mpz_t (which might take too much memory) */
 typedef struct {
