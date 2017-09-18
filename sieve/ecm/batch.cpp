@@ -662,7 +662,8 @@ print_smooth (std::vector<cxx_mpz> &factors,
     for (; !composites.empty() ; ) {
         cxx_mpz & n0 = composites.front();
         if (mpz_cmp_d (n0, BB) < 0) {
-            factors.push_back(move(n0));
+            if (mpz_cmp_ui(n0, 1) > 0)
+                factors.push_back(move(n0));
             composites.pop_front();
             continue;
         }
