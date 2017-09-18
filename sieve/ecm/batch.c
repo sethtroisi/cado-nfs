@@ -78,16 +78,12 @@ mpz_product_tree_add_ui (mpz_product_tree t, unsigned long n)
               t->size++;
             }
           if (t->n[i+1] == 0)
-            {
-              mpz_swap (t->l[i+1], t->l[i]);
-              mpz_set_ui (t->l[i], 1);
-            }
+            mpz_swap (t->l[i+1], t->l[i]);
           else /* accumulate */
-            {
-              mpz_mul (t->l[i+1], t->l[i+1], t->l[i]);
-              mpz_set_ui (t->l[i], 1);
-            }
+            mpz_mul (t->l[i+1], t->l[i+1], t->l[i]);
           t->n[i+1] += t->n[i];
+          /* primes from l[i] are now in l[i+1], thus reset l[i] to 1: */
+          mpz_set_ui (t->l[i], 1);
           t->n[i] = 0;
         }
     }
