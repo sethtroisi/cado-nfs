@@ -1398,10 +1398,9 @@ void factor_survivors_data::cofactoring (timetree_t & timer)
 
         for(int pside = 0 ; pass && pside < 2 ; pside++) {
             int side = trialdiv_first_side ^ pside;
+
             CHILD_TIMER_PARAMETRIC(timer, "checks on side ", side, "");
             TIMER_CATEGORY(timer, cofactoring(side));
-
-            th->rep->survivors.trial_divided_on_side[side]++;
 
             SIBLING_TIMER(timer, "recompute complete norm");
 
@@ -1423,11 +1422,21 @@ void factor_survivors_data::cofactoring (timetree_t & timer)
                         "on side %d for (%" PRId64 ",%" PRIu64 ")\n", side, a, b);
             }
 #endif
+            if (si.conf.sides[side].lim == 0) {
+                /* This is a shortcut. We're probably replacing sieving
+                 * by a product tree, there's no reason to bother doing
+                 * trial division at this point (or maybe there is ?
+                 * would that change the bit size significantly ?) */
+                th->rep->survivors.check_leftover_norm_on_side[side] ++;
+                continue;
+            }
 
             SIBLING_TIMER(timer, "trial division");
 
             verbose_output_print(1, 2, "FIXME %s, line %d\n", __FILE__, __LINE__);
             const bool handle_2 = true; /* FIXME */
+            th->rep->survivors.trial_divided_on_side[side]++;
+
             trial_div (&factors[side], norm[side], N, x,
                     handle_2,
                     &sdata[side].primes,

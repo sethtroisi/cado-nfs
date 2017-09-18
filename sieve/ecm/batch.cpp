@@ -5,7 +5,7 @@
 #include <omp.h>
 #endif
 #include <vector>
-#include <deque>
+#include <list>
 #include <sstream>
 #include "batch.h"
 #include "utils.h"
@@ -103,31 +103,25 @@ cofac_list_init (cofac_list l)
   l->size = 0;
 }
 
-static unsigned long
-prime_list (std::vector<unsigned long> & L, prime_info pi, unsigned long pmin,
+static void
+prime_list (std::vector<unsigned long> & L, prime_info pi,
             unsigned long pmax)
 {
-  unsigned long p;
-
-  for (p = pmin; p < pmax; p = getprime_mt (pi))
+  for (unsigned long p = 2 ; p <= pmax ; p = getprime_mt(pi))
       L.push_back(p);
-  return p;
 }
 
-static unsigned long
-prime_list_poly (std::vector<unsigned long> & L, prime_info pi, unsigned long pmin,
+static void
+prime_list_poly (std::vector<unsigned long> & L, prime_info pi,
                  unsigned long pmax, mpz_poly f)
 {
-  unsigned long p;
-
   if (f->deg == 1)
-    return prime_list (L, pi, pmin, pmax);
+    return prime_list (L, pi, pmax);
 
-  for (p = pmin; p < pmax; p = getprime_mt (pi))
+  for (unsigned long p = 2 ; p <= pmax ; p = getprime_mt(pi))
     if (mpz_divisible_ui_p (f->coeff[f->deg], p) ||
         mpz_poly_roots_ulong (NULL, f, p) > 0)
         L.push_back(p);
-  return p;
 }
 
 /* add in the product tree L all primes pmin <= p < pmax.
@@ -135,38 +129,40 @@ prime_list_poly (std::vector<unsigned long> & L, prime_info pi, unsigned long pm
    (pmin=2 when 'pi' was just initialized).
    Return the current prime in 'pi' at the end, i.e.,
    the smallest prime >= pmax. */
-static unsigned long
-prime_tree (mpz_product_tree L, prime_info pi, unsigned long pmin,
-            unsigned long pmax)
+static void
+prime_tree (mpz_product_tree L, unsigned long pmax)
 {
-  unsigned long p;
-
-  for (p = pmin; p < pmax; p = getprime_mt (pi))
+  prime_info pi;
+  prime_info_init (pi);
+  for (unsigned long p = 2; p < pmax; p = getprime_mt (pi))
     mpz_product_tree_add_ui (L, p);
-  return p;
+  prime_info_clear (pi);
 }
 
 /* same as prime_tree, but only adds primes p for which f has at least one
    root modulo p, or the leading coefficient of f vanishes modulo p */
-static unsigned long
-prime_tree_poly (mpz_product_tree L, prime_info pi, unsigned long pmin,
-                 unsigned long pmax, mpz_poly f)
+static void
+prime_tree_poly (mpz_product_tree L, unsigned long pmax, mpz_poly_srcptr f)
 {
-  unsigned long p, *q;
-  int i, j, nthreads = 1;
+  if (f->deg == 1) {
+    prime_tree (L, pmax);
+    return;
+  }
 
-  if (f->deg == 1)
-    return prime_tree (L, pi, pmin, pmax);
-
+  int nthreads = 1;
 #ifdef HAVE_OPENMP
 #pragma omp parallel
   nthreads = omp_get_num_threads ();
 #endif
   nthreads *= 10; /* to amortize the varying cost of mpz_poly_roots_ulong */
-  q = (unsigned long *) malloc (nthreads * sizeof (unsigned long));
 
-  for (p = pmin; p < pmax;)
+  unsigned long * q = (unsigned long *) malloc (nthreads * sizeof (unsigned long));
+
+  prime_info pi;
+  prime_info_init (pi);
+  for (unsigned long p = 2; p < pmax;)
     {
+        int i;
       /* sequential part: getprime_mt is fast */
       for (i = 0; i < nthreads && p < pmax; p = getprime_mt (pi), i++)
         q[i] = p;
@@ -175,20 +171,19 @@ prime_tree_poly (mpz_product_tree L, prime_info pi, unsigned long pmin,
 #ifdef HAVE_OPENMP
 #pragma omp parallel for schedule(static)
 #endif
-      for (j = 0; j < i; j++)
+      for (int j = 0; j < i; j++)
         if (mpz_divisible_ui_p (f->coeff[f->deg], q[j]) == 0 &&
             mpz_poly_roots_ulong (NULL, f, q[j]) == 0)
           q[j] = 0;
 
       /* sequential part: mpz_product_tree_add_ui is fast */
-      for (j = 0; j < i; j++)
+      for (int j = 0; j < i; j++)
         if (q[j])
           mpz_product_tree_add_ui (L, q[j]);
     }
 
+  prime_info_clear (pi);
   free (q);
-
-  return p;
 }
 
 void
@@ -263,13 +258,12 @@ cofac_list_clear (cofac_list l)
 /* put in P the product of primes p for which the given polynomial has factors
    modulo p */
 static void
-prime_product_poly (mpz_t P, prime_info pi, unsigned long p_max,
-                    unsigned long p_last, mpz_poly f)
+prime_product_poly (mpz_t P, unsigned long p_max, mpz_poly_srcptr f)
 {
   mpz_product_tree L;
 
   mpz_product_tree_init (L);
-  p_last = prime_tree_poly (L, pi, p_last, p_max, f);
+  prime_tree_poly (L, p_max, f);
 
   mpz_product_tree_accumulate (L);
 
@@ -610,7 +604,7 @@ trial_divide (std::vector<cxx_mpz>& factors, cxx_mpz & n, std::vector<unsigned l
  * B is the small prime bound: any factor < B^2 is necessarily prime.
  */
 static bool
-factor_simpleminded (std::vector<cxx_mpz> &factors,
+factor_simple_minded (std::vector<cxx_mpz> &factors,
               cxx_mpz & n,
               facul_method_t *methods,
               unsigned int lpb, double B,
@@ -651,7 +645,7 @@ factor_simpleminded (std::vector<cxx_mpz> &factors,
     };
     temp_t temp;
 
-    std::deque<cxx_mpz> composites;
+    std::list<cxx_mpz> composites;
     if (mpz_cmp_ui(n, 1) > 0) composites.push_back(std::move(n));
     if (mpz_cmp_ui(cofac, 1) > 0) composites.push_back(std::move(cofac));
 
@@ -758,7 +752,7 @@ factor_one (cofac_list L, cado_poly pol, unsigned long *lim, int *lpb,
     for(side = 0 ; smooth && side < 2 ; side++) {
         mpz_set(cofac,(side ? L->A0 : L->R0)[perm[i]]);
         mpz_poly_homogeneous_eval_siui (norm, pol->pols[side], a, b);
-        smooth = smooth && factor_simpleminded (factors[side], norm, methods,
+        smooth = smooth && factor_simple_minded (factors[side], norm, methods,
                 lpb[side], (double) lim[side], SP[side],
                 cofac,
                 (L->side[perm[i]] == side) ? L->sq[perm[i]] : NULL);
@@ -808,7 +802,7 @@ factor (cofac_list L, unsigned long n, cado_poly pol, int lpb[],
   for(int side = 0 ; side < 2 ; side++) {
       prime_info_init (pi);
       B[side] = (unsigned long) ceil (pow (2.0, (double) lpb[side] / 2.0));
-      prime_list_poly (SP[side], pi, 2, B[side], pol->pols[side]);
+      prime_list_poly (SP[side], pi, B[side], pol->pols[side]);
       prime_info_clear (pi);
   }
 
@@ -835,20 +829,9 @@ factor (cofac_list L, unsigned long n, cado_poly pol, int lpb[],
 }
 
 static void
-create_batch_product (mpz_t P, unsigned long B, unsigned long L, mpz_poly pol)
+create_batch_product (mpz_t P, unsigned long L, mpz_poly_srcptr pol)
 {
-  prime_info pi;
-  unsigned long p;
-
-  ASSERT_ALWAYS (L > B);
-
-  prime_info_init (pi);
-
-  for (p = 2; p < B; p = getprime_mt (pi));
-
-  prime_product_poly (P, pi, L, p, pol);
-
-  prime_info_clear (pi);
+  prime_product_poly (P, L, pol);
 }
 
 /* We have 3 cases:
@@ -890,7 +873,7 @@ create_batch_file (const char *f, mpz_t P, unsigned long B, unsigned long L,
     {
       fprintf (out, "# batch: creating large prime product");
       fflush (out);
-      create_batch_product (P, B, L, pol);
+      create_batch_product (P, L, pol);
       goto end;
     }
 
@@ -911,7 +894,7 @@ create_batch_file (const char *f, mpz_t P, unsigned long B, unsigned long L,
   /* case 2 */
   fprintf (out, "# batch: creating large prime product");
   fflush (out);
-  create_batch_product (P, B, L, pol);
+  create_batch_product (P, L, pol);
 
   fp = fopen (f, "w");
   ASSERT_ALWAYS(fp != NULL);
