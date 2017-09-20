@@ -1334,6 +1334,10 @@ void factor_survivors_data::cofactoring (timetree_t & timer)
 
         int i;
         unsigned int j;
+        // Note that are, (i,j) must be true coordinates, not the
+        // ones reduced to (-I/2, I/2) using sublattices.
+        NxToIJ (&i, &j, N, x, si);
+        adjustIJsublat(&i, &j, si);
 
         /* This can be changed (and should be a command line parameter)
          */
@@ -1352,10 +1356,6 @@ void factor_survivors_data::cofactoring (timetree_t & timer)
             /* Compute the norms using the polynomials transformed to 
                i,j-coordinates. The transformed polynomial on the 
                special-q side is already divided by q */
-            // Note that are, (i,j) must be true coordinates, not the
-            // ones reduced to (-I/2, I/2) using sublattices.
-            NxToIJ (&i, &j, N, x, si);
-            adjustIJsublat(&i, &j, si);
             si.sides[side].lognorms->norm(norm[side], i, j);
 
 #ifdef TRACE_K
@@ -1399,22 +1399,22 @@ void factor_survivors_data::cofactoring (timetree_t & timer)
         th->rep->survivors.enter_cofactoring++;
 
         if (las.batch_print_survivors) {
+            verbose_output_start_batch ();
 #ifndef SUPPORT_LARGE_Q
             gmp_printf("%" PRId64 " %" PRIu64 " %Zd %Zd\n", a, b,
                     norm[0], norm[1]);
 #else
             gmp_printf("%Zd %Zd %Zd %Zd\n", az, bz, norm[0], norm[1]);
 #endif
+            verbose_output_end_batch ();
             cpt++;
             continue;
         }
 
         if (las.batch)
         {
-            verbose_output_start_batch ();
             cofac_list_add ((cofac_list_t*) las.L, a, b, norm[0], norm[1],
                     si.doing.side, si.doing.p);
-            verbose_output_end_batch ();
             cpt++;
             continue; /* we deal with all cofactors at the end of las */
         }
