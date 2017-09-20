@@ -1942,10 +1942,10 @@ static void declare_usage(param_list pl)/*{{{*/
   param_list_decl_usage(pl, "batch", "(switch) use batch cofactorization");
   param_list_decl_usage(pl, "batch0", "side-0 batch file");
   param_list_decl_usage(pl, "batch1", "side-1 batch file");
-  param_list_decl_usage(pl, "batchlpb0", "large prime bound on side 0 to be considered by batch cofactorization. Primes between lim0 and 2^batchlpb0 will be dealt with by product trees. Defaults to lpb0.");
-  param_list_decl_usage(pl, "batchlpb1", "large prime bound on side 1 to be considered by batch cofactorization. Primes between lim0 and 2^batchlpb0 will be dealt with by product trees. Defaults to lpb1.");
-  param_list_decl_usage(pl, "batchmfb0", "cofactor bound on side 0 to be considered after batch cofactorization. After the product tree, cofactors below this bound will go through ecm. Defaults to mfb0.");
-  param_list_decl_usage(pl, "batchmfb1", "cofactor bound on side 1 to be considered after batch cofactorization. After the product tree, cofactors below this bound will go through ecm. Defaults to mfb1.");
+  param_list_decl_usage(pl, "batchlpb0", "large prime bound on side 0 to be considered by batch cofactorization. Primes between lim0 and 2^batchlpb0 will be extracted by product trees. Defaults to lpb0.");
+  param_list_decl_usage(pl, "batchlpb1", "large prime bound on side 1 to be considered by batch cofactorization. Primes between lim1 and 2^batchlpb1 will be extracted by product trees. Defaults to lpb1.");
+  param_list_decl_usage(pl, "batchmfb0", "cofactor bound on side 0 to be considered after batch cofactorization. After primes below 2^batchlpb0 have been extracted, cofactors below this bound will go through ecm. Defaults to mfb0.");
+  param_list_decl_usage(pl, "batchmfb1", "cofactor bound on side 1 to be considered after batch cofactorization. After primes below 2^batchlpb1 have been extracted, cofactors below this bound will go through ecm. Defaults to mfb1.");
   param_list_decl_usage(pl, "batch-print-survivors", "(switch) just print survivors for an external cofactorization");
   param_list_decl_usage(pl, "galois", "(switch) for reciprocal polynomials, sieve only half of the q's");
 #ifdef TRACE_K
