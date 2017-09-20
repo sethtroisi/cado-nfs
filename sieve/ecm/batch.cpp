@@ -732,7 +732,7 @@ strip (unsigned long *l, unsigned long n, mpz_t P)
 
 /* sqside = 1 if the special-q is on side 1 (algebraic) */
 static bool
-factor_one (cofac_list L, cado_poly pol, unsigned long *lim, int *lpb,
+factor_one (cofac_list L, cado_poly pol, unsigned long *lim, int * batchlpb, int *lpb,
             FILE *out, facul_method_t *methods,
             std::vector<unsigned long> (&SP)[2],
             unsigned long i)
@@ -764,9 +764,16 @@ factor_one (cofac_list L, cado_poly pol, unsigned long *lim, int *lpb,
 #endif
     {
         if (!smooth) {
-            gmp_fprintf(out,
-                    "# failed on %s on side %d; non-smooth cofactor %Zd\n",
-                    os.str().c_str(), --side, (mpz_srcptr) cofac);
+            --side;
+            /* when we've knowingly decided to _do_ some cofactoring
+             * after the product-tree on that side, then it's normal to
+             * have non-smooth values after all.
+             */
+            if (batchlpb[side] == lpb[side]) {
+                gmp_fprintf(out,
+                        "# failed on %s on side %d; non-smooth cofactor %Zd\n",
+                        os.str().c_str(), side, (mpz_srcptr) cofac);
+            }
         } else {
             for(int side = 0 ; smooth && side < 2 ; side++) {
                 os << ":";
@@ -789,7 +796,7 @@ factor_one (cofac_list L, cado_poly pol, unsigned long *lim, int *lpb,
    n is the number of bi-smooth cofactors in L.
 */
 unsigned long
-factor (cofac_list L, unsigned long n, cado_poly pol, int lpb[],
+factor (cofac_list L, unsigned long n, cado_poly pol, int batchlpb[], int lpb[],
         FILE *out, int nthreads MAYBE_UNUSED)
 {
   unsigned long i, B[2];
@@ -817,7 +824,7 @@ factor (cofac_list L, unsigned long n, cado_poly pol, int lpb[],
 #pragma omp parallel for schedule(static)
 #endif
   for (i = 0; i < n; i++)
-    rep += factor_one (L, pol, B, lpb, out, methods, SP, i);
+    rep += factor_one (L, pol, B, batchlpb, lpb, out, methods, SP, i);
 
   facul_clear_methods (methods);
 
