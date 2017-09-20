@@ -645,23 +645,28 @@ factor_simple_minded (std::vector<cxx_mpz> &factors,
     };
     temp_t temp;
 
-    std::list<cxx_mpz> composites;
-    if (mpz_cmp_ui(n, 1) > 0) composites.push_back(std::move(n));
-    if (mpz_cmp_ui(cofac, 1) > 0) composites.push_back(std::move(cofac));
+    std::list<std::pair<cxx_mpz, facul_method_t *>> composites;
+    if (mpz_cmp_ui(n, 1) > 0) 
+        composites.push_back(std::make_pair(std::move(n), methods));
+    if (mpz_cmp_ui(cofac, 1) > 0)
+        composites.push_back(std::make_pair(std::move(cofac), methods));
 
-    facul_method_t * pm = methods;
     struct modset_t fm[2];
 
     for (; !composites.empty() ; ) {
-        cxx_mpz & n0 = composites.front();
+        cxx_mpz & n0 = composites.front().first;
+        facul_method_t * &pm = composites.front().second;
         if (mpz_cmp_d (n0, BB) < 0) {
             if (mpz_cmp_ui(n0, 1) > 0)
                 factors.push_back(move(n0));
             composites.pop_front();
             continue;
         }
-        if (!pm->method)
-            break;
+
+        if (!pm->method) {
+            mpz_set(cofac, n0);
+            return false;
+        }
 
         /* We're not going to try this method mode than once */
         fm[0].arith = modset_t::CHOOSE_NONE;
@@ -703,11 +708,9 @@ factor_simple_minded (std::vector<cxx_mpz> &factors,
             /* t should be composite, i.e., t >= BB */
             ASSERT(mpz_cmp_d (t, BB) >= 0);
 
-            composites.push_back(t);
+            composites.push_back(std::make_pair(std::move(t), pm));
         }
     }
-    if (!composites.empty())
-        return false;
 
     if (sq) {
         cxx_mpz tz;
