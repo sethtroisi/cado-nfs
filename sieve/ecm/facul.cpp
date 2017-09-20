@@ -50,7 +50,14 @@ static int nb_curves99 (const unsigned int lpb);
 #endif
 
 /* don't use nb_curves90, nb_curves95 and nb_curves99, only use nb_curves */
-int nb_curves (const unsigned int lpb) { return nb_curves90(lpb); }
+int nb_curves (const unsigned int lpb, const unsigned int mfb)
+{
+  /* for up to 2 large primes, we use a very large number of curves (say 100),
+     since the more curves we need, the more likely the cofactor is smooth. */
+  if (mfb <= 2 * lpb)
+    return 100;
+  return nb_curves90 (lpb);
+}
 
 static int
 nb_curves90 (const unsigned int lpb)
@@ -203,12 +210,12 @@ nb_curves99 (const unsigned int lpb)
 /* Wrapper around facul_make_default_strategy */
 facul_strategy_t *
 facul_make_strategy (const unsigned long fbb, const unsigned int lpb,
-		     int n, const int verbose)
+		     const unsigned int mfb, int n, const int verbose)
 {
   facul_strategy_t *strategy;
 
   if (n == -1)
-    n = nb_curves (lpb);
+    n = nb_curves (lpb, mfb);
   strategy = (facul_strategy_t*) malloc (sizeof (facul_strategy_t));
   strategy->lpb = lpb;
   /* Store fbb^2 in assume_prime_thresh */
@@ -828,8 +835,8 @@ facul_make_strategies(const unsigned long rfbb, const unsigned int rlpb,
   if (file == NULL)
     {// make_default_strategy
       int ncurves[2];
-      ncurves[0] = (n0 > -1) ? n0 : nb_curves (rlpb);
-      ncurves[1] = (n1 > -1) ? n1 : nb_curves (alpb);
+      ncurves[0] = (n0 > -1) ? n0 : nb_curves (rlpb, rmfb);
+      ncurves[1] = (n1 > -1) ? n1 : nb_curves (alpb, amfb);
       int max_ncurves = ncurves[0] > ncurves[1]? ncurves[0]: ncurves[1];
       max_curves_used_before_aux = max_ncurves + 4; // account for fixed methods.
       // There is an hardcoded bound on the number of methods.
