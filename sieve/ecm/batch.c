@@ -915,42 +915,49 @@ input_batch (FILE *fp, unsigned long B, unsigned long L, mpz_poly pol,
   unsigned long Bread, Lread;
   mpz_poly pol_read;
   int ret;
+  char msg[1024];
+  msg[0]='\0';
 
+#define CHECK_Z(condition, error_message) do {				\
+  if (!(condition)) {							\
+      snprintf(msg, sizeof(msg), error_message);			\
+      goto parse_error;							\
+  }									\
+} while (0)
+#define CHECK_2(condition, error_message, arg1, arg2) do {		\
+  if (!(condition)) {							\
+      snprintf(msg, sizeof(msg), error_message, arg1, arg2);		\
+      goto parse_error;							\
+  }									\
+} while (0)
   ret = fscanf (fp, "%lu\n", &Bread);
-  ASSERT_ALWAYS (ret == 1);
-  if (Bread != B)
-    {
-      fprintf (stderr, "Error, inconsistent lim value in batch file\n");
-      fprintf (stderr, "expected %lu, file has %lu\n", B, Bread);
-      exit (1);
-    }
+  CHECK_Z(ret == 1, "Cannot read B\n");
+  CHECK_2(Bread == B, "Inconsistent B: expected %lu, file has %lu\n", B, Bread);
   ret = fscanf (fp, "%lu\n", &Lread);
-  ASSERT_ALWAYS (ret == 1);
-  if (Lread != L)
-    {
-      fprintf (stderr, "Error, inconsistent lpb value in batch file\n");
-      fprintf (stderr, "expected %lu, file has %lu\n", L, Lread);
-      exit (1);
-    }
+  CHECK_Z(ret == 1, "Cannot read L\n");
+  CHECK_2(Lread == L, "Inconsistent L: expected %lu, file has %lu\n", L, Lread);
   mpz_poly_init (pol_read, pol->deg);
   mpz_poly_fscanf_coeffs (fp, pol_read, ' ');
   if (mpz_poly_cmp (pol_read, pol) != 0)
     {
-      fprintf (stderr, "Error, inconsistent polynomila in batch file\n");
+      fprintf (stderr, "Error while reading batch product from %s:\n", f);
+      fprintf (stderr, "Inconsistent polynomial in batch file\n");
       fprintf (stderr, "expected ");
       mpz_poly_fprintf (stderr, pol);
       fprintf (stderr, "file has ");
       mpz_poly_fprintf (stderr, pol_read);
-      exit (1);
+      exit (EXIT_FAILURE);
     }
   mpz_poly_clear (pol_read);
   /* now that the header is consistent, we read the integer P */
   ret = mpz_inp_raw (P, fp);
-  if (ret == 0)
-    {
-      fprintf (stderr, "Error while reading batch product from %s\n", f);
-      exit (1);
-    }
+  CHECK_Z(ret == 0, "Could not read large integer\n");
+  return;
+#undef CHECK_2
+#undef CHECK_Z
+parse_error:
+  fprintf (stderr, "Error while reading batch product from %s:\n%s", f, msg);
+  exit(EXIT_FAILURE);
 }
 
 /* We have 3 cases:
