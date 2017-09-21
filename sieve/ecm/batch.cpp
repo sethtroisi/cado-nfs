@@ -856,9 +856,9 @@ output_batch (FILE *fp, unsigned long B, unsigned long L,
 {
   int ret;
 
-  ret = gmp_fprintf (fp, "%Zd\n", B);
+  ret = gmp_fprintf (fp, "%lu\n", B);
   ASSERT_ALWAYS (ret == 1);
-  ret = gmp_fprintf (fp, "%Zd\n", L);
+  ret = gmp_fprintf (fp, "%lu\n", L);
   ASSERT_ALWAYS (ret == 1);
   mpz_poly_fprintf_coeffs (fp, pol, ' ');
   ret = mpz_out_raw (fp, P);
