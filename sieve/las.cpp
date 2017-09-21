@@ -1413,9 +1413,14 @@ void factor_survivors_data::cofactoring (timetree_t & timer)
 
         if (las.batch)
         {
+            /* make sure threads don't write the cofactor list at the
+             * same time !!! */
+            static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
+            pthread_mutex_lock(&lock);
             cofac_list_add ((cofac_list_t*) las.L, a, b, norm[0], norm[1],
                     si.doing.side, si.doing.p);
             cpt++;
+            pthread_mutex_unlock(&lock);
             continue; /* we deal with all cofactors at the end of las */
         }
 
