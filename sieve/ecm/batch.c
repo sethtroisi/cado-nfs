@@ -951,7 +951,7 @@ input_batch (FILE *fp, unsigned long B, unsigned long L, mpz_poly pol,
   mpz_poly_clear (pol_read);
   /* now that the header is consistent, we read the integer P */
   ret = mpz_inp_raw (P, fp);
-  CHECK_Z(ret == 0, "Could not read large integer\n");
+  CHECK_Z(ret > 0, "Could not read large integer\n");
   return;
 #undef CHECK_2
 #undef CHECK_Z
