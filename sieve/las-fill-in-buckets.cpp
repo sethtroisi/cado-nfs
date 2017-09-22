@@ -634,6 +634,13 @@ fill_in_buckets_one_slice(const worker_thread * worker MAYBE_UNUSED, const task_
     const fill_in_buckets_parameters *param = static_cast<const fill_in_buckets_parameters *>(_param);
     // ACTIVATE_TIMER(worker->timer);
     ASSERT_ALWAYS(worker->timer.running());
+    /* This is one of the places where helgrind is likely to complain. We
+     * use thread-safe statics. Helgrind can't cope with it,
+     * unfortunately. So the error is a false positive.
+     *
+     * https://sourceforge.net/p/valgrind/mailman/message/32434015/
+     *
+     */
     CHILD_TIMER(worker->timer, TEMPLATE_INST_NAME(fill_in_buckets_one_slice, LEVEL));
     // TIMER_CATEGORY(worker->timer, sieving(param->side));
 
