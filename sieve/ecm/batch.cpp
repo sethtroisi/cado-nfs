@@ -655,7 +655,7 @@ factor_simple_minded (std::vector<cxx_mpz> &factors,
 
     for (; !composites.empty() ; ) {
         cxx_mpz & n0 = composites.front().first;
-        facul_method_t * &pm = composites.front().second;
+        facul_method_t * pm = composites.front().second;
         if (mpz_cmp_d (n0, BB) < 0) {
             if (mpz_cmp_ui(n0, 1) > 0)
                 factors.push_back(move(n0));
@@ -684,7 +684,10 @@ factor_simple_minded (std::vector<cxx_mpz> &factors,
         /* In this case, no prime factor was stored, no composite was
          * stored: the input number has not been changed, we move on to
          * the next method */
-        if (nf == 0) continue;
+        if (nf == 0) {
+            composites.front().second = pm;
+            continue;
+        }
 
         /* factors[] contains the primes, and fm[] the composite
          * cofactors found */
