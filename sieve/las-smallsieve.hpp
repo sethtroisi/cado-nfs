@@ -10,7 +10,7 @@
  * "ordinary" versus "bad", but in reality one should rather see it as
  * "affine" versus "projective".
  */
-typedef struct {
+class ssp_t {
     /* ordinary primes. Equation is (i-r*j) = 0 mod p */
     /* p may be a prime power, and even a power of two */
     /* Note that we need three fields for the projective primes anyway,
@@ -18,20 +18,18 @@ typedef struct {
      * rather useless. (see ssp_init_oa.)  We can recompute it on the fly
      * when needed.
      */
-    fbprime_t p;
-    fbprime_t r;        // in [ 0, p [
-    fbprime_t offset;   // in [ 0, p [
-} ssp_t;
+public:
+    fbprime_t p;	// q if projective
+    fbprime_t r;        // in [ 0, p [. g if projective
+    fbprime_t offset;   // in [ 0, p [. U if projective
 
-/* We currently *mandate* that this structure has the same size as ssp_t.
- * It would be possible to make it work with only a requirement on
- * identical alignment and smaller size. If extra fields are required, we
- * need to store them with the ssp_marker_t structure.
- */
-typedef struct {
-    /* projective primes.  Here the equation is i == (j/g)*U (mod q) */
-    fbprime_t g, q, U;
-} ssp_proj_t;
+    fbprime_t get_q() const {return p;}
+    fbprime_t get_g() const {return r;}
+    fbprime_t get_U() const {return offset;}
+    void set_q(fbprime_t q) {p=q;}
+    void set_g(fbprime_t g) {r=g;}
+    void set_U(fbprime_t U) {offset=U;}
+};
 
 #define SSP_POW2        (1u<<0)
 #define SSP_PROJ        (1u<<1)

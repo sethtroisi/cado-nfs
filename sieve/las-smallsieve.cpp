@@ -183,22 +183,22 @@ static inline void ssp_init_oa(ssp_t * tail, fbprime_t p, fbprime_t r, unsigned 
     tail->offset = (r * skip) % p;
 }/*}}}*/
 
-static inline void ssp_init_op(ssp_proj_t * tail, fbprime_t p, fbprime_t r, unsigned int skip MAYBE_UNUSED, where_am_I & w MAYBE_UNUSED)/*{{{*/
+static inline void ssp_init_op(ssp_t * tail, fbprime_t p, fbprime_t r, unsigned int skip MAYBE_UNUSED, where_am_I & w MAYBE_UNUSED)/*{{{*/
 {
     unsigned int v = r; /* have consistent notations */
     unsigned int g = gcd_ul(p, v);
     fbprime_t q = p / g;
-    tail->g = g;
-    tail->q = q;
+    tail->set_q(q);
+    tail->set_g(g);
     if (q == 1) {
         ASSERT(r == 0);
-        tail->U = 0;
+        tail->set_U(0);
     } else {
         int rc;
         uint32_t U = v / g; /* coprime to q */
         rc = invmod_32(&U, q);
         ASSERT_ALWAYS(rc != 0);
-        tail->U = U;
+        tail->set_U(U);
     }
 }/*}}}*/
 
@@ -297,19 +297,18 @@ void small_sieve_init(small_sieve_data_t *ssd, unsigned int interleaving,
                  * dominates (and anyway we won't be doing this very
                  * often). */
                 event |= SSP_PROJ;
-                ssp_proj_t * ssp = (ssp_proj_t *) tail;
-                ssp_init_op(ssp, p, r_q - p, skiprows, w);
+                ssp_init_op(tail, p, r_q - p, skiprows, w);
                 /* If g exceeds J, then the only reached locations in the
                  * sieving area will be on line (j=0), thus (1,0) only since
                  * the other are equivalent.
                  */
-                if (ssp->g >= si.J) {
+                if (tail->get_g() >= si.J) {
                     if (verbose) {
                         verbose_output_print(0, 1,
                                 "# small_sieve_init: not adding projective prime"
                                 " (1:%" FBROOT_FORMAT ") mod %" FBPRIME_FORMAT ")"
                                 " to small sieve  because g=%d >= si.J = %d\n",
-                                r_q-p, p, ssp->g, si.J);
+                                r_q-p, p, tail->get_g(), si.J);
                     }
                     event |= SSP_DISCARD;
                 }
@@ -525,7 +524,7 @@ struct small_sieve_context {
     /* This return value is typically logI bits larger than for ordinary
      * primes, so it makes sense to return it as a 64-bit integer.
      */
-    int64_t first_position_projective_prime(const ssp_proj_t * ssp)
+    int64_t first_position_projective_prime(const ssp_t * ssp)
     {
         /* equation here: i == (j/g)*U (mod q) */
         /* we're super-non-critical, here.
@@ -547,8 +546,8 @@ struct small_sieve_context {
          * This is done as follows */
 
         /* next multiple of g above j0 */
-        uint64_t jjmod = jj % ssp->g;
-        if (jjmod) jj += ssp->g;
+        uint64_t jjmod = jj % ssp->get_g();
+        if (jjmod) jj += ssp->get_g();
         jj -= jjmod;
 
         /* All of the fragment above trivializes to a no-op in the
@@ -558,7 +557,7 @@ struct small_sieve_context {
         /* Now we'd like to avoid row number 0 (so jj == 0). */
         /* The sieving code may do some special stuff to fill the
          * position (1,0). At least at some point it did */
-        if (jj == 0) jj += ssp->g;
+        if (jj == 0) jj += ssp->get_g();
 
         // In sublat mode, we also need jj congruent to sublatj0 mod m.
         // XXX A very nasty situation: when ssp->g and sublatm are
@@ -570,13 +569,13 @@ struct small_sieve_context {
         // small sieved primes depending on the sublattice we're
         // considering (or but ssdpos to ULONG_MAX ?).
         if (sublatm > 1) {
-            for( ; jj % sublatm != sublatj0 ; jj += ssp->g);
+            for( ; jj % sublatm != sublatj0 ; jj += ssp->get_g());
         }
         // Find the corresponding i
-        uint64_t ii = uint64_t(jj/ssp->g)*uint64_t(ssp->U);
+        uint64_t ii = uint64_t(jj/ssp->get_g())*uint64_t(ssp->get_U());
 
         if (sublatm > 1) {
-            for( ; ii % sublatm != sublati0 ; ii += ssp->q);
+            for( ; ii % sublatm != sublati0 ; ii += ssp->get_q());
         }
         // In the sublat mode, switch back to reduced convention
         // (exact divisions)
@@ -599,8 +598,8 @@ struct small_sieve_context {
          * i0=-I/2.
          */
         int i0ref = (j0 == jj) ? i0 : (-I/2);
-        int64_t x = (ii-i0ref) % (uint64_t)ssp->q;
-        if (x < 0) x += ssp->q;
+        int64_t x = (ii-i0ref) % (uint64_t)ssp->get_q();
+        if (x < 0) x += ssp->get_q();
         if (jj > j0) {
             x -= region_rank_in_line << LOG_BUCKET_REGION;
             x += (((uint64_t)(jj - j0))<<logI);
@@ -1221,11 +1220,11 @@ void sieve_small_bucket_region(unsigned char *S, int N,
 
         if (event & SSP_PROJ) {
             /* This code also covers projective powers of 2 */
-            ssp_proj_t * ssp = (ssp_proj_t *) &(ssd->ssp[index]);
-            const fbprime_t g = ssp->g;
-            const size_t gI = (size_t)ssp->g << logI;
-            const fbprime_t q = ssp->q;
-            const fbprime_t U = ssp->U;
+            ssp_t * ssp = &(ssd->ssp[index]);
+            const fbprime_t q = ssp->get_q();
+            const fbprime_t g = ssp->get_g();
+            const size_t gI = (size_t)ssp->get_g() << logI;
+            const fbprime_t U = ssp->get_U();
             const fbprime_t p MAYBE_UNUSED = g * q;
             WHERE_AM_I_UPDATE(w, p, p);
             const unsigned char logp = ssd->logp[index];
@@ -1243,7 +1242,7 @@ void sieve_small_bucket_region(unsigned char *S, int N,
              * sieved.  So if S + ssdpos is in the current bucket region,
              * we update all  S + ssdpos + n*q  where ssdpos + n*q < I,
              * then set ssdpos = ((ssdpos % I) + U) % q) + I * g.  */
-            if (!test_divisibility && ssp->q == 1)
+            if (!test_divisibility && ssp->get_q() == 1)
             {
                 /* q = 1, therefore U = 0, and we sieve all entries in lines
                    with g|j, beginning with the line starting at S[ssdpos] */
@@ -1269,7 +1268,7 @@ void sieve_small_bucket_region(unsigned char *S, int N,
                 // sieving.
                 if (event & SSP_DISCARD)
                     continue;
-                ASSERT (ssp->U == 0);
+                ASSERT (ssp->get_U() == 0);
                 ASSERT (pos % (i1 - i0) == 0);
                 ASSERT ((i1 - i0) % (4 * sizeof (unsigned long)) == 0);
                 for (size_t x = 0; x < sizeof (unsigned long); x++)
@@ -1496,11 +1495,11 @@ resieve_small_bucket_region (bucket_primes_t *BP, int N, unsigned char *S,
         if (event == SSP_END) break;
        
         if (event & SSP_PROJ) {
-            ssp_proj_t * ssp = (ssp_proj_t * ) &(ssd->ssp[index]);
-            const fbprime_t g = ssp->g;
+            ssp_t * ssp = &(ssd->ssp[index]);
+            const fbprime_t g = ssp->get_g();
             const uint64_t gI = (uint64_t)g << logI;
 
-            WHERE_AM_I_UPDATE(w, p, g * ssp->q);
+            WHERE_AM_I_UPDATE(w, p, g * ssp->get_q());
 
             /* Test every p-th line, starting at S[ssdpos] */
             int64_t pos = C.first_position_projective_prime(ssp);
