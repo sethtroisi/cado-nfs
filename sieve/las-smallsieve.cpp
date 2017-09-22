@@ -64,12 +64,11 @@ small_sieve_dump(FILE *f, const char *header, va_list va)
     const small_sieve_data_t * ssd = va_arg(va, const small_sieve_data_t *);
     const ssp_marker_t * next_marker = ssd->markers;
     const ssp_t *ssp = ssd->ssp;
-    const unsigned char *logp = ssd->logp;
 
     fprintf(f, "%s", header);
     for (int i = 0; !(next_marker->index == i && next_marker->event == SSP_END); i++) {
         fprintf(f, "# p = %" FBPRIME_FORMAT ", r = %" FBROOT_FORMAT ", offset = %" FBPRIME_FORMAT ", logp = %hhu",
-            ssp[i].p, ssp[i].r, ssp[i].offset, logp[i]);
+            ssp[i].p, ssp[i].r, ssp[i].offset, ssp[i].logp);
         for ( ; next_marker->index == i; next_marker++) {
             int e = next_marker->event;
             if (e & SSP_POW2) fprintf(f, " (power of 2)");
@@ -135,7 +134,6 @@ void push_ssp_marker(small_sieve_data_t *ssd, int &nmarkers, const int __index, 
 void small_sieve_clear(small_sieve_data_t * ssd)
 {
     free(ssd->ssp); ssd->ssp = NULL;
-    free(ssd->logp); ssd->logp = NULL;
     free(ssd->markers); ssd->markers = NULL;
 }
 
@@ -145,13 +143,10 @@ void small_sieve_extract_interval(small_sieve_data_t * r, small_sieve_data_t * s
     r->nb_ssp = bounds[1] - bounds[0];
     r->ssp = (ssp_t *) malloc (r->nb_ssp * sizeof (ssp_t));
     FATAL_ERROR_CHECK(r->nb_ssp > 0 && r->ssp == NULL, "malloc failed");
-    r->logp = (unsigned char *) malloc (r->nb_ssp);
-    FATAL_ERROR_CHECK(r->nb_ssp > 0 && r->logp == NULL, "malloc failed");
     r->markers = NULL;
     int r_nmarkers = 0;
 
     memcpy(r->ssp, s->ssp + bounds[0], r->nb_ssp * sizeof (ssp_t));
-    memcpy(r->logp, s->logp + bounds[0], r->nb_ssp);
 
     ssp_marker_t * next_marker = s->markers;
     for( ; next_marker->index < bounds[0] ; next_marker++);
@@ -218,8 +213,6 @@ void small_sieve_init(small_sieve_data_t *ssd, unsigned int interleaving,
     FATAL_ERROR_CHECK(ssd->ssp == NULL, "malloc failed");
     ssd->markers = NULL;
     int nmarkers = 0;
-    ssd->logp = (unsigned char *) malloc(size);
-    FATAL_ERROR_CHECK(ssd->logp == NULL, "malloc failed");
     // Do another pass on fb and projective primes, to fill in the data
     // while we have any regular primes or projective primes < thresh left
     ssp_t * tail = ssd->ssp;
@@ -278,7 +271,7 @@ void small_sieve_init(small_sieve_data_t *ssd, unsigned int interleaving,
                from p^oldexp to p^exp. */
             const double old_log = (root->oldexp == 0) ? 0. :
                 fb_log (fb_pow (pp, root->oldexp), log_scale, 0.);
-            ssd->logp[index] = fb_log (fb_pow (pp, root->exp), log_scale, - old_log);
+            tail->logp = fb_log (fb_pow (pp, root->exp), log_scale, - old_log);
             
             WHERE_AM_I_UPDATE(w, r, r);
             const fbroot_t r_q = fb_root_in_qlattice(p, r, iter->invq, si.qbasis);
@@ -929,13 +922,13 @@ void sieve_small_bucket_region(unsigned char *S, int N,
                     ASSERT (pos < (int) p);
                     ASSERT (j % 2);
                     for (int x = pos; x < (int) pattern2_size; x += p)
-                        ((unsigned char *)pattern)[x] += ssd->logp[index];
+                        ((unsigned char *)pattern)[x] += ssp->logp;
 #ifdef UGLY_DEBUGGING
                     for (int x = pos; x < (i1 - i0) ; x+= p) {
                         WHERE_AM_I_UPDATE(w, x, (w.j << logI) + x);
-                        sieve_increase(S + x, ssd->logp[index], w);
+                        sieve_increase(S + x, ssp->logp, w);
                         /* cancel the above action */
-                        S[x] += ssd->logp[index];
+                        S[x] += ssp->logp;
                     }
 #endif
 #if 0
@@ -1023,7 +1016,7 @@ void sieve_small_bucket_region(unsigned char *S, int N,
 
                 ASSERT (pos < (int) p);
                 for (unsigned int x = pos; x < 3 * sizeof(unsigned long); x += p)
-                    ((unsigned char *)pattern)[x] += ssd->logp[index];
+                    ((unsigned char *)pattern)[x] += ssp->logp;
 
 #if 0
                 pos += ssp->r;
@@ -1105,7 +1098,7 @@ void sieve_small_bucket_region(unsigned char *S, int N,
             if (p == 3) continue;
 
             WHERE_AM_I_UPDATE(w, p, p);
-            const unsigned char logp = ssd->logp[index];
+            const unsigned char logp = ssp->logp;
             unsigned char *S0 = S;
             int pos = ssdpos[index];
 #ifdef TRACE_K
@@ -1227,7 +1220,7 @@ void sieve_small_bucket_region(unsigned char *S, int N,
             const fbprime_t U = ssp->get_U();
             const fbprime_t p MAYBE_UNUSED = g * q;
             WHERE_AM_I_UPDATE(w, p, p);
-            const unsigned char logp = ssd->logp[index];
+            const unsigned char logp = ssp->logp;
             /* Sieve the projective primes. We have
              *         p^index | fij(i,j)
              * for i,j such that
@@ -1349,7 +1342,7 @@ void sieve_small_bucket_region(unsigned char *S, int N,
             if (p <= pattern2_size)
                 continue;
 
-            const unsigned char logp = ssd->logp[index];
+            const unsigned char logp = ssp->logp;
             unsigned char *S_ptr = S;
 
             int pos = C.first_position_power_of_two(ssp);

@@ -22,6 +22,7 @@ public:
     fbprime_t p;	// q if projective
     fbprime_t r;        // in [ 0, p [. g if projective
     fbprime_t offset;   // in [ 0, p [. U if projective
+    unsigned char logp;
 
     fbprime_t get_q() const {return p;}
     fbprime_t get_g() const {return r;}
@@ -46,7 +47,6 @@ typedef struct {
     ssp_marker_t * markers;
     ssp_t *ssp;
     int nb_ssp;
-    unsigned char * logp;
 } small_sieve_data_t;
 
 /* Include this only now, as there's a cross dependency between the two
