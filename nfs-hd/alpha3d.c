@@ -4,7 +4,7 @@
 #include <time.h>
 #include "alpha3d.h"
 
-static double expect_val_p(mpz_poly_srcptr f, unsigned long p, gmp_randstate_t state)
+static double expect_val_p(mpz_poly_srcptr f, uint64_t p, gmp_randstate_t state)
 {
   mpz_t p_Z;
   mpz_init(p_Z);
