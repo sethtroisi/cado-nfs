@@ -12,7 +12,7 @@ bash <<'EOF'
   wget "https://sourceforge.net/projects/nomad-bb-opt/files/unix_linux/NOMAD.zip/download" -O dist.zip
   unzip dist.zip
   v=$(ls -d nomad.*)
-  mkdir ~/Packages/$v/bin
+  mkdir -p ~/Packages/$v/bin
   cd $v/install && ./install.sh
   cp -p ../bin/nomad ~/Packages/$v/bin
   export PATH=$PATH:$HOME/Packages/$v/bin
@@ -26,6 +26,7 @@ command below. Then install OPAL into your user site directory:
 
 bash <<'EOF'
   T=$(mktemp -d /tmp/XXXXXXXXX)
+  cd "$T"
   cleanup() { rm -rf "$T" ; }
   trap cleanup EXIT
   git clone https://github.com/dpo/opal.git
