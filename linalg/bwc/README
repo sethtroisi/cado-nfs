@@ -180,9 +180,16 @@ expected to be present in the same directory as the calling binary.
     of columns of R.
 
 * keep_rolling_checkpoints=<n>
-    instructs the program to discard the rolling vector checkpoints every
-    <n> checkpoints. This assumes for example that checkpoints are
-    offloaded to external storage in the background by another process.
+    instructs the program to discard the vector checkpoints every
+    <n> checkpoints. Please read on carefully.
+    
+    This option interacts with the two important steps of bwc, namely
+    "krylov" and "mksol".  If the "krylov" step is run with a value K for
+    the "interval" parameter and "mksol" is run with a value M for the
+    same parameter, then the recommended way to use
+    keep_rolling_checkpoints for "krylov" is in conjunction with the
+    following parameter, namely one would set checkpoint_precious=M.
+
     Use of this option is conjunction with skip_online_checks=1 is
     dangerous, since it leaves open the possibility of a failure which
     stands no chance to be eventually detected.
