@@ -239,10 +239,11 @@ void declare_usage(param_list pl)
   param_list_decl_usage(pl, "f", "a polynomial");
   param_list_decl_usage(pl, "p", "bound of the primes");
   param_list_decl_usage(pl, "N", "bound for Monte Carlo computation");
+  param_list_decl_usage(pl, "seed", "seed for Monte Carlo computation");
 }
 
 void initialise_parameters(int argc, char * argv[], mpz_poly_ptr f,
-    unsigned long * p, unsigned int * N)
+    unsigned long * p, gmp_randstate_t rstate, unsigned int * N)
 {
   param_list pl;
   param_list_init(pl);
@@ -267,7 +268,6 @@ void initialise_parameters(int argc, char * argv[], mpz_poly_ptr f,
     exit (EXIT_FAILURE);
   }
 
-  mpz_poly_init(f, -1);
   param_list_parse_mpz_poly(pl, "f", f);
   ASSERT(f->deg > 0);
   
@@ -277,6 +277,10 @@ void initialise_parameters(int argc, char * argv[], mpz_poly_ptr f,
   * N = 10000;
   param_list_parse_uint(pl, "N", N);
 
+  unsigned long seed;
+  if (param_list_parse_ulong(pl, "seed", &seed))
+      gmp_randseed_ui(rstate, seed);
+
   param_list_clear(pl);
 }
 int main(int argc, char ** argv)
@@ -284,11 +288,16 @@ int main(int argc, char ** argv)
   mpz_poly f;
   unsigned long p;
   unsigned int N;
+  gmp_randstate_t rstate;
 
-  initialise_parameters(argc, argv, f, &p, &N);
+  mpz_poly_init(f, -1);
+  gmp_randinit_default(rstate);
 
-  printf("%f\n", alpha3d(f, p, N));
+  initialise_parameters(argc, argv, f, &p, rstate, &N);
 
+  printf("%f\n", alpha3d(f, p, rstate, N));
+
+  gmp_randclear(rstate);
   mpz_poly_clear(f);
 
   return 0;
