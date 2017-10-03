@@ -73,7 +73,7 @@ cado_divert_test(F9 sieve_bug_21480a
 
 cado_divert_test(F9 sieve_bug_21480b
         APPEND_ENVIRONMENT
-            q0=1200107 rho=554209 REL_COUNT=54 CHECKSUM_FILE=
+            q0=1200007 rho=554209 REL_COUNT=54 CHECKSUM_FILE=
         )
 
 cado_divert_test(F9 batch
