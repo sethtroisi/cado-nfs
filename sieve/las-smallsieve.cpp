@@ -1268,8 +1268,11 @@ void sieve_small_bucket_region(unsigned char *S, int N,
                     ((unsigned char *)&logps)[x] = logp;
                 unsigned int j = j0 + (pos >> logI);
                 for( ; j < j1 ; ) {
+                    /* our loop is over line fragments that have a hit,
+                     * and by the condition q=1 above we'll sieve them
+                     * completely */
                     unsigned long *S_ptr = (unsigned long *) (S + pos);
-                    unsigned long *S_end = (unsigned long *) (S + i1 - i0);
+                    unsigned long *S_end = (unsigned long *) (S_ptr + i1 - i0);
                     unsigned long logps2 = logps;
                     if (!(j&1)) {
                         /* j is even. We update only odd i-coordinates */
