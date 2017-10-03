@@ -61,15 +61,22 @@ cado_define_test(F9
 
 cado_divert_test(F9 sieve
         APPEND_ENVIRONMENT
-            REFERENCE_SHA1=e04ae591795ff30af703a2235a4f9fd09d17b380 # 431 rels
+            REL_COUNT=431
+            REFERENCE_SHA1=e04ae591795ff30af703a2235a4f9fd09d17b380
             REFERENCE_REVISION=ede066464ba58b2d6127fa256cef01706282e0ed
-)
+        )
+
+cado_divert_test(F9 sieve_bug_21480
+        APPEND_ENVIRONMENT
+            q0=1200109 rho=116642 REL_COUNT=57 CHECKSUM_FILE=
+        )
 
 cado_divert_test(F9 batch
         APPEND_ENVIRONMENT
             lpb1=24 mfb1=72 lambda1=2.9 lambda0=2.2
             batch0=. batch1=.
-            REFERENCE_SHA1=74bf09179736a350cc706685a83fd155cbb75f33 # 272 rels
+            REL_COUNT=272
+            REFERENCE_SHA1=74bf09179736a350cc706685a83fd155cbb75f33
             REFERENCE_REVISION=6613a1fa323715ee61314078d509b51e4b03c41c
         APPEND_ARGUMENTS -batch
         )
