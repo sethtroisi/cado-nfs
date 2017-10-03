@@ -66,9 +66,14 @@ cado_divert_test(F9 sieve
             REFERENCE_REVISION=ede066464ba58b2d6127fa256cef01706282e0ed
         )
 
-cado_divert_test(F9 sieve_bug_21480
+cado_divert_test(F9 sieve_bug_21480a
         APPEND_ENVIRONMENT
             q0=1200109 rho=116642 REL_COUNT=57 CHECKSUM_FILE=
+        )
+
+cado_divert_test(F9 sieve_bug_21480b
+        APPEND_ENVIRONMENT
+            q0=1200007 rho=554209 REL_COUNT=54 CHECKSUM_FILE=
         )
 
 cado_divert_test(F9 batch
