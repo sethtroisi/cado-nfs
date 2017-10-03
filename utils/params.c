@@ -142,9 +142,23 @@ void param_list_decl_usage(param_list_ptr pl, const char * key, const char * doc
     pl->use_doc = 1;
 }
 
+/* compare two strings, intentionally collating - and _ (except at the
+ * beginning of the string) */
+static int param_strcmp_collate(const char * a, const char * b)
+{
+    if (!b) return !!a;
+    if (!a) return -!!b;
+    for(int k = 0 ; *a && *b ; a++, b++, k++) {
+        int r = (*a > *b) - (*b > *a);
+        if (k && (*a == '-' || *a == '_') && (*b == '-' || *b == '_')) r = 0;
+        if (r) return r;
+    }
+    return (*a > *b) - (*b > *a);
+}
+
 static int is_documented_key(param_list_ptr pl, const char *key) {
     for (int i = 0; i < pl->ndocs; ++i) {
-        if (strcmp(key, pl->docs[i]->key) == 0)
+        if (param_strcmp_collate(key, pl->docs[i]->key) == 0)
             return 1;
     }
     return 0;
@@ -214,17 +228,10 @@ struct sorting_data {
 
 typedef int (*sortfunc_t) (const void *, const void *);
 
-int strcmp_or_null(const char * a, const char * b)
-{
-    if (a == NULL) { return b ? -1 : 0; }
-    if (b == NULL) { return a ? 1 : 0; }
-    return strcmp(a, b);
-}
-
 int paramcmp(const struct sorting_data * a, const struct sorting_data * b)
 {
     int r;
-    r = strcmp_or_null(a->s->key, b->s->key);
+    r = param_strcmp_collate(a->s->key, b->s->key);
     if (r) return r;
     r = a->s->origin - b->s->origin;
     if (r) return r;
@@ -258,7 +265,7 @@ static void param_list_consolidate(param_list_ptr pl)
     // now remove duplicates. The sorting has priorities right.
     unsigned int j = 0;
     for(unsigned int i = 0 ; i < pl->size ; i++) {
-        if (pl->p[i]->key != NULL && i + 1 < pl->size && strcmp(pl->p[i]->key, pl->p[i+1]->key) == 0) {
+        if (pl->p[i]->key != NULL && i + 1 < pl->size && param_strcmp_collate(pl->p[i]->key, pl->p[i+1]->key) == 0) {
             /* The latest pair in the list is the one having highest
              * priority. So we don't do the copy at this moment.
              */
@@ -285,7 +292,7 @@ void param_list_remove_key(param_list_ptr pl, const char * key)
 {
     unsigned int j = 0;
     for(unsigned int i = 0 ; i < pl->size ; i++) {
-        if (strcmp_or_null(pl->p[i]->key, key) == 0) {
+        if (param_strcmp_collate(pl->p[i]->key, key) == 0) {
             if (pl->p[i]->key) free(pl->p[i]->key);
             free(pl->p[i]->value);
         } else {
@@ -509,7 +516,7 @@ static int param_list_update_cmdline_alias(param_list_ptr pl,
         (*p_argc)-=1;
         return 1;
     }
-    if (strcmp(a, al->alias) == 0) {
+    if (param_strcmp_collate(a, al->alias) == 0) {
         if (al->key[0] == '-') {
             /* This is a switch ; we have to treat it accordingly. The
              * difficult part is to properly land on
@@ -546,7 +553,7 @@ static int param_list_update_cmdline_switch(param_list_ptr pl,
         pl->cmdline_argc0 = *p_argc;
     }
     const char * a = (*p_argv[0]);
-    if (strcmp(a, switchpar->switchname) == 0) {
+    if (param_strcmp_collate(a, switchpar->switchname) == 0) {
         param_list_add_key(pl, switchpar->switchname, NULL, PARAMETER_FROM_CMDLINE);
         (*p_argv)+=1;
         (*p_argc)-=1;
@@ -558,7 +565,7 @@ static int param_list_update_cmdline_switch(param_list_ptr pl,
     char * inv_switch;
     int rc = asprintf(&inv_switch, "--no-%s", switchpar->switchname+2);
     ASSERT_ALWAYS(rc>=0);
-    int match = strcmp(inv_switch, a) == 0;
+    int match = param_strcmp_collate(inv_switch, a) == 0;
     free(inv_switch);
     if (match) {
         param_list_add_key(pl, a, NULL, PARAMETER_FROM_CMDLINE);
@@ -635,7 +642,7 @@ int param_list_update_cmdline(param_list_ptr pl,
 
 int param_strcmp(const char * a, parameter_srcptr b)
 {
-    return strcmp_or_null(a, b->key);
+    return param_strcmp_collate(a, b->key);
 }
 
 static int assoc(param_list_ptr pl, const char * key)
