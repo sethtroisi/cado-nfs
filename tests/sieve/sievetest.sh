@@ -116,7 +116,10 @@ run "$LAS_BINARY" "${args[@]}" "${end[@]}" -out "${RELS}" "$@"
 checks_passed=0
 
 if [ "$REL_COUNT" ] ; then
-    tail "$RELS" | grep "Total $REL_COUNT reports"
+    if ! tail "$RELS" | grep "Total $REL_COUNT reports" ; then
+        echo "Expected $REL_COUNT reports, got: `tail -1 $RELS`" >&2
+        exit 1
+    fi
     let checks_passed+=1
 fi
 
