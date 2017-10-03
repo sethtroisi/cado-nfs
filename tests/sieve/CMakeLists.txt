@@ -69,13 +69,21 @@ cado_divert_test(F9 sieve
 cado_divert_test(F9 sieve_bug_21480a
         APPEND_ENVIRONMENT
             q0=1200109 rho=116642 REL_COUNT=57 CHECKSUM_FILE=
-        LAS_BINARY=${las_tracek_path} APPEND_ARGUMENTS -traceab -1098913,1678890
+            LAS_BINARY=${las_tracek_path}
+        APPEND_ARGUMENTS
+            -traceab -1098913,1678890
+        TARGET_DEPENDENCIES
+            las_tracek
         )
 
 cado_divert_test(F9 sieve_bug_21480b
         APPEND_ENVIRONMENT
             q0=1200007 rho=554209 REL_COUNT=54 CHECKSUM_FILE=
-        LAS_BINARY=${las_tracek_path} APPEND_ARGUMENTS -traceab 190203,834245
+            LAS_BINARY=${las_tracek_path}
+        APPEND_ARGUMENTS
+            -traceab 190203,834245
+        TARGET_DEPENDENCIES
+            las_tracek
         )
 
 cado_divert_test(F9 batch
