@@ -9,7 +9,7 @@ RELSD="${WORKDIR:?missing}/rels_dupsup"
 RELSR="${WORKDIR:?missing}/rels_raw"
 RELSF="${WORKDIR:?missing}/rels_filtered"
 
-RELS=$RELSD "`dirname $0`/sievetest.sh" -dup "$@"
+PHONY_CHECK=1 RELS=$RELSD "`dirname $0`/sievetest.sh" -dup "$@"
 ndup_ref=`grep -wc DUPE $RELSD`
 # remove leading spaces (for openbsd 5.3)
 let ndup_ref=ndup_ref
@@ -20,9 +20,9 @@ if [ "$ndup_ref" != "$DUPE_COUNT" ]; then
 fi
 
 
-RELS=$RELSR "`dirname $0`/sievetest.sh" "$@"
+PHONY_CHECK=1 RELS=$RELSR "`dirname $0`/sievetest.sh" "$@"
 
-LAS_BINARY=$DUPSUP_BINARY RELS=$RELSF "`dirname $0`/sievetest.sh" -skew 1.0 "${RELSR}"
+PHONY_CHECK=1 LAS_BINARY=$DUPSUP_BINARY RELS=$RELSF "`dirname $0`/sievetest.sh" -skew 1.0 "${RELSR}"
 ndup=`grep -wc DUPE $RELSF`
 # remove leading spaces (for openbsd 5.3)
 let ndup=ndup
