@@ -113,6 +113,12 @@ run "$LAS_BINARY" "${args[@]}" "${end[@]}" -out "${RELS}" "$@"
 #   defined.
 # REGEX : regular expression that should match in the relation files.
 
+checks_passed=0
+
+if [ "$REL_COUNT" ] ; then
+    tail "$RELS" | grep "Total $REL_COUNT reports"
+    let checks_passed+=1
+fi
 
 if [ "$REFERENCE_SHA1" ] ; then
     SHA1BIN=sha1sum
@@ -144,6 +150,7 @@ if [ "$REFERENCE_SHA1" ] ; then
       echo "$0: Got SHA1 of ${SHA1} but expected ${REFERENCE_SHA1}${REFMSG}"
       exit 1
     fi
+    let checks_passed+=1
 fi
 
 if [ -n "${CHECKSUM_FILE}" ] ; then
@@ -157,6 +164,7 @@ if [ -n "${CHECKSUM_FILE}" ] ; then
       echo "Error, reference checksums in ${CHECKSUM_FILE} differ from mine in ${MYCHECKSUM_FILE}" >&2
       exit 1
     fi
+    let checks_passed+=1
   else
     # File with checksums does not exists, create it
     cp "${MYCHECKSUM_FILE}" "${CHECKSUM_FILE}"
@@ -170,4 +178,14 @@ if [ -n "${REGEX}" ] ; then
     echo "Error, regular expression \"${REGEX}\" does not match output file"
     exit 1
   fi
+  let checks_passed+=1
+fi
+
+if [ "$PHONY_CHECK" ] ; then
+  let checks_passed+=1
+fi
+
+if [ "$checks_passed" = 0 ] ; then
+    echo "Error, zero checks done !" >&2
+    exit 1
 fi

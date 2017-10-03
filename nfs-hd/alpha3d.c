@@ -185,7 +185,7 @@ static void monte_carlo_average_value(double * V, mpz_poly_srcptr f,
 
 /* p_end is the bound on primes, N is the number of iterations in
    monte_carlo_average_value */
-double alpha3d(mpz_poly_srcptr f, unsigned long p_end, unsigned int N)
+double alpha3d(mpz_poly_srcptr f, unsigned long p_end, gmp_randstate_t rstate, unsigned int N)
 {
   mpz_t discriminant;
   mpz_init(discriminant);
@@ -206,11 +206,6 @@ double alpha3d(mpz_poly_srcptr f, unsigned long p_end, unsigned int N)
       p_end);
   unsigned int index = 0;
 
-  gmp_randstate_t state;
-  gmp_randinit_default(state);
-  gmp_randseed_ui(state, time(NULL));
-  srand(time(NULL));
-
   for ( ; p < p_end; p = getprime_mt(pi)) {
     if (mpz_divisible_ui_p(discriminant, p) ||
         mpz_divisible_ui_p(lc, p)) {
@@ -218,19 +213,18 @@ double alpha3d(mpz_poly_srcptr f, unsigned long p_end, unsigned int N)
       index++;
     } else {
       alpha += log((double)p) * (1.0 / (double)(p - 1) - expect_val_p(f, p,
-            state));
+            rstate));
     }
   }
 
   double * V = (double *) malloc(sizeof(double) * index);
-  monte_carlo_average_value(V, f, bad_p, index, N, state);
+  monte_carlo_average_value(V, f, bad_p, index, N, rstate);
 
   for (unsigned int i = 0; i < index; i++) {
     alpha += log((double)bad_p[i]) * (1 / (double)(bad_p[i] - 1) - V[i]);
   }
 
   free (V);
-  gmp_randclear(state);
   free(bad_p);
   prime_info_clear(pi);
   mpz_clear(lc);
