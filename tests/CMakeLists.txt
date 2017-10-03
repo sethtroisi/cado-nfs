@@ -303,6 +303,11 @@ macro(cado_define_test)
             string_join(all_deps ";" ${deps})
             set_tests_properties (${TEST_NAME} PROPERTIES DEPENDS "${all_deps}")
         endif()
+    else()
+        # There is a special case. Even a NO_DEFAULT_RUN test may have
+        # test dependencies, because that's a handy way to have all
+        # inherited tests depend on these.
+        set(${TEST_NAME}_TEST_DEPENDENCIES ${TEST_DEPENDENCIES})
     endif()
 endmacro()
 
@@ -417,9 +422,21 @@ macro(cado_divert_test TEST_BASE DIVERSION)
         set(deps builddep_${TEST_NAME} ${TEST_DEPENDENCIES})
         if(${TEST_BASE}_TEST_EXISTS)
             list(APPEND deps ${TEST_BASE})
+        else()
+            # ok, TEST_BASE does not exist, but we've still built a list
+            # of its test dependencies that we want to obey.
+            list(APPEND deps ${${TEST_BASE}_TEST_DEPENDENCIES})
         endif()
         string_join(all_deps ";" ${deps})
         set_tests_properties (${TEST_NAME} PROPERTIES DEPENDS "${all_deps}")
+    else()
+        set(deps)
+        if(${TEST_BASE}_TEST_EXISTS)
+            list(APPEND deps ${TEST_BASE})
+        else()
+            list(APPEND deps ${${TEST_BASE}_TEST_DEPENDENCIES})
+        endif()
+        set(${TEST_NAME}_TEST_DEPENDENCIES ${deps})
     endif()
 endmacro()
 
