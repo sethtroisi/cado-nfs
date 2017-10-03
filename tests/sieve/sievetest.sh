@@ -132,12 +132,30 @@ if [ "$REFERENCE_SHA1" ] ; then
         exit 1
     fi
 
-    # Try to make sort produce some well-defined ordering on the integers
+    # This was used so that the unix sort -n produce some well-defined
+    # ordering on the integers.
+    # Now that we sort primes as well, we're doing it in perl anyway.
+    # Setting the locale to C can't hurt, but it's perhaps less
+    # important.
     export LC_ALL=C
     export LANG=C
     export LANGUAGE=C
 
-    SHA1=`grep "^[^#]" "${RELS}" | sort -n | ${SHA1BIN}` || exit 1
+    sort_rels() {
+        read -s -r -d '' perl_code <<- 'EOF'
+            /^[^#]/ or next;
+            chomp($_);
+            my ($ab,@sides) = split(":", $_, 3);
+            for (@sides) {
+                $_ = join(",", sort({ hex($a) <=> hex($b) } split(",",$_)));
+            }
+            print join(":", ($ab, @sides)), "\n";
+            
+EOF
+        perl -ne "$perl_code" "$@" | sort -n
+    }
+
+    SHA1=`grep "^[^#]" "${RELS}" | sort_rels | ${SHA1BIN}` || exit 1
     echo "$0: Got SHA1 of ${SHA1}"
     echo "$0: expected ${REFERENCE_SHA1}"
     SHA1="${SHA1%% *}"
@@ -150,7 +168,7 @@ if [ "$REFERENCE_SHA1" ] ; then
       else
           REFMSG=". Set CADO_DEBUG=1 to examine log output"
       fi
-      echo "$0: Got SHA1 of ${SHA1} but expected ${REFERENCE_SHA1}${REFMSG}"
+      echo "$0: Got SHA1(sort(${RELS}))=${SHA1} but expected ${REFERENCE_SHA1}${REFMSG}"
       exit 1
     fi
     let checks_passed+=1
