@@ -12,8 +12,6 @@
 #include "verbose.h"
 
 
-static const int bucket_region = 1 << LOG_BUCKET_REGION;
-
 /* small sieve and resieving */
 
 /* {{{ Some documentation first.
