@@ -621,10 +621,11 @@ sub detect_mpi {
                     last;
                 } elsif ($mpiexec =~ /hydra/) {
                     # Newer mvapich2 uses hydra as well...
-                    print STDERR "Auto-detecting mpich or mvapich2 (hydra) based on alternatives\n";
+                    print STDERR "Auto-detecting mpich or mvapich2 (hydra) or intel mpi (hydra) based on alternatives\n";
                     $maybe_mvapich2='hydra';
                     $maybe_mpich='hydra';
                     $maybe_openmpi=0;
+                    last;
                 } elsif ($mpiexec =~ /mvapich2/) {
                     print STDERR "Auto-detecting mvapich2 based on alternatives\n";
                     $maybe_mpich=0;
@@ -686,6 +687,13 @@ sub detect_mpi {
                         $needs_mpd=1;
                     }
                     last SEVERAL_CHECKS;
+                } elsif ($maybe_mpich && -x "$mpi/mpivars.sh") {
+                    my $v = `unset I_MPI_ROOT ; . $mpi/mpivars.sh  ; echo \$I_MPI_ROOT`;
+                    if ($v) {
+                        $mpi_ver="Intel MPI";
+                        $needs_mpd=0;
+                    }
+                    last SEVERAL_CHECKS;
                 }
             }
             CHECK_OMPI_VERSION: {
@@ -709,12 +717,12 @@ sub detect_mpi {
             print STDERR "Using $mpi_ver, MPI_BINDIR=$mpi\n";
         } else {
             print STDERR "Using UNKNOWN mpi, MPI_BINDIR=$mpi\n";
-            if (defined($needs_mpd=getenv("needs_mpd"))) {
+            if (defined($needs_mpd=$ENV["NEEDS_MPD"])) {
                 warn "Assuming needs_mpd=$needs_mpd as per env variable.\n";
             } else {
                 $needs_mpd=1;
                 warn "Assuming needs_mpd=$needs_mpd ; " .
-                    "modify env variable \$needs_mpd to " .
+                    "modify env variable \$NEEDS_MPD to " .
                     "change fallback behaviour\n";
             }
         }
