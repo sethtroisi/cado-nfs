@@ -3,8 +3,14 @@
 
 #include <stdarg.h>
 #include "fb-types.h"
+#include "macros.h"
 
 /* Structures for small sieve */
+
+#define SSP_POW2        (1u<<0)
+#define SSP_PROJ        (1u<<1)
+#define SSP_DISCARD_SUBLAT     (1u<<14)
+#define SSP_DISCARD     (1u<<15)
 
 /* the two structures here are in the small sieve array. It's written as
  * "ordinary" versus "bad", but in reality one should rather see it as
@@ -18,33 +24,40 @@ class ssp_t {
      * rather useless. (see ssp_init_oa.)  We can recompute it on the fly
      * when needed.
      */
-public:
     fbprime_t p;	// q if projective
     fbprime_t r;        // in [ 0, p [. g if projective
     fbprime_t offset;   // in [ 0, p [. U if projective
+    uint16_t flags;
+public:
     unsigned char logp;
 
-    fbprime_t get_q() const {return p;}
-    fbprime_t get_g() const {return r;}
-    fbprime_t get_U() const {return offset;}
-    void set_q(fbprime_t q) {p=q;}
-    void set_g(fbprime_t g) {r=g;}
-    void set_U(fbprime_t U) {offset=U;}
+    fbprime_t get_p() const {ASSERT(!is_proj()); return p;}
+    fbprime_t get_r() const {ASSERT(!is_proj()); return r;}
+    fbprime_t get_offset() const {ASSERT(!is_proj()); return offset;}
+    fbprime_t get_q() const {ASSERT(is_proj()); ASSERT(p > 0); return p;}
+    fbprime_t get_g() const {ASSERT(is_proj()); ASSERT(r > 0); return r;}
+    fbprime_t get_U() const {ASSERT(is_proj()); return offset;}
+    void set_p(const fbprime_t _p) {p = _p;}
+    void set_q(const fbprime_t q) {p = q;}
+    void set_r(const fbprime_t _r) {r = _r;}
+    void set_g(const fbprime_t g) {ASSERT(g > 0); r = g;}
+    void set_offset(const fbprime_t _offset) {offset = _offset;}
+    void set_U(const fbprime_t U) {offset = U;}
+
+    bool is_pow2() const {return (flags & SSP_POW2) != 0;}
+    bool is_proj() const {return (flags & SSP_PROJ) != 0;}
+    bool is_discarded_sublat() const {return (flags & SSP_DISCARD_SUBLAT) != 0;}
+    bool is_discarded() const {return (flags & SSP_DISCARD) != 0;}
+    bool is_nice() const {return !is_pow2() && !is_proj() && !is_discarded_sublat() && !is_discarded();}
+    void set_pow2() {flags |= SSP_POW2;}
+    void set_proj() {flags |= SSP_PROJ;}
+    void set_discarded_sublat() {flags |= SSP_DISCARD_SUBLAT;}
+    void set_discarded() {flags |= SSP_DISCARD;}
+    
+    void print(FILE *) const;
 };
 
-#define SSP_POW2        (1u<<0)
-#define SSP_PROJ        (1u<<1)
-#define SSP_DISCARD_SUBLAT     (1u<<29)
-#define SSP_DISCARD     (1u<<30)
-#define SSP_END         (1u<<31)
-
 typedef struct {
-    int index;
-    unsigned int event;
-} ssp_marker_t;
-
-typedef struct {
-    ssp_marker_t * markers;
     ssp_t *ssp;
     int nb_ssp;
 } small_sieve_data_t;
