@@ -414,6 +414,7 @@ macro(cado_divert_test TEST_BASE DIVERSION)
             set(test_env env ${${TEST_NAME}_ENVIRONMENT})
         endif()
         add_test(NAME ${TEST_NAME} COMMAND ${test_env} ${${TEST_BASE}_EXECUTABLE} ${ARGUMENTS})
+        set(${TEST_NAME}_TEST_EXISTS 1)
         # prepare a ;-separated list for set_tests_properties
         # note that we do not need to make the test depend on
         # builddep_${TEST_BASE}, since we have made ${TEST_NAME}_dependencies
