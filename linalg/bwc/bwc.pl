@@ -717,7 +717,7 @@ sub detect_mpi {
             print STDERR "Using $mpi_ver, MPI_BINDIR=$mpi\n";
         } else {
             print STDERR "Using UNKNOWN mpi, MPI_BINDIR=$mpi\n";
-            if (defined($needs_mpd=$ENV["NEEDS_MPD"])) {
+            if (defined($needs_mpd=$ENV{NEEDS_MPD})) {
                 warn "Assuming needs_mpd=$needs_mpd as per env variable.\n";
             } else {
                 $needs_mpd=1;
