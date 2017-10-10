@@ -89,7 +89,7 @@ static void small_sieve_print_contents(const char * prefix, small_sieve_data_t *
         const ssp_t &ssp = ssd->ssp[i];
         nproj += ssp.is_proj();
         npow2 += ssp.is_pow2();
-        ndiscard += ssp.is_discarded() || ssp.is_discarded_sublat();
+        ndiscard += ssp.is_discarded_somehow();
         nice += ssp.is_nice();
     }
 
@@ -667,7 +667,7 @@ int64_t *small_sieve_start(small_sieve_data_t *ssd,
          *  sieve_small_bucket_region for each bucket region.
          */
         const ssp_t & ssp = ssd->ssp[index];
-        if (ssp.is_discarded() || ssp.is_discarded_sublat()) {
+        if (ssp.is_discarded_somehow()) {
             /* Do nothing for discarded entries */
         } else if (ssp.is_nice()) {
             ssdpos[index] = C.first_position_ordinary_prime(&ssp);
@@ -1383,7 +1383,12 @@ resieve_small_bucket_region (bucket_primes_t *BP, int N, unsigned char *S,
     }
 
     for(int index = 0 ; index < ssd->nb_ssp ; index++) {
-            ssp_t * ssp = &(ssd->ssp[index]);
+        ssp_t * ssp = &(ssd->ssp[index]);
+        if (ssp->is_discarded_somehow())
+            continue;
+        if (ssp->is_pow2())
+            continue;
+        if (ssp->is_nice()) {
             const fbprime_t p = ssp->get_p();
             if (mpz_cmp_ui(si.qbasis.q, p) == 0) {
                 continue;
@@ -1439,10 +1444,7 @@ resieve_small_bucket_region (bucket_primes_t *BP, int N, unsigned char *S,
             if (pos >= (int) p) pos -= p;
 
             ssdpos[index] = pos;
-
-
-        if (ssp->is_proj()) {
-            ssp_t * ssp = &(ssd->ssp[index]);
+        } else if (ssp->is_proj()) {
             const fbprime_t g = ssp->get_g();
             const uint64_t gI = (uint64_t)g << logI;
 

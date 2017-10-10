@@ -48,7 +48,9 @@ public:
     bool is_proj() const {return (flags & SSP_PROJ) != 0;}
     bool is_discarded_sublat() const {return (flags & SSP_DISCARD_SUBLAT) != 0;}
     bool is_discarded() const {return (flags & SSP_DISCARD) != 0;}
-    bool is_nice() const {return !is_pow2() && !is_proj() && !is_discarded_sublat() && !is_discarded();}
+    bool is_discarded_somehow() const {return is_discarded() || is_discarded_sublat();}
+    bool is_nice() const {return !is_pow2() && !is_proj() && !is_discarded_somehow();}
+
     void set_pow2() {flags |= SSP_POW2;}
     void set_proj() {flags |= SSP_PROJ;}
     void set_discarded_sublat() {flags |= SSP_DISCARD_SUBLAT;}
