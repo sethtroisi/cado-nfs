@@ -338,7 +338,7 @@ $splitwidth = ($prime == 2) ? 64 : 1;
 
 print "$my_cmdline\n" if $my_verbose_flags->{'cmdline'};
 
-if ($main eq ':mpirun') {
+if ($main =~ /:mpirun(?:_single)?/) {
     # ok, this is really an ugly ugly hack. We have some mpi detection
     # magic in this script, which we would like to use. So the :mpirun
     # meta-command is just for that. Of course the argument requirements
@@ -558,6 +558,12 @@ my $mpi_needed = $mpiexec ne '';
 # not officially work, yet it always does. And some programs do turn out
 # to be compiled with mpi, so we need the mpi libraries at runtime... So
 # short of a more accurate solution, this is a hack.
+#
+# Note also that @mpi_precmd_single is absolutely needed when we run a
+# non-mpi binary, yet that does load all of the mpi infrastructure, in a
+# context where that mpi infrastructure smartly reads the environment
+# variables and detects that we need X jobs (use case: bwccheck does
+# bw_common_init_mpi out of convenience, but really isn't an mpi program).
 my @mpi_precmd;
 my @mpi_precmd_single;
 my @mpi_precmd_lingen;
@@ -990,6 +996,13 @@ if ($main eq ':mpirun') {
     # we don't even put @main_args in, because we're tinkering with it
     # somewhat.
     dosystem(@mpi_precmd, @extra_args);
+    exit 0;
+}
+
+if ($main eq ':mpirun_single') {
+    # we don't even put @main_args in, because we're tinkering with it
+    # somewhat.
+    dosystem(@mpi_precmd_single, @extra_args);
     exit 0;
 }
 
