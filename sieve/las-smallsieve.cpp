@@ -62,7 +62,7 @@ void ssp_t::print(FILE *f) const
         this->p, this->r, this->offset, this->logp);
     if (this->is_pow2()) fprintf(f, " (power of 2)");
     if (this->is_proj()) fprintf(f, " (projective root)");
-    if (this->is_discarded()) fprintf(f, "(discarded)");
+    if (this->is_discarded_proj()) fprintf(f, "(discarded) because of projective root");
     if (this->is_discarded_sublat()) fprintf(f, "(discarded because not compatible with sub lattices)");
 }
 
@@ -89,7 +89,7 @@ static void small_sieve_print_contents(const char * prefix, small_sieve_data_t *
         const ssp_t &ssp = ssd->ssp[i];
         nproj += ssp.is_proj();
         npow2 += ssp.is_pow2();
-        ndiscard += ssp.is_discarded_somehow();
+        ndiscard += ssp.is_discarded();
         nice += ssp.is_nice();
     }
 
@@ -667,7 +667,7 @@ int64_t *small_sieve_start(small_sieve_data_t *ssd,
          *  sieve_small_bucket_region for each bucket region.
          */
         const ssp_t & ssp = ssd->ssp[index];
-        if (ssp.is_discarded_somehow()) {
+        if (ssp.is_discarded()) {
             /* Do nothing for discarded entries */
         } else if (ssp.is_nice()) {
             ssdpos[index] = C.first_position_ordinary_prime(&ssp);
@@ -1171,7 +1171,7 @@ void sieve_small_bucket_region(unsigned char *S, int N,
             }
         } else {
 
-            if (ssp->is_discarded()) continue;
+            if (ssp->is_discarded_proj()) continue;
             if (ssp->is_proj()) {
                 /* This code also covers projective powers of 2 */
                 ssp_t * ssp = &(ssd->ssp[index]);
@@ -1220,7 +1220,7 @@ void sieve_small_bucket_region(unsigned char *S, int N,
                     // number 0 must still be sieved in that case, but once
                     // it's done, we can indeed skip the next part of
                     // sieving.
-                    if (ssp->is_discarded())
+                    if (ssp->is_discarded_proj())
                         continue;
                     ASSERT (ssp->get_U() == 0);
                     ASSERT (pos % (i1 - i0) == 0);
@@ -1384,7 +1384,7 @@ resieve_small_bucket_region (bucket_primes_t *BP, int N, unsigned char *S,
 
     for(int index = 0 ; index < ssd->nb_ssp ; index++) {
         ssp_t * ssp = &(ssd->ssp[index]);
-        if (ssp->is_discarded_somehow())
+        if (ssp->is_discarded())
             continue;
         if (ssp->is_pow2())
             continue;
@@ -1461,7 +1461,7 @@ resieve_small_bucket_region (bucket_primes_t *BP, int N, unsigned char *S,
                 BP->push_update(prime);
             }
             // Same as in sieving: we discard after checking for row 0.
-            if (ssp->is_discarded())
+            if (ssp->is_discarded_proj())
                 continue;
 
             /* make sure ssdpos points at start of line or region */

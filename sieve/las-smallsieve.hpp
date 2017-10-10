@@ -10,7 +10,7 @@
 #define SSP_POW2        (1u<<0)
 #define SSP_PROJ        (1u<<1)
 #define SSP_DISCARD_SUBLAT     (1u<<14)
-#define SSP_DISCARD     (1u<<15)
+#define SSP_DISCARD_PROJ     (1u<<15)
 
 /* the two structures here are in the small sieve array. It's written as
  * "ordinary" versus "bad", but in reality one should rather see it as
@@ -47,14 +47,14 @@ public:
     bool is_pow2() const {return (flags & SSP_POW2) != 0;}
     bool is_proj() const {return (flags & SSP_PROJ) != 0;}
     bool is_discarded_sublat() const {return (flags & SSP_DISCARD_SUBLAT) != 0;}
-    bool is_discarded() const {return (flags & SSP_DISCARD) != 0;}
-    bool is_discarded_somehow() const {return is_discarded() || is_discarded_sublat();}
-    bool is_nice() const {return !is_pow2() && !is_proj() && !is_discarded_somehow();}
+    bool is_discarded_proj() const {return (flags & SSP_DISCARD_PROJ) != 0;}
+    bool is_discarded() const {return is_discarded_proj() || is_discarded_sublat();}
+    bool is_nice() const {return !is_pow2() && !is_proj() && !is_discarded();}
 
     void set_pow2() {flags |= SSP_POW2;}
     void set_proj() {flags |= SSP_PROJ;}
     void set_discarded_sublat() {flags |= SSP_DISCARD_SUBLAT;}
-    void set_discarded() {flags |= SSP_DISCARD;}
+    void set_discarded() {flags |= SSP_DISCARD_PROJ;}
     
     void print(FILE *) const;
 };
