@@ -62,8 +62,8 @@ extern int mpz_coprime_p (mpz_t a, mpz_t b);
 /* Put in r the smallest legitimate value that it at least s + diff (note
    that if s+diff is already legitimate, then r = s+diff will result.
 
-   Here, legitimate means prime or composite, with the constraint that
-   all the prime factors must be in [pmin, pmax[ .
+   Here, legitimate means prime or squarefree composite, with the constraint
+   that all the prime factors must be in [pmin, pmax[ .
    */
 void next_mpz_with_factor_constraints(mpz_t r, const mpz_t s,
         const unsigned long diff, unsigned long pmin, unsigned long pmax);

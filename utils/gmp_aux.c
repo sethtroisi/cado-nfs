@@ -310,8 +310,8 @@ ulong_nextcomposite (unsigned long q, unsigned long pmin)
 /* Put in r the smallest legitimate value that it at least s + diff (note
    that if s+diff is already legitimate, then r = s+diff will result.
 
-   Here, legitimate means prime or composite, with the constraint that
-   all the prime factors must be in [pmin, pmax[ .
+   Here, legitimate means prime or squarefree composite, with the constraint
+   that all the prime factors must be in [pmin, pmax[ .
    */
 void 
 next_mpz_with_factor_constraints(mpz_t r, const mpz_t s,
@@ -359,6 +359,11 @@ next_mpz_with_factor_constraints(mpz_t r, const mpz_t s,
                         c ++;
                     } while ((rr % p) == 0);
                     // so p divides exactly c times r.
+                    if (c > 1) {
+                        // Force p=pmax to break the loop.
+                        p = pmax;
+                        continue;
+                    }
                     // check primality of cofactor.
                     bool cofac_prime;
                     {
@@ -381,10 +386,6 @@ next_mpz_with_factor_constraints(mpz_t r, const mpz_t s,
                 p = getprime_mt(pi);
             }
             prime_info_clear(pi);
-            if (rr == 1) {
-                // We have a winner (we can get there for prime powers)
-                return;
-            }
             // We have still a composite in rr, it must have a prime > pmax.
             // This is a fail. Continue with next candidate.
         }

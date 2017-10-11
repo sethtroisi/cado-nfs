@@ -356,6 +356,14 @@ test_next_mpz_with_factor_constraints (void)
   // should get 25631737 = 29*307*2879
   ASSERT_ALWAYS(mpz_cmp_ui(r, 25631737) == 0);
 
+  mpz_set_ui(s, 5426767); // this is 31^2*5647; must be skipped
+  next_mpz_with_factor_constraints(r, s, 0, 25, 100000);
+  ASSERT_ALWAYS(mpz_cmp_ui(r, 5426777) == 0);
+
+  mpz_set_ui(s, 25030009); // this is 5003^2 must be skipped
+  next_mpz_with_factor_constraints(r, s, 0, 100, 100000);
+  ASSERT_ALWAYS(mpz_cmp_ui(r, 25030039) == 0);
+
   mpz_clear(r);
   mpz_clear(s);
 }
