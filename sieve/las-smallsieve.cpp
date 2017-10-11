@@ -218,8 +218,6 @@ void small_sieve_init(small_sieve_data_t *ssd, unsigned int interleaving,
             continue;
         }
 
-        const double log_scale = si.sides[side].lognorms->scale;
-
         for (int nr = 0; nr < iter->nr_roots; nr++, index++) {
             const fb_general_root *root = &(iter->roots[nr]);
             /* Convert into old format for projective roots by adding p if projective */
@@ -243,13 +241,8 @@ void small_sieve_init(small_sieve_data_t *ssd, unsigned int interleaving,
 
             if ((p & 1)==0) tail->set_pow2();
 
-            /* p may already have occurred before, and was taken into account
-               to the power 'oldexp', with a log contribution of 'old_log'. We
-               now want to take into account the extra contribution of going
-               from p^oldexp to p^exp. */
-            const double old_log = (root->oldexp == 0) ? 0. :
-                fb_log (fb_pow (pp, root->oldexp), log_scale, 0.);
-            tail->logp = fb_log (fb_pow (pp, root->exp), log_scale, - old_log);
+            tail->logp = fb_log_delta (pp, root->exp, root->oldexp,
+                si.sides[side].lognorms->scale);
             
             WHERE_AM_I_UPDATE(w, r, r);
             const fbroot_t r_q = fb_root_in_qlattice(p, r, iter->invq, si.qbasis);
