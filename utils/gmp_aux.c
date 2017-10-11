@@ -312,10 +312,14 @@ ulong_nextcomposite (unsigned long q, unsigned long pmin)
 
    Here, legitimate means prime or squarefree composite, with the constraint
    that all the prime factors must be in [pmin, pmax[ .
+
+   The prime factors of r are put in factor_r, and the number of them is
+   returned. The caller must have allocated factor_r with enough space.
    */
-void 
-next_mpz_with_factor_constraints(mpz_t r, const mpz_t s,
-        const unsigned long diff, unsigned long pmin, unsigned long pmax)
+int 
+next_mpz_with_factor_constraints(mpz_t r, unsigned long factor_r[],
+        const mpz_t s, const unsigned long diff, unsigned long pmin,
+        unsigned long pmax)
 {
     ASSERT_ALWAYS(pmin > 2);
     mpz_add_ui(r, s, diff);
@@ -328,11 +332,13 @@ next_mpz_with_factor_constraints(mpz_t r, const mpz_t s,
     while (1) {
         if (mpz_probab_prime_p(r, 10)) {
             if (mpz_cmp_ui(r, pmax) < 0) {
-                return;
+                factor_r[0] = mpz_get_ui(r);
+                return 1;
             }
         } else { // r is composite. Check its factorization.
             // Work with unsigned long
             unsigned long rr = mpz_get_ui(r);
+            int nf = 0;
             prime_info pi;
             prime_info_init(pi);
             unsigned long p = getprime_mt(pi); // p=3
@@ -364,6 +370,7 @@ next_mpz_with_factor_constraints(mpz_t r, const mpz_t s,
                         p = pmax;
                         continue;
                     }
+                    factor_r[nf++] = p;
                     // check primality of cofactor.
                     bool cofac_prime;
                     {
@@ -375,8 +382,9 @@ next_mpz_with_factor_constraints(mpz_t r, const mpz_t s,
                     if (cofac_prime) {
                         if (rr < pmax) {
                             // We have a winner.
+                            factor_r[nf++] = rr;
                             prime_info_clear(pi);
-                            return;
+                            return nf;
                         } else {
                             // Force p=pmax to break the loop.
                             p = pmax;
