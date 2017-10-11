@@ -56,6 +56,12 @@
 
 /* {{{ Some code for information purposes only */
 
+void ssp_simple_t::print(FILE *f) const
+{
+    fprintf(f, "# p = %" FBPRIME_FORMAT ", r = %" FBROOT_FORMAT ", offset = %" FBPRIME_FORMAT ", logp = %hhu",
+        this->p, this->r, this->offset, this->logp);
+}
+
 void ssp_t::print(FILE *f) const
 {
     fprintf(f, "# p = %" FBPRIME_FORMAT ", r = %" FBROOT_FORMAT ", offset = %" FBPRIME_FORMAT ", logp = %hhu",
@@ -72,6 +78,10 @@ small_sieve_dump(FILE *f, const char *header, va_list va)
     const small_sieve_data_t * ssd = va_arg(va, const small_sieve_data_t *);
 
     fprintf(f, "%s", header);
+    for (int i = 0; i < ssd->nb_ssps; i++) {
+        ssd->ssps[i].print(f);
+        fprintf(f, "\n");
+    }
     for (int i = 0; i < ssd->nb_ssp; i++) {
         ssd->ssp[i].print(f);
         fprintf(f, "\n");
@@ -81,7 +91,7 @@ small_sieve_dump(FILE *f, const char *header, va_list va)
 
 static void small_sieve_print_contents(const char * prefix, small_sieve_data_t * ssd)
 {
-    int nice=0;
+    int nice=ssd->nb_ssps;
     int nproj=0;
     int npow2=0;
     int ndiscard=0;
@@ -121,6 +131,7 @@ void small_sieve_info(const char * what, int side, small_sieve_data_t * r)
 /* {{{ Sieve initialization / clearing : first the easy ones */
 void small_sieve_clear(small_sieve_data_t * ssd)
 {
+    free(ssd->ssps); ssd->ssps = NULL;
     free(ssd->ssp); ssd->ssp = NULL;
 }
 
@@ -138,6 +149,26 @@ void small_sieve_extract_interval(small_sieve_data_t * r, small_sieve_data_t * s
 
 /* {{{ Sieve initialization: now the real stuff */
 
+void ssp_t::init_proj(fbprime_t p, fbprime_t r, unsigned int skip MAYBE_UNUSED)/*{{{*/
+{
+    set_proj();
+    unsigned int v = r; /* have consistent notations */
+    unsigned int g = gcd_ul(p, v);
+    fbprime_t q = p / g;
+    set_q(q);
+    set_g(g);
+    if (q == 1) {
+        ASSERT(r == 0);
+        set_U(0);
+    } else {
+        int rc;
+        uint32_t U = v / g; /* coprime to q */
+        rc = invmod_32(&U, q);
+        ASSERT_ALWAYS(rc != 0);
+        set_U(U);
+    }
+}/*}}}*/
+
 // Prepare sieving of small primes: initialize a small_sieve_data_t
 // structure to be used thereafter during sieving each region.
 // ssdpos points at the next position that will be hit by sieving,
@@ -145,41 +176,13 @@ void small_sieve_extract_interval(small_sieve_data_t * r, small_sieve_data_t * s
 // and even BUCKET_REGION
 // It could actually be larger than 32 bits when I > 16.
 
-/* Initialization procedures for the ssp data */
-
-static inline void ssp_init_oa(ssp_t * tail, fbprime_t p, fbprime_t r, unsigned int skip, where_am_I & w MAYBE_UNUSED)/*{{{*/
-{
-    tail->set_p(p);
-    tail->set_r(r);
-    tail->set_offset((r * skip) % p);
-}/*}}}*/
-
-static inline void ssp_init_op(ssp_t * tail, fbprime_t p, fbprime_t r, unsigned int skip MAYBE_UNUSED, where_am_I & w MAYBE_UNUSED)/*{{{*/
-{
-    unsigned int v = r; /* have consistent notations */
-    unsigned int g = gcd_ul(p, v);
-    fbprime_t q = p / g;
-    tail->set_q(q);
-    tail->set_g(g);
-    if (q == 1) {
-        ASSERT(r == 0);
-        tail->set_U(0);
-    } else {
-        int rc;
-        uint32_t U = v / g; /* coprime to q */
-        rc = invmod_32(&U, q);
-        ASSERT_ALWAYS(rc != 0);
-        tail->set_U(U);
-    }
-}/*}}}*/
-
 void small_sieve_init(small_sieve_data_t *ssd, unsigned int interleaving,
                       const std::vector<fb_general_entry> *fb,
                       sieve_info const & si, const int side)
 {
     const unsigned int thresh = si.conf.bucket_thresh;
     const int verbose = 0;
-    where_am_I w;
+    where_am_I w MAYBE_UNUSED;
 
     size_t size = si.sides[side].fb_parts_x->rest[1];
 
@@ -188,6 +191,7 @@ void small_sieve_init(small_sieve_data_t *ssd, unsigned int interleaving,
     ssd->ssp = (ssp_t *) malloc(size * sizeof(ssp_t));
     FATAL_ERROR_CHECK(ssd->ssp == NULL, "malloc failed");
     memset(ssd->ssp, 0, size * sizeof(ssp_t));
+    ssd->ssps = NULL;
     // Do another pass on fb and projective primes, to fill in the data
     // while we have any regular primes or projective primes < thresh left
     ssp_t * tail = ssd->ssp;
@@ -263,8 +267,7 @@ void small_sieve_init(small_sieve_data_t *ssd, unsigned int interleaving,
                 /* Compute the init data in any case, since the gcd
                  * dominates (and anyway we won't be doing this very
                  * often). */
-                tail->set_proj();
-                ssp_init_op(tail, p, r_q - p, skiprows, w);
+                tail->init_proj(p, r_q - p, skiprows);
                 /* If g exceeds J, then the only reached locations in the
                  * sieving area will be on line (j=0), thus (1,0) only since
                  * the other are equivalent.
@@ -280,7 +283,7 @@ void small_sieve_init(small_sieve_data_t *ssd, unsigned int interleaving,
                     tail->set_discarded();
                 }
             } else if (!tail->is_discarded_sublat()) {
-                ssp_init_oa(tail, p, r_q, skiprows, w);
+                tail->init_affine(p, r_q, skiprows);
             }
 
             tail++;

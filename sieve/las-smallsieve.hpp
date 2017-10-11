@@ -12,10 +12,21 @@
 #define SSP_DISCARD_SUBLAT     (1u<<14)
 #define SSP_DISCARD_PROJ     (1u<<15)
 
-/* the two structures here are in the small sieve array. It's written as
- * "ordinary" versus "bad", but in reality one should rather see it as
- * "affine" versus "projective".
- */
+class ssp_simple_t {
+public:
+    fbprime_t p;
+    fbprime_t r;
+    fbprime_t offset;
+    unsigned char logp;
+
+    void init(fbprime_t _p, fbprime_t _r, unsigned int skip) {
+        p = _p;
+        r = _r;
+        offset = (r * skip) % p;
+    }
+    void print(FILE *) const;
+};
+
 class ssp_t {
     /* ordinary primes. Equation is (i-r*j) = 0 mod p */
     /* p may be a prime power, and even a power of two */
@@ -56,12 +67,27 @@ public:
     void set_discarded_sublat() {flags |= SSP_DISCARD_SUBLAT;}
     void set_discarded() {flags |= SSP_DISCARD_PROJ;}
     
+/* Initialization procedures for the ssp data */
+    void init_affine(fbprime_t _p, fbprime_t _r, unsigned int skip) {
+        p = _p;
+        r = _r;
+        offset = (r * skip) % p;
+    }
+    void init_proj(fbprime_t p, fbprime_t r, unsigned int skip MAYBE_UNUSED);
+    void init(fbprime_t p, fbprime_t r, unsigned int skip, bool proj = false) {
+        if (proj)
+            init_proj(p, r, skip);
+        else
+            init_affine(p, r, skip);
+    }
+
     void print(FILE *) const;
 };
 
 typedef struct {
+    ssp_simple_t *ssps;
     ssp_t *ssp;
-    int nb_ssp;
+    int nb_ssps, nb_ssp;
 } small_sieve_data_t;
 
 /* Include this only now, as there's a cross dependency between the two
