@@ -113,6 +113,7 @@ next_legitimate_specialq(mpz_t r, const mpz_t s, const unsigned long diff)
     mpz_nextprime(r, r);
 }
 
+
 static void
 parse_command_line_q0_q1(las_info & las, mpz_ptr q0, mpz_ptr q1, param_list pl, const int qside)
 {
