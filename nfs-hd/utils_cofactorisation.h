@@ -1,7 +1,6 @@
 #ifndef UTILS_COFACTORISATION_H
 #define UTILS_COFACTORISATION_H
 
-#include "cado.h"
 #include "utils.h"
 #include "uint64_array.h"
 #include "mat_Z.h"

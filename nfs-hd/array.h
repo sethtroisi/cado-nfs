@@ -2,7 +2,6 @@
 #define ARRAY_H
 
 #include <stdio.h>
-#include "cado.h"
 #include "utils.h"
 #include "int64_vector.h"
 
