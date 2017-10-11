@@ -345,7 +345,7 @@ void *contiguous_malloc(const size_t size)
   dll_append(chunks, chunk);
 
 #ifdef VERBOSE_CONTIGUOUS_MALLOC
-  printf ("# Returning huge-page memory at %p\n", free_ptr);
+  printf ("# Returning %zu bytes of huge-page memory at %p\n", chunk->size, chunk->ptr);
 #endif
   return free_ptr;
 }
@@ -371,6 +371,9 @@ void contiguous_free(void *ptr)
     printf ("# Freeing %zu bytes of huge-page memory at %p\n", 
             chunk->size, chunk->ptr);
 #endif
+    /* we do not free chunk->ptr yet: that is done when the pool is
+     * completely drained.
+     */
     free(chunk);
     dll_delete(node);
     if (dll_is_empty(chunks)) {

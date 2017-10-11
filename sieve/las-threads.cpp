@@ -11,6 +11,7 @@ void thread_side_data::allocate_bucket_region()
    * of the spared memory, but rather because it's a useful way to trim
    * the irrelevant parts of the code in that case.
    */
+  if (!bucket_region)
   bucket_region = (unsigned char *) contiguous_malloc(BUCKET_REGION + MEMSET_MIN);
 }
 
