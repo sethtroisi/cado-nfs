@@ -326,6 +326,43 @@ test_ulong_nextcomposite (void)
   ASSERT_ALWAYS(q == 1475069);
 }
 
+static void
+test_next_mpz_with_factor_constraints (void)
+{
+  mpz_t r, s;
+  mpz_init(r);
+  mpz_init(s);
+
+  mpz_set_ui(s, 25631719);
+  next_mpz_with_factor_constraints(r, s, 0, 256, 33554432);
+  // should get 25631719 (it is a prime less than 2^25)
+  ASSERT_ALWAYS(mpz_cmp_ui(r, 25631719) == 0);
+  
+  next_mpz_with_factor_constraints(r, s, 1, 256, 33554432);
+  // should get 25631731 (it is a prime, and all intermediate values have
+  // small factors)
+  ASSERT_ALWAYS(mpz_cmp_ui(r, 25631731) == 0);
+
+  next_mpz_with_factor_constraints(r, s, 1, 20, 33554432);
+  // should get 25631729, whose smallest factor is 23.
+  ASSERT_ALWAYS(mpz_cmp_ui(r, 25631729) == 0);
+
+  next_mpz_with_factor_constraints(r, s, 0, 20, 1114425);
+  // should get 25631729 again, whose largest prime factor fits.
+  ASSERT_ALWAYS(mpz_cmp_ui(r, 25631729) == 0);
+
+  mpz_set_ui(s, 25631719);
+  next_mpz_with_factor_constraints(r, s, 0, 25, 100000);
+  // should get 25631737 = 29*307*2879
+  ASSERT_ALWAYS(mpz_cmp_ui(r, 25631737) == 0);
+
+  mpz_clear(r);
+  mpz_clear(s);
+}
+
+
+
+
 int
 main (int argc, const char *argv[])
 {
@@ -344,6 +381,7 @@ main (int argc, const char *argv[])
   test_nbits ();
   test_mpz_ndiv_q (iter);
   test_ulong_nextcomposite ();
+  test_next_mpz_with_factor_constraints ();
   tests_common_clear ();
   exit (EXIT_SUCCESS);
 }
