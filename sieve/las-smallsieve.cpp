@@ -149,9 +149,10 @@ void small_sieve_extract_interval(small_sieve_data_t * r, small_sieve_data_t * s
 
 /* {{{ Sieve initialization: now the real stuff */
 
-void ssp_t::init_proj(fbprime_t p, fbprime_t r, unsigned int skip MAYBE_UNUSED)/*{{{*/
+void ssp_t::init_proj(fbprime_t p, fbprime_t r, unsigned char _logp, unsigned int skip MAYBE_UNUSED)/*{{{*/
 {
     set_proj();
+    logp = _logp;
     unsigned int v = r; /* have consistent notations */
     unsigned int g = gcd_ul(p, v);
     fbprime_t q = p / g;
@@ -191,12 +192,15 @@ void small_sieve_init(small_sieve_data_t *ssd, unsigned int interleaving,
     ssd->ssp = (ssp_t *) malloc(size * sizeof(ssp_t));
     FATAL_ERROR_CHECK(ssd->ssp == NULL, "malloc failed");
     memset(ssd->ssp, 0, size * sizeof(ssp_t));
-    ssd->ssps = NULL;
+
+    ssd->ssps = (ssp_simple_t *) malloc(size * sizeof(ssp_simple_t));
+    FATAL_ERROR_CHECK(ssd->ssps == NULL, "malloc failed");
+    memset(ssd->ssps, 0, size * sizeof(ssp_simple_t));
+
     // Do another pass on fb and projective primes, to fill in the data
     // while we have any regular primes or projective primes < thresh left
     ssp_t * tail = ssd->ssp;
-
-    unsigned int index = 0;
+    ssp_simple_t * tails MAYBE_UNUSED = ssd->ssps;
 
     // The processing of bucket region by nb_threads is interleaved.
     // It means that the positions for the small sieve must jump
@@ -209,7 +213,7 @@ void small_sieve_init(small_sieve_data_t *ssd, unsigned int interleaving,
     unsigned int sublatm = si.conf.sublat.m;
     const unsigned int skiprows = ((interleaving-1) << LOG_BUCKET_REGION) >> si.conf.logI_adjusted;
 
-    for (std::vector<fb_general_entry>::const_iterator iter = fb->begin() ; iter != fb->end() && index < size ; iter++) {
+    for (std::vector<fb_general_entry>::const_iterator iter = fb->begin() ; iter != fb->end() ; iter++) {
         /* p=pp^k, the prime or prime power in this entry, and pp is prime */
         const fbprime_t p = iter->q, pp = iter->p;
         WHERE_AM_I_UPDATE(w, p, p);
@@ -218,10 +222,11 @@ void small_sieve_init(small_sieve_data_t *ssd, unsigned int interleaving,
             continue;
         }
 
-        for (int nr = 0; nr < iter->nr_roots; nr++, index++) {
-            const fb_general_root *root = &(iter->roots[nr]);
-            /* Convert into old format for projective roots by adding p if projective */
-            const fbroot_t r = root->r + (root->proj ? p : 0);
+        for (int nr = 0; nr < iter->nr_roots; nr++) {
+            const fb_general_root &root = iter->roots[nr];
+            /* Convert into old format for projective roots by adding p if projective.
+               FIXME, this sucks. */
+            const fbroot_t r = root.r + (root.proj ? p : 0);
             /* skip q: mark it in place of p to be recognized quickly.
                TODO: maybe use the SSP_DISCARD mechanism ?
                */
@@ -241,7 +246,7 @@ void small_sieve_init(small_sieve_data_t *ssd, unsigned int interleaving,
 
             if ((p & 1)==0) tail->set_pow2();
 
-            tail->logp = fb_log_delta (pp, root->exp, root->oldexp,
+            const unsigned char logp = fb_log_delta (pp, root.exp, root.oldexp,
                 si.sides[side].lognorms->scale);
             
             WHERE_AM_I_UPDATE(w, r, r);
@@ -260,7 +265,7 @@ void small_sieve_init(small_sieve_data_t *ssd, unsigned int interleaving,
                 /* Compute the init data in any case, since the gcd
                  * dominates (and anyway we won't be doing this very
                  * often). */
-                tail->init_proj(p, r_q - p, skiprows);
+                tail->init_proj(p, r_q - p, logp, skiprows);
                 /* If g exceeds J, then the only reached locations in the
                  * sieving area will be on line (j=0), thus (1,0) only since
                  * the other are equivalent.
@@ -275,8 +280,8 @@ void small_sieve_init(small_sieve_data_t *ssd, unsigned int interleaving,
                     }
                     tail->set_discarded();
                 }
-            } else if (!tail->is_discarded_sublat()) {
-                tail->init_affine(p, r_q, skiprows);
+            } else if (!tail->is_discarded()) {
+                tail->init(p, r_q, logp, skiprows);
             }
 
             tail++;

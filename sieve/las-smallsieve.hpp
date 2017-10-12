@@ -19,10 +19,11 @@ public:
     fbprime_t offset;
     unsigned char logp;
 
-    void init(fbprime_t _p, fbprime_t _r, unsigned int skip) {
+    void init(fbprime_t _p, fbprime_t _r, unsigned char _logp, unsigned int skip) {
         p = _p;
         r = _r;
         offset = (r * skip) % p;
+        logp = _logp;
     }
     void print(FILE *) const;
 };
@@ -68,17 +69,20 @@ public:
     void set_discarded() {flags |= SSP_DISCARD_PROJ;}
     
 /* Initialization procedures for the ssp data */
-    void init_affine(fbprime_t _p, fbprime_t _r, unsigned int skip) {
+    void init_affine(fbprime_t _p, fbprime_t _r, unsigned char _logp, unsigned int skip) {
         p = _p;
         r = _r;
+        logp = _logp;
         offset = (r * skip) % p;
     }
-    void init_proj(fbprime_t p, fbprime_t r, unsigned int skip MAYBE_UNUSED);
-    void init(fbprime_t p, fbprime_t r, unsigned int skip, bool proj = false) {
+    void init_proj(fbprime_t p, fbprime_t r, unsigned char _logp,
+                   unsigned int skip MAYBE_UNUSED);
+    void init(fbprime_t p, fbprime_t r, unsigned char logp, unsigned int skip,
+              bool proj = false) {
         if (proj)
-            init_proj(p, r, skip);
+            init_proj(p, r, logp, skip);
         else
-            init_affine(p, r, skip);
+            init_affine(p, r, logp, skip);
     }
 
     void print(FILE *) const;
