@@ -205,7 +205,7 @@ bucket_array_t<LEVEL, HINT>::log_this_update (
     where_am_I & w MAYBE_UNUSED) const
 {
 #if defined(TRACE_K)
-    uint64_t (&BRS)[FB_MAX_PARTS] = BUCKET_REGIONS;
+    size_t (&BRS)[FB_MAX_PARTS] = BUCKET_REGIONS;
     unsigned int saveN = w.N;
     /* flatten the (N,x) coordinate as if relative to a unique array of
      * level-1 bucket regions */
