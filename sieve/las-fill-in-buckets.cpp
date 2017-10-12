@@ -650,39 +650,44 @@ fill_in_buckets_one_slice(const worker_thread * worker MAYBE_UNUSED, const task_
     WHERE_AM_I_UPDATE(w, i, param->slice->get_index());
     WHERE_AM_I_UPDATE(w, N, 0);
 
-    /* Get an unused bucket array that we can write to */
-    bucket_array_t<LEVEL, shorthint_t> &BA = param->ws.reserve_BA<LEVEL, shorthint_t>(param->side);
-    /* Fill the buckets */
-    if (param->slice->is_general())
-      fill_in_buckets_toplevel<LEVEL,fb_general_entry>(BA, param->si, param->slice, param->plattices_dense_vector, w);
-    else if (param->slice->get_nr_roots() == 0)
-      fill_in_buckets_toplevel<LEVEL,fb_entry_x_roots<0> >(BA, param->si, param->slice, param->plattices_dense_vector, w);
-    else if (param->slice->get_nr_roots() == 1)
-      fill_in_buckets_toplevel<LEVEL,fb_entry_x_roots<1> >(BA, param->si, param->slice, param->plattices_dense_vector, w);
-    else if (param->slice->get_nr_roots() == 2)
-      fill_in_buckets_toplevel<LEVEL,fb_entry_x_roots<2> >(BA, param->si, param->slice, param->plattices_dense_vector, w);
-    else if (param->slice->get_nr_roots() == 3)
-      fill_in_buckets_toplevel<LEVEL,fb_entry_x_roots<3> >(BA, param->si, param->slice, param->plattices_dense_vector, w);
-    else if (param->slice->get_nr_roots() == 4)
-      fill_in_buckets_toplevel<LEVEL,fb_entry_x_roots<4> >(BA, param->si, param->slice, param->plattices_dense_vector, w);
-    else if (param->slice->get_nr_roots() == 5)
-      fill_in_buckets_toplevel<LEVEL,fb_entry_x_roots<5> >(BA, param->si, param->slice, param->plattices_dense_vector, w);
-    else if (param->slice->get_nr_roots() == 6)
-      fill_in_buckets_toplevel<LEVEL,fb_entry_x_roots<6> >(BA, param->si, param->slice, param->plattices_dense_vector, w);
-    else if (param->slice->get_nr_roots() == 7)
-      fill_in_buckets_toplevel<LEVEL,fb_entry_x_roots<7> >(BA, param->si, param->slice, param->plattices_dense_vector, w);
-    else if (param->slice->get_nr_roots() == 8)
-      fill_in_buckets_toplevel<LEVEL,fb_entry_x_roots<8> >(BA, param->si, param->slice, param->plattices_dense_vector, w);
-    else if (param->slice->get_nr_roots() == 9)
-      fill_in_buckets_toplevel<LEVEL,fb_entry_x_roots<9> >(BA, param->si, param->slice, param->plattices_dense_vector, w);
-    else if (param->slice->get_nr_roots() == 10)
-      fill_in_buckets_toplevel<LEVEL,fb_entry_x_roots<10> >(BA, param->si, param->slice, param->plattices_dense_vector, w);
-    else
-      ASSERT_ALWAYS(0);
-    /* Release bucket array again */
-    param->ws.release_BA(param->side, BA);
-    delete param;
-    return new task_result;
+    try {
+        /* Get an unused bucket array that we can write to */
+        bucket_array_t<LEVEL, shorthint_t> &BA = param->ws.reserve_BA<LEVEL, shorthint_t>(param->side);
+        /* Fill the buckets */
+        if (param->slice->is_general())
+          fill_in_buckets_toplevel<LEVEL,fb_general_entry>(BA, param->si, param->slice, param->plattices_dense_vector, w);
+        else if (param->slice->get_nr_roots() == 0)
+          fill_in_buckets_toplevel<LEVEL,fb_entry_x_roots<0> >(BA, param->si, param->slice, param->plattices_dense_vector, w);
+        else if (param->slice->get_nr_roots() == 1)
+          fill_in_buckets_toplevel<LEVEL,fb_entry_x_roots<1> >(BA, param->si, param->slice, param->plattices_dense_vector, w);
+        else if (param->slice->get_nr_roots() == 2)
+          fill_in_buckets_toplevel<LEVEL,fb_entry_x_roots<2> >(BA, param->si, param->slice, param->plattices_dense_vector, w);
+        else if (param->slice->get_nr_roots() == 3)
+          fill_in_buckets_toplevel<LEVEL,fb_entry_x_roots<3> >(BA, param->si, param->slice, param->plattices_dense_vector, w);
+        else if (param->slice->get_nr_roots() == 4)
+          fill_in_buckets_toplevel<LEVEL,fb_entry_x_roots<4> >(BA, param->si, param->slice, param->plattices_dense_vector, w);
+        else if (param->slice->get_nr_roots() == 5)
+          fill_in_buckets_toplevel<LEVEL,fb_entry_x_roots<5> >(BA, param->si, param->slice, param->plattices_dense_vector, w);
+        else if (param->slice->get_nr_roots() == 6)
+          fill_in_buckets_toplevel<LEVEL,fb_entry_x_roots<6> >(BA, param->si, param->slice, param->plattices_dense_vector, w);
+        else if (param->slice->get_nr_roots() == 7)
+          fill_in_buckets_toplevel<LEVEL,fb_entry_x_roots<7> >(BA, param->si, param->slice, param->plattices_dense_vector, w);
+        else if (param->slice->get_nr_roots() == 8)
+          fill_in_buckets_toplevel<LEVEL,fb_entry_x_roots<8> >(BA, param->si, param->slice, param->plattices_dense_vector, w);
+        else if (param->slice->get_nr_roots() == 9)
+          fill_in_buckets_toplevel<LEVEL,fb_entry_x_roots<9> >(BA, param->si, param->slice, param->plattices_dense_vector, w);
+        else if (param->slice->get_nr_roots() == 10)
+          fill_in_buckets_toplevel<LEVEL,fb_entry_x_roots<10> >(BA, param->si, param->slice, param->plattices_dense_vector, w);
+        else
+          ASSERT_ALWAYS(0);
+        /* Release bucket array again */
+        param->ws.release_BA(param->side, BA);
+        delete param;
+        return new task_result;
+    } catch (buckets_are_full const& e) {
+        delete param;
+        throw e;
+    }
 }
 
 template <int LEVEL>
