@@ -50,7 +50,7 @@ for var in poly fb I lim{0,1} lpb{0,1} mfb{0,1} ; do
     args=("${args[@]}" -$var $(eval "echo \${$var:?missing}"))
 done
 
-for var in fbc lambda{0,1} ncurves{0,1} descent_hint ; do
+for var in fbc lambda{0,1} ncurves{0,1} descent_hint bkmult ; do
     # Those are optional
     value=$(eval "echo \${$var}")
     if [ "$value" ] ; then
