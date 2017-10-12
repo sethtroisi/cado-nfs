@@ -1,7 +1,6 @@
 #ifndef UTILS_NORM_H
 #define UTILS_NORM_H
 
-#include "cado.h"
 #include "utils.h"
 #include "mpz_poly.h"
 #include "array.h"

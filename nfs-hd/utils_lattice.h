@@ -2,7 +2,6 @@
 #define UTILS_SIEVE_H 
 
 #include <stdint.h>
-#include "cado.h"
 #include "utils.h"
 #include "int64_vector.h"
 #include "double_vector.h"
