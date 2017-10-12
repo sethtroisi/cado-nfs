@@ -84,3 +84,50 @@
    ...
 }
 
+# See there
+# https://sourceforge.net/p/valgrind/mailman/message/32434015/
+{  
+   helgrind_does_not_cope_with_gcc_thread_safe_statics
+   Helgrind:Race
+   fun:_ZNK5tdict4slotcvNS_3keyEEv
+   ...
+   fun:_ZN11thread_pool20thread_work_on_tasksEPv
+   fun:mythread_wrapper
+   fun:start_thread
+   fun:clone
+}
+
+{  
+   drd_does_no_better
+   drd:ConflictingAccess
+   fun:_ZNK5tdict4slotcvNS_3keyEEv
+   ...
+   fun:_ZN11thread_pool20thread_work_on_tasksEPv
+   fun:vgDrd_thread_wrapper
+   fun:start_thread
+   fun:clone
+}
+
+{  
+   helgrind_does_not_cope_with_gcc_thread_safe_statics
+   Helgrind:Race
+   fun:_ZNK5tdict3key6encodeEi
+   fun:_ZNK5tdict15slot_parametricclEi
+   ...
+   fun:_ZN11thread_pool20thread_work_on_tasksEPv
+   fun:mythread_wrapper
+   fun:start_thread
+   fun:clone
+}
+
+{  
+   drd_also_this_one
+   drd:ConflictingAccess
+   fun:_ZNK5tdict3key6encodeEi
+   fun:_ZNK5tdict15slot_parametricclEi
+   ...
+   fun:_ZN11thread_pool20thread_work_on_tasksEPv
+   fun:vgDrd_thread_wrapper
+   fun:start_thread
+   fun:clone
+}
