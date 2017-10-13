@@ -190,16 +190,6 @@ next_legitimate_specialq(mpz_t r, unsigned long fac_r[], const mpz_t s,
         int nf = next_mpz_with_factor_constraints(r, &fac_r[0],
                 s, diff, las.qfac_min, las.qfac_max);
         fac_r[nf] = 0;
-        mpz_t roots[MAX_DEGREE*MAX_DEGREE*MAX_DEGREE];
-        for (int i = 0; i < MAX_DEGREE*MAX_DEGREE*MAX_DEGREE; ++i)
-            mpz_init(roots[i]);
-        int nr = roots_for_composite_q(roots, las.cpoly->pols[1],
-                r, &fac_r[0]);
-        gmp_printf("q = %Zd\n Roots: ", r);
-        for (int i = 0; i < nr; ++i) {
-            gmp_printf("%Zd ", roots[i]);
-        }
-        printf("\n");
     } else {
         mpz_add_ui(r, s, diff);
         /* mpz_nextprime() returns a prime *greater than* its input argument,
@@ -551,10 +541,21 @@ int las_todo_feed_qrange(las_info & las, param_list pl)
         /* handy aliases */
         mpz_ptr q = q0;
 
+        struct q_r_pair {
+            cxx_mpz q;
+            cxx_mpz r;
+            q_r_pair(const mpz_t _q, const mpz_t _r) {
+                mpz_set(q, _q);
+                mpz_set(r, _r);
+            }
+        };
+
+        std::vector<q_r_pair> my_list;
+
         /* If nq_max is specified, then q1 has no effect, even though it
          * has been set equal to q */
         for ( ; (las.nq_max < UINT_MAX || mpz_cmp(q, q1) < 0) &&
-                las.nq_pushed < las.nq_max ; )
+                las.nq_pushed + my_list.size() < las.nq_max ; )
         {
             int nroots;
             if (!las.allow_composite_q) {
@@ -569,15 +570,22 @@ int las_todo_feed_qrange(las_info & las, param_list pl)
             if (las.galois != NULL)
                 nroots = skip_galois_roots(nroots, q, (mpz_t*)roots, las.galois);
 
-            int push_here = nroots;
-            if (las.nq_max < UINT_MAX)
-                push_here = std::min(push_here, int(las.nq_max - las.nq_pushed));
-            for(int i = 0 ; i < push_here ; i++) {
-                las.nq_pushed++;
-                las_todo_push(las, q, roots[push_here-1-i], qside);
+            for (int i = 0; i < nroots; ++i) {
+                q_r_pair qr(q, roots[i]);
+                my_list.push_back(qr);
             }
-
             next_legitimate_specialq(q, fac_q, q, 1, las);
+        }
+        // Truncate to nq_max if necessary and push the sq in reverse
+        // order, because they are processed via a stack (required for
+        // the descent).
+        int push_here = my_list.size();
+        if (las.nq_max < UINT_MAX)
+            push_here = std::min(push_here, int(las.nq_max - las.nq_pushed));
+        for(int i = 0 ; i < push_here ; i++) {
+            las.nq_pushed++;
+            int ind = push_here-i-1;
+            las_todo_push(las, my_list[ind].q, my_list[ind].r, qside);
         }
     } else {
         /* we don't care much about being truly uniform here */
