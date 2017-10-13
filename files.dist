@@ -1193,3 +1193,4 @@ tests/sieve/rsa220.poly
 sieve/logapprox.cpp
 sieve/logapprox.hpp
 tests/sieve/test_logapprox.cpp
+tests/sieve/c90_21505.poly
