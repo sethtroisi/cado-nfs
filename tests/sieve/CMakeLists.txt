@@ -35,6 +35,35 @@ set(F9_baseargs
         LAS_BINARY=${las_path}
 )
 
+set(c90_21505_poly ${CMAKE_CURRENT_SOURCE_DIR}/c90_21505.poly)
+set(c90_21505_roots ${CMAKE_CURRENT_BINARY_DIR}/c90_21505.roots.gz)
+
+cado_define_test(c90_21505_makefb
+        PROGRAM
+            ${makefb_path}
+            -poly ${c90_21505_poly} -lim 811066 -maxbits 11
+            -out ${c90_21505_roots}
+        TARGET_DEPENDENCIES makefb
+        )
+
+cado_define_test(c90_21505_sieve
+        ENVIRONMENT
+            I=11 poly=${c90_21505_poly} 
+            lim0=404327 lim1=811066 lpb0=23 lpb1=23 mfb0=46 mfb1=46 ncurves0=9
+            ncurves1=10 fb=${c90_21505_roots} sqside=1
+            q0=375923 rho=119201
+            CHECKSUM_FILE=
+            LAS_BINARY=${las_path}
+            "REGEX=^-18320,3:.*74f"
+        SCRIPT
+            "${CADO_NFS_SOURCE_DIR}/tests/provide-wdir.sh" --env WORKDIR
+            ${CMAKE_CURRENT_SOURCE_DIR}/sievetest.sh
+            -v -v --adjust-strategy 0
+        TARGET_DEPENDENCIES las
+        TEST_DEPENDENCIES c90_21505_makefb
+        )
+
+
 # Before running F9_sievetest, remove the file with the captured checksums
 # We have to make this a "test" so that ctest runs it, even though it does
 # not actually test anything
