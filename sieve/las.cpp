@@ -390,8 +390,6 @@ int las_todo_feed_qrange(las_info & las, param_list pl)
     if (!las.todo.empty())
         return 1;
 
-    const unsigned long push_at_least_this_many = 1;
-
     mpz_ptr q0 = las.todo_q0;
     mpz_ptr q1 = las.todo_q1;
 
@@ -450,8 +448,7 @@ int las_todo_feed_qrange(las_info & las, param_list pl)
 
         /* If nq_max is specified, then q1 has no effect, even though it
          * has been set equal to q */
-        for ( ; las.todo.size() < push_at_least_this_many &&
-                (las.nq_max < UINT_MAX || mpz_cmp(q, q1) < 0) &&
+        for ( ; (las.nq_max < UINT_MAX || mpz_cmp(q, q1) < 0) &&
                 las.nq_pushed < las.nq_max ; )
         {
             int nroots = mpz_poly_roots ((mpz_t*)roots, f, q);
@@ -476,7 +473,7 @@ int las_todo_feed_qrange(las_info & las, param_list pl)
         /* we don't care much about being truly uniform here */
         mpz_t q;
         mpz_init(q);
-        for ( ; las.todo.size() < push_at_least_this_many && las.nq_pushed < las.nq_max ; ) {
+        for ( ; las.nq_pushed < las.nq_max ; ) {
             mpz_sub(q, q1, q0);
             mpz_urandomm(q, las.rstate, q);
             mpz_add(q, q, q0);
