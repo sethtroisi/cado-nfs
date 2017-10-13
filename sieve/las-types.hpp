@@ -231,7 +231,7 @@ struct las_info : private NonCopyable {
     FILE * todo_list_fd;
  
     /* For composite special-q */
-    bool allow_composite_q;
+    int allow_composite_q;
     uint64_t qfac_min;
     uint64_t qfac_max;
 

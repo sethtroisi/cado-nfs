@@ -292,6 +292,30 @@ las_info::las_info(cxx_param_list & pl)
     } else {
         todo_list_fd = NULL;
     }
+
+    /* composite special-q ? */
+    allow_composite_q = param_list_parse_switch(pl, "-allow-compsq");
+    if (allow_composite_q) {
+        if (galois) {
+            fprintf(stderr, "-galois and -allow-compsq are incompatible options at the moment");
+            exit(EXIT_FAILURE);
+        }
+        if (suppress_duplicates) {
+            fprintf(stderr, "-dup and -allow-compsq are incompatible options at the moment");
+            exit(EXIT_FAILURE);
+        }
+        if (random_sampling) {
+            fprintf(stderr, "-random-sample and -allow-compsq are incompatible options at the moment");
+            exit(EXIT_FAILURE);
+        }
+        if (!param_list_parse_uint64(pl, "qfac-min", &qfac_min)) {
+            qfac_min = 1024;
+        }
+        if (!param_list_parse_uint64(pl, "qfac-max", &qfac_max)) {
+            qfac_max = UINT64_MAX;
+        }
+    }
+
     // }}}
 
     // ----- batch mode {{{

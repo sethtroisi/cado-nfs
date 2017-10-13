@@ -2016,6 +2016,7 @@ static void declare_usage(param_list pl)/*{{{*/
   param_list_decl_usage(pl, "seed", "Use this seed for the random sampling of special-q's (see random-sample)");
   param_list_decl_usage(pl, "nq", "Process this number of special-q's and stop");
   param_list_decl_usage(pl, "todo", "provide file with a list of special-q to sieve instead of qrange");
+  param_list_decl_usage(pl, "allow-compsq", "(switch) allows composite special-q");
   param_list_decl_usage(pl, "qfac-min", "factors of q must be at least that");
   param_list_decl_usage(pl, "qfac-max", "factors of q must be at most that");
 
@@ -2095,6 +2096,7 @@ int main (int argc0, char *argv0[])/*{{{*/
     param_list_configure_switch(pl, "-v", NULL);
     param_list_configure_switch(pl, "-ondemand-siever-config", NULL);
     param_list_configure_switch(pl, "-allow-largesq", &allow_largesq);
+    param_list_configure_switch(pl, "-allow-compsq", NULL);
     param_list_configure_switch(pl, "-stats-stderr", NULL);
     param_list_configure_switch(pl, "-prepend-relation-time", &prepend_relation_time);
     param_list_configure_switch(pl, "-dup", NULL);
