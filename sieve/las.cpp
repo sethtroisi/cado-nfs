@@ -98,28 +98,125 @@ int las_todo_pop_closing_brace(las_info & las)
 /*}}}*/
 
 
+// FIXME: This should go to utils/rootfinder.c and be merged with
+// mpz_poly_roots_gen().
+
+/* Compute the roots of f modulo q, where q is a composite number whose
+ * factorization is given. Returns the number of roots.
+ * The array roots must be pre-allocated with sufficient space (degree of
+ * f raised to the power of the maximum number of factors of q).
+ * Note: q is supposed to be squarefree, so that all elements of fac_q
+ * are distinct primes. The end of the list of prime factors is marked by
+ * a terminating 0 in fac_q.
+ */
+static int roots_for_composite_q(mpz_t* roots, mpz_poly_srcptr f,
+        const mpz_t q, const unsigned long * fac_q)
+{
+    ASSERT_ALWAYS(fac_q[0] != 0);
+    // only one prime left ?
+    if (fac_q[1] == 0) {
+        ASSERT(mpz_cmp_ui(q, fac_q[0]) == 0);
+        return mpz_poly_roots(roots, f, q);
+    }
+    // First, a recursive call with q' = q / fac_q[0]
+    mpz_t qp;
+    mpz_init(qp);
+    ASSERT(mpz_divisible_ui_p(q, fac_q[0]));
+    mpz_divexact_ui(qp, q, fac_q[0]);
+    int nr = roots_for_composite_q(roots, f, qp, fac_q+1);
+    if (nr == 0) { // no roots modulo q'; we have finished.
+        mpz_clear(qp);
+        return 0;
+    }
+
+    // Second, compute the roots modulo fac_q[0]
+    mpz_t fac_q0;
+    mpz_init_set_ui(fac_q0, fac_q[0]);
+    mpz_t roots2[MAX_DEGREE];
+    for (int i = 0; i < MAX_DEGREE; ++i)
+        mpz_init(roots2[i]);
+    int nr2 = mpz_poly_roots(roots2, f, fac_q0);
+
+    // Combine by CRT
+    if (nr2 > 0) {
+        mpz_t new_root, aux;
+        mpz_init(new_root);
+        mpz_init(aux);
+        // pre-compute the coefficients of the CRT
+        mpz_t c, c2;
+        mpz_init(c);
+        mpz_init(c2);
+        int ret = mpz_invert(c, fac_q0, qp);
+        ASSERT_ALWAYS(ret > 0);
+        mpz_mul(c, c, fac_q0);
+        ret = mpz_invert(c2, qp, fac_q0);
+        ASSERT_ALWAYS(ret > 0);
+        mpz_mul(c2, c2, qp);
+
+        // reverse order to avoid erasing the input in roots[]
+        for (int i = nr2-1; i >= 0; --i) {
+            for (int j = 0; j < nr; ++j) {
+                mpz_mul(new_root, roots[j], c);
+                mpz_mul(aux, roots2[i], c2);
+                mpz_add(new_root, new_root, aux);
+                mpz_mod(new_root, new_root, q);
+                mpz_set(roots[i*nr+j], new_root);
+            }
+        }
+        mpz_clear(new_root);
+        mpz_clear(aux);
+    }
+
+    for (int i = 0; i < MAX_DEGREE; ++i)
+        mpz_clear(roots2[i]);
+    mpz_clear(fac_q0);
+    mpz_clear(qp);
+
+    return nr*nr2; // can be 0.
+}
+
+
 /* Put in r the smallest legitimate special-q value that it at least
    s + diff (note that if s+diff is already legitimate, then r = s+diff
-   will result. */
+   will result.
+   In case of composite sq, also store the factorization of r in fac_r,
+   with 0 marking the end of the list of factors.
+   */
 static void
-next_legitimate_specialq(mpz_t r, const mpz_t s, const unsigned long diff)
+next_legitimate_specialq(mpz_t r, unsigned long fac_r[], const mpz_t s,
+        const unsigned long diff, las_info & las)
 {
-    mpz_add_ui(r, s, diff);
-    /* At some point in the future, we might want to allow prime-power or 
-       composite special-q here. */
-    /* mpz_nextprime() returns a prime *greater than* its input argument,
-       which we don't always want, so we subtract 1 first. */
-    mpz_sub_ui(r, r, 1);
-    mpz_nextprime(r, r);
+    if (las.allow_composite_q) {
+        int nf = next_mpz_with_factor_constraints(r, &fac_r[0],
+                s, diff, las.qfac_min, las.qfac_max);
+        fac_r[nf] = 0;
+        mpz_t roots[MAX_DEGREE*MAX_DEGREE*MAX_DEGREE];
+        for (int i = 0; i < MAX_DEGREE*MAX_DEGREE*MAX_DEGREE; ++i)
+            mpz_init(roots[i]);
+        int nr = roots_for_composite_q(roots, las.cpoly->pols[1],
+                r, &fac_r[0]);
+        gmp_printf("q = %Zd\n Roots: ", r);
+        for (int i = 0; i < nr; ++i) {
+            gmp_printf("%Zd ", roots[i]);
+        }
+        printf("\n");
+    } else {
+        mpz_add_ui(r, s, diff);
+        /* mpz_nextprime() returns a prime *greater than* its input argument,
+           which we don't always want, so we subtract 1 first. */
+        mpz_sub_ui(r, r, 1);
+        mpz_nextprime(r, r);
+    }
 }
 
 
 static void
-parse_command_line_q0_q1(las_info & las, mpz_ptr q0, mpz_ptr q1, param_list pl, const int qside)
+parse_command_line_q0_q1(las_info & las, mpz_ptr q0, unsigned long fac_q0 [],
+        mpz_ptr q1, param_list pl, const int qside)
 {
     ASSERT_ALWAYS(param_list_parse_mpz(pl, "q0", q0));
     if (param_list_parse_mpz(pl, "q1", q1)) {
-        next_legitimate_specialq(q0, q0, 0);
+        next_legitimate_specialq(q0, fac_q0, q0, 0, las);
         return;
     }
 
@@ -136,7 +233,7 @@ parse_command_line_q0_q1(las_info & las, mpz_ptr q0, mpz_ptr q1, param_list pl, 
        If -q0 does not give a legitimate special-q value, advance to the
        next legitimate one. */
         mpz_set(t, q0);
-        next_legitimate_specialq(q0, q0, 0);
+        next_legitimate_specialq(q0, fac_q0, q0, 0, las);
         mpz_set(q1, q0);
     }
     mpz_clear(t);
@@ -383,7 +480,10 @@ static void add_relations_with_galois(const char *galois, FILE *output,
 /* {{{ Populating the todo list */
 /* See below in main() for documentation about the q-range and q-list
  * modes */
-/* These functions return non-zero if the todo list is not empty */
+/* These functions return non-zero if the todo list is not empty.
+ * Note: contrary to the qlist mode, here the q-range will be pushed at
+ * once (but the caller doesn't need to know that).
+ * */
 int las_todo_feed_qrange(las_info & las, param_list pl)
 {
     /* If we still have entries in the stack, don't add more now */
@@ -396,10 +496,13 @@ int las_todo_feed_qrange(las_info & las, param_list pl)
     int qside = las.config_pool.base.side;
 
     mpz_poly_ptr f = las.cpoly->pols[qside];
-    cxx_mpz roots[MAX_DEGREE];
+    // FIXME: only 3 factors in composite q !!!!
+    cxx_mpz roots[MAX_DEGREE*MAX_DEGREE*MAX_DEGREE];
+
+    unsigned long fac_q[10];
 
     if (mpz_cmp_ui(q0, 0) == 0) {
-        parse_command_line_q0_q1(las, q0, q1, pl, qside);
+        parse_command_line_q0_q1(las, q0, fac_q, q1, pl, qside);
         if (las.random_sampling) {
             /* For random sampling, it's important that for all integers in
              * the range [q0, q1[, their nextprime() is within the range, and
@@ -412,9 +515,11 @@ int las_todo_feed_qrange(las_info & las, param_list pl)
             /* we need to know the limit of the q range */
             for(unsigned long i = 1 ; ; i++) {
                 mpz_sub_ui(q, q1, i);
-                next_legitimate_specialq(q, q, 0);
+                unsigned long facq[10];
+                next_legitimate_specialq(q, facq, q, 0, las);
                 if (mpz_cmp(q, q1) >= 0)
                     continue;
+                // FIXME for composites here.
                 if (mpz_poly_roots ((mpz_t*) roots, f, q) > 0)
                     break;
                 /* small optimization: avoid redoing root finding
@@ -437,12 +542,12 @@ int las_todo_feed_qrange(las_info & las, param_list pl)
         }
     }
 
-    /* Otherwise we're going to process the next few sq's and put them
-     * into the list */
-    /* The loop processes all special-q in [q, q1]. On loop entry, the value
-       in q is required to be a legitimate special-q, and will be added to
-       the stack. */
     if (!las.random_sampling) {
+        /* We're going to process the sq's and put them into the list
+           The loop processes all special-q in [q0, q1]. On loop entry, the value
+           in q0 is known to be a legitimate special-q and its factorization is in
+           fac_q. */
+
         /* handy aliases */
         mpz_ptr q = q0;
 
@@ -451,7 +556,12 @@ int las_todo_feed_qrange(las_info & las, param_list pl)
         for ( ; (las.nq_max < UINT_MAX || mpz_cmp(q, q1) < 0) &&
                 las.nq_pushed < las.nq_max ; )
         {
-            int nroots = mpz_poly_roots ((mpz_t*)roots, f, q);
+            int nroots;
+            if (!las.allow_composite_q) {
+                nroots = mpz_poly_roots ((mpz_t*)roots, f, q);
+            } else {
+                nroots = roots_for_composite_q((mpz_t *)roots, f, q, &fac_q[0]);
+            }
             if (nroots == 0) {
                 verbose_output_vfprint(0, 1, gmp_vfprintf, "# polynomial has no roots for q = %Zu\n", q);
             }
@@ -467,7 +577,7 @@ int las_todo_feed_qrange(las_info & las, param_list pl)
                 las_todo_push(las, q, roots[push_here-1-i], qside);
             }
 
-            next_legitimate_specialq(q, q, 1);
+            next_legitimate_specialq(q, fac_q, q, 1, las);
         }
     } else {
         /* we don't care much about being truly uniform here */
@@ -477,8 +587,13 @@ int las_todo_feed_qrange(las_info & las, param_list pl)
             mpz_sub(q, q1, q0);
             mpz_urandomm(q, las.rstate, q);
             mpz_add(q, q, q0);
-            next_legitimate_specialq(q, q, 0);
-            int nroots = mpz_poly_roots ((mpz_t*)roots, f, q);
+            next_legitimate_specialq(q, fac_q, q, 0, las);
+            int nroots;
+            if (!las.allow_composite_q) {
+                nroots = mpz_poly_roots ((mpz_t*)roots, f, q);
+            } else {
+                nroots = roots_for_composite_q((mpz_t *)roots, f, q, fac_q);
+            }
             if (!nroots) continue;
             if (las.galois != NULL)
                 nroots = skip_galois_roots(nroots, q, (mpz_t*)roots, las.galois);
