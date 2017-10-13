@@ -45,8 +45,6 @@ struct las_todo_entry {
         }
     }
 private:
-    // TODO: this function becomes a bit long for a header file.
-    // But for the moment we don't have a las-todo.cpp, so...
     void set(const mpz_t _p, const mpz_t _r, const int _side, const int _depth, const int _iteration);
 };
 
