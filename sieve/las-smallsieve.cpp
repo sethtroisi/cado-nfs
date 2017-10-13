@@ -1172,7 +1172,7 @@ void sieve_small_bucket_region(unsigned char *S, int N,
             }
         } else {
 
-            if (ssp->is_discarded_proj()) continue;
+            // if (ssp->is_discarded_proj()) continue;
             if (ssp->is_proj()) {
                 /* This code also covers projective powers of 2 */
                 ssp_t * ssp = &(ssd->ssp[index]);
@@ -1385,11 +1385,11 @@ resieve_small_bucket_region (bucket_primes_t *BP, int N, unsigned char *S,
 
     for(int index = 0 ; index < ssd->nb_ssp ; index++) {
         ssp_t * ssp = &(ssd->ssp[index]);
-        if (ssp->is_discarded())
-            continue;
         if (ssp->is_pow2())
             continue;
         if (ssp->is_nice()) {
+            if (ssp->is_discarded())
+                continue;
             const fbprime_t p = ssp->get_p();
             if (mpz_cmp_ui(si.qbasis.q, p) == 0) {
                 continue;
