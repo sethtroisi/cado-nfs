@@ -111,7 +111,10 @@ bucket_array_t<LEVEL, HINT>::allocate_memory(const uint32_t new_n_bucket,
 
   const size_t min_bucket_size = fill_ratio * BUCKET_REGIONS[LEVEL];
   const size_t new_bucket_size = bucket_misalignment(min_bucket_size, sizeof(update_t));
-  const size_t new_big_size = new_bucket_size * new_n_bucket * sizeof(update_t);
+  size_t new_big_size = new_bucket_size * new_n_bucket * sizeof(update_t);
+  /* add 1 megabyte to each bucket array, so as to deal with overflowing
+   * buckets */
+  new_big_size += 1 << 20;
   const size_t new_size_b_align = ((sizeof(void *) * new_n_bucket + 0x3F) & ~((size_t) 0x3F));
 
   if (new_big_size > big_size) {
