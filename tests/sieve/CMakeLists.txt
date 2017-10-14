@@ -54,7 +54,7 @@ cado_define_test(c90_21505_sieve
             q0=375923 rho=119201
             CHECKSUM_FILE=
             LAS_BINARY=${las_path}
-            "REGEX=^-18320,3:.*74f"
+            "REGEX=^-18320,3:.*THIS_IS_A_JOKE.*74f"
         SCRIPT
             "${CADO_NFS_SOURCE_DIR}/tests/provide-wdir.sh" --env WORKDIR
             ${CMAKE_CURRENT_SOURCE_DIR}/sievetest.sh
