@@ -2533,7 +2533,7 @@ int main (int argc0, char *argv0[])/*{{{*/
         si.update_norm_data();
         si.update(nr_workspaces);
 
-        try {
+
 
         WHERE_AM_I_UPDATE(w, psi, &si);
 
@@ -2651,8 +2651,15 @@ for (unsigned int j_cong = 0; j_cong < sublat_bound; ++j_cong) {
         if (this_max_full >= max_full)
             max_full = this_max_full;
 
+        if (max_full > 1) {
+            verbose_output_vfprint(2, 1, gmp_vfprintf, "# max_full=%f -- cannot continue sieving for q=%Zd, rho=%Zd\n",
+                    max_full, (mpz_srcptr) doing.p, (mpz_srcptr) doing.r);
+            continue;
+        }
+        /*
         ASSERT_ALWAYS(max_full <= 1.0 ||
                 fprintf (stderr, "max_full=%f, see #14987\n", max_full) == 0);
+                */
         
         workspaces->thrs[0].rep->ttbuckets_fill += seconds();
 
@@ -2810,15 +2817,14 @@ if (si.conf.sublat.m) {
     }
 }
 
-        } catch (buckets_are_full const & e) {
-            fprintf(stderr, "# %s\n", e.what());
-            printf("# redoing this q because buckets are full.\n");
+        if (max_full > 1) {
+            verbose_output_vfprint (2, 1, gmp_vfprintf, "# redoing q=%Zd, rho=%Zd because buckets are full.\n", 
+                    (mpz_srcptr) doing.p, (mpz_srcptr) doing.r);
 
-            double new_bk_multiplier = conf.bk_multiplier * (double) e.reached_size / e.theoretical_max_size * 1.01;
-            printf("# Updating bucket multiplier to %.3f*%d/%d*1.01=%.3f\n",
+            double new_bk_multiplier = conf.bk_multiplier * (double) max_full * 1.01;
+            verbose_output_print (2, 1, "# Updating bucket multiplier to %.3f*%f*1.01=%.3f\n",
                     conf.bk_multiplier,
-                    e.reached_size,
-                    e.theoretical_max_size,
+                    max_full,
                     new_bk_multiplier
                   );
             max_full = 0;
@@ -3013,6 +3019,7 @@ if (si.conf.sublat.m) {
         verbose_output_print (2, 1, "# Average logI=%1.1f for %lu special-q's, max bucket fill %f\n",
                 totlogI / (double) nr_sq_processed, nr_sq_processed, max_full);
     }
+    verbose_output_print (2, 1, "# Final value of bk multiplier is %f\n", las.config_pool.base.bk_multiplier);
     verbose_output_print (2, 1, "# Discarded %lu special-q's out of %u pushed\n",
             nr_sq_discarded, las.nq_pushed);
     tts = t0;
