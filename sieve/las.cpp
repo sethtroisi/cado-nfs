@@ -1550,7 +1550,8 @@ void factor_survivors_data::cofactoring (timetree_t & timer)
             verbose_output_start_batch ();
 #ifndef SUPPORT_LARGE_Q
             gmp_printf("%" PRId64 " %" PRIu64 " %Zd %Zd\n", a, b,
-                    norm[0], norm[1]);
+                    (mpz_srcptr) norm[0],
+                    (mpz_srcptr) norm[1]);
 #else
             gmp_printf("%Zd %Zd %Zd %Zd\n",
                     (mpz_srcptr) az,
