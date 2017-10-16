@@ -497,9 +497,8 @@ int las_todo_feed_qrange(las_info & las, param_list pl)
              * that at least one such has roots mod f. Make sure that
              * this is the case.
              */
-            mpz_t q, q1_orig;
-            mpz_init(q);
-            mpz_init_set(q1_orig, q1);
+            cxx_mpz q, q1_orig;
+            mpz_set(q1_orig, q1);
             /* we need to know the limit of the q range */
             for(unsigned long i = 1 ; ; i++) {
                 mpz_sub_ui(q, q1, i);
@@ -522,11 +521,11 @@ int las_todo_feed_qrange(las_info & las, param_list pl)
              * really.
              */
             if (mpz_cmp(q0, q1) > 0) {
-                gmp_fprintf(stderr, "Error: range [%Zd,%Zd[ contains no prime with roots mod f\n", q0, q1_orig);
+                gmp_fprintf(stderr, "Error: range [%Zd,%Zd[ contains no prime with roots mod f\n",
+                        (mpz_srcptr) q0,
+                        (mpz_srcptr) q1_orig);
                 exit(EXIT_FAILURE);
             }
-            mpz_clear(q);
-            mpz_clear(q1_orig);
         }
     }
 
