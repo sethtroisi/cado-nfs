@@ -48,7 +48,7 @@ static inline void NxToAB(int64_t *a, uint64_t *b, const unsigned int N, const u
 
 #ifdef SUPPORT_LARGE_Q
 /* Warning: b might be negative, in which case we return (-a,-b) */
-static inline void xToABmpz(mpz_t a, mpz_t b,
+static inline void xToABmpz(mpz_ptr a, mpz_ptr b,
         const uint64_t x, sieve_info const & si)
 {
     int i, j;
@@ -84,7 +84,7 @@ static inline void xToABmpz(mpz_t a, mpz_t b,
     mpz_clear(aux_j);
 }
 
-static inline void NxToABmpz(mpz_t a, mpz_t b,
+static inline void NxToABmpz(mpz_ptr a, mpz_ptr b,
         const unsigned int N, const unsigned int x, sieve_info const & si)
 {
     xToABmpz(a, b, (((uint64_t)N) << LOG_BUCKET_REGION) + (uint64_t)x, si);

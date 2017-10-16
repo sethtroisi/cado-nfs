@@ -67,11 +67,11 @@ double tt_qstart;
 
 /*****************************/
 
-void las_todo_push_withdepth(las_info & las, mpz_srcptr p, mpz_srcptr r, int side, int depth, int iteration = 0)/*{{{*/
+void las_todo_push_withdepth(las_info & las, cxx_mpz const & p, cxx_mpz const & r, int side, int depth, int iteration = 0)/*{{{*/
 {
     las.todo.push(las_todo_entry(p, r, side, depth, iteration));
 }
-void las_todo_push(las_info & las, mpz_srcptr p, mpz_srcptr r, int side)
+void las_todo_push(las_info & las, cxx_mpz const & p, cxx_mpz const & r, int side)
 {
     las_todo_push_withdepth(las, p, r, side, 0);
 }
@@ -201,8 +201,8 @@ next_legitimate_specialq(mpz_t r, unsigned long fac_r[], const mpz_t s,
 
 
 static void
-parse_command_line_q0_q1(las_info & las, mpz_ptr q0, unsigned long fac_q0 [],
-        mpz_ptr q1, param_list pl, const int qside)
+parse_command_line_q0_q1(las_info & las, cxx_mpz & q0, unsigned long fac_q0 [],
+        cxx_mpz & q1, param_list pl, const int qside)
 {
     ASSERT_ALWAYS(param_list_parse_mpz(pl, "q0", q0));
     if (param_list_parse_mpz(pl, "q1", q1)) {
@@ -211,9 +211,8 @@ parse_command_line_q0_q1(las_info & las, mpz_ptr q0, unsigned long fac_q0 [],
     }
 
     /* We don't have -q1. If we have -rho, we sieve only <q0, rho>. */
-    mpz_t t;
-    mpz_init(t);
-    if (param_list_parse_mpz(pl, "rho", t)) {
+    cxx_mpz t;
+    if (param_list_parse_mpz(pl, "rho", (mpz_ptr) t)) {
         las_todo_push(las, q0, t, qside);
         /* Set empty interval [q0 + 1, q0] as special-q interval */
         mpz_set(q1, q0);
@@ -226,7 +225,6 @@ parse_command_line_q0_q1(las_info & las, mpz_ptr q0, unsigned long fac_q0 [],
         next_legitimate_specialq(q0, fac_q0, q0, 0, las);
         mpz_set(q1, q0);
     }
-    mpz_clear(t);
 }
 
 static int
@@ -480,8 +478,8 @@ int las_todo_feed_qrange(las_info & las, param_list pl)
     if (!las.todo.empty())
         return 1;
 
-    mpz_ptr q0 = las.todo_q0;
-    mpz_ptr q1 = las.todo_q1;
+    cxx_mpz & q0 = las.todo_q0;
+    cxx_mpz & q1 = las.todo_q1;
 
     int qside = las.config_pool.base.side;
 
@@ -589,8 +587,7 @@ int las_todo_feed_qrange(las_info & las, param_list pl)
         }
     } else {
         /* we don't care much about being truly uniform here */
-        mpz_t q;
-        mpz_init(q);
+        cxx_mpz q;
         for ( ; las.nq_pushed < las.nq_max ; ) {
             mpz_sub(q, q1, q0);
             mpz_urandomm(q, las.rstate, q);
@@ -609,7 +606,6 @@ int las_todo_feed_qrange(las_info & las, param_list pl)
             las.nq_pushed++;
             las_todo_push(las, q, roots[i], qside);
         }
-        mpz_clear(q);
     }
 
     return las.todo.size();
@@ -644,10 +640,8 @@ int las_todo_feed_qlist(las_info & las, param_list pl)
     }
 
     /* We have a new entry to parse */
-    mpz_t p, r;
+    cxx_mpz p, r;
     int side = -1;
-    mpz_init(p);
-    mpz_init(r);
     int rc;
     switch(*x++) {
         case '0':
@@ -678,7 +672,7 @@ int las_todo_feed_qlist(las_info & las, param_list pl)
 
     mpz_set_ui(r, 0);
     for( ; *x && !isdigit(*x) ; x++) ;
-    rc = gmp_sscanf(x, "%Zi%n %Zi%n", p, &nread1, r, &nread2);
+    rc = gmp_sscanf(x, "%Zi%n %Zi%n", (mpz_ptr) p, &nread1, (mpz_ptr) r, &nread2);
     ASSERT_ALWAYS(rc == 1 || rc == 2); /* %n does not count */
     x += (rc==1) ? nread1 : nread2;
     ASSERT_ALWAYS(mpz_probab_prime_p(p, 2));
@@ -691,15 +685,14 @@ int las_todo_feed_qlist(las_info & las, param_list pl)
         if (rc < 2 || (f->deg == 1 && rc == 2 && mpz_cmp_ui(r, 0) < 0)) {
             // For rational side, we can compute the root easily.
             ASSERT_ALWAYS(f->deg == 1);
-            int nroots = mpz_poly_roots (&r, f, p);
+            /* ugly cast, yes */
+            int nroots = mpz_poly_roots ((mpz_t*) &r, f, p);
             ASSERT_ALWAYS(nroots == 1);
         }
     }
 
     for( ; *x ; x++) ASSERT_ALWAYS(isspace(*x));
     las_todo_push(las, p, r, side);
-    mpz_clear(p);
-    mpz_clear(r);
     return 1;
 }
 
@@ -1136,7 +1129,7 @@ bool register_contending_relation(las_info const & las, sieve_info const & si, r
                  * not have the info in the descent hint table,
                  * period.
                  */
-                verbose_output_vfprint(0, 1, gmp_vfprintf, "# [descent] Warning: cannot estimate refactoring time for relation involving %d@%d (%Zd,%Zd)\n", n, side, v.p, v.r);
+                verbose_output_vfprint(0, 1, gmp_vfprintf, "# [descent] Warning: cannot estimate refactoring time for relation involving %d@%d (%Zd,%Zd)\n", n, side, (mpz_srcptr) v.p, (mpz_srcptr) v.r);
                 time_left = INFINITY;
             } else {
                 if (std::isfinite(time_left))
@@ -1405,9 +1398,7 @@ void factor_survivors_data::cofactoring (timetree_t & timer)
     std::array<std::vector<cxx_mpz>, 2> lps;
 
 #ifdef SUPPORT_LARGE_Q
-        mpz_t az, bz;
-        mpz_init(az);
-        mpz_init(bz);
+        cxx_mpz az, bz;
 #endif
 
     for (size_t i_surv = 0 ; i_surv < survivors2.size(); i_surv++) {
@@ -1561,7 +1552,11 @@ void factor_survivors_data::cofactoring (timetree_t & timer)
             gmp_printf("%" PRId64 " %" PRIu64 " %Zd %Zd\n", a, b,
                     norm[0], norm[1]);
 #else
-            gmp_printf("%Zd %Zd %Zd %Zd\n", az, bz, norm[0], norm[1]);
+            gmp_printf("%Zd %Zd %Zd %Zd\n",
+                    (mpz_srcptr) az,
+                    (mpz_srcptr) bz,
+                    (mpz_srcptr) norm[0],
+                    (mpz_srcptr) norm[1]);
 #endif
             verbose_output_end_batch ();
             cpt++;
@@ -1686,11 +1681,6 @@ void factor_survivors_data::cofactoring (timetree_t & timer)
             break;
 #endif  /* DLP_DESCENT */
     }
-
-#ifdef SUPPORT_LARGE_Q
-        mpz_clear(az);
-        mpz_clear(bz);
-#endif
 }
 
 /* Adds the number of sieve reports to *survivors,
@@ -2846,7 +2836,7 @@ if (si.conf.sublat.m) {
                     int side = winner.outstanding[i].first;
                     relation::pr const & v(winner.outstanding[i].second);
                     unsigned int n = mpz_sizeinbase(v.p, 2);
-                    verbose_output_vfprint(0, 1, gmp_vfprintf, "# [descent] " HILIGHT_START "pushing side-%d (%Zd,%Zd) [%d@%d]" HILIGHT_END " to todo list\n", side, v.p, v.r, n, side);
+                    verbose_output_vfprint(0, 1, gmp_vfprintf, "# [descent] " HILIGHT_START "pushing side-%d (%Zd,%Zd) [%d@%d]" HILIGHT_END " to todo list\n", side, (mpz_srcptr) v.p, (mpz_srcptr) v.r, n, side);
                     las_todo_push_withdepth(las, v.p, v.r, side, si.doing.depth + 1);
                 }
             }

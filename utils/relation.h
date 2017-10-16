@@ -27,7 +27,7 @@ struct relation_ab {
         mpz_set_int64(az, a);
         mpz_set_uint64(bz, b);
     }
-    relation_ab(mpz_t _az, mpz_t _bz) {
+    relation_ab(mpz_srcptr _az, mpz_srcptr _bz) {
         mpz_set(az, _az);
         mpz_set(bz, _bz);
         a = mpz_get_int64(az);
@@ -72,7 +72,7 @@ struct relation : public relation_ab {
     relation(int64_t a, uint64_t b, int rational_side = -1, int nb_polys = 2)
         : relation_ab(a,b), rational_side(rational_side), nb_polys(nb_polys)
     {}
-    relation(mpz_t a, mpz_t b, int rational_side = -1, int nb_polys = 2)
+    relation(mpz_srcptr a, mpz_srcptr b, int rational_side = -1, int nb_polys = 2)
         : relation_ab(a,b), rational_side(rational_side), nb_polys(nb_polys)
     {}
 
