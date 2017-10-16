@@ -9,14 +9,16 @@
 #include <string.h>
 #include <math.h>
 #include <regex.h>
+#include <vector>
+#include <algorithm>
 
 #include "utils.h"      /* verbose_ stuff */
 #include "portability.h"
 #include "pm1.h"
 #include "pp1.h"
 #include "facul_ecm.h"
-#include "facul.h"
-#include "facul_doit.h"
+#include "facul.hpp"
+#include "facul_doit.hpp"
 
 /* These global variables are only for statistics. In case of
  * multithreaded sieving, the stats might be wrong...
@@ -250,14 +252,11 @@ facul_clear_strategy (facul_strategy_t *strategy)
   free (strategy);
 }
 
-
-static int
-my_cmp_mpz (const mpz_t *a, const mpz_t *b)
-{
-  return mpz_cmp(*a, *b);
-}
-
-
+struct cxx_mpz_cmp {
+    inline bool operator()(cxx_mpz const& a, cxx_mpz const & b) {
+        return mpz_cmp(a, b) < 0;
+    }
+};
 
 void facul_print_stats (FILE *stream)
 {
@@ -305,11 +304,16 @@ void facul_print_stats (FILE *stream)
 
 
 int
-facul (mpz_t *factors, const mpz_t N, const facul_strategy_t *strategy)
+facul (std::vector<cxx_mpz> & factors, cxx_mpz const & N, const facul_strategy_t *strategy)
 {
   int found = 0;
   size_t bits;
   
+    /* XXX ATTENTION: This function may be called recursively. In
+     * particular it may happen that the factors[] vector is not empty. */
+
+  size_t factors_previous_size = factors.size();
+
 #ifdef PARI
   gmp_fprintf (stderr, "%Zd", N);
 #endif
@@ -371,8 +375,7 @@ facul (mpz_t *factors, const mpz_t N, const facul_strategy_t *strategy)
   if (found > 1)
     {
       /* Sort the factors we found */
-      qsort (factors, found, sizeof (mpz_t), 
-	     (int (*)(const void *, const void *)) &my_cmp_mpz);
+      std::sort(factors.begin() + factors_previous_size, factors.end(), cxx_mpz_cmp());
     }
 
   return found;
@@ -1071,7 +1074,7 @@ modset_get_z (mpz_t z, const struct modset_t *modset)
  * factors.
  */
 static int
-facul_aux (mpz_t *factors, const modset_t m,
+facul_aux (std::vector<cxx_mpz> & factors, const modset_t m,
 	   const facul_strategies_t *strategies,
 	   facul_method_side_t *methods, int method_start, int side)
 {
@@ -1151,7 +1154,7 @@ facul_aux (mpz_t *factors, const modset_t m,
       */
       if (fm.arith != modset_t::CHOOSE_NONE)
 	{
-	  int found2 = facul_aux (factors+res_fac, fm, strategies,
+	  int found2 = facul_aux (factors, fm, strategies,
 				  methods, i+1, side);
           if (found2 < 1)// FACUL_NOT_SMOOTH or FACUL_MAYBE
 	    {
@@ -1166,7 +1169,7 @@ facul_aux (mpz_t *factors, const modset_t m,
 	}
       if (cfm.arith != modset_t::CHOOSE_NONE)
 	{
-	  int found2 = facul_aux (factors+res_fac, cfm, strategies,
+	  int found2 = facul_aux (factors, cfm, strategies,
 				  methods, i+1, side);
           if (found2 < 1)// FACUL_NOT_SMOOTH or FACUL_MAYBE
           {
@@ -1196,12 +1199,13 @@ facul_aux (mpz_t *factors, const modset_t m,
              is already factored.
 */
 
-static int*
-facul_both_src (mpz_t **factors, const modset_t* m,
+static std::array<int, 2>
+facul_both_src (std::array<std::vector<cxx_mpz>, 2> & factors, const modset_t* m,
 		const facul_strategies_t *strategies, int* cof,
 		int* is_smooth)
 {
-  int* found = (int*) calloc(2, sizeof(int));
+    std::array<int, 2> found;
+    found.fill(0);
 
   facul_method_side_t* methods = strategies->methods[cof[0]][cof[1]];
 
@@ -1329,7 +1333,7 @@ facul_both_src (mpz_t **factors, const modset_t* m,
 	    // factor f[side][0] or/and f[side][1]
 	    if (f[side][ind_cof].arith != modset_t::CHOOSE_NONE)
 	      {
-		int found2 = facul_aux (factors[side]+found[side],
+		int found2 = facul_aux (factors[side],
 					f[side][ind_cof], strategies,
 					methods, last_i[side] + 1, side);
 		if (found2 < 1)// FACUL_NOT_SMOOTH or FACUL_MAYBE
@@ -1359,13 +1363,15 @@ facul_both_src (mpz_t **factors, const modset_t* m,
   This function is like facul, but we will work with both norms
   together.  It returns the number of factors for each side.
 */
-int*
-facul_both (mpz_t **factors, mpz_t* N,
+std::array<int, 2>
+facul_both (std::array<std::vector<cxx_mpz>, 2> & factors,
+            std::array<cxx_mpz, 2> & N,
 	    const facul_strategies_t *strategies, int* is_smooth)
 {
   int cof[2];
   size_t bits;
-  int* found = NULL;
+  std::array<int, 2> found;
+  found.fill(0);
 
   modset_t n[2];
   n[0].arith = modset_t::CHOOSE_NONE;
@@ -1390,7 +1396,7 @@ facul_both (mpz_t **factors, mpz_t* N,
       bits = mpz_sizeinbase (N[side], 2);
       cof[side] = bits;
       if (bits > MODMPZ_MAXBITS)
-	return 0;
+	return found;
 
       /* Use the fastest modular arithmetic that's large enough for
 	 this input */
@@ -1436,8 +1442,8 @@ facul_both (mpz_t **factors, mpz_t* N,
       if (found[side] > 1)
 	{
 	  /* Sort the factors we found */
-	  qsort (factors[side], found[side], sizeof (mpz_t),
-		 (int (*)(const void *, const void *)) &my_cmp_mpz);
+          ASSERT_ALWAYS(factors[side].size() == (size_t) found[side]);
+          std::sort(factors[side].begin(), factors[side].end(), cxx_mpz_cmp());
 	}
     }
 

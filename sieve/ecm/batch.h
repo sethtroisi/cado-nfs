@@ -4,8 +4,8 @@
 #include <stdlib.h>
 #include <inttypes.h>
 #include <gmp.h>
-#include "facul.h"
-#include "facul_doit.h"
+#include "facul.hpp"
+#include "facul_doit.hpp"
 #include "utils.h"
 
 /* structure to compute on-line a product tree, avoiding to first compute a

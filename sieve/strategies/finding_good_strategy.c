@@ -284,12 +284,7 @@ void strategy_fprint_design(FILE * output_file, const strategy_t * t)
 {
     tabular_fm_t *tmp = t->tab_fm;
     for (int i = 0; i < tmp->index; i++) {
-	fprintf(output_file, "[");
-	//side: 
-	if (t->side[i] == SIDE_1)
-	    fputs("S1: ", output_file);
-	else			// == SIDE_0
-	    fputs("S0: ", output_file);
+	fprintf(output_file, "[S%d: ", t->side[i]);
 
 	fm_t *fm = tmp->tab[i];
 	//method: type, curve

@@ -14,7 +14,7 @@
 #include "trialdiv.h"
 // #include "bucket.hpp"
 #include "cado_poly.h"
-#include "ecm/facul.h"
+#include "ecm/facul.hpp"
 #include "fb-types.h"
 #include "las-plattice.hpp"
 #include "las-fill-in-buckets.hpp"

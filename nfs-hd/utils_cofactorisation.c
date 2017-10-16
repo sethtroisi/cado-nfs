@@ -332,9 +332,11 @@ nb_curves95 (const unsigned int lpb)
 // factors.
 // Remark: FACUL_NOT_SMOOTH is just -1.
 static int
-facul_aux (mpz_t *factors, const struct modset_t m,
+facul_aux (std::vector<cxx_mpz> & factors, const struct modset_t m,
     const facul_aux_data *data, int method_start)
 {
+    /* XXX ATTENTION: This function may be called recursively. In
+     * particular it may happen that the factors[] vector is not empty. */
   int found = 0;
   facul_method_t* methods = data->methods;
   if (methods == NULL)

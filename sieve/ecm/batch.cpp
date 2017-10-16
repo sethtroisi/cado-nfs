@@ -632,19 +632,6 @@ factor_simple_minded (std::vector<cxx_mpz> &factors,
      */
     trial_divide (factors, cofac, SP);
 
-    struct temp_t {
-        mpz_t temp[2];
-        temp_t() {
-            mpz_init(temp[0]);
-            mpz_init(temp[1]);
-        }
-        ~temp_t() {
-            mpz_clear(temp[0]);
-            mpz_clear(temp[1]);
-        }
-    };
-    temp_t temp;
-
     std::list<std::pair<cxx_mpz, facul_method_t *>> composites;
     if (mpz_cmp_ui(n, 1) > 0) 
         composites.push_back(std::make_pair(std::move(n), methods));
@@ -671,7 +658,9 @@ factor_simple_minded (std::vector<cxx_mpz> &factors,
         /* We're not going to try this method mode than once */
         fm[0].arith = modset_t::CHOOSE_NONE;
         fm[1].arith = modset_t::CHOOSE_NONE;
-        int nf = facul_doit_onefm_mpz (temp.temp, n0, *pm, &fm[0], &fm[1], lpb, BB, BBB);
+
+        std::vector<cxx_mpz> temp;
+        int nf = facul_doit_onefm_mpz (temp, n0, *pm, &fm[0], &fm[1], lpb, BB, BBB);
         pm++;
 
         /* Could happen if we allowed a cofactor bound after batch
@@ -693,11 +682,10 @@ factor_simple_minded (std::vector<cxx_mpz> &factors,
          * cofactors found */
         composites.pop_front();
 
+        ASSERT_ALWAYS(temp.size() == (size_t) nf);
         /* temp[0..nf-1] are prime factors of n, 0 <= nf <= 2 */
         for (int j = 0; j < nf; j++) {
-            cxx_mpz tz;
-            mpz_swap(tz, temp.temp[j]);
-            factors.push_back(std::move(tz));
+            factors.push_back(std::move(temp[j]));
         }
 
         /* we may also have composites */

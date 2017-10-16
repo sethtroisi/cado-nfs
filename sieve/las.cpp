@@ -16,7 +16,7 @@
 #include "portability.h"
 #include "utils.h"           /* lots of stuff */
 #include "relation.h"
-#include "ecm/facul.h"
+#include "ecm/facul.hpp"
 #include "bucket.hpp"
 #include "trialdiv.h"
 #include "las-config.h"
@@ -889,50 +889,29 @@ void apply_one_bucket<longhint_t> (unsigned char *S,
 
 
 /* {{{ Trial division */
-typedef struct {
-    uint64_t *fac;
-    int n;
-} factor_list_t;
-
-#define FL_MAX_SIZE 200
-
-void factor_list_init(factor_list_t *fl) {
-    fl->fac = (uint64_t *) malloc (FL_MAX_SIZE * sizeof(uint64_t));
-    ASSERT_ALWAYS(fl->fac != NULL);
-    fl->n = 0;
-}
-
-void factor_list_clear(factor_list_t *fl) {
-    free(fl->fac);
-}
+typedef std::vector<uint64_t> factor_list_t;
 
 static void 
-factor_list_add(factor_list_t *fl, const uint64_t p)
+factor_list_add(factor_list_t & fl, const uint64_t p)
 {
-  ASSERT_ALWAYS(fl->n < FL_MAX_SIZE);
-  fl->fac[fl->n++] = p;
+    fl.push_back(p);
 }
 
 bool
-factor_list_contains(const factor_list_t *fl, const uint64_t p)
+factor_list_contains(factor_list_t const & fl, const uint64_t p)
 {
-  for (int i = 0; i < fl->n; i++) {
-    if (fl->fac[i] == p)
-      return true;
-  }
-  return false;
+    return std::find(fl.begin(), fl.end(), p) != fl.end();
 }
 
 // print a comma-separated list of factors.
 // returns the number of factor printed (in particular, a comma is needed
 // after this output only if the return value is non zero)
-int factor_list_fprint(FILE *f, factor_list_t fl) {
-    int i;
-    for (i = 0; i < fl.n; ++i) {
+int factor_list_fprint(FILE *f, factor_list_t const & fl) {
+    for(size_t i = 0; i < fl.size(); ++i) {
         if (i) fprintf(f, ",");
-        fprintf(f, "%" PRIx64, fl.fac[i]);
+        fprintf(f, "%" PRIx64, fl[i]);
     }
-    return i;
+    return fl.size();
 }
 
 
@@ -944,7 +923,7 @@ static long nr_composite_tests = 0;
 static long nr_wrap_was_composite = 0;
 /* The entries in BP must be sorted in order of increasing x */
 static void
-divide_primes_from_bucket (factor_list_t *fl, mpz_t norm, const unsigned int N, const unsigned int x,
+divide_primes_from_bucket (factor_list_t & fl, mpz_t norm, const unsigned int N, const unsigned int x,
                            bucket_primes_t *BP, const int very_verbose)
 {
   while (!BP->is_end()) {
@@ -991,7 +970,7 @@ divide_primes_from_bucket (factor_list_t *fl, mpz_t norm, const unsigned int N, 
 
 /* The entries in BP must be sorted in order of increasing x */
 static void
-divide_hints_from_bucket (factor_list_t *fl, mpz_t norm, const unsigned int N, const unsigned int x,
+divide_hints_from_bucket (factor_list_t &fl, mpz_t norm, const unsigned int N, const unsigned int x,
                           bucket_array_complete *purged, const fb_factorbase *fb, const int very_verbose)
 {
   while (!purged->is_end()) {
@@ -1051,7 +1030,7 @@ divide_hints_from_bucket (factor_list_t *fl, mpz_t norm, const unsigned int N, c
  * TODO: find a better name for this function.
  */
 NOPROFILE_STATIC void
-trial_div (factor_list_t *fl, mpz_t norm, const unsigned int N, unsigned int x,
+trial_div (std::vector<uint64_t> & fl, mpz_t norm, const unsigned int N, unsigned int x,
            const bool handle_2, bucket_primes_t *primes,
            bucket_array_complete *purged,
 	   trialdiv_divisor_t *trialdiv_data,
@@ -1064,7 +1043,7 @@ trial_div (factor_list_t *fl, mpz_t norm, const unsigned int N, unsigned int x,
     const int trial_div_very_verbose = 0;
 #endif
     int nr_factors;
-    fl->n = 0; /* reset factor list */
+    fl.clear();
 
     if (trial_div_very_verbose) {
         verbose_output_start_batch();
@@ -1075,11 +1054,8 @@ trial_div (factor_list_t *fl, mpz_t norm, const unsigned int N, unsigned int x,
     // handle 2 separately, if it is in fb
     if (handle_2) {
         int bit = mpz_scan1(norm, 0);
-        int i;
-        for (i = 0; i < bit; ++i) {
-            fl->fac[fl->n] = 2;
-            fl->n++;
-        }
+        for (int i = 0; i < bit; ++i)
+            fl.push_back(2);
         if (trial_div_very_verbose)
             verbose_output_vfprint(TRACE_CHANNEL, 0, gmp_vfprintf, "# x = %d, dividing out 2^%d, norm = %Zd\n", x, bit, norm);
         mpz_tdiv_q_2exp(norm, norm, bit);
@@ -1424,17 +1400,9 @@ void factor_survivors_data::cofactoring (timetree_t & timer)
     sieve_info & si(*th->psi);
     las_report_ptr rep = th->rep;
 
-    mpz_t norm[2];
+    std::array<cxx_mpz, 2> norm;
     factor_list_t factors[2];
-    mpz_array_t *lps[2] = { NULL, };
-    uint32_array_t *lps_m[2] = { NULL, }; /* corresponding multiplicities */
-
-    for(int side = 0 ; side < 2 ; side++) {
-        lps[side] = alloc_mpz_array (1);
-        lps_m[side] = alloc_uint32_array (1);
-        factor_list_init(&factors[side]);
-        mpz_init (norm[side]);
-    }
+    std::array<std::vector<cxx_mpz>, 2> lps;
 
 #ifdef SUPPORT_LARGE_Q
         mpz_t az, bz;
@@ -1560,7 +1528,7 @@ void factor_survivors_data::cofactoring (timetree_t & timer)
             const bool handle_2 = true; /* FIXME */
             th->rep->survivors.trial_divided_on_side[side]++;
 
-            trial_div (&factors[side], norm[side], N, x,
+            trial_div (factors[side], norm[side], N, x,
                     handle_2,
                     &sdata[side].primes,
                     &sdata[side].purged,
@@ -1629,7 +1597,7 @@ void factor_survivors_data::cofactoring (timetree_t & timer)
         TIMER_CATEGORY(timer, cofactoring_mixed());
 
         rep->ttcof -= microseconds_thread ();
-        pass = factor_both_leftover_norms(norm, lps, lps_m, si);
+        pass = factor_both_leftover_norms(norm, lps, si);
         th->rep->survivors.cofactored += (pass != 0);
         rep->ttcof += microseconds_thread ();
 #ifdef TRACE_K
@@ -1663,13 +1631,11 @@ void factor_survivors_data::cofactoring (timetree_t & timer)
         /* Note that we explicitly do not bother about storing r in
          * the relations below */
         for (int side = 0; side < 2; side++) {
-            for(int i = 0 ; i < factors[side].n ; i++)
-                rel.add(side, factors[side].fac[i], 0);
-
-            for (unsigned int i = 0; i < lps[side]->length; ++i)
-                rel.add(side, lps[side]->data[i], 0);
+            for (auto const& z : factors[side])
+                rel.add(side, z, 0);
+            for (auto const& z : lps[side])
+                rel.add(side, z, 0);
         }
-
         rel.add(si.conf.side, si.doing.p, 0);
 
         rel.compress();
@@ -1725,13 +1691,6 @@ void factor_survivors_data::cofactoring (timetree_t & timer)
         mpz_clear(az);
         mpz_clear(bz);
 #endif
-
-    for(int side = 0 ; side < 2 ; side++) {
-        mpz_clear(norm[side]);
-        factor_list_clear(&factors[side]);
-        clear_uint32_array (lps_m[side]);
-        clear_mpz_array (lps[side]);
-    }
 }
 
 /* Adds the number of sieve reports to *survivors,
@@ -2412,7 +2371,7 @@ int main (int argc0, char *argv0[])/*{{{*/
 
 #ifndef SUPPORT_LARGE_Q
         if (!Adj.Q.fits_31bits()) { // for fb_root_in_qlattice_31bits
-            fprintf (stderr,
+            verbose_output_print(2, 1,
                     "Warning, special-q basis is too skewed,"
                     " skipping this special-q."
                     " Define SUPPORT_LARGE_Q to proceed anyway.\n");
