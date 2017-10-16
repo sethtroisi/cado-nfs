@@ -20,7 +20,11 @@
 #include "facul.hpp"
 #include "facul_doit.hpp"
 
-/* These global variables are only for statistics. In case of
+#ifdef ENABLE_UNSAFE_FACUL_STATS
+/*
+ * FIXME: the stats are not thread-safe!
+ *
+ * These global variables are only for statistics. In case of
  * multithreaded sieving, the stats might be wrong...
  */
 
@@ -44,6 +48,7 @@ unsigned long stats_found_n[STATS_LEN] = {
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 };
+#endif  /* ENABLE_UNSAFE_FACUL_STATS */
 
 static int nb_curves90 (const unsigned int lpb);
 #if 0
@@ -258,8 +263,9 @@ struct cxx_mpz_cmp {
     }
 };
 
-void facul_print_stats (FILE *stream)
+void facul_print_stats (FILE *stream MAYBE_UNUSED)
 {
+#ifdef ENABLE_UNSAFE_FACUL_STATS
   int i, notfirst;
   unsigned long sum;
 
@@ -300,6 +306,7 @@ void facul_print_stats (FILE *stream)
 		 (notfirst++) ? ", " : "", i, stats_found_n[i]);
     }
   fprintf (stream, ". Total: %lu\n", sum);
+#endif  /* ENABLE_UNSAFE_FACUL_STATS */
 }
 
 
@@ -1087,8 +1094,10 @@ facul_aux (std::vector<cxx_mpz> & factors, const modset_t m,
       if (methods[i].side != side)
 	continue; /* this method is not for this side */
 
+#ifdef ENABLE_UNSAFE_FACUL_STATS
       if (i < STATS_LEN)
 	stats_called_aux[i]++;
+#endif  /* ENABLE_UNSAFE_FACUL_STATS */
       modset_t fm, cfm;
 
       int res_fac = 0;
@@ -1217,19 +1226,20 @@ facul_both_src (std::array<std::vector<cxx_mpz>, 2> & factors, const modset_t* m
   f[0][1].arith = modset_t::CHOOSE_NONE;
   f[1][0].arith = modset_t::CHOOSE_NONE;
   f[1][1].arith = modset_t::CHOOSE_NONE;
+#ifdef ENABLE_UNSAFE_FACUL_STATS
   int stats_nb_side = 0, stats_index_transition = 0;
+#endif  /* ENABLE_UNSAFE_FACUL_STATS */
   int last_i[2]; /* last_i[s] is the index of last method tried on side s */
   for (int i = 0; methods[i].method != NULL; i++)
     {
-      // {for the stats
-      // FIXME: the stats are not thread-safe!
+#ifdef ENABLE_UNSAFE_FACUL_STATS
       stats_current_index = i - stats_nb_side * stats_index_transition;
       if (methods[i].is_the_last)
 	{
 	  stats_nb_side = 1;
 	  stats_index_transition = i+1;
 	}
-      // }
+#endif  /* ENABLE_UNSAFE_FACUL_STATS */
       int side = methods[i].side;
       if (is_smooth[side] != FACUL_MAYBE)
 	{
@@ -1246,10 +1256,10 @@ facul_both_src (std::array<std::vector<cxx_mpz>, 2> & factors, const modset_t* m
 	  continue;
 	}
 
-      // {for the stats
+#ifdef ENABLE_UNSAFE_FACUL_STATS
       if (stats_current_index < STATS_LEN)
 	stats_called[stats_current_index]++;
-      // }
+#endif  /* ENABLE_UNSAFE_FACUL_STATS */
       int res_fac = 0;
       last_i[side] = i;
       switch (m[side].arith) {

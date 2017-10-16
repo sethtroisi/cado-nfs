@@ -5,10 +5,11 @@
 #include "facul_ecm.h"
 #include "mpqs.h"
 
+#ifdef ENABLE_UNSAFE_FACUL_STATS
 extern unsigned long stats_called[];
 extern unsigned long stats_found_n[];
 extern int stats_current_index;
-
+#endif
 
 #define mod_intget_mpz MOD_RENAME(int_get_mpz)
 void
@@ -152,8 +153,10 @@ facul_doit (std::vector<cxx_mpz> & factors, const modulus_t m,
         break;
 #endif
 
+#ifdef ENABLE_UNSAFE_FACUL_STATS
       if (i < STATS_LEN)
 	stats_called[i]++;
+#endif
       
       if (strategy->methods[i].method == PM1_METHOD)
 	bt = pm1 (f, m, (pm1_plan_t *) (strategy->methods[i].plan));
@@ -230,8 +233,10 @@ facul_doit (std::vector<cxx_mpz> & factors, const modulus_t m,
       
       if (mod_intequal (f, n))
 	{
+#ifdef ENABLE_UNSAFE_FACUL_STATS
 	  if (i < STATS_LEN)
 	    stats_found_n[i]++;
+#endif  /* ENABLE_UNSAFE_FACUL_STATS */
 
 	  if (bt == 0)
 	    {
@@ -489,8 +494,10 @@ facul_doit_onefm (std::vector<cxx_mpz> & factors, const modulus_t m,
       
   if (mod_intequal (f, n))
     {
+#ifdef ENABLE_UNSAFE_FACUL_STATS
       if (stats_current_index < STATS_LEN)
 	stats_found_n[stats_current_index]++;
+#endif  /* ENABLE_UNSAFE_FACUL_STATS */
       if (bt == 0)
 	{
 	  /* Input number was found without any backtracking happening?
