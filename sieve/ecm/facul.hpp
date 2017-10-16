@@ -1,5 +1,5 @@
-#ifndef FACUL_H
-#define FACUL_H
+#ifndef FACUL_HPP_
+#define FACUL_HPP_
 
 #include <stdio.h>
 #include <stdint.h>
@@ -59,10 +59,6 @@ typedef struct {
   double BBB;               /* The factor base bound cubed. */
   facul_method_t *methods;  /* List of methods to try */
 } facul_strategy_t;
-
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 
 
@@ -149,8 +145,4 @@ std::array<int,2>
 facul_both (std::array<std::vector<cxx_mpz>, 2>&, std::array<cxx_mpz, 2> & ,
 	    const facul_strategies_t *, int*);
 
-#ifdef __cplusplus
-}
-#endif
-
-#endif /* FACUL_H */
+#endif /* FACUL_HPP_ */
