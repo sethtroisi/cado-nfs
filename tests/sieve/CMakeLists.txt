@@ -68,7 +68,8 @@ cado_define_test(c90_21505_sieve
 # We have to make this a "test" so that ctest runs it, even though it does
 # not actually test anything
 cado_define_test(F9_sievetest_cleanup
-        PROGRAM ${CMAKE_COMMAND} -E remove -f ${F9_checksums})
+        PROGRAM ${CMAKE_COMMAND} -E remove -f
+        ${F9_checksums} ${F9_checksums}_quick)
 
 cado_define_test(F9_makefb
         PROGRAM
@@ -208,7 +209,7 @@ cado_divert_test(F9 todo
         APPEND_ENVIRONMENT
             REFERENCE_SHA1=451406185eca205ee28990c7381f85a1c4942c5f
             REFERENCE_REVISION=88ddb4f779defe692aed14a79ef8c952a4f68efa
-            CHECKSUM_FILE=${F9_checksums}_other
+            CHECKSUM_FILE=
             todo=${CADO_NFS_SOURCE_DIR}/tests/sieve/F9.todo
         )
 
