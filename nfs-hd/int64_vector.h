@@ -7,6 +7,13 @@
 #include "sieving_bound.h"
 #include "vector.h"
 
+/* TODO: should be std::vector<int64_t> */
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+
 /*
  * Initialise a vector.
  *
@@ -204,4 +211,8 @@ int64_t int64_vector_gcd(int64_vector_srcptr v);
  * u = v / gcd(v)
  */
 void int64_vector_reduce(int64_vector_ptr u, int64_vector_srcptr v);
+
+#ifdef __cplusplus
+}
+#endif
 #endif // INT64_VECTOR_H

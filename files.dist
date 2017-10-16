@@ -391,7 +391,7 @@ sieve/ecm/mpqs_2ul2.c
 sieve/ecm/mpqs_mpz.c
 sieve/ecm/batch.h
 sieve/ecm/batch.cpp
-sieve/ecm/finishbatch.c
+sieve/ecm/finishbatch.cpp
 sieve/fb.cpp
 sieve/fb.hpp
 sieve/fb-types.h
@@ -760,10 +760,10 @@ sieve/strategies/CMakeLists.txt
 sieve/strategies/Makefile
 sieve/strategies/README
 sieve/strategies/README.c120
-sieve/strategies/benchfm_exec.c
+sieve/strategies/benchfm_exec.cpp
 sieve/strategies/generate_factoring_method.cpp
 sieve/strategies/generate_factoring_method.hpp
-sieve/strategies/gfm_exec.c
+sieve/strategies/gfm_exec.cpp
 sieve/strategies/utils_st/convex_hull.c
 sieve/strategies/utils_st/convex_hull.h
 sieve/strategies/utils_st/fm.c
@@ -782,11 +782,11 @@ sieve/strategies/utils_st/decomp.c
 sieve/strategies/utils_st/decomp.h
 sieve/strategies/utils_st/tab_decomp.c
 sieve/strategies/utils_st/tab_decomp.h
-sieve/strategies/gst_exec.c
+sieve/strategies/gst_exec.cpp
 sieve/strategies/generate_strategies.cpp
 sieve/strategies/generate_strategies.h
 sieve/strategies/final_exec.c
-sieve/strategies/finding_good_strategy.c
+sieve/strategies/finding_good_strategy.cpp
 sieve/strategies/finding_good_strategy.h
 sieve/strategies/gen_decomp.c
 sieve/strategies/gen_decomp.h

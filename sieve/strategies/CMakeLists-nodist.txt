@@ -5,8 +5,8 @@ set (SRC_UTILS ${SUF_UTILS}point.c ${SUF_UTILS}tab_point.c
      ${SUF_UTILS}decomp.c ${SUF_UTILS}tab_decomp.c)
 
 add_executable(test_strategy_cado
-  test_strategy_cado.c
-  finding_good_strategy.c
+  test_strategy_cado.cpp
+  finding_good_strategy.cpp
   generate_strategies.cpp
   generate_factoring_method.cpp
   ${SRC_UTILS})

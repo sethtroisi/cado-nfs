@@ -5,6 +5,13 @@
 #include "utils.h"
 #include "int64_vector.h"
 
+/* TODO: this looks like reinventing the wheel again and
+ * again and again. */
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /*
  * Array is used to store the value of norm. An index correnspond to an element
  * (a_0, a_1, …, a_{t-1}) with t the dimension of the lattice we consider.
@@ -136,4 +143,7 @@ unsigned char array_get_at(array_ptr array, int * vec,
 void array_set_at(array_ptr array, int * vec, unsigned char val,
     sieving_bound_srcptr H);
 
+#ifdef __cplusplus
+}
+#endif
 #endif /* ARRAY_H */

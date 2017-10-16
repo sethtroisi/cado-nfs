@@ -8,14 +8,14 @@ set (SRC_UTILS ${SUF_UTILS}point.c ${SUF_UTILS}tab_point.c
 
 set (LIB_EXEC m facul utils)
 
-add_executable(gfm gfm_exec.c generate_factoring_method.cpp ${SRC_UTILS})
+add_executable(gfm gfm_exec.cpp generate_factoring_method.cpp ${SRC_UTILS})
 target_link_libraries(gfm ${LIB_EXEC})
 
-add_executable(benchfm benchfm_exec.c generate_factoring_method.cpp ${SRC_UTILS})
+add_executable(benchfm benchfm_exec.cpp generate_factoring_method.cpp ${SRC_UTILS})
 target_link_libraries(benchfm ${LIB_EXEC})
 
 add_executable(gst 
-  gst_exec.c 
+  gst_exec.cpp
   generate_strategies.cpp
   gen_decomp.c
   ${SUF_UTILS}/decomp.c
@@ -26,7 +26,7 @@ target_link_libraries(gst ${LIB_EXEC})
 
 add_executable(finalst 
   final_exec.c
-  finding_good_strategy.c 
+  finding_good_strategy.cpp
   ${SRC_UTILS})
 
 target_link_libraries(finalst ${LIB_EXEC})
