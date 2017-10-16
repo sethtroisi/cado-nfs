@@ -43,50 +43,25 @@ struct relation_ab {
 struct relation : public relation_ab {
     /* Note that for the rational side, we do not compute r !!! */
     struct pr {
-        mpz_t p,r;
-        int e;
-        /* we don't want to use mpz_class, so this is a little bit touchy
-         */
-        pr() {
-            mpz_init_set_ui(p, 0);
-            mpz_init_set_ui(r, 0);
-            e=0;
-        }
+        cxx_mpz p,r;
+        int e = 0;
+        pr() = default;
         pr(mpz_srcptr ap, mpz_srcptr ar, int ae=1) {
-            mpz_init_set(p, ap);
+            mpz_set(p, ap);
             if (ar)
-                mpz_init_set(r, ar);
+                mpz_set(r, ar);
             else
-                mpz_init_set_ui(r, 0);
+                mpz_set_ui(r, 0);
             e = ae;
         }
         pr(unsigned long ap, unsigned long ar, int ae=1) {
-            mpz_init_set_ui(p, ap);
-            mpz_init_set_ui(r, ar);
+            mpz_set_ui(p, ap);
+            mpz_set_ui(r, ar);
             e = ae;
         }
-        ~pr() { mpz_clear(p);
-            mpz_clear(r);
-        }
-        pr(pr const& o) { mpz_init_set(p, o.p);
-            mpz_init_set(r, o.r);
-            e=o.e;
-        }
-#if __cplusplus >= 201103L
-        pr(pr && o) {
-            mpz_init(p);
-            mpz_init(r);
-            mpz_swap(p, o.p);
-            mpz_swap(r, o.r);
-            e=o.e;
-        }
-#endif
-        pr& operator=(const pr& o) {
-            mpz_set(p, o.p);
-            mpz_set(r, o.r);
-            e=o.e;
-            return *this;
-        }
+        pr(pr const& o) = default;
+        pr(pr && o) = default;
+        pr& operator=(const pr& o) = default;
     };
     int rational_side = -1;    /* index of the rational side, if any */
     int nb_polys = 0;         /* number of polynoms, default = 2 */
