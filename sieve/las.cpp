@@ -1498,7 +1498,7 @@ void factor_survivors_data::cofactoring (timetree_t & timer)
 #ifdef TRACE_K
             if (trace_on_spot_ab(a, b)) {
                 verbose_output_vfprint(TRACE_CHANNEL, 0,
-                        gmp_vfprintf, "# start trial division for norm=%Zd ", norm[side]);
+                        gmp_vfprintf, "# start trial division for norm=%Zd ", (mpz_srcptr) norm[side]);
                 verbose_output_print(TRACE_CHANNEL, 0,
                         "on side %d for (%" PRId64 ",%" PRIu64 ")\n", side, a, b);
             }
@@ -1532,7 +1532,7 @@ void factor_survivors_data::cofactoring (timetree_t & timer)
 #ifdef TRACE_K
             if (trace_on_spot_ab(a, b)) {
                 verbose_output_vfprint(TRACE_CHANNEL, 0, gmp_vfprintf,
-                        "# checked leftover norm=%Zd", norm[side]);
+                        "# checked leftover norm=%Zd", (mpz_srcptr) norm[side]);
                 verbose_output_print(TRACE_CHANNEL, 0,
                         " on side %d for (%" PRId64 ",%" PRIu64 "): %d\n",
                         side, a, b, pass);
@@ -1600,7 +1600,9 @@ void factor_survivors_data::cofactoring (timetree_t & timer)
           verbose_output_print(TRACE_CHANNEL, 0,
                   "# factor_leftover_norm failed for (%" PRId64 ",%" PRIu64 "), ", a, b);
           verbose_output_vfprint(TRACE_CHANNEL, 0, gmp_vfprintf,
-                  "remains %Zd, %Zd unfactored\n", norm[0], norm[1]);
+                  "remains %Zd, %Zd unfactored\n",
+                  (mpz_srcptr) norm[0],
+                  (mpz_srcptr) norm[1]);
         }
 #endif
         if (pass <= 0) continue; /* a factor was > 2^lpb, or some

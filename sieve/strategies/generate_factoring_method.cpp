@@ -288,7 +288,7 @@ void bench_proba(gmp_randstate_t state, tabular_fm_t * fm, int len_p_min,
     fm_t *elem;
 
     //Will contain the our composite integers!
-    std::vector<cxx_mpz> N[p_max];
+    std::vector<std::vector<cxx_mpz>> N(p_max);
     
     for (int i = 0; i < len; i++) {
 	elem = tabular_fm_get_fm(fm, i);

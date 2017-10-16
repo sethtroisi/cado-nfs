@@ -226,7 +226,7 @@ void bench_proba_mini(gmp_randstate_t state, tabular_fm_t * fm, int* val_p,
     fm_t *elem;
 
     //{{Will contain the precomputes of composite integer!
-    std::vector<cxx_mpz> N[len_val_p];
+    std::vector<std::vector<cxx_mpz>> N(len_val_p);
     int nb_test_max = 10000;
 
     //}}

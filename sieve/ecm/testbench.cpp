@@ -76,7 +76,7 @@ tryfactor (cxx_mpz const & N, const facul_strategy_t *strategy,
   int facul_code;
 
   if (verbose >= 2)
-    gmp_printf ("Trying to factor %Zd\n", N);
+    gmp_printf ("Trying to factor %Zd\n", (mpz_srcptr) N);
 
   facul_code = facul (f, N, strategy);
   
@@ -86,24 +86,23 @@ tryfactor (cxx_mpz const & N, const facul_strategy_t *strategy,
   if (printfactors && facul_code > 0)
     {
       int j;
-      gmp_printf ("%Zd", f[0]);
+      gmp_printf ("%Zd", (mpz_srcptr) f[0]);
       for (j = 1; j < facul_code; j++)
-        gmp_printf (" %Zd", f[j]);
+        gmp_printf (" %Zd", (mpz_srcptr) f[j]);
       if (printcofactors) {
-        mpz_t c;
-        mpz_init_set (c, N);
+        cxx_mpz c;
+        mpz_set (c, N);
         for (j = 0; j < facul_code; j++)
           mpz_divexact (c, c, f[j]);
         if (mpz_cmp_ui (c, 1) != 0)
-          gmp_printf (" %Zd", c);
-        mpz_clear (c);
+          gmp_printf (" %Zd", (mpz_srcptr) c);
       }
       printf ("\n");
     }
   
   if (printnonfactors && (facul_code == 0 || facul_code == FACUL_NOT_SMOOTH))
     {
-      gmp_printf ("%Zd\n", N);
+      gmp_printf ("%Zd\n", (mpz_srcptr) N);
     }
   
   return facul_code;
@@ -502,7 +501,7 @@ int main (int argc, char **argv)
             if (mpz_fits_ulong_p (N))
               print_pointorder (mpz_get_ui (N), po_sigma, po_parameterization, printfactors);
             else
-              gmp_fprintf (stderr, "%Zd does not fit into an unsigned long, not computing group order\n", N);
+              gmp_fprintf (stderr, "%Zd does not fit into an unsigned long, not computing group order\n", (mpz_srcptr) N);
           }
         else
           {
