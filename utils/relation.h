@@ -59,9 +59,9 @@ struct relation : public relation_ab {
             mpz_set_ui(r, ar);
             e = ae;
         }
-        pr(pr const& o) = default;
-        pr(pr && o) = default;
-        pr& operator=(const pr& o) = default;
+        pr(pr const&) = default;
+        pr(pr &&) = default;
+        pr& operator=(const pr&) = default;
     };
     int rational_side = -1;    /* index of the rational side, if any */
     int nb_polys = 0;         /* number of polynoms, default = 2 */
