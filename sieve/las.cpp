@@ -2551,8 +2551,6 @@ for (unsigned int j_cong = 0; j_cong < sublat_bound; ++j_cong) {
          * in the sieve_info structure, otherwise we'll be polluted by
          * the leftovers from earlier runs.
          */
-        si.update(nr_workspaces);
-
 
 #ifdef TRACE_K
         init_trace_k(si, pl);
@@ -2568,54 +2566,74 @@ for (unsigned int j_cong = 0; j_cong < sublat_bound; ++j_cong) {
          * this hack).
          */
     
-        workspaces->thrs[0].rep->ttbuckets_fill -= seconds();
+        /* we allow fill-in-buckets to run several times, so that
+         * reallocation due to buckets overflowing is allowed */
+        for(;;) {
 
-        /* Allocate buckets */
-        workspaces->pickup_si(si);
+            si.update(nr_workspaces);
 
-        for(int side = 0 ; side < 2 ; side++) {
-            /* This uses the thread pool, and stores the time spent under
-             * timer_special_q (with wait time stored separately */
-            if (!si.sides[side].fb) continue;
-            fill_in_buckets(timer_special_q, *pool, *workspaces, si, side);
+            workspaces->thrs[0].rep->ttbuckets_fill -= seconds();
+
+            /* Allocate buckets */
+            workspaces->pickup_si(si);
+
+            for(int side = 0 ; side < 2 ; side++) {
+                /* This uses the thread pool, and stores the time spent under
+                 * timer_special_q (with wait time stored separately */
+                if (!si.sides[side].fb) continue;
+                fill_in_buckets(timer_special_q, *pool, *workspaces, si, side);
+            }
+
+            // useless
+            // pool->accumulate_and_clear_active_time(*timer_special_q.current);
+
+            workspaces->thrs[0].rep->ttbuckets_fill += seconds();
+
+            /* Check that buckets are not more than full.
+             * Due to templates and si.toplevel being not constant, need a
+             * switch. (really?)
+             */
+            double this_max_full;
+            switch(si.toplevel) {
+                case 1:
+                    this_max_full = workspaces->buckets_max_full<1, shorthint_t>();
+                    break;
+                case 2:
+                    this_max_full = workspaces->buckets_max_full<2, shorthint_t>();
+                    break;
+                case 3:
+                    this_max_full = workspaces->buckets_max_full<3, shorthint_t>();
+                    break;
+                default:
+                    ASSERT_ALWAYS(0);
+            }
+            if (this_max_full >= max_full)
+                max_full = this_max_full;
+
+            if (max_full < 1) 
+                break;
+            {
+                verbose_output_vfprint(2, 1, gmp_vfprintf, "# max_full=%f -- cannot continue sieving for q=%Zd, rho=%Zd\n",
+                        max_full, (mpz_srcptr) doing.p, (mpz_srcptr) doing.r);
+                verbose_output_vfprint (2, 1, gmp_vfprintf,
+                        "# redoing q=%Zd, rho=%Zd because buckets are full (maxfull=%f)\n"
+                        "# Maybe you have too many threads compared to the size of the factor bases.\n"
+                        "# Please try less threads, or a larger -bkmult parameter (at some cost!).\n"
+                        "# The code will now try to adapt by allocating more memory for buckets.\n",
+                        (mpz_srcptr) doing.p, (mpz_srcptr) doing.r, max_full);
+                double new_bk_multiplier = si.conf.bk_multiplier * (double) max_full * 1.01;
+                verbose_output_print (2, 1, "# Updating bucket multiplier to %.3f*%f*1.01=%.3f\n",
+                        si.conf.bk_multiplier,
+                        max_full,
+                        new_bk_multiplier
+                        );
+                max_full = 0;
+                las.config_pool.change_bk_multiplier(new_bk_multiplier);
+                si.conf.bk_multiplier = new_bk_multiplier;
+            }
         }
 
-        // useless
-        // pool->accumulate_and_clear_active_time(*timer_special_q.current);
-
-        /* Check that buckets are not more than full.
-         * Due to templates and si.toplevel being not constant, need a
-         * switch. (really?)
-         */
-        double this_max_full;
-        switch(si.toplevel) {
-            case 1:
-                this_max_full = workspaces->buckets_max_full<1, shorthint_t>();
-                break;
-            case 2:
-                this_max_full = workspaces->buckets_max_full<2, shorthint_t>();
-                break;
-            case 3:
-                this_max_full = workspaces->buckets_max_full<3, shorthint_t>();
-                break;
-            default:
-                ASSERT_ALWAYS(0);
-        }
-        if (this_max_full >= max_full)
-            max_full = this_max_full;
-
-        if (max_full > 1) {
-            verbose_output_vfprint(2, 1, gmp_vfprintf, "# max_full=%f -- cannot continue sieving for q=%Zd, rho=%Zd\n",
-                    max_full, (mpz_srcptr) doing.p, (mpz_srcptr) doing.r);
-            continue;
-        }
-        /*
-        ASSERT_ALWAYS(max_full <= 1.0 ||
-                fprintf (stderr, "max_full=%f, see #14987\n", max_full) == 0);
-                */
         
-        workspaces->thrs[0].rep->ttbuckets_fill += seconds();
-
         // this timing slot is insignificant, let's put it with the
         // bookkeeping crop
         // SIBLING_TIMER(timer_special_q, "prepare small sieve");
@@ -2769,25 +2787,6 @@ if (si.conf.sublat.m) {
         }
     }
 }
-
-        if (max_full > 1) {
-            verbose_output_vfprint (2, 1, gmp_vfprintf, "# redoing q=%Zd, rho=%Zd because buckets are full.\n", 
-                    (mpz_srcptr) doing.p, (mpz_srcptr) doing.r);
-
-            double new_bk_multiplier = conf.bk_multiplier * (double) max_full * 1.01;
-            verbose_output_print (2, 1, "# Updating bucket multiplier to %.3f*%f*1.01=%.3f\n",
-                    conf.bk_multiplier,
-                    max_full,
-                    new_bk_multiplier
-                  );
-            max_full = 0;
-            las.config_pool.change_bk_multiplier(new_bk_multiplier);
-            /* we have to roll back the updates we made to
-             * this structure. */
-            std::swap(las.todo, saved_todo);
-            las.tree.ditch_node();
-            continue;
-        }
 
 #ifdef  DLP_DESCENT
         SIBLING_TIMER(timer_special_q, "descent");

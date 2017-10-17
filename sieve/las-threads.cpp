@@ -119,11 +119,7 @@ T *reservation_array<T>::reserve()
       }
     }
     if (least_full_index == n || least_full >= 1.) {
-        verbose_output_print(2, 1,
-                "# Error: buckets are full (maxfull=%f)!\n"
-                "# Maybe you have too many threads compared to the size of the factor bases.\n"
-                "# Please try less threads, or a larger -bkmult parameter (at some cost!).\n"
-                "# The code will now try to adapt by allocating more memory for buckets.\n", most_full);
+        /* don't cry just now, it would clutter the output. */
         ASSERT_ALWAYS(most_full > 1);
         // size_t j = most_full_index.first;
         // unsigned int i = most_full_index.second;

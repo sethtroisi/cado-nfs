@@ -96,9 +96,11 @@ cado_divert_test(F9 sieve
             REFERENCE_REVISION=ede066464ba58b2d6127fa256cef01706282e0ed
         )
 
+# go wild for the under-allocation. If this is valgrind-ok, then
+# surely #21513 is fixed.
 cado_divert_test(F9 sieve_check_overfull_buckets
         APPEND_ENVIRONMENT
-            q0=1200109 rho=116642 bkmult=0.7
+            q0=1200109 rho=116642 bkmult=0.2
             REL_COUNT=57
             REFERENCE_SHA1=2b973ed88e146aee756d9a27e260157179defc4d
             REFERENCE_REVISION=f06a6284d2cdcb669e300cd0dda349b349761578

@@ -156,9 +156,9 @@ EOF
     }
 
     SHA1=`grep "^[^#]" "${RELS}" | sort_rels | ${SHA1BIN}` || exit 1
+    SHA1="${SHA1%% *}"
     echo "$0: Got SHA1 of ${SHA1}"
     echo "$0: expected ${REFERENCE_SHA1}"
-    SHA1="${SHA1%% *}"
     if [ "${SHA1}" != "${REFERENCE_SHA1}" ] ; then
       if [ -n "${REFERENCE_REVISION}" ] ; then
         REFMSG=", as created by Git revision ${REFERENCE_REVISION}"
