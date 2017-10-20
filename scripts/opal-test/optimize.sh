@@ -201,10 +201,7 @@ fi
 ncurves1_max=`expr $ncurves1 + 3`
 I_min=`expr $I - 1`
 I_max=`expr $I + 1`
-# limit I_max to 18
-if [ $I_max -gt 18 ]; then
-    I_max=18
-fi
+# in the future-I18 branch, there is no upper limit any more on I
 
 ### Replace parameters values in template
 sed "s/lim0_def/$lim0/g" las_decl_template.py | \
