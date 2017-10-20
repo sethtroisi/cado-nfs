@@ -1454,16 +1454,35 @@ void factor_survivors_data::cofactoring (timetree_t & timer)
 
         /* Since the q-lattice is exactly those (a, b) with
            a == rho*b (mod q), q|b  ==>  q|a  ==>  q | gcd(a,b) */
+        /* In case of composite sq, have to check all factors... */
         /* FIXME: fast divisibility test here! */
         /* Dec 2014: on a c90, it takes 0.1 % of total sieving time*/
+        if (si.doing.prime_sq) {
 #ifndef SUPPORT_LARGE_Q
-        if (b == 0 || (mpz_cmp_ui(si.doing.p, b) <= 0 && b % mpz_get_ui(si.doing.p) == 0))
+            if (b == 0 || (mpz_cmp_ui(si.doing.p, b) <= 0 && b % mpz_get_ui(si.doing.p) == 0))
 #else
-        if ((mpz_cmp_ui(bz, 0) == 0) || 
-            (mpz_cmp(si.doing.p, bz) <= 0 &&
-             mpz_divisible_p(bz, si.doing.p)))
+            if ((mpz_cmp_ui(bz, 0) == 0) || 
+                (mpz_cmp(si.doing.p, bz) <= 0 &&
+                 mpz_divisible_p(bz, si.doing.p)))
 #endif
-            continue;
+                continue;
+        } else {
+#ifdef SUPPORT_LARGE_Q
+            ASSERT_ALWAYS(0); // FIXME: not yet implemented!
+#endif
+            if (b == 0)
+                continue;
+            bool ok = true;
+            for (auto const& facq : si.doing.prime_factors) {
+                if (facq <= b && b % facq == 0) {
+                    ok = false;
+                    break;
+                }
+            }
+            if (!ok)
+                continue;
+        }
+
 
         th->rep->survivors.not_both_multiples_of_p++;
 
@@ -1633,7 +1652,12 @@ void factor_survivors_data::cofactoring (timetree_t & timer)
             for (auto const& z : lps[side])
                 rel.add(side, z, 0);
         }
-        rel.add(si.conf.side, si.doing.p, 0);
+        if (si.doing.prime_sq) {
+            rel.add(si.conf.side, si.doing.p, 0);
+        } else {
+            for (auto const& facq : si.doing.prime_factors)
+                rel.add(si.conf.side, facq, 0);
+        }
 
         rel.compress();
 
