@@ -127,7 +127,12 @@ if grep -q "bkthresh1.*=" $params ; then
    bkthresh1=`grep "bkthresh1.*=" $params | cut -d= -f2`
    has_bkthresh1=1
 else
-   bkthresh1=200000000
+   # primes smaller than bkthresh are small-sieved
+   # primes between bkthresh and bkthresh1 are dealt with in two passes
+   # primes larger than bkthresh1 are bucket-sieved
+   # if bkthresh1 is not given on las command line, the code considers that
+   # bkthresh1=bkthresh (or bkthresh1=0)
+   bkthresh1=0
    has_bkthresh1=0
 fi
 lpb0=`grep "^lpb0.*=" $params | cut -d= -f2`
