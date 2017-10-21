@@ -26,8 +26,8 @@ void siever_config::declare_usage(param_list_ptr pl)
     param_list_decl_usage(pl, "ncurves1", "controls number of curves on side 1");
     param_list_decl_usage(pl, "tdthresh", "trial-divide primes p/r <= ththresh (r=number of roots)");
     param_list_decl_usage(pl, "skipped", "primes below this bound are not sieved at all");
-    param_list_decl_usage(pl, "bkthresh", "bucket-sieve primes p >= bkthresh");
-    param_list_decl_usage(pl, "bkthresh1", "2-level bucket-sieve primes p >= bkthresh1");
+    param_list_decl_usage(pl, "bkthresh", "bucket-sieve primes p >= bkthresh (default 2^I)");
+    param_list_decl_usage(pl, "bkthresh1", "2-level bucket-sieve primes p >= bkthresh1 (default 0)");
     param_list_decl_usage(pl, "bkmult", "multiplier to use for taking margin in the bucket allocation\n");
     param_list_decl_usage(pl, "unsievethresh", "Unsieve all p > unsievethresh where p|gcd(a,b)");
     param_list_decl_usage(pl, "dup-qmin", "lower limit of global q-range for 2-sided duplicate removal");
