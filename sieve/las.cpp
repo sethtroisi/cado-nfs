@@ -2172,6 +2172,7 @@ static void declare_usage(param_list pl)/*{{{*/
   tdict_decl_usage(pl);
 }/*}}}*/
 
+#ifdef HAVE_STDCPP_MATH_SPEC_FUNCS
 void display_expected_memory_usage(siever_config const & sc, cado_poly_srcptr cpoly, size_t base_memory = 0)
 {
     printf("# Expected memory usage\n");
@@ -2302,6 +2303,9 @@ void display_expected_memory_usage(siever_config const & sc, cado_poly_srcptr cp
     printf("# Expected memory use, counting %zu MB of base footprint: %zu MB\n",
             base_memory >> 20, memory >> 20);
 }
+#endif
+
+
 int main (int argc0, char *argv0[])/*{{{*/
 {
     double t0, tts, wct;
@@ -2373,11 +2377,13 @@ int main (int argc0, char *argv0[])/*{{{*/
     las_info las(pl);    /* side effects: prints cmdline and flags */
 
 
+#ifdef HAVE_STDCPP_MATH_SPEC_FUNCS
     /* experimental. */
     if (las.verbose >= 1 && las.config_pool.default_config_ptr) {
         siever_config const & sc(*las.config_pool.default_config_ptr);
         display_expected_memory_usage(sc, las.cpoly, Memusage() << 10);
     }
+#endif
 
     /* We have the following dependency chain (not sure the account below
      * is exhaustive).
