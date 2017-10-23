@@ -23,6 +23,10 @@ ncurves0 = Parameter(kind='integer', default=ncurves0_def, bound=(ncurves0_min,n
 ncurves1 = Parameter(kind='integer', default=ncurves1_def, bound=(ncurves1_min,ncurves1_max), name='ncurves1', description='Cofactorization curves, side 1')
 I = Parameter(kind='integer', default=I_def, bound=(I_min, I_max), name='I', description='Sieve region size')
 qmin = Parameter(kind='integer', default=qmin_def, bound=(qmin_min, qmin_max), name='qmin', description='Special-q lower bound')
+# OPAL begins by modifying the first parameters below, thus we should put
+# first the most important parameters
+LAS.add_param(I)
+LAS.add_param(qmin)
 LAS.add_param(lim0)
 LAS.add_param(lim1)
 LAS.add_param(lpb0)
@@ -31,8 +35,6 @@ LAS.add_param(mfb0)
 LAS.add_param(mfb1)
 LAS.add_param(ncurves0)
 LAS.add_param(ncurves1)
-LAS.add_param(I)
-LAS.add_param(qmin)
 
 # Define relevant measure and register with algorithm.
 sievetime = Measure(kind='real', name='SIEVETIME', description='Time in the sieving')

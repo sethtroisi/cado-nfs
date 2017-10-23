@@ -72,8 +72,10 @@ def run(param_file, problem):
 
     las_params["lim0"] = min(las_params["lim0"], 2 ** las_params["lpb0"])
     las_params["lim1"] = min(las_params["lim1"], 2 ** las_params["lpb1"])
-    
-    to_print = ["I", "lim1", "lpb1", "mfb1", "lim0", "lpb0", "mfb0", "ncurves0", "ncurves1", "qmin"]
+
+    # please keep the same order of parameters as in the add_param() calls in
+    # las_decl_template.py
+    to_print = ["I", "qmin", "lim0", "lim1", "lpb0", "lpb1", "mfb0", "mfb1", "ncurves0", "ncurves1"]
     sys.stderr.write("Using parameters %s\n" % " ".join(["%s:%s" % (key, las_params[key]) for key in to_print]))
 
     ### Call makefb on all algebraic polynomials
