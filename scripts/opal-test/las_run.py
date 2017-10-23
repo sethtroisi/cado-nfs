@@ -97,7 +97,6 @@ def run(param_file, problem):
 
     stats = LasStats()
     q0 = las_params["qmin"]
-    q_range = 1000
     q_inc = 0
     # since we remove duplicates, 80% of the total ideals should be enough
     rels_wanted = int(0.8 * primepi(las_params["lpb1"]) + 0.8 * primepi(las_params["lpb0"]))
@@ -109,9 +108,11 @@ def run(param_file, problem):
        sys.stderr.write("Estimate %u relations needed, best time so far is %.0f seconds\n" % (rels_wanted, best_time))
 
     while stats.get_rels() < rels_wanted:
-        # Set q0, q1
+        # Set q0
         outputfile = "las.%d.out" % q0
-        las_params.update({"q0": q0, "q1": q0 + q_range, "out": outputfile})
+        # we prefer -nq 100 to -q1, since with -q1 we might get less precise
+        # timings when the number of special-q's is small
+        las_params.update({"q0": q0, "nq": 100, "out": outputfile})
 
         las_cmd_line = [las, "-allow-largesq", "-never-discard", "-dup", "-dup-qmin"]
         if sqside == 0:
@@ -142,7 +143,7 @@ def run(param_file, problem):
         if cur_time > best_time and cur_rels < rels_wanted:
            break
 
-        # set q_inc so that we do about 10 sieving tests of length q_range
+        # set q_inc so that we do about 10 sieving tests
         if q_inc == 0:
            v = stats.relations_int.lastvalue[0]
            q_inc = int(rels_wanted / (10.0 * v))
