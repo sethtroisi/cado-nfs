@@ -1,4 +1,5 @@
 #include "cado.h"
+#define __STDCPP_MATH_SPEC_FUNCS__ 201003L
 #define __STDCPP_WANT_MATH_SPEC_FUNCS__ 1       /* for expint() */
 /* the macro above is for #include <cmath> -- however it must happen
  * first, because it may well be that one of the intermediary headers
