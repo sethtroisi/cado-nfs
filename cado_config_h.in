@@ -92,5 +92,6 @@
 #endif
 
 #cmakedefine HAVE_GAS_SYNTAX_ASSEMBLY_SOURCES
+#cmakedefine HAVE_STDCPP_MATH_SPEC_FUNCS
 
 #endif  /* CADO_CONFIG_H_ */
