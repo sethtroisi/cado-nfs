@@ -303,5 +303,16 @@ cado_divert_test(test_init_norms rsa220
         --abort-on-jitter 1,5
 )
 
+cado_divert_test(test_init_norms bug21518
+    ARGUMENTS
+    -poly ${CADO_NFS_SOURCE_DIR}/parameters/polynomials/c160.poly
+    -I 14 -lpb0 30 -lpb1 30 -mfb0 60 -mfb1 90
+    -q0 20552291 -rho 9632932
+        -sqside 1
+        --hush-max-jitter 1
+        --abort-on-jitter 1,5
+        -check-bucket 361
+)
+
 add_subdirectory (ecm)
 add_subdirectory (strategies)

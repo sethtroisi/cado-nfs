@@ -563,6 +563,9 @@ void lognorm_fill_rat_smart_inner (unsigned char *S, int i0, int i1, unsigned in
      * fabs(G) here because the code uses always COMPUTE_Y(G) with G >= 0.
      */
 #define COMPUTE_Y(G) lg2 ((G) + 1., offset, modscale)
+    /* COMPUTE_Y(z) returns GUARD + L(z) * scale. Recall that
+     * we have 0 <= log2(z) - L(z) < 0.0861, for any real z > 0.
+     */
 
     for (unsigned int j = j0; j < j1; j++) {
 	int i = i0;
@@ -665,13 +668,17 @@ void lognorm_fill_rat_smart_inner (unsigned char *S, int i0, int i1, unsigned in
             /* conversion rounding is towards zero, while we want it
              * to be towards +infinity. */
             ix += (ix >= 0);
-            ASSERT((int) ix >= i);
-	    if (UNLIKELY(ix >= i1))
-		ix = i1;
-	    size_t di = (int) ix - i;	/* The cast matters ! */
-	    i = ix;
-	    memset_with_writeahead(S, y, di, MEMSET_MIN);
-	    S += di;
+            // ASSERT ((int) ix >= i); // see bug 21518
+            if (LIKELY((int) ix >= i)) {
+                /* It is most likely that we'll only see this branch. Yet
+                 * bug 21518 seems to trigger a nasty corner case */
+                if (UNLIKELY(ix >= i1))
+                    ix = i1;
+                size_t di = (int) ix - i;	/* The cast matters ! */
+                i = ix;
+                memset_with_writeahead(S, y, di, MEMSET_MIN);
+                S += di;
+            }
 	}
     }
 #undef COMPUTE_Y
