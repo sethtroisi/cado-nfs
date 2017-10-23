@@ -1,4 +1,9 @@
 #include "cado.h"
+#define __STDCPP_WANT_MATH_SPEC_FUNCS__ 1       /* for expint() */
+/* the macro above is for #include <cmath> -- however it must happen
+ * first, because it may well be that one of the intermediary headers
+ * pull stuff that is dependent on this flag.
+ */
 #include <stdint.h>     /* AIX wants it first (it's a bug) */
 #include <stdio.h>
 #include <stdlib.h>
@@ -2166,6 +2171,136 @@ static void declare_usage(param_list pl)/*{{{*/
   tdict_decl_usage(pl);
 }/*}}}*/
 
+void display_expected_memory_usage(siever_config const & sc, cado_poly_srcptr cpoly, size_t base_memory = 0)
+{
+    printf("# Expected memory usage\n");
+    /*
+    printf("# base: %zu Kb\n", Memusage());
+    printf("# log bucket region = %d\n", LOG_BUCKET_REGION);
+    printf("# A = %d\n", sc.logA);
+    printf("# lim0 = %lu\n", sc.sides[0].lim);
+    printf("# lim1 = %lu\n", sc.sides[1].lim);
+    printf("# bkthresh = %lu\n", sc.bucket_thresh);
+    printf("# bkthresh1 = %lu\n", sc.bucket_thresh1);
+    */
+
+    // size_t memory_base = Memusage() << 10;
+
+    size_t memory = base_memory;
+    size_t more;
+
+    for(int side = 0 ; side < 2 ; side++) {
+        double p1 = sc.sides[side].lim;
+        double p0 = 2;
+        /* in theory this should depend on the galois group and so on.
+         * Here we're counting only with respect to a full symmetric
+         * Galois group.
+         * 
+         * The average number of roots modulo primes is the average
+         * number of fixed points of a permutation, and that is 1. If we
+         * average over permutations with at least one fixed point, then
+         * we have n! / (n! - D_n), and D_n/n! = \sum_{0\leq k\leq
+         * n}(-1)^k/k!.
+         */
+        int d = cpoly->pols[side]->deg;
+        double ideals_per_prime = 1;
+        double fac=1;
+        for(int k = 1 ; k <= d ; k++) {
+            fac *= -k;
+            ideals_per_prime += 1/fac;
+        }
+        ideals_per_prime = 1/(1-ideals_per_prime);
+        size_t nideals = std::expint(log(p1)) - std::expint(log(p0));
+        printf("# side %d, %zu fb primes (d=%d, %f roots per p if G=S_d): %zuMB\n",
+                side,
+                nideals,
+                d, ideals_per_prime,
+                (more = ((sizeof(fbprime_t) + sizeof(redc_invp_t)) / ideals_per_prime + sizeof(fbroot_t)) * nideals) >> 20);
+        memory += more;
+    }
+
+    // toplevel is computed by fb_factorbase::append, based on thresholds
+    // passed in sieve_info::init_factor_bases. We mimick that code now.
+    int toplevel = -1;
+    for(int side = 0 ; side < 2 ; side++) {
+        int maxlevel_here = (sc.bucket_thresh1 < sc.sides[side].lim) ? 2 : 1;
+        if (maxlevel_here > toplevel)
+            toplevel = maxlevel_here;
+    }
+
+    /* the code path is radically different depending on toplevel. */
+
+    if (toplevel == 2) {
+        // very large factor base primes, between bkthresh1 and lim = we
+        // compute all bucket updates in one go. --> those updates are
+        // bucket_update_t<2, shorthint_t>, that is, an XSIZE2 position
+        // (should be 24 bits, is actually 32) and a short hint.
+        //
+        // For each big bucket region (level-2), we then transform these
+        // updates into updates for the lower-level buckets. We thus
+        // create bucket_update_t<1, longhint_t>'s with the downsort<>
+        // function. The long hint is because we have the full slice
+        // index. the position in such a bucket update is shorter, only
+        // XSIZE1.
+
+        // For moderately large factor base primes (between bkthresh and
+        // bkthresh1), we precompute the FK lattices (at some cost), and we
+        // fill the buckets locally with short hints (and short positions:
+        // bucket_update_t<1, shorthint_t>)
+
+        for(int side = 0 ; side < 2 ; side++) {
+            double p1 = sc.sides[side].lim;
+            double p0 = std::max(sc.bucket_thresh, sc.bucket_thresh1);
+            p0 = std::min(p1, p0);
+            size_t nprimes = std::expint(log(p1)) - std::expint(log(p0));
+            size_t nupdates = (1UL << sc.logA) * (std::log(std::log(p1)) - std::log(std::log(p0)));
+            printf("# level 2, side %d: %zu primes, %zu 2-updates: %zu MB\n",
+                    side, nprimes, nupdates,
+                    (more = sc.bk_multiplier * nupdates * sizeof(bucket_update_t<2, shorthint_t>)) >> 20);
+            memory += more;
+            // how many downsorted updates are alive at a given point in
+            // time ?
+            size_t nupdates_D = nupdates >> 8;
+            printf("# level 1, side %d: %zu downsorted 1-updates: %zu MB\n",
+                    side, nupdates >> 8,
+                    (more = sc.bk_multiplier * nupdates_D * sizeof(bucket_update_t<1, longhint_t>)) >> 20);
+            memory += more;
+        }
+
+        for(int side = 0 ; side < 2 ; side++) {
+            double p1 = std::max(sc.bucket_thresh, sc.bucket_thresh1);
+            double p0 = sc.bucket_thresh;
+            size_t nprimes = std::expint(log(p1)) - std::expint(log(p0));
+            int A0 = LOG_BUCKET_REGION + 8;
+            size_t nupdates = (1UL << A0) * (std::log(std::log(p1)) - std::log(std::log(p0)));
+            printf("# level 1, side %d: %zu primes, %zu 1-updates: %zu MB\n",
+                    side, nprimes, nupdates,
+                    (more = sc.bk_multiplier * nupdates * sizeof(bucket_update_t<1, shorthint_t>)) >> 20);
+            memory += more;
+            printf("# level 1, side %d: %zu primes => precomp_plattices: %zu MB\n",
+                    side, nprimes,
+                    (more = nprimes * sizeof(plattice_enumerate_t)) >> 20);
+            memory += more;
+        }
+    } else if (toplevel == 1) {
+        // *ALL* bucket updates are computed in one go as
+        // bucket_update_t<1, shorthint_t>
+        for(int side = 0 ; side < 2 ; side++) {
+            double p1 = sc.sides[side].lim;
+            double p0 = sc.bucket_thresh;
+            size_t nprimes = std::expint(log(p1)) - std::expint(log(p0));
+            size_t nupdates = (1UL << sc.logA) * (std::log(std::log(p1)) - std::log(std::log(p0)));
+            printf("# level 1, side %d: %zu primes, %zu 1-updates: %zu MB\n",
+                    side, nprimes, nupdates,
+                    (more = sc.bk_multiplier * nupdates * sizeof(bucket_update_t<1, shorthint_t>)) >> 20);
+            memory += more;
+        }
+    }
+
+    // TODO: multiplier
+    printf("# Expected memory use, counting %zu MB of base footprint: %zu MB\n",
+            base_memory >> 20, memory >> 20);
+}
 int main (int argc0, char *argv0[])/*{{{*/
 {
     double t0, tts, wct;
@@ -2235,6 +2370,13 @@ int main (int argc0, char *argv0[])/*{{{*/
     set_LOG_BUCKET_REGION();
 
     las_info las(pl);    /* side effects: prints cmdline and flags */
+
+
+    /* experimental. */
+    if (las.verbose >= 1 && las.config_pool.default_config_ptr) {
+        siever_config const & sc(*las.config_pool.default_config_ptr);
+        display_expected_memory_usage(sc, las.cpoly, Memusage() << 10);
+    }
 
     /* We have the following dependency chain (not sure the account below
      * is exhaustive).

@@ -110,7 +110,14 @@ sieve_info::sieve_info(siever_config const & sc, cado_poly_srcptr cpoly, cxx_par
     for (int side = 0; side < 2; side++) {
         print_fb_statistics(side);
     }
-    toplevel = MAX(sides[0].fb->get_toplevel(), sides[1].fb->get_toplevel());
+    // Now that fb have been initialized, we can set the toplevel.
+    toplevel = -1;
+    for(int side = 0 ; side < 2 ; side++) {
+        if (!sides[side].fb) continue;
+        int level = sides[side].fb->get_toplevel();
+        if (level > toplevel) toplevel = level;
+    }
+
     for(int side = 0 ; side < 2 ; side++) {
         init_trialdiv(side); /* Init refactoring stuff */
         init_fb_smallsieved(side);
