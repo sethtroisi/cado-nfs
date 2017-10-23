@@ -127,9 +127,11 @@ if grep -q "bkthresh1.*=" $params ; then
    bkthresh1=`grep "bkthresh1.*=" $params | cut -d= -f2`
    has_bkthresh1=1
 else
-   # primes larger than bkthresh (default 2^I) are bucket-sieved
-   # primes larger than bkthresh1 (default fbb) are 2-level
-   # bucket-sieved. If bkthresh1>= fbb, then we only have one level.
+   # factor base primes larger than bkthresh (default 2^I) are bucket-sieved
+   # factor base primes between bkthresh1 and lim[01] are 2-level
+   # bucket-sieved. If bkthresh1 = lim[01], then we only have one level.
+   # The default value bkthresh1 = 0 is mapped to bkthresh1 = lim[01].
+   # A similar behaviour is obtained when bkthresh1 = max(lim0,lim1).
    bkthresh1=0
    has_bkthresh1=0
 fi
