@@ -128,7 +128,8 @@ if grep -q "bkthresh1.*=" $params ; then
    has_bkthresh1=1
 else
    # primes larger than bkthresh (default 2^I) are bucket-sieved
-   # primes larger than bkthresh1 (default 0) are 2-level bucket-sieved
+   # primes larger than bkthresh1 (default fbb) are 2-level
+   # bucket-sieved. If bkthresh1>= fbb, then we only have one level.
    bkthresh1=0
    has_bkthresh1=0
 fi
