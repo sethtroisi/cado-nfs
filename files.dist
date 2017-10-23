@@ -17,7 +17,6 @@ cado_config_h.in
 cado_mpi_config_h.in
 portability.h
 typecast.h
-config/alloca.cmake
 config/asm_sample.c
 config/ccwrap.pl.in
 config/curl.cmake
@@ -53,8 +52,6 @@ config/sync_fetch.cmake
 config/mingw.cmake
 config/test-rand.c
 config/test-rand.cmake
-config/odd_address_io_int.c
-config/odd_address_io_int.cmake
 config/python.cmake
 filter/CMakeLists.txt
 filter/Makefile
