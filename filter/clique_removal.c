@@ -64,11 +64,17 @@ comp_cmp_weight_for_qsort (const void *p, const void *q)
    the default one is \Omega_{31} (LAMBDA=3, NU=1).
    Cavallar's weight function is \Omega_{23} (LAMBDA=2, NU=3).
 */
+
+#ifndef USE_WEIGHT_LAMBDA
+#define USE_WEIGHT_LAMBDA 3
+#endif
+#ifndef USE_WEIGHT_NU
+#define USE_WEIGHT_NU 1
+#endif
+
 static inline float
 comp_weight_function (weight_t w)
 {
-#define USE_WEIGHT_LAMBDA 3
-#define USE_WEIGHT_NU 1
   if (w >= 3)
 #if USE_WEIGHT_LAMBDA == 0
     return 1.0;
