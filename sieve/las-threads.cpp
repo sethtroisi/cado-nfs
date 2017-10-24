@@ -213,7 +213,6 @@ reservation_array<bucket_array_t<3, shorthint_t> > &
 reservation_group::get() {
   return RA3_short;
 }
-
 template<>
 reservation_array<bucket_array_t<1, longhint_t> > &
 reservation_group::get()
@@ -226,9 +225,11 @@ reservation_group::get()
 {
   return RA2_long;
 }
-
-/* Fricken C++. There has to be a better way of handling const getter methods
-   than duplicating all the code. */
+/* mapping types to objects is a tricky business. The code below looks
+ * like red tape. But sophisticated means to avoid it would be even
+ * longer (the naming difference "get" versus "cget" is not the annoying
+ * part here -- it's just here as a decoration. The real issue is that we
+ * want the const getter to return a const reference) */
 template<>
 const reservation_array<bucket_array_t<1, shorthint_t> > &
 reservation_group::cget() const
@@ -247,7 +248,6 @@ reservation_group::cget() const
 {
   return RA3_short;
 }
-
 template<>
 const reservation_array<bucket_array_t<1, longhint_t> > &
 reservation_group::cget() const
@@ -265,26 +265,19 @@ reservation_group::cget() const
 
 thread_workspaces::thread_workspaces(const size_t _nr_workspaces,
   const unsigned int _nr_sides, las_info & las)
-  : nr_workspaces(_nr_workspaces), nr_sides(_nr_sides)
+  : nr_workspaces(_nr_workspaces), nr_sides(_nr_sides), groups { _nr_workspaces, _nr_workspaces }
 {
     thrs = new thread_data[_nr_workspaces];
     ASSERT_ALWAYS(thrs != NULL);
-    groups = new reservation_group_ptr[_nr_sides];
-    ASSERT_ALWAYS(groups != NULL);
 
     for(size_t i = 0 ; i < nr_workspaces; i++) {
         thrs[i].init(*this, i, las);
     }
-    for (unsigned int i = 0; i < nr_sides; i++)
-      groups[i] = new reservation_group(_nr_workspaces);
 }
 
 thread_workspaces::~thread_workspaces()
 {
     delete[] thrs;
-    for (unsigned int i = 0; i < nr_sides; i++)
-      delete groups[i];
-    delete[] groups;
 }
 
 /* Prepare to work on sieving a special-q as described by _si.
@@ -319,7 +312,7 @@ thread_workspaces::pickup_si(sieve_info & _si)
             multiplier);
     for (unsigned int i_side = 0; i_side < nr_sides; i_side++) {
         if (!_si.sides[i_side].fb) continue;
-        groups[i_side]->allocate_buckets(si.nb_buckets,
+        groups[i_side].allocate_buckets(si.nb_buckets,
                 multiplier, si.sides[i_side].max_bucket_fill_ratio);
     }
 }
@@ -430,7 +423,7 @@ thread_workspaces::accumulate_and_clear(las_report_ptr rep, sieve_checksum *chec
 template <int LEVEL, typename HINT>
 void
 thread_workspaces::reset_all_pointers(int side) {
-    groups[side]->get<LEVEL, HINT>().reset_all_pointers();
+    groups[side].get<LEVEL, HINT>().reset_all_pointers();
 }
 
 template void thread_workspaces::reset_all_pointers<1, shorthint_t>(int);

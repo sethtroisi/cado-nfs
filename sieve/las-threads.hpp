@@ -67,7 +67,7 @@ struct thread_data_task_wrapper : public task_parameters {
 /* A set of n bucket arrays, all of the same type, and methods to reserve one
    of them for exclusive use and to release it again. */
 template <typename T>
-class reservation_array : private NonCopyable, private monitor {
+class reservation_array : private monitor {
   T * const BAs;
   bool * const in_use;
   const size_t n;
@@ -77,7 +77,10 @@ class reservation_array : private NonCopyable, private monitor {
   size_t find_free() const {
     return std::find(&in_use[0], &in_use[n], false) - &in_use[0];
   }
+  reservation_array(reservation_array const &) = delete;
+  reservation_array& operator=(reservation_array const&) = delete;
 public:
+  reservation_array(reservation_array &&) = default;
   reservation_array(size_t n)
     : BAs(new T[n]), in_use(new bool[n]), n(n)
   {
@@ -132,12 +135,10 @@ public:
 };
 
 class thread_workspaces : private NonCopyable {
-  typedef reservation_group * reservation_group_ptr;
   const size_t nr_workspaces;
   sieve_info * psi;
   const unsigned int nr_sides; /* Usually 2 */
-  reservation_group_ptr *groups; /* one per side. Need pointer array due to
-    lacking new[] without default constructor prior to C++11 :( */
+  reservation_group groups[2]; /* one per side */
 
 public:
   // FIXME: thrs should be private!
@@ -160,22 +161,22 @@ public:
 
   template <int LEVEL, typename HINT>
   bucket_array_t<LEVEL, HINT> *
-  reserve_BA(const int side) {return groups[side]->get<LEVEL, HINT>().reserve();}
+  reserve_BA(const int side) {return groups[side].get<LEVEL, HINT>().reserve();}
 
   template <int LEVEL, typename HINT>
   void
   release_BA(const int side, bucket_array_t<LEVEL, HINT> &BA) {
-    return groups[side]->get<LEVEL, HINT>().release(BA);
+    return groups[side].get<LEVEL, HINT>().release(BA);
   }
 
   /* Iterator over all the bucket arrays of a given type on a given side */
   template <int LEVEL, typename HINT>
   const bucket_array_t<LEVEL, HINT> *
-  cbegin_BA(const int side) const {return groups[side]->cget<LEVEL, HINT>().cbegin();}
+  cbegin_BA(const int side) const {return groups[side].cget<LEVEL, HINT>().cbegin();}
 
   template <int LEVEL, typename HINT>
   const bucket_array_t<LEVEL, HINT> *
-  cend_BA(const int side) const {return groups[side]->cget<LEVEL, HINT>().cend();}
+  cend_BA(const int side) const {return groups[side].cget<LEVEL, HINT>().cend();}
 };
 
 #endif
