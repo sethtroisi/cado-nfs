@@ -91,6 +91,7 @@ public:
      operate on both kind of entries */
   static const bool is_general_type = true;
   static const unsigned char fixed_nr_roots = 0;
+  inline int get_nr_roots() const { return nr_roots; }
 
   fb_general_entry() {}
   template <int Nr_roots>
@@ -146,6 +147,7 @@ public:
   static const unsigned char k = 1, nr_roots = Nr_roots;
   static const bool is_general_type = false;
   static const unsigned char fixed_nr_roots = Nr_roots;
+  inline int get_nr_roots() const { return Nr_roots; }
   fb_entry_x_roots() {};
   /* Allow assignment-construction from general entries */
   fb_entry_x_roots(const fb_general_entry &e) : p(e.p), invq(e.invq) {

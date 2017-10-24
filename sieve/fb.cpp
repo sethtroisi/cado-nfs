@@ -362,24 +362,6 @@ fb_entry_x_roots<Nr_roots>::fprint(FILE *out) const
   fprintf(out, "\n");
 }
 
-/* workaround for compiler bug. gcc-4.2.1 on openbsd 5.3 does not seem to
- * accept the access to foo.nr_roots when nr_roots is in fact a static
- * const member. That's a pity, really. I think the code below is
- * innocuous performance-wise. */
-template <class FB_ENTRY_TYPE>
-struct get_nroots {
-    FB_ENTRY_TYPE const & r;
-    get_nroots(FB_ENTRY_TYPE const & r) : r(r) {}
-    inline unsigned char operator()() const { return r.nr_roots; }
-};
-
-template <int n>
-struct get_nroots<fb_entry_x_roots<n> > {
-    get_nroots(fb_entry_x_roots<n> const &) {}
-    inline unsigned char operator()() const { return fb_entry_x_roots<n>::nr_roots; }
-};
-
-
 template <class FB_ENTRY_TYPE>
 fb_vector<FB_ENTRY_TYPE>::~fb_vector()
 {
@@ -458,13 +440,7 @@ fb_vector<FB_ENTRY_TYPE>::_count_entries(size_t *nprimes, size_t *nroots, double
   double w = 0.;
   size_t nr = 0;
   for (size_t i = 0; i < size; i++) {
-#if 0
-      /* see compiler bug section above... */
-      unsigned char nr_i = data[i].nr_roots;
-#else
-      /* use workaround */
-      unsigned char nr_i = get_nroots<FB_ENTRY_TYPE>(data[i])();
-#endif
+      unsigned char nr_i = data[i].get_nr_roots();
       nr += nr_i;
       w += data[i].weight();
   }
@@ -475,7 +451,7 @@ fb_vector<FB_ENTRY_TYPE>::_count_entries(size_t *nprimes, size_t *nroots, double
 }
 
 /* Compute an upper bound on this slice's weight by assuming all primes in the
-   slice are equal on the first (and thus smallest) one. This relies on the
+   slice are equal to the first (and thus smallest) one. This relies on the
    vector being sorted. */
 template <class FB_ENTRY_TYPE>
 double
