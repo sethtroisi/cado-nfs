@@ -231,11 +231,11 @@ private:
                         uint64_t bucket_number, where_am_I& w) const;
 public:
   size_t nb_of_updates(const int i) const {
-      ASSERT(i < n_bucket);
+      ASSERT((uint32_t) i < n_bucket);
       return bucket_write[i] - bucket_start[i];
   }
   size_t room_allocated_for_updates(const int i) const {
-      ASSERT(i < n_bucket);
+      ASSERT((uint32_t) i < n_bucket);
       return bucket_start[i+1] - bucket_start[i];
   }
   /* Constructor sets everything to zero, and does not allocate memory.
