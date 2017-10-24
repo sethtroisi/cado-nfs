@@ -2681,7 +2681,6 @@ int main (int argc0, char *argv0[])/*{{{*/
         las.tree.new_node(si.doing);
         las_todo_push_closing_brace(las, si.doing.depth);
 
-        nr_sq_processed ++;
         verbose_output_vfprint(0, 1, gmp_vfprintf,
                              "# "
                              HILIGHT_START
@@ -2953,6 +2952,7 @@ if (si.conf.sublat.m) {
 
         /* this gets reset after each q */
         already_printed_for_q.clear();
+        nr_sq_processed++;
 
 #ifdef  DLP_DESCENT
         SIBLING_TIMER(timer_special_q, "descent");
