@@ -105,7 +105,7 @@ public:
       }
   }
 
-  T *reserve();
+  T &reserve();
   void release(T &BA);
 };
 
@@ -160,7 +160,7 @@ public:
   void reset_all_pointers(int side);
 
   template <int LEVEL, typename HINT>
-  bucket_array_t<LEVEL, HINT> *
+  bucket_array_t<LEVEL, HINT> &
   reserve_BA(const int side) {return groups[side].get<LEVEL, HINT>().reserve();}
 
   template <int LEVEL, typename HINT>

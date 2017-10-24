@@ -2657,7 +2657,7 @@ int main (int argc0, char *argv0[])/*{{{*/
         si.update_norm_data();
         si.update(nr_workspaces);
 
-
+        try {
 
         WHERE_AM_I_UPDATE(w, psi, &si);
 
@@ -2804,6 +2804,8 @@ for (unsigned int j_cong = 0; j_cong < sublat_bound; ++j_cong) {
             }
         }
 
+        ASSERT_ALWAYS(max_full <= 1.0 ||
+                fprintf (stderr, "max_full=%f, see #14987\n", max_full) == 0);
         
         // this timing slot is insignificant, let's put it with the
         // bookkeeping crop
@@ -2958,6 +2960,26 @@ if (si.conf.sublat.m) {
         }
     }
 }
+
+        } catch (buckets_are_full const & e) {
+            fprintf(stderr, "# %s\n", e.what());
+            printf("# redoing this q because buckets are full.\n");
+
+            double new_bk_multiplier = conf.bk_multiplier * (double) e.reached_size / e.theoretical_max_size * 1.01;
+            printf("# Updating bucket multiplier to %.3f*%d/%d*1.01=%.3f\n",
+                    conf.bk_multiplier,
+                    e.reached_size,
+                    e.theoretical_max_size,
+                    new_bk_multiplier
+                  );
+            max_full = 0;
+            las.config_pool.change_bk_multiplier(new_bk_multiplier);
+            /* we have to roll back the updates we made to
+             * this structure. */
+            std::swap(las.todo, saved_todo);
+            las.tree.ditch_node();
+            continue;
+        }
 
 #ifdef  DLP_DESCENT
         SIBLING_TIMER(timer_special_q, "descent");
@@ -3142,7 +3164,6 @@ if (si.conf.sublat.m) {
         verbose_output_print (2, 1, "# Average logI=%1.1f for %lu special-q's, max bucket fill %f\n",
                 totlogI / (double) nr_sq_processed, nr_sq_processed, max_full);
     }
-    verbose_output_print (2, 1, "# Final value of bk multiplier is %f\n", las.config_pool.base.bk_multiplier);
     verbose_output_print (2, 1, "# Discarded %lu special-q's out of %u pushed\n",
             nr_sq_discarded, las.nq_pushed);
     tts = t0;

@@ -479,3 +479,9 @@ sieve_checksum::update(const unsigned char *data, const size_t len)
     mpz_clear(mb);
     this->update(new_checksum);
 }
+
+buckets_are_full::buckets_are_full(int l, int b, int r, int t) : level(l), bucket_number(b), reached_size(r), theoretical_max_size(t) {
+    std::ostringstream os;
+    os << "buckets (level "<<level<<") are full. Fullest is bucket #"<<b<<", wrote "<<reached_size<<"/"<<theoretical_max_size<<"";
+    message = os.str();
+}

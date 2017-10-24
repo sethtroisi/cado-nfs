@@ -455,4 +455,18 @@ class sieve_checksum {
   void update(const unsigned char *, size_t);
 };
 
+struct buckets_are_full : public clonable_exception {
+    int level;
+    int bucket_number;
+    int reached_size;
+    int theoretical_max_size;
+    std::string message;
+    buckets_are_full(int l, int b, int r, int t);
+    virtual const char * what() const noexcept { return message.c_str(); }
+    bool operator<(buckets_are_full const& o) const {
+        return (double) reached_size / theoretical_max_size < (double) o.reached_size / o.theoretical_max_size;
+    }
+    virtual clonable_exception * clone() const { return new buckets_are_full(*this); }
+};
+
 #endif	/* BUCKET_HPP_ */
