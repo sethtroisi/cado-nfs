@@ -2253,7 +2253,8 @@ void display_expected_memory_usage(siever_config const & sc, cado_poly_srcptr cp
             double p0 = std::max(sc.bucket_thresh, sc.bucket_thresh1);
             p0 = std::min(p1, p0);
             size_t nprimes = std::expint(log(p1)) - std::expint(log(p0));
-            size_t nupdates = (1UL << sc.logA) * (std::log(std::log(p1)) - std::log(std::log(p0)));
+            size_t nupdates = 0.75 * (1UL << sc.logA) * (std::log(std::log(p1)) - std::log(std::log(p0)));
+            nupdates += NB_DEVIATIONS_BUCKET_REGIONS * sqrt(nupdates);
             verbose_output_print(0, 1, "# level 2, side %d: %zu primes, %zu 2-updates: %zu MB\n",
                     side, nprimes, nupdates,
                     (more = sc.bk_multiplier * nupdates * sizeof(bucket_update_t<2, shorthint_t>)) >> 20);
@@ -2272,7 +2273,8 @@ void display_expected_memory_usage(siever_config const & sc, cado_poly_srcptr cp
             double p0 = sc.bucket_thresh;
             size_t nprimes = std::expint(log(p1)) - std::expint(log(p0));
             int A0 = LOG_BUCKET_REGION + 8;
-            size_t nupdates = (1UL << A0) * (std::log(std::log(p1)) - std::log(std::log(p0)));
+            size_t nupdates = 0.75 * (1UL << A0) * (std::log(std::log(p1)) - std::log(std::log(p0)));
+            nupdates += NB_DEVIATIONS_BUCKET_REGIONS * sqrt(nupdates);
             verbose_output_print(0, 1, "# level 1, side %d: %zu primes, %zu 1-updates: %zu MB\n",
                     side, nprimes, nupdates,
                     (more = sc.bk_multiplier * nupdates * sizeof(bucket_update_t<1, shorthint_t>)) >> 20);
@@ -2289,7 +2291,8 @@ void display_expected_memory_usage(siever_config const & sc, cado_poly_srcptr cp
             double p1 = sc.sides[side].lim;
             double p0 = sc.bucket_thresh;
             size_t nprimes = std::expint(log(p1)) - std::expint(log(p0));
-            size_t nupdates = (1UL << sc.logA) * (std::log(std::log(p1)) - std::log(std::log(p0)));
+            size_t nupdates = 0.75 * (1UL << sc.logA) * (std::log(std::log(p1)) - std::log(std::log(p0)));
+            nupdates += NB_DEVIATIONS_BUCKET_REGIONS * sqrt(nupdates);
             verbose_output_print(0, 1, "# level 1, side %d: %zu primes, %zu 1-updates: %zu MB\n",
                     side, nprimes, nupdates,
                     (more = sc.bk_multiplier * nupdates * sizeof(bucket_update_t<1, shorthint_t>)) >> 20);

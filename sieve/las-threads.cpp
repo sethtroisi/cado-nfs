@@ -66,7 +66,7 @@ void thread_data::update_checksums()
 
 template <typename T>
 void
-reservation_array<T>::allocate_buckets(const uint32_t n_bucket, const double fill_ratio)
+reservation_array<T>::allocate_buckets(const uint32_t n_bucket, const double fill_ratio, int logI_adjusted)
 {
   /* We estimate that the updates will be evenly distributed among the n
      different bucket arrays, so each gets fill_ratio / n.
@@ -77,7 +77,7 @@ reservation_array<T>::allocate_buckets(const uint32_t n_bucket, const double fil
      */
   double ratio = fill_ratio;
   for (size_t i = 0; i < n; i++)
-    BAs[i].allocate_memory(n_bucket, ratio / n);
+    BAs[i].allocate_memory(n_bucket, ratio / n, logI_adjusted);
 }
 
 template <typename T>
@@ -126,7 +126,7 @@ T &reservation_array<T>::reserve()
         /* important ! */
         leave();
         throw buckets_are_full(T::level, i,
-                BAs[j].nb_of_updates(i), BAs[j].bucket_size);
+                BAs[j].nb_of_updates(i), BAs[j].room_allocated_for_updates(i));
     }
     i = least_full_index;
   }
@@ -172,20 +172,20 @@ reservation_group::reservation_group(const size_t nr_bucket_arrays)
 
 void
 reservation_group::allocate_buckets(const uint32_t *n_bucket,
-        const double mult, const double *fill_ratio)
+        const double mult, const double *fill_ratio, int logI_adjusted)
 {
   /* Short hint updates are generated only by fill_in_buckets(), so each BA
      gets filled only by its respective FB part */
-  RA1_short.allocate_buckets(n_bucket[1], mult*fill_ratio[1]);
-  RA2_short.allocate_buckets(n_bucket[2], mult*fill_ratio[2]);
-  RA3_short.allocate_buckets(n_bucket[3], mult*fill_ratio[3]);
+  RA1_short.allocate_buckets(n_bucket[1], mult*fill_ratio[1], logI_adjusted);
+  RA2_short.allocate_buckets(n_bucket[2], mult*fill_ratio[2], logI_adjusted);
+  RA3_short.allocate_buckets(n_bucket[3], mult*fill_ratio[3], logI_adjusted);
 
   /* Long hint bucket arrays get filled by downsorting. The level-2 longhint
      array gets the shorthint updates from level 3 sieving, and the level-1
      longhint array gets the shorthint updates from level 2 sieving as well
      as the previously downsorted longhint updates from level 3 sieving. */
-  RA1_long.allocate_buckets(n_bucket[1], mult*(fill_ratio[2] + fill_ratio[3]));
-  RA2_long.allocate_buckets(n_bucket[2], mult*fill_ratio[3]);
+  RA1_long.allocate_buckets(n_bucket[1], mult*(fill_ratio[2] + fill_ratio[3]), logI_adjusted);
+  RA2_long.allocate_buckets(n_bucket[2], mult*fill_ratio[3], logI_adjusted);
 }
 
 
@@ -313,7 +313,9 @@ thread_workspaces::pickup_si(sieve_info & _si)
     for (unsigned int i_side = 0; i_side < nr_sides; i_side++) {
         if (!_si.sides[i_side].fb) continue;
         groups[i_side].allocate_buckets(si.nb_buckets,
-                multiplier, si.sides[i_side].max_bucket_fill_ratio);
+                multiplier,
+                si.sides[i_side].max_bucket_fill_ratio,
+                si.conf.logI_adjusted);
     }
 }
 
@@ -397,7 +399,8 @@ thread_workspaces::buckets_max_full()
         if (mf > mf0) mf0 = mf;
         if (mf > 1)
             throw buckets_are_full(LEVEL, fullest,
-                    it_BA->nb_of_updates(fullest), it_BA->bucket_size);
+                    it_BA->nb_of_updates(fullest),
+                    it_BA->room_allocated_for_updates(fullest));
       }
     }
     return mf0;

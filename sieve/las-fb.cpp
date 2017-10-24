@@ -241,7 +241,7 @@ void sieve_info::print_fb_statistics(int side)
             verbose_output_print(0, 1, "# Weight of primes in side-%d factor base part %d = %0.5g\n",
                     side, i_part, weight);
         }
-        s.max_bucket_fill_ratio[i_part] = weight * 1.07;
+        s.max_bucket_fill_ratio[i_part] = weight;
     }
 }
 /*}}}*/

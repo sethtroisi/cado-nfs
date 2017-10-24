@@ -230,6 +230,8 @@ las_info::las_info(cxx_param_list & pl)
     verbose_output_add(TRACE_CHANNEL, trace_file, 1);
 #endif
     param_list_print_command_line(output, pl);
+
+
     las_display_config_flags();
     /*  Parse polynomial */
     cado_poly_init(cpoly);
