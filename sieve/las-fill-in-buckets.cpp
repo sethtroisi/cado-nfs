@@ -816,22 +816,22 @@ downsort_tree(
         BAout.add_slice_index(0);
         // The data that comes from fill-in bucket at level above:
         {
-          const bucket_array_t<LEVEL+1,shorthint_t> * BAin
+          const bucket_array_t<LEVEL+1,shorthint_t> * BAin_ptr
             = ws.cbegin_BA<LEVEL+1,shorthint_t>(side);
-          while (BAin != ws.cend_BA<LEVEL+1,shorthint_t>(side)) {
-            downsort<LEVEL+1>(BAout, *BAin, bucket_index, w);
-            BAin++;
+          while (BAin_ptr != ws.cend_BA<LEVEL+1,shorthint_t>(side)) {
+            downsort<LEVEL+1>(BAout, *BAin_ptr, bucket_index, w);
+            BAin_ptr++;
           }
         }
 
         const int toplevel = si.toplevel;
         if (LEVEL < toplevel - 1) {
           // What comes from already downsorted data above:
-          const bucket_array_t<LEVEL+1,longhint_t> * BAin
+          const bucket_array_t<LEVEL+1,longhint_t> * BAin_ptr
             = ws.cbegin_BA<LEVEL+1,longhint_t>(side);
-          while (BAin != ws.cend_BA<LEVEL+1,longhint_t>(side)) { 
-            downsort<LEVEL+1>(BAout, *BAin, bucket_index, w);
-            BAin++;
+          while (BAin_ptr != ws.cend_BA<LEVEL+1,longhint_t>(side)) { 
+            downsort<LEVEL+1>(BAout, *BAin_ptr, bucket_index, w);
+            BAin_ptr++;
           }
         }
         ws.release_BA<LEVEL,longhint_t>(side, BAout);
