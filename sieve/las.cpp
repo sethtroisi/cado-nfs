@@ -17,6 +17,7 @@
 #include <stdarg.h> /* Required so that GMP defines gmp_vfprintf() */
 #include <algorithm>
 #include <vector>
+#include <unordered_set>
 #include "threadpool.hpp"
 #include "fb.hpp"
 #include "portability.h"
@@ -68,6 +69,14 @@ int adjust_strategy = 0;
 
 double general_grace_time_ratio = DESCENT_DEFAULT_GRACE_TIME_RATIO;
 
+/* Accesses to this are protected by verbose_output_start_batch() */
+typedef std::pair< int64_t, uint64_t> abpair_t;
+struct abpair_hash_t {
+    unsigned long operator()(abpair_t const& o) const {
+        return 314159265358979323UL * o.first + 271828182845904523UL + o.second;
+    }
+};
+std::unordered_set<abpair_t, abpair_hash_t> already_printed_for_q;
 
 double tt_qstart;
 
@@ -1681,25 +1690,31 @@ void factor_survivors_data::cofactoring (timetree_t & timer)
                 && relation_is_duplicate(rel, las.nb_threads, si);
             const char *comment = is_dup ? "# DUPE " : "";
             FILE *output;
+            verbose_output_start_batch();   /* lock I/O */
+
+            if (!is_dup && !already_printed_for_q.insert(abpair_t(a,b)).second) {
+                is_dup = 1;
+                comment = "# DUP ";
+            }
             if (!is_dup)
                 cpt++;
-            verbose_output_start_batch();   /* lock I/O */
+
             if (prepend_relation_time) {
                 verbose_output_print(0, 1, "(%1.4f) ", seconds() - tt_qstart);
             }
             verbose_output_print(0, 3, "# i=%d, j=%u, lognorms = %hhu, %hhu\n",
                     i, j, sdata[0].S[x], sdata[1].S[x]);
             for (size_t i_output = 0;
-                 (output = verbose_output_get(0, 0, i_output)) != NULL;
-                 i_output++) {
+                    (output = verbose_output_get(0, 0, i_output)) != NULL;
+                    i_output++) {
                 rel.print(output, comment);
-		    // once filtering is ok for all Galois cases, 
-		    // this entire block would have to disappear
-		    if(las.galois != NULL)
-			// adding relations on the fly in Galois cases
-			add_relations_with_galois(las.galois, output, comment,
-						  &cpt, rel);
-		}
+                // once filtering is ok for all Galois cases, 
+                // this entire block would have to disappear
+                if(las.galois != NULL)
+                    // adding relations on the fly in Galois cases
+                    add_relations_with_galois(las.galois, output, comment,
+                            &cpt, rel);
+            }
             verbose_output_end_batch();     /* unlock I/O */
         }
 
@@ -2935,6 +2950,9 @@ if (si.conf.sublat.m) {
             las.tree.ditch_node();
             continue;
         }
+
+        /* this gets reset after each q */
+        already_printed_for_q.clear();
 
 #ifdef  DLP_DESCENT
         SIBLING_TIMER(timer_special_q, "descent");
