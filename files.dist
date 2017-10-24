@@ -1190,3 +1190,5 @@ sieve/logapprox.hpp
 tests/sieve/test_logapprox.cpp
 tests/sieve/c90_21505.poly
 config/math-special.cmake
+tests/sieve/c155_21515.poly
+tests/sieve/c160_21518.poly

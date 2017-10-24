@@ -106,6 +106,7 @@ cado_divert_test(F9 sieve_check_overfull_buckets
             REFERENCE_REVISION=f06a6284d2cdcb669e300cd0dda349b349761578
             CHECKSUM_FILE=
         )
+# see also c155_21515_sieve_overfull2 further down
 
 cado_divert_test(F9 sieve_bug_21480a
         APPEND_ENVIRONMENT
@@ -182,6 +183,42 @@ cado_divert_test(F9_quick lambda0
         APPEND_ENVIRONMENT lambda0=5 "REGEX=lambda>.*does not make sense")
 cado_divert_test(F9_quick lambda1
         APPEND_ENVIRONMENT lambda1=5 "REGEX=lambda>.*does not make sense")
+
+if(DEFINED ENV{CHECKS_EXPENSIVE})
+# This one triggers overfull buckets during downsorting (from
+# level2-short to level1-long), for #21515
+set(c155_21515_poly ${CMAKE_CURRENT_SOURCE_DIR}/c155_21515.poly)
+set(c155_21515_roots ${CMAKE_CURRENT_BINARY_DIR}/c155_21515.roots.gz)
+
+cado_define_test(c155_21515_makefb
+        PROGRAM
+            ${makefb_path}
+            -poly ${c155_21515_poly} -lim 30940618 -maxbits 24
+            -out ${c155_21515_roots}
+        TARGET_DEPENDENCIES makefb
+        )
+
+cado_define_test(c155_21515_sieve_overfull2
+        ENVIRONMENT
+        fb=${c155_21515_roots}
+        I=16
+        lim0=17246818 lim1=30940618 lpb0=29 lpb1=29
+        poly=${c155_21515_poly}
+        q0=18000000 nq=1 ncurves0=13 ncurves1=23
+        mfb1=61 mfb0=62
+        bkthresh1=10000000
+        bkmult=1.001
+        CHECKSUM_FILE=
+        LAS_BINARY=${las_path}
+        REL_COUNT=129
+        SCRIPT
+            "${CADO_NFS_SOURCE_DIR}/tests/provide-wdir.sh" --env WORKDIR
+            ${CMAKE_CURRENT_SOURCE_DIR}/sievetest.sh
+            -v -v --adjust-strategy 0 -t 1
+        TARGET_DEPENDENCIES las
+        TEST_DEPENDENCIES c155_21515_makefb
+        )
+endif()
 
 
 set(c120_poly ${CMAKE_CURRENT_SOURCE_DIR}/c120.poly)
@@ -347,7 +384,7 @@ cado_divert_test(test_init_norms rsa220
 
 cado_divert_test(test_init_norms bug21518
     ARGUMENTS
-    -poly ${CADO_NFS_SOURCE_DIR}/parameters/polynomials/c160.poly
+    -poly ${CMAKE_CURRENT_SOURCE_DIR}/c160_21518.poly
     -I 14 -lpb0 30 -lpb1 30 -mfb0 60 -mfb1 90
     -q0 20552291 -rho 9632932
         -sqside 1

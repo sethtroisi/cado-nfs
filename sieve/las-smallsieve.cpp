@@ -201,7 +201,10 @@ void small_sieve_init(small_sieve_data_t *ssd, unsigned int interleaving,
     // while we have any regular primes or projective primes < thresh left
     ssp_t * tail = ssd->ssp;
     ssp_simple_t * tails MAYBE_UNUSED = ssd->ssps;
-
+    // TODO: ssps was never set before, probably the right place to deal
+    // with it is here, although I'm not too sure what was the intent.
+    ssd->nb_ssps = 0;
+    
     // The processing of bucket region by nb_threads is interleaved.
     // It means that the positions for the small sieve must jump
     // over the (nb_threads - 1) regions after each region.

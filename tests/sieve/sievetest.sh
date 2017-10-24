@@ -58,7 +58,7 @@ for var in fbc lambda{0,1} ncurves{0,1} descent_hint bkmult ; do
     fi
 done
 
-for var in fbc batch{0,1} ; do
+for var in fbc batch{0,1} bkmult bkthresh{,1} ; do
     # Those are optional too. Being filenames, we allow that they be
     # passed as just ".", which means that we expect to have them in the
     # work directory.

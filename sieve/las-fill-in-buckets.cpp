@@ -748,6 +748,14 @@ fill_in_buckets_one_side(timetree_t& timer, thread_pool &pool, thread_workspaces
     }
     if (!exceptions_to_throw.empty())
         throw *std::max_element(exceptions_to_throw.begin(), exceptions_to_throw.end());
+
+    /* actually we also want to check that not even the last thread has
+     * overrun its bucket pointers.
+     *
+     * the call below throws an exception if we're overfull.
+     */
+    ws.buckets_max_full<LEVEL, shorthint_t>();
+
     pool.accumulate_and_clear_active_time(*timer.current);
     SIBLING_TIMER(timer, "worker thread wait time");
     TIMER_CATEGORY(timer, thread_wait());

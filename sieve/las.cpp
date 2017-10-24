@@ -2173,15 +2173,15 @@ static void declare_usage(param_list pl)/*{{{*/
 #ifdef HAVE_STDCPP_MATH_SPEC_FUNCS
 void display_expected_memory_usage(siever_config const & sc, cado_poly_srcptr cpoly, size_t base_memory = 0)
 {
-    printf("# Expected memory usage\n");
+    verbose_output_print(0, 1, "# Expected memory usage\n");
     /*
-    printf("# base: %zu Kb\n", Memusage());
-    printf("# log bucket region = %d\n", LOG_BUCKET_REGION);
-    printf("# A = %d\n", sc.logA);
-    printf("# lim0 = %lu\n", sc.sides[0].lim);
-    printf("# lim1 = %lu\n", sc.sides[1].lim);
-    printf("# bkthresh = %lu\n", sc.bucket_thresh);
-    printf("# bkthresh1 = %lu\n", sc.bucket_thresh1);
+    verbose_output_print(0, 2, "# base: %zu Kb\n", Memusage());
+    verbose_output_print(0, 2, "# log bucket region = %d\n", LOG_BUCKET_REGION);
+    verbose_output_print(0, 2, "# A = %d\n", sc.logA);
+    verbose_output_print(0, 2, "# lim0 = %lu\n", sc.sides[0].lim);
+    verbose_output_print(0, 2, "# lim1 = %lu\n", sc.sides[1].lim);
+    verbose_output_print(0, 2, "# bkthresh = %lu\n", sc.bucket_thresh);
+    verbose_output_print(0, 2, "# bkthresh1 = %lu\n", sc.bucket_thresh1);
     */
 
     // size_t memory_base = Memusage() << 10;
@@ -2211,7 +2211,7 @@ void display_expected_memory_usage(siever_config const & sc, cado_poly_srcptr cp
         }
         ideals_per_prime = 1/(1-ideals_per_prime);
         size_t nideals = std::expint(log(p1)) - std::expint(log(p0));
-        printf("# side %d, %zu fb primes (d=%d, %f roots per p if G=S_d): %zuMB\n",
+        verbose_output_print(0, 1, "# side %d, %zu fb primes (d=%d, %f roots per p if G=S_d): %zuMB\n",
                 side,
                 nideals,
                 d, ideals_per_prime,
@@ -2254,14 +2254,14 @@ void display_expected_memory_usage(siever_config const & sc, cado_poly_srcptr cp
             p0 = std::min(p1, p0);
             size_t nprimes = std::expint(log(p1)) - std::expint(log(p0));
             size_t nupdates = (1UL << sc.logA) * (std::log(std::log(p1)) - std::log(std::log(p0)));
-            printf("# level 2, side %d: %zu primes, %zu 2-updates: %zu MB\n",
+            verbose_output_print(0, 1, "# level 2, side %d: %zu primes, %zu 2-updates: %zu MB\n",
                     side, nprimes, nupdates,
                     (more = sc.bk_multiplier * nupdates * sizeof(bucket_update_t<2, shorthint_t>)) >> 20);
             memory += more;
             // how many downsorted updates are alive at a given point in
             // time ?
             size_t nupdates_D = nupdates >> 8;
-            printf("# level 1, side %d: %zu downsorted 1-updates: %zu MB\n",
+            verbose_output_print(0, 1, "# level 1, side %d: %zu downsorted 1-updates: %zu MB\n",
                     side, nupdates >> 8,
                     (more = sc.bk_multiplier * nupdates_D * sizeof(bucket_update_t<1, longhint_t>)) >> 20);
             memory += more;
@@ -2273,11 +2273,11 @@ void display_expected_memory_usage(siever_config const & sc, cado_poly_srcptr cp
             size_t nprimes = std::expint(log(p1)) - std::expint(log(p0));
             int A0 = LOG_BUCKET_REGION + 8;
             size_t nupdates = (1UL << A0) * (std::log(std::log(p1)) - std::log(std::log(p0)));
-            printf("# level 1, side %d: %zu primes, %zu 1-updates: %zu MB\n",
+            verbose_output_print(0, 1, "# level 1, side %d: %zu primes, %zu 1-updates: %zu MB\n",
                     side, nprimes, nupdates,
                     (more = sc.bk_multiplier * nupdates * sizeof(bucket_update_t<1, shorthint_t>)) >> 20);
             memory += more;
-            printf("# level 1, side %d: %zu primes => precomp_plattices: %zu MB\n",
+            verbose_output_print(0, 1, "# level 1, side %d: %zu primes => precomp_plattices: %zu MB\n",
                     side, nprimes,
                     (more = nprimes * sizeof(plattice_enumerate_t)) >> 20);
             memory += more;
@@ -2290,7 +2290,7 @@ void display_expected_memory_usage(siever_config const & sc, cado_poly_srcptr cp
             double p0 = sc.bucket_thresh;
             size_t nprimes = std::expint(log(p1)) - std::expint(log(p0));
             size_t nupdates = (1UL << sc.logA) * (std::log(std::log(p1)) - std::log(std::log(p0)));
-            printf("# level 1, side %d: %zu primes, %zu 1-updates: %zu MB\n",
+            verbose_output_print(0, 1, "# level 1, side %d: %zu primes, %zu 1-updates: %zu MB\n",
                     side, nprimes, nupdates,
                     (more = sc.bk_multiplier * nupdates * sizeof(bucket_update_t<1, shorthint_t>)) >> 20);
             memory += more;
@@ -2298,7 +2298,7 @@ void display_expected_memory_usage(siever_config const & sc, cado_poly_srcptr cp
     }
 
     // TODO: multiplier
-    printf("# Expected memory use, counting %zu MB of base footprint: %zu MB\n",
+    verbose_output_print(0, 1, "# Expected memory use, counting %zu MB of base footprint: %zu MB\n",
             base_memory >> 20, memory >> 20);
 }
 #endif
@@ -2314,7 +2314,6 @@ int main (int argc0, char *argv0[])/*{{{*/
     double totlogI = 0.0;
     int argc = argc0;
     char **argv = argv0;
-    double max_full = 0.;
 
 #ifdef HAVE_MINGW
     _fmode = _O_BINARY;     /* Binary open for all files */
@@ -2708,105 +2707,54 @@ for (unsigned int j_cong = 0; j_cong < sublat_bound; ++j_cong) {
 /* The loop on different (i,j) mod m starts here (?) */
         
 
-        /* essentially update the fij polynomials and the max log bounds */
-        si.update_norm_data();
+    /* essentially update the fij polynomials and the max log bounds */
+    si.update_norm_data();
 
-        if (las.verbose >= 2) {
-            verbose_output_print (0, 1, "# f_0'(x) = ");
-            mpz_poly_fprintf(las.output, si.sides[0].lognorms->fij);
-            verbose_output_print (0, 1, "# f_1'(x) = ");
-            mpz_poly_fprintf(las.output, si.sides[1].lognorms->fij);
-        }
+    if (las.verbose >= 2) {
+        verbose_output_print (0, 1, "# f_0'(x) = ");
+        mpz_poly_fprintf(las.output, si.sides[0].lognorms->fij);
+        verbose_output_print (0, 1, "# f_1'(x) = ");
+        mpz_poly_fprintf(las.output, si.sides[1].lognorms->fij);
+    }
 
-        /* Now we're ready to sieve. We have to refresh some fields
-         * in the sieve_info structure, otherwise we'll be polluted by
-         * the leftovers from earlier runs.
-         */
+    /* Now we're ready to sieve. We have to refresh some fields
+     * in the sieve_info structure, otherwise we'll be polluted by
+     * the leftovers from earlier runs.
+     */
 
 #ifdef TRACE_K
-        init_trace_k(si, pl);
+    init_trace_k(si, pl);
 #endif
 
-        /* WARNING. We're filling the report info for thread 0 for
-         * ttbuckets_fill, while in fact the cost is over all threads.
-         * The problem is always the fact that we don't have a proper
-         * per-thread timer. So short of a better solution, this is what
-         * we do. True, it's not clean.
-         * (we need this data to be caught by
-         * las_report_accumulate_threads_and_display further down, hence
-         * this hack).
-         */
-    
-        /* we allow fill-in-buckets to run several times, so that
-         * reallocation due to buckets overflowing is allowed */
-        for(;;) {
+    /* WARNING. We're filling the report info for thread 0 for
+     * ttbuckets_fill, while in fact the cost is over all threads.
+     * The problem is always the fact that we don't have a proper
+     * per-thread timer. So short of a better solution, this is what
+     * we do. True, it's not clean.
+     * (we need this data to be caught by
+     * las_report_accumulate_threads_and_display further down, hence
+     * this hack).
+     */
 
-            si.update(nr_workspaces);
+        si.update(nr_workspaces);
 
-            workspaces->thrs[0].rep->ttbuckets_fill -= seconds();
+        workspaces->thrs[0].rep->ttbuckets_fill -= seconds();
 
-            /* Allocate buckets */
-            workspaces->pickup_si(si);
+        /* Allocate buckets */
+        workspaces->pickup_si(si);
 
-            for(int side = 0 ; side < 2 ; side++) {
-                /* This uses the thread pool, and stores the time spent under
-                 * timer_special_q (with wait time stored separately */
-                if (!si.sides[side].fb) continue;
-                fill_in_buckets(timer_special_q, *pool, *workspaces, si, side);
-            }
-
-            // useless
-            // pool->accumulate_and_clear_active_time(*timer_special_q.current);
-
-            workspaces->thrs[0].rep->ttbuckets_fill += seconds();
-
-            /* Check that buckets are not more than full.
-             * Due to templates and si.toplevel being not constant, need a
-             * switch. (really?)
-             */
-            double this_max_full;
-            switch(si.toplevel) {
-                case 1:
-                    this_max_full = workspaces->buckets_max_full<1, shorthint_t>();
-                    break;
-                case 2:
-                    this_max_full = workspaces->buckets_max_full<2, shorthint_t>();
-                    break;
-                case 3:
-                    this_max_full = workspaces->buckets_max_full<3, shorthint_t>();
-                    break;
-                default:
-                    ASSERT_ALWAYS(0);
-            }
-            if (this_max_full >= max_full)
-                max_full = this_max_full;
-
-            if (max_full < 1) 
-                break;
-            {
-                verbose_output_vfprint(2, 1, gmp_vfprintf, "# max_full=%f -- cannot continue sieving for q=%Zd, rho=%Zd\n",
-                        max_full, (mpz_srcptr) doing.p, (mpz_srcptr) doing.r);
-                verbose_output_vfprint (2, 1, gmp_vfprintf,
-                        "# redoing q=%Zd, rho=%Zd because buckets are full (maxfull=%f)\n"
-                        "# Maybe you have too many threads compared to the size of the factor bases.\n"
-                        "# Please try less threads, or a larger -bkmult parameter (at some cost!).\n"
-                        "# The code will now try to adapt by allocating more memory for buckets.\n",
-                        (mpz_srcptr) doing.p, (mpz_srcptr) doing.r, max_full);
-                double new_bk_multiplier = si.conf.bk_multiplier * (double) max_full * 1.01;
-                verbose_output_print (2, 1, "# Updating bucket multiplier to %.3f*%f*1.01=%.3f\n",
-                        si.conf.bk_multiplier,
-                        max_full,
-                        new_bk_multiplier
-                        );
-                max_full = 0;
-                las.config_pool.change_bk_multiplier(new_bk_multiplier);
-                si.conf.bk_multiplier = new_bk_multiplier;
-            }
+        for(int side = 0 ; side < 2 ; side++) {
+            /* This uses the thread pool, and stores the time spent under
+             * timer_special_q (with wait time stored separately */
+            if (!si.sides[side].fb) continue;
+            fill_in_buckets(timer_special_q, *pool, *workspaces, si, side);
         }
 
-        ASSERT_ALWAYS(max_full <= 1.0 ||
-                fprintf (stderr, "max_full=%f, see #14987\n", max_full) == 0);
-        
+        // useless
+        // pool->accumulate_and_clear_active_time(*timer_special_q.current);
+
+        workspaces->thrs[0].rep->ttbuckets_fill += seconds();
+
         // this timing slot is insignificant, let's put it with the
         // bookkeeping crop
         // SIBLING_TIMER(timer_special_q, "prepare small sieve");
@@ -2962,17 +2910,21 @@ if (si.conf.sublat.m) {
 }
 
         } catch (buckets_are_full const & e) {
-            fprintf(stderr, "# %s\n", e.what());
-            printf("# redoing this q because buckets are full.\n");
+            verbose_output_vfprint (2, 1, gmp_vfprintf,
+                    "# redoing q=%Zd, rho=%Zd because buckets are full\n"
+                    "# %s\n"
+                    "# Maybe you have too many threads compared to the size of the factor bases.\n"
+                    "# Please try less threads, or a larger -bkmult parameter (at some cost!).\n"
+                    "# The code will now try to adapt by allocating more memory for buckets.\n",
+                    (mpz_srcptr) doing.p, (mpz_srcptr) doing.r, e.what());
 
             double new_bk_multiplier = conf.bk_multiplier * (double) e.reached_size / e.theoretical_max_size * 1.01;
-            printf("# Updating bucket multiplier to %.3f*%d/%d*1.01=%.3f\n",
+            verbose_output_print(0, 1, "# Updating bucket multiplier to %.3f*%d/%d*1.01=%.3f\n",
                     conf.bk_multiplier,
                     e.reached_size,
                     e.theoretical_max_size,
                     new_bk_multiplier
                   );
-            max_full = 0;
             las.config_pool.change_bk_multiplier(new_bk_multiplier);
             /* we have to roll back the updates we made to
              * this structure. */
@@ -3159,10 +3111,10 @@ if (si.conf.sublat.m) {
     wct = wct_seconds() - wct;
     if (adjust_strategy < 2) {
         verbose_output_print (2, 1, "# Average J=%1.0f for %lu special-q's, max bucket fill %f\n",
-                totJ / (double) nr_sq_processed, nr_sq_processed, max_full);
+                totJ / (double) nr_sq_processed, nr_sq_processed, las.config_pool.base.bk_multiplier);
     } else {
         verbose_output_print (2, 1, "# Average logI=%1.1f for %lu special-q's, max bucket fill %f\n",
-                totlogI / (double) nr_sq_processed, nr_sq_processed, max_full);
+                totlogI / (double) nr_sq_processed, nr_sq_processed, las.config_pool.base.bk_multiplier);
     }
     verbose_output_print (2, 1, "# Discarded %lu special-q's out of %u pushed\n",
             nr_sq_discarded, las.nq_pushed);
