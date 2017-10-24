@@ -137,13 +137,15 @@ bucket_array_t<LEVEL, HINT>::allocate_memory(const uint32_t new_n_bucket,
       ASSERT_ALWAYS(new_n_bucket % 2 == 0);
       bs_even = 2 * Q + ndev * sqrt(2 * Q);
       bs_odd  = 4 * Q + ndev * sqrt(4 * Q);
+      bs_even = bucket_misalignment(bs_even, sizeof(update_t));
+      bs_odd  = bucket_misalignment(bs_odd, sizeof(update_t));
       new_big_size = (bs_even + bs_odd) * (new_n_bucket / 2) * sizeof(update_t);
   } else {
       bs_even = bs_odd = 3 * Q + ndev * sqrt(3 * Q);
+      bs_even = bucket_misalignment(bs_even, sizeof(update_t));
+      bs_odd  = bucket_misalignment(bs_odd, sizeof(update_t));
       new_big_size = bs_odd * new_n_bucket * sizeof(update_t);
   }
-  bs_even = bucket_misalignment(bs_even, sizeof(update_t));
-  bs_odd  = bucket_misalignment(bs_odd, sizeof(update_t));
 
   /* add 1 megabyte to each bucket array, so as to deal with overflowing
    * buckets */
