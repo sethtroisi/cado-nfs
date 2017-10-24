@@ -936,18 +936,6 @@ void downsort_tree<0>(timetree_t&,
 
 // other fake instances to please level-2 instanciation.
 template <>
-bucket_array_t<3, longhint_t>::bucket_array_t()
-{
-    ASSERT_ALWAYS(0);
-}
-
-template <>
-bucket_array_t<3, longhint_t>::~bucket_array_t()
-{
-    ASSERT_ALWAYS(0);
-}
-
-template <>
 void downsort<3>(bucket_array_t<2, longhint_t>&,
         bucket_array_t<3, longhint_t> const&, unsigned int, where_am_I &)
 {
