@@ -40,10 +40,15 @@ dupsup (FILE *output, relation & rel, las_todo_entry const& doing, const int is_
 static int
 read_sq_comment(las_todo_entry & doing, const char *line)
 {
+    int side;
+    cxx_mpz p,r;
   if (gmp_sscanf(line, "# Sieving side-%d q=%Zd; rho=%Zd;",
-              &doing.side,
-              (mpz_ptr) doing.p,
-              (mpz_ptr) doing.r) == 3) {
+              &side,
+              (mpz_ptr) p,
+              (mpz_ptr) r) == 3) {
+      /* this is the way to go if we want proper initialization of all
+       * fields */
+      doing = las_todo_entry(p, r, side);
     return 1;
   }
   return 0;
