@@ -100,9 +100,9 @@ struct sieve_info {
 
         /* This is updated by applying the special-q lattice transform to
          * the factor base. */
-        small_sieve_data_t ssd[1];
+        small_sieve_data_t ssd;
         /* And this is just created as an extraction of the above */
-        small_sieve_data_t rsd[1];
+        small_sieve_data_t rsd;
     };
     /* }}} */
 

@@ -2,6 +2,7 @@
 #define LAS_SMALLSIEVE_HPP_
 
 #include <stdarg.h>
+#include <vector>
 #include "fb-types.h"
 #include "macros.h"
 
@@ -89,9 +90,8 @@ public:
 };
 
 typedef struct {
-    ssp_simple_t *ssps;
-    ssp_t *ssp;
-    int nb_ssps, nb_ssp;
+    std::vector<ssp_simple_t> ssps;
+    std::vector<ssp_t> ssp;
 } small_sieve_data_t;
 
 /* Include this only now, as there's a cross dependency between the two
@@ -100,26 +100,28 @@ typedef struct {
 #include "las-types.hpp"
 #include "bucket.hpp"
 
-extern void small_sieve_info(const char * what, int side, small_sieve_data_t * r);
+extern void small_sieve_info(const char * what, int side, small_sieve_data_t const & r);
 extern int small_sieve_dump(FILE *, const char *, va_list);
-extern void small_sieve_clear(small_sieve_data_t * ssd);
-extern void small_sieve_extract_interval(small_sieve_data_t * r, small_sieve_data_t * s, int bounds[2]);
-extern void small_sieve_init(small_sieve_data_t *ssd, unsigned int interleaving, const std::vector<fb_general_entry> *fb,
+extern void small_sieve_clear(small_sieve_data_t & ssd);
+extern void small_sieve_extract_interval(small_sieve_data_t & r, small_sieve_data_t const & s, int bounds[2]);
+extern void small_sieve_init(small_sieve_data_t & ssd, unsigned int interleaving, const std::vector<fb_general_entry> *fb,
                       sieve_info const & si, int side);
-extern int64_t * small_sieve_copy_start(int64_t * base, int bounds[2]);
-extern int64_t * small_sieve_start(small_sieve_data_t *ssd, unsigned int N, sieve_info const & si);
+extern void small_sieve_copy_start(std::vector<int64_t> &, std::vector<int64_t> const & base, int bounds[2]);
+extern void small_sieve_start(std::vector<int64_t> &, small_sieve_data_t & ssd, unsigned int N, sieve_info const & si);
 /*
 extern void small_sieve_skip_stride(small_sieve_data_t *ssd, int64_t * ssdpos, unsigned int N, unsigned int interleaving, sieve_info const & si);
 */
 extern void sieve_small_bucket_region(unsigned char *S, int N,
-			       small_sieve_data_t * ssd, int64_t * ssdpos, sieve_info& si,
+			       small_sieve_data_t & ssd,
+                               std::vector<int64_t> & ssdpos, sieve_info& si,
                                int side,
                                int interleaving,
 			       where_am_I& w MAYBE_UNUSED);
 
 extern void
 resieve_small_bucket_region (bucket_primes_t *BP, int N, unsigned char *S,
-        small_sieve_data_t *ssd, int64_t * ssdpos,
+        small_sieve_data_t & ssd, 
+        std::vector<int64_t> & ssdpos,
         sieve_info const & si,
         int interleaving,
         where_am_I& w MAYBE_UNUSED);

@@ -73,30 +73,30 @@ void ssp_t::print(FILE *f) const
 }
 
 int
-small_sieve_dump(FILE *f, const char *header, va_list va)
+small_sieve_dump(FILE *f, const char *header, va_list va) /// XXX uh ? va_ ?
 {
-    const small_sieve_data_t * ssd = va_arg(va, const small_sieve_data_t *);
+    const small_sieve_data_t * p_ssd = va_arg(va, const small_sieve_data_t *);
+    small_sieve_data_t const & ssd(*p_ssd);
 
     fprintf(f, "%s", header);
-    for (int i = 0; i < ssd->nb_ssps; i++) {
-        ssd->ssps[i].print(f);
+    for(auto const & x : ssd.ssps) {
+        x.print(f);
         fprintf(f, "\n");
     }
-    for (int i = 0; i < ssd->nb_ssp; i++) {
-        ssd->ssp[i].print(f);
+    for (auto const & x : ssd.ssp) {
+        x.print(f);
         fprintf(f, "\n");
     }
     return 1;
 }
 
-static void small_sieve_print_contents(const char * prefix, small_sieve_data_t * ssd)
+static void small_sieve_print_contents(const char * prefix, small_sieve_data_t const & ssd)
 {
-    int nice=ssd->nb_ssps;
+    int nice=ssd.ssps.size();
     int nproj=0;
     int npow2=0;
     int ndiscard=0;
-    for(int i = 0; i < ssd->nb_ssp; i++) {
-        const ssp_t &ssp = ssd->ssp[i];
+    for(auto const & ssp : ssd.ssp) {
         nproj += ssp.is_proj();
         npow2 += ssp.is_pow2();
         ndiscard += ssp.is_discarded();
@@ -117,7 +117,7 @@ static void small_sieve_print_contents(const char * prefix, small_sieve_data_t *
 }
 
 
-void small_sieve_info(const char * what, int side, small_sieve_data_t * r)
+void small_sieve_info(const char * what, int side, small_sieve_data_t const & r)
 {
     char * tmp;
     int rc = asprintf(&tmp, "%s(side %d)", what, side);
@@ -129,20 +129,16 @@ void small_sieve_info(const char * what, int side, small_sieve_data_t * r)
 /* }}} */
 
 /* {{{ Sieve initialization / clearing : first the easy ones */
-void small_sieve_clear(small_sieve_data_t * ssd)
+void small_sieve_clear(small_sieve_data_t & ssd)
 {
-    free(ssd->ssps); ssd->ssps = NULL;
-    free(ssd->ssp); ssd->ssp = NULL;
+    ssd.ssps.clear();
+    ssd.ssp.clear();
 }
 
-void small_sieve_extract_interval(small_sieve_data_t * r, small_sieve_data_t * s, int bounds[2])
+void small_sieve_extract_interval(small_sieve_data_t & r, small_sieve_data_t const & s, int bounds[2])
 {
-    memset(r, 0, sizeof(small_sieve_data_t));
-    r->nb_ssp = bounds[1] - bounds[0];
-    r->ssp = (ssp_t *) malloc (r->nb_ssp * sizeof (ssp_t));
-    FATAL_ERROR_CHECK(r->nb_ssp > 0 && r->ssp == NULL, "malloc failed");
-
-    memcpy(r->ssp, s->ssp + bounds[0], r->nb_ssp * sizeof (ssp_t));
+    r = small_sieve_data_t();
+    r.ssp.assign(s.ssp.begin() +  bounds[0], s.ssp.begin() + bounds[1]);
 }
 
 /* }}} */
@@ -177,7 +173,7 @@ void ssp_t::init_proj(fbprime_t p, fbprime_t r, unsigned char _logp, unsigned in
 // and even BUCKET_REGION
 // It could actually be larger than 32 bits when I > 16.
 
-void small_sieve_init(small_sieve_data_t *ssd, unsigned int interleaving,
+void small_sieve_init(small_sieve_data_t & ssd, unsigned int interleaving,
                       const std::vector<fb_general_entry> *fb,
                       sieve_info const & si, const int side)
 {
@@ -189,21 +185,17 @@ void small_sieve_init(small_sieve_data_t *ssd, unsigned int interleaving,
 
     // allocate space for these. n is an upper bound, since some of the
     // ideals might become special ones.
-    ssd->ssp = (ssp_t *) malloc(size * sizeof(ssp_t));
-    FATAL_ERROR_CHECK(ssd->ssp == NULL, "malloc failed");
-    memset(ssd->ssp, 0, size * sizeof(ssp_t));
+    ssd.ssp.assign(size, ssp_t());
 
-    ssd->ssps = (ssp_simple_t *) malloc(size * sizeof(ssp_simple_t));
-    FATAL_ERROR_CHECK(ssd->ssps == NULL, "malloc failed");
-    memset(ssd->ssps, 0, size * sizeof(ssp_simple_t));
+    // ssd.ssps.assign(size, 0);
+    // TODO: ssps was never set before, probably the right place to deal
+    // with it is here, although I'm not too sure what was the intent.
+    ssd.ssps.clear();
 
     // Do another pass on fb and projective primes, to fill in the data
     // while we have any regular primes or projective primes < thresh left
-    ssp_t * tail = ssd->ssp;
-    ssp_simple_t * tails MAYBE_UNUSED = ssd->ssps;
-    // TODO: ssps was never set before, probably the right place to deal
-    // with it is here, although I'm not too sure what was the intent.
-    ssd->nb_ssps = 0;
+    ssp_t * tail = &(ssd.ssp.front());
+    // ssp_simple_t * tails MAYBE_UNUSED = ssd.ssps;
     
     // The processing of bucket region by nb_threads is interleaved.
     // It means that the positions for the small sieve must jump
@@ -290,16 +282,13 @@ void small_sieve_init(small_sieve_data_t *ssd, unsigned int interleaving,
             tail++;
         }
     }
-    ssd->nb_ssp = size;
 }
 /* }}} */
 
 /* {{{ Creation of the ssdpos tables */
-int64_t * small_sieve_copy_start(int64_t * base, int bounds[2])
+void small_sieve_copy_start(std::vector<int64_t>& res, std::vector<int64_t> const & base, int bounds[2])
 {
-    int64_t *res = (int64_t *)malloc((bounds[1] - bounds[0]) * sizeof(int64_t));
-    memcpy(res, base + bounds[0], (bounds[1] - bounds[0]) * sizeof(int64_t));
-    return res;
+    res.assign(base.begin() + bounds[0], base.begin() + bounds[1]);
 }
 
 /* The places to be sieved are governed by the shape of the underlying
@@ -438,7 +427,7 @@ struct small_sieve_context {
         has_origin = has_haxis && has_vaxis;              
     }
 
-    int64_t first_position_ordinary_prime(const ssp_t * ssp, unsigned int dj = 0)
+    int64_t first_position_ordinary_prime(ssp_t const & ssp, unsigned int dj = 0)
     {
         /* equation here: i-r*j = 0 mod p */
 
@@ -466,33 +455,33 @@ struct small_sieve_context {
          *
          * and finally we take pos0 mod p.
          */
-        int64_t x = (int64_t)(j0 + dj) * (int64_t)ssp->get_r() - i0;
+        int64_t x = (int64_t)(j0 + dj) * (int64_t)ssp.get_r() - i0;
         if (sublatm > 1) {
-            ASSERT(ssp->get_p() % sublatm);
+            ASSERT(ssp.get_p() % sublatm);
             /* alternative code. not clear it's better.
                ASSERT(sublatm == 2 || sublatm == 3 || sublatm == 6);
                uint64_t invp_mod_m = p;
                int k = ((sublati0 - r * sublatj0) * invp_mod_m) % sublatm;
                x += ((r * sublatj0 - sublati0) + k * p) / sublatm;
                */
-            int64_t y = ssp->get_r() * sublatj0;
-            for( ; y % sublatm != sublati0 ; y += ssp->get_p());
+            int64_t y = ssp.get_r() * sublatj0;
+            for( ; y % sublatm != sublati0 ; y += ssp.get_p());
             x += (y - sublati0) / sublatm;
         }
-        x= x % (int64_t)ssp->get_p();
+        x= x % (int64_t)ssp.get_p();
         /* As long as i0 <= 0, which holds in the normal case where
          * logI <= LOG_BUCKET_REGION, we can be sure that x >= 0, so
          * we have no issue with the sign.  However, when i0 is a
          * positive number, some extra care is needed.
          */
-        if (x < 0) x += ssp->get_p();
+        if (x < 0) x += ssp.get_p();
         return x;
     }
 
     /* This return value is typically logI bits larger than for ordinary
      * primes, so it makes sense to return it as a 64-bit integer.
      */
-    int64_t first_position_projective_prime(const ssp_t * ssp)
+    int64_t first_position_projective_prime(ssp_t const & ssp)
     {
         /* equation here: i == (j/g)*U (mod q) */
         /* we're super-non-critical, here.
@@ -514,8 +503,8 @@ struct small_sieve_context {
          * This is done as follows */
 
         /* next multiple of g above j0 */
-        uint64_t jjmod = jj % ssp->get_g();
-        if (jjmod) jj += ssp->get_g();
+        uint64_t jjmod = jj % ssp.get_g();
+        if (jjmod) jj += ssp.get_g();
         jj -= jjmod;
 
         /* All of the fragment above trivializes to a no-op in the
@@ -525,10 +514,10 @@ struct small_sieve_context {
         /* Now we'd like to avoid row number 0 (so jj == 0). */
         /* The sieving code may do some special stuff to fill the
          * position (1,0). At least at some point it did */
-        if (jj == 0) jj += ssp->get_g();
+        if (jj == 0) jj += ssp.get_g();
 
         // In sublat mode, we also need jj congruent to sublatj0 mod m.
-        // XXX A very nasty situation: when ssp->g and sublatm are
+        // XXX A very nasty situation: when ssp.g and sublatm are
         // not coprime, we may very well have an infinite loop here
         // (say we want to sieve only even lines and sublatj0=1,
         // sublatm=1. For the moment, we do SSP_DISCARD_SUBLAT
@@ -537,13 +526,13 @@ struct small_sieve_context {
         // small sieved primes depending on the sublattice we're
         // considering (or but ssdpos to ULONG_MAX ?).
         if (sublatm > 1) {
-            for( ; jj % sublatm != sublatj0 ; jj += ssp->get_g());
+            for( ; jj % sublatm != sublatj0 ; jj += ssp.get_g());
         }
         // Find the corresponding i
-        uint64_t ii = uint64_t(jj/ssp->get_g())*uint64_t(ssp->get_U());
+        uint64_t ii = uint64_t(jj/ssp.get_g())*uint64_t(ssp.get_U());
 
         if (sublatm > 1) {
-            for( ; ii % sublatm != sublati0 ; ii += ssp->get_q());
+            for( ; ii % sublatm != sublati0 ; ii += ssp.get_q());
         }
         // In the sublat mode, switch back to reduced convention
         // (exact divisions)
@@ -566,8 +555,8 @@ struct small_sieve_context {
          * i0=-I/2.
          */
         int i0ref = (j0 == jj) ? i0 : (-I/2);
-        int64_t x = (ii-i0ref) % (uint64_t)ssp->get_q();
-        if (x < 0) x += ssp->get_q();
+        int64_t x = (ii-i0ref) % (uint64_t)ssp.get_q();
+        if (x < 0) x += ssp.get_q();
         if (jj > j0) {
             x -= region_rank_in_line << LOG_BUCKET_REGION;
             x += (((uint64_t)(jj - j0))<<logI);
@@ -575,7 +564,7 @@ struct small_sieve_context {
         return x;
     }
 
-    int64_t first_position_power_of_two(const ssp_t * ssp, unsigned int dj = 0)
+    int64_t first_position_power_of_two(ssp_t const & ssp, unsigned int dj = 0)
     {
         /* equation here: i-r*j = 0 mod p, p a power of 2. */
         /* only difference with ordinary case is that we want to
@@ -596,13 +585,13 @@ struct small_sieve_context {
         /* next odd line */
         jj |= 1;
         int i0ref = (j == jj) ? i0 : (-I/2);
-        int64_t x = (int64_t)jj * (int64_t)ssp->get_r();
+        int64_t x = (int64_t)jj * (int64_t)ssp.get_r();
         if (sublatm > 1) {
-            for( ; x % sublatm != sublati0 ; x += ssp->get_p());
+            for( ; x % sublatm != sublati0 ; x += ssp.get_p());
             x = (x - sublati0) / sublatm;
         }
-        x = (x - i0ref) & (ssp->get_p() - 1);
-        if (x < 0) x += ssp->get_p();
+        x = (x - i0ref) & (ssp.get_p() - 1);
+        if (x < 0) x += ssp.get_p();
         /* our target is position x in the bucket region which starts
          * at coordinates (i0ref, jj). How far is that from us ?
          */
@@ -646,12 +635,13 @@ struct small_sieve_context {
     do {} while (0)
 
 /* Only compute the initial ssdpos fields. */
-int64_t *small_sieve_start(small_sieve_data_t *ssd,
+void small_sieve_start(std::vector<int64_t> & ssdpos,
+        small_sieve_data_t & ssd,
         unsigned int first_region_index,
         sieve_info const & si)
 {
     small_sieve_context C(si.conf.logI_adjusted, first_region_index, si.conf.sublat);
-    int64_t * ssdpos = (int64_t *) malloc(ssd->nb_ssp * sizeof(int64_t));
+    ssdpos.assign(ssd.ssp.size(), 0);
 
     /* We want to compute the index of the "next" hit, counted from the
      * starting offset of the "current" bucket region at (i0,j0). The
@@ -664,28 +654,27 @@ int64_t *small_sieve_start(small_sieve_data_t *ssd,
      * negative if j>j0.
      *
      */
-    for(int index = 0 ; index < ssd->nb_ssp ; index++) {
+    for(size_t index = 0 ; index < ssd.ssp.size() ; index++) {
+        ssp_t const & ssp(ssd.ssp[index]);
         /* generic case only. For all other cases (which are rare enough
          * -- typically at most 20, counting powers of two and such), we
          *  compute the starting point from within
          *  sieve_small_bucket_region for each bucket region.
          */
-        const ssp_t & ssp = ssd->ssp[index];
         if (ssp.is_discarded()) {
             /* Do nothing for discarded entries */
         } else if (ssp.is_nice()) {
-            ssdpos[index] = C.first_position_ordinary_prime(&ssp);
+            ssdpos[index] = C.first_position_ordinary_prime(ssp);
         } else if (ssp.is_proj()) {
             /* This also handles powers of 2 with projective root */
-            ssdpos[index] = C.first_position_projective_prime(&ssp);
+            ssdpos[index] = C.first_position_projective_prime(ssp);
         } else if (ssp.is_pow2()) {
             /* Powers of 2 with affine root */
-            ssdpos[index] = C.first_position_power_of_two(&ssp);
+            ssdpos[index] = C.first_position_power_of_two(ssp);
         } else {
             abort(); /* How did we get here? */
         }
     }
-    return ssdpos;
 }
 /* }}} */
 
@@ -828,7 +817,8 @@ inline size_t sieve_full_line(unsigned char * S0, unsigned char * S1, size_t x0 
 // next sieve region S.
 // Information about where we are is in ssd.
 void sieve_small_bucket_region(unsigned char *S, int N,
-                               small_sieve_data_t * ssd, int64_t * ssdpos,
+                               small_sieve_data_t & ssd,
+                               std::vector<int64_t> & ssdpos,
                                sieve_info & si, int side,
                                int interleaving MAYBE_UNUSED,
                                where_am_I & w MAYBE_UNUSED)
@@ -857,8 +847,8 @@ void sieve_small_bucket_region(unsigned char *S, int N,
         /* Process only powers of 2. For now we do a full pass over the ssp_t
            entries. TODO: split off powers of 2 into their own array. */
         const bool verbose_pattern_2 = false;
-        for(int index = 0 ; index < ssd->nb_ssp ; index++) {
-            const ssp_t &ssp = ssd->ssp[index];
+        for(size_t index = 0 ; index < ssd.ssp.size() ; index++) {
+            ssp_t const & ssp(ssd.ssp[index]);
             if (!ssp.is_pow2())
                 continue;
             if (ssp.is_proj()) {
@@ -875,8 +865,7 @@ void sieve_small_bucket_region(unsigned char *S, int N,
              * useless.
              */
             if (j&1) {
-                ssp_t * ssp = &(ssd->ssp[index]);
-                const fbprime_t p = ssp->get_p();
+                const fbprime_t p = ssp.get_p();
                 if (mpz_cmp_ui(si.qbasis.q, p) == 0) {
                     continue;
                 }
@@ -886,7 +875,7 @@ void sieve_small_bucket_region(unsigned char *S, int N,
                     verbose_output_start_batch();
                     for (size_t out_i=0; (out=verbose_output_get(TRACE_CHANNEL, 0, out_i)) != NULL; out_i++) {
                         fprintf(out, "# Adding ");
-                        ssp->print(out);
+                        ssp.print(out);
                         fprintf(out, " to sieving pattern for powers of 2\n");
                     }
                     verbose_output_end_batch();
@@ -906,21 +895,21 @@ void sieve_small_bucket_region(unsigned char *S, int N,
                         if (verbose_pattern_2)
                             verbose_output_print(TRACE_CHANNEL, 0,
                                 "# Hits at pattern[%d]\n", x);
-                        ((unsigned char *)pattern)[x] += ssp->logp;
+                        ((unsigned char *)pattern)[x] += ssp.logp;
                     }
 #ifdef UGLY_DEBUGGING
                     for (int x = pos; x < (i1 - i0) ; x+= p) {
                         WHERE_AM_I_UPDATE(w, x, (w.j << logI) + x);
-                        sieve_increase(S + x, ssp->logp, w);
+                        sieve_increase(S + x, ssp.logp, w);
                         /* cancel the above action */
-                        S[x] += ssp->logp;
+                        S[x] += ssp.logp;
                     }
 #endif
 #if 0
                     /* Skip two lines above, since we sieve only odd lines.
                      * Even lines would correspond to useless reports.
                      */
-                    pos = ((pos + 2 * ssp->get_r()) & (p - 1)) + (2 << logI);
+                    pos = ((pos + 2 * ssp.get_r()) & (p - 1)) + (2 << logI);
 #endif
                 }
 #if 0
@@ -985,9 +974,9 @@ void sieve_small_bucket_region(unsigned char *S, int N,
 
         int * interval = si.sides[side].fb_parts_x->pow3;
         for(int index = interval[0] ; index < interval[1] ; index++) {
-            ssp_t * ssp = &(ssd->ssp[index]);
-            if (ssp->is_nice()) {
-                ASSERT_ALWAYS(ssp->get_p() == 3);
+            ssp_t const & ssp(ssd.ssp[index]);
+            if (ssp.is_nice()) {
+                ASSERT_ALWAYS(ssp.get_p() == 3);
                 const fbprime_t p = 3;
                 WHERE_AM_I_UPDATE(w, p, p);
 
@@ -995,7 +984,7 @@ void sieve_small_bucket_region(unsigned char *S, int N,
 
                 ASSERT (pos < (int) p);
                 for (unsigned int x = pos; x < 3 * sizeof(unsigned long); x += p)
-                    ((unsigned char *)pattern)[x] += ssp->logp;
+                    ((unsigned char *)pattern)[x] += ssp.logp;
             } else {
                 /* index points to a power of 3, and we have an exceptional
                  * event. Sure it can neither be SSP_END nor SSP_POW2.
@@ -1054,11 +1043,11 @@ void sieve_small_bucket_region(unsigned char *S, int N,
     // small primes.
 
     /* use size_t for k, i and twop to speed up in x86 with LEA asm instructions */
-    for(size_t index = 0 ; index < (size_t) ssd->nb_ssp ; index++) {
-        ssp_t * ssp = &(ssd->ssp[index]);
-        if(ssp->is_nice()) {
-            const fbprime_t p = ssp->get_p();
-            const fbprime_t r = ssp->get_r();
+    for(size_t index = 0 ; index < ssd.ssp.size() ; index++) {
+        ssp_t const & ssp(ssd.ssp[index]);
+        if(ssp.is_nice()) {
+            const fbprime_t p = ssp.get_p();
+            const fbprime_t r = ssp.get_r();
 
             if (mpz_cmp_ui(si.qbasis.q, p) == 0) continue;
 
@@ -1067,7 +1056,7 @@ void sieve_small_bucket_region(unsigned char *S, int N,
             if (p == 3) continue;
 
             WHERE_AM_I_UPDATE(w, p, p);
-            const unsigned char logp = ssp->logp;
+            const unsigned char logp = ssp.logp;
             unsigned char *S0 = S;
             int pos = ssdpos[index];
 #ifdef TRACE_K
@@ -1169,23 +1158,23 @@ void sieve_small_bucket_region(unsigned char *S, int N,
                 ssdpos[index] = pos;
             } else {
                 /* skip stride */
-                pos += ssp->get_offset();
+                pos += ssp.get_offset();
                 if (pos >= (int) p) pos -= p;
                 ssdpos[index] = pos;
             }
         } else {
 
-            // if (ssp->is_discarded_proj()) continue;
-            if (ssp->is_proj()) {
+            // if (ssp.is_discarded_proj()) continue;
+            if (ssp.is_proj()) {
                 /* This code also covers projective powers of 2 */
-                ssp_t * ssp = &(ssd->ssp[index]);
-                const fbprime_t q = ssp->get_q();
-                const fbprime_t g = ssp->get_g();
-                const size_t gI = (size_t)ssp->get_g() << logI;
-                const fbprime_t U = ssp->get_U();
+                ssp_t const & ssp(ssd.ssp[index]);
+                const fbprime_t q = ssp.get_q();
+                const fbprime_t g = ssp.get_g();
+                const size_t gI = (size_t)ssp.get_g() << logI;
+                const fbprime_t U = ssp.get_U();
                 const fbprime_t p MAYBE_UNUSED = g * q;
                 WHERE_AM_I_UPDATE(w, p, p);
-                const unsigned char logp = ssp->logp;
+                const unsigned char logp = ssp.logp;
                 /* Sieve the projective primes. We have
                  *         p^index | fij(i,j)
                  * for i,j such that
@@ -1200,7 +1189,7 @@ void sieve_small_bucket_region(unsigned char *S, int N,
                  * sieved.  So if S + ssdpos is in the current bucket region,
                  * we update all  S + ssdpos + n*q  where ssdpos + n*q < I,
                  * then set ssdpos = ((ssdpos % I) + U) % q) + I * g.  */
-                if (!test_divisibility && ssp->get_q() == 1)
+                if (!test_divisibility && ssp.get_q() == 1)
                 {
                     /* q = 1, therefore U = 0, and we sieve all entries in lines
                        with g|j, beginning with the line starting at S[ssdpos] */
@@ -1224,9 +1213,9 @@ void sieve_small_bucket_region(unsigned char *S, int N,
                     // number 0 must still be sieved in that case, but once
                     // it's done, we can indeed skip the next part of
                     // sieving.
-                    if (ssp->is_discarded_proj())
+                    if (ssp.is_discarded_proj())
                         continue;
-                    ASSERT (ssp->get_U() == 0);
+                    ASSERT (ssp.get_U() == 0);
                     ASSERT (pos % (i1 - i0) == 0);
                     ASSERT ((i1 - i0) % (4 * sizeof (unsigned long)) == 0);
                     for (size_t x = 0; x < sizeof (unsigned long); x++)
@@ -1299,18 +1288,18 @@ void sieve_small_bucket_region(unsigned char *S, int N,
                     ssdpos[index] = linestart + lineoffset - (1U << LOG_BUCKET_REGION);
 #endif
                 }
-            } else if (ssp->is_pow2()) {
+            } else if (ssp.is_pow2()) {
                 /* Powers of 2 are treated separately */
                 /* Don't sieve powers of 2 again that were pattern-sieved */
-                ssp_t * ssp = &(ssd->ssp[index]);
-                const fbprime_t p = ssp->get_p();
-                const fbprime_t r = ssp->get_r();
+                ssp_t const & ssp(ssd.ssp[index]);
+                const fbprime_t p = ssp.get_p();
+                const fbprime_t r = ssp.get_r();
                 WHERE_AM_I_UPDATE(w, p, p);
 
                 if (p <= pattern2_size)
                     continue;
 
-                const unsigned char logp = ssp->logp;
+                const unsigned char logp = ssp.logp;
                 unsigned char *S_ptr = S;
 
                 int pos = C.first_position_power_of_two(ssp);
@@ -1367,7 +1356,7 @@ void sieve_small_bucket_region(unsigned char *S, int N,
    Information about where we are is in ssd. */
 void
 resieve_small_bucket_region (bucket_primes_t *BP, int N, unsigned char *S,
-        small_sieve_data_t *ssd, int64_t * ssdpos,
+        small_sieve_data_t & ssd, std::vector<int64_t> & ssdpos,
         sieve_info const & si, int interleaving MAYBE_UNUSED, where_am_I & w MAYBE_UNUSED)
 {
     int logI = si.conf.logI_adjusted;
@@ -1386,18 +1375,18 @@ resieve_small_bucket_region (bucket_primes_t *BP, int N, unsigned char *S,
         ASSERT_ALWAYS((sublatm & 1) == 1);
     }
 
-    for(int index = 0 ; index < ssd->nb_ssp ; index++) {
-        ssp_t * ssp = &(ssd->ssp[index]);
-        if (ssp->is_pow2())
+    for(size_t index = 0 ; index < ssd.ssp.size() ; index++) {
+        ssp_t const & ssp(ssd.ssp[index]);
+        if (ssp.is_pow2())
             continue;
-        if (ssp->is_nice()) {
-            if (ssp->is_discarded())
+        if (ssp.is_nice()) {
+            if (ssp.is_discarded())
                 continue;
-            const fbprime_t p = ssp->get_p();
+            const fbprime_t p = ssp.get_p();
             if (mpz_cmp_ui(si.qbasis.q, p) == 0) {
                 continue;
             }
-            fbprime_t r = ssp->get_r();
+            fbprime_t r = ssp.get_r();
             WHERE_AM_I_UPDATE(w, p, p);
             int pos = ssdpos[index];
             S_ptr = S;
@@ -1444,15 +1433,15 @@ resieve_small_bucket_region (bucket_primes_t *BP, int N, unsigned char *S,
                 S_ptr += I;
                 q ^= p;
             }
-            pos += ssp->get_offset();
+            pos += ssp.get_offset();
             if (pos >= (int) p) pos -= p;
 
             ssdpos[index] = pos;
-        } else if (ssp->is_proj()) {
-            const fbprime_t g = ssp->get_g();
+        } else if (ssp.is_proj()) {
+            const fbprime_t g = ssp.get_g();
             const uint64_t gI = (uint64_t)g << logI;
 
-            WHERE_AM_I_UPDATE(w, p, g * ssp->get_q());
+            WHERE_AM_I_UPDATE(w, p, g * ssp.get_q());
 
             /* Test every p-th line, starting at S[ssdpos] */
             int64_t pos = C.first_position_projective_prime(ssp);
@@ -1465,7 +1454,7 @@ resieve_small_bucket_region (bucket_primes_t *BP, int N, unsigned char *S,
                 BP->push_update(prime);
             }
             // Same as in sieving: we discard after checking for row 0.
-            if (ssp->is_discarded_proj())
+            if (ssp.is_discarded_proj())
                 continue;
 
             /* make sure ssdpos points at start of line or region */

@@ -3,6 +3,7 @@
 
 #include <pthread.h>
 #include <algorithm>
+#include <vector>
 #include "threadpool.hpp"
 #include "las-forwardtypes.hpp"
 #include "bucket.hpp"
@@ -17,8 +18,8 @@ class thread_workspaces;
 struct thread_side_data : private NonCopyable {
   const fb_factorbase *fb = NULL;
   /* For small sieve */
-  int64_t * ssdpos = NULL;
-  int64_t * rsdpos = NULL;
+  std::vector<int64_t> ssdpos;
+  std::vector<int64_t> rsdpos;
 
   /* The real array where we apply the sieve.
      This has size BUCKET_REGION_0 and should be close to L1 cache size. */

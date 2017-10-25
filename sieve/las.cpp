@@ -2018,7 +2018,7 @@ void * process_bucket_region(timetree_t & timer, thread_data *th)
             thread_side_data & ts = th->sides[side];
             // small_sieve_skip_stride(s.ssd, ts.ssdpos, N, las.nb_threads, si);
             int * b = s.fb_parts_x->rs;
-            memcpy(ts.rsdpos, ts.ssdpos + b[0], (b[1]-b[0]) * sizeof(int64_t));
+            ts.rsdpos.assign(ts.ssdpos.begin() + b[0], ts.ssdpos.begin() + b[1]);
         }
 
         BOOKKEEPING_TIMER(timer);
@@ -2808,8 +2808,8 @@ for (unsigned int j_cong = 0; j_cong < sublat_bound; ++j_cong) {
                  * the first region index considered by thread of index
                  * th->id is simply th->id.
                  */
-                ts.ssdpos = small_sieve_start(s.ssd, th->id, si);
-                ts.rsdpos = small_sieve_copy_start(ts.ssdpos, s.fb_parts_x->rs);
+                small_sieve_start(ts.ssdpos, s.ssd, th->id, si);
+                small_sieve_copy_start(ts.rsdpos, ts.ssdpos, s.fb_parts_x->rs);
             }
         }
         BOOKKEEPING_TIMER(timer_special_q);
@@ -2888,23 +2888,7 @@ for (unsigned int j_cong = 0; j_cong < sublat_bound; ++j_cong) {
             /* precomp_plattice now cleans up its own mess */
         }
 
-        BOOKKEEPING_TIMER(timer_special_q);
-
-        // Cleanup smallsieve data
-        for (int i = 0; i < las.nb_threads; ++i) {
-            for(int side = 0 ; side < 2 ; side++) {
-                thread_data * th = &workspaces->thrs[i];
-                thread_side_data &ts = th->sides[side];
-                free(ts.ssdpos);
-                free(ts.rsdpos);
-            }
-        }
-        for(int side = 0 ; side < 2 ; side++) {
-            sieve_info::side_info & s(si.sides[side]);
-            if (!s.fb) continue;
-            small_sieve_clear(s.ssd);
-            small_sieve_clear(s.rsd);
-        }
+        /* small sieve data now gets cleaned automatically */
 
 
 /* XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX */
