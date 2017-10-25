@@ -76,14 +76,13 @@ int
 small_sieve_dump(FILE *f, const char *header, va_list va) /// XXX uh ? va_ ?
 {
     const small_sieve_data_t * p_ssd = va_arg(va, const small_sieve_data_t *);
-    small_sieve_data_t const & ssd(*p_ssd);
 
     fprintf(f, "%s", header);
-    for(auto const & x : ssd.ssps) {
+    for(auto const & x : p_ssd->ssps) {
         x.print(f);
         fprintf(f, "\n");
     }
-    for (auto const & x : ssd.ssp) {
+    for (auto const & x : p_ssd->ssp) {
         x.print(f);
         fprintf(f, "\n");
     }
@@ -112,7 +111,7 @@ static void small_sieve_print_contents(const char * prefix, small_sieve_data_t c
     if (ndiscard) verbose_output_print(0, 2, " %d discarded.", ndiscard);
     verbose_output_print(0, 2, "\n");
     /* With -v -v -v, dump all the small sieve data */
-    verbose_output_vfprint (0, 4, small_sieve_dump, "# Dump of small sieve data:\n", ssd);
+    verbose_output_vfprint (0, 4, small_sieve_dump, "# Dump of small sieve data:\n", &ssd);
     verbose_output_end_batch();
 }
 
