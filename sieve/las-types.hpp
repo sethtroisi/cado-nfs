@@ -182,6 +182,15 @@ struct sieve_info {
 
 /* }}} */
 
+struct las_augmented_output_channel {
+    int verbose;
+    FILE *output;
+    const char * outputname; /* keep track of whether it's gzipped or not */
+    las_augmented_output_channel(cxx_param_list & pl);
+    ~las_augmented_output_channel();
+};
+
+
 /* {{{ las_info
  *
  * las_info holds general data, mostly unrelated to what is actually
@@ -189,13 +198,10 @@ struct sieve_info {
  * lives outside the choice of one particular way to configure the siever
  * versus another.
  */
-struct las_info : private NonCopyable {
+struct las_info : private NonCopyable, public las_augmented_output_channel {
     // ----- general operational flags
     int nb_threads;
-    FILE *output;
-    const char * outputname; /* keep track of whether it's gzipped or not */
     const char * galois; /* a string to indicate which galois to use in las */
-    int verbose;
     int suppress_duplicates;
 
     /* It's not ``general operational'', but global enough to be here */

@@ -175,41 +175,9 @@ void sieve_info::update (size_t nr_workspaces)/*{{{*/
     }
 }/*}}}*/
 
-/* las_info stuff */
 
-las_info::las_info(cxx_param_list & pl)
-    : config_pool(pl)
-#ifdef  DLP_DESCENT
-      , dlog_base(pl)
-#endif
-      /*{{{*/
+static void las_verbose_enter(cxx_param_list & pl, FILE * output, int verbose)
 {
-    /* We strive to initialize things in the exact order they're written
-     * in the struct */
-    // ----- general operational flags {{{
-    nb_threads = 1;		/* default value */
-    param_list_parse_int(pl, "t", &nb_threads);
-    if (nb_threads <= 0) {
-	fprintf(stderr,
-		"Error, please provide a positive number of threads\n");
-	param_list_clear(pl);
-	exit(EXIT_FAILURE);
-    }
-
-    output = stdout;
-    outputname = param_list_lookup_string(pl, "out");
-    if (outputname) {
-	if (!(output = fopen_maybe_compressed(outputname, "w"))) {
-	    fprintf(stderr, "Could not open %s for writing\n", outputname);
-	    exit(EXIT_FAILURE);
-	}
-    }
-    setvbuf(output, NULL, _IOLBF, 0);      /* mingw has no setlinebuf */
-
-    galois = param_list_lookup_string(pl, "galois");
-    verbose = param_list_parse_switch(pl, "-v");
-    suppress_duplicates = param_list_parse_switch(pl, "-dup");
-
     verbose_interpret_parameters(pl);
     verbose_output_init(NR_CHANNELS);
     verbose_output_add(0, output, verbose + 1);
@@ -229,6 +197,60 @@ las_info::las_info(cxx_param_list & pl)
     }
     verbose_output_add(TRACE_CHANNEL, trace_file, 1);
 #endif
+}
+
+static void las_verbose_leave()
+{
+    verbose_output_clear();
+}
+
+las_augmented_output_channel::las_augmented_output_channel(cxx_param_list & pl)
+{
+    output = stdout;
+    outputname = param_list_lookup_string(pl, "out");
+    if (outputname) {
+	if (!(output = fopen_maybe_compressed(outputname, "w"))) {
+	    fprintf(stderr, "Could not open %s for writing\n", outputname);
+	    exit(EXIT_FAILURE);
+	}
+    }
+    verbose = param_list_parse_switch(pl, "-v");
+    setvbuf(output, NULL, _IOLBF, 0);      /* mingw has no setlinebuf */
+    las_verbose_enter(pl, output, verbose);
+}
+las_augmented_output_channel::~las_augmented_output_channel()
+{
+    if (outputname)
+        fclose_maybe_compressed(output, outputname);
+    las_verbose_leave();
+}
+
+
+/* las_info stuff */
+
+las_info::las_info(cxx_param_list & pl)
+    : las_augmented_output_channel(pl),
+        config_pool(pl)
+#ifdef  DLP_DESCENT
+      , dlog_base(pl)
+#endif
+      /*{{{*/
+{
+    /* We strive to initialize things in the exact order they're written
+     * in the struct */
+    // ----- general operational flags {{{
+    nb_threads = 1;		/* default value */
+    param_list_parse_int(pl, "t", &nb_threads);
+    if (nb_threads <= 0) {
+	fprintf(stderr,
+		"Error, please provide a positive number of threads\n");
+	param_list_clear(pl);
+	exit(EXIT_FAILURE);
+    }
+
+    galois = param_list_lookup_string(pl, "galois");
+    suppress_duplicates = param_list_parse_switch(pl, "-dup");
+
     param_list_print_command_line(output, pl);
 
 
@@ -339,10 +361,7 @@ las_info::las_info(cxx_param_list & pl)
 las_info::~las_info()/*{{{*/
 {
     // ----- general operational flags {{{
-    if (outputname)
-        fclose_maybe_compressed(output, outputname);
     gmp_randclear(rstate);
-    verbose_output_clear();
     cado_poly_clear(cpoly);
     // }}}
 
