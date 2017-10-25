@@ -182,7 +182,8 @@ bucket_array_t<LEVEL, HINT>::allocate_memory(const uint32_t new_n_bucket,
     size_b_align = new_size_b_align;
     bucket_write = (update_t **) malloc_pagealigned (size_b_align);
     /* bucket_start is allocated as an array of n_bucket+1 pointers */
-    bucket_start = (update_t **) malloc_aligned (size_b_align + (n_bucket == size_b_align), 0x40);
+    size_t alloc_bstart = MAX(size_b_align, (n_bucket+1) * sizeof(void*));
+    bucket_start = (update_t **) malloc_aligned (alloc_bstart, 0x40);
     bucket_read = (update_t **) malloc_aligned (size_b_align, 0x40);
   }
 
