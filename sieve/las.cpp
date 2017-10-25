@@ -2850,7 +2850,7 @@ for (unsigned int j_cong = 0; j_cong < sublat_bound; ++j_cong) {
                     for (slice_index_t slice_index = fb->get_first_slice_index();
                             (slice = fb->get_slice(slice_index)) != NULL; 
                             slice_index++) {  
-                        precomp_plattice[side][level].push_back(
+                        precomp_plattice.push(side, level,
                                 slice->make_lattice_bases(si.qbasis, si.conf.logI_adjusted, si.conf.sublat));
                     }
                 }
@@ -2885,22 +2885,7 @@ for (unsigned int j_cong = 0; j_cong < sublat_bound; ++j_cong) {
             TIMER_CATEGORY(timer_special_q, thread_wait());
             pool->accumulate_and_reset_wait_time(*timer_special_q.current);
             */
-
-            BOOKKEEPING_TIMER(timer_special_q);
-
-            // Cleanup precomputed lattice bases.
-            for(int side = 0 ; side < 2 ; side++) {
-                for (int level = 1; level < si.toplevel; ++level) {
-                    std::vector<plattices_vector_t*> &V =
-                        precomp_plattice[side][level];
-                    for (std::vector<plattices_vector_t *>::iterator it =
-                            V.begin();
-                            it != V.end();
-                            it++) {
-                        delete *it;
-                    }
-                }
-            }
+            /* precomp_plattice now cleans up its own mess */
         }
 
         BOOKKEEPING_TIMER(timer_special_q);

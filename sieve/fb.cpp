@@ -385,7 +385,7 @@ fb_vector<FB_ENTRY_TYPE>::extract_bycost(std::vector<unsigned long> &p,
 
 
 template <class FB_ENTRY_TYPE>
-plattices_vector_t *
+plattices_vector_t
 fb_slice<FB_ENTRY_TYPE>::make_lattice_bases(const qlattice_basis &basis,
     const int logI, const sublat_t &sublat) const
 {
@@ -394,7 +394,7 @@ fb_slice<FB_ENTRY_TYPE>::make_lattice_bases(const qlattice_basis &basis,
      transform */
   const unsigned long special_q = mpz_fits_ulong_p(basis.q) ? mpz_get_ui(basis.q) : 0;
 
-  plattices_vector_t *result = new plattices_vector_t(get_index());
+  plattices_vector_t result(get_index());
   slice_offset_t i_entry = 0;
   for (const FB_ENTRY_TYPE *it = begin(); it != end(); it++, i_entry++) {
     if (it->p == special_q) /* Assumes it->p != 0 */
@@ -412,11 +412,12 @@ fb_slice<FB_ENTRY_TYPE>::make_lattice_bases(const qlattice_basis &basis,
         if (!sublat.m)
           ple.next();
         if (LIKELY(pli.a0 != 0)) {
-          result->push_back(ple);
+          result.push_back(ple);
         }
       }
     }
   }
+  /* This is moved, not copied */
   return result;
 }
 

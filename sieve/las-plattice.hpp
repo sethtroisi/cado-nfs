@@ -666,9 +666,12 @@ public:
 };
 
 class plattices_vector_t:
-        public std::vector<plattice_enumerate_t>, private NonCopyable {
+        public std::vector<plattice_enumerate_t> {
     slice_index_t index;
 public:
+    /* no copy, but move allowed */
+    plattices_vector_t(plattices_vector_t const&) = delete;
+    plattices_vector_t(plattices_vector_t &&) = default;
     plattices_vector_t(const slice_index_t index) : index(index) {}
     slice_index_t get_index() const {return index;};
 };

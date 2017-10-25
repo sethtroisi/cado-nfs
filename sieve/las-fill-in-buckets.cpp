@@ -862,13 +862,10 @@ downsort_tree(
     /* SECOND: fill in buckets at this level, for this region. */
     ws.reset_all_pointers<LEVEL,shorthint_t>(side);
     slice_index_t slices_pushed = 0;
-    for (typename std::vector<plattices_vector_t *>::iterator pl_it =
-            precomp_plattice[side][LEVEL].begin();
-        pl_it != precomp_plattice[side][LEVEL].end();
-        pl_it++) {
+    for (auto const & it : precomp_plattice(side, LEVEL)) {
       fill_in_buckets_parameters *param =
         new fill_in_buckets_parameters(ws, side, si,
-            (fb_slice_interface *)NULL, *pl_it, NULL, first_region0_index);
+            (fb_slice_interface *)NULL, it, NULL, first_region0_index);
       // TODO: shall we give the weight to help scheduling, here?
       pool.add_task(fill_in_buckets_one_slice_internal<LEVEL>, param, 0);
       slices_pushed++;
