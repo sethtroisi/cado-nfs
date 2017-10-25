@@ -106,6 +106,18 @@ cado_divert_test(F9 sieve_check_overfull_buckets
             REFERENCE_REVISION=f06a6284d2cdcb669e300cd0dda349b349761578
             CHECKSUM_FILE=
         )
+
+# of the same kind. It seems that this leaks, so valgrind should catch
+# it, right ? (beyond that, we do not particularly expect this test to
+# fail)
+cado_divert_test(F9 sieve_check_overfull_1s_buckets
+        APPEND_ENVIRONMENT
+            q0=1200109 rho=116642 bkmult=1.1,1s:0.5 bkthresh1=100000
+            REL_COUNT=57
+            REFERENCE_SHA1=2b973ed88e146aee756d9a27e260157179defc4d
+            REFERENCE_REVISION=f06a6284d2cdcb669e300cd0dda349b349761578
+            CHECKSUM_FILE=
+        )
 # see also c155_21515_sieve_overfull2 further down
 
 cado_divert_test(F9 sieve_bug_21480a
