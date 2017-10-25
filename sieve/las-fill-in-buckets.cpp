@@ -609,20 +609,27 @@ fill_in_buckets_one_slice_internal(const worker_thread * worker, const task_para
     WHERE_AM_I_UPDATE(w, side, param->side);
     WHERE_AM_I_UPDATE(w, i, param->plattices_vector->get_index());
 
-    /* Get an unused bucket array that we can write to */
-    bucket_array_t<LEVEL, shorthint_t> &BA =
-        param->ws.reserve_BA<LEVEL, shorthint_t>(param->side);
-    /* Fill the buckets */
     try {
-        fill_in_buckets_lowlevel<LEVEL>(BA, param->si, param->plattices_vector,
-                (param->first_region0_index == 0), w);
-    } catch(std::exception & e) {
+        /* Get an unused bucket array that we can write to */
+        /* clearly, reserve_BA() possibly throws. As it turns out,
+         * fill_in_buckets_lowlevel<> does not, at least currently. One
+         * could imagine that it could throw, so let's wrap it too.
+         */
+        bucket_array_t<LEVEL, shorthint_t> &BA =
+            param->ws.reserve_BA<LEVEL, shorthint_t>(param->side);
+        /* Fill the buckets */
+        try {
+            fill_in_buckets_lowlevel<LEVEL>(BA, param->si, param->plattices_vector,
+                    (param->first_region0_index == 0), w);
+        } catch(std::exception & e) {
+            param->ws.release_BA(param->side, BA);
+            throw e;
+        }
+        /* Release bucket array again */
         param->ws.release_BA(param->side, BA);
+    } catch(std::exception & e) {
         delete param;
-        throw e;
     }
-    /* Release bucket array again */
-    param->ws.release_BA(param->side, BA);
     delete param;
     return new task_result;
 }

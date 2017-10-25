@@ -768,7 +768,7 @@ class Las(Program):
                  tdthresh: Parameter(checktype=int)=None,
                  bkthresh: Parameter(checktype=int)=None,
                  bkthresh1: Parameter(checktype=int)=None,
-                 bkmult: Parameter(checktype=float)=None,
+                 bkmult: Parameter()=None,
                  lim0: Parameter(checktype=int)=None,
                  lim1: Parameter(checktype=int)=None,
                  lpb0: Parameter(checktype=int)=None,
