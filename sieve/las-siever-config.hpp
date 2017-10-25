@@ -8,7 +8,44 @@
 #include <map>
 #include "params.h"
 
-/*  siever_config */
+/* siever_config */
+ 
+class bkmult_specifier {
+    double base = 1.0;
+    typedef std::map<std::pair<int, char>, double> dict_t;
+    dict_t dict;
+    public:
+    typedef dict_t::key_type key_type;
+    static std::string printkey(dict_t::key_type const& key) {
+        char c[3] = { (char) ('0' + key.first), key.second, '\0' };
+        return std::string(c);
+    }
+    template<typename T> static dict_t::key_type getkey() {
+        return dict_t::key_type(T::level(), T::rtti[0]);
+    }
+    template<typename T> double get() const { return get(getkey<T>()); }
+    double get(dict_t::key_type const& key) const {
+        auto xx = dict.find(key);
+        if (xx != dict.end()) return xx->second;
+        return base;
+    }
+    /* this returns a reference to the value which is used for this key.
+     * It is up to the user to either specify separate keys at the
+     * beginning, or just one. If she specifies just one, then we'll
+     * never populate the dictionary, and a single multiplier will be
+     * used throughout. */
+    double & get(dict_t::key_type const& key) {
+        auto xx = dict.find(key);
+        if (xx != dict.end()) return xx->second;
+        return base;
+    }
+    template<typename T> double get(T const &) const { return get<T>(); }
+    template<typename T> double operator()(T const &) const { return get<T>(); }
+    template<typename T> double operator()() const { return get<T>(); }
+    bkmult_specifier(double x) : base(x) {}
+    bkmult_specifier(const char * specifier);
+    std::string print_all() const;
+};
 /* The following structure lists the fields with an impact on the siever.
  * Different values for these fields will correspond to different siever
  * structures.
@@ -29,7 +66,7 @@ struct siever_config : public _padded_pod<siever_config> {
     unsigned long bucket_thresh1;   // primes above are 2-level bucket-sieved
     unsigned int td_thresh;
     unsigned int skipped;           // don't sieve below this
-    double bk_multiplier = 1.0;     // how much margin when allocating buckets
+    bkmult_specifier bk_multiplier { 1.0 };     // how much margin when allocating buckets
     unsigned int unsieve_thresh;
     struct side_config {
         unsigned long lim; /* factor base bound */
@@ -131,6 +168,7 @@ struct siever_config : public _padded_pod<siever_config> {
     /*}}}*/
 };
 
+
 /* {{{ descent_hint
  *
  * This is used for the descent. For each factor size, we provide a
@@ -169,10 +207,10 @@ struct siever_config_pool {
 
     siever_config get_config_for_q(las_todo_entry const& doing) const;
 
-    void change_bk_multiplier(double d) {
+    void grow_bk_multiplier(bkmult_specifier::key_type const& key, double d) {
         for(auto & c : hints)
-            c.second.bk_multiplier = d;
-        base.bk_multiplier = d;
+            c.second.bk_multiplier.get(key) *= d;
+        base.bk_multiplier.get(key) *= d;
     }
 
 

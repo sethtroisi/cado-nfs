@@ -80,6 +80,7 @@ class reservation_array : private monitor {
   reservation_array(reservation_array const &) = delete;
   reservation_array& operator=(reservation_array const&) = delete;
 public:
+  typedef typename T::update_t update_t;
   reservation_array(reservation_array &&) = default;
   reservation_array(size_t n)
     : BAs(new T[n]), in_use(new bool[n]), n(n)
@@ -130,7 +131,8 @@ protected:
   cget() const;
 public:
   reservation_group(size_t nr_bucket_arrays);
-  void allocate_buckets(const uint32_t *n_bucket, const double multiplier,
+  void allocate_buckets(const uint32_t *n_bucket,
+          bkmult_specifier const& multiplier,
           const double *fill_ratio, int logI_adjusted);
 };
 

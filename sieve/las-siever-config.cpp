@@ -4,6 +4,7 @@
 #include <gmp.h>
 #include <cctype>
 #include <cerrno>
+#include <sstream>
 #include "las-siever-config.hpp"
 #include "verbose.h"
 
@@ -147,7 +148,9 @@ bool siever_config::parse_default(siever_config & sc, param_list_ptr pl)
     /* overrides default only if parameter is given */
     param_list_parse_ulong(pl, "bkthresh", &(sc.bucket_thresh));
     param_list_parse_ulong(pl, "bkthresh1", &(sc.bucket_thresh1));
-    param_list_parse_double(pl, "bkmult", &(sc.bk_multiplier));
+    if (const char * tmp = param_list_lookup_string(pl, "bkmult")) {
+        sc.bk_multiplier = bkmult_specifier(tmp);
+    }
 
     const char *powlim_params[2] = {"powlim0", "powlim1"};
     for (int side = 0; side < 2; side++) {
@@ -361,3 +364,43 @@ siever_config_pool::siever_config_pool(cxx_param_list & pl)/*{{{*/
     }
     fclose(f);
 }/*}}}*/
+
+bkmult_specifier::bkmult_specifier(const char * specifier)
+{
+    const char * p = specifier;
+    for(const char * q ; *p ; p = q + (*q != '\0') ) {
+        const char * colon = NULL;
+        for(q = p ; *q && *q != ',' ; q++)
+            if (*q == ':')
+                colon = q;
+        /* parse from p to q */
+        if (colon) {
+            std::string vs(colon+1, q);
+            std::istringstream is(vs);
+            double v;
+            is >> v;
+            ASSERT_ALWAYS(!(is.rdstate() & std::ios_base::failbit));
+            ASSERT_ALWAYS(colon - p == 2);
+            ASSERT_ALWAYS(p[0] >= '1' && p[0] <= '9');
+            ASSERT_ALWAYS(p[1] == 's' || p[1] == 'l');
+            dict_t::key_type key(p[0]-'0', p[1]);
+            dict.insert(std::make_pair(key, v));
+        } else {
+            std::string vs(p, q);
+            std::istringstream is(vs);
+            is >> base;
+            ASSERT_ALWAYS(!(is.rdstate() & std::ios_base::failbit));
+        }
+    }
+}
+
+std::string bkmult_specifier::print_all() const
+{
+    std::ostringstream os;
+    os << base;
+    for(auto const & x : dict) {
+        key_type const& key(x.first);
+        os << "," << key.first << key.second << ":" << x.second;
+    }
+    return os.str();
+}

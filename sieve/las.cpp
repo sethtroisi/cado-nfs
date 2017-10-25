@@ -2270,17 +2270,23 @@ void display_expected_memory_usage(siever_config const & sc, cado_poly_srcptr cp
             size_t nprimes = std::expint(log(p1)) - std::expint(log(p0));
             size_t nupdates = 0.75 * (1UL << sc.logA) * (std::log(std::log(p1)) - std::log(std::log(p0)));
             nupdates += NB_DEVIATIONS_BUCKET_REGIONS * sqrt(nupdates);
-            verbose_output_print(0, 1, "# level 2, side %d: %zu primes, %zu 2-updates: %zu MB\n",
-                    side, nprimes, nupdates,
-                    (more = sc.bk_multiplier * nupdates * sizeof(bucket_update_t<2, shorthint_t>)) >> 20);
-            memory += more;
-            // how many downsorted updates are alive at a given point in
-            // time ?
-            size_t nupdates_D = nupdates >> 8;
-            verbose_output_print(0, 1, "# level 1, side %d: %zu downsorted 1-updates: %zu MB\n",
-                    side, nupdates >> 8,
-                    (more = sc.bk_multiplier * nupdates_D * sizeof(bucket_update_t<1, longhint_t>)) >> 20);
-            memory += more;
+            {
+                typedef bucket_update_t<2, shorthint_t> type;
+                verbose_output_print(0, 1, "# level 2, side %d: %zu primes, %zu 2-updates: %zu MB\n",
+                        side, nprimes, nupdates,
+                        (more = sc.bk_multiplier.get<type>() * nupdates * sizeof(type)) >> 20);
+                memory += more;
+            }
+            {
+                // how many downsorted updates are alive at a given point in
+                // time ?
+                size_t nupdates_D = nupdates >> 8;
+                typedef bucket_update_t<1, longhint_t> type;
+                verbose_output_print(0, 1, "# level 1, side %d: %zu downsorted 1-updates: %zu MB\n",
+                        side, nupdates >> 8,
+                        (more = sc.bk_multiplier.get<type>() * nupdates_D * sizeof(type)) >> 20);
+                memory += more;
+            }
         }
 
         for(int side = 0 ; side < 2 ; side++) {
@@ -2290,9 +2296,10 @@ void display_expected_memory_usage(siever_config const & sc, cado_poly_srcptr cp
             int A0 = LOG_BUCKET_REGION + 8;
             size_t nupdates = 0.75 * (1UL << A0) * (std::log(std::log(p1)) - std::log(std::log(p0)));
             nupdates += NB_DEVIATIONS_BUCKET_REGIONS * sqrt(nupdates);
+            typedef bucket_update_t<1, shorthint_t> type;
             verbose_output_print(0, 1, "# level 1, side %d: %zu primes, %zu 1-updates: %zu MB\n",
                     side, nprimes, nupdates,
-                    (more = sc.bk_multiplier * nupdates * sizeof(bucket_update_t<1, shorthint_t>)) >> 20);
+                    (more = sc.bk_multiplier(type()) * nupdates * sizeof(type)) >> 20);
             memory += more;
             verbose_output_print(0, 1, "# level 1, side %d: %zu primes => precomp_plattices: %zu MB\n",
                     side, nprimes,
@@ -2307,10 +2314,11 @@ void display_expected_memory_usage(siever_config const & sc, cado_poly_srcptr cp
             double p0 = sc.bucket_thresh;
             size_t nprimes = std::expint(log(p1)) - std::expint(log(p0));
             size_t nupdates = 0.75 * (1UL << sc.logA) * (std::log(std::log(p1)) - std::log(std::log(p0)));
+            typedef bucket_update_t<1, shorthint_t> type;
             nupdates += NB_DEVIATIONS_BUCKET_REGIONS * sqrt(nupdates);
             verbose_output_print(0, 1, "# level 1, side %d: %zu primes, %zu 1-updates: %zu MB\n",
                     side, nprimes, nupdates,
-                    (more = sc.bk_multiplier * nupdates * sizeof(bucket_update_t<1, shorthint_t>)) >> 20);
+                    (more = sc.bk_multiplier.get<type>() * nupdates * sizeof(type)) >> 20);
             memory += more;
         }
     }
@@ -2935,14 +2943,17 @@ if (si.conf.sublat.m) {
                     "# The code will now try to adapt by allocating more memory for buckets.\n",
                     (mpz_srcptr) doing.p, (mpz_srcptr) doing.r, e.what());
 
-            double new_bk_multiplier = conf.bk_multiplier * (double) e.reached_size / e.theoretical_max_size * 1.01;
-            verbose_output_print(0, 1, "# Updating bucket multiplier to %.3f*%d/%d*1.01=%.3f\n",
-                    conf.bk_multiplier,
+            double & old = conf.bk_multiplier.get(e.key);
+            double ratio = (double) e.reached_size / e.theoretical_max_size * 1.01;
+            double new_bk_multiplier = old * ratio;
+            verbose_output_print(0, 1, "# Updating %s bucket multiplier to %.3f*%d/%d*1.01=%.3f\n",
+                    bkmult_specifier::printkey(e.key).c_str(),
+                    old,
                     e.reached_size,
                     e.theoretical_max_size,
                     new_bk_multiplier
                   );
-            las.config_pool.change_bk_multiplier(new_bk_multiplier);
+            las.config_pool.grow_bk_multiplier(e.key, ratio);
             /* we have to roll back the updates we made to
              * this structure. */
             std::swap(las.todo, saved_todo);
@@ -3131,11 +3142,11 @@ if (si.conf.sublat.m) {
     t0 = seconds () - t0;
     wct = wct_seconds() - wct;
     if (adjust_strategy < 2) {
-        verbose_output_print (2, 1, "# Average J=%1.0f for %lu special-q's, max bucket fill %f\n",
-                totJ / (double) nr_sq_processed, nr_sq_processed, las.config_pool.base.bk_multiplier);
+        verbose_output_print (2, 1, "# Average J=%1.0f for %lu special-q's, max bucket fill %s\n",
+                totJ / (double) nr_sq_processed, nr_sq_processed, las.config_pool.base.bk_multiplier.print_all().c_str());
     } else {
-        verbose_output_print (2, 1, "# Average logI=%1.1f for %lu special-q's, max bucket fill %f\n",
-                totlogI / (double) nr_sq_processed, nr_sq_processed, las.config_pool.base.bk_multiplier);
+        verbose_output_print (2, 1, "# Average logI=%1.1f for %lu special-q's, max bucket fill %s\n",
+                totlogI / (double) nr_sq_processed, nr_sq_processed, las.config_pool.base.bk_multiplier.print_all().c_str());
     }
     verbose_output_print (2, 1, "# Discarded %lu special-q's out of %u pushed\n",
             nr_sq_discarded, las.nq_pushed);

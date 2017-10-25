@@ -529,8 +529,8 @@ sieve_checksum::update(const unsigned char *data, const size_t len)
     this->update(new_checksum);
 }
 
-buckets_are_full::buckets_are_full(int l, int b, int r, int t) : level(l), bucket_number(b), reached_size(r), theoretical_max_size(t) {
+buckets_are_full::buckets_are_full(bkmult_specifier::key_type const& key, int b, int r, int t) : key(key), bucket_number(b), reached_size(r), theoretical_max_size(t) {
     std::ostringstream os;
-    os << "Fullest level-"<<level<<" bucket #"<<b<<", wrote "<<reached_size<<"/"<<theoretical_max_size<<"";
+    os << "Fullest level-"<<bkmult_specifier::printkey(key)<<" bucket #"<<b<<", wrote "<<reached_size<<"/"<<theoretical_max_size<<"";
     message = os.str();
 }

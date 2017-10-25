@@ -284,4 +284,5 @@ enum {
   NR_CHANNELS /* This must be the last element of the enum */
 };
 
+
 #endif	/* LAS_TYPES_HPP_ */

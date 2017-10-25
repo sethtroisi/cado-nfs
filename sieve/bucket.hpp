@@ -12,6 +12,8 @@
 #include <exception>
 #include <stdio.h>
 #include <limits>
+#include <map>
+#include <string>
 #include "portability.h"
 #endif
 #include "misc.h"
@@ -19,6 +21,7 @@
 #include "fb.hpp"
 #include "las-debug.hpp"
 #include "threadpool.hpp"
+#include "las-siever-config.hpp"
 
 #include "electric_alloc.h"
 
@@ -136,7 +139,7 @@ template <int LEVEL, typename HINT> class bucket_update_t;
     template <>								\
     class bucket_update_t<LEVEL, HINT> : public HINT {			\
     public:								\
-      static constexpr int level = LEVEL;                                   \
+      static inline int level() { return LEVEL; }                       \
       typedef typename bucket_update_size_per_level<LEVEL>::type br_index_t;\
       br_index_t x;							\
       bucket_update_t(){};						\
@@ -146,6 +149,7 @@ template <int LEVEL, typename HINT> class bucket_update_t;
           x(limit_cast<br_index_t>(_x))					\
         {}								\
     } ALIGNMENT_ATTRIBUTE
+
 
 /* it's admittedly somewhat unsatisfactory. I wish I could find a better
  * way. Maybe with alignas ? Is it a trick I can play at template scope
@@ -185,8 +189,8 @@ template <int LEVEL, typename HINT>
 class bucket_array_t : private NonCopyable {
     public:
   static const int level = LEVEL;
-    private:
   typedef bucket_update_t<LEVEL, HINT> update_t;
+    private:
   update_t *big_data = 0;
   size_t big_size = 0;                  // size of bucket update memory
 
@@ -458,12 +462,12 @@ class sieve_checksum {
 };
 
 struct buckets_are_full : public clonable_exception {
-    int level;
+    bkmult_specifier::key_type key;
     int bucket_number;
     int reached_size;
     int theoretical_max_size;
     std::string message;
-    buckets_are_full(int l, int b, int r, int t);
+    buckets_are_full(bkmult_specifier::key_type const&, int b, int r, int t);
     virtual const char * what() const noexcept { return message.c_str(); }
     bool operator<(buckets_are_full const& o) const {
         return (double) reached_size / theoretical_max_size < (double) o.reached_size / o.theoretical_max_size;
