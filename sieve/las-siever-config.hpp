@@ -5,6 +5,7 @@
 #include "las-todo-entry.hpp"
 #include "fb-types.h"
 #include <string.h>
+#include <string>
 #include <map>
 #include "params.h"
 

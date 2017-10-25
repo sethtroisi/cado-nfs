@@ -12,7 +12,6 @@
 #include <exception>
 #include <stdio.h>
 #include <limits>
-#include <map>
 #include <string>
 #include "portability.h"
 #endif
