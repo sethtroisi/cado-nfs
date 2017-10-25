@@ -804,7 +804,7 @@ downsort_tree(
     thread_workspaces &ws,
     thread_pool &pool,
     sieve_info & si,
-    precomp_plattice_t precomp_plattice)
+    precomp_plattice_t const & precomp_plattice)
 {
   CHILD_TIMER(timer, TEMPLATE_INST_NAME(downsort_tree, LEVEL));
   TIMER_CATEGORY(timer, sieving_mixed());
@@ -921,12 +921,11 @@ downsort_tree(
 // A fake level 0, to avoid infinite loop during compilation.
 template <>
 void downsort_tree<0>(timetree_t&,
-        uint32_t bucket_index MAYBE_UNUSED,
-  uint32_t first_region0_index MAYBE_UNUSED,
-  thread_workspaces &ws MAYBE_UNUSED,
-  thread_pool &pool MAYBE_UNUSED,
-  sieve_info & si MAYBE_UNUSED,
-  precomp_plattice_t precomp_plattice MAYBE_UNUSED)
+  uint32_t, uint32_t,
+  thread_workspaces &,
+  thread_pool &,
+  sieve_info &,
+  precomp_plattice_t const &)
 {
     ASSERT_ALWAYS(0);
 }
@@ -951,9 +950,9 @@ reservation_group::cget<3, longhint_t>() const
 template 
 void downsort_tree<1>(timetree_t&, uint32_t bucket_index, uint32_t first_region0_index,
   thread_workspaces &ws, thread_pool &pool, sieve_info & si,
-  precomp_plattice_t precomp_plattice);
+  precomp_plattice_t const & precomp_plattice);
 
 template
 void downsort_tree<2>(timetree_t&, uint32_t bucket_index, uint32_t first_region0_index,
   thread_workspaces &ws, thread_pool &pool, sieve_info & si,
-  precomp_plattice_t precomp_plattice);
+  precomp_plattice_t const & precomp_plattice);
