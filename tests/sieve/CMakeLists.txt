@@ -83,7 +83,7 @@ cado_define_test(F9
         SCRIPT
             "${CADO_NFS_SOURCE_DIR}/tests/provide-wdir.sh" --env WORKDIR
             ${CMAKE_CURRENT_SOURCE_DIR}/sievetest.sh
-            -v -v --adjust-strategy 0
+            -v --adjust-strategy 0
         TARGET_DEPENDENCIES las
         TEST_DEPENDENCIES F9_sievetest_cleanup F9_makefb
         NO_DEFAULT_RUN
