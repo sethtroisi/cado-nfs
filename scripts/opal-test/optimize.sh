@@ -221,16 +221,16 @@ python las_optimize.py
 ### Parse the solutions from nomad
 # optimized parameters are in nomad-solution.nnn.txt
 f=`ls -t nomad-solution.*.txt | head -1`
-lim0_opt=`head -1 $f`
-lim1_opt=`head -2 $f | tail -1`
-lpb0_opt=`head -3 $f | tail -1`
-lpb1_opt=`head -4 $f | tail -1`
-mfb0_opt=`head -5 $f | tail -1`
-mfb1_opt=`head -6 $f | tail -1`
-ncurves0_opt=`head -7 $f | tail -1`
-ncurves1_opt=`head -8 $f | tail -1`
-I_opt=`head -9 $f | tail -1`
-qmin_opt=`head -10 $f | tail -1`
+I_opt=`head -1 $f`
+qmin_opt=`head -2 $f | tail -1`
+lim0_opt=`head -3 $f | tail -1`
+lim1_opt=`head -4 $f | tail -1`
+lpb0_opt=`head -5 $f | tail -1`
+lpb1_opt=`head -6 $f | tail -1`
+mfb0_opt=`head -7 $f | tail -1`
+mfb1_opt=`head -8 $f | tail -1`
+ncurves0_opt=`head -9 $f | tail -1`
+ncurves1_opt=`head -10 $f | tail -1`
 echo "Optimal parameters:"
 echo "lim0=" $lim0_opt " min=" $lim0_min " max=" $lim0_max
 echo "lim1=" $lim1_opt " min=" $lim1_min " max=" $lim1_max
