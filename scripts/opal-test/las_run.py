@@ -116,7 +116,7 @@ def run(param_file, problem):
         # timings when the number of special-q's is small
         las_params.update({"q0": q0, "nq": 100, "out": outputfile})
 
-        las_cmd_line = [las, "-allow-largesq", "-never-discard", "-dup", "-dup-qmin"]
+        las_cmd_line = [las, "-allow-largesq", "-dup", "-dup-qmin"]
         if sqside == 0:
             las_cmd_line += ["%s,0" % str(las_params["qmin"])]
         else:
