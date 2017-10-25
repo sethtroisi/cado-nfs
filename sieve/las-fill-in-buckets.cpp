@@ -613,8 +613,14 @@ fill_in_buckets_one_slice_internal(const worker_thread * worker, const task_para
     bucket_array_t<LEVEL, shorthint_t> &BA =
         param->ws.reserve_BA<LEVEL, shorthint_t>(param->side);
     /* Fill the buckets */
-    fill_in_buckets_lowlevel<LEVEL>(BA, param->si, param->plattices_vector,
-            (param->first_region0_index == 0), w);
+    try {
+        fill_in_buckets_lowlevel<LEVEL>(BA, param->si, param->plattices_vector,
+                (param->first_region0_index == 0), w);
+    } catch(std::exception & e) {
+        param->ws.release_BA(param->side, BA);
+        delete param;
+        throw e;
+    }
     /* Release bucket array again */
     param->ws.release_BA(param->side, BA);
     delete param;
