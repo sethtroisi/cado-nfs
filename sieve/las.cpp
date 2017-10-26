@@ -2185,7 +2185,20 @@ static void declare_usage(param_list pl)/*{{{*/
   tdict_decl_usage(pl);
 }/*}}}*/
 
+double nprimes_interval(double p0, double p1)
+{
 #ifdef HAVE_STDCPP_MATH_SPEC_FUNCS
+    return std::expint(log(p1)) - std::expint(log(p0));
+#else
+    /* that can't be sooo wrong... */
+    double l1 = log(p1);
+    double l2 = log(p2);
+    double s1 = p1*(1/l1+1/pow(l1,2)+2/pow(l1,3)+6/pow(l1,4));
+    double s0 = p0*(1/l0+1/pow(l0,2)+2/pow(l0,3)+6/pow(l0,4));
+    return s1 - s0;
+#endif
+}
+
 void display_expected_memory_usage(siever_config const & sc, cado_poly_srcptr cpoly, size_t base_memory = 0)
 {
     verbose_output_print(0, 1, "# Expected memory usage\n");
@@ -2225,7 +2238,7 @@ void display_expected_memory_usage(siever_config const & sc, cado_poly_srcptr cp
             ideals_per_prime += 1/fac;
         }
         ideals_per_prime = 1/(1-ideals_per_prime);
-        size_t nideals = std::expint(log(p1)) - std::expint(log(p0));
+        size_t nideals = nprimes_interval(p0, p1);
         verbose_output_print(0, 1, "# side %d, %zu fb primes (d=%d, %f roots per p if G=S_d): %zuMB\n",
                 side,
                 nideals,
@@ -2267,7 +2280,7 @@ void display_expected_memory_usage(siever_config const & sc, cado_poly_srcptr cp
             double p1 = sc.sides[side].lim;
             double p0 = std::max(sc.bucket_thresh, sc.bucket_thresh1);
             p0 = std::min(p1, p0);
-            size_t nprimes = std::expint(log(p1)) - std::expint(log(p0));
+            size_t nprimes = nprimes_interval(p0, p1);
             size_t nupdates = 0.75 * (1UL << sc.logA) * (std::log(std::log(p1)) - std::log(std::log(p0)));
             nupdates += NB_DEVIATIONS_BUCKET_REGIONS * sqrt(nupdates);
             {
@@ -2292,7 +2305,7 @@ void display_expected_memory_usage(siever_config const & sc, cado_poly_srcptr cp
         for(int side = 0 ; side < 2 ; side++) {
             double p1 = std::max(sc.bucket_thresh, sc.bucket_thresh1);
             double p0 = sc.bucket_thresh;
-            size_t nprimes = std::expint(log(p1)) - std::expint(log(p0));
+            size_t nprimes = nprimes_interval(p0, p1);
             int A0 = LOG_BUCKET_REGION + 8;
             size_t nupdates = 0.75 * (1UL << A0) * (std::log(std::log(p1)) - std::log(std::log(p0)));
             nupdates += NB_DEVIATIONS_BUCKET_REGIONS * sqrt(nupdates);
@@ -2312,7 +2325,7 @@ void display_expected_memory_usage(siever_config const & sc, cado_poly_srcptr cp
         for(int side = 0 ; side < 2 ; side++) {
             double p1 = sc.sides[side].lim;
             double p0 = sc.bucket_thresh;
-            size_t nprimes = std::expint(log(p1)) - std::expint(log(p0));
+            size_t nprimes = nprimes_interval(p0, p1);
             size_t nupdates = 0.75 * (1UL << sc.logA) * (std::log(std::log(p1)) - std::log(std::log(p0)));
             typedef bucket_update_t<1, shorthint_t> type;
             nupdates += NB_DEVIATIONS_BUCKET_REGIONS * sqrt(nupdates);
@@ -2327,7 +2340,6 @@ void display_expected_memory_usage(siever_config const & sc, cado_poly_srcptr cp
     verbose_output_print(0, 1, "# Expected memory use, counting %zu MB of base footprint: %zu MB\n",
             base_memory >> 20, memory >> 20);
 }
-#endif
 
 
 int main (int argc0, char *argv0[])/*{{{*/
@@ -2400,13 +2412,11 @@ int main (int argc0, char *argv0[])/*{{{*/
     las_info las(pl);    /* side effects: prints cmdline and flags */
 
 
-#ifdef HAVE_STDCPP_MATH_SPEC_FUNCS
     /* experimental. */
     if (las.verbose >= 1 && las.config_pool.default_config_ptr) {
         siever_config const & sc(*las.config_pool.default_config_ptr);
         display_expected_memory_usage(sc, las.cpoly, Memusage() << 10);
     }
-#endif
 
     /* We have the following dependency chain (not sure the account below
      * is exhaustive).
