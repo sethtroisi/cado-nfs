@@ -2285,7 +2285,7 @@ void display_expected_memory_usage(siever_config const & sc, cado_poly_srcptr cp
             nupdates += NB_DEVIATIONS_BUCKET_REGIONS * sqrt(nupdates);
             {
                 typedef bucket_update_t<2, shorthint_t> type;
-                verbose_output_print(0, 1, "# level 2, side %d: %zu primes, %zu 2-updates: %zu MB\n",
+                verbose_output_print(0, 1, "# level 2, side %d: %zu primes, %zu 2-updates [2s]: %zu MB\n",
                         side, nprimes, nupdates,
                         (more = sc.bk_multiplier.get<type>() * nupdates * sizeof(type)) >> 20);
                 memory += more;
@@ -2295,7 +2295,7 @@ void display_expected_memory_usage(siever_config const & sc, cado_poly_srcptr cp
                 // time ?
                 size_t nupdates_D = nupdates >> 8;
                 typedef bucket_update_t<1, longhint_t> type;
-                verbose_output_print(0, 1, "# level 1, side %d: %zu downsorted 1-updates: %zu MB\n",
+                verbose_output_print(0, 1, "# level 1, side %d: %zu downsorted 1-updates [1l]: %zu MB\n",
                         side, nupdates >> 8,
                         (more = sc.bk_multiplier.get<type>() * nupdates_D * sizeof(type)) >> 20);
                 memory += more;
@@ -2310,7 +2310,7 @@ void display_expected_memory_usage(siever_config const & sc, cado_poly_srcptr cp
             size_t nupdates = 0.75 * (1UL << A0) * (std::log(std::log(p1)) - std::log(std::log(p0)));
             nupdates += NB_DEVIATIONS_BUCKET_REGIONS * sqrt(nupdates);
             typedef bucket_update_t<1, shorthint_t> type;
-            verbose_output_print(0, 1, "# level 1, side %d: %zu primes, %zu 1-updates: %zu MB\n",
+            verbose_output_print(0, 1, "# level 1, side %d: %zu primes, %zu 1-updates [1s]: %zu MB\n",
                     side, nprimes, nupdates,
                     (more = sc.bk_multiplier(type()) * nupdates * sizeof(type)) >> 20);
             memory += more;
@@ -2329,7 +2329,7 @@ void display_expected_memory_usage(siever_config const & sc, cado_poly_srcptr cp
             size_t nupdates = 0.75 * (1UL << sc.logA) * (std::log(std::log(p1)) - std::log(std::log(p0)));
             typedef bucket_update_t<1, shorthint_t> type;
             nupdates += NB_DEVIATIONS_BUCKET_REGIONS * sqrt(nupdates);
-            verbose_output_print(0, 1, "# level 1, side %d: %zu primes, %zu 1-updates: %zu MB\n",
+            verbose_output_print(0, 1, "# level 1, side %d: %zu primes, %zu 1-updates [1s]: %zu MB\n",
                     side, nprimes, nupdates,
                     (more = sc.bk_multiplier.get<type>() * nupdates * sizeof(type)) >> 20);
             memory += more;
