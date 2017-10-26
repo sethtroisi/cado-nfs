@@ -161,13 +161,14 @@ static_assert(sizeof(bucket_update_t<1, shorthint_t>) == 4, "wrong size");
 
 /* TODO: errr. 16 bytes seems a *LOT* */
 /* 8-byte slice index, 2-byte slice offset, probably 2 bytes of padding,
- * and then 4 bytes of position, that makes 8.
+ * and then 2 bytes of position (bucket_update_size_per_level<1> is
+ * 16-bits) which I believe could do without padding, but apparently do
+ * not.
  *
  * I vaguely imagine that the slice index could be smaller: 4 bytes,
- * maybe even 3. Then the position could be 3 bytes. So in total, 8 bytes
- * would suffice.
+ * maybe even 3. So in total, 8 bytes should suffice.
  */
-bu_explicit(1, longhint_t, ATTR_ALIGNED(16));
+bu_explicit(1, longhint_t, ATTR_ALIGNED(8));
 static_assert(sizeof(bucket_update_t<1, longhint_t>) == 16, "wrong size");
 
 bu_explicit(1, primehint_t, ATTR_ALIGNED(8));
