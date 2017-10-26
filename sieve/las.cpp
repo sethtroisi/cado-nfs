@@ -1813,6 +1813,7 @@ void * process_bucket_region(timetree_t & timer, thread_data *th)
             int * b = s.fb_parts_x->rs;
             memcpy(ts.rsdpos, ts.ssdpos + b[0], (b[1]-b[0]) * sizeof(int64_t));
         }
+        BOOKKEEPING_TIMER(timer);
     }
     return NULL;
 }/*}}}*/
