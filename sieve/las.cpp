@@ -2923,9 +2923,9 @@ if (si.conf.sublat.m) {
                     (mpz_srcptr) doing.p, (mpz_srcptr) doing.r, e.what());
 
             double old = conf.bk_multiplier.get(e.key);
-            double ratio = (double) e.reached_size / e.theoretical_max_size * 1.01;
+            double ratio = (double) e.reached_size / e.theoretical_max_size * 1.1;
             double new_bk_multiplier = old * ratio;
-            verbose_output_print(0, 1, "# Updating %s bucket multiplier to %.3f*%d/%d*1.01=%.3f\n",
+            verbose_output_print(0, 1, "# Updating %s bucket multiplier to %.3f*%d/%d*1.1=%.3f\n",
                     bkmult_specifier::printkey(e.key).c_str(),
                     old,
                     e.reached_size,
