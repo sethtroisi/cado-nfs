@@ -173,14 +173,14 @@ static_assert(sizeof(bucket_update_t<1, longhint_t>) == 16, "wrong size");
 bu_explicit(1, primehint_t, ATTR_ALIGNED(8));
 static_assert(sizeof(bucket_update_t<1, primehint_t>) == 8, "wrong size");
 
-bu_explicit(2, shorthint_t, ATTR_ALIGNED(16));
-static_assert(sizeof(bucket_update_t<2, shorthint_t>) == 16, "wrong size");
+bu_explicit(2, shorthint_t, ATTR_ALIGNED(8));
+static_assert(sizeof(bucket_update_t<2, shorthint_t>) == 8, "wrong size");
 
 bu_explicit(2, longhint_t, ATTR_ALIGNED(16));
 static_assert(sizeof(bucket_update_t<2, longhint_t>) == 16, "wrong size");
 
-bu_explicit(3, shorthint_t, ATTR_ALIGNED(16));
-static_assert(sizeof(bucket_update_t<3, shorthint_t>) == 16, "wrong size");
+bu_explicit(3, shorthint_t, ATTR_ALIGNED(8));
+static_assert(sizeof(bucket_update_t<3, shorthint_t>) == 8, "wrong size");
 
 /******** Bucket array typedef **************/
 /******** Bucket array implementation **************/
