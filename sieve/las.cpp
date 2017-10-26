@@ -2413,9 +2413,10 @@ int main (int argc0, char *argv0[])/*{{{*/
 
 
     /* experimental. */
+    size_t base_memory = Memusage() << 10;
     if (las.verbose >= 1 && las.config_pool.default_config_ptr) {
         siever_config const & sc(*las.config_pool.default_config_ptr);
-        display_expected_memory_usage(sc, las.cpoly, Memusage() << 10);
+        display_expected_memory_usage(sc, las.cpoly, base_memory);
     }
 
     /* We have the following dependency chain (not sure the account below
@@ -2936,7 +2937,7 @@ if (si.conf.sublat.m) {
             if (las.verbose >= 1 && las.config_pool.default_config_ptr) {
                 verbose_output_print(0, 1, "# Displaying again expected memory usage since multipliers changed.\n");
                 siever_config const & sc(*las.config_pool.default_config_ptr);
-                display_expected_memory_usage(sc, las.cpoly, Memusage() << 10);
+                display_expected_memory_usage(sc, las.cpoly, base_memory);
             }
             /* we have to roll back the updates we made to
              * this structure. */
