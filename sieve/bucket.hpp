@@ -75,7 +75,7 @@ public:
   static constexpr char const * rtti = "shorthint_t";
 };
 
-/* sizeof(slice_index_t), that is 8 bytes, + 2 hint bytes == 10 bytes */
+/* sizeof(slice_index_t), that is 4 bytes, + 2 hint bytes == 6 bytes */
 /* When purging a bucket, we don't store pointer arrays to indicate where in
    the purged data a new slice begins, as each slice will have only very few
    updates surviving. Instead, we re-write each update to store both slice
@@ -159,17 +159,11 @@ template <int LEVEL, typename HINT> class bucket_update_t;
 bu_explicit(1, shorthint_t, ATTR_ALIGNED(4));
 static_assert(sizeof(bucket_update_t<1, shorthint_t>) == 4, "wrong size");
 
-/* TODO: errr. 16 bytes seems a *LOT* */
-/* 8-byte slice index, 2-byte slice offset, probably 2 bytes of padding,
- * and then 2 bytes of position (bucket_update_size_per_level<1> is
- * 16-bits) which I believe could do without padding, but apparently do
- * not.
- *
- * I vaguely imagine that the slice index could be smaller: 4 bytes,
- * maybe even 3. So in total, 8 bytes should suffice.
+/* 4-byte slice index, 2-byte slice offset, and then 2 bytes of position
+ * (bucket_update_size_per_level<1> is 16-bits).
  */
 bu_explicit(1, longhint_t, ATTR_ALIGNED(8));
-static_assert(sizeof(bucket_update_t<1, longhint_t>) == 16, "wrong size");
+static_assert(sizeof(bucket_update_t<1, longhint_t>) == 8, "wrong size");
 
 bu_explicit(1, primehint_t, ATTR_ALIGNED(8));
 static_assert(sizeof(bucket_update_t<1, primehint_t>) == 8, "wrong size");
@@ -208,13 +202,13 @@ class bucket_array_t : private NonCopyable {
                                         // corresponding bucket the
                                         // updates from that slice start
 public:
-  uint32_t           n_bucket = 0;      // Number of buckets
+  uint32_t n_bucket = 0;                // Number of buckets
 private:
-  size_t             size_b_align = 0;  // cacheline-aligned room for a
+  size_t   size_b_align = 0;            // cacheline-aligned room for a
                                         // set of n_bucket pointers
 
-  slice_index_t      nr_slices = 0;     // Number of different slices
-  slice_index_t      alloc_slices = 0;  // number of checkpoints (each of size
+  size_t   nr_slices = 0;               // Number of different slices
+  size_t   alloc_slices = 0;            // number of checkpoints (each of size
                                         // size_b_align) we have allocated
 
   static const slice_index_t initial_slice_alloc = 256;
