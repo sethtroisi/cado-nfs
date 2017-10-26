@@ -51,33 +51,33 @@ class bkmult_specifier {
  * Different values for these fields will correspond to different siever
  * structures.
  */
-struct siever_config : public _padded_pod<siever_config> {
+struct siever_config {
     /* The bit size of the special-q. Counting in bits is no necessity,
      * we could imagine being more accurate */
-    unsigned int bitsize;  /* bitsize == 0 indicates end of table */
-    int side;   /* special-q side */
-    int logA;
+    unsigned int bitsize=0;  /* bitsize == 0 indicates end of table */
+    int side=0;   /* special-q side */
+    int logA=0;
 
 
     /* For a given logA, we may trigger configurations for various logI
      * values. logI_adjusted is a sieving-only parameter. */
-    int logI_adjusted;
+    int logI_adjusted=0;
     sublat_t sublat;
-    unsigned long bucket_thresh;    // bucket sieve primes >= bucket_thresh
-    unsigned long bucket_thresh1;   // primes above are 2-level bucket-sieved
-    unsigned int td_thresh;
-    unsigned int skipped;           // don't sieve below this
+    unsigned long bucket_thresh=0;    // bucket sieve primes >= bucket_thresh
+    unsigned long bucket_thresh1=0;   // primes above are 2-level bucket-sieved
+    unsigned int td_thresh=0;
+    unsigned int skipped=0;           // don't sieve below this
     bkmult_specifier bk_multiplier { 1.0 };     // how much margin when allocating buckets
-    unsigned int unsieve_thresh;
+    unsigned int unsieve_thresh=0;
     struct side_config {
-        unsigned long lim; /* factor base bound */
-        unsigned long powlim; /* bound on powers in the factor base */
-        int lpb;           /* large prime bound is 2^lpb */
-        int mfb;           /* bound for residuals is 2^mfb */
-        int ncurves;       /* number of cofactorization curves */
-        double lambda;     /* lambda sieve parameter */
-        unsigned long qmin; /* smallest q sieved on this side, for dup sup */
-        unsigned long qmax; /* largest q sieved on this side, for dup sup */
+        unsigned long lim=0;    /* factor base bound */
+        unsigned long powlim=0; /* bound on powers in the factor base */
+        int lpb=0;              /* large prime bound is 2^lpb */
+        int mfb=0;              /* bound for residuals is 2^mfb */
+        int ncurves=0;          /* number of cofactorization curves */
+        double lambda=0;        /* lambda sieve parameter */
+        unsigned long qmin=0;   /* smallest q sieved on this side, for dupsup */
+        unsigned long qmax=0;   /* largest q sieved on this side, for dupsup */
     };
     side_config sides[2];
 
