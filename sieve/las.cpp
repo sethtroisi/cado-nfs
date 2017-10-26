@@ -2933,6 +2933,11 @@ if (si.conf.sublat.m) {
                     new_bk_multiplier
                   );
             las.config_pool.grow_bk_multiplier(e.key, ratio);
+            if (las.verbose >= 1 && las.config_pool.default_config_ptr) {
+                verbose_output_print(0, 1, "# Displaying again expected memory usage since multipliers changed.\n");
+                siever_config const & sc(*las.config_pool.default_config_ptr);
+                display_expected_memory_usage(sc, las.cpoly, Memusage() << 10);
+            }
             /* we have to roll back the updates we made to
              * this structure. */
             std::swap(las.todo, saved_todo);

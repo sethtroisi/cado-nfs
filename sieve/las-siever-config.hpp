@@ -31,7 +31,8 @@ class bkmult_specifier {
         return base;
     }
     double grow(dict_t::key_type const& key, double d) {
-        return dict[key] = get(key) * d;
+        double v = get(key) * d;
+        return dict[key] = v;
     }
     template<typename T> double get(T const &) const { return get<T>(); }
     template<typename T> double operator()(T const &) const { return get<T>(); }
