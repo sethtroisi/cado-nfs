@@ -301,7 +301,7 @@ thread_workspaces::pickup_si(sieve_info & _si)
        basis */
     /* Take some margin depending on parameters */
     /* Multithreading perturbates the fill-in ratio */
-    bkmult_specifier const & multiplier = si.conf.bk_multiplier;
+    bkmult_specifier const & multiplier = * si.bk_multiplier;
 #if 0
     bkmult_specifier multiplier = si.conf.bk_multiplier;
     if (multiplier == 0.0) {

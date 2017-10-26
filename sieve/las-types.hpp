@@ -51,6 +51,9 @@ struct sieve_info {
      * sides[0,1], as well as some other members */
     siever_config conf;
 
+    /* This field gets initialized only via get_sieve_info_from_config */
+    const bkmult_specifier * bk_multiplier = nullptr;
+
     las_todo_entry doing;
 
     // sieving area. Note that in the (conf) member struct, we find
@@ -210,6 +213,13 @@ struct las_info : private NonCopyable, public las_augmented_output_channel {
 
     // ----- default config and adaptive configs
     siever_config_pool config_pool;
+
+    bkmult_specifier bk_multiplier { 1.0 };
+
+    void grow_bk_multiplier(bkmult_specifier::key_type const& key, double d) {
+        bk_multiplier.grow(key, d);
+    }
+
 
     /* There may be several configured sievers. This is used mostly for
      * the descent.

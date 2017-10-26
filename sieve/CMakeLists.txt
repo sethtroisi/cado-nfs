@@ -62,6 +62,7 @@ add_executable(dupsup
     las-qlattice.cpp
     las-norms.cpp logapprox.cpp
     las-coordinates.cpp
+    bucket.cpp
 
     dupsup.cpp las-duplicate.cpp
     las-plattice.cpp las-cofactor.cpp fb.cpp

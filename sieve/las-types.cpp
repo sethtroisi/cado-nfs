@@ -285,6 +285,11 @@ las_info::las_info(cxx_param_list & pl)
     unsigned long seed = 0;
     if (param_list_parse_ulong(pl, "seed", &seed))
         gmp_randseed_ui(rstate, seed);
+
+    if (const char * tmp = param_list_lookup_string(pl, "bkmult")) {
+        bk_multiplier = bkmult_specifier(tmp);
+    }
+
     // }}}
 
     // ----- stuff roughly related to the descent {{{

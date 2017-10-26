@@ -2199,7 +2199,7 @@ double nprimes_interval(double p0, double p1)
 #endif
 }
 
-void display_expected_memory_usage(siever_config const & sc, cado_poly_srcptr cpoly, size_t base_memory = 0)
+void display_expected_memory_usage(siever_config const & sc, cado_poly_srcptr cpoly, bkmult_specifier const & bkmult, size_t base_memory = 0)
 {
     verbose_output_print(0, 1, "# Expected memory usage\n");
     /*
@@ -2287,7 +2287,7 @@ void display_expected_memory_usage(siever_config const & sc, cado_poly_srcptr cp
                 typedef bucket_update_t<2, shorthint_t> type;
                 verbose_output_print(0, 1, "# level 2, side %d: %zu primes, %zu 2-updates [2s]: %zu MB\n",
                         side, nprimes, nupdates,
-                        (more = sc.bk_multiplier.get<type>() * nupdates * sizeof(type)) >> 20);
+                        (more = bkmult.get<type>() * nupdates * sizeof(type)) >> 20);
                 memory += more;
             }
             {
@@ -2297,7 +2297,7 @@ void display_expected_memory_usage(siever_config const & sc, cado_poly_srcptr cp
                 typedef bucket_update_t<1, longhint_t> type;
                 verbose_output_print(0, 1, "# level 1, side %d: %zu downsorted 1-updates [1l]: %zu MB\n",
                         side, nupdates >> 8,
-                        (more = sc.bk_multiplier.get<type>() * nupdates_D * sizeof(type)) >> 20);
+                        (more = bkmult.get<type>() * nupdates_D * sizeof(type)) >> 20);
                 memory += more;
             }
         }
@@ -2312,7 +2312,7 @@ void display_expected_memory_usage(siever_config const & sc, cado_poly_srcptr cp
             typedef bucket_update_t<1, shorthint_t> type;
             verbose_output_print(0, 1, "# level 1, side %d: %zu primes, %zu 1-updates [1s]: %zu MB\n",
                     side, nprimes, nupdates,
-                    (more = sc.bk_multiplier(type()) * nupdates * sizeof(type)) >> 20);
+                    (more = bkmult(type()) * nupdates * sizeof(type)) >> 20);
             memory += more;
             verbose_output_print(0, 1, "# level 1, side %d: %zu primes => precomp_plattices: %zu MB\n",
                     side, nprimes,
@@ -2331,7 +2331,7 @@ void display_expected_memory_usage(siever_config const & sc, cado_poly_srcptr cp
             nupdates += NB_DEVIATIONS_BUCKET_REGIONS * sqrt(nupdates);
             verbose_output_print(0, 1, "# level 1, side %d: %zu primes, %zu 1-updates [1s]: %zu MB\n",
                     side, nprimes, nupdates,
-                    (more = sc.bk_multiplier.get<type>() * nupdates * sizeof(type)) >> 20);
+                    (more = bkmult.get<type>() * nupdates * sizeof(type)) >> 20);
             memory += more;
         }
     }
@@ -2416,7 +2416,7 @@ int main (int argc0, char *argv0[])/*{{{*/
     size_t base_memory = Memusage() << 10;
     if (las.verbose >= 1 && las.config_pool.default_config_ptr) {
         siever_config const & sc(*las.config_pool.default_config_ptr);
-        display_expected_memory_usage(sc, las.cpoly, base_memory);
+        display_expected_memory_usage(sc, las.cpoly, las.bk_multiplier, base_memory);
     }
 
     /* We have the following dependency chain (not sure the account below
@@ -2673,6 +2673,11 @@ int main (int argc0, char *argv0[])/*{{{*/
         /* Maybe create a new siever ? */
         sieve_info & si(sieve_info::get_sieve_info_from_config(conf, las.cpoly, las.sievers, pl));
 
+        /* for some reason get_sieve_info_from_config does not access the
+         * full las_info structure, so we have a few adjustments to make
+         */
+        si.bk_multiplier = &las.bk_multiplier;
+
         si.recover_per_sq_values(Adj);
 
         si.init_j_div();
@@ -2923,7 +2928,7 @@ if (si.conf.sublat.m) {
                     "# The code will now try to adapt by allocating more memory for buckets.\n",
                     (mpz_srcptr) doing.p, (mpz_srcptr) doing.r, e.what());
 
-            double old = conf.bk_multiplier.get(e.key);
+            double old = las.bk_multiplier.get(e.key);
             double ratio = (double) e.reached_size / e.theoretical_max_size * 1.1;
             double new_bk_multiplier = old * ratio;
             verbose_output_print(0, 1, "# Updating %s bucket multiplier to %.3f*%d/%d*1.1=%.3f\n",
@@ -2933,11 +2938,11 @@ if (si.conf.sublat.m) {
                     e.theoretical_max_size,
                     new_bk_multiplier
                   );
-            las.config_pool.grow_bk_multiplier(e.key, ratio);
+            las.grow_bk_multiplier(e.key, ratio);
             if (las.verbose >= 1 && las.config_pool.default_config_ptr) {
                 verbose_output_print(0, 1, "# Displaying again expected memory usage since multipliers changed.\n");
                 siever_config const & sc(*las.config_pool.default_config_ptr);
-                display_expected_memory_usage(sc, las.cpoly, base_memory);
+                display_expected_memory_usage(sc, las.cpoly, las.bk_multiplier, base_memory);
             }
             /* we have to roll back the updates we made to
              * this structure. */
@@ -3128,10 +3133,10 @@ if (si.conf.sublat.m) {
     wct = wct_seconds() - wct;
     if (adjust_strategy < 2) {
         verbose_output_print (2, 1, "# Average J=%1.0f for %lu special-q's, max bucket fill %s\n",
-                totJ / (double) nr_sq_processed, nr_sq_processed, las.config_pool.base.bk_multiplier.print_all().c_str());
+                totJ / (double) nr_sq_processed, nr_sq_processed, las.bk_multiplier.print_all().c_str());
     } else {
         verbose_output_print (2, 1, "# Average logI=%1.1f for %lu special-q's, max bucket fill %s\n",
-                totlogI / (double) nr_sq_processed, nr_sq_processed, las.config_pool.base.bk_multiplier.print_all().c_str());
+                totlogI / (double) nr_sq_processed, nr_sq_processed, las.bk_multiplier.print_all().c_str());
     }
     verbose_output_print (2, 1, "# Discarded %lu special-q's out of %u pushed\n",
             nr_sq_discarded, las.nq_pushed);

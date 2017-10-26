@@ -20,7 +20,6 @@
 #include "fb.hpp"
 #include "las-debug.hpp"
 #include "threadpool.hpp"
-#include "las-siever-config.hpp"
 
 #include "electric_alloc.h"
 
@@ -453,6 +452,37 @@ class sieve_checksum {
   }
   /* Update checksum with the pointed-to data */
   void update(const unsigned char *, size_t);
+};
+
+class bkmult_specifier {
+    double base = 1.0;
+    typedef std::map<std::pair<int, char>, double> dict_t;
+    dict_t dict;
+    public:
+    typedef dict_t::key_type key_type;
+    static std::string printkey(dict_t::key_type const& key) {
+        char c[3] = { (char) ('0' + key.first), key.second, '\0' };
+        return std::string(c);
+    }
+    template<typename T> static dict_t::key_type getkey() {
+        return dict_t::key_type(T::level(), T::rtti[0]);
+    }
+    template<typename T> double get() const { return get(getkey<T>()); }
+    double const & get(dict_t::key_type const& key) const {
+        auto xx = dict.find(key);
+        if (xx != dict.end()) return xx->second;
+        return base;
+    }
+    double grow(dict_t::key_type const& key, double d) {
+        double v = get(key) * d;
+        return dict[key] = v;
+    }
+    template<typename T> double get(T const &) const { return get<T>(); }
+    template<typename T> double operator()(T const &) const { return get<T>(); }
+    template<typename T> double operator()() const { return get<T>(); }
+    bkmult_specifier(double x) : base(x) {}
+    bkmult_specifier(const char * specifier);
+    std::string print_all() const;
 };
 
 struct buckets_are_full : public clonable_exception {

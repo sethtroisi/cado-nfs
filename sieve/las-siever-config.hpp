@@ -11,67 +11,36 @@
 
 /* siever_config */
  
-class bkmult_specifier {
-    double base = 1.0;
-    typedef std::map<std::pair<int, char>, double> dict_t;
-    dict_t dict;
-    public:
-    typedef dict_t::key_type key_type;
-    static std::string printkey(dict_t::key_type const& key) {
-        char c[3] = { (char) ('0' + key.first), key.second, '\0' };
-        return std::string(c);
-    }
-    template<typename T> static dict_t::key_type getkey() {
-        return dict_t::key_type(T::level(), T::rtti[0]);
-    }
-    template<typename T> double get() const { return get(getkey<T>()); }
-    double const & get(dict_t::key_type const& key) const {
-        auto xx = dict.find(key);
-        if (xx != dict.end()) return xx->second;
-        return base;
-    }
-    double grow(dict_t::key_type const& key, double d) {
-        double v = get(key) * d;
-        return dict[key] = v;
-    }
-    template<typename T> double get(T const &) const { return get<T>(); }
-    template<typename T> double operator()(T const &) const { return get<T>(); }
-    template<typename T> double operator()() const { return get<T>(); }
-    bkmult_specifier(double x) : base(x) {}
-    bkmult_specifier(const char * specifier);
-    std::string print_all() const;
-};
 /* The following structure lists the fields with an impact on the siever.
  * Different values for these fields will correspond to different siever
  * structures.
  */
-struct siever_config {
+struct siever_config : public _padded_pod<siever_config> {
     /* The bit size of the special-q. Counting in bits is no necessity,
      * we could imagine being more accurate */
-    unsigned int bitsize=0;  /* bitsize == 0 indicates end of table */
-    int side=0;   /* special-q side */
-    int logA=0;
+    unsigned int bitsize;  /* bitsize == 0 indicates end of table */
+    int side;              /* special-q side */
+    int logA;
 
 
     /* For a given logA, we may trigger configurations for various logI
      * values. logI_adjusted is a sieving-only parameter. */
-    int logI_adjusted=0;
+    int logI_adjusted;
     sublat_t sublat;
-    unsigned long bucket_thresh=0;    // bucket sieve primes >= bucket_thresh
-    unsigned long bucket_thresh1=0;   // primes above are 2-level bucket-sieved
-    unsigned int td_thresh=0;
-    unsigned int skipped=0;           // don't sieve below this
-    bkmult_specifier bk_multiplier { 1.0 };     // how much margin when allocating buckets
-    unsigned int unsieve_thresh=0;
+    unsigned long bucket_thresh;    // bucket sieve primes >= bucket_thresh
+    unsigned long bucket_thresh1;   // primes above are 2-level bucket-sieved
+    unsigned int td_thresh;
+    unsigned int skipped;           // don't sieve below this
+    unsigned int unsieve_thresh;
     struct side_config {
-        unsigned long lim=0;    /* factor base bound */
-        unsigned long powlim=0; /* bound on powers in the factor base */
-        int lpb=0;              /* large prime bound is 2^lpb */
-        int mfb=0;              /* bound for residuals is 2^mfb */
-        int ncurves=0;          /* number of cofactorization curves */
-        double lambda=0;        /* lambda sieve parameter */
-        unsigned long qmin=0;   /* smallest q sieved on this side, for dupsup */
-        unsigned long qmax=0;   /* largest q sieved on this side, for dupsup */
+        unsigned long lim;    /* factor base bound */
+        unsigned long powlim; /* bound on powers in the factor base */
+        int lpb;              /* large prime bound is 2^lpb */
+        int mfb;              /* bound for residuals is 2^mfb */
+        int ncurves;          /* number of cofactorization curves */
+        double lambda;        /* lambda sieve parameter */
+        unsigned long qmin;   /* smallest q sieved on this side, for dupsup */
+        unsigned long qmax;   /* largest q sieved on this side, for dupsup */
     };
     side_config sides[2];
 
@@ -201,13 +170,6 @@ struct siever_config_pool {
     siever_config base;
 
     siever_config get_config_for_q(las_todo_entry const& doing) const;
-
-    void grow_bk_multiplier(bkmult_specifier::key_type const& key, double d) {
-        for(auto & c : hints)
-            c.second.bk_multiplier.grow(key, d);
-        base.bk_multiplier.grow(key, d);
-    }
-
 
     siever_config_pool(cxx_param_list& pl);
 
