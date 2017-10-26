@@ -199,7 +199,7 @@ static int roots_for_composite_q(mpz_t* roots, mpz_poly_srcptr f,
    */
 static void
 next_legitimate_specialq(mpz_t r, unsigned long fac_r[], const mpz_t s,
-        const unsigned long diff, las_info & las)
+        const unsigned long diff, las_info const & las)
 {
     if (las.allow_composite_q) {
         int nf = next_mpz_with_factor_constraints(r, &fac_r[0],
@@ -479,6 +479,44 @@ static void add_relations_with_galois(const char *galois, FILE *output,
     }
 }
 
+cxx_mpz bound_following_previous_legitimate_specialq_withroots(cxx_mpz const& q1_orig, mpz_poly_srcptr f, las_info const & las)
+{
+    /* For random sampling, it's important that for all integers in
+     * the range [q0, q1[, their nextprime() is within the range, and
+     * that at least one such has roots mod f. Make sure that
+     * this is the case.
+     */
+    // FIXME: only 3 factors in composite q !!!!
+    cxx_mpz roots[MAX_DEGREE*MAX_DEGREE*MAX_DEGREE];
+    unsigned long fac_q[10];
+
+    cxx_mpz q, q1 = q1_orig;
+    /* we need to know the limit of the q range */
+    for(unsigned long i = 1 ; ; i++) {
+        mpz_sub_ui(q, q1, i);
+        unsigned long facq[10];
+        next_legitimate_specialq(q, facq, q, 0, las);
+        if (mpz_cmp(q, q1) >= 0)
+            continue;
+        int nroots;
+        if (!las.allow_composite_q) {
+            nroots = mpz_poly_roots ((mpz_t*)roots, f, q);
+        } else {
+            nroots = roots_for_composite_q((mpz_t *)roots, f, q, fac_q);
+        }
+        if (nroots > 0)
+            break;
+        /* small optimization: avoid redoing root finding
+         * several times */
+        mpz_set (q1, q);
+        i = 1;
+    }
+    /* now q is the largest prime < q1 with f having roots mod q */
+    mpz_add_ui (q1, q, 1);
+
+    return q1;
+}
+
 
 /* {{{ Populating the todo list */
 /* See below in main() for documentation about the q-range and q-list
@@ -499,48 +537,26 @@ int las_todo_feed_qrange(las_info & las, param_list pl)
     int qside = las.config_pool.base.side;
 
     mpz_poly_ptr f = las.cpoly->pols[qside];
+
     // FIXME: only 3 factors in composite q !!!!
     cxx_mpz roots[MAX_DEGREE*MAX_DEGREE*MAX_DEGREE];
-
     unsigned long fac_q[10];
 
     if (mpz_cmp_ui(q0, 0) == 0) {
         parse_command_line_q0_q1(las, q0, fac_q, q1, pl, qside);
         if (las.random_sampling) {
-            /* For random sampling, it's important that for all integers in
-             * the range [q0, q1[, their nextprime() is within the range, and
-             * that at least one such has roots mod f. Make sure that
-             * this is the case.
-             */
-            cxx_mpz q, q1_orig;
-            mpz_set(q1_orig, q1);
-            /* we need to know the limit of the q range */
-            for(unsigned long i = 1 ; ; i++) {
-                mpz_sub_ui(q, q1, i);
-                unsigned long facq[10];
-                next_legitimate_specialq(q, facq, q, 0, las);
-                if (mpz_cmp(q, q1) >= 0)
-                    continue;
-                // FIXME for composites here.
-                if (mpz_poly_roots ((mpz_t*) roots, f, q) > 0)
-                    break;
-                /* small optimization: avoid redoing root finding
-                 * several times */
-                mpz_set (q1, q);
-                i = 1;
-            }
-            /* now q is the largest prime < q1 with f having roots mod q */
-            mpz_add_ui (q1, q, 1);
-            /* so now if we pick an integer in [q0, q1[, then its nextprime()
+            cxx_mpz q1_restrict = bound_following_previous_legitimate_specialq_withroots(q1, f, las);
+            /* so now if we pick an integer in [q0, q1[, then its nextprime(x-1)
              * will be in [q0, q1_orig[, which is what we look for,
              * really.
              */
-            if (mpz_cmp(q0, q1) > 0) {
+            if (mpz_cmp(q0, q1_restrict) > 0) {
                 gmp_fprintf(stderr, "Error: range [%Zd,%Zd[ contains no prime with roots mod f\n",
                         (mpz_srcptr) q0,
-                        (mpz_srcptr) q1_orig);
+                        (mpz_srcptr) q1);
                 exit(EXIT_FAILURE);
             }
+            q1 = q1_restrict;
         }
     }
 
@@ -602,10 +618,22 @@ int las_todo_feed_qrange(las_info & las, param_list pl)
     } else {
         /* we don't care much about being truly uniform here */
         cxx_mpz q;
+        cxx_mpz diff;
+        mpz_sub(diff, q1, q0);
+        ASSERT_ALWAYS(las.nq_pushed == 0 || las.nq_pushed == las.nq_max);
         for ( ; las.nq_pushed < las.nq_max ; ) {
-            mpz_sub(q, q1, q0);
+            /* try in [q0 + k * (q1-q0) / n, q0 + (k+1) * (q1-q0) / n[ */
+            cxx_mpz q0l, q1l;
+            mpz_mul_ui(q0l, diff, las.nq_pushed);
+            mpz_mul_ui(q1l, diff, las.nq_pushed + 1);
+            mpz_fdiv_q_ui(q0l, q0l, las.nq_max);
+            mpz_fdiv_q_ui(q1l, q1l, las.nq_max);
+            mpz_add(q0l, q0, q0l);
+            mpz_add(q1l, q0, q1l);
+
+            mpz_sub(q, q1l, q0l);
             mpz_urandomm(q, las.rstate, q);
-            mpz_add(q, q, q0);
+            mpz_add(q, q, q0l);
             next_legitimate_specialq(q, fac_q, q, 0, las);
             int nroots;
             if (!las.allow_composite_q) {
