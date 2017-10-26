@@ -25,20 +25,13 @@ class bkmult_specifier {
         return dict_t::key_type(T::level(), T::rtti[0]);
     }
     template<typename T> double get() const { return get(getkey<T>()); }
-    double get(dict_t::key_type const& key) const {
+    double const & get(dict_t::key_type const& key) const {
         auto xx = dict.find(key);
         if (xx != dict.end()) return xx->second;
         return base;
     }
-    /* this returns a reference to the value which is used for this key.
-     * It is up to the user to either specify separate keys at the
-     * beginning, or just one. If she specifies just one, then we'll
-     * never populate the dictionary, and a single multiplier will be
-     * used throughout. */
-    double & get(dict_t::key_type const& key) {
-        auto xx = dict.find(key);
-        if (xx != dict.end()) return xx->second;
-        return base;
+    double grow(dict_t::key_type const& key, double d) {
+        return dict[key] = get(key) * d;
     }
     template<typename T> double get(T const &) const { return get<T>(); }
     template<typename T> double operator()(T const &) const { return get<T>(); }
@@ -210,8 +203,8 @@ struct siever_config_pool {
 
     void grow_bk_multiplier(bkmult_specifier::key_type const& key, double d) {
         for(auto & c : hints)
-            c.second.bk_multiplier.get(key) *= d;
-        base.bk_multiplier.get(key) *= d;
+            c.second.bk_multiplier.grow(key, d);
+        base.bk_multiplier.grow(key, d);
     }
 
 

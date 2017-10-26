@@ -2922,7 +2922,7 @@ if (si.conf.sublat.m) {
                     "# The code will now try to adapt by allocating more memory for buckets.\n",
                     (mpz_srcptr) doing.p, (mpz_srcptr) doing.r, e.what());
 
-            double & old = conf.bk_multiplier.get(e.key);
+            double old = conf.bk_multiplier.get(e.key);
             double ratio = (double) e.reached_size / e.theoretical_max_size * 1.01;
             double new_bk_multiplier = old * ratio;
             verbose_output_print(0, 1, "# Updating %s bucket multiplier to %.3f*%d/%d*1.01=%.3f\n",
