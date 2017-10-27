@@ -615,19 +615,23 @@ int las_todo_feed_qrange(las_info & las, param_list pl)
             int ind = push_here-i-1;
             las_todo_push(las, my_list[ind].q, my_list[ind].r, qside);
         }
-    } else {
-        /* we don't care much about being truly uniform here */
+    } else { /* random sampling case */
+        /* we care about being uniform here */
         cxx_mpz q;
         cxx_mpz diff;
         mpz_sub(diff, q1, q0);
         ASSERT_ALWAYS(las.nq_pushed == 0 || las.nq_pushed == las.nq_max);
-        for ( ; las.nq_pushed < las.nq_max ; ) {
+	unsigned long n = las.nq_max;
+        for ( ; las.nq_pushed < n ; ) {
             /* try in [q0 + k * (q1-q0) / n, q0 + (k+1) * (q1-q0) / n[ */
             cxx_mpz q0l, q1l;
-            mpz_mul_ui(q0l, diff, las.nq_pushed);
-            mpz_mul_ui(q1l, diff, las.nq_pushed + 1);
-            mpz_fdiv_q_ui(q0l, q0l, las.nq_max);
-            mpz_fdiv_q_ui(q1l, q1l, las.nq_max);
+	    /* we use k = n-1-nq_pushed instead of k=nq_pushed so that
+	       special-q's are sieved in increasing order */
+	    unsigned long k = n - 1 - las.nq_pushed;
+            mpz_mul_ui(q0l, diff, k);
+            mpz_mul_ui(q1l, diff, k + 1);
+            mpz_fdiv_q_ui(q0l, q0l, n);
+            mpz_fdiv_q_ui(q1l, q1l, n);
             mpz_add(q0l, q0, q0l);
             mpz_add(q1l, q0, q1l);
 
