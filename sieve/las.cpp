@@ -2597,8 +2597,18 @@ int main (int argc0, char *argv0[])/*{{{*/
                 las.nb_threads);
 
 
-        if (!Adj.SkewGauss())
+        if (!Adj.SkewGauss()) {
+            verbose_output_vfprint(0, 1, gmp_vfprintf,
+                    "# "
+                    HILIGHT_START
+                    "Discarding side-%d q=%Zd; rho=%Zd (q-lattice basis does not fit)\n"
+                    HILIGHT_END,
+                    doing.side,
+                    (mpz_srcptr) doing.p,
+                    (mpz_srcptr) doing.r);
+            nr_sq_discarded++;
             continue;
+        }
 
 #ifndef SUPPORT_LARGE_Q
         if (!Adj.Q.fits_31bits()) { // for fb_root_in_qlattice_31bits
@@ -2606,6 +2616,7 @@ int main (int argc0, char *argv0[])/*{{{*/
                     "Warning, special-q basis is too skewed,"
                     " skipping this special-q."
                     " Define SUPPORT_LARGE_Q to proceed anyway.\n");
+            nr_sq_discarded++;
             continue;
         }
 #endif
