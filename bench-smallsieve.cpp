@@ -7,6 +7,8 @@
 #include <gmp.h>
 #include <time.h>
 #include <vector>
+#include <sstream>
+#include <algorithm>
 
 #define xxxLOG_BUCKET_REGION_IS_A_CONSTANT
 
@@ -430,7 +432,6 @@ struct {
 /*}}}*/
 
 /*{{{ function objects for all the routines that we have */
-
 #define BEGIN_FOBJ(name_)						\
     struct name_ {							\
         static constexpr const char * name = # name_;				\
@@ -554,9 +555,12 @@ for ( ; pi < S1 ; pi += p_or_2p) {
 END_FOBJ();
 /*}}}*/
 
+/* {{{ our selection of best routines indexed by ceil(log2(I/p)) */
+template<int bit> struct best_evenline;
+template<int bit> struct best_oddline ;
+#if defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM) && !defined(TRACK_CODE_PATH)
 template<int bit> struct best_evenline { typedef generic_loop16 type; };
 template<int bit> struct best_oddline  { typedef generic_loop16 type; };
-
 template<> struct best_evenline<1> { typedef manual0 type; };
 template<> struct best_evenline<2> { typedef manual1 type; };
 template<> struct best_evenline<3> { typedef manual2 type; };
@@ -575,7 +579,7 @@ template<> struct best_oddline<1> { typedef assembly1 type; };
 template<> struct best_oddline<2> { typedef assembly2 type; };
 template<> struct best_oddline<3> { typedef manual3 type; };
 template<> struct best_oddline<4> { typedef assembly4 type; };
-template<> struct best_oddline<5> { typedef assembly5 type; };
+template<> struct best_oddline<5> { typedef generic_loop8 type; };
 template<> struct best_oddline<6> { typedef generic_loop8 type; };
 template<> struct best_oddline<7> { typedef generic_loop12 type; };
 template<> struct best_oddline<8> { typedef generic_loop12 type; };
@@ -584,7 +588,17 @@ template<> struct best_oddline<10> { typedef generic_loop12 type; };
 template<> struct best_oddline<11> { typedef generic_loop12 type; };
 template<> struct best_oddline<12> { typedef generic_loop12 type; };
 template<> struct best_oddline<13> { typedef generic_loop16 type; };
+/* TODO: we could perhaps provide hints so that the generated code can
+ * merge some rounds of the loop. Or maybe the compiler will do that ? */
+#else
+template<int bit> struct best_evenline { typedef manual_oldloop type; };
+template<int bit> struct best_oddline  { typedef manual_oldloop type; };
+#endif
+/* }}} */
 
+
+/******************************************************************/
+/* now provides routines for testing */
 
 /* we create lists of functions, because from all these tidbits we need
  * to generate the more complete sieving functions below.
@@ -603,11 +617,9 @@ struct all_generic_candidates {
 };
 
 template<int bit> struct all_candidates_for_evenline {
-    /* XXX distinguish >= 13 and <  ? */
     typedef all_generic_candidates::type type;
 };
 template<int bit> struct all_candidates_for_oddline {
-    /* XXX distinguish >= 13 and <  ? */
     typedef all_generic_candidates::type type;
 };
 template<> struct all_candidates_for_evenline<1> {
@@ -624,6 +636,52 @@ template<> struct all_candidates_for_evenline<3> {
     typedef list_car<assembly2,
             list_car<manual2,
             all_generic_candidates::type>> type;
+};
+template<> struct all_candidates_for_evenline<4> {
+    typedef list_car<assembly3,
+            list_car<manual3,
+            all_generic_candidates::type>> type;
+};
+template<> struct all_candidates_for_evenline<5> {
+    typedef list_car<assembly4,
+            list_car<manual4,
+            all_generic_candidates::type>> type;
+};
+template<> struct all_candidates_for_evenline<6> {
+    typedef list_car<assembly5,
+            all_generic_candidates::type> type;
+};
+template<> struct all_candidates_for_evenline<7> {
+    typedef list_car<assembly6,
+            all_generic_candidates::type> type;
+};
+template<> struct all_candidates_for_oddline<1> {
+    typedef list_car<assembly1,
+            list_car<manual1,
+            all_generic_candidates::type>> type;
+};
+template<> struct all_candidates_for_oddline<2> {
+    typedef list_car<assembly2,
+            list_car<manual2,
+            all_generic_candidates::type>> type;
+};
+template<> struct all_candidates_for_oddline<3> {
+    typedef list_car<assembly3,
+            list_car<manual3,
+            all_generic_candidates::type>> type;
+};
+template<> struct all_candidates_for_oddline<4> {
+    typedef list_car<assembly4,
+            list_car<manual4,
+            all_generic_candidates::type>> type;
+};
+template<> struct all_candidates_for_oddline<5> {
+    typedef list_car<assembly5,
+            all_generic_candidates::type> type;
+};
+template<> struct all_candidates_for_oddline<6> {
+    typedef list_car<assembly6,
+            all_generic_candidates::type> type;
 };
 
 /* For 2^(I-k) <= p < 2^(I-k+1), we have: 2^k >= 2^I/p > 2^(k-1), and
@@ -1407,13 +1465,20 @@ struct bench_base {
     }
     bench_base(bench_base const &) = delete;
     ~bench_base() { free(S); }
-    void test(candidate_list const & cand, const char * pfx="") {
+    void test(candidate_list const & cand, const char * pfx="", std::string const& goal="current selection") {
+
+        if (cand.empty()) return;
+
         std::vector<unsigned char *> refS;
         size_t I = 1UL << logI;
         int Nmax = 1 << (logA - LOG_BUCKET_REGION);
 
+        std::vector<double> timings;
+        int sel_index = -1;
+
         for(auto const& bf : cand) {
             ss_func f = bf.f;
+            if (bf.sel) sel_index = &bf-&cand.front();
             positions.clear();
             for(auto const & ssp : allprimes)
                 positions.push_back((I/2)%ssp.get_p());
@@ -1422,15 +1487,14 @@ struct bench_base {
             for(int N = 0 ; N < Nmax ; N++) {
                 (*f)(positions, allprimes, S, logI, N);
             }
-            printf("%s%s:\t%.3f%s\n",
-                    pfx,
-                    bf.name, (double) (clock()-tt) / CLOCKS_PER_SEC,
-                    bf.sel ? "\t[current selection]" : "");
+            timings.push_back((double) (clock()-tt) / CLOCKS_PER_SEC);
+            printf(".");
+            fflush(stdout);
             /* FIXME: we're only checking the very last region, here ! */
             if (!refS.empty()) {
                 if (memcmp(S, refS.front(), B) != 0) {
-                    fprintf(stderr, "inconsistency between f%d and f%d\n",
-                            (int) (&bf-&cand.front()), 0);
+                    fprintf(stderr, "inconsistency between %s and %s\n",
+                            bf.name, cand.front().name);
                     for(size_t i = 0, n = 0 ; i < B && n < 16 ; i++) {
                         if (S[i] != refS.front()[i]) {
                             fprintf(stderr, "%04x: %02x != %02x\n",
@@ -1447,6 +1511,71 @@ struct bench_base {
             memcpy(Scopy, S, B);
             refS.push_back(Scopy);
         }
+        printf("\n");
+
+#define BBLACK(X) "\e[01;30m" X "\e[00;30m"
+#define BRED(X)   "\e[01;31m" X "\e[00;30m"
+#define BGREEN(X) "\e[01;32m" X "\e[00;30m"
+#define BYELLOW(X)"\e[01;33m" X "\e[00;30m"
+#define BBLUE(X)  "\e[01;34m" X "\e[00;30m"
+#define BVIOLET(X)"\e[01;35m" X "\e[00;30m"
+#define BNAVY(X)  "\e[01;36m" X "\e[00;30m"
+#define BLACK(X) "\e[00;30m" X "\e[00;30m"
+#define RED(X)   "\e[00;31m" X "\e[00;30m"
+#define GREEN(X) "\e[00;32m" X "\e[00;30m"
+#define YELLOW(X)"\e[00;33m" X "\e[00;30m"
+#define BLUE(X)  "\e[00;34m" X "\e[00;30m"
+#define VIOLET(X)"\e[00;35m" X "\e[00;30m"
+#define NAVY(X)  "\e[00;36m" X "\e[00;30m"
+
+        size_t best_index = std::min_element(timings.begin(), timings.end()) - timings.begin();
+        double best_time = timings[best_index];
+        if (sel_index >= 0) {
+            bool sel_best = (size_t) sel_index == best_index;
+            bool sel_tied = timings[sel_index] <= 1.05 * best_time;;
+            for(auto const& bf : cand) {
+                size_t index = &bf-&cand.front();
+                double tt = timings[index];
+                bool is_best = index == best_index;
+                bool near_best = tt <= 1.05 * best_time;
+                printf("%s%-24s:\t%.3f\t", pfx, bf.name, tt);
+                if (bf.sel) {
+                    if (sel_best) {
+                        printf(BGREEN("%s") "\n", goal.c_str());
+                    } else if (sel_tied) {
+                        printf(GREEN("%s, tied") "\n", goal.c_str());
+                    } else {
+                        printf(BRED("%s, wrong ?") "\n", goal.c_str());
+                    }
+                } else if (is_best && !sel_best) {
+                    if (sel_tied) {
+                         printf(GREEN("current best, tied") "\n");
+                    } else {
+                        printf(BRED("current best") "\n");
+                    }
+                } else if (near_best) {
+                    printf(GREEN("tied")"\n");
+                } else {
+                    printf("\n");
+                }
+            }
+        } else {
+            for(auto const& bf : cand) {
+                size_t index = &bf-&cand.front();
+                double tt = timings[index];
+                bool is_best = index == best_index;
+                bool near_best = tt <= 1.05 * best_time;
+                printf("%s%-24s:\t%.3f\t", pfx, bf.name, tt);
+                if (is_best) {
+                    printf(GREEN("current best") "\n");
+                } else if (near_best) {
+                    printf(GREEN("tied")"\n");
+                } else {
+                    printf("\n");
+                }
+            }
+        }
+
         for(unsigned char * Sp : refS)
             free(Sp);
     }
@@ -1542,7 +1671,7 @@ int main(int argc, char * argv[])
         bounds_perbit[b] = { i0, i1 };
 #endif
 
-        printf("===== now doing specific tests for %d-bit primes =====\n", b+1);
+        printf("===== now doing specific tests for %d-bit primes using candidates<%d> =====\n", b+1, logI-b);
         bench_base bbase(LOG_BUCKET_REGION, logI, logA);
         // std::vector<ssp_t>& allprimes(bbase.allprimes);
         // std::vector<int64_t>& positions(bbase.positions);
@@ -1570,10 +1699,18 @@ int main(int argc, char * argv[])
 
         std::vector<unsigned char *> refS;
 
-        printf("  testing odd lines\n");
-        bbase.test(cand1, "    ");
-        printf("  testing even lines\n");
-        bbase.test(cand2, "    ");
+        if (!cand1.empty()) {
+            std::ostringstream goal_name;
+            goal_name << "best_oddline<" << logI-b << ">";
+            printf("  testing odd lines ");
+            bbase.test(cand1, "    ", goal_name.str());
+        }
+        if (!cand2.empty()) {
+            std::ostringstream goal_name;
+            goal_name << "best_evenline<" << logI-b << ">";
+            printf("  testing even lines ");
+            bbase.test(cand2, "    ", goal_name.str());
+        }
     }
 
     printf("===== now doing tests for complete functions =====\n");
