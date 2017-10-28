@@ -1586,8 +1586,9 @@ void store_primes(std::vector<ssp_t>& allprimes, int bmin, int bmax, gmp_randsta
     mpz_t pz;
     mpz_init(pz);
     mpz_set_ui(pz, 1u << bmin);
-    for(; mpz_cmp_ui(pz, 1u << bmax) < 0 ; ) {
+    for(;;) {
         mpz_nextprime(pz, pz);
+        if (mpz_cmp_ui(pz, 1u << bmax) >= 0) break;
         unsigned long p = mpz_get_ui(pz);
         unsigned long r = gmp_urandomm_ui(rstate, p);
         allprimes.emplace_back(p, r, (r * (interleaving-1)) % p);
@@ -1658,8 +1659,8 @@ int main(int argc, char * argv[])
     // std::vector<std::pair<size_t, size_t>> bounds_perbit(logI + 1, {0,0});
     for(int b = bmin ; b < bmax ; b++) {
 #if 0
-        /* primes within [1<<b, 1<<(b+1)] are, with respect to the
-         * semantics that we use in the template code, counted as
+        /* primes within [1<<b, 1<<(b+1)] are (b+1)-bit primes. With respect to the
+         * semantics that we use in the template code, those are counted as
          * (logI-bit) off the bound. So they will use the code in
          * all_candidates_for_evenline<logI-bit> and
          * all_candidates_for_oddline<logI-bit>.
