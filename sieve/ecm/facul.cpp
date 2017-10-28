@@ -499,7 +499,7 @@ process_line (facul_strategies_t* strategies, unsigned int* index_st,
   regcomp (&preg_index, str_preg_index, REG_ICASE|REG_EXTENDED);
   regcomp (&preg_fm, str_preg_fm, REG_ICASE|REG_EXTENDED);
 
-  // process the ligne
+  // process the line
   const char * str_process = &str[0];
   int side = -1;
   while (str_process[0] != '\0' )
