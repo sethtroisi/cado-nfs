@@ -8,7 +8,7 @@
 #include <time.h>
 #include <vector>
 
-#define LOG_BUCKET_REGION_IS_A_CONSTANT
+#define xxxLOG_BUCKET_REGION_IS_A_CONSTANT
 
 #define HAVE_SSE2
 
@@ -440,6 +440,143 @@ struct {
 } while (0)
 #endif
 
+struct sieve_line_base {
+    unsigned char * S0;
+    unsigned char * S1;
+    size_t pos;
+    size_t p_or_2p;
+    size_t x0;
+    unsigned char logp;
+    size_t generic_loop8(where_am_I& w MAYBE_UNUSED) const {
+        unsigned char * pi = S0 + pos;
+        SMALLSIEVE_ASSEMBLY_NEW_LOOP8(pi, p_or_2p, S1, logp);
+        return pi - S1;
+    }
+    size_t generic_loop12(where_am_I& w MAYBE_UNUSED) const {
+        unsigned char * pi = S0 + pos;
+        SMALLSIEVE_ASSEMBLY_NEW_LOOP12(pi, p_or_2p, S1, logp);
+        return pi - S1;
+    }
+    size_t generic_loop16(where_am_I& w MAYBE_UNUSED) const {
+        unsigned char * pi = S0 + pos;
+        SMALLSIEVE_ASSEMBLY_NEW_LOOP16(pi, p_or_2p, S1, logp);
+        return pi - S1;
+    }
+    size_t generic_oldloop(where_am_I& w MAYBE_UNUSED) const {
+        unsigned char * pi = S0 + pos;
+        SMALLSIEVE_ASSEMBLY_OLD(pi, p_or_2p, S1, logp);
+        return pi - S1;
+    }
+    template<typename T>
+    static void all_functions(std::vector<typename T::impl_t> & res) {
+        res.push_back(&T::generic_loop8);
+        res.push_back(&T::generic_loop12);
+        res.push_back(&T::generic_loop16);
+        res.push_back(&T::generic_oldloop);
+    }
+    template<typename T>
+    struct all_impl { typename T::impl_t f = &T::generic_loop8;
+        struct ne { struct xt { typename T::impl_t f = &T::generic_loop12;
+        struct ne { struct xt { typename T::impl_t f = &T::generic_loop16;
+        struct ne { struct xt { typename T::impl_t f = &T::generic_oldloop;
+    };};};};};};};
+};
+
+/* a template class that can sieve any number of hits in the interval
+ * [2^(bit-1)..2^(bit)] (yes, closed at both ends). Low values of "bit"
+ * indicate that this concerns the functions that are used for large
+ * values of p.
+ *
+ * except for <bit == 0>, where it means [0..1]
+ */
+template<int bit> struct sieve_line : public sieve_line_base {
+    typedef size_t (sieve_line::*impl_t)(where_am_I &) const;
+    sieve_line(sieve_line_base const& x) : sieve_line_base(x) {}
+    static void all_functions(std::vector<impl_t> & res) {
+        sieve_line_base::all_functions<sieve_line>(res);
+    }
+    size_t best_evenlines(where_am_I& w) const {
+        /* XXX can't be a compile-time constant if it's a fallback... */
+        return (bit>=13) ? generic_loop16(w) : generic_loop12(w);
+    }
+    size_t best_oddlines(where_am_I& w) const {
+        /* XXX can't be a compile-time constant if it's a fallback... */
+        return (bit>=13) ? generic_loop16(w) : generic_loop12(w);
+    }
+};
+template<> struct sieve_line<0> : public sieve_line_base {
+    typedef size_t (sieve_line::*impl_t)(where_am_I &) const;
+    sieve_line(sieve_line_base const& x) : sieve_line_base(x) {}
+    size_t manual_unroll(where_am_I& w MAYBE_UNUSED) const {
+        unsigned char * pi = S0 + pos;
+        if (pi < S1) { *pi += logp; pi += p_or_2p; }
+        return pi - S1;
+    }
+    size_t assembly(where_am_I& w MAYBE_UNUSED) const {
+        unsigned char * pi = S0 + pos;
+        SMALLSIEVE_ASSEMBLY_NEW_0_TO_1(pi, p_or_2p, S1, logp);
+        return pi - S1;
+    }
+    struct all_impl { impl_t f = &sieve_line::manual_unroll;
+        struct ne { struct xt { impl_t f = &sieve_line::assembly;
+        struct ne { typedef sieve_line_base::all_impl<sieve_line> xt;};};};};
+    static void all_functions(std::vector<impl_t> & res) {
+        sieve_line_base::all_functions<sieve_line>(res);
+        res.push_back(&sieve_line::manual_unroll);
+        res.push_back(&sieve_line::assembly);
+    }
+    size_t best_evenlines(where_am_I& w) const { return manual_unroll(w); }
+    size_t best_oddlines(where_am_I& w) const { return manual_unroll(w); }
+};
+template<> struct sieve_line<1> : public sieve_line_base {
+    typedef size_t (sieve_line::*impl_t)(where_am_I &) const;
+    sieve_line(sieve_line_base const& x) : sieve_line_base(x) {}
+    size_t manual_unroll(where_am_I& w MAYBE_UNUSED) const {
+        unsigned char * pi = S0 + pos;
+        do {
+            *pi += logp; if ((pi += p_or_2p) >= S1) break;
+            *pi += logp; pi += p_or_2p;
+        } while (0);
+        return pi - S1;
+    }
+    size_t assembly(where_am_I& w MAYBE_UNUSED) const {
+        unsigned char * pi = S0 + pos;
+        SMALLSIEVE_ASSEMBLY_NEW_1_TO_2(pi, p_or_2p, S1, logp);
+        return pi - S1;
+    }
+    static void all_functions(std::vector<impl_t> & res) {
+        sieve_line_base::all_functions<sieve_line>(res);
+        res.push_back(&sieve_line::manual_unroll);
+        res.push_back(&sieve_line::assembly);
+    }
+    size_t best_evenlines(where_am_I& w) const { return manual_unroll(w); }
+    size_t best_oddlines(where_am_I& w) const { return manual_unroll(w); }
+};
+template<> struct sieve_line<2> : public sieve_line_base {
+    typedef size_t (sieve_line::*impl_t)(where_am_I &) const;
+    sieve_line(sieve_line_base const& x) : sieve_line_base(x) {}
+    size_t manual_unroll(where_am_I& w MAYBE_UNUSED) const {
+        unsigned char * pi = S0 + pos;
+        do {
+            *pi += logp; pi += p_or_2p;
+            *pi += logp; if ((pi += p_or_2p) >= S1) break;
+            *pi += logp; if ((pi += p_or_2p) >= S1) break;
+            *pi += logp; pi += p_or_2p;
+        } while (0);
+        return pi - S1;
+    }
+    size_t assembly(where_am_I& w MAYBE_UNUSED) const {
+        unsigned char * pi = S0 + pos;
+        SMALLSIEVE_ASSEMBLY_NEW_2_TO_4(pi, p_or_2p, S1, logp);
+        return pi - S1;
+    }
+    static void all_functions(std::vector<impl_t> & res) {
+        sieve_line_base::all_functions<sieve_line>(res);
+        res.push_back(&sieve_line::manual_unroll);
+        res.push_back(&sieve_line::assembly);
+    }
+};
+
 static inline size_t sieve_full_line(unsigned char * S0, unsigned char * S1, size_t x0 MAYBE_UNUSED, size_t pos, size_t p_or_2p, unsigned char logp, where_am_I w MAYBE_UNUSED) /* {{{ */
 {
     unsigned char * pi = S0 + pos;
@@ -491,6 +628,7 @@ static inline size_t sieve_full_line(unsigned char * S0, unsigned char * S1, siz
  * Note that on even lines, p behaves as if it was doubled.
  */
 
+#if 1
 #define NBITS_LESS 12
 
 #if (NBITS_LESS == 1)/*{{{*/
@@ -830,6 +968,7 @@ static inline size_t sieve_full_line_new(unsigned char * S0, unsigned char * S1,
     return pi - S1;
 }
 #endif/*}}}*/
+#endif
 
 #if 0
 #if 0
@@ -1161,6 +1300,69 @@ j_odd_devel:
         p_pos = pos;
     }
 }
+
+template<int bit, typename even_code, typename odd_code>
+void devel_branch_meta_compare_even(std::vector<int64_t> & positions, std::vector<ssp_t> primes, unsigned char * S, int logI, unsigned int N)
+{
+    SMALLSIEVE_COMMON_DEFS();
+    ASSERT_ALWAYS(positions.size() == primes.size());
+    for(auto const & ssp : primes) {
+        int64_t & p_pos(positions[&ssp - &primes.front()]);
+
+        const fbprime_t p = ssp.get_p();
+        const fbprime_t r = ssp.get_r();
+
+        sieve_line_base SB;
+        SB.logp = ssp.logp;
+        SB.S0 = S;
+        int pos = p_pos;
+
+        where_am_I w MAYBE_UNUSED = 0;
+
+        unsigned int j = j0;
+
+        /* we sieve over the area [S0..S0+(i1-i0)], which may
+         * actually be just a fragment of a line. After that, if
+         * (i1-i0) is different from I, we'll break anyway. So
+         * whether we add I or (i1-i0) to S0 does not matter much.
+         */
+        if (j0 & 1)
+            goto j_odd_devel;
+
+        for( ; j < j1 ; ) {
+            /* for j even, we sieve only odd pi, so step = 2p. */
+            SB.p_or_2p = p+p;
+            SB.S1 = SB.S0 + I;
+            SB.x0 = SB.S0 - S;
+            SB.pos = ((si.conf.sublat.i0 + pos) & 1) ? pos : (pos+p);
+            // sieve_line<bit-1>(SB).best_evenlines(w);
+            sieve_line<bit-1>(SB).*even_code::f(w);
+            SB.S0 = SB.S1;
+            pos += r; if (pos >= (int) p) pos -= p; 
+            if (++j >= j1) break;
+j_odd_devel:
+            /* now j odd again */
+            WHERE_AM_I_UPDATE(w, j, j - j0);
+            SB.p_or_2p = p;
+            SB.S1 = SB.S0 + I;
+            SB.x0 = SB.S0 - S;
+            SB.pos = pos;
+            sieve_line<bit>(SB).*odd_code::f(w);
+            SB.S0 = SB.S1;
+            pos += r; if (pos >= (int) p) pos -= p;
+            ++j;
+        }
+        /* skip stride */
+        pos += ssp.get_offset();
+        if (pos >= (int) p) pos -= p;
+
+        p_pos = pos;
+    }
+}
+
+template<int bit> struct all_candidates_for_evenlines {};
+
+
 typedef void (*ss_func)(std::vector<int64_t> & positions, std::vector<ssp_t> primes, unsigned char * S, int logI, unsigned int N);
 
 ss_func funcs[] = {
@@ -1245,6 +1447,17 @@ int main(int argc, char * argv[])
     std::vector<unsigned char *> refS;
 
     mpz_init_set_ui(si.qbasis.q, 4294967291);
+
+    std::vector<std::pair<size_t, size_t>> bounds_perbit(logI + 1, {0,0});
+    for(int b = bmin ; b < bmax ; b++) {
+        /* primes within [1<<b, 1<<(b+1)] are, with respect to the
+         * semantics that we use in the template code, counted as
+         * (logI-bit) off the bound. So they will use the code in
+         * sieve_line<logI-bit>, for odd lines at least. And for even
+         * lines, we'll use code in sieve_line<logI-bit-1>
+         */
+    }
+
 
     for(ss_func const & f : funcs) {
         positions.clear();
