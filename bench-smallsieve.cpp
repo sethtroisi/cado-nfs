@@ -1,6 +1,7 @@
 #include "cado.h"
 #include <stdio.h>
 #include <stdint.h>
+#include <inttypes.h>
 #include <string.h>
 #include <stdlib.h>
 #include <assert.h>
@@ -84,6 +85,7 @@ struct ssp_t {
 int LOG_BUCKET_REGION = 16;
 #endif
 
+bool consistency_check_mode = false;
 int interleaving = 1;   /* number of threads */
 
 /* this is really a mock structure just for the fun of it. */
@@ -127,514 +129,7 @@ struct {
 
 
 
-/* {{{ preprocessor macro to generate assembly code for the small sieve */
-/* {{{ Comments on the _OLDLOOP version (AF)
-   0. The C code and the asm X86 code have the same algorithm.
-   Read first the C code to understand easily the asm code.
-   1. If there are less than 12 "T" in the line, the goal is to do
-   only one jump (pipe-line breaks) and of course the instructions
-   minimal number.
-   2. 12 "T" seems the best in the critical loop. Before, gcc tries
-   to optimize in a bad way the loop. For gcc generated code, the
-   best is here a systematic code (12*2 instructions), like the C code.
-   3. The asm X86 optimization uses addb logp,(pi+p_or_2p*[0,1,2])
-   & three_p_or_2p = 3 * p_or_2p; the lea (add simulation) & real
-   add interlace seems a bit interesting.
-   So, the loop is smaller & faster (19 instructions versus 27 for
-   gcc best X86 asm).
-   4. Of course, the gain between the 2 versions is light, because
-   the main problem is the access time of the L0 cache: read + write
-   with sieve_increase(pi,logp,w), or *pi += logp in fact.
-   }}} */
-/* define sequences of operations rather systematically.
- *
- * ADD_NOINCR   *pi += logp.
- * ADD_INCR     *pi += logp; pi += incr
- * XADD_NOINCR  if (pi >= fence) goto exit; *pi += logp;
- * XADD_INCR    if (pi >= fence) goto exit; *pi += logp; pi += incr;
- */
-/* {{{ *_ADD_NOINCR */
-#define ONE_ADD_NOINCR(pi, logp)                                     	\
-    "addb " logp ",(" pi ")\n"                /* pi[0] += logp */
-#define TWO_ADDS_NOINCR(pi, incr, logp)                 		\
-    ONE_ADD_NOINCR(pi, logp)               /* pi[0] += logp */       	\
-    ONE_ADD_NOINCR(pi "," incr ",1", logp) /* pi[incr] += logp */
-#define THREE_ADDS_NOINCR(pi, incr, logp)                 		\
-    ONE_ADD_NOINCR(pi, logp)               /* pi[0] += logp */       	\
-    ONE_ADD_NOINCR(pi "," incr ",1", logp) /* pi[incr] += logp */    	\
-    ONE_ADD_NOINCR(pi "," incr ",2", logp) /* pi[2*incr] += logp */
-/* }}} */
-/* {{{ *_ADDS_INCR, including _PRECOMP variant */
-#define ONE_ADD_INCR(pi, incr, logp)                             	\
-    ONE_ADD_NOINCR(pi, logp)                                         	\
-    "lea (" pi "," incr ",1)," pi "\n"        /* pi += incr */
-#define TWO_ADDS_INCR(pi, incr, logp)                 			\
-    ONE_ADD_NOINCR(pi, logp)               /* pi[0] += logp */       	\
-    ONE_ADD_NOINCR(pi "," incr ",1", logp) /* pi[incr] += logp */    	\
-    "lea (" pi "," incr ",2)," pi "\n"     /* pi += 2*incr */
-/* The _PRECOMP variant uses a precomputed  bigincr = 3 * incr  */
-#define THREE_ADDS_INCR_PRECOMP(pi, incr, bigincr, logp)                \
-     THREE_ADDS_NOINCR(pi, incr, logp)                                  \
-    "lea (" pi "," bigincr ",1)," pi "\n"     /* pi += 3*incr */
-/* {{{ expand to define new lengths */
-#define FOUR_ADDS_INCR(pi, incr, logp)                                  \
-    TWO_ADDS_INCR(pi, incr, logp)                                       \
-    TWO_ADDS_INCR(pi, incr, logp)
-#define EIGHT_ADDS_INCR(pi, incr, logp)                                 \
-    FOUR_ADDS_INCR(pi, incr, logp)                                      \
-    FOUR_ADDS_INCR(pi, incr, logp)
-#define TWELVE_ADDS_INCR_PRECOMP(pi, incr, bigincr, logp)               \
-    THREE_ADDS_INCR_PRECOMP(pi, incr, bigincr, logp)                    \
-    THREE_ADDS_INCR_PRECOMP(pi, incr, bigincr, logp)                    \
-    THREE_ADDS_INCR_PRECOMP(pi, incr, bigincr, logp)                    \
-    THREE_ADDS_INCR_PRECOMP(pi, incr, bigincr, logp)
-#define SIXTEEN_ADDS_INCR(pi, incr, logp)                               \
-    EIGHT_ADDS_INCR(pi, incr, logp)                                     \
-    EIGHT_ADDS_INCR(pi, incr, logp)
-/* }}} */
-/* }}} */
-/* {{{ caution: *_XADDS_INCR */
-#define ONE_XADD_NOINCR(pi, fence, logp, exit)               	\
-    "cmp " fence ", " pi "\n"                 /* if (pi >= S1) break; */\
-    "jae " exit "\n"                                                    \
-    ONE_ADD_NOINCR(pi, logp)
-#define ONE_XADD_INCR(pi, incr, fence, logp, exit)       		\
-    ONE_XADD_NOINCR(pi, fence, logp, exit)                   		\
-    "lea (" pi "," incr ",1)," pi "\n"        /* pi += incr */
-#define TWO_XADDS_INCR(pi, incr, fence, logp, exit)             	\
-    ONE_XADD_INCR(pi, incr, fence, logp, exit)                  	\
-    ONE_XADD_INCR(pi, incr, fence, logp, exit)
-/* no need for THREE_XADDs */
-/* {{{ expand to define new lengths */
-#define FOUR_XADDS_INCR(pi, incr, fence, logp, exit)     		\
-    TWO_XADDS_INCR(pi, incr, fence, logp, exit)          		\
-    TWO_XADDS_INCR(pi, incr, fence, logp, exit)
-#define EIGHT_XADDS_INCR(pi, incr, fence, logp, exit)    		\
-    FOUR_XADDS_INCR(pi, incr, fence, logp, exit)         		\
-    FOUR_XADDS_INCR(pi, incr, fence, logp, exit)
-#define TWELVE_XADDS_INCR(pi, incr, fence, logp, exit) 			\
-    EIGHT_XADDS_INCR(pi, incr, fence, logp, exit)        		\
-    FOUR_XADDS_INCR(pi, incr, fence, logp, exit)
-#define SIXTEEN_XADDS_INCR(pi, incr, fence, logp, exit)    		\
-    EIGHT_XADDS_INCR(pi, incr, fence, logp, exit)         		\
-    EIGHT_XADDS_INCR(pi, incr, fence, logp, exit)
-/* }}} */
-/* }}} */
-/* {{{ We also have _NOLASTINCR variants. Those are used in the old
- * assembly loop. As a matter of fact, it is not a good idea to optimize
- * like this: we do need the end value of the pointer, and it's really
- * crucially important for the case there I>B. So using these functions
- * is part of the reason why the old code will not do in the longer term.
- */
-#define TWO_XADDS_NOLASTINCR(pi, incr, fence, logp, exit)       	\
-    ONE_XADD_INCR(pi, incr, fence, logp, exit)                  	\
-    ONE_XADD_NOINCR(pi, fence, logp, exit)
-#define FOUR_XADDS_NOLASTINCR(pi, incr, fence, logp, exit)   		\
-    TWO_XADDS_INCR(pi, incr, fence, logp, exit)          		\
-    TWO_XADDS_NOLASTINCR(pi, incr, fence, logp, exit)
-#define TWELVE_XADDS_NOLASTINCR(pi, incr, fence, logp, exit) 		\
-    EIGHT_XADDS_INCR(pi, incr, fence, logp, exit)        		\
-    FOUR_XADDS_NOLASTINCR(pi, incr, fence, logp, exit)
-#define SMALLSIEVE_ASSEMBLY_OLD(pi, incr, fence, logp) do {             \
-    unsigned char *pi_end;                                              \
-    size_t three_p_or_2p;                                               \
-    __asm__ __volatile__ (                                              \
-            "lea (%3,%3,2), %2\n"     /* three_p_or_2p = p_or_2p * 3 */ \
-            "lea (%1,%2,4), %0\n"     /* pi_end = pi + p_or_2p*12 */    \
-            "cmp %5, %0\n"            /* if (pi_end > S1) no loop */    \
-            "jbe 0f\n"                                                  \
-            "1:\n"                                                      \
-            TWELVE_XADDS_INCR("%1","%3","%5","%4","2f")    \
-            "jmp 2f\n"                                                  \
-            ".balign 8\n"                                               \
-            "0:\n"                                                      \
-            TWELVE_ADDS_INCR_PRECOMP("%1","%3","%2","%4")               \
-            "lea (%1,%2,4), %0\n"    /* if (pi+p_or_2p*12 > S1) break */\
-            "cmp %5, %0\n"                                              \
-            "jbe 0b\n"                                                  \
-            "jmp 1b\n"                                                  \
-            ".balign 8\n"                                               \
-            "2:\n"                                                      \
-            : "=&r"(pi_end), "+&r"(pi), "=&r"(three_p_or_2p)            \
-            : "r"(incr), "q"(logp), "r"(fence) : "cc");                 \
-    pi = pi_end;                                                        \
-} while (0)
-/* }}} */
-#if 0 /* {{{ unused GCC trick */
-/* there is technically a way to drop the "volatile" qualifier, so that
- * gcc understands that we're touching memory, and which memory exactly.
- * Such a way can be found in the snippet below.
- * Alas, I don't know how it is possible to do so and at the same time
- * make sure that: 1 - the memory reference that is passed to the inline asm
- * is strictly of the form (%[register]), and 2 - we can actually get the
- * register back, or emit code that is similar to (%[register],%[displ])
- * from there.
- * And anyway, I don't really believe that it's important: this block is
- * really the expensive operation, what happens to the glue around it is
- * less important.
- */
-#define SMALLSIEVE_ASSEMBLY_NEW(S0, pos, incr, fence, logp) do {        \
-    /* see gcc 6.45.2.6 Clobbers */                                     \
-    typedef unsigned char (*ss_area_t)[1<<16];                          \
-    ss_area_t S0x = (ss_area_t) S0;                                     \
-    asm (                                                               \
-            "leaq (%[S0],%[pos]), %[pi]\n"                              \
-            ONE_ADD_INCR("%[pi]","%[inc]", "%[logp]")            \
-            ONE_XADD_INCR("%[pi]", "%[inc]", "%[ff]", "%[logp]", "0f") \
-            ONE_XADD_INCR("%[pi]", "%[inc]", "%[ff]", "%[logp]", "0f") \
-            ONE_XADD_INCR("%[pi]", "%[inc]", "%[ff]", "%[logp]", "0f") \
-            "0:\n"                                                      \
-            : [S0]"=m"(*S0x), [pi]"=&r"(pi)                             \
-            : [pos]"r"(pos),                                            \
-            [inc]"r"(incr), [logp]"q"(logp), [ff] "r" (fence));         \
-} while (0)
-#endif /* }}} */
-/* {{{ asm volatile statements for all the variants */
-/* {{{ unrolled statements, limited length */
-#define SMALLSIEVE_ASSEMBLY_TRAILER(_pi, _incr, _fence, _logp)          \
-            "0:\n"                                                      \
-            : [pi]"+r"(_pi)                                             \
-            : [inc]"r"(_incr), [logp]"q"(_logp), [ff] "r" (_fence)
-#define SMALLSIEVE_ASSEMBLY_NEW_1_TO_2(_pi, _incr, _fence, _logp)       \
-    asm volatile (                                                      \
-            ONE_ADD_INCR("%[pi]","%[inc]","%[logp]")                    \
-            ONE_XADD_INCR("%[pi]","%[inc]","%[ff]","%[logp]","0f")      \
-            SMALLSIEVE_ASSEMBLY_TRAILER(_pi, _incr, _fence, _logp))
-#define SMALLSIEVE_ASSEMBLY_NEW_2_TO_4(_pi, _incr, _fence, _logp)       \
-    asm volatile (                                                      \
-            TWO_ADDS_INCR("%[pi]","%[inc]","%[logp]")                   \
-            TWO_XADDS_INCR("%[pi]","%[inc]","%[ff]","%[logp]","0f") \
-            SMALLSIEVE_ASSEMBLY_TRAILER(_pi, _incr, _fence, _logp))
-#define SMALLSIEVE_ASSEMBLY_NEW_4_TO_8(_pi, _incr, _fence, _logp)       \
-    asm volatile (                                                      \
-            FOUR_ADDS_INCR("%[pi]","%[inc]","%[logp]")                  \
-            FOUR_XADDS_INCR("%[pi]","%[inc]","%[ff]","%[logp]","0f") \
-            SMALLSIEVE_ASSEMBLY_TRAILER(_pi, _incr, _fence, _logp))
-#define SMALLSIEVE_ASSEMBLY_NEW_8_TO_16(_pi, _incr, _fence, _logp)      \
-    asm volatile (                                                      \
-            EIGHT_ADDS_INCR("%[pi]","%[inc]","%[logp]")                 \
-            EIGHT_XADDS_INCR("%[pi]","%[inc]","%[ff]","%[logp]","0f") \
-            SMALLSIEVE_ASSEMBLY_TRAILER(_pi, _incr, _fence, _logp))
-#define SMALLSIEVE_ASSEMBLY_NEW_16_TO_32(_pi, _incr, _fence, _logp)     \
-    asm volatile (                                                      \
-            SIXTEEN_ADDS_INCR("%[pi]","%[inc]","%[logp]")               \
-            SIXTEEN_XADDS_INCR("%[pi]","%[inc]","%[ff]","%[logp]","0f") \
-            SMALLSIEVE_ASSEMBLY_TRAILER(_pi, _incr, _fence, _logp))
-/* this is the point where the complete unrolling starts being excessive */
-#define SMALLSIEVE_ASSEMBLY_NEW_32_TO_64(_pi, _incr, _fence, _logp)     \
-    asm volatile (                                                      \
-            SIXTEEN_ADDS_INCR("%[pi]","%[inc]","%[logp]")               \
-            SIXTEEN_ADDS_INCR("%[pi]","%[inc]","%[logp]")               \
-            SIXTEEN_XADDS_INCR("%[pi]","%[inc]","%[ff]","%[logp]","0f") \
-            SIXTEEN_XADDS_INCR("%[pi]","%[inc]","%[ff]","%[logp]","0f") \
-            SMALLSIEVE_ASSEMBLY_TRAILER(_pi, _incr, _fence, _logp))
-/* }}} */
-/* {{{ loop8 */
-#define SMALLSIEVE_ASSEMBLY_NEW_LOOP8_COMMON(_pi, _incr, _fence, _logp, _PP) \
-    asm volatile (                                                      \
-            "leaq (%[pi], %[inc], 8), %%rdi\n"                          \
-            "cmpq %[ff], %%rdi\n"                                       \
-            "ja 1f\n"           /* if rdi > fence, no loop */           \
-            ".balign 8\n"                                               \
-            "2:\n"                                                      \
-            _PP                                                         \
-            EIGHT_ADDS_INCR("%[pi]","%[inc]","%[logp]")                 \
-            "leaq (%%rdi, %[inc], 8), %%rdi\n"                          \
-            "cmpq %[ff], %%rdi\n"                                       \
-            "jbe 2b\n"                                                  \
-            "1:\n"                                                      \
-            EIGHT_XADDS_INCR("%[pi]","%[inc]","%[ff]","%[logp]","0f")   \
-            SMALLSIEVE_ASSEMBLY_TRAILER(_pi, _incr, _fence, _logp)      \
-            : "rdi")
-#define SMALLSIEVE_ASSEMBLY_NEW_LOOP8(_pi, _incr, _fence, _logp)        \
-        SMALLSIEVE_ASSEMBLY_NEW_LOOP8_COMMON(_pi, _incr, _fence, _logp, \
-                "")
-#define SMALLSIEVE_ASSEMBLY_NEW_LOOP8P0(_pi, _incr, _fence, _logp)      \
-        SMALLSIEVE_ASSEMBLY_NEW_LOOP8_COMMON(_pi, _incr, _fence, _logp, \
-                "prefetch  (%%rdi)\n")
-#define SMALLSIEVE_ASSEMBLY_NEW_LOOP8P1(_pi, _incr, _fence, _logp)      \
-        SMALLSIEVE_ASSEMBLY_NEW_LOOP8_COMMON(_pi, _incr, _fence, _logp, \
-                "prefetch  (%%rdi, %[inc], 8)\n")
-/* }}} */
-/* {{{ loop12 */
-#define SMALLSIEVE_ASSEMBLY_NEW_LOOP12_COMMON(_pi, _incr, _fence, _logp, _PP) \
-    asm volatile (                                                      \
-            "leaq (%[inc], %[inc], 2), %%r10\n"                         \
-            "leaq (%[pi], %%r10, 4), %%rdi\n"                           \
-            "cmpq %[ff], %%rdi\n"                                       \
-            "ja 1f\n"           /* if rdi > fence, no loop */           \
-            ".balign 8\n"                                               \
-            "2:\n"                                                      \
-            _PP                                                         \
-            TWELVE_ADDS_INCR_PRECOMP("%[pi]","%[inc]","%%r10","%[logp]")\
-            "leaq (%%rdi, %%r10, 4), %%rdi\n"                           \
-            "cmpq %[ff], %%rdi\n"                                       \
-            "jbe 2b\n"                                                  \
-            "1:\n"                                                      \
-            TWELVE_XADDS_INCR("%[pi]","%[inc]","%[ff]","%[logp]","0f")  \
-            SMALLSIEVE_ASSEMBLY_TRAILER(_pi, _incr, _fence, _logp)      \
-            : "rdi", "r10")
-#define SMALLSIEVE_ASSEMBLY_NEW_LOOP12(_pi, _incr, _fence, _logp)       \
-        SMALLSIEVE_ASSEMBLY_NEW_LOOP12_COMMON(_pi, _incr, _fence, _logp,\
-                "")
-#define SMALLSIEVE_ASSEMBLY_NEW_LOOP12P0(_pi, _incr, _fence, _logp)     \
-        SMALLSIEVE_ASSEMBLY_NEW_LOOP12_COMMON(_pi, _incr, _fence, _logp,\
-                "prefetch  (%%rdi)\n")
-#define SMALLSIEVE_ASSEMBLY_NEW_LOOP12P1(_pi, _incr, _fence, _logp)    \
-        SMALLSIEVE_ASSEMBLY_NEW_LOOP12_COMMON(_pi, _incr, _fence, _logp,\
-                "prefetch  (%%rdi, %%r10, 4)\n")
-#define SMALLSIEVE_ASSEMBLY_NEW_LOOP12P2(_pi, _incr, _fence, _logp)    \
-        SMALLSIEVE_ASSEMBLY_NEW_LOOP12_COMMON(_pi, _incr, _fence, _logp,\
-                "prefetch  (%%rdi, %%r10, 8)\n")
-/* }}} */
-/* {{{ loop16 */
-#define SMALLSIEVE_ASSEMBLY_NEW_LOOP16_COMMON(_pi, _incr, _fence, _logp, _PP) \
-    asm volatile (                                                      \
-            "leaq (%[pi], %[inc2], 8), %%rdi\n"                         \
-            "cmpq %[ff], %%rdi\n"                                       \
-            "ja 1f\n"           /* if rdi > fence, no loop */           \
-            ".balign 8\n"                                               \
-            "2:\n"                                                      \
-            _PP                                                         \
-            SIXTEEN_ADDS_INCR("%[pi]","%[inc]","%[logp]")               \
-            "leaq (%%rdi, %[inc2], 8), %%rdi\n"                         \
-            "cmpq %[ff], %%rdi\n"                                       \
-            "jbe 2b\n"                                                  \
-            "1:\n"                                                      \
-            SIXTEEN_XADDS_INCR("%[pi]","%[inc]","%[ff]","%[logp]","0f") \
-            SMALLSIEVE_ASSEMBLY_TRAILER(_pi, _incr, _fence, _logp)      \
-            , [inc2]"r"(2*(_incr)) : "rdi")
-#define SMALLSIEVE_ASSEMBLY_NEW_LOOP16(_pi, _incr, _fence, _logp)        \
-        SMALLSIEVE_ASSEMBLY_NEW_LOOP16_COMMON(_pi, _incr, _fence, _logp, \
-                "")
-#define SMALLSIEVE_ASSEMBLY_NEW_LOOP16P0(_pi, _incr, _fence, _logp)      \
-        SMALLSIEVE_ASSEMBLY_NEW_LOOP16_COMMON(_pi, _incr, _fence, _logp, \
-                "prefetch  (%%rdi)\n")
-#define SMALLSIEVE_ASSEMBLY_NEW_LOOP16P1(_pi, _incr, _fence, _logp)      \
-        SMALLSIEVE_ASSEMBLY_NEW_LOOP16_COMMON(_pi, _incr, _fence, _logp, \
-                "prefetch  (%%rdi, %[inc2], 8)\n")
-/*}}}*/
-/* {{{ the routines below are unused. The might be, in case we insist on
- * using the same code for both even and odd lines (but then it would
- * probably be a loop anyway) */
-#define SMALLSIEVE_ASSEMBLY_NEW_0_TO_1(_pi, _incr, _fence, _logp)       \
-    asm volatile (                                                      \
-            ONE_XADD_INCR("%[pi]","%[inc]","%[ff]","%[logp]","0f")      \
-            SMALLSIEVE_ASSEMBLY_TRAILER(_pi, _incr, _fence, _logp))
-#define SMALLSIEVE_ASSEMBLY_NEW_0_TO_2(_pi, _incr, _fence, _logp)       \
-    asm volatile (                                                      \
-            TWO_XADDS_INCR("%[pi]","%[inc]","%[ff]","%[logp]","0f")     \
-            SMALLSIEVE_ASSEMBLY_TRAILER(_pi, _incr, _fence, _logp))
-#define SMALLSIEVE_ASSEMBLY_NEW_1_TO_4(_pi, _incr, _fence, _logp)       \
-    asm volatile (                                                      \
-            ONE_ADD_INCR("%[pi]","%[inc]","%[logp]")                    \
-            TWO_XADDS_INCR("%[pi]","%[inc]","%[ff]","%[logp]","0f")     \
-            ONE_XADD_INCR("%[pi]","%[inc]","%[ff]","%[logp]","0f")      \
-            SMALLSIEVE_ASSEMBLY_TRAILER(_pi, _incr, _fence, _logp)) 
-/*}}}*/
-/*}}}*/
-/* }}} */
-
-/*{{{ function objects for all the routines that we have */
-#define BEGIN_FOBJ(name_)						\
-    struct name_ {							\
-        static constexpr const char * name = # name_;				\
-        inline size_t operator()(					\
-                unsigned char * S0,					\
-                unsigned char * S1,					\
-                size_t x0 MAYBE_UNUSED,					\
-                size_t pos,						\
-                size_t p_or_2p,						\
-                unsigned char logp,					\
-                where_am_I w MAYBE_UNUSED) const			\
-        {								\
-            unsigned char * pi = S0 + pos
-#define END_FOBJ()							\
-    return pi - S1;							\
-}}
-/* {{{ function objects for assembly code */
-BEGIN_FOBJ(assembly_generic_loop8);
-SMALLSIEVE_ASSEMBLY_NEW_LOOP8(pi, p_or_2p, S1, logp);
-END_FOBJ();
-BEGIN_FOBJ(assembly_generic_loop12);
-SMALLSIEVE_ASSEMBLY_NEW_LOOP12(pi, p_or_2p, S1, logp);
-END_FOBJ();
-BEGIN_FOBJ(assembly_generic_loop16);
-SMALLSIEVE_ASSEMBLY_NEW_LOOP16(pi, p_or_2p, S1, logp);
-END_FOBJ();
-BEGIN_FOBJ(assembly_generic_loop8p0);
-SMALLSIEVE_ASSEMBLY_NEW_LOOP8P0(pi, p_or_2p, S1, logp);
-END_FOBJ();
-BEGIN_FOBJ(assembly_generic_loop12p0);
-SMALLSIEVE_ASSEMBLY_NEW_LOOP12P0(pi, p_or_2p, S1, logp);
-END_FOBJ();
-BEGIN_FOBJ(assembly_generic_loop16p0);
-SMALLSIEVE_ASSEMBLY_NEW_LOOP16P0(pi, p_or_2p, S1, logp);
-END_FOBJ();
-BEGIN_FOBJ(assembly_generic_loop8p1);
-SMALLSIEVE_ASSEMBLY_NEW_LOOP8P1(pi, p_or_2p, S1, logp);
-END_FOBJ();
-BEGIN_FOBJ(assembly_generic_loop12p1);
-SMALLSIEVE_ASSEMBLY_NEW_LOOP12P1(pi, p_or_2p, S1, logp);
-END_FOBJ();
-BEGIN_FOBJ(assembly_generic_loop16p1);
-SMALLSIEVE_ASSEMBLY_NEW_LOOP16P1(pi, p_or_2p, S1, logp);
-END_FOBJ();
-BEGIN_FOBJ(assembly_generic_loop12p2);
-SMALLSIEVE_ASSEMBLY_NEW_LOOP12P2(pi, p_or_2p, S1, logp);
-END_FOBJ();
-BEGIN_FOBJ(assembly_generic_oldloop);
-SMALLSIEVE_ASSEMBLY_OLD(pi, p_or_2p, S1, logp);
-END_FOBJ();
-BEGIN_FOBJ(assembly0);
-SMALLSIEVE_ASSEMBLY_NEW_0_TO_1(pi, p_or_2p, S1, logp);
-END_FOBJ();
-BEGIN_FOBJ(assembly1);
-SMALLSIEVE_ASSEMBLY_NEW_1_TO_2(pi, p_or_2p, S1, logp);
-END_FOBJ();
-BEGIN_FOBJ(assembly2);
-SMALLSIEVE_ASSEMBLY_NEW_2_TO_4(pi, p_or_2p, S1, logp);
-END_FOBJ();
-BEGIN_FOBJ(assembly3);
-SMALLSIEVE_ASSEMBLY_NEW_4_TO_8(pi, p_or_2p, S1, logp);
-END_FOBJ();
-BEGIN_FOBJ(assembly4);
-SMALLSIEVE_ASSEMBLY_NEW_8_TO_16(pi, p_or_2p, S1, logp);
-END_FOBJ();
-BEGIN_FOBJ(assembly5);
-SMALLSIEVE_ASSEMBLY_NEW_16_TO_32(pi, p_or_2p, S1, logp);
-END_FOBJ();
-BEGIN_FOBJ(assembly6);
-SMALLSIEVE_ASSEMBLY_NEW_32_TO_64(pi, p_or_2p, S1, logp);
-END_FOBJ();
-/* }}} */
-/* {{{ Function objects for C code, manually unrolled except for the
- * _loop versions. */
-BEGIN_FOBJ(manual0);
-if (pi < S1) { *pi += logp; pi += p_or_2p; }
-END_FOBJ();
-BEGIN_FOBJ(manual1);
-do {
-    *pi += logp; if ((pi += p_or_2p) >= S1) break;
-    *pi += logp; pi += p_or_2p;
-} while (0);
-END_FOBJ();
-BEGIN_FOBJ(manual2);
-do {
-    *pi += logp; pi += p_or_2p;
-    *pi += logp; if ((pi += p_or_2p) >= S1) break;
-    *pi += logp; if ((pi += p_or_2p) >= S1) break;
-    *pi += logp; pi += p_or_2p;
-} while (0);
-END_FOBJ();
-BEGIN_FOBJ(manual3);
-do {
-    *pi += logp; pi += p_or_2p;
-    *pi += logp; pi += p_or_2p;
-    *pi += logp; pi += p_or_2p;
-    *pi += logp; if ((pi += p_or_2p) >= S1) break;
-    *pi += logp; if ((pi += p_or_2p) >= S1) break;
-    *pi += logp; if ((pi += p_or_2p) >= S1) break;
-    *pi += logp; if ((pi += p_or_2p) >= S1) break;
-    *pi += logp; pi += p_or_2p;
-} while (0);
-END_FOBJ();
-BEGIN_FOBJ(manual4);
-do {
-    *pi += logp; pi += p_or_2p;
-    *pi += logp; pi += p_or_2p;
-    *pi += logp; pi += p_or_2p;
-    *pi += logp; pi += p_or_2p;
-    *pi += logp; pi += p_or_2p;
-    *pi += logp; pi += p_or_2p;
-    *pi += logp; pi += p_or_2p;
-    *pi += logp; if ((pi += p_or_2p) >= S1) break;
-    *pi += logp; if ((pi += p_or_2p) >= S1) break;
-    *pi += logp; if ((pi += p_or_2p) >= S1) break;
-    *pi += logp; if ((pi += p_or_2p) >= S1) break;
-    *pi += logp; if ((pi += p_or_2p) >= S1) break;
-    *pi += logp; if ((pi += p_or_2p) >= S1) break;
-    *pi += logp; if ((pi += p_or_2p) >= S1) break;
-    *pi += logp; if ((pi += p_or_2p) >= S1) break;
-    *pi += logp; pi += p_or_2p;
-} while (0);
-END_FOBJ();
-BEGIN_FOBJ(manual_oldloop);
-#define T do {                                                          \
-    WHERE_AM_I_UPDATE(w, x, x0 + pi - S0);                              \
-    sieve_increase (pi, logp, w); pi += p_or_2p;                        \
-} while(0)
-while (UNLIKELY(pi + p_or_2p * 12 <= S1))
-{ T; T; T; T; T; T; T; T; T; T; T; T; }
-do {
-    if (pi >= S1) break; T; if (pi >= S1) break; T;
-    if (pi >= S1) break; T; if (pi >= S1) break; T;
-    if (pi >= S1) break; T; if (pi >= S1) break; T;
-    if (pi >= S1) break; T; if (pi >= S1) break; T;
-    if (pi >= S1) break; T; if (pi >= S1) break; T;
-    if (pi >= S1) break; T; if (pi >= S1) break; T;
-} while (0);
-#undef T
-END_FOBJ();
-BEGIN_FOBJ(manual_oldloop_nounroll);
-for ( ; pi < S1 ; pi += p_or_2p) {
-    WHERE_AM_I_UPDATE(w, x, x0 + pi - S0);
-    sieve_increase (pi, logp, w);
-}
-END_FOBJ();
-/*}}}*/
-/*}}}*/
-
-/* {{{ our selection of best routines indexed by ceil(log2(I/p)) */
-template<int bit> struct best_evenline;
-template<int bit> struct best_oddline ;
-#if defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM) && !defined(TRACK_CODE_PATH)
-template<int bit> struct best_evenline {
-    typedef int is_default;
-    typedef assembly_generic_loop16p0 type;
-};
-template<int bit> struct best_oddline  {
-    typedef int is_default;
-    typedef assembly_generic_loop16p0 type;
-};
-template<> struct best_evenline<1> { typedef manual0 type; };
-template<> struct best_evenline<2> { typedef manual1 type; };
-template<> struct best_evenline<3> { typedef manual2 type; };
-template<> struct best_evenline<4> { typedef assembly3 type; };
-template<> struct best_evenline<5> { typedef assembly4 type; };
-template<> struct best_evenline<6> { typedef assembly5 type; };
-template<> struct best_evenline<7> { typedef assembly_generic_loop12 type; };
-template<> struct best_evenline<8> { typedef assembly_generic_loop12 type; };
-template<> struct best_evenline<9> { typedef assembly_generic_loop12 type; };
-template<> struct best_evenline<10> { typedef assembly_generic_loop12 type; };
-template<> struct best_evenline<11> { typedef assembly_generic_loop12 type; };
-template<> struct best_evenline<12> { typedef assembly_generic_loop12 type; };
-template<> struct best_evenline<13> { typedef assembly_generic_loop16p0 type; };
-template<> struct best_evenline<14> { typedef assembly_generic_loop16p1 type; };
-template<> struct best_evenline<15> { typedef assembly_generic_loop16p0 type; };
-
-template<> struct best_oddline<1> { typedef assembly1 type; };
-template<> struct best_oddline<2> { typedef assembly2 type; };
-template<> struct best_oddline<3> { typedef assembly3 type; };
-template<> struct best_oddline<4> { typedef assembly4 type; };
-template<> struct best_oddline<5> { typedef assembly_generic_loop8 type; };
-template<> struct best_oddline<6> { typedef assembly_generic_loop8 type; };
-template<> struct best_oddline<7> { typedef assembly_generic_loop12 type; };
-template<> struct best_oddline<8> { typedef assembly_generic_loop12 type; };
-template<> struct best_oddline<9> { typedef assembly_generic_loop12 type; };
-template<> struct best_oddline<10> { typedef assembly_generic_loop12 type; };
-template<> struct best_oddline<11> { typedef assembly_generic_loop12 type; };
-template<> struct best_oddline<12> { typedef assembly_generic_loop12 type; };
-template<> struct best_oddline<13> { typedef assembly_generic_loop16p0 type; };
-template<> struct best_oddline<14> { typedef assembly_generic_loop16p1 type; };
-template<> struct best_oddline<15> { typedef assembly_generic_loop16p0 type; };
-/* TODO: we could perhaps provide hints so that the generated code can
- * merge some rounds of the loop. Or maybe the compiler will do that ? */
-#else
-template<int bit> struct best_evenline { typedef manual_oldloop type; };
-template<int bit> struct best_oddline  { typedef manual_oldloop type; };
-#endif
-/* }}} */
+#include "sieve/las-smallsieve-lowlevel.hpp"
 
 
 /******************************************************************/
@@ -1617,6 +1112,21 @@ template<int bit> struct factory_for_bit_round2 {
 };
 
 struct bench_base {
+#define BBLACK(X) "\e[01;30m" X "\e[00;30m"
+#define BRED(X)   "\e[01;31m" X "\e[00;30m"
+#define BGREEN(X) "\e[01;32m" X "\e[00;30m"
+#define BYELLOW(X)"\e[01;33m" X "\e[00;30m"
+#define BBLUE(X)  "\e[01;34m" X "\e[00;30m"
+#define BVIOLET(X)"\e[01;35m" X "\e[00;30m"
+#define BNAVY(X)  "\e[01;36m" X "\e[00;30m"
+#define BLACK(X) "\e[00;30m" X "\e[00;30m"
+#define RED(X)   "\e[00;31m" X "\e[00;30m"
+#define GREEN(X) "\e[00;32m" X "\e[00;30m"
+#define YELLOW(X)"\e[00;33m" X "\e[00;30m"
+#define BLUE(X)  "\e[00;34m" X "\e[00;30m"
+#define VIOLET(X)"\e[00;35m" X "\e[00;30m"
+#define NAVY(X)  "\e[00;36m" X "\e[00;30m"
+
     std::vector<ssp_t> allprimes;
     std::vector<int64_t> positions;
     unsigned char * S;
@@ -1631,9 +1141,11 @@ struct bench_base {
     bench_base(bench_base const &) = delete;
     ~bench_base() { free(S); }
     void test(candidate_list const & cand, const char * pfx="", std::string const& goal="current selection") {
-
+        if (consistency_check_mode) {
+            test_correctness(cand);
+            return;
+        }
         if (cand.empty()) return;
-
         std::vector<unsigned char *> refS;
         size_t I = 1UL << logI;
         int Nmax = 1 << (logA - LOG_BUCKET_REGION);
@@ -1678,21 +1190,6 @@ struct bench_base {
         }
         printf("\n");
 
-#define BBLACK(X) "\e[01;30m" X "\e[00;30m"
-#define BRED(X)   "\e[01;31m" X "\e[00;30m"
-#define BGREEN(X) "\e[01;32m" X "\e[00;30m"
-#define BYELLOW(X)"\e[01;33m" X "\e[00;30m"
-#define BBLUE(X)  "\e[01;34m" X "\e[00;30m"
-#define BVIOLET(X)"\e[01;35m" X "\e[00;30m"
-#define BNAVY(X)  "\e[01;36m" X "\e[00;30m"
-#define BLACK(X) "\e[00;30m" X "\e[00;30m"
-#define RED(X)   "\e[00;31m" X "\e[00;30m"
-#define GREEN(X) "\e[00;32m" X "\e[00;30m"
-#define YELLOW(X)"\e[00;33m" X "\e[00;30m"
-#define BLUE(X)  "\e[00;34m" X "\e[00;30m"
-#define VIOLET(X)"\e[00;35m" X "\e[00;30m"
-#define NAVY(X)  "\e[00;36m" X "\e[00;30m"
-
         size_t best_index = std::min_element(timings.begin(), timings.end()) - timings.begin();
         double best_time = timings[best_index];
         if (sel_index >= 0) {
@@ -1703,7 +1200,7 @@ struct bench_base {
                 double tt = timings[index];
                 bool is_best = index == best_index;
                 bool near_best = tt <= 1.05 * best_time;
-                printf("%s%-24s:\t%.3f\t", pfx, bf.name, tt);
+                printf("%s%-26s:\t%.3f\t", pfx, bf.name, tt);
                 if (bf.sel) {
                     if (sel_best) {
                         printf(BGREEN("%s") "\n", goal.c_str());
@@ -1747,6 +1244,89 @@ struct bench_base {
         for(unsigned char * Sp : refS)
             free(Sp);
     }
+
+    /* This one has the loop order reversed. We're no longer testing
+     * speed, we're checking correctness.
+     */
+    bool test_correctness(candidate_list const & cand) {
+        if (cand.empty()) return true;
+        if (cand.size()==1) {
+            fprintf(stderr, "warning, %s is the only function we have, there's nothing to check againts...\n", cand.front().name);
+            return true;
+        }
+        size_t I = 1UL << logI;
+        int Nmax = 1 << (logA - LOG_BUCKET_REGION);
+
+        for(auto const & ssp : allprimes)
+            positions.push_back((I/2)%ssp.get_p());
+
+        std::vector<unsigned char *> refS;
+        std::vector<std::vector<int64_t>> refpos;
+        for(size_t i = 0 ; i < cand.size() ; i++) {
+            unsigned char * Scopy;
+            posix_memalign((void**)&Scopy, B, B);
+            refS.push_back(Scopy);
+            /* make a copy */
+            refpos.push_back(positions);
+        }
+        printf("\n");
+        printf("Testing all %d buckets (logA=%d, logB=%d, logI=%d) for functions:\n",
+                Nmax, logA, LOG_BUCKET_REGION, logI);
+        for(auto const& bf : cand)
+            printf("  %s\n", bf.name);
+        bool ok=true;
+        std::vector<bool> ok_perfunc (cand.size(), true);
+        int ndisp = 1;
+        for(int N = 0 ; N < Nmax ; N++) {
+            for(auto const& bf : cand) {
+                size_t index = &bf-&cand.front();
+                ss_func f = bf.f;
+                memset(S, 0, B);
+                (*f)(refpos[index], allprimes, S, logI, N);
+                memcpy(refS[index], S, B);
+                if (!ok_perfunc[index]) continue;
+                if (index > 0) {
+                    if (memcmp(S, refS.front(), B) != 0) {
+                        ok = ok_perfunc[index] = false;
+                        fprintf(stderr, "bucket %d: inconsistency between %s and %s\n",
+                                N, bf.name, cand.front().name);
+                        for(size_t i = 0, n = 0 ; i < B && n < 16 ; i++) {
+                            if (S[i] != refS.front()[i]) {
+                                fprintf(stderr, "%04x: %02x != %02x\n",
+                                        (unsigned int) i,
+                                        (unsigned int) S[i],
+                                        (unsigned int) refS.front()[i]);
+                                n++;
+                            }
+                        }
+                    }
+                    if (refpos[index] != refpos.front()) {
+                        ok = ok_perfunc[index] = false;
+                        fprintf(stderr, "bucket %d: inconsistency in post-sieve positions between %s and %s\n",
+                                N, bf.name, cand.front().name);
+                        for(size_t i = 0, n = 0 ; i < allprimes.size() && n < 16 ; i++) {
+                            if (refpos[index][i] != refpos.front()[i]) {
+                                fprintf(stderr, "p=%u r=%u ;"
+                                        " %" PRId64 "!=%" PRId64 "\n",
+                                        allprimes[i].get_p(),
+                                        allprimes[i].get_r(),
+                                        refpos[index][i],
+                                        refpos.front()[i]);
+                                n++;
+                            }
+                        }
+                    }
+                }
+            }
+            for( ; (N+1)*16 >= (ndisp * Nmax) ; ndisp++) {
+                printf(".");
+                fflush(stdout);
+            }
+        }
+        for(unsigned char * Sp : refS)
+            free(Sp);
+        return ok;
+    }
 };
 
 void store_primes(std::vector<ssp_t>& allprimes, int bmin, int bmax, gmp_randstate_t rstate)
@@ -1780,6 +1360,10 @@ int main(int argc, char * argv[])
             continue;
         }
 #endif
+        if (strcmp(*argv, "-C") == 0) {
+            consistency_check_mode = true;
+            continue;
+        }
         if (strcmp(*argv, "-I") == 0) {
             logI = atoi(argv[1]);
             argv++,argc--;
