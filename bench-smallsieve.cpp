@@ -596,7 +596,7 @@ template<> struct best_evenline<2> { typedef manual1 type; };
 template<> struct best_evenline<3> { typedef manual2 type; };
 template<> struct best_evenline<4> { typedef assembly3 type; };
 template<> struct best_evenline<5> { typedef assembly4 type; };
-template<> struct best_evenline<6> { typedef assembly5 type; };
+template<> struct best_evenline<6> { typedef assembly_generic_loop8 type; };
 template<> struct best_evenline<7> { typedef assembly_generic_loop12 type; };
 template<> struct best_evenline<8> { typedef assembly_generic_loop12 type; };
 template<> struct best_evenline<9> { typedef assembly_generic_loop12 type; };
@@ -607,7 +607,7 @@ template<> struct best_evenline<13> { typedef assembly_generic_loop16 type; };
 
 template<> struct best_oddline<1> { typedef assembly1 type; };
 template<> struct best_oddline<2> { typedef assembly2 type; };
-template<> struct best_oddline<3> { typedef manual3 type; };
+template<> struct best_oddline<3> { typedef assembly3 type; };
 template<> struct best_oddline<4> { typedef assembly4 type; };
 template<> struct best_oddline<5> { typedef assembly_generic_loop8 type; };
 template<> struct best_oddline<6> { typedef assembly_generic_loop8 type; };
@@ -1582,7 +1582,10 @@ struct bench_base {
                     } else if (sel_tied) {
                         printf(GREEN("%s, tied") "\n", goal.c_str());
                     } else {
-                        printf(BRED("%s, wrong ?") "\n", goal.c_str());
+                        printf(BRED("%s, wrong (+%.1f%%)?") "\n",
+                                goal.c_str(),
+                                100.0*(timings[sel_index]/best_time-1)
+                                );
                     }
                 } else if (is_best && !sel_best) {
                     if (sel_tied) {
