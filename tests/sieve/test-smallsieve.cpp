@@ -73,6 +73,7 @@ int consistency_check_mode = 0;
 int interleaving = 1;   /* number of threads */
 int quiet = 0;
 int abort_on_fail = 0;
+int only_complete_functions = 0;
 
 /* this is really a mock structure just for the fun of it. */
 struct {
@@ -229,7 +230,7 @@ static inline size_t sieve_full_line_new(unsigned char * S0, unsigned char * S1,
     return pi - S1;
 }
 
-void current_I18_branch(std::vector<int64_t> & positions, std::vector<ssp_t> primes, unsigned char * S, int logI, unsigned int N) /* {{{ */
+void current_I18_branch(std::vector<int64_t> & positions, std::vector<ssp_t> const& primes, unsigned char * S, int logI, unsigned int N) /* {{{ */
 {
     SMALLSIEVE_COMMON_DEFS();
     ASSERT_ALWAYS(positions.size() == primes.size());
@@ -338,7 +339,7 @@ void current_I18_branch(std::vector<int64_t> & positions, std::vector<ssp_t> pri
         p_pos = pos;
     }
 }/*}}}*/
-void modified_I18_branch_C(std::vector<int64_t> & positions, std::vector<ssp_t> primes, unsigned char * S, int logI, unsigned int N) /* {{{ */
+void modified_I18_branch_C(std::vector<int64_t> & positions, std::vector<ssp_t> const& primes, unsigned char * S, int logI, unsigned int N) /* {{{ */
 {
     SMALLSIEVE_COMMON_DEFS();
     ASSERT_ALWAYS(positions.size() == primes.size());
@@ -391,7 +392,7 @@ void modified_I18_branch_C(std::vector<int64_t> & positions, std::vector<ssp_t> 
         p_pos = pos;
     }
 }/*}}}*/
-void legacy_branch(std::vector<int64_t> & positions, std::vector<ssp_t> primes, unsigned char * S, int logI, unsigned int N) /*{{{*/
+void legacy_branch(std::vector<int64_t> & positions, std::vector<ssp_t> const& primes, unsigned char * S, int logI, unsigned int N) /*{{{*/
 {
     SMALLSIEVE_COMMON_DEFS();
     const unsigned long bucket_region = (1UL << LOG_BUCKET_REGION);
@@ -485,7 +486,7 @@ j_odd:
     }
 }
 /*}}}*/
-void devel_branch(std::vector<int64_t> & positions, std::vector<ssp_t> primes, unsigned char * S, int logI, unsigned int N) /*{{{*/
+void devel_branch(std::vector<int64_t> & positions, std::vector<ssp_t> const& primes, unsigned char * S, int logI, unsigned int N) /*{{{*/
 {
     SMALLSIEVE_COMMON_DEFS();
     ASSERT_ALWAYS(positions.size() == primes.size());
@@ -507,11 +508,20 @@ void devel_branch(std::vector<int64_t> & positions, std::vector<ssp_t> primes, u
          * (i1-i0) is different from I, we'll break anyway. So
          * whether we add I or (i1-i0) to S0 does not matter much.
          */
+        /* TODO: sublat !!!! j actually corresponds to row S(j), with
+         * S(j)=sublatm*j + sublatj0. Therefore:
+         *  - j0&1 == 0 is not sufficient to tell the parity of S(j)
+         *  - if sublatm is even, we not every other line is even (resp.
+         *    odd).
+         *  - if sublatm is even, we should actually take advantage of
+         *    it, and run specific code, probably at the outer loop
+         *    level.
+         */
         if (j0 & 1)
             goto j_odd_devel;
 
         for( ; j < j1 ; ) {
-            /* for j even, we sieve only odd pi, so step = 2p. */
+            /* for S(j) even, we sieve only odd pi, so step = 2p. */
             {
             int xpos = ((si.conf.sublat.i0 + pos) & 1) ? pos : (pos+p);
             overrun = sieve_full_line_new_half(S0, S0 + (i1 - i0), S0 - S,
@@ -522,7 +532,7 @@ void devel_branch(std::vector<int64_t> & positions, std::vector<ssp_t> primes, u
             if (++j >= j1) break;
 
 j_odd_devel:
-            /* now j odd again */
+            /* now S(j) odd again */
             WHERE_AM_I_UPDATE(w, j, j - j0);
             overrun = sieve_full_line_new(S0, S0 + (i1 - i0), S0 - S,
                     pos, p, logp, w);
@@ -590,7 +600,262 @@ j_odd_devel:
     }
 }
 /*}}}*/
-template<typename even_code, typename odd_code> void devel_branch_meta(std::vector<int64_t> & positions, std::vector<ssp_t> primes, unsigned char * S, int logI, unsigned int N) /*{{{*/
+
+template<typename T, typename U, int b, typename F> struct choice_list_car {};
+
+struct small_sieve_routine_base {
+    /* we have here the context that is common to a small sieve routine.
+     * */
+    std::vector<int64_t> & positions;
+    std::vector<ssp_t> const& primes;
+    unsigned char * S;
+    int logI;
+    unsigned int N;
+    small_sieve_routine_base() = delete;
+    small_sieve_routine_base(small_sieve_routine_base const&) = delete;
+    /* for some reason I cannot see the default constructor with
+     * braced-init-lists, that looks weird. Let's move on anyway.
+     */
+    small_sieve_routine_base(std::vector<int64_t>& positions,
+            std::vector<ssp_t> const & primes,
+            unsigned char*& S, int& logI,
+            unsigned int& N) : positions(positions), primes(primes), S(S), logI(logI), N(N) {}
+};
+struct small_sieve_routine : public small_sieve_routine_base {
+    const unsigned int log_lines_per_region;
+    const unsigned int log_regions_per_line;
+    const unsigned int regions_per_line;
+    const unsigned int region_rank_in_line;
+    const bool last_region_in_line;
+    const unsigned int j0;
+    const unsigned int j1;
+    const int I;
+    const int i0;
+    const int i1;
+    // const int row0_is_oddj;
+    const bool has_haxis;
+    const bool has_vaxis;
+    const bool has_origin;
+    size_t index = 0;
+
+    small_sieve_routine() = delete;
+    small_sieve_routine(small_sieve_routine const &) = delete;
+
+    template<typename... T>
+    small_sieve_routine(T&&... args) : small_sieve_routine_base(args...),
+        log_lines_per_region    (MAX(0,LOG_BUCKET_REGION-logI)),
+        log_regions_per_line    (MAX(0,logI-LOG_BUCKET_REGION)),
+        regions_per_line        (1<<log_regions_per_line),
+        region_rank_in_line     (N&(regions_per_line-1)),
+        last_region_in_line     (region_rank_in_line==(regions_per_line-1)),
+        j0      ((N>>log_regions_per_line)<<log_lines_per_region),
+        j1      (j0+(1<<log_lines_per_region)),
+        I       (1<<logI),
+        i0      ((region_rank_in_line<<LOG_BUCKET_REGION)-I/2),
+        i1      (i0+(1<<MIN(LOG_BUCKET_REGION,logI))),
+        // row0_is_oddj    ((j0*sublatm+sublatj0)&1),
+        has_haxis       (!j0),
+        has_vaxis       (region_rank_in_line==((regions_per_line-1)/2)),
+        has_origin      (has_haxis&&has_vaxis)
+    {
+        ASSERT_ALWAYS(positions.size() == primes.size());
+    }
+
+    bool finished() const { return index == primes.size(); }
+    void handle_special(ssp_t const & ssp MAYBE_UNUSED, int64_t & p_pos MAYBE_UNUSED) {
+        /* TODO: projective and so on */
+    }
+    /* This function is responsible for small-sieving primes of a
+     * specific bit size */
+    template<typename even_code, typename odd_code, int bits_off>
+        void handle_nice_primes() /* {{{ */
+    {
+        for( ; index < primes.size() ; index++) {
+            ssp_t const & ssp(primes[index]);
+            int64_t & p_pos(positions[index]);
+
+            /* TODO
+            if (!ssp.is_nice()) {
+                handle_special(ssp, p_pos);
+                index++;
+                continue;
+            }
+            */
+            const fbprime_t p = ssp.get_p();
+            if (bits_off && (p >> (MIN(LOG_BUCKET_REGION,logI) + 1 - bits_off))) {
+                /* time to move on to the next bit size;
+                 */
+                return;
+            }
+
+            int pos = p_pos;
+
+            const fbprime_t r = ssp.get_r();
+            const unsigned char logp = ssp.logp;
+            unsigned char * S0 = S;
+            where_am_I w MAYBE_UNUSED = 0;
+
+            size_t overrun = 0; /* tame gcc */
+            unsigned int j = j0;
+
+            /* we sieve over the area [S0..S0+(i1-i0)], which may
+             * actually be just a fragment of a line. After that, if
+             * (i1-i0) is different from I, we'll break anyway. So
+             * whether we add I or (i1-i0) to S0 does not matter much.
+             */
+            /* TODO: sublat !!!! j actually corresponds to row S(j), with
+             * S(j)=sublatm*j + sublatj0. Therefore:
+             *  - j0&1 == 0 is not sufficient to tell the parity of S(j)
+             *  - if sublatm is even, we not every other line is even (resp.
+             *    odd).
+             *  - if sublatm is even, we should actually take advantage of
+             *    it, and run specific code, probably at the outer loop
+             *    level.
+             */
+            if (j0 & 1)
+                goto j_odd_devel;
+
+            for( ; j < j1 ; ) {
+                /* for j even, we sieve only odd pi, so step = 2p. */
+                {
+                int xpos = ((si.conf.sublat.i0 + pos) & 1) ? pos : (pos+p);
+                overrun = even_code()(S0, S0 + (i1 - i0), S0 - S, xpos, p+p, logp, w);
+                }
+                S0 += I;
+                pos += r; if (pos >= (int) p) pos -= p; 
+                if (++j >= j1) break;
+
+    j_odd_devel:
+                /* now j odd again */
+                WHERE_AM_I_UPDATE(w, j, j - j0);
+                overrun = odd_code()(S0, S0 + (i1 - i0), S0 - S, pos, p, logp, w);
+                S0 += I;
+                pos += r; if (pos >= (int) p) pos -= p;
+                ++j;
+            }
+            if (logI > LOG_BUCKET_REGION) {
+                /* quick notes for incremental adjustment in case I>B (B =
+                 * LOG_BUCKET_REGION).
+                 *
+                 * Let q = 2^(I-B).
+                 * Let N = a*q+b, and N'=N+interleaving=a'*q+b' ; N' is the
+                 * next bucket region we'll handle.
+                 *
+                 * Let interleaving = u*q+v
+                 *
+                 * The row increase is dj = (N' div q) - (N div q) = a'-a
+                 * The fragment increase is di = (N' mod q) - (N mod q) = b'-b
+                 *
+                 * Of course we have -q < b'-b < q
+                 *
+                 * dj can be written as (N'-N-(b'-b)) div q, which is an
+                 * exact division. we rewrite that as:
+                 *
+                 * dj = u + (v - (b'-b)) div q
+                 *
+                 * where the division is again exact. Now (v-(b'-b))
+                 * satisfies:
+                 * -q < v-(b'-b) < 2*q-1
+                 *
+                 * so that the quotient may only be 0 or 1.
+                 *
+                 * It is 1 if and only if v >= q + b'-b, which sounds like a
+                 * reasonable thing to check.
+                 */
+                /* available stuff, for computing the next position:
+                 * p_pos was the position of the first hit on the first line
+                 *       in this bucket.
+                 * pos is the position of the first hit on the next line just
+                 *       above this bucket (possibly +p if we just sieved an
+                 *       even line -- this is a catch, by the way).
+                 * overrun is the position of the first hit on the last line
+                 *       a bucket that would be on the right of this one
+                 *       (even if we're at the end of a line of buckets. In
+                 *       effect, (overrun-p_pos) is congruent to B mod p when
+                 *       the bucket is a single line fragment of size B.
+                 */
+                int N1 = N + interleaving;
+                int Q = logI - LOG_BUCKET_REGION;
+                int dj = (N1>>Q) - j0;
+                int di = (N1&((1<<Q)-1)) - (N&((1<<Q)-1));
+                /* Note that B_mod p is not reduced. It may be <0, and
+                 * may also be >= p if we sieved with 2p because of even j
+                 *
+                 * (0 <= overrun < 2p), and (0 <= pos < p), so -p < B_mod_p < 2p
+                 */
+                int B_mod_p = overrun - p_pos;
+                /* FIXME: we may avoid some of the cost for the modular
+                 * reduction, here. Having a mod operation in this place
+                 * seems to be a fairly terrible idea.
+                 *
+                 * dj is either always the same thing, or that same thing +1.
+                 * di is within a small interval (albeit a centered one).
+                 * 
+                 * It seems feasible to get by with a fixed number of
+                 * conditional subtractions.
+                 */
+                pos = (p_pos + B_mod_p * di + dj * r) % p;
+                if (pos < 0) pos += p;
+            } else {
+                /* skip stride */
+                pos += ssp.get_offset();
+                if (pos >= (int) p) pos -= p;
+            }
+
+            p_pos = pos;
+        }
+    } /* }}} */
+
+    /* we'll now craft all the specific do_it functions into one big
+     * function. Because we're playing tricks with types and lists of
+     * types and such, we need to work with partial specializations at
+     * the class level, which is admittedly messy. */
+    template<typename T>
+        struct do_it
+        {
+            void operator()(small_sieve_routine & SS) {
+                /* default, should be at end of list. We require that we
+                 * are done processing, at this point. */
+                ASSERT_ALWAYS(SS.finished());
+            }
+        };
+
+    /* optimization: do not split into pieces when we have several times
+     * the same code anyway. */
+    template<typename E0, typename O0, int b0, int b1, typename T>
+        struct do_it<choice_list_car<E0,O0,b0,
+                     choice_list_car<E0,O0,b1,
+                    T>>>
+        {
+            static_assert(b0 > b1);
+            void operator()(small_sieve_routine & SS) {
+                SS.handle_nice_primes<E0, O0, b1>();
+                do_it<T>()(SS);
+            }
+        };
+    template<typename E0, typename O0, int b0, typename T>
+        struct do_it<choice_list_car<E0,O0,b0,T>>
+        {
+            void operator()(small_sieve_routine & SS) {
+                SS.handle_nice_primes<E0, O0, b0>();
+                do_it<T>()(SS);
+            }
+        };
+};
+
+template<int b> struct make_best_choice_list {
+    typedef choice_list_car<
+        typename best_evenline<b>::type,
+                 typename best_oddline<b>::type,
+                 b,
+                 typename make_best_choice_list<b-1>::type> type;
+};
+template<> struct make_best_choice_list<-1> {
+    typedef list_nil type;
+};
+
+
+template<typename even_code, typename odd_code> void devel_branch_meta(std::vector<int64_t> & positions, std::vector<ssp_t> const& primes, unsigned char * S, int logI, unsigned int N) /*{{{*/
 {
     SMALLSIEVE_COMMON_DEFS();
     ASSERT_ALWAYS(positions.size() == primes.size());
@@ -611,6 +876,15 @@ template<typename even_code, typename odd_code> void devel_branch_meta(std::vect
          * actually be just a fragment of a line. After that, if
          * (i1-i0) is different from I, we'll break anyway. So
          * whether we add I or (i1-i0) to S0 does not matter much.
+         */
+        /* TODO: sublat !!!! j actually corresponds to row S(j), with
+         * S(j)=sublatm*j + sublatj0. Therefore:
+         *  - j0&1 == 0 is not sufficient to tell the parity of S(j)
+         *  - if sublatm is even, we not every other line is even (resp.
+         *    odd).
+         *  - if sublatm is even, we should actually take advantage of
+         *    it, and run specific code, probably at the outer loop
+         *    level.
          */
         if (j0 & 1)
             goto j_odd_devel;
@@ -706,8 +980,15 @@ j_odd_devel:
     }
 }/*}}}*/
 
+void generated(std::vector<int64_t> & positions, std::vector<ssp_t> const & primes, unsigned char * S, int logI, unsigned int N) /*{{{*/
+{
+    small_sieve_routine SS(positions, primes, S, logI, N);
+    small_sieve_routine::do_it<make_best_choice_list<12>::type>()(SS);
+}
+/*}}}*/
+
 struct cand_func {
-    typedef void (*ss_func)(std::vector<int64_t> & positions, std::vector<ssp_t> primes, unsigned char * S, int logI, unsigned int N);
+    typedef void (*ss_func)(std::vector<int64_t> & positions, std::vector<ssp_t> const& primes, unsigned char * S, int logI, unsigned int N);
     bool sel;
     ss_func f;
     const char * name;
@@ -1007,6 +1288,7 @@ void declare_usage(cxx_param_list & pl)
 #endif
     param_list_decl_usage(pl, "bmin",  "restrict test or timings to primes >= 2^bmin (i.e. (bmin+1)-bit primes)");
     param_list_decl_usage(pl, "bmax",  "restrict test or timings to primes < 2^bmax (i.e. up to bmax-bit primes)");
+    param_list_decl_usage(pl, "only-complete-functions",  "restrict to testing the complete small sieve functions");
 }
 
 int main(int argc0, char * argv0[])
@@ -1023,6 +1305,7 @@ int main(int argc0, char * argv0[])
     param_list_configure_switch(pl, "-q", &quiet);
     param_list_configure_switch(pl, "-C", &consistency_check_mode);
     param_list_configure_switch(pl, "-F", &abort_on_fail);
+    param_list_configure_switch(pl, "--only-complete-functions", &only_complete_functions);
     argv++, argc--;
     for( ; argc ; ) {
         if (param_list_update_cmdline(pl, &argc, &argv)) { continue; }
@@ -1054,68 +1337,70 @@ int main(int argc0, char * argv0[])
 
     int errors = 0;
 
-    // std::vector<std::pair<size_t, size_t>> bounds_perbit(logI + 1, {0,0});
-    for(int b = bmin ; b < bmax ; b++) {
-        if (b == 0) continue;
+    if (!only_complete_functions) {
+        // std::vector<std::pair<size_t, size_t>> bounds_perbit(logI + 1, {0,0});
+        for(int b = bmin ; b < bmax ; b++) {
+            if (b == 0) continue;
 #if 0
-        /* primes within [1<<b, 1<<(b+1)] are (b+1)-bit primes. With respect to the
-         * semantics that we use in the template code, those are counted as
-         * (logI-bit) off the bound. So they will use the code in
-         * all_candidates_for_evenline<logI-bit> and
-         * all_candidates_for_oddline<logI-bit>.
-         */
-        size_t i0 = 0;
-        for( ; i0 < allprimes.size() && !(allprimes[i0].get_p() >> b) ; i0++);
-        size_t i1 = i0;
-        for( ; i1 < allprimes.size() && (allprimes[i1].get_p() >> b) ; i1++);
-        bounds_perbit[b] = { i0, i1 };
+            /* primes within [1<<b, 1<<(b+1)] are (b+1)-bit primes. With respect to the
+             * semantics that we use in the template code, those are counted as
+             * (logI-bit) off the bound. So they will use the code in
+             * all_candidates_for_evenline<logI-bit> and
+             * all_candidates_for_oddline<logI-bit>.
+             */
+            size_t i0 = 0;
+            for( ; i0 < allprimes.size() && !(allprimes[i0].get_p() >> b) ; i0++);
+            size_t i1 = i0;
+            for( ; i1 < allprimes.size() && (allprimes[i1].get_p() >> b) ; i1++);
+            bounds_perbit[b] = { i0, i1 };
 #endif
-        int logfill = std::min(logI, LOG_BUCKET_REGION);
+            int logfill = std::min(logI, LOG_BUCKET_REGION);
 
-        printf("===== now doing specific tests for %d-bit primes using candidates<%d> =====\n", b+1, logfill-b);
-        bench_base bbase(LOG_BUCKET_REGION, logI, logA);
-        // std::vector<ssp_t>& allprimes(bbase.allprimes);
-        // std::vector<int64_t>& positions(bbase.positions);
-        // unsigned char * & S (bbase.S);
-        store_primes(bbase.allprimes, b, b + 1, rstate);
+            printf("===== now doing specific tests for %d-bit primes using candidates<%d> =====\n", b+1, logfill-b);
+            bench_base bbase(LOG_BUCKET_REGION, logI, logA);
+            // std::vector<ssp_t>& allprimes(bbase.allprimes);
+            // std::vector<int64_t>& positions(bbase.positions);
+            // unsigned char * & S (bbase.S);
+            store_primes(bbase.allprimes, b, b + 1, rstate);
 
 
-        // std::vector<ssp_t> lp(allprimes.begin() + i0, allprimes.begin() + i1);
-        // std::vector<int64_t>& lx(positions.begin() + i0, positions.begin() + i1);
-        candidate_list cand1, cand2;
+            // std::vector<ssp_t> lp(allprimes.begin() + i0, allprimes.begin() + i1);
+            // std::vector<int64_t>& lx(positions.begin() + i0, positions.begin() + i1);
+            candidate_list cand1, cand2;
 
-        switch(logfill-b) {
-#define CASE(xxx)							\
-            case xxx:							\
-                factory_for_bit_round1<xxx>()(cand1);	\
-                factory_for_bit_round2<xxx>()(cand2);	\
+            switch(logfill-b) {
+#define CASE(xxx)						\
+                case xxx:					\
+                        factory_for_bit_round1<xxx>()(cand1);	\
+                        factory_for_bit_round2<xxx>()(cand2);	\
                 break
-            CASE(1); CASE(2); CASE(3); CASE(4);
-            CASE(5); CASE(6); CASE(7); CASE(8);
-            CASE(9); CASE(10); CASE(11); CASE(12);
-            CASE(13); CASE(14); CASE(15);
-            default:
-            if (logfill <= b) {
-                factory_for_bit_round1<0>()(cand1);
-                factory_for_bit_round2<0>()(cand2);
-            } else {
-                fprintf(stderr, "sorry, not handled\n");
+                CASE(1); CASE(2); CASE(3); CASE(4);
+                CASE(5); CASE(6); CASE(7); CASE(8);
+                CASE(9); CASE(10); CASE(11); CASE(12);
+                CASE(13); CASE(14); CASE(15);
+                default:
+                if (logfill <= b) {
+                    factory_for_bit_round1<0>()(cand1);
+                    factory_for_bit_round2<0>()(cand2);
+                } else {
+                    fprintf(stderr, "sorry, not handled\n");
+                }
             }
-        }
 
-        std::vector<unsigned char *> refS;
+            std::vector<unsigned char *> refS;
 
-        if (!cand1.empty()) {
-            std::ostringstream goal_name;
-            goal_name << "best_oddline<" << logfill-b << ">";
-            printf("  testing odd lines ");
-            errors += !bbase.test(cand1, "    ", goal_name.str());
-        }
-        if (!cand2.empty()) {
-            std::ostringstream goal_name;
-            goal_name << "best_evenline<" << logfill-b << ">";
-            printf("  testing even lines ");
-            errors += !bbase.test(cand2, "    ", goal_name.str());
+            if (!cand1.empty()) {
+                std::ostringstream goal_name;
+                goal_name << "best_oddline<" << logfill-b << ">";
+                printf("  testing odd lines ");
+                errors += !bbase.test(cand1, "    ", goal_name.str());
+            }
+            if (!cand2.empty()) {
+                std::ostringstream goal_name;
+                goal_name << "best_evenline<" << logfill-b << ">";
+                printf("  testing even lines ");
+                errors += !bbase.test(cand2, "    ", goal_name.str());
+            }
         }
     }
 
@@ -1131,6 +1416,7 @@ int main(int argc0, char * argv0[])
             // modified_I18_branch_C,
                 { false, current_I18_branch, "I18" },
                 { false, devel_branch, "devel" },
+                { false, generated, "devel-meta" },
         };
 
         if (logI <= LOG_BUCKET_REGION)
