@@ -10,6 +10,7 @@
 #include <vector>
 #include <sstream>
 #include <algorithm>
+#include "utils.h"
 #include "macros.h"
 
 #define xxxLOG_BUCKET_REGION_IS_A_CONSTANT
@@ -68,9 +69,10 @@ struct ssp_t {
 int LOG_BUCKET_REGION = 16;
 #endif
 
-bool consistency_check_mode = false;
+int consistency_check_mode = 0;
 int interleaving = 1;   /* number of threads */
-bool quiet = false;
+int quiet = 0;
+int abort_on_fail = 0;
 
 /* this is really a mock structure just for the fun of it. */
 struct {
@@ -813,6 +815,7 @@ struct bench_base {
                             n++;
                         }
                     }
+                    if (abort_on_fail) abort();
                 }
             }
             unsigned char * Scopy;
@@ -933,6 +936,7 @@ struct bench_base {
                                 n++;
                             }
                         }
+                        if (abort_on_fail) abort();
                     }
                     if (refpos[index] != refpos.front()) {
                         ok = ok_perfunc[index] = false;
@@ -949,6 +953,7 @@ struct bench_base {
                                 n++;
                             }
                         }
+                        if (abort_on_fail) abort();
                     }
                 }
             }
@@ -980,52 +985,51 @@ void store_primes(std::vector<ssp_t>& allprimes, int bmin, int bmax, gmp_randsta
     mpz_clear(pz);
 }
 
-int main(int argc, char * argv[])
+void declare_usage(cxx_param_list & pl)
+{
+    param_list_decl_usage(pl, "q",  "quiet mode (for tests, mostly)");
+    param_list_decl_usage(pl, "C",  "run tests, not timings");
+    param_list_decl_usage(pl, "F",  "abort on test failure");
+    param_list_decl_usage(pl, "I",  "set logI (default = 16)");
+    param_list_decl_usage(pl, "A",  "set logA (default = 2*logI-1)");
+#ifndef LOG_BUCKET_REGION_IS_A_CONSTANT
+    param_list_decl_usage(pl, "B",  "set LOG_BUCKET_REGION (default = 16)");
+#endif
+    param_list_decl_usage(pl, "bmin",  "restrict test or timings to primes >= 2^bmin (i.e. (bmin+1)-bit primes)");
+    param_list_decl_usage(pl, "bmax",  "restrict test or timings to primes < 2^bmax (i.e. up to bmax-bit primes)");
+}
+
+int main(int argc0, char * argv0[])
 {
     int logI = 16;
     int logA = 0;
     int bmin = 0;
     int bmax = 0;
-    argv++,argc--;
-    for( ; argc ; argv++, argc--) {
-#ifndef LOG_BUCKET_REGION_IS_A_CONSTANT
-        if (strcmp(*argv, "-B") == 0) {
-            LOG_BUCKET_REGION = atoi(argv[1]);
-            argv++,argc--;
-            continue;
-        }
-#endif
-        if (strcmp(*argv, "-q") == 0) {
-            quiet = true;
-            continue;
-        }
-        if (strcmp(*argv, "-C") == 0) {
-            consistency_check_mode = true;
-            continue;
-        }
-        if (strcmp(*argv, "-I") == 0) {
-            logI = atoi(argv[1]);
-            argv++,argc--;
-            continue;
-        }
-        if (strcmp(*argv, "-A") == 0) {
-            logA = atoi(argv[1]);
-            argv++,argc--;
-            continue;
-        }
-        if (strcmp(*argv, "-bmax") == 0) {
-            bmax = atoi(argv[1]);
-            argv++,argc--;
-            continue;
-        }
-        if (strcmp(*argv, "-bmin") == 0) {
-            bmin = atoi(argv[1]);
-            argv++,argc--;
-            continue;
-        }
-        fprintf(stderr, "unhandled arg: %s\n", *argv);
+    int argc = argc0;
+    char **argv = argv0;
+    cxx_param_list pl;
+
+    declare_usage(pl);
+    param_list_configure_switch(pl, "-q", &quiet);
+    param_list_configure_switch(pl, "-C", &consistency_check_mode);
+    param_list_configure_switch(pl, "-F", &abort_on_fail);
+    argv++, argc--;
+    for( ; argc ; ) {
+        if (param_list_update_cmdline(pl, &argc, &argv)) { continue; }
+        fprintf(stderr, "Unhandled parameter %s\n", argv[0]);
+        param_list_print_usage(pl, argv0[0], stderr);
         exit(EXIT_FAILURE);
     }
+
+
+    param_list_parse_int(pl, "I", &logI);
+    param_list_parse_int(pl, "A", &logA);
+#ifndef LOG_BUCKET_REGION_IS_A_CONSTANT
+    param_list_parse_int(pl, "B", &LOG_BUCKET_REGION);
+#endif
+    param_list_parse_int(pl, "bmin", &bmin);
+    param_list_parse_int(pl, "bmax", &bmax);
+
     si.conf.logI_adjusted = logI;
     if (!bmax) bmax = logI;
     if (!logA) logA = 2*logI-1;
@@ -1034,11 +1038,9 @@ int main(int argc, char * argv[])
     gmp_randinit_default(rstate);
 
     int nthreads=1;
-
     interleaving = nthreads;
 
     mpz_init_set_ui(si.qbasis.q, 4294967291);
-
 
     int errors = 0;
 
