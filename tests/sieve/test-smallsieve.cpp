@@ -315,7 +315,7 @@ void current_I18_branch(std::vector<int64_t> & positions, std::vector<ssp_t> pri
             /* Note that B_mod p is not reduced. It may be <0, and
              * may also be >= p if we sieved with 2p because of even j
              */
-            int B_mod_p = overrun - pos;
+            int B_mod_p = overrun - p_pos;
             /* We may avoid some of the cost for the modular
              * reduction, here:
              *
@@ -327,7 +327,7 @@ void current_I18_branch(std::vector<int64_t> & positions, std::vector<ssp_t> pri
              * So it seems feasible to get by with a fixed number of
              * conditional subtractions.
              */
-            pos = (pos + B_mod_p * di + dj * r) % p;
+            pos = (p_pos + B_mod_p * di + dj * r) % p;
             if (pos < 0) pos += p;
         } else {
             /* skip stride */
@@ -380,8 +380,8 @@ void modified_I18_branch_C(std::vector<int64_t> & positions, std::vector<ssp_t> 
             int Q = logI - LOG_BUCKET_REGION;
             int dj = (N1>>Q) - j0;
             int di = (N1&((1<<Q)-1)) - (N&((1<<Q)-1));
-            int B_mod_p = overrun - pos;
-            pos = (pos + B_mod_p * di + dj * r) % p;
+            int B_mod_p = overrun - p_pos;
+            pos = (p_pos + B_mod_p * di + dj * r) % p;
             if (pos < 0) pos += p;
         } else {
             pos += ssp.get_offset();
@@ -567,7 +567,7 @@ j_odd_devel:
             /* Note that B_mod p is not reduced. It may be <0, and
              * may also be >= p if we sieved with 2p because of even j
              */
-            int B_mod_p = overrun - pos;
+            int B_mod_p = overrun - p_pos;
             /* FIXME: we may avoid some of the cost for the modular
              * reduction, here. Having a mod operation in this place
              * seems to be a fairly terrible idea.
@@ -578,7 +578,7 @@ j_odd_devel:
              * It seems feasible to get by with a fixed number of
              * conditional subtractions.
              */
-            pos = (pos + B_mod_p * di + dj * r) % p;
+            pos = (p_pos + B_mod_p * di + dj * r) % p;
             if (pos < 0) pos += p;
         } else {
             /* skip stride */
@@ -648,7 +648,6 @@ j_odd_devel:
              *
              * Of course we have -q < b'-b < q
              *
-
              * dj can be written as (N'-N-(b'-b)) div q, which is an
              * exact division. we rewrite that as:
              *
@@ -663,6 +662,18 @@ j_odd_devel:
              * It is 1 if and only if v >= q + b'-b, which sounds like a
              * reasonable thing to check.
              */
+            /* available stuff, for computing the next position:
+             * p_pos was the position of the first hit on the first line
+             *       in this bucket.
+             * pos is the position of the first hit on the next line just
+             *       above this bucket (possibly +p if we just sieved an
+             *       even line -- this is a catch, by the way).
+             * overrun is the position of the first hit on the last line
+             *       a bucket that would be on the right of this one
+             *       (even if we're at the end of a line of buckets. In
+             *       effect, (overrun-p_pos) is congruent to B mod p when
+             *       the bucket is a single line fragment of size B.
+             */
             int N1 = N + interleaving;
             int Q = logI - LOG_BUCKET_REGION;
             int dj = (N1>>Q) - j0;
@@ -672,7 +683,7 @@ j_odd_devel:
              *
              * (0 <= overrun < 2p), and (0 <= pos < p), so -p < B_mod_p < 2p
              */
-            int B_mod_p = overrun - pos;
+            int B_mod_p = overrun - p_pos;
             /* FIXME: we may avoid some of the cost for the modular
              * reduction, here. Having a mod operation in this place
              * seems to be a fairly terrible idea.
@@ -683,7 +694,7 @@ j_odd_devel:
              * It seems feasible to get by with a fixed number of
              * conditional subtractions.
              */
-            pos = (pos + B_mod_p * di + dj * r) % p;
+            pos = (p_pos + B_mod_p * di + dj * r) % p;
             if (pos < 0) pos += p;
         } else {
             /* skip stride */
