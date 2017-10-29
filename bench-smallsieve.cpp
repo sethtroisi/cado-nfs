@@ -589,8 +589,14 @@ END_FOBJ();
 template<int bit> struct best_evenline;
 template<int bit> struct best_oddline ;
 #if defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM) && !defined(TRACK_CODE_PATH)
-template<int bit> struct best_evenline { typedef assembly_generic_loop16p0 type; };
-template<int bit> struct best_oddline  { typedef assembly_generic_loop16p0 type; };
+template<int bit> struct best_evenline {
+    typedef int is_default;
+    typedef assembly_generic_loop16p0 type;
+};
+template<int bit> struct best_oddline  {
+    typedef int is_default;
+    typedef assembly_generic_loop16p0 type;
+};
 template<> struct best_evenline<1> { typedef manual0 type; };
 template<> struct best_evenline<2> { typedef manual1 type; };
 template<> struct best_evenline<3> { typedef manual2 type; };
@@ -1367,7 +1373,7 @@ void devel_branch(std::vector<int64_t> & positions, std::vector<ssp_t> primes, u
             /* for j even, we sieve only odd pi, so step = 2p. */
             {
             int xpos = ((si.conf.sublat.i0 + pos) & 1) ? pos : (pos+p);
-            sieve_full_line_new_half(S0, S0 + (I), S0 - S,
+            sieve_full_line_new_half(S0, S0 + (i1 - i0), S0 - S,
                     xpos, p+p, logp, w);
             }
             S0 += I;
@@ -1377,15 +1383,67 @@ void devel_branch(std::vector<int64_t> & positions, std::vector<ssp_t> primes, u
 j_odd_devel:
             /* now j odd again */
             WHERE_AM_I_UPDATE(w, j, j - j0);
-            sieve_full_line_new(S0, S0 + (I), S0 - S,
+            sieve_full_line_new(S0, S0 + (i1 - i0), S0 - S,
                     pos, p, logp, w);
             S0 += I;
             pos += r; if (pos >= (int) p) pos -= p;
             ++j;
         }
+        if (logI > LOG_BUCKET_REGION) {
+            /* quick notes for incremental adjustment in case I>B (B =
+             * LOG_BUCKET_REGION).
+             *
+             * Let q = 2^(I-B).
+             * Let N = a*q+b, and N'=N+interleaving=a'*q+b' ; N' is the
+             * next bucket region we'll handle.
+             *
+             * Let interleaving = u*q+v
+             *
+             * The row increase is dj = (N' div q) - (N div q) = a'-a
+             * The fragment increase is di = (N' mod q) - (N mod q) = b'-b
+             *
+             * Of course we have -q < b'-b < q
+             *
+
+             * dj can be written as (N'-N-(b'-b)) div q, which is an
+             * exact division. we rewrite that as:
+             *
+             * dj = u + (v - (b'-b)) div q
+             *
+             * where the division is again exact. Now (v-(b'-b))
+             * satisfies:
+             * -q < v-(b'-b) < 2*q-1
+             *
+             * so that the quotient may only be 0 or 1.
+             *
+             * It is 1 if and only if v >= q + b'-b, which sounds like a
+             * reasonable thing to check.
+             */
+            int N1 = N + interleaving;
+            int Q = logI - LOG_BUCKET_REGION;
+            int dj = (N1>>Q) - j0;
+            int di = (N1&((1<<Q)-1)) - (N&((1<<Q)-1));
+            /* Note that B_mod p is not reduced. It may be <0, and
+             * may also be >= p if we sieved with 2p because of even j
+             */
+            int B_mod_p = overrun - pos;
+            /* FIXME: we may avoid some of the cost for the modular
+             * reduction, here. Having a mod operation in this place
+             * seems to be a fairly terrible idea.
+             *
+             * dj is either always the same thing, or that same thing +1.
+             * di is within a small interval (albeit a centered one).
+             * 
+             * It seems feasible to get by with a fixed number of
+             * conditional subtractions.
+             */
+            pos = (pos + B_mod_p * di + dj * r) % p;
+            if (pos < 0) pos += p;
+        } else {
             /* skip stride */
             pos += ssp.get_offset();
             if (pos >= (int) p) pos -= p;
+        }
 
         p_pos = pos;
     }
@@ -1420,7 +1478,7 @@ template<typename even_code, typename odd_code> void devel_branch_meta(std::vect
             /* for j even, we sieve only odd pi, so step = 2p. */
             {
             int xpos = ((si.conf.sublat.i0 + pos) & 1) ? pos : (pos+p);
-            even_code()(S0, S0 + (I), S0 - S, xpos, p+p, logp, w);
+            even_code()(S0, S0 + (i1 - i0), S0 - S, xpos, p+p, logp, w);
             }
             S0 += I;
             pos += r; if (pos >= (int) p) pos -= p; 
@@ -1429,14 +1487,66 @@ template<typename even_code, typename odd_code> void devel_branch_meta(std::vect
 j_odd_devel:
             /* now j odd again */
             WHERE_AM_I_UPDATE(w, j, j - j0);
-            odd_code()(S0, S0 + (I), S0 - S, pos, p, logp, w);
+            odd_code()(S0, S0 + (i1 - i0), S0 - S, pos, p, logp, w);
             S0 += I;
             pos += r; if (pos >= (int) p) pos -= p;
             ++j;
         }
+        if (logI > LOG_BUCKET_REGION) {
+            /* quick notes for incremental adjustment in case I>B (B =
+             * LOG_BUCKET_REGION).
+             *
+             * Let q = 2^(I-B).
+             * Let N = a*q+b, and N'=N+interleaving=a'*q+b' ; N' is the
+             * next bucket region we'll handle.
+             *
+             * Let interleaving = u*q+v
+             *
+             * The row increase is dj = (N' div q) - (N div q) = a'-a
+             * The fragment increase is di = (N' mod q) - (N mod q) = b'-b
+             *
+             * Of course we have -q < b'-b < q
+             *
+
+             * dj can be written as (N'-N-(b'-b)) div q, which is an
+             * exact division. we rewrite that as:
+             *
+             * dj = u + (v - (b'-b)) div q
+             *
+             * where the division is again exact. Now (v-(b'-b))
+             * satisfies:
+             * -q < v-(b'-b) < 2*q-1
+             *
+             * so that the quotient may only be 0 or 1.
+             *
+             * It is 1 if and only if v >= q + b'-b, which sounds like a
+             * reasonable thing to check.
+             */
+            int N1 = N + interleaving;
+            int Q = logI - LOG_BUCKET_REGION;
+            int dj = (N1>>Q) - j0;
+            int di = (N1&((1<<Q)-1)) - (N&((1<<Q)-1));
+            /* Note that B_mod p is not reduced. It may be <0, and
+             * may also be >= p if we sieved with 2p because of even j
+             */
+            int B_mod_p = overrun - pos;
+            /* FIXME: we may avoid some of the cost for the modular
+             * reduction, here. Having a mod operation in this place
+             * seems to be a fairly terrible idea.
+             *
+             * dj is either always the same thing, or that same thing +1.
+             * di is within a small interval (albeit a centered one).
+             * 
+             * It seems feasible to get by with a fixed number of
+             * conditional subtractions.
+             */
+            pos = (pos + B_mod_p * di + dj * r) % p;
+            if (pos < 0) pos += p;
+        } else {
             /* skip stride */
             pos += ssp.get_offset();
             if (pos >= (int) p) pos -= p;
+        }
 
         p_pos = pos;
     }
@@ -1717,8 +1827,9 @@ int main(int argc, char * argv[])
         for( ; i1 < allprimes.size() && (allprimes[i1].get_p() >> b) ; i1++);
         bounds_perbit[b] = { i0, i1 };
 #endif
+        int logfill = std::min(logI, LOG_BUCKET_REGION);
 
-        printf("===== now doing specific tests for %d-bit primes using candidates<%d> =====\n", b+1, logI-b);
+        printf("===== now doing specific tests for %d-bit primes using candidates<%d> =====\n", b+1, logfill-b);
         bench_base bbase(LOG_BUCKET_REGION, logI, logA);
         // std::vector<ssp_t>& allprimes(bbase.allprimes);
         // std::vector<int64_t>& positions(bbase.positions);
@@ -1730,7 +1841,7 @@ int main(int argc, char * argv[])
         // std::vector<int64_t>& lx(positions.begin() + i0, positions.begin() + i1);
         candidate_list cand1, cand2;
 
-        switch(logI-b) {
+        switch(logfill-b) {
 #define CASE(xxx)							\
             case xxx:							\
                 factory_for_bit_round1<xxx>()(cand1);	\
@@ -1748,13 +1859,13 @@ int main(int argc, char * argv[])
 
         if (!cand1.empty()) {
             std::ostringstream goal_name;
-            goal_name << "best_oddline<" << logI-b << ">";
+            goal_name << "best_oddline<" << logfill-b << ">";
             printf("  testing odd lines ");
             bbase.test(cand1, "    ", goal_name.str());
         }
         if (!cand2.empty()) {
             std::ostringstream goal_name;
-            goal_name << "best_evenline<" << logI-b << ">";
+            goal_name << "best_evenline<" << logfill-b << ">";
             printf("  testing even lines ");
             bbase.test(cand2, "    ", goal_name.str());
         }
