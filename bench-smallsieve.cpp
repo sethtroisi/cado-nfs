@@ -589,21 +589,23 @@ END_FOBJ();
 template<int bit> struct best_evenline;
 template<int bit> struct best_oddline ;
 #if defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM) && !defined(TRACK_CODE_PATH)
-template<int bit> struct best_evenline { typedef assembly_generic_loop16 type; };
-template<int bit> struct best_oddline  { typedef assembly_generic_loop16 type; };
+template<int bit> struct best_evenline { typedef assembly_generic_loop16p0 type; };
+template<int bit> struct best_oddline  { typedef assembly_generic_loop16p0 type; };
 template<> struct best_evenline<1> { typedef manual0 type; };
 template<> struct best_evenline<2> { typedef manual1 type; };
 template<> struct best_evenline<3> { typedef manual2 type; };
 template<> struct best_evenline<4> { typedef assembly3 type; };
 template<> struct best_evenline<5> { typedef assembly4 type; };
-template<> struct best_evenline<6> { typedef assembly_generic_loop8 type; };
+template<> struct best_evenline<6> { typedef assembly5 type; };
 template<> struct best_evenline<7> { typedef assembly_generic_loop12 type; };
 template<> struct best_evenline<8> { typedef assembly_generic_loop12 type; };
 template<> struct best_evenline<9> { typedef assembly_generic_loop12 type; };
 template<> struct best_evenline<10> { typedef assembly_generic_loop12 type; };
 template<> struct best_evenline<11> { typedef assembly_generic_loop12 type; };
 template<> struct best_evenline<12> { typedef assembly_generic_loop12 type; };
-template<> struct best_evenline<13> { typedef assembly_generic_loop16 type; };
+template<> struct best_evenline<13> { typedef assembly_generic_loop16p0 type; };
+template<> struct best_evenline<14> { typedef assembly_generic_loop16p1 type; };
+template<> struct best_evenline<15> { typedef assembly_generic_loop16p0 type; };
 
 template<> struct best_oddline<1> { typedef assembly1 type; };
 template<> struct best_oddline<2> { typedef assembly2 type; };
@@ -617,7 +619,9 @@ template<> struct best_oddline<9> { typedef assembly_generic_loop12 type; };
 template<> struct best_oddline<10> { typedef assembly_generic_loop12 type; };
 template<> struct best_oddline<11> { typedef assembly_generic_loop12 type; };
 template<> struct best_oddline<12> { typedef assembly_generic_loop12 type; };
-template<> struct best_oddline<13> { typedef assembly_generic_loop16 type; };
+template<> struct best_oddline<13> { typedef assembly_generic_loop16p0 type; };
+template<> struct best_oddline<14> { typedef assembly_generic_loop16p1 type; };
+template<> struct best_oddline<15> { typedef assembly_generic_loop16p0 type; };
 /* TODO: we could perhaps provide hints so that the generated code can
  * merge some rounds of the loop. Or maybe the compiler will do that ? */
 #else
@@ -1449,10 +1453,10 @@ struct cand_func {
 
 typedef std::vector<cand_func> candidate_list;
 
-/* first we create a list of functions that have the currently recorded
- * best code for even lines, and then we iterate on odd lines
+/* code factory: first we create a list of functions that have the
+ * currently recorded best code for even lines, and then we iterate on
+ * the various options for odd lines
  */
-
 template<int bit> struct factory_for_bit_round1 {
     typedef typename best_evenline<bit>::type Be;
     typedef typename best_oddline<bit>::type Bo;
@@ -1470,6 +1474,7 @@ template<int bit> struct factory_for_bit_round1 {
         iterator<typename all_candidates_for_oddline<bit>::type>()(res);
     }
 };
+/* and now the other way around. */
 template<int bit> struct factory_for_bit_round2 {
     typedef typename best_evenline<bit>::type Be;
     typedef typename best_oddline<bit>::type Bo;
