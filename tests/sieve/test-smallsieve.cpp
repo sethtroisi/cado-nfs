@@ -810,7 +810,7 @@ struct small_sieve_routine : public small_sieve_routine_base {
      * function. Because we're playing tricks with types and lists of
      * types and such, we need to work with partial specializations at
      * the class level, which is admittedly messy. */
-    template<typename T>
+    template<typename T, int max_bits_off = INT_MAX>
         struct do_it
         {
             void operator()(small_sieve_routine & SS) {
@@ -822,10 +822,10 @@ struct small_sieve_routine : public small_sieve_routine_base {
 
     /* optimization: do not split into pieces when we have several times
      * the same code anyway. */
-    template<typename E0, typename O0, int b0, int b1, typename T>
+    template<typename E0, typename O0, int b0, int b1, typename T, int bn>
         struct do_it<choice_list_car<E0,O0,b0,
                      choice_list_car<E0,O0,b1,
-                    T>>>
+                    T>>, bn>
         {
             static_assert(b0 > b1);
             void operator()(small_sieve_routine & SS) {
@@ -833,12 +833,35 @@ struct small_sieve_routine : public small_sieve_routine_base {
                 do_it<T>()(SS);
             }
         };
-    template<typename E0, typename O0, int b0, typename T>
-        struct do_it<choice_list_car<E0,O0,b0,T>>
+    template<typename E0, typename O0, int b0, int bn>
+        struct is_compatible_for_range {
+            static_assert(bn > b0);
+            static const int value =
+                E0::template is_compatible<bn-1>::value && 
+                O0::template is_compatible<bn>::value && 
+                is_compatible_for_range<E0, O0, b0, bn-1>::value;
+        };
+    template<typename E0, typename O0, int b0>
+        struct is_compatible_for_range<E0, O0, b0, b0> {
+            static const int value =
+                E0::template is_compatible<b0-1>::value && 
+                O0::template is_compatible<b0>::value;
+        };
+    template<typename E0, typename O0, int b0>
+        struct is_compatible_for_range<E0, O0, b0, INT_MAX> {
+            static const int value =
+                E0::template is_compatible<INT_MAX>::value && 
+                O0::template is_compatible<INT_MAX>::value &&
+                is_compatible_for_range<E0, O0, b0, b0 + 5>::value;
+        };
+
+    template<typename E0, typename O0, int b0, typename T, int bn>
+        struct do_it<choice_list_car<E0,O0,b0,T>, bn>
         {
+            static_assert(is_compatible_for_range<E0, E0, b0, bn>::value);
             void operator()(small_sieve_routine & SS) {
                 SS.handle_nice_primes<E0, O0, b0>();
-                do_it<T>()(SS);
+                do_it<T, b0-1>()(SS);
             }
         };
 };
@@ -853,7 +876,18 @@ template<int b> struct make_best_choice_list {
 template<> struct make_best_choice_list<-1> {
     typedef list_nil type;
 };
-
+template<> struct make_best_choice_list<12> {
+    typedef choice_list_car<
+                assembly_generic_oldloop,
+                assembly_generic_oldloop,
+                3,
+            choice_list_car<
+                assembly2x,
+                assembly2x,
+                0,
+            list_nil
+            >> type;
+};
 
 template<typename even_code, typename odd_code> void devel_branch_meta(std::vector<int64_t> & positions, std::vector<ssp_t> const& primes, unsigned char * S, int logI, unsigned int N) /*{{{*/
 {

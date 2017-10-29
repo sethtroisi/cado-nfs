@@ -324,6 +324,10 @@
     asm volatile (                                                      \
             TWO_XADDS_INCR("%[pi]","%[inc]","%[ff]","%[logp]","0f")     \
             SMALLSIEVE_ASSEMBLY_TRAILER(_pi, _incr, _fence, _logp))
+#define SMALLSIEVE_ASSEMBLY_NEW_0_TO_4(_pi, _incr, _fence, _logp)       \
+    asm volatile (                                                      \
+            FOUR_XADDS_INCR("%[pi]","%[inc]","%[ff]","%[logp]","0f")    \
+            SMALLSIEVE_ASSEMBLY_TRAILER(_pi, _incr, _fence, _logp)) 
 #define SMALLSIEVE_ASSEMBLY_NEW_1_TO_4(_pi, _incr, _fence, _logp)       \
     asm volatile (                                                      \
             ONE_ADD_INCR("%[pi]","%[inc]","%[logp]")                    \
@@ -335,9 +339,14 @@
 /* }}} */
 
 /*{{{ function objects for all the routines that we have */
-#define BEGIN_FOBJ(name_)						\
+#define BEGIN_FOBJ(name_, compatibility_condition)       		\
     struct name_ {							\
-        static constexpr const char * name = # name_;				\
+        template<int b> struct is_compatible {                          \
+            static_assert(compatibility_condition,                      \
+                    # name_ " requires " # compatibility_condition);    \
+            static const bool value = compatibility_condition;          \
+        };                                                              \
+        static constexpr const char * name = # name_;			\
         inline size_t operator()(					\
                 unsigned char * S0,					\
                 unsigned char * S1,					\
@@ -352,73 +361,76 @@
     return pi - S1;							\
 }}
 /* {{{ function objects for assembly code */
-BEGIN_FOBJ(assembly_generic_loop8);
+BEGIN_FOBJ(assembly_generic_loop8, true);
 SMALLSIEVE_ASSEMBLY_NEW_LOOP8(pi, p_or_2p, S1, logp);
 END_FOBJ();
-BEGIN_FOBJ(assembly_generic_loop12);
+BEGIN_FOBJ(assembly_generic_loop12, true);
 SMALLSIEVE_ASSEMBLY_NEW_LOOP12(pi, p_or_2p, S1, logp);
 END_FOBJ();
-BEGIN_FOBJ(assembly_generic_loop16);
+BEGIN_FOBJ(assembly_generic_loop16, true);
 SMALLSIEVE_ASSEMBLY_NEW_LOOP16(pi, p_or_2p, S1, logp);
 END_FOBJ();
-BEGIN_FOBJ(assembly_generic_loop8p0);
+BEGIN_FOBJ(assembly_generic_loop8p0, true);
 SMALLSIEVE_ASSEMBLY_NEW_LOOP8P0(pi, p_or_2p, S1, logp);
 END_FOBJ();
-BEGIN_FOBJ(assembly_generic_loop12p0);
+BEGIN_FOBJ(assembly_generic_loop12p0, true);
 SMALLSIEVE_ASSEMBLY_NEW_LOOP12P0(pi, p_or_2p, S1, logp);
 END_FOBJ();
-BEGIN_FOBJ(assembly_generic_loop16p0);
+BEGIN_FOBJ(assembly_generic_loop16p0, true);
 SMALLSIEVE_ASSEMBLY_NEW_LOOP16P0(pi, p_or_2p, S1, logp);
 END_FOBJ();
-BEGIN_FOBJ(assembly_generic_loop8p1);
+BEGIN_FOBJ(assembly_generic_loop8p1, true);
 SMALLSIEVE_ASSEMBLY_NEW_LOOP8P1(pi, p_or_2p, S1, logp);
 END_FOBJ();
-BEGIN_FOBJ(assembly_generic_loop12p1);
+BEGIN_FOBJ(assembly_generic_loop12p1, true);
 SMALLSIEVE_ASSEMBLY_NEW_LOOP12P1(pi, p_or_2p, S1, logp);
 END_FOBJ();
-BEGIN_FOBJ(assembly_generic_loop16p1);
+BEGIN_FOBJ(assembly_generic_loop16p1, true);
 SMALLSIEVE_ASSEMBLY_NEW_LOOP16P1(pi, p_or_2p, S1, logp);
 END_FOBJ();
-BEGIN_FOBJ(assembly_generic_loop12p2);
+BEGIN_FOBJ(assembly_generic_loop12p2, true);
 SMALLSIEVE_ASSEMBLY_NEW_LOOP12P2(pi, p_or_2p, S1, logp);
 END_FOBJ();
-BEGIN_FOBJ(assembly_generic_oldloop);
+BEGIN_FOBJ(assembly_generic_oldloop, true);
 SMALLSIEVE_ASSEMBLY_OLD(pi, p_or_2p, S1, logp);
 END_FOBJ();
-BEGIN_FOBJ(assembly0);
+BEGIN_FOBJ(assembly0, b <= 0);
 SMALLSIEVE_ASSEMBLY_NEW_0_TO_1(pi, p_or_2p, S1, logp);
 END_FOBJ();
-BEGIN_FOBJ(assembly1);
+BEGIN_FOBJ(assembly1, b == 1);
 SMALLSIEVE_ASSEMBLY_NEW_1_TO_2(pi, p_or_2p, S1, logp);
 END_FOBJ();
-BEGIN_FOBJ(assembly2);
+BEGIN_FOBJ(assembly2, b == 2);
 SMALLSIEVE_ASSEMBLY_NEW_2_TO_4(pi, p_or_2p, S1, logp);
 END_FOBJ();
-BEGIN_FOBJ(assembly3);
+BEGIN_FOBJ(assembly2x, b <= 2);
+SMALLSIEVE_ASSEMBLY_NEW_0_TO_4(pi, p_or_2p, S1, logp);
+END_FOBJ();
+BEGIN_FOBJ(assembly3, b == 3);
 SMALLSIEVE_ASSEMBLY_NEW_4_TO_8(pi, p_or_2p, S1, logp);
 END_FOBJ();
-BEGIN_FOBJ(assembly4);
+BEGIN_FOBJ(assembly4, b == 4);
 SMALLSIEVE_ASSEMBLY_NEW_8_TO_16(pi, p_or_2p, S1, logp);
 END_FOBJ();
-BEGIN_FOBJ(assembly5);
+BEGIN_FOBJ(assembly5, b == 5);
 SMALLSIEVE_ASSEMBLY_NEW_16_TO_32(pi, p_or_2p, S1, logp);
 END_FOBJ();
-BEGIN_FOBJ(assembly6);
+BEGIN_FOBJ(assembly6, b == 6);
 SMALLSIEVE_ASSEMBLY_NEW_32_TO_64(pi, p_or_2p, S1, logp);
 END_FOBJ();
 /* }}} */
 /* {{{ Function objects for C code, manually unrolled except for the
  * _loop versions. */
-BEGIN_FOBJ(manual0);
+BEGIN_FOBJ(manual0, b <= 0);
 if (pi < S1) { *pi += logp; pi += p_or_2p; }
 END_FOBJ();
-BEGIN_FOBJ(manual1);
+BEGIN_FOBJ(manual1, b == 1);
 do {
     *pi += logp; if ((pi += p_or_2p) >= S1) break;
     *pi += logp; pi += p_or_2p;
 } while (0);
 END_FOBJ();
-BEGIN_FOBJ(manual2);
+BEGIN_FOBJ(manual2, b == 2);
 do {
     *pi += logp; pi += p_or_2p;
     *pi += logp; if ((pi += p_or_2p) >= S1) break;
@@ -426,31 +438,11 @@ do {
     *pi += logp; pi += p_or_2p;
 } while (0);
 END_FOBJ();
-BEGIN_FOBJ(manual3);
+BEGIN_FOBJ(manual3, b == 3);
 do {
     *pi += logp; pi += p_or_2p;
     *pi += logp; pi += p_or_2p;
     *pi += logp; pi += p_or_2p;
-    *pi += logp; if ((pi += p_or_2p) >= S1) break;
-    *pi += logp; if ((pi += p_or_2p) >= S1) break;
-    *pi += logp; if ((pi += p_or_2p) >= S1) break;
-    *pi += logp; if ((pi += p_or_2p) >= S1) break;
-    *pi += logp; pi += p_or_2p;
-} while (0);
-END_FOBJ();
-BEGIN_FOBJ(manual4);
-do {
-    *pi += logp; pi += p_or_2p;
-    *pi += logp; pi += p_or_2p;
-    *pi += logp; pi += p_or_2p;
-    *pi += logp; pi += p_or_2p;
-    *pi += logp; pi += p_or_2p;
-    *pi += logp; pi += p_or_2p;
-    *pi += logp; pi += p_or_2p;
-    *pi += logp; if ((pi += p_or_2p) >= S1) break;
-    *pi += logp; if ((pi += p_or_2p) >= S1) break;
-    *pi += logp; if ((pi += p_or_2p) >= S1) break;
-    *pi += logp; if ((pi += p_or_2p) >= S1) break;
     *pi += logp; if ((pi += p_or_2p) >= S1) break;
     *pi += logp; if ((pi += p_or_2p) >= S1) break;
     *pi += logp; if ((pi += p_or_2p) >= S1) break;
@@ -458,7 +450,27 @@ do {
     *pi += logp; pi += p_or_2p;
 } while (0);
 END_FOBJ();
-BEGIN_FOBJ(manual_oldloop);
+BEGIN_FOBJ(manual4, b == 4);
+do {
+    *pi += logp; pi += p_or_2p;
+    *pi += logp; pi += p_or_2p;
+    *pi += logp; pi += p_or_2p;
+    *pi += logp; pi += p_or_2p;
+    *pi += logp; pi += p_or_2p;
+    *pi += logp; pi += p_or_2p;
+    *pi += logp; pi += p_or_2p;
+    *pi += logp; if ((pi += p_or_2p) >= S1) break;
+    *pi += logp; if ((pi += p_or_2p) >= S1) break;
+    *pi += logp; if ((pi += p_or_2p) >= S1) break;
+    *pi += logp; if ((pi += p_or_2p) >= S1) break;
+    *pi += logp; if ((pi += p_or_2p) >= S1) break;
+    *pi += logp; if ((pi += p_or_2p) >= S1) break;
+    *pi += logp; if ((pi += p_or_2p) >= S1) break;
+    *pi += logp; if ((pi += p_or_2p) >= S1) break;
+    *pi += logp; pi += p_or_2p;
+} while (0);
+END_FOBJ();
+BEGIN_FOBJ(manual_oldloop, true);
 #define T do {                                                          \
     WHERE_AM_I_UPDATE(w, x, x0 + pi - S0);                              \
     sieve_increase (pi, logp, w); pi += p_or_2p;                        \
@@ -475,7 +487,7 @@ do {
 } while (0);
 #undef T
 END_FOBJ();
-BEGIN_FOBJ(manual_oldloop_nounroll);
+BEGIN_FOBJ(manual_oldloop_nounroll, true);
 for ( ; pi < S1 ; pi += p_or_2p) {
     WHERE_AM_I_UPDATE(w, x, x0 + pi - S0);
     sieve_increase (pi, logp, w);
@@ -497,8 +509,8 @@ template<int bit> struct best_oddline  {
     typedef assembly_generic_loop16p0 type;
 };
 template<> struct best_evenline<1> { typedef manual0 type; };
-template<> struct best_evenline<2> { typedef manual1 type; };
-template<> struct best_evenline<3> { typedef manual2 type; };
+template<> struct best_evenline<2> { typedef assembly1 type; };
+template<> struct best_evenline<3> { typedef assembly2 type; };
 template<> struct best_evenline<4> { typedef assembly3 type; };
 template<> struct best_evenline<5> { typedef assembly4 type; };
 template<> struct best_evenline<6> { typedef assembly5 type; };
