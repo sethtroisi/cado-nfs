@@ -10,36 +10,19 @@
 #include <vector>
 #include <sstream>
 #include <algorithm>
+#include "macros.h"
 
 #define xxxLOG_BUCKET_REGION_IS_A_CONSTANT
 
-#define HAVE_SSE2
-
 #define WHERE_AM_I_UPDATE(a,b,c)  /**/
 typedef void * where_am_I;
-#define MAYBE_UNUSED __attribute__((unused))
-#define ASSERT(x) assert(x)
-#define croak__(x,y) do {						\
-        fprintf(stderr,"%s in %s at %s:%d -- %s\n",			\
-                (x),__func__,__FILE__,__LINE__,(y));			\
-    } while (0)
-#define ASSERT_ALWAYS(x)						\
-    do {								\
-        if (!(x)) {							\
-            croak__("code BUG() : condition " #x " failed",		\
-                    "Abort");						\
-            abort();							\
-        }								\
-    } while (0)
-#define EXPECT(x,val)	__builtin_expect(x,val)
-#define LIKELY(x)	EXPECT(x,1)
-#define UNLIKELY(x)	EXPECT(x,0)
-#define MIN(l,o) ((l) < (o) ? (l) : (o))
-#define MAX(h,i) ((h) > (i) ? (h) : (i))
+
 static inline void sieve_increase(unsigned char *S, const unsigned char logp, where_am_I& w MAYBE_UNUSED)
 {
     *S += logp;
 }
+
+#include "sieve/las-smallsieve-lowlevel.hpp"
 
 
 /* this does the small sieve loop, only for nice primes.
@@ -87,6 +70,7 @@ int LOG_BUCKET_REGION = 16;
 
 bool consistency_check_mode = false;
 int interleaving = 1;   /* number of threads */
+bool quiet = false;
 
 /* this is really a mock structure just for the fun of it. */
 struct {
@@ -103,33 +87,7 @@ struct {
     } qbasis;
 } si;
 
-/* this is the exact same macro that is found in las-smallsieve.cpp and
- * (in part) in las-norms.cpp
- */
-#define SMALLSIEVE_COMMON_DEFS()                                         \
-    const unsigned int log_lines_per_region = MAX(0, LOG_BUCKET_REGION - logI);\
-    const unsigned int log_regions_per_line = MAX(0, logI - LOG_BUCKET_REGION);\
-    const unsigned int regions_per_line = 1 << log_regions_per_line;           \
-    const unsigned int region_rank_in_line = N & (regions_per_line - 1);       \
-    const bool last_region_in_line MAYBE_UNUSED = region_rank_in_line == (regions_per_line - 1); \
-    const unsigned int j0 = (N >> log_regions_per_line) << log_lines_per_region;    \
-    const unsigned int j1 MAYBE_UNUSED = j0 + (1 << log_lines_per_region);    \
-    const int I = 1 << logI;                                            \
-    const int i0 = (region_rank_in_line << LOG_BUCKET_REGION) - I/2;          \
-    const int i1 MAYBE_UNUSED = i0 + (1 << MIN(LOG_BUCKET_REGION, logI));     \
-    /* those are (1,0,0) in the standard case */                        \
-    const int sublatm MAYBE_UNUSED = si.conf.sublat.m ? si.conf.sublat.m : 1; \
-    const unsigned int sublati0 MAYBE_UNUSED = si.conf.sublat.i0;       \
-    const unsigned int sublatj0 MAYBE_UNUSED = si.conf.sublat.j0;       \
-    const int row0_is_oddj MAYBE_UNUSED = (j0*sublatm + sublatj0) & 1;  \
-    bool has_haxis = !j0;                                               \
-    bool has_vaxis = region_rank_in_line == ((regions_per_line-1)/2);   \
-    bool has_origin MAYBE_UNUSED = has_haxis && has_vaxis;              \
-    do {} while (0)
 
-
-
-#include "sieve/las-smallsieve-lowlevel.hpp"
 
 
 /******************************************************************/
@@ -250,349 +208,24 @@ template<> struct all_candidates_for_oddline<6> {
  * Note that on even lines, p behaves as if it was doubled.
  */
 
-#define NBITS_LESS 12
-
-/*{{{ many functions, #if-protected with NBITS_LESS ...*/
-#if 1
-#if (NBITS_LESS == 1)/*{{{*/
-static inline size_t sieve_full_line_new_half(unsigned char * S0, unsigned char * S1, size_t x0 MAYBE_UNUSED, size_t pos, size_t p_or_2p, unsigned char logp, where_am_I w MAYBE_UNUSED)
-{
-    unsigned char * pi = S0 + pos;
-#if 1
-    /* C or asm, that doesn't make a huge difference */
-    if (pi < S1) *pi += logp;
-    pi += p_or_2p;
-#else
-    SMALLSIEVE_ASSEMBLY_NEW_0_TO_1(pi, p_or_2p, S1, logp);
-#endif
-    return pi - S1;
-}
-static inline size_t sieve_full_line_new(unsigned char * S0, unsigned char * S1, size_t x0 MAYBE_UNUSED, size_t pos, size_t p_or_2p, unsigned char logp, where_am_I w MAYBE_UNUSED)
-{
-    unsigned char * pi = S0 + pos;
-#if 0
-    /* more expensive than the inline asm, although it's a bit of a
-     * mystery while that same code is a winner for even lines on 1-bit
-     * larger primes... */
-    do {
-        *pi += logp;
-        if ((pi += p_or_2p) >= S1) break;
-        *pi += logp;
-        pi += p_or_2p;
-    } while (0);
-#else
-    SMALLSIEVE_ASSEMBLY_NEW_1_TO_2(pi, p_or_2p, S1, logp);
-#endif
-    return pi - S1;
-}
-#endif/*}}}*/
-#if (NBITS_LESS == 2)/*{{{*/
-static inline size_t sieve_full_line_new_half(unsigned char * S0, unsigned char * S1, size_t x0 MAYBE_UNUSED, size_t pos, size_t p_or_2p, unsigned char logp, where_am_I w MAYBE_UNUSED)
-{
-    unsigned char * pi = S0 + pos;
-#if 1
-    /* actually slightly better than the asm */
-    do {
-        *pi += logp; if ((pi += p_or_2p) >= S1) break;
-        *pi += logp; pi += p_or_2p;
-    } while (0);
-#else
-    SMALLSIEVE_ASSEMBLY_NEW_1_TO_2(pi, p_or_2p, S1, logp);
-#endif
-    return pi - S1;
-}
-static inline size_t sieve_full_line_new(unsigned char * S0, unsigned char * S1, size_t x0 MAYBE_UNUSED, size_t pos, size_t p_or_2p, unsigned char logp, where_am_I w MAYBE_UNUSED)
-{
-    unsigned char * pi = S0 + pos;
-#if 0
-    /* the two are more on less on par, with a minor advantage for the
-     * assembly. 
-     */
-    do {
-        *pi += logp; pi += p_or_2p;
-        *pi += logp; if ((pi += p_or_2p) >= S1) break;
-        *pi += logp; if ((pi += p_or_2p) >= S1) break;
-        *pi += logp; pi += p_or_2p;
-    } while (0);
-#else
-    SMALLSIEVE_ASSEMBLY_NEW_2_TO_4(pi, p_or_2p, S1, logp);
-#endif
-    return pi - S1;
-}
-#endif/*}}}*/
-#if (NBITS_LESS == 3)/*{{{*/
-static inline size_t sieve_full_line_new_half(unsigned char * S0, unsigned char * S1, size_t x0 MAYBE_UNUSED, size_t pos, size_t p_or_2p, unsigned char logp, where_am_I w MAYBE_UNUSED)
-{
-    unsigned char * pi = S0 + pos;
-#if 1
-    /* actually slightly better than the asm */
-    do {
-        *pi += logp; pi += p_or_2p;
-        *pi += logp; if ((pi += p_or_2p) >= S1) break;
-        *pi += logp; if ((pi += p_or_2p) >= S1) break;
-        *pi += logp; pi += p_or_2p;
-    } while (0);
-#else
-    SMALLSIEVE_ASSEMBLY_NEW_2_TO_4(pi, p_or_2p, S1, logp);
-#endif
-    return pi - S1;
-}
-static inline size_t sieve_full_line_new(unsigned char * S0, unsigned char * S1, size_t x0 MAYBE_UNUSED, size_t pos, size_t p_or_2p, unsigned char logp, where_am_I w MAYBE_UNUSED)
-{
-    unsigned char * pi = S0 + pos;
-#if 1
-    /* very mildly better than the ASM, but I'm not too sure, to be
-     * honest.
-     */
-    do {
-        *pi += logp; pi += p_or_2p;
-        *pi += logp; pi += p_or_2p;
-        *pi += logp; pi += p_or_2p;
-        *pi += logp; if ((pi += p_or_2p) >= S1) break;
-        *pi += logp; if ((pi += p_or_2p) >= S1) break;
-        *pi += logp; if ((pi += p_or_2p) >= S1) break;
-        *pi += logp; if ((pi += p_or_2p) >= S1) break;
-        *pi += logp; pi += p_or_2p;
-    } while (0);
-#else
-    SMALLSIEVE_ASSEMBLY_NEW_4_TO_8(pi, p_or_2p, S1, logp);
-#endif
-    return pi - S1;
-}
-#endif/*}}}*/
-#if (NBITS_LESS == 4)/*{{{*/
-static inline size_t sieve_full_line_new_half(unsigned char * S0, unsigned char * S1, size_t x0 MAYBE_UNUSED, size_t pos, size_t p_or_2p, unsigned char logp, where_am_I w MAYBE_UNUSED)
-{
-    unsigned char * pi = S0 + pos;
-#if 0
-    /* here, we seem to get considerably better performance with the asm
-     * code.
-     */
-    do {
-        *pi += logp; pi += p_or_2p;
-        *pi += logp; pi += p_or_2p;
-        *pi += logp; pi += p_or_2p;
-        *pi += logp; if ((pi += p_or_2p) >= S1) break;
-        *pi += logp; if ((pi += p_or_2p) >= S1) break;
-        *pi += logp; if ((pi += p_or_2p) >= S1) break;
-        *pi += logp; if ((pi += p_or_2p) >= S1) break;
-        *pi += logp; pi += p_or_2p;
-    } while (0);
-#else
-    SMALLSIEVE_ASSEMBLY_NEW_4_TO_8(pi, p_or_2p, S1, logp);
-#endif
-    return pi - S1;
-}
-static inline size_t sieve_full_line_new(unsigned char * S0, unsigned char * S1, size_t x0 MAYBE_UNUSED, size_t pos, size_t p_or_2p, unsigned char logp, where_am_I w MAYBE_UNUSED)
-{
-    unsigned char * pi = S0 + pos;
-#if 0
-    /* we get some improvement with the asm
-     */
-    do {
-        *pi += logp; pi += p_or_2p;
-        *pi += logp; pi += p_or_2p;
-        *pi += logp; pi += p_or_2p;
-        *pi += logp; pi += p_or_2p;
-        *pi += logp; pi += p_or_2p;
-        *pi += logp; pi += p_or_2p;
-        *pi += logp; pi += p_or_2p;
-        *pi += logp; if ((pi += p_or_2p) >= S1) break;
-        *pi += logp; if ((pi += p_or_2p) >= S1) break;
-        *pi += logp; if ((pi += p_or_2p) >= S1) break;
-        *pi += logp; if ((pi += p_or_2p) >= S1) break;
-        *pi += logp; if ((pi += p_or_2p) >= S1) break;
-        *pi += logp; if ((pi += p_or_2p) >= S1) break;
-        *pi += logp; if ((pi += p_or_2p) >= S1) break;
-        *pi += logp; if ((pi += p_or_2p) >= S1) break;
-        *pi += logp; pi += p_or_2p;
-    } while (0);
-#else
-    SMALLSIEVE_ASSEMBLY_NEW_8_TO_16(pi, p_or_2p, S1, logp);
-#endif
-    return pi - S1;
-}
-#endif/*}}}*/
-#if (NBITS_LESS == 5)/*{{{*/
-static inline size_t sieve_full_line_new_half(unsigned char * S0, unsigned char * S1, size_t x0 MAYBE_UNUSED, size_t pos, size_t p_or_2p, unsigned char logp, where_am_I w MAYBE_UNUSED)
-{
-    unsigned char * pi = S0 + pos;
-#if 0
-    /* C code clearly bad here */
-#else
-    SMALLSIEVE_ASSEMBLY_NEW_8_TO_16(pi, p_or_2p, S1, logp);
-#endif
-    return pi - S1;
-}
-static inline size_t sieve_full_line_new(unsigned char * S0, unsigned char * S1, size_t x0 MAYBE_UNUSED, size_t pos, size_t p_or_2p, unsigned char logp, where_am_I w MAYBE_UNUSED)
-{
-    unsigned char * pi = S0 + pos;
-#if 0
-    /* C manually unrolled code is clearly catastrophic ! */
-#else
-    /* old code is actually a decent option, almost on par */
-    SMALLSIEVE_ASSEMBLY_NEW_16_TO_32(pi, p_or_2p, S1, logp);
-#endif
-    return pi - S1;
-}
-#endif/*}}}*/
-#if (NBITS_LESS == 6)/*{{{*/
-static inline size_t sieve_full_line_new_half(unsigned char * S0, unsigned char * S1, size_t x0 MAYBE_UNUSED, size_t pos, size_t p_or_2p, unsigned char logp, where_am_I w MAYBE_UNUSED)
-{
-    unsigned char * pi = S0 + pos;
-    SMALLSIEVE_ASSEMBLY_NEW_16_TO_32(pi, p_or_2p, S1, logp);
-    return pi - S1;
-}
-static inline size_t sieve_full_line_new(unsigned char * S0, unsigned char * S1, size_t x0 MAYBE_UNUSED, size_t pos, size_t p_or_2p, unsigned char logp, where_am_I w MAYBE_UNUSED)
-{
-    unsigned char * pi = S0 + pos;
-    /* better to use a loop here */
-    SMALLSIEVE_ASSEMBLY_NEW_LOOP8(pi, p_or_2p, S1, logp);
-    return pi - S1;
-}
-#endif/*}}}*/
-#if (NBITS_LESS == 7)/*{{{*/
-static inline size_t sieve_full_line_new_half(unsigned char * S0, unsigned char * S1, size_t x0 MAYBE_UNUSED, size_t pos, size_t p_or_2p, unsigned char logp, where_am_I w MAYBE_UNUSED)
-{
-    unsigned char * pi = S0 + pos;
-    SMALLSIEVE_ASSEMBLY_NEW_LOOP12(pi, p_or_2p, S1, logp);
-    return pi - S1;
-}
-static inline size_t sieve_full_line_new(unsigned char * S0, unsigned char * S1, size_t x0 MAYBE_UNUSED, size_t pos, size_t p_or_2p, unsigned char logp, where_am_I w MAYBE_UNUSED)
-{
-    unsigned char * pi = S0 + pos;
-    /* better to use a loop here */
-    SMALLSIEVE_ASSEMBLY_NEW_LOOP12(pi, p_or_2p, S1, logp);
-    return pi - S1;
-}
-#endif/*}}}*/
-/* at this point, choosing a LOOP12 or a LOOP16 is rather a matter of a
- * 0.1% difference.
- */
-#if (NBITS_LESS == 8)/*{{{*/
-static inline size_t sieve_full_line_new_half(unsigned char * S0, unsigned char * S1, size_t x0 MAYBE_UNUSED, size_t pos, size_t p_or_2p, unsigned char logp, where_am_I w MAYBE_UNUSED)
-{
-    unsigned char * pi = S0 + pos;
-    SMALLSIEVE_ASSEMBLY_NEW_LOOP12(pi, p_or_2p, S1, logp);
-    return pi - S1;
-}
-static inline size_t sieve_full_line_new(unsigned char * S0, unsigned char * S1, size_t x0 MAYBE_UNUSED, size_t pos, size_t p_or_2p, unsigned char logp, where_am_I w MAYBE_UNUSED)
-{
-    unsigned char * pi = S0 + pos;
-    SMALLSIEVE_ASSEMBLY_NEW_LOOP12(pi, p_or_2p, S1, logp);
-    return pi - S1;
-}
-#endif/*}}}*/
-#if (NBITS_LESS == 9)/*{{{*/
-static inline size_t sieve_full_line_new_half(unsigned char * S0, unsigned char * S1, size_t x0 MAYBE_UNUSED, size_t pos, size_t p_or_2p, unsigned char logp, where_am_I w MAYBE_UNUSED)
-{
-    unsigned char * pi = S0 + pos;
-    SMALLSIEVE_ASSEMBLY_NEW_LOOP12(pi, p_or_2p, S1, logp);
-    return pi - S1;
-}
-static inline size_t sieve_full_line_new(unsigned char * S0, unsigned char * S1, size_t x0 MAYBE_UNUSED, size_t pos, size_t p_or_2p, unsigned char logp, where_am_I w MAYBE_UNUSED)
-{
-    unsigned char * pi = S0 + pos;
-    SMALLSIEVE_ASSEMBLY_NEW_LOOP12(pi, p_or_2p, S1, logp);
-    return pi - S1;
-}
-#endif/*}}}*/
-#if (NBITS_LESS == 10)/*{{{*/
-static inline size_t sieve_full_line_new_half(unsigned char * S0, unsigned char * S1, size_t x0 MAYBE_UNUSED, size_t pos, size_t p_or_2p, unsigned char logp, where_am_I w MAYBE_UNUSED)
-{
-    unsigned char * pi = S0 + pos;
-    SMALLSIEVE_ASSEMBLY_NEW_LOOP12(pi, p_or_2p, S1, logp);
-    return pi - S1;
-}
-static inline size_t sieve_full_line_new(unsigned char * S0, unsigned char * S1, size_t x0 MAYBE_UNUSED, size_t pos, size_t p_or_2p, unsigned char logp, where_am_I w MAYBE_UNUSED)
-{
-    unsigned char * pi = S0 + pos;
-    SMALLSIEVE_ASSEMBLY_NEW_LOOP12(pi, p_or_2p, S1, logp);
-    return pi - S1;
-}
-#endif/*}}}*/
-#if (NBITS_LESS == 11)/*{{{*/
-static inline size_t sieve_full_line_new_half(unsigned char * S0, unsigned char * S1, size_t x0 MAYBE_UNUSED, size_t pos, size_t p_or_2p, unsigned char logp, where_am_I w MAYBE_UNUSED)
-{
-    unsigned char * pi = S0 + pos;
-    SMALLSIEVE_ASSEMBLY_NEW_LOOP12(pi, p_or_2p, S1, logp);
-    return pi - S1;
-}
-static inline size_t sieve_full_line_new(unsigned char * S0, unsigned char * S1, size_t x0 MAYBE_UNUSED, size_t pos, size_t p_or_2p, unsigned char logp, where_am_I w MAYBE_UNUSED)
-{
-    unsigned char * pi = S0 + pos;
-    SMALLSIEVE_ASSEMBLY_NEW_LOOP12(pi, p_or_2p, S1, logp);
-    return pi - S1;
-}
-#endif/*}}}*/
-/* LOOP12, LOOP16: idem. Maybe a wee bit better for loop12 */
-#if (NBITS_LESS == 12)/*{{{*/
-static inline size_t sieve_full_line_new_half(unsigned char * S0, unsigned char * S1, size_t x0 MAYBE_UNUSED, size_t pos, size_t p_or_2p, unsigned char logp, where_am_I w MAYBE_UNUSED)
-{
-    unsigned char * pi = S0 + pos;
-    SMALLSIEVE_ASSEMBLY_NEW_LOOP12(pi, p_or_2p, S1, logp);
-    return pi - S1;
-}
-static inline size_t sieve_full_line_new(unsigned char * S0, unsigned char * S1, size_t x0 MAYBE_UNUSED, size_t pos, size_t p_or_2p, unsigned char logp, where_am_I w MAYBE_UNUSED)
-{
-    unsigned char * pi = S0 + pos;
-    SMALLSIEVE_ASSEMBLY_NEW_LOOP12(pi, p_or_2p, S1, logp);
-    return pi - S1;
-}
-#endif/*}}}*/
-/* LOOP12, LOOP16: idem */
-#if (NBITS_LESS == 13)/*{{{*/
-static inline size_t sieve_full_line_new_half(unsigned char * S0, unsigned char * S1, size_t x0 MAYBE_UNUSED, size_t pos, size_t p_or_2p, unsigned char logp, where_am_I w MAYBE_UNUSED)
-{
-    unsigned char * pi = S0 + pos;
-    SMALLSIEVE_ASSEMBLY_NEW_LOOP16(pi, p_or_2p, S1, logp);
-    return pi - S1;
-}
-static inline size_t sieve_full_line_new(unsigned char * S0, unsigned char * S1, size_t x0 MAYBE_UNUSED, size_t pos, size_t p_or_2p, unsigned char logp, where_am_I w MAYBE_UNUSED)
-{
-    unsigned char * pi = S0 + pos;
-    SMALLSIEVE_ASSEMBLY_NEW_LOOP16(pi, p_or_2p, S1, logp);
-    return pi - S1;
-}
-#endif/*}}}*/
-/* LOOP16 better than LOOP12 here */
-#if (NBITS_LESS == 14)/*{{{*/
-static inline size_t sieve_full_line_new_half(unsigned char * S0, unsigned char * S1, size_t x0 MAYBE_UNUSED, size_t pos, size_t p_or_2p, unsigned char logp, where_am_I w MAYBE_UNUSED)
-{
-    unsigned char * pi = S0 + pos;
-    SMALLSIEVE_ASSEMBLY_NEW_LOOP16(pi, p_or_2p, S1, logp);
-    return pi - S1;
-}
-static inline size_t sieve_full_line_new(unsigned char * S0, unsigned char * S1, size_t x0 MAYBE_UNUSED, size_t pos, size_t p_or_2p, unsigned char logp, where_am_I w MAYBE_UNUSED)
-{
-    unsigned char * pi = S0 + pos;
-    SMALLSIEVE_ASSEMBLY_NEW_LOOP16(pi, p_or_2p, S1, logp);
-    return pi - S1;
-}
-#endif/*}}}*/
-#if (NBITS_LESS == 15)/*{{{*/
-static inline size_t sieve_full_line_new_half(unsigned char * S0, unsigned char * S1, size_t x0 MAYBE_UNUSED, size_t pos, size_t p_or_2p, unsigned char logp, where_am_I w MAYBE_UNUSED)
-{
-    unsigned char * pi = S0 + pos;
-    SMALLSIEVE_ASSEMBLY_NEW_LOOP16(pi, p_or_2p, S1, logp);
-    return pi - S1;
-}
-static inline size_t sieve_full_line_new(unsigned char * S0, unsigned char * S1, size_t x0 MAYBE_UNUSED, size_t pos, size_t p_or_2p, unsigned char logp, where_am_I w MAYBE_UNUSED)
-{
-    unsigned char * pi = S0 + pos;
-    SMALLSIEVE_ASSEMBLY_NEW_LOOP16(pi, p_or_2p, S1, logp);
-    return pi - S1;
-}
-#endif/*}}}*/
-#endif/*}}}*/
-
 static inline size_t sieve_full_line(unsigned char * S0, unsigned char * S1, size_t x0 MAYBE_UNUSED, size_t pos, size_t p_or_2p, unsigned char logp, where_am_I w MAYBE_UNUSED)
 {
     unsigned char * pi = S0 + pos;
     SMALLSIEVE_ASSEMBLY_OLD(pi, p_or_2p, S1, logp);
     return pi - S1;
 }
-
+static inline size_t sieve_full_line_new_half(unsigned char * S0, unsigned char * S1, size_t x0 MAYBE_UNUSED, size_t pos, size_t p_or_2p, unsigned char logp, where_am_I w MAYBE_UNUSED)
+{
+    unsigned char * pi = S0 + pos;
+    SMALLSIEVE_ASSEMBLY_NEW_LOOP12(pi, p_or_2p, S1, logp);
+    return pi - S1;
+}
+static inline size_t sieve_full_line_new(unsigned char * S0, unsigned char * S1, size_t x0 MAYBE_UNUSED, size_t pos, size_t p_or_2p, unsigned char logp, where_am_I w MAYBE_UNUSED)
+{
+    unsigned char * pi = S0 + pos;
+    SMALLSIEVE_ASSEMBLY_NEW_LOOP12(pi, p_or_2p, S1, logp);
+    return pi - S1;
+}
 
 void current_I18_branch(std::vector<int64_t> & positions, std::vector<ssp_t> primes, unsigned char * S, int logI, unsigned int N) /* {{{ */
 {
@@ -1140,12 +773,11 @@ struct bench_base {
     }
     bench_base(bench_base const &) = delete;
     ~bench_base() { free(S); }
-    void test(candidate_list const & cand, const char * pfx="", std::string const& goal="current selection") {
+    bool test(candidate_list const & cand, const char * pfx="", std::string const& goal="current selection") {
         if (consistency_check_mode) {
-            test_correctness(cand);
-            return;
+            return test_correctness(cand);
         }
-        if (cand.empty()) return;
+        if (cand.empty()) return true;
         std::vector<unsigned char *> refS;
         size_t I = 1UL << logI;
         int Nmax = 1 << (logA - LOG_BUCKET_REGION);
@@ -1243,6 +875,7 @@ struct bench_base {
 
         for(unsigned char * Sp : refS)
             free(Sp);
+        return true;
     }
 
     /* This one has the loop order reversed. We're no longer testing
@@ -1257,6 +890,7 @@ struct bench_base {
         size_t I = 1UL << logI;
         int Nmax = 1 << (logA - LOG_BUCKET_REGION);
 
+        positions.clear();
         for(auto const & ssp : allprimes)
             positions.push_back((I/2)%ssp.get_p());
 
@@ -1270,10 +904,10 @@ struct bench_base {
             refpos.push_back(positions);
         }
         printf("\n");
-        printf("Testing all %d buckets (logA=%d, logB=%d, logI=%d) for functions:\n",
+        if (!quiet) printf("Testing all %d buckets (logA=%d, logB=%d, logI=%d) for functions:\n",
                 Nmax, logA, LOG_BUCKET_REGION, logI);
         for(auto const& bf : cand)
-            printf("  %s\n", bf.name);
+            if (!quiet) printf("  %s\n", bf.name);
         bool ok=true;
         std::vector<bool> ok_perfunc (cand.size(), true);
         int ndisp = 1;
@@ -1318,11 +952,12 @@ struct bench_base {
                     }
                 }
             }
-            for( ; (N+1)*16 >= (ndisp * Nmax) ; ndisp++) {
+            if (!quiet) for( ; (N+1)*16 >= (ndisp * Nmax) ; ndisp++) {
                 printf(".");
                 fflush(stdout);
             }
         }
+        if (!quiet) printf("\n");
         for(unsigned char * Sp : refS)
             free(Sp);
         return ok;
@@ -1341,7 +976,7 @@ void store_primes(std::vector<ssp_t>& allprimes, int bmin, int bmax, gmp_randsta
         unsigned long r = gmp_urandomm_ui(rstate, p);
         allprimes.emplace_back(p, r, (r * (interleaving-1)) % p);
     }
-    printf("created a list of %zu primes\n", allprimes.size());
+    if (!quiet) printf("created a list of %zu primes\n", allprimes.size());
     mpz_clear(pz);
 }
 
@@ -1360,6 +995,10 @@ int main(int argc, char * argv[])
             continue;
         }
 #endif
+        if (strcmp(*argv, "-q") == 0) {
+            quiet = true;
+            continue;
+        }
         if (strcmp(*argv, "-C") == 0) {
             consistency_check_mode = true;
             continue;
@@ -1400,6 +1039,8 @@ int main(int argc, char * argv[])
 
     mpz_init_set_ui(si.qbasis.q, 4294967291);
 
+
+    int errors = 0;
 
     // std::vector<std::pair<size_t, size_t>> bounds_perbit(logI + 1, {0,0});
     for(int b = bmin ; b < bmax ; b++) {
@@ -1456,13 +1097,13 @@ int main(int argc, char * argv[])
             std::ostringstream goal_name;
             goal_name << "best_oddline<" << logfill-b << ">";
             printf("  testing odd lines ");
-            bbase.test(cand1, "    ", goal_name.str());
+            errors += !bbase.test(cand1, "    ", goal_name.str());
         }
         if (!cand2.empty()) {
             std::ostringstream goal_name;
             goal_name << "best_evenline<" << logfill-b << ">";
             printf("  testing even lines ");
-            bbase.test(cand2, "    ", goal_name.str());
+            errors += !bbase.test(cand2, "    ", goal_name.str());
         }
     }
 
@@ -1483,10 +1124,12 @@ int main(int argc, char * argv[])
         if (logI <= LOG_BUCKET_REGION)
             funcs.emplace_back(false, legacy_branch, "legacy");
 
-        bbase.test(funcs);
+        errors += !bbase.test(funcs);
     }
 
     mpz_clear(si.qbasis.q);
     gmp_randclear(rstate);
+
+    return errors ? EXIT_FAILURE : EXIT_SUCCESS;
 }
 

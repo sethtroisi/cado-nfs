@@ -379,5 +379,10 @@ cado_divert_test(test_init_norms bug21518
         -check-bucket 361
 )
 
+cado_define_test(test-smallsieve.cpp LIBRARIES utils ${gmplib}
+    ARGUMENTS -q -C -A 18 -I 14 -B 14)
+cado_divert_test(test-smallsieve line_fragments
+    ARGUMENTS -q -C -A 18 -I 15 -B 13)
+
 add_subdirectory (ecm)
 add_subdirectory (strategies)

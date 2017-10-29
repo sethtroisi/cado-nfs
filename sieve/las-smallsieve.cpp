@@ -10,7 +10,7 @@
 #include "misc.h"
 #include "portability.h"
 #include "verbose.h"
-
+#include "las-smallsieve-lowlevel.hpp"
 
 /* small sieve and resieving */
 
@@ -608,31 +608,6 @@ struct small_sieve_context {
         return x;
     }
 };
-
-/* This is copied from LOGNORM_FILL_COMMON_DEFS in las-norms.cpp ; from
- * logI, N, and LOG_BUCKET_REGION, define the integers i0, i1, j0, j1,
- * and I.
- */
-#define SMALLSIEVE_COMMON_DEFS()                                         \
-    const unsigned int log_lines_per_region = MAX(0, LOG_BUCKET_REGION - logI);\
-    const unsigned int log_regions_per_line = MAX(0, logI - LOG_BUCKET_REGION);\
-    const unsigned int regions_per_line = 1 << log_regions_per_line;           \
-    const unsigned int region_rank_in_line = N & (regions_per_line - 1);       \
-    const bool last_region_in_line MAYBE_UNUSED = region_rank_in_line == (regions_per_line - 1); \
-    const unsigned int j0 = (N >> log_regions_per_line) << log_lines_per_region;    \
-    const unsigned int j1 MAYBE_UNUSED = j0 + (1 << log_lines_per_region);    \
-    const int I = 1 << logI;                                            \
-    const int i0 = (region_rank_in_line << LOG_BUCKET_REGION) - I/2;          \
-    const int i1 MAYBE_UNUSED = i0 + (1 << MIN(LOG_BUCKET_REGION, logI));     \
-    /* those are (1,0,0) in the standard case */                        \
-    const int sublatm MAYBE_UNUSED = si.conf.sublat.m ? si.conf.sublat.m : 1; \
-    const unsigned int sublati0 MAYBE_UNUSED = si.conf.sublat.i0;       \
-    const unsigned int sublatj0 MAYBE_UNUSED = si.conf.sublat.j0;       \
-    const int row0_is_oddj MAYBE_UNUSED = (j0*sublatm + sublatj0) & 1;  \
-    bool has_haxis = !j0;                                               \
-    bool has_vaxis = region_rank_in_line == ((regions_per_line-1)/2);   \
-    bool has_origin MAYBE_UNUSED = has_haxis && has_vaxis;              \
-    do {} while (0)
 
 /* Only compute the initial ssdpos fields. */
 void small_sieve_start(std::vector<int64_t> & ssdpos,
