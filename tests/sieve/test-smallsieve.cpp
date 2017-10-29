@@ -695,9 +695,8 @@ j_odd_devel:
     }
 }/*}}}*/
 
-typedef void (*ss_func)(std::vector<int64_t> & positions, std::vector<ssp_t> primes, unsigned char * S, int logI, unsigned int N);
-
 struct cand_func {
+    typedef void (*ss_func)(std::vector<int64_t> & positions, std::vector<ssp_t> primes, unsigned char * S, int logI, unsigned int N);
     bool sel;
     ss_func f;
     const char * name;
@@ -788,7 +787,6 @@ struct bench_base {
         int sel_index = -1;
 
         for(auto const& bf : cand) {
-            ss_func f = bf.f;
             if (bf.sel) sel_index = &bf-&cand.front();
             positions.clear();
             for(auto const & ssp : allprimes)
@@ -796,7 +794,7 @@ struct bench_base {
             memset(S, 0, B);
             clock_t tt = clock();
             for(int N = 0 ; N < Nmax ; N++) {
-                (*f)(positions, allprimes, S, logI, N);
+                (*bf.f)(positions, allprimes, S, logI, N);
             }
             timings.push_back((double) (clock()-tt) / CLOCKS_PER_SEC);
             printf(".");
@@ -917,10 +915,12 @@ struct bench_base {
         for(int N = 0 ; N < Nmax ; N++) {
             for(auto const& bf : cand) {
                 size_t index = &bf-&cand.front();
-                ss_func f = bf.f;
                 memset(S, 0, B);
-                (*f)(refpos[index], allprimes, S, logI, N);
+                (*bf.f)(refpos[index], allprimes, S, logI, N);
                 memcpy(refS[index], S, B);
+            }
+            for(auto const& bf : cand) {
+                size_t index = &bf-&cand.front();
                 if (!ok_perfunc[index]) continue;
                 if (index > 0) {
                     if (memcmp(S, refS.front(), B) != 0) {
@@ -936,7 +936,6 @@ struct bench_base {
                                 n++;
                             }
                         }
-                        if (abort_on_fail) abort();
                     }
                     if (refpos[index] != refpos.front()) {
                         ok = ok_perfunc[index] = false;
@@ -953,10 +952,10 @@ struct bench_base {
                                 n++;
                             }
                         }
-                        if (abort_on_fail) abort();
                     }
                 }
             }
+            if (abort_on_fail && !ok) abort();
             if (!quiet) for( ; (N+1)*16 >= (ndisp * Nmax) ; ndisp++) {
                 printf(".");
                 fflush(stdout);
