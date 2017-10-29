@@ -244,7 +244,7 @@ struct {
             "cmp %5, %0\n"            /* if (pi_end > S1) no loop */    \
             "jbe 0f\n"                                                  \
             "1:\n"                                                      \
-            TWELVE_XADDS_NOLASTINCR("%1","%3","%5","%4","2f")           \
+            TWELVE_XADDS_INCR("%1","%3","%5","%4","2f")    \
             "jmp 2f\n"                                                  \
             ".balign 8\n"                                               \
             "0:\n"                                                      \
@@ -669,6 +669,11 @@ template<int bit> struct all_candidates_for_evenline {
 template<int bit> struct all_candidates_for_oddline {
     typedef all_generic_candidates::type type;
 };
+template<> struct all_candidates_for_evenline<0> {
+    typedef list_car<assembly0,
+            list_car<manual0,
+            all_generic_candidates::type>> type;
+};
 template<> struct all_candidates_for_evenline<1> {
     typedef list_car<assembly0,
             list_car<manual0,
@@ -701,6 +706,11 @@ template<> struct all_candidates_for_evenline<6> {
 template<> struct all_candidates_for_evenline<7> {
     typedef list_car<assembly6,
             all_generic_candidates::type> type;
+};
+template<> struct all_candidates_for_oddline<0> {
+    typedef list_car<assembly0,
+            list_car<manual0,
+            all_generic_candidates::type>> type;
 };
 template<> struct all_candidates_for_oddline<1> {
     typedef list_car<assembly1,
@@ -1333,6 +1343,7 @@ j_odd:
             // sieve_full_line(S0, S_ptr, S0 - S, pi - S0, p_or_2p, logp, w);
             pos += r; if (pos >= p) pos -= p;
         } while (++j < nj);
+
         //XXX XXX XXX XXX adding this here, as it is relevant to the comparison
         //with branch I18.
         pos += ssp.get_offset();
@@ -1358,8 +1369,8 @@ void devel_branch(std::vector<int64_t> & positions, std::vector<ssp_t> primes, u
         unsigned char * S0 = S;
         where_am_I w MAYBE_UNUSED = 0;
 
+        size_t overrun = 0; /* tame gcc */
         unsigned int j = j0;
-
 
         /* we sieve over the area [S0..S0+(i1-i0)], which may
          * actually be just a fragment of a line. After that, if
@@ -1373,7 +1384,7 @@ void devel_branch(std::vector<int64_t> & positions, std::vector<ssp_t> primes, u
             /* for j even, we sieve only odd pi, so step = 2p. */
             {
             int xpos = ((si.conf.sublat.i0 + pos) & 1) ? pos : (pos+p);
-            sieve_full_line_new_half(S0, S0 + (i1 - i0), S0 - S,
+            overrun = sieve_full_line_new_half(S0, S0 + (i1 - i0), S0 - S,
                     xpos, p+p, logp, w);
             }
             S0 += I;
@@ -1383,7 +1394,7 @@ void devel_branch(std::vector<int64_t> & positions, std::vector<ssp_t> primes, u
 j_odd_devel:
             /* now j odd again */
             WHERE_AM_I_UPDATE(w, j, j - j0);
-            sieve_full_line_new(S0, S0 + (i1 - i0), S0 - S,
+            overrun = sieve_full_line_new(S0, S0 + (i1 - i0), S0 - S,
                     pos, p, logp, w);
             S0 += I;
             pos += r; if (pos >= (int) p) pos -= p;
@@ -1463,8 +1474,8 @@ template<typename even_code, typename odd_code> void devel_branch_meta(std::vect
         unsigned char * S0 = S;
         where_am_I w MAYBE_UNUSED = 0;
 
+        size_t overrun = 0; /* tame gcc */
         unsigned int j = j0;
-
 
         /* we sieve over the area [S0..S0+(i1-i0)], which may
          * actually be just a fragment of a line. After that, if
@@ -1478,7 +1489,7 @@ template<typename even_code, typename odd_code> void devel_branch_meta(std::vect
             /* for j even, we sieve only odd pi, so step = 2p. */
             {
             int xpos = ((si.conf.sublat.i0 + pos) & 1) ? pos : (pos+p);
-            even_code()(S0, S0 + (i1 - i0), S0 - S, xpos, p+p, logp, w);
+            overrun = even_code()(S0, S0 + (i1 - i0), S0 - S, xpos, p+p, logp, w);
             }
             S0 += I;
             pos += r; if (pos >= (int) p) pos -= p; 
@@ -1487,7 +1498,7 @@ template<typename even_code, typename odd_code> void devel_branch_meta(std::vect
 j_odd_devel:
             /* now j odd again */
             WHERE_AM_I_UPDATE(w, j, j - j0);
-            odd_code()(S0, S0 + (i1 - i0), S0 - S, pos, p, logp, w);
+            overrun = odd_code()(S0, S0 + (i1 - i0), S0 - S, pos, p, logp, w);
             S0 += I;
             pos += r; if (pos >= (int) p) pos -= p;
             ++j;
@@ -1528,6 +1539,8 @@ j_odd_devel:
             int di = (N1&((1<<Q)-1)) - (N&((1<<Q)-1));
             /* Note that B_mod p is not reduced. It may be <0, and
              * may also be >= p if we sieved with 2p because of even j
+             *
+             * (0 <= overrun < 2p), and (0 <= pos < p), so -p < B_mod_p < 2p
              */
             int B_mod_p = overrun - pos;
             /* FIXME: we may avoid some of the cost for the modular
@@ -1752,13 +1765,6 @@ void store_primes(std::vector<ssp_t>& allprimes, int bmin, int bmax, gmp_randsta
     mpz_clear(pz);
 }
 
-candidate_list funcs {
-    // modified_I18_branch_C,
-        { false, current_I18_branch, "I18" },
-        { false, legacy_branch, "legacy" },
-        { false, devel_branch, "devel" },
-};
-
 int main(int argc, char * argv[])
 {
     int logI = 16;
@@ -1852,7 +1858,12 @@ int main(int argc, char * argv[])
             CASE(9); CASE(10); CASE(11); CASE(12);
             CASE(13); CASE(14); CASE(15);
             default:
-            fprintf(stderr, "sorry, not handled\n");
+            if (logfill <= b) {
+                factory_for_bit_round1<0>()(cand1);
+                factory_for_bit_round2<0>()(cand2);
+            } else {
+                fprintf(stderr, "sorry, not handled\n");
+            }
         }
 
         std::vector<unsigned char *> refS;
@@ -1878,6 +1889,15 @@ int main(int argc, char * argv[])
         // std::vector<int64_t>& positions(bbase.positions);
         // unsigned char * & S (bbase.S);
         store_primes(bbase.allprimes, bmin, bmax, rstate);
+
+        candidate_list funcs {
+            // modified_I18_branch_C,
+                { false, current_I18_branch, "I18" },
+                { false, devel_branch, "devel" },
+        };
+
+        if (logI <= LOG_BUCKET_REGION)
+            funcs.emplace_back(false, legacy_branch, "legacy");
 
         bbase.test(funcs);
     }
