@@ -1405,19 +1405,18 @@ get_biased_alpha_projective (mpz_poly_srcptr f, unsigned long B)
    return alpha;
 }
 
-#if 0
 /*
   Similar to above, but for affine part.
 */
 double
-get_biased_alpha_affine (mpz_poly_ptr f, unsigned long B)
+get_biased_alpha_affine (mpz_poly_srcptr f, unsigned long B)
 {
    double alpha, e;
    unsigned long p;
    mpz_t disc;
 
    mpz_init (disc);
-   discriminant (disc, f, d);
+   mpz_poly_discriminant (disc, f);
 
    /* prime p=2 */
    e = special_valuation_affine (f, 2, disc);
@@ -1437,7 +1436,7 @@ get_biased_alpha_affine (mpz_poly_ptr f, unsigned long B)
    return alpha;
 }
 
-
+#if 0
 /*
   Contribution from a particular multiple root r of the polynomial f
   over p. Note, r must also be a double root of f mod p.
@@ -1498,7 +1497,6 @@ average_valuation_affine_root (mpz_poly_ptr f, unsigned long p, unsigned long r 
    return val;
 }
 #endif
-
 
 /**************************** rotation ***************************************/
 

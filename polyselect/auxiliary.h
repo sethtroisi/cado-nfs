@@ -71,6 +71,7 @@ double special_valuation (mpz_poly_srcptr f, unsigned long p, mpz_t disc);
 double special_valuation_affine (mpz_poly_srcptr f, unsigned long p, mpz_t disc);
 double get_alpha (mpz_poly_srcptr, unsigned long);
 double get_biased_alpha_projective (mpz_poly_srcptr f, unsigned long B);
+double get_biased_alpha_affine (mpz_poly_srcptr f, unsigned long B);
 
 /* poly info, being called in order */
 void print_cadopoly_fg (FILE*, mpz_t*, int, mpz_t*, int, mpz_t);
