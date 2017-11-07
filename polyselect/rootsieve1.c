@@ -30,8 +30,8 @@
 /* define ORIGINAL if you want the original algorithm from the paper */
 // #define ORIGINAL
 
-// #define TRACE_V -17
-// #define TRACE_W -9
+// #define TRACE_V 7
+// #define TRACE_W 3
 
 /* global variables */
 int verbose = 0;                /* verbosity level */
@@ -90,6 +90,52 @@ initPrimes (unsigned long B)
 
   return nprimes;
 }
+
+#if 0
+/* put in roots[0], roots[1], ... the roots of f + g * w = 0 mod q,
+   and return the number of roots. Naive implementation. */
+static unsigned long
+get_roots (unsigned long *roots, unsigned long f, unsigned long g,
+           unsigned long q)
+{
+  unsigned long nroots = 0;
+
+  for (unsigned long w = 0; w < q; w++)
+    if (((f + g * w) % q) == 0)
+      roots[nroots++] = w;
+  return nroots;
+}
+#else
+/* put in roots[0], roots[1], ... the roots of f + g * w = 0 mod q,
+   and return the number of roots */
+static unsigned long
+get_roots (unsigned long *roots, unsigned long f, unsigned long g,
+           unsigned long q)
+{
+  unsigned long nroots = 0;
+  unsigned long h = gcd_ul (g, q);
+  if (h == 1) /* only one root, namely -f/g mod q */
+    {
+      unsigned long invg = invert_ul (g, q);
+      roots[0] = ((q - f) * invg) % q;
+      nroots = 1;
+    }
+  else if ((f % h) != 0)
+    nroots = 0;
+  else
+    {
+      f /= h;
+      g /= h;
+      q /= h;
+      unsigned long invg = invert_ul (g, q);
+      roots[0] = ((q - f) * invg) % q;
+      for (unsigned long j = 1; j < h; j++)
+        roots[j] = roots[j-1] + q;
+      nroots = h;
+    }
+  return nroots;
+}
+#endif
 
 /* rotation for a fixed value of v.
    lognorm0 is the lognorm of the initial polynomial (for v=w=0)
@@ -161,6 +207,8 @@ rotate_v (cado_poly_srcptr poly0, long v, long B MAYBE_UNUSED,
 
   mpz_t ump;
   mpz_init (ump);
+  unsigned long *roots = malloc (B * sizeof (long));
+  ASSERT_ALWAYS(roots != NULL);
   for (l = 0; l < nprimes; l++)
     {
       long p = Primes[l];
@@ -185,35 +233,37 @@ rotate_v (cado_poly_srcptr poly0, long v, long B MAYBE_UNUSED,
               mpz_poly_eval_ui (ump, poly->pols[RAT_SIDE], x);
               gx = mpz_fdiv_ui (ump, q);
               /* search roots w of fx + w*gx = 0 mod q */
-              for (long w = 0; w < q; w++)
-                if ((fx + w * gx) % q == 0)
-                  {
-                    /* we should update for w+t*q */
-                    long s, t;
-                    /* compute s = w+t*q-wmin such that
-                       s - q < 0 <= s, i.e.,
-                       (t-1)*q < wmin-w <= t*q: t = ceil((wmin-w)/q) */
-                    if (wmin - w < 0)
-                      t = (wmin - w) / q;
-                    else
-                      t = (wmin - w + q - 1) / q;
-                    s = w + t * q - wmin;
-                    ASSERT_ALWAYS(s >= 0);
-                    ASSERT_ALWAYS(s - q < 0);
-                    while (s < len)
-                      {
-                        A[s] -= nu;
+              unsigned long nroots = get_roots (roots, fx, gx, q);
+              for (unsigned long i = 0; i < nroots; i++)
+                {
+                  long w = roots[i];
+                  /* we should update for w+t*q */
+                  long s, t;
+                  /* compute s = w+t*q-wmin such that
+                     s - q < 0 <= s, i.e.,
+                     (t-1)*q < wmin-w <= t*q: t = ceil((wmin-w)/q) */
+                  if (wmin - w < 0)
+                    t = (wmin - w) / q;
+                  else
+                    t = (wmin - w + q - 1) / q;
+                  s = w + t * q - wmin;
+                  ASSERT_ALWAYS(s >= 0);
+                  ASSERT_ALWAYS(s - q < 0);
+                  while (s < len)
+                    {
+                      A[s] -= nu;
 #if defined(TRACE_V) && defined(TRACE_W)
-                        if (v == TRACE_V && TRACE_W - wmin == s)
-                          printf ("q=%ld x=%ld: updated A[%d] to %f\n",
-                                  q, x, TRACE_W, A[s]);
+                      if (v == TRACE_V && TRACE_W - wmin == s)
+                        printf ("q=%ld x=%ld: updated A[%d] to %f\n",
+                                q, x, TRACE_W, A[s]);
 #endif
-                        s += q;
-                      }
-                  }
+                      s += q;
+                    }
+                }
             }
         }
     }
+  free (roots);
   mpz_clear (ump);
 
 #if defined(TRACE_V) && defined(TRACE_W)
