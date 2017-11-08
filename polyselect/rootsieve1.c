@@ -42,6 +42,7 @@ double best_alpha = DBL_MAX;    /* alpha of best rotation */
 mpz_t bestw;                    /* current best rotation in w */
 int debug = 0;                  /* to print (max,avg) discrepancy with respect
                                    to real alpha */
+double sieve_time = 0;
 double max_discrepancy = 0;
 double sum_discrepancy = 0;
 double num_discrepancy = 0;
@@ -249,6 +250,7 @@ rotate_v (cado_poly_srcptr poly0, long v, long B MAYBE_UNUSED,
                   s = w + t * q - wmin;
                   ASSERT_ALWAYS(s >= 0);
                   ASSERT_ALWAYS(s - q < 0);
+                  sieve_time -= seconds ();
                   while (s < len)
                     {
                       A[s] -= nu;
@@ -259,6 +261,7 @@ rotate_v (cado_poly_srcptr poly0, long v, long B MAYBE_UNUSED,
 #endif
                       s += q;
                     }
+                  sieve_time += seconds ();
                 }
             }
         }
@@ -320,12 +323,6 @@ rotate (cado_poly poly, long B, double maxlognorm, double Bf, double Bg,
   for (long v = vmin; v <= vmax; v ++)
     rotate_v (poly, v, B, maxlognorm, Bf, Bg, area, u, wmin, wmax);
 }
-
-typedef struct
-{
-  long vmod, wmod;
-  double alpha, var, alphaprime;
-} class;
 
 /* don't modify poly, which is the size-optimized polynomial
    (poly0 is the initial polynomial) */
@@ -390,6 +387,7 @@ main (int argc, char **argv)
     long vmin = 0, vmax = 0;
     mpz_t wmin, wmax;
     long B = ALPHA_BOUND;
+    double time = seconds ();
 
     mpz_init (wmin);
     mpz_init (wmax);
@@ -556,6 +554,14 @@ main (int argc, char **argv)
                                         SKEWNESS_DEFAULT_PREC);
 
     print_cadopoly_extra (stdout, poly, argc0, argv0, 0);
+
+    time = seconds () - time;
+    double pols = (double) (umax - umin + 1) * (double) (vmax - vmin + 1)
+      * (mpz_get_d (wmax) - mpz_get_d (wmin) + 1.0);
+    printf ("Sieved %.2e polynomials in %.2f seconds (%.2es/p)\n",
+            pols, time, time / pols);
+    printf ("(sieve time %.2f = %.2f%%)\n", sieve_time,
+            100.0 * sieve_time / time);
 
     free (Primes);
     free (Q);
