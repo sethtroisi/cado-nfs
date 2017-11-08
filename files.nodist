@@ -112,6 +112,7 @@ parameters/polynomials/c180.poly
 parameters/polynomials/c185.poly
 parameters/polynomials/c190.poly
 parameters/polynomials/c195.poly
+parameters/polynomials/c200.poly
 scripts/polsel_params.sage
 linalg/bwc/bcast-file.c
 misc/README
