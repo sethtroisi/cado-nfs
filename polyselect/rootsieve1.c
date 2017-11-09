@@ -165,10 +165,6 @@ rotate_v (cado_poly_srcptr poly0, long v, long B MAYBE_UNUSED,
 
   /* compute f + (v*x)*g */
   rotate_aux (poly->pols[ALG_SIDE]->coeff, g1, g0, 0, v, 1);
-#ifdef TRACE_V
-  if (v == TRACE_V)
-    mpz_poly_fprintf (stdout, poly->pols[ALG_SIDE]);
-#endif
 
   if (mpz_cmp (wminz, wmaxz) > 0)
     goto end;
@@ -210,16 +206,19 @@ rotate_v (cado_poly_srcptr poly0, long v, long B MAYBE_UNUSED,
   mpz_init (ump);
   unsigned long *roots = malloc (B * sizeof (long));
   ASSERT_ALWAYS(roots != NULL);
+  float *L;
+  double nu;
+  L = malloc (B * sizeof (float));
   for (l = 0; l < nprimes; l++)
     {
-      long p = Primes[l];
+      long p = Primes[l], s, t, q;
       double logp = log ((double) p);
-      for (long q = p; q <= Q[l]; q *= p)
+      memset (L, 0, B * sizeof (float));
+      for (q = p; q <= Q[l]; q *= p)
         {
           /* the contribution is log(p)/p^(k-1)/(p+1) when the exponent k
              is not the largest one, and log(p)/p^(k-1)/(p+1)*p/(p-1) for the
              largest exponent k */
-          double nu;
           nu = logp / (double) q * (double) p / (double) (p + 1);
 #ifndef ORIGINAL
           if (q == Q[l])
@@ -238,34 +237,42 @@ rotate_v (cado_poly_srcptr poly0, long v, long B MAYBE_UNUSED,
               for (unsigned long i = 0; i < nroots; i++)
                 {
                   long w = roots[i];
-                  /* we should update for w+t*q */
-                  long s, t;
-                  /* compute s = w+t*q-wmin such that
-                     s - q < 0 <= s, i.e.,
-                     (t-1)*q < wmin-w <= t*q: t = ceil((wmin-w)/q) */
-                  if (wmin - w < 0)
-                    t = (wmin - w) / q;
-                  else
-                    t = (wmin - w + q - 1) / q;
-                  s = w + t * q - wmin;
-                  ASSERT_ALWAYS(s >= 0);
-                  ASSERT_ALWAYS(s - q < 0);
-                  sieve_time -= seconds ();
-                  while (s < len)
-                    {
-                      A[s] -= nu;
-#if defined(TRACE_V) && defined(TRACE_W)
-                      if (v == TRACE_V && TRACE_W - wmin == s)
-                        printf ("q=%ld x=%ld: updated A[%d] to %f\n",
-                                q, x, TRACE_W, A[s]);
-#endif
-                      s += q;
-                    }
-                  sieve_time += seconds ();
+                  /* update for w+t*q */
+                  for (t = 0; t < Q[l] / q; t++)
+                    L[w + t * q] += nu;
                 }
             }
         }
+
+      /* now perform the sieve */
+      sieve_time -= seconds ();
+      q = Q[l];
+      for (w = 0; w < q; w++)
+        {
+          nu = L[w];
+          if (nu == 0.0)
+            continue;
+          /* compute s = w+t*q-wmin such that s - q < 0 <= s, i.e.,
+             (t-1)*q < wmin-w <= t*q: t = ceil((wmin-w)/q) */
+          if (wmin - w < 0)
+            t = (wmin - w) / q;
+          else
+            t = (wmin - w + q - 1) / q;
+          s = w + t * q - wmin;
+          while (s < len)
+            {
+#if defined(TRACE_V) && defined(TRACE_W)
+              if (v == TRACE_V && TRACE_W - wmin == s)
+                printf ("q=%ld: update A[%d] from %f to %f\n",
+                        q, TRACE_W, A[s], A[s] - nu);
+#endif
+              A[s] -= nu;
+              s += q;
+            }
+        }
+      sieve_time += seconds ();
     }
+  free (L);
   free (roots);
   mpz_clear (ump);
 
