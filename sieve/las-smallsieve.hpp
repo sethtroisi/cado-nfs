@@ -10,16 +10,20 @@
 
 #define SSP_POW2        (1u<<0)
 #define SSP_PROJ        (1u<<1)
-#define SSP_DISCARD_SUBLAT     (1u<<14)
-#define SSP_DISCARD_PROJ     (1u<<15)
+#define SSP_DISCARD_SUBLAT     (1u<<2)
+#define SSP_DISCARD_PROJ     (1u<<3)
 
 class ssp_simple_t {
-public:
+protected:
     fbprime_t p;
     fbprime_t r;
     fbprime_t offset;
+public:
     unsigned char logp;
 
+    fbprime_t get_p() const {return p;}
+    fbprime_t get_r() const {return r;}
+    fbprime_t get_offset() const {return offset;}
     void init(fbprime_t _p, fbprime_t _r, unsigned char _logp, unsigned int skip) {
         p = _p;
         r = _r;
@@ -29,7 +33,7 @@ public:
     void print(FILE *) const;
 };
 
-class ssp_t {
+class ssp_t : public ssp_simple_t {
     /* ordinary primes. Equation is (i-r*j) = 0 mod p */
     /* p may be a prime power, and even a power of two */
     /* Note that we need three fields for the projective primes anyway,
@@ -37,12 +41,8 @@ class ssp_t {
      * rather useless. (see ssp_init_oa.)  We can recompute it on the fly
      * when needed.
      */
-    fbprime_t p;	// q if projective
-    fbprime_t r;        // in [ 0, p [. g if projective
-    fbprime_t offset;   // in [ 0, p [. U if projective
-    uint16_t flags;
+    unsigned char flags;
 public:
-    unsigned char logp;
 
     fbprime_t get_p() const {ASSERT(!is_proj()); return p;}
     fbprime_t get_r() const {ASSERT(!is_proj()); return r;}
