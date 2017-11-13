@@ -2850,10 +2850,10 @@ for (unsigned int j_cong = 0; j_cong < sublat_bound; ++j_cong) {
 
             if (!s.fb) continue;
 
-            small_sieve_init(s.ssd, las.nb_threads, s.fb_smallsieved.get(), si, side);
+            small_sieve_init(s.ssd, s.rsd, las.nb_threads,
+                             s.fb_smallsieved.get(), si, side,
+                             si.conf.td_thresh);
             small_sieve_info("small sieve", side, s.ssd);
-
-            small_sieve_extract_interval(s.rsd, s.ssd, s.fb_parts_x->rs);
             small_sieve_info("resieve", side, s.rsd);
 
             // Initialize small sieve data at the first region of level 0

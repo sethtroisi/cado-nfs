@@ -174,9 +174,12 @@ void ssp_t::init_proj(fbprime_t p, fbprime_t r, unsigned char _logp, unsigned in
 // and even BUCKET_REGION
 // It could actually be larger than 32 bits when I > 16.
 
-void small_sieve_init(small_sieve_data_t & ssd, unsigned int interleaving,
+void small_sieve_init(small_sieve_data_t & ssd,
+                      small_sieve_data_t & rsd,
+                      unsigned int interleaving,
                       const std::vector<fb_general_entry> *fb,
-                      sieve_info const & si, const int side)
+                      sieve_info const & si, const int side,
+                      const fbprime_t td_thresh)
 {
     const unsigned int thresh = si.conf.bucket_thresh;
     const int verbose = 0;
@@ -250,17 +253,16 @@ void small_sieve_init(small_sieve_data_t & ssd, unsigned int interleaving,
                         r >= p ? "1/" : "", r % p,
                         is_proj_in_ij ? "1/" : "", r_q % p);
 
-
             ssp_t new_ssp(p, r_q, logp, skiprows, is_proj_in_ij);
             if (new_ssp.is_nice()) {
-#ifdef SIEVING_CODE_BELOW_IS_FIXED
                 /* Simple cases go in the simple vector */
                 ssd.ssps.push_back(new_ssp);
-#else
-                /* For now we dump everything in the general vector because
-                   that's where the sieving code expects it. TODO */
-                ssd.ssp.push_back(new_ssp);
-#endif
+                /* Nice primes with weight at most td_thresh also get added
+                   to the resieve data. TODO: should we re-sieve projective
+                   roots with small U? */
+                if (new_ssp.get_p() <= td_thresh * iter->nr_roots) {
+                    rsd.ssp.push_back(new_ssp);
+                }
             } else if (new_ssp.get_g() >= si.J) {
                 /* ... unless the number of lines to skip is >= J */
                 /* FIXME: we lose hits to (+-1,0) this way (the two locations
