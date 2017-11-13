@@ -21,15 +21,16 @@ protected:
 public:
     unsigned char logp;
 
+    ssp_simple_t() : p(0), r(0), offset(0), logp(0) {}
+    ssp_simple_t(fbprime_t _p, fbprime_t _r, unsigned char _logp, unsigned int skip)
+    : p(_p), r(_r), offset((r*skip)%p), logp(_logp)
+    {}
     fbprime_t get_p() const {return p;}
     fbprime_t get_r() const {return r;}
     fbprime_t get_offset() const {return offset;}
-    void init(fbprime_t _p, fbprime_t _r, unsigned char _logp, unsigned int skip) {
-        p = _p;
-        r = _r;
-        offset = (r * skip) % p;
-        logp = _logp;
-    }
+    void set_p(const fbprime_t _p) {p = _p;}
+    void set_r(const fbprime_t _r) {r = _r;}
+    void set_offset(const fbprime_t _offset) {offset = _offset;}
     void print(FILE *) const;
 };
 
@@ -44,18 +45,35 @@ class ssp_t : public ssp_simple_t {
     unsigned char flags;
 public:
 
+    /* Initialization procedures for the ssp data */
+    /* Constructor for affine case */
+    ssp_t() : ssp_simple_t(), flags(0) {}
+    ssp_t(fbprime_t _p, fbprime_t _r, unsigned char _logp, unsigned int skip)
+    : ssp_simple_t(_p, _r, _logp, skip), flags(0)
+    {}
+    /* Constructor for affine or projective case */
+    ssp_t(fbprime_t _p, fbprime_t _r, unsigned char _logp, unsigned int skip, bool proj)
+    {
+      if (proj || _p % 2 == 0) {
+        init_proj(_p, _r, _logp, skip);
+      } else {
+        /* TODO: How to defer to the other constructor correctly? This here is bad */
+        *this = ssp_t(_p, _r, _logp, skip);
+      }
+    }
+
+    /* We could use the parent class' methods if we get rid of the ASSERT()s */
     fbprime_t get_p() const {ASSERT(!is_proj()); return p;}
     fbprime_t get_r() const {ASSERT(!is_proj()); return r;}
     fbprime_t get_offset() const {ASSERT(!is_proj()); return offset;}
+
     fbprime_t get_q() const {ASSERT(is_proj()); ASSERT(p > 0); return p;}
     fbprime_t get_g() const {ASSERT(is_proj()); ASSERT(r > 0); return r;}
     fbprime_t get_U() const {ASSERT(is_proj()); return offset;}
-    void set_p(const fbprime_t _p) {p = _p;}
-    void set_q(const fbprime_t q) {p = q;}
-    void set_r(const fbprime_t _r) {r = _r;}
-    void set_g(const fbprime_t g) {ASSERT(g > 0); r = g;}
-    void set_offset(const fbprime_t _offset) {offset = _offset;}
-    void set_U(const fbprime_t U) {offset = U;}
+
+    void set_q(const fbprime_t q) {ASSERT(is_proj()); p = q;}
+    void set_g(const fbprime_t g) {ASSERT(is_proj()); ASSERT(g > 0); r = g;}
+    void set_U(const fbprime_t U) {ASSERT(is_proj()); offset = U;}
 
     bool is_pow2() const {return (flags & SSP_POW2) != 0;}
     bool is_proj() const {return (flags & SSP_PROJ) != 0;}
@@ -69,24 +87,10 @@ public:
     void set_discarded_sublat() {flags |= SSP_DISCARD_SUBLAT;}
     void set_discarded() {flags |= SSP_DISCARD_PROJ;}
     
-/* Initialization procedures for the ssp data */
-    void init_affine(fbprime_t _p, fbprime_t _r, unsigned char _logp, unsigned int skip) {
-        p = _p;
-        r = _r;
-        logp = _logp;
-        offset = (r * skip) % p;
-    }
+    void print(FILE *) const;
+private:
     void init_proj(fbprime_t p, fbprime_t r, unsigned char _logp,
                    unsigned int skip MAYBE_UNUSED);
-    void init(fbprime_t p, fbprime_t r, unsigned char logp, unsigned int skip,
-              bool proj = false) {
-        if (proj)
-            init_proj(p, r, logp, skip);
-        else
-            init_affine(p, r, logp, skip);
-    }
-
-    void print(FILE *) const;
 };
 
 typedef struct {

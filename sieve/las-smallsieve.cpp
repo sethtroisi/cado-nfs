@@ -147,6 +147,8 @@ void small_sieve_extract_interval(small_sieve_data_t & r, small_sieve_data_t con
 void ssp_t::init_proj(fbprime_t p, fbprime_t r, unsigned char _logp, unsigned int skip MAYBE_UNUSED)/*{{{*/
 {
     set_proj();
+    if (p % 2 == 0)
+      set_pow2();
     logp = _logp;
     unsigned int v = r; /* have consistent notations */
     unsigned int g = gcd_ul(p, v);
@@ -193,8 +195,6 @@ void small_sieve_init(small_sieve_data_t & ssd, unsigned int interleaving,
 
     // Do another pass on fb and projective primes, to fill in the data
     // while we have any regular primes or projective primes < thresh left
-    ssp_t * tail = &(ssd.ssp.front());
-    // ssp_simple_t * tails MAYBE_UNUSED = ssd.ssps;
     
     // The processing of bucket region by nb_threads is interleaved.
     // It means that the positions for the small sieve must jump
@@ -221,12 +221,8 @@ void small_sieve_init(small_sieve_data_t & ssd, unsigned int interleaving,
             /* Convert into old format for projective roots by adding p if projective.
                FIXME, this sucks. */
             const fbroot_t r = root.r + (root.proj ? p : 0);
-            /* skip q: mark it in place of p to be recognized quickly.
-               TODO: maybe use the SSP_DISCARD mechanism ?
-               */
+
             if (!si.doing.is_coprime_to(pp)) {
-                tail->set_p(mpz_get_ui(si.doing.p));
-                tail++;
                 continue;
             }
 
@@ -234,51 +230,51 @@ void small_sieve_init(small_sieve_data_t & ssd, unsigned int interleaving,
                 // In sublat mode, disable pattern sieving and primes
                 // dividing m. (pp is the prime, here)
                 if (pp == 2 || pp == 3 || (sublatm % pp) == 0) {
-                    tail->set_discarded_sublat();
+                    continue;
                 }
             }
-
-            if ((p & 1)==0) tail->set_pow2();
 
             const unsigned char logp = fb_log_delta (pp, root.exp, root.oldexp,
                 si.sides[side].lognorms->scale);
             
             WHERE_AM_I_UPDATE(w, r, r);
-            const fbroot_t r_q = fb_root_in_qlattice(p, r, iter->invq, si.qbasis);
+            fbroot_t r_q = fb_root_in_qlattice(p, r, iter->invq, si.qbasis);
             /* If this root is somehow interesting (projective in (a,b) or
                in (i,j) plane), print a message */
-            if (verbose && (r > p || r_q >= p))
+            const bool is_proj_in_ij = r_q >= p;
+            if (is_proj_in_ij) r_q -= p;
+            if (verbose && (r > p || is_proj_in_ij))
                 verbose_output_print(0, 1, "# small_sieve_init: side %d, prime %"
                         FBPRIME_FORMAT " root %s%" FBROOT_FORMAT " -> %s%" 
                         FBROOT_FORMAT "\n", side, p, 
                         r >= p ? "1/" : "", r % p,
-                        r_q >= p ? "1/" : "", r_q % p);
+                        is_proj_in_ij ? "1/" : "", r_q % p);
 
-            /* Handle projective roots */
-            if (r_q >= p && !tail->is_discarded_sublat()) {
-                /* Compute the init data in any case, since the gcd
-                 * dominates (and anyway we won't be doing this very
-                 * often). */
-                tail->init_proj(p, r_q - p, logp, skiprows);
-                /* If g exceeds J, then the only reached locations in the
-                 * sieving area will be on line (j=0), thus (1,0) only since
-                 * the other are equivalent.
-                 */
-                if (tail->get_g() >= si.J) {
-                    if (verbose) {
-                        verbose_output_print(0, 1,
-                                "# small_sieve_init: not adding projective prime"
-                                " (1:%" FBROOT_FORMAT ") mod %" FBPRIME_FORMAT ")"
-                                " to small sieve  because g=%d >= si.J = %d\n",
-                                r_q-p, p, tail->get_g(), si.J);
-                    }
-                    tail->set_discarded();
+
+            ssp_t new_ssp(p, r_q, logp, skiprows, is_proj_in_ij);
+            if (new_ssp.is_nice()) {
+#ifdef SIEVING_CODE_BELOW_IS_FIXED
+                /* Simple cases go in the simple vector */
+                ssd.ssps.push_back(new_ssp);
+#else
+                /* For now we dump everything in the general vector because
+                   that's where the sieving code expects it. TODO */
+                ssd.ssp.push_back(new_ssp);
+#endif
+            } else if (new_ssp.get_g() >= si.J) {
+                /* ... unless the number of lines to skip is >= J */
+                /* FIXME: we lose hits to (+-1,0) this way (the two locations
+                   are equal up to sign, but we should sieve one of them!) */
+                if (verbose) {
+                    verbose_output_print(0, 1,
+                            "# small_sieve_init: not adding projective prime"
+                            " (1:%" FBROOT_FORMAT ") mod %" FBPRIME_FORMAT ")"
+                            " to small sieve  because g=%d >= si.J = %d\n",
+                            r_q-p, p, new_ssp.get_g(), si.J);
                 }
-            } else if (!tail->is_discarded()) {
-                tail->init(p, r_q, logp, skiprows);
+            } else {
+                ssd.ssp.push_back(new_ssp);
             }
-
-            tail++;
         }
     }
 }
