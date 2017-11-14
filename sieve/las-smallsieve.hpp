@@ -42,14 +42,14 @@ class ssp_t : public ssp_simple_t {
      * rather useless. (see ssp_init_oa.)  We can recompute it on the fly
      * when needed.
      */
-    unsigned char flags;
+    unsigned char flags = 0;
 public:
 
     /* Initialization procedures for the ssp data */
     /* Constructor for affine case */
     ssp_t() : ssp_simple_t(), flags(0) {}
     ssp_t(fbprime_t _p, fbprime_t _r, unsigned char _logp, unsigned int skip)
-    : ssp_simple_t(_p, _r, _logp, skip), flags(0)
+    : ssp_simple_t(_p, _r, _logp, skip)
     {}
     /* Constructor for affine or projective case */
     ssp_t(fbprime_t _p, fbprime_t _r, unsigned char _logp, unsigned int skip, bool proj)
