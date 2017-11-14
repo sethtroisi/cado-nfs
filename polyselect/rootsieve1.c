@@ -43,6 +43,7 @@ double best_E = 0;              /* E of best rotation (with -E) */
 mpz_t bestw;                    /* current best rotation in w */
 int debug = 0;                  /* to print (max,avg) discrepancy with respect
                                    to real alpha */
+double tot_pols = 0;            /* number of sieved polynomial */
 double sieve_time = 0;
 double max_discrepancy = 0;
 double sum_discrepancy = 0;
@@ -65,8 +66,6 @@ usage_and_die (char *argv0)
   fprintf (stderr, "  -v           verbose toggle\n");
   fprintf (stderr, "  -debug       prints avg/max discrepancy with true affine alpha\n");
   fprintf (stderr, "  -sopt        first size-optimize the given polynomial\n");
-  fprintf (stderr, "  -V vmax      use bounds [-vmax,vmax] for v in v*x*g\n");
-  fprintf (stderr, "  -W wmax      use bounds [-wmax,wmax] for w in w*g\n");
   fprintf (stderr, "  -B nnn       parameter for alpha computation (default %d)\n", ALPHA_BOUND);
   fprintf (stderr, "  -E           optimize E instead of alpha\n");
   exit (1);
@@ -144,14 +143,10 @@ get_roots (unsigned long *roots, unsigned long f, unsigned long g,
 }
 #endif
 
-/* rotation for a fixed value of v.
-   lognorm0 is the lognorm of the initial polynomial (for v=w=0)
-   skew is the skewness of the initial polynomial (for v=w=0) */
+/* rotation for a fixed value of v */
 static void
-rotate_v (cado_poly_srcptr poly0, long v, long B MAYBE_UNUSED,
-          double maxlognorm MAYBE_UNUSED, double Bf MAYBE_UNUSED,
-          double Bg MAYBE_UNUSED, double area MAYBE_UNUSED,
-          long u, mpz_t wminz0, mpz_t wmaxz0)
+rotate_v (cado_poly_srcptr poly0, long v, long B,
+          double maxlognorm, double Bf, double Bg, double area, long u)
 {
   long w, wmin, wmax;
   cado_poly poly;
@@ -159,8 +154,8 @@ rotate_v (cado_poly_srcptr poly0, long v, long B MAYBE_UNUSED,
   mpz_t g1, g0;
   mpz_t wminz, wmaxz;
 
-  mpz_init_set (wminz, wminz0);
-  mpz_init_set (wmaxz, wmaxz0);
+  mpz_init (wminz);
+  mpz_init (wmaxz);
 
   /* first make a local copy of the original polynomial */
   cado_poly_init (poly);
@@ -172,8 +167,17 @@ rotate_v (cado_poly_srcptr poly0, long v, long B MAYBE_UNUSED,
   /* compute f + (v*x)*g */
   rotate_aux (poly->pols[ALG_SIDE]->coeff, g1, g0, 0, v, 1);
 
-  if (mpz_cmp (wminz, wmaxz) > 0)
+  double lognorm = L2_lognorm (poly->pols[ALG_SIDE], poly->skew);
+  rotation_space r;
+  expected_growth (&r, poly->pols[ALG_SIDE], poly->pols[RAT_SIDE], 0,
+                   maxlognorm - lognorm);
+  mpz_set_d (wminz, r.kmin);
+  mpz_set_d (wmaxz, r.kmax);
+
+  if (mpz_cmp (wminz, wmaxz) >= 0)
     goto end;
+
+  tot_pols += mpz_get_d (wmaxz) - mpz_get_d (wminz);
 
   if (verbose)
     {
@@ -358,10 +362,20 @@ rotate_v (cado_poly_srcptr poly0, long v, long B MAYBE_UNUSED,
 
 static void
 rotate (cado_poly poly, long B, double maxlognorm, double Bf, double Bg,
-        double area, long vmin, long vmax, long u, mpz_t wmin, mpz_t wmax)
+        double area, long u)
 {
+  /* determine range [vmin,vmax] */
+  double lognorm = L2_lognorm (poly->pols[ALG_SIDE], poly->skew);
+  rotation_space r;
+  expected_growth (&r, poly->pols[ALG_SIDE], poly->pols[RAT_SIDE], 1,
+                   maxlognorm - lognorm);
+  long vmin = (r.kmin < (double) LONG_MIN) ? LONG_MIN : r.kmin;
+  long vmax = (r.kmax > (double) LONG_MAX) ? LONG_MAX : r.kmax;
+  if (verbose)
+    printf ("u=%ld: vmin=%ld vmax=%ld\n", u, vmin, vmax);
+
   for (long v = vmin; v <= vmax; v ++)
-    rotate_v (poly, v, B, maxlognorm, Bf, Bg, area, u, wmin, wmax);
+    rotate_v (poly, v, B, maxlognorm, Bf, Bg, area, u);
 }
 
 /* don't modify poly, which is the size-optimized polynomial
@@ -426,17 +440,11 @@ main (int argc, char **argv)
     char **argv0 = argv;
     cado_poly poly;
     int I = 0;
-    double skew = 0.0;
     double margin = NORM_MARGIN;
     long umin, umax;
     int sopt = 0;
-    long vmin = 0, vmax = 0;
-    mpz_t wmin, wmax;
     long B = ALPHA_BOUND;
     double time = seconds ();
-
-    mpz_init (wmin);
-    mpz_init (wmax);
 
     while (argc >= 2 && argv[1][0] == '-')
       {
@@ -495,20 +503,6 @@ main (int argc, char **argv)
             argv ++;
             argc --;
           }
-        else if (strcmp (argv[1], "-V") == 0)
-          {
-            vmax = strtol (argv [2], NULL, 10);
-            vmin = -vmax;
-            argv += 2;
-            argc -= 2;
-          }
-        else if (strcmp (argv[1], "-W") == 0)
-          {
-            mpz_set_str (wmax, argv[2], 10);
-            mpz_neg (wmin, wmax);
-            argv += 2;
-            argc -= 2;
-          }
         else if (strcmp (argv[1], "-B") == 0)
           {
             B = strtol (argv [2], NULL, 10);
@@ -553,16 +547,18 @@ main (int argc, char **argv)
         cado_poly_clear (c);
       }
 
-    /* compute the skewness */
-    skew = L2_skewness (poly->pols[ALG_SIDE], SKEWNESS_DEFAULT_PREC);
-
     nprimes = initPrimes (B);
 
     /* determine range [umin,umax] */
-    umin = 0;
-    umax = 0;
+    rotation_space r;
+    expected_growth (&r, poly->pols[ALG_SIDE], poly->pols[RAT_SIDE], 2,
+                     margin);
+    umin = (r.kmin < (double) LONG_MIN) ? LONG_MIN : r.kmin;
+    umax = (r.kmax > (double) LONG_MAX) ? LONG_MAX : r.kmax;
+    if (verbose)
+      printf ("umin=%ld umax=%ld\n", umin, umax);
 
-    double maxlognorm = L2_lognorm (poly->pols[ALG_SIDE], skew) + margin;
+    double maxlognorm = L2_lognorm (poly->pols[ALG_SIDE], poly->skew) + margin;
 
     mpz_init (bestw);
 
@@ -574,11 +570,7 @@ main (int argc, char **argv)
                     poly->pols[RAT_SIDE]->coeff[0], u0, u, 2);
         u0 = u;
 
-        /* recompute the skewness */
-        skew = L2_skewness (poly->pols[ALG_SIDE], SKEWNESS_DEFAULT_PREC);
-
-        rotate (poly, B, maxlognorm, bound_f, bound_g, area,
-                vmin, vmax, u, wmin, wmax);
+        rotate (poly, B, maxlognorm, bound_f, bound_g, area, u);
       }
 
     if (debug)
@@ -608,18 +600,14 @@ main (int argc, char **argv)
     print_cadopoly_extra (stdout, poly, argc0, argv0, 0);
 
     time = seconds () - time;
-    double pols = (double) (umax - umin + 1) * (double) (vmax - vmin + 1)
-      * (mpz_get_d (wmax) - mpz_get_d (wmin) + 1.0);
     printf ("Sieved %.2e polynomials in %.2f seconds (%.2es/p)\n",
-            pols, time, time / pols);
+            tot_pols, time, time / tot_pols);
     printf ("(sieve time %.2f = %.2f%%)\n", sieve_time,
             100.0 * sieve_time / time);
 
     free (Primes);
     free (Q);
     cado_poly_clear (poly);
-    mpz_clear (wmin);
-    mpz_clear (wmax);
     mpz_clear (bestw);
 
     return 0;
