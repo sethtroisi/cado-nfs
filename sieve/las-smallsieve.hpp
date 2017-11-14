@@ -96,6 +96,9 @@ private:
 typedef struct {
     std::vector<ssp_simple_t> ssps;
     std::vector<ssp_t> ssp;
+    /* These iterators tell which of the ssps entries should be used 
+       for re-sieving */
+    std::vector<ssp_simple_t>::const_iterator resieve_start, resieve_end;
 } small_sieve_data_t;
 
 /* Include this only now, as there's a cross dependency between the two
@@ -108,7 +111,7 @@ extern void small_sieve_info(const char * what, int side, small_sieve_data_t con
 extern int small_sieve_dump(FILE *, const char *, va_list);
 extern void small_sieve_clear(small_sieve_data_t & ssd);
 extern void small_sieve_extract_interval(small_sieve_data_t & r, small_sieve_data_t const & s, int bounds[2]);
-extern void small_sieve_init(small_sieve_data_t & ssd, small_sieve_data_t & rsd, unsigned int interleaving, const std::vector<fb_general_entry> *fb,
+extern void small_sieve_init(small_sieve_data_t & ssd, unsigned int interleaving, const std::vector<fb_general_entry> *fb,
                       sieve_info const & si, int side, fbprime_t td_thresh);
 extern void small_sieve_copy_start(std::vector<int64_t> &, std::vector<int64_t> const & base, int bounds[2]);
 extern void small_sieve_start(std::vector<int64_t> &, small_sieve_data_t & ssd, unsigned int N, sieve_info const & si);

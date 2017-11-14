@@ -2850,7 +2850,7 @@ for (unsigned int j_cong = 0; j_cong < sublat_bound; ++j_cong) {
 
             if (!s.fb) continue;
 
-            small_sieve_init(s.ssd, s.rsd, las.nb_threads,
+            small_sieve_init(s.ssd, las.nb_threads,
                              s.fb_smallsieved.get(), si, side,
                              si.conf.td_thresh);
             small_sieve_info("small sieve", side, s.ssd);

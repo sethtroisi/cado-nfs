@@ -175,7 +175,6 @@ void ssp_t::init_proj(fbprime_t p, fbprime_t r, unsigned char _logp, unsigned in
 // It could actually be larger than 32 bits when I > 16.
 
 void small_sieve_init(small_sieve_data_t & ssd,
-                      small_sieve_data_t & rsd,
                       unsigned int interleaving,
                       const std::vector<fb_general_entry> *fb,
                       sieve_info const & si, const int side,
@@ -209,6 +208,10 @@ void small_sieve_init(small_sieve_data_t & ssd,
     // times faster.
     unsigned int sublatm = si.conf.sublat.m;
     const unsigned int skiprows = ((interleaving-1) << LOG_BUCKET_REGION) >> si.conf.logI_adjusted;
+
+    /* A temporary vector to hold primes that should get re-sieved. Will later
+       be appended to ssps. */
+    std::vector<ssp_simple_t> rsd;
 
     for (std::vector<fb_general_entry>::const_iterator iter = fb->begin() ; iter != fb->end() ; iter++) {
         /* p=pp^k, the prime or prime power in this entry, and pp is prime */
@@ -255,13 +258,10 @@ void small_sieve_init(small_sieve_data_t & ssd,
 
             ssp_t new_ssp(p, r_q, logp, skiprows, is_proj_in_ij);
             if (new_ssp.is_nice()) {
-                /* Simple cases go in the simple vector */
-                ssd.ssps.push_back(new_ssp);
-                /* Nice primes with weight at most td_thresh also get added
-                   to the resieve data. TODO: should we re-sieve projective
-                   roots with small U? */
                 if (new_ssp.get_p() <= td_thresh * iter->nr_roots) {
-                    rsd.ssp.push_back(new_ssp);
+                    rsd.push_back(new_ssp);
+                } else {
+                    ssd.ssps.push_back(new_ssp);
                 }
             } else if (new_ssp.get_g() >= si.J) {
                 /* ... unless the number of lines to skip is >= J */
@@ -279,6 +279,9 @@ void small_sieve_init(small_sieve_data_t & ssd,
             }
         }
     }
+    ssd.resieve_start = ssd.ssps.end();
+    ssd.ssps.insert(ssd.ssps.end(), rsd.begin(), rsd.end());
+    ssd.resieve_end = ssd.ssps.end();
 }
 /* }}} */
 
