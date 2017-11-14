@@ -46,6 +46,7 @@ double sieve_time = 0;
 double max_discrepancy = 0;
 double sum_discrepancy = 0;
 double num_discrepancy = 0;
+long u0 = 0, v0 = 0, w0 = 0;    /* initial translation */
 
 static void
 usage_and_die (char *argv0)
@@ -284,14 +285,36 @@ rotate_v (cado_poly_srcptr poly0, long v, long B MAYBE_UNUSED,
 
   /* check for the smallest A[s] */
   for (w = wmin; w <= wmax; w++)
-    if (A[w - wmin] < best_alpha)
-      {
-        bestu = u;
-        bestv = v;
-        mpz_set_si (bestw, w);
-        best_alpha = (double) A[w - wmin];
-        gmp_printf ("u=%ld v=%ld w=%Zd alpha=%f\n", u, v, bestw, best_alpha);
-      }
+    {
+      /* print alpha and E of original polynomial */
+      if (u == -u0 && v == -v0 && w == -w0)
+        {
+          rotate_aux (poly->pols[ALG_SIDE]->coeff, g1, g0, 0, w, 0);
+          poly->skew = L2_skewness (poly->pols[ALG_SIDE],
+                                    SKEWNESS_DEFAULT_PREC);
+          double E = MurphyE (poly, Bf, Bg, area, MURPHY_K);
+          gmp_printf ("u=%ld v=%ld w=%ld est_alpha_aff=%f E=%.2e [original]\n",
+                      u, v, w, A[w - wmin], E);
+          rotate_aux (poly->pols[ALG_SIDE]->coeff, g1, g0, w, 0, 0);
+        }
+      if (A[w - wmin] < best_alpha)
+        {
+          bestu = u;
+          bestv = v;
+          mpz_set_si (bestw, w);
+          best_alpha = (double) A[w - wmin];
+          rotate_auxg_z (poly->pols[ALG_SIDE]->coeff, g1, g0, bestw, 0);
+          poly->skew = L2_skewness (poly->pols[ALG_SIDE],
+                                    SKEWNESS_DEFAULT_PREC);
+          double E = MurphyE (poly, Bf, Bg, area, MURPHY_K);
+          gmp_printf ("u=%ld v=%ld w=%Zd est_alpha_affine=%f E=%.2e\n",
+                      u, v, bestw, best_alpha, E);
+          /* restore the original polynomial (w=0) */
+          mpz_neg (bestw, bestw);
+          rotate_auxg_z (poly->pols[ALG_SIDE]->coeff, g1, g0, bestw, 0);
+          mpz_neg (bestw, bestw);
+        }
+    }
 
   if (debug)
     {
@@ -361,18 +384,24 @@ print_transformation (cado_poly_ptr poly0, cado_poly_srcptr poly)
   ASSERT_ALWAYS(mpz_divisible_p (k, poly0->pols[RAT_SIDE]->coeff[1]));
   mpz_divexact (k, k, poly0->pols[RAT_SIDE]->coeff[1]);
   gmp_printf ("rotation [%Zd,", k);
+  assert (mpz_fits_slong_p (k));
+  u0 = mpz_get_si (k);
   rotate_auxg_z (poly0->pols[ALG_SIDE]->coeff, poly0->pols[RAT_SIDE]->coeff[1],
                  poly0->pols[RAT_SIDE]->coeff[0], k, 2);
   mpz_sub (k, poly->pols[ALG_SIDE]->coeff[2], poly0->pols[ALG_SIDE]->coeff[2]);
   ASSERT_ALWAYS(mpz_divisible_p (k, poly0->pols[RAT_SIDE]->coeff[1]));
   mpz_divexact (k, k, poly0->pols[RAT_SIDE]->coeff[1]);
   gmp_printf ("%Zd,", k);
+  assert (mpz_fits_slong_p (k));
+  v0 = mpz_get_si (k);
   rotate_auxg_z (poly0->pols[ALG_SIDE]->coeff, poly0->pols[RAT_SIDE]->coeff[1],
                  poly0->pols[RAT_SIDE]->coeff[0], k, 1);
   mpz_sub (k, poly->pols[ALG_SIDE]->coeff[1], poly0->pols[ALG_SIDE]->coeff[1]);
   ASSERT_ALWAYS(mpz_divisible_p (k, poly0->pols[RAT_SIDE]->coeff[1]));
   mpz_divexact (k, k, poly0->pols[RAT_SIDE]->coeff[1]);
   gmp_printf ("%Zd]\n", k);
+  assert (mpz_fits_slong_p (k));
+  w0 = mpz_get_si (k);
   rotate_auxg_z (poly0->pols[ALG_SIDE]->coeff, poly0->pols[RAT_SIDE]->coeff[1],
                  poly0->pols[RAT_SIDE]->coeff[0], k, 0);
   ASSERT_ALWAYS(mpz_cmp (poly0->pols[ALG_SIDE]->coeff[0],
