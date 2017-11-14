@@ -39,6 +39,7 @@ long *Primes, nprimes;          /* primes less than B */
 long *Q;                        /* largest p^k < B */
 long bestu = 0, bestv = 0;      /* current best rotation */
 double best_alpha = DBL_MAX;    /* alpha of best rotation */
+double best_E = 0;              /* E of best rotation (with -E) */
 mpz_t bestw;                    /* current best rotation in w */
 int debug = 0;                  /* to print (max,avg) discrepancy with respect
                                    to real alpha */
@@ -47,6 +48,9 @@ double max_discrepancy = 0;
 double sum_discrepancy = 0;
 double num_discrepancy = 0;
 long u0 = 0, v0 = 0, w0 = 0;    /* initial translation */
+int optimizeE = 0;              /* if not zero, optimize E instead of alpha */
+double margin_alpha = 0.0;      /* margin with -E */
+#define MARGIN_ALPHA 1.0
 
 static void
 usage_and_die (char *argv0)
@@ -64,6 +68,7 @@ usage_and_die (char *argv0)
   fprintf (stderr, "  -V vmax      use bounds [-vmax,vmax] for v in v*x*g\n");
   fprintf (stderr, "  -W wmax      use bounds [-wmax,wmax] for w in w*g\n");
   fprintf (stderr, "  -B nnn       parameter for alpha computation (default %d)\n", ALPHA_BOUND);
+  fprintf (stderr, "  -E           optimize E instead of alpha\n");
   exit (1);
 }
 
@@ -295,24 +300,29 @@ rotate_v (cado_poly_srcptr poly0, long v, long B MAYBE_UNUSED,
           double E = MurphyE (poly, Bf, Bg, area, MURPHY_K);
           gmp_printf ("u=%ld v=%ld w=%ld est_alpha_aff=%f E=%.2e [original]\n",
                       u, v, w, A[w - wmin], E);
+          /* restore the original polynomial (w=0) */
           rotate_aux (poly->pols[ALG_SIDE]->coeff, g1, g0, w, 0, 0);
         }
-      if (A[w - wmin] < best_alpha)
+      if (A[w - wmin] < best_alpha + margin_alpha)
         {
-          bestu = u;
-          bestv = v;
-          mpz_set_si (bestw, w);
-          best_alpha = (double) A[w - wmin];
-          rotate_auxg_z (poly->pols[ALG_SIDE]->coeff, g1, g0, bestw, 0);
+          /* compute E */
+          rotate_aux (poly->pols[ALG_SIDE]->coeff, g1, g0, 0, w, 0);
           poly->skew = L2_skewness (poly->pols[ALG_SIDE],
                                     SKEWNESS_DEFAULT_PREC);
           double E = MurphyE (poly, Bf, Bg, area, MURPHY_K);
-          gmp_printf ("u=%ld v=%ld w=%Zd est_alpha_affine=%f E=%.2e\n",
-                      u, v, bestw, best_alpha, E);
           /* restore the original polynomial (w=0) */
-          mpz_neg (bestw, bestw);
-          rotate_auxg_z (poly->pols[ALG_SIDE]->coeff, g1, g0, bestw, 0);
-          mpz_neg (bestw, bestw);
+          rotate_aux (poly->pols[ALG_SIDE]->coeff, g1, g0, w, 0, 0);
+
+          if (optimizeE == 0 || (optimizeE == 1 && E > best_E))
+            {
+              bestu = u;
+              bestv = v;
+              mpz_set_si (bestw, w);
+              best_alpha = (double) A[w - wmin];
+              best_E = E;
+              gmp_printf ("u=%ld v=%ld w=%Zd est_alpha_aff=%f E=%.2e\n",
+                          u, v, bestw, best_alpha, E);
+            }
         }
     }
 
@@ -463,6 +473,13 @@ main (int argc, char **argv)
         else if (strcmp (argv[1], "-v") == 0)
           {
             verbose ++;
+            argv ++;
+            argc --;
+          }
+        else if (strcmp (argv[1], "-E") == 0)
+          {
+            optimizeE = 1;
+            margin_alpha = MARGIN_ALPHA;
             argv ++;
             argc --;
           }
