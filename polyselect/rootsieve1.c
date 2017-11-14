@@ -544,7 +544,6 @@ main (int argc, char **argv)
     /* determine range [umin,umax] */
     umin = 0;
     umax = 0;
-    printf ("umin=%ld umax=%ld\n", umin, umax);
 
     double maxlognorm = L2_lognorm (poly->pols[ALG_SIDE], skew) + margin;
 
