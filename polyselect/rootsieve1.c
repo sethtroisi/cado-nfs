@@ -55,6 +55,12 @@ int optimizeE = 0;              /* if not zero, optimize E instead of alpha */
 double guard_alpha = 0.0;       /* guard when -E */
 #define GUARD_ALPHA 1.0
 
+typedef struct sieve_data {
+  uint16_t q;
+  uint16_t s;
+  float nu;
+} sieve_data;
+
 static void
 usage_and_die (char *argv0)
 {
@@ -214,9 +220,7 @@ rotate_v (cado_poly_srcptr poly0, long v, long B,
      it thus fits in an uint16_t if B does;
      sieve_s contains the first index i multiple of q where the contribution
      sieve_nu should be added, it is thus smaller than q and thus fits too. */
-  uint16_t *sieve_q = malloc (sum_of_prime_powers * sizeof (uint16_t));
-  uint16_t *sieve_s = malloc (sum_of_prime_powers * sizeof (uint16_t));
-  float *sieve_nu = malloc (sum_of_prime_powers * sizeof (float));
+  sieve_data *sieve_d = malloc (sum_of_prime_powers * sizeof (sieve_data));
   unsigned long sieve_n = 0;
   for (l = 0; l < nprimes; l++)
     {
@@ -268,9 +272,9 @@ rotate_v (cado_poly_srcptr poly0, long v, long B,
           else
             t = (wmin - w + q - 1) / q;
           s = w + t * q - wmin;
-          sieve_q[sieve_n] = q;
-          sieve_nu[sieve_n] = nu;
-          sieve_s[sieve_n] = s;
+          sieve_d[sieve_n].q = q;
+          sieve_d[sieve_n].s = s;
+          sieve_d[sieve_n].nu = nu;
           sieve_n ++;
         }
       prepare_time += seconds ();
@@ -301,9 +305,9 @@ rotate_v (cado_poly_srcptr poly0, long v, long B,
       sieve_time -= seconds ();
       for (unsigned long i = 0; i < sieve_n; i++)
         {
-          long q = sieve_q[i];
-          long s = sieve_s[i];
-          float nu = sieve_nu[i];
+          long q = sieve_d[i].q;
+          long s = sieve_d[i].s;
+          float nu = sieve_d[i].nu;
           while (s < LEN)
             {
 #if defined(TRACE_V) && defined(TRACE_W)
@@ -314,7 +318,7 @@ rotate_v (cado_poly_srcptr poly0, long v, long B,
               A[s] -= nu;
               s += q;
             }
-          sieve_s[i] = s - LEN;
+          sieve_d[i].s = s - LEN;
         }
       sieve_time += seconds ();
 
@@ -371,9 +375,7 @@ rotate_v (cado_poly_srcptr poly0, long v, long B,
       wcur += LEN;
     }
 
-  free (sieve_s);
-  free (sieve_q);
-  free (sieve_nu);
+  free (sieve_d);
   free (L);
   free (roots);
   mpz_clear (ump);
