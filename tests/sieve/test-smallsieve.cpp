@@ -793,7 +793,7 @@ struct small_sieve_routine : public small_sieve_routine_base {
     }
     /* This function is responsible for small-sieving primes of a
      * specific bit size */
-    template<typename even_code, typename odd_code, int bits_off>
+    template<typename even_code, typename odd_code, bool fragment, int bits_off>
         void handle_nice_primes() /* {{{ */
     {
         for( ; index < primes.size() ; index++) {
@@ -859,7 +859,7 @@ struct small_sieve_routine : public small_sieve_routine_base {
                 pos += r; if (pos >= (int) p) pos -= p;
                 ++j;
             }
-            if (logI > LOG_BUCKET_REGION) {
+            if (fragment) {
                 /* quick notes for incremental adjustment in case I>B (B =
                  * LOG_BUCKET_REGION).
                  *
@@ -936,7 +936,7 @@ struct small_sieve_routine : public small_sieve_routine_base {
      * function. Because we're playing tricks with types and lists of
      * types and such, we need to work with partial specializations at
      * the class level, which is admittedly messy. */
-    template<typename T, int max_bits_off = INT_MAX>
+    template<typename T, bool fragment, int max_bits_off = INT_MAX>
         struct do_it
         {
             void operator()(small_sieve_routine & SS) {
@@ -948,15 +948,15 @@ struct small_sieve_routine : public small_sieve_routine_base {
 
     /* optimization: do not split into pieces when we have several times
      * the same code anyway. */
-    template<typename E0, typename O0, int b0, int b1, typename T, int bn>
+    template<typename E0, typename O0, int b0, int b1, typename T, bool fragment, int bn>
         struct do_it<choice_list_car<E0,O0,b0,
                      choice_list_car<E0,O0,b1,
-                    T>>, bn>
+                    T>>, fragment, bn>
         {
             static_assert(b0 > b1);
             void operator()(small_sieve_routine & SS) {
-                SS.handle_nice_primes<E0, O0, b1>();
-                do_it<T>()(SS);
+                SS.handle_nice_primes<E0, O0, fragment, b1>();
+                do_it<T, fragment>()(SS);
             }
         };
     template<typename E0, typename O0, int b0, int bn>
@@ -981,13 +981,13 @@ struct small_sieve_routine : public small_sieve_routine_base {
                 is_compatible_for_range<E0, O0, b0, b0 + 5>::value;
         };
 
-    template<typename E0, typename O0, int b0, typename T, int bn>
-        struct do_it<choice_list_car<E0,O0,b0,T>, bn>
+    template<typename E0, typename O0, int b0, typename T, bool fragment, int bn>
+        struct do_it<choice_list_car<E0,O0,b0,T>, fragment, bn>
         {
             static_assert(is_compatible_for_range<E0, E0, b0, bn>::value);
             void operator()(small_sieve_routine & SS) {
-                SS.handle_nice_primes<E0, O0, b0>();
-                do_it<T, b0-1>()(SS);
+                SS.handle_nice_primes<E0, O0, fragment, b0>();
+                do_it<T, fragment, b0-1>()(SS);
             }
         };
 };
@@ -1015,11 +1015,23 @@ template<> struct make_best_choice_list<12> {
             >> type;
 };
 
-template<typename even_code, typename odd_code> void devel_branch_meta(std::vector<int64_t> & positions, std::vector<ssp_t> const& primes, unsigned char * S, int logI, unsigned int N) /*{{{*/
+template<bool b> class overrun_t {
+    size_t x = 0;
+    public:
+    operator size_t() const { return x; }
+    overrun_t operator=(size_t a) { x=a; return *this; }
+};
+
+template<> class overrun_t<false> {
+    public:
+    operator size_t() const { return 0; }
+    inline overrun_t operator=(size_t) { return *this; }
+};
+
+template<typename even_code, typename odd_code, bool fragment> void devel_branch_meta(std::vector<int64_t> & positions, std::vector<ssp_t> const& primes, unsigned char * S, int logI, unsigned int N) /*{{{*/
 {
     SMALLSIEVE_COMMON_DEFS();
     ASSERT_ALWAYS(positions.size() == primes.size());
-    if (logI > LOG_BUCKET_REGION) {
     for(auto const & ssp : primes) {
         int64_t & p_pos(positions[&ssp - &primes.front()]);
         int pos = p_pos;
@@ -1030,7 +1042,7 @@ template<typename even_code, typename odd_code> void devel_branch_meta(std::vect
         unsigned char * S0 = S;
         where_am_I w MAYBE_UNUSED = 0;
 
-        size_t overrun = 0; /* tame gcc */
+        overrun_t<fragment> overrun;
         unsigned int j = j0;
 
         /* we sieve over the area [S0..S0+(i1-i0)], which may
@@ -1069,6 +1081,7 @@ j_odd_devel0:
             ++j;
         }
 
+        if (fragment) {
             /* quick notes for incremental adjustment in case I>B (B =
              * LOG_BUCKET_REGION).
              *
@@ -1131,70 +1144,24 @@ j_odd_devel0:
              */
             pos = (p_pos + B_mod_p * di + dj * r) % p;
             if (pos < 0) pos += p;
-
-            p_pos = pos;
-        }
         } else {
-        for(auto const & ssp : primes) {
-            int64_t & p_pos(positions[&ssp - &primes.front()]);
-            int pos = p_pos;
-
-            const fbprime_t p = ssp.get_p();
-            const fbprime_t r = ssp.get_r();
-            const unsigned char logp = ssp.logp;
-            unsigned char * S0 = S;
-            where_am_I w MAYBE_UNUSED = 0;
-
-            unsigned int j = j0;
-
-            /* we sieve over the area [S0..S0+(i1-i0)], which may
-             * actually be just a fragment of a line. After that, if
-             * (i1-i0) is different from I, we'll break anyway. So
-             * whether we add I or (i1-i0) to S0 does not matter much.
-             */
-            /* TODO: sublat !!!! j actually corresponds to row S(j), with
-             * S(j)=sublatm*j + sublatj0. Therefore:
-             *  - j0&1 == 0 is not sufficient to tell the parity of S(j)
-             *  - if sublatm is even, we not every other line is even (resp.
-             *    odd).
-             *  - if sublatm is even, we should actually take advantage of
-             *    it, and run specific code, probably at the outer loop
-             *    level.
-             */
-            if (j0 & 1)
-                goto j_odd_devel;
-
-            for( ; j < j1 ; ) {
-                /* for j even, we sieve only odd pi, so step = 2p. */
-                {
-                    int xpos = ((si.conf.sublat.i0 + pos) & 1) ? pos : (pos+p);
-                    even_code()(S0, S0 + (i1 - i0), S0 - S, xpos, p+p, logp, w);
-                }
-                S0 += I;
-                pos += r; if (pos >= (int) p) pos -= p; 
-                if (++j >= j1) break;
-
-j_odd_devel:
-                /* now j odd again */
-                WHERE_AM_I_UPDATE(w, j, j - j0);
-                odd_code()(S0, S0 + (i1 - i0), S0 - S, pos, p, logp, w);
-                S0 += I;
-                pos += r; if (pos >= (int) p) pos -= p;
-                ++j;
-            }
             /* skip stride */
             pos += ssp.get_offset();
             if (pos >= (int) p) pos -= p;
 
-        p_pos = pos;
     }
+        p_pos = pos;
     }
 }/*}}}*/
 
 void generated(std::vector<int64_t> & positions, std::vector<ssp_t> const & primes, unsigned char * S, int logI, unsigned int N) /*{{{*/
 {
     small_sieve_routine SS(positions, primes, S, logI, N);
-    small_sieve_routine::do_it<make_best_choice_list<12>::type>()(SS);
+    if (logI > LOG_BUCKET_REGION) {
+    small_sieve_routine::do_it<make_best_choice_list<12>::type, true>()(SS);
+    } else {
+    small_sieve_routine::do_it<make_best_choice_list<12>::type, false>()(SS);
+    }
 }
 /*}}}*/
 
@@ -1212,7 +1179,7 @@ typedef std::vector<cand_func> candidate_list;
  * currently recorded best code for even lines, and then we iterate on
  * the various options for odd lines
  */
-template<int bit> struct factory_for_bit_round1 {
+template<int bit, bool fragment> struct factory_for_bit_round1 {
     typedef typename best_evenline<bit>::type Be;
     typedef typename best_oddline<bit>::type Bo;
     template<typename T> struct iterator {
@@ -1221,7 +1188,7 @@ template<int bit> struct factory_for_bit_round1 {
     template<typename T, typename U> struct iterator<list_car<T, U>> {
         void operator()(candidate_list & res) const {
             bool sel = std::is_same<Bo, T>::value;
-            res.push_back({sel, &devel_branch_meta<Be, T>, T::name});
+            res.push_back({sel, &devel_branch_meta<Be, T, fragment>, T::name});
             iterator<U>()(res);
         }
     };
@@ -1230,7 +1197,7 @@ template<int bit> struct factory_for_bit_round1 {
     }
 };
 /* and now the other way around. */
-template<int bit> struct factory_for_bit_round2 {
+template<int bit, bool fragment> struct factory_for_bit_round2 {
     typedef typename best_evenline<bit>::type Be;
     typedef typename best_oddline<bit>::type Bo;
     template<typename T> struct iterator {
@@ -1239,7 +1206,7 @@ template<int bit> struct factory_for_bit_round2 {
     template<typename T, typename U> struct iterator<list_car<T, U>> {
         void operator()(candidate_list & res) const {
             bool sel = std::is_same<Be, T>::value;
-            res.push_back({sel, &devel_branch_meta<T, Bo>, T::name});
+            res.push_back({sel, &devel_branch_meta<T, Bo, fragment>, T::name});
             iterator<U>()(res);
         }
     };
@@ -1578,23 +1545,48 @@ int main(int argc0, char * argv0[])
             // std::vector<int64_t>& lx(positions.begin() + i0, positions.begin() + i1);
             candidate_list cand1, cand2;
 
+            if (logI > LOG_BUCKET_REGION) {
+                // (true!) bool fragment = logI > LOG_BUCKET_REGION;
+
+                switch(logfill-b) {
+#define CASE(xxx)						\
+                    case xxx:					\
+                            factory_for_bit_round1<xxx, true>()(cand1);	\
+                            factory_for_bit_round2<xxx, true>()(cand2);	\
+                    break
+                    CASE(1); CASE(2); CASE(3); CASE(4);
+                    CASE(5); CASE(6); CASE(7); CASE(8);
+                    CASE(9); CASE(10); CASE(11); CASE(12);
+                    CASE(13); CASE(14); CASE(15);
+#undef CASE
+                    default:
+                    if (logfill <= b) {
+                        factory_for_bit_round1<0, true>()(cand1);
+                        factory_for_bit_round2<0, true>()(cand2);
+                    } else {
+                        fprintf(stderr, "sorry, not handled\n");
+                    }
+                }
+            } else {
             switch(logfill-b) {
 #define CASE(xxx)						\
                 case xxx:					\
-                        factory_for_bit_round1<xxx>()(cand1);	\
-                        factory_for_bit_round2<xxx>()(cand2);	\
+                            factory_for_bit_round1<xxx, false>()(cand1);	\
+                            factory_for_bit_round2<xxx, false>()(cand2);	\
                 break
                 CASE(1); CASE(2); CASE(3); CASE(4);
                 CASE(5); CASE(6); CASE(7); CASE(8);
                 CASE(9); CASE(10); CASE(11); CASE(12);
                 CASE(13); CASE(14); CASE(15);
+#undef CASE
                 default:
                 if (logfill <= b) {
-                    factory_for_bit_round1<0>()(cand1);
-                    factory_for_bit_round2<0>()(cand2);
+                        factory_for_bit_round1<0, false>()(cand1);
+                        factory_for_bit_round2<0, false>()(cand2);
                 } else {
                     fprintf(stderr, "sorry, not handled\n");
                 }
+            }
             }
 
             std::vector<unsigned char *> refS;
