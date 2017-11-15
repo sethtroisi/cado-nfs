@@ -320,7 +320,10 @@ rotate_v (cado_poly_srcptr poly0, long v, long B,
 
       /* check for the smallest A[s] */
       extract_time -= seconds ();
-      for (long j = 0; j < LEN; j++)
+      /* if wcur + LEN > wmax, we check only wmax - wcur entries */
+      long maxj = (wcur + LEN <= wmax) ? LEN : wmax - wcur;
+      tot_pols += maxj;
+      for (long j = 0; j < maxj; j++)
         {
           /* print alpha and E of original polynomial */
           if (u == -u0 && v == -v0 && wcur + j == -w0)
@@ -366,7 +369,6 @@ rotate_v (cado_poly_srcptr poly0, long v, long B,
 #endif
 
       wcur += LEN;
-      tot_pols += LEN;
     }
 
   free (sieve_s);
