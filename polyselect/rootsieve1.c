@@ -44,14 +44,16 @@ mpz_t bestw;                    /* current best rotation in w */
 int debug = 0;                  /* to print (max,avg) discrepancy with respect
                                    to real alpha */
 double tot_pols = 0;            /* number of sieved polynomial */
+double prepare_time = 0;
 double sieve_time = 0;
+double extract_time = 0;
 double max_discrepancy = 0;
 double sum_discrepancy = 0;
 double num_discrepancy = 0;
 long u0 = 0, v0 = 0, w0 = 0;    /* initial translation */
 int optimizeE = 0;              /* if not zero, optimize E instead of alpha */
-double margin_alpha = 0.0;      /* margin with -E */
-#define MARGIN_ALPHA 1.0
+double guard_alpha = 0.0;       /* guard when -E */
+#define GUARD_ALPHA 1.0
 
 static void
 usage_and_die (char *argv0)
@@ -174,23 +176,24 @@ rotate_v (cado_poly_srcptr poly0, long v, long B,
   mpz_set_d (wminz, r.kmin);
   mpz_set_d (wmaxz, r.kmax);
 
-  if (mpz_cmp (wminz, wmaxz) >= 0)
-    goto end;
-
-  tot_pols += mpz_get_d (wmaxz) - mpz_get_d (wminz);
-
   if (verbose)
     {
       gmp_printf ("v=%ld: wmin=%Zd wmax=%Zd\n", v, wminz, wmaxz);
       fflush (stdout);
     }
 
-  /* compute the expected value sum(log(p)/(p-1), p < B) */
+  if (mpz_cmp (wminz, wmaxz) >= 0)
+    goto end;
+
+  /* compute the expected value sum(log(p)/(p-1), p < B) and the
+     sum of largest prime powers sum(p^floor(log(B-1)/log(p)), p < B) */
   double expected = 0.0;
+  unsigned long sum_of_prime_powers = 0;
   for (l = 0; l < nprimes; l++)
     {
       long p = Primes[l];
       expected += log ((double) p) / (double) (p - 1);
+      sum_of_prime_powers += Q[l];
     }
 
   ASSERT_ALWAYS (mpz_fits_slong_p (wmaxz));
@@ -199,19 +202,6 @@ rotate_v (cado_poly_srcptr poly0, long v, long B,
   wmax = mpz_get_si (wmaxz);
   wmin = mpz_get_si (wminz);
 
-  long len = wmax - wmin + 1;
-  float *A = malloc (len * sizeof (float));
-  /* A[w-wmin] corresponds to w */
-  ASSERT_ALWAYS(A != NULL);
-  for (long j = 0; j < len; j++)
-    A[j] = expected;
-
-#if defined(TRACE_V) && defined(TRACE_W)
-  ASSERT_ALWAYS(wmin <= TRACE_W && TRACE_W <= wmax);
-  if (v == TRACE_V)
-    printf ("initialized A[%d] to %f\n", TRACE_W, A[TRACE_W - wmin]);
-#endif
-
   mpz_t ump;
   mpz_init (ump);
   unsigned long *roots = malloc (B * sizeof (long));
@@ -219,6 +209,15 @@ rotate_v (cado_poly_srcptr poly0, long v, long B,
   float *L;
   double nu;
   L = malloc (B * sizeof (float));
+
+  /* sieve data: sieve_q contains the largest p^k < B for each prime p,
+     it thus fits in an uint16_t if B does;
+     sieve_s contains the first index i multiple of q where the contribution
+     sieve_nu should be added, it is thus smaller than q and thus fits too. */
+  uint16_t *sieve_q = malloc (sum_of_prime_powers * sizeof (uint16_t));
+  uint16_t *sieve_s = malloc (sum_of_prime_powers * sizeof (uint16_t));
+  float *sieve_nu = malloc (sum_of_prime_powers * sizeof (float));
+  unsigned long sieve_n = 0;
   for (l = 0; l < nprimes; l++)
     {
       long p = Primes[l], s, t, q;
@@ -254,8 +253,8 @@ rotate_v (cado_poly_srcptr poly0, long v, long B,
             }
         }
 
-      /* now perform the sieve */
-      sieve_time -= seconds ();
+      /* prepare data for the sieve */
+      prepare_time -= seconds ();
       q = Q[l];
       for (w = 0; w < q; w++)
         {
@@ -269,7 +268,43 @@ rotate_v (cado_poly_srcptr poly0, long v, long B,
           else
             t = (wmin - w + q - 1) / q;
           s = w + t * q - wmin;
-          while (s < len)
+          sieve_q[sieve_n] = q;
+          sieve_nu[sieve_n] = nu;
+          sieve_s[sieve_n] = s;
+          sieve_n ++;
+        }
+      prepare_time += seconds ();
+    }
+
+  ASSERT_ALWAYS(sieve_n <= sum_of_prime_powers);
+
+#define LEN (1<<14) /* length of the sieve array */
+
+  float *A = malloc (LEN * sizeof (float));
+  ASSERT_ALWAYS(A != NULL);
+
+  /* we sieve by chunks of LEN cells at a time */
+  long wcur = wmin;
+  while (wcur < wmax)
+    {
+      /* A[j] corresponds to w = wcur + j */
+      for (long j = 0; j < LEN; j++)
+        A[j] = expected;
+
+#if defined(TRACE_V) && defined(TRACE_W)
+      ASSERT_ALWAYS(wmin <= TRACE_W && TRACE_W <= wmax);
+      if (v == TRACE_V && (wcur <= TRACE_W && TRACE_W < wcur + LEN))
+        printf ("initialized A[%d] to %f\n", TRACE_W, A[TRACE_W - wcur]);
+#endif
+
+      /* now perform the sieve */
+      sieve_time -= seconds ();
+      for (unsigned long i = 0; i < sieve_n; i++)
+        {
+          long q = sieve_q[i];
+          long s = sieve_s[i];
+          float nu = sieve_nu[i];
+          while (s < LEN)
             {
 #if defined(TRACE_V) && defined(TRACE_W)
               if (v == TRACE_V && TRACE_W - wmin == s)
@@ -279,76 +314,67 @@ rotate_v (cado_poly_srcptr poly0, long v, long B,
               A[s] -= nu;
               s += q;
             }
+          sieve_s[i] = s - LEN;
         }
       sieve_time += seconds ();
+
+      /* check for the smallest A[s] */
+      extract_time -= seconds ();
+      for (long j = 0; j < LEN; j++)
+        {
+          /* print alpha and E of original polynomial */
+          if (u == -u0 && v == -v0 && wcur + j == -w0)
+            {
+              w = wcur + j;
+              rotate_aux (poly->pols[ALG_SIDE]->coeff, g1, g0, 0, w, 0);
+              poly->skew = L2_skewness (poly->pols[ALG_SIDE],
+                                        SKEWNESS_DEFAULT_PREC);
+              double E = MurphyE (poly, Bf, Bg, area, MURPHY_K);
+              gmp_printf ("u=%ld v=%ld w=%ld est_alpha_aff=%f E=%.2e [original]\n",
+                          u, v, w, A[j], E);
+              /* restore the original polynomial (w=0) */
+              rotate_aux (poly->pols[ALG_SIDE]->coeff, g1, g0, w, 0, 0);
+            }
+          if (A[j] < best_alpha + guard_alpha)
+            {
+              w = wcur + j;
+              /* compute E */
+              rotate_aux (poly->pols[ALG_SIDE]->coeff, g1, g0, 0, w, 0);
+              poly->skew = L2_skewness (poly->pols[ALG_SIDE],
+                                        SKEWNESS_DEFAULT_PREC);
+              double E = MurphyE (poly, Bf, Bg, area, MURPHY_K);
+              /* restore the original polynomial (w=0) */
+              rotate_aux (poly->pols[ALG_SIDE]->coeff, g1, g0, w, 0, 0);
+
+              if (optimizeE == 0 || (optimizeE == 1 && E > best_E))
+                {
+                  bestu = u;
+                  bestv = v;
+                  mpz_set_si (bestw, w);
+                  best_alpha = (double) A[j];
+                  best_E = E;
+                  gmp_printf ("u=%ld v=%ld w=%Zd est_alpha_aff=%f E=%.2e\n",
+                              u, v, bestw, best_alpha, E);
+                }
+            }
+        }
+      extract_time += seconds ();
+
+#if defined(TRACE_V) && defined(TRACE_W)
+      if (v == TRACE_V && (wcur <= TRACE_W && TRACE_W < wcur + LEN))
+        printf ("A[%d] = %f\n", TRACE_W, A[TRACE_W - wcur]);
+#endif
+
+      wcur += LEN;
+      tot_pols += LEN;
     }
+
+  free (sieve_s);
+  free (sieve_q);
+  free (sieve_nu);
   free (L);
   free (roots);
   mpz_clear (ump);
-
-#if defined(TRACE_V) && defined(TRACE_W)
-  if (v == TRACE_V)
-    printf ("A[%d] = %f\n", TRACE_W, A[TRACE_W - wmin]);
-#endif
-
-
-  /* check for the smallest A[s] */
-  for (w = wmin; w <= wmax; w++)
-    {
-      /* print alpha and E of original polynomial */
-      if (u == -u0 && v == -v0 && w == -w0)
-        {
-          rotate_aux (poly->pols[ALG_SIDE]->coeff, g1, g0, 0, w, 0);
-          poly->skew = L2_skewness (poly->pols[ALG_SIDE],
-                                    SKEWNESS_DEFAULT_PREC);
-          double E = MurphyE (poly, Bf, Bg, area, MURPHY_K);
-          gmp_printf ("u=%ld v=%ld w=%ld est_alpha_aff=%f E=%.2e [original]\n",
-                      u, v, w, A[w - wmin], E);
-          /* restore the original polynomial (w=0) */
-          rotate_aux (poly->pols[ALG_SIDE]->coeff, g1, g0, w, 0, 0);
-        }
-      if (A[w - wmin] < best_alpha + margin_alpha)
-        {
-          /* compute E */
-          rotate_aux (poly->pols[ALG_SIDE]->coeff, g1, g0, 0, w, 0);
-          poly->skew = L2_skewness (poly->pols[ALG_SIDE],
-                                    SKEWNESS_DEFAULT_PREC);
-          double E = MurphyE (poly, Bf, Bg, area, MURPHY_K);
-          /* restore the original polynomial (w=0) */
-          rotate_aux (poly->pols[ALG_SIDE]->coeff, g1, g0, w, 0, 0);
-
-          if (optimizeE == 0 || (optimizeE == 1 && E > best_E))
-            {
-              bestu = u;
-              bestv = v;
-              mpz_set_si (bestw, w);
-              best_alpha = (double) A[w - wmin];
-              best_E = E;
-              gmp_printf ("u=%ld v=%ld w=%Zd est_alpha_aff=%f E=%.2e\n",
-                          u, v, bestw, best_alpha, E);
-            }
-        }
-    }
-
-  if (debug)
-    {
-      long w0 = 0;
-      for (w = wmin; w <= wmax; w++)
-        {
-          double alpha, disc;
-          rotate_aux (poly->pols[ALG_SIDE]->coeff, g1, g0, w0, w, 0);
-          w0 = w;
-          alpha = get_biased_alpha_affine (poly->pols[ALG_SIDE], B);
-          disc = fabs (alpha - A[w - wmin]);
-          if (disc > max_discrepancy)
-            {
-              max_discrepancy = disc;
-              // printf ("u=%ld v=%ld w=%ld alpha=%f est=%f error=%f\n", u, v, w, alpha, A[w - wmin], disc);
-            }
-          sum_discrepancy += disc;
-          num_discrepancy += 1;
-        }
-    }
 
   free (A);
 
@@ -487,7 +513,7 @@ main (int argc, char **argv)
         else if (strcmp (argv[1], "-E") == 0)
           {
             optimizeE = 1;
-            margin_alpha = MARGIN_ALPHA;
+            guard_alpha = GUARD_ALPHA;
             argv ++;
             argc --;
           }
@@ -514,6 +540,8 @@ main (int argc, char **argv)
       }
     if (argc != 2)
         usage_and_die (argv[0]);
+
+    ASSERT_ALWAYS(B <= 65536);
 
     if (I != 0)
       area = bound_f * pow (2.0, (double) (2 * I - 1));
@@ -602,8 +630,12 @@ main (int argc, char **argv)
     time = seconds () - time;
     printf ("Sieved %.2e polynomials in %.2f seconds (%.2es/p)\n",
             tot_pols, time, time / tot_pols);
+    printf ("(prepare time %.2f = %.2f%%)\n", prepare_time,
+            100.0 * prepare_time / time);
     printf ("(sieve time %.2f = %.2f%%)\n", sieve_time,
             100.0 * sieve_time / time);
+    printf ("(extract time %.2f = %.2f%%)\n", extract_time,
+            100.0 * extract_time / time);
 
     free (Primes);
     free (Q);
