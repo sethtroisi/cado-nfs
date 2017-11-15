@@ -600,6 +600,109 @@ j_odd_devel:
     }
 }
 /*}}}*/
+void legacy_mod_branch(std::vector<int64_t> & positions, std::vector<ssp_t> const& primes, unsigned char * S, int logI, unsigned int N) /*{{{*/
+{
+    SMALLSIEVE_COMMON_DEFS();
+    const unsigned long bucket_region = (1UL << LOG_BUCKET_REGION);
+    ASSERT_ALWAYS(positions.size() == primes.size());
+    where_am_I w MAYBE_UNUSED = 0;
+
+    for(auto const & ssp : primes) {
+        int64_t & p_pos(positions[&ssp - &primes.front()]);
+        int pos = p_pos;
+
+        const fbprime_t p = ssp.get_p();
+        const fbprime_t r = ssp.get_r();
+        const unsigned char logp = ssp.logp;
+
+        size_t overrun MAYBE_UNUSED = 0; /* tame gcc */
+        unsigned long j;
+        const int test_divisibility MAYBE_UNUSED = 0; /* very slow, but nice for debugging */
+        const unsigned long nj = bucket_region >> si.conf.logI_adjusted; /* Nr. of lines 
+                                                                            per bucket region */
+        /* In order to check whether a j coordinate is even, we need to take
+         * into account the bucket number, especially in case buckets are as
+         * large as the sieve region. The row number corresponding to a given
+         * i0 is i0/I, but we also need to add bucket_nr*bucket_size/I to
+         * this, which is what this flag is for.
+         * Sublat must also be taken into account.
+         */
+        int row0_is_oddj;
+        if (si.conf.sublat.m == 0) {
+            row0_is_oddj = j0 & 1;
+        } else {
+            row0_is_oddj = ((j0 & si.conf.sublat.m) + si.conf.sublat.j0) & 1;
+            // Odd/even property of j is the same as for j+2, even with
+            // sublat, unless sublat.m is even, which is not handled right
+            // now. Same for i.
+            ASSERT_ALWAYS((si.conf.sublat.m & 1) == 1);
+        }
+
+        WHERE_AM_I_UPDATE(w, p, p);
+
+        //XXX XXX XXX const unsigned char logp = ssd->logp[k];
+        unsigned char *S_ptr = S;
+        unsigned char *S1;
+        size_t p_or_2p = p;
+        ASSERT(pos < (int) p);
+        unsigned int i_compens_sublat = 0;
+        if (si.conf.sublat.m != 0) {
+            i_compens_sublat = si.conf.sublat.i0 & 1;
+        }
+        j = 0;
+        if (row0_is_oddj) goto j_odd;
+        // it is possible to make this code work with sieve_full_line by
+        // uncommenting all lines that match S0. Performance is
+        // apparently identical, but it's not fair to say that this *is*
+        // the reference code, as far as performance is concerned.
+        // unsigned char * S0 MAYBE_UNUSED;
+        do {
+            unsigned char *pi;
+            WHERE_AM_I_UPDATE(w, j, j);
+            // S0 = S_ptr;
+            pi = S_ptr + pos;
+            S1 = S_ptr + (i1 - i0);
+            S_ptr += I;
+            /* for j even, we sieve only odd pi, so step = 2p. */
+            p_or_2p += p_or_2p;
+            if (!((i_compens_sublat + pos) & 1)) {
+                pi += p;
+            }
+            SMALLSIEVE_ASSEMBLY_OLD(pi, p_or_2p, S1, logp);
+            overrun = pi - S1;
+            // sieve_full_line(S0, S_ptr, S0 - S, pi - S0, p_or_2p, logp, w);
+            pos += r; if (pos >= (int) p) pos -= p; 
+            /* Next line */
+            if (++j >= nj) break;
+            p_or_2p >>= 1;
+j_odd:
+            WHERE_AM_I_UPDATE(w, j, j);
+            // S0 = S_ptr;
+            pi = S_ptr + pos;
+            S1 = S_ptr + (i1 - i0);
+            S_ptr += I;
+            SMALLSIEVE_ASSEMBLY_OLD(pi, p_or_2p, S1, logp);
+            overrun = pi - S1;
+            pos += r; if (pos >= (int) p) pos -= p;
+        } while (++j < nj);
+
+        if (logI > LOG_BUCKET_REGION) {
+            int N1 = N + interleaving;
+            int Q = logI - LOG_BUCKET_REGION;
+            int dj = (N1>>Q) - j0;
+            int di = (N1&((1<<Q)-1)) - (N&((1<<Q)-1));
+            int B_mod_p = overrun - p_pos;
+            pos = (p_pos + B_mod_p * di + dj * r) % p;
+            if (pos < 0) pos += p;
+        } else {
+            pos += ssp.get_offset();
+            if (pos >= (int) p) pos -= p;
+        }
+
+        p_pos = pos;
+    }
+}
+/*}}}*/
 
 template<typename T, typename U, int b, typename F> struct choice_list_car {};
 
@@ -1455,6 +1558,7 @@ int main(int argc0, char * argv0[])
 
         if (logI <= LOG_BUCKET_REGION)
             funcs.emplace_back(false, legacy_branch, "legacy");
+        funcs.emplace_back(false, legacy_mod_branch, "legacy_mod");
 
         errors += !bbase.test(funcs);
     }
