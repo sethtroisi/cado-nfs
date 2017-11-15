@@ -1344,23 +1344,22 @@ struct bench_base {
         for(int N = 0 ; N < Nmax ; N++) {
             for(auto const& bf : cand) {
                 size_t index = &bf-&cand.front();
-                memset(S, 0, B);
-                (*bf.f)(refpos[index], allprimes, S, logI, N);
-                memcpy(refS[index], S, B);
+                memset(refS[index], 0, B);
+                (*bf.f)(refpos[index], allprimes, refS[index], logI, N);
             }
             for(auto const& bf : cand) {
                 size_t index = &bf-&cand.front();
                 if (!ok_perfunc[index]) continue;
                 if (index > 0) {
-                    if (memcmp(S, refS.front(), B) != 0) {
+                    if (memcmp(refS[index], refS.front(), B) != 0) {
                         ok = ok_perfunc[index] = false;
                         fprintf(stderr, "bucket %d: inconsistency between %s and %s\n",
                                 N, bf.name, cand.front().name);
                         for(size_t i = 0, n = 0 ; i < B && n < 16 ; i++) {
-                            if (S[i] != refS.front()[i]) {
+                            if (refS[index][i] != refS.front()[i]) {
                                 fprintf(stderr, "%04x: %02x != %02x\n",
                                         (unsigned int) i,
-                                        (unsigned int) S[i],
+                                        (unsigned int) refS[index][i],
                                         (unsigned int) refS.front()[i]);
                                 n++;
                             }
