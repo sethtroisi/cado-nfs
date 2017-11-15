@@ -5,6 +5,15 @@
  * logI, N, and LOG_BUCKET_REGION, define the integers i0, i1, j0, j1,
  * and I.
  */
+
+/* About row0_is_oddj: in order to check whether a j coordinate is even,
+ * we need to take into account the bucket number, especially in case
+ * buckets are as large as the sieve region. The row number corresponding
+ * to a given i0 is i0/I, but we also need to add bucket_nr*bucket_size/I
+ * to this, which is what this flag is for.  Sublat must also be taken
+ * into account.
+ */
+
 #define SMALLSIEVE_COMMON_DEFS()                                         \
     const unsigned int log_lines_per_region = MAX(0, LOG_BUCKET_REGION - logI);\
     const unsigned int log_regions_per_line = MAX(0, logI - LOG_BUCKET_REGION);\

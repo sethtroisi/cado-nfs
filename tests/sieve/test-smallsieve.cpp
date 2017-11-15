@@ -412,24 +412,6 @@ void legacy_branch(std::vector<int64_t> & positions, std::vector<ssp_t> const& p
         const int test_divisibility MAYBE_UNUSED = 0; /* very slow, but nice for debugging */
         const unsigned long nj = bucket_region >> si.conf.logI_adjusted; /* Nr. of lines 
                                                                             per bucket region */
-        /* In order to check whether a j coordinate is even, we need to take
-         * into account the bucket number, especially in case buckets are as
-         * large as the sieve region. The row number corresponding to a given
-         * i0 is i0/I, but we also need to add bucket_nr*bucket_size/I to
-         * this, which is what this flag is for.
-         * Sublat must also be taken into account.
-         */
-        int row0_is_oddj;
-        if (si.conf.sublat.m == 0) {
-            row0_is_oddj = (N << (LOG_BUCKET_REGION - si.conf.logI_adjusted)) & 1;
-        } else {
-            int row0 = (N << (LOG_BUCKET_REGION - si.conf.logI_adjusted));
-            row0_is_oddj = (row0 * si.conf.sublat.m + si.conf.sublat.j0) & 1;
-            // Odd/even property of j is the same as for j+2, even with
-            // sublat, unless sublat.m is even, which is not handled right
-            // now. Same for i.
-            ASSERT_ALWAYS((si.conf.sublat.m & 1) == 1);
-        }
 
         WHERE_AM_I_UPDATE(w, p, p);
 
@@ -607,6 +589,7 @@ void legacy_mod_branch(std::vector<int64_t> & positions, std::vector<ssp_t> cons
     ASSERT_ALWAYS(positions.size() == primes.size());
     where_am_I w MAYBE_UNUSED = 0;
 
+    if (logI > LOG_BUCKET_REGION) {
     for(auto const & ssp : primes) {
         int64_t & p_pos(positions[&ssp - &primes.front()]);
         int pos = p_pos;
@@ -620,23 +603,6 @@ void legacy_mod_branch(std::vector<int64_t> & positions, std::vector<ssp_t> cons
         const int test_divisibility MAYBE_UNUSED = 0; /* very slow, but nice for debugging */
         const unsigned long nj = bucket_region >> si.conf.logI_adjusted; /* Nr. of lines 
                                                                             per bucket region */
-        /* In order to check whether a j coordinate is even, we need to take
-         * into account the bucket number, especially in case buckets are as
-         * large as the sieve region. The row number corresponding to a given
-         * i0 is i0/I, but we also need to add bucket_nr*bucket_size/I to
-         * this, which is what this flag is for.
-         * Sublat must also be taken into account.
-         */
-        int row0_is_oddj;
-        if (si.conf.sublat.m == 0) {
-            row0_is_oddj = j0 & 1;
-        } else {
-            row0_is_oddj = ((j0 & si.conf.sublat.m) + si.conf.sublat.j0) & 1;
-            // Odd/even property of j is the same as for j+2, even with
-            // sublat, unless sublat.m is even, which is not handled right
-            // now. Same for i.
-            ASSERT_ALWAYS((si.conf.sublat.m & 1) == 1);
-        }
 
         WHERE_AM_I_UPDATE(w, p, p);
 
@@ -650,7 +616,7 @@ void legacy_mod_branch(std::vector<int64_t> & positions, std::vector<ssp_t> cons
             i_compens_sublat = si.conf.sublat.i0 & 1;
         }
         j = 0;
-        if (row0_is_oddj) goto j_odd;
+            if (row0_is_oddj) goto j_odd0;
         // it is possible to make this code work with sieve_full_line by
         // uncommenting all lines that match S0. Performance is
         // apparently identical, but it's not fair to say that this *is*
@@ -675,7 +641,7 @@ void legacy_mod_branch(std::vector<int64_t> & positions, std::vector<ssp_t> cons
             /* Next line */
             if (++j >= nj) break;
             p_or_2p >>= 1;
-j_odd:
+j_odd0:
             WHERE_AM_I_UPDATE(w, j, j);
             // S0 = S_ptr;
             pi = S_ptr + pos;
@@ -686,7 +652,6 @@ j_odd:
             pos += r; if (pos >= (int) p) pos -= p;
         } while (++j < nj);
 
-        if (logI > LOG_BUCKET_REGION) {
             int N1 = N + interleaving;
             int Q = logI - LOG_BUCKET_REGION;
             int dj = (N1>>Q) - j0;
@@ -694,12 +659,70 @@ j_odd:
             int B_mod_p = overrun - p_pos;
             pos = (p_pos + B_mod_p * di + dj * r) % p;
             if (pos < 0) pos += p;
+
+            p_pos = pos;
+        }
         } else {
+        for(auto const & ssp : primes) {
+            int64_t & p_pos(positions[&ssp - &primes.front()]);
+            int pos = p_pos;
+
+            const fbprime_t p = ssp.get_p();
+            const fbprime_t r = ssp.get_r();
+            const unsigned char logp = ssp.logp;
+
+            unsigned long j;
+            const int test_divisibility MAYBE_UNUSED = 0; /* very slow, but nice for debugging */
+            const unsigned long nj = bucket_region >> si.conf.logI_adjusted; /* Nr. of lines 
+                                                                                per bucket region */
+
+            WHERE_AM_I_UPDATE(w, p, p);
+
+            //XXX XXX XXX const unsigned char logp = ssd->logp[k];
+            unsigned char *S_ptr = S;
+            size_t p_or_2p = p;
+            ASSERT(pos < (int) p);
+            unsigned int i_compens_sublat = 0;
+            if (si.conf.sublat.m != 0) {
+                i_compens_sublat = si.conf.sublat.i0 & 1;
+            }
+            j = 0;
+            if (row0_is_oddj) goto j_odd;
+            // it is possible to make this code work with sieve_full_line by
+            // uncommenting all lines that match S0. Performance is
+            // apparently identical, but it's not fair to say that this *is*
+            // the reference code, as far as performance is concerned.
+            // unsigned char * S0 MAYBE_UNUSED;
+            do {
+                unsigned char *pi;
+                WHERE_AM_I_UPDATE(w, j, j);
+                // S0 = S_ptr;
+                pi = S_ptr + pos;
+                S_ptr += I;
+                /* for j even, we sieve only odd pi, so step = 2p. */
+                p_or_2p += p_or_2p;
+                if (!((i_compens_sublat + pos) & 1)) {
+                    pi += p;
+                }
+                SMALLSIEVE_ASSEMBLY_OLD(pi, p_or_2p, S_ptr, logp);
+                pos += r; if (pos >= (int) p) pos -= p; 
+                /* Next line */
+                if (++j >= nj) break;
+                p_or_2p >>= 1;
+j_odd:
+                WHERE_AM_I_UPDATE(w, j, j);
+                // S0 = S_ptr;
+                pi = S_ptr + pos;
+                S_ptr += I;
+                SMALLSIEVE_ASSEMBLY_OLD(pi, p_or_2p, S_ptr, logp);
+                pos += r; if (pos >= (int) p) pos -= p;
+            } while (++j < nj);
+
             pos += ssp.get_offset();
             if (pos >= (int) p) pos -= p;
-        }
 
         p_pos = pos;
+    }
     }
 }
 /*}}}*/
@@ -735,7 +758,7 @@ struct small_sieve_routine : public small_sieve_routine_base {
     const int I;
     const int i0;
     const int i1;
-    // const int row0_is_oddj;
+    const int row0_is_oddj;
     const bool has_haxis;
     const bool has_vaxis;
     const bool has_origin;
@@ -756,7 +779,7 @@ struct small_sieve_routine : public small_sieve_routine_base {
         I       (1<<logI),
         i0      ((region_rank_in_line<<LOG_BUCKET_REGION)-I/2),
         i1      (i0+(1<<MIN(LOG_BUCKET_REGION,logI))),
-        // row0_is_oddj    ((j0*sublatm+sublatj0)&1),
+        row0_is_oddj    (((j0&(si.conf.sublat.m ? si.conf.sublat.m : 1))+si.conf.sublat.j0)&1),
         has_haxis       (!j0),
         has_vaxis       (region_rank_in_line==((regions_per_line-1)/2)),
         has_origin      (has_haxis&&has_vaxis)
@@ -996,6 +1019,7 @@ template<typename even_code, typename odd_code> void devel_branch_meta(std::vect
 {
     SMALLSIEVE_COMMON_DEFS();
     ASSERT_ALWAYS(positions.size() == primes.size());
+    if (logI > LOG_BUCKET_REGION) {
     for(auto const & ssp : primes) {
         int64_t & p_pos(positions[&ssp - &primes.front()]);
         int pos = p_pos;
@@ -1024,7 +1048,7 @@ template<typename even_code, typename odd_code> void devel_branch_meta(std::vect
          *    level.
          */
         if (j0 & 1)
-            goto j_odd_devel;
+                goto j_odd_devel0;
 
         for( ; j < j1 ; ) {
             /* for j even, we sieve only odd pi, so step = 2p. */
@@ -1036,7 +1060,7 @@ template<typename even_code, typename odd_code> void devel_branch_meta(std::vect
             pos += r; if (pos >= (int) p) pos -= p; 
             if (++j >= j1) break;
 
-j_odd_devel:
+j_odd_devel0:
             /* now j odd again */
             WHERE_AM_I_UPDATE(w, j, j - j0);
             overrun = odd_code()(S0, S0 + (i1 - i0), S0 - S, pos, p, logp, w);
@@ -1044,7 +1068,7 @@ j_odd_devel:
             pos += r; if (pos >= (int) p) pos -= p;
             ++j;
         }
-        if (logI > LOG_BUCKET_REGION) {
+
             /* quick notes for incremental adjustment in case I>B (B =
              * LOG_BUCKET_REGION).
              *
@@ -1107,13 +1131,63 @@ j_odd_devel:
              */
             pos = (p_pos + B_mod_p * di + dj * r) % p;
             if (pos < 0) pos += p;
+
+            p_pos = pos;
+        }
         } else {
+        for(auto const & ssp : primes) {
+            int64_t & p_pos(positions[&ssp - &primes.front()]);
+            int pos = p_pos;
+
+            const fbprime_t p = ssp.get_p();
+            const fbprime_t r = ssp.get_r();
+            const unsigned char logp = ssp.logp;
+            unsigned char * S0 = S;
+            where_am_I w MAYBE_UNUSED = 0;
+
+            unsigned int j = j0;
+
+            /* we sieve over the area [S0..S0+(i1-i0)], which may
+             * actually be just a fragment of a line. After that, if
+             * (i1-i0) is different from I, we'll break anyway. So
+             * whether we add I or (i1-i0) to S0 does not matter much.
+             */
+            /* TODO: sublat !!!! j actually corresponds to row S(j), with
+             * S(j)=sublatm*j + sublatj0. Therefore:
+             *  - j0&1 == 0 is not sufficient to tell the parity of S(j)
+             *  - if sublatm is even, we not every other line is even (resp.
+             *    odd).
+             *  - if sublatm is even, we should actually take advantage of
+             *    it, and run specific code, probably at the outer loop
+             *    level.
+             */
+            if (j0 & 1)
+                goto j_odd_devel;
+
+            for( ; j < j1 ; ) {
+                /* for j even, we sieve only odd pi, so step = 2p. */
+                {
+                    int xpos = ((si.conf.sublat.i0 + pos) & 1) ? pos : (pos+p);
+                    even_code()(S0, S0 + (i1 - i0), S0 - S, xpos, p+p, logp, w);
+                }
+                S0 += I;
+                pos += r; if (pos >= (int) p) pos -= p; 
+                if (++j >= j1) break;
+
+j_odd_devel:
+                /* now j odd again */
+                WHERE_AM_I_UPDATE(w, j, j - j0);
+                odd_code()(S0, S0 + (i1 - i0), S0 - S, pos, p, logp, w);
+                S0 += I;
+                pos += r; if (pos >= (int) p) pos -= p;
+                ++j;
+            }
             /* skip stride */
             pos += ssp.get_offset();
             if (pos >= (int) p) pos -= p;
-        }
 
         p_pos = pos;
+    }
     }
 }/*}}}*/
 
