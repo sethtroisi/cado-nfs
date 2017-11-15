@@ -729,6 +729,19 @@ j_odd:
 
 template<typename T, typename U, int b, typename F> struct choice_list_car {};
 
+template<bool b> class overrun_t {
+    size_t x = 0;
+    public:
+    operator size_t() const { return x; }
+    overrun_t operator=(size_t a) { x=a; return *this; }
+};
+
+template<> class overrun_t<false> {
+    public:
+    operator size_t() const { return 0; }
+    inline overrun_t operator=(size_t) { return *this; }
+};
+
 struct small_sieve_routine_base {
     /* we have here the context that is common to a small sieve routine.
      * */
@@ -747,6 +760,8 @@ struct small_sieve_routine_base {
             unsigned char*& S, int& logI,
             unsigned int& N) : positions(positions), primes(primes), S(S), logI(logI), N(N) {}
 };
+
+
 struct small_sieve_routine : public small_sieve_routine_base {
     const unsigned int log_lines_per_region;
     const unsigned int log_regions_per_line;
@@ -796,6 +811,16 @@ struct small_sieve_routine : public small_sieve_routine_base {
     template<typename even_code, typename odd_code, bool fragment, int bits_off>
         void handle_nice_primes() /* {{{ */
     {
+            /* TODO: sublat !!!! j actually corresponds to row S(j), with
+             * S(j)=sublatm*j + sublatj0. Therefore:
+             *  - j0&1 == 0 is not sufficient to tell the parity of S(j)
+             *  - if sublatm is even, we not every other line is even (resp.
+             *    odd).
+             *  - if sublatm is even, we should actually take advantage of
+             *    it, and run specific code, probably at the outer loop
+             *    level.
+             */
+            if ((j0 & 1) == 0) {
         for( ; index < primes.size() ; index++) {
             ssp_t const & ssp(primes[index]);
             int64_t & p_pos(positions[index]);
@@ -821,27 +846,14 @@ struct small_sieve_routine : public small_sieve_routine_base {
             unsigned char * S0 = S;
             where_am_I w MAYBE_UNUSED = 0;
 
-            size_t overrun = 0; /* tame gcc */
-            unsigned int j = j0;
+                    overrun_t<fragment> overrun;
 
             /* we sieve over the area [S0..S0+(i1-i0)], which may
              * actually be just a fragment of a line. After that, if
              * (i1-i0) is different from I, we'll break anyway. So
              * whether we add I or (i1-i0) to S0 does not matter much.
              */
-            /* TODO: sublat !!!! j actually corresponds to row S(j), with
-             * S(j)=sublatm*j + sublatj0. Therefore:
-             *  - j0&1 == 0 is not sufficient to tell the parity of S(j)
-             *  - if sublatm is even, we not every other line is even (resp.
-             *    odd).
-             *  - if sublatm is even, we should actually take advantage of
-             *    it, and run specific code, probably at the outer loop
-             *    level.
-             */
-            if (j0 & 1)
-                goto j_odd_devel;
-
-            for( ; j < j1 ; ) {
+                    for(unsigned int j = j0 ; ; ) {
                 /* for j even, we sieve only odd pi, so step = 2p. */
                 {
                 int xpos = ((si.conf.sublat.i0 + pos) & 1) ? pos : (pos+p);
@@ -851,13 +863,12 @@ struct small_sieve_routine : public small_sieve_routine_base {
                 pos += r; if (pos >= (int) p) pos -= p; 
                 if (++j >= j1) break;
 
-    j_odd_devel:
                 /* now j odd again */
                 WHERE_AM_I_UPDATE(w, j, j - j0);
                 overrun = odd_code()(S0, S0 + (i1 - i0), S0 - S, pos, p, logp, w);
                 S0 += I;
                 pos += r; if (pos >= (int) p) pos -= p;
-                ++j;
+                        if (++j >= j1) break;
             }
             if (fragment) {
                 /* quick notes for incremental adjustment in case I>B (B =
@@ -930,6 +941,66 @@ struct small_sieve_routine : public small_sieve_routine_base {
 
             p_pos = pos;
         }
+            } else {
+                for( ; index < primes.size() ; index++) {
+                    ssp_t const & ssp(primes[index]);
+                    int64_t & p_pos(positions[index]);
+
+                    /* TODO
+                       if (!ssp.is_nice()) {
+                       handle_special(ssp, p_pos);
+                       index++;
+                       continue;
+                       }
+                       */
+                    const fbprime_t p = ssp.get_p();
+                    if (bits_off && (p >> (MIN(LOG_BUCKET_REGION,logI) + 1 - bits_off))) {
+                        /* time to move on to the next bit size;
+                        */
+                        return;
+                    }
+
+                    int pos = p_pos;
+
+                    const fbprime_t r = ssp.get_r();
+                    const unsigned char logp = ssp.logp;
+                    unsigned char * S0 = S;
+                    where_am_I w MAYBE_UNUSED = 0;
+
+                    overrun_t<fragment> overrun;
+                    for(unsigned int j = j0 ; ; ) {
+                        /* j odd */
+                        WHERE_AM_I_UPDATE(w, j, j - j0);
+                        overrun = odd_code()(S0, S0 + (i1 - i0), S0 - S, pos, p, logp, w);
+                        S0 += I;
+                        pos += r; if (pos >= (int) p) pos -= p;
+                        if (++j >= j1) break;
+
+                        /* j even */
+                        {
+                            int xpos = ((si.conf.sublat.i0 + pos) & 1) ? pos : (pos+p);
+                            overrun = even_code()(S0, S0 + (i1 - i0), S0 - S, xpos, p+p, logp, w);
+                        }
+                        S0 += I;
+                        pos += r; if (pos >= (int) p) pos -= p; 
+                        if (++j >= j1) break;
+                    }
+                    if (fragment) {
+                        int N1 = N + interleaving;
+                        int Q = logI - LOG_BUCKET_REGION;
+                        int dj = (N1>>Q) - j0;
+                        int di = (N1&((1<<Q)-1)) - (N&((1<<Q)-1));
+                        int B_mod_p = overrun - p_pos;
+                        pos = (p_pos + B_mod_p * di + dj * r) % p;
+                        if (pos < 0) pos += p;
+                    } else {
+                        /* skip stride */
+                        pos += ssp.get_offset();
+                        if (pos >= (int) p) pos -= p;
+                    }
+                    p_pos = pos;
+                }
+            }
     } /* }}} */
 
     /* we'll now craft all the specific do_it functions into one big
@@ -1013,19 +1084,6 @@ template<> struct make_best_choice_list<12> {
                 0,
             list_nil
             >> type;
-};
-
-template<bool b> class overrun_t {
-    size_t x = 0;
-    public:
-    operator size_t() const { return x; }
-    overrun_t operator=(size_t a) { x=a; return *this; }
-};
-
-template<> class overrun_t<false> {
-    public:
-    operator size_t() const { return 0; }
-    inline overrun_t operator=(size_t) { return *this; }
 };
 
 template<typename even_code, typename odd_code, bool fragment> void devel_branch_meta(std::vector<int64_t> & positions, std::vector<ssp_t> const& primes, unsigned char * S, int logI, unsigned int N) /*{{{*/
