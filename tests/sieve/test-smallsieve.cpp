@@ -763,6 +763,7 @@ struct small_sieve_routine_base {
 
 template<bool fragment>
 struct small_sieve_routine : public small_sieve_routine_base {
+    const unsigned int min_logI_logB;
     const unsigned int log_lines_per_region;
     const unsigned int log_regions_per_line;
     const unsigned int regions_per_line;
@@ -773,10 +774,10 @@ struct small_sieve_routine : public small_sieve_routine_base {
     const int I;
     const int i0;
     const int i1;
-    const int row0_is_oddj;
-    const bool has_haxis;
-    const bool has_vaxis;
-    const bool has_origin;
+    // const int row0_is_oddj;
+    // const bool has_haxis;
+    // const bool has_vaxis;
+    // const bool has_origin;
     size_t index = 0;
 
     small_sieve_routine() = delete;
@@ -784,8 +785,9 @@ struct small_sieve_routine : public small_sieve_routine_base {
 
     template<typename... T>
     small_sieve_routine(T&&... args) : small_sieve_routine_base(args...),
-        log_lines_per_region    (MAX(0,LOG_BUCKET_REGION-logI)),
-        log_regions_per_line    (MAX(0,logI-LOG_BUCKET_REGION)),
+        min_logI_logB           (fragment ? LOG_BUCKET_REGION : logI),
+        log_lines_per_region    (LOG_BUCKET_REGION-min_logI_logB),
+        log_regions_per_line    (logI-min_logI_logB),
         regions_per_line        (1<<log_regions_per_line),
         region_rank_in_line     (N&(regions_per_line-1)),
         last_region_in_line     (region_rank_in_line==(regions_per_line-1)),
@@ -793,11 +795,11 @@ struct small_sieve_routine : public small_sieve_routine_base {
         j1      (j0+(1<<log_lines_per_region)),
         I       (1<<logI),
         i0      ((region_rank_in_line<<LOG_BUCKET_REGION)-I/2),
-        i1      (i0+(1<<MIN(LOG_BUCKET_REGION,logI))),
-        row0_is_oddj    (((j0&(si.conf.sublat.m ? si.conf.sublat.m : 1))+si.conf.sublat.j0)&1),
-        has_haxis       (!j0),
-        has_vaxis       (region_rank_in_line==((regions_per_line-1)/2)),
-        has_origin      (has_haxis&&has_vaxis)
+        i1      (i0+(1<<min_logI_logB))
+        // row0_is_oddj    ((j0*sublatm+sublatj0)&1),
+        // has_haxis       (!j0),
+        // has_vaxis       (region_rank_in_line==((regions_per_line-1)/2)),
+        // has_origin      (has_haxis&&has_vaxis)
     {
         ASSERT_ALWAYS(positions.size() == primes.size());
     }
@@ -833,7 +835,7 @@ struct small_sieve_routine : public small_sieve_routine_base {
             }
             */
             const fbprime_t p = ssp.get_p();
-            if (bits_off && (p >> (MIN(LOG_BUCKET_REGION,logI) + 1 - bits_off))) {
+                    if (bits_off && (p >> (min_logI_logB + 1 - bits_off))) {
                 /* time to move on to the next bit size;
                  */
                 return;
@@ -912,7 +914,7 @@ struct small_sieve_routine : public small_sieve_routine_base {
                  *       the bucket is a single line fragment of size B.
                  */
                 int N1 = N + interleaving;
-                int Q = logI - LOG_BUCKET_REGION;
+                        const unsigned int Q = log_regions_per_line;
                 int dj = (N1>>Q) - j0;
                 int di = (N1&((1<<Q)-1)) - (N&((1<<Q)-1));
                 /* Note that B_mod p is not reduced. It may be <0, and
@@ -954,7 +956,7 @@ struct small_sieve_routine : public small_sieve_routine_base {
                        }
                        */
                     const fbprime_t p = ssp.get_p();
-                    if (bits_off && (p >> (MIN(LOG_BUCKET_REGION,logI) + 1 - bits_off))) {
+                    if (bits_off && (p >> (min_logI_logB + 1 - bits_off))) {
                         /* time to move on to the next bit size;
                         */
                         return;
@@ -987,7 +989,7 @@ struct small_sieve_routine : public small_sieve_routine_base {
                     }
                     if (fragment) {
                         int N1 = N + interleaving;
-                        int Q = logI - LOG_BUCKET_REGION;
+                        const unsigned int Q = log_regions_per_line;
                         int dj = (N1>>Q) - j0;
                         int di = (N1&((1<<Q)-1)) - (N&((1<<Q)-1));
                         int B_mod_p = overrun - p_pos;
