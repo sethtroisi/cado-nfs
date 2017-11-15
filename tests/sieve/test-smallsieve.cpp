@@ -761,7 +761,7 @@ struct small_sieve_routine_base {
             unsigned int& N) : positions(positions), primes(primes), S(S), logI(logI), N(N) {}
 };
 
-
+template<bool fragment>
 struct small_sieve_routine : public small_sieve_routine_base {
     const unsigned int log_lines_per_region;
     const unsigned int log_regions_per_line;
@@ -808,7 +808,7 @@ struct small_sieve_routine : public small_sieve_routine_base {
     }
     /* This function is responsible for small-sieving primes of a
      * specific bit size */
-    template<typename even_code, typename odd_code, bool fragment, int bits_off>
+    template<typename even_code, typename odd_code, int bits_off>
         void handle_nice_primes() /* {{{ */
     {
             /* TODO: sublat !!!! j actually corresponds to row S(j), with
@@ -1007,10 +1007,10 @@ struct small_sieve_routine : public small_sieve_routine_base {
      * function. Because we're playing tricks with types and lists of
      * types and such, we need to work with partial specializations at
      * the class level, which is admittedly messy. */
-    template<typename T, bool fragment, int max_bits_off = INT_MAX>
+    template<typename T, int max_bits_off = INT_MAX>
         struct do_it
         {
-            void operator()(small_sieve_routine & SS) {
+            void operator()(small_sieve_routine<fragment> & SS) {
                 /* default, should be at end of list. We require that we
                  * are done processing, at this point. */
                 ASSERT_ALWAYS(SS.finished());
@@ -1019,15 +1019,15 @@ struct small_sieve_routine : public small_sieve_routine_base {
 
     /* optimization: do not split into pieces when we have several times
      * the same code anyway. */
-    template<typename E0, typename O0, int b0, int b1, typename T, bool fragment, int bn>
+    template<typename E0, typename O0, int b0, int b1, typename T, int bn>
         struct do_it<choice_list_car<E0,O0,b0,
                      choice_list_car<E0,O0,b1,
-                    T>>, fragment, bn>
+                    T>>, bn>
         {
             static_assert(b0 > b1);
-            void operator()(small_sieve_routine & SS) {
-                SS.handle_nice_primes<E0, O0, fragment, b1>();
-                do_it<T, fragment>()(SS);
+            void operator()(small_sieve_routine<fragment> & SS) {
+                SS.handle_nice_primes<E0, O0, b1>();
+                do_it<T>()(SS);
             }
         };
     template<typename E0, typename O0, int b0, int bn>
@@ -1052,13 +1052,13 @@ struct small_sieve_routine : public small_sieve_routine_base {
                 is_compatible_for_range<E0, O0, b0, b0 + 5>::value;
         };
 
-    template<typename E0, typename O0, int b0, typename T, bool fragment, int bn>
-        struct do_it<choice_list_car<E0,O0,b0,T>, fragment, bn>
+    template<typename E0, typename O0, int b0, typename T, int bn>
+        struct do_it<choice_list_car<E0,O0,b0,T>, bn>
         {
             static_assert(is_compatible_for_range<E0, E0, b0, bn>::value);
-            void operator()(small_sieve_routine & SS) {
-                SS.handle_nice_primes<E0, O0, fragment, b0>();
-                do_it<T, fragment, b0-1>()(SS);
+            void operator()(small_sieve_routine<fragment> & SS) {
+                SS.handle_nice_primes<E0, O0, b0>();
+                do_it<T, b0-1>()(SS);
             }
         };
 };
@@ -1214,11 +1214,12 @@ j_odd_devel0:
 
 void generated(std::vector<int64_t> & positions, std::vector<ssp_t> const & primes, unsigned char * S, int logI, unsigned int N) /*{{{*/
 {
-    small_sieve_routine SS(positions, primes, S, logI, N);
     if (logI > LOG_BUCKET_REGION) {
-    small_sieve_routine::do_it<make_best_choice_list<12>::type, true>()(SS);
+        small_sieve_routine<true> SS(positions, primes, S, logI, N);
+        small_sieve_routine<true>::do_it<make_best_choice_list<12>::type>()(SS);
     } else {
-    small_sieve_routine::do_it<make_best_choice_list<12>::type, false>()(SS);
+        small_sieve_routine<false> SS(positions, primes, S, logI, N);
+        small_sieve_routine<false>::do_it<make_best_choice_list<12>::type>()(SS);
     }
 }
 /*}}}*/
