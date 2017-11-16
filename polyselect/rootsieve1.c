@@ -41,8 +41,6 @@ long bestu = 0, bestv = 0;      /* current best rotation */
 double best_alpha = DBL_MAX;    /* alpha of best rotation */
 double best_E = 0;              /* E of best rotation (with -E) */
 mpz_t bestw;                    /* current best rotation in w */
-int debug = 0;                  /* to print (max,avg) discrepancy with respect
-                                   to real alpha */
 double tot_pols = 0;            /* number of sieved polynomial */
 double prepare_time = 0;
 double sieve_time = 0;
@@ -64,7 +62,7 @@ typedef struct sieve_data {
 static void
 usage_and_die (char *argv0)
 {
-  fprintf (stderr, "usage: %s [-area a] [-I n] [-Bf b] [-Bg c] [-margin x] [-v] [-debug] [-sopt] [-V vmax] [-W wmax] [-B bbb] poly\n", argv0);
+  fprintf (stderr, "usage: %s [-area a] [-I n] [-Bf b] [-Bg c] [-margin x] [-v] [-sopt] [-V vmax] [-W wmax] [-B bbb] poly\n", argv0);
   fprintf (stderr, "  poly: filename of polynomial\n");
   fprintf (stderr, "  -area a      area parameter for Murphy-E computation (default %.2e)\n", AREA);
   fprintf (stderr, "  -I nnn       I-value for Murphy-E computation (overrides area)\n");
@@ -72,7 +70,6 @@ usage_and_die (char *argv0)
   fprintf (stderr, "  -Bg c        Bg bound for Murphy-E computation (default %.2e)\n", BOUND_G);
   fprintf (stderr, "  -margin x    allows a lognorm increase of x (default %.2f)\n", NORM_MARGIN);
   fprintf (stderr, "  -v           verbose toggle\n");
-  fprintf (stderr, "  -debug       prints avg/max discrepancy with true affine alpha\n");
   fprintf (stderr, "  -sopt        first size-optimize the given polynomial\n");
   fprintf (stderr, "  -B nnn       parameter for alpha computation (default %d)\n", ALPHA_BOUND);
   fprintf (stderr, "  -E           optimize E instead of alpha\n");
@@ -337,8 +334,9 @@ rotate_v (cado_poly_srcptr poly0, long v, long B,
               poly->skew = L2_skewness (poly->pols[ALG_SIDE],
                                         SKEWNESS_DEFAULT_PREC);
               double E = MurphyE (poly, Bf, Bg, area, MURPHY_K);
-              gmp_printf ("u=%ld v=%ld w=%ld est_alpha_aff=%f E=%.2e [original]\n",
+              gmp_printf ("u=%ld v=%ld w=%ld est_alpha_aff=%.2f E=%.2e [original]\n",
                           u, v, w, A[j], E);
+              fflush (stdout);
               /* restore the original polynomial (w=0) */
               rotate_aux (poly->pols[ALG_SIDE]->coeff, g1, g0, w, 0, 0);
             }
@@ -360,8 +358,9 @@ rotate_v (cado_poly_srcptr poly0, long v, long B,
                   mpz_set_si (bestw, w);
                   best_alpha = (double) A[j];
                   best_E = E;
-                  gmp_printf ("u=%ld v=%ld w=%Zd est_alpha_aff=%f E=%.2e\n",
+                  gmp_printf ("u=%ld v=%ld w=%Zd est_alpha_aff=%.2f E=%.2e\n",
                               u, v, bestw, best_alpha, E);
+                  fflush (stdout);
                 }
             }
         }
@@ -402,7 +401,10 @@ rotate (cado_poly poly, long B, double maxlognorm, double Bf, double Bg,
   long vmin = (r.kmin < (double) LONG_MIN) ? LONG_MIN : r.kmin;
   long vmax = (r.kmax > (double) LONG_MAX) ? LONG_MAX : r.kmax;
   if (verbose)
-    printf ("u=%ld: vmin=%ld vmax=%ld\n", u, vmin, vmax);
+    {
+      printf ("u=%ld: vmin=%ld vmax=%ld\n", u, vmin, vmax);
+      fflush (stdout);
+    }
 
   for (long v = vmin; v <= vmax; v ++)
     rotate_v (poly, v, B, maxlognorm, Bf, Bg, area, u);
@@ -521,12 +523,6 @@ main (int argc, char **argv)
             argv ++;
             argc --;
           }
-        else if (strcmp (argv[1], "-debug") == 0)
-          {
-            debug = 1;
-            argv ++;
-            argc --;
-          }
         else if (strcmp (argv[1], "-sopt") == 0)
           {
             sopt = 1;
@@ -579,6 +575,9 @@ main (int argc, char **argv)
         cado_poly_clear (c);
       }
 
+    /* compute the skewness */
+    poly->skew = L2_skewness (poly->pols[ALG_SIDE], SKEWNESS_DEFAULT_PREC);
+
     nprimes = initPrimes (B);
 
     /* determine range [umin,umax] */
@@ -605,10 +604,6 @@ main (int argc, char **argv)
         rotate (poly, B, maxlognorm, bound_f, bound_g, area, u);
       }
 
-    if (debug)
-      printf ("discrepancy: avg=%f, max=%g\n",
-              sum_discrepancy / num_discrepancy, max_discrepancy);
-      
     /* restore original polynomial */
     rotate_aux (poly->pols[ALG_SIDE]->coeff, poly->pols[RAT_SIDE]->coeff[1],
                 poly->pols[RAT_SIDE]->coeff[0], u0, 0, 2);
