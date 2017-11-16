@@ -143,29 +143,25 @@
 #define TWELVE_XADDS_NOLASTINCR(pi, incr, fence, logp, exit) 		\
     EIGHT_XADDS_INCR(pi, incr, fence, logp, exit)        		\
     FOUR_XADDS_NOLASTINCR(pi, incr, fence, logp, exit)
-#define SMALLSIEVE_ASSEMBLY_OLD(pi, incr, fence, logp) do {             \
-    unsigned char *pi_end;                                              \
+#define SMALLSIEVE_ASSEMBLY_OLD(_pi, _incr, _fence, _logp) do {             \
+    unsigned char *dummy;                                              \
     size_t three_p_or_2p;                                               \
     __asm__ __volatile__ (                                              \
-            "lea (%3,%3,2), %2\n"     /* three_p_or_2p = p_or_2p * 3 */ \
-            "lea (%1,%2,4), %0\n"     /* pi_end = pi + p_or_2p*12 */    \
-            "cmp %5, %0\n"            /* if (pi_end > S1) no loop */    \
-            "jbe 0f\n"                                                  \
-            "1:\n"                                                      \
-            TWELVE_XADDS_INCR("%1","%3","%5","%4","2f")    \
-            "jmp 2f\n"                                                  \
+            "lea (%[incr],%[incr],2), %[three_p_or_2p]\n"     /* three_p_or_2p = p_or_2p * 3 */ \
+            "lea (%[pi],%[three_p_or_2p],4), %[dummy]\n"     /* pi_end = pi + p_or_2p*12 */    \
+            "cmp %[fence], %[dummy]\n"            /* if (pi_end > S1) no loop */    \
+            "ja 1f\n"                                                  \
             ".balign 8\n"                                               \
             "0:\n"                                                      \
-            TWELVE_ADDS_INCR_PRECOMP("%1","%3","%2","%4")               \
-            "lea (%1,%2,4), %0\n"    /* if (pi+p_or_2p*12 > S1) break */\
-            "cmp %5, %0\n"                                              \
+            TWELVE_ADDS_INCR_PRECOMP("%[pi]","%[incr]","%[three_p_or_2p]","%[logp]")               \
+            "lea (%[pi],%[three_p_or_2p],4), %[dummy]\n"    /* if (pi+p_or_2p*12 > S1) break */\
+            "cmp %[fence], %[dummy]\n"                                              \
             "jbe 0b\n"                                                  \
-            "jmp 1b\n"                                                  \
-            ".balign 8\n"                                               \
+            "1:\n"                                                      \
+            TWELVE_XADDS_INCR("%[pi]","%[incr]","%[fence]","%[logp]","2f")    \
             "2:\n"                                                      \
-            : "=&r"(pi_end), "+&r"(pi), "=&r"(three_p_or_2p)            \
-            : "r"(incr), "q"(logp), "r"(fence) : "cc");                 \
-    pi = pi_end;                                                        \
+            : [dummy] "=&r"(dummy), [pi] "+r"(_pi), [three_p_or_2p]"=&r"(three_p_or_2p)            \
+            : [incr]"r"(_incr), [_logp]"q"(logp), [fence]"r"(_fence) : "cc");                 \
 } while (0)
 /* }}} */
 #if 0 /* {{{ unused GCC trick */
@@ -511,11 +507,11 @@ template<int bit> struct best_oddline ;
 #if defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM) && !defined(TRACK_CODE_PATH)
 template<int bit> struct best_evenline {
     typedef int is_default;
-    typedef assembly_generic_loop16p0 type;
+    typedef manual_oldloop type;
 };
 template<int bit> struct best_oddline  {
     typedef int is_default;
-    typedef assembly_generic_loop16p0 type;
+    typedef manual_oldloop type;
 };
 template<> struct best_evenline<1> { typedef manual0 type; };
 template<> struct best_evenline<2> { typedef assembly1 type; };
@@ -523,6 +519,15 @@ template<> struct best_evenline<3> { typedef assembly2 type; };
 template<> struct best_evenline<4> { typedef assembly3 type; };
 template<> struct best_evenline<5> { typedef assembly4 type; };
 template<> struct best_evenline<6> { typedef assembly5 type; };
+
+template<> struct best_oddline<1> { typedef assembly1 type; };
+template<> struct best_oddline<2> { typedef assembly2 type; };
+template<> struct best_oddline<3> { typedef assembly3 type; };
+template<> struct best_oddline<4> { typedef assembly4 type; };
+template<> struct best_oddline<5> { typedef assembly_generic_loop8 type; };
+template<> struct best_oddline<6> { typedef assembly_generic_loop8 type; };
+
+#if 1
 template<> struct best_evenline<7> { typedef assembly_generic_loop12 type; };
 template<> struct best_evenline<8> { typedef assembly_generic_loop12 type; };
 template<> struct best_evenline<9> { typedef assembly_generic_loop12 type; };
@@ -533,12 +538,6 @@ template<> struct best_evenline<13> { typedef assembly_generic_loop16p0 type; };
 template<> struct best_evenline<14> { typedef assembly_generic_loop16p1 type; };
 template<> struct best_evenline<15> { typedef assembly_generic_loop16p0 type; };
 
-template<> struct best_oddline<1> { typedef assembly1 type; };
-template<> struct best_oddline<2> { typedef assembly2 type; };
-template<> struct best_oddline<3> { typedef assembly3 type; };
-template<> struct best_oddline<4> { typedef assembly4 type; };
-template<> struct best_oddline<5> { typedef assembly_generic_loop8 type; };
-template<> struct best_oddline<6> { typedef assembly_generic_loop8 type; };
 template<> struct best_oddline<7> { typedef assembly_generic_loop12 type; };
 template<> struct best_oddline<8> { typedef assembly_generic_loop12 type; };
 template<> struct best_oddline<9> { typedef assembly_generic_loop12 type; };
@@ -548,6 +547,7 @@ template<> struct best_oddline<12> { typedef assembly_generic_loop12 type; };
 template<> struct best_oddline<13> { typedef assembly_generic_loop16p0 type; };
 template<> struct best_oddline<14> { typedef assembly_generic_loop16p1 type; };
 template<> struct best_oddline<15> { typedef assembly_generic_loop16p0 type; };
+#endif
 /* TODO: we could perhaps provide hints so that the generated code can
  * merge some rounds of the loop. Or maybe the compiler will do that ? */
 #else
