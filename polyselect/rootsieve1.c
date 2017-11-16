@@ -33,6 +33,8 @@
 // #define TRACE_V 7
 // #define TRACE_W 3
 
+#define GUARD_ALPHA 1.0
+
 /* global variables */
 int verbose = 0;                /* verbosity level */
 long *Primes, nprimes;          /* primes less than B */
@@ -51,7 +53,11 @@ double num_discrepancy = 0;
 long u0 = 0, v0 = 0, w0 = 0;    /* initial translation */
 int optimizeE = 0;              /* if not zero, optimize E instead of alpha */
 double guard_alpha = 0.0;       /* guard when -E */
-#define GUARD_ALPHA 1.0
+long mod = 1;                   /* consider class of u,v,w % mod */
+long modu = 0;                  /* consider only u = modu % mod */
+long modv = 0;                  /* consider only v = modv % mod */
+long modw = 0;                  /* consider only w = modw % mod */
+double tot_alpha = 0;           /* sum of alpha's */
 
 typedef struct sieve_data {
   uint16_t q;
@@ -156,7 +162,8 @@ rotate_v (cado_poly_srcptr poly0, long v, long B,
   long w, wmin, wmax;
   cado_poly poly;
   long l;
-  mpz_t g1, g0;
+#define G1 poly->pols[RAT_SIDE]->coeff[1]
+#define G0 poly->pols[RAT_SIDE]->coeff[0]
   mpz_t wminz, wmaxz;
 
   mpz_init (wminz);
@@ -166,11 +173,8 @@ rotate_v (cado_poly_srcptr poly0, long v, long B,
   cado_poly_init (poly);
   cado_poly_set (poly, poly0);
 
-  mpz_init_set (g1, poly->pols[RAT_SIDE]->coeff[1]);
-  mpz_init_set (g0, poly->pols[RAT_SIDE]->coeff[0]);
-
   /* compute f + (v*x)*g */
-  rotate_aux (poly->pols[ALG_SIDE]->coeff, g1, g0, 0, v, 1);
+  rotate_aux (poly->pols[ALG_SIDE]->coeff, G1, G0, 0, v, 1);
 
   double lognorm = L2_lognorm (poly->pols[ALG_SIDE], poly->skew);
   rotation_space r;
@@ -185,8 +189,27 @@ rotate_v (cado_poly_srcptr poly0, long v, long B,
       fflush (stdout);
     }
 
+  /* ensure wminz % mod = modw */
+  long t = (mod + modw - mpz_fdiv_ui (wminz, mod)) % mod;
+  ASSERT_ALWAYS(0 <= t && t < mod);
+  mpz_add_ui (wminz, wminz, t);
+
   if (mpz_cmp (wminz, wmaxz) >= 0)
     goto end;
+
+  /* if mod != 1, we have f + (k*mod+modw)*g = (f+modw*g) + k*(mod*g) */
+  if (mod > 1)
+    {
+      rotate_aux (poly->pols[ALG_SIDE]->coeff, G1, G0, 0, modw, 0); /* f <- f+modw*g */
+      mpz_poly_mul_si (poly->pols[RAT_SIDE], poly->pols[RAT_SIDE], mod);
+      /* wmin -> (wmin - modw) / mod */
+      mpz_sub_ui (wminz, wminz, modw);
+      ASSERT_ALWAYS(mpz_divisible_ui_p (wminz, mod));
+      mpz_divexact_ui (wminz, wminz, mod);
+      /* wmax -> (wmax - modw) / mod */
+      mpz_sub_ui (wmaxz, wmaxz, modw);
+      mpz_cdiv_q_ui (wmaxz, wmaxz, mod);
+    }
 
   /* compute the expected value sum(log(p)/(p-1), p < B) and the
      sum of largest prime powers sum(p^floor(log(B-1)/log(p)), p < B) */
@@ -293,9 +316,9 @@ rotate_v (cado_poly_srcptr poly0, long v, long B,
         A[j] = expected;
 
 #if defined(TRACE_V) && defined(TRACE_W)
-      ASSERT_ALWAYS(wmin <= TRACE_W && TRACE_W <= wmax);
-      if (v == TRACE_V && (wcur <= TRACE_W && TRACE_W < wcur + LEN))
-        printf ("initialized A[%d] to %f\n", TRACE_W, A[TRACE_W - wcur]);
+      if (v == TRACE_V && (mod * wcur + modw <= TRACE_W &&
+                           TRACE_W < mod * (wcur + LEN) + modw))
+        printf ("initialized A[%d] to %f\n", TRACE_W, A[(TRACE_W - modw) / mod - wcur]);
 #endif
 
       /* now perform the sieve */
@@ -305,10 +328,12 @@ rotate_v (cado_poly_srcptr poly0, long v, long B,
           long q = sieve_d[i].q;
           long s = sieve_d[i].s;
           float nu = sieve_d[i].nu;
+          /* if mod=1, a given value of s corresponds to w = wcur + s
+             if mod>1, then s corresponds to w = mod*(wcur + s) + modw */
           while (s < LEN)
             {
 #if defined(TRACE_V) && defined(TRACE_W)
-              if (v == TRACE_V && TRACE_W - wmin == s)
+              if (v == TRACE_V && TRACE_W == mod * (wcur + s) + modw)
                 printf ("q=%ld: update A[%d] from %f to %f\n",
                         q, TRACE_W, A[s], A[s] - nu);
 #endif
@@ -323,39 +348,46 @@ rotate_v (cado_poly_srcptr poly0, long v, long B,
       extract_time -= seconds ();
       /* if wcur + LEN > wmax, we check only wmax - wcur entries */
       long maxj = (wcur + LEN <= wmax) ? LEN : wmax - wcur;
-      tot_pols += maxj;
       for (long j = 0; j < maxj; j++)
         {
+          tot_alpha += A[j];
+          tot_pols += 1;
           /* print alpha and E of original polynomial */
-          if (u == -u0 && v == -v0 && wcur + j == -w0)
+          if (u == -u0 && v == -v0 && mod * (wcur + j) + modw == -w0)
             {
-              w = wcur + j;
-              rotate_aux (poly->pols[ALG_SIDE]->coeff, g1, g0, 0, w, 0);
-              poly->skew = L2_skewness (poly->pols[ALG_SIDE],
-                                        SKEWNESS_DEFAULT_PREC);
+              w = wcur + j; /* local value of w, the global one is mod * w + modw */
+              rotate_aux (poly->pols[ALG_SIDE]->coeff, G1, G0, 0, w, 0);
+              poly->skew = L2_skewness (poly->pols[ALG_SIDE], SKEWNESS_DEFAULT_PREC);
+              /* to compute E, we need to divide g by mod */
+              mpz_poly_divexact_ui (poly->pols[RAT_SIDE], poly->pols[RAT_SIDE], mod);
               double E = MurphyE (poly, Bf, Bg, area, MURPHY_K);
+              /* restore g */
+              mpz_poly_mul_si (poly->pols[RAT_SIDE], poly->pols[RAT_SIDE], mod);
               gmp_printf ("u=%ld v=%ld w=%ld est_alpha_aff=%.2f E=%.2e [original]\n",
-                          u, v, w, A[j], E);
+                          u, v, mod * w + modw, A[j], E);
               fflush (stdout);
               /* restore the original polynomial (w=0) */
-              rotate_aux (poly->pols[ALG_SIDE]->coeff, g1, g0, w, 0, 0);
+              rotate_aux (poly->pols[ALG_SIDE]->coeff, G1, G0, w, 0, 0);
             }
           if (A[j] < best_alpha + guard_alpha)
             {
               w = wcur + j;
               /* compute E */
-              rotate_aux (poly->pols[ALG_SIDE]->coeff, g1, g0, 0, w, 0);
-              poly->skew = L2_skewness (poly->pols[ALG_SIDE],
-                                        SKEWNESS_DEFAULT_PREC);
+              rotate_aux (poly->pols[ALG_SIDE]->coeff, G1, G0, 0, w, 0);
+              poly->skew = L2_skewness (poly->pols[ALG_SIDE], SKEWNESS_DEFAULT_PREC);
+              /* to compute E, we need to divide g by mod */
+              mpz_poly_divexact_ui (poly->pols[RAT_SIDE], poly->pols[RAT_SIDE], mod);
               double E = MurphyE (poly, Bf, Bg, area, MURPHY_K);
+              /* restore g */
+              mpz_poly_mul_si (poly->pols[RAT_SIDE], poly->pols[RAT_SIDE], mod);
               /* restore the original polynomial (w=0) */
-              rotate_aux (poly->pols[ALG_SIDE]->coeff, g1, g0, w, 0, 0);
+              rotate_aux (poly->pols[ALG_SIDE]->coeff, G1, G0, w, 0, 0);
 
               if (optimizeE == 0 || (optimizeE == 1 && E > best_E))
                 {
                   bestu = u;
                   bestv = v;
-                  mpz_set_si (bestw, w);
+                  mpz_set_si (bestw, mod * w + modw);
                   best_alpha = (double) A[j];
                   best_E = E;
                   gmp_printf ("u=%ld v=%ld w=%Zd est_alpha_aff=%.2f E=%.2e\n",
@@ -367,8 +399,9 @@ rotate_v (cado_poly_srcptr poly0, long v, long B,
       extract_time += seconds ();
 
 #if defined(TRACE_V) && defined(TRACE_W)
-      if (v == TRACE_V && (wcur <= TRACE_W && TRACE_W < wcur + LEN))
-        printf ("A[%d] = %f\n", TRACE_W, A[TRACE_W - wcur]);
+      if (v == TRACE_V && (mod * wcur + modw <= TRACE_W &&
+                           TRACE_W < mod * (wcur + LEN) + modw))
+        printf ("A[%d] = %f\n", TRACE_W, A[(TRACE_W - modw) / mod - wcur]);
 #endif
 
       wcur += LEN;
@@ -383,8 +416,8 @@ rotate_v (cado_poly_srcptr poly0, long v, long B,
 
  end:
   cado_poly_clear (poly);
-  mpz_clear (g1);
-  mpz_clear (g0);
+#undef G1
+#undef G0
   mpz_clear (wminz);
   mpz_clear (wmaxz);
 }
@@ -406,7 +439,12 @@ rotate (cado_poly poly, long B, double maxlognorm, double Bf, double Bg,
       fflush (stdout);
     }
 
-  for (long v = vmin; v <= vmax; v ++)
+  /* first ensure that vmin = modu % mod */
+  long t = (((modv - vmin) % mod) + mod) % mod;
+  ASSERT_ALWAYS(0 <= t && t < mod);
+  vmin += t;
+  ASSERT_ALWAYS(vmin % mod == modv || vmin % mod == modv - mod);
+  for (long v = vmin; v <= vmax; v += mod)
     rotate_v (poly, v, B, maxlognorm, Bf, Bg, area, u);
 }
 
@@ -442,6 +480,9 @@ print_transformation (cado_poly_ptr poly0, cado_poly_srcptr poly)
   gmp_printf ("rotation [%Zd,", k);
   assert (mpz_fits_slong_p (k));
   u0 = mpz_get_si (k);
+  /* since we rotate by u0, if we want u = modu % mod, this translates to
+     u = (modu-u0) % mod */
+  modu = (modu + mod - (u0 % mod)) % mod;
   rotate_auxg_z (poly0->pols[ALG_SIDE]->coeff, poly0->pols[RAT_SIDE]->coeff[1],
                  poly0->pols[RAT_SIDE]->coeff[0], k, 2);
   mpz_sub (k, poly->pols[ALG_SIDE]->coeff[2], poly0->pols[ALG_SIDE]->coeff[2]);
@@ -450,6 +491,7 @@ print_transformation (cado_poly_ptr poly0, cado_poly_srcptr poly)
   gmp_printf ("%Zd,", k);
   assert (mpz_fits_slong_p (k));
   v0 = mpz_get_si (k);
+  modv = (modv + mod - (v0 % mod)) % mod;
   rotate_auxg_z (poly0->pols[ALG_SIDE]->coeff, poly0->pols[RAT_SIDE]->coeff[1],
                  poly0->pols[RAT_SIDE]->coeff[0], k, 1);
   mpz_sub (k, poly->pols[ALG_SIDE]->coeff[1], poly0->pols[ALG_SIDE]->coeff[1]);
@@ -458,6 +500,7 @@ print_transformation (cado_poly_ptr poly0, cado_poly_srcptr poly)
   gmp_printf ("%Zd]\n", k);
   assert (mpz_fits_slong_p (k));
   w0 = mpz_get_si (k);
+  modw = (modw + mod - (w0 % mod)) % mod;
   rotate_auxg_z (poly0->pols[ALG_SIDE]->coeff, poly0->pols[RAT_SIDE]->coeff[1],
                  poly0->pols[RAT_SIDE]->coeff[0], k, 0);
   ASSERT_ALWAYS(mpz_cmp (poly0->pols[ALG_SIDE]->coeff[0],
@@ -535,6 +578,31 @@ main (int argc, char **argv)
             argv += 2;
             argc -= 2;
           }
+        else if (strcmp (argv[1], "-mod") == 0)
+          {
+            mod = strtol (argv [2], NULL, 10);
+            ASSERT_ALWAYS(mod >= 1);
+            argv += 2;
+            argc -= 2;
+          }
+        else if (strcmp (argv[1], "-modu") == 0)
+          {
+            modu = strtol (argv [2], NULL, 10);
+            argv += 2;
+            argc -= 2;
+          }
+        else if (strcmp (argv[1], "-modv") == 0)
+          {
+            modv = strtol (argv [2], NULL, 10);
+            argv += 2;
+            argc -= 2;
+          }
+        else if (strcmp (argv[1], "-modw") == 0)
+          {
+            modw = strtol (argv [2], NULL, 10);
+            argv += 2;
+            argc -= 2;
+          }
         else
           break;
       }
@@ -542,6 +610,10 @@ main (int argc, char **argv)
         usage_and_die (argv[0]);
 
     ASSERT_ALWAYS(B <= 65536);
+
+    ASSERT_ALWAYS(0 <= modu && modu < mod);
+    ASSERT_ALWAYS(0 <= modv && modv < mod);
+    ASSERT_ALWAYS(0 <= modw && modw < mod);
 
     if (I != 0)
       area = bound_f * pow (2.0, (double) (2 * I - 1));
@@ -593,8 +665,13 @@ main (int argc, char **argv)
 
     mpz_init (bestw);
 
-    long u0 = 0;
-    for (long u = umin; u <= umax; u++)
+    long u0 = 0; /* current translation in u */
+    /* first ensure that umin = modu % mod */
+    long t = (((modu - umin) % mod) + mod) % mod;
+    ASSERT_ALWAYS(0 <= t && t < mod);
+    umin += t;
+    ASSERT_ALWAYS(umin % mod == modu || umin % mod == modu - mod);
+    for (long u = umin; u <= umax; u += mod)
       {
         rotate_aux (poly->pols[ALG_SIDE]->coeff,
                     poly->pols[RAT_SIDE]->coeff[1],
@@ -629,11 +706,12 @@ main (int argc, char **argv)
     time = seconds () - time;
     printf ("Sieved %.2e polynomials in %.2f seconds (%.2es/p)\n",
             tot_pols, time, time / tot_pols);
-    printf ("(prepare time %.2f = %.2f%%)\n", prepare_time,
+    printf ("Average alpha %.2f\n", tot_alpha / tot_pols);
+    printf ("(prepare time %.2f = %.2f%%, ", prepare_time,
             100.0 * prepare_time / time);
-    printf ("(sieve time %.2f = %.2f%%)\n", sieve_time,
+    printf ("sieve %.2f = %.2f%%, ", sieve_time,
             100.0 * sieve_time / time);
-    printf ("(extract time %.2f = %.2f%%)\n", extract_time,
+    printf ("extract %.2f = %.2f%%)\n", extract_time,
             100.0 * extract_time / time);
 
     free (Primes);
