@@ -176,26 +176,20 @@ void ssp_t::init_proj(fbprime_t p, fbprime_t r, unsigned char _logp, unsigned in
 
 void small_sieve_init(small_sieve_data_t & ssd,
                       unsigned int interleaving,
-                      const std::vector<fb_general_entry> *fb,
-                      sieve_info const & si, const int side,
-                      const fbprime_t td_thresh)
+                      std::vector<fb_general_entry>::const_iterator fb_start,
+                      std::vector<fb_general_entry>::const_iterator fb_end,
+                      std::vector<fb_general_entry>::const_iterator resieve_start,
+                      std::vector<fb_general_entry>::const_iterator resieve_end,
+                      sieve_info const & si, const int side)
 {
     const unsigned int thresh = si.conf.bucket_thresh;
     const int verbose = 0;
     where_am_I w MAYBE_UNUSED;
 
-    size_t size = si.sides[side].fb_parts_x->rest[1];
-
-    // allocate space for these. n is an upper bound, since some of the
-    // ideals might become special ones.
-    ssd.ssp.assign(size, ssp_t());
-
-    // ssd.ssps.assign(size, 0);
-    // TODO: ssps was never set before, probably the right place to deal
-    // with it is here, although I'm not too sure what was the intent.
+    ssd.ssp.clear();
     ssd.ssps.clear();
 
-    // Do another pass on fb and projective primes, to fill in the data
+    // Do a pass on fb and projective primes, to fill in the data
     // while we have any regular primes or projective primes < thresh left
     
     // The processing of bucket region by nb_threads is interleaved.
@@ -209,15 +203,25 @@ void small_sieve_init(small_sieve_data_t & ssd,
     unsigned int sublatm = si.conf.sublat.m;
     const unsigned int skiprows = ((interleaving-1) << LOG_BUCKET_REGION) >> si.conf.logI_adjusted;
 
-    /* A temporary vector to hold primes that should get re-sieved. Will later
-       be appended to ssps. */
-    std::vector<ssp_simple_t> rsd;
+    /* If fb_end == resieve_end, then the condition iter == resieve_end never
+       becomes true in the loop below, so we init it to true here.
+       Kinda ugly. */
+    bool saw_resieve_start = false, saw_resieve_end = (fb_end == resieve_end);
 
-    for (std::vector<fb_general_entry>::const_iterator iter = fb->begin() ; iter != fb->end() ; iter++) {
+    for (std::vector<fb_general_entry>::const_iterator iter = fb_start ;
+         iter != fb_end ; iter++) {
         /* p=pp^k, the prime or prime power in this entry, and pp is prime */
         const fbprime_t p = iter->q, pp = iter->p;
         WHERE_AM_I_UPDATE(w, p, p);
 
+        if (iter == resieve_start) {
+            saw_resieve_start = true;
+            ssd.resieve_start = ssd.ssps.end();
+        }
+        if (iter == resieve_end) {
+            saw_resieve_end = true;
+            ssd.resieve_end = ssd.ssps.end();
+        }
         if (p > thresh) {
             continue;
         }
@@ -258,11 +262,7 @@ void small_sieve_init(small_sieve_data_t & ssd,
 
             ssp_t new_ssp(p, r_q, logp, skiprows, is_proj_in_ij);
             if (new_ssp.is_nice()) {
-                if (new_ssp.get_p() <= td_thresh * iter->nr_roots) {
-                    rsd.push_back(new_ssp);
-                } else {
-                    ssd.ssps.push_back(new_ssp);
-                }
+                ssd.ssps.push_back(new_ssp);
             } else if (new_ssp.get_g() >= si.J) {
                 /* ... unless the number of lines to skip is >= J */
                 /* FIXME: we lose hits to (+-1,0) this way (the two locations
@@ -279,17 +279,11 @@ void small_sieve_init(small_sieve_data_t & ssd,
             }
         }
     }
-    ssd.resieve_start = ssd.ssps.end();
-    ssd.ssps.insert(ssd.ssps.end(), rsd.begin(), rsd.end());
-    ssd.resieve_end = ssd.ssps.end();
+    ASSERT_ALWAYS(saw_resieve_start && saw_resieve_end);
 }
 /* }}} */
 
 /* {{{ Creation of the ssdpos tables */
-void small_sieve_copy_start(std::vector<int64_t>& res, std::vector<int64_t> const & base, int bounds[2])
-{
-    res.assign(base.begin() + bounds[0], base.begin() + bounds[1]);
-}
 
 /* The places to be sieved are governed by the shape of the underlying
  * lattice of points.
@@ -636,6 +630,7 @@ struct small_sieve_context {
 
 /* Only compute the initial ssdpos fields. */
 void small_sieve_start(std::vector<int64_t> & ssdpos,
+        std::vector<int64_t> & rsdpos MAYBE_UNUSED,
         small_sieve_data_t & ssd,
         unsigned int first_region_index,
         sieve_info const & si)
@@ -654,23 +649,23 @@ void small_sieve_start(std::vector<int64_t> & ssdpos,
      * negative if j>j0.
      *
      */
-    for(size_t index = 0 ; index < ssd.ssp.size() ; index++) {
-        ssp_t const & ssp(ssd.ssp[index]);
+    size_t index = 0;
+    for (std::vector<ssp_t>::const_iterator iter = ssd.ssp.begin();
+         iter != ssd.ssp.end(); iter++) {
+         ssp_t const & ssp = *iter;
         /* generic case only. For all other cases (which are rare enough
          * -- typically at most 20, counting powers of two and such), we
          *  compute the starting point from within
          *  sieve_small_bucket_region for each bucket region.
          */
-        if (ssp.is_discarded()) {
-            /* Do nothing for discarded entries */
-        } else if (ssp.is_nice()) {
-            ssdpos[index] = C.first_position_ordinary_prime(ssp);
+        if (ssp.is_nice()) {
+            ssdpos[index++] = C.first_position_ordinary_prime(ssp);
         } else if (ssp.is_proj()) {
             /* This also handles powers of 2 with projective root */
-            ssdpos[index] = C.first_position_projective_prime(ssp);
+            ssdpos[index++] = C.first_position_projective_prime(ssp);
         } else if (ssp.is_pow2()) {
             /* Powers of 2 with affine root */
-            ssdpos[index] = C.first_position_power_of_two(ssp);
+            ssdpos[index++] = C.first_position_power_of_two(ssp);
         } else {
             abort(); /* How did we get here? */
         }

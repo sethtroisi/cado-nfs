@@ -2851,8 +2851,11 @@ for (unsigned int j_cong = 0; j_cong < sublat_bound; ++j_cong) {
             if (!s.fb) continue;
 
             small_sieve_init(s.ssd, las.nb_threads,
-                             s.fb_smallsieved.get(), si, side,
-                             si.conf.td_thresh);
+                             s.fb_smallsieved.get()->begin(),
+                             s.fb_smallsieved.get()->end(),
+                             s.fb_smallsieved.get()->begin() + s.resieve_start_offset,
+                             s.fb_smallsieved.get()->begin() + s.resieve_end_offset,
+                             si, side);
             small_sieve_info("small sieve", side, s.ssd);
             small_sieve_info("resieve", side, s.rsd);
 
@@ -2867,8 +2870,7 @@ for (unsigned int j_cong = 0; j_cong < sublat_bound; ++j_cong) {
                  * the first region index considered by thread of index
                  * th->id is simply th->id.
                  */
-                small_sieve_start(ts.ssdpos, s.ssd, th->id, si);
-                small_sieve_copy_start(ts.rsdpos, ts.ssdpos, s.fb_parts_x->rs);
+                small_sieve_start(ts.ssdpos, ts.rsdpos, s.ssd, th->id, si);
             }
         }
         BOOKKEEPING_TIMER(timer_special_q);
