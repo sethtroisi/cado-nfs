@@ -879,7 +879,7 @@ main (int argc, char **argv)
     mpz_init (bestw);
 
     long u0 = 0; /* current translation in u */
-    for (long u = umin; u <= umax; u += mod)
+    for (long u = umin; u <= umax; u++)
       {
         rotate_aux (poly->pols[ALG_SIDE]->coeff,
                     poly->pols[RAT_SIDE]->coeff[1],
