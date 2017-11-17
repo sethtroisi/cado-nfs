@@ -653,8 +653,8 @@ rotate (cado_poly poly, long B, double maxlognorm, double Bf, double Bg,
   int n;
   c = best_classes (poly, mod, keep, vmin, vmax, &n);
   ASSERT_ALWAYS (n <= keep);
-  if (verbose)
-    printf ("Kept %d classes (keep=%d)\n", n, keep);
+  printf ("Kept %d classes (keep=%d) with alpha from %.2f to %.2f\n",
+          n, keep, c[0].alpha, c[n-1].alpha);
 #pragma omp parallel for schedule(dynamic)
   for (int i = 0; i < n; i++)
     {
