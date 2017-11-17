@@ -180,7 +180,7 @@ main (int argc, char * argv[])
     siever_config conf;
     int nb_threads = 1;
 
-    param_list pl;
+    cxx_param_list pl;
     param_list_init(pl);
     declare_usage(pl);
     argv++,argc--;
@@ -261,6 +261,8 @@ main (int argc, char * argv[])
     mpz_init(sq);
     mpz_init(rho);
 
+    las_info las(pl);
+
     for (int argi = 0; argi < argc; argi++) {
       FILE *f = fopen_maybe_compressed(argv[argi], "rb");
       if (f == NULL) {
@@ -284,7 +286,7 @@ main (int argc, char * argv[])
         } else {
             relation rel;
             if (rel.parse(line)) {
-                int is_dupe = relation_is_duplicate(rel, nb_threads, *psi);
+                int is_dupe = relation_is_duplicate(rel, las, *psi);
                 dupsup(output, rel, doing, is_dupe);
             }
         }
