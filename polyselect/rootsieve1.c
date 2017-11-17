@@ -378,6 +378,7 @@ rotate_v (cado_poly_srcptr poly0, long v, long B,
   rotate_aux (poly->pols[ALG_SIDE]->coeff, G1, G0, 0, v, 1);
 
   /* recompute skewness to ensure lognorm <= maxlognorm */
+  double skew = L2_skewness (poly->pols[ALG_SIDE], SKEWNESS_DEFAULT_PREC);
   double lognorm = L2_lognorm (poly->pols[ALG_SIDE], skew);
   rotation_space r;
   expected_growth (&r, poly->pols[ALG_SIDE], poly->pols[RAT_SIDE], 0,
