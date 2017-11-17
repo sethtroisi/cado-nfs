@@ -208,10 +208,14 @@ void sieve_info::init_fb_smallsieved(int side)
     typedef int interval_t[2];
     interval_t *parts_as_array = &si.sides[side].fb_parts_x->pow2;
     for (int i = 0; i < 6; i++) {
+        if (i == RS)
+            si.sides[side].resieve_start_offset = s->size();
         parts_as_array[i][0] = count_roots(*s);
         std::sort(pieces[i].begin(), pieces[i].end());
         s->insert(s->end(), pieces[i].begin(), pieces[i].end());
         parts_as_array[i][1] = count_roots(*s);
+        if (i == RS)
+            si.sides[side].resieve_end_offset = s->size();
     }
     delete[] pieces;
     si.sides[side].fb_smallsieved = std::shared_ptr<std::vector<fb_general_entry> >(s);

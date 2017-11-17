@@ -79,6 +79,10 @@ struct sieve_info {
 
         std::shared_ptr<trialdiv_divisor_t> trialdiv_data;
         std::shared_ptr<std::vector<fb_general_entry> > fb_smallsieved;
+        /* Iterators that point into fb_smallsieved; the entries between these
+           two iterators are to be small-sieved, the others are not. */
+        size_t resieve_start_offset, resieve_end_offset;
+
         struct {
             int pow2[2];
             int pow3[2];
