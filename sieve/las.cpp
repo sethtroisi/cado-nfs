@@ -1719,7 +1719,7 @@ void factor_survivors_data::cofactoring (timetree_t & timer)
              * quickly return "no".
              */
             int is_dup = do_check
-                && relation_is_duplicate(rel, las.nb_threads, si);
+                && relation_is_duplicate(rel, las, si);
             const char *comment = is_dup ? "# DUPE " : "";
             FILE *output;
             verbose_output_start_batch();   /* lock I/O */
