@@ -203,24 +203,18 @@ void small_sieve_init(small_sieve_data_t & ssd,
     unsigned int sublatm = si.conf.sublat.m;
     const unsigned int skiprows = ((interleaving-1) << LOG_BUCKET_REGION) >> si.conf.logI_adjusted;
 
-    /* If fb_end == resieve_end, then the condition iter == resieve_end never
-       becomes true in the loop below, so we init it to true here.
-       Kinda ugly. */
-    bool saw_resieve_start = false, saw_resieve_end = (fb_end == resieve_end);
+    bool saw_resieve_start = false, saw_resieve_end = false;
 
-    for (std::vector<fb_general_entry>::const_iterator iter = fb_start ;
-         iter != fb_end ; iter++) {
+    std::vector<fb_general_entry>::const_iterator iter = fb_start;
+    while (iter != fb_end) {
         /* p=pp^k, the prime or prime power in this entry, and pp is prime */
         const fbprime_t p = iter->q, pp = iter->p;
         WHERE_AM_I_UPDATE(w, p, p);
 
         if (iter == resieve_start) {
+            ASSERT_ALWAYS(!saw_resieve_end);
             saw_resieve_start = true;
-            ssd.resieve_start = ssd.ssps.end();
-        }
-        if (iter == resieve_end) {
-            saw_resieve_end = true;
-            ssd.resieve_end = ssd.ssps.end();
+            ssd.resieve_start_offset = ssd.ssps.size();
         }
         if (p > thresh) {
             continue;
@@ -277,6 +271,12 @@ void small_sieve_init(small_sieve_data_t & ssd,
             } else {
                 ssd.ssp.push_back(new_ssp);
             }
+        }
+        iter++;
+        if (iter == resieve_end) {
+            ASSERT_ALWAYS(saw_resieve_start);
+            saw_resieve_end = true;
+            ssd.resieve_end_offset = ssd.ssps.size();
         }
     }
     ASSERT_ALWAYS(saw_resieve_start && saw_resieve_end);
@@ -421,7 +421,7 @@ struct small_sieve_context {
         has_origin = has_haxis && has_vaxis;              
     }
 
-    int64_t first_position_ordinary_prime(ssp_t const & ssp, unsigned int dj = 0)
+    int64_t first_position_ordinary_prime(ssp_simple_t const & ssp, unsigned int dj = 0)
     {
         /* equation here: i-r*j = 0 mod p */
 
@@ -636,7 +636,7 @@ void small_sieve_start(std::vector<int64_t> & ssdpos,
         sieve_info const & si)
 {
     small_sieve_context C(si.conf.logI_adjusted, first_region_index, si.conf.sublat);
-    ssdpos.assign(ssd.ssp.size(), 0);
+    ssdpos.assign(ssd.ssp.size() + ssd.ssps.size(), 0);
 
     /* We want to compute the index of the "next" hit, counted from the
      * starting offset of the "current" bucket region at (i0,j0). The
@@ -653,7 +653,7 @@ void small_sieve_start(std::vector<int64_t> & ssdpos,
     for (std::vector<ssp_t>::const_iterator iter = ssd.ssp.begin();
          iter != ssd.ssp.end(); iter++) {
          ssp_t const & ssp = *iter;
-        /* generic case only. For all other cases (which are rare enough
+        /* Simple case only. For all other cases (which are rare enough
          * -- typically at most 20, counting powers of two and such), we
          *  compute the starting point from within
          *  sieve_small_bucket_region for each bucket region.
@@ -670,6 +670,24 @@ void small_sieve_start(std::vector<int64_t> & ssdpos,
             abort(); /* How did we get here? */
         }
     }
+
+    size_t rs_start, rs_end;
+    std::vector<ssp_simple_t>::const_iterator
+        resieve_start = ssd.ssps.begin() + ssd.resieve_start_offset,
+        resieve_end = ssd.ssps.begin() + ssd.resieve_end_offset;
+
+    std::vector<ssp_simple_t>::const_iterator iter = ssd.ssps.begin();
+    while (iter != ssd.ssps.end()) {
+        if (iter == resieve_start)
+            rs_start = index;
+
+        ssdpos[index++] = C.first_position_ordinary_prime(*iter++);
+        
+        if (iter == resieve_end)
+            rs_end = index;
+    }
+
+    rsdpos.assign(ssdpos.begin() + rs_start, ssdpos.begin() + rs_end);
 }
 /* }}} */
 

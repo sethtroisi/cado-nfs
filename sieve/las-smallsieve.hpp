@@ -13,6 +13,11 @@
 #define SSP_DISCARD_SUBLAT     (1u<<2)
 #define SSP_DISCARD_PROJ     (1u<<3)
 
+/* Simple primes/roots. These are implicitly "nice", i.e., odd primes/powers
+   with affine root.
+   We also use them only for primes/roots which are sieved in the normal
+   one-hit-at-a-time line sieving code. Pattern-sieved stuff is kept in
+   ssp_t. */
 class ssp_simple_t {
 protected:
     fbprime_t p;
@@ -31,6 +36,7 @@ public:
     void set_p(const fbprime_t _p) {p = _p;}
     void set_r(const fbprime_t _r) {r = _r;}
     void set_offset(const fbprime_t _offset) {offset = _offset;}
+    bool is_nice() const {return true;}
     void print(FILE *) const;
 };
 
@@ -96,9 +102,9 @@ private:
 typedef struct {
     std::vector<ssp_simple_t> ssps;
     std::vector<ssp_t> ssp;
-    /* These iterators tell which of the ssps entries should be used 
-       for re-sieving */
-    std::vector<ssp_simple_t>::const_iterator resieve_start, resieve_end;
+    /* These offsets, relative to the start of ssps, tell which of the ssps
+       entries should be used for re-sieving */
+    size_t resieve_start_offset, resieve_end_offset;
 } small_sieve_data_t;
 
 /* Include this only now, as there's a cross dependency between the two
