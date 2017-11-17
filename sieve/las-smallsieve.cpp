@@ -1182,8 +1182,9 @@ void sieve_small_bucket_region(unsigned char *S, int N,
     // small primes.
 
     /* use size_t for k, i and twop to speed up in x86 with LEA asm instructions */
-    for(size_t index = 0 ; index < ssd.ssp.size() ; index++) {
-        ssp_t const & ssp(ssd.ssp[index]);
+    size_t index = 0;
+    for(auto iter = ssd.ssp.begin() ; iter != ssd.ssp.end() ; iter++, index++) {
+        ssp_t const & ssp(*iter);
         if(ssp.is_nice()) {
             sieve_one_nice_prime(S, ssp, ssdpos[index], si, i0, i1, j0, j1, I, logI, N, interleaving, w);
         } else {
@@ -1366,6 +1367,9 @@ void sieve_small_bucket_region(unsigned char *S, int N,
 #endif
             }
         }
+    }
+    for (auto iter = ssd.ssps.begin() ; iter != ssd.ssps.end() ; iter++, index++) {
+        sieve_one_nice_prime(S, *iter, ssdpos[index], si, i0, i1, j0, j1, I, logI, N, interleaving, w);
     }
 }
 /* }}} */
