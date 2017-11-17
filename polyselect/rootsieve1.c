@@ -45,9 +45,6 @@ double best_alpha = DBL_MAX;    /* alpha of best rotation */
 double best_E = 0;              /* E of best rotation (with -E) */
 mpz_t bestw;                    /* current best rotation in w */
 double tot_pols = 0;            /* number of sieved polynomial */
-double prepare_time = 0;
-double sieve_time = 0;
-double extract_time = 0;
 double max_discrepancy = 0;
 double sum_discrepancy = 0;
 double num_discrepancy = 0;
@@ -370,6 +367,8 @@ rotate_v (cado_poly_srcptr poly0, long v, long B,
 #define G1 poly->pols[RAT_SIDE]->coeff[1]
 #define G0 poly->pols[RAT_SIDE]->coeff[0]
   mpz_t wminz, wmaxz;
+  double tot_pols_local = 0;
+  double tot_alpha_local = 0;
 
   mpz_init (wminz);
   mpz_init (wmaxz);
@@ -484,7 +483,6 @@ rotate_v (cado_poly_srcptr poly0, long v, long B,
         }
 
       /* prepare data for the sieve */
-      prepare_time -= seconds ();
       q = Q[l];
       for (w = 0; w < q; w++)
         {
@@ -503,7 +501,6 @@ rotate_v (cado_poly_srcptr poly0, long v, long B,
           sieve_d[sieve_n].nu = nu;
           sieve_n ++;
         }
-      prepare_time += seconds ();
     }
 
   ASSERT_ALWAYS(sieve_n <= sum_of_prime_powers);
@@ -528,7 +525,6 @@ rotate_v (cado_poly_srcptr poly0, long v, long B,
 #endif
 
       /* now perform the sieve */
-      sieve_time -= seconds ();
       for (unsigned long i = 0; i < sieve_n; i++)
         {
           long q = sieve_d[i].q;
@@ -548,16 +544,14 @@ rotate_v (cado_poly_srcptr poly0, long v, long B,
             }
           sieve_d[i].s = s - LEN;
         }
-      sieve_time += seconds ();
 
       /* check for the smallest A[s] */
-      extract_time -= seconds ();
       /* if wcur + LEN > wmax, we check only wmax - wcur entries */
       long maxj = (wcur + LEN <= wmax) ? LEN : wmax - wcur;
       for (long j = 0; j < maxj; j++)
         {
-          tot_alpha += A[j];
-          tot_pols += 1;
+          tot_alpha_local += A[j];
+          tot_pols_local += 1;
           /* print alpha and E of original polynomial */
           if (u == -u0 && v == -v0 && mod * (wcur + j) + modw == -w0)
             {
@@ -605,7 +599,6 @@ rotate_v (cado_poly_srcptr poly0, long v, long B,
                 }
             }
         }
-      extract_time += seconds ();
 
 #if defined(TRACE_V) && defined(TRACE_W)
       if (v == TRACE_V && (mod * wcur + modw <= TRACE_W &&
@@ -629,6 +622,13 @@ rotate_v (cado_poly_srcptr poly0, long v, long B,
 #undef G0
   mpz_clear (wminz);
   mpz_clear (wmaxz);
+
+  /* accumulate the number of polynomials and the alpha values */
+#pragma omp critical
+  {
+    tot_pols += tot_pols_local;
+    tot_alpha += tot_alpha_local;
+  }
 }
 
 static void
@@ -914,12 +914,6 @@ main (int argc, char **argv)
     printf ("Sieved %.2e polynomials in %.2f seconds (%.2es/p)\n",
             tot_pols, time, time / tot_pols);
     printf ("Average alpha %.2f\n", tot_alpha / tot_pols);
-    printf ("(prepare time %.2f = %.2f%%, ", prepare_time,
-            100.0 * prepare_time / time);
-    printf ("sieve %.2f = %.2f%%, ", sieve_time,
-            100.0 * sieve_time / time);
-    printf ("extract %.2f = %.2f%%)\n", extract_time,
-            100.0 * extract_time / time);
 
     free (Primes);
     free (Q);
