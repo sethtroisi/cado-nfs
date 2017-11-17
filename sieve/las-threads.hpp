@@ -17,9 +17,10 @@ class thread_workspaces;
 /* All of this exists _for each thread_ */
 struct thread_side_data : private NonCopyable {
   const fb_factorbase *fb = NULL;
+
   /* For small sieve */
-  std::vector<int64_t> ssdpos;
-  std::vector<int64_t> rsdpos;
+  std::vector<spos_t> ssdpos;
+  std::vector<spos_t> rsdpos;
 
   /* The real array where we apply the sieve.
      This has size BUCKET_REGION_0 and should be close to L1 cache size. */

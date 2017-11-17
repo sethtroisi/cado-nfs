@@ -13,6 +13,8 @@
 #define SSP_DISCARD_SUBLAT     (1u<<2)
 #define SSP_DISCARD_PROJ     (1u<<3)
 
+/* spos_t is in las-forwardtypes.hpp */
+
 class ssp_simple_t {
 protected:
     fbprime_t p;
@@ -117,21 +119,22 @@ extern void small_sieve_init(small_sieve_data_t & ssd, unsigned int interleaving
                       std::vector<fb_general_entry>::const_iterator resieve_start,
                       std::vector<fb_general_entry>::const_iterator resieve_end,
                       sieve_info const & si, int side);
-extern void small_sieve_start(std::vector<int64_t> &, std::vector<int64_t> &, small_sieve_data_t & ssd, unsigned int N, sieve_info const & si);
+extern void small_sieve_start(std::vector<spos_t> & ssdpos, small_sieve_data_t & ssd, unsigned int first_region_index, sieve_info const & si);
+extern void small_sieve_copy_start(std::vector<spos_t>& res, std::vector<spos_t> const & base, int bounds[2]);
 /*
-extern void small_sieve_skip_stride(small_sieve_data_t *ssd, int64_t * ssdpos, unsigned int N, unsigned int interleaving, sieve_info const & si);
+extern void small_sieve_skip_stride(small_sieve_data_t *ssd, spos_t * ssdpos, unsigned int N, unsigned int interleaving, sieve_info const & si);
 */
-extern void sieve_small_bucket_region(unsigned char *S, int N,
-			       small_sieve_data_t & ssd,
-                               std::vector<int64_t> & ssdpos, sieve_info& si,
-                               int side,
-                               int interleaving,
-			       where_am_I& w MAYBE_UNUSED);
+extern void sieve_small_bucket_region(unsigned char *S, unsigned int N,
+                               small_sieve_data_t & ssd,
+                               std::vector<spos_t> & ssdpos,
+                               sieve_info & si, int side MAYBE_UNUSED,
+                               int nthreads,
+                               where_am_I & w);
 
 extern void
 resieve_small_bucket_region (bucket_primes_t *BP, int N, unsigned char *S,
         small_sieve_data_t & ssd, 
-        std::vector<int64_t> & ssdpos,
+        std::vector<spos_t> & ssdpos,
         sieve_info const & si,
         int interleaving,
         where_am_I& w MAYBE_UNUSED);

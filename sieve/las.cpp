@@ -2870,7 +2870,8 @@ for (unsigned int j_cong = 0; j_cong < sublat_bound; ++j_cong) {
                  * the first region index considered by thread of index
                  * th->id is simply th->id.
                  */
-                small_sieve_start(ts.ssdpos, ts.rsdpos, s.ssd, th->id, si);
+                small_sieve_start(ts.ssdpos, s.ssd, th->id, si);
+                small_sieve_copy_start(ts.rsdpos, ts.ssdpos, s.fb_parts_x->rs);
             }
         }
         BOOKKEEPING_TIMER(timer_special_q);

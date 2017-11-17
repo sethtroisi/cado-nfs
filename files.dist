@@ -1193,3 +1193,5 @@ config/math-special.cmake
 tests/sieve/c160_21518.poly
 tests/sieve/test-smallsieve.cpp
 sieve/las-smallsieve-lowlevel.hpp
+sieve/las-smallsieve-glue.hpp
+tests/sieve/test-smallsieve-mock.hpp
