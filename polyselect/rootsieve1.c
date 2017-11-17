@@ -393,7 +393,9 @@ rotate_v (cado_poly_srcptr poly0, long v, long B,
       fflush (stdout);
     }
 
-  /* ensure wminz % mod = modw */
+  /* Ensure wminz % mod = modw. Since mod <= MAX_LONG, we have
+     s := wminz % mod < MAX_LONG thus modw - s fits in a long and
+     there is no underflow below. */
   long t = get_mod (modw - mpz_fdiv_ui (wminz, mod), mod);
   ASSERT_ALWAYS(0 <= t && t < mod);
   mpz_add_ui (wminz, wminz, t);
