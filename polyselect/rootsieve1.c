@@ -108,21 +108,6 @@ initPrimes (unsigned long B)
   return nprimes;
 }
 
-#if 0
-/* put in roots[0], roots[1], ... the roots of f + g * w = 0 mod q,
-   and return the number of roots. Naive implementation. */
-static unsigned long
-get_roots (unsigned long *roots, unsigned long f, unsigned long g,
-           unsigned long q)
-{
-  unsigned long nroots = 0;
-
-  for (unsigned long w = 0; w < q; w++)
-    if (((f + g * w) % q) == 0)
-      roots[nroots++] = w;
-  return nroots;
-}
-#else
 /* put in roots[0], roots[1], ... the roots of f + g * w = 0 mod q,
    and return the number of roots */
 static unsigned long
@@ -152,7 +137,6 @@ get_roots (unsigned long *roots, unsigned long f, unsigned long g,
     }
   return nroots;
 }
-#endif
 
 /* rotation for a fixed value of v */
 static void
