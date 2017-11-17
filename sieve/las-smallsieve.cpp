@@ -826,6 +826,132 @@ inline size_t sieve_full_line(unsigned char * S0, unsigned char * S1, size_t x0 
 
 /* {{{ Normal small sieve */
 
+void sieve_one_nice_prime(unsigned char *S, const ssp_simple_t &ssps,
+    int64_t & ssdpos, const sieve_info & si, const int i0, const int i1,
+    const unsigned int j0, const unsigned int j1, const int I, const int logI,
+    const int N, const int interleaving, where_am_I w)
+{
+    const fbprime_t p = ssps.get_p();
+    const fbprime_t r = ssps.get_r();
+
+    if (mpz_cmp_ui(si.qbasis.q, p) == 0)
+        return;
+
+    /* Don't sieve 3 again as it was pattern-sieved -- unless
+     * it's projective, see TODO above. */
+    if (p == 3)
+      return;
+
+    WHERE_AM_I_UPDATE(w, p, p);
+    const unsigned char logp = ssps.logp;
+    unsigned char *S0 = S;
+    int pos = ssdpos;
+#ifdef TRACE_K
+    /* we're keeping track of it with ssdpos, but just in case,
+     * make sure we get it right ! */
+    ASSERT_ALWAYS(pos == C.first_position_ordinary_prime (ssps));
+#endif
+    ASSERT(pos < (int) p);
+    unsigned int i_compens_sublat = si.conf.sublat.i0 & 1;
+    unsigned int j = j0;
+
+    /* we sieve over the area [S0..S0+(i1-i0)], which may
+     * actually be just a fragment of a line. After that, if
+     * (i1-i0) is different from I, we'll break anyway. So
+     * whether we add I or (i1-i0) to S0 does not matter much.
+     */
+    size_t overrun = 0; /* tame gcc */
+    if (j & 1) {
+        WHERE_AM_I_UPDATE(w, j, j - j0);
+        overrun = sieve_full_line(S0, S0 + (i1 - i0), S0 - S,
+                pos, p, logp, w);
+        S0 += I;
+        j++;
+        pos += r; if (pos >= (int) p) pos -= p;
+    }
+    for( ; j < j1 ; ) {
+        /* for j even, we sieve only odd pi, so step = 2p. */
+        int xpos = ((i_compens_sublat + pos) & 1) ? pos : (pos+p);
+        overrun = sieve_full_line(S0, S0 + (i1 - i0), S0 - S,
+                xpos, p+p, logp, w);
+        S0 += I;
+        pos += r; if (pos >= (int) p) pos -= p; 
+        if (++j >= j1) break;
+
+        /* now j odd again */
+        WHERE_AM_I_UPDATE(w, j, j - j0);
+        overrun = sieve_full_line(S0, S0 + (i1 - i0), S0 - S,
+                pos, p, logp, w);
+        S0 += I;
+        pos += r; if (pos >= (int) p) pos -= p;
+        ++j;
+    }
+
+    if (logI > LOG_BUCKET_REGION) {
+        /* quick notes for incremental adjustment in case I>B (B =
+         * LOG_BUCKET_REGION).
+         *
+         * Let q = 2^(I-B).
+         * Let N = a*q+b, and N'=N+interleaving=a'*q+b' ; N' is the
+         * next bucket region we'll handle.
+         *
+         * Let interleaving = u*q+v
+         *
+         * The row increase is dj = (N' div q) - (N div q) = a'-a
+         * The fragment increase is di = (N' mod q) - (N mod q) = b'-b
+         *
+         * Of course we have -q < b'-b < q
+         *
+
+         * dj can be written as (N'-N-(b'-b)) div q, which is an
+         * exact division. we rewrite that as:
+         *
+         * dj = u + (v - (b'-b)) div q
+         *
+         * where the division is again exact. Now (v-(b'-b))
+         * satisfies:
+         * -q < v-(b'-b) < 2*q-1
+         *
+         * so that the quotient may only be 0 or 1.
+         *
+         * It is 1 if and only if v >= q + b'-b, which sounds like a
+         * reasonable thing to check.
+         */
+        int N1 = N + interleaving;
+        int Q = logI - LOG_BUCKET_REGION;
+        int dj = (N1>>Q) - j0;
+        int di = (N1&((1<<Q)-1)) - (N&((1<<Q)-1));
+        /* Note that B_mod p is not reduced. It may be <0, and
+         * may also be >= p if we sieved with 2p because of even j
+         */
+        int B_mod_p = overrun - pos;
+        /* We may avoid some of the cost for the modular
+         * reduction, here:
+         *
+         * dj is either always the same thing, or that same thing
+         * + 1.
+         *
+         * di is within a small interval (albeit a centered one).
+         * 
+         * So it seems feasible to get by with a fixed number of
+         * conditional subtractions.
+         */
+        pos = (pos + B_mod_p * di + dj * r) % p;
+        if (pos < 0) pos += p;
+#ifndef NDEBUG
+        small_sieve_context C1(logI, N1, si.conf.sublat);
+        ASSERT(pos == C1.first_position_ordinary_prime(ssps));
+#endif
+        ssdpos = pos;
+    } else {
+        /* skip stride */
+        pos += ssps.get_offset();
+        if (pos >= (int) p) pos -= p;
+        ssdpos = pos;
+    }
+}
+
+
 // Sieve small primes (up to p < bucket_thresh) of the factor base fb in the
 // next sieve region S.
 // Information about where we are is in ssd.
@@ -1059,122 +1185,7 @@ void sieve_small_bucket_region(unsigned char *S, int N,
     for(size_t index = 0 ; index < ssd.ssp.size() ; index++) {
         ssp_t const & ssp(ssd.ssp[index]);
         if(ssp.is_nice()) {
-            const fbprime_t p = ssp.get_p();
-            const fbprime_t r = ssp.get_r();
-
-            if (mpz_cmp_ui(si.qbasis.q, p) == 0) continue;
-
-            /* Don't sieve 3 again as it was pattern-sieved -- unless
-             * it's projective, see TODO above. */
-            if (p == 3) continue;
-
-            WHERE_AM_I_UPDATE(w, p, p);
-            const unsigned char logp = ssp.logp;
-            unsigned char *S0 = S;
-            int pos = ssdpos[index];
-#ifdef TRACE_K
-            /* we're keeping track of it with ssdpos, but just in case,
-             * make sure we get it right ! */
-            ASSERT_ALWAYS(pos == C.first_position_ordinary_prime (ssp));
-#endif
-            ASSERT(pos < (int) p);
-            unsigned int i_compens_sublat = si.conf.sublat.i0 & 1;
-            unsigned int j = j0;
-
-            /* we sieve over the area [S0..S0+(i1-i0)], which may
-             * actually be just a fragment of a line. After that, if
-             * (i1-i0) is different from I, we'll break anyway. So
-             * whether we add I or (i1-i0) to S0 does not matter much.
-             */
-            size_t overrun = 0; /* tame gcc */
-            if (j & 1) {
-                WHERE_AM_I_UPDATE(w, j, j - j0);
-                overrun = sieve_full_line(S0, S0 + (i1 - i0), S0 - S,
-                        pos, p, logp, w);
-                S0 += I;
-                j++;
-                pos += r; if (pos >= (int) p) pos -= p;
-            }
-            for( ; j < j1 ; ) {
-                /* for j even, we sieve only odd pi, so step = 2p. */
-                int xpos = ((i_compens_sublat + pos) & 1) ? pos : (pos+p);
-                overrun = sieve_full_line(S0, S0 + (i1 - i0), S0 - S,
-                        xpos, p+p, logp, w);
-                S0 += I;
-                pos += r; if (pos >= (int) p) pos -= p; 
-                if (++j >= j1) break;
-
-                /* now j odd again */
-                WHERE_AM_I_UPDATE(w, j, j - j0);
-                overrun = sieve_full_line(S0, S0 + (i1 - i0), S0 - S,
-                        pos, p, logp, w);
-                S0 += I;
-                pos += r; if (pos >= (int) p) pos -= p;
-                ++j;
-            }
-
-            if (logI > LOG_BUCKET_REGION) {
-                /* quick notes for incremental adjustment in case I>B (B =
-                 * LOG_BUCKET_REGION).
-                 *
-                 * Let q = 2^(I-B).
-                 * Let N = a*q+b, and N'=N+interleaving=a'*q+b' ; N' is the
-                 * next bucket region we'll handle.
-                 *
-                 * Let interleaving = u*q+v
-                 *
-                 * The row increase is dj = (N' div q) - (N div q) = a'-a
-                 * The fragment increase is di = (N' mod q) - (N mod q) = b'-b
-                 *
-                 * Of course we have -q < b'-b < q
-                 *
-
-                 * dj can be written as (N'-N-(b'-b)) div q, which is an
-                 * exact division. we rewrite that as:
-                 *
-                 * dj = u + (v - (b'-b)) div q
-                 *
-                 * where the division is again exact. Now (v-(b'-b))
-                 * satisfies:
-                 * -q < v-(b'-b) < 2*q-1
-                 *
-                 * so that the quotient may only be 0 or 1.
-                 *
-                 * It is 1 if and only if v >= q + b'-b, which sounds like a
-                 * reasonable thing to check.
-                 */
-                int N1 = N + interleaving;
-                int Q = logI - LOG_BUCKET_REGION;
-                int dj = (N1>>Q) - j0;
-                int di = (N1&((1<<Q)-1)) - (N&((1<<Q)-1));
-                /* Note that B_mod p is not reduced. It may be <0, and
-                 * may also be >= p if we sieved with 2p because of even j
-                 */
-                int B_mod_p = overrun - ssdpos[index];
-                /* We may avoid some of the cost for the modular
-                 * reduction, here:
-                 *
-                 * dj is either always the same thing, or that same thing
-                 * + 1.
-                 *
-                 * di is within a small interval (albeit a centered one).
-                 * 
-                 * So it seems feasible to get by with a fixed number of
-                 * conditional subtractions.
-                 */
-                pos = (ssdpos[index] + B_mod_p * di + dj * r) % p;
-                if (pos < 0) pos += p;
-#ifndef NDEBUG
-                small_sieve_context C1(logI, N1, si.conf.sublat);
-                ASSERT(pos == C1.first_position_ordinary_prime(ssp));
-#endif
-                ssdpos[index] = pos;
-            } else {
-                /* skip stride */
-                pos += ssp.get_offset();
-                if (pos >= (int) p) pos -= p;
-                ssdpos[index] = pos;
-            }
+            sieve_one_nice_prime(S, ssp, ssdpos[index], si, i0, i1, j0, j1, I, logI, N, interleaving, w);
         } else {
 
             // if (ssp.is_discarded_proj()) continue;
