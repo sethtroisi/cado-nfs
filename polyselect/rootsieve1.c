@@ -26,6 +26,7 @@
 #include "area.h"
 #include "murphyE.h"
 #include "size_optimization.h"
+#include "omp.h"
 
 /* define ORIGINAL if you want the original algorithm from the paper */
 // #define ORIGINAL
@@ -54,10 +55,8 @@ long u0 = 0, v0 = 0, w0 = 0;    /* initial translation */
 int optimizeE = 0;              /* if not zero, optimize E instead of alpha */
 double guard_alpha = 0.0;       /* guard when -E */
 long mod = 1;                   /* consider class of u,v,w % mod */
-long modu = 0;                  /* consider only u = modu % mod */
-long modv = 0;                  /* consider only v = modv % mod */
-long modw = 0;                  /* consider only w = modw % mod */
 double tot_alpha = 0;           /* sum of alpha's */
+int keep = 10;                  /* number of best classes kept */
 
 typedef struct sieve_data {
   uint16_t q;
@@ -80,6 +79,14 @@ usage_and_die (char *argv0)
   fprintf (stderr, "  -B nnn       parameter for alpha computation (default %d)\n", ALPHA_BOUND);
   fprintf (stderr, "  -E           optimize E instead of alpha\n");
   exit (1);
+}
+
+/* return x mod m, with 0 <= x < m */
+static long
+get_mod (long x, long m)
+{
+  x = x % m;
+  return (x >= 0) ? x : x + m;
 }
 
 static unsigned long
@@ -108,8 +115,9 @@ initPrimes (unsigned long B)
   return nprimes;
 }
 
-/* put in roots[0], roots[1], ... the roots of f + g * w = 0 mod q,
-   and return the number of roots */
+/* Put in roots[0], roots[1], ... the roots of f + g * w = 0 mod q,
+   and return the number of roots.
+   Assume 0 <= f, g < q. */
 static unsigned long
 get_roots (unsigned long *roots, unsigned long f, unsigned long g,
            unsigned long q)
@@ -119,7 +127,7 @@ get_roots (unsigned long *roots, unsigned long f, unsigned long g,
   if (h == 1) /* only one root, namely -f/g mod q */
     {
       unsigned long invg = invert_ul (g, q);
-      roots[0] = ((q - f) * invg) % q;
+      roots[0] = get_mod (-f * invg, q);
       nroots = 1;
     }
   else if ((f % h) != 0)
@@ -130,7 +138,7 @@ get_roots (unsigned long *roots, unsigned long f, unsigned long g,
       g /= h;
       q /= h;
       unsigned long invg = invert_ul (g, q);
-      roots[0] = ((q - f) * invg) % q;
+      roots[0] = get_mod (-f * invg, q);
       for (unsigned long j = 1; j < h; j++)
         roots[j] = roots[j-1] + q;
       nroots = h;
@@ -138,10 +146,223 @@ get_roots (unsigned long *roots, unsigned long f, unsigned long g,
   return nroots;
 }
 
+#define TRIES 10
+
+/* Return the average value of alpha in the class (v,w) = (modv,modw) % mod.
+   Assume q is a prime power. */
+static double
+average_alpha (cado_poly_srcptr poly0, long modv, long modw, long q)
+{
+  cado_poly poly;
+  double s = 0.0, alpha;
+  long v0 = 0, w0 = 0, p, t;
+
+  /* check if q is a prime power */
+  ASSERT_ALWAYS (q >= 2);
+  for (p = 2; p * p <= q && q % p != 0; p += 1 + (p > 2));
+  if (q % p != 0)
+    p = q; /* q is prime */
+  /* now p is the smallest prime factor of q */
+  for (t = q; t % p == 0; t = t / p);
+  ASSERT_ALWAYS (t == 1);
+
+  /* first make a local copy of the original polynomial */
+  cado_poly_init (poly);
+  cado_poly_set (poly, poly0);
+
+#define G1 poly->pols[RAT_SIDE]->coeff[1]
+#define G0 poly->pols[RAT_SIDE]->coeff[0]
+
+  /* first rotate by modv*x+modw */
+  rotate_aux (poly->pols[ALG_SIDE]->coeff, G1, G0, 0, modv, 1);
+  v0 = modv;
+  rotate_aux (poly->pols[ALG_SIDE]->coeff, G1, G0, 0, modw, 0);
+  w0 = modw;
+
+  for (long j = 0; j < TRIES; j++)
+    {
+      rotate_aux (poly->pols[ALG_SIDE]->coeff, G1, G0, v0, q * j + modv, 1);
+      v0 = q * j + modv;
+      for (long k = 0; k < TRIES; k++)
+        {
+          rotate_aux (poly->pols[ALG_SIDE]->coeff, G1, G0, w0, q*k + modw, 0);
+          w0 = q * k + modw;
+          alpha = get_biased_alpha_affine_p (poly->pols[ALG_SIDE], p);
+          s += alpha;
+        }
+    }
+
+#undef G1
+#undef G0
+
+  cado_poly_clear (poly);
+  return s / pow ((double) TRIES, 2.0);
+}
+
+/* return 1/p mod q */
+static long
+invert (long p, long q)
+{
+  for (long t = 1; t < q; t++)
+    if ((t * p) % q == 1)
+      return t;
+  ASSERT_ALWAYS(0);
+}
+
+/* Return c such that c = a mod p and c = b mod q.
+   Assume invp = 1/p mod q. */
+static long
+crt (long a, long b, long p, long q, long invp)
+{
+  /* assume c = a + t*p, then t = (b-a)/p mod q */
+  long t = (b - a) % q;
+  if (t < 0)
+    t += q;
+  t = (t * invp) % q;
+  return a + t * p;
+}
+
+typedef struct
+{
+  long vmod, wmod;
+  double alpha;
+} class;
+
+/* Insert alpha into c, where c has already n entries (maximum is keep).
+   Return the new value of n. */
+static int
+insert_class (class *c, int n, int keep, double alpha, long v, long w,
+	      long vmin, long vmax, long mod)
+{
+  int i;
+
+  /* check if this class has at least one representative in [vmin,vmax] */
+  long t = get_mod (v - vmin, mod);
+  if (vmin + t > vmax)
+    return n; /* no representative in [vmin,vmax] */
+
+  for (i = n; i > 0 && alpha < c[i-1].alpha; i--)
+    c[i] = c[i-1];
+  /* now i = 0 or alpha >= c[i-1].alpha */
+  if (i < keep)
+    {
+      c[i].vmod = v;
+      c[i].wmod = w;
+      c[i].alpha = alpha;
+    }
+  n += (n < keep);
+  return n;
+}
+
+/* Return the (at most keep) best classes (v,w) mod 'mod'.
+   Put in *nc the number of returned classes. */
+static class*
+best_classes (cado_poly poly0, long mod, int keep, long vmin, long vmax,
+              int *nc)
+{
+  int nfactors = 0;
+  unsigned long *factors = NULL, p;
+  class *c, *d, *e;
+  int nd, ne;
+  int i;
+  cado_poly poly;
+  long q, Q = 1;
+
+  if (mod == 1)
+    {
+      c = malloc (sizeof (class));
+      c[0].vmod = c[0].wmod = 0;
+      c[0].alpha = 0; /* value does not matter */
+      *nc = 1;
+      return c;
+    }
+
+  *nc = 0;
+  /* first determine the prime factors of mod */
+  for (long t = mod, p = 2; t != 1; p += 1 + (p & 1))
+    {
+      if ((t % p) == 0)
+        {
+          nfactors ++;
+          factors = realloc (factors, nfactors * sizeof (unsigned long));
+          ASSERT_ALWAYS(factors != NULL);
+          q = 1;
+          while ((t % p) == 0)
+            {
+              t /= p;
+              q *= p;
+            }
+          factors[nfactors - 1] = q;
+        }
+    }
+
+  /* make a local copy of the original polynomial */
+  cado_poly_init (poly);
+  cado_poly_set (poly, poly0);
+
+  c = malloc ((keep + 1) * sizeof (class));
+  ASSERT_ALWAYS(c != NULL);
+  d = malloc ((keep + 1) * sizeof (class));
+  ASSERT_ALWAYS(d != NULL);
+  e = malloc ((keep + 1) * sizeof (class));
+  ASSERT_ALWAYS(e != NULL);
+
+  for (i = 0; i < nfactors; i++)
+    {
+      nd = 0; /* number of elements in 'd' */
+      q = factors[i];
+      /* determine p such that q=p^k */
+      for (p = 2; q % p; p++);
+      for (long v = 0; v < q; v++)
+        {
+          for (long w = 0; w < q; w++)
+            {
+              double alpha;
+              alpha = average_alpha (poly, v, w, q);
+              nd = insert_class (d, nd, keep, alpha, v, w, vmin, vmax, q);
+            }
+        }
+      if (i == 0) /* copy d into c */
+        {
+          memcpy (c, d, nd * sizeof (class));
+          *nc = nd;
+        }
+      else /* merge c and d into e */
+        {
+          long inv = invert (Q, q);
+          ne = 0;
+          for (int ic = 0; ic < *nc; ic++)
+            for (int id = 0; id < nd; id++)
+              {
+                double alpha = c[ic].alpha + d[id].alpha;
+		/* if alpha is larger (i.e., worse) than the last element,
+		   since d[] is sorted by increasing values of alpha, we
+		   assume all further values will be worse */
+		if (ne == keep && e[ne-1].alpha < alpha)
+		  break;
+                long v = crt (c[ic].vmod, d[id].vmod, Q, q, inv);
+                long w = crt (c[ic].wmod, d[id].wmod, Q, q, inv);
+                ne = insert_class (e, ne, keep, alpha, v, w, vmin, vmax, Q * q);
+              }
+          /* copy back e to c */
+          memcpy (c, e, ne * sizeof (class));
+          *nc = ne;
+        }
+      Q *= q;
+    }
+
+  cado_poly_clear (poly);
+  free (factors);
+  free (d);
+  free (e);
+  return c;
+}
+
 /* rotation for a fixed value of v */
 static void
 rotate_v (cado_poly_srcptr poly0, long v, long B,
-          double maxlognorm, double Bf, double Bg, double area, long u)
+          double maxlognorm, double Bf, double Bg, double area, long u,
+          long modw)
 {
   long w, wmin, wmax;
   cado_poly poly;
@@ -168,13 +389,14 @@ rotate_v (cado_poly_srcptr poly0, long v, long B,
   mpz_set_d (wmaxz, r.kmax);
 
   if (verbose)
+#pragma omp critical
     {
       gmp_printf ("v=%ld: wmin=%Zd wmax=%Zd\n", v, wminz, wmaxz);
       fflush (stdout);
     }
 
   /* ensure wminz % mod = modw */
-  long t = (mod + modw - mpz_fdiv_ui (wminz, mod)) % mod;
+  long t = get_mod (modw - mpz_fdiv_ui (wminz, mod), mod);
   ASSERT_ALWAYS(0 <= t && t < mod);
   mpz_add_ui (wminz, wminz, t);
 
@@ -347,6 +569,8 @@ rotate_v (cado_poly_srcptr poly0, long v, long B,
               double E = MurphyE (poly, Bf, Bg, area, MURPHY_K);
               /* restore g */
               mpz_poly_mul_si (poly->pols[RAT_SIDE], poly->pols[RAT_SIDE], mod);
+              /* this can only occur for one thread, thus no need to put
+                 #pragma omp critical */
               gmp_printf ("u=%ld v=%ld w=%ld est_alpha_aff=%.2f E=%.2e [original]\n",
                           u, v, mod * w + modw, A[j], E);
               fflush (stdout);
@@ -368,6 +592,7 @@ rotate_v (cado_poly_srcptr poly0, long v, long B,
               rotate_aux (poly->pols[ALG_SIDE]->coeff, G1, G0, w, 0, 0);
 
               if (optimizeE == 0 || (optimizeE == 1 && E > best_E))
+#pragma omp critical
                 {
                   bestu = u;
                   bestv = v;
@@ -423,13 +648,33 @@ rotate (cado_poly poly, long B, double maxlognorm, double Bf, double Bg,
       fflush (stdout);
     }
 
-  /* first ensure that vmin = modu % mod */
-  long t = (((modv - vmin) % mod) + mod) % mod;
-  ASSERT_ALWAYS(0 <= t && t < mod);
-  vmin += t;
-  ASSERT_ALWAYS(vmin % mod == modv || vmin % mod == modv - mod);
-  for (long v = vmin; v <= vmax; v += mod)
-    rotate_v (poly, v, B, maxlognorm, Bf, Bg, area, u);
+  class *c = NULL;
+  int n;
+  c = best_classes (poly, mod, keep, vmin, vmax, &n);
+  ASSERT_ALWAYS (n <= keep);
+  if (verbose)
+    printf ("Kept %d classes (keep=%d)\n", n, keep);
+#pragma omp parallel for schedule(dynamic)
+  for (int i = 0; i < n; i++)
+    {
+      if (verbose)
+#pragma omp critical
+        printf ("class i=%d: u=%ld -mod %ld -modv %ld -modw %ld %.2f\n",
+                i, u0 + u, mod, get_mod (v0 + c[i].vmod, mod),
+                get_mod (w0 + c[i].wmod, mod), c[i].alpha);
+
+      long vmin1 = vmin;
+
+      /* first ensure that vmin1 = modv % mod */
+      long t = get_mod (c[i].vmod - vmin1, mod);
+      ASSERT_ALWAYS(0 <= t && t < mod);
+      vmin1 += t;
+      ASSERT_ALWAYS(get_mod (vmin1, mod) == c[i].vmod);
+      for (long v = vmin1; v <= vmax; v += mod)
+        rotate_v (poly, v, B, maxlognorm, Bf, Bg, area, u, c[i].wmod);
+    }
+
+  free (c);
 }
 
 /* don't modify poly, which is the size-optimized polynomial
@@ -464,9 +709,6 @@ print_transformation (cado_poly_ptr poly0, cado_poly_srcptr poly)
   gmp_printf ("rotation [%Zd,", k);
   assert (mpz_fits_slong_p (k));
   u0 = mpz_get_si (k);
-  /* since we rotate by u0, if we want u = modu % mod, this translates to
-     u = (modu-u0) % mod */
-  modu = (modu + mod - (u0 % mod)) % mod;
   rotate_auxg_z (poly0->pols[ALG_SIDE]->coeff, poly0->pols[RAT_SIDE]->coeff[1],
                  poly0->pols[RAT_SIDE]->coeff[0], k, 2);
   mpz_sub (k, poly->pols[ALG_SIDE]->coeff[2], poly0->pols[ALG_SIDE]->coeff[2]);
@@ -475,7 +717,6 @@ print_transformation (cado_poly_ptr poly0, cado_poly_srcptr poly)
   gmp_printf ("%Zd,", k);
   assert (mpz_fits_slong_p (k));
   v0 = mpz_get_si (k);
-  modv = (modv + mod - (v0 % mod)) % mod;
   rotate_auxg_z (poly0->pols[ALG_SIDE]->coeff, poly0->pols[RAT_SIDE]->coeff[1],
                  poly0->pols[RAT_SIDE]->coeff[0], k, 1);
   mpz_sub (k, poly->pols[ALG_SIDE]->coeff[1], poly0->pols[ALG_SIDE]->coeff[1]);
@@ -484,7 +725,6 @@ print_transformation (cado_poly_ptr poly0, cado_poly_srcptr poly)
   gmp_printf ("%Zd]\n", k);
   assert (mpz_fits_slong_p (k));
   w0 = mpz_get_si (k);
-  modw = (modw + mod - (w0 % mod)) % mod;
   rotate_auxg_z (poly0->pols[ALG_SIDE]->coeff, poly0->pols[RAT_SIDE]->coeff[1],
                  poly0->pols[RAT_SIDE]->coeff[0], k, 0);
   ASSERT_ALWAYS(mpz_cmp (poly0->pols[ALG_SIDE]->coeff[0],
@@ -569,21 +809,9 @@ main (int argc, char **argv)
             argv += 2;
             argc -= 2;
           }
-        else if (strcmp (argv[1], "-modu") == 0)
+        else if (strcmp (argv[1], "-keep") == 0)
           {
-            modu = strtol (argv [2], NULL, 10);
-            argv += 2;
-            argc -= 2;
-          }
-        else if (strcmp (argv[1], "-modv") == 0)
-          {
-            modv = strtol (argv [2], NULL, 10);
-            argv += 2;
-            argc -= 2;
-          }
-        else if (strcmp (argv[1], "-modw") == 0)
-          {
-            modw = strtol (argv [2], NULL, 10);
+            keep = atoi (argv [2]);
             argv += 2;
             argc -= 2;
           }
@@ -593,11 +821,11 @@ main (int argc, char **argv)
     if (argc != 2)
         usage_and_die (argv[0]);
 
-    ASSERT_ALWAYS(B <= 65536);
+#pragma omp parallel
+#pragma omp master
+  printf ("Using %d thread(s)\n", omp_get_num_threads ());
 
-    ASSERT_ALWAYS(0 <= modu && modu < mod);
-    ASSERT_ALWAYS(0 <= modv && modv < mod);
-    ASSERT_ALWAYS(0 <= modw && modw < mod);
+    ASSERT_ALWAYS(B <= 65536);
 
     if (I != 0)
       area = bound_f * pow (2.0, (double) (2 * I - 1));
@@ -650,11 +878,6 @@ main (int argc, char **argv)
     mpz_init (bestw);
 
     long u0 = 0; /* current translation in u */
-    /* first ensure that umin = modu % mod */
-    long t = (((modu - umin) % mod) + mod) % mod;
-    ASSERT_ALWAYS(0 <= t && t < mod);
-    umin += t;
-    ASSERT_ALWAYS(umin % mod == modu || umin % mod == modu - mod);
     for (long u = umin; u <= umax; u += mod)
       {
         rotate_aux (poly->pols[ALG_SIDE]->coeff,

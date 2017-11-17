@@ -1327,7 +1327,7 @@ get_alpha (mpz_poly_srcptr f, unsigned long B)
 
 /* affine part of the special valution for polynomial f over p. */
 double
-special_valuation_affine (mpz_poly_srcptr f, unsigned long p, mpz_t disc )
+special_valuation_affine (mpz_poly_srcptr f, unsigned long p, mpz_t disc)
 {
    double v;
    int pvaluation_disc = 0;
@@ -1432,6 +1432,33 @@ get_biased_alpha_affine (mpz_poly_srcptr f, unsigned long B)
          //printf ("\np: %u, val: %f, alpha: %f\n", p, e, alpha);
 
       }
+   mpz_clear (disc);
+   return alpha;
+}
+
+/*
+  Similar to above, but for a given prime p.
+*/
+double
+get_biased_alpha_affine_p (mpz_poly_srcptr f, unsigned long p)
+{
+   double alpha, e;
+   mpz_t disc;
+
+   mpz_init (disc);
+   mpz_poly_discriminant (disc, f);
+
+   if (p == 2)
+     {
+       e = special_valuation_affine (f, 2, disc);
+       alpha =  (1.0 - e) * log (2.0);
+     }
+   else
+     {
+       ASSERT (ulong_isprime (p));
+       e = special_valuation_affine (f, p, disc);
+       alpha = (1.0 / (double) (p - 1) - e) * log ((double) p);
+     }
    mpz_clear (disc);
    return alpha;
 }
