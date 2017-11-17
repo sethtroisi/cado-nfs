@@ -41,13 +41,10 @@ int verbose = 0;                /* verbosity level */
 long *Primes, nprimes;          /* primes less than B */
 long *Q;                        /* largest p^k < B */
 long bestu = 0, bestv = 0;      /* current best rotation */
+mpz_t bestw;                    /* current best rotation in w */
 double best_alpha = DBL_MAX;    /* alpha of best rotation */
 double best_E = 0;              /* E of best rotation (with -E) */
-mpz_t bestw;                    /* current best rotation in w */
 double tot_pols = 0;            /* number of sieved polynomial */
-double max_discrepancy = 0;
-double sum_discrepancy = 0;
-double num_discrepancy = 0;
 long u0 = 0, v0 = 0, w0 = 0;    /* initial translation */
 int optimizeE = 0;              /* if not zero, optimize E instead of alpha */
 double guard_alpha = 0.0;       /* guard when -E */
@@ -380,7 +377,8 @@ rotate_v (cado_poly_srcptr poly0, long v, long B,
   /* compute f + (v*x)*g */
   rotate_aux (poly->pols[ALG_SIDE]->coeff, G1, G0, 0, v, 1);
 
-  double lognorm = L2_lognorm (poly->pols[ALG_SIDE], poly->skew);
+  /* recompute skewness to ensure lognorm <= maxlognorm */
+  double lognorm = L2_lognorm (poly->pols[ALG_SIDE], skew);
   rotation_space r;
   expected_growth (&r, poly->pols[ALG_SIDE], poly->pols[RAT_SIDE], 0,
                    maxlognorm - lognorm);
