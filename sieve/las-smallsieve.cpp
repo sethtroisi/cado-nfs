@@ -1392,7 +1392,7 @@ resieve_small_bucket_region (bucket_primes_t *BP, int N, unsigned char *S,
     small_sieve_context C(logI, N, si.conf.sublat);
 
     unsigned char *S_ptr;
-    const int resieve_very_verbose = 0, resieve_very_verbose_bad = 0;
+    const int resieve_very_verbose = 0;
 
     unsigned int i_compens_sublat = sublati0 & 1;
 
@@ -1403,18 +1403,11 @@ resieve_small_bucket_region (bucket_primes_t *BP, int N, unsigned char *S,
         ASSERT_ALWAYS((sublatm & 1) == 1);
     }
 
-    for(size_t index = 0 ; index < ssd.ssp.size() ; index++) {
-        ssp_t const & ssp(ssd.ssp[index]);
-        if (ssp.is_pow2())
-            continue;
-        if (ssp.is_nice()) {
-            if (ssp.is_discarded())
-                continue;
-            const fbprime_t p = ssp.get_p();
-            if (mpz_cmp_ui(si.qbasis.q, p) == 0) {
-                continue;
-            }
-            fbprime_t r = ssp.get_r();
+    for(size_t index = 0 ; index < ssd.ssps.size() ; index++) {
+        ssp_simple_t const & ssps(ssd.ssps[index]);
+        {
+            const fbprime_t p = ssps.get_p();
+            fbprime_t r = ssps.get_r();
             WHERE_AM_I_UPDATE(w, p, p);
             int pos = ssdpos[index];
             S_ptr = S;
@@ -1461,86 +1454,10 @@ resieve_small_bucket_region (bucket_primes_t *BP, int N, unsigned char *S,
                 S_ptr += I;
                 q ^= p;
             }
-            pos += ssp.get_offset();
+            pos += ssps.get_offset();
             if (pos >= (int) p) pos -= p;
 
             ssdpos[index] = pos;
-        } else if (ssp.is_proj()) {
-            const fbprime_t g = ssp.get_g();
-            const uint64_t gI = (uint64_t)g << logI;
-
-            WHERE_AM_I_UPDATE(w, p, g * ssp.get_q());
-
-            /* Test every p-th line, starting at S[ssdpos] */
-            int64_t pos = C.first_position_projective_prime(ssp);
-            // This block is for the case where p divides at (1,0).
-            if (UNLIKELY(has_origin && pos == (int64_t) gI)) {
-                bucket_update_t<1, primehint_t> prime;
-                prime.p = g;
-                prime.x = 1 - i0;
-                ASSERT(prime.p >= si.conf.td_thresh);
-                BP->push_update(prime);
-            }
-            // Same as in sieving: we discard after checking for row 0.
-            if (ssp.is_discarded_proj())
-                continue;
-
-            /* make sure ssdpos points at start of line or region */
-            ASSERT(!(pos % (1 << MIN(logI, LOG_BUCKET_REGION))));
-
-            if (resieve_very_verbose_bad) {
-                verbose_output_print(0, 1, "# resieving projective prime %" FBPRIME_FORMAT
-                        ", i0 = %" PRIu64 "\n", g, i0 + pos);
-            }
-            if (pos >> LOG_BUCKET_REGION)
-                continue;
-            unsigned int j = j0 + (pos >> logI);
-            for (; j < j1; j += g) {
-                unsigned char *S_ptr = S + pos;
-                if (!(j & 1)) {
-                    /* Even j: test only odd ii-coordinates */
-                    for (int ii = 1; ii < (i1 - i0); ii += 2) {
-                        if (S_ptr[ii] == 255) continue;
-                        bucket_update_t<1, primehint_t> prime;
-                        const unsigned int x = pos + ii;
-                        if (resieve_very_verbose_bad) {
-                            verbose_output_print(0, 1, "# resieve_small_bucket_region even j: root %"
-                                    FBROOT_FORMAT ",inf divides at x = %u\n",
-                                    g, x);
-                        }
-                        prime.p = g;
-                        prime.x = x;
-                        ASSERT(prime.p >= si.conf.td_thresh);
-                        BP->push_update(prime);
-                    }
-                } else {
-                    /* Odd j: test all ii-coordinates */
-                    for (int ii = 0; ii < (i1 - i0); ii++) {
-                        if (S_ptr[ii] == 255) continue;
-                        bucket_update_t<1, primehint_t> prime;
-                        const unsigned int x = pos + ii;
-                        if (resieve_very_verbose_bad) {
-                            verbose_output_print(0, 1, "# resieve_small_bucket_region odd j: root %"
-                                    FBROOT_FORMAT ",inf divides at x = %u\n",
-                                    g, x);
-                        }
-                        prime.p = g;
-                        prime.x = x;
-                        ASSERT(prime.p >= si.conf.td_thresh);
-                        BP->push_update(prime);
-                    }
-                }
-                pos += gI;
-            }
-#if 0
-            ssdpos[index] = pos - bucket_region;
-            if (resieve_very_verbose_bad) {
-                verbose_output_print(0, 1, "# resieving: new pos = %" PRIu64
-                        ", bucket_region = %d, "
-                        "new ssdpos = %" PRIu64 "\n",
-                        pos, bucket_region, ssdpos[index]);
-            }
-#endif
         }
     }
 }
