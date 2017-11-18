@@ -173,8 +173,15 @@ template<typename is_fragment = tribool_maybe> struct small_sieve_base {/*{{{*/
 
     /* This return value is typically logI bits larger than for ordinary
      * primes, so it makes sense to return it as a 64-bit integer.
+     *
+     * (more precisely, if p is, say, a 25-bit prime, and logI is 20,
+     * then we return 45 bits. note however that projective primes are
+     * not typically that big -- but undoubtedly it may happen).
+     *
+     * Quite probably we would have an interest in doing those projective
+     * primes another way, and not deal with artificially shifted values.
      */
-    spos_t first_position_projective_prime(ssp_t const & ssp) const/*{{{*/
+    int64_t first_position_projective_prime(ssp_t const & ssp) const/*{{{*/
     {
         /* equation here: i == (j/g)*U (mod q) */
         /* we're super-non-critical, here.
@@ -248,7 +255,7 @@ template<typename is_fragment = tribool_maybe> struct small_sieve_base {/*{{{*/
          * i0=-I/2.
          */
         int i0ref = (j0 == jj) ? i0 : (-I()/2);
-        spos_t x = (ii-i0ref) % (uint64_t)ssp.get_q();
+        int64_t x = (ii-i0ref) % (uint64_t)ssp.get_q();
         if (x < 0) x += ssp.get_q();
         if (jj > j0) {
             x -= region_rank_in_line << LOG_BUCKET_REGION;
@@ -623,6 +630,7 @@ struct small_sieve : public small_sieve_base<tribool_const<is_fragment>> {/*{{{*
                 ssp_t const & ssp3(primes[index+3]);
                 spos_t & p_pos3(positions[index+3]);
 
+#if 0
                 /*
                  *
                  * FIXME: the code is not correct !
@@ -645,6 +653,12 @@ struct small_sieve : public small_sieve_base<tribool_const<is_fragment>> {/*{{{*
                     handle_one_prime<even_code, odd_code, bits_off>(ssp3, p_pos3, w);
                     continue;
                 }
+#else
+                ASSERT(ssp0.is_nice());
+                ASSERT(ssp1.is_nice());
+                ASSERT(ssp2.is_nice());
+                ASSERT(ssp3.is_nice());
+#endif
 
                 const fbprime_t p0 = ssp0.get_p();
                 const fbprime_t p1 = ssp1.get_p();
