@@ -181,7 +181,7 @@ average_alpha (cado_poly_srcptr poly0, long modv, long modw, long q)
         {
           rotate_aux (poly->pols[ALG_SIDE]->coeff, G1, G0, w0, q*k + modw, 0);
           w0 = q * k + modw;
-          alpha = get_biased_alpha_affine_p (poly->pols[ALG_SIDE], p);
+          alpha = get_alpha_affine_p (poly->pols[ALG_SIDE], p);
           s += alpha;
         }
     }

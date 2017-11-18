@@ -219,12 +219,12 @@ print_poly_info ( char *buf,
   if (raw_option)
     {
       sprintf (buf, "# Raw polynomial:\n");
-      data_add (raw_proj_alpha, get_biased_alpha_projective (F, ALPHA_BOUND));
+      data_add (raw_proj_alpha, get_alpha_projective (F, ALPHA_BOUND));
     }
   else
     {
       sprintf (buf, "# Size-optimized polynomial:\n");
-      data_add (opt_proj_alpha, get_biased_alpha_projective (F, ALPHA_BOUND));
+      data_add (opt_proj_alpha, get_alpha_projective (F, ALPHA_BOUND));
     }
 
   gmp_sprintf (buf+strlen(buf), "%sn: %Zd\n", prefix, n);
