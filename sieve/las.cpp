@@ -1411,7 +1411,8 @@ void factor_survivors_data::prepare_cofactoring(timetree_t & timer)
         /* Resieve small primes for this bucket region and store them 
            together with the primes recovered from the bucket updates */
         resieve_small_bucket_region (&sdata[side].primes, N, SS,
-                th->psi->sides[side].rsd, th->sides[side].rsdpos,
+                th->psi->sides[side].ssd,
+                th->sides[side].rsdpos,
                 si, th->plas->nb_threads, w);
 
         SIBLING_TIMER(timer, "sort primes in purged buckets");
@@ -2011,6 +2012,11 @@ void * process_bucket_region(timetree_t & timer, thread_data *th)
             {
                 CHILD_TIMER(timer, "small sieve");
 
+                /* save start positions for resieving */
+                ts.rsdpos.assign(
+                        ts.ssdpos.begin() + s.ssd.resieve_start_offset,
+                        ts.ssdpos.begin() + s.ssd.resieve_end_offset);
+
                 /* Sieve small primes */
                 sieve_small_bucket_region(SS, N, s.ssd,
                         ts.ssdpos, si, side,
@@ -2043,15 +2049,15 @@ void * process_bucket_region(timetree_t & timer, thread_data *th)
         SIBLING_TIMER(timer, "reposition small (re)sieve data");
         TIMER_CATEGORY(timer, bookkeeping());
 
+#if 0   // no longer needed
         /* Reset resieving data */
         for(int side = 0 ; side < 2 ; side++) {
             sieve_info::side_info & s(si.sides[side]);
             if (!s.fb) continue;
             thread_side_data & ts = th->sides[side];
             // small_sieve_skip_stride(s.ssd, ts.ssdpos, N, las.nb_threads, si);
-            int * b = s.fb_parts_x->rs;
-            ts.rsdpos.assign(ts.ssdpos.begin() + b[0], ts.ssdpos.begin() + b[1]);
         }
+#endif
 
         BOOKKEEPING_TIMER(timer);
     }
@@ -2857,7 +2863,6 @@ for (unsigned int j_cong = 0; j_cong < sublat_bound; ++j_cong) {
                              s.fb_smallsieved.get()->begin() + s.resieve_end_offset,
                              si, side);
             small_sieve_info("small sieve", side, s.ssd);
-            small_sieve_info("resieve", side, s.rsd);
 
             // Initialize small sieve data at the first region of level 0
             // TODO: multithread this? Probably useless...
@@ -2870,8 +2875,7 @@ for (unsigned int j_cong = 0; j_cong < sublat_bound; ++j_cong) {
                  * the first region index considered by thread of index
                  * th->id is simply th->id.
                  */
-                small_sieve_start(ts.ssdpos, ts.rsdpos, s.ssd, th->id, si);
-                small_sieve_copy_start(ts.rsdpos, ts.ssdpos, s.fb_parts_x->rs);
+                small_sieve_start(ts.ssdpos, s.ssd, th->id, si);
             }
         }
         BOOKKEEPING_TIMER(timer_special_q);

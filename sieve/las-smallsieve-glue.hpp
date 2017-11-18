@@ -703,6 +703,11 @@ struct small_sieve : public small_sieve_base<tribool_const<is_fragment>> {/*{{{*
             for( ; index < primes.size() ; index++) {
                 ssp_simple_t const & ssp(primes[index]);
                 spos_t & p_pos(positions[index]);
+                const fbprime_t p = ssp.get_p();
+                if (bits_off && (p >> (super::min_logI_logB + 1 - bits_off))) {
+                    /* time to move on to the next bit size; */
+                    return;
+                }
                 handle_nice_prime<even_code, odd_code, bits_off>(ssp, p_pos, w);
             }
 

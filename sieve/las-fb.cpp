@@ -164,6 +164,11 @@ void sieve_info::init_fb_smallsieved(int side)
     /* We go through all the primes in FB part 0 and sort them into one of
        5 vectors, and some we discard */
 
+    /* FIXME: that static separation between FB parts is artificial, and
+     * actually causes problems. We want to get rid of it, because our
+     * small sieve limit depends on logI, and logI depends on the special q.
+     */
+
     /* alloc the 6 vectors */
     enum {POW2, POW3, TD, RS, REST, SKIPPED};
     std::vector<fb_general_entry> *pieces = new std::vector<fb_general_entry>[6];
@@ -182,6 +187,9 @@ void sieve_info::init_fb_smallsieved(int side)
     {
         /* The extra conditions on powers of 2 and 3 are related to how
          * pattern-sieving is done.
+         *
+         * FIXME: there is some duplicated logic between here and
+         * small_sieve_init.
          */
         if (it->q < si.conf.skipped) {
             pieces[SKIPPED].push_back(*it);

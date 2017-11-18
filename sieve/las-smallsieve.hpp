@@ -136,7 +136,7 @@ extern void small_sieve_init(small_sieve_data_t & ssd, unsigned int interleaving
                       std::vector<fb_general_entry>::const_iterator resieve_start,
                       std::vector<fb_general_entry>::const_iterator resieve_end,
                       sieve_info const & si, int side);
-extern void small_sieve_start(std::vector<spos_t> & ssdpos, std::vector<spos_t> & rsdpos, small_sieve_data_t & ssd, unsigned int first_region_index, sieve_info const & si);
+extern void small_sieve_start(std::vector<spos_t> & ssdpos, small_sieve_data_t & ssd, unsigned int first_region_index, sieve_info const & si);
 extern void small_sieve_copy_start(std::vector<spos_t>& res, std::vector<spos_t> const & base, int bounds[2]);
 /*
 extern void small_sieve_skip_stride(small_sieve_data_t *ssd, spos_t * ssdpos, unsigned int N, unsigned int interleaving, sieve_info const & si);
