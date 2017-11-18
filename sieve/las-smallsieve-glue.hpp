@@ -120,7 +120,7 @@ template<typename is_fragment = tribool_maybe> struct small_sieve_base {/*{{{*/
         has_origin = has_haxis && has_vaxis;              
     }/*}}}*/
 
-    spos_t first_position_ordinary_prime(ssp_t const & ssp, unsigned int dj = 0) const/*{{{*/
+    spos_t first_position_ordinary_prime(ssp_simple_t const & ssp, unsigned int dj = 0) const/*{{{*/
     {
         /* equation here: i-r*j = 0 mod p */
 
@@ -331,7 +331,8 @@ template<bool is_fragment>
 struct small_sieve : public small_sieve_base<tribool_const<is_fragment>> {/*{{{*/
     typedef small_sieve_base<tribool_const<is_fragment>> super;
     std::vector<int> & positions;
-    std::vector<ssp_t> const& primes;
+    std::vector<ssp_simple_t> const& primes;
+    std::vector<ssp_t> const& not_nice_primes;
     unsigned char * S;
     int nthreads;
 
@@ -342,20 +343,25 @@ struct small_sieve : public small_sieve_base<tribool_const<is_fragment>> {/*{{{*
      * the various instantiations that are triggered by do_it<>.
      */
     size_t index = 0;
+
     small_sieve(std::vector<int>& positions,
-            std::vector<ssp_t> const & primes,
+            std::vector<ssp_simple_t> const & primes,
+            std::vector<ssp_t> const & not_nice_primes,
             unsigned char*S, int logI,
             unsigned int N,
             sublat_t const & sublat,
             int nthreads
             )
         : super(logI, N, sublat),
-            positions(positions), primes(primes), S(S), nthreads(nthreads) {}
+            positions(positions),
+            primes(primes), 
+            not_nice_primes(not_nice_primes),
+            S(S), nthreads(nthreads) {}
 
     bool finished() const { return index == primes.size(); }
 
     /* this one is instantiated outside the class */
-    inline void after_region_adjust(spos_t & p_pos, spos_t pos, overrun_t<is_fragment> const & overrun, ssp_t const & ssp) const;
+    inline void after_region_adjust(spos_t & p_pos, spos_t pos, overrun_t<is_fragment> const & overrun, ssp_simple_t const & ssp) const;
 
     /* most fields from the parent class must be redeclared here if we
      * want to use them transparently -- it's only a shorthand
@@ -369,7 +375,7 @@ struct small_sieve : public small_sieve_base<tribool_const<is_fragment>> {/*{{{*
     using super::I;
     using super::F;
 
-    void handle_projective_prime(ssp_t const & ssp, int & /* p_pos */, where_am_I & w MAYBE_UNUSED) {/*{{{*/
+    void handle_projective_prime(ssp_t const & ssp, where_am_I & w MAYBE_UNUSED) {/*{{{*/
         /* This code also covers projective powers of 2 */
         const fbprime_t q = ssp.get_q();
         const fbprime_t g = ssp.get_g();
@@ -441,7 +447,7 @@ struct small_sieve : public small_sieve_base<tribool_const<is_fragment>> {/*{{{*
                 if (trace_on_range_Nx(w.N, pos, pos + F())) {
                     WHERE_AM_I_UPDATE(w, x, trace_Nx.x);
                     unsigned int x = trace_Nx.x;
-                    unsigned int index = x % I;
+                    unsigned int index = x % I();
                     unsigned int v = (((unsigned char *)(&logps2))[index%sizeof(unsigned long)]);
                     sieve_increase_logging(S + w.x, v, w);
                 }
@@ -492,7 +498,7 @@ struct small_sieve : public small_sieve_base<tribool_const<is_fragment>> {/*{{{*
 #endif
         }
     }/*}}}*/
-    void handle_power_of_2(ssp_t const & ssp, int & /* p_pos */, where_am_I & w MAYBE_UNUSED) {/*{{{*/
+    void handle_power_of_2(ssp_t const & ssp, where_am_I & w MAYBE_UNUSED) {/*{{{*/
         /* Powers of 2 are treated separately */
         /* Don't sieve powers of 2 again that were pattern-sieved */
         const fbprime_t p = ssp.get_p();
@@ -544,26 +550,8 @@ struct small_sieve : public small_sieve_base<tribool_const<is_fragment>> {/*{{{*
         ssdpos[index] = pos;
 #endif
     }/*}}}*/
-    void handle_special_prime(ssp_t const & ssp, int & p_pos, where_am_I & w) {/*{{{*/
-        // if (ssp.is_discarded_proj()) return;
-        if (ssp.is_proj()) {
-            handle_projective_prime(ssp, p_pos, w);
-        } else if (ssp.is_pow2()) {
-            handle_power_of_2(ssp, p_pos, w);
-        }
-    }/*}}}*/
-    bool handle_nice_prime(ssp_t const & ssp, spos_t & p_pos);
     template<typename even_code, typename odd_code, int bits_off>
-    inline bool handle_one_prime(ssp_t const & ssp, spos_t & p_pos, where_am_I & w) {/*{{{*/
-        if (ssp.is_nice()) {
-            return handle_nice_prime<even_code, odd_code, bits_off>(ssp, p_pos, w);
-        } else {
-            handle_special_prime(ssp, p_pos, w);
-            return true;
-        }
-    }/*}}}*/
-    template<typename even_code, typename odd_code, int bits_off>
-    bool handle_nice_prime(ssp_t const & ssp, spos_t & p_pos, where_am_I & w) {/*{{{*/
+    bool handle_nice_prime(ssp_simple_t const & ssp, spos_t & p_pos, where_am_I & w) {/*{{{*/
         const fbprime_t p = ssp.get_p();
         if (bits_off && (p >> (super::min_logI_logB + 1 - bits_off))) {
             /* time to move on to the next bit size; */
@@ -621,44 +609,15 @@ struct small_sieve : public small_sieve_base<tribool_const<is_fragment>> {/*{{{*
 #ifdef HAVE_SSE2
             for( ; index + 3 < primes.size() ; index+=4) {
                 /* find 4 index values with no special prime */
-                ssp_t const & ssp0(primes[index]);
+                ssp_simple_t const & ssp0(primes[index]);
                 spos_t & p_pos0(positions[index]);
-                ssp_t const & ssp1(primes[index+1]);
+                ssp_simple_t const & ssp1(primes[index+1]);
                 spos_t & p_pos1(positions[index+1]);
-                ssp_t const & ssp2(primes[index+2]);
+                ssp_simple_t const & ssp2(primes[index+2]);
                 spos_t & p_pos2(positions[index+2]);
-                ssp_t const & ssp3(primes[index+3]);
+                ssp_simple_t const & ssp3(primes[index+3]);
                 spos_t & p_pos3(positions[index+3]);
 
-#if 0
-                /*
-                 *
-                 * FIXME: the code is not correct !
-                 *
-                 * we have to break here if we've hit the limit that is
-                 * allowed by bits_off...
-                 *
-                 * and our protection is with checking ssp3.get_p(), but
-                 * that requires is_nice(), and is_nice() means that we
-                 * wish to check as below.
-                 *
-                 * chicken-and-egg it seems.
-                 *
-                 * ssp_simple_t will save our day I think.
-                 */
-                if (!ssp0.is_nice() && ssp1.is_nice() && ssp2.is_nice() && ssp3.is_nice()) {
-                    handle_one_prime<even_code, odd_code, bits_off>(ssp0, p_pos0, w);
-                    handle_one_prime<even_code, odd_code, bits_off>(ssp1, p_pos1, w);
-                    handle_one_prime<even_code, odd_code, bits_off>(ssp2, p_pos2, w);
-                    handle_one_prime<even_code, odd_code, bits_off>(ssp3, p_pos3, w);
-                    continue;
-                }
-#else
-                ASSERT(ssp0.is_nice());
-                ASSERT(ssp1.is_nice());
-                ASSERT(ssp2.is_nice());
-                ASSERT(ssp3.is_nice());
-#endif
 
                 const fbprime_t p0 = ssp0.get_p();
                 const fbprime_t p1 = ssp1.get_p();
@@ -742,13 +701,12 @@ struct small_sieve : public small_sieve_base<tribool_const<is_fragment>> {/*{{{*
 #endif
 
             for( ; index < primes.size() ; index++) {
-                ssp_t const & ssp(primes[index]);
+                ssp_simple_t const & ssp(primes[index]);
                 spos_t & p_pos(positions[index]);
-                handle_one_prime<even_code, odd_code, bits_off>(ssp, p_pos, w);
+                handle_nice_prime<even_code, odd_code, bits_off>(ssp, p_pos, w);
             }
 
         }/*}}}*/
-
     private:
     /* {{{ template machinery to make one single function out of several */
     /* we'll now craft all the specific do_it functions into one big
@@ -813,7 +771,8 @@ struct small_sieve : public small_sieve_base<tribool_const<is_fragment>> {/*{{{*
 
     public:
     void pattern_sieve2(where_am_I &);
-    // void pattern_sieve3(where_am_I &);
+    void pattern_sieve3(where_am_I &);
+
     void normal_sieve(where_am_I & w) {
         /* This function will eventually call handle_nice_primes on
          * sub-ranges of the set of small primes. */
@@ -821,11 +780,37 @@ struct small_sieve : public small_sieve_base<tribool_const<is_fragment>> {/*{{{*
         small_sieve<is_fragment>::do_it<choices>()(*this, w);
     }
 
+    void exceptional_sieve(where_am_I & w) {
+        /* a priori we'll never have "nice" primes here, but we're not
+         * forced to rule it out completely, given that we have the code
+         * available at hand. The only glitch is that we're storing the
+         * start positions *only* for the primes in the ssps array. */
+
+        // typedef assembly_generic_oldloop even_code;
+        // typedef assembly_generic_oldloop odd_code;
+
+        for(auto const & ssp : not_nice_primes) {
+#if 0
+            spos_t & p_pos(positions[index]);
+            ASSERT(!ssp.is_nice());
+            if (ssp.is_nice()) {
+                handle_nice_prime<even_code, odd_code, 0>(ssp, p_pos, w);
+            } else
+#endif
+            if (ssp.is_proj()) {
+                handle_projective_prime(ssp, w);
+            } else if (ssp.is_pow2()) {
+                handle_power_of_2(ssp, w);
+            }
+            /* p=3 is pattern-sieved */
+        }
+    }
+
 };/*}}}*/
 
 /* {{{ specific instantiations for the after-bucket-region adjustments */
 template<>
-void small_sieve<true>::after_region_adjust(int & p_pos, int pos, overrun_t<true> const & overrun, ssp_t const & ssp) const
+void small_sieve<true>::after_region_adjust(int & p_pos, int pos, overrun_t<true> const & overrun, ssp_simple_t const & ssp) const
 {
     const fbprime_t r = ssp.get_r();
     const fbprime_t p = ssp.get_p();
@@ -896,7 +881,7 @@ void small_sieve<true>::after_region_adjust(int & p_pos, int pos, overrun_t<true
 }
 
 template<>
-void small_sieve<false>::after_region_adjust(int & p_pos, int pos, overrun_t<false> const &, ssp_t const & ssp) const
+void small_sieve<false>::after_region_adjust(int & p_pos, int pos, overrun_t<false> const &, ssp_simple_t const & ssp) const
 {
     /* skip stride */
     const fbprime_t p = ssp.get_p();

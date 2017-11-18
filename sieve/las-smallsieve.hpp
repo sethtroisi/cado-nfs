@@ -12,9 +12,15 @@
 #define SSP_PROJ        (1u<<1)
 #define SSP_DISCARD_SUBLAT     (1u<<2)
 #define SSP_DISCARD_PROJ     (1u<<3)
+#define SSP_ORDINARY3        (1u<<4)
 
 /* spos_t is in las-forwardtypes.hpp */
 
+/* Simple primes/roots. These are implicitly "nice", i.e., odd primes/powers
+   with affine root.
+   We also use them only for primes/roots which are sieved in the normal
+   one-hit-at-a-time line sieving code. Pattern-sieved stuff is kept in
+   ssp_t. */
 class ssp_simple_t {
 protected:
     fbprime_t p;
@@ -33,6 +39,7 @@ public:
     void set_p(const fbprime_t _p) {p = _p;}
     void set_r(const fbprime_t _r) {r = _r;}
     void set_offset(const fbprime_t _offset) {offset = _offset;}
+    bool is_nice() const {return true;}
     void print(FILE *) const;
 };
 
@@ -58,8 +65,16 @@ public:
     {
       if (proj || _p % 2 == 0) {
         init_proj(_p, _r, _logp, skip);
+      } else if (_p == 3) {
+        (ssp_simple_t&)(*this) = ssp_simple_t(_p, _r, _logp, skip);
+        set_ordinary3();
       } else {
-        /* TODO: How to defer to the other constructor correctly? This here is bad */
+        /* TODO: How to defer to the other constructor correctly? This
+         * here is bad
+         *
+         * (would it do to defer to the other ctor as a default, and then
+         * do this ? or would a move-ctor do the Right Thing ?)
+         * */
         *this = ssp_t(_p, _r, _logp, skip);
       }
     }
@@ -78,6 +93,7 @@ public:
     void set_U(const fbprime_t U) {ASSERT(is_proj()); offset = U;}
 
     bool is_pow2() const {return (flags & SSP_POW2) != 0;}
+    bool is_ordinary3() const {return (flags & SSP_ORDINARY3) != 0;}
     bool is_proj() const {return (flags & SSP_PROJ) != 0;}
     bool is_discarded_sublat() const {return (flags & SSP_DISCARD_SUBLAT) != 0;}
     bool is_discarded_proj() const {return (flags & SSP_DISCARD_PROJ) != 0;}
@@ -85,6 +101,7 @@ public:
     bool is_nice() const {return !is_pow2() && !is_proj() && !is_discarded();}
 
     void set_pow2() {flags |= SSP_POW2;}
+    void set_ordinary3() {flags |= SSP_ORDINARY3;}
     void set_proj() {flags |= SSP_PROJ;}
     void set_discarded_sublat() {flags |= SSP_DISCARD_SUBLAT;}
     void set_discarded() {flags |= SSP_DISCARD_PROJ;}
@@ -98,9 +115,9 @@ private:
 typedef struct {
     std::vector<ssp_simple_t> ssps;
     std::vector<ssp_t> ssp;
-    /* These iterators tell which of the ssps entries should be used 
-       for re-sieving */
-    std::vector<ssp_simple_t>::const_iterator resieve_start, resieve_end;
+    /* These offsets, relative to the start of ssps, tell which of the ssps
+       entries should be used for re-sieving */
+    size_t resieve_start_offset, resieve_end_offset;
 } small_sieve_data_t;
 
 /* Include this only now, as there's a cross dependency between the two
@@ -119,7 +136,7 @@ extern void small_sieve_init(small_sieve_data_t & ssd, unsigned int interleaving
                       std::vector<fb_general_entry>::const_iterator resieve_start,
                       std::vector<fb_general_entry>::const_iterator resieve_end,
                       sieve_info const & si, int side);
-extern void small_sieve_start(std::vector<spos_t> & ssdpos, small_sieve_data_t & ssd, unsigned int first_region_index, sieve_info const & si);
+extern void small_sieve_start(std::vector<spos_t> & ssdpos, std::vector<spos_t> & rsdpos, small_sieve_data_t & ssd, unsigned int first_region_index, sieve_info const & si);
 extern void small_sieve_copy_start(std::vector<spos_t>& res, std::vector<spos_t> const & base, int bounds[2]);
 /*
 extern void small_sieve_skip_stride(small_sieve_data_t *ssd, spos_t * ssdpos, unsigned int N, unsigned int interleaving, sieve_info const & si);
