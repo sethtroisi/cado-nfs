@@ -637,7 +637,9 @@ rotate (cado_poly poly, long B, double maxlognorm, double Bf, double Bg,
         double area, long u)
 {
   /* determine range [vmin,vmax] */
-  double lognorm = L2_lognorm (poly->pols[ALG_SIDE], poly->skew);
+  /* recompute skewness to ensure lognorm <= maxlognorm */
+  double skew = L2_skewness (poly->pols[ALG_SIDE], SKEWNESS_DEFAULT_PREC);
+  double lognorm = L2_lognorm (poly->pols[ALG_SIDE], skew);
   rotation_space r;
   expected_growth (&r, poly->pols[ALG_SIDE], poly->pols[RAT_SIDE], 1,
                    maxlognorm - lognorm);
@@ -660,7 +662,7 @@ rotate (cado_poly poly, long B, double maxlognorm, double Bf, double Bg,
     {
       if (verbose)
 #pragma omp critical
-        printf ("u=%ld: class i=%d: -mod %ld -modv %ld -modw %ld %.2f\n",
+        printf ("u=%ld, class i=%d: -mod %ld -modv %ld -modw %ld %.2f\n",
                 u0 + u, i, mod, get_mod (v0 + c[i].vmod, mod),
                 get_mod (w0 + c[i].wmod, mod), c[i].alpha);
 
@@ -741,7 +743,7 @@ main (int argc, char **argv)
     cado_poly poly;
     int I = 0;
     double margin = NORM_MARGIN;
-    long umin, umax;
+    long umin = LONG_MIN, umax = LONG_MAX;
     int sopt = 0;
     long B = ALPHA_BOUND;
     double time = seconds ();
@@ -814,6 +816,20 @@ main (int argc, char **argv)
             argv += 2;
             argc -= 2;
           }
+        else if (strcmp (argv[1], "-umin") == 0)
+          {
+            umin = strtol (argv [2], NULL, 10);
+            ASSERT_ALWAYS(umin > LONG_MIN); /* LONG_MIN is reserved */
+            argv += 2;
+            argc -= 2;
+          }
+        else if (strcmp (argv[1], "-umax") == 0)
+          {
+            umax = strtol (argv [2], NULL, 10);
+            ASSERT_ALWAYS(umax < LONG_MAX); /* LONG_MAX is reserved */
+            argv += 2;
+            argc -= 2;
+          }
         else if (strcmp (argv[1], "-keep") == 0)
           {
             keep = atoi (argv [2]);
@@ -873,8 +889,10 @@ main (int argc, char **argv)
     rotation_space r;
     expected_growth (&r, poly->pols[ALG_SIDE], poly->pols[RAT_SIDE], 2,
                      margin);
-    umin = (r.kmin < (double) LONG_MIN) ? LONG_MIN : r.kmin;
-    umax = (r.kmax > (double) LONG_MAX) ? LONG_MAX : r.kmax;
+    if (umin == LONG_MIN) /* umin was not given by the user */
+      umin = (r.kmin < (double) LONG_MIN) ? LONG_MIN : r.kmin;
+    if (umax == LONG_MAX) /* umax was not given by the user */
+      umax = (r.kmax > (double) LONG_MAX) ? LONG_MAX : r.kmax;
     if (verbose)
       printf ("umin=%ld umax=%ld\n", umin, umax);
 
