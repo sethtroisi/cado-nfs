@@ -202,11 +202,10 @@ void small_sieve_init(small_sieve_data_t & ssd,
     // times faster.
     unsigned int sublatm = si.conf.sublat.m;
     const unsigned int skiprows = ((interleaving-1) << LOG_BUCKET_REGION) >> si.conf.logI_adjusted;
-
     bool saw_resieve_start = false, saw_resieve_end = false;
-
-    std::vector<fb_general_entry>::const_iterator iter = fb_start;
-    while (iter != fb_end) {
+    
+    for (std::vector<fb_general_entry>::const_iterator iter = fb_start;
+         iter != fb_end; iter++) {
         /* p=pp^k, the prime or prime power in this entry, and pp is prime */
         const fbprime_t p = iter->q, pp = iter->p;
         WHERE_AM_I_UPDATE(w, p, p);
@@ -215,6 +214,11 @@ void small_sieve_init(small_sieve_data_t & ssd,
             ASSERT_ALWAYS(!saw_resieve_end);
             saw_resieve_start = true;
             ssd.resieve_start_offset = ssd.ssps.size();
+        }
+        if (iter == resieve_end) {
+            ASSERT_ALWAYS(saw_resieve_start);
+            saw_resieve_end = true;
+            ssd.resieve_end_offset = ssd.ssps.size();
         }
         if (p > thresh) {
             continue;
@@ -272,12 +276,16 @@ void small_sieve_init(small_sieve_data_t & ssd,
                 ssd.ssp.push_back(new_ssp);
             }
         }
-        iter++;
-        if (iter == resieve_end) {
-            ASSERT_ALWAYS(saw_resieve_start);
-            saw_resieve_end = true;
-            ssd.resieve_end_offset = ssd.ssps.size();
-        }
+    }
+    if (resieve_start == fb_start) {
+        ASSERT_ALWAYS(!saw_resieve_end);
+        saw_resieve_start = true;
+        ssd.resieve_start_offset = ssd.ssps.size();
+    }
+    if (resieve_end == fb_end) {
+        ASSERT_ALWAYS(saw_resieve_start);
+        saw_resieve_end = true;
+        ssd.resieve_end_offset = ssd.ssps.size();
     }
     ASSERT_ALWAYS(saw_resieve_start && saw_resieve_end);
 }
