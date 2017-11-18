@@ -653,15 +653,15 @@ rotate (cado_poly poly, long B, double maxlognorm, double Bf, double Bg,
   int n;
   c = best_classes (poly, mod, keep, vmin, vmax, &n);
   ASSERT_ALWAYS (n <= keep);
-  printf ("Kept %d classes (keep=%d) with alpha from %.2f to %.2f\n",
-          n, keep, c[0].alpha, c[n-1].alpha);
+  printf ("u=%ld: kept %d classes with alpha from %.2f to %.2f\n",
+          u, n, c[0].alpha, c[n-1].alpha);
 #pragma omp parallel for schedule(dynamic)
   for (int i = 0; i < n; i++)
     {
       if (verbose)
 #pragma omp critical
-        printf ("class i=%d: u=%ld -mod %ld -modv %ld -modw %ld %.2f\n",
-                i, u0 + u, mod, get_mod (v0 + c[i].vmod, mod),
+        printf ("u=%ld: class i=%d: -mod %ld -modv %ld -modw %ld %.2f\n",
+                u0 + u, i, mod, get_mod (v0 + c[i].vmod, mod),
                 get_mod (w0 + c[i].wmod, mod), c[i].alpha);
 
       long vmin1 = vmin;
@@ -803,6 +803,10 @@ main (int argc, char **argv)
             argv += 2;
             argc -= 2;
           }
+        /* use http://oeis.org/A051451 for -mod:
+           1, 2, 6, 12, 60, 420, 840, 2520, 27720, 360360, 720720, 12252240,
+           232792560, 5354228880, 26771144400, 80313433200, 2329089562800,
+           72201776446800, 144403552893600 */
         else if (strcmp (argv[1], "-mod") == 0)
           {
             mod = strtol (argv [2], NULL, 10);
