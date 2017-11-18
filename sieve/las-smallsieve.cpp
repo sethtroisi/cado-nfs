@@ -857,6 +857,7 @@ void sieve_one_nice_prime(unsigned char *S, const ssp_simple_t &ssps,
 #ifdef TRACE_K
     /* we're keeping track of it with ssdpos, but just in case,
      * make sure we get it right ! */
+    small_sieve_context C(logI, N, si.conf.sublat);
     ASSERT_ALWAYS(pos == C.first_position_ordinary_prime (ssps));
 #endif
     ASSERT(pos < (int) p);
