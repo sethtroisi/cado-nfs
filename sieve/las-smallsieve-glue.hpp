@@ -25,17 +25,24 @@ template<> struct make_best_choice_list<-1> {
     typedef list_nil type;
 };
 
-#if defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM) && !defined(TRACK_CODE_PATH)
-#if 0
+#if defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM)
+// && !defined(TRACK_CODE_PATH)
+#if 1
 /* The selection below is really scrapping everything we've done to
  * design a code path by bits and pieces, and strives to use almost a
  * one-size-fits-all approach (which admittedly also has its advantages.
+ *
+ * currently it does seem to be the case that this one-size-fits-all
+ * choice wins over the tailored-fit choice above (at least on my
+ * laptop), reaching a 12% win as per the report of test-smallsieve -A 31
+ * -I 16 -B 16 --only-complete-functions (commit faa0396)
  */
 template<> struct make_best_choice_list<12> {
     typedef choice_list_car<
                 assembly_generic_oldloop,
                 assembly_generic_oldloop,
                 3,
+            /* XXX we have a bug with assembly2x here */
             choice_list_car<
                 assembly2x,
                 assembly2x,

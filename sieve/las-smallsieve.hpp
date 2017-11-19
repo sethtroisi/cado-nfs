@@ -41,6 +41,9 @@ public:
     void set_offset(const fbprime_t _offset) {offset = _offset;}
     bool is_nice() const {return true;}
     void print(FILE *) const;
+    bool operator<(ssp_simple_t const& x) const {
+        return p < x.p;
+    }
 };
 
 class ssp_t : public ssp_simple_t {
@@ -52,6 +55,9 @@ class ssp_t : public ssp_simple_t {
      * when needed.
      */
     unsigned char flags = 0;
+    /* forbid comparison of ssp_t -- makes little sense I believe, as
+     * it's a mixed bag. */
+    bool operator<(ssp_simple_t const&) const { return false; }
 public:
 
     /* Initialization procedures for the ssp data */

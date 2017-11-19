@@ -300,6 +300,12 @@ void small_sieve_init(small_sieve_data_t & ssd,
         saw_resieve_end = true;
         ssd.resieve_end_offset = ssd.ssps.size();
     }
+    /* our logic that reacts on the bit size of the small-sieved primes
+     * assumes that small-sieved primes are sorted. It's cheap to do, but
+     * we must pay attention to those tricky resieving indices. XXX do
+     * that.
+     */
+    ASSERT_ALWAYS(std::is_sorted(ssd.ssps.begin(), ssd.ssps.end()));
     ASSERT_ALWAYS(saw_resieve_start && saw_resieve_end);
 }
 /* }}} */
