@@ -377,12 +377,9 @@ rotate_v (cado_poly_srcptr poly0, long v, long B,
   /* compute f + (v*x)*g */
   rotate_aux (poly->pols[ALG_SIDE]->coeff, G1, G0, 0, v, 1);
 
-  /* recompute skewness to ensure lognorm <= maxlognorm */
-  double skew = L2_skewness (poly->pols[ALG_SIDE], SKEWNESS_DEFAULT_PREC);
-  double lognorm = L2_lognorm (poly->pols[ALG_SIDE], skew);
   rotation_space r;
   expected_growth (&r, poly->pols[ALG_SIDE], poly->pols[RAT_SIDE], 0,
-                   maxlognorm - lognorm);
+                   maxlognorm, poly->skew);
   mpz_set_d (wminz, r.kmin);
   mpz_set_d (wmaxz, r.kmax);
 
@@ -578,6 +575,7 @@ rotate_v (cado_poly_srcptr poly0, long v, long B,
               /* compute E */
               rotate_aux (poly->pols[ALG_SIDE]->coeff, G1, G0, 0, w, 0);
               poly->skew = L2_skewness (poly->pols[ALG_SIDE], SKEWNESS_DEFAULT_PREC);
+              double lognorm = L2_lognorm (poly->pols[ALG_SIDE], poly->skew);
               /* to compute E, we need to divide g by mod */
               mpz_poly_divexact_ui (poly->pols[RAT_SIDE], poly->pols[RAT_SIDE], mod);
               double E = MurphyE (poly, Bf, Bg, area, MURPHY_K);
@@ -594,8 +592,8 @@ rotate_v (cado_poly_srcptr poly0, long v, long B,
                   mpz_set_si (bestw, mod * w + modw);
                   best_alpha = (double) A[j];
                   best_E = E;
-                  gmp_printf ("u=%ld v=%ld w=%Zd est_alpha_aff=%.2f E=%.2e\n",
-                              u, v, bestw, best_alpha, E);
+                  gmp_printf ("u=%ld v=%ld w=%Zd lognorm=%.2f est_alpha_aff=%.2f E=%.2e\n",
+                              u, v, bestw, lognorm, best_alpha, E);
                   fflush (stdout);
                 }
             }
@@ -637,12 +635,9 @@ rotate (cado_poly poly, long B, double maxlognorm, double Bf, double Bg,
         double area, long u)
 {
   /* determine range [vmin,vmax] */
-  /* recompute skewness to ensure lognorm <= maxlognorm */
-  double skew = L2_skewness (poly->pols[ALG_SIDE], SKEWNESS_DEFAULT_PREC);
-  double lognorm = L2_lognorm (poly->pols[ALG_SIDE], skew);
   rotation_space r;
   expected_growth (&r, poly->pols[ALG_SIDE], poly->pols[RAT_SIDE], 1,
-                   maxlognorm - lognorm);
+                   maxlognorm, poly->skew);
   long vmin = (r.kmin < (double) LONG_MIN) ? LONG_MIN : r.kmin;
   long vmax = (r.kmax > (double) LONG_MAX) ? LONG_MAX : r.kmax;
   if (verbose)
@@ -859,8 +854,7 @@ main (int argc, char **argv)
       }
 
     if (poly->skew == 0.0)
-      poly->skew = L2_combined_skewness2 (poly->pols[0], poly->pols[1],
-					  SKEWNESS_DEFAULT_PREC);
+      poly->skew = L2_skewness (poly->pols[ALG_SIDE], SKEWNESS_DEFAULT_PREC);
 
     /* if -sopt, size-optimize */
     if (sopt)
@@ -880,23 +874,24 @@ main (int argc, char **argv)
         cado_poly_clear (c);
       }
 
+    nprimes = initPrimes (B);
+
     /* compute the skewness */
     poly->skew = L2_skewness (poly->pols[ALG_SIDE], SKEWNESS_DEFAULT_PREC);
-
-    nprimes = initPrimes (B);
+    double lognorm = L2_lognorm (poly->pols[ALG_SIDE], poly->skew);
+    double maxlognorm = lognorm + margin;
+    printf ("initial lognorm %.2f, maxlognorm %.2f\n", lognorm, maxlognorm);
 
     /* determine range [umin,umax] */
     rotation_space r;
     expected_growth (&r, poly->pols[ALG_SIDE], poly->pols[RAT_SIDE], 2,
-                     margin);
+                     maxlognorm, poly->skew);
     if (umin == LONG_MIN) /* umin was not given by the user */
       umin = (r.kmin < (double) LONG_MIN) ? LONG_MIN : r.kmin;
     if (umax == LONG_MAX) /* umax was not given by the user */
       umax = (r.kmax > (double) LONG_MAX) ? LONG_MAX : r.kmax;
     if (verbose)
       printf ("umin=%ld umax=%ld\n", umin, umax);
-
-    double maxlognorm = L2_lognorm (poly->pols[ALG_SIDE], poly->skew) + margin;
 
     mpz_init (bestw);
 
