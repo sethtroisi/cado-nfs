@@ -383,7 +383,7 @@ rotate_v (cado_poly_srcptr poly0, long v, long B,
   mpz_set_d (wminz, r.kmin);
   mpz_set_d (wmaxz, r.kmax);
 
-  if (verbose)
+  if (verbose > 1)
 #pragma omp critical
     {
       gmp_printf ("v=%ld: wmin=%Zd wmax=%Zd\n", v, wminz, wmaxz);
@@ -655,7 +655,7 @@ rotate (cado_poly poly, long B, double maxlognorm, double Bf, double Bg,
 #pragma omp parallel for schedule(dynamic)
   for (int i = 0; i < n; i++)
     {
-      if (verbose)
+      if (verbose > 1)
 #pragma omp critical
         printf ("u=%ld, class i=%d: -mod %ld -modv %ld -modw %ld %.2f\n",
                 u0 + u, i, mod, get_mod (v0 + c[i].vmod, mod),
