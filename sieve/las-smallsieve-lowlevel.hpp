@@ -1,6 +1,8 @@
 #ifndef LAS_SMALLSIEVE_LOWLEVEL_HPP_
 #define LAS_SMALLSIEVE_LOWLEVEL_HPP_
 
+#include "las-config.h"
+
 /* This is copied from LOGNORM_FILL_COMMON_DEFS in las-norms.cpp ; from
  * logI, N, and LOG_BUCKET_REGION, define the integers i0, i1, j0, j1,
  * and I.

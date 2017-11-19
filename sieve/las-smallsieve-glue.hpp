@@ -24,6 +24,13 @@ template<int b> struct make_best_choice_list {
 template<> struct make_best_choice_list<-1> {
     typedef list_nil type;
 };
+
+#if defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM) && !defined(TRACK_CODE_PATH)
+#if 0
+/* The selection below is really scrapping everything we've done to
+ * design a code path by bits and pieces, and strives to use almost a
+ * one-size-fits-all approach (which admittedly also has its advantages.
+ */
 template<> struct make_best_choice_list<12> {
     typedef choice_list_car<
                 assembly_generic_oldloop,
@@ -36,6 +43,17 @@ template<> struct make_best_choice_list<12> {
             list_nil
             >> type;
 };
+#endif
+#else
+template<> struct make_best_choice_list<12> {
+    typedef choice_list_car<
+                manual_oldloop,
+                manual_oldloop,
+                0,
+            list_nil
+            > type;
+};
+#endif
 
 /*{{{ small sieve classes */
 /*{{{ tristate booleans */
@@ -676,14 +694,22 @@ struct small_sieve : public small_sieve_base<tribool_const<is_fragment>> {/*{{{*
                                         )
                                     )
                             ;
+                        WHERE_AM_I_UPDATE(w, p, p0);
                         overrun0 = even_code()(S0, S1, S0 - S, _mm_extract_epi32(xpos, 0), p0+p0, logp0, w);
+                        WHERE_AM_I_UPDATE(w, p, p1);
                         overrun1 = even_code()(S0, S1, S0 - S, _mm_extract_epi32(xpos, 1), p1+p1, logp1, w);
+                        WHERE_AM_I_UPDATE(w, p, p2);
                         overrun2 = even_code()(S0, S1, S0 - S, _mm_extract_epi32(xpos, 2), p2+p2, logp2, w);
+                        WHERE_AM_I_UPDATE(w, p, p3);
                         overrun3 = even_code()(S0, S1, S0 - S, _mm_extract_epi32(xpos, 3), p3+p3, logp3, w);
                     } else {
+                        WHERE_AM_I_UPDATE(w, p, p0);
                         overrun0 = odd_code()(S0, S1, S0 - S, _mm_extract_epi32(pos, 0), p0, logp0, w);
+                        WHERE_AM_I_UPDATE(w, p, p1);
                         overrun1 = odd_code()(S0, S1, S0 - S, _mm_extract_epi32(pos, 1), p1, logp1, w);
+                        WHERE_AM_I_UPDATE(w, p, p2);
                         overrun2 = odd_code()(S0, S1, S0 - S, _mm_extract_epi32(pos, 2), p2, logp2, w);
+                        WHERE_AM_I_UPDATE(w, p, p3);
                         overrun3 = odd_code()(S0, S1, S0 - S, _mm_extract_epi32(pos, 3), p3, logp3, w);
                     }
                     S0 += I();
@@ -708,6 +734,7 @@ struct small_sieve : public small_sieve_base<tribool_const<is_fragment>> {/*{{{*
                     /* time to move on to the next bit size; */
                     return;
                 }
+                WHERE_AM_I_UPDATE(w, p, p);
                 handle_nice_prime<even_code, odd_code, bits_off>(ssp, p_pos, w);
             }
 
@@ -737,8 +764,11 @@ struct small_sieve : public small_sieve_base<tribool_const<is_fragment>> {/*{{{*
         {
             static_assert(b0 > b1);
             void operator()(small_sieve<is_fragment> & SS, where_am_I & w) {
+                /*
                 SS.handle_nice_primes<E0, O0, b1>(w);
                 do_it<T>()(SS, w);
+                */
+                do_it<choice_list_car<E0,O0,b1, T>, bn>()(SS, w);
             }
         };
     template<typename E0, typename O0, int b0, int bn>
@@ -766,7 +796,7 @@ struct small_sieve : public small_sieve_base<tribool_const<is_fragment>> {/*{{{*
     template<typename E0, typename O0, int b0, typename T, int bn>
         struct do_it<choice_list_car<E0,O0,b0,T>, bn>
         {
-            static_assert(is_compatible_for_range<E0, E0, b0, bn>::value);
+            static_assert(is_compatible_for_range<E0, O0, b0, bn>::value);
             void operator()(small_sieve<is_fragment> & SS, where_am_I & w) {
                 SS.handle_nice_primes<E0, O0, b0>(w);
                 do_it<T, b0-1>()(SS, w);
