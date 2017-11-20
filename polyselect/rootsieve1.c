@@ -586,6 +586,7 @@ rotate_v (cado_poly_srcptr poly0, long v, long B,
             {
               w = wcur + j; /* local value of w, the global one is mod * w + modw */
               rotate_aux (poly->pols[ALG_SIDE]->coeff, G1, G0, 0, w, 0);
+              double skew = poly->skew; /* save skewness */
               poly->skew = L2_skewness (poly->pols[ALG_SIDE], SKEWNESS_DEFAULT_PREC);
               double lognorm = L2_lognorm (poly->pols[ALG_SIDE], poly->skew);
               /* to compute E, we need to divide g by mod */
@@ -598,7 +599,8 @@ rotate_v (cado_poly_srcptr poly0, long v, long B,
               gmp_printf ("u=%ld v=%ld w=%ld lognorm=%.2f est_alpha_aff=%.2f E=%.2e [original]\n",
                           u, v, mod * w + modw, lognorm, A[j], E);
               fflush (stdout);
-              /* restore the original polynomial (w=0) */
+              /* restore the original polynomial (w=0) and skewness */
+              poly->skew = skew;
               rotate_aux (poly->pols[ALG_SIDE]->coeff, G1, G0, w, 0, 0);
             }
           if (A[j] < best_alpha + guard_alpha)
@@ -606,6 +608,7 @@ rotate_v (cado_poly_srcptr poly0, long v, long B,
               w = wcur + j;
               /* compute E */
               rotate_aux (poly->pols[ALG_SIDE]->coeff, G1, G0, 0, w, 0);
+              double skew = poly->skew; /* save skewness */
               poly->skew = L2_skewness (poly->pols[ALG_SIDE], SKEWNESS_DEFAULT_PREC);
               double lognorm = L2_lognorm (poly->pols[ALG_SIDE], poly->skew);
               /* to compute E, we need to divide g by mod */
@@ -613,7 +616,8 @@ rotate_v (cado_poly_srcptr poly0, long v, long B,
               double E = MurphyE (poly, Bf, Bg, area, MURPHY_K);
               /* restore g */
               mpz_poly_mul_si (poly->pols[RAT_SIDE], poly->pols[RAT_SIDE], mod);
-              /* restore the original polynomial (w=0) */
+              /* restore the original polynomial (w=0) and skewness */
+              poly->skew = skew;
               rotate_aux (poly->pols[ALG_SIDE]->coeff, G1, G0, w, 0, 0);
 
               if (optimizeE == 0 || (optimizeE == 1 && E > best_E))
