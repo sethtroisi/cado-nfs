@@ -336,10 +336,6 @@ las_info::las_info(cxx_param_list & pl)
             fprintf(stderr, "-galois and -allow-compsq are incompatible options at the moment");
             exit(EXIT_FAILURE);
         }
-        if (suppress_duplicates) {
-            fprintf(stderr, "-dup and -allow-compsq are incompatible options at the moment");
-            exit(EXIT_FAILURE);
-        }
         if (random_sampling) {
             fprintf(stderr, "-random-sample and -allow-compsq are incompatible options at the moment");
             exit(EXIT_FAILURE);
