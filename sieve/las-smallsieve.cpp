@@ -277,7 +277,7 @@ void small_sieve_init(small_sieve_data_t & ssd,
             }
         }
     }
-    if (resieve_start == fb_start) {
+    if (resieve_start == fb_end) {
         ASSERT_ALWAYS(!saw_resieve_end);
         saw_resieve_start = true;
         ssd.resieve_start_offset = ssd.ssps.size();
