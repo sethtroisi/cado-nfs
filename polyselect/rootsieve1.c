@@ -252,7 +252,7 @@ insert_class (class *c, int n, int keep, double alpha, long v, long w,
    Put in *nc the number of returned classes. */
 static class*
 best_classes (cado_poly poly0, long mod, int keep, long vmin, long vmax,
-              int *nc)
+              int *nc, long u)
 {
   int nfactors = 0;
   unsigned long *factors = NULL, p;
@@ -343,6 +343,37 @@ best_classes (cado_poly poly0, long mod, int keep, long vmin, long vmax,
           *nc = ne;
         }
       Q *= q;
+    }
+
+  /* if u = -u0, add the class of the initial polynomial (-v0,-w0) if not in */
+  if (u == -u0)
+    {
+      int included = -1;
+      for (i = 0; i < *nc; i++)
+        if (get_mod (-v0, mod) == c[i].vmod && get_mod (-w0, mod) == c[i].wmod)
+          included = i;
+      if (included >= 0)
+        printf ("class of initial polynomial has rank %d (%.2f)\n",
+                included, c[included].alpha);
+      else
+        {
+          printf ("class of initial polynomial is not included");
+          if (*nc > 0)
+            printf (" (last %.2f)\n", c[*nc - 1].alpha);
+          else
+            printf ("\n");
+        }
+      if (included == -1)
+        {
+          double alpha = 0;
+          for (int j = 0; j < nfactors; j++)
+            alpha += average_alpha (poly, get_mod (-v0, factors[j]),
+                                    get_mod (-w0, factors[j]), factors[j]);
+          if (*nc == keep)
+            (*nc) --; /* remove the last class */
+          *nc = insert_class (c, *nc, keep, alpha, get_mod (-v0, mod),
+                              get_mod (-w0, mod), vmin, vmax, mod);
+        }
     }
 
   cado_poly_clear (poly);
@@ -556,6 +587,7 @@ rotate_v (cado_poly_srcptr poly0, long v, long B,
               w = wcur + j; /* local value of w, the global one is mod * w + modw */
               rotate_aux (poly->pols[ALG_SIDE]->coeff, G1, G0, 0, w, 0);
               poly->skew = L2_skewness (poly->pols[ALG_SIDE], SKEWNESS_DEFAULT_PREC);
+              double lognorm = L2_lognorm (poly->pols[ALG_SIDE], poly->skew);
               /* to compute E, we need to divide g by mod */
               mpz_poly_divexact_ui (poly->pols[RAT_SIDE], poly->pols[RAT_SIDE], mod);
               double E = MurphyE (poly, Bf, Bg, area, MURPHY_K);
@@ -563,8 +595,8 @@ rotate_v (cado_poly_srcptr poly0, long v, long B,
               mpz_poly_mul_si (poly->pols[RAT_SIDE], poly->pols[RAT_SIDE], mod);
               /* this can only occur for one thread, thus no need to put
                  #pragma omp critical */
-              gmp_printf ("u=%ld v=%ld w=%ld est_alpha_aff=%.2f E=%.2e [original]\n",
-                          u, v, mod * w + modw, A[j], E);
+              gmp_printf ("u=%ld v=%ld w=%ld lognorm=%.2f est_alpha_aff=%.2f E=%.2e [original]\n",
+                          u, v, mod * w + modw, lognorm, A[j], E);
               fflush (stdout);
               /* restore the original polynomial (w=0) */
               rotate_aux (poly->pols[ALG_SIDE]->coeff, G1, G0, w, 0, 0);
@@ -648,10 +680,13 @@ rotate (cado_poly poly, long B, double maxlognorm, double Bf, double Bg,
 
   class *c = NULL;
   int n;
-  c = best_classes (poly, mod, keep, vmin, vmax, &n);
+  c = best_classes (poly, mod, keep, vmin, vmax, &n, u);
   ASSERT_ALWAYS (n <= keep);
-  printf ("u=%ld: kept %d classes with alpha from %.2f to %.2f\n",
-          u, n, c[0].alpha, c[n-1].alpha);
+  printf ("u=%ld: kept %d classes", u, n);
+  if (n == 0)
+    printf ("\n");
+  else
+    printf (" with alpha from %.2f to %.2f\n", c[0].alpha, c[n-1].alpha);
 #pragma omp parallel for schedule(dynamic)
   for (int i = 0; i < n; i++)
     {
@@ -839,7 +874,7 @@ main (int argc, char **argv)
 
 #pragma omp parallel
 #pragma omp master
-  printf ("Using %d thread(s)\n", omp_get_num_threads ());
+  printf ("# Using %d thread(s)\n", omp_get_num_threads ());
 
     ASSERT_ALWAYS(B <= 65536);
 
@@ -865,11 +900,11 @@ main (int argc, char **argv)
         size_optimization (c->pols[ALG_SIDE], c->pols[RAT_SIDE],
                            poly->pols[ALG_SIDE], poly->pols[RAT_SIDE],
                            SOPT_DEFAULT_EFFORT, verbose);
-        printf ("initial polynomial:\n");
+        printf ("# initial polynomial:\n");
         cado_poly_fprintf (stdout, poly, "");
         print_transformation (poly, c);
         cado_poly_set (poly, c);
-        printf ("size-optimized polynomial:\n");
+        printf ("# size-optimized polynomial:\n");
         cado_poly_fprintf (stdout, poly, "");
         cado_poly_clear (c);
       }
@@ -929,9 +964,9 @@ main (int argc, char **argv)
     print_cadopoly_extra (stdout, poly, argc0, argv0, 0);
 
     time = seconds () - time;
-    printf ("Sieved %.2e polynomials in %.2f seconds (%.2es/p)\n",
+    printf ("# Sieved %.2e polynomials in %.2f seconds (%.2es/p)\n",
             tot_pols, time, time / tot_pols);
-    printf ("Average alpha %.2f\n", tot_alpha / tot_pols);
+    printf ("# Average alpha %.2f\n", tot_alpha / tot_pols);
 
     free (Primes);
     free (Q);
