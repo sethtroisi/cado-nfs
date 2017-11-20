@@ -116,6 +116,8 @@ parameters/polynomials/c200.poly
 parameters/polynomials/rsa200.poly
 parameters/polynomials/c210.poly
 parameters/polynomials/rsa210.poly
+parameters/polynomials/c220.poly
+parameters/polynomials/rsa220.poly
 scripts/polsel_params.sage
 linalg/bwc/bcast-file.c
 misc/README
