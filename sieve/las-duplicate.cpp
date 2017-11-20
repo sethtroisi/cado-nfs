@@ -357,8 +357,10 @@ sq_finds_relation(sq_with_fac const& sq_fac, const int sq_side,
  * This takes qmin and qmax into account.
  */
 static int
-sq_was_previously_sieved (const unsigned long sq, int side, sieve_info const & si){
-  if (mpz_cmp_ui (si.doing.p, sq) <= 0) /* we use <= and not < since this
+sq_was_previously_sieved (const uint64_t sq, int side, sieve_info const & si){
+  cxx_mpz Sq;
+  mpz_set_uint64(Sq, sq);
+  if (mpz_cmp(si.doing.p, Sq) <= 0) /* we use <= and not < since this
 					   function is also called with the
 					   current special-q */
     return 0;
