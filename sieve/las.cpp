@@ -2613,7 +2613,7 @@ int main (int argc0, char *argv0[])/*{{{*/
 #ifndef SUPPORT_LARGE_Q
         if (!Adj.Q.fits_31bits()) { // for fb_root_in_qlattice_31bits
             verbose_output_print(2, 1,
-                    "Warning, special-q basis is too skewed,"
+                    "# Warning, special-q basis is too skewed,"
                     " skipping this special-q."
                     " Define SUPPORT_LARGE_Q to proceed anyway.\n");
             nr_sq_discarded++;
