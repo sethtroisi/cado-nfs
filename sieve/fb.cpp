@@ -392,7 +392,6 @@ fb_slice<FB_ENTRY_TYPE>::make_lattice_bases(const qlattice_basis &basis,
   typename FB_ENTRY_TYPE::transformed_entry_t transformed;
   /* Create a transformed vector and store the index of the slice we currently
      transform */
-  const unsigned long special_q = mpz_fits_ulong_p(basis.q) ? mpz_get_ui(basis.q) : 0;
 
   plattices_vector_t result(get_index());
   slice_offset_t i_entry = 0;
