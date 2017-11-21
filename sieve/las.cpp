@@ -488,7 +488,6 @@ cxx_mpz bound_following_previous_legitimate_specialq_withroots(cxx_mpz const& q1
      */
     // FIXME: only 3 factors in composite q !!!!
     cxx_mpz roots[MAX_DEGREE*MAX_DEGREE*MAX_DEGREE];
-    unsigned long fac_q[10];
 
     cxx_mpz q, q1 = q1_orig;
     /* we need to know the limit of the q range */
@@ -502,7 +501,7 @@ cxx_mpz bound_following_previous_legitimate_specialq_withroots(cxx_mpz const& q1
         if (!las.allow_composite_q) {
             nroots = mpz_poly_roots ((mpz_t*)roots, f, q);
         } else {
-            nroots = roots_for_composite_q((mpz_t *)roots, f, q, fac_q);
+            nroots = roots_for_composite_q((mpz_t *)roots, f, q, facq);
         }
         if (nroots > 0)
             break;
