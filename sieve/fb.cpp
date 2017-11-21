@@ -397,7 +397,7 @@ fb_slice<FB_ENTRY_TYPE>::make_lattice_bases(const qlattice_basis &basis,
   plattices_vector_t result(get_index());
   slice_offset_t i_entry = 0;
   for (const FB_ENTRY_TYPE *it = begin(); it != end(); it++, i_entry++) {
-    if (it->p == special_q) /* Assumes it->p != 0 */
+    if (!basis.is_coprime_to(it->p))
       continue;
     it->transform_roots(transformed, basis);
     for (unsigned char i_root = 0; i_root != transformed.nr_roots; i_root++) {
