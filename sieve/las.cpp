@@ -2767,7 +2767,7 @@ int main (int argc0, char *argv0[])/*{{{*/
         verbose_output_print(0, 1, "\n");
         /* TODO: maybe print that later */
         if (!mpz_probab_prime_p(doing.p, 1)) {
-            verbose_output_vfprint(1, 0, gmp_vfprintf,
+            verbose_output_vfprint(0, 1, gmp_vfprintf,
                     "# Warning, q=%Zd is not prime\n",
                     (mpz_srcptr) doing.p);
         }
