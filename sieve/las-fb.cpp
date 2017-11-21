@@ -144,6 +144,7 @@ void sieve_info::share_factor_bases(sieve_info& other)
  * be done once and for all.
  */
 
+#if 0
 static size_t count_roots(const std::vector<fb_general_entry> &v)
 {
     size_t count = 0;
@@ -153,6 +154,7 @@ static size_t count_roots(const std::vector<fb_general_entry> &v)
     }
     return count;
 }
+#endif
 
 /* {{{ sieve_info::{init,clear}_fb_smallsieved */
 void sieve_info::init_fb_smallsieved(int side)
@@ -211,17 +213,11 @@ void sieve_info::init_fb_smallsieved(int side)
     /* Concatenate the 6 vectors into one, and store the beginning and ending
        index of each part in fb_parts_x */
     auto s = std::make_shared<std::vector<fb_general_entry>>();
-    /* FIXME: hack to be able to access the struct fb_parts_x entries via
-       an index */
-    typedef int interval_t[2];
-    interval_t *parts_as_array = &si.sides[side].fb_parts_x->pow2;
     for (int i = 0; i < 6; i++) {
         if (i == RS)
             si.sides[side].resieve_start_offset = s->size();
-        parts_as_array[i][0] = count_roots(*s);
         std::sort(pieces[i].begin(), pieces[i].end());
         s->insert(s->end(), pieces[i].begin(), pieces[i].end());
-        parts_as_array[i][1] = count_roots(*s);
         if (i == RS)
             si.sides[side].resieve_end_offset = s->size();
     }

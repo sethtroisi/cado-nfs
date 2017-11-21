@@ -225,6 +225,8 @@ void small_sieve_init(small_sieve_data_t & ssd,
             saw_resieve_end = true;
             ssd.resieve_end_offset = ssd.ssps.size();
         }
+
+        ASSERT_ALWAYS(p <= thresh);
         if (p > thresh) {
             continue;
         }
@@ -270,27 +272,34 @@ void small_sieve_init(small_sieve_data_t & ssd,
 
             /* FIXME: what should we do with 3, given that it is pattern-sieved?
              */
-            if (new_ssp.is_ordinary3()) {
+
+            /* don't push projective primes that never hit. */
+            if (new_ssp.is_proj()) {
+                if (new_ssp.get_g() >= si.J) {
+                    /* ... unless the number of lines to skip is >= J */
+                    /* FIXME: we lose hits to (+-1,0) this way (the two locations
+                       are equal up to sign, but we should sieve one of them!) */
+                    if (verbose) {
+                        verbose_output_print(0, 1,
+                                "# small_sieve_init: not adding projective prime"
+                                " (1:%" FBROOT_FORMAT ") mod %" FBPRIME_FORMAT ")"
+                                " to small sieve  because g=%d >= si.J = %d\n",
+                                r_q-p, p, new_ssp.get_g(), si.J);
+                    }
+                    continue;
+                }
+                /* projective primes of all sorts go to ssp anyway */
+                ssd.ssp.push_back(new_ssp);
+            } else if (new_ssp.is_ordinary3() || new_ssp.is_pow2()) {
                 ssd.ssp.push_back(new_ssp);
             } else if (new_ssp.is_nice()) {
                 ssd.ssps.push_back(new_ssp);
-            } else if (new_ssp.get_g() >= si.J) {
-                /* ... unless the number of lines to skip is >= J */
-                /* FIXME: we lose hits to (+-1,0) this way (the two locations
-                   are equal up to sign, but we should sieve one of them!) */
-                if (verbose) {
-                    verbose_output_print(0, 1,
-                            "# small_sieve_init: not adding projective prime"
-                            " (1:%" FBROOT_FORMAT ") mod %" FBPRIME_FORMAT ")"
-                            " to small sieve  because g=%d >= si.J = %d\n",
-                            r_q-p, p, new_ssp.get_g(), si.J);
-                }
             } else {
-                ssd.ssp.push_back(new_ssp);
+                ASSERT_ALWAYS(0);
             }
         }
     }
-    if (resieve_start == fb_start) {
+    if (resieve_start == fb_end) {
         ASSERT_ALWAYS(!saw_resieve_end);
         saw_resieve_start = true;
         ssd.resieve_start_offset = ssd.ssps.size();
@@ -300,12 +309,6 @@ void small_sieve_init(small_sieve_data_t & ssd,
         saw_resieve_end = true;
         ssd.resieve_end_offset = ssd.ssps.size();
     }
-    /* our logic that reacts on the bit size of the small-sieved primes
-     * assumes that small-sieved primes are sorted. It's cheap to do, but
-     * we must pay attention to those tricky resieving indices. XXX do
-     * that.
-     */
-    ASSERT_ALWAYS(std::is_sorted(ssd.ssps.begin(), ssd.ssps.end()));
     ASSERT_ALWAYS(saw_resieve_start && saw_resieve_end);
 }
 /* }}} */
@@ -876,7 +879,7 @@ template<bool is_fragment> void small_sieve<is_fragment>::pattern_sieve2(where_a
             pattern[0], pattern[1]);
         if (pattern[0] || pattern[1]) {
             unsigned long *S_ptr = (unsigned long *) (S + ((size_t) (j-j0) << logI));
-            const unsigned long *S_end = (unsigned long *)(S + ((size_t) (j-j0) << logI) + F()) - 2;
+            const unsigned long *S_end = (unsigned long *)(S + ((size_t) (j-j0) << logI) + F());
 
 #ifdef TRACE_K /* {{{ */
             if (trace_on_range_Nx(w.N, w.j*I(), w.j*I()+I())) {
@@ -950,9 +953,9 @@ template<bool is_fragment> void small_sieve<is_fragment>::pattern_sieve3(where_a
             const unsigned long *S_end = (unsigned long *)(S + ((size_t) (j-j0) << logI) + F()) - 2;
 
 #ifdef TRACE_K /* {{{ */
-            if (trace_on_range_Nx(w.N, w.j*I, w.j*I+I)) {
+            if (trace_on_range_Nx(w.N, w.j*I(), w.j*I()+I())) {
                 unsigned int x = trace_Nx.x;
-                unsigned int k = x % I;
+                unsigned int k = x % I();
                 unsigned int v = (((unsigned char *)(pattern+((k/sizeof(unsigned long))%3)))[k%sizeof(unsigned long)]);
                 if (v) {
                     WHERE_AM_I_UPDATE(w, x, x);
@@ -1003,13 +1006,13 @@ void sieve_small_bucket_region(unsigned char *S, unsigned int N,
     if (is_fragment) {
         small_sieve<true> SS(ssdpos, ssd.ssps, ssd.ssp, S, logI, N, si.conf.sublat, nthreads);
         SS.pattern_sieve2(w);
-        // SS.pattern_sieve3(w);
+        SS.pattern_sieve3(w);
         SS.exceptional_sieve(w);
         SS.normal_sieve(w);
     } else {
         small_sieve<false> SS(ssdpos, ssd.ssps, ssd.ssp, S, logI, N, si.conf.sublat, nthreads);
         SS.pattern_sieve2(w);
-        // SS.pattern_sieve3(w);
+        SS.pattern_sieve3(w);
         SS.exceptional_sieve(w);
         SS.normal_sieve(w);
     }

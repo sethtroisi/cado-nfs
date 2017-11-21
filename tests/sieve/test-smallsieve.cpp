@@ -147,9 +147,9 @@ template<> struct all_candidates_for_oddline<6> {
 /* For 2^(I-k) <= p < 2^(I-k+1), we have: 2^k >= 2^I/p > 2^(k-1), and
  *
  * so that the number of intervals of width p that fit within 2^I,
- * which is (2^(I-1))/p, is between:
+ * which is (2^I-1)/p, is between:
  *
- * 2^k > (2^(I-1))/p >= 2^(k-1)
+ * 2^k > (2^I-1)/p >= 2^(k-1)
  *
  * The number of hits (endpoints of the intervals) is thus <= 2^k.
  *

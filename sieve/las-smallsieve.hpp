@@ -69,19 +69,21 @@ public:
     /* Constructor for affine or projective case */
     ssp_t(fbprime_t _p, fbprime_t _r, unsigned char _logp, unsigned int skip, bool proj)
     {
-      if (proj || _p % 2 == 0) {
+      if (proj) {
         init_proj(_p, _r, _logp, skip);
-      } else if (_p == 3) {
-        (ssp_simple_t&)(*this) = ssp_simple_t(_p, _r, _logp, skip);
-        set_ordinary3();
       } else {
-        /* TODO: How to defer to the other constructor correctly? This
-         * here is bad
-         *
-         * (would it do to defer to the other ctor as a default, and then
-         * do this ? or would a move-ctor do the Right Thing ?)
-         * */
-        *this = ssp_t(_p, _r, _logp, skip);
+          /* TODO: How to defer to the other constructor correctly? This
+           * here is bad
+           *
+           * (would it do to defer to the other ctor as a default, and then
+           * do this ? or would a move-ctor do the Right Thing ?)
+           */
+          (ssp_simple_t&)(*this) = ssp_simple_t(_p, _r, _logp, skip);
+          if (_p % 2 == 0) {
+              set_pow2();
+          } else if (_p == 3) {
+              set_ordinary3();
+          }
       }
     }
 

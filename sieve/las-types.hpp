@@ -83,15 +83,6 @@ struct sieve_info {
            two iterators are to be small-sieved, the others are not. */
         size_t resieve_start_offset, resieve_end_offset;
 
-        struct {
-            int pow2[2];
-            int pow3[2];
-            int td[2];
-            int rs[2];
-            int rest[2];
-            int skipped[2];
-        } fb_parts_x[1];
-
         /* The reading, mapping or generating the factor base all create the
          * factor base in several pieces: small primes, and large primes split
          * into one piece for each thread.

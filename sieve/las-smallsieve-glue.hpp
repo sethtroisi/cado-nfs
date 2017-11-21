@@ -357,6 +357,8 @@ struct small_sieve : public small_sieve_base<tribool_const<is_fragment>> {/*{{{*
     typedef small_sieve_base<tribool_const<is_fragment>> super;
     std::vector<int> & positions;
     std::vector<ssp_simple_t> const& primes;
+    size_t sorted_limit;
+    std::list<size_t> sorted_subranges;
     std::vector<ssp_t> const& not_nice_primes;
     unsigned char * S;
     int nthreads;
@@ -381,9 +383,36 @@ struct small_sieve : public small_sieve_base<tribool_const<is_fragment>> {/*{{{*
             positions(positions),
             primes(primes), 
             not_nice_primes(not_nice_primes),
-            S(S), nthreads(nthreads) {}
+            S(S), nthreads(nthreads) {
+                auto s = begin(primes);
+                auto s0 = s;
+                auto e = end(primes);
+                for( ; e > s ; ) {
+                    if ((e-s) < 32) {
+                        /* we don't want to bother adding an extra
+                         * control loop for a small bunch of primes 
+                         */
+                        break;
+                    }
+                    int c;
+                    for(c = 1 ; c < (e-s) && !(s[c] < s[c-1]) ; c++);
+                    if (c <= 16)
+                        fprintf(stderr, "warning, the prime list looks really ugly\n");
+                    /*
+                    fprintf(stderr, "ssp entries [%zd..%zd[ (out of %zu) are sorted\n",
+                            s-s0, s+c-s0, primes.size());
+                            */
+                    sorted_subranges.push_back((s+c) - s0);
+                    s += c;
+                }
+                /*
+                fprintf(stderr, "ssp entries [%zd..%zd[ (tail) do not need to be sorted\n",
+                        s-s0, primes.size());
+                        */
+            }
 
     bool finished() const { return index == primes.size(); }
+    bool finished_sorted_prefix() const { return index == sorted_limit; }
 
     /* this one is instantiated outside the class */
     inline void after_region_adjust(spos_t & p_pos, spos_t pos, overrun_t<is_fragment> const & overrun, ssp_simple_t const & ssp) const;
@@ -631,8 +660,18 @@ struct small_sieve : public small_sieve_base<tribool_const<is_fragment>> {/*{{{*
             bool row0_even = (((j0&super::sublatm)+super::sublatj0) & 1) == 0;
             bool dj_row0_evenness = (super::sublatm & 1);
 
+            /* here, we can sieve for primes p < 2 * F() / 2^bits_off,
+             * (where F() is i1-i0 = 2^min(logI, logB)).
+             *
+             * meaning that the number of hits in a line is at least
+             * floor(F() / p) = 2^(bits_off-1)
+             *
+             * Furthermore, if p >= 2 * F() / 2^(bits_off+1), we can also
+             * say that the number of hits is at most 2^bits_off
+             */
+
 #ifdef HAVE_SSE2
-            for( ; index + 3 < primes.size() ; index+=4) {
+            for( ; index + 3 < sorted_limit ; index+=4) {
                 /* find 4 index values with no special prime */
                 ssp_simple_t const & ssp0(primes[index]);
                 spos_t & p_pos0(positions[index]);
@@ -733,7 +772,7 @@ struct small_sieve : public small_sieve_base<tribool_const<is_fragment>> {/*{{{*
             }
 #endif
 
-            for( ; index < primes.size() ; index++) {
+            for( ; index < sorted_limit ; index++) {
                 ssp_simple_t const & ssp(primes[index]);
                 spos_t & p_pos(positions[index]);
                 const fbprime_t p = ssp.get_p();
@@ -758,7 +797,7 @@ struct small_sieve : public small_sieve_base<tribool_const<is_fragment>> {/*{{{*
             void operator()(small_sieve<is_fragment> & SS, where_am_I &) {
                 /* default, should be at end of list. We require that we
                  * are done processing, at this point. */
-                ASSERT_ALWAYS(SS.finished());
+                ASSERT_ALWAYS(SS.finished_sorted_prefix());
             }
         };
 
@@ -816,10 +855,28 @@ struct small_sieve : public small_sieve_base<tribool_const<is_fragment>> {/*{{{*
     void pattern_sieve3(where_am_I &);
 
     void normal_sieve(where_am_I & w) {
-        /* This function will eventually call handle_nice_primes on
-         * sub-ranges of the set of small primes. */
-        typedef make_best_choice_list<12>::type choices;
-        small_sieve<is_fragment>::do_it<choices>()(*this, w);
+        for(size_t s : sorted_subranges) {
+            sorted_limit = s;
+            /* This function will eventually call handle_nice_primes on
+             * sub-ranges of the set of small primes. */
+            typedef make_best_choice_list<12>::type choices;
+            small_sieve<is_fragment>::do_it<choices>()(*this, w);
+        }
+
+        /* This is for the tail of the list. We typically have powers,
+         * here. These are ordinary, nice, simple prime powers, but the
+         * only catch is that these don't get resieved (because the prime
+         * itself was already divided out, either via trial division or
+         * earlier resieving. By handling them here, we benefit from the
+         * ssdpos table. */
+        for( ; index < primes.size() ; index++) {
+            ssp_simple_t const & ssp(primes[index]);
+            spos_t & p_pos(positions[index]);
+            WHERE_AM_I_UPDATE(w, p, ssp.get_p());
+            typedef assembly_generic_oldloop even_code;
+            typedef assembly_generic_oldloop odd_code;
+            handle_nice_prime<even_code, odd_code, 0>(ssp, p_pos, w);
+        }
     }
 
     void exceptional_sieve(where_am_I & w) {
@@ -828,14 +885,13 @@ struct small_sieve : public small_sieve_base<tribool_const<is_fragment>> {/*{{{*
          * available at hand. The only glitch is that we're storing the
          * start positions *only* for the primes in the ssps array. */
 
-        // typedef assembly_generic_oldloop even_code;
-        // typedef assembly_generic_oldloop odd_code;
 
         for(auto const & ssp : not_nice_primes) {
 #if 0
             spos_t & p_pos(positions[index]);
-            ASSERT(!ssp.is_nice());
             if (ssp.is_nice()) {
+                typedef assembly_generic_oldloop even_code;
+                typedef assembly_generic_oldloop odd_code;
                 handle_nice_prime<even_code, odd_code, 0>(ssp, p_pos, w);
             } else
 #endif
@@ -843,8 +899,12 @@ struct small_sieve : public small_sieve_base<tribool_const<is_fragment>> {/*{{{*
                 handle_projective_prime(ssp, w);
             } else if (ssp.is_pow2()) {
                 handle_power_of_2(ssp, w);
+            } else if (ssp.is_ordinary3()) {
+                /* p=3 is pattern-sieved, nothing to do */
+            } else {
+                /* I don't think we can end up here.  */
+                ASSERT_ALWAYS(0);
             }
-            /* p=3 is pattern-sieved */
         }
     }
 
