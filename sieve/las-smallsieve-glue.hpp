@@ -808,7 +808,7 @@ struct small_sieve : public small_sieve_base<tribool_const<is_fragment>> {/*{{{*
                      choice_list_car<E0,O0,b1,
                     T>>, bn>
         {
-            static_assert(b0 > b1);
+            static_assert(b0 > b1, "choice list is in wrong order");
             void operator()(small_sieve<is_fragment> & SS, where_am_I & w) {
                 /*
                 SS.handle_nice_primes<E0, O0, b1>(w);
@@ -819,7 +819,7 @@ struct small_sieve : public small_sieve_base<tribool_const<is_fragment>> {/*{{{*
         };
     template<typename E0, typename O0, int b0, int bn>
         struct is_compatible_for_range {
-            static_assert(bn > b0);
+            static_assert(bn > b0, "choice list is in wrong order");
             static const int value =
                 E0::template is_compatible<bn-1>::value && 
                 O0::template is_compatible<bn>::value && 
@@ -842,7 +842,7 @@ struct small_sieve : public small_sieve_base<tribool_const<is_fragment>> {/*{{{*
     template<typename E0, typename O0, int b0, typename T, int bn>
         struct do_it<choice_list_car<E0,O0,b0,T>, bn>
         {
-            static_assert(is_compatible_for_range<E0, O0, b0, bn>::value);
+            static_assert(is_compatible_for_range<E0, O0, b0, bn>::value, "Cannot use these two code fragments for primes of the current size");
             void operator()(small_sieve<is_fragment> & SS, where_am_I & w) {
                 SS.handle_nice_primes<E0, O0, b0>(w);
                 do_it<T, b0-1>()(SS, w);
