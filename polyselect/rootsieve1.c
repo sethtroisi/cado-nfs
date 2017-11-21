@@ -34,7 +34,10 @@
 // #define TRACE_V 7
 // #define TRACE_W 3
 
-#define GUARD_ALPHA 1.0
+/* The algorithm is very sensitive to GUARD_ALPHA: with GUARD_ALPHA=1.0,
+   almost 87% of the time is spent checking potential records.
+   With GUARD_ALPHA=0.5, only about 20% of the time is spent for that. */
+#define GUARD_ALPHA 0.5
 
 /* global variables */
 int verbose = 0;                /* verbosity level */
