@@ -251,7 +251,7 @@ sq_finds_relation(sq_with_fac const& sq_fac, const int sq_side,
   
   { // Print some info
     const unsigned long r = mpz_get_ui(doing.r);
-    verbose_output_print(0, VERBOSE_LEVEL, "# DUPECHECK Checking if relation (a,b) = (%" PRId64 ",%" PRIu64 ") is a dupe of sieving special-q -q0 %lu -rho %lu\n", rel.a, rel.b, sq, r);
+    verbose_output_print(0, VERBOSE_LEVEL, "# DUPECHECK Checking if relation (a,b) = (%" PRId64 ",%" PRIu64 ") is a dupe of sieving special-q -q0 %" PRIu64 " -rho %lu\n", rel.a, rel.b, sq, r);
     verbose_output_print(0, VERBOSE_LEVEL, "# DUPECHECK Using special-q basis a0=%" PRId64 "; b0=%" PRId64 "; a1=%" PRId64 "; b1=%" PRId64 "\n", si.qbasis.a0, si.qbasis.b0, si.qbasis.a1, si.qbasis.b1);
     if (oldI != I || oldJ != J)
       verbose_output_print(0, VERBOSE_LEVEL, "# DUPECHECK oldI = %u, I = %u, oldJ = %u, J = %u\n", oldI, I, oldJ, J);
