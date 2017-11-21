@@ -48,9 +48,10 @@ double tot_pols = 0;            /* number of sieved polynomial */
 long u0 = 0, v0 = 0, w0 = 0;    /* initial translation */
 int optimizeE = 0;              /* if not zero, optimize E instead of alpha */
 double guard_alpha = 0.0;       /* guard when -E */
-long mod = 1;                   /* consider class of u,v,w % mod */
+long mod = 0;                   /* consider class of u,v,w % mod, 0 = undef */
 double tot_alpha = 0;           /* sum of alpha's */
 int keep = 10;                  /* number of best classes kept */
+double effort = DBL_MAX;        /* total effort */
 
 typedef struct sieve_data {
   uint16_t q;
@@ -769,6 +770,92 @@ print_transformation (cado_poly_ptr poly0, cado_poly_srcptr poly)
   mpz_clear (k);
 }
 
+double
+rotate_area_v (cado_poly_srcptr poly0, double maxlognorm, long v)
+{
+  cado_poly poly;
+  double area;
+
+  cado_poly_init (poly);
+  cado_poly_set (poly, poly0);
+  rotate_aux (poly->pols[ALG_SIDE]->coeff, poly->pols[RAT_SIDE]->coeff[1],
+	      poly->pols[RAT_SIDE]->coeff[0], 0, v, 1);
+  rotation_space r;
+  expected_growth (&r, poly->pols[ALG_SIDE], poly->pols[RAT_SIDE], 0,
+                   maxlognorm, poly->skew);
+  area = r.kmax - r.kmin;
+  cado_poly_clear (poly);
+  return area;
+}
+
+/* estimate the rootsieve area for a given u */
+double
+rotate_area_u (cado_poly_srcptr poly0, double maxlognorm, long u)
+{
+  double area, sum = 0.0;
+  long h, vmin, vmax;
+  cado_poly poly;
+
+  cado_poly_init (poly);
+  cado_poly_set (poly, poly0);
+  rotate_aux (poly->pols[ALG_SIDE]->coeff, poly->pols[RAT_SIDE]->coeff[1],
+	      poly->pols[RAT_SIDE]->coeff[0], 0, u, 2);
+  rotation_space r;
+  expected_growth (&r, poly->pols[ALG_SIDE], poly->pols[RAT_SIDE], 1,
+                   maxlognorm, poly->skew);
+  vmin = (r.kmin < (double) LONG_MIN) ? LONG_MIN : r.kmin;
+  vmax = (r.kmax > (double) LONG_MAX) ? LONG_MAX : r.kmax;
+#define SAMPLE 100
+  if (vmax / SAMPLE - vmin / SAMPLE > 1)
+    h = vmax / SAMPLE - vmin / SAMPLE;
+  else
+    h = 1;
+
+  for (long v = vmin; v <= vmax; v += h)
+    {
+      area = rotate_area_v (poly, maxlognorm, v);
+      sum += area;
+    }
+  cado_poly_clear (poly);
+  return sum * h;
+}
+
+/* estimate the rootsieve area for umin <= u <= umax */
+double
+rotate_area (cado_poly_srcptr poly, double maxlognorm, long umin, long umax)
+{
+  double area, sum = 0.0;
+
+  for (long u = umin; u <= umax; u++)
+    {
+      area = rotate_area_u (poly, maxlognorm, u);
+      sum += area;
+    }
+  return sum;
+}
+
+/* Given a sieving area, a maximal effort, and a value of keep,
+   compute the best 'mod' value. */
+long
+best_mod (double area, double maxeffort, double keep)
+{
+  long l[] = {1, 2, 6, 12, 60, 420, 840, 2520, 27720, 360360, 720720, 12252240,
+              232792560, 5354228880, 26771144400, 80313433200, 2329089562800};
+  int i = 0;
+  double e;
+  do {
+    mod = l[i];
+    /* the number of polynomials sieved is approximately area/mod^2*keep */
+    e = area / (double) mod / (double) mod * (double) keep;
+    if (e <= maxeffort)
+      break;
+    i += 1;
+  }
+  while (i < 17);
+  printf ("using mod = %ld, effort = %.2e\n", mod, e);
+  return mod;
+}
+
 int
 main (int argc, char **argv)
 {
@@ -811,6 +898,12 @@ main (int argc, char **argv)
         else if (strcmp (argv[1], "-margin") == 0)
           {
             margin = atof (argv [2]);
+            argv += 2;
+            argc -= 2;
+          }
+        else if (strcmp (argv[1], "-effort") == 0)
+          {
+            effort = atof (argv [2]);
             argv += 2;
             argc -= 2;
           }
@@ -932,8 +1025,15 @@ main (int argc, char **argv)
     if (verbose)
       printf ("umin=%ld umax=%ld\n", umin, umax);
 
-    mpz_init (bestw);
+    if (mod == 0) /* compute best 'mod' for given effort */
+      {
+        double sieving_area = rotate_area (poly, maxlognorm, umin, umax);
+        /* print total sieving area */
+        printf ("sieving area %.2e\n", sieving_area);
+        mod = best_mod (sieving_area, effort, keep);
+      }
 
+    mpz_init (bestw);
     long u0 = 0; /* current translation in u */
     for (long u = umin; u <= umax; u++)
       {
