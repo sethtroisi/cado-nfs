@@ -37,6 +37,7 @@
     bool has_origin MAYBE_UNUSED = has_haxis && has_vaxis;              \
     do {} while (0)
 
+#ifdef HAVE_GCC_STYLE_AMD64_INLINE_ASM
 /* {{{ preprocessor macro to generate assembly code for the small sieve */
 /* {{{ Comments on the _OLDLOOP version (AF)
    0. The C code and the asm X86 code have the same algorithm.
@@ -344,6 +345,7 @@
 /*}}}*/
 /*}}}*/
 /* }}} */
+#endif
 
 /*{{{ function objects for all the routines that we have */
 #define BEGIN_FOBJ(name_, compatibility_condition)       		\
@@ -367,6 +369,7 @@
 #define END_FOBJ()							\
     return pi - S1;							\
 }}
+#ifdef HAVE_GCC_STYLE_AMD64_INLINE_ASM
 /* {{{ function objects for assembly code */
 BEGIN_FOBJ(assembly_generic_loop8, true);
 SMALLSIEVE_ASSEMBLY_NEW_LOOP8(pi, p_or_2p, S1, logp);
@@ -426,6 +429,7 @@ BEGIN_FOBJ(assembly6, b == 6);
 SMALLSIEVE_ASSEMBLY_NEW_32_TO_64(pi, p_or_2p, S1, logp);
 END_FOBJ();
 /* }}} */
+#endif
 /* {{{ Function objects for C code, manually unrolled except for the
  * _loop versions. */
 BEGIN_FOBJ(manual0, b <= 0);
