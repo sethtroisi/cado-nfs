@@ -357,8 +357,10 @@ sq_finds_relation(sq_with_fac const& sq_fac, const int sq_side,
  * This takes qmin and qmax into account.
  */
 static int
-sq_was_previously_sieved (const unsigned long sq, int side, sieve_info const & si){
-  if (mpz_cmp_ui (si.doing.p, sq) <= 0) /* we use <= and not < since this
+sq_was_previously_sieved (const uint64_t sq, int side, sieve_info const & si){
+  cxx_mpz Sq;
+  mpz_set_uint64(Sq, sq);
+  if (mpz_cmp(si.doing.p, Sq) <= 0) /* we use <= and not < since this
 					   function is also called with the
 					   current special-q */
     return 0;
@@ -372,10 +374,10 @@ sq_was_previously_sieved (const unsigned long sq, int side, sieve_info const & s
 //   - it destroys its argument along the way
 //   - it allocates the result it returns; the caller must free it.
 // Keep only products that fit in 64 bits.
-std::vector<sq_with_fac> *
+std::vector<sq_with_fac>
 all_multiples(std::vector<uint64_t> & prime_list) {
   if (prime_list.empty()) {
-    std::vector<sq_with_fac> * res = new std::vector<sq_with_fac>();
+    std::vector<sq_with_fac> res;
     return res;
   }
 
@@ -383,36 +385,28 @@ all_multiples(std::vector<uint64_t> & prime_list) {
   prime_list.pop_back();
 
   if (prime_list.empty()) {
-    std::vector<sq_with_fac> * res = new std::vector<sq_with_fac>();
-    std::vector<uint64_t> facq;
-    { 
-      struct sq_with_fac entry = { 1, facq };
-      res->push_back(entry);
-    }
-    facq.push_back(p);
-    { 
-      struct sq_with_fac entry = { p, facq };
-      res->push_back(entry);
-    }
+    std::vector<sq_with_fac> res;
+    res.push_back(sq_with_fac { 1, std::vector<uint64_t> () });
+    res.push_back(sq_with_fac { p, std::vector<uint64_t> (1, p) });
     return res;
   }
 
-  std::vector<sq_with_fac> * res = all_multiples(prime_list);
+  std::vector<sq_with_fac> res = all_multiples(prime_list);
 
-  size_t L = res->size();
+  size_t L = res.size();
   cxx_mpz pp;
   mpz_set_uint64(pp, p);
   for (size_t i = 0; i < L; ++i) {
     std::vector<uint64_t> facq;
-    facq = (*res)[i].facq;
+    facq = res[i].facq;
     facq.push_back(p);
 
     cxx_mpz prod;
-    mpz_mul_uint64(prod, pp, (*res)[i].q);
+    mpz_mul_uint64(prod, pp, res[i].q);
     if (mpz_fits_uint64_p(prod)) {
       uint64_t q = mpz_get_uint64(prod);
       struct sq_with_fac entry = {q, facq};
-      res->push_back(entry);
+      res.push_back(entry);
     }
   }
   return res;
@@ -460,16 +454,15 @@ relation_is_duplicate(relation const& rel, las_info const& las,
       // push it in the list of potential factors of sq
       prime_list.push_back(p);
     }
-    std::vector<sq_with_fac> * sq_list = all_multiples(prime_list);
+    std::vector<sq_with_fac> sq_list = all_multiples(prime_list);
 
     // Step 2: keep only those that have been sieved before current sq.
     std::vector<sq_with_fac> valid_sq;
-    for (auto const & sq : (*sq_list)) {
+    for (auto const & sq : sq_list) {
       if (sq_was_previously_sieved(sq.q, side, si)) {
         valid_sq.push_back(sq);
       }
     }
-    delete sq_list;
 
     // Step 3: emulate sieving for the valid sq, and check if they find
     // our relation.

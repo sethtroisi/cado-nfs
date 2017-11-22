@@ -993,9 +993,8 @@ void sieve_small_bucket_region(unsigned char *S, unsigned int N,
     int logI = si.conf.logI_adjusted;
     bool is_fragment = logI > LOG_BUCKET_REGION;
 
-    /* TODO: special-q, and 3 !!!! */
 #if 0
-            if (mpz_cmp_ui(si.qbasis.q, p) == 0) continue;
+            if (fbprime_t(mpz_get_ui(si.qbasis.q)) == p) continue;
 
             /* Don't sieve 3 again as it was pattern-sieved -- unless
              * it's projective, see TODO above. */
