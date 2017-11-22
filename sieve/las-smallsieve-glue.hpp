@@ -667,7 +667,7 @@ struct small_sieve : public small_sieve_base<tribool_const<is_fragment>> {/*{{{*
              * say that the number of hits is at most 2^bits_off
              */
 
-#ifdef HAVE_SSE2
+#ifdef HAVE_SSE41
             bool row0_even = (((j0&super::sublatm)+super::sublatj0) & 1) == 0;
             bool dj_row0_evenness = (super::sublatm & 1);
 
