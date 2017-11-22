@@ -201,7 +201,7 @@ int main(int argc, char *argv[])
 	    FILE * file_in;
 
 	    //get back the best strategies for r0!
-	    sprintf(name_file_in, "%s/strategies%lu_%d",
+	    snprintf(name_file_in, sizeof(name_file_in), "%s/strategies%lu_%d",
 		    directory_in, lim0, r0);
 	    file_in = fopen(name_file_in, "r");
 	    tabular_strategy_t *strat_r0 = tabular_strategy_fscan(file_in);
@@ -214,7 +214,7 @@ int main(int argc, char *argv[])
 	    fclose(file_in);
 
 	    //get back the best strategies for r1!
-	    sprintf(name_file_in, "%s/strategies%lu_%d",
+	    snprintf(name_file_in, sizeof(name_file_in), "%s/strategies%lu_%d",
 		    directory_in, lim1, r1);
 	    file_in = fopen(name_file_in, "r");
 	    tabular_strategy_t *strat_r1 = tabular_strategy_fscan(file_in);
@@ -232,7 +232,7 @@ int main(int argc, char *argv[])
 	    tabular_strategy_t *res =
 	      generate_strategy_r0_r1(strat_r0, strat_r1);
 	    //print
-	    sprintf(res_file, 
+	    snprintf(res_file, sizeof(res_file), 
 		    "%s/strategies_%d_%d", directory_out, r0, r1);
 	    FILE *file = fopen(res_file, "w");
 	    tabular_strategy_fprint(file, res);
@@ -263,7 +263,7 @@ int main(int argc, char *argv[])
 	    ASSERT_ALWAYS(data_rat);
 	    char name_file_in[strlen(directory_in) + 20];
 	    for (int r0 = 0; r0 <= mfb0; r0++) {
-		sprintf(name_file_in, "%s/strategies%lu_%d",
+		snprintf(name_file_in, sizeof(name_file_in), "%s/strategies%lu_%d",
 			directory_in, lim0, r0);
 		FILE *file_in = fopen(name_file_in, "r");
 		data_rat[r0] = tabular_strategy_fscan(file_in);
@@ -277,7 +277,7 @@ int main(int argc, char *argv[])
 	    }
 
 	    for (int r1 = 0; r1 <= mfb1; r1++) {
-		sprintf(name_file_in, "%s/strategies%lu_%d",
+		snprintf(name_file_in, sizeof(name_file_in), "%s/strategies%lu_%d",
 			directory_in, lim1, r1);
 		FILE *file_in = fopen(name_file_in, "r");
 		tabular_strategy_t *strat_r1 = tabular_strategy_fscan(file_in);
@@ -295,7 +295,7 @@ int main(int argc, char *argv[])
 		    tabular_strategy_t *res =
 			generate_strategy_r0_r1(data_rat[r0], strat_r1);
 		    //print
-		    sprintf(res_file,
+		    snprintf(res_file, sizeof(res_file),
 			    "%s/strategies_%d_%d", directory_out, r0, r1);
 	      FILE *file = fopen(res_file, "w");
 	      tabular_strategy_fprint(file, res);
@@ -412,7 +412,7 @@ int main(int argc, char *argv[])
 	      tabular_decomp_free(tab_decomp);
 
 	      char name_file[strlen (directory_out) + 50];
-	      sprintf(name_file, 
+	      snprintf(name_file, sizeof(name_file), 
 		      "%s/strategies%lu_%d", directory_out, lim0, r0);
 	      FILE *file_out = fopen(name_file, "w");
 	      if (file_out == NULL)
@@ -468,7 +468,7 @@ int main(int argc, char *argv[])
 	      char res_file[strlen(directory_out) + 20];
 	      for (int r0 = 0; r0 <= mfb0; r0++)
 		  for (int r1 = 0; r1 <= mfb1; r1++) {
-		      sprintf(res_file, "%s/strategies_%d_%d", directory_out,
+		      snprintf(res_file, sizeof(res_file), "%s/strategies_%d_%d", directory_out,
 			      r0, r1);
 		      FILE *file = fopen(res_file, "w");
 		      tabular_strategy_fprint(file, matrix[r0][r1]);

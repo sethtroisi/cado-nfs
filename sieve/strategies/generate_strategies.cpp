@@ -478,7 +478,7 @@ tabular_strategy_t ***generate_matrix(const char *name_directory_decomp,
 	tabular_decomp_t *tab_decomp = NULL;
 	if (r0 >= lim_is_prime) {
 	    char name_file[200];
-	    sprintf(name_file,
+	    snprintf(name_file, sizeof(name_file),
 		    "%s/decomp_%lu_%d", name_directory_decomp, lim0, r0);
 	    FILE *file = fopen(name_file, "r");
 
@@ -505,7 +505,7 @@ tabular_strategy_t ***generate_matrix(const char *name_directory_decomp,
 	tabular_decomp_t *tab_decomp = NULL;
 	if (r1 >= lim_is_prime) {
 	    char name_file[200];
-	    sprintf(name_file,
+	    snprintf(name_file, sizeof(name_file),
 		    "%s/decomp_%lu_%d", name_directory_decomp, lim1, r1);
 	    FILE *file = fopen(name_file, "r");
 
