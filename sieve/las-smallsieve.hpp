@@ -23,6 +23,7 @@
    ssp_t. */
 class ssp_simple_t {
 protected:
+    /* Equation for ordinary primes is (i-r*j) = 0 mod p */
     fbprime_t p;
     fbprime_t r;
     fbprime_t offset;
@@ -47,14 +48,10 @@ public:
 };
 
 class ssp_t : public ssp_simple_t {
-    /* ordinary primes. Equation is (i-r*j) = 0 mod p */
-    /* p may be a prime power, and even a power of two */
-    /* Note that we need three fields for the projective primes anyway,
-     * so we may have three here. Yet, admittedly the "offset" field is
-     * rather useless. (see ssp_init_oa.)  We can recompute it on the fly
-     * when needed.
-     */
-    unsigned char flags = 0;
+    /* use the remaining empty space in the struct so that we still have
+     * the same size */
+    uint8_t flags = 0;
+    uint16_t rootp = 0;
     /* forbid comparison of ssp_t -- makes little sense I believe, as
      * it's a mixed bag. */
     bool operator<(ssp_simple_t const&) const { return false; }
@@ -107,8 +104,10 @@ public:
     bool is_discarded_proj() const {return (flags & SSP_DISCARD_PROJ) != 0;}
     bool is_discarded() const {return is_discarded_proj() || is_discarded_sublat();}
     bool is_nice() const {return !is_pow2() && !is_proj() && !is_discarded();}
+    bool is_pow() const { return rootp != 0; }
 
-    void set_pow2() {flags |= SSP_POW2;}
+    void set_pow(unsigned int p) { rootp = p; }
+    void set_pow2() {flags |= SSP_POW2; rootp=2;}
     void set_ordinary3() {flags |= SSP_ORDINARY3;}
     void set_proj() {flags |= SSP_PROJ;}
     void set_discarded_sublat() {flags |= SSP_DISCARD_SUBLAT;}
@@ -119,6 +118,8 @@ private:
     void init_proj(fbprime_t p, fbprime_t r, unsigned char _logp,
                    unsigned int skip MAYBE_UNUSED);
 };
+
+static_assert(sizeof(ssp_simple_t) == sizeof(ssp_t), "struct padding has been tampered with");
 
 typedef struct {
     std::vector<ssp_simple_t> ssps;

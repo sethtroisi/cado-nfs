@@ -270,6 +270,9 @@ void small_sieve_init(small_sieve_data_t & ssd,
 
             ssp_t new_ssp(p, r_q, logp, skiprows, is_proj_in_ij);
 
+            if (p != pp)
+                new_ssp.set_pow(pp);
+
             /* pattern-sieved primes go to ssp */
             if (new_ssp.is_proj()) {
 #if 0
@@ -1140,7 +1143,7 @@ resieve_small_bucket_region (bucket_primes_t *BP, int N, unsigned char *S,
         ASSERT(ssp.is_pow2() || ssp.is_ordinary3() || ssp.is_proj());
 
         /* FIXME: I should not have to do this test */
-        if (ssp.is_pow2() || ssp.is_ordinary3()) continue;
+        if (ssp.is_pow() || ssp.is_ordinary3()) continue;
 
         /* TODO: it doesn't seem very smart to resieve projective primes
          */
