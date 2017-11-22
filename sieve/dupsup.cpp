@@ -181,7 +181,6 @@ main (int argc, char * argv[])
     int nb_threads = 1;
 
     cxx_param_list pl;
-    param_list_init(pl);
     declare_usage(pl);
     argv++,argc--;
 
@@ -226,7 +225,6 @@ main (int argc, char * argv[])
     ok = ok && param_list_parse_double(pl, "skew",    &(cpoly->skew));
     if (!ok) {
         fprintf(stderr, "Error: mandatory parameter missing.\n");
-	param_list_clear(pl);
         exit(EXIT_FAILURE);
     }
     param_list_parse_int(pl, "mt", &nb_threads);
@@ -301,8 +299,6 @@ main (int argc, char * argv[])
     cado_poly_clear(cpoly);
     mpz_clear(sq);
     mpz_clear(rho);
-    param_list_clear(pl);
-
 
     return 0;
 }

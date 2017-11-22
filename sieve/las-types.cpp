@@ -244,7 +244,6 @@ las_info::las_info(cxx_param_list & pl)
     if (nb_threads <= 0) {
 	fprintf(stderr,
 		"Error, please provide a positive number of threads\n");
-	param_list_clear(pl);
 	exit(EXIT_FAILURE);
     }
 
@@ -262,13 +261,11 @@ las_info::las_info(cxx_param_list & pl)
         fprintf(stderr, "Error: -poly is missing\n");
         param_list_print_usage(pl, NULL, stderr);
 	cado_poly_clear(cpoly);
-	param_list_clear(pl);
         exit(EXIT_FAILURE);
     }
     if (!cado_poly_read(cpoly, tmp)) {
 	fprintf(stderr, "Error reading polynomial file %s\n", tmp);
 	cado_poly_clear(cpoly);
-	param_list_clear(pl);
 	exit(EXIT_FAILURE);
     }
     // sc.skewness = cpoly->skew;
@@ -278,7 +275,6 @@ las_info::las_info(cxx_param_list & pl)
     if (cpoly->skew <= 0.0) {
 	fprintf(stderr, "Error, please provide a positive skewness\n");
 	cado_poly_clear(cpoly);
-	param_list_clear(pl);
 	exit(EXIT_FAILURE);
     }
     gmp_randinit_default(rstate);
@@ -322,7 +318,6 @@ las_info::las_info(cxx_param_list & pl)
             /* There's no point in proceeding, since it would really change
              * the behaviour of the program to do so */
             cado_poly_clear(cpoly);
-            param_list_clear(pl);
             exit(EXIT_FAILURE);
         }
     } else {
