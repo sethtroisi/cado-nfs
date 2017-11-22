@@ -1033,7 +1033,10 @@ main (int argc, char **argv)
         double sieving_area = rotate_area (poly, maxlognorm, umin, umax);
         /* print total sieving area */
         printf ("sieving area %.2e\n", sieving_area);
-        mod = best_mod (sieving_area, effort, keep);
+        /* since we keep 'keep' classes for each value of u,
+           we should divide by umax-umin+1 */
+        mod = best_mod (sieving_area / (double) (umax - umin + 1), effort,
+                        keep);
       }
 
     mpz_init (bestw);
