@@ -197,7 +197,7 @@ int main(int argc, char *argv[])
 
 	if (r0 != -1 && r1 != -1) {
 	    //just one couple will be studied!
-	    char name_file_in[strlen(directory_in) + 20];
+	    char name_file_in[strlen(directory_in) + 64];
 	    FILE * file_in;
 
 	    //get back the best strategies for r0!
@@ -261,7 +261,7 @@ int main(int argc, char *argv[])
 	    tabular_strategy_t **data_rat = (tabular_strategy_t**)
 		malloc(sizeof(*data_rat) * (mfb0 + 1));
 	    ASSERT_ALWAYS(data_rat);
-	    char name_file_in[strlen(directory_in) + 20];
+	    char name_file_in[strlen(directory_in) + 64];
 	    for (int r0 = 0; r0 <= mfb0; r0++) {
 		snprintf(name_file_in, sizeof(name_file_in), "%s/strategies%lu_%d",
 			directory_in, lim0, r0);
@@ -411,7 +411,7 @@ int main(int argc, char *argv[])
 
 	      tabular_decomp_free(tab_decomp);
 
-	      char name_file[strlen (directory_out) + 50];
+	      char name_file[strlen (directory_out) + 64];
 	      snprintf(name_file, sizeof(name_file), 
 		      "%s/strategies%lu_%d", directory_out, lim0, r0);
 	      FILE *file_out = fopen(name_file, "w");
@@ -465,7 +465,7 @@ int main(int argc, char *argv[])
 				  lim0, lpb0, mfb0,
 				  lim1, lpb1,mfb1);
 
-	      char res_file[strlen(directory_out) + 20];
+	      char res_file[strlen(directory_out) + 64];
 	      for (int r0 = 0; r0 <= mfb0; r0++)
 		  for (int r1 = 0; r1 <= mfb1; r1++) {
 		      snprintf(res_file, sizeof(res_file), "%s/strategies_%d_%d", directory_out,

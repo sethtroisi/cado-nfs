@@ -789,7 +789,7 @@ tabular_strategy_t ***generate_matrix_ileav(const char *name_directory_decomp,
 
     int lim = 2 * fbb0 - 1;
     for (int r0 = 0; r0 <= mfb0; r0++) {
-	char name_file_in[strlen(name_directory_str) + 20];
+	char name_file_in[strlen(name_directory_str) + 64];
 	FILE * file_in;
 	//get back the best strategies for r0!
 	snprintf(name_file_in, sizeof(name_file_in), "%s/strategies%lu_%d",
@@ -827,7 +827,7 @@ tabular_strategy_t ***generate_matrix_ileav(const char *name_directory_decomp,
 	    }
 	    fclose(file);
 	}
-	char name_file_in[strlen(name_directory_str) + 20];
+	char name_file_in[strlen(name_directory_str) + 64];
 	FILE * file_in;
 	//get back the best strategies for r0!
 	snprintf(name_file_in, sizeof(name_file_in), 

@@ -7,6 +7,8 @@
 # test-mode, that is only a few methods are generated, and the benchs
 # will be very unprecise.
 
+if [ "$CADO_DEBUG" ] ; then set -x ; fi
+
 if [ $# != 9 ]; then
     echo "usage: ./create_strat_file.sh <lim0> <lpb0> <mfb0> <lim1> <lpb1> <mfb1> <poly> <I> <cado_bindir>";
     exit;
