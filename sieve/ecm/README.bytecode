@@ -1,0 +1,53 @@
+bytecode = array of char = 8 bit lenght
+
+bc = b7, b6, ..., b0
+
+### control bytecode <==> b0 = 1
+
+00010000     beginning of a new NAF_block or dbchain_block
+00100000     beginning of a new dbexpansion_block
+00100001     beginning of a new dbexpansion_add_part, inside a dbexpansion_block
+00100010     beginning of a new dbexpansion_NAF_part, inside a dbexpansion_block
+00110000     beginning of a new PRAC_block
+
+11111111     end of computation
+
+
+### operation bytecode <==> b0 = 0
+
+Q = current point
+R[] = array of precomputed point (R[0] = P = starting point at the beginning of
+                                                                      the block)
+
+# inside NAF_block, dbchain_block and dbexpansion_NAF_part block:
+
+  xxxxx000     Q <- [2^n]Q
+                  n = b7...b3
+                  input=proj
+                  output=proj
+  xxxxx010     Q <- [3^n]Q
+                  n = b7...b3
+                  input=proj
+                  output=proj
+  xxxxx100     Q <- [2]Q +/- R[i]
+                  sign given by b3 (0=+, 1=-)
+                  i = b7..b4
+                  input Q=proj
+                  input R[i]⁼ext
+                  output=depend on next byte
+  xxxxx110     Q <- [3]Q +/- R[i]
+                  sign given by b3 (0=+, 1=-)
+                  i = b7..b4
+                  input Q=proj
+                  input R[i]⁼ext
+                  output=depend on next byte
+
+# inside dbexpansion_block (and outside dbexpansion_*_part)
+  xxxxxxx0     R[i] <- [3^n]Q and Q <- R[i]
+                  n = b7...b1
+                  i = position of the current byte from the start of the block
+
+# inside dbexpansion_add_part
+
+# inside PRAC_block
+  current implementation of bytecode
