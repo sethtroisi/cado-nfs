@@ -402,7 +402,9 @@ ellE_print (ellE_point_t P)
 {
   /* FIXME need multiple precision print */
   printf ("(%lu : %lu : %lu)\n", 
-	  mod_intget_ul(P->x), mod_intget_ul(P->y), mod_intget_ul(P->z));
+	  mod_intget_ul(P->x),
+	  mod_intget_ul(P->y),
+	  mod_intget_ul(P->z));
 }
 
 static inline void
@@ -410,7 +412,10 @@ ellEe_print (ellEe_point_t P)
 {
   /* FIXME need multiple precision print */
   printf ("(%lu : %lu : %lu : %lu)\n", 
-	  mod_intget_ul(P->x), mod_intget_ul(P->y), mod_intget_ul(P->t), mod_intget_ul(P->z));
+	  mod_intget_ul(P->x),
+	  mod_intget_ul(P->y),
+	  mod_intget_ul(P->t),
+	  mod_intget_ul(P->z));
 }
 
 /* 
