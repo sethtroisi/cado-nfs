@@ -1063,7 +1063,8 @@ ellE_interpret_bytecode (ellE_point_t P, const char *bc, const unsigned int bc_l
   ellE_init (Q, m);
   ellEe_init (Te, m);
 
-  q = bc[0];       /* 'q':  permet de remplacer les couilles en coquilles [PG, Oct. 2016] */
+  q = bc[0];       /* 'q':  permet de remplacer les couilles */
+		   /* en coquilles [PG, Oct. 2016] */
   ASSERT (q & 1);  /* q is odd */
 
   unsigned char rP_size = (q+1)/2;
