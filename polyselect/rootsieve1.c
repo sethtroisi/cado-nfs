@@ -239,6 +239,14 @@ insert_class (class *c, int n, int keep, double alpha, long v, long w,
   if (vmin + t > vmax)
     return n; /* no representative in [vmin,vmax] */
 
+  /* if alpha exceeds the best alpha value + guard_alpha, then it cannot
+     yield A[j] < best_alpha + guard_alpha in rotate_v(). Note that this
+     remains true after crt: if mod=mod1*mod2, and alpha1 > best_alpha1
+     + guard_alpha, then since alpha = alpha1 + alpha2, then
+     alpha > best_alpha1 + best_alpha2 + guard_alpha */
+  if (n > 0 && alpha > c[0].alpha + guard_alpha)
+    return n;
+
   for (i = n; i > 0 && alpha < c[i-1].alpha; i--)
     c[i] = c[i-1];
   /* now i = 0 or alpha >= c[i-1].alpha */
@@ -349,7 +357,7 @@ best_classes (cado_poly poly0, long mod, int keep, long vmin, long vmax,
       Q *= q;
     }
 
-  /* if u = -u0, add the class of the initial polynomial (-v0,-w0) if not in */
+  /* if u = -u0, check the class of the initial polynomial (-v0,-w0) */
   if (u == -u0)
     {
       int included = -1;
@@ -361,22 +369,15 @@ best_classes (cado_poly poly0, long mod, int keep, long vmin, long vmax,
                 included, c[included].alpha);
       else
         {
-          printf ("class of initial polynomial is not included");
-          if (*nc > 0)
-            printf (" (last %.2f)\n", c[*nc - 1].alpha);
-          else
-            printf ("\n");
-        }
-      if (included == -1)
-        {
           double alpha = 0;
           for (int j = 0; j < nfactors; j++)
             alpha += average_alpha (poly, get_mod (-v0, factors[j]),
                                     get_mod (-w0, factors[j]), factors[j]);
-          if (*nc == keep)
-            (*nc) --; /* remove the last class */
-          *nc = insert_class (c, *nc, keep, alpha, get_mod (-v0, mod),
-                              get_mod (-w0, mod), vmin, vmax, mod);
+          printf ("class of initial polynomial is not included");
+          if (*nc > 0)
+            printf (" (last %.2f wrt %.2f)\n", c[*nc - 1].alpha, alpha);
+          else
+            printf (" (%.2f)\n", alpha);
         }
     }
 
@@ -690,7 +691,7 @@ rotate (cado_poly poly, long B, double maxlognorm, double Bf, double Bg,
   int n;
   c = best_classes (poly, mod, keep, vmin, vmax, &n, u);
   ASSERT_ALWAYS (n <= keep);
-  printf ("u=%ld: kept %d classes", u, n);
+  printf ("u=%ld: kept %d class(es)", u, n);
   if (n == 0)
     printf ("\n");
   else
