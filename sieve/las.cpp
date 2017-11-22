@@ -1718,18 +1718,28 @@ void factor_survivors_data::cofactoring (timetree_t & timer)
              * an unsigned long, then the duplicate check will
              * quickly return "no".
              */
-            int is_dup = do_check
-                && relation_is_duplicate(rel, las, si);
-            const char *comment = is_dup ? "# DUPE " : "";
+
+            const char * dup_comment = NULL;
+
+            if (!already_printed_for_q.insert(abpair_t(a,b)).second) {
+                /* can't insert, so already there: either it's a
+                 * duplicate of a relation that was already printed, or a
+                 * relation that was already identified as a duplicate.
+                 * But at any rate it's not to be printed and we don't
+                 * even want to bother testing whether it's a duplicate
+                 * in the sense of relation_is_duplicate()
+                 */
+                dup_comment = "# DUP ";
+            } else if (do_check && relation_is_duplicate(rel, las, si)) {
+                dup_comment = "# DUPE ";
+            }
+
             FILE *output;
             verbose_output_start_batch();   /* lock I/O */
 
-            if (!is_dup && !already_printed_for_q.insert(abpair_t(a,b)).second) {
-                is_dup = 1;
-                comment = "# DUP ";
-            }
-            if (!is_dup)
-                cpt++;
+            cpt += !dup_comment;
+
+            if (!dup_comment) dup_comment = "";
 
             if (prepend_relation_time) {
                 verbose_output_print(0, 1, "(%1.4f) ", seconds() - tt_qstart);
@@ -1739,12 +1749,12 @@ void factor_survivors_data::cofactoring (timetree_t & timer)
             for (size_t i_output = 0;
                     (output = verbose_output_get(0, 0, i_output)) != NULL;
                     i_output++) {
-                rel.print(output, comment);
+                rel.print(output, dup_comment);
                 // once filtering is ok for all Galois cases, 
                 // this entire block would have to disappear
                 if(las.galois != NULL)
                     // adding relations on the fly in Galois cases
-                    add_relations_with_galois(las.galois, output, comment,
+                    add_relations_with_galois(las.galois, output, dup_comment,
                             &cpt, rel);
             }
             verbose_output_end_batch();     /* unlock I/O */
