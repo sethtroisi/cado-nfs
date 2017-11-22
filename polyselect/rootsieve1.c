@@ -848,7 +848,10 @@ best_mod (double area, double maxeffort, double keep)
   double e;
   do {
     mod = l[i];
-    /* the number of polynomials sieved is approximately area/mod^2*keep */
+    /* The number of polynomials sieved is approximately area/mod^2*keep.
+       Note: there is a bias when vmax-vmin is smaller than mod, since we
+       only keep classes that contain at least an element in [vmin, vmax],
+       thus the probability is larger than (vmax-vmin)/mod. */
     e = area / (double) mod / (double) mod * (double) keep;
     if (e <= maxeffort)
       break;
@@ -1033,10 +1036,7 @@ main (int argc, char **argv)
         double sieving_area = rotate_area (poly, maxlognorm, umin, umax);
         /* print total sieving area */
         printf ("sieving area %.2e\n", sieving_area);
-        /* since we keep 'keep' classes for each value of u,
-           we should divide by umax-umin+1 */
-        mod = best_mod (sieving_area / (double) (umax - umin + 1), effort,
-                        keep);
+        mod = best_mod (sieving_area, effort, keep);
       }
 
     mpz_init (bestw);
