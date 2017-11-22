@@ -781,7 +781,7 @@ renumber_is_additional_column (renumber_srcptr tab, index_t h)
  * /!\ This function assumes that the string out has enough space.
  */
 size_t
-renumber_write_buffer_p (char *out, renumber_ptr tab, unsigned long p,
+renumber_write_buffer_p (char *out, size_t size, renumber_ptr tab, unsigned long p,
                          unsigned long roots[][MAX_DEGREE], int nroots[])
 {
   size_t n = 0;
@@ -799,33 +799,33 @@ renumber_write_buffer_p (char *out, renumber_ptr tab, unsigned long p,
   {
     roots[0][0] = vp;
     for (int i = 0; i < nroots[0]; i++)
-      n += sprintf (out + n, "%lx\n", roots[0][i]);
+      n += snprintf (out + n, size - n, "%lx\n", roots[0][i]);
   }
   /* Two polys: alg and rat */
   else if (tab->nb_polys == 2 && tab->rat != -1)
   {
     int algside = 1-tab->rat;
     if (LIKELY(nroots[tab->rat])) /* There is at most 1 rational root. */
-      n = sprintf (out, "%" PRpr "\n", vp);
+      n += snprintf (out + n, size - n, "%" PRpr "\n", vp);
     else
       roots[algside][0] = vp; /* No rational root */
     for (int i = 0; i < nroots[algside]; i++)
-      n += sprintf (out + n, "%lx\n", roots[algside][i]);
+      n += snprintf (out + n, size - n, "%lx\n", roots[algside][i]);
   }
   /* Two alg polys */
   else if (tab->nb_polys == 2 && tab->rat == -1)
   {
     if (LIKELY (nroots[1]))
     {
-      n = sprintf (out, "%" PRpr "\n", vp);
+      n += snprintf (out + n, size - n, "%" PRpr "\n", vp);
       for (int i = 1; i < nroots[1]; i++)
-        n += sprintf (out + n, "%lx\n", roots[1][i] + p + 1);
+        n += snprintf (out + n, size - n, "%lx\n", roots[1][i] + p + 1);
     }
     else
       roots[0][0] = vp;
 
     for (int i = 0; i < nroots[0]; i++)
-      n += sprintf (out + n, "%lx\n", roots[0][i]);
+      n += snprintf (out + n, size - n, "%lx\n", roots[0][i]);
   }
   /* More than two polys (with or without rat side). */
   else
@@ -833,7 +833,7 @@ renumber_write_buffer_p (char *out, renumber_ptr tab, unsigned long p,
     if (tab->rat == -1 || nroots[tab->rat] == 0) /* The largest root becomes vp */
       replace_first = 1;
     else
-      n = sprintf (out, "%" PRpr "\n", vp);
+      n += snprintf(out + n, size - n, "%" PRpr "\n", vp);
 
     for (int i = tab->nb_polys - 1; i >= 0; i--)
     {
@@ -843,18 +843,19 @@ renumber_write_buffer_p (char *out, renumber_ptr tab, unsigned long p,
         {
           if (UNLIKELY(replace_first))
           {
-            n = sprintf (out, "%" PRpr "\n", vp);
+            n += snprintf(out + n, size - n, "%" PRpr "\n", vp);
             replace_first = 0;
           }
           else
           {
             p_r_values_t vr = compute_vr_from_p_r (tab, p, roots[i][j], i);
-            n += sprintf (out + n, "%" PRpr "\n", vr);
+            n += snprintf(out + n, size - n, "%" PRpr "\n", vr);
           }
         }
       }
     }
   }
+  ASSERT_ALWAYS(n < size);
   return n;
 }
 
@@ -865,7 +866,7 @@ renumber_write_p (renumber_ptr tab, unsigned long p,
   size_t size_buffer;
   char buffer[2048];
 
-  size_buffer = renumber_write_buffer_p (buffer, tab, p, r, k);
+  size_buffer = renumber_write_buffer_p (buffer, sizeof(buffer), tab, p, r, k);
 
   fwrite ((void *) buffer, size_buffer, 1, tab->file);
   for (unsigned int i = 0; i < tab->nb_polys; i++)
