@@ -270,15 +270,26 @@ void small_sieve_init(small_sieve_data_t & ssd,
 
             ssp_t new_ssp(p, r_q, logp, skiprows, is_proj_in_ij);
 
-            /* FIXME: what should we do with 3, given that it is pattern-sieved?
-             */
-
-            /* don't push projective primes that never hit. */
+            /* pattern-sieved primes go to ssp */
             if (new_ssp.is_proj()) {
+#if 0
                 if (new_ssp.get_g() >= si.J) {
-                    /* ... unless the number of lines to skip is >= J */
-                    /* FIXME: we lose hits to (+-1,0) this way (the two locations
-                       are equal up to sign, but we should sieve one of them!) */
+                    /* some projective primes never hit (number of lines
+                     * to skip is >= J). We're tempted to remove them,
+                     * but:
+                     *  - we lose hits to (+-1,0) this way (the two
+                     *    locations are equal up to sign, but we should
+                     *    sieve one of them!) -- see bug 21505.
+                     *  - the cost of having them in he list is
+                     *    ridiculously small anyway.
+                     *
+                     * this being said, we should probably deal with
+                     * projective primes a bit differently, because the
+                     * arithmetic constraints we're imposing on the pos
+                     * fields are different from what we have in the
+                     * normal case (see the computation of gI), and it
+                     * isn't neat.
+                     */
                     if (verbose) {
                         verbose_output_print(0, 1,
                                 "# small_sieve_init: not adding projective prime"
@@ -288,6 +299,7 @@ void small_sieve_init(small_sieve_data_t & ssd,
                     }
                     continue;
                 }
+#endif
                 /* projective primes of all sorts go to ssp anyway */
                 ssd.ssp.push_back(new_ssp);
             } else if (new_ssp.is_ordinary3() || new_ssp.is_pow2()) {
