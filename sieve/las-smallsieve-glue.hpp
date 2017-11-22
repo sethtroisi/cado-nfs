@@ -30,7 +30,7 @@ template<> struct make_best_choice_list<-1> {
 #if 1
 /* The selection below is really scrapping everything we've done to
  * design a code path by bits and pieces, and strives to use almost a
- * one-size-fits-all approach (which admittedly also has its advantages.
+ * one-size-fits-all approach (which admittedly also has its advantages).
  *
  * currently it does seem to be the case that this one-size-fits-all
  * choice wins over the tailored-fit choice above (at least on my
@@ -873,8 +873,8 @@ struct small_sieve : public small_sieve_base<tribool_const<is_fragment>> {/*{{{*
             ssp_simple_t const & ssp(primes[index]);
             spos_t & p_pos(positions[index]);
             WHERE_AM_I_UPDATE(w, p, ssp.get_p());
-            typedef assembly_generic_oldloop even_code;
-            typedef assembly_generic_oldloop odd_code;
+            typedef default_smallsieve_inner_loop even_code;
+            typedef default_smallsieve_inner_loop odd_code;
             handle_nice_prime<even_code, odd_code, 0>(ssp, p_pos, w);
         }
     }

@@ -553,12 +553,14 @@ template<> struct best_oddline<12> { typedef assembly_generic_loop12 type; };
 template<> struct best_oddline<13> { typedef assembly_generic_loop16p0 type; };
 template<> struct best_oddline<14> { typedef assembly_generic_loop16p1 type; };
 template<> struct best_oddline<15> { typedef assembly_generic_loop16p0 type; };
+typedef assembly_generic_oldloop default_smallsieve_inner_loop;
 #endif
 /* TODO: we could perhaps provide hints so that the generated code can
  * merge some rounds of the loop. Or maybe the compiler will do that ? */
 #else
 template<int bit> struct best_evenline { typedef manual_oldloop type; };
 template<int bit> struct best_oddline  { typedef manual_oldloop type; };
+typedef manual_oldloop default_smallsieve_inner_loop;
 #endif
 /* }}} */
 
