@@ -894,7 +894,11 @@ renumber_get_first_index_from_p(renumber_srcptr renumber_info,
     if (UNLIKELY(tab[i] != vp))
     {
       /* There is a problem, most probably p is not prime. */
-      fprintf(stderr, "Fatal error in %s at %s:%d\nError with the cached part of"
+      if (ulong_isprime (p) == 0)
+        fprintf (stderr, "Error, found composite 0x%" PRpr " in relation\n",
+                 p);
+      else
+        fprintf (stderr, "Fatal error in %s at %s:%d\nError with the cached part of"
               " the renumbering table\n  p = 0x%" PRpr "\n  vp = 0x%" PRpr "\n"
               "  i = cached[p] = 0x%" PRid "\n  tab[i] = 0x%" PRpr "\n",
               __func__, __FILE__, __LINE__, p, vp, i, tab[i]);

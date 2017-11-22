@@ -1262,6 +1262,15 @@ mpz_poly_mul_si (mpz_poly_ptr f, mpz_poly_srcptr g, long k)
     mpz_mul_si (f->coeff[i], g->coeff[i], k);
 }
 
+/* Set f = g / k such that deg(g) <= deg(f) and k divides g
+   (those assumptions are not checked). */
+void
+mpz_poly_divexact_ui (mpz_poly_ptr f, mpz_poly_srcptr g, unsigned long k)
+{
+  for (int i = 0; i <= g->deg; i++)
+    mpz_divexact_ui (f->coeff[i], g->coeff[i], k);
+}
+
 /* Set h = fr + k * x^t * g such that t+deg(g) <= deg(f) and t >= 0 (those two
  * assumptions are not checked). fr and f can be the same poly */
 void mpz_poly_rotation_int64 (mpz_poly_ptr fr, mpz_poly_srcptr f,

@@ -538,6 +538,11 @@ lognorm_smart::lognorm_smart(siever_config const & sc, cado_poly_srcptr cpoly, i
     }
 }/*}}}*/
 
+static inline double compute_y(double G, double offset, double modscale) {
+    double res = lg2 ((G) + 1., offset, modscale);
+    return res;
+}
+
 /* {{{ void lognorm_fill_rat_smart. */
 /* Initialize lognorms of the bucket region S[] number N, for F(i,j) with
  * degree = 1.
@@ -562,7 +567,8 @@ void lognorm_fill_rat_smart_inner (unsigned char *S, int i0, int i1, unsigned in
      * and != 0.  So, I add 1.0 on all G values.  It's not useful to do a
      * fabs(G) here because the code uses always COMPUTE_Y(G) with G >= 0.
      */
-#define COMPUTE_Y(G) lg2 ((G) + 1., offset, modscale)
+// #define COMPUTE_Y(G) lg2 ((G) + 1., offset, modscale)
+#define COMPUTE_Y(G) compute_y(G, offset, modscale)
     /* COMPUTE_Y(z) returns GUARD + L(z) * scale. Recall that
      * we have 0 <= log2(z) - L(z) < 0.0861, for any real z > 0.
      */

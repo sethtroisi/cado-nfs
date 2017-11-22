@@ -73,8 +73,11 @@ def run(param_file, problem):
 
     las_params["lim0"] = min(las_params["lim0"], 2 ** las_params["lpb0"])
     las_params["lim1"] = min(las_params["lim1"], 2 ** las_params["lpb1"])
-    
-    to_print = ["I", "lim1", "lpb1", "mfb1", "lim0", "lpb0", "mfb0", "ncurves0", "ncurves1", "qmin", "bkthresh1"]
+
+    # please keep the same order of parameters as in the add_param() calls in
+    # las_decl_template.py
+    to_print = ["I", "qmin", "bkthresh1", "lim0", "lim1", "lpb0", "lpb1", "mfb0", "mfb1", "ncurves0", "ncurves1"]
+
     sys.stderr.write("Using parameters %s\n" % " ".join(["%s:%s" % (key, las_params[key]) for key in to_print]))
 
     ### Call makefb on all algebraic polynomials
@@ -98,7 +101,6 @@ def run(param_file, problem):
 
     stats = LasStats()
     q0 = las_params["qmin"]
-    q_range = 1000
     q_inc = 0
     # since we remove duplicates, 80% of the total ideals should be enough
     rels_wanted = int(0.8 * primepi(las_params["lpb1"]) + 0.8 * primepi(las_params["lpb0"]))
@@ -110,11 +112,13 @@ def run(param_file, problem):
        sys.stderr.write("Estimate %u relations needed, best time so far is %.0f seconds\n" % (rels_wanted, best_time))
 
     while stats.get_rels() < rels_wanted:
-        # Set q0, q1
+        # Set q0
         outputfile = "las.%d.out" % q0
-        las_params.update({"q0": q0, "q1": q0 + q_range, "out": outputfile})
+        # we prefer -nq 100 to -q1, since with -q1 we might get less precise
+        # timings when the number of special-q's is small
+        las_params.update({"q0": q0, "nq": 100, "out": outputfile})
 
-        las_cmd_line = [las, "-allow-largesq", "-never-discard", "-dup", "-dup-qmin"]
+        las_cmd_line = [las, "-allow-largesq", "-dup", "-dup-qmin"]
         if sqside == 0:
             las_cmd_line += ["%s,0" % str(las_params["qmin"])]
         else:
@@ -143,7 +147,7 @@ def run(param_file, problem):
         if cur_time > best_time and cur_rels < rels_wanted:
            break
 
-        # set q_inc so that we do about 10 sieving tests of length q_range
+        # set q_inc so that we do about 10 sieving tests
         if q_inc == 0:
            v = stats.relations_int.lastvalue[0]
            q_inc = int(rels_wanted / (10.0 * v))
