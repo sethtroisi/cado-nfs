@@ -48,8 +48,12 @@ struct {
 /* we create lists of functions, because from all these tidbits we need
  * to generate the more complete sieving functions below.
  */
-
 struct all_generic_candidates {
+    typedef
+            list_car<manual_oldloop,
+            list_car<manual_oldloop_nounroll,
+            list_nil>> type0;
+#ifdef HAVE_GCC_STYLE_AMD64_INLINE_ASM
     typedef list_car<assembly_generic_loop8,
             list_car<assembly_generic_loop12,
             list_car<assembly_generic_loop16,
@@ -61,9 +65,10 @@ struct all_generic_candidates {
             list_car<assembly_generic_loop16p1,
             list_car<assembly_generic_loop12p2,
             list_car<assembly_generic_oldloop,
-            list_car<manual_oldloop,
-            list_car<manual_oldloop_nounroll,
-            list_nil>>> >>> >>> >>> > type;
+            type0> >>> >>> >>> > type;
+#else
+    typedef type0 type;
+#endif
 };
 
 template<int bit> struct all_candidates_for_evenline {
@@ -73,75 +78,124 @@ template<int bit> struct all_candidates_for_oddline {
     typedef all_generic_candidates::type type;
 };
 template<> struct all_candidates_for_evenline<0> {
-    typedef list_car<assembly0,
-            list_car<manual0,
-            all_generic_candidates::type>> type;
+    typedef list_car<manual0, all_generic_candidates::type> type0;
+#ifdef HAVE_GCC_STYLE_AMD64_INLINE_ASM
+    typedef list_car<assembly0, type0> type;
+#else
+    typedef type0 type;
+#endif
 };
 template<> struct all_candidates_for_evenline<1> {
-    typedef list_car<assembly0,
-            list_car<manual0,
-            all_generic_candidates::type>> type;
+    typedef list_car<manual0, all_generic_candidates::type> type0;
+#ifdef HAVE_GCC_STYLE_AMD64_INLINE_ASM
+    typedef list_car<assembly0, type0> type;
+#else
+    typedef type0 type;
+#endif
 };
 template<> struct all_candidates_for_evenline<2> {
-    typedef list_car<assembly1,
-            list_car<manual1,
-            all_generic_candidates::type>> type;
+    typedef list_car<manual1, all_generic_candidates::type> type0;
+#ifdef HAVE_GCC_STYLE_AMD64_INLINE_ASM
+    typedef list_car<assembly1, type0> type;
+#else
+    typedef type0 type;
+#endif
 };
 template<> struct all_candidates_for_evenline<3> {
-    typedef list_car<assembly2,
-            list_car<manual2,
-            all_generic_candidates::type>> type;
+    typedef list_car<manual2, all_generic_candidates::type> type0;
+#ifdef HAVE_GCC_STYLE_AMD64_INLINE_ASM
+    typedef list_car<assembly2, type0> type;
+#else
+    typedef type0 type;
+#endif
 };
 template<> struct all_candidates_for_evenline<4> {
-    typedef list_car<assembly3,
-            list_car<manual3,
-            all_generic_candidates::type>> type;
+    typedef list_car<manual3, all_generic_candidates::type> type0;
+#ifdef HAVE_GCC_STYLE_AMD64_INLINE_ASM
+    typedef list_car<assembly3, type0> type;
+#else
+    typedef type0 type;
+#endif
 };
 template<> struct all_candidates_for_evenline<5> {
-    typedef list_car<assembly4,
-            list_car<manual4,
-            all_generic_candidates::type>> type;
+    typedef list_car<manual4, all_generic_candidates::type> type0;
+#ifdef HAVE_GCC_STYLE_AMD64_INLINE_ASM
+    typedef list_car<assembly4, type0> type;
+#else
+    typedef type0 type;
+#endif
 };
 template<> struct all_candidates_for_evenline<6> {
-    typedef list_car<assembly5,
-            all_generic_candidates::type> type;
+    typedef all_generic_candidates::type type0;
+#ifdef HAVE_GCC_STYLE_AMD64_INLINE_ASM
+    typedef list_car<assembly5, type0> type;
+#else
+    typedef type0 type;
+#endif
 };
 template<> struct all_candidates_for_evenline<7> {
-    typedef list_car<assembly6,
-            all_generic_candidates::type> type;
+    typedef all_generic_candidates::type type0;
+#ifdef HAVE_GCC_STYLE_AMD64_INLINE_ASM
+    typedef list_car<assembly6, type0> type;
+#else
+    typedef type0 type;
+#endif
 };
 template<> struct all_candidates_for_oddline<0> {
-    typedef list_car<assembly0,
-            list_car<manual0,
-            all_generic_candidates::type>> type;
+    typedef list_car<manual0, all_generic_candidates::type> type0;
+#ifdef HAVE_GCC_STYLE_AMD64_INLINE_ASM
+    typedef list_car<assembly0, type0> type;
+#else
+    typedef type0 type;
+#endif
 };
 template<> struct all_candidates_for_oddline<1> {
-    typedef list_car<assembly1,
-            list_car<manual1,
-            all_generic_candidates::type>> type;
+    typedef list_car<manual1, all_generic_candidates::type> type0;
+#ifdef HAVE_GCC_STYLE_AMD64_INLINE_ASM
+    typedef list_car<assembly1, type0> type;
+#else
+    typedef type0 type;
+#endif
 };
 template<> struct all_candidates_for_oddline<2> {
-    typedef list_car<assembly2,
-            list_car<manual2,
-            all_generic_candidates::type>> type;
+    typedef list_car<manual2, all_generic_candidates::type> type0;
+#ifdef HAVE_GCC_STYLE_AMD64_INLINE_ASM
+    typedef list_car<assembly2, type0> type;
+#else
+    typedef type0 type;
+#endif
 };
 template<> struct all_candidates_for_oddline<3> {
-    typedef list_car<assembly3,
-            list_car<manual3,
-            all_generic_candidates::type>> type;
+    typedef list_car<manual3, all_generic_candidates::type> type0;
+#ifdef HAVE_GCC_STYLE_AMD64_INLINE_ASM
+    typedef list_car<assembly3, type0> type;
+#else
+    typedef type0 type;
+#endif
 };
 template<> struct all_candidates_for_oddline<4> {
-    typedef list_car<assembly4,
-            list_car<manual4,
-            all_generic_candidates::type>> type;
+    typedef list_car<manual4, all_generic_candidates::type> type0;
+#ifdef HAVE_GCC_STYLE_AMD64_INLINE_ASM
+    typedef list_car<assembly4, type0> type;
+#else
+    typedef type0 type;
+#endif
 };
 template<> struct all_candidates_for_oddline<5> {
-    typedef list_car<assembly5,
-            all_generic_candidates::type> type;
+    typedef all_generic_candidates::type type0;
+#ifdef HAVE_GCC_STYLE_AMD64_INLINE_ASM
+    typedef list_car<assembly5, type0> type;
+#else
+    typedef type0 type;
+#endif
 };
 template<> struct all_candidates_for_oddline<6> {
-    typedef list_car<assembly6,
-            all_generic_candidates::type> type;
+    typedef all_generic_candidates::type type0;
+#ifdef HAVE_GCC_STYLE_AMD64_INLINE_ASM
+    typedef list_car<assembly6, type0> type;
+#else
+    typedef type0 type;
+#endif
 };
 
 /* For 2^(I-k) <= p < 2^(I-k+1), we have: 2^k >= 2^I/p > 2^(k-1), and
