@@ -210,16 +210,22 @@ void sieve_info::init_fb_smallsieved(int side)
             abort();
         }
     }
-    /* Concatenate the 6 vectors into one, and store the beginning and ending
-       index of each part in fb_parts_x */
-    auto s = std::make_shared<std::vector<fb_general_entry>>();
+
+    /* put the resieved primes first. */
+    auto s = std::make_shared<std::vector<fb_general_entry>>(pieces[RS]);
+    si.sides[side].resieve_start_offset = 0;
+    si.sides[side].resieve_end_offset = s->size();
+
+    /* now the rest. The small_sieve ctor will filter out the exceptional
+     * cases (proj, powers, pattern sieve, etc), and sort the remaining
+     * primes (which may or may not be already sorted, depending on the
+     * shape of the polynomial -- we're getting them as per the slice
+     * ordering, which may be a bit messy).
+     */
     for (int i = 0; i < 6; i++) {
         if (i == RS)
-            si.sides[side].resieve_start_offset = s->size();
-        std::sort(pieces[i].begin(), pieces[i].end());
+            continue;
         s->insert(s->end(), pieces[i].begin(), pieces[i].end());
-        if (i == RS)
-            si.sides[side].resieve_end_offset = s->size();
     }
     si.sides[side].fb_smallsieved = s;
 }

@@ -299,6 +299,8 @@ void small_sieve_init(small_sieve_data_t & ssd,
             }
         }
     }
+    /* Now init_fb_smallsieved puts the resieved primes first anyway */
+    ASSERT_ALWAYS(resieve_start == fb_start);
     if (resieve_start == fb_end) {
         ASSERT_ALWAYS(!saw_resieve_end);
         saw_resieve_start = true;
@@ -310,6 +312,10 @@ void small_sieve_init(small_sieve_data_t & ssd,
         ssd.resieve_end_offset = ssd.ssps.size();
     }
     ASSERT_ALWAYS(saw_resieve_start && saw_resieve_end);
+
+    /* arrange so that the small_sieve() ctor is happy */
+    std::sort(ssd.ssps.begin(), ssd.ssps.begin() + ssd.resieve_end_offset);
+    std::sort(ssd.ssps.begin() + ssd.resieve_end_offset, ssd.ssps.end());
 }
 /* }}} */
 
