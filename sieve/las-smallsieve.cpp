@@ -1048,7 +1048,7 @@ void sieve_small_bucket_region(unsigned char *S, int N,
             const fbprime_t p = ssp.get_p();
             const fbprime_t r = ssp.get_r();
 
-            if (mpz_cmp_ui(si.qbasis.q, p) == 0) continue;
+            if (fbprime_t(mpz_get_ui(si.qbasis.q)) == p) continue;
 
             /* Don't sieve 3 again as it was pattern-sieved -- unless
              * it's projective, see TODO above. */
@@ -1382,7 +1382,7 @@ resieve_small_bucket_region (bucket_primes_t *BP, int N, unsigned char *S,
             if (ssp.is_discarded())
                 continue;
             const fbprime_t p = ssp.get_p();
-            if (mpz_cmp_ui(si.qbasis.q, p) == 0) {
+            if (fbprime_t(mpz_get_ui(si.qbasis.q)) == p) {
                 continue;
             }
             fbprime_t r = ssp.get_r();
