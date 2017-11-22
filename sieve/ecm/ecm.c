@@ -397,6 +397,22 @@ ellEe_neg (ellEe_point_t P, const modulus_t m)
   mod_neg (P->t, P->t, m);
 }
 
+static inline void
+ellE_print (ellE_point_t P)
+{
+  /* FIXME need multiple precision print */
+  printf ("(%lu : %lu : %lu)\n", 
+	  mod_intget_ul(P->x), mod_intget_ul(P->y), mod_intget_ul(P->z));
+}
+
+static inline void
+ellEe_print (ellEe_point_t P)
+{
+  /* FIXME need multiple precision print */
+  printf ("(%lu : %lu : %lu : %lu)\n", 
+	  mod_intget_ul(P->x), mod_intget_ul(P->y), mod_intget_ul(P->t), mod_intget_ul(P->z));
+}
+
 /* 
    Computes Q=2P in E using dedicated doubling in Projective twisted Edwards
    coordinates from [Bernstein et al. 2008] 
@@ -1042,6 +1058,10 @@ ellE_interpret_bytecode (ellE_point_t P, const char *bc, const unsigned int bc_l
 			 const modulus_t m, const residue_t a)
 {
   unsigned char q;
+  ellE_point_t Q;
+  ellEe_point_t Te;
+  ellE_init (Q, m);
+  ellEe_init (Te, m);
 
   q = bc[0];       /* 'q':  permet de remplacer les couilles en coquilles [PG, Oct. 2016] */
   ASSERT (q & 1);  /* q is odd */
@@ -1054,9 +1074,15 @@ ellE_interpret_bytecode (ellE_point_t P, const char *bc, const unsigned int bc_l
   /* _2Pe = [2]P in extended coord */
   ellEe_point_t _2Pe;
   ellEe_init (_2Pe, m);
-
   ellEe_set_from_E (_2Pe, P, m);
   ellEe_double (_2Pe, _2Pe, m, a);
+
+#if 1
+  printf ("P: ");
+  ellE_print (P);
+  printf ("2P: ");
+  ellEe_print (_2Pe);
+#endif
 
   /* _rP[i] = [2*i+1]P in extended coord */
   ellEe_point_t *_rP;
@@ -1072,39 +1098,84 @@ ellE_interpret_bytecode (ellE_point_t P, const char *bc, const unsigned int bc_l
   for (int i = 1 ; i < rP_size ; i++)
     ellEe_add (_rP[i], _rP[i-1], _2Pe, m, a);
 
+#if 1
+  printf ("_rP: ");
+  for (int i = 0 ; i < rP_size ; i++)
+    {
+      printf ("%d: ", i);
+      ellEe_print (_rP[i]);
+    }
+#endif
+
   /* Addition chain */
   
   /* Starting point (depends on bc[1] and bc[2]) */
-  ellE_point_t Q;
-  ellEe_point_t Te;
-  ellE_init (Q, m);
-  ellEe_init (Te, m);
 
   unsigned int i = bc[1] & 0x7F;
-  if (i == 0x7F)
-    ellEe_set (Te, _2Pe, m);
-  else
-    ellEe_set (Te, _rP[i], m);
   
+#if 1
+  printf ("i = %d, 2i+1 = %d\n", i, 2*i+1);
+#endif
+
+  if (i == 0x7F)
+    {
+#if 1
+      printf ("DBLCODE\n");
+#endif
+      ellEe_set (Te, _2Pe, m);
+    }
+  else
+    {
+      ellEe_set (Te, _rP[i], m);
+#if 1
+      printf ("CODE: %d\n", i);
+#endif
+    }
+
+#if 1
+  ellEe_print (Te);
+#endif
+
   if (bc[1] & 0x80)
     {
       i = bc[2] & 0x7F;
-      ellEe_add (Te, Te, _rP[i], m, a);
+#if 1
+      printf ("CODE: %d\n", i);
+#endif
 
+      ellEe_add (Te, Te, _rP[i], m, a);
     }
   ellE_set_from_Ee (Q, Te, m);
+
+#if 1
+  ellE_mul_ul (Q, P, 3, m, a);
+  printf ("3P: ");
+  ellE_print (Q);
+#endif
 
   /* scan bc[i] for i >= 3 */
   for (unsigned int i = 3; i < bc_len; i++)
   {
+#if 1
+    ellE_print (Q);
+#endif
+
     char b = bc[i];
     switch (b)
     {
       case ADDCHAIN_2DBL:
         ellE_double (Q, Q, m, a);
         no_break();
+
+#if 1
+    ellE_print (Q);
+#endif
+
       case ADDCHAIN_DBL:
         ellE_double (Q, Q, m, a);
+#if 1
+    ellE_print (Q);
+#endif
         break;
       default:
         ellEe_set (Te, _rP[b & 0x7f], m);
@@ -2333,26 +2404,21 @@ ell_pointorder (const residue_t sigma, const int parameterization,
   {
     if (Montgomery16_curve_from_k (A, x, mod_get_ul (sigma, m), m) == 0)
       return 0;
-    //    printf ("Montg16 curve built\n");
   }
   else if (parameterization == TWED16)
     {
       if (Twisted_Edwards16_curve_from_sigma (d, Q, mod_get_ul(sigma, m), m) == 0)
 	return 0;
 
-      //      printf ("Twed16 curve built\n");
-
-      // Montgomery16_curve_from_Edwards16...
-      // ax^2 + y^2 = 1 + dx^2y^2 ---> By^2 = x^3 + Ax^2 + x
-      // A = 2(a+d)/(a-d), B = 4/(a-d)
-      // u = (1+y)/(1-y)
-      // v = (1+y)/(1-y)x
-      // source: http://math.stackexchange.com/questions/1391732/birational-equvalence-of-twisted-edwards-and-montgomery-curves?noredirect=1&lq=1
-
-      //      A = 2(a+d)/(a-d) = 2(-1+d)/(-1-d)
+      /* We convert the returned twisted Edwards curve E (with a = -1) of the
+	 form -x^2 + y^2 = 1 + dx^2y^2 together with a point Q on E to an
+	 equivalent Montgomety curve M given by: By^2 = x^3 + Ax^2 + x, where A
+	 = 2(a+d)/(a-d) = 2(-1+d)/(-1-d) and a point (x,z) on M, where x =
+	 (1+Q->y)/(1-Q->y).
+	 (B and z are not needed) */
 
       mod_set1 (A, m);        // A = 1
-      mod_neg (A, A, m);         // A = -1
+      mod_neg (A, A, m);      // A = -1
       mod_set (x, A, m);      // x = -1
       mod_add (x, x, d, m);   // x = (-1+d)
       mod_add (x, x, x, m);   // x = 2(-1+d)
@@ -2360,18 +2426,12 @@ ell_pointorder (const residue_t sigma, const int parameterization,
       mod_inv (A, A, m);      // A = 1/(-1-d)
       mod_mul (A, A, x, m);   // A = 2(-1+d)/(-1-d)
 
-      //      x = (1+Q->y)/(1-Q->y)
-      //      we don't need y
-
       mod_set1 (a, m);           // a = 1
       mod_add (a, a, Q->y, m);   // a = (1+Q->y)
       mod_set1 (x, m);           // x = 1
       mod_sub (x, x, Q->y, m);   // x = (1-Q->y)
       mod_inv (x, x, m);         // x = 1/(1-Q->y)
       mod_mul (x, x, a, m);      // x = (1+Q->y)/(1-Q->y)
-
-      //      printf ("Twed16 curve and point converted to Montg16\n");
-      
     }
   else
   {
@@ -2395,8 +2455,6 @@ ell_pointorder (const residue_t sigma, const int parameterization,
 
   if (curveW_from_Montgomery (a, P, x, A, m) == 0)
     return 0UL;
-  
-  //  printf ("Montg16 curve and point converted to Weierstrass\n");
 
   if (verbose >= 2)
     {

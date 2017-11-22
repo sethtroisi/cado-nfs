@@ -67,6 +67,7 @@ print_pointorder (const unsigned long p, const unsigned long s,
   modredcul_clearmod (m);
 }
 
+
 static int
 tryfactor (mpz_t N, const facul_strategy_t *strategy, 
            const int verbose, const int printfactors, const int printnonfactors, 
@@ -110,7 +111,7 @@ tryfactor (mpz_t N, const facul_strategy_t *strategy,
     }
   for (int i = 0; i < 16; ++i)
       mpz_clear(f[i]);
-  
+ 
   return facul_code;
 }
 
@@ -463,7 +464,10 @@ int main (int argc, char **argv)
 	  
 	  total++;
 	  if (do_pointorder)
-	    print_pointorder (i, po_sigma, po_parameterization, verbose+printfactors);
+	    {
+	      print_pointorder (i, po_sigma, po_parameterization, verbose+printfactors);
+	      /* TODO: check point order */
+	    }
           else
 	    {
               mpz_mul_ui (N, cof, i);
