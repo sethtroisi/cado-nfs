@@ -657,9 +657,6 @@ struct small_sieve : public small_sieve_base<tribool_const<is_fragment>> {/*{{{*
     template<typename even_code, typename odd_code, int bits_off>
         inline void handle_nice_primes(where_am_I & w MAYBE_UNUSED) /* {{{ */
         {
-            bool row0_even = (((j0&super::sublatm)+super::sublatj0) & 1) == 0;
-            bool dj_row0_evenness = (super::sublatm & 1);
-
             /* here, we can sieve for primes p < 2 * F() / 2^bits_off,
              * (where F() is i1-i0 = 2^min(logI, logB)).
              *
@@ -671,6 +668,9 @@ struct small_sieve : public small_sieve_base<tribool_const<is_fragment>> {/*{{{*
              */
 
 #ifdef HAVE_SSE2
+            bool row0_even = (((j0&super::sublatm)+super::sublatj0) & 1) == 0;
+            bool dj_row0_evenness = (super::sublatm & 1);
+
             for( ; index + 3 < sorted_limit ; index+=4) {
                 /* find 4 index values with no special prime */
                 ssp_simple_t const & ssp0(primes[index]);
