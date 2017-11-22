@@ -2919,21 +2919,14 @@ void initialise_parameters(int argc, char * argv[], cado_poly_ptr f,
   declare_usage(pl);
   FILE * fpl;
   char * argv0 = argv[0];
-  char * orig_param;
-  int len = 3;
-  orig_param = (char *) malloc(len * sizeof(char));
-  orig_param[0] = '\0';
-  strcat(orig_param, "# ");
+  char orig_param[1 << 14];
+  size_t n_orig_param = 0;
 
-  for (int i = 0; i < argc - 1; i++) {
-    len = len + strlen(argv[i]) + 1;
-    orig_param = (char *) realloc(orig_param, len * sizeof(char));
-    strcat(orig_param, argv[i]);
-    strcat(orig_param, " ");
+  n_orig_param += snprintf(orig_param, sizeof(orig_param) - n_orig_param, "#");
+
+  for (int i = 0; i < argc; i++) {
+      n_orig_param += snprintf(orig_param, sizeof(orig_param) - n_orig_param, " %s", argv[i]);
   }
-  len = len + strlen(argv[argc - 1]);
-  orig_param = (char *) realloc(orig_param, len * sizeof(char));
-  strcat(orig_param, argv[argc - 1]);
 
   argv++, argc--;
   for( ; argc ; ) {
@@ -3015,7 +3008,6 @@ void initialise_parameters(int argc, char * argv[], cado_poly_ptr f,
 
   // Print command line.
   fprintf(* outstd, "%s\n", orig_param);
-  free(orig_param);
 
   path[0] = '\0';
   param_list_parse_string(pl, "err", path, size_path);
