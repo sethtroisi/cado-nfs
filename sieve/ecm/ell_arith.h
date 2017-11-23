@@ -1,5 +1,16 @@
+#ifndef _ELL_ARITH_H_
+#define _ELL_ARITH_H_
+
+/* Types of coordinates */
+enum ell_point_coord_type {AFF, MONTG, EDW_proj, EDW_ext} ;
 
 
+/* A point on an elliptic curve */
+/* In affine coordinates (AFF), only x and y are guaranteed */
+/* In Montgomery coordinates (MONTG), only x and z are guaranteed */
+/* In Edwards projective (EDW_proj), only x, y and z are guaranteed */
+/* In Edwards extended (EDW_ext), x, y, z, t are guaranteed */
+  
 struct ell_point_s
 {
   residue_t x,y,z,t;
@@ -9,4 +20,5 @@ typedef struct ell_point_s ell_point_t[1];
 typedef struct ell_point_s *ell_point_ptr;
 typedef const struct ell_point_s *ell_point_srcptr;
 
-enum ell_point_coord_type {AFF, MONTG, EDW_proj, EDW_ext} ;
+
+#endif

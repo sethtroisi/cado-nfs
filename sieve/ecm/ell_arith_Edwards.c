@@ -18,33 +18,6 @@
         R <- 3*P
         output_flag can be edwards_proj, edwards_ext
 
-    - edwards_dbladd (R:output_flag, P:edwards_proj, Q:edwards_ext, output_flag)
-        R <- 2*P+Q
-        output_flag can be edwards_proj, edwards_ext, montgomery
-        implemented as
-          edwards_dbl (R, P, edwards_ext)
-          edwards_add (R, R, Q, output_flag)
-
-    - edwards_dblsub (R:output_flag, P:edwards_proj, Q:edwards_ext, output_flag)
-        R <- 2*P-Q
-        output_flag can be edwards_proj, edwards_ext, montgomery
-        implemented as
-          edwards_dbl (R, P, edwards_ext)
-          edwards_sub (R, R, Q, output_flag)
-
-    - edwards_tpladd (R:output_flag, P:edwards_proj, Q:edwards_ext, output_flag)
-        R <- 3*P+Q
-        output_flag can be edwards_proj, edwards_ext, montgomery
-        implemented as
-          edwards_tpl (R, P, edwards_ext)
-          edwards_add (R, R, Q, output_flag)
-
-    - edwards_tplsub (R:output_flag, P:edwards_proj, Q:edwards_ext, output_flag)
-        R <- 3*P-Q
-        output_flag can be edwards_proj, edwards_ext, montgomery
-        implemented as
-          edwards_tpl (R, P, edwards_ext)
-          edwards_sub (R, R, Q, output_flag)
 */
 
 #include "ell_arith.h"
@@ -352,91 +325,90 @@ ellE_dbl (ell_point_t R, const ell_point_t P,
 /* - edwards_tpl (R:output_flag, P:edwards_proj, output_flag) */
 /*     R <- 3*P */
 /*     output_flag can be edwards_proj, edwards_ext */
+
+/* The "tpl-2015-c" tripling formulas */
+/* Cost: 11M + 3S + 1*a + 7add + 2*2. */
+/* Source: 2015 Chuengsatiansup. */
+/* https://hyperelliptic.org/EFD/g1p/auto-twisted-extended-1.html#tripling-tpl-2015-c */
 static void
 ellE_tpl (ell_point_t R, const ell_point_t P,
 	  const modulus_t m, const ell_point_coord_type output_type)
 {
-  /* The "tpl-2015-c" tripling formulas */
-  /* Cost: 11M + 3S + 1*a + 7add + 2*2. */
-  /* Source: 2015 Chuengsatiansup. */
-  /* Explicit formulas: */
-  /*   YY = Y1^2 */
-  /*   aXX = X1^2 */
-  /*   Ap = YY+aXX */
-  /*   B = 2*(2*Z1^2-C) */
-  /*   xB = aXX*B */
-  /*   yB = YY*B */
-  /*   AA = Ap*(YY-aXX) */
-  /*   F = AA-yB */
-  /*   G = AA+xB */
-  /*   xE = X1*(yB+AA) */
-  /*   yH = Y1*(xB-AA) */
-  /*   zF = Z1*F */
-  /*   zG = Z1*G */
-  /*   X3 = xE*zF */
-  /*   Y3 = yH*zG */
-  /*   Z3 = zF*zG */
-  /*   T3 = xE*yH */
+
+  residue_t YY, aXX, Ap, B, xB, yB, AA, F, G, xE, yH, zF, zG;
+
+#if COUNT_ELLE_OPS
+  ellE_triple_count++;
+#endif
+
+  /* ASSERT (output_flag != AFF); */
+  
+  mod_init_noset0 (YY, m);
+  mod_init_noset0 (aXX, m);
+  mod_init_noset0 (Ap, m);
+  mod_init_noset0 (B, m);
+  mod_init_noset0 (xB, m);
+  mod_init_noset0 (yB, m);
+  mod_init_noset0 (AA, m);
+  mod_init_noset0 (F, m);
+  mod_init_noset0 (G, m);
+  mod_init_noset0 (xE, m);
+  mod_init_noset0 (yH, m);
+  mod_init_noset0 (zF, m);
+  mod_init_noset0 (zG, m);
+
+  mod_sqr (YY, P->y, m);                // YY := Y1^2
+  mod_sqr (aXX, P->x, m);               // aXX := X1^2
+  mod_neg (aXX, aXX, m);                // aXX := -X1^2
+  mod_add (Ap, YY, aXX, m);             // Ap := YY+aXX 
+  mod_sqr (B, P->z, m);                 // B := Z1^2
+  mod_add (B, B, B, m);                 // B := 2*Z1^2
+  mod_sub (B, B, Ap, m);                // B := 2*Z1^2-Ap
+  mod_add (B, B, B, m);                 // B := 2*(2*Z1^2-Ap)
+  mod_mul (xB, aXX, B, m);              // xB := aXX*B
+  mod_mul (yB, YY, B, m);               // yB := YY*B
+  mod_sub (AA, YY, aXX, m);             // AA := YY-aXX
+  mod_mul (AA, Ap, AA, m);              // AA := Ap*(YY-aXX)
+  mod_sub (F, AA, yB, m);               // F := AA-yB
+  mod_add (G, AA, xB, m);               // G := AA+xB
+  mod_add (xE, yB, AA, m);              // xE := yB+AA
+  mod_mul (xE, P->x, xE, m);            // xE := X1*(yB+AA)
+  mod_sub (yH, xB, AA, m);              // yH := xB-AA
+  mod_mul (yH, P->y, yH, m);            // yH := Y1*(xB-AA)
+  mod_mul (zF, P->z, F, m);             // zF := Z1*F
+    
+  if (output_type != MONTG)
+    {
+      mod_set (R->x, xE, m);
+      mod_set (R->y, yH, m);
+      mod_mul (R->z, zF, G, m);           // Z3 := Z1*F*G
+      if (output_type == EDW_ext)
+	{
+	  mod_mul (zG, P->z, G, m);       // zG := Z1*G
+	  mod_mul (R->x, xE, zF, m);      // X3 := xE*zF
+	  mod_mul (R->y, yH, zG, m);      // Y3 := yH*zG
+	  mod_mul (R->z, zF, zG, m);      // Z3 := zF*zG
+	  mod_mul (R->t, xE, yH, m);      // T3 := xE*yH
+	}
+    }
+  else
+    {
+      /* Cyril's formula */
+    }
+  
+  mod_clear (YY, m);
+  mod_clear (aXX, m);
+  mod_clear (Ap, m);
+  mod_clear (B, m);
+  mod_clear (xB, m);
+  mod_clear (yB, m);
+  mod_clear (AA, m);
+  mod_clear (F, m);
+  mod_clear (G, m);
+  mod_clear (xE, m);
+  mod_clear (yH, m);
+  mod_clear (zF, m);
+  mod_clear (zG, m);
+}
 
   
-}
-
-  
-/* - edwards_dbladd (R:output_flag, P:edwards_proj, Q:edwards_ext, output_flag) */
-/*     R <- 2*P+Q */
-/*     output_flag can be edwards_proj, edwards_ext, montgomery */
-/*     implemented as */
-/*       edwards_dbl (R, P, edwards_ext) */
-/*       edwards_add (R, R, Q, output_flag) */
-static void
-ellE_dbl_add (ell_point_t R, const ell_point_t P, const ell_point_t Q,
-		 const modulus m, const ell_point_coord_type output_type)
-{
-  ellE_dbl (R, P, m, EDW_ext);
-  ellE_add (R, R, Q, output_type);
-}
-
-
-/* - edwards_dblsub (R:output_flag, P:edwards_proj, Q:edwards_ext, output_flag) */
-/*     R <- 2*P-Q */
-/*     output_flag can be edwards_proj, edwards_ext, montgomery */
-/*     implemented as */
-/*       edwards_dbl (R, P, edwards_ext) */
-/*       edwards_sub (R, R, Q, output_flag) */
-static void
-ellE_dbl_sub (ell_point_t R, const ell_point_t P, const ell_point_t Q,
-		 const modulus m, const ell_point_coord_type output_type)
-{
-  ellE_dbl (R, P, m, EDW_ext);
-  ellE_sub (R, R, Q, output_type);
-}
-
-
-/* - edwards_tpladd (R:output_flag, P:edwards_proj, Q:edwards_ext, output_flag) */
-/*     R <- 3*P+Q */
-/*     output_flag can be edwards_proj, edwards_ext, montgomery */
-/*     implemented as */
-/*       edwards_tpl (R, P, edwards_ext) */
-/*       edwards_add (R, R, Q, output_flag) */
-static void
-ellE_tpl_add (ell_point_t R, const ell_point_t P, const ell_point_t Q,
-	      const modulus m, const ell_point_coord_type output_type)
-{
-  ellE_tpl (R, P, m, EDW_ext);
-  ellE_add (R, R, Q, output_type);
-}
-
-
-/* - edwards_tplsub (R:output_flag, P:edwards_proj, Q:edwards_ext, output_flag) */
-/*     R <- 3*P-Q */
-/*     output_flag can be edwards_proj, edwards_ext, montgomery */
-/*     implemented as */
-/*       edwards_tpl (R, P, edwards_ext) */
-/*       edwards_sub (R, R, Q, output_flag) */
-static void
-ellE_tpl_sub (ell_point_t R, const ell_point_t P, const ell_point_t Q,
-	      const modulus m, const ell_point_coord_type output_type)
-{
-  ellE_tpl (R, P, m, EDW_ext);
-  ellE_sub (R, R, Q, output_type);
-}
