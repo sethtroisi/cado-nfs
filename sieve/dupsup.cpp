@@ -178,6 +178,7 @@ static void declare_usage(param_list_ptr pl)
   param_list_decl_usage(pl, "q1",   "(unused)");
   param_list_decl_usage(pl, "nq",   "(unused)");
   param_list_decl_usage(pl, "adjust-strategy",   "(unused)");
+  param_list_decl_usage(pl, "v",    "(unused)");
   verbose_decl_usage(pl);
 }
 
