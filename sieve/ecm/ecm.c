@@ -35,7 +35,7 @@ static unsigned long ellM_add_count, ellM_double_count;
 
 #define COUNT_ELLE_OPS 0
 #if COUNT_ELLE_OPS
-static unsigned long ellE_add_count, ellE_double_count;
+static unsigned long ellE_add_count, ellE_double_count, ellE_triple_count;
 #endif
 
 
