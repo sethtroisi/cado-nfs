@@ -70,6 +70,16 @@ read_poly(cado_poly_ptr cpoly, param_list_ptr pl)
     }
 }
 
+static void
+check (int seen, const char *param)
+{
+  if (seen == 0)
+    {
+      fprintf (stderr, "Error, missing parameter %s\n", param);
+      exit (EXIT_FAILURE);
+    }
+}
+
 static int
 parse_config(siever_config & sc, param_list_ptr pl)
 {
@@ -88,16 +98,27 @@ parse_config(siever_config & sc, param_list_ptr pl)
         sc.logA = 2 * I - 1;
         printf("# Interpreting -I %d as meaning -A %d\n", I, sc.logA);
     }
+    check (seen, "A or I");
     seen &= param_list_parse_ulong (pl, "lim0",  &(sc.sides[0].lim));
+    check (seen, "lim0");
     seen &= param_list_parse_int   (pl, "lpb0",  &(sc.sides[0].lpb));
+    check (seen, "lpb0");
     seen &= param_list_parse_int   (pl, "mfb0",  &(sc.sides[0].mfb));
-    seen &= param_list_parse_double(pl, "lambda0", &(sc.sides[0].lambda));
+    check (seen, "mfb0");
+    /* lambda0 is optional (otherwise default will be used) */
+    param_list_parse_double(pl, "lambda0", &(sc.sides[0].lambda));
     seen &= param_list_parse_int   (pl, "ncurves0",  &(sc.sides[0].ncurves));
+    check (seen, "ncurves0");
     seen &= param_list_parse_ulong (pl, "lim1",  &(sc.sides[1].lim));
+    check (seen, "lim1");
     seen &= param_list_parse_int   (pl, "lpb1",  &(sc.sides[1].lpb));
+    check (seen, "lpb1");
     seen &= param_list_parse_int   (pl, "mfb1",  &(sc.sides[1].mfb));
-    seen &= param_list_parse_double(pl, "lambda1", &(sc.sides[1].lambda));
+    check (seen, "mfb1");
+    /* lambda1 is optional (otherwise default will be used) */
+    param_list_parse_double(pl, "lambda1", &(sc.sides[1].lambda));
     seen &= param_list_parse_int   (pl, "ncurves1",  &(sc.sides[1].ncurves));
+    check (seen, "ncurves1");
     long dupqmin[2] = {0, 0};
     param_list_parse_long_and_long(pl, "dup-qmin", dupqmin, ",");
     sc.sides[0].qmin = dupqmin[0];
@@ -218,7 +239,9 @@ main (int argc, char * argv[])
     cado_poly cpoly;
     read_poly(cpoly, pl);
     int ok = parse_config(conf, pl);
-    ok = ok && param_list_parse_double(pl, "skew",    &(cpoly->skew));
+    /* the polynomial skewness can be overriden on the command line,
+       but the option -skew is optional */
+    param_list_parse_double(pl, "skew",    &(cpoly->skew));
     if (!ok) {
         fprintf(stderr, "Error: mandatory parameter missing.\n");
 	param_list_clear(pl);
