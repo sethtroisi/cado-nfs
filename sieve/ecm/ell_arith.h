@@ -20,5 +20,10 @@ typedef struct ell_point_s ell_point_t[1];
 typedef struct ell_point_s *ell_point_ptr;
 typedef const struct ell_point_s *ell_point_srcptr;
 
+void ell_point_init (ell_point_t, const modulus_t);
+void ell_point_clear (ell_point_t, const modulus_t);
+void ell_point_set (ell_point_t, const ell_point_t, const modulus_t);
+void ell_point_swap (ell_point_t, ell_point_t, const modulus_t);
+void ell_point_print (ell_point_t, const ell_point_coord);
 
 #endif
