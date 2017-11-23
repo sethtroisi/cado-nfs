@@ -219,10 +219,11 @@ subtract_fb_log(const unsigned char lognorm, relation const& rel,
 /* Return 1 if the relation is probably a duplicate of a relation found
  * when sieving the sq described by si. Return 0 if it is probably not a
  * duplicate */
-int
+static int
 sq_finds_relation(const unsigned long sq, const int sq_side,
                   relation const& rel,
-                  const int nb_threads, sieve_info & old_si)
+                  const int nb_threads, sieve_info & old_si,
+		  int adjust_strategy)
 {
   mpz_array_t *f[2] = { NULL, }; /* Factors of the relation's norms */
   uint32_array_t *m[2] = { NULL, }; /* corresponding multiplicities */
@@ -269,11 +270,15 @@ sq_finds_relation(const unsigned long sq, const int sq_side,
       return 0;
   }
 
-  /* We have no info as to which adjustment option is being used for the
-   * current project... Let's assume the default adjust_strategy = 0
-   * FIXME !
-   */
-  Adj.sieve_info_update_norm_data_Jmax();
+  if (adjust_strategy != 1)
+    Adj.sieve_info_update_norm_data_Jmax();
+
+  if (adjust_strategy >= 2)
+    Adj.adjust_with_estimated_yield();
+
+  if (adjust_strategy >= 3)
+    Adj.sieve_info_update_norm_data_Jmax(true);
+
   siever_config conf = Adj.config();
   conf.logI_adjusted = Adj.logI;
   conf.side = sq_side;
@@ -402,10 +407,10 @@ sq_was_previously_sieved (const unsigned long sq, int side, sieve_info const & s
    whether sieving (sq, side) can find the relation with the sieving
    parameters specified in si.conf. */ 
 
-int
+static int
 check_one_prime(mpz_srcptr zsq, const int side,
                 relation const & rel, const int nb_threads,
-                sieve_info & si)
+                sieve_info & si, int adjust_strategy)
 {
   if (!mpz_fits_ulong_p(zsq)) {
       /* move on. Probably not a duplicate */
@@ -414,7 +419,7 @@ check_one_prime(mpz_srcptr zsq, const int side,
   unsigned long sq = mpz_get_ui(zsq);
   int is_dupe = 0;
   if (sq_was_previously_sieved(sq, side, si)) {
-    is_dupe = sq_finds_relation(sq, side, rel, nb_threads, si);
+    is_dupe = sq_finds_relation(sq, side, rel, nb_threads, si, adjust_strategy);
     verbose_output_print(0, VERBOSE_LEVEL, "# DUPECHECK relation is probably%s a dupe\n",
 			 is_dupe ? "" : " not");
   }
@@ -425,7 +430,7 @@ check_one_prime(mpz_srcptr zsq, const int side,
    "earlier", and 0 if it is probably not a duplicate */
 int
 relation_is_duplicate(relation const& rel, const int nb_threads,
-                      sieve_info & si)
+                      sieve_info & si, int adjust_strategy)
 {
   /* If the special-q does not fit in an unsigned long, we assume it's not a
      duplicate and just move on */
@@ -444,7 +449,8 @@ relation_is_duplicate(relation const& rel, const int nb_threads,
 
   for(int side = 0 ; side < 2 ; side++) {
       for(unsigned int i = 0 ; i < rel.sides[side].size() ; i++) {
-          if (check_one_prime(rel.sides[side][i].p, side, rel, nb_threads, si))
+	if (check_one_prime(rel.sides[side][i].p, side, rel, nb_threads, si,
+			    adjust_strategy))
               return true;
       }
   }

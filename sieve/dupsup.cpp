@@ -196,6 +196,7 @@ main (int argc, char * argv[])
     char * argv0 = argv[0];
     siever_config conf;
     int nb_threads = 1;
+    int adjust_strategy = 0;
 
     param_list pl;
     param_list_init(pl);
@@ -234,7 +235,7 @@ main (int argc, char * argv[])
     param_list_lookup_string(pl, "q0");
     param_list_lookup_string(pl, "q1");
     param_list_lookup_string(pl, "nq");
-    param_list_lookup_string(pl, "adjust-strategy");
+    param_list_parse_int(pl, "adjust-strategy", &adjust_strategy);
     const char * outputname = param_list_lookup_string(pl, "out");
 
     cado_poly cpoly;
@@ -303,7 +304,8 @@ main (int argc, char * argv[])
         } else {
             relation rel;
             if (rel.parse(line)) {
-                int is_dupe = relation_is_duplicate(rel, nb_threads, *psi);
+	      int is_dupe = relation_is_duplicate(rel, nb_threads, *psi,
+						  adjust_strategy);
                 dupsup(output, rel, doing, is_dupe);
             }
         }
