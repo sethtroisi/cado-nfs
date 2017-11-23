@@ -56,7 +56,8 @@ add_library(facul
         stage2.c bytecoder.c prac_bc.c addchain_bc.c
 	makeplan.c facul.cpp
         mpqs_doit.c mpqs_ul.c mpqs_15ul.c mpqs_2ul2.c mpqs_mpz.c
-	batch.c)
+	batch.c
+	ell_arith.c ell_arith_Edwards.c)
 
 set_target_properties(facul PROPERTIES COMPILE_FLAGS "${OpenMP_C_FLAGS}")
 
