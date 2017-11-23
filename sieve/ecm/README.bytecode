@@ -4,11 +4,9 @@ bc = b7, b6, ..., b0
 
 ### control bytecode <==> b0 = 1
 
-00010000     beginning of a new NAF_block or dbchain_block
-00100000     beginning of a new dbexpansion_block
-00100001     beginning of a new dbexpansion_add_part, inside a dbexpansion_block
-00100010     beginning of a new dbexpansion_NAF_part, inside a dbexpansion_block
-00110000     beginning of a new PRAC_block
+00010001     beginning of a new DBLADD_block
+00100001     beginning of a new precomp_block
+00110001     beginning of a new PRAC_block
 
 11111111     end of computation
 
@@ -19,35 +17,55 @@ Q = current point
 R[] = array of precomputed point (R[0] = P = starting point at the beginning of
                                                                       the block)
 
-# inside NAF_block, dbchain_block and dbexpansion_NAF_part block:
+# inside DBLADD_block
 
   xxxxx000     Q <- [2^n]Q
                   n = b7...b3
-                  input=proj
-                  output=proj
+                  input Q=proj
+                  output=depend on next byte
   xxxxx010     Q <- [3^n]Q
                   n = b7...b3
-                  input=proj
-                  output=proj
-  xxxxx100     Q <- [2]Q +/- R[i]
-                  sign given by b3 (0=+, 1=-)
-                  i = b7..b4
                   input Q=proj
-                  input R[i]⁼ext
                   output=depend on next byte
-  xxxxx110     Q <- [3]Q +/- R[i]
-                  sign given by b3 (0=+, 1=-)
-                  i = b7..b4
-                  input Q=proj
-                  input R[i]⁼ext
+  xxxxx100     Q <- Q + R[i]
+                  i = b7..b3
+                  input Q=ext
+                  input R[i]=ext
+                  output=depend on next byte
+  xxxxx110     Q <- Q - R[i]
+                  i = b7..b3
+                  input Q=ext
+                  input R[i]=ext
                   output=depend on next byte
 
-# inside dbexpansion_block (and outside dbexpansion_*_part)
+# inside precomp_block
   xxxxxxx0     R[i] <- [3^n]Q and Q <- R[i]
-                  n = b7...b1
+  xxxxx000     Q <- R[i] <- [2^n]Q
+                  n = b7...b3
                   i = position of the current byte from the start of the block
-
-# inside dbexpansion_add_part
+                  input Q=proj
+                  output R[i]=proj
+                  output Q=proj
+  xxxxx010     Q <- R[i] <- [3^n]Q
+                  n = b7...b3
+                  i = position of the current byte from the start of the block
+                  input Q=proj
+                  output R[i]=proj
+                  output Q=proj
+  xxxxx100     R[k] <- R[i] + R[j]
+                  k = b7..b4
+                  j = c7..c4 # of next byte
+                  i = c3..c0 # of next byte
+                  input R[i]=ext
+                  input R[j]=ext
+                  output R[k]=ext
+  xxxxx100     R[k] <- R[i] - R[j]
+                  k = b7..b4
+                  j = c7..c4 # of next byte
+                  i = c3..c0 # of next byte
+                  input R[i]=ext
+                  input R[j]=ext
+                  output R[k]=ext
 
 # inside PRAC_block
   current implementation of bytecode
