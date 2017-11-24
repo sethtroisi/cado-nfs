@@ -7,6 +7,7 @@
 #include "ularith.h"
 #include "getprime.h"
 #include "addchain_bc.h"
+#include "ell_arith_common.h"
 
 /* Do we want backtracking when processing factors of 2 in E? */
 #ifndef ECM_BACKTRACKING
@@ -30,7 +31,7 @@
 
 #define COUNT_ELLM_OPS 0
 #if COUNT_ELLM_OPS
-static unsigned long ellM_add_count, ellM_double_count;
+static unsigned long ellM_dadd_count, ellM_double_count;
 #endif
 
 #define COUNT_ELLE_OPS 0
@@ -301,454 +302,6 @@ ellM_mul_ul (ellM_point_t R, const ellM_point_t P, unsigned long e,
 /* Functions for curves in twisted Edwards form */
 /* -------------------------------------------------------------------------- */
 
-static inline void
-ellE_init (ellE_point_t P, const modulus_t m)
-{
-  mod_init (P->x, m);
-  mod_init (P->y, m);
-  mod_init (P->z, m);
-}
-
-static inline void
-ellEe_init (ellEe_point_t P, const modulus_t m)
-{
-  mod_init (P->x, m);
-  mod_init (P->y, m);
-  mod_init (P->t, m);
-  mod_init (P->z, m);
-}
-
-static inline void
-ellE_clear (ellE_point_t P, const modulus_t m)
-{
-  mod_clear (P->x, m);
-  mod_clear (P->y, m);
-  mod_clear (P->z, m);
-}
-
-static inline void
-ellEe_clear (ellEe_point_t P, const modulus_t m)
-{
-  mod_clear (P->x, m);
-  mod_clear (P->y, m);
-  mod_clear (P->t, m);
-  mod_clear (P->z, m);
-}
-
-static inline void
-ellE_set (ellE_point_t Q, const ellE_point_t P, const modulus_t m)
-{
-  mod_set (Q->x, P->x, m);
-  mod_set (Q->y, P->y, m);
-  mod_set (Q->z, P->z, m);
-}
-
-static inline void
-ellEe_set (ellEe_point_t Q, const ellEe_point_t P, const modulus_t m)
-{
-  mod_set (Q->x, P->x, m);
-  mod_set (Q->y, P->y, m);
-  mod_set (Q->t, P->t, m);
-  mod_set (Q->z, P->z, m);
-}
-
-/* (x : y : t : z) to (x : y : z) 
-   free: simply ignore t coordinate */
-static inline void
-ellE_set_from_Ee (ellE_point_t Q, const ellEe_point_t P, const modulus_t m)
-{
-  mod_set (Q->x, P->x, m);
-  mod_set (Q->y, P->y, m);
-  mod_set (Q->z, P->z, m);
-}
-
-/* (x : y : z) to (x : y : t : z)
-   cost: 3m+1s by computing (xz, yz, xy, z^2) */
-static inline void
-ellEe_set_from_E (ellEe_point_t Q, const ellE_point_t P, const modulus_t m)
-{
-  mod_mul (Q->x, P->x, P->z, m);
-  mod_mul (Q->y, P->y, P->z, m);
-  mod_mul (Q->t, P->x, P->y, m);
-  mod_sqr (Q->z, P->z, m);
-}
-
-static inline void
-ellE_swap (ellE_point_t Q, ellE_point_t P, const modulus_t m)
-{
-  mod_swap (Q->x, P->x, m);
-  mod_swap (Q->y, P->y, m);
-  mod_swap (Q->z, P->z, m);
-}
-
-static inline void
-ellEe_swap (ellEe_point_t Q, ellEe_point_t P, const modulus_t m)
-{
-  mod_swap (Q->x, P->x, m);
-  mod_swap (Q->y, P->y, m);
-  mod_swap (Q->t, P->t, m);
-  mod_swap (Q->z, P->z, m);
-}
-
-static inline void
-ellEe_neg (ellEe_point_t P, const modulus_t m)
-{
-  mod_neg (P->x, P->x, m);
-  mod_neg (P->t, P->t, m);
-}
-
-static inline void
-ellE_print (ellE_point_t P)
-{
-  /* FIXME need multiple precision print */
-  printf ("(%lu : %lu : %lu)\n", 
-	  mod_intget_ul(P->x),
-	  mod_intget_ul(P->y),
-	  mod_intget_ul(P->z));
-}
-
-static inline void
-ellEe_print (ellEe_point_t P)
-{
-  /* FIXME need multiple precision print */
-  printf ("(%lu : %lu : %lu : %lu)\n", 
-	  mod_intget_ul(P->x),
-	  mod_intget_ul(P->y),
-	  mod_intget_ul(P->t),
-	  mod_intget_ul(P->z));
-}
-
-/* 
-   Computes Q=2P in E using dedicated doubling in Projective twisted Edwards
-   coordinates from [Bernstein et al. 2008] 
-
-   Formulae only depends on the curve constant a (curve constant d is not
-   necessary).  
-
-   Cost: 3m + 4s + 1d (where d stands for a multiplication by a constant)
-
-   @InProceedings{BerBirJoyLanPet08,
-   author = 	 {D. J. Bernstein and P. Birkner M. Joye and T. Lange and C. Peters},
-   title = 	 {Twisted {E}dwards Curves },
-   booktitle = {Progress in Cryptology -- {AFRICACRYPT 2008}},
-   pages = 	 {389--405},
-   year = 	 2008,
-   volume = 	 5023,
-   series = 	 LNCS,
-   publisher = {Springer}
-   }
-   
-*/
-static void
-ellE_double (ellE_point_t Q, const ellE_point_t P, const modulus_t m, const residue_t a)
-{
-  /* FIXME: optimize registers */
-  residue_t B, C, D, E, F, H, J;
-
-#if COUNT_ELLE_OPS
-  ellE_double_count++;
-#endif
-
-  mod_init_noset0 (B, m);
-  mod_init_noset0 (C, m);
-  mod_init_noset0 (D, m);
-  mod_init_noset0 (E, m);
-  mod_init_noset0 (F, m);
-  mod_init_noset0 (H, m);
-  mod_init_noset0 (J, m);
-
-  mod_add (B, P->x, P->y, m);
-  mod_sqr (B, B, m);                  /* B := (X1 + Y1)^2 */
-  mod_sqr (C, P->x, m);               /* C := X1^2 */
-  mod_sqr (D, P->y, m);               /* D := Y1^2 */
-  mod_mul (E, C, a, m);               /* E := aC */
-  mod_add (F, E, D, m);               /* F := E + D */
-  mod_sqr (H, P->z, m);               /* H := Z1^2 */
-  mod_add (H, H, H, m);               /* H := 2H (Any better way to multiply by 2?) */
-  mod_sub (J, F, H, m);               /* J := F - 2H */
-  mod_sub (H, B, C, m);
-  mod_sub (H, H, D, m);
-  mod_mul (Q->x, H, J, m);            /* X3 := (B - C - D) * J */
-  mod_sub (H, E, D, m);
-  mod_mul (Q->y, F, H, m);            /* Y3 := F * (E - D) */
-  mod_mul (Q->z, F, J, m);            /* Z3 := F * J */
-
-  mod_clear (B, m);
-  mod_clear (C, m);
-  mod_clear (D, m);
-  mod_clear (E, m);
-  mod_clear (F, m);
-  mod_clear (H, m);
-  mod_clear (J, m);  
-}
-
-/* 
-   Computes Q=2P in Ee using dedicated doubling in extended twisted Edwards
-   coordinates from [Hisil et al. 2008] 
-
-   Formulae only depends on the curve constant a (curve constant d is not
-   necessary).  
-
-   Cost: 4m + 4s + 1d (where d stands for a multiplication by a constant)
-  
-   @InProceedings{HisWonCarDaw08:twed_revisited,
-   author = 	 {H. Hisil and Wong, K. K.-H. and G. Carter and E. Dawson},
-   title = 	 {Twisted {Edwards} Curves Revisited},
-   booktitle = 	 {Advances in Cryptology, {ASIACRYPT 2008}},
-   pages = 	 {326--343},
-   year = 	 2008,
-   volume = 	 5350,
-   series = 	 LNCS,
-   publisher =    {Springer}
-   }
-*/
-static void
-ellEe_double (ellEe_point_t Q, const ellEe_point_t P, const modulus_t m, 
-             const residue_t a)
-{
-  /* FIXME: optimize registers */
-  residue_t A, B, C, D, E, F, G, H;
-
-#if COUNT_ELLE_OPS
-  ellE_double_count++;
-#endif
-
-  mod_init_noset0 (A, m);
-  mod_init_noset0 (B, m);
-  mod_init_noset0 (C, m);
-  mod_init_noset0 (D, m);
-  mod_init_noset0 (E, m);
-  mod_init_noset0 (F, m);
-  mod_init_noset0 (G, m);
-  mod_init_noset0 (H, m);
-
-  mod_sqr(A, P->x, m);            /* A = X1^2 */
-  mod_sqr(B, P->y, m);            /* B = Y1^2 */
-  mod_sqr(C, P->z, m);
-  mod_add(C, C, C, m);            /* C = 2 * Z1^2 */
-  mod_mul(D, A, a, m);            /* D = a * A */
-  mod_add(E, P->x, P->y, m);
-  mod_sqr(E, E, m);
-  mod_sub(E, E, A, m);
-  mod_sub(E, E, B, m);            /* E = (X1+Y1)^2 - A - B */
-  mod_add(G, D, B, m);            /* G = D + B */
-  mod_sub(F, G, C, m);            /* F = G - C */
-  mod_sub(H, D, B, m);            /* H = D - B */
-  mod_mul(Q->x, E, F, m);         /* X3 = E * F */
-  mod_mul(Q->y, G, H, m);         /* Y3 = G * H */
-  mod_mul(Q->t, E, H, m);         /* T3 = E * H */
-  mod_mul(Q->z, F, G, m);         /* Z3 = F * G */
- 
-  mod_clear (A, m);
-  mod_clear (B, m);
-  mod_clear (C, m);
-  mod_clear (D, m);
-  mod_clear (E, m);
-  mod_clear (F, m);
-  mod_clear (G, m);
-  mod_clear (H, m);
-}
-
-
-/* 
-   Adds P and Q and puts the result in R, using the dedicated addition formula
-   in extended twisted Edwards coordinates from [Hisil et al. 2008]
-
-   Formulae only depends on the curve constant a (curve constant d is not necessary).
-
-   Cost: 9m + 1d    (where d stands for a multiplication by a constant)
-   
-   [Hisil et al. 2008] H. Hisil, K. K.-H. Wong, G. Carter and E. Dawson. Twisted
-   Edwards Curves Revisited. ASIACRYPT 2008, vol 5350 of LNCS, pp. 326--343,
-   Springer.
-*/
-static void
-ellEe_add (ellEe_point_t R, const ellEe_point_t P, const ellEe_point_t Q,
-	   const modulus_t m, const residue_t a)
-{
-  /* FIXME: optimize registers */
-  residue_t A, B, C, D, E, F, G, H;
-
-  /* FIXME: check if necessary in twisted Edwards form */
-/* #if ELLM_SAFE_ADD */
-/*   /\* Handle case where at least one input point is point at infinity *\/ */
-/*   if (mod_is0 (P->z, m)) */
-/*     { */
-/*       ASSERT (mod_is0 (P->x, m)); */
-/*       ellM_set (R, Q, m); */
-/*       return; */
-/*     } */
-/*   if (mod_is0 (Q->z, m)) */
-/*     { */
-/*       ASSERT (mod_is0 (Q->x, m)); */
-/*       ellM_set (R, P, m); */
-/*       return; */
-/*     } */
-/* #endif */
-
-#if COUNT_ELLE_OPS
-  ellE_add_count++;
-#endif
-
-  mod_init_noset0 (A, m);
-  mod_init_noset0 (B, m);
-  mod_init_noset0 (C, m);
-  mod_init_noset0 (D, m);
-  mod_init_noset0 (E, m);
-  mod_init_noset0 (F, m);
-  mod_init_noset0 (G, m);
-  mod_init_noset0 (H, m);
-
-  mod_mul(A, P->x, Q->x, m);          /* A = X1 * X2 */
-  mod_mul(B, P->y, Q->y, m);          /* B = Y1 * Y2 */
-  mod_mul(C, P->z, Q->t, m);          /* C = Z1 * T2 */
-  mod_mul(D, P->t, Q->z, m);          /* D = T1 * Z2 */
-  mod_add(E, D, C, m);                /* E = D + C */
-  mod_sub(H, D, C, m);                /* H = D - C */
-  
-  mod_sub(C, P->x, P->y, m);          /* C = (X1 - Y1) */
-  mod_add(D, Q->x, Q->y, m);          /* D = (X2 + Y2) */
-  mod_mul(F, C, D, m);
-  mod_add(F, F, B, m);
-  mod_sub(F, F, A, m);                /* F = (X1 - Y1) * (X2 + Y2) + B - A */
-  
-  mod_mul(G, A, a, m);
-  mod_add(G, G, B, m);                /* G = B + a * A */
-  
-  mod_mul(R->x, E, F, m);             /* X3 = E * F */
-  mod_mul(R->y, G, H, m);             /* Y3 = G * H */
-  mod_mul(R->z, F, G, m);             /* Z3 = F * G */
-  mod_mul(R->t, E, H, m);             /* T3 = E * H */
-  
-
-/* #if ELLM_SAFE_ADD */
-/*   /\* Check if v == 0, which happens if P=Q or P=-Q.  */
-/*      If P=-Q, set result to point at infinity. */
-/*      If P=Q, use ellM_double() instead. */
-/*      This test only works if P=Q on the pseudo-curve modulo N, i.e., */
-/*      if N has several prime factors p, q, ... and P=Q or P=-Q on E_p but  */
-/*      not on E_q, this test won't notice it. *\/ */
-/*   if (mod_is0 (v, m)) */
-/*     { */
-/*       mod_clear (w, m); */
-/*       mod_clear (v, m); */
-/*       mod_clear (u, m); */
-/*       /\* Test if difference is point at infinity *\/ */
-/*       if (mod_is0 (D->z, m)) */
-/*         { */
-/*           ASSERT (mod_is0 (D->x, m)); */
-/*           ellM_double (R, P, m, b); /\* Yes, points are identical, use doubling *\/ */
-/*         } */
-/*       else */
-/*         {  */
-/*           mod_set0 (R->x, m); /\* No, are each other's negatives. *\/ */
-/*           mod_set0 (R->z, m); /\* Set result to point at infinity *\/ */
-/*         } */
-/*       return; */
-/*     } */
-/* #endif */
-
-  mod_clear (A, m);
-  mod_clear (B, m);
-  mod_clear (C, m);
-  mod_clear (D, m);
-  mod_clear (E, m);
-  mod_clear (F, m);
-  mod_clear (G, m);
-  mod_clear (H, m);
-}
-
-/* Computes Q = 2P + R in projective coordinates,   */
-/* where P is given in projective coord. and R in extended coord. */
-MAYBE_UNUSED
-static void
-ellE_double_add (ellE_point_t Q, const ellE_point_t P, const ellEe_point_t R, const modulus_t m, const residue_t a)
-{
-  ellEe_point_t Qe;
-  ellEe_init (Qe, m);
-  /* TODO: optimize cost */
-  ellE_double (Q, P, m, a);
-  ellEe_set_from_E (Qe, Q, m);
-  ellEe_add (Qe, Qe, R, m, a);
-  ellE_set_from_Ee (Q, Qe, m);
-
-  ellEe_clear (Qe, m);
-}
-
-
-/* Computes R = [e]P (mod m) in homogeneous Edwards coordinates
-
-   Twisted Edwards curve (a,d):
-   ax^2 + y^2 = 1 + d * x^2 * y^2, with a * d * (a-d) != 0
-
-   TODO: add conversions between E and Ee coordinates for consecutive doublings
-   Only useful for precomputed addition chains
- */
-MAYBE_UNUSED 
-static void
-ellE_mul_ul (ellE_point_t R, const ellE_point_t P, const unsigned long e, 
-             const modulus_t m, const residue_t a)
-{
-  unsigned long j;
-  long k;
-  ellEe_point_t T, Pe;
-  
-  if (e == 0UL)
-    {
-      mod_set0 (R->x, m);
-      mod_set1 (R->y, m);
-      mod_set1 (R->z, m);
-      return;
-    }
-  
-  if (e == 1UL)
-    {
-      ellE_set (R, P, m);
-      return;
-    }
-  
-  if (e == 2UL)
-    {
-      ellE_double (R, P, m, a);
-      return;
-    }
-
-  if (e == 4UL)
-    {
-      ellE_double (R, P, m, a);
-      ellE_double (R, R, m, a);
-      return;
-    }
-
-  ellEe_init (T, m);
-  ellEe_init (Pe, m);
-  ellEe_set_from_E (Pe, P, m);
-  
-  /* basic double-and-add */
-  
-  /* fprintf (stdout, "Running ellE_mul_ul for e = %lu\n", e); */
-  
-  mod_set0 (T->x, m);
-  mod_set0 (T->t, m);
-  mod_set1 (T->y, m);
-  mod_set1 (T->z, m);
-  
-  k = CHAR_BIT * sizeof(e) - 1;
-  j = (1UL << k);
-  
-  while(k-- >= 0)
-    {
-      ellEe_double (T, T, m, a);
-      if (j & e)
-	ellEe_add (T, T, Pe, m, a);
-      j >>= 1;
-    }
-
-  ellE_set_from_Ee (R, T, m);
-   
-  ellEe_clear (T, m);
-  ellEe_clear (Pe, m);
-}
 
 
 
@@ -936,106 +489,106 @@ ellW_mul_ui (ellW_point_t P, const unsigned long e, residue_t a,
 /* Interpret the bytecode located at "code" and do the 
    corresponding elliptic curve operations on (x::z) */
 /* static */ void
-ellM_interpret_bytecode (ellM_point_t P, const char *bc, unsigned int bc_len,
+ellM_interpret_bytecode (ell_point_t P, const char *bc, unsigned int bc_len,
                          const modulus_t m, const residue_t b)
 {
-  ellM_point_t A, B, C, t, t2;
+  ell_point_t A, B, C, t, t2;
   
-  ellM_init (A, m);
-  ellM_init (B, m);
-  ellM_init (C, m);
-  ellM_init (t, m);
-  ellM_init (t2, m);
+  ell_point_init (A, m);
+  ell_point_init (B, m);
+  ell_point_init (C, m);
+  ell_point_init (t, m);
+  ell_point_init (t2, m);
 
-  ellM_set (A, P, m);
+  ell_point_set (A, P, m);
 
   for (unsigned i = 0; i < bc_len; i++)
   {
     switch (bc[i])
     {
       case 's': /* Swap A, B */
-        ellM_swap (A, B, m);
+        ell_point_swap (A, B, m);
         break;
       case 'i': /* Start of a subchain */
-        ellM_set (B, A, m);
-        ellM_set (C, A, m);
-        ellM_double (A, A, m, b);
+        ell_point_set (B, A, m);
+        ell_point_set (C, A, m);
+        montgomery_dbl (A, A, m, b);
         break;
       case 'f': /* End of a subchain */
-        ellM_add (A, A, B, C, b, m);
+        montgomery_dadd (A, A, B, C, b, m);
         break;
       case 1:
-        ellM_add (t, A, B, C, b, m);
-        ellM_add (t2, t, A, B, b, m);
-        ellM_add (B, B, t, A, b, m);
-        ellM_set (A, t2, m);
+        montgomery_dadd (t, A, B, C, b, m);
+        montgomery_dadd (t2, t, A, B, b, m);
+        montgomery_dadd (B, B, t, A, b, m);
+        ell_point_set (A, t2, m);
         break;
       case 2:
-        ellM_add (B, A, B, C, b, m);
-        ellM_double (A, A, m, b);
+        montgomery_add (B, A, B, C, b, m);
+        montgomery_double (A, A, m, b);
         break;
       case 3:
-        ellM_add (C, B, A, C, b, m);
-        ellM_swap (B, C, m);
+        montgomery_add (C, B, A, C, b, m);
+        ell_point_swap (B, C, m);
         break;
       case 4:
-        ellM_add (B, B, A, C, b, m);
-        ellM_double (A, A, m, b);
+        montgomery_add (B, B, A, C, b, m);
+        montgomery_double (A, A, m, b);
         break;
       case 5:
-        ellM_add (C, C, A, B, b, m);
-        ellM_double (A, A, m, b);
+        montgomery_add (C, C, A, B, b, m);
+        montgomery_double (A, A, m, b);
         break;
       case 6:
-        ellM_double (t, A, m, b);
-        ellM_add (t2, A, B, C, b, m);
-        ellM_add (A, t, A, A, b, m);
-        ellM_add (C, t, t2, C, b, m);
-        ellM_swap (B, C, m);
+        montgomery_double (t, A, m, b);
+        montgomery_add (t2, A, B, C, b, m);
+        montgomery_add (A, t, A, A, b, m);
+        montgomery_add (C, t, t2, C, b, m);
+        ell_point_swap (B, C, m);
         break;
       case 7:
-        ellM_add (t, A, B, C, b, m);
-        ellM_add (B, t, A, B, b, m);
-        ellM_double (t, A, m, b);
-        ellM_add (A, A, t, A, b, m);
+        montgomery_add (t, A, B, C, b, m);
+        montgomery_add (B, t, A, B, b, m);
+        montgomery_double (t, A, m, b);
+        montgomery_add (A, A, t, A, b, m);
         break;
       case 8:
-        ellM_add (t, A, B, C, b, m);
-        ellM_add (C, C, A, B, b, m);
-        ellM_swap (B, t, m);
-        ellM_double (t, A, m, b);
-        ellM_add (A, A, t, A, b, m);
+        montgomery_add (t, A, B, C, b, m);
+        montgomery_add (C, C, A, B, b, m);
+        ell_point_swap (B, t, m);
+        montgomery_double (t, A, m, b);
+        montgomery_add (A, A, t, A, b, m);
         break;
       case 9:
-        ellM_add (C, C, B, A, b, m);
-        ellM_double (B, B, m, b);
+        montgomery_add (C, C, B, A, b, m);
+        montgomery_double (B, B, m, b);
         break;
       case 10:
         /* Combined final add of old subchain and init of new subchain [=fi] */
-        ellM_add (B, A, B, C, b, m);
-        ellM_set (C, B, m);
-        ellM_double (A, B, m, b);
+        montgomery_add (B, A, B, C, b, m);
+        ell_point_set (C, B, m);
+        montgomery_double (A, B, m, b);
         break;
       case 11:
         /* Combined rule 3 and rule 0 [=\x3s] */
-        ellM_add (C, B, A, C, b, m);
+        montgomery_add (C, B, A, C, b, m);
         /* (B,C,A) := (A,B,C)  */
-        ellM_swap (B, C, m);
-        ellM_swap (A, B, m);
+        ell_point_swap (B, C, m);
+        ell_point_swap (A, B, m);
         break;
       case 12:
         /* Combined rule 3, then subchain end/start [=\x3fi] */
-        ellM_add (t, B, A, C, b, m);
-        ellM_add (C, A, t, B, b, m);
-        ellM_set (B, C, m);
-        ellM_double (A, C, m, b);
+        montgomery_add (t, B, A, C, b, m);
+        montgomery_add (C, A, t, B, b, m);
+        ell_point_set (B, C, m);
+        montgomery_double (A, C, m, b);
         break;
       case 13:
         /* Combined rule 3, swap, rule 3 and swap, merged a bit [=\x3s\x3s] */
-        ellM_set (t, B, m);
-        ellM_add (B, B, A, C, b, m);
-        ellM_set (C, A, m);
-        ellM_add (A, A, B, t, b, m);
+        ell_point_set (t, B, m);
+        montgomery_add (B, B, A, C, b, m);
+        ell_point_set (C, A, m);
+        montgomery_add (A, A, B, t, b, m);
         break;
       default:
         printf ("#Unknown bytecode %u\n", (unsigned int) bc[i]);
@@ -1043,13 +596,13 @@ ellM_interpret_bytecode (ellM_point_t P, const char *bc, unsigned int bc_len,
     }
   }
 
-  ellM_set (P, A, m);
+  ell_point_set (P, A, m);
 
-  ellM_clear (A, m);
-  ellM_clear (B, m);
-  ellM_clear (C, m);
-  ellM_clear (t, m);
-  ellM_clear (t2, m);
+  ell_point_clear (A, m);
+  ell_point_clear (B, m);
+  ell_point_clear (C, m);
+  ell_point_clear (t, m);
+  ell_point_clear (t2, m);
 }
 
 
@@ -1058,148 +611,148 @@ ellM_interpret_bytecode (ellM_point_t P, const char *bc, unsigned int bc_len,
 /* - s is the primorial exponent depending only on B1 */
 /* - P is the initial point given in extended coord */
 /* - Q is returned in projective coord */
-static void
-ellE_interpret_bytecode (ellE_point_t P, const char *bc, const unsigned int bc_len,
-			 const modulus_t m, const residue_t a)
-{
-  unsigned char q;
-  ellE_point_t Q;
-  ellEe_point_t Te;
-  ellE_init (Q, m);
-  ellEe_init (Te, m);
+/* static void */
+/* ellE_interpret_bytecode (ellE_point_t P, const char *bc, const unsigned int bc_len, */
+/* 			 const modulus_t m, const residue_t a) */
+/* { */
+/*   unsigned char q; */
+/*   ellE_point_t Q; */
+/*   ellEe_point_t Te; */
+/*   ellE_init (Q, m); */
+/*   ellEe_init (Te, m); */
 
-  q = bc[0];       /* 'q':  permet de remplacer les couilles */
-		   /* en coquilles [PG, Oct. 2016] */
-  ASSERT (q & 1);  /* q is odd */
+/*   q = bc[0];       /\* 'q':  permet de remplacer les couilles *\/ */
+/* 		   /\* en coquilles [PG, Oct. 2016] *\/ */
+/*   ASSERT (q & 1);  /\* q is odd *\/ */
 
-  unsigned char rP_size = (q+1)/2;
-  ASSERT (rP_size <= 127);
+/*   unsigned char rP_size = (q+1)/2; */
+/*   ASSERT (rP_size <= 127); */
 
-  /* Precomputation phase */
+/*   /\* Precomputation phase *\/ */
   
-  /* _2Pe = [2]P in extended coord */
-  ellEe_point_t _2Pe;
-  ellEe_init (_2Pe, m);
-  ellEe_set_from_E (_2Pe, P, m);
-  ellEe_double (_2Pe, _2Pe, m, a);
+/*   /\* _2Pe = [2]P in extended coord *\/ */
+/*   ellEe_point_t _2Pe; */
+/*   ellEe_init (_2Pe, m); */
+/*   ellEe_set_from_E (_2Pe, P, m); */
+/*   ellEe_double (_2Pe, _2Pe, m, a); */
 
-#if 1
-  printf ("P: ");
-  ellE_print (P);
-  printf ("2P: ");
-  ellEe_print (_2Pe);
-#endif
+/* #if 1 */
+/*   printf ("P: "); */
+/*   ellE_print (P); */
+/*   printf ("2P: "); */
+/*   ellEe_print (_2Pe); */
+/* #endif */
 
-  /* _rP[i] = [2*i+1]P in extended coord */
-  ellEe_point_t *_rP;
-  _rP = (ellEe_point_t *) malloc (rP_size * sizeof (ellEe_point_t));
+/*   /\* _rP[i] = [2*i+1]P in extended coord *\/ */
+/*   ellEe_point_t *_rP; */
+/*   _rP = (ellEe_point_t *) malloc (rP_size * sizeof (ellEe_point_t)); */
 
-  ASSERT (_rP != NULL);
+/*   ASSERT (_rP != NULL); */
 
-  for (int i=0 ; i < rP_size ; i++)
-    ellEe_init (_rP[i], m);
+/*   for (int i=0 ; i < rP_size ; i++) */
+/*     ellEe_init (_rP[i], m); */
 
-  ellEe_set_from_E (_rP[0], P, m);
+/*   ellEe_set_from_E (_rP[0], P, m); */
 
-  for (int i = 1 ; i < rP_size ; i++)
-    ellEe_add (_rP[i], _rP[i-1], _2Pe, m, a);
+/*   for (int i = 1 ; i < rP_size ; i++) */
+/*     ellEe_add (_rP[i], _rP[i-1], _2Pe, m, a); */
 
-#if 1
-  printf ("_rP: ");
-  for (int i = 0 ; i < rP_size ; i++)
-    {
-      printf ("%d: ", i);
-      ellEe_print (_rP[i]);
-    }
-#endif
+/* #if 1 */
+/*   printf ("_rP: "); */
+/*   for (int i = 0 ; i < rP_size ; i++) */
+/*     { */
+/*       printf ("%d: ", i); */
+/*       ellEe_print (_rP[i]); */
+/*     } */
+/* #endif */
 
-  /* Addition chain */
+/*   /\* Addition chain *\/ */
   
-  /* Starting point (depends on bc[1] and bc[2]) */
+/*   /\* Starting point (depends on bc[1] and bc[2]) *\/ */
 
-  unsigned int i = bc[1] & 0x7F;
+/*   unsigned int i = bc[1] & 0x7F; */
   
-#if 1
-  printf ("i = %d, 2i+1 = %d\n", i, 2*i+1);
-#endif
+/* #if 1 */
+/*   printf ("i = %d, 2i+1 = %d\n", i, 2*i+1); */
+/* #endif */
 
-  if (i == 0x7F)
-    {
-#if 1
-      printf ("DBLCODE\n");
-#endif
-      ellEe_set (Te, _2Pe, m);
-    }
-  else
-    {
-      ellEe_set (Te, _rP[i], m);
-#if 1
-      printf ("CODE: %d\n", i);
-#endif
-    }
+/*   if (i == 0x7F) */
+/*     { */
+/* #if 1 */
+/*       printf ("DBLCODE\n"); */
+/* #endif */
+/*       ellEe_set (Te, _2Pe, m); */
+/*     } */
+/*   else */
+/*     { */
+/*       ellEe_set (Te, _rP[i], m); */
+/* #if 1 */
+/*       printf ("CODE: %d\n", i); */
+/* #endif */
+/*     } */
 
-#if 1
-  ellEe_print (Te);
-#endif
+/* #if 1 */
+/*   ellEe_print (Te); */
+/* #endif */
 
-  if (bc[1] & 0x80)
-    {
-      i = bc[2] & 0x7F;
-#if 1
-      printf ("CODE: %d\n", i);
-#endif
+/*   if (bc[1] & 0x80) */
+/*     { */
+/*       i = bc[2] & 0x7F; */
+/* #if 1 */
+/*       printf ("CODE: %d\n", i); */
+/* #endif */
 
-      ellEe_add (Te, Te, _rP[i], m, a);
-    }
-  ellE_set_from_Ee (Q, Te, m);
+/*       ellEe_add (Te, Te, _rP[i], m, a); */
+/*     } */
+/*   ellE_set_from_Ee (Q, Te, m); */
 
-#if 1
-  ellE_mul_ul (Q, P, 3, m, a);
-  printf ("3P: ");
-  ellE_print (Q);
-#endif
+/* #if 1 */
+/*   ellE_mul_ul (Q, P, 3, m, a); */
+/*   printf ("3P: "); */
+/*   ellE_print (Q); */
+/* #endif */
 
-  /* scan bc[i] for i >= 3 */
-  for (unsigned int i = 3; i < bc_len; i++)
-  {
-#if 1
-    ellE_print (Q);
-#endif
+/*   /\* scan bc[i] for i >= 3 *\/ */
+/*   for (unsigned int i = 3; i < bc_len; i++) */
+/*   { */
+/* #if 1 */
+/*     ellE_print (Q); */
+/* #endif */
 
-    char b = bc[i];
-    switch (b)
-    {
-      case ADDCHAIN_2DBL:
-        ellE_double (Q, Q, m, a);
-#if 1
-    ellE_print (Q);
-#endif
-        no_break();
+/*     char b = bc[i]; */
+/*     switch (b) */
+/*     { */
+/*       case ADDCHAIN_2DBL: */
+/*         ellE_double (Q, Q, m, a); */
+/* #if 1 */
+/*     ellE_print (Q); */
+/* #endif */
+/*         no_break(); */
 
-      case ADDCHAIN_DBL:
-        ellE_double (Q, Q, m, a);
-#if 1
-    ellE_print (Q);
-#endif
-        break;
-      default:
-        ellEe_set (Te, _rP[b & 0x7f], m);
-	      if (b & 0x80)
-	        ellEe_neg (Te, m);
-	      ellE_double_add (Q, Q, Te, m, a);
-        break;
-    }
-  }
+/*       case ADDCHAIN_DBL: */
+/*         ellE_double (Q, Q, m, a); */
+/* #if 1 */
+/*     ellE_print (Q); */
+/* #endif */
+/*         break; */
+/*       default: */
+/*         ellEe_set (Te, _rP[b & 0x7f], m); */
+/* 	      if (b & 0x80) */
+/* 	        ellEe_neg (Te, m); */
+/* 	      ellE_double_add (Q, Q, Te, m, a); */
+/*         break; */
+/*     } */
+/*   } */
   
-  ellE_set (P, Q, m);
+/*   ellE_set (P, Q, m); */
 
-  ellE_clear (Q, m);
-  ellEe_clear (_2Pe, m);
-  ellEe_clear (Te, m);
-  for (i=0 ; i < rP_size ; i++)
-    ellEe_clear (_rP[i], m);
-  free (_rP);
-}
+/*   ellE_clear (Q, m); */
+/*   ellEe_clear (_2Pe, m); */
+/*   ellEe_clear (Te, m); */
+/*   for (i=0 ; i < rP_size ; i++) */
+/*     ellEe_clear (_rP[i], m); */
+/*   free (_rP); */
+/* } */
 
 
 /* Produces curve in Montgomery form from sigma value.
@@ -1567,7 +1120,7 @@ Montgomery16_curve_from_k (residue_t b, residue_t x, const unsigned long k,
 
 
 static int 
-Twisted_Edwards16_curve_from_sigma (residue_t d, ellE_point_t P,
+Twisted_Edwards16_curve_from_sigma (residue_t d, ell_point_t P,
 				    MAYBE_UNUSED const unsigned long sigma, 
 				    const modulus_t m)
 {
@@ -1597,7 +1150,7 @@ Twisted_Edwards16_curve_from_sigma (residue_t d, ellE_point_t P,
     {
       mod_gcd (f, yd, m);
       mod_clear (u, m);
-      ellE_clear (P, m);
+      //      ellE_clear (P, m);
       return 0;
     }
   mod_mul (P->y, yn, u, m);
@@ -1611,7 +1164,7 @@ Twisted_Edwards16_curve_from_sigma (residue_t d, ellE_point_t P,
     {
       mod_gcd (f, dd, m);
       mod_clear (u, m);
-      ellE_clear (P, m);
+      //      ellE_clear (P, m);
       return 0;
     }
   mod_mul (d, d, u, m);
@@ -2157,13 +1710,12 @@ int
 ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
 {
   residue_t u, b, d, a;
-  ellM_point_t P, Pt;
-
-  ellE_point_t Q;
+  ell_point_t P, Pt;
+  ell_point_t Q;
 
   /* P is initialized here because the coordinates of P may be used as temporary
      variables when constructing curves from sigma! (mouaif) */
-  ellM_init (P, m); 
+  ell_point_init (P, m); 
 
   unsigned int i;
   int bt = 0;
@@ -2185,7 +1737,7 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
 	mod_clear (u, m);
 	mod_clear (A, m);
 	mod_clear (b, m);
-	ellM_clear (P, m);
+	ell_point_clear (P, m);      
 	mod_clear (s, m);
 	return 0;
       }
@@ -2208,7 +1760,7 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
 	mod_clear (u, m);
 	mod_clear (A, m);
 	mod_clear (b, m);
-	ellM_clear (P, m);
+	ell_point_clear (P, m);
 	return 0;
       }
     mod_set1 (P->z, m);
@@ -2226,7 +1778,7 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
 	  mod_gcd (f, P->x, m);
 	  mod_clear (u, m);
 	  mod_clear (b, m);
-	  ellM_clear (P, m);
+	  ell_point_clear (P, m);
 	  return 0;
 	}
       mod_set1 (P->z, m);
@@ -2236,6 +1788,7 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
     if (Twisted_Edwards16_curve_from_sigma (d, Q, plan->sigma, m) == 0)
       {
 	// TODO: check if factor found!
+	ell_point_clear (Q, m);
 	return 0;
       }
   }
@@ -2287,19 +1840,19 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
 	 probability that a point of very small order on all E_p is encountered
 	 during the Lucas chain is reduced, and so the probability of using
 	 curve addition erroneously. */
-    ellM_init (Pt, m);
-    ellM_set (Pt, P, m);
+    ell_point_init (Pt, m);
+    ell_point_set (Pt, P, m);
     for (i = 0; i < plan->exp2; i++)
       {
-	ellM_double (P, P, m, b);
+	montgomery_dbl (P, P, m, b);
 #if ECM_BACKTRACKING
 	if (mod_is0 (P[0].z, m))
 	  {
-	    ellM_set (P, Pt, m);
+	    ell_point_set (P, Pt, m);
 	    bt = 1;
 	    break;
 	  }
-	ellM_set (Pt, P, m);
+	ell_point_set (Pt, P, m);
 #endif
       }
     mod_gcd (f, P[0].z, m);
@@ -2314,25 +1867,26 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
       
       ellE_interpret_bytecode (Q, plan->bc, plan->bc_len, m, a);
       
-      ellE_point_t Qt;
-      ellE_init (Qt, m);
-      ellE_set (Qt, Q, m);
+      ell_point_t Qt;
+      ell_point_init (Qt, m);
+      ell_point_set (Qt, Q, m);
       for (i = 0; i < plan->exp2; i++)
 	{
-	  ellE_double (Q, Q, m, b);
+	  edwards_dbl (Q, Q, m, EDW_proj);   // ??? output_type ???
+
 #if ECM_BACKTRACKING
 	  if (mod_is0 (Q[0].x, m))
 	    {
-	      ellE_set (Q, Qt, m);
+	      ell_point_set (Q, Qt, m);
 	      bt = 1;
 	      break;
 	    }
-	  ellE_set (Qt, Q, m);
+	  ell_point_set (Qt, Q, m);
 #endif
 	}
       mod_gcd (f, Q[0].x, m);
 
-      ellE_clear (Qt, m);
+      ell_point_clear (Qt, m);
     }
   
 #if 0
@@ -2349,13 +1903,13 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
   
   mod_clear (u, m);
   mod_clear (b, m);
-  ellM_clear (P, m);
-  ellM_clear (Pt, m);
+  ell_point_clear (P, m);
+  ell_point_clear (Pt, m);
   
   if (plan->parameterization & FULLTWED)
   {
     mod_clear (a, m);
-    ellE_clear (Q, m);
+    ell_point_clear (Q, m);
   }
 
   return bt;
@@ -2413,8 +1967,11 @@ ell_pointorder (const residue_t sigma, const int parameterization,
   else if (parameterization == TWED16)
     {
       if (Twisted_Edwards16_curve_from_sigma (d, Q, mod_get_ul(sigma, m), m) == 0)
-	return 0;
-
+	{
+	  // Free Q
+	  return 0;
+	}
+      
       /* We convert the returned twisted Edwards curve E (with a = -1) of the
 	 form -x^2 + y^2 = 1 + dx^2y^2 together with a point Q on E to an
 	 equivalent Montgomety curve M given by: By^2 = x^3 + Ax^2 + x, where A
