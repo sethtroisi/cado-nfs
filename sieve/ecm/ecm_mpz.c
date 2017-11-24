@@ -5,15 +5,8 @@
 #define ell_pointorder ell_pointorder_mpz
 #define ellM_curveorder_jacobi ellM_curveorder_jacobi_mpz
 #define ell_curveorder ell_curveorder_mpz
-#define ellM_double ellM_double_mpz
-#define ellM_add ellM_add_mpz
-#define ellM_interpret_bytecode ellM_interpret_bytecode_mpz
-#define ecm_stage2 ecm_stage2_mpz
 
-#define ecmE ecmE_mpz
-#define ellE_double ellE_double_mpz
-#define ellE_add ellE_add_mpz
-#define ecmE_stage2 ecmE_stage2_mpz
+#define ecm_stage2 ecm_stage2_mpz
 
 #define ec_arith ec_arith_mpz
 #define ec_point_init ec_point_init_mpz
@@ -32,6 +25,7 @@
 #define montgomery_dbl montgomery_dbl_mpz
 #define montgomery_dadd montgomery_dadd_mpz
 #define montgomery_smul_ui montgomery_smul_ui_mpz
+#define ellM_interpret_bytecode ellM_interpret_bytecode_mpz
 
 #define weierstrass_add weierstrass_add_mpz
 #define weierstrass_dbl weierstrass_dbl_mpz

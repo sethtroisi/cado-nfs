@@ -1484,7 +1484,7 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
    Looks for i in Hasse interval so that i*P = O, has complexity O(m^(1/4)). */
 
 unsigned long
-ec_pointorder (const residue_t sigma, const int parameterization, 
+ell_pointorder (const residue_t sigma, const int parameterization, 
 		const unsigned long known_m, const unsigned long known_r,
 		const modulus_t m, const int verbose)
 {
@@ -1838,7 +1838,7 @@ ellM_curveorder_jacobi (residue_t A, residue_t x, modulus_t m)
 }
 
 unsigned long 
-ec_curveorder (const unsigned long sigma_par, int parameterization, 
+ell_curveorder (const unsigned long sigma_par, int parameterization, 
 		const unsigned long m_par)
 {
   residue_t sigma, A, X;
