@@ -271,3 +271,73 @@ edwards_tpl (ell_point_t R, const ell_point_t P,
   mod_clear (zF, m);
   mod_clear (zG, m);
 }
+
+
+/* ------------------------------------------------------------------------- */
+
+/* Computes R = [e]P (mod m)  */
+MAYBE_UNUSED 
+static void
+edwards_mul_ul (ell_point_t R, const ell_point_t P, const unsigned long e, 
+             const modulus_t m)
+{
+  unsigned long j;
+  long k;
+  ell_point_t T, Pe;
+  
+  if (e == 0UL)
+    {
+      mod_set0 (R->x, m);
+      mod_set1 (R->y, m);
+      mod_set1 (R->z, m);
+      return;
+    }
+  
+  if (e == 1UL)
+    {
+      ell_point_set (R, P, m);
+      return;
+    }
+  
+  if (e == 2UL)
+    {
+      edwards_dbl (R, P, m, EDW_ext);
+      return;
+    }
+
+  if (e == 4UL)
+    {
+      edwards_dbl (R, P, m, EDW_ext);
+      edwards_dbl (R, R, m, EDW_ext);
+      return;
+    }
+
+  ell_point_init (T, m);
+  ell_point_init (Pe, m);
+  ell_point_set (Pe, P, m);
+  
+  /* basic double-and-add */
+  
+  mod_set0 (T->x, m);
+  mod_set0 (T->t, m);
+  mod_set1 (T->y, m);
+  mod_set1 (T->z, m);
+  
+  k = CHAR_BIT * sizeof(e) - 1;
+  j = (1UL << k);
+  
+  while(k-- >= 0)
+    {
+      edwards_dbl (T, T, m, EDW_ext);
+      if (j & e)
+	edwards_add (T, T, Pe, m, EDW_ext);
+      j >>= 1;
+    }
+
+  ell_point_set (R, T, m);
+   
+  ell_point_clear (T, m);
+  ell_point_clear (Pe, m);
+}
+
+
