@@ -1,71 +1,104 @@
-bytecode = array of char = 8 bit lenght
+MISHMASH bytecode
+=================
 
-bc = b7, b6, ..., b0
+bytecode = array of byte (implemented as uint8_t)
 
-### control bytecode <==> b0 = 1
+Used to encode different way to perform scalar multiplication for ECM or fast
+exponentitation for p+1.
+This document described the MISHMASH bytecode in the context of ECM, but it can
+easily be translated for P+1.
 
-00010001     beginning of a new DBLADD_block
-00100001     beginning of a new precomp_block
-00110001     beginning of a new PRAC_block
+The MISHMASH bytecode encodes different blocks, each block is responsible for
+performing Q <- [k]P.
 
-11111111     end of computation
+# Environment
+
+P = starting point of the block.
+Q = current point / output point of the block.
+R[] = array of precomputed point
+  - R[0] is always set to P at the beginning of a block
+
+# Format of the point
+  The point can have 3 different formats (always coded on 2 bits in the
+  following):
+    00 = Ep = Twisted Edwards projective coordinates 
+    01 = Ee = Twisted Edwards extended coordinates
+    00 = M  = Montgomery XZ coordinates
 
 
-### operation bytecode <==> b0 = 0
+# The first byte of the bytecode
 
-Q = current point
-R[] = array of precomputed point (R[0] = P = starting point at the beginning of
-                                                                      the block)
+nnnnnnnn
+  The first byte of MISHMASH bytecode is interpreted as an integer N, which is
+  the number of additionl points needed for the computation
+    => size of array R = N + 1 ( + 1 for the starting point)
+  N = nnnnnnnn
 
-# inside DBLADD_block
 
-  xxxxx000     Q <- [2^n]Q
-                  n = b7...b3
-                  input Q=proj
-                  output=depend on next byte
-  xxxxx010     Q <- [3^n]Q
-                  n = b7...b3
-                  input Q=proj
-                  output=depend on next byte
-  xxxxx100     Q <- Q + R[i]
-                  i = b7..b3
-                  input Q=ext
-                  input R[i]=ext
-                  output=depend on next byte
-  xxxxx110     Q <- Q - R[i]
-                  i = b7..b3
-                  input Q=ext
-                  input R[i]=ext
-                  output=depend on next byte
 
-# inside precomp_block
-  xxxxxxx0     R[i] <- [3^n]Q and Q <- R[i]
-  xxxxx000     Q <- R[i] <- [2^n]Q
-                  n = b7...b3
-                  i = position of the current byte from the start of the block
-                  input Q=proj
-                  output R[i]=proj
-                  output Q=proj
-  xxxxx010     Q <- R[i] <- [3^n]Q
-                  n = b7...b3
-                  i = position of the current byte from the start of the block
-                  input Q=proj
-                  output R[i]=proj
-                  output Q=proj
-  xxxxx100     R[k] <- R[i] + R[j]
-                  k = b7..b4
-                  j = c7..c4 # of next byte
-                  i = c3..c0 # of next byte
-                  input R[i]=ext
-                  input R[j]=ext
-                  output R[k]=ext
-  xxxxx100     R[k] <- R[i] - R[j]
-                  k = b7..b4
-                  j = c7..c4 # of next byte
-                  i = c3..c0 # of next byte
-                  input R[i]=ext
-                  input R[j]=ext
-                  output R[k]=ext
+The following byte are interpreted using the format described below.
 
-# inside PRAC_block
-  current implementation of bytecode
+
+# 1-byte opcode
+
+11111111
+  Final opcode, use to mark the end of the bytecode array.
+  Final output is in Q
+
+00000000
+  Beginning of a (default) block, we need to perform R[0] <- Q
+
+00000001
+  Beginning of a PRAC block.
+  Q must be in M format
+  From the next byte, interpret the bytecode as PRAC bytecode until the final
+  byte of PRAC bytecode is reached.
+
+# 2-byte opcode
+
+00000010 iiiiiiii
+  Perform Q <- R[I]
+    I = iiiiiiii is the index for the array R
+
+# 4-byte opcode
+
+00001sff tttttttt dddddddd iiiiiiii
+  Perform Q <- [3^T 2^D] Q +/- R[I]
+    0f = format of the output R[I]
+    s = the sign (0 for an "+", 1 for a "-")
+    T = tttttttt is the number of triplings
+    D = dddddddd is the number of doublings
+    I = iiiiiiii is an index for the array R
+    The input Q must be in Ee or Ep format
+    The input R[I] must be in Ee format
+
+000100ff tttttttt dddddddd iiiiiiii
+  Perform Q <- R[I] <- [3^T 2^D] Q
+    ff = format of the output R[I] (only valid format are Ee or Ep)
+    T = tttttttt is the number of triplings
+    D = dddddddd is the number of doublings
+    I = iiiiiiii is an index for the array R
+    The input Q must be in Ee or Ep format
+    The output Q can be in Ee or Ep format
+
+00011sff iiiiiiii jjjjjjjj kkkkkkkk
+  Perform R[K] <- R[I] +/- R[j]
+    ff = format of the output R[I] (only valid format are Ee or Ep)
+    s = the sign (0 for an "+", 1 for a "-")
+    I = iiiiiiii is an index for the array R
+    J = jjjjjjjj is an index for the array R
+    K = kkkkkkkk is an index for the array R
+    The input R[I] and R[J] must be in Ee format
+
+# Remaining available opcode:
+00000011
+001xxxxx
+010xxxxx
+011xxxxx
+100xxxxx
+101xxxxx
+110xxxxx
+111xxxxx (except 11111111)
+
+PRAC bytecode
+=============
