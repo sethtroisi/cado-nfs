@@ -1,4 +1,4 @@
-#include "ell_arith_common.h"
+#include "ec_arith_common.h"
 
 /* #define SAFE_EDW_TO_MONTG */
 
@@ -6,7 +6,7 @@
 /* (x : y : z) to (x : y : t : z)
    cost: 3m+1s by computing (xz, yz, xy, z^2) */
 inline void
-edwards_proj_to_ext (ell_point_t Q, const ell_point_t P, const modulus_t m)
+edwards_proj_to_ext (ec_point_t Q, const ec_point_t P, const modulus_t m)
 {
   mod_mul (Q->x, P->x, P->z, m);
   mod_mul (Q->y, P->y, P->z, m);
@@ -15,7 +15,7 @@ edwards_proj_to_ext (ell_point_t Q, const ell_point_t P, const modulus_t m)
 }
 
 inline void
-edwards_neg (ell_point_t Q, const ell_point_t P, const modulus_t m)
+edwards_neg (ec_point_t Q, const ec_point_t P, const modulus_t m)
 {
   mod_neg (Q->x, P->x, m);
   mod_neg (Q->t, P->t, m);
@@ -25,8 +25,8 @@ edwards_neg (ell_point_t Q, const ell_point_t P, const modulus_t m)
 /*     R <- P+Q */
 /*     output_flag can be edwards_proj, edwards_ext or montgomery */
 void
-edwards_add (ell_point_t R, const ell_point_t P, const ell_point_t Q,
-	  const modulus_t m, const ell_point_coord_type_t output_type)
+edwards_add (ec_point_t R, const ec_point_t P, const ec_point_t Q,
+	  const modulus_t m, const ec_point_coord_type_t output_type)
 {
   /* The "add-2008-hwcd-4" addition formulas */
   /* Cost: 8M + 8add + 2*2. */
@@ -110,16 +110,16 @@ edwards_add (ell_point_t R, const ell_point_t P, const ell_point_t Q,
 /*     R <- P-Q */
 /*     output_flag can be edwards_proj, edwards_ext or montgomery */
 void
-edwards_sub (ell_point_t R, const ell_point_t P, const ell_point_t Q,
-	  const modulus_t m, const ell_point_coord_type_t output_type)
+edwards_sub (ec_point_t R, const ec_point_t P, const ec_point_t Q,
+	  const modulus_t m, const ec_point_coord_type_t output_type)
 {
-  ell_point_t QQ;
-  ell_point_init (QQ, m);
+  ec_point_t QQ;
+  ec_point_init (QQ, m);
 
   edwards_neg (QQ, Q, m);
   edwards_add (R, P, QQ, m, output_type);
 
-  ell_point_clear (QQ, m);
+  ec_point_clear (QQ, m);
 }
 
 
@@ -127,8 +127,8 @@ edwards_sub (ell_point_t R, const ell_point_t P, const ell_point_t Q,
 /*     R <- 2*P */
 /*     output_flag can be edwards_proj, edwards_ext */
 void
-edwards_dbl (ell_point_t R, const ell_point_t P,
-	  const modulus_t m, const ell_point_coord_type_t output_type)
+edwards_dbl (ec_point_t R, const ec_point_t P,
+	  const modulus_t m, const ec_point_coord_type_t output_type)
 {
   /* The "dbl-2008-hwcd" doubling formulas */
   /* Cost: 4M + 4S + 1*a + 6add + 1*2. */
@@ -191,8 +191,8 @@ edwards_dbl (ell_point_t R, const ell_point_t P,
 /* Source: 2015 Chuengsatiansup. */
 /* https://hyperelliptic.org/EFD/g1p/auto-twisted-extended-1.html#tripling-tpl-2015-c */
 void
-edwards_tpl (ell_point_t R, const ell_point_t P,
-	  const modulus_t m, const ell_point_coord_type_t output_type)
+edwards_tpl (ec_point_t R, const ec_point_t P,
+	  const modulus_t m, const ec_point_coord_type_t output_type)
 {
 
   residue_t YY, aXX, Ap, B, xB, yB, AA, F, G, xE, yH, zF, zG;
@@ -278,12 +278,12 @@ edwards_tpl (ell_point_t R, const ell_point_t P,
 /* Computes R = [e]P (mod m)  */
 MAYBE_UNUSED 
 static void
-edwards_mul_ul (ell_point_t R, const ell_point_t P, const unsigned long e, 
+edwards_mul_ul (ec_point_t R, const ec_point_t P, const unsigned long e, 
              const modulus_t m)
 {
   unsigned long j;
   long k;
-  ell_point_t T, Pe;
+  ec_point_t T, Pe;
   
   if (e == 0UL)
     {
@@ -295,7 +295,7 @@ edwards_mul_ul (ell_point_t R, const ell_point_t P, const unsigned long e,
   
   if (e == 1UL)
     {
-      ell_point_set (R, P, m);
+      ec_point_set (R, P, m);
       return;
     }
   
@@ -312,9 +312,9 @@ edwards_mul_ul (ell_point_t R, const ell_point_t P, const unsigned long e,
       return;
     }
 
-  ell_point_init (T, m);
-  ell_point_init (Pe, m);
-  ell_point_set (Pe, P, m);
+  ec_point_init (T, m);
+  ec_point_init (Pe, m);
+  ec_point_set (Pe, P, m);
   
   /* basic double-and-add */
   
@@ -334,10 +334,10 @@ edwards_mul_ul (ell_point_t R, const ell_point_t P, const unsigned long e,
       j >>= 1;
     }
 
-  ell_point_set (R, T, m);
+  ec_point_set (R, T, m);
    
-  ell_point_clear (T, m);
-  ell_point_clear (Pe, m);
+  ec_point_clear (T, m);
+  ec_point_clear (Pe, m);
 }
 
 

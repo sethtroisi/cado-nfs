@@ -1,8 +1,6 @@
-#include "ell_arith_common.h"
+#include "ec_arith_common.h"
 
 /*
-  include ell_arith.h that defines point_t
-
   implemented functions:
     - montgomery_dadd (R:montgomery, P:montgomery, Q:montgomery, D:montgomery)
         R <- P+Q (where D=P-Q)
@@ -17,7 +15,7 @@
      - b : (a+2)/4 mod n
   It is permissible to let P and Q use the same memory. */
 void
-montgomery_dbl (ell_point_t Q, const ell_point_t P, const modulus_t m, 
+montgomery_dbl (ec_point_t Q, const ec_point_t P, const modulus_t m, 
              const residue_t b)
 {
   residue_t u, v, w;
@@ -67,8 +65,8 @@ montgomery_dbl (ell_point_t Q, const ell_point_t P, const modulus_t m,
 
    R may be identical to P, Q and/or D. */
 void
-montgomery_dadd (ell_point_t R, const ell_point_t P, const ell_point_t Q, 
-          const ell_point_t D, MAYBE_UNUSED const residue_t b, 
+montgomery_dadd (ec_point_t R, const ec_point_t P, const ec_point_t Q, 
+          const ec_point_t D, MAYBE_UNUSED const residue_t b, 
           const modulus_t m)
 {
   residue_t u, v, w;
@@ -145,11 +143,11 @@ montgomery_dadd (ell_point_t R, const ell_point_t P, const ell_point_t Q,
 
 /* (x:z) <- e*(x:z) (mod p) */
 void
-montgomery_mul_ul (ell_point_t R, const ell_point_t P, unsigned long e, 
+montgomery_mul_ul (ec_point_t R, const ec_point_t P, unsigned long e, 
 		   const modulus_t m, const residue_t b)
 {
   unsigned long l, n;
-  ell_point_t t1, t2;
+  ec_point_t t1, t2;
 
   if (e == 0UL)
     {
@@ -160,7 +158,7 @@ montgomery_mul_ul (ell_point_t R, const ell_point_t P, unsigned long e,
 
   if (e == 1UL)
     {
-      ell_point_set (R, P, m);
+      ec_point_set (R, P, m);
       return;
     }
   
@@ -177,17 +175,17 @@ montgomery_mul_ul (ell_point_t R, const ell_point_t P, unsigned long e,
       return;
     }
 
-  ell_point_init (t1, m);
+  ec_point_init (t1, m);
 
   if (e == 3UL)
     {
       montgomery_dbl (t1, P, m, b);
       montgomery_dadd (R, t1, P, P, b, m);
-      ell_point_clear (t1, m);
+      ec_point_clear (t1, m);
       return;
     }
 
-  ell_point_init (t2, m);
+  ec_point_init (t2, m);
   e --;
 
   /* compute number of steps needed: we start from (1,2) and go from
@@ -195,7 +193,7 @@ montgomery_mul_ul (ell_point_t R, const ell_point_t P, unsigned long e,
   for (l = e, n = 0; l > 1; n ++, l /= 2) ;
 
   /* start from P1=P, P2=2P */
-  ell_point_set (t1, P, m);
+  ec_point_set (t1, P, m);
   montgomery_dbl (t2, t1, m, b);
 
   while (n--)
@@ -214,8 +212,8 @@ montgomery_mul_ul (ell_point_t R, const ell_point_t P, unsigned long e,
         }
     }
   
-  ell_point_set (R, t2, m);
+  ec_point_set (R, t2, m);
 
-  ell_point_clear (t1, m);
-  ell_point_clear (t2, m);
+  ec_point_clear (t1, m);
+  ec_point_clear (t2, m);
 }

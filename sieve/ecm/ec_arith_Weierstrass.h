@@ -1,6 +1,4 @@
 /*
-  include ell_arith.h that defines point_t
-
   implemented functions:
     - weierstrass_add (R:weierstrass, P:weierstrass, Q:weierstrass)
         R <- P+Q
