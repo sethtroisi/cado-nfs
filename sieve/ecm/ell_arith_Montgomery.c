@@ -1,3 +1,5 @@
+#include "ell_arith_common.h"
+
 /*
   include ell_arith.h that defines point_t
 
@@ -9,3 +11,211 @@
         R <- 2*P
 */
 
+
+/* computes Q=2P, with 5 muls (3 muls and 2 squares) and 4 add/sub.
+     - m : number to factor
+     - b : (a+2)/4 mod n
+  It is permissible to let P and Q use the same memory. */
+void
+montgomery_dbl (ell_point_t Q, const ell_point_t P, const modulus_t m, 
+             const residue_t b)
+{
+  residue_t u, v, w;
+
+#if ELLM_SAFE_ADD
+  if (mod_is0 (P->z, m))
+    {
+      ASSERT (mod_is0 (P->x, m));
+    }
+#endif
+  
+#if COUNT_ELLM_OPS
+  ellM_double_count++;
+#endif
+
+  mod_init_noset0 (u, m);
+  mod_init_noset0 (v, m);
+  mod_init_noset0 (w, m);
+
+  mod_add (u, P->x, P->z, m);
+  mod_sqr (u, u, m);          /* u = (x + z)^2 */
+  mod_sub (v, P->x, P->z, m);
+  mod_sqr (v, v, m);          /* v = (x - z)^2 */
+  mod_mul (Q->x, u, v, m);    /* x2 = (x^2 - z^2)^2 */
+  mod_sub (w, u, v, m);       /* w = 4 * x * z */
+  mod_mul (u, w, b, m);       /* u = x * z * (A + 2) */
+  mod_add (u, u, v, m);       /* u = x^2 + x * z * A + z^2 */
+  mod_mul (Q->z, w, u, m);    /* Q_z = (4xz) * (x^2 + xzA + z^2) */
+
+#if ELLM_SAFE_ADD
+  if (mod_is0 (Q->z, m))
+    mod_set0 (Q->x, m);
+#endif
+
+  mod_clear (w, m);
+  mod_clear (v, m);
+  mod_clear (u, m);
+}
+
+
+/* adds P and Q and puts the result in R,
+   using 6 muls (4 muls and 2 squares), and 6 add/sub.
+   One assumes that Q-R=D or R-Q=D.
+   This function assumes that P !~= Q, i.e. that there is 
+   no t!=0 so that P->x = t*Q->x and P->z = t*Q->z, for otherwise the result 
+   is (0:0) although it shouldn't be (which actually is good for factoring!).
+
+   R may be identical to P, Q and/or D. */
+void
+montgomery_dadd (ell_point_t R, const ell_point_t P, const ell_point_t Q, 
+          const ell_point_t D, MAYBE_UNUSED const residue_t b, 
+          const modulus_t m)
+{
+  residue_t u, v, w;
+
+#if ELLM_SAFE_ADD
+  /* Handle case where at least one input point is point at infinity */
+  if (mod_is0 (P->z, m))
+    {
+      ASSERT (mod_is0 (P->x, m));
+      ellM_set (R, Q, m);
+      return;
+    }
+  if (mod_is0 (Q->z, m))
+    {
+      ASSERT (mod_is0 (Q->x, m));
+      ellM_set (R, P, m);
+      return;
+    }
+#endif
+
+#if COUNT_ELLM_OPS
+  ellM_dadd_count++;
+#endif
+
+  mod_init_noset0 (u, m);
+  mod_init_noset0 (v, m);
+  mod_init_noset0 (w, m);
+
+  mod_sub (u, P->x, P->z, m);
+  mod_add (v, Q->x, Q->z, m);
+  mod_mul (u, u, v, m);      /* u = (Px-Pz)*(Qx+Qz) */
+  mod_add (w, P->x, P->z, m);
+  mod_sub (v, Q->x, Q->z, m);
+  mod_mul (v, w, v, m);      /* v = (Px+Pz)*(Qx-Qz) */
+  mod_add (w, u, v, m);      /* w = 2*(Qx*Px - Qz*Pz)*/
+  mod_sub (v, u, v, m);      /* v = 2*(Qz*Px - Qx*Pz) */
+#if ELLM_SAFE_ADD
+  /* Check if v == 0, which happens if P=Q or P=-Q. 
+     If P=-Q, set result to point at infinity.
+     If P=Q, use ellM_double() instead.
+     This test only works if P=Q on the pseudo-curve modulo N, i.e.,
+     if N has several prime factors p, q, ... and P=Q or P=-Q on E_p but 
+     not on E_q, this test won't notice it. */
+  if (mod_is0 (v, m))
+    {
+      mod_clear (w, m);
+      mod_clear (v, m);
+      mod_clear (u, m);
+      /* Test if difference is point at infinity */
+      if (mod_is0 (D->z, m))
+        {
+          ASSERT (mod_is0 (D->x, m));
+          montgomery_dbl (R, P, m, b); /* Yes, points are identical, use doubling */
+        }
+      else
+        { 
+          mod_set0 (R->x, m); /* No, are each other's negatives. */
+          mod_set0 (R->z, m); /* Set result to point at infinity */
+        }
+      return;
+    }
+#endif
+  mod_sqr (w, w, m);          /* w = 4*(Qx*Px - Qz*Pz)^2 */
+  mod_sqr (v, v, m);          /* v = 4*(Qz*Px - Qx*Pz)^2 */
+  mod_set (u, D->x, m);       /* save D->x */
+  mod_mul (R->x, w, D->z, m); /* may overwrite D->x */
+  mod_mul (R->z, u, v, m);
+
+  mod_clear (w, m);
+  mod_clear (v, m);
+  mod_clear (u, m);
+}
+
+
+/* (x:z) <- e*(x:z) (mod p) */
+void
+montgomery_mul_ul (ell_point_t R, const ell_point_t P, unsigned long e, 
+		   const modulus_t m, const residue_t b)
+{
+  unsigned long l, n;
+  ell_point_t t1, t2;
+
+  if (e == 0UL)
+    {
+      mod_set0 (R[0].x, m);
+      mod_set0 (R[0].z, m);
+      return;
+    }
+
+  if (e == 1UL)
+    {
+      ell_point_set (R, P, m);
+      return;
+    }
+  
+  if (e == 2UL)
+    {
+      montgomery_dbl (R, P, m, b);
+      return;
+    }
+
+  if (e == 4UL)
+    {
+      montgomery_dbl (R, P, m, b);
+      montgomery_dbl (R, R, m, b);
+      return;
+    }
+
+  ell_point_init (t1, m);
+
+  if (e == 3UL)
+    {
+      montgomery_dbl (t1, P, m, b);
+      montgomery_dadd (R, t1, P, P, b, m);
+      ell_point_clear (t1, m);
+      return;
+    }
+
+  ell_point_init (t2, m);
+  e --;
+
+  /* compute number of steps needed: we start from (1,2) and go from
+     (i,i+1) to (2i,2i+1) or (2i+1,2i+2) */
+  for (l = e, n = 0; l > 1; n ++, l /= 2) ;
+
+  /* start from P1=P, P2=2P */
+  ell_point_set (t1, P, m);
+  montgomery_dbl (t2, t1, m, b);
+
+  while (n--)
+    {
+      if ((e >> n) & 1) /* (i,i+1) -> (2i+1,2i+2) */
+        {
+          /* printf ("(i,i+1) -> (2i+1,2i+2)\n"); */
+          montgomery_dadd (t1, t1, t2, P, b, m);
+          montgomery_dbl (t2, t2, m, b);
+        }
+      else /* (i,i+1) -> (2i,2i+1) */
+        {
+          /* printf ("(i,i+1) -> (2i,2i+1)\n"); */
+          montgomery_dadd (t2, t1, t2, P, b, m);
+          montgomery_dbl (t1, t1, m, b);
+        }
+    }
+  
+  ell_point_set (R, t2, m);
+
+  ell_point_clear (t1, m);
+  ell_point_clear (t2, m);
+}
