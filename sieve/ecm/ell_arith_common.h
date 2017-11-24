@@ -1,5 +1,5 @@
-#ifndef _ELL_ARITH_H_
-#define _ELL_ARITH_H_
+#ifndef _ELL_ARITH_COMMON_H_
+#define _ELL_ARITH_COMMON_H_
 
 /* Types of coordinates */
 typedef enum {
