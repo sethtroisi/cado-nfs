@@ -139,12 +139,6 @@ void small_sieve_clear(small_sieve_data_t & ssd)
     ssd.ssp.clear();
 }
 
-void small_sieve_extract_interval(small_sieve_data_t & r, small_sieve_data_t const & s, int bounds[2])
-{
-    r = small_sieve_data_t();
-    r.ssp.assign(s.ssp.begin() +  bounds[0], s.ssp.begin() + bounds[1]);
-}
-
 /* }}} */
 
 /* {{{ Sieve initialization: now the real stuff */

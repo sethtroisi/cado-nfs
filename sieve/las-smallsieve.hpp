@@ -138,7 +138,6 @@ typedef struct {
 extern void small_sieve_info(const char * what, int side, small_sieve_data_t const & r);
 extern int small_sieve_dump(FILE *, const char *, va_list);
 extern void small_sieve_clear(small_sieve_data_t & ssd);
-extern void small_sieve_extract_interval(small_sieve_data_t & r, small_sieve_data_t const & s, int bounds[2]);
 extern void small_sieve_init(small_sieve_data_t & ssd, unsigned int interleaving,
                       std::vector<fb_general_entry>::const_iterator fb_start,
                       std::vector<fb_general_entry>::const_iterator fb_end,
