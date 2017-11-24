@@ -1,4 +1,4 @@
-#include "ell_arith.h"
+#include "ell_arith_common.h"
 
 /* #define SAFE_EDW_TO_MONTG */
 
@@ -15,10 +15,10 @@ edwards_proj_to_ext (ell_point_t Q, const ell_point_t P, const modulus_t m)
 }
 
 inline void
-edwards_neg (ell_point_t P, const modulus_t m)
+edwards_neg (ell_point_t Q, const ell_point_t P, const modulus_t m)
 {
-  mod_neg (P->x, P->x, m);
-  mod_neg (P->t, P->t, m);
+  mod_neg (Q->x, P->x, m);
+  mod_neg (Q->t, P->t, m);
 }
 
 /* - edwards_add (R:output_flag, P:edwards_ext, Q:edwards_ext, output_flag) */
@@ -26,7 +26,7 @@ edwards_neg (ell_point_t P, const modulus_t m)
 /*     output_flag can be edwards_proj, edwards_ext or montgomery */
 void
 edwards_add (ell_point_t R, const ell_point_t P, const ell_point_t Q,
-	  const modulus m, const ell_point_coord_type output_type)
+	  const modulus_t m, const ell_point_coord_type_t output_type)
 {
   /* The "add-2008-hwcd-4" addition formulas */
   /* Cost: 8M + 8add + 2*2. */
@@ -111,13 +111,13 @@ edwards_add (ell_point_t R, const ell_point_t P, const ell_point_t Q,
 /*     output_flag can be edwards_proj, edwards_ext or montgomery */
 void
 edwards_sub (ell_point_t R, const ell_point_t P, const ell_point_t Q,
-	  const modulus m, const ell_point_coord_type output_type)
+	  const modulus_t m, const ell_point_coord_type_t output_type)
 {
   ell_point_t QQ;
   ell_point_init (QQ, m);
 
   edwards_neg (QQ, Q, m);
-  edwards_add (R, P, QQ, m);
+  edwards_add (R, P, QQ, m, output_type);
 
   ell_point_clear (QQ, m);
 }
@@ -128,7 +128,7 @@ edwards_sub (ell_point_t R, const ell_point_t P, const ell_point_t Q,
 /*     output_flag can be edwards_proj, edwards_ext */
 void
 edwards_dbl (ell_point_t R, const ell_point_t P,
-	  const modulus_t m, const ell_point_coord_type output_type)
+	  const modulus_t m, const ell_point_coord_type_t output_type)
 {
   /* The "dbl-2008-hwcd" doubling formulas */
   /* Cost: 4M + 4S + 1*a + 6add + 1*2. */
@@ -157,7 +157,7 @@ edwards_dbl (ell_point_t R, const ell_point_t P,
   mod_sqr (B, P->y, m);                // B := Y1^2
   mod_sqr (C, P->z, m);                // C := Z1^2
   mod_add (C, C, C, m);                // C := 2*Z1^2
-  mod_mul (D, A, a, m);                // D := a*A
+  mod_neg (D, A, m);                   // D := a*A  (a = -1)
   mod_add (E, P->x, P->y, m);          // E := (X1 + Y1)
   mod_sqr (E, E, m);                   // E := (X1 + Y1)^2
   mod_sub (E, E, A, m);                // E := (X1 + Y1)^2-A
@@ -168,7 +168,7 @@ edwards_dbl (ell_point_t R, const ell_point_t P,
   mod_mul (R->x, E, F, m);             // X3 := E*F
   mod_mul (R->y, G, H, m);             // Y3 := G*H
   mod_mul (R->z, F, G, m);             // Z3 := F*G
-  if (output_flag == EDW_ext)
+  if (output_type == EDW_ext)
     mod_mul (R->t, E, H, m);           // T3 := E*H
   
   mod_clear (A, m);
@@ -192,7 +192,7 @@ edwards_dbl (ell_point_t R, const ell_point_t P,
 /* https://hyperelliptic.org/EFD/g1p/auto-twisted-extended-1.html#tripling-tpl-2015-c */
 void
 edwards_tpl (ell_point_t R, const ell_point_t P,
-	  const modulus_t m, const ell_point_coord_type output_type)
+	  const modulus_t m, const ell_point_coord_type_t output_type)
 {
 
   residue_t YY, aXX, Ap, B, xB, yB, AA, F, G, xE, yH, zF, zG;
@@ -252,6 +252,8 @@ edwards_tpl (ell_point_t R, const ell_point_t P,
       mod_mul (R->y, yH, zG, m);        // Y3 := yH*zG
       mod_mul (R->z, zF, zG, m);        // Z3 := zF*zG
       mod_mul (R->t, xE, yH, m);        // T3 := xE*yH
+      break;
+    default :
       break;
     }
   

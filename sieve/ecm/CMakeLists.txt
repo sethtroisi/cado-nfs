@@ -57,7 +57,7 @@ add_library(facul
 	makeplan.c facul.cpp
         mpqs_doit.c mpqs_ul.c mpqs_15ul.c mpqs_2ul2.c mpqs_mpz.c
 	batch.c
-	ell_arith.c ell_arith_Edwards.c)
+	ell_arith_ul.c	ell_arith_15ul.c ell_arith_2ul2.c ell_arith_mpz.c)
 
 set_target_properties(facul PROPERTIES COMPILE_FLAGS "${OpenMP_C_FLAGS}")
 

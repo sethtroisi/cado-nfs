@@ -1,4 +1,4 @@
-#include "ell_arith.h"
+#include "ell_arith_common.h"
 
 void ell_point_init (ell_point_t P, const modulus_t m)
 {
@@ -32,7 +32,7 @@ void ell_point_swap (ell_point_t Q, ell_point_t P, const modulus_t m)
   mod_swap (Q->z, P->z, m);
 }
 
-void ell_point_print (ell_point_t P, const ell_point_coord coord_type)
+void ell_point_print (ell_point_t P, const ell_point_coord_type_t coord_type)
   {
   /* FIXME need multiple precision print */
   

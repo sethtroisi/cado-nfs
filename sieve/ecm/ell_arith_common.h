@@ -2,7 +2,12 @@
 #define _ELL_ARITH_H_
 
 /* Types of coordinates */
-enum ell_point_coord_type {AFF, MONTG, EDW_proj, EDW_ext} ;
+typedef enum {
+  AFF,
+  MONTG,
+  EDW_proj,
+  EDW_ext
+} ell_point_coord_type_t;
 
 
 /* A point on an elliptic curve */
@@ -24,6 +29,6 @@ void ell_point_init (ell_point_t, const modulus_t);
 void ell_point_clear (ell_point_t, const modulus_t);
 void ell_point_set (ell_point_t, const ell_point_t, const modulus_t);
 void ell_point_swap (ell_point_t, ell_point_t, const modulus_t);
-void ell_point_print (ell_point_t, const ell_point_coord);
+void ell_point_print (ell_point_t, const ell_point_coord_type_t);
 
 #endif
