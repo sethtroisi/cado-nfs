@@ -14,7 +14,7 @@
      - m : number to factor
      - b : (a+2)/4 mod n
   It is permissible to let P and Q use the same memory. */
-void
+static inline void
 montgomery_dbl (ec_point_t Q, const ec_point_t P, const modulus_t m, 
              const residue_t b)
 {
@@ -64,7 +64,7 @@ montgomery_dbl (ec_point_t Q, const ec_point_t P, const modulus_t m,
    is (0:0) although it shouldn't be (which actually is good for factoring!).
 
    R may be identical to P, Q and/or D. */
-void
+static inline void
 montgomery_dadd (ec_point_t R, const ec_point_t P, const ec_point_t Q, 
           const ec_point_t D, MAYBE_UNUSED const residue_t b, 
           const modulus_t m)
@@ -142,9 +142,9 @@ montgomery_dadd (ec_point_t R, const ec_point_t P, const ec_point_t Q,
 
 
 /* (x:z) <- e*(x:z) (mod p) */
-void
-montgomery_mul_ul (ec_point_t R, const ec_point_t P, unsigned long e, 
-		   const modulus_t m, const residue_t b)
+static inline void
+montgomery_smul_ui (ec_point_t R, const ec_point_t P, unsigned long e, 
+		    const modulus_t m, const residue_t b)
 {
   unsigned long l, n;
   ec_point_t t1, t2;

@@ -2,19 +2,7 @@
 
 /* #define SAFE_EDW_TO_MONTG */
 
-
-/* (x : y : z) to (x : y : t : z)
-   cost: 3m+1s by computing (xz, yz, xy, z^2) */
-inline void
-edwards_proj_to_ext (ec_point_t Q, const ec_point_t P, const modulus_t m)
-{
-  mod_mul (Q->x, P->x, P->z, m);
-  mod_mul (Q->y, P->y, P->z, m);
-  mod_mul (Q->t, P->x, P->y, m);
-  mod_sqr (Q->z, P->z, m);
-}
-
-inline void
+static inline void
 edwards_neg (ec_point_t Q, const ec_point_t P, const modulus_t m)
 {
   mod_neg (Q->x, P->x, m);
@@ -24,7 +12,7 @@ edwards_neg (ec_point_t Q, const ec_point_t P, const modulus_t m)
 /* - edwards_add (R:output_flag, P:edwards_ext, Q:edwards_ext, output_flag) */
 /*     R <- P+Q */
 /*     output_flag can be edwards_proj, edwards_ext or montgomery */
-void
+static inline void
 edwards_add (ec_point_t R, const ec_point_t P, const ec_point_t Q,
 	  const modulus_t m, const ec_point_coord_type_t output_type)
 {
@@ -109,7 +97,7 @@ edwards_add (ec_point_t R, const ec_point_t P, const ec_point_t Q,
 /* - edwards_sub (R:output_flag, P:edwards_ext, Q:edwards_ext, output_flag) */
 /*     R <- P-Q */
 /*     output_flag can be edwards_proj, edwards_ext or montgomery */
-void
+static inline void
 edwards_sub (ec_point_t R, const ec_point_t P, const ec_point_t Q,
 	  const modulus_t m, const ec_point_coord_type_t output_type)
 {
@@ -126,7 +114,7 @@ edwards_sub (ec_point_t R, const ec_point_t P, const ec_point_t Q,
 /* - edwards_dbl (R:output_flag, P:edwards_proj, output_flag) */
 /*     R <- 2*P */
 /*     output_flag can be edwards_proj, edwards_ext */
-void
+static inline void
 edwards_dbl (ec_point_t R, const ec_point_t P,
 	  const modulus_t m, const ec_point_coord_type_t output_type)
 {
@@ -190,7 +178,7 @@ edwards_dbl (ec_point_t R, const ec_point_t P,
 /* Cost: 11M + 3S + 1*a + 7add + 2*2. */
 /* Source: 2015 Chuengsatiansup. */
 /* https://hyperelliptic.org/EFD/g1p/auto-twisted-extended-1.html#tripling-tpl-2015-c */
-void
+static inline void
 edwards_tpl (ec_point_t R, const ec_point_t P,
 	  const modulus_t m, const ec_point_coord_type_t output_type)
 {
@@ -277,9 +265,9 @@ edwards_tpl (ec_point_t R, const ec_point_t P,
 
 /* Computes R = [e]P (mod m)  */
 MAYBE_UNUSED 
-static void
-edwards_mul_ul (ec_point_t R, const ec_point_t P, const unsigned long e, 
-             const modulus_t m)
+static inline void
+edwards_smul_ui (ec_point_t R, const ec_point_t P, const unsigned long e, 
+		 const modulus_t m)
 {
   unsigned long j;
   long k;
@@ -339,5 +327,4 @@ edwards_mul_ul (ec_point_t R, const ec_point_t P, const unsigned long e,
   ec_point_clear (T, m);
   ec_point_clear (Pe, m);
 }
-
 
