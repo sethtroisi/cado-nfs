@@ -355,10 +355,10 @@ sieve/ecm/ecm_15ul.c
 sieve/ecm/ecm_2ul2.c
 sieve/ecm/ecm_mpz.c
 sieve/ecm/ecm_ul.c
-sieve/ecm/ell_arith_common.h
-sieve/ecm/ell_arith_common.c
-sieve/ecm/ell_arith_Edwards.c
-sieve/ecm/ell_arith_Montgomery.c
+sieve/ecm/ec_arith_common.h
+sieve/ecm/ec_arith_Edwards.h
+sieve/ecm/ec_arith_Montgomery.h
+sieve/ecm/ec_arith_Weierstrass.h
 sieve/ecm/facul.cpp
 sieve/ecm/facul.h
 sieve/ecm/facul_doit.c
