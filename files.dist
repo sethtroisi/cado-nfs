@@ -358,6 +358,7 @@ sieve/ecm/ecm_ul.c
 sieve/ecm/ell_arith_common.h
 sieve/ecm/ell_arith_common.c
 sieve/ecm/ell_arith_Edwards.c
+sieve/ecm/ell_arith_Montgomery.c
 sieve/ecm/facul.cpp
 sieve/ecm/facul.h
 sieve/ecm/facul_doit.c
