@@ -7,7 +7,12 @@
 #include "ularith.h"
 #include "getprime.h"
 #include "addchain_bc.h"
-#include "ell_arith_common.h"
+
+#include "ec_arith_common.h"
+#include "ec_arith_Edwards.h"
+#include "ec_arith_Montgomery.h"
+#include "ec_arith_Weierstrass.h"
+
 
 /* Do we want backtracking when processing factors of 2 in E? */
 #ifndef ECM_BACKTRACKING
@@ -40,478 +45,32 @@ static unsigned long ellE_add_count, ellE_double_count, ellE_triple_count;
 #endif
 
 
-/* Projective point on Montgomery curve (x : z) onlyx */
-typedef struct {residue_t x, z;} __ellM_point_t;
-typedef __ellM_point_t ellM_point_t[1];
-
-/* Homogeneous projective Edwards coordinates 
-   (x : y : z) ---> (x/z, y/z)  z != 0 */
-typedef struct {residue_t x, y, z;} __ellE_point_t;
-typedef __ellE_point_t ellE_point_t[1];
-
-/* Extended projective Edwards coordinates 
-   [Hisil et al. 2008] */
-typedef struct {residue_t x, y, t, z;} __ellEe_point_t;
-typedef __ellEe_point_t ellEe_point_t[1];
-
-/* Affine point on Weierstrass curve */
-typedef struct {residue_t x, y;} __ellW_point_t;
-typedef __ellW_point_t ellW_point_t[1];
-
-
-/* -------------------------------------------------------------------------- */
-/* Functions for curves in Montgomery form */
-/* -------------------------------------------------------------------------- */
-static inline void
-ellM_init (ellM_point_t P, const modulus_t m)
-{
-  mod_init (P->x, m);
-  mod_init (P->z, m);
-}
-
-static inline void
-ellM_clear (ellM_point_t P, const modulus_t m)
-{
-  mod_clear (P->x, m);
-  mod_clear (P->z, m);
-}
-
-static inline void
-ellM_set (ellM_point_t Q, const ellM_point_t P, const modulus_t m)
-{
-  mod_set (Q->x, P->x, m);
-  mod_set (Q->z, P->z, m);
-}
-
-static inline void
-ellM_swap (ellM_point_t Q, ellM_point_t P, const modulus_t m)
-{
-  mod_swap (Q->x, P->x, m);
-  mod_swap (Q->z, P->z, m);
-}
-
-/* computes Q=2P, with 5 muls (3 muls and 2 squares) and 4 add/sub.
-     - m : number to factor
-     - b : (a+2)/4 mod n
-  It is permissible to let P and Q use the same memory. */
-static void
-ellM_double (ellM_point_t Q, const ellM_point_t P, const modulus_t m, 
-             const residue_t b)
-{
-  residue_t u, v, w;
-
-#if ELLM_SAFE_ADD
-  if (mod_is0 (P->z, m))
-    {
-      ASSERT (mod_is0 (P->x, m));
-    }
-#endif
-  
-#if COUNT_ELLM_OPS
-  ellM_double_count++;
-#endif
-
-  mod_init_noset0 (u, m);
-  mod_init_noset0 (v, m);
-  mod_init_noset0 (w, m);
-
-  mod_add (u, P->x, P->z, m);
-  mod_sqr (u, u, m);          /* u = (x + z)^2 */
-  mod_sub (v, P->x, P->z, m);
-  mod_sqr (v, v, m);          /* v = (x - z)^2 */
-  mod_mul (Q->x, u, v, m);    /* x2 = (x^2 - z^2)^2 */
-  mod_sub (w, u, v, m);       /* w = 4 * x * z */
-  mod_mul (u, w, b, m);       /* u = x * z * (A + 2) */
-  mod_add (u, u, v, m);       /* u = x^2 + x * z * A + z^2 */
-  mod_mul (Q->z, w, u, m);    /* Q_z = (4xz) * (x^2 + xzA + z^2) */
-
-#if ELLM_SAFE_ADD
-  if (mod_is0 (Q->z, m))
-    mod_set0 (Q->x, m);
-#endif
-
-  mod_clear (w, m);
-  mod_clear (v, m);
-  mod_clear (u, m);
-}
-
-
-/* adds P and Q and puts the result in R,
-     using 6 muls (4 muls and 2 squares), and 6 add/sub.
-   One assumes that Q-R=D or R-Q=D.
-   This function assumes that P !~= Q, i.e. that there is 
-   no t!=0 so that P->x = t*Q->x and P->z = t*Q->z, for otherwise the result 
-   is (0:0) although it shouldn't be (which actually is good for factoring!).
-
-   R may be identical to P, Q and/or D. */
-static void
-ellM_add (ellM_point_t R, const ellM_point_t P, const ellM_point_t Q, 
-          const ellM_point_t D, MAYBE_UNUSED const residue_t b, 
-          const modulus_t m)
-{
-  residue_t u, v, w;
-
-#if ELLM_SAFE_ADD
-  /* Handle case where at least one input point is point at infinity */
-  if (mod_is0 (P->z, m))
-    {
-      ASSERT (mod_is0 (P->x, m));
-      ellM_set (R, Q, m);
-      return;
-    }
-  if (mod_is0 (Q->z, m))
-    {
-      ASSERT (mod_is0 (Q->x, m));
-      ellM_set (R, P, m);
-      return;
-    }
-#endif
-
-#if COUNT_ELLM_OPS
-  ellM_add_count++;
-#endif
-
-  mod_init_noset0 (u, m);
-  mod_init_noset0 (v, m);
-  mod_init_noset0 (w, m);
-
-  mod_sub (u, P->x, P->z, m);
-  mod_add (v, Q->x, Q->z, m);
-  mod_mul (u, u, v, m);      /* u = (Px-Pz)*(Qx+Qz) */
-  mod_add (w, P->x, P->z, m);
-  mod_sub (v, Q->x, Q->z, m);
-  mod_mul (v, w, v, m);      /* v = (Px+Pz)*(Qx-Qz) */
-  mod_add (w, u, v, m);      /* w = 2*(Qx*Px - Qz*Pz)*/
-  mod_sub (v, u, v, m);      /* v = 2*(Qz*Px - Qx*Pz) */
-#if ELLM_SAFE_ADD
-  /* Check if v == 0, which happens if P=Q or P=-Q. 
-     If P=-Q, set result to point at infinity.
-     If P=Q, use ellM_double() instead.
-     This test only works if P=Q on the pseudo-curve modulo N, i.e.,
-     if N has several prime factors p, q, ... and P=Q or P=-Q on E_p but 
-     not on E_q, this test won't notice it. */
-  if (mod_is0 (v, m))
-    {
-      mod_clear (w, m);
-      mod_clear (v, m);
-      mod_clear (u, m);
-      /* Test if difference is point at infinity */
-      if (mod_is0 (D->z, m))
-        {
-          ASSERT (mod_is0 (D->x, m));
-          ellM_double (R, P, m, b); /* Yes, points are identical, use doubling */
-        }
-      else
-        { 
-          mod_set0 (R->x, m); /* No, are each other's negatives. */
-          mod_set0 (R->z, m); /* Set result to point at infinity */
-        }
-      return;
-    }
-#endif
-  mod_sqr (w, w, m);          /* w = 4*(Qx*Px - Qz*Pz)^2 */
-  mod_sqr (v, v, m);          /* v = 4*(Qz*Px - Qx*Pz)^2 */
-  mod_set (u, D->x, m);       /* save D->x */
-  mod_mul (R->x, w, D->z, m); /* may overwrite D->x */
-  mod_mul (R->z, u, v, m);
-
-  mod_clear (w, m);
-  mod_clear (v, m);
-  mod_clear (u, m);
-}
-
-
-/* (x:z) <- e*(x:z) (mod p) */
-static void
-ellM_mul_ul (ellM_point_t R, const ellM_point_t P, unsigned long e, 
-             const modulus_t m, const residue_t b)
-{
-  unsigned long l, n;
-  ellM_point_t t1, t2;
-
-  if (e == 0UL)
-    {
-      mod_set0 (R[0].x, m);
-      mod_set0 (R[0].z, m);
-      return;
-    }
-
-  if (e == 1UL)
-    {
-      ellM_set (R, P, m);
-      return;
-    }
-  
-  if (e == 2UL)
-    {
-      ellM_double (R, P, m, b);
-      return;
-    }
-
-  if (e == 4UL)
-    {
-      ellM_double (R, P, m, b);
-      ellM_double (R, R, m, b);
-      return;
-    }
-
-  ellM_init (t1, m);
-
-  if (e == 3UL)
-    {
-      ellM_double (t1, P, m, b);
-      ellM_add (R, t1, P, P, b, m);
-      ellM_clear (t1, m);
-      return;
-    }
-
-  ellM_init (t2, m);
-  e --;
-
-  /* compute number of steps needed: we start from (1,2) and go from
-     (i,i+1) to (2i,2i+1) or (2i+1,2i+2) */
-  for (l = e, n = 0; l > 1; n ++, l /= 2) ;
-
-  /* start from P1=P, P2=2P */
-  ellM_set (t1, P, m);
-  ellM_double (t2, t1, m, b);
-
-  while (n--)
-    {
-      if ((e >> n) & 1) /* (i,i+1) -> (2i+1,2i+2) */
-        {
-          /* printf ("(i,i+1) -> (2i+1,2i+2)\n"); */
-          ellM_add (t1, t1, t2, P, b, m);
-          ellM_double (t2, t2, m, b);
-        }
-      else /* (i,i+1) -> (2i,2i+1) */
-        {
-          /* printf ("(i,i+1) -> (2i,2i+1)\n"); */
-          ellM_add (t2, t1, t2, P, b, m);
-          ellM_double (t1, t1, m, b);
-        }
-    }
-  
-  ellM_set (R, t2, m);
-
-  ellM_clear (t1, m);
-  ellM_clear (t2, m);
-}
-
-/* -------------------------------------------------------------------------- */
-/* Functions for curves in twisted Edwards form */
-/* -------------------------------------------------------------------------- */
-
-
-
-
-/* -------------------------------------------------------------------------- */
-/* Functions for curves in Weierstrass form */
-/* -------------------------------------------------------------------------- */
-static inline void
-ellW_init (ellW_point_t P, const modulus_t m)
-{
-  mod_init (P->x, m);
-  mod_init (P->y, m);
-}
-
-static inline void
-ellW_clear (ellW_point_t P, const modulus_t m)
-{
-  mod_clear (P->x, m);
-  mod_clear (P->y, m);
-}
-
-static inline void
-ellW_set (ellW_point_t Q, const ellW_point_t P, const modulus_t m)
-{
-  mod_set (Q->x, P->x, m);
-  mod_set (Q->y, P->y, m);
-}
-
-static inline void
-ellW_swap (ellW_point_t Q, ellW_point_t P, const modulus_t m)
-{
-  mod_swap (Q->x, P->x, m);
-  mod_swap (Q->y, P->y, m);
-}
-
-/* R <- 2 * P for the curve y^2 = x^3 + a*x + b.
-
-   For Weierstrass coordinates. Returns 1 if doubling worked normally, 
-   0 if the result is point at infinity.
-*/
-
-static int
-ellW_double (ellW_point_t R, const ellW_point_t P, const residue_t a, 
-	     const modulus_t m)
-{
-  residue_t lambda, u, v;
-
-  mod_init_noset0 (lambda, m);
-  mod_init_noset0 (u, m);
-  mod_init_noset0 (v, m);
-
-  mod_sqr (u, P->x, m);
-  mod_add (v, u, u, m);
-  mod_add (v, v, u, m);
-  mod_add (v, v, a, m); /* 3x^2 + a */
-  mod_add (u, P->y, P->y, m);
-  if (mod_inv (u, u, m) == 0)    /* 1/(2*y) */
-  {
-      mod_clear (v, m);
-      mod_clear (u, m);
-      mod_clear (lambda, m);
-      return 0; /* y was 0  =>  result is point at infinity */
-  }
-  mod_mul (lambda, u, v, m);
-  mod_sqr (u, lambda, m);
-  mod_sub (u, u, P->x, m);
-  mod_sub (u, u, P->x, m);    /* x3 = u = lambda^2 - 2*x */
-  mod_sub (v, P->x, u, m);
-  mod_mul (v, v, lambda, m);
-  mod_sub (R->y, v, P->y, m);
-  mod_set (R->x, u, m);
-  
-  mod_clear (v, m);
-  mod_clear (u, m);
-  mod_clear (lambda, m);
-  return 1;
-}
-
-
-/* Adds two points P and Q on the curve y^2 = x^3 + a*x + b
-   in Weierstrass coordinates and puts result in R. 
-   Returns 1 if the addition worked (i.e. the modular inverse existed) 
-   and 0 otherwise (resulting point is point at infinity) */
-static int
-ellW_add (ellW_point_t R, const ellW_point_t P, const ellW_point_t Q, 
-          const residue_t a, const modulus_t m)
-{
-  residue_t lambda, u, v;
-  int r;
-
-  mod_init_noset0 (u, m);
-  mod_init_noset0 (v, m);
-  mod_init_noset0 (lambda, m);
-
-  mod_sub (u, Q->y, P->y, m);
-  mod_sub (v, Q->x, P->x, m);
-  if (mod_inv (v, v, m) == 0)
-  {
-      /* Maybe we were trying to add two identical points? If so,
-         use the ellW_double() function instead */
-      if (mod_equal (P->x, Q->x, m) && mod_equal (P->y, Q->y, m))
-	  r = ellW_double (R, P, a, m);
-      else 
-	{
-	  /* Or maybe the points are negatives of each other? */
-	  mod_neg (u, P->y, m);
-	  if (mod_equal (P->x, Q->x, m) && mod_equal (u, Q->y, m))
-	    r = 0; /* Signal point at infinity */
-	  else
-	    {
-	      /* Neither identical, nor negatives (mod m). Looks like we
-		 found a proper factor. FIXME: What do we do with it? */
-	      r = 0;
-	    }
-	}
-  }
-  else
-  {
-      mod_mul (lambda, u, v, m);
-      mod_sqr (u, lambda, m);
-      mod_sub (u, u, P->x, m);
-      mod_sub (u, u, Q->x, m);    /* x3 = u = lambda^2 - P->x - Q->x */
-      mod_sub (v, P->x, u, m);
-      mod_mul (v, v, lambda, m);
-      mod_sub (R->y, v, P->y, m);
-      mod_set (R->x, u, m);
-      r = 1;
-  }
-
-  mod_clear (lambda, m);
-  mod_clear (v, m);
-  mod_clear (u, m);
-  return r;
-}
-
-
-/* (x,y) <- e * (x,y) on the curve y^2 = x^3 + a*x + b (mod m) */
-static int
-ellW_mul_ui (ellW_point_t P, const unsigned long e, residue_t a, 
-	     const modulus_t m)
-{
-  unsigned long i;
-  ellW_point_t T;
-  int tfinite; /* Nonzero iff T is NOT point at infinity */
-
-  if (e == 0)
-    return 0; /* signal point at infinity */
-
-  ellW_init (T, m);
-
-  i = ~(0UL);
-  i -= i/2;   /* Now the most significant bit of i is set */
-  while ((i & e) == 0)
-    i >>= 1;
-
-  ellW_set (T, P, m);
-  tfinite = 1;
-  i >>= 1;
-
-  while (i > 0)
-  {
-      if (tfinite)
-	tfinite = ellW_double (T, T, a, m);
-      if (e & i)
-      {
-	  if (tfinite)
-	      tfinite = ellW_add (T, T, P, a, m);
-	  else
-	  {
-	      ellW_set (T, P, m);
-	      tfinite = 1;
-	  }
-      }
-      i >>= 1;
-  }
-
-  if (tfinite)
-    ellW_set (P, T, m);
-
-  ellW_clear (T, m);
-
-  return tfinite;
-}
-
-
 /* Interpret the bytecode located at "code" and do the 
    corresponding elliptic curve operations on (x::z) */
 /* static */ void
-ellM_interpret_bytecode (ell_point_t P, const char *bc, unsigned int bc_len,
+ellM_interpret_bytecode (ec_point_t P, const char *bc, unsigned int bc_len,
                          const modulus_t m, const residue_t b)
 {
-  ell_point_t A, B, C, t, t2;
+  ec_point_t A, B, C, t, t2;
   
-  ell_point_init (A, m);
-  ell_point_init (B, m);
-  ell_point_init (C, m);
-  ell_point_init (t, m);
-  ell_point_init (t2, m);
+  ec_point_init (A, m);
+  ec_point_init (B, m);
+  ec_point_init (C, m);
+  ec_point_init (t, m);
+  ec_point_init (t2, m);
 
-  ell_point_set (A, P, m);
+  ec_point_set (A, P, m);
 
   for (unsigned i = 0; i < bc_len; i++)
   {
     switch (bc[i])
     {
       case 's': /* Swap A, B */
-        ell_point_swap (A, B, m);
+        ec_point_swap (A, B, m);
         break;
       case 'i': /* Start of a subchain */
-        ell_point_set (B, A, m);
-        ell_point_set (C, A, m);
+        ec_point_set (B, A, m);
+        ec_point_set (C, A, m);
         montgomery_dbl (A, A, m, b);
         break;
       case 'f': /* End of a subchain */
@@ -521,74 +80,74 @@ ellM_interpret_bytecode (ell_point_t P, const char *bc, unsigned int bc_len,
         montgomery_dadd (t, A, B, C, b, m);
         montgomery_dadd (t2, t, A, B, b, m);
         montgomery_dadd (B, B, t, A, b, m);
-        ell_point_set (A, t2, m);
+        ec_point_set (A, t2, m);
         break;
       case 2:
-        montgomery_add (B, A, B, C, b, m);
-        montgomery_double (A, A, m, b);
+        montgomery_dadd (B, A, B, C, b, m);
+        montgomery_dbl (A, A, m, b);
         break;
       case 3:
-        montgomery_add (C, B, A, C, b, m);
-        ell_point_swap (B, C, m);
+        montgomery_dadd (C, B, A, C, b, m);
+        ec_point_swap (B, C, m);
         break;
       case 4:
-        montgomery_add (B, B, A, C, b, m);
-        montgomery_double (A, A, m, b);
+        montgomery_dadd (B, B, A, C, b, m);
+        montgomery_dbl (A, A, m, b);
         break;
       case 5:
-        montgomery_add (C, C, A, B, b, m);
-        montgomery_double (A, A, m, b);
+        montgomery_dadd (C, C, A, B, b, m);
+        montgomery_dbl (A, A, m, b);
         break;
       case 6:
-        montgomery_double (t, A, m, b);
-        montgomery_add (t2, A, B, C, b, m);
-        montgomery_add (A, t, A, A, b, m);
-        montgomery_add (C, t, t2, C, b, m);
-        ell_point_swap (B, C, m);
+        montgomery_dbl (t, A, m, b);
+        montgomery_dadd (t2, A, B, C, b, m);
+        montgomery_dadd (A, t, A, A, b, m);
+        montgomery_dadd (C, t, t2, C, b, m);
+        ec_point_swap (B, C, m);
         break;
       case 7:
-        montgomery_add (t, A, B, C, b, m);
-        montgomery_add (B, t, A, B, b, m);
-        montgomery_double (t, A, m, b);
-        montgomery_add (A, A, t, A, b, m);
+        montgomery_dadd (t, A, B, C, b, m);
+        montgomery_dadd (B, t, A, B, b, m);
+        montgomery_dbl (t, A, m, b);
+        montgomery_dadd (A, A, t, A, b, m);
         break;
       case 8:
-        montgomery_add (t, A, B, C, b, m);
-        montgomery_add (C, C, A, B, b, m);
-        ell_point_swap (B, t, m);
-        montgomery_double (t, A, m, b);
-        montgomery_add (A, A, t, A, b, m);
+        montgomery_dadd (t, A, B, C, b, m);
+        montgomery_dadd (C, C, A, B, b, m);
+        ec_point_swap (B, t, m);
+        montgomery_dbl (t, A, m, b);
+        montgomery_dadd (A, A, t, A, b, m);
         break;
       case 9:
-        montgomery_add (C, C, B, A, b, m);
-        montgomery_double (B, B, m, b);
+        montgomery_dadd (C, C, B, A, b, m);
+        montgomery_dbl (B, B, m, b);
         break;
       case 10:
         /* Combined final add of old subchain and init of new subchain [=fi] */
-        montgomery_add (B, A, B, C, b, m);
-        ell_point_set (C, B, m);
-        montgomery_double (A, B, m, b);
+        montgomery_dadd (B, A, B, C, b, m);
+        ec_point_set (C, B, m);
+        montgomery_dbl (A, B, m, b);
         break;
       case 11:
         /* Combined rule 3 and rule 0 [=\x3s] */
-        montgomery_add (C, B, A, C, b, m);
+        montgomery_dadd (C, B, A, C, b, m);
         /* (B,C,A) := (A,B,C)  */
-        ell_point_swap (B, C, m);
-        ell_point_swap (A, B, m);
+        ec_point_swap (B, C, m);
+        ec_point_swap (A, B, m);
         break;
       case 12:
         /* Combined rule 3, then subchain end/start [=\x3fi] */
-        montgomery_add (t, B, A, C, b, m);
-        montgomery_add (C, A, t, B, b, m);
-        ell_point_set (B, C, m);
-        montgomery_double (A, C, m, b);
+        montgomery_dadd (t, B, A, C, b, m);
+        montgomery_dadd (C, A, t, B, b, m);
+        ec_point_set (B, C, m);
+        montgomery_dbl (A, C, m, b);
         break;
       case 13:
         /* Combined rule 3, swap, rule 3 and swap, merged a bit [=\x3s\x3s] */
-        ell_point_set (t, B, m);
-        montgomery_add (B, B, A, C, b, m);
-        ell_point_set (C, A, m);
-        montgomery_add (A, A, B, t, b, m);
+        ec_point_set (t, B, m);
+        montgomery_dadd (B, B, A, C, b, m);
+        ec_point_set (C, A, m);
+        montgomery_dadd (A, A, B, t, b, m);
         break;
       default:
         printf ("#Unknown bytecode %u\n", (unsigned int) bc[i]);
@@ -596,13 +155,13 @@ ellM_interpret_bytecode (ell_point_t P, const char *bc, unsigned int bc_len,
     }
   }
 
-  ell_point_set (P, A, m);
+  ec_point_set (P, A, m);
 
-  ell_point_clear (A, m);
-  ell_point_clear (B, m);
-  ell_point_clear (C, m);
-  ell_point_clear (t, m);
-  ell_point_clear (t2, m);
+  ec_point_clear (A, m);
+  ec_point_clear (B, m);
+  ec_point_clear (C, m);
+  ec_point_clear (t, m);
+  ec_point_clear (t2, m);
 }
 
 
@@ -935,14 +494,14 @@ Montgomery12_curve_from_k (residue_t A, residue_t x, const unsigned long k,
       mod_add (a, a, v, m);
       mod_neg (a, a, m);    /* a = -12 */
       {
-        ellW_point_t T;
-        ellW_init (T, m);
+        ec_point_t T;
+        ec_point_init (T, m);
         mod_set (T[0].x, u, m);
         mod_set (T[0].y, v, m);
-        ellW_mul_ui (T, k, a, m);
+        weierstrass_smul_ui (T, k, a, m);
         mod_set (u, T[0].x, m);
         mod_set (v, T[0].y, m);
-        ellW_clear (T, m);
+        ec_point_clear (T, m);
       }
 
       /* Now we have an $u$ such that $v^2 = u^3-12u$ is a square */
@@ -1120,7 +679,7 @@ Montgomery16_curve_from_k (residue_t b, residue_t x, const unsigned long k,
 
 
 static int 
-Twisted_Edwards16_curve_from_sigma (residue_t d, ell_point_t P,
+Twisted_Edwards16_curve_from_sigma (residue_t d, ec_point_t P,
 				    MAYBE_UNUSED const unsigned long sigma, 
 				    const modulus_t m)
 {
@@ -1181,7 +740,7 @@ Twisted_Edwards16_curve_from_sigma (residue_t d, ell_point_t P,
    be computed. 
    x and X may be the same variable. */
 static int
-curveW_from_Montgomery (residue_t a, ellW_point_t P, const residue_t X, 
+curveW_from_Montgomery (residue_t a, ec_point_t P, const residue_t X, 
                         const residue_t A, const modulus_t m)
 {
   residue_t g, one;
@@ -1320,10 +879,10 @@ common_z (const int n1, residue_t *x1, residue_t *z1,
 
 
 static int ATTRIBUTE((__noinline__))
-ecm_stage2 (residue_t r, const ellM_point_t P, const stage2_plan_t *plan, 
+ecm_stage2 (residue_t r, const ec_point_t P, const stage2_plan_t *plan, 
 	    const residue_t b, const modulus_t m)
 {
-  ellM_point_t Pd, Pt; /* d*P, i*d*P, (i+1)*d*P and a temp */
+  ec_point_t Pd, Pt; /* d*P, i*d*P, (i+1)*d*P and a temp */
   residue_t *Pid_x, *Pid_z, *Pj_x, *Pj_z; /* saved i*d*P, i0 <= i < i1, 
               and jP, j in S_1, x and z coordinate stored separately */
   residue_t a, a_bk, t;
@@ -1331,7 +890,7 @@ ecm_stage2 (residue_t r, const ellM_point_t P, const stage2_plan_t *plan,
   int bt = 0;
   const int verbose = 0;
   
-  ellM_init (Pt, m);
+  ec_point_init (Pt, m);
   mod_init_noset0 (t, m);
   mod_init_noset0 (a, m);
   Pj_x = (residue_t *) malloc (plan->s1 * sizeof(residue_t));
@@ -1373,24 +932,24 @@ ecm_stage2 (residue_t r, const ellM_point_t P, const stage2_plan_t *plan,
   
   ASSERT (plan->d % 6 == 0);
   {
-    ellM_point_t ap1_0, ap1_1, ap5_0, ap5_1, P2, P6;
+    ec_point_t ap1_0, ap1_1, ap5_0, ap5_1, P2, P6;
     int i1, i5;
-    ellM_init (ap1_0, m);
-    ellM_init (ap1_1, m);
-    ellM_init (ap5_0, m);
-    ellM_init (ap5_1, m);
-    ellM_init (P6, m);
-    ellM_init (P2, m);
+    ec_point_init (ap1_0, m);
+    ec_point_init (ap1_1, m);
+    ec_point_init (ap5_0, m);
+    ec_point_init (ap5_1, m);
+    ec_point_init (P6, m);
+    ec_point_init (P2, m);
 
     /* Init ap1_0 = 1P, ap1_1 = 7P, ap5_0 = 5P, ap5_1 = 11P
        and P6 = 6P */
-    ellM_set (ap1_0, P, m);            /* ap1_0 = 1*P */
-    ellM_double (P2, P, m, b);         /* P2 = 2*P */
-    ellM_add (P6, P2, P, P, b, m);     /* P6 = 3*P (for now) */
-    ellM_add (ap5_0, P6, P2, P, b, m); /* 5*P = 3*P + 2*P */
-    ellM_double (P6, P6, m, b);        /* P6 = 6*P = 2*(3*P) */
-    ellM_add (ap1_1, P6, P, ap5_0, b, m); /* 7*P = 6*P + P */
-    ellM_add (ap5_1, P6, ap5_0, P, b, m); /* 11*P = 6*P + 5*P */
+    ec_point_set (ap1_0, P, m);            /* ap1_0 = 1*P */
+    montgomery_dbl (P2, P, m, b);         /* P2 = 2*P */
+    montgomery_dadd (P6, P2, P, P, b, m);     /* P6 = 3*P (for now) */
+    montgomery_dadd (ap5_0, P6, P2, P, b, m); /* 5*P = 3*P + 2*P */
+    montgomery_dbl (P6, P6, m, b);        /* P6 = 6*P = 2*(3*P) */
+    montgomery_dadd (ap1_1, P6, P, ap5_0, b, m); /* 7*P = 6*P + P */
+    montgomery_dadd (ap5_1, P6, ap5_0, P, b, m); /* 11*P = 6*P + 5*P */
     
     /* Now we generate all the j*P for j in S_1 */
     /* We treat the first two manually because those might correspond 
@@ -1428,14 +987,14 @@ ecm_stage2 (residue_t r, const ellM_point_t P, const stage2_plan_t *plan,
 	    continue;
           }
 	
-        ellM_add (Pt, ap1_1, P6, ap1_0, b, m);
-        ellM_set (ap1_0, ap1_1, m);
-        ellM_set (ap1_1, Pt, m);
+        montgomery_dadd (Pt, ap1_1, P6, ap1_0, b, m);
+        ec_point_set (ap1_0, ap1_1, m);
+        ec_point_set (ap1_1, Pt, m);
         i1 += 6;
 	
-        ellM_add (Pt, ap5_1, P6, ap5_0, b, m);
-        ellM_set (ap5_0, ap5_1, m);
-        ellM_set (ap5_1, Pt, m);
+        montgomery_dadd (Pt, ap5_1, P6, ap5_0, b, m);
+        ec_point_set (ap5_0, ap5_1, m);
+        ec_point_set (ap5_1, Pt, m);
         i5 += 6;
       }
 
@@ -1443,45 +1002,45 @@ ecm_stage2 (residue_t r, const ellM_point_t P, const stage2_plan_t *plan,
       {
         if (i1 < i5)
           {
-            ellM_add (Pt, ap1_1, P6, ap1_0, b, m);
-            ellM_set (ap1_0, ap1_1, m);
-            ellM_set (ap1_1, Pt, m);
+            montgomery_dadd (Pt, ap1_1, P6, ap1_0, b, m);
+            ec_point_set (ap1_0, ap1_1, m);
+            ec_point_set (ap1_1, Pt, m);
             i1 += 6;
           }
         else
           {
-            ellM_add (Pt, ap5_1, P6, ap5_0, b, m);
-            ellM_set (ap5_0, ap5_1, m);
-            ellM_set (ap5_1, Pt, m);
+            montgomery_dadd (Pt, ap5_1, P6, ap5_0, b, m);
+            ec_point_set (ap5_0, ap5_1, m);
+            ec_point_set (ap5_1, Pt, m);
             i5 += 6;
           }
       }
     
-    ellM_init (Pd, m);
+    ec_point_init (Pd, m);
 #if 0
     /* Also compute Pd = d*P while we've got 6*P */
-    ellM_mul_ul (Pd, P6, plan->d / 6, m, b); /* slow! */
+    montgomery_mul_ul (Pd, P6, plan->d / 6, m, b); /* slow! */
 #else
     ASSERT ((unsigned) (i1 + i5) == plan->d);
     if (i1 + 4 == i5)
       {
-        ellM_double (P2, P2, m, b); /* We need 4P for difference */
-        ellM_add (Pd, ap1_1, ap5_1, P2, b, m);
+        montgomery_dbl (P2, P2, m, b); /* We need 4P for difference */
+        montgomery_dadd (Pd, ap1_1, ap5_1, P2, b, m);
       }
     else if (i5 + 2 == i1)
       {
-        ellM_add (Pd, ap1_1, ap5_1, P2, b, m);
+        montgomery_dadd (Pd, ap1_1, ap5_1, P2, b, m);
       }
     else
       abort ();
 #endif
 
-    ellM_clear (ap1_0, m);
-    ellM_clear (ap1_1, m);
-    ellM_clear (ap5_0, m);
-    ellM_clear (ap5_1, m);
-    ellM_clear (P6, m);
-    ellM_clear (P2, m);
+    ec_point_clear (ap1_0, m);
+    ec_point_clear (ap1_1, m);
+    ec_point_clear (ap5_0, m);
+    ec_point_clear (ap5_1, m);
+    ec_point_clear (P6, m);
+    ec_point_clear (P2, m);
 
   }
 
@@ -1497,10 +1056,10 @@ ecm_stage2 (residue_t r, const ellM_point_t P, const stage2_plan_t *plan,
   
   /* Compute idP for i0 <= i < i1 */
   {
-    ellM_point_t Pid, Pid1;
+    ec_point_t Pid, Pid1;
     
-    ellM_init (Pid, m);
-    ellM_init (Pid1, m);
+    ec_point_init (Pid, m);
+    ec_point_init (Pid1, m);
     k = 0; i = plan->i0;
 
     /* If i0 == 0, we simply leave the first point at (0::0) which is the
@@ -1514,30 +1073,30 @@ ecm_stage2 (residue_t r, const ellM_point_t P, const stage2_plan_t *plan,
       }
 
     /* Todo: do both Pid and Pid1 with one addition chain */
-    ellM_mul_ul (Pid, Pd, i, m, b); /* Pid = i_0 d * P */
+    montgomery_smul_ui (Pid, Pd, i, m, b); /* Pid = i_0 d * P */
     mod_set (Pid_x[k], Pid[0].x, m);
     mod_set (Pid_z[k], Pid[0].z, m);
     k++; i++;
     if (i < plan->i1)
       {
-        ellM_mul_ul (Pid1, Pd, i, m, b); /* Pid = (i_0 + 1) d * P */
+        montgomery_smul_ui (Pid1, Pd, i, m, b); /* Pid = (i_0 + 1) d * P */
         mod_set (Pid_x[k], Pid1[0].x, m);
         mod_set (Pid_z[k], Pid1[0].z, m);
         k++; i++;
       }
     while (i < plan->i1)
       {
-        ellM_add (Pt, Pid1, Pd, Pid, b, m);
-        ellM_set (Pid, Pid1, m);
-        ellM_set (Pid1, Pt, m);
+        montgomery_dadd (Pt, Pid1, Pd, Pid, b, m);
+        ec_point_set (Pid, Pid1, m);
+        ec_point_set (Pid1, Pt, m);
         mod_set (Pid_x[k], Pt[0].x, m);
         mod_set (Pid_z[k], Pt[0].z, m);
         k++; i++;
       }
 
-    ellM_clear (Pd, m);
-    ellM_clear (Pid, m);
-    ellM_clear (Pid1, m);
+    ec_point_clear (Pd, m);
+    ec_point_clear (Pid, m);
+    ec_point_clear (Pid1, m);
   }
 
   if (verbose)
@@ -1696,7 +1255,7 @@ ecm_stage2 (residue_t r, const ellM_point_t P, const stage2_plan_t *plan,
   free (Pid_z);
   Pid_z = NULL;
   
-  ellM_clear (Pt, m);
+  ec_point_clear (Pt, m);
   mod_clear (t, m);
   mod_clear (a, m);
   mod_clear (a_bk, m);
@@ -1710,12 +1269,12 @@ int
 ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
 {
   residue_t u, b, d, a;
-  ell_point_t P, Pt;
-  ell_point_t Q;
+  ec_point_t P, Pt;
+  ec_point_t Q;
 
   /* P is initialized here because the coordinates of P may be used as temporary
      variables when constructing curves from sigma! (mouaif) */
-  ell_point_init (P, m); 
+  ec_point_init (P, m); 
 
   unsigned int i;
   int bt = 0;
@@ -1737,7 +1296,7 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
 	mod_clear (u, m);
 	mod_clear (A, m);
 	mod_clear (b, m);
-	ell_point_clear (P, m);      
+	ec_point_clear (P, m);      
 	mod_clear (s, m);
 	return 0;
       }
@@ -1760,7 +1319,7 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
 	mod_clear (u, m);
 	mod_clear (A, m);
 	mod_clear (b, m);
-	ell_point_clear (P, m);
+	ec_point_clear (P, m);
 	return 0;
       }
     mod_set1 (P->z, m);
@@ -1778,7 +1337,7 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
 	  mod_gcd (f, P->x, m);
 	  mod_clear (u, m);
 	  mod_clear (b, m);
-	  ell_point_clear (P, m);
+	  ec_point_clear (P, m);
 	  return 0;
 	}
       mod_set1 (P->z, m);
@@ -1788,7 +1347,7 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
     if (Twisted_Edwards16_curve_from_sigma (d, Q, plan->sigma, m) == 0)
       {
 	// TODO: check if factor found!
-	ell_point_clear (Q, m);
+	ec_point_clear (Q, m);
 	return 0;
       }
   }
@@ -1840,19 +1399,19 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
 	 probability that a point of very small order on all E_p is encountered
 	 during the Lucas chain is reduced, and so the probability of using
 	 curve addition erroneously. */
-    ell_point_init (Pt, m);
-    ell_point_set (Pt, P, m);
+    ec_point_init (Pt, m);
+    ec_point_set (Pt, P, m);
     for (i = 0; i < plan->exp2; i++)
       {
 	montgomery_dbl (P, P, m, b);
 #if ECM_BACKTRACKING
 	if (mod_is0 (P[0].z, m))
 	  {
-	    ell_point_set (P, Pt, m);
+	    ec_point_set (P, Pt, m);
 	    bt = 1;
 	    break;
 	  }
-	ell_point_set (Pt, P, m);
+	ec_point_set (Pt, P, m);
 #endif
       }
     mod_gcd (f, P[0].z, m);
@@ -1865,11 +1424,11 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
       mod_set1 (a, m);
       mod_neg (a, a, m);
       
-      ellE_interpret_bytecode (Q, plan->bc, plan->bc_len, m, a);
+      /* ellE_interpret_bytecode (Q, plan->bc, plan->bc_len, m, a); */
       
-      ell_point_t Qt;
-      ell_point_init (Qt, m);
-      ell_point_set (Qt, Q, m);
+      ec_point_t Qt;
+      ec_point_init (Qt, m);
+      ec_point_set (Qt, Q, m);
       for (i = 0; i < plan->exp2; i++)
 	{
 	  edwards_dbl (Q, Q, m, EDW_proj);   // ??? output_type ???
@@ -1877,16 +1436,16 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
 #if ECM_BACKTRACKING
 	  if (mod_is0 (Q[0].x, m))
 	    {
-	      ell_point_set (Q, Qt, m);
+	      ec_point_set (Q, Qt, m);
 	      bt = 1;
 	      break;
 	    }
-	  ell_point_set (Qt, Q, m);
+	  ec_point_set (Qt, Q, m);
 #endif
 	}
       mod_gcd (f, Q[0].x, m);
 
-      ell_point_clear (Qt, m);
+      ec_point_clear (Qt, m);
     }
   
 #if 0
@@ -1903,13 +1462,13 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
   
   mod_clear (u, m);
   mod_clear (b, m);
-  ell_point_clear (P, m);
-  ell_point_clear (Pt, m);
+  ec_point_clear (P, m);
+  ec_point_clear (Pt, m);
   
   if (plan->parameterization & FULLTWED)
   {
     mod_clear (a, m);
-    ell_point_clear (Q, m);
+    ec_point_clear (Q, m);
   }
 
   return bt;
@@ -1925,17 +1484,15 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
    Looks for i in Hasse interval so that i*P = O, has complexity O(m^(1/4)). */
 
 unsigned long
-ell_pointorder (const residue_t sigma, const int parameterization, 
+ec_pointorder (const residue_t sigma, const int parameterization, 
 		const unsigned long known_m, const unsigned long known_r,
 		const modulus_t m, const int verbose)
 {
-  ellW_point_t P, Pi, Pg;
-  ellE_point_t Q;
+  ec_point_t P, Pi, Pg, Q, *baby;
   residue_t A, x, a, d;
   unsigned long min, max, i, j, order, cof, p;
   unsigned long giant_step, giant_min, baby_len;
   modint_t tm;
-  ellW_point_t *baby;
 
   ASSERT (known_r < known_m);
 
@@ -1945,9 +1502,9 @@ ell_pointorder (const residue_t sigma, const int parameterization,
   mod_init (x, m);
   mod_init (a, m);
   mod_init (d, m);
-  ellW_init (P, m);
-  ellW_init (Pi, m);
-  ellW_init (Pg, m);
+  ec_point_init (P, m);
+  ec_point_init (Pi, m);
+  ec_point_init (Pg, m);
 
   if (parameterization == BRENT12)
     {
@@ -2060,47 +1617,47 @@ ell_pointorder (const residue_t sigma, const int parameterization,
             "giant_min = %lu\n", known_m, known_r, giant_step, giant_min);
   
   baby_len = giant_step / known_m / 2 + 1;
-  baby = (ellW_point_t *) malloc (baby_len * sizeof (ellW_point_t));
+  baby = (ec_point_t *) malloc (baby_len * sizeof (ec_point_t));
   for (i = 0; i < baby_len; i++)
-    ellW_init (baby[i], m);
+    ec_point_init (baby[i], m);
   
-  ellW_set (Pg, P, m);
+  ec_point_set (Pg, P, m);
   i = known_m;
-  if (ellW_mul_ui (Pg, i, a, m) == 0) /* Pg = m*P for now */
+  if (weierstrass_smul_ui (Pg, i, a, m) == 0) /* Pg = m*P for now */
     goto found_inf;
   
   if (1 < baby_len)
-    ellW_set (baby[1], Pg, m);
+    ec_point_set (baby[1], Pg, m);
   
   if (2 < baby_len)
     {
-      if (ellW_double (Pi, Pg, a, m) == 0)
+      if (weierstrass_dbl (Pi, Pg, a, m) == 0)
         {
           i = 2 * known_m;
           goto found_inf;
         }
-      ellW_set (baby[2], Pi, m);
+      ec_point_set (baby[2], Pi, m);
     }
 
   for (i = 3; i < baby_len; i++)
     {
-      if (ellW_add (Pi, Pi, Pg, a, m) == 0)
+      if (weierstrass_add (Pi, Pi, Pg, a, m) == 0)
         {
           i *= known_m;
           goto found_inf;
         }
-      ellW_set (baby[i], Pi, m);
+      ec_point_set (baby[i], Pi, m);
     }
 
   /* Now compute the giant steps in [giant_min, giant_max] */
   i = giant_step;
-  ellW_set (Pg, P, m);
-  if (ellW_mul_ui (Pg, i, a, m) == 0)
+  ec_point_set (Pg, P, m);
+  if (weierstrass_smul_ui (Pg, i, a, m) == 0)
     goto found_inf;
 
   i = giant_min;
-  ellW_set (Pi, P, m);
-  if (ellW_mul_ui (Pi, i, a, m) == 0)
+  ec_point_set (Pi, P, m);
+  if (weierstrass_smul_ui (Pi, i, a, m) == 0)
     goto found_inf;
   
   while (i <= max + giant_step - 1)
@@ -2128,13 +1685,13 @@ ell_pointorder (const residue_t sigma, const int parameterization,
           }
 
       i += giant_step;
-      if (!ellW_add (Pi, Pi, Pg, a, m))
+      if (!weierstrass_add (Pi, Pi, Pg, a, m))
         goto found_inf;
     }
   
   if (i > max)
   {
-      fprintf (stderr, "ell_order: Error, no match found for p = %lu, "
+      fprintf (stderr, "ec_order: Error, no match found for p = %lu, "
                "min = %lu, max = %lu, giant_step = %lu, giant_min = %lu\n", 
                mod_intget_ul(tm), min, max, giant_step, giant_min);
       abort ();
@@ -2142,8 +1699,8 @@ ell_pointorder (const residue_t sigma, const int parameterization,
 
 found_inf:
   /* Check that i is a multiple of the order */
-  ellW_set (Pi, P, m);
-  if (ellW_mul_ui (Pi, i, a, m) != 0)
+  ec_point_set (Pi, P, m);
+  if (weierstrass_smul_ui (Pi, i, a, m) != 0)
     {
       modint_t tx1, ty1;
       mod_intinit (tx1); 
@@ -2151,7 +1708,7 @@ found_inf:
       mod_get_int (tx1, P[0].x, m);
       mod_get_int (ty1, P[0].y, m);
 #ifndef MODMPZ_MAXBITS
-      fprintf (stderr, "ell_order: Error, %ld*(%ld, %ld) (mod %ld) is "
+      fprintf (stderr, "ec_order: Error, %ld*(%ld, %ld) (mod %ld) is "
                "not the point at infinity\n", 
                i, tx1[0], ty1[0], tm[0]);
 #endif
@@ -2181,34 +1738,34 @@ found_inf:
 
         /* Add factors of p again one by one, stopping when we hit 
            point at infinity */
-        ellW_set (Pi, P, m);
-        if (ellW_mul_ui (Pi, order, a, m) != 0)
+        ec_point_set (Pi, P, m);
+        if (weierstrass_smul_ui (Pi, order, a, m) != 0)
           {
             order *= p;
-            while (ellW_mul_ui (Pi, p, a, m) != 0)
+            while (weierstrass_smul_ui (Pi, p, a, m) != 0)
               order *= p;
           }
       }
   /* Now cof is 1 or a prime */
   if (cof > 1)
     {
-      ellW_set (Pi, P, m);
+      ec_point_set (Pi, P, m);
       ASSERT (order % cof == 0);
-      if (ellW_mul_ui (Pi, order / cof, a, m) == 0)
+      if (weierstrass_smul_ui (Pi, order / cof, a, m) == 0)
         order /= cof;
     }
 
 
   /* One last check that order divides real order */
-  ellW_set (Pi, P, m);
-  if (ellW_mul_ui (Pi, order, a, m) != 0)
+  ec_point_set (Pi, P, m);
+  if (weierstrass_smul_ui (Pi, order, a, m) != 0)
     {
       modint_t tx1, ty1;
       mod_intinit (tx1); 
       mod_intinit (ty1); 
       mod_get_int (tx1, P[0].x, m);
       mod_get_int (ty1, P[0].y, m);
-      fprintf (stderr, "ell_order: Error, final order %ld is wrong\n", 
+      fprintf (stderr, "ec_order: Error, final order %ld is wrong\n", 
                order);
       mod_intclear (tx1); 
       mod_intclear (ty1); 
@@ -2216,7 +1773,7 @@ found_inf:
     }
   
   for (i = 0; i < giant_step; i++)
-    ellW_clear (baby[i], m);
+    ec_point_clear (baby[i], m);
   free (baby);
   baby = NULL;
   mod_clear (A, m);
@@ -2224,10 +1781,10 @@ found_inf:
   mod_clear (a, m);
   mod_clear (d, m);
   mod_intclear (tm);
-  ellW_clear (P, m);
-  ellW_clear (Pi, m);
-  ellW_clear (Pg, m);
-  ellE_clear (Q, m);
+  ec_point_clear (P, m);
+  ec_point_clear (Pi, m);
+  ec_point_clear (Pg, m);
+  ec_point_clear (Q, m);
 
   return order;
 }
@@ -2281,7 +1838,7 @@ ellM_curveorder_jacobi (residue_t A, residue_t x, modulus_t m)
 }
 
 unsigned long 
-ell_curveorder (const unsigned long sigma_par, int parameterization, 
+ec_curveorder (const unsigned long sigma_par, int parameterization, 
 		const unsigned long m_par)
 {
   residue_t sigma, A, X;
@@ -2305,7 +1862,7 @@ ell_curveorder (const unsigned long sigma_par, int parameterization,
   }
   else
   {
-    fprintf (stderr, "ell_curveorder: Unknown parameterization\n");
+    fprintf (stderr, "ec_curveorder: Unknown parameterization\n");
     abort();
   }
   order = ellM_curveorder_jacobi (A, X, m);
