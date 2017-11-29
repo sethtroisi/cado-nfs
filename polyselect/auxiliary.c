@@ -1,6 +1,6 @@
 /* Auxiliary routines for polynomial selection
 
-Copyright 2008, 2009, 2010, 2013 Emmanuel Thome, Paul Zimmermann
+Copyright 2008-2017 Emmanuel Thome, Paul Zimmermann
 
 This file is part of CADO-NFS.
 
@@ -1632,8 +1632,7 @@ print_cadopoly (FILE *fp, cado_poly p)
                 "nr: %u\n", logmu, alpha, alpha_proj, logmu + alpha, nroots);
 
    e = MurphyE (p, bound_f, bound_g, area, MURPHY_K);
-   fprintf (fp, "# MurphyE(Bf=%.0f,Bg=%.0f,area=%.3e)=%.2e\n",
-        bound_f, bound_g, area, e);
+   cado_poly_fprintf_MurphyE (fp, e, bound_f, bound_g, area, "");
 
    return e;
 }
