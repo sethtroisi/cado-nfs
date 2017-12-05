@@ -319,7 +319,7 @@ fill_in_buckets_toplevel_sublat(bucket_array_t<LEVEL, shorthint_t> &orig_BA,
   } else { // Use precomputed FK-basis
     for (unsigned int i = 0; i < precomp_slice->size(); ++i) {
       plattice_info_t pli = (*precomp_slice)[i].unpack(si.conf.logI_adjusted);
-      slice_offset_t i_entry = (*precomp_slice)[i].hint;
+      slice_offset_t i_entry = (*precomp_slice)[i].get_hint();
 
       plattice_enumerate_t ple = plattice_enumerate_t(pli, i_entry, si.conf.logI_adjusted, si.conf.sublat);
 
