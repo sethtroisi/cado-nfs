@@ -457,11 +457,11 @@ struct small_sieve : public small_sieve_base<tribool_const<is_fragment>> {/*{{{*
             /* q = 1, therefore U = 0, and we sieve all entries in lines
                with g|j, beginning with the line starting at S[ssdpos] */
             unsigned long logps;
-            spos_t pos = super::first_position_projective_prime(ssp);
+            long_spos_t pos = super::first_position_projective_prime(ssp);
 
             // The following is for the case where p divides the norm
             // at the position (i,j) = (1,0).
-            if (UNLIKELY(super::has_origin && pos == (spos_t) gI)) {
+            if (UNLIKELY(super::has_origin && pos == (long_spos_t) gI)) {
 #ifdef TRACE_K
                 if (trace_on_spot_Nx(w.N, (1-i0))) {
                     WHERE_AM_I_UPDATE(w, x, trace_Nx.x);

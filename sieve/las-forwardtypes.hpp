@@ -20,5 +20,6 @@ struct descent_tree;
  * LOG_BUCKET_REGION
  */
 typedef int32_t spos_t;
+typedef int64_t long_spos_t;
 
 #endif

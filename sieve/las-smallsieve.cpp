@@ -1156,9 +1156,9 @@ resieve_small_bucket_region (bucket_primes_t *BP, int N, unsigned char *S,
             const uint64_t gI = (uint64_t)g << logI;
 
             /* Test every p-th line, starting at S[ssdpos] */
-            spos_t pos = C.first_position_projective_prime(ssp);
+            long_spos_t pos = C.first_position_projective_prime(ssp);
             // This block is for the case where p divides at (1,0).
-            if (UNLIKELY(has_origin && pos == (spos_t) gI)) {
+            if (UNLIKELY(has_origin && pos == (long_spos_t) gI)) {
                 bucket_update_t<1, primehint_t> prime;
                 prime.p = p;
                 prime.x = 1 - i0;
@@ -1175,7 +1175,7 @@ resieve_small_bucket_region (bucket_primes_t *BP, int N, unsigned char *S,
 
             if (resieve_very_verbose) {
                 verbose_output_print(0, 1, "# resieving projective prime %" FBPRIME_FORMAT
-                        ", i0 = %d\n", q, i0 + pos);
+                        ", i0 = %" PRIi64 "\n", q, i0 + pos);
             }
             if (pos >> LOG_BUCKET_REGION)
                 continue;
