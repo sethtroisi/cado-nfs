@@ -792,6 +792,7 @@ class Las(Program):
                  sqside: Parameter(checktype=int)=None,
                  dup: Toggle()=None,
                  galois: Parameter() = None,
+                 sublat: Parameter(checktype=int)=None,
                  allow_largesq: Toggle("allow-largesq")=None,
                  allow_compsq: Toggle("allow-compsq")=None,
                  qfac_min: Parameter("qfac-min", checktype=int)=None,
