@@ -8,97 +8,79 @@ exponentitation for p+1.
 This document described the MISHMASH bytecode in the context of ECM, but it can
 easily be translated for P+1.
 
-The MISHMASH bytecode encodes different blocks, each block is responsible for
-performing Q <- [k]P.
+The MISHMASH bytecode encodes different blocks, each type of block can have its
+own encoding
 
 # Environment
 
-P = starting point of the block.
-Q = current point / output point of the block.
-R[] = array of precomputed point
-  - R[0] is always set to P at the beginning of a block
+R[] = array of point
+      must be of length >= 2
 
-# Format of the point
-  The point can have 3 different formats (always coded on 2 bits in the
-  following):
-    00 = Ep = Twisted Edwards projective coordinates 
-    01 = Ee = Twisted Edwards extended coordinates
-    00 = M  = Montgomery XZ coordinates
+During initialization, the input point will be copied into R[1].
+The output point must be written in R[1] at the end.
 
 
-# The first byte of the bytecode
+# MISHMASH bytecode
 
-nnnnnnnn
-  The first byte of MISHMASH bytecode is interpreted as an integer N, which is
-  the number of additionl points needed for the computation
-    => size of array R = N + 1 ( + 1 for the starting point)
-  N = nnnnnnnn
+  0000nnnn    Beginning of the MISHMASH bytecode
+              Allocate the array R with n+2 points
+              Must be the first byte of the bytecode
+              Cannont be used afterwards
+  0001nnnn    Beginning of a DBLADD block
+              Set R[0] <- R[n]
+  0010nnnn    Beginning of a PRECOMP block
+              Set R[0] <- R[n]
+  1000nnnn    Beginning of a PRAC block
+              Set R[0] <- R[n]
+  11111111    End of the MISHMASH bytecode
+              R[1] contains the results
+              Must be the last byte of the bytecode
+              Cannont be used before
 
 
+# DBLADD block
 
-The following byte are interpreted using the format described below.
+  00fsnnnn                       R[f] <- R[0] +/- R[n]
+  01fsnnnn dddddddd              R[f] <- 2^d R[0] +/- R[n]
+  10fsnnnn tttttttt              R[f] <- 3^t R[0] +/- R[n]
+  11fsnnnn tttttttt dddddddd     R[f] <- 2^d 3^t R[0] +/- R[n]
 
+    The sign is given by s: + if s=0, - if s=1
+    The f bit stands for 'final', it must be 1 only for the last byte of the
+    block.
 
-# 1-byte opcode
+# PRECOMP block
 
-11111111
-  Final opcode, use to mark the end of the bytecode array.
-  Final output is in Q
+  00askkkk iiiijjjj             R[k] <- R[i] +/- R[j]
+  01askkkk dddddddd             R[k] <- R[0] <- 2^d R[0]
+  10askkkk tttttttt             R[k] <- R[0] <- 3^t R[0]
+  11askkkk tttttttt dddddddd    R[k] <- R[0] <- 2^d 3^t R[0]
 
-00000000
-  Beginning of a (default) block, we need to perform R[0] <- Q
+    The sign is given by s: + if s=0, - if s=1
 
-00000001
-  Beginning of a PRAC block.
-  Q must be in M format
-  From the next byte, interpret the bytecode as PRAC bytecode until the final
-  byte of PRAC bytecode is reached.
+# PRAC block
 
-# 2-byte opcode
+  We always maintain R[0]-R[1] = R[2]
 
-00000010 iiiiiiii
-  Perform Q <- R[I]
-    I = iiiiiiii is the index for the array R
-
-# 4-byte opcode
-
-00001sff tttttttt dddddddd iiiiiiii
-  Perform Q <- [3^T 2^D] Q +/- R[I]
-    0f = format of the output R[I]
-    s = the sign (0 for an "+", 1 for a "-")
-    T = tttttttt is the number of triplings
-    D = dddddddd is the number of doublings
-    I = iiiiiiii is an index for the array R
-    The input Q must be in Ee or Ep format
-    The input R[I] must be in Ee format
-
-000100ff tttttttt dddddddd iiiiiiii
-  Perform Q <- R[I] <- [3^T 2^D] Q
-    ff = format of the output R[I] (only valid format are Ee or Ep)
-    T = tttttttt is the number of triplings
-    D = dddddddd is the number of doublings
-    I = iiiiiiii is an index for the array R
-    The input Q must be in Ee or Ep format
-    The output Q can be in Ee or Ep format
-
-00011sff iiiiiiii jjjjjjjj kkkkkkkk
-  Perform R[K] <- R[I] +/- R[j]
-    ff = format of the output R[I] (only valid format are Ee or Ep)
-    s = the sign (0 for an "+", 1 for a "-")
-    I = iiiiiiii is an index for the array R
-    J = jjjjjjjj is an index for the array R
-    K = kkkkkkkk is an index for the array R
-    The input R[I] and R[J] must be in Ee format
-
-# Remaining available opcode:
-00000011
-001xxxxx
-010xxxxx
-011xxxxx
-100xxxxx
-101xxxxx
-110xxxxx
-111xxxxx (except 11111111)
-
-PRAC bytecode
-=============
+  01101001    beginning a of sub-block                          [ 'i' in ASCII ]
+              R[2] <- R[1] <- R[0]
+              R[0] <- 2 R[0]
+  01110011    swap                                              [ 's' in ASCII ]
+              R[0] <-> R[1]
+  01f00110    end of sub-block                           [ 'f' of 'F' in ASCII ]
+              R[1-f] <- R[0]+R[1]
+              The f bit, ie 'F' in ASCII, must be 1 only for the last sub-block.
+  00000001    Apply rule 1
+  00000010    Apply rule 2
+  00000011    Apply rule 3
+  00000100    Apply rule 4
+  00000101    Apply rule 5
+  00000110    Apply rule 6
+  00000111    Apply rule 7
+  00001000    Apply rule 8
+  00001001    Apply rule 9
+  00001010    Equivalent to 01101001 01100110                  [ 'fi' in ASCII ]
+  00001011    Equivalent to 00000011 01110011       [ rule 3 then 's' in ASCII ]
+  00001100    Equivalent to 00000011 01101001 01100110
+                                                   [ rule 3 then 'fi' in ASCII ]
+  00001101    Equivalent to 00001011 00001011   [ (rule 3 then 's' in ASCII)^2 ]
