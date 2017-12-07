@@ -791,6 +791,7 @@ facul_strategies_t*
 facul_make_strategies(const unsigned long rfbb, const unsigned int rlpb,
 		      const unsigned int rmfb, const unsigned long afbb,
 		      const unsigned int alpb, const unsigned int amfb,
+                      bool perfectly_sieved,
 		      int n0, int n1, FILE* file, const int verbose)
 {
   unsigned int max_curves_used_before_aux = 0;
@@ -808,6 +809,10 @@ facul_make_strategies(const unsigned long rfbb, const unsigned int rlpb,
 
   strategies->BBB[0] = (double) rfbb * strategies->assume_prime_thresh[0];
   strategies->BBB[1] = (double) afbb * strategies->assume_prime_thresh[1];
+  if (!perfectly_sieved) {
+      strategies->assume_prime_thresh[0] = 0.0;
+      strategies->assume_prime_thresh[1] = 0.0;
+  }
 
   // alloc methods
   facul_method_side_t*** methods = (facul_method_side_t***) malloc (sizeof (*methods) * (rmfb+1));

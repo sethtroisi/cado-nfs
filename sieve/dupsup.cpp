@@ -251,6 +251,7 @@ main (int argc, char * argv[])
             conf.sides[1].lim,
             conf.sides[1].lpb,
             conf.sides[1].mfb,
+            true,
             conf.sides[0].ncurves,
             conf.sides[1].ncurves,
             NULL, 0), facul_clear_strategies);
