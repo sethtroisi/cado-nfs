@@ -1528,22 +1528,6 @@ void factor_survivors_data::cofactoring (timetree_t & timer)
                 continue;
         }
 
-        /* For the moment, the unsieving is completely broken for sublat */
-        if (si.conf.sublat.m) {
-#ifndef SUPPORT_LARGE_Q
-            if (bin_gcd_int64_safe(a, b) != 1)
-                continue;
-#else
-            mpz_t tmp;
-            mpz_init(tmp);
-            mpz_gcd(tmp, az, bz);
-            if (mpz_cmp_ui(tmp, 1) != 0) {
-                mpz_clear(tmp);
-                continue;
-            }
-            mpz_clear(tmp);
-#endif
-        }
 
         th->rep->survivors.not_both_multiples_of_p++;
 
