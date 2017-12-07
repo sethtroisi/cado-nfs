@@ -388,6 +388,7 @@ sieve/ecm/mpqs_mpz.c
 sieve/ecm/batch.h
 sieve/ecm/batch.cpp
 sieve/ecm/finishbatch.cpp
+sieve/ecm/finishecm.cpp
 sieve/fb.cpp
 sieve/fb.hpp
 sieve/fb-types.h
