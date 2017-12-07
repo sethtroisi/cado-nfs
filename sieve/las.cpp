@@ -1513,8 +1513,18 @@ void factor_survivors_data::cofactoring (timetree_t & timer)
                 continue;
         } else {
 #ifdef SUPPORT_LARGE_Q
-            ASSERT_ALWAYS(0); // FIXME: not yet implemented!
-#endif
+            if (mpz_cmp_ui(bz, 0) == 0)
+                continue;
+            bool ok = true;
+            for (auto const& facq : si.doing.prime_factors) {
+                if ((mpz_cmp_ui(bz, facq) >= 0) && (mpz_divisible_ui_p(bz, facq))) {
+                    ok = false;
+                    break;
+                }
+            }
+            if (!ok)
+                continue;
+#else
             if (b == 0)
                 continue;
             bool ok = true;
@@ -1526,6 +1536,7 @@ void factor_survivors_data::cofactoring (timetree_t & timer)
             }
             if (!ok)
                 continue;
+#endif
         }
 
 
