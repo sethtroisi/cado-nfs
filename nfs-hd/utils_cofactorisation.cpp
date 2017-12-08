@@ -1011,7 +1011,7 @@ static void find_relation(uint64_array_t * indices, uint64_t * index,
 
     //a must be irreducible.
     if (mpz_cmp_ui(gcd, 1) == 0 && a->deg > 0 &&
-        mpz_cmp_ui(mpz_poly_lc_const(a), 0) > 0 && is_irreducible(a)) {
+        mpz_cmp_ui(mpz_poly_lc(a), 0) > 0 && is_irreducible(a)) {
 
       good_polynomial(a, f, L, H->t, V, main, data, nb_rel_found,
           special_q, q_side, size, outstd, number_factorisation, c, gal,

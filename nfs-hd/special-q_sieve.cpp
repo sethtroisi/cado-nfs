@@ -3078,7 +3078,7 @@ void initialise_parameters(int argc, char * argv[], cado_poly_ptr f,
     ASSERT((* q_range)[1] - (* q_range)[0] == 1);
     mpz_t lc_tmp;
     mpz_init(lc_tmp);
-    mpz_set(lc_tmp, mpz_poly_lc_const(g));
+    mpz_set(lc_tmp, mpz_poly_lc(g));
     ASSERT(mpz_cmp_ui(lc_tmp, 1) == 0);
     mpz_clear(lc_tmp);
     ASSERT((unsigned int) g->deg < H->t);
@@ -3189,7 +3189,7 @@ void initialise_parameters(int argc, char * argv[], cado_poly_ptr f,
       // Compute the norm of (x-1).resultant(f[i]).
       mpz_poly_eval_ui(tmp, f->pols[i], 1);
       mpz_abs(tmp, tmp);
-      mpz_divexact(tmp, tmp, mpz_poly_lc_const(f->pols[i]));
+      mpz_divexact(tmp, tmp, mpz_poly_lc(f->pols[i]));
       brute_force_factorize_ul((*gal_norm_denom)[i], tmp, tmp, 1000);
       ASSERT(mpz_cmp_ui(tmp, 1) == 0);
 #ifndef NDEBUG
