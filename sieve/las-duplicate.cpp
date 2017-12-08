@@ -81,7 +81,8 @@ static void
 compute_a_over_b_mod_p(mpz_t r, const int64_t a, const uint64_t b, const mpz_t p)
 {
   mpz_set_uint64(r, b);
-  mpz_invert(r, r, p);
+  int ret = mpz_invert(r, r, p);
+  ASSERT_ALWAYS(ret);
   mpz_mul_int64(r, r, a);
   mpz_mod(r, r, p);
 }
