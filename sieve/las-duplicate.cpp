@@ -454,11 +454,9 @@ relation_is_duplicate(relation const& rel, las_info const& las,
       }
 
       cxx_mpz aux;
-      for (int side = 0; side < 2; ++side) {
-        mpz_poly_getcoeff(aux, si.cpoly->pols[side]->deg, si.cpoly->pols[side]);
-          if (mpz_divisible_ui_p(aux, p))
-            continue;
-      }
+      mpz_poly_getcoeff(aux, si.cpoly->pols[side]->deg, si.cpoly->pols[side]);
+      if (mpz_divisible_ui_p(aux, p))
+        continue;
 
       // push it in the list of potential factors of sq
       prime_list.push_back(p);
