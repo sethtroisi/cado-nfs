@@ -22,7 +22,7 @@
 #include "las-report-stats.hpp"
 #include "las-unsieve.hpp"
 #include "las-qlattice.hpp"
-#include "las-smallsieve.hpp"
+#include "las-smallsieve-types.hpp"
 #include "ecm/batch.h"
 #include <list>
 #include <vector>

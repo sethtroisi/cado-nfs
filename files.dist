@@ -413,6 +413,7 @@ sieve/las-report-stats.cpp
 sieve/las-report-stats.hpp
 sieve/las-smallsieve.cpp
 sieve/las-smallsieve.hpp
+sieve/las-smallsieve-types.hpp
 sieve/las-types.hpp
 sieve/las-unsieve.cpp
 sieve/las-unsieve-sse2.cpp
