@@ -1601,6 +1601,17 @@ void factor_survivors_data::cofactoring (timetree_t & timer)
                     a, b,
                     th->psi->sides[side].fb.get());
 
+            /* if q is composite, its prime factors have not been sieved.
+             * Check if they divide. */
+            if ((side == si.doing.side) && (!si.doing.prime_sq)) {
+                for (const auto &x : si.doing.prime_factors) {
+                    if (mpz_divisible_uint64_p(norm[side], x)) {
+                        mpz_divexact_uint64(norm[side], norm[side], x);
+                        factors[side].push_back(x);
+                    }
+                }
+            }
+
             SIBLING_TIMER(timer, "check_leftover_norm");
 
             pass = check_leftover_norm (norm[side], si, side);
