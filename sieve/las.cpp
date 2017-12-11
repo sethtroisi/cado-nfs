@@ -3284,6 +3284,14 @@ if (si.conf.sublat.m) {
 
     verbose_output_print (2, 1, "# Total elapsed time %1.2fs, per special-q %gs, per relation %gs\n",
                  wct, wct / (double) nr_sq_processed, wct / (double) report->reports);
+
+    /* memory usage */
+    if (las.verbose >= 1 && las.config_pool.default_config_ptr) {
+        siever_config const & sc(*las.config_pool.default_config_ptr);
+	size_t base_memory = Memusage() << 10;
+        display_expected_memory_usage(sc, las.cpoly, las.bk_multiplier,
+				      base_memory);
+    }
     const long peakmem = PeakMemusage();
     if (peakmem > 0)
         verbose_output_print (2, 1, "# PeakMemusage (MB) = %ld \n",
