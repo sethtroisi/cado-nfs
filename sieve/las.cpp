@@ -1632,6 +1632,18 @@ void factor_survivors_data::cofactoring (timetree_t & timer)
         th->rep->survivors.enter_cofactoring++;
 
         if (las.batch_print_survivors) {
+            // In sublat mode, some non-primitive survivors can exist.
+            if (si.conf.sublat.m) {
+#ifndef SUPPORT_LARGE_Q
+                if (bin_gcd_int64_safe(a,b) != 1)
+                    continue;
+#else
+                cxx_mpz g;
+                mpz_gcd(g, az, bz);
+                if (mpz_cmp_ui(g, 1) != 0)
+                    continue;
+#endif
+            }
             verbose_output_start_batch ();
 #ifndef SUPPORT_LARGE_Q
             gmp_printf("%" PRId64 " %" PRIu64 " %Zd %Zd\n", a, b,
