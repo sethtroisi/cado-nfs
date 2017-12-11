@@ -12,7 +12,7 @@ def nb_special_q(q0,q1,qfac_min=None,qfac_max=infinity,verbose=false):
       # for each p, we have q0/p <= q < q1/p
       pi2 = 0
       pmax = min(qfac_max,floor(sqrt(q1-1)))
-      for p in prime_range(qfac_min,pmax):
+      for p in prime_range(qfac_min,pmax+1):
          qmin = max(ceil(q0/p),p)
          qmax = floor((q1-1)/p)
          assert qmin <= qmax
@@ -20,7 +20,7 @@ def nb_special_q(q0,q1,qfac_min=None,qfac_max=infinity,verbose=false):
       # q0 <= p*q*r < q1 with p <= q <= r
       pi3 = 0
       pmax = min(qfac_max,floor((q1-1)^(1/3)))
-      for p in prime_range(qfac_min,pmax):
+      for p in prime_range(qfac_min,pmax+1):
          # q0/p <= q*r < q1/p
          qmin = p
          qmax = min(qfac_max,floor(sqrt((q1-1)//p)))
@@ -33,14 +33,14 @@ def nb_special_q(q0,q1,qfac_min=None,qfac_max=infinity,verbose=false):
          print pi1, pi2, pi3
       return pi1 + pi2 + pi3
 
-# exact count for 2 factors (slow)
-def nb_special_q_2(q0,q1,qfac_min=None,qfac_max=infinity):
+# exact count for k factors (slow)
+def nb_special_q_k(q0,q1,k,qfac_min=None,qfac_max=infinity):
    q = q0
    count = 0
    while q < q1:
       l = factor(q)
       nb_factors = sum(l[i][1] for i in range(len(l)))
-      if nb_factors == 2:
+      if nb_factors == k:
          qmin = min(l[i][0] for i in range(len(l)))
          qmax = max(l[i][0] for i in range(len(l)))
          if qfac_min<=qmin and qmax<=qfac_max:
