@@ -24,6 +24,9 @@ main (int argc, char *argv[])
 {
   param_list pl;
   char *argv0 = argv[0];
+  double st, wct;
+  st = seconds();
+  wct = wct_seconds();
 
   param_list_init(pl);
   declare_usage(pl);
@@ -96,6 +99,7 @@ main (int argc, char *argv[])
   cxx_mpz A, R;
   long a;
   unsigned long b;
+  unsigned long nrels = 0;
   while (fgets(str, MAX_SIZE, inp)) {
       if (str[0] == '#') continue;
       gmp_sscanf(str, "%ld %lu %Zd %Zd\n", &a, &b, mpz_ptr(R), mpz_ptr(A));
@@ -111,8 +115,11 @@ main (int argc, char *argv[])
           if (found <= 0)
               continue;
       }
+      nrels++;
       gmp_printf("%ld, %lu\n", a, b);
   }
+  printf("# Finish ECM found %lu rels in %.2f s (wct %2.f s)\n",
+          nrels, seconds()-st, wct_seconds()-wct);
   
   fclose_maybe_compressed(inp, infilename);
   facul_clear_strategy(strategy0);
