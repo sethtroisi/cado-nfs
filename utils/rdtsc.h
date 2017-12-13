@@ -19,7 +19,7 @@
 
 #include <stdlib.h>
 
-uint64_t u32_to_64(uint32_t low, uint_32_t high)
+uint64_t u32_to_64(uint32_t low, uint32_t high)
 { return ((uint64_t) high << 32) + (uint64_t) low; }
 
 #ifdef USE_INTEL_PCM
