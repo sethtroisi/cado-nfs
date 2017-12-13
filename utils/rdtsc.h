@@ -120,7 +120,7 @@ static inline void rdtscp(uint32_t *low, uint32_t *high)
 
 __attribute__((__unused__, __artificial__, __always_inline__))
 static inline void
-rdpmc(uint32_t *low, uint32_t *high, const unsigned int selector)
+rdpmc(uint32_t *low, uint32_t *high, const unsigned int selector MAYBE_UNUSED)
 { *low = *high = 0; }
 
 #endif
