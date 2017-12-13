@@ -97,20 +97,34 @@ bool test(const unsigned long iter)
   if(arraysize % N != 0) {exit(EXIT_FAILURE);}
   SIMDTYPE sievearray[arraysize / N];
   ELEMTYPE sievearray2[arraysize];
-  sieve2357_prime_t primes[10] = {
+  sieve2357_prime_t all_primes[] = {
     /* p q idx logp */
+    {3, 1, 0, 2},
     {2, 2, 1, 1},
     {2, 4, 3, 2},
     {2, 8, 0, 6},
+    {2, 16, 14, 12},
+    {2, 32, 21, 24},
     {3, 3, 2, 3},
     {3, 3, 2, 3},
     {5, 5, 4, 4},
     {7, 7, 5, 5},
   };
-  
+  const size_t nr_all_primes = sizeof(all_primes) / sizeof(all_primes[1]);
+  sieve2357_prime_t use_primes[nr_all_primes + 1]; /* +1 for end marker */
+
+  /* Skip those prime (powers) this SIMD type can't sieve */
+  size_t j = 0;
+  for (size_t i = 0; i < nr_all_primes; i++) {
+    if (sieve2357_can_sieve<SIMDTYPE, ELEMTYPE>(all_primes[i].p, all_primes[i].q)) {
+      use_primes[j++] = all_primes[i];
+    }
+  }
+  use_primes[j] = sieve2357_prime_t{0,0,0,0};
+
   start_timing();
   for (unsigned long i = 0; i < iter; i++) {
-    sieve2357<SIMDTYPE, ELEMTYPE>(sievearray, arraysize, primes);
+    sieve2357<SIMDTYPE, ELEMTYPE>(sievearray, arraysize, use_primes);
   }
   end_timing();
   if (1)
@@ -119,7 +133,7 @@ bool test(const unsigned long iter)
 
   /* Do the same thing again, using simple sieve code */
   memset(sievearray2, 0, arraysize);
-  for (sieve2357_prime_t *p = primes; p->p != 0; p++) {
+  for (sieve2357_prime_t *p = use_primes; p->p != 0; p++) {
     for (size_t i = p->idx; i < arraysize; i += p->q) {
       sievearray2[i] += p->logp;
     }
