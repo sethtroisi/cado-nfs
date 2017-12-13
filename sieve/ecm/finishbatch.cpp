@@ -127,7 +127,7 @@ main (int argc, char *argv[])
   FILE * inp = fopen_maybe_compressed(infilename, "r");
   ASSERT_ALWAYS(inp);
 
-#define MAX_SIZE 1024
+#define MAX_SIZE 2048
   char str[MAX_SIZE];
   mpz_t A, R, q;
   mpz_init(A);
