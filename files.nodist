@@ -70,6 +70,7 @@ utils/README_POLYNOMIALS
 utils/CMakeLists-nodist.txt
 utils/cachesize.c
 utils/prime_pi.sage
+utils/rdtsc.h
 tests/utils/build-testcases-rootfinder.m
 linalg/bwc/CMakeLists-nodist.txt
 linalg/bwc/bench_polmatmul.cpp
