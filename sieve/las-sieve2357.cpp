@@ -193,8 +193,7 @@ sieve2357(SIMDTYPE * const sievearray, const size_t arraylen, const sieve2357_pr
     pattern2 = adds<SIMDTYPE, ELEMTYPE>(pattern2, bcaststride_inl<SIMDTYPE, ELEMTYPE>(primes->logp, 0, 1));
   }
 
-  /* Initialise the first word of the pattern with the sieve entries that are
-     powers of 2 */
+  /* Sieve powers of 2 */
   for ( ; primes->p == 2 ; primes++) {
     pattern2 = adds<SIMDTYPE, ELEMTYPE>(pattern2, bcaststride_inl<SIMDTYPE, ELEMTYPE>(primes->logp, primes->idx, primes->q));
   }
