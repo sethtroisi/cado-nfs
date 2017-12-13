@@ -3,8 +3,8 @@
 #include <cstdio>
 #include <cstdlib>
 #include <typeinfo>
-#ifdef HAVE_SSE2
-#include "emmintrin.h"
+#ifdef HAVE_SSSE3
+#include "tmmintrin.h"
 #endif
 #ifdef HAVE_AVX2
 #include "immintrin.h"
@@ -32,7 +32,7 @@ public:
     static constexpr const char * name = "unsigned char";
 };
 
-#ifdef HAVE_SSE2
+#ifdef HAVE_SSSE3
 template<>
 class gettypename<__m128i> {
 public:
@@ -142,7 +142,7 @@ int main(int argc, const char **argv)
 
   init_timing();
   test<unsigned long, unsigned char>(iter);
-#ifdef HAVE_SSE2
+#ifdef HAVE_SSSE3
   test<__m128i, unsigned char>(iter);
 #endif
 #ifdef HAVE_AVX2

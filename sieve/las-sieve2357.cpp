@@ -2,8 +2,8 @@
 #include <cstddef>
 #include <cstdint>
 
-#ifdef HAVE_SSE2
-#include "emmintrin.h"
+#ifdef HAVE_SSSE3
+#include "tmmintrin.h"
 #endif
 #ifdef HAVE_AVX2
 #include "immintrin.h"
@@ -66,7 +66,7 @@ unsigned long bcaststride<unsigned long, unsigned char>(const unsigned char v,
   return bcaststride_inl<unsigned long, unsigned char>(v, offset, stride);
 }
 
-#ifdef HAVE_SSE2
+#ifdef HAVE_SSSE3
 
 template<>
 inline __m128i ATTRIBUTE((__always_inline__, __artificial__))
@@ -259,7 +259,7 @@ sieve2357(SIMDTYPE * const sievearray, const size_t arraylen, const sieve2357_pr
 
 template
 void sieve2357<unsigned long, unsigned char>(unsigned long * const sievearray, const size_t arraylen, const sieve2357_prime_t *primes);
-#ifdef HAVE_SSE2
+#ifdef HAVE_SSSE3
 template
 void sieve2357<__m128i, unsigned char>(__m128i * const sievearray, const size_t arraylen, const sieve2357_prime_t *primes);
 #endif
