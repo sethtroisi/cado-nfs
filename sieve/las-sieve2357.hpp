@@ -13,11 +13,12 @@ typedef struct {
 template<typename SIMDTYPE, typename ELEMTYPE>
 static bool sieve2357_can_sieve(const fbprime_t p, const fbprime_t q)
 {
-  return (p == 2 && q <= sizeof(SIMDTYPE) / sizeof(ELEMTYPE) && q <= 16)
+  const size_t N = sizeof(SIMDTYPE) / sizeof(ELEMTYPE);
+  return (p == 2 && q <= 16 && q <= N)
     // currently, bcaststride() can't do stride >16 */
          || (p == 3 && q <= 3)
-         || (p == 5 && q <= 5)
-         || (p == 7 && q <= 7);
+         || (p == 5 && q <= 5 && q <= N)
+         || (p == 7 && q <= 7 && q <= N);
 }
 
 template<typename SIMDTYPE, typename ELEMTYPE>
