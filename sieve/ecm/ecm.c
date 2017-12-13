@@ -6,7 +6,6 @@
 #include "facul_ecm.h"
 #include "ularith.h"
 #include "getprime.h"
-#include "addchain_bc.h"
 
 #include "ec_arith_common.h"
 #include "ec_arith_Edwards.h"
@@ -26,14 +25,6 @@
 #define ELLM_SAFE_ADD 0
 #endif
 
-#ifndef MAYBE_UNUSED
-#if defined(__GNUC__)
-#define MAYBE_UNUSED __attribute__ ((unused))
-#else
-#define MAYBE_UNUSED
-#endif
-#endif
-
 #define COUNT_ELLM_OPS 0
 #if COUNT_ELLM_OPS
 static unsigned long ellM_dadd_count, ellM_double_count;
@@ -44,275 +35,308 @@ static unsigned long ellM_dadd_count, ellM_double_count;
 static unsigned long ellE_add_count, ellE_double_count, ellE_triple_count;
 #endif
 
+/******************************************************************************/
+/*********************** bytecode interpreter functions ***********************/
+/******************************************************************************/
 
-/* Interpret the bytecode located at "code" and do the 
-   corresponding elliptic curve operations on (x::z) */
-/* static */ void
-ellM_interpret_bytecode (ec_point_t P, const char *bc, unsigned int bc_len,
-                         const modulus_t m, const residue_t b)
+/**** Interpret the double-base chain bytecode for Twisted Edwards curves ****/
+/* Internal function.
+ * Return a pointer to the last parsed byte.
+ * Assume that the bytecode is correct (for example, assume that the size of the
+ * array is correct).
+ */
+static bytecode_const
+bytecode_dbchain_interpret_ec_edwards_internal (bytecode_const bc,
+                                                ec_point_t *R,
+                                                const modulus_t m)
 {
-  ec_point_t A, B, C, t, t2;
-  
-  ec_point_init (A, m);
-  ec_point_init (B, m);
-  ec_point_init (C, m);
-  ec_point_init (t, m);
-  ec_point_init (t2, m);
-
-  ec_point_set (A, P, m);
-
-  for (unsigned i = 0; i < bc_len; i++)
+  while (1)
   {
-    switch (bc[i])
+    uint8_t op, f, s, n, pow2 = 0, pow3 = 0;
+    bytecode_elt_split_2_1_1_4 (&op, &f, &s, &n, *bc);
+
+    if (op == DBCHAIN_OP_TPLADD || op == DBCHAIN_OP_TPLDBLADD)
     {
-      case 's': /* Swap A, B */
-        ec_point_swap (A, B, m);
+      bc++;
+      pow3 = bytecode_elt_to_uint8 (*bc); 
+    }
+    if (op == DBCHAIN_OP_DBLADD || op == DBCHAIN_OP_TPLDBLADD)
+    {
+      bc++;
+      pow2 = bytecode_elt_to_uint8 (*bc); 
+    }
+
+    for (uint8_t i = 0; i < pow3; i++)
+      edwards_tpl (R[0], R[0], m, (i+1==pow3+pow2) ? EDW_ext : EDW_proj);
+    for (uint8_t i = 0; i < pow2; i++)
+      edwards_dbl (R[0], R[0], m, (i+1==pow2) ? EDW_ext : EDW_proj);
+
+    // TODO if f and next_byte is a start of PRAC block => output in montgomery
+    edwards_add (R[f], R[0], R[n], m, f ? EDW_ext : EDW_proj);
+
+    if (f) /* is it finished ? */
+      break;
+    else
+      bc++; /* go to next byte */
+  }
+
+  return bc;
+}
+
+/********* Interpret the precomp bytecode for Twisted Edwards curves **********/
+/* Internal function.
+ * Return a pointer to the last parsed byte.
+ * Assume that the bytecode is correct (for example, assume that the size of the
+ * array is correct).
+ */
+static bytecode_const
+bytecode_precomp_interpret_ec_edwards_internal (bytecode_const bc,
+                                                ec_point_t *R,
+                                                const modulus_t m)
+{
+  while (*bc != PRECOMP_FINAL)
+  {
+    uint8_t op, a, s, i, j, k, pow2, pow3;
+    bytecode_elt_split_2_1_1_4 (&op, &a, &s, &k, *bc);
+
+    switch (op)
+    {
+      case PRECOMP_OP_ADD:
+        bc++;
+        bytecode_elt_split_4_4 (&i, &j, *bc);
+        if (s == 0)
+          edwards_add (R[k], R[i], R[j], m, a ? EDW_ext : EDW_proj);
+        else
+          edwards_sub (R[k], R[i], R[j], m, a ? EDW_ext : EDW_proj);
         break;
-      case 'i': /* Start of a subchain */
-        ec_point_set (B, A, m);
-        ec_point_set (C, A, m);
-        montgomery_dbl (A, A, m, b);
+      case PRECOMP_OP_DBL:
+        bc++;
+        pow2 = bytecode_elt_to_uint8 (*bc); 
+        for (uint8_t i = 0; i < pow2; i++)
+          edwards_dbl (R[0], R[0], m, (i+1==pow2 && a) ? EDW_ext : EDW_proj);
+        if (k > 0)
+          ec_point_set (R[k], R[0], m);
         break;
-      case 'f': /* End of a subchain */
-        montgomery_dadd (A, A, B, C, b, m);
+      case PRECOMP_OP_TPL:
+        bc++;
+        pow3 = bytecode_elt_to_uint8 (*bc); 
+        for (uint8_t i = 0; i < pow3; i++)
+          edwards_tpl (R[0], R[0], m, (i+1==pow3 && a) ? EDW_ext : EDW_proj);
+        if (k > 0)
+          ec_point_set (R[k], R[0], m);
+        break;
+      default:
+        printf ("Fatal error in %s at %s:%d -- unknown bytecode 0x%02x\n",
+                __func__, __FILE__, __LINE__, *bc);
+        abort ();
+    }
+
+    bc++; /* go to next byte */
+  }
+}
+
+/************* Interpret the PRAC bytecode for Montgomery curves *************/
+/* Internal function.
+ * Return a pointer to the last parsed byte.
+ * Assume that the bytecode is correct (for example, assume that the size of the
+ * array R is >= 5).
+ */
+static bytecode_const
+bytecode_prac_interpret_ec_montgomery_internal (bytecode_const bc,
+                                                ec_point_t *R,
+                                                const modulus_t m,
+                                                const residue_t b)
+{
+  while (1)
+  {
+    int finished = 0;
+    switch (*bc)
+    {
+      case PRAC_SWAP: /* [ = 's' ] Swap R[0], R[1] */
+        ec_point_swap (R[0], R[1], m);
+        break;
+      case PRAC_SUBBLOCK_INIT: /* [ = 'i' ] Start of a sub-block */
+        ec_point_set (R[1], R[0], m);
+        ec_point_set (R[2], R[0], m);
+        montgomery_dbl (R[0], R[0], m, b);
+        break;
+      case PRAC_SUBBLOCK_FINAL: /* [ = 'f' ] End of a sub-block */
+        montgomery_dadd (R[0], R[0], R[1], R[2], b, m);
+        break;
+      case PRAC_BLOCK_FINAL: /* [ = 'F' ] End of the block */
+        montgomery_dadd (R[1], R[0], R[1], R[2], b, m);
+        finished = 1;
         break;
       case 1:
-        montgomery_dadd (t, A, B, C, b, m);
-        montgomery_dadd (t2, t, A, B, b, m);
-        montgomery_dadd (B, B, t, A, b, m);
-        ec_point_set (A, t2, m);
+        montgomery_dadd (R[3], R[0], R[1], R[2], b, m);
+        montgomery_dadd (R[4], R[3], R[0], R[1], b, m);
+        montgomery_dadd (R[1], R[1], R[3], R[0], b, m);
+        ec_point_set (R[0], R[4], m);
         break;
       case 2:
-        montgomery_dadd (B, A, B, C, b, m);
-        montgomery_dbl (A, A, m, b);
+        montgomery_dadd (R[1], R[0], R[1], R[2], b, m);
+        montgomery_dbl (R[0], R[0], m, b);
         break;
       case 3:
-        montgomery_dadd (C, B, A, C, b, m);
-        ec_point_swap (B, C, m);
+        montgomery_dadd (R[2], R[1], R[0], R[2], b, m);
+        ec_point_swap (R[1], R[2], m);
         break;
       case 4:
-        montgomery_dadd (B, B, A, C, b, m);
-        montgomery_dbl (A, A, m, b);
+        montgomery_dadd (R[1], R[1], R[0], R[2], b, m);
+        montgomery_dbl (R[0], R[0], m, b);
         break;
       case 5:
-        montgomery_dadd (C, C, A, B, b, m);
-        montgomery_dbl (A, A, m, b);
+        montgomery_dadd (R[2], R[2], R[0], R[1], b, m);
+        montgomery_dbl (R[0], R[0], m, b);
         break;
       case 6:
-        montgomery_dbl (t, A, m, b);
-        montgomery_dadd (t2, A, B, C, b, m);
-        montgomery_dadd (A, t, A, A, b, m);
-        montgomery_dadd (C, t, t2, C, b, m);
-        ec_point_swap (B, C, m);
+        montgomery_dbl (R[3], R[0], m, b);
+        montgomery_dadd (R[4], R[0], R[1], R[2], b, m);
+        montgomery_dadd (R[0], R[3], R[0], R[0], b, m);
+        montgomery_dadd (R[2], R[3], R[4], R[2], b, m);
+        ec_point_swap (R[1], R[2], m);
         break;
       case 7:
-        montgomery_dadd (t, A, B, C, b, m);
-        montgomery_dadd (B, t, A, B, b, m);
-        montgomery_dbl (t, A, m, b);
-        montgomery_dadd (A, A, t, A, b, m);
+        montgomery_dadd (R[3], R[0], R[1], R[2], b, m);
+        montgomery_dadd (R[1], R[3], R[0], R[1], b, m);
+        montgomery_dbl (R[3], R[0], m, b);
+        montgomery_dadd (R[0], R[0], R[3], R[0], b, m);
         break;
       case 8:
-        montgomery_dadd (t, A, B, C, b, m);
-        montgomery_dadd (C, C, A, B, b, m);
-        ec_point_swap (B, t, m);
-        montgomery_dbl (t, A, m, b);
-        montgomery_dadd (A, A, t, A, b, m);
+        montgomery_dadd (R[3], R[0], R[1], R[2], b, m);
+        montgomery_dadd (R[2], R[2], R[0], R[1], b, m);
+        ec_point_swap (R[1], R[3], m);
+        montgomery_dbl (R[3], R[0], m, b);
+        montgomery_dadd (R[0], R[0], R[3], R[0], b, m);
         break;
       case 9:
-        montgomery_dadd (C, C, B, A, b, m);
-        montgomery_dbl (B, B, m, b);
+        montgomery_dadd (R[2], R[2], R[1], R[0], b, m);
+        montgomery_dbl (R[1], R[1], m, b);
         break;
       case 10:
         /* Combined final add of old subchain and init of new subchain [=fi] */
-        montgomery_dadd (B, A, B, C, b, m);
-        ec_point_set (C, B, m);
-        montgomery_dbl (A, B, m, b);
+        montgomery_dadd (R[1], R[0], R[1], R[2], b, m);
+        ec_point_set (R[2], R[1], m);
+        montgomery_dbl (R[0], R[1], m, b);
         break;
       case 11:
         /* Combined rule 3 and rule 0 [=\x3s] */
-        montgomery_dadd (C, B, A, C, b, m);
-        /* (B,C,A) := (A,B,C)  */
-        ec_point_swap (B, C, m);
-        ec_point_swap (A, B, m);
+        montgomery_dadd (R[2], R[1], R[0], R[2], b, m);
+        /* (R[1],R[2],R[0]) := (R[0],R[1],R[2])  */
+        ec_point_swap (R[1], R[2], m);
+        ec_point_swap (R[0], R[1], m);
         break;
       case 12:
         /* Combined rule 3, then subchain end/start [=\x3fi] */
-        montgomery_dadd (t, B, A, C, b, m);
-        montgomery_dadd (C, A, t, B, b, m);
-        ec_point_set (B, C, m);
-        montgomery_dbl (A, C, m, b);
+        montgomery_dadd (R[3], R[1], R[0], R[2], b, m);
+        montgomery_dadd (R[2], R[0], R[3], R[1], b, m);
+        ec_point_set (R[1], R[2], m);
+        montgomery_dbl (R[0], R[2], m, b);
         break;
       case 13:
         /* Combined rule 3, swap, rule 3 and swap, merged a bit [=\x3s\x3s] */
-        ec_point_set (t, B, m);
-        montgomery_dadd (B, B, A, C, b, m);
-        ec_point_set (C, A, m);
-        montgomery_dadd (A, A, B, t, b, m);
+        ec_point_set (R[3], R[1], m);
+        montgomery_dadd (R[1], R[1], R[0], R[2], b, m);
+        ec_point_set (R[2], R[0], m);
+        montgomery_dadd (R[0], R[0], R[1], R[3], b, m);
         break;
       default:
-        printf ("#Unknown bytecode %u\n", (unsigned int) bc[i]);
+        printf ("Fatal error in %s at %s:%d -- unknown bytecode 0x%02x\n",
+                __func__, __FILE__, __LINE__, *bc);
         abort ();
     }
+
+    if (finished) /* is it finished ? */
+      break;
+    else
+      bc++; /* go to next byte */
   }
 
-  ec_point_set (P, A, m);
+  return bc;
+}
 
-  ec_point_clear (A, m);
-  ec_point_clear (B, m);
-  ec_point_clear (C, m);
-  ec_point_clear (t, m);
-  ec_point_clear (t2, m);
+static void
+bytecode_prac_interpret_ec_montgomery (ec_point_t P, bytecode_const bc,
+                                       const modulus_t m, const residue_t b)
+{
+  ec_point_t *R = NULL;
+  unsigned int R_nalloc;
+
+  R_nalloc = 5; /* we need 5 points: 3 for PRAC + 2 temporary points */
+  R = (ec_point_t *) malloc (R_nalloc * sizeof (ec_point_t));
+  FATAL_ERROR_CHECK (R == NULL, "could not malloc R");
+  for (unsigned int i = 0; i < R_nalloc; i++)
+    ec_point_init (R[i], m);
+
+  /* current point (here starting point) go into R[0] at init */
+  ec_point_set (R[0], P, m);
+
+  bytecode_prac_interpret_ec_montgomery_internal (bc, R, m, b);
+
+  /* output is in R[1] */
+  ec_point_set (P, R[1], m);
+
+  for (unsigned int i = 0; i < R_nalloc; i++)
+    ec_point_clear (R[i], m);
+}
+
+/** Interpret the MISHMASH bytecode on Twisted Edwards and Montgomery curves **/
+MAYBE_UNUSED static void
+bytecode_mishmash_interpret_ec_mixed_repr (ec_point_t P, bytecode_const bc,
+                                           const modulus_t m, const residue_t b)
+{
+  ec_point_t *R = NULL;
+  unsigned int R_nalloc;
+  uint8_t n;
+
+  /* parse first byte to alloc R and go to the next byte */
+  bytecode_elt_split_4_4 (NULL, &n, *bc);
+  bc++;
+
+  R_nalloc = n + 2;
+  R = (ec_point_t *) malloc (R_nalloc * sizeof (ec_point_t));
+  FATAL_ERROR_CHECK (R == NULL, "could not malloc R");
+  for (unsigned int i = 0; i < R_nalloc; i++)
+    ec_point_init (R[i], m);
+
+  /* starting point go into R[1] at init */
+  ec_point_set (R[1], P, m);
+
+  while (*bc != MISHMASH_FINAL)
+  {
+    uint8_t t, n;
+    bytecode_elt_split_4_4 (&t, &n, *bc);
+
+    if (n != 0)
+      ec_point_set (R[0], R[n], m);
+
+    if (t == MISHMASH_DBCHAIN_BLOCK)
+      bc = bytecode_dbchain_interpret_ec_edwards_internal (++bc, R, m);
+    else if (t == MISHMASH_PRECOMP_BLOCK)
+      bc = bytecode_precomp_interpret_ec_edwards_internal (++bc, R, m);
+    else if (t == MISHMASH_PRAC_BLOCK)
+      bc = bytecode_prac_interpret_ec_montgomery_internal (++bc, R, m, b);
+    else /* unexpected bytecode */
+    {
+      printf ("Fatal error in %s at %s:%d -- unexpected bytecode 0x%02x\n",
+              __func__, __FILE__, __LINE__, *bc);
+      abort ();
+    }
+
+    bc++; /* go to next byte */
+  }
+
+  /* output is in R[1] */
+  ec_point_set (P, R[1], m);
+
+  for (unsigned int i = 0; i < R_nalloc; i++)
+    ec_point_clear (R[i], m);
 }
 
 
-/* Interpret the addition chain written in bc */
-/* Computes Q = sP, where */
-/* - s is the primorial exponent depending only on B1 */
-/* - P is the initial point given in extended coord */
-/* - Q is returned in projective coord */
-/* static void */
-/* ellE_interpret_bytecode (ellE_point_t P, const char *bc, const unsigned int bc_len, */
-/* 			 const modulus_t m, const residue_t a) */
-/* { */
-/*   unsigned char q; */
-/*   ellE_point_t Q; */
-/*   ellEe_point_t Te; */
-/*   ellE_init (Q, m); */
-/*   ellEe_init (Te, m); */
-
-/*   q = bc[0];       /\* 'q':  permet de remplacer les couilles *\/ */
-/* 		   /\* en coquilles [PG, Oct. 2016] *\/ */
-/*   ASSERT (q & 1);  /\* q is odd *\/ */
-
-/*   unsigned char rP_size = (q+1)/2; */
-/*   ASSERT (rP_size <= 127); */
-
-/*   /\* Precomputation phase *\/ */
-  
-/*   /\* _2Pe = [2]P in extended coord *\/ */
-/*   ellEe_point_t _2Pe; */
-/*   ellEe_init (_2Pe, m); */
-/*   ellEe_set_from_E (_2Pe, P, m); */
-/*   ellEe_double (_2Pe, _2Pe, m, a); */
-
-/* #if 1 */
-/*   printf ("P: "); */
-/*   ellE_print (P); */
-/*   printf ("2P: "); */
-/*   ellEe_print (_2Pe); */
-/* #endif */
-
-/*   /\* _rP[i] = [2*i+1]P in extended coord *\/ */
-/*   ellEe_point_t *_rP; */
-/*   _rP = (ellEe_point_t *) malloc (rP_size * sizeof (ellEe_point_t)); */
-
-/*   ASSERT (_rP != NULL); */
-
-/*   for (int i=0 ; i < rP_size ; i++) */
-/*     ellEe_init (_rP[i], m); */
-
-/*   ellEe_set_from_E (_rP[0], P, m); */
-
-/*   for (int i = 1 ; i < rP_size ; i++) */
-/*     ellEe_add (_rP[i], _rP[i-1], _2Pe, m, a); */
-
-/* #if 1 */
-/*   printf ("_rP: "); */
-/*   for (int i = 0 ; i < rP_size ; i++) */
-/*     { */
-/*       printf ("%d: ", i); */
-/*       ellEe_print (_rP[i]); */
-/*     } */
-/* #endif */
-
-/*   /\* Addition chain *\/ */
-  
-/*   /\* Starting point (depends on bc[1] and bc[2]) *\/ */
-
-/*   unsigned int i = bc[1] & 0x7F; */
-  
-/* #if 1 */
-/*   printf ("i = %d, 2i+1 = %d\n", i, 2*i+1); */
-/* #endif */
-
-/*   if (i == 0x7F) */
-/*     { */
-/* #if 1 */
-/*       printf ("DBLCODE\n"); */
-/* #endif */
-/*       ellEe_set (Te, _2Pe, m); */
-/*     } */
-/*   else */
-/*     { */
-/*       ellEe_set (Te, _rP[i], m); */
-/* #if 1 */
-/*       printf ("CODE: %d\n", i); */
-/* #endif */
-/*     } */
-
-/* #if 1 */
-/*   ellEe_print (Te); */
-/* #endif */
-
-/*   if (bc[1] & 0x80) */
-/*     { */
-/*       i = bc[2] & 0x7F; */
-/* #if 1 */
-/*       printf ("CODE: %d\n", i); */
-/* #endif */
-
-/*       ellEe_add (Te, Te, _rP[i], m, a); */
-/*     } */
-/*   ellE_set_from_Ee (Q, Te, m); */
-
-/* #if 1 */
-/*   ellE_mul_ul (Q, P, 3, m, a); */
-/*   printf ("3P: "); */
-/*   ellE_print (Q); */
-/* #endif */
-
-/*   /\* scan bc[i] for i >= 3 *\/ */
-/*   for (unsigned int i = 3; i < bc_len; i++) */
-/*   { */
-/* #if 1 */
-/*     ellE_print (Q); */
-/* #endif */
-
-/*     char b = bc[i]; */
-/*     switch (b) */
-/*     { */
-/*       case ADDCHAIN_2DBL: */
-/*         ellE_double (Q, Q, m, a); */
-/* #if 1 */
-/*     ellE_print (Q); */
-/* #endif */
-/*         no_break(); */
-
-/*       case ADDCHAIN_DBL: */
-/*         ellE_double (Q, Q, m, a); */
-/* #if 1 */
-/*     ellE_print (Q); */
-/* #endif */
-/*         break; */
-/*       default: */
-/*         ellEe_set (Te, _rP[b & 0x7f], m); */
-/* 	      if (b & 0x80) */
-/* 	        ellEe_neg (Te, m); */
-/* 	      ellE_double_add (Q, Q, Te, m, a); */
-/*         break; */
-/*     } */
-/*   } */
-  
-/*   ellE_set (P, Q, m); */
-
-/*   ellE_clear (Q, m); */
-/*   ellEe_clear (_2Pe, m); */
-/*   ellEe_clear (Te, m); */
-/*   for (i=0 ; i < rP_size ; i++) */
-/*     ellEe_clear (_rP[i], m); */
-/*   free (_rP); */
-/* } */
-
+/******************************************************************************/
+/*********************** bytecode interpreter functions ***********************/
+/******************************************************************************/
 
 /* Produces curve in Montgomery form from sigma value.
    Return 1 if it worked, 0 if a modular inverse failed.
@@ -1378,7 +1402,7 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
   /* Do stage 1 */
   if (plan->parameterization & FULLMONTY)
   {
-    ellM_interpret_bytecode (P, plan->bc, plan->bc_len, m, b);
+    bytecode_prac_interpret_ec_montgomery (P, plan->bc, m, b);
     
       /* Add prime 2 in the desired power. If a zero residue for the 
 	 Z-coordinate is encountered, we backtrack to previous point and stop.

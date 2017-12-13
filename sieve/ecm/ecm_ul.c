@@ -29,7 +29,7 @@
 #define montgomery_dbl montgomery_dbl_ul
 #define montgomery_dadd montgomery_dadd_ul
 #define montgomery_smul_ui montgomery_smul_ui_ul
-#define ellM_interpret_bytecode ellM_interpret_bytecode_ul
+#define bytecode_prac_interpret_ec_montgomery bytecode_prac_interpret_ec_montgomery_ul
 
 #define weierstrass_add weierstrass_add_ul
 #define weierstrass_dbl weierstrass_dbl_ul

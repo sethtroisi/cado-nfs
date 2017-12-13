@@ -5,11 +5,11 @@
 #include "modredc_15ul.h"
 #include "modredc_2ul2.h"
 #include "mod_mpz.h"
+#include "bytecode.h"
 #include "stage2.h"
 
 typedef struct {
-  char *bc;             /* Bytecode for the Lucas chain for stage 1 */
-  unsigned int bc_len;  /* Number of bytes in bytecode */
+  bytecode bc;          /* Bytecode for stage 1 */
   unsigned int exp2;    /* Exponent of 2 in stage 1 primes */
   unsigned int B1;
   stage2_plan_t stage2;

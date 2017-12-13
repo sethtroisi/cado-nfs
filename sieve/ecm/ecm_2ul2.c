@@ -25,7 +25,7 @@
 #define montgomery_dbl montgomery_dbl_2ul2
 #define montgomery_dadd montgomery_dadd_2ul2
 #define montgomery_smul_ui montgomery_smul_ui_2ul2
-#define ellM_interpret_bytecode ellM_interpret_bytecode_2ul2
+#define bytecode_prac_interpret_ec_montgomery bytecode_prac_interpret_ec_montgomery_2ul2
 
 #define weierstrass_add weierstrass_add_2ul2
 #define weierstrass_dbl weierstrass_dbl_2ul2

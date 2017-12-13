@@ -7,8 +7,7 @@
 #include "pm1.h"
 #include "pp1.h"
 #include "facul_ecm.h"
-#include "prac_bc.h"
-#include "addchain_bc.h"
+#include "bytecode.h"
 #include "portability.h"
 
 /* By default we compress the bytecode chain.
@@ -19,13 +18,25 @@
 /* Costs of operations for P+1 (for Lucas chain computed with PRAC algorithm) */
 prac_cost_t pp1_opcost = { .dadd = 10., .dbl = 10.};
 
-/* Costs of operations for Montgomery curves used in ECM (for Lucas chain
- * computed with PRAC algorithm)
- * TODO: find good ratio between addcost and doublecost
+/* Costs of operations for interpreting PRAC chains on Montgomery curves
+ * The cost are the number of modular multiplications and squarings.
  */
-prac_cost_t ecm_montgomery_opcost = { .dadd = 6., .dbl = 5.};
+prac_cost_t ec_montgomery_opcost = { .dadd = 6., .dbl = 5.};
 
-/* Costs of operations for Twisted Edwards Curves with a=-1
+/* Costs of operations for interpreting double base chains on Twisted Edwards
+ * curves with a=-1.
+ * The cost are the number of modular multiplications and squarings.
+ */
+dbchain_cost_t ec_edwards_dbchain_opcost = { .dbl=7., .dbladd=15., .tpl=12.,
+                                             .tpladd=21., .extra_final_add=1. };
+/* Costs of operations for interpreting precomp chains on Twisted Edwards
+ * curves with a=-1.
+ * The cost are the number of modular multiplications and squarings.
+ */
+precomp_cost_t ec_edwards_precomp_opcost = { .add=7., .extra_add_for_add=1.,
+                                             .dbl=7., .extra_dbl_for_add=1.,
+                                             .tpl=12., .extra_tpl_for_add=2. };
+/*
  *  For those curves, we use 3 different models:
  *    projective, extended and (only internally) completed
  *  The costs corresponds to operations on different models:
@@ -41,8 +52,10 @@ prac_cost_t ecm_montgomery_opcost = { .dadd = 6., .dbl = 5.};
  *    - add_precomp corresponds to an addition extended, extended, -> extended
  *  We count 1 for a multiplication and 1 for a squaring on the base field.
  */
-addchain_cost_t TwEdwards_minus1_opcost = { .dbl=7. , .add=7. , .dbladd=15. ,
-                                            .dbl_precomp=8. , .add_precomp=8. };
+
+mishmash_cost_t ec_mixed_repr_opcost = { .dbchain = &ec_edwards_dbchain_opcost,
+                                         .precomp = &ec_edwards_precomp_opcost,
+                                         .prac = &ec_montgomery_opcost };
 
 /***************************** P-1 ********************************************/
 
@@ -126,8 +139,8 @@ pp1_make_plan (pp1_plan_t *plan, const unsigned int B1, const unsigned int B2,
   plan->B1 = B1;
 
   /* Allocates plan->bc, fills it and returns bc_len */
-  plan->bc_len = prac_bytecode (&(plan->bc), B1, plan->exp2, 0, &pp1_opcost,
-                                BYTECODE_COMPRESS, verbose);
+  bytecode_prac_encode (&(plan->bc), B1, plan->exp2, 0, &pp1_opcost,
+                        BYTECODE_COMPRESS, verbose);
 
   /* Make stage 2 plan */
   stage2_make_plan (&(plan->stage2), B1, B2, verbose);
@@ -139,14 +152,13 @@ pp1_clear_plan (pp1_plan_t *plan)
   stage2_clear_plan (&(plan->stage2));
   free (plan->bc);
   plan->bc = NULL;
-  plan->bc_len = 0;
   plan->B1 = 0;
 
   /* Clear the cache for the chains computed by prac algorithm.
    * The first call to this function will free the memory, the other calls will
    * be nop.
    */
-  prac_cache_free ();
+  bytecode_prac_cache_free ();
 }
 
 /***************************** ECM ********************************************/
@@ -198,19 +210,16 @@ ecm_make_plan (ecm_plan_t *plan, const unsigned int B1, const unsigned int B2,
 
   /* Allocates plan->bc, fills it and returns bc_len.
    * For Montgomery curves: we use Lucas chains computed with PRAC algorithm.
-   * For Twisted Edwards curves: we use additions chains
    */
   if (parameterization & FULLMONTY)
   {
-    plan->bc_len = prac_bytecode (&(plan->bc), B1, plan->exp2, pow3_extra,
-                                  &ecm_montgomery_opcost, BYTECODE_COMPRESS,
-                                  verbose);
+    bytecode_prac_encode (&(plan->bc), B1, plan->exp2, pow3_extra,
+        &ec_montgomery_opcost, BYTECODE_COMPRESS, verbose);
   }
-  else if (parameterization & FULLTWED)
+  else if (parameterization & FULLMONTYTWED)
   {
-    plan->bc_len = addchain_bytecode (&(plan->bc), B1, plan->exp2, pow3_extra,
-                                      &TwEdwards_minus1_opcost,
-                                      BYTECODE_COMPRESS, verbose);
+    bytecode_mishmash_encode (&(plan->bc), B1, plan->exp2, pow3_extra,
+        &ec_mixed_repr_opcost, BYTECODE_COMPRESS, verbose);
   }
   else
     FATAL_ERROR_CHECK (1, "Unknown parametrization");
@@ -230,12 +239,11 @@ ecm_clear_plan (ecm_plan_t *plan)
   {
     free (plan->bc);
     plan->bc = NULL;
-    plan->bc_len = 0;
   }
 
   /* Clear the cache for the chains computed by prac algorithm.
    * The first call to this function will free the memory, the other calls will
    * be nop.
    */
-  prac_cache_free ();
+  bytecode_prac_cache_free ();
 }

@@ -25,7 +25,8 @@
 #define montgomery_dbl montgomery_dbl_mpz
 #define montgomery_dadd montgomery_dadd_mpz
 #define montgomery_smul_ui montgomery_smul_ui_mpz
-#define ellM_interpret_bytecode ellM_interpret_bytecode_mpz
+#define bytecode_prac_interpret_ec_montgomery bytecode_prac_interpret_ec_montgomery_mpz
+
 
 #define weierstrass_add weierstrass_add_mpz
 #define weierstrass_dbl weierstrass_dbl_mpz

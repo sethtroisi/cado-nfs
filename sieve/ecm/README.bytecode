@@ -25,22 +25,22 @@ The output point must be written in R[1] at the end.
   0000nnnn    Beginning of the MISHMASH bytecode
               Allocate the array R with n+2 points
               Must be the first byte of the bytecode
-              Cannont be used afterwards
-  0001nnnn    Beginning of a DBLADD block
-              Set R[0] <- R[n]
+              Cannot be used afterwards
+              Copy input point into R[1]
+  0001nnnn    Beginning of a DBCHAIN block
+              Set R[0] <- R[n] (if n is 0, this is a no-op)
   0010nnnn    Beginning of a PRECOMP block
-              Set R[0] <- R[n]
+              Set R[0] <- R[n] (if n is 0, this is a no-op)
   1000nnnn    Beginning of a PRAC block
-              Set R[0] <- R[n]
+              Set R[0] <- R[n] (if n is 0, this is a no-op)
   11111111    End of the MISHMASH bytecode
               R[1] contains the results
               Must be the last byte of the bytecode
               Cannont be used before
 
 
-# DBLADD block
+# DBCHAIN block
 
-  00fsnnnn                       R[f] <- R[0] +/- R[n]
   01fsnnnn dddddddd              R[f] <- 2^d R[0] +/- R[n]
   10fsnnnn tttttttt              R[f] <- 3^t R[0] +/- R[n]
   11fsnnnn tttttttt dddddddd     R[f] <- 2^d 3^t R[0] +/- R[n]
@@ -52,24 +52,33 @@ The output point must be written in R[1] at the end.
 # PRECOMP block
 
   00askkkk iiiijjjj             R[k] <- R[i] +/- R[j]
-  01askkkk dddddddd             R[k] <- R[0] <- 2^d R[0]
-  10askkkk tttttttt             R[k] <- R[0] <- 3^t R[0]
-  11askkkk tttttttt dddddddd    R[k] <- R[0] <- 2^d 3^t R[0]
+  01a0kkkk dddddddd             R[k] <- R[0] <- 2^d R[0]
+  10a0kkkk tttttttt             R[k] <- R[0] <- 3^t R[0]
 
     The sign is given by s: + if s=0, - if s=1
+    In the last two cases, k can be 0 and the second assignment becomes a no-op.
+    The 'a' bit must be 1 if R[k] will be used as a summand in an addition or a
+      substraction later.
+
+  11111111                      End of the block
 
 # PRAC block
 
-  We always maintain R[0]-R[1] = R[2]
+  Remarks:
+    - We always maintain R[0]-R[1] = R[2]
+    - This implies that we need len(R) >= 3
+    - In fact, we need len(R) >= 5, because two temporary points are needed
+
 
   01101001    beginning a of sub-block                          [ 'i' in ASCII ]
               R[2] <- R[1] <- R[0]
               R[0] <- 2 R[0]
   01110011    swap                                              [ 's' in ASCII ]
               R[0] <-> R[1]
-  01f00110    end of sub-block                           [ 'f' of 'F' in ASCII ]
-              R[1-f] <- R[0]+R[1]
-              The f bit, ie 'F' in ASCII, must be 1 only for the last sub-block.
+  01100110    end of sub-block                                  [ 'f' in ASCII ]
+              R[0] <- R[0]+R[1]
+  01000110    end of sub-block and end of PRAC block            [ 'F' in ASCII ]
+              R[1] <- R[0]+R[1]
   00000001    Apply rule 1
   00000010    Apply rule 2
   00000011    Apply rule 3

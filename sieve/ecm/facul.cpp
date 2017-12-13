@@ -696,6 +696,7 @@ facul_make_default_strategy (int n, const int verbose)
       unsigned int k;
 
       B1 += sqrt (B1);
+      printf ("####42#### %f %u\n", B1, (unsigned int) B1);
       /* The factor 50 was determined experimentally with testbench, to find
 	 factors of 40 bits:
 	 testbench -p -cof 1208925819614629174706189 -strat 549755813888 549755913888

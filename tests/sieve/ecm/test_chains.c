@@ -4,8 +4,7 @@
 #include <limits.h>
 #include <sys/time.h>
 
-#include "sieve/ecm/prac_bc.h"
-#include "sieve/ecm/addchain_bc.h"
+#include "sieve/ecm/bytecode.h"
 #include "utils.h"
 #include "test_iter.h"
 #include "tests_common.h"
@@ -37,14 +36,16 @@ test_prac (unsigned int B1min, unsigned int B1max, int compress,
   {
     if (verbose)
       printf ("##### %s with B1 = %u\n", __func__, B1);
-    char *bc;
+
+    bytecode bc;
     mpz_t E;
-    unsigned int len = prac_bytecode (&bc, B1, 0, 0, opcost, compress, verbose);
+
+    bytecode_prac_encode (&bc, B1, 0, 0, opcost, compress, verbose);
 
     mpz_init (E);
     mpz_prod_primes_below_B1 (E, B1);
 
-    if (prac_bytecode_check (bc, len, E, verbose) != 0)
+    if (bytecode_prac_check (bc, E, verbose) != 0)
     {
       printf ("##### Test with B1 = %u failed with PRAC\n", B1);
       n++;
@@ -56,8 +57,8 @@ test_prac (unsigned int B1min, unsigned int B1max, int compress,
 }
 
 unsigned int
-test_addchain (unsigned int B1min, unsigned int B1max, int compress,
-               const addchain_cost_t *opcost, int verbose)
+test_mishmash (unsigned int B1min, unsigned int B1max, int compress,
+               const mishmash_cost_t *opcost, int verbose)
 {
   unsigned int n = 0;
   /* Test all values of B1 in [B1min..B1max] */
@@ -65,17 +66,18 @@ test_addchain (unsigned int B1min, unsigned int B1max, int compress,
   {
     if (verbose)
       printf ("##### %s with B1 = %u\n", __func__, B1);
-    char *bc;
+
+    bytecode bc;
     mpz_t E;
-    unsigned int len = addchain_bytecode (&bc, B1, 0, 0, opcost, compress,
-                                                                       verbose);
+
+    bytecode_mishmash_encode (&bc, B1, 0, 0, opcost, compress, verbose);
 
     mpz_init (E);
     mpz_prod_primes_below_B1 (E, B1);
 
-    if (addchain_bytecode_check (bc, len, E, verbose) != 0)
+    if (bytecode_mishmash_check (bc, E, verbose) != 0)
     {
-      printf ("##### Test with B1 = %u failed with addchain\n", B1);
+      printf ("##### Test with B1 = %u failed with MISHMASH\n", B1);
       n++;
     }
     free (bc);
@@ -105,25 +107,26 @@ int main (int argc, const char **argv)
     nerrors += test_prac (100, 1000, 0, &cost, verbose);
   }
 
-  { /* addchain test */
+  { /* mishmash test */
     /* Random opcost (between 0 and 16) [ 0x1p60 == double 2^60 ] */
-    addchain_cost_t cost;
-    cost.dbl = (double) random_uint64 () / 0x1p60;
-    cost.add = (double) random_uint64 () / 0x1p60;
-    cost.dbladd = (double) random_uint64 () / 0x1p60;
-    cost.dbl_precomp = (double) random_uint64 () / 0x1p60;
-    cost.add_precomp = (double) random_uint64 () / 0x1p60;
-    printf ("Addchain cost: dbl = %f; add = %f; dbladd = %f; dbl_precomp = %f; "
-            "add_precomp = %f\n", cost.dbl, cost.add, cost.dbladd,
-            cost.dbl_precomp, cost.add_precomp);
-    
+    dbchain_cost_t dbchain_cost;
+    memset (&dbchain_cost, 0, sizeof (dbchain_cost_t));
+    precomp_cost_t precomp_cost;
+    memset (&precomp_cost, 0, sizeof (precomp_cost_t));
+    prac_cost_t prac_cost;
+    prac_cost.dbl = (double) random_uint64 () / 0x1p60;
+    prac_cost.dadd = (double) random_uint64 () / 0x1p60;
+    printf ("MISHMAP PRAC cost: dbl = %f; dadd = %f\n", prac_cost.dbl, prac_cost.dadd);
+    mishmash_cost_t cost = { .dbchain = &dbchain_cost, .precomp = &precomp_cost,
+                             .prac = &prac_cost };
 
-    /* compress additions chains */
-    nerrors += test_addchain (100, 1000, 1, &cost, verbose);
-    /* uncompress additions chains */
-    nerrors += test_addchain (100, 1000, 0, &cost, verbose);
+    /* compress mishmash chains */
+    nerrors += test_mishmash (100, 1000, 1, &cost, verbose);
+    /* uncompress mishmash chains */
+    nerrors += test_mishmash (100, 1000, 0, &cost, verbose);
   }
 
+  bytecode_prac_cache_free ();
   tests_common_clear ();
   return (nerrors == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
 }
