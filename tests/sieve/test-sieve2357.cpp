@@ -87,7 +87,7 @@ bool test_bcaststride_many()
 }
 
 template <typename SIMDTYPE, typename ELEMTYPE>
-void test(const unsigned long iter)
+bool test(const unsigned long iter)
 {
   const size_t N = sizeof(SIMDTYPE) / sizeof(ELEMTYPE);
   bool ok = true;
@@ -126,29 +126,33 @@ void test(const unsigned long iter)
   }
 
   /* Compare the two arrays */
-  for (size_t i = 0; i < arraysize; i++) {
+  unsigned long nr_errors = 0;
+  for (size_t i = 0; i < arraysize && nr_errors < 10; i++) {
     if (((ELEMTYPE *)&sievearray)[i] != (sievearray2)[i]) {
       printf("Mismatch, sievearray[%zu] = %hu, sievearray2[%zu] = %hu\n",
              i, ((ELEMTYPE *)&sievearray)[i], i, sievearray2[i]);
+      nr_errors++;
     }
   }
+  return nr_errors == 0;
 }
 
 int main(int argc, const char **argv)
 {
   unsigned long iter = 1;
+  bool ok = true;
   tests_common_cmdline(&argc, &argv, PARSE_SEED | PARSE_ITER);
   tests_common_get_iter(&iter);
 
   init_timing();
-  test<unsigned long, unsigned char>(iter);
+  ok &= test<unsigned long, unsigned char>(iter);
 #ifdef HAVE_SSSE3
-  test<__m128i, unsigned char>(iter);
+  ok &= test<__m128i, unsigned char>(iter);
 #endif
 #ifdef HAVE_AVX2
-  test<__m256i, unsigned char>(iter);
+  ok &= test<__m256i, unsigned char>(iter);
 #endif
   clear_timing();
   tests_common_clear();
-  exit (EXIT_SUCCESS);
+  exit (ok ? EXIT_SUCCESS : EXIT_FAILURE);
 }
