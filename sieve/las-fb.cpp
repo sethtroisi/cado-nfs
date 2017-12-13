@@ -75,8 +75,8 @@ void sieve_info::init_factor_bases(param_list_ptr pl)
             tfb = seconds () - tfb;
             tfb_wct = wct_seconds () - tfb_wct;
             verbose_output_print(0, 1,
-                    "# Reading side-%d factor base of %zuMb took %1.1fs (%1.1fs real)\n",
-                    side, fb[side]->size() >> 20, tfb, tfb_wct);
+                    "# Reading side-%d factor base took %1.1fs (%1.1fs real)\n",
+                    side, tfb, tfb_wct);
         } else {
             double tfb = seconds ();
             double tfb_wct = wct_seconds ();
@@ -88,8 +88,8 @@ void sieve_info::init_factor_bases(param_list_ptr pl)
             tfb = seconds () - tfb;
             tfb_wct = wct_seconds() - tfb_wct;
             verbose_output_print(0, 1,
-                    "# Creating side-%d rational factor base of %zuMb took %1.1fs (%1.1fs real)\n",
-                    side, fb[side]->size() >> 20, tfb, tfb_wct);
+                    "# Creating side-%d rational factor base took %1.1fs (%1.1fs real)\n",
+                    side, tfb, tfb_wct);
         }
     }
 
