@@ -3230,10 +3230,10 @@ if (si.conf.sublat.m) {
     t0 = seconds () - t0;
     wct = wct_seconds() - wct;
     if (adjust_strategy < 2) {
-        verbose_output_print (2, 1, "# Average J=%1.0f for %lu special-q's, max bucket fill %s\n",
+        verbose_output_print (2, 1, "# Average J=%1.0f for %lu special-q's, max bucket fill -bkmult %s\n",
                 totJ / (double) nr_sq_processed, nr_sq_processed, las.bk_multiplier.print_all().c_str());
     } else {
-        verbose_output_print (2, 1, "# Average logI=%1.1f for %lu special-q's, max bucket fill %s\n",
+        verbose_output_print (2, 1, "# Average logI=%1.1f for %lu special-q's, max bucket fill -bkmult %s\n",
                 totlogI / (double) nr_sq_processed, nr_sq_processed, las.bk_multiplier.print_all().c_str());
     }
     verbose_output_print (2, 1, "# Discarded %lu special-q's out of %u pushed\n",
