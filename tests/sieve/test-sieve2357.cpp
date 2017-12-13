@@ -9,8 +9,13 @@
 #ifdef HAVE_AVX2
 #include "immintrin.h"
 #endif
-//#define USE_JEVENTS 1
+// The Jevents library is part of the PMU tools
+// https://github.com/andikleen/pmu-tools
+// #define USE_JEVENTS 1
+// #define DO_TIMING 1
+#ifdef DO_TIMING
 #include "rdtsc.h"
+#endif
 #include "tests_common.h"
 #include "las-sieve2357.hpp"
 
@@ -122,14 +127,18 @@ bool test(const unsigned long iter)
   }
   use_primes[j] = sieve2357_prime_t{0,0,0,0};
 
+#ifdef DO_TIMING
   start_timing();
+#endif
   for (unsigned long i = 0; i < iter; i++) {
     sieve2357<SIMDTYPE, ELEMTYPE>(sievearray, arraysize, use_primes);
   }
+#ifdef DO_TIMING
   end_timing();
   if (1)
     printf("%lu calls of sieve2357<unsigned char, %zu>(%zu) took %lu cycles, %lu per call\n",
            iter, N, arraysize, (unsigned long) get_diff_timing(), (unsigned long) get_diff_timing() / iter);
+#endif
 
   /* Do the same thing again, using simple sieve code */
   memset(sievearray2, 0, arraysize);
@@ -158,7 +167,9 @@ int main(int argc, const char **argv)
   tests_common_cmdline(&argc, &argv, PARSE_SEED | PARSE_ITER);
   tests_common_get_iter(&iter);
 
+#ifdef DO_TIMING
   init_timing();
+#endif
   ok &= test<unsigned long, unsigned char>(iter);
 #ifdef HAVE_SSSE3
   ok &= test<__m128i, unsigned char>(iter);
@@ -166,7 +177,9 @@ int main(int argc, const char **argv)
 #ifdef HAVE_AVX2
   ok &= test<__m256i, unsigned char>(iter);
 #endif
+#ifdef DO_TIMING
   clear_timing();
+#endif
   tests_common_clear();
   exit (ok ? EXIT_SUCCESS : EXIT_FAILURE);
 }
