@@ -415,6 +415,8 @@ sieve/las-report-stats.hpp
 sieve/las-smallsieve.cpp
 sieve/las-smallsieve.hpp
 sieve/las-smallsieve-types.hpp
+sieve/las-sieve2357.cpp
+sieve/las-sieve2357.hpp
 sieve/las-types.hpp
 sieve/las-unsieve.cpp
 sieve/las-unsieve-sse2.cpp
@@ -1198,3 +1200,4 @@ sieve/las-smallsieve-lowlevel.hpp
 sieve/las-smallsieve-glue.hpp
 tests/sieve/test-smallsieve-mock.hpp
 tests/sieve/c90_21553.poly
+tests/sieve/test-sieve2357.cpp

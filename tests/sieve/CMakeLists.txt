@@ -419,5 +419,9 @@ cado_divert_test(test-smallsieve line_fragments2 # bucket region = quarter line
     ARGUMENTS -q -C -A 18 -I 15 -B 13)
 endif()
 
+cado_define_test(test-sieve2357.cpp
+                 ${PROJECT_SOURCE_DIR}/sieve/las-sieve2357.cpp
+                 LIBRARIES utils tests)
+
 add_subdirectory (ecm)
 add_subdirectory (strategies)
