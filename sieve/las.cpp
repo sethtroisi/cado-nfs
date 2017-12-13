@@ -2287,7 +2287,7 @@ double nprimes_interval(double p0, double p1)
 
 void display_expected_memory_usage(siever_config const & sc, cado_poly_srcptr cpoly, bkmult_specifier const & bkmult, size_t base_memory = 0)
 {
-    verbose_output_print(0, 1, "# Expected memory usage\n");
+    verbose_output_print(0, 1, "# Expected memory usage:\n");
     /*
     verbose_output_print(0, 2, "# base: %zu Kb\n", Memusage());
     verbose_output_print(0, 2, "# log bucket region = %d\n", LOG_BUCKET_REGION);
@@ -3293,7 +3293,6 @@ if (si.conf.sublat.m) {
     /* memory usage */
     if (las.verbose >= 1 && las.config_pool.default_config_ptr) {
         siever_config const & sc(*las.config_pool.default_config_ptr);
-	size_t base_memory = Memusage() << 10;
         display_expected_memory_usage(sc, las.cpoly, las.bk_multiplier,
 				      base_memory);
     }
