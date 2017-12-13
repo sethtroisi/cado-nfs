@@ -23,7 +23,7 @@ set (las_sources
     las.cpp fb.cpp las-plattice.cpp
   las-debug.cpp las-report-stats.cpp las-duplicate.cpp
   las-config.c bucket.cpp las-smallsieve.cpp las-unsieve.cpp
-  las-sieve2357.cpp las-unsieve-sse2.cpp
+  las-unsieve-sse2.cpp
   las-trialdiv.cpp las-fb.cpp
   las-descent-trees.cpp las-cofactor.cpp
   las-fill-in-buckets.cpp las-threads.cpp)
