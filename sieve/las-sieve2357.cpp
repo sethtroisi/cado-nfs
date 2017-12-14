@@ -10,7 +10,22 @@
 #endif
 
 #include "ularith.h"
+#include "cado-endian.h"
 #include "las-sieve2357.hpp"
+
+/* Shift "b" so that each byte that does not get shifted out moves to a
+   memory address that is "idx" bytes higher */
+template<typename T>
+static inline T shift_in_memory(T b, int idx)
+{
+#if defined(CADO_LITTLE_ENDIAN)
+    return b << (idx * 8);
+#elif defined(CADO_BIG_ENDIAN)
+    return b >> (idx * 8);
+#else
+#error PDP endianness not implemented
+#endif
+}
 
 static inline unsigned long ATTRIBUTE((__always_inline__, __artificial__))
 modsub(const unsigned long a, const unsigned long b, const unsigned long m)
@@ -50,11 +65,11 @@ bcaststride_inl<unsigned long, unsigned char>(const unsigned char v,
 {
   unsigned long r = 0;
   for (unsigned int i = 0; i < sizeof(unsigned long); i += stride) {
-    r += (unsigned long) v << (i * 8);
+    r += shift_in_memory((unsigned long) v, i);
   }
   /* offset is usually not a compile-time constant; handle it separately so
      the above loop can be compile-time expanded */
-  r <<= (offset * 8);
+  r = shift_in_memory(r, offset);
   return r;
 }
 
