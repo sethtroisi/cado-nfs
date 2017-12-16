@@ -11,7 +11,7 @@ typedef struct {
 /* A predicate that tells whether a prime power q = p^k can be sieved by
    sieve2357 with a given SIMD and element data type */
 template<typename SIMDTYPE, typename ELEMTYPE>
-static bool sieve2357_can_sieve(const fbprime_t p, const fbprime_t q)
+static inline bool sieve2357_can_sieve(const fbprime_t p, const fbprime_t q)
 {
   const size_t N = sizeof(SIMDTYPE) / sizeof(ELEMTYPE);
   return (p == 2 && q <= 16 && q <= N)
