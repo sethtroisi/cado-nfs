@@ -97,28 +97,29 @@ adds<__m128i, unsigned char>(const __m128i a, const __m128i b)
   return _mm_adds_epu8(a, b);
 }
 
+static const char NIL = -1;
 static const __m128i shuffle_constants[17] {
-  _mm_set1_epi8(128), /* Stride = 0: undefined, result gets set to 0 everywhere */
+  _mm_set1_epi8(NIL), /* Stride = 0: undefined, result gets set to 0 everywhere */
   _mm_set_epi8 ( 15,  14,  13,  12,  11,  10,   9,   8,   7,   6,   5,   4,   3,   2,   1, 0), /* 1 */
-  _mm_set_epi8 (128,   7, 128,   6, 128,   5, 128,   4, 128,   3, 128,   2, 128,   1, 128, 0), /* 2 */
-  _mm_set_epi8 (  5, 128, 128,   4, 128, 128,   3, 128, 128,   2, 128, 128,   1, 128, 128, 0), /* 3 */
-  _mm_set_epi8 (128, 128, 128,   3, 128, 128, 128,   2, 128, 128, 128,   1, 128, 128, 128, 0), /* 4 */
-  _mm_set_epi8 (  3, 128, 128, 128, 128,   2, 128, 128, 128, 128,   1, 128, 128, 128, 128, 0), /* 5 */
-  _mm_set_epi8 (128, 128, 128,   2, 128, 128, 128, 128, 128,   1, 128, 128, 128, 128, 128, 0), /* 6 */
-  _mm_set_epi8 (128,   2, 128, 128, 128, 128, 128, 128,   1, 128, 128, 128, 128, 128, 128, 0), /* 7 */
-  _mm_set_epi8 (128, 128, 128, 128, 128, 128, 128,   1, 128, 128, 128, 128, 128, 128, 128, 0), /* 8 */
-  _mm_set_epi8 (128, 128, 128, 128, 128, 128,   1, 128, 128, 128, 128, 128, 128, 128, 128, 0), /* 9 */
-  _mm_set_epi8 (128, 128, 128, 128, 128,   1, 128, 128, 128, 128, 128, 128, 128, 128, 128, 0), /* 10 */
-  _mm_set_epi8 (128, 128, 128, 128,   1, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 0), /* 11 */
-  _mm_set_epi8 (128, 128, 128,   1, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 0), /* 12 */
-  _mm_set_epi8 (128, 128,   1, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 0), /* 13 */
-  _mm_set_epi8 (128,   1, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 0), /* 14 */
-  _mm_set_epi8 (  1, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 0), /* 15 */
-  _mm_set_epi8 (128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 0)  /* 16 */
+  _mm_set_epi8 (NIL,   7, NIL,   6, NIL,   5, NIL,   4, NIL,   3, NIL,   2, NIL,   1, NIL, 0), /* 2 */
+  _mm_set_epi8 (  5, NIL, NIL,   4, NIL, NIL,   3, NIL, NIL,   2, NIL, NIL,   1, NIL, NIL, 0), /* 3 */
+  _mm_set_epi8 (NIL, NIL, NIL,   3, NIL, NIL, NIL,   2, NIL, NIL, NIL,   1, NIL, NIL, NIL, 0), /* 4 */
+  _mm_set_epi8 (  3, NIL, NIL, NIL, NIL,   2, NIL, NIL, NIL, NIL,   1, NIL, NIL, NIL, NIL, 0), /* 5 */
+  _mm_set_epi8 (NIL, NIL, NIL,   2, NIL, NIL, NIL, NIL, NIL,   1, NIL, NIL, NIL, NIL, NIL, 0), /* 6 */
+  _mm_set_epi8 (NIL,   2, NIL, NIL, NIL, NIL, NIL, NIL,   1, NIL, NIL, NIL, NIL, NIL, NIL, 0), /* 7 */
+  _mm_set_epi8 (NIL, NIL, NIL, NIL, NIL, NIL, NIL,   1, NIL, NIL, NIL, NIL, NIL, NIL, NIL, 0), /* 8 */
+  _mm_set_epi8 (NIL, NIL, NIL, NIL, NIL, NIL,   1, NIL, NIL, NIL, NIL, NIL, NIL, NIL, NIL, 0), /* 9 */
+  _mm_set_epi8 (NIL, NIL, NIL, NIL, NIL,   1, NIL, NIL, NIL, NIL, NIL, NIL, NIL, NIL, NIL, 0), /* 10 */
+  _mm_set_epi8 (NIL, NIL, NIL, NIL,   1, NIL, NIL, NIL, NIL, NIL, NIL, NIL, NIL, NIL, NIL, 0), /* 11 */
+  _mm_set_epi8 (NIL, NIL, NIL,   1, NIL, NIL, NIL, NIL, NIL, NIL, NIL, NIL, NIL, NIL, NIL, 0), /* 12 */
+  _mm_set_epi8 (NIL, NIL,   1, NIL, NIL, NIL, NIL, NIL, NIL, NIL, NIL, NIL, NIL, NIL, NIL, 0), /* 13 */
+  _mm_set_epi8 (NIL,   1, NIL, NIL, NIL, NIL, NIL, NIL, NIL, NIL, NIL, NIL, NIL, NIL, NIL, 0), /* 14 */
+  _mm_set_epi8 (  1, NIL, NIL, NIL, NIL, NIL, NIL, NIL, NIL, NIL, NIL, NIL, NIL, NIL, NIL, 0), /* 15 */
+  _mm_set_epi8 (NIL, NIL, NIL, NIL, NIL, NIL, NIL, NIL, NIL, NIL, NIL, NIL, NIL, NIL, NIL, 0)  /* 16 */
 };
 
 static const __m128i shift_constants[2] = {
-  _mm_set1_epi8(128),
+  _mm_set1_epi8(NIL),
   _mm_set_epi8(15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0),
 };
 
