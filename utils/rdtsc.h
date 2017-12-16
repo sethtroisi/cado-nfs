@@ -141,6 +141,14 @@ static inline uint64_t rdtscpl()
     return u32_to_64(low, high);
 }
 
+__attribute__((__unused__, __artificial__, __always_inline__))
+static inline uint64_t rdpmcl(const unsigned int selector)
+{
+    uint32_t high, low;
+    rdpmc(&low, &high, selector);
+    return u32_to_64(low, high);
+}
+
 // rdpmcl_cycles uses a "fixed-function" performance counter to return
 // the count of actual CPU core cycles executed by the current core.
 // Core cycles are not accumulated while the processor is in the "HALT"
@@ -294,7 +302,7 @@ static inline uint64_t get_diff_timing()
     return end_time - start_time;
 #elif defined(USE_JEVENTS)
 #ifdef IMMEDIATE_RDPMC
-    return end_time - u32_to_64(start_time.l, start_time.h);
+    return end_time - u32_to_64(start_time.pair.lo, start_time.pair.hi);
 #else
     return end_time - start_time;
 #endif
@@ -305,17 +313,17 @@ static inline uint64_t get_diff_timing()
 }
 
 #ifdef USE_JEVENTS
-static unsigned long pmc0, pmc1, pmc2, pmc3;
+static uint64_t pmc0, pmc1, pmc2, pmc3;
 #endif
 
 void
 readAllPmc()
 {
 #ifdef USE_JEVENTS
-    pmc0 = rdpmc(0);
-    pmc1 = rdpmc(1);
-    pmc2 = rdpmc(2);
-    pmc3 = rdpmc(3);
+    pmc0 = rdpmcl(0);
+    pmc1 = rdpmcl(1);
+    pmc2 = rdpmcl(2);
+    pmc3 = rdpmcl(3);
 #endif
 }
 
@@ -323,10 +331,10 @@ void
 diffAllPmc()
 {
 #ifdef USE_JEVENTS
-    pmc0 = rdpmc(0) - pmc0;
-    pmc1 = rdpmc(1) - pmc1;
-    pmc2 = rdpmc(0) - pmc2;
-    pmc3 = rdpmc(1) - pmc3;
+    pmc0 = rdpmcl(0) - pmc0;
+    pmc1 = rdpmcl(1) - pmc1;
+    pmc2 = rdpmcl(0) - pmc2;
+    pmc3 = rdpmcl(1) - pmc3;
 #endif
 }
 
