@@ -419,9 +419,14 @@ cado_divert_test(test-smallsieve line_fragments2 # bucket region = quarter line
     ARGUMENTS -q -C -A 18 -I 15 -B 13)
 endif()
 
+if(HAVE_JEVENTS)
+  set(jevents_lib "-ljevents")
+else()
+  set(jevents_lib "")
+endif()
 cado_define_test(test-sieve2357.cpp
                  ${PROJECT_SOURCE_DIR}/sieve/las-sieve2357.cpp
-                 LIBRARIES utils tests)
+                 LIBRARIES utils tests ${jevents_lib})
 
 add_subdirectory (ecm)
 add_subdirectory (strategies)
