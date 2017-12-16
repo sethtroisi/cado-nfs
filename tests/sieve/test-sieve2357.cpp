@@ -9,12 +9,14 @@
 #ifdef HAVE_AVX2
 #include "immintrin.h"
 #endif
+//#define DO_TIMING 1
+#ifdef DO_TIMING
 // The Jevents library is part of the PMU tools
 // https://github.com/andikleen/pmu-tools
-// #define USE_JEVENTS 1
-// #define DO_TIMING 1
-#ifdef DO_TIMING
+#ifdef HAVE_JEVENTS
+#define USE_JEVENTS 1
 #include "rdtsc.h"
+#endif
 #endif
 #include "tests_common.h"
 #include "las-sieve2357.hpp"
@@ -99,9 +101,15 @@ bool test(const unsigned long iter)
   ok &= test_bcaststride_many<SIMDTYPE, ELEMTYPE>();
 
   const size_t arraysize = false ? N*3*5*7 : 65536;
-  if(arraysize % N != 0) {exit(EXIT_FAILURE);}
-  SIMDTYPE sievearray[arraysize / N];
+  if(arraysize % N != 0) {abort();}
+#define ARRAY_ON_HEAP 1
+#if ARRAY_ON_HEAP
+  SIMDTYPE *sievearray = (SIMDTYPE *) aligned_alloc(sizeof(SIMDTYPE), arraysize);
+  ELEMTYPE *sievearray2 = (ELEMTYPE *) aligned_alloc(sizeof(ELEMTYPE), arraysize);
+#else
+  alignas(sizeof(SIMDTYPE)) SIMDTYPE sievearray[arraysize / N];
   ELEMTYPE sievearray2[arraysize];
+#endif
   sieve2357_prime_t all_primes[] = {
     /* p q idx logp */
     {3, 1, 0, 2},
@@ -128,6 +136,8 @@ bool test(const unsigned long iter)
   use_primes[j] = sieve2357_prime_t{0,0,0,0};
 
 #ifdef DO_TIMING
+  sieve2357<SIMDTYPE, ELEMTYPE>(sievearray, arraysize, use_primes);
+  sieve2357<SIMDTYPE, ELEMTYPE>(sievearray, arraysize, use_primes);
   start_timing();
 #endif
   for (unsigned long i = 0; i < iter; i++) {
@@ -135,9 +145,9 @@ bool test(const unsigned long iter)
   }
 #ifdef DO_TIMING
   end_timing();
-  if (1)
-    printf("%lu calls of sieve2357<unsigned char, %zu>(%zu) took %lu cycles, %lu per call\n",
-           iter, N, arraysize, (unsigned long) get_diff_timing(), (unsigned long) get_diff_timing() / iter);
+  printf("%lu calls of sieve2357<%s, %s>(%zu) took %lu cycles, %lu per call\n",
+         iter, gettypename<SIMDTYPE>::name, gettypename<ELEMTYPE>::name, arraysize,
+         (unsigned long) get_diff_timing(), (unsigned long) get_diff_timing() / iter);
 #endif
 
   /* Do the same thing again, using simple sieve code */
@@ -151,12 +161,17 @@ bool test(const unsigned long iter)
   /* Compare the two arrays */
   unsigned long nr_errors = 0;
   for (size_t i = 0; i < arraysize && nr_errors < 10; i++) {
-    if (((ELEMTYPE *)&sievearray)[i] != (sievearray2)[i]) {
-      printf("Mismatch, sievearray[%zu] = %hhu, sievearray2[%zu] = %hhu\n",
-             i, ((ELEMTYPE *)&sievearray)[i], i, sievearray2[i]);
+    if (((ELEMTYPE *)&sievearray[0])[i] != (sievearray2)[i]) {
+      printf("Mismatch, sievearray<%s,%s>[%zu] = %hhu, sievearray2[%zu] = %hhu\n",
+             gettypename<SIMDTYPE>::name, gettypename<ELEMTYPE>::name, i,
+             ((ELEMTYPE *)&sievearray[0])[i], i, sievearray2[i]);
       nr_errors++;
     }
   }
+#if ARRAY_ON_HEAP
+  free(sievearray);
+  free(sievearray2);
+#endif
   return nr_errors == 0;
 }
 
