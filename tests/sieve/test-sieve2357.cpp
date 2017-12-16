@@ -65,7 +65,7 @@ bool test_bcaststride(const unsigned int offset, const unsigned int stride) {
   for (size_t i = 0; i < N; i++) {
     if ((i % stride == offset) != ((ELEMTYPE *)&w)[i]) {
       fprintf(stderr,
-              "test_bcaststride<%s, %s>(v=1, offset=%u, stride=%u) wrong: byte[%zu] == %hu\n",
+              "test_bcaststride<%s, %s>(v=1, offset=%u, stride=%u) wrong: byte[%zu] == %hhu\n",
               gettypename<SIMDTYPE>::name, gettypename<ELEMTYPE>::name,
               offset, stride, i, ((ELEMTYPE *)&w)[i]);
       ok = false;
@@ -152,7 +152,7 @@ bool test(const unsigned long iter)
   unsigned long nr_errors = 0;
   for (size_t i = 0; i < arraysize && nr_errors < 10; i++) {
     if (((ELEMTYPE *)&sievearray)[i] != (sievearray2)[i]) {
-      printf("Mismatch, sievearray[%zu] = %hu, sievearray2[%zu] = %hu\n",
+      printf("Mismatch, sievearray[%zu] = %hhu, sievearray2[%zu] = %hhu\n",
              i, ((ELEMTYPE *)&sievearray)[i], i, sievearray2[i]);
       nr_errors++;
     }
