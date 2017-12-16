@@ -119,5 +119,7 @@
 #define EXECUTABLE_SUFFIX "@CMAKE_EXECUTABLE_SUFFIX@"
 #endif
 
+#cmakedefine    HAVE_JEVENTS
+
 /* vim:set ft=c: */
 #endif  /* CADO_CONFIG_H_ */
