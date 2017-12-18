@@ -1201,6 +1201,5 @@ sieve/las-smallsieve-glue.hpp
 tests/sieve/test-smallsieve-mock.hpp
 tests/sieve/c90_21553.poly
 tests/sieve/test-sieve2357.cpp
-config/jevents.c
 config/jevents.cmake
 config/aligned_alloc.cmake
