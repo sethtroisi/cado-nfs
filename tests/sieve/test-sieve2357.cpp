@@ -94,6 +94,14 @@ bool test_bcaststride_many()
   return ok;
 }
 
+template<typename T>
+T * tolerant_malloc_aligned(size_t size)
+{
+    size_t s = sizeof(T);
+    for( ; s % 8 ; s<<=1);
+    return (T*) malloc_aligned(size, s);
+}
+
 template <typename SIMDTYPE, typename ELEMTYPE>
 bool test(const unsigned long iter)
 {
@@ -105,8 +113,8 @@ bool test(const unsigned long iter)
   if(arraysize % N != 0) {abort();}
 #define ARRAY_ON_HEAP 1
 #if ARRAY_ON_HEAP
-  SIMDTYPE *sievearray = (SIMDTYPE *) malloc_aligned(arraysize, sizeof(SIMDTYPE));
-  ELEMTYPE *sievearray2 = (ELEMTYPE *) malloc_aligned(arraysize, sizeof(ELEMTYPE));
+  SIMDTYPE *sievearray = tolerant_malloc_aligned<SIMDTYPE>(arraysize);
+  ELEMTYPE *sievearray2 = tolerant_malloc_aligned<ELEMTYPE>(arraysize);
 #else
   alignas(sizeof(SIMDTYPE)) SIMDTYPE sievearray[arraysize / N];
   ELEMTYPE sievearray2[arraysize];
