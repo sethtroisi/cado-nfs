@@ -312,6 +312,7 @@ include("${CADO_NFS_SOURCE_DIR}/config/shared_ptr.cmake")
 include("${CADO_NFS_SOURCE_DIR}/config/cxxabi.cmake")
 include("${CADO_NFS_SOURCE_DIR}/config/regex.cmake")
 include("${CADO_NFS_SOURCE_DIR}/config/jevents.cmake")
+include("${CADO_NFS_SOURCE_DIR}/config/aligned_alloc.cmake")
 
 set(CADO_SHARED)
 
