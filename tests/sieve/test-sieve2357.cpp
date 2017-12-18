@@ -18,6 +18,7 @@
 #include "rdtsc.h"
 #endif
 #endif
+#include "utils.h"
 #include "tests_common.h"
 #include "las-sieve2357.hpp"
 
