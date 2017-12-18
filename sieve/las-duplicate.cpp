@@ -209,7 +209,8 @@ struct sq_with_fac {
  * duplicate */
 bool
 sq_finds_relation(sq_with_fac const& sq_fac, const int sq_side,
-    relation const& rel, const int nb_threads, sieve_info & old_si)
+    relation const& rel, const int nb_threads, sieve_info & old_si,
+    int adjust_strategy)
 {
   uint64_t sq = sq_fac.q;
   
@@ -224,11 +225,15 @@ sq_finds_relation(sq_with_fac const& sq_fac, const int sq_side,
     return false;
   }
 
-  /* We have no info as to which adjustment option is being used for the
-   * current project... Let's assume the default adjust_strategy = 0
-   * FIXME !
-   */
-  Adj.sieve_info_update_norm_data_Jmax();
+  if (adjust_strategy != 1)
+    Adj.sieve_info_update_norm_data_Jmax();
+
+  if (adjust_strategy >= 2)
+    Adj.adjust_with_estimated_yield();
+
+  if (adjust_strategy >= 3)
+    Adj.sieve_info_update_norm_data_Jmax(true);
+
   siever_config conf = Adj.config();
   conf.logI_adjusted = Adj.logI;
   conf.side = sq_side;
@@ -413,12 +418,11 @@ all_multiples(std::vector<uint64_t> & prime_list) {
   return res;
 }
 
-
 /* Return 1 if the relation is probably a duplicate of a relation found
    "earlier", and 0 if it is probably not a duplicate */
 int
 relation_is_duplicate(relation const& rel, las_info const& las,
-                      sieve_info & si)
+                      sieve_info & si, int adjust_strategy)
 {
   /* If the special-q does not fit in an unsigned long, we assume it's not a
      duplicate and just move on */
@@ -474,7 +478,7 @@ relation_is_duplicate(relation const& rel, las_info const& las,
     // Step 3: emulate sieving for the valid sq, and check if they find
     // our relation.
     for (auto const & sq : valid_sq) {
-      bool is_dupe = sq_finds_relation(sq, side, rel, las.nb_threads, si);
+      bool is_dupe = sq_finds_relation(sq, side, rel, las.nb_threads, si, adjust_strategy);
       verbose_output_print(0, VERBOSE_LEVEL,
           "# DUPECHECK relation is probably%s a dupe\n",
           is_dupe ? "" : " not");

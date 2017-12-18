@@ -1757,7 +1757,6 @@ void factor_survivors_data::cofactoring (timetree_t & timer)
              * an unsigned long, then the duplicate check will
              * quickly return "no".
              */
-
             const char * dup_comment = NULL;
 
             if (!already_printed_for_q.insert(abpair_t(a,b)).second) {
@@ -1769,7 +1768,7 @@ void factor_survivors_data::cofactoring (timetree_t & timer)
                  * in the sense of relation_is_duplicate()
                  */
                 dup_comment = "# DUP ";
-            } else if (do_check && relation_is_duplicate(rel, las, si)) {
+            } else if (do_check && relation_is_duplicate(rel, las, si, adjust_strategy)) {
                 dup_comment = "# DUPE ";
             }
 
