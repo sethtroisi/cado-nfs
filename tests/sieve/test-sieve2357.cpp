@@ -104,8 +104,8 @@ bool test(const unsigned long iter)
   if(arraysize % N != 0) {abort();}
 #define ARRAY_ON_HEAP 1
 #if ARRAY_ON_HEAP
-  SIMDTYPE *sievearray = (SIMDTYPE *) aligned_alloc(sizeof(SIMDTYPE), arraysize);
-  ELEMTYPE *sievearray2 = (ELEMTYPE *) aligned_alloc(sizeof(ELEMTYPE), arraysize);
+  SIMDTYPE *sievearray = (SIMDTYPE *) malloc_aligned(arraysize, sizeof(SIMDTYPE));
+  ELEMTYPE *sievearray2 = (ELEMTYPE *) malloc_aligned(arraysize, sizeof(ELEMTYPE));
 #else
   alignas(sizeof(SIMDTYPE)) SIMDTYPE sievearray[arraysize / N];
   ELEMTYPE sievearray2[arraysize];
