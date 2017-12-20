@@ -9,7 +9,7 @@
 #ifdef HAVE_AVX2
 #include "immintrin.h"
 #endif
-//#define DO_TIMING 1
+#define DO_TIMING 1
 #ifdef DO_TIMING
 // The Jevents library is part of the PMU tools
 // https://github.com/andikleen/pmu-tools
@@ -57,43 +57,6 @@ public:
 #endif
 
 
-template <typename SIMDTYPE, typename ELEMTYPE>
-bool test_bcaststride(const unsigned int offset, const unsigned int stride) {
-  const size_t N = sizeof(SIMDTYPE) / sizeof(ELEMTYPE);
-  bool ok = true;
-  SIMDTYPE w;
-  
-  w = bcaststride<SIMDTYPE, ELEMTYPE>(1, offset, stride);
-
-  for (size_t i = 0; i < N; i++) {
-    if ((i % stride == offset) != ((ELEMTYPE *)&w)[i]) {
-      fprintf(stderr,
-              "test_bcaststride<%s, %s>(v=1, offset=%u, stride=%u) wrong: byte[%zu] == %hhu\n",
-              gettypename<SIMDTYPE>::name, gettypename<ELEMTYPE>::name,
-              offset, stride, i, ((ELEMTYPE *)&w)[i]);
-      ok = false;
-    }
-  }
-  return ok;
-}
-
-template <typename SIMDTYPE, typename ELEMTYPE>
-bool test_bcaststride_many()
-{
-  const size_t N = sizeof(SIMDTYPE) / sizeof(ELEMTYPE);
-  const unsigned int strides[] = {2, 3, 4, 5, 7, 8, 16, 32};
-  const size_t nr_strides = sizeof(strides) / sizeof(strides[0]);
-  bool ok = true;
-  
-  for (size_t i = 0; i < nr_strides && strides[i] < N; i++) {
-    const unsigned int stride = strides[i];
-    for (unsigned int offset = 0; offset < stride; offset++) {
-      ok &= test_bcaststride<SIMDTYPE, ELEMTYPE>(offset, stride);
-    }
-  }
-  return ok;
-}
-
 template<typename T>
 T * tolerant_malloc_aligned(size_t size)
 {
@@ -103,13 +66,11 @@ T * tolerant_malloc_aligned(size_t size)
 }
 
 template <typename SIMDTYPE, typename ELEMTYPE>
-bool test(const unsigned long iter)
+bool test(const unsigned long iter, const size_t arraysize)
 {
   const size_t N = sizeof(SIMDTYPE) / sizeof(ELEMTYPE);
   bool ok = true;
-  ok &= test_bcaststride_many<SIMDTYPE, ELEMTYPE>();
 
-  const size_t arraysize = false ? N*3*5*7 : 65536;
   if(arraysize % N != 0) {abort();}
 #define ARRAY_ON_HEAP 1
 #if ARRAY_ON_HEAP
@@ -154,9 +115,11 @@ bool test(const unsigned long iter)
   }
 #ifdef DO_TIMING
   end_timing();
-  printf("%lu calls of sieve2357<%s, %s>(%zu) took %lu cycles, %lu per call\n",
+  printf("%lu calls of sieve2357<%s, %s>(%zu) took %lu cycles, %lu per call, %.2f per %s\n",
          iter, gettypename<SIMDTYPE>::name, gettypename<ELEMTYPE>::name, arraysize,
-         (unsigned long) get_diff_timing(), (unsigned long) get_diff_timing() / iter);
+         (unsigned long) get_diff_timing(), (unsigned long) get_diff_timing() / iter,
+         (float)get_diff_timing() / iter / (arraysize / sizeof(SIMDTYPE)),
+         gettypename<SIMDTYPE>::name);
 #endif
 
   /* Do the same thing again, using simple sieve code */
@@ -177,16 +140,18 @@ bool test(const unsigned long iter)
       nr_errors++;
     }
   }
+  ok &= (nr_errors == 0);
 #if ARRAY_ON_HEAP
   free(sievearray);
   free(sievearray2);
 #endif
-  return nr_errors == 0;
+  return ok;
 }
 
 int main(int argc, const char **argv)
 {
   unsigned long iter = 1;
+  size_t arraysize = 32; //32768 - 3200;
   bool ok = true;
   tests_common_cmdline(&argc, &argv, PARSE_SEED | PARSE_ITER);
   tests_common_get_iter(&iter);
@@ -194,12 +159,12 @@ int main(int argc, const char **argv)
 #ifdef DO_TIMING
   init_timing();
 #endif
-  ok &= test<unsigned long, unsigned char>(iter);
+  ok &= test<unsigned long, unsigned char>(iter, arraysize);
 #ifdef HAVE_SSSE3
-  ok &= test<__m128i, unsigned char>(iter);
+  ok &= test<__m128i, unsigned char>(iter, arraysize);
 #endif
 #ifdef HAVE_AVX2
-  ok &= test<__m256i, unsigned char>(iter);
+  ok &= test<__m256i, unsigned char>(iter, arraysize);
 #endif
 #ifdef DO_TIMING
   clear_timing();

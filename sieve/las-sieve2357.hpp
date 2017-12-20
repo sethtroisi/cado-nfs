@@ -14,16 +14,11 @@ template<typename SIMDTYPE, typename ELEMTYPE>
 static inline bool sieve2357_can_sieve(const fbprime_t p, const fbprime_t q)
 {
   const size_t N = sizeof(SIMDTYPE) / sizeof(ELEMTYPE);
-  return (p == 2 && q <= 16 && q <= N)
-    // currently, bcaststride() can't do stride >16 */
+  return (p == 2 && q <= N)
          || (p == 3 && q <= 3)
-         || (p == 5 && q <= 5 && q <= N)
-         || (p == 7 && q <= 7 && q <= N);
+         || (p == 5 && q <= 5)
+         || (p == 7 && q <= 7);
 }
-
-template<typename SIMDTYPE, typename ELEMTYPE>
-SIMDTYPE bcaststride(const ELEMTYPE v, unsigned int offset,
-    unsigned int stride);
 
 template <typename SIMDTYPE, typename ELEMTYPE>
 void sieve2357(SIMDTYPE *, size_t, const sieve2357_prime_t *);
