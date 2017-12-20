@@ -9,7 +9,7 @@
 #ifdef HAVE_AVX2
 #include "immintrin.h"
 #endif
-#define DO_TIMING 1
+//#define DO_TIMING 1
 #ifdef DO_TIMING
 // The Jevents library is part of the PMU tools
 // https://github.com/andikleen/pmu-tools
