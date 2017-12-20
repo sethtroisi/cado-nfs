@@ -47,10 +47,7 @@ extern "C" {
 struct rdpmc_ctx ctx;
 #define IMMEDIATE_RDPMC 1
 #ifdef IMMEDIATE_RDPMC
-static union {
-    struct {unsigned lo, hi;} pair;
-    unsigned long l;
-} start_time;
+struct {unsigned lo, hi;} start_time;
 static unsigned long end_time;
 #else
 static uint64_t start_time, end_time;
@@ -264,7 +261,7 @@ static inline void start_timing()
     serialize();
 #endif
 #ifdef IMMEDIATE_RDPMC
-    rdpmc_cycles(&start_time.pair.lo, &start_time.pair.hi);
+    rdpmc_cycles(&start_time.lo, &start_time.hi);
 #else
     start_time = rdpmc_read(&ctx);
 #endif
@@ -302,7 +299,7 @@ static inline uint64_t get_diff_timing()
     return end_time - start_time;
 #elif defined(USE_JEVENTS)
 #ifdef IMMEDIATE_RDPMC
-    return end_time - u32_to_64(start_time.pair.lo, start_time.pair.hi);
+    return end_time - u32_to_64(start_time.lo, start_time.hi);
 #else
     return end_time - start_time;
 #endif
