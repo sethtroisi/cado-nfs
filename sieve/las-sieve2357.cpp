@@ -296,7 +296,8 @@ template<>
 inline __m256i ATTRIBUTE((__always_inline__, __artificial__))
 set1<__m256i, unsigned char>(const unsigned char c)
 {
-  return _mm256_set1_epi8(c);
+  __m128i t = _mm_cvtsi64x_si128(c);
+  return _mm256_broadcastb_epi8(t);
 }
 
 template<>
@@ -464,9 +465,11 @@ big_loop<__m256i, uint8_t>(__m256i * __restrict__ sievearray, const __m256i * __
 #endif
 
 template <typename SIMDTYPE, typename ELEMTYPE>
+static
 SIMDTYPE sieve2(fbprime_t, fbprime_t, ELEMTYPE);
 
 template <>
+inline
 uint32_t sieve2<uint32_t, unsigned char>(const fbprime_t q, const fbprime_t idx, const unsigned char logp)
 {
     switch (q) {
@@ -477,6 +480,7 @@ uint32_t sieve2<uint32_t, unsigned char>(const fbprime_t q, const fbprime_t idx,
 }
 
 template <>
+inline
 uint64_t sieve2<uint64_t, unsigned char>(const fbprime_t q, const fbprime_t idx, const unsigned char logp)
 {
     switch (q) {
@@ -488,6 +492,7 @@ uint64_t sieve2<uint64_t, unsigned char>(const fbprime_t q, const fbprime_t idx,
 }
 
 template <>
+inline
 __m128i sieve2<__m128i, unsigned char>(const fbprime_t q, const fbprime_t idx, const unsigned char logp)
 {
     switch (q) {
@@ -500,6 +505,7 @@ __m128i sieve2<__m128i, unsigned char>(const fbprime_t q, const fbprime_t idx, c
 }
 
 template <>
+inline
 __m256i sieve2<__m256i, unsigned char>(const fbprime_t q, const fbprime_t idx, const unsigned char logp)
 {
     switch (q) {
