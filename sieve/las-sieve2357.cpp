@@ -491,6 +491,7 @@ uint64_t sieve2<uint64_t, unsigned char>(const fbprime_t q, const fbprime_t idx,
     }
 }
 
+#ifdef HAVE_SSSE3
 template <>
 inline
 __m128i sieve2<__m128i, unsigned char>(const fbprime_t q, const fbprime_t idx, const unsigned char logp)
@@ -503,7 +504,9 @@ __m128i sieve2<__m128i, unsigned char>(const fbprime_t q, const fbprime_t idx, c
         default: abort();
     }
 }
+#endif
 
+#ifdef HAVE_AVX2
 template <>
 inline
 __m256i sieve2<__m256i, unsigned char>(const fbprime_t q, const fbprime_t idx, const unsigned char logp)
@@ -517,7 +520,7 @@ __m256i sieve2<__m256i, unsigned char>(const fbprime_t q, const fbprime_t idx, c
         default: abort();
     }
 }
-
+#endif
 
 template <typename SIMDTYPE, typename ELEMTYPE>
 void
