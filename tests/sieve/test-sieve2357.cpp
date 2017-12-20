@@ -151,7 +151,7 @@ bool test(const unsigned long iter, const size_t arraysize)
 int main(int argc, const char **argv)
 {
   unsigned long iter = 1;
-  size_t arraysize = 32; //32768 - 3200;
+  size_t arraysize = 65536;
   bool ok = true;
   tests_common_cmdline(&argc, &argv, PARSE_SEED | PARSE_ITER);
   tests_common_get_iter(&iter);
