@@ -42,28 +42,26 @@ void
 print_pointorder (const unsigned long p, const unsigned long s, 
                   const unsigned long parameterization, const int verbose)
 {
-  residue_t sigma;
+  residue_t parameter;
   modulus_t m;
   unsigned long o, knownfac;
 
   modredcul_initmod_ul (m, p);
-  modredcul_init (sigma, m);
-  modredcul_set_ul (sigma, s, m);
+  modredcul_init (parameter, m);
+  modredcul_set_ul (parameter, s, m);
   
   if (parameterization == BRENT12 || parameterization == MONTY12)
     knownfac = 12;
   else if (parameterization == MONTY16)
     knownfac = 16;
-  else if (parameterization == TWED16)
-    knownfac = 16;
   else
     abort();
   
-  o = ell_pointorder_ul (sigma, parameterization, knownfac, 0, m, verbose);
+  o = ell_pointorder_ul (parameter, parameterization, knownfac, 0, m, verbose);
   if (verbose)
     printf ("%lu %lu\n", p, o);
 
-  modredcul_clear (sigma, m);  
+  modredcul_clear (parameter, m);  
   modredcul_clearmod (m);
 }
 
@@ -126,7 +124,7 @@ void print_help (char *programname)
   printf ("-ecm <B1> <B2> <s>  Run ECM with B1, B2 and parameter s, using BRENT12 curve\n");
   printf ("-ecmm12 <B1> <B2> <s>  Same, but using Montgomery torsion 12 curve\n");
   printf ("-ecmm16 <B1> <B2> <s>  Same, but using Montgomery torsion 16 curve\n");
-  printf ("-ecme16 <B1> <B2> <s>  Same, but using Edwards torsion 16 curve\n");
+  printf ("-ecmem12 <B1> <B2> <s>  Same, but using Edwards torsion 12 curve\n");
   printf ("-strat   Use the facul default strategy. Don't use with -pm1, -pp1, -ecm\n");
   printf ("-fbb <n> Use <n> as factor base bound, e.g. for primality checks\n");
   printf ("-lpb <n> Use <n> as large prime bound, e.g. for early abort\n");
@@ -178,7 +176,7 @@ int main (int argc, char **argv)
   int printnonfactors = 0;
   int printcofactors = 0;
   int do_pointorder = 0;
-  unsigned long po_sigma = 0, po_parameterization = 0;
+  unsigned long po_parameter = 0, po_parameterization = 0;
   int inp_raw = 0;
   int strat = 0;
   int extra_primes = 0;
@@ -251,24 +249,32 @@ int main (int argc, char **argv)
 	       nr_methods < MAX_METHODS)
 	{
 	  unsigned long B1, B2;
-	  long sigma;
-	  int parameterization = BRENT12;
+	  long parameter;
+	  ec_parameterization_t parameterization;
 	  B1 = strtoul (argv[2], NULL, 10);
 	  B2 = strtoul (argv[3], NULL, 10);
-	  sigma = strtol (argv[4], NULL, 10);
-	  if (strcmp (argv[1], "-ecmm12") == 0)
+	  parameter = strtol (argv[4], NULL, 10);
+	  if (strcmp (argv[1], "-ecm") == 0)
+	    parameterization = BRENT12;
+    else if (strcmp (argv[1], "-ecmm12") == 0)
 	    parameterization = MONTY12;
-	  if (strcmp (argv[1], "-ecmm16") == 0)
+    else if (strcmp (argv[1], "-ecmm16") == 0)
 	    parameterization = MONTY16;
-	  if (strcmp (argv[1], "-ecme16") == 0)
-	    parameterization = TWED16;
-          if (parameterization == MONTY12 && sigma == 1)
+    else if (strcmp (argv[1], "-ecmem12") == 0)
+	    parameterization = MONTYTWED12;
+    else
+    {
+      fprintf (stderr, "Error, unknown parameter %s\n", argv[1]);
+      abort();
+    }
+
+          if (parameterization == MONTY12 && parameter == 1)
             {
               fprintf (stderr, "Parameter 1 does not lead to a valid curve. "
               "Use parameter > 1 for MONTY12 curves.\n");
               exit (EXIT_FAILURE);
             }
-          if (parameterization == MONTY16 && (sigma < 0 || sigma > 1))
+          if (parameterization == MONTY16 && (parameter < 0 || parameter > 1))
             {
               fprintf (stderr, "Only parameter 1 for MONTY16 curves so far.\n");
               exit (EXIT_FAILURE);
@@ -280,7 +286,7 @@ int main (int argc, char **argv)
 	  strategy->methods[nr_methods].plan = malloc (sizeof (ecm_plan_t));
 	  ASSERT (strategy->methods[nr_methods].plan != NULL);
 	  ecm_make_plan (strategy->methods[nr_methods].plan, B1, B2, 
-			 parameterization, labs (sigma), extra_primes, 
+			 parameterization, labs (parameter), extra_primes, 
 			 (verbose / 3));
 	  nr_methods++;
 	  argc -= 4;
@@ -306,11 +312,9 @@ int main (int argc, char **argv)
 	  po_parameterization = BRENT12;
 	  if (strcmp (argv[1], "-pom12") == 0)
 	    po_parameterization = MONTY12;
-	  if (strcmp (argv[1], "-pom16") == 0)
+    else if (strcmp (argv[1], "-pom16") == 0)
 	    po_parameterization = MONTY16;
-	  if (strcmp (argv[1], "-poe16") == 0)
-	    po_parameterization = TWED16;
-	  po_sigma = strtol (argv[2], NULL, 10);
+	  po_parameter = strtol (argv[2], NULL, 10);
 	  argc -= 2;
 	  argv += 2;
 	}
@@ -465,7 +469,7 @@ int main (int argc, char **argv)
 	  total++;
 	  if (do_pointorder)
 	    {
-	      print_pointorder (i, po_sigma, po_parameterization, verbose+printfactors);
+	      print_pointorder (i, po_parameter, po_parameterization, verbose+printfactors);
 	      /* TODO: check point order */
 	    }
           else
@@ -511,7 +515,7 @@ int main (int argc, char **argv)
         if (do_pointorder)
           {
             if (mpz_fits_ulong_p (N))
-              print_pointorder (mpz_get_ui (N), po_sigma, po_parameterization, printfactors);
+              print_pointorder (mpz_get_ui (N), po_parameter, po_parameterization, printfactors);
             else
               gmp_fprintf (stderr, "%Zd does not fit into an unsigned long, not computing group order\n", N);
           }

@@ -1,21 +1,35 @@
 #include "ec_arith_common.h"
 
-/*
-  implemented functions:
-    - montgomery_dadd (R:montgomery, P:montgomery, Q:montgomery, D:montgomery)
-        R <- P+Q (where D=P-Q)
+/************************ Montgomery elliptic curves **************************/
 
-    - montgomery_dbl (R:montgomery, P:montgomery)
-        R <- 2*P
-*/
+/* Equation:
+ *    B*Y^2*Z = X^3 + A*X^2*Z + X*Z^2
+ *
+ * Constant needed in computation: b = (A+2)/4
+ *
+ * Implemented functions:
+ *   - montgomery_dadd (R:montgomery, P:montgomery, Q:montgomery, D:montgomery)
+ *        R <- P+Q (where D=P-Q)
+ *   - montgomery_dbl (R:montgomery, P:montgomery)
+ *        R <- 2*P
+ */
 
-
-/* computes Q=2P, with 5 muls (3 muls and 2 squares) and 4 add/sub.
-     - m : number to factor
-     - b : (a+2)/4 mod n
-  It is permissible to let P and Q use the same memory. */
+/* Compute A = 4*b-2. A and b can be the same variable. */
 static inline void
-montgomery_dbl (ec_point_t Q, const ec_point_t P, const modulus_t m, 
+montgomery_A_from_b (residue_t A, const residue_t b, const modulus_t m)
+{
+  mod_add (A, b, b, m);    /* A <- b+b = 2b */
+  mod_add (A, A, A, m);    /* A <- 4b */
+  mod_sub_ul (A, A, 2, m); /* A <- 4b-2 */
+}
+
+/* Computes Q=2P, with 5 muls (3 muls and 2 squares) and 4 add/sub.
+ *    - m : number to factor
+ *    - b = (A+2)/4 mod m
+ * It is permissible to let P and Q use the same memory.
+ */
+static inline void
+montgomery_dbl (ec_point_t Q, const ec_point_t P, const modulus_t m,
              const residue_t b)
 {
   residue_t u, v, w;
@@ -26,7 +40,7 @@ montgomery_dbl (ec_point_t Q, const ec_point_t P, const modulus_t m,
       ASSERT (mod_is0 (P->x, m));
     }
 #endif
-  
+
 #if COUNT_ELLM_OPS
   ellM_double_count++;
 #endif
@@ -57,16 +71,17 @@ montgomery_dbl (ec_point_t Q, const ec_point_t P, const modulus_t m,
 
 
 /* adds P and Q and puts the result in R,
-   using 6 muls (4 muls and 2 squares), and 6 add/sub.
-   One assumes that Q-R=D or R-Q=D.
-   This function assumes that P !~= Q, i.e. that there is 
-   no t!=0 so that P->x = t*Q->x and P->z = t*Q->z, for otherwise the result 
-   is (0:0) although it shouldn't be (which actually is good for factoring!).
-
-   R may be identical to P, Q and/or D. */
+ * using 6 muls (4 muls and 2 squares), and 6 add/sub.
+ * One assumes that Q-R=D or R-Q=D.
+ * This function assumes that P !~= Q, i.e. that there is
+ * no t!=0 so that P->x = t*Q->x and P->z = t*Q->z, for otherwise the result
+ * is (0:0) although it shouldn't be (which actually is good for factoring!).
+ *
+ * R may be identical to P, Q and/or D.
+ */
 static inline void
-montgomery_dadd (ec_point_t R, const ec_point_t P, const ec_point_t Q, 
-          const ec_point_t D, MAYBE_UNUSED const residue_t b, 
+montgomery_dadd (ec_point_t R, const ec_point_t P, const ec_point_t Q,
+          const ec_point_t D, MAYBE_UNUSED const residue_t b,
           const modulus_t m)
 {
   residue_t u, v, w;
@@ -104,11 +119,11 @@ montgomery_dadd (ec_point_t R, const ec_point_t P, const ec_point_t Q,
   mod_add (w, u, v, m);      /* w = 2*(Qx*Px - Qz*Pz)*/
   mod_sub (v, u, v, m);      /* v = 2*(Qz*Px - Qx*Pz) */
 #if ELLM_SAFE_ADD
-  /* Check if v == 0, which happens if P=Q or P=-Q. 
+  /* Check if v == 0, which happens if P=Q or P=-Q.
      If P=-Q, set result to point at infinity.
      If P=Q, use ellM_double() instead.
      This test only works if P=Q on the pseudo-curve modulo N, i.e.,
-     if N has several prime factors p, q, ... and P=Q or P=-Q on E_p but 
+     if N has several prime factors p, q, ... and P=Q or P=-Q on E_p but
      not on E_q, this test won't notice it. */
   if (mod_is0 (v, m))
     {
@@ -122,7 +137,7 @@ montgomery_dadd (ec_point_t R, const ec_point_t P, const ec_point_t Q,
           montgomery_dbl (R, P, m, b); /* Yes, points are identical, use doubling */
         }
       else
-        { 
+        {
           mod_set0 (R->x, m); /* No, are each other's negatives. */
           mod_set0 (R->z, m); /* Set result to point at infinity */
         }
@@ -143,7 +158,7 @@ montgomery_dadd (ec_point_t R, const ec_point_t P, const ec_point_t Q,
 
 /* (x:z) <- e*(x:z) (mod p) */
 static inline void
-montgomery_smul_ui (ec_point_t R, const ec_point_t P, unsigned long e, 
+montgomery_smul_ui (ec_point_t R, const ec_point_t P, unsigned long e,
 		    const modulus_t m, const residue_t b)
 {
   unsigned long l, n;
@@ -151,8 +166,8 @@ montgomery_smul_ui (ec_point_t R, const ec_point_t P, unsigned long e,
 
   if (e == 0UL)
     {
-      mod_set0 (R[0].x, m);
-      mod_set0 (R[0].z, m);
+      mod_set0 (R->x, m);
+      mod_set0 (R->z, m);
       return;
     }
 
@@ -161,7 +176,7 @@ montgomery_smul_ui (ec_point_t R, const ec_point_t P, unsigned long e,
       ec_point_set (R, P, m);
       return;
     }
-  
+
   if (e == 2UL)
     {
       montgomery_dbl (R, P, m, b);
@@ -211,7 +226,7 @@ montgomery_smul_ui (ec_point_t R, const ec_point_t P, unsigned long e,
           montgomery_dbl (t1, t1, m, b);
         }
     }
-  
+
   ec_point_set (R, t2, m);
 
   ec_point_clear (t1, m);

@@ -163,25 +163,25 @@ pp1_clear_plan (pp1_plan_t *plan)
 
 /***************************** ECM ********************************************/
 
-/* Make byte code for addition chain for stage 1, and the parameters for
-   stage 2. Parameterization chooses Brent-Suyama curves with order divisible
-   by 12 (BRENT12), Montgomery with torsion 12 over Q (MONTY12) or Montgomery
-   with torsion 16 over Q (MONTY16), sigma is the associated parameter.
+/* Generate bytecode for stage 1, and the parameters for stage 2.
+   The curve used in ECM will be computed using the given 'parametrization' with
+   the given 'parameter' value.
    "extra_primes" controls whether some primes should be added (or left out!)
    on top of the primes and prime powers <= B1, for example to take into
    account the known factors in the group order. */
 
 void
 ecm_make_plan (ecm_plan_t *plan, const unsigned int B1, const unsigned int B2,
-              const int parameterization, const unsigned long sigma,
-              const int extra_primes, const int verbose)
+               const ec_parameterization_t parameterization,
+               const unsigned long parameter, const int extra_primes,
+               const int verbose)
 {
   unsigned int pow3_extra;
 
   if (verbose)
     printf("Making plan for ECM with B1=%u, B2=%u, parameterization = %d, "
-            "sigma=%lu, extra primes = %d\n", B1, B2, parameterization, sigma,
-            extra_primes);
+           "parameter = %lu, extra primes = %d\n", B1, B2, parameterization,
+           parameter, extra_primes);
 
   /* If group order is divisible by 12 or 16, add two or four 2s to stage 1 */
   if (extra_primes)
@@ -201,7 +201,7 @@ ecm_make_plan (ecm_plan_t *plan, const unsigned int B1, const unsigned int B2,
   /* Make bytecode for stage 1 */
   plan->B1 = B1;
   plan->parameterization = parameterization;
-  plan->sigma = sigma;
+  plan->parameter = parameter;
 
   /* If group order is divisible by 12, add another 3 to stage 1 primes */
   pow3_extra = (extra_primes && (parameterization & ECM_TORSION12)) ? 1 : 0 ;
@@ -219,10 +219,10 @@ ecm_make_plan (ecm_plan_t *plan, const unsigned int B1, const unsigned int B2,
   else if (parameterization & FULLMONTYTWED)
   {
     bytecode_mishmash_encode (&(plan->bc), B1, plan->exp2, pow3_extra,
-        &ec_mixed_repr_opcost, BYTECODE_COMPRESS, verbose);
+                            &ec_mixed_repr_opcost, BYTECODE_COMPRESS, verbose);
   }
   else
-    FATAL_ERROR_CHECK (1, "Unknown parametrization");
+    FATAL_ERROR_CHECK (1, "Unknown parameterization");
 
   /* Make stage 2 plan */
   stage2_make_plan (&(plan->stage2), B1, B2, verbose);

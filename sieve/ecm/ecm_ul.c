@@ -26,6 +26,7 @@
 #define edwards_tpl edwards_tpl_ul
 #define edwards_smul_ui edwards_smul_ui_ul
 
+#define montgomery_A_from_b montgomery_A_from_b_ul
 #define montgomery_dbl montgomery_dbl_ul
 #define montgomery_dadd montgomery_dadd_ul
 #define montgomery_smul_ui montgomery_smul_ui_ul
@@ -33,6 +34,7 @@
 
 #define weierstrass_add weierstrass_add_ul
 #define weierstrass_dbl weierstrass_dbl_ul
+#define weierstrass_from_montgomery weierstrass_from_montgomery_ul
 #define weierstrass_smul_ui weierstrass_smul_ui_ul
 
 

@@ -58,12 +58,12 @@ bytecode_dbchain_interpret_ec_edwards_internal (bytecode_const bc,
     if (op == DBCHAIN_OP_TPLADD || op == DBCHAIN_OP_TPLDBLADD)
     {
       bc++;
-      pow3 = bytecode_elt_to_uint8 (*bc); 
+      pow3 = bytecode_elt_to_uint8 (*bc);
     }
     if (op == DBCHAIN_OP_DBLADD || op == DBCHAIN_OP_TPLDBLADD)
     {
       bc++;
-      pow2 = bytecode_elt_to_uint8 (*bc); 
+      pow2 = bytecode_elt_to_uint8 (*bc);
     }
 
     for (uint8_t i = 0; i < pow3; i++)
@@ -71,8 +71,23 @@ bytecode_dbchain_interpret_ec_edwards_internal (bytecode_const bc,
     for (uint8_t i = 0; i < pow2; i++)
       edwards_dbl (R[0], R[0], m, (i+1==pow2) ? EDW_ext : EDW_proj);
 
-    // TODO if f and next_byte is a start of PRAC block => output in montgomery
-    edwards_add (R[f], R[0], R[n], m, f ? EDW_ext : EDW_proj);
+    ec_point_coord_type_t output;
+    if (f)
+    {
+      uint8_t t;
+      bytecode_elt_split_4_4 (&t, NULL, bc[1]);
+      if (bc[1] == MISHMASH_FINAL || t == MISHMASH_PRAC_BLOCK)
+        output = MONTG;
+      else
+        output = EDW_ext;
+    }
+    else
+      output = EDW_proj;
+
+    if (s == 0)
+      edwards_add (R[f], R[0], R[n], m, output);
+    else
+      edwards_sub (R[f], R[0], R[n], m, output);
 
     if (f) /* is it finished ? */
       break;
@@ -111,7 +126,7 @@ bytecode_precomp_interpret_ec_edwards_internal (bytecode_const bc,
         break;
       case PRECOMP_OP_DBL:
         bc++;
-        pow2 = bytecode_elt_to_uint8 (*bc); 
+        pow2 = bytecode_elt_to_uint8 (*bc);
         for (uint8_t i = 0; i < pow2; i++)
           edwards_dbl (R[0], R[0], m, (i+1==pow2 && a) ? EDW_ext : EDW_proj);
         if (k > 0)
@@ -119,7 +134,7 @@ bytecode_precomp_interpret_ec_edwards_internal (bytecode_const bc,
         break;
       case PRECOMP_OP_TPL:
         bc++;
-        pow3 = bytecode_elt_to_uint8 (*bc); 
+        pow3 = bytecode_elt_to_uint8 (*bc);
         for (uint8_t i = 0; i < pow3; i++)
           edwards_tpl (R[0], R[0], m, (i+1==pow3 && a) ? EDW_ext : EDW_proj);
         if (k > 0)
@@ -133,6 +148,8 @@ bytecode_precomp_interpret_ec_edwards_internal (bytecode_const bc,
 
     bc++; /* go to next byte */
   }
+
+  return bc;
 }
 
 /************* Interpret the PRAC bytecode for Montgomery curves *************/
@@ -278,6 +295,7 @@ bytecode_prac_interpret_ec_montgomery (ec_point_t P, bytecode_const bc,
 
   for (unsigned int i = 0; i < R_nalloc; i++)
     ec_point_clear (R[i], m);
+  free (R);
 }
 
 /** Interpret the MISHMASH bytecode on Twisted Edwards and Montgomery curves **/
@@ -331,477 +349,521 @@ bytecode_mishmash_interpret_ec_mixed_repr (ec_point_t P, bytecode_const bc,
 
   for (unsigned int i = 0; i < R_nalloc; i++)
     ec_point_clear (R[i], m);
+  free (R);
 }
 
 
 /******************************************************************************/
-/*********************** bytecode interpreter functions ***********************/
+/************************ parameterization functions **************************/
 /******************************************************************************/
 
-/* Produces curve in Montgomery form from sigma value.
-   Return 1 if it worked, 0 if a modular inverse failed.
-   If modular inverse failed, return non-invertible value in x. */
+/* Produces curve in Montgomery form from 'sigma' value.
+ * Also known as Suyama parameterization.
+ * Return 1 if it worked, 0 if a modular inverse failed.
+ * If modular inverse failed, return non-invertible value in P0->x.
+ *
+ * Parametrization:
+      u = sigma^2-5
+      v = 4*sigma
+      x0 = u^3
+      y0 = (sigma^2-1)*(sigma^2-25)*(sigma^4-25)
+      z0 = v^3
+      A = (v-u)^3*(3*u+v)/(4*u^3*v) - 2
+      B = u/z0
+      b = (v-u)^3*(3*u+v)/(16*u^3*v)                          # [ b = (A+2)/4 ]
+ * We only need b and the coordinates of the starting point (x0::z0)
+ * The point of order 3 is given by:
+      x3 = u
+      y3 = 2*(sigma^2-25)*(sigma^2-1)*sigma/u
+      z3 = v
+ * To check with Sage:
+      QQsigma.<sigma> = QQ[]
+      # copy paste all the above formula
+      (b-(A+2)/4).is_zero() # b is correct ?
+      (B*y0^2*z0 - (x0^3+A*x0^2*z0+x0*z0^2)).is_zero() # P0 is on the curve ?
+      (B*y3^2*z3 - (x3^3+A*x3^2*z3+x3*z3^2)).is_zero() # P3 is on the curve ?
+      (4*A*(x3/z3)^3+3*(x3/z3)^4+6*(x3/z3)^2-1).is_zero() # P3 of order 3 ?
+ */
 static int
-Brent12_curve_from_sigma (residue_t A, residue_t x, const residue_t sigma, 
-			  const modulus_t m)
+Brent12_curve_from_sigma (residue_t b, ec_point_t P0, const unsigned long sigma,
+                          const modulus_t m)
 {
-  residue_t u, v, t, b, z;
-  int r;
+  residue_t s, u, v, t1, t2;
+  int ret;
 
+  mod_init_noset0 (s, m);
   mod_init_noset0 (u, m);
   mod_init_noset0 (v, m);
-  mod_init_noset0 (t, m);
-  mod_init_noset0 (b, m);
-  mod_init_noset0 (z, m);
-
-  /* compute b, x */
-  mod_add (v, sigma, sigma, m);
-  mod_add (v, v, v, m);         /* v = 4*sigma */
-  mod_sqr (u, sigma, m);
-  mod_set1 (b, m);
-  mod_add (t, b, b, m);
-  mod_add (t, t, t, m);
-  mod_add (t, t, b, m);         /* t = 5 */
-  mod_sub (u, u, t, m);         /* u = sigma^2 - 5 */
-  mod_sqr (t, u, m);
-  mod_mul (x, t, u, m);         /* x = u^3 */
-  mod_sqr (t, v, m);
-  mod_mul (z, t, v, m);         /* z = v^3 */
-  mod_mul (t, x, v, m);         /* t = x*v = u^3*v */
-  mod_add (b, t, t, m);
-  mod_add (b, b, b, m);         /* b = 4*u^3*v */
-  mod_add (t, u, u, m);
-  mod_add (t, t, u, m);         /* t = 3*u */
-  mod_sub (u, v, u, m);         /* t2 = v-u  (stored in u) */
-  mod_add (v, t, v, m);         /* t3 = 3*u + v (stored in v) */
-  mod_sqr (t, u, m);
-  mod_mul (u, t, u, m);         /* t4 = (u-v)^3 (stored in u) */
-  mod_mul (A, u, v, m);         /* A = (u-v)^3 * (3*u + v) */
-  mod_mul (v, b, z, m);         /* t5 = b*z (stored in v) */
-
-  r = mod_inv (u, v, m);        /* t6 = 1/(b*z) (stored in u) */
-  if (r == 0) /* non-trivial gcd */
-    {
-      mod_set (x, v, m);
-    }
-  else
-    {
-      mod_mul (v, u, b, m);     /* t7 = 1/z (stored in v) */
-      mod_mul (x, x, v, m);     /* x := x/z */
-      mod_mul (v, u, z, m);     /* t8 = 1/b (stored in v) */
-      mod_mul (t, A, v, m);     /* t = A/b = (u-v)^3 * (3*u + v) / (4*u^3*v) */
-      mod_set1 (u, m);
-      mod_add (u, u, u, m);
-      mod_sub (A, t, u, m);     /* A = (u-v)^3 * (3*u + v) / (4*u^3*v) - 2 */
-    }
-
-  mod_clear (z, m);
-  mod_clear (b, m);
-  mod_clear (t, m);
-  mod_clear (v, m);
-  mod_clear (u, m);
-
-  return r;
-}
-
-/* Produces curve in Montgomery parameterization from k value, using
-   parameters for a torsion 12 curve as in Montgomery's thesis (6.1).
-   Return 1 if it worked, 0 if a modular inverse failed. 
-   If a modular inverse failed, the non-invertible value is stored in x.
-
-   The elliptic curve is B y^2 = x^3 + A x^2 + x
-   
-   with A = (-3*a^4-6*a^2+1)/(4*a^3) = (1/a - 3*a*(a^2 + 2))/(2*a)^2
-   and B = (a^2-1)^2/(4*a^3).
-
-   and initial point x = (3*a^2+1)/(4*a).
-
-   A and x are obtained from u and v such that (u,v) = k*P on the curve
-   v^2 = u^3 - 12*u, where P = (-2, 4).
-
-   In Sage notation:
-   E=EllipticCurve([-12,0])
-   P=E(-2,4)
-   k=2
-   kP=k*P; u=kP[0]; v=kP[1]
-   t2 = (u^2-12)/(4*u)
-   a = (u^2 - 4*u - 12)/(u^2 + 12*u - 12)
-   A = (-3*a^4-6*a^2+1)/(4*a^3)
-   B = (a^2-1)^2/(4*a^3)
-   x = (3*a^2+1)/(4*a)
-
-   We want t^2 = (u^2-12)/4u, and a=(t^2-1)/(t^2+3), thus
-   a = (u^2 - 4*u - 12)/(u^2 + 12*u - 12). 
-   We need both a and 1/a, so we can compute the inverses of both
-   u^2 - 4*u - 12 and u^2 + 12*u - 12 with a single batch inversion.
-
-   For k=2, we get u=4, v=-4, t=-1/2, a=-3/13, 
-     A=-4798/351, B=-6400/351 and x=-49/39.
-
-   For k=3, we get u=-2/9, v=-44/27, t=11/3, a=28/37, 
-     A=-6409583/3248896, B=342225/3248896, and x=3721/4144.
-*/
-static int
-Montgomery12_curve_from_k (residue_t A, residue_t x, const unsigned long k, 
-		           const modulus_t m)
-{
-  residue_t u, v, a, t2, one;
-  int r = 0;
-  
-  /* We want a multiple of the point (-2,4) on the curve Y^2=X^3-12*X.
-     The curve has 2-torsion with torsion point (0,0), but adding it 
-     does not seem to change the ECM curve we get out in the end. */
-  mod_init_noset0 (a, m);
-  mod_init_noset0 (u, m);
-  mod_init_noset0 (v, m);
-  mod_init_noset0 (one, m);
+  mod_init_noset0 (t1, m);
   mod_init_noset0 (t2, m);
-  
+
+  mod_set_ul (s, sigma, m);
+
+  mod_add (v, s, s, m);
+  mod_add (v, v, v, m);             /* v = 4*sigma */
+  mod_sqr (u, s, m);
+  mod_set_ul (t1, 5, m);
+  mod_sub (u, u, t1, m);            /* u = sigma^2 - 5 */
+  mod_sqr (t1, u, m);
+  mod_mul (P0->x, t1, u, m);        /* x0 = u^3 */
+  mod_sqr (t1, v, m);
+  mod_mul (P0->z, t1, v, m);        /* z0 = v^3 */
+  mod_mul (t1, P0->x, v, m);
+  mod_2pow_ul (t2, 4, m);
+  mod_mul (t1, t1, t2, m);          /* t1 = 16*x0*v = 16*u^3*v */
+  mod_add (b, u, u, m);
+  mod_add (b, b, u, m);
+  mod_add (b, b, v, m);             /* b = 3*u+v (so far) */
+  mod_sub (t2, v, u, m);
+  mod_mul (b, b, t2, m);            /* b = (v-u)*(3*u+v) (so far) */
+  mod_sqr (t2, t2, m);
+  mod_mul (b, b, t2, m);            /* b = (v-u)^3*(3*u+v) (so far) */
+
+  ret = mod_inv (t2, t1, m);         /* t2 = 1/t1 */
+  if (ret == 0) /* non-trivial gcd */
+    mod_set (P0->x, t1, m);
+  else
+    mod_mul (b, b, t2, m);          /* b = (v-u)^3*(3*u+v)/(16*u^3*v) */
+
+  mod_clear (s, m);
+  mod_clear (u, m);
+  mod_clear (v, m);
+  mod_clear (t1, m);
+  mod_clear (t2, m);
+
+  return ret;
+}
+
+/* Produces curve in Montgomery form from k value, using parameterization for a
+ * torsion 12 curve as in Montgomery's thesis (6.1).
+ * Return 1 if it worked, 0 if a modular inverse failed.
+ * If modular inverse failed, return non-invertible value in P0->x.
+ *
+ * Parametrization:
+ *    (u,v) = k*P
+ *      where P = (-2, 4) is a point on the Weierstrass curve y^2 = x^3 - 12*x
+      d1 = v^2+12*u^2
+      d2 = v^2-4*u^2
+      x0 = 2*(u*(u^2+12))^2
+      y0 = d1*u*(u^2+12)
+      z0 = 2*d1*d2
+      A = (4*(32*v*u^3)^2-2*d1*d2^3)/(d1*d2^3)
+      B = (16*u^2*(v^2+4*u^2))^2/(d1*d2^3)
+      b = (32*v*u^3)^2/(d1*d2^3)
+ * We only need b and the coordinates of the starting point (x0::z0)
+ * The point of order 12 is given by:
+      x12 = 2*u*(2*u + v)^2
+      y12 = v*(2*u + v)^2
+      z12 = 2*u*(-2*u + v)^2
+ * To check with Sage:
+      QQuv.<u,v> = QQ[]
+      I = QQuv.ideal (v^2 - (u^3-12*u))
+      # copy paste all the above formula
+      (b-(A+2)/4).is_zero() # b is correct ?
+      # P0 is on the curve ?
+      eq_P0 = (B*y0^2*z0 - (x0^3+A*x0^2*z0+x0*z0^2))
+      eq_P0.numerator() in I and not eq_P0.denominator() in I
+      # P12 is on the curve ?
+      eq_P12 = (B*y12^2*z12 - (x12^3+A*x12^2*z12+x12*z12^2))
+      eq_P12.numerator() in I and not eq_P12.denominator() in I
+      # P12 of order 3 ?
+      # TODO
+      # P12 of order 4 ?
+      # TODO
+ */
+static int
+Montgomery12_curve_from_k (residue_t b, ec_point_t P0, const unsigned long k,
+		                       const modulus_t m)
+{
+  residue_t u, v, a, uu, vv, d1, d2, t1, t2, one;
+  ec_point_t T;
+  int ret = 0;
+
+  /* We want a multiple of the point (-2,4) on the curve y^2=x^3-12*x.
+   * The curve has 2-torsion with torsion point (0,0), but adding it
+   * does not seem to change the ECM curve we get out in the end.
+   */
+  mod_init_noset0 (u, m);
+  mod_init_noset0 (v, m);
+  mod_init_noset0 (a, m);
+  mod_init_noset0 (uu, m);
+  mod_init_noset0 (vv, m);
+  mod_init_noset0 (d1, m);
+  mod_init_noset0 (d2, m);
+  mod_init_noset0 (t1, m);
+  mod_init_noset0 (t2, m);
+  mod_init_noset0 (one, m);
+
+  ec_point_init (T, m);
+
   mod_set1 (one, m);
 
-  if (k == 2)
-    {
-      /* For k=2, we need A=-4798/351 = -13 - 1/13 - 16/27 
-         and x=-49/39 = 1/13 - 1/3 - 1. */
-      mod_div13 (u, one, m);    /* u = 1/13 */
-      mod_div3 (v, one, m);     /* v = 1/3 */
-      mod_sub (x, u, v, m);     /* x = 1/13 - 1/3 = -10/39 */
-      mod_sub (x, x, one, m);   /* x = -10/39 - 1 = -49/39 */
-      mod_sub (A, one, v, m);   /* A = 1 - 1/3 = 2/3 */
-      mod_div3 (A, A, m);       /* A = 2/9 */
-      mod_add1 (A, A, m);       /* A = 11/9 */
-      mod_div3 (A, A, m);       /* A = 11/27 */
-      mod_sub (A, A, one, m);   /* A = -16/27 */
-      mod_sub (A, A, u, m);     /* A = -16/27 - 1/13 = -235/351 */
-      mod_add (u, one, one, m); /* u = 2 */
-      mod_add (u, u, one, m);   /* u = 3 */
-      mod_add (u, u, u, m);     /* u = 6 */
-      mod_add (u, u, u, m);     /* u = 12 */
-      mod_add1 (u, u, m);       /* u = 13 */
-      mod_sub (A, A, u, m);     /* A = -235/351 - 13 = -4798/351 */
+  /* Compute u and v */
+  mod_add (T->y, one, one, m);
+  mod_neg (T->x, T->y, m);              /* x = -2 */
+  mod_add (T->y, T->y, T->y, m);        /* y = 4 */
+  mod_add (a, T->y, T->y, m);
+  mod_add (a, a, T->y, m);
+  mod_neg (a, a, m);                    /* a = -12 */
 
-      mod_clear (one, m);
-      mod_clear (t2, m);
-      mod_clear (v, m);
-      mod_clear (u, m);
-      mod_clear (a, m);
-      return 1;
-    }
-  else if (k == 3)
-    {
-#if 0
-      mod_set_ul (v, 37UL, m);
-      mod_div2 (v, v, m);
-      mod_div2 (v, v, m);
-      mod_div7 (v, v, m);      /* v = 37/28 = 1/a */
-#else
-      mod_div2 (v, one, m);	/* v = 1/2 */
-      mod_div2 (v, v, m);	/* v = 1/4 */
-      mod_add1 (v, v, m);       /* v = 5/4 */
-      mod_add1 (v, v, m);       /* v = 9/4 */
-      mod_div7 (v, v, m);       /* v = 9/28 */
-      mod_add1 (v, v, m);       /* v = 37/28 = 1/a */
-#endif
-      /* TODO: Write a mod_div37()? Or a general mod_div_n() for small n? */
-      if (mod_inv (a, v, m) == 0)  /* a = 28/37 */
-        {
-	  mod_set (x, v, m);
-	  goto clear_and_exit;
-        }
-    }
+  weierstrass_smul_ui (T, k, a, m); // TODO check for failed inv here
+  mod_set (u, T->x, m);
+  mod_set (v, T->y, m);
+
+  mod_sqr (uu, u, m);                   /* uu = u^2 */
+  mod_sqr (vv, v, m);                   /* vv = v^2 */
+
+  mod_add (t1, uu, uu, m);
+  mod_add (t1, t1, t1, m);
+  mod_sub (d2, vv, t1, m);              /* d2 = v^2-4*u^2 */
+  mod_add (t2, t1, t1, m);
+  mod_add (t2, t2, t1, m);
+  mod_add (d1, vv, t2, m);              /* d1 = v^2+12*u^2 */
+
+  mod_set_ul (t1, 12, m);               /* t1 = 12 */
+  mod_add (P0->x, uu, t1, m);           /* x0 = (u^2+12) [so far] */
+  mod_sqr (P0->x, P0->x, m);            /* x0 = (u^2+12)^2 [so far] */
+  mod_mul (P0->x, P0->x, uu, m);        /* x0 = u^2*(u^2+12)^2 [so far] */
+  mod_add (P0->x, P0->x, P0->x, m);     /* x0 = 2*u^2*(u^2+12)^2 */
+
+  mod_mul (P0->z, d1, d2, m);           /* z0 = d1*d2 [so far] */
+  mod_add (P0->z, P0->z, P0->z, m);     /* z0 = 2*d1*d2 */
+
+  mod_sqr (t1, d2, m);
+  mod_mul (t1, t1, d2, m);
+  mod_mul (t1, t1, d1, m);              /* t1 = d1*d2^3 */
+
+  ret = mod_inv (b, t1, m);             /* 1/t1 = 1/(d1*d2^3) (stored in b) */
+  if (ret == 0) /* non-trivial gcd */
+    mod_set (P0->x, t1, m);
   else
-    {
-      mod_add (v, one, one, m);
-      mod_neg (u, v, m);    /* u = -2 */
-      mod_add (v, v, v, m); /* v = 4 */
-      mod_add (a, v, v, m);
-      mod_add (a, a, v, m);
-      mod_neg (a, a, m);    /* a = -12 */
-      {
-        ec_point_t T;
-        ec_point_init (T, m);
-        mod_set (T[0].x, u, m);
-        mod_set (T[0].y, v, m);
-        weierstrass_smul_ui (T, k, a, m);
-        mod_set (u, T[0].x, m);
-        mod_set (v, T[0].y, m);
-        ec_point_clear (T, m);
-      }
+  {
+    mod_sqr (t1, uu, m);
+    mod_mul (t1, t1, uu, m);
+    mod_mul (b, b, t1, m);              /* b = u^6/(d1*d2^3) [so far] */
+    mod_mul (b, b, vv, m);              /* b = v^2*u^6/(d1*d2^3)  [so far] */
+    mod_2pow_ul (t1, 10, m);            /* t1 = 2^10 = 1024 */
+    mod_mul (b, b, t1, m);              /* b = 1024*v^2*u^6/(d1*d2^3) */
+  }
 
-      /* Now we have an $u$ such that $v^2 = u^3-12u$ is a square */
-      /* printf ("Montgomery12_curve_from_k: u = %lu\n", mod_get_ul (u)); */
-      
-      /* We want a = (u^2 - 4*u - 12)/(u^2 + 12*u - 12). 
-         We need both $a$ and $1/a$, so we can compute the inverses of both
-         u^2 - 4*u - 12 and u^2 + 12*u - 12 with a single batch inversion. */
-
-      mod_sqr (t2, u, m);     /* t2 = u^2 */
-      mod_sub (u, u, one, m);
-      mod_add (u, u, u, m);
-      mod_add (u, u, u, m);   /* u' = 4u - 4 */
-      mod_sub (v, t2, u, m);  /* v = u^2 - 4u + 4 */
-      mod_add (t2, t2, u, m);
-      mod_add (t2, t2, u, m);
-      mod_add (u, t2, u, m);  /* u'' = u^2 + 12u - 12 */
-      mod_add (t2, one, one, m);
-      mod_add (t2, t2, t2, m);
-      mod_add (t2, t2, t2, m);
-      mod_add (t2, t2, t2, m); /* t2 = 16 */
-      mod_sub (v, v, t2, m);   /* v = u^2 - 4u - 12 */
-      
-      mod_mul (t2, u, v, m);
-      if (mod_inv (t2, t2, m) == 0)
-	{
-	  mod_set (x, t2, m);
-	  goto clear_and_exit;
-	}
-
-      /* Now 
-         u'' = u^2 + 12u - 12
-         v  = u^2 - 4u - 12
-         t2 = 1 / ( (u^2 + 12u - 12) * (u^2 - 4u - 12) ).
-         We want 
-         a   = (u^2 - 4u - 12)/(u^2 + 12u - 12) and
-         1/a = (u^2 + 12u - 12)/(u^2 - 4u - 12) */
-      mod_sqr (a, v, m);
-      mod_mul (a, a, t2, m);
-      mod_sqr (v, u, m);
-      mod_mul (v, v, t2, m);
-    }
-
-  /* Here we have $a$ in a, $1/a$ in v */
-  mod_sqr (u, a, m);      /* a^2 */
-  mod_add (A, u, one, m);
-  mod_add (A, A, one, m); /* a^2 + 2 */
-  mod_add (t2, A, A, m);
-  mod_add (A, A, t2, m);  /* 3*(a^2 + 2) */
-  mod_mul (t2, A, a, m);
-  mod_set (A, v, m);
-  mod_sub (A, A, t2, m);  /* 1/a - 3 a (a^2 + 2) */
-  mod_div2 (v, v, m);     /* v = 1/(2a) */
-  mod_sqr (t2, v, m);     /* t2 = 1/(2a)^2 */
-  mod_mul (A, A, t2, m);  /* A = [1/a - 3 a (a^2 + 2)]/(2a)^2 */
-
-  mod_add (x, u, u, m);   /* 2a^2 */
-  mod_add (x, x, u, m);   /* 3*a^2 */
-  mod_add (x, x, one, m); /* 3*a^2 + 1 */
-  mod_div2 (v, v, m);     /* v = 1/(4a) */
-  mod_mul (x, x, v, m);   /* x = (3*a^2 + 1)/(4a) */
-  r = 1;
-
-clear_and_exit:  
-  mod_clear (one, m);
-  mod_clear (t2, m);
-  mod_clear (v, m);
   mod_clear (u, m);
+  mod_clear (v, m);
   mod_clear (a, m);
-  return r;
+  mod_clear (uu, m);
+  mod_clear (vv, m);
+  mod_clear (d1, m);
+  mod_clear (d2, m);
+  mod_clear (t1, m);
+  mod_clear (t2, m);
+  mod_clear (one, m);
+
+  ec_point_clear (T, m);
+
+  return ret;
 }
 
 
 /* Produces curve in Montgomery parameterization from k value, using
    parameters for a torsion 16 curve as in Montgomery's thesis.
    Return 1 if it worked, 0 if a modular inverse failed.
-   Currently can produce only one, hard-coded curve that is cheap 
+   Currently can produce only one, hard-coded curve that is cheap
    to initialise */
 static int
-Montgomery16_curve_from_k (residue_t b, residue_t x, const unsigned long k, 
-		           const modulus_t m)
+Montgomery16_curve_from_k (residue_t b, ec_point_t P0, const unsigned long k,
+		                       const modulus_t m)
 {
-#if 0
   if (k == 1UL)
-    {
-      /* ERROR: this curve has rank 0! That explains why it only ever
-         finds trivial factorizations... */ 
-      /* Make curve corresponding to (a,b,c) = (4, -3, 5) in 
-         Montgomery's thesis, equation (6.2.2). Then A = 337/144, 
-         b = (A+2)/4 = (25/24)^2. x = -3/2, see table 6.2.1. 
-         This curve is cheap to initialise, three div2, one div3, two add,
-	 one mul */
-      residue_t t, t2, one;
-      
-      mod_init (t, m);
-      mod_init (t2, m);
-      mod_init (one, m);
-      
-      mod_set1 (one, m);
-      mod_div2 (t, one, m);     /* t = 1/2 */
-      mod_div2 (t2, t, m);      /* t2 = 1/4 */
-      mod_add (t, t, one, m);   /* t = 3/2 */
-      mod_neg (x, t, m);        /* x = -3/2 */
-      mod_div2 (t2, t2, m);     /* t2 = 1/8 */
-      mod_div3 (t2, t2, m);     /* t2 = 1/24 */
-      mod_add (t2, t2, one, m); /* t2 = 25/24 */
-      mod_sqr (b, t2, m);       /* b = 625/576 */
-
-#ifdef WANT_ASSERT_EXPENSIVE
-      mod_add (t, x, x, m);
-      mod_add (t, t, one, m);
-      mod_add (t, t, one, m);
-      mod_add (t, t, one, m);
-      ASSERT (mod_is0 (t, m));
-      mod_set_ul (t, 576UL, m);
-      mod_mul (t2, b, t, m);
-      mod_set_ul (t, 625UL, m);
-      ASSERT (mod_equal (t, t2, m));
-#endif
-      
-      mod_clear (t, m);
-      mod_clear (t2, m);
-      mod_clear (one, m);
-    }
-#endif
-  if (k == 1UL)
-    {
-      /* Make curve corresponding to (a,b,c) = (8, 15, 17) in 
-         Montgomery's thesis, equation (6.2.2). Then A = 54721/14400, 
-         b = (A+2)/4 = (289/240)^2. x = 8/15, see table 6.2.1. 
-         This curve is cheap to initialise: four div2, one div3, two div5,
-         three add, one mul */
-      residue_t t, t2, one;
-      
-      mod_init (t, m);
-      mod_init (t2, m);
-      mod_init (one, m);
-      
-      mod_set1 (one, m);
-      mod_div3 (t, one, m);
-      mod_div5 (t2, one, m);
-      mod_add (x, t, t2, m);  /* x = 1/3 + 1/5 = 8/15 */
-      mod_div2(t, t, m);
-      mod_div2(t, t, m);
-      mod_div2(t, t, m);
-      mod_div2(t, t, m);      /* t = 1/48 */
-      mod_add (t, t, one, m); /* t = 49/48 */
-      mod_div5 (t, t, m);     /* t = 49/240 */
-      mod_add (t, t, one, m); /* t = 289/240 */
-
-      mod_sqr (b, t, m);      /* b = 83521/57600 */
-      
-#ifdef WANT_ASSERT_EXPENSIVE
-      mod_set_ul (t, 15UL, m);
-      mod_mul (t2, x, t, m);
-      mod_set_ul (t, 8UL, m);
-      ASSERT (mod_equal (t, t2, m));
-      mod_set_ul (t, 57600UL, m);
-      mod_mul (t2, b, t, m);
-      mod_set_ul (t, 83521UL, m);
-      ASSERT (mod_equal (t, t2, m));
-#endif
-      mod_clear (t, m);
-      mod_clear (t2, m);
-      mod_clear (one, m);
-    }
-  else
-    {
-      abort();
-    }
-
-  return 1;
-}
-
-
-
-static int 
-Twisted_Edwards16_curve_from_sigma (residue_t d, ec_point_t P,
-				    MAYBE_UNUSED const unsigned long sigma, 
-				    const modulus_t m)
-{
-  residue_t u, f;
-  const Edwards_curve_t *E = &Ecurve14;
-
-  residue_t xn, xd, yn, yd, dd;
-  
-  mod_init (u, m);
-  mod_init (f, m);
-  
-  mod_set_ul (xn, E->x_numer, m);
-  mod_set_ul (xd, E->x_denom, m);
-  
-  /* (xn, yn) = P (mod m) */
-  if ( mod_inv (u, xd, m) == 0)
-    {
-      mod_gcd (f, xd, m);
-      mod_clear (u, m);
-      return 0;
-    }
-  mod_mul (P->x, xn, u, m);
-  
-  mod_set_ul (yn, E->y_numer, m);
-  mod_set_ul (yd, E->y_denom, m);
-  if (mod_inv (u, yd, m) == 0)
-    {
-      mod_gcd (f, yd, m);
-      mod_clear (u, m);
-      //      ellE_clear (P, m);
-      return 0;
-    }
-  mod_mul (P->y, yn, u, m);
-  
-  mod_set1 (P->z, m);
-  
-  /* Reduce d = dn/dd mod m */
-  mod_set_ul (d, E->d_numer, m);
-  mod_set_ul (dd, E->d_denom, m);
-  if (mod_inv (u, dd, m) == 0)
-    {
-      mod_gcd (f, dd, m);
-      mod_clear (u, m);
-      //      ellE_clear (P, m);
-      return 0;
-    }
-  mod_mul (d, d, u, m);
-  
-  mod_clear (u, m);
-  mod_clear (f, m);
-
-  return 1;
-}
-
-
-/* Make a curve of the form y^2 = x^3 + a*x^2 + b with a valid point
-   (x, y) from a curve Y^2 = X^3 + A*X^2 + X. The value of b will not
-   be computed. 
-   x and X may be the same variable. */
-static int
-curveW_from_Montgomery (residue_t a, ec_point_t P, const residue_t X, 
-                        const residue_t A, const modulus_t m)
-{
-  residue_t g, one;
-  int r;
-
-  mod_init_noset0 (g, m);
-  mod_init_noset0 (one, m);
-  mod_set1 (one, m);
-
-  mod_add (g, X, A, m);
-  mod_mul (g, g, X, m);
-  mod_add (g, g, one, m);
-  mod_mul (g, g, X, m); /* G = X^3 + A*X^2 + X */
-  /* printf ("curveW_from_Montgomery: Y^2 = %lu\n", g[0]); */
-
-  /* Now (x,1) is on the curve G*Y^2 = X^3 + A*X^2 + X. */
-  r = mod_inv (g, g, m);
-  if (r != 0)
   {
-      mod_set (P[0].y, g, m);       /* y = 1/G */
-      mod_div3 (a, A, m);
-      mod_add (P[0].x, X, a, m);
-      mod_mul (P[0].x, P[0].x, g, m); /* x = (X + A/3)/G */
-      mod_mul (a, a, A, m);
-      mod_sub (a, one, a, m);
-      mod_mul (a, a, g, m);
-      mod_mul (a, a, g, m); /* a = (1 - (A^2)/3)/G^2 */
+    /* Make curve corresponding to (a,b,c) = (8, 15, 17) in Montgomery's thesis,
+     * equation (6.2.2).
+     *    A = 54721/14400
+     *    b = (A+2)/4 = (289/240)^2
+     *    x0 = 8
+     *    z0 = 15
+     * [ see table 6.2.1 ]
+     * We only need b and the coordinates of the starting point (x0::z0)
+     * This curve is cheap to initialise: four div2, one div3, two div5,
+     * three add, one mul
+     */
+    residue_t t, one;
+
+    mod_init (t, m);
+    mod_init (one, m);
+
+    mod_set1 (one, m);
+
+    mod_set_ul (P0->x, 8UL, m);     /* x0 = 8 */
+    mod_set_ul (P0->z, 15UL, m);    /* z0 = 15 */
+
+    mod_div3 (t, one, m);
+    mod_div2(t, t, m);
+    mod_div2(t, t, m);
+    mod_div2(t, t, m);
+    mod_div2(t, t, m);              /* t = 1/48 */
+    mod_add (t, t, one, m);         /* t = 49/48 */
+    mod_div5 (t, t, m);             /* t = 49/240 */
+    mod_add (t, t, one, m);         /* t = 289/240 */
+    mod_sqr (b, t, m);              /* b = 83521/57600 */
+
+#ifdef WANT_ASSERT_EXPENSIVE
+    residue_t t2;
+    mod_init (t2, m);
+    mod_set_ul (t, 57600UL, m);
+    mod_mul (t2, b, t, m);
+    mod_set_ul (t, 83521UL, m);
+    ASSERT (mod_equal (t, t2, m));
+    mod_clear (t2, m);
+#endif
+
+    mod_clear (t, m);
+    mod_clear (one, m);
   }
   else
-    fprintf (stderr, "curveW_from_Montgomery: r = 0\n");
+  {
+    abort();
+  }
 
-  mod_clear (one, m);
-  mod_clear (g, m);
-
-  return r;
+  return 1;
 }
 
+/* Produces curve
+ *     - in "a=-1" Twisted Edwards form (in extended or projective coordinates)
+ *     - or in Montgomery from
+ * from a value k, using parameterization for a rational torsion Z/6Z (implies a
+ * torsion of order 12 modulo every prime), based on Theorem 5.4 of the article
+ * "Starfish on strike".
+ * 'parameter' must be > 1
+ * Return 1 if it worked, 0 if a modular inverse failed.
+ * If modular inverse failed, return non-invertible value in P0->x.
+ *
+ * Parametrization:
+ *    (p,q) = k*P
+ *      where P = ?? is a point on the Weierstrass curve
+ *        y^2 = x^3 - 9747*x + 285714
+      alpha = (p-105)*(p+57)
+      beta = q*(p-213)
+      gamma = p^4 - 96*p^3 - 918*p^2 - 2808*p + 45346797
+      delta = gamma + 2^5*3^7 *(p-33)^2
+      epsilon =  p^2 - 66*p + 7569
+      zeta = 2^2*3^6*q*(p-33)
+      # Coeffs for "a=-1" Twisted Edwards curve
+      a = -1
+      d = -alpha^3*(p-51)*(p+327)/zeta^2
+      xE0 = 2*3*(p+3)*alpha*beta*delta
+      yE0 = (2*3^5)*(p-33)*alpha*gamma*epsilon
+      zE0 = alpha^2*delta*epsilon
+      tE0 = 2^2*3^6*(p-33)*(p+3)*beta*gamma
+      # Coeffs for Montgomery curve
+      A = 2*(a+d)/(a-d)
+      B = 4/(a-d)
+      b = zeta^2/(zeta^2-alpha^3*(p-51)*(p+327))               # [ b = (A+2)/4 ]
+      # (xM0:yM0:zM0) = (xE0*(zE0+yE0):(zE0+yE0)*zE0:xE0*(zE0-yE0))
+      xM0 = (p^2 + 114*p - 11331)^3
+      yM0 = (alpha*epsilon*(epsilon+2^2*3^2*5*(p-105))^3)/(2*3*(p+3)*beta)
+      zM0 = ((p-213)*(p+3))^3
+ * We only need the starting point (xE0:yE0:zE0:tE0) (for Edwards extented) or
+ * (xE0:yE0:zE0) (for Edwards projective) or (xM0::zM0) (for Montgomery) and
+ * maybe the curve coefficient b.
+ * The point of order 3 is given by:
+      # Coeffs for "a=-1" Twisted Edwards curve
+      xE3 = 2*3^2*q*alpha
+      yE3 = 2*3^4*(p-33)*alpha
+      zE3 = alpha^2
+      tE3 = zeta
+      # Coeffs for Montgomery curve
+      xM3 = 2*3^2*q*(epsilon+2^2*3^2*5*(p-105))
+      yM3 = alpha*(epsilon+2^2*3^2*5*(p-105))
+      zM3 = 2*3^2*(p+3)*beta
+ * It corresponds to the Brent--Suyama parameterization with
+      sigma = -(p-213)/(p+3)
+ * To check with Sage:
+      QQpq.<p,q> = QQ[]
+      I = QQpq.ideal (q^2-(p^3-9747*p+285714))
+      # copy paste all the above formula
+      # P0 is in extended coordinates, we must have xE0*yE0 == zE0*tE0
+      (xE0*yE0 - zE0*tE0).is_zero()
+      # P0 is on the curve ?
+      eq_P0 = -xE0^2+yE0^2 - (zE0^2+d*tE0^2)
+      eq_P0.numerator() in I and not eq_P0.denominator() in I
+      eq_P02 = B*yM0^2*zM0 - (xM0^3 + A*xM0^2*zM0 + xM0*zM0^2)
+      eq_P02.numerator() in I and not eq_P02.denominator() in I
+      # P3 is in extended coordinates, we must have xE3*yE3 == zE3*tE3
+      (xE3*yE3 - zE3*tE3).is_zero()
+      # P3 is on the curve ?
+      eq_P3 = -xE3^2+yE3^2 - (zE3^2+d*tE3^2)
+      eq_P3.numerator() in I and not eq_P3.denominator() in I
+      eq_P32 = B*yM3^2*zM3 - (xM3^3 + A*xM3^2*zM3 + xM3*zM3^2)
+      eq_P32.numerator() in I and not eq_P32.denominator() in I
+      # P3 is of order 3 ?
+      eq_order3 = 4*A*(xM3/zM3)^3+3*(xM3/zM3)^4+6*(xM3/zM3)^2-1
+      eq_order3.numerator() in I and not eq_order3.denominator() in I
+ *
+ * Remark: The value k=1 produces the same curve that Brent-Suyama
+ * parameterization with sigma=11 (up to isomorphism, i.e. the values of B
+ * differ by a square factor).
+ */
+static int
+ec_parameterization_Z6 (residue_t b, ec_point_t P0, const unsigned long k,
+                        ec_point_coord_type_t coord, const modulus_t m)
+{
+  ASSERT_ALWAYS (coord == MONTG || coord == EDW_ext || coord == EDW_proj);
+  ASSERT_ALWAYS (k > 0);
+
+  residue_t a, p, q, alpha, beta, gamma, delta, epsilon, zeta, pm33, pp3, t;
+  ec_point_t T;
+  int ret = 0;
+
+  ec_point_init (T, m);
+
+  mod_init_noset0 (a, m);
+  mod_init_noset0 (p, m);
+  mod_init_noset0 (q, m);
+  mod_init_noset0 (alpha, m);
+  mod_init_noset0 (beta, m);
+  mod_init_noset0 (gamma, m);
+  mod_init_noset0 (delta, m);
+  mod_init_noset0 (epsilon, m);
+  mod_init_noset0 (zeta, m);
+  mod_init_noset0 (pm33, m);
+  mod_init_noset0 (pp3, m);
+  mod_init_noset0 (t, m);
+
+  /* Compute p and q */
+  mod_set_ul (a, 9747UL, m);
+  mod_neg (a, a, m);
+  mod_set_ul (T->x, 15UL, m);
+  mod_set_ul (T->y, 378UL, m);
+
+  weierstrass_smul_ui (T, k, a, m); // TODO check for failed inv here
+  mod_set (p, T->x, m);
+  mod_set (q, T->y, m);
+
+  mod_set_ul (t, 3UL, m);
+  mod_add (pp3, p, t, m);                 /* pm3 = p+3 */
+
+  mod_set_ul (t, 33UL, m);
+  mod_sub (pm33, p, t, m);                /* pm33 = p-33 */
+
+  mod_set_ul (t, 105UL, m);
+  mod_sub (alpha, p, t, m);
+  mod_set_ul (t, 57UL, m);
+  mod_add (t, p, t, m);
+  mod_mul (alpha, alpha, t, m);           /* alpha = (p-105)*(p+57) */
+
+  mod_set_ul (t, 213UL, m);
+  mod_sub (t, p, t, m);
+  mod_mul (beta, q, t, m);                /* beta = q*(p-213) */
+
+  mod_set_ul (t, 96UL, m);
+  mod_sub (gamma, p, t, m);
+  mod_mul (gamma, gamma, p, m);
+  mod_set_ul (t, 918UL, m);
+  mod_sub (gamma, gamma, t, m);
+  mod_mul (gamma, gamma, p, m);
+  mod_set_ul (t, 2808UL, m);
+  mod_sub (gamma, gamma, t, m);
+  mod_mul (gamma, gamma, p, m);
+  mod_set_ul (t, 45346797, m);
+  mod_add (gamma, gamma, t, m); /* gamma = p^4-96*p^3-918*p^2-2808*p+45346797 */
+
+  mod_set_ul (t, 69984UL, m); /* 2^5*3^7 */
+  mod_sqr (delta, pm33, m);
+  mod_mul (delta, delta, t, m);
+  mod_add (delta, gamma, delta, m);       /* delta = gamma + 2^5*3^7*(p-33)^2 */
+
+  mod_set_ul (t, 66UL, m);
+  mod_sub (epsilon, p, t, m);
+  mod_mul (epsilon, epsilon, p, m);
+  mod_set_ul (t, 7569UL, m);
+  mod_add (epsilon, epsilon, t, m);       /* epsilon =  p^2 - 66*p + 7569 */
+
+  mod_set_ul (zeta, 2916UL, m);
+  mod_mul (zeta, zeta, q, m);
+  mod_mul (zeta, zeta, pm33, m);          /* zeta = 2^2*3^6*q*(p-33) */
+
+  if (coord == MONTG)
+  {
+    mod_set_ul (t, 114UL, m);
+    mod_add (P0->x, p, t, m);
+    mod_mul (P0->x, P0->x, p, m);
+    mod_set_ul (t, 11331UL, m);
+    mod_sub (P0->x, P0->x, t, m);
+    mod_sqr (t, P0->x, m);
+    mod_mul (P0->x, P0->x, t, m);         /* xM0 = (p^2 + 114*p - 11331)^3 */
+    mod_set_ul (t, 213UL, m);
+    mod_sub (P0->z, p, t, m);
+    mod_mul (P0->z, P0->z, pp3, m);
+    mod_sqr (t, P0->z, m);
+    mod_mul (P0->z, P0->z, t, m);         /* zM0 = ((p-213)*(p+3))^3 */
+  }
+  else
+  {
+    mod_set_ul (t, 6UL, m);
+    mod_mul (P0->x, t, pp3, m);
+    mod_mul (P0->x, P0->x, alpha, m);
+    mod_mul (P0->x, P0->x, beta, m);
+    mod_mul (P0->x, P0->x, delta, m);     /* xE0 = 2*3*(p+3)*alpha*beta*delta */
+    mod_set_ul (t, 486UL, m);
+    mod_mul (P0->y, t, pm33, m);
+    mod_mul (P0->y, P0->y, alpha, m);
+    mod_mul (P0->y, P0->y, gamma, m);
+    mod_mul (P0->y, P0->y, epsilon, m);
+                                  /* yE0 = (2*3^5)*(p-33)*alpha*gamma*epsilon */
+    mod_sqr (P0->z, alpha, m);
+    mod_mul (P0->z, P0->z, delta, m);
+    mod_mul (P0->z, P0->z, epsilon, m);   /* zE0 = alpha^2*delta*epsilon */
+    if (coord == EDW_ext)
+    {
+      mod_set_ul (t, 2916UL, m);
+      mod_mul (P0->t, t, pm33, m);
+      mod_mul (P0->t, P0->t, pp3, m);
+      mod_mul (P0->t, P0->t, beta, m);
+      mod_mul (P0->t, P0->t, gamma, m);
+                                     /* tE0 = 2^2*3^6*(p-33)*(p+3)*beta*gamma */
+    }
+  }
+
+  if (b != NULL)
+  {
+    mod_set_ul (t, 51UL, m);
+    mod_sub (b, p, t, m);
+    mod_set_ul (t, 327UL, m);
+    mod_add (t, p, t, m);
+    mod_mul (b, b, t, m);
+    mod_sqr (t, alpha, m);
+    mod_mul (b, b, t, m);
+    mod_mul (b, b, alpha, m);
+    mod_sqr (t, zeta, m);
+    mod_sub (b, t, b, m);
+
+    ret = mod_inv (a, b, m);
+    if (ret == 0) /* non-trivial gcd */
+      mod_set (P0->x, b, m);
+    else
+      mod_mul (b, a, t, m);     /* b = zeta^2/(zeta^2-alpha^3*(p-51)*(p+327)) */
+  }
+
+  mod_clear (p, m);
+  mod_clear (q, m);
+  mod_clear (a, m);
+  mod_clear (alpha, m);
+  mod_clear (beta, m);
+  mod_clear (gamma, m);
+  mod_clear (delta, m);
+  mod_clear (epsilon, m);
+  mod_clear (zeta, m);
+  mod_clear (pm33, m);
+  mod_clear (pp3, m);
+  mod_clear (t, m);
+
+  ec_point_clear (T, m);
+
+  return ret;
+}
+
+/******************************************************************************/
+/******************************************************************************/
+/******************************************************************************/
 
 /* Multiplies x[1] by z[2]*z[3]*z[4]...*z[n],
    x[2] by z[1]*z[3]*z[4]...*z[n] etc., generally
@@ -810,7 +872,7 @@ curveW_from_Montgomery (residue_t a, ec_point_t P, const residue_t X,
 
 MAYBE_UNUSED
 static void ATTRIBUTE((__noinline__))
-common_z (const int n1, residue_t *x1, residue_t *z1, 
+common_z (const int n1, residue_t *x1, residue_t *z1,
 	  const int n2, residue_t *x2, residue_t *z2,
 	  const modulus_t m)
 {
@@ -818,18 +880,18 @@ common_z (const int n1, residue_t *x1, residue_t *z1,
   int i, j;
   residue_t *t, p;
   const int verbose = 0;
-  
+
   if (verbose)
-    printf ("common_z: n1 = %d, n2 = %d, sum = %d, nr muls=%d\n", 
+    printf ("common_z: n1 = %d, n2 = %d, sum = %d, nr muls=%d\n",
             n1, n2, n1 + n2, 4*(n1 + n2) - 6);
-  
+
   if (n < 2)
     return;
-  
+
   t = (residue_t *) malloc (n * sizeof (residue_t));
   for (i = 0; i < n; i++)
     mod_init (t[i], m);
-  
+
   /* Set t[i] = z_0 * z_1 * ... * z_i, where the z_i are taken
      from the two lists z1 and z2 */
   i = j = 0;
@@ -837,15 +899,15 @@ common_z (const int n1, residue_t *x1, residue_t *z1,
     mod_set (t[0], z2[j++], m);
   else
     mod_set (t[0], z1[i++], m);
-  
+
   for ( ; i < n1; i++)
     mod_mul (t[i], t[i - 1], z1[i], m);
-  
+
   for ( ; j < n2; j++)
     mod_mul (t[j + n1], t[j + n1 - 1], z2[j], m);
-  
+
   /* Now t[i] contains z_0 * ... * z_i */
-  
+
 #ifdef ECM15_UL
   if (verbose) {
     printf ("t[] = {");
@@ -853,22 +915,22 @@ common_z (const int n1, residue_t *x1, residue_t *z1,
       printf ("{%lu,%lu}%s", t[verbose_i][0], t[verbose_i][1], (verbose_i < n-1) ? ", " : "");
     printf ("}\n");
   }
-#endif  
+#endif
   mod_init (p, m);
-  
+
   i = n - 1;
   if (i < n1) /* <==>  n2 == 0 */
     mod_mul (x1[i], x1[i], t[n - 2], m);
   else
     mod_mul (x2[i - n1], x2[i - n1], t[n - 2], m);
-  
-  /* Init the accumulator p, either to the last element of z2 if z2 is 
+
+  /* Init the accumulator p, either to the last element of z2 if z2 is
      non-empty, or to the last element of z1 if z2 is empty */
   if (n2 > 0)
     mod_set (p, z2[n2 - 1], m);
   else
     mod_set (p, z1[n1 - 1], m);
-  
+
   for (i = n2 - 2; i > -n1 && i >= 0; i--)
     {
       /* Here p = z_{i+1} * ... * z_{n-1} */
@@ -876,10 +938,10 @@ common_z (const int n1, residue_t *x1, residue_t *z1,
       mod_mul (x2[i], x2[i], t[i + n1 - 1], m);
       mod_mul (p, p, z2[i], m);
     }
-  
+
   /* n1 = 0  =>  i = 0 */
   /* n1 > 0  =>  i = -1 or -2 */
-  
+
   for (i = i + n1 ; i > 0; i--)
     {
       /* Here p = z_{i+1} * ... * z_{n-1} */
@@ -887,14 +949,14 @@ common_z (const int n1, residue_t *x1, residue_t *z1,
       mod_mul (x1[i], x1[i], t[i-1], m);
       mod_mul (p, p, z1[i], m);
     }
-  
+
   if (n1 > 0)
     mod_mul (x1[0], x1[0], p, m);
   else
     mod_mul (x2[0], x2[0], p, m);
-  
+
   mod_clear (p, m);
-  
+
   for (i = 0; i < n; i++)
     mod_clear (t[i], m);
   free (t);
@@ -903,17 +965,17 @@ common_z (const int n1, residue_t *x1, residue_t *z1,
 
 
 static int ATTRIBUTE((__noinline__))
-ecm_stage2 (residue_t r, const ec_point_t P, const stage2_plan_t *plan, 
+ecm_stage2 (residue_t r, const ec_point_t P, const stage2_plan_t *plan,
 	    const residue_t b, const modulus_t m)
 {
   ec_point_t Pd, Pt; /* d*P, i*d*P, (i+1)*d*P and a temp */
-  residue_t *Pid_x, *Pid_z, *Pj_x, *Pj_z; /* saved i*d*P, i0 <= i < i1, 
+  residue_t *Pid_x, *Pid_z, *Pj_x, *Pj_z; /* saved i*d*P, i0 <= i < i1,
               and jP, j in S_1, x and z coordinate stored separately */
   residue_t a, a_bk, t;
   unsigned int i, k, l;
   int bt = 0;
   const int verbose = 0;
-  
+
   ec_point_init (Pt, m);
   mod_init_noset0 (t, m);
   mod_init_noset0 (a, m);
@@ -942,18 +1004,18 @@ ecm_stage2 (residue_t r, const ec_point_t P, const stage2_plan_t *plan,
 #endif
 
   if (verbose)
-    printf ("Stage 2: P = (%lu::%lu)\n", 
+    printf ("Stage 2: P = (%lu::%lu)\n",
             mod_get_ul (P[0].x, m), mod_get_ul (P[0].z, m));
-  
-  /* Compute jP for j in S_1. Compute all the j, 1 <= j < d/2, gcd(j,d)=1 
+
+  /* Compute jP for j in S_1. Compute all the j, 1 <= j < d/2, gcd(j,d)=1
      with two arithmetic progressions 1+6k and 5+6k (this assumes 6|d).
-     We need two values of each progression (1, 7 and 5, 11) and the 
+     We need two values of each progression (1, 7 and 5, 11) and the
      common difference 6. These can be computed with the Lucas chain
-     1, 2, 3, 5, 6, 7, 11 at the cost of 6 additions and 1 doubling. 
-     For d=210, generating all 24 desired values 1 <= j < 210/2, gcd(j,d)=1, 
-     takes 6+16+15=37 point additions. If d=30, we could use 
+     1, 2, 3, 5, 6, 7, 11 at the cost of 6 additions and 1 doubling.
+     For d=210, generating all 24 desired values 1 <= j < 210/2, gcd(j,d)=1,
+     takes 6+16+15=37 point additions. If d=30, we could use
      1,2,3,4,6,7,11,13 which has 5 additions and 2 doublings */
-  
+
   ASSERT (plan->d % 6 == 0);
   {
     ec_point_t ap1_0, ap1_1, ap5_0, ap5_1, P2, P6;
@@ -974,9 +1036,9 @@ ecm_stage2 (residue_t r, const ec_point_t P, const stage2_plan_t *plan,
     montgomery_dbl (P6, P6, m, b);        /* P6 = 6*P = 2*(3*P) */
     montgomery_dadd (ap1_1, P6, P, ap5_0, b, m); /* 7*P = 6*P + P */
     montgomery_dadd (ap5_1, P6, ap5_0, P, b, m); /* 11*P = 6*P + 5*P */
-    
+
     /* Now we generate all the j*P for j in S_1 */
-    /* We treat the first two manually because those might correspond 
+    /* We treat the first two manually because those might correspond
        to ap1_0 = 1*P and ap5_0 = 5*P */
     k = 0;
     if (plan->s1 > k && plan->S1[k] == 1)
@@ -991,7 +1053,7 @@ ecm_stage2 (residue_t r, const ec_point_t P, const stage2_plan_t *plan,
         mod_set (Pj_z[k], ap5_0[0].z, m);
         k++;
       }
-    
+
     i1 = 7;
     i5 = 11;
     while (k < plan->s1)
@@ -1039,7 +1101,7 @@ ecm_stage2 (residue_t r, const ec_point_t P, const stage2_plan_t *plan,
             i5 += 6;
           }
       }
-    
+
     ec_point_init (Pd, m);
 #if 0
     /* Also compute Pd = d*P while we've got 6*P */
@@ -1072,16 +1134,16 @@ ecm_stage2 (residue_t r, const ec_point_t P, const stage2_plan_t *plan,
     {
       printf ("Pj = [");
       for (i = 0; i < plan->s1; i++)
-        printf ("%s(%lu::%lu)", (i>0) ? ", " : "", 
+        printf ("%s(%lu::%lu)", (i>0) ? ", " : "",
                 mod_get_ul (Pj_x[i], m), mod_get_ul (Pj_z[i], m));
       printf ("]\nPd = (%lu::%lu)\n",
                 mod_get_ul (Pd[0].x, m), mod_get_ul (Pd[0].z, m));
     }
-  
+
   /* Compute idP for i0 <= i < i1 */
   {
     ec_point_t Pid, Pid1;
-    
+
     ec_point_init (Pid, m);
     ec_point_init (Pid1, m);
     k = 0; i = plan->i0;
@@ -1095,11 +1157,14 @@ ecm_stage2 (residue_t r, const ec_point_t P, const stage2_plan_t *plan,
 	k++;
 	i++;
       }
+    /* XXX CB: I think this is buggy: with B1=17 and B2=42, i0=0 i1=1, Pid_x
+     * has length 1, so k must be < 1.
+     */
 
     /* Todo: do both Pid and Pid1 with one addition chain */
     montgomery_smul_ui (Pid, Pd, i, m, b); /* Pid = i_0 d * P */
-    mod_set (Pid_x[k], Pid[0].x, m);
-    mod_set (Pid_z[k], Pid[0].z, m);
+    mod_set (Pid_x[k], Pid->x, m);
+    mod_set (Pid_z[k], Pid->z, m);
     k++; i++;
     if (i < plan->i1)
       {
@@ -1127,14 +1192,14 @@ ecm_stage2 (residue_t r, const ec_point_t P, const stage2_plan_t *plan,
     {
       printf ("Pid = [");
       for (i = 0; i < plan->i1 - plan->i0; i++)
-        printf ("%s(%lu:%lu)", (i>0) ? ", " : "", 
+        printf ("%s(%lu:%lu)", (i>0) ? ", " : "",
 	        mod_get_ul (Pid_x[i], m), mod_get_ul (Pid_z[i], m));
       printf ("]\n");
     }
 
   /* Now we've computed all the points we need, so multiply each by
-     the Z-coordinates of all the others, using Zimmermann's 
-     two product-lists trick. 
+     the Z-coordinates of all the others, using Zimmermann's
+     two product-lists trick.
      If i0 == 0, then Pid[0] is the point at infinity (0::0),
      so we skip that one */
   {
@@ -1144,7 +1209,7 @@ ecm_stage2 (residue_t r, const ec_point_t P, const stage2_plan_t *plan,
       {
         residue_t *x1 = Pj_x, *z1 = Pj_z, *x2 = Pid_x + skip, *z2 = Pid_z + skip;
         int n1 = plan->s1, n2 = plan->i1 - plan->i0 - skip;
-        
+
         printf ("Before common_z():\n");
         printf ("x1 = {");
         for (int verbose_i = 0; verbose_i < n1; verbose_i++)
@@ -1160,14 +1225,14 @@ ecm_stage2 (residue_t r, const ec_point_t P, const stage2_plan_t *plan,
           printf ("{%luUL,%luUL}%s", z2[verbose_i][0], z2[verbose_i][1], (verbose_i < n2-1) ? ", " : "}\n");
       }
 #endif
-    common_z (plan->s1, Pj_x, Pj_z, plan->i1 - plan->i0 - skip, 
+    common_z (plan->s1, Pj_x, Pj_z, plan->i1 - plan->i0 - skip,
 	      Pid_x + skip, Pid_z + skip, m);
 #if defined(ECM15_UL)
     if (verbose)
       {
         residue_t *x1 = Pj_x, *z1 = Pj_z, *x2 = Pid_x + skip, *z2 = Pid_z + skip;
         int n1 = plan->s1, n2 = plan->i1 - plan->i0 - skip;
-        
+
         printf ("After common_z():\n");
         printf ("x1 = {");
         for (int verbose_i = 0; verbose_i < n1; verbose_i++)
@@ -1189,13 +1254,13 @@ ecm_stage2 (residue_t r, const ec_point_t P, const stage2_plan_t *plan,
     {
       printf ("After canonicalizing:\nPj = [");
       for (i = 0; i < plan->s1; i++)
-        printf ("%s(%lu:%lu)", (i>0) ? ", " : "", 
+        printf ("%s(%lu:%lu)", (i>0) ? ", " : "",
                 mod_get_ul (Pj_x[i], m), mod_get_ul (Pj_z[i], m));
       printf ("]\n");
-      
+
       printf ("Pid = [");
       for (i = 0; i < plan->i1 - plan->i0; i++)
-        printf ("%s(%lu:%lu)", (i>0) ? ", " : "", 
+        printf ("%s(%lu:%lu)", (i>0) ? ", " : "",
                 mod_get_ul (Pid_x[i], m), mod_get_ul (Pid_z[i], m));
       printf ("]\n");
       fflush(stdout);
@@ -1206,7 +1271,7 @@ ecm_stage2 (residue_t r, const ec_point_t P, const stage2_plan_t *plan,
 
   /* Init the accumulator to Pj[0], which contains the product of
      the Z-coordinates of all the precomputed points, except Pj_z[0]
-     which is equal to P, and we know that one is coprime to the modulus. 
+     which is equal to P, and we know that one is coprime to the modulus.
      Maybe one of the others was zero (mod p) for some prime factor p. */
 
   mod_set (a, Pj_x[0], m);
@@ -1216,7 +1281,7 @@ ecm_stage2 (residue_t r, const ec_point_t P, const stage2_plan_t *plan,
   i = 0;
   l = 0;
   unsigned char j = plan->pairs[0];
-  while (j != NEXT_PASS) 
+  while (j != NEXT_PASS)
     {
       __asm__ volatile ("# ECM stage 2 loop here");
       while (j < NEXT_D && j < NEXT_PASS)
@@ -1225,7 +1290,7 @@ ecm_stage2 (residue_t r, const ec_point_t P, const stage2_plan_t *plan,
 	  j = plan->pairs[++l];
 	  mod_mul (a, a, t, m);
 	}
-      
+
 #if ECM_BACKTRACKING
       /* See if we got a == 0. If yes, restore previous a value and
 	 end stage 2. Let's hope not all factors were found since
@@ -1238,7 +1303,7 @@ ecm_stage2 (residue_t r, const ec_point_t P, const stage2_plan_t *plan,
 	}
       mod_set (a_bk, a, m); /* Save new a value */
 #endif
-      
+
       if (j == NEXT_D)
 	{
 	  i++;
@@ -1254,11 +1319,11 @@ ecm_stage2 (residue_t r, const ec_point_t P, const stage2_plan_t *plan,
   printf("Stage 2 used %lu point additions and %lu point doublings\n",
          ellM_add_count, ellM_double_count);
 #endif
-  
+
   mod_set (r, a, m);
-  
+
   /* Clear everything */
-  
+
   for (i = 0; i < plan->s1; i++)
     {
       mod_clear (Pj_x[i], m);
@@ -1278,7 +1343,7 @@ ecm_stage2 (residue_t r, const ec_point_t P, const stage2_plan_t *plan,
   Pid_x = NULL;
   free (Pid_z);
   Pid_z = NULL;
-  
+
   ec_point_clear (Pt, m);
   mod_clear (t, m);
   mod_clear (a, m);
@@ -1289,211 +1354,120 @@ ecm_stage2 (residue_t r, const ec_point_t P, const stage2_plan_t *plan,
 /* Stores any factor found in f_out (1 if no factor found).
    If back-tracking was used, returns 1, otherwise returns 0. */
 
-int 
+int
 ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
 {
-  residue_t u, b, d, a;
+  residue_t u, b;
   ec_point_t P, Pt;
-  ec_point_t Q;
-
-  /* P is initialized here because the coordinates of P may be used as temporary
-     variables when constructing curves from sigma! (mouaif) */
-  ec_point_init (P, m); 
 
   unsigned int i;
-  int bt = 0;
+  int r, bt = 0;
 
-  mod_init (u, m);
+  ec_point_init (P, m);
   mod_init (b, m);
 
   mod_intset_ul (f, 1UL);
 
   if (plan->parameterization == BRENT12)
-  {
-    residue_t s, A;
-    mod_init_noset0 (s, m);
-    mod_init_noset0 (A, m);
-    mod_set_ul (s, plan->sigma, m);
-    if (Brent12_curve_from_sigma (A, P->x, s, m) == 0)
-      {
-	mod_gcd (f, P->x, m);
-	mod_clear (u, m);
-	mod_clear (A, m);
-	mod_clear (b, m);
-	ec_point_clear (P, m);      
-	mod_clear (s, m);
-	return 0;
-      }
-    mod_clear (s, m);
-    mod_set1 (P->z, m);
-    
-    mod_div2 (A, A, m);
-    mod_set1 (b, m);
-    mod_add (b, b, A, m);
-    mod_div2 (b, b, m); /* b = (A + 2)/4 */
-    mod_clear (A, m);
-  }
+    r = Brent12_curve_from_sigma (b, P, plan->parameter, m);
   else if (plan->parameterization == MONTY12)
-  {
-    residue_t A;
-    mod_init_noset0 (A, m);
-    if (Montgomery12_curve_from_k (A, P->x, plan->sigma, m) == 0)
-      {
-	mod_gcd (f, P->x, m);
-	mod_clear (u, m);
-	mod_clear (A, m);
-	mod_clear (b, m);
-	ec_point_clear (P, m);
-	return 0;
-      }
-    mod_set1 (P->z, m);
-    
-    mod_div2 (A, A, m);
-    mod_set1 (b, m);
-    mod_add (b, b, A, m);
-    mod_div2 (b, b, m); /* b = (A + 2)/4 */
-    mod_clear (A, m);
-  }
+    r = Montgomery12_curve_from_k (b, P, plan->parameter, m);
   else if (plan->parameterization == MONTY16)
-    {
-      if (Montgomery16_curve_from_k (b, P->x, plan->sigma, m) == 0)
-	{
-	  mod_gcd (f, P->x, m);
-	  mod_clear (u, m);
-	  mod_clear (b, m);
-	  ec_point_clear (P, m);
-	  return 0;
-	}
-      mod_set1 (P->z, m);
-  }
-  else if (plan->parameterization == TWED16)
-  {
-    if (Twisted_Edwards16_curve_from_sigma (d, Q, plan->sigma, m) == 0)
-      {
-	// TODO: check if factor found!
-	ec_point_clear (Q, m);
-	return 0;
-      }
-  }
+    r = Montgomery16_curve_from_k (b, P, plan->parameter, m);
+  else if (plan->parameterization == MONTYTWED12)
+    r = ec_parameterization_Z6 (b, P, plan->parameter, EDW_ext, m);
   else
   {
-    fprintf (stderr, "ecm: Unknown parameterization\n");
+    fprintf (stderr, "%s: unknown parameterization\n", __func__);
     abort();
   }
 
+  if (r == 0)
+  {
+    printf ("# factor found during parameterization\n"); // XXX
+    mod_gcd (f, P->x, m);
+    mod_clear (b, m);
+    ec_point_clear (P, m);
+    return 0;
+  }
 
 #ifdef TRACE
   if (plan->parameterization & FULLMONTY)
-    {
-      printf ("starting point: (%lu::%lu) on curve y^2 = x^3 + (%lu*4-2)*x^2 + x\n", 
-	      mod_get_ul (P->x, m), mod_get_ul (P->z, m), mod_get_ul(b, m));
-    }
-  else if (plan->parameterization == TWED16)
-    {
-      printf ("starting point: (%lu:%lu:%lu) on twisted Edwards curve\
-               -x^2 + y^2 = 1 + %lu * x^2 * y^2\n", 
-	      mod_get_ul (Q->x, m), mod_get_ul (Q->y, m), mod_get_ul (Q->z, m), 
-	      mod_get_ul(d, m));
-    }
+  {
+    /* FIXME need multiple precision print */
+    residue_t A;
+    mod_init (A, m);
+    montgomery_A_from_b (A, b, m);
+    printf ("%s: curve: B*Y^2*Z = X^3 + (%lu*4-2)*X^2*Z + X*Z^2\n"
+            "%s: starting point (%lu::%lu)\n", __func__, mod_get_ul (A, m),
+            __func__, mod_get_ul (P->x, m), mod_get_ul (P->z, m));
+    mod_clear (A, m);
+  }
 #endif
 
   /* now start ecm */
 
   /* Do stage 1 */
   if (plan->parameterization & FULLMONTY)
-  {
     bytecode_prac_interpret_ec_montgomery (P, plan->bc, m, b);
-    
-      /* Add prime 2 in the desired power. If a zero residue for the 
-	 Z-coordinate is encountered, we backtrack to previous point and stop.
-	 NOTE: This is not as effective as I hoped. It prevents trivial 
-	 factorizations only if after processing the odd part of the stage 1 
-	 multiplier, the resulting point has power-of-2 order on E_p for all p|N.
-	 If that were to happen, the point probably had that (presumably small 
-	 on most E_p) power-of-2 order during the last couple of primes processed 
-	 in the precomputed Lucas chain, and then quite likely the Lucas chain 
-	 incorrectly used an addition of identical points, causing the 
-	 Z-coordinate to become zero, leading to 0 (mod N) before we even 
-	 get here. 
-	 For example, using 10^6 composites from an RSA155 sieving experiment,
-	 without backtracking we get N as the factor 456 times, with backtracking
-	 still 360 times. 
-	 TODO: this could probably be fixed by treating 3 separately, too, 
-	 instead of putting it in the precomputed Lucas chain. Then the 
-	 probability that a point of very small order on all E_p is encountered
-	 during the Lucas chain is reduced, and so the probability of using
-	 curve addition erroneously. */
-    ec_point_init (Pt, m);
+  else if (plan->parameterization & FULLMONTYTWED)
+    bytecode_mishmash_interpret_ec_mixed_repr (P, plan->bc, m, b);
+    /* input is in Edwards (extended), output is in Montgomery form */
+
+  /* Add prime 2 in the desired power. If a zero residue for the Z-coordinate is
+   * encountered, we backtrack to previous point and stop.
+   * NOTE: This is not as effective as I hoped. It prevents trivial
+   * factorizations only if after processing the odd part of the stage 1
+   * multiplier, the resulting point has power-of-2 order on E_p for all p|N.
+   * If that were to happen, the point probably had that (presumably small on
+   * most E_p) power-of-2 order during the last couple of primes processed in
+   * the precomputed Lucas chain, and then quite likely the Lucas chain
+   * incorrectly used an addition of identical points, causing the Z-coordinate
+   * to become zero, leading to 0 (mod N) before we even get here.  For example,
+   * using 10^6 composites from an RSA155 sieving experiment, without
+   * backtracking we get N as the factor 456 times, with backtracking still 360
+   * times.
+   * TODO: this could probably be fixed by treating 3 separately, too, instead
+   * of putting it in the precomputed Lucas chain. Then the probability that a
+   * point of very small order on all E_p is encountered during the Lucas chain
+   * is reduced, and so the probability of using curve addition erroneously.
+   *
+   * The following code assume P is in Montgomery form.
+   */
+  ec_point_init (Pt, m);
+  ec_point_set (Pt, P, m);
+  for (i = 0; i < plan->exp2; i++)
+  {
+    montgomery_dbl (P, P, m, b);
+#if ECM_BACKTRACKING
+    if (mod_is0 (P->z, m))
+    {
+      ec_point_set (P, Pt, m);
+      bt = 1;
+      break;
+    }
     ec_point_set (Pt, P, m);
-    for (i = 0; i < plan->exp2; i++)
-      {
-	montgomery_dbl (P, P, m, b);
-#if ECM_BACKTRACKING
-	if (mod_is0 (P[0].z, m))
-	  {
-	    ec_point_set (P, Pt, m);
-	    bt = 1;
-	    break;
-	  }
-	ec_point_set (Pt, P, m);
 #endif
-      }
-    mod_gcd (f, P[0].z, m);
   }
-  else if (plan->parameterization == TWED16)
-    {
-      
-      /* a = -1 */
-      mod_init (a, m);
-      mod_set1 (a, m);
-      mod_neg (a, a, m);
-      
-      /* ellE_interpret_bytecode (Q, plan->bc, plan->bc_len, m, a); */
-      
-      ec_point_t Qt;
-      ec_point_init (Qt, m);
-      ec_point_set (Qt, Q, m);
-      for (i = 0; i < plan->exp2; i++)
-	{
-	  edwards_dbl (Q, Q, m, EDW_proj);   // ??? output_type ???
+  mod_gcd (f, P->z, m);
 
-#if ECM_BACKTRACKING
-	  if (mod_is0 (Q[0].x, m))
-	    {
-	      ec_point_set (Q, Qt, m);
-	      bt = 1;
-	      break;
-	    }
-	  ec_point_set (Qt, Q, m);
-#endif
-	}
-      mod_gcd (f, Q[0].x, m);
-
-      ec_point_clear (Qt, m);
-    }
-  
 #if 0
-  printf ("After stage 1, P = (%lu: :%lu), bt = %d, i = %d, exp2 = %d\n", 
-	  mod_get_ul (P->x, m), mod_get_ul (P->z, m), bt, i, plan->exp2);
+  printf ("After stage 1, P = (%lu: :%lu), bt = %d, i = %d, exp2 = %d\n",
+          mod_get_ul (P->x, m), mod_get_ul (P->z, m), bt, i, plan->exp2);
 #endif
-  
-  
-  if (bt == 0 && mod_intcmp_ul(f, 1UL) == 0 && plan->B1 < plan->stage2.B2)
-    {
-      bt = ecm_stage2 (u, P, &(plan->stage2), b, m);
-      mod_gcd (f, u, m);
-    }
-  
+
+  /* Do stage 2 (for P in Montgomery form) */
+  mod_init (u, m);
+  if (bt == 0 && mod_intcmp_ul (f, 1UL) == 0 && plan->B1 < plan->stage2.B2)
+  {
+    bt = ecm_stage2 (u, P, &(plan->stage2), b, m);
+    mod_gcd (f, u, m);
+  }
+
   mod_clear (u, m);
   mod_clear (b, m);
   ec_point_clear (P, m);
   ec_point_clear (Pt, m);
-  
-  if (plan->parameterization & FULLTWED)
-  {
-    mod_clear (a, m);
-    ec_point_clear (Q, m);
-  }
 
   return bt;
 }
@@ -1501,123 +1475,95 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
 
 /* -------------------------------------------------------------------------- */
 
-/* Determine order of a point P on a curve, both defined by the sigma value
-   as in ECM. 
-   If the group order is known to be == r (mod m), this can be supplied in 
+/* Determine order of a point P on a curve, both defined by the parameter value
+   as in ECM.
+   If the group order is known to be == r (mod m), this can be supplied in
    the variables "known_r" and" known_m".
    Looks for i in Hasse interval so that i*P = O, has complexity O(m^(1/4)). */
 
+//TODO parameter is an unsigned long
 unsigned long
-ell_pointorder (const residue_t sigma, const int parameterization, 
-		const unsigned long known_m, const unsigned long known_r,
-		const modulus_t m, const int verbose)
+ell_pointorder (const residue_t parameter,
+                const ec_parameterization_t parameterization,
+                const unsigned long known_m, const unsigned long known_r,
+                const modulus_t m, const int verbose)
 {
   ec_point_t P, Pi, Pg, Q, *baby;
-  residue_t A, x, a, d;
+  residue_t x, a, d;
   unsigned long min, max, i, j, order, cof, p;
   unsigned long giant_step, giant_min, baby_len;
   modint_t tm;
 
   ASSERT (known_r < known_m);
 
+  mod_init (a, m);
+  ec_point_init (P, m);
+
   mod_intinit (tm);
   mod_getmod_int (tm, m);
-  mod_init (A, m);
-  mod_init (x, m);
-  mod_init (a, m);
-  mod_init (d, m);
-  ec_point_init (P, m);
-  ec_point_init (Pi, m);
-  ec_point_init (Pg, m);
 
-  if (parameterization == BRENT12)
-    {
-      if (Brent12_curve_from_sigma (A, x, sigma, m) == 0)
-	return 0;
-    }
-  else if (parameterization == MONTY12)
+  if (parameterization & FULLMONTY)
   {
-    if (Montgomery12_curve_from_k (A, x, mod_get_ul (sigma, m), m) == 0)
-      return 0;
-  }
-  else if (parameterization == MONTY16)
-  {
-    if (Montgomery16_curve_from_k (A, x, mod_get_ul (sigma, m), m) == 0)
-      return 0;
-  }
-  else if (parameterization == TWED16)
+    residue_t A, b;
+    int r = 1;
+
+    mod_init (b, m);
+    mod_init (A, m);
+
+    if (parameterization == BRENT12)
+      r = Brent12_curve_from_sigma (b, P, mod_get_ul (parameter, m), m);
+    else if (parameterization == MONTY12)
+      r = Montgomery12_curve_from_k (b, P, mod_get_ul (parameter, m), m);
+    else if (parameterization == MONTY16)
+      r = Montgomery16_curve_from_k (b, P, mod_get_ul (parameter, m), m);
+
+    if (r)
     {
-      if (Twisted_Edwards16_curve_from_sigma (d, Q, mod_get_ul(sigma, m), m) == 0)
-	{
-	  // Free Q
-	  return 0;
-	}
-      
-      /* We convert the returned twisted Edwards curve E (with a = -1) of the
-	 form -x^2 + y^2 = 1 + dx^2y^2 together with a point Q on E to an
-	 equivalent Montgomety curve M given by: By^2 = x^3 + Ax^2 + x, where A
-	 = 2(a+d)/(a-d) = 2(-1+d)/(-1-d) and a point (x,z) on M, where x =
-	 (1+Q->y)/(1-Q->y).
-	 (B and z are not needed) */
+      montgomery_A_from_b (A, b, m);
 
-      mod_set1 (A, m);        // A = 1
-      mod_neg (A, A, m);      // A = -1
-      mod_set (x, A, m);      // x = -1
-      mod_add (x, x, d, m);   // x = (-1+d)
-      mod_add (x, x, x, m);   // x = 2(-1+d)
-      mod_sub (A, A, d, m);   // A = -1-d
-      mod_inv (A, A, m);      // A = 1/(-1-d)
-      mod_mul (A, A, x, m);   // A = 2(-1+d)/(-1-d)
+      if (verbose >= 2)
+      {
+        /* FIXME need multiple precision print */
+        printf ("%s: Montgomery curve: B * Y^2 = X^3 + %lu * X^2 * Z + X * Z^2 "
+                "(mod %lu)\n%s:   with point: (X::Z) = (%lu::%lu)\n", __func__,
+                mod_get_ul (A, m), mod_intget_ul (tm), __func__,
+                mod_get_ul (P->x, m), mod_get_ul (P->x, m));
+      }
 
-      mod_set1 (a, m);           // a = 1
-      mod_add (a, a, Q->y, m);   // a = (1+Q->y)
-      mod_set1 (x, m);           // x = 1
-      mod_sub (x, x, Q->y, m);   // x = (1-Q->y)
-      mod_inv (x, x, m);         // x = 1/(1-Q->y)
-      mod_mul (x, x, a, m);      // x = (1+Q->y)/(1-Q->y)
+      r = weierstrass_from_montgomery (a, P, A, P, m);
     }
+
+    mod_clear (b, m);
+    mod_clear (A, m);
+
+    if (r == 0)
+    {
+      mod_clear (a, m);
+      ec_point_clear (P, m);
+      mod_intclear (tm);
+      return 0UL;
+    }
+  }
   else
   {
     fprintf (stderr, "ecm: Unknown parameterization\n");
     abort();
   }
-  
-  if (verbose >= 2)
-    {
-      modint_t tA, tx;
-      mod_intinit (tA);
-      mod_intinit (tx);
-      mod_get_int (tA, A, m);
-      mod_get_int (tx, x, m);
-      /* FIXME need multiple precision print */
-      printf ("Curve parameters: A = %lu, x = %ld (mod %ld)\n", 
-              mod_intget_ul(tA), mod_intget_ul(tx), mod_intget_ul(tm)); 
-      mod_intclear (tA);
-      mod_intclear (tx);
-    }
-
-  if (curveW_from_Montgomery (a, P, x, A, m) == 0)
-    return 0UL;
 
   if (verbose >= 2)
-    {
-      modint_t tx1, ty1, ta;
-      mod_intinit (tx1);
-      mod_intinit (ty1);
-      mod_intinit (ta);
-      mod_get_int (tx1, P[0].x, m);
-      mod_get_int (ty1, P[0].y, m);
-      mod_get_int (ta, a, m);
-      /* FIXME need multiple precision print */
-      printf ("Finding order of point (%ld, %ld) on curve "
-              "y^2 = x^3 + %ld * x + b (mod %ld)\n", 
-              mod_intget_ul(tx1), mod_intget_ul(ty1), mod_intget_ul(ta), 
-              mod_intget_ul(tm));
-      mod_intclear (tx1);
-      mod_intclear (ty1);
-      mod_intclear (ta);
-    }
-  
+  {
+    /* FIXME need multiple precision print */
+    printf ("%s: Weierstrass curve: y^2 = x^3 + %lu * x + b (mod %lu)\n"
+            "%s:   with point: (x,y) = (%lu,%lu)\n", __func__,
+            mod_get_ul (a, m), mod_intget_ul (tm), __func__,
+            mod_get_ul (P->x, m), mod_get_ul (P->y, m));
+  }
+
+  mod_init (x, m);
+  mod_init (d, m);
+  ec_point_init (Pi, m);
+  ec_point_init (Pg, m);
+
   /* FIXME deal with multiple precision modulus */
   i = (unsigned long) (2. * sqrt((double) mod_intget_ul(tm)));
   min = mod_intget_ul(tm) - i;
@@ -1627,11 +1573,11 @@ ell_pointorder (const residue_t sigma, const int parameterization,
   giant_step = ceil(sqrt(2.*(double)i / (double) known_m));
   /* Round up to multiple of m */
   giant_step = ((giant_step - 1) / known_m + 1) * known_m;
-  
+
   /* We test Pi +- Pj, where Pi = (giant_min + i*giant_step), i >= 0,
-     and Pj = j*P, 0 <= j <= giant_step / 2. 
-     To ensure we can find all values >= min, ensure 
-     giant_min <= min + giant_step / 2. 
+     and Pj = j*P, 0 <= j <= giant_step / 2.
+     To ensure we can find all values >= min, ensure
+     giant_min <= min + giant_step / 2.
      We also want giant_min == r (mod m) */
   giant_min = ((min + giant_step / 2) / known_m) * known_m + known_r;
   if (giant_min > min + giant_step / 2)
@@ -1639,20 +1585,20 @@ ell_pointorder (const residue_t sigma, const int parameterization,
   if (verbose >= 2)
     printf ("known_m = %lu, known_r = %lu, giant_step = %lu, "
             "giant_min = %lu\n", known_m, known_r, giant_step, giant_min);
-  
+
   baby_len = giant_step / known_m / 2 + 1;
   baby = (ec_point_t *) malloc (baby_len * sizeof (ec_point_t));
   for (i = 0; i < baby_len; i++)
     ec_point_init (baby[i], m);
-  
+
   ec_point_set (Pg, P, m);
   i = known_m;
   if (weierstrass_smul_ui (Pg, i, a, m) == 0) /* Pg = m*P for now */
     goto found_inf;
-  
+
   if (1 < baby_len)
     ec_point_set (baby[1], Pg, m);
-  
+
   if (2 < baby_len)
     {
       if (weierstrass_dbl (Pi, Pg, a, m) == 0)
@@ -1683,7 +1629,7 @@ ell_pointorder (const residue_t sigma, const int parameterization,
   ec_point_set (Pi, P, m);
   if (weierstrass_smul_ui (Pi, i, a, m) == 0)
     goto found_inf;
-  
+
   while (i <= max + giant_step - 1)
     {
       /* Compare x-coordinate with stored baby steps. This makes it
@@ -1693,7 +1639,7 @@ ell_pointorder (const residue_t sigma, const int parameterization,
           {
             if (mod_equal (Pi[0].y, baby[j]->y, m))
               i -= j * known_m; /* Equal, so iP = jP and (i-j)P = 0 */
-            else 
+            else
               {
                 mod_neg (Pi[0].y, Pi[0].y, m);
                 if (mod_equal (Pi[0].y, baby[j]->y, m))
@@ -1712,11 +1658,11 @@ ell_pointorder (const residue_t sigma, const int parameterization,
       if (!weierstrass_add (Pi, Pi, Pg, a, m))
         goto found_inf;
     }
-  
+
   if (i > max)
   {
       fprintf (stderr, "ec_order: Error, no match found for p = %lu, "
-               "min = %lu, max = %lu, giant_step = %lu, giant_min = %lu\n", 
+               "min = %lu, max = %lu, giant_step = %lu, giant_min = %lu\n",
                mod_intget_ul(tm), min, max, giant_step, giant_min);
       abort ();
   }
@@ -1727,24 +1673,24 @@ found_inf:
   if (weierstrass_smul_ui (Pi, i, a, m) != 0)
     {
       modint_t tx1, ty1;
-      mod_intinit (tx1); 
-      mod_intinit (ty1); 
+      mod_intinit (tx1);
+      mod_intinit (ty1);
       mod_get_int (tx1, P[0].x, m);
       mod_get_int (ty1, P[0].y, m);
 #ifndef MODMPZ_MAXBITS
       fprintf (stderr, "ec_order: Error, %ld*(%ld, %ld) (mod %ld) is "
-               "not the point at infinity\n", 
+               "not the point at infinity\n",
                i, tx1[0], ty1[0], tm[0]);
 #endif
-      mod_intclear (tx1); 
-      mod_intclear (ty1); 
+      mod_intclear (tx1);
+      mod_intclear (ty1);
       return 0UL;
     }
-  
+
   /* Ok, now we have some i so that ord(P) | i. Find ord(P).
      We know that ord(P) > 1 since P is not at infinity */
 
-  /* For each prime factor of the order, reduce the exponent of 
+  /* For each prime factor of the order, reduce the exponent of
      that prime factor as far as possible */
 
   cof = order = i;
@@ -1760,7 +1706,7 @@ found_inf:
           }
         ASSERT (cof % p != 0);
 
-        /* Add factors of p again one by one, stopping when we hit 
+        /* Add factors of p again one by one, stopping when we hit
            point at infinity */
         ec_point_set (Pi, P, m);
         if (weierstrass_smul_ui (Pi, order, a, m) != 0)
@@ -1785,22 +1731,21 @@ found_inf:
   if (weierstrass_smul_ui (Pi, order, a, m) != 0)
     {
       modint_t tx1, ty1;
-      mod_intinit (tx1); 
-      mod_intinit (ty1); 
+      mod_intinit (tx1);
+      mod_intinit (ty1);
       mod_get_int (tx1, P[0].x, m);
       mod_get_int (ty1, P[0].y, m);
-      fprintf (stderr, "ec_order: Error, final order %ld is wrong\n", 
+      fprintf (stderr, "ec_order: Error, final order %ld is wrong\n",
                order);
-      mod_intclear (tx1); 
-      mod_intclear (ty1); 
+      mod_intclear (tx1);
+      mod_intclear (ty1);
       abort ();
     }
-  
+
   for (i = 0; i < giant_step; i++)
     ec_point_clear (baby[i], m);
   free (baby);
   baby = NULL;
-  mod_clear (A, m);
   mod_clear (x, m);
   mod_clear (a, m);
   mod_clear (d, m);
@@ -1816,7 +1761,7 @@ found_inf:
 
 /* Count points on curve using the Jacobi symbol. This has complexity O(m). */
 
-unsigned long 
+unsigned long
 ellM_curveorder_jacobi (residue_t A, residue_t x, modulus_t m)
 {
   residue_t t, one;
@@ -1848,7 +1793,7 @@ ellM_curveorder_jacobi (residue_t A, residue_t x, modulus_t m)
       mod_mul (t, t, x, m);
       mod_add (t, t, one, m);
       mod_mul (t, t, x, m);
-      if (bchar == 1) 
+      if (bchar == 1)
 	order = order + (unsigned long) (1L + (long) mod_jacobi (t, m));
       else
 	order = order + (unsigned long) (1L - (long) mod_jacobi (t, m));
@@ -1857,40 +1802,49 @@ ellM_curveorder_jacobi (residue_t A, residue_t x, modulus_t m)
 
   mod_clear (one, m);
   mod_clear (t, m);
-  
+
   return order;
 }
 
-unsigned long 
-ell_curveorder (const unsigned long sigma_par, int parameterization, 
-		const unsigned long m_par)
+unsigned long
+ell_curveorder (const ec_parameterization_t parameterization,
+                const unsigned long parameter, const unsigned long m_par)
 {
-  residue_t sigma, A, X;
+  residue_t b, A;
   modint_t lm;
   modulus_t m;
   unsigned long order;
+  ec_point_t P;
+
+  mod_init_noset0 (b, m);
+  mod_init_noset0 (A, m);
+  ec_point_init (P, m);
 
   mod_intset_ul (lm, m_par);
   mod_initmod_int (m, lm);
-  mod_set_ul (sigma, sigma_par, m);
 
   if (parameterization == BRENT12)
   {
-    if (Brent12_curve_from_sigma (A, X, sigma, m) == 0)
+    if (Brent12_curve_from_sigma (b, P, parameter, m) == 0)
       return 0UL;
+    montgomery_A_from_b (A, b, m);
   }
   else if (parameterization == MONTY12)
   {
-    if (Montgomery12_curve_from_k (A, X, sigma_par, m) == 0)
+    if (Montgomery12_curve_from_k (b, P, parameter, m) == 0)
       return 0UL;
+    montgomery_A_from_b (A, b, m);
   }
   else
   {
     fprintf (stderr, "ec_curveorder: Unknown parameterization\n");
     abort();
   }
-  order = ellM_curveorder_jacobi (A, X, m);
+  order = ellM_curveorder_jacobi (A, P->x, m);
 
+  mod_clear (b, m);
+  mod_clear (A, m);
+  ec_point_clear (P, m);
   return order;
 }
 

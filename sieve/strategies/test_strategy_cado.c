@@ -1008,16 +1008,16 @@ facul_strategy_t* convert_strategy_to_facul_strategy (strategy_t* t, unsigned lo
 		ASSERT(strategy->methods[index_method].plan != NULL);
 		pp1_make_plan(strategy->methods[index_method].plan, B1, B2, 0);
 	      } else if (method == EC_METHOD) {
-		long sigma;
+		unsigned long parameter;
 		if (curve == MONTY16) {
-		  sigma = 1;
+		  parameter = 1;
 		} else
-		  sigma = 4;//2 + rand();
+		  parameter = 4;//2 + rand();
 
 		strategy->methods[index_method].plan = malloc(sizeof(ecm_plan_t));
 		ASSERT(strategy->methods[index_method].plan != NULL);
 		ecm_make_plan(strategy->methods[index_method].plan, B1, B2, curve,
-			      labs(sigma), 0, 0);
+			      labs(parameter), 0, 0);
 	      } else {
 		exit(EXIT_FAILURE);
 	      }
@@ -1036,7 +1036,8 @@ facul_strategy_t* convert_strategy_to_facul_strategy (strategy_t* t, unsigned lo
  */
 static int
 get_index_method (facul_method_t* tab, unsigned int B1, unsigned int B2,
-		  int method, int parameterization, unsigned long sigma)
+                  int method, ec_parameterization_t parameterization,
+                  unsigned long parameter)
 {
   int i = 0;
   while (tab[i].method != 0){
@@ -1069,7 +1070,7 @@ get_index_method (facul_method_t* tab, unsigned int B1, unsigned int B2,
 	  ecm_plan_t* plan = (ecm_plan_t*)tab[i].plan;
 	  if (plan->B1 == B1 && plan->stage2.B2 == B2 &&
 	      plan->parameterization == parameterization
-	      && plan->sigma == sigma)
+	      && plan->parameter == parameter)
 	    break;
 	}
     }
@@ -1129,11 +1130,11 @@ facul_strategies_t* convert_strategy_to_facul_strategies (strategy_t* t, int* r,
 	unsigned long B1 = fm->method[2];
 	unsigned long B2 = fm->method[3];
 	int side = (t->side != NULL)?t->side[i]:0;
-	int sigma = (curve == MONTY16)?1:rand()+2;
+	unsigned long parameter = (curve == MONTY16)?1:rand()+2;
 	//check if the method is already computed!
 	int index_prec_fm = 
 	  get_index_method(strategies->precomputed_methods, B1, B2,
-			   method, curve, sigma);
+			   method, curve, parameter);
 	if ( strategies->precomputed_methods[index_prec_fm].method == 0)
 	  {
 	    /*
@@ -1159,8 +1160,7 @@ facul_strategies_t* convert_strategy_to_facul_strategies (strategy_t* t, int* r,
 	      }
 	    else { //method == EC_METHOD
 	      plan = malloc (sizeof (ecm_plan_t));
-	      ecm_make_plan (plan,
-			     B1, B2, curve, sigma, 1, verbose);
+        ecm_make_plan (plan, B1, B2, curve, parameter, 1, verbose);
 	    }
 	    strategies->precomputed_methods[index_prec_fm].method =method;
 	    strategies->precomputed_methods[index_prec_fm].plan = plan;

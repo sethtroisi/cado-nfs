@@ -22,6 +22,7 @@
 #define edwards_tpl edwards_tpl_mpz
 #define edwards_smul_ui edwards_smul_ui_mpz
 
+#define montgomery_A_from_b montgomery_A_from_b_mpz
 #define montgomery_dbl montgomery_dbl_mpz
 #define montgomery_dadd montgomery_dadd_mpz
 #define montgomery_smul_ui montgomery_smul_ui_mpz
@@ -30,6 +31,7 @@
 
 #define weierstrass_add weierstrass_add_mpz
 #define weierstrass_dbl weierstrass_dbl_mpz
+#define weierstrass_from_montgomery weierstrass_from_montgomery_mpz
 #define weierstrass_smul_ui weierstrass_smul_ui_mpz
 
 #include "ecm.c"

@@ -13,7 +13,7 @@
 
 /* R <- 2 * P for the curve y^2 = x^3 + a*x + b.
 
-   For Weierstrass coordinates. Returns 1 if doubling worked normally, 
+   For Weierstrass coordinates. Returns 1 if doubling worked normally,
    0 if the result is point at infinity.
 */
 static int
@@ -46,7 +46,7 @@ weierstrass_dbl (ec_point_t R, const ec_point_t P,
   mod_mul (v, v, lambda, m);
   mod_sub (R->y, v, P->y, m);
   mod_set (R->x, u, m);
-  
+
   mod_clear (v, m);
   mod_clear (u, m);
   mod_clear (lambda, m);
@@ -56,8 +56,8 @@ weierstrass_dbl (ec_point_t R, const ec_point_t P,
 
 
 /* Adds two points P and Q on the curve y^2 = x^3 + a*x + b
-   in Weierstrass coordinates and puts result in R. 
-   Returns 1 if the addition worked (i.e. the modular inverse existed) 
+   in Weierstrass coordinates and puts result in R.
+   Returns 1 if the addition worked (i.e. the modular inverse existed)
    and 0 otherwise (resulting point is point at infinity) */
 static int
 weierstrass_add (ec_point_t R, const ec_point_t P, const ec_point_t Q,
@@ -78,7 +78,7 @@ weierstrass_add (ec_point_t R, const ec_point_t P, const ec_point_t Q,
          use the ellW_double() function instead */
       if (mod_equal (P->x, Q->x, m) && mod_equal (P->y, Q->y, m))
 	  r = weierstrass_dbl (R, P, a, m);
-      else 
+      else
 	{
 	  /* Or maybe the points are negatives of each other? */
 	  mod_neg (u, P->y, m);
@@ -112,14 +112,70 @@ weierstrass_add (ec_point_t R, const ec_point_t P, const ec_point_t Q,
 }
 
 
+/* Convert the Montgomery curve B*Y^2*Z = X^3 + A*X^2*Z + X*Z^2 with a valid
+ * point Pm into a affine Weierstrass curve y^2 = x^3 + a*x + b with a
+ * valid point Pw.
+ *
+ * Return 1 if it worked, 0 if a modular inverse failed.
+ *
+ * The value of b will not be computed.
+ * a and b can be the same variable.
+ * Pm and Pw can be the same variable.
+ */
+static int
+weierstrass_from_montgomery (residue_t a, ec_point_t Pw, const residue_t A,
+                             ec_point_t Pm, const modulus_t m)
+{
+  residue_t B, one, t, x;
+  int ret;
 
+  mod_init_noset0 (B, m);
+  mod_init_noset0 (one, m);
+  mod_init_noset0 (t, m);
+  mod_init_noset0 (x, m);
+  mod_set1 (one, m);
+
+  ret = mod_inv (t, Pm->z, m);
+  if (ret == 0)
+    fprintf (stderr, "%s: could not invert Z\n", __func__);
+  else
+  {
+    mod_mul (x, Pm->x, t, m); /* x = X/Z */
+    mod_add (B, x, A, m);
+    mod_mul (B, B, x, m);
+    mod_add (B, B, one, m);
+    mod_mul (B, B, x, m); /* B = x^3 + A*x^2 + x */
+
+    /* Now (x,1) is on the curve B*y^2 = x^3 + A*x^2 + x. */
+    ret = mod_inv (B, B, m);
+    if (ret == 0)
+      fprintf (stderr, "%s: could not invert B\n", __func__);
+    else
+    {
+      mod_set (Pw->y, B, m);        /* y = 1/B */
+      mod_div3 (t, A, m);
+      mod_add (Pw->x, x, t, m);
+      mod_mul (Pw->x, Pw->x, B, m); /* x = (X + A/3)/B */
+      mod_mul (a, t, A, m);
+      mod_sub (a, one, a, m);
+      mod_mul (a, a, B, m);
+      mod_mul (a, a, B, m);         /* a = (1 - (A^2)/3)/B^2 */
+    }
+  }
+
+  mod_clear (one, m);
+  mod_clear (B, m);
+  mod_clear (t, m);
+  mod_clear (x, m);
+
+  return ret;
+}
 
 
 /* (x,y) <- e * (x,y) on the curve y^2 = x^3 + a*x + b (mod m) */
-MAYBE_UNUSED 
 static int
-weierstrass_smul_ui (ec_point_t P, const unsigned long e,
-		     const residue_t a, const modulus_t m)
+weierstrass_smul_ui (ec_point_t P, const unsigned long e, const residue_t a,
+                     const modulus_t m)
 {
   unsigned long i;
   ec_point_t T;
@@ -163,8 +219,3 @@ weierstrass_smul_ui (ec_point_t P, const unsigned long e,
 
   return tfinite;
 }
-
-
-
-
-

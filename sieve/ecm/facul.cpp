@@ -390,7 +390,8 @@ facul (mpz_t *factors, const mpz_t N, const facul_strategy_t *strategy)
  */
 static int
 get_index_method (facul_method_t* tab, unsigned int B1, unsigned int B2,
-		  int method, int parameterization, unsigned long sigma)
+                  int method, ec_parameterization_t parameterization,
+                  unsigned long parameter)
 {
   int i = 0;
   while (tab[i].method != 0){
@@ -423,7 +424,7 @@ get_index_method (facul_method_t* tab, unsigned int B1, unsigned int B2,
 	  ecm_plan_t* plan = (ecm_plan_t*)tab[i].plan;
 	  if (plan->B1 == B1 && plan->stage2.B2 == B2 &&
 	      plan->parameterization == parameterization
-	      && plan->sigma == sigma)
+	      && plan->parameter == parameter)
 	    break;
 	}
     }
@@ -471,7 +472,7 @@ process_line (facul_strategies_t* strategies, unsigned int* index_st,
 {
   int index_method = 0; /* this is the index of the current factoring
 			   methods */
-  unsigned int SIGMA[2] = {2,2};
+  unsigned int PARAMETER[2] = {2,2};
   int is_first_brent12[2] = {true, true};
 
   regex_t preg_index, preg_fm;
@@ -506,9 +507,9 @@ process_line (facul_strategies_t* strategies, unsigned int* index_st,
 	  /* changes the current strategy. */
 	  index_st[0] = atoi(res[0]);
 	  index_st[1] = atoi(res[1]);
-	  /* re-init the value of sigma */
-	  SIGMA[0] = 2;
-	  SIGMA[1] = 2;
+	  /* re-init the value of parameter */
+	  PARAMETER[0] = 2;
+	  PARAMETER[1] = 2;
 	  // todo: change it to add it in the parameters of our function.
 	  // maybe unused if you use only one curve B12 by strategy.
 	  is_first_brent12[0] = true;
@@ -543,8 +544,9 @@ process_line (facul_strategies_t* strategies, unsigned int* index_st,
 		{ // zero method
 		  goto next_regex;
 		}
-	      unsigned long sigma = 0;
-	      int curve = 0;
+	      unsigned long parameter = 0;
+	      ec_parameterization_t parameterization = BRENT12;
+        /* set to BRENT12 in order to suppress 'used uninitialized' warning */
 	      int method = 0;
 	      // method
 	      if (strcmp (res[1], "PM1") == 0)
@@ -556,13 +558,12 @@ process_line (facul_strategies_t* strategies, unsigned int* index_st,
 	      else 
 		{
 		  method = EC_METHOD;
-		  // curve
 		  if (strcmp (res[1], "ECM-B12") == 0)
-		    curve = BRENT12;
+		    parameterization = BRENT12;
 		  else if (strcmp (res[1], "ECM-M12") == 0)
-		    curve = MONTY12;
+		    parameterization = MONTY12;
 		  else if (strcmp (res[1], "ECM-M16") == 0)
-		    curve = MONTY16;
+		    parameterization = MONTY16;
 		  else
 		    {
 		      fprintf (stderr,
@@ -570,23 +571,23 @@ process_line (facul_strategies_t* strategies, unsigned int* index_st,
 			       res[1]);
 		      return -1;
 		    }
-		  if (curve == MONTY16)
-		    sigma = 1;
+		  if (parameterization == MONTY16)
+		    parameter = 1;
 		  else
 		    {
-		      if (curve == BRENT12 && is_first_brent12[side])
+		      if (parameterization == BRENT12 && is_first_brent12[side])
 			{
-			  sigma = 11;
+			  parameter = 11;
 			  is_first_brent12[side] = false;
 			}
 		      else
-			sigma = SIGMA[side]++;
+			parameter = PARAMETER[side]++;
 		    }
 		}
 	      // check if the method is already computed
 	      int index_prec_fm = 
 		get_index_method(strategies->precomputed_methods, B1, B2,
-				 method, curve, sigma);
+				 method, parameterization, parameter);
 	      if ( strategies->precomputed_methods[index_prec_fm].method == 0)
 		{
 		  /*
@@ -608,7 +609,7 @@ process_line (facul_strategies_t* strategies, unsigned int* index_st,
 		  else { // method == EC_METHOD
 		    plan = (ecm_plan_t*) malloc (sizeof (ecm_plan_t));
 		    ecm_make_plan ((ecm_plan_t*) plan,
-				   B1, B2, curve, sigma, 1, verbose);
+				   B1, B2, parameterization, parameter, 1, verbose);
 		  }
 		  strategies->precomputed_methods[index_prec_fm].method =method;
 		  strategies->precomputed_methods[index_prec_fm].plan = plan;
@@ -676,7 +677,7 @@ facul_make_default_strategy (int n, const int verbose)
   methods[1].plan = (pp1_plan_t*) malloc (sizeof (pp1_plan_t));
   pp1_make_plan ((pp1_plan_t*) methods[1].plan, 525, 3255, verbose);
 
-  /* run one ECM curve with Montgomery parametrization, B1=105, B2=3255 */
+  /* run one ECM curve with Montgomery parameterization, B1=105, B2=3255 */
   methods[2].method = EC_METHOD;
   methods[2].plan = (ecm_plan_t*) malloc (sizeof (ecm_plan_t));
   ecm_make_plan ((ecm_plan_t*) methods[2].plan, 105, 3255, MONTY12, 2, 1, verbose);
@@ -685,7 +686,8 @@ facul_make_default_strategy (int n, const int verbose)
     {
       methods[3].method = EC_METHOD;
       methods[3].plan = (ecm_plan_t*) malloc (sizeof (ecm_plan_t));
-      ecm_make_plan ((ecm_plan_t*) methods[3].plan, 315, 5355, BRENT12, 11, 1, verbose);
+      ecm_make_plan ((ecm_plan_t*) methods[3].plan, 315, 5355, MONTYTWED12, 1, 1, verbose);
+
     }
 
   /* heuristic strategy where B1 is increased by c*sqrt(B1) at each curve */
@@ -696,7 +698,6 @@ facul_make_default_strategy (int n, const int verbose)
       unsigned int k;
 
       B1 += sqrt (B1);
-      printf ("####42#### %f %u\n", B1, (unsigned int) B1);
       /* The factor 50 was determined experimentally with testbench, to find
 	 factors of 40 bits:
 	 testbench -p -cof 1208925819614629174706189 -strat 549755813888 549755913888

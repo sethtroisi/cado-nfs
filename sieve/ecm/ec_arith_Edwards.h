@@ -6,6 +6,8 @@ static inline void
 edwards_neg (ec_point_t Q, const ec_point_t P, const modulus_t m)
 {
   mod_neg (Q->x, P->x, m);
+  mod_set (Q->y, P->y, m);
+  mod_set (Q->z, P->z, m);
   mod_neg (Q->t, P->t, m);
 }
 
@@ -14,7 +16,7 @@ edwards_neg (ec_point_t Q, const ec_point_t P, const modulus_t m)
 /*     output_flag can be edwards_proj, edwards_ext or montgomery */
 static inline void
 edwards_add (ec_point_t R, const ec_point_t P, const ec_point_t Q,
-	  const modulus_t m, const ec_point_coord_type_t output_type)
+             const modulus_t m, const ec_point_coord_type_t output_type)
 {
   /* The "add-2008-hwcd-4" addition formulas */
   /* Cost: 8M + 8add + 2*2. */
@@ -45,7 +47,7 @@ edwards_add (ec_point_t R, const ec_point_t P, const ec_point_t Q,
   mod_add (t1, Q->y, Q->x, m);     // t1 := (Y2+X2)
   mod_mul (A, t0, t1, m);          // A := (Y1-X1)*(Y2+X2) 
   mod_add (t0, P->y, P->x, m);     // t0 := (X1+Y1)
-  mod_add (t1, Q->y, Q->x, m);     // t1 := (Y2-X2)
+  mod_sub (t1, Q->y, Q->x, m);     // t1 := (Y2-X2)
   mod_mul (B, t0, t1, m);          // B := (Y1+X1)*(Y2-X2)
   mod_mul (C, P->z, Q->t, m);      // C := Z1*T2
   mod_add (C, C, C, m);            // C := 2*Z1*T2
@@ -57,29 +59,29 @@ edwards_add (ec_point_t R, const ec_point_t P, const ec_point_t Q,
   mod_sub (H, D, C, m);            // H := D-C
 
   if (output_type != MONTG)
-    {
-      mod_mul (R->x, E, F, m);     // X3 := E*F
-      mod_mul (R->y, G, H, m);     // Y3 := G*H
-      mod_mul (R->z, F, G, m);     // Z3 := F*G
-      if (output_type == EDW_ext)
-	mod_mul (R->t, E, H, m);   // T3 := E*H
-    }
+  {
+    mod_mul (R->x, E, F, m);     // X3 := E*F
+    mod_mul (R->y, G, H, m);     // Y3 := G*H
+    mod_mul (R->z, F, G, m);     // Z3 := F*G
+    if (output_type == EDW_ext)
+      mod_mul (R->t, E, H, m);   // T3 := E*H
+  }
   else
-    {
+  {
 #ifdef SAFE_EDW_TO_MONTG
-      mod_add (R->x, F, H, m);
-      mod_mul (R->x, R->x, E, m);
-      mod_sub (R->z, F, H, m);
-      mod_mul (R->z, R->z, E, m);
+    mod_add (R->x, F, H, m);
+    mod_mul (R->x, R->x, E, m);
+    mod_sub (R->z, F, H, m);
+    mod_mul (R->z, R->z, E, m);
 #else
-      /* CAUTION! */
-      /* This may produce unstable results */
-      /* But seems to "work" for our purpose */
-      /* TODO: COMMENTS */
-      mod_add (R->x, F, H, m);
-      mod_sub (R->z, F, H, m);
+    /* CAUTION! */
+    /* This may produce unstable results */
+    /* But seems to "work" for our purpose */
+    /* TODO: COMMENTS */
+    mod_add (R->x, F, H, m);
+    mod_sub (R->z, F, H, m);
 #endif
-    }
+  }
   
   mod_clear (t0, m);
   mod_clear (t1, m);
