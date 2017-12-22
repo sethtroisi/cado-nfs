@@ -6,6 +6,9 @@
 #define ellM_curveorder_jacobi ellM_curveorder_jacobi_mpz
 #define ell_curveorder ell_curveorder_mpz
 
+/* The next ones are static so there's no need to rename them, but it's 
+   nice to have these functions distinguishable e.g. in profiler output */
+
 #define ecm_stage2 ecm_stage2_mpz
 
 #define ec_arith ec_arith_mpz
@@ -28,10 +31,19 @@
 #define montgomery_smul_ui montgomery_smul_ui_mpz
 #define bytecode_prac_interpret_ec_montgomery bytecode_prac_interpret_ec_montgomery_mpz
 
-
 #define weierstrass_add weierstrass_add_mpz
 #define weierstrass_dbl weierstrass_dbl_mpz
 #define weierstrass_from_montgomery weierstrass_from_montgomery_mpz
 #define weierstrass_smul_ui weierstrass_smul_ui_mpz
+
+#define ec_parameter_is_valid ec_parameter_is_valid_mpz
+#define ec_parameterization_Brent_Suyama ec_parameterization_Brent_Suyama_mpz
+#define ec_parameterization_Brent_Suyama_is_valid ec_parameterization_Brent_Suyama_is_valid_mpz
+#define ec_parameterization_Montgomery12 ec_parameterization_Montgomery12_mpz
+#define ec_parameterization_Montgomery12_is_valid ec_parameterization_Montgomery12_is_valid_mpz
+#define ec_parameterization_Montgomery16 ec_parameterization_Montgomery16_mpz
+#define ec_parameterization_Montgomery16_is_valid ec_parameterization_Montgomery16_is_valid_mpz
+#define ec_parameterization_Z6 ec_parameterization_Z6_mpz
+#define ec_parameterization_Z6_is_valid ec_parameterization_Z6_is_valid_mpz
 
 #include "ecm.c"

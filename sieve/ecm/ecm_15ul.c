@@ -6,6 +6,8 @@
 #define ellM_curveorder_jacobi ellM_curveorder_jacobi_15ul
 #define ell_curveorder ell_curveorder_15ul
 
+/* The next ones are static so there's no need to rename them, but it's 
+   nice to have these functions distinguishable e.g. in profiler output */
 
 #define ecm_stage2 ecm_stage2_15ul
 
@@ -34,5 +36,14 @@
 #define weierstrass_from_montgomery weierstrass_from_montgomery_15ul
 #define weierstrass_smul_ui weierstrass_smul_ui_15ul
 
+#define ec_parameter_is_valid ec_parameter_is_valid_15ul
+#define ec_parameterization_Brent_Suyama ec_parameterization_Brent_Suyama_15ul
+#define ec_parameterization_Brent_Suyama_is_valid ec_parameterization_Brent_Suyama_is_valid_15ul
+#define ec_parameterization_Montgomery12 ec_parameterization_Montgomery12_15ul
+#define ec_parameterization_Montgomery12_is_valid ec_parameterization_Montgomery12_is_valid_15ul
+#define ec_parameterization_Montgomery16 ec_parameterization_Montgomery16_15ul
+#define ec_parameterization_Montgomery16_is_valid ec_parameterization_Montgomery16_is_valid_15ul
+#define ec_parameterization_Z6 ec_parameterization_Z6_15ul
+#define ec_parameterization_Z6_is_valid ec_parameterization_Z6_is_valid_15ul
 
 #include "ecm.c"

@@ -2,7 +2,6 @@
 #include "modredc_ul_default.h"
 
 #define ecm ecm_ul
-
 #define ell_pointorder ell_pointorder_ul
 #define ellM_curveorder_jacobi ellM_curveorder_jacobi_ul
 #define ell_curveorder ell_curveorder_ul
@@ -37,6 +36,14 @@
 #define weierstrass_from_montgomery weierstrass_from_montgomery_ul
 #define weierstrass_smul_ui weierstrass_smul_ui_ul
 
+#define ec_parameter_is_valid ec_parameter_is_valid_ul
+#define ec_parameterization_Brent_Suyama ec_parameterization_Brent_Suyama_ul
+#define ec_parameterization_Brent_Suyama_is_valid ec_parameterization_Brent_Suyama_is_valid_ul
+#define ec_parameterization_Montgomery12 ec_parameterization_Montgomery12_ul
+#define ec_parameterization_Montgomery12_is_valid ec_parameterization_Montgomery12_is_valid_ul
+#define ec_parameterization_Montgomery16 ec_parameterization_Montgomery16_ul
+#define ec_parameterization_Montgomery16_is_valid ec_parameterization_Montgomery16_is_valid_ul
+#define ec_parameterization_Z6 ec_parameterization_Z6_ul
+#define ec_parameterization_Z6_is_valid ec_parameterization_Z6_is_valid_ul
 
 #include "ecm.c"
-

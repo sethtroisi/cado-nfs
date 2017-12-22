@@ -85,4 +85,4 @@ ec_point_print (ec_point_t P, const ec_point_coord_type_t coord_type)
   }
 }
 
-#endif
+#endif /* _EC_ARITH_COMMON_H_ */

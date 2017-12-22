@@ -112,6 +112,17 @@ void ecm_make_plan (ecm_plan_t *, const unsigned int, const unsigned int,
 
 void ecm_clear_plan (ecm_plan_t *);
 
+int ec_parameter_is_valid_ul (ec_parameterization_t, const unsigned long);
+int ec_parameter_is_valid_15ul (ec_parameterization_t, const unsigned long);
+int ec_parameter_is_valid_2ul2 (ec_parameterization_t, const unsigned long);
+int ec_parameter_is_valid_mpz (ec_parameterization_t, const unsigned long);
+/* In fact the ec_parameter_is_valid_* functions do not use modredc arithmetic,
+ * we can use any of the four.
+ */
+#ifndef ec_parameter_is_valid
+#define ec_parameter_is_valid ec_parameter_is_valid_ul
+#endif
+
 #ifdef __cplusplus
 }
 #endif

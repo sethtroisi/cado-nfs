@@ -1,3 +1,6 @@
+#ifndef _EC_ARITH_WEIERSTRASS_H_
+#define _EC_ARITH_WEIERSTRASS_H_
+
 #include "ec_arith_common.h"
 
 /*
@@ -219,3 +222,5 @@ weierstrass_smul_ui (ec_point_t P, const unsigned long e, const residue_t a,
 
   return tfinite;
 }
+
+#endif /* _EC_ARITH_WEIERSTRASS_H_ */

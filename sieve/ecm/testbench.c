@@ -268,20 +268,13 @@ int main (int argc, char **argv)
       abort();
     }
 
-          if (parameterization == MONTY12 && parameter == 1)
-            {
-              fprintf (stderr, "Parameter 1 does not lead to a valid curve. "
-              "Use parameter > 1 for MONTY12 curves.\n");
-              exit (EXIT_FAILURE);
-            }
-          if (parameterization == MONTY16 && (parameter < 0 || parameter > 1))
-            {
-              fprintf (stderr, "Only parameter 1 for MONTY16 curves so far.\n");
-              exit (EXIT_FAILURE);
-            }
-	  /* FIXME */
-	  /* Only 1 Edwards curve that is fixed for now */
-	  /* No param check necessary */
+    if (!ec_parameter_is_valid (parameterization, parameter))
+    {
+      fprintf (stderr, "Parameter %lu is not valid with parametrization '%s'\n",
+               parameter, argv[1]);
+      exit (EXIT_FAILURE);
+    }
+
 	  strategy->methods[nr_methods].method = EC_METHOD;
 	  strategy->methods[nr_methods].plan = malloc (sizeof (ecm_plan_t));
 	  ASSERT (strategy->methods[nr_methods].plan != NULL);
