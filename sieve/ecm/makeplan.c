@@ -164,8 +164,8 @@ pp1_clear_plan (pp1_plan_t *plan)
 /***************************** ECM ********************************************/
 
 /* Generate bytecode for stage 1, and the parameters for stage 2.
-   The curve used in ECM will be computed using the given 'parametrization' with
-   the given 'parameter' value.
+   The curve used in ECM will be computed using the given 'parameterization'
+   with the given 'parameter' value.
    "extra_primes" controls whether some primes should be added (or left out!)
    on top of the primes and prime powers <= B1, for example to take into
    account the known factors in the group order. */

@@ -36,7 +36,7 @@ The output point must be written in R[1] at the end.
   11111111    End of the MISHMASH bytecode
               R[1] contains the results
               Must be the last byte of the bytecode
-              Cannont be used before
+              Cannot be used before
 
 
 # DBCHAIN block
