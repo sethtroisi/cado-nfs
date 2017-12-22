@@ -11,9 +11,10 @@
  * Constant needed in computation: b = (A+2)/4
  *
  * Implemented functions:
- *   - montgomery_dadd (R:montgomery, P:montgomery, Q:montgomery, D:montgomery)
+ *   - montgomery_dadd (R:MONTGOMERY_xz, P:MONTGOMERY_xz, Q:MONTGOMERY_xz,
+ *                                                              D:MONTGOMERY_xz)
  *        R <- P+Q (where D=P-Q)
- *   - montgomery_dbl (R:montgomery, P:montgomery)
+ *   - montgomery_dbl (R:MONTGOMERY_xz, P:MONTGOMERY_xz)
  *        R <- 2*P
  */
 
@@ -27,7 +28,7 @@ montgomery_A_from_b (residue_t A, const residue_t b, const modulus_t m)
 }
 
 /* Computes Q=2P, with 5 muls (3 muls and 2 squares) and 4 add/sub.
- *    - m : number to factor
+ *    - m : modulus
  *    - b = (A+2)/4 mod m
  * It is permissible to let P and Q use the same memory.
  */

@@ -205,7 +205,7 @@ ec_parameterization_Montgomery12 (residue_t b, ec_point_t P0,
   mod_add (a, a, T->y, m);
   mod_neg (a, a, m);                    /* a = -12 */
 
-  weierstrass_smul_ui (T, k, a, m); // TODO check for failed inv here
+  weierstrass_aff_smul_ui (T, k, a, m); // TODO check for failed inv here
   mod_set (u, T->x, m);
   mod_set (v, T->y, m);
 
@@ -449,7 +449,8 @@ ec_parameterization_Z6 (residue_t b, ec_point_t P0, const unsigned long k,
                         ec_point_coord_type_t coord, const modulus_t m)
 {
   ASSERT_ALWAYS (ec_parameterization_Z6_is_valid (k));
-  ASSERT_ALWAYS (coord == MONTG || coord == EDW_ext || coord == EDW_proj);
+  ASSERT_ALWAYS (coord == MONTGOMERY_xz || coord == TWISTED_EDWARDS_ext
+                                        || coord == TWISTED_EDWARDS_proj);
 
   residue_t a, p, q, alpha, beta, gamma, delta, epsilon, zeta, pm33, pp3, t;
   ec_point_t T;
@@ -475,10 +476,18 @@ ec_parameterization_Z6 (residue_t b, ec_point_t P0, const unsigned long k,
   mod_neg (a, a, m);
   mod_set_ul (T->x, 15UL, m);
   mod_set_ul (T->y, 378UL, m);
+  mod_set1 (T->z, m);
 
-  weierstrass_smul_ui (T, k, a, m); // TODO check for failed inv here
+#if 0
+  weierstrass_aff_smul_ui (T, k, a, m);
   mod_set (p, T->x, m);
   mod_set (q, T->y, m);
+#else
+  weierstrass_proj_smul_ui (T, k, a, m);
+  mod_inv (a, T->z, m); // TODO check for failed inversion
+  mod_mul (p, T->x, a, m);
+  mod_mul (q, T->y, a, m);
+#endif
 
   mod_set_ul (t, 3UL, m);
   mod_add (pp3, p, t, m);                 /* pm3 = p+3 */
@@ -523,7 +532,7 @@ ec_parameterization_Z6 (residue_t b, ec_point_t P0, const unsigned long k,
   mod_mul (zeta, zeta, q, m);
   mod_mul (zeta, zeta, pm33, m);          /* zeta = 2^2*3^6*q*(p-33) */
 
-  if (coord == MONTG)
+  if (coord == MONTGOMERY_xz)
   {
     mod_set_ul (t, 114UL, m);
     mod_add (P0->x, p, t, m);
@@ -554,7 +563,7 @@ ec_parameterization_Z6 (residue_t b, ec_point_t P0, const unsigned long k,
     mod_sqr (P0->z, alpha, m);
     mod_mul (P0->z, P0->z, delta, m);
     mod_mul (P0->z, P0->z, epsilon, m);   /* zE0 = alpha^2*delta*epsilon */
-    if (coord == EDW_ext)
+    if (coord == TWISTED_EDWARDS_ext)
     {
       mod_set_ul (t, 2916UL, m);
       mod_mul (P0->t, t, pm33, m);

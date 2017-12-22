@@ -3,7 +3,7 @@
 
 #include "ec_arith_common.h"
 
-/* #define SAFE_EDW_TO_MONTG */
+/* #define SAFE_TWISTED_EDWARDS_TO_MONTGOMERY */
 
 static inline void
 edwards_neg (ec_point_t Q, const ec_point_t P, const modulus_t m)
@@ -61,17 +61,17 @@ edwards_add (ec_point_t R, const ec_point_t P, const ec_point_t Q,
   mod_add (G, B, A, m);            // G := B+A
   mod_sub (H, D, C, m);            // H := D-C
 
-  if (output_type != MONTG)
+  if (output_type != MONTGOMERY_xz)
   {
     mod_mul (R->x, E, F, m);     // X3 := E*F
     mod_mul (R->y, G, H, m);     // Y3 := G*H
     mod_mul (R->z, F, G, m);     // Z3 := F*G
-    if (output_type == EDW_ext)
+    if (output_type == TWISTED_EDWARDS_ext)
       mod_mul (R->t, E, H, m);   // T3 := E*H
   }
   else
   {
-#ifdef SAFE_EDW_TO_MONTG
+#ifdef SAFE_TWISTED_EDWARDS_TO_MONTGOMERY
     mod_add (R->x, F, H, m);
     mod_mul (R->x, R->x, E, m);
     mod_sub (R->z, F, H, m);
@@ -161,7 +161,7 @@ edwards_dbl (ec_point_t R, const ec_point_t P,
   mod_mul (R->x, E, F, m);             // X3 := E*F
   mod_mul (R->y, G, H, m);             // Y3 := G*H
   mod_mul (R->z, F, G, m);             // Z3 := F*G
-  if (output_type == EDW_ext)
+  if (output_type == TWISTED_EDWARDS_ext)
     mod_mul (R->t, E, H, m);           // T3 := E*H
   
   mod_clear (A, m);
@@ -234,12 +234,12 @@ edwards_tpl (ec_point_t R, const ec_point_t P,
   
   switch (output_type)
     {
-    case EDW_proj :
+    case TWISTED_EDWARDS_proj:
       mod_mul (R->x, xE, F, m);         // X3 := xE*F
       mod_mul (R->y, yH, G, m);         // Y3 := yH*G
       mod_mul (R->z, zF, G, m);         // Z3 := zF*G
       break;
-    case EDW_ext :
+    case TWISTED_EDWARDS_ext:
       mod_mul (zG, P->z, G, m);         // zG := Z1*G
       mod_mul (R->x, xE, zF, m);        // X3 := xE*zF
       mod_mul (R->y, yH, zG, m);        // Y3 := yH*zG
@@ -294,14 +294,14 @@ edwards_smul_ui (ec_point_t R, const ec_point_t P, const unsigned long e,
   
   if (e == 2UL)
     {
-      edwards_dbl (R, P, m, EDW_ext);
+      edwards_dbl (R, P, m, TWISTED_EDWARDS_ext);
       return;
     }
 
   if (e == 4UL)
     {
-      edwards_dbl (R, P, m, EDW_ext);
-      edwards_dbl (R, R, m, EDW_ext);
+      edwards_dbl (R, P, m, TWISTED_EDWARDS_ext);
+      edwards_dbl (R, R, m, TWISTED_EDWARDS_ext);
       return;
     }
 
@@ -321,9 +321,9 @@ edwards_smul_ui (ec_point_t R, const ec_point_t P, const unsigned long e,
   
   while(k-- >= 0)
     {
-      edwards_dbl (T, T, m, EDW_ext);
+      edwards_dbl (T, T, m, TWISTED_EDWARDS_ext);
       if (j & e)
-	edwards_add (T, T, Pe, m, EDW_ext);
+	edwards_add (T, T, Pe, m, TWISTED_EDWARDS_ext);
       j >>= 1;
     }
 

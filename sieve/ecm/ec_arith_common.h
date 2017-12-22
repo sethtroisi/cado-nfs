@@ -3,19 +3,22 @@
 
 /* Types of coordinates */
 typedef enum {
-  AFF,
-  MONTG,
-  EDW_proj,
-  EDW_ext
+  SHORT_WEIERSTRASS_aff,
+  SHORT_WEIERSTRASS_proj,
+  MONTGOMERY_xz,
+  TWISTED_EDWARDS_proj,
+  TWISTED_EDWARDS_ext,
 } ec_point_coord_type_t;
 
 
-/* A point on an elliptic curve */
-/* In affine coordinates (AFF), only x and y are guaranteed */
-/* In Montgomery coordinates (MONTG), only x and z are guaranteed */
-/* In Edwards projective (EDW_proj), only x, y and z are guaranteed */
-/* In Edwards extended (EDW_ext), x, y, z, t are guaranteed */
-  
+/* A point on an elliptic curve:
+ *   The significant coordinates are:
+ *      - x,y for SHORT_WEIERSTRASS_aff
+ *      - x,y,z for SHORT_WEIERSTRASS_proj
+ *      - x,z for MONTGOMERY_xz
+ *      - x,y,z for TWISTED_EDWARDS_proj
+ *      - x,y,z,t for TWISTED_EDWARDS_ext
+ */
 struct ec_point_s
 {
   residue_t x,y,z,t;
@@ -63,25 +66,27 @@ ec_point_swap (ec_point_t Q, ec_point_t P, const modulus_t m)
 
 static inline void
 ec_point_print (ec_point_t P, const ec_point_coord_type_t coord_type)
-  {
+{
   /* FIXME need multiple precision print */
   
   printf ("(%lu", mod_intget_ul(P->x));
-  if (coord_type == MONTG)
+  if (coord_type == MONTGOMERY_xz)
     printf (": %lu)", mod_intget_ul(P->z));
-  else {
+  else
+  {
     printf (": %lu", mod_intget_ul(P->y));
     switch (coord_type)
-      {
-      case EDW_proj :
-	printf (" : %lu", mod_intget_ul(P->z));
-	break;
-      case EDW_ext :
-	printf (" : %lu : %lu", mod_intget_ul(P->t), mod_intget_ul(P->z));
-	break;
+    {
+      case SHORT_WEIERSTRASS_proj: no_break();
+      case TWISTED_EDWARDS_proj:
+        printf (" : %lu)", mod_intget_ul(P->z));
+        break;
+      case TWISTED_EDWARDS_ext:
+        printf (" : %lu : %lu)", mod_intget_ul(P->t), mod_intget_ul(P->z));
+        break;
       default :
-	printf (")\n");
-      }
+        printf (")\n");
+    }
   }
 }
 

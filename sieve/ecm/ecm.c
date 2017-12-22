@@ -68,9 +68,11 @@ bytecode_dbchain_interpret_ec_edwards_internal (bytecode_const bc,
     }
 
     for (uint8_t i = 0; i < pow3; i++)
-      edwards_tpl (R[0], R[0], m, (i+1==pow3+pow2) ? EDW_ext : EDW_proj);
+      edwards_tpl (R[0], R[0], m, (i+1==pow3+pow2) ? TWISTED_EDWARDS_ext :
+                                                          TWISTED_EDWARDS_proj);
     for (uint8_t i = 0; i < pow2; i++)
-      edwards_dbl (R[0], R[0], m, (i+1==pow2) ? EDW_ext : EDW_proj);
+      edwards_dbl (R[0], R[0], m, (i+1==pow2) ? TWISTED_EDWARDS_ext :
+                                                          TWISTED_EDWARDS_proj);
 
     ec_point_coord_type_t output;
     if (f)
@@ -78,12 +80,12 @@ bytecode_dbchain_interpret_ec_edwards_internal (bytecode_const bc,
       uint8_t t;
       bytecode_elt_split_4_4 (&t, NULL, bc[1]);
       if (bc[1] == MISHMASH_FINAL || t == MISHMASH_PRAC_BLOCK)
-        output = MONTG;
+        output = MONTGOMERY_xz;
       else
-        output = EDW_ext;
+        output = TWISTED_EDWARDS_ext;
     }
     else
-      output = EDW_proj;
+      output = TWISTED_EDWARDS_proj;
 
     if (s == 0)
       edwards_add (R[f], R[0], R[n], m, output);
@@ -121,15 +123,18 @@ bytecode_precomp_interpret_ec_edwards_internal (bytecode_const bc,
         bc++;
         bytecode_elt_split_4_4 (&i, &j, *bc);
         if (s == 0)
-          edwards_add (R[k], R[i], R[j], m, a ? EDW_ext : EDW_proj);
+          edwards_add (R[k], R[i], R[j], m, a ? TWISTED_EDWARDS_ext :
+                                                          TWISTED_EDWARDS_proj);
         else
-          edwards_sub (R[k], R[i], R[j], m, a ? EDW_ext : EDW_proj);
+          edwards_sub (R[k], R[i], R[j], m, a ? TWISTED_EDWARDS_ext :
+                                                          TWISTED_EDWARDS_proj);
         break;
       case PRECOMP_OP_DBL:
         bc++;
         pow2 = bytecode_elt_to_uint8 (*bc);
         for (uint8_t i = 0; i < pow2; i++)
-          edwards_dbl (R[0], R[0], m, (i+1==pow2 && a) ? EDW_ext : EDW_proj);
+          edwards_dbl (R[0], R[0], m, (i+1==pow2 && a) ? TWISTED_EDWARDS_ext :
+                                                          TWISTED_EDWARDS_proj);
         if (k > 0)
           ec_point_set (R[k], R[0], m);
         break;
@@ -137,7 +142,8 @@ bytecode_precomp_interpret_ec_edwards_internal (bytecode_const bc,
         bc++;
         pow3 = bytecode_elt_to_uint8 (*bc);
         for (uint8_t i = 0; i < pow3; i++)
-          edwards_tpl (R[0], R[0], m, (i+1==pow3 && a) ? EDW_ext : EDW_proj);
+          edwards_tpl (R[0], R[0], m, (i+1==pow3 && a) ? TWISTED_EDWARDS_ext :
+                                                          TWISTED_EDWARDS_proj);
         if (k > 0)
           ec_point_set (R[k], R[0], m);
         break;
@@ -868,7 +874,7 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
   else if (plan->parameterization == MONTY16)
     r = ec_parameterization_Montgomery16 (b, P, plan->parameter, m);
   else if (plan->parameterization == MONTYTWED12)
-    r = ec_parameterization_Z6 (b, P, plan->parameter, EDW_ext, m);
+    r = ec_parameterization_Z6 (b, P, plan->parameter, TWISTED_EDWARDS_ext, m);
   else
   {
     fprintf (stderr, "%s: unknown parameterization\n", __func__);
@@ -1023,7 +1029,7 @@ ell_pointorder (const residue_t parameter,
                 mod_get_ul (P->x, m), mod_get_ul (P->x, m));
       }
 
-      r = weierstrass_from_montgomery (a, P, A, P, m);
+      r = weierstrass_aff_from_montgomery (a, P, A, P, m);
     }
 
     mod_clear (b, m);
@@ -1086,7 +1092,7 @@ ell_pointorder (const residue_t parameter,
 
   ec_point_set (Pg, P, m);
   i = known_m;
-  if (weierstrass_smul_ui (Pg, i, a, m) == 0) /* Pg = m*P for now */
+  if (weierstrass_aff_smul_ui (Pg, i, a, m) == 0) /* Pg = m*P for now */
     goto found_inf;
 
   if (1 < baby_len)
@@ -1094,7 +1100,7 @@ ell_pointorder (const residue_t parameter,
 
   if (2 < baby_len)
     {
-      if (weierstrass_dbl (Pi, Pg, a, m) == 0)
+      if (weierstrass_aff_dbl (Pi, Pg, a, m) == 0)
         {
           i = 2 * known_m;
           goto found_inf;
@@ -1104,7 +1110,7 @@ ell_pointorder (const residue_t parameter,
 
   for (i = 3; i < baby_len; i++)
     {
-      if (weierstrass_add (Pi, Pi, Pg, a, m) == 0)
+      if (weierstrass_aff_add (Pi, Pi, Pg, m) == 0)
         {
           i *= known_m;
           goto found_inf;
@@ -1115,12 +1121,12 @@ ell_pointorder (const residue_t parameter,
   /* Now compute the giant steps in [giant_min, giant_max] */
   i = giant_step;
   ec_point_set (Pg, P, m);
-  if (weierstrass_smul_ui (Pg, i, a, m) == 0)
+  if (weierstrass_aff_smul_ui (Pg, i, a, m) == 0)
     goto found_inf;
 
   i = giant_min;
   ec_point_set (Pi, P, m);
-  if (weierstrass_smul_ui (Pi, i, a, m) == 0)
+  if (weierstrass_aff_smul_ui (Pi, i, a, m) == 0)
     goto found_inf;
 
   while (i <= max + giant_step - 1)
@@ -1148,7 +1154,7 @@ ell_pointorder (const residue_t parameter,
           }
 
       i += giant_step;
-      if (!weierstrass_add (Pi, Pi, Pg, a, m))
+      if (!weierstrass_aff_add (Pi, Pi, Pg, m))
         goto found_inf;
     }
 
@@ -1163,7 +1169,7 @@ ell_pointorder (const residue_t parameter,
 found_inf:
   /* Check that i is a multiple of the order */
   ec_point_set (Pi, P, m);
-  if (weierstrass_smul_ui (Pi, i, a, m) != 0)
+  if (weierstrass_aff_smul_ui (Pi, i, a, m) != 0)
     {
       modint_t tx1, ty1;
       mod_intinit (tx1);
@@ -1202,10 +1208,10 @@ found_inf:
         /* Add factors of p again one by one, stopping when we hit
            point at infinity */
         ec_point_set (Pi, P, m);
-        if (weierstrass_smul_ui (Pi, order, a, m) != 0)
+        if (weierstrass_aff_smul_ui (Pi, order, a, m) != 0)
           {
             order *= p;
-            while (weierstrass_smul_ui (Pi, p, a, m) != 0)
+            while (weierstrass_aff_smul_ui (Pi, p, a, m) != 0)
               order *= p;
           }
       }
@@ -1214,14 +1220,14 @@ found_inf:
     {
       ec_point_set (Pi, P, m);
       ASSERT (order % cof == 0);
-      if (weierstrass_smul_ui (Pi, order / cof, a, m) == 0)
+      if (weierstrass_aff_smul_ui (Pi, order / cof, a, m) == 0)
         order /= cof;
     }
 
 
   /* One last check that order divides real order */
   ec_point_set (Pi, P, m);
-  if (weierstrass_smul_ui (Pi, order, a, m) != 0)
+  if (weierstrass_aff_smul_ui (Pi, order, a, m) != 0)
     {
       modint_t tx1, ty1;
       mod_intinit (tx1);
