@@ -345,10 +345,10 @@ sieve/bucket.hpp
 sieve/iqsort.h
 sieve/ecm/CMakeLists.txt
 sieve/ecm/Makefile
-sieve/ecm/addchain_bc.c
-sieve/ecm/addchain_bc.h
-sieve/ecm/bytecoder.c
-sieve/ecm/bytecoder.h
+sieve/ecm/README.bytecode
+sieve/ecm/bytecode.c
+sieve/ecm/bytecode.h
+sieve/ecm/bytecode_mishmash_B1_data.h
 sieve/ecm/ecm.c
 sieve/ecm/facul_ecm.h
 sieve/ecm/ecm_15ul.c
@@ -359,6 +359,7 @@ sieve/ecm/ec_arith_common.h
 sieve/ecm/ec_arith_Edwards.h
 sieve/ecm/ec_arith_Montgomery.h
 sieve/ecm/ec_arith_Weierstrass.h
+sieve/ecm/ec_parameterization.h
 sieve/ecm/facul.cpp
 sieve/ecm/facul.h
 sieve/ecm/facul_doit.c
@@ -380,8 +381,6 @@ sieve/ecm/pp1_15ul.c
 sieve/ecm/pp1_2ul2.c
 sieve/ecm/pp1_mpz.c
 sieve/ecm/pp1_ul.c
-sieve/ecm/prac_bc.c
-sieve/ecm/prac_bc.h
 sieve/ecm/stage2.c
 sieve/ecm/stage2.h
 sieve/ecm/testbench.c
