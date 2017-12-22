@@ -116,7 +116,7 @@ int main (int argc, const char **argv)
     prac_cost_t prac_cost;
     prac_cost.dbl = (double) random_uint64 () / 0x1p60;
     prac_cost.dadd = (double) random_uint64 () / 0x1p60;
-    printf ("MISHMAP PRAC cost: dbl = %f; dadd = %f\n", prac_cost.dbl, prac_cost.dadd);
+    printf ("MISHMASH PRAC cost: dbl = %f; dadd = %f\n", prac_cost.dbl, prac_cost.dadd);
     mishmash_cost_t cost = { .dbchain = &dbchain_cost, .precomp = &precomp_cost,
                              .prac = &prac_cost };
 
