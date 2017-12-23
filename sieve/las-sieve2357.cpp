@@ -50,25 +50,6 @@ static SIMDTYPE _and(SIMDTYPE, SIMDTYPE);
 template <typename SIMDTYPE>
 static SIMDTYPE loadu(const SIMDTYPE *);
 
-/* This class defines constants of type SIMDTYPE, used as a mask for sieving
-   patterns, depending on template parameters. These are prefixed by zero-
-   valued entries so that a shifted mask can be read by an (unaligned)
-   memory access. E.g., for a SIMD type of 8 one-byte elements with STRIDE=3,
-   the constants will contain, in order of increasing memory address, the
-   values 0, 0, 0, 0, 0, 0, 0, 0,
-   0xff, 0, 0, 0xff, 0, 0, 0xff, 0, 0 */
-template<typename SIMDTYPE, typename ELEMTYPE, unsigned int STRIDE>
-class patterns {
-public:
-    static const SIMDTYPE pattern[2];
-
-    static SIMDTYPE
-    get_shifted_mask(const fbprime_t shift) {
-        const ELEMTYPE * p = (const ELEMTYPE *)(&pattern[1]) - shift;
-        return loadu<SIMDTYPE>((const SIMDTYPE *) p);
-   }
-};
-
 template<>
 inline unsigned long ATTRIBUTE((__always_inline__, __artificial__))
 adds<unsigned long, unsigned char>(const unsigned long a, const unsigned long b)
@@ -113,100 +94,23 @@ loadu(const T *p)
   return *p;
 }
 
-/* Here come a crapload of magic constants to set up the patterns.
-   Maybe there is a way to have the compiler generate them rather than
-   defining each one individually. */
-#if defined(CADO_LITTLE_ENDIAN)
-template <>
-const uint32_t patterns<uint32_t, unsigned char, 2>::pattern[2] = {
-    0, UINT32_C(0x00ff00ff)
-};
-template <>
-const uint32_t patterns<uint32_t, unsigned char, 4>::pattern[2] = {
-    0, UINT32_C(0x000000ff)
-};
-template <>
-const uint32_t patterns<uint32_t, unsigned char, 3>::pattern[2] = {
-    0, UINT32_C(0xff0000ff)
-};
-template <>
-const uint32_t patterns<uint32_t, unsigned char, 5>::pattern[2] = {
-    0, UINT32_C(0x000000ff)
-};
-template <>
-const uint32_t patterns<uint32_t, unsigned char, 7>::pattern[2] = {
-    0, UINT32_C(0x000000ff)
-};
-template <>
-const uint64_t patterns<uint64_t, unsigned char, 2>::pattern[2] = {
-    0, UINT64_C(0x00ff00ff00ff00ff)
-};
-template <>
-const uint64_t patterns<uint64_t, unsigned char, 4>::pattern[2] = {
-    0, UINT64_C(0x000000ff000000ff)
-};
-template <>
-const uint64_t patterns<uint64_t, unsigned char, 8>::pattern[2] = {
-    0, UINT64_C(0x00000000000000ff)
-};
-template <>
-const uint64_t patterns<uint64_t, unsigned char, 3>::pattern[2] = {
-    0, UINT64_C(0x00ff0000ff0000ff)
-};
-template <>
-const uint64_t patterns<uint64_t, unsigned char, 5>::pattern[2] = {
-    0, UINT64_C(0x0000ff00000000ff)
-};
-template <>
-const uint64_t patterns<uint64_t, unsigned char, 7>::pattern[2] = {
-    0, UINT64_C(0xff000000000000ff)
-};
-#else
-template <>
-const uint32_t patterns<uint32_t, unsigned char, 2>::pattern[2] = {
-    0, UINT32_C(0xff00ff00)
-};
-template <>
-const uint32_t patterns<uint32_t, unsigned char, 4>::pattern[2] = {
-    0, UINT32_C(0xff000000)
-};
-template <>
-const uint32_t patterns<uint32_t, unsigned char, 3>::pattern[2] = {
-    0, UINT32_C(0xff0000ff)
-};
-template <>
-const uint32_t patterns<uint32_t, unsigned char, 5>::pattern[2] = {
-    0, UINT32_C(0xff000000)
-};
-template <>
-const uint32_t patterns<uint32_t, unsigned char, 7>::pattern[2] = {
-    0, UINT32_C(0xff000000)
-};
-template <>
-const uint64_t patterns<uint64_t, unsigned char, 2>::pattern[2] = {
-    0, UINT64_C(0xff00ff00ff00ff00)
-};
-template <>
-const uint64_t patterns<uint64_t, unsigned char, 4>::pattern[2] = {
-    0, UINT64_C(0xff000000ff000000)
-};
-template <>
-const uint64_t patterns<uint64_t, unsigned char, 8>::pattern[2] = {
-    0, UINT64_C(0xff00000000000000)
-};
-template <>
-const uint64_t patterns<uint64_t, unsigned char, 3>::pattern[2] = {
-    0, UINT64_C(0xff0000ff0000ff00)
-};
-template <>
-const uint64_t patterns<uint64_t, unsigned char, 5>::pattern[2] = {
-    0, UINT64_C(0xff00000000ff0000)
-};
-template <>
-const uint64_t patterns<uint64_t, unsigned char, 7>::pattern[2] = {
-    0, UINT64_C(0xff000000000000ff)
-};
-#endif
+static const unsigned char ff = ~(unsigned char)0;
+static const unsigned char pattern2[64] =  {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
+                                            ff, 0, ff, 0, ff, 0, ff, 0, ff, 0, ff, 0, ff, 0, ff, 0, ff, 0, ff, 0, ff, 0, ff, 0, ff, 0, ff, 0, ff, 0, ff, 0};
+static const unsigned char pattern4[64] =  {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
+                                            ff, 0, 0, 0, ff, 0, 0, 0, ff, 0, 0, 0, ff, 0, 0, 0, ff, 0, 0, 0, ff, 0, 0, 0, ff, 0, 0, 0, ff, 0, 0, 0};
+static const unsigned char pattern8[64] =  {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
+                                            ff, 0, 0, 0, 0, 0, 0, 0, ff, 0, 0, 0, 0, 0, 0, 0, ff, 0, 0, 0, 0, 0, 0, 0, ff, 0, 0, 0, 0, 0, 0, 0};
+static const unsigned char pattern16[64] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
+                                            ff, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, ff, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+static const unsigned char pattern32[64] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
+                                            ff, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+static const unsigned char pattern3[64] =  {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
+                                            ff, 0, 0, ff, 0, 0, ff, 0, 0, ff, 0, 0, ff, 0, 0, ff, 0, 0, ff, 0, 0, ff, 0, 0, ff, 0, 0, ff, 0, 0, ff, 0};
+static const unsigned char pattern5[64] =  {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
+                                            ff, 0, 0, 0, 0, ff, 0, 0, 0, 0, ff, 0, 0, 0, 0, ff, 0, 0, 0, 0, ff, 0, 0, 0, 0, ff, 0, 0, 0, 0, ff, 0};
+static const unsigned char pattern7[64] =  {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
+                                            ff, 0, 0, 0, 0, 0, 0, ff, 0, 0, 0, 0, 0, 0, ff, 0, 0, 0, 0, 0, 0, ff, 0, 0, 0, 0, 0, 0, ff, 0, 0, 0};
 
 #ifdef HAVE_SSSE3
 
@@ -244,43 +148,6 @@ loadu<__m128i>(const __m128i *p)
 {
   return _mm_loadu_si128(p);
 }
-
-static const unsigned char ff = ~(unsigned char)0;
-template <>
-const __m128i patterns<__m128i, unsigned char, 2>::pattern[2] = {
-        _mm_set1_epi8(0),
-        _mm_setr_epi8(ff, 0, ff, 0, ff, 0, ff, 0, ff, 0, ff, 0, ff, 0, ff, 0)
-};
-template <>
-const __m128i patterns<__m128i, unsigned char, 4>::pattern[2] = {
-        _mm_set1_epi8(0),
-        _mm_setr_epi8(ff, 0, 0, 0, ff, 0, 0, 0, ff, 0, 0, 0, ff, 0, 0, 0)
-};
-template <>
-const __m128i patterns<__m128i, unsigned char, 8>::pattern[2] = {
-        _mm_set1_epi8(0),
-        _mm_setr_epi8(ff, 0, 0, 0, 0, 0, 0, 0, ff, 0, 0, 0, 0, 0, 0, 0)
-};
-template <>
-const __m128i patterns<__m128i, unsigned char, 16>::pattern[2] = {
-        _mm_set1_epi8(0),
-        _mm_setr_epi8(ff, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
-};
-template <>
-const __m128i patterns<__m128i, unsigned char, 3>::pattern[2] = {
-        _mm_set1_epi8(0),
-        _mm_setr_epi8(ff, 0, 0, ff, 0, 0, ff, 0, 0, ff, 0, 0, ff, 0, 0, ff)
-};
-template <>
-const __m128i patterns<__m128i, unsigned char, 5>::pattern[2] = {
-        _mm_set1_epi8(0),
-        _mm_setr_epi8(ff, 0, 0, 0, 0, ff, 0, 0, 0, 0, ff, 0, 0, 0, 0, ff)
-};
-template <>
-const __m128i patterns<__m128i, unsigned char, 7>::pattern[2] = {
-        _mm_set1_epi8(0),
-        _mm_setr_epi8(ff, 0, 0, 0, 0, 0, 0, ff, 0, 0, 0, 0, 0, 0, ff, 0)
-};
 #endif
 
 #ifdef HAVE_AVX2
@@ -320,55 +187,37 @@ loadu<__m256i>(const __m256i *p)
 {
   return _mm256_loadu_si256(p);
 }
-
-template <>
-const __m256i patterns<__m256i, unsigned char, 2>::pattern[2] = {
-        _mm256_set1_epi8(0),
-        _mm256_setr_epi8(ff, 0, ff, 0, ff, 0, ff, 0, ff, 0, ff, 0, ff, 0, ff, 0, ff, 0, ff, 0, ff, 0, ff, 0, ff, 0, ff, 0, ff, 0, ff, 0)
-};
-template <>
-const __m256i patterns<__m256i, unsigned char, 4>::pattern[2] = {
-        _mm256_set1_epi8(0),
-        _mm256_setr_epi8(ff, 0, 0, 0, ff, 0, 0, 0, ff, 0, 0, 0, ff, 0, 0, 0, ff, 0, 0, 0, ff, 0, 0, 0, ff, 0, 0, 0, ff, 0, 0, 0)
-};
-template <>
-const __m256i patterns<__m256i, unsigned char, 8>::pattern[2] = {
-        _mm256_set1_epi8(0),
-        _mm256_setr_epi8(ff, 0, 0, 0, 0, 0, 0, 0, ff, 0, 0, 0, 0, 0, 0, 0, ff, 0, 0, 0, 0, 0, 0, 0, ff, 0, 0, 0, 0, 0, 0, 0)
-};
-template <>
-const __m256i patterns<__m256i, unsigned char, 16>::pattern[2] = {
-        _mm256_set1_epi8(0),
-        _mm256_setr_epi8(ff, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, ff, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
-};
-template <>
-const __m256i patterns<__m256i, unsigned char, 32>::pattern[2] = {
-        _mm256_set1_epi8(0),
-        _mm256_setr_epi8(ff, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
-};
-template <>
-const __m256i patterns<__m256i, unsigned char, 3>::pattern[2] = {
-    _mm256_set1_epi8(0),
-    _mm256_setr_epi8(ff, 0, 0, ff, 0, 0, ff, 0, 0, ff, 0, 0, ff, 0, 0, ff, 0, 0, ff, 0, 0, ff, 0, 0, ff, 0, 0, ff, 0, 0, ff, 0)
-};
-template <>
-const __m256i patterns<__m256i, unsigned char, 5>::pattern[2] = {
-    _mm256_set1_epi8(0),
-    _mm256_setr_epi8(ff, 0, 0, 0, 0, ff, 0, 0, 0, 0, ff, 0, 0, 0, 0, ff, 0, 0, 0, 0, ff, 0, 0, 0, 0, ff, 0, 0, 0, 0, ff, 0)
-};
-template <>
-const __m256i patterns<__m256i, unsigned char, 7>::pattern[2] = {
-    _mm256_set1_epi8(0),
-    _mm256_setr_epi8(ff, 0, 0, 0, 0, 0, 0, ff, 0, 0, 0, 0, 0, 0, ff, 0, 0, 0, 0, 0, 0, ff, 0, 0, 0, 0, 0, 0, ff, 0, 0, 0)
-};
 #endif
+
+template <typename SIMDTYPE, typename ELEMTYPE, unsigned int STRIDE>
+static inline const ELEMTYPE *get_pattern() {
+    switch (STRIDE) {
+        case 2: return pattern2;
+        case 4: return pattern4;
+        case 8: return pattern8;
+        case 16: return pattern16;
+        case 32: return pattern32;
+        case 3: return pattern3;
+        case 5: return pattern5;
+        case 7: return pattern7;
+        default: abort();
+    }
+}
+
+template <typename SIMDTYPE, typename ELEMTYPE, unsigned int STRIDE>
+static inline SIMDTYPE
+get_shifted_pattern(const fbprime_t shift) {
+    const ELEMTYPE * pattern = get_pattern<SIMDTYPE, ELEMTYPE, STRIDE>();
+    const ELEMTYPE * p = &pattern[32 - shift];
+    return loadu<SIMDTYPE>((const SIMDTYPE *) p);
+}
 
 template <typename SIMDTYPE, typename ELEMTYPE, unsigned int STRIDE>
 static inline SIMDTYPE
 get_shifted_pattern(const fbprime_t offset, ELEMTYPE elem)
 {
-    const SIMDTYPE mask = patterns<SIMDTYPE, ELEMTYPE, STRIDE>::get_shifted_mask(offset);
-    return _and<SIMDTYPE, ELEMTYPE>(mask, set1<SIMDTYPE, ELEMTYPE>(elem));
+    const SIMDTYPE shifted_pattern = get_shifted_pattern<SIMDTYPE, ELEMTYPE, STRIDE>(offset);
+    return _and<SIMDTYPE, ELEMTYPE>(shifted_pattern, set1<SIMDTYPE, ELEMTYPE>(elem));
 }
 
 template <typename SIMDTYPE, typename ELEMTYPE, unsigned int STRIDE>
