@@ -159,7 +159,8 @@ int main(int argc, const char **argv)
 #ifdef DO_TIMING
   init_timing();
 #endif
-  ok &= test<unsigned long, unsigned char>(iter, arraysize);
+  ok &= test<uint32_t, unsigned char>(iter, arraysize);
+  ok &= test<uint64_t, unsigned char>(iter, arraysize);
 #ifdef HAVE_SSSE3
   ok &= test<__m128i, unsigned char>(iter, arraysize);
 #endif

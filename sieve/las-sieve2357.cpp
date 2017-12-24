@@ -50,33 +50,41 @@ static SIMDTYPE _and(SIMDTYPE, SIMDTYPE);
 template <typename SIMDTYPE>
 static SIMDTYPE loadu(const SIMDTYPE *);
 
-template<>
-inline unsigned long ATTRIBUTE((__always_inline__, __artificial__))
-adds<unsigned long, unsigned char>(const unsigned long a, const unsigned long b)
+template<typename SIMDTYPE, typename ELEMTYPE>
+inline SIMDTYPE ATTRIBUTE((__always_inline__, __artificial__))
+adds(const SIMDTYPE a, const SIMDTYPE b)
 {
   return a + b; /* WARNING, we assume no carry between elements here! */
 }
 
-template<>
-inline unsigned long ATTRIBUTE((__always_inline__, __artificial__))
-set0<unsigned long, unsigned char>()
+template<typename SIMDTYPE, typename ELEMTYPE>
+inline SIMDTYPE ATTRIBUTE((__always_inline__, __artificial__))
+set0()
 {
-  return 0UL;
+  return 0;
 }
 
 template<typename SIMDTYPE, typename ELEMTYPE>
-inline SIMDTYPE ATTRIBUTE((__always_inline__, __artificial__))
-set1(const ELEMTYPE c)
+static SIMDTYPE set1(const ELEMTYPE);
+
+template<>
+inline uint32_t ATTRIBUTE((__always_inline__, __artificial__))
+set1<uint32_t, uint8_t>(const uint8_t c)
 {
-  SIMDTYPE r = (SIMDTYPE) c;
-  if (sizeof(SIMDTYPE) > sizeof(ELEMTYPE))
-      r += r << (8*sizeof(ELEMTYPE));
-  if (sizeof(SIMDTYPE) > 2*sizeof(ELEMTYPE))
-      r += r << (2*8*sizeof(ELEMTYPE));
-  if (sizeof(SIMDTYPE) > 4*sizeof(ELEMTYPE))
-      r += r << (4*8*sizeof(ELEMTYPE));
-  if (sizeof(SIMDTYPE) > 8*sizeof(ELEMTYPE))
-      r += r << (8*8*sizeof(ELEMTYPE));
+  uint32_t r = (uint32_t) c;
+  r += r << 8;
+  r += r << 16;
+  return r;
+}
+
+template<>
+inline uint64_t ATTRIBUTE((__always_inline__, __artificial__))
+set1<uint64_t, uint8_t>(const uint8_t c)
+{
+  uint64_t r = (uint32_t) c;
+  r += r << 8;
+  r += r << 16;
+  r += r << 32;
   return r;
 }
 
@@ -94,50 +102,50 @@ loadu(const T *p)
   return *p;
 }
 
-static const unsigned char ff = ~(unsigned char)0;
-static const unsigned char pattern2[64] =  {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-                                            ff, 0, ff, 0, ff, 0, ff, 0, ff, 0, ff, 0, ff, 0, ff, 0, ff, 0, ff, 0, ff, 0, ff, 0, ff, 0, ff, 0, ff, 0, ff, 0};
-static const unsigned char pattern4[64] =  {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-                                            ff, 0, 0, 0, ff, 0, 0, 0, ff, 0, 0, 0, ff, 0, 0, 0, ff, 0, 0, 0, ff, 0, 0, 0, ff, 0, 0, 0, ff, 0, 0, 0};
-static const unsigned char pattern8[64] =  {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-                                            ff, 0, 0, 0, 0, 0, 0, 0, ff, 0, 0, 0, 0, 0, 0, 0, ff, 0, 0, 0, 0, 0, 0, 0, ff, 0, 0, 0, 0, 0, 0, 0};
-static const unsigned char pattern16[64] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-                                            ff, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, ff, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-static const unsigned char pattern32[64] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-                                            ff, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-static const unsigned char pattern3[64] =  {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-                                            ff, 0, 0, ff, 0, 0, ff, 0, 0, ff, 0, 0, ff, 0, 0, ff, 0, 0, ff, 0, 0, ff, 0, 0, ff, 0, 0, ff, 0, 0, ff, 0};
-static const unsigned char pattern5[64] =  {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-                                            ff, 0, 0, 0, 0, ff, 0, 0, 0, 0, ff, 0, 0, 0, 0, ff, 0, 0, 0, 0, ff, 0, 0, 0, 0, ff, 0, 0, 0, 0, ff, 0};
-static const unsigned char pattern7[64] =  {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-                                            ff, 0, 0, 0, 0, 0, 0, ff, 0, 0, 0, 0, 0, 0, ff, 0, 0, 0, 0, 0, 0, ff, 0, 0, 0, 0, 0, 0, ff, 0, 0, 0};
+static const uint8_t ff = ~(uint8_t)0;
+static const uint8_t mask2[64] =  {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                   ff, 0, ff, 0, ff, 0, ff, 0, ff, 0, ff, 0, ff, 0, ff, 0, ff, 0, ff, 0, ff, 0, ff, 0, ff, 0, ff, 0, ff, 0, ff, 0};
+static const uint8_t mask4[64] =  {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                   ff, 0, 0, 0, ff, 0, 0, 0, ff, 0, 0, 0, ff, 0, 0, 0, ff, 0, 0, 0, ff, 0, 0, 0, ff, 0, 0, 0, ff, 0, 0, 0};
+static const uint8_t mask8[64] =  {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                   ff, 0, 0, 0, 0, 0, 0, 0, ff, 0, 0, 0, 0, 0, 0, 0, ff, 0, 0, 0, 0, 0, 0, 0, ff, 0, 0, 0, 0, 0, 0, 0};
+static const uint8_t mask16[64] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                   ff, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, ff, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+static const uint8_t mask32[64] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                   ff, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+static const uint8_t mask3[64] =  {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                   ff, 0, 0, ff, 0, 0, ff, 0, 0, ff, 0, 0, ff, 0, 0, ff, 0, 0, ff, 0, 0, ff, 0, 0, ff, 0, 0, ff, 0, 0, ff, 0};
+static const uint8_t mask5[64] =  {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                   ff, 0, 0, 0, 0, ff, 0, 0, 0, 0, ff, 0, 0, 0, 0, ff, 0, 0, 0, 0, ff, 0, 0, 0, 0, ff, 0, 0, 0, 0, ff, 0};
+static const uint8_t mask7[64] =  {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                   ff, 0, 0, 0, 0, 0, 0, ff, 0, 0, 0, 0, 0, 0, ff, 0, 0, 0, 0, 0, 0, ff, 0, 0, 0, 0, 0, 0, ff, 0, 0, 0};
 
 #ifdef HAVE_SSSE3
 
 template<>
 inline __m128i ATTRIBUTE((__always_inline__, __artificial__))
-set0<__m128i, unsigned char>()
+set0<__m128i, uint8_t>()
 {
   return _mm_setzero_si128 ();
 }
 
 template<>
 inline __m128i ATTRIBUTE((__always_inline__, __artificial__))
-set1<__m128i, unsigned char>(const unsigned char c)
+set1<__m128i, uint8_t>(const uint8_t c)
 {
   return _mm_set1_epi8(c);
 }
 
 template<>
 inline __m128i ATTRIBUTE((__always_inline__, __artificial__))
-adds<__m128i, unsigned char>(const __m128i a, const __m128i b)
+adds<__m128i, uint8_t>(const __m128i a, const __m128i b)
 {
   return _mm_adds_epu8(a, b);
 }
 
 template<>
 inline __m128i ATTRIBUTE((__always_inline__, __artificial__))
-_and<__m128i, unsigned char>(const __m128i a, const __m128i b)
+_and<__m128i, uint8_t>(const __m128i a, const __m128i b)
 {
   return _mm_and_si128(a, b);
 }
@@ -154,14 +162,14 @@ loadu<__m128i>(const __m128i *p)
 
 template<>
 inline __m256i ATTRIBUTE((__always_inline__, __artificial__))
-set0<__m256i, unsigned char>()
+set0<__m256i, uint8_t>()
 {
   return _mm256_setzero_si256 ();
 }
 
 template<>
 inline __m256i ATTRIBUTE((__always_inline__, __artificial__))
-set1<__m256i, unsigned char>(const unsigned char c)
+set1<__m256i, uint8_t>(const uint8_t c)
 {
   __m128i t = _mm_cvtsi64x_si128(c);
   return _mm256_broadcastb_epi8(t);
@@ -169,14 +177,14 @@ set1<__m256i, unsigned char>(const unsigned char c)
 
 template<>
 inline __m256i ATTRIBUTE((__always_inline__, __artificial__))
-adds<__m256i, unsigned char>(const __m256i a, const __m256i b)
+adds<__m256i, uint8_t>(const __m256i a, const __m256i b)
 {
   return _mm256_adds_epu8(a, b);
 }
 
 template<>
 inline __m256i ATTRIBUTE((__always_inline__, __artificial__))
-_and<__m256i, unsigned char>(const __m256i a, const __m256i b)
+_and<__m256i, uint8_t>(const __m256i a, const __m256i b)
 {
   return _mm256_and_si256(a, b);
 }
@@ -189,44 +197,51 @@ loadu<__m256i>(const __m256i *p)
 }
 #endif
 
+/* A demultiplexer that returns the correct mask array for a given "STRIDE"
+   value */
 template <typename SIMDTYPE, typename ELEMTYPE, unsigned int STRIDE>
-static inline const ELEMTYPE *get_pattern() {
+static inline const ELEMTYPE *get_mask() {
     switch (STRIDE) {
-        case 2: return pattern2;
-        case 4: return pattern4;
-        case 8: return pattern8;
-        case 16: return pattern16;
-        case 32: return pattern32;
-        case 3: return pattern3;
-        case 5: return pattern5;
-        case 7: return pattern7;
+        case 2: return mask2;
+        case 4: return mask4;
+        case 8: return mask8;
+        case 16: return mask16;
+        case 32: return mask32;
+        case 3: return mask3;
+        case 5: return mask5;
+        case 7: return mask7;
         default: abort();
     }
 }
 
+/* Return a mask of stride "STRIDE", shifted by "shift", via an unaligned
+   memory read */
 template <typename SIMDTYPE, typename ELEMTYPE, unsigned int STRIDE>
 static inline SIMDTYPE
-get_shifted_pattern(const fbprime_t shift) {
-    const ELEMTYPE * pattern = get_pattern<SIMDTYPE, ELEMTYPE, STRIDE>();
-    const ELEMTYPE * p = &pattern[32 - shift];
+get_shifted_mask(const fbprime_t shift)
+{
+    const ELEMTYPE * mask = get_mask<SIMDTYPE, ELEMTYPE, STRIDE>();
+    const ELEMTYPE * p = &mask[32 - shift];
     return loadu<SIMDTYPE>((const SIMDTYPE *) p);
 }
 
+/* Return a sieving pattern of stride "STRIDE", shifted by "shift", with
+   value "elem" in locations where it hits */
 template <typename SIMDTYPE, typename ELEMTYPE, unsigned int STRIDE>
 static inline SIMDTYPE
-get_shifted_pattern(const fbprime_t offset, ELEMTYPE elem)
+get_pattern(const fbprime_t offset, ELEMTYPE elem)
 {
-    const SIMDTYPE shifted_pattern = get_shifted_pattern<SIMDTYPE, ELEMTYPE, STRIDE>(offset);
-    return _and<SIMDTYPE, ELEMTYPE>(shifted_pattern, set1<SIMDTYPE, ELEMTYPE>(elem));
+    const SIMDTYPE shifted_mask = get_shifted_mask<SIMDTYPE, ELEMTYPE, STRIDE>(offset);
+    return _and<SIMDTYPE, ELEMTYPE>(shifted_mask, set1<SIMDTYPE, ELEMTYPE>(elem));
 }
 
 template <typename SIMDTYPE, typename ELEMTYPE, unsigned int STRIDE>
 static inline void
-sieve_one_prime(SIMDTYPE * const result, const ELEMTYPE logp, const fbprime_t idx)
+sieve_odd_prime(SIMDTYPE * const result, const ELEMTYPE logp, const fbprime_t idx)
 {
     fbprime_t offset = idx;
     for (size_t i = 0; i < STRIDE; i++) {
-        const SIMDTYPE pattern = get_shifted_pattern<SIMDTYPE, ELEMTYPE, STRIDE>(offset, logp);
+        const SIMDTYPE pattern = get_pattern<SIMDTYPE, ELEMTYPE, STRIDE>(offset, logp);
         result[i] = adds<SIMDTYPE, ELEMTYPE>(result[i], pattern);
         offset = modsub(offset, sizeof(SIMDTYPE) % STRIDE, STRIDE);
     }
@@ -314,62 +329,20 @@ big_loop<__m256i, uint8_t>(__m256i * __restrict__ sievearray, const __m256i * __
 #endif
 
 template <typename SIMDTYPE, typename ELEMTYPE>
-static
-SIMDTYPE sieve2(fbprime_t, fbprime_t, ELEMTYPE);
-
-template <>
 inline
-uint32_t sieve2<uint32_t, unsigned char>(const fbprime_t q, const fbprime_t idx, const unsigned char logp)
+SIMDTYPE sieve2(const fbprime_t q, const fbprime_t idx, const uint8_t logp)
 {
+    const size_t N MAYBE_UNUSED = sizeof(SIMDTYPE) / sizeof(ELEMTYPE);
+    ASSERT(q <= N);
     switch (q) {
-        case 2: return get_shifted_pattern<uint32_t, unsigned char, 2>(idx, logp);
-        case 4: return get_shifted_pattern<uint32_t, unsigned char, 4>(idx, logp);
+        case 2: return get_pattern<SIMDTYPE, ELEMTYPE, 2>(idx, logp);
+        case 4: return get_pattern<SIMDTYPE, ELEMTYPE, 4>(idx, logp);
+        case 8: return get_pattern<SIMDTYPE, ELEMTYPE, 8>(idx, logp);
+        case 16: return get_pattern<SIMDTYPE, ELEMTYPE, 16>(idx, logp);
+        case 32: return get_pattern<SIMDTYPE, ELEMTYPE, 32>(idx, logp);
         default: abort();
     }
 }
-
-template <>
-inline
-uint64_t sieve2<uint64_t, unsigned char>(const fbprime_t q, const fbprime_t idx, const unsigned char logp)
-{
-    switch (q) {
-        case 2: return get_shifted_pattern<uint64_t, unsigned char, 2>(idx, logp);
-        case 4: return get_shifted_pattern<uint64_t, unsigned char, 4>(idx, logp);
-        case 8: return get_shifted_pattern<uint64_t, unsigned char, 8>(idx, logp);
-        default: abort();
-    }
-}
-
-#ifdef HAVE_SSSE3
-template <>
-inline
-__m128i sieve2<__m128i, unsigned char>(const fbprime_t q, const fbprime_t idx, const unsigned char logp)
-{
-    switch (q) {
-        case 2: return get_shifted_pattern<__m128i, unsigned char, 2>(idx, logp);
-        case 4: return get_shifted_pattern<__m128i, unsigned char, 4>(idx, logp);
-        case 8: return get_shifted_pattern<__m128i, unsigned char, 8>(idx, logp);
-        case 16: return get_shifted_pattern<__m128i, unsigned char, 16>(idx, logp);
-        default: abort();
-    }
-}
-#endif
-
-#ifdef HAVE_AVX2
-template <>
-inline
-__m256i sieve2<__m256i, unsigned char>(const fbprime_t q, const fbprime_t idx, const unsigned char logp)
-{
-    switch (q) {
-        case 2: return get_shifted_pattern<__m256i, unsigned char, 2>(idx, logp);
-        case 4: return get_shifted_pattern<__m256i, unsigned char, 4>(idx, logp);
-        case 8: return get_shifted_pattern<__m256i, unsigned char, 8>(idx, logp);
-        case 16: return get_shifted_pattern<__m256i, unsigned char, 16>(idx, logp);
-        case 32: return get_shifted_pattern<__m256i, unsigned char, 32>(idx, logp);
-        default: abort();
-    }
-}
-#endif
 
 template <typename SIMDTYPE, typename ELEMTYPE>
 void
@@ -392,7 +365,7 @@ sieve2357(SIMDTYPE * const sievearray, const size_t arraylen, const sieve2357_pr
   alignas(sizeof(SIMDTYPE)) 
   SIMDTYPE pattern23[3] = {pattern2, pattern2, pattern2};
   for ( ; primes->p == 3 ; primes++) {
-    sieve_one_prime<SIMDTYPE, ELEMTYPE, 3>(pattern23, primes->logp, primes->idx);
+    sieve_odd_prime<SIMDTYPE, ELEMTYPE, 3>(pattern23, primes->logp, primes->idx);
   }
 
   alignas(sizeof(SIMDTYPE)) 
@@ -408,7 +381,7 @@ sieve2357(SIMDTYPE * const sievearray, const size_t arraylen, const sieve2357_pr
   alignas(sizeof(SIMDTYPE)) 
   SIMDTYPE pattern5[5] = {zero, zero, zero, zero, zero};
   for ( ; primes->p == 5 ; primes++) {
-    sieve_one_prime<SIMDTYPE, ELEMTYPE, 5>(pattern5, primes->logp, primes->idx);
+    sieve_odd_prime<SIMDTYPE, ELEMTYPE, 5>(pattern5, primes->logp, primes->idx);
   }
  
   for (size_t i = 0; i < 3; i++) {
@@ -429,7 +402,7 @@ sieve2357(SIMDTYPE * const sievearray, const size_t arraylen, const sieve2357_pr
   alignas(sizeof(SIMDTYPE))
   SIMDTYPE pattern7[7] = {zero, zero, zero, zero, zero, zero, zero};
   for ( ; primes->p == 7 ; primes++) {
-    sieve_one_prime<SIMDTYPE, ELEMTYPE, 7>(pattern7, primes->logp, primes->idx);
+    sieve_odd_prime<SIMDTYPE, ELEMTYPE, 7>(pattern7, primes->logp, primes->idx);
   }
 
   const size_t l7 = arraylen / 7 / N;
@@ -442,12 +415,14 @@ sieve2357(SIMDTYPE * const sievearray, const size_t arraylen, const sieve2357_pr
 }
 
 template
-void sieve2357<unsigned long, unsigned char>(unsigned long * const sievearray, const size_t arraylen, const sieve2357_prime_t *primes);
+void sieve2357<uint32_t, uint8_t>(uint32_t * const sievearray, const size_t arraylen, const sieve2357_prime_t *primes);
+template
+void sieve2357<uint64_t, uint8_t>(uint64_t * const sievearray, const size_t arraylen, const sieve2357_prime_t *primes);
 #ifdef HAVE_SSSE3
 template
-void sieve2357<__m128i, unsigned char>(__m128i * const sievearray, const size_t arraylen, const sieve2357_prime_t *primes);
+void sieve2357<__m128i, uint8_t>(__m128i * const sievearray, const size_t arraylen, const sieve2357_prime_t *primes);
 #endif
 #ifdef HAVE_AVX2
 template
-void sieve2357<__m256i, unsigned char>(__m256i * const sievearray, const size_t arraylen, const sieve2357_prime_t *primes);
+void sieve2357<__m256i, uint8_t>(__m256i * const sievearray, const size_t arraylen, const sieve2357_prime_t *primes);
 #endif
