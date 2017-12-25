@@ -9,6 +9,9 @@
 #ifdef HAVE_AVX2
 #include "immintrin.h"
 #endif
+#ifdef HAVE_ARM_NEON
+#include <arm_neon.h>
+#endif
 //#define DO_TIMING 1
 #ifdef DO_TIMING
 // The Jevents library is part of the PMU tools
@@ -166,6 +169,9 @@ int main(int argc, const char **argv)
 #endif
 #ifdef HAVE_AVX2
   ok &= test<__m256i, unsigned char>(iter, arraysize);
+#endif
+#ifdef HAVE_ARM_NEON
+  ok &= test<uint8x16_t, unsigned char>(iter, arraysize);
 #endif
 #ifdef DO_TIMING
   clear_timing();

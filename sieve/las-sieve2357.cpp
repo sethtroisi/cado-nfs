@@ -8,6 +8,9 @@
 #ifdef HAVE_AVX2
 #include "immintrin.h"
 #endif
+#ifdef HAVE_ARM_NEON
+#include <arm_neon.h>
+#endif
 
 #include "ularith.h"
 #include "cado-endian.h"
@@ -194,6 +197,44 @@ inline __m256i ATTRIBUTE((__always_inline__, __artificial__))
 loadu<__m256i>(const __m256i *p)
 {
   return _mm256_loadu_si256(p);
+}
+#endif
+
+#ifdef HAVE_ARM_NEON
+
+template<>
+inline uint8x16_t ATTRIBUTE((__always_inline__, __artificial__))
+set0<uint8x16_t, uint8_t>()
+{
+  return vdupq_n_u8(0);
+}
+
+template<>
+inline uint8x16_t ATTRIBUTE((__always_inline__, __artificial__))
+set1<uint8x16_t, uint8_t>(const uint8_t c)
+{
+   return vdupq_n_u8(c);
+}
+
+template<>
+inline uint8x16_t ATTRIBUTE((__always_inline__, __artificial__))
+adds<uint8x16_t, uint8_t>(const uint8x16_t a, const uint8x16_t b)
+{
+  return vqaddq_u8(a, b);
+}
+
+template<>
+inline uint8x16_t ATTRIBUTE((__always_inline__, __artificial__))
+_and<uint8x16_t, uint8_t>(const uint8x16_t a, const uint8x16_t b)
+{
+  return vandq_u8(a, b);
+}
+
+template<>
+inline uint8x16_t ATTRIBUTE((__always_inline__, __artificial__))
+loadu<uint8x16_t>(const uint8x16_t *p)
+{
+  return vld1q_u8(p);
 }
 #endif
 
@@ -425,4 +466,8 @@ void sieve2357<__m128i, uint8_t>(__m128i * const sievearray, const size_t arrayl
 #ifdef HAVE_AVX2
 template
 void sieve2357<__m256i, uint8_t>(__m256i * const sievearray, const size_t arraylen, const sieve2357_prime_t *primes);
+#endif
+#ifdef HAVE_ARM_NEON
+template
+void sieve2357<uint8x16_t, uint8_t>(uint8x16_t * const sievearray, const size_t arraylen, const sieve2357_prime_t *primes);
 #endif
