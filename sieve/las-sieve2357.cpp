@@ -50,8 +50,8 @@ static SIMDTYPE adds(SIMDTYPE, SIMDTYPE);
 template <typename SIMDTYPE, typename ELEMTYPE>
 static SIMDTYPE _and(SIMDTYPE, SIMDTYPE);
 
-template <typename SIMDTYPE>
-static SIMDTYPE loadu(const SIMDTYPE *);
+template <typename SIMDTYPE, typename ELEMTYPE>
+static SIMDTYPE loadu(const ELEMTYPE *);
 
 template<typename SIMDTYPE, typename ELEMTYPE>
 inline SIMDTYPE ATTRIBUTE((__always_inline__, __artificial__))
@@ -98,11 +98,11 @@ _and(const SIMDTYPE a, const SIMDTYPE b)
   return a & b;
 }
 
-template<typename T>
-inline T ATTRIBUTE((__always_inline__, __artificial__))
-loadu(const T *p)
+template<typename SIMDTYPE, typename ELEMTYPE>
+inline SIMDTYPE ATTRIBUTE((__always_inline__, __artificial__))
+loadu(const ELEMTYPE *p)
 {
-  return *p;
+  return * (const SIMDTYPE *)p;
 }
 
 static const uint8_t ff = ~(uint8_t)0;
@@ -155,9 +155,9 @@ _and<__m128i, uint8_t>(const __m128i a, const __m128i b)
 
 template<>
 inline __m128i ATTRIBUTE((__always_inline__, __artificial__))
-loadu<__m128i>(const __m128i *p)
+loadu<__m128i, uint8_t>(const uint8_t *p)
 {
-  return _mm_loadu_si128(p);
+  return _mm_loadu_si128((const __m128i *) p);
 }
 #endif
 
@@ -194,9 +194,9 @@ _and<__m256i, uint8_t>(const __m256i a, const __m256i b)
 
 template<>
 inline __m256i ATTRIBUTE((__always_inline__, __artificial__))
-loadu<__m256i>(const __m256i *p)
+loadu<__m256i>(const uint8_t *p)
 {
-  return _mm256_loadu_si256(p);
+  return _mm256_loadu_si256((const __m256i *) p);
 }
 #endif
 
@@ -232,7 +232,7 @@ _and<uint8x16_t, uint8_t>(const uint8x16_t a, const uint8x16_t b)
 
 template<>
 inline uint8x16_t ATTRIBUTE((__always_inline__, __artificial__))
-loadu<uint8x16_t>(const uint8x16_t *p)
+loadu<uint8x16_t>(const uint8_t *p)
 {
   return vld1q_u8(p);
 }
@@ -263,7 +263,7 @@ get_shifted_mask(const fbprime_t shift)
 {
     const ELEMTYPE * mask = get_mask<SIMDTYPE, ELEMTYPE, STRIDE>();
     const ELEMTYPE * p = &mask[32 - shift];
-    return loadu<SIMDTYPE>((const SIMDTYPE *) p);
+    return loadu<SIMDTYPE, ELEMTYPE>(p);
 }
 
 /* Return a sieving pattern of stride "STRIDE", shifted by "shift", with
