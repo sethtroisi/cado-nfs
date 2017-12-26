@@ -80,7 +80,10 @@ bool test(const unsigned long iter, const size_t arraysize)
   SIMDTYPE *sievearray = tolerant_malloc_aligned<SIMDTYPE>(arraysize);
   ELEMTYPE *sievearray2 = tolerant_malloc_aligned<ELEMTYPE>(arraysize);
 #else
-  alignas(sizeof(SIMDTYPE)) SIMDTYPE sievearray[arraysize / N];
+#ifdef HAVE_ALIGNAS
+  alignas(sizeof(SIMDTYPE))
+#endif
+  SIMDTYPE sievearray[arraysize / N];
   ELEMTYPE sievearray2[arraysize];
 #endif
   sieve2357_prime_t all_primes[] = {

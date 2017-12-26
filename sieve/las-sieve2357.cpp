@@ -403,13 +403,17 @@ sieve2357(SIMDTYPE * const sievearray, const size_t arraylen, const sieve2357_pr
     pattern2 = adds<SIMDTYPE, ELEMTYPE>(pattern2, sieve2<SIMDTYPE, ELEMTYPE>(primes->q, primes->idx, primes->logp));
   }
 
+#ifdef HAVE_ALIGNAS
   alignas(sizeof(SIMDTYPE)) 
+#endif
   SIMDTYPE pattern23[3] = {pattern2, pattern2, pattern2};
   for ( ; primes->p == 3 ; primes++) {
     sieve_odd_prime<SIMDTYPE, ELEMTYPE, 3>(pattern23, primes->logp, primes->idx);
   }
 
+#ifdef HAVE_ALIGNAS
   alignas(sizeof(SIMDTYPE)) 
+#endif
   SIMDTYPE pattern235[15 + 6] = {
     pattern23[0], pattern23[1], pattern23[2],
     pattern23[0], pattern23[1], pattern23[2],
@@ -419,7 +423,9 @@ sieve2357(SIMDTYPE * const sievearray, const size_t arraylen, const sieve2357_pr
     pattern23[0], pattern23[1], pattern23[2],
     pattern23[0], pattern23[1], pattern23[2],
   };
+#ifdef HAVE_ALIGNAS
   alignas(sizeof(SIMDTYPE)) 
+#endif
   SIMDTYPE pattern5[5] = {zero, zero, zero, zero, zero};
   for ( ; primes->p == 5 ; primes++) {
     sieve_odd_prime<SIMDTYPE, ELEMTYPE, 5>(pattern5, primes->logp, primes->idx);
@@ -440,7 +446,9 @@ sieve2357(SIMDTYPE * const sievearray, const size_t arraylen, const sieve2357_pr
   pattern235[15 + 4] = pattern235[4];
   pattern235[15 + 5] = pattern235[5];
 
+#ifdef HAVE_ALIGNAS
   alignas(sizeof(SIMDTYPE))
+#endif
   SIMDTYPE pattern7[7] = {zero, zero, zero, zero, zero, zero, zero};
   for ( ; primes->p == 7 ; primes++) {
     sieve_odd_prime<SIMDTYPE, ELEMTYPE, 7>(pattern7, primes->logp, primes->idx);
