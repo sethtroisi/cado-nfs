@@ -452,12 +452,6 @@ void small_sieve_start(std::vector<spos_t> & ssdpos,
         unsigned int first_region_index,
         sieve_info const & si)
 {
-#if 0
-    int logI = si.conf.logI_adjusted;
-    ssdpos.assign(ssd.ssp.size(), 0);
-
-    bool is_fragment = logI > LOG_BUCKET_REGION;
-
     /* We want to compute the index of the "next" hit, counted from the
      * starting offset of the "current" bucket region at (i0,j0). The
      * next hit means that it has to be the first in the current bucket
@@ -469,47 +463,6 @@ void small_sieve_start(std::vector<spos_t> & ssdpos,
      * negative if j>j0.
      *
      */
-
-    if (is_fragment) {
-        size_t index = 0;
-        small_sieve_base<tribool_const<true> > C(si.conf.logI_adjusted, first_region_index, si.conf.sublat);
-        for (std::vector<ssp_t>::const_iterator iter = ssd.ssp.begin();
-             iter != ssd.ssp.end(); iter++) {
-             ssp_t const & ssp = *iter;
-            /* generic case only. For all other cases (which are rare enough
-             * -- typically at most 20, counting powers of two and such), we
-             *  compute the starting point from within
-             *  sieve_small_bucket_region for each bucket region.
-             */
-            if (ssp.is_nice()) {
-                ssdpos[index++] = C.first_position_ordinary_prime(ssp);
-            } else if (ssp.is_proj()) {
-                /* This also handles powers of 2 with projective root */
-                ssdpos[index++] = C.first_position_projective_prime(ssp);
-            } else if (ssp.is_pow2()) {
-                /* Powers of 2 with affine root */
-                ssdpos[index++] = C.first_position_power_of_two(ssp);
-            } else {
-                abort(); /* How did we get here? */
-            }
-        }
-    } else {
-        size_t index = 0;
-        small_sieve_base<tribool_const<true> > C(si.conf.logI_adjusted, first_region_index, si.conf.sublat);
-        for (ssp_t const & ssp : ssd.ssp) {
-             if (ssp.is_nice())
-                 ssdpos[index] = C.first_position_ordinary_prime(ssp);
-             else if (ssp.is_proj())
-                 ssdpos[index] = C.first_position_projective_prime(ssp);
-             else if (ssp.is_pow2())
-                 ssdpos[index] = C.first_position_power_of_two(ssp);
-             else
-                 abort();
-             index++;
-        }
-    }
-#endif
-
     /* We store start positions for the simple case only.
      * For all other cases (which are rare enough
      * -- typically at most 20, counting powers of two and such), we
@@ -1007,15 +960,6 @@ void sieve_small_bucket_region(unsigned char *S, unsigned int N,
 {
     int logI = si.conf.logI_adjusted;
     bool is_fragment = logI > LOG_BUCKET_REGION;
-
-#if 0
-            if (fbprime_t(mpz_get_ui(si.qbasis.q)) == p) continue;
-
-            /* Don't sieve 3 again as it was pattern-sieved -- unless
-             * it's projective, see TODO above. */
-            if (p == 3) continue;
-#endif
-
 
     if (is_fragment) {
         small_sieve<true> SS(ssdpos, ssd.ssps, ssd.ssp, S, logI, N, si.conf.sublat, nthreads);
