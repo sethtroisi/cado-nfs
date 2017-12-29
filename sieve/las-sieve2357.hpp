@@ -23,7 +23,8 @@ static inline bool can_sieve(const fbprime_t p, const fbprime_t q)
 }
 
 template <typename SIMDTYPE, typename ELEMTYPE>
-void sieve(SIMDTYPE *, size_t, const prime_t *);
+void sieve(SIMDTYPE *sievearray, size_t arraylen, const prime_t *primes,
+    bool only_odd);
 
 }
 #endif

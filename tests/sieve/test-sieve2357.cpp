@@ -112,12 +112,12 @@ bool test(const unsigned long iter, const size_t arraysize)
   use_primes[j] = sieve2357::prime_t{0,0,0,0};
 
 #ifdef DO_TIMING
-  sieve2357:sieve<SIMDTYPE, ELEMTYPE>(sievearray, arraysize, use_primes);
-  sieve2357::sieve<SIMDTYPE, ELEMTYPE>(sievearray, arraysize, use_primes);
+  sieve2357:sieve<SIMDTYPE, ELEMTYPE>(sievearray, arraysize, use_primes, false);
+  sieve2357::sieve<SIMDTYPE, ELEMTYPE>(sievearray, arraysize, use_primes, false);
   start_timing();
 #endif
   for (unsigned long i = 0; i < iter; i++) {
-    sieve2357::sieve<SIMDTYPE, ELEMTYPE>(sievearray, arraysize, use_primes);
+    sieve2357::sieve<SIMDTYPE, ELEMTYPE>(sievearray, arraysize, use_primes, false);
   }
 #ifdef DO_TIMING
   end_timing();
