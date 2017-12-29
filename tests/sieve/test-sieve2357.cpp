@@ -86,7 +86,7 @@ bool test(const unsigned long iter, const size_t arraysize)
   SIMDTYPE sievearray[arraysize / N];
   ELEMTYPE sievearray2[arraysize];
 #endif
-  sieve2357_prime_t all_primes[] = {
+  sieve2357::prime_t all_primes[] = {
     /* p q idx logp */
     {3, 1, 0, 2},
     {2, 2, 1, 1},
@@ -100,28 +100,28 @@ bool test(const unsigned long iter, const size_t arraysize)
     {7, 7, 5, 5},
   };
   const size_t nr_all_primes = sizeof(all_primes) / sizeof(all_primes[1]);
-  sieve2357_prime_t use_primes[nr_all_primes + 1]; /* +1 for end marker */
+  sieve2357::prime_t use_primes[nr_all_primes + 1]; /* +1 for end marker */
 
   /* Skip those prime (powers) this SIMD type can't sieve */
   size_t j = 0;
   for (size_t i = 0; i < nr_all_primes; i++) {
-    if (sieve2357_can_sieve<SIMDTYPE, ELEMTYPE>(all_primes[i].p, all_primes[i].q)) {
+    if (sieve2357::can_sieve<SIMDTYPE, ELEMTYPE>(all_primes[i].p, all_primes[i].q)) {
       use_primes[j++] = all_primes[i];
     }
   }
-  use_primes[j] = sieve2357_prime_t{0,0,0,0};
+  use_primes[j] = sieve2357::prime_t{0,0,0,0};
 
 #ifdef DO_TIMING
-  sieve2357<SIMDTYPE, ELEMTYPE>(sievearray, arraysize, use_primes);
-  sieve2357<SIMDTYPE, ELEMTYPE>(sievearray, arraysize, use_primes);
+  sieve2357:sieve<SIMDTYPE, ELEMTYPE>(sievearray, arraysize, use_primes);
+  sieve2357::sieve<SIMDTYPE, ELEMTYPE>(sievearray, arraysize, use_primes);
   start_timing();
 #endif
   for (unsigned long i = 0; i < iter; i++) {
-    sieve2357<SIMDTYPE, ELEMTYPE>(sievearray, arraysize, use_primes);
+    sieve2357::sieve<SIMDTYPE, ELEMTYPE>(sievearray, arraysize, use_primes);
   }
 #ifdef DO_TIMING
   end_timing();
-  printf("%lu calls of sieve2357<%s, %s>(%zu) took %lu cycles, %lu per call, %.2f per %s\n",
+  printf("%lu calls of sieve2357::sieve<%s, %s>(%zu) took %lu cycles, %lu per call, %.2f per %s\n",
          iter, gettypename<SIMDTYPE>::name, gettypename<ELEMTYPE>::name, arraysize,
          (unsigned long) get_diff_timing(), (unsigned long) get_diff_timing() / iter,
          (float)get_diff_timing() / iter / (arraysize / sizeof(SIMDTYPE)),
@@ -130,7 +130,7 @@ bool test(const unsigned long iter, const size_t arraysize)
 
   /* Do the same thing again, using simple sieve code */
   memset(sievearray2, 0, arraysize);
-  for (sieve2357_prime_t *p = use_primes; p->p != 0; p++) {
+  for (sieve2357::prime_t *p = use_primes; p->p != 0; p++) {
     for (size_t i = p->idx; i < arraysize; i += p->q) {
       sievearray2[i] += p->logp;
     }

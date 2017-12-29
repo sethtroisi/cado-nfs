@@ -16,6 +16,8 @@
 #include "cado-endian.h"
 #include "las-sieve2357.hpp"
 
+namespace sieve2357 {
+
 /* Shift "b" so that each byte that does not get shifted out moves to a
    memory address that is "idx" bytes higher */
 template<typename T>
@@ -387,7 +389,7 @@ SIMDTYPE sieve2(const fbprime_t q, const fbprime_t idx, const uint8_t logp)
 
 template <typename SIMDTYPE, typename ELEMTYPE>
 void
-sieve2357(SIMDTYPE * const sievearray, const size_t arraylen, const sieve2357_prime_t *primes)
+sieve(SIMDTYPE * const sievearray, const size_t arraylen, const prime_t *primes)
 {
   const SIMDTYPE zero = set0<SIMDTYPE, ELEMTYPE>();
   const size_t N = sizeof(SIMDTYPE) / sizeof(ELEMTYPE);
@@ -464,18 +466,19 @@ sieve2357(SIMDTYPE * const sievearray, const size_t arraylen, const sieve2357_pr
 }
 
 template
-void sieve2357<uint32_t, uint8_t>(uint32_t * const sievearray, const size_t arraylen, const sieve2357_prime_t *primes);
+void sieve<uint32_t, uint8_t>(uint32_t * const sievearray, const size_t arraylen, const prime_t *primes);
 template
-void sieve2357<uint64_t, uint8_t>(uint64_t * const sievearray, const size_t arraylen, const sieve2357_prime_t *primes);
+void sieve<uint64_t, uint8_t>(uint64_t * const sievearray, const size_t arraylen, const prime_t *primes);
 #ifdef HAVE_SSSE3
 template
-void sieve2357<__m128i, uint8_t>(__m128i * const sievearray, const size_t arraylen, const sieve2357_prime_t *primes);
+void sieve<__m128i, uint8_t>(__m128i * const sievearray, const size_t arraylen, const prime_t *primes);
 #endif
 #ifdef HAVE_AVX2
 template
-void sieve2357<__m256i, uint8_t>(__m256i * const sievearray, const size_t arraylen, const sieve2357_prime_t *primes);
+void sieve<__m256i, uint8_t>(__m256i * const sievearray, const size_t arraylen, const prime_t *primes);
 #endif
 #ifdef HAVE_ARM_NEON
 template
-void sieve2357<uint8x16_t, uint8_t>(uint8x16_t * const sievearray, const size_t arraylen, const sieve2357_prime_t *primes);
+void sieve<uint8x16_t, uint8_t>(uint8x16_t * const sievearray, const size_t arraylen, const prime_t *primes);
 #endif
+}
