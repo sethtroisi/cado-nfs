@@ -68,7 +68,7 @@ void ssp_t::print(FILE *f) const
     fprintf(f, "# p = %" FBPRIME_FORMAT ", r = %" FBROOT_FORMAT ", offset = %" FBPRIME_FORMAT ", logp = %hhu",
         this->p, this->r, this->offset, this->logp);
     if (this->is_pow2()) fprintf(f, " (power of 2)");
-    if (this->is_ordinary3()) fprintf(f, " (ordinary p=3)");
+    if (this->is_pattern_sieved()) fprintf(f, " (will be pattern-sieved)");
     if (this->is_proj()) fprintf(f, " (projective root)");
     if (this->is_discarded_proj()) fprintf(f, "(discarded) because of projective root");
     if (this->is_discarded_sublat()) fprintf(f, "(discarded because not compatible with sub lattices)");
@@ -96,12 +96,12 @@ static void small_sieve_print_contents(const char * prefix, small_sieve_data_t c
     int nnice=ssd.ssps.size();
     int nproj=0;
     int npow2=0;
-    int nordinary3=0;
+    int npattern=0;
     int ndiscard=0;
     for(auto const & ssp : ssd.ssp) {
         nproj += ssp.is_proj();
         npow2 += ssp.is_pow2();
-        nordinary3 += ssp.is_ordinary3();
+        npattern += ssp.is_pattern_sieved();
         ndiscard += ssp.is_discarded();
         nnice += ssp.is_nice();
     }
@@ -110,7 +110,7 @@ static void small_sieve_print_contents(const char * prefix, small_sieve_data_t c
     verbose_output_print(0, 2, "# %s: %d nice primes", prefix, nnice);
     /* Primes may be both even and projective... */
     if (npow2) verbose_output_print(0, 2, ", %d powers of 2", npow2);
-    if (nordinary3) verbose_output_print(0, 2, ", %d pattern-sieved 3's", nordinary3);
+    if (npattern) verbose_output_print(0, 2, ", %d pattern-sieved", npattern);
     if (nproj) verbose_output_print(0, 2, ", and %d projective primes", nproj);
     verbose_output_print(0, 2, ".");
     if (ndiscard) verbose_output_print(0, 2, " %d discarded.", ndiscard);
@@ -141,28 +141,36 @@ void small_sieve_clear(small_sieve_data_t & ssd)
 
 /* }}} */
 
+
 /* {{{ Sieve initialization: now the real stuff */
 
-void ssp_t::init_proj(fbprime_t p, fbprime_t r, unsigned char _logp, unsigned int skip MAYBE_UNUSED)/*{{{*/
+ssp_t::ssp_t(fbprime_t _p, fbprime_t _r, unsigned char _logp, unsigned int skip, bool proj) /*{{{*/
+: ssp_t(_p, _r, _logp, skip) /* First, initialize everything as if proj=false */
 {
-    set_proj();
-    if (p % 2 == 0)
-      set_pow2();
-    logp = _logp;
-    unsigned int v = r; /* have consistent notations */
-    unsigned int g = gcd_ul(p, v);
-    fbprime_t q = p / g;
-    set_q(q);
-    set_g(g);
-    if (q == 1) {
-        ASSERT(r == 0);
-        set_U(0);
-    } else {
-        int rc;
-        uint32_t U = v / g; /* coprime to q */
-        rc = invmod_32(&U, q);
-        ASSERT_ALWAYS(rc != 0);
-        set_U(U);
+    if (_p % 2 == 0) {
+        set_pow2();
+    }
+    if (proj) {
+        set_proj();
+        unsigned int v = r; /* have consistent notations */
+        unsigned int g = gcd_ul(p, v);
+        fbprime_t q = p / g;
+        set_q(q);
+        set_g(g);
+        if (q == 1) {
+            ASSERT(v == 0); /* We know p|v, make sure v=0 */
+            set_U(0);
+        } else {
+            int rc;
+            uint32_t U = v / g; /* coprime to q */
+            ASSERT(gcd_ul(U, p) == 1);
+            rc = invmod_32(&U, q);
+            ASSERT_ALWAYS(rc != 0);
+            set_U(U);
+        }
+    }
+    if (pattern_sieve_can_sieve(*this)) {
+        set_pattern_sieved();
     }
 }/*}}}*/
 
@@ -299,7 +307,7 @@ void small_sieve_init(small_sieve_data_t & ssd,
 #endif
                 /* projective primes of all sorts go to ssp anyway */
                 ssd.ssp.push_back(new_ssp);
-            } else if (new_ssp.is_ordinary3() || new_ssp.is_pow2()) {
+            } else if (new_ssp.is_pow2() || new_ssp.is_pattern_sieved()) {
                 ssd.ssp.push_back(new_ssp);
             } else if (new_ssp.is_nice()) {
                 ssd.ssps.push_back(new_ssp);
@@ -889,9 +897,8 @@ template<bool is_fragment> void small_sieve<is_fragment>::do_pattern_sieve(where
         pattern[0] = pattern[1] = pattern[2] = 0UL;
 
         for(ssp_t const & ssp : not_nice_primes) {
-            if (!ssp.is_ordinary3()) continue;
-
-            ASSERT_ALWAYS(ssp.get_p() == 3);
+            if (!ssp.is_pattern_sieved() || ssp.get_p() != 3)
+                continue;
 
             int pos = super::first_position_ordinary_prime(ssp, j - j0);
 
@@ -1073,10 +1080,11 @@ resieve_small_bucket_region (bucket_primes_t *BP, int N, unsigned char *S,
          * obviously won't resieve powers of two, so we're bound to deal
          * with only projective primes here.
          */
-        ASSERT(ssp.is_pow2() || ssp.is_ordinary3() || ssp.is_proj());
+        ASSERT(ssp.is_pow2() || ssp.is_proj() || ssp.is_pattern_sieved());
 
         /* FIXME: I should not have to do this test */
-        if (ssp.is_pow() || ssp.is_ordinary3()) continue;
+        if (ssp.is_pow() || ssp.is_pattern_sieved())
+            continue;
 
         /* TODO: it doesn't seem very smart to resieve projective primes
          */

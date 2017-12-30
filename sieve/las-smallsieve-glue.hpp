@@ -894,12 +894,12 @@ struct small_sieve : public small_sieve_base<tribool_const<is_fragment>> {/*{{{*
                 handle_nice_prime<even_code, odd_code, 0>(ssp, p_pos, w);
             } else
 #endif
-            if (ssp.is_proj()) {
+            if (ssp.is_pattern_sieved()) {
+                /* This ssp is pattern-sieved, nothing to do here */
+            } else if (ssp.is_proj()) {
                 handle_projective_prime(ssp, w);
             } else if (ssp.is_pow2()) {
                 handle_power_of_2(ssp, w);
-            } else if (ssp.is_ordinary3()) {
-                /* p=3 is pattern-sieved, nothing to do */
             } else {
                 /* I don't think we can end up here.  */
                 ASSERT_ALWAYS(0);
