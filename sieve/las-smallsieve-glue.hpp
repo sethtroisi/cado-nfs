@@ -851,8 +851,7 @@ struct small_sieve : public small_sieve_base<tribool_const<is_fragment>> {/*{{{*
     /* }}} */
 
     public:
-    void pattern_sieve2(where_am_I &);
-    void pattern_sieve3(where_am_I &);
+    void do_pattern_sieve(where_am_I &);
 
     void normal_sieve(where_am_I & w) {
         for(size_t s : sorted_subranges) {

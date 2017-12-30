@@ -742,7 +742,7 @@ void sieve_one_nice_prime(unsigned char *S, const ssp_simple_t &ssps,
 
 
 /* {{{ Pattern-sieve powers of 2 up to 2 * sizeof(long) */
-template<bool is_fragment> void small_sieve<is_fragment>::pattern_sieve2(where_am_I & w MAYBE_UNUSED)
+template<bool is_fragment> void small_sieve<is_fragment>::do_pattern_sieve(where_am_I & w MAYBE_UNUSED)
 {
     /* TODO: use SSE2 (well, cost does not seem to be significant anyway).  */
     WHERE_AM_I_UPDATE(w, p, 2);
@@ -871,12 +871,7 @@ template<bool is_fragment> void small_sieve<is_fragment>::pattern_sieve2(where_a
             }
         }
     }
-}
-/* }}} */
 
-/* {{{ Pattern-sieve 3 */
-template<bool is_fragment> void small_sieve<is_fragment>::pattern_sieve3(where_am_I & w MAYBE_UNUSED)
-{
     /* For the time being, it's really 3. But the only thing we care about is
      * the hit rate to be 1 every 3rd, on lines for which we hit. So the code
      * below could be improved to handle more cases, although presently it
@@ -945,7 +940,9 @@ template<bool is_fragment> void small_sieve<is_fragment>::pattern_sieve3(where_a
                 *(S_ptr) += pattern[1];
         }
     }
-} /* }}} */
+}
+/* }}} */
+
 
 /* {{{ Normal small sieve */
 // Sieve small primes (up to p < bucket_thresh) of the factor base fb in the
@@ -963,14 +960,12 @@ void sieve_small_bucket_region(unsigned char *S, unsigned int N,
 
     if (is_fragment) {
         small_sieve<true> SS(ssdpos, ssd.ssps, ssd.ssp, S, logI, N, si.conf.sublat, nthreads);
-        SS.pattern_sieve2(w);
-        SS.pattern_sieve3(w);
+        SS.do_pattern_sieve(w);
         SS.exceptional_sieve(w);
         SS.normal_sieve(w);
     } else {
         small_sieve<false> SS(ssdpos, ssd.ssps, ssd.ssp, S, logI, N, si.conf.sublat, nthreads);
-        SS.pattern_sieve2(w);
-        SS.pattern_sieve3(w);
+        SS.do_pattern_sieve(w);
         SS.exceptional_sieve(w);
         SS.normal_sieve(w);
     }
