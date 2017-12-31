@@ -450,7 +450,7 @@ sieve(SIMDTYPE * const sievearray, const size_t arraylen, const prime_t *primes,
   }
 
   /* Sieve powers of 2 */
-  for ( ; primes->p == 2 ; primes++) {
+  for ( ; primes->q % 2 == 0 ; primes++) {
     pattern2 = adds<SIMDTYPE, ELEMTYPE>(pattern2, sieve2<SIMDTYPE, ELEMTYPE>(primes->q, primes->idx, primes->logp));
   }
 
@@ -460,7 +460,7 @@ sieve(SIMDTYPE * const sievearray, const size_t arraylen, const prime_t *primes,
   alignas(sizeof(SIMDTYPE)) 
 #endif
   SIMDTYPE pattern23[3] = {pattern2, pattern2, pattern2};
-  for ( ; primes->p == 3 ; primes++) {
+  for ( ; primes->q == 3 ; primes++) {
     sieve_odd_prime<SIMDTYPE, ELEMTYPE, 3>(pattern23, primes->logp, primes->idx, even_mask);
   }
 
@@ -480,7 +480,7 @@ sieve(SIMDTYPE * const sievearray, const size_t arraylen, const prime_t *primes,
   alignas(sizeof(SIMDTYPE)) 
 #endif
   SIMDTYPE pattern5[5] = {zero, zero, zero, zero, zero};
-  for ( ; primes->p == 5 ; primes++) {
+  for ( ; primes->q == 5 ; primes++) {
     sieve_odd_prime<SIMDTYPE, ELEMTYPE, 5>(pattern5, primes->logp, primes->idx, even_mask);
   }
  
@@ -503,7 +503,7 @@ sieve(SIMDTYPE * const sievearray, const size_t arraylen, const prime_t *primes,
   alignas(sizeof(SIMDTYPE))
 #endif
   SIMDTYPE pattern7[7] = {zero, zero, zero, zero, zero, zero, zero};
-  for ( ; primes->p == 7 ; primes++) {
+  for ( ; primes->q == 7 ; primes++) {
     sieve_odd_prime<SIMDTYPE, ELEMTYPE, 7>(pattern7, primes->logp, primes->idx, even_mask);
   }
 

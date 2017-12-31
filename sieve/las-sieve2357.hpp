@@ -5,21 +5,20 @@
 
 namespace sieve2357 {
 
+/* We hit sievearray[x] for x = idx + i*q with 0 <= x < arraylen */
 typedef struct {
-  fbprime_t p, q, idx;
+  fbprime_t q, idx;
   unsigned char logp;
 } prime_t;
 
 /* A predicate that tells whether a prime power q = p^k can be sieved by
    sieve2357 with a given SIMD and element data type */
 template<typename SIMDTYPE, typename ELEMTYPE>
-static inline bool can_sieve(const fbprime_t p, const fbprime_t q)
+static inline bool can_sieve(const fbprime_t q)
 {
   const size_t N = sizeof(SIMDTYPE) / sizeof(ELEMTYPE);
-  return (p == 2 && q <= N)
-         || (p == 3 && q <= 3)
-         || (p == 5 && q <= 5)
-         || (p == 7 && q <= 7);
+  return q == 1 || (q % 2 == 0 && N % q  == 0) || q == 3 || q == 5
+      || q == 7;
 }
 
 template <typename SIMDTYPE, typename ELEMTYPE>
