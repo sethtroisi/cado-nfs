@@ -1203,3 +1203,6 @@ tests/sieve/c90_21553.poly
 tests/sieve/test-sieve2357.cpp
 config/jevents.cmake
 config/aligned_alloc.cmake
+config/alignas.cmake
+config/neon.c
+config/neon.cmake
