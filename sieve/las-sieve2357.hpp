@@ -6,10 +6,13 @@
 namespace sieve2357 {
 
 /* We hit sievearray[x] for x = idx + i*q with 0 <= x < arraylen */
-typedef struct {
+struct prime_t {
   fbprime_t q, idx;
   unsigned char logp;
-} prime_t;
+  bool operator<(const sieve2357::prime_t &other) const {
+    return q < other.q;
+  }
+};
 
 /* A predicate that tells whether a prime power q = p^k can be sieved by
    sieve2357 with a given SIMD and element data type */
