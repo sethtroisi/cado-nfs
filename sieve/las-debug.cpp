@@ -147,8 +147,8 @@ int test_divisible(where_am_I& w)
         mpz_divexact_ui (traced_norms[w.side], traced_norms[w.side], (unsigned long) q);
     else
         verbose_output_vfprint(TRACE_CHANNEL, 0, gmp_vfprintf, "# FAILED test_divisible(p=%" FBPRIME_FORMAT
-                ", N=%d, x=%lu, side %d): i = %ld, j = %lu, norm = %Zd\n",
-                w.p, w.N, w.x, w.side, i, j, traced_norms[w.side]);
+                ", N=%d, x=%u, side %d): i = %ld, j = %u, norm = %Zd\n",
+                w.p, w.N, w.x, w.side, (long) i, j, traced_norms[w.side]);
 
     return rc;
 }
