@@ -24,9 +24,14 @@ static inline bool can_sieve(const fbprime_t q)
       || q == 7;
 }
 
+enum {
+    update_set,
+    update_add
+};
+
 template <typename SIMDTYPE, typename ELEMTYPE>
 void sieve(SIMDTYPE *sievearray, size_t arraylen, const prime_t *primes,
-    bool only_odd);
+    bool only_odd, int update_operation);
 
 }
 #endif

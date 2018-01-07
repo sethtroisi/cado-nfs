@@ -327,8 +327,8 @@ sieve_odd_prime(SIMDTYPE * const result, const ELEMTYPE logp,
 
 template <typename SIMDTYPE, typename ELEMTYPE>
 static inline void
-big_loop(SIMDTYPE * __restrict__ sievearray, const SIMDTYPE * const __restrict__ pattern235,
-         const SIMDTYPE * const __restrict__ pattern7, size_t l7)
+big_loop_set(SIMDTYPE * __restrict__ sievearray, const SIMDTYPE * const __restrict__ pattern235,
+    const SIMDTYPE * const __restrict__ pattern7, size_t l7)
 {
   size_t im15 = 0;
   for (size_t i = l7; i > 0; i--) {
@@ -343,10 +343,37 @@ big_loop(SIMDTYPE * __restrict__ sievearray, const SIMDTYPE * const __restrict__
   }
 }
 
+template <typename SIMDTYPE, typename ELEMTYPE>
+static inline void
+big_loop_add(SIMDTYPE * __restrict__ sievearray, const SIMDTYPE * const __restrict__ pattern235,
+    const SIMDTYPE * const __restrict__ pattern7, size_t l7)
+{
+  size_t im15 = 0;
+  for (size_t i = l7; i > 0; i--) {
+    SIMDTYPE t;
+    t = adds<SIMDTYPE, ELEMTYPE>(pattern235[im15], pattern7[0]);
+    sievearray[0] = adds<SIMDTYPE, ELEMTYPE>(t, sievearray[0]);
+    t = adds<SIMDTYPE, ELEMTYPE>(pattern235[im15 + 1], pattern7[1]);
+    sievearray[1] = adds<SIMDTYPE, ELEMTYPE>(t, sievearray[1]);
+    t = adds<SIMDTYPE, ELEMTYPE>(pattern235[im15 + 2], pattern7[2]);
+    sievearray[2] = adds<SIMDTYPE, ELEMTYPE>(t, sievearray[2]);
+    t = adds<SIMDTYPE, ELEMTYPE>(pattern235[im15 + 3], pattern7[3]);
+    sievearray[3] = adds<SIMDTYPE, ELEMTYPE>(t, sievearray[3]);
+    t = adds<SIMDTYPE, ELEMTYPE>(pattern235[im15 + 4], pattern7[4]);
+    sievearray[4] = adds<SIMDTYPE, ELEMTYPE>(t, sievearray[4]);
+    t = adds<SIMDTYPE, ELEMTYPE>(pattern235[im15 + 5], pattern7[5]);
+    sievearray[5] = adds<SIMDTYPE, ELEMTYPE>(t, sievearray[5]);
+    t = adds<SIMDTYPE, ELEMTYPE>(pattern235[im15 + 6], pattern7[6]);
+    sievearray[6] = adds<SIMDTYPE, ELEMTYPE>(t, sievearray[6]);
+    sievearray += 7;
+    if (im15 >= 8) {im15 -= 8;} else {im15 += 7;}
+  }
+}
+
 #if 0 && defined(HAVE_AVX2) && defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM)
 template <>
 inline void
-big_loop<__m256i, uint8_t>(__m256i * __restrict__ sievearray, const __m256i * __restrict__ pattern235,
+big_loop_set<__m256i, uint8_t>(__m256i * __restrict__ sievearray, const __m256i * __restrict__ pattern235,
          const __m256i * const __restrict__ pattern7, const size_t l7)
 {
   __m256i r, pattern235_0 = pattern235[0],
@@ -437,7 +464,7 @@ get_even_mask(const bool only_odd)
 template <typename SIMDTYPE, typename ELEMTYPE>
 void
 sieve(SIMDTYPE * const sievearray, const size_t arraylen, const prime_t *primes,
-      const bool only_odd)
+      const bool only_odd, const int update_operation)
 {
   const SIMDTYPE zero = set0<SIMDTYPE, ELEMTYPE>();
   const SIMDTYPE even_mask = get_even_mask<SIMDTYPE, ELEMTYPE>(only_odd);
@@ -509,27 +536,36 @@ sieve(SIMDTYPE * const sievearray, const size_t arraylen, const prime_t *primes,
 
   const size_t l7 = arraylen / 7 / N;
   
-  big_loop<SIMDTYPE, ELEMTYPE>(sievearray, pattern235, pattern7, l7);
-
-  for (size_t i = l7 * 7; i < arraylen / N; i++) {
-    sievearray[i] = adds<SIMDTYPE, ELEMTYPE>(pattern235[i % 15], pattern7[i % 7]);
-  }
+  if (update_operation == update_set) {
+    big_loop_set<SIMDTYPE, ELEMTYPE>(sievearray, pattern235, pattern7, l7);
+    for (size_t i = l7 * 7; i < arraylen / N; i++) {
+      sievearray[i] = adds<SIMDTYPE, ELEMTYPE>(pattern235[i % 15], pattern7[i % 7]);
+    }
+  } else if (update_operation == update_add) {
+    big_loop_add<SIMDTYPE, ELEMTYPE>(sievearray, pattern235, pattern7, l7);
+    for (size_t i = l7 * 7; i < arraylen / N; i++) {
+      SIMDTYPE t;
+      t = adds<SIMDTYPE, ELEMTYPE>(pattern235[i % 15], pattern7[i % 7]);
+      sievearray[i] = adds<SIMDTYPE, ELEMTYPE>(t, sievearray[i]);
+    }
+  } else
+    abort();
 }
 
 template
-void sieve<uint32_t, uint8_t>(uint32_t * const, size_t, const prime_t *, bool);
+void sieve<uint32_t, uint8_t>(uint32_t * const, size_t, const prime_t *, bool, int);
 template
-void sieve<uint64_t, uint8_t>(uint64_t * const, size_t, const prime_t *, bool);
+void sieve<uint64_t, uint8_t>(uint64_t * const, size_t, const prime_t *, bool, int);
 #ifdef HAVE_SSSE3
 template
-void sieve<__m128i, uint8_t>(__m128i * const, size_t, const prime_t *, bool);
+void sieve<__m128i, uint8_t>(__m128i * const, size_t, const prime_t *, bool, int);
 #endif
 #ifdef HAVE_AVX2
 template
-void sieve<__m256i, uint8_t>(__m256i * const, size_t, const prime_t *, bool);
+void sieve<__m256i, uint8_t>(__m256i * const, size_t, const prime_t *, bool, int);
 #endif
 #ifdef HAVE_ARM_NEON
 template
-void sieve<uint8x16_t, uint8_t>(uint8x16_t * const, size_t, const prime_t *, bool);
+void sieve<uint8x16_t, uint8_t>(uint8x16_t * const, size_t, const prime_t *, bool, int);
 #endif
 }
