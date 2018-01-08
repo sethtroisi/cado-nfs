@@ -64,6 +64,9 @@ template<> struct make_best_choice_list<12> {
 
 /*{{{ small sieve classes */
 /*{{{ tristate booleans */
+/* The tribool classes offer a test(y, n, m) function: if the value of the
+   tribool is true, the first parameter (y) is returned, if it is false,
+   the second is returned, if it is maybe, the third is returned. */
 struct tribool_maybe {
     template<typename T> static inline T test(T const &, T const &, T const & maybe) {
         return maybe;

@@ -29,7 +29,7 @@
 
  * Then we have
  *   i*v == j*u (mod p^k)  <==>  i == (j/g)*U (mod q)
- * with g|j. 
+ * with g|j.
  * 
  * In other words, we can sieve this projective prime (power) much like a 
  * normal prime (power) q with root U, except that after sieving a line 
@@ -60,22 +60,32 @@
 void ssp_simple_t::print(FILE *f) const
 {
     fprintf(f, "# p = %" FBPRIME_FORMAT ", r = %" FBROOT_FORMAT ", offset = %" FBPRIME_FORMAT ", logp = %hhu",
-        this->p, this->r, this->offset, this->logp);
+        p, r, offset, logp);
 }
 
 void ssp_t::print(FILE *f) const
 {
-    fprintf(f, "# p = %" FBPRIME_FORMAT ", r = %" FBROOT_FORMAT ", offset = %" FBPRIME_FORMAT ", logp = %hhu",
-        this->p, this->r, this->offset, this->logp);
-    if (this->is_pow2()) fprintf(f, " (power of 2)");
-    if (this->is_pattern_sieved()) fprintf(f, " (will be pattern-sieved)");
-    if (this->is_proj()) fprintf(f, " (projective root)");
-    if (this->is_discarded_proj()) fprintf(f, "(discarded) because of projective root");
-    if (this->is_discarded_sublat()) fprintf(f, "(discarded because not compatible with sub lattices)");
+    if (!is_proj()) {
+        fprintf(f, "# p = %" FBPRIME_FORMAT ", r = %" FBROOT_FORMAT ", offset = %" FBPRIME_FORMAT ", logp = %hhu",
+            get_p(), get_r(), get_offset(), logp);
+        if (is_pow2()) fprintf(f, " (power of 2)");
+        if (is_pattern_sieved()) fprintf(f, " (pattern-sieved)");
+        if (is_discarded_proj()) fprintf(f, "(discarded because of projective root)");
+        if (is_discarded_sublat()) fprintf(f, "(discarded because not compatible with sub lattices)");
+    } else {
+        fprintf(f, "# q = %" FBPRIME_FORMAT ", g = %" FBROOT_FORMAT ", U = %" FBPRIME_FORMAT ", logp = %hhu",
+            get_q(), get_g(), get_U(), logp);
+        if (is_pow2()) fprintf(f, " (power of 2)");
+        if (is_pattern_sieved()) fprintf(f, " (pattern-sieved)");
+        fprintf(f, " (projective root)");
+        if (is_discarded_proj()) fprintf(f, "(discarded because of projective root)");
+        if (is_discarded_sublat()) fprintf(f, "(discarded because not compatible with sub lattices)");
+    }
 }
 
+/* Uses va_list argument for use with verbose_output_vfprint() */
 int
-small_sieve_dump(FILE *f, const char *header, va_list va) /// XXX uh ? va_ ?
+small_sieve_dump(FILE *f, const char *header, va_list va)
 {
     const small_sieve_data_t * p_ssd = va_arg(va, const small_sieve_data_t *);
 
@@ -268,7 +278,7 @@ void small_sieve_init(small_sieve_data_t & ssd,
                         FBPRIME_FORMAT " root %s%" FBROOT_FORMAT " -> %s%" 
                         FBROOT_FORMAT "\n", side, p, 
                         r >= p ? "1/" : "", r % p,
-                        is_proj_in_ij ? "1/" : "", r_q % p);
+                        is_proj_in_ij ? "1/" : "", r_q);
 
             ssp_t new_ssp(p, r_q, logp, skiprows, is_proj_in_ij);
 
