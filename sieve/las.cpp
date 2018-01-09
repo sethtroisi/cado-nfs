@@ -1759,6 +1759,11 @@ void factor_survivors_data::cofactoring (timetree_t & timer)
              */
             const char * dup_comment = NULL;
 
+            /* lock I/O. Incidentally, the corresponding mutex also
+             * protects the use of the hash table already_printed_for_q
+             * below. */
+            verbose_output_start_batch();
+
             if (!already_printed_for_q.insert(abpair_t(a,b)).second) {
                 /* can't insert, so already there: either it's a
                  * duplicate of a relation that was already printed, or a
@@ -1773,7 +1778,6 @@ void factor_survivors_data::cofactoring (timetree_t & timer)
             }
 
             FILE *output;
-            verbose_output_start_batch();   /* lock I/O */
 
             cpt += !dup_comment;
 
