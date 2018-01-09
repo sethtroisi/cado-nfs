@@ -69,14 +69,16 @@ int adjust_strategy = 0;
 
 double general_grace_time_ratio = DESCENT_DEFAULT_GRACE_TIME_RATIO;
 
-/* Accesses to this are protected by verbose_output_start_batch() */
 typedef std::pair< int64_t, uint64_t> abpair_t;
 struct abpair_hash_t {
     unsigned long operator()(abpair_t const& o) const {
         return 314159265358979323UL * o.first + 271828182845904523UL + o.second;
     }
 };
+
 std::unordered_set<abpair_t, abpair_hash_t> already_printed_for_q;
+static pthread_mutex_t already_printed_for_q_lock = PTHREAD_MUTEX_INITIALIZER;
+
 
 double tt_qstart;
 
@@ -1759,12 +1761,13 @@ void factor_survivors_data::cofactoring (timetree_t & timer)
              */
             const char * dup_comment = NULL;
 
-            /* lock I/O. Incidentally, the corresponding mutex also
-             * protects the use of the hash table already_printed_for_q
+            /* protects the use of the hash table already_printed_for_q
              * below. */
-            verbose_output_start_batch();
+            pthread_mutex_lock(&already_printed_for_q_lock);
+            bool is_new_rel = already_printed_for_q.insert(abpair_t(a,b)).second;
+            pthread_mutex_unlock(&already_printed_for_q_lock);
 
-            if (!already_printed_for_q.insert(abpair_t(a,b)).second) {
+            if (!is_new_rel) {
                 /* can't insert, so already there: either it's a
                  * duplicate of a relation that was already printed, or a
                  * relation that was already identified as a duplicate.
@@ -1778,6 +1781,8 @@ void factor_survivors_data::cofactoring (timetree_t & timer)
             }
 
             FILE *output;
+
+            verbose_output_start_batch(); /* lock I/O. */
 
             cpt += !dup_comment;
 
@@ -3053,7 +3058,10 @@ if (si.conf.sublat.m) {
         }
 
         /* this gets reset after each q */
+        pthread_mutex_lock(&already_printed_for_q_lock);
         already_printed_for_q.clear();
+        pthread_mutex_unlock(&already_printed_for_q_lock);
+
         nr_sq_processed++;
 
 #ifdef  DLP_DESCENT
