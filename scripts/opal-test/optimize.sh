@@ -160,8 +160,12 @@ qmin_max=`expr $qmin \* 2`
 if [ $qmin_max -gt 2147483645 ]; then
    qmin_max=2147483645
 fi
+# unset set -ex locally since bkthresh1_min can be 0,
+# in which case the shell will exit...
+set +ex
 bkthresh1_min=`expr $bkthresh1 / 2`
 bkthresh1_max=`expr $bkthresh1 \* 2`
+set -ex
 lim0_min=`expr $lim0 / 2`
 lim0_max=`expr $lim0 \* 2`
 # integer parameters are limited to 2147483645 in OPAL
