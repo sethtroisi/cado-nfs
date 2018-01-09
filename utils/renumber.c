@@ -87,7 +87,7 @@ get_one_line (FILE *f, char *s)
 // the renumber file). This is the purpose of the BASE parameter.
 static void
 parse_one_line_bad_ideals(struct bad_ideals_s * bad, const char * str, int k,
-    int BASE)
+			  int BASE, int nb_polys)
 {
   int t;
   const char *ptr = str;
@@ -106,7 +106,7 @@ parse_one_line_bad_ideals(struct bad_ideals_s * bad, const char * str, int k,
 
   side = ugly[(unsigned char) *ptr];
   ptr++;
-  ASSERT_ALWAYS(side == 0 || side == 1); /* FIXME: for MNFS */
+  ASSERT_ALWAYS(side >= 0 && side < nb_polys);
   ASSERT_ALWAYS(*ptr == ':');
 
   ptr++;
@@ -166,7 +166,7 @@ parse_bad_ideals_file (FILE *badidealsfile, renumber_ptr renum)
   renum->bad_ideals.max_p = 0;
   while (get_one_line (badidealsfile, s) != 0)
   {
-    parse_one_line_bad_ideals (&(renum->bad_ideals), s, k, 10);
+    parse_one_line_bad_ideals (&(renum->bad_ideals), s, k, 10, renum->nb_polys);
     renum->size += renum->bad_ideals.nb[k];
     renum->bad_ideals.max_p=MAX(renum->bad_ideals.max_p,renum->bad_ideals.p[k]);
     k++;
@@ -640,7 +640,7 @@ renumber_read_table (renumber_ptr tab, const char * filename)
   for (int k = 0; k < tab->bad_ideals.n; k++)
   {
     bytes_read += get_one_line(tab->file, s);
-    parse_one_line_bad_ideals (&tab->bad_ideals, s, k, 16);
+    parse_one_line_bad_ideals (&tab->bad_ideals, s, k, 16, tab->nb_polys);
     tab->bad_ideals.max_p = MAX (tab->bad_ideals.max_p, tab->bad_ideals.p[k]);
     for (int j = 0; j < tab->bad_ideals.nb[k]; j++)
     {
