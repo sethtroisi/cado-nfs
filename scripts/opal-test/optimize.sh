@@ -16,6 +16,7 @@ set -ex
 # NOMAD_MAX_BB_EVAL=50 ./optimize.sh ...
 
 : ${NOMAD_MAX_BB_EVAL=100}
+export NOMAD_MAX_BB_EVAL
 
 # To use say 8 threads:
 # OPAL_NUM_THREADS=8 ./optimize.sh ...
