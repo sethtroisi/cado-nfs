@@ -1,9 +1,5 @@
 #!/usr/bin/env bash
 
-# The main functions to compute SM are tested in utils/test_sm_utils.
-# This test is here to check that the multi-threaded and mono-threaded versions
-# give the same results and that the -nsm option works correctly.
-
 SOURCE_TEST_DIR="`dirname "$0"`"
 BUILD_DIR="$1"
 WORKDIR=`mktemp -d ${TMPDIR-/tmp}/cadotest.XXXXXXXX`
