@@ -268,11 +268,7 @@ compute_one_connected_component (comp_t *clique, purge_matrix_srcptr mat,
       clique->w += comp_weight_function (cur_h_weight);
       if (UNLIKELY(cur_h_weight == 2))
       {
-       if (cur_row > mat->sum2_row[cur_h]) {
-               fprintf(stderr, "Fatal error, mat->sum2_row[%" PRId64 "] = %" PRId64 " < %" PRId64 "\n",
-                               (uint64_t) cur_h, mat->sum2_row[cur_h], cur_row);
-       }
-       ASSERT_ALWAYS(cur_row <= mat->sum2_row[cur_h]);
+        ASSERT_ALWAYS(cur_row <= mat->sum2_row[cur_h]);
         uint64_t the_other_row = mat->sum2_row[cur_h] - cur_row;
         /* First, if the_other_row < clique.i, the connected component was
          * already found (by this thread or another). return 0 */
@@ -316,11 +312,7 @@ delete_one_connected_component (purge_matrix_ptr mat, uint64_t cur_row,
        * initially.*/
       if (UNLIKELY(cur_h_weight == 2 && mat->sum2_row[cur_h]))
       {
-       if (cur_row > mat->sum2_row[cur_h]) {
-               fprintf(stderr, "Fatal error, mat->sum2_row[%" PRId64 "] = %" PRId64 " < %" PRId64 "\n",
-                               (uint64_t) cur_h, mat->sum2_row[cur_h], cur_row);
-       }
-       ASSERT_ALWAYS(cur_row <= mat->sum2_row[cur_h]);
+        ASSERT_ALWAYS(cur_row <= mat->sum2_row[cur_h]);
         uint64_t the_other_row = mat->sum2_row[cur_h] - cur_row;
         /* If the_other_row is not already in the buffer, add it as a todo. */
         if (!vector_contains(row_buffer, the_other_row))
