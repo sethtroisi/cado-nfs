@@ -285,8 +285,9 @@ purge_matrix_compute_sum2_row (purge_matrix_ptr mat, unsigned int nthreads)
 
 /* Internal function */
 void
-print_stats_uint64 (FILE *out, uint64_t *w, uint64_t len, char name[],
-                    char unit[], int verbose)
+print_stats_uint64 (FILE *out, uint64_t *w, uint64_t len,
+        const char * name, const char * unit,
+        int verbose)
 {
   uint64_t av = 0, min = UMAX(uint64_t), max = 0, std = 0, nb_nzero = 0;
   for (uint64_t i = 0; i < len; i++)
