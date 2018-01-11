@@ -442,7 +442,6 @@ static int call_facul(factor_ptr factors, mpz_srcptr norm_r,
   // Trial divide all the small factors.
   int success = brute_force_factorize_ul(factors, norm, norm, B);
   if (success) {
-    mpz_clear(norm);
     return 1;
   }
 
@@ -451,10 +450,8 @@ static int call_facul(factor_ptr factors, mpz_srcptr norm_r,
   if (mpz_probab_prime_p(norm, 1)) {
     if (mpz_sizeinbase(norm, 2) <= data->lpb) {
       factor_append(factors, norm);
-      mpz_clear(norm);
       return 1;
     } else {
-      mpz_clear(norm);
       return 0;
     }
   }
