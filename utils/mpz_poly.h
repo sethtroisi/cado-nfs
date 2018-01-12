@@ -302,6 +302,10 @@ struct cxx_mpz_poly {
     mpz_poly_srcptr operator->() const { return x; }
     std::string print_poly(std::string const& var) const;
 };
+#if GNUC_VERSION_ATLEAST(4,3,0)
+extern void mpz_poly_init(cxx_mpz_poly & pl, int) __attribute__((error("mpz_poly_init must not be called on a mpz_poly reference -- it is the caller's business (via a ctor)")));
+extern void mpz_poly_clear(cxx_mpz_poly & pl) __attribute__((error("mpz_poly_clear must not be called on a mpz_poly reference -- it is the caller's business (via a dtor)")));
+#endif
 
 #endif
 
