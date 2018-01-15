@@ -39,16 +39,13 @@
 const char *method_name[] = {"P-1", "P+1", "ECM"};
 
 void
-print_pointorder (const unsigned long p, const unsigned long s, 
+print_pointorder (const unsigned long p, const unsigned long parameter,
                   const unsigned long parameterization, const int verbose)
 {
-  residue_t parameter;
   modulus_t m;
   unsigned long o, knownfac;
 
   modredcul_initmod_ul (m, p);
-  modredcul_init (parameter, m);
-  modredcul_set_ul (parameter, s, m);
   
   if (parameterization == BRENT12 || parameterization == MONTY12)
     knownfac = 12;
@@ -61,7 +58,6 @@ print_pointorder (const unsigned long p, const unsigned long s,
   if (verbose)
     printf ("%lu %lu\n", p, o);
 
-  modredcul_clear (parameter, m);  
   modredcul_clearmod (m);
 }
 

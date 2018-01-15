@@ -978,14 +978,17 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
 /* -------------------------------------------------------------------------- */
 
 /* Determine order of a point P on a curve, both defined by the parameter value
-   as in ECM.
-   If the group order is known to be == r (mod m), this can be supplied in
-   the variables "known_r" and" known_m".
-   Looks for i in Hasse interval so that i*P = O, has complexity O(m^(1/4)). */
+ * as in ECM.
+ * If the group order is known to be == r (mod m), this can be supplied in
+ * the variables "known_r" and" known_m".
+ * Looks for i in Hasse interval so that i*P = O, has complexity O(m^(1/4)).
+ * Assume:
+ *  - m is prime
+ *  - m fits in an unsigned long
+ */
 
-//TODO parameter is an unsigned long
 unsigned long
-ell_pointorder (const residue_t parameter,
+ell_pointorder (const unsigned long parameter,
                 const ec_parameterization_t parameterization,
                 const unsigned long known_m, const unsigned long known_r,
                 const modulus_t m, const int verbose)
@@ -1013,11 +1016,11 @@ ell_pointorder (const residue_t parameter,
     mod_init (A, m);
 
     if (parameterization == BRENT12)
-      r = ec_parameterization_Brent_Suyama (b, P, mod_get_ul (parameter, m), m);
+      r = ec_parameterization_Brent_Suyama (b, P, parameter, m);
     else if (parameterization == MONTY12)
-      r = ec_parameterization_Montgomery12 (b, P, mod_get_ul (parameter, m), m);
+      r = ec_parameterization_Montgomery12 (b, P, parameter, m);
     else if (parameterization == MONTY16)
-      r = ec_parameterization_Montgomery16 (b, P, mod_get_ul (parameter, m), m);
+      r = ec_parameterization_Montgomery16 (b, P, parameter, m);
 
     if (r)
     {
@@ -1043,6 +1046,12 @@ ell_pointorder (const residue_t parameter,
       return 0UL;
     }
   }
+#if 0
+  else if (parameterization & FULLMONTYTWED)
+  {
+    // TODO write conversion functions
+  }
+#endif
   else
   {
     fprintf (stderr, "ecm: Unknown parameterization\n");
