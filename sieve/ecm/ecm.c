@@ -883,7 +883,9 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
 
   if (r == 0)
   {
-    printf ("# factor found during parameterization\n"); // XXX
+#ifdef TRACE
+    printf ("%s: factor found during parameterization\n");
+#endif
     mod_gcd (f, P->x, m);
     mod_clear (b, m);
     ec_point_clear (P, m);
