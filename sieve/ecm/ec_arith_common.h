@@ -65,28 +65,138 @@ ec_point_swap (ec_point_t Q, ec_point_t P, const modulus_t m)
 }
 
 static inline void
-ec_point_print (ec_point_t P, const ec_point_coord_type_t coord_type)
+ec_point_fprintf (FILE *out, ec_point_t P, const ec_point_coord_type_t coord,
+                  MAYBE_UNUSED const modulus_t m)
 {
-  /* FIXME need multiple precision print */
-  
-  printf ("(%lu", mod_intget_ul(P->x));
-  if (coord_type == MONTGOMERY_xz)
-    printf (": %lu)", mod_intget_ul(P->z));
-  else
+  // XXX experimental and maybe not optimal
+#ifdef MOD_SIZE
+  modint_t x, y, z, t;
+
+  mod_intinit (x);
+  mod_intinit (y);
+  mod_intinit (z);
+  mod_intinit (t);
+
+  mod_get_int (x, P->x, m);
+  mod_get_int (y, P->y, m);
+  mod_get_int (z, P->z, m);
+  mod_get_int (t, P->t, m);
+
+  switch (coord)
   {
-    printf (": %lu", mod_intget_ul(P->y));
-    switch (coord_type)
-    {
-      case SHORT_WEIERSTRASS_proj: no_break();
-      case TWISTED_EDWARDS_proj:
-        printf (" : %lu)", mod_intget_ul(P->z));
-        break;
-      case TWISTED_EDWARDS_ext:
-        printf (" : %lu : %lu)", mod_intget_ul(P->t), mod_intget_ul(P->z));
-        break;
-      default :
-        printf (")\n");
-    }
+    case SHORT_WEIERSTRASS_aff:
+      gmp_fprintf (out, "(%Nd, %Nd)", x, MOD_SIZE, y, MOD_SIZE);
+      break;
+    case SHORT_WEIERSTRASS_proj:
+      gmp_fprintf (out, "(%Nd : %Nd : %Nd)", x, MOD_SIZE, y, MOD_SIZE, z,
+                                                                      MOD_SIZE);
+      break;
+    case MONTGOMERY_xz:
+      gmp_fprintf (out, "(%Nd :: %Nd)", x, MOD_SIZE, z, MOD_SIZE);
+      break;
+    case TWISTED_EDWARDS_proj:
+      gmp_fprintf (out, "(%Nd : %Nd : %Nd)", x, MOD_SIZE, y, MOD_SIZE, z,
+                                                                      MOD_SIZE);
+      break;
+    case TWISTED_EDWARDS_ext:
+      gmp_fprintf (out, "(%Nd : %Nd : %Nd : %Nd)", x, MOD_SIZE, y, MOD_SIZE,
+                                                   z, MOD_SIZE, t, MOD_SIZE);
+      break;
+    default:
+      fprintf (stderr, "%s: unknown coordinates system\n", __func__);
+      abort ();
+  }
+
+  mod_intclear (x);
+  mod_intclear (y);
+  mod_intclear (z);
+  mod_intclear (t);
+#else
+  switch (coord)
+  {
+    case SHORT_WEIERSTRASS_aff:
+      gmp_fprintf (out, "(%Zd, %Zd)", P->x, P->y);
+      break;
+    case SHORT_WEIERSTRASS_proj:
+      gmp_fprintf (out, "(%Zd : %Zd : %Zd)", P->x, P->y, P->z);
+      break;
+    case MONTGOMERY_xz:
+      gmp_fprintf (out, "(%Zd :: %Zd)", P->x, P->z);
+      break;
+    case TWISTED_EDWARDS_proj:
+      gmp_fprintf (out, "(%Zd : %Zd : %Zd)", P->x, P->y, P->z);
+      break;
+    case TWISTED_EDWARDS_ext:
+      gmp_fprintf (out, "(%Zd : %Zd : %Zd : %Zd)", P->x, P->y, P->z, P->t);
+      break;
+    default:
+      fprintf (stderr, "%s: unknown coordinates system\n", __func__);
+      abort ();
+  }
+#endif
+}
+
+static inline void
+ec_montgomery_curve_fprintf (FILE *out, residue_t A, ec_point_t P,
+                             MAYBE_UNUSED const modulus_t m)
+{
+  // XXX experimental
+#ifdef MOD_SIZE
+  modint_t cc, mod;
+
+  mod_intinit (cc);
+  mod_intinit (mod);
+
+  mod_get_int (cc, A, m);
+  mod_getmod_int (mod, m);
+
+  gmp_fprintf (out, "Montgomery curve: B*Y^2 = X^3 + A*X^2*Z + X*Z^2\n"
+                    "  A = %Nd\n  modulo %Nd\n", cc, mod);
+
+  mod_intclear (cc);
+  mod_intclear (mod);
+#else
+  gmp_fprintf (out, "Montgomery curve: B*Y^2 = X^3 + A*X^2*Z + X*Z^2\n"
+                    "  A = %Zd\n  modulo %Zd\n", A, m);
+#endif
+
+  if (P)
+  {
+    fputs ("  with point (X::Z) = ", out);
+    ec_point_fprintf (out, P, MONTGOMERY_xz, m);
+    fputc ('\n', out);
+  }
+}
+
+static inline void
+ec_weierstrass_curve_fprintf (FILE *out, residue_t a, ec_point_t P,
+                             MAYBE_UNUSED const modulus_t m)
+{
+  // XXX experimental
+#ifdef MOD_SIZE
+  modint_t cc, mod;
+
+  mod_intinit (cc);
+  mod_intinit (mod);
+
+  mod_get_int (cc, a, m);
+  mod_getmod_int (mod, m);
+
+  gmp_fprintf (out, "Weierstrass curve: y^2 = x^3 + a*x + b\n"
+                    "  a = %Nd\n  modulo %Nd\n", cc, mod);
+
+  mod_intclear (cc);
+  mod_intclear (mod);
+#else
+  gmp_fprintf (out, "Weierstrass curve: y^2 = x^3 + a*x + b\n"
+                    "  a = %Zd\n  modulo %Zd\n", a, m);
+#endif
+
+  if (P)
+  {
+    fputs ("  with point (x, y) = ", out);
+    ec_point_fprintf (out, P, SHORT_WEIERSTRASS_aff, m);
+    fputc ('\n', out);
   }
 }
 

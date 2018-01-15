@@ -891,17 +891,20 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
   }
 
 #ifdef TRACE
+  residue_t A;
+  mod_init (A, m);
+  montgomery_A_from_b (A, b, m);
   if (plan->parameterization & FULLMONTY)
   {
-    /* FIXME need multiple precision print */
-    residue_t A;
-    mod_init (A, m);
-    montgomery_A_from_b (A, b, m);
-    printf ("%s: curve: B*Y^2*Z = X^3 + (%lu*4-2)*X^2*Z + X*Z^2\n"
-            "%s: starting point (%lu::%lu)\n", __func__, mod_get_ul (A, m),
-            __func__, mod_get_ul (P->x, m), mod_get_ul (P->z, m));
-    mod_clear (A, m);
+    printf ("%s: starting values: ", __func__);
+    ec_montgomery_curve_fprintf (stdout, A, P, m);
   }
+  else
+  {
+    // TODO write similar function for twisted edwards
+    ec_point_fprintf (stdout, P, TWISTED_EDWARDS_ext, m);
+  }
+  mod_clear (A, m);
 #endif
 
   /* now start ecm */
@@ -1022,11 +1025,8 @@ ell_pointorder (const residue_t parameter,
 
       if (verbose >= 2)
       {
-        /* FIXME need multiple precision print */
-        printf ("%s: Montgomery curve: B * Y^2 = X^3 + %lu * X^2 * Z + X * Z^2 "
-                "(mod %lu)\n%s:   with point: (X::Z) = (%lu::%lu)\n", __func__,
-                mod_get_ul (A, m), mod_intget_ul (tm), __func__,
-                mod_get_ul (P->x, m), mod_get_ul (P->x, m));
+        printf ("%s: ", __func__);
+        ec_montgomery_curve_fprintf (stdout, A, P, m);
       }
 
       r = weierstrass_aff_from_montgomery (a, P, A, P, m);
@@ -1051,11 +1051,8 @@ ell_pointorder (const residue_t parameter,
 
   if (verbose >= 2)
   {
-    /* FIXME need multiple precision print */
-    printf ("%s: Weierstrass curve: y^2 = x^3 + %lu * x + b (mod %lu)\n"
-            "%s:   with point: (x,y) = (%lu,%lu)\n", __func__,
-            mod_get_ul (a, m), mod_intget_ul (tm), __func__,
-            mod_get_ul (P->x, m), mod_get_ul (P->y, m));
+    printf ("%s: ", __func__);
+    ec_weierstrass_curve_fprintf (stdout, a, P, m);
   }
 
   mod_init (x, m);
