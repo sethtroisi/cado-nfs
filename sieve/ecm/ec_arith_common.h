@@ -169,6 +169,45 @@ ec_montgomery_curve_fprintf (FILE *out, residue_t A, ec_point_t P,
 }
 
 static inline void
+ec_twisted_edwards_ext_curve_fprintf (FILE *out, residue_t A, ec_point_t P,
+                                      MAYBE_UNUSED const modulus_t m)
+{
+  // XXX experimental
+#ifdef MOD_SIZE
+  modint_t mod;
+  mod_intinit (mod);
+  mod_getmod_int (mod, m);
+  gmp_fprintf (out, "Twisted Edwards curve: -X^2 + Y^2 = Z^2 + d*T^2\n"
+                    "  XY = ZT (extended coordinates)\n  modulo %Nd\n", mod);
+  mod_intclear (mod);
+
+#else
+  gmp_fprintf (out, "Twisted Edwards curve: -X^2 + Y^2 = Z^2 + d*T^2\n"
+                    "  XY = ZT (extended coordinates)\n  modulo %Nd\n", m);
+#endif
+
+  if (P)
+  {
+    fputs ("  with point (X:Y:Z:T) = ", out);
+    ec_point_fprintf (out, P, TWISTED_EDWARDS_ext, m);
+    fputc ('\n', out);
+  }
+
+  if (A)
+  {
+#ifdef MOD_SIZE
+    modint_t cc;
+    mod_intinit (cc);
+    mod_get_int (cc, A, m);
+    gmp_fprintf (out, "  equivalent to Montgomery curve with A = %Nd\n", cc);
+    mod_intclear (cc);
+#else
+    gmp_fprintf (out, "  equivalent to Montgomery curve with A = %Zd\n", A);
+#endif
+  }
+}
+
+static inline void
 ec_weierstrass_curve_fprintf (FILE *out, residue_t a, ec_point_t P,
                              MAYBE_UNUSED const modulus_t m)
 {

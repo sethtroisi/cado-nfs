@@ -896,16 +896,11 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
   residue_t A;
   mod_init (A, m);
   montgomery_A_from_b (A, b, m);
+  printf ("%s: starting values: ", __func__);
   if (plan->parameterization & FULLMONTY)
-  {
-    printf ("%s: starting values: ", __func__);
     ec_montgomery_curve_fprintf (stdout, A, P, m);
-  }
   else
-  {
-    // TODO write similar function for twisted edwards
-    ec_point_fprintf (stdout, P, TWISTED_EDWARDS_ext, m);
-  }
+    ec_twisted_edwards_ext_curve_fprintf (stdout, A, P, m);
   mod_clear (A, m);
 #endif
 
