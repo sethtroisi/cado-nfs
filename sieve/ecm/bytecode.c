@@ -805,7 +805,7 @@ bytecode_prac_check_internal (bytecode_const bc, bytecode_const *endptr,
         mpz_dadd (R[1], R[0], R[1], R[2]);
         mpz_mul_2exp (R[0], R[0], 1);
         break;
-      case 3: /* Rule 3:  R[0], R[1], R[2] <- R[0], R[1]+R[0], R[1] */
+      case 3: /* Rule 3: R[0], R[1], R[2] <- R[0], R[1]+R[0], R[1] */
         if (verbose)
           printf ("# %s: rule 3: R[0], R[1], R[2] <- R[0], R[0] + R[1], R[1]\n",
                   __func__);
@@ -835,7 +835,7 @@ bytecode_prac_check_internal (bytecode_const bc, bytecode_const *endptr,
         mpz_dadd (R[2], R[3], R[4], R[2]);
         mpz_swap (R[1], R[2]);
         break;
-      case 7:  /* R[0], R[1] <- 3 R[0], 2 R[0]+R[1] */
+      case 7: /* R[0], R[1] <- 3 R[0], 2 R[0]+R[1] */
         if (verbose)
           printf ("# %s: rule 7: R[0], R[1] <- 3 R[0], 2 R[0] + R[1]\n",
                   __func__);
@@ -844,39 +844,56 @@ bytecode_prac_check_internal (bytecode_const bc, bytecode_const *endptr,
         mpz_mul_2exp (R[3], R[0], 1);
         mpz_dadd (R[0], R[0], R[3], R[0]);
         break;
-      case 8: /* TODO write comment and verbose printf */
+      case 8: /* R[0], R[1], R[2] <- 3 R[0], R[0]+R[1], R[0]+R[2] */
+        if (verbose)
+          printf ("# %s: rule 8: R[0], R[1], R[2] <- 3 R[0], R[0] + R[1], "
+                  "R[0] + R[2]\n", __func__);
         mpz_dadd (R[3], R[0], R[1], R[2]);
         mpz_dadd (R[2], R[2], R[0], R[1]);
         mpz_swap (R[1], R[3]);
         mpz_mul_2exp (R[3], R[0], 1);
         mpz_dadd (R[0], R[0], R[3], R[0]);
         break;
-      case 9: /* TODO write comment and verbose printf */
+      case 9: /* R[1], R[2] <- 2 R[1], R[2]+R[1] */
+        if (verbose)
+          printf ("# %s: rule 9: R[1], R[2] <- 2 R[1], R[2] + R[1]\n",
+              __func__);
         mpz_dadd (R[2], R[2], R[1], R[0]);
         mpz_mul_2exp (R[1], R[1], 1);
         break;
-      case 10: /* TODO write comment and verbose printf */
-        /* Combined final add of old subchain and init of new subchain [=fi] */
+      case 10: /* Combine end of a sub-block and start of a new sub-block */
+        if (verbose)
+          printf ("# %s: end of sub-block, then new sub-block: R[0], R[1], R[2]"
+                  " <- 2 R[0] + 2 R[1], R[0] + R[1], R[0] + R[1]\n", __func__);
         mpz_dadd (R[1], R[0], R[1], R[2]);
         mpz_set (R[2], R[1]);
         mpz_mul_2exp (R[0], R[1], 1);
         break;
-      case 11: /* TODO write comment and verbose printf */
-        /* Combined rule 3 and rule 0 [=\x3s] */
+      case 11: /* Combine rule 3 and rule 0 */
+        if (verbose)
+          printf ("# %s: rule 11 (= rule 3 + rule 0): R[0], R[1], R[2] <- "
+                  "R[0] + R[1], R[0], R[1]\n",
+                  __func__);
         mpz_dadd (R[2], R[1], R[0], R[2]);
         /* (R[1],R[2],R[0]) := (R[0],R[1],R[2])  */
         mpz_swap (R[1], R[2]);
         mpz_swap (R[0], R[1]);
         break;
-      case 12: /* TODO write comment and verbose printf */
-        /* Combined rule 3, then subchain end/start [=\x3fi] */
+      case 12: /* Combine rule 3 and rule 10 (end and start of a sub-block) */
+        if (verbose)
+          printf ("# %s: rule 3, then end of sub-block, then new sub-block: "
+                  "R[0], R[1], R[2] <- 4 R[0] + 2 R[1], 2 R[0] + R[1], "
+                  "2 R[0] + R[1]\n", __func__);
         mpz_dadd (R[3], R[1], R[0], R[2]);
         mpz_dadd (R[2], R[0], R[3], R[1]);
         mpz_set (R[1], R[2]);
         mpz_mul_2exp (R[0], R[2], 1);
         break;
-      case 13: /* TODO write comment and verbose printf */
-        /* Combined rule 3, swap, rule 3 and swap, merged a bit [=\x3s\x3s] */
+      case 13: /* Combine rule 3, rule 0, rule 3 and rule 0 (= rule 11 twice) */
+        if (verbose)
+          printf ("# %s: rule 13 (= rule 3 + rule 0 + rule 3 + rule 0): "
+                  "R[0], R[1], R[2] <- 2 R[0] + R[1], R[0] + R[1], R[0]\n",
+                  __func__);
         mpz_set (R[3], R[1]);
         mpz_dadd (R[1], R[1], R[0], R[2]);
         mpz_set (R[2], R[0]);
