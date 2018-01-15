@@ -183,7 +183,7 @@ ec_twisted_edwards_ext_curve_fprintf (FILE *out, residue_t A, ec_point_t P,
 
 #else
   gmp_fprintf (out, "Twisted Edwards curve: -X^2 + Y^2 = Z^2 + d*T^2\n"
-                    "  XY = ZT (extended coordinates)\n  modulo %Nd\n", m);
+                    "  XY = ZT (extended coordinates)\n  modulo %Zd\n", m);
 #endif
 
   if (P)
