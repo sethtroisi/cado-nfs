@@ -189,7 +189,7 @@ template<typename is_fragment = tribool_maybe> struct small_sieve_base {/*{{{*/
             for( ; y % sublatm != sublati0 ; y += ssp.get_p());
             x += (y - sublati0) / sublatm;
         }
-        x= x % (spos_t)ssp.get_p();
+        x = x % (spos_t)ssp.get_p();
         /* As long as i0 <= 0, which holds in the normal case where
          * logI <= LOG_BUCKET_REGION, we can be sure that x >= 0, so
          * we have no issue with the sign.  However, when i0 is a
@@ -335,6 +335,35 @@ template<typename is_fragment = tribool_maybe> struct small_sieve_base {/*{{{*/
         }
         return x;
     }/*}}}*/
+
+    /* This function returns the first location hit, relative to the start
+       of the current *line fragment*. dj is the line number being sieved
+       relative to the bucket region start. If a bucket region contains only
+       one line, or only a fragment of a line, then dj must be 0. The line
+       index jj being sieved must be divisible by ssp.g. Line jj=0 is not
+       treated any different than non-zero lines. */
+    int64_t first_position_in_line_fragment_projective_prime(ssp_t const & ssp, unsigned int dj = 0) const
+    {
+        const unsigned int j = j0 + dj;
+        const unsigned int jj = j * sublatm + sublatj0;
+        
+        ASSERT (ssp.is_proj());
+        ASSERT (jj % ssp.get_g() == 0);
+
+        int64_t ii = int64_t(jj / ssp.get_g()) * int64_t(ssp.get_U());
+
+        if (sublatm > 1) {
+            for( ; ii % sublatm != sublati0 ; ii += ssp.get_q());
+        }
+
+        const int i = (sublatm == 1) ? ii : (ii - sublati0) / sublatm;
+
+        int64_t x = (i - i0) % (uint64_t)ssp.get_q();
+        if (x < 0) x += ssp.get_q();
+        ASSERT_ALWAYS(0 <= x && x < ssp.get_q());
+        return x;
+    }
+
 };/*}}}*/
 
 /* {{{ overrun is actually a direct dependent of the <is_fragment>
