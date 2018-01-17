@@ -458,6 +458,7 @@ struct small_sieve : public small_sieve_base<tribool_const<is_fragment>> {/*{{{*
     using super::i0;
     using super::j0;
     using super::j1;
+    using super::sublatj0;
     using super::I;
     using super::F;
 
@@ -516,7 +517,7 @@ struct small_sieve : public small_sieve_base<tribool_const<is_fragment>> {/*{{{*
             for (size_t x = 0; x < sizeof (unsigned long); x++)
                 ((unsigned char *)&logps)[x] = logp;
             unsigned int j = j0 + (pos >> logI);
-            for( ; j < j1 ; ) {
+            for( ; j < j1 ; j += g) {
                 /* our loop is over line fragments that have a hit,
                  * and by the condition q=1 above we'll sieve them
                  * completely */
@@ -545,7 +546,6 @@ struct small_sieve : public small_sieve_base<tribool_const<is_fragment>> {/*{{{*
                     S_ptr[3] += logps2;
                 }
                 pos += gI;
-                j += g;
             }
 #if 0
             ssdpos[index] = pos - (1U << LOG_BUCKET_REGION);
@@ -663,9 +663,12 @@ struct small_sieve : public small_sieve_base<tribool_const<is_fragment>> {/*{{{*
         bool dj_row0_evenness = (super::sublatm & 1);
         bool even = row0_even;
 
-        for(unsigned int j = j0; ; ) {
+        for(unsigned int j = j0; j < j1; j++) {
             WHERE_AM_I_UPDATE(w, j, j - j0);
-            if (even) {
+            if (sublatj0 == 0 && j0 == 0 && j == 0) {
+                /* A nice prime p hits in line j=0 only in locations
+                   where p|i, so no need to sieve those. */
+            } else if (even) {
                 /* for j even, we sieve only odd pi, so step = 2p. */
                 {
                     spos_t xpos = ((super::sublati0 + pos) & 1) ? pos : (pos+p);
@@ -678,7 +681,6 @@ struct small_sieve : public small_sieve_base<tribool_const<is_fragment>> {/*{{{*
             S1 += I();
             pos += r; if (pos >= (spos_t) p) pos -= p; 
             even ^= dj_row0_evenness;
-            if (++j >= j1) break;
         }
         after_region_adjust(p_pos, pos, overrun, ssp);
         return true;
@@ -754,12 +756,15 @@ struct small_sieve : public small_sieve_base<tribool_const<is_fragment>> {/*{{{*
                 __m128i ones = _mm_set1_epi32(1);
                 __m128i sublati0 = _mm_set1_epi32(super::sublati0);
                 bool even = row0_even;
-                for(unsigned int j = j0 ; ; ) {
+                for(unsigned int j = j0 ; j < j1; j++) {
                     WHERE_AM_I_UPDATE(w, j, j - j0);
                     /* the if() branch here that the compiler and/or the
                      * branch predictor are smart enough to make its code
                      * reduce to almost zero */
-                    if (even) {
+                    if (sublatj0 == 0 && j0 == 0 && j == 0) {
+                        /* A nice prime p hits in line j=0 only in locations
+                           where p|i, so no need to sieve those. */
+                    } else if (even) {
                         /* for j even, we sieve only odd pi, so step = 2p. */
                         __m128i xpos =
                             _mm_add_epi32(pos,
@@ -795,7 +800,6 @@ struct small_sieve : public small_sieve_base<tribool_const<is_fragment>> {/*{{{*
                     pos = _mm_add_epi32(pos, r);
                     pos = _mm_sub_epi32(pos, _mm_andnot_si128(_mm_cmplt_epi32(pos, p), p));
                     even ^= dj_row0_evenness;
-                    if (++j >= j1) break;
                 }
                 after_region_adjust(p_pos0, _mm_extract_epi32(pos, 0), overrun0, ssp0);
                 after_region_adjust(p_pos1, _mm_extract_epi32(pos, 1), overrun1, ssp1);
