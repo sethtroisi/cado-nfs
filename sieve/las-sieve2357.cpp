@@ -477,7 +477,7 @@ sieve(SIMDTYPE * const sievearray, const size_t arraylen, const prime_t *primes,
   }
 
   /* Sieve powers of 2 */
-  for ( ; primes->q % 2 == 0 ; primes++) {
+  for ( ; primes->q != 0 && primes->q % 2 == 0 ; primes++) {
     pattern2 = adds<SIMDTYPE, ELEMTYPE>(pattern2, sieve2<SIMDTYPE, ELEMTYPE>(primes->q, primes->idx, primes->logp));
   }
 
