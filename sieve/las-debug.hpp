@@ -115,4 +115,10 @@ static inline void sieve_increase(unsigned char *S, const unsigned char logp, wh
 
 #endif  /* TRACE_K */
 
+/* If -dumpregion is given, dump sieve region to a file to be able to
+   compare new sieving code with a known good reference. Beware of
+   resulting large files. */
+void dump_region(const char *filename_stem, const unsigned char *S, const mpz_t sq,
+    const mpz_t rho, int side);
+
 #endif	/* LAS_DEBUG_HPP_ */

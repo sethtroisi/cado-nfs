@@ -292,5 +292,17 @@ void sieve_increase_underflow_trap(unsigned char *S, const unsigned char logp, w
 }
 #endif
 
+void dump_region(const char *filename_stem, const unsigned char *S, const mpz_t sq,
+    const mpz_t rho, const int side)
+{
+    if (filename_stem != NULL) {
+        char *filename;
+        int rc = gmp_asprintf(&filename, "%s.sq%Zd.rho%Zd.side%d.dump",
+            filename_stem, sq, rho, side);
+        ASSERT_ALWAYS(rc > 0);
+        FILE *f = fopen(filename, "a");
+        fwrite(S, sizeof(unsigned char), BUCKET_REGION, f);
+        fclose(f);
+    }
+}
 /* }}} */
-

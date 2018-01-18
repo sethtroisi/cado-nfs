@@ -2084,7 +2084,7 @@ void * process_bucket_region(timetree_t & timer, thread_data *th)
                             side, w.N, trace_Nx.x, S[side][trace_Nx.x]);
 #endif
             }
-
+            dump_region(las.dump_filename, S[side], si.doing.p, si.doing.r, side);
             BOOKKEEPING_TIMER(timer);
         }
 
