@@ -10,7 +10,7 @@
 # which should be near from prime_pi(2^lpb0) + prime_pi(2^lpb1)
 
 # Force the shell to bomb out in case a command fails in the script.
-set -ex
+# set -e
 
 # To limit the number of black-box evaluations to say 50:
 # NOMAD_MAX_BB_EVAL=50 ./optimize.sh ...
@@ -67,8 +67,8 @@ fi
 d=`mktemp -d`
 echo "Working directory:" $d
 
-cleanup() { rm -rf "$d" ; }
-trap cleanup EXIT
+# cleanup() { rm -rf "$d" ; }
+# trap cleanup EXIT
 
 ### Copy las_optimize, report and poly file and replace its name in las_run
 cp $2 las_optimize.py report.py $d
@@ -116,6 +116,7 @@ echo "OPAL_CADO_SQSIDE=${OPAL_CADO_SQSIDE}"
 ### Get parameters from params file and set _min and _max
 lim0=`grep "^lim0.*=" $params | cut -d= -f2`
 lim1=`grep "^lim1.*=" $params | cut -d= -f2`
+echo $lim0 $lim1
 if grep -q "qmin.*=" $params ; then
    qmin=`grep "qmin.*=" $params | cut -d= -f2`
    has_qmin=1
@@ -137,8 +138,10 @@ else
 fi
 lpb0=`grep "^lpb0.*=" $params | cut -d= -f2`
 lpb1=`grep "^lpb1.*=" $params | cut -d= -f2`
+echo $lpb0 $lpb1
 mfb0=`grep "mfb0.*=" $params | cut -d= -f2`
 mfb1=`grep "mfb1.*=" $params | cut -d= -f2`
+echo $mfb0 $mfb1
 if grep -q "ncurves0.*=" $params ; then
    ncurves0=`grep "ncurves0.*=" $params | cut -d= -f2`
    has_ncurves0=1
@@ -154,14 +157,22 @@ else
    has_ncurves1=0
 fi
 I=`grep "I.*=" $params | cut -d= -f2`
+echo $I
 qmin_min=`expr $qmin / 2`
 qmin_max=`expr $qmin \* 2`
+echo $qmin_min $qmin_max
 # integer parameters are limited to 2147483645 in OPAL
 if [ $qmin_max -gt 2147483645 ]; then
    qmin_max=2147483645
 fi
+echo "qmin_max" $qmin_max
+echo "bkthresh1" $bkthresh1
+echo `expr $bkthresh1 / 2`
 bkthresh1_min=`expr $bkthresh1 / 2`
+echo $bkthresh1_min
 bkthresh1_max=`expr $bkthresh1 \* 2`
+echo $bkthresh1_min $bkthresh1_max
+echo "lim0" $lim0
 lim0_min=`expr $lim0 / 2`
 lim0_max=`expr $lim0 \* 2`
 # integer parameters are limited to 2147483645 in OPAL
@@ -173,8 +184,10 @@ lim1_max=`expr $lim1 \* 2`
 if [ $lim1_max -gt 2147483645 ]; then
    lim1_max=2147483645
 fi
+echo "lim0" $lim0_min $lim0_max
 lpb0_min=`expr $lpb0 - 1`
 lpb0_max=`expr $lpb0 + 1`
+echo $lpb0_min $lpb0_max
 lpb1_min=`expr $lpb1 - 1`
 lpb1_max=`expr $lpb1 + 1`
 mfb0_min=$lpb0_min
@@ -187,6 +200,8 @@ mfb1_max=`expr $lpb1_max \* 3`
 if [ $mfb1 -gt $mfb1_max ]; then
    mfb1_max=$mfb1
 fi
+echo $mfb0_min $mfb0_max
+echo $mfb1_min $mfb1_max
 if [ $ncurves0 -gt 3 ]; then
 ncurves0_min=`expr $ncurves0 - 3`
 else
@@ -225,9 +240,11 @@ sed "s/ncurves1_def/$ncurves1/g" | sed "s/ncurves1_min/$ncurves1_min/g" | \
 sed "s/ncurves1_max/$ncurves1_max/g" | \
 sed "s/I_def/$I/g" | sed "s/I_min/$I_min/g" | sed "s/I_max/$I_max/g" \
 > $d/las_declaration.py
+echo $d/las_declaration.py
 
 ### Go to working directory and execute las_optimize.py
 cd $d
+echo $d
 python las_optimize.py
 
 ### Parse the solutions from nomad
@@ -279,4 +296,4 @@ fi
 if [ $has_ncurves1 -eq 0 ]; then
    echo "tasks.sieve.ncurves1 = $ncurves1_opt" >> $params.opt
 fi
-/bin/rm -fr $d
+# /bin/rm -fr $d
