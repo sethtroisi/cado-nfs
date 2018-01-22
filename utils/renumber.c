@@ -87,7 +87,7 @@ get_one_line (FILE *f, char *s)
 // the renumber file). This is the purpose of the BASE parameter.
 static void
 parse_one_line_bad_ideals(struct bad_ideals_s * bad, const char * str, int k,
-    int BASE)
+			  int BASE, int nb_polys)
 {
   int t;
   const char *ptr = str;
@@ -106,7 +106,7 @@ parse_one_line_bad_ideals(struct bad_ideals_s * bad, const char * str, int k,
 
   side = ugly[(unsigned char) *ptr];
   ptr++;
-  ASSERT_ALWAYS(side == 0 || side == 1); /* FIXME: for MNFS */
+  ASSERT_ALWAYS(side >= 0 && side < nb_polys);
   ASSERT_ALWAYS(*ptr == ':');
 
   ptr++;
@@ -166,7 +166,7 @@ parse_bad_ideals_file (FILE *badidealsfile, renumber_ptr renum)
   renum->bad_ideals.max_p = 0;
   while (get_one_line (badidealsfile, s) != 0)
   {
-    parse_one_line_bad_ideals (&(renum->bad_ideals), s, k, 10);
+    parse_one_line_bad_ideals (&(renum->bad_ideals), s, k, 10, renum->nb_polys);
     renum->size += renum->bad_ideals.nb[k];
     renum->bad_ideals.max_p=MAX(renum->bad_ideals.max_p,renum->bad_ideals.p[k]);
     k++;
@@ -250,27 +250,33 @@ renumber_sort_ul (unsigned long *r, size_t n)
   }
 }
 
-/* return zero if no roots mod p, else non-zero */
+/* Set r to the largest root of f modulo p such that (p,r) corresponds to an
+ * ideal on side s which is not a badideal.
+ * Note: If there is a projective root, it is the largest (r = p by convention)
+ * Return zero if no such root mod p exists, else non-zero
+ */
 static int
-get_largest_root_mod_p (p_r_values_t *r, mpz_poly_srcptr f, p_r_values_t p)
+get_largest_nonbad_root_mod_p (p_r_values_t *r, mpz_poly_srcptr f,
+                               p_r_values_t p, int s, renumber_srcptr rn)
 {
   int deg = f->deg;
-  /* If there is a projective root, it is the largest (r = p by convention) */
-  if (mpz_divisible_ui_p (f->coeff[deg], p))
+  if (mpz_divisible_ui_p (f->coeff[deg], p)
+      && !renumber_is_bad (NULL, NULL, rn, p, p, s))
   {
-    *r = p;
+    *r = p; /* non bad projective ideal */
     return 1;
   }
 
   unsigned long roots[deg];
-  size_t k = (size_t) mpz_poly_roots_ulong (roots, (mpz_poly_ptr) f, p);
-  if (k)
+  size_t nroots = (size_t) mpz_poly_roots_ulong (roots, (mpz_poly_ptr) f, p);
+  renumber_sort_ul (roots, nroots); /* sort in decreasing order */
+  for (size_t i = 0; i < nroots; i++)
   {
-    unsigned long max = roots[--k];
-    while (k--)
-      if (UNLIKELY (roots[k] > max)) max = roots[k];
-    *r = max;
-    return 2;
+    if (!renumber_is_bad (NULL, NULL, rn, p, roots[i], s))
+    {
+      *r = roots[i];
+      return 2;
+    }
   }
 
   return 0;
@@ -640,7 +646,7 @@ renumber_read_table (renumber_ptr tab, const char * filename)
   for (int k = 0; k < tab->bad_ideals.n; k++)
   {
     bytes_read += get_one_line(tab->file, s);
-    parse_one_line_bad_ideals (&tab->bad_ideals, s, k, 16);
+    parse_one_line_bad_ideals (&tab->bad_ideals, s, k, 16, tab->nb_polys);
     tab->bad_ideals.max_p = MAX (tab->bad_ideals.max_p, tab->bad_ideals.p[k]);
     for (int j = 0; j < tab->bad_ideals.nb[k]; j++)
     {
@@ -1093,9 +1099,8 @@ renumber_get_p_r_from_index (renumber_srcptr renumber_info, p_r_values_t *p,
     {
       *side = renumber_info->nb_polys - 1;
       while (*side >= 0 && (*p > renumber_info->biggest_prime_below_lpb[*side]
-                            || !get_largest_root_mod_p (r, pol->pols[*side], *p)
-                            || renumber_is_bad (NULL, NULL, renumber_info, *p,
-                                                                    *r, *side)))
+                            || !get_largest_nonbad_root_mod_p (r,
+                                  pol->pols[*side], *p, *side, renumber_info)))
         (*side)--;
       ASSERT_ALWAYS (*side >= 0);
     }

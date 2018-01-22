@@ -16,24 +16,25 @@
 # NOMAD_MAX_BB_EVAL=50 ./optimize.sh ...
 
 : ${NOMAD_MAX_BB_EVAL=100}
+export NOMAD_MAX_BB_EVAL
 
 # To use say 8 threads:
-# NUM_THREADS=8 ./optimize.sh ...
+# OPAL_NUM_THREADS=8 ./optimize.sh ...
 # Note that when the number of threads increases, the estimated time reported
 # by OPAL does increase. This is not really a problem if this time increases
 # by the same factor between two sets of parameters. However this is no longer
 # the case for a number of threads larger than 4. Here are examples on rsa140,
 # with two different sets of parameters, lpb[01]=28 and lpb[01]=29:
 #                  lpb[01]=28                     lpb[01]=29
-# NUM_THREADS=2      1.31e6                         1.35e6
-# NUM_THREADS=4      1.32e6                         1.35e6
-# NUM_THREADS=8      1.40e6                         1.43e6
-# NUM_THREADS=16     1.82e6                         1.78e6
-# We thus see the estimated time indeed increases with NUM_THREADS, and
-# with NUM_THREADS=16 the first set of parameters is worse than the second one.
-# Thus for production use we recommend to use NUM_THREADS <= 4.
+# OPAL_NUM_THREADS=2      1.31e6                         1.35e6
+# OPAL_NUM_THREADS=4      1.32e6                         1.35e6
+# OPAL_NUM_THREADS=8      1.40e6                         1.43e6
+# OPAL_NUM_THREADS=16     1.82e6                         1.78e6
+# We thus see the estimated time indeed increases with OPAL_NUM_THREADS, and
+# with OPAL_NUM_THREADS=16 the first set of parameters is worse than the second one.
+# Thus for production use we recommend to use OPAL_NUM_THREADS <= 4.
 
-: ${NUM_THREADS=4}
+: ${OPAL_NUM_THREADS=4}
 
 cwd=`pwd`
 
@@ -73,7 +74,7 @@ echo "Working directory:" $d
 ### Copy las_optimize, report and poly file and replace its name in las_run
 cp $2 las_optimize.py report.py $d
 sed "s/c59.polyselect2.poly/$poly/g" las_run.py | \
-sed "s/2 # number of threads for las/$NUM_THREADS/g" > $d/las_run.py
+sed "s/2 # number of threads for las/$OPAL_NUM_THREADS/g" > $d/las_run.py
 
 ### Parsing poly file (number of poly and rat/alg) (for now assume npoly == 2)
 npoly=`grep -c "^poly[0-9]" $d/$poly || :`
@@ -165,14 +166,13 @@ echo $qmin_min $qmin_max
 if [ $qmin_max -gt 2147483645 ]; then
    qmin_max=2147483645
 fi
-echo "qmin_max" $qmin_max
-echo "bkthresh1" $bkthresh1
-echo `expr $bkthresh1 / 2`
+# unset set -ex locally since bkthresh1_min can be 0,
+# in which case the shell will exit...
+set +ex
 bkthresh1_min=`expr $bkthresh1 / 2`
 echo $bkthresh1_min
 bkthresh1_max=`expr $bkthresh1 \* 2`
-echo $bkthresh1_min $bkthresh1_max
-echo "lim0" $lim0
+set -ex
 lim0_min=`expr $lim0 / 2`
 lim0_max=`expr $lim0 \* 2`
 # integer parameters are limited to 2147483645 in OPAL
@@ -254,12 +254,13 @@ I_opt=`head -1 $f`
 qmin_opt=`head -2 $f | tail -1`
 lim0_opt=`head -3 $f | tail -1`
 lim1_opt=`head -4 $f | tail -1`
-lpb0_opt=`head -5 $f | tail -1`
-lpb1_opt=`head -6 $f | tail -1`
-mfb0_opt=`head -7 $f | tail -1`
-mfb1_opt=`head -8 $f | tail -1`
-ncurves0_opt=`head -9 $f | tail -1`
-ncurves1_opt=`head -10 $f | tail -1`
+bkthresh1_opt=`head -5 $f | tail -1`
+lpb0_opt=`head -6 $f | tail -1`
+lpb1_opt=`head -7 $f | tail -1`
+mfb0_opt=`head -8 $f | tail -1`
+mfb1_opt=`head -9 $f | tail -1`
+ncurves0_opt=`head -10 $f | tail -1`
+ncurves1_opt=`head -11 $f | tail -1`
 echo "Optimal parameters:"
 echo "lim0=" $lim0_opt " min=" $lim0_min " max=" $lim0_max
 echo "lim1=" $lim1_opt " min=" $lim1_min " max=" $lim1_max

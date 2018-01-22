@@ -2925,7 +2925,7 @@ void initialise_parameters(int argc, char * argv[], cado_poly_ptr f,
   n_orig_param += snprintf(orig_param, sizeof(orig_param) - n_orig_param, "#");
 
   for (int i = 0; i < argc; i++) {
-      n_orig_param += snprintf(orig_param, sizeof(orig_param) - n_orig_param, " %s", argv[i]);
+      n_orig_param += snprintf(orig_param + n_orig_param, sizeof(orig_param) - n_orig_param, " %s", argv[i]);
   }
 
   argv++, argc--;

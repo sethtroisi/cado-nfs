@@ -428,5 +428,9 @@ cado_define_test(test-sieve2357.cpp
                  ${PROJECT_SOURCE_DIR}/sieve/las-sieve2357.cpp
                  LIBRARIES utils tests ${jevents_lib})
 
+# test renumber
+cado_define_test(SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/test_renumber.sh
+    ${CADO_NFS_BINARY_DIR} TARGET_DEPENDENCIES freerel debug_renumber)
+
 add_subdirectory (ecm)
 add_subdirectory (strategies)
