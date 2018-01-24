@@ -195,7 +195,7 @@ cado_divert_test(F9 sublat
             I=10
             REL_COUNT=242
             REFERENCE_SHA1=8ea4b9e59f308023a35ac3c147199eec98d1b63e
-            REFERENCE_REVISION=xxxxxxxxxxxxxxxxxx
+            REFERENCE_REVISION=f8dc5eff0976dd7745712e3e51b67cc523427beb
         APPEND_ARGUMENTS -sublat 3
         )
 
