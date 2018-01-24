@@ -269,7 +269,8 @@ purge_matrix_compute_sum2_row_mt (purge_matrix_ptr mat, unsigned int nthreads)
 }
 
 void
-purge_matrix_compute_sum2_row (purge_matrix_ptr mat, unsigned int nthreads)
+purge_matrix_compute_sum2_row (purge_matrix_ptr mat,
+        unsigned int nthreads MAYBE_UNUSED)
 {
 #ifndef __arm__
     /* the branch below does not seem to work as we expect it to on the
