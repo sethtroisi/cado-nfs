@@ -190,14 +190,14 @@ cado_divert_test(F9 batch
         APPEND_ARGUMENTS -batch
         )
 
-if (0)
 cado_divert_test(F9 sublat
         APPEND_ENVIRONMENT
-            REFERENCE_SHA1=090c7a9172ba1e70a459df8b0d7e024c4289d093
-            REFERENCE_REVISION=604a709c968e05ec09423dba1a977e100f038a90
+            I=10
+            REL_COUNT=242
+            REFERENCE_SHA1=8ea4b9e59f308023a35ac3c147199eec98d1b63e
+            REFERENCE_REVISION=xxxxxxxxxxxxxxxxxx
         APPEND_ARGUMENTS -sublat 3
         )
-endif()
 
 # We make these depend on sievetest, for checking the checksum file.
 # Since sievetest depends on makefb, we don't have to specify it
