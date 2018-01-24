@@ -2,6 +2,7 @@
 #define LAS_SIEVE2357_HPP
 
 #include "las-smallsieve-types.hpp"
+#include "las-debug.hpp"
 
 namespace sieve2357 {
 
@@ -31,7 +32,7 @@ enum {
 
 template <typename SIMDTYPE, typename ELEMTYPE>
 void sieve(SIMDTYPE *sievearray, size_t arraylen, const prime_t *primes,
-    bool only_odd, int update_operation);
+    bool only_odd, int update_operation, where_am_I & w);
 
 }
 #endif

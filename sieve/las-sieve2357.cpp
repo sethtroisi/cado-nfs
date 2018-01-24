@@ -464,7 +464,7 @@ get_even_mask(const bool only_odd)
 template <typename SIMDTYPE, typename ELEMTYPE>
 void
 sieve(SIMDTYPE * const sievearray, const size_t arraylen, const prime_t *primes,
-      const bool only_odd, const int update_operation)
+      const bool only_odd, const int update_operation, where_am_I & w MAYBE_UNUSED)
 {
   const SIMDTYPE zero = set0<SIMDTYPE, ELEMTYPE>();
   const SIMDTYPE even_mask = get_even_mask<SIMDTYPE, ELEMTYPE>(only_odd);
@@ -553,16 +553,16 @@ sieve(SIMDTYPE * const sievearray, const size_t arraylen, const prime_t *primes,
 }
 
 template
-void sieve<uint32_t, uint8_t>(uint32_t * const, size_t, const prime_t *, bool, int);
+void sieve<uint32_t, uint8_t>(uint32_t * const, size_t, const prime_t *, bool, int, where_am_I &);
 template
-void sieve<uint64_t, uint8_t>(uint64_t * const, size_t, const prime_t *, bool, int);
+void sieve<uint64_t, uint8_t>(uint64_t * const, size_t, const prime_t *, bool, int, where_am_I &);
 #ifdef HAVE_SSSE3
 template
-void sieve<__m128i, uint8_t>(__m128i * const, size_t, const prime_t *, bool, int);
+void sieve<__m128i, uint8_t>(__m128i * const, size_t, const prime_t *, bool, int, where_am_I &);
 #endif
 #ifdef HAVE_AVX2
 template
-void sieve<__m256i, uint8_t>(__m256i * const, size_t, const prime_t *, bool, int);
+void sieve<__m256i, uint8_t>(__m256i * const, size_t, const prime_t *, bool, int, where_am_I &);
 #endif
 #ifdef HAVE_ARM_NEON
 template

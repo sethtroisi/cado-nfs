@@ -24,6 +24,7 @@
 #include "utils.h"
 #include "tests_common.h"
 #include "las-sieve2357.hpp"
+#include "las-debug.hpp"
 
 template<typename T>
 class gettypename {
@@ -111,13 +112,15 @@ bool test(const unsigned long iter, const size_t arraysize)
   }
   use_primes[j] = sieve2357::prime_t{0,0,0};
 
+  where_am_I w;
+
 #ifdef DO_TIMING
-  sieve2357:sieve<SIMDTYPE, ELEMTYPE>(sievearray, arraysize, use_primes, false, sieve2357::update_set);
-  sieve2357::sieve<SIMDTYPE, ELEMTYPE>(sievearray, arraysize, use_primes, false, sieve2357::update_set);
+  sieve2357:sieve<SIMDTYPE, ELEMTYPE>(sievearray, arraysize, use_primes, false, sieve2357::update_set, w);
+  sieve2357::sieve<SIMDTYPE, ELEMTYPE>(sievearray, arraysize, use_primes, false, sieve2357::update_set, w);
   start_timing();
 #endif
   for (unsigned long i = 0; i < iter; i++) {
-    sieve2357::sieve<SIMDTYPE, ELEMTYPE>(sievearray, arraysize, use_primes, false, sieve2357::update_set);
+    sieve2357::sieve<SIMDTYPE, ELEMTYPE>(sievearray, arraysize, use_primes, false, sieve2357::update_set, w);
   }
 #ifdef DO_TIMING
   end_timing();

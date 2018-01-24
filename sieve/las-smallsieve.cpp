@@ -857,7 +857,7 @@ template<bool is_fragment> void small_sieve<is_fragment>::do_pattern_sieve(where
         uint64_t *S_ptr = (uint64_t *) (S + ((size_t) (j - j0) << logI));
         const bool sieve_only_odd = (j%2 == 0);
         sieve2357::sieve<uint64_t, uint8_t>(S_ptr, F(), psp, sieve_only_odd,
-            sieve2357::update_add);
+            sieve2357::update_add, w);
     }
 #else
     /* TODO: use SSE2 (well, cost does not seem to be significant anyway).  */
