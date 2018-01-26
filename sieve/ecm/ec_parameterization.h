@@ -404,6 +404,24 @@ ec_parameterization_Z6_is_valid (const unsigned long k)
       xM0 = (p^2 + 114*p - 11331)^3
       yM0 = (alpha*epsilon*(epsilon+2^2*3^2*5*(p-105))^3)/(2*3*(p+3)*beta)
       zM0 = ((p-213)*(p+3))^3
+
+ * Parameterization (where (p:q:r) := k*P):
+      sigma_num = 213*r-p
+      sigma_den = (p+3*r)
+      u_num = sigma_num^2-5*sigma_den^2
+      u_den = sigma_den^2
+      v_num = 4*sigma_num
+      v_den = sigma_den
+
+      # Coeffs for Montgomery curve
+      A = 2*(a+d)/(a-d)
+      B = 4/(a-d)
+      b = (u_den*v_num-v_den*u_num)^3*(3*v_den*u_num+u_den*v_num)/(16*(v_den*u_num)^3*u_den*v_num)
+# [ b = (A+2)/4 ]
+      # (xM0:yM0:zM0) = (xE0*(zE0+yE0):(zE0+yE0)*zE0:xE0*(zE0-yE0))
+      x0 = u^3
+      y0 = (sigma^2-1)*(sigma^2-25)*(sigma^4-25)
+      z0 = v^3
  * The point of order 3 is given by:
       # Coeffs for "a=-1" Twisted Edwards curve
       xE3 = 2*3^2*q*alpha
