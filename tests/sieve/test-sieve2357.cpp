@@ -70,7 +70,8 @@ T * tolerant_malloc_aligned(size_t size)
 }
 
 template <typename SIMDTYPE, typename ELEMTYPE>
-bool test(const unsigned long iter, const size_t arraysize)
+bool test(const unsigned long iter, const size_t arraysize,
+  const sieve2357::prime_t *all_primes, const size_t nr_all_primes)
 {
   const size_t N = sizeof(SIMDTYPE) / sizeof(ELEMTYPE);
   bool ok = true;
@@ -87,20 +88,6 @@ bool test(const unsigned long iter, const size_t arraysize)
   SIMDTYPE sievearray[arraysize / N];
   ELEMTYPE sievearray2[arraysize];
 #endif
-  sieve2357::prime_t all_primes[] = {
-    /* q idx logp */
-    {1, 0, 2},
-    {2, 1, 1},
-    {4, 3, 2},
-    {8, 0, 6},
-    {16, 14, 12},
-    {32, 21, 24},
-    {3, 2, 3},
-    {3, 2, 3},
-    {5, 4, 4},
-    {7, 5, 5},
-  };
-  const size_t nr_all_primes = sizeof(all_primes) / sizeof(all_primes[1]);
   sieve2357::prime_t use_primes[nr_all_primes + 1]; /* +1 for end marker */
 
   /* Skip those prime (powers) this SIMD type can't sieve */
@@ -124,11 +111,13 @@ bool test(const unsigned long iter, const size_t arraysize)
   }
 #ifdef DO_TIMING
   end_timing();
-  printf("%lu calls of sieve2357::sieve<%s, %s>(%zu) took %lu cycles, %lu per call, %.2f per %s\n",
-         iter, gettypename<SIMDTYPE>::name, gettypename<ELEMTYPE>::name, arraysize,
-         (unsigned long) get_diff_timing(), (unsigned long) get_diff_timing() / iter,
-         (float)get_diff_timing() / iter / (arraysize / sizeof(SIMDTYPE)),
-         gettypename<SIMDTYPE>::name);
+  if (iter > 1) {
+    printf("%lu calls of sieve2357::sieve<%s, %s>(%zu) took %lu cycles, %lu per call, %.2f per %s\n",
+           iter, gettypename<SIMDTYPE>::name, gettypename<ELEMTYPE>::name, arraysize,
+           (unsigned long) get_diff_timing(), (unsigned long) get_diff_timing() / iter,
+           (float)get_diff_timing() / iter / (arraysize / sizeof(SIMDTYPE)),
+           gettypename<SIMDTYPE>::name);
+  }
 #endif
 
   /* Do the same thing again, using simple sieve code */
@@ -157,6 +146,24 @@ bool test(const unsigned long iter, const size_t arraysize)
   return ok;
 }
 
+bool test_all(const unsigned long iter, const size_t arraysize,
+  const sieve2357::prime_t *all_primes, const size_t nr_all_primes)
+{
+  bool ok = true;
+  ok &= test<uint32_t, unsigned char>(iter, arraysize, all_primes, nr_all_primes);
+  ok &= test<uint64_t, unsigned char>(iter, arraysize, all_primes, nr_all_primes);
+#ifdef HAVE_SSSE3
+  ok &= test<__m128i, unsigned char>(iter, arraysize, all_primes, nr_all_primes);
+#endif
+#ifdef HAVE_AVX2
+  ok &= test<__m256i, unsigned char>(iter, arraysize, all_primes, nr_all_primes);
+#endif
+#ifdef HAVE_ARM_NEON
+  ok &= test<uint8x16_t, unsigned char>(iter, arraysize, all_primes, nr_all_primes);
+#endif
+  return ok;
+}
+
 int main(int argc, const char **argv)
 {
   unsigned long iter = 1;
@@ -168,17 +175,40 @@ int main(int argc, const char **argv)
 #ifdef DO_TIMING
   init_timing();
 #endif
-  ok &= test<uint32_t, unsigned char>(iter, arraysize);
-  ok &= test<uint64_t, unsigned char>(iter, arraysize);
-#ifdef HAVE_SSSE3
-  ok &= test<__m128i, unsigned char>(iter, arraysize);
-#endif
-#ifdef HAVE_AVX2
-  ok &= test<__m256i, unsigned char>(iter, arraysize);
-#endif
-#ifdef HAVE_ARM_NEON
-  ok &= test<uint8x16_t, unsigned char>(iter, arraysize);
-#endif
+
+  {
+    sieve2357::prime_t all_primes[] = {
+      /* q idx logp */
+      {1, 0, 2},
+      {2, 1, 1},
+      {4, 3, 2},
+      {8, 0, 6},
+      {16, 14, 12},
+      {32, 21, 24},
+      {3, 2, 3},
+      {3, 2, 3},
+      {5, 4, 4},
+      {7, 5, 5},
+    };
+
+    ok &= test_all(iter, arraysize, &all_primes[0], sizeof(all_primes) / sizeof(all_primes[0]));
+  }
+
+  for (int k = 0; k <= 6; k++) {
+    const fbprime_t p = 1 << k;
+    for(fbroot_t i = 0; i < p; i++) {
+      sieve2357::prime_t cur_prime[1] = {p, i, 1};
+      ok &= test_all(1, arraysize, cur_prime, 1);
+    }
+  }
+
+  for (fbprime_t p = 3; p <= 7; p += 2) {
+    for(fbroot_t i = 0; i < p; i++) {
+      sieve2357::prime_t cur_prime[1] = {p, i, 1};
+      ok &= test_all(1, arraysize, cur_prime, 1);
+    }
+  }
+
 #ifdef DO_TIMING
   clear_timing();
 #endif
