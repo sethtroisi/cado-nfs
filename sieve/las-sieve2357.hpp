@@ -6,6 +6,18 @@
 
 namespace sieve2357 {
 
+#if defined(HAVE_AVX2)
+typedef __m256i preferred_simd_type;
+#elif defined(HAVE_SSSE3)
+typedef __m128i preferred_simd_type;
+#elif defined(HAVE_ARM_NEON)
+typedef uint8x16_t preferred_simd_type;
+#elif LONG_BIT == 64 /* FIXME: this is false on, e.g., MinGW. What's a better condition here? */
+typedef uint64_t preferred_simd_type;
+#else
+typedef uint32_t preferred_simd_type;
+#endif
+
 /* We hit sievearray[x] for x = idx + i*q with 0 <= x < arraylen */
 struct prime_t {
   fbprime_t q, idx;
