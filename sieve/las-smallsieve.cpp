@@ -287,9 +287,9 @@ void small_sieve_init(small_sieve_data_t & ssd,
             if (is_proj_in_ij) r_q -= p;
             if (verbose && (r > p || is_proj_in_ij))
                 verbose_output_print(0, 1, "# small_sieve_init: side %d, prime %"
-                        FBPRIME_FORMAT " root %s%" FBROOT_FORMAT " -> %s%" 
-                        FBROOT_FORMAT "\n", side, p, 
-                        r >= p ? "1/" : "", r % p,
+                        FBPRIME_FORMAT " root %s%" FBROOT_FORMAT " (logp %hhu) "
+                        " -> %s%" FBROOT_FORMAT "\n", side, p,
+                        r >= p ? "1/" : "", r % p, logp,
                         is_proj_in_ij ? "1/" : "", r_q);
 
             ssp_t new_ssp(p, r_q, logp, skiprows, is_proj_in_ij);
@@ -886,6 +886,17 @@ template<bool is_fragment> void small_sieve<is_fragment>::do_pattern_sieve(where
                 /* Do nothing. It's a projective power of 2, * but for the
                    moment these are not pattern-sieved. TODO: pattern sieve
                    them in those lines where they hit. */
+
+                if (verbose_pattern_2) {
+                    FILE *out;
+                    verbose_output_start_batch();
+                    for (size_t out_i=0; (out=verbose_output_get(0, 1, out_i)) != NULL; out_i++) {
+                        fprintf(out, "# Not adding ");
+                        ssp.print(out);
+                        fprintf(out, " to sieving pattern for powers of 2 in line %u\n", j);
+                    }
+                    verbose_output_end_batch();
+                }
                 continue;
             }
             /* Powers of 2 greater than the pattern size get sieved below */
@@ -909,7 +920,7 @@ template<bool is_fragment> void small_sieve<is_fragment>::do_pattern_sieve(where
                     for (size_t out_i=0; (out=verbose_output_get(TRACE_CHANNEL, 0, out_i)) != NULL; out_i++) {
                         fprintf(out, "# Adding ");
                         ssp.print(out);
-                        fprintf(out, " to sieving pattern for powers of 2\n");
+                        fprintf(out, " to sieving pattern for powers of 2 in line %u\n", j);
                     }
                     verbose_output_end_batch();
                 }
@@ -959,8 +970,8 @@ template<bool is_fragment> void small_sieve<is_fragment>::do_pattern_sieve(where
         /* Apply the pattern */
         if (verbose_pattern_2)
             verbose_output_print(TRACE_CHANNEL, 0,
-                "# Sieving pattern for powers of 2 is: %lx, %lx\n",
-            pattern[0], pattern[1]);
+                "# Sieving pattern for powers of 2 in line %u is: %lx, %lx\n",
+            j, pattern[0], pattern[1]);
         if (pattern[0] || pattern[1]) {
             unsigned long *S_ptr = (unsigned long *) (S + ((size_t) (j-j0) << logI));
             const unsigned long *S_end = (unsigned long *)(S + ((size_t) (j-j0) << logI) + F());
