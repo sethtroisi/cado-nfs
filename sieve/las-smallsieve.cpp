@@ -13,8 +13,6 @@
 #include "las-smallsieve-glue.hpp"
 #include "las-sieve2357.hpp"
 
-#define USE_SIEVE2357 1
-
 /* small sieve and resieving */
 
 /* {{{ Some documentation first.
@@ -153,6 +151,7 @@ void small_sieve_clear(small_sieve_data_t & ssd)
 
 /* }}} */
 
+static bool use_sieve2357 = false;
 
 /* {{{ Sieve initialization: now the real stuff */
 
@@ -180,21 +179,17 @@ ssp_t::ssp_t(fbprime_t _p, fbprime_t _r, unsigned char _logp, unsigned int skip,
             ASSERT_ALWAYS(rc != 0);
             set_U(U);
         }
-#if USE_SIEVE2357
-        if (sieve2357::can_sieve<uint64_t, uint8_t>(this->get_q())) {
+        if (use_sieve2357 && sieve2357::can_sieve<uint64_t, uint8_t>(this->get_q())) {
             set_pattern_sieved();
         }
     } else {
-        if (sieve2357::can_sieve<uint64_t, uint8_t>(this->get_p())) {
+        if (use_sieve2357 && sieve2357::can_sieve<uint64_t, uint8_t>(this->get_p())) {
             set_pattern_sieved();
         }
-#endif
     }
-#if !USE_SIEVE2357
-    if (pattern_sieve_can_sieve(*this)) {
+    if (!use_sieve2357 && pattern_sieve_can_sieve(*this)) {
         set_pattern_sieved();
     }
-#endif
 }/*}}}*/
 
 // Prepare sieving of small primes: initialize a small_sieve_data_t
@@ -218,6 +213,10 @@ void small_sieve_init(small_sieve_data_t & ssd,
 
     ssd.ssp.clear();
     ssd.ssps.clear();
+
+    use_sieve2357 = getenv("use_sieve2357") != NULL;
+    if (use_sieve2357)
+        verbose_output_print(0, 1, "# Using sieve2357\n");
 
     // Do a pass on fb and projective primes, to fill in the data
     // while we have any regular primes or projective primes < thresh left
@@ -775,7 +774,8 @@ void sieve_one_nice_prime(unsigned char *S, const ssp_simple_t &ssps,
 /* {{{ Pattern-sieve primes with the is_pattern_sieved flag */
 template<bool is_fragment> void small_sieve<is_fragment>::do_pattern_sieve(where_am_I & w MAYBE_UNUSED)
 {
-#if USE_SIEVE2357
+    if (use_sieve2357)
+    {
     sieve2357::prime_t psp[ not_nice_primes.size() + 1];
 
     unsigned int j = j0;
@@ -859,7 +859,7 @@ template<bool is_fragment> void small_sieve<is_fragment>::do_pattern_sieve(where
         sieve2357::sieve<uint64_t, uint8_t>(S_ptr, F(), psp, sieve_only_odd,
             sieve2357::update_add, w);
     }
-#else
+    } else {
     /* TODO: use SSE2 (well, cost does not seem to be significant anyway).  */
     WHERE_AM_I_UPDATE(w, p, 2);
     /* First collect updates for powers of two in a pattern,
@@ -1055,7 +1055,7 @@ template<bool is_fragment> void small_sieve<is_fragment>::do_pattern_sieve(where
                 *(S_ptr) += pattern[1];
         }
     }
-#endif
+    }
 }
 /* }}} */
 
