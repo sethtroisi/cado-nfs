@@ -837,7 +837,7 @@ template<bool is_fragment> void small_sieve<is_fragment>::do_pattern_sieve(where
                     /* This projective root does not hit in this line */
                     continue;
                 }
-                const fbprime_t pos = super::first_position_in_line_fragment_projective_prime(ssp, j - j0);
+                const fbprime_t pos = super::first_position_in_line(ssp, j - j0);
                 ASSERT_ALWAYS (pos < ssp.get_q());
                 psp[i++] = {ssp.get_q(), pos, ssp.logp};
             } else if (ssp.is_pow2()) {

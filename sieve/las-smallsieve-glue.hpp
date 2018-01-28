@@ -130,22 +130,22 @@ template<typename is_fragment = tribool_maybe> struct small_sieve_base {/*{{{*/
 
 #if 0
         log_regions_per_line = MAX(0, logI - LOG_BUCKET_REGION);
-        regions_per_line = 1 << log_regions_per_line;           
-        region_rank_in_line = N & (regions_per_line - 1);       
-        last_region_in_line = region_rank_in_line == (regions_per_line - 1); 
+        regions_per_line = 1 << log_regions_per_line;
+        region_rank_in_line = N & (regions_per_line - 1);
+        last_region_in_line = region_rank_in_line == (regions_per_line - 1);
         I = 1 << logI;
-        i0 = (region_rank_in_line << LOG_BUCKET_REGION) - I/2;          
-        i1 = i0 + (1 << MIN(LOG_BUCKET_REGION, logI));     
+        i0 = (region_rank_in_line << LOG_BUCKET_REGION) - I/2;
+        i1 = i0 + (1 << MIN(LOG_BUCKET_REGION, logI));
         /* those are (1,0,0) in the standard case */
         row0_is_oddj = (j0*sublatm + sublatj0) & 1;
 #endif
-        sublatm = sublat.m ? sublat.m : 1; 
-        sublati0 = sublat.i0;       
-        sublatj0 = sublat.j0;       
+        sublatm = sublat.m ? sublat.m : 1;
+        sublati0 = sublat.i0;
+        sublatj0 = sublat.j0;
 
-        bool has_haxis = !j0;                                               
-        bool has_vaxis = region_rank_in_line == ((regions_per_line-1)/2);   
-        has_origin = has_haxis && has_vaxis;              
+        bool has_haxis = !j0;
+        bool has_vaxis = region_rank_in_line == ((regions_per_line-1)/2);
+        has_origin = has_haxis && has_vaxis;
     }/*}}}*/
 
     spos_t first_position_ordinary_prime(ssp_simple_t const & ssp, unsigned int dj = 0) const/*{{{*/
@@ -339,29 +339,50 @@ template<typename is_fragment = tribool_maybe> struct small_sieve_base {/*{{{*/
     /* This function returns the first location hit, relative to the start
        of the current *line fragment*. dj is the line number being sieved
        relative to the bucket region start. If a bucket region contains only
-       one line, or only a fragment of a line, then dj must be 0. The line
-       index jj being sieved must be divisible by ssp.g. Line jj=0 is not
-       treated any different than non-zero lines. */
-    int64_t first_position_in_line_fragment_projective_prime(ssp_t const & ssp, unsigned int dj = 0) const
+       one line, or only a fragment of a line, then dj must be 0. If ssp is
+       a projective root, then the line index jj being sieved must be
+       divisible by ssp.g. Line jj=0 is not treated any different than non-
+       zero lines. For powers of 2, even lines are not skipped by this
+       method - the caller needs to do it, if desired. */
+    fbroot_t first_position_in_line(ssp_t const & ssp, unsigned int dj = 0) const
     {
         const unsigned int j = j0 + dj;
         const unsigned int jj = j * sublatm + sublatj0;
-        
-        ASSERT (ssp.is_proj());
-        ASSERT (jj % ssp.get_g() == 0);
 
-        int64_t ii = int64_t(jj / ssp.get_g()) * int64_t(ssp.get_U());
+        if (ssp.is_proj()) {
+            ASSERT (jj % ssp.get_g() == 0);
 
-        if (sublatm > 1) {
-            for( ; ii % sublatm != sublati0 ; ii += ssp.get_q());
+            int64_t ii = int64_t(jj / ssp.get_g()) * int64_t(ssp.get_U());
+
+            int i;
+            if (sublatm > 1) {
+                for( ; ii % sublatm != sublati0 ; ii += ssp.get_q());
+                i = (ii - sublati0) / sublatm;
+            } else {
+                i = ii;
+            }
+
+            int64_t x = (i - i0) % (uint64_t)ssp.get_q();
+            if (x < 0) x += ssp.get_q();
+            ASSERT_ALWAYS(0 <= x && x < ssp.get_q());
+            return (fbroot_t) x;
+        } else {
+            /* Affine roots hit in every line, but not necessarily in every line fragment */
+            int64_t ii = int64_t(jj) * int64_t(ssp.get_r());
+
+            int i;
+            if (sublatm > 1) {
+                for( ; ii % sublatm != sublati0 ; ii += ssp.get_p());
+                i = (ii - sublati0) / sublatm;
+            } else {
+                i = ii;
+            }
+
+            int64_t x = (i - i0) % (uint64_t)ssp.get_p();
+            if (x < 0) x += ssp.get_p();
+            ASSERT_ALWAYS(0 <= x && x < ssp.get_p());
+            return (fbroot_t) x;
         }
-
-        const int i = (sublatm == 1) ? ii : (ii - sublati0) / sublatm;
-
-        int64_t x = (i - i0) % (uint64_t)ssp.get_q();
-        if (x < 0) x += ssp.get_q();
-        ASSERT_ALWAYS(0 <= x && x < ssp.get_q());
-        return x;
     }
 
 };/*}}}*/
