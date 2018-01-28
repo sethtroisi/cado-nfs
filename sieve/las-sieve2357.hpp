@@ -10,7 +10,17 @@ namespace sieve2357 {
 struct prime_t {
   fbprime_t q, idx;
   unsigned char logp;
+  /* Make prime_t sortable in the order in which sieve2357 expects them:
+     first q=1, then powers of 2, then odd primes in increasing order */
   bool operator<(const sieve2357::prime_t &other) const {
+    if (q == 1 && other.q != 1)
+      return true;
+    if (q != 1 && other.q == 1)
+      return false;
+    if (q % 2 == 0 && other.q % 2 == 1)
+      return true;
+    if (q % 2 == 1 && other.q % 2 == 0)
+      return false;
     return q < other.q;
   }
 };

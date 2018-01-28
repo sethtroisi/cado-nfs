@@ -534,6 +534,8 @@ sieve(SIMDTYPE * const sievearray, const size_t arraylen, const prime_t *primes,
     sieve_odd_prime<SIMDTYPE, ELEMTYPE, 7>(pattern7, primes->logp, primes->idx, even_mask);
   }
 
+  ASSERT_ALWAYS(primes->q == 0);
+
   const size_t l7 = arraylen / 7 / N;
   
   if (update_operation == update_set) {
