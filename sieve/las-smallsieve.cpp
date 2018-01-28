@@ -772,7 +772,7 @@ void sieve_one_nice_prime(unsigned char *S, const ssp_simple_t &ssps,
 }
 
 
-/* {{{ Pattern-sieve powers of 2 up to 2 * sizeof(long) */
+/* {{{ Pattern-sieve primes with the is_pattern_sieved flag */
 template<bool is_fragment> void small_sieve<is_fragment>::do_pattern_sieve(where_am_I & w MAYBE_UNUSED)
 {
 #if USE_SIEVE2357
@@ -889,7 +889,7 @@ template<bool is_fragment> void small_sieve<is_fragment>::do_pattern_sieve(where
                 continue;
             }
             /* Powers of 2 greater than the pattern size get sieved below */
-            if (ssp.get_p() > 2*sizeof(unsigned long))
+            if (!ssp.is_pattern_sieved())
                 continue;
             /* *Affine* powers of two are relevant only for odd lines anyway:
              * indeed, if i-j*r=0 mod 2^k and j even, then i even too, so

@@ -591,7 +591,7 @@ struct small_sieve : public small_sieve_base<tribool_const<is_fragment>> {/*{{{*
         const fbprime_t r = ssp.get_r();
         WHERE_AM_I_UPDATE(w, p, p);
 
-        if (p <= pattern2_size)
+        if (ssp.is_pattern_sieved())
             return;
 
         const unsigned char logp = ssp.logp;
