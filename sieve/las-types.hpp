@@ -275,6 +275,7 @@ struct las_info : private NonCopyable, public las_augmented_output_channel {
     void print_cof_stats();
 
     const char *dump_filename;
+    dumpfile dumpfiles[2];
 
     las_info(cxx_param_list &);
     ~las_info();

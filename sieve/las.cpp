@@ -2084,7 +2084,7 @@ void * process_bucket_region(timetree_t & timer, thread_data *th)
                             side, w.N, trace_Nx.x, S[side][trace_Nx.x]);
 #endif
             }
-            dump_region(las.dump_filename, S[side], si.doing.p, si.doing.r, side);
+            las.dumpfiles[side].write(S[side], BUCKET_REGION);
             BOOKKEEPING_TIMER(timer);
         }
 
@@ -2643,6 +2643,9 @@ int main (int argc0, char *argv0[])/*{{{*/
         ASSERT_ALWAYS(mpz_poly_is_root(las.cpoly->pols[doing.side], doing.r, doing.p));
 
         SIBLING_TIMER(timer_special_q, "skew Gauss");
+
+        las.dumpfiles[0].setname(las.dump_filename, doing.p, doing.r, 0);
+        las.dumpfiles[1].setname(las.dump_filename, doing.p, doing.r, 1);
 
         sieve_range_adjust Adj(doing,
                 las.cpoly,
