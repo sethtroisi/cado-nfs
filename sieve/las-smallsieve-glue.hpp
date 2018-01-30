@@ -295,6 +295,8 @@ template<typename is_fragment = tribool_maybe> struct small_sieve_base {/*{{{*/
         /* only difference with ordinary case is that we want to
          * sieve only odd lines.
          */
+        // FIXME: this is probably broken with sublattices (well,
+        // let's give it a try).
         /* For powers of 2, we sieve only odd lines (*) and 
          * ssdpos needs to point at line j=1. We assume
          * that in this case (si.I/2) % p == 0
@@ -318,13 +320,9 @@ template<typename is_fragment = tribool_maybe> struct small_sieve_base {/*{{{*/
         /* our target is position x in the bucket region which starts
          * at coordinates (i0ref, jj). How far is that from us ?
          */
-        // The condition is: if ((jj / sublatm) > j)
-        // but we separate the case sublatm=1 to avoid the div in the
-        // general case.
-        if (((sublatm == 1) && (jj > j)) ||
-                ((jj / sublatm) > j)) {
+        if (jj > j) {
             x -= region_rank_in_line << LOG_BUCKET_REGION;
-            x += (((uint64_t)((jj / sublatm) - j0))<<logI);
+            x += (((uint64_t)(jj - j0))<<logI);
             /* For the case of several bucket regions per line, it's
              * clear that this position will be outside the current
              * bucket region. Note that some special care is needed
