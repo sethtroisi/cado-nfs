@@ -780,38 +780,36 @@ template<bool is_fragment> void small_sieve<is_fragment>::do_pattern_sieve(where
 
     unsigned int j = j0;
 
-/* This can be enabled or disabled. If disabled, the more general pattern-
-   sieving code below will be used for line 0, too. */
-#if 1
-    const unsigned int bucket_region = 1U << LOG_BUCKET_REGION;
-    const int verbose = 0;
-    /* Handle pattern-sieved primes in line jj = 0 separately. The only
-       location of interest here is ii = 1, jj = 0. */
-    if (j == 0 && super::sublatj0 == 0) { /* Are we in line jj = 0 ? */
+/* This can be enabled or disabled. If enabled, only location i = 1 will be
+   updated in line j = 0. If disabled, the more general pattern-sieving
+   code below will be used for line 0, too, but that will hit all locations
+   with odd i. */
+    if (skip_line_jj0 && j == 0 && super::sublatj0 == 0) {
+        const int verbose = 0;
         WHERE_AM_I_UPDATE(w, j, 0);
         /* If sublattice, does this sublattice contain ii = 1 ?
            If we sieve fragments of a line, does this fragment contain
            i = 1? We assume that a fragment contains i = 1 iff it contains
-           i = 0 */
+           the origin */
         if ((super::sublatm == 1 || super::sublati0 == 1) &&
             super::has_origin) {
             for (auto const & ssp : not_nice_primes) {
                 /* Primes that are not pattern-sieved are handled elsewhere */
                 if (!ssp.is_pattern_sieved())
                     continue;
-                /* Does this prime hit location ii = 1 ? In line j = 0, all
-                   prime (powers) q hit at i = 0 (where norm = 0) and also at
-                   i = +-q, +-2q, +-3q, ... Thus the only case that hits
-                   i = 1 is a projective root with q = 1. */
+                /* Does this prime hit location ii = 1 ? In line jj = 0, all
+                   prime (powers) q hit at ii = 0 (where norm = 0) and also
+                   at ii = +-q, +-2q, +-3q, ... Thus the only case that hits
+                   ii = 1 is a projective root with q = 1. */
                 if (ssp.is_proj() && ssp.get_q() == 1) {
                     if (verbose) {
                         ssp.print(stdout);
                         printf(" hits at ii=1, jj=0\n");
                     }
-                    WHERE_AM_I_UPDATE(w, p, ssp.get_q() * ssp.get_g());
+                    WHERE_AM_I_UPDATE(w, p, ssp.get_g());
                     WHERE_AM_I_UPDATE(w, r, 0);
                     const unsigned int x = -super::i0 + 1;
-                    ASSERT_ALWAYS (x < bucket_region);
+                    ASSERT (x < (1U << LOG_BUCKET_REGION));
                     WHERE_AM_I_UPDATE(w, x, x);
                     sieve_increase(S + x, ssp.logp, w);
                 }
@@ -819,7 +817,6 @@ template<bool is_fragment> void small_sieve<is_fragment>::do_pattern_sieve(where
         }
         j++;
     }
-#endif
 
     for ( ; j < j1; j++) {
         size_t i = 0;
@@ -990,11 +987,14 @@ template<bool is_fragment> void small_sieve<is_fragment>::do_pattern_sieve(where
 
             ASSERT((S_end - S_ptr) % 4 == 0);
 
-            for ( ; S_ptr < S_end ; S_ptr += 4) {
-                S_ptr[0] += pattern[0];
-                S_ptr[1] += pattern[1];
-                S_ptr[2] += pattern[0];
-                S_ptr[3] += pattern[1];
+            if (skip_line_jj0 && super::has_origin && j0 == 0 && j == 0) {
+            } else {
+                for ( ; S_ptr < S_end ; S_ptr += 4) {
+                    S_ptr[0] += pattern[0];
+                    S_ptr[1] += pattern[1];
+                    S_ptr[2] += pattern[0];
+                    S_ptr[3] += pattern[1];
+                }
             }
         }
     }
@@ -1053,17 +1053,19 @@ template<bool is_fragment> void small_sieve<is_fragment>::do_pattern_sieve(where
             }
 #endif /* }}} */
 
-            for( ; S_ptr < S_end ; S_ptr += 3) {
-                S_ptr[0] += pattern[0];
-                S_ptr[1] += pattern[1];
-                S_ptr[2] += pattern[2];
+            if (skip_line_jj0 && super::has_origin && j == 0) {
+            } else {
+                for( ; S_ptr < S_end ; S_ptr += 3) {
+                    S_ptr[0] += pattern[0];
+                    S_ptr[1] += pattern[1];
+                    S_ptr[2] += pattern[2];
+                }
+                S_end += 2;
+                if (S_ptr < S_end)
+                    *(S_ptr++) += pattern[0];
+                if (S_ptr < S_end)
+                    *(S_ptr) += pattern[1];
             }
-
-            S_end += 2;
-            if (S_ptr < S_end)
-                *(S_ptr++) += pattern[0];
-            if (S_ptr < S_end)
-                *(S_ptr) += pattern[1];
         }
     }
     }

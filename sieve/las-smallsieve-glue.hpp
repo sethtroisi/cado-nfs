@@ -111,6 +111,7 @@ template<typename is_fragment = tribool_maybe> struct small_sieve_base {/*{{{*/
     bool has_origin;
     inline int F() const { return 1 << min_logI_logB; }
     inline int I() const { return 1 << logI; }
+    static const bool skip_line_jj0 = false;
     small_sieve_base(int logI, int N, sublat_t const & sublat)/*{{{*/
         : logI(logI), N(N)
     {
@@ -242,7 +243,7 @@ template<typename is_fragment = tribool_maybe> struct small_sieve_base {/*{{{*/
         /* Now we'd like to avoid row number 0 (so jj == 0). */
         /* The sieving code may do some special stuff to fill the
          * position (1,0). At least at some point it did */
-        if (jj == 0) jj += ssp.get_g();
+        if (skip_line_jj0 && jj == 0) jj += ssp.get_g();
 
         // In sublat mode, we also need jj congruent to sublatj0 mod m.
         // XXX A very nasty situation: when ssp.g and sublatm are
@@ -482,6 +483,7 @@ struct small_sieve : public small_sieve_base<tribool_const<is_fragment>> {/*{{{*
     using super::sublatj0;
     using super::I;
     using super::F;
+    using super::skip_line_jj0;
 
     void handle_projective_prime(ssp_t const & ssp, where_am_I & w MAYBE_UNUSED) {/*{{{*/
         /* This code also covers projective powers of 2 */
@@ -686,7 +688,7 @@ struct small_sieve : public small_sieve_base<tribool_const<is_fragment>> {/*{{{*
 
         for(unsigned int j = j0; j < j1; j++) {
             WHERE_AM_I_UPDATE(w, j, j - j0);
-            if (sublatj0 == 0 && j0 == 0 && j == 0) {
+            if (skip_line_jj0 && sublatj0 == 0 && j0 == 0 && j == 0) {
                 /* A nice prime p hits in line j=0 only in locations
                    where p|i, so no need to sieve those. */
             } else if (even) {
@@ -782,7 +784,7 @@ struct small_sieve : public small_sieve_base<tribool_const<is_fragment>> {/*{{{*
                     /* the if() branch here that the compiler and/or the
                      * branch predictor are smart enough to make its code
                      * reduce to almost zero */
-                    if (sublatj0 == 0 && j0 == 0 && j == 0) {
+                    if (skip_line_jj0 && sublatj0 == 0 && j0 == 0 && j == 0) {
                         /* A nice prime p hits in line j=0 only in locations
                            where p|i, so no need to sieve those. */
                     } else if (even) {
