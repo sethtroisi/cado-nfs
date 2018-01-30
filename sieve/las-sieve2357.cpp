@@ -558,6 +558,6 @@ void sieve<__m256i, uint8_t>(__m256i * const, size_t, const prime_t *, bool, int
 #endif
 #ifdef HAVE_ARM_NEON
 template
-void sieve<uint8x16_t, uint8_t>(uint8x16_t * const, size_t, const prime_t *, bool, int);
+void sieve<uint8x16_t, uint8_t>(uint8x16_t * const, size_t, const prime_t *, bool, int, where_am_I &);
 #endif
 }
