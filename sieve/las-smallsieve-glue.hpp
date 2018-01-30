@@ -295,8 +295,6 @@ template<typename is_fragment = tribool_maybe> struct small_sieve_base {/*{{{*/
         /* only difference with ordinary case is that we want to
          * sieve only odd lines.
          */
-        // FIXME: this is probably broken with sublattices (well,
-        // let's give it a try).
         /* For powers of 2, we sieve only odd lines (*) and 
          * ssdpos needs to point at line j=1. We assume
          * that in this case (si.I/2) % p == 0
@@ -308,8 +306,12 @@ template<typename is_fragment = tribool_maybe> struct small_sieve_base {/*{{{*/
         uint64_t jj = j*sublatm + sublatj0;
         // uint64_t ii = i0*sublatm + sublati0;
         /* next odd line */
-        jj |= 1;
-        int i0ref = (j == jj) ? i0 : (-I()/2);
+        // This was: jj |= 1;
+        int i0ref = i0;
+        if ((jj & 1) == 0) {
+            jj += sublatm;
+            i0ref = (-I()/2);
+        }
         spos_t x = (spos_t)jj * (spos_t)ssp.get_r();
         if (sublatm > 1) {
             for( ; x % sublatm != sublati0 ; x += ssp.get_p());
@@ -320,9 +322,13 @@ template<typename is_fragment = tribool_maybe> struct small_sieve_base {/*{{{*/
         /* our target is position x in the bucket region which starts
          * at coordinates (i0ref, jj). How far is that from us ?
          */
-        if (jj > j) {
+        // The condition is: if ((jj / sublatm) > j)
+        // but we separate the case sublatm=1 to avoid the div in the
+        // general case.
+        if (((sublatm == 1) && (jj > j)) ||
+                ((jj / sublatm) > j)) {
             x -= region_rank_in_line << LOG_BUCKET_REGION;
-            x += (((uint64_t)(jj - j0))<<logI);
+            x += (((uint64_t)((jj / sublatm) - j0))<<logI);
             /* For the case of several bucket regions per line, it's
              * clear that this position will be outside the current
              * bucket region. Note that some special care is needed
@@ -581,7 +587,7 @@ struct small_sieve : public small_sieve_base<tribool_const<is_fragment>> {/*{{{*
          * one go. But really, who cares, at the end of the day.
          */
 
-        if (j % 2 == 0) {
+        if ((j*super::sublatm + super::sublatj0) % 2 == 0) {
             ASSERT(pos >= F());
             pos -= F(); S_ptr += F();
             j++;
