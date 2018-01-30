@@ -199,15 +199,12 @@ cado_divert_test(F9 sublat
         APPEND_ARGUMENTS -sublat 3
         )
 
-# Note: without -skipped 100, we get 86 relations.
-# When the problem is fixed, we should get around 50 relations, but this
-# is an approximation.
-# cado_divert_test(F9 skipped
-#         APPEND_ENVIRONMENT
-#             I=10
-#             REL_COUNT=50
-#         APPEND_ARGUMENTS -skipped 100
-#         )
+cado_divert_test(F9 skipped
+        APPEND_ENVIRONMENT
+            I=10
+            REL_COUNT=60
+        APPEND_ARGUMENTS -skipped 100
+        )
 
 # We make these depend on sievetest, for checking the checksum file.
 # Since sievetest depends on makefb, we don't have to specify it
