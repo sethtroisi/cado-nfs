@@ -969,6 +969,17 @@ struct bench_base {
         where_am_I w;
         for(auto const& bf : cand) {
             if (bf.sel) sel_index = &bf-&cand.front();
+
+            /* Do it once just to warm up */
+            positions.clear();
+            for(auto const & ssp : allprimes)
+                positions.push_back((I/2)%ssp.get_p());
+            memset(S, 0, B);
+            for(int N = 0 ; N < Nmax ; N++) {
+                (*bf.f)(positions, allprimes, S, logI, N, w);
+            }
+
+            /* and now with the intent of computing timings.  */
             positions.clear();
             for(auto const & ssp : allprimes)
                 positions.push_back((I/2)%ssp.get_p());
@@ -977,6 +988,7 @@ struct bench_base {
             for(int N = 0 ; N < Nmax ; N++) {
                 (*bf.f)(positions, allprimes, S, logI, N, w);
             }
+
             timings.push_back((double) (clock()-tt) / CLOCKS_PER_SEC);
             printf(".");
             fflush(stdout);
