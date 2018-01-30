@@ -55,6 +55,8 @@
  * to get the first position to sieve in the next suitable line.
  * }}} */
 
+static bool use_sieve2357 = false;
+
 /* {{{ Some code for information purposes only */
 
 void ssp_simple_t::print(FILE *f) const
@@ -151,8 +153,6 @@ void small_sieve_clear(small_sieve_data_t & ssd)
 
 /* }}} */
 
-static bool use_sieve2357 = false;
-
 /* {{{ Sieve initialization: now the real stuff */
 
 ssp_t::ssp_t(fbprime_t _p, fbprime_t _r, unsigned char _logp, unsigned int skip, bool proj) /*{{{*/
@@ -208,7 +208,7 @@ void small_sieve_init(small_sieve_data_t & ssd,
                       sieve_info const & si, const int side)
 {
     const unsigned int thresh = si.conf.bucket_thresh;
-    const int verbose = 1;
+    const int verbose = 0;
     where_am_I w MAYBE_UNUSED;
 
     ssd.ssp.clear();
@@ -655,11 +655,6 @@ void sieve_one_nice_prime(unsigned char *S, const ssp_simple_t &ssps,
     if (mpz_cmp_ui(si.qbasis.q, p) == 0)
         return;
 
-    /* Don't sieve 3 again as it was pattern-sieved -- unless
-     * it's projective, see TODO above. */
-    if (p == 3)
-      return;
-
     WHERE_AM_I_UPDATE(w, p, p);
     const unsigned char logp = ssps.logp;
     unsigned char *S0 = S;
@@ -820,41 +815,87 @@ template<bool is_fragment> void small_sieve<is_fragment>::do_pattern_sieve(where
 
     for ( ; j < j1; j++) {
         size_t i = 0;
-        WHERE_AM_I_UPDATE(w, j, j - j0);
-        for(auto const & ssp : not_nice_primes) {
+        const unsigned int dj = j - j0;
+        const unsigned int jj = j * super::sublatm + super::sublatj0;
+        const size_t x0 = (size_t) dj << logI;
+        const bool sieve_only_odd = (jj % 2 == 0);
+        uint64_t *S_ptr = (uint64_t *) (S + x0);
+        WHERE_AM_I_UPDATE(w, j, dj);
+#ifdef TRACE_K
+        unsigned char orig_Sx = 0;
+        if (trace_on_range_Nx(super::N, x0, x0 + super::F())) {
+            orig_Sx = S[trace_Nx.x];
+        }
+#endif
+        for (auto const & ssp : not_nice_primes) {
             ASSERT_ALWAYS(i < not_nice_primes.size() + 1);
             if (!ssp.is_pattern_sieved()) {
                 /* Nothing to do here */
-            } else if (ssp.is_pow2() && j % 2 == 0) {
-                /* We hit only i,j both even here, nothing to do */
+                continue;
             } else if (ssp.is_proj()) {
-                WHERE_AM_I_UPDATE(w, p, ssp.get_q());
-                const fbprime_t g = ssp.get_g();
-                if (j % g != 0) {
+                if (jj % ssp.get_g() != 0) {
                     /* This projective root does not hit in this line */
                     continue;
                 }
-                const fbprime_t pos = super::first_position_in_line(ssp, j - j0);
-                ASSERT_ALWAYS (pos < ssp.get_q());
+                if (0) {
+                    /* If q is a power of 2 and we are in a line that is an
+                       even multiple of g, then we don't need to sieve this
+                       prime, because it hits only in locations wgere ii,jj
+                       are both even. However, the sieve_only_odd parameter
+                       already skips even ii in line with even jj, so that
+                       covers this case, too, and is handled almost for free
+                       by the sieve2357 code. */
+                    unsigned int jg = jj / ssp.get_g();
+                    if (ssp.get_q() % 2 == 0 && jg % 2 == 0) {
+                        /* Only ii,jj both even are hit */
+                        continue;
+                    }
+                }
+                WHERE_AM_I_UPDATE(w, p, ssp.get_q() * ssp.get_g());
+                WHERE_AM_I_UPDATE(w, r, ssp.get_U());
+                const fbprime_t pos = super::first_position_in_line(ssp, dj);
                 psp[i++] = {ssp.get_q(), pos, ssp.logp};
-            } else if (ssp.is_pow2()) {
-                WHERE_AM_I_UPDATE(w, p, ssp.get_p());
-                const fbprime_t pos = super::first_position_power_of_two(ssp, j - j0);
-                ASSERT_ALWAYS(pos < ssp.get_p());
-                psp[i++] = {ssp.get_p(), pos, ssp.logp};
             } else {
                 WHERE_AM_I_UPDATE(w, p, ssp.get_p());
-                const fbprime_t pos = super::first_position_ordinary_prime(ssp, j - j0);
-                ASSERT_ALWAYS(pos < ssp.get_p());
+                if (ssp.is_pow2() && sieve_only_odd)
+                    continue;
+                const fbprime_t pos = super::first_position_in_line(ssp, dj);
                 psp[i++] = {ssp.get_p(), pos, ssp.logp};
             }
+#ifdef TRACE_K
+            if (trace_on_range_Nx(super::N, x0, x0 + super::F())) {
+                /* We are in the correct line (fragment). */
+                const fbprime_t q = psp[i - 1].q, pos = psp[i - 1].idx;
+                unsigned char logp = psp[i - 1].logp;
+                if (0) {
+                    printf("# Pattern sieve side %i, line %u (N=%d, x0=%zu, trace_Nx.x=%u): Adding psp[%zu] = {%u, %u, %hhu}, from  ",
+                        w.side, jj, super::N, x0, trace_Nx.x, i - 1, q, pos, logp);
+                    ssp.print(stdout);
+                    printf("\n");
+                }
+                if ((trace_Nx.x - x0) % q == pos && (!sieve_only_odd || trace_Nx.x % 2 != 0)) {
+                    WHERE_AM_I_UPDATE(w, x, trace_Nx.x);
+                    sieve_increase(S + trace_Nx.x, logp, w);
+                }
+            }
+#endif
         }
+#ifdef TRACE_K
+        unsigned char new_Sx = 0;
+        if (trace_on_range_Nx(super::N, x0, x0 + super::F())) {
+            new_Sx = S[trace_Nx.x];
+            S[trace_Nx.x] = orig_Sx;
+        }
+#endif
         std::sort(&psp[0], &psp[i]);
         psp[i++] = {0, 0, 0};
-        uint64_t *S_ptr = (uint64_t *) (S + ((size_t) (j - j0) << logI));
-        const bool sieve_only_odd = (j%2 == 0);
         sieve2357::sieve<uint64_t, uint8_t>(S_ptr, F(), psp, sieve_only_odd,
             sieve2357::update_add, w);
+#ifdef TRACE_K
+        if (trace_on_range_Nx(super::N, x0, x0 + super::F())) {
+            ASSERT_ALWAYS(new_Sx == S[trace_Nx.x]);
+        }
+#endif
     }
     } else {
     /* TODO: use SSE2 (well, cost does not seem to be significant anyway).  */
@@ -880,7 +921,7 @@ template<bool is_fragment> void small_sieve<is_fragment>::do_pattern_sieve(where
             if (!ssp.is_pow2())
                 continue;
             if (ssp.is_proj()) {
-                /* Do nothing. It's a projective power of 2, * but for the
+                /* Do nothing. It's a projective power of 2, but for the
                    moment these are not pattern-sieved. TODO: pattern sieve
                    them in those lines where they hit. */
 
@@ -1205,7 +1246,7 @@ resieve_small_bucket_region (bucket_primes_t *BP, int N, unsigned char *S,
         ASSERT(ssp.is_pow2() || ssp.is_proj() || ssp.is_pattern_sieved());
 
         /* FIXME: I should not have to do this test */
-        if (ssp.is_pow() || ssp.is_pattern_sieved())
+        if (ssp.is_pow() || ssp.is_pow2())
             continue;
 
         /* TODO: it doesn't seem very smart to resieve projective primes
