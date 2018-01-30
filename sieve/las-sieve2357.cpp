@@ -2,16 +2,6 @@
 #include <cstddef>
 #include <cstdint>
 
-#ifdef HAVE_SSSE3
-#include "tmmintrin.h"
-#endif
-#ifdef HAVE_AVX2
-#include "immintrin.h"
-#endif
-#ifdef HAVE_ARM_NEON
-#include <arm_neon.h>
-#endif
-
 #include "ularith.h"
 #include "cado-endian.h"
 #include "las-sieve2357.hpp"

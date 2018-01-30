@@ -1,6 +1,16 @@
 #ifndef LAS_SIEVE2357_HPP
 #define LAS_SIEVE2357_HPP
 
+#ifdef HAVE_SSSE3
+#include "tmmintrin.h"
+#endif
+#ifdef HAVE_AVX2
+#include "immintrin.h"
+#endif
+#ifdef HAVE_ARM_NEON
+#include <arm_neon.h>
+#endif
+
 #include "las-smallsieve-types.hpp"
 #include "las-debug.hpp"
 
