@@ -197,14 +197,14 @@ int main(int argc, const char **argv)
   for (int k = 0; k <= 6; k++) {
     const fbprime_t p = 1 << k;
     for(fbroot_t i = 0; i < p; i++) {
-      sieve2357::prime_t cur_prime[1] = {p, i, 1};
+      sieve2357::prime_t cur_prime[1] = {{p, i, 1}};
       ok &= test_all(1, arraysize, cur_prime, 1);
     }
   }
 
   for (fbprime_t p = 3; p <= 7; p += 2) {
     for(fbroot_t i = 0; i < p; i++) {
-      sieve2357::prime_t cur_prime[1] = {p, i, 1};
+      sieve2357::prime_t cur_prime[1] = {{p, i, 1}};
       ok &= test_all(1, arraysize, cur_prime, 1);
     }
   }
