@@ -73,6 +73,7 @@ add_executable(dupsup
     las-smallsieve.cpp
     las-trialdiv.cpp las-fb.cpp
     las-debug.cpp
+    las-sieve2357.cpp
     trialdiv.c
     )
 target_link_libraries(dupsup utils_with_io facul)

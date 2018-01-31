@@ -6,6 +6,13 @@
 #include "las-types.hpp"
 #include "bucket.hpp"
 
+static inline bool
+pattern_sieve_can_sieve(ssp_t &ssp) {
+    return !ssp.is_proj() &&
+       ((ssp.get_p() % 2 == 0 && ssp.get_p() <= 2*sizeof(unsigned long)) ||
+        ssp.get_p() == 3);
+}
+
 extern void small_sieve_info(const char * what, int side, small_sieve_data_t const & r);
 extern int small_sieve_dump(FILE *, const char *, va_list);
 extern void small_sieve_clear(small_sieve_data_t & ssd);

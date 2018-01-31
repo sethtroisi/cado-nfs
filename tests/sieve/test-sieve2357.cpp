@@ -24,6 +24,7 @@
 #include "utils.h"
 #include "tests_common.h"
 #include "las-sieve2357.hpp"
+#include "las-debug.hpp"
 
 template<typename T>
 class gettypename {
@@ -69,7 +70,8 @@ T * tolerant_malloc_aligned(size_t size)
 }
 
 template <typename SIMDTYPE, typename ELEMTYPE>
-bool test(const unsigned long iter, const size_t arraysize)
+bool test(const unsigned long iter, const size_t arraysize,
+  const sieve2357::prime_t *all_primes, const size_t nr_all_primes)
 {
   const size_t N = sizeof(SIMDTYPE) / sizeof(ELEMTYPE);
   bool ok = true;
@@ -86,51 +88,41 @@ bool test(const unsigned long iter, const size_t arraysize)
   SIMDTYPE sievearray[arraysize / N];
   ELEMTYPE sievearray2[arraysize];
 #endif
-  sieve2357_prime_t all_primes[] = {
-    /* p q idx logp */
-    {3, 1, 0, 2},
-    {2, 2, 1, 1},
-    {2, 4, 3, 2},
-    {2, 8, 0, 6},
-    {2, 16, 14, 12},
-    {2, 32, 21, 24},
-    {3, 3, 2, 3},
-    {3, 3, 2, 3},
-    {5, 5, 4, 4},
-    {7, 7, 5, 5},
-  };
-  const size_t nr_all_primes = sizeof(all_primes) / sizeof(all_primes[1]);
-  sieve2357_prime_t use_primes[nr_all_primes + 1]; /* +1 for end marker */
+  sieve2357::prime_t use_primes[nr_all_primes + 1]; /* +1 for end marker */
 
   /* Skip those prime (powers) this SIMD type can't sieve */
   size_t j = 0;
   for (size_t i = 0; i < nr_all_primes; i++) {
-    if (sieve2357_can_sieve<SIMDTYPE, ELEMTYPE>(all_primes[i].p, all_primes[i].q)) {
+    if (sieve2357::can_sieve<SIMDTYPE, ELEMTYPE>(all_primes[i].q)) {
       use_primes[j++] = all_primes[i];
     }
   }
-  use_primes[j] = sieve2357_prime_t{0,0,0,0};
+  use_primes[j] = sieve2357::prime_t{0,0,0};
+
+  where_am_I w;
 
 #ifdef DO_TIMING
-  sieve2357<SIMDTYPE, ELEMTYPE>(sievearray, arraysize, use_primes);
-  sieve2357<SIMDTYPE, ELEMTYPE>(sievearray, arraysize, use_primes);
+  sieve2357:sieve<SIMDTYPE, ELEMTYPE>(sievearray, arraysize, use_primes, false, sieve2357::update_set, w);
+  sieve2357::sieve<SIMDTYPE, ELEMTYPE>(sievearray, arraysize, use_primes, false, sieve2357::update_set, w);
   start_timing();
 #endif
   for (unsigned long i = 0; i < iter; i++) {
-    sieve2357<SIMDTYPE, ELEMTYPE>(sievearray, arraysize, use_primes);
+    sieve2357::sieve<SIMDTYPE, ELEMTYPE>(sievearray, arraysize, use_primes, false, sieve2357::update_set, w);
   }
 #ifdef DO_TIMING
   end_timing();
-  printf("%lu calls of sieve2357<%s, %s>(%zu) took %lu cycles, %lu per call, %.2f per %s\n",
-         iter, gettypename<SIMDTYPE>::name, gettypename<ELEMTYPE>::name, arraysize,
-         (unsigned long) get_diff_timing(), (unsigned long) get_diff_timing() / iter,
-         (float)get_diff_timing() / iter / (arraysize / sizeof(SIMDTYPE)),
-         gettypename<SIMDTYPE>::name);
+  if (iter > 1) {
+    printf("%lu calls of sieve2357::sieve<%s, %s>(%zu) took %lu cycles, %lu per call, %.2f per %s\n",
+           iter, gettypename<SIMDTYPE>::name, gettypename<ELEMTYPE>::name, arraysize,
+           (unsigned long) get_diff_timing(), (unsigned long) get_diff_timing() / iter,
+           (float)get_diff_timing() / iter / (arraysize / sizeof(SIMDTYPE)),
+           gettypename<SIMDTYPE>::name);
+  }
 #endif
 
   /* Do the same thing again, using simple sieve code */
   memset(sievearray2, 0, arraysize);
-  for (sieve2357_prime_t *p = use_primes; p->p != 0; p++) {
+  for (sieve2357::prime_t *p = use_primes; p->q != 0; p++) {
     for (size_t i = p->idx; i < arraysize; i += p->q) {
       sievearray2[i] += p->logp;
     }
@@ -154,6 +146,24 @@ bool test(const unsigned long iter, const size_t arraysize)
   return ok;
 }
 
+bool test_all(const unsigned long iter, const size_t arraysize,
+  const sieve2357::prime_t *all_primes, const size_t nr_all_primes)
+{
+  bool ok = true;
+  ok &= test<uint32_t, unsigned char>(iter, arraysize, all_primes, nr_all_primes);
+  ok &= test<uint64_t, unsigned char>(iter, arraysize, all_primes, nr_all_primes);
+#ifdef HAVE_SSSE3
+  ok &= test<__m128i, unsigned char>(iter, arraysize, all_primes, nr_all_primes);
+#endif
+#ifdef HAVE_AVX2
+  ok &= test<__m256i, unsigned char>(iter, arraysize, all_primes, nr_all_primes);
+#endif
+#ifdef HAVE_ARM_NEON
+  ok &= test<uint8x16_t, unsigned char>(iter, arraysize, all_primes, nr_all_primes);
+#endif
+  return ok;
+}
+
 int main(int argc, const char **argv)
 {
   unsigned long iter = 1;
@@ -165,17 +175,40 @@ int main(int argc, const char **argv)
 #ifdef DO_TIMING
   init_timing();
 #endif
-  ok &= test<uint32_t, unsigned char>(iter, arraysize);
-  ok &= test<uint64_t, unsigned char>(iter, arraysize);
-#ifdef HAVE_SSSE3
-  ok &= test<__m128i, unsigned char>(iter, arraysize);
-#endif
-#ifdef HAVE_AVX2
-  ok &= test<__m256i, unsigned char>(iter, arraysize);
-#endif
-#ifdef HAVE_ARM_NEON
-  ok &= test<uint8x16_t, unsigned char>(iter, arraysize);
-#endif
+
+  {
+    sieve2357::prime_t all_primes[] = {
+      /* q idx logp */
+      {1, 0, 2},
+      {2, 1, 1},
+      {4, 3, 2},
+      {8, 0, 6},
+      {16, 14, 12},
+      {32, 21, 24},
+      {3, 2, 3},
+      {3, 2, 3},
+      {5, 4, 4},
+      {7, 5, 5},
+    };
+
+    ok &= test_all(iter, arraysize, &all_primes[0], sizeof(all_primes) / sizeof(all_primes[0]));
+  }
+
+  for (int k = 0; k <= 6; k++) {
+    const fbprime_t p = 1 << k;
+    for(fbroot_t i = 0; i < p; i++) {
+      sieve2357::prime_t cur_prime[1] = {{p, i, 1}};
+      ok &= test_all(1, arraysize, cur_prime, 1);
+    }
+  }
+
+  for (fbprime_t p = 3; p <= 7; p += 2) {
+    for(fbroot_t i = 0; i < p; i++) {
+      sieve2357::prime_t cur_prime[1] = {{p, i, 1}};
+      ok &= test_all(1, arraysize, cur_prime, 1);
+    }
+  }
+
 #ifdef DO_TIMING
   clear_timing();
 #endif

@@ -11,7 +11,7 @@
 #define SSP_PROJ        (1u<<1)
 #define SSP_DISCARD_SUBLAT     (1u<<2)
 #define SSP_DISCARD_PROJ     (1u<<3)
-#define SSP_ORDINARY3        (1u<<4)
+#define SSP_PATTERN_SIEVED   (1u<<4)
 
 /* spos_t is in las-forwardtypes.hpp */
 
@@ -63,25 +63,7 @@ public:
     : ssp_simple_t(_p, _r, _logp, skip)
     {}
     /* Constructor for affine or projective case */
-    ssp_t(fbprime_t _p, fbprime_t _r, unsigned char _logp, unsigned int skip, bool proj)
-    {
-      if (proj) {
-        init_proj(_p, _r, _logp, skip);
-      } else {
-          /* TODO: How to defer to the other constructor correctly? This
-           * here is bad
-           *
-           * (would it do to defer to the other ctor as a default, and then
-           * do this ? or would a move-ctor do the Right Thing ?)
-           */
-          (ssp_simple_t&)(*this) = ssp_simple_t(_p, _r, _logp, skip);
-          if (_p % 2 == 0) {
-              set_pow2();
-          } else if (_p == 3) {
-              set_ordinary3();
-          }
-      }
-    }
+    ssp_t(fbprime_t _p, fbprime_t _r, unsigned char _logp, unsigned int skip, bool proj);
 
     /* We could use the parent class' methods if we get rid of the ASSERT()s */
     fbprime_t get_p() const {ASSERT(!is_proj()); return p;}
@@ -97,20 +79,20 @@ public:
     void set_U(const fbprime_t U) {ASSERT(is_proj()); offset = U;}
 
     bool is_pow2() const {return (flags & SSP_POW2) != 0;}
-    bool is_ordinary3() const {return (flags & SSP_ORDINARY3) != 0;}
     bool is_proj() const {return (flags & SSP_PROJ) != 0;}
     bool is_discarded_sublat() const {return (flags & SSP_DISCARD_SUBLAT) != 0;}
     bool is_discarded_proj() const {return (flags & SSP_DISCARD_PROJ) != 0;}
     bool is_discarded() const {return is_discarded_proj() || is_discarded_sublat();}
     bool is_nice() const {return !is_pow2() && !is_proj() && !is_discarded();}
     bool is_pow() const { return rootp != 0; }
+    bool is_pattern_sieved() const {return (flags & SSP_PATTERN_SIEVED) != 0;}
 
     void set_pow(unsigned int p) { rootp = p; }
     void set_pow2() {flags |= SSP_POW2; rootp=2;}
-    void set_ordinary3() {flags |= SSP_ORDINARY3;}
     void set_proj() {flags |= SSP_PROJ;}
     void set_discarded_sublat() {flags |= SSP_DISCARD_SUBLAT;}
     void set_discarded() {flags |= SSP_DISCARD_PROJ;}
+    void set_pattern_sieved() {flags |= SSP_PATTERN_SIEVED;}
     
     void print(FILE *) const;
 private:

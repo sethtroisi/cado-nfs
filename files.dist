@@ -1206,3 +1206,6 @@ config/aligned_alloc.cmake
 tests/sieve/test_renumber.data/mnfs5.badideals
 tests/sieve/test_renumber.data/mnfs5.poly
 tests/sieve/test_renumber.sh
+config/alignas.cmake
+config/neon.c
+config/neon.cmake

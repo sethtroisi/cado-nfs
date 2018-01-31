@@ -346,7 +346,9 @@ las_info::las_info(cxx_param_list & pl)
     batch_print_survivors = param_list_parse_switch(pl, "-batch-print-survivors");
     cofac_list_init (L);
     // }}} 
-    
+
+    dump_filename = param_list_lookup_string(pl, "dumpfile");
+
     init_cof_stats(pl);
 }/*}}}*/
 

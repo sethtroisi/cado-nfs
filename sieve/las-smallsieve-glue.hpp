@@ -64,6 +64,9 @@ template<> struct make_best_choice_list<12> {
 
 /*{{{ small sieve classes */
 /*{{{ tristate booleans */
+/* The tribool classes offer a test(y, n, m) function: if the value of the
+   tribool is true, the first parameter (y) is returned, if it is false,
+   the second is returned, if it is maybe, the third is returned. */
 struct tribool_maybe {
     template<typename T> static inline T test(T const &, T const &, T const & maybe) {
         return maybe;
@@ -108,6 +111,7 @@ template<typename is_fragment = tribool_maybe> struct small_sieve_base {/*{{{*/
     bool has_origin;
     inline int F() const { return 1 << min_logI_logB; }
     inline int I() const { return 1 << logI; }
+    static const bool skip_line_jj0 = false;
     small_sieve_base(int logI, int N, sublat_t const & sublat)/*{{{*/
         : logI(logI), N(N)
     {
@@ -127,22 +131,22 @@ template<typename is_fragment = tribool_maybe> struct small_sieve_base {/*{{{*/
 
 #if 0
         log_regions_per_line = MAX(0, logI - LOG_BUCKET_REGION);
-        regions_per_line = 1 << log_regions_per_line;           
-        region_rank_in_line = N & (regions_per_line - 1);       
-        last_region_in_line = region_rank_in_line == (regions_per_line - 1); 
+        regions_per_line = 1 << log_regions_per_line;
+        region_rank_in_line = N & (regions_per_line - 1);
+        last_region_in_line = region_rank_in_line == (regions_per_line - 1);
         I = 1 << logI;
-        i0 = (region_rank_in_line << LOG_BUCKET_REGION) - I/2;          
-        i1 = i0 + (1 << MIN(LOG_BUCKET_REGION, logI));     
+        i0 = (region_rank_in_line << LOG_BUCKET_REGION) - I/2;
+        i1 = i0 + (1 << MIN(LOG_BUCKET_REGION, logI));
         /* those are (1,0,0) in the standard case */
         row0_is_oddj = (j0*sublatm + sublatj0) & 1;
 #endif
-        sublatm = sublat.m ? sublat.m : 1; 
-        sublati0 = sublat.i0;       
-        sublatj0 = sublat.j0;       
+        sublatm = sublat.m ? sublat.m : 1;
+        sublati0 = sublat.i0;
+        sublatj0 = sublat.j0;
 
-        bool has_haxis = !j0;                                               
-        bool has_vaxis = region_rank_in_line == ((regions_per_line-1)/2);   
-        has_origin = has_haxis && has_vaxis;              
+        bool has_haxis = !j0;
+        bool has_vaxis = region_rank_in_line == ((regions_per_line-1)/2);
+        has_origin = has_haxis && has_vaxis;
     }/*}}}*/
 
     spos_t first_position_ordinary_prime(ssp_simple_t const & ssp, unsigned int dj = 0) const/*{{{*/
@@ -186,7 +190,7 @@ template<typename is_fragment = tribool_maybe> struct small_sieve_base {/*{{{*/
             for( ; y % sublatm != sublati0 ; y += ssp.get_p());
             x += (y - sublati0) / sublatm;
         }
-        x= x % (spos_t)ssp.get_p();
+        x = x % (spos_t)ssp.get_p();
         /* As long as i0 <= 0, which holds in the normal case where
          * logI <= LOG_BUCKET_REGION, we can be sure that x >= 0, so
          * we have no issue with the sign.  However, when i0 is a
@@ -239,7 +243,7 @@ template<typename is_fragment = tribool_maybe> struct small_sieve_base {/*{{{*/
         /* Now we'd like to avoid row number 0 (so jj == 0). */
         /* The sieving code may do some special stuff to fill the
          * position (1,0). At least at some point it did */
-        if (jj == 0) jj += ssp.get_g();
+        if (skip_line_jj0 && jj == 0) jj += ssp.get_g();
 
         // In sublat mode, we also need jj congruent to sublatj0 mod m.
         // XXX A very nasty situation: when ssp.g and sublatm are
@@ -332,6 +336,56 @@ template<typename is_fragment = tribool_maybe> struct small_sieve_base {/*{{{*/
         }
         return x;
     }/*}}}*/
+
+    /* This function returns the first location hit, relative to the start
+       of the current *line fragment*. dj is the line number being sieved
+       relative to the bucket region start. If a bucket region contains only
+       one line, or only a fragment of a line, then dj must be 0. If ssp is
+       a projective root, then the line index jj being sieved must be
+       divisible by ssp.g. Line jj=0 is not treated any different than non-
+       zero lines. For powers of 2, even lines are not skipped by this
+       method - the caller needs to do it, if desired. */
+    fbroot_t first_position_in_line(ssp_t const & ssp, unsigned int dj = 0) const
+    {
+        const unsigned int j = j0 + dj;
+        const unsigned int jj = j * sublatm + sublatj0;
+
+        if (ssp.is_proj()) {
+            ASSERT (jj % ssp.get_g() == 0);
+
+            int64_t ii = int64_t(jj / ssp.get_g()) * int64_t(ssp.get_U());
+
+            int i;
+            if (sublatm > 1) {
+                for( ; ii % sublatm != sublati0 ; ii += ssp.get_q());
+                i = (ii - sublati0) / sublatm;
+            } else {
+                i = ii;
+            }
+
+            int64_t x = (i - i0) % (uint64_t)ssp.get_q();
+            if (x < 0) x += ssp.get_q();
+            ASSERT_ALWAYS(0 <= x && x < ssp.get_q());
+            return (fbroot_t) x;
+        } else {
+            /* Affine roots hit in every line, but not necessarily in every line fragment */
+            int64_t ii = int64_t(jj) * int64_t(ssp.get_r());
+
+            int i;
+            if (sublatm > 1) {
+                for( ; ii % sublatm != sublati0 ; ii += ssp.get_p());
+                i = (ii - sublati0) / sublatm;
+            } else {
+                i = ii;
+            }
+
+            int64_t x = (i - i0) % (uint64_t)ssp.get_p();
+            if (x < 0) x += ssp.get_p();
+            ASSERT_ALWAYS(0 <= x && x < ssp.get_p());
+            return (fbroot_t) x;
+        }
+    }
+
 };/*}}}*/
 
 /* {{{ overrun is actually a direct dependent of the <is_fragment>
@@ -426,8 +480,10 @@ struct small_sieve : public small_sieve_base<tribool_const<is_fragment>> {/*{{{*
     using super::i0;
     using super::j0;
     using super::j1;
+    using super::sublatj0;
     using super::I;
     using super::F;
+    using super::skip_line_jj0;
 
     void handle_projective_prime(ssp_t const & ssp, where_am_I & w MAYBE_UNUSED) {/*{{{*/
         /* This code also covers projective powers of 2 */
@@ -484,7 +540,7 @@ struct small_sieve : public small_sieve_base<tribool_const<is_fragment>> {/*{{{*
             for (size_t x = 0; x < sizeof (unsigned long); x++)
                 ((unsigned char *)&logps)[x] = logp;
             unsigned int j = j0 + (pos >> logI);
-            for( ; j < j1 ; ) {
+            for( ; j < j1 ; j += g) {
                 /* our loop is over line fragments that have a hit,
                  * and by the condition q=1 above we'll sieve them
                  * completely */
@@ -513,7 +569,6 @@ struct small_sieve : public small_sieve_base<tribool_const<is_fragment>> {/*{{{*
                     S_ptr[3] += logps2;
                 }
                 pos += gI;
-                j += g;
             }
 #if 0
             ssdpos[index] = pos - (1U << LOG_BUCKET_REGION);
@@ -559,7 +614,7 @@ struct small_sieve : public small_sieve_base<tribool_const<is_fragment>> {/*{{{*
         const fbprime_t r = ssp.get_r();
         WHERE_AM_I_UPDATE(w, p, p);
 
-        if (p <= pattern2_size)
+        if (ssp.is_pattern_sieved())
             return;
 
         const unsigned char logp = ssp.logp;
@@ -631,9 +686,12 @@ struct small_sieve : public small_sieve_base<tribool_const<is_fragment>> {/*{{{*
         bool dj_row0_evenness = (super::sublatm & 1);
         bool even = row0_even;
 
-        for(unsigned int j = j0; ; ) {
+        for(unsigned int j = j0; j < j1; j++) {
             WHERE_AM_I_UPDATE(w, j, j - j0);
-            if (even) {
+            if (skip_line_jj0 && sublatj0 == 0 && j0 == 0 && j == 0) {
+                /* A nice prime p hits in line j=0 only in locations
+                   where p|i, so no need to sieve those. */
+            } else if (even) {
                 /* for j even, we sieve only odd pi, so step = 2p. */
                 {
                     spos_t xpos = ((super::sublati0 + pos) & 1) ? pos : (pos+p);
@@ -646,7 +704,6 @@ struct small_sieve : public small_sieve_base<tribool_const<is_fragment>> {/*{{{*
             S1 += I();
             pos += r; if (pos >= (spos_t) p) pos -= p; 
             even ^= dj_row0_evenness;
-            if (++j >= j1) break;
         }
         after_region_adjust(p_pos, pos, overrun, ssp);
         return true;
@@ -722,12 +779,15 @@ struct small_sieve : public small_sieve_base<tribool_const<is_fragment>> {/*{{{*
                 __m128i ones = _mm_set1_epi32(1);
                 __m128i sublati0 = _mm_set1_epi32(super::sublati0);
                 bool even = row0_even;
-                for(unsigned int j = j0 ; ; ) {
+                for(unsigned int j = j0 ; j < j1; j++) {
                     WHERE_AM_I_UPDATE(w, j, j - j0);
                     /* the if() branch here that the compiler and/or the
                      * branch predictor are smart enough to make its code
                      * reduce to almost zero */
-                    if (even) {
+                    if (skip_line_jj0 && sublatj0 == 0 && j0 == 0 && j == 0) {
+                        /* A nice prime p hits in line j=0 only in locations
+                           where p|i, so no need to sieve those. */
+                    } else if (even) {
                         /* for j even, we sieve only odd pi, so step = 2p. */
                         __m128i xpos =
                             _mm_add_epi32(pos,
@@ -763,7 +823,6 @@ struct small_sieve : public small_sieve_base<tribool_const<is_fragment>> {/*{{{*
                     pos = _mm_add_epi32(pos, r);
                     pos = _mm_sub_epi32(pos, _mm_andnot_si128(_mm_cmplt_epi32(pos, p), p));
                     even ^= dj_row0_evenness;
-                    if (++j >= j1) break;
                 }
                 after_region_adjust(p_pos0, _mm_extract_epi32(pos, 0), overrun0, ssp0);
                 after_region_adjust(p_pos1, _mm_extract_epi32(pos, 1), overrun1, ssp1);
@@ -851,8 +910,7 @@ struct small_sieve : public small_sieve_base<tribool_const<is_fragment>> {/*{{{*
     /* }}} */
 
     public:
-    void pattern_sieve2(where_am_I &);
-    void pattern_sieve3(where_am_I &);
+    void do_pattern_sieve(where_am_I &);
 
     void normal_sieve(where_am_I & w) {
         for(size_t s : sorted_subranges) {
@@ -895,12 +953,12 @@ struct small_sieve : public small_sieve_base<tribool_const<is_fragment>> {/*{{{*
                 handle_nice_prime<even_code, odd_code, 0>(ssp, p_pos, w);
             } else
 #endif
-            if (ssp.is_proj()) {
+            if (ssp.is_pattern_sieved()) {
+                /* This ssp is pattern-sieved, nothing to do here */
+            } else if (ssp.is_proj()) {
                 handle_projective_prime(ssp, w);
             } else if (ssp.is_pow2()) {
                 handle_power_of_2(ssp, w);
-            } else if (ssp.is_ordinary3()) {
-                /* p=3 is pattern-sieved, nothing to do */
             } else {
                 /* I don't think we can end up here.  */
                 ASSERT_ALWAYS(0);
