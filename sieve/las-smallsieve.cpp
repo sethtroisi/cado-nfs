@@ -819,7 +819,6 @@ template<bool is_fragment> void small_sieve<is_fragment>::do_pattern_sieve(where
         const unsigned int jj = j * super::sublatm + super::sublatj0;
         const size_t x0 = (size_t) dj << logI;
         const bool sieve_only_odd = (jj % 2 == 0);
-        uint64_t *S_ptr = (uint64_t *) (S + x0);
         WHERE_AM_I_UPDATE(w, j, dj);
 #ifdef TRACE_K
         unsigned char orig_Sx = 0;
@@ -889,8 +888,9 @@ template<bool is_fragment> void small_sieve<is_fragment>::do_pattern_sieve(where
 #endif
         std::sort(&psp[0], &psp[i]);
         psp[i++] = {0, 0, 0};
-        sieve2357::sieve<uint64_t, uint8_t>(S_ptr, F(), psp, sieve_only_odd,
-            sieve2357::update_add, w);
+        sieve2357::sieve<sieve2357::preferred_simd_type, uint8_t>(
+            (sieve2357::preferred_simd_type *) (S + x0), F(), psp,
+            sieve_only_odd, sieve2357::update_add, w);
 #ifdef TRACE_K
         if (trace_on_range_Nx(super::N, x0, x0 + super::F())) {
             ASSERT_ALWAYS(new_Sx == S[trace_Nx.x]);
