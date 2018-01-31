@@ -2275,6 +2275,7 @@ static void declare_usage(param_list pl)/*{{{*/
   las_dlog_base::declare_parameter_usage(pl);
 #endif /* DLP_DESCENT */
   param_list_decl_usage(pl, "never-discard", "Disable the discarding process for special-q's. This is dangerous. See bug #15617");
+  param_list_decl_usage(pl, "dumpfile", "Dump entire sieve region to file for debugging.");
   verbose_decl_usage(pl);
   tdict_decl_usage(pl);
 }/*}}}*/
