@@ -223,7 +223,7 @@ void sieve_info::init_fb_smallsieved(int side)
      * ordering, which may be a bit messy).
      */
     for (int i = 0; i < 6; i++) {
-        if (i == RS)
+        if ((i == RS) || (i == SKIPPED))
             continue;
         s->insert(s->end(), pieces[i].begin(), pieces[i].end());
     }

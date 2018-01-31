@@ -271,7 +271,7 @@ void small_sieve_init(small_sieve_data_t & ssd,
                 //
                 // FIXME. ok, they're certainly not "nice", but we should
                 // sieve them nonetheless.
-                if (pp == 2 || pp == 3 || (sublatm % pp) == 0) {
+                if (pp == 3 || (sublatm % pp) == 0) {
                     continue;
                 }
             }
@@ -944,7 +944,7 @@ template<bool is_fragment> void small_sieve<is_fragment>::do_pattern_sieve(where
              * indeed, if i-j*r=0 mod 2^k and j even, then i even too, so
              * useless.
              */
-            if (j&1) {
+            if ((j*super::sublatm + super::sublatj0)&1) {
                 const fbprime_t p = ssp.get_p();
                 /*
                 if (mpz_cmp_ui(si.qbasis.q, p) == 0) {
@@ -972,7 +972,7 @@ template<bool is_fragment> void small_sieve<is_fragment>::do_pattern_sieve(where
                     // Hence, we have to do this reduction here:
                     pos &= (p-1);
                     ASSERT (pos < (spos_t) p);
-                    ASSERT (j % 2);
+                    // ASSERT (j % 2);
                     for (int x = pos; x < (int) pattern2_size; x += p) {
                         if (verbose_pattern_2)
                             verbose_output_print(TRACE_CHANNEL, 0,

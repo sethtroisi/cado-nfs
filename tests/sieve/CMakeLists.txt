@@ -193,21 +193,18 @@ cado_divert_test(F9 batch
 cado_divert_test(F9 sublat
         APPEND_ENVIRONMENT
             I=10
-            REL_COUNT=242
-            REFERENCE_SHA1=8ea4b9e59f308023a35ac3c147199eec98d1b63e
-            REFERENCE_REVISION=f8dc5eff0976dd7745712e3e51b67cc523427beb
+            REL_COUNT=245
+            REFERENCE_SHA1=11f0947fa83a200160ad934215c141917ca3074e
+            REFERENCE_REVISION=xxxxxxxxxxxxxxxxxxxxxxxxxx
         APPEND_ARGUMENTS -sublat 3
         )
 
-# Note: without -skipped 100, we get 86 relations.
-# When the problem is fixed, we should get around 50 relations, but this
-# is an approximation.
-# cado_divert_test(F9 skipped
-#         APPEND_ENVIRONMENT
-#             I=10
-#             REL_COUNT=50
-#         APPEND_ARGUMENTS -skipped 100
-#         )
+cado_divert_test(F9 skipped
+        APPEND_ENVIRONMENT
+            I=10
+            REL_COUNT=60
+        APPEND_ARGUMENTS -skipped 100
+        )
 
 # We make these depend on sievetest, for checking the checksum file.
 # Since sievetest depends on makefb, we don't have to specify it

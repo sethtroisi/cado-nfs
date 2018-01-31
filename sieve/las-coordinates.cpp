@@ -112,19 +112,19 @@ int ABToIJ(int *i, unsigned int *j, const int64_t a, const uint64_t b, sieve_inf
     *i = mpz_get_si(ii);
     *j = mpz_get_ui(jj);
     if (si.conf.sublat.m != 0) {
-        int64_t imodm = (*i) % si.conf.sublat.m;
+        int64_t imodm = (*i) % int64_t(si.conf.sublat.m);
         if (imodm < 0) {
             imodm += si.conf.sublat.m;
         }
-        int64_t jmodm = (*j) % si.conf.sublat.m;
+        int64_t jmodm = (*j) % int64_t(si.conf.sublat.m);
         if (jmodm < 0)
             jmodm += si.conf.sublat.m;
         if (imodm != si.conf.sublat.i0 || jmodm != si.conf.sublat.j0) {
             fprintf(stderr, "# TraceAB: (i,j) does not belong to the right congruence class\n");
             ok = 0;
         } else {
-            *i = ((*i) - imodm) / si.conf.sublat.m;
-            *j = ((*j) - jmodm) / si.conf.sublat.m;
+            *i = ((*i) - imodm) / int64_t(si.conf.sublat.m);
+            *j = ((*j) - jmodm) / int64_t(si.conf.sublat.m);
         }
     }
 
