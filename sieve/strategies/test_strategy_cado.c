@@ -1017,7 +1017,7 @@ facul_strategy_t* convert_strategy_to_facul_strategy (strategy_t* t, unsigned lo
 		strategy->methods[index_method].plan = malloc(sizeof(ecm_plan_t));
 		ASSERT(strategy->methods[index_method].plan != NULL);
 		ecm_make_plan(strategy->methods[index_method].plan, B1, B2, curve,
-			      labs(parameter), 0, 0);
+			      parameter, 0, 0);
 	      } else {
 		exit(EXIT_FAILURE);
 	      }
