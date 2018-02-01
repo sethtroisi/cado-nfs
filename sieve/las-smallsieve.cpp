@@ -814,7 +814,7 @@ template<bool is_fragment> void small_sieve<is_fragment>::do_pattern_sieve(where
     }
 
     for ( ; j < j1; j++) {
-        size_t i = 0;
+        size_t i = 0;   // Info: this is not an abscissa, here, but a plain counter
         const unsigned int dj = j - j0;
         const unsigned int jj = j * super::sublatm + super::sublatj0;
         const size_t x0 = (size_t) dj << logI;
@@ -827,7 +827,7 @@ template<bool is_fragment> void small_sieve<is_fragment>::do_pattern_sieve(where
         }
 #endif
         for (auto const & ssp : not_nice_primes) {
-            ASSERT_ALWAYS(i < not_nice_primes.size() + 1);
+            ASSERT_ALWAYS(i < not_nice_primes.size());
             if (!ssp.is_pattern_sieved()) {
                 /* Nothing to do here */
                 continue;

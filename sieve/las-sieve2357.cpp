@@ -80,7 +80,7 @@ get_shifted_mask(const fbprime_t shift)
     return loadu<SIMDTYPE, ELEMTYPE>(p);
 }
 
-/* Return a sieving pattern of stride "STRIDE", shifted by "shift", with
+/* Return a sieving pattern of stride "STRIDE", shifted by "offset", with
    value "elem" in locations where it hits */
 template <typename SIMDTYPE, typename ELEMTYPE, unsigned int STRIDE>
 static inline SIMDTYPE
