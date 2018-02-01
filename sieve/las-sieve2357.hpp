@@ -57,6 +57,13 @@ static inline bool can_sieve(const fbprime_t q)
       || q == 7;
 }
 
+/* The sieve() function can either write to the sieve array, overwriting any
+   data that was previously there, or add to the sieve array.
+   If sieve2357::sieve() is to write to a sieve array that contains only
+   zeroes, then the former is faster (don't have to zero out the array and
+   sieve() saves one read and add per word).
+   If the sieve array contains non-zero data, then obviously update_add is
+   required. */
 enum {
     update_set,
     update_add
