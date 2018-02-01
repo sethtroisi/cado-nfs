@@ -5,22 +5,23 @@
 #include "ularith.h"
 #include "cado-endian.h"
 #include "las-sieve2357.hpp"
+#include "intrinsics.hpp"
+
+template<>
+inline uint32_t ATTRIBUTE((__always_inline__, __artificial__))
+adds<uint32_t, uint8_t>(const uint32_t a, const uint32_t b)
+{
+  return a + b; /* WARNING, we assume no carry between elements here! */
+}
+
+template<>
+inline uint64_t ATTRIBUTE((__always_inline__, __artificial__))
+adds<uint64_t, uint8_t>(const uint64_t a, const uint64_t b)
+{
+  return a + b; /* WARNING, we assume no carry between elements here! */
+}
 
 namespace sieve2357 {
-
-/* Shift "b" so that each byte that does not get shifted out moves to a
-   memory address that is "idx" bytes higher */
-template<typename T>
-static inline T shift_in_memory(T b, int idx)
-{
-#if defined(CADO_LITTLE_ENDIAN)
-    return b << (idx * 8);
-#elif defined(CADO_BIG_ENDIAN)
-    return b >> (idx * 8);
-#else
-#error PDP endianness not implemented
-#endif
-}
 
 static inline unsigned long ATTRIBUTE((__always_inline__, __artificial__))
 modsub(const unsigned long a, const unsigned long b, const unsigned long m)
@@ -28,83 +29,6 @@ modsub(const unsigned long a, const unsigned long b, const unsigned long m)
   unsigned long r;
   ularith_submod_ul_ul(&r, a, b, m);
   return r;
-}
-
-template <typename SIMDTYPE, typename ELEMTYPE>
-static SIMDTYPE set0();
-
-template <typename SIMDTYPE, typename ELEMTYPE>
-static SIMDTYPE set1(ELEMTYPE);
-
-template <typename SIMDTYPE, typename ELEMTYPE>
-static SIMDTYPE adds(SIMDTYPE, SIMDTYPE);
-
-template <typename SIMDTYPE, typename ELEMTYPE>
-static SIMDTYPE _and(SIMDTYPE, SIMDTYPE);
-
-template <typename SIMDTYPE, typename ELEMTYPE>
-static SIMDTYPE andnot(SIMDTYPE);
-
-template <typename SIMDTYPE, typename ELEMTYPE>
-static SIMDTYPE loadu(const ELEMTYPE *);
-
-template<typename SIMDTYPE, typename ELEMTYPE>
-inline SIMDTYPE ATTRIBUTE((__always_inline__, __artificial__))
-adds(const SIMDTYPE a, const SIMDTYPE b)
-{
-  return a + b; /* WARNING, we assume no carry between elements here! */
-}
-
-template<typename SIMDTYPE, typename ELEMTYPE>
-inline SIMDTYPE ATTRIBUTE((__always_inline__, __artificial__))
-set0()
-{
-  return 0;
-}
-
-template<typename SIMDTYPE, typename ELEMTYPE>
-static SIMDTYPE set1(const ELEMTYPE);
-
-template<>
-inline uint32_t ATTRIBUTE((__always_inline__, __artificial__))
-set1<uint32_t, uint8_t>(const uint8_t c)
-{
-  uint32_t r = (uint32_t) c;
-  r += r << 8;
-  r += r << 16;
-  return r;
-}
-
-template<>
-inline uint64_t ATTRIBUTE((__always_inline__, __artificial__))
-set1<uint64_t, uint8_t>(const uint8_t c)
-{
-  uint64_t r = (uint32_t) c;
-  r += r << 8;
-  r += r << 16;
-  r += r << 32;
-  return r;
-}
-
-template<typename SIMDTYPE, typename ELEMTYPE>
-inline SIMDTYPE ATTRIBUTE((__always_inline__, __artificial__))
-_and(const SIMDTYPE a, const SIMDTYPE b)
-{
-  return a & b;
-}
-
-template<typename SIMDTYPE, typename ELEMTYPE>
-inline SIMDTYPE ATTRIBUTE((__always_inline__, __artificial__))
-andnot(const SIMDTYPE a, const SIMDTYPE b)
-{
-  return (~a) & b;
-}
-
-template<typename SIMDTYPE, typename ELEMTYPE>
-inline SIMDTYPE ATTRIBUTE((__always_inline__, __artificial__))
-loadu(const ELEMTYPE *p)
-{
-  return * (const SIMDTYPE *)p;
 }
 
 static const uint8_t ff = ~(uint8_t)0;
@@ -125,141 +49,6 @@ static const uint8_t mask5[64] =  {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
 static const uint8_t mask7[64] =  {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                                    ff, 0, 0, 0, 0, 0, 0, ff, 0, 0, 0, 0, 0, 0, ff, 0, 0, 0, 0, 0, 0, ff, 0, 0, 0, 0, 0, 0, ff, 0, 0, 0};
 
-#ifdef HAVE_SSSE3
-
-template<>
-inline __m128i ATTRIBUTE((__always_inline__, __artificial__))
-set0<__m128i, uint8_t>()
-{
-  return _mm_setzero_si128 ();
-}
-
-template<>
-inline __m128i ATTRIBUTE((__always_inline__, __artificial__))
-set1<__m128i, uint8_t>(const uint8_t c)
-{
-  return _mm_set1_epi8(c);
-}
-
-template<>
-inline __m128i ATTRIBUTE((__always_inline__, __artificial__))
-adds<__m128i, uint8_t>(const __m128i a, const __m128i b)
-{
-  return _mm_adds_epu8(a, b);
-}
-
-template<>
-inline __m128i ATTRIBUTE((__always_inline__, __artificial__))
-_and<__m128i, uint8_t>(const __m128i a, const __m128i b)
-{
-  return _mm_and_si128(a, b);
-}
-
-template<>
-inline __m128i ATTRIBUTE((__always_inline__, __artificial__))
-andnot<__m128i, uint8_t>(const __m128i a, const __m128i b)
-{
-  return _mm_andnot_si128(a, b);
-}
-
-template<>
-inline __m128i ATTRIBUTE((__always_inline__, __artificial__))
-loadu<__m128i, uint8_t>(const uint8_t *p)
-{
-  return _mm_loadu_si128((const __m128i *) p);
-}
-#endif
-
-#ifdef HAVE_AVX2
-
-template<>
-inline __m256i ATTRIBUTE((__always_inline__, __artificial__))
-set0<__m256i, uint8_t>()
-{
-  return _mm256_setzero_si256 ();
-}
-
-template<>
-inline __m256i ATTRIBUTE((__always_inline__, __artificial__))
-set1<__m256i, uint8_t>(const uint8_t c)
-{
-  __m128i t = _mm_cvtsi64x_si128(c);
-  return _mm256_broadcastb_epi8(t);
-}
-
-template<>
-inline __m256i ATTRIBUTE((__always_inline__, __artificial__))
-adds<__m256i, uint8_t>(const __m256i a, const __m256i b)
-{
-  return _mm256_adds_epu8(a, b);
-}
-
-template<>
-inline __m256i ATTRIBUTE((__always_inline__, __artificial__))
-_and<__m256i, uint8_t>(const __m256i a, const __m256i b)
-{
-  return _mm256_and_si256(a, b);
-}
-
-template<>
-inline __m256i ATTRIBUTE((__always_inline__, __artificial__))
-andnot<__m256i, uint8_t>(const __m256i a, const __m256i b)
-{
-  return _mm256_andnot_si256(a, b);
-}
-
-template<>
-inline __m256i ATTRIBUTE((__always_inline__, __artificial__))
-loadu<__m256i>(const uint8_t *p)
-{
-  return _mm256_loadu_si256((const __m256i *) p);
-}
-#endif
-
-#ifdef HAVE_ARM_NEON
-
-template<>
-inline uint8x16_t ATTRIBUTE((__always_inline__, __artificial__))
-set0<uint8x16_t, uint8_t>()
-{
-  return vdupq_n_u8(0);
-}
-
-template<>
-inline uint8x16_t ATTRIBUTE((__always_inline__, __artificial__))
-set1<uint8x16_t, uint8_t>(const uint8_t c)
-{
-   return vdupq_n_u8(c);
-}
-
-template<>
-inline uint8x16_t ATTRIBUTE((__always_inline__, __artificial__))
-adds<uint8x16_t, uint8_t>(const uint8x16_t a, const uint8x16_t b)
-{
-  return vqaddq_u8(a, b);
-}
-
-template<>
-inline uint8x16_t ATTRIBUTE((__always_inline__, __artificial__))
-_and<uint8x16_t, uint8_t>(const uint8x16_t a, const uint8x16_t b)
-{
-  return vandq_u8(a, b);
-}
-
-template<>
-inline uint8x16_t ATTRIBUTE((__always_inline__, __artificial__))
-andnot<uint8x16_t, uint8_t>(const uint8x16_t a, const uint8x16_t b)
-{
-  return vandq_u8(vmvnq_u8(a), b);
-}
-
-template<>
-inline uint8x16_t ATTRIBUTE((__always_inline__, __artificial__))
-loadu<uint8x16_t>(const uint8_t *p)
-{
-  return vld1q_u8(p);
-}
-#endif
 
 /* A demultiplexer that returns the correct mask array for a given "STRIDE"
    value. We should also partially specialise ELEMTYPE = uint8_t, but C++
