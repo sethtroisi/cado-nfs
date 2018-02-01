@@ -884,7 +884,7 @@ template<bool is_fragment> void small_sieve<is_fragment>::do_pattern_sieve(where
                     printf("\n");
                 }
                 if ((trace_Nx.x - x0) % q == pos &&
-                    (skip_mod_2 == 0 || trace_Nx.x % 2 == skip_mod_2 % 2)) {
+                    (skip_mod_2 == 0 || trace_Nx.x % 2 == (unsigned) skip_mod_2 % 2)) {
                     WHERE_AM_I_UPDATE(w, x, trace_Nx.x);
                     sieve_increase(S + trace_Nx.x, logp, w);
                 }
