@@ -818,7 +818,7 @@ template<bool is_fragment> void small_sieve<is_fragment>::do_pattern_sieve(where
         const unsigned int dj = j - j0;
         const unsigned int jj = j * super::sublatm + super::sublatj0;
         const size_t x0 = (size_t) dj << logI;
-        const bool sieve_only_odd = (jj % 2 == 0);
+        int skip_mod_2 = 0;
         WHERE_AM_I_UPDATE(w, j, dj);
 #ifdef TRACE_K
         unsigned char orig_Sx = 0;
@@ -826,6 +826,15 @@ template<bool is_fragment> void small_sieve<is_fragment>::do_pattern_sieve(where
             orig_Sx = S[trace_Nx.x];
         }
 #endif
+        if (jj % 2 == 0) {
+            if (super::sublatm == 3 && super::sublati0 == 1) {
+                /* Skip odd indices which correspond to even ii */
+                skip_mod_2 = 2;
+            } else {
+                /* Skip even indices which correspond to even ii */
+                skip_mod_2 = 1;
+            }
+        }
         for (auto const & ssp : not_nice_primes) {
             ASSERT_ALWAYS(i < not_nice_primes.size());
             if (!ssp.is_pattern_sieved()) {
@@ -840,7 +849,7 @@ template<bool is_fragment> void small_sieve<is_fragment>::do_pattern_sieve(where
                     /* If q is a power of 2 and we are in a line that is an
                        even multiple of g, then we don't need to sieve this
                        prime, because it hits only in locations wgere ii,jj
-                       are both even. However, the sieve_only_odd parameter
+                       are both even. However, the skip_mod_2 parameter
                        already skips even ii in line with even jj, so that
                        covers this case, too, and is handled almost for free
                        by the sieve2357 code. */
@@ -856,8 +865,10 @@ template<bool is_fragment> void small_sieve<is_fragment>::do_pattern_sieve(where
                 psp[i++] = {ssp.get_q(), pos, ssp.logp};
             } else {
                 WHERE_AM_I_UPDATE(w, p, ssp.get_p());
+# if 0 /* what do about this one? */
                 if (ssp.is_pow2() && sieve_only_odd)
                     continue;
+#endif
                 const fbprime_t pos = super::first_position_in_line(ssp, dj);
                 psp[i++] = {ssp.get_p(), pos, ssp.logp};
             }
@@ -872,7 +883,8 @@ template<bool is_fragment> void small_sieve<is_fragment>::do_pattern_sieve(where
                     ssp.print(stdout);
                     printf("\n");
                 }
-                if ((trace_Nx.x - x0) % q == pos && (!sieve_only_odd || trace_Nx.x % 2 != 0)) {
+                if ((trace_Nx.x - x0) % q == pos &&
+                    (skip_mod_2 == 0 || trace_Nx.x % 2 == skip_mod_2 % 2)) {
                     WHERE_AM_I_UPDATE(w, x, trace_Nx.x);
                     sieve_increase(S + trace_Nx.x, logp, w);
                 }
@@ -890,7 +902,7 @@ template<bool is_fragment> void small_sieve<is_fragment>::do_pattern_sieve(where
         psp[i++] = {0, 0, 0};
         sieve2357::sieve<sieve2357::preferred_simd_type, uint8_t>(
             (sieve2357::preferred_simd_type *) (S + x0), F(), psp,
-            sieve_only_odd, sieve2357::update_add, w);
+            skip_mod_2, sieve2357::update_add, w);
 #ifdef TRACE_K
         if (trace_on_range_Nx(super::N, x0, x0 + super::F())) {
             ASSERT_ALWAYS(new_Sx == S[trace_Nx.x]);
