@@ -71,7 +71,7 @@ enum {
 
 template <typename SIMDTYPE, typename ELEMTYPE>
 void sieve(SIMDTYPE *sievearray, size_t arraylen, const prime_t *primes,
-    bool only_odd, int update_operation, where_am_I & w);
+    int skip_mod_2, int update_operation, where_am_I & w);
 
 }
 #endif
