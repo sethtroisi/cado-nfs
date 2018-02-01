@@ -3,6 +3,16 @@
 
 #include "ec_arith_common.h"
 
+#ifdef ECM_COUNT_OPS
+static unsigned int _count_edwards_add, _count_edwards_dbl, _count_edwards_tpl;
+static int _count_edwards_extraM;
+#define EDWARDS_COUNT_OPS_M _count_edwards_add*8 + _count_edwards_dbl*7 \
+                            + _count_edwards_tpl*12 + _count_edwards_extraM
+#define EDWARDS_COUNT_OPS_RESET() do { _count_edwards_extraM = 0;           \
+      _count_edwards_add = _count_edwards_dbl = _count_edwards_tpl = 0;    \
+    } while (0)
+#endif
+
 /* #define SAFE_TWISTED_EDWARDS_TO_MONTGOMERY */
 
 static inline void
@@ -26,12 +36,16 @@ edwards_add (ec_point_t R, const ec_point_t P, const ec_point_t Q,
   /* Cost: 8M + 6add dependent upon the first point. */
   /* Source: 2008 Hisil–Wong–Carter–Dawson */ 
   /* http://eprint.iacr.org/2008/522, Section 3.2. */
+  
+#ifdef ECM_COUNT_OPS
+  _count_edwards_add++;
+  if (output_type == TWISTED_EDWARDS_ext)
+    _count_edwards_extraM++;
+  else if (output_type == MONTGOMERY_xz)
+    _count_edwards_extraM -= 4;
+#endif
 
   residue_t t0, t1, A, B, C, D, E, F, G, H;
-  
-#if COUNT_ELLE_OPS
-  edwards_add_count++;
-#endif
   
   /* ASSERT (output_flag != AFF); */
 
@@ -130,8 +144,10 @@ edwards_dbl (ec_point_t R, const ec_point_t P,
     
   residue_t A, B, C, D, E, F, G, H;
 
-#if COUNT_ELLE_OPS
-  edwards_double_count++;
+#ifdef ECM_COUNT_OPS
+  _count_edwards_dbl++;
+  if (output_type == TWISTED_EDWARDS_ext)
+    _count_edwards_extraM++;
 #endif
 
   /* ASSERT (output_flag != AFF); */
@@ -190,8 +206,10 @@ edwards_tpl (ec_point_t R, const ec_point_t P,
 
   residue_t YY, aXX, Ap, B, xB, yB, AA, F, G, xE, yH, zF, zG;
 
-#if COUNT_ELLE_OPS
-  edwards_triple_count++;
+#ifdef ECM_COUNT_OPS
+  _count_edwards_tpl++;
+  if (output_type == TWISTED_EDWARDS_ext)
+    _count_edwards_extraM += 2;
 #endif
 
   /* ASSERT (output_flag != AFF); */

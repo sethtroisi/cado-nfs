@@ -3,6 +3,14 @@
 
 #include "ec_arith_common.h"
 
+#ifdef ECM_COUNT_OPS
+static unsigned int _count_montgomery_dadd, _count_montgomery_dbl;
+#define MONTGOMERY_COUNT_OPS_M _count_montgomery_dadd*6+_count_montgomery_dbl*5
+#define MONTGOMERY_COUNT_OPS_RESET() do {                   \
+      _count_montgomery_dadd = _count_montgomery_dbl = 0;   \
+    } while (0)
+#endif
+
 /************************ Montgomery elliptic curves **************************/
 
 /* Equation:
@@ -45,8 +53,8 @@ montgomery_dbl (ec_point_t Q, const ec_point_t P, const modulus_t m,
     }
 #endif
 
-#if COUNT_ELLM_OPS
-  ellM_double_count++;
+#ifdef ECM_COUNT_OPS
+  _count_montgomery_dbl++;
 #endif
 
   mod_init_noset0 (u, m);
@@ -90,6 +98,10 @@ montgomery_dadd (ec_point_t R, const ec_point_t P, const ec_point_t Q,
 {
   residue_t u, v, w;
 
+#ifdef ECM_COUNT_OPS
+  _count_montgomery_dadd++;
+#endif
+
 #if ELLM_SAFE_ADD
   /* Handle case where at least one input point is point at infinity */
   if (mod_is0 (P->z, m))
@@ -104,10 +116,6 @@ montgomery_dadd (ec_point_t R, const ec_point_t P, const ec_point_t Q,
       ellM_set (R, P, m);
       return;
     }
-#endif
-
-#if COUNT_ELLM_OPS
-  ellM_dadd_count++;
 #endif
 
   mod_init_noset0 (u, m);

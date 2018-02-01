@@ -2,10 +2,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <inttypes.h>
 #include "portability.h"
 #include "facul_ecm.h"
 #include "ularith.h"
 #include "getprime.h"
+#include "timing.h"
+
+//#define ECM_COUNT_OPS /* define to print number of operations of ECM */
+#define ECM_TIMINGS /* define to print timings of ECM */
 
 #include "ec_arith_common.h"
 #include "ec_arith_Edwards.h"
@@ -26,14 +31,14 @@
 #define ELLM_SAFE_ADD 0
 #endif
 
-#define COUNT_ELLM_OPS 0
-#if COUNT_ELLM_OPS
-static unsigned long ellM_dadd_count, ellM_double_count;
-#endif
-
-#define COUNT_ELLE_OPS 0
-#if COUNT_ELLE_OPS
-static unsigned long ellE_add_count, ellE_double_count, ellE_triple_count;
+#ifdef ECM_COUNT_OPS
+static unsigned int _count_stage2_M;
+#define ECM_COUNT_OPS_STAGE1_TOTAL_M EDWARDS_COUNT_OPS_M+MONTGOMERY_COUNT_OPS_M
+#define ECM_COUNT_OPS_STAGE2_TOTAL_M MONTGOMERY_COUNT_OPS_M+_count_stage2_M
+#define ECM_COUNT_OPS_RESET() do {                             \
+      EDWARDS_COUNT_OPS_RESET(); MONTGOMERY_COUNT_OPS_RESET(); \
+      _count_stage2_M = 0;                                     \
+    } while (0)
 #endif
 
 /******************************************************************************/
@@ -498,10 +503,6 @@ ecm_stage2 (residue_t r, const ec_point_t P, const stage2_plan_t *plan,
       mod_init_noset0 (Pid_z[i], m);
     }
 
-#if COUNT_ELLM_OPS
-  ellM_add_count = ellM_double_count = 0;
-#endif
-
   if (verbose)
     printf ("Stage 2: P = (%lu::%lu)\n",
             mod_get_ul (P[0].x, m), mod_get_ul (P[0].z, m));
@@ -814,11 +815,6 @@ ecm_stage2 (residue_t r, const ec_point_t P, const stage2_plan_t *plan,
   if (verbose)
     printf ("Accumulator = %lu\n", mod_get_ul (a, m));
 
-#if COUNT_ELLM_OPS
-  printf("Stage 2 used %lu point additions and %lu point doublings\n",
-         ellM_add_count, ellM_double_count);
-#endif
-
   mod_set (r, a, m);
 
   /* Clear everything */
@@ -862,10 +858,20 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
   unsigned int i;
   int r, bt = 0;
 
+#ifdef ECM_TIMINGS
+  uint64_t t0, param_dt, stage1_dt, stage2_dt;
+  double ecm_starttime, ecm_dt;
+  ecm_starttime = wct_seconds();
+#endif
+
   ec_point_init (P, m);
   mod_init (b, m);
 
   mod_intset_ul (f, 1UL);
+
+#ifdef ECM_TIMINGS
+  t0 = microseconds_thread ();
+#endif
 
   if (plan->parameterization == BRENT12)
     r = ec_parameterization_Brent_Suyama (b, P, plan->parameter, m);
@@ -880,6 +886,10 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
     fprintf (stderr, "%s: unknown parameterization\n", __func__);
     abort();
   }
+
+#ifdef ECM_TIMINGS
+  param_dt = microseconds_thread() - t0;
+#endif
 
   if (r == 0)
   {
@@ -907,6 +917,13 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
   /* now start ecm */
 
   /* Do stage 1 */
+#ifdef ECM_COUNT_OPS
+  ECM_COUNT_OPS_RESET();
+#endif
+#ifdef ECM_TIMINGS
+  t0 = microseconds_thread();
+#endif
+
   if (plan->parameterization & FULLMONTY)
     bytecode_prac_interpret_ec_montgomery (P, plan->bc, m, b);
   else if (plan->parameterization & FULLMONTYTWED)
@@ -950,12 +967,33 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
   }
   mod_gcd (f, P->z, m);
 
+#ifdef ECM_TIMINGS
+  stage1_dt = microseconds_thread() - t0;
+#endif
 #if 0
   printf ("After stage 1, P = (%lu: :%lu), bt = %d, i = %d, exp2 = %d\n",
           mod_get_ul (P->x, m), mod_get_ul (P->z, m), bt, i, plan->exp2);
 #endif
 
+#ifdef ECM_COUNT_OPS
+  unsigned int tot_stage1_M = ECM_COUNT_OPS_STAGE1_TOTAL_M;
+  fprintf (stderr, "COUNT OPS: for stage 1 with B1 = %u\n"
+                   "COUNT OPS:   Montgomery: %3u dADD %3u DBL\n"
+                   "COUNT OPS:      Edwards: %3u ADD  %3u DBL %3u TPL %3d M\n"
+                   "COUNT OPS:        total: %5u M\n", plan->B1,
+                   _count_montgomery_dadd, _count_montgomery_dbl,
+                   _count_edwards_add, _count_edwards_dbl, _count_edwards_tpl,
+                   _count_edwards_extraM, tot_stage1_M);
+#endif
+
   /* Do stage 2 (for P in Montgomery form) */
+#ifdef ECM_COUNT_OPS
+  ECM_COUNT_OPS_RESET();
+#endif
+#ifdef ECM_TIMINGS
+  t0 = microseconds_thread();
+#endif
+
   mod_init (u, m);
   if (bt == 0 && mod_intcmp_ul (f, 1UL) == 0 && plan->B1 < plan->stage2.B2)
   {
@@ -963,10 +1001,35 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
     mod_gcd (f, u, m);
   }
 
+#ifdef ECM_TIMINGS
+  stage2_dt = microseconds_thread() - t0;
+#endif
+#ifdef ECM_COUNT_OPS
+  unsigned int tot_stage2_M = ECM_COUNT_OPS_STAGE2_TOTAL_M;
+  fprintf (stderr, "COUNT OPS: for stage 2 with B2 = %u\n"
+                   "COUNT OPS:   Montgomery: %3u dADD %3u DBL\n"
+                   "COUNT OPS:          mul: %3u M\n"
+                   "COUNT OPS:        total: %5u M\n"
+                   "COUNT OPS: ECM total: %5u M\n", plan->stage2.B2,
+                   _count_montgomery_dadd, _count_montgomery_dbl,
+                   _count_stage2_M, tot_stage2_M, tot_stage1_M + tot_stage2_M);
+#endif
+
   mod_clear (u, m);
   mod_clear (b, m);
   ec_point_clear (P, m);
   ec_point_clear (Pt, m);
+
+#ifdef ECM_TIMINGS
+  ecm_dt = wct_seconds() - ecm_starttime;
+  fprintf (stderr, "TIMINGS:   ECM took %.0f usec\n"
+                   "TIMINGS:      param took %" PRIu64 "usec\n"
+                   "TIMINGS:     stage1 took %" PRIu64 "usec\n"
+                   "TIMINGS:     stage2 took %" PRIu64 "usec\n"
+                   "TIMINGS:      extra time %.0fusec\n",
+                   ecm_dt*1e6, param_dt, stage1_dt, stage2_dt,
+                   ecm_dt*1e6-(double)(param_dt+stage1_dt+stage2_dt));
+#endif
 
   return bt;
 }
