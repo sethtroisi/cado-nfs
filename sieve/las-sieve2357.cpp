@@ -252,7 +252,7 @@ get_even_mask(const int skip_mod_2)
     } else {
         even_mask = mask2; /* 0, 0, 0, 0, ... */
     }
-    return *(SIMDTYPE *)even_mask;
+    return loadu<SIMDTYPE, ELEMTYPE>(even_mask);
 }
 
 template <typename SIMDTYPE, typename ELEMTYPE>
