@@ -19,34 +19,11 @@
 #include "gmp_aux.h"
 #include "gzip.h"
 #include "threadpool.hpp"
+#include "misc.h"
 
 
 static unsigned int fb_log_2 (fbprime_t);
 static bool fb_linear_root (fbroot_t *, const mpz_t *, fbprime_t);
-
-/* strtoul(), but with const char ** for second argument.
-   Otherwise it's not possible to do, e.g., strtoul(p, &p, 10) when p is
-   of type const char *
-*/
-static inline unsigned long int
-strtoul_const(const char *nptr, const char **endptr, const int base)
-{
-  char *end;
-  unsigned long r;
-  r = strtoul(nptr, &end, base);
-  *endptr = end;
-  return r;
-}
-
-static inline unsigned long long int
-strtoull_const(const char *nptr, const char **endptr, const int base)
-{
-  char *end;
-  unsigned long long r;
-  r = strtoull(nptr, &end, base);
-  *endptr = end;
-  return r;
-}
 
 // Adapted from utils/ularith.h
 // TODO: this function should go somewhere else...
