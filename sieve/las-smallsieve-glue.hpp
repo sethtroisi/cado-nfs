@@ -14,20 +14,10 @@ template<typename T, typename U> struct list_car {};
 
 template<typename T, typename U, int b, typename F> struct choice_list_car {};
 
-template<int b> struct make_best_choice_list {
-    typedef choice_list_car<
-        typename best_evenline<b>::type,
-                 typename best_oddline<b>::type,
-                 b,
-                 typename make_best_choice_list<b-1>::type> type;
-};
-template<> struct make_best_choice_list<-1> {
-    typedef list_nil type;
-};
-
+struct small_sieve_best_code_choices {
 #if defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM)
 // && !defined(TRACK_CODE_PATH)
-#if 1
+
 /* The selection below is really scrapping everything we've done to
  * design a code path by bits and pieces, and strives to use almost a
  * one-size-fits-all approach (which admittedly also has its advantages).
@@ -37,30 +27,37 @@ template<> struct make_best_choice_list<-1> {
  * laptop), reaching a 12% win as per the report of test-smallsieve -A 31
  * -I 16 -B 16 --only-complete-functions (commit faa0396)
  */
-template<> struct make_best_choice_list<12> {
+
     typedef choice_list_car<
                 assembly_generic_oldloop,
                 assembly_generic_oldloop,
-                3,
-            /* XXX we have a bug with assembly2x here */
+                5, /* use the two functions above for primes that have a
+                      max number of hits on odd lines that is at least 32 */
             choice_list_car<
-                assembly2x,
-                assembly2x,
-                0,
+                assembly3, /* 4 to 8 hits on even lines */
+                assembly4, /* 16 to 32 hits on odd lines */
+                4, /* use the two functions above for primes that have a
+                      max number of hits on odd lines that is at least 16 */
+            choice_list_car<
+                assembly2, /* 2 to 4 hits on even lines */
+                assembly3, /* 4 to 8 hits on odd lines */
+                3, /* use the two functions above for primes that have a
+                      max number of hits on odd lines that is at least 8 */
+            choice_list_car<
+                assembly1x, /* 0 to 2 hits on even lines */
+                assembly2x, /* 0 to 4 hits on odd lines */
+                0, /* use the two functions above for the remaining primes */
             list_nil
-            >> type;
-};
-#endif
+            >>>> type;
 #else
-template<> struct make_best_choice_list<12> {
     typedef choice_list_car<
                 manual_oldloop,
                 manual_oldloop,
                 0,
             list_nil
             > type;
-};
 #endif
+};
 
 /*{{{ small sieve classes */
 /*{{{ tristate booleans */
@@ -427,7 +424,8 @@ struct small_sieve : public small_sieve_base<tribool_const<is_fragment>> {/*{{{*
     static const int test_divisibility = 0; /* very slow, but nice for debugging */
 
     /* This "index" field is actually the loop counter that is shared by
-     * the various instantiations that are triggered by do_it<>.
+     * the various instantiations that are triggered by
+     * handle_nice_primes_meta_loop<>.
      */
     size_t index = 0;
 
@@ -852,12 +850,12 @@ struct small_sieve : public small_sieve_base<tribool_const<is_fragment>> {/*{{{*
         }/*}}}*/
     private:
     /* {{{ template machinery to make one single function out of several */
-    /* we'll now craft all the specific do_it functions into one big
-     * function. Because we're playing tricks with types and lists of
-     * types and such, we need to work with partial specializations at
-     * the class level, which is admittedly messy. */
+    /* we'll now craft all the specific handle_nice_primes_meta_loop
+     * functions into one big function. Because we're playing tricks with
+     * types and lists of types and such, we need to work with partial
+     * specializations at the class level, which is admittedly messy. */
     template<typename T, int max_bits_off = INT_MAX>
-        struct do_it
+        struct handle_nice_primes_meta_loop
         {
             void operator()(small_sieve<is_fragment> & SS, where_am_I &) {
                 /* default, should be at end of list. We require that we
@@ -869,7 +867,7 @@ struct small_sieve : public small_sieve_base<tribool_const<is_fragment>> {/*{{{*
     /* optimization: do not split into pieces when we have several times
      * the same code anyway. */
     template<typename E0, typename O0, int b0, int b1, typename T, int bn>
-        struct do_it<choice_list_car<E0,O0,b0,
+        struct handle_nice_primes_meta_loop<choice_list_car<E0,O0,b0,
                      choice_list_car<E0,O0,b1,
                     T>>, bn>
         {
@@ -877,9 +875,9 @@ struct small_sieve : public small_sieve_base<tribool_const<is_fragment>> {/*{{{*
             void operator()(small_sieve<is_fragment> & SS, where_am_I & w) {
                 /*
                 SS.handle_nice_primes<E0, O0, b1>(w);
-                do_it<T>()(SS, w);
+                handle_nice_primes_meta_loop<T>()(SS, w);
                 */
-                do_it<choice_list_car<E0,O0,b1, T>, bn>()(SS, w);
+                handle_nice_primes_meta_loop<choice_list_car<E0,O0,b1, T>, bn>()(SS, w);
             }
         };
     template<typename E0, typename O0, int b0, int bn>
@@ -905,12 +903,12 @@ struct small_sieve : public small_sieve_base<tribool_const<is_fragment>> {/*{{{*
         };
 
     template<typename E0, typename O0, int b0, typename T, int bn>
-        struct do_it<choice_list_car<E0,O0,b0,T>, bn>
+        struct handle_nice_primes_meta_loop<choice_list_car<E0,O0,b0,T>, bn>
         {
             static_assert(is_compatible_for_range<E0, O0, b0, bn>::value, "Cannot use these two code fragments for primes of the current size");
             void operator()(small_sieve<is_fragment> & SS, where_am_I & w) {
                 SS.handle_nice_primes<E0, O0, b0>(w);
-                do_it<T, b0-1>()(SS, w);
+                handle_nice_primes_meta_loop<T, b0-1>()(SS, w);
             }
         };
     /* }}} */
@@ -923,8 +921,8 @@ struct small_sieve : public small_sieve_base<tribool_const<is_fragment>> {/*{{{*
             sorted_limit = s;
             /* This function will eventually call handle_nice_primes on
              * sub-ranges of the set of small primes. */
-            typedef make_best_choice_list<12>::type choices;
-            small_sieve<is_fragment>::do_it<choices>()(*this, w);
+            typedef small_sieve_best_code_choices::type choices;
+            small_sieve<is_fragment>::handle_nice_primes_meta_loop<choices>()(*this, w);
         }
 
         /* This is for the tail of the list. We typically have powers,
