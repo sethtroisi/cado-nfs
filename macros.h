@@ -208,6 +208,14 @@ LEXLE3(__GNU_MP_VERSION,__GNU_MP_VERSION_MINOR,__GNU_MP_VERSION_PATCHLEVEL,X,Y,Z
 #endif
 #endif
 
+#ifndef ATTRIBUTE_ARTIFICIAL
+#if GNUC_VERSION_ATLEAST(4,3,0)
+#define ATTRIBUTE_ARTIFICIAL __attribute__ ((__artificial__))
+#else
+#define ATTRIBUTE_ARTIFICIAL
+#endif
+#endif
+
 #if defined(__GNUC__)
 
 #ifndef NO_INLINE

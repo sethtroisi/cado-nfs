@@ -63,7 +63,7 @@ static uint64_t start_time, end_time;
 
 #if defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM)
 
-__attribute__((__unused__, __artificial__, __always_inline__))
+__attribute__((__unused__, __always_inline__)) ATTRIBUTE_ARTIFICIAL
 static inline void serialize()
 {
     unsigned long id = 0;
@@ -75,7 +75,7 @@ static inline void serialize()
 
 /* Use RDTSC to read CPU core clock cycles except that on contemporary CPUs,
    it actually reads some natural-time counter */
-__attribute__((__unused__, __artificial__, __always_inline__))
+__attribute__((__unused__, __always_inline__)) ATTRIBUTE_ARTIFICIAL
 static inline void rdtsc(uint32_t *low, uint32_t *high)
 {
     __asm__ volatile("RDTSC\n\t"
@@ -85,7 +85,7 @@ static inline void rdtsc(uint32_t *low, uint32_t *high)
 
 /* Use RDTSCP to serialize, then read TSC. Instructions following RDTSCP may
    start to execute before RDTSCP finishes. */
-__attribute__((__unused__, __artificial__, __always_inline__))
+__attribute__((__unused__, __always_inline__)) ATTRIBUTE_ARTIFICIAL
 static inline void rdtscp(uint32_t *low, uint32_t *high)
 {
     __asm__ volatile("RDTSCP\n\t"
@@ -95,7 +95,7 @@ static inline void rdtscp(uint32_t *low, uint32_t *high)
 }
 
 /* Read a performance measurement counter */
-__attribute__((__unused__, __artificial__, __always_inline__))
+__attribute__((__unused__, __always_inline__)) ATTRIBUTE_ARTIFICIAL
 static inline void
 rdpmc(uint32_t *low, uint32_t *high, const unsigned int selector)
 {
@@ -104,25 +104,25 @@ rdpmc(uint32_t *low, uint32_t *high, const unsigned int selector)
 
 #else /* defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM) */
 
-__attribute__((__unused__, __artificial__, __always_inline__))
+__attribute__((__unused__, __always_inline__)) ATTRIBUTE_ARTIFICIAL
 static inline void serialize() {}
 
-__attribute__((__unused__, __artificial__, __always_inline__))
+__attribute__((__unused__, __always_inline__)) ATTRIBUTE_ARTIFICIAL
 static inline void rdtsc(uint32_t *low, uint32_t *high)
 { *low = *high = 0; }
 
-__attribute__((__unused__, __artificial__, __always_inline__))
+__attribute__((__unused__, __always_inline__)) ATTRIBUTE_ARTIFICIAL
 static inline void rdtscp(uint32_t *low, uint32_t *high)
 { *low = *high = 0; }
 
-__attribute__((__unused__, __artificial__, __always_inline__))
+__attribute__((__unused__, __always_inline__)) ATTRIBUTE_ARTIFICIAL
 static inline void
 rdpmc(uint32_t *low, uint32_t *high, const unsigned int selector MAYBE_UNUSED)
 { *low = *high = 0; }
 
 #endif
 
-__attribute__((__unused__, __artificial__, __always_inline__))
+__attribute__((__unused__, __always_inline__)) ATTRIBUTE_ARTIFICIAL
 static inline uint64_t rdtscl()
 {
     uint32_t high, low;
@@ -130,7 +130,7 @@ static inline uint64_t rdtscl()
     return u32_to_64(low, high);
 }
 
-__attribute__((__unused__, __artificial__, __always_inline__))
+__attribute__((__unused__, __always_inline__)) ATTRIBUTE_ARTIFICIAL
 static inline uint64_t rdtscpl()
 {
     uint32_t high, low;
@@ -138,7 +138,7 @@ static inline uint64_t rdtscpl()
     return u32_to_64(low, high);
 }
 
-__attribute__((__unused__, __artificial__, __always_inline__))
+__attribute__((__unused__, __always_inline__)) ATTRIBUTE_ARTIFICIAL
 static inline uint64_t rdpmcl(const unsigned int selector)
 {
     uint32_t high, low;
@@ -183,7 +183,7 @@ static inline uint64_t rdpmcl(const unsigned int selector)
 // again next time it updates any of these CR/MSR.
 
 
-__attribute__((__unused__, __artificial__, __always_inline__))
+__attribute__((__unused__, __always_inline__)) ATTRIBUTE_ARTIFICIAL
 static inline void
 rdpmc_cycles(uint32_t *low, uint32_t *high)
 {
@@ -192,7 +192,7 @@ rdpmc_cycles(uint32_t *low, uint32_t *high)
     rdpmc(low, high, c);
 }
 
-__attribute__((__unused__, __artificial__, __always_inline__))
+__attribute__((__unused__, __always_inline__)) ATTRIBUTE_ARTIFICIAL
 static inline uint64_t rdpmcl_cycles()
 {
     uint32_t low, high;

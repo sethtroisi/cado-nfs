@@ -8,14 +8,14 @@
 #include "intrinsics.hpp"
 
 template<>
-inline uint32_t ATTRIBUTE((__always_inline__, __artificial__))
+inline uint32_t ATTRIBUTE((__always_inline__)) ATTRIBUTE_ARTIFICIAL
 adds<uint32_t, uint8_t>(const uint32_t a, const uint32_t b)
 {
   return a + b; /* WARNING, we assume no carry between elements here! */
 }
 
 template<>
-inline uint64_t ATTRIBUTE((__always_inline__, __artificial__))
+inline uint64_t ATTRIBUTE((__always_inline__)) ATTRIBUTE_ARTIFICIAL
 adds<uint64_t, uint8_t>(const uint64_t a, const uint64_t b)
 {
   return a + b; /* WARNING, we assume no carry between elements here! */
@@ -23,7 +23,7 @@ adds<uint64_t, uint8_t>(const uint64_t a, const uint64_t b)
 
 namespace sieve2357 {
 
-static inline unsigned long ATTRIBUTE((__always_inline__, __artificial__))
+static inline unsigned long ATTRIBUTE((__always_inline__)) ATTRIBUTE_ARTIFICIAL
 modsub(const unsigned long a, const unsigned long b, const unsigned long m)
 {
   unsigned long r;
