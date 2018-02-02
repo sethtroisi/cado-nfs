@@ -195,6 +195,16 @@ ssp_t::ssp_t(fbprime_t _p, fbprime_t _r, unsigned char _logp, unsigned int skip,
 // and even BUCKET_REGION
 // It could actually be larger than 32 bits when I > 16.
 
+/* Functor for sorting ssp_t in the order in which sieve2357 expects them */
+struct order_ssp_t {
+    bool operator()(const ssp_t &ssp1, const ssp_t &ssp2) const {
+        fbprime_t q1 = ssp1.is_proj() ? ssp1.get_q() : ssp1.get_p();
+        fbprime_t q2 = ssp1.is_proj() ? ssp2.get_q() : ssp2.get_p();
+        return sieve2357::order_lt(q1, q2);
+    }
+};
+static order_ssp_t order_ssp;
+
 void small_sieve_init(small_sieve_data_t & ssd,
                       unsigned int nthreads,
                       std::vector<fb_general_entry>::const_iterator fb_start,
@@ -347,6 +357,11 @@ void small_sieve_init(small_sieve_data_t & ssd,
     /* arrange so that the small_sieve() ctor is happy */
     std::sort(ssd.ssps.begin(), ssd.ssps.begin() + ssd.resieve_end_offset);
     std::sort(ssd.ssps.begin() + ssd.resieve_end_offset, ssd.ssps.end());
+
+    /* Sort general ssp vector in the order in which sieve2357::sieve expects
+       them. small_sieve::do_pattern_sieve may drop some of these entries but
+       preserves the ordering. */
+    std::sort(ssd.ssp.begin(), ssd.ssp.end(), order_ssp);
 }
 /* }}} */
 
@@ -835,20 +850,6 @@ template<bool is_fragment> void small_sieve<is_fragment>::do_pattern_sieve(where
                     /* This projective root does not hit in this line */
                     continue;
                 }
-                if (0) {
-                    /* If q is a power of 2 and we are in a line that is an
-                       even multiple of g, then we don't need to sieve this
-                       prime, because it hits only in locations wgere ii,jj
-                       are both even. However, the skip_mod_2 parameter
-                       already skips even ii in line with even jj, so that
-                       covers this case, too, and is handled almost for free
-                       by the sieve2357 code. */
-                    unsigned int jg = jj / ssp.get_g();
-                    if (ssp.get_q() % 2 == 0 && jg % 2 == 0) {
-                        /* Only ii,jj both even are hit */
-                        continue;
-                    }
-                }
                 WHERE_AM_I_UPDATE(w, p, ssp.get_q() * ssp.get_g());
                 WHERE_AM_I_UPDATE(w, r, ssp.get_U());
                 const fbprime_t pos = super::first_position_in_line(ssp, dj);
@@ -866,7 +867,7 @@ template<bool is_fragment> void small_sieve<is_fragment>::do_pattern_sieve(where
             if (trace_on_range_Nx(super::N, x0, x0 + super::F())) {
                 /* We are in the correct line (fragment). */
                 const fbprime_t q = psp[i - 1].q, pos = psp[i - 1].idx;
-                unsigned char logp = psp[i - 1].logp;
+                const unsigned char logp = psp[i - 1].logp;
                 if (0) {
                     printf("# Pattern sieve side %i, line %u (N=%d, x0=%zu, trace_Nx.x=%u): Adding psp[%zu] = {%u, %u, %hhu}, from  ",
                         w.side, jj, super::N, x0, trace_Nx.x, i - 1, q, pos, logp);
@@ -888,7 +889,6 @@ template<bool is_fragment> void small_sieve<is_fragment>::do_pattern_sieve(where
             S[trace_Nx.x] = orig_Sx;
         }
 #endif
-        std::sort(&psp[0], &psp[i]);
         psp[i++] = {0, 0, 0};
         sieve2357::sieve<sieve2357::preferred_simd_type, uint8_t>(
             (sieve2357::preferred_simd_type *) (S + x0), F(), psp,

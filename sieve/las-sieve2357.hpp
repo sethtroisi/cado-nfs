@@ -28,23 +28,24 @@ typedef uint64_t preferred_simd_type;
 typedef uint32_t preferred_simd_type;
 #endif
 
+/* Define ordering on q which sieve2357 expect: first q=1, then powers of 2,
+   then odd primes in increasing order */
+static inline bool order_lt(fbprime_t q1, fbprime_t q2) {
+    if (q1 == 1 && q2 != 1)
+      return true;
+    if (q1 != 1 && q2 == 1)
+      return false;
+    if (q1 % 2 == 0 && q2 % 2 == 1)
+      return true;
+    if (q1 % 2 == 1 && q2 % 2 == 0)
+      return false;
+    return q1 < q2;
+}
+
 /* We hit sievearray[x] for x = idx + i*q with 0 <= x < arraylen */
 struct prime_t {
   fbprime_t q, idx;
   unsigned char logp;
-  /* Make prime_t sortable in the order in which sieve2357 expects them:
-     first q=1, then powers of 2, then odd primes in increasing order */
-  bool operator<(const sieve2357::prime_t &other) const {
-    if (q == 1 && other.q != 1)
-      return true;
-    if (q != 1 && other.q == 1)
-      return false;
-    if (q % 2 == 0 && other.q % 2 == 1)
-      return true;
-    if (q % 2 == 1 && other.q % 2 == 0)
-      return false;
-    return q < other.q;
-  }
 };
 
 /* A predicate that tells whether a prime power q = p^k can be sieved by
