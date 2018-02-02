@@ -196,7 +196,7 @@ template<>
 inline __m256i ATTRIBUTE((__always_inline__)) ATTRIBUTE_ARTIFICIAL
 set1<__m256i, uint8_t>(const uint8_t c)
 {
-  __m128i t = _mm_cvtsi64x_si128(c);
+  __m128i t = _mm_cvtsi64_si128(c);
   return _mm256_broadcastb_epi8(t);
 }
 
