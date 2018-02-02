@@ -146,6 +146,36 @@ template<typename is_fragment = tribool_maybe> struct small_sieve_base {/*{{{*/
         has_origin = has_haxis && has_vaxis;
     }/*}}}*/
 
+    /* Returns (ii - sublati0 + k*q) / sublatm with k >= 0 minimal so that
+       result is an integer */
+    int fix_sublat_i(int64_t ii, const fbprime_t q) const {
+        if (sublatm == 1) {
+            ASSERT(ii <= INT_MAX);
+            return (int) ii;
+        } else if (sublatm == 2) {
+            ASSERT(q % 2 != 0 || ii % 2 == sublati0);
+            for( ; ii % 2 != sublati0 ; ii += q);
+            ii = (ii - sublati0) / 2;
+            ASSERT(ii <= INT_MAX);
+            return ii;
+        } else if (sublatm == 3) {
+            ASSERT(q % 3 != 0 || ii % 3 == sublati0);
+            for( ; ii % 3 != sublati0 ; ii += q);
+            ii = (ii - sublati0) / 3;
+            ASSERT(ii <= INT_MAX);
+            return ii;
+        } else if (sublatm == 6) {
+            ASSERT(q % 2 != 0 || ii % 2 == sublati0);
+            ASSERT(q % 3 != 0 || ii % 3 == sublati0);
+            for( ; ii % 6 != sublati0 ; ii += q);
+            ii = (ii - sublati0) / 6;
+            ASSERT(ii <= INT_MAX);
+            return ii;
+        } else {
+            ASSERT_ALWAYS(false);
+        };
+    }
+
     spos_t first_position_ordinary_prime(ssp_simple_t const & ssp, unsigned int dj = 0) const/*{{{*/
     {
         /* equation here: i-r*j = 0 mod p */
@@ -184,8 +214,7 @@ template<typename is_fragment = tribool_maybe> struct small_sieve_base {/*{{{*/
                x += ((r * sublatj0 - sublati0) + k * p) / sublatm;
                */
             spos_t y = ssp.get_r() * sublatj0;
-            for( ; y % sublatm != sublati0 ; y += ssp.get_p());
-            x += (y - sublati0) / sublatm;
+            x += fix_sublat_i(y, ssp.get_p());
         }
         x = x % (spos_t)ssp.get_p();
         /* As long as i0 <= 0, which holds in the normal case where
@@ -257,15 +286,13 @@ template<typename is_fragment = tribool_maybe> struct small_sieve_base {/*{{{*/
         // Find the corresponding i
         int ii = int(jj/ssp.get_g())*int(ssp.get_U());
 
-        if (sublatm > 1) {
-            for( ; ii % sublatm != sublati0 ; ii += ssp.get_q());
-        }
+        ii = fix_sublat_i(ii, ssp.get_q());
         // In the sublat mode, switch back to reduced convention
         // (exact divisions)
         if (sublatm > 1) {
             jj = (jj-sublatj0) / sublatm;
-            ii = (ii-sublati0) / sublatm;
         }
+
         /* At this point we know that the point (ii,jj) is one of the
          * points to be sieved, and jj-j0 perhaps is within reach for
          * this bucket region (not always). How do we adjust with
@@ -314,10 +341,7 @@ template<typename is_fragment = tribool_maybe> struct small_sieve_base {/*{{{*/
             i0ref = (-I()/2);
         }
         spos_t x = (spos_t)jj * (spos_t)ssp.get_r();
-        if (sublatm > 1) {
-            for( ; x % sublatm != sublati0 ; x += ssp.get_p());
-            x = (x - sublati0) / sublatm;
-        }
+        x = fix_sublat_i(x, ssp.get_p());
         x = (x - i0ref) & (ssp.get_p() - 1);
         if (x < 0) x += ssp.get_p();
         /* our target is position x in the bucket region which starts
@@ -356,32 +380,16 @@ template<typename is_fragment = tribool_maybe> struct small_sieve_base {/*{{{*/
         if (ssp.is_proj()) {
             ASSERT (jj % ssp.get_g() == 0);
 
-            int64_t ii = int64_t(jj / ssp.get_g()) * int64_t(ssp.get_U());
-
-            int i;
-            if (sublatm > 1) {
-                for( ; ii % sublatm != sublati0 ; ii += ssp.get_q());
-                i = (ii - sublati0) / sublatm;
-            } else {
-                i = ii;
-            }
-
+            const int64_t ii = int64_t(jj / ssp.get_g()) * int64_t(ssp.get_U());
+            const int i = fix_sublat_i(ii, ssp.get_q());
             int64_t x = (i - i0) % (uint64_t)ssp.get_q();
             if (x < 0) x += ssp.get_q();
             ASSERT_ALWAYS(0 <= x && x < ssp.get_q());
             return (fbroot_t) x;
         } else {
             /* Affine roots hit in every line, but not necessarily in every line fragment */
-            int64_t ii = int64_t(jj) * int64_t(ssp.get_r());
-
-            int i;
-            if (sublatm > 1) {
-                for( ; ii % sublatm != sublati0 ; ii += ssp.get_p());
-                i = (ii - sublati0) / sublatm;
-            } else {
-                i = ii;
-            }
-
+            const int64_t ii = int64_t(jj) * int64_t(ssp.get_r());
+            const int i = fix_sublat_i(ii, ssp.get_p());
             int64_t x = (i - i0) % (uint64_t)ssp.get_p();
             if (x < 0) x += ssp.get_p();
             ASSERT_ALWAYS(0 <= x && x < ssp.get_p());
