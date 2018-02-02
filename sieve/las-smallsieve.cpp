@@ -154,6 +154,8 @@ void small_sieve_clear(small_sieve_data_t & ssd)
 
 /* {{{ Sieve initialization: now the real stuff */
 
+using sieve2357::preferred_simd_type;
+
 ssp_t::ssp_t(fbprime_t _p, fbprime_t _r, unsigned char _logp, unsigned int skip, bool proj) /*{{{*/
 : ssp_t(_p, _r, _logp, skip) /* First, initialize everything as if proj=false */
 {
@@ -178,11 +180,11 @@ ssp_t::ssp_t(fbprime_t _p, fbprime_t _r, unsigned char _logp, unsigned int skip,
             ASSERT_ALWAYS(rc != 0);
             set_U(U);
         }
-        if (sieve2357::can_sieve<uint64_t, uint8_t>(this->get_q())) {
+        if (sieve2357::can_sieve<preferred_simd_type, uint8_t>(this->get_q())) {
             set_pattern_sieved();
         }
     } else {
-        if (sieve2357::can_sieve<uint64_t, uint8_t>(this->get_p())) {
+        if (sieve2357::can_sieve<preferred_simd_type, uint8_t>(this->get_p())) {
             set_pattern_sieved();
         }
     }
@@ -890,8 +892,8 @@ template<bool is_fragment> void small_sieve<is_fragment>::do_pattern_sieve(where
         }
 #endif
         psp[i++] = {0, 0, 0};
-        sieve2357::sieve<sieve2357::preferred_simd_type, uint8_t>(
-            (sieve2357::preferred_simd_type *) (S + x0), F(), psp,
+        sieve2357::sieve<preferred_simd_type, uint8_t>(
+            (preferred_simd_type *) (S + x0), F(), psp,
             skip_mod_2, sieve2357::update_add, w);
 #ifdef TRACE_K
         if (trace_on_range_Nx(super::N, x0, x0 + super::F())) {
