@@ -201,7 +201,7 @@ ssp_t::ssp_t(fbprime_t _p, fbprime_t _r, unsigned char _logp, unsigned int skip,
 struct order_ssp_t {
     bool operator()(const ssp_t &ssp1, const ssp_t &ssp2) const {
         fbprime_t q1 = ssp1.is_proj() ? ssp1.get_q() : ssp1.get_p();
-        fbprime_t q2 = ssp1.is_proj() ? ssp2.get_q() : ssp2.get_p();
+        fbprime_t q2 = ssp2.is_proj() ? ssp2.get_q() : ssp2.get_p();
         return sieve2357::order_lt(q1, q2);
     }
 };
