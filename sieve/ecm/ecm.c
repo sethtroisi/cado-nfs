@@ -12,6 +12,8 @@
 //#define ECM_COUNT_OPS /* define to print number of operations of ECM */
 #define ECM_TIMINGS /* define to print timings of ECM */
 
+#define TRACE
+
 #include "ec_arith_common.h"
 #include "ec_arith_Edwards.h"
 #include "ec_arith_Montgomery.h"
@@ -354,6 +356,13 @@ bytecode_mishmash_interpret_ec_mixed_repr (ec_point_t P, bytecode_const bc,
     }
 
     bc++; /* go to next byte */
+
+#ifdef TRACE
+    fprintf (stdout, "> %s: point after 1st bloc (in Montgomery form):\n", __func__);
+    fprintf (stdout, "  (X::Z) =");
+    ec_point_fprintf (stdout, R[1], MONTGOMERY_xz, m);
+#endif
+
   }
 
   /* output is in R[1] */
@@ -894,7 +903,7 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
   if (r == 0)
   {
 #ifdef TRACE
-    printf ("%s: factor found during parameterization\n");
+    printf ("%s: factor found during parameterization\n", __func__);
 #endif
     mod_gcd (f, P->x, m);
     mod_clear (b, m);
@@ -906,7 +915,7 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
   residue_t A;
   mod_init (A, m);
   montgomery_A_from_b (A, b, m);
-  printf ("%s: starting values: ", __func__);
+  fprintf (stdout, "> %s: starting values:\n", __func__);
   if (plan->parameterization & FULLMONTY)
     ec_montgomery_curve_fprintf (stdout, A, P, m);
   else
@@ -930,6 +939,13 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
     bytecode_mishmash_interpret_ec_mixed_repr (P, plan->bc, m, b);
     /* input is in Edwards (extended), output is in Montgomery form */
 
+#ifdef TRACE
+  fprintf (stdout, "> %s: Output of phase 1 (in Montgomery form):\n", __func__);
+  fprintf (stdout, "  (X::Z) =");
+  ec_point_fprintf (stdout, P, MONTGOMERY_xz, m);
+#endif
+
+  
   /* Add prime 2 in the desired power. If a zero residue for the Z-coordinate is
    * encountered, we backtrack to previous point and stop.
    * NOTE: This is not as effective as I hoped. It prevents trivial
