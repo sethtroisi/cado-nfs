@@ -10,7 +10,7 @@
 #include "timing.h"
 
 //#define ECM_COUNT_OPS /* define to print number of operations of ECM */
-#define ECM_TIMINGS /* define to print timings of ECM */
+//#define ECM_TIMINGS /* define to print timings of ECM */
 
 #include "ec_arith_common.h"
 #include "ec_arith_Edwards.h"
