@@ -361,11 +361,11 @@ ec_parameterization_Z6_is_valid (const unsigned long k)
  * 
  * Elliptic parameterization (parameter is called k).
  *    E: y^2 = x^3 - 9747*x + 285714
- *      rank = 1
- *      P = (15, 378) is a point of infinite order
- *      Torsion points: P2 = (33:0:1) of order 2
- *                      Q2 = (78:0:1) of order 2
- *                      P2+Q2 = (-111:0:1) of order 2
+ *       rank = 1
+ *       P = (15, 378) is a point of infinite order
+ *       Torsion points: P2 = (33:0:1) of order 2
+ *                       Q2 = (78:0:1) of order 2
+ *                       P2+Q2 = (-111:0:1) of order 2
  *
  * Reference: based on Theorem 5.4 of the article "Starfish on strike".
  *
@@ -377,90 +377,112 @@ ec_parameterization_Z6_is_valid (const unsigned long k)
  *       A point and its opposite produce the same curve (with opposite starting
  *        points)
  *       It generates curves isomorphic to Brent--Suyama curves with
- *        sigma = -(p-213)/(p+3)
- *       The value k=1 produces the same curve that the Brent-Suyama
- *        parameterization with sigma=11 (up to isomorphism, i.e. the values of
- *        B differ by a square factor).
+ *       sigma = -(p-213)/(p+3)
+ *       The value k=1 produces the same curve as the Brent-Suyama
+ *       parameterization with sigma=11 (up to isomorphism, i.e. the values of
+ *       B differ by a square factor).
  *
- * Parameterization (where (p,q) := k*P):
-      alpha = (p-105)*(p+57)
-      beta = q*(p-213)
-      gamma = p^4 - 96*p^3 - 918*p^2 - 2808*p + 45346797
-      delta = gamma + 2^5*3^7 *(p-33)^2
-      epsilon =  p^2 - 66*p + 7569
-      zeta = 2^2*3^6*q*(p-33)
-      # Coeffs for "a=-1" Twisted Edwards curve
-      a = -1
-      d = -alpha^3*(p-51)*(p+327)/zeta^2
-      xE0 = 2*3*(p+3)*alpha*beta*delta
-      yE0 = (2*3^5)*(p-33)*alpha*gamma*epsilon
-      zE0 = alpha^2*delta*epsilon
-      tE0 = 2^2*3^6*(p-33)*(p+3)*beta*gamma
-      # Coeffs for Montgomery curve
-      A = 2*(a+d)/(a-d)
-      B = 4/(a-d)
-      b = zeta^2/(zeta^2-alpha^3*(p-51)*(p+327))               # [ b = (A+2)/4 ]
-      # (xM0:yM0:zM0) = (xE0*(zE0+yE0):(zE0+yE0)*zE0:xE0*(zE0-yE0))
-      xM0 = (p^2 + 114*p - 11331)^3
-      yM0 = (alpha*epsilon*(epsilon+2^2*3^2*5*(p-105))^3)/(2*3*(p+3)*beta)
-      zM0 = ((p-213)*(p+3))^3
 
- * Parameterization (where (p:q:r) := k*P):
-      sigma_num = 213*r-p
-      sigma_den = (p+3*r)
-      u_num = sigma_num^2-5*sigma_den^2
-      u_den = sigma_den^2
-      v_num = 4*sigma_num
-      v_den = sigma_den
+ * Parameterization (where (U, V, W) := [k]*P)
 
-      # Coeffs for Montgomery curve
-      A = 2*(a+d)/(a-d)
-      B = 4/(a-d)
-      b = (u_den*v_num-v_den*u_num)^3*(3*v_den*u_num+u_den*v_num)/(16*(v_den*u_num)^3*u_den*v_num)
-# [ b = (A+2)/4 ]
-      # (xM0:yM0:zM0) = (xE0*(zE0+yE0):(zE0+yE0)*zE0:xE0*(zE0-yE0))
-      x0 = u^3
-      y0 = (sigma^2-1)*(sigma^2-25)*(sigma^4-25)
-      z0 = v^3
- * The point of order 3 is given by:
-      # Coeffs for "a=-1" Twisted Edwards curve
-      xE3 = 2*3^2*q*alpha
-      yE3 = 2*3^4*(p-33)*alpha
-      zE3 = alpha^2
-      tE3 = zeta
-      # Coeffs for Montgomery curve
-      xM3 = 2*3^2*q*(epsilon+2^2*3^2*5*(p-105))
-      yM3 = alpha*(epsilon+2^2*3^2*5*(p-105))
-      zM3 = 2*3^2*(p+3)*beta
- * To check with Sage:
-      QQpq.<p,q> = QQ[]
-      I = QQpq.ideal (q^2-(p^3-9747*p+285714))
-      # copy paste all the above formula
-      # P0 is in extended coordinates, we must have xE0*yE0 == zE0*tE0
-      (xE0*yE0 - zE0*tE0).is_zero()
-      # P0 is on the curve ?
-      eq_P0 = -xE0^2+yE0^2 - (zE0^2+d*tE0^2)
-      eq_P0.numerator() in I and not eq_P0.denominator() in I
-      eq_P02 = B*yM0^2*zM0 - (xM0^3 + A*xM0^2*zM0 + xM0*zM0^2)
-      eq_P02.numerator() in I and not eq_P02.denominator() in I
-      # P3 is in extended coordinates, we must have xE3*yE3 == zE3*tE3
-      (xE3*yE3 - zE3*tE3).is_zero()
-      # P3 is on the curve ?
-      eq_P3 = -xE3^2+yE3^2 - (zE3^2+d*tE3^2)
-      eq_P3.numerator() in I and not eq_P3.denominator() in I
-      eq_P32 = B*yM3^2*zM3 - (xM3^3 + A*xM3^2*zM3 + xM3*zM3^2)
-      eq_P32.numerator() in I and not eq_P32.denominator() in I
-      # P3 is of order 3 ?
-      eq_order3 = 4*A*(xM3/zM3)^3+3*(xM3/zM3)^4+6*(xM3/zM3)^2-1
-      eq_order3.numerator() in I and not eq_order3.denominator() in I
- */
+ * The following code can be pasted into Sage
+ * -------------------------------------------------------------------------
 
-/* Return 1 if it worked, 0 if a modular inverse failed.
+ # Curve from Strafish on strike (theorem 5.4)
+ E1 = EllipticCurve([0,-1/2304,0,-5/221184,1/28311552])
+
+ # A curve is short Weierstrass form, isomorphic to E1 with integer coefficients
+ E2 = EllipticCurve([-9747, 285714])
+
+ # QQpqr.<p,q,r> = QQ[]
+ # I = QQpqr.ideal(E2.defining_polynomial()(z=r,x=p,y=q))
+
+ QQxyz.<x,y,z> = QQ[]
+ I = QQxyz.ideal(E2.defining_polynomial())
+
+ phi1 = E1.isomorphism_to(E2)
+ phi2 = E2.isomorphism_to(E1)
+
+ # Apply the Weierstrass transformation (u,r,s,t) in projective coordinate
+ # (x,y,z)  |-->  (U,V,W) = (u^2x + r*z , u^3y + su^2x + t*z, z).
+
+ U = (phi1).u^2*x+(phi1).r*z
+ V = (phi1).u^3*y+(phi1).s*(phi1).u^2*x+(phi1).t*z
+ W = z
+
+ l = lcm([c.denominator() for c in U.coefficients()\
+         + V.coefficients() + W.coefficients()])
+
+ U *= l     # U = 144*(x + 3*z)
+ V *= l     # V = y
+ W *= l     # W = 2985984*z
+
+ sigma = (W - 96*U)/(96*U)
+ sigma2 = sigma^2
+ alpha = sigma2-5
+ alpha3 = alpha^3
+ beta = 4*sigma
+ beta3 = beta^3
+ t1 = (sigma-1)*(sigma+5)*(sigma2+5)
+ t2 = alpha3+beta3
+
+ zE0 = t1*t2*U^2
+ xE0 = 2*V*sigma*t2*W
+ yE0 = (alpha3-beta3)*t1*U^2
+ tE0 = 2*V*sigma*W*(alpha3-beta3)
+
+ # Check if PE0 = (xE0:yE0:zE0:tE0) is on the extended twisted
+ # Edwards curve: (-1)*xE0^2 + yE0^2 - zE0^2 - d*tE0^2
+ a = -1
+ # Compute r = v/u^2 following Starfish on strike (Theorem 5.4)
+ # with v = V/W and u = U/W
+ r = (V*W)/U^2
+ # Compute d following Starfish on strike (Theorem 5.4)
+ d = ((beta+alpha)^3*(beta-3*alpha)) / (r*(beta-alpha))^2
+
+ eq_Ed = a*xE0^2 + yE0^2 - zE0^2 - d*tE0^2
+ print "P0 is on curve:       ",
+ print eq_Ed.numerator() in I\
+ and not(eq_Ed.denominator() in I)\
+ and (xE0*yE0 - zE0*tE0 in I)
+
+
+ # Compute Montgomery curve parameters
+ # following 20 years of ECM by Zimmermann and Dodson
+ xM0 = alpha3
+ zM0 = beta3 
+ A = (((beta-alpha)^3)*(3*alpha+beta) / (4*alpha3*beta)) - 2
+
+ # Applying the morphism from the Montgomery curve By2 = x^3 + Ax^2 + x
+ # to its equivalent Edwards form ax^2 + y^2 = 1 + dx^2y^2
+ # sets a = (A+2)/B.
+ # We define B so that the corresponding Edwards curve has a = -1.
+ B = - (A+2)
+
+ # Check if PM0 = (xM0:yM0:zM0) is on the Montgomery curve equivalent to
+ # the Edwards curve eq_Ed
+ _b = alpha/beta^3
+ y0 = (sigma^2-1)*(sigma^2-25)*(sigma^4-25)
+
+ # Ad-hoc code for checking that b/B is a square in I
+ e2 = E2.defining_polynomial()
+ e3 = (-e2 + y^2*z)*z
+ f = (_b/(B*e3)).factor()
+ print "b/B is a square in I: ",\
+ not(any([m[1] % 2 for m in list(f)])) and QQ(f.unit()).is_square()
+ yM02 = (b/B)*y0^2
+ eq_M0 = B*yM02*zM0-xM0*(xM0^2+A*xM0*zM0+zM0^2)
+ print "M0 in on curve:       ",
+ print eq_M0.numerator() in I and not(eq_M0.denominator() in I)
+
+ * -------------------------------------------------------------------------
+
+ * Return 1 if it worked, 0 if a modular inverse failed.
  * If modular inverse failed, return non-invertible value in P0->x.
  *
  * We only need the starting point (xE0:yE0:zE0:tE0) (for Edwards extented) or
  * (xE0:yE0:zE0) (for Edwards projective) or (xM0::zM0) (for Montgomery) and
- * the curve coefficient b (if b is not NULL).
+ * the curve coefficient b = (A+2)/4 (if b is not NULL).
  */
 static int
 ec_parameterization_Z6 (residue_t b, ec_point_t P0, const unsigned long k,
@@ -553,10 +575,8 @@ ec_parameterization_Z6 (residue_t b, ec_point_t P0, const unsigned long k,
 
     mod_mul (P0->y, P0->y, _t0, m);       /* P->y = (alpha3-beta3)*_t0*U^2 */
     mod_mul (P0->z, _t0, _t2, m);         /* P->z = _t0*_t2*U^2 */
-
   }
   
-
   if (b != NULL)
   {
     mod_mul (_t0, alpha3, beta, m);
