@@ -537,24 +537,25 @@ ec_parameterization_Z6 (residue_t b, ec_point_t P0, const unsigned long k,
     mod_add (_t2, alpha3, beta3, m);      /* _t2 = alpha^3 + beta^3 */
     
     mod_mul (P0->x, V, sigma, m);
-    mod_mul (P0->x, P0->x, _t2, m);
     mod_mul (P0->x, P0->x, W, m);
-    mod_add (P0->x, P0->x, P0->x, m);     /* P->x = 2*V*sigma*_t2*W */
-
-    mod_sqr (_t0, U, m);
-    mod_mul (_t0, _t0, _t1, m);           /* t = _t1*U^2 */
-    mod_sub (P0->y, alpha3, beta3, m);
-    mod_mul (P0->y, P0->y, _t0, m);       /* P->y = (alpha3-beta3)*z1*U^2 */
-
-    mod_mul (P0->z, _t0, _t2, m);         /* P->z = z1*z2*U^2 */
+    mod_add (P0->x, P0->x, P0->x, m);
 
     if (coord == TWISTED_EDWARDS_ext)
-      {
-	mod_inv (_t0, P0->z, m);
-	mod_mul (P0->t, P0->x, P0->y, m);
-	mod_mul (P0->t, P0->t, _t0, m);
-      }
+      mod_set (P0->t, P0->x, m);
+
+    mod_mul (P0->x, P0->x, _t2, m);       /* P0->x = 2*V*sigma*W*_t2 */
+    mod_sqr (_t0, U, m);
+    mod_mul (_t0, _t0, _t1, m);           /* _t0 = _t1*U^2 */
+    mod_sub (P0->y, alpha3, beta3, m);
+
+    if (coord == TWISTED_EDWARDS_ext)
+	mod_mul (P0->t, P0->t, P0->y, m); /* P0->t = 2*V*sigma*W*(alpha3-beta3) */
+
+    mod_mul (P0->y, P0->y, _t0, m);       /* P->y = (alpha3-beta3)*_t0*U^2 */
+    mod_mul (P0->z, _t0, _t2, m);         /* P->z = _t0*_t2*U^2 */
+
   }
+  
 
   if (b != NULL)
   {
