@@ -417,6 +417,10 @@ ec_parameterization_Z6_is_valid (const unsigned long k)
  V *= l     # V = y
  W *= l     # W = 2985984*z
 
+ print "U = ", U.factor()
+ print "V = ", V.factor()
+ print "W = ", W.factor()
+
  sigma = (W - 96*U)/(96*U)
  sigma2 = sigma^2
  alpha = sigma2-5
@@ -441,7 +445,7 @@ ec_parameterization_Z6_is_valid (const unsigned long k)
  d = ((beta+alpha)^3*(beta-3*alpha)) / (r*(beta-alpha))^2
 
  eq_Ed = a*xE0^2 + yE0^2 - zE0^2 - d*tE0^2
- print "P0 is on curve:       ",
+ print "PE0 is on curve:      ",
  print eq_Ed.numerator() in I\
  and not(eq_Ed.denominator() in I)\
  and (xE0*yE0 - zE0*tE0 in I)
@@ -472,7 +476,7 @@ ec_parameterization_Z6_is_valid (const unsigned long k)
  not(any([m[1] % 2 for m in list(f)])) and QQ(f.unit()).is_square()
  yM02 = (b/B)*y0^2
  eq_M0 = B*yM02*zM0-xM0*(xM0^2+A*xM0*zM0+zM0^2)
- print "M0 in on curve:       ",
+ print "PM0 in on curve:      ",
  print eq_M0.numerator() in I and not(eq_M0.denominator() in I)
 
  * -------------------------------------------------------------------------
