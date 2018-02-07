@@ -470,276 +470,127 @@ ec_parameterization_Z6 (residue_t b, ec_point_t P0, const unsigned long k,
   ASSERT_ALWAYS (coord == MONTGOMERY_xz || coord == TWISTED_EDWARDS_ext
                                         || coord == TWISTED_EDWARDS_proj);
 
-  residue_t a, p, q, r, t, _96U, sigma, sigma2, alpha, alpha3, beta, beta3, z1, z2, U, V, W;
+  residue_t sigma, sigma2, alpha, alpha3, beta, beta3, U, V, W;
+  residue_t _t0, _t1, _t2;
+  
   ec_point_t T;
   int ret = 0;
 
   ec_point_init (T, m);
 
-  mod_init_noset0 (a, m);
-  mod_init_noset0 (p, m);
-  mod_init_noset0 (q, m);
-  mod_init_noset0 (r, m);
   mod_init_noset0 (U, m);
   mod_init_noset0 (V, m);
   mod_init_noset0 (W, m);
-  mod_init_noset0 (t, m);
-  mod_init_noset0 (_96U, m);
+  mod_init_noset0 (_t0, m);
+  mod_init_noset0 (_t1, m);
+  mod_init_noset0 (_t2, m);
   mod_init_noset0 (sigma, m);
   mod_init_noset0 (sigma2, m);
   mod_init_noset0 (alpha, m);
   mod_init_noset0 (alpha3, m);
   mod_init_noset0 (beta, m);
   mod_init_noset0 (beta3, m);
-  mod_init_noset0 (z1, m);
-  mod_init_noset0 (z2, m);
   
-  mod_set_ul (a, 9747UL, m);
-  mod_neg (a, a, m);
+  mod_set_ul (_t0, 9747UL, m);
+  mod_neg (_t0, _t0, m);
   mod_set_ul (T->x, 15UL, m);
   mod_set_ul (T->y, 378UL, m);
   mod_set1 (T->z, m);
 
-#if 0
-  weierstrass_aff_smul_ui (T, k, a, m);
-  mod_set (p, T->x, m);
-  mod_set (q, T->y, m);
-#else
-  weierstrass_proj_smul_ui (T, k, a, m);
-  mod_set (p, T->x, m);
-  mod_set (q, T->y, m);
-  mod_set (r, T->z, m);
-#endif
+  weierstrass_proj_smul_ui (T, k, _t0, m);
 
-
-  mod_set_ul (t, 144UL, m);
-  mod_add (U, p, r, m);
-  mod_add (U, U, r, m);
-  mod_add (U, U, r, m);
-  mod_mul (U, U, t, m);          /* U = 144*p + 432*r */
-  mod_set (V, q, m);             /* V = q */
+  mod_set_ul (_t0, 144UL, m);
+  mod_add (U, T->x, T->z, m);
+  mod_add (U, U, T->z, m);
+  mod_add (U, U, T->z, m);
+  mod_mul (U, U, _t0, m);                 /* U = 144*(T->x + 3*r) */
+  mod_set (V, T->y, m);                   /* V = q */
   mod_set_ul (W, 2985984UL, m);
-  mod_mul (W, W, r, m);          /* W = 12^6 * r*/
+  mod_mul (W, W, T->z, m);                /* W = 12^6 * r*/
 
-
-  mod_set_ul (_96U, 96UL, m);
-  mod_mul (_96U, _96U, U, m);
-  mod_inv (t, _96U, m);                  /* t = 1/(96U) */
-  mod_sub (sigma, W, _96U, m);
-  mod_mul (sigma, sigma, t, m);          /* sigma = (W - 96*U)/96*U */
-  mod_mul (sigma2, sigma, sigma, m);     /* sigma2 = sigma^2 */
-  mod_sub_ul (alpha, sigma2, 5UL, m);    /* alpha = sigma^2 - 5 */
+  mod_set_ul (_t0, 96UL, m);
+  mod_mul (_t0, _t0, U, m);
+  mod_inv (_t1, _t0, m);                  /* t = 1/(96*U) */
+  mod_sub (sigma, W, _t0, m);
+  mod_mul (sigma, sigma, _t1, m);         /* sigma = (W - 96*U)/96*U */
+  mod_mul (sigma2, sigma, sigma, m);      /* sigma2 = sigma^2 */
+  mod_sub_ul (alpha, sigma2, 5UL, m);     /* alpha = sigma^2 - 5 */
   mod_mul (alpha3, alpha, alpha, m);     
-  mod_mul (alpha3, alpha3, alpha, m);    /* alpha3 = alpha^3 */
+  mod_mul (alpha3, alpha3, alpha, m);     /* alpha3 = alpha^3 */
   mod_add (beta, sigma, sigma, m);
-  mod_add (beta, beta, beta, m);         /* beta = 4*sigma */
+  mod_add (beta, beta, beta, m);          /* beta = 4*sigma */
   mod_mul (beta3, beta, beta, m);
-  mod_mul (beta3, beta3, beta, m);       /* beta3 = beta^3 */
-
-  /* mod_set_ul (t, 105UL, m); */
-  /* mod_sub (alpha, p, t, m); */
-  /* mod_set_ul (t, 57UL, m); */
-  /* mod_add (t, p, t, m); */
-  /* mod_mul (alpha, alpha, t, m);           /\* alpha = (p-105)*(p+57) *\/ */
-
-  /* mod_set_ul (t, 213UL, m); */
-  /* mod_sub (t, p, t, m); */
-  /* mod_mul (beta, q, t, m);                /\* beta = q*(p-213) *\/ */
-
-  /* mod_set_ul (t, 96UL, m); */
-  /* mod_sub (gamma, p, t, m); */
-  /* mod_mul (gamma, gamma, p, m); */
-  /* mod_set_ul (t, 918UL, m); */
-  /* mod_sub (gamma, gamma, t, m); */
-  /* mod_mul (gamma, gamma, p, m); */
-  /* mod_set_ul (t, 2808UL, m); */
-  /* mod_sub (gamma, gamma, t, m); */
-  /* mod_mul (gamma, gamma, p, m); */
-  /* mod_set_ul (t, 45346797, m); */
-  /* mod_add (gamma, gamma, t, m); /\* gamma = p^4-96*p^3-918*p^2-2808*p+45346797 *\/ */
-
-  /* mod_set_ul (t, 69984UL, m); /\* 2^5*3^7 *\/ */
-  /* mod_sqr (delta, pm33, m); */
-  /* mod_mul (delta, delta, t, m); */
-  /* mod_add (delta, gamma, delta, m);       /\* delta = gamma + 2^5*3^7*(p-33)^2 *\/ */
-
-  /* mod_set_ul (t, 66UL, m); */
-  /* mod_sub (epsilon, p, t, m); */
-  /* mod_mul (epsilon, epsilon, p, m); */
-  /* mod_set_ul (t, 7569UL, m); */
-  /* mod_add (epsilon, epsilon, t, m);       /\* epsilon =  p^2 - 66*p + 7569 *\/ */
-
-  /* mod_set_ul (zeta, 2916UL, m); */
-  /* mod_mul (zeta, zeta, q, m); */
-  /* mod_mul (zeta, zeta, pm33, m);          /\* zeta = 2^2*3^6*q*(p-33) *\/ */
+  mod_mul (beta3, beta3, beta, m);        /* beta3 = beta^3 */
 
   if (coord == MONTGOMERY_xz)
   {
-    /*
-      # Coeffs for Montgomery curve from sigma
-      xM0 = alpha3
-      zM0 = beta3 
-    */
-
-    /* mod_set_ul (t, 114UL, m); */
-    /* mod_add (P0->x, p, t, m); */
-    /* mod_mul (P0->x, P0->x, p, m); */
-    /* mod_set_ul (t, 11331UL, m); */
-    /* mod_sub (P0->x, P0->x, t, m); */
-    /* mod_sqr (t, P0->x, m); */
-    /* mod_mul (P0->x, P0->x, t, m);         /\* xM0 = (p^2 + 114*p - 11331)^3 *\/ */
-    /* mod_set_ul (t, 213UL, m); */
-    /* mod_sub (P0->z, p, t, m); */
-    /* mod_mul (P0->z, P0->z, pp3, m); */
-    /* mod_sqr (t, P0->z, m); */
-    /* mod_mul (P0->z, P0->z, t, m);         /\* zM0 = ((p-213)*(p+3))^3 *\/ */
-
     mod_set (P0->x, alpha3, m);
     mod_set (P0->z, beta3, m);
-    
   }
   else
   {
-
-    /*
-      z1 = (sigma-1)*(sigma+5)*(sigma2+5)
-      z2 = alpha3+beta3
-      
-      # Coeffs for twisted Edwards curve from sigma
-      xE0 = (2*qq*sigma)*z2*rr
-      yE0 = (alpha3-beta3)*z1*pp^2
-      zE0 = z1*z2*pp^2
-    */
-    
-    /* mod_set_ul (t, 6UL, m); */
-    /* mod_mul (P0->x, t, pp3, m); */
-    /* mod_mul (P0->x, P0->x, alpha, m); */
-    /* mod_mul (P0->x, P0->x, beta, m); */
-    /* mod_mul (P0->x, P0->x, delta, m);     /\* xE0 = 2*3*(p+3)*alpha*beta*delta *\/ */
-    /* mod_set_ul (t, 486UL, m); */
-    /* mod_mul (P0->y, t, pm33, m); */
-    /* mod_mul (P0->y, P0->y, alpha, m); */
-    /* mod_mul (P0->y, P0->y, gamma, m); */
-    /* mod_mul (P0->y, P0->y, epsilon, m); */
-    /*                               /\* yE0 = (2*3^5)*(p-33)*alpha*gamma*epsilon *\/ */
-    /* mod_sqr (P0->z, alpha, m); */
-    /* mod_mul (P0->z, P0->z, delta, m); */
-    /* mod_mul (P0->z, P0->z, epsilon, m);   /\* zE0 = alpha^2*delta*epsilon *\/ */
-    /* if (coord == TWISTED_EDWARDS_ext) */
-    /* { */
-    /*   mod_set_ul (t, 2916UL, m); */
-    /*   mod_mul (P0->t, t, pm33, m); */
-    /*   mod_mul (P0->t, P0->t, pp3, m); */
-    /*   mod_mul (P0->t, P0->t, beta, m); */
-    /*   mod_mul (P0->t, P0->t, gamma, m); */
-    /*                                  /\* tE0 = 2^2*3^6*(p-33)*(p+3)*beta*gamma *\/ */
-    /* } */
-
-    /* 
-       z1 = sigma2*(sigma2+beta) + 5*(beta-5)
-    */
-
-    /*
-      z1 = (sigma-1)*(sigma+5)*(sigma2+5)
-      z2 = alpha3+beta3
-      
-      zE0 = z1*z2*U^2
-      xE0 = 2*V*sigma*z2*W
-      yE0 = (alpha3-beta3)*z1*U^2
-      tE0 = (xE0*yE0)/zE0
-    */
-    
-
-    mod_sub_ul (z1, sigma, 1UL, m);
-    mod_add_ul (t, sigma, 5UL, m);
-    mod_mul (z1, z1, t, m);
-    mod_add_ul (t, sigma2, 5UL, m);
-    mod_mul (z1, z1, t, m);           /* z1 = (sigma-1)*(sigma+5)*(sigma2+5) */
-    
-    mod_add (z2, alpha3, beta3, m);   /* z2 = alpha^3 + beta^3 */
+    mod_sub_ul (_t1, sigma, 1UL, m);      /* _t1 = (sigma-1)  */
+    mod_add_ul (_t0, sigma, 5UL, m);      /* _t0 = (sigma+5) */
+    mod_mul (_t1, _t1, _t0, m);           /* _t1 = (sigma-1)*(sigma+5) */
+    mod_add_ul (_t0, sigma2, 5UL, m);     /* _t0 = (sigma^2+5) */
+    mod_mul (_t1, _t1, _t0, m);           /* _t1 = (sigma-1)*(sigma+5)*(sigma2+5) */
+    mod_add (_t2, alpha3, beta3, m);      /* _t2 = alpha^3 + beta^3 */
     
     mod_mul (P0->x, V, sigma, m);
-    mod_mul (P0->x, P0->x, z2, m);
+    mod_mul (P0->x, P0->x, _t2, m);
     mod_mul (P0->x, P0->x, W, m);
-    mod_add (P0->x, P0->x, P0->x, m); /* P->x = 2*V*sigma*z2*W */
+    mod_add (P0->x, P0->x, P0->x, m);     /* P->x = 2*V*sigma*_t2*W */
 
-    mod_sqr (t, U, m);
-    mod_mul (t, t, z1, m);            /* t = z1*U^2 */
+    mod_sqr (_t0, U, m);
+    mod_mul (_t0, _t0, _t1, m);           /* t = _t1*U^2 */
     mod_sub (P0->y, alpha3, beta3, m);
-    mod_mul (P0->y, P0->y, t, m);     /* P->y = (alpha3-beta3)*z1*U^2 */
+    mod_mul (P0->y, P0->y, _t0, m);       /* P->y = (alpha3-beta3)*z1*U^2 */
 
-    mod_mul (P0->z, t, z2, m);        /* P->z = z1*z2*U^2 */
+    mod_mul (P0->z, _t0, _t2, m);         /* P->z = z1*z2*U^2 */
 
     if (coord == TWISTED_EDWARDS_ext)
       {
-	mod_inv (t, P0->z, m);
+	mod_inv (_t0, P0->z, m);
 	mod_mul (P0->t, P0->x, P0->y, m);
-	mod_mul (P0->t, P0->t, t, m);
+	mod_mul (P0->t, P0->t, _t0, m);
       }
   }
 
   if (b != NULL)
   {
-    /* mod_set_ul (t, 51UL, m); */
-    /* mod_sub (b, p, t, m); */
-    /* mod_set_ul (t, 327UL, m); */
-    /* mod_add (t, p, t, m); */
-    /* mod_mul (b, b, t, m); */
-    /* mod_sqr (t, alpha, m); */
-    /* mod_mul (b, b, t, m); */
-    /* mod_mul (b, b, alpha, m); */
-    /* mod_sqr (t, zeta, m); */
-    /* mod_sub (b, t, b, m); */
-
-    /* ret = mod_inv (a, b, m); */
-    /* if (ret == 0) /\* non-trivial gcd *\/ */
-    /*   mod_set (P0->x, b, m); */
-    /* else */
-    /*   mod_mul (b, a, t, m);     /\* b = zeta^2/(zeta^2-alpha^3*(p-51)*(p+327)) *\/ */
-
-  /*    
-	# One needs AA = (A+2)/4
-	AA = (((beta-alpha)^3)*(3*alpha+beta) / (16*alpha3*beta))
-  */
-
-    mod_mul (t, alpha3, beta, m);
-    mod_add (t, t, t, m);
-    mod_add (t, t, t, m);
-    mod_add (t, t, t, m);
-    mod_add (t, t, t, m);
-    ret = mod_inv (z1, t, m);
+    mod_mul (_t0, alpha3, beta, m);
+    mod_add (_t0, _t0, _t0, m);
+    mod_add (_t0, _t0, _t0, m);
+    mod_add (_t0, _t0, _t0, m);
+    mod_add (_t0, _t0, _t0, m);
+    ret = mod_inv (_t1, _t0, m);
     if (ret == 0)
-      mod_set (P0->x, t, m);
+      mod_set (P0->x, _t0, m);
     else
       {
-	mod_sub (t, beta, alpha, m);
-	mod_sqr (z2, t, m);
-	mod_mul (z2, z2, t, m);
+	mod_sub (_t0, beta, alpha, m);
+	mod_sqr (_t2, _t0, m);
+	mod_mul (_t2, _t2, _t0, m);
 	mod_add (b, alpha, alpha, m);
 	mod_add (b, b, alpha, m);
 	mod_add (b, b, beta, m);
-	mod_mul (b, b, z2, m);
-	mod_mul (b, b, z1, m);
+	mod_mul (b, b, _t2, m);
+	mod_mul (b, b, _t1, m);
       }
   }
 
-  mod_clear (a, m);
-  mod_clear (p, m);
-  mod_clear (q, m);
-  mod_clear (r, m);
   mod_clear (U, m);
   mod_clear (V, m);
   mod_clear (W, m);
-  mod_clear (t, m);
-  mod_clear (_96U, m);
+  mod_clear (_t0, m);
+  mod_clear (_t1, m);
+  mod_clear (_t2, m);
   mod_clear (sigma, m);
   mod_clear (sigma2, m);
   mod_clear (alpha, m);
   mod_clear (alpha3, m);
   mod_clear (beta, m);
   mod_clear (beta3, m);
-  mod_clear (z1, m);
-  mod_clear (z2, m);
 
   ec_point_clear (T, m);
 
