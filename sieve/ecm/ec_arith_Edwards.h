@@ -15,6 +15,22 @@ static int _count_edwards_extraM;
 
 /* #define SAFE_TWISTED_EDWARDS_TO_MONTGOMERY */
 
+/* Compute d = -(A-2)/(A+2). A and d can be the same variable. */
+static inline void
+edwards_d_from_montgomery_A (residue_t d, const residue_t A, const modulus_t m)
+{
+  residue_t (t);
+  mod_init (t, m);
+
+  mod_add_ul (t, A, 2UL, m);
+  mod_inv (d, t, m);
+  mod_sub_ul (t, t, 4UL, m); /* t = A-2 */
+  mod_mul (d, d, t, m);
+  mod_neg (d, d, m);
+
+  mod_clear (t, m);
+}
+
 static inline void
 edwards_neg (ec_point_t Q, const ec_point_t P, const modulus_t m)
 {

@@ -66,32 +66,14 @@ ec_point_swap (ec_point_t Q, ec_point_t P, const modulus_t m)
 
 static inline void
 ec_point_fprintf (FILE *out, ec_point_t P, const ec_point_coord_type_t coord,
-                  MAYBE_UNUSED const modulus_t m)
+                  const modulus_t m)
 {
-  // XXX experimental and maybe not optimal
-
-  residue_t v1, v2, tmp;
-  mod_init (v1, m);
-  mod_init (v2, m);
-  mod_init (tmp, m);
-  
-  mod_inv (v1, P->z, m);
-  mod_mul (v1, v1, P->x, m);
-
-  mod_sub (v2, P->z, P->y, m);
-  mod_inv (v2, v2, m);
-  mod_add (tmp, P->z, P->y, m);
-  mod_mul (v2, v2, tmp, m);
-  
-#ifdef MOD_SIZE
-  modint_t x, y, z, t, w1, w2;
+  modint_t x, y, z, t;
 
   mod_intinit (x);
   mod_intinit (y);
   mod_intinit (z);
   mod_intinit (t);
-  mod_intinit (w1);
-  mod_intinit (w2);
   
   mod_get_int (x, P->x, m);
   mod_get_int (y, P->y, m);
@@ -100,28 +82,23 @@ ec_point_fprintf (FILE *out, ec_point_t P, const ec_point_coord_type_t coord,
 
   switch (coord)
   {
-    case SHORT_WEIERSTRASS_aff:
-      gmp_fprintf (out, "(%Nd, %Nd)", x, MOD_SIZE, y, MOD_SIZE);
+    case SHORT_WEIERSTRASS_aff: /* (x, y) */
+      mod_fprintf (out, "%s(0x%" PRIMODx ", 0x%" PRIMODx ")", MOD_PRINT_INT(x),
+          MOD_PRINT_INT(y));
       break;
-    case SHORT_WEIERSTRASS_proj:
-      gmp_fprintf (out, "(%Nd : %Nd : %Nd)", x, MOD_SIZE, y, MOD_SIZE, z,
-                                                                      MOD_SIZE);
+    case TWISTED_EDWARDS_proj: /* (X : Y : Z) */
+    case SHORT_WEIERSTRASS_proj: /* (X : Y : Z) */
+      mod_fprintf (out, "(0x%" PRIMODx " : 0x%" PRIMODx " : 0x%" PRIMODx ")",
+          MOD_PRINT_INT(x), MOD_PRINT_INT(y), MOD_PRINT_INT(z));
       break;
-    case MONTGOMERY_xz:
-      gmp_fprintf (out, "(%Nd :: %Nd)\n", x, MOD_SIZE, z, MOD_SIZE);
-      mod_get_int (w1, v1, m);
-      gmp_fprintf (out, "  X/Z: %Nd\n", w1, MOD_SIZE);
+    case MONTGOMERY_xz: /* (X :: Z) */
+      mod_fprintf (out, "(0x%" PRIMODx " :: 0x%" PRIMODx ")", MOD_PRINT_INT(x),
+          MOD_PRINT_INT(z));
       break;
-    case TWISTED_EDWARDS_proj:
-      gmp_fprintf (out, "(%Nd : %Nd : %Nd)", x, MOD_SIZE, y, MOD_SIZE, z,
-                                                                      MOD_SIZE);
-      break;
-    case TWISTED_EDWARDS_ext:
-      gmp_fprintf (out, "(%Nd : %Nd : %Nd : %Nd)\n", x, MOD_SIZE, y, MOD_SIZE,
-                                                   z, MOD_SIZE, t, MOD_SIZE);
-      mod_get_int (w2, v2, m);
-      gmp_fprintf (out, "  (Z+Y)/(Z-Y): %Nd\n", w2, MOD_SIZE);
-      
+    case TWISTED_EDWARDS_ext: /* (X : Y : Z : T) */
+      mod_fprintf (out, "(0x%" PRIMODx " : 0x%" PRIMODx " : 0x%" PRIMODx " : "
+          "0x%" PRIMODx ")", MOD_PRINT_INT(x), MOD_PRINT_INT(y),
+          MOD_PRINT_INT(z), MOD_PRINT_INT(t));
       break;
     default:
       fprintf (stderr, "%s: unknown coordinates system\n", __func__);
@@ -132,113 +109,60 @@ ec_point_fprintf (FILE *out, ec_point_t P, const ec_point_coord_type_t coord,
   mod_intclear (y);
   mod_intclear (z);
   mod_intclear (t);
-  mod_intclear (w1);
-  mod_intclear (w2);
-#else
-  switch (coord)
-  {
-    case SHORT_WEIERSTRASS_aff:
-      gmp_fprintf (out, "(%Zd, %Zd)", P->x, P->y);
-      break;
-    case SHORT_WEIERSTRASS_proj:
-      gmp_fprintf (out, "(%Zd : %Zd : %Zd)", P->x, P->y, P->z);
-      break;
-    case MONTGOMERY_xz:
-      gmp_fprintf (out, "(%Zd :: %Zd)\n", P->x, P->z);
-      gmp_fprintf (out, "  X/Z = %Zd\n", v1);
-      break;
-    case TWISTED_EDWARDS_proj:
-      gmp_fprintf (out, "(%Zd : %Zd : %Zd)", P->x, P->y, P->z);
-      break;
-    case TWISTED_EDWARDS_ext:
-      gmp_fprintf (out, "(%Zd : %Zd : %Zd : %Zd)\n", P->x, P->y, P->z, P->t);
-      gmp_fprintf (out, "  (Z+Y)/(Z-Y) = %Zd\n", v2);
-      break;
-    default:
-      fprintf (stderr, "%s: unknown coordinates system\n", __func__);
-      abort ();
-  }
-#endif
-  mod_clear (v1, m);
-  mod_clear (v2, m);
-  mod_clear (tmp, m);
 }
 
 static inline void
-ec_montgomery_curve_fprintf (FILE *out, residue_t A, ec_point_t P,
-                             MAYBE_UNUSED const modulus_t m)
+ec_montgomery_curve_fprintf (FILE *out, const char *prefix, residue_t A,
+                             ec_point_t P, const modulus_t m)
 {
-  // XXX experimental
-
-#ifdef MOD_SIZE
-  modint_t cc, mod;
+  modint_t cc;
+  const char *pre = (prefix == NULL) ? "" : prefix;
 
   mod_intinit (cc);
-  mod_intinit (mod);
-
   mod_get_int (cc, A, m);
-  mod_getmod_int (mod, m);
 
-  gmp_fprintf (out, "  Montgomery curve: B*Y^2 = X^3 + A*X^2*Z + X*Z^2\n"
-	       "  A = %Nd\n  modulo %Nd\n", cc, MOD_SIZE, mod, MOD_SIZE);
+  mod_fprintf (out, "%sMontgomery curve: B*Y^2 = X^3 + A*X^2*Z + X*Z^2\n"
+                    "%sA = 0x%" PRIMODx "\n", pre, pre, MOD_PRINT_INT (cc));
 
   mod_intclear (cc);
-  mod_intclear (mod);
-#else
-  gmp_fprintf (out, "  Montgomery curve: B*Y^2 = X^3 + A*X^2*Z + X*Z^2\n"
-                    "  A = %Zd\n  modulo %Zd\n", A, m);
-
-#endif
 
   if (P)
   {
-    fputs ("  with point (X::Z) = ", out);
+    fprintf (out, "%swith point (X::Z) = ", pre);
     ec_point_fprintf (out, P, MONTGOMERY_xz, m);
     fputc ('\n', out);
   }
 }
 
+/* A is the curve coefficient of the isomorphic Montgomery curve, the relation
+ * is (because we have a=-1):
+ *    A = 2*(1-d)/(1+d)
+ *    d = -(A-2)/(A+2)
+ */
 static inline void
-ec_twisted_edwards_ext_curve_fprintf (FILE *out, residue_t A, ec_point_t P,
-                                      MAYBE_UNUSED const modulus_t m)
+ec_twisted_edwards_ext_curve_fprintf (FILE *out, const char *prefix,
+                                      residue_t d, ec_point_t P,
+                                      const modulus_t m)
 {
-  // XXX experimental
-#ifdef MOD_SIZE
-  modint_t mod;
-  mod_intinit (mod);
-  mod_getmod_int (mod, m);
-  gmp_fprintf (out, "Twisted Edwards curve: -X^2 + Y^2 = Z^2 + d*T^2\n"
-	       "  XY = ZT (extended coordinates)\n  modulo %Nd\n", mod, MOD_SIZE);
-  mod_intclear (mod);
+  const char *pre = (prefix == NULL) ? "" : prefix;
 
-#else
-  gmp_fprintf (out, "Twisted Edwards curve: -X^2 + Y^2 = Z^2 + d*T^2\n"
-                    "  XY = ZT (extended coordinates)\n  modulo %Zd\n", m);
-#endif
+  modint_t cc;
+  mod_intinit (cc);
 
+  mod_get_int (cc, d, m);
 
-  if (A)
-  {
-#ifdef MOD_SIZE
-    modint_t cc;
-    mod_intinit (cc);
-    mod_get_int (cc, A, m);
-    gmp_fprintf (out, "  Equivalent to Montgomery curve with\n"
-		      "  A = %Nd\n", cc, MOD_SIZE);
-    mod_intclear (cc);
-#else
-    gmp_fprintf (out, "  Equivalent to Montgomery curve with\n"
-		      "  A = %Zd\n", A);
-#endif
-  }
-  
+  mod_fprintf (out, "%sTwisted Edwards curve: -X^2 + Y^2 = Z^2 + d*T^2\n"
+                    "%sXY = ZT (extended coordinates)\n%sd = 0x%" PRIMODx "\n",
+                    pre, pre, pre, MOD_PRINT_INT (cc));
+
+  mod_intclear (cc);
+
   if (P)
-    {
-      fputs ("  with point (X:Y:Z:T) = ", out);
-      ec_point_fprintf (out, P, TWISTED_EDWARDS_ext, m);
-      fputc ('\n', out);
-    }
-  
+  {
+    fprintf (out, "%swith point (X:Y:Z:T) = ", pre);
+    ec_point_fprintf (out, P, TWISTED_EDWARDS_ext, m);
+    fputc ('\n', out);
+  }
 }
 
 static inline void
@@ -246,6 +170,7 @@ ec_weierstrass_curve_fprintf (FILE *out, residue_t a, ec_point_t P,
                              MAYBE_UNUSED const modulus_t m)
 {
   // XXX experimental
+  // TODO rewrite it as the others
 #ifdef MOD_SIZE
   modint_t cc, mod;
 
@@ -256,7 +181,7 @@ ec_weierstrass_curve_fprintf (FILE *out, residue_t a, ec_point_t P,
   mod_getmod_int (mod, m);
 
   gmp_fprintf (out, "Weierstrass curve: y^2 = x^3 + a*x + b\n"
-	       "  a = %Nd\n  modulo %Nd\n", cc, MOD_SIZE, mod, MOD_SIZE);
+                    "  a = %Nd\n  modulo %Nd\n", cc, MOD_SIZE, mod, MOD_SIZE);
 
   mod_intclear (cc);
   mod_intclear (mod);

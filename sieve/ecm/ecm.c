@@ -12,7 +12,7 @@
 //#define ECM_COUNT_OPS /* define to print number of operations of ECM */
 //#define ECM_TIMINGS /* define to print timings of ECM */
 
-#define TRACE
+//#define ECM_TRACE
 
 #include "ec_arith_common.h"
 #include "ec_arith_Edwards.h"
@@ -356,13 +356,6 @@ bytecode_mishmash_interpret_ec_mixed_repr (ec_point_t P, bytecode_const bc,
     }
 
     bc++; /* go to next byte */
-
-#ifdef TRACE
-    fprintf (stdout, "> %s: point after 1st bloc (in Montgomery form):\n", __func__);
-    fprintf (stdout, "  (X::Z) =");
-    ec_point_fprintf (stdout, R[1], MONTGOMERY_xz, m);
-#endif
-
   }
 
   /* output is in R[1] */
@@ -861,6 +854,11 @@ ecm_stage2 (residue_t r, const ec_point_t P, const stage2_plan_t *plan,
 int
 ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
 {
+#ifdef ECM_TRACE
+    mod_printf ("# TRACE: start %s with B1=%u and B2=%u for m = %" PRIMODu "\n",
+            __func__, plan->B1, plan->stage2.B2, MOD_PRINT_MODULUS (m));
+#endif
+
   residue_t u, b;
   ec_point_t P, Pt;
 
@@ -890,6 +888,7 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
     r = ec_parameterization_Montgomery16 (b, P, plan->parameter, m);
   else if (plan->parameterization == MONTYTWED12)
     r = ec_parameterization_Z6 (b, P, plan->parameter, TWISTED_EDWARDS_ext, m);
+    // TODO the output point depend on the first block of the bytecode
   else
   {
     fprintf (stderr, "%s: unknown parameterization\n", __func__);
@@ -902,8 +901,8 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
 
   if (r == 0)
   {
-#ifdef TRACE
-    printf ("%s: factor found during parameterization\n", __func__);
+#ifdef ECM_TRACE
+    printf ("# TRACE: factor found during parameterization\n");
 #endif
     mod_gcd (f, P->x, m);
     mod_clear (b, m);
@@ -911,16 +910,36 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
     return 0;
   }
 
-#ifdef TRACE
+#ifdef ECM_TRACE
   residue_t A;
+  ec_point_t PM;
+  ec_point_init (PM, m);
   mod_init (A, m);
   montgomery_A_from_b (A, b, m);
-  fprintf (stdout, "> %s: starting values:\n", __func__);
+  fprintf (stdout, "# TRACE: starting values:\n");
+
   if (plan->parameterization & FULLMONTY)
-    ec_montgomery_curve_fprintf (stdout, A, P, m);
+  {
+    ec_montgomery_curve_fprintf (stdout, "# TRACE:   ", A, P, m);
+    montgomery_point_to_affine (PM, P, m);
+    fprintf (stdout, "# TRACE:                       = ");
+    ec_point_fprintf (stdout, PM, MONTGOMERY_xz, m);
+    fputc ('\n', stdout);
+  }
   else
-    ec_twisted_edwards_ext_curve_fprintf (stdout, A, P, m);
+  {
+    residue_t d;
+    mod_init (d, m);
+    edwards_d_from_montgomery_A (d, A, m);
+    ec_twisted_edwards_ext_curve_fprintf (stdout, "# TRACE:   ", d, P, m);
+    mod_clear (d, m);
+
+    fprintf (stdout, "# TRACE:   Equivalent to Montgomery curve with:\n");
+    montgomery_point_from_edwards_point (PM, P, 1, m);
+    ec_montgomery_curve_fprintf (stdout, "# TRACE:     ", A, PM, m);
+  }
   mod_clear (A, m);
+  ec_point_clear (PM, m);
 #endif
 
   /* now start ecm */
@@ -939,10 +958,16 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
     bytecode_mishmash_interpret_ec_mixed_repr (P, plan->bc, m, b);
     /* input is in Edwards (extended), output is in Montgomery form */
 
-#ifdef TRACE
-  fprintf (stdout, "> %s: Output of phase 1 (in Montgomery form):\n", __func__);
-  fprintf (stdout, "  (X::Z) =");
+#ifdef ECM_TRACE
+  ec_point_t PfM;
+  ec_point_init (PfM, m);
+  montgomery_point_to_affine (PfM, P, m);
+  fprintf (stdout, "# TRACE: after stage 1:\n# TRACE:   output (X::Z) = ");
   ec_point_fprintf (stdout, P, MONTGOMERY_xz, m);
+  fprintf (stdout, "\n# TRACE:   output (X::Z) = ");
+  ec_point_fprintf (stdout, PfM, MONTGOMERY_xz, m);
+  fputc ('\n', stdout);
+  ec_point_clear (PfM, m);
 #endif
 
   
@@ -1105,7 +1130,7 @@ ell_pointorder (const unsigned long parameter,
       if (verbose >= 2)
       {
         printf ("%s: ", __func__);
-        ec_montgomery_curve_fprintf (stdout, A, P, m);
+        ec_montgomery_curve_fprintf (stdout, NULL, A, P, m);
       }
 
       r = weierstrass_aff_from_montgomery (a, P, A, P, m);

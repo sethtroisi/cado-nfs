@@ -25,3 +25,8 @@
 #define modulus_t            modulusmpz_t
 #define modint_t             modintmpz_t
 #define MOD_MAXBITS          MODMPZ_MAXBITS
+
+#define PRIMODu "Zd"
+#define PRIMODx "Zx"
+#define MOD_PRINT_INT(x) x
+#define MOD_PRINT_MODULUS(m) m

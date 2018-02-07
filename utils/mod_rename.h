@@ -144,6 +144,8 @@
 #define mod_set1             MOD_RENAME(set1)
 #define mod_next             MOD_RENAME(next)
 #define mod_finished         MOD_RENAME(finished)
+#define mod_fprintf          gmp_fprintf
+#define mod_printf           gmp_printf
 
 /* A function that is not used anywhere. The purpose is solely generating 
    compilation errors if any of the renamed functions, which constitute  

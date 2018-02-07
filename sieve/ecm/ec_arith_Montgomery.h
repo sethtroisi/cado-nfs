@@ -35,6 +35,30 @@ montgomery_A_from_b (residue_t A, const residue_t b, const modulus_t m)
   mod_sub_ul (A, A, 2, m); /* A <- 4b-2 */
 }
 
+/* P and Q can be the same variables */
+static inline void
+montgomery_point_to_affine (ec_point_t Q, ec_point_t P, const modulus_t m)
+{
+  residue_t t;
+  mod_init (t, m);
+
+  mod_inv (t, P->z, m);
+  mod_mul (Q->x, P->x, t, m);
+  mod_set1 (Q->z, m);
+
+  mod_clear (t, m);
+}
+
+static inline void
+montgomery_point_from_edwards_point (ec_point_t PM, ec_point_t PE, int out_aff,
+                                     const modulus_t m)
+{
+  mod_add (PM->x, PE->z, PE->y, m);
+  mod_sub (PM->z, PE->z, PE->y, m);
+  if (out_aff)
+    montgomery_point_to_affine (PM, PM, m);
+}
+
 /* Computes Q=2P, with 5 muls (3 muls and 2 squares) and 4 add/sub.
  *    - m : modulus
  *    - b = (A+2)/4 mod m

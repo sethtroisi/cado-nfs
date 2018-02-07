@@ -28,6 +28,11 @@
 #define MOD_MINBITS          MODREDC15UL_MINBITS
 #define MOD_MAXBITS          MODREDC15UL_MAXBITS
 
+#define PRIMODu "Nd"
+#define PRIMODx "Nx"
+#define MOD_PRINT_INT(x) x, MOD_SIZE
+#define MOD_PRINT_MODULUS(x) x[0].m, MOD_SIZE
+
 /* This function is used in mod_2ul_common.h with different 
    implementations for 15ul and 2ul2. Maybe there's a prettier way */
 #undef mod_divn

@@ -26,3 +26,8 @@
 #define modint_t             modintredcul_t
 #define MOD_SIZE             MODREDCUL_SIZE
 #define MOD_MAXBITS          MODREDCUL_MAXBITS
+
+#define PRIMODu "lu"
+#define PRIMODx "lx"
+#define MOD_PRINT_INT(x) x[0]
+#define MOD_PRINT_MODULUS(x) x[0].m
