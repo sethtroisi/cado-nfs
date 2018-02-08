@@ -47,12 +47,12 @@ print_pointorder (const unsigned long p, const unsigned long parameter,
 
   modredcul_initmod_ul (m, p);
   
-  if (parameterization == BRENT12 || parameterization == MONTY12)
+  if (parameterization & ECM_TORSION12)
     knownfac = 12;
-  else if (parameterization == MONTY16)
+  else if (parameterization & ECM_TORSION16)
     knownfac = 16;
   else
-    abort();
+    knownfac = 1;
   
   o = ell_pointorder_ul (parameter, parameterization, knownfac, 0, m, verbose);
   if (verbose)
@@ -141,7 +141,7 @@ void print_help (char *programname)
   printf ("-inp <f> Read decimal numbers to factor from file <f>\n");
   printf ("-inpraw <f>  Read numbers in GMP raw format from file <f>\n");
   printf ("-inpstop <n> Stop after reading <n> numbers\n");
-  printf ("-po <s>, -pom12 <s>, -pom16 <s>, -poe16 <s> Compute order of starting point. Use -vf\n");
+  printf ("-po <s>, -pom12 <s>, -pom16 <s>, -poem12 <s> Compute order of starting point. Use -vf\n");
 }
 
 unsigned long
@@ -260,8 +260,8 @@ int main (int argc, char **argv)
 	    parameterization = MONTYTWED12;
     else
     {
-      fprintf (stderr, "Error, unknown parameter %s\n", argv[1]);
-      abort();
+      fprintf (stderr, "Unrecognized option: %s\n", argv[1]);
+      exit (EXIT_FAILURE);
     }
 
     if (!ec_parameter_is_valid (parameterization, parameter))
@@ -298,11 +298,19 @@ int main (int argc, char **argv)
      else if (argc > 2 && strncmp (argv[1], "-po", 3) == 0)
 	{
 	  do_pointorder = 1;
-	  po_parameterization = BRENT12;
-	  if (strcmp (argv[1], "-pom12") == 0)
+    if (strcmp (argv[1], "-po") == 0)
+	    po_parameterization = BRENT12;
+    else if (strcmp (argv[1], "-pom12") == 0)
 	    po_parameterization = MONTY12;
     else if (strcmp (argv[1], "-pom16") == 0)
 	    po_parameterization = MONTY16;
+    else if (strcmp (argv[1], "-poem12") == 0)
+	    po_parameterization = MONTYTWED12;
+    else
+    {
+      fprintf (stderr, "Unrecognized option: %s\n", argv[1]);
+      exit (EXIT_FAILURE);
+    }
 	  po_parameter = strtol (argv[2], NULL, 10);
 	  argc -= 2;
 	  argv += 2;
