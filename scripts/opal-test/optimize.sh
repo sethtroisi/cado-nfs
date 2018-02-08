@@ -18,6 +18,12 @@
 : ${NOMAD_MAX_BB_EVAL=100}
 export NOMAD_MAX_BB_EVAL
 
+# To use nomad p-MADS set NOMAD_MPI to more than 1.
+# This will run blackbox evaluations in parallel.
+
+: ${NOMAD_MPI=1}
+export NOMAD_MPI 
+
 # To use say 8 threads:
 # OPAL_NUM_THREADS=8 ./optimize.sh ...
 # Note that when the number of threads increases, the estimated time reported
@@ -35,6 +41,12 @@ export NOMAD_MAX_BB_EVAL
 # Thus for production use we recommend to use OPAL_NUM_THREADS <= 4.
 
 : ${OPAL_NUM_THREADS=4}
+
+# Set number of parallel instances of las.
+# This can help to parallelize the optimization process, but the use of NOMAD_MPI is preferred.
+# Set to 1 unless you understand what you're doing
+
+: ${OPAL_NUM_WORKERS=1}
 
 cwd=`pwd`
 
@@ -71,10 +83,12 @@ echo "Working directory:" $d
 # cleanup() { rm -rf "$d" ; }
 # trap cleanup EXIT
 
+
 ### Copy las_optimize, report and poly file and replace its name in las_run
 cp $2 las_optimize.py report.py $d
 sed "s/c59.polyselect2.poly/$poly/g" las_run.py | \
-sed "s/2 # number of threads for las/$OPAL_NUM_THREADS/g" > $d/las_run.py
+sed "s/[0-9]\+,\? # number of threads for las/$OPAL_NUM_THREADS,/g" | \
+sed "s/[0-9]\+,\? # number of workers for las/$OPAL_NUM_WORKERS,/g" > $d/las_run.py
 
 ### Parsing poly file (number of poly and rat/alg) (for now assume npoly == 2)
 npoly=`grep -c "^poly[0-9]" $d/$poly || :`
