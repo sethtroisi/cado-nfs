@@ -121,6 +121,7 @@ struct mishmash_cost_s
   dbchain_cost_t *dbchain; /* cost for DBCHAIN block */
   precomp_cost_t *precomp; /* cost for PRECOMP block */
   prac_cost_t *prac; /* cost for PRAC block */
+  double switch_cost;
 };
 
 typedef struct mishmash_cost_s mishmash_cost_t;
