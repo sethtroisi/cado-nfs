@@ -166,33 +166,25 @@ ec_twisted_edwards_ext_curve_fprintf (FILE *out, const char *prefix,
 }
 
 static inline void
-ec_weierstrass_curve_fprintf (FILE *out, residue_t a, ec_point_t P,
-                             MAYBE_UNUSED const modulus_t m)
+ec_weierstrass_curve_fprintf (FILE *out, const char *prefix, residue_t a,
+                              ec_point_t P, const modulus_t m)
 {
-  // XXX experimental
-  // TODO rewrite it as the others
-#ifdef MOD_SIZE
-  modint_t cc, mod;
+  const char *pre = (prefix == NULL) ? "" : prefix;
 
+  modint_t cc;
   mod_intinit (cc);
-  mod_intinit (mod);
 
   mod_get_int (cc, a, m);
-  mod_getmod_int (mod, m);
 
-  gmp_fprintf (out, "Weierstrass curve: y^2 = x^3 + a*x + b\n"
-                    "  a = %Nd\n  modulo %Nd\n", cc, MOD_SIZE, mod, MOD_SIZE);
+  mod_fprintf (out, "%sWeierstrass curve: y^2 = x^3 + a*x + b\n"
+                    "%sa = 0x%" PRIMODx "\n", pre, pre, MOD_PRINT_INT (cc));
+
 
   mod_intclear (cc);
-  mod_intclear (mod);
-#else
-  gmp_fprintf (out, "Weierstrass curve: y^2 = x^3 + a*x + b\n"
-                    "  a = %Zd\n  modulo %Zd\n", a, m);
-#endif
 
   if (P)
   {
-    fputs ("  with point (x, y) = ", out);
+    fprintf (out, "%swith point (x, y) = ", pre);
     ec_point_fprintf (out, P, SHORT_WEIERSTRASS_aff, m);
     fputc ('\n', out);
   }
