@@ -1055,6 +1055,9 @@ bytecode_mishmash_cost (bytecode_const bc, bytecode_const *endptr,
     bc++; /* go to next byte */
   }
 
+  /* Add the cost due to the switch of coordinates */
+  cost += opcost->switch_cost;
+
   if (endptr != NULL)
     *endptr = bc;
 
@@ -1093,7 +1096,7 @@ bytecode_mishmash_encode (bytecode *bc, unsigned int B1, unsigned int pow2_nb,
 
   if (verbose)
   {
-    double cost = bytecode_mishmash_cost (precomp_data->bc, NULL, opcost);
+    cost = bytecode_mishmash_cost (precomp_data->bc, NULL, opcost);
     printf ("# %s: for B1=%u using precomputed data for B1=%u with cost=%f\n",
             __func__, B1, precomp_data->B1, cost);
   }
@@ -1171,10 +1174,10 @@ bytecode_mishmash_encode (bytecode *bc, unsigned int B1, unsigned int pow2_nb,
   if (verbose)
   {
     /* The cost of the initial doublings */
-    double power2cost = pow2_nb * opcost->prac->dbl; // TODO use the best DBL
-    /* Print the bytecode */
-    //printf ("Byte code for stage 1: "); // TODO
-    //bytecode_prac_fprintf (stdout, *bc); // TODO
+    double power2cost = pow2_nb * opcost->prac->dbl;
+    /* Print the bytecode */ // TODO
+    //printf ("Byte code for stage 1: ");
+    //bytecode_mishmash_fprintf (stdout, *bc);
     /* Print the cost */
     printf ("# %s: cost of power of 2: %f\n", __func__, power2cost);
     printf ("# %s: total cost: %f\n", __func__, cost + power2cost);

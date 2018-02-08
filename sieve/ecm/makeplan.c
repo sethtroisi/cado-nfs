@@ -55,7 +55,8 @@ precomp_cost_t ec_edwards_precomp_opcost = { .add=7., .extra_add_for_add=1.,
 
 mishmash_cost_t ec_mixed_repr_opcost = { .dbchain = &ec_edwards_dbchain_opcost,
                                          .precomp = &ec_edwards_precomp_opcost,
-                                         .prac = &ec_montgomery_opcost };
+                                         .prac = &ec_montgomery_opcost,
+                                         .switch_cost = -4. };
 
 /***************************** P-1 ********************************************/
 

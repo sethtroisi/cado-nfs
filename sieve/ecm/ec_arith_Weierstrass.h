@@ -183,8 +183,9 @@ weierstrass_aff_from_montgomery (residue_t a, ec_point_t Pw, const residue_t A,
  *    - m : modulus
  *    - a : curve coefficient
  *
- * Return 1 if it worked, 0 if a modular inverse failed.
- * If modular inverse failed, return non-invertible value in R->x. TODO
+ * Return 0 if e*P is the point at infinity, else return nonzero.
+ * If the point at infinity is due to a failed inversion, the non-invertible
+ * value is returned in P->x.
  */
 static int
 weierstrass_aff_smul_ui (ec_point_t P, const unsigned long e, const residue_t a,
@@ -210,23 +211,25 @@ weierstrass_aff_smul_ui (ec_point_t P, const unsigned long e, const residue_t a,
 
   while (i > 0)
   {
+    if (tfinite)
+      tfinite = weierstrass_aff_dbl (T, T, a, m);
+    if (e & i)
+    {
       if (tfinite)
-	tfinite = weierstrass_aff_dbl (T, T, a, m);
-      if (e & i)
+        tfinite = weierstrass_aff_add (T, T, P, m);
+      else
       {
-	  if (tfinite)
-	      tfinite = weierstrass_aff_add (T, T, P, m);
-	  else
-	  {
-	      ec_point_set (T, P, m);
-	      tfinite = 1;
-	  }
+        ec_point_set (T, P, m);
+        tfinite = 1;
       }
-      i >>= 1;
+    }
+    i >>= 1;
   }
 
   if (tfinite)
     ec_point_set (P, T, m);
+  else
+    mod_set (P->x, T->x, m);
 
   ec_point_clear (T, m);
 
