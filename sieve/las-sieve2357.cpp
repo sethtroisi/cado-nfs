@@ -44,11 +44,10 @@ class patterns {
   static const ELEMTYPE mask7[64];
 
 public:
-  /* A demultiplexer that returns the correct mask array for a given "STRIDE"
+  /* A demultiplexer that returns the correct mask array for a given "stride"
      value. */
-  template <unsigned int STRIDE>
-  static inline const ELEMTYPE *get_mask() {
-      switch (STRIDE) {
+  static inline const ELEMTYPE *get_mask(unsigned int stride) {
+      switch (stride) {
           case 2: return mask2;
           case 4: return mask4;
           case 8: return mask8;
@@ -61,24 +60,24 @@ public:
       }
   }
 
-  /* Return a mask of stride "STRIDE", shifted by "shift", via an unaligned
+  /* Return a mask of stride "stride", shifted by "shift", via an unaligned
      memory read */
-  template <typename SIMDTYPE, unsigned int STRIDE>
+  template <typename SIMDTYPE>
   static inline SIMDTYPE
-  get_shifted_mask(const fbprime_t shift)
+  get_shifted_mask(const unsigned int stride, const fbprime_t shift)
   {
-      const ELEMTYPE * mask = get_mask<STRIDE>();
+      const ELEMTYPE * mask = get_mask(stride);
       const ELEMTYPE * p = &mask[32 - shift];
       return loadu<SIMDTYPE, ELEMTYPE>(p);
   }
 
-  /* Return a sieving pattern of stride "STRIDE", shifted by "offset", with
+  /* Return a sieving pattern of stride "stride", shifted by "shift", with
      value "elem" in locations where it hits */
-  template <typename SIMDTYPE, unsigned int STRIDE>
+  template <typename SIMDTYPE>
   static inline SIMDTYPE
-  get_pattern(const fbprime_t offset, ELEMTYPE elem)
+  get_pattern(const unsigned int stride, const fbprime_t shift, const ELEMTYPE elem)
   {
-      const SIMDTYPE shifted_mask = get_shifted_mask<SIMDTYPE, STRIDE>(offset);
+      const SIMDTYPE shifted_mask = get_shifted_mask<SIMDTYPE>(stride, shift);
       return _and<SIMDTYPE, ELEMTYPE>(shifted_mask, set1<SIMDTYPE, ELEMTYPE>(elem));
   }
 };
@@ -112,17 +111,17 @@ template<> const uint8_t patterns<uint8_t>::mask7[64] =
    ff, 0, 0, 0, 0, 0, 0, ff, 0, 0, 0, 0, 0, 0, ff, 0, 0, 0, 0, 0, 0, ff, 0, 0, 0, 0, 0, 0, ff, 0, 0, 0};
 
 
-template <typename SIMDTYPE, typename ELEMTYPE, unsigned int STRIDE>
+template <typename SIMDTYPE, typename ELEMTYPE>
 static inline void
 sieve_odd_prime(SIMDTYPE * const result, const ELEMTYPE logp,
-    const fbprime_t idx, const SIMDTYPE even_mask)
+    const fbprime_t stride, const fbprime_t idx, const SIMDTYPE even_mask)
 {
     fbprime_t offset = idx;
-    for (size_t i = 0; i < STRIDE; i++) {
-        SIMDTYPE pattern = patterns<ELEMTYPE>::template get_pattern<SIMDTYPE, STRIDE>(offset, logp);
+    for (size_t i = 0; i < stride; i++) {
+        SIMDTYPE pattern = patterns<ELEMTYPE>::template get_pattern<SIMDTYPE>(stride, offset, logp);
         pattern = andnot<SIMDTYPE, ELEMTYPE>(even_mask, pattern);
         result[i] = adds<SIMDTYPE, ELEMTYPE>(result[i], pattern);
-        offset = modsub(offset, sizeof(SIMDTYPE) % STRIDE, STRIDE);
+        offset = modsub(offset, sizeof(SIMDTYPE) % stride, stride);
     }
 }
 
@@ -241,11 +240,11 @@ SIMDTYPE sieve2(const fbprime_t q, const fbprime_t idx, const uint8_t logp)
     const size_t N MAYBE_UNUSED = sizeof(SIMDTYPE) / sizeof(ELEMTYPE);
     ASSERT(q <= N);
     switch (q) {
-        case 2: return patterns<ELEMTYPE>::template get_pattern<SIMDTYPE, 2>(idx, logp);
-        case 4: return patterns<ELEMTYPE>::template get_pattern<SIMDTYPE, 4>(idx, logp);
-        case 8: return patterns<ELEMTYPE>::template get_pattern<SIMDTYPE, 8>(idx, logp);
-        case 16: return patterns<ELEMTYPE>::template get_pattern<SIMDTYPE, 16>(idx, logp);
-        case 32: return patterns<ELEMTYPE>::template get_pattern<SIMDTYPE, 32>(idx, logp);
+        case 2: return patterns<ELEMTYPE>::template get_pattern<SIMDTYPE>(2, idx, logp);
+        case 4: return patterns<ELEMTYPE>::template get_pattern<SIMDTYPE>(4, idx, logp);
+        case 8: return patterns<ELEMTYPE>::template get_pattern<SIMDTYPE>(8, idx, logp);
+        case 16: return patterns<ELEMTYPE>::template get_pattern<SIMDTYPE>(16, idx, logp);
+        case 32: return patterns<ELEMTYPE>::template get_pattern<SIMDTYPE>(32, idx, logp);
         default: abort();
     }
 }
@@ -265,7 +264,7 @@ get_even_mask(const int skip_mod_2)
     const bool only_odd = (skip_mod_2 & 1) != 0;
     const bool only_even = (skip_mod_2 & 2) != 0;
     ASSERT (!(only_odd && only_even));
-    const ELEMTYPE *mask2 = patterns<ELEMTYPE>::template get_mask<2>();
+    const ELEMTYPE *mask2 = patterns<ELEMTYPE>::get_mask(2);
     const ELEMTYPE *even_mask;
     if (only_odd) {
         even_mask = mask2 + 32; /* ff, 0, ff, 0, ... */
@@ -304,7 +303,7 @@ sieve(SIMDTYPE * const sievearray, const size_t arraylen, const prime_t *primes,
 #endif
   SIMDTYPE pattern23[3] = {pattern2, pattern2, pattern2};
   for ( ; primes->q == 3 ; primes++) {
-    sieve_odd_prime<SIMDTYPE, ELEMTYPE, 3>(pattern23, primes->logp, primes->idx, even_mask);
+    sieve_odd_prime<SIMDTYPE, ELEMTYPE>(pattern23, primes->logp, 3, primes->idx, even_mask);
   }
 
 #ifdef HAVE_ALIGNAS
@@ -324,7 +323,7 @@ sieve(SIMDTYPE * const sievearray, const size_t arraylen, const prime_t *primes,
 #endif
   SIMDTYPE pattern5[5] = {zero, zero, zero, zero, zero};
   for ( ; primes->q == 5 ; primes++) {
-    sieve_odd_prime<SIMDTYPE, ELEMTYPE, 5>(pattern5, primes->logp, primes->idx, even_mask);
+    sieve_odd_prime<SIMDTYPE, ELEMTYPE>(pattern5, primes->logp, 5, primes->idx, even_mask);
   }
  
   for (size_t i = 0; i < 3; i++) {
@@ -347,7 +346,7 @@ sieve(SIMDTYPE * const sievearray, const size_t arraylen, const prime_t *primes,
 #endif
   SIMDTYPE pattern7[7] = {zero, zero, zero, zero, zero, zero, zero};
   for ( ; primes->q == 7 ; primes++) {
-    sieve_odd_prime<SIMDTYPE, ELEMTYPE, 7>(pattern7, primes->logp, primes->idx, even_mask);
+    sieve_odd_prime<SIMDTYPE, ELEMTYPE>(pattern7, primes->logp, 7, primes->idx, even_mask);
   }
 
   ASSERT_ALWAYS(primes->q == 0);
