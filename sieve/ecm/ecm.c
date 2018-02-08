@@ -14,6 +14,12 @@
 
 //#define ECM_TRACE
 
+/* Define to 1 to make ellM_add() test if the two points are identical,
+   and call ellM_double() if they are */
+#ifndef ELLM_SAFE_ADD
+#define ELLM_SAFE_ADD 0
+#endif
+
 #include "ec_arith_common.h"
 #include "ec_arith_Edwards.h"
 #include "ec_arith_Montgomery.h"
@@ -25,12 +31,6 @@
 #ifndef ECM_BACKTRACKING
 /* Default is "yes." Set to 0 for "no." */
 #define ECM_BACKTRACKING 1
-#endif
-
-/* Define to 1 to make ellM_add() test if the two points are identical,
-   and call ellM_double() if they are */
-#ifndef ELLM_SAFE_ADD
-#define ELLM_SAFE_ADD 0
 #endif
 
 #ifdef ECM_COUNT_OPS
@@ -1016,10 +1016,6 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
 
 #ifdef ECM_TIMINGS
   stage1_dt = microseconds_thread() - t0;
-#endif
-#if 0
-  printf ("After stage 1, P = (%lu: :%lu), bt = %d, i = %d, exp2 = %d\n",
-          mod_get_ul (P->x, m), mod_get_ul (P->z, m), bt, i, plan->exp2);
 #endif
 
 #ifdef ECM_COUNT_OPS
