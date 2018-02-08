@@ -1164,7 +1164,7 @@ ell_pointorder (const unsigned long parameter,
   if (verbose >= 2)
   {
     printf ("%s: ", __func__);
-    ec_weierstrass_curve_fprintf (stdout, a, P, m);
+    ec_weierstrass_curve_fprintf (stdout, NULL, a, P, m);
   }
 
   mod_init (x, m);
