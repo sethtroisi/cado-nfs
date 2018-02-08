@@ -178,10 +178,6 @@ ec_parameterization_Montgomery12 (residue_t b, ec_point_t P0,
   ec_point_t T;
   int ret = 0;
 
-  /* We want a multiple of the point (-2,4) on the curve y^2=x^3-12*x.
-   * The curve has 2-torsion with torsion point (0,0), but adding it
-   * does not seem to change the ECM curve we get out in the end.
-   */
   mod_init_noset0 (u, m);
   mod_init_noset0 (v, m);
   mod_init_noset0 (a, m);
@@ -205,44 +201,49 @@ ec_parameterization_Montgomery12 (residue_t b, ec_point_t P0,
   mod_add (a, a, T->y, m);
   mod_neg (a, a, m);                    /* a = -12 */
 
-  weierstrass_aff_smul_ui (T, k, a, m); // TODO check for failed inv here
-  mod_set (u, T->x, m);
-  mod_set (v, T->y, m);
-
-  mod_sqr (uu, u, m);                   /* uu = u^2 */
-  mod_sqr (vv, v, m);                   /* vv = v^2 */
-
-  mod_add (t1, uu, uu, m);
-  mod_add (t1, t1, t1, m);
-  mod_sub (d2, vv, t1, m);              /* d2 = v^2-4*u^2 */
-  mod_add (t2, t1, t1, m);
-  mod_add (t2, t2, t1, m);
-  mod_add (d1, vv, t2, m);              /* d1 = v^2+12*u^2 */
-
-  mod_set_ul (t1, 12, m);               /* t1 = 12 */
-  mod_add (P0->x, uu, t1, m);           /* x0 = (u^2+12) [so far] */
-  mod_sqr (P0->x, P0->x, m);            /* x0 = (u^2+12)^2 [so far] */
-  mod_mul (P0->x, P0->x, uu, m);        /* x0 = u^2*(u^2+12)^2 [so far] */
-  mod_add (P0->x, P0->x, P0->x, m);     /* x0 = 2*u^2*(u^2+12)^2 */
-
-  mod_mul (P0->z, d1, d2, m);           /* z0 = d1*d2 [so far] */
-  mod_add (P0->z, P0->z, P0->z, m);     /* z0 = 2*d1*d2 */
-
-  mod_sqr (t1, d2, m);
-  mod_mul (t1, t1, d2, m);
-  mod_mul (t1, t1, d1, m);              /* t1 = d1*d2^3 */
-
-  ret = mod_inv (b, t1, m);             /* 1/t1 = 1/(d1*d2^3) (stored in b) */
+  ret = weierstrass_aff_smul_ui (T, k, a, m);
   if (ret == 0) /* non-trivial gcd */
-    mod_set (P0->x, t1, m);
+    mod_set (P0->x, T->x, m);
   else
   {
-    mod_sqr (t1, uu, m);
-    mod_mul (t1, t1, uu, m);
-    mod_mul (b, b, t1, m);              /* b = u^6/(d1*d2^3) [so far] */
-    mod_mul (b, b, vv, m);              /* b = v^2*u^6/(d1*d2^3)  [so far] */
-    mod_2pow_ul (t1, 10, m);            /* t1 = 2^10 = 1024 */
-    mod_mul (b, b, t1, m);              /* b = 1024*v^2*u^6/(d1*d2^3) */
+    mod_set (u, T->x, m);
+    mod_set (v, T->y, m);
+
+    mod_sqr (uu, u, m);                   /* uu = u^2 */
+    mod_sqr (vv, v, m);                   /* vv = v^2 */
+
+    mod_add (t1, uu, uu, m);
+    mod_add (t1, t1, t1, m);
+    mod_sub (d2, vv, t1, m);              /* d2 = v^2-4*u^2 */
+    mod_add (t2, t1, t1, m);
+    mod_add (t2, t2, t1, m);
+    mod_add (d1, vv, t2, m);              /* d1 = v^2+12*u^2 */
+
+    mod_set_ul (t1, 12, m);               /* t1 = 12 */
+    mod_add (P0->x, uu, t1, m);           /* x0 = (u^2+12) [so far] */
+    mod_sqr (P0->x, P0->x, m);            /* x0 = (u^2+12)^2 [so far] */
+    mod_mul (P0->x, P0->x, uu, m);        /* x0 = u^2*(u^2+12)^2 [so far] */
+    mod_add (P0->x, P0->x, P0->x, m);     /* x0 = 2*u^2*(u^2+12)^2 */
+
+    mod_mul (P0->z, d1, d2, m);           /* z0 = d1*d2 [so far] */
+    mod_add (P0->z, P0->z, P0->z, m);     /* z0 = 2*d1*d2 */
+
+    mod_sqr (t1, d2, m);
+    mod_mul (t1, t1, d2, m);
+    mod_mul (t1, t1, d1, m);              /* t1 = d1*d2^3 */
+
+    ret = mod_inv (b, t1, m);             /* 1/t1 = 1/(d1*d2^3) (stored in b) */
+    if (ret == 0) /* non-trivial gcd */
+      mod_set (P0->x, t1, m);
+    else
+    {
+      mod_sqr (t1, uu, m);
+      mod_mul (t1, t1, uu, m);
+      mod_mul (b, b, t1, m);              /* b = u^6/(d1*d2^3) [so far] */
+      mod_mul (b, b, vv, m);              /* b = v^2*u^6/(d1*d2^3)  [so far] */
+      mod_2pow_ul (t1, 10, m);            /* t1 = 2^10 = 1024 */
+      mod_mul (b, b, t1, m);              /* b = 1024*v^2*u^6/(d1*d2^3) */
+    }
   }
 
   mod_clear (u, m);
