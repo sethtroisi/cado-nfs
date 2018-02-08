@@ -1110,7 +1110,7 @@ ell_pointorder (const unsigned long parameter,
   mod_intinit (tm);
   mod_getmod_int (tm, m);
 
-  if (parameterization & FULLMONTY)
+  if (parameterization & FULLMONTY || parameterization == MONTYTWED12)
   {
     residue_t A, b;
     int r = 1;
@@ -1124,6 +1124,8 @@ ell_pointorder (const unsigned long parameter,
       r = ec_parameterization_Montgomery12 (b, P, parameter, m);
     else if (parameterization == MONTY16)
       r = ec_parameterization_Montgomery16 (b, P, parameter, m);
+    else /* if (parameterization == MONTYTWED12) */
+      r = ec_parameterization_Z6 (b, P, parameter, MONTGOMERY_xz, m);
 
     if (r)
     {
@@ -1149,15 +1151,9 @@ ell_pointorder (const unsigned long parameter,
       return 0UL;
     }
   }
-#if 0
-  else if (parameterization & FULLMONTYTWED)
-  {
-    // TODO write conversion functions
-  }
-#endif
   else
   {
-    fprintf (stderr, "ecm: Unknown parameterization\n");
+    fprintf (stderr, "%s: Unknown parameterization\n", __func__);
     abort();
   }
 
