@@ -83,7 +83,7 @@ ec_point_fprintf (FILE *out, ec_point_t P, const ec_point_coord_type_t coord,
   switch (coord)
   {
     case SHORT_WEIERSTRASS_aff: /* (x, y) */
-      mod_fprintf (out, "%s(0x%" PRIMODx ", 0x%" PRIMODx ")", MOD_PRINT_INT(x),
+      mod_fprintf (out, "(0x%" PRIMODx ", 0x%" PRIMODx ")", MOD_PRINT_INT(x),
           MOD_PRINT_INT(y));
       break;
     case TWISTED_EDWARDS_proj: /* (X : Y : Z) */
