@@ -411,29 +411,47 @@ ec_parameterization_Z6_is_valid (const unsigned long k)
  W = z
 
  l = lcm([c.denominator() for c in U.coefficients()\
-         + V.coefficients() + W.coefficients()])
+ + V.coefficients() + W.coefficients()])
 
  U *= l     # U = 144*(x + 3*z)
  V *= l     # V = y
  W *= l     # W = 2985984*z
 
- print "U = ", U.factor()
- print "V = ", V.factor()
- print "W = ", W.factor()
+ sigma_d = 96*U
+ sigma_n = (W - sigma_d)
 
- sigma = (W - 96*U)/(96*U)
- sigma2 = sigma^2
- alpha = sigma2-5
- alpha3 = alpha^3
- beta = 4*sigma
- beta3 = beta^3
- t1 = (sigma-1)*(sigma+5)*(sigma2+5)
- t2 = alpha3+beta3
+ sigma2_n = sigma_n^2
+ sigma2_d = sigma_d^2
 
- zE0 = t1*t2*U^2
- xE0 = 2*V*sigma*t2*W
- yE0 = (alpha3-beta3)*t1*U^2
- tE0 = 2*V*sigma*W*(alpha3-beta3)
+ alpha_n = sigma2_n - 5*sigma2_d
+ alpha_d = sigma2_d
+
+ alpha3_n = alpha_n^3
+ alpha3_d = alpha_d^3
+
+ beta_n = 4*sigma_n
+ beta_d = sigma_d
+
+ beta3_n = beta_n^3
+ beta3_d = beta_d^3
+
+ gamma = (sigma_n - sigma_d)*(sigma_n + 5*sigma_d)*(sigma2_n + 5*sigma2_d)
+ delta = (sigma2_n - 5*sigma2_d)^3
+ epsilon = (beta_n * sigma_d)^3
+
+ t0 = gamma*U^2
+ t2 = 2*V*W*sigma_n*sigma_d^3
+
+ zE0 = delta+epsilon
+ xE0 = zE0
+
+ zE0 = zE0*t0
+ xE0 = xE0*t2
+
+ yE0 = delta - epsilon
+ tE0 = yE0
+ yE0 = yE0*t0
+ tE0 = tE0*t2
 
  # Check if PE0 = (xE0:yE0:zE0:tE0) is on the extended twisted
  # Edwards curve: (-1)*xE0^2 + yE0^2 - zE0^2 - d*tE0^2
@@ -442,10 +460,12 @@ ec_parameterization_Z6_is_valid (const unsigned long k)
  # with v = V/W and u = U/W
  r = (V*W)/U^2
  # Compute d following Starfish on strike (Theorem 5.4)
+ alpha = alpha_n / alpha_d
+ beta = beta_n / beta_d
  d = ((beta+alpha)^3*(beta-3*alpha)) / (r*(beta-alpha))^2
 
  eq_Ed = a*xE0^2 + yE0^2 - zE0^2 - d*tE0^2
- print "PE0 is on curve:      ",
+ print "P0 is on curve:       ",
  print eq_Ed.numerator() in I\
  and not(eq_Ed.denominator() in I)\
  and (xE0*yE0 - zE0*tE0 in I)
@@ -453,10 +473,14 @@ ec_parameterization_Z6_is_valid (const unsigned long k)
 
  # Compute Montgomery curve parameters
  # following 20 years of ECM by Zimmermann and Dodson
- xM0 = alpha3
- zM0 = beta3 
- A = (((beta-alpha)^3)*(3*alpha+beta) / (4*alpha3*beta)) - 2
 
+ xM0 = alpha3_n*beta3_d
+ zM0 = beta3_n*alpha3_d
+
+ #A = (((beta-alpha)^3)*(3*alpha+beta) / (4*alpha3*beta)) - 2
+ A = ((beta_n*alpha_d-alpha_n*beta_d)^3 * (3*alpha_n*beta_d + beta_n*alpha_d))\
+ / (4*alpha3_n*beta_n*alpha_d*beta3_d) - 2
+      
  # Applying the morphism from the Montgomery curve By2 = x^3 + Ax^2 + x
  # to its equivalent Edwards form ax^2 + y^2 = 1 + dx^2y^2
  # sets a = (A+2)/B.
@@ -465,8 +489,11 @@ ec_parameterization_Z6_is_valid (const unsigned long k)
 
  # Check if PM0 = (xM0:yM0:zM0) is on the Montgomery curve equivalent to
  # the Edwards curve eq_Ed
- _b = alpha/beta^3
- y0 = (sigma^2-1)*(sigma^2-25)*(sigma^4-25)
+ alpha3 = alpha^3
+ beta3 = beta^3
+ sigma = sigma_n / sigma_d
+ _b = alpha/beta3
+ y0 = (sigma^2-1)*(sigma^2-25)*(sigma^4-25)*alpha3_d*beta3_d
 
  # Ad-hoc code for checking that b/B is a square in I
  e2 = E2.defining_polynomial()
@@ -474,10 +501,20 @@ ec_parameterization_Z6_is_valid (const unsigned long k)
  f = (_b/(B*e3)).factor()
  print "b/B is a square in I: ",\
  not(any([m[1] % 2 for m in list(f)])) and QQ(f.unit()).is_square()
- yM02 = (b/B)*y0^2
+ yM02 = (_b/B)*y0^2
  eq_M0 = B*yM02*zM0-xM0*(xM0^2+A*xM0*zM0+zM0^2)
- print "PM0 in on curve:      ",
+ print "M0 in on curve:       ",
  print eq_M0.numerator() in I and not(eq_M0.denominator() in I)
+
+ # Define P3 = (xE3, yE3) a point of order 3 on eq_Ed
+ # Check that P3 in on the curve
+
+ xE3 = -r/((sigma-1)*(sigma+5))
+ yE3 = (alpha - beta)/(alpha + beta)
+ eq_P3 = a*xE3^2+yE3^2 - (1 + d*xE3^2*yE3^2)
+ print "P3 is on curve:       ",
+ print eq_P3.numerator() in I\
+ and not(eq_P3.denominator() in I)
 
  * -------------------------------------------------------------------------
 
@@ -496,8 +533,11 @@ ec_parameterization_Z6 (residue_t b, ec_point_t P0, const unsigned long k,
   ASSERT_ALWAYS (coord == MONTGOMERY_xz || coord == TWISTED_EDWARDS_ext
                                         || coord == TWISTED_EDWARDS_proj);
 
-  residue_t sigma, sigma2, alpha, alpha3, beta, beta3, U, V, W;
-  residue_t _t0, _t1, _t2;
+  residue_t U, V, W;
+  residue_t sigma_n, sigma_d, sigma2_n, sigma2_d, alpha_n, alpha_d,
+    alpha3_n, alpha3_d, beta_n, beta_d, beta3_n, beta3_d,
+    gamma, delta, epsilon;
+  residue_t _t0, _t1_n, _t1_d, _t2;
   
   ec_point_t T;
   int ret = 0;
@@ -508,99 +548,145 @@ ec_parameterization_Z6 (residue_t b, ec_point_t P0, const unsigned long k,
   mod_init_noset0 (V, m);
   mod_init_noset0 (W, m);
   mod_init_noset0 (_t0, m);
-  mod_init_noset0 (_t1, m);
+  mod_init_noset0 (_t1_n, m);
+  mod_init_noset0 (_t1_d, m);
   mod_init_noset0 (_t2, m);
-  mod_init_noset0 (sigma, m);
-  mod_init_noset0 (sigma2, m);
-  mod_init_noset0 (alpha, m);
-  mod_init_noset0 (alpha3, m);
-  mod_init_noset0 (beta, m);
-  mod_init_noset0 (beta3, m);
-  
+  mod_init_noset0 (sigma_n, m);
+  mod_init_noset0 (sigma_d, m);
+  mod_init_noset0 (sigma2_n, m);
+  mod_init_noset0 (sigma2_d, m);
+  mod_init_noset0 (alpha_n, m);
+  mod_init_noset0 (alpha_d, m);
+  mod_init_noset0 (alpha3_n, m);
+  mod_init_noset0 (alpha3_d, m);
+  mod_init_noset0 (beta_n, m);
+  mod_init_noset0 (beta_d, m);
+  mod_init_noset0 (beta3_n, m);
+  mod_init_noset0 (beta3_d, m);
+  mod_init_noset0 (gamma, m);
+  mod_init_noset0 (delta, m);
+  mod_init_noset0 (epsilon, m);
+
   mod_set_ul (_t0, 9747UL, m);
   mod_neg (_t0, _t0, m);
   mod_set_ul (T->x, 15UL, m);
   mod_set_ul (T->y, 378UL, m);
   mod_set1 (T->z, m);
 
+  /* Inversion free scalar multiplication */
   weierstrass_proj_smul_ui (T, k, _t0, m);
 
   mod_set_ul (_t0, 144UL, m);
   mod_add (U, T->x, T->z, m);
   mod_add (U, U, T->z, m);
   mod_add (U, U, T->z, m);
-  mod_mul (U, U, _t0, m);                 /* U = 144*(T->x + 3*r) */
-  mod_set (V, T->y, m);                   /* V = q */
+  mod_mul (U, U, _t0, m);                   /* U = 144*(T->x + 3*T->z) */
+  mod_set (V, T->y, m);                     /* V = T->y */
   mod_set_ul (W, 2985984UL, m);
-  mod_mul (W, W, T->z, m);                /* W = 12^6 * r*/
+  mod_mul (W, W, T->z, m);                  /* W = 12^6 * T->z*/
 
-  mod_set_ul (_t0, 96UL, m);
-  mod_mul (_t0, _t0, U, m);
-  mod_inv (_t1, _t0, m);                  /* t = 1/(96*U) */
-  mod_sub (sigma, W, _t0, m);
-  mod_mul (sigma, sigma, _t1, m);         /* sigma = (W - 96*U)/96*U */
-  mod_mul (sigma2, sigma, sigma, m);      /* sigma2 = sigma^2 */
-  mod_sub_ul (alpha, sigma2, 5UL, m);     /* alpha = sigma^2 - 5 */
-  mod_mul (alpha3, alpha, alpha, m);     
-  mod_mul (alpha3, alpha3, alpha, m);     /* alpha3 = alpha^3 */
-  mod_add (beta, sigma, sigma, m);
-  mod_add (beta, beta, beta, m);          /* beta = 4*sigma */
-  mod_mul (beta3, beta, beta, m);
-  mod_mul (beta3, beta3, beta, m);        /* beta3 = beta^3 */
+  mod_set_ul (sigma_d, 96UL, m);
+  mod_mul (sigma_d, sigma_d, U, m);         /* sigma_d = 96*U */
+  mod_sub (sigma_n, W, sigma_d, m);         /* sigma_n = (W - 96*U) */
+  
+  mod_sqr (sigma2_n, sigma_n, m);           /* sigma2_n = sigma_n^2 */
+  mod_sqr (sigma2_d, sigma_d, m);           /* sigma2_d = sigma_d^2 */
 
+  mod_set_ul (alpha_n, 5UL, m);
+  mod_mul (alpha_n, alpha_n, sigma2_d, m);  
+  mod_sub (alpha_n, sigma2_n, alpha_n, m);  /* alpha_n = sigma_n^2 - 5*sigma_d^2 */
+  mod_set (alpha_d, sigma2_d, m);           /* alpha_d = sigma_d^2 */
+  
+  mod_sqr (alpha3_n, alpha_n, m);     
+  mod_mul (alpha3_n, alpha3_n, alpha_n, m); /* alpha3_n = alpha_n^3 */
+  mod_sqr (alpha3_d, alpha_d, m);     
+  mod_mul (alpha3_d, alpha3_d, alpha_d, m); /* alpha3_d = alpha_d^3 */
+  
+  mod_add (beta_n, sigma_n, sigma_n, m);
+  mod_add (beta_n, beta_n, beta_n, m);      /* beta_n = 4*sigma_n */
+  mod_set (beta_d, sigma_d, m);             /* beta_d = sigma_d */
+  
+  mod_sqr (beta3_n, beta_n, m);
+  mod_mul (beta3_n, beta3_n, beta_n, m);    /* beta3_n = beta_n^3 */
+  mod_sqr (beta3_d, beta_d, m);
+  mod_mul (beta3_d, beta3_d, beta_d, m);    /* beta3_d = beta_d^3 */
+  
   if (coord == MONTGOMERY_xz)
   {
-    mod_set (P0->x, alpha3, m);
-    mod_set (P0->z, beta3, m);
+    mod_mul (P0->x, alpha3_n, beta3_d, m);  /* xM0 = alpha3_n*beta3_d */
+    mod_mul (P0->z, beta3_n, alpha3_d, m);  /* zM0 = beta3_n*alpha3_d */
   }
   else
   {
-    mod_sub_ul (_t1, sigma, 1UL, m);      /* _t1 = (sigma-1)  */
-    mod_add_ul (_t0, sigma, 5UL, m);      /* _t0 = (sigma+5) */
-    mod_mul (_t1, _t1, _t0, m);           /* _t1 = (sigma-1)*(sigma+5) */
-    mod_add_ul (_t0, sigma2, 5UL, m);     /* _t0 = (sigma^2+5) */
-    mod_mul (_t1, _t1, _t0, m);           /* _t1 = (sigma-1)*(sigma+5)*(sigma2+5) */
-    mod_add (_t2, alpha3, beta3, m);      /* _t2 = alpha^3 + beta^3 */
+    mod_sub (gamma, sigma_n, sigma_d, m);   /* gamma = sigma_n - sigma_d */
+    mod_set_ul (_t0, 5UL, m);                 
+    mod_mul (_t0, _t0, sigma_d, m);         /* _t0 = 5*sigma_d */
+    mod_add (_t0, sigma_n, _t0, m);         /* _t0 = sigma_n + 5*sigma_d */
+    mod_mul (gamma, gamma, _t0, m);         /* gamma = (sigma_n - sigma_d) *
+					               (sigma_n + 5*sigma_d) */
+    mod_set_ul (_t0, 5UL, m);                 
+    mod_mul (_t0, _t0, sigma2_d, m);        /* _t0 = 5*sigma_d^2 */
+    mod_sub (delta, sigma2_n, _t0, m);      /* delta = sigma_n^2 - 5*sigma_d^2 */
+    mod_add (_t0, sigma2_n, _t0, m);        /* _t0 = sigma_n^2 + 5*sigma_d^2 */
+    mod_mul (gamma, gamma, _t0, m);
+
+    mod_sqr (_t0, delta, m);
+    mod_mul (delta, delta, _t0, m);         /* delta = (sigma2_n - 5*sigma2_d)^3 */
     
-    mod_mul (P0->x, V, sigma, m);
-    mod_mul (P0->x, P0->x, W, m);
-    mod_add (P0->x, P0->x, P0->x, m);
+    mod_mul (epsilon, beta_n, sigma_d, m);
+    mod_sqr (_t0, epsilon, m);
+    mod_mul (epsilon, _t0, epsilon, m);     /* epsilon = (beta_n * sigma_d)^3 */
 
+    mod_sqr (_t0, U, m);                    /* U^2 */
+    mod_mul (_t0, _t0, gamma, m);           /* gamma*U^2 */
+    
+    mod_mul (_t2, V, W, m);
+    mod_mul (_t2, _t2, sigma_n, m);
+    mod_mul (_t2, _t2, sigma2_d, m);
+    mod_mul (_t2, _t2, sigma_d, m);
+    mod_add (_t2, _t2, _t2, m);       /* 2*V*W*sigma_n*sigma_d^3 */
+    
+    mod_add (P0->z, delta, epsilon, m);
+    mod_set (P0->x, P0->z, m);
+    
+    mod_mul (P0->z, P0->z, _t0, m);
+    mod_mul (P0->x, P0->x, _t2, m);
+
+    mod_sub (P0->y, delta, epsilon, m);     /* delta - epsilon */
+    
     if (coord == TWISTED_EDWARDS_ext)
-      mod_set (P0->t, P0->x, m);
+      mod_set (P0->t, P0->y, m);
 
-    mod_mul (P0->x, P0->x, _t2, m);       /* P0->x = 2*V*sigma*W*_t2 */
-    mod_sqr (_t0, U, m);
-    mod_mul (_t0, _t0, _t1, m);           /* _t0 = _t1*U^2 */
-    mod_sub (P0->y, alpha3, beta3, m);
-
+    mod_mul (P0->y, P0->y, _t0, m);
+    
     if (coord == TWISTED_EDWARDS_ext)
-	mod_mul (P0->t, P0->t, P0->y, m); /* P0->t = 2*V*sigma*W*(alpha3-beta3) */
-
-    mod_mul (P0->y, P0->y, _t0, m);       /* P->y = (alpha3-beta3)*_t0*U^2 */
-    mod_mul (P0->z, _t0, _t2, m);         /* P->z = _t0*_t2*U^2 */
+	mod_mul (P0->t, P0->t, _t2, m);
   }
   
   if (b != NULL)
   {
-    mod_mul (_t0, alpha3, beta, m);
+    mod_mul (_t0, alpha3_n, beta_n, m);
+    mod_mul (_t0, _t0, alpha_d, m);
+    mod_mul (_t0, _t0, beta3_d, m);
     mod_add (_t0, _t0, _t0, m);
     mod_add (_t0, _t0, _t0, m);
     mod_add (_t0, _t0, _t0, m);
-    mod_add (_t0, _t0, _t0, m);
-    ret = mod_inv (_t1, _t0, m);
+    mod_add (_t0, _t0, _t0, m);             /* 16*alpha3_n*beta_n*alpha_d*beta3_d */
+    ret = mod_inv (_t0, _t0, m);
     if (ret == 0)
       mod_set (P0->x, _t0, m);
     else
       {
-	mod_sub (_t0, beta, alpha, m);
-	mod_sqr (_t2, _t0, m);
-	mod_mul (_t2, _t2, _t0, m);
-	mod_add (b, alpha, alpha, m);
-	mod_add (b, b, alpha, m);
-	mod_add (b, b, beta, m);
-	mod_mul (b, b, _t2, m);
-	mod_mul (b, b, _t1, m);
+	mod_mul (delta, beta_n, alpha_d, m);       /* delta = beta_n*alpha_d */
+	mod_mul (epsilon, alpha_n, beta_d, m);     /* epsilon = alpha_n*beta_d */
+	mod_add (gamma, epsilon, epsilon, m);
+	mod_add (gamma, gamma, epsilon, m);        /* gamma = 3*epsilon */
+	mod_add (gamma, gamma, delta, m);          /* gamma = 3*epsilon + delta */
+	mod_sub (delta, delta, epsilon, m);        /* delta = delta - epsilon */
+	mod_sqr (b, delta, m);                 
+	mod_mul (b, b, delta, m);      
+	mod_mul (b, b, gamma, m);
+	mod_mul (b, b, _t0, m);
       }
   }
 
@@ -608,14 +694,24 @@ ec_parameterization_Z6 (residue_t b, ec_point_t P0, const unsigned long k,
   mod_clear (V, m);
   mod_clear (W, m);
   mod_clear (_t0, m);
-  mod_clear (_t1, m);
+  mod_clear (_t1_n, m);
+  mod_clear (_t1_d, m);
   mod_clear (_t2, m);
-  mod_clear (sigma, m);
-  mod_clear (sigma2, m);
-  mod_clear (alpha, m);
-  mod_clear (alpha3, m);
-  mod_clear (beta, m);
-  mod_clear (beta3, m);
+  mod_clear (sigma_n, m);
+  mod_clear (sigma_d, m);
+  mod_clear (sigma2_n, m);
+  mod_clear (sigma2_d, m);
+  mod_clear (alpha_n, m);
+  mod_clear (alpha_d, m);
+  mod_clear (alpha3_n, m);
+  mod_clear (alpha3_d, m);
+  mod_clear (beta_n, m);
+  mod_clear (beta_d, m);
+  mod_clear (beta3_n, m);
+  mod_clear (beta3_d, m);
+  mod_clear (gamma, m);
+  mod_clear (delta, m);
+  mod_clear (epsilon, m);
 
   ec_point_clear (T, m);
 
