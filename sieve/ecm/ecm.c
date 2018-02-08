@@ -861,6 +861,7 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
 
   residue_t u, b;
   ec_point_t P, Pt;
+  ec_point_coord_type_t param_output_type;
 
   unsigned int i;
   int r, bt = 0;
@@ -876,19 +877,26 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
 
   mod_intset_ul (f, 1UL);
 
+  /**************************** parameterization ******************************/
 #ifdef ECM_TIMINGS
   t0 = microseconds_thread ();
 #endif
 
-  if (plan->parameterization == BRENT12)
-    r = ec_parameterization_Brent_Suyama (b, P, plan->parameter, m);
-  else if (plan->parameterization == MONTY12)
-    r = ec_parameterization_Montgomery12 (b, P, plan->parameter, m);
-  else if (plan->parameterization == MONTY16)
-    r = ec_parameterization_Montgomery16 (b, P, plan->parameter, m);
+  if (plan->parameterization & FULLMONTY)
+  {
+    param_output_type = MONTGOMERY_xz;
+    if (plan->parameterization == BRENT12)
+      r = ec_parameterization_Brent_Suyama (b, P, plan->parameter, m);
+    else if (plan->parameterization == MONTY12)
+      r = ec_parameterization_Montgomery12 (b, P, plan->parameter, m);
+    else /* if (plan->parameterization == MONTY16) */
+      r = ec_parameterization_Montgomery16 (b, P, plan->parameter, m);
+  }
   else if (plan->parameterization == MONTYTWED12)
-    r = ec_parameterization_Z6 (b, P, plan->parameter, TWISTED_EDWARDS_ext, m);
-    // TODO the output point depend on the first block of the bytecode
+  {
+    param_output_type = plan->bc[1] & 0x80 ? MONTGOMERY_xz: TWISTED_EDWARDS_ext;
+    r = ec_parameterization_Z6 (b, P, plan->parameter, param_output_type, m);
+  }
   else
   {
     fprintf (stderr, "%s: unknown parameterization\n", __func__);
@@ -918,7 +926,7 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
   montgomery_A_from_b (A, b, m);
   fprintf (stdout, "# TRACE: starting values:\n");
 
-  if (plan->parameterization & FULLMONTY)
+  if (param_output_type == MONTGOMERY_xz)
   {
     ec_montgomery_curve_fprintf (stdout, "# TRACE:   ", A, P, m);
     montgomery_point_to_affine (PM, P, m);
@@ -942,9 +950,7 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
   ec_point_clear (PM, m);
 #endif
 
-  /* now start ecm */
-
-  /* Do stage 1 */
+  /******************************** stage 1 ***********************************/
 #ifdef ECM_COUNT_OPS
   ECM_COUNT_OPS_RESET();
 #endif
@@ -952,11 +958,11 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
   t0 = microseconds_thread();
 #endif
 
+  /* output is always in Montgomery form */
   if (plan->parameterization & FULLMONTY)
     bytecode_prac_interpret_ec_montgomery (P, plan->bc, m, b);
   else if (plan->parameterization & FULLMONTYTWED)
     bytecode_mishmash_interpret_ec_mixed_repr (P, plan->bc, m, b);
-    /* input is in Edwards (extended), output is in Montgomery form */
 
 #ifdef ECM_TRACE
   ec_point_t PfM;
@@ -1027,7 +1033,7 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
                    _count_edwards_extraM, tot_stage1_M);
 #endif
 
-  /* Do stage 2 (for P in Montgomery form) */
+  /******************************** stage 2 ***********************************/
 #ifdef ECM_COUNT_OPS
   ECM_COUNT_OPS_RESET();
 #endif
