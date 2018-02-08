@@ -69,9 +69,10 @@ T * tolerant_malloc_aligned(size_t size)
     return (T*) malloc_aligned(size, s);
 }
 
+
 template <typename SIMDTYPE, typename ELEMTYPE>
 bool test(const unsigned long iter, const size_t arraysize,
-  const sieve2357::prime_t *all_primes, const size_t nr_all_primes)
+  const sieve2357base::prime_t *all_primes, const size_t nr_all_primes)
 {
   const size_t N = sizeof(SIMDTYPE) / sizeof(ELEMTYPE);
   bool ok = true;
@@ -88,26 +89,26 @@ bool test(const unsigned long iter, const size_t arraysize,
   SIMDTYPE sievearray[arraysize / N];
   ELEMTYPE sievearray2[arraysize];
 #endif
-  sieve2357::prime_t use_primes[nr_all_primes + 1]; /* +1 for end marker */
+  sieve2357base::prime_t use_primes[nr_all_primes + 1]; /* +1 for end marker */
 
   /* Skip those prime (powers) this SIMD type can't sieve */
   size_t j = 0;
   for (size_t i = 0; i < nr_all_primes; i++) {
-    if (sieve2357::can_sieve<SIMDTYPE, ELEMTYPE>(all_primes[i].q)) {
+    if (sieve2357<SIMDTYPE, ELEMTYPE>::can_sieve(all_primes[i].q)) {
       use_primes[j++] = all_primes[i];
     }
   }
-  use_primes[j] = sieve2357::prime_t{0,0,0};
+  use_primes[j] = sieve2357base::prime_t{0,0,0};
 
   where_am_I w;
 
 #ifdef DO_TIMING
-  sieve2357:sieve<SIMDTYPE, ELEMTYPE>(sievearray, arraysize, use_primes, false, sieve2357::update_set, w);
-  sieve2357::sieve<SIMDTYPE, ELEMTYPE>(sievearray, arraysize, use_primes, false, sieve2357::update_set, w);
+  sieve2357<SIMDTYPE, ELEMTYPE>:sieve(sievearray, arraysize, use_primes, false, sieve2357base::update_set, w);
+  sieve2357<SIMDTYPE, ELEMTYPE>::sieve(sievearray, arraysize, use_primes, false, sieve2357base::update_set, w);
   start_timing();
 #endif
   for (unsigned long i = 0; i < iter; i++) {
-    sieve2357::sieve<SIMDTYPE, ELEMTYPE>(sievearray, arraysize, use_primes, false, sieve2357::update_set, w);
+    sieve2357<SIMDTYPE, ELEMTYPE>::sieve(sievearray, arraysize, use_primes, false, sieve2357base::update_set, w);
   }
 #ifdef DO_TIMING
   end_timing();
@@ -122,7 +123,7 @@ bool test(const unsigned long iter, const size_t arraysize,
 
   /* Do the same thing again, using simple sieve code */
   memset(sievearray2, 0, arraysize);
-  for (sieve2357::prime_t *p = use_primes; p->q != 0; p++) {
+  for (sieve2357base::prime_t *p = use_primes; p->q != 0; p++) {
     for (size_t i = p->idx; i < arraysize; i += p->q) {
       sievearray2[i] += p->logp;
     }
@@ -147,7 +148,7 @@ bool test(const unsigned long iter, const size_t arraysize,
 }
 
 bool test_all(const unsigned long iter, const size_t arraysize,
-  const sieve2357::prime_t *all_primes, const size_t nr_all_primes)
+  const sieve2357base::prime_t *all_primes, const size_t nr_all_primes)
 {
   bool ok = true;
   ok &= test<uint32_t, unsigned char>(iter, arraysize, all_primes, nr_all_primes);
@@ -177,7 +178,7 @@ int main(int argc, const char **argv)
 #endif
 
   {
-    sieve2357::prime_t all_primes[] = {
+    sieve2357base::prime_t all_primes[] = {
       /* q idx logp */
       {1, 0, 2},
       {2, 1, 1},
@@ -197,14 +198,14 @@ int main(int argc, const char **argv)
   for (int k = 0; k <= 6; k++) {
     const fbprime_t p = 1 << k;
     for(fbroot_t i = 0; i < p; i++) {
-      sieve2357::prime_t cur_prime[1] = {{p, i, 1}};
+      sieve2357base::prime_t cur_prime[1] = {{p, i, 1}};
       ok &= test_all(1, arraysize, cur_prime, 1);
     }
   }
 
   for (fbprime_t p = 3; p <= 7; p += 2) {
     for(fbroot_t i = 0; i < p; i++) {
-      sieve2357::prime_t cur_prime[1] = {{p, i, 1}};
+      sieve2357base::prime_t cur_prime[1] = {{p, i, 1}};
       ok &= test_all(1, arraysize, cur_prime, 1);
     }
   }

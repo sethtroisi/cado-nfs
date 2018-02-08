@@ -7,6 +7,8 @@
 #include "las-sieve2357.hpp"
 #include "intrinsics.hpp"
 
+/* Specialize adds() for use in sieve2357, assuming that sieving very small
+   primes does not overflow an element */
 template<>
 inline uint32_t ATTRIBUTE((__always_inline__)) ATTRIBUTE_ARTIFICIAL
 adds<uint32_t, uint8_t>(const uint32_t a, const uint32_t b)
@@ -20,8 +22,6 @@ adds<uint64_t, uint8_t>(const uint64_t a, const uint64_t b)
 {
   return a + b; /* WARNING, we assume no carry between elements here! */
 }
-
-namespace sieve2357 {
 
 static inline unsigned long ATTRIBUTE((__always_inline__)) ATTRIBUTE_ARTIFICIAL
 modsub(const unsigned long a, const unsigned long b, const unsigned long m)
@@ -112,8 +112,8 @@ template<> const uint8_t patterns<uint8_t>::mask7[64] =
 
 
 template <typename SIMDTYPE, typename ELEMTYPE>
-static inline void
-sieve_odd_prime(SIMDTYPE * const result, const ELEMTYPE logp,
+inline void
+sieve2357<SIMDTYPE, ELEMTYPE>::sieve_odd_prime(SIMDTYPE * const result, const ELEMTYPE logp,
     const fbprime_t stride, const fbprime_t idx, const SIMDTYPE even_mask)
 {
     fbprime_t offset = idx;
@@ -126,8 +126,8 @@ sieve_odd_prime(SIMDTYPE * const result, const ELEMTYPE logp,
 }
 
 template <typename SIMDTYPE, typename ELEMTYPE>
-static inline void
-big_loop_set(SIMDTYPE * __restrict__ sievearray, const SIMDTYPE * const __restrict__ pattern235,
+inline void
+sieve2357<SIMDTYPE, ELEMTYPE>::big_loop_set(SIMDTYPE * __restrict__ sievearray, const SIMDTYPE * const __restrict__ pattern235,
     const SIMDTYPE * const __restrict__ pattern7, size_t l7)
 {
   size_t im15 = 0;
@@ -144,8 +144,8 @@ big_loop_set(SIMDTYPE * __restrict__ sievearray, const SIMDTYPE * const __restri
 }
 
 template <typename SIMDTYPE, typename ELEMTYPE>
-static inline void
-big_loop_add(SIMDTYPE * __restrict__ sievearray, const SIMDTYPE * const __restrict__ pattern235,
+inline void
+sieve2357<SIMDTYPE, ELEMTYPE>::big_loop_add(SIMDTYPE * __restrict__ sievearray, const SIMDTYPE * const __restrict__ pattern235,
     const SIMDTYPE * const __restrict__ pattern7, size_t l7)
 {
   size_t im15 = 0;
@@ -171,7 +171,6 @@ big_loop_add(SIMDTYPE * __restrict__ sievearray, const SIMDTYPE * const __restri
 }
 
 #if 0 && defined(HAVE_AVX2) && defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM)
-template <>
 inline void
 big_loop_set<__m256i, uint8_t>(__m256i * __restrict__ sievearray, const __m256i * __restrict__ pattern235,
          const __m256i * const __restrict__ pattern7, const size_t l7)
@@ -234,8 +233,8 @@ big_loop_set<__m256i, uint8_t>(__m256i * __restrict__ sievearray, const __m256i 
 #endif
 
 template <typename SIMDTYPE, typename ELEMTYPE>
-inline
-SIMDTYPE sieve2(const fbprime_t q, const fbprime_t idx, const uint8_t logp)
+inline SIMDTYPE
+sieve2357<SIMDTYPE, ELEMTYPE>::sieve2(const fbprime_t q, const fbprime_t idx, const uint8_t logp)
 {
     const size_t N MAYBE_UNUSED = sizeof(SIMDTYPE) / sizeof(ELEMTYPE);
     ASSERT(q <= N);
@@ -258,8 +257,8 @@ SIMDTYPE sieve2(const fbprime_t q, const fbprime_t idx, const uint8_t logp)
    zeroes out nothing, in case 1 it zeroes out elements at even indices,
    and in case 2 it zeroes out elements at odd indices. */
 template <typename SIMDTYPE, typename ELEMTYPE>
-static inline SIMDTYPE
-get_even_mask(const int skip_mod_2)
+inline SIMDTYPE
+sieve2357<SIMDTYPE, ELEMTYPE>::get_even_mask(const int skip_mod_2)
 {
     const bool only_odd = (skip_mod_2 & 1) != 0;
     const bool only_even = (skip_mod_2 & 2) != 0;
@@ -278,11 +277,11 @@ get_even_mask(const int skip_mod_2)
 
 template <typename SIMDTYPE, typename ELEMTYPE>
 void
-sieve(SIMDTYPE * const sievearray, const size_t arraylen, const prime_t *primes,
+sieve2357<SIMDTYPE, ELEMTYPE>::sieve(SIMDTYPE * const sievearray, const size_t arraylen, const prime_t *primes,
       const int skip_mod_2, const int update_operation, where_am_I & w MAYBE_UNUSED)
 {
   const SIMDTYPE zero = set0<SIMDTYPE, ELEMTYPE>();
-  const SIMDTYPE even_mask = get_even_mask<SIMDTYPE, ELEMTYPE>(skip_mod_2);
+  const SIMDTYPE even_mask = get_even_mask(skip_mod_2);
   const size_t N = sizeof(SIMDTYPE) / sizeof(ELEMTYPE);
   SIMDTYPE pattern2 = zero;
 
@@ -293,7 +292,7 @@ sieve(SIMDTYPE * const sievearray, const size_t arraylen, const prime_t *primes,
 
   /* Sieve powers of 2 */
   for ( ; primes->q != 0 && primes->q % 2 == 0 ; primes++) {
-    pattern2 = adds<SIMDTYPE, ELEMTYPE>(pattern2, sieve2<SIMDTYPE, ELEMTYPE>(primes->q, primes->idx, primes->logp));
+    pattern2 = adds<SIMDTYPE, ELEMTYPE>(pattern2, sieve2(primes->q, primes->idx, primes->logp));
   }
 
   pattern2 = andnot<SIMDTYPE, ELEMTYPE>(even_mask, pattern2);
@@ -303,7 +302,7 @@ sieve(SIMDTYPE * const sievearray, const size_t arraylen, const prime_t *primes,
 #endif
   SIMDTYPE pattern23[3] = {pattern2, pattern2, pattern2};
   for ( ; primes->q == 3 ; primes++) {
-    sieve_odd_prime<SIMDTYPE, ELEMTYPE>(pattern23, primes->logp, 3, primes->idx, even_mask);
+    sieve_odd_prime(pattern23, primes->logp, 3, primes->idx, even_mask);
   }
 
 #ifdef HAVE_ALIGNAS
@@ -323,7 +322,7 @@ sieve(SIMDTYPE * const sievearray, const size_t arraylen, const prime_t *primes,
 #endif
   SIMDTYPE pattern5[5] = {zero, zero, zero, zero, zero};
   for ( ; primes->q == 5 ; primes++) {
-    sieve_odd_prime<SIMDTYPE, ELEMTYPE>(pattern5, primes->logp, 5, primes->idx, even_mask);
+    sieve_odd_prime(pattern5, primes->logp, 5, primes->idx, even_mask);
   }
  
   for (size_t i = 0; i < 3; i++) {
@@ -346,7 +345,7 @@ sieve(SIMDTYPE * const sievearray, const size_t arraylen, const prime_t *primes,
 #endif
   SIMDTYPE pattern7[7] = {zero, zero, zero, zero, zero, zero, zero};
   for ( ; primes->q == 7 ; primes++) {
-    sieve_odd_prime<SIMDTYPE, ELEMTYPE>(pattern7, primes->logp, 7, primes->idx, even_mask);
+    sieve_odd_prime(pattern7, primes->logp, 7, primes->idx, even_mask);
   }
 
   ASSERT_ALWAYS(primes->q == 0);
@@ -354,12 +353,12 @@ sieve(SIMDTYPE * const sievearray, const size_t arraylen, const prime_t *primes,
   const size_t l7 = arraylen / 7 / N;
   
   if (update_operation == update_set) {
-    big_loop_set<SIMDTYPE, ELEMTYPE>(sievearray, pattern235, pattern7, l7);
+    big_loop_set(sievearray, pattern235, pattern7, l7);
     for (size_t i = l7 * 7; i < arraylen / N; i++) {
       sievearray[i] = adds<SIMDTYPE, ELEMTYPE>(pattern235[i % 15], pattern7[i % 7]);
     }
   } else if (update_operation == update_add) {
-    big_loop_add<SIMDTYPE, ELEMTYPE>(sievearray, pattern235, pattern7, l7);
+    big_loop_add(sievearray, pattern235, pattern7, l7);
     for (size_t i = l7 * 7; i < arraylen / N; i++) {
       SIMDTYPE t;
       t = adds<SIMDTYPE, ELEMTYPE>(pattern235[i % 15], pattern7[i % 7]);
@@ -369,20 +368,14 @@ sieve(SIMDTYPE * const sievearray, const size_t arraylen, const prime_t *primes,
     abort();
 }
 
-template
-void sieve<uint32_t, uint8_t>(uint32_t * const, size_t, const prime_t *, int, int, where_am_I &);
-template
-void sieve<uint64_t, uint8_t>(uint64_t * const, size_t, const prime_t *, int, int, where_am_I &);
+template class sieve2357<uint32_t, uint8_t>;
+template class sieve2357<uint64_t, uint8_t>;
 #ifdef HAVE_SSSE3
-template
-void sieve<__m128i, uint8_t>(__m128i * const, size_t, const prime_t *, int, int, where_am_I &);
+template class sieve2357<__m128i, uint8_t>;
 #endif
 #ifdef HAVE_AVX2
-template
-void sieve<__m256i, uint8_t>(__m256i * const, size_t, const prime_t *, int, int, where_am_I &);
+template class sieve2357<__m256i, uint8_t>;
 #endif
 #ifdef HAVE_ARM_NEON
-template
-void sieve<uint8x16_t, uint8_t>(uint8x16_t * const, size_t, const prime_t *, int, int, where_am_I &);
+template class sieve2357<uint8x16_t, uint8_t>;
 #endif
-}
