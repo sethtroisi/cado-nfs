@@ -28,6 +28,7 @@ config/gcc-bug-58805.c
 config/gcc-bugs.cmake
 config/gmp.cmake
 config/inline-assembly.c
+config/inline-assembly-arm.c
 config/math.cmake
 config/posix.cmake
 config/mpi.cmake
