@@ -1033,11 +1033,15 @@ bytecode_mishmash_cost (bytecode_const bc, bytecode_const *endptr,
 {
   double cost = 0.;
   bc++; /* ignore first init byte */
+  int switch_needed = 0;
 
   while (*bc != MISHMASH_FINAL)
   {
     uint8_t t, n;
     bytecode_elt_split_4_4 (&t, &n, *bc);
+
+    if (t == MISHMASH_DBCHAIN_BLOCK || t == MISHMASH_PRECOMP_BLOCK)
+      switch_needed = 1;
 
     if (t == MISHMASH_DBCHAIN_BLOCK)
       cost += bytecode_dbchain_cost (++bc, &bc, opcost->dbchain);
@@ -1056,7 +1060,8 @@ bytecode_mishmash_cost (bytecode_const bc, bytecode_const *endptr,
   }
 
   /* Add the cost due to the switch of coordinates */
-  cost += opcost->switch_cost;
+  if (switch_needed)
+    cost += opcost->switch_cost;
 
   if (endptr != NULL)
     *endptr = bc;
