@@ -1215,7 +1215,7 @@ ell_pointorder (const unsigned long parameter,
 
   for (i = 3; i < baby_len; i++)
     {
-      if (weierstrass_aff_add (Pi, Pi, Pg, m) == 0)
+      if (weierstrass_aff_add (Pi, Pi, Pg, a, m) == 0)
         {
           i *= known_m;
           goto found_inf;
@@ -1259,7 +1259,7 @@ ell_pointorder (const unsigned long parameter,
           }
 
       i += giant_step;
-      if (!weierstrass_aff_add (Pi, Pi, Pg, m))
+      if (!weierstrass_aff_add (Pi, Pi, Pg, a, m))
         goto found_inf;
     }
 
