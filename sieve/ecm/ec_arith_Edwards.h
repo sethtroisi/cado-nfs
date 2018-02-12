@@ -20,7 +20,7 @@ static inline void
 edwards_d_from_montgomery_A (residue_t d, const residue_t A, const modulus_t m)
 {
   residue_t (t);
-  mod_init (t, m);
+  mod_init_noset0 (t, m);
 
   mod_add_ul (t, A, 2UL, m);
   mod_inv (d, t, m);

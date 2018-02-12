@@ -873,7 +873,7 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
 #endif
 
   ec_point_init (P, m);
-  mod_init (b, m);
+  mod_init_noset0 (b, m);
 
   mod_intset_ul (f, 1UL);
 
@@ -922,7 +922,7 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
   residue_t A;
   ec_point_t PM;
   ec_point_init (PM, m);
-  mod_init (A, m);
+  mod_init_noset0 (A, m);
   montgomery_A_from_b (A, b, m);
   fprintf (stdout, "# TRACE: starting values:\n");
 
@@ -937,7 +937,7 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
   else
   {
     residue_t d;
-    mod_init (d, m);
+    mod_init_noset0 (d, m);
     edwards_d_from_montgomery_A (d, A, m);
     ec_twisted_edwards_ext_curve_fprintf (stdout, "# TRACE:   ", d, P, m);
     mod_clear (d, m);
