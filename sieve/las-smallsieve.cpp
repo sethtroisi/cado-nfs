@@ -155,6 +155,15 @@ void small_sieve_clear(small_sieve_data_t & ssd)
 /* {{{ Sieve initialization: now the real stuff */
 
 typedef sieve2357base::preferred_simd_type preferred_simd_type;
+#if GNUC_VERSION_ATLEAST(6,1,0)
+/* https://gcc.gnu.org/bugzilla/show_bug.cgi?id=69884 */
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wignored-attributes"
+#endif
+typedef sieve2357<preferred_simd_type, uint8_t> preferred_sieve2357;
+#if GNUC_VERSION_ATLEAST(6,1,0)
+#pragma GCC diagnostic pop
+#endif
 
 ssp_t::ssp_t(fbprime_t _p, fbprime_t _r, unsigned char _logp, unsigned int skip, bool proj) /*{{{*/
 : ssp_t(_p, _r, _logp, skip) /* First, initialize everything as if proj=false */
@@ -180,11 +189,11 @@ ssp_t::ssp_t(fbprime_t _p, fbprime_t _r, unsigned char _logp, unsigned int skip,
             ASSERT_ALWAYS(rc != 0);
             set_U(U);
         }
-        if (sieve2357<preferred_simd_type, uint8_t>::can_sieve(this->get_q())) {
+        if (preferred_sieve2357::can_sieve(this->get_q())) {
             set_pattern_sieved();
         }
     } else {
-        if (sieve2357<preferred_simd_type, uint8_t>::can_sieve(this->get_p())) {
+        if (preferred_sieve2357::can_sieve(this->get_p())) {
             set_pattern_sieved();
         }
     }
@@ -892,7 +901,7 @@ template<bool is_fragment> void small_sieve<is_fragment>::do_pattern_sieve(where
         }
 #endif
         psp[i++] = {0, 0, 0};
-        sieve2357<preferred_simd_type, uint8_t>::sieve(
+        preferred_sieve2357::sieve(
             (preferred_simd_type *) (S + x0), F(), psp,
             skip_mod_2, sieve2357base::update_add, w);
 #ifdef TRACE_K

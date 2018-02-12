@@ -368,6 +368,11 @@ sieve2357<SIMDTYPE, ELEMTYPE>::sieve(SIMDTYPE * const sievearray, const size_t a
     abort();
 }
 
+#if GNUC_VERSION_ATLEAST(6,1,0)
+/* https://gcc.gnu.org/bugzilla/show_bug.cgi?id=69884 */
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wignored-attributes"
+#endif
 template class sieve2357<uint32_t, uint8_t>;
 template class sieve2357<uint64_t, uint8_t>;
 #ifdef HAVE_SSSE3
@@ -378,4 +383,7 @@ template class sieve2357<__m256i, uint8_t>;
 #endif
 #ifdef HAVE_ARM_NEON
 template class sieve2357<uint8x16_t, uint8_t>;
+#endif
+#if GNUC_VERSION_ATLEAST(6,1,0)
+#pragma GCC diagnostic pop
 #endif
