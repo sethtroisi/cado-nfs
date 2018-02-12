@@ -172,6 +172,7 @@ edwards_sub (ec_point_t R, const ec_point_t P, const ec_point_t Q,
  * All coordinates of the output point R that can be used as temporary
  * variables.
  * TODO // comments are from efd
+ * TODO update comment
   * The "dbl-2008-hwcd" doubling formulas *
   * Cost: 4M + 4S + 1*a + 6add + 1*2. *
   * Source: 2008 Hisil–Wong–Carter–Dawson *
@@ -192,39 +193,31 @@ edwards_dbl (ec_point_t R, const ec_point_t P,
     _count_edwards_extraM++;
 #endif
 
-  residue_t u0, u1, u2;
+  residue_t u0, u1;
 
   mod_init_noset0 (u0, m);
   mod_init_noset0 (u1, m);
-  mod_init_noset0 (u2, m);
 
-  mod_sqr (u0, P->x, m);              /* u0 <- A := X1^2 */
-  mod_sqr (u1, P->y, m);              /* u1 <- B := Y1^2 */
-  mod_neg (u0, u0, m);                /* u0 <- D := -A  (a = -1) */
+  mod_mul (u0, P->x, P->x, m);      /* u0 <-  C := X1^2 */
+  mod_mul (u1, P->y, P->y, m);      /* u1 <-  D := Y1^2 */
+  mod_add (R->x, P->x, P->y, m);    /* Rx <-       X1+Y1 */
+  mod_mul (R->x, R->x, R->x, m);    /* Rx <-  B := (X1+Y1)^2 */
+  mod_add (R->y, u0, u1, m);        /* Ry <-       C+D */
+  mod_sub (u0, u0, u1, m);          /* u0 <- -F := C-D */
+  mod_sub (R->x, R->y, R->x, m);    /* Rx <-    := C+D-B */
 
-  mod_add (u2, P->x, P->y, m);        /* u2 <-      (X1 + Y1) */
-  mod_sqr (u2, u2, m);                /* u2 <-      (X1 + Y1)^2 */
-  mod_add (u2, u2, u0, m);            /* u2 <-      (X1 + Y1)^2-A */
-  mod_sub (u2, u2, u1, m);            /* u2 <- E := (X1 + Y1)^2-A-B */
+  mod_mul (u1, P->z, P->z, m);      /* u1 <-  H := Z1^2 */
+  mod_add (u1, u1, u1, m);          /* u1 <-    := 2*H  */
+  mod_add (u1, u0, u1, m);          /* u1 <- -J := -F + 2*H */
 
-  mod_sub (R->t, u0, u1, m);          /* Rt <- H := D-B */
-  mod_add (u0, u0, u1, m);            /* u0 <- G := D+B */
-
-  mod_sqr (u1, P->z, m);              /* u1 <-      Z1^2 */
-  mod_add (u1, u1, u1, m);            /* u1 <- C := 2*Z1^2 */
-
-  mod_sub (u1, u0, u1, m);            /* u1 <- F := G-C */
-
-
-  mod_mul (R->x, u2, u1, m);          /* Rx <- X3 := E*F */
-  mod_mul (R->y, u0, R->t, m);        /* Ry <- Y3 := G*H */
-  mod_mul (R->z, u1, u0, m);          /* Rz <- Z3 := F*G */
   if (output_type == TWISTED_EDWARDS_ext)
-    mod_mul (R->t, u2, R->t, m);      /* Rt <- T3 := E*H */
+    mod_mul(R->t, R->x, R->y, m);   /* Rt <- T3 := (B-C-D)*(-C-D) */
+  mod_mul (R->x, R->x, u1, m);      /* Rx <- X3 := (B-C-D) * J */
+  mod_mul (R->y, R->y, u0, m);      /* Ry <- Y3 := F*(-C-D) */
+  mod_mul (R->z, u0, u1, m);        /* Rz <- Z3 := F * J */
 
   mod_clear (u0, m);
   mod_clear (u1, m);
-  mod_clear (u2, m);
 }
 
 
