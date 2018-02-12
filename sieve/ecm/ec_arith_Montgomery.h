@@ -40,7 +40,7 @@ static inline void
 montgomery_point_to_affine (ec_point_t Q, ec_point_t P, const modulus_t m)
 {
   residue_t t;
-  mod_init (t, m);
+  mod_init_noset0 (t, m);
 
   mod_inv (t, P->z, m);
   mod_mul (Q->x, P->x, t, m);

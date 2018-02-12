@@ -19,6 +19,7 @@
 #define ec_point_print ec_point_print_mpz
 
 #define edwards_neg edwards_neg_mpz
+#define edwards_addsub edwards_addsub_mpz
 #define edwards_add edwards_add_mpz
 #define edwards_sub edwards_sub_mpz
 #define edwards_dbl edwards_dbl_mpz

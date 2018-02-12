@@ -85,7 +85,7 @@ weierstrass_aff_dbl (ec_point_t R, const ec_point_t P, const residue_t a,
  */
 static int
 weierstrass_aff_add (ec_point_t R, const ec_point_t P, const ec_point_t Q,
-                     const modulus_t m)
+                     const residue_t a, const modulus_t m)
 {
   residue_t lambda, u, v;
   int ret;
@@ -108,6 +108,8 @@ weierstrass_aff_add (ec_point_t R, const ec_point_t P, const ec_point_t Q,
     mod_sub (R->y, v, P->y, m);
     mod_set (R->x, u, m);
   }
+  else if (mod_equal (P->x, Q->x, m) && mod_equal (P->y, Q->y, m))
+    ret = weierstrass_aff_dbl (R, P, a, m);
   else
     mod_set (R->x, u, m);
 
@@ -216,7 +218,7 @@ weierstrass_aff_smul_ui (ec_point_t P, const unsigned long e, const residue_t a,
     if (e & i)
     {
       if (tfinite)
-        tfinite = weierstrass_aff_add (T, T, P, m);
+        tfinite = weierstrass_aff_add (T, T, P, a, m);
       else
       {
         ec_point_set (T, P, m);
