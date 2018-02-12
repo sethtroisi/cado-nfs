@@ -182,7 +182,7 @@ edwards_sub (ec_point_t R, const ec_point_t P, const ec_point_t Q,
  */
 static inline void
 edwards_dbl (ec_point_t R, const ec_point_t P,
-	  const modulus_t m, const ec_point_coord_type_t output_type)
+             const modulus_t m, const ec_point_coord_type_t output_type)
 {
   ASSERT_EXPENSIVE (output_flag == TWISTED_EDWARDS_ext ||
                     output_flag == TWISTED_EDWARDS_proj);
@@ -300,7 +300,7 @@ edwards_tpl (ec_point_t R, const ec_point_t P,
 MAYBE_UNUSED
 static inline void
 edwards_smul_ui (ec_point_t R, const ec_point_t P, const unsigned long e,
-		 const modulus_t m)
+                 const modulus_t m)
 {
   unsigned long j;
   long k;
@@ -351,7 +351,7 @@ edwards_smul_ui (ec_point_t R, const ec_point_t P, const unsigned long e,
     {
       edwards_dbl (T, T, m, TWISTED_EDWARDS_ext);
       if (j & e)
-	edwards_add (T, T, Pe, m, TWISTED_EDWARDS_ext);
+        edwards_add (T, T, Pe, m, TWISTED_EDWARDS_ext);
       j >>= 1;
     }
 
