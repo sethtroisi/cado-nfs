@@ -198,15 +198,15 @@ edwards_dbl (ec_point_t R, const ec_point_t P,
   mod_init_noset0 (u0, m);
   mod_init_noset0 (u1, m);
 
-  mod_mul (u0, P->x, P->x, m);      /* u0 <-  C := X1^2 */
-  mod_mul (u1, P->y, P->y, m);      /* u1 <-  D := Y1^2 */
+  mod_sqr (u0, P->x, m);            /* u0 <-  C := X1^2 */
+  mod_sqr (u1, P->y, m);            /* u1 <-  D := Y1^2 */
   mod_add (R->x, P->x, P->y, m);    /* Rx <-       X1+Y1 */
-  mod_mul (R->x, R->x, R->x, m);    /* Rx <-  B := (X1+Y1)^2 */
+  mod_sqr (R->x, R->x, m);          /* Rx <-  B := (X1+Y1)^2 */
   mod_add (R->y, u0, u1, m);        /* Ry <-       C+D */
   mod_sub (u0, u0, u1, m);          /* u0 <- -F := C-D */
   mod_sub (R->x, R->y, R->x, m);    /* Rx <-    := C+D-B */
 
-  mod_mul (u1, P->z, P->z, m);      /* u1 <-  H := Z1^2 */
+  mod_sqr (u1, P->z, m);            /* u1 <-  H := Z1^2 */
   mod_add (u1, u1, u1, m);          /* u1 <-    := 2*H  */
   mod_add (u1, u0, u1, m);          /* u1 <- -J := -F + 2*H */
 
