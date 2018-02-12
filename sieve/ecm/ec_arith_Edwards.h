@@ -54,8 +54,8 @@ edwards_neg (ec_point_t Q, const ec_point_t P, const modulus_t m)
   /* https://hyperelliptic.org/EFD/g1p/auto-twisted-extended-1.html#addition-add-2008-hwcd-4
    * */
 static inline void
-edwards_add (ec_point_t R, const ec_point_t P, const ec_point_t Q,
-             const modulus_t m, const ec_point_coord_type_t output_type)
+edwards_addsub (ec_point_t R, const ec_point_t P, const ec_point_t Q, int sub,
+                const modulus_t m, const ec_point_coord_type_t output_type)
 {
   ASSERT_EXPENSIVE (output_flag == TWISTED_EDWARDS_ext ||
                     output_flag == TWISTED_EDWARDS_proj ||
@@ -75,36 +75,55 @@ edwards_add (ec_point_t R, const ec_point_t P, const ec_point_t Q,
   mod_init_noset0 (u1, m);
   mod_init_noset0 (u2, m);
 
-  mod_sub (u0, P->y, P->x, m);     /* u0 <-      (Y1-X1) */
-  mod_add (u1, Q->y, Q->x, m);     /* u1 <-      (Y2+X2) */
-  mod_mul (u2, u0, u1, m);         /* u2 <- A := (Y1-X1)*(Y2+X2) */
-  mod_add (u1, P->y, P->x, m);     /* u1 <-      (X1+Y1) */
-  mod_sub (u0, Q->y, Q->x, m);     /* u0 <-      (Y2-X2) */
-  mod_mul (u0, u0, u1, m);         /* u0 <- B := (Y1+X1)*(Y2-X2) */
-  mod_sub (u1, u0, u2, m);         /* u1 <- F := B-A */
-  mod_add (u0, u0, u2, m);         /* u0 <- G := B+A */
-  mod_mul (u2, P->z, Q->t, m);     /* u2 <-      Z1*T2 */
-  mod_add (u2, u2, u2, m);         /* u2 <- C := 2*Z1*T2 */
-  mod_mul (R->z, P->t, Q->z, m);   /* Rz <-      T1*Z2 */
-  mod_add (R->z, R->z, R->z, m);   /* Rz <- D := 2*T1*Z2 */
-  mod_sub (R->t, R->z, u2, m);     /* Rt <- H := D-C */
-  mod_add (u2, R->z, u2, m);       /* u2 <- E := D+C */
-
-  if (output_type != MONTGOMERY_xz)
+  if (sub)
   {
-    mod_mul (R->x, u2, u1, m);     /* Rx <- X3 := E*F */
-    mod_mul (R->y, u0, R->t, m);   /* Ry <- Y3 := G*H */
-    mod_mul (R->z, u0, u1, m);     /* Rz <- Z3 := F*G */
-    if (output_type == TWISTED_EDWARDS_ext)
-      mod_mul (R->t, R->t, u2, m); /* Rt <- T3 := E*H */
+    mod_add (u1, Q->y, Q->x, m);    /* u1 <-      (Y2+X2) */
+    mod_sub (u0, Q->y, Q->x, m);    /* u0 <-      (Y2-X2) */
   }
   else
   {
+    mod_add (u0, Q->y, Q->x, m);    /* u0 <-      (Y2+X2) */
+    mod_sub (u1, Q->y, Q->x, m);    /* u1 <-      (Y2-X2) */
+  }
+
+  mod_sub (u2, P->y, P->x, m);      /* u2 <-      (Y1-X1) */
+  mod_mul (u0, u0, u2, m);          /* u0 <- A := (Y1-X1)*(Y2+/-X2) */
+  mod_add (u2, P->y, P->x, m);      /* u2 <-      (X1+Y1) */
+  mod_mul (u1, u1, u2, m);          /* u1 <- B := (Y1+X1)*(Y2-/+X2) */
+  mod_sub (R->x, u1, u0, m);        /* Rx <- F := B-A */
+  mod_add (R->y, u1, u0, m);        /* Ry <- G := B+A */
+
+  mod_add (u1, P->z, P->z, m);      /* u1 <-      2*Z1 */
+  mod_mul (u1, u1, Q->t, m);        /* u1 <- C := 2*Z1*T2 */
+  mod_add (u2, Q->z, Q->z, m);      /* u2 <-      2*Z2 */
+  mod_mul (u2, u2, P->t, m);        /* u2 <- D := 2*T1*Z2 */
+  if (sub)
+  {
+    mod_add (u0, u2, u1, m);        /* u0 <- H := D+C */
+    mod_sub (u1, u2, u1, m);        /* u1 <- E := D-C */
+  }
+  else
+  {
+    mod_sub (u0, u2, u1, m);        /* u0 <- H := D-C */
+    mod_add (u1, u2, u1, m);        /* u1 <- E := D+C */
+  }
+
+
+  if (output_type == TWISTED_EDWARDS_ext || output_type == TWISTED_EDWARDS_proj)
+  {
+    mod_mul (R->z, R->x, R->y, m);  /* Rz <- Z3 := F*G */
+    mod_mul (R->x, R->x, u1, m);    /* Rx <- X3 := E*F */
+    mod_mul (R->y, R->y, u0, m);    /* Ry <- Y3 := G*H */
+    if (output_type == TWISTED_EDWARDS_ext)
+      mod_mul (R->t, u0, u1, m);    /* Rt <- T3 := E*H */
+  }
+  else /* if (output_type == MONTGOMERY_xz) */
+  {
 #ifdef SAFE_TWISTED_EDWARDS_TO_MONTGOMERY
-    mod_add (R->x, u1, R->t, m);   /* Rx <-       F+H */
-    mod_mul (R->x, R->x, u0, m);   /* Rx <-       G*(F+H) */
-    mod_sub (R->z, u1, R->t, m);   /* Rz <-       F-H */
-    mod_mul (R->z, R->z, u0, m);   /* Rz <-       G*(F-H) */
+    mod_sub (R->z, R->x, u0, m);    /* Rz <-       F-H */
+    mod_mul (R->z, R->z, R->y, m);  /* Rz <-       G*(F-H) */
+    mod_add (R->x, R->x, u0, m);    /* Rx <-       F+H */
+    mod_mul (R->x, R->x, R->y, m);  /* Rx <-       G*(F+H) */
 #else
     /* CAUTION! */
     /* This may produce unstable results */
@@ -123,8 +142,8 @@ edwards_add (ec_point_t R, const ec_point_t P, const ec_point_t Q,
      * divides by G           [ G = 0 => Z = Y = 0 = > (X:Y:Z) = (1:0:0) ]
      *        -> (F+H :: F-H)
      */
-    mod_add (R->x, u1, R->t, m);   /* Rx <-       F+H */
-    mod_sub (R->z, u1, R->t, m);   /* Rz <-       F-H */
+    mod_sub (R->z, R->x, u0, m);    /* Rz <-       F-H */
+    mod_add (R->x, R->x, u0, m);    /* Rx <-       F+H */
 #endif
   }
 
@@ -133,22 +152,18 @@ edwards_add (ec_point_t R, const ec_point_t P, const ec_point_t Q,
   mod_clear (u2, m);
 }
 
+static inline void
+edwards_add (ec_point_t R, const ec_point_t P, const ec_point_t Q,
+             const modulus_t m, const ec_point_coord_type_t output_type)
+{
+  edwards_addsub (R, P, Q, 0, m, output_type);
+}
 
-/* - edwards_sub (R:output_flag, P:edwards_ext, Q:edwards_ext, output_flag) */
-/*     R <- P-Q */
-/*     output_flag can be edwards_proj, edwards_ext or montgomery */
 static inline void
 edwards_sub (ec_point_t R, const ec_point_t P, const ec_point_t Q,
-	  const modulus_t m, const ec_point_coord_type_t output_type)
+             const modulus_t m, const ec_point_coord_type_t output_type)
 {
-  // TODO improve this
-  ec_point_t QQ;
-  ec_point_init (QQ, m);
-
-  edwards_neg (QQ, Q, m);
-  edwards_add (R, P, QQ, m, output_type);
-
-  ec_point_clear (QQ, m);
+  edwards_addsub (R, P, Q, 1, m, output_type);
 }
 
 /* - edwards_dbl (R:output_flag, P:edwards_proj, output_flag)

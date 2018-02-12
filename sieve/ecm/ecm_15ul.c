@@ -19,6 +19,7 @@
 #define ec_point_print ec_point_print_15ul
 
 #define edwards_neg edwards_neg_15ul
+#define edwards_addsub edwards_addsub_15ul
 #define edwards_add edwards_add_15ul
 #define edwards_sub edwards_sub_15ul
 #define edwards_dbl edwards_dbl_15ul
