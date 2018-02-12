@@ -125,7 +125,7 @@ weierstrass_aff_add (ec_point_t R, const ec_point_t P, const ec_point_t Q,
  * valid affine point Pw.
  *
  * Return 1 if it worked, 0 if a modular inverse failed.
- * If modular inverse failed, return non-invertible value in Pw->x. TODO
+ * If modular inverse failed, return non-invertible value in Pw->x.
  *
  * The curve coefficient b of the short Weierstrass curve will not be computed.
  * a and A can be the same variable.
@@ -133,7 +133,7 @@ weierstrass_aff_add (ec_point_t R, const ec_point_t P, const ec_point_t Q,
  */
 static int
 weierstrass_aff_from_montgomery (residue_t a, ec_point_t Pw, const residue_t A,
-                             ec_point_t Pm, const modulus_t m)
+                                 ec_point_t Pm, const modulus_t m)
 {
   residue_t B, one, t, x;
   int ret;
@@ -146,7 +146,10 @@ weierstrass_aff_from_montgomery (residue_t a, ec_point_t Pw, const residue_t A,
 
   ret = mod_inv (t, Pm->z, m);
   if (ret == 0)
+  {
     fprintf (stderr, "%s: could not invert Z\n", __func__);
+    mod_set (Pw->x, Pm->z, m);
+  }
   else
   {
     mod_mul (x, Pm->x, t, m); /* x = X/Z */
@@ -156,19 +159,21 @@ weierstrass_aff_from_montgomery (residue_t a, ec_point_t Pw, const residue_t A,
     mod_mul (B, B, x, m); /* B = x^3 + A*x^2 + x */
 
     /* Now (x,1) is on the curve B*y^2 = x^3 + A*x^2 + x. */
-    ret = mod_inv (B, B, m);
+    ret = mod_inv (Pw->y, B, m);    /* y = 1/B */
     if (ret == 0)
+    {
       fprintf (stderr, "%s: could not invert B\n", __func__);
+      mod_set (Pw->x, B, m);
+    }
     else
     {
-      mod_set (Pw->y, B, m);        /* y = 1/B */
       mod_div3 (t, A, m);
       mod_add (Pw->x, x, t, m);
-      mod_mul (Pw->x, Pw->x, B, m); /* x = (X + A/3)/B */
+      mod_mul (Pw->x, Pw->x, Pw->y, m); /* x = (X + A/3)/B */
       mod_mul (a, t, A, m);
       mod_sub (a, one, a, m);
-      mod_mul (a, a, B, m);
-      mod_mul (a, a, B, m);         /* a = (1 - (A^2)/3)/B^2 */
+      mod_mul (a, a, Pw->y, m);
+      mod_mul (a, a, Pw->y, m);         /* a = (1 - (A^2)/3)/B^2 */
     }
   }
 

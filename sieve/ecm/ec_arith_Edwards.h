@@ -40,19 +40,22 @@ edwards_neg (ec_point_t Q, const ec_point_t P, const modulus_t m)
   mod_neg (Q->t, P->t, m);
 }
 
-/* - edwards_add (R:output_flag, P:edwards_ext, Q:edwards_ext, output_flag)
- *     R <- P+Q
+/* edwards_addsub (R:output_flag, P:edwards_ext, Q:edwards_ext, sub,output_flag)
+ *     R <- P+Q      if sub == 0
+ *     R <- P-Q      if sub != 0
  *     output_flag can be edwards_proj, edwards_ext or montgomery
- * All coordinates of the output point R that can be used as temporary
- * variables.
+ * R can be the same variable as P or Q.
+ * All coordinates of the output point R can be modified (because they may be
+ * used as temporary variables).
+ * Cost:
+ *    7M + 8add + 2*2         if output_flag == TWISTED_EDWARDS_proj
+ *    8M + 8add + 2*2         if output_flag == TWISTED_EDWARDS_ext
+ *    4M + 10add + 2*2        if output_flag == TWISTED_EDWARDS_ext
+ * Notations in the comments come from:
+ *    https://hyperelliptic.org/EFD/g1p/auto-twisted-extended-1.html#addition-add-2008-hwcd-4
+ * Source: Hisil–Wong–Carter–Dawson, 2008, section 3.2 of
+ *    http://eprint.iacr.org/2008/522
  */
-  /* The "add-2008-hwcd-4" addition formulas */
-  /* Cost: 8M + 8add + 2*2. */
-  /* Cost: 8M + 6add dependent upon the first point. */
-  /* Source: 2008 Hisil–Wong–Carter–Dawson */
-  /* http://eprint.iacr.org/2008/522, Section 3.2. */
-  /* https://hyperelliptic.org/EFD/g1p/auto-twisted-extended-1.html#addition-add-2008-hwcd-4
-   * */
 static inline void
 edwards_addsub (ec_point_t R, const ec_point_t P, const ec_point_t Q, int sub,
                 const modulus_t m, const ec_point_coord_type_t output_type)
@@ -166,19 +169,19 @@ edwards_sub (ec_point_t R, const ec_point_t P, const ec_point_t Q,
   edwards_addsub (R, P, Q, 1, m, output_type);
 }
 
-/* - edwards_dbl (R:output_flag, P:edwards_proj, output_flag)
+/* edwards_dbl (R:output_flag, P:edwards_proj, output_flag)
  *     R <- 2*P
  *     output_flag can be edwards_proj or edwards_ext
- * All coordinates of the output point R that can be used as temporary
- * variables.
- * TODO // comments are from efd
- * TODO update comment
-  * The "dbl-2008-hwcd" doubling formulas *
-  * Cost: 4M + 4S + 1*a + 6add + 1*2. *
-  * Source: 2008 Hisil–Wong–Carter–Dawson *
-  * http://eprint.iacr.org/2008/522, Section 3.3. *
-  * https://hyperelliptic.org/EFD/g1p/auto-twisted-extended-1.html#doubling-dbl-2008-hwcd
-  *
+ * R can be the same variable as P.
+ * All coordinates of the output point R can be modified (because they may be
+ * used as temporary variables).
+ * Cost:
+ *    3M + 4S + 5add + 1*2         if output_flag == TWISTED_EDWARDS_proj
+ *    4M + 4S + 5add + 1*2         if output_flag == TWISTED_EDWARDS_ext
+ * Notations in the comments come from:
+ *    https://hyperelliptic.org/EFD/g1p/auto-twisted-projective.html#doubling-dbl-2008-bbjlp
+ * Source: Bernstein–Birkner–Joye–Lange–Peters, 2008
+ *    http://eprint.iacr.org/2008/013.
  */
 static inline void
 edwards_dbl (ec_point_t R, const ec_point_t P,
@@ -198,15 +201,15 @@ edwards_dbl (ec_point_t R, const ec_point_t P,
   mod_init_noset0 (u0, m);
   mod_init_noset0 (u1, m);
 
-  mod_mul (u0, P->x, P->x, m);      /* u0 <-  C := X1^2 */
-  mod_mul (u1, P->y, P->y, m);      /* u1 <-  D := Y1^2 */
+  mod_sqr (u0, P->x, m);            /* u0 <-  C := X1^2 */
+  mod_sqr (u1, P->y, m);            /* u1 <-  D := Y1^2 */
   mod_add (R->x, P->x, P->y, m);    /* Rx <-       X1+Y1 */
-  mod_mul (R->x, R->x, R->x, m);    /* Rx <-  B := (X1+Y1)^2 */
+  mod_sqr (R->x, R->x, m);          /* Rx <-  B := (X1+Y1)^2 */
   mod_add (R->y, u0, u1, m);        /* Ry <-       C+D */
   mod_sub (u0, u0, u1, m);          /* u0 <- -F := C-D */
   mod_sub (R->x, R->y, R->x, m);    /* Rx <-    := C+D-B */
 
-  mod_mul (u1, P->z, P->z, m);      /* u1 <-  H := Z1^2 */
+  mod_sqr (u1, P->z, m);            /* u1 <-  H := Z1^2 */
   mod_add (u1, u1, u1, m);          /* u1 <-    := 2*H  */
   mod_add (u1, u0, u1, m);          /* u1 <- -J := -F + 2*H */
 
@@ -221,14 +224,19 @@ edwards_dbl (ec_point_t R, const ec_point_t P,
 }
 
 
-/* - edwards_tpl (R:output_flag, P:edwards_proj, output_flag) */
-/*     R <- 3*P */
-/*     output_flag can be edwards_proj, edwards_ext */
-
-/* The "tpl-2015-c" tripling formulas */
-/* Cost: 11M + 3S + 1*a + 7add + 2*2. */
-/* Source: 2015 Chuengsatiansup. */
-/* https://hyperelliptic.org/EFD/g1p/auto-twisted-extended-1.html#tripling-tpl-2015-c */
+/* edwards_tpl (R:output_flag, P:edwards_proj, output_flag)
+ *     R <- 3*P
+ *     output_flag can be edwards_proj or edwards_ext
+ * R can be the same variable as P.
+ * All coordinates of the output point R can be modified (because they may be
+ * used as temporary variables).
+ * Cost:
+ *     9M + 3S + 7add + 2*2 + 1*-1      if output_flag == TWISTED_EDWARDS_proj
+ *    11M + 3S + 7add + 2*2 + 1*-1      if output_flag == TWISTED_EDWARDS_ext
+ * Notations in the comments come from:
+ *    https://hyperelliptic.org/EFD/g1p/auto-twisted-extended-1.html#tripling-tpl-2015-c
+ * Source: 2015 Chuengsatiansup.
+ */
 static inline void
 edwards_tpl (ec_point_t R, const ec_point_t P,
              const modulus_t m, const ec_point_coord_type_t output_type)
@@ -269,22 +277,19 @@ edwards_tpl (ec_point_t R, const ec_point_t P,
   mod_mul (u2, P->y, u2, m);        /* u2 <-  yH := Y1*(xB-AA) */
   mod_mul (u0, P->z, R->t, m);      /* u0 <-  zF := Z1*F */
 
-  switch (output_type)
+  if (output_type == TWISTED_EDWARDS_proj)
   {
-    case TWISTED_EDWARDS_proj:
-      mod_mul (R->x, u1, R->t, m);  /* Rx <-  X3 := xE*F */
-      mod_mul (R->y, u2, u3, m);    /* Ry <-  Y3 := yH*G */
-      mod_mul (R->z, u0, u3, m);    /* Rz <-  Z3 := zF*G */
-      break;
-    case TWISTED_EDWARDS_ext:
-      mod_mul (u3, P->z, u3, m);    /* u3 <-  zG := Z1*G */
-      mod_mul (R->x, u1, u0, m);    /* Rx <-  X3 := xE*zF */
-      mod_mul (R->y, u2, u3, m);    /* Ry <-  Y3 := yH*zG */
-      mod_mul (R->z, u0, u3, m);    /* Rz <-  Z3 := zF*zG */
-      mod_mul (R->t, u1, u2, m);    /* Rt <- T3 := xE*yH */
-      break;
-    default: // XXX Error ??
-      break;
+    mod_mul (R->x, u1, R->t, m);    /* Rx <-  X3 := xE*F */
+    mod_mul (R->y, u2, u3, m);      /* Ry <-  Y3 := yH*G */
+    mod_mul (R->z, u0, u3, m);      /* Rz <-  Z3 := zF*G */
+  }
+  else /* if (output_type == TWISTED_EDWARDS_ext) */
+  {
+    mod_mul (u3, P->z, u3, m);      /* u3 <-  zG := Z1*G */
+    mod_mul (R->x, u1, u0, m);      /* Rx <-  X3 := xE*zF */
+    mod_mul (R->y, u2, u3, m);      /* Ry <-  Y3 := yH*zG */
+    mod_mul (R->z, u0, u3, m);      /* Rz <-  Z3 := zF*zG */
+    mod_mul (R->t, u1, u2, m);      /* Rt <- T3 := xE*yH */
   }
 
   mod_clear (u0, m);
