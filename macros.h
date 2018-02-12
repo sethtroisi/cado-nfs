@@ -270,7 +270,7 @@ LEXLE3(__GNU_MP_VERSION,__GNU_MP_VERSION_MINOR,__GNU_MP_VERSION_PATCHLEVEL,X,Y,Z
 #endif
 #endif /* if defined(__GNUC__) */
 
-#if GNUC_VERSION_ATLEAST(7,0,0)
+#if GNUC_VERSION_ATLEAST(7,0,0) && !defined(__ICC)
 #define no_break() __attribute__ ((fallthrough))
 #else
 #define no_break()
