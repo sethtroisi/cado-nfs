@@ -31,31 +31,65 @@ modsub(const unsigned long a, const unsigned long b, const unsigned long m)
   return r;
 }
 
+/* This "patterns_base" is only here to placate the C++ compiler: when it
+ * instantiates, it really wants to see the specializations of the static
+ * data members above the code that uses them. There are various ways to
+ * do so, some uglier than others, and none that really looks nice. Here
+ * is just one example.
+ */
 template<typename ELEMTYPE>
-class patterns {
+struct patterns_base {
+    static const ELEMTYPE mask2[64];
+    static const ELEMTYPE mask4[64];
+    static const ELEMTYPE mask8[64];
+    static const ELEMTYPE mask16[64];
+    static const ELEMTYPE mask32[64];
+    static const ELEMTYPE mask3[64];
+    static const ELEMTYPE mask5[64];
+    static const ELEMTYPE mask7[64];
+};
 
-  static const ELEMTYPE mask2[64];
-  static const ELEMTYPE mask4[64];
-  static const ELEMTYPE mask8[64];
-  static const ELEMTYPE mask16[64];
-  static const ELEMTYPE mask32[64];
-  static const ELEMTYPE mask3[64];
-  static const ELEMTYPE mask5[64];
-  static const ELEMTYPE mask7[64];
+static const uint8_t ff = ~(uint8_t)0;
+template<> const uint8_t patterns_base<uint8_t>::mask2[64] =
+  {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+   ff, 0, ff, 0, ff, 0, ff, 0, ff, 0, ff, 0, ff, 0, ff, 0, ff, 0, ff, 0, ff, 0, ff, 0, ff, 0, ff, 0, ff, 0, ff, 0};
+template<> const uint8_t patterns_base<uint8_t>::mask4[64] =
+  {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+   ff, 0, 0, 0, ff, 0, 0, 0, ff, 0, 0, 0, ff, 0, 0, 0, ff, 0, 0, 0, ff, 0, 0, 0, ff, 0, 0, 0, ff, 0, 0, 0};
+template<> const uint8_t patterns_base<uint8_t>::mask8[64] =
+  {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+   ff, 0, 0, 0, 0, 0, 0, 0, ff, 0, 0, 0, 0, 0, 0, 0, ff, 0, 0, 0, 0, 0, 0, 0, ff, 0, 0, 0, 0, 0, 0, 0};
+template<> const uint8_t patterns_base<uint8_t>::mask16[64] =
+  {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+   ff, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, ff, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+template<> const uint8_t patterns_base<uint8_t>::mask32[64] =
+  {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+   ff, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+template<> const uint8_t patterns_base<uint8_t>::mask3[64] =
+  {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+   ff, 0, 0, ff, 0, 0, ff, 0, 0, ff, 0, 0, ff, 0, 0, ff, 0, 0, ff, 0, 0, ff, 0, 0, ff, 0, 0, ff, 0, 0, ff, 0};
+template<> const uint8_t patterns_base<uint8_t>::mask5[64] =
+  {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+   ff, 0, 0, 0, 0, ff, 0, 0, 0, 0, ff, 0, 0, 0, 0, ff, 0, 0, 0, 0, ff, 0, 0, 0, 0, ff, 0, 0, 0, 0, ff, 0};
+template<> const uint8_t patterns_base<uint8_t>::mask7[64] =
+  {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+   ff, 0, 0, 0, 0, 0, 0, ff, 0, 0, 0, 0, 0, 0, ff, 0, 0, 0, 0, 0, 0, ff, 0, 0, 0, 0, 0, 0, ff, 0, 0, 0};
 
+template<typename ELEMTYPE>
+class patterns : public patterns_base<ELEMTYPE> {
 public:
   /* A demultiplexer that returns the correct mask array for a given "stride"
      value. */
   static inline const ELEMTYPE *get_mask(unsigned int stride) {
       switch (stride) {
-          case 2: return mask2;
-          case 4: return mask4;
-          case 8: return mask8;
-          case 16: return mask16;
-          case 32: return mask32;
-          case 3: return mask3;
-          case 5: return mask5;
-          case 7: return mask7;
+          case 2: return patterns_base<ELEMTYPE>::mask2;
+          case 4: return patterns_base<ELEMTYPE>::mask4;
+          case 8: return patterns_base<ELEMTYPE>::mask8;
+          case 16: return patterns_base<ELEMTYPE>::mask16;
+          case 32: return patterns_base<ELEMTYPE>::mask32;
+          case 3: return patterns_base<ELEMTYPE>::mask3;
+          case 5: return patterns_base<ELEMTYPE>::mask5;
+          case 7: return patterns_base<ELEMTYPE>::mask7;
           default: abort();
       }
   }
@@ -83,33 +117,6 @@ public:
 };
 
 template class patterns<uint8_t>;
-
-static const uint8_t ff = ~(uint8_t)0;
-template<> const uint8_t patterns<uint8_t>::mask2[64] =
-  {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-   ff, 0, ff, 0, ff, 0, ff, 0, ff, 0, ff, 0, ff, 0, ff, 0, ff, 0, ff, 0, ff, 0, ff, 0, ff, 0, ff, 0, ff, 0, ff, 0};
-template<> const uint8_t patterns<uint8_t>::mask4[64] =
-  {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-   ff, 0, 0, 0, ff, 0, 0, 0, ff, 0, 0, 0, ff, 0, 0, 0, ff, 0, 0, 0, ff, 0, 0, 0, ff, 0, 0, 0, ff, 0, 0, 0};
-template<> const uint8_t patterns<uint8_t>::mask8[64] =
-  {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-   ff, 0, 0, 0, 0, 0, 0, 0, ff, 0, 0, 0, 0, 0, 0, 0, ff, 0, 0, 0, 0, 0, 0, 0, ff, 0, 0, 0, 0, 0, 0, 0};
-template<> const uint8_t patterns<uint8_t>::mask16[64] =
-  {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-   ff, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, ff, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-template<> const uint8_t patterns<uint8_t>::mask32[64] =
-  {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-   ff, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-template<> const uint8_t patterns<uint8_t>::mask3[64] =
-  {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-   ff, 0, 0, ff, 0, 0, ff, 0, 0, ff, 0, 0, ff, 0, 0, ff, 0, 0, ff, 0, 0, ff, 0, 0, ff, 0, 0, ff, 0, 0, ff, 0};
-template<> const uint8_t patterns<uint8_t>::mask5[64] =
-  {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-   ff, 0, 0, 0, 0, ff, 0, 0, 0, 0, ff, 0, 0, 0, 0, ff, 0, 0, 0, 0, ff, 0, 0, 0, 0, ff, 0, 0, 0, 0, ff, 0};
-template<> const uint8_t patterns<uint8_t>::mask7[64] =
-  {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-   ff, 0, 0, 0, 0, 0, 0, ff, 0, 0, 0, 0, 0, 0, ff, 0, 0, 0, 0, 0, 0, ff, 0, 0, 0, 0, 0, 0, ff, 0, 0, 0};
-
 
 template <typename SIMDTYPE, typename ELEMTYPE>
 inline void
