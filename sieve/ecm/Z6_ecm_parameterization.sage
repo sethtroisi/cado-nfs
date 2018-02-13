@@ -28,23 +28,23 @@ U *= l     # U = 144*(x + 3*z)
 V *= l     # V = y
 W *= l     # W = 2985984*z
 
-sigma_d = 96*U
-sigma_n = (W - sigma_d)
+sigma_d = 96*U                        # u0
+sigma_n = (W - sigma_d)               # u1
 
-sigma2_n = sigma_n^2
-sigma2_d = sigma_d^2
+sigma2_n = sigma_n^2                  # u2
+sigma2_d = sigma_d^2                  # u3
 
-alpha_n = sigma2_n - 5*sigma2_d
-alpha_d = sigma2_d
+alpha_n = sigma2_n - 5*sigma2_d       # u4
+alpha_d = sigma2_d                    # u3
 
-alpha3_n = alpha_n^3
-alpha3_d = alpha_d^3
+alpha3_n = alpha_n^3                  # u5
+alpha3_d = alpha_d^3                  # u6 = u3^3
 
-beta_n = 4*sigma_n
-beta_d = sigma_d
+beta_n = 4*sigma_n                    # u7
+beta_d = sigma_d                      # u8 = u0
 
-beta3_n = beta_n^3
-beta3_d = beta_d^3
+beta3_n = beta_n^3                    # u9 = u7^3
+beta3_d = beta_d^3                    # u10 = u8^3
 
 gamma = (sigma_n - sigma_d)*(sigma_n + 5*sigma_d)*(sigma2_n + 5*sigma2_d)
 delta = (sigma2_n - 5*sigma2_d)^3

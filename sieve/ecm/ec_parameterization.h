@@ -418,51 +418,42 @@ ec_parameterization_Z6_is_valid (const unsigned long k)
  V *= l     # V = y
  W *= l     # W = 2985984*z
 
- sigma_d = 96*U
- sigma_n = (W - sigma_d)
+ # -----------------------------------------------------------------------------
 
- sigma2_n = sigma_n^2
- sigma2_d = sigma_d^2
+ u0 = 96*U                       # u0 = 96*U
+ u1 = (W - u0)                   # u1 = (W - sigma_d)
+ u2 = u1^2                       # u2 = u1^2
+ u3 = u0^2                       # u3 = u0^2
+ u4 = u2 - 5*u3                  # u4 = u2 - 5*u3
+ u5 = u4^3                       # u5 = u4^3
+ u6 = 4*u1                       # u6 = 4*u1
 
- alpha_n = sigma2_n - 5*sigma2_d
- alpha_d = sigma2_d
-
- alpha3_n = alpha_n^3
- alpha3_d = alpha_d^3
-
- beta_n = 4*sigma_n
- beta_d = sigma_d
-
- beta3_n = beta_n^3
- beta3_d = beta_d^3
-
- gamma = (sigma_n - sigma_d)*(sigma_n + 5*sigma_d)*(sigma2_n + 5*sigma2_d)
- delta = (sigma2_n - 5*sigma2_d)^3
- epsilon = (beta_n * sigma_d)^3
-
- t0 = gamma*U^2
- t2 = 2*V*W*sigma_n*sigma_d^3
-
- zE0 = delta+epsilon
- xE0 = zE0
-
- zE0 = zE0*t0
- xE0 = xE0*t2
-
- yE0 = delta - epsilon
- tE0 = yE0
- yE0 = yE0*t0
- tE0 = tE0*t2
-
- # Compute Montgomery curve parameters
+ # Compute M0 = (xM0::zE0) and A: Montgomery curve parameters
  # following 20 years of ECM by Zimmermann and Dodson
 
- xM0 = alpha3_n*beta3_d
- zM0 = beta3_n*alpha3_d
+ xM0 = u5*u3*u0
+ zM0 = (u6*u3)^3
 
- A = ((beta_n*alpha_d-alpha_n*beta_d)^3 * (3*alpha_n*beta_d + beta_n*alpha_d))\
- / (4*alpha3_n*beta_n*alpha_d*beta3_d) - 2
+ #A = (((beta-alpha)^3)*(3*alpha+beta) / (4*alpha3*beta)) - 2
+ A = ((u6*u3-u4*u0)^3 * (3*u4*u0 + u6*u3)) / (4*u3*u5*u6*u2) - 2
 
+ # Compute E0 = (xE0:yE0:zE0:tE0) base point on twisted Edwards curve
+ # following starfish on strike
+
+ Tx = (u1 - u0)*(u1 + 5*u0)*(u2 + 5*u3)
+ Ty = (u2 - 5*u3)^3
+ Tt = (u6*u0)^3
+
+ u1 = 2*u1*u2*V*W
+ u2 = u0^3
+ u7 = Tx*U^2
+
+ zE0 = (Ty + Tt)*u7
+ xE0 = (Ty + Tt)*u1
+ yE0 = (Ty - Tt)*u7
+ tE0 = (Ty - Tt)*u1
+
+ # -----------------------------------------------------------------------------
 
  # Check if PE0 = (xE0:yE0:zE0:tE0) is on the extended twisted
  # Edwards curve: (-1)*xE0^2 + yE0^2 - zE0^2 - d*tE0^2
@@ -471,8 +462,8 @@ ec_parameterization_Z6_is_valid (const unsigned long k)
  # with v = V/W and u = U/W
  r = (V*W)/U^2
  # Compute d following Starfish on strike (Theorem 5.4)
- alpha = alpha_n / alpha_d
- beta = beta_n / beta_d
+ alpha = u4 / u3
+ beta = u6 / u0
  d = ((beta+alpha)^3*(beta-3*alpha)) / (r*(beta-alpha))^2
 
  eq_Ed = a*xE0^2 + yE0^2 - zE0^2 - d*tE0^2
@@ -480,7 +471,8 @@ ec_parameterization_Z6_is_valid (const unsigned long k)
  print eq_Ed.numerator() in I\
  and not(eq_Ed.denominator() in I)\
  and (xE0*yE0 - zE0*tE0 in I)
-      
+
+
  # Applying the morphism from the Montgomery curve By2 = x^3 + Ax^2 + x
  # to its equivalent Edwards form ax^2 + y^2 = 1 + dx^2y^2
  # sets a = (A+2)/B.
@@ -491,9 +483,9 @@ ec_parameterization_Z6_is_valid (const unsigned long k)
  # the Edwards curve eq_Ed
  alpha3 = alpha^3
  beta3 = beta^3
- sigma = sigma_n / sigma_d
+ sigma = u1 / u0
  _b = alpha/beta3
- y0 = (sigma^2-1)*(sigma^2-25)*(sigma^4-25)*alpha3_d*beta3_d
+ y0 = (sigma^2-1)*(sigma^2-25)*(sigma^4-25)*(u3*u6)^3
 
  # Ad-hoc code for checking that b/B is a square in I
  e2 = E2.defining_polynomial()
@@ -653,14 +645,14 @@ ec_parameterization_Z6 (residue_t b, ec_point_t P0, const unsigned long k,
     mod_add (T->t, T->t, T->t, m);
     mod_add (T->t, T->t, T->t, m);
     mod_add (T->t, T->t, T->t, m);
-    mod_add (T->t, T->t, T->t, m);       /* 16*alpha3_n*beta_n*alpha_d*beta3_d */
+    mod_add (T->t, T->t, T->t, m);       /* 16*u3*u5*u7*u2 */
     ret = mod_inv (T->t, T->t, m);
     if (ret == 0)
       mod_set (P0->x, T->t, m);
     else
       {
-	mod_mul (T->y, u7, u3, m);       /* T->y = beta_n*alpha_d */
-	mod_mul (T->z, u4, u0, m);       /* T->z = alpha_n*beta_d */
+	mod_mul (T->y, u7, u3, m);       /* T->y = u7*u3 */
+	mod_mul (T->z, u4, u0, m);       /* T->z = u4*u0 */
 	mod_add (T->x, T->z, T->z, m);
 	mod_add (T->x, T->x, T->z, m);   /* T->x = 3*T->z */
 	mod_add (T->x, T->x, T->y, m);   /* T->x = 3*T->z + T->y */
