@@ -44,6 +44,7 @@
 #cmakedefine    HAVE_ARM_NEON
 
 #cmakedefine    HAVE_GCC_STYLE_AMD64_INLINE_ASM
+#cmakedefine    HAVE_GCC_STYLE_ARM_INLINE_ASM
 
 #cmakedefine    VOLATILE_IF_GCC_UBUNTU_BUG
 #cmakedefine    VOLATILE_IF_GCC_58805_BUG
