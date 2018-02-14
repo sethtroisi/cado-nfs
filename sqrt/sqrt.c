@@ -1331,19 +1331,18 @@ calculateTaskN (int task, const char *prefix, int numdep, int nthreads,
       T[j]->side = side;
       T[j]->Np = Np;
     }
-  if (nthreads > 1) {
-      for (j = 0; j < nthreads; j++)
-          pthread_create (&tid[j], NULL, one_thread, (void *) (T+j));
-      while (j > 0)
-          pthread_join (tid[--j], NULL);
-  } else {
-      /* I know it's eqiuvalent to the above. But on openbsd, where we
-       * have obscure failures that seem to be triggered by
-       * multithreading, it seems that it is not. So let's play it
-       * simple.
-       */
-      one_thread((void*) T);
-  }
+#ifdef __OpenBSD__
+  /* On openbsd, we have obscure failures that seem to be triggered
+   * by multithreading. So let's play it simple.
+   */
+  for (j = 0; j < nthreads; j++)
+      (*one_thread)((void*)(T+j));
+#else
+  for (j = 0; j < nthreads; j++)
+      pthread_create (&tid[j], NULL, one_thread, (void *) (T+j));
+  while (j > 0)
+      pthread_join (tid[--j], NULL);
+#endif
   free (tid);
   free (T);
 }
@@ -1521,6 +1520,14 @@ int main(int argc, char *argv[])
         create_dependencies(prefix, indexname, purgedname, kername);
     }
 
+#ifdef __OpenBSD__
+    if (nthreads > 1) {
+        fprintf(stderr, "Warning: reducing number of threads to 1 for openbsd ; unexplained failure https://ci.inria.fr/cado/job/compile-openbsd-59-amd64-random-integer/2775/console\n");
+        /* We'll still process everything we've been told to. But in a
+         * single-threaded fashion */
+    }
+#endif
+
     if (opt_side0 || opt_side1 || opt_gcd)
       {
         int i;
@@ -1535,12 +1542,6 @@ int main(int argc, char *argv[])
             }
       }
 
-#ifdef __OpenBSD__
-    if (nthreads > 1) {
-        fprintf(stderr, "Warning: reducing number of threads to 1 for openbsd ; unexplained failure https://ci.inria.fr/cado/job/compile-openbsd-59-amd64-random-integer/2775/console\n");
-        nthreads=1;
-    }
-#endif
     if (nthreads == 0)
       {
         fprintf (stderr, "Error, no more dependency\n");
