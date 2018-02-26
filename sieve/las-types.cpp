@@ -6,174 +6,6 @@
 #include "las-types.hpp"
 #include "las-config.h"
 #include "las-norms.hpp"
-/* sieve_info stuff */
-
-/* This function creates a new sieve_info structure, taking advantage of
- * structures which might already exist in las.sievers
- *  - for sieving, if factor base parameters are similar, we're going to
- *    share_factor_bases()
- *  - for cofactoring, if large prime bounds and mfbs are similar, we're
- *    going to reuse the strategies.
- * 
- * The siever_config structure to be passed to this function is not
- * permitted to lack anything.
- *
- * This function differs from las_info::get_sieve_info_from_config(),
- * since the latters also registers the returned object within
- * las.sievers (while the function here only *reads* this list).
- */
-sieve_info::sieve_info(siever_config const & sc, cado_poly_srcptr cpoly, std::list<sieve_info> & sievers, cxx_param_list & pl) /*{{{*/
-    : cpoly(cpoly), conf(sc)
-{
-    I = 1UL << sc.logI_adjusted;
-
-    std::list<sieve_info>::iterator psi;
-    
-    /*** Sieving ***/
-
-    psi = find_if(sievers.begin(), sievers.end(), sc.same_fb_parameters());
-
-    if (psi != sievers.end()) {
-        sieve_info & other(*psi);
-        verbose_output_print(0, 1, "# copy factor base data from previous siever\n");
-        share_factor_bases(other);
-    } else {
-        verbose_output_print(0, 1, "# bucket_region = %zu\n",
-                BUCKET_REGION);
-        init_factor_bases(pl);
-        for (int side = 0; side < 2; side++) {
-            print_fb_statistics(side);
-        }
-    }
-
-    // Now that fb have been initialized, we can set the toplevel.
-    toplevel = -1;
-    for(int side = 0 ; side < 2 ; side++) {
-        if (!sides[side].fb) continue;
-        int level = sides[side].fb->get_toplevel();
-        if (level > toplevel) toplevel = level;
-    }
-
-#if 0
-    /* Initialize the number of buckets */
-    /* (it's now done in sieve_info::update, which is more timely) */
-    /* set the maximal value of the number of buckets. This directly
-     * depends on A */
-    uint32_t XX[FB_MAX_PARTS] = { 0, NB_BUCKETS_2, NB_BUCKETS_3, 0};
-    uint64_t BRS[FB_MAX_PARTS] = BUCKET_REGIONS;
-    uint64_t A = UINT64_C(1) << conf.logA;
-    XX[toplevel] = iceildiv(A, BRS[toplevel]);
-    for (int i = toplevel+1; i < FB_MAX_PARTS; ++i)
-        XX[i] = 0;
-    if (toplevel > 1 && XX[toplevel] == 1) {
-        XX[toplevel-1] = iceildiv(A, BRS[toplevel-1]);
-        ASSERT_ALWAYS(XX[toplevel-1] != 1);
-    }
-    for (int i = 0; i < FB_MAX_PARTS; ++i) {
-        nb_buckets[i] = XX[i];
-    }
-#endif
-
-    for(int side = 0 ; side < 2 ; side++) {
-	init_trialdiv(side); /* Init refactoring stuff */
-        if (!sides[side].fb) continue;
-        init_fb_smallsieved(side);
-        verbose_output_print(0, 2, "# small side-%d factor base", side);
-        size_t nr_roots;
-        sides[side].fb->get_part(0)->count_entries(NULL, &nr_roots, NULL);
-        verbose_output_print(0, 2, " (total %zu)\n", nr_roots);
-    }
-
-    /*** Cofactoring ***/
-
-    psi = find_if(sievers.begin(), sievers.end(), sc.same_cofactoring());
-
-    if (psi != sievers.end()) {
-        sieve_info & other(*psi);
-        verbose_output_print(0, 1, "# copy cofactoring strategies from previous siever\n");
-        strategies = other.strategies;
-    } else {
-        init_strategies(pl);
-    }
-}
-/*}}}*/
-/* This ctor is a simplified version of the former. Of course I'd be
- * happy to use delegated constructors here.
- */
-sieve_info::sieve_info(siever_config const & sc, cado_poly_srcptr cpoly, cxx_param_list & pl) /*{{{*/
-    : cpoly(cpoly), conf(sc)
-{
-    I = 1UL << sc.logI_adjusted;
-    std::list<sieve_info>::iterator psi;
-    verbose_output_print(0, 1, "# bucket_region = %zu\n", BUCKET_REGION);
-    init_factor_bases(pl);
-    for (int side = 0; side < 2; side++) {
-        print_fb_statistics(side);
-    }
-    // Now that fb have been initialized, we can set the toplevel.
-    toplevel = -1;
-    for(int side = 0 ; side < 2 ; side++) {
-        if (!sides[side].fb) continue;
-        int level = sides[side].fb->get_toplevel();
-        if (level > toplevel) toplevel = level;
-    }
-
-    for(int side = 0 ; side < 2 ; side++) {
-        init_trialdiv(side); /* Init refactoring stuff */
-        init_fb_smallsieved(side);
-        verbose_output_print(0, 2, "# small side-%d factor base", side);
-        size_t nr_roots;
-        sides[side].fb->get_part(0)->count_entries(NULL, &nr_roots, NULL);
-        verbose_output_print(0, 2, " (total %zu)\n", nr_roots);
-    }
-    init_strategies(pl);
-}
-/*}}}*/
-
-void sieve_info::update_norm_data ()/*{{{*/
-{
-    for(int side = 0 ; side < 2 ; side++) {
-        sides[side].lognorms = std::make_shared<lognorm_smart>(conf, cpoly, side, qbasis, J);
-    }
-}
-
-/*}}}*/
-void sieve_info::update (size_t nr_workspaces)/*{{{*/
-{
-    uint64_t A = UINT64_C(1) << conf.logA;
-
-    /* update number of buckets at toplevel */
-    size_t (&BRS)[FB_MAX_PARTS] = BUCKET_REGIONS;
-    nb_buckets[toplevel] = iceildiv(A, BRS[toplevel]);
-
-    // maybe there is only 1 bucket at toplevel and less than 256 at
-    // toplevel-1, due to a tiny J.
-    if (toplevel > 1) {
-        if (nb_buckets[toplevel] == 1) {
-            nb_buckets[toplevel-1] = iceildiv(A, BRS[toplevel - 1]);
-            // we forbid skipping two levels.
-            ASSERT_ALWAYS(nb_buckets[toplevel-1] != 1);
-        } else {
-            nb_buckets[toplevel-1] = BRS[toplevel]/BRS[toplevel-1];
-        }
-    }
-
-    /* Update the slices of the factor base according to new log base */
-    for(int side = 0 ; side < 2 ; side++) {
-        /* The safety factor controls by how much a single slice should fill a
-           bucket array at most, i.e., with .5, a single slice should never fill
-           a bucket array more than half-way. */
-        const double safety_factor = .5;
-        sieve_info::side_info & sis(sides[side]);
-        double max_weight[FB_MAX_PARTS];
-        for (int i_part = 0; i_part < FB_MAX_PARTS; i_part++) {
-            max_weight[i_part] = sis.max_bucket_fill_ratio[i_part] / nr_workspaces
-                * safety_factor;
-        }
-        if (!sis.fb) continue;
-        sis.fb->make_slices(sis.lognorms->scale, max_weight);
-    }
-}/*}}}*/
 
 
 static void las_verbose_enter(cxx_param_list & pl, FILE * output, int verbose)
@@ -444,7 +276,7 @@ void las_info::clear_cof_stats()
 }
 //}}}
 
-sieve_info & sieve_info::get_sieve_info_from_config(siever_config const & sc, cado_poly_srcptr cpoly, std::list<sieve_info> & registry, cxx_param_list & pl)/*{{{*/
+sieve_info & sieve_info::get_sieve_info_from_config(siever_config const & sc, cado_poly_srcptr cpoly, std::list<sieve_info> & registry, cxx_param_list & pl, bool try_fbc)/*{{{*/
 {
     std::list<sieve_info>::iterator psi;
     psi = find_if(registry.begin(), registry.end(), sc.same_config());
@@ -452,7 +284,7 @@ sieve_info & sieve_info::get_sieve_info_from_config(siever_config const & sc, ca
         sc.display();
         return *psi;
     }
-    registry.push_back(sieve_info(sc, cpoly, registry, pl));
+    registry.push_back(sieve_info(sc, cpoly, registry, pl, try_fbc));
     sieve_info & si(registry.back());
     verbose_output_print(0, 1, "# Creating new sieve configuration for q~2^%d on side %d (logI=%d)\n",
             sc.bitsize, sc.side, si.conf.logI_adjusted);

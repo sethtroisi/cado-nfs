@@ -323,7 +323,7 @@ bucket_single<LEVEL, HINT>::sort()
 
 void
 bucket_primes_t::purge (const bucket_array_t<1, shorthint_t> &BA,
-              const int i, const fb_part *fb, const unsigned char *S)
+              const int i, fb_factorbase::slicing const & fb, const unsigned char *S)
 {
   for (slice_index_t i_slice = 0; i_slice < BA.get_nr_slices(); i_slice++) {
     const slice_index_t slice_index = BA.get_slice_index(i_slice);
@@ -332,9 +332,7 @@ bucket_primes_t::purge (const bucket_array_t<1, shorthint_t> &BA,
 
     for ( ; it != end_it ; it++) {
       if (UNLIKELY(S[it->x] != 255)) {
-        const fb_slice_interface *slice = fb->get_slice(slice_index);
-        ASSERT_ALWAYS(slice != NULL);
-        fbprime_t p = slice->get_prime(it->hint);
+        fbprime_t p = fb[slice_index].get_prime(it->hint);
         push_update(bucket_update_t<1, primehint_t>(it->x, p, 0, 0));
       }
     }

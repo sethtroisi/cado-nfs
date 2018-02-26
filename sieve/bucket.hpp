@@ -399,7 +399,7 @@ public:
   bucket_primes_t (const size_t size) : super(size){}
   ~bucket_primes_t(){}
   void purge (const bucket_array_t<1, shorthint_t> &BA, 
-          int i, const fb_part *fb, const unsigned char *S);
+          int i, fb_factorbase::slicing const & fb, const unsigned char *S);
 };
 
 /* Stores info containing both slice index and offset instead of only the offset */

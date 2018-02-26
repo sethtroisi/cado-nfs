@@ -1,5 +1,5 @@
 #ifndef LAS_PLATTICE_H
-#define LAS_PLATTICE_H 1
+#define LAS_PLATTICE_H
 
 /*******************************************************************/
 /********        Walking in p-lattices                    **********/

@@ -669,7 +669,7 @@ fill_in_buckets_one_slice(const worker_thread * worker MAYBE_UNUSED, const task_
         bucket_array_t<LEVEL, shorthint_t> &BA = param->ws.reserve_BA<LEVEL, shorthint_t>(param->side);
         /* Fill the buckets */
         if (param->slice->is_general())
-          fill_in_buckets_toplevel<LEVEL,fb_general_entry>(BA, param->si, param->slice, param->plattices_dense_vector, w);
+          fill_in_buckets_toplevel<LEVEL,fb_entry_general>(BA, param->si, param->slice, param->plattices_dense_vector, w);
         else if (param->slice->get_nr_roots() == 0)
           fill_in_buckets_toplevel<LEVEL,fb_entry_x_roots<0> >(BA, param->si, param->slice, param->plattices_dense_vector, w);
         else if (param->slice->get_nr_roots() == 1)

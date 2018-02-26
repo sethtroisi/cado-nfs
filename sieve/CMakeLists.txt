@@ -18,7 +18,7 @@ set (las_sources
     las-qlattice.cpp
     las-norms.cpp logapprox.cpp
     las-coordinates.cpp
-
+    las-sieve-info.cpp
     las-types.cpp
     las.cpp fb.cpp las-plattice.cpp
   las-debug.cpp las-report-stats.cpp las-duplicate.cpp

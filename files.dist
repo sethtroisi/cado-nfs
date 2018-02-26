@@ -1211,3 +1211,6 @@ tests/sieve/test_renumber.sh
 config/alignas.cmake
 config/neon.c
 config/neon.cmake
+utils/multityped_array.hpp
+sieve/las-sieve-info.cpp
+sieve/las-sieve-info.hpp

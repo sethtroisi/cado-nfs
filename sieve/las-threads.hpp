@@ -16,7 +16,7 @@ class thread_workspaces;
 
 /* All of this exists _for each thread_ */
 struct thread_side_data : private NonCopyable {
-  const fb_factorbase *fb = NULL;
+  const fb_factorbase::slicing *fbs __attribute__((deprecated)) = NULL;
 
   /* For small sieve */
   std::vector<spos_t> ssdpos;
@@ -33,10 +33,12 @@ struct thread_side_data : private NonCopyable {
   private:
   void allocate_bucket_region();
   public:
-  void set_fb(const fb_factorbase *_fb) {
-      fb = _fb;
+#if 0
+  void set_fbs(const fb_factorbase::slicing *_fbs) {
+      fbs = _fbs;
       allocate_bucket_region();
   }
+#endif
   void update_checksum(){checksum_post_sieve.update(bucket_region, BUCKET_REGION);}
 };
 

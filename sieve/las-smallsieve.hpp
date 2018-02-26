@@ -10,10 +10,10 @@ extern void small_sieve_info(const char * what, int side, small_sieve_data_t con
 extern int small_sieve_dump(FILE *, const char *, va_list);
 extern void small_sieve_clear(small_sieve_data_t & ssd);
 extern void small_sieve_init(small_sieve_data_t & ssd, unsigned int interleaving,
-                      std::vector<fb_general_entry>::const_iterator fb_start,
-                      std::vector<fb_general_entry>::const_iterator fb_end,
-                      std::vector<fb_general_entry>::const_iterator resieve_start,
-                      std::vector<fb_general_entry>::const_iterator resieve_end,
+                      std::vector<fb_entry_general>::const_iterator fb_start,
+                      std::vector<fb_entry_general>::const_iterator fb_end,
+                      std::vector<fb_entry_general>::const_iterator resieve_start,
+                      std::vector<fb_entry_general>::const_iterator resieve_end,
                       sieve_info const & si, int side);
 extern void small_sieve_start(std::vector<spos_t> & ssdpos, small_sieve_data_t & ssd, unsigned int first_region_index, sieve_info const & si);
 extern void small_sieve_copy_start(std::vector<spos_t>& res, std::vector<spos_t> const & base, int bounds[2]);

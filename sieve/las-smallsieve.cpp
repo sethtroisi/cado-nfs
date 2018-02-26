@@ -218,10 +218,10 @@ static order_ssp_t order_ssp;
 
 void small_sieve_init(small_sieve_data_t & ssd,
                       unsigned int nthreads,
-                      std::vector<fb_general_entry>::const_iterator fb_start,
-                      std::vector<fb_general_entry>::const_iterator fb_end,
-                      std::vector<fb_general_entry>::const_iterator resieve_start,
-                      std::vector<fb_general_entry>::const_iterator resieve_end,
+                      std::vector<fb_entry_general>::const_iterator fb_start,
+                      std::vector<fb_entry_general>::const_iterator fb_end,
+                      std::vector<fb_entry_general>::const_iterator resieve_start,
+                      std::vector<fb_entry_general>::const_iterator resieve_end,
                       sieve_info const & si, const int side)
 {
     const unsigned int thresh = si.conf.bucket_thresh;
@@ -246,7 +246,7 @@ void small_sieve_init(small_sieve_data_t & ssd,
     const unsigned int skiprows = ((nthreads-1) << LOG_BUCKET_REGION) >> si.conf.logI_adjusted;
     bool saw_resieve_start = false, saw_resieve_end = false;
     
-    for (std::vector<fb_general_entry>::const_iterator iter = fb_start;
+    for (std::vector<fb_entry_general>::const_iterator iter = fb_start;
          iter != fb_end; iter++) {
         /* p=pp^k, the prime or prime power in this entry, and pp is prime */
         const fbprime_t p = iter->q, pp = iter->p;
@@ -320,7 +320,7 @@ void small_sieve_init(small_sieve_data_t & ssd,
                      *  - we lose hits to (+-1,0) this way (the two
                      *    locations are equal up to sign, but we should
                      *    sieve one of them!) -- see bug 21505.
-                     *  - the cost of having them in he list is
+                     *  - the cost of having them in the list is
                      *    ridiculously small anyway.
                      *
                      * this being said, we should probably deal with

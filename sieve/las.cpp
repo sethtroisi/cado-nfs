@@ -828,7 +828,7 @@ NOPROFILE_STATIC
 void
 apply_one_bucket (unsigned char *S,
         const bucket_array_t<1, HINT> &BA, const int i,
-        const fb_part *fb, where_am_I & w)
+        fb_factorbase::slicing::part const & fbp, where_am_I & w)
 {
   WHERE_AM_I_UPDATE(w, p, 0);
 
@@ -836,7 +836,7 @@ apply_one_bucket (unsigned char *S,
     const bucket_update_t<1, HINT> *it = BA.begin(i, i_slice);
     const bucket_update_t<1, HINT> * const it_end = BA.end(i, i_slice);
     const slice_index_t slice_index = BA.get_slice_index(i_slice);
-    const unsigned char logp = fb->get_slice(slice_index)->get_logp();
+    const unsigned char logp = fbp[slice_index].get_logp();
 
     /* TODO: the code below is quite possibly correct, except perhaps for the
      * treatment of where_am_I stuff. I get inconsistent
@@ -904,15 +904,15 @@ apply_one_bucket (unsigned char *S,
 template 
 void apply_one_bucket<shorthint_t> (unsigned char *S,
         const bucket_array_t<1, shorthint_t> &BA, const int i,
-        const fb_part *fb, where_am_I & w);
+        fb_factorbase::slicing::part const & fbp, where_am_I & w);
 
 template <>
 void apply_one_bucket<longhint_t> (unsigned char *S,
         const bucket_array_t<1, longhint_t> &BA, const int i,
-        const fb_part *fb, where_am_I & w) {
+        fb_factorbase::slicing::part const & fbp, where_am_I & w) {
   WHERE_AM_I_UPDATE(w, p, 0);
 
-  // There is only one slice.
+  // There is only one fb_slice.
   slice_index_t i_slice = 0;
   const bucket_update_t<1, longhint_t> *it = BA.begin(i, i_slice);
   const bucket_update_t<1, longhint_t> * const it_end = BA.end(i, i_slice);
@@ -922,7 +922,7 @@ void apply_one_bucket<longhint_t> (unsigned char *S,
   // type?
   while (it != it_end) {
     slice_index_t index = it->index;
-    const unsigned char logp = fb->get_slice(index)->get_logp();
+    const unsigned char logp = fbp[index].get_logp();
     apply_one_update<longhint_t> (S, it++, logp, w);
   }
 }
@@ -1011,7 +1011,9 @@ divide_primes_from_bucket (factor_list_t & fl, mpz_t norm, const unsigned int N,
 /* The entries in BP must be sorted in order of increasing x */
 static void
 divide_hints_from_bucket (factor_list_t &fl, mpz_t norm, const unsigned int N, const unsigned int x,
-                          bucket_array_complete *purged, const fb_factorbase *fb, const int very_verbose)
+                          bucket_array_complete *purged,
+                          fb_factorbase::slicing const & fbs,
+                          const int very_verbose)
 {
   while (!purged->is_end()) {
       const bucket_update_t<1, longhint_t> complete_hint = purged->get_next_update();
@@ -1022,20 +1024,19 @@ divide_hints_from_bucket (factor_list_t &fl, mpz_t norm, const unsigned int N, c
         }
       if (complete_hint.x == x) {
           if (bucket_prime_stats) nr_bucket_longhints++;
-          const fb_slice_interface *slice = fb->get_slice(complete_hint.index);
-          ASSERT_ALWAYS(slice != NULL);
-          const unsigned long p = slice->get_prime(complete_hint.hint);
+          fb_slice_interface const & fb_slice = fbs[complete_hint.index];
+          const unsigned long p = fb_slice.get_prime(complete_hint.hint);
           if (very_verbose) {
-              const unsigned char k = slice->get_k(complete_hint.hint);
+              const unsigned char k = fb_slice.get_k(complete_hint.hint);
               verbose_output_print(0, 1,
-                                   "# N = %u, x = %d, dividing out slice hint, "
+                                   "# N = %u, x = %d, dividing out fb_slice hint, "
                                    "index = %lu offset = %lu ",
                                    N, x, (unsigned long) complete_hint.index,
                                    (unsigned long) complete_hint.hint);
-              if (slice->is_general()) {
+              if (fb_slice.is_general()) {
                   verbose_output_print(0, 1, "(general)");
               } else {
-                  verbose_output_print(0, 1, "(%d roots)", slice->get_nr_roots());
+                  verbose_output_print(0, 1, "(%d roots)", fb_slice.get_nr_roots());
               }
               verbose_output_vfprint(0, 1, gmp_vfprintf,
                                      ", q = %lu^%hhu, norm = %Zd\n",
@@ -1075,7 +1076,7 @@ trial_div (std::vector<uint64_t> & fl, mpz_t norm, const unsigned int N, unsigne
            bucket_array_complete *purged,
 	   trialdiv_divisor_t *trialdiv_data,
            int64_t a, uint64_t b,
-           const fb_factorbase *fb)
+           fb_factorbase::slicing const & fbs)
 {
 #ifdef TRACE_K
     const int trial_div_very_verbose = trace_on_spot_ab(a,b);
@@ -1103,8 +1104,10 @@ trial_div (std::vector<uint64_t> & fl, mpz_t norm, const unsigned int N, unsigne
 
     // remove primes in "primes" that map to x
     divide_primes_from_bucket (fl, norm, N, x, primes, trial_div_very_verbose);
-    if (fb)
-    divide_hints_from_bucket (fl, norm, N, x, purged, fb, trial_div_very_verbose);
+
+    // now remove prime hints in "purged". If we had no factor base, then
+    // we really should have an empty list here.
+    divide_hints_from_bucket (fl, norm, N, x, purged, fbs, trial_div_very_verbose);
     if (trial_div_very_verbose)
         verbose_output_vfprint(TRACE_CHANNEL, 0, gmp_vfprintf, "# x = %d, after dividing out bucket/resieved norm = %Zd\n", x, norm);
 
@@ -1601,7 +1604,7 @@ void factor_survivors_data::cofactoring (timetree_t & timer)
                     &sdata[side].purged,
                     si.sides[side].trialdiv_data.get(),
                     a, b,
-                    th->psi->sides[side].fb.get());
+                    *th->psi->sides[side].fbs);
 
             /* if q is composite, its prime factors have not been sieved.
              * Check if they divide. */
@@ -2039,7 +2042,7 @@ void * process_bucket_region(timetree_t & timer, thread_data *th)
                 const bucket_array_t<1, shorthint_t> * const BA_end =
                     th->ws->cend_BA<1, shorthint_t>(side);
                 for (; BA != BA_end; BA++)  {
-                    apply_one_bucket(SS, *BA, ii, ts.fb->get_part(1), w);
+                    apply_one_bucket(SS, *BA, ii, si.sides[side].fbs->get_part(1), w);
                 }
             }
 
@@ -2055,7 +2058,7 @@ void * process_bucket_region(timetree_t & timer, thread_data *th)
                     // FIXME: the updates could come from part 3 as well,
                     // not only part 2.
                     ASSERT_ALWAYS(si.toplevel <= 2);
-                    apply_one_bucket(SS, *BAd, ii, ts.fb->get_part(2), w);
+                    apply_one_bucket(SS, *BAd, ii, si.sides[side].fbs->get_part(2), w);
                 }
             }
 
@@ -2362,7 +2365,7 @@ void display_expected_memory_usage(siever_config const & sc, cado_poly_srcptr cp
         // For each big bucket region (level-2), we then transform these
         // updates into updates for the lower-level buckets. We thus
         // create bucket_update_t<1, longhint_t>'s with the downsort<>
-        // function. The long hint is because we have the full slice
+        // function. The long hint is because we have the full fb_slice
         // index. the position in such a bucket update is shorter, only
         // XSIZE1.
 
@@ -2532,7 +2535,7 @@ int main (int argc0, char *argv0[])/*{{{*/
         /* Create a default siever instance among las.sievers if needed */
         if (las.config_pool.default_config_ptr) {
             siever_config const & sc(*las.config_pool.default_config_ptr);
-            sieve_info::get_sieve_info_from_config(sc, las.cpoly, las.sievers, pl);
+            sieve_info::get_sieve_info_from_config(sc, las.cpoly, las.sievers, pl, true);
         }
         /* Create all siever configurations from the preconfigured hints */
         /* This can also be done dynamically if needed */
@@ -2756,6 +2759,12 @@ int main (int argc0, char *argv0[])/*{{{*/
             }
         }
 
+
+        /* At this point we've decided on a new configuration for the
+         * siever. The new stuff compared to the previous status of the
+         * code is that this configuration also includes thresholds for
+         * the factorbase parts.
+         */
         siever_config conf = Adj.config();
         conf.logI_adjusted = Adj.logI;
 
@@ -2805,6 +2814,10 @@ int main (int argc0, char *argv0[])/*{{{*/
          * the leftovers from earlier runs.
          */
         si.update_norm_data();
+
+        /* this function should really be renamed ! It embodies, in
+         * particular, the creation of the different slices in the factor
+         * base */
         si.update(nr_workspaces);
 
         try {
@@ -2858,7 +2871,8 @@ for (unsigned int j_cong = 0; j_cong < sublat_bound; ++j_cong) {
         
 
     /* essentially update the fij polynomials and the max log bounds */
-    si.update_norm_data();
+    // I think that this is useless now.
+    // si.update_norm_data();
 
     if (las.verbose >= 2) {
         verbose_output_print (0, 1, "# f_0'(x) = ");
@@ -2971,14 +2985,17 @@ for (unsigned int j_cong = 0; j_cong < sublat_bound; ++j_cong) {
                 if (!si.sides[side].fb) continue;
                 CHILD_TIMER_PARAMETRIC(timer_special_q, "side ", side, "");
                 for (int level = 1; level < si.toplevel; ++level) {
-                    const fb_part * fb = si.sides[side].fb->get_part(level);
-                    const fb_slice_interface *slice;
-                    for (slice_index_t slice_index = fb->get_first_slice_index();
-                            (slice = fb->get_slice(slice_index)) != NULL; 
-                            slice_index++) {  
-                        precomp_plattice.push(side, level,
-                                slice->make_lattice_bases(si.qbasis, si.conf.logI_adjusted, si.conf.sublat));
-                    }
+
+                    struct make_lattice_basis {
+                        int side, level;
+                        sieve_info const & si;
+                        precomp_plattice_t & precomp_plattice;
+                        void operator()(fb_slice_interface const & s) {
+                            precomp_plattice.push(side, level, s.make_lattice_bases(si.qbasis, si.conf.logI_adjusted, si.conf.sublat));
+                        }
+                    };
+
+                    si.sides[side].fbs->foreach_slice(make_lattice_basis { side, level, si, precomp_plattice });
                 }
             }
 
@@ -3320,7 +3337,7 @@ if (si.conf.sublat.m) {
             (double) report->reports / (double) nr_sq_processed);
 
 
-    print_worst_weight_errors();
+    // XXX re-enable print_worst_weight_errors();
 
     /*}}}*/
 

@@ -27,11 +27,17 @@ struct siever_config : public _padded_pod<siever_config> {
      * values. logI_adjusted is a sieving-only parameter. */
     int logI_adjusted;
     sublat_t sublat;
+
+    /* first two are bkthresh and bkthresh1 anyway */
+    unsigned long fb_thresholds[FB_MAX_PARTS];
+
     unsigned long bucket_thresh;    // bucket sieve primes >= bucket_thresh
     unsigned long bucket_thresh1;   // primes above are 2-level bucket-sieved
+
     unsigned int td_thresh;
     unsigned int skipped;           // don't sieve below this
     unsigned int unsieve_thresh;
+
     struct side_config {
         unsigned long lim;    /* factor base bound */
         unsigned long powlim; /* bound on powers in the factor base */
@@ -84,12 +90,12 @@ struct siever_config : public _padded_pod<siever_config> {
         bool operator()(siever_config const& o) const {
             bool ok = true;
             // ok = ok && sc.logI_adjusted == o.logI_adjusted;
-            ok = ok && sc.bucket_thresh == o.bucket_thresh;
-            ok = ok && sc.bucket_thresh1 == o.bucket_thresh1;
-            ok = ok && sc.td_thresh == o.td_thresh;
+            // removed 20180219 ok = ok && sc.bucket_thresh == o.bucket_thresh;
+            // removed 20180219 ok = ok && sc.bucket_thresh1 == o.bucket_thresh1;
+            // removed 20180219 ok = ok && sc.td_thresh == o.td_thresh;
             ok = ok && sc.skipped == o.skipped;
             // ok = ok && sc.bk_multiplier == o.bk_multiplier;
-            ok = ok && sc.unsieve_thresh == o.unsieve_thresh;
+            // removed 20180219 ok = ok && sc.unsieve_thresh == o.unsieve_thresh;
             for(int side = 0 ; side < 2 ; side++) {
                 ok = ok && sc.sides[side].lim == o.sides[side].lim;
                 ok = ok && sc.sides[side].powlim == o.sides[side].powlim;

@@ -4,121 +4,6 @@
 #include "las-types.hpp"
 #include "fb.hpp"
 
-/*  Factor base handling */
-/* {{{ sieve_info::{init,clear,share}_factor_bases */
-void sieve_info::init_factor_bases(param_list_ptr pl)
-{
-    fb_factorbase *fb[2];
-
-    for(int side = 0 ; side < 2 ; side++) {
-        fbprime_t bk_thresh = conf.bucket_thresh;
-        fbprime_t bk_thresh1 = conf.bucket_thresh1;
-        const fbprime_t fbb = conf.sides[side].lim;
-        if (!fbb) {
-            fb[side] = NULL;
-            continue;
-        }
-        const fbprime_t powlim = conf.sides[side].powlim;
-        if (bk_thresh > fbb) {
-            bk_thresh = fbb;
-        }
-        if (bk_thresh1 == 0 || bk_thresh1 > fbb) {
-            bk_thresh1 = fbb;
-        }
-        const fbprime_t thresholds[4] = {bk_thresh, bk_thresh1, fbb, fbb};
-        const bool only_general[4]={true, false, false, false};
-        sides[side].fb = std::make_shared<fb_factorbase>(thresholds, powlim, only_general);
-        fb[side] = sides[side].fb.get();
-    }
-
-    const char * fbcfilename = param_list_lookup_string(pl, "fbc");
-
-    if (fbcfilename != NULL) {
-      /* Try to read the factor base cache file. If that fails, because
-         the file does not exist or is not compatible with our parameters,
-         it will be written after we generate the factor bases. */
-      verbose_output_print(0, 1, "# Mapping memory image of factor base from file %s\n",
-                           fbcfilename);
-      if (fb_mmap_fbc(fb, fbcfilename)) {
-        verbose_output_print(0, 1, "# Finished mapping memory image of factor base\n");
-        return;
-      } else {
-        verbose_output_print(0, 1, "# Could not map memory image of factor base\n");
-      }
-    }
-
-    for(int side = 0 ; side < 2 ; side++) {
-        cxx_mpz_poly pol;
-
-        if (!conf.sides[side].lim) continue;
-
-        mpz_poly_set(pol, cpoly->pols[side]);
-
-        if (pol->deg > 1) {
-            double tfb = seconds ();
-            double tfb_wct = wct_seconds ();
-            char fbparamname[4];
-            std::string polystring = pol.print_poly("x");
-            verbose_output_vfprint(0, 1, gmp_vfprintf,
-                    "# Reading side-%d factor base from disk"
-                    " for polynomial f%d(x) = %s\n",
-                    side, side, polystring.c_str());
-            snprintf(fbparamname, sizeof(fbparamname), "fb%d", side);
-            const char * fbfilename = param_list_lookup_string(pl, fbparamname);
-            if (!fbfilename) {
-                fprintf(stderr, "Error: factor base file for side %d is not given\n", side);
-                exit(EXIT_FAILURE);
-            }
-            verbose_output_print(0, 1, "# Reading side-%d factor base from %s\n", side, fbfilename);
-            if (!fb[side]->read(fbfilename))
-                exit(EXIT_FAILURE);
-            tfb = seconds () - tfb;
-            tfb_wct = wct_seconds () - tfb_wct;
-            verbose_output_print(0, 1,
-                    "# Reading side-%d factor base took %1.1fs (%1.1fs real)\n",
-                    side, tfb, tfb_wct);
-        } else {
-            double tfb = seconds ();
-            double tfb_wct = wct_seconds ();
-            /* note: we parse again the -t option here -- it gets parsed
-             * in the las_info ctor too */
-            int nb_threads = 1;		/* default value */
-            param_list_parse_int(pl, "t", &nb_threads);
-            fb[side]->make_linear_threadpool (pol->coeff, nb_threads);
-            tfb = seconds () - tfb;
-            tfb_wct = wct_seconds() - tfb_wct;
-            verbose_output_print(0, 1,
-                    "# Creating side-%d rational factor base took %1.1fs (%1.1fs real)\n",
-                    side, tfb, tfb_wct);
-        }
-    }
-
-    if (fbcfilename != NULL) {
-        verbose_output_print(0, 1, "# Writing memory image of factor base to file %s\n", fbcfilename);
-        fb_dump_fbc(fb, fbcfilename);
-        verbose_output_print(0, 1, "# Finished writing memory image of factor base\n");
-    }
-
-    /* Note that max_bucket_fill_ratio and friends are set from within
-     * print_fb_statistics, which is a bit ugly.
-     */
-}
-
-void sieve_info::share_factor_bases(sieve_info& other)
-{
-    for(int side = 0 ; side < 2 ; side++) {
-        ASSERT_ALWAYS(conf.sides[side].lim == other.conf.sides[side].lim);
-        ASSERT_ALWAYS(conf.sides[side].powlim == other.conf.sides[side].powlim);
-        sieve_info::side_info & sis(sides[side]);
-        sieve_info::side_info & sis0(other.sides[side]);
-        sis.fb = sis0.fb;
-        for (int i = 0; i < FB_MAX_PARTS; i++)
-            sis.max_bucket_fill_ratio[i] = sis0.max_bucket_fill_ratio[i];
-    }
-}
-
-/* }}} */
-
 /*  reordering of the small factor base
  *
  * We split the small factor base in several non-overlapping, contiguous
@@ -145,10 +30,10 @@ void sieve_info::share_factor_bases(sieve_info& other)
  */
 
 #if 0
-static size_t count_roots(const std::vector<fb_general_entry> &v)
+static size_t count_roots(const std::vector<fb_entry_general> &v)
 {
     size_t count = 0;
-    for(std::vector<fb_general_entry>::const_iterator it = v.begin();
+    for(std::vector<fb_entry_general>::const_iterator it = v.begin();
         it != v.end(); it++) {
         count += it->nr_roots;
     }
@@ -173,17 +58,17 @@ void sieve_info::init_fb_smallsieved(int side)
 
     /* alloc the 6 vectors */
     enum {POW2, POW3, TD, RS, REST, SKIPPED};
-    std::vector<std::vector<fb_general_entry>> pieces(6);
+    std::vector<std::vector<fb_entry_general>> pieces(6);
 
     fb_part *small_part = si.sides[side].fb->get_part(0);
     ASSERT_ALWAYS(small_part->is_only_general());
-    const fb_vector<fb_general_entry> *small_entries = small_part->get_general_vector();
+    const fb_vector<fb_entry_general> *small_entries = small_part->get_general_vector();
 
     fbprime_t plim = si.conf.bucket_thresh;
     fbprime_t costlim = si.conf.td_thresh;
 
     const size_t pattern2_size = sizeof(unsigned long) * 2;
-    for (fb_vector<fb_general_entry>::const_iterator it = small_entries->begin();
+    for (fb_vector<fb_entry_general>::const_iterator it = small_entries->begin();
          it != small_entries->end();
          it++)
     {
@@ -212,7 +97,7 @@ void sieve_info::init_fb_smallsieved(int side)
     }
 
     /* put the resieved primes first. */
-    auto s = std::make_shared<std::vector<fb_general_entry>>(pieces[RS]);
+    auto s = std::make_shared<std::vector<fb_entry_general>>(pieces[RS]);
     si.sides[side].resieve_start_offset = 0;
     si.sides[side].resieve_end_offset = s->size();
 

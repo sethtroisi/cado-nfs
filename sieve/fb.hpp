@@ -12,15 +12,65 @@
 #include <stdint.h>
 #include <gmp.h>
 #include <vector>
+#include <deque>
+#include <list>
+#include <algorithm>
 #include <map>
+#include "multityped_array.hpp"
 #include "las-config.h"
 #include "cado_poly.h" // for MAX_DEGREE
 #include "fb-types.h"
 #include "las-qlattice.hpp"
 #include "las-plattice.hpp"
 #include "las-base.hpp"
+#include "las-siever-config.hpp"
 
-/* Forward declaration so fb_general_entry can use it in constructors */
+/* structure:
+ *
+ * fb_factorbase
+ *  -> private members of type fb_vector<X>, called fbX_vector's, X
+ *     ranging from 0 to MAX_DEGREE.
+ *     It is not entirely clear that we have a real need for fb_vector
+ *     per se: it could very well be an std::vector.
+ *     Well, except for polymorphism (currently,
+ *     fb_vector_interface::get_slices mainly serves this purpose).
+ *  -> a map from a tuple(list of thresholds + log scale) to a list of
+ *     fb_slice sets (fb_slice_set)
+ *
+ * The key to the map above would be a specific struct.
+ *
+ * The mapped type fb_slice_set would also be templated and contain typed
+ * pointers to within the fbX_vector's.
+ *
+ * Note that fill_in_buckets_toplevel de-multiplexes the template thing.
+ */
+
+/* We almost surely want to de-multiplex the fb_slice type */
+
+#if 0
+class fb_slicing {
+    struct fb_slicing_part {
+        std::vector<fb_slice> fbX_slices[1 + MAX_DEGREE];; /* From 0 to MAX_DEGREE */
+      fb_slice<fb_entry_x_roots<1> > fb1_slices;
+      fb_slice<fb_entry_x_roots<2> > fb2_slices;
+      fb_slice<fb_entry_x_roots<3> > fb3_slices;
+      fb_slice<fb_entry_x_roots<4> > fb4_slices;
+      fb_slice<fb_entry_x_roots<5> > fb5_slices;
+      fb_slice<fb_entry_x_roots<6> > fb6_slices;
+      fb_slice<fb_entry_x_roots<7> > fb7_slices;
+      fb_slice<fb_entry_x_roots<8> > fb8_slices;
+      fb_slice<fb_entry_x_roots<9> > fb9_slices;
+      fb_slice<fb_entry_x_roots<10> > fb10_slices;
+      fb_slice<fb_entry_general> general_vector;
+    };
+    fb_slicing_part parts[FB_MAX_PARTS];
+    size_t get_nslices(int part);
+    size_t get_slice(int part, int index);
+};
+#endif
+
+/* {{{ fb entries: sets of prime ideals above one single rational prime p. */
+/* Forward declaration so fb_entry_general can use it in constructors */
 template <int Nr_roots>
 class fb_entry_x_roots;
 
@@ -39,7 +89,7 @@ struct fb_general_root {
                    const unsigned char oldexp=0, const bool proj=false) :
                    r(r), proj(proj), exp(nexp), oldexp(oldexp) {}
   /* Create a root from a linear polynomial */
-  fb_general_root (fbprime_t q, const mpz_t *poly, const unsigned char nexp=1,
+  fb_general_root (fbprime_t q, cxx_mpz_poly const & poly, const unsigned char nexp=1,
                    const unsigned char oldexp=0);
 
   /* Constructor from the old format of storing projective roots, which has q
@@ -78,10 +128,10 @@ struct fb_general_root {
    etc. They could, of course, also store the simple cases, but for those we
    use the simple struct to conserve memory and to decide algorithms (batch
    inversion, etc.) statically. */
-class fb_general_entry : public _padded_pod<fb_general_entry> {
+class fb_entry_general : public _padded_pod<fb_entry_general> {
   void read_roots (const char *, unsigned char, unsigned char, unsigned long);
 public:
-  typedef fb_general_entry transformed_entry_t;
+  typedef fb_entry_general transformed_entry_t;
   fbprime_t q, p; /* q = p^k */
   redc_invp_t invq; /* invq = -1/q (mod 2^32), or (mod 2^64), depending on
 		       the size of redc_invp_t */
@@ -93,14 +143,14 @@ public:
   static const unsigned char fixed_nr_roots = 0;
   inline int get_nr_roots() const { return nr_roots; }
 
-  fb_general_entry() {}
+  fb_entry_general() {}
   template <int Nr_roots>
-  fb_general_entry (const fb_entry_x_roots<Nr_roots> &e);
+  fb_entry_general (const fb_entry_x_roots<Nr_roots> &e);
   fbprime_t get_q() const {return q;}
   fbroot_t get_r(const size_t i) const {return roots[i].r;};
   fbroot_t get_proj(const size_t i) const {return roots[i].proj;};
   void parse_line (const char *line, unsigned long linenr);
-  void merge (const fb_general_entry &);
+  void merge (const fb_entry_general &);
   void fprint(FILE *out) const;
   bool is_simple() const;
   void transform_roots(transformed_entry_t &, const qlattice_basis &) const;
@@ -112,8 +162,8 @@ public:
     }
   }
   /* Allow sorting by p */
-  bool operator<(const fb_general_entry &other) const {return this->p < other.p;}
-  bool operator>(const fb_general_entry &other) const {return this->p > other.p;}
+  bool operator<(const fb_entry_general &other) const {return this->p < other.p;}
+  bool operator>(const fb_entry_general &other) const {return this->p > other.p;}
 };
 
 template <int Nr_roots>
@@ -150,7 +200,7 @@ public:
   inline int get_nr_roots() const { return Nr_roots; }
   fb_entry_x_roots() {};
   /* Allow assignment-construction from general entries */
-  fb_entry_x_roots(const fb_general_entry &e) : p(e.p), invq(e.invq) {
+  fb_entry_x_roots(const fb_entry_general &e) : p(e.p), invq(e.invq) {
     ASSERT_ALWAYS(Nr_roots == e.nr_roots);
     ASSERT(e.is_simple());
     for (int i = 0; i < Nr_roots; i++)
@@ -171,407 +221,486 @@ public:
   }
 };
 
+/* }}} */
 
-class fb_countable_entries {
-  friend class fb_part;
-  virtual void _count_entries(size_t *nprimes, size_t *nroots, double *weight)
-    const = 0;
-  public:
-  virtual ~fb_countable_entries(){}
-  void count_entries(size_t *nprimes, size_t *nroots, double *weight) const {
-    if (nprimes != NULL) *nprimes = 0;
-    if (nroots != NULL) *nroots = 0;
-    if (weight != NULL) *weight = 0;
-    _count_entries(nprimes, nroots, weight);
-  }
-};
-
-class fb_interface : public fb_countable_entries {
-public:
-  virtual ~fb_interface(){}
-  virtual void append(const fb_general_entry &) = 0;
-  virtual void fprint(FILE *) const = 0;
-};
-
-
-class fb_transformed_vector: 
-      public std::vector<plattice_sieve_entry>, private NonCopyable {
-  slice_index_t index;
-public:
-  fb_transformed_vector(const slice_index_t index) : index(index) {}
-  slice_index_t get_index() const {return index;};
-};
-
-
-/* The work queue of slices that need to be sieved must return a common base
-   class of fb_slice<FB_ENTRY_TYPE>; this base class is fb_slice_interface.
-   It allows determining which kind of slice it is, so that the correct
-   siever implementation can be called. It also allows generating a vector
-   of general entries with the transformed roots. */
 class fb_slice_interface {
-  public:
-  fb_slice_interface(){}
-  virtual ~fb_slice_interface(){}
-  virtual int get_nr_roots() const = 0;
-  virtual bool is_general() const = 0;
-  virtual plattices_vector_t make_lattice_bases(const qlattice_basis &, int, const sublat_t &) const = 0;
-  virtual unsigned char get_logp() const = 0;
-  virtual slice_index_t get_index() const = 0;
-  virtual fbprime_t get_prime(slice_offset_t offset) const = 0;
-  virtual unsigned char get_k(slice_offset_t offset) const = 0;
-  virtual double get_weight() const = 0;
+    public:
+        fb_slice_interface() = default;
+        virtual ~fb_slice_interface(){}
+        virtual unsigned char get_logp() const = 0;
+        virtual fbprime_t get_prime(slice_offset_t offset) const = 0;
+        virtual unsigned char get_k(slice_offset_t offset) const = 0;
+        virtual bool is_general() const = 0;
+        virtual int get_nr_roots() const = 0;
+        virtual plattices_vector_t make_lattice_bases(const qlattice_basis &, int, const sublat_t &) const = 0;
 };
 
-class fb_vector_interface: public fb_interface {
-  virtual void *mmap_fbc(void *p, void * const end) = 0;
-  virtual bool  dump_fbc(FILE *f) const = 0;
-  virtual void  clear() = 0;
-  public:
-  virtual ~fb_vector_interface(){}
-  virtual const fb_slice_interface *get_slice(size_t) const = 0;
-  virtual int get_nr_roots() const = 0;
-  virtual bool is_general() const = 0;
-  virtual void extract_bycost(std::vector<unsigned long> &extracted, fbprime_t pmax, fbprime_t td_thresh) const = 0;
-  virtual void finalize() = 0;
-  /* Create slices so that one slice contains at most max_slice_len entries,
-   * and all entries in a slice have the same round(fb_log(p, scale)).
-   * scale is the quantity by which we multiply the log_2 of the primes we
-   * consider.
-   */
-  virtual void make_slices(double scale, double max_weight,
-                           slice_index_t &next_index) = 0;
-  virtual const fb_slice_interface *get_first_slice() const = 0;
-  friend class fb_part;
-};
-
-
-/* A slice is a range of consecutive entries in an fb_vector. 
-   The pointers of slice into the vector's data are "weak", i.e., they do not
-   determine the pointed-to data's lifetime. In fact, slices are re-computed
-   each time the logarithm base changes, and the slice pointers move around
-   accordingly.
-   Each slice in a factor base has a unique index. This index will be used to
-   reconstruct factor base primes from the hint: each update stores a hint
-   which is an offset within a slice, and the slice index is stored for ranges
-   of updates, allowing the factor base entry to be looked up via (roughly)
-   *(factorbase.get_slice(index) + offset), except the concrete type of the
-   pointed-to data needs to be determined to be able to calculate the correct
-   memory address in the "+ offset" operation.  */
-template <class FB_ENTRY_TYPE>
+template<typename FB_ENTRY_TYPE>
 class fb_slice : public fb_slice_interface {
-  const FB_ENTRY_TYPE *_begin, *_end;
-  unsigned char logp;
-  slice_index_t index;
-  double weight;
-  public:
-  typedef typename FB_ENTRY_TYPE::transformed_entry_t transformed_entry_t;
-  fb_slice(const FB_ENTRY_TYPE *begin,
-           const FB_ENTRY_TYPE *end,
-           const unsigned char logp,
-           const slice_index_t index,
-           const double weight)
-           : _begin(begin), _end(end), logp(logp), index(index),
-             weight(weight) {}
-  /* Iterators */
-  const FB_ENTRY_TYPE *begin() const {return _begin;}
-  const FB_ENTRY_TYPE *end() const {return _end;}
-  /* Implement the fb_slice_interface */
-  int get_nr_roots() const {return FB_ENTRY_TYPE::fixed_nr_roots;}
-  bool is_general() const {return FB_ENTRY_TYPE::is_general_type;}
-  unsigned char get_logp() const {return logp;};
-  slice_index_t get_index() const {return index;}
-  double get_weight() const {return weight;}
-  void fprint(FILE *out) const;
-  fbprime_t get_prime(const slice_offset_t offset) const {
-    ASSERT_ALWAYS(_begin + offset < _end);
-    return _begin[offset].p;
-  }
-  unsigned char get_k(const slice_offset_t offset) const {
-    ASSERT_ALWAYS(_begin + offset < _end);
-    return _begin[offset].k;
-  }
-  plattices_vector_t make_lattice_bases(const qlattice_basis &, int, const sublat_t &) const;
+    typename std::vector<FB_ENTRY_TYPE>::const_iterator _begin, _end;
+    unsigned char logp;
+    slice_index_t index;
+    double weight;
+    public:
+    unsigned char get_logp() const override { return logp; }
+    fbprime_t get_prime(slice_offset_t offset) const override {
+        return _begin[offset].p;
+    }
+    unsigned char get_k(slice_offset_t offset) const override {
+        return _begin[offset].k;
+        /* power. Well, most often it's a constant ! We need to
+         * access it from the virtual base though. This is way we're
+         * not folding it to a template access.  */
+    }
+    bool is_general() const override { return FB_ENTRY_TYPE::is_general_type; }
+    /* get_nr_roots() on a fb_slice returns zero for slices of general
+     * type ! */
+    int get_nr_roots() const override { return FB_ENTRY_TYPE::fixed_nr_roots;}
+    plattices_vector_t make_lattice_bases(const qlattice_basis &, int, const sublat_t &) const override;
 };
 
-/* A predicate to test whether an fb_slice has weight at most x, for use with
-   STL search functions etc. */
-class fb_slice_pred_weight_le {
-  const double max_weight;
-public:
-  fb_slice_pred_weight_le (const double x) : max_weight(x) {}
-  bool operator() (const fb_slice_interface *slice) const {return slice->get_weight() <= max_weight;}
+/* entries and general_entries: we declare general entries, as well
+ * as entries for all numbers of roots between 1 and MAX_ROOTS
+ *
+ * (notationally, general_entries corresponds to -1 as a number of
+ * roots).
+ * */
+template<int n> struct fb_entries_factory {
+    typedef std::vector<fb_entry_x_roots<n>> type;
+};
+template<> struct fb_entries_factory<-1> {
+    typedef std::vector<fb_entry_general> type;
+};
+template<int n> struct fb_slices_factory {
+    typedef std::vector<fb_slice<fb_entry_x_roots<n>>> type;
+};
+template<> struct fb_slices_factory<-1> {
+    typedef std::vector<fb_slice<fb_entry_general>> type;
 };
 
+class fb_factorbase {
+    public:
+        /* Has to be <= MAX_DEGREE */
+    static const int MAX_ROOTS = MAX_DEGREE;
 
-template <class FB_ENTRY_TYPE>
-class fb_vector : public fb_vector_interface, private NonCopyable {
-  FB_ENTRY_TYPE *data;
-  size_t         size, alloc;
-  bool           read_only, mmapped;
+    class vector_interface {
+    };
 
-  typedef std::vector<fb_slice<FB_ENTRY_TYPE> > slices_t;
-  const slices_t *slices; /* If no slicing exists, e.g., because the fb_part
-                             is only_general (and thus meant for line-sieving)
-                             or because the vector is empty, then
-                             slices == NULL */
-  std::map<const double, const slices_t *> cached_slices;
-  void sort();
-  double est_weight_max(size_t, size_t) const;
-  double est_weight_avg(size_t, size_t) const;
-  double est_weight_simpson(size_t, size_t) const;
-  double est_weight_mertens(size_t, size_t) const;
-  double est_weight_sum(size_t, size_t) const;
-  double est_weight_compare(size_t, size_t) const;
-  double est_weight(size_t, size_t) const;
-  void *mmap_fbc(void *p, void * const end);
-  bool  dump_fbc(FILE *f) const;
-  void  clear();
-  void  init();
- public:
-  static const size_t max_slice_len = 65536;
+    template<typename FB_ENTRY_TYPE>
+    class vector : public vector_interface, public std::vector<FB_ENTRY_TYPE> {
+    };
 
-  fb_vector() : slices(NULL) { init(); }
-  ~fb_vector();
+    private:
 
-  void make_slices(double scale, double max_weight, slice_index_t &next_index);
+    int side;
 
-  typedef const FB_ENTRY_TYPE *const_iterator;
+    typedef multityped_array<fb_entries_factory, -1, MAX_ROOTS+1> entries_t;
+    entries_t entries;
+    // now we put it as member of index -1 above.
+    // vector<fb_entry_general> general_entries;
 
-  const_iterator begin() const { return data;      }
-  const_iterator end()   const { return data+size; }
+    /* This inserts a pool of entries to the factor base. We do it with
+     * many entries in a row so as to avoid looping MAX_ROOTS times for
+     * each root, and so that we don't feel sorry to use
+     * multityped_array_foreach (even though in truth, it's quite
+     * probably fine)
+     */
 
-  /* Implement fb_vector interface */
-  int get_nr_roots() const {return FB_ENTRY_TYPE::fixed_nr_roots;}
-  bool is_general() const {return FB_ENTRY_TYPE::is_general_type;}
+    /* FIXME: bizarrely, std::dequeue does not work, here. */
+    struct appender {
+        std::list<fb_entry_general> &pool;
+        bool positive = true;
+        appender(std::list<fb_entry_general> &pool):pool(pool){}
+        void switch_to_general_entries_only() { positive = false; }
+        template<int n>
+        void operator()(typename fb_entries_factory<n>::type & x) {
+            if (positive != (n >= 0)) return;
+            for(auto it = pool.begin(); it != pool.end(); ) {
+                fb_entry_general E = std::move(*it);
+                bool must_go_to_general =
+                    !E.is_simple() 
+                    || E.k == 1
+                    /* || E.q < powlim TODO */;
 
-  void append(const fb_general_entry &new_entry) {
-    ASSERT_ALWAYS(!read_only);
-    if (size >= alloc) {
-      alloc += std::max(alloc, static_cast<size_t>(16));
-      data   = static_cast<FB_ENTRY_TYPE *>(realloc(data, alloc * sizeof(FB_ENTRY_TYPE)));
-      if (data == NULL)
-        throw std::bad_alloc();
+                if ((n >= 0 && !must_go_to_general && it->nr_roots == n)
+                    || (n < 0 && must_go_to_general)) {
+                    auto it_next = it;
+                    ++it_next;
+                    x.push_back(std::move(E));
+                    pool.erase(it);
+                    it = it_next;
+                }
+            }
+        }
+    };
+    public:
+    void append(std::list<fb_entry_general> &pool) {
+        /* The "positive" hack and the two passes are just here so that we
+         * don't needlessly to a complete pass over the full list just to
+         * trim a pocketful of special entries.
+         */
+        appender A { pool };
+        multityped_array_foreach(A, entries);
+        A.switch_to_general_entries_only();
+        multityped_array_foreach(A, entries);
+        ASSERT_ALWAYS(pool.empty());
     }
-    memset(data+size, 0, sizeof(FB_ENTRY_TYPE));
-    data[size++] = new_entry;
-  }
-  
-  void _count_entries(size_t *nprimes, size_t *nroots, double *weight) const;
-  void fprint(FILE *out) const;
-  void extract_bycost(std::vector<unsigned long> &extracted, fbprime_t pmax,
-                      fbprime_t td_thresh) const;
 
-  /* Finalizing requires only sorting the vector */
-  void finalize() {
-    ASSERT_ALWAYS(!read_only);
-    alloc = size;
-    data  = static_cast<FB_ENTRY_TYPE *>(realloc(data, alloc * sizeof(FB_ENTRY_TYPE)));
-    sort();
-    read_only = true;
-  }
-
-  const fb_slice<FB_ENTRY_TYPE> *get_first_slice() const {
-    if (slices == NULL || slices->empty()) {
-      return NULL;
+    private:
+    /* {{{ Various ways to count primes, prime ideals, and hit ratio
+     * ("weight") of entries in the whole factor base, or in subranges
+     */
+    struct _count_primes {
+            template<int n>
+            size_t operator()(size_t t0, typename fb_entries_factory<n>::type const  & x) const {
+                return t0 + x.size();
+            }
+    };
+    struct _count_prime_ideals {
+            template<int n>
+            size_t operator()(size_t t0, typename fb_entries_factory<n>::type const  & x) const {
+                return t0 + n * x.size();
+            }
+    };
+    struct _count_weight {
+            template<int n>
+            double operator()(double t, typename fb_entries_factory<n>::type const  & x) const {
+                for(auto const & e : x)
+                    t += e.weight();
+                return t;
+            }
+    };
+    struct _count_combined {
+        size_t & nprimes;
+        size_t & nideals;
+        double & weight;
+        template<int n>
+        void operator()(typename fb_entries_factory<n>::type const  & x) const {
+            for(auto const & e : x) {
+                nprimes++;
+                nideals += e.get_nr_roots();
+                weight += e.weight();
+            }
+        }
+    };
+    struct _count_primes_interval {
+            fbprime_t pmin = 0;
+            fbprime_t pmax = std::numeric_limits<fbprime_t>::max();
+            template<int n>
+            size_t operator()(size_t t, typename fb_entries_factory<n>::type const  & x) const {
+                for(auto const & e : x) {
+                    if (e.get_q() >= pmin && e.get_q() < pmax)
+                        t++;
+                }
+                return t;
+            }
+    };
+    struct _count_prime_ideals_interval {
+            fbprime_t pmin = 0;
+            fbprime_t pmax = std::numeric_limits<fbprime_t>::max();
+            template<int n>
+            size_t operator()(size_t t, typename fb_entries_factory<n>::type const  & x) const {
+                for(auto const & e : x) {
+                    if (e.get_q() >= pmin && e.get_q() < pmax)
+                        t += n;
+                }
+                return t;
+            }
+    };
+    struct _count_weight_interval {
+            fbprime_t pmin = 0;
+            fbprime_t pmax = std::numeric_limits<fbprime_t>::max();
+            template<int n>
+            double operator()(double t, typename fb_entries_factory<n>::type const  & x) const {
+                for(auto const & e : x)
+                    if (e.get_q() >= pmin && e.get_q() < pmax)
+                        t += e.weight();
+                return t;
+            }
+    };
+    struct _count_combined_interval {
+        size_t & nprimes;
+        size_t & nideals;
+        double & weight;
+        _count_combined_interval(size_t & np, size_t & ni, double & w) :
+            nprimes(np), nideals(ni), weight(w) {}
+        fbprime_t pmin = 0;
+        fbprime_t pmax = std::numeric_limits<fbprime_t>::max();
+        template<int n>
+        void operator()(typename fb_entries_factory<n>::type const & x) const {
+            for(auto const & e : x) {
+                nprimes++;
+                nideals += e.get_nr_roots();
+                weight += e.weight();
+            }
+        }
+    };
+    /* }}} */
+    public:
+    size_t count_primes() const {
+        return multityped_array_fold(_count_primes(), 0, entries);
     }
-    return &(*slices)[0];
-  }
-  const fb_slice<FB_ENTRY_TYPE> *get_slice(const size_t n) const {
-    if (slices == NULL || slices->empty())
-      return NULL;
-    const slice_index_t first = slices->front().get_index();
-    const slice_index_t last = slices->back().get_index();
-    const fb_slice<FB_ENTRY_TYPE> *slice = NULL;
-    if (first <= n && n <= last) {
-      slice = &(*slices)[n - first];
-      ASSERT_ALWAYS(n == slice->get_index());
+    size_t count_prime_ideals() const {
+        return multityped_array_fold(_count_primes(), 0, entries);
     }
-    return slice;
-  }
-  friend class fb_part;
-};
+    size_t count_weight() const {
+        return multityped_array_fold(_count_weight(), 0, entries);
+    }
 
-/* A "part" is the set of all factor base primes that get sieved over a given
-   bucket region size.
-   E.g., when we have only 1 level of bucket sorting, then the factor base has
-   2 parts: the line-sieved primes, and the bucket-sieved primes. */
-class fb_part: public fb_interface, private NonCopyable {
-  
-  /* How do we identify the number of slices in each array?
-     Should we have
-     size_t nr_entries[9];
-     here, or let each array end with a "magic value", such as a slice with
-     0 entries, or a NULL pointer? */
 
-  const fbprime_t powlim;
-  /* If true, all entries go in the general vector */
-  const bool only_general;
+    /* the key type lists the things with respect to which we're willing
+     * to divide the views on our factor base.
+     */
+        struct key_type {
+            fbprime_t thresholds[FB_MAX_PARTS];
+            double scale;
+            /* This might seem non obvious, but this parameters controls
+             * the size of the slices, because we want to enforce some
+             * relatively-even division. It's not entirely clear that we
+             * want it here, but we definitely want it somewhere. */
+            unsigned int nr_workspaces;
 
-  /* These vectors are filled when we read or generate the factor base.
-     The slices point into the vectors' storage. */
-  fb_vector<fb_entry_x_roots<0> > fb0_slices; /* From 0 to MAX_DEGREE */
-  fb_vector<fb_entry_x_roots<1> > fb1_slices;
-  fb_vector<fb_entry_x_roots<2> > fb2_slices;
-  fb_vector<fb_entry_x_roots<3> > fb3_slices;
-  fb_vector<fb_entry_x_roots<4> > fb4_slices;
-  fb_vector<fb_entry_x_roots<5> > fb5_slices;
-  fb_vector<fb_entry_x_roots<6> > fb6_slices;
-  fb_vector<fb_entry_x_roots<7> > fb7_slices;
-  fb_vector<fb_entry_x_roots<8> > fb8_slices;
-  fb_vector<fb_entry_x_roots<9> > fb9_slices;
-  fb_vector<fb_entry_x_roots<10> > fb10_slices;
-  fb_vector<fb_general_entry> general_vector;
+            bool operator<(key_type const& x) const {
+                for(int i = 0; i < FB_MAX_PARTS; ++i) {
+                    int r = (thresholds[i] > x.thresholds[i]) - (x.thresholds[i] > thresholds[i]);
+                    if (r) return r < 0;
+                }
+                return scale < x.scale;
+            }
+        };
 
-  fb_vector_interface *get_slices(const unsigned int n) {
-    ASSERT_ALWAYS(n <= MAX_DEGREE);
+    public:
+    class slicing {
+        public:
+        class part {
+            /* slices and general_slices: actually general_slices is
+             * slices for number of roots -1, and that is 
+             * always a vector of length 1. And we have slices (vectors
+             * of fb_slice objects) for all numbers of roots between 1 and
+             * MAX_ROOTS.
+             */
+            typedef multityped_array<fb_slices_factory, 1, MAX_ROOTS+1> slices_t;
+            slices_t slices;
+            
+            /* the general vector will be made of "anything that is not
+             * simple" (as per the logic that used to be in
+             * fb_part::append and fb_entry_general::is_simple). That means:
+             *  - all powers go to the general vector
+             *  - everything below bkthresh, too (but see below).
+             *  - primes with multiple roots as well (but to be honest,
+             *    it's not entirely clear to me why -- after all, there's
+             *    no special treatment to speak of).
+             */
+
+            friend class slicing;
+
+            /* We use this to access our arrays called slices and
+             * general_slices.
+             *
+             * 0 <= i < slices0.size()   -->  return &(slices0[i])
+             * slices0.size() <= i < slices1.size() --> return &(slices1[i-slices0.size()])
+             * and so on.
+             *
+             * The tail of the list will return the proper index in the
+             * general slices
+             */
+            struct return_pointer_if_in_subrange {
+                typedef fb_slice_interface const * type;
+                typedef slice_index_t key_type;
+                template<int K>
+                    type operator()(typename fb_slices_factory<K>::type const & x, slice_index_t & k) {
+                        if ((size_t) k < x.size()) {
+                            return &(x[k]);
+                        } else {
+                            k -= x.size();
+                            return NULL;
+                        }
+                    }
+            };
+
+            fb_slice_interface const * get(slice_index_t & index) const {
+                /* used to be in fb_vector::get_slice
+                 *
+                 * and in fb_part::get_slice for the lookup of the
+                 * vector.
+                 *
+                 * TODO: dichotomy, perhaps ? Can we do the dichotomy
+                 * elegantly ?
+                 */
+                const fb_slice_interface * res = multityped_array_locate<return_pointer_if_in_subrange>()(slices, index);
+                if (res) return res;
+                ASSERT_ALWAYS(0);
+                return NULL;
+            }
+
+            template<typename T>
+            struct foreach_slice_s {
+                T & f;
+                template<int n>
+                void operator()(typename fb_slices_factory<n>::type & x) {
+                    for(auto & a : x) {
+                        f(a);
+                    }
+                }
+            };
+            template<typename T>
+            void foreach_slice(T & f) {
+                multityped_array_foreach(foreach_slice_s<T> { f }, slices);
+            }
+            template<typename T>
+            void foreach_slice(T && f) {
+                multityped_array_foreach(foreach_slice_s<T> { f }, slices);
+            }
+
+            public:
+            fb_slice_interface const & operator[](slice_index_t index) const {
+                /* This bombs out if get returns NULL, but it shouldn't
+                 */
+                return *get(index);
+            }
+        };
+
+        private:
+
+        /* We have "parts" that correspond to the various layers of the
+         * bucket sieving
+         *
+         *  ==> THERE IS NO "part" FOR THE SMALL SIEVE <==
+         *
+         * This means that parts[0] will always be a meaningless
+         * placeholder. Indeed, the small sieve does not care about
+         * slices!
+         */
+        std::array<part, FB_MAX_PARTS> parts;
+        int toplevel = 0;
+
+        fb_slice_interface const * get(slice_index_t index) const {
+            for (auto const & p : parts) {
+                const fb_slice_interface *fb_slice = p.get(index);
+                if (fb_slice) return fb_slice;
+            }
+            return NULL;
+        }
+
+        public:
+
+        part const & get_part(int i) const { return parts[i]; }
+
+        inline int get_toplevel() const { return toplevel; }
+
+        /* This accesses the *fb_slice* with this index. Not the vector of
+         * slices ! */
+        fb_slice_interface const & operator[](slice_index_t index) const {
+            return *get(index);
+        }
+
+        public:
+
+        /* Here, when computing the slices, we stow away the small
+         * primes, and arrange them according to the internal logic of
+         * the small sieve. In particular, we want to keep track of where
+         * the resieved primes are. We also do all sorts of fancy stuff
+         * in init_fb_smallsieved, but it's not entirely clear what
+         * should stay. Some is utter cruft.
+         *
+         * Note that the data that we prepare here is still not attached
+         * to any special-q. We're replacing what used to be done in
+         * init_fb_smallsieved, but not in small_sieve_init.
+         *
+         * Theoretically, we should be able to prepare the stuff well
+         * enough so that small_sieve_init becomes really simple. Hmmm,
+         * except for primes that become projective depending on the
+         * special-q.
+         *
+         * small_sieve_init sorts data anyway. (presently). Maybe we
+         * could do away with that sorting and do it here instead ? Not
+         * clear at all.
+         */
+
+        struct small_sieve_entries_t {
+            std::vector<fb_entry_general> resieved;
+            std::vector<fb_entry_general> rest;
+        };
+
+        small_sieve_entries_t small_sieve_entries;
+
+        /* trial divided primes are extracted directly from the factor
+         * base by sieve_info::init_trialdiv, using extract_bycost.
+         *
+         * Now it would quite probably make sense to simply fetch that
+         * from us (the "slicing" object), and keep with the caller the
+         * fancy behaviour that we allow the trial division limit to be
+         * above the factor base bound.
+         */
+        void extract_bycost_smallprimes(std::vector<unsigned long> &res, fbprime_t pmax, fbprime_t td_thresh) const {
+            for(auto const& e : small_sieve_entries.resieved)
+                e.extract_bycost(res, pmax, td_thresh);
+            for(auto const& e : small_sieve_entries.rest)
+                e.extract_bycost(res, pmax, td_thresh);
+        }
+
+        template<typename T>
+        void foreach_slice(T & f) {
+            for (auto & p : parts) {
+                p.foreach_slice(f);
+            }
+        }
+        template<typename T>
+        void foreach_slice(T && f) {
+            for (auto & p : parts) {
+                p.foreach_slice(f);
+            }
+        }
+
+        slicing() = default;
+        slicing(fb_factorbase const & fb, key_type const & K);
+    };
+
+    private:
+        std::map<key_type, slicing> cache;
+        int read(const char * const filename);
+
+    public:
+        /* accessors.
+         * As in the std::map case, the non-const accessor is allowed to
+         * create stuff. */
     
-    if (only_general)
-     return NULL;
-    
-    switch (n) {
-      case 0: return &fb0_slices;
-      case 1: return &fb1_slices;
-      case 2: return &fb2_slices;
-      case 3: return &fb3_slices;
-      case 4: return &fb4_slices;
-      case 5: return &fb5_slices;
-      case 6: return &fb6_slices;
-      case 7: return &fb7_slices;
-      case 8: return &fb8_slices;
-      case 9: return &fb9_slices;
-      case 10: return &fb10_slices;
-      default: abort();
-    }
-  }
-  const fb_vector_interface *get_slices(const unsigned int n) const {
-    ASSERT_ALWAYS(n <= MAX_DEGREE);
-    
-    if (only_general)
-     return NULL;
-    
-    switch (n) {
-      case 0: return &fb0_slices;
-      case 1: return &fb1_slices;
-      case 2: return &fb2_slices;
-      case 3: return &fb3_slices;
-      case 4: return &fb4_slices;
-      case 5: return &fb5_slices;
-      case 6: return &fb6_slices;
-      case 7: return &fb7_slices;
-      case 8: return &fb8_slices;
-      case 9: return &fb9_slices;
-      case 10: return &fb10_slices;
-      default: abort();
-    }
-  }
-  void make_slices(double scale, double max_weight, slice_index_t &next_index);
-  void *mmap_fbc(void *p, void * const end);
-  bool  dump_fbc(FILE *f) const;
-  void  clear();
-public:
-  fb_part(const fbprime_t _powlim, const bool only_general=false)
-    : powlim(_powlim), only_general(only_general){}
-  ~fb_part(){}
-  void append(const fb_general_entry &);
-  void fprint(FILE *) const;
-  void _count_entries(size_t *nprimes, size_t *nroots, double *weight) const;
-  void finalize();
-  bool is_only_general() const {return only_general;}
-  const fb_vector<fb_general_entry> *get_general_vector(){ return &general_vector; }
-  const fb_slice_interface *get_first_slice() const {
-    /* Find the first non-empty slices entry and return a pointer to it,
-       or return NULL if all are empty */
-    const fb_slice_interface *slice = NULL;
-    if (!only_general) {
-      for (unsigned int nr_roots = 0; slice == NULL && nr_roots <= MAX_DEGREE; nr_roots++) {
-        const fb_vector_interface *slices = get_slices(nr_roots);
-        if (slices != NULL)
-          slice = slices->get_first_slice();
-      }
-    }
-    if (slice == NULL)
-      slice = general_vector.get_first_slice();
+        inline slicing & operator[](key_type const& K) { 
+            auto it = cache.find(K);
+            if (it != cache.end())
+                return it->second;
 
-    return slice;
-  }
-  /* Returns the index of the first non-empty slice in this part.
-     If there are no slices, i.e., this part is empty, returns 0.  */
-  slice_index_t get_first_slice_index() const {
-    const fb_slice_interface *slice = get_first_slice();
-    return (slice == NULL) ? 0 : slice->get_index();
-  }
-  const fb_slice_interface *get_slice(const slice_index_t slice_idx) const {
-    for (unsigned int nr_roots = 0; nr_roots <= MAX_DEGREE; nr_roots++) {
-      const fb_vector_interface *slices = get_slices(nr_roots);
-      if (slices != NULL) {
-        const fb_slice_interface *slice;
-        if ((slice = slices->get_slice(slice_idx)) != NULL) return slice;
-      }
-    }
-    return general_vector.get_slice(slice_idx);
-  }
-  void extract_bycost(std::vector<unsigned long> &p, fbprime_t pmax, fbprime_t td_thresh) const;
-  friend class fb_factorbase;
+            /* create a new slot */
+            return cache[K] = slicing(*this, K);
+        }
+
+        inline slicing const & operator[](key_type const& K) const {
+            return cache.at(K);
+        }
+
+    private:
+        void make_linear(cxx_mpz_poly const & poly, unsigned long lim, unsigned long powlim);
+        void make_linear_threadpool (cxx_mpz_poly const & poly, unsigned long lim, unsigned long powlim, unsigned int nb_threads);
+
+    public:
+        fb_factorbase(FILE * fbc_filename, siever_config const & conf, int side);
+        fb_factorbase(cxx_cado_poly const & cpoly, siever_config const & conf, cxx_param_list & pl, int side);
+
+    private:
+        struct sorter {
+            template<int n>
+                void operator()(typename fb_entries_factory<n>::type & x) {
+                    std::sort(x.begin(), x.end());
+                }
+        };
+
+    public:
+        void finalize() {
+            multityped_array_foreach(sorter(), entries);
+        }
 };
 
-/* Splits the factor base for a polynomial into disjoint parts which are
-   sieved over different sieve region sizes.
-   For example,
-   parts[0] will contain very small primes that are line-sieved,
-   parts[1] contains bucket-sieved primes with 1 level of bucket sorting
-   (i.e., hits get sorted into bucket regions of size 2^16)
-*/
-class fb_factorbase: public fb_interface, private NonCopyable {
-  fb_part *parts[FB_MAX_PARTS];
-  fbprime_t thresholds[FB_MAX_PARTS];
-  void finalize();
-  int toplevel;
-  void *mmap_fbc(void *p, void * const end);
-  bool  dump_fbc(FILE *f) const;
-  void  clear();
- public:
-  fb_factorbase(const fbprime_t *thresholds,
-                fbprime_t powlim,
-		const bool *only_general=NULL);
-  ~fb_factorbase();
-  int read(const char * const filename);
-  void make_linear (const mpz_t *poly);
-  void make_linear_parallel (const mpz_t *poly, const unsigned int nb_threads);
-  void make_linear_threadpool(const mpz_t *poly, const unsigned int nb_threads);
-  size_t size() const {return 0;}
-  void fprint(FILE *) const;
-  void append(const fb_general_entry &);
-  void _count_entries(size_t *nprimes, size_t *nroots, double *weight) const;
-  fb_part *get_part(const size_t n) const {ASSERT_ALWAYS(n < FB_MAX_PARTS); return parts[n];}
-  void extract_bycost(std::vector<unsigned long> &extracted, fbprime_t pmax, fbprime_t td_thresh) const;
-  void make_slices(double scale, const double max_weight[FB_MAX_PARTS]);
-  const fb_slice_interface *get_slice(const slice_index_t slice_idx) const {
-    for (unsigned int i_part = 0; i_part <= FB_MAX_PARTS; i_part++) {
-      const fb_slice_interface *slice;
-      if ((slice = parts[i_part]->get_slice(slice_idx)) != NULL)
-        return slice;
-    }
-    return NULL;
-  }
-  int get_toplevel() const { return toplevel; }
-
-  friend bool fb_mmap_fbc(fb_factorbase *[2], const char *);
-  friend void fb_dump_fbc(fb_factorbase *[2], const char *);
-};
-
-
-/* round(x*y-z) */
-unsigned char	fb_log (double x, double y, double z);
-fbprime_t       fb_pow (fbprime_t, unsigned long);
-
-/* fb_log_delta(p, n, o, s) = fb_log(p, n, s) - fb_log(p, o, s)
-   This computes the increment when sieving p^n after having already
-   sieved p^o. */
+unsigned char   fb_log (double x, double y, double z);
 unsigned char	fb_log_delta (fbprime_t, unsigned long, unsigned long, double);
-fbprime_t       fb_is_power (fbprime_t, unsigned long *);
-void print_worst_weight_errors();
-
-bool fb_mmap_fbc(fb_factorbase *fb[2], const char *filename);
-void fb_dump_fbc(fb_factorbase *fb[2], const char *filename);
 
 #endif
