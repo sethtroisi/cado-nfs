@@ -66,6 +66,7 @@ sieve/ecm/ecm_check.c
 sieve/ecm/issmooth.c
 sieve/ecm/Z6_ecm_parameterization.sage
 sieve/ecm/bench_ecm.sh
+sieve/ecm/cofac_utils.sage
 sqrt/CMakeLists-nodist.txt
 sqrt/lift.c
 utils/README_POLYNOMIALS
