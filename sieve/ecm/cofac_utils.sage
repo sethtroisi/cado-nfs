@@ -3,8 +3,7 @@ def Weierstrass_from_Montgomery (A, B, x, y) :
     Ew = EllipticCurve ([0,A/B,0,1/B^2,0])
     xw = x/B
     yw = y/B
-    assert (Ew.is_on_curve(xw,yw))
-    return [Ew, Ew([xw,yw])]
+    return (Ew, Ew([xw,yw]))
 
 
 def MontgomeryCurve (*args):
@@ -120,12 +119,12 @@ def BrentSuyama_parameterization (sigma, p) :
     a = (v - u)^3 * (3*u + v)
     b = 4*u^3*v
     A = a/b - 2
-    assert (A != 2 and A != -2)
+    # |A| != 2
     x = u^3 / v^3
     w = x^3 + A*x^2 + x
-    assert (w != 0)
+    # w != 0
     E = EllipticCurve (K, [0, w*A, 0, w^2, 0])
-    return [E, E.point([x * w, w^2])]
+    return (E, E.point([x * w, w^2]))
 
 
 
@@ -143,15 +142,14 @@ def Monty12_parameterization (n, p, verbose=false) :
         print u, ":", v
     t = v/(2*u)
     t2 = t^2
-    assert (t2 != -3)
     a = (t2 - 1)/(t2 + 3)
-    assert (a != 0)
+    # a != 0
     X0 = 3*a^2+1
     Z0 = 4*a
     A = -(3*a^4+6*a^2-1)/(4*a^3)
-    assert (A != 2 or A != -2)
+    # |A| != 2
     B = (a^2-1)^2/(4*a^3)
-    assert (B != 0)
+    # B != 0
 
     # Montgomery curve is: B y^2 = x^3 + A x^2 + x
     # with y->B*Y, x->B*X we get Y^2 = X^3 + A/B*X^2 + 1/B^2*X
@@ -237,8 +235,8 @@ def Twed12_parameterization (n,p, verbose=false) :
     beta = beta_n / beta_d
     d = ((beta+alpha)^3*(beta-3*alpha)) / (r*(beta-alpha))^2
 
-    print "P0 is on curve:       ",
-    print (a*xE0^2 + yE0^2 - zE0^2 - d*tE0^2 == 0) and (xE0*yE0 == zE0*tE0)
+    # print "P0 is on curve:       ",
+    # print (a*xE0^2 + yE0^2 - zE0^2 - d*tE0^2 == 0) and (xE0*yE0 == zE0*tE0)
 
     # Compute Montgomery curve parameters
     # following 20 years of ECM by Zimmermann and Dodson
@@ -269,45 +267,42 @@ def Twed12_parameterization (n,p, verbose=false) :
 #    print "b/B is a square in I: ",\
 #        not(any([m[1] % 2 for m in list(f)])) and QQ(f.unit()).is_square()
     yM02 = (_b/B)*y0^2
-    eq_M0 = B*yM02*zM0-xM0*(xM0^2+A*xM0*zM0+zM0^2)
-    print "M0 in on curve:       ",
-    print eq_M0 == 0
+#    eq_M0 = B*yM02*zM0-xM0*(xM0^2+A*xM0*zM0+zM0^2)
+#    print "M0 in on curve:       ",
+#    print eq_M0 == 0
 
     return Weierstrass_from_Montgomery (A, B, xM0/zM0, K(sqrt(yM02)/zM0))
 
-            
-
-    
-# get_order
-
-# P-1
-# Inputs: p, param
-# Output: [p, o, po, lpf]
-
-# R = IntegerModRing (p-1)
-# a = R(param)
-# o = p-1
-# po = a.order()
-# lpf = largest_prime_factor(po)
-# return [p, o, po, lpf]
 
 def get_order_from_method(method, sigma, p) :
-# ECM
-# Inputs:
-# Output: [p, o, po, lpf]
-
-# Brent-Suyama (sigma)
-# Compute elliptic curve E parameterized by sigma and base point (x,y)
-    if (method == 2) :
+    # P-1
+    if (method == 0) :
+        R = IntegerModRing (p-1)
+        a = R(sigma)
+        o = p-1
+        po = a.order()
+        lpf = largest_prime_factor(po)
+        return (p, o, po, lpf)
+    # P+1
+    elif (method == 1):
+        # TODO
+        print "Not implemented yet!"
+        return 0
+    # ECM - Brent-Suyama
+    elif (method == 2) :
         T = BrentSuyama_parameterization (sigma, p)
+    # ECM - Monty12
     elif (method == 3) :
         T = Monty12_parameterization (sigma, p)
-        #elif (method == 4) :
-        #    T = Monty16_parameteriztion (n, p)
+    # ECM - Monty16
+    elif (method == 4) :
+        # T = Monty16_parameteriztion (n, p)
+        # TODO
+        print "Not implemented yet!"
+        return 0
+    # ECM - Twed12
     elif (method == 5) :
         T = Twed12_parameterization (sigma, p)
-        
-        # T = [Elliptic curve E in Weierstrass form, curve parameter, non torsion point on E]
         
     o = T[0].order()
     po = T[-1].order()
