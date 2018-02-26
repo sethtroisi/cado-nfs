@@ -359,8 +359,8 @@ def factor_test_line (outfile, pdata, qdata, pcomment="", qcomment=""):
   outfile.write ("%d %d %d # %s, %s\n" % (N, p, q, pcomment, qcomment))
 
 
-def make_factor_test (outfile, B1, B2, method, param, minq=40, minp=10000):
-  header = "# Created with: make_factor_test (%d, %d, %d, %d, %d, %d)\n"
+def write_factor_test_file (outfile, B1, B2, method, param, minq=40, minp=10000):
+  header = "# Created with: write_factor_test_file (%d, %d, %d, %d, %d, %d)\n"
   outfile.write (header % (B1, B2, method, param, minq, minp))
 
   # Composite number < 2^32
@@ -400,9 +400,24 @@ def make_factor_test (outfile, B1, B2, method, param, minq=40, minp=10000):
     q = prime_with_lpf_in_range (floor(2^v / p2[0]), B2+1, 0, method, param)
     factor_test_line (outfile, p2, q, "one B1,B2-smooth factor", "one non-smooth cofactor")
 
+def write_order_test_file (outfile, pmin, pmax, method, param):
+  p = next_prime (pmin-1)
+  while p <= pmax:
+    info = get_order_from_method (method, param, p)
+    outfile.write ("%d %d %d\n" % (info[0], info[0], info[2]))
+    p = next_prime (p)
 
-B1 = 100
-B2 = 1000
-param = 10
-with open ('test_factor_%s_%d_%d_%d.inp2' % ('ecm', param, B1, B2), 'w') as f:
-  make_factor_test (f, B1, B2, 2, param)
+def write_test_files ():
+  B1 = 100
+  B2 = 1000
+  param = 10
+  with open ('test_factor_%s_%d_%d_%d.inp2' % ('ecm', param, B1, B2), 'w') as f:
+    write_factor_test_file (f, B1, B2, 2, param)
+
+  pmin = 1000
+  pmax = 2000
+  param = 10
+  with open ('test_order_%s_%d_%d_%d.inp2' % ('ecm', param, pmin, pmax), 'w') as f:
+    write_order_test_file (f, pmin, pmax, 2, param)
+
+write_test_files ()
