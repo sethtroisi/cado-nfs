@@ -1,5 +1,16 @@
 import sys
 
+##### P+1
+def pp1_parameterization (P0, p):
+  F = GF(p)
+  Fx = F['x']
+  P = Fx([1, -P0, 1]) # P = x^2-P0*x+1
+  if P.is_irreducible():
+    F2 = F.extension (P, 'a')
+    return F2, F2.gen()
+  else:
+    return F, P.roots()[0][0]
+
 
 def Weierstrass_from_Montgomery (*args) :
     """
@@ -20,7 +31,6 @@ def Weierstrass_from_Montgomery (*args) :
     else :
         raise TypeError (sys._getframe().f_code.co_name + " takes 2 or 3 arguments")
     
-
 # def MontgomeryCurve (*args):
 #   """
 #   MontgomeryCurve ([A,B])
@@ -301,17 +311,18 @@ def Twed12_parameterization (n,p, verbose=false) :
 def get_order_from_method(method, sigma, p) :
     # P-1
     if (method == 0) :
-        R = IntegerModRing (p-1)
-        a = R(sigma)
-        o = p-1
-        po = a.order()
-        lpf = largest_prime_factor(po)
-        return (p, o, po, lpf)
+      R = GF(p)
+      a = R(sigma)
+      o = p-1
+      po = a.multiplicative_order()
+      lpf = largest_prime_factor(po)
+      return (p, o, po, lpf)
     # P+1
     elif (method == 1):
-        # TODO
-        print "Not implemented yet!"
-        return 0
+      G, x0 = pp1_parameterization (sigma, p)
+      o = p-1 if G == GF(p) else p+1
+      po = x0.multiplicative_order()
+      return (p, o, po, largest_prime_factor (po))
     # ECM - Brent-Suyama
     elif (method == 2) :
         T = BrentSuyama_parameterization (sigma, p)
@@ -363,82 +374,3 @@ def prime_with_B1_B2_smooth_order (minp, B1, B2, method, param):
     if B1 < lpf and lpf <= B2 and is_powersmooth(ZZ(o/lpf).factor(), B1):
       return info
     p = next_prime (p)
-
-
-def factor_test_line (outfile, pdata, qdata, pcomment="", qcomment=""):
-  if qdata[0] < pdata[0]: # Rename so that p refers to the smaller prime
-    qdata, pdata, qcomment, pcomment = pdata, qdata, pcomment, qcomment
-  p = pdata[0]
-  q = qdata[0]
-  N = p*q
-  if (pdata[3].nbits() <= 60):
-    pcomment += " "# if pcomment else ""
-    pcomment += "(order=%d, lpf=%d)" % (pdata[2], pdata[3])
-  if (qdata[3].nbits() <= 60):
-    qcomment += " "# if qcomment else ""
-    qcomment += "(order=%d, lpf=%d)" % (qdata[2], qdata[3])
-  outfile.write ("%d %d %d # %s, %s\n" % (N, p, q, pcomment, qcomment))
-
-
-def write_factor_test_file (outfile, B1, B2, method, param, minq=40, minp=10000):
-  header = "# Created with: write_factor_test_file (%d, %d, %d, %d, %d, %d)\n"
-  outfile.write (header % (B1, B2, method, param, minq, minp))
-
-  # Composite number < 2^32
-  # A B1-smooth factor # FIXME does not test correctly B1-powersmoothness
-  p1 = prime_with_lpf_in_range (minp, minq, B1, method, param)
-  # A non-smooth cofactor
-  q = prime_with_lpf_in_range (minp, B2+1, 0, method, param)
-  factor_test_line (outfile, p1, q, "one B1-smooth factor", "one non-smooth cofactor")
-
-  # A B1, B2-smooth factor, but not B1-smooth
-  p2 = prime_with_B1_B2_smooth_order (minp, B1, B2, method, param)
-  factor_test_line (outfile, p2, q, "one B1,B2-smooth factor", "one non-smooth cofactor")
-
-  # A B1 and a B1,B2-smooth factor
-  factor_test_line (outfile, p1, p2, "one B1-smooth factor", "one B1,B2-smooth factor")
-
-  # Find two B1-smooth factors with different power of 2 in the order
-  # Backtracking does not work reliably for ECM as in the addition chain with a
-  # point of small order, an addition may be used incorrectly where a doubling
-  # would be required, causing a zero coordinate before a backtracking
-  # checkpoint is reached.
-  if method < 2: # ie P-1 or P+2
-    p3 = p1
-    while p1[2].valuation(2) == p3[2].valuation(2):
-      p3 = prime_with_lpf_in_range (p3[0]+1, minq, B1, method, param);
-    factor_test_line (outfile, p1, p3, " # Two B1-smooth factors with different power of 2 in the order", "")
-
-  ## XXX remove this test
-  q1 = prime_with_lpf_in_range (minp, B1, B1+50, method, param)
-  q2 = prime_with_lpf_in_range (minp, q1[3] + 500, B2, method, param)
-  factor_test_line (outfile, q1, q2, " # Two B1,B2-smooth factors with LPF in differnet giant-steps", "")
-
-  for v in [33, 49, 65, 97, 127, 128, 200]:
-    # A non-smooth cofactor such that the product is >2^v[i]
-    q = prime_with_lpf_in_range (floor(2^v / p1[0]), B2+1, 0, method, param)
-    factor_test_line (outfile, p1, q, "one B1-smooth factor", "one non-smooth cofactor")
-    q = prime_with_lpf_in_range (floor(2^v / p2[0]), B2+1, 0, method, param)
-    factor_test_line (outfile, p2, q, "one B1,B2-smooth factor", "one non-smooth cofactor")
-
-def write_order_test_file (outfile, pmin, pmax, method, param):
-  p = next_prime (pmin-1)
-  while p <= pmax:
-    info = get_order_from_method (method, param, p)
-    outfile.write ("%d %d %d\n" % (info[0], info[0], info[2]))
-    p = next_prime (p)
-
-def write_test_files ():
-  B1 = 100
-  B2 = 1000
-  param = 10
-  with open ('test_factor_%s_%d_%d_%d.inp2' % ('ecm', param, B1, B2), 'w') as f:
-    write_factor_test_file (f, B1, B2, 2, param)
-
-  pmin = 1000
-  pmax = 2000
-  param = 10
-  with open ('test_order_%s_%d_%d_%d.inp2' % ('ecm', param, pmin, pmax), 'w') as f:
-    write_order_test_file (f, pmin, pmax, 2, param)
-
-write_test_files ()

@@ -540,7 +540,7 @@ tests/sieve/ecm/test_order_ecmm16_1_1000000_1001000.inp
 tests/sieve/ecm/test_order_ecmm16_1_1000_2000.inp
 tests/sieve/ecm/test_mpqs.c
 tests/sieve/ecm/test_testbench.sh
-tests/sieve/ecm/make_tests.sh
+tests/sieve/ecm/generate_test_files.sage
 tests/sieve/ecm/test_chains.c
 tests/polyselect/CMakeLists.txt
 tests/polyselect/test_auxiliary.c
