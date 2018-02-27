@@ -173,8 +173,62 @@ def Monty12_parameterization (n, p, verbose=false) :
 
 
 
-# def Monty16_parameterization (n, p) :
-# TODO
+def Monty16_parameterization (n, p) :
+    if n != 1:
+        print "Only one curve with rational torsion 16 implemented so far"
+        return
+    K = GF(p)
+    x = K(1)
+    y = K(1)
+    A = K(54721/14400)
+    x *= K(8/15)
+    B = x^3 + A*x^2 + x
+
+    if (B*y^2 != x^3 + A*x^2 + x) :
+        print "Point is wrong"
+        exit (1)
+
+    return Weierstrass_from_Montgomery (A, B, x, y)
+        
+        
+
+# ecmtorsion16(n,p,verbose) = {
+#   local (E, A, B, x, y);
+
+#   if (n != 1, error ("Only one curve with rational torsion 16 implemented so far"));
+
+#   if (p == 0, A = 1, A = Mod (1, p));
+#   x = A;
+#   y = A;
+#   A *= 54721/14400;
+#   x *= 8/15;
+#   B = x^3 + A*x^2 + x;
+  
+#   if (B*y^2 != x^3 + A*x^2 + x, error ("Point is wrong"));
+  
+#   /* Now we have the curve By^2 = x^3 + Ax^2 + x.
+#      Transform into a curve of form 
+#      y^2 = x^3 + a*x^2 + b*x
+#      by multiplying the equation by B^3 to receive
+#      B^4 * y^2 = B^3*x^3 + A*B^3*x^2 + B^3*x
+#      and change of variables (x,y) -> (x'*B, y'*B^2) to get the curve
+#      y'^2 = x'^3 + A*B*x'^2 + B^2*x' */
+
+#   if (verbose, 
+#     print("u = ", u, ", t^2 = ", t2, ", a = ", a, ", A = ", A, ", B = ", B, 
+#           ", (x,y) = (", x, ",", y, ") on By^2 = x^3 + Ax^2 + x");
+#   );
+
+#   E = ellinit ([0, B*A, 0, B^2, 0]);
+#   x *= B;
+#   y *= B^2;
+  
+#   if (y^2 != x^3 + A*B*x^2 + B^2*x, error ("New point is wrong"));
+
+#   if (!ellisoncurve(E,[x,y]), error ("Point is not on curve"));
+
+#   return ([E, [x, y]]);
+# }
 
 
 
@@ -296,10 +350,7 @@ def get_order_from_method(method, sigma, p) :
         T = Monty12_parameterization (sigma, p)
     # ECM - Monty16
     elif (method == 4) :
-        # T = Monty16_parameteriztion (n, p)
-        # TODO
-        print "Not implemented yet!"
-        return 0
+        T = Monty16_parameterization (sigma, p)
     # ECM - Twed12
     elif (method == 5) :
         T = Twed12_parameterization (sigma, p)
