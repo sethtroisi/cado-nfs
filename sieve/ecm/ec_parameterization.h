@@ -585,6 +585,7 @@ ec_parameterization_Z6 (residue_t b, ec_point_t P0, const unsigned long k,
     mod_mul (u6, u7, u3, m);
     mod_sqr (P0->z, u6, m);
     mod_mul (P0->z, P0->z, u6, m);      /* zM0 = (u7*u3)^3 */
+    mod_mul (u2, u3, u0, m);            /* u2 = u0^3 */
   }
   else
   {
