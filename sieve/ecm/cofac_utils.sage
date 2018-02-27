@@ -356,9 +356,12 @@ def prime_with_lpf_in_range (minp, minlpf, maxlpf, method, param):
   assert maxlpf == 0 or minlpf <= maxlpf, "maxlpf must be 0 or >= minlpf"
   p = next_prime (minp-1)
   while True:
-    info = get_order_from_method (method, param, p)
-    if minlpf <= info[3] and (maxlpf == 0 or info[3] <= maxlpf):
-      return info
+    try:
+      info = get_order_from_method (method, param, p)
+      if minlpf <= info[3] and (maxlpf == 0 or info[3] <= maxlpf):
+        return info
+    except (ZeroDivisionError, ArithmeticError):
+      pass
     p = next_prime (p)
 
 
@@ -368,9 +371,12 @@ def prime_with_B1_B2_smooth_order (minp, B1, B2, method, param):
   assert B2 > B1, "B2 must be > B1"
   p = next_prime (minp-1)
   while True:
-    info = get_order_from_method (method, param, p)
-    o = info[2]
-    lpf = info[3]
-    if B1 < lpf and lpf <= B2 and is_powersmooth(ZZ(o/lpf).factor(), B1):
-      return info
+    try:
+      info = get_order_from_method (method, param, p)
+      o = info[2]
+      lpf = info[3]
+      if B1 < lpf and lpf <= B2 and is_powersmooth(ZZ(o/lpf).factor(), B1):
+        return info
+    except (ZeroDivisionError, ArithmeticError):
+      pass
     p = next_prime (p)

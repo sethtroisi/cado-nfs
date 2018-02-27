@@ -67,8 +67,11 @@ def write_factor_test_file (outfile, B1, B2, method, param, minq=40, minp=10000)
 def write_order_test_file (outfile, pmin, pmax, method, param):
   p = next_prime (pmin-1)
   while p <= pmax:
-    info = get_order_from_method (method, param, p)
-    outfile.write ("%d %d %d\n" % (info[0], info[0], info[2]))
+    try:
+      info = get_order_from_method (method, param, p)
+      outfile.write ("%d %d %d\n" % (info[0], info[0], info[2]))
+    except (ZeroDivisionError, ArithmeticError):
+      pass
     p = next_prime (p)
 
 ################################################################################
@@ -84,7 +87,7 @@ methods = {
     (2, "ecm"): [ 10, 11 ],
     (3, "ecmm12"): [ 2, 4 ],
     (4, "ecmm16"): [ 1 ],
-    (5, "ecmem12"): [ 1 ]
+    (5, "ecmem12"): [ 2 ]
   }
 for m, params_list in methods.items():
   method, m_str = m
@@ -96,7 +99,7 @@ for m, params_list in methods.items():
     else:
       raise TypeError ("param must be in ZZ or QQ")
 
-    filename = "test_factor_%s_%s_%d_%d.inp2" % (m_str, param_str, B1, B2)
+    filename = "test_factor_%s_%s_%d_%d.inp" % (m_str, param_str, B1, B2)
     filepath = os.path.join (sage_file_dir, filename)
     print "### Writing %s ... " % filename
     with open (filepath, 'w') as f:
@@ -109,13 +112,12 @@ methods = {
     (2, "ecm"): [ 10, 11, 12 ],
     (3, "ecmm12"): [ 4, 5, 6],
     (4, "ecmm16"): [ 1 ],
+    (5, "ecmem12"): [ 2, 3, 4 ],
   }
 for pmin in [ 1000, 1000000, 1000000000 ]:
   pmax = pmin + 1000
   for m, params_list in methods.items():
     method, m_str = m
-    if m_str != "ecm" and pmin == 1000000000:
-      continue
     for param in params_list:
       filename = "test_order_%s_%d_%d_%d.inp" % (m_str, param, pmin, pmax)
       filepath = os.path.join (sage_file_dir, filename)
