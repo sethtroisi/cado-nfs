@@ -192,46 +192,6 @@ def Monty16_parameterization (n, p) :
         
         
 
-# ecmtorsion16(n,p,verbose) = {
-#   local (E, A, B, x, y);
-
-#   if (n != 1, error ("Only one curve with rational torsion 16 implemented so far"));
-
-#   if (p == 0, A = 1, A = Mod (1, p));
-#   x = A;
-#   y = A;
-#   A *= 54721/14400;
-#   x *= 8/15;
-#   B = x^3 + A*x^2 + x;
-  
-#   if (B*y^2 != x^3 + A*x^2 + x, error ("Point is wrong"));
-  
-#   /* Now we have the curve By^2 = x^3 + Ax^2 + x.
-#      Transform into a curve of form 
-#      y^2 = x^3 + a*x^2 + b*x
-#      by multiplying the equation by B^3 to receive
-#      B^4 * y^2 = B^3*x^3 + A*B^3*x^2 + B^3*x
-#      and change of variables (x,y) -> (x'*B, y'*B^2) to get the curve
-#      y'^2 = x'^3 + A*B*x'^2 + B^2*x' */
-
-#   if (verbose, 
-#     print("u = ", u, ", t^2 = ", t2, ", a = ", a, ", A = ", A, ", B = ", B, 
-#           ", (x,y) = (", x, ",", y, ") on By^2 = x^3 + Ax^2 + x");
-#   );
-
-#   E = ellinit ([0, B*A, 0, B^2, 0]);
-#   x *= B;
-#   y *= B^2;
-  
-#   if (y^2 != x^3 + A*B*x^2 + B^2*x, error ("New point is wrong"));
-
-#   if (!ellisoncurve(E,[x,y]), error ("Point is not on curve"));
-
-#   return ([E, [x, y]]);
-# }
-
-
-
 def Twed12_parameterization (n,p, verbose=false) :
     K = GF(p)
     # Elliptic parameterization (parameter is called k).
