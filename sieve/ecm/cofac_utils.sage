@@ -1,27 +1,43 @@
-
-def Weierstrass_from_Montgomery (A, B, x, y) :
-    Ew = EllipticCurve ([0,A/B,0,1/B^2,0])
-    xw = x/B
-    yw = y/B
-    return (Ew, Ew([xw,yw]))
+import sys
 
 
-def MontgomeryCurve (*args):
-  """
-  MontgomeryCurve ([A,B])
-  MontgomeryCurve (Ring, [A,B])
-  """
-  if len(args) == 1:
-    A = args[0][0]
-    B = args[0][1]
-    return EllipticCurve ([0,A/B,0,1/B^2,0])
-  elif len(args) == 2:
-    R = args[0]
-    A = args[1][0]
-    B = args[1][1]
-    return EllipticCurve (R, [0,A/B,0,1/B^2,0])
-  else:
-    raise TypeError ("MontgomeryCurve takes at most 2 arguments")
+def Weierstrass_from_Montgomery (*args) :
+    """
+    Weierstrass_from_Montgomery (A, B)
+
+    Weierstrass_from_Montgomery (A, B, [x, y])
+    """
+    if len (args) >= 2 :
+        A = args[0]
+        B = args[1]
+        Ew = EllipticCurve ([0,A/B,0,1/B^2,0])
+    if len (args) == 2:
+        return Ew
+    elif len (args) == 3 :
+        x = args[2][0]
+        y = args[2][1]
+        return (Ew, Ew([x/B, y/B]))
+    else :
+        raise TypeError (sys._getframe().f_code.co_name + " takes 2 or 3 arguments")
+    
+
+# def MontgomeryCurve (*args):
+#   """
+#   MontgomeryCurve ([A,B])
+#   MontgomeryCurve (Ring, [A,B])
+#   """
+#   if len(args) == 1:
+#     A = args[0][0]
+#     B = args[0][1]
+#     return EllipticCurve ([0,A/B,0,1/B^2,0])
+#   elif len(args) == 2:
+#     R = args[0]
+#     A = args[1][0]
+#     B = args[1][1]
+#     return EllipticCurve (R, [0,A/B,0,1/B^2,0])
+#   else:
+#     raise TypeError ("MontgomeryCurve takes at most 2 arguments")
+
 
 def _Suyama_parameterization_internal (s):
   u = s^2-5
@@ -169,26 +185,20 @@ def Monty12_parameterization (n, p, verbose=false) :
         print "P3 = ", P3
         print "[3]P3 = ", 3*P3
 
-    return Weierstrass_from_Montgomery (A, B, x, y)
+    return Weierstrass_from_Montgomery (A, B, [x, y])
 
 
 
 def Monty16_parameterization (n, p) :
     if n != 1:
-        print "Only one curve with rational torsion 16 implemented so far"
-        return
+        # Only one curve with torsion 16 implemented so far
+        raise ValueError (sys._getframe().f_code.co_name + " requires n=1")
     K = GF(p)
-    x = K(1)
-    y = K(1)
     A = K(54721/14400)
-    x *= K(8/15)
+    x = K(8/15)
+    y = K(1)
     B = x^3 + A*x^2 + x
-
-    if (B*y^2 != x^3 + A*x^2 + x) :
-        print "Point is wrong"
-        exit (1)
-
-    return Weierstrass_from_Montgomery (A, B, x, y)
+    return Weierstrass_from_Montgomery (A, B, [x, y])
         
         
 
@@ -285,7 +295,7 @@ def Twed12_parameterization (n,p, verbose=false) :
 #    print "M0 in on curve:       ",
 #    print eq_M0 == 0
 
-    return Weierstrass_from_Montgomery (A, B, xM0/zM0, K(sqrt(yM02)/zM0))
+    return Weierstrass_from_Montgomery (A, B, [xM0/zM0, K(sqrt(yM02)/zM0)])
 
 
 def get_order_from_method(method, sigma, p) :
