@@ -3,6 +3,7 @@
 
 #include <pthread.h>
 #include <algorithm>
+#include <vector>
 #include "threadpool.hpp"
 #include "las-forwardtypes.hpp"
 #include "bucket.hpp"
@@ -15,20 +16,27 @@ class thread_workspaces;
 
 /* All of this exists _for each thread_ */
 struct thread_side_data : private NonCopyable {
-  const fb_factorbase *fb;
+  const fb_factorbase *fb = NULL;
+
   /* For small sieve */
-  int64_t * ssdpos;
-  int64_t * rsdpos;
+  std::vector<spos_t> ssdpos;
+  std::vector<spos_t> rsdpos;
 
   /* The real array where we apply the sieve.
      This has size BUCKET_REGION_0 and should be close to L1 cache size. */
-  unsigned char *bucket_region;
+  unsigned char *bucket_region = NULL;
   sieve_checksum checksum_post_sieve;
 
   thread_side_data();
   ~thread_side_data();
-  
-  void set_fb(const fb_factorbase *_fb) {fb = _fb;}
+
+  private:
+  void allocate_bucket_region();
+  public:
+  void set_fb(const fb_factorbase *_fb) {
+      fb = _fb;
+      allocate_bucket_region();
+  }
   void update_checksum(){checksum_post_sieve.update(bucket_region, BUCKET_REGION);}
 };
 
@@ -42,6 +50,7 @@ struct thread_data : private NonCopyable {
                            timetree_t things absorbs everything. We still
                            need to decide what we do with the non-timer
                            (a.k.a. counter) data. */
+  /* SS is used only in process_bucket region */
   unsigned char *SS;
   bool is_initialized;
   uint32_t first_region0_index;
@@ -60,7 +69,7 @@ struct thread_data_task_wrapper : public task_parameters {
 /* A set of n bucket arrays, all of the same type, and methods to reserve one
    of them for exclusive use and to release it again. */
 template <typename T>
-class reservation_array : private NonCopyable, private monitor {
+class reservation_array : private monitor {
   T * const BAs;
   bool * const in_use;
   const size_t n;
@@ -70,7 +79,11 @@ class reservation_array : private NonCopyable, private monitor {
   size_t find_free() const {
     return std::find(&in_use[0], &in_use[n], false) - &in_use[0];
   }
+  reservation_array(reservation_array const &) = delete;
+  reservation_array& operator=(reservation_array const&) = delete;
 public:
+  typedef typename T::update_t update_t;
+  reservation_array(reservation_array &&) = default;
   reservation_array(size_t n)
     : BAs(new T[n]), in_use(new bool[n]), n(n)
   {
@@ -85,7 +98,7 @@ public:
 
   /* Allocate enough memory to be able to store at least n_bucket buckets,
      each of size at least fill_ratio * bucket region size. */
-  void allocate_buckets(const uint32_t n_bucket, double fill_ratio);
+  void allocate_buckets(const uint32_t n_bucket, double fill_ratio, int logI_adjusted);
   const T* cbegin() const {return &BAs[0];}
   const T* cend() const {return &BAs[n];}
 
@@ -120,17 +133,16 @@ protected:
   cget() const;
 public:
   reservation_group(size_t nr_bucket_arrays);
-  void allocate_buckets(const uint32_t *n_bucket, const double multiplier,
-          const double *fill_ratio);
+  void allocate_buckets(const uint32_t *n_bucket,
+          bkmult_specifier const& multiplier,
+          const double *fill_ratio, int logI_adjusted);
 };
 
 class thread_workspaces : private NonCopyable {
-  typedef reservation_group * reservation_group_ptr;
   const size_t nr_workspaces;
   sieve_info * psi;
   const unsigned int nr_sides; /* Usually 2 */
-  reservation_group_ptr *groups; /* one per side. Need pointer array due to
-    lacking new[] without default constructor prior to C++11 :( */
+  reservation_group groups[2]; /* one per side */
 
 public:
   // FIXME: thrs should be private!
@@ -153,22 +165,22 @@ public:
 
   template <int LEVEL, typename HINT>
   bucket_array_t<LEVEL, HINT> &
-  reserve_BA(const int side) {return groups[side]->get<LEVEL, HINT>().reserve();}
+  reserve_BA(const int side) {return groups[side].get<LEVEL, HINT>().reserve();}
 
   template <int LEVEL, typename HINT>
   void
   release_BA(const int side, bucket_array_t<LEVEL, HINT> &BA) {
-    return groups[side]->get<LEVEL, HINT>().release(BA);
+    return groups[side].get<LEVEL, HINT>().release(BA);
   }
 
   /* Iterator over all the bucket arrays of a given type on a given side */
   template <int LEVEL, typename HINT>
   const bucket_array_t<LEVEL, HINT> *
-  cbegin_BA(const int side) const {return groups[side]->cget<LEVEL, HINT>().cbegin();}
+  cbegin_BA(const int side) const {return groups[side].cget<LEVEL, HINT>().cbegin();}
 
   template <int LEVEL, typename HINT>
   const bucket_array_t<LEVEL, HINT> *
-  cend_BA(const int side) const {return groups[side]->cget<LEVEL, HINT>().cend();}
+  cend_BA(const int side) const {return groups[side].cget<LEVEL, HINT>().cend();}
 };
 
 #endif

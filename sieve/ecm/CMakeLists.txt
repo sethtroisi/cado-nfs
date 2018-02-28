@@ -40,15 +40,15 @@ add_library(facul
         ecm_ul.c
         pm1_ul.c
         pp1_ul.c
-        facul_doit_ul.c
+        facul_doit_ul.cpp
         ecm_15ul.c
         pm1_15ul.c
         pp1_15ul.c
-        facul_doit_15ul.c
+        facul_doit_15ul.cpp
         ecm_2ul2.c
         pm1_2ul2.c
         pp1_2ul2.c
-        facul_doit_2ul2.c
+        facul_doit_2ul2.cpp
         ecm_mpz.c
         pm1_mpz.c
         pp1_mpz.c
@@ -65,13 +65,21 @@ if(MINGW)
 target_link_libraries(facul gnurx)
 endif()
 
-add_executable(testbench testbench.c)
+add_executable(testbench testbench.cpp)
 target_link_libraries(testbench facul utils m)
 
 
-add_executable(finishbatch finishbatch.c)
+add_executable(finishbatch finishbatch.cpp)
 target_link_libraries(finishbatch facul utils m)
 set_target_properties(finishbatch PROPERTIES LINK_FLAGS "${OpenMP_C_FLAGS}")
+
+add_executable(finishecm finishecm.cpp)
+target_link_libraries(finishecm facul utils m)
+
+add_executable(precompbatch precompbatch.cpp)
+target_link_libraries(precompbatch facul utils m)
+set_target_properties(precompbatch PROPERTIES LINK_FLAGS "${OpenMP_C_FLAGS}")
+
 
 
 include(CMakeLists-nodist.txt OPTIONAL)

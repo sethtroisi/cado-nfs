@@ -65,12 +65,23 @@ FILE: for my $f (@all_files) {
     } else {
         my $first = shift @includes;
         my @include_cado = grep { $_->[1] =~ /cado\.h/ } @includes;
-        if ($first && $first->[1] !~ /cado\.h/) {
-            print STDERR "$f:$first->[0]: is a compilation unit, its first include file must be cado.h\n";
-            $err++;
-        } elsif (@include_cado) {
-            my $lnum = $include_cado[0]->[0];
-            print STDERR "$f:$lnum: there is no point in including cado.h twice\n";
+        if ($first) {
+            if ($first->[1] =~ /cado\.h/) {
+                if ($first->[1] !~ /"cado\.h"/) {
+                    print STDERR "$f:$first->[0]: cado.h should be included as \"cado.h\", not <cado.h>\n";
+                    $err++;
+                }
+            } else {
+                print STDERR "$f:$first->[0]: is a compilation unit, its first include file must be \"cado.h\"\n";
+                $err++;
+            }
+            if (@include_cado) {
+                my $lnum = $include_cado[0]->[0];
+                print STDERR "$f:$lnum: there is no point in including cado.h twice\n";
+                $err++;
+            }
+        } else {
+            print STDERR "$f:1: is a compilation unit, it must include \"cado.h\"\n";
             $err++;
         }
     }

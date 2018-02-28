@@ -1,3 +1,4 @@
+
 #include "cado.h"
 #include <stdio.h>
 #include <stdarg.h>
@@ -37,7 +38,7 @@ sieve_info::sieve_info(siever_config const & sc, cado_poly_srcptr cpoly, std::li
         verbose_output_print(0, 1, "# copy factor base data from previous siever\n");
         share_factor_bases(other);
     } else {
-        verbose_output_print(0, 1, "# bucket_region = %" PRIu64 "\n",
+        verbose_output_print(0, 1, "# bucket_region = %zu\n",
                 BUCKET_REGION);
         init_factor_bases(pl);
         for (int side = 0; side < 2; side++) {
@@ -49,16 +50,9 @@ sieve_info::sieve_info(siever_config const & sc, cado_poly_srcptr cpoly, std::li
     toplevel = -1;
     for(int side = 0 ; side < 2 ; side++) {
         if (!sides[side].fb) continue;
-        int level = sides[0].fb->get_toplevel();
+        int level = sides[side].fb->get_toplevel();
         if (level > toplevel) toplevel = level;
     }
-
-    /* If LOG_BUCKET_REGION == sc.logI, then one bucket (whose size is the
-     * L1 cache size) is actually one line. This changes some assumptions
-     * in sieve_small_bucket_region and resieve_small_bucket_region, where
-     * we want to differentiate on the parity on j.
-     */
-    ASSERT_ALWAYS(LOG_BUCKET_REGION >= conf.logI_adjusted);
 
 #if 0
     /* Initialize the number of buckets */
@@ -111,13 +105,19 @@ sieve_info::sieve_info(siever_config const & sc, cado_poly_srcptr cpoly, cxx_par
 {
     I = 1UL << sc.logI_adjusted;
     std::list<sieve_info>::iterator psi;
-    verbose_output_print(0, 1, "# bucket_region = %" PRIu64 "\n",
-            BUCKET_REGION);
+    verbose_output_print(0, 1, "# bucket_region = %zu\n", BUCKET_REGION);
     init_factor_bases(pl);
     for (int side = 0; side < 2; side++) {
         print_fb_statistics(side);
     }
-    toplevel = MAX(sides[0].fb->get_toplevel(), sides[1].fb->get_toplevel());
+    // Now that fb have been initialized, we can set the toplevel.
+    toplevel = -1;
+    for(int side = 0 ; side < 2 ; side++) {
+        if (!sides[side].fb) continue;
+        int level = sides[side].fb->get_toplevel();
+        if (level > toplevel) toplevel = level;
+    }
+
     for(int side = 0 ; side < 2 ; side++) {
         init_trialdiv(side); /* Init refactoring stuff */
         init_fb_smallsieved(side);
@@ -143,7 +143,7 @@ void sieve_info::update (size_t nr_workspaces)/*{{{*/
     uint64_t A = UINT64_C(1) << conf.logA;
 
     /* update number of buckets at toplevel */
-    uint64_t BRS[FB_MAX_PARTS] = BUCKET_REGIONS;
+    size_t (&BRS)[FB_MAX_PARTS] = BUCKET_REGIONS;
     nb_buckets[toplevel] = iceildiv(A, BRS[toplevel]);
 
     // maybe there is only 1 bucket at toplevel and less than 256 at
@@ -175,41 +175,9 @@ void sieve_info::update (size_t nr_workspaces)/*{{{*/
     }
 }/*}}}*/
 
-/* las_info stuff */
 
-las_info::las_info(cxx_param_list & pl)
-    : config_pool(pl)
-#ifdef  DLP_DESCENT
-      , dlog_base(pl)
-#endif
-      /*{{{*/
+static void las_verbose_enter(cxx_param_list & pl, FILE * output, int verbose)
 {
-    /* We strive to initialize things in the exact order they're written
-     * in the struct */
-    // ----- general operational flags {{{
-    nb_threads = 1;		/* default value */
-    param_list_parse_int(pl, "t", &nb_threads);
-    if (nb_threads <= 0) {
-	fprintf(stderr,
-		"Error, please provide a positive number of threads\n");
-	param_list_clear(pl);
-	exit(EXIT_FAILURE);
-    }
-
-    output = stdout;
-    outputname = param_list_lookup_string(pl, "out");
-    if (outputname) {
-	if (!(output = fopen_maybe_compressed(outputname, "w"))) {
-	    fprintf(stderr, "Could not open %s for writing\n", outputname);
-	    exit(EXIT_FAILURE);
-	}
-    }
-    setvbuf(output, NULL, _IOLBF, 0);      /* mingw has no setlinebuf */
-
-    galois = param_list_lookup_string(pl, "galois");
-    verbose = param_list_parse_switch(pl, "-v");
-    suppress_duplicates = param_list_parse_switch(pl, "-dup");
-
     verbose_interpret_parameters(pl);
     verbose_output_init(NR_CHANNELS);
     verbose_output_add(0, output, verbose + 1);
@@ -229,7 +197,62 @@ las_info::las_info(cxx_param_list & pl)
     }
     verbose_output_add(TRACE_CHANNEL, trace_file, 1);
 #endif
+}
+
+static void las_verbose_leave()
+{
+    verbose_output_clear();
+}
+
+las_augmented_output_channel::las_augmented_output_channel(cxx_param_list & pl)
+{
+    output = stdout;
+    outputname = param_list_lookup_string(pl, "out");
+    if (outputname) {
+	if (!(output = fopen_maybe_compressed(outputname, "w"))) {
+	    fprintf(stderr, "Could not open %s for writing\n", outputname);
+	    exit(EXIT_FAILURE);
+	}
+    }
+    verbose = param_list_parse_switch(pl, "-v");
+    setvbuf(output, NULL, _IOLBF, 0);      /* mingw has no setlinebuf */
+    las_verbose_enter(pl, output, verbose);
+}
+las_augmented_output_channel::~las_augmented_output_channel()
+{
+    if (outputname)
+        fclose_maybe_compressed(output, outputname);
+    las_verbose_leave();
+}
+
+
+/* las_info stuff */
+
+las_info::las_info(cxx_param_list & pl)
+    : las_augmented_output_channel(pl),
+        config_pool(pl)
+#ifdef  DLP_DESCENT
+      , dlog_base(pl)
+#endif
+      /*{{{*/
+{
+    /* We strive to initialize things in the exact order they're written
+     * in the struct */
+    // ----- general operational flags {{{
+    nb_threads = 1;		/* default value */
+    param_list_parse_int(pl, "t", &nb_threads);
+    if (nb_threads <= 0) {
+	fprintf(stderr,
+		"Error, please provide a positive number of threads\n");
+	exit(EXIT_FAILURE);
+    }
+
+    galois = param_list_lookup_string(pl, "galois");
+    suppress_duplicates = param_list_parse_switch(pl, "-dup");
+
     param_list_print_command_line(output, pl);
+
+
     las_display_config_flags();
     /*  Parse polynomial */
     cado_poly_init(cpoly);
@@ -238,13 +261,11 @@ las_info::las_info(cxx_param_list & pl)
         fprintf(stderr, "Error: -poly is missing\n");
         param_list_print_usage(pl, NULL, stderr);
 	cado_poly_clear(cpoly);
-	param_list_clear(pl);
         exit(EXIT_FAILURE);
     }
     if (!cado_poly_read(cpoly, tmp)) {
 	fprintf(stderr, "Error reading polynomial file %s\n", tmp);
 	cado_poly_clear(cpoly);
-	param_list_clear(pl);
 	exit(EXIT_FAILURE);
     }
     // sc.skewness = cpoly->skew;
@@ -254,17 +275,21 @@ las_info::las_info(cxx_param_list & pl)
     if (cpoly->skew <= 0.0) {
 	fprintf(stderr, "Error, please provide a positive skewness\n");
 	cado_poly_clear(cpoly);
-	param_list_clear(pl);
 	exit(EXIT_FAILURE);
     }
     gmp_randinit_default(rstate);
     unsigned long seed = 0;
     if (param_list_parse_ulong(pl, "seed", &seed))
         gmp_randseed_ui(rstate, seed);
+
+    if (const char * tmp = param_list_lookup_string(pl, "bkmult")) {
+        bk_multiplier = bkmult_specifier(tmp);
+    }
+
     // }}}
 
-#ifdef  DLP_DESCENT
     // ----- stuff roughly related to the descent {{{
+#ifdef  DLP_DESCENT
     descent_helper = NULL;
 #endif
     // }}}
@@ -293,12 +318,27 @@ las_info::las_info(cxx_param_list & pl)
             /* There's no point in proceeding, since it would really change
              * the behaviour of the program to do so */
             cado_poly_clear(cpoly);
-            param_list_clear(pl);
             exit(EXIT_FAILURE);
         }
     } else {
         todo_list_fd = NULL;
     }
+
+    /* composite special-q ? */
+    allow_composite_q = param_list_parse_switch(pl, "-allow-compsq");
+    if (allow_composite_q) {
+        if (galois) {
+            fprintf(stderr, "-galois and -allow-compsq are incompatible options at the moment");
+            exit(EXIT_FAILURE);
+        }
+        if (!param_list_parse_uint64(pl, "qfac-min", &qfac_min)) {
+            qfac_min = 1024;
+        }
+        if (!param_list_parse_uint64(pl, "qfac-max", &qfac_max)) {
+            qfac_max = UINT64_MAX;
+        }
+    }
+
     // }}}
 
     // ----- batch mode {{{
@@ -306,17 +346,16 @@ las_info::las_info(cxx_param_list & pl)
     batch_print_survivors = param_list_parse_switch(pl, "-batch-print-survivors");
     cofac_list_init (L);
     // }}} 
-    
+
+    dump_filename = param_list_lookup_string(pl, "dumpfile");
+
     init_cof_stats(pl);
 }/*}}}*/
 
 las_info::~las_info()/*{{{*/
 {
     // ----- general operational flags {{{
-    if (outputname)
-        fclose_maybe_compressed(output, outputname);
     gmp_randclear(rstate);
-    verbose_output_clear();
     cado_poly_clear(cpoly);
     // }}}
 

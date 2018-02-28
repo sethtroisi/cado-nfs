@@ -9,16 +9,22 @@
 #include <string.h>
 #include <math.h>
 #include <regex.h>
+#include <vector>
+#include <algorithm>
 
 #include "utils.h"      /* verbose_ stuff */
 #include "portability.h"
 #include "pm1.h"
 #include "pp1.h"
 #include "facul_ecm.h"
-#include "facul.h"
-#include "facul_doit.h"
+#include "facul.hpp"
+#include "facul_doit.hpp"
 
-/* These global variables are only for statistics. In case of
+#ifdef ENABLE_UNSAFE_FACUL_STATS
+/*
+ * FIXME: the stats are not thread-safe!
+ *
+ * These global variables are only for statistics. In case of
  * multithreaded sieving, the stats might be wrong...
  */
 
@@ -42,6 +48,7 @@ unsigned long stats_found_n[STATS_LEN] = {
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 };
+#endif  /* ENABLE_UNSAFE_FACUL_STATS */
 
 static int nb_curves90 (const unsigned int lpb);
 #if 0
@@ -250,17 +257,15 @@ facul_clear_strategy (facul_strategy_t *strategy)
   free (strategy);
 }
 
+struct cxx_mpz_cmp {
+    inline bool operator()(cxx_mpz const& a, cxx_mpz const & b) {
+        return mpz_cmp(a, b) < 0;
+    }
+};
 
-static int
-my_cmp_mpz (const mpz_t *a, const mpz_t *b)
+void facul_print_stats (FILE *stream MAYBE_UNUSED)
 {
-  return mpz_cmp(*a, *b);
-}
-
-
-
-void facul_print_stats (FILE *stream)
-{
+#ifdef ENABLE_UNSAFE_FACUL_STATS
   int i, notfirst;
   unsigned long sum;
 
@@ -301,15 +306,21 @@ void facul_print_stats (FILE *stream)
 		 (notfirst++) ? ", " : "", i, stats_found_n[i]);
     }
   fprintf (stream, ". Total: %lu\n", sum);
+#endif  /* ENABLE_UNSAFE_FACUL_STATS */
 }
 
 
 int
-facul (mpz_t *factors, const mpz_t N, const facul_strategy_t *strategy)
+facul (std::vector<cxx_mpz> & factors, cxx_mpz const & N, const facul_strategy_t *strategy)
 {
   int found = 0;
   size_t bits;
   
+    /* XXX ATTENTION: This function may be called recursively. In
+     * particular it may happen that the factors[] vector is not empty. */
+
+  size_t factors_previous_size = factors.size();
+
 #ifdef PARI
   gmp_fprintf (stderr, "%Zd", N);
 #endif
@@ -371,8 +382,7 @@ facul (mpz_t *factors, const mpz_t N, const facul_strategy_t *strategy)
   if (found > 1)
     {
       /* Sort the factors we found */
-      qsort (factors, found, sizeof (mpz_t), 
-	     (int (*)(const void *, const void *)) &my_cmp_mpz);
+      std::sort(factors.begin() + factors_previous_size, factors.end(), cxx_mpz_cmp());
     }
 
   return found;
@@ -490,7 +500,7 @@ process_line (facul_strategies_t* strategies, unsigned int* index_st,
   regcomp (&preg_index, str_preg_index, REG_ICASE|REG_EXTENDED);
   regcomp (&preg_fm, str_preg_fm, REG_ICASE|REG_EXTENDED);
 
-  // process the ligne
+  // process the line
   const char * str_process = &str[0];
   int side = -1;
   while (str_process[0] != '\0' )
@@ -667,32 +677,47 @@ facul_make_default_strategy (int n, const int verbose)
   ASSERT_ALWAYS (n >= 0);  
   facul_method_t *methods = (facul_method_t*) malloc ((n+4) * sizeof (facul_method_t));
 
+  int i = 0;
+
+#if 0
+  /* This is relevant only for very weird experiments where we have small
+   * factors that stick together.  */
+  /* run one P-1 curve with B1=30 and B2=100 */
+  methods[i].method = PM1_METHOD;
+  methods[i].plan = (pm1_plan_t*) malloc (sizeof (pm1_plan_t));
+  pm1_make_plan ((pm1_plan_t*) methods[i].plan, 30, 100, verbose);
+  i++;
+#endif
+
   /* run one P-1 curve with B1=315 and B2=2205 */
-  methods[0].method = PM1_METHOD;
-  methods[0].plan = (pm1_plan_t*) malloc (sizeof (pm1_plan_t));
-  pm1_make_plan ((pm1_plan_t*) methods[0].plan, 315, 2205, verbose);
+  methods[i].method = PM1_METHOD;
+  methods[i].plan = (pm1_plan_t*) malloc (sizeof (pm1_plan_t));
+  pm1_make_plan ((pm1_plan_t*) methods[i].plan, 315, 2205, verbose);
+  i++;
 
   /* run one P+1 curve with B1=525 and B2=3255 */
-  methods[1].method = PP1_27_METHOD;
-  methods[1].plan = (pp1_plan_t*) malloc (sizeof (pp1_plan_t));
-  pp1_make_plan ((pp1_plan_t*) methods[1].plan, 525, 3255, verbose);
+  methods[i].method = PP1_27_METHOD;
+  methods[i].plan = (pp1_plan_t*) malloc (sizeof (pp1_plan_t));
+  pp1_make_plan ((pp1_plan_t*) methods[i].plan, 525, 3255, verbose);
+  i++;
 
-  /* run one ECM curve with Montgomery parameterization, B1=105, B2=3255 */
-  methods[2].method = EC_METHOD;
-  methods[2].plan = (ecm_plan_t*) malloc (sizeof (ecm_plan_t));
-  ecm_make_plan ((ecm_plan_t*) methods[2].plan, 105, 3255, MONTY12, 2, 1, verbose);
+  /* run one ECM curve with Montgomery parametrization, B1=105, B2=3255 */
+  methods[i].method = EC_METHOD;
+  methods[i].plan = (ecm_plan_t*) malloc (sizeof (ecm_plan_t));
+  ecm_make_plan ((ecm_plan_t*) methods[i].plan, 105, 3255, MONTY12, 2, 1, verbose);
+  i++;
 
   if (n > 0)
     {
-      methods[3].method = EC_METHOD;
-      methods[3].plan = (ecm_plan_t*) malloc (sizeof (ecm_plan_t));
-      ecm_make_plan ((ecm_plan_t*) methods[3].plan, 315, 5355, MONTYTWED12, 1, 1, verbose);
-
+      methods[i].method = EC_METHOD;
+      methods[i].plan = (ecm_plan_t*) malloc (sizeof (ecm_plan_t));
+      ecm_make_plan ((ecm_plan_t*) methods[i].plan, 315, 5355, MONTYTWED12, 11, 1, verbose);
+      i++;
     }
 
   /* heuristic strategy where B1 is increased by c*sqrt(B1) at each curve */
   double B1 = 105.0;
-  for (int i = 4; i < n + 3; i++)
+  for (; i < n + 3; i++)
     {
       double B2;
       unsigned int k;
@@ -767,6 +792,7 @@ facul_strategies_t*
 facul_make_strategies(const unsigned long rfbb, const unsigned int rlpb,
 		      const unsigned int rmfb, const unsigned long afbb,
 		      const unsigned int alpb, const unsigned int amfb,
+                      bool perfectly_sieved,
 		      int n0, int n1, FILE* file, const int verbose)
 {
   unsigned int max_curves_used_before_aux = 0;
@@ -784,6 +810,10 @@ facul_make_strategies(const unsigned long rfbb, const unsigned int rlpb,
 
   strategies->BBB[0] = (double) rfbb * strategies->assume_prime_thresh[0];
   strategies->BBB[1] = (double) afbb * strategies->assume_prime_thresh[1];
+  if (!perfectly_sieved) {
+      strategies->assume_prime_thresh[0] = 0.0;
+      strategies->assume_prime_thresh[1] = 0.0;
+  }
 
   // alloc methods
   facul_method_side_t*** methods = (facul_method_side_t***) malloc (sizeof (*methods) * (rmfb+1));
@@ -1057,7 +1087,7 @@ modset_get_z (mpz_t z, const struct modset_t *modset)
  * factors.
  */
 static int
-facul_aux (mpz_t *factors, const modset_t m,
+facul_aux (std::vector<cxx_mpz> & factors, const modset_t m,
 	   const facul_strategies_t *strategies,
 	   facul_method_side_t *methods, int method_start, int side)
 {
@@ -1070,8 +1100,10 @@ facul_aux (mpz_t *factors, const modset_t m,
       if (methods[i].side != side)
 	continue; /* this method is not for this side */
 
+#ifdef ENABLE_UNSAFE_FACUL_STATS
       if (i < STATS_LEN)
 	stats_called_aux[i]++;
+#endif  /* ENABLE_UNSAFE_FACUL_STATS */
       modset_t fm, cfm;
 
       int res_fac = 0;
@@ -1137,7 +1169,7 @@ facul_aux (mpz_t *factors, const modset_t m,
       */
       if (fm.arith != modset_t::CHOOSE_NONE)
 	{
-	  int found2 = facul_aux (factors+res_fac, fm, strategies,
+	  int found2 = facul_aux (factors, fm, strategies,
 				  methods, i+1, side);
           if (found2 < 1)// FACUL_NOT_SMOOTH or FACUL_MAYBE
 	    {
@@ -1152,7 +1184,7 @@ facul_aux (mpz_t *factors, const modset_t m,
 	}
       if (cfm.arith != modset_t::CHOOSE_NONE)
 	{
-	  int found2 = facul_aux (factors+res_fac, cfm, strategies,
+	  int found2 = facul_aux (factors, cfm, strategies,
 				  methods, i+1, side);
           if (found2 < 1)// FACUL_NOT_SMOOTH or FACUL_MAYBE
           {
@@ -1182,12 +1214,13 @@ facul_aux (mpz_t *factors, const modset_t m,
              is already factored.
 */
 
-static int*
-facul_both_src (mpz_t **factors, const modset_t* m,
+static std::array<int, 2>
+facul_both_src (std::array<std::vector<cxx_mpz>, 2> & factors, const modset_t* m,
 		const facul_strategies_t *strategies, int* cof,
 		int* is_smooth)
 {
-  int* found = (int*) calloc(2, sizeof(int));
+    std::array<int, 2> found;
+    found.fill(0);
 
   facul_method_side_t* methods = strategies->methods[cof[0]][cof[1]];
 
@@ -1199,19 +1232,20 @@ facul_both_src (mpz_t **factors, const modset_t* m,
   f[0][1].arith = modset_t::CHOOSE_NONE;
   f[1][0].arith = modset_t::CHOOSE_NONE;
   f[1][1].arith = modset_t::CHOOSE_NONE;
+#ifdef ENABLE_UNSAFE_FACUL_STATS
   int stats_nb_side = 0, stats_index_transition = 0;
+#endif  /* ENABLE_UNSAFE_FACUL_STATS */
   int last_i[2]; /* last_i[s] is the index of last method tried on side s */
   for (int i = 0; methods[i].method != NULL; i++)
     {
-      // {for the stats
-      // FIXME: the stats are not thread-safe!
+#ifdef ENABLE_UNSAFE_FACUL_STATS
       stats_current_index = i - stats_nb_side * stats_index_transition;
       if (methods[i].is_the_last)
 	{
 	  stats_nb_side = 1;
 	  stats_index_transition = i+1;
 	}
-      // }
+#endif  /* ENABLE_UNSAFE_FACUL_STATS */
       int side = methods[i].side;
       if (is_smooth[side] != FACUL_MAYBE)
 	{
@@ -1228,10 +1262,10 @@ facul_both_src (mpz_t **factors, const modset_t* m,
 	  continue;
 	}
 
-      // {for the stats
+#ifdef ENABLE_UNSAFE_FACUL_STATS
       if (stats_current_index < STATS_LEN)
 	stats_called[stats_current_index]++;
-      // }
+#endif  /* ENABLE_UNSAFE_FACUL_STATS */
       int res_fac = 0;
       last_i[side] = i;
       switch (m[side].arith) {
@@ -1315,7 +1349,7 @@ facul_both_src (mpz_t **factors, const modset_t* m,
 	    // factor f[side][0] or/and f[side][1]
 	    if (f[side][ind_cof].arith != modset_t::CHOOSE_NONE)
 	      {
-		int found2 = facul_aux (factors[side]+found[side],
+		int found2 = facul_aux (factors[side],
 					f[side][ind_cof], strategies,
 					methods, last_i[side] + 1, side);
 		if (found2 < 1)// FACUL_NOT_SMOOTH or FACUL_MAYBE
@@ -1345,13 +1379,15 @@ facul_both_src (mpz_t **factors, const modset_t* m,
   This function is like facul, but we will work with both norms
   together.  It returns the number of factors for each side.
 */
-int*
-facul_both (mpz_t **factors, mpz_t* N,
+std::array<int, 2>
+facul_both (std::array<std::vector<cxx_mpz>, 2> & factors,
+            std::array<cxx_mpz, 2> & N,
 	    const facul_strategies_t *strategies, int* is_smooth)
 {
   int cof[2];
   size_t bits;
-  int* found = NULL;
+  std::array<int, 2> found;
+  found.fill(0);
 
   modset_t n[2];
   n[0].arith = modset_t::CHOOSE_NONE;
@@ -1376,7 +1412,7 @@ facul_both (mpz_t **factors, mpz_t* N,
       bits = mpz_sizeinbase (N[side], 2);
       cof[side] = bits;
       if (bits > MODMPZ_MAXBITS)
-	return 0;
+	return found;
 
       /* Use the fastest modular arithmetic that's large enough for
 	 this input */
@@ -1422,8 +1458,8 @@ facul_both (mpz_t **factors, mpz_t* N,
       if (found[side] > 1)
 	{
 	  /* Sort the factors we found */
-	  qsort (factors[side], found[side], sizeof (mpz_t),
-		 (int (*)(const void *, const void *)) &my_cmp_mpz);
+          ASSERT_ALWAYS(factors[side].size() == (size_t) found[side]);
+          std::sort(factors[side].begin(), factors[side].end(), cxx_mpz_cmp());
 	}
     }
 

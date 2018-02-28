@@ -4,6 +4,11 @@
 #include <stdint.h>
 #include "utils.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+
 /*
  * Represent an ideal.
  */
@@ -327,5 +332,8 @@ int ideal_spq_get_deg_g(ideal_spq_srcptr ideal);
  */
 void ideal_spq_get_g(mpz_poly_ptr g, ideal_spq_srcptr ideal);
 
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* IDEAL_H */

@@ -7,6 +7,13 @@
 #include "sieving_bound.h"
 #include "vector.h"
 
+// TODO: STL
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+
 /*
  * Initialise a vector.
  *
@@ -157,5 +164,9 @@ void int64_vector_to_double_vector(double_vector_ptr v_d,
  */
 double double_vector_orthogonal_projection(double_vector_ptr res,
     double_vector_srcptr u, double_vector_srcptr v);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* DOUBLE_VECTOR_H */

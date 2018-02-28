@@ -3,7 +3,6 @@
 
 #include "las-types.hpp"
 #include "relation.h"
-#include "mpz_array.h"
 
 sieve_info *
 fill_in_sieve_info(las_todo_entry const& doing,
@@ -13,6 +12,6 @@ fill_in_sieve_info(las_todo_entry const& doing,
 /* We take a non-const reference because we're (temporarily) sharing the
  * pointers used for strategies and such.
  */
-int relation_is_duplicate(relation const&, int, sieve_info &);
+int relation_is_duplicate(relation const&, las_info const&, sieve_info &, int adjust_strategy);
 
 #endif
