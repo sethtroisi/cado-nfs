@@ -155,12 +155,6 @@ public:
   bool is_simple() const;
   void transform_roots(transformed_entry_t &, const qlattice_basis &) const;
   double weight() const {return 1./q * nr_roots;}
-  void extract_bycost(std::vector<unsigned long> &extracted, fbprime_t pmax, fbprime_t td_thresh) const {
-    if (k == 1 && p <= pmax && p <= nr_roots * td_thresh) {
-      // printf("Extracting p = %" FBPRIME_FORMAT "\n", p);
-      extracted.push_back(static_cast<unsigned long>(p));
-    }
-  }
   /* Allow sorting by p */
   bool operator<(const fb_entry_general &other) const {return this->p < other.p;}
   bool operator>(const fb_entry_general &other) const {return this->p > other.p;}
@@ -215,10 +209,6 @@ public:
   bool operator>(const fb_entry_x_roots<Nr_roots> &other) const {return this->p > other.p;}
   void fprint(FILE *) const;
   void transform_roots(transformed_entry_t &, const qlattice_basis &) const;
-  void extract_bycost(std::vector<unsigned long> &extracted, fbprime_t pmax, fbprime_t td_thresh) const {
-    if (p <= pmax && p <= Nr_roots * td_thresh)
-      extracted.push_back(static_cast<unsigned long>(p));
-  }
 };
 
 /* }}} */
@@ -230,10 +220,16 @@ class fb_slice_interface {
         virtual unsigned char get_logp() const = 0;
         virtual fbprime_t get_prime(slice_offset_t offset) const = 0;
         virtual unsigned char get_k(slice_offset_t offset) const = 0;
+        virtual slice_index_t get_index() const = 0;
         virtual bool is_general() const = 0;
         virtual int get_nr_roots() const = 0;
         virtual plattices_vector_t make_lattice_bases(const qlattice_basis &, int, const sublat_t &) const = 0;
 };
+
+/* This is one of the function objects in fb.cpp that needs to tinker
+ * with the internals of fb_slice.
+ */
+struct subdivide_slices;
 
 template<typename FB_ENTRY_TYPE>
 class fb_slice : public fb_slice_interface {
@@ -241,7 +237,10 @@ class fb_slice : public fb_slice_interface {
     unsigned char logp;
     slice_index_t index;
     double weight;
+    friend struct subdivide_slices;
+    fb_slice(typename std::vector<FB_ENTRY_TYPE>::const_iterator it, unsigned char logp) : _begin(it), _end(it), logp(logp), index(0), weight(0) {}
     public:
+    typedef FB_ENTRY_TYPE entry_t;
     unsigned char get_logp() const override { return logp; }
     fbprime_t get_prime(slice_offset_t offset) const override {
         return _begin[offset].p;
@@ -252,6 +251,7 @@ class fb_slice : public fb_slice_interface {
          * access it from the virtual base though. This is way we're
          * not folding it to a template access.  */
     }
+    slice_index_t get_index() const {return index;}
     bool is_general() const override { return FB_ENTRY_TYPE::is_general_type; }
     /* get_nr_roots() on a fb_slice returns zero for slices of general
      * type ! */
@@ -453,6 +453,8 @@ class fb_factorbase {
      */
         struct key_type {
             fbprime_t thresholds[FB_MAX_PARTS];
+            fbprime_t td_thresh;
+            fbprime_t skipped;
             double scale;
             /* This might seem non obvious, but this parameters controls
              * the size of the slices, because we want to enforce some
@@ -461,10 +463,15 @@ class fb_factorbase {
             unsigned int nr_workspaces;
 
             bool operator<(key_type const& x) const {
+                int r;
                 for(int i = 0; i < FB_MAX_PARTS; ++i) {
-                    int r = (thresholds[i] > x.thresholds[i]) - (x.thresholds[i] > thresholds[i]);
+                    r = (thresholds[i] > x.thresholds[i]) - (x.thresholds[i] > thresholds[i]);
                     if (r) return r < 0;
                 }
+                r = (td_thresh > x.td_thresh) - (x.td_thresh > td_thresh);
+                if (r) return r < 0;
+                r = (skipped > x.skipped) - (x.skipped > skipped);
+                if (r) return r < 0;
                 return scale < x.scale;
             }
         };
@@ -479,10 +486,18 @@ class fb_factorbase {
              * of fb_slice objects) for all numbers of roots between 1 and
              * MAX_ROOTS.
              */
-            typedef multityped_array<fb_slices_factory, 1, MAX_ROOTS+1> slices_t;
+            typedef multityped_array<fb_slices_factory, -1, MAX_ROOTS+1> slices_t;
+            friend struct subdivide_slices;
             slices_t slices;
+            public:
+            template<int n>
+                typename fb_slices_factory<n>::type& get_slices_vector_for_nroots() {
+                    return slices.get<n>();
+                }
+            private:
             
-            /* the general vector will be made of "anything that is not
+            /* the general vector (the one with index -1 in the
+             * multityped array) is made of "anything that is not
              * simple" (as per the logic that used to be in
              * fb_part::append and fb_entry_general::is_simple). That means:
              *  - all powers go to the general vector
@@ -497,12 +512,10 @@ class fb_factorbase {
             /* We use this to access our arrays called slices and
              * general_slices.
              *
-             * 0 <= i < slices0.size()   -->  return &(slices0[i])
-             * slices0.size() <= i < slices1.size() --> return &(slices1[i-slices0.size()])
+             * 0 <= i <slicesG.size()   -->  return &(slicesG[i])
+             * slicesG.size() <= i < slices0.size() --> return &(slices0[i-slicesG.size()])
+             * slices0.size() <= i < slices1.size() --> return &(slices1[i-slicesG.size()-slices0.size()])
              * and so on.
-             *
-             * The tail of the list will return the proper index in the
-             * general slices
              */
             struct return_pointer_if_in_subrange {
                 typedef fb_slice_interface const * type;
@@ -538,11 +551,16 @@ class fb_factorbase {
                 T & f;
                 template<int n>
                 void operator()(typename fb_slices_factory<n>::type & x) {
-                    for(auto & a : x) {
+                    for(auto & a : x) 
                         f(a);
-                    }
+                }
+                template<int n>
+                void operator()(typename fb_slices_factory<n>::type const & x) {
+                    for(auto const & a : x) 
+                        f(a);
                 }
             };
+            public:
             template<typename T>
             void foreach_slice(T & f) {
                 multityped_array_foreach(foreach_slice_s<T> { f }, slices);
@@ -552,7 +570,15 @@ class fb_factorbase {
                 multityped_array_foreach(foreach_slice_s<T> { f }, slices);
             }
 
-            public:
+            template<typename T>
+            void foreach_slice(T & f) const {
+                multityped_array_foreach(foreach_slice_s<T> { f }, slices);
+            }
+            template<typename T>
+            void foreach_slice(T && f) const {
+                multityped_array_foreach(foreach_slice_s<T> { f }, slices);
+            }
+
             fb_slice_interface const & operator[](slice_index_t index) const {
                 /* This bombs out if get returns NULL, but it shouldn't
                  */
@@ -599,45 +625,59 @@ class fb_factorbase {
         /* Here, when computing the slices, we stow away the small
          * primes, and arrange them according to the internal logic of
          * the small sieve. In particular, we want to keep track of where
-         * the resieved primes are. We also do all sorts of fancy stuff
-         * in init_fb_smallsieved, but it's not entirely clear what
-         * should stay. Some is utter cruft.
+         * the resieved primes are.
          *
          * Note that the data that we prepare here is still not attached
          * to any special-q. We're replacing what used to be done in
          * init_fb_smallsieved, but not in small_sieve_init.
          *
-         * Theoretically, we should be able to prepare the stuff well
-         * enough so that small_sieve_init becomes really simple. Hmmm,
-         * except for primes that become projective depending on the
-         * special-q.
+         * Primes below the bucket-sieve threshold are small-sieved. Some
+         * will be treated specially when cofactoring:
          *
-         * small_sieve_init sorts data anyway. (presently). Maybe we
-         * could do away with that sorting and do it here instead ? Not
-         * clear at all.
+         *  - primes such that nb_roots / p >= 1/tdhresh will be
+         *    trial-divided.
+         *  - primes (ideals) that are not trial divided and that are not
+         *    powers are resieved.
+         *
+         * And of course, depending on the special-q, small-sieved prime
+         * ideals become projective, and therefore escape the general
+         * treatment.
+         *
+         * Note that the condition on trial division is not clear-cut
+         * w.r.t p. The small sieve code is somewhat dependent on the
+         * number of hits per row, which is I/p. And it matters to have
+         * small-sieved primes sorted according to this value. Hence, as
+         * p increases, we might have:
+         *  small p's that are trial-divided because 1/p >=
+         *  1/td_thresh.
+         *  some p's with p<=2*td_thresh, among which some are trial
+         *   divided if 2 roots or more are above, otherwise they're
+         *   resieved.
+         *  some p's with p<=3*td_thresh, again with a distinction...
+         *  and so on up to p>d*tdshresh, (d being the polynomial
+         *  degree). Above this bound we're sure that we no longer see
+         *  any trial-divided prime.
+         *
+         * For each slicing, we elect to compute two copies of the lists
+         * of prime ideals below bkthresh:
+         *  - first, prime ideals that we know will be resieved. Those
+         *    form the largest part of the list.
+         *  - second, prime ideals above primes that will be trial-divided.
+         *
          */
 
+        /* This contains all factor base prime ideals below the bucket
+         * threshold.  */
         struct small_sieve_entries_t {
+            /* general ones. Not powers, not trial-divided ones. */
             std::vector<fb_entry_general> resieved;
+            /* the rest. some are powers, others are trial-divided */
             std::vector<fb_entry_general> rest;
+            /* from "rest" above, we can infer the list of trial-divided
+             * primes by merely restricting to entries with k==1 */
         };
 
         small_sieve_entries_t small_sieve_entries;
-
-        /* trial divided primes are extracted directly from the factor
-         * base by sieve_info::init_trialdiv, using extract_bycost.
-         *
-         * Now it would quite probably make sense to simply fetch that
-         * from us (the "slicing" object), and keep with the caller the
-         * fancy behaviour that we allow the trial division limit to be
-         * above the factor base bound.
-         */
-        void extract_bycost_smallprimes(std::vector<unsigned long> &res, fbprime_t pmax, fbprime_t td_thresh) const {
-            for(auto const& e : small_sieve_entries.resieved)
-                e.extract_bycost(res, pmax, td_thresh);
-            for(auto const& e : small_sieve_entries.rest)
-                e.extract_bycost(res, pmax, td_thresh);
-        }
 
         template<typename T>
         void foreach_slice(T & f) {

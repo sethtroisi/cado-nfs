@@ -240,7 +240,7 @@ void small_sieve_init(small_sieve_data_t & ssd,
     // For typical primes, this jump is easily precomputed and goes into
     // the ssp struct.
     
-    // If we are doing sublattices modulo m, then we jump virutally m
+    // If we are doing sublattices modulo m, then we jump virtually m
     // times faster.
     unsigned int sublatm = si.conf.sublat.m;
     const unsigned int skiprows = ((nthreads-1) << LOG_BUCKET_REGION) >> si.conf.logI_adjusted;
@@ -366,6 +366,10 @@ void small_sieve_init(small_sieve_data_t & ssd,
     ASSERT_ALWAYS(saw_resieve_start && saw_resieve_end);
 
     /* arrange so that the small_sieve() ctor is happy */
+    /* I _think_ that normally, if the new code does its job correctly,
+     * then this should be already sorted */
+    ASSERT_ALWAYS(std::is_sorted(ssd.ssps.begin(), ssd.ssps.begin() + ssd.resieve_end_offset));
+    ASSERT_ALWAYS(std::is_sorted(ssd.ssps.begin() + ssd.resieve_end_offset, ssd.ssps.end()));
     std::sort(ssd.ssps.begin(), ssd.ssps.begin() + ssd.resieve_end_offset);
     std::sort(ssd.ssps.begin() + ssd.resieve_end_offset, ssd.ssps.end());
 

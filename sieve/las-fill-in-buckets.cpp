@@ -246,7 +246,7 @@ template <int LEVEL, class FB_ENTRY_TYPE>
 void
 fill_in_buckets_toplevel_sublat(bucket_array_t<LEVEL, shorthint_t> &orig_BA,
                 sieve_info const & si MAYBE_UNUSED,
-                const fb_slice_interface * const slice,
+                fb_slice<FB_ENTRY_TYPE> const & slice,
                 plattices_dense_vector_t * precomp_slice,
                 where_am_I & w)
 {
@@ -256,7 +256,7 @@ fill_in_buckets_toplevel_sublat(bucket_array_t<LEVEL, shorthint_t> &orig_BA,
   bucket_array_t<LEVEL, shorthint_t> BA;  /* local copy. Gain a register + use stack */
   BA.move(orig_BA);
 
-  slice_index_t slice_index = slice->get_index();
+  slice_index_t slice_index = slice.get_index();
   if (!first_sublat) {
     ASSERT(slice_index == precomp_slice->get_index());
   }
@@ -293,7 +293,7 @@ fill_in_buckets_toplevel_sublat(bucket_array_t<LEVEL, shorthint_t> &orig_BA,
             const slice_offset_t hint = ple.get_hint();
             WHERE_AM_I_UPDATE(w, h, hint);
 #ifdef TRACE_K
-            const fbprime_t p = slice->get_prime(hint); 
+            const fbprime_t p = slice.get_prime(hint); 
             WHERE_AM_I_UPDATE(w, p, p);
 #else
             const fbprime_t p = 0;
@@ -329,7 +329,7 @@ fill_in_buckets_toplevel_sublat(bucket_array_t<LEVEL, shorthint_t> &orig_BA,
         const slice_offset_t hint = ple.get_hint();
         WHERE_AM_I_UPDATE(w, h, hint);
 #ifdef TRACE_K
-        const fbprime_t p = slice->get_prime(hint); 
+        const fbprime_t p = slice.get_prime(hint); 
         WHERE_AM_I_UPDATE(w, p, p);
 #else
         const fbprime_t p = 0;
@@ -361,7 +361,7 @@ template <int LEVEL, class FB_ENTRY_TYPE>
 void
 fill_in_buckets_toplevel(bucket_array_t<LEVEL, shorthint_t> &orig_BA,
                 sieve_info const & si MAYBE_UNUSED,
-                const fb_slice_interface * const slice,
+                fb_slice<FB_ENTRY_TYPE> const & slice,
                 plattices_dense_vector_t * precomp_slice,
                 where_am_I & w)
 {
@@ -380,7 +380,7 @@ fill_in_buckets_toplevel(bucket_array_t<LEVEL, shorthint_t> &orig_BA,
   bucket_array_t<LEVEL, shorthint_t> BA;  /* local copy. Gain a register + use stack */
   BA.move(orig_BA);
 
-  slice_index_t slice_index = slice->get_index();
+  slice_index_t slice_index = slice.get_index();
 
   /* Write new set of pointers for the new slice */
   BA.add_slice_index(slice_index);
@@ -409,7 +409,7 @@ fill_in_buckets_toplevel(bucket_array_t<LEVEL, shorthint_t> &orig_BA,
           const slice_offset_t hint = ple.get_hint();
           WHERE_AM_I_UPDATE(w, h, hint);
 #ifdef TRACE_K
-          const fbprime_t p = slice->get_prime(hint); 
+          const fbprime_t p = slice.get_prime(hint); 
           WHERE_AM_I_UPDATE(w, p, p);
 #else
           const fbprime_t p = 0;
@@ -479,9 +479,10 @@ fill_in_buckets_lowlevel(
     const slice_offset_t hint = pl.get_hint();
     WHERE_AM_I_UPDATE(w, h, hint);
 #ifdef TRACE_K
-    const fb_slice_interface * slice =
-      si.sides[w.side].fb->get_slice(slice_index);
-    const fbprime_t p = slice->get_prime(hint); 
+    /* this is a bit expensive, since we're scanning all parts.
+     * Fortunately it's only a debug call anyway. */
+    fb_slice_interface const & slice = (*si.sides[w.side].fbs)[slice_index];
+    const fbprime_t p = slice.get_prime(hint); 
     WHERE_AM_I_UPDATE(w, p, p);
 #else
     const fbprime_t p = 0;
@@ -704,16 +705,81 @@ fill_in_buckets_one_slice(const worker_thread * worker MAYBE_UNUSED, const task_
     }
 }
 
+/* Whether or not we want fill_in_buckets_one_slice to be templatized
+ * both for LEVEL and n is not clear. At some point, we're doing code
+ * bloat for almost nothing.
+ *
+ * Now given the code below, it's easy enough to arrange so that we go
+ * back to the virtual base fb_slice_interface.
+ */
+template<int LEVEL>
+struct push_slice_to_task_list {
+    thread_pool & pool;
+    fill_in_buckets_parameters model;
+    push_slice_to_task_list(thread_pool&pool, fill_in_buckets_parameters const & m) : pool(pool), model(m) {}
+    size_t pushed = 0;
+    template<int n>
+    void operator()(typename fb_slices_factory<n>::type const & s) {
+        fill_in_buckets_parameters *param = new fill_in_buckets_parameters(model);
+        param->slice = &s;
+        typedef typename fb_slices_factory<n>::type::entry_t entry_t;
+        pool.add_task(fill_in_buckets_toplevel<LEVEL, entry_t>, param, 0, 0, s.get_weight());
+        pushed++;
+    }
+};
+template<int LEVEL>
+struct push_slice_to_task_list_saving_precomp {
+    thread_pool & pool;
+    fill_in_buckets_parameters model;
+    std::vector<plattices_dense_vector_t *> & Vpre;
+    bool is_first;
+    size_t pushed = 0;
+    push_slice_to_task_list_saving_precomp(thread_pool&pool, fill_in_buckets_parameters const & m, std::vector<plattices_dense_vector_t *> & Vpre, bool is_first) : pool(pool), model(m), Vpre(Vpre), is_first(is_first) {}
+    template<int n>
+    void operator()(typename fb_slices_factory<n>::type const & s) {
+        plattices_dense_vector_t * pre;
+        if (is_first) {
+            ASSERT_ALWAYS(Vpre.size() == pushed);
+            pre = new plattices_dense_vector_t(s.get_index());
+            Vpre.push_back(pre);
+        } else {
+            pre = Vpre[pushed];
+        }
+        fill_in_buckets_parameters *param = new fill_in_buckets_parameters(model);
+        param->slice = &s;
+        param->plattices_dense_vector = pre;
+        typedef typename fb_slices_factory<n>::type::entry_t entry_t;
+        pool.add_task(fill_in_buckets_toplevel<LEVEL, entry_t>, param, 0, 0, s.get_weight());
+        pushed++;
+    }
+};
+
 template <int LEVEL>
 static void
-fill_in_buckets_one_side(timetree_t& timer, thread_pool &pool, thread_workspaces &ws, const fb_part *fb, sieve_info & si, const int side)
+fill_in_buckets_one_side(timetree_t& timer, thread_pool &pool, thread_workspaces &ws, sieve_info & si, const int side)
 {
+    const fb_factorbase::slicing * fbs = si.sides[side].fbs;
+
     CHILD_TIMER_PARAMETRIC(timer, "fill_in_buckets_one_side on side ", side, "");
     TIMER_CATEGORY(timer, sieving(side));
 
     slice_index_t slices_pushed = 0;
 
-    if (!si.conf.sublat.m || (si.conf.sublat.i0 == 0 && si.conf.sublat.j0 == 1)) {
+    fill_in_buckets_parameters model(ws, side, si, NULL, NULL, NULL, 0);
+
+    if (!si.conf.sublat.m) {
+        push_slice_to_task_list<LEVEL> F(pool, model);
+        fbs->get_part(LEVEL).foreach_slice(F);
+        slices_pushed = F.pushed;
+    } else {
+        auto & Vpre(si.sides[side].precomp_plattice_dense);
+        bool is_first = si.conf.sublat.i0 == 0 && si.conf.sublat.j0 == 1;
+        push_slice_to_task_list_saving_precomp<LEVEL> F(pool, model, Vpre, is_first);
+        fbs->get_part(LEVEL).foreach_slice(F);
+        slices_pushed = F.pushed;
+    }
+
+#if 0
         /* Process all slices in this factor base part */
         const fb_slice_interface *slice;
         for (slice_index_t slice_index = fb->get_first_slice_index();
@@ -741,6 +807,7 @@ fill_in_buckets_one_side(timetree_t& timer, thread_pool &pool, thread_workspaces
             slices_pushed++;
         }
     }
+#endif
 
     /* we need to check for exceptions due to bucket updates. Because
      * we've pushed all slides at this point, we have no option but to
@@ -784,18 +851,15 @@ void fill_in_buckets(timetree_t& timer, thread_pool &pool, thread_workspaces &ws
     switch (si.toplevel) {
         case 1:
             plattice_enumerate_area<1>::value = plattice_x_t(si.J) << si.conf.logI_adjusted;
-            fill_in_buckets_one_side<1>(timer, pool, ws,
-                    si.sides[side].fb->get_part(si.toplevel), si, side);
+            fill_in_buckets_one_side<1>(timer, pool, ws, si, side);
             break;
         case 2:
             plattice_enumerate_area<2>::value = plattice_x_t(si.J) << si.conf.logI_adjusted;
-            fill_in_buckets_one_side<2>(timer, pool, ws,
-                    si.sides[side].fb->get_part(si.toplevel), si, side);
+            fill_in_buckets_one_side<2>(timer, pool, ws, si, side);
             break;
         case 3:
             plattice_enumerate_area<3>::value = plattice_x_t(si.J) << si.conf.logI_adjusted;
-            fill_in_buckets_one_side<3>(timer, pool, ws,
-                    si.sides[side].fb->get_part(si.toplevel), si, side);
+            fill_in_buckets_one_side<3>(timer, pool, ws, si, side);
             break;
         default:
             ASSERT_ALWAYS(0);

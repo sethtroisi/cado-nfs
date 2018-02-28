@@ -107,7 +107,6 @@ struct sieve_info {
     void share_factor_bases(sieve_info & other);
 
     void init_fb_smallsieved(int side);
-    void print_fb_statistics(int side);
 
     /* in las-trialdiv.cpp */
     void init_trialdiv(int side);

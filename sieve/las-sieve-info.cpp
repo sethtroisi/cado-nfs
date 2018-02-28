@@ -97,6 +97,8 @@ void sieve_info::update (unsigned int nr_workspaces)/*{{{*/
 
         fb_factorbase::key_type K {
             {bk_thresh, bk_thresh1, fbb, fbb},
+            conf.td_thresh,
+            conf.skipped,
             sis.lognorms->scale,
             nr_workspaces
         };

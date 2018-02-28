@@ -36,6 +36,7 @@ struct siever_config : public _padded_pod<siever_config> {
 
     unsigned int td_thresh;
     unsigned int skipped;           // don't sieve below this
+
     unsigned int unsieve_thresh;
 
     struct side_config {

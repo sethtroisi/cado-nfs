@@ -37,7 +37,10 @@ void sieve_info::init_trialdiv(int side)
     /* Maybe we can use the factor base. If we have one, of course ! */
     unsigned long pmax_sofar = 0;
     if (s.fbs) {
-        s.fbs->extract_bycost_smallprimes(trialdiv_primes, pmax, si.conf.td_thresh);
+        for(auto const & pp : s.fbs->small_sieve_entries.rest) {
+            if (pp.k > 1) continue;
+            trialdiv_primes.push_back(pp.p);
+        }
         cxx_mpz zz(trialdiv_primes.back());
         mpz_nextprime(zz, zz);
         pmax_sofar = MIN(pmax, mpz_get_ui(zz));
@@ -49,7 +52,7 @@ void sieve_info::init_trialdiv(int side)
         unsigned long p;
         /* first seek to the end of the fb. */
         for ( ; (p = getprime_mt (pi)) < pmax_sofar ; );
-        cxx_mpz_poly const & f(si.cpoly->pols[side]);
+      cxx_mpz_poly const & f(si.cpoly->pols[side]);
         for(int minroots = 1 ; minroots <= f->deg ; minroots++) {
             p = append_prime_list(std::back_inserter(trialdiv_primes),
                     pi, MIN(pmax, minroots * si.conf.td_thresh), f, minroots);
@@ -57,6 +60,7 @@ void sieve_info::init_trialdiv(int side)
         prime_info_clear (pi);
     }
 
+    ASSERT_ALWAYS(std::is_sorted(trialdiv_primes.begin(), trialdiv_primes.end()));
     std::sort(trialdiv_primes.begin(), trialdiv_primes.end());
     size_t n = trialdiv_primes.size();
     int skip2 = n > 0 && trialdiv_primes[0] == 2;

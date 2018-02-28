@@ -483,6 +483,67 @@ struct dispatch_weight_parts {
         }
 };
 
+struct dispatch_small_sieved_primes {
+    fb_factorbase::slicing & S;
+    unsigned int td_thresh;
+    /* TODO: it's a bit unsatisfactory that we do this comparison on
+     * it->p for each prime.
+     */
+    template<int n>
+        void operator()(typename fb_entries_interval_factory<n>::type const  & x) {
+            /* entries between x.begin and x.end go to the vectors of
+             * small-sieved primes */
+            /* the product td_thresh * it->get_nr_roots() will be
+             * folded outside the loop for the most common cases.
+             */
+            for(auto it = x.begin ; it != x.end ; ++it) {
+                fb_entry_general G(*it);
+                if (it->k > 1 || it->p <= td_thresh * it->get_nr_roots()) {
+                    S.small_sieve_entries.rest.push_back(G);
+                } else {
+                    S.small_sieve_entries.resieved.push_back(G);
+                }
+            }
+        }
+};
+
+struct subdivide_slices {
+    fb_factorbase::slicing::part & dst;
+    fb_factorbase::key_type K;
+    template<int n>
+        void operator()(typename fb_entries_interval_factory<n>::type const  & x) {
+            typedef typename fb_slices_factory<n>::type vslice_t;
+            typedef typename vslice_t::value_type slice_t;
+            typedef typename slice_t::entry_t entry_t;
+
+            // vslice_t & sdst(dst.get_slices_vector_for_nroots<n>());
+            vslice_t & sdst(dst.slices.get<n>());
+            size_t interval_width = x.end - x.begin;
+            if (!interval_width) return;
+            /* first scan to separate by values of logp */
+            typename std::vector<entry_t>::const_iterator it = x.begin;
+            typename std::vector<slice_t> pool;
+            /* can't emplace_back here because private ctor */
+            pool.push_back(slice_t(it, fb_log(it->get_q(), K.scale, 0)));
+            for( ; it != x.end ; ++it) {
+                unsigned char cur_logp = fb_log(it->get_q(), K.scale, 0);
+                if (cur_logp == pool.back().logp) {
+                    pool.back().weight += it->weight();
+                    continue;
+                }
+                pool.back()._end = it;
+                pool.push_back(slice_t(it, cur_logp));
+                pool.back().weight += it->weight();
+            }
+            pool.back()._end = it;
+            fprintf(stderr, "slices for n=%d roots: from %zu entries, we found %zu different logp values\n", n, interval_width, pool.size());
+
+            /* bold move: all of them become slices... */
+            sdst.swap(pool);
+        }
+};
+
+
 
 fb_factorbase::slicing::slicing(fb_factorbase const & fb, fb_factorbase::key_type const & K) {
 
@@ -518,7 +579,19 @@ fb_factorbase::slicing::slicing(fb_factorbase const & fb, fb_factorbase::key_typ
      * will now make sure that slices are small enough so that a single
      * slice never ever exceeds some fraction of this weight  */
      
+    /* First, part 0 is treated in a special way. There's no slicing to
+     * speak of. We simply populate the small_sieve_entries struct,
+     * according to the rules that pertain to this data (which primes are
+     * resieved, which are trial-divided, and so on).
+     */
 
+    multityped_array_foreach(dispatch_small_sieved_primes { *this, K.td_thresh }, D.intervals[0]);
+
+    /* Next, we have sets of begin and end pointers. We need to subdivide
+     * them.
+     */
+    for (int i = 1; i < FB_MAX_PARTS; i++)
+        multityped_array_foreach(subdivide_slices { parts[i], K }, D.intervals[i]);
 
     /* we're going to divide our vector in several
      * parts, and compute slices. That used to be done by many
