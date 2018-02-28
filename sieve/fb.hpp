@@ -221,6 +221,7 @@ class fb_slice_interface {
         virtual fbprime_t get_prime(slice_offset_t offset) const = 0;
         virtual unsigned char get_k(slice_offset_t offset) const = 0;
         virtual slice_index_t get_index() const = 0;
+        virtual double get_weight() const = 0;
         virtual bool is_general() const = 0;
         virtual int get_nr_roots() const = 0;
         virtual plattices_vector_t make_lattice_bases(const qlattice_basis &, int, const sublat_t &) const = 0;
@@ -241,6 +242,8 @@ class fb_slice : public fb_slice_interface {
     fb_slice(typename std::vector<FB_ENTRY_TYPE>::const_iterator it, unsigned char logp) : _begin(it), _end(it), logp(logp), index(0), weight(0) {}
     public:
     typedef FB_ENTRY_TYPE entry_t;
+    inline typename std::vector<FB_ENTRY_TYPE>::const_iterator begin() const { return _begin; }
+    inline typename std::vector<FB_ENTRY_TYPE>::const_iterator end() const { return _end; }
     unsigned char get_logp() const override { return logp; }
     fbprime_t get_prime(slice_offset_t offset) const override {
         return _begin[offset].p;
@@ -252,6 +255,7 @@ class fb_slice : public fb_slice_interface {
          * not folding it to a template access.  */
     }
     slice_index_t get_index() const {return index;}
+    double get_weight() const {return weight;}
     bool is_general() const override { return FB_ENTRY_TYPE::is_general_type; }
     /* get_nr_roots() on a fb_slice returns zero for slices of general
      * type ! */
@@ -312,9 +316,10 @@ class fb_factorbase {
         bool positive = true;
         appender(std::list<fb_entry_general> &pool):pool(pool){}
         void switch_to_general_entries_only() { positive = false; }
-        template<int n>
-        void operator()(typename fb_entries_factory<n>::type & x) {
-            if (positive != (n >= 0)) return;
+        template<typename T>
+        void operator()(T & x) {
+            typedef typename T::value_type FB_ENTRY_TYPE;
+            if (positive != !FB_ENTRY_TYPE::is_general_type) return;
             for(auto it = pool.begin(); it != pool.end(); ) {
                 fb_entry_general E = std::move(*it);
                 bool must_go_to_general =
@@ -322,8 +327,9 @@ class fb_factorbase {
                     || E.k == 1
                     /* || E.q < powlim TODO */;
 
-                if ((n >= 0 && !must_go_to_general && it->nr_roots == n)
-                    || (n < 0 && must_go_to_general)) {
+                bool ok1 = FB_ENTRY_TYPE::is_general_type && must_go_to_general;
+                bool ok2 = !FB_ENTRY_TYPE::is_general_type && !must_go_to_general && FB_ENTRY_TYPE::fixed_nr_roots == it->nr_roots;
+                if (ok1 || ok2) {
                     auto it_next = it;
                     ++it_next;
                     x.push_back(std::move(E));
@@ -351,20 +357,26 @@ class fb_factorbase {
      * ("weight") of entries in the whole factor base, or in subranges
      */
     struct _count_primes {
-            template<int n>
-            size_t operator()(size_t t0, typename fb_entries_factory<n>::type const  & x) const {
+            template<typename T>
+            size_t operator()(size_t t0, T const  & x) const {
                 return t0 + x.size();
             }
     };
     struct _count_prime_ideals {
-            template<int n>
-            size_t operator()(size_t t0, typename fb_entries_factory<n>::type const  & x) const {
-                return t0 + n * x.size();
+            template<typename T>
+            size_t operator()(size_t t0, T const  & x) const {
+                if (T::is_general_type) {
+                    for(auto const & a : x)
+                        t0 += a.get_nr_roots();
+                    return t0;
+                } else {
+                    return t0 + T::fixed_nr_roots * x.size();
+                }
             }
     };
     struct _count_weight {
-            template<int n>
-            double operator()(double t, typename fb_entries_factory<n>::type const  & x) const {
+            template<typename T>
+            double operator()(double t, T const  & x) const {
                 for(auto const & e : x)
                     t += e.weight();
                 return t;
@@ -374,8 +386,8 @@ class fb_factorbase {
         size_t & nprimes;
         size_t & nideals;
         double & weight;
-        template<int n>
-        void operator()(typename fb_entries_factory<n>::type const  & x) const {
+        template<typename T>
+        void operator()(T const  & x) const {
             for(auto const & e : x) {
                 nprimes++;
                 nideals += e.get_nr_roots();
@@ -386,8 +398,8 @@ class fb_factorbase {
     struct _count_primes_interval {
             fbprime_t pmin = 0;
             fbprime_t pmax = std::numeric_limits<fbprime_t>::max();
-            template<int n>
-            size_t operator()(size_t t, typename fb_entries_factory<n>::type const  & x) const {
+            template<typename T>
+            size_t operator()(size_t t, T const  & x) const {
                 for(auto const & e : x) {
                     if (e.get_q() >= pmin && e.get_q() < pmax)
                         t++;
@@ -398,11 +410,11 @@ class fb_factorbase {
     struct _count_prime_ideals_interval {
             fbprime_t pmin = 0;
             fbprime_t pmax = std::numeric_limits<fbprime_t>::max();
-            template<int n>
-            size_t operator()(size_t t, typename fb_entries_factory<n>::type const  & x) const {
+            template<typename T>
+            size_t operator()(size_t t, T const  & x) const {
                 for(auto const & e : x) {
                     if (e.get_q() >= pmin && e.get_q() < pmax)
-                        t += n;
+                        t += e.get_nr_roots();
                 }
                 return t;
             }
@@ -410,8 +422,8 @@ class fb_factorbase {
     struct _count_weight_interval {
             fbprime_t pmin = 0;
             fbprime_t pmax = std::numeric_limits<fbprime_t>::max();
-            template<int n>
-            double operator()(double t, typename fb_entries_factory<n>::type const  & x) const {
+            template<typename T>
+            double operator()(double t, T const  & x) const {
                 for(auto const & e : x)
                     if (e.get_q() >= pmin && e.get_q() < pmax)
                         t += e.weight();
@@ -426,8 +438,8 @@ class fb_factorbase {
             nprimes(np), nideals(ni), weight(w) {}
         fbprime_t pmin = 0;
         fbprime_t pmax = std::numeric_limits<fbprime_t>::max();
-        template<int n>
-        void operator()(typename fb_entries_factory<n>::type const & x) const {
+        template<typename T>
+        void operator()(T const & x) const {
             for(auto const & e : x) {
                 nprimes++;
                 nideals += e.get_nr_roots();
@@ -520,8 +532,8 @@ class fb_factorbase {
             struct return_pointer_if_in_subrange {
                 typedef fb_slice_interface const * type;
                 typedef slice_index_t key_type;
-                template<int K>
-                    type operator()(typename fb_slices_factory<K>::type const & x, slice_index_t & k) {
+                template<typename T>
+                    type operator()(T const & x, slice_index_t & k) {
                         if ((size_t) k < x.size()) {
                             return &(x[k]);
                         } else {
@@ -546,41 +558,36 @@ class fb_factorbase {
                 return NULL;
             }
 
-            template<typename T>
+            template<typename F>
             struct foreach_slice_s {
-                T & f;
-                template<int n>
-                void operator()(typename fb_slices_factory<n>::type & x) {
-                    for(auto & a : x) 
-                        f(a);
-                }
-                template<int n>
-                void operator()(typename fb_slices_factory<n>::type const & x) {
-                    for(auto const & a : x) 
-                        f(a);
-                }
+                F & f;
+                template<typename T>
+                void operator()(T & x) { for(auto & a : x) f(a); }
+                template<typename T>
+                void operator()(T const & x) { for(auto const & a : x) f(a); }
             };
             public:
-            template<typename T>
-            void foreach_slice(T & f) {
-                multityped_array_foreach(foreach_slice_s<T> { f }, slices);
+            template<typename F>
+            void foreach_slice(F & f) {
+                multityped_array_foreach(foreach_slice_s<F> { f }, slices);
             }
-            template<typename T>
-            void foreach_slice(T && f) {
-                multityped_array_foreach(foreach_slice_s<T> { f }, slices);
+            template<typename F>
+            void foreach_slice(F && f) {
+                multityped_array_foreach(foreach_slice_s<F> { f }, slices);
             }
-
-            template<typename T>
-            void foreach_slice(T & f) const {
-                multityped_array_foreach(foreach_slice_s<T> { f }, slices);
+            template<typename F>
+            void foreach_slice(F & f) const {
+                multityped_array_foreach(foreach_slice_s<F> { f }, slices);
             }
-            template<typename T>
-            void foreach_slice(T && f) const {
-                multityped_array_foreach(foreach_slice_s<T> { f }, slices);
+            template<typename F>
+            void foreach_slice(F && f) const {
+                multityped_array_foreach(foreach_slice_s<F> { f }, slices);
             }
 
             fb_slice_interface const & operator[](slice_index_t index) const {
-                /* This bombs out if get returns NULL, but it shouldn't
+                /* This bombs out at runtime if get returns NULL, but
+                 * then it should be an indication of a programmer
+                 * mistake.
                  */
                 return *get(index);
             }
@@ -728,10 +735,8 @@ class fb_factorbase {
 
     private:
         struct sorter {
-            template<int n>
-                void operator()(typename fb_entries_factory<n>::type & x) {
-                    std::sort(x.begin(), x.end());
-                }
+            template<typename T>
+            void operator()(T & x) { std::sort(x.begin(), x.end()); }
         };
 
     public:

@@ -94,12 +94,14 @@ template<typename G, template<int> class F> struct multityped_array_foreach_inne
     template<int n0, int n1>
     void operator()(G & g, multityped_array<F, n0, n1> & A) const {
         operator()(g, (multityped_array<F, n0, n1-1> &) A);
-        g.template operator()<n1-1>(A.x);
+        // g.template operator()<n1-1>(A.x);
+        g(A.x);
     }
     template<int n0, int n1>
     void operator()(G & g, multityped_array<F, n0, n1> const & A) const {
         operator()(g, (multityped_array<F, n0, n1-1> const &) A);
-        g.template operator()<n1-1>(A.x);
+        // g.template operator()<n1-1>(A.x);
+        g(A.x);
     }
 };
 
@@ -130,12 +132,14 @@ template<typename G, typename T, template<int> class F> struct multityped_array_
 
     template<int n0, int n1>
     T operator()(G & g, T const & t0, multityped_array<F, n0, n1> & A) const {
-        T t1 = g.template operator()<n1-1>(t0, A.x);
+        // T t1 = g.template operator()<n1-1>(t0, A.x);
+        T t1 = g(t0, A.x);
         return operator()(g, t1, (multityped_array<F, n0, n1-1> &) A);
     }
     template<int n0, int n1>
     T operator()(G & g, T const & t0, multityped_array<F, n0, n1> const & A) const {
-        T t1 = g.template operator()<n1-1>(t0, A.x);
+        // T t1 = g.template operator()<n1-1>(t0, A.x);
+        T t1 = g(t0, A.x);
         return operator()(g, t1, (multityped_array<F, n0, n1-1> &) A);
     }
 };
@@ -171,14 +175,16 @@ template<typename G> class multityped_array_locate {
             typename G::type res = (*this)((multityped_array<F, n0, n1-1> &) A, k);
             if (res != typename G::type())
                 return res;
-            return G().template operator()<n1-1>(A.x, k);
+            // return G().template operator()<n1-1>(A.x, k);
+            return G()(A.x, k);
         }
         template<int n0, int n1>
         typename G::type operator()(multityped_array<F, n0, n1> const & A, typename G::key_type & k) const {
             typename G::type res = (*this)((multityped_array<F, n0, n1-1> &) A, k);
             if (res != typename G::type())
                 return res;
-            return G().template operator()<n1-1>(A.x, k);
+            // return G().template operator()<n1-1>(A.x, k);
+            return G()(A.x, k);
         }
     };
     public:

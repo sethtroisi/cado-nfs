@@ -45,6 +45,7 @@
 #ifdef __cplusplus
 #include "cxx_mpz.hpp"
 #include "gmpxx.hpp"
+#include "cxx_misc.hpp"
 #endif
 #include "mpz_poly_bivariate.h"
 

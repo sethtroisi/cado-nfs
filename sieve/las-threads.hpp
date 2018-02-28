@@ -16,7 +16,7 @@ class thread_workspaces;
 
 /* All of this exists _for each thread_ */
 struct thread_side_data : private NonCopyable {
-  const fb_factorbase::slicing *fbs __attribute__((deprecated)) = NULL;
+  // const fb_factorbase::slicing *fbs __attribute__((deprecated)) = NULL;
 
   /* For small sieve */
   std::vector<spos_t> ssdpos;

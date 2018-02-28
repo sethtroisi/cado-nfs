@@ -48,14 +48,16 @@ void thread_data::init(const thread_workspaces &_ws, const int _id, las_info con
   is_initialized = true;
 }
 
-void thread_data::pickup_si(sieve_info & _si)
+void thread_data::pickup_si(sieve_info &)
 {
+  /*
   psi = & _si;
   sieve_info & si(*psi);
   for (int side = 0 ; side < 2 ; side++) {
       if (si.sides[side].fb)
           sides[side].set_fbs(si.sides[side].fb.get());
   }
+  */
 }
 
 void thread_data::update_checksums()

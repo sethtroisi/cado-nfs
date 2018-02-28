@@ -436,7 +436,8 @@ fb_linear_root (fbroot_t & root, cxx_mpz_poly const & poly, const fbprime_t q)
 template<int n>
 struct fb_entries_interval_factory {
     struct type {
-        typename fb_entries_factory<n>::type::const_iterator begin, end;
+        typedef typename fb_entries_factory<n>::type container_type;
+        typename container_type::const_iterator begin, end;
     };
 };
 
@@ -455,15 +456,18 @@ struct dispatch_weight_parts {
     /* TODO: factor base entries that made it only to the vector of
      * general entries will perhas deserve a special treatment.
      */
-    template<int n>
-        void operator()(typename fb_entries_factory<n>::type const  & x) {
-            typedef typename fb_entries_factory<n>::type::const_iterator xit_t;
+    template<typename T>
+        void operator()(T const  & x) {
+            /* T is fb_entries_factory<n>::type for some n */
+            typedef typename T::const_iterator xit_t;
+            typedef typename T::value_type FB_ENTRY_TYPE;
             xit_t it = x.begin();
             /* we're now processing entries with n roots. First make sure
              * that the begin pointer for the first part correctly points
              * to the beginning of our current vector of entries.
              */
             int i = 0;
+            constexpr int n = FB_ENTRY_TYPE::is_general_type ? -1 : FB_ENTRY_TYPE::fixed_nr_roots;
             intervals[0].get<n>().begin = it;
             for( ; it != x.end() ; ++it) {
                 fbprime_t q = it->get_q();
@@ -489,8 +493,9 @@ struct dispatch_small_sieved_primes {
     /* TODO: it's a bit unsatisfactory that we do this comparison on
      * it->p for each prime.
      */
-    template<int n>
-        void operator()(typename fb_entries_interval_factory<n>::type const  & x) {
+    template<typename T>
+        void operator()(T const  & x) {
+            /* T is fb_entries_interval_factory<n>::type for some n */
             /* entries between x.begin and x.end go to the vectors of
              * small-sieved primes */
             /* the product td_thresh * it->get_nr_roots() will be
@@ -510,12 +515,16 @@ struct dispatch_small_sieved_primes {
 struct subdivide_slices {
     fb_factorbase::slicing::part & dst;
     fb_factorbase::key_type K;
-    template<int n>
-        void operator()(typename fb_entries_interval_factory<n>::type const  & x) {
-            typedef typename fb_slices_factory<n>::type vslice_t;
-            typedef typename vslice_t::value_type slice_t;
-            typedef typename slice_t::entry_t entry_t;
+    template<typename T>
+        void operator()(T const & x) {
+            /* T is fb_entries_interval_factory<n>::type for some n */
+            typedef T interval_t;
+            typedef typename interval_t::container_type ventry_t;
+            typedef typename ventry_t::value_type entry_t;
+            typedef fb_slice<entry_t> slice_t;
+            typedef std::vector<slice_t> vslice_t;
 
+            constexpr int n = entry_t::is_general_type ? -1 : entry_t::fixed_nr_roots;
             // vslice_t & sdst(dst.get_slices_vector_for_nroots<n>());
             vslice_t & sdst(dst.slices.get<n>());
             size_t interval_width = x.end - x.begin;

@@ -269,11 +269,11 @@ fill_in_buckets_toplevel_sublat(bucket_array_t<LEVEL, shorthint_t> &orig_BA,
   // FIXME: A LOT OF DUPLICATED CODE, HERE!!!
   if (first_sublat) {
     slice_offset_t i_entry = 0;
-    const fb_slice<FB_ENTRY_TYPE> * const sl = (const fb_slice<FB_ENTRY_TYPE> * const) slice;
-    for (const FB_ENTRY_TYPE *it = sl->begin(); it != sl->end(); it++, i_entry++) {
-      if (!si.qbasis.is_coprime_to(it->p))
+    for (auto const & e : slice) {
+      increment_counter_on_dtor<slice_offset_t> _dummy(i_entry);
+      if (!si.qbasis.is_coprime_to(e.p))
         continue;
-      it->transform_roots(transformed, si.qbasis);
+      e.transform_roots(transformed, si.qbasis);
       for (unsigned char i_root = 0; i_root != transformed.nr_roots; i_root++) {
         const fbroot_t r = transformed.get_r(i_root);
         const bool proj = transformed.get_proj(i_root);
@@ -362,18 +362,10 @@ void
 fill_in_buckets_toplevel(bucket_array_t<LEVEL, shorthint_t> &orig_BA,
                 sieve_info const & si MAYBE_UNUSED,
                 fb_slice<FB_ENTRY_TYPE> const & slice,
-                plattices_dense_vector_t * precomp_slice,
+                plattices_dense_vector_t * /* unused */,
                 where_am_I & w)
 {
-  if (si.conf.sublat.m) {
-    // TODO: two function calls might yield a penalty, due to 
-    // instruction cache pollution (due to templating, we are talking
-    // about many, many functions, here).
-    // Could worth investigating...
-    fill_in_buckets_toplevel_sublat<LEVEL,FB_ENTRY_TYPE>(orig_BA, si, slice, 
-        precomp_slice, w);
-    return;
-  }
+  ASSERT_ALWAYS(!si.conf.sublat.m);
 
   ASSERT(slice != NULL);
   bool first_reg = true;
@@ -388,11 +380,12 @@ fill_in_buckets_toplevel(bucket_array_t<LEVEL, shorthint_t> &orig_BA,
   typename FB_ENTRY_TYPE::transformed_entry_t transformed;
 
   slice_offset_t i_entry = 0;
-  const fb_slice<FB_ENTRY_TYPE> * const sl = (const fb_slice<FB_ENTRY_TYPE> * const) slice;
-  for (const FB_ENTRY_TYPE *it = sl->begin(); it != sl->end(); it++, i_entry++) {
-    if (!si.qbasis.is_coprime_to(it->p))
+
+  for (auto const & e : slice) {
+    increment_counter_on_dtor<slice_offset_t> _dummy(i_entry);
+    if (!si.qbasis.is_coprime_to(e.p))
       continue;
-    it->transform_roots(transformed, si.qbasis);
+    e.transform_roots(transformed, si.qbasis);
     for (unsigned char i_root = 0; i_root != transformed.nr_roots; i_root++) {
       const fbroot_t r = transformed.get_r(i_root);
       const bool proj = transformed.get_proj(i_root);
@@ -456,25 +449,23 @@ template <int LEVEL>
 fill_in_buckets_lowlevel(
     bucket_array_t<LEVEL, shorthint_t> &orig_BA,
     sieve_info const & si MAYBE_UNUSED,
-    plattices_vector_t *plattices_vector,
+    plattices_vector_t & plattices_vector,
     bool first_reg,
     where_am_I & w)
 {
     /* The timer stuff is dealt with by the caller */
-  const slice_index_t slice_index = plattices_vector->get_index();
+  const slice_index_t slice_index = plattices_vector.get_index();
   bucket_array_t<LEVEL, shorthint_t> BA;  /* local copy. Gain a register + use stack */
   BA.move(orig_BA);
 
   /* Write new set of pointers for the new slice */
   BA.add_slice_index(slice_index);
 
-  for (plattices_vector_t::iterator pl_it = plattices_vector->begin();
-      pl_it != plattices_vector->end(); pl_it++) {
-
+  for (auto & ple : plattices_vector) {
     // Work with a copy, otherwise we don't get all optimizations.
     // Maybe with a wise use of the 'restrict' keyword, we might get
     // what we want, but this is C++11, anyway.
-    plattice_enumerate_t pl(*pl_it);
+    plattice_enumerate_t pl(ple);
 
     const slice_offset_t hint = pl.get_hint();
     WHERE_AM_I_UPDATE(w, h, hint);
@@ -524,8 +515,8 @@ fill_in_buckets_lowlevel(
     }
 
     // save current position, and prepare for next area.
-    pl_it->set_x(pl.get_x());
-    pl_it->advance_to_next_area(LEVEL);
+    ple.set_x(pl.get_x());
+    ple.advance_to_next_area(LEVEL);
   } 
   // printf("%.3f\n", BA.max_full());
   orig_BA.move(BA);
@@ -536,9 +527,9 @@ public:
   thread_workspaces &ws;
   const int side;
   sieve_info const & si;
-  const fb_slice_interface * const slice;
-  plattices_vector_t * const plattices_vector; // content changed during fill-in
-  plattices_dense_vector_t * const plattices_dense_vector; // for sublat
+  const fb_slice_interface * slice;
+  plattices_vector_t * plattices_vector; // content changed during fill-in
+  plattices_dense_vector_t * plattices_dense_vector; // for sublat
   const uint32_t first_region0_index;
   fill_in_buckets_parameters(thread_workspaces &_ws, const int _side,
           sieve_info const & _si, const fb_slice_interface *_slice,
@@ -582,7 +573,7 @@ public:
  * parametric timer slots.
  */
 PREPARE_TEMPLATE_INST_NAMES(fill_in_buckets_one_slice_internal, "");
-PREPARE_TEMPLATE_INST_NAMES(fill_in_buckets_one_slice, "");
+// PREPARE_TEMPLATE_INST_NAMES(fill_in_buckets_one_slice, "");
 PREPARE_TEMPLATE_INST_NAMES(fill_in_buckets_one_side, "");
 PREPARE_TEMPLATE_INST_NAMES(downsort_tree, "");
 
@@ -620,7 +611,8 @@ fill_in_buckets_one_slice_internal(const worker_thread * worker, const task_para
             param->ws.reserve_BA<LEVEL, shorthint_t>(param->side);
         /* Fill the buckets */
         try {
-            fill_in_buckets_lowlevel<LEVEL>(BA, param->si, param->plattices_vector,
+            fill_in_buckets_lowlevel<LEVEL>(BA, param->si,
+                    * param->plattices_vector,
                     (param->first_region0_index == 0), w);
         } catch(buckets_are_full & e) {
             param->ws.release_BA(param->side, BA);
@@ -636,15 +628,18 @@ fill_in_buckets_one_slice_internal(const worker_thread * worker, const task_para
     return new task_result;
 }
 
+/* we really wish to have a single timing slot for all the instantiations
+ * of fill_in_buckets_toplevel_wrapper */
+static tdict::slot timer_slot_for_fibt_wrapper("fill_in_buckets_toplevel_wrapper");
 
 // At top level.
 // We need to interleave the root transforms and the FK walk,
 // otherwise, we spend all the time waiting for memory.
 // Hence the ugly de-templatization.
 // At some point, the code should be re-organized, I'm afraid.
-template<int LEVEL>
+template<int LEVEL, class FB_ENTRY_TYPE>
 task_result *
-fill_in_buckets_one_slice(const worker_thread * worker MAYBE_UNUSED, const task_parameters * _param)
+fill_in_buckets_toplevel_wrapper(const worker_thread * worker MAYBE_UNUSED, const task_parameters * _param)
 {
     const fill_in_buckets_parameters *param = static_cast<const fill_in_buckets_parameters *>(_param);
     // ACTIVATE_TIMER(worker->timer);
@@ -656,7 +651,10 @@ fill_in_buckets_one_slice(const worker_thread * worker MAYBE_UNUSED, const task_
      * https://sourceforge.net/p/valgrind/mailman/message/32434015/
      *
      */
-    CHILD_TIMER(worker->timer, TEMPLATE_INST_NAME(fill_in_buckets_one_slice, LEVEL));
+    // CHILD_TIMER(worker->timer, TEMPLATE_INST_NAME(fill_in_buckets_one_slice, LEVEL));
+    
+
+    timetree_t::accounting_child local_timer_sentry(worker->timer, timer_slot_for_fibt_wrapper);
     // TIMER_CATEGORY(worker->timer, sieving(param->side));
 
     where_am_I w;
@@ -668,33 +666,40 @@ fill_in_buckets_one_slice(const worker_thread * worker MAYBE_UNUSED, const task_
     try {
         /* Get an unused bucket array that we can write to */
         bucket_array_t<LEVEL, shorthint_t> &BA = param->ws.reserve_BA<LEVEL, shorthint_t>(param->side);
-        /* Fill the buckets */
-        if (param->slice->is_general())
-          fill_in_buckets_toplevel<LEVEL,fb_entry_general>(BA, param->si, param->slice, param->plattices_dense_vector, w);
-        else if (param->slice->get_nr_roots() == 0)
-          fill_in_buckets_toplevel<LEVEL,fb_entry_x_roots<0> >(BA, param->si, param->slice, param->plattices_dense_vector, w);
-        else if (param->slice->get_nr_roots() == 1)
-          fill_in_buckets_toplevel<LEVEL,fb_entry_x_roots<1> >(BA, param->si, param->slice, param->plattices_dense_vector, w);
-        else if (param->slice->get_nr_roots() == 2)
-          fill_in_buckets_toplevel<LEVEL,fb_entry_x_roots<2> >(BA, param->si, param->slice, param->plattices_dense_vector, w);
-        else if (param->slice->get_nr_roots() == 3)
-          fill_in_buckets_toplevel<LEVEL,fb_entry_x_roots<3> >(BA, param->si, param->slice, param->plattices_dense_vector, w);
-        else if (param->slice->get_nr_roots() == 4)
-          fill_in_buckets_toplevel<LEVEL,fb_entry_x_roots<4> >(BA, param->si, param->slice, param->plattices_dense_vector, w);
-        else if (param->slice->get_nr_roots() == 5)
-          fill_in_buckets_toplevel<LEVEL,fb_entry_x_roots<5> >(BA, param->si, param->slice, param->plattices_dense_vector, w);
-        else if (param->slice->get_nr_roots() == 6)
-          fill_in_buckets_toplevel<LEVEL,fb_entry_x_roots<6> >(BA, param->si, param->slice, param->plattices_dense_vector, w);
-        else if (param->slice->get_nr_roots() == 7)
-          fill_in_buckets_toplevel<LEVEL,fb_entry_x_roots<7> >(BA, param->si, param->slice, param->plattices_dense_vector, w);
-        else if (param->slice->get_nr_roots() == 8)
-          fill_in_buckets_toplevel<LEVEL,fb_entry_x_roots<8> >(BA, param->si, param->slice, param->plattices_dense_vector, w);
-        else if (param->slice->get_nr_roots() == 9)
-          fill_in_buckets_toplevel<LEVEL,fb_entry_x_roots<9> >(BA, param->si, param->slice, param->plattices_dense_vector, w);
-        else if (param->slice->get_nr_roots() == 10)
-          fill_in_buckets_toplevel<LEVEL,fb_entry_x_roots<10> >(BA, param->si, param->slice, param->plattices_dense_vector, w);
-        else
-          ASSERT_ALWAYS(0);
+
+        fill_in_buckets_toplevel<LEVEL,FB_ENTRY_TYPE>(BA, param->si,
+                *dynamic_cast<fb_slice<FB_ENTRY_TYPE> const *>(param->slice),
+                param->plattices_dense_vector, w);
+
+        /* Release bucket array again */
+        param->ws.release_BA(param->side, BA);
+        delete param;
+        return new task_result;
+    } catch (buckets_are_full const& e) {
+        delete param;
+        throw e;
+    }
+}
+/* same for sublat */
+template<int LEVEL, class FB_ENTRY_TYPE>
+task_result *
+fill_in_buckets_toplevel_sublat_wrapper(const worker_thread * worker MAYBE_UNUSED, const task_parameters * _param)
+{
+    const fill_in_buckets_parameters *param = static_cast<const fill_in_buckets_parameters *>(_param);
+    ASSERT_ALWAYS(worker->timer.running());
+    timetree_t::accounting_child local_timer_sentry(worker->timer, timer_slot_for_fibt_wrapper);
+
+    where_am_I w;
+    WHERE_AM_I_UPDATE(w, psi, & param->si);
+    WHERE_AM_I_UPDATE(w, side, param->side);
+    WHERE_AM_I_UPDATE(w, i, param->slice->get_index());
+    WHERE_AM_I_UPDATE(w, N, 0);
+
+    try {
+        bucket_array_t<LEVEL, shorthint_t> &BA = param->ws.reserve_BA<LEVEL, shorthint_t>(param->side);
+        fill_in_buckets_toplevel_sublat<LEVEL,FB_ENTRY_TYPE>(BA, param->si,
+                *dynamic_cast<fb_slice<FB_ENTRY_TYPE> const *>(param->slice),
+                param->plattices_dense_vector, w);
         /* Release bucket array again */
         param->ws.release_BA(param->side, BA);
         delete param;
@@ -718,12 +723,13 @@ struct push_slice_to_task_list {
     fill_in_buckets_parameters model;
     push_slice_to_task_list(thread_pool&pool, fill_in_buckets_parameters const & m) : pool(pool), model(m) {}
     size_t pushed = 0;
-    template<int n>
-    void operator()(typename fb_slices_factory<n>::type const & s) {
+    template<typename T>
+    void operator()(T const & s) {
         fill_in_buckets_parameters *param = new fill_in_buckets_parameters(model);
         param->slice = &s;
-        typedef typename fb_slices_factory<n>::type::entry_t entry_t;
-        pool.add_task(fill_in_buckets_toplevel<LEVEL, entry_t>, param, 0, 0, s.get_weight());
+        typedef typename T::entry_t entry_t;
+        task_function_t f = fill_in_buckets_toplevel_wrapper<LEVEL, entry_t>;
+        pool.add_task(f, param, 0, 0, s.get_weight());
         pushed++;
     }
 };
@@ -735,8 +741,8 @@ struct push_slice_to_task_list_saving_precomp {
     bool is_first;
     size_t pushed = 0;
     push_slice_to_task_list_saving_precomp(thread_pool&pool, fill_in_buckets_parameters const & m, std::vector<plattices_dense_vector_t *> & Vpre, bool is_first) : pool(pool), model(m), Vpre(Vpre), is_first(is_first) {}
-    template<int n>
-    void operator()(typename fb_slices_factory<n>::type const & s) {
+    template<typename T>
+    void operator()(T const & s) {
         plattices_dense_vector_t * pre;
         if (is_first) {
             ASSERT_ALWAYS(Vpre.size() == pushed);
@@ -748,8 +754,9 @@ struct push_slice_to_task_list_saving_precomp {
         fill_in_buckets_parameters *param = new fill_in_buckets_parameters(model);
         param->slice = &s;
         param->plattices_dense_vector = pre;
-        typedef typename fb_slices_factory<n>::type::entry_t entry_t;
-        pool.add_task(fill_in_buckets_toplevel<LEVEL, entry_t>, param, 0, 0, s.get_weight());
+        typedef typename T::entry_t entry_t;
+        task_function_t f = fill_in_buckets_toplevel_sublat_wrapper<LEVEL, entry_t>;
+        pool.add_task(f, param, 0, 0, s.get_weight());
         pushed++;
     }
 };
