@@ -40,7 +40,7 @@ const char *method_name[] = {"P-1", "P+1", "ECM"};
 
 void
 print_pointorder (const unsigned long p, const unsigned long parameter,
-                  const unsigned long parameterization, const int verbose)
+                  ec_parameterization_t parameterization, const int verbose)
 {
   modulus_t m;
   unsigned long o, knownfac;
@@ -165,7 +165,8 @@ int main (int argc, char **argv)
   int printnonfactors = 0;
   int printcofactors = 0;
   int do_pointorder = 0;
-  unsigned long po_parameter = 0, po_parameterization = 0;
+  unsigned long po_parameter = 0;
+  ec_parameterization_t po_parameterization = BRENT12;
   int inp_raw = 0;
   int strat = 0;
   int extra_primes = 0;
@@ -236,7 +237,7 @@ int main (int argc, char **argv)
 	       nr_methods < MAX_METHODS)
 	{
 	  unsigned long B1, B2;
-	  long parameter;
+	  unsigned long parameter;
 	  ec_parameterization_t parameterization;
 	  B1 = strtoul (argv[2], NULL, 10);
 	  B2 = strtoul (argv[3], NULL, 10);
@@ -266,8 +267,7 @@ int main (int argc, char **argv)
 	  strategy->methods[nr_methods].plan = malloc (sizeof (ecm_plan_t));
 	  ASSERT (strategy->methods[nr_methods].plan != NULL);
 	  ecm_make_plan ((ecm_plan_t*) strategy->methods[nr_methods].plan, B1, B2, 
-			 parameterization, labs (parameter), extra_primes, 
-			 (verbose / 3));
+       parameterization, parameter, extra_primes, (verbose / 3));
 	  nr_methods++;
 	  argc -= 4;
 	  argv += 4;
@@ -302,7 +302,16 @@ int main (int argc, char **argv)
       fprintf (stderr, "Unrecognized option: %s\n", argv[1]);
       exit (EXIT_FAILURE);
     }
+
 	  po_parameter = strtol (argv[2], NULL, 10);
+
+    if (!ec_parameter_is_valid (po_parameterization, po_parameter))
+    {
+      fprintf (stderr, "Parameter %lu is not valid with parametrization '%s'\n",
+               po_parameter, argv[1]);
+      exit (EXIT_FAILURE);
+    }
+
 	  argc -= 2;
 	  argv += 2;
 	}

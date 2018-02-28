@@ -973,7 +973,7 @@ facul_strategy_t* convert_strategy_to_facul_strategy (strategy_t* t, unsigned lo
 	    {
 	      fm_t* fm = tab_fm->tab[i];
 	      int method = (int)fm->method[0];
-	      int curve = (int)fm->method[1];
+	      ec_parameterization_t curve = (ec_parameterization_t) fm->method[1];
 	      unsigned long B1 = fm->method[2];
 	      unsigned long B2 = fm->method[3];
 	      strategy->methods[index_method].method = method;
@@ -1105,7 +1105,7 @@ facul_strategies_t* convert_strategy_to_facul_strategies (strategy_t* t, int* r,
       {
 	fm_t* fm = tab_fm->tab[i];
 	int method = (int)fm->method[0];
-	int curve = (int)fm->method[1];
+	ec_parameterization_t curve = (ec_parameterization_t) fm->method[1];
 	unsigned long B1 = fm->method[2];
 	unsigned long B2 = fm->method[3];
 	int side = (t->side != NULL)?t->side[i]:0;
@@ -1139,7 +1139,6 @@ facul_strategies_t* convert_strategy_to_facul_strategies (strategy_t* t, int* r,
 	      }
 	    else { //method == EC_METHOD
 	      plan = malloc (sizeof (ecm_plan_t));
-        ecm_make_plan (plan, B1, B2, curve, parameter, 1, verbose);
         ecm_make_plan ((ecm_plan_t*) plan, B1, B2, curve, parameter, 1, verbose);
 	    }
 	    strategies->precomputed_methods[index_prec_fm].method =method;

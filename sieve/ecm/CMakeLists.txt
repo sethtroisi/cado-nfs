@@ -52,12 +52,12 @@ add_library(facul
         ecm_mpz.c
         pm1_mpz.c
         pp1_mpz.c
-        facul_doit_mpz.c
+        facul_doit_mpz.cpp
         stage2.c
         bytecode.c
         makeplan.c facul.cpp
         mpqs_doit.c mpqs_ul.c mpqs_15ul.c mpqs_2ul2.c mpqs_mpz.c
-        batch.c)
+        batch.cpp)
 
 set_target_properties(facul PROPERTIES COMPILE_FLAGS "${OpenMP_C_FLAGS}")
 
