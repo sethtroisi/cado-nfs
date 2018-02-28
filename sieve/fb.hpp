@@ -158,6 +158,9 @@ public:
   /* Allow sorting by p */
   bool operator<(const fb_entry_general &other) const {return this->p < other.p;}
   bool operator>(const fb_entry_general &other) const {return this->p > other.p;}
+  struct sort_byq {
+    bool operator()(fb_entry_general const & a, fb_entry_general const & b) const { return a.get_q() < b.get_q(); };
+  };
 };
 
 template <int Nr_roots>
@@ -287,177 +290,43 @@ class fb_factorbase {
         /* Has to be <= MAX_DEGREE */
     static const int MAX_ROOTS = MAX_DEGREE;
 
-    class vector_interface {
-    };
-
-    template<typename FB_ENTRY_TYPE>
-    class vector : public vector_interface, public std::vector<FB_ENTRY_TYPE> {
-    };
-
     private:
 
+    cxx_mpz_poly f;
     int side;
 
     typedef multityped_array<fb_entries_factory, -1, MAX_ROOTS+1> entries_t;
     entries_t entries;
-    // now we put it as member of index -1 above.
-    // vector<fb_entry_general> general_entries;
 
-    /* This inserts a pool of entries to the factor base. We do it with
-     * many entries in a row so as to avoid looping MAX_ROOTS times for
-     * each root, and so that we don't feel sorry to use
+    /* {{{ append. This inserts a pool of entries to the factor base. We
+     * do it with many entries in a row so as to avoid looping MAX_ROOTS
+     * times for each root, and so that we don't feel sorry to use
      * multityped_array_foreach (even though in truth, it's quite
      * probably fine)
      */
-
-    /* FIXME: bizarrely, std::dequeue does not work, here. */
-    struct appender {
-        std::list<fb_entry_general> &pool;
-        bool positive = true;
-        appender(std::list<fb_entry_general> &pool):pool(pool){}
-        void switch_to_general_entries_only() { positive = false; }
-        template<typename T>
-        void operator()(T & x) {
-            typedef typename T::value_type FB_ENTRY_TYPE;
-            if (positive != !FB_ENTRY_TYPE::is_general_type) return;
-            for(auto it = pool.begin(); it != pool.end(); ) {
-                fb_entry_general E = std::move(*it);
-                bool must_go_to_general =
-                    !E.is_simple() 
-                    || E.k == 1
-                    /* || E.q < powlim TODO */;
-
-                bool ok1 = FB_ENTRY_TYPE::is_general_type && must_go_to_general;
-                bool ok2 = !FB_ENTRY_TYPE::is_general_type && !must_go_to_general && FB_ENTRY_TYPE::fixed_nr_roots == it->nr_roots;
-                if (ok1 || ok2) {
-                    auto it_next = it;
-                    ++it_next;
-                    x.push_back(std::move(E));
-                    pool.erase(it);
-                    it = it_next;
-                }
-            }
-        }
-    };
-    public:
-    void append(std::list<fb_entry_general> &pool) {
-        /* The "positive" hack and the two passes are just here so that we
-         * don't needlessly to a complete pass over the full list just to
-         * trim a pocketful of special entries.
-         */
-        appender A { pool };
-        multityped_array_foreach(A, entries);
-        A.switch_to_general_entries_only();
-        multityped_array_foreach(A, entries);
-        ASSERT_ALWAYS(pool.empty());
-    }
-
     private:
+    struct helper_functor_append;
+    public:
+    void append(std::list<fb_entry_general> &pool);
+    /* }}} */
+
     /* {{{ Various ways to count primes, prime ideals, and hit ratio
      * ("weight") of entries in the whole factor base, or in subranges
      */
-    struct _count_primes {
-            template<typename T>
-            size_t operator()(size_t t0, T const  & x) const {
-                return t0 + x.size();
-            }
-    };
-    struct _count_prime_ideals {
-            template<typename T>
-            size_t operator()(size_t t0, T const  & x) const {
-                if (T::is_general_type) {
-                    for(auto const & a : x)
-                        t0 += a.get_nr_roots();
-                    return t0;
-                } else {
-                    return t0 + T::fixed_nr_roots * x.size();
-                }
-            }
-    };
-    struct _count_weight {
-            template<typename T>
-            double operator()(double t, T const  & x) const {
-                for(auto const & e : x)
-                    t += e.weight();
-                return t;
-            }
-    };
-    struct _count_combined {
-        size_t & nprimes;
-        size_t & nideals;
-        double & weight;
-        template<typename T>
-        void operator()(T const  & x) const {
-            for(auto const & e : x) {
-                nprimes++;
-                nideals += e.get_nr_roots();
-                weight += e.weight();
-            }
-        }
-    };
-    struct _count_primes_interval {
-            fbprime_t pmin = 0;
-            fbprime_t pmax = std::numeric_limits<fbprime_t>::max();
-            template<typename T>
-            size_t operator()(size_t t, T const  & x) const {
-                for(auto const & e : x) {
-                    if (e.get_q() >= pmin && e.get_q() < pmax)
-                        t++;
-                }
-                return t;
-            }
-    };
-    struct _count_prime_ideals_interval {
-            fbprime_t pmin = 0;
-            fbprime_t pmax = std::numeric_limits<fbprime_t>::max();
-            template<typename T>
-            size_t operator()(size_t t, T const  & x) const {
-                for(auto const & e : x) {
-                    if (e.get_q() >= pmin && e.get_q() < pmax)
-                        t += e.get_nr_roots();
-                }
-                return t;
-            }
-    };
-    struct _count_weight_interval {
-            fbprime_t pmin = 0;
-            fbprime_t pmax = std::numeric_limits<fbprime_t>::max();
-            template<typename T>
-            double operator()(double t, T const  & x) const {
-                for(auto const & e : x)
-                    if (e.get_q() >= pmin && e.get_q() < pmax)
-                        t += e.weight();
-                return t;
-            }
-    };
-    struct _count_combined_interval {
-        size_t & nprimes;
-        size_t & nideals;
-        double & weight;
-        _count_combined_interval(size_t & np, size_t & ni, double & w) :
-            nprimes(np), nideals(ni), weight(w) {}
-        fbprime_t pmin = 0;
-        fbprime_t pmax = std::numeric_limits<fbprime_t>::max();
-        template<typename T>
-        void operator()(T const & x) const {
-            for(auto const & e : x) {
-                nprimes++;
-                nideals += e.get_nr_roots();
-                weight += e.weight();
-            }
-        }
-    };
-    /* }}} */
+    private:
+    struct helper_functor_count_primes;
+    struct helper_functor_count_prime_ideals;
+    struct helper_functor_count_weight;
+    struct helper_functor_count_combined;
+    struct helper_functor_count_primes_interval;
+    struct helper_functor_count_prime_ideals_interval;
+    struct helper_functor_count_weight_interval;
+    struct helper_functor_count_combined_interval;
     public:
-    size_t count_primes() const {
-        return multityped_array_fold(_count_primes(), 0, entries);
-    }
-    size_t count_prime_ideals() const {
-        return multityped_array_fold(_count_primes(), 0, entries);
-    }
-    size_t count_weight() const {
-        return multityped_array_fold(_count_weight(), 0, entries);
-    }
+    size_t count_primes() const;
+    size_t count_prime_ideals() const;
+    size_t count_weight() const;
+    /* }}} */
 
 
     /* the key type lists the things with respect to which we're willing
@@ -705,7 +574,7 @@ class fb_factorbase {
 
     private:
         std::map<key_type, slicing> cache;
-        int read(const char * const filename);
+        int read(const char * const filename, unsigned long lim, unsigned long powlim);
 
     public:
         /* accessors.
@@ -730,13 +599,27 @@ class fb_factorbase {
         void make_linear_threadpool (cxx_mpz_poly const & poly, unsigned long lim, unsigned long powlim, unsigned int nb_threads);
 
     public:
-        fb_factorbase(FILE * fbc_filename, siever_config const & conf, int side);
-        fb_factorbase(cxx_cado_poly const & cpoly, siever_config const & conf, cxx_param_list & pl, int side);
+        fb_factorbase(cxx_cado_poly const & cpoly, siever_config const & conf, int side, FILE * fbc_filename);
+        fb_factorbase(cxx_cado_poly const & cpoly, siever_config const & conf, int side, cxx_param_list & pl);
 
     private:
         struct sorter {
             template<typename T>
-            void operator()(T & x) { std::sort(x.begin(), x.end()); }
+            void operator()(T & x) {
+                /* not entirely clear to me. Shall we sort by q or by p ?
+                 */
+                typedef typename T::value_type X;
+                auto by_q = [](X const & a, X const & b) { return a.get_q() < b.get_q(); };
+                /*
+                auto by_p_then_q = [](X const & a, X const & b) {
+                    return
+                        a.get_p() < b.get_p() ||
+                        a.get_p() == b.get_p() &&
+                        a.get_q() < b.get_q();
+                };
+                */
+                std::sort(x.begin(), x.end(), by_q);
+            }
         };
 
     public:

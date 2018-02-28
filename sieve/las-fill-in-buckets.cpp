@@ -252,7 +252,6 @@ fill_in_buckets_toplevel_sublat(bucket_array_t<LEVEL, shorthint_t> &orig_BA,
 {
   ASSERT_ALWAYS(si.conf.sublat.m != 0);
   bool first_sublat = si.conf.sublat.i0 == 0 && si.conf.sublat.j0 == 1;
-  ASSERT(slice != NULL);
   bucket_array_t<LEVEL, shorthint_t> BA;  /* local copy. Gain a register + use stack */
   BA.move(orig_BA);
 
@@ -367,7 +366,6 @@ fill_in_buckets_toplevel(bucket_array_t<LEVEL, shorthint_t> &orig_BA,
 {
   ASSERT_ALWAYS(!si.conf.sublat.m);
 
-  ASSERT(slice != NULL);
   bool first_reg = true;
   bucket_array_t<LEVEL, shorthint_t> BA;  /* local copy. Gain a register + use stack */
   BA.move(orig_BA);
@@ -667,6 +665,7 @@ fill_in_buckets_toplevel_wrapper(const worker_thread * worker MAYBE_UNUSED, cons
         /* Get an unused bucket array that we can write to */
         bucket_array_t<LEVEL, shorthint_t> &BA = param->ws.reserve_BA<LEVEL, shorthint_t>(param->side);
 
+        ASSERT(param->slice);
         fill_in_buckets_toplevel<LEVEL,FB_ENTRY_TYPE>(BA, param->si,
                 *dynamic_cast<fb_slice<FB_ENTRY_TYPE> const *>(param->slice),
                 param->plattices_dense_vector, w);
@@ -697,6 +696,7 @@ fill_in_buckets_toplevel_sublat_wrapper(const worker_thread * worker MAYBE_UNUSE
 
     try {
         bucket_array_t<LEVEL, shorthint_t> &BA = param->ws.reserve_BA<LEVEL, shorthint_t>(param->side);
+        ASSERT(param->slice);
         fill_in_buckets_toplevel_sublat<LEVEL,FB_ENTRY_TYPE>(BA, param->si,
                 *dynamic_cast<fb_slice<FB_ENTRY_TYPE> const *>(param->slice),
                 param->plattices_dense_vector, w);

@@ -59,6 +59,7 @@ add_subdirectory(strategies)
 add_executable(dupsup
     las-todo-entry.cpp
     las-siever-config.cpp
+    las-sieve-info.cpp
     las-qlattice.cpp
     las-norms.cpp logapprox.cpp
     las-coordinates.cpp

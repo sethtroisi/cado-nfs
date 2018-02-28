@@ -433,6 +433,170 @@ fb_linear_root (fbroot_t & root, cxx_mpz_poly const & poly, const fbprime_t q)
   return is_projective;
 }
 
+/* {{{ counting primes, prime ideals, and so on in the whole factor base.
+ * In fact, these functions are not used presently.
+ */
+struct fb_factorbase::helper_functor_count_primes {
+        template<typename T>
+        size_t operator()(size_t t0, T const  & x) const {
+            return t0 + x.size();
+        }
+};
+struct fb_factorbase::helper_functor_count_prime_ideals {
+        template<typename T>
+        size_t operator()(size_t t0, T const  & x) const {
+            if (T::is_general_type) {
+                for(auto const & a : x)
+                    t0 += a.get_nr_roots();
+                return t0;
+            } else {
+                return t0 + T::fixed_nr_roots * x.size();
+            }
+        }
+};
+struct fb_factorbase::helper_functor_count_weight {
+        template<typename T>
+        double operator()(double t, T const  & x) const {
+            for(auto const & e : x)
+                t += e.weight();
+            return t;
+        }
+};
+struct fb_factorbase::helper_functor_count_combined {
+    size_t & nprimes;
+    size_t & nideals;
+    double & weight;
+    template<typename T>
+    void operator()(T const  & x) const {
+        for(auto const & e : x) {
+            nprimes++;
+            nideals += e.get_nr_roots();
+            weight += e.weight();
+        }
+    }
+};
+struct fb_factorbase::helper_functor_count_primes_interval {
+        fbprime_t pmin = 0;
+        fbprime_t pmax = std::numeric_limits<fbprime_t>::max();
+        template<typename T>
+        size_t operator()(size_t t, T const  & x) const {
+            for(auto const & e : x) {
+                if (e.get_q() >= pmin && e.get_q() < pmax)
+                    t++;
+            }
+            return t;
+        }
+};
+struct fb_factorbase::helper_functor_count_prime_ideals_interval {
+        fbprime_t pmin = 0;
+        fbprime_t pmax = std::numeric_limits<fbprime_t>::max();
+        template<typename T>
+        size_t operator()(size_t t, T const  & x) const {
+            for(auto const & e : x) {
+                if (e.get_q() >= pmin && e.get_q() < pmax)
+                    t += e.get_nr_roots();
+            }
+            return t;
+        }
+};
+struct fb_factorbase::helper_functor_count_weight_interval {
+        fbprime_t pmin = 0;
+        fbprime_t pmax = std::numeric_limits<fbprime_t>::max();
+        template<typename T>
+        double operator()(double t, T const  & x) const {
+            for(auto const & e : x)
+                if (e.get_q() >= pmin && e.get_q() < pmax)
+                    t += e.weight();
+            return t;
+        }
+};
+struct fb_factorbase::helper_functor_count_combined_interval {
+    size_t & nprimes;
+    size_t & nideals;
+    double & weight;
+    helper_functor_count_combined_interval(size_t & np, size_t & ni, double & w) :
+        nprimes(np), nideals(ni), weight(w) {}
+    fbprime_t pmin = 0;
+    fbprime_t pmax = std::numeric_limits<fbprime_t>::max();
+    template<typename T>
+    void operator()(T const & x) const {
+        for(auto const & e : x) {
+            nprimes++;
+            nideals += e.get_nr_roots();
+            weight += e.weight();
+        }
+    }
+};
+
+/* outside visible interface */
+size_t fb_factorbase::count_primes() const {
+    return multityped_array_fold(helper_functor_count_primes(), 0, entries);
+}
+size_t fb_factorbase::count_prime_ideals() const {
+    return multityped_array_fold(helper_functor_count_primes(), 0, entries);
+}
+size_t fb_factorbase::count_weight() const {
+    return multityped_array_fold(helper_functor_count_weight(), 0, entries);
+}
+/* }}} */
+
+/* {{{ append. */
+
+/* FIXME: bizarrely, std::dequeue does not work, here. */
+struct fb_factorbase::helper_functor_append {
+    std::list<fb_entry_general> &pool;
+    int deg;
+    bool positive = true;
+    helper_functor_append(std::list<fb_entry_general> &pool, int deg)
+        : pool(pool), deg(deg) {}
+    void switch_to_general_entries_only() { positive = false; }
+    template<typename T>
+        void operator()(T & x) {
+            typedef typename T::value_type FB_ENTRY_TYPE;
+            constexpr bool isG = FB_ENTRY_TYPE::is_general_type;
+            constexpr unsigned char N = FB_ENTRY_TYPE::fixed_nr_roots;
+            if (positive != !isG) return;
+            /* normally we should not have primes with zero prime
+             * ideals above them in the factor base */
+            if (!isG && N == 0) return;
+            /* likewise, no more roots than the degree of the number
+             * field */
+            if (!isG && N > deg) return;
+            for(auto it = pool.begin(); it != pool.end(); ) {
+                fb_entry_general E = std::move(*it);
+                /* see above */
+                ASSERT(E.nr_roots > 0 && E.nr_roots <= deg);
+                bool must_go_to_general = !E.is_simple() || E.k > 1
+                    /* || E.q < powlim TODO */;
+
+                bool ok1 = isG && must_go_to_general;
+                bool ok2 = !isG && !must_go_to_general && N == E.nr_roots;
+                if (ok1 || ok2) {
+                    auto it_next = it;
+                    ++it_next;
+                    x.push_back(std::move(E));
+                    pool.erase(it);
+                    it = it_next;
+                } else {
+                    ++it;
+                }
+            }
+        }
+};
+void fb_factorbase::append(std::list<fb_entry_general> &pool) {
+    /* The "positive" hack and the two passes are just here so that we
+     * don't needlessly to a complete pass over the full list just to
+     * trim a pocketful of special entries.
+     */
+    helper_functor_append A { pool, mpz_poly_degree(f) };
+    multityped_array_foreach(A, entries);
+    A.switch_to_general_entries_only();
+    multityped_array_foreach(A, entries);
+    ASSERT_ALWAYS(pool.empty());
+}
+/* }}} */
+
+
 template<int n>
 struct fb_entries_interval_factory {
     struct type {
@@ -446,9 +610,9 @@ struct fb_entries_interval_factory {
  */
 struct dispatch_weight_parts {
     fb_factorbase::key_type K;
-    std::array<size_t, FB_MAX_PARTS> np;
-    std::array<size_t, FB_MAX_PARTS> ni;
-    std::array<double, FB_MAX_PARTS> w;
+    std::array<size_t, FB_MAX_PARTS> np { 0, };
+    std::array<size_t, FB_MAX_PARTS> ni { 0, };
+    std::array<double, FB_MAX_PARTS> w { 0, };
     typedef multityped_array<fb_entries_interval_factory, -1, fb_factorbase::MAX_ROOTS+1> intervals_t;
     std::array<intervals_t, FB_MAX_PARTS> intervals;
     dispatch_weight_parts(fb_factorbase::key_type K) : K(K) {}
@@ -457,7 +621,7 @@ struct dispatch_weight_parts {
      * general entries will perhas deserve a special treatment.
      */
     template<typename T>
-        void operator()(T const  & x) {
+        int operator()(int toplevel, T const  & x) {
             /* T is fb_entries_factory<n>::type for some n */
             typedef typename T::const_iterator xit_t;
             typedef typename T::value_type FB_ENTRY_TYPE;
@@ -484,6 +648,15 @@ struct dispatch_weight_parts {
                 w[i] += it->weight();
             }
             intervals[i].get<n>().end = it;
+            /* for consistency, make sure all further parts are
+             * understood as empty.
+             */
+            if (i > toplevel) toplevel = i;
+            for( ; ++i < FB_MAX_PARTS ; ) {
+                intervals[i].get<n>().begin = it;
+                intervals[i].get<n>().end = it;
+            }
+            return toplevel;
         }
 };
 
@@ -545,9 +718,15 @@ struct subdivide_slices {
                 pool.back().weight += it->weight();
             }
             pool.back()._end = it;
-            fprintf(stderr, "slices for n=%d roots: from %zu entries, we found %zu different logp values\n", n, interval_width, pool.size());
+            verbose_output_print (0, 2, "# slices for n=%d roots: from %zu entries, we found %zu different logp values\n", n, interval_width, pool.size());
+            for(auto const & s : pool) {
+                verbose_output_print (0, 2, "#  n=%d logp=%d: %zu entries, weight=%f\n",
+                        n, (int) s.get_logp(), s.end() - s.begin(), s.get_weight());
+            }
 
             /* bold move: all of them become slices... */
+            /* of course that won't stay, it's obvious WIP.
+             * TODO */
             sdst.swap(pool);
         }
 };
@@ -569,8 +748,8 @@ fb_factorbase::slicing::slicing(fb_factorbase const & fb, fb_factorbase::key_typ
      */
 
     dispatch_weight_parts D { K };
-    multityped_array_foreach(D, fb.entries);
-    for (int i = 0; i < FB_MAX_PARTS; i++) {
+    int toplevel = multityped_array_fold(D, 0, fb.entries);
+    for (int i = 0; i <= toplevel; i++) {
         size_t nr_primes = D.np[i];
         size_t nr_roots = D.ni[i];
         double weight = D.w[i];
@@ -595,6 +774,19 @@ fb_factorbase::slicing::slicing(fb_factorbase const & fb, fb_factorbase::key_typ
      */
 
     multityped_array_foreach(dispatch_small_sieved_primes { *this, K.td_thresh }, D.intervals[0]);
+    auto by_q = fb_entry_general::sort_byq();
+
+    /* small sieve cares about this list being sorted by hit rate, I
+     * believe. This is tricky because small sieve considers the hit rate
+     * *per line*, and given some q here, the special-q lattice may
+     * change the picture somewhat if the prime becomes projective: we
+     * may have (p^k1,r1) and (p^k2,r2) two distinct roots above p with
+     * k1 < k2, yet if only the latter becomes projective the hit rate
+     * per line becomes p^k1 and p^(k2-1) (for example). So there's clear
+     * potential for the ordering to be swapped.
+     */
+    std::sort(small_sieve_entries.resieved.begin(), small_sieve_entries.resieved.end(), by_q);
+    std::sort(small_sieve_entries.rest.begin(), small_sieve_entries.rest.end(), by_q);
 
     /* Next, we have sets of begin and end pointers. We need to subdivide
      * them.
@@ -1017,7 +1209,7 @@ read_strip_comment (char *const line)
 */
 
     int
-fb_factorbase::read(const char * const filename)
+fb_factorbase::read(const char * const filename, unsigned long lim, unsigned long powlim)
 {
     FILE *fbfile;
     // too small linesize led to a problem with rsa768;
@@ -1037,7 +1229,7 @@ fb_factorbase::read(const char * const filename)
 
     std::list<fb_entry_general> pool;
     int pool_size = 0;
-
+    size_t overflow = 0;
     while (!feof(fbfile)) {
         /* Sadly, the size parameter of fgets() is of type int */
         if (fgets (line, static_cast<int>(linesize), fbfile) == NULL)
@@ -1050,6 +1242,10 @@ fb_factorbase::read(const char * const filename)
 
         fb_entry_general C;
         C.parse_line (line, linenr);
+        if (C.q > lim || (C.k > 1 && C.q > powlim)) {
+            overflow++;
+            continue;
+        }
         C.invq = compute_invq(C.q);
 
         if (C.p > maxprime) maxprime = C.p;
@@ -1077,6 +1273,9 @@ fb_factorbase::read(const char * const filename)
     verbose_output_print (0, 2, "# Factor base successfully read, %lu primes, "
             "largest was %" FBPRIME_FORMAT "\n",
             nr_primes, maxprime);
+    if (overflow) {
+        verbose_output_print (0, 2, "# Note: %zu primes above limits (lim=%lu, powlim=%lu) were discarded\n", overflow, lim, powlim);
+    }
 
     fclose_maybe_compressed (fbfile, filename);
 
@@ -1086,7 +1285,7 @@ fb_factorbase::read(const char * const filename)
 
 
 /*  Factor base handling */
-fb_factorbase::fb_factorbase(cxx_cado_poly const & cpoly, siever_config const & conf, cxx_param_list & pl, int side) : side(side)
+fb_factorbase::fb_factorbase(cxx_cado_poly const & cpoly, siever_config const & conf, int side, cxx_param_list & pl) : f(cpoly->pols[side]), side(side)
 {
     char paramname[5];
 
@@ -1113,7 +1312,7 @@ fb_factorbase::fb_factorbase(cxx_cado_poly const & cpoly, siever_config const & 
             exit(EXIT_FAILURE);
         }
         verbose_output_print(0, 1, "# Reading side-%d factor base from %s\n", side, fbfilename);
-        if (!read(fbfilename))
+        if (!read(fbfilename, lim, powlim))
             exit(EXIT_FAILURE);
         tfb = seconds () - tfb;
         tfb_wct = wct_seconds () - tfb_wct;
@@ -1143,7 +1342,7 @@ union fbc_header {
      */
     siever_config::side_config sc;
 };
-fb_factorbase::fb_factorbase(FILE * fbc_filename, siever_config const & conf, int side) : side(side)
+fb_factorbase::fb_factorbase(cxx_cado_poly const & cpoly, siever_config const & conf, int side, FILE * fbc_filename) : f(cpoly->pols[side]), side(side)
 {
     fbc_header header;
     int nr = fread(&header, 1, 256, fbc_filename);

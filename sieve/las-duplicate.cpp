@@ -90,7 +90,7 @@ compute_a_over_b_mod_p(mpz_t r, const int64_t a, const uint64_t b, const mpz_t p
 sieve_info *
 fill_in_sieve_info(las_todo_entry const & doing,
                    uint32_t I, uint32_t J,
-                   cado_poly_ptr cpoly, siever_config const & conf, int nb_threads)
+                   cxx_cado_poly const & cpoly, siever_config const & conf, int nb_threads)
 {
   sieve_info * x = new sieve_info;
 
@@ -98,7 +98,7 @@ fill_in_sieve_info(las_todo_entry const & doing,
 
   new_si.I = I;
   new_si.J = J;
-  new_si.cpoly = cpoly;
+  new_si.cpoly_ptr = &cpoly;
   new_si.conf = conf;
   new_si.conf.side = doing.side;
   new_si.doing = doing;
@@ -218,7 +218,7 @@ sq_finds_relation(sq_with_fac const& sq_fac, const int sq_side,
   // prime or composite (it assumes prime). This is fragile!!!
   las_todo_entry doing = special_q_from_ab(rel.a, rel.b, sq, sq_side);
 
-  sieve_range_adjust Adj(doing, old_si.cpoly, old_si.conf, nb_threads);
+  sieve_range_adjust Adj(doing, old_si.cpoly(), old_si.conf, nb_threads);
 
   if (!Adj.SkewGauss() || !Adj.Q.fits_31bits() || !Adj.sieve_info_adjust_IJ()) {
     verbose_output_print(0, VERBOSE_LEVEL, "# DUPECHECK q-lattice discarded\n");
@@ -243,7 +243,7 @@ sq_finds_relation(sq_with_fac const& sq_fac, const int sq_side,
    * ourselves.
    */
   sieve_info si;
-  si.cpoly = old_si.cpoly;
+  si.cpoly_ptr = old_si.cpoly_ptr;
   si.conf = conf;
   si.I = 1UL << conf.logI_adjusted;
   si.recover_per_sq_values(Adj);
@@ -458,7 +458,7 @@ relation_is_duplicate(relation const& rel, las_info const& las,
       }
 
       cxx_mpz aux;
-      mpz_poly_getcoeff(aux, si.cpoly->pols[side]->deg, si.cpoly->pols[side]);
+      mpz_poly_getcoeff(aux, si.cpoly()->pols[side]->deg, si.cpoly()->pols[side]);
       if (mpz_divisible_ui_p(aux, p))
         continue;
 

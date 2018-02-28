@@ -66,6 +66,7 @@ void mpz_poly_realloc (mpz_poly_ptr f, int nc);
 void mpz_poly_set(mpz_poly_ptr g, mpz_poly_srcptr f);
 void mpz_poly_swap (mpz_poly_ptr f, mpz_poly_ptr g);
 void mpz_poly_clear(mpz_poly_ptr f);
+static inline int mpz_poly_degree(mpz_poly_srcptr f) { return f->deg; }
 
 void mpz_poly_cleandeg(mpz_poly_ptr f, int deg);
 void mpz_poly_setcoeffs(mpz_poly_ptr f, mpz_t * coeffs, int d);

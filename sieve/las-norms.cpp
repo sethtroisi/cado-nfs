@@ -282,7 +282,7 @@ get_maxnorm_rectangular (double_poly_srcptr src_poly, const double X,
 
 /* }}} */
 
-lognorm_base::lognorm_base(siever_config const & sc, cado_poly_srcptr cpoly, int side, qlattice_basis const & Q, int J)
+lognorm_base::lognorm_base(siever_config const & sc, cxx_cado_poly const & cpoly, int side, qlattice_basis const & Q, int J)
     : logI(sc.logI_adjusted), J(J)
     /*{{{*/
 {
@@ -401,7 +401,7 @@ unsigned char lognorm_base::lognorm(int i, unsigned int j) const {
 /***********************************************************************/
 
 /* {{{ reference slow code for computing lognorms */
-lognorm_reference::lognorm_reference(siever_config const & sc, cado_poly_srcptr cpoly, int side, qlattice_basis const & Q, int J) : lognorm_base(sc, cpoly, side, Q, J)/*{{{*/
+lognorm_reference::lognorm_reference(siever_config const & sc, cxx_cado_poly const & cpoly, int side, qlattice_basis const & Q, int J) : lognorm_base(sc, cpoly, side, Q, J)/*{{{*/
 {
     /* Knowing the norm on the rational side is bounded by 2^(2^k), compute
      * lognorms approximations for k bits of exponent + NORM_BITS-k bits
@@ -524,7 +524,7 @@ void lognorm_reference::fill(unsigned char * S, int N) const/*{{{*/
 /***********************************************************************/
 
 /* {{{ faster code */
-lognorm_smart::lognorm_smart(siever_config const & sc, cado_poly_srcptr cpoly, int side, qlattice_basis const & Q, int J) : lognorm_base(sc, cpoly, side, Q, J)/*{{{*/
+lognorm_smart::lognorm_smart(siever_config const & sc, cxx_cado_poly const & cpoly, int side, qlattice_basis const & Q, int J) : lognorm_base(sc, cpoly, side, Q, J)/*{{{*/
 {
     /* See init_degree_one_norms_bucket_region_smart for the explanation of
      * this table */

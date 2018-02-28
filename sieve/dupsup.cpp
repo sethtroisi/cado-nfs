@@ -242,7 +242,7 @@ main (int argc, char * argv[])
     param_list_parse_int(pl, "adjust-strategy", &adjust_strategy);
     const char * outputname = param_list_lookup_string(pl, "out");
 
-    cado_poly cpoly;
+    cxx_cado_poly cpoly;
     read_poly(cpoly, pl);
     int ok = parse_config(conf, pl);
     /* the polynomial skewness can be overriden on the command line,
@@ -322,7 +322,6 @@ main (int argc, char * argv[])
     if (outputname)
         fclose_maybe_compressed(output, outputname);
 
-    cado_poly_clear(cpoly);
     mpz_clear(sq);
     mpz_clear(rho);
 

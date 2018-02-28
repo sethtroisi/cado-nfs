@@ -62,7 +62,7 @@ struct las_info : private NonCopyable, public las_augmented_output_channel {
     int suppress_duplicates;
 
     /* It's not ``general operational'', but global enough to be here */
-    cado_poly cpoly;
+    cxx_cado_poly cpoly;
     gmp_randstate_t rstate;
 
     // ----- default config and adaptive configs

@@ -16,13 +16,14 @@
  * since the latters also registers the returned object within
  * las.sievers (while the function here only *reads* this list).
  */
-sieve_info::sieve_info(siever_config const & sc, cado_poly_srcptr cpoly, std::list<sieve_info> & sievers, cxx_param_list & pl, bool try_fbc) /*{{{*/
-    : cpoly(cpoly), conf(sc)
+sieve_info::sieve_info(siever_config const & sc, cxx_cado_poly const & cpoly, std::list<sieve_info> & sievers, cxx_param_list & pl, bool try_fbc) /*{{{*/
+    : cpoly_ptr(&cpoly), conf(sc)
 {
     I = 1UL << sc.logI_adjusted;
 
     std::list<sieve_info>::iterator psi;
 
+    // cxx_cado_poly const & cpoly = *(cxx_cado_poly const *)cpoly_;
     /*** Sieving ***/
 
     psi = find_if(sievers.begin(), sievers.end(), sc.same_fb_parameters());
@@ -36,8 +37,8 @@ sieve_info::sieve_info(siever_config const & sc, cado_poly_srcptr cpoly, std::li
         const char * fbc_filename = param_list_lookup_string(pl, "fbc");
         if (try_fbc && fbc_filename) {
             FILE * f = fopen(fbc_filename, "r");
-            sides[0].fb=std::make_shared<fb_factorbase>(f, sc, 0);
-            sides[1].fb=std::make_shared<fb_factorbase>(f, sc, 1);
+            sides[0].fb=std::make_shared<fb_factorbase>(cpoly, sc, 0, f);
+            sides[1].fb=std::make_shared<fb_factorbase>(cpoly, sc, 1, f);
             /* what shall we do ? If we copy, instead of mmaping, then
              * we'll duplicate the memory, so it's no good. OTOH, this
              * stuff now has many many pointers...
@@ -48,8 +49,8 @@ sieve_info::sieve_info(siever_config const & sc, cado_poly_srcptr cpoly, std::li
              * contain a full-fledged reference because then the type
              * would not be default constructible.
              */
-            sides[0].fb=std::make_shared<fb_factorbase>(*(cxx_cado_poly const *)cpoly, sc, pl, 0);
-            sides[1].fb=std::make_shared<fb_factorbase>(*(cxx_cado_poly const *)cpoly, sc, pl, 1);
+            sides[0].fb=std::make_shared<fb_factorbase>(cpoly, sc, 0, pl);
+            sides[1].fb=std::make_shared<fb_factorbase>(cpoly, sc, 1, pl);
         }
         /* we used to call print_fb_statistics at this point, it should
          * no longer be needed now.  */
@@ -72,7 +73,7 @@ sieve_info::sieve_info(siever_config const & sc, cado_poly_srcptr cpoly, std::li
 void sieve_info::update_norm_data ()/*{{{*/
 {
     for(int side = 0 ; side < 2 ; side++) {
-        sides[side].lognorms = std::make_shared<lognorm_smart>(conf, cpoly, side, qbasis, J);
+        sides[side].lognorms = std::make_shared<lognorm_smart>(conf, *cpoly_ptr, side, qbasis, J);
     }
 }
 

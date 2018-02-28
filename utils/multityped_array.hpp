@@ -224,8 +224,9 @@ template<int n> struct type_factory {
 };
 
 struct print {
-    template<int n> 
-    void operator()(typename type_factory<n>::type const & x) {
+    template<typename T>
+    void operator()(T const & x) {
+        constexpr size_t n = x.size();
         std::cout << "field x" << n << " has elements";
         for(auto a : x) std::cout << " " << a;
         std::cout << std::endl;
@@ -234,8 +235,9 @@ struct print {
 
 struct print2 {
     int k;
-    template<int n>
-    void operator()(std::array<int, n> const & x) {
+    template<typename T>
+    void operator()(T const & x) {
+        constexpr size_t n = x.size();
         std::cout << "field x" << n << " has elements";
         for(auto a : x) std::cout << " " << a;
         std::cout << " [" << k << "]";
@@ -244,18 +246,18 @@ struct print2 {
 };
 
 struct fill {
-    template<int n>
-    void operator()(typename type_factory<n>::type & x) {
+    template<typename T>
+    void operator()(T & x) {
         for(unsigned int i = 0 ; i < x.size() ; ++i)
-            x[i] = i*n;
+            x[i] = i*x.size();
     }
 };
 
 struct return_pointer_if_in_subrange {
     typedef int * type;
     typedef int key_type;
-    template<int K>
-    type operator()(std::array<int, K> & x, int & k) {
+    template<typename T>
+    type operator()(T & x, int & k) {
         if ((size_t) k < x.size()) {
             return &(x[k]);
         } else {
@@ -263,8 +265,8 @@ struct return_pointer_if_in_subrange {
             return NULL;
         }
     }
-    template<int K>
-    type operator()(std::array<int, K> const & x, int & k) {
+    template<typename T>
+    type operator()(T const & x, int & k) {
         if ((size_t) k < x.size()) {
             return &(x[k]);
         } else {
@@ -275,11 +277,13 @@ struct return_pointer_if_in_subrange {
 };
 
 struct accumulate_sizes {
-    template<int n>
-    int operator()(int t0, std::array<int, n> const &) const {
-        return t0 + n;
+    template<typename T>
+    int operator()(int t0, T const & a) const {
+        return t0 + a.size();
     }
 };
+
+
 
 int main()
 {

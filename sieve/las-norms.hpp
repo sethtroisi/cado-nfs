@@ -29,7 +29,7 @@ struct lognorm_base {/*{{{*/
     double scale;      /* scale used for logarithms for fb and norm.
                         * must be of form (int)x * 0.1 */
 
-    lognorm_base(siever_config const & sc, cado_poly_srcptr cpoly, int side, qlattice_basis const & Q, int J);
+    lognorm_base(siever_config const & sc, cxx_cado_poly const & cpoly, int side, qlattice_basis const & Q, int J);
 
     void norm(mpz_ptr x, int i, unsigned int j) const;
     unsigned char lognorm(int i, unsigned int j) const;
@@ -47,7 +47,7 @@ struct lognorm_reference : public lognorm_base {/*{{{*/
      * explanation of this table. */
     unsigned char lognorm_table[1 << NORM_BITS];
 
-    lognorm_reference(siever_config const & sc, cado_poly_srcptr cpoly, int side, qlattice_basis const & Q, int J);
+    lognorm_reference(siever_config const & sc, cxx_cado_poly const & cpoly, int side, qlattice_basis const & Q, int J);
     virtual void fill(unsigned char * S, int N) const;
 };
 
@@ -62,7 +62,7 @@ struct lognorm_smart : public lognorm_base {/*{{{*/
      * original one on the segment [-I,I]x{1}.
      */
     piecewise_linear_function G;
-    lognorm_smart(siever_config const & sc, cado_poly_srcptr cpoly, int side, qlattice_basis const & Q, int J);
+    lognorm_smart(siever_config const & sc, cxx_cado_poly const & cpoly, int side, qlattice_basis const & Q, int J);
     virtual void fill(unsigned char * S, int N) const;
 };
 

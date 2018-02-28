@@ -87,17 +87,14 @@ las_info::las_info(cxx_param_list & pl)
 
     las_display_config_flags();
     /*  Parse polynomial */
-    cado_poly_init(cpoly);
     const char *tmp;
     if ((tmp = param_list_lookup_string(pl, "poly")) == NULL) {
         fprintf(stderr, "Error: -poly is missing\n");
         param_list_print_usage(pl, NULL, stderr);
-	cado_poly_clear(cpoly);
         exit(EXIT_FAILURE);
     }
     if (!cado_poly_read(cpoly, tmp)) {
 	fprintf(stderr, "Error reading polynomial file %s\n", tmp);
-	cado_poly_clear(cpoly);
 	exit(EXIT_FAILURE);
     }
     // sc.skewness = cpoly->skew;
@@ -106,7 +103,6 @@ las_info::las_info(cxx_param_list & pl)
     param_list_parse_double(pl, "skew", &(cpoly->skew));
     if (cpoly->skew <= 0.0) {
 	fprintf(stderr, "Error, please provide a positive skewness\n");
-	cado_poly_clear(cpoly);
 	exit(EXIT_FAILURE);
     }
     gmp_randinit_default(rstate);
@@ -149,7 +145,6 @@ las_info::las_info(cxx_param_list & pl)
             fprintf(stderr, "%s: %s\n", filename, strerror(errno));
             /* There's no point in proceeding, since it would really change
              * the behaviour of the program to do so */
-            cado_poly_clear(cpoly);
             exit(EXIT_FAILURE);
         }
     } else {
@@ -188,7 +183,6 @@ las_info::~las_info()/*{{{*/
 {
     // ----- general operational flags {{{
     gmp_randclear(rstate);
-    cado_poly_clear(cpoly);
     // }}}
 
     // ----- todo list and such {{{
@@ -276,7 +270,7 @@ void las_info::clear_cof_stats()
 }
 //}}}
 
-sieve_info & sieve_info::get_sieve_info_from_config(siever_config const & sc, cado_poly_srcptr cpoly, std::list<sieve_info> & registry, cxx_param_list & pl, bool try_fbc)/*{{{*/
+sieve_info & sieve_info::get_sieve_info_from_config(siever_config const & sc, cxx_cado_poly const & cpoly, std::list<sieve_info> & registry, cxx_param_list & pl, bool try_fbc)/*{{{*/
 {
     std::list<sieve_info>::iterator psi;
     psi = find_if(registry.begin(), registry.end(), sc.same_config());

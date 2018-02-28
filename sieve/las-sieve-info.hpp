@@ -28,7 +28,8 @@ namespace std { using boost::shared_ptr; using boost::make_shared; }
  * file names, or verbosity flags, which do not affect the output).
  */
 struct sieve_info {
-    cado_poly_srcptr cpoly; /* The polynomial pair */
+    cxx_cado_poly const * cpoly_ptr; /* The polynomial pair */
+    inline cxx_cado_poly const & cpoly() { return *cpoly_ptr; }
 
     /* This conditions the validity of the sieve_info_side members
      * sides[0,1], as well as some other members */
@@ -131,10 +132,10 @@ struct sieve_info {
     void update_norm_data ();
     void update (unsigned int nr_workspaces);
 
-    sieve_info(siever_config const & sc, cado_poly_srcptr cpoly, std::list<sieve_info> & sievers, cxx_param_list & pl, bool try_fbc = false);
+    sieve_info(siever_config const & sc, cxx_cado_poly const & cpoly, std::list<sieve_info> & sievers, cxx_param_list & pl, bool try_fbc = false);
 
     sieve_info() {
-        cpoly = NULL;
+        cpoly_ptr = NULL;
         I = J = 0;
         memset(nb_buckets, 0, sizeof(nb_buckets));
         toplevel = 0;
@@ -146,7 +147,7 @@ struct sieve_info {
      * danger is with the static initialization order fiasco which lurks
      * near, so I've been refraining so far.
      */
-    static sieve_info & get_sieve_info_from_config(siever_config const & sc, cado_poly_srcptr cpoly, std::list<sieve_info> & registry, cxx_param_list & pl, bool try_fbc = false);
+    static sieve_info & get_sieve_info_from_config(siever_config const & sc, cxx_cado_poly const & cpoly, std::list<sieve_info> & registry, cxx_param_list & pl, bool try_fbc = false);
 
     void recover_per_sq_values(sieve_range_adjust const& Adj) {
         doing = Adj.doing;

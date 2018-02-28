@@ -52,7 +52,7 @@ void sieve_info::init_trialdiv(int side)
         unsigned long p;
         /* first seek to the end of the fb. */
         for ( ; (p = getprime_mt (pi)) < pmax_sofar ; );
-      cxx_mpz_poly const & f(si.cpoly->pols[side]);
+        cxx_mpz_poly const & f(si.cpoly()->pols[side]);
         for(int minroots = 1 ; minroots <= f->deg ; minroots++) {
             p = append_prime_list(std::back_inserter(trialdiv_primes),
                     pi, MIN(pmax, minroots * si.conf.td_thresh), f, minroots);
