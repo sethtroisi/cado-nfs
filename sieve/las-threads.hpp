@@ -14,6 +14,8 @@
 
 class thread_workspaces;
 
+struct thread_data;
+
 /* All of this exists _for each thread_ */
 struct thread_side_data : private NonCopyable {
   // const fb_factorbase::slicing *fbs __attribute__((deprecated)) = NULL;
@@ -32,6 +34,7 @@ struct thread_side_data : private NonCopyable {
 
   private:
   void allocate_bucket_region();
+  friend struct thread_data;
   public:
 #if 0
   void set_fbs(const fb_factorbase::slicing *_fbs) {

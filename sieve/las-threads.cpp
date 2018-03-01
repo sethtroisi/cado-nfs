@@ -48,10 +48,12 @@ void thread_data::init(const thread_workspaces &_ws, const int _id, las_info con
   is_initialized = true;
 }
 
-void thread_data::pickup_si(sieve_info &)
+void thread_data::pickup_si(sieve_info & _si)
 {
-  /*
   psi = & _si;
+  for (int side = 0 ; side < 2 ; side++)
+      sides[side].allocate_bucket_region();
+  /*
   sieve_info & si(*psi);
   for (int side = 0 ; side < 2 ; side++) {
       if (si.sides[side].fb)
