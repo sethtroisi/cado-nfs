@@ -2764,68 +2764,38 @@ int main (int argc0, char *argv0[])/*{{{*/
 
 
         /* At this point we've decided on a new configuration for the
-         * siever. The new stuff compared to the previous status of the
-         * code is that this configuration also includes thresholds for
-         * the factorbase parts.
+         * siever.
          */
         conf.logI = Adj.logI;
-
-        /* XXX */
-        /* XXX */
-#if 0
-        /* NO, NO, NO. We don't want that. This must come later */
-        /* It's a bit of a hack, yes. If we tinker with I, then we are
-         * varying the notion of bucket-sieved primes. So the "default"
-         * setting varies, and if there's a user-supplied value, it
-         * should by no means fall below the minimum admissible value.
-         */
-        conf.bucket_thresh = 1UL << logI;
-        param_list_parse_ulong(pl, "bkthresh", &(conf.bucket_thresh));
-        if (conf.bucket_thresh < (1UL << logI)) {
-            verbose_output_print(0, 1, "# Warning: with logI = %d,"
-                    " we can't have %lu as the bucket threshold. Using %lu\n",
-                    logI,
-                    conf.bucket_thresh,
-                    1UL << logI);
-            conf.bucket_thresh = 1UL << logI;
-        }
-#endif
-
-        /* done with skew gauss ! */
 
         BOOKKEEPING_TIMER(timer_special_q);
 
         /* Maybe create a new siever ? */
         sieve_info & si(sieve_info::get_sieve_info_from_config(conf, las.cpoly, las.sievers, pl));
-
         /* for some reason get_sieve_info_from_config does not access the
          * full las_info structure, so we have a few adjustments to make
          */
         si.bk_multiplier = &las.bk_multiplier;
-
         si.recover_per_sq_values(Adj);
-
         si.init_j_div();
         si.init_unsieve_data();
-
-        /* checks the value of J,
-         * precompute the skewed polynomials of f(x) and g(x), and also
-         * their floating-point versions */
-
-        totJ += si.J;
-        totlogI += si.conf.logI;
-
-
         /* Now we're ready to sieve. We have to refresh some fields
          * in the sieve_info structure, otherwise we'll be polluted by
          * the leftovers from earlier runs.
          */
+        /* precompute the skewed polynomials of f(x) and g(x), and also
+         * their floating-point versions */
         si.update_norm_data();
-
-        /* this function should really be renamed ! It embodies, in
+        /* This function should really be renamed ! It embodies, in
          * particular, the creation of the different slices in the factor
-         * base */
+         * base. */
         si.update(nr_workspaces);
+
+
+        /* for statistics */
+        totJ += si.J;
+        totlogI += si.conf.logI;
+
 
         try {
 
@@ -2907,6 +2877,8 @@ for (unsigned int j_cong = 0; j_cong < sublat_bound; ++j_cong) {
      * this hack).
      */
 
+
+        /* TODO why this second call to sieve_info::update ?? */
         si.update(nr_workspaces);
 
         workspaces->thrs[0].rep->ttbuckets_fill -= seconds();

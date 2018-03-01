@@ -359,6 +359,13 @@ class fb_factorbase {
     public:
     class slicing {
         public:
+        struct stats_type {
+            std::array<size_t, FB_MAX_PARTS> primes { 0, };
+            std::array<size_t, FB_MAX_PARTS> ideals { 0, };
+            std::array<double, FB_MAX_PARTS> weight { 0, };
+        };
+        stats_type stats;
+
         class part {
             /* slices and general_slices: actually general_slices is
              * slices for number of roots -1, and that is 

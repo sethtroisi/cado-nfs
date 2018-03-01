@@ -216,6 +216,9 @@ struct order_ssp_t {
 };
 static order_ssp_t order_ssp;
 
+/* TODO all these iterator arguments are ridiculous: we have si at hand
+ * anyway...
+ */
 void small_sieve_init(small_sieve_data_t & ssd,
                       unsigned int nthreads,
                       std::vector<fb_entry_general>::const_iterator fb_start,
@@ -224,7 +227,7 @@ void small_sieve_init(small_sieve_data_t & ssd,
                       std::vector<fb_entry_general>::const_iterator resieve_end,
                       sieve_info const & si, const int side)
 {
-    const unsigned int thresh = si.conf.bucket_thresh;
+    const unsigned int thresh = si.sides[side].fbK.thresholds[0];
     const int verbose = 0;
     where_am_I w MAYBE_UNUSED;
 
@@ -351,7 +354,8 @@ void small_sieve_init(small_sieve_data_t & ssd,
             }
         }
     }
-    /* Now init_fb_smallsieved puts the resieved primes first anyway */
+    /* Now the factor base small entries puts the resieved primes first
+     * anyway */
     ASSERT_ALWAYS(resieve_start == fb_start);
     if (resieve_start == fb_end) {
         ASSERT_ALWAYS(!saw_resieve_end);

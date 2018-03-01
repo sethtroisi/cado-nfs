@@ -737,7 +737,8 @@ template<int LEVEL>
 struct push_slice_to_task_list_saving_precomp {
     thread_pool & pool;
     fill_in_buckets_parameters model;
-    std::vector<plattices_dense_vector_t *> & Vpre;
+    /* precomp_plattice_dense_t == std::vector<plattices_dense_vector_t *> */
+    precomp_plattice_dense_t & Vpre;
     bool is_first;
     size_t pushed = 0;
     push_slice_to_task_list_saving_precomp(thread_pool&pool, fill_in_buckets_parameters const & m, std::vector<plattices_dense_vector_t *> & Vpre, bool is_first) : pool(pool), model(m), Vpre(Vpre), is_first(is_first) {}
@@ -747,6 +748,11 @@ struct push_slice_to_task_list_saving_precomp {
         if (is_first) {
             ASSERT_ALWAYS(Vpre.size() == pushed);
             pre = new plattices_dense_vector_t(s.get_index());
+
+            /* TODO: This looks pretty awful. We should reserve the array
+             * beforehand, this should save a constant factor on the
+             * amortized constant cost of storing an element to a vector.
+             */
             Vpre.push_back(pre);
         } else {
             pre = Vpre[pushed];

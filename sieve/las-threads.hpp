@@ -137,7 +137,8 @@ public:
   reservation_group(size_t nr_bucket_arrays);
   void allocate_buckets(const uint32_t *n_bucket,
           bkmult_specifier const& multiplier,
-          const double *fill_ratio, int logI);
+          std::array<double, FB_MAX_PARTS> const &
+          fill_ratio, int logI);
 };
 
 class thread_workspaces : private NonCopyable {

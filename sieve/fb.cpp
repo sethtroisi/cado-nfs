@@ -620,11 +620,8 @@ struct fb_entries_interval_factory {
 /* Goal: count the weight, the number of primes and so on, and find
  * iterators that point to the right portions.
  */
-struct helper_functor_dispatch_weight_parts {
+struct helper_functor_dispatch_weight_parts : public fb_factorbase::slicing::stats_type {
     fb_factorbase::key_type K;
-    std::array<size_t, FB_MAX_PARTS> np { 0, };
-    std::array<size_t, FB_MAX_PARTS> ni { 0, };
-    std::array<double, FB_MAX_PARTS> w { 0, };
     typedef multityped_array<fb_entries_interval_factory, -1, fb_factorbase::MAX_ROOTS+1> intervals_t;
     std::array<intervals_t, FB_MAX_PARTS> intervals;
     helper_functor_dispatch_weight_parts(fb_factorbase::key_type K) : K(K) {}
@@ -655,9 +652,9 @@ struct helper_functor_dispatch_weight_parts {
                     intervals[i+1].get<n>().begin = it;
                 }
                 ASSERT_ALWAYS(i < FB_MAX_PARTS);
-                np[i]++;
-                ni[i]+= it->get_nr_roots(); /* == n, except when n==-1 */
-                w[i] += it->weight();
+                primes[i]++;
+                ideals[i]+= it->get_nr_roots(); /* == n, except when n==-1 */
+                weight[i] += it->weight();
             }
             intervals[i].get<n>().end = it;
             /* for consistency, make sure all further parts are
@@ -767,9 +764,9 @@ fb_factorbase::slicing::slicing(fb_factorbase const & fb, fb_factorbase::key_typ
     helper_functor_dispatch_weight_parts D { K };
     toplevel = multityped_array_fold(D, 0, fb.entries);
     for (int i = 0; i <= toplevel; i++) {
-        size_t nr_primes = D.np[i];
-        size_t nr_roots = D.ni[i];
-        double weight = D.w[i];
+        size_t nr_primes = D.primes[i];
+        size_t nr_roots = D.ideals[i];
+        double weight = D.weight[i];
         int side = fb.side;
         if (!nr_primes) continue;
             verbose_output_print(0, 1, "# Number of primes in side-%d factor base part %d = %zu\n",
@@ -780,9 +777,10 @@ fb_factorbase::slicing::slicing(fb_factorbase const & fb, fb_factorbase::key_typ
                     side, i, weight);
     }
 
-    /* D.w[i] is now what used to be called max_bucket_fill_ratio. We
+    /* D.weight[i] is now what used to be called max_bucket_fill_ratio. We
      * will now make sure that slices are small enough so that a single
      * slice never ever exceeds some fraction of this weight  */
+    stats = D;
      
     /* First, part 0 is treated in a special way. There's no slicing to
      * speak of. We simply populate the small_sieve_entries struct,

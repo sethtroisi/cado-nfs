@@ -49,48 +49,101 @@ struct sieve_info {
     // description of the q-lattice. The values here should remain
     // compatible with those in ->conf (this concerns notably the bit
     // size as well as the special-q side).
+    //
+    // Within las, this is set via sieve_info::recover_per_sq_values(),
+    // which is quite normal since skew gauss is done within
+    // sieve_range_adjust.
     qlattice_basis qbasis;
 
     // parameters for bucket sieving
     /* Actual number of buckets at toplevel used by current special-q */
     uint32_t nb_buckets[FB_MAX_PARTS];
 
-    /* Largest level for which the corresponding fb_part is not empty */
+    /* Largest level for which the corresponding fb_part is not empty.
+     * This is set via sieve_info::update */
     int toplevel;
 
     /* {{{ sieve_side_info */
     struct side_info {
+        /* lognorms is set by sieve_info::update_norm_data(), and depends on
+         *      conf.logA
+         *      conf.sides[side].lpb
+         *      conf.sides[side].sublat
+         *      cpoly
+         *      qbasis
+         *      conf.logI
+         *      conf.J
+         *
+         * We recompute the lognorms for each q.
+         */
         std::shared_ptr<lognorm_base> lognorms;
 
-        std::shared_ptr<trialdiv_divisor_t> trialdiv_data;
-        std::shared_ptr<std::vector<fb_entry_general> > fb_smallsieved;
-        /* Iterators that point into fb_smallsieved; the entries between these
-           two iterators are to be small-sieved, the others are not. */
-        size_t resieve_start_offset, resieve_end_offset;
-
-        /* The reading, mapping or generating the factor base all create the
-         * factor base in several pieces: small primes, and large primes split
-         * into one piece for each thread.
+        /* fb depends on
+         *      cpoly
+         *      conf.sides[side].lim
+         *      conf.sides[side].powlim
          *
-         * [§23.2.4.9 : references to an associative container remain valid]
+         * Morally there should be one single factor base. Currently, in
+         * las_descent, we have several. See comment in
+         * sieve_info::sieve_info
+         *
+         * sieve_info::sieve_info is also the place from where the factor
+         * base is created.
          */
         std::shared_ptr<fb_factorbase> fb;
+
+        /* fbK depends on
+         *      conf.logI
+         *      conf.sides[side].lim
+         *      nthreads
+         * and is set by sieve_info::update */
         fb_factorbase::key_type fbK;
 
-        /* fbs is always (*fb)[fbK] */
+        /* *fbs is always (*fb)[fbK]. It's kept as a pointer for speedy
+         * access and so that the structure remains
+         * default-constructible. This is set by sieve_info::update
+         */
         fb_factorbase::slicing * fbs = NULL;
 
-        /* Caching of the FK-basis in sublat mode */
+        /* trialdiv_data depends on fbK.td_thresh, and marginally on
+         * fbK.thresholds[0].
+         *
+         * TODO
+         * Currently it is set by sieve_info::update, but this looks
+         * completely wrong. There's absolutely no reason why we can't
+         * cache it based on fbK.td_thresh.
+         */
+        std::shared_ptr<trialdiv_divisor_t> trialdiv_data;
+
+
+        /* TODO
+         * fb_smallsieved is a middle man which we should kill. Really,
+         * fbs->small_sieve_entries has everything we need, and we should
+         * use that instead.
+         *
+         * This is currently set in sieve_info::update
+         */
+        std::shared_ptr<std::vector<fb_entry_general> > fb_smallsieved;
+        /* Offsets into fb_smallsieved; the entries between these
+           two offsets are to be small-sieved, the others are not. */
+        size_t resieve_start_offset, resieve_end_offset;
+
+        /* precomp_plattice_dense: caching of the FK-basis in sublat mode.
+         * (for the toplevel only)
+         *
+         * It's quite unholy. A vector of pointers to vectors of FK bases.
+         *
+         * Allocation is made in las-fill-in-buckets.cpp
+         *
+         * There's some cleanup that is done directly in las.
+         * */
         precomp_plattice_dense_t precomp_plattice_dense;
 
-        /* When threads pick up this sieve_info structure, they should check
-         * their bucket allocation */
-        double max_bucket_fill_ratio[FB_MAX_PARTS];
-
         /* This is updated by applying the special-q lattice transform to
-         * the factor base. */
+         * the factor base. This is a "current status" that gets updated
+         * as we sieve. It's initialized by small_sieve_init
+         */
         small_sieve_data_t ssd;
-
     };
     /* }}} */
 
@@ -108,10 +161,8 @@ struct sieve_info {
      */
 
     /* in las-fb.cpp */
-    void init_factor_bases( param_list_ptr pl);
-    void share_factor_bases(sieve_info & other);
-
-    void init_fb_smallsieved(int side);
+    // void init_factor_bases( param_list_ptr pl);
+    // void share_factor_bases(sieve_info & other);
 
     /* in las-trialdiv.cpp */
     void init_trialdiv(int side);

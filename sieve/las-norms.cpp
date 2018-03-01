@@ -1108,7 +1108,7 @@ B:=[bestrep(a):a in {{a*b*c*x:a in {1,-1},b in {1,d},c in {1,s}}:x in MM}];
     int best_squeeze = -1;
 
     /* We integrate on 2^(2*N-1) points (well, morally 2^(2N), but we halve
-     * that by homogeneity */
+     * that by homogeneity) */
     int N = 5;
 
     double reference = estimate_yield_in_sieve_area(shuffle_matrices[0], 0, N);

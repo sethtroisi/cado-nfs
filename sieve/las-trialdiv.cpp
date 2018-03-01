@@ -30,7 +30,7 @@ void sieve_info::init_trialdiv(int side)
        and that it appears at most once. */
 
     sieve_info::side_info & s(si.sides[side]);
-    unsigned long pmax = MIN((unsigned long) si.conf.bucket_thresh,
+    unsigned long pmax = MIN((unsigned long) s.fbK.thresholds[0],
                              trialdiv_get_max_p());
     std::vector<unsigned long> trialdiv_primes;
 
@@ -55,7 +55,7 @@ void sieve_info::init_trialdiv(int side)
         cxx_mpz_poly const & f(si.cpoly()->pols[side]);
         for(int minroots = 1 ; minroots <= f->deg ; minroots++) {
             p = append_prime_list(std::back_inserter(trialdiv_primes),
-                    pi, MIN(pmax, minroots * si.conf.td_thresh), f, minroots);
+                    pi, MIN(pmax, minroots * s.fbK.td_thresh), f, minroots);
         }
         prime_info_clear (pi);
     }

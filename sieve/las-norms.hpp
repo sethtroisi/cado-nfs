@@ -72,11 +72,14 @@ struct sieve_range_adjust {/*{{{*/
 private:
     las_todo_entry doing;
     const siever_config conf;   /* This "conf" field is only used for a
-                                 * few fields. In particular the
-                                 * large prime bounds. We're specifically
-                                 * *not* using the sieving fields, since
-                                 * by design these can be decided *after*
-                                 * the adjustment.  */
+                                 * few fields:
+                                 *      logA
+                                 *      sublat
+                                 *      lpb
+                                 * We're specifically *not* using the
+                                 * sieving fields, since by design these
+                                 * can be decided *after* the adjustment.
+                                 */
     cado_poly_srcptr cpoly;
     int nb_threads;
     cxx_double_poly fijd[2];

@@ -41,24 +41,3 @@ static size_t count_roots(const std::vector<fb_entry_general> &v)
 }
 #endif
 
-/* {{{ sieve_info::{init,clear}_fb_smallsieved */
-void sieve_info::init_fb_smallsieved(int side)
-{
-    /* TODO: This is just a copy. We should kill that, and use the field
-     * from the slicing directly. */
-    sieve_info & si(*this);
-    if (!si.sides[side].fb) return;
-    const fb_factorbase::slicing * fbs = si.sides[side].fbs;
-    /* put the resieved primes first. */
-    auto s = std::make_shared<std::vector<fb_entry_general>>();
-    std::vector<fb_entry_general> const & RS(fbs->small_sieve_entries.resieved);
-    s->insert(s->end(), RS.begin(), RS.end());
-    si.sides[side].resieve_start_offset = 0;
-    si.sides[side].resieve_end_offset = s->size();
-    std::vector<fb_entry_general> const & R(fbs->small_sieve_entries.rest);
-    s->insert(s->end(), R.begin(), R.end());
-    si.sides[side].fb_smallsieved = s;
-}
-
-/* }}} */
-

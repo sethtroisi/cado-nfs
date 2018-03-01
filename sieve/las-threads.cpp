@@ -174,7 +174,8 @@ reservation_group::reservation_group(const size_t nr_bucket_arrays)
 
 void
 reservation_group::allocate_buckets(const uint32_t *n_bucket,
-        bkmult_specifier const& mult, const double *fill_ratio, int logI)
+        bkmult_specifier const& mult,
+        std::array<double, FB_MAX_PARTS> const & fill_ratio, int logI)
 {
   /* Short hint updates are generated only by fill_in_buckets(), so each BA
      gets filled only by its respective FB part */
@@ -324,7 +325,7 @@ thread_workspaces::pickup_si(sieve_info & _si)
         if (!_si.sides[i_side].fb) continue;
         groups[i_side].allocate_buckets(si.nb_buckets,
                 multiplier,
-                si.sides[i_side].max_bucket_fill_ratio,
+                si.sides[i_side].fbs->stats.weight,
                 si.conf.logI);
     }
 }

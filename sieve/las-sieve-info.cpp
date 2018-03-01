@@ -93,7 +93,7 @@ void sieve_info::update_norm_data ()/*{{{*/
 }
 
 /*}}}*/
-void sieve_info::update (unsigned int nr_workspaces)/*{{{*/
+void sieve_info::update (unsigned int nr_workspaces)
 {
     uint64_t A = UINT64_C(1) << conf.logA;
 
@@ -105,19 +105,32 @@ void sieve_info::update (unsigned int nr_workspaces)/*{{{*/
          *
          * That's actually the whole point of this overhaul !
          */
-        fbprime_t bk_thresh = conf.bucket_thresh;
-        fbprime_t bk_thresh1 = conf.bucket_thresh1;
+        fbprime_t bucket_thresh  = conf.bucket_thresh;
+        fbprime_t bucket_thresh1 = conf.bucket_thresh1;
         fbprime_t fbb = conf.sides[side].lim;
-        if (bk_thresh > fbb) bk_thresh = fbb;
-        if (bk_thresh1 == 0 || bk_thresh1 > fbb) bk_thresh1 = fbb;
+
+        if (bucket_thresh == 0)
+            bucket_thresh = 1UL << conf.logI;
+        if (bucket_thresh < (1UL << conf.logI)) {
+            verbose_output_print(0, 1, "# Warning: with logI = %d,"
+                    " we can't have %lu as the bucket threshold. Using %lu\n",
+                    conf.logI,
+                    conf.bucket_thresh,
+                    1UL << conf.logI);
+            bucket_thresh = 1UL << conf.logI;
+        }
+
+        if (bucket_thresh > fbb) bucket_thresh = fbb;
+        if (bucket_thresh1 == 0 || bucket_thresh1 > fbb) bucket_thresh1 = fbb;
 
         fb_factorbase::key_type K {
-            {bk_thresh, bk_thresh1, fbb, fbb},
+            {bucket_thresh, bucket_thresh1, fbb, fbb},
             conf.td_thresh,
             conf.skipped,
             sis.lognorms->scale,
             nr_workspaces
         };
+        sis.fbK = K;
 
         /* The size of the slices must be in accordance to our
          * multithread setting. Hopefully, that one does not change...
@@ -129,17 +142,37 @@ void sieve_info::update (unsigned int nr_workspaces)/*{{{*/
          * inherently tied to the count of the entries in each part.
          */
 
+        sis.fbK = K;
         sis.fbs = &(*sis.fb)[K];
     }
 
-    /* TODO: toplevel depends on the fb thresholds. Or more specifically,
-     * it is decided once we have interpreted the fb thresholds, and
-     * decided on where are the different parts.
-     *
-     * Now since the fb_thresholds are interpreted at the same time as
-     * the log scale parameter, we must be done with the log scale
-     * computation before we do anything top-level related.
-     */
+    for(int side = 0 ; side < 2 ; side++) {
+	init_trialdiv(side); /* Init refactoring stuff */
+        sieve_info::side_info & sis(sides[side]);
+        if (!sis.fb) continue;
+
+        {
+            /* TODO: In this block, we're doing just a copy. We should
+             * kill that, and use the field from the slicing directly. */
+            const fb_factorbase::slicing * fbs = sis.fbs;
+            /* put the resieved primes first. */
+            auto s = std::make_shared<std::vector<fb_entry_general>>();
+            std::vector<fb_entry_general> const & RS(fbs->small_sieve_entries.resieved);
+            s->insert(s->end(), RS.begin(), RS.end());
+            sis.resieve_start_offset = 0;
+            sis.resieve_end_offset = s->size();
+            std::vector<fb_entry_general> const & R(fbs->small_sieve_entries.rest);
+            s->insert(s->end(), R.begin(), R.end());
+            sis.fb_smallsieved = s;
+        }
+
+        /*
+        verbose_output_print(0, 2, "# small side-%d factor base", side);
+        size_t nr_roots;
+        sides[side].fb->get_part(0)->count_entries(NULL, &nr_roots, NULL);
+        verbose_output_print(0, 2, " (total %zu)\n", nr_roots);
+        */
+    }
 
     // Now that fb have been initialized, we can set the toplevel.
     toplevel = -1;
@@ -147,38 +180,6 @@ void sieve_info::update (unsigned int nr_workspaces)/*{{{*/
         if (!sides[side].fb) continue;
         int level = sides[side].fbs->get_toplevel();
         if (level > toplevel) toplevel = level;
-    }
-
-#if 0
-    /* Initialize the number of buckets */
-    /* (it's now done in sieve_info::update, which is more timely) */
-    /* set the maximal value of the number of buckets. This directly
-     * depends on A */
-    uint32_t XX[FB_MAX_PARTS] = { 0, NB_BUCKETS_2, NB_BUCKETS_3, 0};
-    uint64_t BRS[FB_MAX_PARTS] = BUCKET_REGIONS;
-    uint64_t A = UINT64_C(1) << conf.logA;
-    XX[toplevel] = iceildiv(A, BRS[toplevel]);
-    for (int i = toplevel+1; i < FB_MAX_PARTS; ++i)
-        XX[i] = 0;
-    if (toplevel > 1 && XX[toplevel] == 1) {
-        XX[toplevel-1] = iceildiv(A, BRS[toplevel-1]);
-        ASSERT_ALWAYS(XX[toplevel-1] != 1);
-    }
-    for (int i = 0; i < FB_MAX_PARTS; ++i) {
-        nb_buckets[i] = XX[i];
-    }
-#endif
-
-    for(int side = 0 ; side < 2 ; side++) {
-	init_trialdiv(side); /* Init refactoring stuff */
-        if (!sides[side].fb) continue;
-        init_fb_smallsieved(side);
-        /*
-        verbose_output_print(0, 2, "# small side-%d factor base", side);
-        size_t nr_roots;
-        sides[side].fb->get_part(0)->count_entries(NULL, &nr_roots, NULL);
-        verbose_output_print(0, 2, " (total %zu)\n", nr_roots);
-        */
     }
 
     /* update number of buckets at toplevel */
@@ -198,7 +199,7 @@ void sieve_info::update (unsigned int nr_workspaces)/*{{{*/
     }
 }/*}}}*/
 
-
+#if 0
 void sieve_info::share_factor_bases(sieve_info& other)
 {
     for(int side = 0 ; side < 2 ; side++) {
@@ -209,3 +210,4 @@ void sieve_info::share_factor_bases(sieve_info& other)
         sis.fb = sis0.fb;
     }
 }
+#endif
