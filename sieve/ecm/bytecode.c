@@ -700,9 +700,12 @@ bytecode_prac_encode (bytecode *bc, unsigned int B1, unsigned int pow2_nb,
   }
   prime_info_clear (pi);
 
-  /* replace last 'f' by a 'F' */
-  bytecode_encoder_remove_one (encoder);
-  bytecode_encoder_add_one (encoder, PRAC_BLOCK_FINAL);
+  if (bytecode_encoder_length (encoder) > 0)
+  {
+    /* replace last 'f' by a 'F' */
+    bytecode_encoder_remove_one (encoder);
+    bytecode_encoder_add_one (encoder, PRAC_BLOCK_FINAL);
+  }
 
   /* compress if asked */
   if (compress)
