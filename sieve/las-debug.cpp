@@ -84,8 +84,8 @@ void trace_per_sq_init(sieve_info const & si, const struct trace_Nx_t *Nx,
     }
 
     if ((trace_ij.j < UINT_MAX && trace_ij.j >= si.J)
-         || (trace_ij.i < -(1L << (si.conf.logI_adjusted-1)))
-         || (trace_ij.i >= (1L << (si.conf.logI_adjusted-1))))
+         || (trace_ij.i < -(1L << (si.conf.logI-1)))
+         || (trace_ij.i >= (1L << (si.conf.logI-1))))
     {
         verbose_output_print(TRACE_CHANNEL, 0, "# Relation (%" PRId64 ",%" PRIu64 ") to be traced is "
                 "outside of the current (i,j)-rectangle (i=%d j=%u)\n",
@@ -129,7 +129,7 @@ int test_divisible(where_am_I& w)
     fbprime_t p = w.p;
     if (p==0) return 1;
 
-    const unsigned int logI = w.psi->conf.logI_adjusted;
+    const unsigned int logI = w.psi->conf.logI;
     const unsigned int I = 1U << logI;
 
     const unsigned long X = w.x + (w.N << LOG_BUCKET_REGION);

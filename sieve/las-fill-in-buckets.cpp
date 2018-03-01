@@ -279,12 +279,12 @@ fill_in_buckets_toplevel_sublat(bucket_array_t<LEVEL, shorthint_t> &orig_BA,
         /* If proj and r > 0, then r == 1/p (mod p^2), so all hits would be in
            locations with p | gcd(i,j). */
         if (LIKELY(!proj || r == 0)) {
-          plattice_info_t pli = plattice_info_t(transformed.get_q(), r, proj, si.conf.logI_adjusted);
+          plattice_info_t pli = plattice_info_t(transformed.get_q(), r, proj, si.conf.logI);
           // In sublat mode, save it for later use
           plattice_info_dense_t plid(pli, i_entry);
           precomp_slice->push_back(plid);
 
-          plattice_enumerate_t ple = plattice_enumerate_t(pli, i_entry, si.conf.logI_adjusted, si.conf.sublat);
+          plattice_enumerate_t ple = plattice_enumerate_t(pli, i_entry, si.conf.logI, si.conf.sublat);
 
           if (plattice_enumerate_finished<LEVEL>(ple.get_x()))
             continue;
@@ -317,10 +317,10 @@ fill_in_buckets_toplevel_sublat(bucket_array_t<LEVEL, shorthint_t> &orig_BA,
     }
   } else { // Use precomputed FK-basis
     for (unsigned int i = 0; i < precomp_slice->size(); ++i) {
-      plattice_info_t pli = (*precomp_slice)[i].unpack(si.conf.logI_adjusted);
+      plattice_info_t pli = (*precomp_slice)[i].unpack(si.conf.logI);
       slice_offset_t i_entry = (*precomp_slice)[i].get_hint();
 
-      plattice_enumerate_t ple = plattice_enumerate_t(pli, i_entry, si.conf.logI_adjusted, si.conf.sublat);
+      plattice_enumerate_t ple = plattice_enumerate_t(pli, i_entry, si.conf.logI, si.conf.sublat);
 
       if (plattice_enumerate_finished<LEVEL>(ple.get_x()))
         continue;
@@ -390,9 +390,9 @@ fill_in_buckets_toplevel(bucket_array_t<LEVEL, shorthint_t> &orig_BA,
       /* If proj and r > 0, then r == 1/p (mod p^2), so all hits would be in
          locations with p | gcd(i,j). */
       if (LIKELY(!proj || r == 0)) {
-        plattice_info_t pli = plattice_info_t(transformed.get_q(), r, proj, si.conf.logI_adjusted);
+        plattice_info_t pli = plattice_info_t(transformed.get_q(), r, proj, si.conf.logI);
   
-        plattice_enumerate_t ple = plattice_enumerate_t(pli, i_entry, si.conf.logI_adjusted);
+        plattice_enumerate_t ple = plattice_enumerate_t(pli, i_entry, si.conf.logI);
 
         // Skip (i,j)=(0,0)
         ple.next();
@@ -854,18 +854,18 @@ void fill_in_buckets(timetree_t& timer, thread_pool &pool, thread_workspaces &ws
 {
     // per se, we're not doing anything here.
     // CHILD_TIMER(timer, __func__);
-    plattice_enumerate_t::set_masks(si.conf.logI_adjusted);
+    plattice_enumerate_t::set_masks(si.conf.logI);
     switch (si.toplevel) {
         case 1:
-            plattice_enumerate_area<1>::value = plattice_x_t(si.J) << si.conf.logI_adjusted;
+            plattice_enumerate_area<1>::value = plattice_x_t(si.J) << si.conf.logI;
             fill_in_buckets_one_side<1>(timer, pool, ws, si, side);
             break;
         case 2:
-            plattice_enumerate_area<2>::value = plattice_x_t(si.J) << si.conf.logI_adjusted;
+            plattice_enumerate_area<2>::value = plattice_x_t(si.J) << si.conf.logI;
             fill_in_buckets_one_side<2>(timer, pool, ws, si, side);
             break;
         case 3:
-            plattice_enumerate_area<3>::value = plattice_x_t(si.J) << si.conf.logI_adjusted;
+            plattice_enumerate_area<3>::value = plattice_x_t(si.J) << si.conf.logI;
             fill_in_buckets_one_side<3>(timer, pool, ws, si, side);
             break;
         default:

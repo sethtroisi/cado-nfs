@@ -93,7 +93,7 @@ template <int LEVEL, typename HINT>
 void
 bucket_array_t<LEVEL, HINT>::allocate_memory(const uint32_t new_n_bucket,
                                 const double fill_ratio,
-                                int logI_adjusted,
+                                int logI,
                                 const slice_index_t prealloc_slices)
 {
   /* Don't try to allocate anything, nor print a message, for sieving levels
@@ -102,15 +102,15 @@ bucket_array_t<LEVEL, HINT>::allocate_memory(const uint32_t new_n_bucket,
     return;
 
   /* We'll allocate bucket regions of size 2^LOG_BUCKET_REGIONS[LEVEL],
-   * and those will be used to cover lines of size 2^logI_adjusted.
+   * and those will be used to cover lines of size 2^logI.
    *
-   * If LOG_BUCKET_REGIONS[LEVEL] > logI_adjusted, then we'll have both
+   * If LOG_BUCKET_REGIONS[LEVEL] > logI, then we'll have both
    * even and odd lines in there, so 75% of the locations will receive
    * updates.
    *
-   * If LOG_BUCKET_REGIONS[LEVEL] <= logI_adjusted, it's different. The
+   * If LOG_BUCKET_REGIONS[LEVEL] <= logI, it's different. The
    * line ordinate for bucket region number N will be N, maybe shifted
-   * right by a few bits (logI_adjusted - LOG_BUCKET_REGIONS[LEVEL]).
+   * right by a few bits (logI - LOG_BUCKET_REGIONS[LEVEL]).
    * Bucket regions for which this line ordinate is even will receive
    * updates for 50% of the locations only, in contrast to 100% when the
    * ordinate is even.
@@ -132,8 +132,8 @@ bucket_array_t<LEVEL, HINT>::allocate_memory(const uint32_t new_n_bucket,
   const int ndev = NB_DEVIATIONS_BUCKET_REGIONS;
 
   uint32_t bitmask_line_ordinate = 0;
-  if (LOG_BUCKET_REGIONS[LEVEL] <= logI_adjusted) {
-      bitmask_line_ordinate = UINT32_C(1) << (logI_adjusted - LOG_BUCKET_REGIONS[LEVEL]);
+  if (LOG_BUCKET_REGIONS[LEVEL] <= logI) {
+      bitmask_line_ordinate = UINT32_C(1) << (logI - LOG_BUCKET_REGIONS[LEVEL]);
       ASSERT_ALWAYS(new_n_bucket % 2 == 0);
       bs_even = 2 * Q + ndev * sqrt(2 * Q);
       bs_odd  = 4 * Q + ndev * sqrt(4 * Q);

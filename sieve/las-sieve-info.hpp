@@ -26,13 +26,16 @@ namespace std { using boost::shared_ptr; using boost::make_shared; }
 /* General information about the siever, based on some input-dependent
  * configuration data with an impact on the output (as opposed to e.g.
  * file names, or verbosity flags, which do not affect the output).
+ *
+ * A sieve_info struct depends on the special-q.
  */
 struct sieve_info {
     cxx_cado_poly const * cpoly_ptr; /* The polynomial pair */
     inline cxx_cado_poly const & cpoly() { return *cpoly_ptr; }
 
     /* This conditions the validity of the sieve_info_side members
-     * sides[0,1], as well as some other members */
+     * sides[0,1], as well as some other members. If config fields match,
+     * we can basically use the same sieve_info structure. */
     siever_config conf;
 
     /* This field gets initialized only via get_sieve_info_from_config */
@@ -40,8 +43,6 @@ struct sieve_info {
 
     las_todo_entry doing;
 
-    // sieving area. Note that in the (conf) member struct, we find
-    // logI_adjusted (will be renamed eventually), as well as logA.
     uint32_t J;
     uint32_t I;
 
@@ -74,6 +75,9 @@ struct sieve_info {
          * [§23.2.4.9 : references to an associative container remain valid]
          */
         std::shared_ptr<fb_factorbase> fb;
+        fb_factorbase::key_type fbK;
+
+        /* fbs is always (*fb)[fbK] */
         fb_factorbase::slicing * fbs = NULL;
 
         /* Caching of the FK-basis in sublat mode */
@@ -116,7 +120,7 @@ struct sieve_info {
     /* Data for unsieving locations where gcd(i,j) > 1 */
     /* This gets initialized only when I is finally decided */
     unsieve_data us;
-    void init_unsieve_data() { us = unsieve_data(conf.logI_adjusted, conf.logA); }
+    void init_unsieve_data() { us = unsieve_data(conf.logI, conf.logA); }
 
     /* in las-unsieve.cpp */
     /* Data for divisibility tests p|i in lines where p|j */
@@ -156,7 +160,7 @@ struct sieve_info {
         if (!qbasis.prime_sq) {
             qbasis.prime_factors = doing.prime_factors;
         }
-        ASSERT_ALWAYS(conf.logI_adjusted == Adj.logI);
+        ASSERT_ALWAYS(conf.logI == Adj.logI);
         ASSERT_ALWAYS(I == (1UL << Adj.logI));
         J = Adj.J;
     }

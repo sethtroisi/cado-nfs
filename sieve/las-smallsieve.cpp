@@ -243,7 +243,7 @@ void small_sieve_init(small_sieve_data_t & ssd,
     // If we are doing sublattices modulo m, then we jump virtually m
     // times faster.
     unsigned int sublatm = si.conf.sublat.m;
-    const unsigned int skiprows = ((nthreads-1) << LOG_BUCKET_REGION) >> si.conf.logI_adjusted;
+    const unsigned int skiprows = ((nthreads-1) << LOG_BUCKET_REGION) >> si.conf.logI;
     bool saw_resieve_start = false, saw_resieve_end = false;
     
     for (std::vector<fb_entry_general>::const_iterator iter = fb_start;
@@ -521,7 +521,7 @@ void small_sieve_start(std::vector<spos_t> & ssdpos,
      *  compute the starting point from within sieve_small_bucket_region
      *  for each bucket region.
      */
-    small_sieve_base<> C(si.conf.logI_adjusted, first_region_index, si.conf.sublat);
+    small_sieve_base<> C(si.conf.logI, first_region_index, si.conf.sublat);
     ssdpos.clear();
     ssdpos.reserve(ssd.ssps.size());
     for (ssp_simple_t const & ssp : ssd.ssps) {
@@ -929,7 +929,7 @@ void sieve_small_bucket_region(unsigned char *S, unsigned int N,
                                int nthreads,
                                where_am_I & w)
 {
-    int logI = si.conf.logI_adjusted;
+    int logI = si.conf.logI;
     bool is_fragment = logI > LOG_BUCKET_REGION;
 
     if (is_fragment) {
@@ -960,7 +960,7 @@ resieve_small_bucket_region (bucket_primes_t *BP, int N, unsigned char *S,
         small_sieve_data_t & ssd, std::vector<spos_t> & ssdpos,
         sieve_info const & si, int nthreads MAYBE_UNUSED, where_am_I & w MAYBE_UNUSED)
 {
-    int logI = si.conf.logI_adjusted;
+    int logI = si.conf.logI;
     SMALLSIEVE_COMMON_DEFS();
     small_sieve_base<> C(logI, N, si.conf.sublat);
 

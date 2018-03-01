@@ -281,7 +281,7 @@ sieve_info & sieve_info::get_sieve_info_from_config(siever_config const & sc, cx
     registry.push_back(sieve_info(sc, cpoly, registry, pl, try_fbc));
     sieve_info & si(registry.back());
     verbose_output_print(0, 1, "# Creating new sieve configuration for q~2^%d on side %d (logI=%d)\n",
-            sc.bitsize, sc.side, si.conf.logI_adjusted);
+            sc.bitsize, sc.side, si.conf.logI);
     sc.display();
     return registry.back();
 }/*}}}*/

@@ -30,9 +30,9 @@ int only_complete_functions = 0;
 
 /* this is really a mock structure just for the fun of it. */
 struct {
+    int logI;
     struct {
         sublat_t sublat;
-        int logI_adjusted;
     } conf;
     struct {
         mpz_t q;
@@ -412,7 +412,7 @@ void legacy_branch(std::vector<int> & positions, std::vector<ssp_simple_t> const
 
         unsigned long j;
         const int test_divisibility MAYBE_UNUSED = 0; /* very slow, but nice for debugging */
-        const unsigned long nj = bucket_region >> si.conf.logI_adjusted; /* Nr. of lines 
+        const unsigned long nj = bucket_region >> si.conf.logI; /* Nr. of lines 
                                                                             per bucket region */
 
         WHERE_AM_I_UPDATE(w, p, p);
@@ -603,7 +603,7 @@ void legacy_mod_branch(std::vector<int> & positions, std::vector<ssp_simple_t> c
         size_t overrun MAYBE_UNUSED = 0; /* tame gcc */
         unsigned long j;
         const int test_divisibility MAYBE_UNUSED = 0; /* very slow, but nice for debugging */
-        const unsigned long nj = bucket_region >> si.conf.logI_adjusted; /* Nr. of lines 
+        const unsigned long nj = bucket_region >> si.conf.logI; /* Nr. of lines 
                                                                             per bucket region */
 
         WHERE_AM_I_UPDATE(w, p, p);
@@ -677,7 +677,7 @@ j_odd0:
 
             unsigned long j;
             const int test_divisibility MAYBE_UNUSED = 0; /* very slow, but nice for debugging */
-            const unsigned long nj = bucket_region >> si.conf.logI_adjusted; /* Nr. of lines 
+            const unsigned long nj = bucket_region >> si.conf.logI; /* Nr. of lines 
                                                                                 per bucket region */
 
             WHERE_AM_I_UPDATE(w, p, p);
@@ -1225,7 +1225,7 @@ int main(int argc0, char * argv0[])
     param_list_parse_int(pl, "bmin", &bmin);
     param_list_parse_int(pl, "bmax", &bmax);
 
-    si.conf.logI_adjusted = logI;
+    si.conf.logI = logI;
     if (!bmax) bmax = logI;
     if (!logA) logA = 2*logI-1;
 

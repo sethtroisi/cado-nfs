@@ -433,6 +433,19 @@ fb_linear_root (fbroot_t & root, cxx_mpz_poly const & poly, const fbprime_t q)
   return is_projective;
 }
 
+std::ostream& operator<<(std::ostream& o, fb_factorbase::key_type const & k)
+{
+    o << "scale=" << k.scale
+      << ", "
+      << "thresholds={";
+    for(int i = 0 ; i < FB_MAX_PARTS ; i++) {
+        if (i) o << ", ";
+        o << k.thresholds[i];
+    }
+    o << "}";
+    return o;
+}
+
 /* {{{ counting primes, prime ideals, and so on in the whole factor base.
  * In fact, these functions are not used presently.
  */
@@ -596,7 +609,6 @@ void fb_factorbase::append(std::list<fb_entry_general> &pool) {
 }
 /* }}} */
 
-
 template<int n>
 struct fb_entries_interval_factory {
     struct type {
@@ -608,14 +620,14 @@ struct fb_entries_interval_factory {
 /* Goal: count the weight, the number of primes and so on, and find
  * iterators that point to the right portions.
  */
-struct dispatch_weight_parts {
+struct helper_functor_dispatch_weight_parts {
     fb_factorbase::key_type K;
     std::array<size_t, FB_MAX_PARTS> np { 0, };
     std::array<size_t, FB_MAX_PARTS> ni { 0, };
     std::array<double, FB_MAX_PARTS> w { 0, };
     typedef multityped_array<fb_entries_interval_factory, -1, fb_factorbase::MAX_ROOTS+1> intervals_t;
     std::array<intervals_t, FB_MAX_PARTS> intervals;
-    dispatch_weight_parts(fb_factorbase::key_type K) : K(K) {}
+    helper_functor_dispatch_weight_parts(fb_factorbase::key_type K) : K(K) {}
 
     /* TODO: factor base entries that made it only to the vector of
      * general entries will perhas deserve a special treatment.
@@ -660,7 +672,7 @@ struct dispatch_weight_parts {
         }
 };
 
-struct dispatch_small_sieved_primes {
+struct helper_functor_dispatch_small_sieved_primes {
     fb_factorbase::slicing & S;
     unsigned int td_thresh;
     /* TODO: it's a bit unsatisfactory that we do this comparison on
@@ -685,7 +697,7 @@ struct dispatch_small_sieved_primes {
         }
 };
 
-struct subdivide_slices {
+struct helper_functor_subdivide_slices {
     fb_factorbase::slicing::part & dst;
     fb_factorbase::key_type K;
     template<typename T>
@@ -744,11 +756,16 @@ fb_factorbase::slicing::slicing(fb_factorbase const & fb, fb_factorbase::key_typ
      * That used to be done in fb_part::_count_entries
      *
      * Now this is all done in the "foreach" below, which does a lot of
-     * stuff using the dispatch_weight_parts structure above.
+     * stuff using the helper_functor_dispatch_weight_parts structure above.
      */
 
-    dispatch_weight_parts D { K };
-    int toplevel = multityped_array_fold(D, 0, fb.entries);
+    std::ostringstream os;
+    os << K;
+    verbose_output_print(0, 1, "# Creating new slicing on side %d for %s\n",
+            fb.side, os.str().c_str());
+
+    helper_functor_dispatch_weight_parts D { K };
+    toplevel = multityped_array_fold(D, 0, fb.entries);
     for (int i = 0; i <= toplevel; i++) {
         size_t nr_primes = D.np[i];
         size_t nr_roots = D.ni[i];
@@ -773,7 +790,7 @@ fb_factorbase::slicing::slicing(fb_factorbase const & fb, fb_factorbase::key_typ
      * resieved, which are trial-divided, and so on).
      */
 
-    multityped_array_foreach(dispatch_small_sieved_primes { *this, K.td_thresh }, D.intervals[0]);
+    multityped_array_foreach(helper_functor_dispatch_small_sieved_primes { *this, K.td_thresh }, D.intervals[0]);
     auto by_q = fb_entry_general::sort_byq();
 
     /* small sieve cares about this list being sorted by hit rate, I
@@ -792,7 +809,7 @@ fb_factorbase::slicing::slicing(fb_factorbase const & fb, fb_factorbase::key_typ
      * them.
      */
     for (int i = 1; i < FB_MAX_PARTS; i++)
-        multityped_array_foreach(subdivide_slices { parts[i], K }, D.intervals[i]);
+        multityped_array_foreach(helper_functor_subdivide_slices { parts[i], K }, D.intervals[i]);
 
     /* we're going to divide our vector in several
      * parts, and compute slices. That used to be done by many
@@ -1285,12 +1302,9 @@ fb_factorbase::read(const char * const filename, unsigned long lim, unsigned lon
 
 
 /*  Factor base handling */
-fb_factorbase::fb_factorbase(cxx_cado_poly const & cpoly, siever_config const & conf, int side, cxx_param_list & pl) : f(cpoly->pols[side]), side(side)
+fb_factorbase::fb_factorbase(cxx_cado_poly const & cpoly, int side, unsigned long lim, unsigned long powlim, cxx_param_list & pl) : f(cpoly->pols[side]), side(side)
 {
     char paramname[5];
-
-    unsigned long lim = conf.sides[side].lim;
-    unsigned long powlim = conf.sides[side].powlim;
 
     if (!lim) return;
 
@@ -1337,22 +1351,24 @@ fb_factorbase::fb_factorbase(cxx_cado_poly const & cpoly, siever_config const & 
 
 union fbc_header {
     char h[256];
-    /* we only want lim and powlim to match what we see in the file.
-     * The rest is not checked, and not relevant.
-     */
-    siever_config::side_config sc;
+    /* TODO: add a checksum of the polynomial, or maybe even the
+     * polynomial itself ? */
+    struct {
+        unsigned long lim;
+        unsigned long powlim;
+    } sc;
 };
-fb_factorbase::fb_factorbase(cxx_cado_poly const & cpoly, siever_config const & conf, int side, FILE * fbc_filename) : f(cpoly->pols[side]), side(side)
+fb_factorbase::fb_factorbase(cxx_cado_poly const & cpoly, int side, unsigned long lim, unsigned long powlim, FILE * fbc_filename) : f(cpoly->pols[side]), side(side)
 {
     fbc_header header;
     int nr = fread(&header, 1, 256, fbc_filename);
     ASSERT_ALWAYS(nr == sizeof(header.h));
-    if (conf.sides[side].lim != header.sc.lim) {
-        fprintf(stderr, "Fatal error: cached factor base file is not consistent with the configured value lim%d=%lu\n", side, conf.sides[side].lim);
+    if (lim != header.sc.lim) {
+        fprintf(stderr, "Fatal error: cached factor base file is not consistent with the configured value lim%d=%lu\n", side, lim);
         exit(EXIT_FAILURE);
     }
-    if (conf.sides[side].powlim != header.sc.powlim) {
-        fprintf(stderr, "Fatal error: cached factor base file is not consistent with the configured value powlim%d=%lu\n", side, conf.sides[side].powlim);
+    if (powlim != header.sc.powlim) {
+        fprintf(stderr, "Fatal error: cached factor base file is not consistent with the configured value powlim%d=%lu\n", side, powlim);
         exit(EXIT_FAILURE);
     }
 
@@ -1360,33 +1376,11 @@ fb_factorbase::fb_factorbase(cxx_cado_poly const & cpoly, siever_config const & 
 
     /* We assume that the cache file gets read in order, side 0 before
      * side 1.
+     *
+     * The difficulty is that we want the (allocator of the) internal
+     * container for entries in the factor base to be mmap-able.  But
+     * then, that means an immutable container, clearly !
      */
-
-    /* TODO. Really, we want that only for the default config. At this
-     * moment it's not entirely clear how we would do that.
-     */
-#if 0
-    for(int side = 0 ; side < 2 ; side++) {
-        fbprime_t bk_thresh = conf.bucket_thresh;
-        fbprime_t bk_thresh1 = conf.bucket_thresh1;
-        const fbprime_t fbb = conf.sides[side].lim;
-        if (!fbb) {
-            fb[side] = NULL;
-            continue;
-        }
-        const fbprime_t powlim = conf.sides[side].powlim;
-        if (bk_thresh > fbb) {
-            bk_thresh = fbb;
-        }
-        if (bk_thresh1 == 0 || bk_thresh1 > fbb) {
-            bk_thresh1 = fbb;
-        }
-        const fbprime_t thresholds[4] = {bk_thresh, bk_thresh1, fbb, fbb};
-        const bool only_general[4]={true, false, false, false};
-        sides[side].fb = std::make_shared<fb_factorbase>(thresholds, powlim, only_general);
-        fb[side] = sides[side].fb.get();
-    }
-#endif
 
     /* TODO: re-enable */
 #if 0

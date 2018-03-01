@@ -218,7 +218,8 @@ sq_finds_relation(sq_with_fac const& sq_fac, const int sq_side,
   // prime or composite (it assumes prime). This is fragile!!!
   las_todo_entry doing = special_q_from_ab(rel.a, rel.b, sq, sq_side);
 
-  sieve_range_adjust Adj(doing, old_si.cpoly(), old_si.conf, nb_threads);
+  siever_config conf = old_si.conf;
+  sieve_range_adjust Adj(doing, old_si.cpoly(), conf, nb_threads);
 
   if (!Adj.SkewGauss() || !Adj.Q.fits_31bits() || !Adj.sieve_info_adjust_IJ()) {
     verbose_output_print(0, VERBOSE_LEVEL, "# DUPECHECK q-lattice discarded\n");
@@ -234,8 +235,7 @@ sq_finds_relation(sq_with_fac const& sq_fac, const int sq_side,
   if (adjust_strategy >= 3)
     Adj.sieve_info_update_norm_data_Jmax(true);
 
-  siever_config conf = Adj.config();
-  conf.logI_adjusted = Adj.logI;
+  conf.logI = Adj.logI;
   conf.side = sq_side;
 
   /* We don't have a constructor which is well adapted to our needs here.
@@ -245,7 +245,7 @@ sq_finds_relation(sq_with_fac const& sq_fac, const int sq_side,
   sieve_info si;
   si.cpoly_ptr = old_si.cpoly_ptr;
   si.conf = conf;
-  si.I = 1UL << conf.logI_adjusted;
+  si.I = 1UL << conf.logI;
   si.recover_per_sq_values(Adj);
   si.strategies = old_si.strategies;
 

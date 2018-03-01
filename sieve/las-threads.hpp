@@ -100,7 +100,7 @@ public:
 
   /* Allocate enough memory to be able to store at least n_bucket buckets,
      each of size at least fill_ratio * bucket region size. */
-  void allocate_buckets(const uint32_t n_bucket, double fill_ratio, int logI_adjusted);
+  void allocate_buckets(const uint32_t n_bucket, double fill_ratio, int logI);
   const T* cbegin() const {return &BAs[0];}
   const T* cend() const {return &BAs[n];}
 
@@ -137,7 +137,7 @@ public:
   reservation_group(size_t nr_bucket_arrays);
   void allocate_buckets(const uint32_t *n_bucket,
           bkmult_specifier const& multiplier,
-          const double *fill_ratio, int logI_adjusted);
+          const double *fill_ratio, int logI);
 };
 
 class thread_workspaces : private NonCopyable {

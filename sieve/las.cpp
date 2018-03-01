@@ -1255,7 +1255,7 @@ void factor_survivors_data::search_survivors(timetree_t & timer)
 
     /* change N, which is a bucket number, to
      * (i0, i1, j0, j1) */
-    int logI = si.conf.logI_adjusted;
+    int logI = si.conf.logI;
     /* This bit of code is replicated from las-smallsieve.cpp */
     const unsigned int log_lines_per_region = MAX(0, LOG_BUCKET_REGION - logI);
     const unsigned int log_regions_per_line = MAX(0, logI - LOG_BUCKET_REGION);
@@ -1984,7 +1984,7 @@ void * process_bucket_region(timetree_t & timer, thread_data *th)
         // unsigned int first_i = (N & ((1 << log_buckets_per_line) - 1)) << LOG_BUCKET_REGION;
         // unsigned int first_j = (N >> log_buckets_per_line) << log_lines_per_bucket;
 
-        int logI = si.conf.logI_adjusted;
+        int logI = si.conf.logI;
         /* This bit of code is replicated from las-smallsieve.cpp */
         const unsigned int log_lines_per_region = MAX(0, LOG_BUCKET_REGION - logI);
         const unsigned int log_regions_per_line = MAX(0, logI - LOG_BUCKET_REGION);
@@ -2660,10 +2660,13 @@ int main (int argc0, char *argv0[])/*{{{*/
         las.dumpfiles[0].setname(las.dump_filename, doing.p, doing.r, 0);
         las.dumpfiles[1].setname(las.dump_filename, doing.p, doing.r, 1);
 
-        sieve_range_adjust Adj(doing,
-                las.cpoly,
-                las.config_pool.get_config_for_q(doing),
-                las.nb_threads);
+        siever_config conf = las.config_pool.get_config_for_q(doing);
+
+        /* The whole business about sieve_range_adjust is to compute the
+         * optimal logI and J for this special-q. We have several
+         * strategies for that.
+         */
+        sieve_range_adjust Adj(doing, las.cpoly, conf, las.nb_threads);
 
 
         if (!Adj.SkewGauss()) {
@@ -2765,24 +2768,28 @@ int main (int argc0, char *argv0[])/*{{{*/
          * code is that this configuration also includes thresholds for
          * the factorbase parts.
          */
-        siever_config conf = Adj.config();
-        conf.logI_adjusted = Adj.logI;
+        conf.logI = Adj.logI;
 
+        /* XXX */
+        /* XXX */
+#if 0
+        /* NO, NO, NO. We don't want that. This must come later */
         /* It's a bit of a hack, yes. If we tinker with I, then we are
          * varying the notion of bucket-sieved primes. So the "default"
          * setting varies, and if there's a user-supplied value, it
          * should by no means fall below the minimum admissible value.
          */
-        conf.bucket_thresh = 1UL << conf.logI_adjusted;
+        conf.bucket_thresh = 1UL << logI;
         param_list_parse_ulong(pl, "bkthresh", &(conf.bucket_thresh));
-        if (conf.bucket_thresh < (1UL << conf.logI_adjusted)) {
+        if (conf.bucket_thresh < (1UL << logI)) {
             verbose_output_print(0, 1, "# Warning: with logI = %d,"
                     " we can't have %lu as the bucket threshold. Using %lu\n",
-                    conf.logI_adjusted,
+                    logI,
                     conf.bucket_thresh,
-                    1UL << conf.logI_adjusted);
-            conf.bucket_thresh = 1UL << conf.logI_adjusted;
+                    1UL << logI);
+            conf.bucket_thresh = 1UL << logI;
         }
+#endif
 
         /* done with skew gauss ! */
 
@@ -2806,7 +2813,7 @@ int main (int argc0, char *argv0[])/*{{{*/
          * their floating-point versions */
 
         totJ += si.J;
-        totlogI += si.conf.logI_adjusted;
+        totlogI += si.conf.logI;
 
 
         /* Now we're ready to sieve. We have to refresh some fields
@@ -2974,7 +2981,7 @@ for (unsigned int j_cong = 0; j_cong < sublat_bound; ++j_cong) {
 
             // Prepare plattices at internal levels
             // TODO: this could be multi-threaded
-            plattice_x_t max_area = plattice_x_t(si.J)<<si.conf.logI_adjusted;
+            plattice_x_t max_area = plattice_x_t(si.J)<<si.conf.logI;
             plattice_enumerate_area<1>::value =
                 MIN(max_area, plattice_x_t(BUCKET_REGIONS[2]));
             plattice_enumerate_area<2>::value =
@@ -2991,7 +2998,7 @@ for (unsigned int j_cong = 0; j_cong < sublat_bound; ++j_cong) {
                         sieve_info const & si;
                         precomp_plattice_t & precomp_plattice;
                         void operator()(fb_slice_interface const & s) {
-                            precomp_plattice.push(side, level, s.make_lattice_bases(si.qbasis, si.conf.logI_adjusted, si.conf.sublat));
+                            precomp_plattice.push(side, level, s.make_lattice_bases(si.qbasis, si.conf.logI, si.conf.sublat));
                         }
                     };
 

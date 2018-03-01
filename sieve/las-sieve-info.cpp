@@ -19,12 +19,31 @@
 sieve_info::sieve_info(siever_config const & sc, cxx_cado_poly const & cpoly, std::list<sieve_info> & sievers, cxx_param_list & pl, bool try_fbc) /*{{{*/
     : cpoly_ptr(&cpoly), conf(sc)
 {
-    I = 1UL << sc.logI_adjusted;
+    I = 1UL << sc.logI;
 
     std::list<sieve_info>::iterator psi;
 
-    // cxx_cado_poly const & cpoly = *(cxx_cado_poly const *)cpoly_;
-    /*** Sieving ***/
+    /*** factor base ***/
+    
+    /* This is screwed.
+     *
+     * We wish to address the case where depending on the special-q,
+     * there may be different sieving bounds (lim). And then, this causes
+     * us to read new factor bases.
+     *
+     * This is screwed because morally, there should be one single factor
+     * base. It should be truncated if needed, when creating a slicing.
+     *
+     * How exactly this should be done is not totally clear. Maybe along
+     * the following lines.
+     *
+     * The factor base can be initialized essentially with the
+     * polynomials, lim, and powlim.
+     *
+     * The siever_config that comes now *may* be used to restrict the
+     * factor base: it defines a new fb_factorbase::key_type, which then
+     * is used to create a slicing.
+     */
 
     psi = find_if(sievers.begin(), sievers.end(), sc.same_fb_parameters());
 
@@ -37,23 +56,19 @@ sieve_info::sieve_info(siever_config const & sc, cxx_cado_poly const & cpoly, st
         const char * fbc_filename = param_list_lookup_string(pl, "fbc");
         if (try_fbc && fbc_filename) {
             FILE * f = fopen(fbc_filename, "r");
-            sides[0].fb=std::make_shared<fb_factorbase>(cpoly, sc, 0, f);
-            sides[1].fb=std::make_shared<fb_factorbase>(cpoly, sc, 1, f);
-            /* what shall we do ? If we copy, instead of mmaping, then
-             * we'll duplicate the memory, so it's no good. OTOH, this
-             * stuff now has many many pointers...
-             */
+            for(int side = 0 ; side < 2 ; side++) {
+                unsigned long lim = sc.sides[side].lim;
+                unsigned long powlim = sc.sides[side].powlim;
+                sides[side].fb=std::make_shared<fb_factorbase>(cpoly, side, lim, powlim, f);
+            }
             fclose(f);
         } else {
-            /* TODO: get rid of the indirection. We can't have sieve_info
-             * contain a full-fledged reference because then the type
-             * would not be default constructible.
-             */
-            sides[0].fb=std::make_shared<fb_factorbase>(cpoly, sc, 0, pl);
-            sides[1].fb=std::make_shared<fb_factorbase>(cpoly, sc, 1, pl);
+            for(int side = 0 ; side < 2 ; side++) {
+                unsigned long lim = sc.sides[side].lim;
+                unsigned long powlim = sc.sides[side].powlim;
+                sides[side].fb=std::make_shared<fb_factorbase>(cpoly, side, lim, powlim, pl);
+            }
         }
-        /* we used to call print_fb_statistics at this point, it should
-         * no longer be needed now.  */
     }
 
 
@@ -73,7 +88,7 @@ sieve_info::sieve_info(siever_config const & sc, cxx_cado_poly const & cpoly, st
 void sieve_info::update_norm_data ()/*{{{*/
 {
     for(int side = 0 ; side < 2 ; side++) {
-        sides[side].lognorms = std::make_shared<lognorm_smart>(conf, *cpoly_ptr, side, qbasis, J);
+        sides[side].lognorms = std::make_shared<lognorm_smart>(conf, *cpoly_ptr, side, qbasis, conf.logI, J);
     }
 }
 

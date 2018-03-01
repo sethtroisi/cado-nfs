@@ -282,8 +282,8 @@ get_maxnorm_rectangular (double_poly_srcptr src_poly, const double X,
 
 /* }}} */
 
-lognorm_base::lognorm_base(siever_config const & sc, cxx_cado_poly const & cpoly, int side, qlattice_basis const & Q, int J)
-    : logI(sc.logI_adjusted), J(J)
+lognorm_base::lognorm_base(siever_config const & sc, cxx_cado_poly const & cpoly, int side, qlattice_basis const & Q, int logI, int J)
+    : logI(logI), J(J)
     /*{{{*/
 {
     int64_t H[4] = { Q.a0, Q.b0, Q.a1, Q.b1 };
@@ -401,7 +401,7 @@ unsigned char lognorm_base::lognorm(int i, unsigned int j) const {
 /***********************************************************************/
 
 /* {{{ reference slow code for computing lognorms */
-lognorm_reference::lognorm_reference(siever_config const & sc, cxx_cado_poly const & cpoly, int side, qlattice_basis const & Q, int J) : lognorm_base(sc, cpoly, side, Q, J)/*{{{*/
+lognorm_reference::lognorm_reference(siever_config const & sc, cxx_cado_poly const & cpoly, int side, qlattice_basis const & Q, int logI, int J) : lognorm_base(sc, cpoly, side, Q, logI, J)/*{{{*/
 {
     /* Knowing the norm on the rational side is bounded by 2^(2^k), compute
      * lognorms approximations for k bits of exponent + NORM_BITS-k bits
@@ -524,7 +524,7 @@ void lognorm_reference::fill(unsigned char * S, int N) const/*{{{*/
 /***********************************************************************/
 
 /* {{{ faster code */
-lognorm_smart::lognorm_smart(siever_config const & sc, cxx_cado_poly const & cpoly, int side, qlattice_basis const & Q, int J) : lognorm_base(sc, cpoly, side, Q, J)/*{{{*/
+lognorm_smart::lognorm_smart(siever_config const & sc, cxx_cado_poly const & cpoly, int side, qlattice_basis const & Q, int logI, int J) : lognorm_base(sc, cpoly, side, Q, logI, J)/*{{{*/
 {
     /* See init_degree_one_norms_bucket_region_smart for the explanation of
      * this table */
@@ -533,7 +533,7 @@ lognorm_smart::lognorm_smart(siever_config const & sc, cxx_cado_poly const & cpo
 
     if (fijd->deg > 1) {
         piecewise_linear_approximator A(fijd, log(2)/scale);
-        int I = 1 << sc.logI_adjusted;
+        int I = 1 << logI;
         G = A.logapprox(-(I/2), I/2);
     }
 }/*}}}*/

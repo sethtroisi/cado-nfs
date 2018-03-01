@@ -329,22 +329,22 @@ int main (int argc0, char *argv0[])/*{{{*/
         }
 
         siever_config conf = Adj.config();
-        conf.logI_adjusted = Adj.logI;
+        logI = Adj.logI;
 
         /* It's a bit of a hack, yes. If we tinker with I, then we are
          * varying the notion of bucket-sieved primes. So the "default"
          * setting varies, and if there's a user-supplied value, it
          * should by no means fall below the minimum admissible value.
          */
-        conf.bucket_thresh = 1UL << conf.logI_adjusted;
+        conf.bucket_thresh = 1UL << logI;
         param_list_parse_ulong(pl, "bkthresh", &(conf.bucket_thresh));
-        if (conf.bucket_thresh < (1UL << conf.logI_adjusted)) {
+        if (conf.bucket_thresh < (1UL << logI)) {
             verbose_output_print(0, 1, "# Warning: with logI = %d,"
                     " we can't have %lu as the bucket threshold. Using %lu\n",
-                    conf.logI_adjusted,
+                    logI,
                     conf.bucket_thresh,
-                    1UL << conf.logI_adjusted);
-            conf.bucket_thresh = 1UL << conf.logI_adjusted;
+                    1UL << logI);
+            conf.bucket_thresh = 1UL << logI;
         }
         /* done with skew gauss ! */
 
@@ -366,7 +366,7 @@ int main (int argc0, char *argv0[])/*{{{*/
                     "# Warning, q=%Zd is not prime\n",
                     (mpz_srcptr) doing.p);
         }
-        verbose_output_print(0, 2, "# I=%u; J=%u\n", 1U << conf.logI_adjusted, Adj.J);
+        verbose_output_print(0, 2, "# I=%u; J=%u\n", 1U << logI, Adj.J);
 
         std::shared_ptr<lognorm_base> lognorms[NCODES][2];
 
@@ -385,7 +385,7 @@ int main (int argc0, char *argv0[])/*{{{*/
             }
         }
 
-        int logI = conf.logI_adjusted;
+        int logI = logI;
         size_t I = 1UL << logI;
         size_t J = Adj.J;
         int B = 1 << LOG_BUCKET_REGION;

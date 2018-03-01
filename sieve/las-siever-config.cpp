@@ -95,15 +95,11 @@ bool siever_config::parse_default(siever_config & sc, param_list_ptr pl)
             fprintf(stderr, "# -A and -I are incompatible\n");
             exit(EXIT_FAILURE);
         }
-        // This is useful for a default config
-        sc.logI_adjusted = (sc.logA+1)/2;
     } else if (param_list_lookup_string(pl, "I")) {
         int I;
         complete &= param_list_parse_int  (pl, "I", &I);
         sc.logA = 2 * I - 1;
         verbose_output_print(0, 1, "# Interpreting -I %d as meaning -A %d\n", I, sc.logA);
-        // This is useful for a default config
-        sc.logI_adjusted = I;
     }
 
     if (sc.sides[0].lim > 2147483647UL || sc.sides[1].lim > 2147483647UL)
@@ -126,12 +122,9 @@ bool siever_config::parse_default(siever_config & sc, param_list_ptr pl)
     param_list_parse_uint(pl, "sublat", &(sc.sublat.m));
 
     /* Parse optional siever configuration parameters */
-    sc.td_thresh = 1024;	/* default value */
-    sc.skipped = 1;	/* default value */
     param_list_parse_uint(pl, "tdthresh", &(sc.td_thresh));
     param_list_parse_uint(pl, "skipped", &(sc.skipped));
 
-    sc.unsieve_thresh = 100;
     if (param_list_parse_uint(pl, "unsievethresh", &(sc.unsieve_thresh))) {
         verbose_output_print(0, 1, "# Un-sieving primes > %u\n",
                 sc.unsieve_thresh);
@@ -143,8 +136,10 @@ bool siever_config::parse_default(siever_config & sc, param_list_ptr pl)
     //
     // As a consequence, we should make it possible to specify extra
     // parameters in the hint file format (not just I,lim,lpb,mfb).
-    sc.bucket_thresh = 1 << ((sc.logA+1)/2);	/* default value */
-    sc.bucket_thresh1 = 0;	/* default value */
+    //
+    // The logic that sets bucket_thresh to 2^I by default is done late,
+    // namely when we are about to create a new slicing for the factor
+    // base.
     /* overrides default only if parameter is given */
     param_list_parse_ulong(pl, "bkthresh", &(sc.bucket_thresh));
     param_list_parse_ulong(pl, "bkthresh1", &(sc.bucket_thresh1));

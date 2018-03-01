@@ -23,7 +23,6 @@
 #include "las-qlattice.hpp"
 #include "las-plattice.hpp"
 #include "las-base.hpp"
-#include "las-siever-config.hpp"
 
 /* structure:
  *
@@ -233,7 +232,7 @@ class fb_slice_interface {
 /* This is one of the function objects in fb.cpp that needs to tinker
  * with the internals of fb_slice.
  */
-struct subdivide_slices;
+struct helper_functor_subdivide_slices;
 
 template<typename FB_ENTRY_TYPE>
 class fb_slice : public fb_slice_interface {
@@ -241,7 +240,7 @@ class fb_slice : public fb_slice_interface {
     unsigned char logp;
     slice_index_t index;
     double weight;
-    friend struct subdivide_slices;
+    friend struct helper_functor_subdivide_slices;
     fb_slice(typename std::vector<FB_ENTRY_TYPE>::const_iterator it, unsigned char logp) : _begin(it), _end(it), logp(logp), index(0), weight(0) {}
     public:
     typedef FB_ENTRY_TYPE entry_t;
@@ -368,7 +367,7 @@ class fb_factorbase {
              * MAX_ROOTS.
              */
             typedef multityped_array<fb_slices_factory, -1, MAX_ROOTS+1> slices_t;
-            friend struct subdivide_slices;
+            friend struct helper_functor_subdivide_slices;
             slices_t slices;
             public:
             template<int n>
@@ -474,6 +473,8 @@ class fb_factorbase {
          * slices!
          */
         std::array<part, FB_MAX_PARTS> parts;
+
+        /* toplevel is set by the ctor */
         int toplevel = 0;
 
         fb_slice_interface const * get(slice_index_t index) const {
@@ -552,8 +553,11 @@ class fb_factorbase {
             /* from "rest" above, we can infer the list of trial-divided
              * primes by merely restricting to entries with k==1 */
         };
-
         small_sieve_entries_t small_sieve_entries;
+        /* TODO: I doubt that the struct above will stay. Seems awkward.
+         * We'd better have a single vector, and the position of the
+         * "end-of-resieved" thing.
+         */
 
         template<typename T>
         void foreach_slice(T & f) {
@@ -599,8 +603,8 @@ class fb_factorbase {
         void make_linear_threadpool (cxx_mpz_poly const & poly, unsigned long lim, unsigned long powlim, unsigned int nb_threads);
 
     public:
-        fb_factorbase(cxx_cado_poly const & cpoly, siever_config const & conf, int side, FILE * fbc_filename);
-        fb_factorbase(cxx_cado_poly const & cpoly, siever_config const & conf, int side, cxx_param_list & pl);
+        fb_factorbase(cxx_cado_poly const & cpoly, int side, unsigned long lim, unsigned long powlim, FILE * fbc_filename);
+        fb_factorbase(cxx_cado_poly const & cpoly, int side, unsigned long lim, unsigned long powlim, cxx_param_list & pl);
 
     private:
         struct sorter {
@@ -627,6 +631,8 @@ class fb_factorbase {
             multityped_array_foreach(sorter(), entries);
         }
 };
+
+std::ostream& operator<<(std::ostream& o, fb_factorbase::key_type const &);
 
 unsigned char   fb_log (double x, double y, double z);
 unsigned char	fb_log_delta (fbprime_t, unsigned long, unsigned long, double);
