@@ -727,10 +727,16 @@ struct helper_functor_subdivide_slices {
                 pool.back().weight += it->weight();
             }
             pool.back()._end = it;
-            verbose_output_print (0, 2, "# slices for n=%d roots: from %zu entries, we found %zu different logp values\n", n, interval_width, pool.size());
+            std::ostringstream n_eq;
+            n_eq << "n=";
+            if (n < 0) n_eq << "*"; else n_eq << n;
+            verbose_output_print (0, 2, "# slices for %s roots: from %zu entries, we found %zu different logp values\n", n_eq.str().c_str(), interval_width, pool.size());
             for(auto const & s : pool) {
-                verbose_output_print (0, 2, "#  n=%d logp=%d: %zu entries, weight=%f\n",
-                        n, (int) s.get_logp(), s.end() - s.begin(), s.get_weight());
+                verbose_output_print (0, 2, "#  %s logp=%d: %zu entries, weight=%f\n",
+                        n_eq.str().c_str(),
+                        (int) s.get_logp(),
+                        s.end() - s.begin(),
+                        s.get_weight());
             }
 
             /* bold move: all of them become slices... */
