@@ -1,6 +1,8 @@
 #ifndef BYTECODE_MISHMASH_B1_DATA_H
 #define BYTECODE_MISHMASH_B1_DATA_H
 
+/* This file was generated automatically */
+
 #include "bytecode.h"
 
 struct mishmash_B1_data_s
@@ -12,16 +14,11 @@ struct mishmash_B1_data_s
 
 typedef struct mishmash_B1_data_s mishmash_B1_data_t;
 
-/* B1=5 computed with 2 blocks, cost=38M */
-static const uint8_t _B1_5_bc[] = {
-    0x03,
-    0x81,
-      /* 5*3  /  PRAC  /  28 M (=2DBL+0TPL+3ADD+0M) */
-      0x69, 0x03, 0x66, 0x69, 0x46,
-      /* 2*2  /  PRAC  /  10 M (=2DBL+0TPL+0ADD+0M) */
-      /* done outside of bytecode (for backtracking) */
+/* B1=1 computed with 0 blocks, cost=0M */
+static const uint8_t _B1_1_bc[] = {
+    0x00,
     0xff
-  }; /* end of bytecode for B1=5 */
+  }; /* end of bytecode for B1=1 */
 
 /* B1=105 computed with 10 blocks, cost=1144M */
 static const uint8_t _B1_105_bc[] = {
@@ -2245,7 +2242,7 @@ static const uint8_t _B1_1021_bc[] = {
 
 /* Sorted by increasing B1 */
 static mishmash_B1_data_t mishmash_B1_data[] = {
-    { .B1 = 5, .len = sizeof(_B1_5_bc)/sizeof(*_B1_5_bc), .bc = _B1_5_bc },
+    { .B1 = 1, .len = sizeof(_B1_1_bc)/sizeof(*_B1_1_bc), .bc = _B1_1_bc },
     { .B1 = 105, .len = sizeof(_B1_105_bc)/sizeof(*_B1_105_bc), .bc = _B1_105_bc },
     { .B1 = 115, .len = sizeof(_B1_115_bc)/sizeof(*_B1_115_bc), .bc = _B1_115_bc },
     { .B1 = 125, .len = sizeof(_B1_125_bc)/sizeof(*_B1_125_bc), .bc = _B1_125_bc },
