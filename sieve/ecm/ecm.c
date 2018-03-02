@@ -293,6 +293,9 @@ bytecode_prac_interpret_ec_montgomery (ec_point_t P, bytecode_const bc,
   ec_point_t *R = NULL;
   unsigned int R_nalloc;
 
+  if (bc == NULL)
+    return;
+
   R_nalloc = 5; /* we need 5 points: 3 for PRAC + 2 temporary points */
   R = (ec_point_t *) malloc (R_nalloc * sizeof (ec_point_t));
   FATAL_ERROR_CHECK (R == NULL, "could not malloc R");

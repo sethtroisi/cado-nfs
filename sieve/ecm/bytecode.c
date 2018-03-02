@@ -414,6 +414,12 @@ bytecode_prac_cache_free ()
 void
 bytecode_prac_fprintf (FILE *out, bytecode_const bc)
 {
+  if (bc == NULL)
+  {
+    printf (" (length = 0)\n");
+    return ;
+  }
+
   unsigned int i = 0;
   while (1)
   {
@@ -715,9 +721,14 @@ bytecode_prac_encode (bytecode *bc, unsigned int B1, unsigned int pow2_nb,
 
   /* Copy into bc */
   unsigned int bc_len = bytecode_encoder_length (encoder);
-  *bc = (bytecode) malloc (bc_len * sizeof (bytecode_elt));
-  ASSERT_ALWAYS (*bc);
-  memcpy (*bc, encoder->bc, bc_len * sizeof (bytecode_elt));
+  if (bc_len > 0)
+  {
+    *bc = (bytecode) malloc (bc_len * sizeof (bytecode_elt));
+    ASSERT_ALWAYS (*bc);
+    memcpy (*bc, encoder->bc, bc_len * sizeof (bytecode_elt));
+  }
+  else
+    *bc = NULL;
 
   if (verbose)
   {
@@ -936,7 +947,10 @@ bytecode_prac_check (bytecode_const bc, mpz_srcptr E, int verbose)
   /* current point (here starting point) go into R[0] at init */
   mpz_set_ui (R[0], 1);
 
-  ret = bytecode_prac_check_internal (bc, NULL, R, R_nalloc, verbose);
+  if (bc != NULL)
+    ret = bytecode_prac_check_internal (bc, NULL, R, R_nalloc, verbose);
+  else
+    mpz_set (R[1], R[0]);
 
   if (ret == 0 && mpz_cmp (R[1], E) != 0) /* output is in R[1] */
   {

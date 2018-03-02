@@ -102,9 +102,9 @@ int main (int argc, const char **argv)
     printf ("PRAC cost: dbl = %f; dadd = %f\n", cost.dbl, cost.dadd);
 
     /* compress prac chains */
-    nerrors += test_prac (100, 1100, 1, &cost, verbose);
+    nerrors += test_prac (1, 1100, 1, &cost, verbose);
     /* uncompress prac chains */
-    nerrors += test_prac (100, 1100, 0, &cost, verbose);
+    nerrors += test_prac (1, 1100, 0, &cost, verbose);
   }
 
   { /* mishmash test */
@@ -121,9 +121,9 @@ int main (int argc, const char **argv)
                              .prac = &prac_cost };
 
     /* compress mishmash chains */
-    nerrors += test_mishmash (100, 1100, 1, &cost, verbose);
+    nerrors += test_mishmash (1, 1100, 1, &cost, verbose);
     /* uncompress mishmash chains */
-    nerrors += test_mishmash (100, 1100, 0, &cost, verbose);
+    nerrors += test_mishmash (1, 1100, 0, &cost, verbose);
   }
 
   bytecode_prac_cache_free ();
