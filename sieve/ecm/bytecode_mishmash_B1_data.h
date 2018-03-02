@@ -20,6 +20,30 @@ static const uint8_t _B1_1_bc[] = {
     0xff
   }; /* end of bytecode for B1=1 */
 
+/* B1=100 computed with 8 blocks, cost=1052M */
+static const uint8_t _B1_100_bc[] = {
+    0x03,
+    /* 97*79*67*59*43*41*29*19*11*7*7*5*3*3*3  /  double-base chain  /  476 M (=45DBL+10TPL+5ADD+1M) */
+    0x11, 0x41, 0x05, 0xd1, 0x01, 0x04, 0x41, 0x0d, 0xd1, 0x09, 0x0e, 0x71, 0x09,
+    /* 89*23  /  double-base chain  /  86 M (=11DBL+0TPL+1ADD+1M) */
+    0x11, 0x71, 0x0b,
+    /* 83*73*71*61*37*17*5  /  double-base chain  /  287 M (=22DBL+9TPL+3ADD+1M) */
+    0x11, 0xd1, 0x01, 0x0a, 0xd1, 0x07, 0x02, 0xe1, 0x01, 0x0a,
+    /* Here we saved 4M on the last operation */
+    0x81,
+      /* 13  /  PRAC  /  29 M (=1DBL+0TPL+4ADD+0M) */
+      0x69, 0x0b, 0x0b, 0x03, 0x66,
+      /* 31*3  /  PRAC  /  52 M (=2DBL+0TPL+7ADD+0M) */
+      0x69, 0x03, 0x0b, 0x0b, 0x0b, 0x03, 0x66, 0x69, 0x66,
+      /* 47  /  PRAC  /  46 M (=2DBL+0TPL+6ADD+0M) */
+      0x69, 0x02, 0x0b, 0x0b, 0x0b, 0x03, 0x66,
+      /* 53  /  PRAC  /  50 M (=4DBL+0TPL+5ADD+0M) */
+      0x69, 0x02, 0x02, 0x0b, 0x02, 0x46,
+      /* 2*2*2*2*2*2  /  PRAC  /  30 M (=6DBL+0TPL+0ADD+0M) */
+      /* done outside of bytecode (for backtracking) */
+    0xff
+  }; /* end of bytecode for B1=100 */
+
 /* B1=105 computed with 10 blocks, cost=1144M */
 static const uint8_t _B1_105_bc[] = {
     0x03,
@@ -97,6 +121,30 @@ static const uint8_t _B1_125_bc[] = {
       /* done outside of bytecode (for backtracking) */
     0xff
   }; /* end of bytecode for B1=125 */
+
+/* B1=128 computed with 8 blocks, cost=1427M */
+static const uint8_t _B1_128_bc[] = {
+    0x03,
+    /* 127*113*109*89*73*43*37*29*23*19*13*7*5*5*3*3*3*3  /  double-base chain  /  582 M (=75DBL+0TPL+7ADD+1M) */
+    0x11, 0x51, 0x0b, 0x51, 0x11, 0x51, 0x08, 0x41, 0x03, 0x41, 0x08, 0x41, 0x11, 0x71, 0x0b,
+    /* 97*83*71*47*41*17  /  double-base chain  /  274 M (=31DBL+2TPL+4ADD+1M) */
+    0x11, 0x51, 0x05, 0x41, 0x08, 0xd1, 0x01, 0x10, 0xf1, 0x01, 0x02,
+    /* 101*53*31  /  double-base chain  /  142 M (=11DBL+4TPL+2ADD+1M) */
+    0x11, 0xc1, 0x01, 0x0a, 0xe1, 0x03, 0x01,
+    /* 107*67  /  double-base chain  /  106 M (=11DBL+1TPL+2ADD+1M) */
+    0x11, 0xc1, 0x01, 0x01, 0x61, 0x0a,
+    /* 103*79*61*59*11*5  /  double base expansion  /  242 M (=29DBL+1TPL+3ADD+3M) */
+    0x21, 0xa2, 0x01, 0xff, 0x12, 0x41, 0x0d, 0x42, 0x0a, 0x61, 0x06,
+    /* Here we saved 4M on the last operation */
+    0x81,
+      /* 7  /  PRAC  /  22 M (=2DBL+0TPL+2ADD+0M) */
+      0x69, 0x02, 0x66,
+      /* 11  /  PRAC  /  28 M (=2DBL+0TPL+3ADD+0M) */
+      0x69, 0x02, 0x03, 0x46,
+      /* 2*2*2*2*2*2*2  /  PRAC  /  35 M (=7DBL+0TPL+0ADD+0M) */
+      /* done outside of bytecode (for backtracking) */
+    0xff
+  }; /* end of bytecode for B1=128 */
 
 /* B1=137 computed with 9 blocks, cost=1499M */
 static const uint8_t _B1_137_bc[] = {
@@ -391,6 +439,38 @@ static const uint8_t _B1_244_bc[] = {
       /* done outside of bytecode (for backtracking) */
     0xff
   }; /* end of bytecode for B1=244 */
+
+/* B1=256 computed with 12 blocks, cost=2809M */
+static const uint8_t _B1_256_bc[] = {
+    0x03,
+    /* 167*109*73*41*37*31*23*19*13*13*11*7*7*5*5*5*3*3*3*3*3  /  double-base chain  /  581 M (=76DBL+0TPL+6ADD+1M) */
+    0x11, 0x41, 0x10, 0x51, 0x13, 0x51, 0x05, 0x51, 0x0c, 0x41, 0x14, 0x61, 0x04,
+    /* 241*193*191*17  /  double-base chain  /  209 M (=24DBL+2TPL+2ADD+1M) */
+    0x11, 0xc1, 0x02, 0x09, 0x71, 0x0f,
+    /* 251*229*179*173*103*67*29  /  double-base chain  /  375 M (=42DBL+4TPL+4ADD+1M) */
+    0x11, 0x51, 0x0e, 0xc1, 0x01, 0x08, 0xd1, 0x02, 0x09, 0xe1, 0x01, 0x0b,
+    /* 239*223*151*107*101  /  double-base chain  /  283 M (=30DBL+4TPL+3ADD+1M) */
+    0x11, 0x51, 0x18, 0xd1, 0x04, 0x01, 0x61, 0x05,
+    /* 233*89  /  double-base chain  /  113 M (=8DBL+4TPL+1ADD+1M) */
+    0x11, 0xe1, 0x04, 0x08,
+    /* 227*163*157*131*59*53*47*43  /  double-base chain  /  412 M (=41DBL+7TPL+5ADD+1M) */
+    0x11, 0x51, 0x1d, 0xd1, 0x01, 0x03, 0x41, 0x04, 0xd1, 0x02, 0x04, 0xf1, 0x04, 0x01,
+    /* 197*127*97*83  /  double-base chain  /  219 M (=26DBL+1TPL+3ADD+1M) */
+    0x11, 0x41, 0x0b, 0x41, 0x05, 0xe1, 0x01, 0x0a,
+    /* 211*181*79  /  double-base chain  /  173 M (=12DBL+6TPL+2ADD+1M) */
+    0x11, 0xc1, 0x01, 0x05, 0xe1, 0x05, 0x07,
+    /* 199*139*137*113*71*61  /  double base expansion  /  317 M (=36DBL+3TPL+3ADD+5M) */
+    0x21, 0xa2, 0x01, 0xa3, 0x01, 0x80, 0x01, 0xff, 0x10, 0x52, 0x08, 0x51, 0x12, 0x73, 0x0a,
+    /* Here we saved 4M on the last operation */
+    0x81,
+      /* 11  /  PRAC  /  28 M (=2DBL+0TPL+3ADD+0M) */
+      0x69, 0x02, 0x03, 0x66,
+      /* 149  /  PRAC  /  63 M (=3DBL+0TPL+8ADD+0M) */
+      0x69, 0x02, 0x03, 0x0b, 0x0b, 0x0b, 0x0b, 0x02, 0x46,
+      /* 2*2*2*2*2*2*2*2  /  PRAC  /  40 M (=8DBL+0TPL+0ADD+0M) */
+      /* done outside of bytecode (for backtracking) */
+    0xff
+  }; /* end of bytecode for B1=256 */
 
 /* B1=260 computed with 16 blocks, cost=2813M */
 static const uint8_t _B1_260_bc[] = {
@@ -2243,9 +2323,11 @@ static const uint8_t _B1_1021_bc[] = {
 /* Sorted by increasing B1 */
 static mishmash_B1_data_t mishmash_B1_data[] = {
     { .B1 = 1, .len = sizeof(_B1_1_bc)/sizeof(*_B1_1_bc), .bc = _B1_1_bc },
+    { .B1 = 100, .len = sizeof(_B1_100_bc)/sizeof(*_B1_100_bc), .bc = _B1_100_bc },
     { .B1 = 105, .len = sizeof(_B1_105_bc)/sizeof(*_B1_105_bc), .bc = _B1_105_bc },
     { .B1 = 115, .len = sizeof(_B1_115_bc)/sizeof(*_B1_115_bc), .bc = _B1_115_bc },
     { .B1 = 125, .len = sizeof(_B1_125_bc)/sizeof(*_B1_125_bc), .bc = _B1_125_bc },
+    { .B1 = 128, .len = sizeof(_B1_128_bc)/sizeof(*_B1_128_bc), .bc = _B1_128_bc },
     { .B1 = 137, .len = sizeof(_B1_137_bc)/sizeof(*_B1_137_bc), .bc = _B1_137_bc },
     { .B1 = 148, .len = sizeof(_B1_148_bc)/sizeof(*_B1_148_bc), .bc = _B1_148_bc },
     { .B1 = 161, .len = sizeof(_B1_161_bc)/sizeof(*_B1_161_bc), .bc = _B1_161_bc },
@@ -2255,6 +2337,7 @@ static mishmash_B1_data_t mishmash_B1_data[] = {
     { .B1 = 214, .len = sizeof(_B1_214_bc)/sizeof(*_B1_214_bc), .bc = _B1_214_bc },
     { .B1 = 229, .len = sizeof(_B1_229_bc)/sizeof(*_B1_229_bc), .bc = _B1_229_bc },
     { .B1 = 244, .len = sizeof(_B1_244_bc)/sizeof(*_B1_244_bc), .bc = _B1_244_bc },
+    { .B1 = 256, .len = sizeof(_B1_256_bc)/sizeof(*_B1_256_bc), .bc = _B1_256_bc },
     { .B1 = 260, .len = sizeof(_B1_260_bc)/sizeof(*_B1_260_bc), .bc = _B1_260_bc },
     { .B1 = 276, .len = sizeof(_B1_276_bc)/sizeof(*_B1_276_bc), .bc = _B1_276_bc },
     { .B1 = 293, .len = sizeof(_B1_293_bc)/sizeof(*_B1_293_bc), .bc = _B1_293_bc },
