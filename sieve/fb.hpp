@@ -246,6 +246,7 @@ class fb_slice : public fb_slice_interface {
     typedef FB_ENTRY_TYPE entry_t;
     inline typename std::vector<FB_ENTRY_TYPE>::const_iterator begin() const { return _begin; }
     inline typename std::vector<FB_ENTRY_TYPE>::const_iterator end() const { return _end; }
+    inline size_t size() const { return _end - _begin; }
     unsigned char get_logp() const override { return logp; }
     fbprime_t get_prime(slice_offset_t offset) const override {
         return _begin[offset].p;
