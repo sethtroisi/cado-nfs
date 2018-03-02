@@ -20,6 +20,8 @@
 #include "facul.hpp"
 #include "facul_doit.hpp"
 
+//#define USE_LEGACY_DEFAULT_STRATEGY 1
+
 #ifdef ENABLE_UNSAFE_FACUL_STATS
 /*
  * FIXME: the stats are not thread-safe!
@@ -704,14 +706,22 @@ facul_make_default_strategy (int n, const int verbose)
   /* run one ECM curve with Montgomery parametrization, B1=105, B2=3255 */
   methods[i].method = EC_METHOD;
   methods[i].plan = (ecm_plan_t*) malloc (sizeof (ecm_plan_t));
+#ifdef USE_LEGACY_DEFAULT_STRATEGY
   ecm_make_plan ((ecm_plan_t*) methods[i].plan, 105, 3255, MONTY12, 2, 1, verbose);
+#else
+  ecm_make_plan ((ecm_plan_t*) methods[i].plan, 105, 3255, MONTYTWED12, 1, 1, verbose);
+#endif
   i++;
 
   if (n > 0)
     {
       methods[i].method = EC_METHOD;
       methods[i].plan = (ecm_plan_t*) malloc (sizeof (ecm_plan_t));
-      ecm_make_plan ((ecm_plan_t*) methods[i].plan, 315, 5355, MONTYTWED12, 11, 1, verbose);
+#ifdef USE_LEGACY_DEFAULT_STRATEGY
+      ecm_make_plan ((ecm_plan_t*) methods[i].plan, 315, 5355, BRENT12, 11, 1, verbose);
+#else
+      ecm_make_plan ((ecm_plan_t*) methods[i].plan, 315, 5355, MONTYTWED12, 2, 1, verbose);
+#endif
       i++;
     }
 
@@ -740,7 +750,11 @@ facul_make_default_strategy (int n, const int verbose)
       methods[i].method = EC_METHOD;
       methods[i].plan = (ecm_plan_t*) malloc (sizeof (ecm_plan_t));
       ecm_make_plan ((ecm_plan_t*) methods[i].plan, (unsigned int) B1, (2 * k + 1) * 105,
+#ifdef USE_LEGACY_DEFAULT_STRATEGY
 		     MONTY12, i - 1, 1, 0);
+#else
+		     MONTYTWED12, i - 1, 1, 0);
+#endif
     }
 
 #ifdef USE_MPQS
