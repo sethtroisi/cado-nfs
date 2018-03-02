@@ -149,6 +149,7 @@ fb_entry_general::fb_entry_general (const fb_entry_x_roots<Nr_roots> &e) {
     /* Use simple constructor for root */
     roots[i] = e.roots[i];
   }
+  nr_roots = Nr_roots;
 }
 
 
