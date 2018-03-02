@@ -697,8 +697,8 @@ struct helper_functor_dispatch_small_sieved_primes {
 struct helper_functor_subdivide_slices {
     fb_factorbase::slicing::part & dst;
     fb_factorbase::key_type K;
-    slice_index_t index = 0;
-    helper_functor_subdivide_slices(fb_factorbase::slicing::part & dst, fb_factorbase::key_type const & K) : dst(dst), K(K), index(0) {}
+    slice_index_t index;
+    // helper_functor_subdivide_slices(fb_factorbase::slicing::part & dst, fb_factorbase::key_type const & K) : dst(dst), K(K), index(0) {}
     template<typename T>
         void operator()(T const & x) {
             /* T is fb_entries_interval_factory<n>::type for some n */
@@ -816,11 +816,15 @@ fb_factorbase::slicing::slicing(fb_factorbase const & fb, fb_factorbase::key_typ
 
     /* Next, we have sets of begin and end pointers. We need to subdivide
      * them.
+     *
+     * We want a global numbering for the slice, because after
+     * downsorting, slices from various levels are mixed together.
      */
-    for (int i = 1; i < FB_MAX_PARTS; i++)
-        multityped_array_foreach(helper_functor_subdivide_slices { parts[i], K }, D.intervals[i]);
-
-
+    slice_index_t s = 0;
+    for (int i = 1; i < FB_MAX_PARTS; i++) {
+        multityped_array_foreach(helper_functor_subdivide_slices { parts[i], K, s }, D.intervals[i]);
+        s += parts[i].nslices();
+    }
 
     /* we're going to divide our vector in several
      * parts, and compute slices. That used to be done by many

@@ -290,6 +290,7 @@ fill_in_buckets_toplevel_sublat(bucket_array_t<LEVEL, shorthint_t> &orig_BA,
             continue;
           if (LIKELY(pli.a0 != 0)) {
             const slice_offset_t hint = ple.get_hint();
+            ASSERT(hint == i_entry);
             WHERE_AM_I_UPDATE(w, h, hint);
 #ifdef TRACE_K
             const fbprime_t p = slice.get_prime(hint); 
@@ -396,6 +397,8 @@ fill_in_buckets_toplevel(bucket_array_t<LEVEL, shorthint_t> &orig_BA,
 
         // Skip (i,j)=(0,0)
         ple.next();
+
+        // what does pli.a0 == 0 correspond to ?
         if (LIKELY(pli.a0 != 0)) {
           const slice_offset_t hint = ple.get_hint();
           WHERE_AM_I_UPDATE(w, h, hint);

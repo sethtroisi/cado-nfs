@@ -405,7 +405,7 @@ class fb_factorbase {
              * slices0.size() <= i < slices1.size() --> return &(slices1[i-slicesG.size()-slices0.size()])
              * and so on.
              */
-            struct return_pointer_if_in_subrange {
+            struct helper_functor_get {
                 typedef fb_slice_interface const * type;
                 typedef slice_index_t key_type;
                 template<typename T>
@@ -428,12 +428,28 @@ class fb_factorbase {
                  * TODO: dichotomy, perhaps ? Can we do the dichotomy
                  * elegantly ?
                  */
-                const fb_slice_interface * res = multityped_array_locate<return_pointer_if_in_subrange>()(slices, index);
+                const fb_slice_interface * res = multityped_array_locate<helper_functor_get>()(slices, index);
                 ASSERT_ALWAYS(res);
                 ASSERT_ALWAYS(res->get_index() == index);
                 if (res) return res;
                 return NULL;
             }
+
+            /* {{{ use caching for the number of slices, as it's a handy
+             * thing to query */
+            mutable slice_index_t _nslices = std::numeric_limits<slice_index_t>::max();
+            struct helper_functor_nslices {
+                template<typename T>
+                    slice_index_t operator()(slice_index_t t, T const & x) const {
+                        return t + x.size();
+                    }
+            };
+            slice_index_t nslices() const {
+                if (_nslices != std::numeric_limits<slice_index_t>::max())
+                    return _nslices;
+                return _nslices = multityped_array_fold(helper_functor_nslices(), 0, slices);
+            }
+            /* }}} */
 
             template<typename F>
             struct foreach_slice_s {
@@ -486,31 +502,26 @@ class fb_factorbase {
         /* toplevel is set by the ctor */
         int toplevel = 0;
 
-#if 0
-        /* This can't work, as we do not have a global numbering for
-         * slices */
-
         fb_slice_interface const * get(slice_index_t index) const {
             for (auto const & p : parts) {
-                const fb_slice_interface *fb_slice = p.get(index);
-                if (fb_slice) return fb_slice;
+                if (index < p.nslices()) 
+                    return p.get(index);
+                else
+                    index -= p.nslices();
             }
             return NULL;
         }
-#endif
         public:
 
         part const & get_part(int i) const { return parts[i]; }
 
         inline int get_toplevel() const { return toplevel; }
 
-#if 0
         /* This accesses the *fb_slice* with this index. Not the vector of
          * slices ! */
         fb_slice_interface const & operator[](slice_index_t index) const {
             return *get(index);
         }
-#endif
 
         public:
 

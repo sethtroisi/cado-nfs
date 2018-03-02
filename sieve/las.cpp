@@ -891,8 +891,14 @@ apply_one_bucket (unsigned char *S,
       } while (0);
 
 #endif
-      INSERT_2_VALUES(x0); INSERT_2_VALUES(x1); INSERT_2_VALUES(x2); INSERT_2_VALUES(x3);
-      INSERT_2_VALUES(x4); INSERT_2_VALUES(x5); INSERT_2_VALUES(x6); INSERT_2_VALUES(x7);
+      INSERT_2_VALUES(x0);
+      INSERT_2_VALUES(x1);
+      INSERT_2_VALUES(x2);
+      INSERT_2_VALUES(x3);
+      INSERT_2_VALUES(x4);
+      INSERT_2_VALUES(x5);
+      INSERT_2_VALUES(x6);
+      INSERT_2_VALUES(x7);
     }
 #endif
     while (it != it_end)
@@ -1024,7 +1030,7 @@ divide_hints_from_bucket (factor_list_t &fl, mpz_t norm, const unsigned int N, c
         }
       if (complete_hint.x == x) {
           if (bucket_prime_stats) nr_bucket_longhints++;
-          fb_slice_interface const & fb_slice = fbs.get_part(1)[complete_hint.index];
+          fb_slice_interface const & fb_slice = fbs[complete_hint.index];
           const unsigned long p = fb_slice.get_prime(complete_hint.hint);
           if (very_verbose) {
               const unsigned char k = fb_slice.get_k(complete_hint.hint);
