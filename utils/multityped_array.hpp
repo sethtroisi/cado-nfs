@@ -188,8 +188,9 @@ template<typename G> class multityped_array_locate {
         }
     };
     public:
-    /* we really want the key to be mutable through the process, so the
-     * first specializations below are not valid 
+    /* The key is mutable through the process for the inner functions.
+     * However we do not wish to expose that to the caller.
+     */
     template<template<int> class F, int n0, int n1>
         typename G::type operator()(multityped_array<F, n0, n1> & A, typename G::key_type k) const {
             return inner<F>()(A, k);
@@ -198,7 +199,7 @@ template<typename G> class multityped_array_locate {
         typename G::type operator()(multityped_array<F, n0, n1> const & A, typename G::key_type k) const {
             return inner<F>()(A, k);
         }
-     * */
+    /*
     template<template<int> class F, int n0, int n1>
         typename G::type operator()(multityped_array<F, n0, n1> & A, typename G::key_type & k) const {
             return inner<F>()(A, k);
@@ -207,6 +208,7 @@ template<typename G> class multityped_array_locate {
         typename G::type operator()(multityped_array<F, n0, n1> const & A, typename G::key_type & k) const {
             return inner<F>()(A, k);
         }
+        */
 };
 
 /*

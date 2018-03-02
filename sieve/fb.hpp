@@ -429,8 +429,9 @@ class fb_factorbase {
                  * elegantly ?
                  */
                 const fb_slice_interface * res = multityped_array_locate<return_pointer_if_in_subrange>()(slices, index);
+                ASSERT_ALWAYS(res);
+                ASSERT_ALWAYS(res->get_index() == index);
                 if (res) return res;
-                ASSERT_ALWAYS(0);
                 return NULL;
             }
 
@@ -485,6 +486,10 @@ class fb_factorbase {
         /* toplevel is set by the ctor */
         int toplevel = 0;
 
+#if 0
+        /* This can't work, as we do not have a global numbering for
+         * slices */
+
         fb_slice_interface const * get(slice_index_t index) const {
             for (auto const & p : parts) {
                 const fb_slice_interface *fb_slice = p.get(index);
@@ -492,18 +497,20 @@ class fb_factorbase {
             }
             return NULL;
         }
-
+#endif
         public:
 
         part const & get_part(int i) const { return parts[i]; }
 
         inline int get_toplevel() const { return toplevel; }
 
+#if 0
         /* This accesses the *fb_slice* with this index. Not the vector of
          * slices ! */
         fb_slice_interface const & operator[](slice_index_t index) const {
             return *get(index);
         }
+#endif
 
         public:
 

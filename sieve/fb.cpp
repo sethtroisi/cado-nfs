@@ -697,6 +697,8 @@ struct helper_functor_dispatch_small_sieved_primes {
 struct helper_functor_subdivide_slices {
     fb_factorbase::slicing::part & dst;
     fb_factorbase::key_type K;
+    slice_index_t index = 0;
+    helper_functor_subdivide_slices(fb_factorbase::slicing::part & dst, fb_factorbase::key_type const & K) : dst(dst), K(K), index(0) {}
     template<typename T>
         void operator()(T const & x) {
             /* T is fb_entries_interval_factory<n>::type for some n */
@@ -743,6 +745,9 @@ struct helper_functor_subdivide_slices {
             /* of course that won't stay, it's obvious WIP.
              * TODO */
             sdst.swap(pool);
+
+            /* And then we number all slices */
+            for(auto & s : sdst) s.index = index++;
         }
 };
 
@@ -814,6 +819,8 @@ fb_factorbase::slicing::slicing(fb_factorbase const & fb, fb_factorbase::key_typ
      */
     for (int i = 1; i < FB_MAX_PARTS; i++)
         multityped_array_foreach(helper_functor_subdivide_slices { parts[i], K }, D.intervals[i]);
+
+
 
     /* we're going to divide our vector in several
      * parts, and compute slices. That used to be done by many

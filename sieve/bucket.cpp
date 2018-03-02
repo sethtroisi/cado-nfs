@@ -332,7 +332,7 @@ bucket_primes_t::purge (const bucket_array_t<1, shorthint_t> &BA,
 
     for ( ; it != end_it ; it++) {
       if (UNLIKELY(S[it->x] != 255)) {
-        fbprime_t p = fb[slice_index].get_prime(it->hint);
+        fbprime_t p = fb.get_part(1)[slice_index].get_prime(it->hint);
         push_update(bucket_update_t<1, primehint_t>(it->x, p, 0, 0));
       }
     }
