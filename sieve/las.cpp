@@ -3345,7 +3345,7 @@ if (si.conf.sublat.m) {
             (double) report->reports / (double) nr_sq_processed);
 
 
-    // XXX re-enable print_worst_weight_errors();
+    print_slice_weight_estimator_stats();
 
     /*}}}*/
 

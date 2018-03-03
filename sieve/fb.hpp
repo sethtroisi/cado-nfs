@@ -2,8 +2,8 @@
 *                Functions for the factor base                  *
 *****************************************************************/
 
-#ifndef FB_H
-#define FB_H
+#ifndef FB_HPP_
+#define FB_HPP_
 
 #include <stdio.h>
 #include <stddef.h>
@@ -23,50 +23,6 @@
 #include "las-qlattice.hpp"
 #include "las-plattice.hpp"
 #include "las-base.hpp"
-
-/* structure:
- *
- * fb_factorbase
- *  -> private members of type fb_vector<X>, called fbX_vector's, X
- *     ranging from 0 to MAX_DEGREE.
- *     It is not entirely clear that we have a real need for fb_vector
- *     per se: it could very well be an std::vector.
- *     Well, except for polymorphism (currently,
- *     fb_vector_interface::get_slices mainly serves this purpose).
- *  -> a map from a tuple(list of thresholds + log scale) to a list of
- *     fb_slice sets (fb_slice_set)
- *
- * The key to the map above would be a specific struct.
- *
- * The mapped type fb_slice_set would also be templated and contain typed
- * pointers to within the fbX_vector's.
- *
- * Note that fill_in_buckets_toplevel de-multiplexes the template thing.
- */
-
-/* We almost surely want to de-multiplex the fb_slice type */
-
-#if 0
-class fb_slicing {
-    struct fb_slicing_part {
-        std::vector<fb_slice> fbX_slices[1 + MAX_DEGREE];; /* From 0 to MAX_DEGREE */
-      fb_slice<fb_entry_x_roots<1> > fb1_slices;
-      fb_slice<fb_entry_x_roots<2> > fb2_slices;
-      fb_slice<fb_entry_x_roots<3> > fb3_slices;
-      fb_slice<fb_entry_x_roots<4> > fb4_slices;
-      fb_slice<fb_entry_x_roots<5> > fb5_slices;
-      fb_slice<fb_entry_x_roots<6> > fb6_slices;
-      fb_slice<fb_entry_x_roots<7> > fb7_slices;
-      fb_slice<fb_entry_x_roots<8> > fb8_slices;
-      fb_slice<fb_entry_x_roots<9> > fb9_slices;
-      fb_slice<fb_entry_x_roots<10> > fb10_slices;
-      fb_slice<fb_entry_general> general_vector;
-    };
-    fb_slicing_part parts[FB_MAX_PARTS];
-    size_t get_nslices(int part);
-    size_t get_slice(int part, int index);
-};
-#endif
 
 /* {{{ fb entries: sets of prime ideals above one single rational prime p. */
 /* Forward declaration so fb_entry_general can use it in constructors */
@@ -235,8 +191,13 @@ class fb_slice_interface {
  */
 struct helper_functor_subdivide_slices;
 
+/* see fb_slice_weight.hpp */
+template<typename FB_ENTRY_TYPE>
+class fb_slice_weight_estimator;
+
 template<typename FB_ENTRY_TYPE>
 class fb_slice : public fb_slice_interface {
+    friend class fb_slice_weight_estimator<FB_ENTRY_TYPE>;
     typename std::vector<FB_ENTRY_TYPE>::const_iterator _begin, _end;
     unsigned char logp;
     slice_index_t index;
@@ -673,4 +634,7 @@ unsigned char   fb_log (double x, double y, double z);
 unsigned char	fb_log_delta (fbprime_t, unsigned long, unsigned long, double);
 fbprime_t       fb_is_power (fbprime_t, unsigned long *);
 
-#endif
+/* This is defined in fb-slice-weight.cpp */
+void print_slice_weight_estimator_stats();
+
+#endif  /* FB_HPP_ */
