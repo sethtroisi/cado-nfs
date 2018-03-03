@@ -950,7 +950,7 @@ qlattice_basis operator*(sieve_range_adjust::mat<int> const& m, qlattice_basis c
  *
  * The range is taken as one half of the 0-centered range whose width and
  * height are 2^(ceil(A/2)-squeeze)) times 2^(floor(A/2)+squeeze+1) --
- * this larger range as size 2^(A+1).
+ * this larger range has size 2^(A+1).
  * 
  * Integration points are chosen as centers of *rectangles* (not
  * squares) which are proportional to the sieve area.
@@ -1111,8 +1111,9 @@ B:=[bestrep(a):a in {{a*b*c*x:a in {1,-1},b in {1,d},c in {1,s}}:x in MM}];
      * that by homogeneity) */
     int N = 5;
 
+    /* Try negative squeeze values, so that we use _longer_ rows */
     double reference = estimate_yield_in_sieve_area(shuffle_matrices[0], 0, N);
-    for(int squeeze = 0 ; squeeze <= 3 ; squeeze++) {
+    for(int squeeze = 0 ; squeeze >= -3 ; squeeze--) {
         for(int r = 0 ; r < nmatrices ; r++) {
             if (squeeze == 0 && (r & 1)) continue;
             mat<int> const & Sr(shuffle_matrices[r]);
