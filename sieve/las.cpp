@@ -2303,9 +2303,25 @@ double nprimes_interval(double p0, double p1)
 #endif
 }
 
-void display_expected_memory_usage(siever_config const & sc, cado_poly_srcptr cpoly, bkmult_specifier const & bkmult, size_t base_memory = 0)
+
+/* TODO: This depends on the fbK thresholds, and we should access them
+ * with priority.
+ *
+ * Our fetching of the siever_config fields is definitely wrong here.
+ */
+void display_expected_memory_usage(siever_config const & sc0, cado_poly_srcptr cpoly, bkmult_specifier const & bkmult, size_t base_memory = 0)
 {
-    verbose_output_print(0, 1, "# Expected memory usage:\n");
+    /* do the estimate based on the "average" logI. This is most often
+     * going to give a reasonable rough idea anyway.
+     */
+    siever_config sc = sc0;
+    sc.logI = (1+sc.logA)/2;
+    verbose_output_print(0, 1, "# Expected memory usage (assuming logI=%d):\n", sc.logI);
+
+    fb_factorbase::key_type K[2] {
+            sc.instantiate_thresholds(0),
+            sc.instantiate_thresholds(1) };
+
     /*
     verbose_output_print(0, 2, "# base: %zu Kb\n", Memusage());
     verbose_output_print(0, 2, "# log bucket region = %d\n", LOG_BUCKET_REGION);
@@ -2351,13 +2367,14 @@ void display_expected_memory_usage(siever_config const & sc, cado_poly_srcptr cp
         memory += more;
     }
 
-    // toplevel is computed by fb_factorbase::append, based on thresholds
-    // passed in sieve_info::init_factor_bases. We mimick that code now.
+    // toplevel is computed by fb_factorbase::slicing::slicing, based on
+    // thresholds in fbK
     int toplevel = -1;
     for(int side = 0 ; side < 2 ; side++) {
-        int maxlevel_here = (sc.bucket_thresh1 < sc.sides[side].lim) ? 2 : 1;
-        if (maxlevel_here > toplevel)
-            toplevel = maxlevel_here;
+        int m;
+        for(m = 0 ; m < FB_MAX_PARTS && K[side].thresholds[m] >= sc.sides[side].lim; ++m);
+        if (m > toplevel)
+            toplevel = m;
     }
 
     /* the code path is radically different depending on toplevel. */
@@ -2381,8 +2398,13 @@ void display_expected_memory_usage(siever_config const & sc, cado_poly_srcptr cp
         // bucket_update_t<1, shorthint_t>)
 
         for(int side = 0 ; side < 2 ; side++) {
-            double p1 = sc.sides[side].lim;
-            double p0 = std::max(sc.bucket_thresh, sc.bucket_thresh1);
+            /* In truth, I sort of know it isn't valid. We've built most
+             * of the stuff on the idea that there's a global "toplevel"
+             * notion, but that barely applies when on e of the factor
+             * bases happens to be much smaller than the other one */
+            ASSERT_ALWAYS(K[side].thresholds[2] == sc.sides[side].lim);
+            double p1 = K[side].thresholds[2];
+            double p0 = K[side].thresholds[1];
             p0 = std::min(p1, p0);
             size_t nprimes = nprimes_interval(p0, p1);
             size_t nupdates = 0.75 * (1UL << sc.logA) * (std::log(std::log(p1)) - std::log(std::log(p0)));
@@ -2407,8 +2429,8 @@ void display_expected_memory_usage(siever_config const & sc, cado_poly_srcptr cp
         }
 
         for(int side = 0 ; side < 2 ; side++) {
-            double p1 = std::max(sc.bucket_thresh, sc.bucket_thresh1);
-            double p0 = sc.bucket_thresh;
+            double p1 = K[side].thresholds[1];
+            double p0 = K[side].thresholds[0];
             size_t nprimes = nprimes_interval(p0, p1);
             int A0 = LOG_BUCKET_REGION + 8;
             size_t nupdates = 0.75 * (1UL << A0) * (std::log(std::log(p1)) - std::log(std::log(p0)));
@@ -2427,8 +2449,9 @@ void display_expected_memory_usage(siever_config const & sc, cado_poly_srcptr cp
         // *ALL* bucket updates are computed in one go as
         // bucket_update_t<1, shorthint_t>
         for(int side = 0 ; side < 2 ; side++) {
-            double p1 = sc.sides[side].lim;
-            double p0 = sc.bucket_thresh;
+            ASSERT_ALWAYS(K[side].thresholds[1] == sc.sides[side].lim);
+            double p1 = K[side].thresholds[1];
+            double p0 = K[side].thresholds[0];
             size_t nprimes = nprimes_interval(p0, p1);
             size_t nupdates = 0.75 * (1UL << sc.logA) * (std::log(std::log(p1)) - std::log(std::log(p0)));
             typedef bucket_update_t<1, shorthint_t> type;

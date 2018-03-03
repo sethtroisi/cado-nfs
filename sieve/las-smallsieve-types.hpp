@@ -3,6 +3,7 @@
 
 #include <vector>
 #include "fb-types.h"
+#include "fb.hpp"
 #include "macros.h"
 
 /* Structures for small sieve */
@@ -103,6 +104,7 @@ private:
 static_assert(sizeof(ssp_simple_t) == sizeof(ssp_t), "struct padding has been tampered with");
 
 typedef struct {
+    fb_factorbase::key_type fbK;
     std::vector<ssp_simple_t> ssps;
     std::vector<ssp_t> ssp;
     /* These offsets, relative to the start of ssps, tell which of the ssps

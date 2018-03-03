@@ -4,6 +4,7 @@
 #include "las-base.hpp"
 #include "las-todo-entry.hpp"
 #include "fb-types.h"
+#include "fb.hpp"
 #include <string.h>
 #include <string>
 #include <map>
@@ -21,7 +22,8 @@ struct siever_config : public _padded_pod<siever_config> {
     unsigned int bitsize;  /* bitsize == 0 indicates end of table */
     int side;              /* special-q side */
     int logA;
-    int logI;
+
+    int logI;   /* see below. logI is initialized late in the game */
 
     sublat_t sublat;
 
@@ -39,10 +41,25 @@ struct siever_config : public _padded_pod<siever_config> {
      *    this struct be dynamic depending on a setter function for logI
      *  - the side, as well.
      */
+    private:    /* someday I'll put "private". sieve_info::update, or
+                 * whatever it may be called in the future, might access
+                 * this data from a member function.
+                 * display_expected_memory_usage must be adapted, too.
+                 */
+    /* access should rather be
+     * via si.sides[side].fbK.thresholds[0,1]
+     * and si.sides[side].fbK.{td_thresh, skipped}
+     */
     unsigned long bucket_thresh = 0;  // bucket sieve primes >= bucket_thresh
     unsigned long bucket_thresh1 = 0; // primes above are 2-level bucket-sieved
     unsigned int td_thresh = 1024;
     unsigned int skipped = 1;         // don't sieve below this
+
+    public:
+    /* the only way to access the four fields above */
+    fb_factorbase::key_type instantiate_thresholds(int side) const;
+
+    public:
 
     /* unsieve threshold is not related to the factor base. */
     unsigned int unsieve_thresh = 100;

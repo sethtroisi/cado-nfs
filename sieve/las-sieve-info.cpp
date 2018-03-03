@@ -105,33 +105,9 @@ void sieve_info::update (unsigned int nr_workspaces)
          *
          * That's actually the whole point of this overhaul !
          */
-        fbprime_t bucket_thresh  = conf.bucket_thresh;
-        fbprime_t bucket_thresh1 = conf.bucket_thresh1;
-        fbprime_t fbb = conf.sides[side].lim;
+        fb_factorbase::key_type K = conf.instantiate_thresholds(side);
 
-        if (bucket_thresh == 0)
-            bucket_thresh = 1UL << conf.logI;
-        if (bucket_thresh < (1UL << conf.logI)) {
-            verbose_output_print(0, 1, "# Warning: with logI = %d,"
-                    " we can't have %lu as the bucket threshold. Using %lu\n",
-                    conf.logI,
-                    conf.bucket_thresh,
-                    1UL << conf.logI);
-            bucket_thresh = 1UL << conf.logI;
-        }
-
-        if (bucket_thresh > fbb) bucket_thresh = fbb;
-        if (bucket_thresh1 == 0 || bucket_thresh1 > fbb) bucket_thresh1 = fbb;
-
-        fb_factorbase::key_type K {
-            {bucket_thresh, bucket_thresh1, fbb, fbb},
-            conf.td_thresh,
-            conf.skipped,
-            sis.lognorms->scale,
-            nr_workspaces
-        };
-        sis.fbK = K;
-
+        K.scale = sis.lognorms->scale,
         /* The size of the slices must be in accordance to our
          * multithread setting. Hopefully, that one does not change...
          * We want to divide in small enough pieces, so that the amout of
@@ -141,6 +117,7 @@ void sieve_info::update (unsigned int nr_workspaces)
          * place, and has now moved to inside the make_slices call. It is
          * inherently tied to the count of the entries in each part.
          */
+        K.nr_workspaces = nr_workspaces;
 
         sis.fbK = K;
         sis.fbs = &(*sis.fb)[K];

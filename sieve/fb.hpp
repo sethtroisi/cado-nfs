@@ -294,6 +294,8 @@ class fb_factorbase {
 
     cxx_mpz_poly f;
     int side;
+    unsigned long lim;
+    unsigned long powlim;
 
     typedef multityped_array<fb_entries_factory, -1, MAX_ROOTS+1> entries_t;
     entries_t entries;
@@ -604,7 +606,7 @@ class fb_factorbase {
 
     private:
         std::map<key_type, slicing> cache;
-        int read(const char * const filename, unsigned long lim, unsigned long powlim);
+        int read(const char * const filename);
 
     public:
         /* accessors.
@@ -625,8 +627,8 @@ class fb_factorbase {
         }
 
     private:
-        void make_linear(cxx_mpz_poly const & poly, unsigned long lim, unsigned long powlim);
-        void make_linear_threadpool (cxx_mpz_poly const & poly, unsigned long lim, unsigned long powlim, unsigned int nb_threads);
+        void make_linear();
+        void make_linear_threadpool (unsigned int nb_threads);
 
     public:
         fb_factorbase(cxx_cado_poly const & cpoly, int side, unsigned long lim, unsigned long powlim, FILE * fbc_filename);

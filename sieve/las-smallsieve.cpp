@@ -231,6 +231,8 @@ void small_sieve_init(small_sieve_data_t & ssd,
     const int verbose = 0;
     where_am_I w MAYBE_UNUSED;
 
+    ssd.fbK = si.sides[side].fbK;
+
     ssd.ssp.clear();
     ssd.ssps.clear();
 
@@ -1031,7 +1033,7 @@ resieve_small_bucket_region (bucket_primes_t *BP, int N, unsigned char *S,
                 }
                 prime.p = p;
                 prime.x = x;
-                ASSERT(prime.p >= si.conf.td_thresh);
+                ASSERT(prime.p >= ssd.fbK.td_thresh);
                 BP->push_update(prime);
             }
             pos += r;
@@ -1067,7 +1069,7 @@ resieve_small_bucket_region (bucket_primes_t *BP, int N, unsigned char *S,
             /* the code below definitely does not deal with projective
              * primes that do not sieve full lines.  */
             if (q > 1) continue;
-            if (p < si.conf.td_thresh) continue;
+            if (p < ssd.fbK.td_thresh) continue;
 
             WHERE_AM_I_UPDATE(w, p, p);
 
@@ -1080,7 +1082,7 @@ resieve_small_bucket_region (bucket_primes_t *BP, int N, unsigned char *S,
                 bucket_update_t<1, primehint_t> prime;
                 prime.p = p;
                 prime.x = 1 - i0;
-                ASSERT(prime.p >= si.conf.td_thresh);
+                ASSERT(prime.p >= ssd.fbK.td_thresh);
                 BP->push_update(prime);
             }
             // Same as in sieving: we discard after checking for row 0.

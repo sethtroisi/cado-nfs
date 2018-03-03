@@ -184,6 +184,45 @@ bool siever_config::parse_default(siever_config & sc, param_list_ptr pl)
 }
 /* }}} */
 
+/* returns a set of thresholds that is compatible with the command-line
+ * defaults that we see here, as well as the logI that we've just made
+ * our mind on using.
+ *
+ * XXX NOTE XXX : the scale field is set to 0 by this function.
+ *
+ * XXX NOTE XXX : the nr_workspaces field is set to 0 by this function,
+ * because the caller is expected to set that instead.
+ *
+ *
+ */
+fb_factorbase::key_type siever_config::instantiate_thresholds(int side) const
+{
+    fbprime_t fbb = sides[side].lim;
+    fbprime_t bucket_thresh = this->bucket_thresh;
+    fbprime_t bucket_thresh1 = this->bucket_thresh1;
+
+    if (bucket_thresh == 0)
+        bucket_thresh = 1UL << logI;
+    if (bucket_thresh < (1UL << logI)) {
+        verbose_output_print(0, 1, "# Warning: with logI = %d,"
+                " we can't have %lu as the bucket threshold. Using %lu\n",
+                logI,
+                (unsigned long) bucket_thresh,
+                1UL << logI);
+        bucket_thresh = 1UL << logI;
+    }
+
+    if (bucket_thresh > fbb) bucket_thresh = fbb;
+    if (bucket_thresh1 == 0 || bucket_thresh1 > fbb) bucket_thresh1 = fbb;
+
+    return fb_factorbase::key_type {
+        {bucket_thresh, bucket_thresh1, fbb, fbb},
+            td_thresh,
+            skipped,
+            0,
+            0
+    };
+}
 siever_config siever_config_pool::get_config_for_q(las_todo_entry const & doing) const /*{{{*/
 {
     // arrange so that we don't have the same header line as the one
@@ -356,3 +395,4 @@ siever_config_pool::siever_config_pool(cxx_param_list & pl)/*{{{*/
     }
     fclose(f);
 }/*}}}*/
+

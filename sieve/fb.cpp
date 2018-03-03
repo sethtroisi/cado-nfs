@@ -969,8 +969,9 @@ static std::vector<fb_power_t> fb_powers (fbprime_t powlim)
  */
 
 /*{{{ sequential code */
-void fb_factorbase::make_linear (cxx_mpz_poly const & poly, unsigned long lim, unsigned long powlim)
+void fb_factorbase::make_linear ()
 {
+    cxx_mpz_poly const & poly(f);
     /* Prepare for computing powers up to that limit */
     std::vector<fb_power_t> powers(fb_powers(powlim));
     size_t next_pow = 0;
@@ -1119,8 +1120,9 @@ static void store_task_result(fb_factorbase &fb, task_info_t const & T)
     fb.append(pool);
 }
 
-void fb_factorbase::make_linear_threadpool (cxx_mpz_poly const & poly, unsigned long lim, unsigned long powlim, unsigned int nb_threads)
+void fb_factorbase::make_linear_threadpool (unsigned int nb_threads)
 {
+    cxx_mpz_poly const & poly(f);
     /* Prepare for computing powers up to that limit */
     std::vector<fb_power_t> powers(fb_powers(powlim));
     size_t next_pow = 0;
@@ -1242,7 +1244,7 @@ read_strip_comment (char *const line)
 */
 
     int
-fb_factorbase::read(const char * const filename, unsigned long lim, unsigned long powlim)
+fb_factorbase::read(const char * const filename)
 {
     FILE *fbfile;
     // too small linesize led to a problem with rsa768;
@@ -1318,7 +1320,7 @@ fb_factorbase::read(const char * const filename, unsigned long lim, unsigned lon
 
 
 /*  Factor base handling */
-fb_factorbase::fb_factorbase(cxx_cado_poly const & cpoly, int side, unsigned long lim, unsigned long powlim, cxx_param_list & pl) : f(cpoly->pols[side]), side(side)
+fb_factorbase::fb_factorbase(cxx_cado_poly const & cpoly, int side, unsigned long lim, unsigned long powlim, cxx_param_list & pl) : f(cpoly->pols[side]), side(side), lim(lim), powlim(powlim)
 {
     char paramname[5];
 
@@ -1342,7 +1344,7 @@ fb_factorbase::fb_factorbase(cxx_cado_poly const & cpoly, int side, unsigned lon
             exit(EXIT_FAILURE);
         }
         verbose_output_print(0, 1, "# Reading side-%d factor base from %s\n", side, fbfilename);
-        if (!read(fbfilename, lim, powlim))
+        if (!read(fbfilename))
             exit(EXIT_FAILURE);
         tfb = seconds () - tfb;
         tfb_wct = wct_seconds () - tfb_wct;
@@ -1356,7 +1358,7 @@ fb_factorbase::fb_factorbase(cxx_cado_poly const & cpoly, int side, unsigned lon
          * in the las_info ctor too */
         int nb_threads = 1;		/* default value */
         param_list_parse_int(pl, "t", &nb_threads);
-        make_linear_threadpool (pol, lim, powlim, nb_threads);
+        make_linear_threadpool (nb_threads);
         tfb = seconds () - tfb;
         tfb_wct = wct_seconds() - tfb_wct;
         verbose_output_print(0, 1,
@@ -1374,7 +1376,7 @@ union fbc_header {
         unsigned long powlim;
     } sc;
 };
-fb_factorbase::fb_factorbase(cxx_cado_poly const & cpoly, int side, unsigned long lim, unsigned long powlim, FILE * fbc_filename) : f(cpoly->pols[side]), side(side)
+fb_factorbase::fb_factorbase(cxx_cado_poly const & cpoly, int side, unsigned long lim, unsigned long powlim, FILE * fbc_filename) : f(cpoly->pols[side]), side(side), lim(lim), powlim(powlim)
 {
     fbc_header header;
     int nr = fread(&header, 1, 256, fbc_filename);
