@@ -219,6 +219,7 @@ class fb_slice_interface {
     public:
         fb_slice_interface() = default;
         virtual ~fb_slice_interface(){}
+        virtual size_t size() const = 0;
         virtual unsigned char get_logp() const = 0;
         virtual fbprime_t get_prime(slice_offset_t offset) const = 0;
         virtual unsigned char get_k(slice_offset_t offset) const = 0;
@@ -246,9 +247,15 @@ class fb_slice : public fb_slice_interface {
     typedef FB_ENTRY_TYPE entry_t;
     inline typename std::vector<FB_ENTRY_TYPE>::const_iterator begin() const { return _begin; }
     inline typename std::vector<FB_ENTRY_TYPE>::const_iterator end() const { return _end; }
-    inline size_t size() const { return _end - _begin; }
+    inline size_t size() const override { return _end - _begin; }
     unsigned char get_logp() const override { return logp; }
     fbprime_t get_prime(slice_offset_t offset) const override {
+        /* While it may make sense to manipulate slices that exceed the
+         * expected max size during the work to construct them, it should
+         * be pretty clear that we'll never ever try to use get_prime,
+         * which is limited in its type, on a slice that has more prime
+         * ideals that this function can address */
+        ASSERT(size() <= std::numeric_limits<slice_offset_t>::max());
         return _begin[offset].p;
     }
     unsigned char get_k(slice_offset_t offset) const override {
@@ -257,8 +264,8 @@ class fb_slice : public fb_slice_interface {
          * access it from the virtual base though. This is way we're
          * not folding it to a template access.  */
     }
-    slice_index_t get_index() const {return index;}
-    double get_weight() const {return weight;}
+    slice_index_t get_index() const override {return index;}
+    double get_weight() const override {return weight;}
     bool is_general() const override { return FB_ENTRY_TYPE::is_general_type; }
     /* get_nr_roots() on a fb_slice returns zero for slices of general
      * type ! */
