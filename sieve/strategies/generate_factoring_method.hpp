@@ -3,6 +3,7 @@
 
 #include <gmp.h>
 #include "facul.hpp"
+#include "facul_ecm.h"
 #include "tab_fm.h"
 #include "tab_point.h"
 

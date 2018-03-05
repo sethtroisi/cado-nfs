@@ -293,6 +293,9 @@ bytecode_prac_interpret_ec_montgomery (ec_point_t P, bytecode_const bc,
   ec_point_t *R = NULL;
   unsigned int R_nalloc;
 
+  if (bc == NULL)
+    return;
+
   R_nalloc = 5; /* we need 5 points: 3 for PRAC + 2 temporary points */
   R = (ec_point_t *) malloc (R_nalloc * sizeof (ec_point_t));
   FATAL_ERROR_CHECK (R == NULL, "could not malloc R");
@@ -857,6 +860,8 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
 #ifdef ECM_TRACE
     mod_printf ("# TRACE: start %s with B1=%u and B2=%u for m = %" PRIMODu "\n",
             __func__, plan->B1, plan->stage2.B2, MOD_PRINT_MODULUS (m));
+    printf ("# TRACE: using parameterization 0x%x with parameter %lu\n",
+            plan->parameterization, plan->parameter);
 #endif
 
   residue_t u, b;
@@ -909,10 +914,11 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
 
   if (r == 0)
   {
-#ifdef ECM_TRACE
-    printf ("# TRACE: factor found during parameterization\n");
-#endif
     mod_gcd (f, P->x, m);
+#ifdef ECM_TRACE
+    mod_printf ("# TRACE: during parameterization, found factor %" PRIMODu "\n",
+                MOD_PRINT_INT (f));
+#endif
     mod_clear (b, m);
     ec_point_clear (P, m);
     return 0;
@@ -924,14 +930,13 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
   ec_point_init (PM, m);
   mod_init_noset0 (A, m);
   montgomery_A_from_b (A, b, m);
-  fprintf (stdout, "# TRACE: starting values:\n");
+  printf ("# TRACE: starting values:\n");
 
   if (param_output_type == MONTGOMERY_xz)
   {
     ec_montgomery_curve_fprintf (stdout, "# TRACE:   ", A, P, m);
-    montgomery_point_to_affine (PM, P, m);
-    fprintf (stdout, "# TRACE:                       = ");
-    ec_point_fprintf (stdout, PM, MONTGOMERY_xz, m);
+    printf ("# TRACE:                     = ");
+    montgomery_point_fprintf_affine (stdout, P, m);
     fputc ('\n', stdout);
   }
   else
@@ -942,7 +947,7 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
     ec_twisted_edwards_ext_curve_fprintf (stdout, "# TRACE:   ", d, P, m);
     mod_clear (d, m);
 
-    fprintf (stdout, "# TRACE:   Equivalent to Montgomery curve with:\n");
+    printf ("# TRACE:   Equivalent to Montgomery curve with:\n");
     montgomery_point_from_edwards_point (PM, P, 1, m);
     ec_montgomery_curve_fprintf (stdout, "# TRACE:     ", A, PM, m);
   }
@@ -965,17 +970,13 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
     bytecode_mishmash_interpret_ec_mixed_repr (P, plan->bc, m, b);
 
 #ifdef ECM_TRACE
-  ec_point_t PfM;
-  ec_point_init (PfM, m);
-  montgomery_point_to_affine (PfM, P, m);
-  fprintf (stdout, "# TRACE: after stage 1:\n# TRACE:   output (X::Z) = ");
+  printf ("# TRACE: after stage 1 (without the powers of 2):\n");
+  printf ("# TRACE:   output (X::Z) = ");
   ec_point_fprintf (stdout, P, MONTGOMERY_xz, m);
-  fprintf (stdout, "\n# TRACE:   output (X::Z) = ");
-  ec_point_fprintf (stdout, PfM, MONTGOMERY_xz, m);
+  printf ("\n# TRACE:                 = ");
+  montgomery_point_fprintf_affine (stdout, P, m);
   fputc ('\n', stdout);
-  ec_point_clear (PfM, m);
 #endif
-
   
   /* Add prime 2 in the desired power. If a zero residue for the Z-coordinate is
    * encountered, we backtrack to previous point and stop.
@@ -1018,6 +1019,19 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
   stage1_dt = microseconds_thread() - t0;
 #endif
 
+#ifdef ECM_TRACE
+  printf ("# TRACE: after stage 1 and %u power(s) of 2 (out of %u):\n", i,
+          plan->exp2);
+  printf ("# TRACE:   output (X::Z) = ");
+  ec_point_fprintf (stdout, P, MONTGOMERY_xz, m);
+  printf ("\n# TRACE:                 = ");
+  montgomery_point_fprintf_affine (stdout, P, m);
+#if ECM_BACKTRACKING
+  mod_printf ("\n# TRACE:   backtracking was%s used", bt ? "" :" not");
+#endif
+  mod_printf ("\n# TRACE:   gcd = %" PRIMODu "\n", MOD_PRINT_INT (f));
+#endif
+
 #ifdef ECM_COUNT_OPS
   unsigned int tot_stage1_M = ECM_COUNT_OPS_STAGE1_TOTAL_M;
   fprintf (stderr, "COUNT OPS: for stage 1 with B1 = %u\n"
@@ -1042,7 +1056,14 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
   {
     bt = ecm_stage2 (u, P, &(plan->stage2), b, m);
     mod_gcd (f, u, m);
+#ifdef ECM_TRACE
+    mod_printf ("# TRACE: after stage 2, gcd=%" PRIMODu "\n", MOD_PRINT_INT(f));
+#endif
   }
+#ifdef ECM_TRACE
+  else
+    printf ("# TRACE: stage 2 not done\n");
+#endif
 
 #ifdef ECM_TIMINGS
   stage2_dt = microseconds_thread() - t0;

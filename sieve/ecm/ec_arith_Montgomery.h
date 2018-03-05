@@ -36,17 +36,34 @@ montgomery_A_from_b (residue_t A, const residue_t b, const modulus_t m)
 }
 
 /* P and Q can be the same variables */
-static inline void
+static inline int
 montgomery_point_to_affine (ec_point_t Q, ec_point_t P, const modulus_t m)
 {
   residue_t t;
   mod_init_noset0 (t, m);
 
-  mod_inv (t, P->z, m);
-  mod_mul (Q->x, P->x, t, m);
-  mod_set1 (Q->z, m);
+  int ret = mod_inv (t, P->z, m);
+  if (ret)
+  {
+    mod_mul (Q->x, P->x, t, m);
+    mod_set1 (Q->z, m);
+  }
 
   mod_clear (t, m);
+  return ret;
+}
+
+static inline void
+montgomery_point_fprintf_affine (FILE *out, ec_point_t P, const modulus_t m)
+{
+  ec_point_t Paff;
+  ec_point_init (Paff, m);
+  int ret = montgomery_point_to_affine (Paff, P, m);
+  if (ret)
+    ec_point_fprintf (out, Paff, MONTGOMERY_xz, m);
+  else
+    fprintf (out, "(not a affine point)");
+  ec_point_clear (Paff, m);
 }
 
 static inline void

@@ -160,6 +160,7 @@ pp1_stage1 (residue_t X, bytecode_const bc, const residue_t two,
 
   for (unsigned int i = 0; i < R_nalloc; i++)
     mod_clear (R[i], m);
+  free (R);
 }
 
 void 
