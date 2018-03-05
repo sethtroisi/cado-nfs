@@ -20,25 +20,27 @@ static const uint8_t _B1_1_bc[] = {
     0xff
   }; /* end of bytecode for B1=1 */
 
-/* B1=100 computed with 8 blocks, cost=1052M */
+/* B1=100 computed with 9 blocks, cost=1039M */
 static const uint8_t _B1_100_bc[] = {
     0x03,
-    /* 97*79*67*59*43*41*29*19*11*7*7*5*3*3*3  /  double-base chain  /  476 M (=45DBL+10TPL+5ADD+1M) */
-    0x11, 0x41, 0x05, 0xd1, 0x01, 0x04, 0x41, 0x0d, 0xd1, 0x09, 0x0e, 0x71, 0x09,
+    /* 73*71*61*17*5  /  double-base chain  /  189 M (=12DBL+8TPL+1ADD+1M) */
+    0x11, 0xf1, 0x08, 0x0c,
     /* 89*23  /  double-base chain  /  86 M (=11DBL+0TPL+1ADD+1M) */
     0x11, 0x71, 0x0b,
-    /* 83*73*71*61*37*17*5  /  double-base chain  /  287 M (=22DBL+9TPL+3ADD+1M) */
-    0x11, 0xd1, 0x01, 0x0a, 0xd1, 0x07, 0x02, 0xe1, 0x01, 0x0a,
+    /* 59*53*43*41*13  /  double-base chain  /  206 M (=15DBL+7TPL+2ADD+1M) */
+    0x11, 0xc1, 0x07, 0x03, 0x61, 0x0c,
+    /* 31*11*3  /  double-base chain  /  79 M (=10DBL+0TPL+1ADD+1M) */
+    0x11, 0x71, 0x0a,
+    /* 97*83*79*67*37*7*7  /  double base expansion  /  282 M (=33DBL+2TPL+3ADD+3M) */
+    0x21, 0xa2, 0x01, 0x80, 0x01, 0xff, 0x10, 0x52, 0x09, 0x51, 0x0e, 0x62, 0x0a,
     /* Here we saved 4M on the last operation */
     0x81,
-      /* 13  /  PRAC  /  29 M (=1DBL+0TPL+4ADD+0M) */
-      0x69, 0x0b, 0x0b, 0x03, 0x66,
-      /* 31*3  /  PRAC  /  52 M (=2DBL+0TPL+7ADD+0M) */
-      0x69, 0x03, 0x0b, 0x0b, 0x0b, 0x03, 0x66, 0x69, 0x66,
-      /* 47  /  PRAC  /  46 M (=2DBL+0TPL+6ADD+0M) */
-      0x69, 0x02, 0x0b, 0x0b, 0x0b, 0x03, 0x66,
-      /* 53  /  PRAC  /  50 M (=4DBL+0TPL+5ADD+0M) */
-      0x69, 0x02, 0x02, 0x0b, 0x02, 0x46,
+      /* 47*3*3*3  /  PRAC  /  79 M (=5DBL+0TPL+9ADD+0M) */
+      0x69, 0x02, 0x0b, 0x0b, 0x0b, 0x03, 0x66, 0x69, 0x66, 0x69, 0x66, 0x69, 0x66,
+      /* 19*5  /  PRAC  /  52 M (=2DBL+0TPL+7ADD+0M) */
+      0x69, 0x03, 0x66, 0x69, 0x03, 0x0b, 0x0b, 0x03, 0x66,
+      /* 29  /  PRAC  /  40 M (=2DBL+0TPL+5ADD+0M) */
+      0x69, 0x02, 0x0b, 0x0b, 0x03, 0x46,
       /* 2*2*2*2*2*2  /  PRAC  /  30 M (=6DBL+0TPL+0ADD+0M) */
       /* done outside of bytecode (for backtracking) */
     0xff
@@ -122,25 +124,27 @@ static const uint8_t _B1_125_bc[] = {
     0xff
   }; /* end of bytecode for B1=125 */
 
-/* B1=128 computed with 8 blocks, cost=1427M */
+/* B1=128 computed with 9 blocks, cost=1391M */
 static const uint8_t _B1_128_bc[] = {
     0x03,
-    /* 127*113*109*89*73*43*37*29*23*19*13*7*5*5*3*3*3*3  /  double-base chain  /  582 M (=75DBL+0TPL+7ADD+1M) */
-    0x11, 0x51, 0x0b, 0x51, 0x11, 0x51, 0x08, 0x41, 0x03, 0x41, 0x08, 0x41, 0x11, 0x71, 0x0b,
-    /* 97*83*71*47*41*17  /  double-base chain  /  274 M (=31DBL+2TPL+4ADD+1M) */
-    0x11, 0x51, 0x05, 0x41, 0x08, 0xd1, 0x01, 0x10, 0xf1, 0x01, 0x02,
-    /* 101*53*31  /  double-base chain  /  142 M (=11DBL+4TPL+2ADD+1M) */
-    0x11, 0xc1, 0x01, 0x0a, 0xe1, 0x03, 0x01,
-    /* 107*67  /  double-base chain  /  106 M (=11DBL+1TPL+2ADD+1M) */
-    0x11, 0xc1, 0x01, 0x01, 0x61, 0x0a,
-    /* 103*79*61*59*11*5  /  double base expansion  /  242 M (=29DBL+1TPL+3ADD+3M) */
-    0x21, 0xa2, 0x01, 0xff, 0x12, 0x41, 0x0d, 0x42, 0x0a, 0x61, 0x06,
+    /* 109*73*37*19*13*7*5*3*3*3  /  double-base chain  /  261 M (=36DBL+0TPL+1ADD+1M) */
+    0x11, 0x71, 0x24,
+    /* 127*113*43*29*5*3  /  double-base chain  /  205 M (=28DBL+0TPL+1ADD+1M) */
+    0x11, 0x71, 0x1c,
+    /* 107*103*97*89*53*23  /  double-base chain  /  293 M (=32DBL+3TPL+4ADD+1M) */
+    0x11, 0xc1, 0x03, 0x08, 0x51, 0x0e, 0x51, 0x06, 0x71, 0x04,
+    /* 101*83*79  /  double-base chain  /  156 M (=13DBL+4TPL+2ADD+1M) */
+    0x11, 0x51, 0x09, 0xe1, 0x04, 0x04,
+    /* 71*67*61*47*41*31*17*11*11  /  double base expansion  /  355 M (=26DBL+12TPL+3ADD+5M) */
+    0x21, 0xa2, 0x08, 0xa3, 0x02, 0x80, 0x02, 0xff, 0x10, 0x53, 0x09, 0x41, 0x01, 0x62, 0x10,
     /* Here we saved 4M on the last operation */
     0x81,
+      /* 5  /  PRAC  /  17 M (=1DBL+0TPL+2ADD+0M) */
+      0x69, 0x03, 0x66,
       /* 7  /  PRAC  /  22 M (=2DBL+0TPL+2ADD+0M) */
       0x69, 0x02, 0x66,
-      /* 11  /  PRAC  /  28 M (=2DBL+0TPL+3ADD+0M) */
-      0x69, 0x02, 0x03, 0x46,
+      /* 59  /  PRAC  /  51 M (=3DBL+0TPL+6ADD+0M) */
+      0x69, 0x02, 0x03, 0x0b, 0x02, 0x03, 0x46,
       /* 2*2*2*2*2*2*2  /  PRAC  /  35 M (=7DBL+0TPL+0ADD+0M) */
       /* done outside of bytecode (for backtracking) */
     0xff
@@ -440,33 +444,37 @@ static const uint8_t _B1_244_bc[] = {
     0xff
   }; /* end of bytecode for B1=244 */
 
-/* B1=256 computed with 12 blocks, cost=2809M */
+/* B1=256 computed with 14 blocks, cost=2748M */
 static const uint8_t _B1_256_bc[] = {
     0x03,
-    /* 167*109*73*41*37*31*23*19*13*13*11*7*7*5*5*5*3*3*3*3*3  /  double-base chain  /  581 M (=76DBL+0TPL+6ADD+1M) */
-    0x11, 0x41, 0x10, 0x51, 0x13, 0x51, 0x05, 0x51, 0x0c, 0x41, 0x14, 0x61, 0x04,
-    /* 241*193*191*17  /  double-base chain  /  209 M (=24DBL+2TPL+2ADD+1M) */
-    0x11, 0xc1, 0x02, 0x09, 0x71, 0x0f,
-    /* 251*229*179*173*103*67*29  /  double-base chain  /  375 M (=42DBL+4TPL+4ADD+1M) */
-    0x11, 0x51, 0x0e, 0xc1, 0x01, 0x08, 0xd1, 0x02, 0x09, 0xe1, 0x01, 0x0b,
-    /* 239*223*151*107*101  /  double-base chain  /  283 M (=30DBL+4TPL+3ADD+1M) */
-    0x11, 0x51, 0x18, 0xd1, 0x04, 0x01, 0x61, 0x05,
-    /* 233*89  /  double-base chain  /  113 M (=8DBL+4TPL+1ADD+1M) */
-    0x11, 0xe1, 0x04, 0x08,
-    /* 227*163*157*131*59*53*47*43  /  double-base chain  /  412 M (=41DBL+7TPL+5ADD+1M) */
-    0x11, 0x51, 0x1d, 0xd1, 0x01, 0x03, 0x41, 0x04, 0xd1, 0x02, 0x04, 0xf1, 0x04, 0x01,
-    /* 197*127*97*83  /  double-base chain  /  219 M (=26DBL+1TPL+3ADD+1M) */
-    0x11, 0x41, 0x0b, 0x41, 0x05, 0xe1, 0x01, 0x0a,
-    /* 211*181*79  /  double-base chain  /  173 M (=12DBL+6TPL+2ADD+1M) */
-    0x11, 0xc1, 0x01, 0x05, 0xe1, 0x05, 0x07,
-    /* 199*139*137*113*71*61  /  double base expansion  /  317 M (=36DBL+3TPL+3ADD+5M) */
-    0x21, 0xa2, 0x01, 0xa3, 0x01, 0x80, 0x01, 0xff, 0x10, 0x52, 0x08, 0x51, 0x12, 0x73, 0x0a,
+    /* 227*73*67*17  /  double-base chain  /  180 M (=21DBL+2TPL+1ADD+1M) */
+    0x11, 0xe1, 0x02, 0x15,
+    /* 179*101*97*47*29*23*5  /  double-base chain  /  283 M (=38DBL+0TPL+2ADD+1M) */
+    0x11, 0x51, 0x23, 0x71, 0x03,
+    /* 223*137*103*83*37  /  double-base chain  /  251 M (=30DBL+2TPL+2ADD+1M) */
+    0x11, 0xc1, 0x02, 0x13, 0x71, 0x0b,
+    /* 151*31*7  /  double-base chain  /  114 M (=15DBL+0TPL+1ADD+1M) */
+    0x11, 0x71, 0x0f,
+    /* 233*191*173*157  /  double-base chain  /  230 M (=27DBL+2TPL+2ADD+1M) */
+    0x11, 0xc1, 0x01, 0x09, 0xf1, 0x01, 0x12,
+    /* 193*127*109*107*61*13*7  /  double-base chain  /  309 M (=12DBL+18TPL+1ADD+1M) */
+    0x11, 0xf1, 0x12, 0x0c,
+    /* 211*139*13*11  /  double-base chain  /  171 M (=22DBL+0TPL+2ADD+1M) */
+    0x11, 0x51, 0x0e, 0x71, 0x08,
+    /* 167*149*5  /  double-base chain  /  132 M (=9DBL+5TPL+1ADD+1M) */
+    0x11, 0xf1, 0x05, 0x09,
+    /* 241*229*19  /  double-base chain  /  157 M (=20DBL+0TPL+2ADD+1M) */
+    0x11, 0x41, 0x10, 0x71, 0x04,
+    /* 181*131*89*59*11  /  double-base chain  /  241 M (=24DBL+4TPL+3ADD+1M) */
+    0x11, 0x41, 0x07, 0xd1, 0x04, 0x09, 0x71, 0x08,
+    /* 251*43*41  /  double-base chain  /  151 M (=14DBL+3TPL+2ADD+1M) */
+    0x11, 0xc1, 0x01, 0x0a, 0xe1, 0x02, 0x04,
+    /* 239*199*197*163*113*79*71*53  /  double base expansion  /  421 M (=46DBL+6TPL+3ADD+3M) */
+    0x21, 0xa2, 0x03, 0x80, 0x03, 0xff, 0x10, 0x41, 0x04, 0x41, 0x1c, 0x62, 0x0e,
     /* Here we saved 4M on the last operation */
     0x81,
-      /* 11  /  PRAC  /  28 M (=2DBL+0TPL+3ADD+0M) */
-      0x69, 0x02, 0x03, 0x66,
-      /* 149  /  PRAC  /  63 M (=3DBL+0TPL+8ADD+0M) */
-      0x69, 0x02, 0x03, 0x0b, 0x0b, 0x0b, 0x0b, 0x02, 0x46,
+      /* 5*3*3*3*3*3  /  PRAC  /  72 M (=6DBL+0TPL+7ADD+0M) */
+      0x69, 0x66, 0x69, 0x66, 0x69, 0x66, 0x69, 0x66, 0x69, 0x03, 0x66, 0x69, 0x46,
       /* 2*2*2*2*2*2*2*2  /  PRAC  /  40 M (=8DBL+0TPL+0ADD+0M) */
       /* done outside of bytecode (for backtracking) */
     0xff
@@ -1067,6 +1075,47 @@ static const uint8_t _B1_508_bc[] = {
       /* done outside of bytecode (for backtracking) */
     0xff
   }; /* end of bytecode for B1=508 */
+
+/* B1=512 computed with 17 blocks, cost=5694M */
+static const uint8_t _B1_512_bc[] = {
+    0x02,
+    /* 389*307*271*127*113*109*73*43*37*29*19*17*13*11*11*7*5*5*3*3*3*3  /  double-base chain  /  757 M (=100DBL+0TPL+7ADD+1M) */
+    0x11, 0x51, 0x05, 0x51, 0x17, 0x41, 0x0d, 0x41, 0x14, 0x51, 0x0b, 0x51, 0x19, 0x61, 0x03,
+    /* 503*499*457*313*223*197*157*101*31*19*13  /  double-base chain  /  586 M (=71DBL+4TPL+5ADD+1M) */
+    0x11, 0xc1, 0x01, 0x08, 0x51, 0x21, 0x41, 0x02, 0x41, 0x11, 0xf1, 0x03, 0x0b,
+    /* 449*443*439*431*359*239*211*199*139*137*3  /  double-base chain  /  627 M (=70DBL+8TPL+5ADD+1M) */
+    0x11, 0x41, 0x10, 0x51, 0x1b, 0xd1, 0x07, 0x04, 0xd1, 0x01, 0x02, 0x71, 0x15,
+    /* 401*349*347*331*241*179*67*53  /  double-base chain  /  470 M (=51DBL+6TPL+5ADD+1M) */
+    0x11, 0x41, 0x01, 0x51, 0x12, 0xd1, 0x06, 0x0f, 0x51, 0x09, 0x61, 0x08,
+    /* 193*191  /  double-base chain  /  117 M (=12DBL+2TPL+1ADD+1M) */
+    0x11, 0xf1, 0x02, 0x0c,
+    /* 479*293*269  /  double-base chain  /  195 M (=22DBL+2TPL+2ADD+1M) */
+    0x11, 0x41, 0x0d, 0xf1, 0x02, 0x09,
+    /* 337*317*257*61*23  /  double-base chain  /  273 M (=32DBL+2TPL+3ADD+1M) */
+    0x11, 0xd1, 0x02, 0x05, 0x51, 0x07, 0x71, 0x14,
+    /* 397*379*173*163*41  /  double-base chain  /  290 M (=31DBL+4TPL+3ADD+1M) */
+    0x11, 0xc1, 0x03, 0x09, 0x41, 0x05, 0xe1, 0x01, 0x11,
+    /* 491*487*373*17  /  double-base chain  /  238 M (=27DBL+2TPL+3ADD+1M) */
+    0x11, 0x41, 0x02, 0xc1, 0x01, 0x04, 0xe1, 0x01, 0x15,
+    /* 461*311*281*277*89*7  /  double-base chain  /  333 M (=36DBL+4TPL+4ADD+1M) */
+    0x11, 0x41, 0x02, 0x51, 0x08, 0xd1, 0x02, 0x10, 0xe1, 0x02, 0x0a,
+    /* 433*229*227*167*107*83  /  double-base chain  /  352 M (=37DBL+5TPL+4ADD+1M) */
+    0x11, 0xd1, 0x02, 0x08, 0x41, 0x12, 0x51, 0x08, 0xe1, 0x03, 0x03,
+    /* 467*97*59  /  double-base chain  /  170 M (=15DBL+4TPL+2ADD+1M) */
+    0x11, 0xc1, 0x02, 0x04, 0xe1, 0x02, 0x0b,
+    /* 383*283*149*47  /  double-base chain  /  245 M (=20DBL+6TPL+4ADD+1M) */
+    0x11, 0xd1, 0x02, 0x04, 0xd1, 0x01, 0x05, 0xd1, 0x02, 0x08, 0xf1, 0x01, 0x03,
+    /* 419*409*251*151*103*71*5  /  double base expansion  /  364 M (=43DBL+3TPL+3ADD+3M) */
+    0x21, 0xa2, 0x03, 0xff, 0x12, 0x52, 0x1f, 0x41, 0x06, 0x62, 0x06,
+    /* 509*367*263*233*181*131*7  /  double base expansion  /  387 M (=46DBL+3TPL+3ADD+5M) */
+    0x21, 0xa2, 0x02, 0xa3, 0x01, 0xff, 0x13, 0x52, 0x14, 0x41, 0x10, 0x73, 0x0a,
+    /* 463*421*353*79  /  double base expansion  /  249 M (=26DBL+4TPL+2ADD+3M) */
+    0x21, 0xa2, 0x03, 0x80, 0x01, 0xff, 0x10, 0x51, 0x12, 0x72, 0x08,
+    /* Here we saved 4M on the last operation */
+      /* 2*2*2*2*2*2*2*2*2  /  PRAC  /  45 M (=9DBL+0TPL+0ADD+0M) */
+      /* done outside of bytecode (for backtracking) */
+    0xff
+  }; /* end of bytecode for B1=512 */
 
 /* B1=531 computed with 21 blocks, cost=5846M */
 static const uint8_t _B1_531_bc[] = {
@@ -2352,6 +2401,7 @@ static mishmash_B1_data_t mishmash_B1_data[] = {
     { .B1 = 464, .len = sizeof(_B1_464_bc)/sizeof(*_B1_464_bc), .bc = _B1_464_bc },
     { .B1 = 486, .len = sizeof(_B1_486_bc)/sizeof(*_B1_486_bc), .bc = _B1_486_bc },
     { .B1 = 508, .len = sizeof(_B1_508_bc)/sizeof(*_B1_508_bc), .bc = _B1_508_bc },
+    { .B1 = 512, .len = sizeof(_B1_512_bc)/sizeof(*_B1_512_bc), .bc = _B1_512_bc },
     { .B1 = 531, .len = sizeof(_B1_531_bc)/sizeof(*_B1_531_bc), .bc = _B1_531_bc },
     { .B1 = 554, .len = sizeof(_B1_554_bc)/sizeof(*_B1_554_bc), .bc = _B1_554_bc },
     { .B1 = 577, .len = sizeof(_B1_577_bc)/sizeof(*_B1_577_bc), .bc = _B1_577_bc },
