@@ -1,5 +1,5 @@
-#ifndef _EC_ARITH_EDWARDS_H_
-#define _EC_ARITH_EDWARDS_H_
+#ifndef EC_ARITH_EDWARDS_H_
+#define EC_ARITH_EDWARDS_H_
 
 #include "ec_arith_common.h"
 
@@ -366,4 +366,4 @@ edwards_smul_ui (ec_point_t R, const ec_point_t P, const unsigned long e,
   ec_point_clear (Pe, m);
 }
 
-#endif /* _EC_ARITH_EDWARDS_H_ */
+#endif /* EC_ARITH_EDWARDS_H_ */

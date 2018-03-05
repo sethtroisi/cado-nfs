@@ -1,5 +1,5 @@
-#ifndef _EC_ARITH_MONTGOMERY_H_
-#define _EC_ARITH_MONTGOMERY_H_
+#ifndef EC_ARITH_MONTGOMERY_H_
+#define EC_ARITH_MONTGOMERY_H_
 
 #include "ec_arith_common.h"
 
@@ -286,4 +286,4 @@ montgomery_smul_ui (ec_point_t R, const ec_point_t P, unsigned long e,
   ec_point_clear (t2, m);
 }
 
-#endif /* _EC_ARITH_MONTGOMERY_H_ */
+#endif /* EC_ARITH_MONTGOMERY_H_ */

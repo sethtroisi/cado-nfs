@@ -1,5 +1,5 @@
-#ifndef __BYTECODE_H__
-#define __BYTECODE_H__
+#ifndef BYTECODE_H_
+#define BYTECODE_H_
 
 #include <stdint.h>
 #include <gmp.h>
@@ -131,4 +131,4 @@ void bytecode_mishmash_encode (bytecode *, unsigned int, unsigned int,
 int bytecode_mishmash_check (bytecode_const, mpz_srcptr, int);
 
 
-#endif /* __BYTECODE_H__ */
+#endif /* BYTECODE_H_ */

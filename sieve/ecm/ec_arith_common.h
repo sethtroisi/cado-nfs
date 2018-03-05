@@ -1,5 +1,5 @@
-#ifndef _EC_ARITH_COMMON_H_
-#define _EC_ARITH_COMMON_H_
+#ifndef EC_ARITH_COMMON_H_
+#define EC_ARITH_COMMON_H_
 
 /* Types of coordinates */
 typedef enum {
@@ -190,4 +190,4 @@ ec_weierstrass_curve_fprintf (FILE *out, const char *prefix, residue_t a,
   }
 }
 
-#endif /* _EC_ARITH_COMMON_H_ */
+#endif /* EC_ARITH_COMMON_H_ */

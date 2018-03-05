@@ -1,3 +1,6 @@
+#ifndef EC_PARAMETERIZATION_H_
+#define EC_PARAMETERIZATION_H_
+
 #include "ec_arith_common.h"
 #include "ec_arith_Edwards.h"
 #include "ec_arith_Montgomery.h"
@@ -702,3 +705,5 @@ ec_parameter_is_valid (ec_parameterization_t parameterization,
       abort ();
   }
 }
+
+#endif /* EC_PARAMETERIZATION_H_ */

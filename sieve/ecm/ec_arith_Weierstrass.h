@@ -1,5 +1,5 @@
-#ifndef _EC_ARITH_WEIERSTRASS_H_
-#define _EC_ARITH_WEIERSTRASS_H_
+#ifndef EC_ARITH_WEIERSTRASS_H_
+#define EC_ARITH_WEIERSTRASS_H_
 
 #include "ec_arith_common.h"
 
@@ -419,4 +419,4 @@ weierstrass_proj_smul_ui (ec_point_t P, const unsigned long e,
   /* else do nothing for e == 1 */
 }
 
-#endif /* _EC_ARITH_WEIERSTRASS_H_ */
+#endif /* EC_ARITH_WEIERSTRASS_H_ */
