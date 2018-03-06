@@ -35,6 +35,13 @@ montgomery_A_from_b (residue_t A, const residue_t b, const modulus_t m)
   mod_sub_ul (A, A, 2, m); /* A <- 4b-2 */
 }
 
+static inline void
+montgomery_point_set_zero (ec_point_t P, const modulus_t m)
+{
+  mod_set0 (P->x, m);
+  mod_set0 (P->z, m);
+}
+
 /* P and Q can be the same variables */
 static inline int
 montgomery_point_to_affine (ec_point_t Q, ec_point_t P, const modulus_t m)
@@ -190,10 +197,7 @@ montgomery_dadd (ec_point_t R, const ec_point_t P, const ec_point_t Q,
           montgomery_dbl (R, P, m, b); /* Yes, points are identical, use doubling */
         }
       else
-        {
-          mod_set0 (R->x, m); /* No, are each other's negatives. */
-          mod_set0 (R->z, m); /* Set result to point at infinity */
-        }
+        montgomery_point_set_zero (R, m); /* Set result to point at infinity */
       return;
     }
 #endif

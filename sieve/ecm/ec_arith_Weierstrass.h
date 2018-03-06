@@ -243,6 +243,13 @@ weierstrass_aff_smul_ui (ec_point_t P, const unsigned long e, const residue_t a,
   return tfinite;
 }
 
+static inline void
+weierstrass_proj_point_set_zero (ec_point_t P, const modulus_t m)
+{
+  mod_set0 (P->x, m);
+  mod_set1 (P->y, m);
+  mod_set0 (P->z, m);
+}
 /* Computes R=2P, with ? muls (? muls and ? squares) and ? add/sub.
  *    - m : modulus
  *    - a : curve coefficient
@@ -386,11 +393,7 @@ weierstrass_proj_smul_ui (ec_point_t P, const unsigned long e,
                           const residue_t a, const modulus_t m)
 {
   if (e == 0)
-  {
-    mod_set0 (P->x, m);
-    mod_set1 (P->y, m);
-    mod_set0 (P->z, m);
-  }
+    weierstrass_proj_point_set_zero (P, m);
   else if (e > 1)
   {
     unsigned long i;
