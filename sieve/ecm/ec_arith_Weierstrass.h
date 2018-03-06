@@ -212,7 +212,7 @@ weierstrass_aff_smul_ui (ec_point_t P, const unsigned long e, const residue_t a,
   while ((i & e) == 0)
     i >>= 1;
 
-  ec_point_set (T, P, m);
+  ec_point_set (T, P, m, SHORT_WEIERSTRASS_aff);
   tfinite = 1;
   i >>= 1;
 
@@ -226,7 +226,7 @@ weierstrass_aff_smul_ui (ec_point_t P, const unsigned long e, const residue_t a,
         tfinite = weierstrass_aff_add (T, T, P, a, m);
       else
       {
-        ec_point_set (T, P, m);
+        ec_point_set (T, P, m, SHORT_WEIERSTRASS_aff);
         tfinite = 1;
       }
     }
@@ -234,7 +234,7 @@ weierstrass_aff_smul_ui (ec_point_t P, const unsigned long e, const residue_t a,
   }
 
   if (tfinite)
-    ec_point_set (P, T, m);
+    ec_point_set (P, T, m, SHORT_WEIERSTRASS_aff);
   else
     mod_set (P->x, T->x, m);
 
@@ -403,7 +403,7 @@ weierstrass_proj_smul_ui (ec_point_t P, const unsigned long e,
     while ((i & e) == 0)
       i >>= 1;
 
-    ec_point_set (T, P, m);
+    ec_point_set (T, P, m, SHORT_WEIERSTRASS_proj);
     i >>= 1; /* skip most significant bit of e */
 
     for (; i > 0; i >>= 1)
@@ -413,7 +413,7 @@ weierstrass_proj_smul_ui (ec_point_t P, const unsigned long e,
         weierstrass_proj_add (T, T, P, m);
     }
 
-    ec_point_set (P, T, m);
+    ec_point_set (P, T, m, SHORT_WEIERSTRASS_proj);
     ec_point_clear (T, m);
   }
   /* else do nothing for e == 1 */

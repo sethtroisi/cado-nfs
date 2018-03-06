@@ -143,7 +143,8 @@ bytecode_precomp_interpret_ec_edwards_internal (bytecode_const bc,
           edwards_dbl (R[0], R[0], m, (i+1==pow2 && a) ? TWISTED_EDWARDS_ext :
                                                           TWISTED_EDWARDS_proj);
         if (k > 0)
-          ec_point_set (R[k], R[0], m);
+          ec_point_set (R[k], R[0], m, a ? TWISTED_EDWARDS_ext :
+                                                          TWISTED_EDWARDS_proj);
         break;
       case PRECOMP_OP_TPL:
         bc++;
@@ -152,7 +153,8 @@ bytecode_precomp_interpret_ec_edwards_internal (bytecode_const bc,
           edwards_tpl (R[0], R[0], m, (i+1==pow3 && a) ? TWISTED_EDWARDS_ext :
                                                           TWISTED_EDWARDS_proj);
         if (k > 0)
-          ec_point_set (R[k], R[0], m);
+          ec_point_set (R[k], R[0], m, a ? TWISTED_EDWARDS_ext :
+                                                          TWISTED_EDWARDS_proj);
         break;
       default:
         printf ("Fatal error in %s at %s:%d -- unknown bytecode 0x%02x\n",
@@ -184,11 +186,11 @@ bytecode_prac_interpret_ec_montgomery_internal (bytecode_const bc,
     switch (*bc)
     {
       case PRAC_SWAP: /* [ = 's' ] Swap R[0], R[1] */
-        ec_point_swap (R[0], R[1], m);
+        ec_point_swap (R[0], R[1], m, MONTGOMERY_xz);
         break;
       case PRAC_SUBBLOCK_INIT: /* [ = 'i' ] Start of a sub-block */
-        ec_point_set (R[1], R[0], m);
-        ec_point_set (R[2], R[0], m);
+        ec_point_set (R[1], R[0], m, MONTGOMERY_xz);
+        ec_point_set (R[2], R[0], m, MONTGOMERY_xz);
         montgomery_dbl (R[0], R[0], m, b);
         break;
       case PRAC_SUBBLOCK_FINAL: /* [ = 'f' ] End of a sub-block */
@@ -202,7 +204,7 @@ bytecode_prac_interpret_ec_montgomery_internal (bytecode_const bc,
         montgomery_dadd (R[3], R[0], R[1], R[2], b, m);
         montgomery_dadd (R[4], R[3], R[0], R[1], b, m);
         montgomery_dadd (R[1], R[1], R[3], R[0], b, m);
-        ec_point_set (R[0], R[4], m);
+        ec_point_set (R[0], R[4], m, MONTGOMERY_xz);
         break;
       case 2:
         montgomery_dadd (R[1], R[0], R[1], R[2], b, m);
@@ -210,7 +212,7 @@ bytecode_prac_interpret_ec_montgomery_internal (bytecode_const bc,
         break;
       case 3:
         montgomery_dadd (R[2], R[1], R[0], R[2], b, m);
-        ec_point_swap (R[1], R[2], m);
+        ec_point_swap (R[1], R[2], m, MONTGOMERY_xz);
         break;
       case 4:
         montgomery_dadd (R[1], R[1], R[0], R[2], b, m);
@@ -225,7 +227,7 @@ bytecode_prac_interpret_ec_montgomery_internal (bytecode_const bc,
         montgomery_dadd (R[4], R[0], R[1], R[2], b, m);
         montgomery_dadd (R[0], R[3], R[0], R[0], b, m);
         montgomery_dadd (R[2], R[3], R[4], R[2], b, m);
-        ec_point_swap (R[1], R[2], m);
+        ec_point_swap (R[1], R[2], m, MONTGOMERY_xz);
         break;
       case 7:
         montgomery_dadd (R[3], R[0], R[1], R[2], b, m);
@@ -236,7 +238,7 @@ bytecode_prac_interpret_ec_montgomery_internal (bytecode_const bc,
       case 8:
         montgomery_dadd (R[3], R[0], R[1], R[2], b, m);
         montgomery_dadd (R[2], R[2], R[0], R[1], b, m);
-        ec_point_swap (R[1], R[3], m);
+        ec_point_swap (R[1], R[3], m, MONTGOMERY_xz);
         montgomery_dbl (R[3], R[0], m, b);
         montgomery_dadd (R[0], R[0], R[3], R[0], b, m);
         break;
@@ -247,28 +249,28 @@ bytecode_prac_interpret_ec_montgomery_internal (bytecode_const bc,
       case 10:
         /* Combined final add of old subchain and init of new subchain [=fi] */
         montgomery_dadd (R[1], R[0], R[1], R[2], b, m);
-        ec_point_set (R[2], R[1], m);
+        ec_point_set (R[2], R[1], m, MONTGOMERY_xz);
         montgomery_dbl (R[0], R[1], m, b);
         break;
       case 11:
         /* Combined rule 3 and rule 0 [=\x3s] */
         montgomery_dadd (R[2], R[1], R[0], R[2], b, m);
         /* (R[1],R[2],R[0]) := (R[0],R[1],R[2])  */
-        ec_point_swap (R[1], R[2], m);
-        ec_point_swap (R[0], R[1], m);
+        ec_point_swap (R[1], R[2], m, MONTGOMERY_xz);
+        ec_point_swap (R[0], R[1], m, MONTGOMERY_xz);
         break;
       case 12:
         /* Combined rule 3, then subchain end/start [=\x3fi] */
         montgomery_dadd (R[3], R[1], R[0], R[2], b, m);
         montgomery_dadd (R[2], R[0], R[3], R[1], b, m);
-        ec_point_set (R[1], R[2], m);
+        ec_point_set (R[1], R[2], m, MONTGOMERY_xz);
         montgomery_dbl (R[0], R[2], m, b);
         break;
       case 13:
         /* Combined rule 3, swap, rule 3 and swap, merged a bit [=\x3s\x3s] */
-        ec_point_set (R[3], R[1], m);
+        ec_point_set (R[3], R[1], m, MONTGOMERY_xz);
         montgomery_dadd (R[1], R[1], R[0], R[2], b, m);
-        ec_point_set (R[2], R[0], m);
+        ec_point_set (R[2], R[0], m, MONTGOMERY_xz);
         montgomery_dadd (R[0], R[0], R[1], R[3], b, m);
         break;
       default:
@@ -303,12 +305,12 @@ bytecode_prac_interpret_ec_montgomery (ec_point_t P, bytecode_const bc,
     ec_point_init (R[i], m);
 
   /* current point (here starting point) go into R[0] at init */
-  ec_point_set (R[0], P, m);
+  ec_point_set (R[0], P, m, MONTGOMERY_xz);
 
   bytecode_prac_interpret_ec_montgomery_internal (bc, R, m, b);
 
   /* output is in R[1] */
-  ec_point_set (P, R[1], m);
+  ec_point_set (P, R[1], m, MONTGOMERY_xz);
 
   for (unsigned int i = 0; i < R_nalloc; i++)
     ec_point_clear (R[i], m);
@@ -335,7 +337,7 @@ bytecode_mishmash_interpret_ec_mixed_repr (ec_point_t P, bytecode_const bc,
     ec_point_init (R[i], m);
 
   /* starting point go into R[1] at init */
-  ec_point_set (R[1], P, m);
+  ec_point_set (R[1], P, m, TWISTED_EDWARDS_ext);
 
   while (*bc != MISHMASH_FINAL)
   {
@@ -343,7 +345,7 @@ bytecode_mishmash_interpret_ec_mixed_repr (ec_point_t P, bytecode_const bc,
     bytecode_elt_split_4_4 (&t, &n, *bc);
 
     if (n != 0)
-      ec_point_set (R[0], R[n], m);
+      ec_point_set (R[0], R[n], m, TWISTED_EDWARDS_ext);
 
     if (t == MISHMASH_DBCHAIN_BLOCK)
       bc = bytecode_dbchain_interpret_ec_edwards_internal (++bc, R, m);
@@ -361,8 +363,8 @@ bytecode_mishmash_interpret_ec_mixed_repr (ec_point_t P, bytecode_const bc,
     bc++; /* go to next byte */
   }
 
-  /* output is in R[1] */
-  ec_point_set (P, R[1], m);
+  /* output (always in Montgomery form) is in R[1] */
+  ec_point_set (P, R[1], m, MONTGOMERY_xz);
 
   for (unsigned int i = 0; i < R_nalloc; i++)
     ec_point_clear (R[i], m);
@@ -534,7 +536,7 @@ ecm_stage2 (residue_t r, const ec_point_t P, const stage2_plan_t *plan,
 
     /* Init ap1_0 = 1P, ap1_1 = 7P, ap5_0 = 5P, ap5_1 = 11P
        and P6 = 6P */
-    ec_point_set (ap1_0, P, m);            /* ap1_0 = 1*P */
+    ec_point_set (ap1_0, P, m, MONTGOMERY_xz); /* ap1_0 = 1*P */
     montgomery_dbl (P2, P, m, b);         /* P2 = 2*P */
     montgomery_dadd (P6, P2, P, P, b, m);     /* P6 = 3*P (for now) */
     montgomery_dadd (ap5_0, P6, P2, P, b, m); /* 5*P = 3*P + 2*P */
@@ -579,13 +581,13 @@ ecm_stage2 (residue_t r, const ec_point_t P, const stage2_plan_t *plan,
           }
 	
         montgomery_dadd (Pt, ap1_1, P6, ap1_0, b, m);
-        ec_point_set (ap1_0, ap1_1, m);
-        ec_point_set (ap1_1, Pt, m);
+        ec_point_set (ap1_0, ap1_1, m, MONTGOMERY_xz);
+        ec_point_set (ap1_1, Pt, m, MONTGOMERY_xz);
         i1 += 6;
 	
         montgomery_dadd (Pt, ap5_1, P6, ap5_0, b, m);
-        ec_point_set (ap5_0, ap5_1, m);
-        ec_point_set (ap5_1, Pt, m);
+        ec_point_set (ap5_0, ap5_1, m, MONTGOMERY_xz);
+        ec_point_set (ap5_1, Pt, m, MONTGOMERY_xz);
         i5 += 6;
       }
 
@@ -594,15 +596,15 @@ ecm_stage2 (residue_t r, const ec_point_t P, const stage2_plan_t *plan,
         if (i1 < i5)
           {
             montgomery_dadd (Pt, ap1_1, P6, ap1_0, b, m);
-            ec_point_set (ap1_0, ap1_1, m);
-            ec_point_set (ap1_1, Pt, m);
+            ec_point_set (ap1_0, ap1_1, m, MONTGOMERY_xz);
+            ec_point_set (ap1_1, Pt, m, MONTGOMERY_xz);
             i1 += 6;
           }
         else
           {
             montgomery_dadd (Pt, ap5_1, P6, ap5_0, b, m);
-            ec_point_set (ap5_0, ap5_1, m);
-            ec_point_set (ap5_1, Pt, m);
+            ec_point_set (ap5_0, ap5_1, m, MONTGOMERY_xz);
+            ec_point_set (ap5_1, Pt, m, MONTGOMERY_xz);
             i5 += 6;
           }
       }
@@ -681,8 +683,8 @@ ecm_stage2 (residue_t r, const ec_point_t P, const stage2_plan_t *plan,
     while (i < plan->i1)
       {
         montgomery_dadd (Pt, Pid1, Pd, Pid, b, m);
-        ec_point_set (Pid, Pid1, m);
-        ec_point_set (Pid1, Pt, m);
+        ec_point_set (Pid, Pid1, m, MONTGOMERY_xz);
+        ec_point_set (Pid1, Pt, m, MONTGOMERY_xz);
         mod_set (Pid_x[k], Pt[0].x, m);
         mod_set (Pid_z[k], Pt[0].z, m);
         k++; i++;
@@ -999,18 +1001,18 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
    * The following code assume P is in Montgomery form.
    */
   ec_point_init (Pt, m);
-  ec_point_set (Pt, P, m);
+  ec_point_set (Pt, P, m, MONTGOMERY_xz);
   for (i = 0; i < plan->exp2; i++)
   {
     montgomery_dbl (P, P, m, b);
 #if ECM_BACKTRACKING
     if (mod_is0 (P->z, m))
     {
-      ec_point_set (P, Pt, m);
+      ec_point_set (P, Pt, m, MONTGOMERY_xz);
       bt = 1;
       break;
     }
-    ec_point_set (Pt, P, m);
+    ec_point_set (Pt, P, m, MONTGOMERY_xz);
 #endif
   }
   mod_gcd (f, P->z, m);
@@ -1216,13 +1218,13 @@ ell_pointorder (const unsigned long parameter,
   for (i = 0; i < baby_len; i++)
     ec_point_init (baby[i], m);
 
-  ec_point_set (Pg, P, m);
+  ec_point_set (Pg, P, m, SHORT_WEIERSTRASS_aff);
   i = known_m;
   if (weierstrass_aff_smul_ui (Pg, i, a, m) == 0) /* Pg = m*P for now */
     goto found_inf;
 
   if (1 < baby_len)
-    ec_point_set (baby[1], Pg, m);
+    ec_point_set (baby[1], Pg, m, SHORT_WEIERSTRASS_aff);
 
   if (2 < baby_len)
     {
@@ -1231,7 +1233,7 @@ ell_pointorder (const unsigned long parameter,
           i = 2 * known_m;
           goto found_inf;
         }
-      ec_point_set (baby[2], Pi, m);
+      ec_point_set (baby[2], Pi, m, SHORT_WEIERSTRASS_aff);
     }
 
   for (i = 3; i < baby_len; i++)
@@ -1241,17 +1243,17 @@ ell_pointorder (const unsigned long parameter,
           i *= known_m;
           goto found_inf;
         }
-      ec_point_set (baby[i], Pi, m);
+      ec_point_set (baby[i], Pi, m, SHORT_WEIERSTRASS_aff);
     }
 
   /* Now compute the giant steps in [giant_min, giant_max] */
   i = giant_step;
-  ec_point_set (Pg, P, m);
+  ec_point_set (Pg, P, m, SHORT_WEIERSTRASS_aff);
   if (weierstrass_aff_smul_ui (Pg, i, a, m) == 0)
     goto found_inf;
 
   i = giant_min;
-  ec_point_set (Pi, P, m);
+  ec_point_set (Pi, P, m, SHORT_WEIERSTRASS_aff);
   if (weierstrass_aff_smul_ui (Pi, i, a, m) == 0)
     goto found_inf;
 
@@ -1294,7 +1296,7 @@ ell_pointorder (const unsigned long parameter,
 
 found_inf:
   /* Check that i is a multiple of the order */
-  ec_point_set (Pi, P, m);
+  ec_point_set (Pi, P, m, SHORT_WEIERSTRASS_aff);
   if (weierstrass_aff_smul_ui (Pi, i, a, m) != 0)
     {
       modint_t tx1, ty1;
@@ -1333,7 +1335,7 @@ found_inf:
 
         /* Add factors of p again one by one, stopping when we hit
            point at infinity */
-        ec_point_set (Pi, P, m);
+        ec_point_set (Pi, P, m, SHORT_WEIERSTRASS_aff);
         if (weierstrass_aff_smul_ui (Pi, order, a, m) != 0)
           {
             order *= p;
@@ -1344,7 +1346,7 @@ found_inf:
   /* Now cof is 1 or a prime */
   if (cof > 1)
     {
-      ec_point_set (Pi, P, m);
+      ec_point_set (Pi, P, m, SHORT_WEIERSTRASS_aff);
       ASSERT (order % cof == 0);
       if (weierstrass_aff_smul_ui (Pi, order / cof, a, m) == 0)
         order /= cof;
@@ -1352,7 +1354,7 @@ found_inf:
 
 
   /* One last check that order divides real order */
-  ec_point_set (Pi, P, m);
+  ec_point_set (Pi, P, m, SHORT_WEIERSTRASS_aff);
   if (weierstrass_aff_smul_ui (Pi, order, a, m) != 0)
     {
       modint_t tx1, ty1;

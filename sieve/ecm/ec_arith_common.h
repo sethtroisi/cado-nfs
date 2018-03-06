@@ -13,10 +13,10 @@ typedef enum {
 
 /* A point on an elliptic curve:
  *   The significant coordinates are:
- *      - x,y for SHORT_WEIERSTRASS_aff
- *      - x,y,z for SHORT_WEIERSTRASS_proj
- *      - x,z for MONTGOMERY_xz
- *      - x,y,z for TWISTED_EDWARDS_proj
+ *      - x,y     for SHORT_WEIERSTRASS_aff
+ *      - x,y,z   for SHORT_WEIERSTRASS_proj
+ *      - x,  z   for MONTGOMERY_xz
+ *      - x,y,z   for TWISTED_EDWARDS_proj
  *      - x,y,z,t for TWISTED_EDWARDS_ext
  */
 struct ec_point_s
@@ -47,21 +47,29 @@ ec_point_clear (ec_point_t P, const modulus_t m)
 }
 
 static inline void
-ec_point_set (ec_point_t Q, const ec_point_t P, const modulus_t m)
+ec_point_set (ec_point_t Q, const ec_point_t P, const modulus_t m,
+              const ec_point_coord_type_t coord)
 {
   mod_set (Q->x, P->x, m);
-  mod_set (Q->y, P->y, m);
-  mod_set (Q->z, P->z, m);
-  mod_set (Q->t, P->t, m);
+  if (coord != MONTGOMERY_xz)
+    mod_set (Q->y, P->y, m);
+  if (coord != SHORT_WEIERSTRASS_aff)
+    mod_set (Q->z, P->z, m);
+  if (coord == TWISTED_EDWARDS_ext)
+    mod_set (Q->t, P->t, m);
 }
 
 static inline void
-ec_point_swap (ec_point_t Q, ec_point_t P, const modulus_t m)
+ec_point_swap (ec_point_t Q, ec_point_t P, const modulus_t m,
+               const ec_point_coord_type_t coord)
 {
   mod_swap (Q->x, P->x, m);
-  mod_swap (Q->y, P->y, m);
-  mod_swap (Q->t, P->t, m);
-  mod_swap (Q->z, P->z, m);
+  if (coord != MONTGOMERY_xz)
+    mod_swap (Q->y, P->y, m);
+  if (coord != SHORT_WEIERSTRASS_aff)
+    mod_swap (Q->z, P->z, m);
+  if (coord == TWISTED_EDWARDS_ext)
+    mod_swap (Q->t, P->t, m);
 }
 
 static inline void

@@ -226,7 +226,7 @@ montgomery_smul_ui (ec_point_t R, const ec_point_t P, unsigned long e,
 
   if (e == 1UL)
     {
-      ec_point_set (R, P, m);
+      ec_point_set (R, P, m, MONTGOMERY_xz);
       return;
     }
 
@@ -261,7 +261,7 @@ montgomery_smul_ui (ec_point_t R, const ec_point_t P, unsigned long e,
   for (l = e, n = 0; l > 1; n ++, l /= 2) ;
 
   /* start from P1=P, P2=2P */
-  ec_point_set (t1, P, m);
+  ec_point_set (t1, P, m, MONTGOMERY_xz);
   montgomery_dbl (t2, t1, m, b);
 
   while (n--)
@@ -280,7 +280,7 @@ montgomery_smul_ui (ec_point_t R, const ec_point_t P, unsigned long e,
         }
     }
 
-  ec_point_set (R, t2, m);
+  ec_point_set (R, t2, m, MONTGOMERY_xz);
 
   ec_point_clear (t1, m);
   ec_point_clear (t2, m);
