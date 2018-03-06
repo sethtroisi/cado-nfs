@@ -732,7 +732,12 @@ facul_make_default_strategy (int n, const int verbose)
       double B2;
       unsigned int k;
 
+      /* If the sequence of B1 values is modified, it may be a good thing to
+       * regenerate bytecode_mishmash_B1_data.h to add precomputed chains for
+       * the new B1 values.
+       */
       B1 += sqrt (B1);
+
       /* The factor 50 was determined experimentally with testbench, to find
 	 factors of 40 bits:
 	 testbench -p -cof 1208925819614629174706189 -strat 549755813888 549755913888
