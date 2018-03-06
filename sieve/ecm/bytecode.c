@@ -681,6 +681,53 @@ bytecode_prac_encode_one (bytecode_encoder_ptr encoder, const unsigned int k,
 }
 
 void
+bytecode_prac_compress (bytecode_encoder_ptr encoder, int verbose)
+{
+  unsigned int i, j, len = encoder->len;
+  bytecode bc = encoder->bc;
+
+  if (verbose)
+    printf ("# %s: before, length = %u\n", __func__, len);
+
+  for (i = 0, j = 0; i < len; i++, j++)
+  {
+    /* 3 then 's' then 3 then 's' => 13 */
+    if (i+3 < len && bc[i] == 3 && bc[i+1] == PRAC_SWAP
+                  && bc[i+2] == 3 && bc[i+3] == PRAC_SWAP)
+    {
+      bc[j] = 13;
+      i += 3;
+    }
+    /* 3 then 'fi' => 12 */
+    else if (i+2 < len && bc[i] == 3 && bc[i+1] == PRAC_SUBBLOCK_FINAL
+                                              && bc[i+2] == PRAC_SUBBLOCK_INIT)
+    {
+      bc[j] = 12;
+      i += 2;
+    }
+    /* 'fi' => 10 */
+    else if (i+1 < len && bc[i] == PRAC_SUBBLOCK_FINAL
+                                              && bc[i+1] == PRAC_SUBBLOCK_INIT)
+    {
+      bc[j] = 10;
+      i += 1;
+    }
+    /* 3 then 's' => 11 */
+    else if (i+1 < len && bc[i] == 3 && bc[i+1] == PRAC_SWAP)
+    {
+      bc[j] = 11;
+      i += 1;
+    }
+    else
+      bc[j] = bc[i];
+  }
+  encoder->len = j;
+
+  if (verbose)
+    printf ("# %s: after, length = %u\n", __func__, encoder->len);
+}
+
+void
 bytecode_prac_encode (bytecode *bc, unsigned int B1, unsigned int pow2_nb,
                       unsigned int pow3_extra, const prac_cost_t *opcost,
                       int compress, int verbose)
@@ -713,11 +760,8 @@ bytecode_prac_encode (bytecode *bc, unsigned int B1, unsigned int pow2_nb,
     bytecode_encoder_add_one (encoder, PRAC_BLOCK_FINAL);
   }
 
-  /* compress if asked */
-  if (compress)
-  {
-  /* TODO compress if necessary */
-  }
+  if (compress) /* compress if asked */
+    bytecode_prac_compress (encoder, verbose);
 
   /* Copy into bc */
   unsigned int bc_len = bytecode_encoder_length (encoder);
@@ -1158,11 +1202,8 @@ bytecode_mishmash_encode (bytecode *bc, unsigned int B1, unsigned int pow2_nb,
     bytecode_encoder_remove_one (encoder);
     bytecode_encoder_add_one (encoder, PRAC_BLOCK_FINAL);
 
-    /* compress if asked */
-    if (compress)
-    {
-      /* TODO compress if necessary */
-    }
+    if (compress) /* compress if asked */
+      bytecode_prac_compress (encoder, verbose);
 
     /* Copy into bc */
     unsigned int len = precomp_data->len + bytecode_encoder_length(encoder) + 1;
