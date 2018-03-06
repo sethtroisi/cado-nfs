@@ -32,6 +32,18 @@ edwards_d_from_montgomery_A (residue_t d, const residue_t A, const modulus_t m)
 }
 
 static inline void
+edwards_point_set_zero (ec_point_t P, const modulus_t m,
+                        const ec_point_coord_type_t coord)
+{
+  ASSERT_EXPENSIVE (coord==TWISTED_EDWARDS_ext || coord==TWISTED_EDWARDS_proj);
+  mod_set0 (P->x, m);
+  mod_set1 (P->y, m);
+  mod_set1 (P->z, m);
+  if (coord == TWISTED_EDWARDS_ext)
+    mod_set0 (P->t, m);
+}
+
+static inline void
 edwards_neg (ec_point_t Q, const ec_point_t P, const modulus_t m)
 {
   mod_neg (Q->x, P->x, m);
@@ -299,71 +311,51 @@ edwards_tpl (ec_point_t R, const ec_point_t P,
 }
 
 
-/* ------------------------------------------------------------------------- */
-
-/* Computes R = [e]P (mod m)  */
+/* edwards_smul_ui (R:edwards_ext, P:edwards_ext, k: unsigned long)
+ *     R <- k*P
+ * R can be the same variable as P.
+ */
 MAYBE_UNUSED
 static inline void
-edwards_smul_ui (ec_point_t R, const ec_point_t P, const unsigned long e,
+edwards_smul_ui (ec_point_t R, const ec_point_t P, const unsigned long k,
                  const modulus_t m)
 {
-  unsigned long j;
-  long k;
-  ec_point_t T, Pe;
+  if (k == 0UL)
+    edwards_point_set_zero (R, m, TWISTED_EDWARDS_ext);
+  else if (k == 1UL)
+    ec_point_set (R, P, m, TWISTED_EDWARDS_ext);
+  else if (k == 2UL)
+    edwards_dbl (R, P, m, TWISTED_EDWARDS_ext);
+  else if (k == 2UL)
+    edwards_tpl (R, P, m, TWISTED_EDWARDS_ext);
+  else
+  {
+    /* basic double-and-add */
+    unsigned long mask;
+    ec_point_t T;
 
-  if (e == 0UL)
-    {
-      mod_set0 (R->x, m);
-      mod_set1 (R->y, m);
-      mod_set1 (R->z, m);
-      return;
-    }
+    ec_point_init (T, m);
 
-  if (e == 1UL)
-    {
-      ec_point_set (R, P, m);
-      return;
-    }
+    mask = ~(0UL);
+    mask -= mask/2;   /* Now the most significant bit of i is set */
+    while ((mask & k) == 0)
+      mask >>= 1;
 
-  if (e == 2UL)
-    {
-      edwards_dbl (R, P, m, TWISTED_EDWARDS_ext);
-      return;
-    }
+    /* Most significant bit of k is 1, do it outside the loop */
+    ec_point_set (T, P, m, TWISTED_EDWARDS_ext);
+    mask >>= 1;
 
-  if (e == 4UL)
-    {
-      edwards_dbl (R, P, m, TWISTED_EDWARDS_ext);
-      edwards_dbl (R, R, m, TWISTED_EDWARDS_ext);
-      return;
-    }
-
-  ec_point_init (T, m);
-  ec_point_init (Pe, m);
-  ec_point_set (Pe, P, m);
-
-  /* basic double-and-add */
-
-  mod_set0 (T->x, m);
-  mod_set0 (T->t, m);
-  mod_set1 (T->y, m);
-  mod_set1 (T->z, m);
-
-  k = CHAR_BIT * sizeof(e) - 1;
-  j = (1UL << k);
-
-  while(k-- >= 0)
+    for ( ; mask > 0; mask >>= 1)
     {
       edwards_dbl (T, T, m, TWISTED_EDWARDS_ext);
-      if (j & e)
-        edwards_add (T, T, Pe, m, TWISTED_EDWARDS_ext);
-      j >>= 1;
+      if (k & mask) /* output in ext only on the last iteration */
+        edwards_add (T, T, P, m, (mask > 1) ? TWISTED_EDWARDS_proj :
+                                                           TWISTED_EDWARDS_ext);
     }
 
-  ec_point_set (R, T, m);
-
-  ec_point_clear (T, m);
-  ec_point_clear (Pe, m);
+    ec_point_set (R, T, m, TWISTED_EDWARDS_ext);
+    ec_point_clear (T, m);
+  }
 }
 
 #endif /* _EC_ARITH_EDWARDS_H_ */
