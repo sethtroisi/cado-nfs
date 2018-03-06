@@ -16,6 +16,9 @@ typedef const struct mpz_poly_s * mpz_poly_srcptr;
 #include "double_poly.h"
 
 #ifdef __cplusplus
+#include <string>
+#include <istream>
+#include <ostream>
 extern "C" {
 #endif
 
@@ -71,6 +74,7 @@ void mpz_poly_cleandeg(mpz_poly_ptr f, int deg);
 void mpz_poly_setcoeffs(mpz_poly_ptr f, mpz_t * coeffs, int d);
 void mpz_poly_set_zero(mpz_poly_ptr f);
 void mpz_poly_set_xi(mpz_poly_ptr f, int i);
+void mpz_poly_set_mpz(mpz_poly_ptr f, mpz_srcptr z);
 void mpz_poly_set_double_poly(mpz_poly_ptr g, double_poly_srcptr f);
 
 void mpz_poly_init_set_ab (mpz_poly_ptr rel, int64_t a, uint64_t b);
@@ -170,6 +174,7 @@ void polymodF_mul(polymodF_t Q, const polymodF_t P1, const polymodF_t P2,
                   mpz_poly_srcptr F);
 void mpz_poly_sqr_mod_f_mod_mpz(mpz_poly_ptr Q, mpz_poly_srcptr P, mpz_poly_srcptr f,
                                 mpz_srcptr m, mpz_srcptr invm, mpz_srcptr invf);
+void mpz_poly_pow_ui(mpz_poly_ptr B, mpz_poly_srcptr A, unsigned long n);
 void mpz_poly_pow_ui_mod_f(mpz_poly_ptr B, mpz_poly_srcptr A, unsigned long n, mpz_poly_srcptr f);
 void mpz_poly_pow_mod_f_mod_ui(mpz_poly_ptr Q, mpz_poly_srcptr P, mpz_poly_srcptr f,
                              mpz_srcptr a, unsigned long p);
@@ -302,6 +307,10 @@ struct cxx_mpz_poly {
     mpz_poly_srcptr operator->() const { return x; }
     std::string print_poly(std::string const& var) const;
 };
+
+std::ostream& operator<<(std::ostream& o, cxx_mpz_poly const & f);
+std::istream& operator>>(std::istream& in, cxx_mpz_poly & f);
+
 #if GNUC_VERSION_ATLEAST(4,3,0)
 extern void mpz_poly_init(cxx_mpz_poly & pl, int) __attribute__((error("mpz_poly_init must not be called on a mpz_poly reference -- it is the caller's business (via a ctor)")));
 extern void mpz_poly_clear(cxx_mpz_poly & pl) __attribute__((error("mpz_poly_clear must not be called on a mpz_poly reference -- it is the caller's business (via a dtor)")));

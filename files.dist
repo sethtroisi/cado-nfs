@@ -1211,3 +1211,4 @@ tests/sieve/test_renumber.sh
 config/alignas.cmake
 config/neon.c
 config/neon.cmake
+tests/utils/test_mpz_poly_parsing.cpp
