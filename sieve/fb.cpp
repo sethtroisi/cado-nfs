@@ -685,7 +685,7 @@ struct helper_functor_dispatch_weight_parts : public fb_factorbase::slicing::sta
 
 struct helper_functor_dispatch_small_sieved_primes {
     fb_factorbase::slicing & S;
-    unsigned int td_thresh;
+    fb_factorbase::key_type K;
     /* TODO: it's a bit unsatisfactory that we do this comparison on
      * it->p for each prime.
      */
@@ -698,8 +698,13 @@ struct helper_functor_dispatch_small_sieved_primes {
              * folded outside the loop for the most common cases.
              */
             for(auto it = x.begin ; it != x.end ; ++it) {
+                if (it->get_q() < K.skipped) {
+                    if (it->k == 1)
+                        S.small_sieve_entries.skipped.push_back(it->p);
+                    continue;
+                }
                 fb_entry_general G(*it);
-                if (it->k > 1 || it->p <= td_thresh * it->get_nr_roots()) {
+                if (it->k > 1 || it->p <= K.td_thresh * it->get_nr_roots()) {
                     S.small_sieve_entries.rest.push_back(G);
                 } else {
                     S.small_sieve_entries.resieved.push_back(G);
@@ -815,7 +820,7 @@ fb_factorbase::slicing::slicing(fb_factorbase const & fb, fb_factorbase::key_typ
      * resieved, which are trial-divided, and so on).
      */
 
-    multityped_array_foreach(helper_functor_dispatch_small_sieved_primes { *this, K.td_thresh }, D.intervals[0]);
+    multityped_array_foreach(helper_functor_dispatch_small_sieved_primes { *this, K }, D.intervals[0]);
     auto by_q = fb_entry_general::sort_byq();
 
     /* small sieve cares about this list being sorted by hit rate, I

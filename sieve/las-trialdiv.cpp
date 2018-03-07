@@ -32,7 +32,7 @@ void sieve_info::init_trialdiv(int side)
     sieve_info::side_info & s(si.sides[side]);
     unsigned long pmax = MIN((unsigned long) s.fbK.thresholds[0],
                              trialdiv_get_max_p());
-    std::vector<unsigned long> trialdiv_primes;
+    std::vector<unsigned long> trialdiv_primes = s.fbs->small_sieve_entries.skipped;
 
     /* Maybe we can use the factor base. If we have one, of course ! */
     unsigned long pmax_sofar = 0;

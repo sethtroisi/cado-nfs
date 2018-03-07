@@ -556,6 +556,10 @@ class fb_factorbase {
             std::vector<fb_entry_general> rest;
             /* from "rest" above, we can infer the list of trial-divided
              * primes by merely restricting to entries with k==1 */
+
+            /* this is sort of a trash can. We won't use these primes for
+             * the small sieve, but they do matter for trial division */
+            std::vector<unsigned long> skipped;
         };
         small_sieve_entries_t small_sieve_entries;
         /* TODO: I doubt that the struct above will stay. Seems awkward.
