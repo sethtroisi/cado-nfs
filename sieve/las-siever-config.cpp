@@ -148,7 +148,13 @@ bool siever_config::parse_default(siever_config & sc, param_list_ptr pl)
     for (int side = 0; side < 2; side++) {
         if (!param_list_parse_ulong(pl, powlim_params[side],
                     &sc.sides[side].powlim)) {
-            sc.sides[side].powlim = sc.bucket_thresh - 1;
+            if (sc.bucket_thresh) {
+                sc.sides[side].powlim = sc.bucket_thresh - 1;
+            } else {
+                /* include all powers. We'll discard all those that go to
+                 * bucket sieving anyway */
+                sc.sides[side].powlim = ULONG_MAX;
+            }
             verbose_output_print(0, 1,
                     "# Using default value of %lu for -%s\n",
                     sc.sides[side].powlim, powlim_params[side]);

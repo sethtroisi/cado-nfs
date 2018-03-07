@@ -225,6 +225,68 @@ transform_n_roots(unsigned long *p, unsigned long *r, fb_iterator t,
 }
 #endif
 
+/* {{{ Big question: shall we enable bucket-sieving for powers ?
+ *
+ * There are several difficulties, in fact. One rationale that yields a
+ * straight "no" answer is that such primes make very little difference
+ * to the smooth part, so we'd better skip them anyway.
+ *
+ * But it's not the hardest thing.
+ *
+ * For the small sieve, we create the small_sieve_data from the factor
+ * base entries, and we compute the logp accordingly, per entry.
+ *
+ * For the bucket-sieve, we use the fact that the factor base is sorted
+ * in increasing log(p) order, and we create slices with ranges of primes
+ * that have the same round(scale*log(p)).
+ *
+ * Currently, the factor base is sorted by q=p^k. A power that makes the
+ * p-valuation go from p^k0 to p^k1 contributes
+ * round(k1*log(p))-round(k0*log(p)). Therefore, sorting by q does not
+ * mean that log(p)'s are sorted, and we're in trouble because when we
+ * take powers aboard in a slice, their log(p) value is not correctly
+ * represented. 
+ * 
+ * Previously, we had the behaviour of setting powlim to bucket_thresh-1,
+ * effectively preventing powers from appearing in the bucket-sieve.
+ *
+ * Now powlim is a factor base parameter, and bucket_thresh comes later,
+ * so such a default does not work.
+ *
+ * The strategy we take here is that *if* we see powers here (and we know
+ * that will happen only for the fairly rare general entries), then we do
+ * something special:
+ *  - either we say that we skip over this entry
+ *  - or we defer to apply_buckets the expensive computation of a proper
+ *    logp value.
+ *
+ * Currently we do the former. The latter would be viable since only a
+ * small fraction of the apply_one_bucket time is devoted to dealing with
+ * general entries, so we could imagine having a branch in there for
+ * dealing with them. But that would be quite painful. Furthermore, it
+ * would then be mandatory to split the entries with same q, same p, but
+ * different k0,k1 pairs (we do encounter these), so that the hint would
+ * still open the possibility to infer the value of log(p).
+ *
+ *
+ * Note that it would not be possible to sidestep the issue by sorting
+ * the vectors of entries by (k1-k0)*log(p) (which would make a
+ * difference only for general entries anyway). This is because even
+ * sorting by increasing (k1-k0)*log(p) does not guarantee that
+ * round(s*k1*log(p))-round(s*k0*log(p)) increases. (counter-example:
+ * s=1, k1*log(p)=0.51, k0*log(p)=0.49 diff=0.02 round-round=1
+ *      k1*log(p)=1.49, k0*log(p)=0.51 diff=0.98 round-round=0
+ * )
+ * }}} */
+template<class FB_ENTRY_TYPE>
+inline bool discard_power_for_bucket_sieving(FB_ENTRY_TYPE const &) {
+    return false;
+}
+template<>
+inline bool discard_power_for_bucket_sieving<fb_entry_general>(fb_entry_general const & e) {
+    return e.k > 1;
+}
+
 // At top level, the fill-in of the buckets must interleave
 // the root transforms and the FK walks, otherwise we spend a lot of time
 // doing nothing while waiting for memory.
@@ -272,6 +334,8 @@ fill_in_buckets_toplevel_sublat(bucket_array_t<LEVEL, shorthint_t> &orig_BA,
       increment_counter_on_dtor<slice_offset_t> _dummy(i_entry);
       if (!si.qbasis.is_coprime_to(e.p))
         continue;
+      if (discard_power_for_bucket_sieving(e))
+          continue;
       e.transform_roots(transformed, si.qbasis);
       for (unsigned char i_root = 0; i_root != transformed.nr_roots; i_root++) {
         const fbroot_t r = transformed.get_r(i_root);
@@ -384,6 +448,8 @@ fill_in_buckets_toplevel(bucket_array_t<LEVEL, shorthint_t> &orig_BA,
     increment_counter_on_dtor<slice_offset_t> _dummy(i_entry);
     if (!si.qbasis.is_coprime_to(e.p))
       continue;
+    if (discard_power_for_bucket_sieving(e))
+        continue;
     e.transform_roots(transformed, si.qbasis);
     for (unsigned char i_root = 0; i_root != transformed.nr_roots; i_root++) {
       const fbroot_t r = transformed.get_r(i_root);
