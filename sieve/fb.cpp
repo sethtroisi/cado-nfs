@@ -9,6 +9,14 @@
 #include <pthread.h>
 #include <streambuf>
 #include <istream>
+#ifdef HAVE_GLIBC_VECTOR_INTERNALS
+/* need all that for mmap() stuff */
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <unistd.h>
+#endif
 #include "fb.hpp"
 #include "mod_ul.h"
 #include "verbose.h"
@@ -1399,11 +1407,16 @@ fb_factorbase::fb_factorbase(cxx_cado_poly const & cpoly, int side, unsigned lon
  */
 
 struct fbc_header {
-    int version = 0;
+    static const int current_version = 1;
+    static const size_t header_block_size = 4096;
     struct side_info {
-        size_t base_offset;     /* offset to beginning of file */
-        size_t size;            /* size in bytes of header + data blocks */
-        int degree = 0;
+        int version;
+        size_t base_offset;     /* offset to beginning of file of the
+                                   corresponding header block (add 4096 to
+                                   get the offset to the data block) */
+        size_t size;            /* size in bytes of header + data blocks
+        */
+        int degree;
         cxx_mpz_poly f;
         unsigned long lim;
         unsigned long powlim;
@@ -1411,39 +1424,65 @@ struct fbc_header {
             size_t offset;      /* offset to beginning of file */
             size_t nentries;
             size_t entry_size;
-            std::istream& parse(std::istream& in, size_t header_offset) {
-                if (!(in >> offset >> nentries >> entry_size)) return in;
-                offset += header_offset;
+            std::istream& parse(std::istream& in) {
+                in >> offset >> nentries >> entry_size;
                 return in;
+            }
+            std::ostream& print(std::ostream& out) const {
+                out << offset << " " << nentries << " " << entry_size << "\n";
+                return out;
             }
         };
         std::vector<entryvec> entries;
-        std::istream& parse(std::istream& in, size_t header_offset) {
-            base_offset = header_offset;
-            if (!(in >> size >> degree)) return in;
-            if (!(in >> f)) return in;
+        std::istream& parse(std::istream& in, size_t header_offset = 0) {
+            in >> version;
+            if (!in) return in;
+            if (version != current_version)
+                throw std::runtime_error("fbc version mismatch");
+            base_offset = 0;
+            in >> size >> degree >> f >> lim >> powlim;
+            if (!in) return in;
             for(int s = -1 ; s <= mpz_poly_degree(f) ; s++) {
                 entryvec e;
-                if (!e.parse(in, header_offset)) return in;
+                if (!e.parse(in)) return in;
                 entries.push_back(e);
             }
+            adjust_header_offset(header_offset);
             return in;
+        }
+        std::ostream& print(std::ostream& out) const {
+            out << version << "\n"
+                << size << "\n"
+                << f->deg << "\n"
+                << f << "\n"
+                << lim << "\n"
+                << powlim << "\n";
+            if (!out) return out;
+            for(auto e : entries) {
+                /* copy by value because we want a relative offset here */
+                e.offset -= base_offset;
+                if (!e.print(out)) return out;
+            }
+            return out;
+        }
+        void adjust_header_offset(size_t header_offset) {
+            for(auto & e : entries)
+                e.offset = e.offset + header_offset - base_offset;
+            base_offset = header_offset;
         }
     };
     std::vector<side_info> sides;
-    std::istream& parse_merge(std::istream& in, size_t header_offset) {
-        in >> version;
-        if (!in) return in;
-        if (version != 1)
-            throw std::runtime_error("fbc version mismatch");
-
-        side_info si;
-        if (!si.parse(in, header_offset)) return in;
-        sides.push_back(si);
-
-        return in;
-    }
 };
+std::istream& operator>>(std::istream& in, fbc_header::side_info & si)
+{
+    return si.parse(in);
+}
+
+std::ostream& operator<<(std::ostream& out, fbc_header::side_info const & si)
+{
+    return si.print(out);
+}
+
 
 // from https://stackoverflow.com/questions/13059091/creating-an-input-stream-from-constant-memory
 struct membuf: std::streambuf {
@@ -1476,7 +1515,6 @@ struct helper_functor_reseat_mmapped_chunks {
         void operator()(T & x) {
             typedef typename T::value_type FB_ENTRY_TYPE;
             if (next == chunks.end()) return;
-
             ASSERT_ALWAYS(sizeof(FB_ENTRY_TYPE) == next->entry_size);
 
             using namespace mmap_allocator_details;
@@ -1495,23 +1533,25 @@ fb_factorbase::fb_factorbase(cxx_cado_poly const & cpoly, int side, unsigned lon
      * be mmap-able is anyway an even stricter requirement as far as I
      * can tell).
      */
-    FILE * fbc = fopen(fbc_filename, "r");
+    int fbc = open(fbc_filename, O_RDONLY);
     ASSERT_ALWAYS(fbc);
 
     fbc_header hdr;
 
-    size_t fbc_size = fseek(fbc,0,SEEK_END);
+    size_t fbc_size = lseek(fbc,0,SEEK_END);
 
     for(size_t header_offset = 0 ; header_offset != fbc_size ; ) {
         /* Read header block starting at position "header_offset" */
-        std::vector<char> area(4096);
-        int rc = fseek(fbc, header_offset, SEEK_SET);
+        std::vector<char> area(fbc_header::header_block_size);
+        int rc = lseek(fbc, header_offset, SEEK_SET);
         ASSERT_ALWAYS(rc >= 0);
-        int nr = fread(&area.front(), 1, area.size(), fbc);
+        int nr = ::read(fbc, &area.front(), area.size());
         ASSERT_ALWAYS(nr == sizeof(area.size()));
         imemstream is(&area.front(), area.size());
-        ASSERT_ALWAYS(hdr.parse_merge(is, header_offset));
-        header_offset += hdr.sides.back().size;
+        fbc_header::side_info si;
+        ASSERT_ALWAYS(si.parse(is, header_offset));
+        header_offset += si.size;
+        hdr.sides.push_back(si);
     }
 
     /* find the block for the current polynomial in the fbc file */
@@ -1534,57 +1574,113 @@ fb_factorbase::fb_factorbase(cxx_cado_poly const & cpoly, int side, unsigned lon
         fprintf(stderr, "Fatal error: cannot find cached factor base for side %d in file %s\n", side, fbc_filename);
         exit(EXIT_FAILURE);
     }
-    fclose(fbc);
+    close(fbc);
 
-    auto const & block (hdr.sides[block_index_in_file]);
 
     /* Now do the mmapping ! */
+    auto const & block (hdr.sides[block_index_in_file]);
+    verbose_output_print(0, 1,
+            "# Reading side-%d factor base via mmap() from block %d in %s, (offset %zu, size %zu)\n",
+            side, block_index_in_file, fbc_filename, block.base_offset, block.size);
     using namespace mmap_allocator_details;
     mmapped_file source(fbc_filename, mmap_allocator_details::READ_ONLY, block.base_offset, block.size);
     multityped_array_foreach(helper_functor_reseat_mmapped_chunks { block.entries, block.entries.begin(), source}, entries);
-
-    /* We assume that the cache file gets read in order, side 0 before
-     * side 1.
-     *
-     * The difficulty is that we want the (allocator of the) internal
-     * container for entries in the factor base to be mmap-able.  But
-     * then, that means an immutable container, clearly !
-     */
-
-    /* TODO: re-enable */
-#if 0
-    const char * fbcfilename = param_list_lookup_string(pl, "fbc");
-
-    if (fbcfilename != NULL) {
-        /* Try to read the factor base cache file. If that fails, because
-           the file does not exist or is not compatible with our parameters,
-           it will be written after we generate the factor bases. */
-        verbose_output_print(0, 1, "# Mapping memory image of factor base from file %s\n",
-                fbcfilename);
-        if (fb_mmap_fbc(fb, fbcfilename)) {
-            verbose_output_print(0, 1, "# Finished mapping memory image of factor base\n");
-            return;
-        } else {
-            verbose_output_print(0, 1, "# Could not map memory image of factor base\n");
-        }
-    }
-#endif
-#if 0
-
-    if (fbcfilename != NULL) {
-        verbose_output_print(0, 1, "# Writing memory image of factor base to file %s\n", fbcfilename);
-        /* TODO: re-enable */
-        fb_dump_fbc(fb, fbcfilename);
-        verbose_output_print(0, 1, "# Finished writing memory image of factor base\n");
-    }
-
-    /* Note that max_bucket_fill_ratio and friends are set from within
-     * print_fb_statistics, which is a bit ugly.
-     *
-     * (used to)
-     */
-#endif
 }
+
+struct helper_functor_recreate_fbc_header {
+    fbc_header::side_info & block;
+    size_t current_offset;
+    template<typename T>
+        void operator()(T & x) {
+            typedef typename T::value_type FB_ENTRY_TYPE;
+            /* We do *NOT* push anything beyond that limit.
+             *
+             * degree + 2 is for [-1, 0, ..., degree ]
+             *
+             */
+            if (block.entries.size() == (size_t) (block.degree + 2)) {
+                ASSERT_ALWAYS(x.empty());
+                return;
+            }
+            fbc_header::side_info::entryvec e {
+                    current_offset,
+                    x.size(),
+                    sizeof(FB_ENTRY_TYPE)
+            };
+            block.entries.push_back(e);
+            
+            size_t mem_size = e.nentries * sizeof(FB_ENTRY_TYPE);
+            /* we don't *have* to align it immensely. Make it a cache
+             * line... */
+            mem_size = ((mem_size - 1) | 63) + 1;
+            current_offset += mem_size;
+        }
+
+};
+
+struct helper_functor_write_to_fbc_file {
+    int fbc;
+    size_t header_block_offset;
+    std::vector<fbc_header::side_info::entryvec> const & chunks;
+    std::vector<fbc_header::side_info::entryvec>::const_iterator next;
+    template<typename T>
+        void operator()(T & x) {
+            typedef typename T::value_type FB_ENTRY_TYPE;
+            if (next == chunks.end()) return;
+            ASSERT_ALWAYS(sizeof(FB_ENTRY_TYPE) == next->entry_size);
+
+            lseek(fbc, header_block_offset + next->offset, SEEK_SET);
+            ASSERT_ALWAYS(x.size() == next->nentries);
+            ::write(fbc, &x.front(), sizeof(FB_ENTRY_TYPE) * x.size());
+            next++;
+        }
+
+};
+
+void fb_factorbase::save_fbc(const char * fbc_filename) const
+{
+    /* We have a complete factor base prepared. We must first re-create
+     * the header.
+     */
+    fbc_header::side_info S { fbc_header::current_version, 0, 0, f->deg, f, lim, powlim, {} }; 
+
+    helper_functor_recreate_fbc_header R { S, fbc_header::header_block_size };
+    multityped_array_foreach(R, entries);
+    /* This must be aligned to a page size */
+    S.size = ((R.current_offset - 1) | (sysconf(_SC_PAGE_SIZE) -1)) + 1;
+
+    /* Next, we must append it to the cache file */
+
+    int fbc = open(fbc_filename, O_RDWR | O_CREAT, 0666);
+    ASSERT_ALWAYS(fbc >= 0);
+
+    size_t fbc_size = lseek(fbc, 0, SEEK_END);
+
+    if ((fbc_size & (sysconf(_SC_PAGE_SIZE) - 1)) != 0) {
+        fprintf(stderr, "Fatal error: existing cache file %s is not page-aligned\n", fbc_filename);
+        exit(EXIT_FAILURE);
+    }
+
+    std::ostringstream os;
+    os << S;
+    os << "\n\n\n\n\n"; /* a convenience so that "head" displays the header */
+    if (os.str().size() > fbc_header::header_block_size) {
+        fprintf(stderr, "Fatal error: header doesn't fit (contents follow):\n%s\n", os.str().c_str());
+        exit(EXIT_FAILURE);
+    }
+
+    /* yes it's a short read, but we expect that all writes will do
+     * fseek + fwrite, thereby inserting zeroes automagically (POSIX says
+     * that). 
+     */
+    ::write(fbc, os.str().c_str(), os.str().size());
+
+    multityped_array_foreach(helper_functor_write_to_fbc_file { fbc, fbc_size, S.entries, S.entries.begin() }, entries);
+    ASSERT_ALWAYS((size_t) lseek(fbc, 0, SEEK_END) <= fbc_size + S.size);
+    ftruncate(fbc, fbc_size + S.size);
+    close(fbc);
+}
+
 #endif
 
 template <class FB_ENTRY_TYPE>
