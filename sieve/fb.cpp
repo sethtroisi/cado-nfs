@@ -7,11 +7,8 @@
 #include <cctype>
 #include <gmp.h>
 #include <pthread.h>
-#ifdef HAVE_SYS_MMAN_H
-#include <sys/mman.h>
-#else
-#define MAP_FAILED ((void *) -1)
-#endif
+#include <streambuf>
+#include <istream>
 #include "fb.hpp"
 #include "mod_ul.h"
 #include "verbose.h"
@@ -707,6 +704,7 @@ struct helper_functor_subdivide_slices {
             typedef typename interval_t::container_type ventry_t;
             typedef typename ventry_t::value_type entry_t;
             typedef fb_slice<entry_t> slice_t;
+            typedef typename slice_t::fb_entry_vector fb_entry_vector;
             typedef std::vector<slice_t> vslice_t;
 
             constexpr int n = entry_t::is_general_type ? -1 : entry_t::fixed_nr_roots;
@@ -715,7 +713,7 @@ struct helper_functor_subdivide_slices {
             size_t interval_width = x.end - x.begin;
             if (!interval_width) return;
             /* first scan to separate by values of logp */
-            typename std::vector<entry_t>::const_iterator it = x.begin;
+            typename fb_entry_vector::const_iterator it = x.begin;
             typename std::vector<slice_t> pool;
             /* can't emplace_back here because private ctor */
             pool.push_back(slice_t(it, fb_log(it->get_q(), K.scale, 0)));
@@ -1367,30 +1365,183 @@ fb_factorbase::fb_factorbase(cxx_cado_poly const & cpoly, int side, unsigned lon
     }
 }
 
-union fbc_header {
-    char h[256];
-    /* TODO: add a checksum of the polynomial, or maybe even the
-     * polynomial itself ? */
-    struct {
+/* We now require the glibc in order to do factor base caching, because
+ * we prefer to rely on mmap-able vectors that subclass the standard
+ * library ones */
+#ifdef HAVE_GLIBC_VECTOR_INTERNALS
+/* (desired) structure of the factor base cache header block (ascii, 4096
+ * bytes).
+ *
+ * version (integer)
+ * size in bytes of header + data (integer, aligned to page size)
+ *      [note: other descriptors might follow at this position !]
+ * degree of polynomial (integer)
+ * polynomial in string format (string)
+ * factor base limit (integer)
+ * factor base power limit (integer)
+ *
+ * and then
+ *      offset to beginning of vector of general entries (integer)
+ *      number of general entries (integer)
+ *      size in bytes per general entry (integer)
+ *      offset to beginning of vector of entries with 0 roots (integer)
+ *      number of entries with 0 roots (integer)
+ *      size in bytes per entries with 0 roots (integer)
+ *      offset to beginning of vector of entries with 1 roots (integer)
+ *      number of entries with 1 roots (integer)
+ *      size in bytes per entries with 1 roots (integer)
+ *      ...
+ *      offset to beginning of vector of entries with deg(f) roots (integer)
+ *      number of entries with deg(f) roots (integer)
+ *      size in bytes per entries with deg(f) roots (integer)
+ *
+ * Multiple cache files can be concatenated one after another.
+ */
+
+struct fbc_header {
+    int version = 0;
+    struct side_info {
+        size_t base_offset;     /* offset to beginning of file */
+        size_t size;            /* size in bytes of header + data blocks */
+        int degree = 0;
+        cxx_mpz_poly f;
         unsigned long lim;
         unsigned long powlim;
-    } sc;
-};
-fb_factorbase::fb_factorbase(cxx_cado_poly const & cpoly, int side, unsigned long lim, unsigned long powlim, FILE * fbc_filename) : f(cpoly->pols[side]), side(side), lim(lim), powlim(powlim)
-{
-    fbc_header header;
-    int nr = fread(&header, 1, 256, fbc_filename);
-    ASSERT_ALWAYS(nr == sizeof(header.h));
-    if (lim != header.sc.lim) {
-        fprintf(stderr, "Fatal error: cached factor base file is not consistent with the configured value lim%d=%lu\n", side, lim);
-        exit(EXIT_FAILURE);
+        struct entryvec {
+            size_t offset;      /* offset to beginning of file */
+            size_t nentries;
+            size_t entry_size;
+            std::istream& parse(std::istream& in, size_t header_offset) {
+                if (!(in >> offset >> nentries >> entry_size)) return in;
+                offset += header_offset;
+                return in;
+            }
+        };
+        std::vector<entryvec> entries;
+        std::istream& parse(std::istream& in, size_t header_offset) {
+            base_offset = header_offset;
+            if (!(in >> size >> degree)) return in;
+            if (!(in >> f)) return in;
+            for(int s = -1 ; s <= mpz_poly_degree(f) ; s++) {
+                entryvec e;
+                if (!e.parse(in, header_offset)) return in;
+                entries.push_back(e);
+            }
+            return in;
+        }
+    };
+    std::vector<side_info> sides;
+    std::istream& parse_merge(std::istream& in, size_t header_offset) {
+        in >> version;
+        if (!in) return in;
+        if (version != 1)
+            throw std::runtime_error("fbc version mismatch");
+
+        side_info si;
+        if (!si.parse(in, header_offset)) return in;
+        sides.push_back(si);
+
+        return in;
     }
-    if (powlim != header.sc.powlim) {
-        fprintf(stderr, "Fatal error: cached factor base file is not consistent with the configured value powlim%d=%lu\n", side, powlim);
+};
+
+// from https://stackoverflow.com/questions/13059091/creating-an-input-stream-from-constant-memory
+struct membuf: std::streambuf {
+    membuf(char const* base, size_t size) {
+        char* p(const_cast<char*>(base));
+        this->setg(p, p, p + size);
+    }
+};
+struct imemstream: virtual membuf, std::istream {
+    imemstream(char const* base, size_t size)
+        : membuf(base, size)
+        , std::istream(static_cast<std::streambuf*>(this)) {
+    }
+};
+#endif
+
+#ifndef HAVE_GLIBC_VECTOR_INTERNALS
+fb_factorbase::fb_factorbase(cxx_cado_poly const &, int, unsigned long, unsigned long, const char * fbc_filename) {
+        fprintf(stderr, "Fatal error: cannot use cache file %s -- support code missing\n", fbc_filename);
         exit(EXIT_FAILURE);
+}
+#endif
+
+#ifdef HAVE_GLIBC_VECTOR_INTERNALS
+struct helper_functor_reseat_mmapped_chunks {
+    std::vector<fbc_header::side_info::entryvec> const & chunks;
+    std::vector<fbc_header::side_info::entryvec>::const_iterator next;
+    mmap_allocator_details::mmapped_file & source;
+    template<typename T>
+        void operator()(T & x) {
+            typedef typename T::value_type FB_ENTRY_TYPE;
+            if (next == chunks.end()) return;
+
+            ASSERT_ALWAYS(sizeof(FB_ENTRY_TYPE) == next->entry_size);
+
+            using namespace mmap_allocator_details;
+            mmappable_vector<FB_ENTRY_TYPE> y(mmap_allocator<FB_ENTRY_TYPE>(source, next->offset, next->nentries));
+            y.mmap(next->nentries);
+            swap(x, y);
+            next++;
+        }
+};
+
+fb_factorbase::fb_factorbase(cxx_cado_poly const & cpoly, int side, unsigned long lim, unsigned long powlim, const char * fbc_filename) : f(cpoly->pols[side]), side(side), lim(lim), powlim(powlim)
+{
+    /* First use standard I/O to read the cached file header.
+     *
+     * The cached file header must absolutely be seekable (asking it to
+     * be mmap-able is anyway an even stricter requirement as far as I
+     * can tell).
+     */
+    FILE * fbc = fopen(fbc_filename, "r");
+    ASSERT_ALWAYS(fbc);
+
+    fbc_header hdr;
+
+    size_t fbc_size = fseek(fbc,0,SEEK_END);
+
+    for(size_t header_offset = 0 ; header_offset != fbc_size ; ) {
+        /* Read header block starting at position "header_offset" */
+        std::vector<char> area(4096);
+        int rc = fseek(fbc, header_offset, SEEK_SET);
+        ASSERT_ALWAYS(rc >= 0);
+        int nr = fread(&area.front(), 1, area.size(), fbc);
+        ASSERT_ALWAYS(nr == sizeof(area.size()));
+        imemstream is(&area.front(), area.size());
+        ASSERT_ALWAYS(hdr.parse_merge(is, header_offset));
+        header_offset += hdr.sides.back().size;
     }
 
-    /* Oh and this is all still TODO, of course ! */
+    /* find the block for the current polynomial in the fbc file */
+    int block_index_in_file = -1;
+    for(auto const & block : hdr.sides) {
+        int index = (&block - &hdr.sides.front());
+        if (mpz_poly_cmp(block.f, f) != 0) continue;
+        if (block.lim != lim) {
+            fprintf(stderr, "Note: cached factor base number %d in file %s skipped because not consistent with lim%d=%lu\n", index, fbc_filename, side, lim);
+            continue;
+        }
+        if (block.powlim != powlim) {
+            fprintf(stderr, "Note: cached factor base number %d in file %s skipped because not consistent with powlim%d=%lu\n", index, fbc_filename, side, lim);
+            continue;
+        }
+        block_index_in_file = index;
+        break;
+    }
+    if (block_index_in_file < 0) {
+        fprintf(stderr, "Fatal error: cannot find cached factor base for side %d in file %s\n", side, fbc_filename);
+        exit(EXIT_FAILURE);
+    }
+    fclose(fbc);
+
+    auto const & block (hdr.sides[block_index_in_file]);
+
+    /* Now do the mmapping ! */
+    using namespace mmap_allocator_details;
+    mmapped_file source(fbc_filename, mmap_allocator_details::READ_ONLY, block.base_offset, block.size);
+    multityped_array_foreach(helper_functor_reseat_mmapped_chunks { block.entries, block.entries.begin(), source}, entries);
 
     /* We assume that the cache file gets read in order, side 0 before
      * side 1.
@@ -1434,6 +1585,7 @@ fb_factorbase::fb_factorbase(cxx_cado_poly const & cpoly, int side, unsigned lon
      */
 #endif
 }
+#endif
 
 template <class FB_ENTRY_TYPE>
 plattices_vector_t

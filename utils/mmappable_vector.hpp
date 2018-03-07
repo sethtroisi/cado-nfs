@@ -24,6 +24,7 @@ class mmappable_vector: public std::vector<T, A> {
 
         mmappable_vector(): Base() { }
 
+        /* I think this does plain crap */
         mmappable_vector(const mmappable_vector<T, A> &other): Base(other) { } 
 
         /* This is not conforming, since the container
@@ -112,5 +113,13 @@ class mmappable_vector: public std::vector<T, A> {
             a = A();
         }
 };
+
+
+template <typename T, typename A>
+void swap(mmappable_vector<T,A> & a, mmappable_vector<T,A> & b)
+{
+    typedef typename mmappable_vector<T,A>::Base Base;
+    std::swap((Base&)a, (Base&)b);
+}
 
 #endif /* MMAPPABLE_VECTOR_HPP_ */

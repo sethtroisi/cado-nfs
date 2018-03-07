@@ -55,13 +55,18 @@ sieve_info::sieve_info(siever_config const & sc, cxx_cado_poly const & cpoly, st
     } else {
         const char * fbc_filename = param_list_lookup_string(pl, "fbc");
         if (try_fbc && fbc_filename) {
-            FILE * f = fopen(fbc_filename, "r");
+            /* ok, this is going to read the fbc header twice. Not really
+             * a big problem IMO */
+#ifdef HAVE_GLIBC_VECTOR_INTERNALS
             for(int side = 0 ; side < 2 ; side++) {
                 unsigned long lim = sc.sides[side].lim;
                 unsigned long powlim = sc.sides[side].powlim;
-                sides[side].fb=std::make_shared<fb_factorbase>(cpoly, side, lim, powlim, f);
+                sides[side].fb=std::make_shared<fb_factorbase>(cpoly, side, lim, powlim, fbc_filename);
             }
-            fclose(f);
+#else
+            fprintf(stderr, "factor base cache not available with your libstdc++ library, sorry.\n");
+            exit(EXIT_FAILURE);
+#endif
         } else {
             for(int side = 0 ; side < 2 ; side++) {
                 unsigned long lim = sc.sides[side].lim;

@@ -63,7 +63,7 @@ class fb_slice_weight_estimator {
 template <>
 class
 fb_slice_weight_estimator<fb_entry_general> {
-    typedef typename std::vector<fb_entry_general>::const_iterator it_t;
+    typedef typename fb_slice<fb_entry_general>::fb_entry_vector::const_iterator it_t;
     typedef fb_slice<fb_entry_general> sl_t;
     public:
     double operator()(sl_t const &, it_t a, it_t b) const {

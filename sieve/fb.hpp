@@ -24,6 +24,13 @@
 #include "las-plattice.hpp"
 #include "las-base.hpp"
 
+#ifdef HAVE_GLIBC_VECTOR_INTERNALS
+#include "mmappable_vector.hpp"
+#else
+/* yes, it's a hack */
+#define mmappable_vector std::vector
+#endif
+
 /* {{{ fb entries: sets of prime ideals above one single rational prime p. */
 /* Forward declaration so fb_entry_general can use it in constructors */
 template <int Nr_roots>
@@ -198,16 +205,17 @@ class fb_slice_weight_estimator;
 template<typename FB_ENTRY_TYPE>
 class fb_slice : public fb_slice_interface {
     friend class fb_slice_weight_estimator<FB_ENTRY_TYPE>;
-    typename std::vector<FB_ENTRY_TYPE>::const_iterator _begin, _end;
+    typedef mmappable_vector<FB_ENTRY_TYPE> fb_entry_vector;
+    typename fb_entry_vector::const_iterator _begin, _end;
     unsigned char logp;
     slice_index_t index;
     double weight;
     friend struct helper_functor_subdivide_slices;
-    fb_slice(typename std::vector<FB_ENTRY_TYPE>::const_iterator it, unsigned char logp) : _begin(it), _end(it), logp(logp), index(0), weight(0) {}
+    fb_slice(typename mmappable_vector<FB_ENTRY_TYPE>::const_iterator it, unsigned char logp) : _begin(it), _end(it), logp(logp), index(0), weight(0) {}
     public:
     typedef FB_ENTRY_TYPE entry_t;
-    inline typename std::vector<FB_ENTRY_TYPE>::const_iterator begin() const { return _begin; }
-    inline typename std::vector<FB_ENTRY_TYPE>::const_iterator end() const { return _end; }
+    inline typename fb_entry_vector::const_iterator begin() const { return _begin; }
+    inline typename fb_entry_vector::const_iterator end() const { return _end; }
     inline size_t size() const override { return _end - _begin; }
     unsigned char get_logp() const override { return logp; }
     fbprime_t get_prime(slice_offset_t offset) const override {
@@ -241,10 +249,10 @@ class fb_slice : public fb_slice_interface {
  * roots).
  * */
 template<int n> struct fb_entries_factory {
-    typedef std::vector<fb_entry_x_roots<n>> type;
+    typedef mmappable_vector<fb_entry_x_roots<n>> type;
 };
 template<> struct fb_entries_factory<-1> {
-    typedef std::vector<fb_entry_general> type;
+    typedef mmappable_vector<fb_entry_general> type;
 };
 template<int n> struct fb_slices_factory {
     typedef std::vector<fb_slice<fb_entry_x_roots<n>>> type;
@@ -599,7 +607,7 @@ class fb_factorbase {
         void make_linear_threadpool (unsigned int nb_threads);
 
     public:
-        fb_factorbase(cxx_cado_poly const & cpoly, int side, unsigned long lim, unsigned long powlim, FILE * fbc_filename);
+        fb_factorbase(cxx_cado_poly const & cpoly, int side, unsigned long lim, unsigned long powlim, const char * fbc_filename);
         fb_factorbase(cxx_cado_poly const & cpoly, int side, unsigned long lim, unsigned long powlim, cxx_param_list & pl);
 
     private:
