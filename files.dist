@@ -1217,3 +1217,8 @@ sieve/las-sieve-info.hpp
 utils/cxx_misc.hpp
 sieve/fb-slice-weight.cpp
 sieve/fb-slice-weight.hpp
+config/glibc_vector_internals.cmake
+utils/mmap_allocator.cpp
+utils/mmap_allocator.hpp
+utils/mmappable_vector.hpp
+tests/utils/test_mmappable_vector.cpp

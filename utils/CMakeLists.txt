@@ -18,6 +18,9 @@ set (sources
         gmpxx.cpp
         rho.c
 )
+if (HAVE_GLIBC_VECTOR_INTERNALS)
+    set(sources ${sources} mmap_allocator.cpp)
+endif()
 if (NOT MINGW)
     set (sources ${sources} cado_popen.c)
 endif()
