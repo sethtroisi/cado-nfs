@@ -15,6 +15,10 @@
 #include <string.h>
 #include <gmp.h>
 #include <sstream>
+#include <vector>
+#include <string>
+#include <utility>
+#include <stdexcept>
 #include "portability.h"
 #include "mpz_poly.h"
 #include "lll.h"
@@ -679,6 +683,13 @@ void mpz_poly_set_xi(mpz_poly_ptr f, int i)
         mpz_set_ui(f->coeff[j], j == i);
     }
     f->deg = i;
+}
+
+void mpz_poly_set_mpz(mpz_poly_ptr f, mpz_srcptr z)
+{
+    mpz_poly_realloc (f, 1);
+    mpz_set(f->coeff[0], z);
+    mpz_poly_cleandeg(f, 0);
 }
 
 /* g <- quo (f, x^i) */
@@ -1961,11 +1972,44 @@ void mpz_poly_derivative(mpz_poly_ptr df, mpz_poly_srcptr f) {
     mpz_mul_si (df->coeff[n], f->coeff[n + 1], n + 1);
 }
 
+/* B = A^n */
+void mpz_poly_pow_ui(mpz_poly_ptr B, mpz_poly_srcptr A, unsigned long n)/*{{{*/
+{
+    if (n == 0) {
+        mpz_poly_set_xi(B, 0);
+        return;
+    }
+    if (A->deg < 0) {
+        mpz_poly_set_zero(B);
+        return;
+    }
+    if (B == A) {
+        mpz_poly C;
+        mpz_poly_init(C, n * A->deg);
+        mpz_poly_pow_ui(C, A, n);
+        mpz_poly_swap(B, C);
+        mpz_poly_clear(C);
+        return;
+    }
+    unsigned long k = ((~0UL)>>1) + 1;
+    for( ; k > n ; k >>= 1);
+    mpz_poly_set(B, A);
+    for( ; k >>= 1 ; ) {
+        mpz_poly_mul(B, B, B);
+        if (n & k)
+            mpz_poly_mul(B, B, A);
+    }
+}/*}}}*/
+
 /* B = A^n mod f, assuming f is monic */
 void mpz_poly_pow_ui_mod_f(mpz_poly_ptr B, mpz_poly_srcptr A, unsigned long n, mpz_poly_srcptr f)/*{{{*/
 {
     if (n == 0) {
         mpz_poly_set_xi(B, 0);
+        return;
+    }
+    if (A->deg < 0) {
+        mpz_poly_set_zero(B);
         return;
     }
     if (B == A || B  == f) {
@@ -1978,6 +2022,7 @@ void mpz_poly_pow_ui_mod_f(mpz_poly_ptr B, mpz_poly_srcptr A, unsigned long n, m
     }
     unsigned long k = ((~0UL)>>1) + 1;
     for( ; k > n ; k >>= 1);
+    mpz_poly_realloc(B, n * A->deg + 1);
     mpz_poly_set(B, A);
     mpz_poly Q;
     mpz_poly_init(Q, 3*f->deg-3);
@@ -3751,6 +3796,7 @@ int mpz_poly_factor_and_lift_padically(mpz_poly_factor_list_ptr fac, mpz_poly_sr
 std::string cxx_mpz_poly::print_poly(std::string const& var) const
 {
     std::ostringstream os;
+    if (x->deg < 0) os << "0";
     for(int i = 0 ; i <= x->deg ; i++) {
         int r = mpz_cmp_ui(x->coeff[i], 0);
         if (r == 0) continue;
@@ -4090,4 +4136,191 @@ void  mpz_poly_setcoeffs_counter_print_error_code(int error_code){
   case -6: printf("-6: content(f) > 1\n"); break;
   default: printf(" 0: undetermined error.\n");
   }
+}
+
+
+/* TODO: I wonder whether this could be expanded to do the parsing of the
+ * fantastic galois actions that we have here and there... */
+
+/* This structure has only two public functions: tokenize and parse */
+struct poly_parser {
+
+    struct parse_error: public std::exception {
+        const char * what() { return "parse error"; }
+    };
+
+private:
+    enum expression_token {
+        LEFT_PAREN,
+        RIGHT_PAREN,
+        PLUS,
+        MINUS,
+        TIMES,
+        POWER,
+        POSITIVE_INTEGER,
+        LITERAL
+    };
+    std::vector<expression_token> tokens;
+    std::vector<char> literals;
+    std::vector<cxx_mpz> integers;
+
+    std::vector<expression_token>::const_iterator ctok;
+    std::vector<char>::const_iterator clit;
+    std::vector<cxx_mpz>::const_iterator cint;
+
+    inline void next() { if (ctok != tokens.end()) ctok++; }
+    inline bool test(expression_token s) { return ctok != tokens.end() && *ctok == s; }
+
+    bool accept(expression_token s) {
+        if (!test(s)) return false;
+        next();
+        return true;
+    }
+
+    int expect(expression_token s) {
+        if (accept(s))
+            return 1;
+        throw parse_error();
+        return 0;
+    }
+
+    unsigned long exponent() {
+        if (accept(POWER)) {
+            expect(POSITIVE_INTEGER);
+            cxx_mpz e = *cint++;
+            while (accept(POWER)) {
+                expect(POSITIVE_INTEGER);
+                if (!mpz_fits_ulong_p(*cint)) throw parse_error();
+                unsigned long ei = mpz_get_ui(*cint++);
+                mpz_pow_ui(e, e, ei);
+            }
+            if (!mpz_fits_ulong_p(e)) throw parse_error();
+            return mpz_get_ui(e);
+        } else {
+            return 1;
+        }
+    }
+
+    cxx_mpz_poly parse_factor() {
+        cxx_mpz_poly p;
+        if (accept(LITERAL)) {
+            clit++;
+            mpz_poly_set_xi(p, exponent());
+        } else if (accept(POSITIVE_INTEGER)) {
+            mpz_poly_set_mpz(p, *cint++);
+        } else if (accept(LEFT_PAREN)) {
+            mpz_poly_swap(p, parse_expression());
+            expect(RIGHT_PAREN);
+        } else {
+            throw parse_error();
+        }
+        unsigned long e = exponent();
+        if (e != 1)
+            mpz_poly_pow_ui(p, p, e);
+        return p;
+    }
+
+    cxx_mpz_poly parse_term() {
+        cxx_mpz_poly p = parse_factor();
+        for( ; accept(TIMES) ; )
+            mpz_poly_mul(p, p, parse_factor());
+        return p;
+    }
+
+    cxx_mpz_poly parse_expression() {
+        cxx_mpz_poly p;
+        if (test(PLUS)) {
+            next();
+            p = parse_term();
+        } else if (!test(MINUS)) {
+            p = parse_term();
+        }
+
+        for(;;) {
+            if (test(PLUS)) {
+                next();
+                mpz_poly_add(p, p, parse_term());
+            } else if (test(MINUS)) {
+                next();
+                mpz_poly_sub(p, p, parse_term());
+            } else
+                break;
+        }
+        return p;
+    }
+public:
+    cxx_mpz_poly parse() {
+        for(auto const & l : literals)
+            if (l != literals.front()) throw parse_error();
+        cxx_mpz_poly p = parse_expression();
+        if (ctok != tokens.end())
+            throw parse_error();
+        return p;
+    }
+
+    bool tokenize(std::istream& is) {
+        tokens.clear();
+        literals.clear();
+        integers.clear();
+        for( ; !is.eof() ; ) {
+            int c;
+            for(;;is.get()) {
+                c = is.peek();
+                if (is.eof() || !isspace(c)) break;
+            }
+            /* c is the next non-whitespace character */
+            if (is.eof()) { break;
+            } else if (c == '+') { is.get(); tokens.push_back(PLUS);
+            } else if (c == '-') { is.get(); tokens.push_back(MINUS);
+            } else if (c == '*') { is.get(); tokens.push_back(TIMES);
+            } else if (c == '(') { is.get(); tokens.push_back(LEFT_PAREN);
+            } else if (c == ')') { is.get(); tokens.push_back(RIGHT_PAREN);
+            } else if (c == '^') { is.get(); tokens.push_back(POWER);
+            } else if (isdigit(c)) {
+                /* gmp's mpz parser really wants only an mpz, nothing
+                 * else. We have to collect digits first.
+                 */
+                std::string s;
+                for(;!is.eof() && isdigit(c);is.get(), c=is.peek()) {
+                    s += c;
+                }
+                cxx_mpz z;
+                mpz_set_str(z, s.c_str(), 0);
+
+                integers.push_back(z);
+                tokens.push_back(POSITIVE_INTEGER);
+            } else if (isalpha(c)) {
+                is.get();
+                literals.push_back(c);
+                tokens.push_back(LITERAL);
+            }
+        };
+        ctok = tokens.begin();
+        clit = literals.begin();
+        cint = integers.begin();
+        return true;
+    }
+};
+
+std::istream& operator>>(std::istream& in, cxx_mpz_poly & f)
+{
+    std::string line;
+    if (!getline(in, line)) return in;
+    std::istringstream is(line);
+
+    poly_parser P;
+    P.tokenize(is);
+
+    try {
+        f = P.parse();
+    } catch (poly_parser::parse_error const & p) {
+        in.setstate(std::ios_base::failbit);
+        return in;
+    }
+
+    return in;
+}
+
+std::ostream& operator<<(std::ostream& o, cxx_mpz_poly const & f) {
+    return o << f.print_poly(std::string("x"));
 }

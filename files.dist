@@ -1222,3 +1222,4 @@ utils/mmap_allocator.cpp
 utils/mmap_allocator.hpp
 utils/mmappable_vector.hpp
 tests/utils/test_mmappable_vector.cpp
+tests/utils/test_mpz_poly_parsing.cpp
