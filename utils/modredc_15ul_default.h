@@ -21,13 +21,18 @@
 #undef MOD_SIZE
 #undef MOD_MINBITS
 #undef MOD_MAXBITS
+#undef MOD_APPEND_TYPE
+#undef PRIMODu
+#undef PRIMODx
+#undef MOD_PRINT_INT
+#undef MOD_PRINT_MODULUS
 #define residue_t            residueredc15ul_t
 #define modulus_t            modulusredc15ul_t
 #define modint_t             modintredc15ul_t
 #define MOD_SIZE             MODREDC15UL_SIZE
 #define MOD_MINBITS          MODREDC15UL_MINBITS
 #define MOD_MAXBITS          MODREDC15UL_MAXBITS
-
+#define MOD_APPEND_TYPE(x)   x##_15ul
 #define PRIMODu "Nd"
 #define PRIMODx "Nx"
 #define MOD_PRINT_INT(x) x, MOD_SIZE

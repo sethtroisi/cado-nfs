@@ -1,7 +1,22 @@
-#ifndef _EC_ARITH_EDWARDS_H_
-#define _EC_ARITH_EDWARDS_H_
+#ifndef EC_ARITH_EDWARDS_H_
+#define EC_ARITH_EDWARDS_H_
+
+#ifndef mod_init
+  #error "One of the mod*_default.h headers must be included before this file"
+#endif
 
 #include "ec_arith_common.h"
+
+/* a=-1 Twisted Edwards elliptic curves
+ *
+ * Extended coordinates, with equations
+ *                  -X^2 + Y^2 = Z^2 + d*T^2
+ *                  X*Y = Z*T
+ * Projective coordinates, with equation:
+ *                  -X^2*Z^2 + Y^2*Z^2 = Z^4+d*X^2*Y^2
+ *
+ * Constant needed in computation: none
+ */
 
 #ifdef ECM_COUNT_OPS
 static unsigned int _count_edwards_add, _count_edwards_dbl, _count_edwards_tpl;
@@ -16,6 +31,7 @@ static int _count_edwards_extraM;
 /* #define SAFE_TWISTED_EDWARDS_TO_MONTGOMERY */
 
 /* Compute d = -(A-2)/(A+2). A and d can be the same variable. */
+#define edwards_d_from_montgomery_A MOD_APPEND_TYPE(edwards_d_from_montgomery_A)
 static inline void
 edwards_d_from_montgomery_A (residue_t d, const residue_t A, const modulus_t m)
 {
@@ -31,6 +47,37 @@ edwards_d_from_montgomery_A (residue_t d, const residue_t A, const modulus_t m)
   mod_clear (t, m);
 }
 
+#define edwards_ext_curve_fprintf MOD_APPEND_TYPE(edwards_ext_curve_fprintf)
+static inline void
+edwards_ext_curve_fprintf (FILE *out, const char *prefix, residue_t d,
+                           ec_point_t P, const modulus_t m)
+{
+  const char *pre = (prefix == NULL) ? "" : prefix;
+
+  modint_t cc;
+  mod_intinit (cc);
+
+  mod_get_int (cc, d, m);
+
+  mod_fprintf (out, "%sTwisted Edwards curve: -X^2 + Y^2 = Z^2 + d*T^2\n"
+                    "%sXY = ZT (extended coordinates)\n%sd = 0x%" PRIMODx "\n",
+                    pre, pre, pre, MOD_PRINT_INT (cc));
+
+  mod_intclear (cc);
+
+  if (P)
+  {
+    fprintf (out, "%swith point (X:Y:Z:T) = ", pre);
+    ec_point_fprintf (out, P, TWISTED_EDWARDS_ext, m);
+    fputc ('\n', out);
+  }
+}
+
+/* Set P to zero (the neutral point):
+ *    (0:1:1:0)     if coord is TWISTED_EDWARDS_ext
+ *    (0:1:1)       if coord is TWISTED_EDWARDS_proj
+ */
+#define edwards_point_set_zero MOD_APPEND_TYPE(edwards_point_set_zero)
 static inline void
 edwards_point_set_zero (ec_point_t P, const modulus_t m,
                         const ec_point_coord_type_t coord)
@@ -43,6 +90,7 @@ edwards_point_set_zero (ec_point_t P, const modulus_t m,
     mod_set0 (P->t, m);
 }
 
+#define edwards_neg MOD_APPEND_TYPE(edwards_neg)
 static inline void
 edwards_neg (ec_point_t Q, const ec_point_t P, const modulus_t m)
 {
@@ -68,6 +116,7 @@ edwards_neg (ec_point_t Q, const ec_point_t P, const modulus_t m)
  * Source: Hisil–Wong–Carter–Dawson, 2008, section 3.2 of
  *    http://eprint.iacr.org/2008/522
  */
+#define edwards_addsub MOD_APPEND_TYPE(edwards_addsub)
 static inline void
 edwards_addsub (ec_point_t R, const ec_point_t P, const ec_point_t Q, int sub,
                 const modulus_t m, const ec_point_coord_type_t output_type)
@@ -167,6 +216,7 @@ edwards_addsub (ec_point_t R, const ec_point_t P, const ec_point_t Q, int sub,
   mod_clear (u2, m);
 }
 
+#define edwards_add MOD_APPEND_TYPE(edwards_add)
 static inline void
 edwards_add (ec_point_t R, const ec_point_t P, const ec_point_t Q,
              const modulus_t m, const ec_point_coord_type_t output_type)
@@ -174,6 +224,7 @@ edwards_add (ec_point_t R, const ec_point_t P, const ec_point_t Q,
   edwards_addsub (R, P, Q, 0, m, output_type);
 }
 
+#define edwards_sub MOD_APPEND_TYPE(edwards_sub)
 static inline void
 edwards_sub (ec_point_t R, const ec_point_t P, const ec_point_t Q,
              const modulus_t m, const ec_point_coord_type_t output_type)
@@ -195,6 +246,7 @@ edwards_sub (ec_point_t R, const ec_point_t P, const ec_point_t Q,
  * Source: Bernstein–Birkner–Joye–Lange–Peters, 2008
  *    http://eprint.iacr.org/2008/013.
  */
+#define edwards_dbl MOD_APPEND_TYPE(edwards_dbl)
 static inline void
 edwards_dbl (ec_point_t R, const ec_point_t P,
              const modulus_t m, const ec_point_coord_type_t output_type)
@@ -249,6 +301,7 @@ edwards_dbl (ec_point_t R, const ec_point_t P,
  *    https://hyperelliptic.org/EFD/g1p/auto-twisted-extended-1.html#tripling-tpl-2015-c
  * Source: 2015 Chuengsatiansup.
  */
+#define edwards_tpl MOD_APPEND_TYPE(edwards_tpl)
 static inline void
 edwards_tpl (ec_point_t R, const ec_point_t P,
              const modulus_t m, const ec_point_coord_type_t output_type)
@@ -315,6 +368,7 @@ edwards_tpl (ec_point_t R, const ec_point_t P,
  *     R <- k*P
  * R can be the same variable as P.
  */
+#define edwards_smul_ui MOD_APPEND_TYPE(edwards_smul_ui)
 MAYBE_UNUSED
 static inline void
 edwards_smul_ui (ec_point_t R, const ec_point_t P, const unsigned long k,
@@ -358,4 +412,4 @@ edwards_smul_ui (ec_point_t R, const ec_point_t P, const unsigned long k,
   }
 }
 
-#endif /* _EC_ARITH_EDWARDS_H_ */
+#endif /* EC_ARITH_EDWARDS_H_ */

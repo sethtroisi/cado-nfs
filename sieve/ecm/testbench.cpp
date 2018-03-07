@@ -54,7 +54,8 @@ print_pointorder (const unsigned long p, const unsigned long parameter,
   else
     knownfac = 1;
   
-  o = ell_pointorder_ul (parameter, parameterization, knownfac, 0, m, verbose);
+  o = ec_parameterization_point_order_ul (parameterization, parameter, knownfac,
+                                          0, m, verbose);
   if (verbose)
     printf ("%lu %lu\n", p, o);
 

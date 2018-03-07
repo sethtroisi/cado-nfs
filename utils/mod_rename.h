@@ -72,6 +72,8 @@
 #undef mod_set1
 #undef mod_next
 #undef mod_finished
+#undef mod_fprintf
+#undef mod_printf
 
 #define mod_intinit          MOD_RENAME(intinit)
 #define mod_intclear         MOD_RENAME(intclear)

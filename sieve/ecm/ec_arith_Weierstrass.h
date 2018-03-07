@@ -1,32 +1,49 @@
-#ifndef _EC_ARITH_WEIERSTRASS_H_
-#define _EC_ARITH_WEIERSTRASS_H_
+#ifndef EC_ARITH_WEIERSTRASS_H_
+#define EC_ARITH_WEIERSTRASS_H_
+
+#ifndef mod_init
+  #error "One of the mod*_default.h headers must be included before this file"
+#endif
 
 #include "ec_arith_common.h"
 
-/********************* Short Weierstrass elliptic curves **********************/
-
-/* Equation:
- *    y^2 = x^3 + a*x + b                for affine
- *    Y^2*Z = X^3 + a*X*Z^Z + b*Z^3      for projective
+/* Short Weierstrass elliptic curves
+ *
+ * Affine coordinates, with equation
+ *                   y^2 = x^3 + a*x + b
+ * Projective coordinates, with equation:
+ *                  Y^2*Z = X^3 + a*X*Z^Z + b*Z^3
  *
  * Curve coefficient needed in computation: a
- *
- * Implemented functions:
- *  - weierstrass_aff_add (R:SHORT_WEIERSTRASS_aff, P:SHORT_WEIERSTRASS_aff,
- *                                                      Q:SHORT_WEIERSTRASS_aff)
- *      R <- P+Q
- *
- *  - weierstrass_aff_dbl (R:SHORT_WEIERSTRASS_aff, P:SHORT_WEIERSTRASS_aff)
- *      R <- 2*P
- *
- *  - weierstrass_proj_add (R:SHORT_WEIERSTRASS_proj, P:SHORT_WEIERSTRASS_proj,
- *                                                    Q:SHORT_WEIERSTRASS_proj)
- *      R <- P+Q
- *
- *  - weierstrass_proj_dbl (R:SHORT_WEIERSTRASS_proj, P:SHORT_WEIERSTRASS_proj)
- *      R <- 2*P
  */
 
+
+#define weierstrass_aff_curve_fprintf MOD_APPEND_TYPE(weierstrass_aff_curve_fprintf)
+static inline void
+weierstrass_aff_curve_fprintf (FILE *out, const char *prefix,
+                                const residue_t a, ec_point_t P,
+                                const modulus_t m)
+{
+  const char *pre = (prefix == NULL) ? "" : prefix;
+
+  modint_t cc;
+  mod_intinit (cc);
+
+  mod_get_int (cc, a, m);
+
+  mod_fprintf (out, "%sWeierstrass curve: y^2 = x^3 + a*x + b\n"
+                    "%sa = 0x%" PRIMODx "\n", pre, pre, MOD_PRINT_INT (cc));
+
+
+  mod_intclear (cc);
+
+  if (P)
+  {
+    fprintf (out, "%swith point (x, y) = ", pre);
+    ec_point_fprintf (out, P, SHORT_WEIERSTRASS_aff, m);
+    fputc ('\n', out);
+  }
+}
 
 /* Computes R=2P, with 1 inv, 4 muls (2 muls and 2 squares) and 8 add/sub.
  *    - m : modulus
@@ -37,6 +54,7 @@
  *
  * It is permissible to let P and Q use the same memory.
  */
+#define weierstrass_aff_dbl MOD_APPEND_TYPE(weierstrass_aff_dbl)
 static int
 weierstrass_aff_dbl (ec_point_t R, const ec_point_t P, const residue_t a,
                      const modulus_t m)
@@ -83,6 +101,7 @@ weierstrass_aff_dbl (ec_point_t R, const ec_point_t P, const residue_t a,
  *
  * It is permissible to let R and P (or R and Q) use the same memory.
  */
+#define weierstrass_aff_add MOD_APPEND_TYPE(weierstrass_aff_add)
 static int
 weierstrass_aff_add (ec_point_t R, const ec_point_t P, const ec_point_t Q,
                      const residue_t a, const modulus_t m)
@@ -131,6 +150,8 @@ weierstrass_aff_add (ec_point_t R, const ec_point_t P, const ec_point_t Q,
  * a and A can be the same variable.
  * Pm and Pw can be the same variable.
  */
+#define weierstrass_aff_from_montgomery MOD_APPEND_TYPE(weierstrass_aff_from_montgomery)
+MAYBE_UNUSED
 static int
 weierstrass_aff_from_montgomery (residue_t a, ec_point_t Pw, const residue_t A,
                                  ec_point_t Pm, const modulus_t m)
@@ -194,6 +215,7 @@ weierstrass_aff_from_montgomery (residue_t a, ec_point_t Pw, const residue_t A,
  * If the point at infinity is due to a failed inversion, the non-invertible
  * value is returned in P->x.
  */
+#define weierstrass_aff_smul_ui MOD_APPEND_TYPE(weierstrass_aff_smul_ui)
 static int
 weierstrass_aff_smul_ui (ec_point_t P, const unsigned long e, const residue_t a,
                          const modulus_t m)
@@ -243,6 +265,241 @@ weierstrass_aff_smul_ui (ec_point_t P, const unsigned long e, const residue_t a,
   return tfinite;
 }
 
+/* Return the order of the point P on the Weierstrass curve defined by the curve
+ * coefficient a modulo the prime m.
+ * Looks for i in Hasse interval so that i*P = O, has complexity O(m^(1/4)).
+ * If the group order is known to be == r (mod m), this can be supplied in
+ * the variables "known_r" and" known_m".
+ * XXX For now, this function only works for _ul arithmetic, so only the _ul
+ * version is defined.
+ */
+#if defined(MOD_SIZE) && MOD_SIZE == 1
+#define weierstrass_aff_point_order MOD_APPEND_TYPE(weierstrass_aff_point_order)
+unsigned long
+weierstrass_aff_point_order (const residue_t a, ec_point_t P,
+                             const unsigned long known_m,
+                             const unsigned long known_r, const modulus_t m,
+                             const int verbose)
+{
+  ec_point_t Pi, Pg, Q, *baby;
+  residue_t x, d;
+  unsigned long min, max, i, j, order, cof, p;
+  unsigned long giant_step, giant_min, baby_len;
+  modint_t tm;
+
+  ASSERT (known_r < known_m);
+
+  mod_intinit (tm);
+  mod_getmod_int (tm, m);
+
+  if (verbose >= 2)
+  {
+    printf ("%s: ", __func__);
+    weierstrass_aff_curve_fprintf (stdout, NULL, a, P, m);
+  }
+
+  mod_init (x, m);
+  mod_init (d, m);
+  ec_point_init (Pi, m);
+  ec_point_init (Pg, m);
+
+  /* XXX Here we assume m fits in an unsigned long */
+  i = (unsigned long) (2. * sqrt((double) mod_intget_ul(tm)));
+  min = mod_intget_ul(tm) - i;
+  max = mod_intget_ul(tm) + i;
+
+  /* Giant steps visit values == r (mod m), baby steps values == 0 (mod m) */
+  giant_step = ceil(sqrt(2.*(double)i / (double) known_m));
+  /* Round up to multiple of m */
+  giant_step = ((giant_step - 1) / known_m + 1) * known_m;
+
+  /* We test Pi +- Pj, where Pi = (giant_min + i*giant_step), i >= 0,
+     and Pj = j*P, 0 <= j <= giant_step / 2.
+     To ensure we can find all values >= min, ensure
+     giant_min <= min + giant_step / 2.
+     We also want giant_min == r (mod m) */
+  giant_min = ((min + giant_step / 2) / known_m) * known_m + known_r;
+  if (giant_min > min + giant_step / 2)
+    giant_min -= known_m;
+  if (verbose >= 2)
+    printf ("known_m = %lu, known_r = %lu, giant_step = %lu, "
+            "giant_min = %lu\n", known_m, known_r, giant_step, giant_min);
+
+  baby_len = giant_step / known_m / 2 + 1;
+  baby = (ec_point_t *) malloc (baby_len * sizeof (ec_point_t));
+  for (i = 0; i < baby_len; i++)
+    ec_point_init (baby[i], m);
+
+  ec_point_set (Pg, P, m, SHORT_WEIERSTRASS_aff);
+  i = known_m;
+  if (weierstrass_aff_smul_ui (Pg, i, a, m) == 0) /* Pg = m*P for now */
+    goto found_inf;
+
+  if (1 < baby_len)
+    ec_point_set (baby[1], Pg, m, SHORT_WEIERSTRASS_aff);
+
+  if (2 < baby_len)
+    {
+      if (weierstrass_aff_dbl (Pi, Pg, a, m) == 0)
+        {
+          i = 2 * known_m;
+          goto found_inf;
+        }
+      ec_point_set (baby[2], Pi, m, SHORT_WEIERSTRASS_aff);
+    }
+
+  for (i = 3; i < baby_len; i++)
+    {
+      if (weierstrass_aff_add (Pi, Pi, Pg, a, m) == 0)
+        {
+          i *= known_m;
+          goto found_inf;
+        }
+      ec_point_set (baby[i], Pi, m, SHORT_WEIERSTRASS_aff);
+    }
+
+  /* Now compute the giant steps in [giant_min, giant_max] */
+  i = giant_step;
+  ec_point_set (Pg, P, m, SHORT_WEIERSTRASS_aff);
+  if (weierstrass_aff_smul_ui (Pg, i, a, m) == 0)
+    goto found_inf;
+
+  i = giant_min;
+  ec_point_set (Pi, P, m, SHORT_WEIERSTRASS_aff);
+  if (weierstrass_aff_smul_ui (Pi, i, a, m) == 0)
+    goto found_inf;
+
+  while (i <= max + giant_step - 1)
+    {
+      /* Compare x-coordinate with stored baby steps. This makes it
+         O(sqrt(p)) complexity, strictly speaking. */
+      for (j = 1; j < baby_len; j++)
+        if (mod_equal (Pi[0].x, baby[j]->x, m))
+          {
+            if (mod_equal (Pi[0].y, baby[j]->y, m))
+              i -= j * known_m; /* Equal, so iP = jP and (i-j)P = 0 */
+            else
+              {
+                mod_neg (Pi[0].y, Pi[0].y, m);
+                if (mod_equal (Pi[0].y, baby[j]->y, m))
+                  i += j * known_m; /* Negatives, so iP = -jP and (i+j)P = 0 */
+                else
+                  {
+                    fprintf (stderr, "Matching x-coordinates, but y neither "
+                             "equal nor negatives\n");
+                    abort();
+                  }
+              }
+            goto found_inf;
+          }
+
+      i += giant_step;
+      if (!weierstrass_aff_add (Pi, Pi, Pg, a, m))
+        goto found_inf;
+    }
+
+  if (i > max)
+  {
+      fprintf (stderr, "ec_order: Error, no match found for p = %lu, "
+               "min = %lu, max = %lu, giant_step = %lu, giant_min = %lu\n",
+               mod_intget_ul(tm), min, max, giant_step, giant_min);
+      abort ();
+  }
+
+found_inf:
+  /* Check that i is a multiple of the order */
+  ec_point_set (Pi, P, m, SHORT_WEIERSTRASS_aff);
+  if (weierstrass_aff_smul_ui (Pi, i, a, m) != 0)
+    {
+      modint_t tx1, ty1;
+      mod_intinit (tx1);
+      mod_intinit (ty1);
+      mod_get_int (tx1, P[0].x, m);
+      mod_get_int (ty1, P[0].y, m);
+#ifndef MODMPZ_MAXBITS
+      fprintf (stderr, "ec_order: Error, %ld*(%ld, %ld) (mod %ld) is "
+               "not the point at infinity\n",
+               i, tx1[0], ty1[0], tm[0]);
+#endif
+      mod_intclear (tx1);
+      mod_intclear (ty1);
+      return 0UL;
+    }
+
+  /* Ok, now we have some i so that ord(P) | i. Find ord(P).
+     We know that ord(P) > 1 since P is not at infinity */
+
+  /* For each prime factor of the order, reduce the exponent of
+     that prime factor as far as possible */
+
+  cof = order = i;
+  for (p = 2; p * p <= cof; p += 1 + p%2)
+    if (cof % p == 0)
+      {
+        ASSERT (order % p == 0);
+        /* Remove all factors of p */
+        for (order /= p, cof /= p; order % p == 0; order /= p)
+          {
+            ASSERT(cof % p == 0);
+            cof /= p;
+          }
+        ASSERT (cof % p != 0);
+
+        /* Add factors of p again one by one, stopping when we hit
+           point at infinity */
+        ec_point_set (Pi, P, m, SHORT_WEIERSTRASS_aff);
+        if (weierstrass_aff_smul_ui (Pi, order, a, m) != 0)
+          {
+            order *= p;
+            while (weierstrass_aff_smul_ui (Pi, p, a, m) != 0)
+              order *= p;
+          }
+      }
+  /* Now cof is 1 or a prime */
+  if (cof > 1)
+    {
+      ec_point_set (Pi, P, m, SHORT_WEIERSTRASS_aff);
+      ASSERT (order % cof == 0);
+      if (weierstrass_aff_smul_ui (Pi, order / cof, a, m) == 0)
+        order /= cof;
+    }
+
+
+  /* One last check that order divides real order */
+  ec_point_set (Pi, P, m, SHORT_WEIERSTRASS_aff);
+  if (weierstrass_aff_smul_ui (Pi, order, a, m) != 0)
+    {
+      modint_t tx1, ty1;
+      mod_intinit (tx1);
+      mod_intinit (ty1);
+      mod_get_int (tx1, P[0].x, m);
+      mod_get_int (ty1, P[0].y, m);
+      fprintf (stderr, "ec_order: Error, final order %ld is wrong\n",
+               order);
+      mod_intclear (tx1);
+      mod_intclear (ty1);
+      abort ();
+    }
+
+  for (i = 0; i < giant_step; i++)
+    ec_point_clear (baby[i], m);
+  free (baby);
+  baby = NULL;
+  mod_clear (x, m);
+  mod_clear (d, m);
+  mod_intclear (tm);
+  ec_point_clear (Pi, m);
+  ec_point_clear (Pg, m);
+  ec_point_clear (Q, m);
+
+  return order;
+}
+#endif /* defined(MOD_SIZE) && MOD_SIZE == 1 */
+
+/***************************** projective version *****************************/
+
+/* Set P to zero (the neutral point): (0:1:0) */
+#define weierstrass_proj_point_set_zero MOD_APPEND_TYPE(weierstrass_proj_point_set_zero)
 static inline void
 weierstrass_proj_point_set_zero (ec_point_t P, const modulus_t m)
 {
@@ -250,12 +507,14 @@ weierstrass_proj_point_set_zero (ec_point_t P, const modulus_t m)
   mod_set1 (P->y, m);
   mod_set0 (P->z, m);
 }
+
 /* Computes R=2P, with ? muls (? muls and ? squares) and ? add/sub.
  *    - m : modulus
  *    - a : curve coefficient
  *
  * It is permissible to let P and Q use the same memory.
  */
+#define weierstrass_proj_dbl MOD_APPEND_TYPE(weierstrass_proj_dbl)
 static void
 weierstrass_proj_dbl (ec_point_t R, const ec_point_t P, const residue_t a,
                       const modulus_t m)
@@ -326,6 +585,7 @@ weierstrass_proj_dbl (ec_point_t R, const ec_point_t P, const residue_t a,
  *
  * It is permissible to let R and P (or R and Q) use the same memory.
  */
+#define weierstrass_proj_add MOD_APPEND_TYPE(weierstrass_proj_add)
 static void
 weierstrass_proj_add (ec_point_t R, const ec_point_t P, const ec_point_t Q,
                       const modulus_t m)
@@ -388,6 +648,7 @@ weierstrass_proj_add (ec_point_t R, const ec_point_t P, const ec_point_t Q,
  *    - m : modulus
  *    - a : curve coefficient
  */
+#define weierstrass_proj_smul_ui MOD_APPEND_TYPE(weierstrass_proj_smul_ui)
 static void
 weierstrass_proj_smul_ui (ec_point_t P, const unsigned long e,
                           const residue_t a, const modulus_t m)
@@ -422,4 +683,4 @@ weierstrass_proj_smul_ui (ec_point_t P, const unsigned long e,
   /* else do nothing for e == 1 */
 }
 
-#endif /* _EC_ARITH_WEIERSTRASS_H_ */
+#endif /* EC_ARITH_WEIERSTRASS_H_ */

@@ -1,5 +1,9 @@
-#ifndef _EC_ARITH_COMMON_H_
-#define _EC_ARITH_COMMON_H_
+#ifndef EC_ARITH_COMMON_H_
+#define EC_ARITH_COMMON_H_
+
+#ifndef mod_init
+  #error "One of the mod*_default.h headers must be included before this file"
+#endif
 
 /* Types of coordinates */
 typedef enum {
@@ -28,6 +32,7 @@ typedef struct ec_point_s ec_point_t[1];
 typedef struct ec_point_s *ec_point_ptr;
 typedef const struct ec_point_s *ec_point_srcptr;
 
+#define ec_point_init MOD_APPEND_TYPE(ec_point_init)
 static inline void
 ec_point_init (ec_point_t P, const modulus_t m)
 {
@@ -37,6 +42,7 @@ ec_point_init (ec_point_t P, const modulus_t m)
   mod_init (P->t, m);
 }
 
+#define ec_point_clear MOD_APPEND_TYPE(ec_point_clear)
 static inline void
 ec_point_clear (ec_point_t P, const modulus_t m)
 {
@@ -46,6 +52,7 @@ ec_point_clear (ec_point_t P, const modulus_t m)
   mod_clear (P->t, m);
 }
 
+#define ec_point_set MOD_APPEND_TYPE(ec_point_set)
 static inline void
 ec_point_set (ec_point_t Q, const ec_point_t P, const modulus_t m,
               const ec_point_coord_type_t coord)
@@ -59,6 +66,7 @@ ec_point_set (ec_point_t Q, const ec_point_t P, const modulus_t m,
     mod_set (Q->t, P->t, m);
 }
 
+#define ec_point_swap MOD_APPEND_TYPE(ec_point_swap)
 static inline void
 ec_point_swap (ec_point_t Q, ec_point_t P, const modulus_t m,
                const ec_point_coord_type_t coord)
@@ -72,6 +80,7 @@ ec_point_swap (ec_point_t Q, ec_point_t P, const modulus_t m,
     mod_swap (Q->t, P->t, m);
 }
 
+#define ec_point_fprintf MOD_APPEND_TYPE(ec_point_fprintf)
 static inline void
 ec_point_fprintf (FILE *out, ec_point_t P, const ec_point_coord_type_t coord,
                   const modulus_t m)
@@ -118,84 +127,4 @@ ec_point_fprintf (FILE *out, ec_point_t P, const ec_point_coord_type_t coord,
   mod_intclear (z);
   mod_intclear (t);
 }
-
-static inline void
-ec_montgomery_curve_fprintf (FILE *out, const char *prefix, residue_t A,
-                             ec_point_t P, const modulus_t m)
-{
-  modint_t cc;
-  const char *pre = (prefix == NULL) ? "" : prefix;
-
-  mod_intinit (cc);
-  mod_get_int (cc, A, m);
-
-  mod_fprintf (out, "%sMontgomery curve: B*Y^2 = X^3 + A*X^2*Z + X*Z^2\n"
-                    "%sA = 0x%" PRIMODx "\n", pre, pre, MOD_PRINT_INT (cc));
-
-  mod_intclear (cc);
-
-  if (P)
-  {
-    fprintf (out, "%swith point (X::Z) = ", pre);
-    ec_point_fprintf (out, P, MONTGOMERY_xz, m);
-    fputc ('\n', out);
-  }
-}
-
-/* A is the curve coefficient of the isomorphic Montgomery curve, the relation
- * is (because we have a=-1):
- *    A = 2*(1-d)/(1+d)
- *    d = -(A-2)/(A+2)
- */
-static inline void
-ec_twisted_edwards_ext_curve_fprintf (FILE *out, const char *prefix,
-                                      residue_t d, ec_point_t P,
-                                      const modulus_t m)
-{
-  const char *pre = (prefix == NULL) ? "" : prefix;
-
-  modint_t cc;
-  mod_intinit (cc);
-
-  mod_get_int (cc, d, m);
-
-  mod_fprintf (out, "%sTwisted Edwards curve: -X^2 + Y^2 = Z^2 + d*T^2\n"
-                    "%sXY = ZT (extended coordinates)\n%sd = 0x%" PRIMODx "\n",
-                    pre, pre, pre, MOD_PRINT_INT (cc));
-
-  mod_intclear (cc);
-
-  if (P)
-  {
-    fprintf (out, "%swith point (X:Y:Z:T) = ", pre);
-    ec_point_fprintf (out, P, TWISTED_EDWARDS_ext, m);
-    fputc ('\n', out);
-  }
-}
-
-static inline void
-ec_weierstrass_curve_fprintf (FILE *out, const char *prefix, residue_t a,
-                              ec_point_t P, const modulus_t m)
-{
-  const char *pre = (prefix == NULL) ? "" : prefix;
-
-  modint_t cc;
-  mod_intinit (cc);
-
-  mod_get_int (cc, a, m);
-
-  mod_fprintf (out, "%sWeierstrass curve: y^2 = x^3 + a*x + b\n"
-                    "%sa = 0x%" PRIMODx "\n", pre, pre, MOD_PRINT_INT (cc));
-
-
-  mod_intclear (cc);
-
-  if (P)
-  {
-    fprintf (out, "%swith point (x, y) = ", pre);
-    ec_point_fprintf (out, P, SHORT_WEIERSTRASS_aff, m);
-    fputc ('\n', out);
-  }
-}
-
-#endif /* _EC_ARITH_COMMON_H_ */
+#endif /* EC_ARITH_COMMON_H_ */

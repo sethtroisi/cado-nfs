@@ -1,12 +1,13 @@
+/* This file is not compilable as-is, it must be included by another file. */
+#ifndef mod_init
+  #error "One of the mod*_default.h headers must be included before this file"
+#endif
+
 #include "cado.h"
-#include <stdio.h>
-#include <stdlib.h>
 #include <math.h>
 #include <inttypes.h>
 #include "portability.h"
 #include "facul_ecm.h"
-#include "ularith.h"
-#include "getprime.h"
 #include "timing.h"
 
 //#define ECM_COUNT_OPS /* define to print number of operations of ECM */
@@ -20,12 +21,19 @@
 #define ELLM_SAFE_ADD 0
 #endif
 
+/* Exported functions. */
+#define ecm MOD_APPEND_TYPE(ecm)
+
+/* Each static function are rename just before its declaration (there is no need
+ * to rename them, but it's nice to have these functions distinguishable e.g. in
+ * profiler output).
+ */
+
 #include "ec_arith_common.h"
 #include "ec_arith_Edwards.h"
 #include "ec_arith_Montgomery.h"
 #include "ec_arith_Weierstrass.h"
 #include "ec_parameterization.h"
-
 
 /* Do we want backtracking when processing factors of 2 in E? */
 #ifndef ECM_BACKTRACKING
@@ -53,10 +61,10 @@ static unsigned int _count_stage2_M;
  * Assume that the bytecode is correct (for example, assume that the size of the
  * array is correct).
  */
+#define bytecode_dbchain_interpret_edwards_internal MOD_APPEND_TYPE(bytecode_dbchain_interpret_edwards_internal)
 static bytecode_const
-bytecode_dbchain_interpret_ec_edwards_internal (bytecode_const bc,
-                                                ec_point_t *R,
-                                                const modulus_t m)
+bytecode_dbchain_interpret_edwards_internal (bytecode_const bc, ec_point_t *R,
+                                             const modulus_t m)
 {
   while (1)
   {
@@ -114,10 +122,10 @@ bytecode_dbchain_interpret_ec_edwards_internal (bytecode_const bc,
  * Assume that the bytecode is correct (for example, assume that the size of the
  * array is correct).
  */
+#define bytecode_precomp_interpret_edwards_internal MOD_APPEND_TYPE(bytecode_precomp_interpret_edwards_internal)
 static bytecode_const
-bytecode_precomp_interpret_ec_edwards_internal (bytecode_const bc,
-                                                ec_point_t *R,
-                                                const modulus_t m)
+bytecode_precomp_interpret_edwards_internal (bytecode_const bc, ec_point_t *R,
+                                             const modulus_t m)
 {
   while (*bc != PRECOMP_FINAL)
   {
@@ -174,11 +182,11 @@ bytecode_precomp_interpret_ec_edwards_internal (bytecode_const bc,
  * Assume that the bytecode is correct (for example, assume that the size of the
  * array R is >= 5).
  */
+#define bytecode_prac_interpret_montgomery_internal MOD_APPEND_TYPE(bytecode_prac_interpret_montgomery_internal)
 static bytecode_const
-bytecode_prac_interpret_ec_montgomery_internal (bytecode_const bc,
-                                                ec_point_t *R,
-                                                const modulus_t m,
-                                                const residue_t b)
+bytecode_prac_interpret_montgomery_internal (bytecode_const bc, ec_point_t *R,
+                                             const modulus_t m,
+                                             const residue_t b)
 {
   while (1)
   {
@@ -288,9 +296,10 @@ bytecode_prac_interpret_ec_montgomery_internal (bytecode_const bc,
   return bc;
 }
 
+#define bytecode_prac_interpret_montgomery MOD_APPEND_TYPE(bytecode_prac_interpret_montgomery)
 static void
-bytecode_prac_interpret_ec_montgomery (ec_point_t P, bytecode_const bc,
-                                       const modulus_t m, const residue_t b)
+bytecode_prac_interpret_montgomery (ec_point_t P, bytecode_const bc,
+                                    const modulus_t m, const residue_t b)
 {
   ec_point_t *R = NULL;
   unsigned int R_nalloc;
@@ -307,7 +316,7 @@ bytecode_prac_interpret_ec_montgomery (ec_point_t P, bytecode_const bc,
   /* current point (here starting point) go into R[0] at init */
   ec_point_set (R[0], P, m, MONTGOMERY_xz);
 
-  bytecode_prac_interpret_ec_montgomery_internal (bc, R, m, b);
+  bytecode_prac_interpret_montgomery_internal (bc, R, m, b);
 
   /* output is in R[1] */
   ec_point_set (P, R[1], m, MONTGOMERY_xz);
@@ -318,9 +327,10 @@ bytecode_prac_interpret_ec_montgomery (ec_point_t P, bytecode_const bc,
 }
 
 /** Interpret the MISHMASH bytecode on Twisted Edwards and Montgomery curves **/
-MAYBE_UNUSED static void
-bytecode_mishmash_interpret_ec_mixed_repr (ec_point_t P, bytecode_const bc,
-                                           const modulus_t m, const residue_t b)
+#define bytecode_mishmash_interpret_mixed_repr MOD_APPEND_TYPE(bytecode_mishmash_interpret_mixed_repr)
+static void
+bytecode_mishmash_interpret_mixed_repr (ec_point_t P, bytecode_const bc,
+                                        const modulus_t m, const residue_t b)
 {
   ec_point_t *R = NULL;
   unsigned int R_nalloc;
@@ -348,11 +358,11 @@ bytecode_mishmash_interpret_ec_mixed_repr (ec_point_t P, bytecode_const bc,
       ec_point_set (R[0], R[n], m, TWISTED_EDWARDS_ext);
 
     if (t == MISHMASH_DBCHAIN_BLOCK)
-      bc = bytecode_dbchain_interpret_ec_edwards_internal (++bc, R, m);
+      bc = bytecode_dbchain_interpret_edwards_internal (++bc, R, m);
     else if (t == MISHMASH_PRECOMP_BLOCK)
-      bc = bytecode_precomp_interpret_ec_edwards_internal (++bc, R, m);
+      bc = bytecode_precomp_interpret_edwards_internal (++bc, R, m);
     else if (t == MISHMASH_PRAC_BLOCK)
-      bc = bytecode_prac_interpret_ec_montgomery_internal (++bc, R, m, b);
+      bc = bytecode_prac_interpret_montgomery_internal (++bc, R, m, b);
     else /* unexpected bytecode */
     {
       printf ("Fatal error in %s at %s:%d -- unexpected bytecode 0x%02x\n",
@@ -381,6 +391,7 @@ bytecode_mishmash_interpret_ec_mixed_repr (ec_point_t P, bytecode_const bc,
    x[i] by \prod_{1\leq j \leq n, j\neq i} z[j]
    Requires n > 1. Uses 4n-6 multiplications. */
 
+#define common_z MOD_APPEND_TYPE(common_z)
 MAYBE_UNUSED
 static void ATTRIBUTE((__noinline__))
 common_z (const int n1, residue_t *x1, residue_t *z1,
@@ -475,6 +486,7 @@ common_z (const int n1, residue_t *x1, residue_t *z1,
 }
 
 
+#define ecm_stage2 MOD_APPEND_TYPE(ecm_stage_2)
 static int ATTRIBUTE((__noinline__))
 ecm_stage2 (residue_t r, const ec_point_t P, const stage2_plan_t *plan,
 	    const residue_t b, const modulus_t m)
@@ -936,7 +948,7 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
 
   if (param_output_type == MONTGOMERY_xz)
   {
-    ec_montgomery_curve_fprintf (stdout, "# TRACE:   ", A, P, m);
+    montgomery_curve_fprintf (stdout, "# TRACE:   ", A, P, m);
     printf ("# TRACE:                     = ");
     montgomery_point_fprintf_affine (stdout, P, m);
     fputc ('\n', stdout);
@@ -946,12 +958,12 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
     residue_t d;
     mod_init_noset0 (d, m);
     edwards_d_from_montgomery_A (d, A, m);
-    ec_twisted_edwards_ext_curve_fprintf (stdout, "# TRACE:   ", d, P, m);
+    edwards_ext_curve_fprintf (stdout, "# TRACE:   ", d, P, m);
     mod_clear (d, m);
 
     printf ("# TRACE:   Equivalent to Montgomery curve with:\n");
     montgomery_point_from_edwards_point (PM, P, 1, m);
-    ec_montgomery_curve_fprintf (stdout, "# TRACE:     ", A, PM, m);
+    montgomery_curve_fprintf (stdout, "# TRACE:     ", A, PM, m);
   }
   mod_clear (A, m);
   ec_point_clear (PM, m);
@@ -967,9 +979,9 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
 
   /* output is always in Montgomery form */
   if (plan->parameterization & FULLMONTY)
-    bytecode_prac_interpret_ec_montgomery (P, plan->bc, m, b);
+    bytecode_prac_interpret_montgomery (P, plan->bc, m, b);
   else if (plan->parameterization & FULLMONTYTWED)
-    bytecode_mishmash_interpret_ec_mixed_repr (P, plan->bc, m, b);
+    bytecode_mishmash_interpret_mixed_repr (P, plan->bc, m, b);
 
 #ifdef ECM_TRACE
   printf ("# TRACE: after stage 1 (without the powers of 2):\n");
@@ -1099,379 +1111,3 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
 
   return bt;
 }
-
-
-/* -------------------------------------------------------------------------- */
-
-/* Determine order of a point P on a curve, both defined by the parameter value
- * as in ECM.
- * If the group order is known to be == r (mod m), this can be supplied in
- * the variables "known_r" and" known_m".
- * Looks for i in Hasse interval so that i*P = O, has complexity O(m^(1/4)).
- * Assume:
- *  - m is prime
- *  - m fits in an unsigned long
- */
-
-unsigned long
-ell_pointorder (const unsigned long parameter,
-                const ec_parameterization_t parameterization,
-                const unsigned long known_m, const unsigned long known_r,
-                const modulus_t m, const int verbose)
-{
-  ec_point_t P, Pi, Pg, Q, *baby;
-  residue_t x, a, d;
-  unsigned long min, max, i, j, order, cof, p;
-  unsigned long giant_step, giant_min, baby_len;
-  modint_t tm;
-
-  ASSERT (known_r < known_m);
-
-  mod_init (a, m);
-  ec_point_init (P, m);
-
-  mod_intinit (tm);
-  mod_getmod_int (tm, m);
-
-  if (parameterization & FULLMONTY || parameterization == MONTYTWED12)
-  {
-    residue_t A, b;
-    int r = 1;
-
-    mod_init (b, m);
-    mod_init (A, m);
-
-    if (parameterization == BRENT12)
-      r = ec_parameterization_Brent_Suyama (b, P, parameter, m);
-    else if (parameterization == MONTY12)
-      r = ec_parameterization_Montgomery12 (b, P, parameter, m);
-    else if (parameterization == MONTY16)
-      r = ec_parameterization_Montgomery16 (b, P, parameter, m);
-    else /* if (parameterization == MONTYTWED12) */
-      r = ec_parameterization_Z6 (b, P, parameter, MONTGOMERY_xz, m);
-
-    if (r)
-    {
-      montgomery_A_from_b (A, b, m);
-
-      if (verbose >= 2)
-      {
-        printf ("%s: ", __func__);
-        ec_montgomery_curve_fprintf (stdout, NULL, A, P, m);
-      }
-
-      r = weierstrass_aff_from_montgomery (a, P, A, P, m);
-    }
-
-    mod_clear (b, m);
-    mod_clear (A, m);
-
-    if (r == 0)
-    {
-      mod_clear (a, m);
-      ec_point_clear (P, m);
-      mod_intclear (tm);
-      return 0UL;
-    }
-  }
-  else
-  {
-    fprintf (stderr, "%s: Unknown parameterization\n", __func__);
-    abort();
-  }
-
-  if (verbose >= 2)
-  {
-    printf ("%s: ", __func__);
-    ec_weierstrass_curve_fprintf (stdout, NULL, a, P, m);
-  }
-
-  mod_init (x, m);
-  mod_init (d, m);
-  ec_point_init (Pi, m);
-  ec_point_init (Pg, m);
-
-  /* FIXME deal with multiple precision modulus */
-  i = (unsigned long) (2. * sqrt((double) mod_intget_ul(tm)));
-  min = mod_intget_ul(tm) - i;
-  max = mod_intget_ul(tm) + i;
-
-  /* Giant steps visit values == r (mod m), baby steps values == 0 (mod m) */
-  giant_step = ceil(sqrt(2.*(double)i / (double) known_m));
-  /* Round up to multiple of m */
-  giant_step = ((giant_step - 1) / known_m + 1) * known_m;
-
-  /* We test Pi +- Pj, where Pi = (giant_min + i*giant_step), i >= 0,
-     and Pj = j*P, 0 <= j <= giant_step / 2.
-     To ensure we can find all values >= min, ensure
-     giant_min <= min + giant_step / 2.
-     We also want giant_min == r (mod m) */
-  giant_min = ((min + giant_step / 2) / known_m) * known_m + known_r;
-  if (giant_min > min + giant_step / 2)
-    giant_min -= known_m;
-  if (verbose >= 2)
-    printf ("known_m = %lu, known_r = %lu, giant_step = %lu, "
-            "giant_min = %lu\n", known_m, known_r, giant_step, giant_min);
-
-  baby_len = giant_step / known_m / 2 + 1;
-  baby = (ec_point_t *) malloc (baby_len * sizeof (ec_point_t));
-  for (i = 0; i < baby_len; i++)
-    ec_point_init (baby[i], m);
-
-  ec_point_set (Pg, P, m, SHORT_WEIERSTRASS_aff);
-  i = known_m;
-  if (weierstrass_aff_smul_ui (Pg, i, a, m) == 0) /* Pg = m*P for now */
-    goto found_inf;
-
-  if (1 < baby_len)
-    ec_point_set (baby[1], Pg, m, SHORT_WEIERSTRASS_aff);
-
-  if (2 < baby_len)
-    {
-      if (weierstrass_aff_dbl (Pi, Pg, a, m) == 0)
-        {
-          i = 2 * known_m;
-          goto found_inf;
-        }
-      ec_point_set (baby[2], Pi, m, SHORT_WEIERSTRASS_aff);
-    }
-
-  for (i = 3; i < baby_len; i++)
-    {
-      if (weierstrass_aff_add (Pi, Pi, Pg, a, m) == 0)
-        {
-          i *= known_m;
-          goto found_inf;
-        }
-      ec_point_set (baby[i], Pi, m, SHORT_WEIERSTRASS_aff);
-    }
-
-  /* Now compute the giant steps in [giant_min, giant_max] */
-  i = giant_step;
-  ec_point_set (Pg, P, m, SHORT_WEIERSTRASS_aff);
-  if (weierstrass_aff_smul_ui (Pg, i, a, m) == 0)
-    goto found_inf;
-
-  i = giant_min;
-  ec_point_set (Pi, P, m, SHORT_WEIERSTRASS_aff);
-  if (weierstrass_aff_smul_ui (Pi, i, a, m) == 0)
-    goto found_inf;
-
-  while (i <= max + giant_step - 1)
-    {
-      /* Compare x-coordinate with stored baby steps. This makes it
-         O(sqrt(p)) complexity, strictly speaking. */
-      for (j = 1; j < baby_len; j++)
-        if (mod_equal (Pi[0].x, baby[j]->x, m))
-          {
-            if (mod_equal (Pi[0].y, baby[j]->y, m))
-              i -= j * known_m; /* Equal, so iP = jP and (i-j)P = 0 */
-            else
-              {
-                mod_neg (Pi[0].y, Pi[0].y, m);
-                if (mod_equal (Pi[0].y, baby[j]->y, m))
-                  i += j * known_m; /* Negatives, so iP = -jP and (i+j)P = 0 */
-                else
-                  {
-                    fprintf (stderr, "Matching x-coordinates, but y neither "
-                             "equal nor negatives\n");
-                    abort();
-                  }
-              }
-            goto found_inf;
-          }
-
-      i += giant_step;
-      if (!weierstrass_aff_add (Pi, Pi, Pg, a, m))
-        goto found_inf;
-    }
-
-  if (i > max)
-  {
-      fprintf (stderr, "ec_order: Error, no match found for p = %lu, "
-               "min = %lu, max = %lu, giant_step = %lu, giant_min = %lu\n",
-               mod_intget_ul(tm), min, max, giant_step, giant_min);
-      abort ();
-  }
-
-found_inf:
-  /* Check that i is a multiple of the order */
-  ec_point_set (Pi, P, m, SHORT_WEIERSTRASS_aff);
-  if (weierstrass_aff_smul_ui (Pi, i, a, m) != 0)
-    {
-      modint_t tx1, ty1;
-      mod_intinit (tx1);
-      mod_intinit (ty1);
-      mod_get_int (tx1, P[0].x, m);
-      mod_get_int (ty1, P[0].y, m);
-#ifndef MODMPZ_MAXBITS
-      fprintf (stderr, "ec_order: Error, %ld*(%ld, %ld) (mod %ld) is "
-               "not the point at infinity\n",
-               i, tx1[0], ty1[0], tm[0]);
-#endif
-      mod_intclear (tx1);
-      mod_intclear (ty1);
-      return 0UL;
-    }
-
-  /* Ok, now we have some i so that ord(P) | i. Find ord(P).
-     We know that ord(P) > 1 since P is not at infinity */
-
-  /* For each prime factor of the order, reduce the exponent of
-     that prime factor as far as possible */
-
-  cof = order = i;
-  for (p = 2; p * p <= cof; p += 1 + p%2)
-    if (cof % p == 0)
-      {
-        ASSERT (order % p == 0);
-        /* Remove all factors of p */
-        for (order /= p, cof /= p; order % p == 0; order /= p)
-          {
-            ASSERT(cof % p == 0);
-            cof /= p;
-          }
-        ASSERT (cof % p != 0);
-
-        /* Add factors of p again one by one, stopping when we hit
-           point at infinity */
-        ec_point_set (Pi, P, m, SHORT_WEIERSTRASS_aff);
-        if (weierstrass_aff_smul_ui (Pi, order, a, m) != 0)
-          {
-            order *= p;
-            while (weierstrass_aff_smul_ui (Pi, p, a, m) != 0)
-              order *= p;
-          }
-      }
-  /* Now cof is 1 or a prime */
-  if (cof > 1)
-    {
-      ec_point_set (Pi, P, m, SHORT_WEIERSTRASS_aff);
-      ASSERT (order % cof == 0);
-      if (weierstrass_aff_smul_ui (Pi, order / cof, a, m) == 0)
-        order /= cof;
-    }
-
-
-  /* One last check that order divides real order */
-  ec_point_set (Pi, P, m, SHORT_WEIERSTRASS_aff);
-  if (weierstrass_aff_smul_ui (Pi, order, a, m) != 0)
-    {
-      modint_t tx1, ty1;
-      mod_intinit (tx1);
-      mod_intinit (ty1);
-      mod_get_int (tx1, P[0].x, m);
-      mod_get_int (ty1, P[0].y, m);
-      fprintf (stderr, "ec_order: Error, final order %ld is wrong\n",
-               order);
-      mod_intclear (tx1);
-      mod_intclear (ty1);
-      abort ();
-    }
-
-  for (i = 0; i < giant_step; i++)
-    ec_point_clear (baby[i], m);
-  free (baby);
-  baby = NULL;
-  mod_clear (x, m);
-  mod_clear (a, m);
-  mod_clear (d, m);
-  mod_intclear (tm);
-  ec_point_clear (P, m);
-  ec_point_clear (Pi, m);
-  ec_point_clear (Pg, m);
-  ec_point_clear (Q, m);
-
-  return order;
-}
-
-
-/* Count points on curve using the Jacobi symbol. This has complexity O(m). */
-
-unsigned long
-ellM_curveorder_jacobi (residue_t A, residue_t x, modulus_t m)
-{
-  residue_t t, one;
-  unsigned long order, i;
-  modint_t tm;
-  int bchar;
-
-  mod_init_noset0 (t, m);
-  mod_init_noset0 (one, m);
-  mod_set1 (one, m);
-
-  /* Compute x^3 + A*x^2 + x and see if it is a square */
-  mod_set (t, x, m);
-  mod_add (t, t, A, m);
-  mod_mul (t, t, x, m);
-  mod_add (t, t, one, m);
-  mod_mul (t, t, x, m);
-  bchar = mod_jacobi (t, m);
-  ASSERT (bchar != 0);
-
-  order = 2; /* One for (0, 0, 1), one for the point at infinity */
-  /* FIXME deal with multi-word modulus */
-  mod_getmod_int (tm, m);
-  for (i = 1; mod_intcmp_ul (tm, i) > 0; i++)
-    {
-      mod_set_ul (x, i, m);
-      mod_set (t, x, m);
-      mod_add (t, t, A, m);
-      mod_mul (t, t, x, m);
-      mod_add (t, t, one, m);
-      mod_mul (t, t, x, m);
-      if (bchar == 1)
-	order = order + (unsigned long) (1L + (long) mod_jacobi (t, m));
-      else
-	order = order + (unsigned long) (1L - (long) mod_jacobi (t, m));
-	/* Brackets put like this to avoid signedness warning */
-    }
-
-  mod_clear (one, m);
-  mod_clear (t, m);
-
-  return order;
-}
-
-unsigned long
-ell_curveorder (const ec_parameterization_t parameterization,
-                const unsigned long parameter, const unsigned long m_par)
-{
-  residue_t b, A;
-  modint_t lm;
-  modulus_t m;
-  unsigned long order;
-  ec_point_t P;
-
-  mod_init_noset0 (b, m);
-  mod_init_noset0 (A, m);
-  ec_point_init (P, m);
-
-  mod_intset_ul (lm, m_par);
-  mod_initmod_int (m, lm);
-
-  if (parameterization == BRENT12)
-  {
-    if (ec_parameterization_Brent_Suyama (b, P, parameter, m) == 0)
-      return 0UL;
-    montgomery_A_from_b (A, b, m);
-  }
-  else if (parameterization == MONTY12)
-  {
-    if (ec_parameterization_Montgomery12 (b, P, parameter, m) == 0)
-      return 0UL;
-    montgomery_A_from_b (A, b, m);
-  }
-  else
-  {
-    fprintf (stderr, "ec_curveorder: Unknown parameterization\n");
-    abort();
-  }
-  order = ellM_curveorder_jacobi (A, P->x, m);
-
-  mod_clear (b, m);
-  mod_clear (A, m);
-  ec_point_clear (P, m);
-  return order;
-}
-

@@ -1,7 +1,13 @@
+#ifndef EC_PARAMETERIZATION_H_
+#define EC_PARAMETERIZATION_H_
+
+#ifndef mod_init
+  #error "One of the mod*_default.h headers must be included before this file"
+#endif
+
 #include "ec_arith_common.h"
-#include "ec_arith_Edwards.h"
-#include "ec_arith_Montgomery.h"
 #include "ec_arith_Weierstrass.h"
+
 
 /******************************************************************************/
 /*********************** Brent--Suyama parameterization ***********************/
@@ -37,7 +43,7 @@
       (4*A*(x3/z3)^3+3*(x3/z3)^4+6*(x3/z3)^2-1).is_zero() # P3 of order 3 ?
  */
 
-
+#define ec_parameterization_Brent_Suyama_is_valid MOD_APPEND_TYPE(ec_parameterization_Brent_Suyama_is_valid)
 static inline int
 ec_parameterization_Brent_Suyama_is_valid (const unsigned long sigma)
 {
@@ -53,6 +59,7 @@ ec_parameterization_Brent_Suyama_is_valid (const unsigned long sigma)
  * For the computation, we only need b and the coordinates (x0::z0) of the
  * starting point.
  */
+#define ec_parameterization_Brent_Suyama MOD_APPEND_TYPE(ec_parameterization_Brent_Suyama)
 static int
 ec_parameterization_Brent_Suyama (residue_t b, ec_point_t P0,
                                   const unsigned long sigma, const modulus_t m)
@@ -153,6 +160,7 @@ ec_parameterization_Brent_Suyama (residue_t b, ec_point_t P0,
       # TODO check that 4*P12 is of order 3 and 3*P12 is of order 4
  */
 
+#define ec_parameterization_Montgomery12_is_valid MOD_APPEND_TYPE(ec_parameterization_Montgomery12_is_valid)
 static inline int
 ec_parameterization_Montgomery12_is_valid (const unsigned long k)
 {
@@ -168,6 +176,7 @@ ec_parameterization_Montgomery12_is_valid (const unsigned long k)
  * For the computation, we only need b and the coordinates (x0::z0) of the
  * starting point.
  */
+#define ec_parameterization_Montgomery12 MOD_APPEND_TYPE(ec_parameterization_Montgomery12)
 static int
 ec_parameterization_Montgomery12 (residue_t b, ec_point_t P0,
                                   const unsigned long k, const modulus_t m)
@@ -276,6 +285,7 @@ ec_parameterization_Montgomery12 (residue_t b, ec_point_t P0,
  */
 
 
+#define ec_parameterization_Montgomery16_is_valid MOD_APPEND_TYPE(ec_parameterization_Montgomery16_is_valid)
 static inline int
 ec_parameterization_Montgomery16_is_valid (const unsigned long k)
 {
@@ -286,6 +296,7 @@ ec_parameterization_Montgomery16_is_valid (const unsigned long k)
 }
 
 
+#define ec_parameterization_Montgomery16 MOD_APPEND_TYPE(ec_parameterization_Montgomery16)
 /* Return 1 if it worked, 0 if a modular inverse failed.
  * If modular inverse failed, return non-invertible value in P0->x.
  */
@@ -347,6 +358,7 @@ ec_parameterization_Montgomery16 (residue_t b, ec_point_t P0,
 /******************************************************************************/
 
 
+#define ec_parameterization_Z6_is_valid MOD_APPEND_TYPE(ec_parameterization_Z6_is_valid)
 static inline int
 ec_parameterization_Z6_is_valid (const unsigned long k)
 {
@@ -517,6 +529,7 @@ ec_parameterization_Z6_is_valid (const unsigned long k)
  * (xE0:yE0:zE0) (for Edwards projective) or (xM0::zM0) (for Montgomery) and
  * the curve coefficient b = (A+2)/4 (if b is not NULL).
  */
+#define ec_parameterization_Z6 MOD_APPEND_TYPE(ec_parameterization_Z6)
 static int
 ec_parameterization_Z6 (residue_t b, ec_point_t P0, const unsigned long k,
                         ec_point_coord_type_t coord, const modulus_t m)
@@ -682,23 +695,4 @@ ec_parameterization_Z6 (residue_t b, ec_point_t P0, const unsigned long k,
   return ret;
 }
 
-int
-ec_parameter_is_valid (ec_parameterization_t parameterization,
-                       const unsigned long parameter)
-{
-  switch (parameterization)
-  {
-    case BRENT12:
-      return ec_parameterization_Brent_Suyama_is_valid (parameter);
-    case MONTY12:
-      return ec_parameterization_Montgomery12_is_valid (parameter);
-    case MONTY16:
-      return ec_parameterization_Montgomery16_is_valid (parameter);
-    case MONTYTWED12:
-      return ec_parameterization_Z6_is_valid (parameter);
-    default:
-      printf ("Fatal error in %s at %s:%d -- unknown parameterization %u\n",
-              __func__, __FILE__, __LINE__, parameterization);
-      abort ();
-  }
-}
+#endif /* EC_PARAMETERIZATION_H_ */

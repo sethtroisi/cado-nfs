@@ -1,5 +1,9 @@
-#ifndef _EC_ARITH_MONTGOMERY_H_
-#define _EC_ARITH_MONTGOMERY_H_
+#ifndef EC_ARITH_MONTGOMERY_H_
+#define EC_ARITH_MONTGOMERY_H_
+
+#ifndef mod_init
+  #error "One of the mod*_default.h headers must be included before this file"
+#endif
 
 #include "ec_arith_common.h"
 
@@ -11,22 +15,17 @@ static unsigned int _count_montgomery_dadd, _count_montgomery_dbl;
     } while (0)
 #endif
 
-/************************ Montgomery elliptic curves **************************/
-
-/* Equation:
+/* Montgomery elliptic curves
+ *
+ * XZ-only coordinates, with equation:
  *    B*Y^2*Z = X^3 + A*X^2*Z + X*Z^2
  *
  * Constant needed in computation: b = (A+2)/4
  *
- * Implemented functions:
- *   - montgomery_dadd (R:MONTGOMERY_xz, P:MONTGOMERY_xz, Q:MONTGOMERY_xz,
- *                                                              D:MONTGOMERY_xz)
- *        R <- P+Q (where D=P-Q)
- *   - montgomery_dbl (R:MONTGOMERY_xz, P:MONTGOMERY_xz)
- *        R <- 2*P
  */
 
 /* Compute A = 4*b-2. A and b can be the same variable. */
+#define montgomery_A_from_b MOD_APPEND_TYPE(montgomery_A_from_b)
 static inline void
 montgomery_A_from_b (residue_t A, const residue_t b, const modulus_t m)
 {
@@ -35,6 +34,31 @@ montgomery_A_from_b (residue_t A, const residue_t b, const modulus_t m)
   mod_sub_ul (A, A, 2, m); /* A <- 4b-2 */
 }
 
+#define montgomery_curve_fprintf MOD_APPEND_TYPE(montgomery_curve_fprintf)
+static inline void
+montgomery_curve_fprintf (FILE *out, const char *prefix, residue_t A,
+                          ec_point_t P, const modulus_t m)
+{
+  modint_t cc;
+  const char *pre = (prefix == NULL) ? "" : prefix;
+
+  mod_intinit (cc);
+  mod_get_int (cc, A, m);
+
+  mod_fprintf (out, "%sMontgomery curve: B*Y^2 = X^3 + A*X^2*Z + X*Z^2\n"
+                    "%sA = 0x%" PRIMODx "\n", pre, pre, MOD_PRINT_INT (cc));
+
+  mod_intclear (cc);
+
+  if (P)
+  {
+    fprintf (out, "%swith point (X::Z) = ", pre);
+    ec_point_fprintf (out, P, MONTGOMERY_xz, m);
+    fputc ('\n', out);
+  }
+}
+
+/* Set P to zero (the neutral point): (0::0) */
 static inline void
 montgomery_point_set_zero (ec_point_t P, const modulus_t m)
 {
@@ -42,7 +66,12 @@ montgomery_point_set_zero (ec_point_t P, const modulus_t m)
   mod_set0 (P->z, m);
 }
 
-/* P and Q can be the same variables */
+/* Set Q to the same point as P but with z = 1.
+ * Return 1 if it worked, 0 if the computation of the modular inverse of P->z
+ * failed.
+ * P and Q can be the same variables
+ */
+#define montgomery_point_to_affine MOD_APPEND_TYPE(montgomery_point_to_affine)
 static inline int
 montgomery_point_to_affine (ec_point_t Q, ec_point_t P, const modulus_t m)
 {
@@ -60,6 +89,8 @@ montgomery_point_to_affine (ec_point_t Q, ec_point_t P, const modulus_t m)
   return ret;
 }
 
+/* Convert the point P in affine before printing it (mostly used for debug) */
+#define montgomery_point_fprintf_affine MOD_APPEND_TYPE(montgomery_point_fprintf_affine)
 static inline void
 montgomery_point_fprintf_affine (FILE *out, ec_point_t P, const modulus_t m)
 {
@@ -73,6 +104,7 @@ montgomery_point_fprintf_affine (FILE *out, ec_point_t P, const modulus_t m)
   ec_point_clear (Paff, m);
 }
 
+#define montgomery_point_from_edwards_point MOD_APPEND_TYPE(montgomery_point_from_edwards_point)
 static inline void
 montgomery_point_from_edwards_point (ec_point_t PM, ec_point_t PE, int out_aff,
                                      const modulus_t m)
@@ -83,11 +115,13 @@ montgomery_point_from_edwards_point (ec_point_t PM, ec_point_t PE, int out_aff,
     montgomery_point_to_affine (PM, PM, m);
 }
 
-/* Computes Q=2P, with 5 muls (3 muls and 2 squares) and 4 add/sub.
- *    - m : modulus
- *    - b = (A+2)/4 mod m
+/* montgomery_dbl (Q, P)
+ *     Q <- 2*P
  * It is permissible to let P and Q use the same memory.
+ * Cost:
+ *    3M + 2S + 4add/sub
  */
+#define montgomery_dbl MOD_APPEND_TYPE(montgomery_dbl)
 static inline void
 montgomery_dbl (ec_point_t Q, const ec_point_t P, const modulus_t m,
              const residue_t b)
@@ -130,15 +164,16 @@ montgomery_dbl (ec_point_t Q, const ec_point_t P, const modulus_t m,
 }
 
 
-/* adds P and Q and puts the result in R,
- * using 6 muls (4 muls and 2 squares), and 6 add/sub.
- * One assumes that Q-R=D or R-Q=D.
+/* montgomery_dadd (R, P, Q, D)
+ *     R <- P+Q with D=P-Q or D=Q-P
+ * R may be identical to P, Q and/or D.
  * This function assumes that P !~= Q, i.e. that there is
  * no t!=0 so that P->x = t*Q->x and P->z = t*Q->z, for otherwise the result
  * is (0:0) although it shouldn't be (which actually is good for factoring!).
- *
- * R may be identical to P, Q and/or D.
+ * Cost:
+ *    4M + 2S + 6add/sub
  */
+#define montgomery_dadd MOD_APPEND_TYPE(montgomery_dadd)
 static inline void
 montgomery_dadd (ec_point_t R, const ec_point_t P, const ec_point_t Q,
           const ec_point_t D, MAYBE_UNUSED const residue_t b,
@@ -213,7 +248,9 @@ montgomery_dadd (ec_point_t R, const ec_point_t P, const ec_point_t Q,
 }
 
 
+// TODO rewrite so it can output eP and (e+1)P at the same time
 /* (x:z) <- e*(x:z) (mod p) */
+#define montgomery_smul_ui MOD_APPEND_TYPE(montgomery_smul_ui)
 static inline void
 montgomery_smul_ui (ec_point_t R, const ec_point_t P, unsigned long e,
 		    const modulus_t m, const residue_t b)
@@ -290,4 +327,78 @@ montgomery_smul_ui (ec_point_t R, const ec_point_t P, unsigned long e,
   ec_point_clear (t2, m);
 }
 
-#endif /* _EC_ARITH_MONTGOMERY_H_ */
+/* Return the order of a Mongomery curve, using the Jacobi symbol.
+ * The curve is described by the curve coefficient A and a point P (which gives
+ * the Jacobi symbol of the curve coefficient B).
+ * P must not be a point of order 2 and P->z must be invertible modulo m.
+ * This has complexity O(m).
+ * This function only works for _ul arithmetic, so only the _ul version is
+ * defined. Do we need the others versions (_15ul, _2ul2, _mpz) ? Not really,
+ * because due to the complexity of this function, it will be too expensive to
+ * use it with large value of m.
+ */
+#if defined(MOD_SIZE) && MOD_SIZE == 1
+#define montgomery_curve_order MOD_APPEND_TYPE(montgomery_curve_order)
+static inline unsigned long
+montgomery_curve_order (residue_t A, ec_point_t P, const modulus_t m)
+{
+  residue_t x, t, one;
+  unsigned long order, i;
+  modint_t tm;
+  int bchar;
+
+  /* Compute x = P->x/P->z mod m */
+  mod_init_noset0 (x, m);
+
+  int ret = mod_inv (x, P->z, m);
+  if (ret)
+    mod_mul (x, x, P->x, m);
+  else
+  {
+    mod_clear (x, m);
+    return 0UL;
+  }
+
+  mod_init_noset0 (t, m);
+  mod_init_noset0 (one, m);
+  mod_set1 (one, m);
+  mod_intinit (tm);
+
+
+  /* Compute x^3 + A*x^2 + x and see if it is a square */
+  mod_set (t, x, m);
+  mod_add (t, t, A, m);
+  mod_mul (t, t, x, m);
+  mod_add (t, t, one, m);
+  mod_mul (t, t, x, m);
+  bchar = mod_jacobi (t, m);
+  ASSERT (bchar != 0);
+
+  order = 2; /* One for (0, 0, 1), one for the point at infinity */
+  mod_getmod_int (tm, m);
+  /* XXX Here we assume m fits in an unsigned long (or the loop never stops) */
+  for (i = 1; mod_intcmp_ul (tm, i) > 0; i++)
+  {
+    mod_set_ul (x, i, m);
+    mod_set (t, x, m);
+    mod_add (t, t, A, m);
+    mod_mul (t, t, x, m);
+    mod_add (t, t, one, m);
+    mod_mul (t, t, x, m);
+    if (bchar == 1)
+      order = order + (unsigned long) (1L + (long) mod_jacobi (t, m));
+    else
+      order = order + (unsigned long) (1L - (long) mod_jacobi (t, m));
+      /* Brackets put like this to avoid signedness warning */
+  }
+
+  mod_intclear (tm);
+  mod_clear (one, m);
+  mod_clear (t, m);
+  mod_clear (x, m);
+
+  return order;
+}
+#endif /* defined(MOD_SIZE) && MOD_SIZE == 1 */
+
+#endif /* EC_ARITH_MONTGOMERY_H_ */
