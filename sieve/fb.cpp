@@ -710,6 +710,7 @@ struct helper_functor_dispatch_small_sieved_primes {
 
 struct helper_functor_subdivide_slices {
     fb_factorbase::slicing::part & dst;
+    int part_index;
     fb_factorbase::key_type K;
     slice_index_t index;
     // helper_functor_subdivide_slices(fb_factorbase::slicing::part & dst, fb_factorbase::key_type const & K) : dst(dst), K(K), index(0) {}
@@ -747,7 +748,7 @@ struct helper_functor_subdivide_slices {
             std::ostringstream n_eq;
             n_eq << "n=";
             if (n < 0) n_eq << "*"; else n_eq << n;
-            verbose_output_print (0, 2, "# slices for %s roots: from %zu entries, we found %zu different logp values\n", n_eq.str().c_str(), interval_width, pool.size());
+            verbose_output_print (0, 2, "# slices for part %d, %s roots: from %zu entries, we found %zu different logp values\n", part_index, n_eq.str().c_str(), interval_width, pool.size());
             for(auto const & s : pool) {
                 verbose_output_print (0, 2, "#  %s logp=%d: %zu entries, weight=%f\n",
                         n_eq.str().c_str(),
@@ -837,7 +838,7 @@ fb_factorbase::slicing::slicing(fb_factorbase const & fb, fb_factorbase::key_typ
      */
     slice_index_t s = 0;
     for (int i = 1; i < FB_MAX_PARTS; i++) {
-        multityped_array_foreach(helper_functor_subdivide_slices { parts[i], K, s }, D.intervals[i]);
+        multityped_array_foreach(helper_functor_subdivide_slices { parts[i], i, K, s }, D.intervals[i]);
         s += parts[i].nslices();
     }
 
