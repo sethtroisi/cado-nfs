@@ -112,14 +112,31 @@ class mmappable_vector: public std::vector<T, A> {
             munmap();
             a = A();
         }
+        void swap(mmappable_vector<T,A> & __x) {
+            /* /usr/include/c++/7/bits/stl_vector.h:103:
+             * std::_Vector_base<T,A>::_M_swap_data does not seem to do
+             * anything about the data fields of the allocator. IDK if
+             * it's a bug or a feature, but that sounds definitely
+             * worrisome.
+             */
+#ifdef __GLIBC__
+            A & a(Base::_M_get_Tp_allocator());
+            std::swap(a, (A&) __x._M_get_Tp_allocator());
+            std::swap(Base::_M_impl._M_start, __x._M_impl._M_start);
+            std::swap(Base::_M_impl._M_finish, __x._M_impl._M_finish);
+            std::swap(Base::_M_impl._M_end_of_storage, __x._M_impl._M_end_of_storage);
+#else
+#error "Not GNU libstdc++, please expand code"
+#endif
+        }
+
 };
 
 
 template <typename T, typename A>
 void swap(mmappable_vector<T,A> & a, mmappable_vector<T,A> & b)
 {
-    typedef typename mmappable_vector<T,A>::Base Base;
-    std::swap((Base&)a, (Base&)b);
+    a.swap(b);
 }
 
 #endif /* MMAPPABLE_VECTOR_HPP_ */

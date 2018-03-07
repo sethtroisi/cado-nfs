@@ -585,7 +585,15 @@ struct fb_factorbase::helper_functor_append {
                 fb_entry_general E = std::move(*it);
                 /* see above */
                 ASSERT(E.nr_roots > 0 && E.nr_roots <= deg);
+                /* why E.nr_roots == deg-1 ? Because it *can* happen,
+                 * really. Archetypal case is x^2-2 at 0 mod 2: there's a
+                 * double root, yet the valuation reaches 1, not more.
+                 * Because we're ramifying, that's it.
+                 * 
+                 * (on the rsa155 polynomial, this happens mod 11 and 43).
+                 */
                 bool must_go_to_general = !E.is_simple() || E.k > 1
+                    || E.nr_roots == (deg-1)
                     /* || E.q < powlim TODO */;
 
                 bool ok1 = isG && must_go_to_general;
@@ -982,13 +990,9 @@ void fb_factorbase::make_linear ()
     std::vector<fb_power_t> powers(fb_powers(powlim));
     size_t next_pow = 0;
 
-    std::string polystring = poly.print_poly("x");
-
     verbose_output_print(0, 1,
-            "# Making factor base for polynomial g(x) = %s,\n"
-            "# including primes up to %lu"
-            " and prime powers up to %lu.\n",
-            polystring.c_str(), lim, powlim);
+            "# including primes up to %lu and prime powers up to %lu.\n",
+            lim, powlim);
 
     prime_info(pi);
 
@@ -1133,14 +1137,10 @@ void fb_factorbase::make_linear_threadpool (unsigned int nb_threads)
     std::vector<fb_power_t> powers(fb_powers(powlim));
     size_t next_pow = 0;
 
-    std::string polystring = poly.print_poly("x");
-
     verbose_output_print(0, 1,
-            "# Making factor base for polynomial g(x) = %s,\n"
-            "# including primes up to %lu"
-            " and prime powers up to %lu"
+            "# including primes up to %lu and prime powers up to %lu"
             " using threadpool of %u threads.\n",
-            polystring.c_str(), lim, powlim, nb_threads);
+            lim, powlim, nb_threads);
 
 #define MARGIN 3
     // Prepare more tasks, so that threads keep being busy.
@@ -1325,58 +1325,10 @@ fb_factorbase::read(const char * const filename)
 }
 
 
-/*  Factor base handling */
-fb_factorbase::fb_factorbase(cxx_cado_poly const & cpoly, int side, unsigned long lim, unsigned long powlim, cxx_param_list & pl) : f(cpoly->pols[side]), side(side), lim(lim), powlim(powlim)
-{
-    char paramname[5];
-
-    if (!lim) return;
-
-    cxx_mpz_poly pol;
-    mpz_poly_set(pol, cpoly->pols[side]);
-
-    if (pol->deg > 1) {
-        double tfb = seconds ();
-        double tfb_wct = wct_seconds ();
-        std::string polystring = pol.print_poly("x");
-        verbose_output_print(0, 1,
-                "# Reading side-%d factor base from disk"
-                " for polynomial f%d(x) = %s\n",
-                side, side, polystring.c_str());
-        snprintf(paramname, sizeof(paramname), "fb%d", side);
-        const char * fbfilename = param_list_lookup_string(pl, paramname);
-        if (!fbfilename) {
-            fprintf(stderr, "Error: factor base file for side %d is not given\n", side);
-            exit(EXIT_FAILURE);
-        }
-        verbose_output_print(0, 1, "# Reading side-%d factor base from %s\n", side, fbfilename);
-        if (!read(fbfilename))
-            exit(EXIT_FAILURE);
-        tfb = seconds () - tfb;
-        tfb_wct = wct_seconds () - tfb_wct;
-        verbose_output_print(0, 1,
-                "# Reading side-%d factor base took %1.1fs (%1.1fs real)\n",
-                side, tfb, tfb_wct);
-    } else {
-        double tfb = seconds ();
-        double tfb_wct = wct_seconds ();
-        /* note: we parse again the -t option here -- it gets parsed
-         * in the las_info ctor too */
-        int nb_threads = 1;		/* default value */
-        param_list_parse_int(pl, "t", &nb_threads);
-        make_linear_threadpool (nb_threads);
-        tfb = seconds () - tfb;
-        tfb_wct = wct_seconds() - tfb_wct;
-        verbose_output_print(0, 1,
-                "# Creating side-%d rational factor base took %1.1fs (%1.1fs real)\n",
-                side, tfb, tfb_wct);
-    }
-}
-
 /* We now require the glibc in order to do factor base caching, because
  * we prefer to rely on mmap-able vectors that subclass the standard
  * library ones */
-#ifdef HAVE_GLIBC_VECTOR_INTERNALS
+
 /* (desired) structure of the factor base cache header block (ascii, 4096
  * bytes).
  *
@@ -1409,78 +1361,82 @@ fb_factorbase::fb_factorbase(cxx_cado_poly const & cpoly, int side, unsigned lon
 struct fbc_header {
     static const int current_version = 1;
     static const size_t header_block_size = 4096;
-    struct side_info {
-        int version;
-        size_t base_offset;     /* offset to beginning of file of the
-                                   corresponding header block (add 4096 to
-                                   get the offset to the data block) */
-        size_t size;            /* size in bytes of header + data blocks
-        */
-        int degree;
-        cxx_mpz_poly f;
-        unsigned long lim;
-        unsigned long powlim;
-        struct entryvec {
-            size_t offset;      /* offset to beginning of file */
-            size_t nentries;
-            size_t entry_size;
-            std::istream& parse(std::istream& in) {
-                in >> offset >> nentries >> entry_size;
-                return in;
-            }
-            std::ostream& print(std::ostream& out) const {
-                out << offset << " " << nentries << " " << entry_size << "\n";
-                return out;
-            }
-        };
-        std::vector<entryvec> entries;
-        std::istream& parse(std::istream& in, size_t header_offset = 0) {
-            in >> version;
-            if (!in) return in;
-            if (version != current_version)
-                throw std::runtime_error("fbc version mismatch");
-            base_offset = 0;
-            in >> size >> degree >> f >> lim >> powlim;
-            if (!in) return in;
-            for(int s = -1 ; s <= mpz_poly_degree(f) ; s++) {
-                entryvec e;
-                if (!e.parse(in)) return in;
-                entries.push_back(e);
-            }
-            adjust_header_offset(header_offset);
+    int version;
+    size_t base_offset = 0; /* offset to beginning of file of the
+                               corresponding header block (add 4096 to
+                               get the offset to the data block) */
+    size_t size = 0;        /* size in bytes of header + data blocks
+    */
+    int degree = -1;
+    cxx_mpz_poly f;
+    unsigned long lim = 0;
+    unsigned long powlim = 0;
+    fbc_header() = default;
+    fbc_header(cxx_mpz_poly const &f, unsigned long lim, long powlim) :
+        version(current_version), degree(f->deg), f(f), lim(lim), powlim(powlim) {}
+    operator bool() const { return f->deg >= 1; }
+    struct entryvec {
+        size_t offset;      /* offset to beginning of file */
+        size_t nentries;
+        size_t entry_size;
+        std::istream& parse(std::istream& in) {
+            in >> offset >> nentries >> entry_size;
             return in;
         }
         std::ostream& print(std::ostream& out) const {
-            out << version << "\n"
-                << size << "\n"
-                << f->deg << "\n"
-                << f << "\n"
-                << lim << "\n"
-                << powlim << "\n";
-            if (!out) return out;
-            for(auto e : entries) {
-                /* copy by value because we want a relative offset here */
-                e.offset -= base_offset;
-                if (!e.print(out)) return out;
-            }
+            out << offset << " " << nentries << " " << entry_size << "\n";
             return out;
         }
-        void adjust_header_offset(size_t header_offset) {
-            for(auto & e : entries)
-                e.offset = e.offset + header_offset - base_offset;
-            base_offset = header_offset;
-        }
     };
-    std::vector<side_info> sides;
+    std::vector<entryvec> entries;
+    std::istream& parse(std::istream& in) {
+        in >> version;
+        if (!in) return in;
+        if (version != current_version)
+            throw std::runtime_error("fbc version mismatch");
+        base_offset = 0;
+        in >> size >> degree;
+        if (!in) return in;
+        in >> f;
+        if (!in) return in;
+        in >> lim >> powlim;
+        if (!in) return in;
+        for(int s = -1 ; s <= mpz_poly_degree(f) ; s++) {
+            entryvec e;
+            if (!e.parse(in)) return in;
+            entries.push_back(e);
+        }
+        return in;
+    }
+    std::ostream& print(std::ostream& out) const {
+        out << version << "\n"
+            << size << "\n"
+            << f->deg << "\n"
+            << f << "\n"
+            << lim << "\n"
+            << powlim << "\n";
+        if (!out) return out;
+        for(auto e : entries) {
+            /* copy by value because we want a relative offset here */
+            e.offset -= base_offset;
+            if (!e.print(out)) return out;
+        }
+        return out;
+    }
+    void adjust_header_offset(size_t header_offset) {
+        for(auto & e : entries)
+            e.offset = e.offset + header_offset - base_offset;
+        base_offset = header_offset;
+    }
 };
-std::istream& operator>>(std::istream& in, fbc_header::side_info & si)
+std::istream& operator>>(std::istream& in, fbc_header & hdr)
 {
-    return si.parse(in);
+    return hdr.parse(in);
 }
 
-std::ostream& operator<<(std::ostream& out, fbc_header::side_info const & si)
+std::ostream& operator<<(std::ostream& out, fbc_header const & hdr)
 {
-    return si.print(out);
+    return hdr.print(out);
 }
 
 
@@ -1497,19 +1453,57 @@ struct imemstream: virtual membuf, std::istream {
         , std::istream(static_cast<std::streambuf*>(this)) {
     }
 };
-#endif
 
-#ifndef HAVE_GLIBC_VECTOR_INTERNALS
-fb_factorbase::fb_factorbase(cxx_cado_poly const &, int, unsigned long, unsigned long, const char * fbc_filename) {
-        fprintf(stderr, "Fatal error: cannot use cache file %s -- support code missing\n", fbc_filename);
-        exit(EXIT_FAILURE);
+fbc_header find_fbc_header_block_for_poly(const char * fbc_filename, cxx_mpz_poly const & f, unsigned long lim, unsigned long powlim, int side)
+{
+    /* The cached file header must absolutely be seekable (asking it to
+     * be mmap-able is anyway an even stricter requirement as far as I
+     * can tell).
+     */
+    if (!fbc_filename) return fbc_header();
+    int fbc = open(fbc_filename, O_RDONLY);
+    if (fbc < 0) return fbc_header();
+
+    size_t fbc_size = lseek(fbc,0,SEEK_END);
+
+    for(size_t header_offset = 0, index = 0 ; header_offset != fbc_size ; index++) {
+        /* Read header block starting at position "header_offset" */
+        std::vector<char> area(fbc_header::header_block_size);
+        int rc = lseek(fbc, header_offset, SEEK_SET);
+        ASSERT_ALWAYS(rc >= 0);
+        int nr = ::read(fbc, &area.front(), area.size());
+        ASSERT_ALWAYS(nr >= 0 && (size_t) nr == area.size());
+        imemstream is(&area.front(), area.size());
+        fbc_header hdr;
+        ASSERT_ALWAYS(is >> hdr);
+        hdr.adjust_header_offset(header_offset);
+        header_offset += hdr.size;
+
+        if (mpz_poly_cmp(hdr.f, f) != 0) continue;
+        if (hdr.lim != lim) {
+            fprintf(stderr, "Note: cached factor base number %zu in file %s skipped because not consistent with lim%d=%lu\n", index, fbc_filename, side, lim);
+            continue;
+        }
+        if (hdr.powlim != powlim) {
+            fprintf(stderr, "Note: cached factor base number %zu in file %s skipped because not consistent with powlim%d=%lu\n", index, fbc_filename, side, lim);
+            continue;
+        }
+
+        verbose_output_print(0, 1,
+                "# Reading side-%d factor base via mmap() from block %zu in %s, (offset %zu, size %zu)\n",
+                side, index, fbc_filename, hdr.base_offset, hdr.size);
+        close(fbc);
+        return hdr;
+    }
+    verbose_output_print(0, 1, "# cannot find cached factor base for side %d in file %s (will recreate)\n", side, fbc_filename);
+    close(fbc);
+    return fbc_header();
 }
-#endif
 
 #ifdef HAVE_GLIBC_VECTOR_INTERNALS
 struct helper_functor_reseat_mmapped_chunks {
-    std::vector<fbc_header::side_info::entryvec> const & chunks;
-    std::vector<fbc_header::side_info::entryvec>::const_iterator next;
+    std::vector<fbc_header::entryvec> const & chunks;
+    std::vector<fbc_header::entryvec>::const_iterator next;
     mmap_allocator_details::mmapped_file & source;
     template<typename T>
         void operator()(T & x) {
@@ -1525,70 +1519,8 @@ struct helper_functor_reseat_mmapped_chunks {
         }
 };
 
-fb_factorbase::fb_factorbase(cxx_cado_poly const & cpoly, int side, unsigned long lim, unsigned long powlim, const char * fbc_filename) : f(cpoly->pols[side]), side(side), lim(lim), powlim(powlim)
-{
-    /* First use standard I/O to read the cached file header.
-     *
-     * The cached file header must absolutely be seekable (asking it to
-     * be mmap-able is anyway an even stricter requirement as far as I
-     * can tell).
-     */
-    int fbc = open(fbc_filename, O_RDONLY);
-    ASSERT_ALWAYS(fbc);
-
-    fbc_header hdr;
-
-    size_t fbc_size = lseek(fbc,0,SEEK_END);
-
-    for(size_t header_offset = 0 ; header_offset != fbc_size ; ) {
-        /* Read header block starting at position "header_offset" */
-        std::vector<char> area(fbc_header::header_block_size);
-        int rc = lseek(fbc, header_offset, SEEK_SET);
-        ASSERT_ALWAYS(rc >= 0);
-        int nr = ::read(fbc, &area.front(), area.size());
-        ASSERT_ALWAYS(nr == sizeof(area.size()));
-        imemstream is(&area.front(), area.size());
-        fbc_header::side_info si;
-        ASSERT_ALWAYS(si.parse(is, header_offset));
-        header_offset += si.size;
-        hdr.sides.push_back(si);
-    }
-
-    /* find the block for the current polynomial in the fbc file */
-    int block_index_in_file = -1;
-    for(auto const & block : hdr.sides) {
-        int index = (&block - &hdr.sides.front());
-        if (mpz_poly_cmp(block.f, f) != 0) continue;
-        if (block.lim != lim) {
-            fprintf(stderr, "Note: cached factor base number %d in file %s skipped because not consistent with lim%d=%lu\n", index, fbc_filename, side, lim);
-            continue;
-        }
-        if (block.powlim != powlim) {
-            fprintf(stderr, "Note: cached factor base number %d in file %s skipped because not consistent with powlim%d=%lu\n", index, fbc_filename, side, lim);
-            continue;
-        }
-        block_index_in_file = index;
-        break;
-    }
-    if (block_index_in_file < 0) {
-        fprintf(stderr, "Fatal error: cannot find cached factor base for side %d in file %s\n", side, fbc_filename);
-        exit(EXIT_FAILURE);
-    }
-    close(fbc);
-
-
-    /* Now do the mmapping ! */
-    auto const & block (hdr.sides[block_index_in_file]);
-    verbose_output_print(0, 1,
-            "# Reading side-%d factor base via mmap() from block %d in %s, (offset %zu, size %zu)\n",
-            side, block_index_in_file, fbc_filename, block.base_offset, block.size);
-    using namespace mmap_allocator_details;
-    mmapped_file source(fbc_filename, mmap_allocator_details::READ_ONLY, block.base_offset, block.size);
-    multityped_array_foreach(helper_functor_reseat_mmapped_chunks { block.entries, block.entries.begin(), source}, entries);
-}
-
 struct helper_functor_recreate_fbc_header {
-    fbc_header::side_info & block;
+    fbc_header & block;
     size_t current_offset;
     template<typename T>
         void operator()(T & x) {
@@ -1602,7 +1534,7 @@ struct helper_functor_recreate_fbc_header {
                 ASSERT_ALWAYS(x.empty());
                 return;
             }
-            fbc_header::side_info::entryvec e {
+            fbc_header::entryvec e {
                     current_offset,
                     x.size(),
                     sizeof(FB_ENTRY_TYPE)
@@ -1615,14 +1547,13 @@ struct helper_functor_recreate_fbc_header {
             mem_size = ((mem_size - 1) | 63) + 1;
             current_offset += mem_size;
         }
-
 };
 
 struct helper_functor_write_to_fbc_file {
     int fbc;
     size_t header_block_offset;
-    std::vector<fbc_header::side_info::entryvec> const & chunks;
-    std::vector<fbc_header::side_info::entryvec>::const_iterator next;
+    std::vector<fbc_header::entryvec> const & chunks;
+    std::vector<fbc_header::entryvec>::const_iterator next;
     template<typename T>
         void operator()(T & x) {
             typedef typename T::value_type FB_ENTRY_TYPE;
@@ -1634,54 +1565,142 @@ struct helper_functor_write_to_fbc_file {
             ::write(fbc, &x.front(), sizeof(FB_ENTRY_TYPE) * x.size());
             next++;
         }
-
 };
 
-void fb_factorbase::save_fbc(const char * fbc_filename) const
+#endif
+
+fb_factorbase::fb_factorbase(cxx_cado_poly const & cpoly, int side, unsigned long lim, unsigned long powlim, cxx_param_list & pl, const char * fbc_filename) : f(cpoly->pols[side]), side(side), lim(lim), powlim(powlim)
 {
-    /* We have a complete factor base prepared. We must first re-create
-     * the header.
-     */
-    fbc_header::side_info S { fbc_header::current_version, 0, 0, f->deg, f, lim, powlim, {} }; 
+    if (!lim) return;
 
-    helper_functor_recreate_fbc_header R { S, fbc_header::header_block_size };
-    multityped_array_foreach(R, entries);
-    /* This must be aligned to a page size */
-    S.size = ((R.current_offset - 1) | (sysconf(_SC_PAGE_SIZE) -1)) + 1;
+    double tfb = seconds ();
+    double tfb_wct = wct_seconds ();
+    std::string polystring = f.print_poly("x");
 
-    /* Next, we must append it to the cache file */
 
-    int fbc = open(fbc_filename, O_RDWR | O_CREAT, 0666);
-    ASSERT_ALWAYS(fbc >= 0);
+    fbc_header hdr;
+#ifdef HAVE_GLIBC_VECTOR_INTERNALS
+    /* First use standard I/O to read the cached file header. */
+    hdr = find_fbc_header_block_for_poly(fbc_filename, f, lim, powlim, side);
+    if (hdr) {
+        verbose_output_print(0, 1,
+                "# Reading side-%d factor base from cache %s"
+                " for polynomial f%d(x) = %s\n",
+                side, fbc_filename, side, polystring.c_str());
+        /* Now do the mmapping ! */
+        using namespace mmap_allocator_details;
+        mmapped_file source(fbc_filename, mmap_allocator_details::READ_ONLY, hdr.base_offset, hdr.size);
+        multityped_array_foreach(helper_functor_reseat_mmapped_chunks { hdr.entries, hdr.entries.begin(), source}, entries);
 
-    size_t fbc_size = lseek(fbc, 0, SEEK_END);
-
-    if ((fbc_size & (sysconf(_SC_PAGE_SIZE) - 1)) != 0) {
-        fprintf(stderr, "Fatal error: existing cache file %s is not page-aligned\n", fbc_filename);
+        tfb = seconds () - tfb;
+        tfb_wct = wct_seconds () - tfb_wct;
+        verbose_output_print(0, 1,
+                "# Reading side-%d factor base took %1.1fs (%1.1fs real)\n",
+                side, tfb, tfb_wct);
+        return;
+    }
+#else
+    if (fbc_filename) {
+        fprintf(stderr, "factor base cache not available with your libstdc++ library, sorry.\n");
         exit(EXIT_FAILURE);
     }
+#endif
 
-    std::ostringstream os;
-    os << S;
-    os << "\n\n\n\n\n"; /* a convenience so that "head" displays the header */
-    if (os.str().size() > fbc_header::header_block_size) {
-        fprintf(stderr, "Fatal error: header doesn't fit (contents follow):\n%s\n", os.str().c_str());
-        exit(EXIT_FAILURE);
+    /* compute, or maybe read the factor base from the ascii file */
+    {
+        char paramname[5];
+
+        if (f->deg > 1) {
+            verbose_output_print(0, 1,
+                    "# Reading side-%d factor base from disk"
+                    " for polynomial f%d(x) = %s\n",
+                    side, side, polystring.c_str());
+            snprintf(paramname, sizeof(paramname), "fb%d", side);
+            const char * fbfilename = param_list_lookup_string(pl, paramname);
+            if (!fbfilename) {
+                fprintf(stderr, "Error: factor base file for side %d is not given\n", side);
+                exit(EXIT_FAILURE);
+            }
+            verbose_output_print(0, 1, "# Reading side-%d factor base from %s\n", side, fbfilename);
+            if (!read(fbfilename))
+                exit(EXIT_FAILURE);
+            tfb = seconds () - tfb;
+            tfb_wct = wct_seconds () - tfb_wct;
+            verbose_output_print(0, 1,
+                    "# Reading side-%d factor base took %1.1fs (%1.1fs real)\n",
+                    side, tfb, tfb_wct);
+        } else {
+            verbose_output_print(0, 1,
+                    "# Creating side-%d rational factor base"
+                    " for polynomial f%d(x) = %s\n",
+                    side, side, polystring.c_str());
+
+            /* note: we parse again the -t option here -- it gets parsed
+             * in the las_info ctor too */
+            int nb_threads = 1;		/* default value */
+            param_list_parse_int(pl, "t", &nb_threads);
+            make_linear_threadpool (nb_threads);
+            tfb = seconds () - tfb;
+            tfb_wct = wct_seconds() - tfb_wct;
+            verbose_output_print(0, 1,
+                    "# Creating side-%d rational factor base took %1.1fs (%1.1fs real)\n",
+                    side, tfb, tfb_wct);
+        }
     }
 
-    /* yes it's a short read, but we expect that all writes will do
-     * fseek + fwrite, thereby inserting zeroes automagically (POSIX says
-     * that). 
-     */
-    ::write(fbc, os.str().c_str(), os.str().size());
+#ifdef HAVE_GLIBC_VECTOR_INTERNALS
+    if (fbc_filename) {
+        /* We have a complete factor base prepared. If we reach here,
+         * then we have to store it to the cache file */
+        tfb = seconds ();
+        tfb_wct = wct_seconds ();
 
-    multityped_array_foreach(helper_functor_write_to_fbc_file { fbc, fbc_size, S.entries, S.entries.begin() }, entries);
-    ASSERT_ALWAYS((size_t) lseek(fbc, 0, SEEK_END) <= fbc_size + S.size);
-    ftruncate(fbc, fbc_size + S.size);
-    close(fbc);
+        fbc_header S(f, lim, powlim);
+
+        helper_functor_recreate_fbc_header R { S, fbc_header::header_block_size };
+        multityped_array_foreach(R, entries);
+        /* This must be aligned to a page size */
+        S.size = ((R.current_offset - 1) | (sysconf(_SC_PAGE_SIZE) -1)) + 1;
+
+        /* Next, we must append it to the cache file */
+
+        int fbc = open(fbc_filename, O_RDWR | O_CREAT, 0666);
+        ASSERT_ALWAYS(fbc >= 0);
+
+        size_t fbc_size = lseek(fbc, 0, SEEK_END);
+
+        if ((fbc_size & (sysconf(_SC_PAGE_SIZE) - 1)) != 0) {
+            fprintf(stderr, "Fatal error: existing cache file %s is not page-aligned\n", fbc_filename);
+            exit(EXIT_FAILURE);
+        }
+
+        std::ostringstream os;
+        os << S;
+        os << "\n\n\n\n\n"; /* a convenience so that "head" displays the header */
+        if (os.str().size() > fbc_header::header_block_size) {
+            fprintf(stderr, "Fatal error: header doesn't fit (contents follow):\n%s\n", os.str().c_str());
+            exit(EXIT_FAILURE);
+        }
+
+        /* yes it's a short read, but we expect that all writes will do
+         * fseek + fwrite, thereby inserting zeroes automagically (POSIX says
+         * that). 
+         */
+        ::write(fbc, os.str().c_str(), os.str().size());
+
+        multityped_array_foreach(helper_functor_write_to_fbc_file { fbc, fbc_size, S.entries, S.entries.begin() }, entries);
+        ASSERT_ALWAYS((size_t) lseek(fbc, 0, SEEK_END) <= fbc_size + S.size);
+        ftruncate(fbc, fbc_size + S.size);
+        close(fbc);
+        tfb = seconds () - tfb;
+        tfb_wct = wct_seconds() - tfb_wct;
+        verbose_output_print(0, 1,
+                "# Saving side-%d factor base to cache %s took %1.1fs (%1.1fs real)\n",
+                side, fbc_filename, tfb, tfb_wct);
+    }
+#endif
 }
 
-#endif
 
 template <class FB_ENTRY_TYPE>
 plattices_vector_t

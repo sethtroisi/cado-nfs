@@ -58,6 +58,28 @@ namespace mmap_allocator_details
                 void * get(offset_type, size_type);
                 void put(void *, offset_type, size_type);
             };
+#if 0
+            /* use this to trace shared_ptr games. */
+            class shared_mapping : private std::shared_ptr<mapping> {
+                public:
+                template<typename... Args> shared_mapping(Args... args) :
+                    std::shared_ptr<mapping>(args...) {
+                        fprintf(stderr, "Creating a shared_ptr [%p]\n", (void*) get());
+                    }
+                shared_mapping(std::shared_ptr<mapping> const & s) : std::shared_ptr<mapping>(s) { 
+                    fprintf(stderr, "Copying a shared_ptr [%p]\n", (void*) get());
+                }
+                shared_mapping(shared_mapping const & s) : std::shared_ptr<mapping>(s) {
+                    fprintf(stderr, "Copying a shared_ptr [%p]\n", (void*) get());
+                }
+                ~shared_mapping() {
+                    fprintf(stderr, "Destroying a shared_ptr [%p]\n", (void*) get());
+                }
+                mapping * operator->() { return std::shared_ptr<mapping>::operator->(); }
+                mapping const * operator->() const { return std::shared_ptr<mapping>::operator->(); }
+                operator bool() const { return (std::shared_ptr<mapping> const&)(*this) != nullptr; }
+            };
+#endif
             std::shared_ptr<mapping> m;
             public:
             class segment {
@@ -65,6 +87,8 @@ namespace mmap_allocator_details
                 std::shared_ptr<mapping> file;
                 offset_type offset;
                 size_type length;
+                /* with shared_mapping above that defines an operator
+                 * bool, we just say "return file" */
                 operator bool() const { return file != nullptr; }
                 void * get(size_type s) {
                     if (s == 0) return NULL;

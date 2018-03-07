@@ -54,38 +54,10 @@ sieve_info::sieve_info(siever_config const & sc, cxx_cado_poly const & cpoly, st
         sides[1].fb = other.sides[1].fb;
     } else {
         const char * fbc_filename = param_list_lookup_string(pl, "fbc");
-        if (try_fbc && fbc_filename) {
-            /* ok, this is going to read the fbc header twice. Not really
-             * a big problem IMO */
-#ifdef HAVE_GLIBC_VECTOR_INTERNALS
-            if (access(fbc_filename, R_OK) == 0) {
-                /* cache exists, read it */
-                for(int side = 0 ; side < 2 ; side++) {
-                    unsigned long lim = sc.sides[side].lim;
-                    unsigned long powlim = sc.sides[side].powlim;
-                    sides[side].fb=std::make_shared<fb_factorbase>(cpoly, side, lim, powlim, fbc_filename);
-                }
-            } else {
-                /* no cache yet: compute the factor base, then write to
-                 * cache */
-                for(int side = 0 ; side < 2 ; side++) {
-                    unsigned long lim = sc.sides[side].lim;
-                    unsigned long powlim = sc.sides[side].powlim;
-                    sides[side].fb=std::make_shared<fb_factorbase>(cpoly, side, lim, powlim, pl);
-                    /* This appends to the fbc file */
-                    sides[side].fb->save_fbc(fbc_filename);
-                }
-            }
-#else
-            fprintf(stderr, "factor base cache not available with your libstdc++ library, sorry.\n");
-            exit(EXIT_FAILURE);
-#endif
-        } else {
-            for(int side = 0 ; side < 2 ; side++) {
-                unsigned long lim = sc.sides[side].lim;
-                unsigned long powlim = sc.sides[side].powlim;
-                sides[side].fb=std::make_shared<fb_factorbase>(cpoly, side, lim, powlim, pl);
-            }
+        for(int side = 0 ; side < 2 ; side++) {
+            unsigned long lim = sc.sides[side].lim;
+            unsigned long powlim = sc.sides[side].powlim;
+            sides[side].fb=std::make_shared<fb_factorbase>(cpoly, side, lim, powlim, pl, try_fbc ? fbc_filename : NULL);
         }
     }
 

@@ -608,8 +608,7 @@ class fb_factorbase {
 
     public:
         fb_factorbase(cxx_cado_poly const & cpoly, int side, unsigned long lim, unsigned long powlim, const char * fbc_filename);
-        fb_factorbase(cxx_cado_poly const & cpoly, int side, unsigned long lim, unsigned long powlim, cxx_param_list & pl);
-        void save_fbc(const char * fbc_filename) const;
+        fb_factorbase(cxx_cado_poly const & cpoly, int side, unsigned long lim, unsigned long powlim, cxx_param_list & pl, const char * fbc_filename);
 
     private:
         struct sorter {

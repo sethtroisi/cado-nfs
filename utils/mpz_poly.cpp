@@ -4305,6 +4305,10 @@ public:
 std::istream& operator>>(std::istream& in, cxx_mpz_poly & f)
 {
     std::string line;
+    for(;;in.get()) {
+        int c = in.peek();
+        if (in.eof() || !isspace(c)) break;
+    }
     if (!getline(in, line)) return in;
     std::istringstream is(line);
 
