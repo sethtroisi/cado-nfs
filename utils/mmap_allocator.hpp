@@ -18,8 +18,11 @@
  * The version here has been trimmed down significantly, look for uptream
  * version for more features */
 
-namespace mmap_allocator_namespace
+namespace mmap_allocator_details
 {
+    typedef off_t offset_type;
+    typedef size_t size_type;
+
     enum access_mode {
         DEFAULT_STL_ALLOCATOR, /* Default STL allocator (malloc based). Reason is to have containers that do both and are compatible */
         READ_ONLY,  /* Readonly modus. Segfaults when vector content is written to */
@@ -43,8 +46,6 @@ namespace mmap_allocator_namespace
      */
     class mmapped_file {
         public:
-            typedef off_t offset_type;
-            typedef size_t size_type;
             private:
             class mapping {
                 int fd = -1;
@@ -83,19 +84,17 @@ namespace mmap_allocator_namespace
             mmapped_file(const char * fname, access_mode mode = READ_ONLY, offset_type offset = 0, size_type length = std::numeric_limits<size_type>::max()) : m(std::make_shared<mapping>(fname, mode, offset, length)) {}
     };
 
-    template <typename T, typename A> class mmappable_vector;
-
     template <typename T> class mmap_allocator: public std::allocator<T>
     {
         public:
             using typename std::allocator<T>::size_type;
             using typename std::allocator<T>::pointer;
             using typename std::allocator<T>::const_pointer;
-            typedef mmapped_file::offset_type offset_type;
+            typedef mmap_allocator_details::offset_type offset_type;
         private:
             mmapped_file::segment s;
-            friend class mmappable_vector<T, mmap_allocator<T> >;
         public:
+            bool has_defined_mapping() const { return s; }
             template<typename _Tp1>
             struct rebind { typedef mmap_allocator<_Tp1> other; };
 

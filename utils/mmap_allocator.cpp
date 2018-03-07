@@ -17,7 +17,7 @@
 #define UPPER_ALIGN_TO_PAGE(x) ALIGN_TO_PAGE((x)+(sysconf(_SC_PAGE_SIZE)-1))
 #define OFFSET_INTO_PAGE(x) ((x) & (sysconf(_SC_PAGE_SIZE) - 1))
 
-namespace mmap_allocator_namespace {
+namespace mmap_allocator_details {
     mmapped_file::mapping::mapping(const char * filename, access_mode amode, offset_type offset, size_type length) {
         if (!filename || *filename == '\0') {
             throw mmap_allocator_exception("mmapped_file not correctly initialized: filename is empty.");

@@ -19,7 +19,7 @@
  * version for more features */
 
 using namespace std;
-using namespace mmap_allocator_namespace;
+using namespace mmap_allocator_details;
 
 
 const char * tmpdir = "/tmp";
