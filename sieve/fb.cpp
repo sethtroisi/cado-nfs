@@ -601,6 +601,9 @@ struct fb_factorbase::helper_functor_append {
                 if (ok1 || ok2) {
                     auto it_next = it;
                     ++it_next;
+                    double w = E.weight();
+                    if (!x.weight_cdf.empty()) w += x.weight_cdf.back();
+                    x.weight_cdf.push_back(w);
                     x.push_back(std::move(E));
                     pool.erase(it);
                     it = it_next;
@@ -628,11 +631,17 @@ struct fb_entries_interval_factory {
     struct type {
         typedef typename fb_entries_factory<n>::type container_type;
         typename container_type::const_iterator begin, end;
+        typedef typename container_type::weight_container_type weight_container_type;
+        typename weight_container_type::const_iterator weight_begin, weight_end;
     };
 };
 
 /* Goal: count the weight, the number of primes and so on, and find
  * iterators that point to the right portions.
+ *
+ * TODO This can be drastically improved: we don't have to walk the
+ * factor base in full. It suffices to cache the expected transition
+ * points once and for all.
  */
 struct helper_functor_dispatch_weight_parts : public fb_factorbase::slicing::stats_type {
     fb_factorbase::key_type K;
@@ -646,38 +655,44 @@ struct helper_functor_dispatch_weight_parts : public fb_factorbase::slicing::sta
     template<typename T>
         int operator()(int toplevel, T const  & x) {
             /* T is fb_entries_factory<n>::type for some n */
-            typedef typename T::const_iterator xit_t;
             typedef typename T::value_type FB_ENTRY_TYPE;
-            xit_t it = x.begin();
+
+            size_t k = 0;
             /* we're now processing entries with n roots. First make sure
              * that the begin pointer for the first part correctly points
              * to the beginning of our current vector of entries.
              */
             int i = 0;
             constexpr int n = FB_ENTRY_TYPE::is_general_type ? -1 : FB_ENTRY_TYPE::fixed_nr_roots;
-            intervals[0].get<n>().begin = it;
-            for( ; it != x.end() ; ++it) {
-                fbprime_t q = it->get_q();
+            intervals[0].get<n>().begin = x.begin() + k;
+            intervals[0].get<n>().weight_begin = x.weight_begin() + k;
+            for( ; k != x.size() ; ++k) {
+                fbprime_t q = x[k].get_q();
                 /* This really really mandates that we have sorted
                  * vectors of entries in the factor base ! */
                 for( ; i < FB_MAX_PARTS && q >= K.thresholds[i] ; ++i) {
-                    intervals[i].get<n>().end = it;
+                    intervals[i].get<n>().end = x.begin() + k;
+                    intervals[i].get<n>().weight_end = x.weight_begin() + k;
                     ASSERT_ALWAYS(i + 1 < FB_MAX_PARTS);
-                    intervals[i+1].get<n>().begin = it;
+                    intervals[i+1].get<n>().begin = x.begin() + k;
+                    intervals[i+1].get<n>().weight_begin = x.weight_begin() + k;
                 }
                 ASSERT_ALWAYS(i < FB_MAX_PARTS);
                 primes[i]++;
-                ideals[i]+= it->get_nr_roots(); /* == n, except when n==-1 */
-                weight[i] += it->weight();
+                ideals[i] += x[k].get_nr_roots(); /* == n, except when n==-1 */
+                weight[i] += x[k].weight();
             }
-            intervals[i].get<n>().end = it;
+            intervals[i].get<n>().end = x.begin() + k;
+            intervals[i].get<n>().weight_end = x.weight_begin() + k;
             /* for consistency, make sure all further parts are
              * understood as empty.
              */
             if (i > toplevel) toplevel = i;
             for( ; ++i < FB_MAX_PARTS ; ) {
-                intervals[i].get<n>().begin = it;
-                intervals[i].get<n>().end = it;
+                intervals[i].get<n>().begin = x.begin() + k;
+                intervals[i].get<n>().end = x.begin() + k;
+                intervals[i].get<n>().weight_begin = x.weight_begin() + k;
+                intervals[i].get<n>().weight_end = x.weight_begin() + k;
             }
             return toplevel;
         }
@@ -713,6 +728,90 @@ struct helper_functor_dispatch_small_sieved_primes {
         }
 };
 
+/* In order to subdivide into sub-ranges with constant logp, we have a
+ * fairly simple problem to solve. Given:
+ *      a random access iterator type T (here,
+ *      mmappable_vector<entry_t>::const_iterator).
+ *      a function F that computes an integer from a object of type T (here, x -> fb_log(x->get_q(), K.scale, 0)), 
+ *      a range R of iterators of type T, such that F is monotonic (that
+ *      is, for a,b two iterators within the range R, a<=b => F(*a) <=
+ *      F(*b)
+ * return a vector of iterators i within R to points where F(*i) changes,
+ * that is F(i[-1]) < F(*i).
+ *
+ * begin(R) is always included in the returned vector, except when the
+ * range is empty.
+ */
+
+struct find_value_change_points_naive {
+    template<typename T, typename F>
+    std::vector<T> operator()(F const & f, T a, T b) const {
+        std::vector<T> pool;
+        if (a == b) return pool;
+        T it = a;
+        pool.push_back(it);
+        int last = f(it);
+        for( ; it != b ; ++it) {
+            int cur = f(it);
+            if (cur == last) continue;
+            last = cur;
+            pool.push_back(it);
+        }
+        return pool;
+    }
+};
+
+/* This version is of course much faster. */
+struct find_value_change_points_recursive {
+    template<typename T, typename F>
+    void recurse(F const & f, T a, T b, std::vector<T>& pool) const {
+        /* pool contains all the positions of the value changes up to
+         * (and including) the point that led to the value f(a).
+         */
+        if (f(a) == f(b)) return;
+        if ((b-a) == 1) { pool.push_back(b); return; }
+        T c = a + (b-a)/2;
+        recurse(f, a, c, pool);
+        recurse(f, c, b, pool);
+        /* post-condition: same as pre-condition, up to the value f(b) */
+    }
+
+    template<typename T, typename F>
+    std::vector<T> operator()(F const & f, T a, T b, bool include_begin = true) const {
+        std::vector<T> pool;
+        if (a == b) return pool;
+        if (include_begin) pool.push_back(a);
+        recurse(f, a, --b, pool);
+        return pool;
+    }
+};
+
+#if 0
+/* test code */
+int main(int argc, char * argv[])
+{
+    double scale = 1;
+    if (argc == 2) {
+        std::istringstream (argv[1]) >> scale;
+        std::cout << "running with scale="<<scale<<std::endl;
+    }
+
+    std::vector<int> X;
+    for(int i = 10 ; i < 10000000 ; ++i) X.push_back(i);
+
+    typedef std::vector<int>::const_iterator it_t;
+    auto f = [scale](auto x) { return (int) (scale*log(*x)); };
+
+    // std::vector<it_t> pool = find_value_change_points()(f, X.cbegin(), X.cend());
+    std::vector<it_t> pool = find_value_change_points_recursive()(f, X.cbegin(), X.cend());
+
+    for(auto const & p : pool) {
+        std::cout << *p << " " << scale*log(*p) << std::endl;
+    }
+}
+#endif
+
+
 struct helper_functor_subdivide_slices {
     fb_factorbase::slicing::part & dst;
     int part_index;
@@ -734,22 +833,26 @@ struct helper_functor_subdivide_slices {
             vslice_t & sdst(dst.slices.get<n>());
             size_t interval_width = x.end - x.begin;
             if (!interval_width) return;
+            typedef typename fb_entry_vector::const_iterator it_t;
+
             /* first scan to separate by values of logp */
-            typename fb_entry_vector::const_iterator it = x.begin;
+            auto f = [this](it_t it) { return fb_log(it->get_q(), K.scale, 0); };
+            std::vector<it_t> splits = find_value_change_points_recursive()(f, x.begin, x.end, false);
+            splits.push_back(x.end);
+
+            /* Now use our splitting points and the precomputed primitive
+             * of the weight function to deduce the slice weight.
+             */
             typename std::vector<slice_t> pool;
-            /* can't emplace_back here because private ctor */
-            pool.push_back(slice_t(it, fb_log(it->get_q(), K.scale, 0)));
-            for( ; it != x.end ; ++it) {
-                unsigned char cur_logp = fb_log(it->get_q(), K.scale, 0);
-                if (cur_logp == pool.back().logp) {
-                    pool.back().weight += it->weight();
-                    continue;
-                }
-                pool.back()._end = it;
-                pool.push_back(slice_t(it, cur_logp));
-                pool.back().weight += it->weight();
+            it_t it = x.begin;
+            for(it_t jt : splits) {
+                slice_t s(it, jt, f(it));
+                size_t iw = it - x.begin;
+                size_t jw = jt - x.begin;
+                s.weight = x.weight_begin[jw] - x.weight_begin[iw]; 
+                pool.push_back(s);
+                it = jt;
             }
-            pool.back()._end = it;
             std::ostringstream n_eq;
             n_eq << "n=";
             if (n < 0) n_eq << "*"; else n_eq << n;

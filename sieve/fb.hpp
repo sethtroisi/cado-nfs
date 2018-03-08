@@ -31,6 +31,22 @@
 #define mmappable_vector std::vector
 #endif
 
+/* The *factor base* is made of *entries*. We have several vectors of
+ * entries, each with primes splitting in the same number of roots.
+ *
+ * For each set of *thresholds* and each *scale* value, we define a
+ * *slicing*. A slicing is a division of the factor base into *parts*.
+ * Then each part contains several vectors of *slices* (in the same
+ * manner as we have several vectors of entries in the factor base). A
+ * slice is formed by basically two pointers into the vector of entries
+ * in the factor base that have this number of roots.
+ *
+ * The factor base also contains auxiliary data attached to each vector
+ * of entries, namely the cumulative distribution function of the weight.
+ * This is used to subdivide slices into pieces of equal weight when
+ * needed.
+ */
+
 /* {{{ fb entries: sets of prime ideals above one single rational prime p. */
 /* Forward declaration so fb_entry_general can use it in constructors */
 template <int Nr_roots>
@@ -211,7 +227,8 @@ class fb_slice : public fb_slice_interface {
     slice_index_t index;
     double weight;
     friend struct helper_functor_subdivide_slices;
-    fb_slice(typename mmappable_vector<FB_ENTRY_TYPE>::const_iterator it, unsigned char logp) : _begin(it), _end(it), logp(logp), index(0), weight(0) {}
+    fb_slice(typename fb_entry_vector::const_iterator it, unsigned char logp) : _begin(it), _end(it), logp(logp), index(0), weight(0) {}
+    fb_slice(typename fb_entry_vector::const_iterator it, typename fb_entry_vector::const_iterator jt, unsigned char logp) : _begin(it), _end(jt), logp(logp), index(0), weight(0) {}
     public:
     typedef FB_ENTRY_TYPE entry_t;
     inline typename fb_entry_vector::const_iterator begin() const { return _begin; }
@@ -248,11 +265,35 @@ class fb_slice : public fb_slice_interface {
  * (notationally, general_entries corresponds to -1 as a number of
  * roots).
  * */
+
+template<typename T> struct entries_and_cdf {
+    struct type : public mmappable_vector<T> {
+        /* cumulative distribution function. This is set up by
+         * helper_functor_append. We use it to split into slices.
+         * weight_cdf[i] is \sum_{j < i} super[j].weight
+         * (this is why we have a default initializer with a lone 0)
+         */
+        /* We *might* want to consider the cdf only for several entries
+         * at a time (say, 16), so as to minimize the cost of finding the
+         * split points */
+        typedef std::vector<double> weight_container_type;
+        std::vector<double> weight_cdf { 0 };
+        inline weight_container_type::const_iterator weight_begin() const { 
+            return weight_cdf.begin();
+        }
+        inline weight_container_type::const_iterator weight_end() const { 
+            return weight_cdf.begin();
+        }
+        inline weight_container_type::size_type weight_size() const { 
+            return weight_cdf.size();
+        }
+    };
+};
 template<int n> struct fb_entries_factory {
-    typedef mmappable_vector<fb_entry_x_roots<n>> type;
+    typedef typename entries_and_cdf<fb_entry_x_roots<n>>::type type;
 };
 template<> struct fb_entries_factory<-1> {
-    typedef mmappable_vector<fb_entry_general> type;
+    typedef typename entries_and_cdf<fb_entry_general>::type type;
 };
 template<int n> struct fb_slices_factory {
     typedef std::vector<fb_slice<fb_entry_x_roots<n>>> type;
