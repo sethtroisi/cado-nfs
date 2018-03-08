@@ -3003,7 +3003,7 @@ for (unsigned int j_cong = 0; j_cong < sublat_bound; ++j_cong) {
                         }
                     };
 
-                    si.sides[side].fbs->foreach_slice(make_lattice_basis { side, level, si, precomp_plattice });
+                    si.sides[side].fbs->get_part(level).foreach_slice(make_lattice_basis { side, level, si, precomp_plattice });
                 }
             }
 

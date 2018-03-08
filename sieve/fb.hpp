@@ -355,6 +355,7 @@ class fb_factorbase {
             typedef multityped_array<fb_slices_factory, -1, MAX_ROOTS+1> slices_t;
             friend struct helper_functor_subdivide_slices;
             slices_t slices;
+            slice_index_t first_slice_index = 0;
             public:
             template<int n>
                 typename fb_slices_factory<n>::type& get_slices_vector_for_nroots() {
@@ -406,7 +407,13 @@ class fb_factorbase {
                  * TODO: dichotomy, perhaps ? Can we do the dichotomy
                  * elegantly ?
                  */
-                const fb_slice_interface * res = multityped_array_locate<helper_functor_get>()(slices, index);
+                if (index < first_slice_index) return NULL;
+                slice_index_t idx = index - first_slice_index;
+                if (idx >= nslices()) {
+                    index = idx - nslices();
+                    return NULL;
+                }
+                const fb_slice_interface * res = multityped_array_locate<helper_functor_get>()(slices, idx);
                 ASSERT_ALWAYS(res);
                 ASSERT_ALWAYS(res->get_index() == index);
                 if (res) return res;
@@ -482,10 +489,8 @@ class fb_factorbase {
 
         fb_slice_interface const * get(slice_index_t index) const {
             for (auto const & p : parts) {
-                if (index < p.nslices()) 
+                if (index < p.first_slice_index + p.nslices()) 
                     return p.get(index);
-                else
-                    index -= p.nslices();
             }
             return NULL;
         }

@@ -754,21 +754,29 @@ struct helper_functor_subdivide_slices {
             n_eq << "n=";
             if (n < 0) n_eq << "*"; else n_eq << n;
             verbose_output_print (0, 2, "# slices for part %d, %s roots: from %zu entries, we found %zu different logp values\n", part_index, n_eq.str().c_str(), interval_width, pool.size());
-            for(auto const & s : pool) {
-                verbose_output_print (0, 2, "#  %s logp=%d: %zu entries, weight=%f\n",
+
+            /* bold move: all of them become slices... */
+            /* of course that won't stay, it's obvious WIP.
+             */
+            /* TODO */ /* TODO */ /* TODO */ /* TODO */
+            /* TODO */ /* TODO */ /* TODO */ /* TODO */
+            /* TODO */ /* TODO */ /* TODO */ /* TODO */
+            sdst.swap(pool);
+            /* TODO */ /* TODO */ /* TODO */ /* TODO */
+            /* TODO */ /* TODO */ /* TODO */ /* TODO */
+            /* TODO */ /* TODO */ /* TODO */ /* TODO */
+
+            /* And then we number all slices */
+            for(auto & s : sdst) s.index = index++;
+
+            for(auto const & s : sdst) {
+                verbose_output_print (0, 2, "# [%lu] %s logp=%d: %zu entries, weight=%f\n",
+                        (unsigned long) s.index,
                         n_eq.str().c_str(),
                         (int) s.get_logp(),
                         s.end() - s.begin(),
                         s.get_weight());
             }
-
-            /* bold move: all of them become slices... */
-            /* of course that won't stay, it's obvious WIP.
-             * TODO */
-            sdst.swap(pool);
-
-            /* And then we number all slices */
-            for(auto & s : sdst) s.index = index++;
         }
 };
 
@@ -843,6 +851,7 @@ fb_factorbase::slicing::slicing(fb_factorbase const & fb, fb_factorbase::key_typ
      */
     slice_index_t s = 0;
     for (int i = 1; i < FB_MAX_PARTS; i++) {
+        parts[i].first_slice_index = s;
         multityped_array_foreach(helper_functor_subdivide_slices { parts[i], i, K, s }, D.intervals[i]);
         s += parts[i].nslices();
     }
