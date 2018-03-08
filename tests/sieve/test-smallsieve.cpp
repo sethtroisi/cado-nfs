@@ -30,9 +30,9 @@ int only_complete_functions = 0;
 
 /* this is really a mock structure just for the fun of it. */
 struct {
-    int logI;
     struct {
         sublat_t sublat;
+        int logI;
     } conf;
     struct {
         mpz_t q;
