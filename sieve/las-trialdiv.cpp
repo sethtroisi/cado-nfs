@@ -60,8 +60,9 @@ void sieve_info::init_trialdiv(int side)
         prime_info_clear (pi);
     }
 
-    ASSERT_ALWAYS(std::is_sorted(trialdiv_primes.begin(), trialdiv_primes.end()));
-    std::sort(trialdiv_primes.begin(), trialdiv_primes.end());
+    ASSERT(std::is_sorted(trialdiv_primes.begin(), trialdiv_primes.end()));
+    // std::sort(trialdiv_primes.begin(), trialdiv_primes.end());
+    
     size_t n = trialdiv_primes.size();
     int skip2 = n > 0 && trialdiv_primes[0] == 2;
     s.trialdiv_data = std::shared_ptr<trialdiv_divisor_t>(trialdiv_init(&trialdiv_primes.front() + skip2, n - skip2), trialdiv_clear);

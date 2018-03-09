@@ -374,10 +374,10 @@ void small_sieve_init(small_sieve_data_t & ssd,
     /* arrange so that the small_sieve() ctor is happy */
     /* I _think_ that normally, if the new code does its job correctly,
      * then this should be already sorted */
-    ASSERT_ALWAYS(std::is_sorted(ssd.ssps.begin(), ssd.ssps.begin() + ssd.resieve_end_offset));
-    ASSERT_ALWAYS(std::is_sorted(ssd.ssps.begin() + ssd.resieve_end_offset, ssd.ssps.end()));
-    std::sort(ssd.ssps.begin(), ssd.ssps.begin() + ssd.resieve_end_offset);
-    std::sort(ssd.ssps.begin() + ssd.resieve_end_offset, ssd.ssps.end());
+    ASSERT(std::is_sorted(ssd.ssps.begin(), ssd.ssps.begin() + ssd.resieve_end_offset));
+    ASSERT(std::is_sorted(ssd.ssps.begin() + ssd.resieve_end_offset, ssd.ssps.end()));
+    // std::sort(ssd.ssps.begin(), ssd.ssps.begin() + ssd.resieve_end_offset);
+    // std::sort(ssd.ssps.begin() + ssd.resieve_end_offset, ssd.ssps.end());
 
     /* Sort general ssp vector in the order in which sieve2357::sieve expects
        them. small_sieve::do_pattern_sieve may drop some of these entries but
