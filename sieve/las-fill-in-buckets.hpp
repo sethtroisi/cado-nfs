@@ -47,6 +47,13 @@ downsort_tree(timetree_t&,
         thread_pool &pool,
         sieve_info& si,
         precomp_plattice_t const & precomp_plattice);
+
 void fill_in_buckets(timetree_t&, thread_pool &, thread_workspaces &, sieve_info &, int side);
+
+void fill_in_buckets_prepare_precomp_plattice(
+                        int side,
+                        int level,
+                        sieve_info const & si MAYBE_UNUSED,
+                        precomp_plattice_t & precomp_plattice);
 
 #endif

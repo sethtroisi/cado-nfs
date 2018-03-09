@@ -1008,6 +1008,8 @@ divide_primes_from_bucket (factor_list_t & fl, mpz_t norm, const unsigned int N,
               /* Remove powers of prime divisors */
               factor_list_add(fl, p);
               mpz_divexact_ui (norm, norm, p);
+              /* Lacking bucket-sieving for powers, we have to check for
+               * divisibility once again */
           } while (mpz_divisible_ui_p (norm, p));
       }
   }
@@ -1056,7 +1058,7 @@ divide_hints_from_bucket (factor_list_t &fl, mpz_t norm, const unsigned int N, c
                   abort();
               } else {
                   verbose_output_print(0, 2,
-                           "# Note (harmless): p = %lu does not divide at (N,x) = (%u,%d), was divided out before\n",
+                           "# Note (harmless): p = %lu (from hint) does not divide at (N,x) = (%u,%d), was divided out before\n",
                            p, N, x);
               }
           } else do {
@@ -2989,22 +2991,20 @@ for (unsigned int j_cong = 0; j_cong < sublat_bound; ++j_cong) {
                 MIN(max_area, plattice_x_t(BUCKET_REGIONS[3]));
             plattice_enumerate_area<3>::value = max_area;
             precomp_plattice_t precomp_plattice;
+
             for (int side = 0; side < 2; ++side) {
                 if (!si.sides[side].fb) continue;
                 CHILD_TIMER_PARAMETRIC(timer_special_q, "side ", side, "");
+
                 for (int level = 1; level < si.toplevel; ++level) {
 
-                    struct make_lattice_basis {
-                        int side, level;
-                        sieve_info const & si;
-                        precomp_plattice_t & precomp_plattice;
-                        void operator()(fb_slice_interface const & s) {
-                            precomp_plattice.push(side, level, s.make_lattice_bases(si.qbasis, si.conf.logI, si.conf.sublat));
-                        }
-                    };
-
-                    si.sides[side].fbs->get_part(level).foreach_slice(make_lattice_basis { side, level, si, precomp_plattice });
+                fill_in_buckets_prepare_precomp_plattice(
+                        side,
+                        level,
+                        si,
+                        precomp_plattice);
                 }
+
             }
 
             SIBLING_TIMER(timer_special_q, "process_bucket_region outer container (MT)");

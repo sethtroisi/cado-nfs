@@ -287,6 +287,65 @@ inline bool discard_power_for_bucket_sieving<fb_entry_general>(fb_entry_general 
     return e.k > 1;
 }
 
+template <class FB_ENTRY_TYPE>
+plattices_vector_t
+make_lattice_bases(fb_slice<FB_ENTRY_TYPE> const & slice,
+        const qlattice_basis &basis,
+    const int logI, const sublat_t &sublat)
+{
+  typename FB_ENTRY_TYPE::transformed_entry_t transformed;
+  /* Create a transformed vector and store the index of the fb_slice we
+   * currently transform */
+
+  plattices_vector_t result(slice.get_index());
+  slice_offset_t i_entry = 0;
+  for (auto const & e : slice) {
+      increment_counter_on_dtor<slice_offset_t> _dummy(i_entry);
+    if (!basis.is_coprime_to(e.p))
+      continue;
+    if (discard_power_for_bucket_sieving(e))
+        continue;
+    e.transform_roots(transformed, basis);
+    for (unsigned char i_root = 0; i_root != transformed.nr_roots; i_root++) {
+      const fbroot_t r = transformed.get_r(i_root);
+      const bool proj = transformed.get_proj(i_root);
+      /* If proj and r > 0, then r == 1/p (mod p^2), so all hits would be in
+         locations with p | gcd(i,j). */
+      if (LIKELY(!proj || r == 0)) {
+        plattice_info_t pli = plattice_info_t(transformed.get_q(), r, proj, logI);
+        plattice_enumerate_t ple = plattice_enumerate_t(pli, i_entry, logI, sublat);
+        // Skip (0,0) unless we have sublattices.
+        if (!sublat.m)
+          ple.next();
+        if (LIKELY(pli.a0 != 0)) {
+          result.push_back(ple);
+        }
+      }
+    }
+  }
+  /* This is moved, not copied */
+  return result;
+}
+
+struct helper_functor_make_lattice_bases {
+    int side, level;
+    sieve_info const & si;
+    precomp_plattice_t & precomp_plattice;
+    template<typename T>
+        void operator()(T const & s) {
+            precomp_plattice.push(side, level, make_lattice_bases(s, si.qbasis, si.conf.logI, si.conf.sublat));
+        }
+};
+
+void fill_in_buckets_prepare_precomp_plattice(
+                        int side,
+                        int level,
+                        sieve_info const & si MAYBE_UNUSED,
+                        precomp_plattice_t & precomp_plattice)
+{
+    si.sides[side].fbs->get_part(level).foreach_slice(helper_functor_make_lattice_bases { side, level, si, precomp_plattice });
+}
+
 // At top level, the fill-in of the buckets must interleave
 // the root transforms and the FK walks, otherwise we spend a lot of time
 // doing nothing while waiting for memory.

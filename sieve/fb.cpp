@@ -731,6 +731,60 @@ struct helper_functor_dispatch_small_sieved_primes {
                     continue;
                 }
                 fb_entry_general G(E);
+                /* Currently, trial division gobbles factors as long as
+                 * they are found. Therefore it does not make sense to
+                 * resieve powers of trial-divided primes.
+                 *
+                 * Resieving powers of resieved primes, however (this
+                 * could occur, e.g., if tdthresh=1024 and
+                 * bkthresh=2^21), does make sense: this may eliminate
+                 * the need to loop on the divisibility condition in
+                 * divide_primes_from_bucket, if we bucket-sieve powers
+                 * (currently we don't).
+                 *
+                 * Given a prime power in the small sieve entries, we
+                 * would need to decide whether the corresponding prime
+                 * was trial-divided. The tricky part is that this
+                 * depends on the number of roots at the base valuation.
+                 *
+                 * TODO.
+                 *
+                 * One way (just a suggestion) to do that could be:
+                 *  - compute sqrt(bkthresh = K.thresholds[0]).
+                 *  Powers of primes above that would certainly not be
+                 *  resieved. More exactly, we could compute an arry of
+                 *  thresholds (with b = bkthresh = K.thresholds[0]):
+                 *      T[] = { b^(1/n), b^(1/(n-1)), ..., b^(1/2) }
+                 *  with n largest so that b^(1/n) >= K.tdthresh.
+                 *  (realistically, we'll have n=2 anyway).
+                 *
+                 *  Now when we see a resieved prime (not power) in the
+                 *  loop below, we can check it against the thresholds in
+                 *  t. This gives the max power that we could be led to
+                 *  consider within resieving. This will most often, very
+                 *  quickly be: none. When there are some, we need to
+                 *  provision for accepting p^i for resieving, for the
+                 *  relevant values of i. We may put that in a temporary
+                 *  list, and take the appopriate action when we
+                 *  encounter p^i later on.
+                 *
+                 *  This strategy, in the case logI=21, tdthresh=1024,
+                 *  would lead us to special-case all prime squares
+                 *  between 2^20 and 2^21 (57 primes only...).
+                 *
+                 *
+                 *  Maybe we could also special-case only the case where
+                 *  we have ramification.
+                 *  
+                 *
+                 *  Or we could assume that the number of roots for p^k
+                 *  is the same as for p, and then the condition for p to
+                 *  be trial-divided would be simply
+                 *      E.p <= K.td_thresh * E.get_nr_roots()
+                 *
+                 *  This may be wrong on only rare cases, and we would
+                 *  have harmless "p does not divide"'s anyway.
+                 */
                 if (E.k > 1 || E.p <= K.td_thresh * E.get_nr_roots()) {
                     S.small_sieve_entries.rest.push_back(G);
                 } else {
@@ -1014,6 +1068,7 @@ fb_factorbase::slicing::slicing(fb_factorbase const & fb, fb_factorbase::key_typ
      * per line becomes p^k1 and p^(k2-1) (for example). So there's clear
      * potential for the ordering to be swapped.
      */
+    std::sort(small_sieve_entries.skipped.begin(), small_sieve_entries.skipped.end());
     std::sort(small_sieve_entries.resieved.begin(), small_sieve_entries.resieved.end(), by_q);
     std::sort(small_sieve_entries.rest.begin(), small_sieve_entries.rest.end(), by_q);
 
@@ -1898,40 +1953,4 @@ fb_factorbase::fb_factorbase(cxx_cado_poly const & cpoly, int side, unsigned lon
     get_threshold_pos(lim);
 }
 
-
-template <class FB_ENTRY_TYPE>
-plattices_vector_t
-fb_slice<FB_ENTRY_TYPE>::make_lattice_bases(const qlattice_basis &basis,
-    const int logI, const sublat_t &sublat) const
-{
-  typename FB_ENTRY_TYPE::transformed_entry_t transformed;
-  /* Create a transformed vector and store the index of the fb_slice we currently
-     transform */
-
-  plattices_vector_t result(index);
-  slice_offset_t i_entry = 0;
-  for (auto it = _begin; it != _end; ++it, i_entry++) {
-    if (!basis.is_coprime_to(it->p))
-      continue;
-    it->transform_roots(transformed, basis);
-    for (unsigned char i_root = 0; i_root != transformed.nr_roots; i_root++) {
-      const fbroot_t r = transformed.get_r(i_root);
-      const bool proj = transformed.get_proj(i_root);
-      /* If proj and r > 0, then r == 1/p (mod p^2), so all hits would be in
-         locations with p | gcd(i,j). */
-      if (LIKELY(!proj || r == 0)) {
-        plattice_info_t pli = plattice_info_t(transformed.get_q(), r, proj, logI);
-        plattice_enumerate_t ple = plattice_enumerate_t(pli, i_entry, logI, sublat);
-        // Skip (0,0) unless we have sublattices.
-        if (!sublat.m)
-          ple.next();
-        if (LIKELY(pli.a0 != 0)) {
-          result.push_back(ple);
-        }
-      }
-    }
-  }
-  /* This is moved, not copied */
-  return result;
-}
 

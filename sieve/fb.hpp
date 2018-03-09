@@ -206,7 +206,6 @@ class fb_slice_interface {
         virtual double get_weight() const = 0;
         virtual bool is_general() const = 0;
         virtual int get_nr_roots() const = 0;
-        virtual plattices_vector_t make_lattice_bases(const qlattice_basis &, int, const sublat_t &) const = 0;
 };
 
 /* This is one of the function objects in fb.cpp that needs to tinker
@@ -256,7 +255,6 @@ class fb_slice : public fb_slice_interface {
     /* get_nr_roots() on a fb_slice returns zero for slices of general
      * type ! */
     int get_nr_roots() const override { return FB_ENTRY_TYPE::fixed_nr_roots;}
-    plattices_vector_t make_lattice_bases(const qlattice_basis &, int, const sublat_t &) const override;
 };
 
 /* entries and general_entries: we declare general entries, as well
