@@ -276,6 +276,7 @@ template<typename T> struct entries_and_cdf {
         /* We *might* want to consider the cdf only for several entries
          * at a time (say, 16), so as to minimize the cost of finding the
          * split points */
+        typedef mmappable_vector<T> container_type;
         typedef std::vector<double> weight_container_type;
         std::vector<double> weight_cdf { 0 };
         inline weight_container_type::const_iterator weight_begin() const { 
@@ -286,6 +287,12 @@ template<typename T> struct entries_and_cdf {
         }
         inline weight_container_type::size_type weight_size() const { 
             return weight_cdf.size();
+        }
+        double weight_delta(size_t a, size_t b) const {
+            return weight_cdf[b] - weight_cdf[a];
+        }
+        double weight_delta(typename container_type::const_iterator a, typename container_type::const_iterator b) const {
+            return weight_cdf[b-container_type::begin()] - weight_cdf[a-container_type::begin()];
         }
     };
 };
@@ -316,6 +323,15 @@ class fb_factorbase {
 
     typedef multityped_array<fb_entries_factory, -1, MAX_ROOTS+1> entries_t;
     entries_t entries;
+
+    public:
+    typedef std::array<size_t, MAX_ROOTS+2> threshold_pos;
+    threshold_pos get_threshold_pos(fbprime_t) const;
+
+    private:
+    /* The threshold position cache is used to accelerate the creation of
+     * slicings. */
+    mutable std::map<fbprime_t, threshold_pos> threshold_pos_cache;
 
     /* {{{ append. This inserts a pool of entries to the factor base. We
      * do it with many entries in a row so as to avoid looping MAX_ROOTS

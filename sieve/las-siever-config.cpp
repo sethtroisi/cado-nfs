@@ -220,6 +220,7 @@ fb_factorbase::key_type siever_config::instantiate_thresholds(int side) const
 
     if (bucket_thresh > fbb) bucket_thresh = fbb;
     if (bucket_thresh1 == 0 || bucket_thresh1 > fbb) bucket_thresh1 = fbb;
+    if (bucket_thresh > bucket_thresh1) bucket_thresh1 = bucket_thresh;
 
     return fb_factorbase::key_type {
         {bucket_thresh, bucket_thresh1, fbb, fbb},

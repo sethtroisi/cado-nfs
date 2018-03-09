@@ -626,6 +626,42 @@ void fb_factorbase::append(std::list<fb_entry_general> &pool) {
 }
 /* }}} */
 
+/* {{{ Tool to find the position of the threshold primes */
+struct helper_functor_find_threshold_pos {
+    fbprime_t threshold;
+    fb_factorbase::threshold_pos & res;
+    template<typename T>
+        void operator()(T const  & x) {
+            /* T is fb_entries_factory<n>::type for some n */
+            typedef typename T::value_type FB_ENTRY_TYPE;
+            constexpr int n = FB_ENTRY_TYPE::is_general_type ? -1 : FB_ENTRY_TYPE::fixed_nr_roots;
+            size_t & target(res[n + 1]);
+            if (threshold == std::numeric_limits<fbprime_t>::max()) {
+                target = x.size();
+                return;
+            }
+            for(size_t k = 0 ; k != x.size() ; ++k) {
+                if (x[k].get_q() >= threshold) {
+                    target = k;
+                    return;
+                }
+            }
+            target = x.size();
+        }
+};
+fb_factorbase::threshold_pos fb_factorbase::get_threshold_pos(fbprime_t thr) const {
+    if (thr >= lim)
+        thr = std::numeric_limits<fbprime_t>::max();
+    auto it = threshold_pos_cache.find(thr);
+    if (it != threshold_pos_cache.end())
+        return it->second;
+    threshold_pos res;
+    multityped_array_foreach(helper_functor_find_threshold_pos { thr, res }, entries);
+    threshold_pos_cache[thr] = res;
+    return res;
+}
+/* }}} */
+
 template<int n>
 struct fb_entries_interval_factory {
     struct type {
@@ -636,63 +672,32 @@ struct fb_entries_interval_factory {
     };
 };
 
-/* Goal: count the weight, the number of primes and so on, and find
- * iterators that point to the right portions.
- *
- * TODO This can be drastically improved: we don't have to walk the
- * factor base in full. It suffices to cache the expected transition
- * points once and for all.
+/* Goal: count the weight, the number of primes and so on. For this, we
+ * use positions that have been computed via get_threshold_pos
  */
-struct helper_functor_dispatch_weight_parts : public fb_factorbase::slicing::stats_type {
-    fb_factorbase::key_type K;
-    typedef multityped_array<fb_entries_interval_factory, -1, fb_factorbase::MAX_ROOTS+1> intervals_t;
-    std::array<intervals_t, FB_MAX_PARTS> intervals;
-    helper_functor_dispatch_weight_parts(fb_factorbase::key_type K) : K(K) {}
+struct helper_functor_count_weight_parts : public fb_factorbase::slicing::stats_type {
+    std::array<fb_factorbase::threshold_pos, FB_MAX_PARTS+1> local_thresholds;
+    helper_functor_count_weight_parts(std::array<fb_factorbase::threshold_pos, FB_MAX_PARTS+1> const & l) : local_thresholds(l) {}
 
-    /* TODO: factor base entries that made it only to the vector of
-     * general entries will perhas deserve a special treatment.
-     */
     template<typename T>
         int operator()(int toplevel, T const  & x) {
             /* T is fb_entries_factory<n>::type for some n */
             typedef typename T::value_type FB_ENTRY_TYPE;
 
-            size_t k = 0;
-            /* we're now processing entries with n roots. First make sure
-             * that the begin pointer for the first part correctly points
-             * to the beginning of our current vector of entries.
-             */
-            int i = 0;
             constexpr int n = FB_ENTRY_TYPE::is_general_type ? -1 : FB_ENTRY_TYPE::fixed_nr_roots;
-            intervals[0].get<n>().begin = x.begin() + k;
-            intervals[0].get<n>().weight_begin = x.weight_begin() + k;
-            for( ; k != x.size() ; ++k) {
-                fbprime_t q = x[k].get_q();
-                /* This really really mandates that we have sorted
-                 * vectors of entries in the factor base ! */
-                for( ; i < FB_MAX_PARTS && q >= K.thresholds[i] ; ++i) {
-                    intervals[i].get<n>().end = x.begin() + k;
-                    intervals[i].get<n>().weight_end = x.weight_begin() + k;
-                    ASSERT_ALWAYS(i + 1 < FB_MAX_PARTS);
-                    intervals[i+1].get<n>().begin = x.begin() + k;
-                    intervals[i+1].get<n>().weight_begin = x.weight_begin() + k;
+
+            for(int i = 0 ; i < FB_MAX_PARTS ; i++) {
+                size_t k0 = local_thresholds[i][1+n];
+                size_t k1 = local_thresholds[i+1][1+n];
+                if (k1 != k0 && i > toplevel) toplevel = i;
+                primes[i] += k1 - k0;
+                weight[i] += x.weight_delta(k0, k1);
+                if (FB_ENTRY_TYPE::is_general_type) {
+                    for(size_t k = k0 ; k < k1 ; ++k)
+                        ideals[i] += x[k].get_nr_roots();
+                } else {
+                    ideals[i] += (k1 - k0) * n;
                 }
-                ASSERT_ALWAYS(i < FB_MAX_PARTS);
-                primes[i]++;
-                ideals[i] += x[k].get_nr_roots(); /* == n, except when n==-1 */
-                weight[i] += x[k].weight();
-            }
-            intervals[i].get<n>().end = x.begin() + k;
-            intervals[i].get<n>().weight_end = x.weight_begin() + k;
-            /* for consistency, make sure all further parts are
-             * understood as empty.
-             */
-            if (i > toplevel) toplevel = i;
-            for( ; ++i < FB_MAX_PARTS ; ) {
-                intervals[i].get<n>().begin = x.begin() + k;
-                intervals[i].get<n>().end = x.begin() + k;
-                intervals[i].get<n>().weight_begin = x.weight_begin() + k;
-                intervals[i].get<n>().weight_end = x.weight_begin() + k;
             }
             return toplevel;
         }
@@ -701,25 +706,32 @@ struct helper_functor_dispatch_weight_parts : public fb_factorbase::slicing::sta
 struct helper_functor_dispatch_small_sieved_primes {
     fb_factorbase::slicing & S;
     fb_factorbase::key_type K;
+    std::array<fb_factorbase::threshold_pos, FB_MAX_PARTS+1> local_thresholds;
     /* TODO: it's a bit unsatisfactory that we do this comparison on
      * it->p for each prime.
      */
     template<typename T>
         void operator()(T const  & x) {
-            /* T is fb_entries_interval_factory<n>::type for some n */
-            /* entries between x.begin and x.end go to the vectors of
+            /* T is fb_entries_factory<n>::type for some n */
+            typedef typename T::value_type FB_ENTRY_TYPE;
+            constexpr int n = FB_ENTRY_TYPE::is_general_type ? -1 : FB_ENTRY_TYPE::fixed_nr_roots;
+            /* entries between x[local_thresholds[0][1+n]] and
+             * x[local_thresholds[1][1+n]] go to the vectors of
              * small-sieved primes */
             /* the product td_thresh * it->get_nr_roots() will be
              * folded outside the loop for the most common cases.
              */
-            for(auto it = x.begin ; it != x.end ; ++it) {
-                if (it->get_q() < K.skipped) {
-                    if (it->k == 1)
-                        S.small_sieve_entries.skipped.push_back(it->p);
+            size_t k0 = local_thresholds[0][1+n];
+            size_t k1 = local_thresholds[1][1+n];
+            for(size_t k = k0 ; k < k1 ; ++k) {
+                FB_ENTRY_TYPE const & E(x[k]);
+                if (E.get_q() < K.skipped) {
+                    if (E.k == 1)
+                        S.small_sieve_entries.skipped.push_back(E.p);
                     continue;
                 }
-                fb_entry_general G(*it);
-                if (it->k > 1 || it->p <= K.td_thresh * it->get_nr_roots()) {
+                fb_entry_general G(E);
+                if (E.k > 1 || E.p <= K.td_thresh * E.get_nr_roots()) {
                     S.small_sieve_entries.rest.push_back(G);
                 } else {
                     S.small_sieve_entries.resieved.push_back(G);
@@ -816,40 +828,43 @@ struct helper_functor_subdivide_slices {
     fb_factorbase::slicing::part & dst;
     int part_index;
     fb_factorbase::key_type K;
+    std::array<fb_factorbase::threshold_pos, FB_MAX_PARTS+1> local_thresholds;
     slice_index_t index;
     // helper_functor_subdivide_slices(fb_factorbase::slicing::part & dst, fb_factorbase::key_type const & K) : dst(dst), K(K), index(0) {}
     template<typename T>
         void operator()(T const & x) {
-            /* T is fb_entries_interval_factory<n>::type for some n */
-            typedef T interval_t;
-            typedef typename interval_t::container_type ventry_t;
+            /* T is fb_entries_factory<n>::type for some n */
+            typedef typename T::container_type ventry_t;
             typedef typename ventry_t::value_type entry_t;
             typedef fb_slice<entry_t> slice_t;
-            typedef typename slice_t::fb_entry_vector fb_entry_vector;
+            static_assert(std::is_same<typename slice_t::fb_entry_vector, ventry_t>::value);
             typedef std::vector<slice_t> vslice_t;
 
             constexpr int n = entry_t::is_general_type ? -1 : entry_t::fixed_nr_roots;
             // vslice_t & sdst(dst.get_slices_vector_for_nroots<n>());
             vslice_t & sdst(dst.slices.get<n>());
-            size_t interval_width = x.end - x.begin;
+
+            size_t k0 = local_thresholds[part_index][1+n];
+            size_t k1 = local_thresholds[part_index + 1][1+n];
+
+            size_t interval_width = k1 - k0;
             if (!interval_width) return;
-            typedef typename fb_entry_vector::const_iterator it_t;
+            typedef typename ventry_t::const_iterator it_t;
 
             /* first scan to separate by values of logp */
             auto f = [this](it_t it) { return fb_log(it->get_q(), K.scale, 0); };
-            std::vector<it_t> splits = find_value_change_points_recursive()(f, x.begin, x.end, false);
-            splits.push_back(x.end);
+            std::vector<it_t> splits = find_value_change_points_recursive()(f,
+                    x.begin() + k0, x.begin() + k1, false);
+            splits.push_back(x.begin() + k1);
 
             /* Now use our splitting points and the precomputed primitive
              * of the weight function to deduce the slice weight.
              */
             typename std::vector<slice_t> pool;
-            it_t it = x.begin;
+            it_t it = x.begin() + k0;
             for(it_t jt : splits) {
                 slice_t s(it, jt, f(it));
-                size_t iw = it - x.begin;
-                size_t jw = jt - x.begin;
-                s.weight = x.weight_begin[jw] - x.weight_begin[iw]; 
+                s.weight = x.weight_delta(it, jt);
                 pool.push_back(s);
                 it = jt;
             }
@@ -888,8 +903,8 @@ struct helper_functor_subdivide_slices {
 fb_factorbase::slicing::slicing(fb_factorbase const & fb, fb_factorbase::key_type const & K) {
 
     /* parts[0] will be unused.
-     * parts[1] will have primes between K.thresholds[1] and K.thresholds[2]
-     * parts[2] will have primes above K.thresholds[2].
+     * parts[1] will have primes between K.thresholds[0] and K.thresholds[1]
+     * parts[2] will have primes above K.thresholds[1].
      */
 
     /* First thing we're going to do is count the weight of each part.
@@ -904,8 +919,17 @@ fb_factorbase::slicing::slicing(fb_factorbase const & fb, fb_factorbase::key_typ
     verbose_output_print(0, 1, "# Creating new slicing on side %d for %s\n",
             fb.side, os.str().c_str());
 
-    helper_functor_dispatch_weight_parts D { K };
+    /* This uses our cache of thresholds, we expect it to be quick enough */
+    std::array<threshold_pos, FB_MAX_PARTS+1> local_thresholds;
+    local_thresholds[0] = fb.get_threshold_pos(0);
+    for(int i = 0 ; i < FB_MAX_PARTS ; ++i)
+        local_thresholds[i+1] = fb.get_threshold_pos(K.thresholds[i]);
+
+    /* Now we sum the contributions in all ranges, and deduce the
+     * toplevel (at least the toplevel for this factor base) */
+    helper_functor_count_weight_parts D { local_thresholds };
     toplevel = multityped_array_fold(D, 0, fb.entries);
+
     for (int i = 0; i <= toplevel; i++) {
         size_t nr_primes = D.primes[i];
         size_t nr_roots = D.ideals[i];
@@ -931,7 +955,7 @@ fb_factorbase::slicing::slicing(fb_factorbase const & fb, fb_factorbase::key_typ
      * resieved, which are trial-divided, and so on).
      */
 
-    multityped_array_foreach(helper_functor_dispatch_small_sieved_primes { *this, K }, D.intervals[0]);
+    multityped_array_foreach(helper_functor_dispatch_small_sieved_primes { *this, K, local_thresholds }, fb.entries);
     auto by_q = fb_entry_general::sort_byq();
 
     /* small sieve cares about this list being sorted by hit rate, I
@@ -955,7 +979,7 @@ fb_factorbase::slicing::slicing(fb_factorbase const & fb, fb_factorbase::key_typ
     slice_index_t s = 0;
     for (int i = 1; i < FB_MAX_PARTS; i++) {
         parts[i].first_slice_index = s;
-        multityped_array_foreach(helper_functor_subdivide_slices { parts[i], i, K, s }, D.intervals[i]);
+        multityped_array_foreach(helper_functor_subdivide_slices { parts[i], i, K, local_thresholds, s }, fb.entries);
         s += parts[i].nslices();
     }
 
@@ -1442,6 +1466,7 @@ fb_factorbase::read(const char * const filename)
     return 1;
 }
 
+/* {{{ factor base cache */
 
 /* We now require the glibc in order to do factor base caching, because
  * we prefer to rely on mmap-able vectors that subclass the standard
@@ -1687,6 +1712,8 @@ struct helper_functor_write_to_fbc_file {
 
 #endif
 
+/* }}} */
+
 fb_factorbase::fb_factorbase(cxx_cado_poly const & cpoly, int side, unsigned long lim, unsigned long powlim, cxx_param_list & pl, const char * fbc_filename) : f(cpoly->pols[side]), side(side), lim(lim), powlim(powlim)
 {
     if (!lim) return;
@@ -1817,6 +1844,11 @@ fb_factorbase::fb_factorbase(cxx_cado_poly const & cpoly, int side, unsigned lon
                 side, fbc_filename, tfb, tfb_wct);
     }
 #endif
+
+    /* This puts an entry in the cache with the end position for all
+     * vectors. We have a shortcut that avoids re-reading the entire
+     * factor base for that */
+    get_threshold_pos(lim);
 }
 
 
