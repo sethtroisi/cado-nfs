@@ -571,6 +571,7 @@ struct fb_factorbase::helper_functor_append {
     void switch_to_general_entries_only() { positive = false; }
     template<typename T>
         void operator()(T & x) {
+            ASSERT_ALWAYS(x.weight_cdf.size() == x.size() + 1);
             typedef typename T::value_type FB_ENTRY_TYPE;
             constexpr bool isG = FB_ENTRY_TYPE::is_general_type;
             constexpr unsigned char N = FB_ENTRY_TYPE::fixed_nr_roots;
@@ -611,6 +612,7 @@ struct fb_factorbase::helper_functor_append {
                     ++it;
                 }
             }
+            ASSERT_ALWAYS(x.weight_cdf.size() == x.size() + 1);
         }
 };
 void fb_factorbase::append(std::list<fb_entry_general> &pool) {
@@ -797,7 +799,7 @@ struct helper_functor_dispatch_small_sieved_primes {
 /* In order to subdivide into sub-ranges with constant logp, we have a
  * fairly simple problem to solve. Given:
  *      a random access iterator type T (here,
- *      mmappable_vector<entry_t>::const_iterator).
+ *      mmappable_vector<FB_ENTRY_TYPE>::const_iterator).
  *      a function F that computes an integer from a object of type T (here, x -> fb_log(x->get_q(), K.scale, 0)), 
  *      a range R of iterators of type T, such that F is monotonic (that
  *      is, for a,b two iterators within the range R, a<=b => F(*a) <=
@@ -889,12 +891,12 @@ struct helper_functor_subdivide_slices {
         void operator()(T const & x) {
             /* T is fb_entries_factory<n>::type for some n */
             typedef typename T::container_type ventry_t;
-            typedef typename ventry_t::value_type entry_t;
-            typedef fb_slice<entry_t> slice_t;
+            typedef typename ventry_t::value_type FB_ENTRY_TYPE;
+            typedef fb_slice<FB_ENTRY_TYPE> slice_t;
             static_assert(std::is_same<typename slice_t::fb_entry_vector, ventry_t>::value);
             typedef std::vector<slice_t> vslice_t;
 
-            constexpr int n = entry_t::is_general_type ? -1 : entry_t::fixed_nr_roots;
+            constexpr int n = FB_ENTRY_TYPE::is_general_type ? -1 : FB_ENTRY_TYPE::fixed_nr_roots;
             size_t k0 = local_thresholds[part_index][1+n];
             size_t k1 = local_thresholds[part_index + 1][1+n];
 
@@ -1622,14 +1624,21 @@ struct fbc_header {
     operator bool() const { return f->deg >= 1; }
     struct entryvec {
         size_t offset;      /* offset to beginning of file */
+        size_t weight_offset;      /* offset to beginning of file */
         size_t nentries;
         size_t entry_size;
         std::istream& parse(std::istream& in) {
-            in >> offset >> nentries >> entry_size;
+            in >> offset
+                >> weight_offset
+                >> nentries
+                >> entry_size;
             return in;
         }
         std::ostream& print(std::ostream& out) const {
-            out << offset << " " << nentries << " " << entry_size << "\n";
+            out << offset << " "
+                << weight_offset << " "
+                << nentries << " "
+                << entry_size << "\n";
             return out;
         }
     };
@@ -1669,8 +1678,10 @@ struct fbc_header {
         return out;
     }
     void adjust_header_offset(size_t header_offset) {
-        for(auto & e : entries)
+        for(auto & e : entries) {
             e.offset = e.offset + header_offset - base_offset;
+            e.weight_offset = e.weight_offset + header_offset - base_offset;
+        }
         base_offset = header_offset;
     }
 };
@@ -1760,13 +1771,17 @@ struct helper_functor_reseat_mmapped_chunks {
             mmappable_vector<FB_ENTRY_TYPE> y(mmap_allocator<FB_ENTRY_TYPE>(source, next->offset, next->nentries));
             y.mmap(next->nentries);
             swap(x, y);
+
+            mmappable_vector<double> yw(mmap_allocator<double>(source, next->weight_offset, next->nentries + 1));
+            yw.mmap(next->nentries + 1);
+            swap(x.weight_cdf, yw);
             next++;
         }
 };
 
 struct helper_functor_recreate_fbc_header {
     fbc_header & block;
-    size_t current_offset;
+    size_t & current_offset;
     template<typename T>
         void operator()(T & x) {
             typedef typename T::value_type FB_ENTRY_TYPE;
@@ -1775,18 +1790,47 @@ struct helper_functor_recreate_fbc_header {
              * degree + 2 is for [-1, 0, ..., degree ]
              *
              */
+            constexpr int n = FB_ENTRY_TYPE::is_general_type ? -1 : FB_ENTRY_TYPE::fixed_nr_roots;
             if (block.entries.size() == (size_t) (block.degree + 2)) {
                 ASSERT_ALWAYS(x.empty());
                 return;
             }
+            ASSERT_ALWAYS(block.entries.size() == 1 + n);
             fbc_header::entryvec e {
                     current_offset,
+                    0,  /* will be done later */
                     x.size(),
                     sizeof(FB_ENTRY_TYPE)
             };
             block.entries.push_back(e);
             
             size_t mem_size = e.nentries * sizeof(FB_ENTRY_TYPE);
+            /* we don't *have* to align it immensely. Make it a cache
+             * line... */
+            mem_size = ((mem_size - 1) | 63) + 1;
+            current_offset += mem_size;
+        }
+};
+
+/* We fill the weight offsets at a later point, because those are more
+ * seldom used. Better hammer a single part of the file.
+ */
+struct helper_functor_recreate_fbc_header_weight_part {
+    fbc_header & block;
+    size_t & current_offset;
+    template<typename T>
+        void operator()(T & x) {
+            typedef typename T::value_type FB_ENTRY_TYPE;
+            constexpr int n = FB_ENTRY_TYPE::is_general_type ? -1 : FB_ENTRY_TYPE::fixed_nr_roots;
+            if (n > block.degree) {
+                ASSERT_ALWAYS(x.empty());
+                return;
+            }
+            block.entries[n+1].weight_offset = current_offset;
+            
+            ASSERT_ALWAYS(x.weight_cdf.size() == x.size() + 1);
+
+            size_t mem_size = (x.size() + 1) * sizeof(double);
             /* we don't *have* to align it immensely. Make it a cache
              * line... */
             mem_size = ((mem_size - 1) | 63) + 1;
@@ -1812,13 +1856,38 @@ struct helper_functor_write_to_fbc_file {
         }
 };
 
+struct helper_functor_write_to_fbc_file_weight_part {
+    int fbc;
+    size_t header_block_offset;
+    std::vector<fbc_header::entryvec> const & chunks;
+    std::vector<fbc_header::entryvec>::const_iterator next;
+    template<typename T>
+        void operator()(T & x) {
+            if (next == chunks.end()) return;
+            lseek(fbc, header_block_offset + next->weight_offset, SEEK_SET);
+            ::write(fbc, &*x.weight_begin(), sizeof(double) * (x.size() + 1));
+            next++;
+        }
+};
+
 #endif
 
 /* }}} */
 
+struct helper_functor_put_first_0 {
+    template<typename T>
+        void operator()(T & x) {
+            x.clear();
+            x.weight_cdf.clear();
+            x.weight_cdf.push_back(0);
+        }
+};
+
 fb_factorbase::fb_factorbase(cxx_cado_poly const & cpoly, int side, unsigned long lim, unsigned long powlim, cxx_param_list & pl, const char * fbc_filename) : f(cpoly->pols[side]), side(side), lim(lim), powlim(powlim)
 {
     if (!lim) return;
+
+    multityped_array_foreach(helper_functor_put_first_0(), entries);
 
     double tfb = seconds ();
     double tfb_wct = wct_seconds ();
@@ -1904,10 +1973,18 @@ fb_factorbase::fb_factorbase(cxx_cado_poly const & cpoly, int side, unsigned lon
 
         fbc_header S(f, lim, powlim);
 
-        helper_functor_recreate_fbc_header R { S, fbc_header::header_block_size };
-        multityped_array_foreach(R, entries);
+        /* current_offset is passed by reference below */
+        size_t current_offset = fbc_header::header_block_size;
+        multityped_array_foreach(
+                helper_functor_recreate_fbc_header {
+                    S, current_offset },
+                entries);
+        multityped_array_foreach(
+                helper_functor_recreate_fbc_header_weight_part {
+                    S, current_offset },
+                entries);
         /* This must be aligned to a page size */
-        S.size = ((R.current_offset - 1) | (sysconf(_SC_PAGE_SIZE) -1)) + 1;
+        S.size = ((current_offset - 1) | (sysconf(_SC_PAGE_SIZE) -1)) + 1;
 
         /* Next, we must append it to the cache file */
 
@@ -1936,6 +2013,7 @@ fb_factorbase::fb_factorbase(cxx_cado_poly const & cpoly, int side, unsigned lon
         ::write(fbc, os.str().c_str(), os.str().size());
 
         multityped_array_foreach(helper_functor_write_to_fbc_file { fbc, fbc_size, S.entries, S.entries.begin() }, entries);
+        multityped_array_foreach(helper_functor_write_to_fbc_file_weight_part { fbc, fbc_size, S.entries, S.entries.begin() }, entries);
         ASSERT_ALWAYS((size_t) lseek(fbc, 0, SEEK_END) <= fbc_size + S.size);
         ftruncate(fbc, fbc_size + S.size);
         close(fbc);

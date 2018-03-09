@@ -265,7 +265,11 @@ class fb_slice : public fb_slice_interface {
  * */
 
 template<typename T> struct entries_and_cdf {
-    struct type : public mmappable_vector<T> {
+    typedef mmappable_vector<T> container_type;
+    typedef mmappable_vector<double> weight_container_type;
+    struct type : public container_type {
+        typedef typename entries_and_cdf<T>::container_type container_type;
+        typedef typename entries_and_cdf<T>::weight_container_type weight_container_type;
         /* cumulative distribution function. This is set up by
          * helper_functor_append. We use it to split into slices.
          * weight_cdf[i] is \sum_{j < i} super[j].weight
@@ -274,9 +278,7 @@ template<typename T> struct entries_and_cdf {
         /* We *might* want to consider the cdf only for several entries
          * at a time (say, 16), so as to minimize the cost of finding the
          * split points */
-        typedef mmappable_vector<T> container_type;
-        typedef std::vector<double> weight_container_type;
-        std::vector<double> weight_cdf { 0 };
+        weight_container_type weight_cdf { 0 };
         inline weight_container_type::const_iterator weight_begin() const { 
             return weight_cdf.begin();
         }
@@ -677,7 +679,6 @@ class fb_factorbase {
         void make_linear_threadpool (unsigned int nb_threads);
 
     public:
-        fb_factorbase(cxx_cado_poly const & cpoly, int side, unsigned long lim, unsigned long powlim, const char * fbc_filename);
         fb_factorbase(cxx_cado_poly const & cpoly, int side, unsigned long lim, unsigned long powlim, cxx_param_list & pl, const char * fbc_filename);
 
     private:
