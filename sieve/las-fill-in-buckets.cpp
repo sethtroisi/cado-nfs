@@ -608,6 +608,7 @@ fill_in_buckets_one_slice_internal(const worker_thread * worker, const task_para
     WHERE_AM_I_UPDATE(w, psi, & param->si);
     WHERE_AM_I_UPDATE(w, side, param->side);
     WHERE_AM_I_UPDATE(w, i, param->plattices_vector->get_index());
+    WHERE_AM_I_UPDATE(w, N, param->first_region0_index);
 
     try {
         /* Get an unused bucket array that we can write to */
