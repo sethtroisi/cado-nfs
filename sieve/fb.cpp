@@ -841,9 +841,6 @@ struct helper_functor_subdivide_slices {
             typedef std::vector<slice_t> vslice_t;
 
             constexpr int n = entry_t::is_general_type ? -1 : entry_t::fixed_nr_roots;
-            // vslice_t & sdst(dst.get_slices_vector_for_nroots<n>());
-            vslice_t & sdst(dst.slices.get<n>());
-
             size_t k0 = local_thresholds[part_index][1+n];
             size_t k1 = local_thresholds[part_index + 1][1+n];
 
@@ -873,26 +870,76 @@ struct helper_functor_subdivide_slices {
             if (n < 0) n_eq << "*"; else n_eq << n;
             verbose_output_print (0, 2, "# slices for part %d, %s roots: from %zu entries, we found %zu different logp values\n", part_index, n_eq.str().c_str(), interval_width, pool.size());
 
-            /* bold move: all of them become slices... */
-            /* of course that won't stay, it's obvious WIP.
+            /* We now divide into several slices of roughly equal weight.
+             * We can assess this weight by looking at the cdf.
              */
-            /* TODO */ /* TODO */ /* TODO */ /* TODO */
-            /* TODO */ /* TODO */ /* TODO */ /* TODO */
-            /* TODO */ /* TODO */ /* TODO */ /* TODO */
-            sdst.swap(pool);
-            /* TODO */ /* TODO */ /* TODO */ /* TODO */
-            /* TODO */ /* TODO */ /* TODO */ /* TODO */
-            /* TODO */ /* TODO */ /* TODO */ /* TODO */
+            vslice_t & sdst(dst.slices.get<n>());
+            for(auto const & s : pool) {
+                /* s is a slice with common logp value. Maybe we have to
+                 * split it. */
+                unsigned char cur_logp = s.logp;
+                auto swb = x.weight_begin() + (s.begin() - x.begin());
+                auto swe = x.weight_begin() + (s.end() - x.begin());
+                double w0 = *swb;
+                for(size_t npieces = iceildiv(s.size(), std::numeric_limits<slice_offset_t>::max()) ; ; npieces++) {
+                    /* Compute the split points for splitting into
+                     * exactly npieces of roughly equal weight */
+                    std::vector<it_t> ssplits;
+                    it_t it = s.begin();
+                    for(size_t k = 1 ; k <= npieces ; ++k) {
+                        double target = w0 + (k * s.weight) / npieces;
+                        /* Find first position where the cdf is >= target */
+                        it_t jt;
+                        if (k == npieces) {
+                            jt = s.end();
+                        } else {
+                            auto jw = std::lower_bound(swb, swe, target);
+                            jt = x.begin() + (jw - x.weight_begin());
+                            ASSERT(jt >= s.begin() && it <= s.end());
+                        }
+                        if (jt - it > std::numeric_limits<slice_offset_t>::max()) {
+                            /* overflow. Do not push the split point, we'll try
+                             * with more pieces */
+                            verbose_output_print (0, 2, "# while splitting slice for %s logp=%d (%zu entries, weight=%f): splitting in %zu pieces is not enough, we have an overlow with block #%zu. Trying %zu pieces\n",
+                                    n_eq.str().c_str(),
+                                    (int) s.get_logp(),
+                                    s.size(),
+                                    s.get_weight(),
+                                    npieces,
+                                    k-1,
+                                    npieces + 1);
+                            break;
+                        }
+                        ssplits.push_back(jt);
+                        it = jt;
+                    }
+                    if (ssplits.size() != npieces) {
+                        /* try one more piece */
+                        continue;
+                    }
+                    /* We're satisfied with those split points. Re-do the
+                     * sub-slices, and push them to the final list. We
+                     * can drop the list of split points afterwards */
+                    it = s.begin();
+                    for(it_t jt : ssplits) {
+                        slice_t s(it, jt, cur_logp);
+                        s.weight = x.weight_delta(it, jt);
+                        sdst.push_back(s);
+                        it = jt;
+                    }
+                    break;
+                }
+            }
 
             /* And then we number all slices */
             for(auto & s : sdst) s.index = index++;
 
             for(auto const & s : sdst) {
                 verbose_output_print (0, 2, "# [%lu] %s logp=%d: %zu entries, weight=%f\n",
-                        (unsigned long) s.index,
+                        (unsigned long) s.get_index(),
                         n_eq.str().c_str(),
                         (int) s.get_logp(),
-                        s.end() - s.begin(),
+                        s.size(),
                         s.get_weight());
             }
         }

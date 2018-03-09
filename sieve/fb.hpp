@@ -294,6 +294,12 @@ template<typename T> struct entries_and_cdf {
         double weight_delta(typename container_type::const_iterator a, typename container_type::const_iterator b) const {
             return weight_cdf[b-container_type::begin()] - weight_cdf[a-container_type::begin()];
         }
+        double weight_cdf_at(size_t a) const {
+            return weight_cdf_at[a];
+        }
+        double weight_cdf_at(typename container_type::const_iterator a) const {
+            return weight_cdf[a-container_type::begin()];
+        }
     };
 };
 template<int n> struct fb_entries_factory {
