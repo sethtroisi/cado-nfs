@@ -37,7 +37,7 @@ namespace mmap_allocator_details
         mmap_allocator_exception(std::string msg_param):
             std::runtime_error(msg_param) { }
 
-        virtual ~mmap_allocator_exception(void) { }
+        virtual ~mmap_allocator_exception(void) noexcept { }
     };
 
     /* Only the mmapped_file is something we can use to grab mapping
