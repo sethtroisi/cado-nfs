@@ -893,7 +893,7 @@ struct helper_functor_subdivide_slices {
             typedef typename T::container_type ventry_t;
             typedef typename ventry_t::value_type FB_ENTRY_TYPE;
             typedef fb_slice<FB_ENTRY_TYPE> slice_t;
-            static_assert(std::is_same<typename slice_t::fb_entry_vector, ventry_t>::value);
+            static_assert(std::is_same<typename slice_t::fb_entry_vector, ventry_t>::value, "template helper_functor_subdivide_slices is misused");
             typedef std::vector<slice_t> vslice_t;
 
             constexpr int n = FB_ENTRY_TYPE::is_general_type ? -1 : FB_ENTRY_TYPE::fixed_nr_roots;
