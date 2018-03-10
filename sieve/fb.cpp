@@ -464,12 +464,12 @@ struct fb_factorbase::helper_functor_count_primes {
 struct fb_factorbase::helper_functor_count_prime_ideals {
         template<typename T>
         size_t operator()(size_t t0, T const  & x) const {
-            if (T::is_general_type) {
+            if (T::value_type::is_general_type) {
                 for(auto const & a : x)
                     t0 += a.get_nr_roots();
                 return t0;
             } else {
-                return t0 + T::fixed_nr_roots * x.size();
+                return t0 + T::value_type::fixed_nr_roots * x.size();
             }
         }
 };
