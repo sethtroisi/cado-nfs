@@ -281,10 +281,12 @@ uint64_nextprime (uint64_t q)
 
 #define REPS 3 /* number of Miller-Rabin tests in isprime */
 
-/* For GMP 6.0.0:
+/* For GMP 6.1.2:
    with REPS=1, the smallest composite reported prime is 1537381
-   with REPS=2, it is 1943521
-   with REPS=3, it is 465658903
+                (then 1803601, 1943521, 2237017, 3604201, 5095177, ...);
+   with REPS=2, it is 1943521 (then 16661633, 18790021, 54470491, ...);
+   with REPS=3, it is 465658903 (then 2242724851, 5969607379, 6635692801, ...);
+   with REPS=4, none < 10000000000.
    See also https://en.wikipedia.org/wiki/Miller–Rabin_primality_test
 */
 int
