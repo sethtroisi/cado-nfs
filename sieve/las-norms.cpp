@@ -1111,9 +1111,8 @@ B:=[bestrep(a):a in {{a*b*c*x:a in {1,-1},b in {1,d},c in {1,s}}:x in MM}];
      * that by homogeneity) */
     int N = 5;
 
-    /* Try negative squeeze values, so that we use _longer_ rows */
     double reference = estimate_yield_in_sieve_area(shuffle_matrices[0], 0, N);
-    for(int squeeze = 0 ; squeeze >= -3 ; squeeze--) {
+    for(int squeeze = 0 ; squeeze <= 3 ; squeeze++) {
         for(int r = 0 ; r < nmatrices ; r++) {
             if (squeeze == 0 && (r & 1)) continue;
             mat<int> const & Sr(shuffle_matrices[r]);
