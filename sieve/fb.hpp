@@ -402,9 +402,11 @@ class fb_factorbase {
     class slicing {
         public:
         struct stats_type {
-            std::array<size_t, FB_MAX_PARTS> primes { 0, };
-            std::array<size_t, FB_MAX_PARTS> ideals { 0, };
-            std::array<double, FB_MAX_PARTS> weight { 0, };
+            /* explicit-initializing as below forces zero-initialization
+             * of members */
+            std::array<size_t, FB_MAX_PARTS> primes { };
+            std::array<size_t, FB_MAX_PARTS> ideals { };
+            std::array<double, FB_MAX_PARTS> weight { };
         };
         stats_type stats;
 
