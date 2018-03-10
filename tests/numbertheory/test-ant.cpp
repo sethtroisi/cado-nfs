@@ -26,7 +26,6 @@ istream& operator>>(istream& is, cxx_mpz_poly& f)/*{{{*/
     return is;
 }
 /*}}}*/
-}
 
 ostream& operator<<(ostream& o, cxx_mpz_poly const& v)/*{{{*/
 {
@@ -40,6 +39,7 @@ ostream& operator<<(ostream& o, cxx_mpz_poly const& v)/*{{{*/
     }
     return o;
 }/*}}}*/
+}
 
 static void decl_usage(param_list_ptr pl)/*{{{*/
 {
