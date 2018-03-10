@@ -268,7 +268,7 @@ void current_I18_branch(std::vector<int> & positions, std::vector<ssp_simple_t> 
             overrun = sieve_full_line(S0, S0 + (i1 - i0), S0 - S,
                     xpos, p+p, logp, w);
             S0 += I;
-            pos += r; if (pos >= (int) p) pos -= p; 
+            pos += r; if (pos >= (int) p) pos -= p;
             if (++j >= j1) break;
 
             /* now j odd again */
@@ -326,7 +326,7 @@ void current_I18_branch(std::vector<int> & positions, std::vector<ssp_simple_t> 
              * + 1.
              *
              * di is within a small interval (albeit a centered one).
-             * 
+             *
              * So it seems feasible to get by with a fixed number of
              * conditional subtractions.
              */
@@ -363,7 +363,7 @@ void modified_I18_branch_C(std::vector<int> & positions, std::vector<ssp_simple_
          */
         fbprime_t spx = (p+p)^p;
         fbprime_t px = (j0&1)?p:(p+p);
-        /* The increment is i1-i0, not I, to cover the case where 
+        /* The increment is i1-i0, not I, to cover the case where
          * B <= I; we then have i1-i0 = B
          * because there's a min. (and in that case, there's only a
          * single line).
@@ -374,7 +374,7 @@ void modified_I18_branch_C(std::vector<int> & positions, std::vector<ssp_simple_
             overrun = sieve_full_line(S0, S0 + (i1 - i0), S0 - S,
                     pos + (((si.conf.sublat.i0^pos^1)&1&~j)?p:0), px, logp, w);
             S0 += I;
-            pos += r; if (pos >= (int) p) pos -= p; 
+            pos += r; if (pos >= (int) p) pos -= p;
             px ^= spx;
         }
         if (logI > LOG_BUCKET_REGION) {
@@ -412,7 +412,7 @@ void legacy_branch(std::vector<int> & positions, std::vector<ssp_simple_t> const
 
         unsigned long j;
         const int test_divisibility MAYBE_UNUSED = 0; /* very slow, but nice for debugging */
-        const unsigned long nj = bucket_region >> si.conf.logI_adjusted; /* Nr. of lines 
+        const unsigned long nj = bucket_region >> si.conf.logI_adjusted; /* Nr. of lines
                                                                             per bucket region */
 
         WHERE_AM_I_UPDATE(w, p, p);
@@ -445,7 +445,7 @@ void legacy_branch(std::vector<int> & positions, std::vector<ssp_simple_t> const
             }
             SMALLSIEVE_ASSEMBLY_OLD(pi, p_or_2p, S_ptr, logp);
             // sieve_full_line(S0, S_ptr, S0 - S, pi - S0, p_or_2p, logp, w);
-            pos += r; if (pos >= p) pos -= p; 
+            pos += r; if (pos >= p) pos -= p;
             /* Next line */
             if (++j >= nj) break;
             p_or_2p >>= 1;
@@ -511,7 +511,7 @@ void devel_branch(std::vector<int> & positions, std::vector<ssp_simple_t> const&
                     xpos, p+p, logp, w);
             }
             S0 += I;
-            pos += r; if (pos >= (int) p) pos -= p; 
+            pos += r; if (pos >= (int) p) pos -= p;
             if (++j >= j1) break;
 
 j_odd_devel:
@@ -569,7 +569,7 @@ j_odd_devel:
              *
              * dj is either always the same thing, or that same thing +1.
              * di is within a small interval (albeit a centered one).
-             * 
+             *
              * It seems feasible to get by with a fixed number of
              * conditional subtractions.
              */
@@ -603,7 +603,7 @@ void legacy_mod_branch(std::vector<int> & positions, std::vector<ssp_simple_t> c
         size_t overrun MAYBE_UNUSED = 0; /* tame gcc */
         unsigned long j;
         const int test_divisibility MAYBE_UNUSED = 0; /* very slow, but nice for debugging */
-        const unsigned long nj = bucket_region >> si.conf.logI_adjusted; /* Nr. of lines 
+        const unsigned long nj = bucket_region >> si.conf.logI_adjusted; /* Nr. of lines
                                                                             per bucket region */
 
         WHERE_AM_I_UPDATE(w, p, p);
@@ -639,7 +639,7 @@ void legacy_mod_branch(std::vector<int> & positions, std::vector<ssp_simple_t> c
             SMALLSIEVE_ASSEMBLY_OLD(pi, p_or_2p, S1, logp);
             overrun = pi - S1;
             // sieve_full_line(S0, S_ptr, S0 - S, pi - S0, p_or_2p, logp, w);
-            pos += r; if (pos >= (int) p) pos -= p; 
+            pos += r; if (pos >= (int) p) pos -= p;
             /* Next line */
             if (++j >= nj) break;
             p_or_2p >>= 1;
@@ -677,7 +677,7 @@ j_odd0:
 
             unsigned long j;
             const int test_divisibility MAYBE_UNUSED = 0; /* very slow, but nice for debugging */
-            const unsigned long nj = bucket_region >> si.conf.logI_adjusted; /* Nr. of lines 
+            const unsigned long nj = bucket_region >> si.conf.logI_adjusted; /* Nr. of lines
                                                                                 per bucket region */
 
             WHERE_AM_I_UPDATE(w, p, p);
@@ -709,7 +709,7 @@ j_odd0:
                     pi += p;
                 }
                 SMALLSIEVE_ASSEMBLY_OLD(pi, p_or_2p, S_ptr, logp);
-                pos += r; if (pos >= (int) p) pos -= p; 
+                pos += r; if (pos >= (int) p) pos -= p;
                 /* Next line */
                 if (++j >= nj) break;
                 p_or_2p >>= 1;
@@ -771,7 +771,7 @@ template<typename even_code, typename odd_code, bool fragment> void devel_branch
             overrun = even_code()(S0, S0 + (i1 - i0), S0 - S, xpos, p+p, logp, w);
             }
             S0 += I;
-            pos += r; if (pos >= (int) p) pos -= p; 
+            pos += r; if (pos >= (int) p) pos -= p;
             if (++j >= j1) break;
 
 j_odd_devel0:
@@ -840,7 +840,7 @@ j_odd_devel0:
              *
              * dj is either always the same thing, or that same thing +1.
              * di is within a small interval (albeit a centered one).
-             * 
+             *
              * It seems feasible to get by with a fixed number of
              * conditional subtractions.
              */
