@@ -343,7 +343,8 @@ void fill_in_buckets_prepare_precomp_plattice(
                         sieve_info const & si MAYBE_UNUSED,
                         precomp_plattice_t & precomp_plattice)
 {
-    si.sides[side].fbs->get_part(level).foreach_slice(helper_functor_make_lattice_bases { side, level, si, precomp_plattice });
+    helper_functor_make_lattice_bases F { side, level, si, precomp_plattice };
+    si.sides[side].fbs->get_part(level).foreach_slice(F);
 }
 
 // At top level, the fill-in of the buckets must interleave

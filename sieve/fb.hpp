@@ -273,12 +273,14 @@ template<typename T> struct entries_and_cdf {
         /* cumulative distribution function. This is set up by
          * helper_functor_append. We use it to split into slices.
          * weight_cdf[i] is \sum_{j < i} super[j].weight
-         * (this is why we have a default initializer with a lone 0)
+         *
+         * Thus we always need a lone 0 to initialize. See
+         * helper_functor_put_first_0, used in the fb_factorbase ctor.
          */
         /* We *might* want to consider the cdf only for several entries
          * at a time (say, 16), so as to minimize the cost of finding the
          * split points */
-        weight_container_type weight_cdf { 0 };
+        weight_container_type weight_cdf;
         inline weight_container_type::const_iterator weight_begin() const { 
             return weight_cdf.begin();
         }
@@ -497,7 +499,8 @@ class fb_factorbase {
             slice_index_t nslices() const {
                 if (_nslices != std::numeric_limits<slice_index_t>::max())
                     return _nslices;
-                return _nslices = multityped_array_fold(helper_functor_nslices(), 0, slices);
+                helper_functor_nslices N;
+                return _nslices = multityped_array_fold(N, 0, slices);
             }
             /* }}} */
 
@@ -512,20 +515,27 @@ class fb_factorbase {
             public:
             template<typename F>
             void foreach_slice(F & f) {
-                multityped_array_foreach(foreach_slice_s<F> { f }, slices);
-            }
-            template<typename F>
-            void foreach_slice(F && f) {
-                multityped_array_foreach(foreach_slice_s<F> { f }, slices);
+                foreach_slice_s<F> FF { f };
+                multityped_array_foreach(FF, slices);
             }
             template<typename F>
             void foreach_slice(F & f) const {
+                foreach_slice_s<F> FF { f };
+                multityped_array_foreach(FF, slices);
+            }
+            /*
+             * old g++ seems to have difficulties with this variant, and
+             * is puzzled by the apparent ambiguity -- newer g++ groks it
+             * correctly, as does clang
+            template<typename F>
+            void foreach_slice(F && f) {
                 multityped_array_foreach(foreach_slice_s<F> { f }, slices);
             }
             template<typename F>
             void foreach_slice(F && f) const {
                 multityped_array_foreach(foreach_slice_s<F> { f }, slices);
             }
+            */
 
             fb_slice_interface const & operator[](slice_index_t index) const {
                 /* This bombs out at runtime if get returns NULL, but
@@ -705,7 +715,8 @@ class fb_factorbase {
 
     public:
         void finalize() {
-            multityped_array_foreach(sorter(), entries);
+            sorter S;
+            multityped_array_foreach(S, entries);
         }
 };
 

@@ -549,13 +549,16 @@ struct fb_factorbase::helper_functor_count_combined_interval {
 
 /* outside visible interface */
 size_t fb_factorbase::count_primes() const {
-    return multityped_array_fold(helper_functor_count_primes(), 0, entries);
+    helper_functor_count_primes C;
+    return multityped_array_fold(C, 0, entries);
 }
 size_t fb_factorbase::count_prime_ideals() const {
-    return multityped_array_fold(helper_functor_count_primes(), 0, entries);
+    helper_functor_count_prime_ideals C;
+    return multityped_array_fold(C, 0, entries);
 }
 size_t fb_factorbase::count_weight() const {
-    return multityped_array_fold(helper_functor_count_weight(), 0, entries);
+    helper_functor_count_weight C;
+    return multityped_array_fold(C, 0, entries);
 }
 /* }}} */
 
@@ -658,7 +661,8 @@ fb_factorbase::threshold_pos fb_factorbase::get_threshold_pos(fbprime_t thr) con
     if (it != threshold_pos_cache.end())
         return it->second;
     threshold_pos res;
-    multityped_array_foreach(helper_functor_find_threshold_pos { thr, res }, entries);
+    helper_functor_find_threshold_pos H { thr, res };
+    multityped_array_foreach(H, entries);
     threshold_pos_cache[thr] = res;
     return res;
 }
@@ -1058,7 +1062,8 @@ fb_factorbase::slicing::slicing(fb_factorbase const & fb, fb_factorbase::key_typ
      * resieved, which are trial-divided, and so on).
      */
 
-    multityped_array_foreach(helper_functor_dispatch_small_sieved_primes { *this, K, local_thresholds }, fb.entries);
+    helper_functor_dispatch_small_sieved_primes SS { *this , K, local_thresholds };
+    multityped_array_foreach(SS, fb.entries);
     auto by_q = fb_entry_general::sort_byq();
 
     /* small sieve cares about this list being sorted by hit rate, I
@@ -1083,7 +1088,8 @@ fb_factorbase::slicing::slicing(fb_factorbase const & fb, fb_factorbase::key_typ
     slice_index_t s = 0;
     for (int i = 1; i < FB_MAX_PARTS; i++) {
         parts[i].first_slice_index = s;
-        multityped_array_foreach(helper_functor_subdivide_slices { parts[i], i, K, local_thresholds, s }, fb.entries);
+        helper_functor_subdivide_slices SUB { parts[i], i, K, local_thresholds, s };
+        multityped_array_foreach(SUB, fb.entries);
         s += parts[i].nslices();
     }
 
@@ -1887,7 +1893,8 @@ fb_factorbase::fb_factorbase(cxx_cado_poly const & cpoly, int side, unsigned lon
 {
     if (!lim) return;
 
-    multityped_array_foreach(helper_functor_put_first_0(), entries);
+    helper_functor_put_first_0 F0;
+    multityped_array_foreach(F0, entries);
 
     double tfb = seconds ();
     double tfb_wct = wct_seconds ();
@@ -1906,7 +1913,8 @@ fb_factorbase::fb_factorbase(cxx_cado_poly const & cpoly, int side, unsigned lon
         /* Now do the mmapping ! */
         using namespace mmap_allocator_details;
         mmapped_file source(fbc_filename, mmap_allocator_details::READ_ONLY, hdr.base_offset, hdr.size);
-        multityped_array_foreach(helper_functor_reseat_mmapped_chunks { hdr.entries, hdr.entries.begin(), source}, entries);
+        helper_functor_reseat_mmapped_chunks MM { hdr.entries, hdr.entries.begin(), source};
+        multityped_array_foreach(MM, entries);
 
         tfb = seconds () - tfb;
         tfb_wct = wct_seconds () - tfb_wct;
@@ -1975,14 +1983,10 @@ fb_factorbase::fb_factorbase(cxx_cado_poly const & cpoly, int side, unsigned lon
 
         /* current_offset is passed by reference below */
         size_t current_offset = fbc_header::header_block_size;
-        multityped_array_foreach(
-                helper_functor_recreate_fbc_header {
-                    S, current_offset },
-                entries);
-        multityped_array_foreach(
-                helper_functor_recreate_fbc_header_weight_part {
-                    S, current_offset },
-                entries);
+        helper_functor_recreate_fbc_header HH { S, current_offset };
+        multityped_array_foreach(HH, entries);
+        helper_functor_recreate_fbc_header_weight_part HW { S, current_offset };
+        multityped_array_foreach(HW, entries);
         /* This must be aligned to a page size */
         S.size = ((current_offset - 1) | (sysconf(_SC_PAGE_SIZE) -1)) + 1;
 
@@ -2012,8 +2016,10 @@ fb_factorbase::fb_factorbase(cxx_cado_poly const & cpoly, int side, unsigned lon
          */
         ::write(fbc, os.str().c_str(), os.str().size());
 
-        multityped_array_foreach(helper_functor_write_to_fbc_file { fbc, fbc_size, S.entries, S.entries.begin() }, entries);
-        multityped_array_foreach(helper_functor_write_to_fbc_file_weight_part { fbc, fbc_size, S.entries, S.entries.begin() }, entries);
+        helper_functor_write_to_fbc_file W1 { fbc, fbc_size, S.entries, S.entries.begin() };
+        multityped_array_foreach(W1, entries);
+        helper_functor_write_to_fbc_file_weight_part W2 { fbc, fbc_size, S.entries, S.entries.begin() };
+        multityped_array_foreach(W2, entries);
         ASSERT_ALWAYS((size_t) lseek(fbc, 0, SEEK_END) <= fbc_size + S.size);
         ftruncate(fbc, fbc_size + S.size);
         close(fbc);
