@@ -330,7 +330,7 @@ void current_I18_branch(std::vector<int> & positions, std::vector<ssp_simple_t> 
              * So it seems feasible to get by with a fixed number of
              * conditional subtractions.
              */
-            pos = (p_pos + B_mod_p * di + dj * r) % p;
+            pos = (p_pos + B_mod_p * di + dj * (int) r) % (int) p;
             if (pos < 0) pos += p;
         } else {
             /* skip stride */
@@ -385,7 +385,7 @@ void modified_I18_branch_C(std::vector<int> & positions, std::vector<ssp_simple_
     ASSERT(overrun < (int) 2*p);
     ASSERT(p_pos < (int) p);
             int B_mod_p = overrun - p_pos;
-            pos = (p_pos + B_mod_p * di + dj * r) % p;
+            pos = (p_pos + B_mod_p * di + dj * (int) r) % (int) p;
             if (pos < 0) pos += p;
         } else {
             pos += ssp.get_offset();
@@ -573,7 +573,7 @@ j_odd_devel:
              * It seems feasible to get by with a fixed number of
              * conditional subtractions.
              */
-            pos = (p_pos + B_mod_p * di + dj * r) % p;
+            pos = (p_pos + B_mod_p * di + dj * (int) r) % (int) p;
             if (pos < 0) pos += p;
         } else {
             /* skip stride */
@@ -661,7 +661,7 @@ j_odd0:
     ASSERT(overrun < (int) 2*p);
     ASSERT(p_pos < (int) p);
             int B_mod_p = overrun - p_pos;
-            pos = (p_pos + B_mod_p * di + dj * r) % p;
+            pos = (p_pos + B_mod_p * di + dj * (int) r) % (int) p;
             if (pos < 0) pos += p;
 
             p_pos = pos;
@@ -844,7 +844,7 @@ j_odd_devel0:
              * It seems feasible to get by with a fixed number of
              * conditional subtractions.
              */
-            pos = (p_pos + B_mod_p * di + dj * r) % p;
+            pos = (p_pos + B_mod_p * di + dj * (int) r) % (int) p;
             if (pos < 0) pos += p;
         } else {
             /* skip stride */
