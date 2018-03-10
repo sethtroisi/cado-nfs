@@ -16,10 +16,11 @@ int main()
 }
 ")
 
+CHECK_CXX_SOURCE_COMPILES("${check_alignas_code}" HAVE_ALIGNAS)
+
 if(HAVE_ALIGNAS)
     message(STATUS "Testing whether C++11 alignas() can be used -- yes")
 else()
     message(STATUS "Testing whether C++11 alignas() can be used -- no")
 endif()
 
-CHECK_CXX_SOURCE_COMPILES("${check_alignas_code}" HAVE_ALIGNAS)

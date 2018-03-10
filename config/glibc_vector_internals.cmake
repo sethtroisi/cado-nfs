@@ -21,3 +21,10 @@ int main() {
 ")
 
 CHECK_CXX_SOURCE_COMPILES("${tinker_with_glibc_internals}" HAVE_GLIBC_VECTOR_INTERNALS)
+
+if(HAVE_GLIBC_VECTOR_INTERNALS)
+    message(STATUS "Testing whether C++11 glibc vector internals can be used -- yes")
+else()
+    message(STATUS "Testing whether C++11 glibc vector internals can be used -- no")
+endif()
+
