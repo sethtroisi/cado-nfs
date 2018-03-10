@@ -1009,9 +1009,10 @@ resieve_small_bucket_region (bucket_primes_t *BP, int N, unsigned char *S,
          */
         bool row0_even = (((j0&sublatm)+sublatj0) & 1) == 0;
         unsigned int q = row0_even ? p : 0;
+        int i = 0; /* placate gcc */
         for (unsigned int j = j0; j < j1; j ++) {
             WHERE_AM_I_UPDATE(w, j, j);
-            for (int i = pos + (q& -!((pos+i_compens_sublat)&1)) ; i < C.F() ; i += p+q) {
+            for (i = pos + (q& -!((pos+i_compens_sublat)&1)) ; i < C.F() ; i += p+q) {
                 if (LIKELY(S_ptr[i] == 255)) continue;
                 bucket_update_t<1, primehint_t> prime;
                 unsigned int x = ((size_t) (j-j0) << logI) + i;
@@ -1032,10 +1033,26 @@ resieve_small_bucket_region (bucket_primes_t *BP, int N, unsigned char *S,
             S_ptr += I;
             q ^= p;
         }
-        pos += ssps.get_offset();
-        if (pos >= (spos_t) p) pos -= p;
-
-        ssdpos[index - ssd.resieve_start_offset] = pos;
+        if (logI <= LOG_BUCKET_REGION) {
+            pos += ssps.get_offset();
+            if (pos >= (spos_t) p) pos -= p;
+            ssdpos[index - ssd.resieve_start_offset] = pos;
+        } else {
+            int & p_pos(ssdpos[index - ssd.resieve_start_offset]);
+            size_t overrun = i - C.F();
+            /* see small_sieve<true>::after_region_adjust in
+             * las-smallsieve-lowlevel */
+            int N1 = N + nthreads;
+            int dj = (N1>>log_regions_per_line) - j0;
+            unsigned int regions_per_line      = (1<<log_regions_per_line);
+            int di = (N1&(regions_per_line-1)) - (N&(regions_per_line-1));
+            ASSERT(overrun < (size_t) 2*p);
+            ASSERT(p_pos < (spos_t) p);
+            int B_mod_p = overrun - p_pos;
+            pos = (p_pos + B_mod_p * di + dj * (int) r) % (int) p;
+            if (pos < 0) pos += p;
+            p_pos = pos;
+        }
     }
 
     for(auto const & ssp : ssd.ssp) {

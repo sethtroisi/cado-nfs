@@ -1047,7 +1047,31 @@ void small_sieve<true>::after_region_adjust(int & p_pos, int pos, overrun_t<true
      * It seems feasible to get by with a fixed number of
      * conditional subtractions.
      */
-    pos = (p_pos + B_mod_p * di + dj * r) % p;
+
+    /* The two int casts are important.
+     *
+     * Example where this matters:
+     *
+     *  logI = 19
+     *  nthreads = 1
+     *  N = 7
+     *  N1 = 8
+     *  logB = 16
+     *  p = 77527
+     *  r = 17042
+     *  p_pos = (int &) @0x7fff34008f30: 35973
+     *  overrun = 125491
+     *  B_mod_p = 89518
+     *  di = -7
+     *  dj = 1
+     *
+     * if we wrap around badly, we get
+     *  pos = 18101
+     * otherwise it's
+     *  pos = 46605
+     */
+
+    pos = (p_pos + B_mod_p * di + dj * (int) r) % (int) p;
     if (pos < 0) pos += p;
     p_pos = pos;
 }
