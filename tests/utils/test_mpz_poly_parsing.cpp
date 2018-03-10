@@ -7,7 +7,7 @@
 #include "mpz_poly.h"
 
 /* a shorthand so that we can use user-defined literals */
-cxx_mpz operator "" _mpz (const char* str, size_t = 0)
+cxx_mpz operator "" _mpz (const char* str, size_t)
 {
     cxx_mpz res;
     mpz_set_str(res, str, 0);
