@@ -4146,7 +4146,7 @@ void  mpz_poly_setcoeffs_counter_print_error_code(int error_code){
 struct poly_parser {
 
     struct parse_error: public std::exception {
-        const char * what() { return "parse error"; }
+        const char * what() const noexcept override { return "parse error"; }
     };
 
 private:
