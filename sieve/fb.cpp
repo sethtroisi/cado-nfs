@@ -1582,6 +1582,7 @@ fb_factorbase::read(const char * const filename)
  * we prefer to rely on mmap-able vectors that subclass the standard
  * library ones */
 
+#ifdef HAVE_GLIBC_VECTOR_INTERNALS
 /* (desired) structure of the factor base cache header block (ascii, 4096
  * bytes).
  *
@@ -1762,7 +1763,6 @@ fbc_header find_fbc_header_block_for_poly(const char * fbc_filename, cxx_mpz_pol
     return fbc_header();
 }
 
-#ifdef HAVE_GLIBC_VECTOR_INTERNALS
 struct helper_functor_reseat_mmapped_chunks {
     std::vector<fbc_header::entryvec> const & chunks;
     std::vector<fbc_header::entryvec>::const_iterator next;
@@ -1901,8 +1901,8 @@ fb_factorbase::fb_factorbase(cxx_cado_poly const & cpoly, int side, unsigned lon
     std::string polystring = f.print_poly("x");
 
 
-    fbc_header hdr;
 #ifdef HAVE_GLIBC_VECTOR_INTERNALS
+    fbc_header hdr;
     /* First use standard I/O to read the cached file header. */
     hdr = find_fbc_header_block_for_poly(fbc_filename, f, lim, powlim, side);
     if (hdr) {
