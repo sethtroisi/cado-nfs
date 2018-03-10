@@ -65,7 +65,7 @@ class mmappable_vector: public std::vector<T, A> {
         void mmap(size_t n)
         {
             Base::reserve(n);
-#ifdef __GLIBC__
+#ifdef HAVE_GLIBC_VECTOR_INTERNALS
             Base::_M_impl._M_finish = Base::_M_impl._M_start + n;
 #else
 #error "Not GNU libstdc++, please expand code"
@@ -75,7 +75,7 @@ class mmappable_vector: public std::vector<T, A> {
         {
             size_t n = Base::size();
             Base::clear();
-#ifdef __GLIBC__
+#ifdef HAVE_GLIBC_VECTOR_INTERNALS
             Base::_M_deallocate(Base::_M_impl._M_start, n);
             Base::_M_impl._M_start = 0;
             Base::_M_impl._M_finish = 0;
@@ -93,7 +93,7 @@ class mmappable_vector: public std::vector<T, A> {
         /* Adding enable_if because really that only makes sense
          * with our allocator, no other */
         typename std::enable_if<std::is_same<mmap_allocator_details::mmap_allocator<T>, A>::value>::type mmap_file(const char * filename, mmap_allocator_details::access_mode mode, mmap_allocator_details::offset_type offset, mmap_allocator_details::size_type length) {
-#ifdef __GLIBC__
+#ifdef HAVE_GLIBC_VECTOR_INTERNALS
             A & a(Base::_M_get_Tp_allocator());
 #else
 #error "Not GNU libstdc++, please expand code"
@@ -103,7 +103,7 @@ class mmappable_vector: public std::vector<T, A> {
             mmap(length);
         }
         typename std::enable_if<std::is_same<mmap_allocator_details::mmap_allocator<T>, A>::value>::type munmap_file() {
-#ifdef __GLIBC__
+#ifdef HAVE_GLIBC_VECTOR_INTERNALS
             A & a(Base::_M_get_Tp_allocator());
 #else
 #error "Not GNU libstdc++, please expand code"
@@ -119,7 +119,7 @@ class mmappable_vector: public std::vector<T, A> {
              * it's a bug or a feature, but that sounds definitely
              * worrisome.
              */
-#ifdef __GLIBC__
+#ifdef HAVE_GLIBC_VECTOR_INTERNALS
             A & a(Base::_M_get_Tp_allocator());
             std::swap(a, (A&) __x._M_get_Tp_allocator());
             std::swap(Base::_M_impl._M_start, __x._M_impl._M_start);
