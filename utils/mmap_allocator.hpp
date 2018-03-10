@@ -146,7 +146,7 @@ namespace mmap_allocator_details
 
             mmap_allocator() = default;
             mmap_allocator(const std::allocator<T> &a): std::allocator<T>(a) {}
-            mmap_allocator(const mmap_allocator &a) = default;
+            mmap_allocator(const mmap_allocator &) = default;
             ~mmap_allocator() = default;
 
             /* These are the only ctors that enable a behaviour that
