@@ -283,7 +283,7 @@ template<typename T> struct entries_and_cdf {
             return weight_cdf.begin();
         }
         inline weight_container_type::const_iterator weight_end() const { 
-            return weight_cdf.begin();
+            return weight_cdf.end();
         }
         inline weight_container_type::size_type weight_size() const { 
             return weight_cdf.size();
@@ -295,7 +295,7 @@ template<typename T> struct entries_and_cdf {
             return weight_cdf[b-container_type::begin()] - weight_cdf[a-container_type::begin()];
         }
         double weight_cdf_at(size_t a) const {
-            return weight_cdf_at[a];
+            return weight_cdf[a];
         }
         double weight_cdf_at(typename container_type::const_iterator a) const {
             return weight_cdf[a-container_type::begin()];
