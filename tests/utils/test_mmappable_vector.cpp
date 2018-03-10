@@ -9,7 +9,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-#include <sys/time.h>
+// #include <sys/time.h>
 #include "utils.h"
 #include "mmappable_vector.hpp"
 
@@ -210,17 +210,17 @@ void test_cache_bug(void)
 
 void read_large_file(enum access_mode mode)
 {
-    struct timeval t, t2;
+    // struct timeval t, t2;
     mmappable_vector<int> vec;
 
-    gettimeofday(&t, NULL);
+    // gettimeofday(&t, NULL);
 
     vec.mmap_file(TESTFILE, mode, 0, FILESIZE);
     for (int i=0;i<FILESIZE;i++) {
         ASSERT_ALWAYS(vec[i] == i);
     }
-    gettimeofday(&t2, NULL);
-    fprintf(stderr, "Mode: %d Time: %lu.%06lu\n", mode, (t2.tv_sec - t.tv_sec)-(t2.tv_usec < t.tv_usec), (t2.tv_usec < t.tv_usec)*1000000 + (t2.tv_usec - t.tv_usec));
+    // gettimeofday(&t2, NULL);
+    // fprintf(stderr, "Mode: %d Time: %lu.%06lu\n", mode, (t2.tv_sec - t.tv_sec)-(t2.tv_usec < t.tv_usec), (t2.tv_usec < t.tv_usec)*1000000 + (t2.tv_usec - t.tv_usec));
 }
 
 void test_large_file(void)
