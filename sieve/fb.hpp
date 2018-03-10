@@ -404,9 +404,9 @@ class fb_factorbase {
         struct stats_type {
             /* explicit-initializing as below forces zero-initialization
              * of members */
-            std::array<size_t, FB_MAX_PARTS> primes { };
-            std::array<size_t, FB_MAX_PARTS> ideals { };
-            std::array<double, FB_MAX_PARTS> weight { };
+            std::array<size_t, FB_MAX_PARTS> primes {{}};
+            std::array<size_t, FB_MAX_PARTS> ideals {{}};
+            std::array<double, FB_MAX_PARTS> weight {{}};
         };
         stats_type stats;
 
