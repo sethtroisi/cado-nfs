@@ -11,6 +11,7 @@
 #include <limits.h>
 #include <stdint.h>
 #include <gmp.h>
+#include <array>
 #include <vector>
 #include <deque>
 #include <list>
