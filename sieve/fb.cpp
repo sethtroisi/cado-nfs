@@ -1926,7 +1926,8 @@ fb_factorbase::fb_factorbase(cxx_cado_poly const & cpoly, int side, unsigned lon
 #else
     if (fbc_filename) {
         fprintf(stderr, "factor base cache not available with your libstdc++ library, sorry.\n");
-        exit(EXIT_FAILURE);
+        /* It is not a failure, though: we can still read the factor base
+         * as it is, after all... */
     }
 #endif
 
