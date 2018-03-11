@@ -1,6 +1,9 @@
 include(CheckCXXSourceCompiles)
 
 set(tinker_with_glibc_internals "
+#ifdef __OpenBSD__
+#error \"forcibly disabling mmappable vectors for openbsd\"
+#endif
 #include <vector>
 
 struct fred : public std::vector<int> {
