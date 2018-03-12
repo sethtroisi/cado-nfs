@@ -15,6 +15,23 @@
    Of 78498 tries there were 77224 with a factor found
    Ratio: 0.983770
    Total time: 3.10 s, per call: 39.472700 usec, per factor: 40.123899 usec
+
+To test the ul arithmetic on a 64-bit processor:
+
+./testbench -cof 4294967311 -p -ecm 315 5355 11 3 10000000
+
+To test the 15ul arithmetic on a 64-bit processor:
+
+./testbench -cof 18446744073709551629 -p -ecm 315 5355 11 3 10000000
+
+To test the 2ul2 arithmetic on a 64-bit processor:
+
+./testbench -cof 79228162514264337593543950397 -p -ecm 315 5355 11 3 10000000
+
+To test the mpz arithmetic on a 64-bit processor:
+
+./testbench -cof 340282366920938463463374607431768211507 -p -ecm 315 5355 11 3 10000000
+
 */
 
 #include "cado.h"
