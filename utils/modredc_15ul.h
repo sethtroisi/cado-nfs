@@ -882,7 +882,7 @@ modredc15ul_mul (residueredc15ul_t r, const residueredc15ul_t a,
     "mulq %[m1]\n\t"         /* rdx:rax <= (2^64-1)*(2^32-1) = 2^96-2^64-2^32+1 */
     "addq %%rax, %[t0]\n\t"
     "movq %[a0], %%rax\n\t"  /* independent, goes in pipe 0 */
-    "adcq %%rdx, %[t1]\n\t"  /* t0:t1 = (a0*b0+u0*m)/2^64 */
+    "adcq %%rdx, %[t1]\n\t"  /* t1:t0 = (a0*b0+u0*m)/2^64 */
     ABORT_IF_CY              /* <= ((2^64-1)^2 + 2^160 - 2^128 - 2^96 - 1)/2^64
                                 <= 2^96 - 2^32 - 2 */
     
