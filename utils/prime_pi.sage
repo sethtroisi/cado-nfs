@@ -7,6 +7,8 @@ def nb_special_q(q0,q1,qfac_min=None,qfac_max=infinity,verbose=false):
       kmax = floor(log(q1)/log(qfac_min))
       assert kmax <= 3, "number of special-q factors is assumed <= 3"
       pi1 = prime_pi(min(q1,qfac_max))-prime_pi(max(q0,qfac_min))
+      if pi1 < 0:
+         pi1 = 0
       # count number of composites p*q with q0 <= p*q < q1 and p <= q
       # we thus have p^2 < q1, thus p < sqrt(q1)
       # for each p, we have q0/p <= q < q1/p
