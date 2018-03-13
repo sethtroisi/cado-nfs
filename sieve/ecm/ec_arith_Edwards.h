@@ -380,7 +380,7 @@ edwards_smul_ui (ec_point_t R, const ec_point_t P, const unsigned long k,
     ec_point_set (R, P, m, TWISTED_EDWARDS_ext);
   else if (k == 2UL)
     edwards_dbl (R, P, m, TWISTED_EDWARDS_ext);
-  else if (k == 2UL)
+  else if (k == 3UL)
     edwards_tpl (R, P, m, TWISTED_EDWARDS_ext);
   else
   {
