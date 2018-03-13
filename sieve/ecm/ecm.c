@@ -756,6 +756,9 @@ ecm_stage2 (residue_t r, const ec_point_t P, const stage2_plan_t *plan,
 #endif
     common_z (plan->s1, Pj_x, Pj_z, plan->i1 - plan->i0 - skip,
 	      Pid_x + skip, Pid_z + skip, m);
+#ifdef ECM_COUNT_OPS
+    _count_stage2_M += 4*(plan->s1+plan->i1-plan->i0-skip) - 6;
+#endif
 #if defined(ECM15_UL)
     if (verbose)
       {
@@ -818,6 +821,9 @@ ecm_stage2 (residue_t r, const ec_point_t P, const stage2_plan_t *plan,
 	  mod_sub (t, Pid_x[i], Pj_x[j], m);
 	  j = plan->pairs[++l];
 	  mod_mul (a, a, t, m);
+#ifdef ECM_COUNT_OPS
+    _count_stage2_M++;
+#endif
 	}
 
 #if ECM_BACKTRACKING
