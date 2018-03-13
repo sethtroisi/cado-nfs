@@ -495,7 +495,6 @@ ecm_stage2 (residue_t r, const ec_point_t P, const stage2_plan_t *plan,
   residue_t *Pid_x, *Pid_z, *Pj_x, *Pj_z; /* saved i*d*P, i0 <= i < i1,
               and jP, j in S_1, x and z coordinate stored separately */
   residue_t a, a_bk, t;
-  unsigned int i, k, l;
   int bt = 0;
   const int verbose = 0;
 
@@ -511,17 +510,18 @@ ecm_stage2 (residue_t r, const ec_point_t P, const stage2_plan_t *plan,
   ASSERT (Pid_x != NULL);
   Pid_z = (residue_t *) malloc ((plan->i1 - plan->i0) * sizeof(residue_t));
   ASSERT (Pid_z != NULL);
-  for (i = 0; i < plan->s1; i++)
+  for (unsigned int i = 0; i < plan->s1; i++)
     {
       mod_init_noset0 (Pj_x[i], m);
       mod_init_noset0 (Pj_z[i], m);
     }
-  for (i = 0; i < plan->i1 - plan->i0; i++)
+  for (unsigned int i = 0; i < plan->i1 - plan->i0; i++)
     {
       mod_init_noset0 (Pid_x[i], m);
       mod_init_noset0 (Pid_z[i], m);
     }
 
+  // FIXME works only for _ul
   if (verbose)
     printf ("Stage 2: P = (%lu::%lu)\n",
             mod_get_ul (P[0].x, m), mod_get_ul (P[0].z, m));
@@ -559,7 +559,7 @@ ecm_stage2 (residue_t r, const ec_point_t P, const stage2_plan_t *plan,
     /* Now we generate all the j*P for j in S_1 */
     /* We treat the first two manually because those might correspond
        to ap1_0 = 1*P and ap5_0 = 5*P */
-    k = 0;
+    unsigned int k = 0;
     if (plan->s1 > k && plan->S1[k] == 1)
       {
         mod_set (Pj_x[k], ap1_0[0].x, m);
@@ -649,10 +649,11 @@ ecm_stage2 (residue_t r, const ec_point_t P, const stage2_plan_t *plan,
 
   }
 
+  // FIXME works only for _ul
   if (verbose)
     {
       printf ("Pj = [");
-      for (i = 0; i < plan->s1; i++)
+      for (unsigned int i = 0; i < plan->s1; i++)
         printf ("%s(%lu::%lu)", (i>0) ? ", " : "",
                 mod_get_ul (Pj_x[i], m), mod_get_ul (Pj_z[i], m));
       printf ("]\nPd = (%lu::%lu)\n",
@@ -665,52 +666,61 @@ ecm_stage2 (residue_t r, const ec_point_t P, const stage2_plan_t *plan,
 
     ec_point_init (Pid, m);
     ec_point_init (Pid1, m);
-    k = 0; i = plan->i0;
+    unsigned int k = 0, i = plan->i0;
 
     /* If i0 == 0, we simply leave the first point at (0::0) which is the
        point at infinity */
     if (plan->i0 == 0)
-      {
-	mod_set0 (Pid_x[k], m);
-	mod_set0 (Pid_z[k], m);
-	k++;
-	i++;
-      }
-    /* XXX CB: I think this is buggy: with B1=17 and B2=42, i0=0 i1=1, Pid_x
-     * has length 1, so k must be < 1.
-     */
+    {
+      mod_set0 (Pid_x[k], m);
+      mod_set0 (Pid_z[k], m);
+      k++;
+      i++;
+    }
 
-    /* Todo: do both Pid and Pid1 with one addition chain */
-    montgomery_smul_ui (Pid, Pd, i, m, b); /* Pid = i_0 d * P */
-    mod_set (Pid_x[k], Pid->x, m);
-    mod_set (Pid_z[k], Pid->z, m);
-    k++; i++;
-    if (i < plan->i1)
+    /* Now i = i0 or i0+1 and i > 0 */
+    /* plan->i1 == 1 implies plan->i0 = 0, so nothing more to do */
+    if (plan->i1 > 1)
+    {
+      if (i+1 == plan->i1) /* only need one multiple of d*P */
       {
-        montgomery_smul_ui (Pid1, Pd, i, m, b); /* Pid = (i_0 + 1) d * P */
-        mod_set (Pid_x[k], Pid1[0].x, m);
-        mod_set (Pid_z[k], Pid1[0].z, m);
-        k++; i++;
+        montgomery_smul_ui (Pt, NULL, Pd, i, m, b); /* Pt = i*(d*P) */
+        mod_set (Pid_x[k], Pt->x, m);
+        mod_set (Pid_z[k], Pt->z, m);
       }
-    while (i < plan->i1)
+      else
       {
-        montgomery_dadd (Pt, Pid1, Pd, Pid, b, m);
-        ec_point_set (Pid, Pid1, m, MONTGOMERY_xz);
-        ec_point_set (Pid1, Pt, m, MONTGOMERY_xz);
-        mod_set (Pid_x[k], Pt[0].x, m);
-        mod_set (Pid_z[k], Pt[0].z, m);
-        k++; i++;
+        /* Pid = i*(d*P) and Pid1 = (i+1)*(d*P) */
+        montgomery_smul_ui (Pid, Pid1, Pd, i, m, b);
+        mod_set (Pid_x[k], Pid->x, m);
+        mod_set (Pid_z[k], Pid->z, m);
+        k++;
+        mod_set (Pid_x[k], Pid1->x, m);
+        mod_set (Pid_z[k], Pid1->z, m);
+        k++;
+        i += 2;
+
+        for ( ; i < plan->i1; k++, i++)
+        {
+          montgomery_dadd (Pt, Pid1, Pd, Pid, b, m);
+          ec_point_set (Pid, Pid1, m, MONTGOMERY_xz);
+          ec_point_set (Pid1, Pt, m, MONTGOMERY_xz);
+          mod_set (Pid_x[k], Pt->x, m);
+          mod_set (Pid_z[k], Pt->z, m);
+        }
       }
+    }
 
     ec_point_clear (Pd, m);
     ec_point_clear (Pid, m);
     ec_point_clear (Pid1, m);
   }
 
+  // FIXME works only for _ul
   if (verbose)
     {
       printf ("Pid = [");
-      for (i = 0; i < plan->i1 - plan->i0; i++)
+      for (unsigned int i = 0; i < plan->i1 - plan->i0; i++)
         printf ("%s(%lu:%lu)", (i>0) ? ", " : "",
 	        mod_get_ul (Pid_x[i], m), mod_get_ul (Pid_z[i], m));
       printf ("]\n");
@@ -769,16 +779,17 @@ ecm_stage2 (residue_t r, const ec_point_t P, const stage2_plan_t *plan,
 #endif
   }
 
+  // FIXME works only for _ul
   if (verbose)
     {
       printf ("After canonicalizing:\nPj = [");
-      for (i = 0; i < plan->s1; i++)
+      for (unsigned int i = 0; i < plan->s1; i++)
         printf ("%s(%lu:%lu)", (i>0) ? ", " : "",
                 mod_get_ul (Pj_x[i], m), mod_get_ul (Pj_z[i], m));
       printf ("]\n");
 
       printf ("Pid = [");
-      for (i = 0; i < plan->i1 - plan->i0; i++)
+      for (unsigned int i = 0; i < plan->i1 - plan->i0; i++)
         printf ("%s(%lu:%lu)", (i>0) ? ", " : "",
                 mod_get_ul (Pid_x[i], m), mod_get_ul (Pid_z[i], m));
       printf ("]\n");
@@ -797,8 +808,7 @@ ecm_stage2 (residue_t r, const ec_point_t P, const stage2_plan_t *plan,
   mod_init_noset0 (a_bk, m); /* Backup value of a, in case we get a == 0 */
   mod_set (a_bk, a, m);
 
-  i = 0;
-  l = 0;
+  unsigned i = 0, l = 0;
   unsigned char j = plan->pairs[0];
   while (j != NEXT_PASS)
     {

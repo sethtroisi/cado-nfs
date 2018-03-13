@@ -248,83 +248,81 @@ montgomery_dadd (ec_point_t R, const ec_point_t P, const ec_point_t Q,
 }
 
 
-// TODO rewrite so it can output eP and (e+1)P at the same time
-/* (x:z) <- e*(x:z) (mod p) */
+/* montgomery_smul_ui (R, Rp1, P, k)
+ *     R <- k*P
+ *     Rp1 <- (k+1)*P       if Rp1 != NULL
+ * R or Rp1 can be the same variable as P.
+ * Cost:
+ *    log2(k) DBL and log2(k)-1 dADD to compute R and Rp1
+ *    computing only R save 1 DBL or 1 dADD depending on the parity of k
+ */
 #define montgomery_smul_ui MOD_APPEND_TYPE(montgomery_smul_ui)
 static inline void
-montgomery_smul_ui (ec_point_t R, const ec_point_t P, unsigned long e,
-		    const modulus_t m, const residue_t b)
+montgomery_smul_ui (ec_point_t R, ec_point_t Rp1, const ec_point_t P,
+                    const unsigned long k, const modulus_t m, const residue_t b)
 {
-  unsigned long l, n;
-  ec_point_t t1, t2;
+  if (k == 0UL)
+  {
+    montgomery_point_set_zero (R, m);
+    if (Rp1)
+      ec_point_set (Rp1, P, m, MONTGOMERY_xz);
+  }
+  else if (k == 1UL)
+  {
+    ec_point_set (R, P, m, MONTGOMERY_xz);
+    if (Rp1)
+      montgomery_dbl (Rp1, P, m, b);
+  }
+  else
+  {
+    /* Montgomery Ladder */
+    unsigned long mask;
+    ec_point_t T0, T1;
 
-  if (e == 0UL)
+    ec_point_init (T0, m);
+    ec_point_init (T1, m);
+
+    mask = ~(0UL);
+    mask -= mask/2;   /* Now the most significant bit of i is set */
+    while ((mask & k) == 0)
+      mask >>= 1;
+
+    /* Most significant bit of k is 1, do it outside the loop */
+    ec_point_set (T0, P, m, MONTGOMERY_xz); /* starting value T0 = P */
+    montgomery_dbl (T1, P, m, b);           /* starting value T1 = 2P */
+    mask >>= 1;
+
+    for ( ; mask > 1; mask >>= 1) /* loop invariant: T1-T0 = P */
     {
-      mod_set0 (R->x, m);
-      mod_set0 (R->z, m);
-      return;
+      if (k & mask) /* (T0,T1) <- (T1+T0, 2*T1) */
+      {
+        montgomery_dadd (T0, T1, T0, P, b, m);
+        montgomery_dbl (T1, T1, m, b);
+      }
+      else /* (T0,T1) <- (2*T0, T1+T0) */
+      {
+        montgomery_dadd (T1, T1, T0, P, b, m);
+        montgomery_dbl (T0, T0, m, b);
+      }
     }
 
-  if (e == 1UL)
+    /* Deal with least significant bit outside the loop */
+    if (k & mask)
     {
-      ec_point_set (R, P, m, MONTGOMERY_xz);
-      return;
+      montgomery_dadd (R, T1, T0, P, b, m);
+      if (Rp1)
+        montgomery_dbl (Rp1, T1, m, b);
+    }
+    else
+    {
+      montgomery_dbl (R, T0, m, b);
+      if (Rp1)
+        montgomery_dadd (Rp1, T1, T0, P, b, m);
     }
 
-  if (e == 2UL)
-    {
-      montgomery_dbl (R, P, m, b);
-      return;
-    }
-
-  if (e == 4UL)
-    {
-      montgomery_dbl (R, P, m, b);
-      montgomery_dbl (R, R, m, b);
-      return;
-    }
-
-  ec_point_init (t1, m);
-
-  if (e == 3UL)
-    {
-      montgomery_dbl (t1, P, m, b);
-      montgomery_dadd (R, t1, P, P, b, m);
-      ec_point_clear (t1, m);
-      return;
-    }
-
-  ec_point_init (t2, m);
-  e --;
-
-  /* compute number of steps needed: we start from (1,2) and go from
-     (i,i+1) to (2i,2i+1) or (2i+1,2i+2) */
-  for (l = e, n = 0; l > 1; n ++, l /= 2) ;
-
-  /* start from P1=P, P2=2P */
-  ec_point_set (t1, P, m, MONTGOMERY_xz);
-  montgomery_dbl (t2, t1, m, b);
-
-  while (n--)
-    {
-      if ((e >> n) & 1) /* (i,i+1) -> (2i+1,2i+2) */
-        {
-          /* printf ("(i,i+1) -> (2i+1,2i+2)\n"); */
-          montgomery_dadd (t1, t1, t2, P, b, m);
-          montgomery_dbl (t2, t2, m, b);
-        }
-      else /* (i,i+1) -> (2i,2i+1) */
-        {
-          /* printf ("(i,i+1) -> (2i,2i+1)\n"); */
-          montgomery_dadd (t2, t1, t2, P, b, m);
-          montgomery_dbl (t1, t1, m, b);
-        }
-    }
-
-  ec_point_set (R, t2, m, MONTGOMERY_xz);
-
-  ec_point_clear (t1, m);
-  ec_point_clear (t2, m);
+    ec_point_clear (T0, m);
+    ec_point_clear (T1, m);
+  }
 }
 
 /* Return the order of a Mongomery curve, using the Jacobi symbol.
