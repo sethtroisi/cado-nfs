@@ -127,8 +127,8 @@ edwards_addsub (ec_point_t R, const ec_point_t P, const ec_point_t Q, int sub,
 
 #ifdef ECM_COUNT_OPS
   _count_edwards_add++;
-  if (output_type == TWISTED_EDWARDS_ext)
-    _count_edwards_extraM++;
+  if (output_type == TWISTED_EDWARDS_proj)
+    _count_edwards_extraM--;
   else if (output_type == MONTGOMERY_xz)
     _count_edwards_extraM -= 4;
 #endif
