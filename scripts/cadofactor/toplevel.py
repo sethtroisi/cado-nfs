@@ -814,6 +814,9 @@ class Cado_NFS_toplevel(object):
                 ncpus = self.number_of_logical_cores()
                 self.args.server_threads = ncpus
                 self.logger.info("Set tasks.threads=%d based on detected logical cpus" % ncpus)
+                # for bwc, it is better not to use hyperthreading
+                c = self.number_of_physical_cores()
+                self.parameters.set_simple("tasks.linalg.bwc.threads", c)
             t=int(self.args.server_threads)
             self.parameters.set_simple("tasks.threads", t)
         # We want to enforce a value for tasks.polyselect.threads and
