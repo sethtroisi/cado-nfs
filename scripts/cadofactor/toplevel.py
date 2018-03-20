@@ -1060,6 +1060,7 @@ class Cado_NFS_toplevel(object):
         tasks.threads = 4
         tasks.workdir = /tmp/a
         tasks.linalg.bwc.cpubinding = /tmp/misc/cpubinding.conf
+        tasks.linalg.bwc.threads = 4
         tasks.polyselect.threads = 2
         tasks.sieve.las.threads = 2
 
