@@ -550,11 +550,7 @@ mod_isprime (const modulus_t m)
      identifying composites == 2 (mod 3). Thus we use it only for 2 (mod 3) */
   if (n % 3UL == 1UL)
     {
-      mod_set1 (b, m);
-      mod_add (b, b, b, m);
-      mod_add (b, b, b, m);
-      mod_add (b, b, b, m);
-      mod_add (b, b, minusone, m);  /* b = 7 */
+      mod_set_ul_reduced (b, 7, m); /* b = 7 (m > 7 here) */
       mod_pow_ul (r1, b, mm1, m);   /* r = 7^mm1 mod m */
       if (!find_minus1 (r1, minusone, po2, m))
 	goto end; /* Not prime */
