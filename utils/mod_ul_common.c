@@ -526,14 +526,17 @@ mod_isprime (const modulus_t m)
 
   /* Do base 2 SPRP test */
   mod_2pow_ul (r1, mm1, m);   /* r = 2^mm1 mod m */
+  /* If n = 3 mod 4, then -1 is not a square, so the Miller-Rabin test
+     can only succeed when r1 = 1 or -1: no further square can give -1.
+     For all inputs 1 <= n < 10^6, this discards 210668 numbers. */
+  if (n % 4 == 3)
+    {
+      if (!mod_is1 (r1, m) && !mod_equal (r1, minusone, m))
+        goto end;
+    }
   /* If n is prime and 1 or 7 (mod 8), then 2 is a square (mod n)
      and one less squaring must suffice. This does not strengthen the
      test but saves one squaring for composite input */
-  if (n % 8 == 7)
-    {
-      if (!mod_is1 (r1, m))
-        goto end;
-    }
   else if (!find_minus1 (r1, minusone, po2 - ((n % 8 == 1) ? 1 : 0), m))
     goto end; /* Not prime */
 
