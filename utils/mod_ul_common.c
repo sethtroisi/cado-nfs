@@ -529,10 +529,14 @@ mod_isprime (const modulus_t m)
   /* If n is prime and 1 or 7 (mod 8), then 2 is a square (mod n)
      and one less squaring must suffice. This does not strengthen the
      test but saves one squaring for composite input */
-  if (n % 8 == 7)
+  if (n % 4 == 3)
     {
+      /* If n = 3 mod 4, since squares mod 4 are 0 and 1, then no square
+         can equal n-1 which is 2 mod 4, thus the only way n is prime is
+         if r1 = 1 (r1 = -1 mod n is impossible since it would imply
+         mm1 = 0, which is impossible since mm1 is odd) */
       if (!mod_is1 (r1, m))
-        goto end;
+        goto end; /* Not prime */
     }
   else if (!find_minus1 (r1, minusone, po2 - ((n % 8 == 1) ? 1 : 0), m))
     goto end; /* Not prime */
