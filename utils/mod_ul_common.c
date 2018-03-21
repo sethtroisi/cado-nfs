@@ -526,14 +526,17 @@ mod_isprime (const modulus_t m)
 
   /* Do base 2 SPRP test */
   mod_2pow_ul (r1, mm1, m);   /* r = 2^mm1 mod m */
+  /* If n = 3 mod 4, then -1 is not a square, so the Miller-Rabin test
+     can only succeed when r1 = 1 or -1: no further square can give -1.
+     For all inputs 1 <= n < 10^6, this discards 210668 numbers. */
+  if (n % 4 == 3)
+    {
+      if (!mod_is1 (r1, m) && !mod_equal (r1, minusone, m))
+        goto end;
+    }
   /* If n is prime and 1 or 7 (mod 8), then 2 is a square (mod n)
      and one less squaring must suffice. This does not strengthen the
      test but saves one squaring for composite input */
-  if (n % 8 == 7)
-    {
-      if (!mod_is1 (r1, m))
-        goto end;
-    }
   else if (!find_minus1 (r1, minusone, po2 - ((n % 8 == 1) ? 1 : 0), m))
     goto end; /* Not prime */
 
@@ -547,57 +550,48 @@ mod_isprime (const modulus_t m)
      identifying composites == 2 (mod 3). Thus we use it only for 2 (mod 3) */
   if (n % 3UL == 1UL)
     {
-      mod_set1 (b, m);
-      mod_add (b, b, b, m);
-      mod_add (b, b, b, m);
-      mod_add (b, b, b, m);
-      mod_add (b, b, minusone, m);  /* b = 7 */
+      mod_set_ul_reduced (b, 7, m); /* b = 7 (m > 7 here) */
       mod_pow_ul (r1, b, mm1, m);   /* r = 7^mm1 mod m */
       if (!find_minus1 (r1, minusone, po2, m))
 	goto end; /* Not prime */
 
+      /* the strong pseudoprimes in bases 2 and 7 up to 10^7 are 314821,
+         2269093, 2284453, 3539101, 5489641, 6386993 */
       if (n < 2269093UL)
         {
-	  r = (n != 314821UL);
+	  r = n != 314821UL;
 	  goto end;
         }
 
-      /* b is still 7 here */
-      mod_add (b, b, b, m); /* 14 */
-      mod_sub (b, b, minusone, m); /* 15 */
-      mod_add (b, b, b, m); /* 30 */
-      mod_add (b, b, b, m); /* 60 */
-      mod_sub (b, b, minusone, m); /* 61 */
+      mod_set_ul_reduced (b, 61, m); /* b = 61 (m > 61 here) */
       mod_pow_ul (r1, b, mm1, m);   /* r = 61^mm1 mod m */
       if (!find_minus1 (r1, minusone, po2, m))
 	goto end; /* Not prime */
 
 #if (ULONG_MAX > 4294967295UL)
+      /* https://en.wikipedia.org/wiki/Miller%E2%80%93Rabin_primality_test */
       if (n != 4759123141UL && n != 8411807377UL && n < 11207066041UL)
         {
 	  r = 1;
 	  goto end;
         }
 
-      mod_set1 (b, m);
-      mod_add (b, b, b, m);
-      mod_add (b, b, b, m);
-      mod_sub (b, b, minusone, m);    /* b = 5 */
+      mod_set_ul_reduced (b, 5, m); /* b = 5 */
       mod_pow_ul (r1, b, mm1, m);   /* r = 5^mm1 mod m */
       if (!find_minus1 (r1, minusone, po2, m))
 	goto end; /* Not prime */
 	
-          /* These are the base 5,7,61 SPSP < 10^13 and n == 1 (mod 3) */
-	  r = (n != 30926647201UL && n != 45821738881UL &&
-	       n != 74359744201UL && n != 90528271681UL &&
-	       n != 110330267041UL && n != 373303331521UL &&
-	       n != 440478111067UL && n != 1436309367751UL &&
-	       n != 1437328758421UL && n != 1858903385041UL &&
-	       n != 4897239482521UL && n != 5026103290981UL &&
-	       n != 5219055617887UL && n != 5660137043641UL &&
-	       n != 6385803726241UL);
+      /* These are the base 2,5,7,61 SPSP < 10^13 and n == 1 (mod 3) */
+      r = (n != 30926647201UL && n != 45821738881UL &&
+           n != 74359744201UL && n != 90528271681UL &&
+           n != 110330267041UL && n != 373303331521UL &&
+           n != 440478111067UL && n != 1436309367751UL &&
+           n != 1437328758421UL && n != 1858903385041UL &&
+           n != 4897239482521UL && n != 5026103290981UL &&
+           n != 5219055617887UL && n != 5660137043641UL &&
+           n != 6385803726241UL);
 #else
-	      r = 1;
+      r = 1;
 #endif
     }
   else
@@ -615,16 +609,13 @@ mod_isprime (const modulus_t m)
 	  goto end;
 	}
 
-      mod_set1 (b, m);
-      mod_add (b, b, b, m);
-      mod_add (b, b, b, m);
-      mod_sub (b, b, minusone, m);    /* b = 5 */
+      mod_set_ul_reduced (b, 5, m); /* b = 5 */
       mod_pow_ul (r1, b, mm1, m);   /* r = 5^mm1 mod m */
       if (!find_minus1 (r1, minusone, po2, m))
 	goto end; /* Not prime */
 
 #if (ULONG_MAX > 4294967295UL)
-      /* These are the base 3,5 SPSP < 10^13 with n == 2 (mod 3) */
+      /* These are the base 2,3,5 SPSP < 10^13 with n == 2 (mod 3) */
       r = (n != 244970876021UL && n != 405439595861UL &&
 	   n != 1566655993781UL && n != 3857382025841UL &&
 	   n != 4074652846961UL && n != 5783688565841UL);
