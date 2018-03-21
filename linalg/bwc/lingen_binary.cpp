@@ -1076,7 +1076,7 @@ static bool go_quadratic(polmat& E, polmat& pi)/*{{{*/
 {
     using namespace globals;
     using namespace std;
-    stats.enter(__func__, E.ncoef);
+    stats.enter_norecurse(__func__, E.ncoef);
 
     unsigned int deg = E.ncoef - 1;
     for(unsigned int j = 0 ; j < E.ncols ; j++) {

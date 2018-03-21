@@ -7,44 +7,32 @@
 
 class tree_stats {
     struct function_stats {
-        unsigned int ncalled;
-        unsigned int min_inputsize;
-        unsigned int max_inputsize;
-        unsigned int sum_inputsize;
-        double spent;
-        double projected_time;
-        unsigned int projected_calls;
+        unsigned int ncalled = 0;
+        unsigned int min_inputsize = UINT_MAX;
+        unsigned int max_inputsize = 0;
+        unsigned int sum_inputsize = 0;
+        unsigned int trimmed = 0;       /* either sum_inputsize or 0 */
+        double spent = 0;
+        double projected_time = 0;
+        unsigned int projected_calls = 0;
         std::map<std::string, double> small_steps;
-        function_stats() : 
-            ncalled(0),
-            min_inputsize(UINT_MAX),
-            max_inputsize(0),
-            sum_inputsize(0),
-            spent(0),
-            small_steps()
-        {}
     };
 
     struct level_stats : public std::map<std::string, function_stats> {
-        double projected_time(unsigned int);
+        double projected_time(unsigned int, unsigned int);
         double last_printed_projected_time;
+        unsigned int trimmed_here;       /* trimmed at this level ! */
     };
 
 
     struct running_stats {
         std::string func;
-        unsigned int inputsize;
-        double time_self;
-        double time_children;
+        unsigned int inputsize = 0;
+        unsigned int trimmed = 0;
+        double time_self = 0;
+        double time_children = 0;
         std::map<std::string, double> small_steps;
-        double * substep;
-        running_stats() : func()
-                          , inputsize(0)
-                          , time_self(0)
-                          , time_children(0)
-                          , small_steps()
-                          , substep(NULL)
-        { }
+        double * substep = NULL;
     };
 
     std::vector<level_stats> stack;
@@ -61,7 +49,9 @@ class tree_stats {
 public:
     unsigned int depth;
     
-    void enter(const char * func, unsigned int inputsize); 
+    void enter(const char * func, unsigned int inputsize, unsigned int trimmed = 0); 
+    void enter_norecurse(const char * func, unsigned int inputsize) { enter(func, inputsize, inputsize); }
+
     int leave(int rc);
 
     void begin_smallstep(const char * func MAYBE_UNUSED);
