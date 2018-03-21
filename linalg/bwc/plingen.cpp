@@ -264,7 +264,7 @@ static inline unsigned int expected_pi_length(dims * d, unsigned int len)/*{{{*/
 /* TODO: adapt for GF(2) */
 static int bw_lingen_basecase(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta) /*{{{*/
 {
-    stats.enter(__func__, E->size);
+    stats.enter_norecurse(__func__, E->size);
     dims * d = bm->d;
     unsigned int m = d->m;
     unsigned int n = d->n;

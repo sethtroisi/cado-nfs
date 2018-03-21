@@ -14,14 +14,16 @@
 
 using namespace std;
 
-double tree_stats::level_stats::projected_time(unsigned int total_breadth)
+double tree_stats::level_stats::projected_time(unsigned int total_breadth, unsigned int trimmed_breadth)
 {
     // return total_breadth * spent / sum_inputsize;
     unsigned int sum_inputsize = 0;
     // unsigned int ncalled = 0;
+    trimmed_here = 0;
     for(map<string, function_stats>::const_iterator x = begin() ; x != end() ; x++) {
         function_stats const& F(x->second);
         sum_inputsize += F.sum_inputsize;
+        trimmed_here += F.trimmed;
         // ncalled += ncalled;
     }
     // unsigned int expected_total_calls = total_breadth / (sum_inputsize / (double) ncalled);
@@ -30,8 +32,8 @@ double tree_stats::level_stats::projected_time(unsigned int total_breadth)
     for(map<string, function_stats>::iterator x = begin() ; x != end() ; x++) {
         function_stats & F(x->second);
         // expected_calls = expected_total_calls * (double) ncalled / ncalled;
-        double r = (double) total_breadth / sum_inputsize;
-        ASSERT_ALWAYS(sum_inputsize <= total_breadth);
+        double r = (double) (total_breadth - trimmed_breadth) / sum_inputsize;
+        ASSERT_ALWAYS(sum_inputsize <= (total_breadth - trimmed_breadth));
         // double contrib = n * spent / ncalled;
         // total_breadth / sum_inputsize * (double) ncalled * (double) ncalled / ncalled * spent / ncalled;
         F.projected_calls = round(r * F.ncalled);
@@ -51,6 +53,7 @@ void tree_stats::print(unsigned int level)
     int nok=0;
     double firstok = 0;
     double complement = 0;
+    unsigned int tree_trimmed_breadth = 0;
     for(unsigned int k = 0 ; k < stack.size() ; k++) {
         level_stats & u(stack[k]);
 
@@ -61,7 +64,7 @@ void tree_stats::print(unsigned int level)
             /* Compute projected time for this level based on the total
              * breadth, and the calls which we had so far.
              */
-            double pt = u.projected_time(tree_total_breadth);
+            double pt = u.projected_time(tree_total_breadth, tree_trimmed_breadth);
 
             if (nstars && nok == 0) {
                 firstok = pt;
@@ -107,6 +110,7 @@ void tree_stats::print(unsigned int level)
                             t * (double) F.projected_calls / n);
                 }
             }
+            tree_trimmed_breadth += u.trimmed_here;
             u.last_printed_projected_time = pt;
         } else {
             /* We're not in a situation where we can control exactly
@@ -165,7 +169,7 @@ void tree_stats::print(unsigned int level)
     }
 }
 
-void tree_stats::enter(const char * func, unsigned int inputsize)
+void tree_stats::enter(const char * func, unsigned int inputsize, unsigned int trimmed)
 {
     int rank;
     if (depth == 0)
@@ -179,6 +183,7 @@ void tree_stats::enter(const char * func, unsigned int inputsize)
     s.time_self = -wct_seconds();
     s.func = func;
     s.inputsize = inputsize;
+    s.trimmed = trimmed;
     if (!curstack.empty()) {
         ASSERT_ALWAYS(!curstack.back().substep);
     }
@@ -221,6 +226,7 @@ int tree_stats::leave(int rc)
     if (s.inputsize > F.max_inputsize)
         F.max_inputsize = s.inputsize;
     F.sum_inputsize += s.inputsize;
+    F.trimmed += s.trimmed;
     F.spent += s.time_self;
     for(map<string, double>::const_iterator x = s.small_steps.begin() ; x != s.small_steps.end() ; x++) {
         pair<map<string, double>::iterator, bool> fsi = F.small_steps.insert(make_pair(x->first, 0));
@@ -232,11 +238,13 @@ int tree_stats::leave(int rc)
     if (now < last_print_time + 2) return rc;
 
     int needprint = 0;
+    unsigned int trimmed_breadth = 0;
     for(unsigned int k = 0 ; !needprint && k < stack.size() ; k++) {
         level_stats & u(stack[k]);
-        double t = u.projected_time(tree_total_breadth);
+        double t = u.projected_time(tree_total_breadth, trimmed_breadth);
         double t0 = u.last_printed_projected_time;
         needprint = (t < 0.98 * t0) || (t > 1.02 * t0);
+        trimmed_breadth += u.trimmed_here;
     }
 
     if (!needprint)
