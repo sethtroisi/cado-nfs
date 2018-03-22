@@ -5,7 +5,9 @@
 #include <unistd.h>
 #include <assert.h>
 
+#include "utils.h"
 #include "flint-fft/fft.h"
+
 /*{{{ macros */
 #ifndef PTR
 #define PTR(x) ((x)->_mp_d)
