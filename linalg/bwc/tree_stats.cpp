@@ -251,10 +251,33 @@ int tree_stats::leave(int rc)
         return rc;
 
     last_print_time = now;
+    last_print_position = make_pair(level, F.sum_inputsize);
 
     print(level);
 
     return rc;
+}
+
+void tree_stats::final_print()
+{
+    ASSERT_ALWAYS(depth == 0);
+    if (last_print_position != make_pair(0u, tree_total_breadth))
+        print(0);
+    {
+        /* print ETA */
+        time_t eta[1];
+        char eta_string[32];
+        *eta = wct_seconds();
+#ifdef HAVE_CTIME_R
+        ctime_r(eta, eta_string);
+#else
+        strncpy(eta_string, ctime(eta), sizeof(eta_string));
+#endif
+        unsigned int s = strlen(eta_string);
+        for( ; s && isspace((int)(unsigned char)eta_string[s-1]) ; eta_string[--s]='\0') ;
+
+        printf("lingen done at: %s\n", eta_string);
+    }
 }
 
 void tree_stats::begin_smallstep(const char * func)

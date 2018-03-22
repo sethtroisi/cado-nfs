@@ -40,6 +40,7 @@ class tree_stats {
 
     unsigned int tree_total_breadth;
     double last_print_time;
+    std::pair<unsigned int, unsigned int> last_print_position { 0,0 };
 
     double begin;       /* stored as a wct_seconds() return value */
 
@@ -53,6 +54,8 @@ public:
     void enter_norecurse(const char * func, unsigned int inputsize) { enter(func, inputsize, inputsize); }
 
     int leave(int rc);
+
+    void final_print();
 
     void begin_smallstep(const char * func MAYBE_UNUSED);
     void end_smallstep();

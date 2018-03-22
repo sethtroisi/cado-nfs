@@ -3077,6 +3077,7 @@ int main(int argc, char *argv[])
         bm_io_end_read(aa);
 
         bw_biglingen_collective(bm, xpi, xE, delta);
+        stats.final_print();
 
         display_deltas(bm, delta);
         if (!rank) printf("(pi->alloc = %zu)\n", bigmatpoly_my_cell(xpi)->alloc);
@@ -3120,6 +3121,7 @@ int main(int argc, char *argv[])
         bm_io_end_read(aa);
 
         bw_lingen_single(bm, pi, E, delta);
+        stats.final_print();
 
         display_deltas(bm, delta);
         if (!rank) printf("(pi->alloc = %zu)\n", pi->alloc);
