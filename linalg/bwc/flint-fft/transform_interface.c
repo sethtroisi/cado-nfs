@@ -40,6 +40,7 @@
 #include "fft.h"
 #include "ulong_extras.h"
 #include "fft_tuning.h"
+#include "fft.h"
 #include "timing.h"
 
 #ifndef iceildiv

@@ -95,6 +95,16 @@ mpn_sumdiff_n(mp_ptr s, mp_ptr d, mp_srcptr x, mp_srcptr y, mp_size_t n)
     return ret;
 }
 
+/* mpn_mulmod_2expp1 is an internal function exposed by mpir, but the
+ * real symbol is mpn_mulmod_2expp1_basecase anyway. The tarball we're
+ * extracting here has the very same code (with a more permissive
+ * license) as flint_mpn_mulmod_2expp1_basecase
+ *
+ * Bottom line: if we use gmp and not mpir, we may use the code we have
+ * here.
+ */
+#define mpn_mulmod_2expp1 flint_mpn_mulmod_2expp1_basecase
+
 #endif
 
 #define fft_sumdiff(t, u, r, s, n) \
