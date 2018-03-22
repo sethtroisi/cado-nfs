@@ -216,7 +216,7 @@ void fft_transform_info_adjust_depth(struct fft_transform_info * fti, unsigned i
 {
     fft_transform_info_set_first_guess(fti);
 
-    ASSERT_ALWAYS(adj < fti->depth);
+    ASSERT_ALWAYS(adj < (unsigned int) fti->depth);
 
     mp_bitcnt_t bits1 = fti->bits1;
     mp_bitcnt_t bits2 = fti->bits2;
