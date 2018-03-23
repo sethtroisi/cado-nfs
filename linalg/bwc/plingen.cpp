@@ -28,21 +28,12 @@
 #include "lingen-matpoly.h"
 
 #define ENABLE_MPI_LINGEN
-#ifdef  HAVE_MPIR
-#define ENABLE_CACHING_MPI_LINGEN
-#endif
 
 #ifdef  ENABLE_MPI_LINGEN
 #include "lingen-bigmatpoly.h"
 #endif
 
-#ifdef  ENABLE_CACHING_MPI_LINGEN
-#ifdef HAVE_MPIR
 #include "lingen-bigmatpoly-ft.h"
-#else
-#error "ENABLE_CACHING_MPI_LINGEN requires MPIR"
-#endif
-#endif
 
 #include "bw-common.h"		/* Handy. Allows Using global functions
                                  * for recovering parameters */
@@ -1320,11 +1311,9 @@ static int bw_biglingen_recursive(bmstatus_ptr bm, bigmatpoly pi, bigmatpoly E, 
     logline_begin(stdout, z, "t=%u MPI-MP%s(%zu, %zu) -> %zu",
             bm->t, caching ? "-caching" : "",
             E->size, pi_left->size, E->size - pi_left->size + 1);
-#ifdef  ENABLE_CACHING_MPI_LINGEN
     if (caching)
         bigmatpoly_mp_caching(ab, E_right, E, pi_left);
     else
-#endif
         bigmatpoly_mp(ab, E_right, E, pi_left);
     logline_end(&bm->t_mp, "");
     stats.end_smallstep();
@@ -1336,11 +1325,9 @@ static int bw_biglingen_recursive(bmstatus_ptr bm, bigmatpoly pi, bigmatpoly E, 
     logline_begin(stdout, z, "t=%u MPI-MUL%s(%zu, %zu) -> %zu",
             bm->t, caching ? "-caching" : "",
             pi_left->size, pi_right->size, pi_left->size + pi_right->size - 1);
-#ifdef  ENABLE_CACHING_MPI_LINGEN
     if (caching)
         bigmatpoly_mul_caching(ab, pi, pi_left, pi_right);
     else
-#endif
         bigmatpoly_mul(ab, pi, pi_left, pi_right);
     logline_end(&bm->t_mul, "");
     stats.end_smallstep();
@@ -2871,13 +2858,6 @@ int main(int argc, char *argv[])
         ASSERT_ALWAYS(rc >= 0);
     }
     ASSERT_ALWAYS((afile==NULL) == (ffile == NULL));
-
-#ifndef ENABLE_CACHING_MPI_LINGEN
-    if (caching) {
-        fprintf(stderr, "--caching=1 only supported with ENABLE_CACHING_MPI_LINGEN\n");
-        exit(EXIT_FAILURE);
-    }
-#endif
 
     bmstatus_init(bm, bw->m, bw->n);
 

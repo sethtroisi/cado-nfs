@@ -76,7 +76,7 @@ mpn_sumdiff_n(mp_ptr s, mp_ptr d, mp_srcptr x, mp_srcptr y, mp_size_t n)
 	return 0;
 
     if ((s == x && d == y) || (s == y && d == x)) {
-	t = flint_malloc(n * sizeof(mp_limb_t));
+	t = (mp_ptr) flint_malloc(n * sizeof(mp_limb_t));
 	ret = mpn_sub_n(t, x, y, n);
 	ret += 2 * mpn_add_n(s, x, y, n);
 	flint_mpn_copyi(d, t, n);
