@@ -50,15 +50,22 @@ class tree_stats {
 public:
     unsigned int depth;
     
-    void enter(const char * func, unsigned int inputsize, unsigned int trimmed = 0); 
-    void enter_norecurse(const char * func, unsigned int inputsize) { enter(func, inputsize, inputsize); }
-
-    int leave(int rc);
+    void enter(const char * func, unsigned int inputsize, bool recurse = true); 
+    void leave();
 
     void final_print();
 
     void begin_smallstep(const char * func MAYBE_UNUSED);
     void end_smallstep();
+
+    struct sentinel {
+        tree_stats & stats;
+        sentinel(sentinel const&) = delete;
+        sentinel(tree_stats & stats,
+                const char * func, unsigned int inputsize, bool recurse = true)
+            : stats(stats) { stats.enter(func, inputsize, recurse); }
+        ~sentinel() { stats.leave(); }
+    };
 };
 
 #endif	/* TREE_STATS_HPP_ */

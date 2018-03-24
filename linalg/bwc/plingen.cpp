@@ -255,7 +255,8 @@ static inline unsigned int expected_pi_length(dims * d, unsigned int len)/*{{{*/
 /* TODO: adapt for GF(2) */
 static int bw_lingen_basecase(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta) /*{{{*/
 {
-    stats.enter_norecurse(__func__, E->size);
+    tree_stats::sentinel dummy(stats, __func__, E->size, false);
+
     dims * d = bm->d;
     unsigned int m = d->m;
     unsigned int n = d->n;
@@ -522,7 +523,7 @@ static int bw_lingen_basecase(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned i
     free(pivots);
     free(pi_lengths);   /* What shall we do with this one ??? */
 
-    return stats.leave(generator_found);
+    return generator_found;
 }/*}}}*/
 
 /*}}}*/
@@ -1178,7 +1179,7 @@ static int bw_biglingen_collective(bmstatus_ptr bm, bigmatpoly pi, bigmatpoly E,
 static int bw_lingen_recursive(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta) /*{{{*/
 {
     size_t z = E->size;
-    stats.enter(__func__, E->size);
+    tree_stats::sentinel dummy(stats, __func__, E->size);
     dims * d = bm->d;
     abdst_field ab = d->ab;
     int done;
@@ -1207,7 +1208,7 @@ static int bw_lingen_recursive(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned 
         matpoly_swap(pi_left, pi);
         matpoly_clear(ab, pi_left);
         // fprintf(stderr, "Leave %s\n", __func__);
-        return stats.leave(1);
+        return 1;
     }
 
     stats.begin_smallstep("MP");
@@ -1232,7 +1233,7 @@ static int bw_lingen_recursive(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned 
     matpoly_clear(ab, pi_right);
 
     // fprintf(stderr, "Leave %s\n", __func__);
-    return stats.leave(done);
+    return done;
 }/*}}}*/
 
 static int bw_lingen_single(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta) /*{{{*/
@@ -1269,7 +1270,7 @@ static int bw_lingen_single(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int
 static int bw_biglingen_recursive(bmstatus_ptr bm, bigmatpoly pi, bigmatpoly E, unsigned int *delta) /*{{{*/
 {
     size_t z = E->size;
-    stats.enter(__func__, E->size);
+    tree_stats::sentinel dummy(stats, __func__, E->size);
 
     dims * d = bm->d;
     abdst_field ab = d->ab;
@@ -1303,7 +1304,7 @@ static int bw_biglingen_recursive(bmstatus_ptr bm, bigmatpoly pi, bigmatpoly E, 
         bigmatpoly_clear(ab, pi_right);
         bigmatpoly_clear(ab, E_right);
         // fprintf(stderr, "Leave %s\n", __func__);
-        return stats.leave(1);
+        return 1;
     }
 
     stats.begin_smallstep("MP");
@@ -1336,7 +1337,7 @@ static int bw_biglingen_recursive(bmstatus_ptr bm, bigmatpoly pi, bigmatpoly E, 
     bigmatpoly_clear(ab, pi_right);
 
     // fprintf(stderr, "Leave %s\n", __func__);
-    return stats.leave(done);
+    return done;
 }/*}}}*/
 
 static int bw_biglingen_collective(bmstatus_ptr bm, bigmatpoly pi, bigmatpoly E, unsigned int *delta)/*{{{*/
