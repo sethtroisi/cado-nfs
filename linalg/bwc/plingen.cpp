@@ -28,21 +28,12 @@
 #include "lingen-matpoly.h"
 
 #define ENABLE_MPI_LINGEN
-#ifdef  HAVE_MPIR
-#define ENABLE_CACHING_MPI_LINGEN
-#endif
 
 #ifdef  ENABLE_MPI_LINGEN
 #include "lingen-bigmatpoly.h"
 #endif
 
-#ifdef  ENABLE_CACHING_MPI_LINGEN
-#ifdef HAVE_MPIR
 #include "lingen-bigmatpoly-ft.h"
-#else
-#error "ENABLE_CACHING_MPI_LINGEN requires MPIR"
-#endif
-#endif
 
 #include "bw-common.h"		/* Handy. Allows Using global functions
                                  * for recovering parameters */
@@ -264,7 +255,8 @@ static inline unsigned int expected_pi_length(dims * d, unsigned int len)/*{{{*/
 /* TODO: adapt for GF(2) */
 static int bw_lingen_basecase(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta) /*{{{*/
 {
-    stats.enter_norecurse(__func__, E->size);
+    tree_stats::sentinel dummy(stats, __func__, E->size, false);
+
     dims * d = bm->d;
     unsigned int m = d->m;
     unsigned int n = d->n;
@@ -531,7 +523,7 @@ static int bw_lingen_basecase(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned i
     free(pivots);
     free(pi_lengths);   /* What shall we do with this one ??? */
 
-    return stats.leave(generator_found);
+    return generator_found;
 }/*}}}*/
 
 /*}}}*/
@@ -1187,7 +1179,7 @@ static int bw_biglingen_collective(bmstatus_ptr bm, bigmatpoly pi, bigmatpoly E,
 static int bw_lingen_recursive(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta) /*{{{*/
 {
     size_t z = E->size;
-    stats.enter(__func__, E->size);
+    tree_stats::sentinel dummy(stats, __func__, E->size);
     dims * d = bm->d;
     abdst_field ab = d->ab;
     int done;
@@ -1216,7 +1208,7 @@ static int bw_lingen_recursive(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned 
         matpoly_swap(pi_left, pi);
         matpoly_clear(ab, pi_left);
         // fprintf(stderr, "Leave %s\n", __func__);
-        return stats.leave(1);
+        return 1;
     }
 
     stats.begin_smallstep("MP");
@@ -1241,7 +1233,7 @@ static int bw_lingen_recursive(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned 
     matpoly_clear(ab, pi_right);
 
     // fprintf(stderr, "Leave %s\n", __func__);
-    return stats.leave(done);
+    return done;
 }/*}}}*/
 
 static int bw_lingen_single(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta) /*{{{*/
@@ -1278,7 +1270,7 @@ static int bw_lingen_single(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int
 static int bw_biglingen_recursive(bmstatus_ptr bm, bigmatpoly pi, bigmatpoly E, unsigned int *delta) /*{{{*/
 {
     size_t z = E->size;
-    stats.enter(__func__, E->size);
+    tree_stats::sentinel dummy(stats, __func__, E->size);
 
     dims * d = bm->d;
     abdst_field ab = d->ab;
@@ -1312,7 +1304,7 @@ static int bw_biglingen_recursive(bmstatus_ptr bm, bigmatpoly pi, bigmatpoly E, 
         bigmatpoly_clear(ab, pi_right);
         bigmatpoly_clear(ab, E_right);
         // fprintf(stderr, "Leave %s\n", __func__);
-        return stats.leave(1);
+        return 1;
     }
 
     stats.begin_smallstep("MP");
@@ -1320,11 +1312,9 @@ static int bw_biglingen_recursive(bmstatus_ptr bm, bigmatpoly pi, bigmatpoly E, 
     logline_begin(stdout, z, "t=%u MPI-MP%s(%zu, %zu) -> %zu",
             bm->t, caching ? "-caching" : "",
             E->size, pi_left->size, E->size - pi_left->size + 1);
-#ifdef  ENABLE_CACHING_MPI_LINGEN
     if (caching)
         bigmatpoly_mp_caching(ab, E_right, E, pi_left);
     else
-#endif
         bigmatpoly_mp(ab, E_right, E, pi_left);
     logline_end(&bm->t_mp, "");
     stats.end_smallstep();
@@ -1336,11 +1326,9 @@ static int bw_biglingen_recursive(bmstatus_ptr bm, bigmatpoly pi, bigmatpoly E, 
     logline_begin(stdout, z, "t=%u MPI-MUL%s(%zu, %zu) -> %zu",
             bm->t, caching ? "-caching" : "",
             pi_left->size, pi_right->size, pi_left->size + pi_right->size - 1);
-#ifdef  ENABLE_CACHING_MPI_LINGEN
     if (caching)
         bigmatpoly_mul_caching(ab, pi, pi_left, pi_right);
     else
-#endif
         bigmatpoly_mul(ab, pi, pi_left, pi_right);
     logline_end(&bm->t_mul, "");
     stats.end_smallstep();
@@ -1349,7 +1337,7 @@ static int bw_biglingen_recursive(bmstatus_ptr bm, bigmatpoly pi, bigmatpoly E, 
     bigmatpoly_clear(ab, pi_right);
 
     // fprintf(stderr, "Leave %s\n", __func__);
-    return stats.leave(done);
+    return done;
 }/*}}}*/
 
 static int bw_biglingen_collective(bmstatus_ptr bm, bigmatpoly pi, bigmatpoly E, unsigned int *delta)/*{{{*/
@@ -2872,13 +2860,6 @@ int main(int argc, char *argv[])
     }
     ASSERT_ALWAYS((afile==NULL) == (ffile == NULL));
 
-#ifndef ENABLE_CACHING_MPI_LINGEN
-    if (caching) {
-        fprintf(stderr, "--caching=1 only supported with ENABLE_CACHING_MPI_LINGEN\n");
-        exit(EXIT_FAILURE);
-    }
-#endif
-
     bmstatus_init(bm, bw->m, bw->n);
 
     const char * rhs_name = param_list_lookup_string(pl, "rhs");
@@ -3077,6 +3058,7 @@ int main(int argc, char *argv[])
         bm_io_end_read(aa);
 
         bw_biglingen_collective(bm, xpi, xE, delta);
+        stats.final_print();
 
         display_deltas(bm, delta);
         if (!rank) printf("(pi->alloc = %zu)\n", bigmatpoly_my_cell(xpi)->alloc);
@@ -3120,6 +3102,7 @@ int main(int argc, char *argv[])
         bm_io_end_read(aa);
 
         bw_lingen_single(bm, pi, E, delta);
+        stats.final_print();
 
         display_deltas(bm, delta);
         if (!rank) printf("(pi->alloc = %zu)\n", pi->alloc);

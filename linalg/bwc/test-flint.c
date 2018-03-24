@@ -5,7 +5,9 @@
 #include <unistd.h>
 #include <assert.h>
 
+#include "utils.h"
 #include "flint-fft/fft.h"
+
 /*{{{ macros */
 #ifndef PTR
 #define PTR(x) ((x)->_mp_d)
@@ -183,7 +185,7 @@ int operand_sizes_fppol(int * cx, int * cy, mpz_t p, int s, gmp_randstate_t rsta
 void fti_disp(struct fft_transform_info* fti)
 {
     printf("fti_bits:=%lu; fti_ks_coeff_bits:=%lu; fti_depth:=%zu;\n",
-            fti->bits, fti->ks_coeff_bits, fti->depth);
+            fti->bits, fti->ks_coeff_bits, (size_t) fti->depth);
     printf("fti_trunc0:=%lu;\n", fti->trunc0);
     printf("fti_w:=%lu;\n", fti->w);
     printf("fti_alg:=%d;\n", fti->alg);

@@ -219,8 +219,13 @@ extern const unsigned char __flint_clz_tab[128];
 static __inline__ unsigned int FLINT_BIT_COUNT(mp_limb_t x)
 {
     unsigned int zeros = FLINT_BITS;
-    if (x)
-	count_leading_zeros(zeros, x);
+#ifdef __GNUC__
+    /* make sure mp_limb_t and unsigned long are the same beast */
+    char dummy[(sizeof(mp_limb_t) == sizeof(unsigned long))-1] __attribute__((unused));
+    if (x) zeros = __builtin_clzl(x);
+#else
+#error "implement me"
+#endif
     return FLINT_BITS - zeros;
 }
 

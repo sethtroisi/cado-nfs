@@ -40,6 +40,7 @@ class tree_stats {
 
     unsigned int tree_total_breadth;
     double last_print_time;
+    std::pair<unsigned int, unsigned int> last_print_position { 0,0 };
 
     double begin;       /* stored as a wct_seconds() return value */
 
@@ -49,13 +50,22 @@ class tree_stats {
 public:
     unsigned int depth;
     
-    void enter(const char * func, unsigned int inputsize, unsigned int trimmed = 0); 
-    void enter_norecurse(const char * func, unsigned int inputsize) { enter(func, inputsize, inputsize); }
+    void enter(const char * func, unsigned int inputsize, bool recurse = true); 
+    void leave();
 
-    int leave(int rc);
+    void final_print();
 
     void begin_smallstep(const char * func MAYBE_UNUSED);
     void end_smallstep();
+
+    struct sentinel {
+        tree_stats & stats;
+        sentinel(sentinel const&) = delete;
+        sentinel(tree_stats & stats,
+                const char * func, unsigned int inputsize, bool recurse = true)
+            : stats(stats) { stats.enter(func, inputsize, recurse); }
+        ~sentinel() { stats.leave(); }
+    };
 };
 
 #endif	/* TREE_STATS_HPP_ */

@@ -1,11 +1,6 @@
 #ifndef BIGMATPOLY_FT_H_
 #define BIGMATPOLY_FT_H_
 
-
-#ifndef HAVE_MPIR
-#error "This interface is only available with MPIR"
-#endif
-
 #include "mpfq_layer.h"
 #include "lingen-matpoly-ft.h"
 #include "lingen-bigmatpoly.h"

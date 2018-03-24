@@ -1,10 +1,6 @@
 #ifndef LINGEN_MATPOLY_FT_H_
 #define LINGEN_MATPOLY_FT_H_
 
-#ifndef HAVE_MPIR
-#error "This interface is only available with MPIR"
-#endif
-
 #include "lingen-matpoly.h"
 #include "flint-fft/fft.h"
 

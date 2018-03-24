@@ -576,16 +576,23 @@ class Statistics(object):
         printed if the value is not known.
         """
         result = []
+        errors = []
         for format_arr in self.stat_formats:
             line = []
             for format_str in format_arr:
                 try:
                     line.append(format_str.format(**self.stats))
-                except (KeyError, IndexError):
-                    pass
+                except KeyError:
+                    errors.append("KeyError with \"%s\"" % format_str)
+                except IndexError:
+                    errors.append("IndexError with \"%s\"" % format_str)
             if line:
                 result.append("".join(line))
-        return result
+        if len(errors) > 0:
+            errors.append("(registered stats: %s)" % self.stats)
+            return result, errors
+        else:
+            return result, None
     
     # Helper functions for processing statistics.
     # We can't make them @staticmethod or references are not callable
@@ -837,7 +844,13 @@ class HasStatistics(BaseStatistics, HasState, DoesLogging, metaclass=abc.ABCMeta
         
         Sub-classes can override to add/remove/change strings.
         """
-        return self.statistics.as_strings()
+        result, errors = self.statistics.as_strings()
+        if errors is not None:
+            self.logger.warning("some stats could not be displayed for %s (see log file for debug info)", self.name)
+            for e in errors:
+                self.logger.debug(e)
+        return result
+
 
     def print_stats(self):
         stat_msgs = self.get_statistics_as_strings()
@@ -1880,10 +1893,6 @@ class Polysel1Task(ClientServerTask, DoesImport, HasStatistics, patterns.Observe
     
     def get_achievement(self):
         return self.state["wu_received"] * self.params["adrange"] / (self.params["admax"] - self.params["admin"])
-
-    def get_total_cpu_or_real_time(self, is_cpu):
-        """ Return number of seconds of cpu time spent by polyselect_ropt """
-        return float(self.state.get("stats_total_time", 0.)) if is_cpu else 0.
 
     def updateObserver(self, message):
         identifier = self.filter_notification(message)
@@ -4155,6 +4164,54 @@ class LinAlgTask(Task, HasStatistics):
     def stat_conversions(self):
         return (
         (
+            "prep_wct",
+            float,
+            "0",
+            Statistics.add_list,
+            re.compile(re_cap_n_fp("Timings for prep: .wct.", 1)),
+            False
+        ),
+        (
+            "prep_cpu",
+            float,
+            "0",
+            Statistics.add_list,
+            re.compile(re_cap_n_fp("Timings for prep: .cpu.", 1)),
+            False
+        ),
+        (
+            "secure_wct",
+            float,
+            "0",
+            Statistics.add_list,
+            re.compile(re_cap_n_fp("Timings for secure: .wct.", 1)),
+            False
+        ),
+        (
+            "secure_cpu",
+            float,
+            "0",
+            Statistics.add_list,
+            re.compile(re_cap_n_fp("Timings for secure: .cpu.", 1)),
+            False
+        ),
+        (
+            "gather_wct",
+            float,
+            "0",
+            Statistics.add_list,
+            re.compile(re_cap_n_fp("Timings for gather: .wct.", 1)),
+            False
+        ),
+        (
+            "gather_cpu",
+            float,
+            "0",
+            Statistics.add_list,
+            re.compile(re_cap_n_fp("Timings for gather: .cpu.", 1)),
+            False
+        ),
+        (
             "krylov_wct",
             float,
             "0",
@@ -4167,7 +4224,7 @@ class LinAlgTask(Task, HasStatistics):
             (int, float),
             "0",
             Statistics.add_list,
-            re.compile(re_cap_n_fp(r"krylov done N=(\d+) ; CPU:", 1)),
+            re.compile(re_cap_n_fp(r"krylov done N=(\d+) ; CPU\d*:", 1)),
             True
         ),
         (
@@ -4175,7 +4232,7 @@ class LinAlgTask(Task, HasStatistics):
             float,
             "0",
             Statistics.add_list,
-            re.compile(re_cap_n_fp(r"krylov done N=\d+ ; cpu-wait:", 1)),
+            re.compile(re_cap_n_fp(r"krylov done N=\d+ ; cpu-wait\d*:", 1)),
             True
         ),
         (
@@ -4183,7 +4240,7 @@ class LinAlgTask(Task, HasStatistics):
             float,
             "0",
             Statistics.add_list,
-            re.compile(re_cap_n_fp(r"krylov done N=\d+ ; COMM:", 1)),
+            re.compile(re_cap_n_fp(r"krylov done N=\d+ ; COMM\d*:", 1)),
             True
         ),
         (
@@ -4191,7 +4248,7 @@ class LinAlgTask(Task, HasStatistics):
             float,
             "0",
             Statistics.add_list,
-            re.compile(re_cap_n_fp(r"krylov done N=\d+ ; comm-wait:", 1)),
+            re.compile(re_cap_n_fp(r"krylov done N=\d+ ; comm-wait\d*:", 1)),
             True
         ),
         (
@@ -4223,7 +4280,7 @@ class LinAlgTask(Task, HasStatistics):
             (int, float),
             "0",
             Statistics.add_list,
-            re.compile(re_cap_n_fp(r"mksol done N=(\d+) ; CPU:", 1)),
+            re.compile(re_cap_n_fp(r"mksol done N=(\d+) ; CPU\d*:", 1)),
             True
         ),
         (
@@ -4231,7 +4288,7 @@ class LinAlgTask(Task, HasStatistics):
             float,
             "0",
             Statistics.add_list,
-            re.compile(re_cap_n_fp(r"mksol done N=\d+ ; cpu-wait:", 1)),
+            re.compile(re_cap_n_fp(r"mksol done N=\d+ ; cpu-wait\d*:", 1)),
             True
         ),
         (
@@ -4239,7 +4296,7 @@ class LinAlgTask(Task, HasStatistics):
             float,
             "0",
             Statistics.add_list,
-            re.compile(re_cap_n_fp(r"mksol done N=\d+ ; COMM:", 1)),
+            re.compile(re_cap_n_fp(r"mksol done N=\d+ ; COMM\d*:", 1)),
             True
         ),
         (
@@ -4247,7 +4304,7 @@ class LinAlgTask(Task, HasStatistics):
             float,
             "0",
             Statistics.add_list,
-            re.compile(re_cap_n_fp(r"mksol done N=\d+ ; comm-wait:", 1)),
+            re.compile(re_cap_n_fp(r"mksol done N=\d+ ; comm-wait\d*:", 1)),
             True
         ),
     )
@@ -4270,6 +4327,14 @@ class LinAlgTask(Task, HasStatistics):
                 " ({mksol_cpu[0]:d} iterations)"
                 ],
         )
+
+    def get_total_cpu_or_real_time(self, is_cpu):
+        """ Return number of seconds of cpu time spent by bwc """
+        what = "_cpu" if is_cpu else "_wct"
+        s = 0
+        for step in [ "prep", "secure", "gather", "lingen", "krylov", "mksol" ]:
+            s = s + float(self.statistics.stats.get(step+what, [0.])[0])
+        return s
     
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator=mediator, db=db, parameters=parameters,
@@ -4312,6 +4377,15 @@ class LinAlgTask(Task, HasStatistics):
                 raise Exception("Kernel file %s does not exist" % dependencyfilename)
             self.logger.debug("Parsing stats from %s" % stdoutpath)
             self.parse_stats(stdoutpath, commit=False)
+
+            # for some reason, submit_command does not properly catch the
+            # time taken by bwc. Is it related to bwc being a perl
+            # script, or maybe is it related to the output filter ? At
+            # any rate, we're better off resetting the real time to what
+            # we've read from the output.
+            real = self.get_total_cpu_or_real_time(False)
+            self.state.update({"realtime_bwc": real}, commit=True)
+
             output_version = self.state.get("output_version", 0) + 1
             update = {"dependency": dependencyfilename.get_wdir_relative(),
                       "output_version": output_version}

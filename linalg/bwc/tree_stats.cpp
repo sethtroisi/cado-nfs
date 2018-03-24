@@ -169,8 +169,10 @@ void tree_stats::print(unsigned int level)
     }
 }
 
-void tree_stats::enter(const char * func, unsigned int inputsize, unsigned int trimmed)
+void tree_stats::enter(const char * func, unsigned int inputsize, bool recurse)
 {
+    unsigned int trimmed = recurse ? 0 : inputsize;
+
     int rank;
     if (depth == 0)
         tree_total_breadth = inputsize;
@@ -194,11 +196,11 @@ void tree_stats::enter(const char * func, unsigned int inputsize, unsigned int t
         stack.insert(stack.end(), curstack.size() - stack.size(), level_stats());
 }
 
-int tree_stats::leave(int rc)
+void tree_stats::leave()
 {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    if (rank) { --depth; return rc; }
+    if (rank) { --depth; return; }
     double now = wct_seconds();
     running_stats s = curstack.back();
     curstack.pop_back();
@@ -235,7 +237,7 @@ int tree_stats::leave(int rc)
 
     /* Is it any useful to print something new ? */
 
-    if (now < last_print_time + 2) return rc;
+    if (now < last_print_time + 2) return;
 
     int needprint = 0;
     unsigned int trimmed_breadth = 0;
@@ -248,13 +250,34 @@ int tree_stats::leave(int rc)
     }
 
     if (!needprint)
-        return rc;
+        return;
 
     last_print_time = now;
+    last_print_position = make_pair(level, F.sum_inputsize);
 
     print(level);
+}
 
-    return rc;
+void tree_stats::final_print()
+{
+    ASSERT_ALWAYS(depth == 0);
+    if (last_print_position != make_pair(0u, tree_total_breadth))
+        print(0);
+    {
+        /* print ETA */
+        time_t eta[1];
+        char eta_string[32];
+        *eta = wct_seconds();
+#ifdef HAVE_CTIME_R
+        ctime_r(eta, eta_string);
+#else
+        strncpy(eta_string, ctime(eta), sizeof(eta_string));
+#endif
+        unsigned int s = strlen(eta_string);
+        for( ; s && isspace((int)(unsigned char)eta_string[s-1]) ; eta_string[--s]='\0') ;
+
+        printf("lingen done at: %s\n", eta_string);
+    }
 }
 
 void tree_stats::begin_smallstep(const char * func)
