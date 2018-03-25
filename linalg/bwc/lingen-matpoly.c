@@ -266,11 +266,11 @@ double matpoly_addmul(abdst_field ab, matpoly c, matpoly a, matpoly b, int draft
                         matpoly_part(ab, a, i, k, 0), a->size,
                         matpoly_part(ab, b, k, j, 0), b->size);
                 abvec_ur_add(ab, tmp[1], tmp[1], tmp[0], c->size);
-                if (draft) { ++c1; set = (tt1 + (tt = wct_seconds())) >= 1; }
+                if (draft) { ++c1; set = (tt1 + (tt = wct_seconds())) >= draft; }
             }
             if (draft) { tt1 += tt; tt0 -= tt; }
             abvec_reduce(ab, matpoly_part(ab, c, i, j, 0), tmp[1], c->size);
-            if (draft) { ++c0; tt0 += wct_seconds(); set = set || tt0 >= 1; }
+            if (draft) { ++c0; tt0 += wct_seconds(); set = set || tt0 >= draft; }
         }
     }
     abvec_ur_clear(ab, &tmp[0], c->size);

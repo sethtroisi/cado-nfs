@@ -59,7 +59,7 @@ double matpoly_ft_dft(abdst_field ab, matpoly_ft_ptr t, matpoly_ptr a, struct ff
             /* ok, casting like this is a crude hack ! */
             fft_do_dft_fppol(tij, (mp_limb_t *) aij, a->size, tt, fti, ab->p);
             logline_printf(2, ".");
-            if (draft) { ++c0; set = (tt0 + (ttm = wct_seconds())) >= 1; }
+            if (draft) { ++c0; set = (tt0 + (ttm = wct_seconds())) >= draft; }
         }
         logline_printf(2, " | ");
     }
@@ -161,7 +161,7 @@ double matpoly_ft_addmul(abdst_field ab MAYBE_UNUSED, matpoly_ft_ptr u, matpoly_
                 void * t0ik = pointer_arith(t0->data, (i*t0->n+k) * tsize);
                 void * t1kj = pointer_arith(t1->data, (k*t1->n+j) * tsize);
                 fft_addmul(uij, t0ik, t1kj, tt, qt, fti);
-                if (draft) { ++c0; set = (tt0 + (ttm = wct_seconds())) >= 1; }
+                if (draft) { ++c0; set = (tt0 + (ttm = wct_seconds())) >= draft; }
             }
         }
     }
@@ -220,7 +220,7 @@ double matpoly_ft_ift(abdst_field ab, matpoly_ptr a, matpoly_ft_ptr t, struct ff
             /* ok, casting like this is a crude hack ! */
             fft_do_ift_fppol((mp_limb_t *) aij, a->size, tij, tt, fti, ab->p);
             logline_printf(2, ".");
-            if (draft) { ++c0; set = (tt0 + (ttm = wct_seconds())) >= 1; }
+            if (draft) { ++c0; set = (tt0 + (ttm = wct_seconds())) >= draft; }
         }
         logline_printf(2, " | ");
     }
@@ -254,7 +254,7 @@ double matpoly_ft_ift_mp(abdst_field ab, matpoly_ptr a, matpoly_ft_ptr t, unsign
             /* ok, casting like this is a crude hack ! */
             fft_do_ift_fppol_mp((mp_limb_t *) aij, a->size, tij, tt, fti, ab->p, shift);
             logline_printf(2, ".");
-            if (draft) { ++c0; set = (tt0 + (ttm = wct_seconds())) >= 1; }
+            if (draft) { ++c0; set = (tt0 + (ttm = wct_seconds())) >= draft; }
         }
         logline_printf(2, " | ");
     }

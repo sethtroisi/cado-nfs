@@ -390,7 +390,7 @@ double bigmatpoly_mul(abdst_field ab, bigmatpoly c, bigmatpoly a, bigmatpoly b, 
         x0 += matpoly_addmul(ab, lc, 
                 bigmatpoly_cell(a, irank, k),
                 bigmatpoly_cell(b, k, jrank), draft);
-        if (draft) { ++c0; set = (tt0 + (tt = wct_seconds())) >= 1; }
+        if (draft) { ++c0; set = (tt0 + (tt = wct_seconds())) >= draft; }
     }
 
 #if 0
@@ -445,7 +445,7 @@ double bigmatpoly_mp(abdst_field ab,/*{{{*/
         x0 += matpoly_addmp(ab, lb,
                 bigmatpoly_cell(a, irank, k),
                 bigmatpoly_cell(c, k, jrank), draft);
-        if (draft) { ++c0; set = (tt0 + (tt = wct_seconds())) >= 1; }
+        if (draft) { ++c0; set = (tt0 + (tt = wct_seconds())) >= draft; }
     }
 
 #if 0

@@ -124,8 +124,6 @@ void plingen_decl_usage(param_list_ptr pl)
             "provide timings on all output lines");
     param_list_decl_usage(pl, "tune",
             "activate tuning mode");
-    param_list_decl_usage(pl, "draft",
-            "activate draft mode");
     param_list_decl_usage(pl, "allow_zero_on_rhs",
             "do not cry if the generator corresponds to a zero contribution on the RHS vectors");
 
@@ -170,11 +168,12 @@ void plingen_decl_usage(param_list_ptr pl)
             "use recursive algorithm above this size");
     param_list_decl_usage(pl, "save_gathered_checkpoints",
             "save global checkpoints files, instead of per-job files");
+    param_list_decl_usage(pl, "draft",
+            "activate draft mode, give minimal number of seconds _per measure_");
 
     param_list_configure_switch(pl, "--tune", &global_flag_tune);
     param_list_configure_switch(pl, "--ascii", &global_flag_ascii);
     param_list_configure_switch(pl, "--timings", &with_timings);
-    param_list_configure_switch(pl, "--draft", &draft_mode);
     param_list_configure_alias(pl, "seed", "random_seed");
 
     plingen_tuning_decl_usage(pl);
@@ -2870,6 +2869,7 @@ int main(int argc, char *argv[])
     param_list_parse_int(pl, "split-output-file", &split_output_file);
     param_list_parse_int(pl, "split-input-file", &split_input_file);
     param_list_parse_int(pl, "caching", &caching);
+    param_list_parse_int(pl, "draft", &draft_mode);
 
     const char * afile = param_list_lookup_string(pl, "afile");
 

@@ -275,7 +275,7 @@ double bigmatpoly_ft_mul(abdst_field ab, bigmatpoly_ft_ptr c, bigmatpoly_ft_ptr 
         x0 += matpoly_ft_addmul(ab, lc, 
                 bigmatpoly_ft_cell(a, irank, k),
                 bigmatpoly_ft_cell(b, k, jrank), fti, draft);
-        if (draft) { ++c0; set = (tt0 + (tt = wct_seconds())) >= 1; }
+        if (draft) { ++c0; set = (tt0 + (tt = wct_seconds())) >= draft; }
     }
 
     if (!set) return x0;
@@ -369,7 +369,7 @@ double bigmatpoly_ft_mul2(abdst_field ab, bigmatpoly_ft_ptr c, bigmatpoly_ft_ptr
              * or not !
              */
             MPI_Barrier(a->com[0]);
-            set = (tt0 + (tt = wct_seconds())) >= 1;
+            set = (tt0 + (tt = wct_seconds())) >= draft;
             MPI_Bcast(&set, 1, MPI_INT, 0, a->com[0]);
         }
     }
