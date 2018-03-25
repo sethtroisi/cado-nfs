@@ -1215,13 +1215,17 @@ bw_lingen_recursive(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta,
 
     stats.begin_smallstep("MP");
     matpoly_rshift(ab, E, E, half - pi_left->size + 1);
-    logline_begin(stdout, z, "t=%u MP(%zu, %zu) -> %zu",
-            bm->t, E->size, pi_left->size, E->size - pi_left->size + 1);
+    logline_begin(stdout, z, "t=%u MP%s(%zu, %zu) -> %zu",
+            bm->t, caching ? "-caching" : "",
+            E->size, pi_left->size, E->size - pi_left->size + 1);
 
     /* the artificial time is the time we've skipped by not doing the mp
      * in full. It gets measured only if draft==true
      */
-    art = matpoly_mp(ab, E_right, E, pi_left, draft);
+    if (caching)
+        art = matpoly_mp_caching(ab, E_right, E, pi_left, draft);
+    else
+        art = matpoly_mp(ab, E_right, E, pi_left, draft);
     stats.add_artificial_time(art);
 
     logline_end(&(bm->t_mp), "");
@@ -1233,13 +1237,17 @@ bw_lingen_recursive(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta,
     matpoly_clear(ab, E_right);
 
     stats.begin_smallstep("MUL");
-    logline_begin(stdout, z, "t=%u MUL(%zu, %zu) -> %zu",
-            bm->t, pi_left->size, pi_right->size, pi_left->size + pi_right->size - 1);
+    logline_begin(stdout, z, "t=%u MUL%s(%zu, %zu) -> %zu",
+            bm->t, caching ? "-caching" : "",
+            pi_left->size, pi_right->size, pi_left->size + pi_right->size - 1);
 
     /* when we're just measuring the time, we're going to fake the
      * computation by just squaring pi_left.
      */
-    art = matpoly_mul(ab, pi, pi_left, draft ? pi_left : pi_right, draft);
+    if (caching)
+        art = matpoly_mul_caching(ab, pi, pi_left, draft ? pi_left : pi_right, draft);
+    else
+        art = matpoly_mul(ab, pi, pi_left, draft ? pi_left : pi_right, draft);
     stats.add_artificial_time(art);
 
     logline_end(&bm->t_mul, "");
