@@ -6,16 +6,26 @@
 #include <map>
 
 class tree_stats {
+    struct small_step_time {
+        double real = 0, artificial = 0;
+        small_step_time operator+=(small_step_time const & x) {
+            real += x.real;
+            artificial += x.artificial;
+            return *this;
+        }
+    };
     struct function_stats {
         unsigned int ncalled = 0;
         unsigned int min_inputsize = UINT_MAX;
         unsigned int max_inputsize = 0;
         unsigned int sum_inputsize = 0;
         unsigned int trimmed = 0;       /* either sum_inputsize or 0 */
+        /* The "spent" time also includes artificial time. So does the
+         * projected time. */
         double spent = 0;
         double projected_time = 0;
         unsigned int projected_calls = 0;
-        std::map<std::string, double> small_steps;
+        std::map<std::string, small_step_time> small_steps;
     };
 
     struct level_stats : public std::map<std::string, function_stats> {
@@ -30,9 +40,19 @@ class tree_stats {
         unsigned int inputsize = 0;
         unsigned int trimmed = 0;
         double time_self = 0;
+        /* this time must not be subtracted from the parent time (because
+         * it was not spent for real), but we must take it into account
+         * for projected timings.
+         */
+        double time_artificial = 0;
         double time_children = 0;
-        std::map<std::string, double> small_steps;
-        double * substep = NULL;
+        std::map<std::string, small_step_time> small_steps;
+        small_step_time * substep = NULL;
+        inline void add_artificial_time(double t) {
+            if (substep) substep->artificial += t;
+            /* it does get counted inside our timing anyway */
+            time_artificial += t;
+        }
     };
 
     std::vector<level_stats> stack;
@@ -47,8 +67,10 @@ class tree_stats {
 
     void print(unsigned int level);
 
+    bool draft = false;
 public:
     unsigned int depth;
+    inline void set_draft_mode(bool d) { draft = d; }
     
     void enter(const char * func, unsigned int inputsize, bool recurse = true); 
     void leave();
@@ -66,6 +88,8 @@ public:
             : stats(stats) { stats.enter(func, inputsize, recurse); }
         ~sentinel() { stats.leave(); }
     };
+
+    void add_artificial_time(double t);
 };
 
 #endif	/* TREE_STATS_HPP_ */

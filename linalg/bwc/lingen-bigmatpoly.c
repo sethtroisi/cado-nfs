@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include "portability.h"
 #include "macros.h"
+#include "utils.h"
 #include "lingen-matpoly.h"
 #include "lingen-bigmatpoly.h"
 
@@ -355,7 +356,7 @@ void bigmatpoly_allgather_col(abdst_field ab, bigmatpoly a)
 }
 /* }}} */
 
-void bigmatpoly_mul(abdst_field ab, bigmatpoly c, bigmatpoly a, bigmatpoly b)/*{{{*/
+double bigmatpoly_mul(abdst_field ab, bigmatpoly c, bigmatpoly a, bigmatpoly b, int draft)/*{{{*/
 {
     ASSERT_ALWAYS(a->n == b->m);
     ASSERT_ALWAYS(a->n1 == b->m1);
@@ -378,17 +379,39 @@ void bigmatpoly_mul(abdst_field ab, bigmatpoly c, bigmatpoly a, bigmatpoly b)/*{
     bigmatpoly_zero(ab, c);
     lc->size = c->size;
     ASSERT_ALWAYS(a->n == b->m);
-    for(unsigned int k = 0 ; k < a->n1 ; k++) {
-        matpoly_addmul(ab, lc, 
+
+    double tt0=0, tt=0; /* tt=0: placate gcc */
+    unsigned long c0 = 0;
+    int set = 0;
+    double x0 = 0;
+
+    if (draft) { tt=wct_seconds(); tt0 -= tt; }
+    for(unsigned int k = 0 ; k < a->n1 && !set ; k++) {
+        x0 += matpoly_addmul(ab, lc, 
                 bigmatpoly_cell(a, irank, k),
-                bigmatpoly_cell(b, k, jrank));
+                bigmatpoly_cell(b, k, jrank), draft);
+        if (draft) { ++c0; set = (tt0 + (tt = wct_seconds())) >= 1; }
     }
+
+#if 0
+    fprintf(stderr, "%s(%zu,%zu) %s after %lu/%u [%f]\n",
+            __func__,
+            a->size,b->size,
+            set ? "gives up" : "does not give up",
+            c0, a->n1, tt0+tt);
+#endif
+
+    if (!set) return x0;
+    tt0 += tt;
+    /* The *real* time we've spent is tt0, we should not count it */
+    return (tt0 + x0) * a->n1 / c0 - tt0;
 }/*}}}*/
 
-void bigmatpoly_mp(abdst_field ab,/*{{{*/
+double bigmatpoly_mp(abdst_field ab,/*{{{*/
         bigmatpoly b,
         bigmatpoly a,
-        bigmatpoly c)
+        bigmatpoly c,
+        int draft)
 {
     if (bigmatpoly_check_pre_init(b)) {
         bigmatpoly_finish_init(ab, b, a->m, c->n, MAX(a->size, c->size) - MIN(a->size, c->size) + 1);
@@ -412,11 +435,31 @@ void bigmatpoly_mp(abdst_field ab,/*{{{*/
     ASSERT_ALWAYS(lb->size == b->size);
     ASSERT_ALWAYS(lb->alloc >= lb->size);
 
-    for(unsigned int k = 0 ; k < a->n1 ; k++) {
-        matpoly_addmp(ab, lb,
+    double tt0=0, tt=0; /* tt=0: placate gcc */
+    unsigned long c0 = 0;
+    int set = 0;
+    double x0 = 0;
+
+    if (draft) { tt=wct_seconds(); tt0 -= tt; }
+    for(unsigned int k = 0 ; k < a->n1 && !set ; k++) {
+        x0 += matpoly_addmp(ab, lb,
                 bigmatpoly_cell(a, irank, k),
-                bigmatpoly_cell(c, k, jrank));
+                bigmatpoly_cell(c, k, jrank), draft);
+        if (draft) { ++c0; set = (tt0 + (tt = wct_seconds())) >= 1; }
     }
+
+#if 0
+    fprintf(stderr, "%s(%zu,%zu) %s after %lu/%u [%f]\n",
+            __func__,
+            a->size,c->size,
+            set ? "gives up" : "does not give up",
+            c0, a->n1, tt0+tt);
+#endif
+
+    if (!set) return x0;
+    tt0 += tt;
+    /* The *real* time we've spent is tt0, we should not count it */
+    return (tt0 + x0) * a->n1 / c0 - tt0;
 }/*}}}*/
 
 /*

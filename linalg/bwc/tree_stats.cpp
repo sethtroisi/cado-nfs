@@ -20,8 +20,8 @@ double tree_stats::level_stats::projected_time(unsigned int total_breadth, unsig
     unsigned int sum_inputsize = 0;
     // unsigned int ncalled = 0;
     trimmed_here = 0;
-    for(map<string, function_stats>::const_iterator x = begin() ; x != end() ; x++) {
-        function_stats const& F(x->second);
+    for(auto const & x : *this) {
+        function_stats const& F(x.second);
         sum_inputsize += F.sum_inputsize;
         trimmed_here += F.trimmed;
         // ncalled += ncalled;
@@ -29,8 +29,8 @@ double tree_stats::level_stats::projected_time(unsigned int total_breadth, unsig
     // unsigned int expected_total_calls = total_breadth / (sum_inputsize / (double) ncalled);
     /* Now count the contribution of each sub-function */
     double contrib = 0;
-    for(map<string, function_stats>::iterator x = begin() ; x != end() ; x++) {
-        function_stats & F(x->second);
+    for(auto & x : *this) {
+        function_stats & F(x.second);
         // expected_calls = expected_total_calls * (double) ncalled / ncalled;
         double r = (double) (total_breadth - trimmed_breadth) / sum_inputsize;
         ASSERT_ALWAYS(sum_inputsize <= (total_breadth - trimmed_breadth));
@@ -47,6 +47,10 @@ double tree_stats::level_stats::projected_time(unsigned int total_breadth, unsig
 
 void tree_stats::print(unsigned int level)
 {
+    int rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    if (rank) return;
+
     double sum = 0;
     double time_to_go = 0;
     int nstars=0;
@@ -54,6 +58,8 @@ void tree_stats::print(unsigned int level)
     double firstok = 0;
     double complement = 0;
     unsigned int tree_trimmed_breadth = 0;
+    const char * prefix = draft ? "##DRAFT## ":"";
+
     for(unsigned int k = 0 ; k < stack.size() ; k++) {
         level_stats & u(stack[k]);
 
@@ -76,35 +82,39 @@ void tree_stats::print(unsigned int level)
 
             char code[2]={'\0', '\0'};
             if (u.size() > 1) code[0] = 'a';
-            for(map<string, function_stats>::const_iterator x = u.begin() ; x != u.end() ; x++) {
-                string const& key(x->first);
-                function_stats const& F(x->second);
+            for(auto const & x : u) {
+                string const& key(x.first);
+                function_stats const& F(x.second);
                 sum += F.projected_time;
                 time_to_go += F.projected_time - F.spent;
-                printf("%u%s [%u-%u, %s] %u/%u %.2g -> %.1f (total: %.1f)\n",
+                printf("%s%u%s [%u-%u, %s] %u/%u %.2g -> %.1f (total: %.1f)\n",
+                        prefix,
                         k, (const char*) code,
                         F.min_inputsize, F.max_inputsize,
                         key.c_str(),
                         F.ncalled, F.projected_calls,
                         F.spent / F.ncalled, F.projected_time, sum);
                 if (code[0]) code[0]++;
-                for(map<string, double>::const_iterator y = F.small_steps.begin() ; y != F.small_steps.end() ; y++) {
-                    double t = y->second;
+                for(auto const & y : F.small_steps) {
+                    double t = y.second.real + y.second.artificial;
                     unsigned int n = F.ncalled;
                     if (k < curstack.size()) {
                         running_stats const& r(curstack[k]);
                         if (r.func == key) {
                             /* shall we count one extra call which has alreay
                              * been done ?? */
-                            map<string, double>::const_iterator z = r.small_steps.find(y->first);
+                            auto z = r.small_steps.find(y.first);
                             if (z != r.small_steps.end() && &(z->second) != r.substep) {
-                                t += z->second;
+                                /* also count the artificial time */
+                                t += z->second.real;
+                                t += z->second.artificial;
                                 n++;
                             }
                         }
                     }
-                    printf("   (%s %u/%u %.2g -> %.1f)\n",
-                            y->first.c_str(),
+                    printf("%s   (%s %u/%u %.2g -> %.1f)\n",
+                            prefix,
+                            y.first.c_str(),
                             n, F.projected_calls,
                             t / n,
                             t * (double) F.projected_calls / n);
@@ -122,19 +132,21 @@ void tree_stats::print(unsigned int level)
             ASSERT_ALWAYS(k < curstack.size());
             running_stats const& r(curstack[k]);
             unsigned int exp_ncalls = round((double) tree_total_breadth / r.inputsize);
-            printf("%u * [%u, %s] 0/%u\n",
+            printf("%s%u * [%u, %s] 0/%u\n",
+                    prefix,
                     k,
                     r.inputsize,
                     r.func.c_str(),
                     exp_ncalls);
-            for(map<string, double>::const_iterator y = r.small_steps.begin() ; y != r.small_steps.end() ; y++) {
-                double t = 0;
+            for(auto const & y : r.small_steps) {
                 unsigned int n = 0;
-                ASSERT_ALWAYS(&(y->second) != r.substep);
-                t += y->second;
+                ASSERT_ALWAYS(&(y.second) != r.substep);
+                /* also count the artificial time */
+                double t = y.second.real + y.second.artificial;
                 n++;
-                printf("   (%s %u/%u %.2g -> %.1f)\n",
-                        y->first.c_str(),
+                printf("%s   (%s %u/%u %.2g -> %.1f)\n",
+                        prefix,
+                        y.first.c_str(),
                         n, exp_ncalls,
                         t / n,
                         t * (double) exp_ncalls / n);
@@ -146,7 +158,8 @@ void tree_stats::print(unsigned int level)
     }
 
     if (nstars && nok >= 2) {
-        printf("expected time for levels 0-%u: %.1f (total: %.1f)\n",
+        printf("%sexpected time for levels 0-%u: %.1f (total: %.1f)\n",
+                prefix,
                 nstars-1, complement, sum + complement);
     }
 
@@ -165,8 +178,19 @@ void tree_stats::print(unsigned int level)
         unsigned int s = strlen(eta_string);
         for( ; s && isspace((int)(unsigned char)eta_string[s-1]) ; eta_string[--s]='\0') ;
 
-        printf("lingen ETA: %s\n", eta_string);
+        if (draft) {
+            printf("%slingen expected duration: %f s (ETA from now: %s)\n", prefix, time_to_go + complement, eta_string);
+        } else {
+            printf("lingen ETA: %s\n", eta_string);
+        }
     }
+}
+
+void tree_stats::add_artificial_time(double t) {
+    int rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    if (rank) return;
+    curstack.back().add_artificial_time(t);
 }
 
 void tree_stats::enter(const char * func, unsigned int inputsize, bool recurse)
@@ -219,8 +243,7 @@ void tree_stats::leave()
 
     /* merge our running stats into the level_stats */
 
-    pair<map<string, function_stats>::iterator, bool>
-        fi = t.insert(make_pair(s.func,function_stats()));
+    auto fi = t.insert(make_pair(s.func,function_stats()));
     function_stats & F(fi.first->second);
     F.ncalled++;
     if (s.inputsize < F.min_inputsize)
@@ -229,10 +252,10 @@ void tree_stats::leave()
         F.max_inputsize = s.inputsize;
     F.sum_inputsize += s.inputsize;
     F.trimmed += s.trimmed;
-    F.spent += s.time_self;
-    for(map<string, double>::const_iterator x = s.small_steps.begin() ; x != s.small_steps.end() ; x++) {
-        pair<map<string, double>::iterator, bool> fsi = F.small_steps.insert(make_pair(x->first, 0));
-        fsi.first->second += x->second;
+    F.spent += s.time_self + s.time_artificial;
+    for(auto const & x : s.small_steps) {
+        auto fsi = F.small_steps.insert(make_pair(x.first, small_step_time()));
+        fsi.first->second += x.second;
     }
 
     /* Is it any useful to print something new ? */
@@ -276,7 +299,7 @@ void tree_stats::final_print()
         unsigned int s = strlen(eta_string);
         for( ; s && isspace((int)(unsigned char)eta_string[s-1]) ; eta_string[--s]='\0') ;
 
-        printf("lingen done at: %s\n", eta_string);
+        if (!draft) printf("lingen done at: %s\n", eta_string);
     }
 }
 
@@ -287,7 +310,7 @@ void tree_stats::begin_smallstep(const char * func)
     if (rank) return;
     ASSERT_ALWAYS(!curstack.empty());
     running_stats& s(curstack.back());
-    pair<map<string, double>::iterator, bool> ssi = s.small_steps.insert(make_pair(func, 0));
+    auto ssi = s.small_steps.insert(make_pair(func, small_step_time()));
     // At first thought, we never have two substeps of the same name at a given
     // level. Alas, this is not always right. One example is at the mpi
     // threshold in lingen. We have 2 gather and 2 scatter steps.
@@ -308,7 +331,7 @@ void tree_stats::begin_smallstep(const char * func)
     //
     // ASSERT_ALWAYS(ssi.second);
     s.substep = &(ssi.first->second);
-    *s.substep -= wct_seconds();
+    s.substep->real -= wct_seconds();
 }
 
 void tree_stats::end_smallstep()
@@ -318,6 +341,6 @@ void tree_stats::end_smallstep()
     if (rank) return;
     ASSERT_ALWAYS(!curstack.empty());
     running_stats& s(curstack.back());
-    *s.substep += wct_seconds();
+    s.substep->real += wct_seconds();
     s.substep = NULL;
 }

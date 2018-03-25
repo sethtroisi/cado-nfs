@@ -875,7 +875,7 @@ void plingen_tune_mul(abdst_field ab, unsigned int m, unsigned int n, cutoff_lis
             /* The matpoly layer is just completetly different -- and gets
              * faster quite early on... */
             for(small_bench<timer_t> x = finder.micro_bench(2); !x.done(); ++x) {
-                matpoly_mul(ab, xpi, xpiL, xpiR);
+                matpoly_mul(ab, xpi, xpiL, xpiR, false);
                 x.set_since_last();
             }
             if (xpiref->size == 0) {
@@ -922,7 +922,7 @@ void plingen_tune_mul(abdst_field ab, unsigned int m, unsigned int n, cutoff_lis
             mpz_clear(p);
 #else
             for(small_bench<timer_t> x = finder.micro_bench(3); !x.done(); ++x) {
-                matpoly_mul_caching_adj(ab, xpi, xpiL, xpiR, adj);
+                matpoly_mul_caching_adj(ab, xpi, xpiL, xpiR, adj, false);
                 x.set_since_last();
             }
 #endif
@@ -1113,7 +1113,7 @@ void plingen_tune_mp(abdst_field ab, unsigned int m, unsigned int n, cutoff_list
             /* The matpoly layer is just completetly different -- and gets
              * faster quite early on... */
             for(small_bench<timer_t> x = finder.micro_bench(2); !x.done(); ++x) {
-                matpoly_mp(ab, xER, xE, xpiL);
+                matpoly_mp(ab, xER, xE, xpiL, false);
                 x.set_since_last();
             }
             if (xERref->size == 0) {
@@ -1167,7 +1167,7 @@ void plingen_tune_mp(abdst_field ab, unsigned int m, unsigned int n, cutoff_list
             mpz_clear(p);
 #endif
             for(small_bench<timer_t> x = finder.micro_bench(3); !x.done(); ++x) {
-                matpoly_mp_caching_adj(ab, xER, xE, xpiL, adj);
+                matpoly_mp_caching_adj(ab, xER, xE, xpiL, adj, false);
                 x.set_since_last();
             }
             if (xERref->size == 0) {
