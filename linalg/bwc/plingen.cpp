@@ -74,12 +74,8 @@ static int split_output_file = 0; /* do split by ourselves */
 
 gmp_randstate_t rstate;
 
-#ifdef HAVE_MPIR
 static int caching = 1;
 static unsigned int caching_threshold = 10;
-#else
-static int caching = 0;
-#endif
 
 static const char * checkpoint_directory;
 static unsigned int checkpoint_threshold = 100;
@@ -2928,9 +2924,7 @@ int main(int argc, char *argv[])
     bm->lingen_mpi_threshold = 1000;
     param_list_parse_uint(pl, "lingen_threshold", &(bm->lingen_threshold));
     param_list_parse_uint(pl, "display-threshold", &(display_threshold));
-#ifdef HAVE_MPIR
     param_list_parse_uint(pl, "caching-threshold", &(caching_threshold));
-#endif
     param_list_parse_uint(pl, "lingen_mpi_threshold", &(bm->lingen_mpi_threshold));
     param_list_parse_uint(pl, "io-block-size", &(io_block_size));
     gmp_randseed_ui(rstate, bw->seed);

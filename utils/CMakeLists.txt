@@ -22,11 +22,6 @@ if (NOT MINGW)
     set (sources ${sources} cado_popen.c)
 endif()
 
-# gmpxx.cpp now included unconditionally above.
-#if (NOT HAVE_GMPXX AND NOT HAVE_MPIRXX)
-#    set (sources ${sources} gmpxx.cpp)
-#endif()
-
 set (sources_io
         filter_io.cpp
 )
@@ -55,9 +50,6 @@ add_library (utils ${CADO_SHARED} ${sources})
 set_source_files_properties("${CMAKE_CURRENT_BINARY_DIR}/modified_files.c" PROPERTIES GENERATED TRUE)
 add_dependencies(utils list_modified_files)
 target_link_libraries(utils pthread ${gmp_libname} m)
-if (HAVE_GMPXX OR HAVE_MPIRXX)
-    target_link_libraries(utils "${gmp_libname}xx")
-endif()
 
 add_library (utils_with_io ${CADO_SHARED} ${sources_io})
 target_link_libraries(utils_with_io utils)
