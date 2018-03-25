@@ -165,6 +165,12 @@ void tree_stats::print(unsigned int level)
 
     /* Note that time_to_go is only relative to the levels for which we
      * have got at least one data point */
+
+    if (draft) {
+        /* draft mode means that we're going to start over anyway ! */
+        time_to_go = sum;
+    }
+
     {
         /* print ETA */
         time_t eta[1];
@@ -179,7 +185,7 @@ void tree_stats::print(unsigned int level)
         for( ; s && isspace((int)(unsigned char)eta_string[s-1]) ; eta_string[--s]='\0') ;
 
         if (draft) {
-            printf("%slingen expected duration: %f s (ETA from now: %s)\n", prefix, time_to_go + complement, eta_string);
+            printf("%slingen expected duration: %f s (ETA from now: %s)\n", prefix, sum + complement, eta_string);
         } else {
             printf("lingen ETA: %s\n", eta_string);
         }
