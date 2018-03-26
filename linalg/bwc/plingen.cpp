@@ -1231,7 +1231,9 @@ bw_lingen_recursive(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta,
     logline_end(&(bm->t_mp), "");
     stats.end_smallstep();
 
-    if (!draft)
+    int do_right = !draft || stats.spent_so_far() < draft;
+
+    if (do_right)
         done = bw_lingen_single(bm, pi_right, E_right, delta, draft);
 
     matpoly_clear(ab, E_right);
@@ -1245,9 +1247,9 @@ bw_lingen_recursive(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta,
      * computation by just squaring pi_left.
      */
     if (caching)
-        art = matpoly_mul_caching(ab, pi, pi_left, draft ? pi_left : pi_right, draft);
+        art = matpoly_mul_caching(ab, pi, pi_left, do_right ? pi_right : pi_left, draft);
     else
-        art = matpoly_mul(ab, pi, pi_left, draft ? pi_left : pi_right, draft);
+        art = matpoly_mul(ab, pi, pi_left, do_right ? pi_right : pi_left, draft);
     stats.add_artificial_time(art);
 
     logline_end(&bm->t_mul, "");
@@ -1346,7 +1348,9 @@ int bw_biglingen_recursive(bmstatus_ptr bm, bigmatpoly pi, bigmatpoly E, unsigne
     logline_end(&bm->t_mp, "");
     stats.end_smallstep();
 
-    if (!draft)
+    int do_right = !draft || stats.spent_so_far() < draft;
+
+    if (do_right)
         done = bw_biglingen_collective(bm, pi_right, E_right, delta, draft);
     
     bigmatpoly_clear(ab, E_right);
@@ -1360,9 +1364,9 @@ int bw_biglingen_recursive(bmstatus_ptr bm, bigmatpoly pi, bigmatpoly E, unsigne
      * computation by just squaring pi_left.
      */
     if (caching)
-        art = bigmatpoly_mul_caching(ab, pi, pi_left, draft ? pi_left : pi_right, draft);
+        art = bigmatpoly_mul_caching(ab, pi, pi_left, do_right ? pi_right : pi_left, draft);
     else
-        art = bigmatpoly_mul(ab, pi, pi_left, draft ? pi_left : pi_right, draft);
+        art = bigmatpoly_mul(ab, pi, pi_left, do_right ? pi_right : pi_left, draft);
     stats.add_artificial_time(art);
     logline_end(&bm->t_mul, "");
     stats.end_smallstep();

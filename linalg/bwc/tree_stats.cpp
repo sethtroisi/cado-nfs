@@ -226,6 +226,25 @@ void tree_stats::enter(const char * func, unsigned int inputsize, bool recurse)
         stack.insert(stack.end(), curstack.size() - stack.size(), level_stats());
 }
 
+/* This returns the time spent on this function for all calls at this
+ * level, including the artificial time that has been reported so far by
+ * these calls.
+ */
+double tree_stats::spent_so_far()
+{
+    int rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    if (rank) return 0;
+    double now = wct_seconds();
+    running_stats s = curstack.back();
+    unsigned int level = depth-1;
+    ASSERT_ALWAYS(level < stack.size());
+    double t = s.time_self + now + s.time_artificial;
+    auto fi = stack[level].find(s.func);
+    if (fi != stack[level].end()) t += fi->second.spent;
+    return t;
+}
+
 void tree_stats::leave()
 {
     int rank;

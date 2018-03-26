@@ -90,6 +90,12 @@ public:
     };
 
     void add_artificial_time(double t);
+
+    /* This returns the time spent on this function for all calls at this
+     * level, including the artificial time that has been reported so far by
+     * these calls.
+     */
+    double spent_so_far();
 };
 
 #endif	/* TREE_STATS_HPP_ */
