@@ -3105,8 +3105,10 @@ int main(int argc, char *argv[])
         bw_biglingen_collective(bm, xpi, xE, delta, draft_mode);
         stats.final_print();
 
-        display_deltas(bm, delta);
-        if (!rank) printf("(pi->alloc = %zu)\n", bigmatpoly_my_cell(xpi)->alloc);
+        if (!draft_mode) {
+            display_deltas(bm, delta);
+            if (!rank) printf("(pi->alloc = %zu)\n", bigmatpoly_my_cell(xpi)->alloc);
+        }
 
         if (!draft_mode && check_luck_condition(bm)) {
             bm_io_begin_write(aa);
@@ -3149,8 +3151,10 @@ int main(int argc, char *argv[])
         bw_lingen_single(bm, pi, E, delta, draft_mode);
         stats.final_print();
 
-        display_deltas(bm, delta);
-        if (!rank) printf("(pi->alloc = %zu)\n", pi->alloc);
+        if (!draft_mode) {
+            display_deltas(bm, delta);
+            if (!rank) printf("(pi->alloc = %zu)\n", pi->alloc);
+        }
 
         if (!draft_mode && check_luck_condition(bm)) {
             bm_io_begin_write(aa);
@@ -3166,9 +3170,7 @@ int main(int argc, char *argv[])
 
     }
 
-
-
-    if (!rank) {
+    if (!rank && !draft_mode && random_input_length) {
         printf("t_basecase = %.2f\n", bm->t_basecase);
         printf("t_mp = %.2f\n", bm->t_mp);
         printf("t_mul = %.2f\n", bm->t_mul);
@@ -3184,6 +3186,7 @@ int main(int argc, char *argv[])
     gmp_randclear(rstate);
 
     param_list_clear(pl);
+
     bw_common_clear(bw);
 
     return rank0_exit_code;
