@@ -245,12 +245,9 @@ void tree_stats::leave()
     ASSERT_ALWAYS(depth == curstack.size());
     ASSERT_ALWAYS(level < stack.size());
 
-    level_stats& t(stack[level]);
-
     /* merge our running stats into the level_stats */
 
-    auto fi = t.insert(make_pair(s.func,function_stats()));
-    function_stats & F(fi.first->second);
+    function_stats & F(stack[level][s.func]);
     F.ncalled++;
     if (s.inputsize < F.min_inputsize)
         F.min_inputsize = s.inputsize;
@@ -260,8 +257,7 @@ void tree_stats::leave()
     F.trimmed += s.trimmed;
     F.spent += s.time_self + s.time_artificial;
     for(auto const & x : s.small_steps) {
-        auto fsi = F.small_steps.insert(make_pair(x.first, small_step_time()));
-        fsi.first->second += x.second;
+        F.small_steps[x.first] += x.second;
     }
 
     /* Is it any useful to print something new ? */
@@ -316,7 +312,6 @@ void tree_stats::begin_smallstep(const char * func)
     if (rank) return;
     ASSERT_ALWAYS(!curstack.empty());
     running_stats& s(curstack.back());
-    auto ssi = s.small_steps.insert(make_pair(func, small_step_time()));
     // At first thought, we never have two substeps of the same name at a given
     // level. Alas, this is not always right. One example is at the mpi
     // threshold in lingen. We have 2 gather and 2 scatter steps.
@@ -336,7 +331,7 @@ void tree_stats::begin_smallstep(const char * func)
     //    "foo(L+R)").
     //
     // ASSERT_ALWAYS(ssi.second);
-    s.substep = &(ssi.first->second);
+    s.substep = &(s.small_steps[func]);
     s.substep->real -= wct_seconds();
 }
 
