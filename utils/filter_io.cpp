@@ -798,6 +798,7 @@ void filter_rels_producer_thread(struct filter_rels_producer_thread_arg_s * arg)
          */
         FILE * f = cado_popen(*filename, "r");
         ssize_t rc = ringbuf_feed_stream(r, f);
+        int saved_errno = errno;
 #ifdef  HAVE_GETRUSAGE
         struct rusage rus;
         status = cado_pclose2(f, &rus);
@@ -805,14 +806,17 @@ void filter_rels_producer_thread(struct filter_rels_producer_thread_arg_s * arg)
 #else
         status = cado_pclose(f);
 #endif
+        if (rc < 0) errno = saved_errno;
+
         if (rc < 0 || status == -1
 #if defined(WIFEXITED) && defined(WEXITSTATUS)
             || !WIFEXITED(status) || WEXITSTATUS(status) != 0
 #endif
            ) {
             fprintf(stderr,
-                    "%s: load error (%s) from\n%s\n",
+                    "%s: load error (%s) while %s\n%s\n",
                     __func__,
+                    rc < 0 ? "reading from" : "closing",
                     strerror(errno), *filename);
             abort();
         }
