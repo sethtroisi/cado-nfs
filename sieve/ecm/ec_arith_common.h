@@ -42,6 +42,16 @@ ec_point_init (ec_point_t P, const modulus_t m)
   mod_init (P->t, m);
 }
 
+#define ec_point_init_noset0 MOD_APPEND_TYPE(ec_point_init_noset0)
+static inline void
+ec_point_init_noset0 (ec_point_t P, const modulus_t m)
+{
+  mod_init_noset0 (P->x, m);
+  mod_init_noset0 (P->y, m);
+  mod_init_noset0 (P->z, m);
+  mod_init_noset0 (P->t, m);
+}
+
 #define ec_point_clear MOD_APPEND_TYPE(ec_point_clear)
 static inline void
 ec_point_clear (ec_point_t P, const modulus_t m)
@@ -82,8 +92,8 @@ ec_point_swap (ec_point_t Q, ec_point_t P, const modulus_t m,
 
 #define ec_point_fprintf MOD_APPEND_TYPE(ec_point_fprintf)
 static inline void
-ec_point_fprintf (FILE *out, ec_point_t P, const ec_point_coord_type_t coord,
-                  const modulus_t m)
+ec_point_fprintf (FILE *out, const ec_point_t P,
+                  const ec_point_coord_type_t coord, const modulus_t m)
 {
   modint_t x, y, z, t;
 
@@ -93,9 +103,12 @@ ec_point_fprintf (FILE *out, ec_point_t P, const ec_point_coord_type_t coord,
   mod_intinit (t);
   
   mod_get_int (x, P->x, m);
-  mod_get_int (y, P->y, m);
-  mod_get_int (z, P->z, m);
-  mod_get_int (t, P->t, m);
+  if (coord != MONTGOMERY_xz)
+    mod_get_int (y, P->y, m);
+  if (coord != SHORT_WEIERSTRASS_aff)
+    mod_get_int (z, P->z, m);
+  if (coord == TWISTED_EDWARDS_ext)
+    mod_get_int (t, P->t, m);
 
   switch (coord)
   {

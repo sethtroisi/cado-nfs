@@ -59,8 +59,6 @@
 #undef mod_2pow_ul
 #undef mod_pow_mp
 #undef mod_2pow_mp
-#undef mod_V_ul
-#undef mod_V_mp
 #undef mod_sprp
 #undef mod_sprp2
 #undef mod_isprime
@@ -133,8 +131,6 @@
 #define mod_2pow_ul          MOD_RENAME(2pow_ul)
 #define mod_pow_mp           MOD_RENAME(pow_mp)
 #define mod_2pow_mp          MOD_RENAME(2pow_mp)
-#define mod_V_ul             MOD_RENAME(V_ul)
-#define mod_V_mp             MOD_RENAME(V_mp)
 #define mod_sprp             MOD_RENAME(sprp)
 #define mod_sprp2            MOD_RENAME(sprp2)
 #define mod_isprime          MOD_RENAME(isprime)
@@ -217,8 +213,6 @@ mod_test_if_functions_exist()
   p = (void*) &mod_2pow_ul;
   p = (void*) &mod_pow_mp;
   p = (void*) &mod_2pow_mp;
-  p = (void*) &mod_V_ul;
-  p = (void*) &mod_V_mp;
   p = (void*) &mod_sprp;
   p = (void*) &mod_sprp2;
   p = (void*) &mod_isprime;

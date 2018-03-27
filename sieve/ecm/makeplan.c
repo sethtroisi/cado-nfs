@@ -16,7 +16,7 @@
 #define BYTECODE_COMPRESS 1
 
 /* Costs of operations for P+1 (for Lucas chain computed with PRAC algorithm) */
-prac_cost_t pp1_opcost = { .dadd = 10., .dbl = 10.};
+prac_cost_t pp1_opcost = { .dadd = 1., .dbl = 1.};
 
 /* Costs of operations for interpreting PRAC chains on Montgomery curves
  * The cost are the number of modular multiplications and squarings.
@@ -105,7 +105,10 @@ pm1_make_plan (pm1_plan_t *plan, const unsigned int B1, const unsigned int B2,
   while ((plan->E[plan->E_nrwords - 1] & plan->E_mask) == 0UL)
     plan->E_mask >>= 1;
 
-  stage2_make_plan (&(plan->stage2), B1, B2, verbose);
+  /* stage2 is done with P+1 code */
+  stage2_cost_t stage2_opcost = { .dadd = pp1_opcost.dadd,
+                                  .dbl = pp1_opcost.dbl, .is_ecm = 0 };
+  stage2_make_plan (&(plan->stage2), B1, B2, &stage2_opcost, verbose);
 }
 
 
@@ -144,7 +147,9 @@ pp1_make_plan (pp1_plan_t *plan, const unsigned int B1, const unsigned int B2,
                         BYTECODE_COMPRESS, verbose);
 
   /* Make stage 2 plan */
-  stage2_make_plan (&(plan->stage2), B1, B2, verbose);
+  stage2_cost_t stage2_opcost = { .dadd = pp1_opcost.dadd,
+                                  .dbl = pp1_opcost.dbl, .is_ecm = 0 };
+  stage2_make_plan (&(plan->stage2), B1, B2, &stage2_opcost, verbose);
 }
 
 void
@@ -226,7 +231,9 @@ ecm_make_plan (ecm_plan_t *plan, const unsigned int B1, const unsigned int B2,
     FATAL_ERROR_CHECK (1, "Unknown parameterization");
 
   /* Make stage 2 plan */
-  stage2_make_plan (&(plan->stage2), B1, B2, verbose);
+  stage2_cost_t stage2_opcost = { .dadd = ec_montgomery_opcost.dadd,
+                                 .dbl = ec_montgomery_opcost.dbl, .is_ecm = 1 };
+  stage2_make_plan (&(plan->stage2), B1, B2, &stage2_opcost, verbose);
 }
 
 

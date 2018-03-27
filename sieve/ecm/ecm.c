@@ -8,12 +8,12 @@
 #include <inttypes.h>
 #include "portability.h"
 #include "facul_ecm.h"
-#include "timing.h"
 
-//#define ECM_COUNT_OPS /* define to print number of operations of ECM */
-//#define ECM_TIMINGS /* define to print timings of ECM */
+/* define to print number of operations of ECM (/!\ not thread-safe) */
+//#define ECM_COUNT_OPS
 
-//#define ECM_TRACE
+//#define ECM_DEBUG /* define to print debug information */
+//#define ECM_STAGE2_DEBUG /* define to print debug information for stage 2 */
 
 /* Define to 1 to make ellM_add() test if the two points are identical,
    and call ellM_double() if they are */
@@ -389,255 +389,228 @@ bytecode_mishmash_interpret_mixed_repr (ec_point_t P, bytecode_const bc,
 /* Multiplies x[1] by z[2]*z[3]*z[4]...*z[n],
    x[2] by z[1]*z[3]*z[4]...*z[n] etc., generally
    x[i] by \prod_{1\leq j \leq n, j\neq i} z[j]
-   Requires n > 1. Uses 4n-6 multiplications. */
+   Requires n > 1. Uses 4n-6 multiplications.
+ * If n <= 1 there is nothing to do.
+ */
 
 #define common_z MOD_APPEND_TYPE(common_z)
-MAYBE_UNUSED
 static void ATTRIBUTE((__noinline__))
-common_z (const int n1, residue_t *x1, residue_t *z1,
-	  const int n2, residue_t *x2, residue_t *z2,
-	  const modulus_t m)
+common_z (ec_point_t *L1, const unsigned int n1, ec_point_t *L2,
+          const unsigned int n2, const modulus_t m)
 {
-  const int n = n1 + n2;
-  int i, j;
-  residue_t *t, p;
-  const int verbose = 0;
+  const unsigned int n = n1 + n2;
+  residue_t *t = NULL, p;
 
-  if (verbose)
-    printf ("common_z: n1 = %d, n2 = %d, sum = %d, nr muls=%d\n",
-            n1, n2, n1 + n2, 4*(n1 + n2) - 6);
-
-  if (n < 2)
+  if (n <= 1) /* nothing to do in this case */
     return;
 
-  t = (residue_t *) malloc (n * sizeof (residue_t));
-  for (i = 0; i < n; i++)
+#ifdef ECM_COUNT_OPS
+    _count_stage2_M += 4*n - 6;
+#endif
+
+  mod_init (p, m);
+  t = (residue_t *) malloc ((n-1) * sizeof (residue_t));
+  ASSERT_ALWAYS (t != NULL);
+  for (unsigned int i = 0; i < n-1; i++)
     mod_init (t[i], m);
 
-  /* Set t[i] = z_0 * z_1 * ... * z_i, where the z_i are taken
-     from the two lists z1 and z2 */
-  i = j = 0;
-  if (n1 == 0)
-    mod_set (t[0], z2[j++], m);
+  /* Set t[i] = z_0 * z_1 * ... * z_i, where the z_i are the Z-coordinates taken
+   * from the two lists L1 and L2.
+   */
+  if (n1)
+    mod_set (t[0], L1[0]->z, m);
   else
-    mod_set (t[0], z1[i++], m);
-
-  for ( ; i < n1; i++)
-    mod_mul (t[i], t[i - 1], z1[i], m);
-
-  for ( ; j < n2; j++)
-    mod_mul (t[j + n1], t[j + n1 - 1], z2[j], m);
-
-  /* Now t[i] contains z_0 * ... * z_i */
-
-#ifdef ECM15_UL
-  if (verbose) {
-    printf ("t[] = {");
-    for (int verbose_i = 0; verbose_i < n; verbose_i++)
-      printf ("{%lu,%lu}%s", t[verbose_i][0], t[verbose_i][1], (verbose_i < n-1) ? ", " : "");
-    printf ("}\n");
+    mod_set (t[0], L2[0]->z, m); /* L1 is empty */
+  for (unsigned int i = 1; i < n-1; i++)
+  {
+    if (i < n1)
+      mod_mul (t[i], t[i-1], L1[i]->z, m);
+    else
+      mod_mul (t[i], t[i-1], L2[i-n1]->z, m);
   }
-#endif
-  mod_init (p, m);
+  /* cost: n-2 mul */
 
-  i = n - 1;
-  if (i < n1) /* <==>  n2 == 0 */
-    mod_mul (x1[i], x1[i], t[n - 2], m);
+  if (n2)
+  {
+    mod_mul (L2[n2-1]->x, L2[n2-1]->x, t[n-2], m);
+    mod_set (p, L2[n2-1]->z, m);
+  }
   else
-    mod_mul (x2[i - n1], x2[i - n1], t[n - 2], m);
+  {
+    mod_mul (L1[n1-1]->x, L1[n1-1]->x, t[n-2], m);
+    mod_set (p, L1[n1-1]->z, m);
+  }
+  /* cost: 1 mul */
 
-  /* Init the accumulator p, either to the last element of z2 if z2 is
-     non-empty, or to the last element of z1 if z2 is empty */
-  if (n2 > 0)
-    mod_set (p, z2[n2 - 1], m);
-  else
-    mod_set (p, z1[n1 - 1], m);
-
-  for (i = n2 - 2; i > -n1 && i >= 0; i--)
+  for (unsigned int i = n-2; i > 0; i--)
+  {
+    if (i < n1)
     {
-      /* Here p = z_{i+1} * ... * z_{n-1} */
-      mod_mul (x2[i], x2[i], p, m);
-      mod_mul (x2[i], x2[i], t[i + n1 - 1], m);
-      mod_mul (p, p, z2[i], m);
+      mod_mul (L1[i]->x, L1[i]->x, p, m);
+      mod_mul (L1[i]->x, L1[i]->x, t[i-1], m);
+      mod_mul (p, p, L1[i]->z, m);
     }
-
-  /* n1 = 0  =>  i = 0 */
-  /* n1 > 0  =>  i = -1 or -2 */
-
-  for (i = i + n1 ; i > 0; i--)
+    else
     {
-      /* Here p = z_{i+1} * ... * z_{n-1} */
-      mod_mul (x1[i], x1[i], p, m);
-      mod_mul (x1[i], x1[i], t[i-1], m);
-      mod_mul (p, p, z1[i], m);
+      mod_mul (L2[i-n1]->x, L2[i-n1]->x, p, m);
+      mod_mul (L2[i-n1]->x, L2[i-n1]->x, t[i-1], m);
+      mod_mul (p, p, L2[i-n1]->z, m);
     }
+  }
+  /* cost: 3*n-6 mul */
 
-  if (n1 > 0)
-    mod_mul (x1[0], x1[0], p, m);
+  if (n1)
+    mod_mul (L1[0]->x, L1[0]->x, p, m);
   else
-    mod_mul (x2[0], x2[0], p, m);
+    mod_mul (L2[0]->x, L2[0]->x, p, m);
+  /* cost: 1 mul */
 
+  /* free memory */
   mod_clear (p, m);
-
-  for (i = 0; i < n; i++)
+  for (unsigned int i = 0; i < n-1; i++)
     mod_clear (t[i], m);
   free (t);
-  t = NULL;
 }
 
 
 #define ecm_stage2 MOD_APPEND_TYPE(ecm_stage_2)
 static int ATTRIBUTE((__noinline__))
 ecm_stage2 (residue_t r, const ec_point_t P, const stage2_plan_t *plan,
-	    const residue_t b, const modulus_t m)
+            const residue_t b, const modulus_t m)
 {
-  ec_point_t Pd, Pt; /* d*P, i*d*P, (i+1)*d*P and a temp */
-  residue_t *Pid_x, *Pid_z, *Pj_x, *Pj_z; /* saved i*d*P, i0 <= i < i1,
-              and jP, j in S_1, x and z coordinate stored separately */
-  residue_t a, a_bk, t;
+  ASSERT (plan->w % 6 == 0); /* see stage2_make_plan */
+
+  ec_point_t wP, Pt; /* w*P and a temp */
+  ec_point_t *vwP, *uP; /* saved v*w*P, vmin <= v <= vmax, and uP, u in U. */
   int bt = 0;
-  const int verbose = 0;
 
+  ec_point_init (wP, m);
   ec_point_init (Pt, m);
-  mod_init_noset0 (t, m);
-  mod_init_noset0 (a, m);
-  Pj_x = (residue_t *) malloc (plan->s1 * sizeof(residue_t));
-  ASSERT (Pj_x != NULL);
-  Pj_z = (residue_t *) malloc (plan->s1 * sizeof(residue_t));
-  ASSERT (Pj_z != NULL);
-  ASSERT(plan->i0 < plan->i1);
-  Pid_x = (residue_t *) malloc ((plan->i1 - plan->i0) * sizeof(residue_t));
-  ASSERT (Pid_x != NULL);
-  Pid_z = (residue_t *) malloc ((plan->i1 - plan->i0) * sizeof(residue_t));
-  ASSERT (Pid_z != NULL);
-  for (unsigned int i = 0; i < plan->s1; i++)
-    {
-      mod_init_noset0 (Pj_x[i], m);
-      mod_init_noset0 (Pj_z[i], m);
-    }
-  for (unsigned int i = 0; i < plan->i1 - plan->i0; i++)
-    {
-      mod_init_noset0 (Pid_x[i], m);
-      mod_init_noset0 (Pid_z[i], m);
-    }
 
-  // FIXME works only for _ul
-  if (verbose)
-    printf ("Stage 2: P = (%lu::%lu)\n",
-            mod_get_ul (P[0].x, m), mod_get_ul (P[0].z, m));
+  ASSERT (plan->vmin <= plan->vmax);
+  vwP = (ec_point_t *) malloc ((plan->vmax-plan->vmin+1) * sizeof (ec_point_t));
+  ASSERT (vwP != NULL);
+  uP = (ec_point_t *) malloc (plan->U_len * sizeof (ec_point_t));
+  ASSERT (uP != NULL);
 
-  /* Compute jP for j in S_1. Compute all the j, 1 <= j < d/2, gcd(j,d)=1
-     with two arithmetic progressions 1+6k and 5+6k (this assumes 6|d).
-     We need two values of each progression (1, 7 and 5, 11) and the
-     common difference 6. These can be computed with the Lucas chain
-     1, 2, 3, 5, 6, 7, 11 at the cost of 6 additions and 1 doubling.
-     For d=210, generating all 24 desired values 1 <= j < 210/2, gcd(j,d)=1,
-     takes 6+16+15=37 point additions. If d=30, we could use
-     1,2,3,4,6,7,11,13 which has 5 additions and 2 doublings */
+  for (unsigned int i = 0; i < plan->vmax - plan->vmin + 1; i++)
+    ec_point_init_noset0 (vwP[i], m);
+  for (unsigned int i = 0; i < plan->U_len; i++)
+    ec_point_init_noset0 (uP[i], m);
 
-  ASSERT (plan->d % 6 == 0);
-  {
+#ifdef ECM_STAGE2_DEBUG
+  modint_t _int;
+  mod_intinit (_int);
+  printf ("# %s: input P=", __func__);
+  ec_point_fprintf (stdout, P, MONTGOMERY_xz, m);
+  fputc ('\n', stdout);
+#endif
+
+  { /***************************** baby step **********************************/
+    /* Compute u*P for u in U. Compute all the u, 1 <= u < d/2, gcd(u,w)=1
+     * with two arithmetic progressions 1+6k and 5+6k (this assumes 6|w).
+     * We need two values of each progression (1, 7 and 5, 11) and the
+     * common difference 6. These can be computed with the Lucas chain
+     * 1, 2, 3, 5, 6, 7, 11 at the cost of 4 additions and 2 doublings.
+     * If w=30, we could use 1,2,3,4,6,7,11,13 which has 4 additions and 3
+     * doublings.
+     */
     ec_point_t ap1_0, ap1_1, ap5_0, ap5_1, P2, P6;
-    int i1, i5;
-    ec_point_init (ap1_0, m);
-    ec_point_init (ap1_1, m);
-    ec_point_init (ap5_0, m);
-    ec_point_init (ap5_1, m);
-    ec_point_init (P6, m);
-    ec_point_init (P2, m);
+    ec_point_init_noset0 (ap1_0, m);
+    ec_point_init_noset0 (ap1_1, m);
+    ec_point_init_noset0 (ap5_0, m);
+    ec_point_init_noset0 (ap5_1, m);
+    ec_point_init_noset0 (P6, m);
+    ec_point_init_noset0 (P2, m);
 
-    /* Init ap1_0 = 1P, ap1_1 = 7P, ap5_0 = 5P, ap5_1 = 11P
-       and P6 = 6P */
-    ec_point_set (ap1_0, P, m, MONTGOMERY_xz); /* ap1_0 = 1*P */
-    montgomery_dbl (P2, P, m, b);         /* P2 = 2*P */
-    montgomery_dadd (P6, P2, P, P, b, m);     /* P6 = 3*P (for now) */
-    montgomery_dadd (ap5_0, P6, P2, P, b, m); /* 5*P = 3*P + 2*P */
-    montgomery_dbl (P6, P6, m, b);        /* P6 = 6*P = 2*(3*P) */
-    montgomery_dadd (ap1_1, P6, P, ap5_0, b, m); /* 7*P = 6*P + P */
-    montgomery_dadd (ap5_1, P6, ap5_0, P, b, m); /* 11*P = 6*P + 5*P */
+    /* Init ap1_0 = 1P, ap1_1 = 7P, ap5_0 = 5P, ap5_1 = 11P and P6 = 6P */
+    ec_point_set (ap1_0, P, m, MONTGOMERY_xz);    /* ap1_0 = 1*P */
+    montgomery_dbl (P2, P, m, b);                 /* P2 = 2*P */
+    montgomery_dadd (P6, P2, P, P, b, m);         /* P6 = 3*P (for now) */
+    montgomery_dadd (ap5_0, P6, P2, P, b, m);     /* 5*P = 3*P + 2*P */
+    montgomery_dbl (P6, P6, m, b);                /* P6 = 6*P = 2*(3*P) */
+    montgomery_dadd (ap1_1, P6, P, ap5_0, b, m);  /* 7*P = 6*P + P */
+    montgomery_dadd (ap5_1, P6, ap5_0, P, b, m);  /* 11*P = 6*P + 5*P */
 
-    /* Now we generate all the j*P for j in S_1 */
-    /* We treat the first two manually because those might correspond
-       to ap1_0 = 1*P and ap5_0 = 5*P */
+#ifdef ECM_STAGE2_DEBUG
+    printf ("# %s: 1*P=", __func__);
+    ec_point_fprintf (stdout, ap1_0, MONTGOMERY_xz, m);
+    printf ("\n# %s: 5*P=", __func__);
+    ec_point_fprintf (stdout, ap5_0, MONTGOMERY_xz, m);
+    printf ("\n# %s: 7*P=", __func__);
+    ec_point_fprintf (stdout, ap1_1, MONTGOMERY_xz, m);
+    printf ("\n# %s: 11*P=", __func__);
+    ec_point_fprintf (stdout, ap5_1, MONTGOMERY_xz, m);
+    fputc ('\n', stdout);
+#endif
+
+    /* Now we generate all the u*P for u in U */
+    /* We treat the first two manually because those might correspond to
+     * ap1_0 = 1*P and ap5_0 = 5*P */
     unsigned int k = 0;
-    if (plan->s1 > k && plan->S1[k] == 1)
+    if (k < plan->U_len && plan->U[k] == 1)
+    {
+      ec_point_set (uP[k], ap1_0, m, MONTGOMERY_xz);
+      k++;
+    }
+    if (k < plan->U_len && plan->U[k] == 5)
+    {
+      ec_point_set (uP[k], ap5_0, m, MONTGOMERY_xz);
+      k++;
+    }
+
+    unsigned int u_1mod6 = 7, u_5mod6 = 11;
+    while (k < plan->U_len)
+    {
+      if (plan->U[k] == u_1mod6)
       {
-        mod_set (Pj_x[k], ap1_0[0].x, m);
-        mod_set (Pj_z[k], ap1_0[0].z, m);
+        ec_point_set (uP[k], ap1_1, m, MONTGOMERY_xz);
         k++;
+        continue;
       }
-    if (plan->s1 > k && plan->S1[k] == 5)
+      if (plan->U[k] == u_5mod6)
       {
-        mod_set (Pj_x[k], ap5_0[0].x, m);
-        mod_set (Pj_z[k], ap5_0[0].z, m);
+        ec_point_set (uP[k], ap5_1, m, MONTGOMERY_xz);
         k++;
+        continue;
       }
 
-    i1 = 7;
-    i5 = 11;
-    while (k < plan->s1)
-      {
-        if (plan->S1[k] == i1)
-          {
-            mod_set (Pj_x[k], ap1_1[0].x, m);
-            mod_set (Pj_z[k], ap1_1[0].z, m);
-	    k++;
-	    continue;
-          }
-        if (plan->S1[k] == i5)
-          {
-            mod_set (Pj_x[k], ap5_1[0].x, m);
-            mod_set (Pj_z[k], ap5_1[0].z, m);
-	    k++;
-	    continue;
-          }
-	
-        montgomery_dadd (Pt, ap1_1, P6, ap1_0, b, m);
-        ec_point_set (ap1_0, ap1_1, m, MONTGOMERY_xz);
-        ec_point_set (ap1_1, Pt, m, MONTGOMERY_xz);
-        i1 += 6;
-	
-        montgomery_dadd (Pt, ap5_1, P6, ap5_0, b, m);
-        ec_point_set (ap5_0, ap5_1, m, MONTGOMERY_xz);
-        ec_point_set (ap5_1, Pt, m, MONTGOMERY_xz);
-        i5 += 6;
-      }
+      montgomery_dadd (Pt, ap1_1, P6, ap1_0, b, m);
+      ec_point_set (ap1_0, ap1_1, m, MONTGOMERY_xz);
+      ec_point_set (ap1_1, Pt, m, MONTGOMERY_xz);
+      u_1mod6 += 6;
 
-    if ((unsigned) (i1 + i5) < plan->d)
-      {
-        if (i1 < i5)
-          {
-            montgomery_dadd (Pt, ap1_1, P6, ap1_0, b, m);
-            ec_point_set (ap1_0, ap1_1, m, MONTGOMERY_xz);
-            ec_point_set (ap1_1, Pt, m, MONTGOMERY_xz);
-            i1 += 6;
-          }
-        else
-          {
-            montgomery_dadd (Pt, ap5_1, P6, ap5_0, b, m);
-            ec_point_set (ap5_0, ap5_1, m, MONTGOMERY_xz);
-            ec_point_set (ap5_1, Pt, m, MONTGOMERY_xz);
-            i5 += 6;
-          }
-      }
+      montgomery_dadd (Pt, ap5_1, P6, ap5_0, b, m);
+      ec_point_set (ap5_0, ap5_1, m, MONTGOMERY_xz);
+      ec_point_set (ap5_1, Pt, m, MONTGOMERY_xz);
+      u_5mod6 += 6;
+    }
 
-    ec_point_init (Pd, m);
-#if 0
-    /* Also compute Pd = d*P while we've got 6*P */
-    montgomery_mul_ul (Pd, P6, plan->d / 6, m, b); /* slow! */
-#else
-    ASSERT ((unsigned) (i1 + i5) == plan->d);
-    if (i1 + 4 == i5)
-      {
-        montgomery_dbl (P2, P2, m, b); /* We need 4P for difference */
-        montgomery_dadd (Pd, ap1_1, ap5_1, P2, b, m);
-      }
-    else if (i5 + 2 == i1)
-      {
-        montgomery_dadd (Pd, ap1_1, ap5_1, P2, b, m);
-      }
-    else
-      abort ();
+    /* Compute compute wP = w*P */
+    if (plan->w == 6)
+      ec_point_set (wP, P6, m, MONTGOMERY_xz);
+    else if (plan->w == 12)
+      montgomery_dbl (wP, P6, m, b);
+    else if (plan->w % 12 == 0)
+    {
+      montgomery_dadd (Pt, ap1_1, P6, ap1_0, b, m);
+      montgomery_dadd (wP, Pt, ap5_1, P2, b, m);
+    }
+    else /* plan->w % 12 == 6 */
+    {
+      montgomery_dbl (P2, P2, m, b); /* We need 4P for difference */
+      montgomery_dadd (wP, ap1_1, ap5_1, P2, b, m);
+    }
+
+#ifdef ECM_STAGE2_DEBUG
+    for (unsigned int k = 0; k < plan->U_len; k++)
+    {
+      printf ("%s# %s: %u*P=", k ? "\n" : "", __func__, plan->U[k]);
+      ec_point_fprintf (stdout, uP[k], MONTGOMERY_xz, m);
+    }
+    printf ("\n# %s: %u*P=", __func__, plan->w);
+    ec_point_fprintf (stdout, wP, MONTGOMERY_xz, m);
+    fputc ('\n', stdout);
 #endif
 
     ec_point_clear (ap1_0, m);
@@ -646,238 +619,134 @@ ecm_stage2 (residue_t r, const ec_point_t P, const stage2_plan_t *plan,
     ec_point_clear (ap5_1, m);
     ec_point_clear (P6, m);
     ec_point_clear (P2, m);
+  } /* end baby step */
 
-  }
-
-  // FIXME works only for _ul
-  if (verbose)
+  { /**************************** giant step **********************************/
+    /* Compute vwP for vmin <= v < vmax */
+    if (plan->vmin == plan->vmax) /* If vmin == vmax, only vmin*w*P is needed */
+      montgomery_smul_ul (vwP[0], NULL, wP, plan->vmin, m, b);
+    else
     {
-      printf ("Pj = [");
-      for (unsigned int i = 0; i < plan->s1; i++)
-        printf ("%s(%lu::%lu)", (i>0) ? ", " : "",
-                mod_get_ul (Pj_x[i], m), mod_get_ul (Pj_z[i], m));
-      printf ("]\nPd = (%lu::%lu)\n",
-                mod_get_ul (Pd[0].x, m), mod_get_ul (Pd[0].z, m));
-    }
+      montgomery_smul_ul (vwP[0], vwP[1], wP, plan->vmin, m, b);
 
-  /* Compute idP for i0 <= i < i1 */
-  {
-    ec_point_t Pid, Pid1;
+      unsigned int k = 2, v = plan->vmin+2;
 
-    ec_point_init (Pid, m);
-    ec_point_init (Pid1, m);
-    unsigned int k = 0, i = plan->i0;
-
-    /* If i0 == 0, we simply leave the first point at (0::0) which is the
-       point at infinity */
-    if (plan->i0 == 0)
-    {
-      mod_set0 (Pid_x[k], m);
-      mod_set0 (Pid_z[k], m);
-      k++;
-      i++;
-    }
-
-    /* Now i = i0 or i0+1 and i > 0 */
-    /* plan->i1 == 1 implies plan->i0 = 0, so nothing more to do */
-    if (plan->i1 > 1)
-    {
-      if (i+1 == plan->i1) /* only need one multiple of d*P */
+      for ( ; v <= plan->vmax; k++, v++)
       {
-        montgomery_smul_ui (Pt, NULL, Pd, i, m, b); /* Pt = i*(d*P) */
-        mod_set (Pid_x[k], Pt->x, m);
-        mod_set (Pid_z[k], Pt->z, m);
-      }
-      else
-      {
-        /* Pid = i*(d*P) and Pid1 = (i+1)*(d*P) */
-        montgomery_smul_ui (Pid, Pid1, Pd, i, m, b);
-        mod_set (Pid_x[k], Pid->x, m);
-        mod_set (Pid_z[k], Pid->z, m);
-        k++;
-        mod_set (Pid_x[k], Pid1->x, m);
-        mod_set (Pid_z[k], Pid1->z, m);
-        k++;
-        i += 2;
-
-        for ( ; i < plan->i1; k++, i++)
-        {
-          montgomery_dadd (Pt, Pid1, Pd, Pid, b, m);
-          ec_point_set (Pid, Pid1, m, MONTGOMERY_xz);
-          ec_point_set (Pid1, Pt, m, MONTGOMERY_xz);
-          mod_set (Pid_x[k], Pt->x, m);
-          mod_set (Pid_z[k], Pt->z, m);
-        }
+        if (v % 2 == 0 && v/2 >= plan->vmin)
+          montgomery_dbl (vwP[k], vwP[v/2-plan->vmin], m, b);
+        else
+          montgomery_dadd (vwP[k], vwP[k-1], wP, vwP[k-2], b, m);
       }
     }
 
-    ec_point_clear (Pd, m);
-    ec_point_clear (Pid, m);
-    ec_point_clear (Pid1, m);
-  }
-
-  // FIXME works only for _ul
-  if (verbose)
+#ifdef ECM_STAGE2_DEBUG
+    for (unsigned int k = 0; k < plan->vmax - plan->vmin + 1; k++)
     {
-      printf ("Pid = [");
-      for (unsigned int i = 0; i < plan->i1 - plan->i0; i++)
-        printf ("%s(%lu:%lu)", (i>0) ? ", " : "",
-	        mod_get_ul (Pid_x[i], m), mod_get_ul (Pid_z[i], m));
-      printf ("]\n");
+      printf ("%s# %s: %u*w*P=", k ? "\n" : "", __func__, plan->vmin+k);
+      ec_point_fprintf (stdout, vwP[k], MONTGOMERY_xz, m);
     }
-
-  /* Now we've computed all the points we need, so multiply each by
-     the Z-coordinates of all the others, using Zimmermann's
-     two product-lists trick.
-     If i0 == 0, then Pid[0] is the point at infinity (0::0),
-     so we skip that one */
-  {
-    int skip = (plan->i0 == 0) ? 1 : 0;
-#if defined(ECM15_UL)
-    if (verbose)
-      {
-        residue_t *x1 = Pj_x, *z1 = Pj_z, *x2 = Pid_x + skip, *z2 = Pid_z + skip;
-        int n1 = plan->s1, n2 = plan->i1 - plan->i0 - skip;
-
-        printf ("Before common_z():\n");
-        printf ("x1 = {");
-        for (int verbose_i = 0; verbose_i < n1; verbose_i++)
-          printf ("{%luUL,%luUL}%s", x1[verbose_i][0], x1[verbose_i][1], (verbose_i < n1-1) ? ", " : "}\n");
-        printf ("z1 = {");
-        for (int verbose_i = 0; verbose_i < n1; verbose_i++)
-          printf ("{%luUL,%luUL}%s", z1[verbose_i][0], z1[verbose_i][1], (verbose_i < n1-1) ? ", " : "}\n");
-        printf ("x2 = {");
-        for (int verbose_i = 0; verbose_i < n2; verbose_i++)
-          printf ("{%luUL,%luUL}%s", x2[verbose_i][0], x2[verbose_i][1], (verbose_i < n2-1) ? ", " : "}\n");
-        printf ("z2 = {");
-        for (int verbose_i = 0; verbose_i < n2; verbose_i++)
-          printf ("{%luUL,%luUL}%s", z2[verbose_i][0], z2[verbose_i][1], (verbose_i < n2-1) ? ", " : "}\n");
-      }
+    fputc ('\n', stdout);
 #endif
-    common_z (plan->s1, Pj_x, Pj_z, plan->i1 - plan->i0 - skip,
-	      Pid_x + skip, Pid_z + skip, m);
+  } /* end giant step */
+
+
+  { /***************************** common_z ***********************************/
+    /* Now we've computed all the points we need, so multiply each by the
+     * Z-coordinates of all the others, using Zimmermann's two product-lists
+     * trick. If vmin == 0, then vwP[0] is the point at infinity (0::0), so we
+     * skip that one
+     */
+    int skip = (plan->vmin == 0) ? 1 : 0;
+    common_z (uP, plan->U_len, vwP+skip, plan->vmax-plan->vmin+1-skip, m);
+
+#ifdef ECM_STAGE2_DEBUG
+    for (unsigned int k = 0; k < plan->U_len; k++)
+    {
+      mod_get_int (_int, uP[k]->x, m);
+      mod_printf ("# %s: after common_z, %u*P=(0x%" PRIMODx " :: Z)\n",
+                  __func__, plan->U[k], MOD_PRINT_INT (_int));
+    }
+    for (unsigned int k = 0; k < plan->vmax - plan->vmin + 1; k++)
+    {
+      mod_get_int (_int, vwP[k]->x, m);
+      mod_printf ("# %s: after common_z, %u*w*P=(0x%" PRIMODx " :: Z)\n",
+                  __func__, plan->vmin+k, MOD_PRINT_INT (_int));
+    }
+#endif
+  } /* end of common_z */
+
+  { /***************************** product ************************************/
+    /* Now compute
+     *        r = prod_{u,v in plan->pairs}{X_vwP - X_uP}
+     *
+     * Initialize r with uP[0], which contains the product of the Z-coordinates
+     * of all the precomputed points, except the Z-coordinate of uP[0]. Note
+     * that uP[0] is equal to P, and we know that the Z-coordinate of P is
+     * coprime to the modulus m. It cost nothing to add this in the product and
+     * we could catch a factor p if, by chance, one of the Z-coordinates is 0
+     * modulo p.
+     */
+    residue_t t, r_bak; /* Backup value of a, in case we get r == 0 */
+    mod_init_noset0 (t, m);
+    mod_init_noset0 (r_bak, m);
+
+    mod_set (r, uP[0]->x, m);
+    mod_set (r_bak, r, m);
+
+    for (unsigned int v_idx = 0, *u_ptr = plan->pairs; ; v_idx++, u_ptr++)
+    {
+      ASSERT (v_idx <= plan->vmax - plan->vmin);
+#if ECM_BACKTRACKING
+      mod_set (r_bak, r, m);
+#endif
+
+      for (; *u_ptr != PAIR_END && *u_ptr != PAIR_INCR_V; u_ptr++)
+      {
+        mod_sub (t, vwP[v_idx]->x, uP[*u_ptr]->x, m);
+        mod_mul (r, r, t, m);
 #ifdef ECM_COUNT_OPS
-    _count_stage2_M += 4*(plan->s1+plan->i1-plan->i0-skip) - 6;
+        _count_stage2_M++;
 #endif
-#if defined(ECM15_UL)
-    if (verbose)
-      {
-        residue_t *x1 = Pj_x, *z1 = Pj_z, *x2 = Pid_x + skip, *z2 = Pid_z + skip;
-        int n1 = plan->s1, n2 = plan->i1 - plan->i0 - skip;
-
-        printf ("After common_z():\n");
-        printf ("x1 = {");
-        for (int verbose_i = 0; verbose_i < n1; verbose_i++)
-          printf ("{%luUL,%luUL}%s", x1[verbose_i][0], x1[verbose_i][1], (verbose_i < n1-1) ? ", " : "}\n");
-        printf ("z1 = {");
-        for (int verbose_i = 0; verbose_i < n1; verbose_i++)
-          printf ("{%luUL,%luUL}%s", z1[verbose_i][0], z1[verbose_i][1], (verbose_i < n1-1) ? ", " : "}\n");
-        printf ("x2 = {");
-        for (int verbose_i = 0; verbose_i < n2; verbose_i++)
-          printf ("{%luUL,%luUL}%s", x2[verbose_i][0], x2[verbose_i][1], (verbose_i < n2-1) ? ", " : "}\n");
-        printf ("z2 = {");
-        for (int verbose_i = 0; verbose_i < n2; verbose_i++)
-          printf ("{%luUL,%luUL}%s", z2[verbose_i][0], z2[verbose_i][1], (verbose_i < n2-1) ? ", " : "}\n");
       }
-#endif
-  }
-
-  // FIXME works only for _ul
-  if (verbose)
-    {
-      printf ("After canonicalizing:\nPj = [");
-      for (unsigned int i = 0; i < plan->s1; i++)
-        printf ("%s(%lu:%lu)", (i>0) ? ", " : "",
-                mod_get_ul (Pj_x[i], m), mod_get_ul (Pj_z[i], m));
-      printf ("]\n");
-
-      printf ("Pid = [");
-      for (unsigned int i = 0; i < plan->i1 - plan->i0; i++)
-        printf ("%s(%lu:%lu)", (i>0) ? ", " : "",
-                mod_get_ul (Pid_x[i], m), mod_get_ul (Pid_z[i], m));
-      printf ("]\n");
-      fflush(stdout);
-    }
-
-  /* Now process all the primes p = id - j, B1 < p <= B2 and multiply
-     (id*P)_x - (j*P)_x to the accumulator */
-
-  /* Init the accumulator to Pj[0], which contains the product of
-     the Z-coordinates of all the precomputed points, except Pj_z[0]
-     which is equal to P, and we know that one is coprime to the modulus.
-     Maybe one of the others was zero (mod p) for some prime factor p. */
-
-  mod_set (a, Pj_x[0], m);
-  mod_init_noset0 (a_bk, m); /* Backup value of a, in case we get a == 0 */
-  mod_set (a_bk, a, m);
-
-  unsigned i = 0, l = 0;
-  unsigned char j = plan->pairs[0];
-  while (j != NEXT_PASS)
-    {
-      __asm__ volatile ("# ECM stage 2 loop here");
-      while (j < NEXT_D && j < NEXT_PASS)
-	{
-	  mod_sub (t, Pid_x[i], Pj_x[j], m);
-	  j = plan->pairs[++l];
-	  mod_mul (a, a, t, m);
-#ifdef ECM_COUNT_OPS
-    _count_stage2_M++;
-#endif
-	}
 
 #if ECM_BACKTRACKING
-      /* See if we got a == 0. If yes, restore previous a value and
-	 end stage 2. Let's hope not all factors were found since
-	 the last d increase. */
-      if (mod_is0 (a, m))
-	{
-	  mod_set (a, a_bk, m);
-	  bt = 1;
-	  break;
-	}
-      mod_set (a_bk, a, m); /* Save new a value */
+      /* See if we got r == 0. If yes, restore previous r value and end stage 2.
+       * Let's hope not all factors were found since the last v increase.
+       */
+      if (mod_is0 (r, m))
+      {
+        mod_set (r, r_bak, m);
+        bt = 1;
+        break;
+      }
 #endif
 
-      if (j == NEXT_D)
-	{
-	  i++;
-	  j = plan->pairs[++l];
-	  ASSERT (i < plan->i1 - plan->i0);
-	}
+      if (*u_ptr == PAIR_END)
+        break;
     }
 
-  if (verbose)
-    printf ("Accumulator = %lu\n", mod_get_ul (a, m));
+#ifdef ECM_STAGE2_DEBUG
+    mod_get_int (_int, r, m);
+    mod_printf ("# %s: r=%" PRIMODu "\n", __func__, MOD_PRINT_INT (_int));
+    mod_intclear (_int);
+#endif
 
-  mod_set (r, a, m);
+    mod_clear (t, m);
+    mod_clear (r_bak, m);
+  }
 
   /* Clear everything */
+  for (unsigned int i = 0; i < plan->U_len; i++)
+    ec_point_clear (uP[i], m);
+  for (unsigned int i = 0; i < plan->vmax - plan->vmin + 1; i++)
+    ec_point_clear (vwP[i], m);
 
-  for (i = 0; i < plan->s1; i++)
-    {
-      mod_clear (Pj_x[i], m);
-      mod_clear (Pj_z[i], m);
-    }
-  free (Pj_x);
-  Pj_x = NULL;
-  free (Pj_z);
-  Pj_z = NULL;
+  free (uP);
+  free (vwP);
 
-  for (i = 0; i < plan->i1 - plan->i0; i++)
-    {
-      mod_clear (Pid_x[i], m);
-      mod_clear (Pid_z[i], m);
-    }
-  free (Pid_x);
-  Pid_x = NULL;
-  free (Pid_z);
-  Pid_z = NULL;
-
+  ec_point_clear (wP, m);
   ec_point_clear (Pt, m);
-  mod_clear (t, m);
-  mod_clear (a, m);
-  mod_clear (a_bk, m);
   return bt;
 }
 
@@ -887,11 +756,11 @@ ecm_stage2 (residue_t r, const ec_point_t P, const stage2_plan_t *plan,
 int
 ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
 {
-#ifdef ECM_TRACE
-    mod_printf ("# TRACE: start %s with B1=%u and B2=%u for m = %" PRIMODu "\n",
-            __func__, plan->B1, plan->stage2.B2, MOD_PRINT_MODULUS (m));
-    printf ("# TRACE: using parameterization 0x%x with parameter %lu\n",
-            plan->parameterization, plan->parameter);
+#ifdef ECM_DEBUG
+    mod_printf ("# %s: start with B1=%u and B2=%u for m = %" PRIMODu "\n",
+                __func__, plan->B1, plan->stage2.B2, MOD_PRINT_MODULUS (m));
+    printf ("# %s: using parameterization 0x%x with parameter %lu\n",
+            __func__, plan->parameterization, plan->parameter);
 #endif
 
   residue_t u, b;
@@ -901,22 +770,12 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
   unsigned int i;
   int r, bt = 0;
 
-#ifdef ECM_TIMINGS
-  uint64_t t0, param_dt, stage1_dt, stage2_dt;
-  double ecm_starttime, ecm_dt;
-  ecm_starttime = wct_seconds();
-#endif
-
   ec_point_init (P, m);
   mod_init_noset0 (b, m);
 
   mod_intset_ul (f, 1UL);
 
   /**************************** parameterization ******************************/
-#ifdef ECM_TIMINGS
-  t0 = microseconds_thread ();
-#endif
-
   if (plan->parameterization & FULLMONTY)
   {
     param_output_type = MONTGOMERY_xz;
@@ -938,15 +797,11 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
     abort();
   }
 
-#ifdef ECM_TIMINGS
-  param_dt = microseconds_thread() - t0;
-#endif
-
   if (r == 0)
   {
     mod_gcd (f, P->x, m);
-#ifdef ECM_TRACE
-    mod_printf ("# TRACE: during parameterization, found factor %" PRIMODu "\n",
+#ifdef ECM_DEBUG
+    mod_printf ("# %s: during parameterization, found factor %" PRIMODu "\n",
                 MOD_PRINT_INT (f));
 #endif
     mod_clear (b, m);
@@ -954,18 +809,21 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
     return 0;
   }
 
-#ifdef ECM_TRACE
+#ifdef ECM_DEBUG
   residue_t A;
   ec_point_t PM;
   ec_point_init (PM, m);
   mod_init_noset0 (A, m);
   montgomery_A_from_b (A, b, m);
-  printf ("# TRACE: starting values:\n");
+  printf ("# %s: starting values:\n", __func__);
+
+#define STR(s) XSTR(s)
+#define XSTR(s) #s
 
   if (param_output_type == MONTGOMERY_xz)
   {
-    montgomery_curve_fprintf (stdout, "# TRACE:   ", A, P, m);
-    printf ("# TRACE:                     = ");
+    montgomery_curve_fprintf (stdout, "# " STR(ecm) ":   ", A, P, m);
+    printf ("# %s:                     = ", __func__);
     montgomery_point_fprintf_affine (stdout, P, m);
     fputc ('\n', stdout);
   }
@@ -974,12 +832,12 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
     residue_t d;
     mod_init_noset0 (d, m);
     edwards_d_from_montgomery_A (d, A, m);
-    edwards_ext_curve_fprintf (stdout, "# TRACE:   ", d, P, m);
+    edwards_ext_curve_fprintf (stdout, "# " STR(ecm) ":   ", d, P, m);
     mod_clear (d, m);
 
-    printf ("# TRACE:   Equivalent to Montgomery curve with:\n");
+    printf ("# %s:   Equivalent to Montgomery curve with:\n", __func__);
     montgomery_point_from_edwards_point (PM, P, 1, m);
-    montgomery_curve_fprintf (stdout, "# TRACE:     ", A, PM, m);
+    montgomery_curve_fprintf (stdout, "# " STR(ecm) ":     ", A, PM, m);
   }
   mod_clear (A, m);
   ec_point_clear (PM, m);
@@ -989,9 +847,6 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
 #ifdef ECM_COUNT_OPS
   ECM_COUNT_OPS_RESET();
 #endif
-#ifdef ECM_TIMINGS
-  t0 = microseconds_thread();
-#endif
 
   /* output is always in Montgomery form */
   if (plan->parameterization & FULLMONTY)
@@ -999,15 +854,15 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
   else if (plan->parameterization & FULLMONTYTWED)
     bytecode_mishmash_interpret_mixed_repr (P, plan->bc, m, b);
 
-#ifdef ECM_TRACE
-  printf ("# TRACE: after stage 1 (without the powers of 2):\n");
-  printf ("# TRACE:   output (X::Z) = ");
+#ifdef ECM_DEBUG
+  printf ("# %s: after stage 1 (without the powers of 2):\n", __func__);
+  printf ("# %s:   output (X::Z) = ", __func__);
   ec_point_fprintf (stdout, P, MONTGOMERY_xz, m);
-  printf ("\n# TRACE:                 = ");
+  printf ("\n# %s:                 = ", __func__);
   montgomery_point_fprintf_affine (stdout, P, m);
   fputc ('\n', stdout);
 #endif
-  
+
   /* Add prime 2 in the desired power. If a zero residue for the Z-coordinate is
    * encountered, we backtrack to previous point and stop.
    * NOTE: This is not as effective as I hoped. It prevents trivial
@@ -1045,40 +900,33 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
   }
   mod_gcd (f, P->z, m);
 
-#ifdef ECM_TIMINGS
-  stage1_dt = microseconds_thread() - t0;
-#endif
-
-#ifdef ECM_TRACE
-  printf ("# TRACE: after stage 1 and %u power(s) of 2 (out of %u):\n", i,
-          plan->exp2);
-  printf ("# TRACE:   output (X::Z) = ");
+#ifdef ECM_DEBUG
+  printf ("# %s: after stage 1 and %u power(s) of 2 (out of %u):\n", __func__,
+          i, plan->exp2);
+  printf ("# %s:   output (X::Z) = ", __func__);
   ec_point_fprintf (stdout, P, MONTGOMERY_xz, m);
-  printf ("\n# TRACE:                 = ");
+  printf ("\n# %s:                 = ", __func__);
   montgomery_point_fprintf_affine (stdout, P, m);
 #if ECM_BACKTRACKING
-  mod_printf ("\n# TRACE:   backtracking was%s used", bt ? "" :" not");
+  mod_printf ("\n# %s:   backtracking was%s used", __func__, bt ? "" :" not");
 #endif
-  mod_printf ("\n# TRACE:   gcd = %" PRIMODu "\n", MOD_PRINT_INT (f));
+  mod_printf ("\n# %s:   gcd = %" PRIMODu "\n", __func__, MOD_PRINT_INT (f));
 #endif
 
 #ifdef ECM_COUNT_OPS
   unsigned int tot_stage1_M = ECM_COUNT_OPS_STAGE1_TOTAL_M;
-  fprintf (stderr, "COUNT OPS: for stage 1 with B1 = %u\n"
-                   "COUNT OPS:   Montgomery: %3u dADD %3u DBL\n"
-                   "COUNT OPS:      Edwards: %3u ADD  %3u DBL %3u TPL %3d M\n"
-                   "COUNT OPS:        total: %5u M\n", plan->B1,
-                   _count_montgomery_dadd, _count_montgomery_dbl,
-                   _count_edwards_add, _count_edwards_dbl, _count_edwards_tpl,
-                   _count_edwards_extraM, tot_stage1_M);
+  printf ("# %s: count ops: for stage 1 with B1 = %u\n"
+          "# %s: count ops:   Montgomery: %3u dADD %3u DBL\n"
+          "# %s: count ops:      Edwards: %3u ADD  %3u DBL %3u TPL %3d M\n"
+          "# %s: count ops:        total: %5u M\n", __func__, plan->B1,
+          __func__, _count_montgomery_dadd, _count_montgomery_dbl, __func__,
+          _count_edwards_add, _count_edwards_dbl, _count_edwards_tpl,
+          _count_edwards_extraM, __func__, tot_stage1_M);
 #endif
 
   /******************************** stage 2 ***********************************/
 #ifdef ECM_COUNT_OPS
   ECM_COUNT_OPS_RESET();
-#endif
-#ifdef ECM_TIMINGS
-  t0 = microseconds_thread();
 #endif
 
   mod_init (u, m);
@@ -1086,44 +934,32 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
   {
     bt = ecm_stage2 (u, P, &(plan->stage2), b, m);
     mod_gcd (f, u, m);
-#ifdef ECM_TRACE
-    mod_printf ("# TRACE: after stage 2, gcd=%" PRIMODu "\n", MOD_PRINT_INT(f));
+#ifdef ECM_DEBUG
+    mod_printf ("# %s: after stage 2, gcd=%" PRIMODu "\n", __func__,
+                                                           MOD_PRINT_INT(f));
 #endif
   }
-#ifdef ECM_TRACE
+#ifdef ECM_DEBUG
   else
-    printf ("# TRACE: stage 2 not done\n");
+    printf ("# %s: stage 2 not done\n", __func__);
 #endif
 
-#ifdef ECM_TIMINGS
-  stage2_dt = microseconds_thread() - t0;
-#endif
 #ifdef ECM_COUNT_OPS
   unsigned int tot_stage2_M = ECM_COUNT_OPS_STAGE2_TOTAL_M;
-  fprintf (stderr, "COUNT OPS: for stage 2 with B2 = %u\n"
-                   "COUNT OPS:   Montgomery: %3u dADD %3u DBL\n"
-                   "COUNT OPS:          mul: %3u M\n"
-                   "COUNT OPS:        total: %5u M\n"
-                   "COUNT OPS: ECM total: %5u M\n", plan->stage2.B2,
-                   _count_montgomery_dadd, _count_montgomery_dbl,
-                   _count_stage2_M, tot_stage2_M, tot_stage1_M + tot_stage2_M);
+  printf ("# %s: count ops: for stage 2 with B2 = %u\n"
+          "# %s: count ops:   Montgomery: %3u dADD %3u DBL\n"
+          "# %s: count ops:          mul: %3u M\n"
+          "# %s: count ops:        total: %5u M\n"
+          "# %s: count ops: ECM total: %5u M\n", __func__, plan->stage2.B2,
+          __func__, _count_montgomery_dadd, _count_montgomery_dbl, __func__,
+          _count_stage2_M, __func__, tot_stage2_M, __func__,
+          tot_stage1_M + tot_stage2_M);
 #endif
 
   mod_clear (u, m);
   mod_clear (b, m);
   ec_point_clear (P, m);
   ec_point_clear (Pt, m);
-
-#ifdef ECM_TIMINGS
-  ecm_dt = wct_seconds() - ecm_starttime;
-  fprintf (stderr, "TIMINGS:   ECM took %.0f usec\n"
-                   "TIMINGS:      param took %" PRIu64 "usec\n"
-                   "TIMINGS:     stage1 took %" PRIu64 "usec\n"
-                   "TIMINGS:     stage2 took %" PRIu64 "usec\n"
-                   "TIMINGS:      extra time %.0fusec\n",
-                   ecm_dt*1e6, param_dt, stage1_dt, stage2_dt,
-                   ecm_dt*1e6-(double)(param_dt+stage1_dt+stage2_dt));
-#endif
 
   return bt;
 }

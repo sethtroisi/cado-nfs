@@ -248,19 +248,25 @@ montgomery_dadd (ec_point_t R, const ec_point_t P, const ec_point_t Q,
 }
 
 
-/* montgomery_smul_ui (R, Rp1, P, k)
+/* montgomery_smul_ul (R, Rp1, P, k)
  *     R <- k*P
  *     Rp1 <- (k+1)*P       if Rp1 != NULL
  * R or Rp1 can be the same variable as P.
  * Cost:
  *    log2(k) DBL and log2(k)-1 dADD to compute R and Rp1
  *    computing only R save 1 DBL or 1 dADD depending on the parity of k
+ *    If the second most significant bit of k is 0, we save 1 DBL
  */
-#define montgomery_smul_ui MOD_APPEND_TYPE(montgomery_smul_ui)
+#define montgomery_smul_ul MOD_APPEND_TYPE(montgomery_smul_ul)
 static inline void
-montgomery_smul_ui (ec_point_t R, ec_point_t Rp1, const ec_point_t P,
+montgomery_smul_ul (ec_point_t R, ec_point_t Rp1, const ec_point_t P,
                     const unsigned long k, const modulus_t m, const residue_t b)
 {
+  ec_point_t T0, T1;
+
+  ec_point_init (T0, m);
+  ec_point_init (T1, m);
+
   if (k == 0UL)
   {
     montgomery_point_set_zero (R, m);
@@ -273,14 +279,21 @@ montgomery_smul_ui (ec_point_t R, ec_point_t Rp1, const ec_point_t P,
     if (Rp1)
       montgomery_dbl (Rp1, P, m, b);
   }
-  else
+  else if (k == 2UL)
+  {
+    if (Rp1)
+    {
+      montgomery_dbl (T1, P, m, b);
+      montgomery_dadd (Rp1, T1, P, P, b, m);
+      ec_point_set (R, T1, m, MONTGOMERY_xz);
+    }
+    else
+      montgomery_dbl (R, P, m, b);
+  }
+  else /* k >= 3 */
   {
     /* Montgomery Ladder */
     unsigned long mask;
-    ec_point_t T0, T1;
-
-    ec_point_init (T0, m);
-    ec_point_init (T1, m);
 
     mask = ~(0UL);
     mask -= mask/2;   /* Now the most significant bit of i is set */
@@ -291,6 +304,17 @@ montgomery_smul_ui (ec_point_t R, ec_point_t Rp1, const ec_point_t P,
     ec_point_set (T0, P, m, MONTGOMERY_xz); /* starting value T0 = P */
     montgomery_dbl (T1, P, m, b);           /* starting value T1 = 2P */
     mask >>= 1;
+
+    /* If the second most significant bit of k is 0, then we do the iteration
+     * manually (to avoid to compute again 2P)
+     * As k >= 3, we know that in this case k has at least 3 bits.
+     */
+    if (!(k & mask)) /* (T0,T1) <- (2*P, 3*P) */
+    {
+      ec_point_set (T0, T1, m, MONTGOMERY_xz);
+      montgomery_dadd (T1, T1, P, P, b, m);
+      mask >>= 1;
+    }
 
     for ( ; mask > 1; mask >>= 1) /* loop invariant: T1-T0 = P */
     {
@@ -319,10 +343,10 @@ montgomery_smul_ui (ec_point_t R, ec_point_t Rp1, const ec_point_t P,
       if (Rp1)
         montgomery_dadd (Rp1, T1, T0, P, b, m);
     }
-
-    ec_point_clear (T0, m);
-    ec_point_clear (T1, m);
   }
+
+  ec_point_clear (T0, m);
+  ec_point_clear (T1, m);
 }
 
 /* Return the order of a Mongomery curve, using the Jacobi symbol.
