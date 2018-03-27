@@ -816,8 +816,9 @@ void filter_rels_producer_thread(struct filter_rels_producer_thread_arg_s * arg)
             fprintf(stderr,
                     "%s: load error (%s) while %s\n%s\n",
                     __func__,
+                    strerror(errno),
                     rc < 0 ? "reading from" : "closing",
-                    strerror(errno), *filename);
+                    *filename);
             abort();
         }
     }
