@@ -600,6 +600,7 @@ prac_chain (const unsigned int n, const double v, const prac_cost_t *opcost,
      Return DBL_MAX in this case. */
   return (d == 1) ? cost : DBL_MAX;
 }
+
 /* Encode bytecode for an addition chain for odd k (repeated val times), and
  * return its cost.
  * k must be odd and prime (not exactly: prac algorithm always succeeds on
@@ -1259,6 +1260,7 @@ bytecode_mishmash_check_internal (bytecode_const bc, bytecode_const *endptr,
                                   mpz_t *R, unsigned int R_len, int verbose)
 {
   int ret = 0;
+  uint8_t prev_block_type = 0;
 
   bc++; /* ignore first init byte: R should be already allocated */
 
@@ -1274,6 +1276,16 @@ bytecode_mishmash_check_internal (bytecode_const bc, bytecode_const *endptr,
     }
     else /* not the initial byte (nor the final byte) */
     {
+      uint8_t cur_block_type = (t >> 3) & 0x1;
+      if (cur_block_type < prev_block_type)
+      {
+        printf ("# %s: error, a block of type 0 cannot appear after a block "
+                "of type 1\n", __func__);
+        ret = 1;
+      }
+      else
+        prev_block_type = cur_block_type;
+
       if (n >= R_len)
       {
         printf ("# %s: error, n=%u must be < %u\n", __func__, n, R_len);
