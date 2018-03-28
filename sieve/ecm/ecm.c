@@ -501,6 +501,7 @@ ecm_stage2 (residue_t r, const ec_point_t P, const stage2_plan_t *plan,
 #ifdef ECM_STAGE2_DEBUG
   modint_t _int;
   mod_intinit (_int);
+  printf ("# %s: w=%u\n", __func__, plan->w);
   printf ("# %s: input P=", __func__);
   ec_point_fprintf (stdout, P, MONTGOMERY_xz, m);
   fputc ('\n', stdout);

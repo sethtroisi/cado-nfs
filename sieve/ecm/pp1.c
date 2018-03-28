@@ -177,6 +177,7 @@ pp1_stage2 (residue_t r, const residue_t X, const stage2_plan_t *plan,
   modint_t _int;
   mod_intinit (_int);
   mod_get_int (_int, X, m);
+  printf ("# %s: w=%u\n", __func__, plan->w);
   mod_printf ("# %s: input X=%" PRIMODu "\n", __func__, MOD_PRINT_INT(_int));
 #endif
 
