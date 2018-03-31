@@ -252,7 +252,7 @@ double matpoly_addmul(abdst_field ab, matpoly c, matpoly a, matpoly b, int draft
     abvec_ur_init(ab, &tmp[0], c->size);
     abvec_ur_init(ab, &tmp[1], c->size);
 
-    double tt0=0, tt1=0, tt;
+    double tt0=0, tt1=0, tt=0;  /* placate gcc */
     unsigned long c0 = 0, c1 = 0;
     int set = 0;
 
@@ -321,7 +321,7 @@ double matpoly_addmp(abdst_field ab, matpoly b, matpoly a, matpoly c, int draft)
     abvec_ur_init(ab, &tmp[0], a->size + c->size - 1);
     abvec_ur_init(ab, &tmp[1], b->size);
 
-    double tt0=0, tt1=0, tt;
+    double tt0=0, tt1=0, tt=0;  /* placate gcc */
     unsigned long c0 = 0, c1 = 0;
     int set = 0;
 
