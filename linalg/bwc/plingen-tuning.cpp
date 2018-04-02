@@ -1334,12 +1334,13 @@ void plingen_tuning(abdst_field ab, unsigned int m, unsigned int n, MPI_Comm com
 
     /* XXX BUG: with depth adjustment==0 early on, we get check failures.
      * Must investigate */
-    cutoff_list cl_mul = NULL;
-    cutoff_list cl_mp = NULL;
 
+    cutoff_list cl_mp = NULL;
     // plingen_tune_mp_fti_depth(ab, m, n, &cl_mp);
-    // plingen_tune_mul_fti_depth(ab, m, n, &cl_mul);
     plingen_tune_mp(ab, m, n, cl_mp);
+
+    cutoff_list cl_mul = NULL;
+    // plingen_tune_mul_fti_depth(ab, m, n, &cl_mul);
     plingen_tune_mul(ab, m, n, cl_mul);
 
 #if 0

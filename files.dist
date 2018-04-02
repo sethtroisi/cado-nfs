@@ -1212,3 +1212,5 @@ config/alignas.cmake
 config/neon.c
 config/neon.cmake
 tests/utils/test_mpz_poly_parsing.cpp
+tests/linalg/bwc/flint-fft/CMakeLists.txt
+tests/linalg/bwc/flint-fft/test_transform_length.cpp

@@ -438,3 +438,5 @@ cado_define_test(TEST_NAME test-lingen-crc
 endif()
 
 cado_define_test(test-arith-modp.cpp LIBRARIES tests utils)
+
+add_subdirectory (flint-fft)
