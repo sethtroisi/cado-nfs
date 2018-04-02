@@ -240,14 +240,15 @@ void matpoly_rshift(abdst_field ab, matpoly_ptr dst, matpoly_srcptr src, unsigne
 
 double matpoly_addmul(abdst_field ab, matpoly c, matpoly a, matpoly b, int draft)/*{{{*/
 {
+    size_t csize = a->size + b->size; csize -= (csize > 0);
     ASSERT_ALWAYS(a->n == b->m);
     if (matpoly_check_pre_init(c)) {
-        matpoly_init(ab, c, a->m, b->n, a->size + b->size - 1);
+        matpoly_init(ab, c, a->m, b->n, csize);
     }
     ASSERT_ALWAYS(c->m == a->m);
     ASSERT_ALWAYS(c->n == b->n);
-    ASSERT_ALWAYS(c->alloc >= a->size + b->size - 1);
-    c->size = a->size + b->size - 1;
+    ASSERT_ALWAYS(c->alloc >= csize);
+    c->size = csize;
     abvec_ur tmp[2];
     abvec_ur_init(ab, &tmp[0], c->size);
     abvec_ur_init(ab, &tmp[1], c->size);
@@ -291,20 +292,23 @@ double matpoly_addmul(abdst_field ab, matpoly c, matpoly a, matpoly b, int draft
 
 double matpoly_mul(abdst_field ab, matpoly c, matpoly a, matpoly b, int draft)/*{{{*/
 {
+    size_t csize = a->size + b->size; csize -= (csize > 0);
+
     ASSERT_ALWAYS(a->n == b->m);
     if (matpoly_check_pre_init(c)) {
-        matpoly_init(ab, c, a->m, b->n, a->size + b->size - 1);
+        matpoly_init(ab, c, a->m, b->n, csize);
     }
     ASSERT_ALWAYS(c->m == a->m);
     ASSERT_ALWAYS(c->n == b->n);
-    ASSERT_ALWAYS(c->alloc >= a->size + b->size - 1);
-    c->size = a->size + b->size - 1;
+    ASSERT_ALWAYS(c->alloc >= csize);
+    c->size = csize;
     abvec_set_zero(ab, c->x, c->m * c->n * c->size);
     return matpoly_addmul(ab, c, a, b, draft);
 }/*}}}*/
 
 double matpoly_addmp(abdst_field ab, matpoly b, matpoly a, matpoly c, int draft)/*{{{*/
 {
+    size_t fullsize = a->size + c->size; fullsize -= (fullsize > 0);
     unsigned int nb = MAX(a->size, c->size) - MIN(a->size, c->size) + 1;
     ASSERT_ALWAYS(a->n == c->m);
     if (matpoly_check_pre_init(b)) {
@@ -318,7 +322,7 @@ double matpoly_addmp(abdst_field ab, matpoly b, matpoly a, matpoly c, int draft)
     /* We are going to make it completely stupid for a beginning. */
     /* XXX XXX XXX FIXME !!! */
     abvec_ur tmp[2];
-    abvec_ur_init(ab, &tmp[0], a->size + c->size - 1);
+    abvec_ur_init(ab, &tmp[0], fullsize);
     abvec_ur_init(ab, &tmp[1], b->size);
 
     double tt0=0, tt1=0, tt=0;  /* placate gcc */
@@ -344,7 +348,7 @@ double matpoly_addmp(abdst_field ab, matpoly b, matpoly a, matpoly c, int draft)
             if (draft) { ++c0; tt0 += wct_seconds(); set = set || tt0 >= 1; }
         }
     }
-    abvec_ur_clear(ab, &tmp[0], a->size + c->size - 1);
+    abvec_ur_clear(ab, &tmp[0], fullsize);
     abvec_ur_clear(ab, &tmp[1], b->size);
 
     if (!set) return 0;

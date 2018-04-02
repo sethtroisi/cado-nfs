@@ -410,6 +410,7 @@ double bigmatpoly_ft_ift_mp(abdst_field ab, bigmatpoly_ptr a, bigmatpoly_ft_ptr 
 
 double bigmatpoly_mul_caching_adj(abdst_field ab, bigmatpoly c, bigmatpoly a, bigmatpoly b, unsigned int adj, int draft)/*{{{*/
 {
+    size_t csize = a->size + b->size; csize -= (csize > 0);
     bigmatpoly_ft tc, ta, tb;
     mpz_t p;
     mpz_init(p);
@@ -429,7 +430,7 @@ double bigmatpoly_mul_caching_adj(abdst_field ab, bigmatpoly c, bigmatpoly a, bi
     bigmatpoly_clear(ab, c);
     bigmatpoly_ptr model = a;
     bigmatpoly_ft_ptr ftmodel = (bigmatpoly_ft_ptr) a;
-    bigmatpoly_init(ab, c, model, a->m, b->n, a->size + b->size - 1);
+    bigmatpoly_init(ab, c, model, a->m, b->n, csize);
     bigmatpoly_ft_init(ab, ta, ftmodel, a->m, a->n, fti);
     bigmatpoly_ft_init(ab, tb, ftmodel, b->m, b->n, fti);
     bigmatpoly_ft_init(ab, tc, ftmodel, a->m, b->n, fti);
@@ -438,7 +439,7 @@ double bigmatpoly_mul_caching_adj(abdst_field ab, bigmatpoly c, bigmatpoly a, bi
     logline_printf(1, "DFT(B, %u*%u)\n", b->m0, b->n0);
     x0 += bigmatpoly_ft_dft(ab, tb, b, fti, draft);
     x0 += bigmatpoly_ft_mul2(ab, tc, ta, tb, fti, draft);
-    c->size = a->size + b->size - 1;
+    c->size = csize;
     logline_printf(1, "IFT(C, %u*%u)\n", c->m0, c->n0);
     x0 += bigmatpoly_ft_ift(ab, c, tc, fti, draft);
     bigmatpoly_ft_clear(ab, ta, fti);

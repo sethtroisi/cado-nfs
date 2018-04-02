@@ -1214,3 +1214,13 @@ config/neon.cmake
 tests/utils/test_mpz_poly_parsing.cpp
 tests/linalg/bwc/flint-fft/CMakeLists.txt
 tests/linalg/bwc/flint-fft/test_transform_length.cpp
+tests/linalg/bwc/test_matpoly.cpp
+tests/filter/Makefile
+tests/linalg/Makefile
+tests/linalg/bwc/Makefile
+tests/misc/Makefile
+tests/numbertheory/Makefile
+tests/polyselect/Makefile
+tests/sieve/Makefile
+tests/sqrt/Makefile
+tests/utils/Makefile

@@ -403,6 +403,9 @@ foreach(v ${BWC_GFP_ARITHMETIC_BACKENDS})
         plingen.cpp
         plingen-tuning.cpp
         tree_stats.cpp
+        )
+
+    set(plingen_${v}_support_sources
         logline.c
         lingen-matpoly.c
         lingen-bigmatpoly.c
@@ -414,14 +417,21 @@ foreach(v ${BWC_GFP_ARITHMETIC_BACKENDS})
 
     # make plingen_pz a default target, but not the others.
     if(v STREQUAL "pz")
+        add_library(plingen_${v}_support ${plingen_${v}_support_sources})
         add_executable(plingen_${v} ${plingen_${v}_sources})
         install(TARGETS plingen_${v} RUNTIME DESTINATION ${LIBSUFFIX}/linalg/bwc)
     else()
+        add_library(plingen_${v}_support EXCLUDE_FROM_ALL ${plingen_${v}_support_sources})
         add_executable(plingen_${v} EXCLUDE_FROM_ALL ${plingen_${v}_sources})
     endif()
 
-    target_link_libraries(plingen_${v} flint-fft ${gmp_libname} utils)
+    target_link_libraries(plingen_${v}_support flint-fft ${gmp_libname} utils)
+    target_link_libraries(plingen_${v} plingen_${v}_support)
 
+    set_target_properties(plingen_${v}_support PROPERTIES
+        COMPILE_FLAGS "--mpi -DSELECT_MPFQ_LAYER_${v}"
+        LINK_FLAGS "--mpi"
+        )
     set_target_properties(plingen_${v} PROPERTIES
         COMPILE_FLAGS "--mpi -DSELECT_MPFQ_LAYER_${v}"
         LINK_FLAGS "--mpi"

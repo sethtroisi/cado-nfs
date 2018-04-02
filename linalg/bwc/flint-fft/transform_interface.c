@@ -79,7 +79,8 @@ static inline mp_size_t fti_rsize0(struct fft_transform_info * fti)
 {
     mp_size_t w = fti->w;
     mp_size_t n = 1 << fti->depth;
-    mp_size_t rsize0 = n*w/FLINT_BITS;  /* need rsize0+1 words for x\in R */
+    mp_bitcnt_t nw = (mp_bitcnt_t) n * w;
+    mp_size_t rsize0 = nw/FLINT_BITS;  /* need rsize0+1 words for x\in R */
     return rsize0;
 }
 /*}}}*/
@@ -254,6 +255,35 @@ static unsigned long firstwrap(mp_size_t j1, mp_size_t j2, mp_bitcnt_t bits, mp_
     }
 }
 
+int fft_transform_info_check(const struct fft_transform_info * fti)
+{
+    mp_bitcnt_t b1 = MIN(fti->bits1, fti->bits2);
+    mp_bitcnt_t b2 = MAX(fti->bits1, fti->bits2);
+    unsigned int m = fti->nacc;
+    mp_bitcnt_t minwrap = fti->minwrap;
+    mp_bitcnt_t b = fti->bits;
+    unsigned int w = fti->w;
+    unsigned int depth = fti->depth;
+    unsigned int n = 1 << depth;
+    // unsigned int L = 4 * n;
+    mp_bitcnt_t j1 = iceildiv(b1, b);
+    mp_bitcnt_t j2 = iceildiv(b2, b);
+    mp_bitcnt_t nw = (mp_bitcnt_t) n * w;
+
+    /* poly coeffs do not wrap around */
+    if (!(2*b + FLINT_FLOG2(j1 * m) <= nw)) return 0;
+
+    /* no wrapping occurs before W */
+    if (!minwrap) {
+        /* per the lemma above, this is a necessary condition anyway in
+         * this case */
+        if (!(j1 + j2 - 1 <= 4 * n)) return 0;
+        minwrap = b1 + b2 + FLINT_CLOG2(m);
+    }
+    if (!(firstwrap(j1, j2, b, n) >= minwrap)) return 0;
+
+    return 1;
+}
 
 /* set the depth, w, and bits fields to something at least reasonable.
  *
@@ -283,20 +313,22 @@ void fft_transform_info_set_first_guess(struct fft_transform_info * fti)
         depth = e / 2;
         n = 1 << depth;
         w = 1 << (e & 1);
+        mp_bitcnt_t nw = (mp_bitcnt_t) n * w;
         /* decrease (n,w) for a test */
         if (w == 1) { w = 2; depth--; n/=2; } else { w = 1; }
-        if (!((b1+b2)*2 <= (4*n+1)*n*w)) {
+        if (!((b1+b2)*2 <= (4*n+1)*nw)) {
             /* increase again */
             if (w == 1) { w = 2; } else { w = 1; depth++; n*=2; }
         }
-        ASSERT_ALWAYS((b1+b2)*2 <= (4*n+1)*n*w);
+        ASSERT_ALWAYS((b1+b2)*2 <= (4*n+1)*nw);
     }
 
     for( ;; depth += (w==2), w^=3) {
         n = 1 << depth;
+        mp_bitcnt_t nw = (mp_bitcnt_t) n * w;
         unsigned int s = FLINT_CLOG2(m);
-        if (s > n * w) continue;
-        unsigned int bmax = (n*w-s) / 2;
+        if (s > nw) continue;
+        unsigned int bmax = (nw-s) / 2;
         unsigned int bmin;
         if (minwrap) {
             bmin = iceildiv(minwrap, 4 * n);
@@ -306,9 +338,8 @@ void fft_transform_info_set_first_guess(struct fft_transform_info * fti)
         }
 
         /* check conditions 1 and 2 above */
-        unsigned int j1, j2;
         for(unsigned int b = bmax ; b >= bmin ; b--) {
-            if (2*b + FLINT_CLOG2(m * (j1 = iceildiv(b1, b))) <= n * w) {
+            if (2*b + FLINT_CLOG2(m * iceildiv(b1, b)) <= nw) {
                 /* good, we found something ! */
 #if 0
         /* XXX Hack for debugging. Make sure that bits is a multiple of
@@ -321,12 +352,7 @@ void fft_transform_info_set_first_guess(struct fft_transform_info * fti)
                 fti->w = w;
                 fti->depth = depth;
 
-                j2 = iceildiv(b2, b);
-                ASSERT_ALWAYS(2*b + FLINT_CLOG2(m * j1) <= n * w);
-                if (minwrap)
-                    ASSERT_ALWAYS(4 * n * b >= minwrap);
-                else
-                    ASSERT_ALWAYS(j1 + j2 - 1 <= 4 * n);
+                ASSERT_ALWAYS(fft_transform_info_check(fti));
 
                 return;
             }
@@ -389,6 +415,8 @@ void fft_transform_info_adjust_depth(struct fft_transform_info * fti, unsigned i
      * product size must be compatible with the final FFT length.
      */
 
+    mp_bitcnt_t nw;
+
     if (depth < 11) {
 	mp_size_t wadj = 1;
 
@@ -437,7 +465,8 @@ void fft_transform_info_adjust_depth(struct fft_transform_info * fti, unsigned i
             do {		/* see if a smaller w will work. This can
                                    reduce the ring size. */
                 w -= wadj;
-		bits = (n * w - (depth + 1) - log_nacc) / 2;
+                nw = (mp_bitcnt_t) n * w;
+		bits = (nw - (depth + 1) - log_nacc) / 2;
 #if 0
                 /* XXX Hack for debugging. Make sure that bits is a multiple of
                  * four, so that we split at nibbles.
@@ -448,7 +477,8 @@ void fft_transform_info_adjust_depth(struct fft_transform_info * fti, unsigned i
 		j2 = iceildiv(bits2, bits);
 	    } while (firstwrap(j1, j2, bits, n) >= minwrap && w > wadj);
 	    w += wadj;
-            bits = (n * w - (depth + 1) - log_nacc) / 2;
+            nw = (mp_bitcnt_t) n * w;
+            bits = (nw - (depth + 1) - log_nacc) / 2;
             j1 = iceildiv(bits1, bits);
             j2 = iceildiv(bits2, bits);
 	}
@@ -471,7 +501,8 @@ void fft_transform_info_adjust_depth(struct fft_transform_info * fti, unsigned i
         j1 = iceildiv(bits1, obits);
         j2 = iceildiv(bits1, obits);
         log_nacc = FLINT_CLOG2(nacc*MAX(j1, j2));
-        bits = (n * w - log_nacc) / 2;
+        nw = (mp_bitcnt_t) n * w;
+        bits = (nw - log_nacc) / 2;
     }
 
 #if 0
@@ -480,10 +511,11 @@ void fft_transform_info_adjust_depth(struct fft_transform_info * fti, unsigned i
      */
     bits &= ~(mp_bitcnt_t) 3;
 #endif
+    nw = (mp_bitcnt_t) n * w;
     j1 = iceildiv(bits1, bits);
     j2 = iceildiv(bits2, bits);
-    assert(firstwrap(j1, j2, bits, n) >= (unsigned long) minwrap);
-    assert(2*bits + log_nacc <= (mp_bitcnt_t) n*w);
+    assert(firstwrap(j1, j2, bits, n) >= (mp_bitcnt_t) minwrap);
+    assert(2*bits + log_nacc <= nw);
     fti->w = w;
     fti->depth = depth;
     fti->bits = bits;
@@ -587,7 +619,7 @@ void fft_get_transform_info_fppol_mp(struct fft_transform_info * fti, mpz_srcptr
              * happens, the wrapped lower part is in an interval of
              * bounded length).
              */
-            nmax * cbits + 1);
+            nmax * cbits + FLINT_CLOG2(nacc) + 1);
     /* The maximum number of summands is nmin */
     fti->ks_coeff_bits = cbits;
 }
@@ -1212,7 +1244,8 @@ void fft_do_ift(mp_limb_t * x, mp_size_t nx, void * y, void * temp, struct fft_t
 {
     mp_size_t w = fti->w;
     mp_size_t n = 1 << fti->depth;
-    mp_size_t rsize0 = n*w/FLINT_BITS;  /* need rsize0+1 words for x\in R */
+    mp_bitcnt_t nw = (mp_bitcnt_t) n * w;
+    mp_size_t rsize0 = nw/FLINT_BITS;  /* need rsize0+1 words for x\in R */
     fft_do_ift_backend(y, temp, fti);
     mpn_zero(x, nx);
     if (!fti->minwrap) {
@@ -1224,7 +1257,7 @@ void fft_do_ift(mp_limb_t * x, mp_size_t nx, void * y, void * temp, struct fft_t
      * typical middle product uses, we don't need it. But it's cheap).
      */
     /* we want at least (4*n-1)*bits+n*w bits in the output zone */
-    mp_bitcnt_t need = (4*n-1)*fti->bits+n*w;
+    mp_bitcnt_t need = (4*n-1)*fti->bits+nw;
     assert(nx >= (mp_size_t) iceildiv(need, FLINT_BITS));
     fft_addcombine_bits(x, y, fti->trunc0, fti->bits, rsize0, nx);
     /* bits above 4*n*fti->bits need to wrap around */
@@ -1232,7 +1265,7 @@ void fft_do_ift(mp_limb_t * x, mp_size_t nx, void * y, void * temp, struct fft_t
     mp_size_t outneedlimbs = iceildiv(outneed, FLINT_BITS);
     assert(outneedlimbs <= rsize0 + 1);
     mp_size_t toplimb = (4*n*fti->bits) / FLINT_BITS;
-    unsigned int topoffset = (4*n*fti->bits) % FLINT_BITS;
+    mp_bitcnt_t topoffset = (4*n*fti->bits) % FLINT_BITS;
     mp_size_t cy;
     mpn_zero(temp, rsize0 + 1);
     do {

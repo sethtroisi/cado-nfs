@@ -268,6 +268,8 @@ double matpoly_ft_ift_mp(abdst_field ab, matpoly_ptr a, matpoly_ft_ptr t, unsign
 
 double matpoly_mul_caching_adj(abdst_field ab, matpoly c, matpoly a, matpoly b, unsigned int adj, int draft)/*{{{*/
 {
+    size_t csize = a->size + b->size; csize -= (csize > 0);
+
     matpoly_ft tc, ta, tb;
     mpz_t p;
     mpz_init(p);
@@ -281,14 +283,14 @@ double matpoly_mul_caching_adj(abdst_field ab, matpoly c, matpoly a, matpoly b, 
     double x0 = 0;
 
     matpoly_clear(ab, c);
-    matpoly_init(ab, c, a->m, b->n, a->size + b->size - 1);
+    matpoly_init(ab, c, a->m, b->n, csize);
     matpoly_ft_init(ab, ta, a->m, a->n, fti);
     matpoly_ft_init(ab, tb, b->m, b->n, fti);
     matpoly_ft_init(ab, tc, a->m, b->n, fti);
     x0 += matpoly_ft_dft(ab, ta, a, fti, draft);
     x0 += matpoly_ft_dft(ab, tb, b, fti, draft);
     x0 += matpoly_ft_mul(ab, tc, ta, tb, fti, draft);
-    c->size = a->size + b->size - 1;
+    c->size = csize;
     ASSERT_ALWAYS(c->size <= c->alloc);
     x0 += matpoly_ft_ift(ab, c, tc, fti, draft);
     matpoly_ft_clear(ab, ta, fti);

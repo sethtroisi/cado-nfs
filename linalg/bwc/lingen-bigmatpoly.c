@@ -358,10 +358,12 @@ void bigmatpoly_allgather_col(abdst_field ab, bigmatpoly a)
 
 double bigmatpoly_mul(abdst_field ab, bigmatpoly c, bigmatpoly a, bigmatpoly b, int draft)/*{{{*/
 {
+    size_t csize = a->size + b->size; csize -= (csize > 0);
+
     ASSERT_ALWAYS(a->n == b->m);
     ASSERT_ALWAYS(a->n1 == b->m1);
     if (bigmatpoly_check_pre_init(c)) {
-        bigmatpoly_finish_init(ab, c, a->m, b->n, a->size + b->size - 1);
+        bigmatpoly_finish_init(ab, c, a->m, b->n, csize);
     }
     ASSERT_ALWAYS(c->m);
     ASSERT_ALWAYS(c->m == a->m);
@@ -372,7 +374,7 @@ double bigmatpoly_mul(abdst_field ab, bigmatpoly c, bigmatpoly a, bigmatpoly b, 
     MPI_Comm_rank(c->com[1], &jrank);
     bigmatpoly_allgather_row(ab, a);
     bigmatpoly_allgather_col(ab, b);
-    bigmatpoly_set_size(c, a->size + b->size - 1);
+    bigmatpoly_set_size(c, csize);
     // ASSERT_ALWAYS(c->alloc >= c->size);
 
     matpoly_ptr lc = bigmatpoly_my_cell(c);
