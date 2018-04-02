@@ -160,6 +160,7 @@ class Polynomials(object):
     re_pol_g = re.compile(r"Y(\d+)\s*:\s*(-?\d+)")
     re_polys = re.compile(r"poly(\d+)\s*:") # FIXME: do better?
     re_Murphy = re.compile(re_cap_n_fp(r"\s*#\s*MurphyE\s*\((.*)\)\s*=", 1))
+    re_best = re.compile(r"# Best polynomial found \(revision (.*)\):")
     # the 'lognorm' variable now represents the expected E-value
     re_lognorm = re.compile(re_cap_n_fp(r"\s*#\s*exp_E", 1))
     
@@ -179,6 +180,7 @@ class Polynomials(object):
         """
         self.MurphyE = 0.
         self.MurphyParams = None
+        self.revision = None
         self.lognorm = 0.
         self.params = {}
         polyf = Polynomial()
@@ -224,6 +226,10 @@ class Polynomials(object):
                         "Line '%s' redefines Murphy E value" % line)
                 self.MurphyParams = match.group(1)
                 self.MurphyE = float(match.group(2))
+                continue
+            match = self.re_best.match(line)
+            if match:
+                self.revision = match.group(1)
                 continue
             # If this is a comment line telling the expected E-value,
             # extract the value and store it
@@ -301,6 +307,8 @@ class Polynomials(object):
                 arr.append("# MurphyE (%s) = %g\n" % (self.MurphyParams, self.MurphyE))
             else:
                 arr.append("# MurphyE = %g\n" % self.MurphyE)
+        if not self.revision == None:
+            arr.append("# found by revision %s\n" % self.revision)
         if not self.lognorm == 0.:
             arr.append("# exp_E %g\n" % self.lognorm)
         if len(self.tabpoly) > 0:
