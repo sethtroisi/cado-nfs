@@ -1,6 +1,8 @@
 #ifndef LAS_BASE_HPP_
 #define LAS_BASE_HPP_
 
+#include <string.h>
+
 /* C++ base classes that are not application-specific. */
 
 /* Base class with private copy-constructor and assignment operator.
@@ -26,15 +28,18 @@ template <typename T>
 class _padded_pod {
   public:
     _padded_pod() {
-      memset(this,  0, sizeof(T));
+      // see bug 21663
+      memset((void*)this,  0, sizeof(T));
     }
 
     _padded_pod(const _padded_pod &x) {
-      memcpy(this, &x, sizeof(T));
+      // see bug 21663
+      memcpy((void*)this, (const void *) &x, sizeof(T));
     }
 
     const _padded_pod &operator=(const _padded_pod &x) {
-      memcpy(this, &x, sizeof(T));
+      // see bug 21663
+      memcpy((void*)this, &x, sizeof(T));
       return *this;
     }
 };

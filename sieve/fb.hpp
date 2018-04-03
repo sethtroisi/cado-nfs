@@ -348,11 +348,13 @@ class fb_vector : public fb_vector_interface, private NonCopyable {
     ASSERT_ALWAYS(!read_only);
     if (size >= alloc) {
       alloc += std::max(alloc, static_cast<size_t>(16));
-      data   = static_cast<FB_ENTRY_TYPE *>(realloc(data, alloc * sizeof(FB_ENTRY_TYPE)));
+      // see bug 21663
+      data   = static_cast<FB_ENTRY_TYPE *>(realloc((void*) data, alloc * sizeof(FB_ENTRY_TYPE)));
       if (data == NULL)
         throw std::bad_alloc();
     }
-    memset(data+size, 0, sizeof(FB_ENTRY_TYPE));
+    // see bug 21663
+    memset((void*)(data+size), 0, sizeof(FB_ENTRY_TYPE));
     data[size++] = new_entry;
   }
   
@@ -365,7 +367,7 @@ class fb_vector : public fb_vector_interface, private NonCopyable {
   void finalize() {
     ASSERT_ALWAYS(!read_only);
     alloc = size;
-    data  = static_cast<FB_ENTRY_TYPE *>(realloc(data, alloc * sizeof(FB_ENTRY_TYPE)));
+    data  = static_cast<FB_ENTRY_TYPE *>(realloc((void*)data, alloc * sizeof(FB_ENTRY_TYPE)));
     sort();
     read_only = true;
   }

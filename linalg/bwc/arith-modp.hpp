@@ -40,10 +40,12 @@ namespace details {
         operator mp_limb_t * () { return x; }
         operator const mp_limb_t * () const { return x; }
         static void zero(self * x, int N) {
-            memset(x, 0, n * N * sizeof(mp_limb_t));
+            // see bug 21663
+            memset(x->x, 0, n * N * sizeof(mp_limb_t));
         }
         static void copy(self * y, const self * x, int N) {
-            memcpy(y, x, n * N * sizeof(mp_limb_t));
+            // see bug 21663
+            memcpy(y->x, x->x, n * N * sizeof(mp_limb_t));
         }
         bool operator==(self const& a) {
             return memcmp(x, a.x, n * sizeof(mp_limb_t)) == 0;
