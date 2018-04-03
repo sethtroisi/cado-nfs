@@ -784,7 +784,7 @@ struct filter_rels_producer_thread_arg_s {
     timingstats_dict_ptr stats;
 };
 
-void filter_rels_producer_thread(struct filter_rels_producer_thread_arg_s * arg)
+void * filter_rels_producer_thread(struct filter_rels_producer_thread_arg_s * arg)
 {
     ringbuf_ptr r = arg->rb;
 
@@ -831,6 +831,7 @@ void filter_rels_producer_thread(struct filter_rels_producer_thread_arg_s * arg)
             thread_times[0],
             thread_times[1]);
             */
+    return NULL;
 }
 /*}}}*/
 
