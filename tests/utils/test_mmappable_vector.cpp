@@ -181,7 +181,7 @@ void test_shortcut_interface(void)
         /* This is expected to fail, because the vector is already mapped */
         vec.mmap_file(TESTFILE, READ_ONLY, 0, 1024);
         ASSERT_ALWAYS(0);
-    } catch (mmap_allocator_exception e) {
+    } catch (mmap_allocator_exception const & e) {
         fprintf(stderr, "Exception message (expected): %s\n", e.what());
     }
     vec.munmap_file();
