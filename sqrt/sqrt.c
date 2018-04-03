@@ -89,10 +89,8 @@ get_depname (const char *prefix, const char *algrat, int numdep)
   for (int i = 0; strlen (suffix = suffixes[i]) != 0; i++)
     if (strcmp (prefix + strlen (prefix) - strlen (suffix), suffix) == 0)
       break;
-  prefix_base = malloc (strlen (prefix) - strlen (suffix) + 1);
+  prefix_base = strndup(prefix, strlen (prefix) - strlen (suffix));
   ASSERT_ALWAYS(prefix_base != NULL);
-  strncpy (prefix_base, prefix, strlen (prefix) - strlen (suffix));
-  prefix_base[strlen (prefix) - strlen (suffix)] = '\0';
   ret = asprintf (&depname, "%s.%s%03d%s", prefix_base, algrat, numdep, suffix);
   ASSERT_ALWAYS(ret > 0);
   free (prefix_base);
