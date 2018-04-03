@@ -1246,7 +1246,9 @@ void fb_factorbase::make_linear ()
             "# including primes up to %lu and prime powers up to %lu.\n",
             lim, powlim);
 
-    prime_info(pi);
+    prime_info pi;
+
+    prime_info_init(pi);
 
     std::list<fb_entry_general> pool;
     size_t pool_size = 0;
