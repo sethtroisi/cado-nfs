@@ -877,10 +877,12 @@ namespace details {
 #endif
             }
             static void zero(elt * x, int N) {
-                memset(x, 0, N * sizeof(data));
+                // see bug 21663
+                memset(x->data, 0, N * sizeof(data));
             }
             static void copy(elt * y, const elt * x, int N) {
-                memcpy(y, x, N * sizeof(data));
+                // see bug 21663
+                memcpy(y->data, x->data, N * sizeof(data));
             }
             bool operator==(elt const& a) {
                 return memcmp(data, a.data, sizeof(data)) == 0;
