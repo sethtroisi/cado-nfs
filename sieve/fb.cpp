@@ -1187,7 +1187,9 @@ fb_factorbase::make_linear (const mpz_t *poly)
   fb_powers *powers = new fb_powers(powlim);
   size_t next_pow = 0;
 
-  prime_info(pi);
+  prime_info pi;
+
+  prime_info_init(pi);
 
   verbose_output_vfprint(0, 1, gmp_vfprintf,
                "# Making factor base for polynomial g(x) = %Zd*x%s%Zd,\n"
