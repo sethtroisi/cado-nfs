@@ -23,9 +23,7 @@
 #include "lingen-polymat.h"
 #include "lingen-matpoly.h"
 // #include "lingen-bigpolymat.h" // 20150826: deleted.
-#ifdef  HAVE_MPIR
 #include "lingen-matpoly-ft.h"
-#endif
 #include "plingen.h"
 #include "plingen-tuning.h"
 
@@ -417,7 +415,6 @@ void catch_control_signals()
  * polymat_mp_kara_threshold
  */
 
-#ifdef HAVE_MPIR
 void plingen_tune_mul_fti_depth(abdst_field ab, unsigned int m, unsigned int n, cutoff_list *cl_out)/*{{{*/
 {
     gmp_randstate_t rstate;
@@ -758,7 +755,6 @@ void plingen_tune_mp_fti_depth(abdst_field ab, unsigned int m, unsigned int n, c
 
     gmp_randclear(rstate);
 }/*}}}*/
-#endif  /* HAVE_MPIR */
 
 
 void plingen_tune_mul(abdst_field ab, unsigned int m, unsigned int n, cutoff_list cl MAYBE_UNUSED)/*{{{*/
@@ -766,20 +762,14 @@ void plingen_tune_mul(abdst_field ab, unsigned int m, unsigned int n, cutoff_lis
     gmp_randstate_t rstate;
     gmp_randinit_default(rstate);
     gmp_randseed_ui(rstate, 1);
-#ifdef HAVE_MPIR
 #define TUNE_MUL_FINDER_NMETHODS 4
-#else  /* HAVE_MPIR */
-#define TUNE_MUL_FINDER_NMETHODS 3
-#endif  /* HAVE_MPIR */
 
     typedef timer_rusage timer_t;
     cutoff_finder<timer_rusage> finder(TUNE_MUL_FINDER_NMETHODS);
     finder.set_method_name(0, "polymat-basecase");
     finder.set_method_name(1, "polymat-karatsuba");
     finder.set_method_name(2, "matpoly-kronecker-schönhage");
-#ifdef  HAVE_MPIR
     finder.set_method_name(3, "matpoly-ft-kronecker-schönhage-caching");
-#endif
 
     polymat_cutoff_info always_basecase[1];
     polymat_cutoff_info improved[1];
@@ -885,7 +875,7 @@ void plingen_tune_mul(abdst_field ab, unsigned int m, unsigned int n, cutoff_lis
             /* The matpoly layer is just completetly different -- and gets
              * faster quite early on... */
             for(small_bench<timer_t> x = finder.micro_bench(2); !x.done(); ++x) {
-                matpoly_mul(ab, xpi, xpiL, xpiR);
+                matpoly_mul(ab, xpi, xpiL, xpiR, false);
                 x.set_since_last();
             }
             if (xpiref->size == 0) {
@@ -896,7 +886,6 @@ void plingen_tune_mul(abdst_field ab, unsigned int m, unsigned int n, cutoff_lis
             }
         }
 
-#ifdef HAVE_MPIR
         if (finder.still_meaningful_to_test(3)) {
             unsigned int adj = cutoff_list_get(cl, k);
             {
@@ -933,7 +922,7 @@ void plingen_tune_mul(abdst_field ab, unsigned int m, unsigned int n, cutoff_lis
             mpz_clear(p);
 #else
             for(small_bench<timer_t> x = finder.micro_bench(3); !x.done(); ++x) {
-                matpoly_mul_caching_adj(ab, xpi, xpiL, xpiR, adj);
+                matpoly_mul_caching_adj(ab, xpi, xpiL, xpiR, adj, false);
                 x.set_since_last();
             }
 #endif
@@ -958,7 +947,6 @@ void plingen_tune_mul(abdst_field ab, unsigned int m, unsigned int n, cutoff_lis
 #endif
 #endif
         }
-#endif
 
         cout << input_length
             << " " << finder.summarize_for_this_length(k)
@@ -997,20 +985,14 @@ void plingen_tune_mp(abdst_field ab, unsigned int m, unsigned int n, cutoff_list
     gmp_randstate_t rstate;
     gmp_randinit_default(rstate);
     gmp_randseed_ui(rstate, 1);
-#ifdef HAVE_MPIR
 #define TUNE_MP_FINDER_NMETHODS 4
-#else  /* HAVE_MPIR */
-#define TUNE_MP_FINDER_NMETHODS 3
-#endif  /* HAVE_MPIR */
 
     typedef timer_rusage timer_t;
     cutoff_finder<timer_rusage> finder(TUNE_MP_FINDER_NMETHODS);
     finder.set_method_name(0, "polymat-basecase");
     finder.set_method_name(1, "polymat-karatsuba");
     finder.set_method_name(2, "matpoly-kronecker-schönhage");
-#ifdef  HAVE_MPIR
     finder.set_method_name(3, "matpoly-ft-kronecker-schönhage-caching");
-#endif
 
     polymat_cutoff_info always_basecase[1];
     polymat_cutoff_info improved[1];
@@ -1131,7 +1113,7 @@ void plingen_tune_mp(abdst_field ab, unsigned int m, unsigned int n, cutoff_list
             /* The matpoly layer is just completetly different -- and gets
              * faster quite early on... */
             for(small_bench<timer_t> x = finder.micro_bench(2); !x.done(); ++x) {
-                matpoly_mp(ab, xER, xE, xpiL);
+                matpoly_mp(ab, xER, xE, xpiL, false);
                 x.set_since_last();
             }
             if (xERref->size == 0) {
@@ -1142,7 +1124,6 @@ void plingen_tune_mp(abdst_field ab, unsigned int m, unsigned int n, cutoff_list
             }
         }
 
-#ifdef HAVE_MPIR
         if (finder.still_meaningful_to_test(3)) {
             unsigned int adj = UINT_MAX;
             if (cl) {
@@ -1186,7 +1167,7 @@ void plingen_tune_mp(abdst_field ab, unsigned int m, unsigned int n, cutoff_list
             mpz_clear(p);
 #endif
             for(small_bench<timer_t> x = finder.micro_bench(3); !x.done(); ++x) {
-                matpoly_mp_caching_adj(ab, xER, xE, xpiL, adj);
+                matpoly_mp_caching_adj(ab, xER, xE, xpiL, adj, false);
                 x.set_since_last();
             }
             if (xERref->size == 0) {
@@ -1210,7 +1191,6 @@ void plingen_tune_mp(abdst_field ab, unsigned int m, unsigned int n, cutoff_list
 #endif
 #endif
         }
-#endif
 
         cout << input_length
             << " " << finder.summarize_for_this_length(k)
@@ -1354,12 +1334,13 @@ void plingen_tuning(abdst_field ab, unsigned int m, unsigned int n, MPI_Comm com
 
     /* XXX BUG: with depth adjustment==0 early on, we get check failures.
      * Must investigate */
-    cutoff_list cl_mul = NULL;
-    cutoff_list cl_mp = NULL;
 
+    cutoff_list cl_mp = NULL;
     // plingen_tune_mp_fti_depth(ab, m, n, &cl_mp);
-    // plingen_tune_mul_fti_depth(ab, m, n, &cl_mul);
     plingen_tune_mp(ab, m, n, cl_mp);
+
+    cutoff_list cl_mul = NULL;
+    // plingen_tune_mul_fti_depth(ab, m, n, &cl_mul);
     plingen_tune_mul(ab, m, n, cl_mul);
 
 #if 0

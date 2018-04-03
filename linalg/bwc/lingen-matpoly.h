@@ -26,6 +26,7 @@ typedef const struct matpoly_s * matpoly_srcptr;
 #ifdef __cplusplus
 extern "C" {
 #endif
+
 void matpoly_init(abdst_field ab, matpoly_ptr p, unsigned int m, unsigned int n, int len);
 int matpoly_check_pre_init(matpoly_srcptr p);
 void matpoly_realloc(abdst_field ab, matpoly_ptr p, size_t newalloc);
@@ -65,13 +66,10 @@ void matpoly_rshift(abdst_field ab, matpoly_ptr dst, matpoly_srcptr src, unsigne
 
 void matpoly_transpose_dumb(abdst_field ab, matpoly_ptr dst, matpoly_srcptr src);
 
-void matpoly_addmul(abdst_field ab, matpoly c, matpoly a, matpoly b);
-void matpoly_addmp(abdst_field ab, matpoly c, matpoly a, matpoly b);
-void matpoly_mul(abdst_field ab, matpoly c, matpoly a, matpoly b);
-void matpoly_mp(abdst_field ab, matpoly c, matpoly a, matpoly b);
-#ifdef __cplusplus
-}
-#endif
+double matpoly_addmul(abdst_field ab, matpoly c, matpoly a, matpoly b, int draft);
+double matpoly_addmp(abdst_field ab, matpoly c, matpoly a, matpoly b, int draft);
+double matpoly_mul(abdst_field ab, matpoly c, matpoly a, matpoly b, int draft);
+double matpoly_mp(abdst_field ab, matpoly c, matpoly a, matpoly b, int draft);
 
 
 /* {{{ access interface for matpoly */
@@ -91,6 +89,9 @@ static inline absrc_elt matpoly_coeff_const(abdst_field ab, matpoly_srcptr p, un
 }
 /* }}} */
 
+#ifdef __cplusplus
+}
+#endif
 
 
 #endif	/* LINGEN_MATPOLY_H_ */

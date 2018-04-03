@@ -470,12 +470,12 @@ int param_list_configure_switch(param_list_ptr pl, const char * switchname, int 
         pl->nswitches_alloc <<= 1;
         pl->switches = realloc(pl->switches, pl->nswitches_alloc * sizeof(param_list_switch));
     }
-    char * tmp = (char *) malloc(strlen(switchname)+2);
-    tmp[0]='-';
+    char * tmp;
     if (switchname[1] == '-') { // have -- in the switch
-        strncpy(tmp, switchname, strlen(switchname) + 1);
+        tmp = strdup(switchname);
     } else {
-        strncpy(tmp+1, switchname, strlen(switchname) + 1);
+        int rc = asprintf(&tmp, "-%s", switchname);
+        ASSERT_ALWAYS(rc >= 0);
     }
     // put the -- version
     pl->switches[pl->nswitches]->switchname = strdup(tmp);

@@ -66,10 +66,20 @@ extern "C" {
                          __FLINT_VERSION_PATCHLEVEL)
 
 /* 
- * Check mpir and mpfr version numbers */
+ * Check mpir and mpfr version numbers.
+ *
+ * The functions below, since not provided by gmp, are provided by
+ * cado-nfs instead
+ */
 #if __GNU_MP_VERSION < 5
-#error GMP 5.0.0 or MPIR 2.6.0 or later are required
+mp_limb_t mpn_neg (mp_limb_t *rp, const mp_limb_t *sp, mp_size_t n);
+void mpn_xor_n (mp_limb_t *rp, const mp_limb_t *s1p, const mp_limb_t *s2p,
+		mp_size_t n);
+void mpn_zero(mp_limb_t *rp, mp_size_t n);
+void mpn_copyi(mp_limb_t *rp, const mp_limb_t * up, mp_size_t n);
+void mpn_copyd(mp_limb_t *rp, const mp_limb_t * up, mp_size_t n);
 #endif
+
 
 
 /* 

@@ -3071,7 +3071,7 @@ void inversion_lift(struct prime_data * p, mpz_ptr iHx, mpz_srcptr Hx, int preci
     // gmp_fprintf(stderr, "# [%2.2lf] %Zd\n", WCT, p->iHx_mod);
 }/* }}} */
 
-void prime_inversion_lifts_child(struct subtask_info_t * info)
+void * prime_inversion_lifts_child(struct subtask_info_t * info)
 {
     struct prime_data * p = info->p;
     mpz_srcptr px = power_lookup_const(p->powers, glob.prec);
@@ -3089,6 +3089,7 @@ void prime_inversion_lifts_child(struct subtask_info_t * info)
     fprintf(stderr, "# [%2.2lf] [P%dA%d] lifting H^-l\n", WCT, glob.arank, glob.prank);
     inversion_lift(p, p->iHx, Hx, glob.prec);
     mpz_clear(Hx);
+    return NULL;
 }
 
 void prime_inversion_lifts(struct prime_data * primes, int i0, int i1)
@@ -3149,7 +3150,7 @@ struct postcomp_subtask_info_t {
     struct wq_task * handle;
 };
 
-void prime_postcomputations_child(struct postcomp_subtask_info_t * info)
+void * prime_postcomputations_child(struct postcomp_subtask_info_t * info)
 {
     struct prime_data * p = info->p;
     int j = info->j;
@@ -3255,6 +3256,7 @@ void prime_postcomputations_child(struct postcomp_subtask_info_t * info)
     mpz_clear(z);
     mpf_clear(pxf);
     mpf_clear(ratio);
+    return NULL;
 }
 
 void prime_postcomputations(struct prime_data * primes, int i0, int i1, int64_t * contribs64, mp_limb_t * contribsN)

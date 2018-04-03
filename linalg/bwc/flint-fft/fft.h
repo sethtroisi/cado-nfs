@@ -398,6 +398,7 @@ void fft_get_transform_info(struct fft_transform_info * fti, mp_bitcnt_t bits1, 
 void fft_get_transform_info_mulmod(struct fft_transform_info * fti, mp_bitcnt_t xbits, mp_bitcnt_t ybits, unsigned int nacc, mp_bitcnt_t minwrap);
 void fft_transform_info_adjust_depth(struct fft_transform_info * fti, unsigned int adj);
 void fft_transform_info_set_first_guess(struct fft_transform_info * fti);
+int fft_transform_info_check(const struct fft_transform_info * fti);
 void fft_get_transform_allocs(size_t sizes[3], struct fft_transform_info * fti);
 void fft_transform_prepare(void * x, struct fft_transform_info * fti);
 void fft_do_dft(void * y, mp_limb_t * x, mp_size_t nx, void * temp, struct fft_transform_info * fti);

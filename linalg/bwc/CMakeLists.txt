@@ -388,12 +388,14 @@ target_link_libraries(cleanup bitlinalg utils m)
 
 install(TARGETS cleanup RUNTIME DESTINATION ${LIBSUFFIX}/linalg/bwc)
 
+if(BWC_GFP_ARITHMETIC_BACKENDS)
     # This is a convenience library which is used **ONLY** by one binary,
     # so there's absolutely no point in making it shared.
     file(GLOB flint_fft_files flint-fft/*.c)
     add_library(flint-fft ${flint_fft_files})
     add_executable(test-flint test-flint.c)
     target_link_libraries(test-flint flint-fft utils ${gmp_libname})
+endif()
 
 foreach(v ${BWC_GFP_ARITHMETIC_BACKENDS})
     set(plingen_${v}_sources
@@ -401,29 +403,35 @@ foreach(v ${BWC_GFP_ARITHMETIC_BACKENDS})
         plingen.cpp
         plingen-tuning.cpp
         tree_stats.cpp
+        )
+
+    set(plingen_${v}_support_sources
         logline.c
         lingen-matpoly.c
         lingen-bigmatpoly.c
         lingen-polymat.c
         # lingen-bigpolymat.c # deleted 20150826
         mpfq/mpfq_${v}.c
-        )
-
-        set(plingen_${v}_sources
-            ${plingen_${v}_sources}
-            lingen-matpoly-ft.c
-            lingen-bigmatpoly-ft.c)
+        lingen-matpoly-ft.c
+        lingen-bigmatpoly-ft.c)
 
     # make plingen_pz a default target, but not the others.
     if(v STREQUAL "pz")
+        add_library(plingen_${v}_support ${plingen_${v}_support_sources})
         add_executable(plingen_${v} ${plingen_${v}_sources})
         install(TARGETS plingen_${v} RUNTIME DESTINATION ${LIBSUFFIX}/linalg/bwc)
     else()
+        add_library(plingen_${v}_support EXCLUDE_FROM_ALL ${plingen_${v}_support_sources})
         add_executable(plingen_${v} EXCLUDE_FROM_ALL ${plingen_${v}_sources})
     endif()
 
-        target_link_libraries(plingen_${v} flint-fft ${gmp_libname} utils)
+    target_link_libraries(plingen_${v}_support flint-fft ${gmp_libname} utils)
+    target_link_libraries(plingen_${v} plingen_${v}_support)
 
+    set_target_properties(plingen_${v}_support PROPERTIES
+        COMPILE_FLAGS "--mpi -DSELECT_MPFQ_LAYER_${v}"
+        LINK_FLAGS "--mpi"
+        )
     set_target_properties(plingen_${v} PROPERTIES
         COMPILE_FLAGS "--mpi -DSELECT_MPFQ_LAYER_${v}"
         LINK_FLAGS "--mpi"
