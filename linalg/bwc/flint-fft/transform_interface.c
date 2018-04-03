@@ -499,8 +499,8 @@ void fft_transform_info_adjust_depth(struct fft_transform_info * fti, unsigned i
     for(mp_bitcnt_t obits = 0; obits != bits;) {
         obits = bits;
         j1 = iceildiv(bits1, obits);
-        j2 = iceildiv(bits1, obits);
-        log_nacc = FLINT_CLOG2(nacc*MAX(j1, j2));
+        j2 = iceildiv(bits2, obits);
+        log_nacc = FLINT_CLOG2(nacc*MIN(j1, j2));
         nw = (mp_bitcnt_t) n * w;
         bits = (nw - log_nacc) / 2;
     }
@@ -514,8 +514,6 @@ void fft_transform_info_adjust_depth(struct fft_transform_info * fti, unsigned i
     nw = (mp_bitcnt_t) n * w;
     j1 = iceildiv(bits1, bits);
     j2 = iceildiv(bits2, bits);
-    assert(firstwrap(j1, j2, bits, n) >= (mp_bitcnt_t) minwrap);
-    assert(2*bits + log_nacc <= nw);
     fti->w = w;
     fti->depth = depth;
     fti->bits = bits;
@@ -525,6 +523,7 @@ void fft_transform_info_adjust_depth(struct fft_transform_info * fti, unsigned i
         fti->trunc0 = 4 * n;
     }
     // fprintf(stderr, "/* DEPTH = %zu, ALG = %d */\n", fti->depth, fti->alg);
+    ASSERT_ALWAYS(fft_transform_info_check(fti));
 }
 
 void fft_get_transform_info_mulmod(struct fft_transform_info * fti, mp_bitcnt_t bits1, mp_bitcnt_t bits2, unsigned int nacc, mp_bitcnt_t minwrap)
