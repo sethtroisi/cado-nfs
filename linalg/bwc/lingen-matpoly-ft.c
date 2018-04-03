@@ -46,7 +46,7 @@ double matpoly_ft_dft(abdst_field ab, matpoly_ft_ptr t, matpoly_ptr a, struct ff
     void * tt = malloc(fft_alloc_sizes[1]);
     memset(tt, 0, fft_alloc_sizes[1]);
 
-    double tt0=0, ttm;
+    double tt0=0, ttm=0; /* placate gcc */
     unsigned long c0 = 0;
     int set = 0;
 
@@ -145,7 +145,7 @@ double matpoly_ft_addmul(abdst_field ab MAYBE_UNUSED, matpoly_ft_ptr u, matpoly_
     memset(qt, 0, fft_alloc_sizes[1]);
     memset(tt, 0, fft_alloc_sizes[2]);
 
-    double tt0=0, ttm;
+    double tt0=0, ttm=0; /* placate gcc */
     unsigned long c0 = 0;
     int set = 0;
 
@@ -207,7 +207,7 @@ double matpoly_ft_ift(abdst_field ab, matpoly_ptr a, matpoly_ft_ptr t, struct ff
     void * tt = malloc(fft_alloc_sizes[1]);
     memset(tt, 0, fft_alloc_sizes[1]);
 
-    double tt0=0, ttm;
+    double tt0=0, ttm=0; /* placate gcc */
     unsigned long c0 = 0;
     int set = 0;
 
@@ -241,7 +241,7 @@ double matpoly_ft_ift_mp(abdst_field ab, matpoly_ptr a, matpoly_ft_ptr t, unsign
     void * tt = malloc(fft_alloc_sizes[1]);
     memset(tt, 0, fft_alloc_sizes[1]);
 
-    double tt0=0, ttm;
+    double tt0=0, ttm=0; /* placate gcc */
     unsigned long c0 = 0;
     int set = 0;
 
