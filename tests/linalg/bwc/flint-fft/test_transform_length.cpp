@@ -61,6 +61,8 @@ void test_transform_length()
     fft_get_transform_info_mulmod(fti, 14e8, 14e8, 8, 0); fti_explain(fti);
     fft_get_transform_info_mulmod(fti, 3e9, 5e9, 8, 0); fti_explain(fti);
     fft_get_transform_info_mulmod(fti, 6e9, 4e9, 8, 0); fti_explain(fti);
+
+    fft_get_transform_info_mulmod(fti, 10780, 4900, 16, 0); fti_explain(fti);
 }
 
 int main()
