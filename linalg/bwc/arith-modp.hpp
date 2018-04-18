@@ -21,8 +21,6 @@ namespace details {
      */
     template<bool x> struct is_true {};
     template<> struct is_true<true> { typedef int type; };
-    template<typename T, typename U> struct is_same { static const bool value = false; };
-    template<typename T> struct is_same<T, T> { static const bool value = true; };
     template<typename T> struct make_signed {};
     template<> struct make_signed<unsigned long> { typedef long type; };
     template<> struct make_signed<unsigned long long> { typedef long long type; };

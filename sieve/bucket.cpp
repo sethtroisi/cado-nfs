@@ -3,6 +3,7 @@
 #include <stdlib.h>   // for malloc and friends
 #include <string.h>   // for memcpy
 #include <new>        // for std::bad_alloc
+#include <type_traits> // for std::is_same (C++11)
 #include <gmp.h>
 #if defined(HAVE_SSE2)
 #include <emmintrin.h>
@@ -237,17 +238,6 @@ bucket_array_t<LEVEL, HINT>::max_full (unsigned int * fullest_index) const
   return max;
 }
 
-// Replace std::is_same()::value that is not yet available.
-template <typename T, typename U>
-struct is_same
-{
-    static const bool value = false;
-};
-
-template <typename T>
-struct is_same<T, T> { static const bool value = true; };
-
-
 template <int LEVEL, typename HINT>
 void
 bucket_array_t<LEVEL, HINT>::log_this_update (
@@ -275,7 +265,7 @@ bucket_array_t<LEVEL, HINT>::log_this_update (
             "to BA<%d>[%u]\n",
             (unsigned int) w.x, w.side, (unsigned int) w.i,
             (unsigned int) w.h, w.p, LEVEL, (unsigned int) w.N);
-        if (is_same<HINT,longhint_t>::value) {
+        if (std::is_same<HINT,longhint_t>::value) {
           verbose_output_print (TRACE_CHANNEL, 0,
              "# Warning: did not check divisibility during downsorting p=%"
              FBPRIME_FORMAT "\n", w.p);
