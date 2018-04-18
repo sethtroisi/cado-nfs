@@ -2823,11 +2823,6 @@ int main (int argc0, char *argv0[])/*{{{*/
         si.update(nr_workspaces);
 
 
-        /* for statistics */
-        totJ += si.J;
-        totlogI += si.conf.logI;
-
-
         try {
 
         WHERE_AM_I_UPDATE(w, psi, &si);
@@ -3091,7 +3086,10 @@ if (si.conf.sublat.m) {
         already_printed_for_q.clear();
         pthread_mutex_unlock(&already_printed_for_q_lock);
 
+        /* for statistics */
         nr_sq_processed++;
+        totJ += si.J;
+        totlogI += si.conf.logI;
 
 #ifdef  DLP_DESCENT
         SIBLING_TIMER(timer_special_q, "descent");
