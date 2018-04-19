@@ -106,7 +106,7 @@ public:
       }
   }
 
-  T &reserve();
+  T &reserve(int);
   void release(T &BA);
 };
 
@@ -171,7 +171,9 @@ public:
 
   template <int LEVEL, typename HINT>
   bucket_array_t<LEVEL, HINT> &
-  reserve_BA(const int side) {return groups[side].get<LEVEL, HINT>().reserve();}
+  reserve_BA(const int side, int wish) {
+      return groups[side].get<LEVEL, HINT>().reserve(wish);
+  }
 
   template <int LEVEL, typename HINT>
   void
