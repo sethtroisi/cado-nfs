@@ -68,14 +68,13 @@ struct thread_data_task_wrapper : public task_parameters {
    of them for exclusive use and to release it again. */
 template <typename T>
 class reservation_array : private monitor {
-  T * const BAs;
-  bool * const in_use;
-  const size_t n;
+    std::vector<T> BAs;
+    std::vector<bool> in_use;
   condition_variable cv;
   /* Return the index of the first entry that's currently not in use, or the
      first index out of array bounds if all are in use */
   size_t find_free() const {
-    return std::find(&in_use[0], &in_use[n], false) - &in_use[0];
+    return std::find(in_use.begin(), in_use.end(), false) - in_use.begin();
   }
   reservation_array(reservation_array const &) = delete;
   reservation_array& operator=(reservation_array const&) = delete;
@@ -83,27 +82,22 @@ public:
   typedef typename T::update_t update_t;
   reservation_array(reservation_array &&) = default;
   reservation_array(size_t n)
-    : BAs(new T[n]), in_use(new bool[n]), n(n)
+    : BAs(n), in_use(n, false)
   {
-    for (size_t i = 0; i < n; i++) {
-      in_use[i] = false;
-    }
-  }
-  ~reservation_array() {
-    delete[] BAs;
-    delete[] in_use;
   }
 
   /* Allocate enough memory to be able to store at least n_bucket buckets,
      each of size at least fill_ratio * bucket region size. */
   void allocate_buckets(const uint32_t n_bucket, double fill_ratio, int logI);
-  const T* cbegin() const {return &BAs[0];}
-  const T* cend() const {return &BAs[n];}
+  // typename std::vector<T>::const_iterator cbegin() const {return BAs.cbegin();}
+  // typename std::vector<T>::const_iterator cend() const {return BAs.cend();}
+  // std::vector<T>& arrays() { return BAs; }
+  std::vector<T> const& bucket_arrays() const { return BAs; }
+  inline int rank(T const & BA) const { return &BA - &BAs.front(); }
 
   void reset_all_pointers() {
-      for (T * it = &BAs[0]; it != &BAs[n]; it++) {
-          it->reset_pointers();
-      }
+      for(auto & A : BAs)
+          A.reset_pointers();
   }
 
   T &reserve(int);
@@ -181,14 +175,17 @@ public:
     return groups[side].get<LEVEL, HINT>().release(BA);
   }
 
-  /* Iterator over all the bucket arrays of a given type on a given side */
+  /*
+   * not even needed. Better to expose only reserve() and release()
   template <int LEVEL, typename HINT>
-  const bucket_array_t<LEVEL, HINT> *
-  cbegin_BA(const int side) const {return groups[side].cget<LEVEL, HINT>().cbegin();}
+  std::vector<bucket_array_t<LEVEL, HINT>> &
+  bucket_arrays(int side) {return groups[side].get<LEVEL, HINT>().bucket_arrays();}
+  */
 
   template <int LEVEL, typename HINT>
-  const bucket_array_t<LEVEL, HINT> *
-  cend_BA(const int side) const {return groups[side].cget<LEVEL, HINT>().cend();}
+  std::vector<bucket_array_t<LEVEL, HINT>> const &
+  bucket_arrays(int side) const {return groups[side].cget<LEVEL, HINT>().bucket_arrays();}
+
 };
 
 #endif
