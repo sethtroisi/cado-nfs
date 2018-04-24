@@ -2988,8 +2988,8 @@ for (unsigned int j_cong = 0; j_cong < sublat_bound; ++j_cong) {
                             si,
                             precomp_plattice);
                 }
-
             }
+            pool->drain_queue(0);
 
             SIBLING_TIMER(timer_special_q, "process_bucket_region outer container (MT)");
             TIMER_CATEGORY(timer_special_q, bookkeeping());
