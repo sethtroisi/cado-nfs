@@ -141,6 +141,7 @@ public:
   void add_task(task_function_t func, const task_parameters * params, const int id, const size_t queue = 0, double cost = 0.0);
   task_result *get_result(size_t queue = 0, bool blocking = true);
   void drain_queue(const size_t queue, void (*f)(task_result*) = NULL);
+  void drain_all_queues();
   clonable_exception * get_exception(const size_t queue = 0);
 
   /* All threads in a thread pool have their respective timer active at

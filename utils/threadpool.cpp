@@ -106,10 +106,12 @@ thread_pool::thread_pool(const size_t nr_threads, const size_t nr_queues)
 };
 
 thread_pool::~thread_pool() {
+  drain_all_queues();
   enter();
   kill_threads = true;
   for (auto & T : tasks) broadcast(T.not_empty); /* Wakey wakey, time to die */
   leave();
+  drain_all_queues();
   for (auto const & T : tasks) ASSERT_ALWAYS(T.empty());
   for (auto const & R : results) ASSERT_ALWAYS(R.empty());
   for (auto const & E : exceptions) ASSERT_ALWAYS(E.empty());
@@ -257,8 +259,12 @@ void thread_pool::drain_queue(const size_t queue, void (*f)(task_result*))
     }
     leave();
 }
-
-
+void thread_pool::drain_all_queues()
+{
+    for(size_t queue = 0 ; queue < results.size() ; ++queue) {
+        drain_queue(queue);
+    }
+}
 
 /* get an exception from the specified exceptions queue. This is
  * obviously non-blocking, because exceptions are exceptional. So when no
