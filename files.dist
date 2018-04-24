@@ -1235,3 +1235,4 @@ tests/polyselect/Makefile
 tests/sieve/Makefile
 tests/sqrt/Makefile
 tests/utils/Makefile
+utils/utils_cxx.hpp
