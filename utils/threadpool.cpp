@@ -96,6 +96,7 @@ class exceptions_queue : public std::queue<clonable_exception *>, private NonCop
 thread_pool::thread_pool(const size_t nr_threads, const size_t nr_queues)
   :
       tasks(nr_queues), results(nr_queues), exceptions(nr_queues),
+      created(nr_queues, 0), joined(nr_queues, 0),
       kill_threads(false)
 {
     /* Threads start accessing the queues as soon as they run */
@@ -158,6 +159,7 @@ thread_pool::add_task(task_function_t func, const task_parameters * params,
     enter();
     ASSERT_ALWAYS(!kill_threads);
     tasks[queue].push(new thread_task(func, id, params, queue, cost));
+    created[queue]++;
 
     /* Find a queue with waiting threads, starting with "queue" */
     size_t i = queue;
@@ -235,10 +237,28 @@ thread_pool::get_result(const size_t queue, const bool blocking) {
       wait(results[queue].not_empty);
     result = results[queue].front();
     results[queue].pop();
+    joined[queue]++;
   }
   leave();
   return result;
 }
+
+void thread_pool::drain_queue(const size_t queue, void (*f)(task_result*))
+{
+    enter();
+    for(size_t cr = created[queue]; joined[queue] < cr ; ) {
+        while (results[queue].empty())
+            wait(results[queue].not_empty);
+        task_result * result = results[queue].front();
+        results[queue].pop();
+        joined[queue]++;
+        if (f) f(result);
+        delete result;
+    }
+    leave();
+}
+
+
 
 /* get an exception from the specified exceptions queue. This is
  * obviously non-blocking, because exceptions are exceptional. So when no
