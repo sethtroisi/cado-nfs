@@ -911,10 +911,14 @@ fill_in_buckets_one_side(timetree_t& timer, thread_pool &pool, thread_workspaces
     fill_in_buckets_parameters model(ws, side, si, NULL, NULL, NULL, 0);
 
     if (!si.conf.sublat.m) {
+        /* This creates a task meant to call
+         * fill_in_buckets_toplevel_wrapper */
         push_slice_to_task_list<LEVEL> F(pool, model);
         fbs->get_part(LEVEL).foreach_slice(F);
         slices_pushed = F.pushed;
     } else {
+        /* This creates a task meant to call
+         * fill_in_buckets_toplevel_sublat_wrapper */
         auto & Vpre(si.sides[side].precomp_plattice_dense);
         bool is_first = si.conf.sublat.i0 == 0 && si.conf.sublat.j0 == 1;
         push_slice_to_task_list_saving_precomp<LEVEL> F(pool, model, Vpre, is_first);
@@ -986,6 +990,7 @@ fill_in_buckets_one_side(timetree_t& timer, thread_pool &pool, thread_workspaces
     pool.accumulate_and_reset_wait_time(*timer.current);
 }
 
+
 void fill_in_buckets(timetree_t& timer, thread_pool &pool, thread_workspaces &ws, sieve_info & si, int side)
 {
     // per se, we're not doing anything here.
@@ -1008,6 +1013,7 @@ void fill_in_buckets(timetree_t& timer, thread_pool &pool, thread_workspaces &ws
             ASSERT_ALWAYS(0);
     }
 }
+
 /* }}} */
 
 

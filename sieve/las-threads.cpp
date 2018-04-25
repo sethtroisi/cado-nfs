@@ -277,6 +277,9 @@ thread_workspaces::thread_workspaces(const size_t _nr_workspaces,
   const unsigned int _nr_sides, las_info & las)
   : nr_workspaces(_nr_workspaces), nr_sides(_nr_sides), groups { _nr_workspaces, _nr_workspaces }
 {
+    /* Well, groups is an array of side 2 anyway... */
+    ASSERT_ALWAYS(_nr_sides == 2);
+
     thrs = new thread_data[_nr_workspaces];
     ASSERT_ALWAYS(thrs != NULL);
 
@@ -425,6 +428,7 @@ template double thread_workspaces::buckets_max_full<2, shorthint_t>();
 template double thread_workspaces::buckets_max_full<3, shorthint_t>();
 template double thread_workspaces::buckets_max_full<1, longhint_t>();
 template double thread_workspaces::buckets_max_full<2, longhint_t>();
+
 
 void
 thread_workspaces::accumulate_and_clear(las_report_ptr rep, sieve_checksum *checksum)
