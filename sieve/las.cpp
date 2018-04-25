@@ -2900,23 +2900,15 @@ for (unsigned int j_cong = 0; j_cong < sublat_bound; ++j_cong) {
         }
         pool->drain_queue(0);
 
-        workspaces.check_buckets_max_full(si.toplevel, shorthint_t());
-
         pool->accumulate_and_clear_active_time(*timer_special_q.current);
 
+        workspaces.check_buckets_max_full(si.toplevel, shorthint_t());
         auto exc = pool->get_exceptions<buckets_are_full>(0);
         if (!exc.empty())
             throw *std::max_element(exc.begin(), exc.end());
 
-
-        // useless
-        // pool->accumulate_and_clear_active_time(*timer_special_q.current);
-
         workspaces.thrs[0].rep->ttbuckets_fill += seconds();
 
-        // this timing slot is insignificant, let's put it with the
-        // bookkeeping crop
-        // SIBLING_TIMER(timer_special_q, "prepare small sieve");
         BOOKKEEPING_TIMER(timer_special_q);
 
         /* Prepare small sieve and re-sieve */
@@ -3152,29 +3144,11 @@ if (si.conf.sublat.m) {
 
         qt0 = seconds() - qt0;
 
-        /*
-         * I think it's useless now. All routines which use the thread
-         * pool properly report their time use with the equivalent of
-         * these functions.
-        pool->accumulate_and_clear_active_time(timer_special_q);
-        SIBLING_TIMER(timer_special_q, "worker thread wait time");
-        pool->accumulate_and_reset_wait_time(*timer_special_q.current);
-        */
-
         timer_special_q.stop();
         
-        if (tdict::global_enable >= 2) {
-            verbose_output_print (0, 1, "%s", timer_special_q.display().c_str());
-
-            double t = 0;
-            for(auto const &c : timer_special_q.filter_by_category()) {
-                verbose_output_print (0, 1, "# %s: %.2f\n", 
-                        coarse_las_timers::explain(c.first).c_str(),
-                        c.second);
-                t += c.second;
-            }
-            verbose_output_print (0, 1, "# total counted time: %.2f\n", t);
-        }
+        /* We used to display timer_special_q ; now it makes little
+         * sense, in fact, because we've started to aggressively
+         * desynchronize some of the tasks */
 
         global_timer += timer_special_q;
 
