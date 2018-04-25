@@ -1041,10 +1041,13 @@ fb_factorbase::slicing::slicing(fb_factorbase const & fb, fb_factorbase::key_typ
     helper_functor_count_weight_parts D { local_thresholds };
     toplevel = multityped_array_fold(D, 0, fb.entries);
 
+    double total_weight = 0;
+
     for (int i = 0; i <= toplevel; i++) {
         size_t nr_primes = D.primes[i];
         size_t nr_roots = D.ideals[i];
         double weight = D.weight[i];
+        total_weight += weight;
         int side = fb.side;
         if (!nr_primes) continue;
             verbose_output_print(0, 1, "# Number of primes in side-%d factor base part %d = %zu\n",
@@ -1057,7 +1060,8 @@ fb_factorbase::slicing::slicing(fb_factorbase const & fb, fb_factorbase::key_typ
 
     /* D.weight[i] is now what used to be called max_bucket_fill_ratio. We
      * will now make sure that slices are small enough so that a single
-     * slice never ever exceeds some fraction of this weight  */
+     * slice never ever exceeds some fraction of the total weight (for
+     * all parts)  */
     stats = D;
      
     /* First, part 0 is treated in a special way. There's no slicing to
