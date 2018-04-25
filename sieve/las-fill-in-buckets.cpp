@@ -297,7 +297,7 @@ make_lattice_bases(fb_slice<FB_ENTRY_TYPE> const & slice,
   /* Create a transformed vector and store the index of the fb_slice we
    * currently transform */
 
-  plattices_vector_t result(slice.get_index());
+  plattices_vector_t result(slice.get_index(), slice.get_weight());
   slice_offset_t i_entry = 0;
   for (auto const & e : slice) {
       increment_counter_on_dtor<slice_offset_t> _dummy(i_entry);
