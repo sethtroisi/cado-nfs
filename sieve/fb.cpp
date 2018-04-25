@@ -886,6 +886,7 @@ int main(int argc, char * argv[])
 
 struct helper_functor_subdivide_slices {
     fb_factorbase::slicing::part & dst;
+    int side;   /* for printing */
     int part_index;
     fb_factorbase::key_type K;
     std::array<fb_factorbase::threshold_pos, FB_MAX_PARTS+1> local_thresholds;
@@ -928,7 +929,7 @@ struct helper_functor_subdivide_slices {
             std::ostringstream n_eq;
             n_eq << "n=";
             if (n < 0) n_eq << "*"; else n_eq << n;
-            verbose_output_print (0, 2, "# slices for part %d, %s roots: from %zu entries, we found %zu different logp values\n", part_index, n_eq.str().c_str(), interval_width, pool.size());
+            verbose_output_print (0, 2, "# slices for side-%d part %d, %s roots: %zu entries, %zu logp values\n", side, part_index, n_eq.str().c_str(), interval_width, pool.size());
 
             /* We now divide into several slices of roughly equal weight.
              * We can assess this weight by looking at the cdf.
@@ -960,13 +961,15 @@ struct helper_functor_subdivide_slices {
                         if (jt - it > std::numeric_limits<slice_offset_t>::max()) {
                             /* overflow. Do not push the split point, we'll try
                              * with more pieces */
-                            verbose_output_print (0, 2, "# while splitting slice for %s logp=%d (%zu entries, weight=%f): splitting in %zu pieces is not enough, we have an overlow with block #%zu. Trying %zu pieces\n",
+                            verbose_output_print (0, 2, "# [side-%d part %d %s logp=%d; %zu entries, weight=%f]: slice %zu/%zu overflows. Trying %zu slices\n",
+                                    side,
+                                    part_index,
                                     n_eq.str().c_str(),
                                     (int) s.get_logp(),
                                     s.size(),
                                     s.get_weight(),
-                                    npieces,
                                     k-1,
+                                    npieces,
                                     npieces + 1);
                             break;
                         }
@@ -995,7 +998,8 @@ struct helper_functor_subdivide_slices {
             for(auto & s : sdst) s.index = index++;
 
             for(auto const & s : sdst) {
-                verbose_output_print (0, 2, "# [%lu] %s logp=%d: %zu entries, weight=%f\n",
+                verbose_output_print (0, 2, "# [side-%d %lu] %s logp=%d: %zu entries, weight=%f\n",
+                        side,
                         (unsigned long) s.get_index(),
                         n_eq.str().c_str(),
                         (int) s.get_logp(),
@@ -1088,7 +1092,7 @@ fb_factorbase::slicing::slicing(fb_factorbase const & fb, fb_factorbase::key_typ
     slice_index_t s = 0;
     for (int i = 1; i < FB_MAX_PARTS; i++) {
         parts[i].first_slice_index = s;
-        helper_functor_subdivide_slices SUB { parts[i], i, K, local_thresholds, s };
+        helper_functor_subdivide_slices SUB { parts[i], fb.side, i, K, local_thresholds, s };
         multityped_array_foreach(SUB, fb.entries);
         s += parts[i].nslices();
     }
