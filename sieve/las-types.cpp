@@ -249,6 +249,19 @@ las_info::las_info(cxx_param_list & pl)
 
     galois = param_list_lookup_string(pl, "galois");
     suppress_duplicates = param_list_parse_switch(pl, "-dup");
+    if (suppress_duplicates) {
+        bool qmin_initialized = false;
+        for (int side = 0; side < 2; side++) {
+            if (config_pool.default_config_ptr->sides[side].qmin != LONG_MAX) {
+                qmin_initialized = true;
+            }
+        }
+        if (!qmin_initialized) {
+            fprintf(stderr,
+                    "Error: -dup-qmin is mandatory with -dup\n");
+            exit(EXIT_FAILURE);
+        }
+    }
 
     param_list_print_command_line(output, pl);
 
