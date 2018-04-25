@@ -1777,6 +1777,7 @@ void factor_survivors_data::cofactoring (timetree_t & timer)
                  */
                 dup_comment = "# DUP ";
             } else if (do_check && relation_is_duplicate(rel, las, si, adjust_strategy)) {
+                th->rep->duplicates++;
                 dup_comment = "# DUPE ";
             }
 
@@ -1817,9 +1818,12 @@ void factor_survivors_data::cofactoring (timetree_t & timer)
     }
 }
 
-/* Adds the number of sieve reports to *survivors,
-   number of survivors with coprime a, b to *coprimes */
-// FIXME NOPROFILE_STATIC
+/* Returns the number of relations.
+   All the other stats (survivors, duplicates, etc) are
+   updated by side-effect in th->rep.
+   Note that the number of relations ends up also in th->rep,
+   but this is done by the caller.
+   */
 int
 factor_survivors (timetree_t & timer, thread_data *th, int N, where_am_I & w MAYBE_UNUSED)
 {
@@ -2167,6 +2171,9 @@ void las_report_accumulate_threads_and_display(las_info & las,
               si.conf.side,
               (mpz_srcptr) si.doing.p,
               (mpz_srcptr) si.doing.r);
+    if (las.suppress_duplicates) {
+        verbose_output_print(0, 1, "# number of eliminated duplicates: %lu\n", rep->duplicates);
+    }
     double qtts = qt0 - rep->tn[0] - rep->tn[1] - rep->ttf;
     if (rep->survivors.after_sieve != rep->survivors.not_both_even) {
         verbose_output_print(0, 1, "# Warning: found %ld hits with i,j both even (not a bug, but should be very rare)\n", rep->survivors.after_sieve - rep->survivors.not_both_even);
@@ -2831,8 +2838,7 @@ int main (int argc0, char *argv0[])/*{{{*/
             verbose_output_print(0, 1, " # within descent, currently at depth %d", si.doing.depth);
         }
         verbose_output_print(0, 1, "\n");
-        /* TODO: maybe print that later */
-        if (!mpz_probab_prime_p(doing.p, 1)) {
+        if (!las.allow_composite_q && !mpz_probab_prime_p(doing.p, 1)) {
             verbose_output_vfprint(0, 1, gmp_vfprintf,
                     "# Warning, q=%Zd is not prime\n",
                     (mpz_srcptr) doing.p);
@@ -3315,6 +3321,9 @@ if (si.conf.sublat.m) {
     if (peakmem > 0)
         verbose_output_print (2, 1, "# PeakMemusage (MB) = %ld \n",
                 peakmem >> 10);
+    if (las.suppress_duplicates) {
+        verbose_output_print(2, 1, "# Total number of eliminated duplicates: %lu\n", report->duplicates);
+    }
     verbose_output_print (2, 1, "# Total %lu reports [%1.3gs/r, %1.1fr/sq]\n",
             report->reports, t0 / (double) report->reports,
             (double) report->reports / (double) nr_sq_processed);

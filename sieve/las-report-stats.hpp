@@ -19,6 +19,7 @@ struct las_report_s {
         unsigned long smooth;
     } survivors;
     unsigned long reports;
+    unsigned long duplicates;   /* used with -dup option */
     double tn[2];            /* norms */
     double ttbuckets_fill;
     double ttbuckets_apply;
