@@ -4,7 +4,7 @@
 #include "gmp.h"
 #include "las-siever-config.hpp"
 #include "cxx_mpz.hpp"
-#include "facul.hpp"
+#include "ecm/facul.hpp"
 #include <array>
 #include <vector>
 
