@@ -1730,10 +1730,10 @@ void factor_survivors_data::cofactoring (timetree_t & timer)
                 rel.add(side, z, 0);
         }
         if (si.doing.prime_sq) {
-            rel.add(si.conf.side, si.doing.p, 0);
+            rel.add(si.doing.side, si.doing.p, 0);
         } else {
             for (auto const& facq : si.doing.prime_factors)
-                rel.add(si.conf.side, facq, 0);
+                rel.add(si.doing.side, facq, 0);
         }
 
         rel.compress();
@@ -2130,7 +2130,7 @@ void las_report_accumulate_threads_and_display(las_info & las,
     verbose_output_vfprint(0, 1, gmp_vfprintf, "# %lu %s for side-%d (%Zd,%Zd)\n",
               rep.reports,
               las.batch ? "survivor(s) saved" : "relation(s)",
-              si.conf.side,
+              si.doing.side,
               (mpz_srcptr) si.doing.p,
               (mpz_srcptr) si.doing.r);
     if (las.suppress_duplicates) {
@@ -2786,7 +2786,7 @@ int main (int argc0, char *argv0[])/*{{{*/
                              HILIGHT_START
                              "Sieving side-%d q=%Zd; rho=%Zd;"
                              HILIGHT_END,
-                             si.conf.side,
+                             si.doing.side,
                              (mpz_srcptr) si.doing.p,
                              (mpz_srcptr) si.doing.r);
 
