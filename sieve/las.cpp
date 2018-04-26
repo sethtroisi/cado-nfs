@@ -1682,14 +1682,14 @@ void factor_survivors_data::cofactoring (timetree_t & timer)
             continue; /* we deal with all cofactors at the end of las */
         }
 
-        std::array<int, 2> cof_bitsize = {0,0};
+        std::array<int, 2> cof_bitsize = {{0,0}};
         las.cofac_stats.call(norm, cof_bitsize);
 
         SIBLING_TIMER(timer, "factor_both_leftover_norms");
         TIMER_CATEGORY(timer, cofactoring_mixed());
 
         rep.ttcof -= microseconds_thread ();
-        pass = factor_both_leftover_norms(norm, lps, {si.conf.sides[0].lim, si.conf.sides[1].lim}, si.strategies.get());
+        pass = factor_both_leftover_norms(norm, lps, {{si.conf.sides[0].lim, si.conf.sides[1].lim}}, si.strategies.get());
         th->rep.survivors.cofactored += (pass != 0);
         rep.ttcof += microseconds_thread ();
 #ifdef TRACE_K
