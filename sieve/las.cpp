@@ -1216,7 +1216,6 @@ struct factor_survivors_data {
     where_am_I & w;
     int cpt;
     int copr;
-    uint32_t cof_bitsize[2];
 
     struct side_data {
         unsigned char * S;
@@ -1240,7 +1239,6 @@ struct factor_survivors_data {
             sdata[side].S = th->sides[side].bucket_region;
             if (!SS && sdata[side].S)
                 SS = sdata[side].S;
-            cof_bitsize[side]=0;
         }
         /* SS gets the merged information in the end. This is the first
          * non-null sdata[x].S array */
@@ -1684,23 +1682,14 @@ void factor_survivors_data::cofactoring (timetree_t & timer)
             continue; /* we deal with all cofactors at the end of las */
         }
 
-        if (las.cof_stats_file) {
-            cof_bitsize[0] = mpz_sizeinbase (norm[0], 2);
-            cof_bitsize[1] = mpz_sizeinbase (norm[1], 2);
-            /* no need to use a mutex here: either we use one thread only
-               to compute the cofactorization data and if several threads
-               the order is irrelevant. The only problem that can happen
-               is when two threads increase the value at the same time,
-               and it is increased by 1 instead of 2, but this should
-               happen rarely. */
-            las.cof_call[cof_bitsize[0]][cof_bitsize[1]] ++;
-        }
+        std::array<int, 2> cof_bitsize = {0,0};
+        las.cofac_stats.call(norm, cof_bitsize);
 
         SIBLING_TIMER(timer, "factor_both_leftover_norms");
         TIMER_CATEGORY(timer, cofactoring_mixed());
 
         rep.ttcof -= microseconds_thread ();
-        pass = factor_both_leftover_norms(norm, lps, si);
+        pass = factor_both_leftover_norms(norm, lps, {si.conf.sides[0].lim, si.conf.sides[1].lim}, si.strategies.get());
         th->rep.survivors.cofactored += (pass != 0);
         rep.ttcof += microseconds_thread ();
 #ifdef TRACE_K
@@ -1722,8 +1711,7 @@ void factor_survivors_data::cofactoring (timetree_t & timer)
         SIBLING_TIMER(timer, "print relations");
         TIMER_CATEGORY(timer, bookkeeping());
 
-        if (las.cof_stats_file) /* learning phase */
-            las.cof_succ[cof_bitsize[0]][cof_bitsize[1]] ++;
+        las.cofac_stats.success(cof_bitsize);
 	    
         // ASSERT (bin_gcd_int64_safe (a, b) == 1);
 
@@ -3295,7 +3283,7 @@ if (si.conf.sublat.m) {
 
     /*}}}*/
 
-    las.print_cof_stats();
+    las.cofac_stats.print();
 
     return 0;
 }/*}}}*/
