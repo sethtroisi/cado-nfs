@@ -33,6 +33,7 @@ void las_report_accumulate_and_clear(las_report_ptr p, las_report_ptr q)
     unsigned long (*ss)[256] = q->survivor_sizes;
     unsigned long (*rs)[256] = q->report_sizes;
     p->reports += q->reports;
+    p->duplicates += q->duplicates;
     unsigned long * ps = (unsigned long*) & p->survivors;
     unsigned long * qs = (unsigned long*) & q->survivors;
     for(size_t i = 0 ; i < sizeof(p->survivors) / sizeof(unsigned long) ; i++) {
