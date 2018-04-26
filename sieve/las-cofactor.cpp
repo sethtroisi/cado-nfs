@@ -37,18 +37,18 @@
                         -> cannot yield a relation
 */
 int
-check_leftover_norm (cxx_mpz const & n, sieve_info const & si, int side)
+check_leftover_norm (cxx_mpz const & n, siever_config::side_config const & scs)
 {
   size_t s = mpz_sizeinbase (n, 2);
-  unsigned int lpb = si.conf.sides[side].lpb;
-  unsigned int mfb = si.conf.sides[side].mfb;
+  unsigned int lpb = scs.lpb;
+  unsigned int mfb = scs.mfb;
   unsigned int klpb;
   double nd, kB, B;
 
   if (s > mfb)
     return 0; /* n has more than mfb bits, which is the given limit */
 
-  if (si.conf.sides[side].lim == 0) {
+  if (scs.lim == 0) {
       /* special case when not sieving */
       return 1;
   }
@@ -59,7 +59,7 @@ check_leftover_norm (cxx_mpz const & n, sieve_info const & si, int side)
      course, but we have no guarantee that our cofactor is prime... */
 
   nd = mpz_get_d (n);
-  B = (double) si.conf.sides[side].lim;
+  B = (double) scs.lim;
   kB = B * B;
   for (klpb = lpb; klpb < s; klpb += lpb, kB *= B)
     {

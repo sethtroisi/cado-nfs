@@ -1619,7 +1619,7 @@ void factor_survivors_data::cofactoring (timetree_t & timer)
 
             SIBLING_TIMER(timer, "check_leftover_norm");
 
-            pass = check_leftover_norm (norm[side], si, side);
+            pass = check_leftover_norm (norm[side], si.conf.sides[side]);
 #ifdef TRACE_K
             if (trace_on_spot_ab(a, b)) {
                 verbose_output_vfprint(TRACE_CHANNEL, 0, gmp_vfprintf,

@@ -7,7 +7,7 @@
 #include <array>
 #include <vector>
 
-int check_leftover_norm (cxx_mpz const & n, sieve_info const & si, int side);
+int check_leftover_norm (cxx_mpz const & n, siever_config::side_config const & sc);
 
 int factor_both_leftover_norms(
         std::array<cxx_mpz, 2> & norms,
