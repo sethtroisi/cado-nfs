@@ -1605,7 +1605,7 @@ void mpz_poly_eval_mod_mpz(mpz_t res, mpz_poly_srcptr f, mpz_srcptr x,
 
 /* Return 1 if poly(root) % modulus == 0, return 0 otherwise */
 /* Coefficients of f(x) need not be reduced mod m */
-int mpz_poly_is_root(mpz_poly_srcptr poly, mpz_srcprt root, mpz_srcprt modulus)
+int mpz_poly_is_root(mpz_poly_srcptr poly, mpz_srcptr root, mpz_srcptr modulus)
 {
     mpz_t x;
     mpz_init(x);
