@@ -514,27 +514,6 @@ downsort<2>(bucket_array_t<1, longhint_t> &BA_out,
             const bucket_array_t<2, longhint_t> &BA_in,
             uint32_t bucket_number, where_am_I & w);
 
-void
-sieve_checksum::update(const unsigned int other)
-{
-    unsigned long r;
-    ularith_addmod_ul_ul(&r, checksum, other, checksum_prime);
-    checksum = r;
-}
-
-void
-sieve_checksum::update(const unsigned char *data, const size_t len)
-{
-    mpz_t mb;
-    unsigned int new_checksum;
-
-    mpz_init(mb);
-    mpz_import(mb, len, -1, sizeof(unsigned char), -1, 0, data);
-    new_checksum = mpz_tdiv_ui(mb, checksum_prime);
-    mpz_clear(mb);
-    this->update(new_checksum);
-}
-
 buckets_are_full::buckets_are_full(bkmult_specifier::key_type const& key, int b, int r, int t) : key(key), bucket_number(b), reached_size(r), theoretical_max_size(t) {
     std::ostringstream os;
     os << "Fullest level-"<<bkmult_specifier::printkey(key)<<" bucket #"<<b<<", wrote "<<reached_size<<"/"<<theoretical_max_size<<"";

@@ -22,6 +22,8 @@ struct las_report {
         unsigned long cofactored;
         unsigned long smooth;
     } survivors;
+    unsigned long total_logI=0;
+    unsigned long total_J=0;
     unsigned long reports=0;
     unsigned long duplicates=0;   /* used with -dup option */
     double tn[2]={0,0};           /* norms */
@@ -48,6 +50,8 @@ struct las_report {
                 ps[i] += qs[i];
             }
         }
+        total_logI += q.total_logI;
+        total_J += q.total_J;
         reports += q.reports;
         duplicates += q.duplicates;
         for(int side = 0 ; side < 2 ; side++) tn[side]  += q.tn[side];
