@@ -35,7 +35,6 @@ sieve_checksum::update(const unsigned char *data, const size_t len)
  *  - accumulates the timing reports for all threads into a collated report
  *  - display the per-sq timing relative to this report, and the given
  *    timing argument (in seconds).
- *  - merge the per-sq report into a global report
  */
 nfs_aux::~nfs_aux()
 {
@@ -44,18 +43,36 @@ nfs_aux::~nfs_aux()
      * stuff in this case. Maybe we should still make some effort so that
      * we can print the lost time ?
      */
+
+    timer_special_q.stop();
+
     if (!complete)
         return;
 
     for (auto & T : th) {
         rep.accumulate_and_clear(std::move(T.rep));
+        timer_special_q += T.timer;
         for (int side = 0; side < 2; side++)
             checksum_post_sieve[side].update(T.checksum_post_sieve[side]);
     }
 
     verbose_output_start_batch();
 
+    if (tdict::global_enable >= 2) {
+        verbose_output_print (0, 1, "%s", timer_special_q.display().c_str());
+
+        double t = 0;
+        for(auto const &c : timer_special_q.filter_by_category()) {
+            verbose_output_print (0, 1, "# %s: %.2f\n",
+                    coarse_las_timers::explain(c.first).c_str(),
+                    c.second);
+            t += c.second;
+        }
+        verbose_output_print (0, 1, "# total counted time: %.2f\n", t);
+    }
+
     rep.display_survivor_counters();
+
     verbose_output_print(0, 2,
             "# Checksums over sieve region: "
             "after all sieving: %u, %u\n",

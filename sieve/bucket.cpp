@@ -461,6 +461,9 @@ downsort(bucket_array_t<INPUT_LEVEL - 1, longhint_t> &BA_out,
          const bucket_array_t<INPUT_LEVEL, shorthint_t> &BA_in,
          uint32_t bucket_number, where_am_I & w)
 {
+  /* Time recording for this function is done by the caller
+   * (downsort_wrapper)
+   */
   /* Rather similar to purging, except it doesn't purge */
   for (slice_index_t i_slice = 0; i_slice < BA_in.get_nr_slices(); i_slice++) {
     const slice_index_t slice_index = BA_in.get_slice_index(i_slice);

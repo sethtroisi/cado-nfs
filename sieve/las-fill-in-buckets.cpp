@@ -775,11 +775,9 @@ public:
  * embody a suffix like " on side ", so that it's possible tu run
  * parametric timer slots.
  */
-PREPARE_TEMPLATE_INST_NAMES(fill_in_buckets_one_slice_internal, "");
-// PREPARE_TEMPLATE_INST_NAMES(fill_in_buckets_one_slice, "");
-PREPARE_TEMPLATE_INST_NAMES(fill_in_buckets_one_side, "");
+PREPARE_TEMPLATE_INST_NAMES(fill_in_buckets_one_slice_internal, " on side ");
+PREPARE_TEMPLATE_INST_NAMES(downsort, " on side ");
 PREPARE_TEMPLATE_INST_NAMES(downsort_tree, "");
-PREPARE_TEMPLATE_INST_NAMES(downsort_wrapper, "");
 
 #define TEMPLATE_INST_NAME(x,y) CADO_CONCATENATE(x, _name)<y>::value
 #else
@@ -802,11 +800,13 @@ fill_in_buckets_one_slice_internal(const worker_thread * worker, task_parameters
     nfs_work & ws(param->ws);
     sieve_info const & si(param->si);
     where_am_I & w(taux.w);
+    int side = param->side;
 
     // we're declaring the timer here, but really the work happens below
     // in fill_in_buckets_lowlevel. We happen to have access to
     // param->side here, so we use it to provide a nicer timing report.
-    CHILD_TIMER(timer, TEMPLATE_INST_NAME(fill_in_buckets_one_slice_internal, LEVEL));
+    CHILD_TIMER_PARAMETRIC(timer, TEMPLATE_INST_NAME(fill_in_buckets_one_slice_internal, LEVEL), param->side, "");
+    TIMER_CATEGORY(timer, sieving(side));
 
     w = param->w;
     WHERE_AM_I_UPDATE(w, psi, & si);
@@ -844,7 +844,7 @@ fill_in_buckets_one_slice_internal(const worker_thread * worker, task_parameters
 
 /* we really wish to have a single timing slot for all the instantiations
  * of fill_in_buckets_toplevel_wrapper */
-static tdict::slot timer_slot_for_fibt_wrapper("fill_in_buckets_toplevel_wrapper");
+static tdict::slot_parametric timer_slot_for_fibt("fill_in_buckets_toplevel on side ", "");
 
 // At top level.
 // We need to interleave the root transforms and the FK walk,
@@ -855,13 +855,16 @@ template<int LEVEL, class FB_ENTRY_TYPE>
 task_result *
 fill_in_buckets_toplevel_wrapper(const worker_thread * worker MAYBE_UNUSED, task_parameters * _param)
 {
-    const fill_in_buckets_parameters *param = static_cast<const fill_in_buckets_parameters *>(_param);
+    fill_in_buckets_parameters *param = static_cast<fill_in_buckets_parameters *>(_param);
     
     /* Import some contextual stuff */
     int id = worker->rank();
     nfs_aux::thread_data & taux(param->aux.th[id]);
     timetree_t & timer(taux.timer);
+    sieve_info const & si(param->si);
+    nfs_work & ws(param->ws);
     where_am_I & w(taux.w);
+    int side = param->side;
 
     ACTIVATE_TIMER(timer);
 
@@ -870,14 +873,11 @@ fill_in_buckets_toplevel_wrapper(const worker_thread * worker MAYBE_UNUSED, task
      * unfortunately. So the error is a false positive.
      *
      * https://sourceforge.net/p/valgrind/mailman/message/32434015/
-     *
      */
-    // CHILD_TIMER(worker->timer, TEMPLATE_INST_NAME(fill_in_buckets_one_slice, LEVEL));
+    timetree_t::accounting_child local_timer_sentry(timer, timer_slot_for_fibt(side));
 
-    timetree_t::accounting_child local_timer_sentry(timer, timer_slot_for_fibt_wrapper);
-    // TIMER_CATEGORY(worker->timer, sieving(param->side));
+    TIMER_CATEGORY(timer, sieving(side));
 
-    w = param->w;
     WHERE_AM_I_UPDATE(w, psi, & param->si);
     WHERE_AM_I_UPDATE(w, side, param->side);
     WHERE_AM_I_UPDATE(w, i, param->slice->get_index());
@@ -885,15 +885,13 @@ fill_in_buckets_toplevel_wrapper(const worker_thread * worker MAYBE_UNUSED, task
 
     try {
         /* Get an unused bucket array that we can write to */
-        bucket_array_t<LEVEL, shorthint_t> &BA = param->ws.reserve_BA<LEVEL, shorthint_t>(param->side, -1);
-
+        bucket_array_t<LEVEL, shorthint_t> &BA = ws.reserve_BA<LEVEL, shorthint_t>(param->side, -1);
         ASSERT(param->slice);
-        fill_in_buckets_toplevel<LEVEL,FB_ENTRY_TYPE>(BA, param->si,
+        fill_in_buckets_toplevel<LEVEL,FB_ENTRY_TYPE>(BA, si,
                 *dynamic_cast<fb_slice<FB_ENTRY_TYPE> const *>(param->slice),
                 param->plattices_dense_vector, w);
-
         /* Release bucket array again */
-        param->ws.release_BA(param->side, BA);
+        param->ws.release_BA(side, BA);
         delete param;
         return new task_result;
     } catch (buckets_are_full const& e) {
@@ -915,25 +913,33 @@ fill_in_buckets_toplevel_sublat_wrapper(const worker_thread * worker MAYBE_UNUSE
     sieve_info const & si(param->si);
     nfs_work & ws(param->ws);
     where_am_I & w(taux.w);
+    int side = param->side;
 
     ACTIVATE_TIMER(timer);
 
-    timetree_t::accounting_child local_timer_sentry(timer, timer_slot_for_fibt_wrapper);
+    /* This is one of the places where helgrind is likely to complain. We
+     * use thread-safe statics. Helgrind can't cope with it,
+     * unfortunately. So the error is a false positive.
+     *
+     * https://sourceforge.net/p/valgrind/mailman/message/32434015/
+     */
+    timetree_t::accounting_child local_timer_sentry(timer, timer_slot_for_fibt(side));
+    TIMER_CATEGORY(timer, sieving(side));
 
-    w = param->w;
     WHERE_AM_I_UPDATE(w, psi, & si);
     WHERE_AM_I_UPDATE(w, side, param->side);
     WHERE_AM_I_UPDATE(w, i, param->slice->get_index());
     WHERE_AM_I_UPDATE(w, N, 0);
 
     try {
+        /* Get an unused bucket array that we can write to */
         bucket_array_t<LEVEL, shorthint_t> &BA = ws.reserve_BA<LEVEL, shorthint_t>(param->side, -1);
         ASSERT(param->slice);
         fill_in_buckets_toplevel_sublat<LEVEL,FB_ENTRY_TYPE>(BA, si,
                 *dynamic_cast<fb_slice<FB_ENTRY_TYPE> const *>(param->slice),
                 param->plattices_dense_vector, w);
         /* Release bucket array again */
-        ws.release_BA(param->side, BA);
+        ws.release_BA(side, BA);
         delete param;
         return new task_result;
     } catch (buckets_are_full const& e) {
@@ -1006,8 +1012,8 @@ fill_in_buckets_one_side(nfs_work &ws, nfs_aux & aux, thread_pool &pool, sieve_i
     timetree_t & timer(aux.timer_special_q);
     const fb_factorbase::slicing * fbs = si.sides[side].fbs;
 
-    CHILD_TIMER_PARAMETRIC(timer, "fill_in_buckets_one_side on side ", side, "");
-    TIMER_CATEGORY(timer, sieving(side));
+    /* We're just pushing tasks, here. */
+    BOOKKEEPING_TIMER(timer);
 
     fill_in_buckets_parameters model(ws, aux, side, si, NULL, NULL, NULL, 0, w);
 
@@ -1104,7 +1110,8 @@ task_result * downsort_wrapper(const worker_thread * worker,
 
     auto const & BAin(param->BAin);
 
-    CHILD_TIMER(timer, TEMPLATE_INST_NAME(downsort_wrapper, LEVEL));
+    CHILD_TIMER_PARAMETRIC(timer, TEMPLATE_INST_NAME(downsort, LEVEL), side, "");
+    TIMER_CATEGORY(timer, sieving(side));
 
     auto & BAout(ws.reserve_BA<LEVEL, longhint_t>(side, ws.rank_BA(side, BAin)));
 

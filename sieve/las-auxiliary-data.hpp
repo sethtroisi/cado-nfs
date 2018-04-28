@@ -134,6 +134,8 @@ class nfs_aux {/*{{{*/
             th(nthreads, thread_data(*this))
     {
         qt0 = seconds();
+        ASSERT_ALWAYS(!timer_special_q.running());
+        timer_special_q.start();
     }
 
 

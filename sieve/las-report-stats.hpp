@@ -103,7 +103,7 @@ struct coarse_las_timers {
     static int thread_wait() { return 11; }
     static std::string explain(int x) {
         switch(x) {
-            case -1: return "uncounted";
+            case -1: return "uncategorized";
             case 0: return "bookkeeping";
             case 1: return "search_survivors";
             case 2: return "sieving on side 0";

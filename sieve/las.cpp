@@ -1779,6 +1779,7 @@ factor_survivors (nfs_work::thread_data & ws_taux, nfs_aux::thread_data & taux, 
 {
     timetree_t & timer(taux.timer);
     CHILD_TIMER(timer, __func__);
+    TIMER_CATEGORY(timer, cofactoring_mixed());
 
     factor_survivors_data F(ws_taux, taux, si, N);
 
@@ -2886,9 +2887,6 @@ int main (int argc0, char *argv0[])/*{{{*/
             try {
                 nfs_aux aux(las, doing, already_printed_for_q, rep, timer_special_q, las.nb_threads);
 
-                /* move start() to the nfs_aux ctor ? */
-                timer_special_q.start();
-
                 bool done = do_one_special_q(las, workspaces, aux, *pool, pl);
 
                 if (!done) {
@@ -2902,7 +2900,6 @@ int main (int argc0, char *argv0[])/*{{{*/
                 /* for statistics */
                 nr_sq_processed++;
 
-                timer_special_q.stop();
                 aux.complete = true;
                 aux_good.splice(aux_good.end(), aux_pending);
 
@@ -2916,7 +2913,6 @@ int main (int argc0, char *argv0[])/*{{{*/
 
                 break;
             } catch (buckets_are_full const & e) {
-                timer_special_q.stop();
                 aux_botched.splice(aux_good.end(), aux_pending);
                 verbose_output_vfprint (2, 1, gmp_vfprintf,
                         "# redoing q=%Zd, rho=%Zd because buckets are full\n"
