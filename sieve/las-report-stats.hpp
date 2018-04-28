@@ -26,6 +26,10 @@ struct las_report {
     unsigned long total_J=0;
     unsigned long reports=0;
     unsigned long duplicates=0;   /* used with -dup option */
+    unsigned long multi_print=0;  /* the ones that were printed several
+                                     times because the special-q was
+                                     restarted. For convenience, we
+                                     _also_ count them in [reports].  */
     double tn[2]={0,0};           /* norms */
     double ttbuckets_fill=0;
     double ttbuckets_apply=0;
@@ -54,6 +58,7 @@ struct las_report {
         total_J += q.total_J;
         reports += q.reports;
         duplicates += q.duplicates;
+        multi_print += q.multi_print;
         for(int side = 0 ; side < 2 ; side++) tn[side]  += q.tn[side];
         ttbuckets_fill  += q.ttbuckets_fill;
         ttbuckets_apply += q.ttbuckets_apply;

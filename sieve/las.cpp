@@ -315,7 +315,7 @@ static void adwg(FILE *output, const char *comment, int *cpt,
     if(b < 0) { a = -a; b = -b; }
     rel.a = a; rel.b = (uint64_t)b;
     rel.print(output, comment);
-    *cpt += 1;
+    *cpt += (*comment != '\0');
 }
 
 /* removing p^vp from the list of factors in rel. */
@@ -399,7 +399,7 @@ static void add_relations_with_galois(const char *galois, FILE *output,
 	rel.a = aa; rel.b = (uint64_t)bb;
 	// same factorization as for (a, b)
 	rel.print(output, comment);
-	*cpt += 1;
+	*cpt += (*comment != '\0');
 	// sig((a, b)) = (-(a+b), a-b)
 	aa = -(a1+b1);
 	bb = a1-b1;
@@ -424,13 +424,13 @@ static void add_relations_with_galois(const char *galois, FILE *output,
 	if(bb < 0){ aa = -aa; bb = -bb; }
 	rel.a = aa; rel.b = (uint64_t)bb;
 	rel.print(output, comment);
-	*cpt += 1;
+	*cpt += (*comment != '\0');
 	// sig^3((a, b)) = sig((b, -a)) = (a-b, a+b)
 	aa = -aa; // FIXME: check!
 	if(aa < 0){ aa = -aa; bb = -bb; }
 	rel.a = bb; rel.b = (uint64_t)aa;
 	rel.print(output, comment);
-	*cpt += 1;
+	*cpt += (*comment != '\0');
     }
     else if(strcmp(galois, "autom6.1") == 0){
 	// fact do not change
@@ -1725,19 +1725,20 @@ void factor_survivors_data::cofactoring ()
                  * even want to bother testing whether it's a duplicate
                  * in the sense of relation_is_duplicate()
                  */
+                rep.multi_print++;
+                cpt++;
                 dup_comment = "# DUP ";
             } else if (do_check && relation_is_duplicate(rel, las, si, adjust_strategy)) {
                 rep.duplicates++;
                 dup_comment = "# DUPE ";
+            } else {
+                cpt ++;
+                dup_comment = "";
             }
 
             FILE *output;
 
             verbose_output_start_batch(); /* lock I/O. */
-
-            cpt += !dup_comment;
-
-            if (!dup_comment) dup_comment = "";
 
             if (prepend_relation_time) {
                 verbose_output_print(0, 1, "(%1.4f) ", seconds() - tt_qstart);
