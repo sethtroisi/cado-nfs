@@ -39,7 +39,7 @@ template <int LEVEL>
 void
 downsort_tree(
         nfs_work &ws,
-        nfs_work_cofac &wc,
+        std::shared_ptr<nfs_work_cofac> wc_p,
         std::shared_ptr<nfs_aux> aux_p,
         thread_pool &pool,
         uint32_t bucket_index,

@@ -1147,9 +1147,7 @@ bool register_contending_relation(las_info const & las, sieve_info const & si, r
 struct factor_survivors_data {/*{{{*/
     worker_thread * worker;
     nfs_work & ws;
-    nfs_work_cofac & wc;
-    /* aux is just stats and so on. This will become a shared pointer
-     * someday */
+    std::shared_ptr<nfs_work_cofac> wc_p;
     std::shared_ptr<nfs_aux> aux_p;
     where_am_I & w;
 
@@ -1181,14 +1179,14 @@ struct factor_survivors_data {/*{{{*/
     factor_survivors_data(
             worker_thread * worker,
             nfs_work & ws,
-            nfs_work_cofac & wc,
+            std::shared_ptr<nfs_work_cofac> wc_p,
             std::shared_ptr<nfs_aux> aux_p,
             sieve_info & si,
             int N)
         :
             worker(worker),
             ws(ws),
-            wc(wc),
+            wc_p(wc_p),
             aux_p(aux_p),
             w(aux_p->th[worker->rank()].w),
             si(si),
@@ -1488,9 +1486,9 @@ struct cofac_standalone {
 };
 
 struct detached_cofac_parameters : public cofac_standalone, public task_parameters {
-    nfs_work_cofac & wc;
+    std::shared_ptr<nfs_work_cofac> wc_p;
     std::shared_ptr<nfs_aux> aux_p;
-    detached_cofac_parameters(nfs_work_cofac & wc, std::shared_ptr<nfs_aux> aux_p, cofac_standalone&& C) : cofac_standalone(C), wc(wc), aux_p(aux_p) {}
+    detached_cofac_parameters(std::shared_ptr<nfs_work_cofac> wc_p, std::shared_ptr<nfs_aux> aux_p, cofac_standalone&& C) : cofac_standalone(C), wc_p(wc_p), aux_p(aux_p) {}
 };
 
 task_result * detached_cofac(worker_thread * worker, task_parameters * _param)
@@ -1501,7 +1499,7 @@ task_result * detached_cofac(worker_thread * worker, task_parameters * _param)
      * that a new sieve task has begun. Therefore we cannot safely access
      * the sieve_info structure. */
     int id = worker->rank();
-    nfs_work_cofac & wc(param->wc);
+    nfs_work_cofac & wc(*param->wc_p);
     nfs_aux & aux(*param->aux_p);
     nfs_aux::thread_data & taux(aux.th[id]);
     las_info const & las(wc.las);
@@ -1866,7 +1864,7 @@ void factor_survivors_data::cofactoring ()
             continue; /* we deal with all cofactors at the end of las */
         }
 
-        auto D = new detached_cofac_parameters(wc, aux_p, std::move(cur));
+        auto D = new detached_cofac_parameters(wc_p, aux_p, std::move(cur));
 
 #ifndef  DLP_DESCENT
         worker->get_pool().add_task(detached_cofac, D, 0, 1); /* id 0, queue 1 */
@@ -1887,7 +1885,7 @@ void factor_survivors_data::cofactoring ()
    but this is done by the caller.
    */
 int
-factor_survivors (worker_thread * worker, nfs_work & ws, nfs_work_cofac & wc, std::shared_ptr<nfs_aux> aux_p, sieve_info & si, int N)
+factor_survivors (worker_thread * worker, nfs_work & ws, std::shared_ptr<nfs_work_cofac> wc_p, std::shared_ptr<nfs_aux> aux_p, sieve_info & si, int N)
 {
     int id = worker->rank();
     nfs_aux & aux(*aux_p);
@@ -1896,7 +1894,7 @@ factor_survivors (worker_thread * worker, nfs_work & ws, nfs_work_cofac & wc, st
     CHILD_TIMER(timer, __func__);
     TIMER_CATEGORY(timer, cofactoring_mixed());
 
-    factor_survivors_data F(worker, ws, wc, aux_p, si, N);
+    factor_survivors_data F(worker, ws, wc_p, aux_p, si, N);
 
     F.search_survivors();
     F.convert_survivors();
@@ -2001,7 +1999,6 @@ task_result * process_bucket_region(worker_thread * worker, task_parameters * _p
     int id = worker->rank();
     int nthreads = worker->nthreads();
     nfs_work & ws(param->ws);
-    nfs_work_cofac & wc(param->wc);
     nfs_work::thread_data & tws(param->ws.th[id]);
     nfs_aux::thread_data & taux(param->aux_p->th[id]);
     timetree_t & timer(taux.timer);
@@ -2161,7 +2158,7 @@ task_result * process_bucket_region(worker_thread * worker, task_parameters * _p
 
         /* Factor survivors */
         rep.ttf -= seconds_thread ();
-        rep.reports += factor_survivors (worker, ws, wc, param->aux_p, si, N);
+        rep.reports += factor_survivors (worker, ws, param->wc_p, param->aux_p, si, N);
         rep.ttf += seconds_thread ();
 
         SIBLING_TIMER(timer, "reposition small (re)sieve data");
@@ -2518,7 +2515,7 @@ void postprocess_specialq_descent(las_info & las, las_todo_entry const & doing, 
  * downsort, apply-buckets, lognorm computation, small sieve computation,
  * and survivor search and detection, all from here.
  */
-void do_one_special_q_sublat(las_info const & las, sieve_info & si, nfs_work & ws, nfs_work_cofac & wc, std::shared_ptr<nfs_aux> aux_p, thread_pool & pool)/*{{{*/
+void do_one_special_q_sublat(las_info const & las, sieve_info & si, nfs_work & ws, std::shared_ptr<nfs_work_cofac> wc_p, std::shared_ptr<nfs_aux> aux_p, thread_pool & pool)/*{{{*/
 {
     nfs_aux & aux(*aux_p);
     timetree_t & timer_special_q(aux.timer_special_q);
@@ -2619,7 +2616,7 @@ void do_one_special_q_sublat(las_info const & las, sieve_info & si, nfs_work & w
 
         /* Process bucket regions in parallel */
         for(int i = 0 ; i < las.nb_threads ; i++) {
-            auto P = new process_bucket_region_parameters(ws, wc, aux_p, si, w);
+            auto P = new process_bucket_region_parameters(ws, wc_p, aux_p, si, w);
             /* first_region0_index is always 0 for toplevel==1 */
             task_function_t f = process_bucket_region;
             pool.add_task(f, P, i, 0);
@@ -2642,11 +2639,11 @@ void do_one_special_q_sublat(las_info const & las, sieve_info & si, nfs_work & w
         for (uint32_t i = 0; i < si.nb_buckets[si.toplevel]; i++) {
             switch (si.toplevel) {
                 case 2:
-                    downsort_tree<1>(ws, wc, aux_p, pool, i, i*BRS[2]/BRS[1],
+                    downsort_tree<1>(ws, wc_p, aux_p, pool, i, i*BRS[2]/BRS[1],
                             si, precomp_plattice, w);
                     break;
                 case 3:
-                    downsort_tree<2>(ws, wc, aux_p, pool, i, i*BRS[3]/BRS[1],
+                    downsort_tree<2>(ws, wc_p, aux_p, pool, i, i*BRS[3]/BRS[1],
                             si, precomp_plattice, w);
                     break;
                 default:
@@ -2730,7 +2727,7 @@ bool do_one_special_q(las_info & las, nfs_work & ws, std::shared_ptr<nfs_aux> au
      * base. */
     si.update(las.nb_threads);
 
-    nfs_work_cofac wc(las, si);
+    auto wc_p = std::make_shared<nfs_work_cofac>(las, si);
 
     rep.total_logI += si.conf.logI;
     rep.total_J += si.J;
@@ -2781,7 +2778,7 @@ bool do_one_special_q(las_info & las, nfs_work & ws, std::shared_ptr<nfs_aux> au
                 verbose_output_print(0, 1, "# Sublattice (i,j) == (%u, %u) mod %u\n",
                         si.conf.sublat.i0, si.conf.sublat.j0, si.conf.sublat.m);
             }
-            do_one_special_q_sublat(las, si, ws, wc, aux_p, pool);
+            do_one_special_q_sublat(las, si, ws, wc_p, aux_p, pool);
 
         }
     }
