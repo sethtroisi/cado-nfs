@@ -1491,9 +1491,27 @@ struct detached_cofac_parameters : public cofac_standalone, public task_paramete
     detached_cofac_parameters(std::shared_ptr<nfs_work_cofac> wc_p, std::shared_ptr<nfs_aux> aux_p, cofac_standalone&& C) : cofac_standalone(C), wc_p(wc_p), aux_p(aux_p) {}
 };
 
+/* Generic tool to cause an arbitrary closure to be called at destructor
+ * time. See below for a use case.
+ */
+template<typename T> struct call_dtor {
+    T & x;
+    call_dtor(T & x): x(x) {}
+    ~call_dtor() { x(); }
+};
+
 task_result * detached_cofac(worker_thread * worker, task_parameters * _param)
 {
+    /* We must exit by cleaning the param structure we've been given. But
+     * everything we do with the objects whose life is dependent on our
+     * param structure must of course be completed at this point. This
+     * holds as well for the timer. Yet ACTIVATE_TIMER below registers
+     * some stuff to be done at dtor time, so it's important that we
+     * clean up the parameters *after* the timer cleans up.
+     */
     detached_cofac_parameters *param = static_cast<detached_cofac_parameters *>(_param);
+    auto clean_param = [&]() { delete param; };
+    call_dtor<decltype(clean_param)> x(clean_param);
 
     /* Import some contextual stuff. Careful: at this point, we expect
      * that a new sieve task has begun. Therefore we cannot safely access
@@ -1535,7 +1553,6 @@ task_result * detached_cofac(worker_thread * worker, task_parameters * _param)
     if (pass <= 0) {
         /* a factor was > 2^lpb, or some
            factorization was incomplete */
-        delete param;
         return new task_result;
     }
 
@@ -1618,7 +1635,6 @@ task_result * detached_cofac(worker_thread * worker, task_parameters * _param)
     /* Build histogram of lucky S[x] values */
     rep.mark_report(cur.S[0], cur.S[1]);
 
-    delete param;
     return new task_result;
 }
 #if 0
