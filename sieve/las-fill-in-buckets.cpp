@@ -333,7 +333,7 @@ struct make_lattice_bases_parameters : public make_lattice_bases_parameters_base
 
 template <class FB_ENTRY_TYPE>
 task_result *
-make_lattice_bases(const worker_thread * worker MAYBE_UNUSED,
+make_lattice_bases(worker_thread * worker MAYBE_UNUSED,
         task_parameters * _param)
 {
     const make_lattice_bases_parameters<FB_ENTRY_TYPE> *param = static_cast<const make_lattice_bases_parameters<FB_ENTRY_TYPE> *>(_param);
@@ -788,7 +788,7 @@ PREPARE_TEMPLATE_INST_NAMES(downsort_tree, "");
 // top-level, since the plattices have already been precomputed.
 template<int LEVEL>
 task_result *
-fill_in_buckets_one_slice_internal(const worker_thread * worker, task_parameters * _param)
+fill_in_buckets_one_slice_internal(worker_thread * worker, task_parameters * _param)
 {
     fill_in_buckets_parameters *param = static_cast<fill_in_buckets_parameters *>(_param);
 
@@ -853,7 +853,7 @@ static tdict::slot_parametric timer_slot_for_fibt("fill_in_buckets_toplevel on s
 // At some point, the code should be re-organized, I'm afraid.
 template<int LEVEL, class FB_ENTRY_TYPE>
 task_result *
-fill_in_buckets_toplevel_wrapper(const worker_thread * worker MAYBE_UNUSED, task_parameters * _param)
+fill_in_buckets_toplevel_wrapper(worker_thread * worker MAYBE_UNUSED, task_parameters * _param)
 {
     fill_in_buckets_parameters *param = static_cast<fill_in_buckets_parameters *>(_param);
     
@@ -902,7 +902,7 @@ fill_in_buckets_toplevel_wrapper(const worker_thread * worker MAYBE_UNUSED, task
 /* same for sublat */
 template<int LEVEL, class FB_ENTRY_TYPE>
 task_result *
-fill_in_buckets_toplevel_sublat_wrapper(const worker_thread * worker MAYBE_UNUSED, task_parameters * _param)
+fill_in_buckets_toplevel_sublat_wrapper(worker_thread * worker MAYBE_UNUSED, task_parameters * _param)
 {
     fill_in_buckets_parameters *param = static_cast<fill_in_buckets_parameters *>(_param);
 
@@ -1092,7 +1092,7 @@ struct downsort_parameters : public task_parameters {
 };
 
 template<int LEVEL, typename HINT_TYPE>
-task_result * downsort_wrapper(const worker_thread * worker,
+task_result * downsort_wrapper(worker_thread * worker,
         task_parameters * _param)
 {
     auto param = static_cast<downsort_parameters<LEVEL, HINT_TYPE> *>(_param);
@@ -1171,6 +1171,7 @@ template <int LEVEL>
 void
 downsort_tree(
     nfs_work &ws,
+    nfs_work_cofac & wc,
     nfs_aux &aux,
     thread_pool &pool,
     uint32_t bucket_index,
@@ -1250,7 +1251,7 @@ downsort_tree(
       for (unsigned int i = 0; i < si.nb_buckets[LEVEL]; ++i) {
           size_t (&BRS)[FB_MAX_PARTS] = BUCKET_REGIONS;
           uint32_t N = first_region0_index + i*(BRS[LEVEL]/BRS[1]);
-          downsort_tree<LEVEL-1>(ws, aux, pool, i, N, si, precomp_plattice, w);
+          downsort_tree<LEVEL-1>(ws, wc, aux, pool, i, N, si, precomp_plattice, w);
       }
   } else {
       pool.drain_queue(0);
@@ -1266,7 +1267,7 @@ downsort_tree(
 
       /* PROCESS THE REGIONS AT LEVEL 0 */
       for (int i = 0; i < las.nb_threads; ++i) {
-          auto P = new process_bucket_region_parameters(ws, aux, si, const_ref(w));
+          auto P = new process_bucket_region_parameters(ws, wc, aux, si, const_ref(w));
           P->first_region0_index = first_region0_index;
           pool.add_task(process_bucket_region, P, i, 0);
       }
@@ -1286,6 +1287,7 @@ downsort_tree(
 template <>
 void downsort_tree<0>(
   nfs_work &,
+  nfs_work_cofac &,
   nfs_aux &,
   thread_pool &,
   uint32_t, uint32_t,
@@ -1313,6 +1315,6 @@ reservation_group::cget<3, longhint_t>() const
 // Now the two exported instances
 
 template 
-void downsort_tree<1>(nfs_work &, nfs_aux &, thread_pool &, uint32_t, uint32_t, sieve_info &, precomp_plattice_t &, where_am_I &);
+void downsort_tree<1>(nfs_work &, nfs_work_cofac&, nfs_aux &, thread_pool &, uint32_t, uint32_t, sieve_info &, precomp_plattice_t &, where_am_I &);
 template 
-void downsort_tree<2>(nfs_work &, nfs_aux &, thread_pool &, uint32_t, uint32_t, sieve_info &, precomp_plattice_t &, where_am_I &);
+void downsort_tree<2>(nfs_work &, nfs_work_cofac&, nfs_aux &, thread_pool &, uint32_t, uint32_t, sieve_info &, precomp_plattice_t &, where_am_I &);

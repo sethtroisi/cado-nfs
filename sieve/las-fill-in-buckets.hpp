@@ -6,6 +6,7 @@
 #include "las-plattice.hpp"
 #include "tdict.hpp"
 #include "threadpool.hpp"
+#include "las-threads-work-data.hpp"
 
 #include "las-forwardtypes.hpp"
 
@@ -37,6 +38,7 @@ template <int LEVEL>
 void
 downsort_tree(
         nfs_work &ws,
+        nfs_work_cofac &wc,
         nfs_aux &aux,
         thread_pool &pool,
         uint32_t bucket_index,
