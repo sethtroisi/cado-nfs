@@ -1172,7 +1172,7 @@ void
 downsort_tree(
     nfs_work &ws,
     nfs_work_cofac & wc,
-    nfs_aux &aux,
+    std::shared_ptr<nfs_aux> aux_p,
     thread_pool &pool,
     uint32_t bucket_index,
     uint32_t first_region0_index,
@@ -1181,6 +1181,7 @@ downsort_tree(
     where_am_I & w)
 {
     las_info const& las(ws.las);
+    nfs_aux & aux(*aux_p);
     timetree_t & timer(aux.timer_special_q);
 
   CHILD_TIMER(timer, TEMPLATE_INST_NAME(downsort_tree, LEVEL));
@@ -1251,7 +1252,7 @@ downsort_tree(
       for (unsigned int i = 0; i < si.nb_buckets[LEVEL]; ++i) {
           size_t (&BRS)[FB_MAX_PARTS] = BUCKET_REGIONS;
           uint32_t N = first_region0_index + i*(BRS[LEVEL]/BRS[1]);
-          downsort_tree<LEVEL-1>(ws, wc, aux, pool, i, N, si, precomp_plattice, w);
+          downsort_tree<LEVEL-1>(ws, wc, aux_p, pool, i, N, si, precomp_plattice, w);
       }
   } else {
       pool.drain_queue(0);
@@ -1267,7 +1268,7 @@ downsort_tree(
 
       /* PROCESS THE REGIONS AT LEVEL 0 */
       for (int i = 0; i < las.nb_threads; ++i) {
-          auto P = new process_bucket_region_parameters(ws, wc, aux, si, const_ref(w));
+          auto P = new process_bucket_region_parameters(ws, wc, aux_p, si, const_ref(w));
           P->first_region0_index = first_region0_index;
           pool.add_task(process_bucket_region, P, i, 0);
       }
@@ -1288,7 +1289,7 @@ template <>
 void downsort_tree<0>(
   nfs_work &,
   nfs_work_cofac &,
-  nfs_aux &,
+  std::shared_ptr<nfs_aux>,
   thread_pool &,
   uint32_t, uint32_t,
   sieve_info &,
@@ -1315,6 +1316,8 @@ reservation_group::cget<3, longhint_t>() const
 // Now the two exported instances
 
 template 
-void downsort_tree<1>(nfs_work &, nfs_work_cofac&, nfs_aux &, thread_pool &, uint32_t, uint32_t, sieve_info &, precomp_plattice_t &, where_am_I &);
+void downsort_tree<1>(nfs_work &, nfs_work_cofac&,
+        std::shared_ptr<nfs_aux> aux_p,
+        thread_pool &, uint32_t, uint32_t, sieve_info &, precomp_plattice_t &, where_am_I &);
 template 
-void downsort_tree<2>(nfs_work &, nfs_work_cofac&, nfs_aux &, thread_pool &, uint32_t, uint32_t, sieve_info &, precomp_plattice_t &, where_am_I &);
+void downsort_tree<2>(nfs_work &, nfs_work_cofac&, std::shared_ptr<nfs_aux>, thread_pool &, uint32_t, uint32_t, sieve_info &, precomp_plattice_t &, where_am_I &);

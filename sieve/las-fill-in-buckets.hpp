@@ -2,6 +2,7 @@
 #define LAS_FILL_IN_BUCKETS_HPP_
 
 #include <array>
+#include <memory>
 #include "fb-types.h"
 #include "las-plattice.hpp"
 #include "tdict.hpp"
@@ -39,7 +40,7 @@ void
 downsort_tree(
         nfs_work &ws,
         nfs_work_cofac &wc,
-        nfs_aux &aux,
+        std::shared_ptr<nfs_aux> aux_p,
         thread_pool &pool,
         uint32_t bucket_index,
         uint32_t first_region0_index,

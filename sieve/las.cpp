@@ -1147,12 +1147,10 @@ bool register_contending_relation(las_info const & las, sieve_info const & si, r
 struct factor_survivors_data {/*{{{*/
     worker_thread * worker;
     nfs_work & ws;
-    nfs_work::thread_data & tws;
     nfs_work_cofac & wc;
     /* aux is just stats and so on. This will become a shared pointer
      * someday */
-    nfs_aux & aux;
-    nfs_aux::thread_data & taux;
+    std::shared_ptr<nfs_aux> aux_p;
     where_am_I & w;
 
     sieve_info & si;
@@ -1182,22 +1180,25 @@ struct factor_survivors_data {/*{{{*/
      */
     factor_survivors_data(
             worker_thread * worker,
-            nfs_work::thread_data & tws,
+            nfs_work & ws,
             nfs_work_cofac & wc,
-            nfs_aux::thread_data & taux, sieve_info & si,
+            std::shared_ptr<nfs_aux> aux_p,
+            sieve_info & si,
             int N)
         :
             worker(worker),
-            ws(tws.ws), tws(tws),
+            ws(ws),
             wc(wc),
-            aux(taux.common), taux(taux),
-            w(taux.w),
+            aux_p(aux_p),
+            w(aux_p->th[worker->rank()].w),
             si(si),
             N(N)
     {
         cpt = 0;
         copr = 0;
         SS = NULL;
+        int id = worker->rank();
+        nfs_work::thread_data & tws(ws.th[id]);
         for(int side = 0 ; side < 2 ; side++) {
             sides[side].S = tws.sides[side].bucket_region;
             if (!SS && sides[side].S)
@@ -1216,6 +1217,9 @@ struct factor_survivors_data {/*{{{*/
 void factor_survivors_data::search_survivors()/*{{{*/
 {
     /* Import some contextual stuff */
+    int id = worker->rank();
+    nfs_work::thread_data & tws(ws.th[id]);
+    nfs_aux::thread_data & taux(aux_p->th[id]);
     timetree_t & timer(taux.timer);
     las_report& rep(taux.rep);
     las_info const & las(ws.las);
@@ -1326,6 +1330,8 @@ void factor_survivors_data::search_survivors()/*{{{*/
 
 void factor_survivors_data::convert_survivors()/*{{{*/
 {
+    int id = worker->rank();
+    nfs_aux::thread_data & taux(aux_p->th[id]);
     timetree_t & timer(taux.timer);
     BOOKKEEPING_TIMER(timer);
     /* Convert data type of list from uint32_t to the correct br_index_t */
@@ -1483,8 +1489,8 @@ struct cofac_standalone {
 
 struct detached_cofac_parameters : public cofac_standalone, public task_parameters {
     nfs_work_cofac & wc;
-    nfs_aux & aux;
-    detached_cofac_parameters(nfs_work_cofac & wc, nfs_aux& aux, cofac_standalone&& C) : cofac_standalone(C), wc(wc), aux(aux) {}
+    std::shared_ptr<nfs_aux> aux_p;
+    detached_cofac_parameters(nfs_work_cofac & wc, std::shared_ptr<nfs_aux> aux_p, cofac_standalone&& C) : cofac_standalone(C), wc(wc), aux_p(aux_p) {}
 };
 
 task_result * detached_cofac(worker_thread * worker, task_parameters * _param)
@@ -1496,7 +1502,7 @@ task_result * detached_cofac(worker_thread * worker, task_parameters * _param)
      * the sieve_info structure. */
     int id = worker->rank();
     nfs_work_cofac & wc(param->wc);
-    nfs_aux & aux(param->aux);
+    nfs_aux & aux(*param->aux_p);
     nfs_aux::thread_data & taux(aux.th[id]);
     las_info const & las(wc.las);
     las_report & rep(taux.rep);
@@ -1623,7 +1629,10 @@ task_result * detached_cofac(worker_thread * worker, task_parameters * _param)
 void factor_survivors_data::prepare_cofactoring()/*{{{*/
 {
     las_info const & las(ws.las);
+    int id = worker->rank();
+    nfs_aux::thread_data & taux(aux_p->th[id]);
     timetree_t & timer(taux.timer);
+    nfs_work::thread_data & tws(ws.th[id]);
 
     /* Copy those bucket entries that belong to sieving survivors and
        store them with the complete prime */
@@ -1685,6 +1694,8 @@ void factor_survivors_data::cofactoring ()
 {
     /* Import some contextual stuff */
     las_info const & las(ws.las);
+    int id = worker->rank();
+    nfs_aux::thread_data & taux(aux_p->th[id]);
     las_report & rep(taux.rep);
     timetree_t & timer(taux.timer);
 
@@ -1855,7 +1866,7 @@ void factor_survivors_data::cofactoring ()
             continue; /* we deal with all cofactors at the end of las */
         }
 
-        auto D = new detached_cofac_parameters(wc, aux, std::move(cur));
+        auto D = new detached_cofac_parameters(wc, aux_p, std::move(cur));
 
 #ifndef  DLP_DESCENT
         worker->get_pool().add_task(detached_cofac, D, 0, 1); /* id 0, queue 1 */
@@ -1876,13 +1887,16 @@ void factor_survivors_data::cofactoring ()
    but this is done by the caller.
    */
 int
-factor_survivors (worker_thread * worker, nfs_work::thread_data & ws_taux, nfs_work_cofac & wc, nfs_aux::thread_data & taux, sieve_info & si, int N, where_am_I & w MAYBE_UNUSED)
+factor_survivors (worker_thread * worker, nfs_work & ws, nfs_work_cofac & wc, std::shared_ptr<nfs_aux> aux_p, sieve_info & si, int N)
 {
+    int id = worker->rank();
+    nfs_aux & aux(*aux_p);
+    nfs_aux::thread_data & taux(aux.th[id]);
     timetree_t & timer(taux.timer);
     CHILD_TIMER(timer, __func__);
     TIMER_CATEGORY(timer, cofactoring_mixed());
 
-    factor_survivors_data F(worker, ws_taux, wc, taux, si, N);
+    factor_survivors_data F(worker, ws, wc, aux_p, si, N);
 
     F.search_survivors();
     F.convert_survivors();
@@ -1989,7 +2003,7 @@ task_result * process_bucket_region(worker_thread * worker, task_parameters * _p
     nfs_work & ws(param->ws);
     nfs_work_cofac & wc(param->wc);
     nfs_work::thread_data & tws(param->ws.th[id]);
-    nfs_aux::thread_data & taux(param->aux.th[id]);
+    nfs_aux::thread_data & taux(param->aux_p->th[id]);
     timetree_t & timer(taux.timer);
     ACTIVATE_TIMER(timer);
     las_report& rep(taux.rep);
@@ -2147,7 +2161,7 @@ task_result * process_bucket_region(worker_thread * worker, task_parameters * _p
 
         /* Factor survivors */
         rep.ttf -= seconds_thread ();
-        rep.reports += factor_survivors (worker, tws, wc, taux, si, N, w);
+        rep.reports += factor_survivors (worker, ws, wc, param->aux_p, si, N);
         rep.ttf += seconds_thread ();
 
         SIBLING_TIMER(timer, "reposition small (re)sieve data");
@@ -2504,8 +2518,9 @@ void postprocess_specialq_descent(las_info & las, las_todo_entry const & doing, 
  * downsort, apply-buckets, lognorm computation, small sieve computation,
  * and survivor search and detection, all from here.
  */
-void do_one_special_q_sublat(las_info const & las, sieve_info & si, nfs_work & ws, nfs_work_cofac & wc, nfs_aux & aux, thread_pool & pool)/*{{{*/
+void do_one_special_q_sublat(las_info const & las, sieve_info & si, nfs_work & ws, nfs_work_cofac & wc, std::shared_ptr<nfs_aux> aux_p, thread_pool & pool)/*{{{*/
 {
+    nfs_aux & aux(*aux_p);
     timetree_t & timer_special_q(aux.timer_special_q);
     las_report& rep(aux.rep);
     where_am_I & w(aux.w);
@@ -2604,7 +2619,7 @@ void do_one_special_q_sublat(las_info const & las, sieve_info & si, nfs_work & w
 
         /* Process bucket regions in parallel */
         for(int i = 0 ; i < las.nb_threads ; i++) {
-            auto P = new process_bucket_region_parameters(ws, wc, aux, si, w);
+            auto P = new process_bucket_region_parameters(ws, wc, aux_p, si, w);
             /* first_region0_index is always 0 for toplevel==1 */
             task_function_t f = process_bucket_region;
             pool.add_task(f, P, i, 0);
@@ -2627,11 +2642,11 @@ void do_one_special_q_sublat(las_info const & las, sieve_info & si, nfs_work & w
         for (uint32_t i = 0; i < si.nb_buckets[si.toplevel]; i++) {
             switch (si.toplevel) {
                 case 2:
-                    downsort_tree<1>(ws, wc, aux, pool, i, i*BRS[2]/BRS[1],
+                    downsort_tree<1>(ws, wc, aux_p, pool, i, i*BRS[2]/BRS[1],
                             si, precomp_plattice, w);
                     break;
                 case 3:
-                    downsort_tree<2>(ws, wc, aux, pool, i, i*BRS[3]/BRS[1],
+                    downsort_tree<2>(ws, wc, aux_p, pool, i, i*BRS[3]/BRS[1],
                             si, precomp_plattice, w);
                     break;
                 default:
@@ -2652,8 +2667,9 @@ void do_one_special_q_sublat(las_info const & las, sieve_info & si, nfs_work & w
 }/*}}}*/
 
 /* This returns false if the special-q was discarded */
-bool do_one_special_q(las_info & las, nfs_work & ws, nfs_aux & aux, thread_pool & pool, cxx_param_list & pl)
+bool do_one_special_q(las_info & las, nfs_work & ws, std::shared_ptr<nfs_aux> aux_p, thread_pool & pool, cxx_param_list & pl)
 {
+    nfs_aux & aux(*aux_p);
     las_todo_entry const & doing(aux.doing);
     timetree_t& timer_special_q(aux.timer_special_q);
     las_report& rep(aux.rep);
@@ -2765,7 +2781,7 @@ bool do_one_special_q(las_info & las, nfs_work & ws, nfs_aux & aux, thread_pool 
                 verbose_output_print(0, 1, "# Sublattice (i,j) == (%u, %u) mod %u\n",
                         si.conf.sublat.i0, si.conf.sublat.j0, si.conf.sublat.m);
             }
-            do_one_special_q_sublat(las, si, ws, wc, aux, pool);
+            do_one_special_q_sublat(las, si, ws, wc, aux_p, pool);
 
         }
     }
@@ -2986,17 +3002,29 @@ int main (int argc0, char *argv0[])/*{{{*/
         auto rel_hash_p = std::make_shared<nfs_aux::rel_hash_t>();
 
         for(;;) {
+            /* We're playing a very dangerous game here. rep and timer
+             * below are created here, at the end of a temp list. When
+             * exiting this loop, they will still be live somewhere,
+             * either in aux_good or aux_botched. The nfs_aux data holds
+             * references to this stuff. But this nfs_aux is expected to
+             * live slightly longer, so it will tinker with these structs
+             * at a time where they've already been moved to aux_good (or
+             * even aux_botched, if an exception occurs late during 1l
+             * downsorting). We must be sure that all threads are done
+             * when we finally consume the aux_good and aux_botched
+             * lists!
+             */
             std::list<std::pair<las_report, timetree_t>> aux_pending;
             aux_pending.push_back(std::pair<las_report, timetree_t>());
-
             las_report & rep(aux_pending.back().first);
             timetree_t & timer_special_q(aux_pending.back().second);
 
             /* ready to start over if we encounter an exception */
             try {
-                nfs_aux aux(las, doing, rel_hash_p, rep, timer_special_q, las.nb_threads);
+                auto aux_p = std::make_shared<nfs_aux>(las, doing, rel_hash_p, rep, timer_special_q, las.nb_threads);
+                nfs_aux & aux(*aux_p);
 
-                bool done = do_one_special_q(las, workspaces, aux, *pool, pl);
+                bool done = do_one_special_q(las, workspaces, aux_p, *pool, pl);
 
                 if (!done) {
                     /* Then we don't even keep track of the time, it's
