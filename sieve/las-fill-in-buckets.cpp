@@ -1023,7 +1023,11 @@ fill_in_buckets_one_side(nfs_work &ws, nfs_aux & aux, thread_pool &pool, sieve_i
         fb_factorbase::slicing::part const & P = fbs->get_part(LEVEL);
         /* This way we can spare the need to expose the copy contructor
          * of the container's value_type */
-        Vpre = precomp_plattice_dense_t(P.nslices());
+        if (si.conf.sublat.i0 == 0 && si.conf.sublat.j0 == 1) {
+            /* first sublat */
+            Vpre = precomp_plattice_dense_t(P.nslices());
+        }
+        ASSERT_ALWAYS(Vpre.size() == P.nslices());
         push_slice_to_task_list_saving_precomp<LEVEL> F(pool, P, model, Vpre);
         P.foreach_slice(F);
     }
