@@ -1253,7 +1253,8 @@ void factor_survivors_data::search_survivors()/*{{{*/
                 sides[1].S ? sides[1].S[trace_Nx.x] : ~0u);
         verbose_output_vfprint(TRACE_CHANNEL, 0, gmp_vfprintf,
                 "# Remaining norms which have not been accounted for in sieving: (%Zd, %Zd)\n",
-                traced_norms[0], traced_norms[1]);
+                (mpz_srcptr) traced_norms[0],
+                (mpz_srcptr) traced_norms[1]);
     }
 #endif  /* }}} */
 
@@ -1368,7 +1369,7 @@ struct cofac_standalone {
     }/*}}}*/
 #ifdef TRACE_K
     bool trace_on_spot() const {/*{{{*/
-        return trace_on_spot(a, b);
+        return trace_on_spot_ab(a, b);
     }/*}}}*/
 #endif
     inline bool both_even() const {/*{{{*/
@@ -1480,7 +1481,7 @@ struct cofac_standalone {
         /* This proxies to las-cofactor.cpp */
         return ::factor_both_leftover_norms(norm,
                 lps,
-                { wc.sc.sides[0].lim, wc.sc.sides[1].lim },
+                {{ wc.sc.sides[0].lim, wc.sc.sides[1].lim }},
                 wc.strategies.get());
     }/*}}}*/
 };
@@ -1523,7 +1524,7 @@ task_result * detached_cofac(worker_thread * worker, task_parameters * _param)
 
     cofac_standalone & cur(*param);
 
-    std::array<int, 2> cof_bitsize {0,0}; /* placate compiler */
+    std::array<int, 2> cof_bitsize {{ 0,0 }}; /* placate compiler */
     las.cofac_stats.call(cur.norm, cof_bitsize);
 
     SIBLING_TIMER(timer, "factor_both_leftover_norms");
@@ -1744,10 +1745,10 @@ void factor_survivors_data::cofactoring ()
 
         /* start building a new object. This is a swap operation */
         cur = cofac_standalone(N, x, si);
-        cur.S = { sides[0].S[x], sides[1].S[x] };
+        cur.S = {{ sides[0].S[x], sides[1].S[x] }};
 
 #ifdef TRACE_K/*{{{*/
-        if (cur.trace_on_spot_ab())
+        if (cur.trace_on_spot())
           verbose_output_print(TRACE_CHANNEL, 0, "# about to start cofactorization for (%"
                    PRId64 ",%" PRIu64 ")  %zu %u\n", cur.a, cur.b, x, SS[x]);
 #endif/*}}}*/
@@ -1796,7 +1797,7 @@ void factor_survivors_data::cofactoring ()
             si.sides[side].lognorms->norm(cur.norm[side], i, j);
 
 #ifdef TRACE_K/*{{{*/
-            if (cur.trace_on_spot_ab()) {
+            if (cur.trace_on_spot()) {
                 verbose_output_vfprint(TRACE_CHANNEL, 0,
                         gmp_vfprintf, "# start trial division for norm=%Zd ", (mpz_srcptr) cur.norm[side]);
                 verbose_output_print(TRACE_CHANNEL, 0,
@@ -1842,7 +1843,7 @@ void factor_survivors_data::cofactoring ()
 
             pass = check_leftover_norm (cur.norm[side], si.conf.sides[side]);
 #ifdef TRACE_K
-            if (cur.trace_on_spot_ab()) {
+            if (cur.trace_on_spot()) {
                 verbose_output_vfprint(TRACE_CHANNEL, 0, gmp_vfprintf,
                         "# checked leftover norm=%Zd", (mpz_srcptr) cur.norm[side]);
                 verbose_output_print(TRACE_CHANNEL, 0,
