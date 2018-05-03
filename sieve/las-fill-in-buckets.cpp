@@ -449,9 +449,6 @@ fill_in_buckets_toplevel_sublat(bucket_array_t<LEVEL, shorthint_t> &orig_BA,
   BA.move(orig_BA);
 
   slice_index_t slice_index = slice.get_index();
-  if (!first_sublat) {
-    ASSERT(slice_index == precomp_slice->get_index());
-  }
 
   /* Write new set of pointers for the new slice */
   BA.add_slice_index(slice_index);
