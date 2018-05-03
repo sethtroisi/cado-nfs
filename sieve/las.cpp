@@ -1519,7 +1519,16 @@ task_result * detached_cofac(worker_thread * worker, task_parameters * _param)
     las_info const & las(wc.las);
     las_report & rep(taux.rep);
     timetree_t & timer(taux.timer);
+    /* The timer is normally not running, as we're in a thread task.
+     * However, in descent mode, this is called synchronously, and then
+     * the situation is different since the timer has already been
+     * activated above.
+     */
+#ifndef DLP_DESCENT
     ACTIVATE_TIMER(timer);
+#else
+    CHILD_TIMER(timer, __func__);
+#endif
     nfs_aux::rel_hash_t& rel_hash(aux.get_rel_hash());
 
     cofac_standalone & cur(*param);
