@@ -62,6 +62,7 @@ int prepend_relation_time = 0;
 int exit_after_rel_found = 0;
 int allow_largesq = 0;
 int adjust_strategy = 0;
+int sync_at_special_q = 0;
 
 double general_grace_time_ratio = DESCENT_DEFAULT_GRACE_TIME_RATIO;
 
@@ -2262,6 +2263,7 @@ static void declare_usage(param_list pl)/*{{{*/
     param_list_decl_usage(pl, "prepend-relation-time", "prefix all relation produced with time offset since beginning of special-q processing");
     param_list_decl_usage(pl, "ondemand-siever-config", "(switch) defer initialization of siever precomputed structures (one per special-q side) to time of first actual use");
     param_list_decl_usage(pl, "dup", "(switch) suppress duplicate relations");
+    param_list_decl_usage(pl, "sync", "(switch) synchronize all threads at each special-q");
     param_list_decl_usage(pl, "batch", "(switch) use batch cofactorization");
     param_list_decl_usage(pl, "batch0", "side-0 batch file");
     param_list_decl_usage(pl, "batch1", "side-1 batch file");
@@ -2685,7 +2687,11 @@ void do_one_special_q_sublat(las_info const & las, sieve_info & si, nfs_work & w
     /* This ensures proper serialization of stuff that is in queue 0.
      * Maybe we could be looser about this.
      */
-    pool.drain_queue(0);
+    if (sync_at_special_q) {
+        pool.drain_all_queues();
+    } else {
+        pool.drain_queue(0);
+    }
 }/*}}}*/
 
 /* This returns false if the special-q was discarded */
@@ -2879,6 +2885,7 @@ int main (int argc0, char *argv0[])/*{{{*/
     param_list_configure_switch(pl, "-stats-stderr", NULL);
     param_list_configure_switch(pl, "-prepend-relation-time", &prepend_relation_time);
     param_list_configure_switch(pl, "-dup", NULL);
+    param_list_configure_switch(pl, "-sync", &sync_at_special_q);
     param_list_configure_switch(pl, "-batch", NULL);
     param_list_configure_switch(pl, "-batch-print-survivors", NULL);
     //    param_list_configure_switch(pl, "-galois", NULL);
