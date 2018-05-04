@@ -2802,23 +2802,23 @@ bool do_one_special_q(las_info & las, nfs_work & ws, std::shared_ptr<nfs_aux> au
     for(int side = 0 ; side < 2 ; side++)
         las.dumpfiles[side].setname(las.dump_filename, doing);
 
+    std::ostringstream extra;
+    if (si.doing.depth)
+        extra << " # within descent, currently at depth " << si.doing.depth;
+
     verbose_output_vfprint(0, 1, gmp_vfprintf,
             "# "
             HILIGHT_START
             "Sieving side-%d q=%Zd; rho=%Zd;"
             HILIGHT_END
-            " a0=%" PRId64 "; b0=%" PRId64 "; a1=%" PRId64 "; b1=%" PRId64 "; J=%u;",
+            " a0=%" PRId64 "; b0=%" PRId64 "; a1=%" PRId64 "; b1=%" PRId64 "; J=%u;%s\n",
             si.doing.side,
             (mpz_srcptr) si.doing.p,
             (mpz_srcptr) si.doing.r,
             si.qbasis.a0, si.qbasis.b0,
             si.qbasis.a1, si.qbasis.b1,
-            si.J);
+            si.J, extra.str().c_str());
 
-    if (si.doing.depth) {
-        verbose_output_print(0, 1, " # within descent, currently at depth %d", si.doing.depth);
-    }
-    verbose_output_print(0, 1, "\n");
 
     if (!las.allow_composite_q && !mpz_probab_prime_p(doing.p, 1)) {
         verbose_output_vfprint(0, 1, gmp_vfprintf,
