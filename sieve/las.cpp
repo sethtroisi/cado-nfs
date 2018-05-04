@@ -2801,12 +2801,11 @@ bool do_one_special_q(las_info & las, nfs_work & ws, std::shared_ptr<nfs_aux> au
             "# "
             HILIGHT_START
             "Sieving side-%d q=%Zd; rho=%Zd;"
-            HILIGHT_END,
+            HILIGHT_END
+            " a0=%" PRId64 "; b0=%" PRId64 "; a1=%" PRId64 "; b1=%" PRId64 "; J=%u;",
             si.doing.side,
             (mpz_srcptr) si.doing.p,
-            (mpz_srcptr) si.doing.r);
-
-    verbose_output_print(0, 1, " a0=%" PRId64 "; b0=%" PRId64 "; a1=%" PRId64 "; b1=%" PRId64 "; J=%u;",
+            (mpz_srcptr) si.doing.r,
             si.qbasis.a0, si.qbasis.b0,
             si.qbasis.a1, si.qbasis.b1,
             si.J);
