@@ -311,11 +311,12 @@ skip_galois_roots(const int orig_nroots, const mpz_t q, mpz_t *roots,
     return nroots;
 }
 
-static void adwg(FILE *output, const char *comment, unsigned long *cpt,
+static void adwg(std::ostream& os, const char *comment, unsigned long *cpt,
 		 relation &rel, int64_t a, int64_t b){
     if(b < 0) { a = -a; b = -b; }
     rel.a = a; rel.b = (uint64_t)b;
-    rel.print(output, comment);
+    if (comment) os << comment;
+    os << rel << '\n';
     *cpt += (*comment != '\0');
 }
 
@@ -355,7 +356,7 @@ static void add_galois_factors(relation &rel, int p, int vp){
 }
 
 /* adding relations on the fly in Galois cases */
-static void add_relations_with_galois(const char *galois, FILE *output, 
+static void add_relations_with_galois(const char *galois, std::ostream& os,
 				      const char *comment, unsigned long *cpt,
 				      relation &rel){
     int64_t a0, b0, a1, b1, a2, b2, a3, b3, a5, b5, aa, bb, a;
@@ -369,27 +370,27 @@ static void add_relations_with_galois(const char *galois, FILE *output,
 	// remember, 1/x is for plain autom
 	// 1/y is for Galois filtering: x^4+1 -> DO NOT DUPLICATE RELATIONS!
 	// (a-b/x) = 1/x*(-b+a*x)
-	adwg(output, comment, cpt, rel, -b0, -a0);
+	adwg(os, comment, cpt, rel, -b0, -a0);
     else if(strcmp(galois, "autom2.2") == 0)
 	// remember, -x is for plain autom
 	// -y is for Galois filtering: x^4+1 -> DO NOT DUPLICATE RELATIONS!
 	// (a-(-b)*x) ~ (-a-b*x)
-	adwg(output, comment, cpt, rel, -a0, b0);
+	adwg(os, comment, cpt, rel, -a0, b0);
     else if(strcmp(galois, "autom3.1") == 0){
 	// x -> 1-1/x; hence 1/x*(b-(b-a)*x)
 	a1 = a; b1 = (int64_t)b;
 	a2 = b1; b2 = b1-a1;
-	adwg(output, comment, cpt, rel, a2, b2);
+	adwg(os, comment, cpt, rel, a2, b2);
 	a3 = b2; b3 = b2-a2;
-	adwg(output, comment, cpt, rel, a3, b3);
+	adwg(os, comment, cpt, rel, a3, b3);
     }
     else if(strcmp(galois, "autom3.2") == 0){
 	// x -> -1-1/x; hence 1/x*(b-(-a-b)*x)
 	a1 = a; b1 = (int64_t)b;
 	a2 = b1; b2 = -a1-b1;
-	adwg(output, comment, cpt, rel, a2, b2);
+	adwg(os, comment, cpt, rel, a2, b2);
 	a3 = b2; b3 = -a2-b2;
-	adwg(output, comment, cpt, rel, a3, b3);
+	adwg(os, comment, cpt, rel, a3, b3);
     }
     else if(strcmp(galois, "autom4.1") == 0){
 	// FIXME: rewrite and check
@@ -399,8 +400,9 @@ static void add_relations_with_galois(const char *galois, FILE *output,
 	if(bb < 0){ aa = -aa; bb = -bb; }
 	rel.a = aa; rel.b = (uint64_t)bb;
 	// same factorization as for (a, b)
-	rel.print(output, comment);
-	*cpt += (*comment != '\0');
+        if (comment) os << comment;
+        os << rel << '\n';
+        *cpt += (*comment != '\0');
 	// sig((a, b)) = (-(a+b), a-b)
 	aa = -(a1+b1);
 	bb = a1-b1;
@@ -424,19 +426,21 @@ static void add_relations_with_galois(const char *galois, FILE *output,
 	}
 	if(bb < 0){ aa = -aa; bb = -bb; }
 	rel.a = aa; rel.b = (uint64_t)bb;
-	rel.print(output, comment);
-	*cpt += (*comment != '\0');
+        if (comment) os << comment;
+        os << rel << '\n';
+        *cpt += (*comment != '\0');
 	// sig^3((a, b)) = sig((b, -a)) = (a-b, a+b)
 	aa = -aa; // FIXME: check!
 	if(aa < 0){ aa = -aa; bb = -bb; }
 	rel.a = bb; rel.b = (uint64_t)aa;
-	rel.print(output, comment);
-	*cpt += (*comment != '\0');
+        if (comment) os << comment;
+        os << rel << '\n';
+        *cpt += (*comment != '\0');
     }
     else if(strcmp(galois, "autom6.1") == 0){
 	// fact do not change
-	adwg(output, comment, cpt, rel, a0 + b0, -a0); // (a2, b2)
-	adwg(output, comment, cpt, rel, b0, -(a0+b0)); // (a4, b4)
+	adwg(os, comment, cpt, rel, a0 + b0, -a0); // (a2, b2)
+	adwg(os, comment, cpt, rel, b0, -(a0+b0)); // (a4, b4)
 
 	// fact do change
         a1 = -(2*a0+b0); b1= a0-b0;
@@ -446,7 +450,7 @@ static void add_relations_with_galois(const char *galois, FILE *output,
 	    b1 /= 3;
 	    d++;
 	}
-	fprintf(output, "# d1=%d\n", d);
+	os << "# d1=" << d << "\n";
 	a3 =-(2*b0+a0); b3 = 2*a0+b0;
 	a5 = a0-b0;     b5 = 2*b0+a0;
 	if(d == 0)
@@ -455,15 +459,15 @@ static void add_relations_with_galois(const char *galois, FILE *output,
 	else
 	    // we need to remove 3^3
 	    remove_galois_factors(rel, 3, 3);
-	adwg(output, comment, cpt, rel, a1, b1); // (a1/3^d, b1/3^d)
+	adwg(os, comment, cpt, rel, a1, b1); // (a1/3^d, b1/3^d)
 	for(int i = 0; i < d; i++){
 	    a3 /= 3;
 	    b3 /= 3;
 	    a5 /= 3;
 	    b5 /= 3;
 	}
-	adwg(output, comment, cpt, rel, a3, b3); // (a3/3^d, b3/3^d)
-	adwg(output, comment, cpt, rel, a5, b5); // (a5/3^d, b5/3^d)
+	adwg(os, comment, cpt, rel, a3, b3); // (a3/3^d, b3/3^d)
+	adwg(os, comment, cpt, rel, a5, b5); // (a5/3^d, b5/3^d)
     }
 }
 
@@ -1612,31 +1616,32 @@ task_result * detached_cofac(worker_thread * worker, task_parameters * _param)
             dup_comment = "# DUPE ";
         }
 
-        FILE *output;
-
-        verbose_output_start_batch(); /* lock I/O. */
-
         /* Not clear what gives when we have Galois relations.
          */
         rep.reports += !dup_comment;
 
         if (!dup_comment) dup_comment = "";
 
-        if (prepend_relation_time) {
-            verbose_output_print(0, 1, "(%1.4f) ", seconds() - tt_qstart);
-        }
+        std::ostringstream os;
+
+        if (prepend_relation_time)
+            os << "(" << seconds() - tt_qstart << ") ";
+
         // verbose_output_print(0, 3, "# i=%d, j=%u, lognorms = %hhu, %hhu\n", i, j, cur.S[0], cur.S[1]);
-        for (size_t i_output = 0;
-                (output = verbose_output_get(0, 0, i_output)) != NULL;
-                i_output++) {
-            rel.print(output, dup_comment);
+
+        os << dup_comment << rel << "\n";
+
+        if(las.galois != NULL) {
+            // adding relations on the fly in Galois cases
             // once filtering is ok for all Galois cases, 
             // this entire block would have to disappear
-            if(las.galois != NULL)
-                // adding relations on the fly in Galois cases
-                add_relations_with_galois(las.galois, output, dup_comment,
-                        &rep.reports, rel);
+            add_relations_with_galois(las.galois, os, dup_comment,
+                    &rep.reports, rel);
         }
+
+        /* print all in one go */
+        verbose_output_start_batch();     /* unlock I/O */
+        verbose_output_print(0, 1, "%s", os.str().c_str());
         verbose_output_end_batch();     /* unlock I/O */
 #ifdef DLP_DESCENT
         res->rel_p = std::make_shared<relation>(std::move(rel));
