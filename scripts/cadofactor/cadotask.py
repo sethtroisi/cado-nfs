@@ -3280,7 +3280,7 @@ class Duplicates2Task(Task, FilesCreator, HasStatistics):
             "0",
             Statistics.add_list,
             re.compile(re_cap_n_fp(r"# Done: Read \d+ relations in", 1, "s")),
-            False
+            True    # allow several !
         ),
     )
     @property
@@ -3349,7 +3349,7 @@ class Duplicates2Task(Task, FilesCreator, HasStatistics):
             outfilenames = {f:i for f in files}
             self.add_output_files(outfilenames, commit=False)
             # XXX How do we add the timings ?
-            # self.parse_stats(stdoutpath, commit=True)
+            self.parse_stats(stdoutpath, commit=False)
             self.logger.info("%d unique relations remain on slice %d",
                              nr_rels, i)
             self.slice_relcounts[str(i)] = nr_rels
