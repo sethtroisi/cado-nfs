@@ -30,8 +30,8 @@ echo $cmd
 nfake=`$cmd | grep -c "^[^#]"`
 
 # remove leading spaces (for openbsd 5.3)
-let nfake=nfake
-nfake_exp=156
+nfake=`echo $nfake`
+nfake_exp=136
 if [ "$nfake" != "$nfake_exp" ]; then
     echo "Wrong number of fake relations ($nfake, expected $nfake_exp)"
     exit 1
