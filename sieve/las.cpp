@@ -2697,6 +2697,15 @@ bool do_one_special_q(las_info & las, nfs_work & ws, std::shared_ptr<nfs_aux> au
     las_report& rep(aux.rep);
     where_am_I & w MAYBE_UNUSED(aux.w);
 
+    // arrange so that we don't have the same header line as the one
+    // which prints the q-lattice basis
+    verbose_output_vfprint(0, 1, gmp_vfprintf,
+                         "#\n"
+                         "# "
+                         "Now sieving side-%d q=%Zd; rho=%Zd\n",
+                         doing.side,
+                         (mpz_srcptr) doing.p,
+                         (mpz_srcptr) doing.r);
     /* Check whether q is larger than the large prime bound.
      * This can create some problems, for instance in characters.
      * By default, this is not allowed, but the parameter
