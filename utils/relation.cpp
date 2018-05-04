@@ -7,12 +7,12 @@
 #include <errno.h>
 #include <algorithm>
 
-#include "relation.h"
+#include "relation.hpp"
 #include "gzip.h"
 #include "timing.h"
 #include "portability.h"
 #include "relation-tools.h"
-#include "relation.h"
+#include "relation.hpp"
 
 using namespace std;
 
