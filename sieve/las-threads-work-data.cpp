@@ -14,7 +14,7 @@ void nfs_work::thread_data::side_data::allocate_bucket_region()
 }
 
 nfs_work::thread_data::thread_data(thread_data const & o)
-    : ws(o.ws), sides {o.sides}
+    : ws(o.ws), sides(o.sides)
 {
     SS = (unsigned char *) contiguous_malloc(BUCKET_REGION);
     memcpy(SS, o.SS, BUCKET_REGION);
