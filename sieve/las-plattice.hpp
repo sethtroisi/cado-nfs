@@ -738,9 +738,9 @@ struct plattice_info_dense_t {
         if (b1 > mask20)
             b1 = mask20;
 
-        pack[0] =   (minus_a0 & mask20) | (b0 << 20);
+        pack[0] = (minus_a0 & mask20) | (b0 << 20);
         pack[1] = ((b0 >> 12) & mask8 ) | ((a1 & mask20) << 8) | (b1 << 28);
-        pack[2] =  ((b1 >> 4) & mask16) | (hint << 16);
+        pack[2] = ((b1 >> 4) & mask16) | (hint << 16);
     }
 
     plattice_info_t unpack(const int logI) const {
