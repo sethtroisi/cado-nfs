@@ -28,6 +28,6 @@ struct process_bucket_region_parameters: public task_parameters {
 };
 
 /* This is in las.cpp */
-extern task_result * process_bucket_region(worker_thread * worker, task_parameters * _param);
+extern task_result * process_bucket_region(worker_thread * worker, task_parameters * _param, int);
 
 #endif	/* LAS_PROCESS_BUCKET_REGION_HPP_ */

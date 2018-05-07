@@ -1501,7 +1501,7 @@ struct detached_cofac_result : public task_result {
     std::shared_ptr<relation> rel_p;
 };
 
-task_result * detached_cofac(worker_thread * worker, task_parameters * _param)
+task_result * detached_cofac(worker_thread * worker, task_parameters * _param, int)
 {
     auto clean_param = call_dtor([_param]() { delete _param; });
 
@@ -2027,7 +2027,7 @@ void SminusS (unsigned char *S1, unsigned char *EndS1, unsigned char *S2) {/*{{{
  * The other threads are accessed by combining the thread pointer th and
  * the thread id: the i-th thread is at th - id + i
  */
-task_result * process_bucket_region(worker_thread * worker, task_parameters * _param)
+task_result * process_bucket_region(worker_thread * worker, task_parameters * _param, int)
 {
     const process_bucket_region_parameters *param = static_cast<const process_bucket_region_parameters *>(_param);
 

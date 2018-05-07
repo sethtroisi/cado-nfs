@@ -289,6 +289,19 @@ inline bool discard_power_for_bucket_sieving<fb_entry_general>(fb_entry_general 
     return e.k > 1;
 }
 
+
+/*********y**************************************************************/
+/* multithreaded processing of make_lattice_bases (a.k.a
+ * precomp_plattices)
+ *
+ * This creates one control object per slice, with storage ownership of
+ * the control object transfered to the called function. Because we
+ * depend on the slice, the type of the object is parameterized by the
+ * slice type.
+ *
+ * We may elect to make the "model" a shared_ptr.
+ */
+
 struct make_lattice_bases_parameters_base: public task_parameters {
   int side;
   int level;
@@ -334,7 +347,7 @@ struct make_lattice_bases_parameters : public make_lattice_bases_parameters_base
 template <class FB_ENTRY_TYPE>
 task_result *
 make_lattice_bases(worker_thread * worker MAYBE_UNUSED,
-        task_parameters * _param)
+        task_parameters * _param, int)
 {
     const make_lattice_bases_parameters<FB_ENTRY_TYPE> *param = static_cast<const make_lattice_bases_parameters<FB_ENTRY_TYPE> *>(_param);
 
@@ -417,6 +430,15 @@ void fill_in_buckets_prepare_precomp_plattice(
     push_make_bases_to_task_list F { pool, model };
     P.foreach_slice(F);
 }
+
+
+/*********y**************************************************************/
+/* multithreaded processing of fill_in_buckets_toplevel (both with and
+ * without sublattices) is more complicated. First because the important
+ * functions are not the ones whose prototype is the one we expect most
+ * from a multithreade task, second because we strive to manage
+ * exceptions properly. So we go through several quirky paths below.
+ */
 
 // At top level, the fill-in of the buckets must interleave
 // the root transforms and the FK walks, otherwise we spend a lot of time
@@ -785,7 +807,7 @@ PREPARE_TEMPLATE_INST_NAMES(downsort_tree, "");
 // top-level, since the plattices have already been precomputed.
 template<int LEVEL>
 task_result *
-fill_in_buckets_one_slice_internal(worker_thread * worker, task_parameters * _param)
+fill_in_buckets_one_slice_internal(worker_thread * worker, task_parameters * _param, int)
 {
     fill_in_buckets_parameters *param = static_cast<fill_in_buckets_parameters *>(_param);
 
@@ -850,7 +872,7 @@ static tdict::slot_parametric timer_slot_for_fibt("fill_in_buckets_toplevel on s
 // At some point, the code should be re-organized, I'm afraid.
 template<int LEVEL, class FB_ENTRY_TYPE>
 task_result *
-fill_in_buckets_toplevel_wrapper(worker_thread * worker MAYBE_UNUSED, task_parameters * _param)
+fill_in_buckets_toplevel_wrapper(worker_thread * worker MAYBE_UNUSED, task_parameters * _param, int)
 {
     fill_in_buckets_parameters *param = static_cast<fill_in_buckets_parameters *>(_param);
     
@@ -899,7 +921,7 @@ fill_in_buckets_toplevel_wrapper(worker_thread * worker MAYBE_UNUSED, task_param
 /* same for sublat */
 template<int LEVEL, class FB_ENTRY_TYPE>
 task_result *
-fill_in_buckets_toplevel_sublat_wrapper(worker_thread * worker MAYBE_UNUSED, task_parameters * _param)
+fill_in_buckets_toplevel_sublat_wrapper(worker_thread * worker MAYBE_UNUSED, task_parameters * _param, int)
 {
     fill_in_buckets_parameters *param = static_cast<fill_in_buckets_parameters *>(_param);
 
@@ -1065,76 +1087,6 @@ void fill_in_buckets_toplevel(nfs_work &ws, nfs_aux & aux, thread_pool &pool, si
  *
  */
 
-template<int LEVEL, typename HINT_TYPE>
-struct downsort_parameters : public task_parameters {
-    nfs_work &ws;
-    nfs_aux &aux;
-    int side;
-    uint32_t bucket_index;
-    bucket_array_t<LEVEL+1,HINT_TYPE> const & BAin;
-    where_am_I w;
-
-    downsort_parameters(
-        nfs_work &ws,
-        nfs_aux &aux,
-        int side, 
-        uint32_t bucket_index,
-        bucket_array_t<LEVEL+1,HINT_TYPE> const & BAin,
-        where_am_I const& w)
-    :
-        ws(ws),
-        aux(aux),
-        side(side),
-        bucket_index(bucket_index),
-        BAin(BAin),
-        w(w)
-    {}
-
-};
-
-template<int LEVEL, typename HINT_TYPE>
-task_result * downsort_wrapper(worker_thread * worker,
-        task_parameters * _param)
-{
-    auto param = static_cast<downsort_parameters<LEVEL, HINT_TYPE> *>(_param);
-
-    /* Import some contextual stuff */
-    int id = worker->rank();
-    nfs_aux::thread_data & taux(param->aux.th[id]);
-    timetree_t & timer(taux.timer);
-    ACTIVATE_TIMER(timer);
-
-    int side = param->side;
-    nfs_work & ws(param->ws);
-    where_am_I & w(taux.w);
-    w = param->w;
-
-    auto const & BAin(param->BAin);
-
-    CHILD_TIMER_PARAMETRIC(timer, TEMPLATE_INST_NAME(downsort, LEVEL), side, "");
-    TIMER_CATEGORY(timer, sieving(side));
-
-    auto & BAout(ws.reserve_BA<LEVEL, longhint_t>(side, ws.rank_BA(side, BAin)));
-
-    /* We do not need to reset the pointers when we downsort the
-     * longhints from the level above.
-     */
-    if (std::is_same<HINT_TYPE, shorthint_t>::value) {
-        // This is a fake slice_index. For a longhint_t bucket, each update
-        // contains its own slice_index, directly used by apply_one_bucket
-        // and purge.
-        BAout.reset_pointers();
-        BAout.add_slice_index(0);
-    }
-
-    downsort<LEVEL+1>(BAout, BAin, param->bucket_index, w);
-
-    ws.template release_BA<LEVEL,longhint_t>(side, BAout);
-
-    delete param;
-    return new task_result;
-}
-
 /* This is auxiliary only. We downsort stuff that wa already downsorted.
  * So it applies only if LEVEL+1 is itself not the toplevel.
  * For this reason, we must have a specific instantiation that reduces
@@ -1151,13 +1103,18 @@ void downsort_aux(
     where_am_I & w)
 {
     // What comes from already downsorted data above:
-    for(auto const & B : ws.bucket_arrays<LEVEL+1,longhint_t>(side)) {
-        pool.add_task(
-                downsort_wrapper<LEVEL, longhint_t>,
-                new downsort_parameters<LEVEL, longhint_t> {
-                    ws, aux, side, bucket_index, B,
-                    const_ref(w)
-                }, 0);
+    for(auto const & BAin : ws.bucket_arrays<LEVEL+1,longhint_t>(side)) {
+        pool.add_task_lambda([&,side,w](worker_thread * worker, int bucket_index) {
+            nfs_aux::thread_data & taux(aux.th[worker->rank()]);
+            timetree_t & timer(taux.timer);
+            ACTIVATE_TIMER(timer);
+            taux.w = w;
+            CHILD_TIMER_PARAMETRIC(timer, TEMPLATE_INST_NAME(downsort, LEVEL), side, "");
+            TIMER_CATEGORY(timer, sieving(side));
+            auto & BAout(ws.reserve_BA<LEVEL, longhint_t>(side, ws.rank_BA(side, BAin)));
+            downsort<LEVEL+1>(BAout, BAin, bucket_index, taux.w);
+            ws.template release_BA<LEVEL,longhint_t>(side, BAout);
+        }, bucket_index, 0);
     }
 }
 template<>
@@ -1214,14 +1171,24 @@ downsort_tree(
          * process them in parallel. There would be various ways to
          * achieve that.
          */
-        for(auto const & B : ws.bucket_arrays<LEVEL+1,shorthint_t>(side)) {
-            pool.add_task(
-                    downsort_wrapper<LEVEL, shorthint_t>, 
-                    new downsort_parameters<LEVEL, shorthint_t> {
-                        ws, aux, side,
-                        bucket_index, B,
-                        const_ref(w)
-                    }, 0);
+        for(auto const & BAin : ws.bucket_arrays<LEVEL+1,shorthint_t>(side)) {
+            pool.add_task_lambda([&,side,w](worker_thread * worker, int bucket_index) {
+                nfs_aux::thread_data & taux(aux.th[worker->rank()]);
+                timetree_t & timer(taux.timer);
+                taux.w = w;
+                ACTIVATE_TIMER(timer);
+                CHILD_TIMER_PARAMETRIC(timer, TEMPLATE_INST_NAME(downsort, LEVEL), side, "");
+                TIMER_CATEGORY(timer, sieving(side));
+                auto & BAout(ws.reserve_BA<LEVEL, longhint_t>(side, ws.rank_BA(side, BAin)));
+                // This is a fake slice_index. For a longhint_t bucket,
+                // each update contains its own slice_index, directly
+                // used by apply_one_bucket
+                // and purge.
+                BAout.reset_pointers();
+                BAout.add_slice_index(0);
+                downsort<LEVEL+1>(BAout, BAin, bucket_index, taux.w);
+                ws.template release_BA<LEVEL,longhint_t>(side, BAout);
+            }, bucket_index, 0);
         }
         // What comes from already downsorted data above. We put this in
         // an external function because we need the code to be elided or
