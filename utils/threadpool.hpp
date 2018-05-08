@@ -123,35 +123,6 @@ public:
 
 typedef task_result *(*task_function_t)(worker_thread * worker, task_parameters *, int id);
 
-namespace thread_pool_details {
-template<typename T>
-struct task_parameters_lambda : public task_parameters {
-    T f;
-    task_parameters_lambda(T const& f) : f(f) {}
-};
-template<typename T>
-task_result * do_task_parameters_lambda(worker_thread * worker, task_parameters * _param, int id) {
-    auto clean_param = call_dtor([_param]() { delete _param; });
-    task_parameters_lambda<T> *param = static_cast<task_parameters_lambda<T>*>(_param);
-    param->f(worker, id);
-    return new task_result;
-}
-template<typename T>
-task_result * call_class_operator(worker_thread * worker, task_parameters * _param, int id) {
-    auto clean_param = call_dtor([_param]() { delete _param; });
-    T *param = static_cast<T*>(_param);
-    (*param)(worker, id);
-    return new task_result;
-}
-template<typename T>
-task_result * call_shared_task(worker_thread * worker, task_parameters * _param, int id) {
-    auto clean_param = call_dtor([_param]() { delete _param; });
-    T *param = static_cast<T*>(_param);
-    (*param)(worker, id);
-    return new task_result;
-}
-}
-
 class thread_pool : private monitor, private NonCopyable {
   friend class worker_thread;
 
@@ -191,7 +162,7 @@ public:
           return res;
       }
 
-  /* add_task is the simplest interface. It does not even specify who has
+  /* {{{ add_task is the simplest interface. It does not even specify who has
    * ownership of the params object. Two common cases can be envisioned.
    *  - either the caller retains ownership, in which case it obviously
    *    has to join all threads before deletion.
@@ -202,8 +173,9 @@ public:
    * In the latter case, the id field is only of limited use.
    */
   void add_task(task_function_t func, task_parameters * params, const int id, const size_t queue = 0, double cost = 0.0);
+  /* }}} */
 
-  /* add_task_lambda.
+  /* {{{ add_task_lambda.
    *
    * This adds a task to process exactly one lambda function. The lambda
    * function is expected to take the worker thread as only argument.
@@ -218,14 +190,29 @@ public:
    *            pool.add_task_lambda([&foo](worker_thread*) { frob(foo); *            });
    *    }
    */
+private:
+  template<typename T>
+      struct task_parameters_lambda : public task_parameters {
+          T f;
+          task_parameters_lambda(T const& f) : f(f) {}
+      };
+  template<typename T>
+      static
+      task_result * do_task_parameters_lambda(worker_thread * worker, task_parameters * _param, int id) {
+          auto clean_param = call_dtor([_param]() { delete _param; });
+          task_parameters_lambda<T> *param = static_cast<task_parameters_lambda<T>*>(_param);
+          param->f(worker, id);
+          return new task_result;
+      }
+public:
   template<typename T>
       void add_task_lambda(T f, const int id, const size_t queue = 0, double cost = 0.0)
       {
-          using namespace thread_pool_details;
-          add_task(do_task_parameters_lambda<T>, new task_parameters_lambda<T>(f), id, queue, cost);
+          add_task(thread_pool::do_task_parameters_lambda<T>, new task_parameters_lambda<T>(f), id, queue, cost);
       }
+  /* }}} */
 
-  /* add task_class.
+  /* {{{ add task_class.
    *
    * This creates a copy ff of the class object f of type T, and eventually
    * calls ff(worker, id), deleting ff afterwards. As f itself is copied,
@@ -235,13 +222,22 @@ public:
    * there is only limited potential for using the id argument.
    * Furthermore, it happily duplicates the argument descriptors.
    */
+private:
+  template<typename T>
+      static task_result * call_class_operator(worker_thread * worker, task_parameters * _param, int id) {
+          auto clean_param = call_dtor([_param]() { delete _param; });
+          T *param = static_cast<T*>(_param);
+          (*param)(worker, id);
+          return new task_result;
+      }
+public:
   template<typename T>
       void add_task_class(T const & f, const int id, const size_t queue = 0, double cost = 0.0)
       {
-          using namespace thread_pool_details;
           static_assert(std::is_base_of<task_parameters, T>::value, "type must inherit from task_parameters");
-          add_task(call_class_operator<T>, new T(f), id, queue, cost);
+          add_task(thread_pool::call_class_operator<T>, new T(f), id, queue, cost);
       }
+  /* }}} */
 
 #if 1
   /* {{{ add_shared_task -- NOT SATISFACTORY. Do not use.
@@ -274,12 +270,21 @@ public:
           T const & operator*() const { return *(super const&)(*this); }
       };
   template<typename T, typename... Args>
-  shared_task<T> make_shared_task(Args&&... args) { return shared_task<T>(std::make_shared<T>(args...)); }
+  static shared_task<T> make_shared_task(Args&&... args) { return shared_task<T>(std::make_shared<T>(args...)); }
 
+private:
   template<typename T>
-      void add_task_shared(std::shared_ptr<T> f, const int id, const size_t queue = 0, double cost = 0.0)
+      static task_result * call_shared_task(worker_thread * worker, task_parameters * _param, int id) {
+          auto clean_param = call_dtor([_param]() { delete _param; });
+          thread_pool::shared_task<T> *param = static_cast<thread_pool::shared_task<T>*>(_param);
+          (**param)(worker, id);
+          return new task_result;
+      }
+public:
+  template<typename T>
+      void add_shared_task(shared_task<T> const & f, const int id, const size_t queue = 0, double cost = 0.0)
       {
-          using namespace thread_pool_details;
+          add_task(thread_pool::call_shared_task<T>, new shared_task<T>(f), id, queue, cost);
       }
   /* }}} */
 #endif

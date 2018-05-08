@@ -1031,6 +1031,14 @@ fill_in_buckets_one_side(nfs_work &ws, nfs_aux & aux, thread_pool &pool, sieve_i
     /* We're just pushing tasks, here. */
     BOOKKEEPING_TIMER(timer);
 
+    /* This is crucially important. We do not push any updates beyond
+     * that max value of j.
+     *
+     * Hmmm. ::value... It's a global :-0
+     */
+    plattice_enumerate_t::set_masks(si.conf.logI);
+    plattice_enumerate_area<LEVEL>::value = plattice_x_t(si.J) << si.conf.logI;
+
     fill_in_buckets_parameters model(ws, aux, side, si, NULL, NULL, NULL, 0, w);
 
     if (!si.conf.sublat.m) {
@@ -1060,18 +1068,14 @@ void fill_in_buckets_toplevel(nfs_work &ws, nfs_aux & aux, thread_pool &pool, si
 {
     // per se, we're not doing anything here.
     // CHILD_TIMER(timer, __func__);
-    plattice_enumerate_t::set_masks(si.conf.logI);
     switch (si.toplevel) {
         case 1:
-            plattice_enumerate_area<1>::value = plattice_x_t(si.J) << si.conf.logI;
             fill_in_buckets_one_side<1>(ws, aux, pool, si, side, w);
             break;
         case 2:
-            plattice_enumerate_area<2>::value = plattice_x_t(si.J) << si.conf.logI;
             fill_in_buckets_one_side<2>(ws, aux, pool, si, side, w);
             break;
         case 3:
-            plattice_enumerate_area<3>::value = plattice_x_t(si.J) << si.conf.logI;
             fill_in_buckets_one_side<3>(ws, aux, pool, si, side, w);
             break;
         default:
@@ -1132,13 +1136,12 @@ downsort_tree(
     std::shared_ptr<nfs_work_cofac> wc_p,
     std::shared_ptr<nfs_aux> aux_p,
     thread_pool &pool,
-    uint32_t bucket_index,
+    uint32_t bucket_index,      /* for the current level ! */
     uint32_t first_region0_index,
     sieve_info & si,
     precomp_plattice_t & precomp_plattice,
     where_am_I & w)
 {
-    las_info const& las(ws.las);
     nfs_aux & aux(*aux_p);
     timetree_t & timer(aux.timer_special_q);
 
@@ -1217,12 +1220,31 @@ downsort_tree(
 
   /* RECURSE */
   if (LEVEL > 1) {
-      for (unsigned int i = 0; i < si.nb_buckets[LEVEL]; ++i) {
+      for (int i = 0; i < si.nb_buckets[LEVEL]; ++i) {
           size_t (&BRS)[FB_MAX_PARTS] = BUCKET_REGIONS;
           uint32_t N = first_region0_index + i*(BRS[LEVEL]/BRS[1]);
           downsort_tree<LEVEL-1>(ws, wc_p, aux_p, pool, i, N, si, precomp_plattice, w);
       }
   } else {
+      /* Prepare for PBR: we need to precompute the small sieve positions
+       * for all the small sieved primes.
+       */
+      for(int side = 0 ; side < 2 ; side++) {
+          pool.add_task_lambda([=,&si](worker_thread * worker, int){
+                  timetree_t & timer(aux_p->th[worker->rank()].timer);
+                  ACTIVATE_TIMER(timer);
+                  SIBLING_TIMER(timer, "prepare small sieve");
+                  TIMER_CATEGORY(timer, bookkeeping());
+                  sieve_info::side_info & s(si.sides[side]);
+                  if (!s.fb) return;
+                  ASSERT(si.toplevel > 1);
+                  SIBLING_TIMER(timer, "small sieve start positions");
+                  TIMER_CATEGORY(timer, bookkeeping());
+                  small_sieve_start_many(s.ssdpos_many, s.ssd, s.ssd_offsets, first_region0_index, si);
+                  },0);
+      }
+
+
       pool.drain_queue(0);
       /* Now fill_in_buckets is completed for all levels. Time to check
        * that we had no overflow, and move on to process_bucket_region.
@@ -1235,11 +1257,7 @@ downsort_tree(
       }
 
       /* PROCESS THE REGIONS AT LEVEL 0 */
-      for (int i = 0; i < las.nb_threads; ++i) {
-          auto P = new process_bucket_region_parameters(ws, wc_p, aux_p, si, const_ref(w));
-          P->first_region0_index = first_region0_index;
-          pool.add_task(process_bucket_region, P, i, 0);
-      }
+      process_many_bucket_regions(ws, wc_p, aux_p, pool, first_region0_index, si, w);
 
       /* We need that, because the next downsort_tree call in the loop
        * above (for LEVEL>1) will reset the pointers while filling the 1l
