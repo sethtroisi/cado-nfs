@@ -2894,6 +2894,7 @@ int main (int argc0, char *argv0[])/*{{{*/
     param_list_configure_switch(pl, "-batch-print-survivors", NULL);
     //    param_list_configure_switch(pl, "-galois", NULL);
     param_list_configure_alias(pl, "skew", "S");
+    param_list_configure_alias(pl, "log-bucket-region", "B");
     // TODO: All these aliases should disappear, someday.
     // This is just legacy.
     param_list_configure_alias(pl, "fb1", "fb");
