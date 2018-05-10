@@ -17,16 +17,19 @@ reservation_array<T>::allocate_buckets(int n_bucket, double fill_ratio, int logI
      factor bases).
      */
   double ratio = fill_ratio;
+
   size_t n = BAs.size();
   for (size_t i = 0; i < n; i++) {
       auto & B(BAs[i]);
+      /* Arrange so that the largest allocations are done first ! */
+      double cost = ratio/n * BUCKET_REGIONS[T::level] * n_bucket * sizeof(typename T::update_t);
       pool.add_task_lambda([=,&B,&aux](worker_thread * worker,int){
             timetree_t & timer(aux.th[worker->rank()].timer);
             ACTIVATE_TIMER(timer);
             SIBLING_TIMER(timer, "allocate_buckets");
             TIMER_CATEGORY(timer, bookkeeping());
             B.allocate_memory(n_bucket, ratio / n, logI);
-              }, i, 2);
+              }, i, 2, cost);
       /* queue 2. Joined in nfs_work::allocate_buckets */
   }
 }

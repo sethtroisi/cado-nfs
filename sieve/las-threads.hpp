@@ -16,7 +16,7 @@
    of them for exclusive use and to release it again. */
 template <typename T>
 class reservation_array : private monitor {
-    /* typically, T is here bucket_array<LEVEL, HINT>. It's a
+    /* typically, T is here bucket_array_t<LEVEL, HINT>. It's a
      * non-copy-able object. Yet, it's legit to use std::vectors's on
      * such objects in c++11, provided that we limit ourselves to the
      * right constructor, and compiled code never uses allocation
