@@ -161,7 +161,7 @@ private:
     friend sieve_range_adjust::vec<double> operator*(sieve_range_adjust::vec<double> const& a, sieve_range_adjust::mat<int> const& m) ;
     friend qlattice_basis operator*(sieve_range_adjust::mat<int> const& m, qlattice_basis const& Q) ;
     void prepare_fijd();
-    int adapt_threads(const char *);// probably deprecated
+    int round_to_full_bucket_regions(const char *);
     double estimate_yield_in_sieve_area(mat<int> const& shuffle, int squeeze, int N);
 };/*}}}*/
 

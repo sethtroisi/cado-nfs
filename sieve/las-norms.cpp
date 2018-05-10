@@ -919,7 +919,7 @@ sieve_range_adjust::sieve_info_update_norm_data_Jmax (bool keep_logI)
 
   J = (unsigned int) Jmax;
 
-  return adapt_threads(__func__);
+  return round_to_full_bucket_regions(__func__);
 }//}}}
 
 /* {{{ a few helpers (otherwise I'll menage to get things wrong
@@ -1143,7 +1143,7 @@ B:=[bestrep(a):a in {{a*b*c*x:a in {1,-1},b in {1,d},c in {1,s}}:x in MM}];
         verbose_output_print(0, 1, "%s",os.str().c_str());
     }
 
-    return adapt_threads(__func__);
+    return round_to_full_bucket_regions(__func__);
 }/*}}}*/
 
 /* return 0 if we should discard that special-q because the rounded
@@ -1228,16 +1228,13 @@ int sieve_range_adjust::sieve_info_adjust_IJ()/*{{{*/
     J = MIN((uint32_t) J, I >> 1);
     logI = (logA + 1) / 2;
 
-    return adapt_threads(__func__);
+    return round_to_full_bucket_regions(__func__);
 }/*}}}*/
 
-int sieve_range_adjust::adapt_threads(const char * origin)/*{{{*/
+int sieve_range_adjust::round_to_full_bucket_regions(const char * origin)/*{{{*/
 {
     /* Compute number of i-lines per bucket region, must be integer */
     uint32_t i = 1U << MAX(LOG_BUCKET_REGION - logI, 0);
-
-    /* just a check that this function can now be dropped entirely */
-    ASSERT_ALWAYS(J % i == 0);
 
     // we no longer need to do that.
     // i *= nb_threads;  /* ensures nb of bucket regions divisible by nb_threads */
