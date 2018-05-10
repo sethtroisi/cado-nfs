@@ -288,7 +288,7 @@ int main (int argc0, char *argv0[])/*{{{*/
         }
         las_todo_entry doing(q, rho, sqside);
 
-        sieve_range_adjust Adj(doing, cpoly, config_base, 1);
+        sieve_range_adjust Adj(doing, cpoly, config_base);
 
         if (!Adj.SkewGauss())
             continue;
