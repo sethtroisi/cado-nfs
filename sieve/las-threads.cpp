@@ -27,7 +27,7 @@ reservation_array<T>::allocate_buckets(int n_bucket, double fill_ratio, int logI
             TIMER_CATEGORY(timer, bookkeeping());
             B.allocate_memory(n_bucket, ratio / n, logI);
               }, i, 2);
-      /* queue 2. Joined in reservation_group::allocate_buckets */
+      /* queue 2. Joined in nfs_work::allocate_buckets */
   }
 }
 
@@ -156,8 +156,6 @@ reservation_group::allocate_buckets(const int *n_bucket,
      as the previously downsorted longhint updates from level 3 sieving. */
   RA1_long.allocate_buckets(n_bucket[1], mult.get<T1l>()*(fill_ratio[2] + fill_ratio[3]), logI, aux, pool);
   RA2_long.allocate_buckets(n_bucket[2], mult.get<T2l>()*fill_ratio[3], logI, aux, pool);
-
-  pool.drain_queue(2);
 }
 
 
