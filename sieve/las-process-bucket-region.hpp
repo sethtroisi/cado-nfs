@@ -65,7 +65,7 @@ struct process_bucket_region_spawn {
 };
 
 struct process_bucket_region_run : public process_bucket_region_spawn {
-    thread_pool & pool;
+    worker_thread * worker;
     nfs_aux::thread_data & taux;
     nfs_work::thread_data & tws;
     timetree_t & timer;
@@ -98,11 +98,11 @@ struct process_bucket_region_run : public process_bucket_region_spawn {
     unsigned char *SS;
     
     struct side_data {/*{{{*/
-        bucket_primes_t primes;
-        bucket_array_complete purged;
+        bucket_array_complete purged;   /* for purge_buckets */
+        bucket_primes_t primes;         /* for resieving */
         side_data() :
-            primes(bucket_primes_t(BUCKET_REGION)),
-            purged(bucket_array_complete(BUCKET_REGION))
+            purged(bucket_array_complete(BUCKET_REGION)),
+            primes(bucket_primes_t(BUCKET_REGION))
         {}
     };/*}}}*/
 
