@@ -1209,9 +1209,9 @@ int sieve_range_adjust::sieve_info_adjust_IJ()/*{{{*/
     const double rt_skew = sqrt(skew);
     verbose_output_vfprint(0, 2, gmp_vfprintf,
             "# Called sieve_info_adjust_IJ((a0=%" PRId64 "; b0=%" PRId64
-            "; a1=%" PRId64 "; b1=%" PRId64 "), p=%Zd, skew=%f, nb_threads=%d)\n",
+            "; a1=%" PRId64 "; b1=%" PRId64 "), p=%Zd, skew=%f)\n",
             Q.a0, Q.b0, Q.a1, Q.b1,
-            (mpz_srcptr) doing.p, skew, nb_threads);
+            (mpz_srcptr) doing.p, skew);
     if (Q.skewed_norm0(skew) > Q.skewed_norm1(skew)) {
         /* exchange u0 and u1, thus I and J */
         swap(Q.a0, Q.a1);
@@ -1235,7 +1235,12 @@ int sieve_range_adjust::adapt_threads(const char * origin)/*{{{*/
 {
     /* Compute number of i-lines per bucket region, must be integer */
     uint32_t i = 1U << MAX(LOG_BUCKET_REGION - logI, 0);
-    i *= nb_threads;  /* ensures nb of bucket regions divisible by nb_threads */
+
+    /* just a check that this function can now be dropped entirely */
+    ASSERT_ALWAYS(J % i == 0);
+
+    // we no longer need to do that.
+    // i *= nb_threads;  /* ensures nb of bucket regions divisible by nb_threads */
 
     /* Bug 15617: if we round up, we are not true to our promises */
     uint32_t nJ = (J / i) * i; /* Round down to multiple of i */
@@ -1251,7 +1256,8 @@ int sieve_range_adjust::adapt_threads(const char * origin)/*{{{*/
  
 uint32_t sieve_range_adjust::get_minimum_J()
 {
-    return nb_threads << MAX(0, (LOG_BUCKET_REGION - logI));
+    /* no longer dependent on the number of threads */
+    return 1 << MAX(0, (LOG_BUCKET_REGION - logI));
 }
 
 void sieve_range_adjust::set_minimum_J_anyway()
