@@ -621,7 +621,6 @@ void small_sieve_start_many(std::vector<std::vector<spos_t>> & ssdpos_many,
                     if (x >= ssd.ssps[s].get_p()) x -= ssd.ssps[s].get_p();
                     ssdpos_many[k][s] = x;
                 }
-                k++;
             }
         }
     } else if (logI == logB) {
