@@ -411,8 +411,8 @@ lognorm_reference::lognorm_reference(siever_config const & sc, cxx_cado_poly con
      */
     int k = (int) ceil (log2 (maxlog2));
     int K = 1 << k;
-    ASSERT_ALWAYS(NORM_BITS >= k);
-    int l = NORM_BITS - k;
+    ASSERT_ALWAYS(lognorm_reference::NORM_BITS >= k);
+    int l = lognorm_reference::NORM_BITS - k;
     int L = 1 << l;
 
     /* extract k bits from the exponent, and l bits from the mantissa */
@@ -465,7 +465,7 @@ void lognorm_fill_rat_reference(
     double u0 = fijd->coeff[0];
     double u1 = fijd->coeff[1];
 
-    int l = NORM_BITS - (int) ceil(log2(maxlog2));
+    int l = lognorm_reference::NORM_BITS - (int) ceil(log2(maxlog2));
 
     for(unsigned int j = j0 ; j < j1 ; j++) {
 	double z = u0 * j + u1 * i0;

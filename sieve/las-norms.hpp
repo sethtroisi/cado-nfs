@@ -45,6 +45,14 @@ struct lognorm_base {/*{{{*/
 struct lognorm_reference : public lognorm_base {/*{{{*/
     /* See init_degree_X_norms_bucket_region_referencecode for the
      * explanation of this table. */
+
+    /* Number of bits used to estimate the norms with the old reference code.
+     * Unused otherwise.
+     * This should be large enough: it must be such that all norms are
+     * smaller than 2^(2^NORM_BITS)
+     * This imposes NORM_BITS >= 8, or even >= 9 for large factorizations. */
+    static const int NORM_BITS = 10;
+
     unsigned char lognorm_table[1 << NORM_BITS];
 
     lognorm_reference(siever_config const & sc, cxx_cado_poly const & cpoly, int side, qlattice_basis const & Q, int logI, int J);

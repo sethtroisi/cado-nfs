@@ -65,7 +65,6 @@ void las_display_config_flags()
 #ifdef USE_CACHEBUFFER
     verbose_output_print(0, 1, " USE_CACHEBUFFER");
 #endif
-    verbose_output_print(0, 1, " NORM_BITS=%u", NORM_BITS);
     verbose_output_print(0, 1, " LOG_BUCKET_REGION=%u", LOG_BUCKET_REGION);
     verbose_output_print(0, 1, " GUARD=%1.2f", (double) GUARD);
     verbose_output_print(0, 1, " LOG_MAX=%.1f", LOG_MAX);

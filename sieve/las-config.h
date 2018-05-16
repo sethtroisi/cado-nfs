@@ -7,13 +7,6 @@
 #define SSE_NORM_INIT
 #endif
 
-/* Number of bits used to estimate the norms with the old reference code.
- * Unused otherwise.
- * This should be large enough: it must be such that all norms are
- * smaller than 2^(2^NORM_BITS)
- * This imposes NORM_BITS >= 8, or even >= 9 for large factorizations. */
-#define NORM_BITS 10
-
 /* define PROFILE to keep certain functions from being inlined, in order to
    make them show up on profiler output */
 //#define PROFILE
