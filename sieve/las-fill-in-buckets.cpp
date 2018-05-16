@@ -432,7 +432,7 @@ void fill_in_buckets_prepare_precomp_plattice(
 }
 
 
-/*********y**************************************************************/
+/***********************************************************************/
 /* multithreaded processing of fill_in_buckets_toplevel (both with and
  * without sublattices) is more complicated. First because the important
  * functions are not the ones whose prototype is the one we expect most
@@ -794,8 +794,8 @@ public:
  * embody a suffix like " on side ", so that it's possible tu run
  * parametric timer slots.
  */
-PREPARE_TEMPLATE_INST_NAMES(fill_in_buckets_one_slice_internal, " on side ");
-PREPARE_TEMPLATE_INST_NAMES(downsort, " on side ");
+PREPARE_TEMPLATE_INST_NAMES(fill_in_buckets_one_slice_internal, "");
+PREPARE_TEMPLATE_INST_NAMES(downsort, "");
 PREPARE_TEMPLATE_INST_NAMES(downsort_tree, "");
 
 #define TEMPLATE_INST_NAME(x,y) CADO_CONCATENATE(x, _name)<y>::value
@@ -821,11 +821,12 @@ fill_in_buckets_one_slice_internal(worker_thread * worker, task_parameters * _pa
     where_am_I & w(taux.w);
     int side = param->side;
 
+    MARK_TIMER_FOR_SIDE(timer, side);
+
     // we're declaring the timer here, but really the work happens below
     // in fill_in_buckets_lowlevel. We happen to have access to
     // param->side here, so we use it to provide a nicer timing report.
-    CHILD_TIMER_PARAMETRIC(timer, TEMPLATE_INST_NAME(fill_in_buckets_one_slice_internal, LEVEL), param->side, "");
-    TIMER_CATEGORY(timer, sieving(side));
+    CHILD_TIMER(timer, TEMPLATE_INST_NAME(fill_in_buckets_one_slice_internal, LEVEL));
 
     w = param->w;
     WHERE_AM_I_UPDATE(w, psi, & si);
@@ -883,6 +884,7 @@ fill_in_buckets_toplevel_wrapper(worker_thread * worker MAYBE_UNUSED, task_param
     int side = param->side;
 
     ENTER_THREAD_TIMER(timer);
+    MARK_TIMER_FOR_SIDE(timer, side);
 
     /* This is one of the places where helgrind is likely to complain. We
      * use thread-safe statics. Helgrind can't cope with it,
@@ -890,9 +892,7 @@ fill_in_buckets_toplevel_wrapper(worker_thread * worker MAYBE_UNUSED, task_param
      *
      * https://sourceforge.net/p/valgrind/mailman/message/32434015/
      */
-    timetree_t::accounting_child local_timer_sentry(timer, timer_slot_for_fibt(side));
-
-    TIMER_CATEGORY(timer, sieving(side));
+    timetree_t::accounting_child local_timer_sentry(timer, tdict_slot_for_fibt);
 
     WHERE_AM_I_UPDATE(w, psi, & param->si);
     WHERE_AM_I_UPDATE(w, side, param->side);
@@ -932,6 +932,7 @@ fill_in_buckets_toplevel_sublat_wrapper(worker_thread * worker MAYBE_UNUSED, tas
     int side = param->side;
 
     ENTER_THREAD_TIMER(timer);
+    MARK_TIMER_FOR_SIDE(timer, side);
 
     /* This is one of the places where helgrind is likely to complain. We
      * use thread-safe statics. Helgrind can't cope with it,
@@ -939,8 +940,7 @@ fill_in_buckets_toplevel_sublat_wrapper(worker_thread * worker MAYBE_UNUSED, tas
      *
      * https://sourceforge.net/p/valgrind/mailman/message/32434015/
      */
-    timetree_t::accounting_child local_timer_sentry(timer, timer_slot_for_fibt(side));
-    TIMER_CATEGORY(timer, sieving(side));
+    timetree_t::accounting_child local_timer_sentry(timer, tdict_slot_for_fibt);
 
     WHERE_AM_I_UPDATE(w, psi, & si);
     WHERE_AM_I_UPDATE(w, side, param->side);
@@ -1109,9 +1109,9 @@ void downsort_aux(
             nfs_aux::thread_data & taux(aux.th[worker->rank()]);
             timetree_t & timer(taux.timer);
             ENTER_THREAD_TIMER(timer);
+            MARK_TIMER_FOR_SIDE(timer, side);
             taux.w = w;
-            CHILD_TIMER_PARAMETRIC(timer, TEMPLATE_INST_NAME(downsort, LEVEL), side, "");
-            TIMER_CATEGORY(timer, sieving(side));
+            CHILD_TIMER(timer, TEMPLATE_INST_NAME(downsort, LEVEL));
             auto & BAout(ws.reserve_BA<LEVEL, longhint_t>(side, ws.rank_BA(side, BAin)));
             downsort<LEVEL+1>(BAout, BAin, bucket_index, taux.w);
             ws.template release_BA<LEVEL,longhint_t>(side, BAout);
@@ -1152,7 +1152,6 @@ downsort_tree(
   for (int side = 0; side < 2; ++side) {
     if (!si.sides[side].fb) continue;
     WHERE_AM_I_UPDATE(w, side, side);
-    CHILD_TIMER_PARAMETRIC(timer, "side ", side, "");
     TIMER_CATEGORY(timer, sieving(side));
     /* FIRST: Downsort what is coming from the level above, for this
      * bucket index */
@@ -1177,8 +1176,8 @@ downsort_tree(
                 timetree_t & timer(taux.timer);
                 taux.w = w;
                 ENTER_THREAD_TIMER(timer);
-                CHILD_TIMER_PARAMETRIC(timer, TEMPLATE_INST_NAME(downsort, LEVEL), side, "");
-                TIMER_CATEGORY(timer, sieving(side));
+                MARK_TIMER_FOR_SIDE(timer, side);
+                CHILD_TIMER(timer, TEMPLATE_INST_NAME(downsort, LEVEL));
                 auto & BAout(ws.reserve_BA<LEVEL, longhint_t>(side, ws.rank_BA(side, BAin)));
                 // This is a fake slice_index. For a longhint_t bucket,
                 // each update contains its own slice_index, directly
@@ -1235,7 +1234,6 @@ downsort_tree(
                   timetree_t & timer(aux_p->th[worker->rank()].timer);
                   ENTER_THREAD_TIMER(timer);
                   MARK_TIMER_FOR_SIDE(timer, side);
-                  TIMER_CATEGORY(timer, sieving(side));
                   SIBLING_TIMER(timer, "prepare small sieve");
                   sieve_info::side_info & s(si.sides[side]);
                   if (!s.fb) return;

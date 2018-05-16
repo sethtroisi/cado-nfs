@@ -135,8 +135,9 @@ class nfs_aux {/*{{{*/
 };/*}}}*/
 
 extern tdict::slot_parametric tdict_slot_for_side;
+extern tdict::slot tdict_slot_for_alloc_buckets;
 extern tdict::slot tdict_slot_for_threads;
-extern tdict::slot_parametric timer_slot_for_fibt;
+extern tdict::slot tdict_slot_for_fibt;
 
 #define ENTER_THREAD_TIMER(timer)       \
     ACTIVATE_TIMER(timer);                           \

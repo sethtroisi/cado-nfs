@@ -1448,7 +1448,6 @@ process_bucket_region_run::surv2_t process_bucket_region_run::convert_survivors(
 void process_bucket_region_run::purge_buckets(int side)/*{{{*/
 {
     SIBLING_TIMER(timer, "purge buckets");
-    TIMER_CATEGORY(timer, sieving(side));
 
     unsigned char * Sx = S[0] ? S[0] : S[1];
 
@@ -1472,7 +1471,6 @@ void process_bucket_region_run::purge_buckets(int side)/*{{{*/
 void process_bucket_region_run::resieve(int side)/*{{{*/
 {
     SIBLING_TIMER(timer, "resieve");
-    TIMER_CATEGORY(timer, sieving(side));
 
     unsigned char * Sx = S[0] ? S[0] : S[1];
 
@@ -1687,7 +1685,7 @@ task_result * detached_cofac(worker_thread * worker, task_parameters * _param, i
     std::array<int, 2> cof_bitsize {{ 0,0 }}; /* placate compiler */
     las.cofac_stats.call(cur.norm, cof_bitsize);
 
-    SIBLING_TIMER(timer, "factor_both_leftover_norms");
+    SIBLING_TIMER(timer, "cofactoring"); // aka factor_both_leftover_norms
     TIMER_CATEGORY(timer, cofactoring_mixed());
 
     rep.ttcof -= microseconds_thread ();
@@ -1701,7 +1699,7 @@ task_result * detached_cofac(worker_thread * worker, task_parameters * _param, i
 #ifdef TRACE_K
     if (cur.trace_on_spot() && pass == 0) {
         verbose_output_print(TRACE_CHANNEL, 0,
-                "# factor_leftover_norm failed for (%" PRId64 ",%" PRIu64 "), ", cur.a, cur.b);
+                "# factor_both_leftover_norm failed for (%" PRId64 ",%" PRIu64 "), ", cur.a, cur.b);
         verbose_output_vfprint(TRACE_CHANNEL, 0, gmp_vfprintf,
                 "remains %Zd, %Zd unfactored\n",
                 (mpz_srcptr) cur.norm[0],
@@ -1836,7 +1834,6 @@ void process_bucket_region_run::cofactoring_sync (surv2_t & survivors2)/*{{{*/
          */
 
         SIBLING_TIMER(timer, "check_coprime");
-        TIMER_CATEGORY(timer, cofactoring_mixed());
 
         /* start building a new object. This is a swap operation */
         cur = cofac_standalone(N, x, si);
@@ -1880,8 +1877,9 @@ void process_bucket_region_run::cofactoring_sync (surv2_t & survivors2)/*{{{*/
         for(int pside = 0 ; pass && pside < 2 ; pside++) {
             int side = trialdiv_first_side ^ pside;
 
-            CHILD_TIMER_PARAMETRIC(timer, "checks on side ", side, "");
+            CHILD_TIMER_PARAMETRIC(timer, "side ", side, " pre-cofactoring checks");
             TIMER_CATEGORY(timer, cofactoring(side));
+
 
             SIBLING_TIMER(timer, "recompute complete norm");
 
@@ -2011,8 +2009,7 @@ void process_bucket_region_run::operator()() {/*{{{*/
         sieve_info::side_info & s(si.sides[side]);
         if (!s.fb) continue;
 
-        SIBLING_TIMER_PARAMETRIC(timer, "side ", side, "");
-        TIMER_CATEGORY(timer, sieving(side));
+        MARK_TIMER_FOR_SIDE(timer, side);
 
         init_norms(side);
         apply_buckets(side);
@@ -2034,6 +2031,7 @@ void process_bucket_region_run::operator()() {/*{{{*/
 
     /* These two steps used to be called "prepare_cofactoring" */
     for(int side = 0 ; side < 2 ; side++) {
+        MARK_TIMER_FOR_SIDE(timer, side);
         purge_buckets(side);
         resieve(side);
     }
@@ -2426,7 +2424,6 @@ void do_one_special_q_sublat(las_info const & las, sieve_info & si, nfs_work & w
     where_am_I & w(aux.w);
 
     /* essentially update the fij polynomials and the max log bounds */
-
     if (las.verbose >= 2) {
         verbose_output_print (0, 1, "# f_0'(x) = ");
         mpz_poly_fprintf(las.output, si.sides[0].lognorms->fij);
@@ -2486,7 +2483,6 @@ void do_one_special_q_sublat(las_info const & las, sieve_info & si, nfs_work & w
 
             ENTER_THREAD_TIMER(timer);
             MARK_TIMER_FOR_SIDE(timer, side);
-            TIMER_CATEGORY(timer, sieving(side));
 
             SIBLING_TIMER(timer, "prepare small sieve");
 
@@ -2523,41 +2519,39 @@ void do_one_special_q_sublat(las_info const & las, sieve_info & si, nfs_work & w
 
     rep.ttbuckets_fill += seconds();
 
-    BOOKKEEPING_TIMER(timer_special_q);
-    if (si.toplevel == 1) {
-        {
-            CHILD_TIMER(timer_special_q, "process_bucket_region outer container");
-            TIMER_CATEGORY(timer_special_q, sieving_mixed());
-
+    {
+        CHILD_TIMER(timer_special_q, "process_bucket_region outer container");
+        TIMER_CATEGORY(timer_special_q, sieving_mixed());
+        if (si.toplevel == 1) {
             /* Process bucket regions in parallel */
             process_many_bucket_regions(ws, wc_p, aux_p, pool, 0, si, w);
-        }
-    } else {
-        SIBLING_TIMER(timer_special_q, "process_bucket_region outer container");
-        TIMER_CATEGORY(timer_special_q, sieving_mixed());
+        } else {
+            // Prepare plattices at internal levels
 
-        // Prepare plattices at internal levels
-
-        // Visit the downsorting tree depth-first.
-        // If toplevel = 1, then this is just processing all bucket
-        // regions.
-        size_t (&BRS)[FB_MAX_PARTS] = BUCKET_REGIONS;
-        for (int i = 0; i < si.nb_buckets[si.toplevel]; i++) {
-            switch (si.toplevel) {
-                case 2:
-                    downsort_tree<1>(ws, wc_p, aux_p, pool, i, i*BRS[2]/BRS[1],
-                            si, precomp_plattice, w);
-                    break;
-                case 3:
-                    downsort_tree<2>(ws, wc_p, aux_p, pool, i, i*BRS[3]/BRS[1],
-                            si, precomp_plattice, w);
-                    break;
-                default:
-                    ASSERT_ALWAYS(0);
+            // Visit the downsorting tree depth-first.
+            // If toplevel = 1, then this is just processing all bucket
+            // regions.
+            size_t (&BRS)[FB_MAX_PARTS] = BUCKET_REGIONS;
+            for (int i = 0; i < si.nb_buckets[si.toplevel]; i++) {
+                switch (si.toplevel) {
+                    case 2:
+                        downsort_tree<1>(ws, wc_p, aux_p, pool,
+                                i, i*BRS[2]/BRS[1],
+                                si, precomp_plattice, w);
+                        break;
+                    case 3:
+                        downsort_tree<2>(ws, wc_p, aux_p, pool, i,
+                                i*BRS[3]/BRS[1],
+                                si, precomp_plattice, w);
+                        break;
+                    default:
+                        ASSERT_ALWAYS(0);
+                }
             }
         }
     }
 
+    BOOKKEEPING_TIMER(timer_special_q);
     /* This ensures proper serialization of stuff that is in queue 0.
      * Maybe we could be looser about this.
      */
@@ -2719,6 +2713,20 @@ bool do_one_special_q(las_info & las, nfs_work & ws, std::shared_ptr<nfs_aux> au
 #endif
 
     return true;
+}
+
+void prepare_timer_layout_for_multithreaded_tasks(timetree_t & timer)
+{
+    /* This does nothing. We're just setting up the required
+     * empty shell so that all the multithreaded tasks that
+     * begin with MARK_TIMER_FOR_SIDE are properly registered
+     * under the "sieving on side X" umbrella.
+     */
+    timetree_t::accounting_child x(timer, tdict_slot_for_threads);
+    for (int side = 0; side < 2; ++side) {
+        MARK_TIMER_FOR_SIDE(timer, side);
+        TIMER_CATEGORY(timer, sieving(side));
+    }
 }
 
 int main (int argc0, char *argv0[])/*{{{*/
@@ -2956,6 +2964,8 @@ int main (int argc0, char *argv0[])/*{{{*/
                  * category */
                 auto aux_p = std::make_shared<nfs_aux>(las, doing, rel_hash_p, rep, timer_special_q, las.nb_threads);
                 nfs_aux & aux(*aux_p);
+
+                prepare_timer_layout_for_multithreaded_tasks(timer_special_q);
 
                 bool done = do_one_special_q(las, workspaces, aux_p, *pool, pl);
 
