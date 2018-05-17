@@ -777,10 +777,18 @@ struct plattice_info_dense_t {
 class plattices_dense_vector_t:
         public std::vector<plattice_info_dense_t> {
 public:
+#if !GNUC_VERSION(4,7,2)
+    /* Apparently there's a bug in gcc 4.7.2, which does not recognize
+     * that a vector of plattices_dense_vector_t is ok with a move ctor
+     * and no copy ctor. I'm not entirely sure why, and I don't really
+     * want to investigate. Theoretically, defining ctors as below should
+     * be fine.
+     */
     plattices_dense_vector_t(plattices_dense_vector_t const&) = delete;
     plattices_dense_vector_t(plattices_dense_vector_t&&) = default;
     plattices_dense_vector_t& operator=(plattices_dense_vector_t&&) = default;
     plattices_dense_vector_t() = default;
+#endif
 };
 
 
