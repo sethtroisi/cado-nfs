@@ -1240,6 +1240,7 @@ void fb_factorbase::make_linear ()
 typedef struct {
     mpz_poly_srcptr poly;
     unsigned int n;
+    unsigned int index;
 
     fbprime_t p[GROUP];
     fbprime_t q[GROUP];
@@ -1303,6 +1304,13 @@ static int get_new_task(task_info_t &T, fbprime_t &next_prime, prime_info& pi, c
     return i;
 }
 
+typedef std::pair<unsigned int, task_info_t *> pending_result_t;
+/* priority queue is for lowest index first, here */
+bool operator<(pending_result_t const & a, pending_result_t const& b)
+{
+    return a.first > b.first;
+}
+
 static void store_task_result(fb_factorbase &fb, task_info_t const & T)
 {
     std::list<fb_entry_general> pool;
@@ -1319,6 +1327,7 @@ static void store_task_result(fb_factorbase &fb, task_info_t const & T)
         fb_cur.invq = T.invq[j];
         pool.push_back(fb_cur);
     }
+    ASSERT(std::is_sorted(pool.begin(), pool.end(), fb_entry_general::sort_byq()));
     fb.append(pool);
 }
 
@@ -1355,30 +1364,52 @@ void fb_factorbase::make_linear_threadpool (unsigned int nb_threads)
 
     // Stage 0: prepare tasks
     unsigned int active_task = 0;
+    unsigned int scheduled_tasks = 0;
     for (unsigned int i = 0; i < nb_tab; ++i) {
-        int ret;
-        ret = get_new_task(T[i], next_prime, pi, maxp, next_pow, powers);
-        if (!ret)
+        task_info_t * curr_T = &T[i];
+
+        if (!get_new_task(*curr_T, next_prime, pi, maxp, next_pow, powers))
             break;
-        pool.add_task(process_one_task, &params[i], 0);
+        curr_T->index = scheduled_tasks++;
+        pool.add_task(process_one_task, &params[curr_T-T], 0);
         active_task++;
     }
 
+    /* store_task_result is only called for tasks that get completed in
+     * order */
+    unsigned int completed_tasks = 0;
+    std::priority_queue<pending_result_t> pending;
+
     // Stage 1: while there are still primes, wait for a result and
     // schedule a new task.
-    for(int cont = 1 ; cont && active_task ; ) {
+    for( ; active_task ; ) {
         task_result *result = pool.get_result();
         make_linear_thread_result *res =
             static_cast<make_linear_thread_result *>(result);
         active_task--;
         task_info_t * curr_T = res->T;
-        store_task_result(*this, *curr_T);
-        cont = get_new_task(*curr_T, next_prime, pi, maxp, next_pow, powers);
-        if (cont) {
-            active_task++;
-            pool.add_task(process_one_task, res->orig_param, 0);
+
+        unsigned int just_finished = curr_T->index;
+        if (just_finished == completed_tasks) {
+            store_task_result(*this, *curr_T);
+            completed_tasks++;
+        } else {
+            pending.push(std::make_pair(just_finished, new task_info_t(*curr_T)));
         }
         delete result;
+
+        for( ; !pending.empty() && pending.top().first == completed_tasks ; ) {
+            store_task_result(*this, *pending.top().second);
+            delete pending.top().second;
+            pending.pop();
+            completed_tasks++;
+        }
+
+        if (!get_new_task(*curr_T, next_prime, pi, maxp, next_pow, powers))
+            break;
+        curr_T->index = scheduled_tasks++;
+        pool.add_task(process_one_task, &params[curr_T-T], 0);
+        active_task++;
     }
 
     // Stage 2: purge last tasks
@@ -1387,9 +1418,25 @@ void fb_factorbase::make_linear_threadpool (unsigned int nb_threads)
         make_linear_thread_result *res =
             static_cast<make_linear_thread_result *>(result);
         task_info_t * curr_T = res->T;
-        store_task_result(*this, *curr_T);
+
+        unsigned int just_finished = curr_T->index;
+        if (just_finished == completed_tasks) {
+            store_task_result(*this, *curr_T);
+            completed_tasks++;
+        } else {
+            pending.push(std::make_pair(just_finished, new task_info_t(*curr_T)));
+        }
         delete result;
+
+        for( ; !pending.empty() && pending.top().first == completed_tasks ; ) {
+            store_task_result(*this, *pending.top().second);
+            delete pending.top().second;
+            pending.pop();
+            completed_tasks++;
+        }
     }
+    ASSERT_ALWAYS(pending.empty());
+    ASSERT_ALWAYS(completed_tasks == scheduled_tasks);
 
     delete [] T;
     delete [] params;
@@ -1537,16 +1584,20 @@ fb_factorbase::read(const char * const filename)
  *
  * and then
  *      offset to beginning of vector of general entries (integer)
+ *      offset to beginning of vector of weights for these entries
  *      number of general entries (integer)
  *      size in bytes per general entry (integer)
  *      offset to beginning of vector of entries with 0 roots (integer)
+ *      offset to beginning of vector of weights for these entries
  *      number of entries with 0 roots (integer)
  *      size in bytes per entries with 0 roots (integer)
  *      offset to beginning of vector of entries with 1 roots (integer)
+ *      offset to beginning of vector of weights for these entries
  *      number of entries with 1 roots (integer)
  *      size in bytes per entries with 1 roots (integer)
  *      ...
  *      offset to beginning of vector of entries with deg(f) roots (integer)
+ *      offset to beginning of vector of weights for these entries
  *      number of entries with deg(f) roots (integer)
  *      size in bytes per entries with deg(f) roots (integer)
  *
