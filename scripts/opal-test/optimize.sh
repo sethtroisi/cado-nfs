@@ -4,7 +4,8 @@
 # Puts the optimized file in params.cxx.opt in the current directory.
 # Remark: the 'nomad' binary must be in $PATH (see README)
 # The CADO_BUILD environment variable must contain the CADO-NFS build
-# directory (makefb and las are taken from $CADO_BUILD/sieve)
+# directory (makefb and las are taken from $CADO_BUILD/sieve), i.e.,
+# something like /xxx/cado-nfs/build/<some_name>
 
 # Important: if lpb0 and/or lpb1 change, you need to recompute rels_wanted,
 # which should be near from prime_pi(2^lpb0) + prime_pi(2^lpb1)
