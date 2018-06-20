@@ -77,6 +77,11 @@ else
   exit 1
 fi
 
+if ! [ -x "${CADO_BUILD}/sieve/makefb" ] || ! [ -x "${CADO_BUILD}/sieve/las" ] ; then
+    echo "could not find ${CADO_BUILD}/sieve/makefb and ${CADO_BUILD}/sieve/las ; have you run \"make\" ?"
+    exit 1
+fi
+
 ### Set working directory
 d=`mktemp -d`
 echo "Working directory:" $d
