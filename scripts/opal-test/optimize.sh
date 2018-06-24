@@ -102,7 +102,7 @@ if [ $npoly -eq 0 ] ; then # polys are given by Y[0-9] and (c[0-9] or X[0-9])
   if grep -q "^[cX][2-9]" $d/$poly ; then
     poly1="alg"
   else
-    poly0="rat"
+    poly1="rat"
   fi
 elif [ $npoly -eq 2 ] ; then # polys are given by 'poly[0-9]:c0,c1,...'
   if [ `grep "^poly0" $d/$poly | tr -cd , | wc -c` -eq 1 ] ; then
