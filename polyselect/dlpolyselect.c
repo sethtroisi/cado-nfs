@@ -566,16 +566,16 @@ main (int argc, char *argv[])
 
     t = seconds () - t;
 
-    printf ("found %lu irreducible f out of %lu candidates out of %lu\n",
+    printf ("# found %lu irreducible f out of %lu candidates out of %lu\n",
             f_irreducible, f_candidate, maxtries / modm);
-    printf ("best score %1.2f, worst %1.2f, max guard %1.2f\n",
+    printf ("# best score %1.2f, worst %1.2f, max guard %1.2f\n",
             best_score_f, worst_score_f, max_guard);
     if (max_guard > ALPHA_BOUND_GUARD)
-      printf ("Warning: max_guard > ALPHA_BOUND_GUARD, might "
+      printf ("# Warning: max_guard > ALPHA_BOUND_GUARD, might "
               "have missed some polynomials\n");
-    printf ("Time %.2fs", t);
+    printf ("# Time %.2fs", t);
 #ifdef TIMINGS
-    printf (" (roots %.2fs, irred %.2fs, lll %.2fs)", t_roots, t_irred, t_lll);
+    printf ("# (roots %.2fs, irred %.2fs, lll %.2fs)", t_roots, t_irred, t_lll);
 #endif
     printf ("\n");
 
