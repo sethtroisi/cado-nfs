@@ -549,15 +549,6 @@ static inline double compute_y(double G, double offset, double modscale) {
  */
 void lognorm_fill_rat_smart_inner (unsigned char *S, int i0, int i1, unsigned int j0, unsigned int j1, double scale, cxx_double_poly const & fijd, const double *cexp2)
 {
-    double u0 = fijd->coeff[0];
-    double u1 = fijd->coeff[1];
-
-    ASSERT_ALWAYS(u1 != 0.);
-
-    using std::signbit;
-    double u1_abs = fabs(u1);
-    double inv_u1_abs = 1/u1_abs;
-
     double modscale = scale / 0x100000;
     double offset = 0x3FF00000 - GUARD / modscale;
     /* The lg2 function wants  a positive value.
@@ -572,6 +563,28 @@ void lognorm_fill_rat_smart_inner (unsigned char *S, int i0, int i1, unsigned in
     /* COMPUTE_Y(z) returns GUARD + L(z) * scale. Recall that
      * we have 0 <= log2(z) - L(z) < 0.0861, for any real z > 0.
      */
+
+    double u0 = fijd->coeff[0];
+    double u1 = fijd->coeff[1];
+
+    if (UNLIKELY(u1 == 0)) {
+        /* constant approximating functions do occur, see bug 21684. This
+         * is triggered in particular by quadratic polynomials, which we
+         * do get with nonlinear polynomial selection.
+         */
+        for (unsigned int j = j0; j < j1; j++) {
+            double g = fabs(u0 * j);
+            uint8_t y = COMPUTE_Y(g);
+            size_t di = i1 - i0;
+            memset_with_writeahead(S, y, di, MEMSET_MIN);
+            S += di;
+        }
+        return;
+    }
+
+    using std::signbit;
+    double u1_abs = fabs(u1);
+    double inv_u1_abs = 1/u1_abs;
 
     for (unsigned int j = j0; j < j1; j++) {
 	int i = i0;

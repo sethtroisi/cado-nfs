@@ -464,7 +464,7 @@ cado_divert_test(test_init_norms bug21518
         -check-bucket 361
 )
 
-cado_divert_test(test_init_norms bug21684
+cado_divert_test(test_init_norms bug21684a
     ARGUMENTS
     -poly ${CMAKE_CURRENT_SOURCE_DIR}/c95_21684.poly
     -I 13 -lpb0 24 -lpb1 25 -mfb0 48 -mfb1 50
@@ -475,6 +475,19 @@ cado_divert_test(test_init_norms bug21684
     # jitter.
     --abort-on-jitter 2,5
     -check-bucket 505
+)
+
+cado_divert_test(test_init_norms bug21684b
+    ARGUMENTS
+    -poly ${CMAKE_CURRENT_SOURCE_DIR}/c95_21684.poly
+    -I 13 -lpb0 24 -lpb1 25 -mfb0 48 -mfb1 50
+    -q0 310087 -rho 178382
+    -sqside 1
+    --hush-max-jitter 1
+    # 21684 has two algebraic sides, so it's fine if we have some extra
+    # jitter.
+    --abort-on-jitter 2,5
+    -check-bucket 4
 )
 
 # we have no pretense to have optimized code for these cases, so don't
