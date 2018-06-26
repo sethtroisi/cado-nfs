@@ -471,7 +471,9 @@ cado_divert_test(test_init_norms bug21684
     -q0 310049 -rho 270571
     -sqside 1
     --hush-max-jitter 1
-    --abort-on-jitter 1,5
+    # 21684 has two algebraic sides, so it's fine if we have some extra
+    # jitter.
+    --abort-on-jitter 2,5
     -check-bucket 505
 )
 
