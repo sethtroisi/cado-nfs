@@ -84,7 +84,7 @@ double best_score_f = DBL_MAX, worst_score_f = DBL_MIN;
 unsigned long f_candidate = 0;   /* number of irreducibility tests */
 unsigned long f_irreducible = 0; /* number of irreducible polynomials */
 double max_guard = DBL_MIN;
-// #define TIMINGS
+#define TIMINGS
 #ifdef TIMINGS
 double t_roots = 0.0, t_irred = 0.0, t_lll = 0.0;
 #endif
@@ -210,24 +210,23 @@ polygen_JL_f (int d, unsigned int bound, mpz_t *f, unsigned long idx)
     }
     
     /* irreducibility test */
-    if(ok){
-      ok = mpz_poly_squarefree_p (ff);
 #ifdef TIMINGS
       t_irred -= seconds_thread ();
 #endif
-      if(ok){
-	ok = mpz_poly_is_irreducible_z (ff);
-#ifdef TIMINGS
-	t_irred += seconds_thread ();
-#endif
-	if(ok){
+    if (ok)
+      {
+        ok = mpz_poly_squarefree_p (ff);
+        if (ok)
+          ok = mpz_poly_is_irreducible_z (ff);
+	if(ok)
 #ifdef HAVE_OPENMP
 #pragma omp critical
 #endif
 	  f_irreducible ++;
-	}
       }
-    }
+#ifdef TIMINGS
+	t_irred += seconds_thread ();
+#endif
     return ok;
 }
 
@@ -575,7 +574,7 @@ main (int argc, char *argv[])
               "have missed some polynomials\n");
     printf ("# Time %.2fs", t);
 #ifdef TIMINGS
-    printf ("# (roots %.2fs, irred %.2fs, lll %.2fs)", t_roots, t_irred, t_lll);
+    printf (" (roots %.2fs, irred %.2fs, lll %.2fs)", t_roots, t_irred, t_lll);
 #endif
     printf ("\n");
 
