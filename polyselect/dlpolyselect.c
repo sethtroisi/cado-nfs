@@ -84,15 +84,41 @@ double best_score_f = DBL_MAX, worst_score_f = DBL_MIN;
 unsigned long f_candidate = 0;   /* number of irreducibility tests */
 unsigned long f_irreducible = 0; /* number of irreducible polynomials */
 double max_guard = DBL_MIN;
-// #define TIMINGS
+#define TIMINGS
 #ifdef TIMINGS
-double t_roots = 0.0, t_irred = 0.0, t_lll = 0.0, t_murphyE = 0.0;
+double timer[4] = {0.0, };
 #endif
 
 double Bf = 0.0, Bg = 0.0, Area = 0.0;
 double bestE = 0.0; /* best Murphy-E so far */
 int opt_flag = 0; /* 0: optimize "simple" E
                      1: optimize Muprhy E */
+
+#define TIMER_ROOTS 0
+#define TIMER_IRRED 1
+#define TIMER_LLL   2
+#define TIMER_MURPHYE 3
+
+#ifdef TIMINGS
+#define START_TIMER double t = seconds_thread ()
+#define END_TIMER(x) add_timer (x, seconds_thread () - t)
+
+/* flag=0: computing roots of f mod p
+        1: checking irreducibility of f
+        2: LLL reduction
+        3: computing MurphyE */
+static void
+add_timer (int flag, double t)
+{
+#ifdef HAVE_OPENMP
+#pragma omp critical
+#endif
+  timer[flag] += t;
+}
+#else
+#define START_TIMER
+#define END_TIMER(x)
+#endif
 
 /*
   Print two nonlinear poly info. Return non-zero for record polynomials.
@@ -146,18 +172,14 @@ print_nonlinear_poly_info (mpz_poly ff, double alpha_f, mpz_poly gg,
 
         /* compute Murphy-E */
         cado_poly p;
-#ifdef TIMINGS
-        t_murphyE -= seconds_thread ();
-#endif
+	START_TIMER;
         p->pols[ALG_SIDE]->coeff = f;
         p->pols[ALG_SIDE]->deg = df;
         p->pols[RAT_SIDE]->coeff = g;
         p->pols[RAT_SIDE]->deg = dg;
         p->skew = skew;
         E = MurphyE (p, Bf, Bg, Area, MURPHY_K);
-#ifdef TIMINGS
-        t_murphyE += seconds_thread ();
-#endif
+	END_TIMER (TIMER_MURPHYE);
         if (E <= bestE)
           return 0;
         bestE = E;
@@ -239,31 +261,26 @@ polygen_JL_f (int d, unsigned int bound, mpz_t *f, unsigned long idx)
     // #define POLY_CONTENT -6
     // if ((ok == 1) || ((ok == 0) && (max_abs_coeffs == POLY_CONTENT))){
     // #undef POLY_CONTENT
-    if (ok == 1){
+    if (ok)
 #ifdef HAVE_OPENMP
 #pragma omp critical
 #endif
       f_candidate ++;
-    }
-    
+
     /* irreducibility test */
-#ifdef TIMINGS
-      t_irred -= seconds_thread ();
-#endif
     if (ok)
       {
+	START_TIMER;
         ok = mpz_poly_squarefree_p (ff);
         if (ok)
           ok = mpz_poly_is_irreducible_z (ff);
-	if(ok)
+	END_TIMER (TIMER_IRRED);
 #ifdef HAVE_OPENMP
 #pragma omp critical
 #endif
+	if (ok)
 	  f_irreducible ++;
       }
-#ifdef TIMINGS
-	t_irred += seconds_thread ();
-#endif
     return ok;
 }
 
@@ -304,13 +321,9 @@ polygen_JL_g (mpz_t N, int dg, mat_Z g, mpz_t root)
         }
     }
 
-#ifdef TIMINGS
-    t_lll -= seconds_thread ();
-#endif
+    START_TIMER;
     LLL (det, g, NULL, a, b);
-#ifdef TIMINGS
-    t_lll += seconds_thread ();
-#endif
+    END_TIMER (TIMER_LLL);
 
     mpz_clear (det);
     mpz_clear (a);
@@ -357,13 +370,9 @@ polygen_JL2 (mpz_t n, unsigned int df, unsigned int dg,
     a = malloc ((dg + 1) * sizeof (long));
 
     /* compute roots of the polynomial f */
-#ifdef TIMINGS
-    t_roots -= seconds_thread ();
-#endif
+    START_TIMER;
     nr = mpz_poly_roots_mpz (rf, f, n);
-#ifdef TIMINGS
-    t_roots += seconds_thread ();
-#endif
+    END_TIMER (TIMER_ROOTS);
     ASSERT(nr <= df);
 
     // if (nr > 0)
@@ -629,7 +638,8 @@ main (int argc, char *argv[])
     printf ("# Time %.2fs", t);
 #ifdef TIMINGS
     printf (" (roots %.2fs, irred %.2fs, lll %.2fs, MurphyE %.2fs)",
-            t_roots, t_irred, t_lll, t_murphyE);
+            timer[TIMER_ROOTS], timer[TIMER_IRRED], timer[TIMER_LLL],
+	    timer[TIMER_MURPHYE]);
 #endif
     printf ("\n");
 
