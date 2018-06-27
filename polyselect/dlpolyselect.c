@@ -361,7 +361,7 @@ root_lift (mpz_t n, mpz_t kn, unsigned long k, mpz_poly f, mpz_t r)
 static void
 polygen_JL2 (mpz_t n, unsigned long k,
              unsigned int df, unsigned int dg,
-	     unsigned long nb_comb, mpz_poly f)
+	     unsigned long nb_comb, mpz_poly f, long bound2)
 {
     unsigned int i, j, nr, format = 1;
     mpz_t *rf, c, kn;
@@ -369,7 +369,6 @@ polygen_JL2 (mpz_t n, unsigned long k,
     mpz_poly *v, u;
     long *a;
     double alpha_f;
-    long bound2 = 1;
 
     ASSERT_ALWAYS (df >= 3);
     mpz_init (c);
@@ -489,7 +488,7 @@ polygen_JL2 (mpz_t n, unsigned long k,
 static void
 polygen_JL1 (mpz_t n, unsigned long k,
              unsigned int df, unsigned int dg, unsigned int bound,
-             unsigned long idx, unsigned long nb_comb)
+             unsigned long idx, unsigned long nb_comb, unsigned int bound2)
 {
     unsigned int i;
     mpz_t *f;
@@ -507,7 +506,7 @@ polygen_JL1 (mpz_t n, unsigned long k,
     /* generate f of degree d with small coefficients */
     irred = polygen_JL_f (df, bound, f, idx);
     if (irred)
-      polygen_JL2 (n, k, df, dg, nb_comb, ff);
+      polygen_JL2 (n, k, df, dg, nb_comb, ff, bound2);
     /* clear */
     for (i = 0; i <= df; i ++)
       mpz_clear (f[i]);
@@ -665,7 +664,7 @@ main (int argc, char *argv[])
     }
 #endif
     for (unsigned long c = modr; c < maxtries; c += modm)
-      polygen_JL1 (N, multiplier, df, dg, bound, c, nb_comb);
+      polygen_JL1 (N, multiplier, df, dg, bound, c, nb_comb, bound2);
 
     t = seconds () - t;
 
