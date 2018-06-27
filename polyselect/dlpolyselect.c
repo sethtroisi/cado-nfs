@@ -84,7 +84,7 @@ double best_score_f = DBL_MAX, worst_score_f = DBL_MIN;
 unsigned long f_candidate = 0;   /* number of irreducibility tests */
 unsigned long f_irreducible = 0; /* number of irreducible polynomials */
 double max_guard = DBL_MIN;
-#define TIMINGS
+// #define TIMINGS
 #ifdef TIMINGS
 double t_roots = 0.0, t_irred = 0.0, t_lll = 0.0, t_murphyE = 0.0;
 #endif
@@ -146,14 +146,18 @@ print_nonlinear_poly_info (mpz_poly ff, double alpha_f, mpz_poly gg,
 
         /* compute Murphy-E */
         cado_poly p;
+#ifdef TIMINGS
         t_murphyE -= seconds_thread ();
+#endif
         p->pols[ALG_SIDE]->coeff = f;
         p->pols[ALG_SIDE]->deg = df;
         p->pols[RAT_SIDE]->coeff = g;
         p->pols[RAT_SIDE]->deg = dg;
         p->skew = skew;
         E = MurphyE (p, Bf, Bg, Area, MURPHY_K);
+#ifdef TIMINGS
         t_murphyE += seconds_thread ();
+#endif
         if (E <= bestE)
           return 0;
         bestE = E;
