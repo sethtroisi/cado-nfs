@@ -163,6 +163,7 @@ class Polynomials(object):
     re_best = re.compile(r"# Best polynomial found \(revision (.*)\):")
     # the 'lognorm' variable now represents the expected E-value
     re_lognorm = re.compile(re_cap_n_fp(r"\s*#\s*exp_E", 1))
+    re_score = re.compile(re_cap_n_fp(r"# f\+g score", 1))
     
     # Keys that can occur in a polynomial file, in their preferred ordering,
     # and whether the key is mandatory or not. The preferred ordering is used
@@ -182,6 +183,7 @@ class Polynomials(object):
         self.MurphyParams = None
         self.revision = None
         self.lognorm = 0.
+        self.score = 0.
         self.params = {}
         polyf = Polynomial()
         polyg = Polynomial()
@@ -239,6 +241,13 @@ class Polynomials(object):
                     raise PolynomialParseException(
                         "Line '%s' redefines exp_E value" % line)
                 self.lognorm = float(match.group(1))
+                continue
+            match = self.re_score.match(line)
+            if match:
+                if self.score != 0:
+                    raise PolynomialParseException(
+                        "Line '%s' redefines score value" % line)
+                self.score = float(match.group(1))
                 continue
             # Drop comment, strip whitespace
             line2 = line.split('#', 1)[0].strip()
@@ -2400,6 +2409,304 @@ class Polysel2Task(ClientServerTask, HasStatistics, DoesImport, patterns.Observe
                                  "after size optimization", rank)
     def get_will_import(self):
         return "import" in self.params
+
+class PolyselJLTask(ClientServerTask, patterns.Observer):
+    """ Find a polynomial pair using Joux-Lercier for DL in GF(p), uses client/server """
+    @property
+    def name(self):
+        return "polyselectJL"
+    @property
+    def title(self):
+        return "Polynomial Selection (Joux-Lercier)"
+    @property
+    def programs(self):
+        return ((cadoprograms.PolyselectJL, (), {}),)
+    @property
+    def paramnames(self):
+        return self.join_params(super().paramnames, {
+            "N": int, "modr": 0, "nrkeep": 20,
+            "bound": int, "modm": int, "degree": int
+            })
+    @staticmethod
+    def update_scores(old_score, new_score):
+        score = [0, 0]
+        score[0] = min(old_score[0] or new_score[0], new_score[0])
+        # New maximum
+        score[1] = max(old_score[1], new_score[1])
+        return score
+    
+    def __init__(self, *, mediator, db, parameters, path_prefix):
+        super().__init__(mediator=mediator, db=db, parameters=parameters,
+                         path_prefix=path_prefix)
+        assert self.params["nrkeep"] > 0
+        self.state["rnext"] = self.state.get("rnext", 0)
+
+        tablename = self.make_tablename("bestpolynomials")
+        self.best_polynomials = self.make_db_dict(
+                tablename, connection=self.db_connection)
+        self._check_best_polynomials()
+
+        self.poly_heap = []
+        self.bestpoly = None
+            
+    def _check_best_polynomials(self):
+        # Check that the keys form a sequence of consecutive non-negative
+        # integers
+        oldkeys = list(self.best_polynomials.keys())
+        oldkeys.sort(key=int)
+        assert oldkeys == list(map(str, range(len(self.best_polynomials))))
+
+    def _compare_heap_db(self):
+        """ Compare that the polynomials in the heap and in the DB agree
+        
+        They must contain an equal number of entries, and each polynomial
+        stored in the heap must be at the specified index in the DB.
+        """
+        assert len(self.poly_heap) == len(self.best_polynomials)
+        for score, (key, poly) in self.poly_heap:
+            assert self.best_polynomials[key] == str(poly)
+
+    def run(self):
+        super().run()
+
+        if self.is_done():
+            self.logger.info("Already finished - nothing to do")
+            return True
+        
+        # Submit all the WUs we need to reach the final modr
+        while self.need_more_wus():
+            self.submit_one_wu()
+        
+        # Wait for all the WUs to finish
+        while self.get_number_outstanding_wus() > 0:
+            self.wait()
+        
+        self._compare_heap_db()
+        self.logger.info("Finished")
+        filename = self.workdir.make_filename("poly")
+        self.bestpoly.create_file(filename)
+        self.state["polyfilename"] = filename.get_wdir_relative()
+        self.logger.info("Selected polynomial has score %f",
+                self.bestpoly.score);
+        return True
+    
+    def is_done(self):
+        return not self.need_more_wus() and \
+            self.get_number_outstanding_wus() == 0
+    
+    def get_achievement(self):
+        return self.state["wu_received"] / self.params["modm"]
+
+    def updateObserver(self, message):
+        identifier = self.filter_notification(message)
+        if not identifier:
+            # This notification was not for me
+            return False
+        if self.handle_error_result(message):
+            return True
+        (filename, ) = message.get_output_files()
+        self.process_polyfile(filename, commit=False)
+        # Always mark ok to avoid warning messages about WUs that did not
+        # find a poly
+        self.verification(message.get_wu_id(), True, commit=True)
+        return True
+    
+    @staticmethod
+    def read_blocks(input):
+        """ Return blocks of consecutive non-empty lines from input
+        
+        Whitespace is stripped; a line containing only whitespace is
+        considered empty. An empty block is never returned.
+        
+        >>> list(Polysel1Task.read_blocks(['', 'a', 'b', '', 'c', '', '', 'd', 'e', '']))
+        [['a', 'b'], ['c'], ['d', 'e']]
+        """
+        block = []
+        for line in input:
+            line = line.strip()
+            if line:
+                block.append(line)
+            else:
+                if block:
+                    yield block
+                block = []
+        if block:
+            yield block
+
+    def import_one_file(self, filename):
+        self.process_polyfile(filename)
+
+    def process_polyfile(self, filename, commit=True):
+        """ Read all polynomials in a file and add them to the
+        DB and priority queue if worthwhile.
+        
+        Different polynomials must be separated by a blank line.
+        """
+        try:
+            polyfile = self.read_log_warning(filename)
+        except (OSError, IOError) as e:
+            if e.errno == 2: # No such file or directory
+                self.logger.error("File '%s' does not exist", filename)
+                return None
+            else:
+                raise
+
+        totalparsed, totaladded = 0, 0
+        for block in self.read_blocks(polyfile):
+            parsed, added = self.parse_and_add_poly(block, filename)
+            totalparsed += parsed
+            totaladded += added
+        have = len(self.poly_heap)
+        nrkeep = self.params["nrkeep"]
+        fullmsg = ("%d/%d" % (have, nrkeep)) if have < nrkeep else "%d" % nrkeep
+        self.logger.info("Parsed %d polynomials, added %d to priority queue (has %s)",
+                         totalparsed, totaladded, fullmsg)
+        if totaladded:
+            self.logger.info("Worst polynomial in queue now has score %f",
+                             -self.poly_heap[0][0])
+    
+    def read_log_warning(self, filename):
+        """ Read lines from file. If a "# WARNING" line occurs, log it.
+        """
+        re_warning = re.compile("# WARNING")
+        with open(filename, "r") as inputfile:
+            for line in inputfile:
+                if re_warning.match(line):
+                    self.logger.warn("File %s contains: %s",
+                                     filename, line.strip())
+                yield line
+
+    def parse_and_add_poly(self, text, filename):
+        """ Parse a polynomial from an iterable of lines and add it to the
+        priority queue and DB. Return a two-element list with the number of
+        polynomials parsed and added, i.e., (0,0) or (1,0) or (1,1).
+        """
+        poly = self.parse_poly(text, filename)
+        if poly is None:
+            return (0, 0)
+        if poly.getN() != self.params["N"]:
+            self.logger.error("Polynomial is for the wrong prime:\n%s",
+                              poly)
+            return (0, 0)
+        if not poly.score:
+            self.logger.warn("Polynomial in file %s has no score, skipping it",
+                             filename)
+            return (0, 0)
+        if self._add_poly_heap_db(poly):
+            if self.bestpoly is None or self.bestpoly.score > poly.score:
+                self.bestpoly = poly
+                self.logger.info("Best polynomial so far has score %f",
+                        poly.score);
+            return (1, 1)
+        else:
+            return (1, 0)
+
+    def _add_poly_heap_db(self, poly):
+        """ Add a polynomial to the heap and DB, if it's good enough.
+        
+        Returns True if the poly was added, False if not. """
+        key = self._add_poly_heap(poly)
+        if key is None:
+            return False
+        self.best_polynomials[key] = str(poly)
+        return True
+
+    def _add_poly_heap(self, poly):
+        """ Add a polynomial to the heap
+        
+        If the heap is full (nrkeep), the worst polynomial (i.e., with the
+        largest score) is replaced if the new one is better.
+        Returns the key (as a str) under which the polynomial was added,
+        or None if it was not added.
+        """
+        assert len(self.poly_heap) <= self.params["nrkeep"]
+        debug = False
+
+        # Find DB index under which to store this new poly. If the heap
+        # is not full, use the next bigger index.
+        key = len(self.poly_heap)
+        # Is the heap full?
+        if key == self.params["nrkeep"]:
+            # Should we store this poly at all, i.e., is it better than
+            # the worst one in the heap?
+            worstscore = -self.poly_heap[0][0]
+            if worstscore <= poly.score:
+                if debug:
+                    self.logger.debug("_add_poly_heap(): new poly score %f, "
+                          "worst in heap has %f. Not adding",
+                          poly.score, worstscore)
+                return None
+            # Pop the worst poly from heap and re-use its DB index
+            key = heapq.heappop(self.poly_heap)[1][0]
+            if debug:
+                self.logger.debug("_add_poly_heap(): new poly score %f, "
+                    "worst in heap has %f. Replacing DB index %s",
+                     poly.score, worstscore, key)
+        else:
+            # Heap was not full
+            if debug:
+                self.logger.debug("_add_poly_heap(): heap was not full, adding "
+                    "poly with score %f at DB index %s", poly.score, key)
+
+        # The DB requires the key to be a string. In order to have
+        # identical data in DB and heap, we store key as str everywhere.
+        key = str(key)
+
+        # Python heapq stores a minheap, so in order to have the worst
+        # polynomial (with largest score) easily accessible, we use
+        # -score as the heap key
+        new_entry = (-poly.score, (key, poly))
+        heapq.heappush(self.poly_heap, new_entry)
+        return key
+
+    def parse_poly(self, text, filename):
+        poly = None
+        try:
+            poly = Polynomials(text)
+        except PolynomialParseException as e:
+            if str(e) != "No polynomials found":
+                self.logger.warn("Invalid polyselect file '%s': %s",
+                                  filename, e)
+                return None
+        except UnicodeDecodeError as e:
+            self.logger.error("Error reading '%s' (corrupted?): %s", filename, e)
+            return None
+        
+        if not poly:
+            return None
+        return poly
+    
+    def get_raw_polynomials(self):
+        # Extract polynomials from heap and return as list
+        return [entry[1][1] for entry in self.poly_heap]
+
+    def get_poly_filename(self):
+        return self.get_state_filename("polyfilename")
+
+    def get_poly(self):
+        return self.bestpoly
+
+    def get_have_two_alg_sides(self):
+            return True
+
+    def need_more_wus(self):
+        return 1 + self.state["rnext"] < self.params["modm"]
+    
+    def submit_one_wu(self):
+        modr = self.state["rnext"]
+        df = self.params["degree"]
+        dg = self.params["degree"]-1
+        outputfile = self.workdir.make_filename("%d" % (modr,), prefix=self.name)
+        if self.test_outputfile_exists(outputfile):
+            self.logger.info("%s already exists, won't generate again",
+                             outputfile)
+        else:
+            p = cadoprograms.PolyselectJL(modr=modr, df=df, dg=dg,
+                                        stdout=str(outputfile),
+                                        **self.progparams[0])
+            self.submit_command(p, "%d" % (modr,), commit=False)
+        self.state.update({"rnext": modr+1}, commit=True)
+
 
 class PolyselGFpnTask(Task, DoesImport):
     """ Polynomial selection for DL in extension fields """
@@ -5287,7 +5594,7 @@ class CompleteFactorization(HasState, wudb.DbAccess,
         # This isn't a Task subclass so we don't really need to define
         # paramnames, but we do it out of habit
         return {"name": str, "workdir": str, "N": int, "ell": 0, "dlp": False,
-                "gfpext": 1, "trybadwu": False, "target": 0}
+                "gfpext": 1, "jlpoly" : False, "trybadwu": False, "target": 0}
     @property
     def title(self):
         return "Complete Factorization"
@@ -5368,14 +5675,20 @@ class CompleteFactorization(HasState, wudb.DbAccess,
         ## For DLP in extension fields, we can not use the classical
         ## polynomial selection, but otherwise we do:
         if self.params["gfpext"] == 1:
-            self.polysel1 = Polysel1Task(mediator=self,
-                                       db=db,
-                                       parameters=self.parameters,
-                                       path_prefix=polyselpath)
-            self.polysel2 = Polysel2Task(mediator=self,
-                                       db=db,
-                                       parameters=self.parameters,
-                                       path_prefix=polyselpath)
+            if self.params["jlpoly"]:
+                self.polyselJL = PolyselJLTask(mediator=self,
+                                           db=db,
+                                           parameters=self.parameters,
+                                           path_prefix=polyselpath)
+            else:
+                self.polysel1 = Polysel1Task(mediator=self,
+                                           db=db,
+                                           parameters=self.parameters,
+                                           path_prefix=polyselpath)
+                self.polysel2 = Polysel2Task(mediator=self,
+                                           db=db,
+                                           parameters=self.parameters,
+                                           path_prefix=polyselpath)
         else:
             self.polyselgfpn = PolyselGFpnTask(mediator=self,
                     db=db,
@@ -5436,7 +5749,10 @@ class CompleteFactorization(HasState, wudb.DbAccess,
         # run
         if self.params["dlp"]:
             if self.params["gfpext"] == 1:
-                self.tasks = (self.polysel1, self.polysel2)
+                if self.params["jlpoly"]:
+                    self.tasks = (self.polyselJL,)
+                else:
+                    self.tasks = (self.polysel1, self.polysel2)
             else:
                 self.tasks = (self.polyselgfpn,)
             self.tasks = self.tasks + (self.numbertheory, self.fb,
@@ -5496,12 +5812,17 @@ class CompleteFactorization(HasState, wudb.DbAccess,
 
         ## Set requests related to polynomial selection
         if self.params["gfpext"] == 1:
-            self.request_map[Request.GET_RAW_POLYNOMIALS] = self.polysel1.get_raw_polynomials
-            self.request_map[Request.GET_POLY_RANK] = self.polysel1.get_poly_rank
-            self.request_map[Request.GET_POLYNOMIAL] = self.polysel2.get_poly
-            self.request_map[Request.GET_POLYNOMIAL_FILENAME] = self.polysel2.get_poly_filename
-            self.request_map[Request.GET_HAVE_TWO_ALG_SIDES] = self.polysel2.get_have_two_alg_sides
-            self.request_map[Request.GET_WILL_IMPORT_FINAL_POLYNOMIAL] = self.polysel2.get_will_import
+            if self.params["jlpoly"]:
+                self.request_map[Request.GET_POLYNOMIAL] = self.polyselJL.get_poly
+                self.request_map[Request.GET_POLYNOMIAL_FILENAME] = self.polyselJL.get_poly_filename
+                self.request_map[Request.GET_HAVE_TWO_ALG_SIDES] = self.polyselJL.get_have_two_alg_sides
+            else:
+                self.request_map[Request.GET_RAW_POLYNOMIALS] = self.polysel1.get_raw_polynomials
+                self.request_map[Request.GET_POLY_RANK] = self.polysel1.get_poly_rank
+                self.request_map[Request.GET_POLYNOMIAL] = self.polysel2.get_poly
+                self.request_map[Request.GET_POLYNOMIAL_FILENAME] = self.polysel2.get_poly_filename
+                self.request_map[Request.GET_HAVE_TWO_ALG_SIDES] = self.polysel2.get_have_two_alg_sides
+                self.request_map[Request.GET_WILL_IMPORT_FINAL_POLYNOMIAL] = self.polysel2.get_will_import
         else:
             self.request_map[Request.GET_POLYNOMIAL] = self.polyselgfpn.get_poly
             self.request_map[Request.GET_POLYNOMIAL_FILENAME] = self.polyselgfpn.get_poly_filename

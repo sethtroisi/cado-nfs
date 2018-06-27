@@ -704,6 +704,23 @@ class PolyselectGFpn(Program):
                  **kwargs):
         super().__init__(locals(), **kwargs)
 
+class PolyselectJL(Program):
+    binary = "dlpolyselect"
+    name = binary
+    subdir = "polyselect"
+
+    def __init__(self, *,
+                 verbose : Toggle("v")=None,
+                 N: Parameter(checktype=int)=None,
+                 df: Parameter(checktype=int)=None,
+                 dg: Parameter(checktype=int)=None,
+                 bound: Parameter(checktype=int)=None,
+                 modm: Parameter(checktype=int)=None,
+                 modr: Parameter(checktype=int)=None,
+                 threads : Parameter("t", checktype=int)=None,
+                 **kwargs):
+        super().__init__(locals(), **kwargs)
+
 class MakeFB(Program):
     """
     >>> p = MakeFB(poly="foo.poly", lim=1, skip_check_binary_exists=True)
