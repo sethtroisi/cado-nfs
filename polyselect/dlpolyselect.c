@@ -284,12 +284,12 @@ polygen_JL_f (int d, unsigned int bound, mpz_t *f, unsigned long idx)
     return ok;
 }
 
-/* Generate polynomial g(x) of degree dg, given root 'root' of f.
+/* Generate polynomial g(x) of degree dg, given root 'root' of f mod N.
    It might be better to take into account the skewness of f in the LLL
    lattice, but experimentally this does not give better results (probably
    because LLL is not very sensible to a small change of the skewness). */
 static void
-polygen_JL_g (mpz_t N, int dg, mat_Z g, mpz_t root)
+polygen_JL_g (mpz_t kN, int dg, mat_Z g, mpz_t root)
 {
     int i, j;
     mpz_t a, b, det, r;
@@ -309,7 +309,7 @@ polygen_JL_g (mpz_t N, int dg, mat_Z g, mpz_t root)
             if (i == 1)
               {
                 if (j == 1)
-                    mpz_set (g.coeff[j][i], N);
+                    mpz_set (g.coeff[j][i], kN);
                 else
                   {
                     mpz_neg (g.coeff[j][i], r);
@@ -331,15 +331,40 @@ polygen_JL_g (mpz_t N, int dg, mat_Z g, mpz_t root)
     mpz_clear (r);
 }
 
+/* lift root r of f mod n to a root of f mod k*n, where k = k*n.
+   Return 0 if lift is not possible. */
+static int
+root_lift (mpz_t n, mpz_t kn, unsigned long k, mpz_poly f, mpz_t r)
+{
+  if (k == 1)
+    return 1;
+
+  unsigned long i;
+  mpz_t v;
+  mpz_init (v);
+  for (i = 0; i < k; i++)
+    {
+      mpz_poly_eval (v, f, r);
+      mpz_mod (v, v, kn);
+      if (mpz_cmp_ui (v, 0) == 0)
+        break;
+      mpz_add (r, r, n);
+    }
+  mpz_clear (v);
+
+  return i < k;
+}
+
 /* JL method to generate d and d-1 polynomial.
    Given irreducible polynomial f of degree df, find roots of f mod n,
    and for each root, use Joux-Lercier method to find good polynomials g. */
 static void
-polygen_JL2 (mpz_t n, unsigned int df, unsigned int dg,
+polygen_JL2 (mpz_t n, unsigned long k,
+             unsigned int df, unsigned int dg,
 	     unsigned long nb_comb, mpz_poly f)
 {
     unsigned int i, j, nr, format = 1;
-    mpz_t *rf, c;
+    mpz_t *rf, c, kn;
     mat_Z g;
     mpz_poly *v, u;
     long *a;
@@ -348,6 +373,8 @@ polygen_JL2 (mpz_t n, unsigned int df, unsigned int dg,
 
     ASSERT_ALWAYS (df >= 3);
     mpz_init (c);
+    mpz_init (kn);
+    mpz_mul_ui (kn, n, k); /* k * n */
     rf = (mpz_t *) malloc (df * sizeof(mpz_t));
     for (i = 0; i < df; i ++)
       mpz_init (rf[i]);
@@ -375,28 +402,29 @@ polygen_JL2 (mpz_t n, unsigned int df, unsigned int dg,
     END_TIMER (TIMER_ROOTS);
     ASSERT(nr <= df);
 
-    // if (nr > 0)
-      {
-        double skew_f, lognorm_f, score_f;
-        alpha_f = get_alpha (f, ALPHA_BOUND);
-        skew_f = L2_skewness (f, SKEWNESS_DEFAULT_PREC);
-        lognorm_f = L2_lognorm (f, skew_f);
-        score_f = lognorm_f + alpha_f;
+    /* update the best and worst score for f (FIXME: even if f has no roots?) */
+    double skew_f, lognorm_f, score_f;
+    alpha_f = get_alpha (f, ALPHA_BOUND);
+    skew_f = L2_skewness (f, SKEWNESS_DEFAULT_PREC);
+    lognorm_f = L2_lognorm (f, skew_f);
+    score_f = lognorm_f + alpha_f;
 
-        if (score_f < best_score_f)
+    if (score_f < best_score_f)
 #ifdef HAVE_OPENMP
 #pragma omp critical
 #endif
-          best_score_f = score_f;
+      best_score_f = score_f;
 
-        if (score_f > worst_score_f)
+    if (score_f > worst_score_f)
 #ifdef HAVE_OPENMP
 #pragma omp critical
 #endif
-          worst_score_f = score_f;
-      }
+      worst_score_f = score_f;
 
+    /* for each root of f mod n, generate the corresponding g */
     for (i = 0; i < nr; i ++) {
+        if (root_lift (n, kn, k, f, rf[i]) == 0)
+          continue;
         /* generate g of degree dg */
         polygen_JL_g (n, dg, g, rf[i]);
 
@@ -448,12 +476,19 @@ polygen_JL2 (mpz_t n, unsigned int df, unsigned int dg,
     free (g.coeff);
     free (rf);
     mpz_clear (c);
+    mpz_clear (kn);
 }
 
 /* JL method to generate d and d-1 polynomial.
-   Generate polynomial f of degree df with |f[i]| <= bound and index 'idx'. */
+   Generate polynomial f of degree df with |f[i]| <= bound and index 'idx'.
+   k is the multiplier (default 1, must be a small integer):
+   - we lift roots of f from mod n to mod (k*n)
+   - we put k*n in the LLL matrix instead
+   - in such a way the resultant is divisible by k, thus for any prime factor q of k
+     f and g might have common roots mod q */
 static void
-polygen_JL1 (mpz_t n, unsigned int df, unsigned int dg, unsigned int bound,
+polygen_JL1 (mpz_t n, unsigned long k,
+             unsigned int df, unsigned int dg, unsigned int bound,
              unsigned long idx, unsigned long nb_comb)
 {
     unsigned int i;
@@ -472,7 +507,7 @@ polygen_JL1 (mpz_t n, unsigned int df, unsigned int dg, unsigned int bound,
     /* generate f of degree d with small coefficients */
     irred = polygen_JL_f (df, bound, f, idx);
     if (irred)
-      polygen_JL2 (n, df, dg, nb_comb, ff);
+      polygen_JL2 (n, k, df, dg, nb_comb, ff);
     /* clear */
     for (i = 0; i <= df; i ++)
       mpz_clear (f[i]);
@@ -498,6 +533,7 @@ main (int argc, char *argv[])
     unsigned long maxtries;
     double t;
     unsigned long modr = 0, modm = 1;
+    unsigned long multiplier = 1;
 
     t = seconds ();
     mpz_init (N);
@@ -544,6 +580,11 @@ main (int argc, char *argv[])
         }
         else if (argc >= 3 && strcmp (argv[1], "-t") == 0) {
             nthreads = atoi (argv[2]);
+            argv += 2;
+            argc -= 2;
+        }
+        else if (argc >= 3 && strcmp (argv[1], "-k") == 0) {
+            multiplier = atoi (argv[2]);
             argv += 2;
             argc -= 2;
         }
@@ -624,7 +665,7 @@ main (int argc, char *argv[])
     }
 #endif
     for (unsigned long c = modr; c < maxtries; c += modm)
-      polygen_JL1 (N, df, dg, bound, c, nb_comb);
+      polygen_JL1 (N, multiplier, df, dg, bound, c, nb_comb);
 
     t = seconds () - t;
 
