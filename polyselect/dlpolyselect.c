@@ -86,8 +86,13 @@ unsigned long f_irreducible = 0; /* number of irreducible polynomials */
 double max_guard = DBL_MIN;
 #define TIMINGS
 #ifdef TIMINGS
-double t_roots = 0.0, t_irred = 0.0, t_lll = 0.0;
+double t_roots = 0.0, t_irred = 0.0, t_lll = 0.0, t_murphyE = 0.0;
 #endif
+
+double Bf = 0.0, Bg = 0.0, Area = 0.0;
+double bestE = 0.0; /* best Murphy-E so far */
+int opt_flag = 0; /* 0: optimize "simple" E
+                     1: optimize Muprhy E */
 
 /*
   Print two nonlinear poly info. Return non-zero for record polynomials.
@@ -127,14 +132,39 @@ print_nonlinear_poly_info (mpz_poly ff, double alpha_f, mpz_poly gg,
 #endif
       max_guard = score_approx - score;
 
-    if (score >= best_score)
-      return 0; /* only print record scores */
+    double E = 0.0;
+    if (opt_flag == 0)
+      {
+        if (score >= best_score)
+          return 0; /* only print record scores */
+      }
+    else /* optimize Murphy-E */
+      {
+        if (score >= best_score + 1.0) /* the guard 1.0 seems good in
+                                          practice */
+          return 0;
+
+        /* compute Murphy-E */
+        cado_poly p;
+        t_murphyE -= seconds_thread ();
+        p->pols[ALG_SIDE]->coeff = f;
+        p->pols[ALG_SIDE]->deg = df;
+        p->pols[RAT_SIDE]->coeff = g;
+        p->pols[RAT_SIDE]->deg = dg;
+        p->skew = skew;
+        E = MurphyE (p, Bf, Bg, Area, MURPHY_K);
+        t_murphyE += seconds_thread ();
+        if (E <= bestE)
+          return 0;
+        bestE = E;
+      }
 
 #ifdef HAVE_OPENMP
 #pragma omp critical
 #endif
     {
-      best_score = score;
+      if (score < best_score)
+        best_score = score;
 
       if (format == 1)
 	gmp_printf ("n: %Zd\n", n);
@@ -163,6 +193,9 @@ print_nonlinear_poly_info (mpz_poly ff, double alpha_f, mpz_poly gg,
       printf ("# g lognorm %1.2f, alpha %1.2f, score %1.2f\n",
 	      logmu[1], alpha_g, logmu[1] + alpha_g);
       printf ("# f+g score %1.2f\n", score);
+      if (opt_flag)
+        cado_poly_fprintf_MurphyE (stdout, E, Bf, Bg, Area, "");
+
       printf ("\n");
       fflush (stdout);
     }
@@ -501,6 +534,21 @@ main (int argc, char *argv[])
             argv += 2;
             argc -= 2;
         }
+        else if (argc >= 3 && strcmp (argv[1], "-Bf") == 0) {
+            Bf = atof (argv[2]);
+            argv += 2;
+            argc -= 2;
+        }
+        else if (argc >= 3 && strcmp (argv[1], "-Bg") == 0) {
+            Bg = atof (argv[2]);
+            argv += 2;
+            argc -= 2;
+        }
+        else if (argc >= 3 && strcmp (argv[1], "-area") == 0) {
+            Area = atof (argv[2]);
+            argv += 2;
+            argc -= 2;
+        }
         else {
             fprintf (stderr, "Invalid option: %s\n", argv[1]);
             usage();
@@ -523,6 +571,8 @@ main (int argc, char *argv[])
         fprintf (stderr, "       only support dg < df.\n");
         usage ();
     }
+
+    opt_flag = Bf != 0 && Bg != 0 && Area != 0;
 
     srand (time (NULL));
 
@@ -574,7 +624,8 @@ main (int argc, char *argv[])
               "have missed some polynomials\n");
     printf ("# Time %.2fs", t);
 #ifdef TIMINGS
-    printf (" (roots %.2fs, irred %.2fs, lll %.2fs)", t_roots, t_irred, t_lll);
+    printf (" (roots %.2fs, irred %.2fs, lll %.2fs, MurphyE %.2fs)",
+            t_roots, t_irred, t_lll, t_murphyE);
 #endif
     printf ("\n");
 
