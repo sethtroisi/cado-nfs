@@ -163,7 +163,6 @@ class Polynomials(object):
     re_best = re.compile(r"# Best polynomial found \(revision (.*)\):")
     # the 'lognorm' variable now represents the expected E-value
     re_lognorm = re.compile(re_cap_n_fp(r"\s*#\s*exp_E", 1))
-    re_score = re.compile(re_cap_n_fp(r"# f\+g score", 1))
     
     # Keys that can occur in a polynomial file, in their preferred ordering,
     # and whether the key is mandatory or not. The preferred ordering is used
@@ -183,7 +182,6 @@ class Polynomials(object):
         self.MurphyParams = None
         self.revision = None
         self.lognorm = 0.
-        self.score = 0.
         self.params = {}
         polyf = Polynomial()
         polyg = Polynomial()
@@ -241,13 +239,6 @@ class Polynomials(object):
                     raise PolynomialParseException(
                         "Line '%s' redefines exp_E value" % line)
                 self.lognorm = float(match.group(1))
-                continue
-            match = self.re_score.match(line)
-            if match:
-                if self.score != 0:
-                    raise PolynomialParseException(
-                        "Line '%s' redefines score value" % line)
-                self.score = float(match.group(1))
                 continue
             # Drop comment, strip whitespace
             line2 = line.split('#', 1)[0].strip()
@@ -2425,47 +2416,21 @@ class PolyselJLTask(ClientServerTask, patterns.Observer):
     def paramnames(self):
         return self.join_params(super().paramnames, {
             "N": int, "modr": 0, "nrkeep": 20,
-            "bound": int, "modm": int, "degree": int
+            "bound": int, "modm": int, "degree": int,
+            "I": int, "lim1": int, "lim0": int
             })
-    @staticmethod
-    def update_scores(old_score, new_score):
-        score = [0, 0]
-        score[0] = min(old_score[0] or new_score[0], new_score[0])
-        # New maximum
-        score[1] = max(old_score[1], new_score[1])
-        return score
     
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator=mediator, db=db, parameters=parameters,
                          path_prefix=path_prefix)
         assert self.params["nrkeep"] > 0
         self.state["rnext"] = self.state.get("rnext", 0)
-
-        tablename = self.make_tablename("bestpolynomials")
-        self.best_polynomials = self.make_db_dict(
-                tablename, connection=self.db_connection)
-        self._check_best_polynomials()
-
-        self.poly_heap = []
+        self.progparams[0].setdefault("area", 2.**(2*self.params["I"]-1) \
+                * self.params["lim1"])
+        self.progparams[0].setdefault("Bf", float(self.params["lim1"]))
+        self.progparams[0].setdefault("Bg", float(self.params["lim0"]))
         self.bestpoly = None
             
-    def _check_best_polynomials(self):
-        # Check that the keys form a sequence of consecutive non-negative
-        # integers
-        oldkeys = list(self.best_polynomials.keys())
-        oldkeys.sort(key=int)
-        assert oldkeys == list(map(str, range(len(self.best_polynomials))))
-
-    def _compare_heap_db(self):
-        """ Compare that the polynomials in the heap and in the DB agree
-        
-        They must contain an equal number of entries, and each polynomial
-        stored in the heap must be at the specified index in the DB.
-        """
-        assert len(self.poly_heap) == len(self.best_polynomials)
-        for score, (key, poly) in self.poly_heap:
-            assert self.best_polynomials[key] == str(poly)
-
     def run(self):
         super().run()
 
@@ -2481,13 +2446,12 @@ class PolyselJLTask(ClientServerTask, patterns.Observer):
         while self.get_number_outstanding_wus() > 0:
             self.wait()
         
-        self._compare_heap_db()
         self.logger.info("Finished")
         filename = self.workdir.make_filename("poly")
         self.bestpoly.create_file(filename)
         self.state["polyfilename"] = filename.get_wdir_relative()
-        self.logger.info("Selected polynomial has score %f",
-                self.bestpoly.score);
+        self.logger.info("Selected polynomial has MurphyE %f",
+                self.bestpoly.MurphyE);
         return True
     
     def is_done(self):
@@ -2537,11 +2501,6 @@ class PolyselJLTask(ClientServerTask, patterns.Observer):
         self.process_polyfile(filename)
 
     def process_polyfile(self, filename, commit=True):
-        """ Read all polynomials in a file and add them to the
-        DB and priority queue if worthwhile.
-        
-        Different polynomials must be separated by a blank line.
-        """
         try:
             polyfile = self.read_log_warning(filename)
         except (OSError, IOError) as e:
@@ -2551,19 +2510,11 @@ class PolyselJLTask(ClientServerTask, patterns.Observer):
             else:
                 raise
 
-        totalparsed, totaladded = 0, 0
+        totalparsed = 0
         for block in self.read_blocks(polyfile):
-            parsed, added = self.parse_and_add_poly(block, filename)
+            parsed = self.parse_and_add_poly(block, filename)
             totalparsed += parsed
-            totaladded += added
-        have = len(self.poly_heap)
-        nrkeep = self.params["nrkeep"]
-        fullmsg = ("%d/%d" % (have, nrkeep)) if have < nrkeep else "%d" % nrkeep
-        self.logger.info("Parsed %d polynomials, added %d to priority queue (has %s)",
-                         totalparsed, totaladded, fullmsg)
-        if totaladded:
-            self.logger.info("Worst polynomial in queue now has score %f",
-                             -self.poly_heap[0][0])
+        self.logger.info("Parsed %d polynomials", totalparsed)
     
     def read_log_warning(self, filename):
         """ Read lines from file. If a "# WARNING" line occurs, log it.
@@ -2577,87 +2528,22 @@ class PolyselJLTask(ClientServerTask, patterns.Observer):
                 yield line
 
     def parse_and_add_poly(self, text, filename):
-        """ Parse a polynomial from an iterable of lines and add it to the
-        priority queue and DB. Return a two-element list with the number of
-        polynomials parsed and added, i.e., (0,0) or (1,0) or (1,1).
-        """
         poly = self.parse_poly(text, filename)
         if poly is None:
-            return (0, 0)
+            return 0
         if poly.getN() != self.params["N"]:
             self.logger.error("Polynomial is for the wrong prime:\n%s",
                               poly)
-            return (0, 0)
-        if not poly.score:
-            self.logger.warn("Polynomial in file %s has no score, skipping it",
+            return 0
+        if not poly.MurphyE:
+            self.logger.warn("Polynomial in file %s has no MurphyE, skipping it",
                              filename)
-            return (0, 0)
-        if self._add_poly_heap_db(poly):
-            if self.bestpoly is None or self.bestpoly.score > poly.score:
-                self.bestpoly = poly
-                self.logger.info("Best polynomial so far has score %f",
-                        poly.score);
-            return (1, 1)
-        else:
-            return (1, 0)
-
-    def _add_poly_heap_db(self, poly):
-        """ Add a polynomial to the heap and DB, if it's good enough.
-        
-        Returns True if the poly was added, False if not. """
-        key = self._add_poly_heap(poly)
-        if key is None:
-            return False
-        self.best_polynomials[key] = str(poly)
-        return True
-
-    def _add_poly_heap(self, poly):
-        """ Add a polynomial to the heap
-        
-        If the heap is full (nrkeep), the worst polynomial (i.e., with the
-        largest score) is replaced if the new one is better.
-        Returns the key (as a str) under which the polynomial was added,
-        or None if it was not added.
-        """
-        assert len(self.poly_heap) <= self.params["nrkeep"]
-        debug = False
-
-        # Find DB index under which to store this new poly. If the heap
-        # is not full, use the next bigger index.
-        key = len(self.poly_heap)
-        # Is the heap full?
-        if key == self.params["nrkeep"]:
-            # Should we store this poly at all, i.e., is it better than
-            # the worst one in the heap?
-            worstscore = -self.poly_heap[0][0]
-            if worstscore <= poly.score:
-                if debug:
-                    self.logger.debug("_add_poly_heap(): new poly score %f, "
-                          "worst in heap has %f. Not adding",
-                          poly.score, worstscore)
-                return None
-            # Pop the worst poly from heap and re-use its DB index
-            key = heapq.heappop(self.poly_heap)[1][0]
-            if debug:
-                self.logger.debug("_add_poly_heap(): new poly score %f, "
-                    "worst in heap has %f. Replacing DB index %s",
-                     poly.score, worstscore, key)
-        else:
-            # Heap was not full
-            if debug:
-                self.logger.debug("_add_poly_heap(): heap was not full, adding "
-                    "poly with score %f at DB index %s", poly.score, key)
-
-        # The DB requires the key to be a string. In order to have
-        # identical data in DB and heap, we store key as str everywhere.
-        key = str(key)
-
-        # Python heapq stores a minheap, so in order to have the worst
-        # polynomial (with largest score) easily accessible, we use
-        # -score as the heap key
-        new_entry = (-poly.score, (key, poly))
-        heapq.heappush(self.poly_heap, new_entry)
-        return key
+            return 0
+        if self.bestpoly is None or self.bestpoly.MurphyE < poly.MurphyE:
+            self.bestpoly = poly
+            self.logger.info("Best polynomial so far has MurphyE %f",
+                    poly.MurphyE);
+        return 1
 
     def parse_poly(self, text, filename):
         poly = None
@@ -2676,10 +2562,6 @@ class PolyselJLTask(ClientServerTask, patterns.Observer):
             return None
         return poly
     
-    def get_raw_polynomials(self):
-        # Extract polynomials from heap and return as list
-        return [entry[1][1] for entry in self.poly_heap]
-
     def get_poly_filename(self):
         return self.get_state_filename("polyfilename")
 
