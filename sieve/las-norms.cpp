@@ -1005,7 +1005,7 @@ double sieve_range_adjust::estimate_yield_in_sieve_area(mat<int> const& shuffle,
             for(int side = 0 ; side < 2 ; side++) {
                 double z = double_poly_eval_homogeneous(fijd[side], xys[0], xys[1]);
                 double a = log2(fabs(z));
-                double d = dickman_rho(a/lpbs[side]);
+                double d = dickman_rho_local(a/lpbs[side], fabs(z));
                 verbose_output_print(0, 4, " %d %e %e", side, z, d);
                 prod *= d;
             }
