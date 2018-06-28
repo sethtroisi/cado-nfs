@@ -2417,7 +2417,10 @@ class PolyselJLTask(ClientServerTask, patterns.Observer):
         return self.join_params(super().paramnames, {
             "N": int, "modr": 0, "nrkeep": 20,
             "bound": int, "modm": int, "degree": int,
-            "I": int, "lim1": int, "lim0": int
+            "I": int,
+            "lim1": int, "lim0": int,
+            "lpb0": int, "lpb1": int,
+            "qmin": 0
             })
     
     def __init__(self, *, mediator, db, parameters, path_prefix):
@@ -2425,10 +2428,13 @@ class PolyselJLTask(ClientServerTask, patterns.Observer):
                          path_prefix=path_prefix)
         assert self.params["nrkeep"] > 0
         self.state["rnext"] = self.state.get("rnext", 0)
+        qmin = self.params["qmin"]
+        if qmin == 0:
+            qmin = max(self.params["lim0"], self.params["lim1"])
         self.progparams[0].setdefault("area", 2.**(2*self.params["I"]-1) \
-                * self.params["lim1"])
-        self.progparams[0].setdefault("Bf", float(self.params["lim1"]))
-        self.progparams[0].setdefault("Bg", float(self.params["lim0"]))
+                * qmin)
+        self.progparams[0].setdefault("Bf", float(2**self.params["lpb1"]))
+        self.progparams[0].setdefault("Bg", float(2**self.params["lpb0"]))
         self.bestpoly = None
             
     def run(self):
