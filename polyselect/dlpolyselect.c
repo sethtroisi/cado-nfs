@@ -287,7 +287,8 @@ polygen_JL_f (int d, unsigned int bound, mpz_t *f, unsigned long idx)
 /* Generate polynomial g(x) of degree dg, given root 'root' of f mod N.
    It might be better to take into account the skewness of f in the LLL
    lattice, but experimentally this does not give better results (probably
-   because LLL is not very sensible to a small change of the skewness). */
+   because LLL is not very sensible to a small change of the skewness).
+   kN is the product k*N, where k is the multiplier. */
 static void
 polygen_JL_g (mpz_t kN, int dg, mat_Z g, mpz_t root)
 {
@@ -425,7 +426,7 @@ polygen_JL2 (mpz_t n, unsigned long k,
         if (root_lift (n, kn, k, f, rf[i]) == 0)
           continue;
         /* generate g of degree dg */
-        polygen_JL_g (n, dg, g, rf[i]);
+        polygen_JL_g (kn, dg, g, rf[i]);
 
         /* we skip idx = 0 which should correspond to c[0] = ... = c[dg] = 0 */
         for (unsigned long idx = 1; idx < nb_comb; idx ++)
