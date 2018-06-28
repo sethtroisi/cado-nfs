@@ -636,8 +636,6 @@ main (int argc, char *argv[])
     maxtries_double *= (double) (bound + 1);
     maxtries_double *= pow ((double) (2 * bound + 1), (double) (df - 2));
     maxtries_double *= (double) (2 * bound);
-    /* since each coefficient of f of degree 0 to df-1 is chosen randomly
-       in [-bound, bound-1], we have (2*bound)^df possible values for f */
     if (maxtries_double >= (double) ULONG_MAX)
       maxtries = ULONG_MAX;
     else
