@@ -14,7 +14,7 @@
 
 #include "portability.h"
 #include "macros.h"
-#include "relation.h"
+#include "relation.hpp"
 #include "params.h"
 #include "cado_poly.h"
 #include "gzip.h"
@@ -173,7 +173,6 @@ static void declare_usage(param_list_ptr pl)
   param_list_decl_usage(pl, "dup-qmin", "lower limit of global q-range for 2-sided duplicate removal");
   param_list_decl_usage(pl, "dup-qmax", "upper limit of global q-range for 2-sided duplicate removal");
   param_list_decl_usage(pl, "sqside", "side of special-q (default=1)");
-  param_list_decl_usage(pl, "mt",   "number of threads to use");
   /* those are typical from las invocations, we wish to keep them
    * accepted */
   param_list_decl_usage(pl, "out",  "filename where relations are written, instead of stdout");
@@ -200,7 +199,6 @@ main (int argc, char * argv[])
 {
     char * argv0 = argv[0];
     siever_config conf;
-    int nb_threads = 1;
     int adjust_strategy = 0;
 
     cxx_param_list pl;
@@ -242,7 +240,7 @@ main (int argc, char * argv[])
     param_list_parse_int(pl, "adjust-strategy", &adjust_strategy);
     const char * outputname = param_list_lookup_string(pl, "out");
 
-    cado_poly cpoly;
+    cxx_cado_poly cpoly;
     read_poly(cpoly, pl);
     int ok = parse_config(conf, pl);
     /* the polynomial skewness can be overriden on the command line,
@@ -252,7 +250,6 @@ main (int argc, char * argv[])
         fprintf(stderr, "Error: mandatory parameter missing.\n");
         exit(EXIT_FAILURE);
     }
-    param_list_parse_int(pl, "mt", &nb_threads);
 
     if (param_list_warn_unused(pl))
     {
@@ -287,6 +284,8 @@ main (int argc, char * argv[])
 
     las_info las(pl);
 
+    las_todo_entry doing;
+
     for (int argi = 0; argi < argc; argi++) {
       FILE *f = fopen_maybe_compressed(argv[argi], "rb");
       if (f == NULL) {
@@ -298,19 +297,17 @@ main (int argc, char * argv[])
         char line[1024];
         if (fgets(line, sizeof(line), f) == NULL)
           break;
-        las_todo_entry doing;
         if (read_sq_comment(doing, line)) {
             /* TODO we need to fix that for dynamic I */
             if (psi) delete psi;
             uint32_t I = 1UL << ((conf.logA+1)/2);
             uint32_t J = 1UL << ((conf.logA-1)/2);
-            int nb_threads = 1;
-            psi = fill_in_sieve_info(doing, I, J, cpoly, conf, nb_threads);
+            psi = fill_in_sieve_info(doing, I, J, cpoly, conf);
             psi->strategies = strategies;
         } else {
             relation rel;
             if (rel.parse(line)) {
-                int is_dupe = relation_is_duplicate(rel, las, *psi, adjust_strategy);
+                int is_dupe = relation_is_duplicate(rel, doing, las, psi->conf, psi->strategies, adjust_strategy);
                 dupsup(output, rel, doing, is_dupe);
             }
         }
@@ -322,7 +319,6 @@ main (int argc, char * argv[])
     if (outputname)
         fclose_maybe_compressed(output, outputname);
 
-    cado_poly_clear(cpoly);
     mpz_clear(sq);
     mpz_clear(rho);
 

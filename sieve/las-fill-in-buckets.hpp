@@ -1,33 +1,30 @@
 #ifndef LAS_FILL_IN_BUCKETS_HPP_
 #define LAS_FILL_IN_BUCKETS_HPP_
 
-#include "las-types.hpp"
+#include <array>
+#include <memory>
 #include "fb-types.h"
 #include "las-plattice.hpp"
-#include "las-threads.hpp"
 #include "tdict.hpp"
+#include "threadpool.hpp"
+#include "las-threads-work-data.hpp"
+
+#include "las-forwardtypes.hpp"
 
 // This one is used for keeping information of middle primes.
 struct precomp_plattice_t {
-    std::vector<plattices_vector_t *> v [2][FB_MAX_PARTS];
+    typedef std::vector<plattices_vector_t> vec_type;
+    std::array<std::array<vec_type, FB_MAX_PARTS>, 2> v;
     precomp_plattice_t(precomp_plattice_t const&) = delete;
     precomp_plattice_t() = default;
     void push(int side, int level, plattices_vector_t&& x) {
-        v[side][level].push_back(new plattices_vector_t(std::move(x)));
+        v[side][level].push_back(std::move(x));
     }
-    ~precomp_plattice_t() {
-        for(int side = 0 ; side < 2 ; side++) {
-            for (int level = 1; level < FB_MAX_PARTS; ++level) {
-                for(auto & x : v[side][level]) {
-                    delete x;
-                }
-            }
-        }
-    }
-    std::vector<plattices_vector_t *> & operator()(int side, int level) {
+    ~precomp_plattice_t() = default;
+    std::vector<plattices_vector_t> & operator()(int side, int level) {
         return v[side][level];
     }
-    std::vector<plattices_vector_t *> const & operator()(int side, int level) const {
+    std::vector<plattices_vector_t> const & operator()(int side, int level) const {
         return v[side][level];
     }
 };
@@ -36,17 +33,34 @@ struct precomp_plattice_t {
 // This one is for remembering the FK basis in sublat mode, between two
 // different congruences of (i,j) mod m.
 // For simplicity, we remember them only for the toplevel.
-typedef std::vector<plattices_dense_vector_t *> precomp_plattice_dense_t;
+typedef std::vector<plattices_dense_vector_t> precomp_plattice_dense_t;
 
 template <int LEVEL>
 void
-downsort_tree(timetree_t&,
+downsort_tree(
+        nfs_work &ws,
+        std::shared_ptr<nfs_work_cofac> wc_p,
+        std::shared_ptr<nfs_aux> aux_p,
+        thread_pool &pool,
         uint32_t bucket_index,
         uint32_t first_region0_index,
-        thread_workspaces &ws,
+        sieve_info& si,
+        precomp_plattice_t & precomp_plattice,
+        where_am_I & w);
+
+void fill_in_buckets_toplevel(
+        nfs_work &ws,
+        nfs_aux &aux,
         thread_pool &pool,
         sieve_info& si,
-        precomp_plattice_t const & precomp_plattice);
-void fill_in_buckets(timetree_t&, thread_pool &, thread_workspaces &, sieve_info &, int side);
+        int side,
+        where_am_I & w);
+
+void fill_in_buckets_prepare_precomp_plattice(
+        thread_pool &pool,
+        int side,
+        int level,
+        sieve_info const & si,
+        precomp_plattice_t & precomp_plattice);
 
 #endif

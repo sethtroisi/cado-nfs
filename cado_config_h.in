@@ -125,5 +125,8 @@
 
 #cmakedefine    HAVE_JEVENTS
 
+#cmakedefine    HAVE_GLIBC_VECTOR_INTERNALS
+
+
 /* vim:set ft=c: */
 #endif  /* CADO_CONFIG_H_ */

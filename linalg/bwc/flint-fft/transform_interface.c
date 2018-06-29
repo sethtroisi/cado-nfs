@@ -40,6 +40,7 @@
 #include "fft.h"
 #include "ulong_extras.h"
 #include "fft_tuning.h"
+#include "fft.h"
 #include "timing.h"
 
 #ifndef iceildiv
@@ -78,7 +79,8 @@ static inline mp_size_t fti_rsize0(struct fft_transform_info * fti)
 {
     mp_size_t w = fti->w;
     mp_size_t n = 1 << fti->depth;
-    mp_size_t rsize0 = n*w/FLINT_BITS;  /* need rsize0+1 words for x\in R */
+    mp_bitcnt_t nw = (mp_bitcnt_t) n * w;
+    mp_size_t rsize0 = nw/FLINT_BITS;  /* need rsize0+1 words for x\in R */
     return rsize0;
 }
 /*}}}*/
@@ -92,26 +94,145 @@ static inline mp_size_t fti_rsize0(struct fft_transform_info * fti)
  *
  */
 
-/* j1 = ceiling(x1/b)
- * j2 = ceiling(x2/b)
+/*
+ * Common data: we have m pairs of integers, all having b_1 and b_2 bits,
+ * respectively (we assume b_1 <= b_2). We add the evaluations of the
+ * function M applied to all pairs (that is, M(x_0,y_0) + \cdots
+ * M(x_{m-1},y_{m-1})), where M is either:
+ *  - integer multiplication
+ *  - middle product, or more precisely modular integer multiplication
+ *    modulo 2^W\pm 1, where W is any integer we do not need to have
+ *    control over, provided that it satisfies at least W >= b_2 + \log_2 m.
  *
- * Lemma: x1+x2 <= 4*n*b implies j1+j2-1<=4*n
+ * Henceforth, we refer to the two situations above as MUL and MP,
+ * respectively.
+ *
+ * This is done by splitting all integers into b-bit pieces, and
+ * computing an FFT of length 4n (n is chosen as a power of two) in the
+ * ring R=Z/(2^{n*w} + 1), where $\sqrt 2$ is a 4n-th root of unity.
+ *
+ * There are several things we need to do.
+ *  
+ *  - Determine exactly which is the index of the first wrapped bit,
+ *  depending on b_1, b_2, n, w, b. (it is not always 4*n*b).
+ *
+ *  - Show how we can compute a reasonable "first guess" that has w=1 or
+ *  w=2.
+ *
+ *  - See then how it is possible to do with a shorter transform length,
+ *  increasing w accordingly.
+ *
+ *
+ * The index of the first wrapped bit.
+ * -----------------------------------
+ * 
+ * We want to compute the index of the first wrapped bit when multiplying
+ * P_1 * P_2 in R[X] modulo X^{4*n}\pm 1, with the integer evaluation of P_1
+ * at 2^b is the integer a_1, and P_1 has length j_1. (Ditto for P_2).
+ *
+ * A short one-liner answer: Evaluation is at 2^b, 4*n is the first
+ * degree that wraps, whence we are tempted to say that 4*n*b is the
+ * first bit index that wraps.
+ *
+ * Almost.
+ *
+ * The catch is that there are some bits above that index that *don't
+ * wrap*, because they come from the coefficient of degree j_1 + j_2-2.
+ *
+ * Therefore, whenever j_1 + j_2-1<= transform_length (= 4 n), we're sure
+ * that we get no wrapping bit (because the polynomial evaluation doesn't
+ * wrap!). We just have to pay attention to the fact that the evaluation
+ * of the product may be more than 2^{4 n b}.
+ *
+ * => the index of the first wrapped bit is:
+ *      - infinity if j_1 + j_2-1 <= 4 n
+ *      - 4 n b otherwise.
+ *
+ * example b=30 x_1=150 x_2=95 j_1=5 (deg=4) j_2=4 (deg=3) j_1 + j_2-1=8 (deg=7)
+ * ; 4*n=8. This wraps at 240 bits while the product has 245 bits.
+ * However the degree 7 coefficient of the polynomial contains 35 bits of
+ * info, which is all we need. There is actually no bit that wraps.
+ *
+ * The following Lemma is a bit useful.
+ *
+ * Lemma: b_1 + b_2 <= 4 n b implies j_1 + j_2-1<=4 n
  *
  * Proof:
- *     bj1+bj2-e1-e2 <= 4*n*b
- *     j1+j2-(e1+e2)/b <= 4n
- *     Let now Z=j1+j2-(e1+e2+1)/b.
- *     We have: Z < j1+j2-(e1+e2)/b <= 4n
- *            e1+e2+1 <= 2*b-1, whence 0 < (e1+e2+1)/b < 2
- *     Thus j1+j2-1 <= Ceiling(Z) <= j1 + j2, and Ceiling(Z) <= 4*n.
+ *      since j_1 = Ceiling(b_1/b) and j_2 = Ceiling(b_2,b), we have
+ *      b_1 = b j_1 - e_1 and b_2 = b j_2 - e_2
+ *      with 0 <= e_1,e_2 <= b-1
  *
- * Conclusion: checking minwrap as in 4*n*bits >= minwrap is actually
- * more restrictive than just checking 4*n >= j1+j2-1 
+ *      suppose now that b_1 + b_2 <= 4 n b. We have:
  *
- * (example b=30 x1=150 x2=95 j1=5 j2=4 j1+j2-1=8 ; 4*n=8. This wraps at
- * 240 bits, but the degree 7 coefficient of the polynomials contains all
- * the needed bits. Nothing will appear in the coefficient of degee 8 in
- * the polynomial product.
+ *      b j_1 + b j_2-e_1-e_2 <= 4 n b 
+ *      j_1 + j_2-(e_1 + e_2)/b <= 4n
+ *
+ *      Let now Z=j_1 + j_2-(e_1 + e_2 + 1)/b.
+ *      We have: Z < j_1 + j_2-(e_1 + e_2)/b <= 4n. In particular, Ceiling(Z) <= 4n
+ *             e_1 + e_2 + 1 <= 2 b-1, whence 0 < (e_1 + e_2 + 1)/b < 2
+ *      Thus j_1 + j_2-1 <= Ceiling(Z) <= 4n
+ *      End of proof.
+ *
+ * A corollary is that for any integer W such that W >= b_1 + b_2 (in
+ * particular, if we have W >= b_1 + b_2 + \log_2 m), if 4nb >= W
+ * then we automatically have j_1 + j_2-1 <= 4 n. In other words, the
+ * former is a sufficient condition for no wrapping to occur below W,
+ * while the latter is necessary.
+ *
+ *
+ * Computation of a first guess
+ * ----------------------------
+ *
+ * Here are the conditions that must be obeyed, given b1, b2, b, m, n, w:
+ *
+ *  1 - 2^{2b} j_1 m <= 2^{n w}   (poly coeffs do not wrap around)
+ *  2 - no wrapping occurs below W, with W = b_1 + b_2 + \log_2 m for the
+ *  MUL case, and W = b_2 + \log_2 m for the MP case.
+ *
+ * By (1) we have that 2^{2b} b_1/b <= 2^{n w} / m. This would give the
+ * maximum b value with Lambert's W function, but we rather give an upper
+ * bound. Since b<=b1, we have b_{max} <= (n w - \log_2 m)/2 <= n w / 2
+ *
+ * In the MUL case, by the lemma and its corollary, we must have 
+ *      \lceil b_1/b \rceil + \lceil b_2/b \rceil - 1 \leq 4 n
+ *      (b_1 + b_2) / b \leq 4 n + 1
+ *      b \geq (b_1 + b_2) / (4 n + 1)
+ * (necessary, but not sufficient).
+ *
+ * In the MP case, the no wrapping condition gives the following lower
+ * bound instead:
+ *      b_2 + \log_2 m \leq 4 n b
+ *      b \geq (b_2 + \log_2 m) / (4 n)
+ *
+ * Now a _first guess_ is defined as something with w = 1 or 2. So at
+ * most 2. We use it to deduce the minimal n (of the first guess). Maybe
+ * we'll settle on a shorter transform length later on, but that's just a
+ * first guess. Our first guess might be a wee bit below the minimal
+ * (n,w) that works. All we care about is that it's not above.
+ *
+ * We use the following strategy to choose our starting n and w.
+ *
+ * MP case: n^2 w \geq (b_2 + \log_2 m) / 2.
+ *          delta = \lfloor e/2\rfloor with e = \log_2 (b_2 + \log_2 m) - 1.
+ *          n = 2^delta
+ *          w = 2^{e\bmod 2}.
+ *
+ * MUL case: (n+1/4)nw \geq (b_1 + b_2) / 2  (really there's no log m)
+ *          first find minimal nw such that
+ *           n^2 w \geq (b_1 + b_2) / 2 (same strategy as above, essentially).
+ *          and then maybe (n,w/2) (if w=2) or (n/2,2w) (if w=1) will
+ *          also work.
+ *
+ * Then we compute the interval bmax, bmin. Because bmax might perhaps
+ * now work, we'll descend from there until we find a b that works. Here,
+ * "works" refer to the conditions numbered 1 and 2 above. If we
+ * don't find a good b before bmin, we go for a longer transform.
+ *
+ *
+ * Use shorter transforms
+ * ----------------------
+ *
+ * (to be continued).
  *
  */
 
@@ -134,51 +255,92 @@ static unsigned long firstwrap(mp_size_t j1, mp_size_t j2, mp_bitcnt_t bits, mp_
     }
 }
 
-/* set the depth, w, and bits fields to something at least reasonable */
+int fft_transform_info_check(const struct fft_transform_info * fti)
+{
+    mp_bitcnt_t b1 = MIN(fti->bits1, fti->bits2);
+    mp_bitcnt_t b2 = MAX(fti->bits1, fti->bits2);
+    unsigned int m = fti->nacc;
+    mp_bitcnt_t minwrap = fti->minwrap;
+    mp_bitcnt_t b = fti->bits;
+    unsigned int w = fti->w;
+    unsigned int depth = fti->depth;
+    unsigned int n = 1 << depth;
+    // unsigned int L = 4 * n;
+    mp_bitcnt_t j1 = iceildiv(b1, b);
+    mp_bitcnt_t j2 = iceildiv(b2, b);
+    mp_bitcnt_t nw = (mp_bitcnt_t) n * w;
+
+    /* poly coeffs do not wrap around */
+    if (!(2*b + FLINT_FLOG2(j1 * m) <= nw)) return 0;
+
+    /* no wrapping occurs before W */
+    if (!minwrap) {
+        /* per the lemma above, this is a necessary condition anyway in
+         * this case */
+        if (!(j1 + j2 - 1 <= 4 * n)) return 0;
+        minwrap = b1 + b2 + FLINT_CLOG2(m);
+    }
+    if (!(firstwrap(j1, j2, b, n) >= minwrap)) return 0;
+
+    return 1;
+}
+
+/* set the depth, w, and bits fields to something at least reasonable.
+ *
+ * This selects w=1 or 2, w*2^(2depth) minimal, and bits maximal.
+ */
 void fft_transform_info_set_first_guess(struct fft_transform_info * fti)
 {
-    mp_bitcnt_t bits1 = fti->bits1;
-    mp_bitcnt_t bits2 = fti->bits2;
-    unsigned int nacc = fti->nacc;
+    mp_bitcnt_t b1 = MIN(fti->bits1, fti->bits2);
+    mp_bitcnt_t b2 = MAX(fti->bits1, fti->bits2);
+    unsigned int m = fti->nacc;
     mp_bitcnt_t minwrap = fti->minwrap;
 
-    mp_size_t depth = 6;
-    mp_size_t w = 1;
-    mp_size_t n = ((mp_size_t) 1 << depth);
-    unsigned int log_nacc = FLINT_CLOG2(nacc);
-    mp_bitcnt_t bits = (n * w - (depth + 1) - log_nacc) / 2;
-    mp_size_t j1 = iceildiv(bits1, bits);
-    mp_size_t j2 = iceildiv(bits2, bits);
+    unsigned int clogm = FLINT_CLOG2(m);
+    // unsigned int flogm = clogm - ((m&(m-1)) != 0);
 
-    if (minwrap == 0)
-        minwrap = bits1 + bits2;
+    unsigned int n, w, depth;
 
-    assert(j1 + j2 - 1 > 2 * n);
+    ASSERT_ALWAYS(minwrap == 0 || minwrap >= b2 + clogm);
 
-    while (firstwrap(j1, j2, bits, n) < (unsigned long) minwrap) {
-	if (w == 1)
-	    w = 2;
-	else {
-	    depth++;
-	    w = 1;
-	    n *= 2;
-	}
+    if (minwrap) {      /* MP case */
+        unsigned int e = FLINT_CLOG2(minwrap) - 1;
+        depth = e / 2;
+        n = 1 << depth;
+        w = 1 << (e & 1);
+    } else {    /* MUL case */
+        unsigned int e = FLINT_CLOG2(b1 + b2) - 1;
+        depth = e / 2;
+        n = 1 << depth;
+        w = 1 << (e & 1);
+        mp_bitcnt_t nw = (mp_bitcnt_t) n * w;
+        /* decrease (n,w) for a test */
+        if (w == 1) { w = 2; depth--; n/=2; } else { w = 1; }
+        if (!((b1+b2)*2 <= (4*n+1)*nw)) {
+            /* increase again */
+            if (w == 1) { w = 2; } else { w = 1; depth++; n*=2; }
+        }
+        ASSERT_ALWAYS((b1+b2)*2 <= (4*n+1)*nw);
+    }
 
-        /* Take [[bits]] as small as we can, subject to the constraint
-         * that coefficients may be multiplied in R=Z/2^(nw)+1 with no
-         * wraparound.
-         *
-         * Based on this, we cannot set [[bits]] to a higher value.
-         *
-         * If we elect to set [[bits]] to a value which is smaller than
-         * the upper bound we computed, then this would
-         * increase the degrees j1 and j2 somewhat. A second effect
-         * is that 4*n*bits is even smaller. As a consequence, we always
-         * set [[bits]] to the upper bound.
-         */
-        log_nacc = FLINT_CLOG2(nacc*iceildiv(4*n, j1+j2-1));
-        bits = (n * w - (depth + 1) - log_nacc) / 2;
+    for( ;; depth += (w==2), w^=3) {
+        n = 1 << depth;
+        mp_bitcnt_t nw = (mp_bitcnt_t) n * w;
+        unsigned int s = FLINT_CLOG2(m);
+        if (s > nw) continue;
+        unsigned int bmax = (nw-s) / 2;
+        unsigned int bmin;
+        if (minwrap) {
+            bmin = iceildiv(minwrap, 4 * n);
+        } else {
+            bmin = iceildiv(b1+b2, 4*n+1);
+            for( ; bmin <= bmax && (iceildiv(b1, bmin) + iceildiv(b2, bmin) - 1 > 4 * n) ; bmin++);
+        }
 
+        /* check conditions 1 and 2 above */
+        for(unsigned int b = bmax ; b >= bmin ; b--) {
+            if (2*b + FLINT_CLOG2(m * iceildiv(b1, b)) <= nw) {
+                /* good, we found something ! */
 #if 0
         /* XXX Hack for debugging. Make sure that bits is a multiple of
          * four, so that we split at nibbles.
@@ -186,19 +348,16 @@ void fft_transform_info_set_first_guess(struct fft_transform_info * fti)
         bits &= ~(mp_bitcnt_t) 3;
 #endif
 
-	j1 = iceildiv(bits1, bits);
-	j2 = iceildiv(bits2, bits);
+                fti->bits = b;
+                fti->w = w;
+                fti->depth = depth;
+
+                ASSERT_ALWAYS(fft_transform_info_check(fti));
+
+                return;
+            }
+        }
     }
-
-    assert(j1 * bits >= bits1);
-    assert(j2 * bits >= bits2);
-    assert(firstwrap(j1, j2, bits, n) >= (unsigned long) minwrap);
-    assert(2*bits + (depth + 1) + log_nacc <= (mp_bitcnt_t) n*w);
-    assert(w==1 || w==2);
-
-    fti->depth = depth;
-    fti->w = w;
-    fti->bits = bits;
 }
 
 /* This provides a mechanism to adjust the fft depth int the direction of
@@ -215,7 +374,9 @@ void fft_transform_info_adjust_depth(struct fft_transform_info * fti, unsigned i
 {
     fft_transform_info_set_first_guess(fti);
 
-    ASSERT_ALWAYS(adj < fti->depth);
+    /* This is adapted from mul_fft_main.c */
+
+    ASSERT_ALWAYS(adj < (unsigned int) fti->depth);
 
     mp_bitcnt_t bits1 = fti->bits1;
     mp_bitcnt_t bits2 = fti->bits2;
@@ -253,6 +414,8 @@ void fft_transform_info_adjust_depth(struct fft_transform_info * fti, unsigned i
      * must be above that for padding to work. And of course the final
      * product size must be compatible with the final FFT length.
      */
+
+    mp_bitcnt_t nw;
 
     if (depth < 11) {
 	mp_size_t wadj = 1;
@@ -302,7 +465,8 @@ void fft_transform_info_adjust_depth(struct fft_transform_info * fti, unsigned i
             do {		/* see if a smaller w will work. This can
                                    reduce the ring size. */
                 w -= wadj;
-		bits = (n * w - (depth + 1) - log_nacc) / 2;
+                nw = (mp_bitcnt_t) n * w;
+		bits = (nw - (depth + 1) - log_nacc) / 2;
 #if 0
                 /* XXX Hack for debugging. Make sure that bits is a multiple of
                  * four, so that we split at nibbles.
@@ -313,6 +477,10 @@ void fft_transform_info_adjust_depth(struct fft_transform_info * fti, unsigned i
 		j2 = iceildiv(bits2, bits);
 	    } while (firstwrap(j1, j2, bits, n) >= minwrap && w > wadj);
 	    w += wadj;
+            nw = (mp_bitcnt_t) n * w;
+            bits = (nw - (depth + 1) - log_nacc) / 2;
+            j1 = iceildiv(bits1, bits);
+            j2 = iceildiv(bits2, bits);
 	}
         fti->alg = 0;
     } else {
@@ -327,18 +495,25 @@ void fft_transform_info_adjust_depth(struct fft_transform_info * fti, unsigned i
         fti->alg = 1;
     }
 
-    log_nacc = FLINT_CLOG2(nacc*iceildiv(4*n, j1+j2-1));
-    bits = (n * w - (depth + 1) - log_nacc) / 2;
+    /* refine the number of bits */
+    for(mp_bitcnt_t obits = 0; obits != bits;) {
+        obits = bits;
+        j1 = iceildiv(bits1, obits);
+        j2 = iceildiv(bits2, obits);
+        log_nacc = FLINT_CLOG2(nacc*MIN(j1, j2));
+        nw = (mp_bitcnt_t) n * w;
+        bits = (nw - log_nacc) / 2;
+    }
+
 #if 0
     /* XXX Hack for debugging. Make sure that bits is a multiple of
      * four, so that we split at nibbles.
      */
     bits &= ~(mp_bitcnt_t) 3;
 #endif
+    nw = (mp_bitcnt_t) n * w;
     j1 = iceildiv(bits1, bits);
     j2 = iceildiv(bits2, bits);
-    assert(firstwrap(j1, j2, bits, n) >= (unsigned long) minwrap);
-    assert(2*bits + (depth + 1) + log_nacc <= (mp_bitcnt_t) n*w);
     fti->w = w;
     fti->depth = depth;
     fti->bits = bits;
@@ -348,6 +523,7 @@ void fft_transform_info_adjust_depth(struct fft_transform_info * fti, unsigned i
         fti->trunc0 = 4 * n;
     }
     // fprintf(stderr, "/* DEPTH = %zu, ALG = %d */\n", fti->depth, fti->alg);
+    ASSERT_ALWAYS(fft_transform_info_check(fti));
 }
 
 void fft_get_transform_info_mulmod(struct fft_transform_info * fti, mp_bitcnt_t bits1, mp_bitcnt_t bits2, unsigned int nacc, mp_bitcnt_t minwrap)
@@ -423,8 +599,12 @@ void fft_get_transform_info_fppol(struct fft_transform_info * fti, mpz_srcptr p,
     fft_get_transform_info(fti, n1 * cbits, n2 * cbits, nacc);
     fti->ks_coeff_bits = cbits;
 }
+
+/* middle product of two polynomials of length nmin and nmax, with nmin
+ * <= nmax. */
 void fft_get_transform_info_fppol_mp(struct fft_transform_info * fti, mpz_srcptr p, mp_size_t nmin, mp_size_t nmax, unsigned int nacc)
 {
+    /* The maximum number of summands is nmin */
     mp_bitcnt_t cbits = 2 * mpz_sizeinbase(p, 2) + FLINT_CLOG2(nacc * nmin);
     /* See above */
     if (nmax*cbits < 4096)
@@ -433,7 +613,12 @@ void fft_get_transform_info_fppol_mp(struct fft_transform_info * fti, mpz_srcptr
             nmin * cbits,
             nmax * cbits,
             nacc,
-            nmax * cbits + 1);
+            /* even this extra bit isn't really needed, if we do the job
+             * of adding a proper comparison at the end. (Whatever
+             * happens, the wrapped lower part is in an interval of
+             * bounded length).
+             */
+            nmax * cbits + FLINT_CLOG2(nacc) + 1);
     /* The maximum number of summands is nmin */
     fti->ks_coeff_bits = cbits;
 }
@@ -1058,7 +1243,8 @@ void fft_do_ift(mp_limb_t * x, mp_size_t nx, void * y, void * temp, struct fft_t
 {
     mp_size_t w = fti->w;
     mp_size_t n = 1 << fti->depth;
-    mp_size_t rsize0 = n*w/FLINT_BITS;  /* need rsize0+1 words for x\in R */
+    mp_bitcnt_t nw = (mp_bitcnt_t) n * w;
+    mp_size_t rsize0 = nw/FLINT_BITS;  /* need rsize0+1 words for x\in R */
     fft_do_ift_backend(y, temp, fti);
     mpn_zero(x, nx);
     if (!fti->minwrap) {
@@ -1070,7 +1256,7 @@ void fft_do_ift(mp_limb_t * x, mp_size_t nx, void * y, void * temp, struct fft_t
      * typical middle product uses, we don't need it. But it's cheap).
      */
     /* we want at least (4*n-1)*bits+n*w bits in the output zone */
-    mp_bitcnt_t need = (4*n-1)*fti->bits+n*w;
+    mp_bitcnt_t need = (4*n-1)*fti->bits+nw;
     assert(nx >= (mp_size_t) iceildiv(need, FLINT_BITS));
     fft_addcombine_bits(x, y, fti->trunc0, fti->bits, rsize0, nx);
     /* bits above 4*n*fti->bits need to wrap around */
@@ -1078,7 +1264,7 @@ void fft_do_ift(mp_limb_t * x, mp_size_t nx, void * y, void * temp, struct fft_t
     mp_size_t outneedlimbs = iceildiv(outneed, FLINT_BITS);
     assert(outneedlimbs <= rsize0 + 1);
     mp_size_t toplimb = (4*n*fti->bits) / FLINT_BITS;
-    unsigned int topoffset = (4*n*fti->bits) % FLINT_BITS;
+    mp_bitcnt_t topoffset = (4*n*fti->bits) % FLINT_BITS;
     mp_size_t cy;
     mpn_zero(temp, rsize0 + 1);
     do {
@@ -1243,7 +1429,7 @@ void mpn_addmod_2expp1(mp_limb_t * z, mp_limb_t * x, mp_limb_t * y, mp_size_t li
      *        result is x.
      * c0 == 0:
      *    then mpn_add_n will yield a carry bit, to be subtracted
-     *    *unless* the result is exactly 2^(n*w).
+     *    *unless* the result is exactly 2^{n*w}.
      *
      * The important thing is to optimize is the most likely case c0==0,
      * and c1 to be subtracted

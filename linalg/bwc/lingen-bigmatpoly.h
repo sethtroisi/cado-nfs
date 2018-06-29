@@ -53,8 +53,8 @@ static inline matpoly_ptr bigmatpoly_cell(bigmatpoly_ptr p, unsigned int i, unsi
 void bigmatpoly_truncate_loc(abdst_field ab, bigmatpoly_ptr dst, bigmatpoly_ptr src, unsigned int size);
 void bigmatpoly_rshift(abdst_field ab, bigmatpoly_ptr dst, bigmatpoly_ptr src, unsigned int k);
 
-void bigmatpoly_mul(abdst_field ab, bigmatpoly c, bigmatpoly a, bigmatpoly b);
-void bigmatpoly_mp(abdst_field ab, bigmatpoly c, bigmatpoly a, bigmatpoly b);
+double bigmatpoly_mul(abdst_field ab, bigmatpoly c, bigmatpoly a, bigmatpoly b, int draft);
+double bigmatpoly_mp(abdst_field ab, bigmatpoly c, bigmatpoly a, bigmatpoly b, int draft);
 
 void bigmatpoly_gather_mat(abdst_field ab, matpoly dst, bigmatpoly src);
 void bigmatpoly_scatter_mat(abdst_field ab, bigmatpoly_ptr dst, matpoly_ptr src);

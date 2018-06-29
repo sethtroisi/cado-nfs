@@ -282,8 +282,8 @@ get_maxnorm_rectangular (double_poly_srcptr src_poly, const double X,
 
 /* }}} */
 
-lognorm_base::lognorm_base(siever_config const & sc, cado_poly_srcptr cpoly, int side, qlattice_basis const & Q, int J)
-    : logI(sc.logI_adjusted), J(J)
+lognorm_base::lognorm_base(siever_config const & sc, cxx_cado_poly const & cpoly, int side, qlattice_basis const & Q, int logI, int J)
+    : logI(logI), J(J)
     /*{{{*/
 {
     int64_t H[4] = { Q.a0, Q.b0, Q.a1, Q.b1 };
@@ -401,7 +401,7 @@ unsigned char lognorm_base::lognorm(int i, unsigned int j) const {
 /***********************************************************************/
 
 /* {{{ reference slow code for computing lognorms */
-lognorm_reference::lognorm_reference(siever_config const & sc, cado_poly_srcptr cpoly, int side, qlattice_basis const & Q, int J) : lognorm_base(sc, cpoly, side, Q, J)/*{{{*/
+lognorm_reference::lognorm_reference(siever_config const & sc, cxx_cado_poly const & cpoly, int side, qlattice_basis const & Q, int logI, int J) : lognorm_base(sc, cpoly, side, Q, logI, J)/*{{{*/
 {
     /* Knowing the norm on the rational side is bounded by 2^(2^k), compute
      * lognorms approximations for k bits of exponent + NORM_BITS-k bits
@@ -411,8 +411,8 @@ lognorm_reference::lognorm_reference(siever_config const & sc, cado_poly_srcptr 
      */
     int k = (int) ceil (log2 (maxlog2));
     int K = 1 << k;
-    ASSERT_ALWAYS(NORM_BITS >= k);
-    int l = NORM_BITS - k;
+    ASSERT_ALWAYS(lognorm_reference::NORM_BITS >= k);
+    int l = lognorm_reference::NORM_BITS - k;
     int L = 1 << l;
 
     /* extract k bits from the exponent, and l bits from the mantissa */
@@ -465,7 +465,7 @@ void lognorm_fill_rat_reference(
     double u0 = fijd->coeff[0];
     double u1 = fijd->coeff[1];
 
-    int l = NORM_BITS - (int) ceil(log2(maxlog2));
+    int l = lognorm_reference::NORM_BITS - (int) ceil(log2(maxlog2));
 
     for(unsigned int j = j0 ; j < j1 ; j++) {
 	double z = u0 * j + u1 * i0;
@@ -524,7 +524,7 @@ void lognorm_reference::fill(unsigned char * S, int N) const/*{{{*/
 /***********************************************************************/
 
 /* {{{ faster code */
-lognorm_smart::lognorm_smart(siever_config const & sc, cado_poly_srcptr cpoly, int side, qlattice_basis const & Q, int J) : lognorm_base(sc, cpoly, side, Q, J)/*{{{*/
+lognorm_smart::lognorm_smart(siever_config const & sc, cxx_cado_poly const & cpoly, int side, qlattice_basis const & Q, int logI, int J) : lognorm_base(sc, cpoly, side, Q, logI, J)/*{{{*/
 {
     /* See init_degree_one_norms_bucket_region_smart for the explanation of
      * this table */
@@ -533,7 +533,7 @@ lognorm_smart::lognorm_smart(siever_config const & sc, cado_poly_srcptr cpoly, i
 
     if (fijd->deg > 1) {
         piecewise_linear_approximator A(fijd, log(2)/scale);
-        int I = 1 << sc.logI_adjusted;
+        int I = 1 << logI;
         G = A.logapprox(-(I/2), I/2);
     }
 }/*}}}*/
@@ -549,15 +549,6 @@ static inline double compute_y(double G, double offset, double modscale) {
  */
 void lognorm_fill_rat_smart_inner (unsigned char *S, int i0, int i1, unsigned int j0, unsigned int j1, double scale, cxx_double_poly const & fijd, const double *cexp2)
 {
-    double u0 = fijd->coeff[0];
-    double u1 = fijd->coeff[1];
-
-    ASSERT_ALWAYS(u1 != 0.);
-
-    using std::signbit;
-    double u1_abs = fabs(u1);
-    double inv_u1_abs = 1/u1_abs;
-
     double modscale = scale / 0x100000;
     double offset = 0x3FF00000 - GUARD / modscale;
     /* The lg2 function wants  a positive value.
@@ -573,8 +564,30 @@ void lognorm_fill_rat_smart_inner (unsigned char *S, int i0, int i1, unsigned in
      * we have 0 <= log2(z) - L(z) < 0.0861, for any real z > 0.
      */
 
+    double u0 = fijd->coeff[0];
+    double u1 = fijd->coeff[1];
+
+    if (UNLIKELY(u1 == 0)) {
+        /* constant approximating functions do occur, see bug 21684. This
+         * is triggered in particular by quadratic polynomials, which we
+         * do get with nonlinear polynomial selection.
+         */
+        for (unsigned int j = j0; j < j1; j++) {
+            double g = fabs(u0 * j);
+            uint8_t y = COMPUTE_Y(g);
+            size_t di = i1 - i0;
+            memset_with_writeahead(S, y, di, MEMSET_MIN);
+            S += di;
+        }
+        return;
+    }
+
+    using std::signbit;
+    double u1_abs = fabs(u1);
+    double inv_u1_abs = 1/u1_abs;
+
     for (unsigned int j = j0; j < j1; j++) {
-	int64_t i = i0;
+	int i = i0;
 	double g = fabs(u0 * j + u1 * i0);
 	uint8_t y;
 	double root = -u0 * j / u1;
@@ -617,9 +630,9 @@ void lognorm_fill_rat_smart_inner (unsigned char *S, int i0, int i1, unsigned in
                 /* conversion rounding is towards zero, while we want it
                  * to be towards +infinity. */
                 ix += (ix >= 0);
-		if (UNLIKELY((int64_t)ix >= i1))
+                if (UNLIKELY(ix >= (double) i1))
 		    ix = i1;
-		size_t di = (int64_t) ix - i;	/* The cast matters ! */
+		size_t di = (int) ix - i;	/* The cast matters ! */
 		i = ix;
 		if (!di)
                     break;
@@ -675,12 +688,12 @@ void lognorm_fill_rat_smart_inner (unsigned char *S, int i0, int i1, unsigned in
              * to be towards +infinity. */
             ix += (ix >= 0);
             // ASSERT ((int) ix >= i); // see bug 21518
-            if (LIKELY((int64_t) ix >= i)) {
+            if (LIKELY(ix >= (double) i)) {
                 /* It is most likely that we'll only see this branch. Yet
                  * bug 21518 seems to trigger a nasty corner case */
                 if (UNLIKELY(ix >= i1))
                     ix = i1;
-                size_t di = (int64_t) ix - i;	/* The cast matters ! */
+                size_t di = (int) ix - i;	/* The cast matters ! */
                 i = ix;
                 memset_with_writeahead(S, y, di, MEMSET_MIN);
                 S += di;
@@ -919,7 +932,7 @@ sieve_range_adjust::sieve_info_update_norm_data_Jmax (bool keep_logI)
 
   J = (unsigned int) Jmax;
 
-  return adapt_threads(__func__);
+  return round_to_full_bucket_regions(__func__);
 }//}}}
 
 /* {{{ a few helpers (otherwise I'll menage to get things wrong
@@ -950,7 +963,7 @@ qlattice_basis operator*(sieve_range_adjust::mat<int> const& m, qlattice_basis c
  *
  * The range is taken as one half of the 0-centered range whose width and
  * height are 2^(ceil(A/2)-squeeze)) times 2^(floor(A/2)+squeeze+1) --
- * this larger range as size 2^(A+1).
+ * this larger range has size 2^(A+1).
  * 
  * Integration points are chosen as centers of *rectangles* (not
  * squares) which are proportional to the sieve area.
@@ -992,7 +1005,7 @@ double sieve_range_adjust::estimate_yield_in_sieve_area(mat<int> const& shuffle,
             for(int side = 0 ; side < 2 ; side++) {
                 double z = double_poly_eval_homogeneous(fijd[side], xys[0], xys[1]);
                 double a = log2(fabs(z));
-                double d = dickman_rho(a/lpbs[side]);
+                double d = dickman_rho_local(a/lpbs[side], fabs(z));
                 verbose_output_print(0, 4, " %d %e %e", side, z, d);
                 prod *= d;
             }
@@ -1108,7 +1121,7 @@ B:=[bestrep(a):a in {{a*b*c*x:a in {1,-1},b in {1,d},c in {1,s}}:x in MM}];
     int best_squeeze = -1;
 
     /* We integrate on 2^(2*N-1) points (well, morally 2^(2N), but we halve
-     * that by homogeneity */
+     * that by homogeneity) */
     int N = 5;
 
     double reference = estimate_yield_in_sieve_area(shuffle_matrices[0], 0, N);
@@ -1122,7 +1135,7 @@ B:=[bestrep(a):a in {{a*b*c*x:a in {1,-1},b in {1,d},c in {1,s}}:x in MM}];
                 best_squeeze = squeeze;
                 best_sum = sum;
             }
-            verbose_output_print(0, 2, "# estimated yield for rectangle #%d,%d: %e\n", r, squeeze, sum);
+            verbose_output_print(0, 4, "# estimated yield for rectangle #%d,%d: %e\n", r, squeeze, sum);
         }
     }
 
@@ -1143,7 +1156,7 @@ B:=[bestrep(a):a in {{a*b*c*x:a in {1,-1},b in {1,d},c in {1,s}}:x in MM}];
         verbose_output_print(0, 1, "%s",os.str().c_str());
     }
 
-    return adapt_threads(__func__);
+    return round_to_full_bucket_regions(__func__);
 }/*}}}*/
 
 /* return 0 if we should discard that special-q because the rounded
@@ -1209,9 +1222,9 @@ int sieve_range_adjust::sieve_info_adjust_IJ()/*{{{*/
     const double rt_skew = sqrt(skew);
     verbose_output_vfprint(0, 2, gmp_vfprintf,
             "# Called sieve_info_adjust_IJ((a0=%" PRId64 "; b0=%" PRId64
-            "; a1=%" PRId64 "; b1=%" PRId64 "), p=%Zd, skew=%f, nb_threads=%d)\n",
+            "; a1=%" PRId64 "; b1=%" PRId64 "), p=%Zd, skew=%f)\n",
             Q.a0, Q.b0, Q.a1, Q.b1,
-            (mpz_srcptr) doing.p, skew, nb_threads);
+            (mpz_srcptr) doing.p, skew);
     if (Q.skewed_norm0(skew) > Q.skewed_norm1(skew)) {
         /* exchange u0 and u1, thus I and J */
         swap(Q.a0, Q.a1);
@@ -1228,14 +1241,16 @@ int sieve_range_adjust::sieve_info_adjust_IJ()/*{{{*/
     J = MIN((uint32_t) J, I >> 1);
     logI = (logA + 1) / 2;
 
-    return adapt_threads(__func__);
+    return round_to_full_bucket_regions(__func__);
 }/*}}}*/
 
-int sieve_range_adjust::adapt_threads(const char * origin)/*{{{*/
+int sieve_range_adjust::round_to_full_bucket_regions(const char * origin)/*{{{*/
 {
     /* Compute number of i-lines per bucket region, must be integer */
     uint32_t i = 1U << MAX(LOG_BUCKET_REGION - logI, 0);
-    i *= nb_threads;  /* ensures nb of bucket regions divisible by nb_threads */
+
+    // we no longer need to do that.
+    // i *= nb_threads;  /* ensures nb of bucket regions divisible by nb_threads */
 
     /* Bug 15617: if we round up, we are not true to our promises */
     uint32_t nJ = (J / i) * i; /* Round down to multiple of i */
@@ -1249,9 +1264,10 @@ int sieve_range_adjust::adapt_threads(const char * origin)/*{{{*/
 /*}}}*/
 
  
-int sieve_range_adjust::get_minimum_J()
+uint32_t sieve_range_adjust::get_minimum_J()
 {
-    return nb_threads << MAX(0, (LOG_BUCKET_REGION - logI));
+    /* no longer dependent on the number of threads */
+    return 1 << MAX(0, (LOG_BUCKET_REGION - logI));
 }
 
 void sieve_range_adjust::set_minimum_J_anyway()

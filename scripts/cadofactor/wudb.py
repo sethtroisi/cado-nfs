@@ -745,10 +745,13 @@ class FilesTable(DbTable):
     index = {}
 
 
+# The sqrt_factors table contains the input number to be factored. As
+# such, we must make sure that it's permitted to go at least as far as we
+# intend to go. 200 digits is definitely too small.
 class DictDbTable(DbTable):
     fields = (
         ("rowid", "INTEGER PRIMARY KEY ASC", "UNIQUE NOT NULL"),
-        ("kkey", "VARCHAR(200)", "UNIQUE NOT NULL"),
+        ("kkey", "VARCHAR(300)", "UNIQUE NOT NULL"),
         ("type", "INTEGER", "NOT NULL"),
         ("value", "TEXT", "")
         )

@@ -95,15 +95,11 @@ bool siever_config::parse_default(siever_config & sc, param_list_ptr pl)
             fprintf(stderr, "# -A and -I are incompatible\n");
             exit(EXIT_FAILURE);
         }
-        // This is useful for a default config
-        sc.logI_adjusted = (sc.logA+1)/2;
     } else if (param_list_lookup_string(pl, "I")) {
         int I;
         complete &= param_list_parse_int  (pl, "I", &I);
         sc.logA = 2 * I - 1;
         verbose_output_print(0, 1, "# Interpreting -I %d as meaning -A %d\n", I, sc.logA);
-        // This is useful for a default config
-        sc.logI_adjusted = I;
     }
 
     if (sc.sides[0].lim > 2147483647UL || sc.sides[1].lim > 2147483647UL)
@@ -126,12 +122,9 @@ bool siever_config::parse_default(siever_config & sc, param_list_ptr pl)
     param_list_parse_uint(pl, "sublat", &(sc.sublat.m));
 
     /* Parse optional siever configuration parameters */
-    sc.td_thresh = 1024;	/* default value */
-    sc.skipped = 1;	/* default value */
     param_list_parse_uint(pl, "tdthresh", &(sc.td_thresh));
     param_list_parse_uint(pl, "skipped", &(sc.skipped));
 
-    sc.unsieve_thresh = 100;
     if (param_list_parse_uint(pl, "unsievethresh", &(sc.unsieve_thresh))) {
         verbose_output_print(0, 1, "# Un-sieving primes > %u\n",
                 sc.unsieve_thresh);
@@ -143,8 +136,10 @@ bool siever_config::parse_default(siever_config & sc, param_list_ptr pl)
     //
     // As a consequence, we should make it possible to specify extra
     // parameters in the hint file format (not just I,lim,lpb,mfb).
-    sc.bucket_thresh = 1 << ((sc.logA+1)/2);	/* default value */
-    sc.bucket_thresh1 = 0;	/* default value */
+    //
+    // The logic that sets bucket_thresh to 2^I by default is done late,
+    // namely when we are about to create a new slicing for the factor
+    // base.
     /* overrides default only if parameter is given */
     param_list_parse_ulong(pl, "bkthresh", &(sc.bucket_thresh));
     param_list_parse_ulong(pl, "bkthresh1", &(sc.bucket_thresh1));
@@ -153,7 +148,13 @@ bool siever_config::parse_default(siever_config & sc, param_list_ptr pl)
     for (int side = 0; side < 2; side++) {
         if (!param_list_parse_ulong(pl, powlim_params[side],
                     &sc.sides[side].powlim)) {
-            sc.sides[side].powlim = sc.bucket_thresh - 1;
+            if (sc.bucket_thresh) {
+                sc.sides[side].powlim = sc.bucket_thresh - 1;
+            } else {
+                /* include all powers. We'll discard all those that go to
+                 * bucket sieving anyway */
+                sc.sides[side].powlim = ULONG_MAX;
+            }
             verbose_output_print(0, 1,
                     "# Using default value of %lu for -%s\n",
                     sc.sides[side].powlim, powlim_params[side]);
@@ -171,35 +172,62 @@ bool siever_config::parse_default(siever_config & sc, param_list_ptr pl)
     sc.sides[0].qmin = dupqmin[0];
     sc.sides[1].qmin = dupqmin[1];
 
-    long dupqmax[2] = {LONG_MAX, LONG_MAX};
-    param_list_parse_long_and_long(pl, "dup-qmax", dupqmax, ",");
-    sc.sides[0].qmax = dupqmax[0];
-    sc.sides[1].qmax = dupqmax[1];
-
     /* Change 0 (not initialized) into LONG_MAX */
     for (int side = 0; side < 2; side ++)
         if (sc.sides[side].qmin == 0)
             sc.sides[side].qmin = LONG_MAX;
 
-    /* if qmin is not given, use lim on the sqside by default */
-    if (sc.sides[sc.side].qmin == LONG_MAX)
-        sc.sides[sc.side].qmin = sc.sides[sc.side].lim;
+    long dupqmax[2] = {LONG_MAX, LONG_MAX};
+    param_list_parse_long_and_long(pl, "dup-qmax", dupqmax, ",");
+    sc.sides[0].qmax = dupqmax[0];
+    sc.sides[1].qmax = dupqmax[1];
 
     return complete;
 }
 /* }}} */
 
+/* returns a set of thresholds that is compatible with the command-line
+ * defaults that we see here, as well as the logI that we've just made
+ * our mind on using.
+ *
+ * XXX NOTE XXX : the scale field is set to 0 by this function.
+ *
+ * XXX NOTE XXX : the nr_workspaces field is set to 0 by this function,
+ * because the caller is expected to set that instead.
+ *
+ *
+ */
+fb_factorbase::key_type siever_config::instantiate_thresholds(int side) const
+{
+    fbprime_t fbb = sides[side].lim;
+    fbprime_t bucket_thresh = this->bucket_thresh;
+    fbprime_t bucket_thresh1 = this->bucket_thresh1;
+
+    if (bucket_thresh == 0)
+        bucket_thresh = 1UL << logI;
+    if (bucket_thresh < (1UL << logI)) {
+        verbose_output_print(0, 1, "# Warning: with logI = %d,"
+                " we can't have %lu as the bucket threshold. Using %lu\n",
+                logI,
+                (unsigned long) bucket_thresh,
+                1UL << logI);
+        bucket_thresh = 1UL << logI;
+    }
+
+    if (bucket_thresh > fbb) bucket_thresh = fbb;
+    if (bucket_thresh1 == 0 || bucket_thresh1 > fbb) bucket_thresh1 = fbb;
+    if (bucket_thresh > bucket_thresh1) bucket_thresh1 = bucket_thresh;
+
+    return fb_factorbase::key_type {
+        {bucket_thresh, bucket_thresh1, fbb, fbb},
+            td_thresh,
+            skipped,
+            0,
+            0
+    };
+}
 siever_config siever_config_pool::get_config_for_q(las_todo_entry const & doing) const /*{{{*/
 {
-    // arrange so that we don't have the same header line as the one
-    // which prints the q-lattice basis
-    verbose_output_vfprint(0, 1, gmp_vfprintf,
-                         "#\n"
-                         "# "
-                         "Now sieving side-%d q=%Zd; rho=%Zd\n",
-                         doing.side,
-                         (mpz_srcptr) doing.p,
-                         (mpz_srcptr) doing.r);
     siever_config config = base;
     config.bitsize = mpz_sizeinbase(doing.p, 2);
     config.side = doing.side;
@@ -361,3 +389,4 @@ siever_config_pool::siever_config_pool(cxx_param_list & pl)/*{{{*/
     }
     fclose(f);
 }/*}}}*/
+

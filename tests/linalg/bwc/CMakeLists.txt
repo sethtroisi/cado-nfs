@@ -178,6 +178,22 @@ foreach(gfp_layer ${BWC_GFP_ARITHMETIC_BACKENDS})
             lingen_threshold=10 lingen_mpi_threshold=40 thr=3x3
             ${extra})
     endif()
+    if(gfp_layer STREQUAL "pz")
+        cado_define_test(test-bwc-plingen-draft
+            PROGRAM ${CADO_NFS_BINARY_DIR}/linalg/bwc/plingen_pz
+            ARGUMENTS
+lingen_threshold=60  m=4 n=2  prime=101538509534246169632617439 --random-input-with-length 20000  --draft 2 logline_threshold=2048
+        )
+    endif()
+
+    cado_define_test(TEST_NAME test_matpoly_${gfp_layer}
+        SOURCES test_matpoly.cpp
+        ARGUMENTS --prime ${p}
+        LIBRARIES utils plingen_${gfp_layer}_support)
+    set_target_properties(test_matpoly_${gfp_layer} PROPERTIES
+        COMPILE_FLAGS "--mpi -DSELECT_MPFQ_LAYER_${gfp_layer}"
+        LINK_FLAGS "--mpi"
+        )
 endforeach(gfp_layer ${BWC_GFP_ARITHMETIC_BACKENDS})
 
 
@@ -431,3 +447,5 @@ cado_define_test(TEST_NAME test-lingen-crc
 endif()
 
 cado_define_test(test-arith-modp.cpp LIBRARIES tests utils)
+
+add_subdirectory (flint-fft)

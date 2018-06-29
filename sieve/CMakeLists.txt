@@ -18,15 +18,17 @@ set (las_sources
     las-qlattice.cpp
     las-norms.cpp logapprox.cpp
     las-coordinates.cpp
-
+    las-sieve-info.cpp
     las-types.cpp
-    las.cpp fb.cpp las-plattice.cpp
+    las-choose-sieve-area.cpp
+    las-auxiliary-data.cpp
+    las.cpp fb.cpp fb-slice-weight.cpp las-plattice.cpp
   las-debug.cpp las-report-stats.cpp las-duplicate.cpp
   las-config.c bucket.cpp las-smallsieve.cpp las-unsieve.cpp
   las-sieve2357.cpp las-unsieve-sse2.cpp
   las-trialdiv.cpp las-fb.cpp
   las-descent-trees.cpp las-cofactor.cpp
-  las-fill-in-buckets.cpp las-threads.cpp)
+  las-fill-in-buckets.cpp las-threads.cpp las-threads-work-data.cpp)
 set (las_libraries trialdiv facul utils ${pthread_libs})
 # set (las_libraries trialdiv facul utils ${pthread_libs})
 
@@ -59,7 +61,9 @@ add_subdirectory(strategies)
 add_executable(dupsup
     las-todo-entry.cpp
     las-siever-config.cpp
+    las-sieve-info.cpp
     las-qlattice.cpp
+    las-choose-sieve-area.cpp
     las-norms.cpp logapprox.cpp
     las-coordinates.cpp
     bucket.cpp

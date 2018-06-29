@@ -76,7 +76,7 @@ mpn_sumdiff_n(mp_ptr s, mp_ptr d, mp_srcptr x, mp_srcptr y, mp_size_t n)
 	return 0;
 
     if ((s == x && d == y) || (s == y && d == x)) {
-	t = flint_malloc(n * sizeof(mp_limb_t));
+	t = (mp_ptr) flint_malloc(n * sizeof(mp_limb_t));
 	ret = mpn_sub_n(t, x, y, n);
 	ret += 2 * mpn_add_n(s, x, y, n);
 	flint_mpn_copyi(d, t, n);
@@ -94,6 +94,16 @@ mpn_sumdiff_n(mp_ptr s, mp_ptr d, mp_srcptr x, mp_srcptr y, mp_size_t n)
     ret += mpn_sub_n(d, x, y, n);
     return ret;
 }
+
+/* mpn_mulmod_2expp1 is an internal function exposed by mpir, but the
+ * real symbol is mpn_mulmod_2expp1_basecase anyway. The tarball we're
+ * extracting here has the very same code (with a more permissive
+ * license) as flint_mpn_mulmod_2expp1_basecase
+ *
+ * Bottom line: if we use gmp and not mpir, we may use the code we have
+ * here.
+ */
+#define mpn_mulmod_2expp1 flint_mpn_mulmod_2expp1_basecase
 
 #endif
 
@@ -388,6 +398,7 @@ void fft_get_transform_info(struct fft_transform_info * fti, mp_bitcnt_t bits1, 
 void fft_get_transform_info_mulmod(struct fft_transform_info * fti, mp_bitcnt_t xbits, mp_bitcnt_t ybits, unsigned int nacc, mp_bitcnt_t minwrap);
 void fft_transform_info_adjust_depth(struct fft_transform_info * fti, unsigned int adj);
 void fft_transform_info_set_first_guess(struct fft_transform_info * fti);
+int fft_transform_info_check(const struct fft_transform_info * fti);
 void fft_get_transform_allocs(size_t sizes[3], struct fft_transform_info * fti);
 void fft_transform_prepare(void * x, struct fft_transform_info * fti);
 void fft_do_dft(void * y, mp_limb_t * x, mp_size_t nx, void * temp, struct fft_transform_info * fti);

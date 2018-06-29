@@ -4,7 +4,8 @@
 # Puts the optimized file in params.cxx.opt in the current directory.
 # Remark: the 'nomad' binary must be in $PATH (see README)
 # The CADO_BUILD environment variable must contain the CADO-NFS build
-# directory (makefb and las are taken from $CADO_BUILD/sieve)
+# directory (makefb and las are taken from $CADO_BUILD/sieve), i.e.,
+# something like /xxx/cado-nfs/build/<some_name>
 
 # Important: if lpb0 and/or lpb1 change, you need to recompute rels_wanted,
 # which should be near from prime_pi(2^lpb0) + prime_pi(2^lpb1)
@@ -76,6 +77,11 @@ else
   exit 1
 fi
 
+if ! [ -x "${CADO_BUILD}/sieve/makefb" ] || ! [ -x "${CADO_BUILD}/sieve/las" ] ; then
+    echo "could not find ${CADO_BUILD}/sieve/makefb and ${CADO_BUILD}/sieve/las ; have you run \"make\" ?"
+    exit 1
+fi
+
 ### Set working directory
 d=`mktemp -d`
 echo "Working directory:" $d
@@ -101,7 +107,7 @@ if [ $npoly -eq 0 ] ; then # polys are given by Y[0-9] and (c[0-9] or X[0-9])
   if grep -q "^[cX][2-9]" $d/$poly ; then
     poly1="alg"
   else
-    poly0="rat"
+    poly1="rat"
   fi
 elif [ $npoly -eq 2 ] ; then # polys are given by 'poly[0-9]:c0,c1,...'
   if [ `grep "^poly0" $d/$poly | tr -cd , | wc -c` -eq 1 ] ; then

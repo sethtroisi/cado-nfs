@@ -73,6 +73,7 @@ Thus the function to check for duplicates needs the following information:
 #include "las-coordinates.hpp"
 #include "las-norms.hpp"
 #include "las-cofactor.hpp"
+#include "las-choose-sieve-area.hpp"
 
 /* default verbose level of # DUPECHECK lines */
 #define VERBOSE_LEVEL 2
@@ -90,7 +91,7 @@ compute_a_over_b_mod_p(mpz_t r, const int64_t a, const uint64_t b, const mpz_t p
 sieve_info *
 fill_in_sieve_info(las_todo_entry const & doing,
                    uint32_t I, uint32_t J,
-                   cado_poly_ptr cpoly, siever_config const & conf, int nb_threads)
+                   cxx_cado_poly const & cpoly, siever_config const & conf)
 {
   sieve_info * x = new sieve_info;
 
@@ -98,12 +99,12 @@ fill_in_sieve_info(las_todo_entry const & doing,
 
   new_si.I = I;
   new_si.J = J;
-  new_si.cpoly = cpoly;
+  new_si.cpoly_ptr = &cpoly;
   new_si.conf = conf;
   new_si.conf.side = doing.side;
   new_si.doing = doing;
 
-  sieve_range_adjust Adj(doing, cpoly, conf, nb_threads);
+  sieve_range_adjust Adj(doing, cpoly, conf);
   Adj.SkewGauss();
   if (!Adj.sieve_info_adjust_IJ()) {
       delete x;
@@ -208,51 +209,43 @@ struct sq_with_fac {
  * when sieving the sq described by si. Return false if it is probably not a
  * duplicate */
 bool
-sq_finds_relation(sq_with_fac const& sq_fac, const int sq_side,
-    relation const& rel, const int nb_threads, sieve_info & old_si,
+sq_finds_relation(las_info const & las, sq_with_fac const& sq_fac, const int sq_side,
+    relation const& rel,
+    siever_config const & old_sc,
+    std::shared_ptr<facul_strategies_t> old_strategies,
     int adjust_strategy)
 {
   uint64_t sq = sq_fac.q;
-  
+     
   // Warning: the entry we create here does not know whether sq is
   // prime or composite (it assumes prime). This is fragile!!!
   las_todo_entry doing = special_q_from_ab(rel.a, rel.b, sq, sq_side);
 
-  sieve_range_adjust Adj(doing, old_si.cpoly, old_si.conf, nb_threads);
+  siever_config conf;
+  qlattice_basis Q;
+  uint32_t J;
 
-  if (!Adj.SkewGauss() || !Adj.Q.fits_31bits() || !Adj.sieve_info_adjust_IJ()) {
+  if (!choose_sieve_area(las, adjust_strategy, doing, conf, Q, J)) {
     verbose_output_print(0, VERBOSE_LEVEL, "# DUPECHECK q-lattice discarded\n");
     return false;
   }
 
-  if (adjust_strategy != 1)
-    Adj.sieve_info_update_norm_data_Jmax();
-
-  if (adjust_strategy >= 2)
-    Adj.adjust_with_estimated_yield();
-
-  if (adjust_strategy >= 3)
-    Adj.sieve_info_update_norm_data_Jmax(true);
-
-  siever_config conf = Adj.config();
-  conf.logI_adjusted = Adj.logI;
-  conf.side = sq_side;
+  ASSERT_ALWAYS(conf.side == sq_side);
 
   /* We don't have a constructor which is well adapted to our needs here.
    * We're going to play dirty tricks, and fill out the stuff by
-   * ourselves.
+   * ourselves. This should be fixed someday. XXX
    */
   sieve_info si;
-  si.cpoly = old_si.cpoly;
+  si.cpoly_ptr = & las.cpoly;
   si.conf = conf;
-  si.I = 1UL << conf.logI_adjusted;
-  si.recover_per_sq_values(Adj);
-  si.strategies = old_si.strategies;
-
+  si.I = 1UL << conf.logI;
+  si.set_for_new_q(doing, Q, J);
+  si.strategies = old_strategies;
 
   const uint32_t oldI = si.I, oldJ = si.J;
   si.update_norm_data();
-  uint32_t I = si.I, J = si.J;
+  uint32_t I = si.I;
 
   
   { // Print some info
@@ -311,7 +304,7 @@ sq_finds_relation(sq_with_fac const& sq_fac, const int sq_side,
   std::array<cxx_mpz, 2> cof;
   for (int side = 0; side < 2; side++) {
     mpz_set_ui(cof[side], 1);
-    const unsigned long fbb = old_si.conf.sides[side].lim;
+    const unsigned long fbb = old_sc.sides[side].lim;
     unsigned int nb_p = rel.sides[side].size();
     for (unsigned int i = 0; i < nb_p; i++) {
       const unsigned long p = mpz_get_ui(rel.sides[side][i].p);
@@ -336,7 +329,7 @@ sq_finds_relation(sq_with_fac const& sq_fac, const int sq_side,
 
   /* Check that the cofactors are within the mfb bound */
   for (int side = 0; side < 2; ++side) {
-    if (!check_leftover_norm (cof[side], si, side)) {
+    if (!check_leftover_norm (cof[side], si.conf.sides[side])) {
       verbose_output_vfprint(0, VERBOSE_LEVEL, gmp_vfprintf,
           "# DUPECHECK cofactor %Zd is outside bounds\n",
           (__mpz_struct*) cof[side]);
@@ -345,7 +338,7 @@ sq_finds_relation(sq_with_fac const& sq_fac, const int sq_side,
   }
 
   std::array<std::vector<cxx_mpz>, 2> f;
-  int pass = factor_both_leftover_norms(cof, f, si);
+  int pass = factor_both_leftover_norms(cof, f, {{si.conf.sides[0].lim, si.conf.sides[1].lim}}, si.strategies.get());
 
   if (pass <= 0) {
     verbose_output_vfprint(0, VERBOSE_LEVEL, gmp_vfprintf,
@@ -361,18 +354,20 @@ sq_finds_relation(sq_with_fac const& sq_fac, const int sq_side,
 /* This function decides whether the given (sq,side) was previously
  * sieved (compared to the current special-q stored in si.doing).
  * This takes qmin and qmax into account.
+ *
+ * TODO: what's up with side here ? Any distinction between side and
+ * doing.side ???
  */
 static int
-sq_was_previously_sieved (const uint64_t sq, int side, sieve_info const & si){
+sq_was_previously_sieved (const uint64_t sq, int side, las_todo_entry const & doing, siever_config const & sc){
   cxx_mpz Sq;
   mpz_set_uint64(Sq, sq);
-  if (mpz_cmp(si.doing.p, Sq) <= 0) /* we use <= and not < since this
-					   function is also called with the
-					   current special-q */
+  if (mpz_cmp(doing.p, Sq) <= 0) /* we use <= and not < since this
+				    function is also called with the
+				    current special-q */
     return 0;
 
-  return (sq >= si.conf.sides[side].qmin)
-      && (sq <  si.conf.sides[side].qmax);
+  return (sq >= sc.sides[side].qmin) && (sq <  sc.sides[side].qmax);
 }
 
 // Warning: this function works with side effects:
@@ -421,12 +416,16 @@ all_multiples(std::vector<uint64_t> & prime_list) {
 /* Return 1 if the relation is probably a duplicate of a relation found
    "earlier", and 0 if it is probably not a duplicate */
 int
-relation_is_duplicate(relation const& rel, las_info const& las,
-                      sieve_info & si, int adjust_strategy)
+relation_is_duplicate(relation const& rel,
+        las_todo_entry const & doing,
+        las_info const& las,
+        siever_config const & old_sc,
+        std::shared_ptr<facul_strategies_t> old_strategies,
+        int adjust_strategy)
 {
   /* If the special-q does not fit in an unsigned long, we assume it's not a
      duplicate and just move on */
-  if (!mpz_fits_uint64_p(si.doing.p)) {
+  if (!mpz_fits_uint64_p(doing.p)) {
     return false;
   }
 
@@ -448,7 +447,7 @@ relation_is_duplicate(relation const& rel, las_info const& las,
 
       // can this p be part of valid sq ?
       if (! las.allow_composite_q) {
-        if ((p < si.conf.sides[side].qmin) || (p >= si.conf.sides[side].qmax)) {
+        if ((p < old_sc.sides[side].qmin) || (p >= old_sc.sides[side].qmax)) {
           continue;
         }
       } else {
@@ -458,7 +457,7 @@ relation_is_duplicate(relation const& rel, las_info const& las,
       }
 
       cxx_mpz aux;
-      mpz_poly_getcoeff(aux, si.cpoly->pols[side]->deg, si.cpoly->pols[side]);
+      mpz_poly_getcoeff(aux, las.cpoly->pols[side]->deg, las.cpoly->pols[side]);
       if (mpz_divisible_ui_p(aux, p))
         continue;
 
@@ -470,7 +469,7 @@ relation_is_duplicate(relation const& rel, las_info const& las,
     // Step 2: keep only those that have been sieved before current sq.
     std::vector<sq_with_fac> valid_sq;
     for (auto const & sq : sq_list) {
-      if (sq_was_previously_sieved(sq.q, side, si)) {
+      if (sq_was_previously_sieved(sq.q, side, doing, old_sc)) {
         valid_sq.push_back(sq);
       }
     }
@@ -478,7 +477,7 @@ relation_is_duplicate(relation const& rel, las_info const& las,
     // Step 3: emulate sieving for the valid sq, and check if they find
     // our relation.
     for (auto const & sq : valid_sq) {
-      bool is_dupe = sq_finds_relation(sq, side, rel, las.nb_threads, si, adjust_strategy);
+      bool is_dupe = sq_finds_relation(las, sq, side, rel, old_sc, old_strategies, adjust_strategy);
       verbose_output_print(0, VERBOSE_LEVEL,
           "# DUPECHECK relation is probably%s a dupe\n",
           is_dupe ? "" : " not");

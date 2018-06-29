@@ -12,7 +12,7 @@
 #include <sstream>
 #include <algorithm>
 #include <map>
-#include <type_traits>
+#include <type_traits>  // for std::is_same (C++11)
 
 #include "bwc_config.h"
 #include "matmul.h"
@@ -957,7 +957,7 @@ void matmul_zone_data<gfp, fast_gfp>::mul(void * xdst, void const * xsrc, int d)
     size_t nsrc = mm->public_->dim[d];
     size_t ndst = mm->public_->dim[!d];
     
-    if (arith_modp::details::is_same<elt, fast_elt>::value) {
+    if (std::is_same<elt, fast_elt>::value) {
         src = (const fast_elt *) xsrc;
         dst = (fast_elt *) xdst;
     } else {
@@ -1122,7 +1122,7 @@ void matmul_zone_data<gfp, fast_gfp>::mul(void * xdst, void const * xsrc, int d)
         scratch_alloc.deallocate(tdst, ndst);
     }
 
-    if (!arith_modp::details::is_same<elt, fast_elt>::value) {
+    if (!std::is_same<elt, fast_elt>::value) {
         std::copy(alternate[!d].begin(), alternate[!d].end(), (elt*) xdst);
     }
 

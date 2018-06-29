@@ -38,7 +38,7 @@ tasks.I = 15
 tasks.sieve.qmin = 101875000
 tasks.sieve.bkmult = 1.1
 
-tasks.sieve.qrange = 10000
+tasks.sieve.qrange = 5000
 
 ###########################################################################
 # Filtering

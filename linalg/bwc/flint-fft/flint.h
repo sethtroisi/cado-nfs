@@ -66,10 +66,20 @@ extern "C" {
                          __FLINT_VERSION_PATCHLEVEL)
 
 /* 
- * Check mpir and mpfr version numbers */
+ * Check mpir and mpfr version numbers.
+ *
+ * The functions below, since not provided by gmp, are provided by
+ * cado-nfs instead
+ */
 #if __GNU_MP_VERSION < 5
-#error GMP 5.0.0 or MPIR 2.6.0 or later are required
+mp_limb_t mpn_neg (mp_limb_t *rp, const mp_limb_t *sp, mp_size_t n);
+void mpn_xor_n (mp_limb_t *rp, const mp_limb_t *s1p, const mp_limb_t *s2p,
+		mp_size_t n);
+void mpn_zero(mp_limb_t *rp, mp_size_t n);
+void mpn_copyi(mp_limb_t *rp, const mp_limb_t * up, mp_size_t n);
+void mpn_copyd(mp_limb_t *rp, const mp_limb_t * up, mp_size_t n);
 #endif
+
 
 
 /* 
@@ -219,8 +229,13 @@ extern const unsigned char __flint_clz_tab[128];
 static __inline__ unsigned int FLINT_BIT_COUNT(mp_limb_t x)
 {
     unsigned int zeros = FLINT_BITS;
-    if (x)
-	count_leading_zeros(zeros, x);
+#ifdef __GNUC__
+    /* make sure mp_limb_t and unsigned long are the same beast */
+    char dummy[(sizeof(mp_limb_t) == sizeof(unsigned long))-1] __attribute__((unused));
+    if (x) zeros = __builtin_clzl(x);
+#else
+#error "implement me"
+#endif
     return FLINT_BITS - zeros;
 }
 

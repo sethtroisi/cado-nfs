@@ -1,5 +1,5 @@
 #ifndef LAS_PLATTICE_H
-#define LAS_PLATTICE_H 1
+#define LAS_PLATTICE_H
 
 /*******************************************************************/
 /********        Walking in p-lattices                    **********/
@@ -675,12 +675,12 @@ public:
 class plattices_vector_t:
         public std::vector<plattice_enumerate_t> {
     slice_index_t index;
+    double weight;
 public:
-    /* no copy, but move allowed */
-    plattices_vector_t(plattices_vector_t const&) = delete;
-    plattices_vector_t(plattices_vector_t &&) = default;
-    plattices_vector_t(const slice_index_t index) : index(index) {}
+    plattices_vector_t() = default;
+    plattices_vector_t(slice_index_t index, double weight) : index(index), weight(weight) {}
     slice_index_t get_index() const {return index;};
+    slice_index_t get_weight() const {return weight;};
 };
 
 /* Dense version of plattice_info_t and friends for long-term storage in
@@ -738,9 +738,9 @@ struct plattice_info_dense_t {
         if (b1 > mask20)
             b1 = mask20;
 
-        pack[0] =   (minus_a0 & mask20) | (b0 << 20);
+        pack[0] = (minus_a0 & mask20) | (b0 << 20);
         pack[1] = ((b0 >> 12) & mask8 ) | ((a1 & mask20) << 8) | (b1 << 28);
-        pack[2] =  ((b1 >> 4) & mask16) | (hint << 16);
+        pack[2] = ((b1 >> 4) & mask16) | (hint << 16);
     }
 
     plattice_info_t unpack(const int logI) const {
@@ -775,11 +775,20 @@ struct plattice_info_dense_t {
 };
 
 class plattices_dense_vector_t:
-        public std::vector<plattice_info_dense_t>, private NonCopyable {
-    slice_index_t index;
+        public std::vector<plattice_info_dense_t> {
 public:
-    plattices_dense_vector_t(const slice_index_t index) : index(index) {}
-    slice_index_t get_index() const {return index;};
+#if !GNUC_VERSION(4,7,2)
+    /* Apparently there's a bug in gcc 4.7.2, which does not recognize
+     * that a vector of plattices_dense_vector_t is ok with a move ctor
+     * and no copy ctor. I'm not entirely sure why, and I don't really
+     * want to investigate. Theoretically, defining ctors as below should
+     * be fine.
+     */
+    plattices_dense_vector_t(plattices_dense_vector_t const&) = delete;
+    plattices_dense_vector_t(plattices_dense_vector_t&&) = default;
+    plattices_dense_vector_t& operator=(plattices_dense_vector_t&&) = default;
+    plattices_dense_vector_t() = default;
+#endif
 };
 
 

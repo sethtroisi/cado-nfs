@@ -218,6 +218,7 @@ nfs-hd/murphyE3d.h
 nfs-hd/murphyE3d.c
 nfs-hd/alpha3d.h
 nfs-hd/alpha3d.mag
+nfs-hd/alpha3d.sage
 README.nfs-hd
 nfs-hd/automatic_p6bd40.sh
 nfs-hd/check_relations/

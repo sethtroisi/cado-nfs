@@ -15,6 +15,10 @@
 #include <string.h>
 #include <gmp.h>
 #include <sstream>
+#include <vector>
+#include <string>
+#include <utility>
+#include <stdexcept>
 #include "portability.h"
 #include "mpz_poly.h"
 #include "lll.h"
@@ -75,7 +79,7 @@ static const long tc_points[MAX_TC_DEGREE] = {0, 1, -1, 2, -2, 3, -3, 4, -4,
 
 #if GNUC_VERSION_ATLEAST(7,0,0)
 #pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wstrict-overflow" 
+#pragma GCC diagnostic ignored "-Wstrict-overflow"
 #endif
 /* Given f[0]...f[t] that contain respectively f(0), ..., f(t),
    put in f[0]...f[t] the coefficients of f. Assumes t <= MAX_TC_DEGREE.
@@ -496,7 +500,7 @@ void mpz_poly_realloc (mpz_poly_ptr f, int nc)
 /* Copy f to g, where g must be initialized (but there is no need it has
    enough allocated coefficients, since mpz_poly_setcoeff reallocates if
    needed). */
-void mpz_poly_set(mpz_poly_ptr g, mpz_poly_srcptr f) 
+void mpz_poly_set(mpz_poly_ptr g, mpz_poly_srcptr f)
 {
   int i;
 
@@ -508,7 +512,7 @@ void mpz_poly_set(mpz_poly_ptr g, mpz_poly_srcptr f)
     mpz_poly_setcoeff (g, i, f->coeff[i]);
 }
 
-void mpz_poly_set_double_poly(mpz_poly_ptr g, double_poly_srcptr f) 
+void mpz_poly_set_double_poly(mpz_poly_ptr g, double_poly_srcptr f)
 {
   mpz_poly_realloc (g, f->deg + 1);
   g->deg = f->deg;
@@ -527,7 +531,7 @@ mpz_poly_init_set_ab (mpz_poly_ptr rel, int64_t a, uint64_t b)
 
 /* rel <- a-b*x */
 void
-mpz_poly_init_set_mpz_ab (mpz_poly_ptr rel, mpz_t a, mpz_t b)
+mpz_poly_init_set_mpz_ab (mpz_poly_ptr rel, mpz_srcptr a, mpz_srcptr b)
 {
     mpz_poly_init(rel, 1);
     mpz_poly_setcoeff(rel, 0, a);
@@ -557,7 +561,7 @@ mpz_poly_swap (mpz_poly_ptr f, mpz_poly_ptr g)
 }
 
 /* Free polynomial f in mpz_poly. */
-void mpz_poly_clear(mpz_poly_ptr f) 
+void mpz_poly_clear(mpz_poly_ptr f)
 {
   int i;
   for (i = 0; i < f->alloc; ++i)
@@ -603,7 +607,7 @@ void mpz_poly_setcoeffs (mpz_poly_ptr f, mpz_t * coeffs, int d)
 }
 
 /* Set a zero polynomial. */
-void mpz_poly_set_zero(mpz_poly_ptr f) 
+void mpz_poly_set_zero(mpz_poly_ptr f)
 {
   f->deg = -1;
 }
@@ -663,7 +667,7 @@ void mpz_poly_setcoeff_double(mpz_poly_ptr f, int i, double z)
 }
 
 /* Get coefficient for the i-th term. */
-void mpz_poly_getcoeff(mpz_t res, int i, mpz_poly_srcptr f)
+void mpz_poly_getcoeff(mpz_ptr res, int i, mpz_poly_srcptr f)
 {
     if (i > f->deg)
         mpz_set_ui (res, 0);
@@ -679,6 +683,13 @@ void mpz_poly_set_xi(mpz_poly_ptr f, int i)
         mpz_set_ui(f->coeff[j], j == i);
     }
     f->deg = i;
+}
+
+void mpz_poly_set_mpz(mpz_poly_ptr f, mpz_srcptr z)
+{
+    mpz_poly_realloc (f, 1);
+    mpz_set(f->coeff[0], z);
+    mpz_poly_cleandeg(f, 0);
 }
 
 /* g <- quo (f, x^i) */
@@ -1217,7 +1228,7 @@ mpz_poly_divisible_mpz (mpz_poly_srcptr P, mpz_srcptr a)
 
 /* Set ft(x) = f(x+k) where k is an mpz_t, ft and f can be the same poly. */
 void
-mpz_poly_translation (mpz_poly_ptr ft, mpz_poly_srcptr f, const mpz_t k)
+mpz_poly_translation (mpz_poly_ptr ft, mpz_poly_srcptr f, mpz_srcptr k)
 {
   int i, j;
   int d = f->deg;
@@ -1231,7 +1242,7 @@ mpz_poly_translation (mpz_poly_ptr ft, mpz_poly_srcptr f, const mpz_t k)
 /* Set fr = f + k * x^t * g such that t+deg(g) <= deg(f) and t >= 0 (those two
  * assumptions are not checked). fr and f can be the same poly */
 void mpz_poly_rotation (mpz_poly_ptr fr, mpz_poly_srcptr f, mpz_poly_srcptr g,
-                        const mpz_t k, int t)
+                        mpz_srcptr k, int t)
 {
   mpz_poly_set (fr, f);
   for (int i = 0; i <= g->deg; i++)
@@ -1281,7 +1292,7 @@ void mpz_poly_rotation_int64 (mpz_poly_ptr fr, mpz_poly_srcptr f,
  * on output.
  */
 static int
-mpz_poly_pseudodiv_r (mpz_poly_ptr h, mpz_poly_srcptr f, mpz_srcptr N, mpz_t factor)
+mpz_poly_pseudodiv_r (mpz_poly_ptr h, mpz_poly_srcptr f, mpz_srcptr N, mpz_ptr factor)
 {
   int i, d = f->deg, dh = h->deg;
   mpz_t tmp, inv;
@@ -1540,7 +1551,7 @@ void mpz_poly_div_2_mod_mpz (mpz_poly_ptr f, mpz_poly_srcptr g, mpz_srcptr m)
 }
 
 /* Set res=f(x). Assumes res and x are different variables. */
-void mpz_poly_eval(mpz_t res, mpz_poly_srcptr f, mpz_srcptr x) {
+void mpz_poly_eval(mpz_ptr res, mpz_poly_srcptr f, mpz_srcptr x) {
   int i, d;
   d = f->deg;
   if (d == -1) {
@@ -1555,7 +1566,7 @@ void mpz_poly_eval(mpz_t res, mpz_poly_srcptr f, mpz_srcptr x) {
 }
 
 /* Set res=f(x) where x is an unsigned long. */
-void mpz_poly_eval_ui (mpz_t res, mpz_poly_srcptr f, unsigned long x)
+void mpz_poly_eval_ui (mpz_ptr res, mpz_poly_srcptr f, unsigned long x)
 {
   int d = f->deg;
 
@@ -1569,7 +1580,7 @@ void mpz_poly_eval_ui (mpz_t res, mpz_poly_srcptr f, unsigned long x)
 
 /* Set res=f'(x), where x is an unsigned long */
 void
-mpz_poly_eval_diff_ui (mpz_t res, mpz_poly_srcptr f, unsigned long x)
+mpz_poly_eval_diff_ui (mpz_ptr res, mpz_poly_srcptr f, unsigned long x)
 {
   int d = f->deg;
 
@@ -1594,7 +1605,7 @@ void mpz_poly_eval_mod_mpz(mpz_t res, mpz_poly_srcptr f, mpz_srcptr x,
 
 /* Return 1 if poly(root) % modulus == 0, return 0 otherwise */
 /* Coefficients of f(x) need not be reduced mod m */
-int mpz_poly_is_root(mpz_poly_srcptr poly, mpz_t root, mpz_t modulus)
+int mpz_poly_is_root(mpz_poly_srcptr poly, mpz_srcptr root, mpz_srcptr modulus)
 {
     mpz_t x;
     mpz_init(x);
@@ -1814,7 +1825,7 @@ mpz_poly_mod_f_mod_mpz (mpz_poly_ptr R, mpz_poly_srcptr f, mpz_srcptr m,
 	mpz_submul (R->coeff[i], c, f->coeff[f->deg-R->deg+i]);
       R->deg--;
     }
-  
+
   mpz_clear (c);
   if (invf == NULL)
     mpz_clear (aux);
@@ -1961,11 +1972,44 @@ void mpz_poly_derivative(mpz_poly_ptr df, mpz_poly_srcptr f) {
     mpz_mul_si (df->coeff[n], f->coeff[n + 1], n + 1);
 }
 
+/* B = A^n */
+void mpz_poly_pow_ui(mpz_poly_ptr B, mpz_poly_srcptr A, unsigned long n)/*{{{*/
+{
+    if (n == 0) {
+        mpz_poly_set_xi(B, 0);
+        return;
+    }
+    if (A->deg < 0) {
+        mpz_poly_set_zero(B);
+        return;
+    }
+    if (B == A) {
+        mpz_poly C;
+        mpz_poly_init(C, n * A->deg);
+        mpz_poly_pow_ui(C, A, n);
+        mpz_poly_swap(B, C);
+        mpz_poly_clear(C);
+        return;
+    }
+    unsigned long k = ((~0UL)>>1) + 1;
+    for( ; k > n ; k >>= 1);
+    mpz_poly_set(B, A);
+    for( ; k >>= 1 ; ) {
+        mpz_poly_mul(B, B, B);
+        if (n & k)
+            mpz_poly_mul(B, B, A);
+    }
+}/*}}}*/
+
 /* B = A^n mod f, assuming f is monic */
 void mpz_poly_pow_ui_mod_f(mpz_poly_ptr B, mpz_poly_srcptr A, unsigned long n, mpz_poly_srcptr f)/*{{{*/
 {
     if (n == 0) {
         mpz_poly_set_xi(B, 0);
+        return;
+    }
+    if (A->deg < 0) {
+        mpz_poly_set_zero(B);
         return;
     }
     if (B == A || B  == f) {
@@ -1978,6 +2022,7 @@ void mpz_poly_pow_ui_mod_f(mpz_poly_ptr B, mpz_poly_srcptr A, unsigned long n, m
     }
     unsigned long k = ((~0UL)>>1) + 1;
     for( ; k > n ; k >>= 1);
+    mpz_poly_realloc(B, n * A->deg + 1);
     mpz_poly_set(B, A);
     mpz_poly Q;
     mpz_poly_init(Q, 3*f->deg-3);
@@ -2376,7 +2421,7 @@ void mpz_poly_gcd_mpz(mpz_poly_ptr f, mpz_poly_srcptr a, mpz_poly_srcptr b, mpz_
 /* Coefficients of f and g need not be reduced mod p on input.
  * Coefficients of f are reduced mod p on output */
 int
-mpz_poly_pseudogcd_mpz(mpz_poly_ptr f, mpz_poly_ptr g, mpz_srcptr N, mpz_t factor)
+mpz_poly_pseudogcd_mpz(mpz_poly_ptr f, mpz_poly_ptr g, mpz_srcptr N, mpz_ptr factor)
 {
     mpz_poly_mod_mpz(f, f, N, NULL);
     mpz_poly_mod_mpz(g, g, N, NULL);
@@ -2547,7 +2592,7 @@ mpz_poly_homography (mpz_poly_ptr Fij, mpz_poly_srcptr F, int64_t H[4])
 }
 
 /* v <- |f(i,j)|, where f is homogeneous of degree d */
-void mpz_poly_homogeneous_eval_siui (mpz_t v, mpz_poly_srcptr f, const int64_t i, const uint64_t j)
+void mpz_poly_homogeneous_eval_siui (mpz_ptr v, mpz_poly_srcptr f, const int64_t i, const uint64_t j)
 {
   unsigned int k = f->deg;
   ASSERT(k > 0);
@@ -2576,7 +2621,7 @@ void mpz_poly_homogeneous_eval_siui (mpz_t v, mpz_poly_srcptr f, const int64_t i
 
 /* put in c the content of f */
 void
-mpz_poly_content (mpz_t c, mpz_poly_srcptr F)
+mpz_poly_content (mpz_ptr c, mpz_poly_srcptr F)
 {
   int i;
   mpz_t *f = F->coeff;
@@ -2869,10 +2914,10 @@ mpz_poly_squarefree_p (mpz_poly_srcptr f)
  * If f is not irreducible, then p will be root of a factor of degree <= d-1,
  * which will yield a linear dependency of the same order as the coefficients
  * of f, otherwise if f is irreducible the linear dependency will be of order
- * p^(1/d). 
+ * p^(1/d).
  *
  * \return 0 by default, 1 if the poly is irreducible.
- * 
+ *
  * this function is without any warranty and at your own risk
  */
 int mpz_poly_is_irreducible_z(mpz_poly_srcptr f)
@@ -2990,7 +3035,7 @@ int mpz_poly_is_irreducible_z(mpz_poly_srcptr f)
   return ret;
 }
 
-  
+
 /* factoring polynomials */
 
 void mpz_poly_factor_list_init(mpz_poly_factor_list_ptr l)
@@ -3446,7 +3491,7 @@ static int mpz_poly_factor2(mpz_poly_factor_list_ptr list, mpz_poly_srcptr f,
  * k is the degree of factors we are looking for.
  *
  * We split in two parts:
- * 
+ *
  *  - factors whose roots are squares in GF(p^k).
  *  - factors whose roots are non squares in GF(p^k).
  *
@@ -3751,6 +3796,7 @@ int mpz_poly_factor_and_lift_padically(mpz_poly_factor_list_ptr fac, mpz_poly_sr
 std::string cxx_mpz_poly::print_poly(std::string const& var) const
 {
     std::ostringstream os;
+    if (x->deg < 0) os << "0";
     for(int i = 0 ; i <= x->deg ; i++) {
         int r = mpz_cmp_ui(x->coeff[i], 0);
         if (r == 0) continue;
@@ -3781,7 +3827,7 @@ std::string cxx_mpz_poly::print_poly(std::string const& var) const
  * \param[in]  counter         counter storing the coefficients of f
  * \param[in]  bound           max absolute value of coefficients of f
  *
- * \return 1 if the poly is valid (content = 1, not a duplicate, and +/-1 is not a root) 
+ * \return 1 if the poly is valid (content = 1, not a duplicate, and +/-1 is not a root)
  *           (in fact the value returned is != 0) and in this case,
  *           max_abs_coeffs is set to the largest absolute value of the coefficients of f
  * \return 0 if the poly corresponding to the counter is a duplicate, and in that case,
@@ -3796,10 +3842,9 @@ std::string cxx_mpz_poly::print_poly(std::string const& var) const
  */
 int mpz_poly_setcoeffs_counter(mpz_poly_ptr f, int* max_abs_coeffs, unsigned long *next_counter, int deg, unsigned long counter, unsigned int bound){
     unsigned int i;
-    unsigned long idx = counter, mod_j=0, mod_k=0;
+    unsigned long idx = counter;
     int j;
     int *fint, ok = 1;
-    mpz_t content;
     //unsigned long idx_next_poly_ok = idx;
     int error_code = 0; // because I want to know what is the pb
 #define POLY_EQUIV_INV_X -1 // the poly is the same as (+/-)f(1/x)
@@ -3829,13 +3874,12 @@ int mpz_poly_setcoeffs_counter(mpz_poly_ptr f, int* max_abs_coeffs, unsigned lon
 	fint[i] = (idx % (2 * bound + 1)) - bound;
         idx = idx / (2 * bound + 1);
     }
-    
+
     /* we take -bound <= f[0] <= bound, f[0] <> 0,
        which makes 2*bound possible values */
     ASSERT(idx < 2 * bound);
     fint[0] = (idx < bound) ? idx - bound : idx - (bound - 1);
-    
-    
+
     /* since f and the reversed polynomial are equivalent, we can assume
        |f[deg]| < |f[0]| or (|f[deg]| = |f[0]| and |f[deg-1]| < |f[1]|) or ... */
 
@@ -3848,6 +3892,8 @@ int mpz_poly_setcoeffs_counter(mpz_poly_ptr f, int* max_abs_coeffs, unsigned lon
     ok = ((j*2 >= deg) || (abs(fint[deg-j]) < abs(fint[j])));
     */
     ok = 1;
+    /* out of the 85176 raw polynomials of degree 4 for bound=6,
+       the following test discards 41106, i.e., about 48% */
     for (int i = 0; 2 * i < deg; i++)
       {
         if (abs(fint[deg-i]) != abs(fint[i]))
@@ -3875,6 +3921,7 @@ int mpz_poly_setcoeffs_counter(mpz_poly_ptr f, int* max_abs_coeffs, unsigned lon
 	// in that case, counter++ is not enough because f[d]=1 is the only possibility,
 	// so the next counter we are looking for is with f[d-1]++
 	if(abs(fint[deg-1]+1) > abs(fint[1])){
+	  unsigned long mod_j, mod_k;
 	  // setting ld=1 then incrementing the second high deg coeff is not enough
 	  idx = *next_counter;
 	  // set the second high deg coeff to 0
@@ -3906,8 +3953,10 @@ int mpz_poly_setcoeffs_counter(mpz_poly_ptr f, int* max_abs_coeffs, unsigned lon
       }
     }// end of the computation of the next valid non-duplicate counter
 
-    /* since f(x) is equivalent to (-1)^deg*f(-x), if f[deg-1] = 0, then the
-       largest i = deg-3, deg-5, ..., such that f[i] <> 0 should have f[i] > 0 */
+    /* Since f(x) is equivalent to (-1)^deg*f(-x), if f[deg-1] = 0, then the
+       largest i = deg-3, deg-5, ..., such that f[i] <> 0 should have f[i] > 0.
+       Out of the 44070 remaining polynomials for degree 4 and bound = 6, this test
+       discards 3276, i.e., about 7.4% */
     if (ok && fint[deg-1] == 0)
       {
         for (int i = deg - 3; i >= 0; i -= 2)
@@ -3923,10 +3972,12 @@ int mpz_poly_setcoeffs_counter(mpz_poly_ptr f, int* max_abs_coeffs, unsigned lon
       error_code = POLY_EQUIV_MINUS_X; // the poly is an equivalent to (-1)^deg*f(-x)
     }
 
-    /* if |f[i]| = |f[deg-i]| for all i, then [f[deg], f[deg-1], ..., f[1], f[0]]
+    /* If |f[i]| = |f[deg-i]| for all i, then [f[deg], f[deg-1], ..., f[1], f[0]]
        is equivalent to [s*f[0], s*t*f[1], s*t^2*f[2], ...], where
        s = sign(f[0]), and s*t^i is the sign of f[i] where i is the smallest
-       odd index > 0 such that f[i] <> 0.  */
+       odd index > 0 such that f[i] <> 0.
+       Out of the 40794 remaining polynomials for degree 4 and bound = 6, this test
+       discards 468, i.e., about 1.1% */
     if (ok && fint[deg] == abs(fint[0])) /* f[deg] > 0 */
       {
         int s = (fint[0] > 0) ? 1 : -1, t = 0, i;
@@ -3959,6 +4010,8 @@ int mpz_poly_setcoeffs_counter(mpz_poly_ptr f, int* max_abs_coeffs, unsigned lon
       error_code = POLY_EQUIV_MINUS_COEFFS;
     }
 
+    /* Out of the 40326 remaining polynomials for degree 4 and bound = 6, this test
+       discards 3480, i.e., about 8.6% */
     if (ok){
       /* check if +-1 is a root of f (very common): compute the sum of the coefficients, and the alterned sum: it should be != 0 */
       // evaluating at 1 means sum the coefficients
@@ -3986,8 +4039,11 @@ int mpz_poly_setcoeffs_counter(mpz_poly_ptr f, int* max_abs_coeffs, unsigned lon
     for (j = 0; j <= deg; j ++)
       mpz_set_si (f->coeff[j], fint[j]);
 
+    /* Out of the 36846 remaining polynomials for degree 4 and bound = 6, this test
+       discards 1640, i.e., about 4.5% */
     if (ok){
       /* content test */
+      mpz_t content;
       mpz_init (content);
       mpz_poly_content (content, f);
       ok = mpz_cmp_ui (content, 1) == 0; /* duplicate with f/t */
@@ -4033,7 +4089,7 @@ int mpz_poly_setcoeffs_counter(mpz_poly_ptr f, int* max_abs_coeffs, unsigned lon
  f_{deg-1} > 0
  f_0 != 0: constant coeff non-zero
 
-This corresponds to the number of polynomials that can be enumerated with the function 
+This corresponds to the number of polynomials that can be enumerated with the function
 mpz_poly_setcoeffs_counter
 */
 unsigned long mpz_poly_cardinality(int deg, unsigned int bound){
@@ -4090,4 +4146,195 @@ void  mpz_poly_setcoeffs_counter_print_error_code(int error_code){
   case -6: printf("-6: content(f) > 1\n"); break;
   default: printf(" 0: undetermined error.\n");
   }
+}
+
+
+/* TODO: I wonder whether this could be expanded to do the parsing of the
+ * fantastic galois actions that we have here and there... */
+
+/* This structure has only two public functions: tokenize and parse */
+struct poly_parser {
+
+    struct parse_error: public std::exception {
+        const char * what() const noexcept override { return "parse error"; }
+    };
+
+private:
+    enum expression_token {
+        LEFT_PAREN,
+        RIGHT_PAREN,
+        PLUS,
+        MINUS,
+        TIMES,
+        POWER,
+        POSITIVE_INTEGER,
+        LITERAL
+    };
+    std::vector<expression_token> tokens;
+    std::vector<char> literals;
+    std::vector<cxx_mpz> integers;
+
+    std::vector<expression_token>::const_iterator ctok;
+    std::vector<char>::const_iterator clit;
+    std::vector<cxx_mpz>::const_iterator cint;
+
+    inline void next() { if (ctok != tokens.end()) ctok++; }
+    inline bool test(expression_token s) { return ctok != tokens.end() && *ctok == s; }
+
+    bool accept(expression_token s) {
+        if (!test(s)) return false;
+        next();
+        return true;
+    }
+
+    int expect(expression_token s) {
+        if (accept(s))
+            return 1;
+        throw parse_error();
+        return 0;
+    }
+
+    unsigned long exponent() {
+        if (accept(POWER)) {
+            expect(POSITIVE_INTEGER);
+            cxx_mpz e = *cint++;
+            while (accept(POWER)) {
+                expect(POSITIVE_INTEGER);
+                if (!mpz_fits_ulong_p(*cint)) throw parse_error();
+                unsigned long ei = mpz_get_ui(*cint++);
+                mpz_pow_ui(e, e, ei);
+            }
+            if (!mpz_fits_ulong_p(e)) throw parse_error();
+            return mpz_get_ui(e);
+        } else {
+            return 1;
+        }
+    }
+
+    cxx_mpz_poly parse_factor() {
+        cxx_mpz_poly p;
+        if (accept(LITERAL)) {
+            clit++;
+            mpz_poly_set_xi(p, exponent());
+        } else if (accept(POSITIVE_INTEGER)) {
+            mpz_poly_set_mpz(p, *cint++);
+        } else if (accept(LEFT_PAREN)) {
+            mpz_poly_swap(p, parse_expression());
+            expect(RIGHT_PAREN);
+        } else {
+            throw parse_error();
+        }
+        unsigned long e = exponent();
+        if (e != 1)
+            mpz_poly_pow_ui(p, p, e);
+        return p;
+    }
+
+    cxx_mpz_poly parse_term() {
+        cxx_mpz_poly p = parse_factor();
+        for( ; accept(TIMES) ; )
+            mpz_poly_mul(p, p, parse_factor());
+        return p;
+    }
+
+    cxx_mpz_poly parse_expression() {
+        cxx_mpz_poly p;
+        if (test(PLUS)) {
+            next();
+            p = parse_term();
+        } else if (!test(MINUS)) {
+            p = parse_term();
+        }
+
+        for(;;) {
+            if (test(PLUS)) {
+                next();
+                mpz_poly_add(p, p, parse_term());
+            } else if (test(MINUS)) {
+                next();
+                mpz_poly_sub(p, p, parse_term());
+            } else
+                break;
+        }
+        return p;
+    }
+public:
+    cxx_mpz_poly parse() {
+        for(auto const & l : literals)
+            if (l != literals.front()) throw parse_error();
+        cxx_mpz_poly p = parse_expression();
+        if (ctok != tokens.end())
+            throw parse_error();
+        return p;
+    }
+
+    bool tokenize(std::istream& is) {
+        tokens.clear();
+        literals.clear();
+        integers.clear();
+        for( ; !is.eof() ; ) {
+            int c;
+            for(;;is.get()) {
+                c = is.peek();
+                if (is.eof() || !isspace(c)) break;
+            }
+            /* c is the next non-whitespace character */
+            if (is.eof()) { break;
+            } else if (c == '+') { is.get(); tokens.push_back(PLUS);
+            } else if (c == '-') { is.get(); tokens.push_back(MINUS);
+            } else if (c == '*') { is.get(); tokens.push_back(TIMES);
+            } else if (c == '(') { is.get(); tokens.push_back(LEFT_PAREN);
+            } else if (c == ')') { is.get(); tokens.push_back(RIGHT_PAREN);
+            } else if (c == '^') { is.get(); tokens.push_back(POWER);
+            } else if (isdigit(c)) {
+                /* gmp's mpz parser really wants only an mpz, nothing
+                 * else. We have to collect digits first.
+                 */
+                std::string s;
+                for(;!is.eof() && isdigit(c);is.get(), c=is.peek()) {
+                    s += c;
+                }
+                cxx_mpz z;
+                mpz_set_str(z, s.c_str(), 0);
+
+                integers.push_back(z);
+                tokens.push_back(POSITIVE_INTEGER);
+            } else if (isalpha(c)) {
+                is.get();
+                literals.push_back(c);
+                tokens.push_back(LITERAL);
+            }
+        };
+        ctok = tokens.begin();
+        clit = literals.begin();
+        cint = integers.begin();
+        return true;
+    }
+};
+
+std::istream& operator>>(std::istream& in, cxx_mpz_poly & f)
+{
+    std::string line;
+    for(;;in.get()) {
+        int c = in.peek();
+        if (in.eof() || !isspace(c)) break;
+    }
+    if (!getline(in, line)) return in;
+    std::istringstream is(line);
+
+    poly_parser P;
+    P.tokenize(is);
+
+    try {
+        f = P.parse();
+    } catch (poly_parser::parse_error const & p) {
+        in.setstate(std::ios_base::failbit);
+        return in;
+    }
+
+    return in;
+}
+
+std::ostream& operator<<(std::ostream& o, cxx_mpz_poly const & f) {
+    return o << f.print_poly(std::string("x"));
 }

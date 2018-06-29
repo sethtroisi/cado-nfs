@@ -64,6 +64,15 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 /* POSIX: popen/pclose with -std=c99, -pedantic or -ansi (requires
  * _POSIX_C_SOURCE==2 ?) fileno */
 #define _XOPEN_SOURCE   700     /* posix_memalign lrand48 strndup */
+
+/* This #define _FILE_OFFSET_BITS is useless, really: we never made the
+ * effort to use off_t in cado-nfs code, and we always lived on the
+ * assumption that size_t was certainly enough. Sadly untrue on 32-bit
+ * machines: there, off_t + _FILE_OFFSET_BITS=64 are the only way
+ * to deal with files above 2G. But at this point, it makes no sense to
+ * amend the whole code to take this into account.
+ */
+#define _FILE_OFFSET_BITS 64
 #define _BSD_SOURCE     /* M_LN2 gethostname strdup random */
 #define _ISOC99_SOURCE  /* Sometimes there's link trickery which causes fscanf to be linked in *only* when this is defined */
 #define _DEFAULT_SOURCE /* for glibc 2.20 and later. As per the man page

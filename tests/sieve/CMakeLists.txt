@@ -92,6 +92,54 @@ cado_define_test(c90_21553_sieve
         TEST_DEPENDENCIES c90_21553_makefb
         )
 
+set(c95_21684_poly ${CMAKE_CURRENT_SOURCE_DIR}/c95_21684.poly)
+# the only needed thing is test_init_norms at the end of the file. The
+# excerpt commented out below gives material to do a more thorough test.
+
+# set(c95_21684_roots0 ${CMAKE_CURRENT_BINARY_DIR}/c95_21684.roots0.gz)
+# set(c95_21684_roots1 ${CMAKE_CURRENT_BINARY_DIR}/c95_21684.roots1.gz)
+# 
+# cado_define_test(c95_21684_makefb0
+#         PROGRAM
+#             ${makefb_path}
+#             -poly ${c95_21684_poly}
+#             -lim 600000
+#             -maxbits 13
+#             -out ${c95_21684_roots0}
+#             -side 0
+#         TARGET_DEPENDENCIES makefb
+#         )
+# cado_define_test(c95_21684_makefb1
+#         PROGRAM
+#             ${makefb_path}
+#             -poly ${c95_21684_poly}
+#             -lim 850000
+#             -maxbits 13
+#             -out ${c95_21684_roots1}
+#             -side 1
+#         TARGET_DEPENDENCIES makefb
+#         )
+# 
+# cado_define_test(c95_21684_sieve
+#         ENVIRONMENT
+#             I=13 poly=${c95_21684_poly} 
+#             lim0=600000 lim1=850000 lpb0=24 lpb1=25 mfb0=48 mfb1=50 ncurves0=11
+#             ncurves1=14 
+#             fb0=${c95_21684_roots0}
+#             fb1=${c95_21684_roots1}
+#             sqside=1
+#             q0=310049 rho=270571
+#             CHECKSUM_FILE=
+#             LAS_BINARY=${las_path}
+#             "REGEX=reports"
+#         SCRIPT
+#             "${CADO_NFS_SOURCE_DIR}/tests/provide-wdir.sh" --env WORKDIR
+#             ${CMAKE_CURRENT_SOURCE_DIR}/sievetest.sh
+#             -v -v --adjust-strategy 0
+#         TARGET_DEPENDENCIES las
+#         TEST_DEPENDENCIES c95_21684_makefb0 c95_21684_makefb1
+#         )
+# 
 
 # Before running F9_sievetest, remove the file with the captured checksums
 # We have to make this a "test" so that ctest runs it, even though it does
@@ -312,9 +360,10 @@ cado_define_test(F9_dupsup
 # Try fake relation generation
 cado_define_test(F9_fakereltest
     SCRIPT
+    "${CADO_NFS_SOURCE_DIR}/tests/provide-wdir.sh" --env WORKDIR
     ${CMAKE_CURRENT_SOURCE_DIR}/F9.fakerels.sh
     ${F9_roots} ${las_path} ${CADO_NFS_SOURCE_DIR}
-    TARGET_DEPENDENCIES fake_rels freerel
+    TARGET_DEPENDENCIES fake_rels freerel las
     TEST_DEPENDENCIES F9_makefb)
 
 # Try with default TRIALDIV_MAXLEN, whatever it may be
@@ -413,6 +462,32 @@ cado_divert_test(test_init_norms bug21518
         --hush-max-jitter 1
         --abort-on-jitter 1,5
         -check-bucket 361
+)
+
+cado_divert_test(test_init_norms bug21684a
+    ARGUMENTS
+    -poly ${CMAKE_CURRENT_SOURCE_DIR}/c95_21684.poly
+    -I 13 -lpb0 24 -lpb1 25 -mfb0 48 -mfb1 50
+    -q0 310049 -rho 270571
+    -sqside 1
+    --hush-max-jitter 1
+    # 21684 has two algebraic sides, so it's fine if we have some extra
+    # jitter.
+    --abort-on-jitter 2,5
+    -check-bucket 505
+)
+
+cado_divert_test(test_init_norms bug21684b
+    ARGUMENTS
+    -poly ${CMAKE_CURRENT_SOURCE_DIR}/c95_21684.poly
+    -I 13 -lpb0 24 -lpb1 25 -mfb0 48 -mfb1 50
+    -q0 310087 -rho 178382
+    -sqside 1
+    --hush-max-jitter 1
+    # 21684 has two algebraic sides, so it's fine if we have some extra
+    # jitter.
+    --abort-on-jitter 2,5
+    -check-bucket 4
 )
 
 # we have no pretense to have optimized code for these cases, so don't

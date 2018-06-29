@@ -212,7 +212,7 @@ int mkdir_with_parents(const char * dir, int fatal)
         for( ; dir[pos] == '/' ; pos++) ;
         if (pos == n) break;
         const char * slash = strchr(dir + pos, '/');
-        strncpy(tmp, dir, n);
+        strncpy(tmp, dir, n+1);
         if (slash) {
             pos = slash - dir;
             tmp[pos]='\0';

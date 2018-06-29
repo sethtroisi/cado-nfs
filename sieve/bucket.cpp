@@ -3,6 +3,7 @@
 #include <stdlib.h>   // for malloc and friends
 #include <string.h>   // for memcpy
 #include <new>        // for std::bad_alloc
+#include <type_traits> // for std::is_same (C++11)
 #include <gmp.h>
 #if defined(HAVE_SSE2)
 #include <emmintrin.h>
@@ -93,7 +94,7 @@ template <int LEVEL, typename HINT>
 void
 bucket_array_t<LEVEL, HINT>::allocate_memory(const uint32_t new_n_bucket,
                                 const double fill_ratio,
-                                int logI_adjusted,
+                                int logI,
                                 const slice_index_t prealloc_slices)
 {
   /* Don't try to allocate anything, nor print a message, for sieving levels
@@ -102,15 +103,15 @@ bucket_array_t<LEVEL, HINT>::allocate_memory(const uint32_t new_n_bucket,
     return;
 
   /* We'll allocate bucket regions of size 2^LOG_BUCKET_REGIONS[LEVEL],
-   * and those will be used to cover lines of size 2^logI_adjusted.
+   * and those will be used to cover lines of size 2^logI.
    *
-   * If LOG_BUCKET_REGIONS[LEVEL] > logI_adjusted, then we'll have both
+   * If LOG_BUCKET_REGIONS[LEVEL] > logI, then we'll have both
    * even and odd lines in there, so 75% of the locations will receive
    * updates.
    *
-   * If LOG_BUCKET_REGIONS[LEVEL] <= logI_adjusted, it's different. The
+   * If LOG_BUCKET_REGIONS[LEVEL] <= logI, it's different. The
    * line ordinate for bucket region number N will be N, maybe shifted
-   * right by a few bits (logI_adjusted - LOG_BUCKET_REGIONS[LEVEL]).
+   * right by a few bits (logI - LOG_BUCKET_REGIONS[LEVEL]).
    * Bucket regions for which this line ordinate is even will receive
    * updates for 50% of the locations only, in contrast to 100% when the
    * ordinate is even.
@@ -132,8 +133,8 @@ bucket_array_t<LEVEL, HINT>::allocate_memory(const uint32_t new_n_bucket,
   const int ndev = NB_DEVIATIONS_BUCKET_REGIONS;
 
   uint32_t bitmask_line_ordinate = 0;
-  if (LOG_BUCKET_REGIONS[LEVEL] <= logI_adjusted) {
-      bitmask_line_ordinate = UINT32_C(1) << (logI_adjusted - LOG_BUCKET_REGIONS[LEVEL]);
+  if (LOG_BUCKET_REGIONS[LEVEL] <= logI) {
+      bitmask_line_ordinate = UINT32_C(1) << (logI - LOG_BUCKET_REGIONS[LEVEL]);
       ASSERT_ALWAYS(new_n_bucket % 2 == 0);
       bs_even = 2 * Q + ndev * sqrt(2 * Q);
       bs_odd  = 4 * Q + ndev * sqrt(4 * Q);
@@ -157,12 +158,14 @@ bucket_array_t<LEVEL, HINT>::allocate_memory(const uint32_t new_n_bucket,
     if (big_data != NULL)
       physical_free (big_data, big_size);
     if (bitmask_line_ordinate) {
-        verbose_output_print(0, 3, "# Allocating %zu bytes for %" PRIu32 " buckets of %zu to %zu update entries of %zu bytes each\n",
+        verbose_output_print(0, 3, "# [%d%c] Allocating %zu bytes for %" PRIu32 " buckets of %zu to %zu update entries of %zu bytes each\n",
+                             LEVEL, HINT::rtti[0],
                              new_big_size, new_n_bucket,
                              bs_even, bs_odd,
                              sizeof(update_t));
     } else {
-        verbose_output_print(0, 3, "# Allocating %zu bytes for %" PRIu32 " buckets of %zu update entries of %zu bytes each\n",
+        verbose_output_print(0, 3, "# [%d%c] Allocating %zu bytes for %" PRIu32 " buckets of %zu update entries of %zu bytes each\n",
+                             LEVEL, HINT::rtti[0],
                              new_big_size, new_n_bucket, 
                              bs_even,
                              sizeof(update_t));
@@ -208,7 +211,14 @@ void
 bucket_array_t<LEVEL, HINT>::realloc_slice_start(const size_t extra_space)
 {
   const size_t new_alloc_slices = alloc_slices + extra_space;
-  verbose_output_print(0, 3, "# Reallocating BA->slice_start from %zu entries to %zu entries\n",
+  /* I pretty much doubt that this message is _ever_ useful. At the very
+   * least, reallocating from 0 to something shouldn't trigger loud
+   * output. And I'm not sure there's a situation where alloc_slices >
+   * 0...
+   */
+  if (alloc_slices)
+  verbose_output_print(0, 3, "# [%d%c] Reallocating BA->slice_start from %zu entries to %zu entries\n",
+                       LEVEL, HINT::rtti[0],
                        alloc_slices, new_alloc_slices);
 
   const size_t old_size = size_b_align * alloc_slices;
@@ -236,17 +246,15 @@ bucket_array_t<LEVEL, HINT>::max_full (unsigned int * fullest_index) const
     }
   return max;
 }
-
-// Replace std::is_same()::value that is not yet available.
-template <typename T, typename U>
-struct is_same
+template <int LEVEL, typename HINT>
+double
+bucket_array_t<LEVEL, HINT>::average_full() const
 {
-    static const bool value = false;
-};
-
-template <typename T>
-struct is_same<T, T> { static const bool value = true; };
-
+    size_t a = 0;
+    for (unsigned int i = 0; i < n_bucket; ++i)
+        a += nb_of_updates (i);
+    return (double) a / (bucket_start[n_bucket] - bucket_start[0]);
+}
 
 template <int LEVEL, typename HINT>
 void
@@ -275,7 +283,7 @@ bucket_array_t<LEVEL, HINT>::log_this_update (
             "to BA<%d>[%u]\n",
             (unsigned int) w.x, w.side, (unsigned int) w.i,
             (unsigned int) w.h, w.p, LEVEL, (unsigned int) w.N);
-        if (is_same<HINT,longhint_t>::value) {
+        if (std::is_same<HINT,longhint_t>::value) {
           verbose_output_print (TRACE_CHANNEL, 0,
              "# Warning: did not check divisibility during downsorting p=%"
              FBPRIME_FORMAT "\n", w.p);
@@ -323,7 +331,7 @@ bucket_single<LEVEL, HINT>::sort()
 
 void
 bucket_primes_t::purge (const bucket_array_t<1, shorthint_t> &BA,
-              const int i, const fb_part *fb, const unsigned char *S)
+              const int i, fb_factorbase::slicing const & fb, const unsigned char *S)
 {
   for (slice_index_t i_slice = 0; i_slice < BA.get_nr_slices(); i_slice++) {
     const slice_index_t slice_index = BA.get_slice_index(i_slice);
@@ -332,9 +340,7 @@ bucket_primes_t::purge (const bucket_array_t<1, shorthint_t> &BA,
 
     for ( ; it != end_it ; it++) {
       if (UNLIKELY(S[it->x] != 255)) {
-        const fb_slice_interface *slice = fb->get_slice(slice_index);
-        ASSERT_ALWAYS(slice != NULL);
-        fbprime_t p = slice->get_prime(it->hint);
+        fbprime_t p = fb[slice_index].get_prime(it->hint);
         push_update(bucket_update_t<1, primehint_t>(it->x, p, 0, 0));
       }
     }
@@ -455,6 +461,9 @@ downsort(bucket_array_t<INPUT_LEVEL - 1, longhint_t> &BA_out,
          const bucket_array_t<INPUT_LEVEL, shorthint_t> &BA_in,
          uint32_t bucket_number, where_am_I & w)
 {
+  /* Time recording for this function is done by the caller
+   * (downsort_wrapper)
+   */
   /* Rather similar to purging, except it doesn't purge */
   for (slice_index_t i_slice = 0; i_slice < BA_in.get_nr_slices(); i_slice++) {
     const slice_index_t slice_index = BA_in.get_slice_index(i_slice);
@@ -464,7 +473,8 @@ downsort(bucket_array_t<INPUT_LEVEL - 1, longhint_t> &BA_out,
 
     for ( ; it != end_it ; it++) {
       WHERE_AM_I_UPDATE(w, p,
-          w.psi->sides[w.side].fb->get_slice(slice_index)->get_prime(it->hint));
+          (*w.psi->sides[w.side].fbs)[slice_index].get_prime(it->hint));
+      WHERE_AM_I_UPDATE(w, h, it->hint);
       BA_out.push_update(it->x, 0, it->hint, slice_index, w);
     }
   }
@@ -507,27 +517,6 @@ void
 downsort<2>(bucket_array_t<1, longhint_t> &BA_out,
             const bucket_array_t<2, longhint_t> &BA_in,
             uint32_t bucket_number, where_am_I & w);
-
-void
-sieve_checksum::update(const unsigned int other)
-{
-    unsigned long r;
-    ularith_addmod_ul_ul(&r, checksum, other, checksum_prime);
-    checksum = r;
-}
-
-void
-sieve_checksum::update(const unsigned char *data, const size_t len)
-{
-    mpz_t mb;
-    unsigned int new_checksum;
-
-    mpz_init(mb);
-    mpz_import(mb, len, -1, sizeof(unsigned char), -1, 0, data);
-    new_checksum = mpz_tdiv_ui(mb, checksum_prime);
-    mpz_clear(mb);
-    this->update(new_checksum);
-}
 
 buckets_are_full::buckets_are_full(bkmult_specifier::key_type const& key, int b, int r, int t) : key(key), bucket_number(b), reached_size(r), theoretical_max_size(t) {
     std::ostringstream os;

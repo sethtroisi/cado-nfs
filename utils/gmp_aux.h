@@ -89,6 +89,30 @@ void mpn_copyi(mp_limb_t *rp, const mp_limb_t * up, mp_size_t n);
 void mpn_copyd(mp_limb_t *rp, const mp_limb_t * up, mp_size_t n);
 #endif
 
+#ifndef HAVE_MPIR
+
+/* Yes, it's a bit ugly of course. */
+static inline void mpn_rrandom (mp_limb_t *rp, gmp_randstate_t rstate, mp_size_t N)
+{
+    mpz_t dummy;
+    dummy->_mp_d = rp;
+    dummy->_mp_alloc = N;
+    dummy->_mp_size = N;
+    mpz_rrandomb(dummy, rstate, N * GMP_LIMB_BITS);
+}
+
+
+static inline void mpn_randomb (mp_limb_t *rp, gmp_randstate_t rstate, mp_size_t N)
+{
+    mpz_t dummy;
+    dummy->_mp_d = rp;
+    dummy->_mp_alloc = N;
+    dummy->_mp_size = N;
+    mpz_urandomb(dummy, rstate, N * GMP_LIMB_BITS);
+}
+
+#endif
+
 #ifdef __cplusplus
 }
 #endif
