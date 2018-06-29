@@ -75,15 +75,23 @@ skew: 1.37
 #include <stdlib.h>
 #include <time.h>
 
+/* define SKEW to allow skewed polynomials */
+// #define SKEW
+
 /* We assume a difference <= ALPHA_BOUND_GUARD between alpha computed
    with ALPHA_BOUND_SMALL and ALPHA_BOUND. In practice the largest value
    observed is 0.79. */
 #define ALPHA_BOUND_GUARD 1.0
 
+/* global variables */
 double best_score_f = DBL_MAX, worst_score_f = DBL_MIN;
 unsigned long f_candidate = 0;   /* number of irreducibility tests */
 unsigned long f_irreducible = 0; /* number of irreducible polynomials */
 double max_guard = DBL_MIN;
+#ifdef SKEW
+unsigned long *count = NULL; /* for 1 <= ad <= bound, count[ad] is the number of
+				degree-d polynomials with leading coefficient ad */
+#endif
 #define TIMINGS
 #ifdef TIMINGS
 double timer[4] = {0.0, };
@@ -228,6 +236,89 @@ print_nonlinear_poly_info (mpz_poly ff, double alpha_f, mpz_poly gg,
     return 1;
 }
 
+#ifdef SKEW
+static void
+init_count (unsigned int bound, unsigned int df)
+{
+  unsigned int ad, j, k, mult;
+  double skew, b;
+
+  count = malloc ((bound + 1) * sizeof (unsigned long));
+  count[0] = 0; /* we will put the global sum in count[0] */
+  for (ad = 1; ad <= bound; ad++)
+    {
+      skew = pow ((double) bound / (double) ad, 1.0 / ((double) df / 2.0));
+      count[ad] = 1;
+      for (j = 0; j < df; j++)
+	{
+	  /* coefficient of degree j is bounded by ad*skew^(df-j) */
+	  b = (double) ad * pow (skew, (double) (df - j));
+	  k = (unsigned int) b; /* rounded towards zero */
+	  if (j == df - 1)
+	    mult = k + 1; /* we can assume the degree-(d-1) coefficient
+			     is in [0..k] via f(-x) */
+	  else if (j != 0)
+	    mult = 2 * k + 1; /* coefficient in [-k..k] */
+	  else
+	    mult = 2 * k; /* coefficient in [-k..k], except 0 */
+	  if ((double) count[ad] * (double) mult > (double) ULONG_MAX)
+	    {
+	      fprintf (stderr, "Error, too large bound\n");
+	      exit (EXIT_FAILURE);
+	    }
+	  count[ad] *= mult;
+	}
+      if (count[0] + count[ad] < count[0])
+	{
+	  fprintf (stderr, "Error, too large bound\n");
+	  exit (EXIT_FAILURE);
+	}
+      count[0] += count[ad];
+    }
+}
+
+static void
+generate_f (mpz_t *f, unsigned int d, unsigned long idx, unsigned int bound)
+{
+  unsigned int ad, j;
+  double skew, b;
+
+  /* first find the leading coefficient */
+  for (ad = 1; idx >= count[ad]; ad++)
+    idx -= count[ad];
+  ASSERT_ALWAYS(ad <= bound);
+  mpz_set_ui (f[d], ad);
+
+  /* now find the other coefficients (see init_count) */
+  skew = pow ((double) bound / (double) ad, 1.0 / ((double) d / 2.0));
+  for (j = 0; j < d; j++)
+    {
+      int c, k;
+      b = (double) ad * pow (skew, (double) (d - j));
+      k = (int) b;
+      if (j == d - 1) /* coefficient in [0..k] */
+	{
+	  c = idx % (k + 1);
+	  idx /= k + 1;
+	}
+      else if (j > 0) /* coefficient in [-k..k] */
+	{
+	  c = (idx % (2 * k + 1)) - k;
+	  idx /= 2 * k + 1;
+	}
+      else /* j=0: coefficient in [-k..k] except 0 */
+	{
+	  c = idx % (2 * k);
+	  /* 0..k-1 goes to -k..-1 and k..2k-1 to 1..k */
+	  c = (c < k) ? c - k : c - (k - 1);
+	  idx /= 2 * k;
+	}
+      mpz_set_si (f[j], c);
+    }
+  ASSERT_ALWAYS(idx == 0);
+}
+#endif
+
 /*
   Generate polynomial f(x) of degree d with rank 'idx',
   with coefficients in [-bound, bound].
@@ -249,9 +340,13 @@ polygen_JL_f (int d, unsigned int bound, mpz_t *f, unsigned long idx)
     ff->deg = d;
     ff->coeff = f;
     //mpz_poly_init(ff, d);
+#ifndef SKEW
     int max_abs_coeffs;
     unsigned long next_counter;
     ok = mpz_poly_setcoeffs_counter(ff, &max_abs_coeffs, &next_counter, d, idx, bound);
+#else
+    generate_f (f, d, idx, bound);
+#endif
 
     // to be compatible with the previous version, the count on the number of valid polys was before
     // the content test.
@@ -290,10 +385,11 @@ polygen_JL_f (int d, unsigned int bound, mpz_t *f, unsigned long idx)
    because LLL is not very sensible to a small change of the skewness).
    kN is the product k*N, where k is the multiplier. */
 static void
-polygen_JL_g (mpz_t kN, int dg, mat_Z g, mpz_t root)
+polygen_JL_g (mpz_t kN, int dg, mat_Z g, mpz_t root, double skew_f)
 {
     int i, j;
     mpz_t a, b, det, r;
+    unsigned long skew = round (skew_f), skew_powi = 1;
 
     mpz_init (det);
     mpz_init_set_ui (a, 1);
@@ -317,14 +413,30 @@ polygen_JL_g (mpz_t kN, int dg, mat_Z g, mpz_t root)
                     mpz_mul (r, r, root);
                   }
               }
-            else
-              mpz_set_ui (g.coeff[j][i], i==j);
+            else if (i == j)
+	      {
+		ASSERT_ALWAYS((double) skew_powi * (double) skew < (double) ULONG_MAX);
+		skew_powi *= skew;
+		mpz_set_ui (g.coeff[j][i], skew_powi);
+	      }
         }
     }
 
     START_TIMER;
     LLL (det, g, NULL, a, b);
     END_TIMER (TIMER_LLL);
+
+    /* divide row i back by skew^i */
+    skew_powi = 1;
+    for (i = 2;  i <= dg + 1; i++)
+      {
+	skew_powi *= skew;
+	for (j = 1; j <= dg + 1; j++)
+	  {
+	    ASSERT_ALWAYS (mpz_divisible_ui_p (g.coeff[j][i], skew_powi));
+	    mpz_divexact_ui (g.coeff[j][i], g.coeff[j][i], skew_powi);
+	  }
+      }
 
     mpz_clear (det);
     mpz_clear (a);
@@ -378,10 +490,10 @@ polygen_JL2 (mpz_t n, unsigned long k,
     rf = (mpz_t *) malloc (df * sizeof(mpz_t));
     for (i = 0; i < df; i ++)
       mpz_init (rf[i]);
-    g.coeff = (mpz_t **) malloc ((dg + 2)*sizeof(mpz_t*));
+    g.coeff = (mpz_t **) malloc ((dg + 2) * sizeof(mpz_t*));
     g.NumRows = g.NumCols = dg + 1;
     for (i = 0; i <= dg + 1; i ++) {
-        g.coeff[i] = (mpz_t *) malloc ((dg + 2)*sizeof(mpz_t));
+        g.coeff[i] = (mpz_t *) malloc ((dg + 2) * sizeof(mpz_t));
         for (j = 0; j <= dg + 1; j ++) {
             mpz_init (g.coeff[i][j]);
         }
@@ -426,7 +538,7 @@ polygen_JL2 (mpz_t n, unsigned long k,
         if (root_lift (n, kn, k, f, rf[i]) == 0)
           continue;
         /* generate g of degree dg */
-        polygen_JL_g (kn, dg, g, rf[i]);
+        polygen_JL_g (kn, dg, g, rf[i], skew_f);
 
         /* we skip idx = 0 which should correspond to c[0] = ... = c[dg] = 0 */
         for (unsigned long idx = 1; idx < nb_comb; idx ++)
@@ -520,7 +632,6 @@ usage ()
     fprintf (stderr, "./dlpolyselect -N xxx -df xxx -dg xxx -bound xxx [-modr xxx] [-modm xxx] [-t xxx]\n");
     exit (1);
 }
-
 
 int
 main (int argc, char *argv[])
@@ -632,6 +743,10 @@ main (int argc, char *argv[])
 
     ASSERT_ALWAYS (bound >= 1);
 
+#ifdef SKEW
+    init_count (bound, df);
+    maxtries = count[0];
+#else
     double maxtries_double = (double) bound;
     maxtries_double *= (double) (bound + 1);
     maxtries_double *= pow ((double) (2 * bound + 1), (double) (df - 2));
@@ -640,6 +755,7 @@ main (int argc, char *argv[])
       maxtries = ULONG_MAX;
     else
       maxtries = (unsigned long) maxtries_double;
+#endif
 
     unsigned int bound2 = 1; /* bound on the coefficients of linear
                                 combinations from the LLL short vectors */
@@ -683,6 +799,9 @@ main (int argc, char *argv[])
     printf ("\n");
 
     mpz_clear (N);
+#ifdef SKEW
+    free (count);
+#endif
 
     return 0;
 }
