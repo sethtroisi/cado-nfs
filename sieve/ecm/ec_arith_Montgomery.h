@@ -8,8 +8,10 @@
 #include "ec_arith_common.h"
 
 #ifdef ECM_COUNT_OPS
+#include "ec_arith_cost.h"
 static unsigned int _count_montgomery_dadd, _count_montgomery_dbl;
-#define MONTGOMERY_COUNT_OPS_M _count_montgomery_dadd*6+_count_montgomery_dbl*5
+#define MONTGOMERY_COUNT_OPS_M _count_montgomery_dadd * MONTGOMERY_dADD \
+                             + _count_montgomery_dbl * MONTGOMERY_DBL
 #define MONTGOMERY_COUNT_OPS_RESET() do {                   \
       _count_montgomery_dadd = _count_montgomery_dbl = 0;   \
     } while (0)

@@ -353,6 +353,7 @@ sieve/ecm/ecm_15ul.c
 sieve/ecm/ecm_2ul2.c
 sieve/ecm/ecm_mpz.c
 sieve/ecm/ecm_ul.c
+sieve/ecm/ec_arith_cost.h
 sieve/ecm/ec_arith_common.h
 sieve/ecm/ec_arith_Edwards.h
 sieve/ecm/ec_arith_Montgomery.h

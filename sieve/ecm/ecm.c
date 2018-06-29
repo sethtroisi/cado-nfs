@@ -42,12 +42,14 @@
 #endif
 
 #ifdef ECM_COUNT_OPS
-static unsigned int _count_stage2_M;
+static unsigned int _count_stage2_common_z, _count_stage2_product;
 #define ECM_COUNT_OPS_STAGE1_TOTAL_M EDWARDS_COUNT_OPS_M+MONTGOMERY_COUNT_OPS_M
-#define ECM_COUNT_OPS_STAGE2_TOTAL_M MONTGOMERY_COUNT_OPS_M+_count_stage2_M
+#define ECM_COUNT_OPS_STAGE2_TOTAL_M MONTGOMERY_COUNT_OPS_M \
+                                   + _count_stage2_common_z \
+                                   + _count_stage2_product
 #define ECM_COUNT_OPS_RESET() do {                             \
       EDWARDS_COUNT_OPS_RESET(); MONTGOMERY_COUNT_OPS_RESET(); \
-      _count_stage2_M = 0;                                     \
+      _count_stage2_common_z = _count_stage2_product = 0;      \
     } while (0)
 #endif
 
@@ -405,7 +407,7 @@ common_z (ec_point_t *L1, const unsigned int n1, ec_point_t *L2,
     return;
 
 #ifdef ECM_COUNT_OPS
-    _count_stage2_M += 4*n - 6;
+  _count_stage2_common_z += 4*n - 6;
 #endif
 
   mod_init (p, m);
@@ -707,7 +709,7 @@ ecm_stage2 (residue_t r, const ec_point_t P, const stage2_plan_t *plan,
         mod_sub (t, vwP[v_idx]->x, uP[*u_ptr]->x, m);
         mod_mul (r, r, t, m);
 #ifdef ECM_COUNT_OPS
-        _count_stage2_M++;
+        _count_stage2_product++;
 #endif
       }
 
@@ -917,12 +919,15 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
 #ifdef ECM_COUNT_OPS
   unsigned int tot_stage1_M = ECM_COUNT_OPS_STAGE1_TOTAL_M;
   printf ("# %s: count ops: for stage 1 with B1 = %u\n"
-          "# %s: count ops:   Montgomery: %3u dADD %3u DBL\n"
-          "# %s: count ops:      Edwards: %3u ADD  %3u DBL %3u TPL %3d M\n"
-          "# %s: count ops:        total: %5u M\n", __func__, plan->B1,
-          __func__, _count_montgomery_dadd, _count_montgomery_dbl, __func__,
-          _count_edwards_add, _count_edwards_dbl, _count_edwards_tpl,
-          _count_edwards_extraM, __func__, tot_stage1_M);
+          "# %s: count ops:         Edwards: %u DBL %u DBLext %u TPL %u TPLext "
+                                            "%u ADD %u ADDext %u ADDmont\n"
+          "# %s: count ops:      Montgomery: %u DBL %u dADD\n"
+          "# %s: count ops:   stage 1 total: %u M\n", __func__, plan->B1,
+          __func__, _count_edwards_dbl, _count_edwards_dblext,
+          _count_edwards_tpl, _count_edwards_tplext, _count_edwards_add,
+          _count_edwards_addext, _count_edwards_addmont, __func__,
+          _count_montgomery_dbl, _count_montgomery_dadd, __func__,
+          tot_stage1_M);
 #endif
 
   /******************************** stage 2 ***********************************/
@@ -947,13 +952,15 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
 
 #ifdef ECM_COUNT_OPS
   unsigned int tot_stage2_M = ECM_COUNT_OPS_STAGE2_TOTAL_M;
-  printf ("# %s: count ops: for stage 2 with B2 = %u\n"
-          "# %s: count ops:   Montgomery: %3u dADD %3u DBL\n"
-          "# %s: count ops:          mul: %3u M\n"
-          "# %s: count ops:        total: %5u M\n"
-          "# %s: count ops: ECM total: %5u M\n", __func__, plan->stage2.B2,
-          __func__, _count_montgomery_dadd, _count_montgomery_dbl, __func__,
-          _count_stage2_M, __func__, tot_stage2_M, __func__,
+  printf ("# %s: count ops: for stage 2 with B2 = %u [ with w = %u ]\n"
+          "# %s: count ops:      Montgomery: %u DBL %u dADD\n"
+          "# %s: count ops:        common_z: %u M\n"
+          "# %s: count ops:         product: %u M\n"
+          "# %s: count ops:   stage 2 total: %u M\n"
+          "# %s: count ops: ECM total: %5u M\n", __func__,
+          plan->stage2.B2, plan->stage2.w, __func__, _count_montgomery_dbl,
+          _count_montgomery_dadd, __func__, _count_stage2_common_z, __func__,
+          _count_stage2_product, __func__, tot_stage2_M, __func__,
           tot_stage1_M + tot_stage2_M);
 #endif
 

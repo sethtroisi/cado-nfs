@@ -19,12 +19,22 @@
  */
 
 #ifdef ECM_COUNT_OPS
-static unsigned int _count_edwards_add, _count_edwards_dbl, _count_edwards_tpl;
-static int _count_edwards_extraM;
-#define EDWARDS_COUNT_OPS_M _count_edwards_add*8 + _count_edwards_dbl*7 \
-                            + _count_edwards_tpl*12 + _count_edwards_extraM
-#define EDWARDS_COUNT_OPS_RESET() do { _count_edwards_extraM = 0;           \
-      _count_edwards_add = _count_edwards_dbl = _count_edwards_tpl = 0;    \
+#include "ec_arith_cost.h"
+static unsigned int _count_edwards_dbl, _count_edwards_dblext,
+                    _count_edwards_tpl, _count_edwards_tplext,
+                    _count_edwards_add, _count_edwards_addext,
+                    _count_edwards_addmont;
+#define EDWARDS_COUNT_OPS_M _count_edwards_dbl * EDWARDS_DBL \
+                          + _count_edwards_dblext * EDWARDS_DBLext \
+                          + _count_edwards_tpl * EDWARDS_TPL \
+                          + _count_edwards_tplext * EDWARDS_TPLext \
+                          + _count_edwards_add * EDWARDS_ADD \
+                          + _count_edwards_addext * EDWARDS_ADDext \
+                          + _count_edwards_addmont * EDWARDS_ADDmontgomery
+#define EDWARDS_COUNT_OPS_RESET() do { \
+      _count_edwards_dbl = _count_edwards_dblext = _count_edwards_tpl = 0;    \
+      _count_edwards_tplext = _count_edwards_add = _count_edwards_addext = 0; \
+      _count_edwards_addmont = 0;                                             \
     } while (0)
 #endif
 
@@ -126,11 +136,12 @@ edwards_addsub (ec_point_t R, const ec_point_t P, const ec_point_t Q, int sub,
                     output_flag == MONTGOMERY_xz);
 
 #ifdef ECM_COUNT_OPS
-  _count_edwards_add++;
   if (output_type == TWISTED_EDWARDS_proj)
-    _count_edwards_extraM--;
-  else if (output_type == MONTGOMERY_xz)
-    _count_edwards_extraM -= 4;
+    _count_edwards_add++;
+  else if (output_type == TWISTED_EDWARDS_ext)
+    _count_edwards_addext++;
+  else /* if (output_type == MONTGOMERY_xz) */
+    _count_edwards_addmont++;
 #endif
 
   residue_t u0, u1, u2;
@@ -255,9 +266,10 @@ edwards_dbl (ec_point_t R, const ec_point_t P,
                     output_flag == TWISTED_EDWARDS_proj);
 
 #ifdef ECM_COUNT_OPS
-  _count_edwards_dbl++;
-  if (output_type == TWISTED_EDWARDS_ext)
-    _count_edwards_extraM++;
+  if (output_type == TWISTED_EDWARDS_proj)
+    _count_edwards_dbl++;
+  else /* if (output_type == TWISTED_EDWARDS_ext) */
+    _count_edwards_dblext++;
 #endif
 
   residue_t u0, u1;
@@ -310,9 +322,10 @@ edwards_tpl (ec_point_t R, const ec_point_t P,
                     output_flag == TWISTED_EDWARDS_proj);
 
 #ifdef ECM_COUNT_OPS
-  _count_edwards_tpl++;
-  if (output_type == TWISTED_EDWARDS_ext)
-    _count_edwards_extraM += 2;
+  if (output_type == TWISTED_EDWARDS_proj)
+    _count_edwards_tpl++;
+  else /* if (output_type == TWISTED_EDWARDS_ext) */
+    _count_edwards_tplext++;
 #endif
 
   residue_t u0, u1, u2, u3;

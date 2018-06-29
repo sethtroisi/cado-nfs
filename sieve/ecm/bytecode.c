@@ -116,7 +116,7 @@ bytecode_dbchain_check_internal (bytecode_const bc, bytecode_const *endptr,
         bc++;
         pow2 = *bc;
       }
-    
+
       if (verbose)
       {
         char opchar = s ? '-' : '+';
@@ -161,34 +161,42 @@ bytecode_dbchain_cost (bytecode_const bc, bytecode_const *endptr,
     if (op == DBCHAIN_OP_DBLADD)
     {
       bc++;
-      uint8_t pow2 = *bc; 
-      cost += (pow2-1) * opcost->dbl + opcost->dbladd;
+      uint8_t pow2 = *bc;
+      cost += (pow2-1) * opcost->DBL + opcost->DBLa;
     }
     else if (op == DBCHAIN_OP_TPLADD)
     {
       bc++;
-      uint8_t pow3 = *bc; 
-      cost += (pow3-1) * opcost->tpl + opcost->tpladd;
+      uint8_t pow3 = *bc;
+      cost += (pow3-1) * opcost->TPL + opcost->TPLa;
     }
     else /* op == DBCHAIN_OP_TPLDBLADD */
     {
       bc++;
-      uint8_t pow3 = *bc; 
+      uint8_t pow3 = *bc;
       bc++;
       uint8_t pow2 = *bc;
       if (pow2 > 0)
-        cost += pow3 * opcost->tpl + (pow2-1) * opcost->dbl + opcost->dbladd;
+        cost += pow3 * opcost->TPL + (pow2-1) * opcost->DBL + opcost->DBLa;
       else
-        cost += (pow3-1) * opcost->tpl + opcost->tpladd;
+        cost += (pow3-1) * opcost->TPL + opcost->TPLa;
     }
 
     if (f) /* is it finished ? */
     {
-      cost += opcost->extra_final_add;
+      uint8_t t;
+      bytecode_elt_split_4_4 (&t, NULL, bc[1]);
+      if (bc[1] == MISHMASH_FINAL || t == MISHMASH_PRAC_BLOCK)
+        cost += opcost->ADDd;
+      else
+        cost += opcost->ADDa;
       break;
     }
     else
+    {
+      cost += opcost->ADD;
       bc++; /* go to next byte */
+    }
   }
 
   if (endptr != NULL)
@@ -289,25 +297,30 @@ bytecode_precomp_cost (bytecode_const bc, bytecode_const *endptr,
     if (op == PRECOMP_OP_ADD)
     {
       bc++;
-      cost += opcost->add;
       if (a)
-        cost += opcost->extra_add_for_add;
+        cost += opcost->ADDa;
+      else
+        cost += opcost->ADD;
     }
     else if (op == PRECOMP_OP_DBL)
     {
       bc++;
       uint8_t pow2 = bytecode_elt_to_uint8 (*bc);
-      cost += pow2 * opcost->dbl;
+      cost += (pow2-1) * opcost->DBL;
       if (a)
-        cost += opcost->extra_dbl_for_add;
+        cost += opcost->DBLa;
+      else
+        cost += opcost->DBL;
     }
     else /* op == PRECOMP_OP_TPL */
     {
       bc++;
       uint8_t pow3 = bytecode_elt_to_uint8 (*bc);
-      cost += pow3 * opcost->tpl;
+      cost += (pow3-1) * opcost->TPL;
       if (a)
-        cost += opcost->extra_tpl_for_add;
+        cost += opcost->TPLa;
+      else
+        cost += opcost->TPL;
     }
 
     bc++; /* go to next byte */
@@ -322,17 +335,17 @@ bytecode_precomp_cost (bytecode_const bc, bytecode_const *endptr,
 /************************************ PRAC ************************************/
 /******************************************************************************/
 
-/* Table of multipliers for PRAC. prac_mul[i], 1 <= i <= 9, has continued 
-   fraction sequence of all ones but with a 2 in the (i+1)-st place, 
-   prac_mul[i], 10 <= i <= 17, has continued fraction sequence of all ones 
+/* Table of multipliers for PRAC. prac_mul[i], 1 <= i <= 9, has continued
+   fraction sequence of all ones but with a 2 in the (i+1)-st place,
+   prac_mul[i], 10 <= i <= 17, has continued fraction sequence of all ones
    but with a 2 in second and in the (i-7)-th place
    and prac_mul[0] is all ones, i.e. the golden ratio. */
 #define PRAC_NR_MULTIPLIERS 10
-static const double prac_mul[PRAC_NR_MULTIPLIERS] = 
-  {1.61803398874989484820 /* 0 */, 1.38196601125010515179 /* 1 */, 
-   1.72360679774997896964 /* 2 */, 1.58017872829546410471 /* 3 */, 
+static const double prac_mul[PRAC_NR_MULTIPLIERS] =
+  {1.61803398874989484820 /* 0 */, 1.38196601125010515179 /* 1 */,
+   1.72360679774997896964 /* 2 */, 1.58017872829546410471 /* 3 */,
    1.63283980608870628543 /* 4 */, 1.61242994950949500192 /* 5 */,
-   1.62018198080741576482 /* 6 */, 1.61721461653440386266 /* 7 */, 
+   1.62018198080741576482 /* 6 */, 1.61721461653440386266 /* 7 */,
    1.61834711965622805798 /* 8 */, 1.61791440652881789386 /* 9 */,
 #if PRAC_NR_MULTIPLIERS == 18
    1.41982127170453589529 /* 10 */, 1.36716019391129371457 /* 11 */,
@@ -481,16 +494,16 @@ bytecode_prac_fprintf (FILE *out, bytecode_const bc)
 /***** Computing the PRAC chains *****/
 
 /***********************************************************************
-   Generating Lucas chains with Montgomery's PRAC algorithm. Code taken 
-   from GMP-ECM, mostly written by Paul Zimmermann, and slightly 
+   Generating Lucas chains with Montgomery's PRAC algorithm. Code taken
+   from GMP-ECM, mostly written by Paul Zimmermann, and slightly
    modified here
 ************************************************************************/
 
 
-/* Produce a PRAC chain with initial multiplier v. 
+/* Produce a PRAC chain with initial multiplier v.
  * Returns its arithmetic cost or DBL_MAX if no chain could be computed.
- * The cost of a differential addition is opcost->dadd, the cost a doubling is
- * opcost->dbl.
+ * The cost of a differential addition is opcost->dADD, the cost a doubling is
+ * opcost->dDBL.
  */
 static double
 prac_chain (const unsigned int n, const double v, const prac_cost_t *opcost,
@@ -507,7 +520,7 @@ prac_chain (const unsigned int n, const double v, const prac_cost_t *opcost,
   e = 2 * r - n;
 
   /* initial doubling (subchain init) */
-  cost = opcost->dbl;
+  cost = opcost->DBL;
   if (encoder != NULL)
     bytecode_encoder_add_one (encoder, PRAC_SUBBLOCK_INIT); /* 'i' */
 
@@ -525,28 +538,28 @@ prac_chain (const unsigned int n, const double v, const prac_cost_t *opcost,
     { /* condition 1 */
       d = (2 * d - e) / 3;
       e = (e - d) / 2;
-      cost += 3 * opcost->dadd; /* 3 additions */
+      cost += 3 * opcost->dADD; /* 3 additions */
       if (encoder != NULL)
         bytecode_encoder_add_one (encoder, (bytecode_elt) 1);
     }
     else if (4 * d <= 5 * e && (d - e) % 6 == 0)
     { /* condition 2 */
       d = (d - e) / 2;
-      cost += opcost->dadd + opcost->dbl; /* one addition, one doubling */
+      cost += opcost->dADD + opcost->DBL; /* one addition, one doubling */
       if (encoder != NULL)
         bytecode_encoder_add_one (encoder, (bytecode_elt) 2);
     }
     else if (d <= 4 * e)
     { /* condition 3 */
       d -= e;
-      cost += opcost->dadd; /* one addition */
+      cost += opcost->dADD; /* one addition */
       if (encoder != NULL)
         bytecode_encoder_add_one (encoder, (bytecode_elt) 3);
     }
     else if ((d + e) % 2 == 0)
     { /* condition 4 */
       d = (d - e) / 2;
-      cost += opcost->dadd + opcost->dbl; /* one addition, one doubling */
+      cost += opcost->dADD + opcost->DBL; /* one addition, one doubling */
       if (encoder != NULL)
         bytecode_encoder_add_one (encoder, (bytecode_elt) 4);
     }
@@ -554,7 +567,7 @@ prac_chain (const unsigned int n, const double v, const prac_cost_t *opcost,
     else if (d % 2 == 0)
     { /* condition 5 */
       d /= 2;
-      cost += opcost->dadd + opcost->dbl; /* one addition, one doubling */
+      cost += opcost->dADD + opcost->DBL; /* one addition, one doubling */
       if (encoder != NULL)
         bytecode_encoder_add_one (encoder, (bytecode_elt) 5);
     }
@@ -562,35 +575,35 @@ prac_chain (const unsigned int n, const double v, const prac_cost_t *opcost,
     else if (d % 3 == 0)
     { /* condition 6 */
       d = d / 3 - e;
-      cost += 3 * opcost->dadd + opcost->dbl; /* three additions, one doubling */
+      cost += 3 * opcost->dADD + opcost->DBL; /* three additions, one doubling */
       if (encoder != NULL)
         bytecode_encoder_add_one (encoder, (bytecode_elt) 6);
     }
     else if ((d + e) % 3 == 0)
     { /* condition 7 */
       d = (d - 2 * e) / 3;
-      cost += 3 * opcost->dadd + opcost->dbl; /* three additions, one doubling */
+      cost += 3 * opcost->dADD + opcost->DBL; /* three additions, one doubling */
       if (encoder != NULL)
         bytecode_encoder_add_one (encoder, (bytecode_elt) 7);
     }
     else if ((d - e) % 3 == 0)
     { /* condition 8 */
       d = (d - e) / 3;
-      cost += 3 * opcost->dadd + opcost->dbl; /* three additions, one doubling */
+      cost += 3 * opcost->dADD + opcost->DBL; /* three additions, one doubling */
       if (encoder != NULL)
         bytecode_encoder_add_one (encoder, (bytecode_elt) 8);
     }
     else /* necessarily e is even */
     { /* condition 9 */
       e /= 2;
-      cost += opcost->dadd + opcost->dbl; /* one addition, one doubling */
+      cost += opcost->dADD + opcost->DBL; /* one addition, one doubling */
       if (encoder != NULL)
         bytecode_encoder_add_one (encoder, (bytecode_elt) 9);
     }
   }
 
   /* final addition */
-  cost += opcost->dadd;
+  cost += opcost->dADD;
   if (encoder != NULL)
     bytecode_encoder_add_one (encoder, PRAC_SUBBLOCK_FINAL); /* 'f' */
 
@@ -623,7 +636,7 @@ bytecode_prac_encode_one (bytecode_encoder_ptr encoder, const unsigned int k,
      * what multipliers we use.
      */
      best_mul = prac_mul[0];
-     mincost = opcost->dbl + opcost->dadd;
+     mincost = opcost->DBL + opcost->dADD;
 
     if (verbose)
       printf ("# %s: k=3 best_mul=%f mincost=%f\n", __func__,best_mul, mincost);
@@ -641,7 +654,7 @@ bytecode_prac_encode_one (bytecode_encoder_ptr encoder, const unsigned int k,
     {
       double mul = prac_mul[i];
       if (verbose > 1)
-        printf ("# %s: computing Lucas chain for k=%u with mul=%f\n", __func__, 
+        printf ("# %s: computing Lucas chain for k=%u with mul=%f\n", __func__,
             k, mul);
       double cost = prac_chain (k, mul, opcost, NULL);
 
@@ -778,7 +791,7 @@ bytecode_prac_encode (bytecode *bc, unsigned int B1, unsigned int pow2_nb,
   if (verbose)
   {
     /* The cost of the initial doublings */
-    double power2cost = pow2_nb * opcost->dbl;
+    double power2cost = pow2_nb * opcost->DBL;
     /* Print the bytecode */
     printf ("Byte code for stage 1: ");
     bytecode_prac_fprintf (stdout, *bc);
@@ -810,7 +823,7 @@ bytecode_prac_check_internal (bytecode_const bc, bytecode_const *endptr,
         R_len);
     ret = 1;
   }
-  
+
   if (*bc != PRAC_SUBBLOCK_INIT)
   {
     printf ("# %s: error, PRAC bytecode must start with 'i' = 0x%02x, "
@@ -1033,7 +1046,7 @@ bytecode_prac_cost (bytecode_const bc, bytecode_const *endptr,
       case PRAC_SWAP:
         break;
       case PRAC_SUBBLOCK_INIT:
-        cost += opcost->dbl;
+        cost += opcost->DBL;
         break;
       case PRAC_BLOCK_FINAL:
         finished = 1;
@@ -1041,28 +1054,28 @@ bytecode_prac_cost (bytecode_const bc, bytecode_const *endptr,
       case PRAC_SUBBLOCK_FINAL:
       case 3:
       case 11:
-        cost += opcost->dadd; 
+        cost += opcost->dADD;
         break;
       case 1:
-        cost += 3 * opcost->dadd;
+        cost += 3 * opcost->dADD;
         break;
       case 2:
       case 4:
       case 5:
       case 9:
       case 10:
-        cost += opcost->dadd + opcost->dbl; 
+        cost += opcost->dADD + opcost->DBL;
         break;
       case 6:
       case 7:
       case 8:
-        cost += 3 * opcost->dadd + opcost->dbl; 
+        cost += 3 * opcost->dADD + opcost->DBL;
         break;
       case 12:
-        cost += 2 * opcost->dadd + opcost->dbl; 
+        cost += 2 * opcost->dADD + opcost->DBL;
         break;
       case 13:
-        cost += 2 * opcost->dadd; 
+        cost += 2 * opcost->dADD;
         break;
       default:
         printf ("Fatal error in %s at %s:%d -- unknown bytecode 0x%02x\n",
@@ -1095,22 +1108,19 @@ bytecode_mishmash_cost (bytecode_const bc, bytecode_const *endptr,
 {
   double cost = 0.;
   bc++; /* ignore first init byte */
-  int switch_needed = 0;
+  prac_cost_t prac_opcost = { .dADD = opcost->dADD, .DBL = opcost->dDBL };
 
   while (*bc != MISHMASH_FINAL)
   {
     uint8_t t, n;
     bytecode_elt_split_4_4 (&t, &n, *bc);
 
-    if (t == MISHMASH_DBCHAIN_BLOCK || t == MISHMASH_PRECOMP_BLOCK)
-      switch_needed = 1;
-
     if (t == MISHMASH_DBCHAIN_BLOCK)
-      cost += bytecode_dbchain_cost (++bc, &bc, opcost->dbchain);
+      cost += bytecode_dbchain_cost (++bc, &bc, opcost);
     else if (t == MISHMASH_PRECOMP_BLOCK)
-      cost += bytecode_precomp_cost (++bc, &bc, opcost->precomp);
+      cost += bytecode_precomp_cost (++bc, &bc, opcost);
     else if (t == MISHMASH_PRAC_BLOCK)
-      cost += bytecode_prac_cost (++bc, &bc, opcost->prac);
+      cost += bytecode_prac_cost (++bc, &bc, &prac_opcost);
     else if (t != MISHMASH_INIT) /* unknown bytecode */
     {
       printf ("Fatal error in %s at %s:%d -- unknown bytecode 0x%02x\n",
@@ -1120,10 +1130,6 @@ bytecode_mishmash_cost (bytecode_const bc, bytecode_const *endptr,
 
     bc++; /* go to next byte */
   }
-
-  /* Add the cost due to the switch of coordinates */
-  if (switch_needed)
-    cost += opcost->switch_cost;
 
   if (endptr != NULL)
     *endptr = bc;
@@ -1143,6 +1149,7 @@ bytecode_mishmash_encode (bytecode *bc, unsigned int B1, unsigned int pow2_nb,
   ASSERT_ALWAYS (B1 >= mishmash_B1_data[0].B1);
 
   double cost = 0.; /* used for verbose output */
+  prac_cost_t prac_opcost = { .dADD = opcost->dADD, .DBL = opcost->dDBL };
   bytecode_encoder_t encoder;
 
   /* init the encoder */
@@ -1153,7 +1160,7 @@ bytecode_mishmash_encode (bytecode *bc, unsigned int B1, unsigned int pow2_nb,
   {
     if (mishmash_B1_data[i].B1 == B1)
       break;
-    else if (i+1 == mishmash_B1_data_len || B1 < mishmash_B1_data[i+1].B1) 
+    else if (i+1 == mishmash_B1_data_len || B1 < mishmash_B1_data[i+1].B1)
       break;
     else
       i++;
@@ -1191,7 +1198,7 @@ bytecode_mishmash_encode (bytecode *bc, unsigned int B1, unsigned int pow2_nb,
         if (verbose)
           printf ("# %s: do prime p=%u with PRAC [ %u time(s) ]\n", __func__,
               p, v);
-        cost += bytecode_prac_encode_one (encoder, p, v, opcost->prac, verbose);
+        cost += bytecode_prac_encode_one (encoder, p, v, &prac_opcost, verbose);
       }
     }
     prime_info_clear (pi);
@@ -1238,7 +1245,7 @@ bytecode_mishmash_encode (bytecode *bc, unsigned int B1, unsigned int pow2_nb,
   if (verbose)
   {
     /* The cost of the initial doublings */
-    double power2cost = pow2_nb * opcost->prac->dbl;
+    double power2cost = pow2_nb * opcost->dDBL;
     /* Print the bytecode */ // TODO
     //printf ("Byte code for stage 1: ");
     //bytecode_mishmash_fprintf (stdout, *bc);

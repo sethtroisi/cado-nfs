@@ -8,6 +8,7 @@
 #include "pp1.h"
 #include "facul_ecm.h"
 #include "bytecode.h"
+#include "ec_arith_cost.h"
 #include "portability.h"
 
 /* By default we compress the bytecode chain.
@@ -16,47 +17,40 @@
 #define BYTECODE_COMPRESS 1
 
 /* Costs of operations for P+1 (for Lucas chain computed with PRAC algorithm) */
-prac_cost_t pp1_opcost = { .dadd = 1., .dbl = 1.};
+prac_cost_t pp1_opcost = { .DBL = 1, .dADD = 1. };
 
 /* Costs of operations for interpreting PRAC chains on Montgomery curves
  * The cost are the number of modular multiplications and squarings.
  */
-prac_cost_t ec_montgomery_opcost = { .dadd = 6., .dbl = 5.};
+prac_cost_t ec_montgomery_opcost = { .DBL = MONTGOMERY_DBL,
+                                     .dADD = MONTGOMERY_dADD };
 
-/* Costs of operations for interpreting double base chains on Twisted Edwards
- * curves with a=-1.
+/* Costs of operations for interpreting MISHMASH bytecode on "a=-1" twisted
+ * Edwards curves and Montgomery curves.
  * The cost are the number of modular multiplications and squarings.
+ *
+ * For "a=-1" twisted Edwards curves, we use 2 different coordinates system:
+ *    - projective: (X:Y:Z)
+ *    - extended: (X:Y:Z:T) and XY = ZT
+ *      Note: if we forget T, we have projective coordinates
+ * The costs corresponds to operations on different coordinates system:
+ *    - DBL: doubling projective -> projective
+ *    - DBLa: doubling projective -> extended
+ *    - TPL: tripling projective -> projective
+ *    - TPLa: tripling projective -> extended
+ *    - ADD: addition extended,extended -> projective
+ *    - ADDa: addition extended,extended -> extended
+ *    - ADDd: addition extended,extended -> Montgomery curve
+ *
+ *  dADD and dDBL correspond to differential addition and doubling on a
+ *  Montgomery curve.
  */
-dbchain_cost_t ec_edwards_dbchain_opcost = { .dbl=7., .dbladd=15., .tpl=12.,
-                                             .tpladd=21., .extra_final_add=1. };
-/* Costs of operations for interpreting precomp chains on Twisted Edwards
- * curves with a=-1.
- * The cost are the number of modular multiplications and squarings.
- */
-precomp_cost_t ec_edwards_precomp_opcost = { .add=7., .extra_add_for_add=1.,
-                                             .dbl=7., .extra_dbl_for_add=1.,
-                                             .tpl=12., .extra_tpl_for_add=2. };
-/*
- *  For those curves, we use 3 different models:
- *    projective, extended and (only internally) completed
- *  The costs corresponds to operations on different models:
- *    - dbl corresponds to a doubling projective -> projective
- *    - add corresponds to an addition extended,extended -> projective
- *    - dbladd corresponds to a doubling and an addition
- *        projective, extended -> projective
- *      It is more costly than add + dbl but it is due to the fact that if we
- *      wanted to do the same operation with 1 add and 1 dbl, we would need to
- *      convert the output of the dbl from projective to extended in order to be
- *      able to use the add, which is costly.
- *    - dbl_precomp corresponds to a doubling extended -> extended
- *    - add_precomp corresponds to an addition extended, extended, -> extended
- *  We count 1 for a multiplication and 1 for a squaring on the base field.
- */
-
-mishmash_cost_t ec_mixed_repr_opcost = { .dbchain = &ec_edwards_dbchain_opcost,
-                                         .precomp = &ec_edwards_precomp_opcost,
-                                         .prac = &ec_montgomery_opcost,
-                                         .switch_cost = -4. };
+mishmash_cost_t ec_mixed_repr_opcost = {
+    .DBL = EDWARDS_DBL, .DBLa = EDWARDS_DBLext,
+    .TPL = EDWARDS_TPL, .TPLa = EDWARDS_TPLext,
+    .ADD = EDWARDS_ADD, .ADDa = EDWARDS_ADDext, .ADDd = EDWARDS_ADDmontgomery,
+    .dDBL = MONTGOMERY_DBL, .dADD = MONTGOMERY_dADD
+  };
 
 /***************************** P-1 ********************************************/
 
@@ -106,8 +100,8 @@ pm1_make_plan (pm1_plan_t *plan, const unsigned int B1, const unsigned int B2,
     plan->E_mask >>= 1;
 
   /* stage2 is done with P+1 code */
-  stage2_cost_t stage2_opcost = { .dadd = pp1_opcost.dadd,
-                                  .dbl = pp1_opcost.dbl, .is_ecm = 0 };
+  stage2_cost_t stage2_opcost = { .dadd = pp1_opcost.dADD,
+                                  .dbl = pp1_opcost.DBL, .is_ecm = 0 };
   stage2_make_plan (&(plan->stage2), B1, B2, &stage2_opcost, verbose);
 }
 
@@ -147,8 +141,8 @@ pp1_make_plan (pp1_plan_t *plan, const unsigned int B1, const unsigned int B2,
                         BYTECODE_COMPRESS, verbose);
 
   /* Make stage 2 plan */
-  stage2_cost_t stage2_opcost = { .dadd = pp1_opcost.dadd,
-                                  .dbl = pp1_opcost.dbl, .is_ecm = 0 };
+  stage2_cost_t stage2_opcost = { .dadd = pp1_opcost.dADD,
+                                  .dbl = pp1_opcost.DBL, .is_ecm = 0 };
   stage2_make_plan (&(plan->stage2), B1, B2, &stage2_opcost, verbose);
 }
 
@@ -231,8 +225,8 @@ ecm_make_plan (ecm_plan_t *plan, const unsigned int B1, const unsigned int B2,
     FATAL_ERROR_CHECK (1, "Unknown parameterization");
 
   /* Make stage 2 plan */
-  stage2_cost_t stage2_opcost = { .dadd = ec_montgomery_opcost.dadd,
-                                 .dbl = ec_montgomery_opcost.dbl, .is_ecm = 1 };
+  stage2_cost_t stage2_opcost = { .dadd = ec_montgomery_opcost.dADD,
+                                 .dbl = ec_montgomery_opcost.DBL, .is_ecm = 1 };
   stage2_make_plan (&(plan->stage2), B1, B2, &stage2_opcost, verbose);
 }
 
