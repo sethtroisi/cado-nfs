@@ -79,7 +79,7 @@ static const long tc_points[MAX_TC_DEGREE] = {0, 1, -1, 2, -2, 3, -3, 4, -4,
 
 #if GNUC_VERSION_ATLEAST(7,0,0)
 #pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wstrict-overflow" 
+#pragma GCC diagnostic ignored "-Wstrict-overflow"
 #endif
 /* Given f[0]...f[t] that contain respectively f(0), ..., f(t),
    put in f[0]...f[t] the coefficients of f. Assumes t <= MAX_TC_DEGREE.
@@ -500,7 +500,7 @@ void mpz_poly_realloc (mpz_poly_ptr f, int nc)
 /* Copy f to g, where g must be initialized (but there is no need it has
    enough allocated coefficients, since mpz_poly_setcoeff reallocates if
    needed). */
-void mpz_poly_set(mpz_poly_ptr g, mpz_poly_srcptr f) 
+void mpz_poly_set(mpz_poly_ptr g, mpz_poly_srcptr f)
 {
   int i;
 
@@ -512,7 +512,7 @@ void mpz_poly_set(mpz_poly_ptr g, mpz_poly_srcptr f)
     mpz_poly_setcoeff (g, i, f->coeff[i]);
 }
 
-void mpz_poly_set_double_poly(mpz_poly_ptr g, double_poly_srcptr f) 
+void mpz_poly_set_double_poly(mpz_poly_ptr g, double_poly_srcptr f)
 {
   mpz_poly_realloc (g, f->deg + 1);
   g->deg = f->deg;
@@ -561,7 +561,7 @@ mpz_poly_swap (mpz_poly_ptr f, mpz_poly_ptr g)
 }
 
 /* Free polynomial f in mpz_poly. */
-void mpz_poly_clear(mpz_poly_ptr f) 
+void mpz_poly_clear(mpz_poly_ptr f)
 {
   int i;
   for (i = 0; i < f->alloc; ++i)
@@ -607,7 +607,7 @@ void mpz_poly_setcoeffs (mpz_poly_ptr f, mpz_t * coeffs, int d)
 }
 
 /* Set a zero polynomial. */
-void mpz_poly_set_zero(mpz_poly_ptr f) 
+void mpz_poly_set_zero(mpz_poly_ptr f)
 {
   f->deg = -1;
 }
@@ -1825,7 +1825,7 @@ mpz_poly_mod_f_mod_mpz (mpz_poly_ptr R, mpz_poly_srcptr f, mpz_srcptr m,
 	mpz_submul (R->coeff[i], c, f->coeff[f->deg-R->deg+i]);
       R->deg--;
     }
-  
+
   mpz_clear (c);
   if (invf == NULL)
     mpz_clear (aux);
@@ -2914,10 +2914,10 @@ mpz_poly_squarefree_p (mpz_poly_srcptr f)
  * If f is not irreducible, then p will be root of a factor of degree <= d-1,
  * which will yield a linear dependency of the same order as the coefficients
  * of f, otherwise if f is irreducible the linear dependency will be of order
- * p^(1/d). 
+ * p^(1/d).
  *
  * \return 0 by default, 1 if the poly is irreducible.
- * 
+ *
  * this function is without any warranty and at your own risk
  */
 int mpz_poly_is_irreducible_z(mpz_poly_srcptr f)
@@ -3035,7 +3035,7 @@ int mpz_poly_is_irreducible_z(mpz_poly_srcptr f)
   return ret;
 }
 
-  
+
 /* factoring polynomials */
 
 void mpz_poly_factor_list_init(mpz_poly_factor_list_ptr l)
@@ -3491,7 +3491,7 @@ static int mpz_poly_factor2(mpz_poly_factor_list_ptr list, mpz_poly_srcptr f,
  * k is the degree of factors we are looking for.
  *
  * We split in two parts:
- * 
+ *
  *  - factors whose roots are squares in GF(p^k).
  *  - factors whose roots are non squares in GF(p^k).
  *
@@ -3827,7 +3827,7 @@ std::string cxx_mpz_poly::print_poly(std::string const& var) const
  * \param[in]  counter         counter storing the coefficients of f
  * \param[in]  bound           max absolute value of coefficients of f
  *
- * \return 1 if the poly is valid (content = 1, not a duplicate, and +/-1 is not a root) 
+ * \return 1 if the poly is valid (content = 1, not a duplicate, and +/-1 is not a root)
  *           (in fact the value returned is != 0) and in this case,
  *           max_abs_coeffs is set to the largest absolute value of the coefficients of f
  * \return 0 if the poly corresponding to the counter is a duplicate, and in that case,
@@ -3842,10 +3842,9 @@ std::string cxx_mpz_poly::print_poly(std::string const& var) const
  */
 int mpz_poly_setcoeffs_counter(mpz_poly_ptr f, int* max_abs_coeffs, unsigned long *next_counter, int deg, unsigned long counter, unsigned int bound){
     unsigned int i;
-    unsigned long idx = counter, mod_j=0, mod_k=0;
+    unsigned long idx = counter;
     int j;
     int *fint, ok = 1;
-    mpz_t content;
     //unsigned long idx_next_poly_ok = idx;
     int error_code = 0; // because I want to know what is the pb
 #define POLY_EQUIV_INV_X -1 // the poly is the same as (+/-)f(1/x)
@@ -3875,13 +3874,12 @@ int mpz_poly_setcoeffs_counter(mpz_poly_ptr f, int* max_abs_coeffs, unsigned lon
 	fint[i] = (idx % (2 * bound + 1)) - bound;
         idx = idx / (2 * bound + 1);
     }
-    
+
     /* we take -bound <= f[0] <= bound, f[0] <> 0,
        which makes 2*bound possible values */
     ASSERT(idx < 2 * bound);
     fint[0] = (idx < bound) ? idx - bound : idx - (bound - 1);
-    
-    
+
     /* since f and the reversed polynomial are equivalent, we can assume
        |f[deg]| < |f[0]| or (|f[deg]| = |f[0]| and |f[deg-1]| < |f[1]|) or ... */
 
@@ -3894,6 +3892,8 @@ int mpz_poly_setcoeffs_counter(mpz_poly_ptr f, int* max_abs_coeffs, unsigned lon
     ok = ((j*2 >= deg) || (abs(fint[deg-j]) < abs(fint[j])));
     */
     ok = 1;
+    /* out of the 85176 raw polynomials of degree 4 for bound=6,
+       the following test discards 41106, i.e., about 48% */
     for (int i = 0; 2 * i < deg; i++)
       {
         if (abs(fint[deg-i]) != abs(fint[i]))
@@ -3921,6 +3921,7 @@ int mpz_poly_setcoeffs_counter(mpz_poly_ptr f, int* max_abs_coeffs, unsigned lon
 	// in that case, counter++ is not enough because f[d]=1 is the only possibility,
 	// so the next counter we are looking for is with f[d-1]++
 	if(abs(fint[deg-1]+1) > abs(fint[1])){
+	  unsigned long mod_j, mod_k;
 	  // setting ld=1 then incrementing the second high deg coeff is not enough
 	  idx = *next_counter;
 	  // set the second high deg coeff to 0
@@ -3952,8 +3953,10 @@ int mpz_poly_setcoeffs_counter(mpz_poly_ptr f, int* max_abs_coeffs, unsigned lon
       }
     }// end of the computation of the next valid non-duplicate counter
 
-    /* since f(x) is equivalent to (-1)^deg*f(-x), if f[deg-1] = 0, then the
-       largest i = deg-3, deg-5, ..., such that f[i] <> 0 should have f[i] > 0 */
+    /* Since f(x) is equivalent to (-1)^deg*f(-x), if f[deg-1] = 0, then the
+       largest i = deg-3, deg-5, ..., such that f[i] <> 0 should have f[i] > 0.
+       Out of the 44070 remaining polynomials for degree 4 and bound = 6, this test
+       discards 3276, i.e., about 7.4% */
     if (ok && fint[deg-1] == 0)
       {
         for (int i = deg - 3; i >= 0; i -= 2)
@@ -3969,10 +3972,12 @@ int mpz_poly_setcoeffs_counter(mpz_poly_ptr f, int* max_abs_coeffs, unsigned lon
       error_code = POLY_EQUIV_MINUS_X; // the poly is an equivalent to (-1)^deg*f(-x)
     }
 
-    /* if |f[i]| = |f[deg-i]| for all i, then [f[deg], f[deg-1], ..., f[1], f[0]]
+    /* If |f[i]| = |f[deg-i]| for all i, then [f[deg], f[deg-1], ..., f[1], f[0]]
        is equivalent to [s*f[0], s*t*f[1], s*t^2*f[2], ...], where
        s = sign(f[0]), and s*t^i is the sign of f[i] where i is the smallest
-       odd index > 0 such that f[i] <> 0.  */
+       odd index > 0 such that f[i] <> 0.
+       Out of the 40794 remaining polynomials for degree 4 and bound = 6, this test
+       discards 468, i.e., about 1.1% */
     if (ok && fint[deg] == abs(fint[0])) /* f[deg] > 0 */
       {
         int s = (fint[0] > 0) ? 1 : -1, t = 0, i;
@@ -4005,6 +4010,8 @@ int mpz_poly_setcoeffs_counter(mpz_poly_ptr f, int* max_abs_coeffs, unsigned lon
       error_code = POLY_EQUIV_MINUS_COEFFS;
     }
 
+    /* Out of the 40326 remaining polynomials for degree 4 and bound = 6, this test
+       discards 3480, i.e., about 8.6% */
     if (ok){
       /* check if +-1 is a root of f (very common): compute the sum of the coefficients, and the alterned sum: it should be != 0 */
       // evaluating at 1 means sum the coefficients
@@ -4032,8 +4039,11 @@ int mpz_poly_setcoeffs_counter(mpz_poly_ptr f, int* max_abs_coeffs, unsigned lon
     for (j = 0; j <= deg; j ++)
       mpz_set_si (f->coeff[j], fint[j]);
 
+    /* Out of the 36846 remaining polynomials for degree 4 and bound = 6, this test
+       discards 1640, i.e., about 4.5% */
     if (ok){
       /* content test */
+      mpz_t content;
       mpz_init (content);
       mpz_poly_content (content, f);
       ok = mpz_cmp_ui (content, 1) == 0; /* duplicate with f/t */
@@ -4079,7 +4089,7 @@ int mpz_poly_setcoeffs_counter(mpz_poly_ptr f, int* max_abs_coeffs, unsigned lon
  f_{deg-1} > 0
  f_0 != 0: constant coeff non-zero
 
-This corresponds to the number of polynomials that can be enumerated with the function 
+This corresponds to the number of polynomials that can be enumerated with the function
 mpz_poly_setcoeffs_counter
 */
 unsigned long mpz_poly_cardinality(int deg, unsigned int bound){

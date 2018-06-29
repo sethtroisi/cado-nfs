@@ -252,8 +252,13 @@ init_count (unsigned int bound, unsigned int df)
       for (j = 0; j < df; j++)
 	{
 	  /* coefficient of degree j is bounded by ad*skew^(df-j) */
-	  b = (double) ad * pow (skew, (double) (df - j));
-	  k = (unsigned int) b; /* rounded towards zero */
+	  if (2 * j == df)
+	    k = bound;
+	  else
+	    {
+	      b = (double) ad * pow (skew, (double) (df - j));
+	      k = (unsigned int) b; /* rounded towards zero */
+	    }
 	  if (j == df - 1)
 	    mult = k + 1; /* we can assume the degree-(d-1) coefficient
 			     is in [0..k] via f(-x) */
@@ -277,45 +282,105 @@ init_count (unsigned int bound, unsigned int df)
     }
 }
 
-static void
+static int
 generate_f (mpz_t *f, unsigned int d, unsigned long idx, unsigned int bound)
 {
   unsigned int ad, j;
   double skew, b;
+  int ok = 1;
+  int *a;
+
+  a = malloc ((d + 1) * sizeof (int));
 
   /* first find the leading coefficient */
   for (ad = 1; idx >= count[ad]; ad++)
     idx -= count[ad];
   ASSERT_ALWAYS(ad <= bound);
-  mpz_set_ui (f[d], ad);
+  a[d] = ad;
 
   /* now find the other coefficients (see init_count) */
   skew = pow ((double) bound / (double) ad, 1.0 / ((double) d / 2.0));
   for (j = 0; j < d; j++)
     {
-      int c, k;
-      b = (double) ad * pow (skew, (double) (d - j));
-      k = (int) b;
+      int k;
+      if (2 * j == d)
+	k = bound;
+      else
+	{
+	  b = (double) ad * pow (skew, (double) (d - j));
+	  k = (int) b;
+	}
       if (j == d - 1) /* coefficient in [0..k] */
 	{
-	  c = idx % (k + 1);
+	  a[j] = idx % (k + 1);
 	  idx /= k + 1;
 	}
       else if (j > 0) /* coefficient in [-k..k] */
 	{
-	  c = (idx % (2 * k + 1)) - k;
+	  a[j] = (idx % (2 * k + 1)) - k;
 	  idx /= 2 * k + 1;
 	}
       else /* j=0: coefficient in [-k..k] except 0 */
 	{
-	  c = idx % (2 * k);
+	  a[j] = idx % (2 * k);
 	  /* 0..k-1 goes to -k..-1 and k..2k-1 to 1..k */
-	  c = (c < k) ? c - k : c - (k - 1);
+	  a[j] = (a[j] < k) ? a[j] - k : a[j] - (k - 1);
 	  idx /= 2 * k;
 	}
-      mpz_set_si (f[j], c);
     }
   ASSERT_ALWAYS(idx == 0);
+
+  /* Check if the reverse polynomial has smaller rank.
+     This test discards about 7.7% of the polynomials for d=4 and bound=6. */
+  for (j = 0; 2 * j < d; j++)
+    if (abs (a[d-j]) != abs(a[j]))
+      {
+	ok = abs (a[d-j]) < abs(a[j]);
+	break;
+      }
+
+  /* Since f(x) is equivalent to f(-x), if a[d-1]=0, then the largest a[d-3],
+     a[d-5], ... that is non zero should be positive. Discards 13.5% of the
+     remaining polynomials. */
+  if (ok)
+    for (j = d + 1; j >= 2;)
+      {
+	j -= 2;
+	if (a[j] != 0)
+	  {
+	    ok = a[j] > 0;
+	    break;
+	  }
+      }
+
+  /* Check if +-1 is a root of f. Discards 4.3% of the remaining polynomials. */
+  if (ok)
+    {
+      int value_one = 0, value_minus_one = 0;
+      for (j = 0; j <= d; j++)
+	{
+	  value_one += a[j];
+	  value_minus_one += (j & 1) ? -a[j] : a[j];
+	}
+      ok = value_one != 0 && value_minus_one != 0;
+    }
+
+  /* Content test. Discards 2.3% of the remaining polynomials. */
+  if (ok)
+    {
+      unsigned long g = a[d];
+      for (j = 0; j < d; j++)
+	g = gcd_int64 (g, a[j]);
+      ok = g == 1;
+    }
+
+  if (ok)
+    for (j = 0; j <= d; j++)
+      mpz_set_si (f[j], a[j]);
+
+  free (a);
+
+  return ok;
 }
 #endif
 
@@ -345,7 +410,7 @@ polygen_JL_f (int d, unsigned int bound, mpz_t *f, unsigned long idx)
     unsigned long next_counter;
     ok = mpz_poly_setcoeffs_counter(ff, &max_abs_coeffs, &next_counter, d, idx, bound);
 #else
-    generate_f (f, d, idx, bound);
+    ok = generate_f (f, d, idx, bound);
 #endif
 
     // to be compatible with the previous version, the count on the number of valid polys was before
@@ -769,6 +834,8 @@ main (int argc, char *argv[])
                                             (double) dg);
     nb_comb = (nb_comb_f > (double) ULONG_MAX) ? ULONG_MAX
       : (unsigned long) nb_comb_f;
+
+    printf ("# will generate about %lu polynomials\n", maxtries / modm);
 
 #ifdef HAVE_OPENMP
     omp_set_num_threads (nthreads);
