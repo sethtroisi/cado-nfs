@@ -97,9 +97,9 @@ int main (int argc, const char **argv)
   { /* PRAC test */
     /* Random opcost (between 0 and 16) [ 0x1p60 == double 2^60 ] */
     prac_cost_t cost;
-    cost.dbl = (double) random_uint64 () / 0x1p60;
-    cost.dadd = (double) random_uint64 () / 0x1p60;
-    printf ("PRAC cost: dbl = %f; dadd = %f\n", cost.dbl, cost.dadd);
+    cost.DBL = (double) random_uint64 () / 0x1p60;
+    cost.dADD = (double) random_uint64 () / 0x1p60;
+    printf ("PRAC cost: DBL = %f; dADD = %f\n", cost.DBL, cost.dADD);
 
     /* compress prac chains */
     nerrors += test_prac (1, 1100, 1, &cost, verbose);
@@ -113,12 +113,20 @@ int main (int argc, const char **argv)
     memset (&dbchain_cost, 0, sizeof (dbchain_cost_t));
     precomp_cost_t precomp_cost;
     memset (&precomp_cost, 0, sizeof (precomp_cost_t));
-    prac_cost_t prac_cost;
-    prac_cost.dbl = (double) random_uint64 () / 0x1p60;
-    prac_cost.dadd = (double) random_uint64 () / 0x1p60;
-    printf ("MISHMASH PRAC cost: dbl = %f; dadd = %f\n", prac_cost.dbl, prac_cost.dadd);
-    mishmash_cost_t cost = { .dbchain = &dbchain_cost, .precomp = &precomp_cost,
-                             .prac = &prac_cost };
+    mishmash_cost_t cost;
+    cost.DBL = (double) random_uint64 () / 0x1p60;
+    cost.DBLa = (double) random_uint64 () / 0x1p60;
+    cost.TPL = (double) random_uint64 () / 0x1p60;
+    cost.TPLa = (double) random_uint64 () / 0x1p60;
+    cost.ADD = (double) random_uint64 () / 0x1p60;
+    cost.ADDa = (double) random_uint64 () / 0x1p60;
+    cost.ADDd = (double) random_uint64 () / 0x1p60;
+    cost.dDBL = (double) random_uint64 () / 0x1p60;
+    cost.dADD = (double) random_uint64 () / 0x1p60;
+    printf ("MISHMASH PRAC cost: DBL = %f ; DBLa = %f ; TPL = %f ; TPLa = %f ; "
+            "ADD = %f ; ADDa = %f ; ADDd = %f ; dDBL = %f ; dADD = %f\n",
+            cost.DBL, cost.DBLa, cost.TPL, cost.TPLa, cost.ADD, cost.ADDa,
+            cost.ADDd, cost.dDBL, cost.dADD);
 
     /* compress mishmash chains */
     nerrors += test_mishmash (1, 1100, 1, &cost, verbose);
