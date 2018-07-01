@@ -94,6 +94,8 @@ is advised to trigger re-configuration of the build system, by the
 special command ``make cmake''. Another way to achieve the same goal is
 to remove the build tree, which is below build/ (normally named as the
 hostname of the current machine): ``make tidy'' should do it.
+Then, of course, you must recompile with ``make'', since ``make cmake''
+is just the equivalent of ``./configure'' in a classical build system.
 
 Optional (alternative): configure using cmake directly
 ======================================================
