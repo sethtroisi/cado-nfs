@@ -76,7 +76,8 @@ void nfs_work::allocate_buckets(sieve_info const & si, nfs_aux & aux, thread_poo
             multiplier.print_all().c_str());
 
     for (unsigned int side = 0; side < 2; side++) {
-        if (!si.sides[side].fb) continue;
+        sieve_info::side_info const & sis(si.sides[side]);
+        if (sis.fb->empty()) continue;
         groups[side].allocate_buckets(si.nb_buckets,
                 multiplier,
                 si.sides[side].fbs->stats.weight,

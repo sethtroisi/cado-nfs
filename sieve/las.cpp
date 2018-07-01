@@ -2006,8 +2006,8 @@ void process_bucket_region_run::operator()() {/*{{{*/
 
     for (int side = 0; side < 2; side++) {
         WHERE_AM_I_UPDATE(w, side, side);
-        sieve_info::side_info & s(si.sides[side]);
-        if (!s.fb) continue;
+        sieve_info::side_info & sis(si.sides[side]);
+        if (sis.fb->empty()) continue;
 
         MARK_TIMER_FOR_SIDE(timer, side);
 
@@ -2460,7 +2460,8 @@ void do_one_special_q_sublat(las_info const & las, sieve_info & si, nfs_work & w
     precomp_plattice_t precomp_plattice;
 
     for(int side = 0 ; side < 2 ; side++) {
-        if (!si.sides[side].fb) continue;
+        sieve_info::side_info & sis(si.sides[side]);
+        if (sis.fb->empty()) continue;
 
         fill_in_buckets_toplevel(ws, aux, pool, si, side, w);
 
@@ -2487,7 +2488,7 @@ void do_one_special_q_sublat(las_info const & las, sieve_info & si, nfs_work & w
             SIBLING_TIMER(timer, "prepare small sieve");
 
             sieve_info::side_info & s(si.sides[side]);
-            if (!s.fb) return;
+            if (s.fb->empty()) return;
 
             small_sieve_init(s.ssd,
                     s.ssd_offsets,

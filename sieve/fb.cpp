@@ -1893,10 +1893,14 @@ struct helper_functor_put_first_0 {
 
 fb_factorbase::fb_factorbase(cxx_cado_poly const & cpoly, int side, unsigned long lim, unsigned long powlim, cxx_param_list & pl, const char * fbc_filename) : f(cpoly->pols[side]), side(side), lim(lim), powlim(powlim)
 {
-    if (!lim) return;
-
+    /* This initial 0 must be here in all cases, even for an empty factor
+     * base.
+     */
     helper_functor_put_first_0 F0;
     multityped_array_foreach(F0, entries);
+
+    if (empty())
+        return;
 
     double tfb = seconds ();
     double tfb_wct = wct_seconds ();

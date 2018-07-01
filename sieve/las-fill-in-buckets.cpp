@@ -1150,7 +1150,8 @@ downsort_tree(
   WHERE_AM_I_UPDATE(w, N, first_region0_index);
 
   for (int side = 0; side < 2; ++side) {
-    if (!si.sides[side].fb) continue;
+    sieve_info::side_info & sis(si.sides[side]);
+    if (sis.fb->empty()) continue;
     WHERE_AM_I_UPDATE(w, side, side);
     TIMER_CATEGORY(timer, sieving(side));
     /* FIRST: Downsort what is coming from the level above, for this
@@ -1236,7 +1237,7 @@ downsort_tree(
                   MARK_TIMER_FOR_SIDE(timer, side);
                   SIBLING_TIMER(timer, "prepare small sieve");
                   sieve_info::side_info & s(si.sides[side]);
-                  if (!s.fb) return;
+                  if (s.fb->empty()) return;
                   ASSERT(si.toplevel > 1);
                   SIBLING_TIMER(timer, "small sieve start positions");
                   small_sieve_start_many(s.ssdpos_many, s.ssd, s.ssd_offsets, first_region0_index, si);
