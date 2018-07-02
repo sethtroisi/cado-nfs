@@ -930,7 +930,7 @@ struct helper_functor_subdivide_slices {
             std::ostringstream n_eq;
             n_eq << "n=";
             if (n < 0) n_eq << "*"; else n_eq << n;
-            verbose_output_print (0, 2, "# slices for side-%d part %d, %s roots: %zu entries, %zu logp values\n", side, part_index, n_eq.str().c_str(), interval_width, pool.size());
+            verbose_output_print (0, 3, "# slices for side-%d part %d, %s roots: %zu entries, %zu logp values\n", side, part_index, n_eq.str().c_str(), interval_width, pool.size());
 
             /* We now divide into several slices of roughly equal weight.
              * We can assess this weight by looking at the cdf.
@@ -974,7 +974,7 @@ struct helper_functor_subdivide_slices {
                         if (jt - it > std::numeric_limits<slice_offset_t>::max()) {
                             /* overflow. Do not push the split point, we'll try
                              * with more pieces */
-                            verbose_output_print (0, 2, "# [side-%d part %d %s logp=%d; %zu entries, weight=%f]: slice %zu/%zu overflows. Trying %zu slices\n",
+                            verbose_output_print (0, 3, "# [side-%d part %d %s logp=%d; %zu entries, weight=%f]: slice %zu/%zu overflows. Trying %zu slices\n",
                                     side,
                                     part_index,
                                     n_eq.str().c_str(),
@@ -1011,7 +1011,7 @@ struct helper_functor_subdivide_slices {
             for(auto & s : sdst) s.index = index++;
 
             for(auto const & s : sdst) {
-                verbose_output_print (0, 2, "# [side-%d %lu] %s logp=%d: %zu entries, weight=%f\n",
+                verbose_output_print (0, 3, "# [side-%d %lu] %s logp=%d: %zu entries, weight=%f\n",
                         side,
                         (unsigned long) s.get_index(),
                         n_eq.str().c_str(),
