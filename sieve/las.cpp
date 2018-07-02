@@ -1745,24 +1745,25 @@ task_result * detached_cofac(worker_thread * worker, task_parameters * _param, i
 
         const char * dup_comment = NULL;
 
-        if (!is_new_rel) {
-            /* can't insert, so already there: either it's a
-             * duplicate of a relation that was already printed, or a
-             * relation that was already identified as a duplicate.
-             * But at any rate it's not to be printed and we don't
-             * even want to bother testing whether it's a duplicate
-             * in the sense of relation_is_duplicate()
-             */
-            dup_comment = "# DUP ";
-        } else if (do_check && relation_is_duplicate(rel,
+        if (do_check && relation_is_duplicate(rel,
                     wc.doing, wc.las, wc.sc, wc.strategies,
                     adjust_strategy)) {
             dup_comment = "# DUPE ";
+        } else {
+            if (!is_new_rel) {
+                /* the relation was already printed in a prior attempt,
+                 * that was aborted because of an exception. */
+                dup_comment = "# DUP ";
+            }
+            /* Even if the relation was already printed, the las_report
+             * object is (now) specific to the current attempt, and has
+             * no memory of the number of reports for the failed
+             * attempt. Therefore we need to count the relation as a
+             * report no matter what.
+             */
+            rep.reports ++;
+            /* Not clear what gives when we have Galois relations.  */
         }
-
-        /* Not clear what gives when we have Galois relations.
-         */
-        rep.reports += !dup_comment;
 
         if (!dup_comment) dup_comment = "";
 
