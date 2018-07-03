@@ -2746,6 +2746,7 @@ int main (int argc0, char *argv0[])/*{{{*/
     setbuf(stderr, NULL);
 
     cxx_param_list pl;
+    las_install_sighandlers();
 
     declare_usage(pl);
 
