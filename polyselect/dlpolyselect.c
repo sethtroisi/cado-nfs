@@ -454,7 +454,9 @@ polygen_JL_g (mpz_t kN, int dg, mat_Z g, mpz_t root, double skew_f)
 {
     int i, j;
     mpz_t a, b, det, r;
-    unsigned long skew = round (skew_f), skew_powi = 1;
+    unsigned long skew, skew_powi;
+
+    skew = skew_f < 0.5 ? 1 : round (skew_f);
 
     mpz_init (det);
     mpz_init_set_ui (a, 1);
@@ -466,7 +468,7 @@ polygen_JL_g (mpz_t kN, int dg, mat_Z g, mpz_t root, double skew_f)
         }
     }
 
-    for (i = 1;  i <= dg + 1; i++) {
+    for (i = skew_powi = 1; i <= dg + 1; i++) {
         for (j = 1; j <= dg + 1; j++) {
             if (i == 1)
               {
