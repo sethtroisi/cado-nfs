@@ -2443,83 +2443,89 @@ void do_one_special_q_sublat(las_info const & las, sieve_info & si, nfs_work & w
         MIN(max_area, plattice_x_t(BUCKET_REGIONS[3]));
     plattice_enumerate_area<3>::value = max_area;
 
+    /* TODO: is there a way to share this in sublat mode ? */
+    precomp_plattice_t precomp_plattice;
+
     /* This count _only_ works if we do completely synchronous stuff. As
      * soon as we begin dropping synchronization points, it will be
      * completely impossible to do such hacks.
      */
-    rep.ttbuckets_fill -= seconds();
-    
+
     {
-        /* allocate_bucket_regions is probably ridiculously cheap in
-         * comparison to allocate_buckets */
-        ws.allocate_bucket_regions();
+        rep.ttbuckets_fill -= seconds();
+        auto dummy = call_dtor([&rep]() { rep.ttbuckets_fill += seconds(); });
 
-        ws.allocate_buckets(si, *aux_p, pool);
-    }
+        {
+            /* allocate_bucket_regions is probably ridiculously cheap in
+             * comparison to allocate_buckets */
+            ws.allocate_bucket_regions();
 
-    /* TODO: is there a way to share this in sublat mode ? */
-    precomp_plattice_t precomp_plattice;
-
-    for(int side = 0 ; side < 2 ; side++) {
-        sieve_info::side_info & sis(si.sides[side]);
-        if (sis.fb->empty()) continue;
-
-        fill_in_buckets_toplevel(ws, aux, pool, si, side, w);
-
-        // Prepare plattices at internal levels.
-        for (int level = 1; level < si.toplevel; ++level) {
-            fill_in_buckets_prepare_precomp_plattice(
-                    pool, side, level, si, precomp_plattice);
+            ws.allocate_buckets(si, *aux_p, pool);
         }
-    }
 
-    /*
-     * Mixing-and-matching threads here with the fill-in-buckets threads
-     * might lead to unbalance.
-     */
-    BOOKKEEPING_TIMER(timer_special_q);
+        for(int side = 0 ; side < 2 ; side++) {
+            sieve_info::side_info & sis(si.sides[side]);
+            if (sis.fb->empty()) continue;
 
-    for(int side = 0 ; side < 2 ; side++) {
-        pool.add_task_lambda([&si,aux_p,side](worker_thread * worker,int){
-            timetree_t & timer(aux_p->th[worker->rank()].timer);
+            fill_in_buckets_toplevel(ws, aux, pool, si, side, w);
 
-            ENTER_THREAD_TIMER(timer);
-            MARK_TIMER_FOR_SIDE(timer, side);
-
-            SIBLING_TIMER(timer, "prepare small sieve");
-
-            sieve_info::side_info & s(si.sides[side]);
-            if (s.fb->empty()) return;
-
-            small_sieve_init(s.ssd,
-                    s.ssd_offsets,
-                    s.fb_smallsieved.get()->begin(),
-                    s.fb_smallsieved.get()->end(),
-                    s.fb_smallsieved.get()->begin() + s.resieve_start_offset,
-                    s.fb_smallsieved.get()->begin() + s.resieve_end_offset,
-                    si, side);
-
-            small_sieve_info("small sieve", side, s.ssd);
-            if (si.toplevel == 1) {
-                /* when si.toplevel > 1, this start_many call is done
-                 * several times.
-                 */
-                SIBLING_TIMER(timer, "small sieve start positions ");
-                small_sieve_start_many(s.ssdpos_many, s.ssd, s.ssd_offsets, 0, si);
+            // Prepare plattices at internal levels.
+            for (int level = 1; level < si.toplevel; ++level) {
+                fill_in_buckets_prepare_precomp_plattice(
+                        pool, side, level, si, precomp_plattice);
             }
-        },0);
+        }
+
+        /*
+         * Mixing-and-matching threads here with the fill-in-buckets threads
+         * might lead to unbalance.
+         */
+        BOOKKEEPING_TIMER(timer_special_q);
+
+        for(int side = 0 ; side < 2 ; side++) {
+            pool.add_task_lambda([&si,aux_p,side](worker_thread * worker,int){
+                    timetree_t & timer(aux_p->th[worker->rank()].timer);
+
+                    ENTER_THREAD_TIMER(timer);
+                    MARK_TIMER_FOR_SIDE(timer, side);
+
+                    SIBLING_TIMER(timer, "prepare small sieve");
+
+                    sieve_info::side_info & s(si.sides[side]);
+                    if (s.fb->empty()) return;
+
+                    small_sieve_init(s.ssd,
+                            s.ssd_offsets,
+                            s.fb_smallsieved.get()->begin(),
+                            s.fb_smallsieved.get()->end(),
+                            s.fb_smallsieved.get()->begin() + s.resieve_start_offset,
+                            s.fb_smallsieved.get()->begin() + s.resieve_end_offset,
+                            si, side);
+
+                    small_sieve_info("small sieve", side, s.ssd);
+                    if (si.toplevel == 1) {
+                        /* when si.toplevel > 1, this start_many call is done
+                         * several times.
+                         */
+                        SIBLING_TIMER(timer, "small sieve start positions ");
+                        small_sieve_start_many(s.ssdpos_many, s.ssd, s.ssd_offsets, 0, si);
+                    }
+            },0);
+        }
+
+        /* Note: we haven't done any downsorting yet ! */
+
+        pool.drain_queue(0);
+
+        ws.check_buckets_max_full(si.toplevel, shorthint_t());
+        auto exc = pool.get_exceptions<buckets_are_full>(0);
+        if (!exc.empty())
+            throw *std::max_element(exc.begin(), exc.end());
+
+        /* trigger the increase of ttbuckets_fill, even if we encountered an
+         * exception. See the dummy object above.
+         */
     }
-
-    /* Note: we haven't done any downsorting yet ! */
-
-    pool.drain_queue(0);
-
-    ws.check_buckets_max_full(si.toplevel, shorthint_t());
-    auto exc = pool.get_exceptions<buckets_are_full>(0);
-    if (!exc.empty())
-        throw *std::max_element(exc.begin(), exc.end());
-
-    rep.ttbuckets_fill += seconds();
 
     {
         CHILD_TIMER(timer_special_q, "process_bucket_region outer container");
