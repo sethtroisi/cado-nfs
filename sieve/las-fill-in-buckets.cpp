@@ -388,8 +388,9 @@ make_lattice_bases(worker_thread * worker MAYBE_UNUSED,
       }
     }
   }
-  /* This is moved, not copied */
+  /* This is moved, not copied. Note that V is a reference. */
   param->V[result.get_index()] = std::move(result);
+  delete param;
   return new task_result;
 }
 
