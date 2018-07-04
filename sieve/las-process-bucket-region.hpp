@@ -125,13 +125,11 @@ struct process_bucket_region_run : public process_bucket_region_spawn {
     void apply_buckets(int side);
     void small_sieve(int side);
     void SminusS(int side);
-    typedef std::vector<uint32_t> surv1_t;
-    typedef std::vector<bucket_update_t<1, shorthint_t>::br_index_t> surv2_t;
-    surv1_t search_survivors();
-    surv2_t convert_survivors(surv1_t&& survivors);
+    typedef std::vector<bucket_update_t<1, shorthint_t>::br_index_t> survivors_t;
+    survivors_t search_survivors();
     void purge_buckets(int side);
     void resieve(int side);
-    void cofactoring_sync (surv2_t & survivors2);
+    void cofactoring_sync (survivors_t & survivors2);
     void operator()();
 };
 

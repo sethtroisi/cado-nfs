@@ -1325,9 +1325,11 @@ void process_bucket_region_run::SminusS(int side)/*{{{*/
                 side, w.N, trace_Nx.x, S[side][trace_Nx.x]);
 #endif
 }/*}}}*/
-process_bucket_region_run::surv1_t process_bucket_region_run::search_survivors() /*{{{*/
+process_bucket_region_run::survivors_t process_bucket_region_run::search_survivors() /*{{{*/
 {
-    surv1_t survivors;
+    typedef std::vector<uint32_t> surv1_t;
+
+    surv1_t temp_sv;
 
     CHILD_TIMER(timer, __func__);
     TIMER_CATEGORY(timer, search_survivors());
@@ -1384,7 +1386,8 @@ process_bucket_region_run::surv1_t process_bucket_region_run::search_survivors()
 
     rep.survivors.before_sieve += 1U << LOG_BUCKET_REGION;
 
-    survivors.reserve(128);
+    temp_sv.reserve(128);
+
     for (unsigned int j = j0; j < j1; j++)
     {
         int offset = (j-j0) << logI;
@@ -1402,7 +1405,7 @@ process_bucket_region_run::surv1_t process_bucket_region_run::search_survivors()
             si.sides[0].lognorms->bound,
             si.sides[1].lognorms->bound,
         };
-        size_t old_size = survivors.size();
+        size_t old_size = temp_sv.size();
 
         ASSERT(j < si.J);
 
@@ -1412,7 +1415,7 @@ process_bucket_region_run::surv1_t process_bucket_region_run::search_survivors()
                 N,
                 si.j_div,
                 si.conf.unsieve_thresh,
-                si.us, survivors, si.conf.sublat);
+                si.us, temp_sv, si.conf.sublat);
 
         /* Survivors written by search_survivors_in_line() have index
          * relative to their j-line. We need to convert to index within
@@ -1428,22 +1431,12 @@ process_bucket_region_run::surv1_t process_bucket_region_run::search_survivors()
 
         if (!offset) continue;
 
-        for (size_t i_surv = old_size; i_surv < survivors.size(); i_surv++)
-            survivors[i_surv] += offset;
+        for (size_t i_surv = old_size; i_surv < temp_sv.size(); i_surv++)
+            temp_sv[i_surv] += offset;
     }
 
-    return survivors;
-}/*}}}*/
-process_bucket_region_run::surv2_t process_bucket_region_run::convert_survivors(surv1_t&& survivors)/*{{{*/
-{
-    BOOKKEEPING_TIMER(timer);
-    /* Convert data type of list from uint32_t to the correct br_index_t */
-    surv2_t survivors2;
-    survivors2.reserve(survivors.size());
-    for (auto x : survivors)
-        survivors2.push_back(x);
-    survivors.clear();
-    return survivors2;
+    /* This used to be called convert_survivors */
+    return survivors_t(begin(temp_sv), end(temp_sv));
 }/*}}}*/
 void process_bucket_region_run::purge_buckets(int side)/*{{{*/
 {
@@ -1798,12 +1791,10 @@ task_result * detached_cofac(worker_thread * worker, task_parameters * _param, i
 
     return (task_result*) res;
 }
-#if 0
-#endif
 
 /* }}} */
 /*}}}*/
-void process_bucket_region_run::cofactoring_sync (surv2_t & survivors2)/*{{{*/
+void process_bucket_region_run::cofactoring_sync (survivors_t & survivors2)/*{{{*/
 {
     CHILD_TIMER(timer, __func__);
     TIMER_CATEGORY(timer, cofactoring_mixed());
@@ -2032,7 +2023,6 @@ void process_bucket_region_run::operator()() {/*{{{*/
     rep.ttf -= seconds_thread ();
 
     auto survivors = search_survivors();
-    auto survivors2 = convert_survivors(std::move(survivors));
 
     /* These two steps used to be called "prepare_cofactoring" */
     for(int side = 0 ; side < 2 ; side++) {
@@ -2057,7 +2047,7 @@ void process_bucket_region_run::operator()() {/*{{{*/
     double tt = rep.ttcof;
 #endif
 
-    cofactoring_sync(survivors2);
+    cofactoring_sync(survivors);
 
     rep.ttf += seconds_thread ();
 #ifdef  DLP_DESCENT
