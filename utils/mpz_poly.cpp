@@ -37,6 +37,7 @@
 // compute timings for Q^a mod(f,p): square, multiplication, reduction mod f
 // PZ piece of code:
 // in mpz_poly.h: add #define TIMINGS
+// beware: these timers are not thread-safe.
 #ifdef TIMINGS
 #include <time.h>
 #include <timing.h>

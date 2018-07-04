@@ -6,8 +6,8 @@
 #include <gmp.h>
 #include "macros.h"
 
-#define TIMINGS
-// for timings of roots mod p
+#define xxxTIMINGS
+// for timings of roots mod p (beware, this is not thread-safe)
 
 /* forward-declare our type before inclusion by double_poly.h, since we
  * include eachother
