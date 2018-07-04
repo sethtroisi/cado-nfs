@@ -67,17 +67,23 @@ main (int argc, char *argv[])
 
   param_list_parse_ulong(pl, "t"   , &nb_threads);
   
-  unsigned long lim[2] = {0, 0};
+  unsigned long lim[2] = {ULONG_MAX, ULONG_MAX};
   param_list_parse_ulong(pl, "lim0", &lim[0]);
   param_list_parse_ulong(pl, "lim1", &lim[1]);
+  if (lim[0] == ULONG_MAX || lim[1] == ULONG_MAX) {
+      fprintf(stderr,
+              "Error: parameters lim[01] are mandatory\n");
+      param_list_print_usage(pl, argv0, stderr);
+      exit(EXIT_FAILURE);
+  }
 
   int batchlpb[2] = {0, 0};
   param_list_parse_int(pl, "batchlpb0", &batchlpb[0]);
   param_list_parse_int(pl, "batchlpb1", &batchlpb[1]);
 
-  if (batchlpb[0] * batchlpb[1] * lim[0] * lim[1] == 0) {
+  if (batchlpb[0] * batchlpb[1] == 0) {
       fprintf(stderr,
-              "Error: parameters batchlpb[01] and lim[01] are mandatory\n");
+              "Error: parameters batchlpb[01] are mandatory\n");
       param_list_print_usage(pl, argv0, stderr);
       exit(EXIT_FAILURE);
   }
