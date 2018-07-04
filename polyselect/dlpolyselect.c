@@ -876,8 +876,8 @@ main (int argc, char *argv[])
     printf (" (roots %.2fs, irred %.2fs, lll %.2fs, MurphyE %.2fs)",
             timer[TIMER_ROOTS], timer[TIMER_IRRED], timer[TIMER_LLL],
 	    timer[TIMER_MURPHYE]);
+    printf ("\n#              ");
     print_timings_barrett_pow_mod_f_mod_p();
-    printf ("\n");
 #endif
     printf ("\n");
 
