@@ -1688,11 +1688,11 @@ task_result * detached_cofac(worker_thread * worker, task_parameters * _param, i
     SIBLING_TIMER(timer, "cofactoring"); // aka factor_both_leftover_norms
     TIMER_CATEGORY(timer, cofactoring_mixed());
 
-    rep.ttcof -= microseconds_thread ();
+    rep.ttcof -= seconds_thread ();
     rep.survivors.enter_cofactoring++;
     int pass = cur.factor_both_leftover_norms(wc);
     rep.survivors.cofactored += (pass != 0);
-    rep.ttcof += microseconds_thread ();
+    rep.ttcof += seconds_thread ();
 
     auto res = new detached_cofac_result;
 
@@ -1992,6 +1992,9 @@ void process_bucket_region_run::cofactoring_sync (surv2_t & survivors2)/*{{{*/
 }/*}}}*/
 void process_bucket_region_run::operator()() {/*{{{*/
 
+    // This is too verbose.
+    // fprintf(stderr, "=== entering PBR for report id %lu\n", rep.id);
+
     /* first check some early abort conditions. */
     if (recursive_descent) {
         /* For the descent mode, we bail out as early as possible. We
@@ -2058,6 +2061,9 @@ void process_bucket_region_run::operator()() {/*{{{*/
 
     rep.ttf += seconds_thread ();
 #ifdef  DLP_DESCENT
+    /* hack, see above. The situation where cofactoring_sync also induces
+     * ttcof is now exceptional, and taken care of here.
+     */
     rep.ttf -= rep.ttcof - tt;
 #endif
 
@@ -2515,6 +2521,7 @@ void do_one_special_q_sublat(las_info const & las, sieve_info & si, nfs_work & w
                             si, side);
 
                     small_sieve_info("small sieve", side, s.ssd);
+
                     if (si.toplevel == 1) {
                         /* when si.toplevel > 1, this start_many call is done
                          * several times.
@@ -2985,6 +2992,7 @@ int main (int argc0, char *argv0[])/*{{{*/
                  * category */
                 auto aux_p = std::make_shared<nfs_aux>(las, doing, rel_hash_p, rep, timer_special_q, las.nb_threads);
                 nfs_aux & aux(*aux_p);
+                ACTIVATE_TIMER(timer_special_q);
 
                 prepare_timer_layout_for_multithreaded_tasks(timer_special_q);
 
@@ -3014,7 +3022,7 @@ int main (int argc0, char *argv0[])/*{{{*/
 
                 break;
             } catch (buckets_are_full const & e) {
-                aux_botched.splice(aux_good.end(), aux_pending);
+                aux_botched.splice(aux_botched.end(), aux_pending);
                 verbose_output_vfprint (2, 1, gmp_vfprintf,
                         "# redoing q=%Zd, rho=%Zd because buckets are full\n"
                         "# %s\n"
@@ -3058,6 +3066,12 @@ int main (int argc0, char *argv0[])/*{{{*/
     for(auto & P : aux_good) {
         global_report.accumulate_and_clear(std::move(P.first));
         global_timer += P.second;
+    }
+    las_report botched_report;
+    timetree_t botched_timer;
+    for(auto & P : aux_botched) {
+        botched_report.accumulate_and_clear(std::move(P.first));
+        botched_timer += P.second;
     }
 
     if (recursive_descent) {
@@ -3123,6 +3137,7 @@ int main (int argc0, char *argv0[])/*{{{*/
 
     t0 = seconds () - t0;
     wct = wct_seconds() - wct;
+
     if (adjust_strategy < 2) {
         verbose_output_print (2, 1, "# Average J=%1.0f for %lu special-q's, max bucket fill -bkmult %s\n",
                 global_report.total_J / (double) nr_sq_processed, nr_sq_processed, las.bk_multiplier.print_all().c_str());
@@ -3136,8 +3151,10 @@ int main (int argc0, char *argv0[])/*{{{*/
     tts -= global_report.tn[0];
     tts -= global_report.tn[1];
     tts -= global_report.ttf;
+    tts -= global_report.ttcof;
 
     global_timer.stop();
+
     if (tdict::global_enable >= 1) {
         verbose_output_print (0, 1, "#\n# Hierarchical timings:\n%s", global_timer.display().c_str());
 
@@ -3169,12 +3186,40 @@ int main (int argc0, char *argv0[])/*{{{*/
                  nr_bucket_primes, nr_div_tests, nr_composite_tests, nr_wrap_was_composite);
     }
 
+    double waste = 0;
+    waste += botched_report.tn[0];
+    waste += botched_report.tn[1];
+    waste += botched_report.ttbuckets_fill;
+    waste += botched_report.ttbuckets_apply;
+    waste += botched_report.ttf;
+    waste += botched_report.ttcof;
+
+    verbose_output_print (2, 1, "# Wasted cpu time due to %zu bkmult adjustments: %1.2f [norm %1.2f+%1.2f, sieving "
+                " (%1.2f + %1.2f),"
+                " factor (%1.2f + %1.2f)]\n",
+                aux_botched.size(),
+                waste,
+                botched_report.tn[0],
+                botched_report.tn[1],
+                botched_report.ttbuckets_fill,
+                botched_report.ttbuckets_apply,
+		botched_report.ttf, botched_report.ttcof);
+
+    t0 -= waste;
+    global_report.tn[0] -= botched_report.tn[0];
+    global_report.tn[1] -= botched_report.tn[1];
+    global_report.ttbuckets_fill -= botched_report.ttbuckets_fill;
+    global_report.ttbuckets_apply -= botched_report.ttbuckets_apply;
+    global_report.ttf -= botched_report.ttf;
+    global_report.ttcof -= botched_report.ttcof;
+
     if (dont_print_tally && las.nb_threads > 1) 
         verbose_output_print (2, 1, "# Total cpu time %1.2fs [tally available only in mono-thread]\n", t0);
     else
         verbose_output_print (2, 1, "# Total cpu time %1.2fs [norm %1.2f+%1.1f, sieving %1.1f"
                 " (%1.1f + %1.1f + %1.1f),"
-                " factor %1.1f (%1.1f + %1.1f)]\n", t0,
+                " factor %1.1f (%1.1f + %1.1f)] (not incl wasted time)\n",
+                t0,
                 global_report.tn[0],
                 global_report.tn[1],
                 tts,
@@ -3199,9 +3244,11 @@ int main (int argc0, char *argv0[])/*{{{*/
     if (las.suppress_duplicates) {
         verbose_output_print(2, 1, "# Total number of eliminated duplicates: %lu\n", global_report.duplicates);
     }
-    verbose_output_print (2, 1, "# Total %lu reports [%1.3gs/r, %1.1fr/sq]\n",
+    verbose_output_print (2, 1, "# Total %lu reports [%1.3gs/r, %1.1fr/sq] in %1.3g elapsed s [%.1f%% CPU]\n",
             global_report.reports, t0 / (double) global_report.reports,
-            (double) global_report.reports / (double) nr_sq_processed);
+            (double) global_report.reports / (double) nr_sq_processed,
+            wct,
+            100*t0/wct);
 
 
     print_slice_weight_estimator_stats();

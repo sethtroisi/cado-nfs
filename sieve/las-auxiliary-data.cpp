@@ -31,7 +31,7 @@ sieve_checksum::update(const unsigned char *data, const size_t len)
 
 nfs_aux::~nfs_aux()
 {
-    timer_special_q.stop();
+    ASSERT_ALWAYS(!timer_special_q.running());
 
     if (!complete)
         return;
@@ -78,7 +78,13 @@ nfs_aux::~nfs_aux()
         verbose_output_print(0, 1, "# number of eliminated duplicates: %lu\n", rep.duplicates);
 
     qt0 = seconds() - qt0;
-    double qtts = qt0 - rep.tn[0] - rep.tn[1] - rep.ttf;
+    wct_qt0 = wct_seconds() - wct_qt0;
+
+    /* qt0 also aggregates time that was spent while we were processing
+     * stuff asynchronously. Other thread might have been processing
+     * other special-qs during that time.
+     */
+    double qtts = qt0 - rep.tn[0] - rep.tn[1] - rep.ttf - rep.ttcof;
     if (rep.survivors.after_sieve != rep.survivors.not_both_even) {
         verbose_output_print(0, 1, "# Warning: found %ld hits with i,j both even (not a bug, but should be very rare)\n", rep.survivors.after_sieve - rep.survivors.not_both_even);
     }
@@ -88,20 +94,19 @@ nfs_aux::~nfs_aux()
     int dont_print_tally = 1;
 #endif
     if (dont_print_tally && las.nb_threads > 1) {
-        verbose_output_print(0, 1, "# Time for this special-q: %1.4fs [tally available only in mono-thread]\n", qt0);
+        verbose_output_print(0, 1, "# Time for this special-q: %1.4fs [tally available only in mono-thread] in %1.4f elapsed s\n", qt0, wct_qt0);
     } else {
-        //convert ttcof from microseconds to seconds
-        rep.ttcof *= 0.000001;
         verbose_output_print(0, 1, "# Time for this special-q: %1.4fs [norm %1.4f+%1.4f, sieving %1.4f"
                 " (%1.4f + %1.4f + %1.4f),"
-                " factor %1.4f (%1.4f + %1.4f)]\n", qt0,
+                " factor %1.4f (%1.4f + %1.4f] [+ external async time] in %1.4f elapsed s\n", qt0,
                 rep.tn[0],
                 rep.tn[1],
                 qtts,
                 rep.ttbuckets_fill,
                 rep.ttbuckets_apply,
                 qtts-rep.ttbuckets_fill-rep.ttbuckets_apply,
-                rep.ttf, rep.ttf - rep.ttcof, rep.ttcof);
+                rep.ttf + rep.ttcof, rep.ttf, rep.ttcof,
+                wct_qt0);
     }
 
     verbose_output_end_batch();

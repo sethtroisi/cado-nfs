@@ -126,14 +126,14 @@ static void small_sieve_print_contents(const char * prefix, small_sieve_data_t c
     }
 
     verbose_output_start_batch();
-    verbose_output_print(0, 2, "# %s: %d nice primes", prefix, nnice);
+    verbose_output_print(0, 3, "# %s: %d nice primes", prefix, nnice);
     /* Primes may be both even and projective... */
-    if (npow2) verbose_output_print(0, 2, ", %d powers of 2", npow2);
-    if (npattern) verbose_output_print(0, 2, ", %d pattern-sieved", npattern);
-    if (nproj) verbose_output_print(0, 2, ", and %d projective primes", nproj);
-    verbose_output_print(0, 2, ".");
-    if (ndiscard) verbose_output_print(0, 2, " %d discarded.", ndiscard);
-    verbose_output_print(0, 2, "\n");
+    if (npow2) verbose_output_print(0, 3, ", %d powers of 2", npow2);
+    if (npattern) verbose_output_print(0, 3, ", %d pattern-sieved", npattern);
+    if (nproj) verbose_output_print(0, 3, ", and %d projective primes", nproj);
+    verbose_output_print(0, 3, ".");
+    if (ndiscard) verbose_output_print(0, 3, " %d discarded.", ndiscard);
+    verbose_output_print(0, 3, "\n");
     /* With -v -v -v, dump all the small sieve data */
     verbose_output_vfprint (0, 4, small_sieve_dump, "# Dump of small sieve data:\n", &ssd);
     verbose_output_end_batch();

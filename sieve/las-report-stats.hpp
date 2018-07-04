@@ -35,6 +35,11 @@ struct las_report {
     double ttbuckets_apply=0;
     double ttf=0;                 /* factor_survivors */
     double ttcof=0;               /* cofactorisation */
+    las_report() = default;
+    las_report(las_report const&) = delete;
+    las_report(las_report &&) = default;
+    las_report operator=(las_report const&) = delete;
+    las_report& operator=(las_report &&) = default;
     class count_matrix {
         /* First index: rational side */
         unsigned long data[256][256];
