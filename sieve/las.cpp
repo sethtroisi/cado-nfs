@@ -2024,7 +2024,8 @@ void process_bucket_region_run::operator()() {/*{{{*/
     if (ws.las.verbose >= 2)
         taux.update_checksums(tws);
 
-    /* rep.ttf is going to miss the asynchronous time... */
+    /* rep.ttf does not count the asynchronous time spent in
+     * detached_cofac. */
     rep.ttf -= seconds_thread ();
 
     auto survivors = search_survivors();
@@ -2046,9 +2047,20 @@ void process_bucket_region_run::operator()() {/*{{{*/
     }
 #endif
 
+#ifdef  DLP_DESCENT
+    /* we're doing detached_cofac right away in the descent case, so we
+     * must untangle the ttf and ttcof timings.
+     */
+    double tt = rep.ttcof;
+#endif
+
     cofactoring_sync(survivors2);
 
     rep.ttf += seconds_thread ();
+#ifdef  DLP_DESCENT
+    rep.ttf -= rep.ttcof - tt;
+#endif
+
 }/*}}}*/
 /*}}}*/
 
@@ -3107,8 +3119,6 @@ int main (int argc0, char *argv0[])/*{{{*/
 		las.output, las.nb_threads);
 	tcof_batch = seconds () - tcof_batch;
 	global_report.ttcof += tcof_batch;
-	/* add to ttf since the remaining time will be computed as ttf-ttcof */
-	global_report.ttf += tcof_batch;
       }
 
     t0 = seconds () - t0;
@@ -3171,7 +3181,7 @@ int main (int argc0, char *argv0[])/*{{{*/
                 global_report.ttbuckets_fill,
                 global_report.ttbuckets_apply,
                 tts-global_report.ttbuckets_fill-global_report.ttbuckets_apply,
-		global_report.ttf, global_report.ttf - global_report.ttcof, global_report.ttcof);
+		global_report.ttf + global_report.ttcof, global_report.ttf, global_report.ttcof);
 
     verbose_output_print (2, 1, "# Total elapsed time %1.2fs, per special-q %gs, per relation %gs\n",
                  wct, wct / (double) nr_sq_processed, wct / (double) global_report.reports);

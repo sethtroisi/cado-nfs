@@ -75,9 +75,6 @@ skew: 1.37
 #include <stdlib.h>
 #include <time.h>
 
-/* define SKEW to allow skewed polynomials */
-// #define SKEW
-
 /* We assume a difference <= ALPHA_BOUND_GUARD between alpha computed
    with ALPHA_BOUND_SMALL and ALPHA_BOUND. In practice the largest value
    observed is 0.79. */
@@ -88,10 +85,10 @@ double best_score_f = DBL_MAX, worst_score_f = DBL_MIN;
 unsigned long f_candidate = 0;   /* number of irreducibility tests */
 unsigned long f_irreducible = 0; /* number of irreducible polynomials */
 double max_guard = DBL_MIN;
-#ifdef SKEW
+int skew = 0;                   /* see the -skew option */
 unsigned long *count = NULL; /* for 1 <= ad <= bound, count[ad] is the number of
-				degree-d polynomials with leading coefficient ad */
-#endif
+				degree-d polynomials with leading coefficient ad.
+                                Used only when -skew option is set.*/
 #define TIMINGS
 #ifdef TIMINGS
 double timer[4] = {0.0, };
@@ -236,7 +233,6 @@ print_nonlinear_poly_info (mpz_poly ff, double alpha_f, mpz_poly gg,
     return 1;
 }
 
-#ifdef SKEW
 static void
 init_count (unsigned int bound, unsigned int df)
 {
@@ -382,7 +378,6 @@ generate_f (mpz_t *f, unsigned int d, unsigned long idx, unsigned int bound)
 
   return ok;
 }
-#endif
 
 /*
   Generate polynomial f(x) of degree d with rank 'idx',
@@ -405,13 +400,14 @@ polygen_JL_f (int d, unsigned int bound, mpz_t *f, unsigned long idx)
     ff->deg = d;
     ff->coeff = f;
     //mpz_poly_init(ff, d);
-#ifndef SKEW
-    int max_abs_coeffs;
-    unsigned long next_counter;
-    ok = mpz_poly_setcoeffs_counter(ff, &max_abs_coeffs, &next_counter, d, idx, bound);
-#else
-    ok = generate_f (f, d, idx, bound);
-#endif
+    if (!skew) {
+        int max_abs_coeffs;
+        unsigned long next_counter;
+        ok = mpz_poly_setcoeffs_counter(ff, &max_abs_coeffs, &next_counter,
+                d, idx, bound);
+    } else {
+        ok = generate_f (f, d, idx, bound);
+    }
 
     // to be compatible with the previous version, the count on the number of valid polys was before
     // the content test.
@@ -697,7 +693,7 @@ polygen_JL1 (mpz_t n, unsigned long k,
 static void
 usage ()
 {
-    fprintf (stderr, "./dlpolyselect -N xxx -df xxx -dg xxx -bound xxx [-modr xxx] [-modm xxx] [-t xxx]\n");
+    fprintf (stderr, "./dlpolyselect -N xxx -df xxx -dg xxx -bound xxx [-modr xxx] [-modm xxx] [-t xxx] [-skew]\n");
     exit (1);
 }
 
@@ -725,7 +721,7 @@ main (int argc, char *argv[])
     fflush (stdout);
 
     /* parsing */
-    while (argc >= 3 && argv[1][0] == '-')
+    while (argc >= 2 && argv[1][0] == '-')
     {
         if (argc >= 3 && strcmp (argv[1], "-N") == 0) {
             mpz_set_str (N, argv[2], 10);
@@ -766,6 +762,11 @@ main (int argc, char *argv[])
             multiplier = atoi (argv[2]);
             argv += 2;
             argc -= 2;
+        }
+        else if (argc >= 2 && strcmp (argv[1], "-skew") == 0) {
+            skew = 1;
+            argv += 1;
+            argc -= 1;
         }
         else if (argc >= 3 && strcmp (argv[1], "-Bf") == 0) {
             Bf = atof (argv[2]);
@@ -811,19 +812,29 @@ main (int argc, char *argv[])
 
     ASSERT_ALWAYS (bound >= 1);
 
-#ifdef SKEW
-    init_count (bound, df);
-    maxtries = count[0];
-#else
-    double maxtries_double = (double) bound;
-    maxtries_double *= (double) (bound + 1);
-    maxtries_double *= pow ((double) (2 * bound + 1), (double) (df - 2));
-    maxtries_double *= (double) (2 * bound);
-    if (maxtries_double >= (double) ULONG_MAX)
-      maxtries = ULONG_MAX;
-    else
-      maxtries = (unsigned long) maxtries_double;
-#endif
+    if (skew) {
+        init_count (bound, df);
+        maxtries = count[0];
+    } else {
+      /* check modm has no common factor with B, B+1, 2B+1 and 2B to avoid
+         a bias between classes mod 'modm' */
+        if (gcd_uint64 (modm, 2 * bound) != 1 ||
+          gcd_uint64 (modm, bound + 1) != 1 ||
+          gcd_uint64 (modm, 2 * bound + 1) != 1)
+          {
+            fprintf (stderr, "Error, modm should be coprime to "
+                     "2*bound(bound+1)(2*bound+1)\n");
+            exit (1);
+          }
+        double maxtries_double = (double) bound;
+        maxtries_double *= (double) (bound + 1);
+        maxtries_double *= pow ((double) (2 * bound + 1), (double) (df - 2));
+        maxtries_double *= (double) (2 * bound);
+        if (maxtries_double >= (double) ULONG_MAX)
+            maxtries = ULONG_MAX;
+        else
+            maxtries = (unsigned long) maxtries_double;
+    }
 
     unsigned int bound2 = 1; /* bound on the coefficients of linear
                                 combinations from the LLL short vectors */
@@ -871,9 +882,8 @@ main (int argc, char *argv[])
     printf ("\n");
 
     mpz_clear (N);
-#ifdef SKEW
-    free (count);
-#endif
+    if (skew)
+        free (count);
 
     return 0;
 }

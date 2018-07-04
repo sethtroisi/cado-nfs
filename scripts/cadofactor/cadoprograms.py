@@ -720,6 +720,7 @@ class PolyselectJL(Program):
                  bound: Parameter(checktype=int)=None,
                  modm: Parameter(checktype=int)=None,
                  modr: Parameter(checktype=int)=None,
+                 skew : Toggle()=None,
                  threads : Parameter("t", checktype=int)=None,
                  **kwargs):
         super().__init__(locals(), **kwargs)
