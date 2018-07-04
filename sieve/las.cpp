@@ -2203,6 +2203,7 @@ void display_expected_memory_usage(siever_config const & sc0, cado_poly_srcptr c
     size_t more;
 
     for(int side = 0 ; side < 2 ; side++) {
+        if (!sc.sides[side].lim) continue;
         double p1 = sc.sides[side].lim;
         double p0 = 2;
         /* in theory this should depend on the galois group and so on.
@@ -2263,6 +2264,7 @@ void display_expected_memory_usage(siever_config const & sc0, cado_poly_srcptr c
         // bucket_update_t<1, shorthint_t>)
 
         for(int side = 0 ; side < 2 ; side++) {
+            if (!sc.sides[side].lim) continue;
             /* In truth, I sort of know it isn't valid. We've built most
              * of the stuff on the idea that there's a global "toplevel"
              * notion, but that barely applies when on e of the factor
@@ -2294,6 +2296,7 @@ void display_expected_memory_usage(siever_config const & sc0, cado_poly_srcptr c
         }
 
         for(int side = 0 ; side < 2 ; side++) {
+            if (!sc.sides[side].lim) continue;
             double p1 = K[side].thresholds[1];
             double p0 = K[side].thresholds[0];
             size_t nprimes = nprimes_interval(p0, p1);
@@ -2314,6 +2317,7 @@ void display_expected_memory_usage(siever_config const & sc0, cado_poly_srcptr c
         // *ALL* bucket updates are computed in one go as
         // bucket_update_t<1, shorthint_t>
         for(int side = 0 ; side < 2 ; side++) {
+            if (!sc.sides[side].lim) continue;
             ASSERT_ALWAYS(K[side].thresholds[1] == sc.sides[side].lim);
             double p1 = K[side].thresholds[1];
             double p0 = K[side].thresholds[0];
