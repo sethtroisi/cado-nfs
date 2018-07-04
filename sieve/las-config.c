@@ -13,6 +13,13 @@ int NB_DEVIATIONS_BUCKET_REGIONS = 3;
 
 void set_LOG_BUCKET_REGION()
 {
+    if (LOG_BUCKET_REGION > 16) {
+        fprintf(stderr, "This binary only supports -B up to -B 16\n");
+        ASSERT_ALWAYS(0);
+        // we need to fix bucket_update_size_per_level<1>::type if we
+        // want to explore larger B's.
+    }
+
     BUCKET_REGION = ((size_t)1) << LOG_BUCKET_REGION;
     LOG_BUCKET_REGIONS[0] = -1;
     LOG_BUCKET_REGIONS[1] = LOG_BUCKET_REGION;

@@ -120,12 +120,19 @@ public:
    This creates, of course, a large memory overhead. */
  
 template<int LEVEL> struct bucket_update_size_per_level;
-#if LOG_BUCKET_REGION <= 16
+
+/* This only works if LOG_BUCKET_REGION <= 16 !
+ *
+ * However, now that it's a runtime setting, we can't statically decide
+ * here.
+ */
 template<> struct bucket_update_size_per_level<1> { typedef uint16_t type; };
 /* TODO: create a fake 24-bit type as uint8_t[3]. */
 template<> struct bucket_update_size_per_level<2> { typedef uint32_t type; };
 template<> struct bucket_update_size_per_level<3> { typedef uint32_t type; };
-#else
+
+#if 0
+/* here are types that would fit larger bucket regions */
 template<> struct bucket_update_size_per_level<1> { typedef uint32_t type; };
 template<> struct bucket_update_size_per_level<2> { typedef uint32_t type; };
 template<> struct bucket_update_size_per_level<3> { typedef uint64_t type; };
