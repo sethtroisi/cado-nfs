@@ -814,6 +814,14 @@ main (int argc, char *argv[])
     init_count (bound, df);
     maxtries = count[0];
 #else
+    /* check modm has no common factor with B, B+1, 2B+1 and 2B to avoid
+       a bias between classes mod 'modm' */
+    if (gcd_uint64 (modm, 2 * bound) != 1 || gcd_uint64 (modm, bound + 1) != 1
+        || gcd_uint64 (modm, 2 * bound + 1) != 1)
+      {
+        fprintf (stderr, "Error, modm should be coprime to 2*bound(bound+1)(2*bound+1)\n");
+        exit (1);
+      }
     double maxtries_double = (double) bound;
     maxtries_double *= (double) (bound + 1);
     maxtries_double *= pow ((double) (2 * bound + 1), (double) (df - 2));
