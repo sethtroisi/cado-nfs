@@ -511,10 +511,11 @@ polygen_JL_g (mpz_t kN, int dg, mat_Z g, mpz_t root, double skew_f)
     mpz_clear (r);
 }
 
-/* lift root r of f mod n to a root of f mod k*n, where k = k*n.
+/* lift root r of f mod N to a root of f mod k*N, where kN = k*N.
+   For Joux-Lercier, N=p is a large prime, and k is a small integer.
    Return 0 if lift is not possible. */
 static int
-root_lift (mpz_t n, mpz_t kn, unsigned long k, mpz_poly f, mpz_t r)
+root_lift (mpz_t N, mpz_t kN, unsigned long k, mpz_poly f, mpz_t r)
 {
   if (k == 1)
     return 1;
@@ -525,17 +526,17 @@ root_lift (mpz_t n, mpz_t kn, unsigned long k, mpz_poly f, mpz_t r)
   for (i = 0; i < k; i++)
     {
       mpz_poly_eval (v, f, r);
-      mpz_mod (v, v, kn);
+      mpz_mod (v, v, kN);
       if (mpz_cmp_ui (v, 0) == 0)
         break;
-      mpz_add (r, r, n);
+      mpz_add (r, r, N);
     }
   mpz_clear (v);
 
   return i < k;
 }
 
-/* JL method to generate d and d-1 polynomial.
+/* JL method to generate degree d and d-1 polynomials.
    Given irreducible polynomial f of degree df, find roots of f mod n,
    and for each root, use Joux-Lercier method to find good polynomials g. */
 static void
@@ -864,6 +865,8 @@ main (int argc, char *argv[])
     printf (" (roots %.2fs, irred %.2fs, lll %.2fs, MurphyE %.2fs)",
             timer[TIMER_ROOTS], timer[TIMER_IRRED], timer[TIMER_LLL],
 	    timer[TIMER_MURPHYE]);
+    print_timings_barrett_pow_mod_f_mod_p();
+    printf ("\n");
 #endif
     printf ("\n");
 

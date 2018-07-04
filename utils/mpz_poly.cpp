@@ -34,6 +34,47 @@
 #define max(a,b) ((a)<(b) ? (b) : (a))
 #endif
 
+// compute timings for Q^a mod(f,p): square, multiplication, reduction mod f
+// PZ piece of code:
+// in mpz_poly.h: add #define TIMINGS
+#ifdef TIMINGS
+#include <time.h>
+#include <timing.h>
+double timer[3] = {0.0, 0.0, 0.0};
+#endif
+
+#define TIMER_MUL 0
+#define TIMER_SQR 1
+#define TIMER_RED 2
+
+#ifdef TIMINGS
+#define START_TIMER double t = seconds_thread ()
+#define RESTART_TIMER t = seconds_thread ()
+#define END_TIMER(x) add_timer (x, seconds_thread () - t)
+
+/* flag=0: computing roots of f mod p
+        1: checking irreducibility of f
+        2: LLL reduction
+        3: computing MurphyE */
+static void
+add_timer (int flag, double t)
+{
+  timer[flag] += t;
+}
+#else
+#define START_TIMER
+#define RESTART_TIMER
+#define END_TIMER(x)
+#endif
+
+#ifdef TIMINGS
+void print_timings_barrett_pow_mod_f_mod_p(){
+    printf (" (mul %.2fs, square %.2fs, red mod (f,p) %.2fs)",
+            timer[TIMER_MUL], timer[TIMER_SQR], timer[TIMER_RED]);
+}
+#endif
+
+
 /* --------------------------------------------------------------------------
    Static functions
    -------------------------------------------------------------------------- */
@@ -1914,13 +1955,24 @@ mpz_poly_mul_mod_f_mod_mpz (mpz_poly_ptr Q, mpz_poly_srcptr P1, mpz_poly_srcptr 
   mpz_poly R;
 
   mpz_poly_init(R, d);
-
-  d = mpz_poly_mul_tc (R->coeff, P1->coeff, d1, P2->coeff, d2);
-  mpz_poly_cleandeg(R, d);
-
-  // reduce mod f
-  mpz_poly_mod_f_mod_mpz (R, f, m, invm, invf);
-
+#ifdef TIMINGS
+  if (mpz_fits_sint_p (f->coeff[0])){
+    START_TIMER;
+    d = mpz_poly_mul_tc (R->coeff, P1->coeff, d1, P2->coeff, d2);
+    mpz_poly_cleandeg(R, d);
+    END_TIMER (TIMER_MUL);
+    // reduce mod f
+    RESTART_TIMER;
+    mpz_poly_mod_f_mod_mpz (R, f, m, invm, invf);
+    END_TIMER (TIMER_RED);
+  }else
+#endif
+  {
+    d = mpz_poly_mul_tc (R->coeff, P1->coeff, d1, P2->coeff, d2);
+    mpz_poly_cleandeg(R, d);
+    // reduce mod f
+    mpz_poly_mod_f_mod_mpz (R, f, m, invm, invf);
+  }
   mpz_poly_set(Q, R);
   mpz_poly_clear(R);
 }
@@ -1952,11 +2004,25 @@ mpz_poly_sqr_mod_f_mod_mpz (mpz_poly_ptr Q, mpz_poly_srcptr P, mpz_poly_srcptr f
 
   /* Fast squaring in 2d1+1 squares, i.e., 2d-1 squares.
      For d=5, this gives 9 squares. */
-  d = mpz_poly_sqr_tc (R->coeff, P->coeff, d1);
-  mpz_poly_cleandeg(R, d);
-
-  // reduce mod f
-  mpz_poly_mod_f_mod_mpz (R, f, m, invm, invf);
+  // compute timing only if f has short coefficients
+#ifdef TIMINGS
+  if (mpz_fits_sint_p (f->coeff[0])){
+    START_TIMER;
+    d = mpz_poly_sqr_tc (R->coeff, P->coeff, d1);
+    mpz_poly_cleandeg(R, d);
+    END_TIMER (TIMER_SQR);
+    // reduce mod f
+    RESTART_TIMER;
+    mpz_poly_mod_f_mod_mpz (R, f, m, invm, invf);
+    END_TIMER (TIMER_RED);
+  }else
+#endif
+  {
+    d = mpz_poly_sqr_tc (R->coeff, P->coeff, d1);
+    mpz_poly_cleandeg(R, d);
+    // reduce mod f
+    mpz_poly_mod_f_mod_mpz (R, f, m, invm, invf);
+  }
 
   mpz_poly_set(Q, R);
   mpz_poly_clear(R);
