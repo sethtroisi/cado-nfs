@@ -36,9 +36,9 @@
 
 // compute timings for Q^a mod(f,p): square, multiplication, reduction mod f
 // PZ piece of code:
-// in mpz_poly.h: add #define TIMINGS
+// in mpz_poly.h: add #define MPZ_POLY_TIMINGS
 // beware: these timers are not thread-safe.
-#ifdef TIMINGS
+#ifdef MPZ_POLY_TIMINGS
 #include <time.h>
 #include <timing.h>
 double timer[3] = {0.0, 0.0, 0.0};
@@ -48,7 +48,7 @@ double timer[3] = {0.0, 0.0, 0.0};
 #define TIMER_SQR 1
 #define TIMER_RED 2
 
-#ifdef TIMINGS
+#ifdef MPZ_POLY_TIMINGS
 #define START_TIMER double t = seconds_thread ()
 #define RESTART_TIMER t = seconds_thread ()
 #define END_TIMER(x) add_timer (x, seconds_thread () - t)
@@ -68,7 +68,7 @@ add_timer (int flag, double t)
 #define END_TIMER(x)
 #endif
 
-#ifdef TIMINGS
+#ifdef MPZ_POLY_TIMINGS
 void print_timings_barrett_pow_mod_f_mod_p(){
     printf (" (mul %.2fs, square %.2fs, red mod (f,p) %.2fs)",
             timer[TIMER_MUL], timer[TIMER_SQR], timer[TIMER_RED]);
@@ -1956,7 +1956,7 @@ mpz_poly_mul_mod_f_mod_mpz (mpz_poly_ptr Q, mpz_poly_srcptr P1, mpz_poly_srcptr 
   mpz_poly R;
 
   mpz_poly_init(R, d);
-#ifdef TIMINGS
+#ifdef MPZ_POLY_TIMINGS
   if (mpz_fits_sint_p (f->coeff[0])){
     START_TIMER;
     d = mpz_poly_mul_tc (R->coeff, P1->coeff, d1, P2->coeff, d2);
@@ -2006,7 +2006,7 @@ mpz_poly_sqr_mod_f_mod_mpz (mpz_poly_ptr Q, mpz_poly_srcptr P, mpz_poly_srcptr f
   /* Fast squaring in 2d1+1 squares, i.e., 2d-1 squares.
      For d=5, this gives 9 squares. */
   // compute timing only if f has short coefficients
-#ifdef TIMINGS
+#ifdef MPZ_POLY_TIMINGS
   if (mpz_fits_sint_p (f->coeff[0])){
     START_TIMER;
     d = mpz_poly_sqr_tc (R->coeff, P->coeff, d1);

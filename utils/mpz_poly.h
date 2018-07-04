@@ -6,7 +6,7 @@
 #include <gmp.h>
 #include "macros.h"
 
-#define xxxTIMINGS
+#define xxxMPZ_POLY_TIMINGS
 // for timings of roots mod p (beware, this is not thread-safe)
 
 /* forward-declare our type before inclusion by double_poly.h, since we
@@ -115,7 +115,7 @@ void mpz_poly_fscanf_coeffs (FILE *fp, mpz_poly_ptr f, const char sep);
 void mpz_poly_fprintf_cado_format (FILE *fp, mpz_poly_srcptr f,
                                    const char letter, const char *pre);
 void mpz_poly_print_raw(mpz_poly_srcptr f);
-#ifdef TIMINGS
+#ifdef MPZ_POLY_TIMINGS
   void print_timings_barrett_pow_mod_f_mod_p();
 #endif
 /* Tests and comparison functions */

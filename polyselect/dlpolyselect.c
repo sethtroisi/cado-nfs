@@ -89,8 +89,13 @@ int skew = 0;                   /* see the -skew option */
 unsigned long *count = NULL; /* for 1 <= ad <= bound, count[ad] is the number of
 				degree-d polynomials with leading coefficient ad.
                                 Used only when -skew option is set.*/
-#define TIMINGS
-#ifdef TIMINGS
+
+/* MPZ_POLY_TIMINGS is defined (or maybe not) in mpz_poly.hpp
+ */
+#ifndef MPZ_POLY_H_
+#error "please include mpz_poly.h first"
+#endif
+#ifdef MPZ_POLY_TIMINGS
 double timer[4] = {0.0, };
 #endif
 
@@ -104,7 +109,7 @@ int opt_flag = 0; /* 0: optimize "simple" E
 #define TIMER_LLL   2
 #define TIMER_MURPHYE 3
 
-#ifdef TIMINGS
+#ifdef MPZ_POLY_TIMINGS
 #define START_TIMER double t = seconds_thread ()
 #define END_TIMER(x) add_timer (x, seconds_thread () - t)
 
@@ -872,7 +877,7 @@ main (int argc, char *argv[])
       printf ("# Warning: max_guard > ALPHA_BOUND_GUARD, might "
               "have missed some polynomials\n");
     printf ("# Time %.2fs", t);
-#ifdef TIMINGS
+#ifdef MPZ_POLY_TIMINGS
     printf (" (roots %.2fs, irred %.2fs, lll %.2fs, MurphyE %.2fs)",
             timer[TIMER_ROOTS], timer[TIMER_IRRED], timer[TIMER_LLL],
 	    timer[TIMER_MURPHYE]);
