@@ -1686,7 +1686,6 @@ task_result * detached_cofac(worker_thread * worker, task_parameters * _param, i
     TIMER_CATEGORY(timer, cofactoring_mixed());
 
     rep.ttcof -= seconds_thread ();
-    rep.survivors.enter_cofactoring++;
     int pass = cur.factor_both_leftover_norms(wc);
     rep.survivors.cofactored += (pass != 0);
     rep.ttcof += seconds_thread ();
@@ -1999,7 +1998,6 @@ void process_bucket_region_run::cofactoring_sync (survivors_t & survivors)/*{{{*
         }
 
         if (!pass) continue;
-
 
         rep.survivors.enter_cofactoring++;
 
