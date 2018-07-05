@@ -2092,12 +2092,13 @@ void process_bucket_region_run::operator()() {/*{{{*/
 
     auto survivors = search_survivors();
 
-    /* Check if one of the factor bases is empty. This means that we may
-     * have decided to *not* sieve on that side, refusing to pay a
-     * per-area time a second time. This is based on the rationale that
-     * we expect the *other* side to be such a selective test that it
-     * isn't worth the trouble. But then, it means that purge_buckets and
-     * resieving are not worth the trouble either.
+    /* The "do_resieve" flag (set above in the ctor) checks if one of the
+     * factor bases is empty. This means that we may have decided to
+     * *not* sieve on that side, refusing to pay a per-area time a second
+     * time. This is based on the rationale that we expect the *other*
+     * side to be such a selective test that it isn't worth the trouble.
+     * But then, it means that purge_buckets and resieving are not worth
+     * the trouble either.
      */
 
     /* These two steps used to be called "prepare_cofactoring" */
