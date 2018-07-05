@@ -2026,6 +2026,8 @@ void process_bucket_region_run::operator()() {/*{{{*/
     /* These two steps used to be called "prepare_cofactoring" */
     for(int side = 0 ; side < 2 ; side++) {
         MARK_TIMER_FOR_SIDE(timer, side);
+        sieve_info::side_info & sis(si.sides[side]);
+        if (sis.fb->empty()) continue;
         purge_buckets(side);
         resieve(side);
     }
