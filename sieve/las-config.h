@@ -63,7 +63,9 @@
 
 #define FB_MAX_PARTS 4
 
-#if 1
+#define VARIABLE_BUCKET_REGION
+
+#ifdef VARIABLE_BUCKET_REGION
 
 #ifdef __cplusplus
 extern "C" {
@@ -86,7 +88,7 @@ extern int NB_DEVIATIONS_BUCKET_REGIONS;
 }
 #endif
 
-#else
+#else   /* !VARIABLE_BUCKET_REGION */
 /* Optimal bucket region: 2^16 = 64K == close to L1 size.
  * It is possible to put a higher value, in order to set I > 16.
  * However, this will have a bad impact on the memory usage, and on
@@ -106,7 +108,7 @@ extern int NB_DEVIATIONS_BUCKET_REGIONS;
 #define BUCKET_REGION_3 NB_BUCKETS_3*BUCKET_REGION_2
 
 #define BUCKET_REGIONS { 0, BUCKET_REGION_1, BUCKET_REGION_2, BUCKET_REGION_3 }
-#endif
+#endif  /* VARIABLE_BUCKET_REGION */
 
 #define DESCENT_DEFAULT_GRACE_TIME_RATIO 0.2    /* default value */
 

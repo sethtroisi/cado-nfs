@@ -63,6 +63,7 @@ int exit_after_rel_found = 0;
 int allow_largesq = 0;
 int adjust_strategy = 0;
 int sync_at_special_q = 0;
+int trialdiv_first_side = 0;
 
 double general_grace_time_ratio = DESCENT_DEFAULT_GRACE_TIME_RATIO;
 
@@ -1325,9 +1326,11 @@ void process_bucket_region_run::SminusS(int side)/*{{{*/
                 side, w.N, trace_Nx.x, S[side][trace_Nx.x]);
 #endif
 }/*}}}*/
-process_bucket_region_run::surv1_t process_bucket_region_run::search_survivors() /*{{{*/
+process_bucket_region_run::survivors_t process_bucket_region_run::search_survivors() /*{{{*/
 {
-    surv1_t survivors;
+    typedef std::vector<uint32_t> surv1_t;
+
+    surv1_t temp_sv;
 
     CHILD_TIMER(timer, __func__);
     TIMER_CATEGORY(timer, search_survivors());
@@ -1384,7 +1387,8 @@ process_bucket_region_run::surv1_t process_bucket_region_run::search_survivors()
 
     rep.survivors.before_sieve += 1U << LOG_BUCKET_REGION;
 
-    survivors.reserve(128);
+    temp_sv.reserve(128);
+
     for (unsigned int j = j0; j < j1; j++)
     {
         int offset = (j-j0) << logI;
@@ -1402,7 +1406,7 @@ process_bucket_region_run::surv1_t process_bucket_region_run::search_survivors()
             si.sides[0].lognorms->bound,
             si.sides[1].lognorms->bound,
         };
-        size_t old_size = survivors.size();
+        size_t old_size = temp_sv.size();
 
         ASSERT(j < si.J);
 
@@ -1412,7 +1416,7 @@ process_bucket_region_run::surv1_t process_bucket_region_run::search_survivors()
                 N,
                 si.j_div,
                 si.conf.unsieve_thresh,
-                si.us, survivors, si.conf.sublat);
+                si.us, temp_sv, si.conf.sublat);
 
         /* Survivors written by search_survivors_in_line() have index
          * relative to their j-line. We need to convert to index within
@@ -1428,22 +1432,12 @@ process_bucket_region_run::surv1_t process_bucket_region_run::search_survivors()
 
         if (!offset) continue;
 
-        for (size_t i_surv = old_size; i_surv < survivors.size(); i_surv++)
-            survivors[i_surv] += offset;
+        for (size_t i_surv = old_size; i_surv < temp_sv.size(); i_surv++)
+            temp_sv[i_surv] += offset;
     }
 
-    return survivors;
-}/*}}}*/
-process_bucket_region_run::surv2_t process_bucket_region_run::convert_survivors(surv1_t&& survivors)/*{{{*/
-{
-    BOOKKEEPING_TIMER(timer);
-    /* Convert data type of list from uint32_t to the correct br_index_t */
-    surv2_t survivors2;
-    survivors2.reserve(survivors.size());
-    for (auto x : survivors)
-        survivors2.push_back(x);
-    survivors.clear();
-    return survivors2;
+    /* This used to be called convert_survivors */
+    return survivors_t(begin(temp_sv), end(temp_sv));
 }/*}}}*/
 void process_bucket_region_run::purge_buckets(int side)/*{{{*/
 {
@@ -1688,11 +1682,11 @@ task_result * detached_cofac(worker_thread * worker, task_parameters * _param, i
     SIBLING_TIMER(timer, "cofactoring"); // aka factor_both_leftover_norms
     TIMER_CATEGORY(timer, cofactoring_mixed());
 
-    rep.ttcof -= microseconds_thread ();
+    rep.ttcof -= seconds_thread ();
     rep.survivors.enter_cofactoring++;
     int pass = cur.factor_both_leftover_norms(wc);
     rep.survivors.cofactored += (pass != 0);
-    rep.ttcof += microseconds_thread ();
+    rep.ttcof += seconds_thread ();
 
     auto res = new detached_cofac_result;
 
@@ -1745,24 +1739,25 @@ task_result * detached_cofac(worker_thread * worker, task_parameters * _param, i
 
         const char * dup_comment = NULL;
 
-        if (!is_new_rel) {
-            /* can't insert, so already there: either it's a
-             * duplicate of a relation that was already printed, or a
-             * relation that was already identified as a duplicate.
-             * But at any rate it's not to be printed and we don't
-             * even want to bother testing whether it's a duplicate
-             * in the sense of relation_is_duplicate()
-             */
-            dup_comment = "# DUP ";
-        } else if (do_check && relation_is_duplicate(rel,
+        if (do_check && relation_is_duplicate(rel,
                     wc.doing, wc.las, wc.sc, wc.strategies,
                     adjust_strategy)) {
             dup_comment = "# DUPE ";
+        } else {
+            if (!is_new_rel) {
+                /* the relation was already printed in a prior attempt,
+                 * that was aborted because of an exception. */
+                dup_comment = "# DUP ";
+            }
+            /* Even if the relation was already printed, the las_report
+             * object is (now) specific to the current attempt, and has
+             * no memory of the number of reports for the failed
+             * attempt. Therefore we need to count the relation as a
+             * report no matter what.
+             */
+            rep.reports ++;
+            /* Not clear what gives when we have Galois relations.  */
         }
-
-        /* Not clear what gives when we have Galois relations.
-         */
-        rep.reports += !dup_comment;
 
         if (!dup_comment) dup_comment = "";
 
@@ -1797,12 +1792,10 @@ task_result * detached_cofac(worker_thread * worker, task_parameters * _param, i
 
     return (task_result*) res;
 }
-#if 0
-#endif
 
 /* }}} */
 /*}}}*/
-void process_bucket_region_run::cofactoring_sync (surv2_t & survivors2)/*{{{*/
+void process_bucket_region_run::cofactoring_sync (survivors_t & survivors2)/*{{{*/
 {
     CHILD_TIMER(timer, __func__);
     TIMER_CATEGORY(timer, cofactoring_mixed());
@@ -1869,10 +1862,6 @@ void process_bucket_region_run::cofactoring_sync (surv2_t & survivors2)/*{{{*/
         // ones reduced to (-I/2, I/2) using sublattices.
         NxToIJ (&i, &j, N, x, si);
         adjustIJsublat(&i, &j, si);
-
-        /* This can be changed (and should be a command line parameter)
-        */
-        static const int trialdiv_first_side = 0;
 
         for(int pside = 0 ; pass && pside < 2 ; pside++) {
             int side = trialdiv_first_side ^ pside;
@@ -1991,6 +1980,9 @@ void process_bucket_region_run::cofactoring_sync (surv2_t & survivors2)/*{{{*/
 }/*}}}*/
 void process_bucket_region_run::operator()() {/*{{{*/
 
+    // This is too verbose.
+    // fprintf(stderr, "=== entering PBR for report id %lu\n", rep.id);
+
     /* first check some early abort conditions. */
     if (recursive_descent) {
         /* For the descent mode, we bail out as early as possible. We
@@ -2006,8 +1998,8 @@ void process_bucket_region_run::operator()() {/*{{{*/
 
     for (int side = 0; side < 2; side++) {
         WHERE_AM_I_UPDATE(w, side, side);
-        sieve_info::side_info & s(si.sides[side]);
-        if (!s.fb) continue;
+        sieve_info::side_info & sis(si.sides[side]);
+        if (sis.fb->empty()) continue;
 
         MARK_TIMER_FOR_SIDE(timer, side);
 
@@ -2023,11 +2015,11 @@ void process_bucket_region_run::operator()() {/*{{{*/
     if (ws.las.verbose >= 2)
         taux.update_checksums(tws);
 
-    /* rep.ttf is going to miss the asynchronous time... */
+    /* rep.ttf does not count the asynchronous time spent in
+     * detached_cofac. */
     rep.ttf -= seconds_thread ();
 
     auto survivors = search_survivors();
-    auto survivors2 = convert_survivors(std::move(survivors));
 
     /* These two steps used to be called "prepare_cofactoring" */
     for(int side = 0 ; side < 2 ; side++) {
@@ -2045,9 +2037,23 @@ void process_bucket_region_run::operator()() {/*{{{*/
     }
 #endif
 
-    cofactoring_sync(survivors2);
+#ifdef  DLP_DESCENT
+    /* we're doing detached_cofac right away in the descent case, so we
+     * must untangle the ttf and ttcof timings.
+     */
+    double tt = rep.ttcof;
+#endif
+
+    cofactoring_sync(survivors);
 
     rep.ttf += seconds_thread ();
+#ifdef  DLP_DESCENT
+    /* hack, see above. The situation where cofactoring_sync also induces
+     * ttcof is now exceptional, and taken care of here.
+     */
+    rep.ttf -= rep.ttcof - tt;
+#endif
+
 }/*}}}*/
 /*}}}*/
 
@@ -2076,6 +2082,7 @@ static void declare_usage(param_list pl)/*{{{*/
     param_list_decl_usage(pl, "q1",   "right bound of special-q range");
     param_list_decl_usage(pl, "rho",  "sieve only root r mod q0");
     param_list_decl_usage(pl, "sqside", "put special-q on this side");
+    param_list_decl_usage(pl, "trialdiv-first-side", "begin trial division on this side");
     param_list_decl_usage(pl, "random-sample", "Sample this number of special-q's at random, within the range [q0,q1]");
     param_list_decl_usage(pl, "seed", "Use this seed for the random sampling of special-q's (see random-sample)");
     param_list_decl_usage(pl, "nq", "Process this number of special-q's and stop");
@@ -2184,6 +2191,7 @@ void display_expected_memory_usage(siever_config const & sc0, cado_poly_srcptr c
     size_t more;
 
     for(int side = 0 ; side < 2 ; side++) {
+        if (!sc.sides[side].lim) continue;
         double p1 = sc.sides[side].lim;
         double p0 = 2;
         /* in theory this should depend on the galois group and so on.
@@ -2244,6 +2252,7 @@ void display_expected_memory_usage(siever_config const & sc0, cado_poly_srcptr c
         // bucket_update_t<1, shorthint_t>)
 
         for(int side = 0 ; side < 2 ; side++) {
+            if (!sc.sides[side].lim) continue;
             /* In truth, I sort of know it isn't valid. We've built most
              * of the stuff on the idea that there's a global "toplevel"
              * notion, but that barely applies when on e of the factor
@@ -2275,6 +2284,7 @@ void display_expected_memory_usage(siever_config const & sc0, cado_poly_srcptr c
         }
 
         for(int side = 0 ; side < 2 ; side++) {
+            if (!sc.sides[side].lim) continue;
             double p1 = K[side].thresholds[1];
             double p0 = K[side].thresholds[0];
             size_t nprimes = nprimes_interval(p0, p1);
@@ -2295,6 +2305,7 @@ void display_expected_memory_usage(siever_config const & sc0, cado_poly_srcptr c
         // *ALL* bucket updates are computed in one go as
         // bucket_update_t<1, shorthint_t>
         for(int side = 0 ; side < 2 ; side++) {
+            if (!sc.sides[side].lim) continue;
             ASSERT_ALWAYS(K[side].thresholds[1] == sc.sides[side].lim);
             double p1 = K[side].thresholds[1];
             double p0 = K[side].thresholds[0];
@@ -2442,82 +2453,90 @@ void do_one_special_q_sublat(las_info const & las, sieve_info & si, nfs_work & w
         MIN(max_area, plattice_x_t(BUCKET_REGIONS[3]));
     plattice_enumerate_area<3>::value = max_area;
 
+    /* TODO: is there a way to share this in sublat mode ? */
+    precomp_plattice_t precomp_plattice;
+
     /* This count _only_ works if we do completely synchronous stuff. As
      * soon as we begin dropping synchronization points, it will be
      * completely impossible to do such hacks.
      */
-    rep.ttbuckets_fill -= seconds();
-    
+
     {
-        /* allocate_bucket_regions is probably ridiculously cheap in
-         * comparison to allocate_buckets */
-        ws.allocate_bucket_regions();
+        rep.ttbuckets_fill -= seconds();
+        auto dummy = call_dtor([&rep]() { rep.ttbuckets_fill += seconds(); });
 
-        ws.allocate_buckets(si, *aux_p, pool);
-    }
+        {
+            /* allocate_bucket_regions is probably ridiculously cheap in
+             * comparison to allocate_buckets */
+            ws.allocate_bucket_regions();
 
-    /* TODO: is there a way to share this in sublat mode ? */
-    precomp_plattice_t precomp_plattice;
-
-    for(int side = 0 ; side < 2 ; side++) {
-        if (!si.sides[side].fb) continue;
-
-        fill_in_buckets_toplevel(ws, aux, pool, si, side, w);
-
-        // Prepare plattices at internal levels.
-        for (int level = 1; level < si.toplevel; ++level) {
-            fill_in_buckets_prepare_precomp_plattice(
-                    pool, side, level, si, precomp_plattice);
+            ws.allocate_buckets(si, *aux_p, pool);
         }
-    }
 
-    /*
-     * Mixing-and-matching threads here with the fill-in-buckets threads
-     * might lead to unbalance.
-     */
-    BOOKKEEPING_TIMER(timer_special_q);
+        for(int side = 0 ; side < 2 ; side++) {
+            sieve_info::side_info & sis(si.sides[side]);
+            if (sis.fb->empty()) continue;
 
-    for(int side = 0 ; side < 2 ; side++) {
-        pool.add_task_lambda([&si,aux_p,side](worker_thread * worker,int){
-            timetree_t & timer(aux_p->th[worker->rank()].timer);
+            fill_in_buckets_toplevel(ws, aux, pool, si, side, w);
 
-            ENTER_THREAD_TIMER(timer);
-            MARK_TIMER_FOR_SIDE(timer, side);
-
-            SIBLING_TIMER(timer, "prepare small sieve");
-
-            sieve_info::side_info & s(si.sides[side]);
-            if (!s.fb) return;
-
-            small_sieve_init(s.ssd,
-                    s.ssd_offsets,
-                    s.fb_smallsieved.get()->begin(),
-                    s.fb_smallsieved.get()->end(),
-                    s.fb_smallsieved.get()->begin() + s.resieve_start_offset,
-                    s.fb_smallsieved.get()->begin() + s.resieve_end_offset,
-                    si, side);
-
-            small_sieve_info("small sieve", side, s.ssd);
-            if (si.toplevel == 1) {
-                /* when si.toplevel > 1, this start_many call is done
-                 * several times.
-                 */
-                SIBLING_TIMER(timer, "small sieve start positions ");
-                small_sieve_start_many(s.ssdpos_many, s.ssd, s.ssd_offsets, 0, si);
+            // Prepare plattices at internal levels.
+            for (int level = 1; level < si.toplevel; ++level) {
+                fill_in_buckets_prepare_precomp_plattice(
+                        pool, side, level, si, precomp_plattice);
             }
-        },0);
+        }
+
+        /*
+         * Mixing-and-matching threads here with the fill-in-buckets threads
+         * might lead to unbalance.
+         */
+        BOOKKEEPING_TIMER(timer_special_q);
+
+        for(int side = 0 ; side < 2 ; side++) {
+            pool.add_task_lambda([&si,aux_p,side](worker_thread * worker,int){
+                    timetree_t & timer(aux_p->th[worker->rank()].timer);
+
+                    ENTER_THREAD_TIMER(timer);
+                    MARK_TIMER_FOR_SIDE(timer, side);
+
+                    SIBLING_TIMER(timer, "prepare small sieve");
+
+                    sieve_info::side_info & s(si.sides[side]);
+                    if (s.fb->empty()) return;
+
+                    small_sieve_init(s.ssd,
+                            s.ssd_offsets,
+                            s.fb_smallsieved.get()->begin(),
+                            s.fb_smallsieved.get()->end(),
+                            s.fb_smallsieved.get()->begin() + s.resieve_start_offset,
+                            s.fb_smallsieved.get()->begin() + s.resieve_end_offset,
+                            si, side);
+
+                    small_sieve_info("small sieve", side, s.ssd);
+
+                    if (si.toplevel == 1) {
+                        /* when si.toplevel > 1, this start_many call is done
+                         * several times.
+                         */
+                        SIBLING_TIMER(timer, "small sieve start positions ");
+                        small_sieve_start_many(s.ssdpos_many, s.ssd, s.ssd_offsets, 0, si);
+                    }
+            },0);
+        }
+
+        /* Note: we haven't done any downsorting yet ! */
+
+        pool.drain_queue(0);
+
+        ws.check_buckets_max_full(si.toplevel, shorthint_t());
+        auto exc = pool.get_exceptions<buckets_are_full>(0);
+        if (!exc.empty())
+            throw *std::max_element(exc.begin(), exc.end());
+
+        /* trigger the increase of ttbuckets_fill, even if we encountered an
+         * exception. See the dummy object above.
+         */
     }
-
-    /* Note: we haven't done any downsorting yet ! */
-
-    pool.drain_queue(0);
-
-    ws.check_buckets_max_full(si.toplevel, shorthint_t());
-    auto exc = pool.get_exceptions<buckets_are_full>(0);
-    if (!exc.empty())
-        throw *std::max_element(exc.begin(), exc.end());
-
-    rep.ttbuckets_fill += seconds();
 
     {
         CHILD_TIMER(timer_special_q, "process_bucket_region outer container");
@@ -2744,6 +2763,7 @@ int main (int argc0, char *argv0[])/*{{{*/
     setbuf(stderr, NULL);
 
     cxx_param_list pl;
+    las_install_sighandlers();
 
     declare_usage(pl);
 
@@ -2787,6 +2807,7 @@ int main (int argc0, char *argv0[])/*{{{*/
         exit(EXIT_FAILURE);
     }
 
+    param_list_parse_int(pl, "trialdiv-first-side", &trialdiv_first_side);
     param_list_parse_int(pl, "adjust-strategy", &adjust_strategy);
     param_list_parse_int(pl, "exit-early", &exit_after_rel_found);
 #if DLP_DESCENT
@@ -2964,6 +2985,7 @@ int main (int argc0, char *argv0[])/*{{{*/
                  * category */
                 auto aux_p = std::make_shared<nfs_aux>(las, doing, rel_hash_p, rep, timer_special_q, las.nb_threads);
                 nfs_aux & aux(*aux_p);
+                ACTIVATE_TIMER(timer_special_q);
 
                 prepare_timer_layout_for_multithreaded_tasks(timer_special_q);
 
@@ -2993,7 +3015,7 @@ int main (int argc0, char *argv0[])/*{{{*/
 
                 break;
             } catch (buckets_are_full const & e) {
-                aux_botched.splice(aux_good.end(), aux_pending);
+                aux_botched.splice(aux_botched.end(), aux_pending);
                 verbose_output_vfprint (2, 1, gmp_vfprintf,
                         "# redoing q=%Zd, rho=%Zd because buckets are full\n"
                         "# %s\n"
@@ -3037,6 +3059,12 @@ int main (int argc0, char *argv0[])/*{{{*/
     for(auto & P : aux_good) {
         global_report.accumulate_and_clear(std::move(P.first));
         global_timer += P.second;
+    }
+    las_report botched_report;
+    timetree_t botched_timer;
+    for(auto & P : aux_botched) {
+        botched_report.accumulate_and_clear(std::move(P.first));
+        botched_timer += P.second;
     }
 
     if (recursive_descent) {
@@ -3098,12 +3126,11 @@ int main (int argc0, char *argv0[])/*{{{*/
 		las.output, las.nb_threads);
 	tcof_batch = seconds () - tcof_batch;
 	global_report.ttcof += tcof_batch;
-	/* add to ttf since the remaining time will be computed as ttf-ttcof */
-	global_report.ttf += tcof_batch;
       }
 
     t0 = seconds () - t0;
     wct = wct_seconds() - wct;
+
     if (adjust_strategy < 2) {
         verbose_output_print (2, 1, "# Average J=%1.0f for %lu special-q's, max bucket fill -bkmult %s\n",
                 global_report.total_J / (double) nr_sq_processed, nr_sq_processed, las.bk_multiplier.print_all().c_str());
@@ -3117,8 +3144,10 @@ int main (int argc0, char *argv0[])/*{{{*/
     tts -= global_report.tn[0];
     tts -= global_report.tn[1];
     tts -= global_report.ttf;
+    tts -= global_report.ttcof;
 
     global_timer.stop();
+
     if (tdict::global_enable >= 1) {
         verbose_output_print (0, 1, "#\n# Hierarchical timings:\n%s", global_timer.display().c_str());
 
@@ -3150,19 +3179,47 @@ int main (int argc0, char *argv0[])/*{{{*/
                  nr_bucket_primes, nr_div_tests, nr_composite_tests, nr_wrap_was_composite);
     }
 
+    double waste = 0;
+    waste += botched_report.tn[0];
+    waste += botched_report.tn[1];
+    waste += botched_report.ttbuckets_fill;
+    waste += botched_report.ttbuckets_apply;
+    waste += botched_report.ttf;
+    waste += botched_report.ttcof;
+
+    verbose_output_print (2, 1, "# Wasted cpu time due to %zu bkmult adjustments: %1.2f [norm %1.2f+%1.2f, sieving "
+                " (%1.2f + %1.2f),"
+                " factor (%1.2f + %1.2f)]\n",
+                aux_botched.size(),
+                waste,
+                botched_report.tn[0],
+                botched_report.tn[1],
+                botched_report.ttbuckets_fill,
+                botched_report.ttbuckets_apply,
+		botched_report.ttf, botched_report.ttcof);
+
+    t0 -= waste;
+    global_report.tn[0] -= botched_report.tn[0];
+    global_report.tn[1] -= botched_report.tn[1];
+    global_report.ttbuckets_fill -= botched_report.ttbuckets_fill;
+    global_report.ttbuckets_apply -= botched_report.ttbuckets_apply;
+    global_report.ttf -= botched_report.ttf;
+    global_report.ttcof -= botched_report.ttcof;
+
     if (dont_print_tally && las.nb_threads > 1) 
         verbose_output_print (2, 1, "# Total cpu time %1.2fs [tally available only in mono-thread]\n", t0);
     else
         verbose_output_print (2, 1, "# Total cpu time %1.2fs [norm %1.2f+%1.1f, sieving %1.1f"
                 " (%1.1f + %1.1f + %1.1f),"
-                " factor %1.1f (%1.1f + %1.1f)]\n", t0,
+                " factor %1.1f (%1.1f + %1.1f)] (not incl wasted time)\n",
+                t0,
                 global_report.tn[0],
                 global_report.tn[1],
                 tts,
                 global_report.ttbuckets_fill,
                 global_report.ttbuckets_apply,
                 tts-global_report.ttbuckets_fill-global_report.ttbuckets_apply,
-		global_report.ttf, global_report.ttf - global_report.ttcof, global_report.ttcof);
+		global_report.ttf + global_report.ttcof, global_report.ttf, global_report.ttcof);
 
     verbose_output_print (2, 1, "# Total elapsed time %1.2fs, per special-q %gs, per relation %gs\n",
                  wct, wct / (double) nr_sq_processed, wct / (double) global_report.reports);
@@ -3180,9 +3237,11 @@ int main (int argc0, char *argv0[])/*{{{*/
     if (las.suppress_duplicates) {
         verbose_output_print(2, 1, "# Total number of eliminated duplicates: %lu\n", global_report.duplicates);
     }
-    verbose_output_print (2, 1, "# Total %lu reports [%1.3gs/r, %1.1fr/sq]\n",
+    verbose_output_print (2, 1, "# Total %lu reports [%1.3gs/r, %1.1fr/sq] in %1.3g elapsed s [%.1f%% CPU]\n",
             global_report.reports, t0 / (double) global_report.reports,
-            (double) global_report.reports / (double) nr_sq_processed);
+            (double) global_report.reports / (double) nr_sq_processed,
+            wct,
+            100*t0/wct);
 
 
     print_slice_weight_estimator_stats();

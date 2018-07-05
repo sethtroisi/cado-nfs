@@ -75,9 +75,6 @@ skew: 1.37
 #include <stdlib.h>
 #include <time.h>
 
-/* define SKEW to allow skewed polynomials */
-// #define SKEW
-
 /* We assume a difference <= ALPHA_BOUND_GUARD between alpha computed
    with ALPHA_BOUND_SMALL and ALPHA_BOUND. In practice the largest value
    observed is 0.79. */
@@ -88,12 +85,17 @@ double best_score_f = DBL_MAX, worst_score_f = DBL_MIN;
 unsigned long f_candidate = 0;   /* number of irreducibility tests */
 unsigned long f_irreducible = 0; /* number of irreducible polynomials */
 double max_guard = DBL_MIN;
-#ifdef SKEW
+int skew = 0;                   /* see the -skew option */
 unsigned long *count = NULL; /* for 1 <= ad <= bound, count[ad] is the number of
-				degree-d polynomials with leading coefficient ad */
+				degree-d polynomials with leading coefficient ad.
+                                Used only when -skew option is set.*/
+
+/* MPZ_POLY_TIMINGS is defined (or maybe not) in mpz_poly.hpp
+ */
+#ifndef MPZ_POLY_H_
+#error "please include mpz_poly.h first"
 #endif
-#define TIMINGS
-#ifdef TIMINGS
+#ifdef MPZ_POLY_TIMINGS
 double timer[4] = {0.0, };
 #endif
 
@@ -107,7 +109,7 @@ int opt_flag = 0; /* 0: optimize "simple" E
 #define TIMER_LLL   2
 #define TIMER_MURPHYE 3
 
-#ifdef TIMINGS
+#ifdef MPZ_POLY_TIMINGS
 #define START_TIMER double t = seconds_thread ()
 #define END_TIMER(x) add_timer (x, seconds_thread () - t)
 
@@ -236,7 +238,6 @@ print_nonlinear_poly_info (mpz_poly ff, double alpha_f, mpz_poly gg,
     return 1;
 }
 
-#ifdef SKEW
 static void
 init_count (unsigned int bound, unsigned int df)
 {
@@ -382,7 +383,6 @@ generate_f (mpz_t *f, unsigned int d, unsigned long idx, unsigned int bound)
 
   return ok;
 }
-#endif
 
 /*
   Generate polynomial f(x) of degree d with rank 'idx',
@@ -405,13 +405,14 @@ polygen_JL_f (int d, unsigned int bound, mpz_t *f, unsigned long idx)
     ff->deg = d;
     ff->coeff = f;
     //mpz_poly_init(ff, d);
-#ifndef SKEW
-    int max_abs_coeffs;
-    unsigned long next_counter;
-    ok = mpz_poly_setcoeffs_counter(ff, &max_abs_coeffs, &next_counter, d, idx, bound);
-#else
-    ok = generate_f (f, d, idx, bound);
-#endif
+    if (!skew) {
+        int max_abs_coeffs;
+        unsigned long next_counter;
+        ok = mpz_poly_setcoeffs_counter(ff, &max_abs_coeffs, &next_counter,
+                d, idx, bound);
+    } else {
+        ok = generate_f (f, d, idx, bound);
+    }
 
     // to be compatible with the previous version, the count on the number of valid polys was before
     // the content test.
@@ -454,7 +455,9 @@ polygen_JL_g (mpz_t kN, int dg, mat_Z g, mpz_t root, double skew_f)
 {
     int i, j;
     mpz_t a, b, det, r;
-    unsigned long skew = round (skew_f), skew_powi = 1;
+    unsigned long skew, skew_powi;
+
+    skew = skew_f < 0.5 ? 1 : round (skew_f);
 
     mpz_init (det);
     mpz_init_set_ui (a, 1);
@@ -466,7 +469,7 @@ polygen_JL_g (mpz_t kN, int dg, mat_Z g, mpz_t root, double skew_f)
         }
     }
 
-    for (i = 1;  i <= dg + 1; i++) {
+    for (i = skew_powi = 1; i <= dg + 1; i++) {
         for (j = 1; j <= dg + 1; j++) {
             if (i == 1)
               {
@@ -509,10 +512,11 @@ polygen_JL_g (mpz_t kN, int dg, mat_Z g, mpz_t root, double skew_f)
     mpz_clear (r);
 }
 
-/* lift root r of f mod n to a root of f mod k*n, where k = k*n.
+/* lift root r of f mod N to a root of f mod k*N, where kN = k*N.
+   For Joux-Lercier, N=p is a large prime, and k is a small integer.
    Return 0 if lift is not possible. */
 static int
-root_lift (mpz_t n, mpz_t kn, unsigned long k, mpz_poly f, mpz_t r)
+root_lift (mpz_t N, mpz_t kN, unsigned long k, mpz_poly f, mpz_t r)
 {
   if (k == 1)
     return 1;
@@ -523,17 +527,17 @@ root_lift (mpz_t n, mpz_t kn, unsigned long k, mpz_poly f, mpz_t r)
   for (i = 0; i < k; i++)
     {
       mpz_poly_eval (v, f, r);
-      mpz_mod (v, v, kn);
+      mpz_mod (v, v, kN);
       if (mpz_cmp_ui (v, 0) == 0)
         break;
-      mpz_add (r, r, n);
+      mpz_add (r, r, N);
     }
   mpz_clear (v);
 
   return i < k;
 }
 
-/* JL method to generate d and d-1 polynomial.
+/* JL method to generate degree d and d-1 polynomials.
    Given irreducible polynomial f of degree df, find roots of f mod n,
    and for each root, use Joux-Lercier method to find good polynomials g. */
 static void
@@ -694,7 +698,7 @@ polygen_JL1 (mpz_t n, unsigned long k,
 static void
 usage ()
 {
-    fprintf (stderr, "./dlpolyselect -N xxx -df xxx -dg xxx -bound xxx [-modr xxx] [-modm xxx] [-t xxx]\n");
+    fprintf (stderr, "./dlpolyselect -N xxx -df xxx -dg xxx -bound xxx [-modr xxx] [-modm xxx] [-t xxx] [-skew]\n");
     exit (1);
 }
 
@@ -722,7 +726,7 @@ main (int argc, char *argv[])
     fflush (stdout);
 
     /* parsing */
-    while (argc >= 3 && argv[1][0] == '-')
+    while (argc >= 2 && argv[1][0] == '-')
     {
         if (argc >= 3 && strcmp (argv[1], "-N") == 0) {
             mpz_set_str (N, argv[2], 10);
@@ -763,6 +767,11 @@ main (int argc, char *argv[])
             multiplier = atoi (argv[2]);
             argv += 2;
             argc -= 2;
+        }
+        else if (argc >= 2 && strcmp (argv[1], "-skew") == 0) {
+            skew = 1;
+            argv += 1;
+            argc -= 1;
         }
         else if (argc >= 3 && strcmp (argv[1], "-Bf") == 0) {
             Bf = atof (argv[2]);
@@ -808,19 +817,29 @@ main (int argc, char *argv[])
 
     ASSERT_ALWAYS (bound >= 1);
 
-#ifdef SKEW
-    init_count (bound, df);
-    maxtries = count[0];
-#else
-    double maxtries_double = (double) bound;
-    maxtries_double *= (double) (bound + 1);
-    maxtries_double *= pow ((double) (2 * bound + 1), (double) (df - 2));
-    maxtries_double *= (double) (2 * bound);
-    if (maxtries_double >= (double) ULONG_MAX)
-      maxtries = ULONG_MAX;
-    else
-      maxtries = (unsigned long) maxtries_double;
-#endif
+    if (skew) {
+        init_count (bound, df);
+        maxtries = count[0];
+    } else {
+      /* check modm has no common factor with B, B+1, 2B+1 and 2B to avoid
+         a bias between classes mod 'modm' */
+        if (gcd_uint64 (modm, 2 * bound) != 1 ||
+          gcd_uint64 (modm, bound + 1) != 1 ||
+          gcd_uint64 (modm, 2 * bound + 1) != 1)
+          {
+            fprintf (stderr, "Error, modm should be coprime to "
+                     "2*bound(bound+1)(2*bound+1)\n");
+            exit (1);
+          }
+        double maxtries_double = (double) bound;
+        maxtries_double *= (double) (bound + 1);
+        maxtries_double *= pow ((double) (2 * bound + 1), (double) (df - 2));
+        maxtries_double *= (double) (2 * bound);
+        if (maxtries_double >= (double) ULONG_MAX)
+            maxtries = ULONG_MAX;
+        else
+            maxtries = (unsigned long) maxtries_double;
+    }
 
     unsigned int bound2 = 1; /* bound on the coefficients of linear
                                 combinations from the LLL short vectors */
@@ -858,17 +877,18 @@ main (int argc, char *argv[])
       printf ("# Warning: max_guard > ALPHA_BOUND_GUARD, might "
               "have missed some polynomials\n");
     printf ("# Time %.2fs", t);
-#ifdef TIMINGS
+#ifdef MPZ_POLY_TIMINGS
     printf (" (roots %.2fs, irred %.2fs, lll %.2fs, MurphyE %.2fs)",
             timer[TIMER_ROOTS], timer[TIMER_IRRED], timer[TIMER_LLL],
 	    timer[TIMER_MURPHYE]);
+    printf ("\n#              ");
+    print_timings_barrett_pow_mod_f_mod_p();
 #endif
     printf ("\n");
 
     mpz_clear (N);
-#ifdef SKEW
-    free (count);
-#endif
+    if (skew)
+        free (count);
 
     return 0;
 }

@@ -503,7 +503,7 @@ cado_define_test(full_c30
             -dlp -ell 445257213376519703258944813
             -t 2 -dlp-no-keep
             3037544709654617415632521514287
-            jlpoly=true tasks.polyselect.bound=5 tasks.polyselect.modm=5
+            jlpoly=true tasks.polyselect.bound=5 tasks.polyselect.modm=7
             tasks.polyselect.degree=3 tasks.reconstructlog.checkdlp=false
             TARGET_DEPENDENCIES full_c30_dependencies debug_renumber
             plingen_pz sm sm_simple las_descent reconstructlog-dl

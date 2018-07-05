@@ -139,12 +139,13 @@ free_hugepages(void *m, const size_t size MAYBE_UNUSED)
     size_t rounded_up_size = nr_pages * LARGE_PAGE_SIZE; 
     pthread_mutex_lock(&mmapped_regions_lock);
     dllist_ptr node = dll_find (mmapped_regions, (void *) m);
-    pthread_mutex_unlock(&mmapped_regions_lock);
     if (node != NULL) {
       dll_delete(node);
+      pthread_mutex_unlock(&mmapped_regions_lock);
       munmap((void *) m, rounded_up_size);
       return;
     }
+    pthread_mutex_unlock(&mmapped_regions_lock);
   }
 #endif
   
@@ -154,9 +155,9 @@ free_hugepages(void *m, const size_t size MAYBE_UNUSED)
     size_t rounded_up_size = nr_pages * LARGE_PAGE_SIZE; 
     pthread_mutex_lock(&malloced_regions_lock);
     dllist_ptr node = dll_find (malloced_regions, (void *) m);
-    pthread_mutex_unlock(&malloced_regions_lock);
     if (node != NULL) {
       dll_delete(node);
+      pthread_mutex_unlock(&malloced_regions_lock);
 #if defined(__linux) && defined(HAVE_POSIX_MEMALIGN)
       /* we must remove the memory protection we had ! */
       mprotect(m + rounded_up_size, 0x1000, PROT_READ|PROT_WRITE|PROT_EXEC);
@@ -164,6 +165,7 @@ free_hugepages(void *m, const size_t size MAYBE_UNUSED)
       free_aligned(m);
       return;
     }
+    pthread_mutex_unlock(&malloced_regions_lock);
   }
 #endif
   free_pagealigned(m);
@@ -318,7 +320,7 @@ int chunks_inited = 0;
 void *contiguous_malloc(const size_t size)
 {
   if (!chunks_inited) {
-      pthread_mutex_lock(&chunks_lock);
+    pthread_mutex_lock(&chunks_lock);
     dll_init(chunks);
     chunks_inited = 1;
     pthread_mutex_unlock(&chunks_lock);

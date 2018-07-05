@@ -17,6 +17,8 @@
 #define TYPE_MAYBE_UNUSED       /**/
 #endif
 
+extern void las_install_sighandlers();
+
 /* {{{ where_am_I (debug) */
 struct where_am_I {
 #ifdef TRACK_CODE_PATH

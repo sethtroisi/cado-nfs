@@ -48,52 +48,55 @@ T &reservation_array<T>::reserve(int wish)
 
   if (wish >= 0) {
       ASSERT_ALWAYS(!in_use[wish]);
-      in_use[wish]=true;
-      leave();
-      return BAs[wish];
+      i=wish;
+      goto happy;
   }
 
   while ((i = find_free()) == n)
     wait(cv);
 
   if (choose_least_full) {
-    /* Find the least-full bucket array */
-    double least_full = 1.;
-    double most_full = 0;
-    /* We want indices too. For most full buckets, we even want to report
-     * the exact index of the overflowing buckets */
-    size_t least_full_index = n;
-    std::pair<size_t, unsigned int> most_full_index;
+    /* Find the least-full bucket array. A bucket array that has one, or
+     * maybe several full buckets, but isn't full on average may still be
+     * used. We'll prefer the least full bucket arrays anyway.
+     */
     if (verbose)
-      verbose_output_print(0, 3, "# Looking for least full bucket\n");
-    for (size_t j = 0; j < n; j++) {
-      if (in_use[j])
+      verbose_output_print(0, 3, "# Looking for least full bucket array\n");
+    double least_full = 1000; /* any large value */
+    int least_full_index = -1;
+    for (i = 0; i < n; i++) {
+      if (in_use[i])
         continue;
-      double full = BAs[j].average_full();
-      if (verbose)
-        verbose_output_print(0, 3, "# Bucket %zu is %.0f%% full\n",
-                             j, full * 100.);
-      if (full > most_full) {
-          most_full = full;
-          most_full_index = std::make_pair(j, 0);
-      }
+      double full = BAs[i].average_full();
       if (full < least_full) {
-        least_full = full;
-        least_full_index = j;
+          least_full = full;
+          least_full_index = i;
       }
     }
-    if (least_full_index == n || least_full >= 1.) {
-        verbose_output_print(0, 1, "# Error: buckets are full, throwing exception\n");
-        ASSERT_ALWAYS(most_full > 1);
-        size_t j = most_full_index.first;
-        unsigned int i = most_full_index.second;
-        /* important ! */
-        leave();
-        throw buckets_are_full(bkmult_specifier::getkey<typename T::update_t>(), i,
-                BAs[j].nb_of_updates(i), BAs[j].room_allocated_for_updates(i));
+    if (least_full_index >= 0) {
+        if (verbose)
+            verbose_output_print(0, 3, "# Bucket %d is %.0f%% full\n",
+                    least_full_index, least_full * 100.);
+        i = least_full_index;
+        goto happy;
     }
-    i = least_full_index;
+    /*
+     * Now all bucket arrays are full on average. We're going to scream
+     * and throw an exception. Now where we ought to go from here is not
+     * really decided upon based on our analysis, but rather on the check
+     * that is done in check_buckets_max_full. Here we'll just throw a
+     * mostly phony exception that will maybe be caught and acted upon,
+     * or maybe not.
+     */
+    leave(); /* important ! */
+
+    auto k = bkmult_specifier::getkey<typename T::update_t>();
+    verbose_output_print(0, 1, "# Error: %s buckets are full (least avg %f), throwing exception\n",
+            bkmult_specifier::printkey(k).c_str(),
+            least_full);
+    throw buckets_are_full(k, -1, least_full * 1e6, 1 * 1e6); 
   }
+happy:
   in_use[i] = true;
   leave();
   return BAs[i];

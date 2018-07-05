@@ -1024,18 +1024,6 @@ int sieve_range_adjust::adjust_with_estimated_yield()/*{{{*/
 {
     {
         std::ostringstream os;
-        for(int side = 0 ; side < 2 ; side++) {
-            cxx_mpz_poly f;
-            mpz_poly_set(f,cpoly->pols[side]);
-            os << "# f"<<side<<"="<<f.print_poly("x")<<"\n";
-            if (side == doing.side)
-                os << "# q"<<side<<"="<<doing.p<<"\n";
-        }
-        os << "# skew="<<cpoly->skew<<"\n";
-        verbose_output_print(0, 2, "%s",os.str().c_str());
-    }
-    {
-        std::ostringstream os;
         os << "# Initial q-lattice: a0="<<Q.a0<<"; b0="<<Q.b0<<"; a1="<<Q.a1<<"; b1="<<Q.b1<<";\n";
         verbose_output_print(0, 1, "%s",os.str().c_str());
     }
