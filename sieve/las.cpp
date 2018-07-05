@@ -1944,6 +1944,7 @@ void process_bucket_region_run::cofactoring_sync (survivors_t & survivors2)/*{{{
             // In sublat mode, some non-primitive survivors can exist.
             // The cofactoring via ECM is made aware of this, but not the
             // batch mode, so we have to ensure it.
+            rep.reports++;
             if (si.conf.sublat.m && !cur.ab_coprime()) continue;
             verbose_output_start_batch ();
             cur.print_as_survivor();
@@ -1954,6 +1955,7 @@ void process_bucket_region_run::cofactoring_sync (survivors_t & survivors2)/*{{{
         if (ws.las.batch)
         {
             /* see above */
+            rep.reports++;
             if (si.conf.sublat.m && !cur.ab_coprime()) continue;
             /* make sure threads don't write the cofactor list at the
              * same time !!! */
