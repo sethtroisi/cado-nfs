@@ -63,6 +63,7 @@ int exit_after_rel_found = 0;
 int allow_largesq = 0;
 int adjust_strategy = 0;
 int sync_at_special_q = 0;
+int trialdiv_first_side = 0;
 
 double general_grace_time_ratio = DESCENT_DEFAULT_GRACE_TIME_RATIO;
 
@@ -1862,10 +1863,6 @@ void process_bucket_region_run::cofactoring_sync (survivors_t & survivors2)/*{{{
         NxToIJ (&i, &j, N, x, si);
         adjustIJsublat(&i, &j, si);
 
-        /* This can be changed (and should be a command line parameter)
-        */
-        static const int trialdiv_first_side = 0;
-
         for(int pside = 0 ; pass && pside < 2 ; pside++) {
             int side = trialdiv_first_side ^ pside;
 
@@ -2085,6 +2082,7 @@ static void declare_usage(param_list pl)/*{{{*/
     param_list_decl_usage(pl, "q1",   "right bound of special-q range");
     param_list_decl_usage(pl, "rho",  "sieve only root r mod q0");
     param_list_decl_usage(pl, "sqside", "put special-q on this side");
+    param_list_decl_usage(pl, "trialdiv-first-side", "begin trial division on this side");
     param_list_decl_usage(pl, "random-sample", "Sample this number of special-q's at random, within the range [q0,q1]");
     param_list_decl_usage(pl, "seed", "Use this seed for the random sampling of special-q's (see random-sample)");
     param_list_decl_usage(pl, "nq", "Process this number of special-q's and stop");
@@ -2809,6 +2807,7 @@ int main (int argc0, char *argv0[])/*{{{*/
         exit(EXIT_FAILURE);
     }
 
+    param_list_parse_int(pl, "trialdiv-first-side", &trialdiv_first_side);
     param_list_parse_int(pl, "adjust-strategy", &adjust_strategy);
     param_list_parse_int(pl, "exit-early", &exit_after_rel_found);
 #if DLP_DESCENT
