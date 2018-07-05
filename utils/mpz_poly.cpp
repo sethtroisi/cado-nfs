@@ -368,6 +368,7 @@ mpz_poly_sqr_tc (mpz_t *f, mpz_t *g, int r)
   nbits = mpz_sizeinbase (f[0], 2);
 
   if (r == 2 && nbits < 4096)
+#if 1
     /* (g2*x^2+g1*x+g0)^2 = g2^2*x^4 + (2*g2*g1)*x^3 +
        (g1^2+2*g2*g0)*x^2 + (2*g1*g0)*x + g0^2 in 3 SQR + 2 MUL.
        Experimentally this is faster for less than 4096 bits than the
@@ -388,6 +389,27 @@ mpz_poly_sqr_tc (mpz_t *f, mpz_t *g, int r)
       mpz_sub (f[2], f[2], f[1]); /* g1^2 + 2*g2*g0 */
       return 4;
     }
+#else
+    /* Algorithm SQR3 from Asymmetric Squaring Formulae by Chung and Hasan,
+       with 4 SQR and 1 MUL, not tested so far */
+    {
+      mpz_mul (f[0], g[0], g[0]);   /* f0 = S0 = a0^2 */
+      mpz_add (f[1], g[2], g[0]);   /* f1 = g2 + g0 */
+      mpz_sub (f[2], f[1], g[1]);   /* f2 = a2 - a1 + a0 */
+      mpz_add (f[1], g[2], f[1]);   /* f1 = a2 + a1 + a0 */
+      mpz_mul (f[1], f[1], f[1]);   /* S1 = (a2 + a1 + a0)^2 */
+      mpz_mul (f[2], f[2], f[2]);   /* S2 = (a2 - a1 + a0)^2 */
+      mpz_mul (f[3], g[2], g[1]);
+      mpz_mul_2exp (f[3], f[3], 1); /* S3 = 2*a1*a2 */
+      mpz_add (f[2], f[1], f[2]);
+      mpz_div_2exp (f[2], f[2], 1); /* T1 = (S1 + S2) / 2 */
+      mpz_sub (f[1], f[1], f[2]);   /* S1 - T1 */
+      mpz_sub (f[1], f[1], f[3]);   /* f1 = S1 - T1 - S3 */
+      mpz_mul (f[4], g[2], g[2]);   /* f4 = S4 = a2^2 */
+      mpz_sub (f[2], f[2], f[4]);   /* T1 - S4 */
+      mpz_sub (f[2], f[2], f[0]);   /* f2 = T1 - S4 - S0 */
+    }
+#endif
 
   if (r == 3 && nbits < 4096)
     /* (g3*x^3+g2*x^2+g1*x+g0)^2 = g3^2*x^6 + (2*g3*g2)*x^5
