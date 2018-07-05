@@ -98,7 +98,7 @@ nfs_aux::~nfs_aux()
     } else {
         verbose_output_print(0, 1, "# Time for this special-q: %1.4fs [norm %1.4f+%1.4f, sieving %1.4f"
                 " (%1.4f + %1.4f + %1.4f),"
-                " factor %1.4f (%1.4f + %1.4f] [+ external async time] in %1.4f elapsed s\n", qt0,
+                " factor %1.4f (%1.4f + %1.4f)] [+ external async time] in %1.4f elapsed s\n", qt0,
                 rep.tn[0],
                 rep.tn[1],
                 qtts,
