@@ -1150,9 +1150,9 @@ void SminusS (unsigned char *S1, unsigned char *EndS1, unsigned char *S2) {/*{{{
              "add $0x40,%0\n"
              "add $0x40,%1\n"
              : "+&r"(S1i), "+&r"(S2i), "=&x"(x0), "=&x"(x1), "=&x"(x2), "=&x"(x3) : "x"(z));
-        /* I prefer use ASM than intrinsics to be sure each 4 instructions which
-         * use exactly a cache line are together. I'm 99% sure it's not useful...
-         * but it's more beautiful :-)
+        /* I prefer use ASM than intrinsics to be sure each 4
+         * instructions which use exactly a cache line are together. I'm
+         * 99% sure it's not useful...  but it's more beautiful :-)
          */
         /*
            __m128i x0, x1, x2, x3;
@@ -1254,12 +1254,15 @@ bool register_contending_relation(las_info const & las, sieve_info const & si, r
         SS = tws.SS;
         memset(SS, 0, BUCKET_REGION);
 
+        /* see comment in process_bucket_region_run::operator()() */
+        do_resieve = si.conf.sides[0].lim && si.conf.sides[1].lim;
+
         /* we're ready to go ! processing is in the operator() method.
          */
     }/*}}}*/
 void process_bucket_region_spawn::operator()(worker_thread * worker, int id) /*{{{{*/
 {
-    /* create a temp obkect with more fields, and dispose it shortly
+    /* create a temp object with more fields, and dispose it shortly
      * afterwards once we're done.  */
     process_bucket_region_run(*this, worker, id)();
 }/*}}}*/
@@ -1447,7 +1450,7 @@ void process_bucket_region_run::purge_buckets(int side)/*{{{*/
 
     for (auto & BA : ws.bucket_arrays<1, shorthint_t>(side)) {
 #if defined(HAVE_SSE2) && defined(SMALLSET_PURGE)
-        sides[side].purged.purge(BA, bucket_relative_index, Sx, survivors2);
+        sides[side].purged.purge(BA, bucket_relative_index, Sx, survivors);
 #else
         sides[side].purged.purge(BA, bucket_relative_index, Sx);
 #endif
@@ -1795,7 +1798,7 @@ task_result * detached_cofac(worker_thread * worker, task_parameters * _param, i
 
 /* }}} */
 /*}}}*/
-void process_bucket_region_run::cofactoring_sync (survivors_t & survivors2)/*{{{*/
+void process_bucket_region_run::cofactoring_sync (survivors_t & survivors)/*{{{*/
 {
     CHILD_TIMER(timer, __func__);
     TIMER_CATEGORY(timer, cofactoring_mixed());
@@ -1805,12 +1808,13 @@ void process_bucket_region_run::cofactoring_sync (survivors_t & survivors2)/*{{{
 
     cofac_standalone cur;
 
-    for (size_t i_surv = 0 ; i_surv < survivors2.size(); i_surv++) {
+
+    for (size_t i_surv = 0 ; i_surv < survivors.size(); i_surv++) {
 #ifdef DLP_DESCENT
         if (ws.las.tree.must_take_decision())
             break;
 #endif
-        const size_t x = survivors2[i_surv];
+        const size_t x = survivors[i_surv];
         ASSERT_ALWAYS (Sx[x] != 255);
         ASSERT(x < ((size_t) 1 << LOG_BUCKET_REGION));
 
@@ -1863,80 +1867,139 @@ void process_bucket_region_run::cofactoring_sync (survivors_t & survivors2)/*{{{
         NxToIJ (&i, &j, N, x, si);
         adjustIJsublat(&i, &j, si);
 
-        for(int pside = 0 ; pass && pside < 2 ; pside++) {
-            int side = trialdiv_first_side ^ pside;
+        if (do_resieve) {
 
-            CHILD_TIMER_PARAMETRIC(timer, "side ", side, " pre-cofactoring checks");
-            TIMER_CATEGORY(timer, cofactoring(side));
+            for(int pside = 0 ; pass && pside < 2 ; pside++) {
+                int side = trialdiv_first_side ^ pside;
+
+                CHILD_TIMER_PARAMETRIC(timer, "side ", side, " pre-cofactoring checks");
+                TIMER_CATEGORY(timer, cofactoring(side));
 
 
-            SIBLING_TIMER(timer, "recompute complete norm");
+                SIBLING_TIMER(timer, "recompute complete norm");
 
-            // Trial divide norm on side 'side'
-            /* Compute the norms using the polynomials transformed to 
-               i,j-coordinates. The transformed polynomial on the 
-               special-q side is already divided by q */
-            si.sides[side].lognorms->norm(cur.norm[side], i, j);
+                // Trial divide norm on side 'side'
+                /* Compute the norms using the polynomials transformed to 
+                   i,j-coordinates. The transformed polynomial on the 
+                   special-q side is already divided by q */
+                si.sides[side].lognorms->norm(cur.norm[side], i, j);
 
 #ifdef TRACE_K/*{{{*/
-            if (cur.trace_on_spot()) {
-                verbose_output_vfprint(TRACE_CHANNEL, 0,
-                        gmp_vfprintf, "# start trial division for norm=%Zd ", (mpz_srcptr) cur.norm[side]);
-                verbose_output_print(TRACE_CHANNEL, 0,
-                        "on side %d for (%" PRId64 ",%" PRIu64 ")\n", side, cur.a, cur.b);
-            }
+                if (cur.trace_on_spot()) {
+                    verbose_output_vfprint(TRACE_CHANNEL, 0,
+                            gmp_vfprintf, "# start trial division for norm=%Zd ", (mpz_srcptr) cur.norm[side]);
+                    verbose_output_print(TRACE_CHANNEL, 0,
+                            "on side %d for (%" PRId64 ",%" PRIu64 ")\n", side, cur.a, cur.b);
+                }
 #endif/*}}}*/
 
-            if (si.conf.sides[side].lim == 0) {
-                /* This is a shortcut. We're probably replacing sieving
-                 * by a product tree, there's no reason to bother doing
-                 * trial division at this point (or maybe there is ?
-                 * would that change the bit size significantly ?) */
-                rep.survivors.check_leftover_norm_on_side[side] ++;
-                continue;
-            }
+                if (si.conf.sides[side].lim == 0) {
+                    /* This is a shortcut. We're probably replacing sieving
+                     * by a product tree, there's no reason to bother doing
+                     * trial division at this point (or maybe there is ?
+                     * would that change the bit size significantly ?) */
+                    rep.survivors.check_leftover_norm_on_side[side] ++;
+                    continue;
+                }
 
-            SIBLING_TIMER(timer, "trial division");
+                SIBLING_TIMER(timer, "trial division");
 
-            verbose_output_print(1, 2, "FIXME %s, line %d\n", __FILE__, __LINE__);
-            const bool handle_2 = true; /* FIXME */
-            rep.survivors.trial_divided_on_side[side]++;
+                verbose_output_print(1, 2, "FIXME %s, line %d\n", __FILE__, __LINE__);
+                const bool handle_2 = true; /* FIXME */
+                rep.survivors.trial_divided_on_side[side]++;
 
-            trial_div (cur.factors[side], cur.norm[side], N, x,
-                    handle_2,
-                    &sides[side].primes,
-                    &sides[side].purged,
-                    si.sides[side].trialdiv_data.get(),
-                    cur.a, cur.b,
-                    *si.sides[side].fbs);
+                trial_div (cur.factors[side], cur.norm[side], N, x,
+                        handle_2,
+                        &sides[side].primes,
+                        &sides[side].purged,
+                        si.sides[side].trialdiv_data.get(),
+                        cur.a, cur.b,
+                        *si.sides[side].fbs);
 
-            /* if q is composite, its prime factors have not been sieved.
-             * Check if they divide. */
-            if ((side == si.doing.side) && (!si.doing.prime_sq)) {
-                for (const auto &x : si.doing.prime_factors) {
-                    if (mpz_divisible_uint64_p(cur.norm[side], x)) {
-                        mpz_divexact_uint64(cur.norm[side], cur.norm[side], x);
-                        cur.factors[side].push_back(x);
+                /* if q is composite, its prime factors have not been sieved.
+                 * Check if they divide. They probably don't, since we
+                 * have computed the norm with the polynomials adapted to
+                 * the (i,j) plane, and q divided out. But still,
+                 * valuations are not desired here.
+                 */
+                if ((side == si.doing.side) && (!si.doing.prime_sq)) {
+                    for (const auto &x : si.doing.prime_factors) {
+                        if (mpz_divisible_uint64_p(cur.norm[side], x)) {
+                            mpz_divexact_uint64(cur.norm[side], cur.norm[side], x);
+                            cur.factors[side].push_back(x);
+                        }
                     }
                 }
-            }
 
-            SIBLING_TIMER(timer, "check_leftover_norm");
+                SIBLING_TIMER(timer, "check_leftover_norm");
 
-            pass = check_leftover_norm (cur.norm[side], si.conf.sides[side]);
+                pass = check_leftover_norm (cur.norm[side], si.conf.sides[side]);
 #ifdef TRACE_K
-            if (cur.trace_on_spot()) {
-                verbose_output_vfprint(TRACE_CHANNEL, 0, gmp_vfprintf,
-                        "# checked leftover norm=%Zd", (mpz_srcptr) cur.norm[side]);
-                verbose_output_print(TRACE_CHANNEL, 0,
-                        " on side %d for (%" PRId64 ",%" PRIu64 "): %d\n",
-                        side, cur.a, cur.b, pass);
-            }
+                if (cur.trace_on_spot()) {
+                    verbose_output_vfprint(TRACE_CHANNEL, 0, gmp_vfprintf,
+                            "# checked leftover norm=%Zd", (mpz_srcptr) cur.norm[side]);
+                    verbose_output_print(TRACE_CHANNEL, 0,
+                            " on side %d for (%" PRId64 ",%" PRIu64 "): %d\n",
+                            side, cur.a, cur.b, pass);
+                }
 #endif
-            rep.survivors.check_leftover_norm_on_side[side] += pass;
+                rep.survivors.check_leftover_norm_on_side[side] += pass;
+            }
+        } else {
+            ASSERT_ALWAYS(ws.las.batch);
+
+            /* no resieve, so no list of prime factors to divide. No
+             * point in doing trial division anyway either.
+             */
+            for(int side = 0 ; side < 2 ; side++) {
+                CHILD_TIMER_PARAMETRIC(timer, "side ", side, " pre-cofactoring checks");
+                TIMER_CATEGORY(timer, cofactoring(side));
+
+                SIBLING_TIMER(timer, "recompute complete norm");
+
+                /* factor() is batch.cpp recomputes the complete norm, so
+                 * there's no need to compute the norm right now for the
+                 * side we've sieved with.
+                 */
+
+                if (!si.conf.sides[side].lim)
+                    si.sides[side].lognorms->norm(cur.norm[side], i, j);
+                else {
+                    /* This is recognized specially in the
+                     * factor_simple_minded() code in batch.cpp
+                     */
+                    mpz_set_ui(cur.norm[side], 0);
+                }
+
+                /* We don't even bother with q and its prime factors.
+                 * We're expecting to recover just everything after the
+                 * game anyway */
+
+                /* Note that we're *NOT* doing the equivalent of
+                 * check_leftover_norm here. This is explained by two
+                 * things:
+                 *
+                 *  - while the "red zone" of post-sieve values that we
+                 *  know can't yield relations is quite wide (from L to
+                 *  B^2), it's only a marginal fraction of the total
+                 *  number of reports. Even more so if we take into
+                 *  account the necessary tolerance near the boundaries
+                 *  of the red zone.
+                 *
+                 *  - we don't have the complete norm (with factors taken
+                 *  out) at this point, so there's no way we can do a
+                 *  primality check -- which is, in fact, the most
+                 *  stringent check because it applies to the bulk of the
+                 *  candidates.
+                 *
+                 * Bottom line: we just hand over *everything* to the
+                 * batch cofactorization.
+                 */
+            }
         }
 
         if (!pass) continue;
+
 
         rep.survivors.enter_cofactoring++;
 
@@ -2005,9 +2068,15 @@ void process_bucket_region_run::operator()() {/*{{{*/
 
         MARK_TIMER_FOR_SIDE(timer, side);
 
+        /* Compute norms in S[side] */
         init_norms(side);
+
+        /* Accumulate sieve contributions in SS */
         apply_buckets(side);
         small_sieve(side);
+
+        /* compute S[side][x] = max(S[side][x] - SS[x], 0),
+         * and clear SS.  */
         SminusS(side);
 
         ws.las.dumpfiles[side].write(S[side], BUCKET_REGION);
@@ -2023,8 +2092,16 @@ void process_bucket_region_run::operator()() {/*{{{*/
 
     auto survivors = search_survivors();
 
+    /* Check if one of the factor bases is empty. This means that we may
+     * have decided to *not* sieve on that side, refusing to pay a
+     * per-area time a second time. This is based on the rationale that
+     * we expect the *other* side to be such a selective test that it
+     * isn't worth the trouble. But then, it means that purge_buckets and
+     * resieving are not worth the trouble either.
+     */
+
     /* These two steps used to be called "prepare_cofactoring" */
-    for(int side = 0 ; side < 2 ; side++) {
+    for(int side = 0 ; do_resieve && side < 2 ; side++) {
         MARK_TIMER_FOR_SIDE(timer, side);
         purge_buckets(side);
         resieve(side);
@@ -2660,6 +2737,11 @@ bool do_one_special_q(las_info & las, nfs_work & ws, std::shared_ptr<nfs_aux> au
          * particular, the creation of the different slices in the factor
          * base. */
     }
+
+    /* Currently we assume that we're doing sieving + resieving on
+     * both sides, or we're not. In the latter case, we expect to
+     * complete the factoring work with batch cofactorization */
+    ASSERT_ALWAYS(las.batch || (conf.sides[0].lim && conf.sides[1].lim));
 
     sieve_info & si(*psi);
 

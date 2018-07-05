@@ -78,6 +78,7 @@ struct process_bucket_region_run : public process_bucket_region_spawn {
      * field be defined here, and drop the latter.
      */
     where_am_I & w;
+    bool do_resieve;
 
     /* A note on SS versus S[side]
      *
