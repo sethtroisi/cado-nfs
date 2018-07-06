@@ -628,6 +628,10 @@ polygen_JL2 (mpz_t n, unsigned long k,
             for (u->deg = dg; u->deg >= 0 && mpz_cmp_ui (u->coeff[u->deg], 0)
                    == 0; u->deg--);
 
+            /* if u is not square-free, skip it */
+            if (!mpz_poly_squarefree_p (u))
+              continue;
+
             if (print_nonlinear_poly_info (f, alpha_f, u, format, n))
               {
 #if 0 /* print coefficients of record combination */
