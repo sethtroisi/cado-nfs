@@ -97,7 +97,7 @@ class nfs_work {
     double check_buckets_max_full();
 
     template <typename HINT>
-        double check_buckets_max_full(int level, HINT const & hint);
+        double check_buckets_max_full(int level);
 
     template <int LEVEL, typename HINT> void reset_all_pointers(int side);
 

@@ -763,12 +763,12 @@ NOPROFILE_STATIC
 #endif
 void
 apply_one_update (unsigned char * const S,
-        const bucket_update_t<1, HINT> * const u,
+        bucket_update_t<1, HINT> const & u,
         const unsigned char logp, where_am_I & w)
 {
-  WHERE_AM_I_UPDATE(w, h, u->hint);
-  WHERE_AM_I_UPDATE(w, x, u->x);
-  sieve_increase(S + (u->x), logp, w);
+  WHERE_AM_I_UPDATE(w, h, u.hint);
+  WHERE_AM_I_UPDATE(w, x, u.x);
+  sieve_increase(S + u.x, logp, w);
 }
 
 template <typename HINT>
@@ -778,14 +778,16 @@ NOPROFILE_STATIC
 #endif
 void
 apply_one_bucket (unsigned char *S,
-        const bucket_array_t<1, HINT> &BA, const int i,
+        bucket_array_t<1, HINT> const &BA, const int i,
         fb_factorbase::slicing::part const & fbp, where_am_I & w)
 {
   WHERE_AM_I_UPDATE(w, p, 0);
 
   for (slice_index_t i_slice = 0; i_slice < BA.get_nr_slices(); i_slice++) {
-    const bucket_update_t<1, HINT> *it = BA.begin(i, i_slice);
-    const bucket_update_t<1, HINT> * const it_end = BA.end(i, i_slice);
+      auto sl = BA.slice_range(i, i_slice);
+      auto it = sl.begin();
+      auto it_end = sl.end();
+
     const slice_index_t slice_index = BA.get_slice_index(i_slice);
     const unsigned char logp = fbp[slice_index].get_logp();
 
@@ -803,7 +805,7 @@ apply_one_bucket (unsigned char *S,
     }
 
     while (it != next_align)
-      apply_one_update<HINT> (S, it++, logp, w);
+      apply_one_update<HINT> (S, *it++, logp, w);
 
     while (it + 16 <= it_end) {
       uint64_t x0, x1, x2, x3, x4, x5, x6, x7;
@@ -853,7 +855,7 @@ apply_one_bucket (unsigned char *S,
     }
 #endif
     while (it != it_end)
-      apply_one_update<HINT> (S, it++, logp, w);
+      apply_one_update<HINT> (S, *it++, logp, w);
   }
 }
 
@@ -866,22 +868,17 @@ void apply_one_bucket<shorthint_t> (unsigned char *S,
 template <>
 void apply_one_bucket<longhint_t> (unsigned char *S,
         const bucket_array_t<1, longhint_t> &BA, const int i,
-        fb_factorbase::slicing::part const & fbp, where_am_I & w) {
-  WHERE_AM_I_UPDATE(w, p, 0);
+        fb_factorbase::slicing::part const & fbp, where_am_I & w)
+{
+    WHERE_AM_I_UPDATE(w, p, 0);
 
-  // There is only one fb_slice.
-  slice_index_t i_slice = 0;
-  const bucket_update_t<1, longhint_t> *it = BA.begin(i, i_slice);
-  const bucket_update_t<1, longhint_t> * const it_end = BA.end(i, i_slice);
-
-  // FIXME: Computing logp for each and every entry seems really, really
-  // inefficient. Could we add it to a bucket_update_t of "longhint"
-  // type?
-  while (it != it_end) {
-    slice_index_t index = it->index;
-    const unsigned char logp = fbp[index].get_logp();
-    apply_one_update<longhint_t> (S, it++, logp, w);
-  }
+    // There is only one fb_slice. Slice indices are embedded in the
+    // (long) hints.
+    for(auto const & it : BA.slice_range(i, 0)) {
+        slice_index_t index = it.index;
+        const unsigned char logp = fbp[index].get_logp();
+        apply_one_update<longhint_t> (S, it, logp, w);
+    }
 }
 /* }}} */
 
@@ -1231,6 +1228,81 @@ bool register_contending_relation(las_info const & las, sieve_info const & si, r
 }/*}}}*/
 #endif /* DLP_DESCENT */
 
+struct process_bucket_region_run : public process_bucket_region_spawn {
+    worker_thread * worker;
+    nfs_aux::thread_data & taux;
+    nfs_work::thread_data & tws;
+    timetree_t & timer;
+    int bucket_relative_index;
+    timetree_t::accounting_child_autoactivate dummy;
+    las_report& rep;
+    unsigned char * S[2];
+    /* We will have this point to the thread's where_am_I data member.
+     * (within nfs_aux::th). However it might be just as easy to let this
+     * field be defined here, and drop the latter.
+     */
+    where_am_I & w;
+    bool do_resieve;
+
+    /* A note on SS versus S[side]
+     *
+     * SS is temp data. It's only used here, and it could well be defined
+     * here only. We declare it at the thread_data level to avoid
+     * constant malloc()/free().
+     *
+     * S[side] is where we compute the norm initialization. Some
+     * tolerance is subtracted from these lognorms to account for
+     * accepted cofactors.
+     *
+     * SS is the bucket region where we apply the buckets, and also later
+     * where we do the small sieve.
+     *
+     * as long as SS[x] >= S[side][x], we are good.
+     */
+
+    unsigned char *SS;
+    
+    struct side_data {/*{{{*/
+        bucket_array_complete purged;   /* for purge_buckets */
+        bucket_primes_t primes;         /* for resieving */
+        side_data() :
+            purged(bucket_array_complete(BUCKET_REGION)),
+            primes(bucket_primes_t(BUCKET_REGION))
+        {}
+    };/*}}}*/
+
+    std::array<side_data, 2> sides;
+
+    process_bucket_region_run(process_bucket_region_spawn const & p, worker_thread * worker, int id);
+
+    /* will be passed as results of functions
+    std::vector<uint32_t> survivors;
+    std::vector<bucket_update_t<1, shorthint_t>::br_index_t> survivors2;
+     * */
+
+    /* most probably useless, I guess
+    int N;
+    int cpt;
+    int copr;
+    */
+
+    void init_norms(int side);
+
+    template<bool with_hints>
+    void apply_buckets_inner(int side);
+
+    void apply_buckets(int side);
+    void small_sieve(int side);
+    void SminusS(int side);
+    typedef std::vector<bucket_update_t<1, shorthint_t>::br_index_t> survivors_t;
+    survivors_t search_survivors();
+    void purge_buckets(int side);
+    void resieve(int side);
+    void cofactoring_sync (survivors_t & survivors2);
+    void operator()();
+};
+
+
 /*{{{ process_bucket_region, split into pieces. */
     process_bucket_region_run::process_bucket_region_run(process_bucket_region_spawn const & p, worker_thread * worker, int id): /* {{{ */
             process_bucket_region_spawn(p),
@@ -1281,12 +1353,15 @@ void process_bucket_region_run::init_norms(int side)/*{{{*/
                 side, w.N, trace_Nx.x, S[side][trace_Nx.x]);
 #endif
 }/*}}}*/
-void process_bucket_region_run::apply_buckets(int side)/*{{{*/
+    template<bool with_hints>
+void process_bucket_region_run::apply_buckets_inner(int side)/*{{{*/
 {
+    typedef typename hints_proxy<with_hints>::l my_longhint_t;
+    typedef typename hints_proxy<with_hints>::s my_shorthint_t;
     rep.ttbuckets_apply -= seconds_thread();
     {
         CHILD_TIMER(timer, "apply buckets");
-        for (auto const & BA : ws.bucket_arrays<1, shorthint_t>(side))
+        for (auto const & BA : ws.bucket_arrays<1, my_shorthint_t>(side))
             apply_one_bucket(SS, BA, bucket_relative_index, si.sides[side].fbs->get_part(1), w);
     }
 
@@ -1294,7 +1369,7 @@ void process_bucket_region_run::apply_buckets(int side)/*{{{*/
     if (si.toplevel > 1) {
         CHILD_TIMER(timer, "apply downsorted buckets");
 
-        for (auto const & BAd : ws.bucket_arrays<1, longhint_t>(side)) {
+        for (auto const & BAd : ws.bucket_arrays<1, my_longhint_t>(side)) {
             // FIXME: the updates could come from part 3 as well,
             // not only part 2.
             ASSERT_ALWAYS(si.toplevel <= 2);
@@ -1303,6 +1378,15 @@ void process_bucket_region_run::apply_buckets(int side)/*{{{*/
     }
     rep.ttbuckets_apply += seconds_thread();
 }/*}}}*/
+void process_bucket_region_run::apply_buckets(int side)
+{
+    if (do_resieve) {
+        apply_buckets_inner<true>(side);
+    } else {
+        apply_buckets_inner<false>(side);
+    }
+}
+
 void process_bucket_region_run::small_sieve(int side)/*{{{*/
 {
     CHILD_TIMER(timer, "small sieve");
@@ -2538,10 +2622,6 @@ void do_one_special_q_sublat(las_info const & las, sieve_info & si, nfs_work & w
     /* TODO: is there a way to share this in sublat mode ? */
     precomp_plattice_t precomp_plattice;
 
-    /* This count _only_ works if we do completely synchronous stuff. As
-     * soon as we begin dropping synchronization points, it will be
-     * completely impossible to do such hacks.
-     */
 
     {
         rep.ttbuckets_fill -= seconds();
@@ -2610,7 +2690,7 @@ void do_one_special_q_sublat(las_info const & las, sieve_info & si, nfs_work & w
 
         pool.drain_queue(0);
 
-        ws.check_buckets_max_full(si.toplevel, shorthint_t());
+        ws.check_buckets_max_full<shorthint_t>(si.toplevel);
         auto exc = pool.get_exceptions<buckets_are_full>(0);
         if (!exc.empty())
             throw *std::max_element(exc.begin(), exc.end());

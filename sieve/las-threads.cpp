@@ -118,6 +118,11 @@ template class reservation_array<bucket_array_t<2, shorthint_t> >;
 template class reservation_array<bucket_array_t<3, shorthint_t> >;
 template class reservation_array<bucket_array_t<1, longhint_t> >;
 template class reservation_array<bucket_array_t<2, longhint_t> >;
+template class reservation_array<bucket_array_t<1, emptyhint_t> >;
+template class reservation_array<bucket_array_t<2, emptyhint_t> >;
+template class reservation_array<bucket_array_t<3, emptyhint_t> >;
+template class reservation_array<bucket_array_t<1, logphint_t> >;
+template class reservation_array<bucket_array_t<2, logphint_t> >;
 
 /* Reserve the required number of bucket arrays. For shorthint BAs, we
  * need at least as many as there are threads filling them (or more, for
@@ -136,16 +141,26 @@ reservation_group::reservation_group(int nr_bucket_arrays)
      * #1l.
      */
     RA1_long(nr_bucket_arrays),
-    RA2_long(nr_bucket_arrays)
+    RA2_long(nr_bucket_arrays),
+    RA1_empty(nr_bucket_arrays),
+    RA2_empty(nr_bucket_arrays),
+    RA3_empty(nr_bucket_arrays),
+    RA1_logp(nr_bucket_arrays),
+    RA2_logp(nr_bucket_arrays)
 {
 }
 
+
+/* TODO: we may expose two distinct runtime functions that trigger
+ * allocation either on the bare or non-bare bucket arrays.
+ */
 void
 reservation_group::allocate_buckets(const int *n_bucket,
         bkmult_specifier const& mult,
         std::array<double, FB_MAX_PARTS> const & fill_ratio, int logI,
         nfs_aux & aux,
-        thread_pool & pool)
+        thread_pool & pool,
+        bool with_hints)
 {
   /* Short hint updates are generated only by fill_in_buckets(), so each BA
      gets filled only by its respective FB part */
@@ -154,16 +169,28 @@ reservation_group::allocate_buckets(const int *n_bucket,
   typedef typename decltype(RA3_short)::update_t T3s;
   typedef typename decltype(RA1_long)::update_t T1l;
   typedef typename decltype(RA2_long)::update_t T2l;
-  RA1_short.allocate_buckets(n_bucket[1], mult.get<T1s>()*fill_ratio[1], logI, aux, pool);
-  RA2_short.allocate_buckets(n_bucket[2], mult.get<T2s>()*fill_ratio[2], logI, aux, pool);
-  RA3_short.allocate_buckets(n_bucket[3], mult.get<T3s>()*fill_ratio[3], logI, aux, pool);
 
-  /* Long hint bucket arrays get filled by downsorting. The level-2 longhint
-     array gets the shorthint updates from level 3 sieving, and the level-1
-     longhint array gets the shorthint updates from level 2 sieving as well
-     as the previously downsorted longhint updates from level 3 sieving. */
-  RA1_long.allocate_buckets(n_bucket[1], mult.get<T1l>()*(fill_ratio[2] + fill_ratio[3]), logI, aux, pool);
-  RA2_long.allocate_buckets(n_bucket[2], mult.get<T2l>()*fill_ratio[3], logI, aux, pool);
+  /* We use the same multiplier definitions for both "with" and "without
+   * hints".
+   */
+  if (with_hints) {
+      RA1_short.allocate_buckets(n_bucket[1], mult.get<T1s>()*fill_ratio[1], logI, aux, pool);
+      RA2_short.allocate_buckets(n_bucket[2], mult.get<T2s>()*fill_ratio[2], logI, aux, pool);
+      RA3_short.allocate_buckets(n_bucket[3], mult.get<T3s>()*fill_ratio[3], logI, aux, pool);
+
+      /* Long hint bucket arrays get filled by downsorting. The level-2 longhint
+         array gets the shorthint updates from level 3 sieving, and the level-1
+         longhint array gets the shorthint updates from level 2 sieving as well
+         as the previously downsorted longhint updates from level 3 sieving. */
+      RA1_long.allocate_buckets(n_bucket[1], mult.get<T1l>()*(fill_ratio[2] + fill_ratio[3]), logI, aux, pool);
+      RA2_long.allocate_buckets(n_bucket[2], mult.get<T2l>()*fill_ratio[3], logI, aux, pool);
+  } else {
+      RA1_empty.allocate_buckets(n_bucket[1], mult.get<T1s>()*fill_ratio[1], logI, aux, pool);
+      RA2_empty.allocate_buckets(n_bucket[2], mult.get<T2s>()*fill_ratio[2], logI, aux, pool);
+      RA3_empty.allocate_buckets(n_bucket[3], mult.get<T3s>()*fill_ratio[3], logI, aux, pool);
+      RA1_logp.allocate_buckets(n_bucket[1], mult.get<T1l>()*(fill_ratio[2] + fill_ratio[3]), logI, aux, pool);
+      RA2_logp.allocate_buckets(n_bucket[2], mult.get<T2l>()*fill_ratio[3], logI, aux, pool);
+  }
 }
 
 
@@ -203,6 +230,7 @@ reservation_group::get()
 {
   return RA2_long;
 }
+
 /* mapping types to objects is a tricky business. The code below looks
  * like red tape. But sophisticated means to avoid it would be even
  * longer (the naming difference "get" versus "cget" is not the annoying
@@ -238,5 +266,77 @@ reservation_group::cget() const
 {
   return RA2_long;
 }
+template <>
+const reservation_array<bucket_array_t<3, longhint_t> > &
+reservation_group::cget<3, longhint_t>() const
+{
+    ASSERT_ALWAYS(0);
+}
 
 
+/* And ditto for empty or near-empty hints */
+template<>
+reservation_array<bucket_array_t<1, emptyhint_t> > &
+reservation_group::get()
+{
+  return RA1_empty;
+}
+template<>
+reservation_array<bucket_array_t<2, emptyhint_t> > &
+reservation_group::get()
+{
+  return RA2_empty;
+}
+template<>
+reservation_array<bucket_array_t<3, emptyhint_t> > &
+reservation_group::get() {
+  return RA3_empty;
+}
+template<>
+reservation_array<bucket_array_t<1, logphint_t> > &
+reservation_group::get()
+{
+  return RA1_logp;
+}
+template<>
+reservation_array<bucket_array_t<2, logphint_t> > &
+reservation_group::get()
+{
+  return RA2_logp;
+}
+template<>
+const reservation_array<bucket_array_t<1, emptyhint_t> > &
+reservation_group::cget() const
+{
+  return RA1_empty;
+}
+template<>
+const reservation_array<bucket_array_t<2, emptyhint_t> > &
+reservation_group::cget() const
+{
+  return RA2_empty;
+}
+template<>
+const reservation_array<bucket_array_t<3, emptyhint_t> > &
+reservation_group::cget() const
+{
+  return RA3_empty;
+}
+template<>
+const reservation_array<bucket_array_t<1, logphint_t> > &
+reservation_group::cget() const
+{
+  return RA1_logp;
+}
+template<>
+const reservation_array<bucket_array_t<2, logphint_t> > &
+reservation_group::cget() const
+{
+  return RA2_logp;
+}
+template <>
+const reservation_array<bucket_array_t<3, logphint_t> > &
+reservation_group::cget<3, logphint_t>() const
+{
+    ASSERT_ALWAYS(0);
+}

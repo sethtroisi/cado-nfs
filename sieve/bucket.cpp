@@ -304,6 +304,11 @@ template class bucket_array_t<2, shorthint_t>;
 template class bucket_array_t<3, shorthint_t>;
 template class bucket_array_t<1, longhint_t>;
 template class bucket_array_t<2, longhint_t>;
+template class bucket_array_t<1, emptyhint_t>;
+template class bucket_array_t<2, emptyhint_t>;
+template class bucket_array_t<3, emptyhint_t>;
+template class bucket_array_t<1, logphint_t>;
+template class bucket_array_t<2, logphint_t>;
 
 
 /* A compare function suitable for sorting updates in order of ascending x
@@ -333,18 +338,15 @@ void
 bucket_primes_t::purge (const bucket_array_t<1, shorthint_t> &BA,
               const int i, fb_factorbase::slicing const & fb, const unsigned char *S)
 {
-  for (slice_index_t i_slice = 0; i_slice < BA.get_nr_slices(); i_slice++) {
-    const slice_index_t slice_index = BA.get_slice_index(i_slice);
-    const bucket_update_t<1, shorthint_t> *it = BA.begin(i, i_slice);
-    const bucket_update_t<1, shorthint_t> * const end_it = BA.end(i, i_slice);
-
-    for ( ; it != end_it ; it++) {
-      if (UNLIKELY(S[it->x] != 255)) {
-        fbprime_t p = fb[slice_index].get_prime(it->hint);
-        push_update(bucket_update_t<1, primehint_t>(it->x, p, 0, 0));
-      }
+    for (slice_index_t i_slice = 0; i_slice < BA.get_nr_slices(); i_slice++) {
+        const slice_index_t slice_index = BA.get_slice_index(i_slice);
+        for(auto const & it : BA.slice_range(i, i_slice)) {
+            if (UNLIKELY(S[it.x] != 255)) {
+                fbprime_t p = fb[slice_index].get_prime(it.hint);
+                push_update(bucket_update_t<1, primehint_t>(it.x, p, 0, 0));
+            }
+        }
     }
-  }
 }
 
 template <typename HINT>
@@ -374,17 +376,14 @@ bucket_array_complete::purge(
     const bucket_array_t<1, HINT> &BA,
     const int i, const unsigned char *S)
 {
-  for (slice_index_t i_slice = 0; i_slice < BA.get_nr_slices(); i_slice++) {
-    const slice_index_t slice_index = BA.get_slice_index(i_slice);
-    const bucket_update_t<1, HINT> *it = BA.begin(i, i_slice);
-    const bucket_update_t<1, HINT> * const end_it = BA.end(i, i_slice);
-
-    for ( ; it != end_it ; it++) {
-      if (UNLIKELY(S[it->x] != 255)) {
-        push_update(to_longhint(*it, slice_index));
-      }
+    for (slice_index_t i_slice = 0; i_slice < BA.get_nr_slices(); i_slice++) {
+        const slice_index_t slice_index = BA.get_slice_index(i_slice);
+        for(auto const & it : BA.slice_range(i, i_slice)) {
+            if (UNLIKELY(S[it.x] != 255)) {
+                push_update(to_longhint(it, slice_index));
+            }
+        }
     }
-  }
 }
 
 template void
@@ -406,19 +405,16 @@ bucket_array_complete::purge_1 (
     const bucket_array_t<1, HINT> &BA, const int i,
     const std::vector<typename bucket_update_t<1, HINT>::br_index_t> &survivors)
 {
-  smallset<SIZE, typename bucket_update_t<1, HINT>::br_index_t> surv_set(survivors);
+    smallset<SIZE, typename bucket_update_t<1, HINT>::br_index_t> surv_set(survivors);
 
-  for (slice_index_t i_slice = 0; i_slice < BA.get_nr_slices(); i_slice++) {
-    const slice_index_t slice_index = BA.get_slice_index(i_slice);
-    const bucket_update_t<1, HINT> *it = BA.begin(i, i_slice);
-    const bucket_update_t<1, HINT> * const end_it = BA.end(i, i_slice);
-
-    for ( ; it != end_it ; it++) {
-      if (UNLIKELY(surv_set.contains(it->x))) {
-        push_update(to_longhint(*it, slice_index));
-      }
+    for (slice_index_t i_slice = 0; i_slice < BA.get_nr_slices(); i_slice++) {
+        const slice_index_t slice_index = BA.get_slice_index(i_slice);
+        for(auto const & it : BA.slice_range(i, i_slice)) {
+            if (UNLIKELY(surv_set.contains(it.x))) {
+                push_update(to_longhint(it, slice_index));
+            }
+        }
     }
-  }
 }
 
 template <typename HINT>
@@ -457,9 +453,48 @@ template class bucket_single<1, longhint_t>;
 
 template<int INPUT_LEVEL>
 void
-downsort(bucket_array_t<INPUT_LEVEL - 1, longhint_t> &BA_out,
-         const bucket_array_t<INPUT_LEVEL, shorthint_t> &BA_in,
-         uint32_t bucket_number, where_am_I & w)
+downsort(fb_factorbase::slicing const & fbs MAYBE_UNUSED,
+        bucket_array_t<INPUT_LEVEL - 1, longhint_t> &BA_out,
+        const bucket_array_t<INPUT_LEVEL, shorthint_t> &BA_in,
+        uint32_t bucket_number, where_am_I & w)
+{
+    /* Time recording for this function is done by the caller
+     * (downsort_wrapper)
+     */
+    /* Rather similar to purging, except it doesn't purge */
+    for (slice_index_t i_slice = 0; i_slice < BA_in.get_nr_slices(); i_slice++) {
+        const slice_index_t slice_index = BA_in.get_slice_index(i_slice);
+        WHERE_AM_I_UPDATE(w, i, slice_index);
+        for(auto const & it : BA_in.slice_range(bucket_number, i_slice)) {
+            WHERE_AM_I_UPDATE(w, p, fbs[slice_index].get_prime(it.hint));
+            WHERE_AM_I_UPDATE(w, h, it.hint);
+            BA_out.push_update(it.x, 0, it.hint, slice_index, w);
+        }
+    }
+}
+
+template<int INPUT_LEVEL>
+void
+downsort(fb_factorbase::slicing const & /* unused */,
+        bucket_array_t<INPUT_LEVEL - 1, longhint_t> &BA_out,
+         const bucket_array_t<INPUT_LEVEL, longhint_t> &BA_in,
+         uint32_t bucket_number, where_am_I & w) 
+{
+    /* longhint updates don't write slice end pointers, so there must be
+       exactly 1 slice per bucket */
+    ASSERT_ALWAYS(BA_in.get_nr_slices() == 1);
+
+    for(auto const & it : BA_in.slice_range(bucket_number, 0)) {
+        BA_out.push_update(it.x, 0, it.hint, it.index, w);
+    }
+}
+
+template<int INPUT_LEVEL>
+void
+downsort(fb_factorbase::slicing const & fbs,
+        bucket_array_t<INPUT_LEVEL - 1, logphint_t> &BA_out,
+        const bucket_array_t<INPUT_LEVEL, emptyhint_t> &BA_in,
+        uint32_t bucket_number, where_am_I & w)
 {
   /* Time recording for this function is done by the caller
    * (downsort_wrapper)
@@ -467,34 +502,27 @@ downsort(bucket_array_t<INPUT_LEVEL - 1, longhint_t> &BA_out,
   /* Rather similar to purging, except it doesn't purge */
   for (slice_index_t i_slice = 0; i_slice < BA_in.get_nr_slices(); i_slice++) {
     const slice_index_t slice_index = BA_in.get_slice_index(i_slice);
-    WHERE_AM_I_UPDATE(w, i, slice_index);
-    const bucket_update_t<INPUT_LEVEL, shorthint_t> *it = BA_in.begin(bucket_number, i_slice);
-    const bucket_update_t<INPUT_LEVEL, shorthint_t> * const end_it = BA_in.end(bucket_number, i_slice);
-
-    for ( ; it != end_it ; it++) {
-      WHERE_AM_I_UPDATE(w, p,
-          (*w.psi->sides[w.side].fbs)[slice_index].get_prime(it->hint));
-      WHERE_AM_I_UPDATE(w, h, it->hint);
-      BA_out.push_update(it->x, 0, it->hint, slice_index, w);
+    // WHERE_AM_I_UPDATE(w, i, slice_index);
+    for (auto const & it : BA_in.slice_range(bucket_number, i_slice)) {
+        logphint_t h = fbs[slice_index].get_logp();
+        BA_out.push_update(it.x, h, w);
     }
   }
 }
 
 template<int INPUT_LEVEL>
 void
-downsort(bucket_array_t<INPUT_LEVEL - 1, longhint_t> &BA_out,
-         const bucket_array_t<INPUT_LEVEL, longhint_t> &BA_in,
-         uint32_t bucket_number, where_am_I & w) 
+downsort(fb_factorbase::slicing const & /* unused */,
+        bucket_array_t<INPUT_LEVEL - 1, logphint_t> &BA_out,
+        const bucket_array_t<INPUT_LEVEL, logphint_t> &BA_in,
+        uint32_t bucket_number, where_am_I & w) 
 {
-  /* longhint updates don't write slice end pointers, so there must be
-     exactly 1 slice per bucket */
-  ASSERT_ALWAYS(BA_in.get_nr_slices() == 1);
-  const bucket_update_t<INPUT_LEVEL, longhint_t> *it = BA_in.begin(bucket_number, 0);
-  const bucket_update_t<INPUT_LEVEL, longhint_t> * const end_it = BA_in.end(bucket_number, 0);
-
-  for ( ; it != end_it ; it++) {
-    BA_out.push_update(it->x, 0, it->hint, it->index, w);
-  }
+    /* longhint updates don't write slice end pointers, so there must be
+       exactly 1 slice per bucket */
+    ASSERT_ALWAYS(BA_in.get_nr_slices() == 1);
+    for (auto const & it : BA_in.slice_range(bucket_number, 0)) {
+        BA_out.push_update(it.x, it, w);
+    }
 }
 
 /* Explicitly instantiate the versions of downsort() that we'll need:
@@ -502,21 +530,45 @@ downsort(bucket_array_t<INPUT_LEVEL - 1, longhint_t> &BA_out,
    longhint from level 2. */
 template
 void
-downsort<2>(bucket_array_t<1, longhint_t> &BA_out,
-            const bucket_array_t<2, shorthint_t> &BA_in,
-            uint32_t bucket_number, where_am_I & w);
+downsort<2>(fb_factorbase::slicing const &,
+        bucket_array_t<1, longhint_t> &BA_out,
+        const bucket_array_t<2, shorthint_t> &BA_in,
+        uint32_t bucket_number, where_am_I & w);
 
 template
 void
-downsort<3>(bucket_array_t<2, longhint_t> &BA_out,
-            const bucket_array_t<3, shorthint_t> &BA_in,
-            uint32_t bucket_number, where_am_I & wr);
+downsort<3>(fb_factorbase::slicing const &,
+        bucket_array_t<2, longhint_t> &BA_out,
+        const bucket_array_t<3, shorthint_t> &BA_in,
+        uint32_t bucket_number, where_am_I & wr);
 
 template
 void
-downsort<2>(bucket_array_t<1, longhint_t> &BA_out,
-            const bucket_array_t<2, longhint_t> &BA_in,
-            uint32_t bucket_number, where_am_I & w);
+downsort<2>(fb_factorbase::slicing const &,
+        bucket_array_t<1, longhint_t> &BA_out,
+        const bucket_array_t<2, longhint_t> &BA_in,
+        uint32_t bucket_number, where_am_I & w);
+
+template
+void
+downsort<2>(fb_factorbase::slicing const &,
+        bucket_array_t<1, logphint_t> &BA_out,
+        const bucket_array_t<2, emptyhint_t> &BA_in,
+        uint32_t bucket_number, where_am_I & w);
+
+template
+void
+downsort<3>(fb_factorbase::slicing const &,
+        bucket_array_t<2, logphint_t> &BA_out,
+        const bucket_array_t<3, emptyhint_t> &BA_in,
+        uint32_t bucket_number, where_am_I & wr);
+
+template
+void
+downsort<2>(fb_factorbase::slicing const &,
+        bucket_array_t<1, logphint_t> &BA_out,
+        const bucket_array_t<2, logphint_t> &BA_in,
+        uint32_t bucket_number, where_am_I & w);
 
 buckets_are_full::buckets_are_full(bkmult_specifier::key_type const& key, int b, int r, int t) : key(key), bucket_number(b), reached_size(r), theoretical_max_size(t) {
     std::ostringstream os;
