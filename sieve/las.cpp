@@ -2339,6 +2339,8 @@ void display_expected_memory_usage(siever_config const & sc0, cado_poly_srcptr c
         sc.instantiate_thresholds(0),
             sc.instantiate_thresholds(1) };
 
+    bool do_resieve = sc.sides[0].lim && sc.sides[1].lim;
+
     /*
        verbose_output_print(0, 2, "# base: %zu Kb\n", Memusage());
        verbose_output_print(0, 2, "# log bucket region = %d\n", LOG_BUCKET_REGION);
@@ -2431,20 +2433,40 @@ void display_expected_memory_usage(siever_config const & sc0, cado_poly_srcptr c
             size_t nupdates = 0.75 * (1UL << sc.logA) * (std::log(std::log(p1)) - std::log(std::log(p0)));
             nupdates += NB_DEVIATIONS_BUCKET_REGIONS * sqrt(nupdates);
             {
-                typedef bucket_update_t<2, shorthint_t> type;
+                double m;
+                size_t s;
+                if (do_resieve) {
+                    typedef bucket_update_t<2, shorthint_t> type;
+                    s=sizeof(type);
+                    m=bkmult.get<type>();
+                } else {
+                    typedef bucket_update_t<2, emptyhint_t> type;
+                    s=sizeof(type);
+                    m=bkmult.get<type>();
+                }
                 verbose_output_print(0, 1, "# level 2, side %d: %zu primes, %zu 2-updates [2s]: %zu MB\n",
                         side, nprimes, nupdates,
-                        (more = bkmult.get<type>() * nupdates * sizeof(type)) >> 20);
+                        (more = m * nupdates * s) >> 20);
                 memory += more;
             }
             {
                 // how many downsorted updates are alive at a given point in
                 // time ?
                 size_t nupdates_D = nupdates >> 8;
-                typedef bucket_update_t<1, longhint_t> type;
+                double m;
+                size_t s;
+                if (do_resieve) {
+                    typedef bucket_update_t<2, longhint_t> type;
+                    s=sizeof(type);
+                    m=bkmult.get<type>();
+                } else {
+                    typedef bucket_update_t<2, logphint_t> type;
+                    s=sizeof(type);
+                    m=bkmult.get<type>();
+                }
                 verbose_output_print(0, 1, "# level 1, side %d: %zu downsorted 1-updates [1l]: %zu MB\n",
                         side, nupdates >> 8,
-                        (more = bkmult.get<type>() * nupdates_D * sizeof(type)) >> 20);
+                        (more = m * nupdates_D * s) >> 20);
                 memory += more;
             }
         }
@@ -2457,10 +2479,20 @@ void display_expected_memory_usage(siever_config const & sc0, cado_poly_srcptr c
             int A0 = LOG_BUCKET_REGION + 8;
             size_t nupdates = 0.75 * (1UL << A0) * (std::log(std::log(p1)) - std::log(std::log(p0)));
             nupdates += NB_DEVIATIONS_BUCKET_REGIONS * sqrt(nupdates);
-            typedef bucket_update_t<1, shorthint_t> type;
+            double m;
+            size_t s;
+            if (do_resieve) {
+                typedef bucket_update_t<1, shorthint_t> type;
+                s=sizeof(type);
+                m=bkmult.get<type>();
+            } else {
+                typedef bucket_update_t<1, emptyhint_t> type;
+                s=sizeof(type);
+                m=bkmult.get<type>();
+            }
             verbose_output_print(0, 1, "# level 1, side %d: %zu primes, %zu 1-updates [1s]: %zu MB\n",
                     side, nprimes, nupdates,
-                    (more = bkmult(type()) * nupdates * sizeof(type)) >> 20);
+                    (more = m * nupdates * s) >> 20);
             memory += more;
             verbose_output_print(0, 1, "# level 1, side %d: %zu primes => precomp_plattices: %zu MB\n",
                     side, nprimes,
@@ -2477,11 +2509,21 @@ void display_expected_memory_usage(siever_config const & sc0, cado_poly_srcptr c
             double p0 = K[side].thresholds[0];
             size_t nprimes = nprimes_interval(p0, p1);
             size_t nupdates = 0.75 * (1UL << sc.logA) * (std::log(std::log(p1)) - std::log(std::log(p0)));
-            typedef bucket_update_t<1, shorthint_t> type;
+            double m;
+            size_t s;
+            if (do_resieve) {
+                typedef bucket_update_t<1, shorthint_t> type;
+                s=sizeof(type);
+                m=bkmult.get<type>();
+            } else {
+                typedef bucket_update_t<1, emptyhint_t> type;
+                s=sizeof(type);
+                m=bkmult.get<type>();
+            }
             nupdates += NB_DEVIATIONS_BUCKET_REGIONS * sqrt(nupdates);
             verbose_output_print(0, 1, "# level 1, side %d: %zu primes, %zu 1-updates [1s]: %zu MB\n",
                     side, nprimes, nupdates,
-                    (more = bkmult.get<type>() * nupdates * sizeof(type)) >> 20);
+                    (more = m * nupdates * s) >> 20);
             memory += more;
         }
     }
