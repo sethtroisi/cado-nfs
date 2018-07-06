@@ -332,6 +332,19 @@ mpz_poly_mul_tc (mpz_t *f, mpz_t *g, int r, mpz_t *h, int s)
   return t;
 }
 
+/* f2*x^2+f1*x+f0 = (g1*x+g0)^2 using Karatsuba and 3 SQR */
+static int
+mpz_poly_sqr_tc2 (mpz_t *f, mpz_t *g)
+{
+  mpz_mul (f[0], g[0], g[0]);
+  mpz_mul (f[2], g[1], g[1]);
+  mpz_add (f[1], g[0], g[1]);
+  mpz_mul (f[1], f[1], f[1]);
+  mpz_sub (f[1], f[1], f[0]);
+  mpz_sub (f[1], f[1], f[2]);
+  return 2;
+}
+
 /* Same as mpz_poly_mul_tc for the squaring: store in f[0..2r] the coefficients
    of g^2, where g has degree r, and its coefficients are in g[0..r].
    Assumes f differs from g, and f[0..2r] are already allocated.
@@ -353,15 +366,7 @@ mpz_poly_sqr_tc (mpz_t *f, mpz_t *g, int r)
     }
 
   if (r == 1) /* 3 SQR: always optimal */
-    {
-      mpz_mul (f[0], g[0], g[0]);
-      mpz_mul (f[2], g[1], g[1]);
-      mpz_add (f[1], g[0], g[1]);
-      mpz_mul (f[1], f[1], f[1]);
-      mpz_sub (f[1], f[1], f[0]);
-      mpz_sub (f[1], f[1], f[2]);
-      return 2;
-    }
+    return mpz_poly_sqr_tc2 (f, g);
 
   /* we assume the number of bits of f[0] is representative of the size of
      the coefficients of f */
@@ -408,6 +413,7 @@ mpz_poly_sqr_tc (mpz_t *f, mpz_t *g, int r)
       mpz_mul (f[4], g[2], g[2]);   /* f4 = S4 = a2^2 */
       mpz_sub (f[2], f[2], f[4]);   /* T1 - S4 */
       mpz_sub (f[2], f[2], f[0]);   /* f2 = T1 - S4 - S0 */
+      return 4;
     }
 #endif
 
