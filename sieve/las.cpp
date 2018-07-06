@@ -2306,10 +2306,12 @@ void display_expected_memory_usage(siever_config const & sc0, cado_poly_srcptr c
     int toplevel = -1;
     for(int side = 0 ; side < 2 ; side++) {
         int m;
-        for(m = 0 ; m < FB_MAX_PARTS && K[side].thresholds[m] >= sc.sides[side].lim; ++m);
+        for(m = 0 ; m < FB_MAX_PARTS && K[side].thresholds[m] < sc.sides[side].lim; ++m);
         if (m > toplevel)
             toplevel = m;
     }
+
+    ASSERT_ALWAYS(toplevel == 1 || toplevel == 2);
 
     /* the code path is radically different depending on toplevel. */
 
