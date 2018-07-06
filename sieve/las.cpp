@@ -17,6 +17,8 @@
 #include <stdarg.h> /* Required so that GMP defines gmp_vfprintf() */
 #include <algorithm>
 #include <vector>
+#include <sstream>  /* for c++ string handling */
+#include <iterator> /* ostream_iterator */
 #include "threadpool.hpp"
 #include "fb.hpp"
 #include "portability.h"
@@ -2762,14 +2764,26 @@ bool do_one_special_q(las_info & las, nfs_work & ws, std::shared_ptr<nfs_aux> au
         if (si.doing.depth)
             extra << " # within descent, currently at depth " << si.doing.depth;
 
+        char factoq[1024];
+        if (las.allow_composite_q) {
+            std::ostringstream oss;
+            std::copy(si.doing.prime_factors.begin(),
+                      si.doing.prime_factors.end()-1,
+                      std::ostream_iterator<int>(oss, "*"));
+            oss << si.doing.prime_factors.back();
+            snprintf(factoq, 1024, "=%s", oss.str().c_str());
+        } else {
+            factoq[0] = '\0';
+        }
         verbose_output_vfprint(0, 1, gmp_vfprintf,
                 "# "
                 HILIGHT_START
-                "Sieving side-%d q=%Zd; rho=%Zd;"
+                "Sieving side-%d q=%Zd%s; rho=%Zd;"
                 HILIGHT_END
                 " a0=%" PRId64 "; b0=%" PRId64 "; a1=%" PRId64 "; b1=%" PRId64 "; J=%u;%s\n",
                 si.doing.side,
                 (mpz_srcptr) si.doing.p,
+                factoq,
                 (mpz_srcptr) si.doing.r,
                 si.qbasis.a0, si.qbasis.b0,
                 si.qbasis.a1, si.qbasis.b1,
