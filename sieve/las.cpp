@@ -2423,7 +2423,7 @@ void display_expected_memory_usage(siever_config const & sc0, cado_poly_srcptr c
             if (!sc.sides[side].lim) continue;
             /* In truth, I sort of know it isn't valid. We've built most
              * of the stuff on the idea that there's a global "toplevel"
-             * notion, but that barely applies when on e of the factor
+             * notion, but that barely applies when one of the factor
              * bases happens to be much smaller than the other one */
             ASSERT_ALWAYS(K[side].thresholds[2] == sc.sides[side].lim);
             double p1 = K[side].thresholds[2];
@@ -2733,6 +2733,7 @@ void do_one_special_q_sublat(las_info const & las, sieve_info & si, nfs_work & w
         pool.drain_queue(0);
 
         ws.check_buckets_max_full<shorthint_t>(si.toplevel);
+        ws.check_buckets_max_full<emptyhint_t>(si.toplevel);
         auto exc = pool.get_exceptions<buckets_are_full>(0);
         if (!exc.empty())
             throw *std::max_element(exc.begin(), exc.end());
