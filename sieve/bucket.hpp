@@ -63,6 +63,7 @@ TARGET_TYPE limit_cast(const SOURCE_TYPE &b)
 /* emptyhint_t is shorthint_t with no data -> its rtti key is s */
 class emptyhint_t {
 public:
+  slice_offset_t hint_for_where_am_i() const { return 0; }
   emptyhint_t() {}
   emptyhint_t(const slice_offset_t slice_offset MAYBE_UNUSED) {}
   emptyhint_t(const fbprime_t p MAYBE_UNUSED,
@@ -76,6 +77,7 @@ public:
 class shorthint_t {
 public:
   slice_offset_t hint;
+  slice_offset_t hint_for_where_am_i() const { return hint; }
   shorthint_t() {}
   shorthint_t(const slice_offset_t slice_offset)
     : hint(slice_offset) {}
@@ -95,6 +97,7 @@ class longhint_t {
 public:
   slice_index_t index;
   slice_offset_t hint;
+  slice_offset_t hint_for_where_am_i() const { return hint; }
   longhint_t(){}
   longhint_t(const slice_offset_t slice_offset,
              const slice_index_t slice_index)
@@ -112,6 +115,7 @@ public:
 class logphint_t {
 public:
     char logp;
+  slice_offset_t hint_for_where_am_i() const { return 0; }
   logphint_t(){}
   logphint_t(const fbprime_t p MAYBE_UNUSED,
              const slice_offset_t slice_offset MAYBE_UNUSED,

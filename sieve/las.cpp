@@ -766,7 +766,7 @@ apply_one_update (unsigned char * const S,
         bucket_update_t<1, HINT> const & u,
         const unsigned char logp, where_am_I & w)
 {
-  WHERE_AM_I_UPDATE(w, h, u.hint);
+  WHERE_AM_I_UPDATE(w, h, u.hint_for_where_am_i());
   WHERE_AM_I_UPDATE(w, x, u.x);
   sieve_increase(S + u.x, logp, w);
 }
