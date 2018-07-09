@@ -480,7 +480,7 @@ vector<index_t> all_comp_sq_2(uint64_t q0, uint64_t q1, uint64_t qfac_min,
             }
         }
     }
-    fprintf(stderr, "Got %" PRIu64 " 2-composite sq\n", list.size()>>1);
+    fprintf(stderr, "Got %lu 2-composite sq\n", list.size()>>1);
     return list;
 }
 
@@ -519,12 +519,12 @@ vector<index_t> all_comp_sq_3(uint64_t q0, uint64_t q1, uint64_t pos_min,
                     list.push_back(Ind.ind[pos2]);
                     list.push_back(Ind.ind[pos3]);
                 } else {
-                    fprintf(stderr, "Wooops !!!\n");
+              //      fprintf(stderr, "Wooops !!!\n");
                 }
             }
         }
     }
-    fprintf(stderr, "Got %" PRIu64 " 3-composite sq\n", list.size()/3);
+    fprintf(stderr, "Got %lu 3-composite sq\n", list.size()/3);
     return list;
 }
 
