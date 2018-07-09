@@ -103,6 +103,8 @@ struct indexrange {
 
     // Compute one position corresponding to the given p. In the case where
     // there are several positions, the choice is arbitrary.
+    // If p is not in the table, compute a position with a close-enough
+    // prime.
     uint64_t pos_from_p(p_r_values_t p) {
         uint64_t low, high;
         p_r_values_t pp;
@@ -123,8 +125,7 @@ struct indexrange {
             else
                 low = middle;
         } while (high > low+1);
-        fprintf(stderr, "Error: can't find p in table\n");
-        ASSERT_ALWAYS(0);
+        return low;
     }
  
     vector <index_t>::iterator iterator_from_index(index_t z) {
@@ -349,8 +350,9 @@ void print_fake_rel_manyq(
     char str[MAX_STR];
     char *pstr;
     int len = MAX_STR;
-    for (uint64_t ii = 0; ii < nq; ii += nfacq) {
+    for (uint64_t ii = 0; ii < nfacq*nq; ii += nfacq) {
         int nr = int((*nrels)[long_random(buf)%nrels->size()]);
+//        fprintf(stdout, "%u, %u\n", list_q[ii], list_q[ii+1]);
         for (; nr > 0; --nr) {
             pstr = str;
             len = MAX_STR;
@@ -471,11 +473,14 @@ vector<index_t> all_comp_sq_2(uint64_t q0, uint64_t q1, uint64_t qfac_min,
             if (L >= q0 && L <= q1) {
                 list.push_back(Ind.ind[pos1]);
                 list.push_back(Ind.ind[pos2]);
+//                fprintf(stderr, "%lu*%lu : (%u, %u)\n",
+//                        l1, l2, Ind.ind[pos1], Ind.ind[pos2]);
             } else {
-                fprintf(stderr, "Wooops !!!\n");
+//                fprintf(stderr, "Wooops !!!\n");
             }
         }
     }
+    fprintf(stderr, "Got %zu 2-composite sq\n", (size_t)(list.size()>>1));
     return list;
 }
 
@@ -514,11 +519,12 @@ vector<index_t> all_comp_sq_3(uint64_t q0, uint64_t q1, uint64_t pos_min,
                     list.push_back(Ind.ind[pos2]);
                     list.push_back(Ind.ind[pos3]);
                 } else {
-                    fprintf(stderr, "Wooops !!!\n");
+              //      fprintf(stderr, "Wooops !!!\n");
                 }
             }
         }
     }
+    fprintf(stderr, "Got %zu 3-composite sq\n", (size_t)(list.size()/3));
     return list;
 }
 
@@ -704,9 +710,9 @@ main (int argc, char *argv[])
   /****** Composite special-q ******/
   vector<index_t>::iterator first_indq2, last_indq2;
   vector<index_t>::iterator first_indq3, last_indq3;
+  vector<index_t> comp2, comp3;
   
   if (compsq) {
-      vector<index_t> comp2, comp3;
       comp2 = all_comp_sq_2(q0, q1, qfac_min, qfac_max, Ind[sqside]);
       first_indq2 = comp2.begin();
       last_indq2 = comp2.end();
@@ -717,8 +723,8 @@ main (int argc, char *argv[])
 
   /****** go multi-thread ******/
   uint64_t block = (last_indq - first_indq) / mt;
-  uint64_t block2 = (last_indq2 - first_indq2) / mt;
-  uint64_t block3 = (last_indq3 - first_indq3) / mt;
+  uint64_t block2 = (last_indq2 - first_indq2) / (2*mt);
+  uint64_t block3 = (last_indq3 - first_indq3) / (3*mt);
 
   pthread_t * thid = (pthread_t *)malloc(mt*sizeof(pthread_t));
   struct th_args * args = (struct th_args *)malloc(mt*sizeof(struct th_args));
@@ -727,8 +733,8 @@ main (int argc, char *argv[])
       args[i].nq2 = 0;
       args[i].nq3 = 0;
       if (compsq) {
-          args[i].list_q_comp2 = first_indq2 + block2*i;
-          args[i].list_q_comp3 = first_indq3 + block3*i;
+          args[i].list_q_comp2 = first_indq2 + 2*block2*i;
+          args[i].list_q_comp3 = first_indq3 + 3*block3*i;
       } else {
           args[i].list_q_prime = first_indq + block*i;
       }
@@ -741,8 +747,8 @@ main (int argc, char *argv[])
           }
       } else {
           if (compsq) {
-              args[i].nq2 = last_indq2 - args[i].list_q_comp2;
-              args[i].nq3 = last_indq3 - args[i].list_q_comp3;
+              args[i].nq2 = (last_indq2 - args[i].list_q_comp2)/2;
+              args[i].nq3 = (last_indq3 - args[i].list_q_comp3)/3;
           } else {
               args[i].nq = last_indq - args[i].list_q_prime;
           }
