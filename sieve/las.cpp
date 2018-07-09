@@ -3362,11 +3362,6 @@ int main (int argc0, char *argv0[])/*{{{*/
     }
     verbose_output_print (2, 1, "# Discarded %lu special-q's out of %u pushed\n",
             nr_sq_discarded, las.nq_pushed);
-    tts = t0;
-    tts -= global_report.tn[0];
-    tts -= global_report.tn[1];
-    tts -= global_report.ttf;
-    tts -= global_report.ttcof;
 
     global_timer.stop();
 
@@ -3421,12 +3416,20 @@ int main (int argc0, char *argv0[])/*{{{*/
 		botched_report.ttf, botched_report.ttcof);
 
     t0 -= waste;
+
+    tts = t0;
+    tts -= global_report.tn[0];
+    tts -= global_report.tn[1];
+    tts -= global_report.ttf;
+    tts -= global_report.ttcof;
+    /*
     global_report.tn[0] -= botched_report.tn[0];
     global_report.tn[1] -= botched_report.tn[1];
     global_report.ttbuckets_fill -= botched_report.ttbuckets_fill;
     global_report.ttbuckets_apply -= botched_report.ttbuckets_apply;
     global_report.ttf -= botched_report.ttf;
     global_report.ttcof -= botched_report.ttcof;
+    */
 
     if (dont_print_tally && las.nb_threads > 1) 
         verbose_output_print (2, 1, "# Total cpu time %1.2fs [tally available only in mono-thread]\n", t0);
