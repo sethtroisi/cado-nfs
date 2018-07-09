@@ -1244,7 +1244,7 @@ int param_list_parse_int_list_size(param_list_ptr pl, const char * key , int ** 
   for (;;) {
     int ret = sscanf(tmp, "%d", &i);
     if (ret != 1) {
-      fprintf (stderr, "Error while parsing coffecient array %s[%d]\n", key, *t
+      fprintf (stderr, "Error while parsing coefficient array %s[%d]\n", key, *t
           - 1);
       exit(1);
     }
@@ -1334,11 +1334,12 @@ int param_list_parse_mpz_poly(param_list_ptr pl, const char * key,
     if(*tmp == '\0') {
       break;
     }
-    if (*tmp != ',') {
+    if (*tmp != ',' && !isspace(*tmp)) {
       fprintf (stderr, "Error while parsing polynomial %s\n", key);
       exit(1);
     }
     tmp++;
+    for( ; *tmp && isspace(*tmp) ; tmp++);
   }
   mpz_clear(coeff);
   return 1;

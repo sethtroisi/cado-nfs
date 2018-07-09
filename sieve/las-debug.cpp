@@ -15,13 +15,47 @@
 #include "portability.h"
 
 using namespace std;
-#if defined(__GLIBC__) && (defined(TRACE_K) || defined(CHECK_UNDERFLOW))
+#if defined(__GLIBC__)
 #include <execinfo.h>   /* For backtrace. Since glibc 2.1 */
+#include <signal.h>     /* we use it only with glibc */
 #endif
 #ifdef HAVE_CXXABI_H
 /* We use that to demangle C++ names */
 #include <cxxabi.h>
 #endif
+
+#if defined(__GLIBC__)
+static void signal_handling (int signum)/*{{{*/
+{
+   fprintf (stderr, "*** Error: caught signal \"%s\"\n", strsignal (signum));
+
+   int sz = 100, i;
+   void *buffer [sz];
+   char** text;
+
+   sz = backtrace (buffer, sz);
+   text = backtrace_symbols (buffer, sz);
+
+   fprintf(stderr, "======= Backtrace: =========\n");
+   for (i = 0; i < sz; i++)
+       fprintf (stderr, "%s\n", text [i]);
+
+   signal (signum, SIG_DFL);
+   raise (signum);
+}/*}}}*/
+#endif
+
+void las_install_sighandlers()
+{
+#ifdef __GLIBC__
+    signal (SIGABRT, signal_handling);
+    signal (SIGSEGV, signal_handling);
+#else
+    verbose_output_print(0, 0, "# Cannot catch signals, lack glibc support\n");
+#endif
+}
+
+
 
 /* The trivial calls for when TRACE_K is *not* defined are inlines in
  * las-debug.h */

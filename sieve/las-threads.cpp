@@ -48,52 +48,55 @@ T &reservation_array<T>::reserve(int wish)
 
   if (wish >= 0) {
       ASSERT_ALWAYS(!in_use[wish]);
-      in_use[wish]=true;
-      leave();
-      return BAs[wish];
+      i=wish;
+      goto happy;
   }
 
   while ((i = find_free()) == n)
     wait(cv);
 
   if (choose_least_full) {
-    /* Find the least-full bucket array */
-    double least_full = 1.;
-    double most_full = 0;
-    /* We want indices too. For most full buckets, we even want to report
-     * the exact index of the overflowing buckets */
-    size_t least_full_index = n;
-    std::pair<size_t, unsigned int> most_full_index;
+    /* Find the least-full bucket array. A bucket array that has one, or
+     * maybe several full buckets, but isn't full on average may still be
+     * used. We'll prefer the least full bucket arrays anyway.
+     */
     if (verbose)
-      verbose_output_print(0, 3, "# Looking for least full bucket\n");
-    for (size_t j = 0; j < n; j++) {
-      if (in_use[j])
+      verbose_output_print(0, 3, "# Looking for least full bucket array\n");
+    double least_full = 1000; /* any large value */
+    int least_full_index = -1;
+    for (i = 0; i < n; i++) {
+      if (in_use[i])
         continue;
-      double full = BAs[j].average_full();
-      if (verbose)
-        verbose_output_print(0, 3, "# Bucket %zu is %.0f%% full\n",
-                             j, full * 100.);
-      if (full > most_full) {
-          most_full = full;
-          most_full_index = std::make_pair(j, 0);
-      }
+      double full = BAs[i].average_full();
       if (full < least_full) {
-        least_full = full;
-        least_full_index = j;
+          least_full = full;
+          least_full_index = i;
       }
     }
-    if (least_full_index == n || least_full >= 1.) {
-        verbose_output_print(0, 1, "# Error: buckets are full, throwing exception\n");
-        ASSERT_ALWAYS(most_full > 1);
-        size_t j = most_full_index.first;
-        unsigned int i = most_full_index.second;
-        /* important ! */
-        leave();
-        throw buckets_are_full(bkmult_specifier::getkey<typename T::update_t>(), i,
-                BAs[j].nb_of_updates(i), BAs[j].room_allocated_for_updates(i));
+    if (least_full_index >= 0) {
+        if (verbose)
+            verbose_output_print(0, 3, "# Bucket %d is %.0f%% full\n",
+                    least_full_index, least_full * 100.);
+        i = least_full_index;
+        goto happy;
     }
-    i = least_full_index;
+    /*
+     * Now all bucket arrays are full on average. We're going to scream
+     * and throw an exception. Now where we ought to go from here is not
+     * really decided upon based on our analysis, but rather on the check
+     * that is done in check_buckets_max_full. Here we'll just throw a
+     * mostly phony exception that will maybe be caught and acted upon,
+     * or maybe not.
+     */
+    leave(); /* important ! */
+
+    auto k = bkmult_specifier::getkey<typename T::update_t>();
+    verbose_output_print(0, 1, "# Error: %s buckets are full (least avg %f), throwing exception\n",
+            bkmult_specifier::printkey(k).c_str(),
+            least_full);
+    throw buckets_are_full(k, -1, least_full * 1e6, 1 * 1e6); 
   }
+happy:
   in_use[i] = true;
   leave();
   return BAs[i];
@@ -115,6 +118,11 @@ template class reservation_array<bucket_array_t<2, shorthint_t> >;
 template class reservation_array<bucket_array_t<3, shorthint_t> >;
 template class reservation_array<bucket_array_t<1, longhint_t> >;
 template class reservation_array<bucket_array_t<2, longhint_t> >;
+template class reservation_array<bucket_array_t<1, emptyhint_t> >;
+template class reservation_array<bucket_array_t<2, emptyhint_t> >;
+template class reservation_array<bucket_array_t<3, emptyhint_t> >;
+template class reservation_array<bucket_array_t<1, logphint_t> >;
+template class reservation_array<bucket_array_t<2, logphint_t> >;
 
 /* Reserve the required number of bucket arrays. For shorthint BAs, we
  * need at least as many as there are threads filling them (or more, for
@@ -133,16 +141,26 @@ reservation_group::reservation_group(int nr_bucket_arrays)
      * #1l.
      */
     RA1_long(nr_bucket_arrays),
-    RA2_long(nr_bucket_arrays)
+    RA2_long(nr_bucket_arrays),
+    RA1_empty(nr_bucket_arrays),
+    RA2_empty(nr_bucket_arrays),
+    RA3_empty(nr_bucket_arrays),
+    RA1_logp(nr_bucket_arrays),
+    RA2_logp(nr_bucket_arrays)
 {
 }
 
+
+/* TODO: we may expose two distinct runtime functions that trigger
+ * allocation either on the bare or non-bare bucket arrays.
+ */
 void
 reservation_group::allocate_buckets(const int *n_bucket,
         bkmult_specifier const& mult,
         std::array<double, FB_MAX_PARTS> const & fill_ratio, int logI,
         nfs_aux & aux,
-        thread_pool & pool)
+        thread_pool & pool,
+        bool with_hints)
 {
   /* Short hint updates are generated only by fill_in_buckets(), so each BA
      gets filled only by its respective FB part */
@@ -151,16 +169,28 @@ reservation_group::allocate_buckets(const int *n_bucket,
   typedef typename decltype(RA3_short)::update_t T3s;
   typedef typename decltype(RA1_long)::update_t T1l;
   typedef typename decltype(RA2_long)::update_t T2l;
-  RA1_short.allocate_buckets(n_bucket[1], mult.get<T1s>()*fill_ratio[1], logI, aux, pool);
-  RA2_short.allocate_buckets(n_bucket[2], mult.get<T2s>()*fill_ratio[2], logI, aux, pool);
-  RA3_short.allocate_buckets(n_bucket[3], mult.get<T3s>()*fill_ratio[3], logI, aux, pool);
 
-  /* Long hint bucket arrays get filled by downsorting. The level-2 longhint
-     array gets the shorthint updates from level 3 sieving, and the level-1
-     longhint array gets the shorthint updates from level 2 sieving as well
-     as the previously downsorted longhint updates from level 3 sieving. */
-  RA1_long.allocate_buckets(n_bucket[1], mult.get<T1l>()*(fill_ratio[2] + fill_ratio[3]), logI, aux, pool);
-  RA2_long.allocate_buckets(n_bucket[2], mult.get<T2l>()*fill_ratio[3], logI, aux, pool);
+  /* We use the same multiplier definitions for both "with" and "without
+   * hints".
+   */
+  if (with_hints) {
+      RA1_short.allocate_buckets(n_bucket[1], mult.get<T1s>()*fill_ratio[1], logI, aux, pool);
+      RA2_short.allocate_buckets(n_bucket[2], mult.get<T2s>()*fill_ratio[2], logI, aux, pool);
+      RA3_short.allocate_buckets(n_bucket[3], mult.get<T3s>()*fill_ratio[3], logI, aux, pool);
+
+      /* Long hint bucket arrays get filled by downsorting. The level-2 longhint
+         array gets the shorthint updates from level 3 sieving, and the level-1
+         longhint array gets the shorthint updates from level 2 sieving as well
+         as the previously downsorted longhint updates from level 3 sieving. */
+      RA1_long.allocate_buckets(n_bucket[1], mult.get<T1l>()*(fill_ratio[2] + fill_ratio[3]), logI, aux, pool);
+      RA2_long.allocate_buckets(n_bucket[2], mult.get<T2l>()*fill_ratio[3], logI, aux, pool);
+  } else {
+      RA1_empty.allocate_buckets(n_bucket[1], mult.get<T1s>()*fill_ratio[1], logI, aux, pool);
+      RA2_empty.allocate_buckets(n_bucket[2], mult.get<T2s>()*fill_ratio[2], logI, aux, pool);
+      RA3_empty.allocate_buckets(n_bucket[3], mult.get<T3s>()*fill_ratio[3], logI, aux, pool);
+      RA1_logp.allocate_buckets(n_bucket[1], mult.get<T1l>()*(fill_ratio[2] + fill_ratio[3]), logI, aux, pool);
+      RA2_logp.allocate_buckets(n_bucket[2], mult.get<T2l>()*fill_ratio[3], logI, aux, pool);
+  }
 }
 
 
@@ -200,6 +230,7 @@ reservation_group::get()
 {
   return RA2_long;
 }
+
 /* mapping types to objects is a tricky business. The code below looks
  * like red tape. But sophisticated means to avoid it would be even
  * longer (the naming difference "get" versus "cget" is not the annoying
@@ -235,5 +266,77 @@ reservation_group::cget() const
 {
   return RA2_long;
 }
+template <>
+const reservation_array<bucket_array_t<3, longhint_t> > &
+reservation_group::cget<3, longhint_t>() const
+{
+    ASSERT_ALWAYS(0);
+}
 
 
+/* And ditto for empty or near-empty hints */
+template<>
+reservation_array<bucket_array_t<1, emptyhint_t> > &
+reservation_group::get()
+{
+  return RA1_empty;
+}
+template<>
+reservation_array<bucket_array_t<2, emptyhint_t> > &
+reservation_group::get()
+{
+  return RA2_empty;
+}
+template<>
+reservation_array<bucket_array_t<3, emptyhint_t> > &
+reservation_group::get() {
+  return RA3_empty;
+}
+template<>
+reservation_array<bucket_array_t<1, logphint_t> > &
+reservation_group::get()
+{
+  return RA1_logp;
+}
+template<>
+reservation_array<bucket_array_t<2, logphint_t> > &
+reservation_group::get()
+{
+  return RA2_logp;
+}
+template<>
+const reservation_array<bucket_array_t<1, emptyhint_t> > &
+reservation_group::cget() const
+{
+  return RA1_empty;
+}
+template<>
+const reservation_array<bucket_array_t<2, emptyhint_t> > &
+reservation_group::cget() const
+{
+  return RA2_empty;
+}
+template<>
+const reservation_array<bucket_array_t<3, emptyhint_t> > &
+reservation_group::cget() const
+{
+  return RA3_empty;
+}
+template<>
+const reservation_array<bucket_array_t<1, logphint_t> > &
+reservation_group::cget() const
+{
+  return RA1_logp;
+}
+template<>
+const reservation_array<bucket_array_t<2, logphint_t> > &
+reservation_group::cget() const
+{
+  return RA2_logp;
+}
+template <>
+const reservation_array<bucket_array_t<3, logphint_t> > &
+reservation_group::cget<3, logphint_t>() const
+{
+    ASSERT_ALWAYS(0);
+}

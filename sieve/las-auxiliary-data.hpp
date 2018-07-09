@@ -94,19 +94,20 @@ class nfs_aux {/*{{{*/
     std::array<sieve_checksum,2> checksum_post_sieve;
 
     struct thread_data {/*{{{*/
-        nfs_aux & common;
+        //nfs_aux & common;
         /* each thread has its own, and we'll summarize at the end */
         las_report rep;
         timetree_t timer;
         std::array<sieve_checksum,2> checksum_post_sieve;
         where_am_I w;
-        thread_data(nfs_aux & t) : common(t) {}
+        //thread_data(nfs_aux & t) : common(t) {}
         void update_checksums(nfs_work::thread_data & tws);
     };/*}}}*/
 
     std::vector<thread_data> th;
 
     double qt0;
+    double wct_qt0;
 
     nfs_aux(las_info const & las,
             las_todo_entry const & doing,
@@ -120,11 +121,10 @@ class nfs_aux {/*{{{*/
             rel_hash_p(rel_hash_p),
             rep(rep),
             timer_special_q(t),
-            th(nthreads, thread_data(*this))
+            th(nthreads)//, thread_data(*this))
     {
+        wct_qt0 = wct_seconds();
         qt0 = seconds();
-        ASSERT_ALWAYS(!timer_special_q.running());
-        timer_special_q.start();
     }
 
 

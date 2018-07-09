@@ -196,6 +196,9 @@ cado_divert_test(F9 sieve_check_overfull
         )
 cado_divert_test(F9_sieve_check_overfull 1short
     APPEND_ENVIRONMENT bkmult=1.1,1s:0.5)
+cado_divert_test(F9_sieve_check_overfull 1short_twosteps
+    APPEND_ARGUMENTS -B 10
+    APPEND_ENVIRONMENT bkmult=1.1,1s:0.5)
 cado_divert_test(F9_sieve_check_overfull 1long
     APPEND_ENVIRONMENT bkmult=1.1,1l:0.5)
 # working with the _2short overruns is a bit subtle. Because if we go
@@ -204,7 +207,7 @@ cado_divert_test(F9_sieve_check_overfull 1long
 # Especially because the case below has only one level-2 bucket anyway
 # (it is so contrived). So we are quite likely to get a plain, unpolite,
 # Segmentation Fault. The check below has been tuned so that the overrun
-# mechanism is indeed triggered should run successfully.
+# mechanism is indeed triggered, and so should run successfully.
 cado_divert_test(F9_sieve_check_overfull 2short
     APPEND_ENVIRONMENT bkmult=1.1,2s:0.48)
 

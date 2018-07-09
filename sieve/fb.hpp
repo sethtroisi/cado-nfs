@@ -330,6 +330,10 @@ class fb_factorbase {
     unsigned long lim;
     unsigned long powlim;
 
+    public:
+    bool empty() const { return lim == 0; }
+
+    private:
     typedef multityped_array<fb_entries_factory, -1, MAX_ROOTS+1> entries_t;
     entries_t entries;
 

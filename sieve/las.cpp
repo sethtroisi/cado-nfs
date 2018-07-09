@@ -17,6 +17,8 @@
 #include <stdarg.h> /* Required so that GMP defines gmp_vfprintf() */
 #include <algorithm>
 #include <vector>
+#include <sstream>  /* for c++ string handling */
+#include <iterator> /* ostream_iterator */
 #include "threadpool.hpp"
 #include "fb.hpp"
 #include "portability.h"
@@ -63,6 +65,7 @@ int exit_after_rel_found = 0;
 int allow_largesq = 0;
 int adjust_strategy = 0;
 int sync_at_special_q = 0;
+int trialdiv_first_side = 0;
 
 double general_grace_time_ratio = DESCENT_DEFAULT_GRACE_TIME_RATIO;
 
@@ -760,12 +763,12 @@ NOPROFILE_STATIC
 #endif
 void
 apply_one_update (unsigned char * const S,
-        const bucket_update_t<1, HINT> * const u,
+        bucket_update_t<1, HINT> const & u,
         const unsigned char logp, where_am_I & w)
 {
-  WHERE_AM_I_UPDATE(w, h, u->hint);
-  WHERE_AM_I_UPDATE(w, x, u->x);
-  sieve_increase(S + (u->x), logp, w);
+  WHERE_AM_I_UPDATE(w, h, u.hint_for_where_am_i());
+  WHERE_AM_I_UPDATE(w, x, u.x);
+  sieve_increase(S + u.x, logp, w);
 }
 
 template <typename HINT>
@@ -775,14 +778,16 @@ NOPROFILE_STATIC
 #endif
 void
 apply_one_bucket (unsigned char *S,
-        const bucket_array_t<1, HINT> &BA, const int i,
+        bucket_array_t<1, HINT> const &BA, const int i,
         fb_factorbase::slicing::part const & fbp, where_am_I & w)
 {
   WHERE_AM_I_UPDATE(w, p, 0);
 
   for (slice_index_t i_slice = 0; i_slice < BA.get_nr_slices(); i_slice++) {
-    const bucket_update_t<1, HINT> *it = BA.begin(i, i_slice);
-    const bucket_update_t<1, HINT> * const it_end = BA.end(i, i_slice);
+      auto sl = BA.slice_range(i, i_slice);
+      auto it = sl.begin();
+      auto it_end = sl.end();
+
     const slice_index_t slice_index = BA.get_slice_index(i_slice);
     const unsigned char logp = fbp[slice_index].get_logp();
 
@@ -800,7 +805,7 @@ apply_one_bucket (unsigned char *S,
     }
 
     while (it != next_align)
-      apply_one_update<HINT> (S, it++, logp, w);
+      apply_one_update<HINT> (S, *it++, logp, w);
 
     while (it + 16 <= it_end) {
       uint64_t x0, x1, x2, x3, x4, x5, x6, x7;
@@ -850,7 +855,7 @@ apply_one_bucket (unsigned char *S,
     }
 #endif
     while (it != it_end)
-      apply_one_update<HINT> (S, it++, logp, w);
+      apply_one_update<HINT> (S, *it++, logp, w);
   }
 }
 
@@ -863,22 +868,17 @@ void apply_one_bucket<shorthint_t> (unsigned char *S,
 template <>
 void apply_one_bucket<longhint_t> (unsigned char *S,
         const bucket_array_t<1, longhint_t> &BA, const int i,
-        fb_factorbase::slicing::part const & fbp, where_am_I & w) {
-  WHERE_AM_I_UPDATE(w, p, 0);
+        fb_factorbase::slicing::part const & fbp, where_am_I & w)
+{
+    WHERE_AM_I_UPDATE(w, p, 0);
 
-  // There is only one fb_slice.
-  slice_index_t i_slice = 0;
-  const bucket_update_t<1, longhint_t> *it = BA.begin(i, i_slice);
-  const bucket_update_t<1, longhint_t> * const it_end = BA.end(i, i_slice);
-
-  // FIXME: Computing logp for each and every entry seems really, really
-  // inefficient. Could we add it to a bucket_update_t of "longhint"
-  // type?
-  while (it != it_end) {
-    slice_index_t index = it->index;
-    const unsigned char logp = fbp[index].get_logp();
-    apply_one_update<longhint_t> (S, it++, logp, w);
-  }
+    // There is only one fb_slice. Slice indices are embedded in the
+    // (long) hints.
+    for(auto const & it : BA.slice_range(i, 0)) {
+        slice_index_t index = it.index;
+        const unsigned char logp = fbp[index].get_logp();
+        apply_one_update<longhint_t> (S, it, logp, w);
+    }
 }
 /* }}} */
 
@@ -1149,9 +1149,9 @@ void SminusS (unsigned char *S1, unsigned char *EndS1, unsigned char *S2) {/*{{{
              "add $0x40,%0\n"
              "add $0x40,%1\n"
              : "+&r"(S1i), "+&r"(S2i), "=&x"(x0), "=&x"(x1), "=&x"(x2), "=&x"(x3) : "x"(z));
-        /* I prefer use ASM than intrinsics to be sure each 4 instructions which
-         * use exactly a cache line are together. I'm 99% sure it's not useful...
-         * but it's more beautiful :-)
+        /* I prefer use ASM than intrinsics to be sure each 4
+         * instructions which use exactly a cache line are together. I'm
+         * 99% sure it's not useful...  but it's more beautiful :-)
          */
         /*
            __m128i x0, x1, x2, x3;
@@ -1228,6 +1228,81 @@ bool register_contending_relation(las_info const & las, sieve_info const & si, r
 }/*}}}*/
 #endif /* DLP_DESCENT */
 
+struct process_bucket_region_run : public process_bucket_region_spawn {
+    worker_thread * worker;
+    nfs_aux::thread_data & taux;
+    nfs_work::thread_data & tws;
+    timetree_t & timer;
+    int bucket_relative_index;
+    timetree_t::accounting_child_autoactivate dummy;
+    las_report& rep;
+    unsigned char * S[2];
+    /* We will have this point to the thread's where_am_I data member.
+     * (within nfs_aux::th). However it might be just as easy to let this
+     * field be defined here, and drop the latter.
+     */
+    where_am_I & w;
+    bool do_resieve;
+
+    /* A note on SS versus S[side]
+     *
+     * SS is temp data. It's only used here, and it could well be defined
+     * here only. We declare it at the thread_data level to avoid
+     * constant malloc()/free().
+     *
+     * S[side] is where we compute the norm initialization. Some
+     * tolerance is subtracted from these lognorms to account for
+     * accepted cofactors.
+     *
+     * SS is the bucket region where we apply the buckets, and also later
+     * where we do the small sieve.
+     *
+     * as long as SS[x] >= S[side][x], we are good.
+     */
+
+    unsigned char *SS;
+    
+    struct side_data {/*{{{*/
+        bucket_array_complete purged;   /* for purge_buckets */
+        bucket_primes_t primes;         /* for resieving */
+        side_data() :
+            purged(bucket_array_complete(BUCKET_REGION)),
+            primes(bucket_primes_t(BUCKET_REGION))
+        {}
+    };/*}}}*/
+
+    std::array<side_data, 2> sides;
+
+    process_bucket_region_run(process_bucket_region_spawn const & p, worker_thread * worker, int id);
+
+    /* will be passed as results of functions
+    std::vector<uint32_t> survivors;
+    std::vector<bucket_update_t<1, shorthint_t>::br_index_t> survivors2;
+     * */
+
+    /* most probably useless, I guess
+    int N;
+    int cpt;
+    int copr;
+    */
+
+    void init_norms(int side);
+
+    template<bool with_hints>
+    void apply_buckets_inner(int side);
+
+    void apply_buckets(int side);
+    void small_sieve(int side);
+    void SminusS(int side);
+    typedef std::vector<bucket_update_t<1, shorthint_t>::br_index_t> survivors_t;
+    survivors_t search_survivors();
+    void purge_buckets(int side);
+    void resieve(int side);
+    void cofactoring_sync (survivors_t & survivors2);
+    void operator()();
+};
+
+
 /*{{{ process_bucket_region, split into pieces. */
     process_bucket_region_run::process_bucket_region_run(process_bucket_region_spawn const & p, worker_thread * worker, int id): /* {{{ */
             process_bucket_region_spawn(p),
@@ -1253,12 +1328,15 @@ bool register_contending_relation(las_info const & las, sieve_info const & si, r
         SS = tws.SS;
         memset(SS, 0, BUCKET_REGION);
 
+        /* see comment in process_bucket_region_run::operator()() */
+        do_resieve = si.conf.sides[0].lim && si.conf.sides[1].lim;
+
         /* we're ready to go ! processing is in the operator() method.
          */
     }/*}}}*/
 void process_bucket_region_spawn::operator()(worker_thread * worker, int id) /*{{{{*/
 {
-    /* create a temp obkect with more fields, and dispose it shortly
+    /* create a temp object with more fields, and dispose it shortly
      * afterwards once we're done.  */
     process_bucket_region_run(*this, worker, id)();
 }/*}}}*/
@@ -1275,12 +1353,15 @@ void process_bucket_region_run::init_norms(int side)/*{{{*/
                 side, w.N, trace_Nx.x, S[side][trace_Nx.x]);
 #endif
 }/*}}}*/
-void process_bucket_region_run::apply_buckets(int side)/*{{{*/
+    template<bool with_hints>
+void process_bucket_region_run::apply_buckets_inner(int side)/*{{{*/
 {
+    typedef typename hints_proxy<with_hints>::l my_longhint_t;
+    typedef typename hints_proxy<with_hints>::s my_shorthint_t;
     rep.ttbuckets_apply -= seconds_thread();
     {
         CHILD_TIMER(timer, "apply buckets");
-        for (auto const & BA : ws.bucket_arrays<1, shorthint_t>(side))
+        for (auto const & BA : ws.bucket_arrays<1, my_shorthint_t>(side))
             apply_one_bucket(SS, BA, bucket_relative_index, si.sides[side].fbs->get_part(1), w);
     }
 
@@ -1288,7 +1369,7 @@ void process_bucket_region_run::apply_buckets(int side)/*{{{*/
     if (si.toplevel > 1) {
         CHILD_TIMER(timer, "apply downsorted buckets");
 
-        for (auto const & BAd : ws.bucket_arrays<1, longhint_t>(side)) {
+        for (auto const & BAd : ws.bucket_arrays<1, my_longhint_t>(side)) {
             // FIXME: the updates could come from part 3 as well,
             // not only part 2.
             ASSERT_ALWAYS(si.toplevel <= 2);
@@ -1297,6 +1378,15 @@ void process_bucket_region_run::apply_buckets(int side)/*{{{*/
     }
     rep.ttbuckets_apply += seconds_thread();
 }/*}}}*/
+void process_bucket_region_run::apply_buckets(int side)
+{
+    if (do_resieve) {
+        apply_buckets_inner<true>(side);
+    } else {
+        apply_buckets_inner<false>(side);
+    }
+}
+
 void process_bucket_region_run::small_sieve(int side)/*{{{*/
 {
     CHILD_TIMER(timer, "small sieve");
@@ -1325,9 +1415,11 @@ void process_bucket_region_run::SminusS(int side)/*{{{*/
                 side, w.N, trace_Nx.x, S[side][trace_Nx.x]);
 #endif
 }/*}}}*/
-process_bucket_region_run::surv1_t process_bucket_region_run::search_survivors() /*{{{*/
+process_bucket_region_run::survivors_t process_bucket_region_run::search_survivors() /*{{{*/
 {
-    surv1_t survivors;
+    typedef std::vector<uint32_t> surv1_t;
+
+    surv1_t temp_sv;
 
     CHILD_TIMER(timer, __func__);
     TIMER_CATEGORY(timer, search_survivors());
@@ -1384,7 +1476,8 @@ process_bucket_region_run::surv1_t process_bucket_region_run::search_survivors()
 
     rep.survivors.before_sieve += 1U << LOG_BUCKET_REGION;
 
-    survivors.reserve(128);
+    temp_sv.reserve(128);
+
     for (unsigned int j = j0; j < j1; j++)
     {
         int offset = (j-j0) << logI;
@@ -1402,7 +1495,7 @@ process_bucket_region_run::surv1_t process_bucket_region_run::search_survivors()
             si.sides[0].lognorms->bound,
             si.sides[1].lognorms->bound,
         };
-        size_t old_size = survivors.size();
+        size_t old_size = temp_sv.size();
 
         ASSERT(j < si.J);
 
@@ -1412,7 +1505,7 @@ process_bucket_region_run::surv1_t process_bucket_region_run::search_survivors()
                 N,
                 si.j_div,
                 si.conf.unsieve_thresh,
-                si.us, survivors, si.conf.sublat);
+                si.us, temp_sv, si.conf.sublat);
 
         /* Survivors written by search_survivors_in_line() have index
          * relative to their j-line. We need to convert to index within
@@ -1428,22 +1521,12 @@ process_bucket_region_run::surv1_t process_bucket_region_run::search_survivors()
 
         if (!offset) continue;
 
-        for (size_t i_surv = old_size; i_surv < survivors.size(); i_surv++)
-            survivors[i_surv] += offset;
+        for (size_t i_surv = old_size; i_surv < temp_sv.size(); i_surv++)
+            temp_sv[i_surv] += offset;
     }
 
-    return survivors;
-}/*}}}*/
-process_bucket_region_run::surv2_t process_bucket_region_run::convert_survivors(surv1_t&& survivors)/*{{{*/
-{
-    BOOKKEEPING_TIMER(timer);
-    /* Convert data type of list from uint32_t to the correct br_index_t */
-    surv2_t survivors2;
-    survivors2.reserve(survivors.size());
-    for (auto x : survivors)
-        survivors2.push_back(x);
-    survivors.clear();
-    return survivors2;
+    /* This used to be called convert_survivors */
+    return survivors_t(begin(temp_sv), end(temp_sv));
 }/*}}}*/
 void process_bucket_region_run::purge_buckets(int side)/*{{{*/
 {
@@ -1453,7 +1536,7 @@ void process_bucket_region_run::purge_buckets(int side)/*{{{*/
 
     for (auto & BA : ws.bucket_arrays<1, shorthint_t>(side)) {
 #if defined(HAVE_SSE2) && defined(SMALLSET_PURGE)
-        sides[side].purged.purge(BA, bucket_relative_index, Sx, survivors2);
+        sides[side].purged.purge(BA, bucket_relative_index, Sx, survivors);
 #else
         sides[side].purged.purge(BA, bucket_relative_index, Sx);
 #endif
@@ -1688,11 +1771,10 @@ task_result * detached_cofac(worker_thread * worker, task_parameters * _param, i
     SIBLING_TIMER(timer, "cofactoring"); // aka factor_both_leftover_norms
     TIMER_CATEGORY(timer, cofactoring_mixed());
 
-    rep.ttcof -= microseconds_thread ();
-    rep.survivors.enter_cofactoring++;
+    rep.ttcof -= seconds_thread ();
     int pass = cur.factor_both_leftover_norms(wc);
     rep.survivors.cofactored += (pass != 0);
-    rep.ttcof += microseconds_thread ();
+    rep.ttcof += seconds_thread ();
 
     auto res = new detached_cofac_result;
 
@@ -1745,24 +1827,25 @@ task_result * detached_cofac(worker_thread * worker, task_parameters * _param, i
 
         const char * dup_comment = NULL;
 
-        if (!is_new_rel) {
-            /* can't insert, so already there: either it's a
-             * duplicate of a relation that was already printed, or a
-             * relation that was already identified as a duplicate.
-             * But at any rate it's not to be printed and we don't
-             * even want to bother testing whether it's a duplicate
-             * in the sense of relation_is_duplicate()
-             */
-            dup_comment = "# DUP ";
-        } else if (do_check && relation_is_duplicate(rel,
+        if (do_check && relation_is_duplicate(rel,
                     wc.doing, wc.las, wc.sc, wc.strategies,
                     adjust_strategy)) {
             dup_comment = "# DUPE ";
+        } else {
+            if (!is_new_rel) {
+                /* the relation was already printed in a prior attempt,
+                 * that was aborted because of an exception. */
+                dup_comment = "# DUP ";
+            }
+            /* Even if the relation was already printed, the las_report
+             * object is (now) specific to the current attempt, and has
+             * no memory of the number of reports for the failed
+             * attempt. Therefore we need to count the relation as a
+             * report no matter what.
+             */
+            rep.reports ++;
+            /* Not clear what gives when we have Galois relations.  */
         }
-
-        /* Not clear what gives when we have Galois relations.
-         */
-        rep.reports += !dup_comment;
 
         if (!dup_comment) dup_comment = "";
 
@@ -1797,12 +1880,10 @@ task_result * detached_cofac(worker_thread * worker, task_parameters * _param, i
 
     return (task_result*) res;
 }
-#if 0
-#endif
 
 /* }}} */
 /*}}}*/
-void process_bucket_region_run::cofactoring_sync (surv2_t & survivors2)/*{{{*/
+void process_bucket_region_run::cofactoring_sync (survivors_t & survivors)/*{{{*/
 {
     CHILD_TIMER(timer, __func__);
     TIMER_CATEGORY(timer, cofactoring_mixed());
@@ -1812,12 +1893,13 @@ void process_bucket_region_run::cofactoring_sync (surv2_t & survivors2)/*{{{*/
 
     cofac_standalone cur;
 
-    for (size_t i_surv = 0 ; i_surv < survivors2.size(); i_surv++) {
+
+    for (size_t i_surv = 0 ; i_surv < survivors.size(); i_surv++) {
 #ifdef DLP_DESCENT
         if (ws.las.tree.must_take_decision())
             break;
 #endif
-        const size_t x = survivors2[i_surv];
+        const size_t x = survivors[i_surv];
         ASSERT_ALWAYS (Sx[x] != 255);
         ASSERT(x < ((size_t) 1 << LOG_BUCKET_REGION));
 
@@ -1870,81 +1952,135 @@ void process_bucket_region_run::cofactoring_sync (surv2_t & survivors2)/*{{{*/
         NxToIJ (&i, &j, N, x, si);
         adjustIJsublat(&i, &j, si);
 
-        /* This can be changed (and should be a command line parameter)
-        */
-        static const int trialdiv_first_side = 0;
+        if (do_resieve) {
 
-        for(int pside = 0 ; pass && pside < 2 ; pside++) {
-            int side = trialdiv_first_side ^ pside;
+            for(int pside = 0 ; pass && pside < 2 ; pside++) {
+                int side = trialdiv_first_side ^ pside;
 
-            CHILD_TIMER_PARAMETRIC(timer, "side ", side, " pre-cofactoring checks");
-            TIMER_CATEGORY(timer, cofactoring(side));
+                CHILD_TIMER_PARAMETRIC(timer, "side ", side, " pre-cofactoring checks");
+                TIMER_CATEGORY(timer, cofactoring(side));
 
 
-            SIBLING_TIMER(timer, "recompute complete norm");
+                SIBLING_TIMER(timer, "recompute complete norm");
 
-            // Trial divide norm on side 'side'
-            /* Compute the norms using the polynomials transformed to 
-               i,j-coordinates. The transformed polynomial on the 
-               special-q side is already divided by q */
-            si.sides[side].lognorms->norm(cur.norm[side], i, j);
+                // Trial divide norm on side 'side'
+                /* Compute the norms using the polynomials transformed to 
+                   i,j-coordinates. The transformed polynomial on the 
+                   special-q side is already divided by q */
+                si.sides[side].lognorms->norm(cur.norm[side], i, j);
 
 #ifdef TRACE_K/*{{{*/
-            if (cur.trace_on_spot()) {
-                verbose_output_vfprint(TRACE_CHANNEL, 0,
-                        gmp_vfprintf, "# start trial division for norm=%Zd ", (mpz_srcptr) cur.norm[side]);
-                verbose_output_print(TRACE_CHANNEL, 0,
-                        "on side %d for (%" PRId64 ",%" PRIu64 ")\n", side, cur.a, cur.b);
-            }
+                if (cur.trace_on_spot()) {
+                    verbose_output_vfprint(TRACE_CHANNEL, 0,
+                            gmp_vfprintf, "# start trial division for norm=%Zd ", (mpz_srcptr) cur.norm[side]);
+                    verbose_output_print(TRACE_CHANNEL, 0,
+                            "on side %d for (%" PRId64 ",%" PRIu64 ")\n", side, cur.a, cur.b);
+                }
 #endif/*}}}*/
 
-            if (si.conf.sides[side].lim == 0) {
-                /* This is a shortcut. We're probably replacing sieving
-                 * by a product tree, there's no reason to bother doing
-                 * trial division at this point (or maybe there is ?
-                 * would that change the bit size significantly ?) */
-                rep.survivors.check_leftover_norm_on_side[side] ++;
-                continue;
-            }
+                if (si.conf.sides[side].lim == 0) {
+                    /* This is a shortcut. We're probably replacing sieving
+                     * by a product tree, there's no reason to bother doing
+                     * trial division at this point (or maybe there is ?
+                     * would that change the bit size significantly ?) */
+                    rep.survivors.check_leftover_norm_on_side[side] ++;
+                    continue;
+                }
 
-            SIBLING_TIMER(timer, "trial division");
+                SIBLING_TIMER(timer, "trial division");
 
-            verbose_output_print(1, 2, "FIXME %s, line %d\n", __FILE__, __LINE__);
-            const bool handle_2 = true; /* FIXME */
-            rep.survivors.trial_divided_on_side[side]++;
+                verbose_output_print(1, 2, "FIXME %s, line %d\n", __FILE__, __LINE__);
+                const bool handle_2 = true; /* FIXME */
+                rep.survivors.trial_divided_on_side[side]++;
 
-            trial_div (cur.factors[side], cur.norm[side], N, x,
-                    handle_2,
-                    &sides[side].primes,
-                    &sides[side].purged,
-                    si.sides[side].trialdiv_data.get(),
-                    cur.a, cur.b,
-                    *si.sides[side].fbs);
+                trial_div (cur.factors[side], cur.norm[side], N, x,
+                        handle_2,
+                        &sides[side].primes,
+                        &sides[side].purged,
+                        si.sides[side].trialdiv_data.get(),
+                        cur.a, cur.b,
+                        *si.sides[side].fbs);
 
-            /* if q is composite, its prime factors have not been sieved.
-             * Check if they divide. */
-            if ((side == si.doing.side) && (!si.doing.prime_sq)) {
-                for (const auto &x : si.doing.prime_factors) {
-                    if (mpz_divisible_uint64_p(cur.norm[side], x)) {
-                        mpz_divexact_uint64(cur.norm[side], cur.norm[side], x);
-                        cur.factors[side].push_back(x);
+                /* if q is composite, its prime factors have not been sieved.
+                 * Check if they divide. They probably don't, since we
+                 * have computed the norm with the polynomials adapted to
+                 * the (i,j) plane, and q divided out. But still,
+                 * valuations are not desired here.
+                 */
+                if ((side == si.doing.side) && (!si.doing.prime_sq)) {
+                    for (const auto &x : si.doing.prime_factors) {
+                        if (mpz_divisible_uint64_p(cur.norm[side], x)) {
+                            mpz_divexact_uint64(cur.norm[side], cur.norm[side], x);
+                            cur.factors[side].push_back(x);
+                        }
                     }
                 }
-            }
 
-            SIBLING_TIMER(timer, "check_leftover_norm");
+                SIBLING_TIMER(timer, "check_leftover_norm");
 
-            pass = check_leftover_norm (cur.norm[side], si.conf.sides[side]);
+                pass = check_leftover_norm (cur.norm[side], si.conf.sides[side]);
 #ifdef TRACE_K
-            if (cur.trace_on_spot()) {
-                verbose_output_vfprint(TRACE_CHANNEL, 0, gmp_vfprintf,
-                        "# checked leftover norm=%Zd", (mpz_srcptr) cur.norm[side]);
-                verbose_output_print(TRACE_CHANNEL, 0,
-                        " on side %d for (%" PRId64 ",%" PRIu64 "): %d\n",
-                        side, cur.a, cur.b, pass);
-            }
+                if (cur.trace_on_spot()) {
+                    verbose_output_vfprint(TRACE_CHANNEL, 0, gmp_vfprintf,
+                            "# checked leftover norm=%Zd", (mpz_srcptr) cur.norm[side]);
+                    verbose_output_print(TRACE_CHANNEL, 0,
+                            " on side %d for (%" PRId64 ",%" PRIu64 "): %d\n",
+                            side, cur.a, cur.b, pass);
+                }
 #endif
-            rep.survivors.check_leftover_norm_on_side[side] += pass;
+                rep.survivors.check_leftover_norm_on_side[side] += pass;
+            }
+        } else {
+            ASSERT_ALWAYS(ws.las.batch);
+
+            /* no resieve, so no list of prime factors to divide. No
+             * point in doing trial division anyway either.
+             */
+            for(int side = 0 ; side < 2 ; side++) {
+                CHILD_TIMER_PARAMETRIC(timer, "side ", side, " pre-cofactoring checks");
+                TIMER_CATEGORY(timer, cofactoring(side));
+
+                SIBLING_TIMER(timer, "recompute complete norm");
+
+                /* factor() is batch.cpp recomputes the complete norm, so
+                 * there's no need to compute the norm right now for the
+                 * side we've sieved with.
+                 */
+
+                if (!si.conf.sides[side].lim)
+                    si.sides[side].lognorms->norm(cur.norm[side], i, j);
+                else {
+                    /* This is recognized specially in the
+                     * factor_simple_minded() code in batch.cpp
+                     */
+                    mpz_set_ui(cur.norm[side], 0);
+                }
+
+                /* We don't even bother with q and its prime factors.
+                 * We're expecting to recover just everything after the
+                 * game anyway */
+
+                /* Note that we're *NOT* doing the equivalent of
+                 * check_leftover_norm here. This is explained by two
+                 * things:
+                 *
+                 *  - while the "red zone" of post-sieve values that we
+                 *  know can't yield relations is quite wide (from L to
+                 *  B^2), it's only a marginal fraction of the total
+                 *  number of reports. Even more so if we take into
+                 *  account the necessary tolerance near the boundaries
+                 *  of the red zone.
+                 *
+                 *  - we don't have the complete norm (with factors taken
+                 *  out) at this point, so there's no way we can do a
+                 *  primality check -- which is, in fact, the most
+                 *  stringent check because it applies to the bulk of the
+                 *  candidates.
+                 *
+                 * Bottom line: we just hand over *everything* to the
+                 * batch cofactorization.
+                 */
+            }
         }
 
         if (!pass) continue;
@@ -1955,6 +2091,7 @@ void process_bucket_region_run::cofactoring_sync (surv2_t & survivors2)/*{{{*/
             // In sublat mode, some non-primitive survivors can exist.
             // The cofactoring via ECM is made aware of this, but not the
             // batch mode, so we have to ensure it.
+            rep.reports++;
             if (si.conf.sublat.m && !cur.ab_coprime()) continue;
             verbose_output_start_batch ();
             cur.print_as_survivor();
@@ -1965,6 +2102,7 @@ void process_bucket_region_run::cofactoring_sync (surv2_t & survivors2)/*{{{*/
         if (ws.las.batch)
         {
             /* see above */
+            rep.reports++;
             if (si.conf.sublat.m && !cur.ab_coprime()) continue;
             /* make sure threads don't write the cofactor list at the
              * same time !!! */
@@ -1991,6 +2129,9 @@ void process_bucket_region_run::cofactoring_sync (surv2_t & survivors2)/*{{{*/
 }/*}}}*/
 void process_bucket_region_run::operator()() {/*{{{*/
 
+    // This is too verbose.
+    // fprintf(stderr, "=== entering PBR for report id %lu\n", rep.id);
+
     /* first check some early abort conditions. */
     if (recursive_descent) {
         /* For the descent mode, we bail out as early as possible. We
@@ -2006,14 +2147,20 @@ void process_bucket_region_run::operator()() {/*{{{*/
 
     for (int side = 0; side < 2; side++) {
         WHERE_AM_I_UPDATE(w, side, side);
-        sieve_info::side_info & s(si.sides[side]);
-        if (!s.fb) continue;
+        sieve_info::side_info & sis(si.sides[side]);
+        if (sis.fb->empty()) continue;
 
         MARK_TIMER_FOR_SIDE(timer, side);
 
+        /* Compute norms in S[side] */
         init_norms(side);
+
+        /* Accumulate sieve contributions in SS */
         apply_buckets(side);
         small_sieve(side);
+
+        /* compute S[side][x] = max(S[side][x] - SS[x], 0),
+         * and clear SS.  */
         SminusS(side);
 
         ws.las.dumpfiles[side].write(S[side], BUCKET_REGION);
@@ -2023,14 +2170,23 @@ void process_bucket_region_run::operator()() {/*{{{*/
     if (ws.las.verbose >= 2)
         taux.update_checksums(tws);
 
-    /* rep.ttf is going to miss the asynchronous time... */
+    /* rep.ttf does not count the asynchronous time spent in
+     * detached_cofac. */
     rep.ttf -= seconds_thread ();
 
     auto survivors = search_survivors();
-    auto survivors2 = convert_survivors(std::move(survivors));
+
+    /* The "do_resieve" flag (set above in the ctor) checks if one of the
+     * factor bases is empty. This means that we may have decided to
+     * *not* sieve on that side, refusing to pay a per-area time a second
+     * time. This is based on the rationale that we expect the *other*
+     * side to be such a selective test that it isn't worth the trouble.
+     * But then, it means that purge_buckets and resieving are not worth
+     * the trouble either.
+     */
 
     /* These two steps used to be called "prepare_cofactoring" */
-    for(int side = 0 ; side < 2 ; side++) {
+    for(int side = 0 ; do_resieve && side < 2 ; side++) {
         MARK_TIMER_FOR_SIDE(timer, side);
         purge_buckets(side);
         resieve(side);
@@ -2045,9 +2201,23 @@ void process_bucket_region_run::operator()() {/*{{{*/
     }
 #endif
 
-    cofactoring_sync(survivors2);
+#ifdef  DLP_DESCENT
+    /* we're doing detached_cofac right away in the descent case, so we
+     * must untangle the ttf and ttcof timings.
+     */
+    double tt = rep.ttcof;
+#endif
+
+    cofactoring_sync(survivors);
 
     rep.ttf += seconds_thread ();
+#ifdef  DLP_DESCENT
+    /* hack, see above. The situation where cofactoring_sync also induces
+     * ttcof is now exceptional, and taken care of here.
+     */
+    rep.ttf -= rep.ttcof - tt;
+#endif
+
 }/*}}}*/
 /*}}}*/
 
@@ -2076,6 +2246,7 @@ static void declare_usage(param_list pl)/*{{{*/
     param_list_decl_usage(pl, "q1",   "right bound of special-q range");
     param_list_decl_usage(pl, "rho",  "sieve only root r mod q0");
     param_list_decl_usage(pl, "sqside", "put special-q on this side");
+    param_list_decl_usage(pl, "trialdiv-first-side", "begin trial division on this side");
     param_list_decl_usage(pl, "random-sample", "Sample this number of special-q's at random, within the range [q0,q1]");
     param_list_decl_usage(pl, "seed", "Use this seed for the random sampling of special-q's (see random-sample)");
     param_list_decl_usage(pl, "nq", "Process this number of special-q's and stop");
@@ -2168,6 +2339,8 @@ void display_expected_memory_usage(siever_config const & sc0, cado_poly_srcptr c
         sc.instantiate_thresholds(0),
             sc.instantiate_thresholds(1) };
 
+    bool do_resieve = sc.sides[0].lim && sc.sides[1].lim;
+
     /*
        verbose_output_print(0, 2, "# base: %zu Kb\n", Memusage());
        verbose_output_print(0, 2, "# log bucket region = %d\n", LOG_BUCKET_REGION);
@@ -2184,6 +2357,7 @@ void display_expected_memory_usage(siever_config const & sc0, cado_poly_srcptr c
     size_t more;
 
     for(int side = 0 ; side < 2 ; side++) {
+        if (!sc.sides[side].lim) continue;
         double p1 = sc.sides[side].lim;
         double p0 = 2;
         /* in theory this should depend on the galois group and so on.
@@ -2218,10 +2392,12 @@ void display_expected_memory_usage(siever_config const & sc0, cado_poly_srcptr c
     int toplevel = -1;
     for(int side = 0 ; side < 2 ; side++) {
         int m;
-        for(m = 0 ; m < FB_MAX_PARTS && K[side].thresholds[m] >= sc.sides[side].lim; ++m);
+        for(m = 0 ; m < FB_MAX_PARTS && K[side].thresholds[m] < sc.sides[side].lim; ++m);
         if (m > toplevel)
             toplevel = m;
     }
+
+    ASSERT_ALWAYS(toplevel == 1 || toplevel == 2);
 
     /* the code path is radically different depending on toplevel. */
 
@@ -2244,9 +2420,10 @@ void display_expected_memory_usage(siever_config const & sc0, cado_poly_srcptr c
         // bucket_update_t<1, shorthint_t>)
 
         for(int side = 0 ; side < 2 ; side++) {
+            if (!sc.sides[side].lim) continue;
             /* In truth, I sort of know it isn't valid. We've built most
              * of the stuff on the idea that there's a global "toplevel"
-             * notion, but that barely applies when on e of the factor
+             * notion, but that barely applies when one of the factor
              * bases happens to be much smaller than the other one */
             ASSERT_ALWAYS(K[side].thresholds[2] == sc.sides[side].lim);
             double p1 = K[side].thresholds[2];
@@ -2256,35 +2433,66 @@ void display_expected_memory_usage(siever_config const & sc0, cado_poly_srcptr c
             size_t nupdates = 0.75 * (1UL << sc.logA) * (std::log(std::log(p1)) - std::log(std::log(p0)));
             nupdates += NB_DEVIATIONS_BUCKET_REGIONS * sqrt(nupdates);
             {
-                typedef bucket_update_t<2, shorthint_t> type;
+                double m;
+                size_t s;
+                if (do_resieve) {
+                    typedef bucket_update_t<2, shorthint_t> type;
+                    s=sizeof(type);
+                    m=bkmult.get<type>();
+                } else {
+                    typedef bucket_update_t<2, emptyhint_t> type;
+                    s=sizeof(type);
+                    m=bkmult.get<type>();
+                }
                 verbose_output_print(0, 1, "# level 2, side %d: %zu primes, %zu 2-updates [2s]: %zu MB\n",
                         side, nprimes, nupdates,
-                        (more = bkmult.get<type>() * nupdates * sizeof(type)) >> 20);
+                        (more = m * nupdates * s) >> 20);
                 memory += more;
             }
             {
                 // how many downsorted updates are alive at a given point in
                 // time ?
                 size_t nupdates_D = nupdates >> 8;
-                typedef bucket_update_t<1, longhint_t> type;
+                double m;
+                size_t s;
+                if (do_resieve) {
+                    typedef bucket_update_t<2, longhint_t> type;
+                    s=sizeof(type);
+                    m=bkmult.get<type>();
+                } else {
+                    typedef bucket_update_t<2, logphint_t> type;
+                    s=sizeof(type);
+                    m=bkmult.get<type>();
+                }
                 verbose_output_print(0, 1, "# level 1, side %d: %zu downsorted 1-updates [1l]: %zu MB\n",
                         side, nupdates >> 8,
-                        (more = bkmult.get<type>() * nupdates_D * sizeof(type)) >> 20);
+                        (more = m * nupdates_D * s) >> 20);
                 memory += more;
             }
         }
 
         for(int side = 0 ; side < 2 ; side++) {
+            if (!sc.sides[side].lim) continue;
             double p1 = K[side].thresholds[1];
             double p0 = K[side].thresholds[0];
             size_t nprimes = nprimes_interval(p0, p1);
             int A0 = LOG_BUCKET_REGION + 8;
             size_t nupdates = 0.75 * (1UL << A0) * (std::log(std::log(p1)) - std::log(std::log(p0)));
             nupdates += NB_DEVIATIONS_BUCKET_REGIONS * sqrt(nupdates);
-            typedef bucket_update_t<1, shorthint_t> type;
+            double m;
+            size_t s;
+            if (do_resieve) {
+                typedef bucket_update_t<1, shorthint_t> type;
+                s=sizeof(type);
+                m=bkmult.get<type>();
+            } else {
+                typedef bucket_update_t<1, emptyhint_t> type;
+                s=sizeof(type);
+                m=bkmult.get<type>();
+            }
             verbose_output_print(0, 1, "# level 1, side %d: %zu primes, %zu 1-updates [1s]: %zu MB\n",
                     side, nprimes, nupdates,
-                    (more = bkmult(type()) * nupdates * sizeof(type)) >> 20);
+                    (more = m * nupdates * s) >> 20);
             memory += more;
             verbose_output_print(0, 1, "# level 1, side %d: %zu primes => precomp_plattices: %zu MB\n",
                     side, nprimes,
@@ -2295,16 +2503,27 @@ void display_expected_memory_usage(siever_config const & sc0, cado_poly_srcptr c
         // *ALL* bucket updates are computed in one go as
         // bucket_update_t<1, shorthint_t>
         for(int side = 0 ; side < 2 ; side++) {
+            if (!sc.sides[side].lim) continue;
             ASSERT_ALWAYS(K[side].thresholds[1] == sc.sides[side].lim);
             double p1 = K[side].thresholds[1];
             double p0 = K[side].thresholds[0];
             size_t nprimes = nprimes_interval(p0, p1);
             size_t nupdates = 0.75 * (1UL << sc.logA) * (std::log(std::log(p1)) - std::log(std::log(p0)));
-            typedef bucket_update_t<1, shorthint_t> type;
+            double m;
+            size_t s;
+            if (do_resieve) {
+                typedef bucket_update_t<1, shorthint_t> type;
+                s=sizeof(type);
+                m=bkmult.get<type>();
+            } else {
+                typedef bucket_update_t<1, emptyhint_t> type;
+                s=sizeof(type);
+                m=bkmult.get<type>();
+            }
             nupdates += NB_DEVIATIONS_BUCKET_REGIONS * sqrt(nupdates);
             verbose_output_print(0, 1, "# level 1, side %d: %zu primes, %zu 1-updates [1s]: %zu MB\n",
                     side, nprimes, nupdates,
-                    (more = bkmult.get<type>() * nupdates * sizeof(type)) >> 20);
+                    (more = m * nupdates * s) >> 20);
             memory += more;
         }
     }
@@ -2442,82 +2661,87 @@ void do_one_special_q_sublat(las_info const & las, sieve_info & si, nfs_work & w
         MIN(max_area, plattice_x_t(BUCKET_REGIONS[3]));
     plattice_enumerate_area<3>::value = max_area;
 
-    /* This count _only_ works if we do completely synchronous stuff. As
-     * soon as we begin dropping synchronization points, it will be
-     * completely impossible to do such hacks.
-     */
-    rep.ttbuckets_fill -= seconds();
-    
-    {
-        /* allocate_bucket_regions is probably ridiculously cheap in
-         * comparison to allocate_buckets */
-        ws.allocate_bucket_regions();
-
-        ws.allocate_buckets(si, *aux_p, pool);
-    }
-
     /* TODO: is there a way to share this in sublat mode ? */
     precomp_plattice_t precomp_plattice;
 
-    for(int side = 0 ; side < 2 ; side++) {
-        if (!si.sides[side].fb) continue;
 
-        fill_in_buckets_toplevel(ws, aux, pool, si, side, w);
+    {
+        rep.ttbuckets_fill -= seconds();
+        auto dummy = call_dtor([&rep]() { rep.ttbuckets_fill += seconds(); });
 
-        // Prepare plattices at internal levels.
-        for (int level = 1; level < si.toplevel; ++level) {
-            fill_in_buckets_prepare_precomp_plattice(
-                    pool, side, level, si, precomp_plattice);
+        {
+            /* allocate_bucket_regions is probably ridiculously cheap in
+             * comparison to allocate_buckets */
+            ws.allocate_bucket_regions();
+
+            ws.allocate_buckets(si, *aux_p, pool);
         }
-    }
 
-    /*
-     * Mixing-and-matching threads here with the fill-in-buckets threads
-     * might lead to unbalance.
-     */
-    BOOKKEEPING_TIMER(timer_special_q);
+        for(int side = 0 ; side < 2 ; side++) {
+            sieve_info::side_info & sis(si.sides[side]);
+            if (sis.fb->empty()) continue;
 
-    for(int side = 0 ; side < 2 ; side++) {
-        pool.add_task_lambda([&si,aux_p,side](worker_thread * worker,int){
-            timetree_t & timer(aux_p->th[worker->rank()].timer);
+            fill_in_buckets_toplevel(ws, aux, pool, si, side, w);
 
-            ENTER_THREAD_TIMER(timer);
-            MARK_TIMER_FOR_SIDE(timer, side);
-
-            SIBLING_TIMER(timer, "prepare small sieve");
-
-            sieve_info::side_info & s(si.sides[side]);
-            if (!s.fb) return;
-
-            small_sieve_init(s.ssd,
-                    s.ssd_offsets,
-                    s.fb_smallsieved.get()->begin(),
-                    s.fb_smallsieved.get()->end(),
-                    s.fb_smallsieved.get()->begin() + s.resieve_start_offset,
-                    s.fb_smallsieved.get()->begin() + s.resieve_end_offset,
-                    si, side);
-
-            small_sieve_info("small sieve", side, s.ssd);
-            if (si.toplevel == 1) {
-                /* when si.toplevel > 1, this start_many call is done
-                 * several times.
-                 */
-                SIBLING_TIMER(timer, "small sieve start positions ");
-                small_sieve_start_many(s.ssdpos_many, s.ssd, s.ssd_offsets, 0, si);
+            // Prepare plattices at internal levels.
+            for (int level = 1; level < si.toplevel; ++level) {
+                fill_in_buckets_prepare_precomp_plattice(
+                        pool, side, level, si, precomp_plattice);
             }
-        },0);
+        }
+
+        /*
+         * Mixing-and-matching threads here with the fill-in-buckets threads
+         * might lead to unbalance.
+         */
+        BOOKKEEPING_TIMER(timer_special_q);
+
+        for(int side = 0 ; side < 2 ; side++) {
+            pool.add_task_lambda([&si,aux_p,side](worker_thread * worker,int){
+                    timetree_t & timer(aux_p->th[worker->rank()].timer);
+
+                    ENTER_THREAD_TIMER(timer);
+                    MARK_TIMER_FOR_SIDE(timer, side);
+
+                    SIBLING_TIMER(timer, "prepare small sieve");
+
+                    sieve_info::side_info & s(si.sides[side]);
+                    if (s.fb->empty()) return;
+
+                    small_sieve_init(s.ssd,
+                            s.ssd_offsets,
+                            s.fb_smallsieved.get()->begin(),
+                            s.fb_smallsieved.get()->end(),
+                            s.fb_smallsieved.get()->begin() + s.resieve_start_offset,
+                            s.fb_smallsieved.get()->begin() + s.resieve_end_offset,
+                            si, side);
+
+                    small_sieve_info("small sieve", side, s.ssd);
+
+                    if (si.toplevel == 1) {
+                        /* when si.toplevel > 1, this start_many call is done
+                         * several times.
+                         */
+                        SIBLING_TIMER(timer, "small sieve start positions ");
+                        small_sieve_start_many(s.ssdpos_many, s.ssd, s.ssd_offsets, 0, si);
+                    }
+            },0);
+        }
+
+        /* Note: we haven't done any downsorting yet ! */
+
+        pool.drain_queue(0);
+
+        ws.check_buckets_max_full<shorthint_t>(si.toplevel);
+        ws.check_buckets_max_full<emptyhint_t>(si.toplevel);
+        auto exc = pool.get_exceptions<buckets_are_full>(0);
+        if (!exc.empty())
+            throw *std::max_element(exc.begin(), exc.end());
+
+        /* trigger the increase of ttbuckets_fill, even if we encountered an
+         * exception. See the dummy object above.
+         */
     }
-
-    /* Note: we haven't done any downsorting yet ! */
-
-    pool.drain_queue(0);
-
-    ws.check_buckets_max_full(si.toplevel, shorthint_t());
-    auto exc = pool.get_exceptions<buckets_are_full>(0);
-    if (!exc.empty())
-        throw *std::max_element(exc.begin(), exc.end());
-
-    rep.ttbuckets_fill += seconds();
 
     {
         CHILD_TIMER(timer_special_q, "process_bucket_region outer container");
@@ -2640,6 +2864,11 @@ bool do_one_special_q(las_info & las, nfs_work & ws, std::shared_ptr<nfs_aux> au
          * base. */
     }
 
+    /* Currently we assume that we're doing sieving + resieving on
+     * both sides, or we're not. In the latter case, we expect to
+     * complete the factoring work with batch cofactorization */
+    ASSERT_ALWAYS(las.batch || (conf.sides[0].lim && conf.sides[1].lim));
+
     sieve_info & si(*psi);
 
     si.update(las.nb_threads);
@@ -2661,14 +2890,26 @@ bool do_one_special_q(las_info & las, nfs_work & ws, std::shared_ptr<nfs_aux> au
         if (si.doing.depth)
             extra << " # within descent, currently at depth " << si.doing.depth;
 
+        char factoq[1024];
+        if (las.allow_composite_q) {
+            std::ostringstream oss;
+            std::copy(si.doing.prime_factors.begin(),
+                      si.doing.prime_factors.end()-1,
+                      std::ostream_iterator<int>(oss, "*"));
+            oss << si.doing.prime_factors.back();
+            snprintf(factoq, 1024, "=%s", oss.str().c_str());
+        } else {
+            factoq[0] = '\0';
+        }
         verbose_output_vfprint(0, 1, gmp_vfprintf,
                 "# "
                 HILIGHT_START
-                "Sieving side-%d q=%Zd; rho=%Zd;"
+                "Sieving side-%d q=%Zd%s; rho=%Zd;"
                 HILIGHT_END
                 " a0=%" PRId64 "; b0=%" PRId64 "; a1=%" PRId64 "; b1=%" PRId64 "; J=%u;%s\n",
                 si.doing.side,
                 (mpz_srcptr) si.doing.p,
+                factoq,
                 (mpz_srcptr) si.doing.r,
                 si.qbasis.a0, si.qbasis.b0,
                 si.qbasis.a1, si.qbasis.b1,
@@ -2744,6 +2985,7 @@ int main (int argc0, char *argv0[])/*{{{*/
     setbuf(stderr, NULL);
 
     cxx_param_list pl;
+    las_install_sighandlers();
 
     declare_usage(pl);
 
@@ -2787,6 +3029,7 @@ int main (int argc0, char *argv0[])/*{{{*/
         exit(EXIT_FAILURE);
     }
 
+    param_list_parse_int(pl, "trialdiv-first-side", &trialdiv_first_side);
     param_list_parse_int(pl, "adjust-strategy", &adjust_strategy);
     param_list_parse_int(pl, "exit-early", &exit_after_rel_found);
 #if DLP_DESCENT
@@ -2964,6 +3207,7 @@ int main (int argc0, char *argv0[])/*{{{*/
                  * category */
                 auto aux_p = std::make_shared<nfs_aux>(las, doing, rel_hash_p, rep, timer_special_q, las.nb_threads);
                 nfs_aux & aux(*aux_p);
+                ACTIVATE_TIMER(timer_special_q);
 
                 prepare_timer_layout_for_multithreaded_tasks(timer_special_q);
 
@@ -2993,7 +3237,7 @@ int main (int argc0, char *argv0[])/*{{{*/
 
                 break;
             } catch (buckets_are_full const & e) {
-                aux_botched.splice(aux_good.end(), aux_pending);
+                aux_botched.splice(aux_botched.end(), aux_pending);
                 verbose_output_vfprint (2, 1, gmp_vfprintf,
                         "# redoing q=%Zd, rho=%Zd because buckets are full\n"
                         "# %s\n"
@@ -3037,6 +3281,12 @@ int main (int argc0, char *argv0[])/*{{{*/
     for(auto & P : aux_good) {
         global_report.accumulate_and_clear(std::move(P.first));
         global_timer += P.second;
+    }
+    las_report botched_report;
+    timetree_t botched_timer;
+    for(auto & P : aux_botched) {
+        botched_report.accumulate_and_clear(std::move(P.first));
+        botched_timer += P.second;
     }
 
     if (recursive_descent) {
@@ -3098,12 +3348,11 @@ int main (int argc0, char *argv0[])/*{{{*/
 		las.output, las.nb_threads);
 	tcof_batch = seconds () - tcof_batch;
 	global_report.ttcof += tcof_batch;
-	/* add to ttf since the remaining time will be computed as ttf-ttcof */
-	global_report.ttf += tcof_batch;
       }
 
     t0 = seconds () - t0;
     wct = wct_seconds() - wct;
+
     if (adjust_strategy < 2) {
         verbose_output_print (2, 1, "# Average J=%1.0f for %lu special-q's, max bucket fill -bkmult %s\n",
                 global_report.total_J / (double) nr_sq_processed, nr_sq_processed, las.bk_multiplier.print_all().c_str());
@@ -3117,8 +3366,10 @@ int main (int argc0, char *argv0[])/*{{{*/
     tts -= global_report.tn[0];
     tts -= global_report.tn[1];
     tts -= global_report.ttf;
+    tts -= global_report.ttcof;
 
     global_timer.stop();
+
     if (tdict::global_enable >= 1) {
         verbose_output_print (0, 1, "#\n# Hierarchical timings:\n%s", global_timer.display().c_str());
 
@@ -3150,19 +3401,47 @@ int main (int argc0, char *argv0[])/*{{{*/
                  nr_bucket_primes, nr_div_tests, nr_composite_tests, nr_wrap_was_composite);
     }
 
+    double waste = 0;
+    waste += botched_report.tn[0];
+    waste += botched_report.tn[1];
+    waste += botched_report.ttbuckets_fill;
+    waste += botched_report.ttbuckets_apply;
+    waste += botched_report.ttf;
+    waste += botched_report.ttcof;
+
+    verbose_output_print (2, 1, "# Wasted cpu time due to %zu bkmult adjustments: %1.2f [norm %1.2f+%1.2f, sieving "
+                " (%1.2f + %1.2f),"
+                " factor (%1.2f + %1.2f)]\n",
+                aux_botched.size(),
+                waste,
+                botched_report.tn[0],
+                botched_report.tn[1],
+                botched_report.ttbuckets_fill,
+                botched_report.ttbuckets_apply,
+		botched_report.ttf, botched_report.ttcof);
+
+    t0 -= waste;
+    global_report.tn[0] -= botched_report.tn[0];
+    global_report.tn[1] -= botched_report.tn[1];
+    global_report.ttbuckets_fill -= botched_report.ttbuckets_fill;
+    global_report.ttbuckets_apply -= botched_report.ttbuckets_apply;
+    global_report.ttf -= botched_report.ttf;
+    global_report.ttcof -= botched_report.ttcof;
+
     if (dont_print_tally && las.nb_threads > 1) 
         verbose_output_print (2, 1, "# Total cpu time %1.2fs [tally available only in mono-thread]\n", t0);
     else
         verbose_output_print (2, 1, "# Total cpu time %1.2fs [norm %1.2f+%1.1f, sieving %1.1f"
                 " (%1.1f + %1.1f + %1.1f),"
-                " factor %1.1f (%1.1f + %1.1f)]\n", t0,
+                " factor %1.1f (%1.1f + %1.1f)] (not incl wasted time)\n",
+                t0,
                 global_report.tn[0],
                 global_report.tn[1],
                 tts,
                 global_report.ttbuckets_fill,
                 global_report.ttbuckets_apply,
                 tts-global_report.ttbuckets_fill-global_report.ttbuckets_apply,
-		global_report.ttf, global_report.ttf - global_report.ttcof, global_report.ttcof);
+		global_report.ttf + global_report.ttcof, global_report.ttf, global_report.ttcof);
 
     verbose_output_print (2, 1, "# Total elapsed time %1.2fs, per special-q %gs, per relation %gs\n",
                  wct, wct / (double) nr_sq_processed, wct / (double) global_report.reports);
@@ -3180,9 +3459,11 @@ int main (int argc0, char *argv0[])/*{{{*/
     if (las.suppress_duplicates) {
         verbose_output_print(2, 1, "# Total number of eliminated duplicates: %lu\n", global_report.duplicates);
     }
-    verbose_output_print (2, 1, "# Total %lu reports [%1.3gs/r, %1.1fr/sq]\n",
+    verbose_output_print (2, 1, "# Total %lu reports [%1.3gs/r, %1.1fr/sq] in %1.3g elapsed s [%.1f%% CPU]\n",
             global_report.reports, t0 / (double) global_report.reports,
-            (double) global_report.reports / (double) nr_sq_processed);
+            (double) global_report.reports / (double) nr_sq_processed,
+            wct,
+            100*t0/wct);
 
 
     print_slice_weight_estimator_stats();

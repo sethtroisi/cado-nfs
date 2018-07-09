@@ -65,6 +65,11 @@ class reservation_group {
   reservation_array<bucket_array_t<3, shorthint_t> > RA3_short;
   reservation_array<bucket_array_t<1, longhint_t> > RA1_long;
   reservation_array<bucket_array_t<2, longhint_t> > RA2_long;
+  reservation_array<bucket_array_t<1, emptyhint_t> > RA1_empty;
+  reservation_array<bucket_array_t<2, emptyhint_t> > RA2_empty;
+  reservation_array<bucket_array_t<3, emptyhint_t> > RA3_empty;
+  reservation_array<bucket_array_t<1, logphint_t> > RA1_logp;
+  reservation_array<bucket_array_t<2, logphint_t> > RA2_logp;
 protected:
   template<int LEVEL, typename HINT>
   reservation_array<bucket_array_t<LEVEL, HINT> > &
@@ -78,7 +83,8 @@ public:
   void allocate_buckets(const int *n_bucket,
           bkmult_specifier const& multiplier,
           std::array<double, FB_MAX_PARTS> const &
-          fill_ratio, int logI, nfs_aux&, thread_pool&);
+          fill_ratio, int logI, nfs_aux&, thread_pool&,
+          bool);
 };
 
 #endif

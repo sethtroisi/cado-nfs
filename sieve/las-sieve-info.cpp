@@ -91,7 +91,7 @@ void sieve_info::update (unsigned int nb_threads)
 
     for(int side = 0 ; side < 2 ; side++) {
         sieve_info::side_info & sis(sides[side]);
-        if (!sis.fb) continue;
+        if (sis.fb->empty()) continue;
 
         fb_factorbase::key_type K = conf.instantiate_thresholds(side);
 
@@ -112,9 +112,10 @@ void sieve_info::update (unsigned int nb_threads)
     }
 
     for(int side = 0 ; side < 2 ; side++) {
-	init_trialdiv(side); /* Init refactoring stuff */
         sieve_info::side_info & sis(sides[side]);
-        if (!sis.fb) continue;
+        if (sis.fb->empty()) continue;
+
+	init_trialdiv(side); /* Init refactoring stuff */
 
         {
             /* TODO: In this block, we're doing just a copy. We should
@@ -142,7 +143,9 @@ void sieve_info::update (unsigned int nb_threads)
     // Now that fb have been initialized, we can set the toplevel.
     toplevel = -1;
     for(int side = 0 ; side < 2 ; side++) {
-        if (!sides[side].fb) continue;
+        sieve_info::side_info & sis(sides[side]);
+        if (sis.fb->empty()) continue;
+
         int level = sides[side].fbs->get_toplevel();
         if (level > toplevel) toplevel = level;
     }

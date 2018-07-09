@@ -63,10 +63,12 @@ selection with the following command-line:
 
 $ ./cado-nfs.py -dlp -ell 101538509534246169632617439 191907783019725260605646959711 jlpoly=true tasks.polyselect.bound=5 tasks.polyselect.modm=5 tasks.polyselect.degree=3 tasks.reconstructlog.checkdlp=false
 
-Note that the individual logarithm phase is not implemented in that case,
-and the consistency check is not possible either. However, setting
+Note that the individual logarithm phase (also called the descent) is not
+implemented in that case, and the full consistency check is not possible
+either. However, setting
   tasks.reconstructlog.partial=false
-provides a very good test that everything went as expected.
+provides a very good test that everything went as expected (not as good
+as checkdlp=true would do, but we can't have that here).
 
 **** Using non-linear polynomials
 
