@@ -61,19 +61,24 @@ long myrandom_non_mt() {
 // side, and more or less of the same size.
 // Usage:
 //  - init()
-//  - do many append() (increasing order of indices)
+//  - do many append() (increasing order of indices) and append_prime()
 //  - finalize()
 //  - can call random_index()
 //  - can call iterator_from_index()
+//  - can call pos_from_p() and p_from_pos() if append_prime() has been done
 
 struct indexrange {
     vector <index_t>ind;
+    vector <p_r_values_t>prime;
 
     void init() { }
     void finalize() { }
 
     void append(index_t z) {
         ind.push_back(z);
+    }
+    void append_prime(p_r_values_t p) {
+        prime.push_back(p);
     }
 
     index_t random_index(index_t z, gmp_randstate_t buf) {
@@ -92,6 +97,36 @@ struct indexrange {
         return ind[low + uint64_t(long_random(buf)%(high-low))];
     }
 
+    p_r_values_t p_from_pos(uint64_t position) {
+        return prime[position];
+    }
+
+    // Compute one position corresponding to the given p. In the case where
+    // there are several positions, the choice is arbitrary.
+    uint64_t pos_from_p(p_r_values_t p) {
+        uint64_t low, high;
+        p_r_values_t pp;
+        low = 0; high = prime.size()-1;
+        pp = prime[low];
+        if (pp == p)
+            return low;
+        pp = prime[high];
+        if (pp == p)
+            return high;
+        do {
+            uint64_t middle = (low+high)>>1;
+            pp = prime[middle];
+            if (p == pp)
+                return middle;
+            if (p < pp)
+                high = middle;
+            else
+                low = middle;
+        } while (high > low+1);
+        fprintf(stderr, "Error: can't find p in table\n");
+        ASSERT_ALWAYS(0);
+    }
+ 
     vector <index_t>::iterator iterator_from_index(index_t z) {
         vector<index_t>::iterator it;
         it = lower_bound(ind.begin(), ind.end(), z);
@@ -101,13 +136,24 @@ struct indexrange {
 
 // Fill in the indexrange data structure from the renumber table,
 // gathering indices in two arrays, one for each side.
+// In case of composite special-qs, also fill-in the list of the
+// corresponding primes on the sqside.
 void prepare_indexrange(indexrange *Ind, renumber_t ren_tab, 
-        cado_poly cpoly) {
+        cado_poly cpoly, int sqside, int compsq) {
     Ind[0].init();
     Ind[1].init();
     for (index_t i = 0; i < ren_tab->size; i++) {
         int side = renumber_get_side_from_index(ren_tab, i, cpoly);
         Ind[side].append(i);
+        if (compsq && (side == sqside)) {
+            p_r_values_t p, r;
+            if (ren_tab->table[i] == RENUMBER_SPECIAL_VALUE) {
+                renumber_badideal_get_p_r_below(ren_tab, &p, &r, &side, i);
+            } else {
+                renumber_get_p_r_from_index(ren_tab, &p, &r, &side, i, cpoly);
+            }
+            Ind[sqside].append_prime(p);
+        }
     }
     Ind[0].finalize();
     Ind[1].finalize();
@@ -129,8 +175,21 @@ bool operator<(fake_rel const& x, fake_rel const& y) {
     return x.b < y.b;
 }
 
-void read_rel(fake_rel& rel, uint64_t q, int sqside, const char *str,
-        renumber_t ren_tab) {
+int p_coprimeto_q(uint64_t p, uint64_t q, vector<uint64_t> facq) {
+    if (facq.size() == 0) {
+        return q != p;
+    } else {
+        for (auto f : facq) {
+            if (f == p)
+                return 0;
+        }
+        return 1;
+    }
+}
+
+
+void read_rel(fake_rel& rel, uint64_t q, vector<uint64_t> facq,
+        int sqside, const char *str, renumber_t ren_tab) {
     rel.nb_ind[0] = 0;
     rel.nb_ind[1] = 0;
     int side = 0;
@@ -166,7 +225,7 @@ void read_rel(fake_rel& rel, uint64_t q, int sqside, const char *str,
         char *endpstr = NULL;
         uint64_t p = strtoull(pstr, &endpstr, 16);
         ASSERT_ALWAYS (endpstr != pstr);
-        if (side != sqside || q != p) {
+        if (side != sqside || p_coprimeto_q(p, q, facq)) {
             p_r_values_t r = relation_compute_r(a, b, p);
             index_t index;
             int nb;
@@ -185,12 +244,13 @@ void read_rel(fake_rel& rel, uint64_t q, int sqside, const char *str,
 }
 
 void read_sample_file(vector<unsigned int> &nrels, vector<fake_rel> &rels,
-        int sqside, const char *filename, renumber_t ren_tab)
+        int sqside, const char *filename, renumber_t ren_tab, int compsq)
 {
     FILE * file;
     file = fopen(filename, "r");
     ASSERT_ALWAYS (file != NULL);
     uint64_t q = 0;
+    vector<uint64_t> facq;
     unsigned int nr = 0;
 
     char line[1024];
@@ -208,7 +268,17 @@ void read_sample_file(vector<unsigned int> &nrels, vector<fake_rel> &rels,
                 // starting a new special-q
                 ASSERT_ALWAYS (sqside == (ptr[15] - '0'));
                 ptr += 19; // skip "# Sieving side-0 q="
-                uint64_t nq = strtoull(ptr, NULL, 10);
+                uint64_t nq = strtoull(ptr, &ptr, 10);
+                if (compsq) {
+                    // read also the factorization of q
+                    facq.clear();
+                    ASSERT_ALWAYS(ptr[0] == '=');
+                    do {
+                        ptr++;
+                        uint64_t fac = strtoull(ptr, &ptr, 10);
+                        facq.push_back(fac);
+                    } while (ptr[0] == '*');
+                }
                 if (nq != q) {
                     nrels.push_back(nr);
                     nr = 0;
@@ -217,7 +287,7 @@ void read_sample_file(vector<unsigned int> &nrels, vector<fake_rel> &rels,
             }
         } else {
             fake_rel rel;
-            read_rel(rel, q, sqside, line, ren_tab);
+            read_rel(rel, q, facq, sqside, line, ren_tab);
             rels.push_back(rel);
             nr++;
         }
@@ -269,7 +339,7 @@ void reduce_mod_2(index_t *frel, int *nf) {
 }
 
 void print_fake_rel_manyq(
-        vector<index_t>::iterator list_q, uint64_t nq,
+        vector<index_t>::iterator list_q, int nfacq, uint64_t nq,
         vector<fake_rel> *rels, vector<unsigned int> *nrels,
         indexrange *Ind, int dl,
         gmp_randstate_t buf)
@@ -279,8 +349,7 @@ void print_fake_rel_manyq(
     char str[MAX_STR];
     char *pstr;
     int len = MAX_STR;
-    for (uint64_t ii = 0; ii < nq; ++ii) {
-        index_t indq = list_q[ii];
+    for (uint64_t ii = 0; ii < nq; ii += nfacq) {
         int nr = int((*nrels)[long_random(buf)%nrels->size()]);
         for (; nr > 0; --nr) {
             pstr = str;
@@ -293,8 +362,11 @@ void print_fake_rel_manyq(
             // pick a random relation as a model and prepare a string to
             // be printed.
             int i = long_random(buf) % rels->size();
-            frel[0] = indq;
-            int nf = 1;
+            int nf = 0;
+            for (int j = 0; j < nfacq; j++) {
+                frel[nf] = list_q[ii + j];
+                nf++;
+            }
             for (int side = 0; side < 2; ++side) {
                 int np = (*rels)[i].nb_ind[side];
                 for (int j = 0; j < np; ++j) {
@@ -329,8 +401,12 @@ void print_fake_rel_manyq(
 }
 
 struct th_args {
-    vector<index_t>::iterator list_q;
+    vector<index_t>::iterator list_q_prime;
     uint64_t nq;
+    vector<index_t>::iterator list_q_comp2;
+    uint64_t nq2;
+    vector<index_t>::iterator list_q_comp3;
+    uint64_t nq3;
     vector<fake_rel> *rels;
     vector<unsigned int> *nrels;
     indexrange *Ind;
@@ -341,8 +417,18 @@ struct th_args {
 
 void * do_thread(void * rgs) {
     struct th_args * args = (struct th_args *) rgs;
-    print_fake_rel_manyq(args->list_q, args->nq, args->rels, args->nrels,
-            args->Ind, args->dl, args->rstate);
+    if (args->nq > 0)
+        print_fake_rel_manyq(args->list_q_prime, 1, args->nq, args->rels,
+                args->nrels, args->Ind, args->dl, args->rstate);
+    
+    if (args->nq2 > 0)
+        print_fake_rel_manyq(args->list_q_comp2, 2, args->nq2, args->rels,
+                args->nrels, args->Ind, args->dl, args->rstate);
+
+    if (args->nq3 > 0)
+        print_fake_rel_manyq(args->list_q_comp3, 3, args->nq3, args->rels,
+                args->nrels, args->Ind, args->dl, args->rstate);
+
     return NULL;
 }
 
@@ -361,6 +447,82 @@ void advance_prime_in_fb(int *mult, uint64_t *q, uint64_t *roots,
     *q = newp;
 }
 
+// All composite special-q in [q0, q1] with 2 prime factors in the range
+// of the factor base pointed by positions in [pos_min, pos_max] in Ind
+vector<index_t> all_comp_sq_2(uint64_t q0, uint64_t q1, uint64_t qfac_min,
+        uint64_t qfac_max, indexrange &Ind)
+{
+    vector<index_t> list;
+
+    uint64_t l1min = MAX(q0/qfac_max, qfac_min);
+    uint64_t pos_l1min = Ind.pos_from_p(l1min);
+    uint64_t l1max = MIN(qfac_max, round(sqrt(q1)));
+    uint64_t pos_l1max = Ind.pos_from_p(l1max);
+
+    for (uint64_t pos1 = pos_l1min; pos1 < pos_l1max; ++pos1) {
+        uint64_t l1 = Ind.p_from_pos(pos1);
+        uint64_t l2min = MAX(l1, q0/l1);
+        uint64_t pos_l2min = Ind.pos_from_p(l2min);
+        uint64_t l2max = MIN(qfac_max, q1/l1);
+        uint64_t pos_l2max = Ind.pos_from_p(l2max);
+        for (uint64_t pos2 = pos_l2min; pos2 < pos_l2max; ++pos2) {
+            uint64_t l2 = Ind.p_from_pos(pos2);
+            uint64_t L = l1*l2;
+            if (L >= q0 && L <= q1) {
+                list.push_back(Ind.ind[pos1]);
+                list.push_back(Ind.ind[pos2]);
+            } else {
+                fprintf(stderr, "Wooops !!!\n");
+            }
+        }
+    }
+    return list;
+}
+
+// All composite special-q in [q0, q1] with 3 prime factors in the range
+// of the factor base pointed by positions in [pos_min, pos_max] in Ind
+vector<index_t> all_comp_sq_3(uint64_t q0, uint64_t q1, uint64_t pos_min,
+        uint64_t pos_max, indexrange &Ind)
+{
+    vector<index_t> list;
+
+    uint64_t qfac_min = Ind.p_from_pos(pos_min);
+    uint64_t qfac_max = Ind.p_from_pos(pos_max);
+
+    uint64_t l1min = MAX(q0/(qfac_max*qfac_max), qfac_min);
+    uint64_t pos_l1min = Ind.pos_from_p(l1min);
+    uint64_t l1max = MIN(qfac_max, round(pow(q1, 0.333333333333)));
+    uint64_t pos_l1max = Ind.pos_from_p(l1max);
+
+    for (uint64_t pos1 = pos_l1min; pos1 < pos_l1max; ++pos1) {
+        uint64_t l1 = Ind.p_from_pos(pos1);
+        uint64_t l2min = MAX(l1, q0/(l1*qfac_max));
+        uint64_t pos_l2min = Ind.pos_from_p(l2min);
+        uint64_t l2max = MIN(qfac_max, round(sqrt(q1/l1)));
+        uint64_t pos_l2max = Ind.pos_from_p(l2max);
+        for (uint64_t pos2 = pos_l2min; pos2 < pos_l2max; ++pos2) {
+            uint64_t l2 = Ind.p_from_pos(pos2);
+            uint64_t l3min = MAX(l2, q0/(l1*l2));
+            uint64_t pos_l3min = Ind.pos_from_p(l3min);
+            uint64_t l3max = MIN(qfac_max, q1/(l1*l2));
+            uint64_t pos_l3max = Ind.pos_from_p(l3max);
+            for (uint64_t pos3 = pos_l3min; pos3 < pos_l3max; ++pos3) {
+                uint64_t l3 = Ind.p_from_pos(pos3);
+                uint64_t L = l1*l2*l3;
+                if (L >= q0 && L <= q1) {
+                    list.push_back(Ind.ind[pos1]);
+                    list.push_back(Ind.ind[pos2]);
+                    list.push_back(Ind.ind[pos3]);
+                } else {
+                    fprintf(stderr, "Wooops !!!\n");
+                }
+            }
+        }
+    }
+    return list;
+}
+
+
 static void declare_usage(param_list pl)
 {
     param_list_decl_usage(pl, "poly", "polynomial file");
@@ -372,6 +534,9 @@ static void declare_usage(param_list pl)
     param_list_decl_usage(pl, "sample", "file where to find a sample of relations");
     param_list_decl_usage(pl, "renumber", "renumber table");
     param_list_decl_usage(pl, "dl", "(switch) dl mode");
+    param_list_decl_usage(pl, "allow-compsq", "(switch) allows composite sq");
+    param_list_decl_usage(pl, "qfac-min", "factors of q must be at least that");
+    param_list_decl_usage(pl, "qfac-max", "factors of q must be at most that");
     param_list_decl_usage(pl, "t", "number of threads to use");
     verbose_decl_usage(pl);
 }
@@ -388,10 +553,14 @@ main (int argc, char *argv[])
   uint64_t q1 = 0;
   int dl = 0;
   int mt = 1;
+  int compsq = 0;
+  uint64_t qfac_min = 1024;
+  uint64_t qfac_max = UINT64_MAX;
 
   param_list_init(pl);
   declare_usage(pl);
   param_list_configure_switch(pl, "-dl", &dl);
+  param_list_configure_switch(pl, "-allow-compsq", &compsq);
   
   cado_poly_init(cpoly);
 
@@ -450,6 +619,8 @@ main (int argc, char *argv[])
   }
 
   param_list_parse_int(pl, "t", &mt);
+  param_list_parse_uint64(pl, "qfac-min", &qfac_min);
+  param_list_parse_uint64(pl, "qfac-max", &qfac_max);
 
   if (!cado_poly_read(cpoly, filename))
     {
@@ -487,50 +658,94 @@ main (int argc, char *argv[])
 
   vector<fake_rel> rels;
   vector<unsigned int> nrels;
-  read_sample_file(nrels, rels, sqside, sample, ren_table);
+  read_sample_file(nrels, rels, sqside, sample, ren_table, compsq);
 
   param_list_warn_unused(pl);
 
   // Two index ranges, one for each side
   indexrange Ind[2];
-  prepare_indexrange(Ind, ren_table, cpoly);
+  prepare_indexrange(Ind, ren_table, cpoly, sqside, compsq);
 
-  // Precompute ideals in [q0-q1]
-  prime_info pdata;
-  prime_info_init(pdata);
-  // fast forward until we reach q0
-  uint64_t q = 2;
-  while (q < q0) {
-      q = getprime_mt(pdata);
-  }
-  uint64_t roots[MAX_DEGREE];
-  int mult = mpz_poly_roots_uint64(roots, cpoly->pols[sqside], q); 
-  while (mult == 0) {
-      advance_prime_in_fb(&mult, &q, roots, cpoly, sqside, pdata);
-  }
-  index_t indq = renumber_get_index_from_p_r(ren_table, q, roots[0], sqside);
-  vector<index_t>::iterator first_indq = Ind[sqside].iterator_from_index(indq);
-  // Same for q1:
-  while (q < q1) {
-      q = getprime_mt(pdata);
-  }
-  mult = mpz_poly_roots_uint64(roots, cpoly->pols[sqside], q); 
-  while (mult == 0) {
-      advance_prime_in_fb(&mult, &q, roots, cpoly, sqside, pdata);
-  }
-  indq = renumber_get_index_from_p_r(ren_table, q, roots[0], sqside);
-  vector<index_t>::iterator last_indq = Ind[sqside].iterator_from_index(indq);
 
-  // go multi-thread
+  /****** Prime special-q ******/
+  vector<index_t>::iterator first_indq, last_indq;
+  if (!compsq) {
+      // Precompute ideals in [q0-q1]
+      prime_info pdata;
+      prime_info_init(pdata);
+      // fast forward until we reach q0
+      uint64_t q = 2;
+      while (q < q0) {
+          q = getprime_mt(pdata);
+      }
+      uint64_t roots[MAX_DEGREE];
+      int mult = mpz_poly_roots_uint64(roots, cpoly->pols[sqside], q); 
+      while (mult == 0) {
+          advance_prime_in_fb(&mult, &q, roots, cpoly, sqside, pdata);
+      }
+      index_t indq = renumber_get_index_from_p_r(ren_table, q, roots[0], sqside);
+      first_indq = Ind[sqside].iterator_from_index(indq);
+      // Same for q1:
+      while (q < q1) {
+          q = getprime_mt(pdata);
+      }
+      mult = mpz_poly_roots_uint64(roots, cpoly->pols[sqside], q); 
+      while (mult == 0) {
+          advance_prime_in_fb(&mult, &q, roots, cpoly, sqside, pdata);
+      }
+      indq = renumber_get_index_from_p_r(ren_table, q, roots[0], sqside);
+      last_indq = Ind[sqside].iterator_from_index(indq);
+      prime_info_clear(pdata);
+  } else {
+      // TODO: we might want to implement this, one day.
+      ASSERT_ALWAYS(q0 > qfac_max);
+  }
+
+  /****** Composite special-q ******/
+  vector<index_t>::iterator first_indq2, last_indq2;
+  vector<index_t>::iterator first_indq3, last_indq3;
+  
+  if (compsq) {
+      vector<index_t> comp2, comp3;
+      comp2 = all_comp_sq_2(q0, q1, qfac_min, qfac_max, Ind[sqside]);
+      first_indq2 = comp2.begin();
+      last_indq2 = comp2.end();
+      comp3 = all_comp_sq_3(q0, q1, qfac_min, qfac_max, Ind[sqside]);
+      first_indq3 = comp3.begin();
+      last_indq3 = comp3.end();
+  }
+
+  /****** go multi-thread ******/
   uint64_t block = (last_indq - first_indq) / mt;
+  uint64_t block2 = (last_indq2 - first_indq2) / mt;
+  uint64_t block3 = (last_indq3 - first_indq3) / mt;
+
   pthread_t * thid = (pthread_t *)malloc(mt*sizeof(pthread_t));
   struct th_args * args = (struct th_args *)malloc(mt*sizeof(struct th_args));
   for (int i = 0; i < mt; ++i) {
-      args[i].list_q = first_indq + block*i;
-      if (i < mt-1) {
-          args[i].nq = block;
+      args[i].nq = 0;
+      args[i].nq2 = 0;
+      args[i].nq3 = 0;
+      if (compsq) {
+          args[i].list_q_comp2 = first_indq2 + block2*i;
+          args[i].list_q_comp3 = first_indq3 + block3*i;
       } else {
-          args[i].nq = last_indq - args[i].list_q;
+          args[i].list_q_prime = first_indq + block*i;
+      }
+      if (i < mt-1) {
+          if (compsq) {
+              args[i].nq2 = block2;
+              args[i].nq3 = block3;
+          } else {
+              args[i].nq = block;
+          }
+      } else {
+          if (compsq) {
+              args[i].nq2 = last_indq2 - args[i].list_q_comp2;
+              args[i].nq3 = last_indq3 - args[i].list_q_comp3;
+          } else {
+              args[i].nq = last_indq - args[i].list_q_prime;
+          }
       }
       args[i].rels = &rels;
       args[i].nrels = &nrels;
@@ -549,7 +764,6 @@ main (int argc, char *argv[])
   gmp_randclear(global_rstate_non_mt);
   free(thid);
   free(args);
-  prime_info_clear(pdata);
   renumber_clear(ren_table);
   cado_poly_clear(cpoly);
   param_list_clear(pl);

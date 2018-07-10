@@ -86,9 +86,7 @@ unsigned long f_candidate = 0;   /* number of irreducibility tests */
 unsigned long f_irreducible = 0; /* number of irreducible polynomials */
 double max_guard = DBL_MIN;
 int skew = 0;                   /* see the -skew option */
-unsigned long *count = NULL; /* for 1 <= ad <= bound, count[ad] is the number of
-				degree-d polynomials with leading coefficient ad.
-                                Used only when -skew option is set.*/
+unsigned long *count = NULL;    /* use only with -skew */
 
 /* MPZ_POLY_TIMINGS is defined (or maybe not) in mpz_poly.hpp
  */
@@ -238,107 +236,105 @@ print_nonlinear_poly_info (mpz_poly ff, double alpha_f, mpz_poly gg,
     return 1;
 }
 
-static void
-init_count (unsigned int bound, unsigned int df)
+/* return the number of polynomials we look for in the case of skewness:
+ * we compute the maximal skewness s = B^(-2/d)
+ * the coefficients of degree >= d/2 are bounded by B
+ * the coefficients of degree i < d/2 are bounded by B*s^(d/2-i) */
+static unsigned long
+get_maxtries (unsigned int B, unsigned int d)
 {
-  unsigned int ad, j, k, mult;
-  double skew, b;
+  unsigned long maxtries = 1, c;
+  unsigned int i;
+  double skew;
 
-  count = malloc ((bound + 1) * sizeof (unsigned long));
-  count[0] = 0; /* we will put the global sum in count[0] */
-  for (ad = 1; ad <= bound; ad++)
+  ASSERT_ALWAYS(d >= 2);
+
+  skew = pow ((double) B, 2.0 / (double) d);
+  count = malloc ((d + 1) * sizeof (unsigned long));
+  for (i = 0; i <= d; i++)
     {
-      skew = pow ((double) bound / (double) ad, 1.0 / ((double) df / 2.0));
-      count[ad] = 1;
-      for (j = 0; j < df; j++)
-	{
-	  /* coefficient of degree j is bounded by ad*skew^(df-j) */
-	  if (2 * j == df)
-	    k = bound;
-	  else
-	    {
-	      b = (double) ad * pow (skew, (double) (df - j));
-	      k = (unsigned int) b; /* rounded towards zero */
-	    }
-	  if (j == df - 1)
-	    mult = k + 1; /* we can assume the degree-(d-1) coefficient
-			     is in [0..k] via f(-x) */
-	  else if (j != 0)
-	    mult = 2 * k + 1; /* coefficient in [-k..k] */
-	  else
-	    mult = 2 * k; /* coefficient in [-k..k], except 0 */
-	  if ((double) count[ad] * (double) mult > (double) ULONG_MAX)
-	    {
-	      fprintf (stderr, "Error, too large bound\n");
-	      exit (EXIT_FAILURE);
-	    }
-	  count[ad] *= mult;
-	}
-      if (count[0] + count[ad] < count[0])
-	{
-	  fprintf (stderr, "Error, too large bound\n");
-	  exit (EXIT_FAILURE);
-	}
-      count[0] += count[ad];
+      if (i == d)
+        c = B;         /* coefficient in 1..B */
+      else if (i == d - 1)
+        c = B + 1;     /* coefficient in 0..B */
+      else if (2 * i >= d)
+        c = 2 * B + 1; /* coefficient in -B..B */
+      else /* i < d/2 */
+        {
+          c = B * (unsigned long) pow (skew, (double) (d - 2 * i) / 2.0);
+          if (i > 0)
+            c = 2 * c + 1;
+          else
+            c = 2 * c;
+        }
+      count[i] = c;
+      if (maxtries >= ULONG_MAX / count[i])
+        {
+          fprintf (stderr, "Error, too large -bound option\n");
+          exit (1);
+        }
+      maxtries *= count[i];
     }
+  return maxtries;
 }
 
 static int
 generate_f (mpz_t *f, unsigned int d, unsigned long idx, unsigned int bound)
 {
-  unsigned int ad, j;
-  double skew, b;
+  unsigned int i, j;
   int ok = 1;
   int *a;
 
   a = malloc ((d + 1) * sizeof (int));
 
-  /* first find the leading coefficient */
-  for (ad = 1; idx >= count[ad]; ad++)
-    idx -= count[ad];
-  ASSERT_ALWAYS(ad <= bound);
-  a[d] = ad;
-
-  /* now find the other coefficients (see init_count) */
-  skew = pow ((double) bound / (double) ad, 1.0 / ((double) d / 2.0));
-  for (j = 0; j < d; j++)
+  /* the coefficient of degree j can take count[j] different values */
+  for (j = 0; j <= d; j++)
     {
-      int k;
-      if (2 * j == d)
-	k = bound;
-      else
+      long k;
+      a[j] = idx % count[j];
+      idx = idx / count[j];
+      if (j == d)
+        a[j] ++;      /* coefficient in [1..B] */
+      else if (j == 0) /* coefficient in [-k..k] except 0 */
 	{
-	  b = (double) ad * pow (skew, (double) (d - j));
-	  k = (int) b;
+          k = count[j] / 2; /* count[j]=2*k */
+          /* 0..k-1 -> -k..-1
+             k..2k-1 -> 1..k */
+          a[j] = (a[j] < k) ? a[j] - k : a[j] - (k - 1);
 	}
-      if (j == d - 1) /* coefficient in [0..k] */
+      else if (j < d - 1)
 	{
-	  a[j] = idx % (k + 1);
-	  idx /= k + 1;
-	}
-      else if (j > 0) /* coefficient in [-k..k] */
-	{
-	  a[j] = (idx % (2 * k + 1)) - k;
-	  idx /= 2 * k + 1;
-	}
-      else /* j=0: coefficient in [-k..k] except 0 */
-	{
-	  a[j] = idx % (2 * k);
-	  /* 0..k-1 goes to -k..-1 and k..2k-1 to 1..k */
-	  a[j] = (a[j] < k) ? a[j] - k : a[j] - (k - 1);
-	  idx /= 2 * k;
+          k = count[j] / 2; /* count[j]=2*k+1 */
+          a[j] -= k;
 	}
     }
   ASSERT_ALWAYS(idx == 0);
 
+  /* Check if polynomial agrees with maximal skewness: for i > d/2 and j < d/2,
+     the line going through |a[i]| and |a[j]| should not exceed bound at d/2 */
+  for (i = d / 2 + 1; i <= d && ok; i++)
+    {
+      unsigned ai = abs (a[i]);
+      if (ai == 0)
+        continue;
+      for (j = 0; j < (d + 1) / 2 && ok; j++)
+        {
+          unsigned aj = abs (a[j]);
+          double s = pow ((double) aj / (double) ai, 1.0 / (double) (i - j));
+          double mid = (double) ai * pow (s, (double) (2 * i - d) / 2.0);
+          ok = mid <= (double) bound;
+        }
+    }
+
   /* Check if the reverse polynomial has smaller rank.
      This test discards about 7.7% of the polynomials for d=4 and bound=6. */
-  for (j = 0; 2 * j < d; j++)
-    if (abs (a[d-j]) != abs(a[j]))
-      {
-	ok = abs (a[d-j]) < abs(a[j]);
-	break;
-      }
+  if (ok)
+    for (j = 0; 2 * j < d; j++)
+      if (abs (a[d-j]) != abs(a[j]))
+        {
+          ok = abs (a[d-j]) < abs(a[j]);
+          break;
+        }
 
   /* Since f(x) is equivalent to f(-x), if a[d-1]=0, then the largest a[d-3],
      a[d-5], ... that is non zero should be positive. Discards 13.5% of the
@@ -632,6 +628,11 @@ polygen_JL2 (mpz_t n, unsigned long k,
             for (u->deg = dg; u->deg >= 0 && mpz_cmp_ui (u->coeff[u->deg], 0)
                    == 0; u->deg--);
 
+            /* if u is not square-free or irreducible, skip it */
+            if (mpz_cmp_ui (u->coeff[0], 0) == 0 || !mpz_poly_squarefree_p (u)
+                || !mpz_poly_is_irreducible_z (u))
+              continue;
+
             if (print_nonlinear_poly_info (f, alpha_f, u, format, n))
               {
 #if 0 /* print coefficients of record combination */
@@ -817,10 +818,9 @@ main (int argc, char *argv[])
 
     ASSERT_ALWAYS (bound >= 1);
 
-    if (skew) {
-        init_count (bound, df);
-        maxtries = count[0];
-    } else {
+    if (skew)
+      maxtries = get_maxtries (bound, df);
+    else {
       /* check modm has no common factor with B, B+1, 2B+1 and 2B to avoid
          a bias between classes mod 'modm' */
         if (gcd_uint64 (modm, 2 * bound) != 1 ||

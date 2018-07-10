@@ -613,25 +613,34 @@ factor_simple_minded (std::vector<cxx_mpz> &factors,
               cxx_mpz& cofac, mpz_ptr sq)
 {
     double BB = B * B, BBB = B * B * B;
-    ASSERT(mpz_divisible_p (n, cofac));
-    mpz_divexact (n, n, cofac);
 
-    if (sq) {
-        ASSERT(mpz_divisible_p (n, sq));
-        mpz_divexact (n, n, sq);
+    if (mpz_cmp_ui(cofac, 0) == 0) {
+        if (sq) {
+            ASSERT(mpz_divisible_p (n, sq));
+            mpz_divexact (n, n, sq);
+        }
+        trial_divide (factors, n, SP);
+    } else {
+        ASSERT(mpz_divisible_p (n, cofac));
+        mpz_divexact (n, n, cofac);
+
+        if (sq) {
+            ASSERT(mpz_divisible_p (n, sq));
+            mpz_divexact (n, n, sq);
+        }
+
+        /* remove small primes */
+        trial_divide (factors, n, SP);
+
+        /* the cofactor that we found with the product tree will have primes
+         * between lim and 2^batchlpb. We typically have batchlpb < lpb, and
+         * lim > sqrt(2^lpb), so that we know that [cofac] has no prime factor
+         * below B=sqrt(2^lpb). It is not guaranteed, though: we may have
+         * elected to get rid of sieving on that side, in which case [cofac]
+         * may very well contain small primes.
+         */
+        trial_divide (factors, cofac, SP);
     }
-
-    /* remove small primes */
-    trial_divide (factors, n, SP);
-
-    /* the cofactor that we found with the product tree will have primes
-     * between lim and 2^batchlpb. We typically have batchlpb < lpb, and
-     * lim > sqrt(2^lpb), so that we know that [cofac] has no prime factor
-     * below B=sqrt(2^lpb). It is not guaranteed, though: we may have
-     * elected to get rid of sieving on that side, in which case [cofac]
-     * may very well contain small primes.
-     */
-    trial_divide (factors, cofac, SP);
 
     std::list<std::pair<cxx_mpz, facul_method_t *>> composites;
     if (mpz_cmp_ui(n, 1) > 0) 

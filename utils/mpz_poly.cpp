@@ -332,6 +332,131 @@ mpz_poly_mul_tc (mpz_t *f, mpz_t *g, int r, mpz_t *h, int s)
   return t;
 }
 
+/* f2*x^2+f1*x+f0 = (g1*x+g0)^2 using Karatsuba and 3 SQR */
+static int
+mpz_poly_sqr_tc2 (mpz_t *f, mpz_t *g)
+{
+  mpz_mul (f[0], g[0], g[0]);
+  mpz_mul (f[2], g[1], g[1]);
+  mpz_add (f[1], g[0], g[1]);
+  mpz_mul (f[1], f[1], f[1]);
+  mpz_sub (f[1], f[1], f[0]);
+  mpz_sub (f[1], f[1], f[2]);
+  return 2;
+}
+
+#if 1
+/* Algorithm SQR3 from Asymmetric Squaring Formulae by Chung and Hasan,
+   with 4 SQR and 1 MUL. */
+static int
+mpz_poly_sqr_tc3 (mpz_t *c, mpz_t *a)
+{
+  mpz_mul (c[0], a[0], a[0]);      /* c0 = S0 = a0^2 */
+  mpz_add (c[1], a[2], a[0]);      /* c1 = a2 + a0 */
+  mpz_sub (c[2], c[1], a[1]);      /* c2 = a2 - a1 + a0 */
+  mpz_add (c[1], c[1], a[1]);      /* c1 = a2 + a1 + a0 */
+  mpz_mul (c[1], c[1], c[1]);      /* S1 = (a2 + a1 + a0)^2 */
+  mpz_mul (c[2], c[2], c[2]);      /* S2 = (a2 - a1 + a0)^2 */
+  mpz_mul (c[3], a[2], a[1]);
+  mpz_mul_2exp (c[3], c[3], 1);    /* S3 = 2*a1*a2 */
+  mpz_add (c[2], c[1], c[2]);
+  mpz_tdiv_q_2exp (c[2], c[2], 1); /* T1 = (S1 + S2) / 2 */
+  mpz_sub (c[1], c[1], c[2]);      /* S1 - T1 */
+  mpz_sub (c[1], c[1], c[3]);      /* c1 = S1 - T1 - S3 */
+  mpz_mul (c[4], a[2], a[2]);      /* c4 = S4 = a2^2 */
+  mpz_sub (c[2], c[2], c[4]);      /* T1 - S4 */
+  mpz_sub (c[2], c[2], c[0]);      /* c2 = T1 - S4 - S0 */
+  return 4;
+}
+#else
+/* (g2*x^2+g1*x+g0)^2 = g2^2*x^4 + (2*g2*g1)*x^3 +
+   (g1^2+2*g2*g0)*x^2 + (2*g1*g0)*x + g0^2 in 3 SQR + 2 MUL.
+   Experimentally this is faster for less than 4096 bits than the
+   algorithm in 5 SQR from mpz_poly_mul_tc_interpolate. */
+static int
+mpz_poly_sqr_tc3 (mpz_t *f, mpz_t *g)
+{
+  mpz_mul (f[4], g[2], g[2]);   /* g2^2 */
+  mpz_mul (f[3], g[2], g[1]);
+  mpz_mul_2exp (f[3], f[3], 1); /* 2*g2*g1 */
+  mpz_mul (f[1], g[1], g[0]);
+  mpz_mul_2exp (f[1], f[1], 1); /* 2*g1*g0 */
+  mpz_mul (f[0], g[0], g[0]);   /* g0^2 */
+  mpz_add (f[2], g[2], g[1]);
+  mpz_add (f[2], f[2], g[0]);
+  mpz_mul (f[2], f[2], f[2]);   /* (g2+g1+g0)^2 */
+  mpz_sub (f[2], f[2], f[4]);
+  mpz_sub (f[2], f[2], f[0]);   /* g1^2 + 2*g2*g0 + 2*g2*g1 + 2*g1*g0 */
+  mpz_sub (f[2], f[2], f[3]);   /* g1^2 + 2*g2*g0 + 2*g1*g0 */
+  mpz_sub (f[2], f[2], f[1]);   /* g1^2 + 2*g2*g0 */
+  return 4;
+}
+#endif
+
+#if 1
+/* 2 levels of Karatsuba: 9 SQR */
+static int
+mpz_poly_sqr_tc4 (mpz_t *f, mpz_t *g)
+{
+  mpz_t t;
+
+  mpz_init (t);
+  /* f4*x^2+f3*x+f2 <- [(g3+g1)*x + (g2+g0)]^2 */
+  mpz_add (f[0], g[0], g[2]);
+  mpz_add (f[1], g[1], g[3]);
+  mpz_poly_sqr_tc2 (f + 2, f);
+  /* save f2 into t */
+  mpz_swap (t, f[2]);
+  /* f2*x^2+f1*x+f0 <- (g1*x+g0)^2 */
+  mpz_poly_sqr_tc2 (f, g);
+  /* subtract f2*x^2+f1*x+f0 from f4*x^2+f3*x+t */
+  mpz_sub (f[4], f[4], f[2]);
+  mpz_sub (f[3], f[3], f[1]);
+  mpz_sub (t, t, f[0]);
+  /* re-add t into f2 */
+  mpz_add (f[2], f[2], t);
+  /* save f4 into t */
+  mpz_swap (t, f[4]);
+  /* f6*x^2+f5*x+f4 <- (g3*x+g2)^2 */
+  mpz_poly_sqr_tc2 (f + 4, g + 2);
+  /* subtract f6*x^2+f5*x+f4 from t*x^2+f3*x+f2 */
+  mpz_sub (t, t, f[6]);
+  mpz_sub (f[3], f[3], f[5]);
+  mpz_sub (f[2], f[2], f[4]);
+  /* re-add t into f4 */
+  mpz_add (f[4], f[4], t);
+  mpz_clear (t);
+  return 6;
+}
+#else
+static int
+mpz_poly_sqr_tc4 (mpz_t *f, mpz_t *g)
+{
+  /* (g3*x^3+g2*x^2+g1*x+g0)^2 = g3^2*x^6 + (2*g3*g2)*x^5
+     + (g2^2+2*g3*g1)*x^4 + (2*g3*g0+2*g2*g1)*x^3
+     + (g1^2+2*g2*g0)*x^2 + (2*g1*g0)*x + g0^2 in 4 SQR + 6 MUL.
+     Experimentally this is faster for less than 4096 bits than the
+     algorithm in 7 SQR from mpz_poly_mul_tc_interpolate. */
+  mpz_mul (f[6], g[3], g[3]); /* g3^2 */
+  mpz_mul (f[5], g[3], g[2]);
+  mpz_mul_2exp (f[5], f[5], 1); /* 2*g3*g2 */
+  mpz_mul (f[1], g[1], g[0]);
+  mpz_mul_2exp (f[1], f[1], 1); /* 2*g1*g0 */
+  mpz_mul (f[2], g[1], g[1]); /* g1^2 */
+  mpz_mul (f[0], g[2], g[0]);
+  mpz_addmul_ui (f[2], f[0], 2); /* g1^2+2*g2*g0 */
+  mpz_mul (f[4], g[2], g[2]); /* g2^2 */
+  mpz_mul (f[0], g[3], g[1]);
+  mpz_addmul_ui (f[4], f[0], 2); /* g2^2+2*g3*g1 */
+  mpz_mul (f[3], g[3], g[0]);
+  mpz_mul (f[0], g[2], g[1]);
+  mpz_add (f[3], f[3], f[0]);
+  mpz_mul_2exp (f[3], f[3], 1); /* 2*g3*g0+2*g2*g1 */
+  mpz_mul (f[0], g[0], g[0]); /* g0^2 */
+  return 6;
+}
+#endif
+
 /* Same as mpz_poly_mul_tc for the squaring: store in f[0..2r] the coefficients
    of g^2, where g has degree r, and its coefficients are in g[0..r].
    Assumes f differs from g, and f[0..2r] are already allocated.
@@ -353,67 +478,17 @@ mpz_poly_sqr_tc (mpz_t *f, mpz_t *g, int r)
     }
 
   if (r == 1) /* 3 SQR: always optimal */
-    {
-      mpz_mul (f[0], g[0], g[0]);
-      mpz_mul (f[2], g[1], g[1]);
-      mpz_add (f[1], g[0], g[1]);
-      mpz_mul (f[1], f[1], f[1]);
-      mpz_sub (f[1], f[1], f[0]);
-      mpz_sub (f[1], f[1], f[2]);
-      return 2;
-    }
+    return mpz_poly_sqr_tc2 (f, g);
 
   /* we assume the number of bits of f[0] is representative of the size of
      the coefficients of f */
   nbits = mpz_sizeinbase (f[0], 2);
 
   if (r == 2 && nbits < 4096)
-    /* (g2*x^2+g1*x+g0)^2 = g2^2*x^4 + (2*g2*g1)*x^3 +
-       (g1^2+2*g2*g0)*x^2 + (2*g1*g0)*x + g0^2 in 3 SQR + 2 MUL.
-       Experimentally this is faster for less than 4096 bits than the
-       algorithm in 5 SQR from mpz_poly_mul_tc_interpolate. */
-    {
-      mpz_mul (f[4], g[2], g[2]); /* g2^2 */
-      mpz_mul (f[3], g[2], g[1]);
-      mpz_mul_2exp (f[3], f[3], 1); /* 2*g2*g1 */
-      mpz_mul (f[1], g[1], g[0]);
-      mpz_mul_2exp (f[1], f[1], 1); /* 2*g1*g0 */
-      mpz_mul (f[0], g[0], g[0]); /* g0^2 */
-      mpz_add (f[2], g[2], g[1]);
-      mpz_add (f[2], f[2], g[0]);
-      mpz_mul (f[2], f[2], f[2]); /* (g2+g1+g0)^2 */
-      mpz_sub (f[2], f[2], f[4]);
-      mpz_sub (f[2], f[2], f[0]); /* g1^2 + 2*g2*g0 + 2*g2*g1 + 2*g1*g0 */
-      mpz_sub (f[2], f[2], f[3]); /* g1^2 + 2*g2*g0 + 2*g1*g0 */
-      mpz_sub (f[2], f[2], f[1]); /* g1^2 + 2*g2*g0 */
-      return 4;
-    }
+    return mpz_poly_sqr_tc3 (f, g);
 
   if (r == 3 && nbits < 4096)
-    /* (g3*x^3+g2*x^2+g1*x+g0)^2 = g3^2*x^6 + (2*g3*g2)*x^5
-       + (g2^2+2*g3*g1)*x^4 + (2*g3*g0+2*g2*g1)*x^3
-       + (g1^2+2*g2*g0)*x^2 + (2*g1*g0)*x + g0^2 in 4 SQR + 6 MUL.
-       Experimentally this is faster for less than 4096 bits than the
-       algorithm in 7 SQR from mpz_poly_mul_tc_interpolate. */
-    {
-      mpz_mul (f[6], g[3], g[3]); /* g3^2 */
-      mpz_mul (f[5], g[3], g[2]);
-      mpz_mul_2exp (f[5], f[5], 1); /* 2*g3*g2 */
-      mpz_mul (f[1], g[1], g[0]);
-      mpz_mul_2exp (f[1], f[1], 1); /* 2*g1*g0 */
-      mpz_mul (f[2], g[1], g[1]); /* g1^2 */
-      mpz_mul (f[0], g[2], g[0]);
-      mpz_addmul_ui (f[2], f[0], 2); /* g1^2+2*g2*g0 */
-      mpz_mul (f[4], g[2], g[2]); /* g2^2 */
-      mpz_mul (f[0], g[3], g[1]);
-      mpz_addmul_ui (f[4], f[0], 2); /* g2^2+2*g3*g1 */
-      mpz_mul (f[3], g[3], g[0]);
-      mpz_mul (f[0], g[2], g[1]);
-      mpz_add (f[3], f[3], f[0]);
-      mpz_mul_2exp (f[3], f[3], 1); /* 2*g3*g0+2*g2*g1 */
-      mpz_mul (f[0], g[0], g[0]); /* g0^2 */
-      return 6;
-    }
+    return mpz_poly_sqr_tc4 (f, g);
 
   t = 2 * r; /* product has degree t thus t+1 coefficients */
   if (t > MAX_TC_DEGREE) {
