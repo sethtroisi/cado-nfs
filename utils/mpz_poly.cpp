@@ -1403,6 +1403,39 @@ void mpz_poly_rotation_int64 (mpz_poly_ptr fr, mpz_poly_srcptr f,
     mpz_addmul_int64 (fr->coeff[i+t], g->coeff[i], k);
 }
 
+/* a <- b cmod c with -c/2 <= a < c/2 */
+static void
+mpz_cmod (mpz_ptr a, mpz_srcptr b, mpz_srcptr c)
+{
+  mpz_mod (a, b, c); /* now 0 <= a < c */
+
+  size_t n = mpz_size (c);
+  mp_limb_t aj, cj;
+  int sub = 0, sh = GMP_NUMB_BITS - 1;
+
+  if (mpz_getlimbn (a, n-1) >= (mp_limb_t) 1 << sh)
+    sub = 1;
+  else
+    {
+      while (n-- > 0)
+	{
+	  cj = mpz_getlimbn (c, n);
+	  aj = mpz_getlimbn (a, n) << 1;
+	  if (n > 0)
+	    aj |= mpz_getlimbn (a, n-1) >> sh;
+	  if (aj > cj)
+	    {
+	      sub = 1;
+	      break;
+	    }
+	  else if (aj < cj)
+	    break;
+	}
+    }
+  if (sub)
+    mpz_sub (a, a, c);
+}
+
 /* h=rem(h, f) mod N, f not necessarily monic, N not necessarily prime */
 /* Coefficients of f must be reduced mod N
  * Coefficients of h need not be reduced mod N on input, but are reduced
@@ -1434,14 +1467,14 @@ mpz_poly_pseudodiv_r (mpz_poly_ptr h, mpz_poly_srcptr f, mpz_srcptr N, mpz_ptr f
     /* subtract h[dh]/f[d]*x^(dh-d)*f from h */
     if (mpz_cmp_ui(inv, 1) != 0) {
       mpz_mul (h->coeff[dh], h->coeff[dh], inv);
-      mpz_mod (h->coeff[dh], h->coeff[dh], N);
+      mpz_cmod (h->coeff[dh], h->coeff[dh], N);
     }
 
     for (i = 0; i < d; i++) {
       mpz_mul (tmp, h->coeff[dh], f->coeff[i]);
       mpz_mod (tmp, tmp, N);
       mpz_sub (h->coeff[dh - d + i], h->coeff[dh - d + i], tmp);
-      mpz_mod (h->coeff[dh - d + i], h->coeff[dh - d + i], N);
+      mpz_cmod (h->coeff[dh - d + i], h->coeff[dh - d + i], N);
     }
 
     do {
@@ -1926,10 +1959,10 @@ mpz_poly_mod_f_mod_mpz (mpz_poly_ptr R, mpz_poly_srcptr f, mpz_srcptr m,
   while (R->deg >= f->deg)
     {
       /* Here m is large (thousand to million bits) and lc(f) is small
-       * (typically one word). We first add to R lambda * m * x^(dR-df) ---
-       * which is zero mod m --- such that the new coefficient of degree dR
-       * is divisible by lc(f), i.e., lambda = -lc(R)/m mod lc(f). Then if
-       * c = (lc(R) + lambda * m) / lc(f), we subtract c * x^(dR-df) * f. */
+       * (typically one word). We first subtract lambda * m * x^(dR-df) ---
+       * which is zero mod m --- to R such that the new coefficient of degree
+       * dR is divisible by lc(f), i.e., lambda = lc(R)/m mod lc(f). Then if
+       * c = (lc(R) - lambda * m) / lc(f), we subtract c * x^(dR-df) * f. */
       mpz_mod (c, R->coeff[R->deg], f->coeff[f->deg]); /* lc(R) mod lc(f) */
       mpz_mul (c, c, (invf == NULL) ? aux : invf);
       mpz_mod (c, c, f->coeff[f->deg]);    /* lc(R)/m mod lc(f) */
@@ -1939,7 +1972,7 @@ mpz_poly_mod_f_mod_mpz (mpz_poly_ptr R, mpz_poly_srcptr f, mpz_srcptr m,
       /* If R[deg] has initially size 2n, and f[deg] = O(1), then c has size
 	 2n here. */
       for (int i = R->deg - 1; i >= R->deg - f->deg; --i)
-	mpz_submul (R->coeff[i], c, f->coeff[f->deg-R->deg+i]);
+	mpz_submul (R->coeff[i], c, f->coeff[f->deg - R->deg + i]);
       R->deg--;
     }
 
@@ -2248,7 +2281,7 @@ void barrett_mod (mpz_ptr a, mpz_srcptr b, mpz_srcptr m, mpz_srcptr invm)
   sizeb = mpz_size (b);
   if (invm == NULL || sizeb <= k || k == 1)
   {
-    mpz_mod (a, b, m);
+    mpz_cmod (a, b, m);
     return;
   }
 
@@ -2278,7 +2311,7 @@ void barrett_mod (mpz_ptr a, mpz_srcptr b, mpz_srcptr m, mpz_srcptr invm)
     mpz_sub (a, a, c);
   }
   mpz_clear (c);
-  mpz_mod (a, a, m);
+  mpz_cmod (a, a, m);
 }
 
 /* Q = P^a mod f, mod p. Note, p is mpz_t */
@@ -2523,9 +2556,9 @@ mpz_poly_totalsize (mpz_poly_srcptr f)
 static void
 mpz_poly_gcd_mpz_clobber (mpz_poly_ptr f, mpz_poly_ptr g, mpz_srcptr p)
 {
-    /* First reduce mod p */
-    mpz_poly_mod_mpz(f, f, p, NULL);
-    mpz_poly_mod_mpz(g, g, p, NULL);
+  /* First reduce mod p */
+  mpz_poly_mod_mpz (f, f, p, NULL);
+  mpz_poly_mod_mpz (g, g, p, NULL);
   while (g->deg >= 0)
     {
       mpz_poly_div_r (f, g, p);
@@ -3062,7 +3095,7 @@ mpz_poly_squarefree_p (mpz_poly_srcptr f)
  *
  * this function is without any warranty and at your own risk
  */
-int mpz_poly_is_irreducible_z(mpz_poly_srcptr f)
+int mpz_poly_is_irreducible_z (mpz_poly_srcptr f)
 {
   mpz_t p;
   int d = f->deg;
