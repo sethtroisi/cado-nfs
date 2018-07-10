@@ -81,7 +81,7 @@ skew: 1.37
 #define ALPHA_BOUND_GUARD 1.0
 
 /* global variables */
-double best_score_f = DBL_MAX, worst_score_f = DBL_MIN;
+double best_score_f = DBL_MAX, worst_score_f = DBL_MIN, sum_score_f = 0;
 unsigned long f_candidate = 0;   /* number of irreducibility tests */
 unsigned long f_irreducible = 0; /* number of irreducible polynomials */
 double max_guard = DBL_MIN;
@@ -432,11 +432,6 @@ polygen_JL_f (int d, unsigned int bound, mpz_t *f, unsigned long idx)
         if (ok)
           ok = mpz_poly_is_irreducible_z (ff);
 	END_TIMER (TIMER_IRRED);
-#ifdef HAVE_OPENMP
-#pragma omp critical
-#endif
-	if (ok)
-	  f_irreducible ++;
       }
     return ok;
 }
@@ -597,6 +592,14 @@ polygen_JL2 (mpz_t n, unsigned long k,
 #pragma omp critical
 #endif
       worst_score_f = score_f;
+
+#ifdef HAVE_OPENMP
+#pragma omp critical
+#endif
+    {
+      f_irreducible ++;
+      sum_score_f += score_f;
+    }
 
     /* for each root of f mod n, generate the corresponding g */
     for (i = 0; i < nr; i ++) {
@@ -875,8 +878,9 @@ main (int argc, char *argv[])
 
     printf ("# found %lu irreducible f out of %lu candidates out of %lu\n",
             f_irreducible, f_candidate, maxtries / modm);
-    printf ("# best score %1.2f, worst %1.2f, max guard %1.2f\n",
-            best_score_f, worst_score_f, max_guard);
+    printf ("# best f-score %1.2f, av. %1.2f, worst %1.2f, max alpha-guard %1.2f\n",
+            best_score_f, sum_score_f / f_irreducible, worst_score_f,
+            max_guard);
     if (max_guard > ALPHA_BOUND_GUARD)
       printf ("# Warning: max_guard > ALPHA_BOUND_GUARD, might "
               "have missed some polynomials\n");
