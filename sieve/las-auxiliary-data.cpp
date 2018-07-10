@@ -3,6 +3,9 @@
 #include "las-threads.hpp"
 #include "las-types.hpp"
 
+/* in las.cpp */
+extern int sync_at_special_q;
+
 void nfs_aux::thread_data::update_checksums(nfs_work::thread_data & tws)
 {
     for(int side = 0 ; side < 2 ; side++)
@@ -96,9 +99,23 @@ nfs_aux::~nfs_aux()
     if (dont_print_tally && las.nb_threads > 1) {
         verbose_output_print(0, 1, "# Time for this special-q: %1.4fs [tally available only in mono-thread] in %1.4f elapsed s\n", qt0, wct_qt0);
     } else {
-        verbose_output_print(0, 1, "# Time for this special-q: *%1.4fs [norm %1.4f+%1.4f, sieving *%1.4f"
+        const char * fmt[2] = {
+            /* for default, special-q-overlapping mode: */
+            "# Time for this special-q: *%1.4fs"
+                " [norm %1.4f+%1.4f, sieving *%1.4f"
                 " (%1.4f + %1.4f + *%1.4f),"
-                " factor %1.4f (%1.4f + %1.4f)] [*: incl overlap time] in %1.4f elapsed s\n", qt0,
+                " factor %1.4f (%1.4f + %1.4f)]"
+                " in %1.4f elapsed s"
+                " [*: incl overlap time]\n",
+            /* for legacy synchronous mode: */
+            "# Time for this special-q: %1.4fs"
+                " [norm %1.4f+%1.4f, sieving %1.4f"
+                " (%1.4f + %1.4f + %1.4f),"
+                " factor %1.4f (%1.4f + %1.4f)]"
+                " in %1.4f elapsed s"
+                "\n" };
+        verbose_output_print(0, 1, fmt[sync_at_special_q != 0],
+                qt0,
                 rep.tn[0],
                 rep.tn[1],
                 qtts,
