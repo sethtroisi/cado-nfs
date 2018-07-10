@@ -41,7 +41,7 @@
 #ifdef MPZ_POLY_TIMINGS
 #include <time.h>
 #include <timing.h>
-double timer[3] = {0.0, 0.0, 0.0};
+static double timer[3] = {0.0, 0.0, 0.0};
 #endif
 
 #define TIMER_MUL 0

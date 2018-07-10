@@ -88,13 +88,13 @@ double max_guard = DBL_MIN;
 int skew = 0;                   /* see the -skew option */
 unsigned long *count = NULL;    /* use only with -skew */
 
-/* MPZ_POLY_TIMINGS is defined (or maybe not) in mpz_poly.hpp
+/* MPZ_POLY_TIMINGS is defined (or maybe not) in utils/mpz_poly.h
  */
 #ifndef MPZ_POLY_H_
 #error "please include mpz_poly.h first"
 #endif
 #ifdef MPZ_POLY_TIMINGS
-double timer[4] = {0.0, };
+static double timer[4] = {0.0, };
 #endif
 
 double Bf = 0.0, Bg = 0.0, Area = 0.0;
