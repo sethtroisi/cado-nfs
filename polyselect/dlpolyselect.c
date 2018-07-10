@@ -628,10 +628,14 @@ polygen_JL2 (mpz_t n, unsigned long k,
             for (u->deg = dg; u->deg >= 0 && mpz_cmp_ui (u->coeff[u->deg], 0)
                    == 0; u->deg--);
 
-            /* if u is not square-free or irreducible, skip it */
+#if 0
+            /* If u is not square-free or irreducible, skip it. However, this
+               test is very expensive, and non-irreducible polynomials should
+               not happen in practice for large input N, thus we disable. */
             if (mpz_cmp_ui (u->coeff[0], 0) == 0 || !mpz_poly_squarefree_p (u)
                 || !mpz_poly_is_irreducible_z (u))
               continue;
+#endif
 
             if (print_nonlinear_poly_info (f, alpha_f, u, format, n))
               {
