@@ -54,6 +54,7 @@ extern uint64_t uint64_nextprime (uint64_t);
 extern int ulong_isprime (unsigned long);
 extern unsigned long ulong_nextcomposite (unsigned long, unsigned long);
 extern void mpz_ndiv_qr (mpz_t q, mpz_t r, mpz_t n, const mpz_t d);
+extern void mpz_ndiv_r (mpz_t r, mpz_srcptr n, mpz_srcptr d);
 extern void mpz_ndiv_qr_ui (mpz_t q, mpz_t r, mpz_t n, unsigned long int d);
 extern void mpz_ndiv_q (mpz_t q, mpz_t n, const mpz_t d);
 extern void mpz_ndiv_q_ui (mpz_t q, mpz_t n, unsigned long int d);

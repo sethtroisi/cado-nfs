@@ -146,7 +146,7 @@ void mpz_poly_makemonic_mod_mpz (mpz_poly_ptr Q, mpz_poly_srcptr P, mpz_srcptr m
 int mpz_poly_mod_f_mod_mpz (mpz_poly_ptr R, mpz_poly_srcptr f, mpz_srcptr m,
                             mpz_srcptr invm, mpz_srcptr invf);
 int mpz_poly_mod_mpz (mpz_poly_ptr R, mpz_poly_srcptr A, mpz_srcptr m, mpz_srcptr invm);
-int mpz_poly_mod_mpz_lazy (mpz_poly_ptr R, mpz_poly_srcptr A, mpz_srcptr m, mpz_srcptr invm);
+int mpz_poly_mod_mpz_lazy (mpz_poly_ptr R, mpz_poly_srcptr A, mpz_srcptr m);
 void mpz_poly_mul_mod_f_mod_mpz(mpz_poly_ptr Q, mpz_poly_srcptr P1, mpz_poly_srcptr P2,
                                 mpz_poly_srcptr f, mpz_srcptr m,
                                 mpz_srcptr invm, mpz_srcptr invf);
@@ -201,7 +201,7 @@ void mpz_poly_base_modp_lift (mpz_poly_ptr a, mpz_poly *P, int k, mpz_srcptr pk)
 size_t mpz_poly_sizeinbase (mpz_poly_srcptr f, int base);
 void mpz_poly_infinity_norm(mpz_ptr in, mpz_poly_srcptr f);
 size_t mpz_poly_totalsize (mpz_poly_srcptr f);
-void mpz_poly_gcd_mpz (mpz_poly_ptr h, mpz_poly_srcptr f, mpz_poly_srcptr g, mpz_srcptr p);
+  void mpz_poly_gcd_mpz (mpz_poly_ptr h, mpz_poly_srcptr f, mpz_poly_srcptr g, mpz_srcptr p, mpz_srcptr invp);
 // compute f = GCD(f,g) mod N. If this fails, put the factor in the last
 // given argument.
 int mpz_poly_pseudogcd_mpz(mpz_poly_ptr , mpz_poly_ptr , mpz_srcptr , mpz_ptr);
@@ -238,7 +238,7 @@ void mpz_poly_factor_list_clear(mpz_poly_factor_list_ptr l);
 void mpz_poly_factor_list_flush(mpz_poly_factor_list_ptr l);
 void mpz_poly_factor_list_push(mpz_poly_factor_list_ptr l, mpz_poly_srcptr f, int m);
 void mpz_poly_factor_list_fprintf(FILE* fp, mpz_poly_factor_list_srcptr l);
-int mpz_poly_factor_sqf(mpz_poly_factor_list_ptr lf, mpz_poly_srcptr f, mpz_srcptr p);
+int mpz_poly_factor_sqf(mpz_poly_factor_list_ptr lf, mpz_poly_srcptr f, mpz_srcptr p, mpz_srcptr invp);
 int mpz_poly_factor_ddf(mpz_poly_factor_list_ptr lf, mpz_poly_srcptr f0, mpz_srcptr p);
 int mpz_poly_factor_edf(mpz_poly_factor_list_ptr lf, mpz_poly_srcptr f, int k, mpz_srcptr p, gmp_randstate_t rstate);
 
