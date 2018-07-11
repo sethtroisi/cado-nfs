@@ -9,6 +9,10 @@
 #include "cado_poly.h"
 #include "logapprox.hpp"
 
+/* Only relevant with --adjust-strategy 2 */
+#define ADJUST_STRATEGY2_MIN_SQUEEZE 0
+#define ADJUST_STRATEGY2_MAX_SQUEEZE 3
+
 double get_maxnorm_rectangular (double_poly_srcptr src_poly, const double X, const double Y);
 
 struct lognorm_base {/*{{{*/

@@ -45,7 +45,7 @@ void nfs_work::thread_data::allocate_bucket_regions()
 }
 
 nfs_work::nfs_work(las_info const & _las)
-    : nfs_work(_las, _las.nb_threads + 2)
+    : nfs_work(_las, NUMBER_OF_BAS_FOR_THREADS(_las.nb_threads))
 {}
 nfs_work::nfs_work(las_info const & _las, int nr_workspaces)
     : las(_las),

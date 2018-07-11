@@ -6,6 +6,8 @@
 #include "las-threads.hpp"
 #include "ecm/facul.hpp"
 
+#define NUMBER_OF_BAS_FOR_THREADS(n)    ((n) == 1 ? 1 : ((n) + 2))
+
 /*
  * This structure holds the key algorithmic data that is used in las. It
  * is intentionally detached from the rest of the ``stats-like'' control
