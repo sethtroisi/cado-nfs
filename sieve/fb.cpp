@@ -1859,7 +1859,9 @@ struct helper_functor_write_to_fbc_file {
 
             lseek(fbc, header_block_offset + next->offset, SEEK_SET);
             ASSERT_ALWAYS(x.size() == next->nentries);
-            ::write(fbc, &x.front(), sizeof(FB_ENTRY_TYPE) * x.size());
+            size_t n = sizeof(FB_ENTRY_TYPE) * x.size();
+            ssize_t m = ::write(fbc, &x.front(), n);
+            ASSERT_ALWAYS (m == (ssize_t)n);
             next++;
         }
 };
@@ -1873,7 +1875,9 @@ struct helper_functor_write_to_fbc_file_weight_part {
         void operator()(T & x) {
             if (next == chunks.end()) return;
             lseek(fbc, header_block_offset + next->weight_offset, SEEK_SET);
-            ::write(fbc, &*x.weight_begin(), sizeof(double) * (x.size() + 1));
+            size_t n = sizeof(double) * (x.size() + 1);
+            ssize_t m = ::write(fbc, &*x.weight_begin(), n);
+            ASSERT_ALWAYS (m == (ssize_t)n);
             next++;
         }
 };
@@ -2020,14 +2024,17 @@ fb_factorbase::fb_factorbase(cxx_cado_poly const & cpoly, int side, unsigned lon
              * fseek + fwrite, thereby inserting zeroes automagically (POSIX says
              * that). 
              */
-            ::write(fbc, os.str().c_str(), os.str().size());
+            size_t n = os.str().size();
+            ssize_t m = ::write(fbc, os.str().c_str(), n);
+            ASSERT_ALWAYS(m = (ssize_t) n);
 
             helper_functor_write_to_fbc_file W1 { fbc, fbc_size, S.entries, S.entries.begin() };
             multityped_array_foreach(W1, entries);
             helper_functor_write_to_fbc_file_weight_part W2 { fbc, fbc_size, S.entries, S.entries.begin() };
             multityped_array_foreach(W2, entries);
             ASSERT_ALWAYS((size_t) lseek(fbc, 0, SEEK_END) <= fbc_size + S.size);
-            ftruncate(fbc, fbc_size + S.size);
+            int ret = ftruncate(fbc, fbc_size + S.size);
+            ASSERT_ALWAYS (ret == 0);
             close(fbc);
             tfb = seconds () - tfb;
             tfb_wct = wct_seconds() - tfb_wct;
