@@ -3064,6 +3064,14 @@ bool do_one_special_q(las_info & las, nfs_work & ws, std::shared_ptr<nfs_aux> au
     for(int side = 0 ; side < 2 ; side++)
         si.sides[side].precomp_plattice_dense.clear();
 
+    for(int side = 0 ; side < 2 ; side++) {
+        sieve_info::side_info & s(si.sides[side]);
+        s.ssdpos_many.clear();
+        small_sieve_clear(s.ssd);
+        s.ssd_offsets.up.clear();
+        s.ssd_offsets.right.clear();
+    }
+
 #ifdef DLP_DESCENT
     postprocess_specialq_descent(las, doing, timer_special_q);
 #endif
