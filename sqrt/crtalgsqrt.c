@@ -1668,30 +1668,6 @@ void sqrt_lift(struct prime_data * p, mpz_ptr A, mpz_ptr sx, int precision)
 }
 /* }}} */
 
-/* {{{ This wraps around barrett reduction, depending on whether we
- * choose to use it or not */
-mpz_ptr my_barrett_init(mpz_srcptr px MAYBE_UNUSED)
-{
-#ifndef WITH_BARRETT
-    return NULL;
-#else
-    if (mpz_size(px) < 10000)
-        return NULL;
-    mpz_ptr qx = malloc(sizeof(mpz_t));
-    mpz_init(qx);
-    barrett_init(qx, px);
-    return qx;
-#endif
-}
-
-void my_barrett_clear(mpz_ptr qx)
-{
-    if (!qx) return;
-    mpz_clear(qx);
-    free(qx);
-}
-/* }}} */
-
 void root_lift(struct prime_data * p, mpz_ptr rx, mpz_ptr irx, int precision)/* {{{ */
 {
     double w0 = WCT;
@@ -1709,7 +1685,6 @@ void root_lift(struct prime_data * p, mpz_ptr rx, mpz_ptr irx, int precision)/* 
         logprint("precision %d\n", precision);
     mpz_srcptr pk = power_lookup_const(p->powers, precision);
     mpz_srcptr pl = power_lookup_const(p->powers, lower);
-    mpz_ptr qk = my_barrett_init(pk);
 
     mpz_t ta, tb;
     mpz_init(ta);
@@ -1742,8 +1717,6 @@ void root_lift(struct prime_data * p, mpz_ptr rx, mpz_ptr irx, int precision)/* 
 
     mpz_clear(ta);
     mpz_clear(tb);
-
-    my_barrett_clear(qk);
 }/* }}} */
 
 void prime_initialization(struct prime_data * p)/* {{{ */

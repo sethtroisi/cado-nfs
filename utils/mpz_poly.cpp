@@ -1854,7 +1854,6 @@ mpz_poly_makemonic_mod_mpz (mpz_poly_ptr Q, mpz_poly_srcptr P, mpz_srcptr m)
 
 /* Coefficients of A need not be reduced mod m
  * Coefficients of R are reduced mod m
- * invm may be NULL (or computed by barrett_init)
  */
 int
 mpz_poly_mod_mpz (mpz_poly_ptr R, mpz_poly_srcptr A, mpz_srcptr m)
@@ -1891,11 +1890,9 @@ mpz_poly_mod_mpz_lazy (mpz_poly_ptr R, mpz_poly_srcptr A, mpz_srcptr m)
 
 /* Reduce R[d]*x^d + ... + R[0] mod f[df]*x^df + ... + f[0] modulo m.
    Return the degree of the remainder.
-   Assume invm = floor(B^(2k)/m), m having k limbs, and B is the limb base.
    Coefficients of f must be reduced mod m on input.
    Coefficients of R need not be reduced mod m on input, but are reduced
    on output.
-   invm may be NULL (or computed by barrett_init).
    If invf is not NULL, it should be 1/m mod lc(f). */
 int
 mpz_poly_mod_f_mod_mpz (mpz_poly_ptr R, mpz_poly_srcptr f, mpz_srcptr m,
@@ -2008,7 +2005,6 @@ mpz_poly_reduce_frac_mod_f_mod_mpz (mpz_poly_ptr num, mpz_poly_ptr denom,
 
 /* Q = P1*P2 mod f, mod m
    f is the original algebraic polynomial (non monic but small coefficients)
-   Assume invm = floor(B^(2k)/m), m having k limbs, and B is the limb base.
    Coefficients of P1 and P2 need not be reduced mod m.
    Coefficients of Q are reduced mod m.
    If invf is not NULL, it is 1/m mod lc(f). */
@@ -2055,7 +2051,6 @@ mpz_poly_mul_mod_f (mpz_poly_ptr Q, mpz_poly_srcptr P1, mpz_poly_srcptr P2,
 
 /* Q = P^2 mod f, mod m
    f is the original algebraic polynomial (non monic but small coefficients)
-   Assume invm = floor(B^(2k)/m), m having k limbs, and B is the limb base.
    Coefficients of P need not be reduced mod m.
    Coefficients of Q are reduced mod m.
    If not NULL, invf = 1/m mod lc(f). */

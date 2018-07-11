@@ -112,7 +112,6 @@ test_sm (FILE * datafile)
     mpz_poly_init(SMc, F->deg);
 
     //     /* Real tests begin here */
-    //     barrett_init(invl2, ell2);
     //     mpz_poly_init (SMc, degF);
     mpz_poly_init (Nc, degF);
     mpz_poly_init (Dc, degF);
