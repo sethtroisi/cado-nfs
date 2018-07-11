@@ -367,23 +367,14 @@ polymodF_from_ab (polymodF_t tmp, mpz_t a, mpz_t b)
   mpz_set (tmp->p->coeff[0], a);
 }
 
-/* Reduce the coefficients of R in [-m/2, m/2], which are assumed in [0, m[ */
+/* Reduce the coefficients of R in [-m/2, m/2) */
 static void
 mpz_poly_mod_center (mpz_poly R, const mpz_t m)
 {
   int i;
-  mpz_t m_over_2;
 
-  mpz_init (m_over_2);
-  mpz_div_2exp (m_over_2, m, 2);
   for (i=0; i <= R->deg; i++)
-    {
-      ASSERT_ALWAYS(mpz_cmp_ui (R->coeff[i], 0) >= 0);
-      ASSERT_ALWAYS(mpz_cmp (R->coeff[i], m) < 0);
-      if (mpz_cmp (R->coeff[i], m_over_2) > 0)
-        mpz_sub (R->coeff[i], R->coeff[i], m);
-    }
-  mpz_clear (m_over_2);
+    mpz_ndiv_r (R->coeff[i], R->coeff[i], m);
 }
 
 #if 0
@@ -453,11 +444,14 @@ TonelliShanks (mpz_poly res, const mpz_poly a, const mpz_poly F, unsigned long p
       int i;
       // pick a random delta
       for (i = 0; i < d; ++i)
-    mpz_urandomm(delta->coeff[i], state, myp);
+	mpz_urandomm(delta->coeff[i], state, myp);
       mpz_poly_cleandeg(delta, d-1);
       // raise it to power (q-1)/2
       mpz_poly_pow_mod_f_mod_ui(auxpol, delta, F, aux, p);
-    } while ((auxpol->deg != 0) || (mpz_cmp_ui(auxpol->coeff[0], p-1)!= 0));
+      /* Warning: the coefficients of auxpol might either be reduced in
+	 [0, p) or in [-p/2, p/2). This code should work in both cases. */
+    } while (auxpol->deg != 0 || (mpz_cmp_ui (auxpol->coeff[0], p-1) != 0 &&
+				  mpz_cmp_si (auxpol->coeff[0], -1) != 0));
     gmp_randclear (state);
   }
 
