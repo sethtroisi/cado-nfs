@@ -2250,7 +2250,9 @@ void barrett_mod (mpz_ptr a, mpz_srcptr b, mpz_srcptr m, mpz_srcptr invm)
   mpz_t c;
 
   sizeb = mpz_size (b);
-  if (invm == NULL || sizeb <= k || k == 1)
+  /* on wurst.loria.fr, mpz_ndiv_r (aka mpz_mod) is faster than barrett_mod
+     up to at least 8192 bits, i.e., 128 limbs of 64 bits */
+  if (invm == NULL || sizeb <= k || k <= 128)
   {
     mpz_ndiv_r (a, b, m);
     return;
