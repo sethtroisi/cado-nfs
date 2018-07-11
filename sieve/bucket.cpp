@@ -191,6 +191,9 @@ bucket_array_t<LEVEL, HINT>::allocate_memory(const uint32_t new_n_bucket,
     size_t alloc_bstart = MAX(size_b_align, (n_bucket+1) * sizeof(void*));
     bucket_start = (update_t **) malloc_aligned (alloc_bstart, 0x40);
     bucket_read = (update_t **) malloc_aligned (size_b_align, 0x40);
+    memset(bucket_write, 0, size_b_align);
+    memset(bucket_start, 0, alloc_bstart);
+    memset(bucket_read, 0, size_b_align);
   }
 
   /* This requires size_b_align to have been set to the new value */
@@ -231,6 +234,7 @@ bucket_array_t<LEVEL, HINT>::realloc_slice_start(const size_t extra_space)
   slice_index = (slice_index_t *) realloc(slice_index, new_alloc_slices * sizeof(slice_index_t));
   ASSERT_ALWAYS(slice_index != NULL);
   alloc_slices = new_alloc_slices;
+  memset(slice_index, 0, new_alloc_slices * sizeof(slice_index_t));
 }
 
 /* Returns how full the fullest bucket is, as a fraction of its size */
