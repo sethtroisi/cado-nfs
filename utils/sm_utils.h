@@ -11,8 +11,6 @@ struct sm_side_info_s {
                 equal to unitrank but can be modified by the user. */
     mpz_t ell;
     mpz_t ell2;
-    mpz_t invl2;        /* barrett precomputed inverse.
-                           Not always used; see compute_sm_lowlevel */
     mpz_poly_srcptr f0;
     mpz_poly f;       /* monic */
     mpz_poly_factor_list fac;

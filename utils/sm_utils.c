@@ -5,29 +5,19 @@
 
 /* compute the SM */
 static void
-compute_sm_lowlevel (mpz_poly SM, mpz_poly_srcptr num, const mpz_poly F, const mpz_t ell,
-            const mpz_t smexp, const mpz_t ell2, const mpz_t invl2)
+compute_sm_lowlevel (mpz_poly SM, mpz_poly_srcptr num, const mpz_poly F,
+                     const mpz_t ell, const mpz_t smexp, const mpz_t ell2)
 {
-    int use_barrett = 0;
-    /* It *seeems* that for the applicable range of SM computations,
-     * barrett reduction offer no gain (the mpz_poly layer was designed
-     * with the sqrt application in mind, not SM !). We might want to
-     * take the decision here though, depending on:
-     *  - the bit size of ell2
-     *  - the bit size of num (we mutliply by it often)
-     *  - the bit size of the coefficients of F
-     */
-    mpz_poly_pow_mod_f_mod_mpz_barrett(SM, num, F, smexp, ell2, use_barrett ? invl2 : NULL);
-    mpz_poly_sub_ui(SM, SM, 1);
-    mpz_poly_divexact_mpz(SM, SM, ell);
+    mpz_poly_pow_mod_f_mod_mpz (SM, num, F, smexp, ell2);
+    mpz_poly_sub_ui (SM, SM, 1);
+    mpz_poly_divexact_mpz (SM, SM, ell);
 }
 
 void compute_sm_straightforward(mpz_poly_ptr dst, mpz_poly_srcptr u, sm_side_info_srcptr sm)
 {
     if (sm->nsm == 0)
         return;
-    compute_sm_lowlevel (dst,
-            u, sm->f0, sm->ell, sm->exponent, sm->ell2, sm->invl2);
+    compute_sm_lowlevel (dst, u, sm->f0, sm->ell, sm->exponent, sm->ell2);
 }
 
 double m_seconds = 0;
@@ -68,11 +58,11 @@ void compute_sm_piecewise(mpz_poly_ptr dst, mpz_poly_srcptr u, sm_side_info_srcp
 #if 0
         if (g->deg > 1) {
             compute_sm_lowlevel (chunks[j], u,
-                    g, sm->ell, sm->exponents[j], sm->ell2, sm->invl2);
+                    g, sm->ell, sm->exponents[j], sm->ell2);
         } else {
             ASSERT_ALWAYS(mpz_cmp_ui(g->coeff[1], 1) == 0);
             mpz_poly_set(chunks[j], u);
-            mpz_poly_mod_f_mod_mpz(chunks[j], g, sm->ell2, sm->invl2), NULL;
+            mpz_poly_mod_f_mod_mpz(chunks[j], g, sm->ell2, NULL);
             ASSERT_ALWAYS(chunks[j]->deg == 0);
             mpz_ptr c = chunks[j]->coeff[0];
             mpz_powm(c, c, sm->exponents[j], sm->ell2);
@@ -81,7 +71,7 @@ void compute_sm_piecewise(mpz_poly_ptr dst, mpz_poly_srcptr u, sm_side_info_srcp
         }
 #else
         compute_sm_lowlevel (chunks[j], u,
-                g, sm->ell, sm->exponents[j], sm->ell2, sm->invl2);
+                g, sm->ell, sm->exponents[j], sm->ell2);
 #endif
         for(int k = 0 ; k < g->deg ; k++, s++) {
             mpz_swap(temp->coeff[s], chunks[j]->coeff[k]);
@@ -210,7 +200,7 @@ sm_build_one_relset (sm_relset_ptr rel, uint64_t *r, int64_t *e, int len,
         if (F[s] == NULL) continue;
         mpz_poly_pow_mod_f_mod_mpz (tmp[s], abpolys[r[k]], F[s], ee, ell2);
         mpz_poly_mul_mod_f_mod_mpz (rel->num[s], rel->num[s], tmp[s], F[s],
-                                    ell2, NULL, NULL);
+                                    ell2, NULL);
       }
     }
     else
@@ -221,7 +211,7 @@ sm_build_one_relset (sm_relset_ptr rel, uint64_t *r, int64_t *e, int len,
         if (F[s] == NULL) continue;
         mpz_poly_pow_mod_f_mod_mpz(tmp[s], abpolys[r[k]], F[s], ee, ell2);
         mpz_poly_mul_mod_f_mod_mpz(rel->denom[s], rel->denom[s], tmp[s], F[s],
-                                   ell2, NULL, NULL);
+                                   ell2, NULL);
       }
     }
   }
@@ -276,7 +266,7 @@ void compute_change_of_basis_matrix(mpz_t * matrix, mpz_poly_srcptr f, mpz_poly_
         mpz_poly_xgcd_mpz(d, g, h, a, b, ell);
 
         /* we now have the complete cofactor */
-        mpz_poly_mul_mod_f_mod_mpz(h, b, h, f, ell, NULL, NULL);
+        mpz_poly_mul_mod_f_mod_mpz(h, b, h, f, ell, NULL);
         for(int j = 0 ; j < g->deg ; j++, s++) {
             /* store into the matrix the coefficients of x^j*h
              * modulo f */
@@ -285,7 +275,7 @@ void compute_change_of_basis_matrix(mpz_t * matrix, mpz_poly_srcptr f, mpz_poly_
                     mpz_set(matrix[s * f->deg + k], h->coeff[k]);
             }
             mpz_poly_mul_xi(h, h, 1);
-            mpz_poly_mod_f_mod_mpz(h, f, ell, NULL, NULL);
+            mpz_poly_mod_f_mod_mpz(h, f, ell, NULL);
         }
         mpz_poly_clear(b);
         mpz_poly_clear(a);
@@ -334,7 +324,6 @@ void sm_side_info_init(sm_side_info_ptr sm, mpz_poly_srcptr f0, mpz_srcptr ell)
     mpz_init_set(sm->ell, ell);
     mpz_init(sm->ell2);
     mpz_mul(sm->ell2, sm->ell, sm->ell);
-    mpz_init(sm->invl2);
 
     mpz_poly_init(sm->f, -1);
     sm->f0 = f0;
@@ -371,8 +360,6 @@ void sm_side_info_init(sm_side_info_ptr sm, mpz_poly_srcptr f0, mpz_srcptr ell)
         mpz_sub_ui(sm->exponents[i], sm->exponents[i], 1);
         mpz_lcm(sm->exponent, sm->exponent, sm->exponents[i]);
     }
-
-    barrett_init(sm->invl2, sm->ell2);
 }
 
 void sm_side_info_clear(sm_side_info_ptr sm)
@@ -395,7 +382,6 @@ void sm_side_info_clear(sm_side_info_ptr sm)
     mpz_poly_factor_list_clear(sm->fac);
     mpz_poly_clear(sm->f);
 
-    mpz_clear(sm->invl2);
     mpz_clear(sm->ell2);
     mpz_clear(sm->ell);
 }

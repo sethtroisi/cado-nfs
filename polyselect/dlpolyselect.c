@@ -890,7 +890,7 @@ main (int argc, char *argv[])
             timer[TIMER_ROOTS], timer[TIMER_IRRED], timer[TIMER_LLL],
 	    timer[TIMER_MURPHYE]);
     printf ("\n#              ");
-    print_timings_barrett_pow_mod_f_mod_p();
+    print_timings_pow_mod_f_mod_p();
 #endif
     printf ("\n");
 
