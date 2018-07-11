@@ -139,7 +139,7 @@ test_sm (FILE * datafile)
       mpz_poly_set (Nc, relset->num[0]);
       mpz_poly_set (Dc, relset->denom[0]);
       mpz_poly_reduce_frac_mod_f_mod_mpz (relset->num[0], relset->denom[0],
-              F, sm_info->ell2, sm_info->invl2);
+              F, sm_info->ell2);
       compute_sm_straightforward (SMc, relset->num[0], sm_info);
       sm_relset_clear (relset, 2);
     }

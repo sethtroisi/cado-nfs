@@ -262,7 +262,7 @@ static int mpz_poly_coeff_cmp(const mpz_t *a, const mpz_t *b) {
    which should be degree of f. Assumes p is odd, and deg(f) >= 1. */
 static int
 mpz_poly_cantor_zassenhaus (mpz_t *r, mpz_poly_srcptr f, mpz_srcptr p,
-                            mpz_srcptr invp, int depth)
+                            int depth)
 {
   mpz_t a, aux;
   mpz_poly q, h;
@@ -303,18 +303,18 @@ mpz_poly_cantor_zassenhaus (mpz_t *r, mpz_poly_srcptr f, mpz_srcptr p,
     mpz_poly_sub_ui (h, h, 1);
 
     /* q = gcd(f,h) */
-    mpz_poly_gcd_mpz (q, f, h, p, invp);
+    mpz_poly_gcd_mpz (q, f, h, p);
     dq = q->deg;
     ASSERT (dq >= 0);
 
     /* recursion-split */
     if (0 < dq && dq < d)
     {
-      n = mpz_poly_cantor_zassenhaus (r, q, p, invp, depth + 1);
+      n = mpz_poly_cantor_zassenhaus (r, q, p, depth + 1);
       ASSERT (n == dq);
 
       mpz_poly_divexact (h, f, q, p);
-      m = mpz_poly_cantor_zassenhaus (r + n, h, p, invp, depth + 1);
+      m = mpz_poly_cantor_zassenhaus (r + n, h, p, depth + 1);
       ASSERT (m == h->deg);
       n += m;
       break;
@@ -343,14 +343,12 @@ mpz_poly_roots_mpz (mpz_t *r, mpz_poly_srcptr f, mpz_srcptr p)
   int nr = 0;
   mpz_poly fp, g, h;
   int d = f->deg;
-  mpz_t invp;
 
   ASSERT(d >= 1);
 
   mpz_poly_init (fp, d);
   mpz_poly_init (g, 2*d-1);
   mpz_poly_init (h, 2*d-1);
-  mpz_init (invp);
 
   /* If f has small coefficients (like in Joux-Lercier polynomial selection)
      don't make f monic, since it might make the coefficients of fp blow up.
@@ -370,8 +368,7 @@ mpz_poly_roots_mpz (mpz_t *r, mpz_poly_srcptr f, mpz_srcptr p)
      might help to split them. */
   mpz_poly_sub (h, h, g);
   /* g = gcd (mpz_poly_fp, h) */
-  barrett_init (invp, p);
-  mpz_poly_gcd_mpz (fp, fp, h, p, invp);
+  mpz_poly_gcd_mpz (fp, fp, h, p);
   /* fp contains gcd(x^p-x, f) */
   nr = fp->deg;
   ASSERT (nr >= 0);
@@ -379,7 +376,7 @@ mpz_poly_roots_mpz (mpz_t *r, mpz_poly_srcptr f, mpz_srcptr p)
   /* If r is NULL, we only return the number of roots. */
   if (r != NULL && nr > 0)
   {
-    int n MAYBE_UNUSED = mpz_poly_cantor_zassenhaus (r, fp, p, invp, 0);
+    int n MAYBE_UNUSED = mpz_poly_cantor_zassenhaus (r, fp, p, 0);
     ASSERT (n == nr);
   }
 
@@ -387,7 +384,6 @@ mpz_poly_roots_mpz (mpz_t *r, mpz_poly_srcptr f, mpz_srcptr p)
   mpz_poly_clear(fp);
   mpz_poly_clear(g);
   mpz_poly_clear(h);
-  mpz_clear (invp);
 
   /* Sort the roots */
   if (r && nr)
