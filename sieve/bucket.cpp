@@ -19,25 +19,9 @@
 #include "ularith.h"
 #include "smallset.hpp"
 
-/* sz is the size of a bucket for an array of buckets. In bytes, a bucket
-   size is sz * sr, with sr = sizeof of one element of the bucket (a record).
-   If sz * sr is a multiple of the page, and if the buckets array is filled
-   *UNIFORMLY & REGULARLY*, all the buckets in the array have the possibility
-   to reach their end of the memory pages at the same time.
-   In this case, the system must manage multiple TLB misses & must provide
-   multiple physical pages of memory in same time = really a bad idea!
-   So, in this case, I increase lightly sz.
-   NB: I use in fact sz*sr*4 and not sz*sr, because an half or a quart
-   of the buckets which reach at the same time the end of their page is
-   sufficient to slow down the code.
-*/
 static size_t
-bucket_misalignment(const size_t sz, const size_t sr) {
-  size_t size; 
-  if ((sz * sr * 4) & (pagesize() - 1))
-    size = sz;
-  else 
-    size = sz + 8 / sr + ((8 % sr) ? 1 : 0);
+bucket_misalignment(const size_t sz, const size_t sr MAYBE_UNUSED) {
+  size_t size = sz; 
 #ifdef HAVE_SSE2
   /* Round up to a multiple of CACHELINESIZE to make SSE2 aligned accesses
      work */
