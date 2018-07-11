@@ -1655,13 +1655,13 @@ struct cofac_standalone {
         return mpz_cmp_ui(g, 1) == 0;
 #endif
     }/*}}}*/
-    void print_as_survivor() {/*{{{*/
+    void print_as_survivor(FILE * f) {/*{{{*/
 #ifndef SUPPORT_LARGE_Q
-        gmp_printf("%" PRId64 " %" PRIu64 " %Zd %Zd\n", a, b,
+        gmp_fprintf(f, "%" PRId64 " %" PRIu64 " %Zd %Zd\n", a, b,
                 (mpz_srcptr) norm[0],
                 (mpz_srcptr) norm[1]);
 #else
-        gmp_printf("%Zd %Zd %Zd %Zd\n",
+        gmp_fprintf(f, "%Zd %Zd %Zd %Zd\n",
                 (mpz_srcptr) az,
                 (mpz_srcptr) bz,
                 (mpz_srcptr) norm[0],
@@ -2031,7 +2031,7 @@ void process_bucket_region_run::cofactoring_sync (survivors_t & survivors)/*{{{*
                 rep.survivors.check_leftover_norm_on_side[side] += pass;
             }
         } else {
-            ASSERT_ALWAYS(ws.las.batch);
+            ASSERT_ALWAYS(ws.las.batch || ws.las.batch_print_survivors);
 
             /* no resieve, so no list of prime factors to divide. No
              * point in doing trial division anyway either.
@@ -2094,7 +2094,7 @@ void process_bucket_region_run::cofactoring_sync (survivors_t & survivors)/*{{{*
             rep.reports++;
             if (si.conf.sublat.m && !cur.ab_coprime()) continue;
             verbose_output_start_batch ();
-            cur.print_as_survivor();
+            cur.print_as_survivor(ws.las.batch_print_survivors);
             verbose_output_end_batch ();
             continue;
         }
@@ -2282,7 +2282,7 @@ static void declare_usage(param_list pl)/*{{{*/
     param_list_decl_usage(pl, "batchlpb1", "large prime bound on side 1 to be considered by batch cofactorization. Primes between lim1 and 2^batchlpb1 will be extracted by product trees. Defaults to lpb1.");
     param_list_decl_usage(pl, "batchmfb0", "cofactor bound on side 0 to be considered after batch cofactorization. After primes below 2^batchlpb0 have been extracted, cofactors below this bound will go through ecm. Defaults to lpb0.");
     param_list_decl_usage(pl, "batchmfb1", "cofactor bound on side 1 to be considered after batch cofactorization. After primes below 2^batchlpb1 have been extracted, cofactors below this bound will go through ecm. Defaults to lpb1.");
-    param_list_decl_usage(pl, "batch-print-survivors", "(switch) just print survivors for an external cofactorization");
+    param_list_decl_usage(pl, "batch-print-survivors", "just print survivors to the specified file (or pipe) for an external cofactorization");
     param_list_decl_usage(pl, "galois", "(switch) for reciprocal polynomials, sieve only half of the q's");
 #ifdef TRACE_K
     param_list_decl_usage(pl, "traceab", "Relation to trace, in a,b format");
@@ -2982,7 +2982,7 @@ bool do_one_special_q(las_info & las, nfs_work & ws, std::shared_ptr<nfs_aux> au
     /* Currently we assume that we're doing sieving + resieving on
      * both sides, or we're not. In the latter case, we expect to
      * complete the factoring work with batch cofactorization */
-    ASSERT_ALWAYS(las.batch || (conf.sides[0].lim && conf.sides[1].lim));
+    ASSERT_ALWAYS(las.batch || las.batch_print_survivors || (conf.sides[0].lim && conf.sides[1].lim));
 
     sieve_info & si(*psi);
 
@@ -3115,7 +3115,6 @@ int main (int argc0, char *argv0[])/*{{{*/
     param_list_configure_switch(pl, "-dup", NULL);
     param_list_configure_switch(pl, "-sync", &sync_at_special_q);
     param_list_configure_switch(pl, "-batch", NULL);
-    param_list_configure_switch(pl, "-batch-print-survivors", NULL);
     //    param_list_configure_switch(pl, "-galois", NULL);
     param_list_configure_alias(pl, "skew", "S");
     param_list_configure_alias(pl, "log-bucket-region", "B");

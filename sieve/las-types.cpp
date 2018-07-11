@@ -184,7 +184,15 @@ las_info::las_info(cxx_param_list & pl)
 
     // ----- batch mode {{{
     batch = param_list_parse_switch(pl, "-batch");
-    batch_print_survivors = param_list_parse_switch(pl, "-batch-print-survivors");
+
+    const char * bps = param_list_lookup_string(pl, "batch-print-survivors");
+    if (bps) {
+        batch_print_survivors = fopen(bps, "w");
+        ASSERT_ALWAYS(batch_print_survivors != NULL);
+    } else {
+        batch_print_survivors = NULL;
+    }
+
     cofac_list_init (L);
     // }}} 
 
@@ -205,6 +213,7 @@ las_info::~las_info()/*{{{*/
     // }}}
  
     // ----- batch mode: very little
+    if (batch_print_survivors) fclose(batch_print_survivors);
     cofac_list_clear (L);
 }/*}}}*/
 
