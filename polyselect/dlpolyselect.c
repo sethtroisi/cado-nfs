@@ -87,6 +87,7 @@ unsigned long f_irreducible = 0; /* number of irreducible polynomials */
 double max_guard = DBL_MIN;
 int skew = 0;                   /* see the -skew option */
 unsigned long *count = NULL;    /* use only with -skew */
+int easySM = 0;                 /* see the -easySM option */
 
 /* MPZ_POLY_TIMINGS is defined (or maybe not) in utils/mpz_poly.h
  */
@@ -128,12 +129,30 @@ add_timer (int flag, double t)
 #define END_TIMER(x)
 #endif
 
+
+static int
+check_SM (mpz_poly ff, mpz_t ell)
+{
+    if (ff->deg <= 2) {
+        return 1;
+    }
+    if (ff->deg > 4) {
+        fprintf(stderr, "Not implemented\n");
+        ASSERT_ALWAYS(0);
+    }
+    // in degree 3 and 4, the minimum number of SMs is 1. We
+    // check that we have at least one root mod ell.
+    int nr = mpz_poly_roots_mpz(NULL, ff, ell);
+    return (nr >= 1);
+}
+
+
 /*
   Print two nonlinear poly info. Return non-zero for record polynomials.
 */
 static int
 print_nonlinear_poly_info (mpz_poly ff, double alpha_f, mpz_poly gg,
-                           int format,  mpz_t n)
+                           int format,  mpz_t n, mpz_t ell)
 {
     unsigned int i;
     double skew, logmu[2], alpha_g_approx, alpha_g, score, score_approx;
@@ -188,10 +207,19 @@ print_nonlinear_poly_info (mpz_poly ff, double alpha_f, mpz_poly gg,
         p->skew = skew;
         E = MurphyE (p, Bf, Bg, Area, MURPHY_K);
 	END_TIMER (TIMER_MURPHYE);
-        if (E <= bestE)
-          return 0;
-        bestE = E;
       }
+
+    if (E <= bestE)
+        return 0;
+    /* Possibly check the number of roots mod ell of f and g, assuming that
+     * they have the minimum number of real roots. */
+    if (easySM) {
+        if (! check_SM(ff, ell))
+            return 0;
+        if (! check_SM(gg, ell))
+            return 0;
+    }
+    bestE = E;
 
 #ifdef HAVE_OPENMP
 #pragma omp critical
@@ -433,6 +461,15 @@ polygen_JL_f (int d, unsigned int bound, mpz_t *f, unsigned long idx)
           ok = mpz_poly_is_irreducible_z (ff);
 	END_TIMER (TIMER_IRRED);
       }
+
+    /* check that the number of real roots is minimal*/
+    if (ok && easySM) {
+        int nr = numberOfRealRoots(ff->coeff, ff->deg, 0.0, 0, NULL);
+        if (ff->deg & 1)
+            ok = (nr == 1);
+        else 
+            ok = (nr == 0);
+    }
     return ok;
 }
 
@@ -534,7 +571,7 @@ root_lift (mpz_t N, mpz_t kN, unsigned long k, mpz_poly f, mpz_t r)
 static void
 polygen_JL2 (mpz_t n, unsigned long k,
              unsigned int df, unsigned int dg,
-	     unsigned long nb_comb, mpz_poly f, long bound2)
+	     unsigned long nb_comb, mpz_poly f, long bound2, mpz_t ell)
 {
     unsigned int i, j, nr, format = 1;
     mpz_t *rf, c, kn;
@@ -639,8 +676,19 @@ polygen_JL2 (mpz_t n, unsigned long k,
                 || !mpz_poly_is_irreducible_z (u))
               continue;
 #endif
+            /* check the real roots of g, to minimize number of SMs */
+            if (easySM) {
+                int nr = numberOfRealRoots(u->coeff, u->deg, 0.0, 0, NULL);
+                int ok;
+                if (u->deg & 1)
+                    ok = (nr == 1);
+                else
+                    ok = (nr == 0);
+                if (! ok) 
+                    continue; // skip this g
+            }
 
-            if (print_nonlinear_poly_info (f, alpha_f, u, format, n))
+            if (print_nonlinear_poly_info (f, alpha_f, u, format, n, ell))
               {
 #if 0 /* print coefficients of record combination */
                 for (j = 0; j <= dg; j++)
@@ -678,7 +726,8 @@ polygen_JL2 (mpz_t n, unsigned long k,
 static void
 polygen_JL1 (mpz_t n, unsigned long k,
              unsigned int df, unsigned int dg, unsigned int bound,
-             unsigned long idx, unsigned long nb_comb, unsigned int bound2)
+             unsigned long idx, unsigned long nb_comb, unsigned int bound2,
+             mpz_t ell)
 {
     unsigned int i;
     mpz_t *f;
@@ -696,7 +745,7 @@ polygen_JL1 (mpz_t n, unsigned long k,
     /* generate f of degree d with small coefficients */
     irred = polygen_JL_f (df, bound, f, idx);
     if (irred)
-      polygen_JL2 (n, k, df, dg, nb_comb, ff, bound2);
+      polygen_JL2 (n, k, df, dg, nb_comb, ff, bound2, ell);
     /* clear */
     for (i = 0; i <= df; i ++)
       mpz_clear (f[i]);
@@ -706,7 +755,7 @@ polygen_JL1 (mpz_t n, unsigned long k,
 static void
 usage ()
 {
-    fprintf (stderr, "./dlpolyselect -N xxx -df xxx -dg xxx -bound xxx [-modr xxx] [-modm xxx] [-t xxx] [-skew]\n");
+    fprintf (stderr, "./dlpolyselect -N xxx -df xxx -dg xxx -bound xxx [-modr xxx] [-modm xxx] [-t xxx] [-easySM <ell>] [-skew]\n");
     exit (1);
 }
 
@@ -715,6 +764,7 @@ main (int argc, char *argv[])
 {
     int i;
     mpz_t N;
+    mpz_t ell;
     unsigned int df = 0, dg = 0;
     int nthreads = 1;
     unsigned int bound = 4; /* bound on the coefficients of f */
@@ -725,6 +775,7 @@ main (int argc, char *argv[])
 
     t = seconds ();
     mpz_init (N);
+    mpz_init (ell);
 
     /* printf command-line */
     printf ("#");
@@ -738,6 +789,12 @@ main (int argc, char *argv[])
     {
         if (argc >= 3 && strcmp (argv[1], "-N") == 0) {
             mpz_set_str (N, argv[2], 10);
+            argv += 2;
+            argc -= 2;
+        }
+        else if (argc >= 3 && strcmp (argv[1], "-easySM") == 0) {
+            mpz_set_str (ell, argv[2], 10);
+            easySM = 1;
             argv += 2;
             argc -= 2;
         }
@@ -872,7 +929,7 @@ main (int argc, char *argv[])
     }
 #endif
     for (unsigned long c = modr; c < maxtries; c += modm)
-      polygen_JL1 (N, multiplier, df, dg, bound, c, nb_comb, bound2);
+      polygen_JL1 (N, multiplier, df, dg, bound, c, nb_comb, bound2, ell);
 
     t = seconds () - t;
 
@@ -895,6 +952,7 @@ main (int argc, char *argv[])
     printf ("\n");
 
     mpz_clear (N);
+    mpz_clear (ell);
     if (skew)
         free (count);
 
