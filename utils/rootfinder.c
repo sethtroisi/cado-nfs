@@ -295,6 +295,7 @@ mpz_poly_cantor_zassenhaus (mpz_t *r, mpz_poly_srcptr f, mpz_srcptr p,
     mpz_set_ui (aux, 1);
     mpz_poly_setcoeff (q, 1, aux);
     mpz_poly_setcoeff (q, 0, a);
+    q->deg = 1;
 
     /* h=(x+a)^((p-1)/2) mod (f, p) */
     mpz_sub_ui (aux, p, 1);
