@@ -191,6 +191,7 @@ mpz_poly* mpz_poly_base_modp_init (mpz_poly_srcptr P0, int p, int *K, int l);
 void mpz_poly_base_modp_clear (mpz_poly *P, int l);
 void mpz_poly_base_modp_lift (mpz_poly_ptr a, mpz_poly *P, int k, mpz_srcptr pk);
 size_t mpz_poly_sizeinbase (mpz_poly_srcptr f, int base);
+size_t mpz_poly_size (mpz_poly_srcptr f);
 void mpz_poly_infinity_norm(mpz_ptr in, mpz_poly_srcptr f);
 size_t mpz_poly_totalsize (mpz_poly_srcptr f);
 void mpz_poly_gcd_mpz (mpz_poly_ptr h, mpz_poly_srcptr f, mpz_poly_srcptr g, mpz_srcptr p);

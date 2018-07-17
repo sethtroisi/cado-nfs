@@ -1899,6 +1899,7 @@ mpz_poly_mod_f_mod_mpz (mpz_poly_ptr R, mpz_poly_srcptr f, mpz_srcptr m,
 			mpz_srcptr invf)
 {
   mpz_t aux, c;
+  size_t size_m, size_f;
 
   if (f == NULL)
     goto reduce_R;
@@ -1909,6 +1910,9 @@ mpz_poly_mod_f_mod_mpz (mpz_poly_ptr R, mpz_poly_srcptr f, mpz_srcptr m,
       /* aux = 1/m mod lc(f) */
       mpz_invert (aux, m, f->coeff[f->deg]);
     }
+
+  size_m = mpz_size (m);
+  size_f = mpz_poly_size (f);
 
   mpz_init (c);
   // FIXME: write a subquadratic variant
@@ -1926,7 +1930,11 @@ mpz_poly_mod_f_mod_mpz (mpz_poly_ptr R, mpz_poly_srcptr f, mpz_srcptr m,
       ASSERT (mpz_divisible_p (R->coeff[R->deg], f->coeff[f->deg]));
       mpz_divexact (c, R->coeff[R->deg], f->coeff[f->deg]);
       /* If R[deg] has initially size 2n, and f[deg] = O(1), then c has size
-	 2n here. */
+	 2n here. However, in the equal-degree factorization, even if f[deg]
+	 = O(1), the lower coefficients of f might have n bits. Thus we decide
+	 to reduce whenever the total size exceeds 2n. */
+      if (mpz_size (c) + size_f > 2 * size_m)
+	mpz_mod (c, c, m);
       for (int i = R->deg - 1; i >= R->deg - f->deg; --i)
 	mpz_submul (R->coeff[i], c, f->coeff[f->deg - R->deg + i]);
       R->deg--;
@@ -2394,6 +2402,23 @@ mpz_poly_sizeinbase (mpz_poly_srcptr f, int b)
   for (i = 0; i <= d; i++)
   {
     s = mpz_sizeinbase (f->coeff[i], b);
+    if (s > S)
+      S = s;
+  }
+  return S;
+}
+
+/* return the maximal limb-size of the coefficients of f */
+size_t
+mpz_poly_size (mpz_poly_srcptr f)
+{
+  size_t S = 0, s;
+  int i;
+  int d = f->deg;
+
+  for (i = 0; i <= d; i++)
+  {
+    s = mpz_size (f->coeff[i]);
     if (s > S)
       S = s;
   }
