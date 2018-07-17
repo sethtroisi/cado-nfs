@@ -191,7 +191,7 @@ void next_cand_Fp_jl(cand_t cand, void *params) {
 
 
 void usage(char *argv0) {
-  fprintf(stderr, "./%s [-poly polfile] [-jl] [-mt n] [-mineff e] [-maxeff E] [-seed s] [-target t] [-v] p z\n", argv0);
+  fprintf(stderr, "./%s [-poly polfile] [-sqside xxx] [-jl] [-mt n] [-mineff e] [-maxeff E] [-seed s] [-target t] [-v] p z\n", argv0);
   abort();
 }
 
