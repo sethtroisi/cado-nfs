@@ -207,10 +207,10 @@ print_nonlinear_poly_info (mpz_poly ff, double alpha_f, mpz_poly gg,
         p->skew = skew;
         E = MurphyE (p, Bf, Bg, Area, MURPHY_K);
 	END_TIMER (TIMER_MURPHYE);
+        if (E <= bestE)
+            return 0;
       }
 
-    if (E <= bestE)
-        return 0;
     /* Possibly check the number of roots mod ell of f and g, assuming that
      * they have the minimum number of real roots. */
     if (easySM) {
