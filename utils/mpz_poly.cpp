@@ -42,6 +42,7 @@
 #include <time.h>
 #include <timing.h>
 static double timer[3] = {0.0, 0.0, 0.0};
+static unsigned long calls[3] = {0, 0, 0};
 #endif
 
 #define TIMER_MUL 0
@@ -61,6 +62,7 @@ static void
 add_timer (int flag, double t)
 {
   timer[flag] += t;
+  calls[flag] += 1;
 }
 #else
 #define START_TIMER
@@ -70,8 +72,9 @@ add_timer (int flag, double t)
 
 #ifdef MPZ_POLY_TIMINGS
 void print_timings_pow_mod_f_mod_p(){
-    printf (" (mul %.2fs, square %.2fs, red mod (f,p) %.2fs)",
-            timer[TIMER_MUL], timer[TIMER_SQR], timer[TIMER_RED]);
+    printf (" (mul %.2fs/%lu, square %.2fs/%lu, red mod (f,p) %.2fs/%lu)",
+            timer[TIMER_MUL], calls[TIMER_MUL], timer[TIMER_SQR], calls[TIMER_SQR],
+	    timer[TIMER_RED], calls[TIMER_RED]);
 }
 #endif
 
