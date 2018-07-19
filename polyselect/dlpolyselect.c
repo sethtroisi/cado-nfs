@@ -250,10 +250,12 @@ print_nonlinear_poly_info (mpz_poly ff, double alpha_f, mpz_poly gg,
 	  gmp_printf ("Y%u %Zd\n", i, g[i]);
       }
       printf ("skew: %1.2f\n", skew);
-      printf ("# f lognorm %1.2f, alpha %1.2f, score %1.2f\n",
-	      logmu[0], alpha_f, logmu[0] + alpha_f);
-      printf ("# g lognorm %1.2f, alpha %1.2f, score %1.2f\n",
-	      logmu[1], alpha_g, logmu[1] + alpha_g);
+      int nr = numberOfRealRoots (f, df, 0, 0, NULL);
+      printf ("# f lognorm %1.2f, alpha %1.2f, score %1.2f, %d rroot(s)\n",
+	      logmu[0], alpha_f, logmu[0] + alpha_f, nr);
+      nr = numberOfRealRoots (g, dg, 0, 0, NULL);
+      printf ("# g lognorm %1.2f, alpha %1.2f, score %1.2f, %d rroot(s)\n",
+	      logmu[1], alpha_g, logmu[1] + alpha_g, nr);
       printf ("# f+g score %1.2f\n", score);
       if (opt_flag)
         cado_poly_fprintf_MurphyE (stdout, E, Bf, Bg, Area, "");

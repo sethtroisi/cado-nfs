@@ -406,6 +406,7 @@ usp (mpz_t a, mpz_t b, int m, int up, int va, int vb, int n, int *nroots,
 }
 
 /* return the number of real roots of the polynomial p[0]+p[1]*x+...+p[n]*x^n
+   (where n is orig_n below).
    Assume p[n] is not zero.
    T (if not zero) is a bound on the absolute value of the real roots.
    If verbose is non-zero, print the isolating intervals for the roots.
