@@ -88,6 +88,8 @@ double max_guard = DBL_MIN;
 int skew = 0;                   /* see the -skew option */
 unsigned long *count = NULL;    /* use only with -skew */
 int easySM = 0;                 /* see the -easySM option */
+int rrf = -1;                   /* see the -rrf option */
+int rrg = -1;                   /* see the -rrg option */
 
 /* MPZ_POLY_TIMINGS is defined (or maybe not) in utils/mpz_poly.h
  */
@@ -459,19 +461,21 @@ polygen_JL_f (int d, unsigned int bound, mpz_t *f, unsigned long idx)
       {
 	START_TIMER;
         ok = mpz_poly_squarefree_p (ff);
+        /* check number of real roots */
+        if (ok && (easySM || rrf != -1))
+          {
+            int nr = numberOfRealRoots (ff->coeff, ff->deg, 0.0, 0, NULL);
+            if (easySM)
+              /* check that the number of real roots is minimal */
+              ok = nr == (ff->deg & 1);
+            else
+              ok = nr == rrf;
+          }
         if (ok)
           ok = mpz_poly_is_irreducible_z (ff);
 	END_TIMER (TIMER_IRRED);
       }
 
-    /* check that the number of real roots is minimal*/
-    if (ok && easySM) {
-        int nr = numberOfRealRoots(ff->coeff, ff->deg, 0.0, 0, NULL);
-        if (ff->deg & 1)
-            ok = (nr == 1);
-        else 
-            ok = (nr == 0);
-    }
     return ok;
 }
 
@@ -678,17 +682,18 @@ polygen_JL2 (mpz_t n, unsigned long k,
                 || !mpz_poly_is_irreducible_z (u))
               continue;
 #endif
-            /* check the real roots of g, to minimize number of SMs */
-            if (easySM) {
-                int nr = numberOfRealRoots(u->coeff, u->deg, 0.0, 0, NULL);
+            /* check the number of real roots of g */
+            if (easySM || rrg != -1)
+              {
+                int nr = numberOfRealRoots (u->coeff, u->deg, 0.0, 0, NULL);
                 int ok;
-                if (u->deg & 1)
-                    ok = (nr == 1);
+                if (easySM)
+                  ok = nr == (u->deg & 1);
                 else
-                    ok = (nr == 0);
+                  ok = nr == rrg;
                 if (! ok) 
                     continue; // skip this g
-            }
+              }
 
             if (print_nonlinear_poly_info (f, alpha_f, u, format, n, ell))
               {
@@ -832,6 +837,20 @@ main (int argc, char *argv[])
         }
         else if (argc >= 3 && strcmp (argv[1], "-k") == 0) {
             multiplier = atoi (argv[2]);
+            argv += 2;
+            argc -= 2;
+        }
+        /* if rrf = -1 (default), f might have any number of real roots,
+           otherwise it should have exactly 'rrf' real roots */
+        else if (argc >= 3 && strcmp (argv[1], "-rrf") == 0) {
+            rrf = atoi (argv[2]);
+            argv += 2;
+            argc -= 2;
+        }
+        /* if rrg = -1 (default), g might have any number of real roots,
+           otherwise it should have exactly 'rrg' real roots */
+        else if (argc >= 3 && strcmp (argv[1], "-rrg") == 0) {
+            rrg = atoi (argv[2]);
             argv += 2;
             argc -= 2;
         }
