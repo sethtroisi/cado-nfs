@@ -1,4 +1,3 @@
-
 #include "cado.h"
 #include <stdio.h>
 #include <stdarg.h>
@@ -6,7 +5,8 @@
 #include "las-types.hpp"
 #include "las-config.h"
 #include "las-norms.hpp"
-
+#include "misc.h"
+#include "memusage.h"
 
 static void las_verbose_enter(cxx_param_list & pl, FILE * output, int verbose)
 {
@@ -184,7 +184,15 @@ las_info::las_info(cxx_param_list & pl)
 
     // ----- batch mode {{{
     batch = param_list_parse_switch(pl, "-batch");
-    batch_print_survivors = param_list_parse_switch(pl, "-batch-print-survivors");
+
+    const char * bps = param_list_lookup_string(pl, "batch-print-survivors");
+    if (bps) {
+        batch_print_survivors = fopen(bps, "w");
+        ASSERT_ALWAYS(batch_print_survivors != NULL);
+    } else {
+        batch_print_survivors = NULL;
+    }
+
     cofac_list_init (L);
     // }}} 
 
@@ -193,6 +201,15 @@ las_info::las_info(cxx_param_list & pl)
 
 las_info::~las_info()/*{{{*/
 {
+    char buf1[16];
+
+    verbose_output_print(0, 2, "# Getting rid of %zu sieve_info structures [rss=%s]\n", sievers.size(), size_disp_fine(1024UL * Memusage2(), buf1, 10000.0));
+    for(int i = 0 ; !sievers.empty() ; ++i) {
+        sievers.erase(sievers.begin());
+        verbose_output_print(0, 2, "# Discarded %d-th sieve_info [rss=%s]\n", i, size_disp_fine(1024UL * Memusage2(), buf1, 10000.0));
+    }
+
+
     // ----- general operational flags {{{
     gmp_randclear(rstate);
     // }}}
@@ -205,6 +222,7 @@ las_info::~las_info()/*{{{*/
     // }}}
  
     // ----- batch mode: very little
+    if (batch_print_survivors) fclose(batch_print_survivors);
     cofac_list_clear (L);
 }/*}}}*/
 

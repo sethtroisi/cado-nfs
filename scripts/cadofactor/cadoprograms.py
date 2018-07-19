@@ -712,6 +712,7 @@ class PolyselectJL(Program):
     def __init__(self, *,
                  verbose : Toggle("v")=None,
                  N: Parameter(checktype=int)=None,
+                 easySM: Parameter(checktype=int)=None,
                  df: Parameter(checktype=int)=None,
                  dg: Parameter(checktype=int)=None,
                  area : Parameter(checktype=float)=None,

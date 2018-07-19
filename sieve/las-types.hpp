@@ -102,7 +102,7 @@ struct las_info : private NonCopyable, public las_augmented_output_channel {
     void clear_hint_table();
     // ----- batch mode
     int batch; /* batch mode for cofactorization */
-    int batch_print_survivors;
+    FILE * batch_print_survivors;
 
     /* Would this rather go somewhere else ? In a global (not per-sq)
      * version of nfs_work_cofac perhaps ?

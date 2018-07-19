@@ -66,7 +66,7 @@ find_prime_div (const unsigned int n, const unsigned int min_f,
  	    if (primes[p])
 		return p;
 	}
-	f += 2; /* Assumes n even */
+	f += 2; /* Assumes n and min_f both odd */
     }
     
     if (primes[p])
@@ -196,8 +196,9 @@ stage2_make_plan (stage2_plan_t *plan, const unsigned int B2min,
   {
       /* Do a pass over the primes in reverse, flagging off those primes
 	 that are included as composite values id+-j, where id-+j is prime.
-	 The smallest prime not in d is not_in_d, so any proper divisor of
-	 i*d+-j is at most (i*d+d/2+1) / not_in_d */
+	 The smallest prime not in d is not_in_d, the maximal value for i
+	 is imax, the maximal value for j is d/2-1, so any proper divisor
+	 of i*d+-j is at most (i*d+d/2-1) / not_in_d */
       for (p = B2; p >= (max_i * d + d/2 - 1) / not_in_d; p--)
       {
 	  if (primes[p])
@@ -284,7 +285,7 @@ stage2_make_plan (stage2_plan_t *plan, const unsigned int B2min,
 		      primes[r2] = 0;
 		      if (verbose)
 			  printf ("Including %u * %u +- %u which includes "
-				  "%u as factors\n", i, d, j, 
+				  "%u as a factor\n", i, d, j, 
 				  (r1 == 0) ? r2 : r1);
 		  }
 	      }
