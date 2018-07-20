@@ -2,6 +2,9 @@
 #define SM_UTILS_H_
 
 /* Which SMs are used ?
+ * There have been several choices during time. We keep track of the old
+ * choices, in case there are still parts of the code that make reference
+ * to them.
  *
  * Legacy choice:
  *   Compute modulo f(x), with an exponent corresponding to the LCM of
@@ -42,7 +45,6 @@ struct sm_side_info_s {
     int is_factor_used[MAX_DEGREE];
     mpz_t exponent;
     mpz_t * exponents;
-    mpz_t * matrix;
 };
 typedef struct sm_side_info_s sm_side_info[1];
 typedef struct sm_side_info_s * sm_side_info_ptr;

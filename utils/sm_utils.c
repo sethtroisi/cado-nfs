@@ -13,13 +13,6 @@ compute_sm_lowlevel (mpz_poly SM, mpz_poly_srcptr num, const mpz_poly F,
     mpz_poly_divexact_mpz (SM, SM, ell);
 }
 
-void compute_sm_straightforward(mpz_poly_ptr dst, mpz_poly_srcptr u, sm_side_info_srcptr sm)
-{
-    if (sm->nsm == 0)
-        return;
-    compute_sm_lowlevel (dst, u, sm->f0, sm->ell, sm->exponent, sm->ell2);
-}
-
 double m_seconds = 0;
 
 /* u and dst may be equal */
@@ -83,19 +76,6 @@ void compute_sm_piecewise(mpz_poly_ptr dst, mpz_poly_srcptr u, sm_side_info_srcp
 
     temp->deg = s - 1;
 
-#if 0
-    /* now apply the change of basis matrix */
-    for(int s = 0 ; s < n ; s++) {
-        mpz_set_ui(dst->coeff[s], 0);
-        for(int k = 0 ; k < n ; k++) {
-            mpz_addmul(dst->coeff[s],
-                    temp->coeff[k],
-                    sm->matrix[k * n + s]);
-        }
-        mpz_mod(dst->coeff[s], dst->coeff[s], sm->ell);
-    }
-#endif
-
     mpz_poly_set(dst, temp);
 
     for(int j = 0 ; j < fac->size ; j++) {
@@ -109,24 +89,6 @@ void compute_sm_piecewise(mpz_poly_ptr dst, mpz_poly_srcptr u, sm_side_info_srcp
 void
 print_sm2 (FILE *f, mpz_poly SM, int nSM, MAYBE_UNUSED int d, const char * delim)
 {
-#if 0 // Legacy was reverse order
-  if (nSM == 0)
-    return;
-  d--;
-  if (d > SM->deg)
-    fprintf(f, "0");
-  else
-    gmp_fprintf(f, "%Zu", SM->coeff[d]);
-  for(int j = 1; j < nSM; j++)
-  {
-    d--;
-    if (d > SM->deg)
-      fprintf(f, " 0");
-    else
-      gmp_fprintf(f, "%s%Zu", delim, SM->coeff[d]);
-  }
-  //fprintf(f, "\n");
-#else // Now, d does not make sense anymore.
   if (nSM == 0)
       return;
   for (int j = 0; j < nSM; ++j) {
@@ -137,8 +99,8 @@ print_sm2 (FILE *f, mpz_poly SM, int nSM, MAYBE_UNUSED int d, const char * delim
       if (j != nSM-1)
           fprintf(f, "%s", delim);
   }
-#endif
 }
+
 void
 print_sm (FILE *f, mpz_poly SM, int nSM, int d)
 {
@@ -251,56 +213,6 @@ static int compute_unit_rank(mpz_poly_srcptr f)
     return unitrank;
 }
 
-void compute_change_of_basis_matrix(mpz_t * matrix, mpz_poly_srcptr f, mpz_poly_factor_list_srcptr fac, mpz_srcptr ell)
-{
-    /* now compute the change of basis matrix. This is given simply
-     * as the CRT matrix from the piecewise representation modulo
-     * the factors of f to the full representation.
-     *
-     * We thus have full_repr(x) = \sum multiplier_g * repr_g(x)
-     *
-     * Where multiplier_g is a multiple of f/g, such that
-     * f/g*multiplier_g is one modulo f.
-     *
-     * Note that the computation of this matrix is ok to do mod ell
-     * only ; going to ell^2 is unnecessary.
-     */
-
-    for(int i = 0, s = 0 ; i < fac->size ; i++) {
-        mpz_poly d, a, b, h;
-        mpz_poly_srcptr g = fac->factors[i]->f;
-        mpz_poly_init(h, f->deg - g->deg);
-        mpz_poly_init(d, 0);
-        mpz_poly_init(a, f->deg - g->deg - 1);
-        mpz_poly_init(b, g->deg - 1);
-
-        /* compute h = product of other factors */
-        mpz_poly_divexact(h, f, g, ell);
-
-        /* now invert h modulo g */
-
-        /* say a*g + b*h = 1 */
-        mpz_poly_xgcd_mpz(d, g, h, a, b, ell);
-
-        /* we now have the complete cofactor */
-        mpz_poly_mul_mod_f_mod_mpz(h, b, h, f, ell, NULL);
-        for(int j = 0 ; j < g->deg ; j++, s++) {
-            /* store into the matrix the coefficients of x^j*h
-             * modulo f */
-            for(int k = 0 ; k < f->deg ; k++) {
-                if (k <= h->deg)
-                    mpz_set(matrix[s * f->deg + k], h->coeff[k]);
-            }
-            mpz_poly_mul_xi(h, h, 1);
-            mpz_poly_mod_f_mod_mpz(h, f, ell, NULL);
-        }
-        mpz_poly_clear(b);
-        mpz_poly_clear(a);
-        mpz_poly_clear(d);
-        mpz_poly_clear(h);
-    }
-}
-
 void sm_side_info_print(FILE * out, sm_side_info_srcptr sm)
 {
     if (sm->unit_rank == 0) {
@@ -315,15 +227,6 @@ void sm_side_info_print(FILE * out, sm_side_info_srcptr sm)
                 sm->exponents[i]);
         mpz_poly_fprintf(out, sm->fac->factors[i]->f);
     }
-    fprintf(out, "# change of basis matrix to OK/ell*OK from piecewise representation\n");
-    for(int i = 0 ; i < sm->f->deg ; i++) {
-        fprintf(out, "# ");
-        for(int j = 0 ; j < sm->f->deg ; j++) {
-            gmp_fprintf(out, " %Zd", sm->matrix[i * sm->f->deg + j]);
-        }
-        fprintf(out, "\n");
-    }
-
 }
 
 
@@ -349,11 +252,6 @@ void sm_side_info_init(sm_side_info_ptr sm, mpz_poly_srcptr f0, mpz_srcptr ell)
     mpz_poly_factor_list_init(sm->fac);
 
     mpz_init(sm->exponent);
-    sm->matrix = malloc(sm->f->deg * sm->f->deg * sizeof(mpz_t));
-    for(int i = 0 ; i < sm->f->deg ; i++)
-        for(int j = 0 ; j < sm->f->deg ; j++)
-            mpz_init_set_ui(sm->matrix[i * sm->f->deg + j], 0);
-
     /* note that sm->exponents is initialized at the very end of this
      * function */
 
@@ -388,9 +286,6 @@ void sm_side_info_init(sm_side_info_ptr sm, mpz_poly_srcptr f0, mpz_srcptr ell)
         }
     }
 
-    /* compute this, for fun. */
-    compute_change_of_basis_matrix(sm->matrix, sm->f, sm->fac, ell);
-
     /* also compute the lcm of the ell^i-1 */
     sm->exponents = malloc(sm->fac->size * sizeof(mpz_t));
     mpz_set_ui(sm->exponent, 1);
@@ -406,11 +301,6 @@ void sm_side_info_clear(sm_side_info_ptr sm)
 {
     if (sm->unit_rank == 0)
         return;
-
-    for(int i = 0 ; i < sm->f->deg ; i++)
-        for(int j = 0 ; j < sm->f->deg ; j++)
-            mpz_clear(sm->matrix[i * sm->f->deg + j]);
-    free(sm->matrix);
 
     mpz_clear(sm->exponent);
 
