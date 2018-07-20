@@ -44,7 +44,10 @@ void compute_sm_piecewise(mpz_poly_ptr dst, mpz_poly_srcptr u, sm_side_info_srcp
         mpz_poly_init(chunks[j], g->deg-1);
     }
 
-    for(int j = 0, s = 0 ; j < fac->size ; j++) {
+    int s = 0;
+    for(int j = 0; j < fac->size ; j++) {
+        if (!sm->is_factor_used[j])
+            continue;
         /* simply call the usual function here */
         mpz_poly_srcptr g = fac->factors[j]->f;
         /* it is tempting to reduce u mod g ; depending on the context,
@@ -78,8 +81,9 @@ void compute_sm_piecewise(mpz_poly_ptr dst, mpz_poly_srcptr u, sm_side_info_srcp
         }
     }
 
-    temp->deg = n - 1;
+    temp->deg = s - 1;
 
+#if 0
     /* now apply the change of basis matrix */
     for(int s = 0 ; s < n ; s++) {
         mpz_set_ui(dst->coeff[s], 0);
@@ -90,9 +94,9 @@ void compute_sm_piecewise(mpz_poly_ptr dst, mpz_poly_srcptr u, sm_side_info_srcp
         }
         mpz_mod(dst->coeff[s], dst->coeff[s], sm->ell);
     }
+#endif
 
-
-    dst->deg = n - 1;
+    mpz_poly_set(dst, temp);
 
     for(int j = 0 ; j < fac->size ; j++) {
         mpz_poly_clear(chunks[j]);
@@ -103,8 +107,9 @@ void compute_sm_piecewise(mpz_poly_ptr dst, mpz_poly_srcptr u, sm_side_info_srcp
 
 /* Assume nSM > 0 */
 void
-print_sm2 (FILE *f, mpz_poly SM, int nSM, int d, const char * delim)
+print_sm2 (FILE *f, mpz_poly SM, int nSM, MAYBE_UNUSED int d, const char * delim)
 {
+#if 0 // Legacy was reverse order
   if (nSM == 0)
     return;
   d--;
@@ -121,6 +126,18 @@ print_sm2 (FILE *f, mpz_poly SM, int nSM, int d, const char * delim)
       gmp_fprintf(f, "%s%Zu", delim, SM->coeff[d]);
   }
   //fprintf(f, "\n");
+#else // Now, d does not make sense anymore.
+  if (nSM == 0)
+      return;
+  for (int j = 0; j < nSM; ++j) {
+      if (j > SM->deg)
+          fprintf(f, "0");
+      else
+          gmp_fprintf(f, "%Zu", SM->coeff[j]);
+      if (j != nSM-1)
+          fprintf(f, "%s", delim);
+  }
+#endif
 }
 void
 print_sm (FILE *f, mpz_poly SM, int nSM, int d)
@@ -293,8 +310,9 @@ void sm_side_info_print(FILE * out, sm_side_info_srcptr sm)
     fprintf(out, "# unit rank is %d\n", sm->unit_rank);
     fprintf(out, "# lifted factors of f modulo ell^2\n");
     for(int i = 0 ; i < sm->fac->size ; i++) {
-        gmp_fprintf(out, "# factor %d, exponent ell^%d-1=%Zd:\n# ",
-                i, sm->fac->factors[i]->f->deg, sm->exponents[i]);
+        gmp_fprintf(out, "# factor %d (used=%d), exponent ell^%d-1=%Zd:\n# ",
+                i, sm->is_factor_used[i], sm->fac->factors[i]->f->deg,
+                sm->exponents[i]);
         mpz_poly_fprintf(out, sm->fac->factors[i]->f);
     }
     fprintf(out, "# change of basis matrix to OK/ell*OK from piecewise representation\n");
@@ -346,6 +364,28 @@ void sm_side_info_init(sm_side_info_ptr sm, mpz_poly_srcptr f0, mpz_srcptr ell)
         gmp_randinit_default(rstate);
         mpz_poly_factor_and_lift_padically(sm->fac, sm->f, sm->ell, 2, rstate);
         gmp_randclear(rstate);
+    }
+
+    /* select a subset of factors such that the sum of the degrees is
+     * at least the number of sm to compute */
+    {
+        int s = 0;
+        int i = 0;
+        while (s < sm->nsm) {
+            ASSERT_ALWAYS(sm->fac->size > i);
+            s += sm->fac->factors[i]->f->deg;
+            sm->is_factor_used[i] = 1;
+            i++;
+        }
+        i--;
+        while (s > sm->nsm && i >= 0) {
+            int di = sm->fac->factors[i]->f->deg;
+            if (s - di >= sm->nsm) {
+                s -= di;
+                sm->is_factor_used[i] = 0;
+            }
+            i--;
+        }
     }
 
     /* compute this, for fun. */

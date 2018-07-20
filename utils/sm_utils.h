@@ -1,6 +1,31 @@
 #ifndef SM_UTILS_H_
 #define SM_UTILS_H_
 
+/* Which SMs are used ?
+ *
+ * Legacy choice:
+ *   Compute modulo f(x), with an exponent corresponding to the LCM of
+ *   all factors modulo ell. Then take the coefficients of the resulting
+ *   polynomials, starting with the one with largest degree, in order to
+ *   avoid jokes with the constant coefficient and Galois effects.
+ *
+ * Transitional:
+ *   Do this computation using CRT modulo all factors of f(x), but
+ *   keeping the compatibility with the legacy choice.
+ *
+ * Current choice:
+ *   Select a subset of factors of f(x) mod ell so that their degrees sum
+ *   up to (just) at least the number of required SMs. See
+ *   sm_side_info_init() for the basic algorithm that chooses these
+ *   factors.
+ *   Then compute modulo each factor f_i(x) mod ell, with the exponent
+ *   attached to the degree of this factor. Each coefficient of the
+ *   resulting polynomial contributes directly to the output SMs (no
+ *   CRT).
+ *
+ */
+
+
 #define MAX_LEN_RELSET 1024
 
 #include "mpz_poly.h"
@@ -14,6 +39,7 @@ struct sm_side_info_s {
     mpz_poly_srcptr f0;
     mpz_poly f;       /* monic */
     mpz_poly_factor_list fac;
+    int is_factor_used[MAX_DEGREE];
     mpz_t exponent;
     mpz_t * exponents;
     mpz_t * matrix;
