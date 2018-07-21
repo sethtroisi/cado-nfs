@@ -1323,7 +1323,9 @@ class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
         else:
             stderrmsg = ""
         if stderr:
-            self.logger.error("Stderr output follows%s:\n%s", stderrmsg, stderr)
+            self.logger.error("Stderr output (last 10 lines only) follow%s:", stderrmsg)
+            for l in stderr.decode().split('\n')[-10:]:
+                self.logger.error("\t"+l)
 
     def submit_command(self, command, identifier, commit=True, log_errors=False):
         ''' Run a command.
