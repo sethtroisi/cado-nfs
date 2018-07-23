@@ -187,6 +187,19 @@ that prime special-q's will always be used (in addition to composite s-q's).
 If sieving over [q0,q1], with tasks.sieve.qfac_max < q0, then all special-q's
 will be composite.
 
+Sieving with large special-q's
+==============================
+
+If you get an error like the following:
+
+   The special q (27 bits) is larger than the large prime bound on side 1 (26 bits).
+   You can disable this check with the -allow-largesq argument,
+   It is for instance useful for the descent.
+
+then you can solve it as follows:
+
+tasks.sieve.allow_largesq = true
+
 Importing relations
 ===================
 

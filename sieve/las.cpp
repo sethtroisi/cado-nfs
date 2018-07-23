@@ -2937,6 +2937,7 @@ bool do_one_special_q(las_info & las, nfs_work & ws, std::shared_ptr<nfs_aux> au
                     "the -allow-largesq argument,\n");
             fprintf(stderr, "       It is for instance useful for the "
                     "descent.\n");
+	    fprintf(stderr, "       Use tasks.sieve.allow_largesq=true.\n");
             exit(EXIT_FAILURE);
         }
     }
