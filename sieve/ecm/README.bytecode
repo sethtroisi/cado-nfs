@@ -100,6 +100,7 @@ MISHMASH bytecode:
     The sign is given by s: + if s=0, - if s=1
     The f bit stands for 'final', it must be 1 only for the last byte of the
     block.
+    The number of doublings d and the number of triplings t must be > 0.
     ADDx = ADD if f = 0
            ADDa if f = 1 and the next block is of type 0
            ADDd if f = 1 and the next block is of type 1
@@ -116,6 +117,7 @@ MISHMASH bytecode:
   11111111                      End of the block
 
     The sign is given by s: + if s=0, - if s=1
+    The number of doublings d and the number of triplings t must be > 0.
     In the last two cases, k can be 0 and the second assignment becomes a no-op.
 
 

@@ -100,21 +100,25 @@ bytecode_dbchain_check_internal (bytecode_const bc, bytecode_const *endptr,
       if (op == DBCHAIN_OP_DBLADD)
       {
         bc++;
-        pow2 = *bc; 
+        pow2 = bytecode_elt_to_uint8 (*bc);
         pow3 = 0;
+        ret = (pow2 == 0); /* pow2 must be > 0 */
       }
       else if (op == DBCHAIN_OP_TPLADD)
       {
         bc++;
-        pow3 = *bc; 
+        pow3 = bytecode_elt_to_uint8 (*bc);
         pow2 = 0;
+        ret = (pow3 == 0); /* pow3 must be > 0 */
       }
       else /* op == DBCHAIN_OP_TPLDBLADD */
       {
         bc++;
-        pow3 = *bc; 
+        pow3 = bytecode_elt_to_uint8 (*bc);
+        ret = (pow3 == 0); /* pow3 must be > 0 */
         bc++;
-        pow2 = *bc;
+        pow2 = bytecode_elt_to_uint8 (*bc);
+        ret = (pow2 == 0); /* pow2 must be > 0 */
       }
 
       if (verbose)
@@ -252,6 +256,7 @@ bytecode_precomp_check_internal (bytecode_const bc, bytecode_const *endptr,
       {
         bc++;
         uint8_t pow2 = bytecode_elt_to_uint8 (*bc);
+        ret = (pow2 == 0); /* pow2 must be > 0 */
         if (verbose)
           printf ("# %s: R[%u] <- R[0] <- 2^%u R[0]\n", __func__, k, pow2);
         mpz_mul_2exp (R[0], R[0], pow2);
@@ -261,6 +266,7 @@ bytecode_precomp_check_internal (bytecode_const bc, bytecode_const *endptr,
       {
         bc++;
         uint8_t pow3 = bytecode_elt_to_uint8 (*bc);
+        ret = (pow3 == 0); /* pow2 must be > 0 */
         if (verbose)
           printf ("# %s: R[%u] <- R[0] <- 3^%u R[0]\n", __func__, k, pow3);
         for (uint8_t i = 0; i < pow3; i++)
