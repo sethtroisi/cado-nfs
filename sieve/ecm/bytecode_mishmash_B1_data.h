@@ -20,32 +20,6 @@ static const uint8_t _B1_1_bc[] = {
     0xff
   }; /* end of bytecode for B1=1 */
 
-/* B1=100 computed with 9 blocks, cost=1039M */
-static const uint8_t _B1_100_bc[] = {
-    0x03,
-    /* 73*71*61*17*5  /  double-base chain  /  189 M (=11DBL+1DBLa+8TPL+1ADDa) */
-    0x11, 0xf1, 0x08, 0x0c,
-    /* 89*23  /  double-base chain  /  86 M (=10DBL+1DBLa+1ADDa) */
-    0x11, 0x71, 0x0b,
-    /* 59*53*43*41*13  /  double-base chain  /  206 M (=13DBL+2DBLa+7TPL+1ADD+1ADDa) */
-    0x11, 0xc1, 0x07, 0x03, 0x61, 0x0c,
-    /* 31*11*3  /  double-base chain  /  79 M (=9DBL+1DBLa+1ADDa) */
-    0x11, 0x71, 0x0a,
-    /* 97*83*79*67*37*7*7  /  double-base expansion  /  282 M (=30DBL+3DBLa+1TPL+1TPLa+2ADD+1ADDa) */
-    0x21, 0xa2, 0x01, 0x80, 0x01, 0xff, 0x10, 0x52, 0x09, 0x51, 0x0e, 0x62, 0x0a,
-    /* Switch to Montgomery / last ADDa is in fact a ADDd / -4 M */
-    0x81,
-      /* 19*3*3  /  PRAC  /  57 M (=3dDBL+7dADD) */
-      0x69, 0x0a, 0x0b, 0x03, 0x0b, 0x03, 0x0a, 0x66,
-      /* 29*3  /  PRAC  /  51 M (=3dDBL+6dADD) */
-      0x69, 0x0a, 0x0d, 0x0b, 0x02, 0x66,
-      /* 47*5  /  PRAC  /  63 M (=3dDBL+8dADD) */
-      0x69, 0x0d, 0x0d, 0x02, 0x0a, 0x03, 0x46,
-    /* 2*2*2*2*2*2  /  Montgomery  /  30 M (=6dDBL) */
-    /* done outside of bytecode (for backtracking) */
-    0xff
-  }; /* end of bytecode for B1=100 */
-
 /* B1=105 computed with 11 blocks, cost=1144M */
 static const uint8_t _B1_105_bc[] = {
     0x03,
@@ -125,32 +99,6 @@ static const uint8_t _B1_125_bc[] = {
     /* done outside of bytecode (for backtracking) */
     0xff
   }; /* end of bytecode for B1=125 */
-
-/* B1=128 computed with 9 blocks, cost=1391M */
-static const uint8_t _B1_128_bc[] = {
-    0x03,
-    /* 109*73*37*19*13*7*5*3*3*3  /  double-base chain  /  261 M (=35DBL+1DBLa+1ADDa) */
-    0x11, 0x71, 0x24,
-    /* 127*113*43*29*5*3  /  double-base chain  /  205 M (=27DBL+1DBLa+1ADDa) */
-    0x11, 0x71, 0x1c,
-    /* 107*103*97*89*53*23  /  double-base chain  /  293 M (=28DBL+4DBLa+3TPL+3ADD+1ADDa) */
-    0x11, 0xc1, 0x03, 0x08, 0x51, 0x0e, 0x51, 0x06, 0x71, 0x04,
-    /* 101*83*79  /  double-base chain  /  156 M (=11DBL+2DBLa+4TPL+1ADD+1ADDa) */
-    0x11, 0x51, 0x09, 0xe1, 0x04, 0x04,
-    /* 71*67*61*47*41*31*17*11*11  /  double-base expansion  /  355 M (=23DBL+3DBLa+10TPL+2TPLa+2ADD+1ADDa) */
-    0x21, 0xa2, 0x08, 0xa3, 0x02, 0x80, 0x02, 0xff, 0x10, 0x53, 0x09, 0x41, 0x01, 0x62, 0x10,
-    /* Switch to Montgomery / last ADDa is in fact a ADDd / -4 M */
-    0x81,
-      /* 5  /  PRAC  /  17 M (=1dDBL+2dADD) */
-      0x69, 0x03, 0x66,
-      /* 7  /  PRAC  /  22 M (=2dDBL+2dADD) */
-      0x69, 0x02, 0x66,
-      /* 59  /  PRAC  /  51 M (=3dDBL+6dADD) */
-      0x69, 0x0b, 0x03, 0x0b, 0x02, 0x02, 0x46,
-    /* 2*2*2*2*2*2*2  /  Montgomery  /  35 M (=7dDBL) */
-    /* done outside of bytecode (for backtracking) */
-    0xff
-  }; /* end of bytecode for B1=128 */
 
 /* B1=137 computed with 9 blocks, cost=1499M */
 static const uint8_t _B1_137_bc[] = {
@@ -641,6 +589,48 @@ static const uint8_t _B1_310_bc[] = {
     /* done outside of bytecode (for backtracking) */
     0xff
   }; /* end of bytecode for B1=310 */
+
+/* B1=315 computed with 17 blocks, cost=3491M */
+static const uint8_t _B1_315_bc[] = {
+    0x03,
+    /* 181*61*47*37*13*7*7  /  double-base chain  /  249 M (=23DBL+1DBLa+6TPL+1ADDa) */
+    0x11, 0xf1, 0x06, 0x18,
+    /* 193*191*101*73*5  /  double-base chain  /  225 M (=23DBL+1DBLa+4TPL+1ADDa) */
+    0x11, 0xf1, 0x04, 0x18,
+    /* 211*107*19*11  /  double-base chain  /  166 M (=18DBL+1DBLa+2TPL+1ADDa) */
+    0x11, 0xe1, 0x02, 0x13,
+    /* 277*223*137*127*103*67*53*29  /  double-base chain  /  402 M (=44DBL+3DBLa+4TPL+2ADD+1ADDa) */
+    0x11, 0xc1, 0x02, 0x1e, 0xc1, 0x02, 0x09, 0x61, 0x08,
+    /* 251*239*233*149*43*17*13  /  double-base chain  /  336 M (=38DBL+3DBLa+2TPL+2ADD+1ADDa) */
+    0x11, 0xc1, 0x01, 0x10, 0x41, 0x0c, 0xf1, 0x01, 0x0d,
+    /* 313*311*179*157*113*89*83*71  /  double-base chain  /  435 M (=50DBL+4DBLa+2TPL+3ADD+1ADDa) */
+    0x11, 0x41, 0x18, 0xc1, 0x02, 0x09, 0x41, 0x13, 0x61, 0x02,
+    /* 293*283*227*163*59*41  /  double-base chain  /  335 M (=34DBL+4DBLa+3TPL+3ADD+1ADDa) */
+    0x11, 0x51, 0x15, 0x51, 0x05, 0x41, 0x0a, 0xe1, 0x03, 0x02,
+    /* 307*241*79*31*5  /  double-base chain  /  228 M (=23DBL+2DBLa+3TPL+1ADD+1ADDa) */
+    0x11, 0xc1, 0x01, 0x12, 0xf1, 0x02, 0x07,
+    /* 269*197*167*131*97*23*11  /  double-base chain  /  349 M (=36DBL+4DBLa+3TPL+3ADD+1ADDa) */
+    0x11, 0xd1, 0x01, 0x03, 0x41, 0x0a, 0xd1, 0x01, 0x06, 0xe1, 0x01, 0x15,
+    /* 271*17  /  double-base chain  /  96 M (=8DBL+1DBLa+2TPL+1ADDa) */
+    0x11, 0xf1, 0x02, 0x09,
+    /* 257  /  double-base chain  /  65 M (=7DBL+1DBLa+1ADDa) */
+    0x11, 0x61, 0x08,
+    /* 229*109  /  double-base chain  /  120 M (=11DBL+2DBLa+1TPL+1ADD+1ADDa) */
+    0x11, 0x41, 0x06, 0xe1, 0x01, 0x07,
+    /* 281*173*151*139  /  double-base expansion  /  243 M (=19DBL+3DBLa+3TPL+2TPLa+2ADD+1ADDa) */
+    0x21, 0xa2, 0x02, 0xa3, 0x02, 0x80, 0x01, 0xff, 0x10, 0x41, 0x02, 0x42, 0x07, 0x63, 0x0d,
+    /* Switch to Montgomery / last ADDa is in fact a ADDd / -4 M */
+    0x81,
+      /* 5*3*3*3*3*3  /  PRAC  /  72 M (=6dDBL+7dADD) */
+      0x69, 0x0a, 0x0a, 0x0a, 0x03, 0x0a, 0x0a, 0x66,
+      /* 199  /  PRAC  /  64 M (=2dDBL+9dADD) */
+      0x69, 0x02, 0x0d, 0x0d, 0x0d, 0x03, 0x66,
+      /* 263  /  PRAC  /  70 M (=2dDBL+10dADD) */
+      0x69, 0x0b, 0x02, 0x73, 0x0d, 0x03, 0x0d, 0x0b, 0x03, 0x46,
+    /* 2*2*2*2*2*2*2*2  /  Montgomery  /  40 M (=8dDBL) */
+    /* done outside of bytecode (for backtracking) */
+    0xff
+  }; /* end of bytecode for B1=315 */
 
 /* B1=327 computed with 16 blocks, cost=3541M */
 static const uint8_t _B1_327_bc[] = {
@@ -2550,11 +2540,9 @@ static const uint8_t _B1_1021_bc[] = {
 /* Sorted by increasing B1 */
 static mishmash_B1_data_t mishmash_B1_data[] = {
     { .B1 = 1, .len = sizeof(_B1_1_bc)/sizeof(*_B1_1_bc), .bc = _B1_1_bc },
-    { .B1 = 100, .len = sizeof(_B1_100_bc)/sizeof(*_B1_100_bc), .bc = _B1_100_bc },
     { .B1 = 105, .len = sizeof(_B1_105_bc)/sizeof(*_B1_105_bc), .bc = _B1_105_bc },
     { .B1 = 115, .len = sizeof(_B1_115_bc)/sizeof(*_B1_115_bc), .bc = _B1_115_bc },
     { .B1 = 125, .len = sizeof(_B1_125_bc)/sizeof(*_B1_125_bc), .bc = _B1_125_bc },
-    { .B1 = 128, .len = sizeof(_B1_128_bc)/sizeof(*_B1_128_bc), .bc = _B1_128_bc },
     { .B1 = 137, .len = sizeof(_B1_137_bc)/sizeof(*_B1_137_bc), .bc = _B1_137_bc },
     { .B1 = 148, .len = sizeof(_B1_148_bc)/sizeof(*_B1_148_bc), .bc = _B1_148_bc },
     { .B1 = 161, .len = sizeof(_B1_161_bc)/sizeof(*_B1_161_bc), .bc = _B1_161_bc },
@@ -2569,6 +2557,7 @@ static mishmash_B1_data_t mishmash_B1_data[] = {
     { .B1 = 276, .len = sizeof(_B1_276_bc)/sizeof(*_B1_276_bc), .bc = _B1_276_bc },
     { .B1 = 293, .len = sizeof(_B1_293_bc)/sizeof(*_B1_293_bc), .bc = _B1_293_bc },
     { .B1 = 310, .len = sizeof(_B1_310_bc)/sizeof(*_B1_310_bc), .bc = _B1_310_bc },
+    { .B1 = 315, .len = sizeof(_B1_315_bc)/sizeof(*_B1_315_bc), .bc = _B1_315_bc },
     { .B1 = 327, .len = sizeof(_B1_327_bc)/sizeof(*_B1_327_bc), .bc = _B1_327_bc },
     { .B1 = 345, .len = sizeof(_B1_345_bc)/sizeof(*_B1_345_bc), .bc = _B1_345_bc },
     { .B1 = 364, .len = sizeof(_B1_364_bc)/sizeof(*_B1_364_bc), .bc = _B1_364_bc },
