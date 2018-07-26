@@ -64,7 +64,6 @@ sieve/ecm/CMakeLists-nodist.txt
 sieve/ecm/ecm_avg_exp.gp
 sieve/ecm/ecm_check.c
 sieve/ecm/issmooth.c
-sieve/ecm/Z6_ecm_parameterization.sage
 sieve/ecm/cofac_utils.sage
 sqrt/CMakeLists-nodist.txt
 sqrt/lift.c
@@ -224,4 +223,3 @@ nfs-hd/automatic_p6bd40.sh
 nfs-hd/check_relations/
 parameters/nfs-hd/
 filter/CMakeLists-nodist.txt
-las_timings.sh
