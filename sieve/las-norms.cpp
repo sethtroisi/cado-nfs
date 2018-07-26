@@ -1113,7 +1113,7 @@ B:=[bestrep(a):a in {{a*b*c*x:a in {1,-1},b in {1,d},c in {1,s}}:x in MM}];
     int N = 5;
 
     double reference = estimate_yield_in_sieve_area(shuffle_matrices[0], 0, N);
-    for(int squeeze = 0 ; squeeze <= 3 ; squeeze++) {
+    for(int squeeze = ADJUST_STRATEGY2_MIN_SQUEEZE ; squeeze <= ADJUST_STRATEGY2_MAX_SQUEEZE ; squeeze++) {
         for(int r = 0 ; r < nmatrices ; r++) {
             if (squeeze == 0 && (r & 1)) continue;
             mat<int> const & Sr(shuffle_matrices[r]);

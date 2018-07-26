@@ -8,4 +8,7 @@ target_link_libraries(convert_poly utils)
 add_executable(convert_rels EXCLUDE_FROM_ALL convert_rels.c)
 target_link_libraries(convert_rels utils)
 
+add_executable(descent_init_Fp EXCLUDE_FROM_ALL descent_init_Fp.c smooth_detect.c)
+target_link_libraries(descent_init_Fp utils ecm)
+
 # vim: set ft=cmake:

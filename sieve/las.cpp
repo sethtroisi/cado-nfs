@@ -1655,13 +1655,13 @@ struct cofac_standalone {
         return mpz_cmp_ui(g, 1) == 0;
 #endif
     }/*}}}*/
-    void print_as_survivor() {/*{{{*/
+    void print_as_survivor(FILE * f) {/*{{{*/
 #ifndef SUPPORT_LARGE_Q
-        gmp_printf("%" PRId64 " %" PRIu64 " %Zd %Zd\n", a, b,
+        gmp_fprintf(f, "%" PRId64 " %" PRIu64 " %Zd %Zd\n", a, b,
                 (mpz_srcptr) norm[0],
                 (mpz_srcptr) norm[1]);
 #else
-        gmp_printf("%Zd %Zd %Zd %Zd\n",
+        gmp_fprintf(f, "%Zd %Zd %Zd %Zd\n",
                 (mpz_srcptr) az,
                 (mpz_srcptr) bz,
                 (mpz_srcptr) norm[0],
@@ -2031,7 +2031,7 @@ void process_bucket_region_run::cofactoring_sync (survivors_t & survivors)/*{{{*
                 rep.survivors.check_leftover_norm_on_side[side] += pass;
             }
         } else {
-            ASSERT_ALWAYS(ws.las.batch);
+            ASSERT_ALWAYS(ws.las.batch || ws.las.batch_print_survivors);
 
             /* no resieve, so no list of prime factors to divide. No
              * point in doing trial division anyway either.
@@ -2094,7 +2094,7 @@ void process_bucket_region_run::cofactoring_sync (survivors_t & survivors)/*{{{*
             rep.reports++;
             if (si.conf.sublat.m && !cur.ab_coprime()) continue;
             verbose_output_start_batch ();
-            cur.print_as_survivor();
+            cur.print_as_survivor(ws.las.batch_print_survivors);
             verbose_output_end_batch ();
             continue;
         }
@@ -2282,7 +2282,7 @@ static void declare_usage(param_list pl)/*{{{*/
     param_list_decl_usage(pl, "batchlpb1", "large prime bound on side 1 to be considered by batch cofactorization. Primes between lim1 and 2^batchlpb1 will be extracted by product trees. Defaults to lpb1.");
     param_list_decl_usage(pl, "batchmfb0", "cofactor bound on side 0 to be considered after batch cofactorization. After primes below 2^batchlpb0 have been extracted, cofactors below this bound will go through ecm. Defaults to lpb0.");
     param_list_decl_usage(pl, "batchmfb1", "cofactor bound on side 1 to be considered after batch cofactorization. After primes below 2^batchlpb1 have been extracted, cofactors below this bound will go through ecm. Defaults to lpb1.");
-    param_list_decl_usage(pl, "batch-print-survivors", "(switch) just print survivors for an external cofactorization");
+    param_list_decl_usage(pl, "batch-print-survivors", "just print survivors to the specified file (or pipe) for an external cofactorization");
     param_list_decl_usage(pl, "galois", "(switch) for reciprocal polynomials, sieve only half of the q's");
 #ifdef TRACE_K
     param_list_decl_usage(pl, "traceab", "Relation to trace, in a,b format");
@@ -2326,14 +2326,25 @@ double nprimes_interval(double p0, double p1)
  *
  * Our fetching of the siever_config fields is definitely wrong here.
  */
-void display_expected_memory_usage(siever_config const & sc0, cado_poly_srcptr cpoly, bkmult_specifier const & bkmult, size_t base_memory = 0)
+void display_expected_memory_usage(siever_config const & sc0, cado_poly_srcptr cpoly, int nthreads, bkmult_specifier const & bkmult, size_t base_memory = 0)
 {
     /* do the estimate based on the "average" logI. This is most often
      * going to give a reasonable rough idea anyway.
      */
     siever_config sc = sc0;
-    sc.logI = (1+sc.logA)/2;
-    verbose_output_print(0, 1, "# Expected memory usage (assuming logI=%d):\n", sc.logI);
+
+    int logImin, logImax;
+
+    if (adjust_strategy == 2) {
+        logImin = (1+sc.logA)/2 - ADJUST_STRATEGY2_MAX_SQUEEZE;
+        logImax = (1+sc.logA)/2 - ADJUST_STRATEGY2_MIN_SQUEEZE;
+    } else {
+        logImin = logImax = (1+sc.logA)/2;
+    }
+
+    for(int logI = logImin ; logI <= logImax ; logI++) {
+        sc.logI = logI;
+    verbose_output_print(0, 1, "# Expected memory usage assuming logI=%d:\n", sc.logI);
 
     fb_factorbase::key_type K[2] {
         sc.instantiate_thresholds(0),
@@ -2379,13 +2390,38 @@ void display_expected_memory_usage(siever_config const & sc0, cado_poly_srcptr c
         }
         ideals_per_prime = 1/(1-ideals_per_prime);
         size_t nideals = nprimes_interval(p0, p1);
+        /* we have nideals/ideals_per_prime prime numbers, totalling
+         * nideals roots.
+         * Per prime, we have:
+         *      fbprime_t
+         *      redc_invp_t
+         *      double  (for the weight_cdf table).
+         * Per root we have:
+         *      fbroot_t
+         */
         verbose_output_print(0, 1, "# side %d, %zu fb primes (d=%d, %f roots per p if G=S_d): %zuMB\n",
                 side,
                 nideals,
                 d, ideals_per_prime,
-                (more = ((sizeof(fbprime_t) + sizeof(redc_invp_t)) / ideals_per_prime + sizeof(fbroot_t)) * nideals) >> 20);
+                (more = ((sizeof(fbprime_t) + sizeof(redc_invp_t) + sizeof(double)) / ideals_per_prime + sizeof(fbroot_t)) * nideals) >> 20);
         memory += more;
     }
+
+#if defined(__linux__) && defined(__GLIBC__) && defined(__x86_64__)
+    /* count threads. Each costs 8M+4k for the stack, 64MB for the
+     * private heap. However, this is only virtual address space.
+     * Therefore it's not really clear how we should count it. Maybe "not
+     * at all" is a good start, in fact.
+     *
+     * 64MB is actually transiently 128MB, then 64MB.
+     */
+    if (0) {
+        verbose_output_print(0, 1, "# %d threads: %zuMB\n",
+                nthreads,
+                (more = nthreads * 0x4801000) >> 20);
+        memory += more;
+    }
+#endif
 
     // toplevel is computed by fb_factorbase::slicing::slicing, based on
     // thresholds in fbK
@@ -2400,6 +2436,33 @@ void display_expected_memory_usage(siever_config const & sc0, cado_poly_srcptr c
     ASSERT_ALWAYS(toplevel == 1 || toplevel == 2);
 
     /* the code path is radically different depending on toplevel. */
+
+    int nba = NUMBER_OF_BAS_FOR_THREADS(nthreads);
+
+    double m1s, m1l, m2s;
+    size_t s1s, s1l, s2s;
+    size_t mins1s, mins1l, mins2s;
+    if (do_resieve) {
+        s2s=sizeof(bucket_update_t<2, shorthint_t>);
+        m2s=bkmult.get<bucket_update_t<2, shorthint_t>>();
+        s1s=sizeof(bucket_update_t<1, shorthint_t>);
+        m1s=bkmult.get<bucket_update_t<1, shorthint_t>>();
+        s1l=sizeof(bucket_update_t<1, longhint_t>);
+        m1l=bkmult.get<bucket_update_t<1, longhint_t>>();
+        mins1s = 256; // bucket_array_t<1, shorthint_t>::initial_slice_alloc;
+        mins2s = 256; // bucket_array_t<2, shorthint_t>::initial_slice_alloc;
+        mins1l = 256; // bucket_array_t<1, longhint_t>::initial_slice_alloc;
+    } else {
+        s2s=sizeof(bucket_update_t<2, emptyhint_t>);
+        m2s=bkmult.get<bucket_update_t<2, emptyhint_t>>();
+        s1s=sizeof(bucket_update_t<1, emptyhint_t>);
+        m1s=bkmult.get<bucket_update_t<1, emptyhint_t>>();
+        s1l=sizeof(bucket_update_t<1, logphint_t>);
+        m1l=bkmult.get<bucket_update_t<1, logphint_t>>();
+        mins1s = 256; // bucket_array_t<1, emptyhint_t>::initial_slice_alloc;
+        mins2s = 256; // bucket_array_t<2, emptyhint_t>::initial_slice_alloc;
+        mins1l = 256; // bucket_array_t<1, logphint_t>::initial_slice_alloc;
+    }
 
     if (toplevel == 2) {
         // very large factor base primes, between bkthresh1 and lim = we
@@ -2430,43 +2493,63 @@ void display_expected_memory_usage(siever_config const & sc0, cado_poly_srcptr c
             double p0 = K[side].thresholds[1];
             p0 = std::min(p1, p0);
             size_t nprimes = nprimes_interval(p0, p1);
-            size_t nupdates = 0.75 * (1UL << sc.logA) * (std::log(std::log(p1)) - std::log(std::log(p0)));
-            nupdates += NB_DEVIATIONS_BUCKET_REGIONS * sqrt(nupdates);
+            double w = (std::log(std::log(p1)) - std::log(std::log(p0)));
+
+            /* we duplicate code that is found in allocate_memory. TODO:
+             * refactor that */
+            size_t nreg = 1UL << (sc.logA - LOG_BUCKET_REGIONS[2]);
+            size_t nup_per_reg = 0.25 * w * BUCKET_REGIONS[2] / nba;
+            /* assume LOG_BUCKET_REGIONS[2] > logI */
+            nup_per_reg *= 3;
+            nup_per_reg += NB_DEVIATIONS_BUCKET_REGIONS * sqrt(nup_per_reg);
+            size_t nupdates = nup_per_reg * nreg * nba;
             {
-                double m;
-                size_t s;
-                if (do_resieve) {
-                    typedef bucket_update_t<2, shorthint_t> type;
-                    s=sizeof(type);
-                    m=bkmult.get<type>();
-                } else {
-                    typedef bucket_update_t<2, emptyhint_t> type;
-                    s=sizeof(type);
-                    m=bkmult.get<type>();
-                }
-                verbose_output_print(0, 1, "# level 2, side %d: %zu primes, %zu 2-updates [2s]: %zu MB\n",
+                verbose_output_print(0, 1, "# level 2, side %d: %zu primes, room for %zu 2-updates [2s] in %d arrays: %zu MB\n",
                         side, nprimes, nupdates,
-                        (more = m * nupdates * s) >> 20);
+                        nba,
+                        (more = m2s * nupdates * s2s) >> 20);
+                memory += more;
+            }
+            {
+                /* Count the slice_start pointers as well. We need to know
+                 * how many slices will be processed in each bucket
+                 * array. A rough rule of thumb probably works.
+                 */
+                size_t nslices_estim = iceildiv(nprimes >> 16, nba);
+                std::ostringstream os;
+                if (nslices_estim < mins2s)
+                    os << " [note: using minimum value of " << mins2s << " slices instead; " << 100.0*(mins2s-nslices_estim)/mins2s << "% waste !]";
+                verbose_output_print(0, 1, "# level 2, side %d: expect %zu slices per array, %zu pointers each, in %d arrays: %zu MB%s\n",
+                        side,
+                        nslices_estim,
+                        nreg,
+                        nba,
+                        (more = nba * nreg * MAX(nslices_estim, mins2s) * sizeof(void*)) >> 20,
+                        os.str().c_str());
                 memory += more;
             }
             {
                 // how many downsorted updates are alive at a given point in
                 // time ?
                 size_t nupdates_D = nupdates >> 8;
-                double m;
-                size_t s;
-                if (do_resieve) {
-                    typedef bucket_update_t<2, longhint_t> type;
-                    s=sizeof(type);
-                    m=bkmult.get<type>();
-                } else {
-                    typedef bucket_update_t<2, logphint_t> type;
-                    s=sizeof(type);
-                    m=bkmult.get<type>();
-                }
                 verbose_output_print(0, 1, "# level 1, side %d: %zu downsorted 1-updates [1l]: %zu MB\n",
-                        side, nupdates >> 8,
-                        (more = m * nupdates_D * s) >> 20);
+                        side, nupdates_D,
+                        (more = m1l * nupdates_D * s1l) >> 20);
+                memory += more;
+            }
+            {
+                size_t nslices_estim = 1;
+                size_t nreg = 1 << (LOG_BUCKET_REGIONS[2] - LOG_BUCKET_REGIONS[1]);
+                std::ostringstream os;
+                if (nslices_estim < mins1l)
+                    os << " [note: using minimum value of " << mins1l << " slices instead; " << 100.0*(mins1l-nslices_estim)/mins1l << "% waste !]";
+                verbose_output_print(0, 1, "# level 1, side %d: expect %zu slices per array, %zu pointers each, in %d arrays: %zu MB%s\n",
+                        side,
+                        nslices_estim,
+                        nreg,
+                        nba,
+                        (more = nba * nreg * MAX(nslices_estim, mins1l) * sizeof(void*)) >> 20,
+                        os.str().c_str());
                 memory += more;
             }
         }
@@ -2476,28 +2559,42 @@ void display_expected_memory_usage(siever_config const & sc0, cado_poly_srcptr c
             double p1 = K[side].thresholds[1];
             double p0 = K[side].thresholds[0];
             size_t nprimes = nprimes_interval(p0, p1);
-            int A0 = LOG_BUCKET_REGION + 8;
-            size_t nupdates = 0.75 * (1UL << A0) * (std::log(std::log(p1)) - std::log(std::log(p0)));
-            nupdates += NB_DEVIATIONS_BUCKET_REGIONS * sqrt(nupdates);
-            double m;
-            size_t s;
-            if (do_resieve) {
-                typedef bucket_update_t<1, shorthint_t> type;
-                s=sizeof(type);
-                m=bkmult.get<type>();
-            } else {
-                typedef bucket_update_t<1, emptyhint_t> type;
-                s=sizeof(type);
-                m=bkmult.get<type>();
-            }
-            verbose_output_print(0, 1, "# level 1, side %d: %zu primes, %zu 1-updates [1s]: %zu MB\n",
-                    side, nprimes, nupdates,
-                    (more = m * nupdates * s) >> 20);
+            double w = (std::log(std::log(p1)) - std::log(std::log(p0)));
+
+            size_t nreg = 1 << (LOG_BUCKET_REGIONS[2] - LOG_BUCKET_REGIONS[1]);
+            size_t nup_per_reg = 0.25 * w * BUCKET_REGIONS[1] / nba;
+            /* assume LOG_BUCKET_REGIONS[1] > logI -- if it's not the
+             * case, the count will not be too wrong anyway. */
+            nup_per_reg *= 3;
+            nup_per_reg += NB_DEVIATIONS_BUCKET_REGIONS * sqrt(nup_per_reg);
+            size_t nupdates = nup_per_reg * nreg * nba;
+            verbose_output_print(0, 1, "# level 1, side %d: %zu primes, %zu 1-updates [1s] in %d arrays: %zu MB\n",
+                    side, nprimes, nupdates, nba,
+                    (more = m1s * nupdates * s1s) >> 20);
             memory += more;
             verbose_output_print(0, 1, "# level 1, side %d: %zu primes => precomp_plattices: %zu MB\n",
                     side, nprimes,
                     (more = nprimes * sizeof(plattice_enumerate_t)) >> 20);
             memory += more;
+
+            {
+                /* Count the slice_start pointers as well. We need to know
+                 * how many slices will be processed in each bucket
+                 * array. A rough rule of thumb probably works.
+                 */
+                size_t nslices_estim = iceildiv(nprimes >> 16, nba);
+                std::ostringstream os;
+                if (nslices_estim < mins1s)
+                    os << " [note: using minimum value of " << mins1s << " slices instead; " << 100.0*(mins1s-nslices_estim)/mins1s << "% waste !]";
+                verbose_output_print(0, 1, "# level 1, side %d: expect %zu slices per array, %zu pointers each, in %d arrays: %zu MB%s\n",
+                        side,
+                        nslices_estim,
+                        nreg,
+                        nba,
+                        (more = nba * nreg * MAX(nslices_estim, mins1s) * sizeof(void*)) >> 20,
+                        os.str().c_str());
+                memory += more;
+            }
         }
     } else if (toplevel == 1) {
         // *ALL* bucket updates are computed in one go as
@@ -2508,29 +2605,47 @@ void display_expected_memory_usage(siever_config const & sc0, cado_poly_srcptr c
             double p1 = K[side].thresholds[1];
             double p0 = K[side].thresholds[0];
             size_t nprimes = nprimes_interval(p0, p1);
-            size_t nupdates = 0.75 * (1UL << sc.logA) * (std::log(std::log(p1)) - std::log(std::log(p0)));
-            double m;
-            size_t s;
-            if (do_resieve) {
-                typedef bucket_update_t<1, shorthint_t> type;
-                s=sizeof(type);
-                m=bkmult.get<type>();
-            } else {
-                typedef bucket_update_t<1, emptyhint_t> type;
-                s=sizeof(type);
-                m=bkmult.get<type>();
-            }
+            double w = (std::log(std::log(p1)) - std::log(std::log(p0)));
+
+            /* we duplicate code that is found in allocate_memory. TODO:
+             * refactor that */
+            size_t nreg = 1UL << (sc.logA - LOG_BUCKET_REGIONS[1]);
+            size_t nup_per_reg = 0.25 * w * BUCKET_REGIONS[1] / nba;
+            /* assume LOG_BUCKET_REGIONS[1] > logI -- if it's not the
+             * case, the count will not be too wrong anyway. */
+            nup_per_reg *= 3;
+            nup_per_reg += NB_DEVIATIONS_BUCKET_REGIONS * sqrt(nup_per_reg);
+            size_t nupdates = nup_per_reg * nreg * nba;
             nupdates += NB_DEVIATIONS_BUCKET_REGIONS * sqrt(nupdates);
-            verbose_output_print(0, 1, "# level 1, side %d: %zu primes, %zu 1-updates [1s]: %zu MB\n",
-                    side, nprimes, nupdates,
-                    (more = m * nupdates * s) >> 20);
+            verbose_output_print(0, 1, "# level 1, side %d: %zu primes, %zu 1-updates [1s] in %d arrays: %zu MB\n",
+                    side, nprimes, nupdates, nba,
+                    (more = m1s * nupdates * s1s) >> 20);
             memory += more;
+            {
+                /* Count the slice_start pointers as well. We need to know
+                 * how many slices will be processed in each bucket
+                 * array. A rough rule of thumb probably works.
+                 */
+                size_t nslices_estim = iceildiv(nprimes >> 16, nba);
+                std::ostringstream os;
+                if (nslices_estim < mins1s)
+                    os << " [note: using minimum value of " << mins1s << " slices instead; " << 100.0*(mins1s-nslices_estim)/mins1s << "% waste !]";
+                verbose_output_print(0, 1, "# level 1, side %d: expect %zu slices per array, %zu pointers each, in %d arrays: %zu MB%s\n",
+                        side,
+                        nslices_estim,
+                        nreg,
+                        nba,
+                        (more = nba * nreg * MAX(nslices_estim, mins1s) * sizeof(void*)) >> 20,
+                        os.str().c_str());
+                memory += more;
+            }
         }
     }
 
     // TODO: multiplier
     verbose_output_print(0, 1, "# Expected memory use, counting %zu MB of base footprint: %zu MB\n",
             base_memory >> 20, memory >> 20);
+    }
 }
 
 #ifdef  DLP_DESCENT
@@ -2822,6 +2937,7 @@ bool do_one_special_q(las_info & las, nfs_work & ws, std::shared_ptr<nfs_aux> au
                     "the -allow-largesq argument,\n");
             fprintf(stderr, "       It is for instance useful for the "
                     "descent.\n");
+	    fprintf(stderr, "       Use tasks.sieve.allow_largesq=true.\n");
             exit(EXIT_FAILURE);
         }
     }
@@ -2867,7 +2983,7 @@ bool do_one_special_q(las_info & las, nfs_work & ws, std::shared_ptr<nfs_aux> au
     /* Currently we assume that we're doing sieving + resieving on
      * both sides, or we're not. In the latter case, we expect to
      * complete the factoring work with batch cofactorization */
-    ASSERT_ALWAYS(las.batch || (conf.sides[0].lim && conf.sides[1].lim));
+    ASSERT_ALWAYS(las.batch || las.batch_print_survivors || (conf.sides[0].lim && conf.sides[1].lim));
 
     sieve_info & si(*psi);
 
@@ -2949,6 +3065,14 @@ bool do_one_special_q(las_info & las, nfs_work & ws, std::shared_ptr<nfs_aux> au
     for(int side = 0 ; side < 2 ; side++)
         si.sides[side].precomp_plattice_dense.clear();
 
+    for(int side = 0 ; side < 2 ; side++) {
+        sieve_info::side_info & s(si.sides[side]);
+        s.ssdpos_many.clear();
+        small_sieve_clear(s.ssd);
+        s.ssd_offsets.up.clear();
+        s.ssd_offsets.right.clear();
+    }
+
 #ifdef DLP_DESCENT
     postprocess_specialq_descent(las, doing, timer_special_q);
 #endif
@@ -3000,7 +3124,6 @@ int main (int argc0, char *argv0[])/*{{{*/
     param_list_configure_switch(pl, "-dup", NULL);
     param_list_configure_switch(pl, "-sync", &sync_at_special_q);
     param_list_configure_switch(pl, "-batch", NULL);
-    param_list_configure_switch(pl, "-batch-print-survivors", NULL);
     //    param_list_configure_switch(pl, "-galois", NULL);
     param_list_configure_alias(pl, "skew", "S");
     param_list_configure_alias(pl, "log-bucket-region", "B");
@@ -3048,7 +3171,7 @@ int main (int argc0, char *argv0[])/*{{{*/
     size_t base_memory = Memusage() << 10;
     if (las.verbose >= 1 && las.config_pool.default_config_ptr) {
         siever_config const & sc(*las.config_pool.default_config_ptr);
-        display_expected_memory_usage(sc, las.cpoly, las.bk_multiplier, base_memory);
+        display_expected_memory_usage(sc, las.cpoly, las.nb_threads, las.bk_multiplier, base_memory);
     }
 
     /* We have the following dependency chain (not sure the account below
@@ -3260,7 +3383,7 @@ int main (int argc0, char *argv0[])/*{{{*/
                 if (las.verbose >= 1 && las.config_pool.default_config_ptr) {
                     verbose_output_print(0, 1, "# Displaying again expected memory usage since multipliers changed.\n");
                     siever_config const & sc(*las.config_pool.default_config_ptr);
-                    display_expected_memory_usage(sc, las.cpoly, las.bk_multiplier, base_memory);
+                    display_expected_memory_usage(sc, las.cpoly, las.nb_threads, las.bk_multiplier, base_memory);
                 }
                 /* we have to roll back the updates we made to
                  * this structure. */
@@ -3362,11 +3485,6 @@ int main (int argc0, char *argv0[])/*{{{*/
     }
     verbose_output_print (2, 1, "# Discarded %lu special-q's out of %u pushed\n",
             nr_sq_discarded, las.nq_pushed);
-    tts = t0;
-    tts -= global_report.tn[0];
-    tts -= global_report.tn[1];
-    tts -= global_report.ttf;
-    tts -= global_report.ttcof;
 
     global_timer.stop();
 
@@ -3421,12 +3539,20 @@ int main (int argc0, char *argv0[])/*{{{*/
 		botched_report.ttf, botched_report.ttcof);
 
     t0 -= waste;
+
+    tts = t0;
+    tts -= global_report.tn[0];
+    tts -= global_report.tn[1];
+    tts -= global_report.ttf;
+    tts -= global_report.ttcof;
+    /*
     global_report.tn[0] -= botched_report.tn[0];
     global_report.tn[1] -= botched_report.tn[1];
     global_report.ttbuckets_fill -= botched_report.ttbuckets_fill;
     global_report.ttbuckets_apply -= botched_report.ttbuckets_apply;
     global_report.ttf -= botched_report.ttf;
     global_report.ttcof -= botched_report.ttcof;
+    */
 
     if (dont_print_tally && las.nb_threads > 1) 
         verbose_output_print (2, 1, "# Total cpu time %1.2fs [tally available only in mono-thread]\n", t0);
@@ -3449,7 +3575,7 @@ int main (int argc0, char *argv0[])/*{{{*/
     /* memory usage */
     if (las.verbose >= 1 && las.config_pool.default_config_ptr) {
         siever_config const & sc(*las.config_pool.default_config_ptr);
-        display_expected_memory_usage(sc, las.cpoly, las.bk_multiplier,
+        display_expected_memory_usage(sc, las.cpoly, las.nb_threads, las.bk_multiplier,
 				      base_memory);
     }
     const long peakmem = PeakMemusage();

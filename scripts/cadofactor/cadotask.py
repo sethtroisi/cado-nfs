@@ -1323,7 +1323,9 @@ class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
         else:
             stderrmsg = ""
         if stderr:
-            self.logger.error("Stderr output follows%s:\n%s", stderrmsg, stderr)
+            self.logger.error("Stderr output (last 10 lines only) follow%s:", stderrmsg)
+            for l in stderr.decode().split('\n')[-10:]:
+                self.logger.error("\t"+l)
 
     def submit_command(self, command, identifier, commit=True, log_errors=False):
         ''' Run a command.
@@ -2420,7 +2422,7 @@ class PolyselJLTask(ClientServerTask, patterns.Observer):
             "I": int,
             "lim1": int, "lim0": int,
             "lpb0": int, "lpb1": int,
-            "qmin": 0
+            "qmin": 0, "ell": int, "fastSM" : False
             })
     
     def __init__(self, *, mediator, db, parameters, path_prefix):
@@ -2435,6 +2437,8 @@ class PolyselJLTask(ClientServerTask, patterns.Observer):
                 * qmin)
         self.progparams[0].setdefault("Bf", float(2**self.params["lpb1"]))
         self.progparams[0].setdefault("Bg", float(2**self.params["lpb0"]))
+        if self.params["fastSM"]:
+            self.progparams[0].setdefault("easySM", self.params["ell"])
         self.bestpoly = None
             
     def run(self):

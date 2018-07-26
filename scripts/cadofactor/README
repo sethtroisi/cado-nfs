@@ -187,6 +187,19 @@ that prime special-q's will always be used (in addition to composite s-q's).
 If sieving over [q0,q1], with tasks.sieve.qfac_max < q0, then all special-q's
 will be composite.
 
+Sieving with large special-q's
+==============================
+
+If you get an error like the following:
+
+   The special q (27 bits) is larger than the large prime bound on side 1 (26 bits).
+   You can disable this check with the -allow-largesq argument,
+   It is for instance useful for the descent.
+
+then you can solve it as follows:
+
+tasks.sieve.allow_largesq = true
+
 Importing relations
 ===================
 
@@ -286,12 +299,17 @@ line (or in the parameter file):
 
 tasks.filter.required_excess=0.2
 
-Note: if your factorization already started the linear algebra step, and you
+If your factorization already started the linear algebra step, and you
 want to do more sieving, you can restart it with a larger "rels_wanted" than
 the current number of relations. For example if you have say 1000000 relations
 (grep "is now" in the log file), just add in the cado-nfs.py line:
 
 tasks.sieve.rels_wanted=1000001
+
+If on the contrary you want to start filtering as soon as you have a positive
+excess (or you know you have enough relations in case of imported relations), use:
+
+tasks.sieve.rels_wanted=1
 
 If not enough relations are collected after the filtering step, the sieve
 is executed again with an additional number of wanted relations.  The

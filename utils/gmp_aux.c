@@ -483,6 +483,39 @@ mpz_ndiv_q_ui (mpz_t q, mpz_t n, unsigned long int d)
   mpz_clear (r);
 }
 
+/* a <- b cmod c with -c/2 <= a < c/2 */
+void
+mpz_ndiv_r (mpz_ptr a, mpz_srcptr b, mpz_srcptr c)
+{
+  mpz_mod (a, b, c); /* now 0 <= a < c */
+
+  size_t n = mpz_size (c);
+  mp_limb_t aj, cj;
+  int sub = 0, sh = GMP_NUMB_BITS - 1;
+
+  if (mpz_getlimbn (a, n-1) >= (mp_limb_t) 1 << sh)
+    sub = 1;
+  else
+    {
+      while (n-- > 0)
+	{
+	  cj = mpz_getlimbn (c, n);
+	  aj = mpz_getlimbn (a, n) << 1;
+	  if (n > 0)
+	    aj |= mpz_getlimbn (a, n-1) >> sh;
+	  if (aj > cj)
+	    {
+	      sub = 1;
+	      break;
+	    }
+	  else if (aj < cj)
+	    break;
+	}
+    }
+  if (sub)
+    mpz_sub (a, a, c);
+}
+
 /* Return non-zero if a and b are coprime, else return 0 if gcd(a, b) != 1 */
 int
 mpz_coprime_p (mpz_t a, mpz_t b)

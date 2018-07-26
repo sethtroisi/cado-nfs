@@ -250,20 +250,6 @@ static void WRAP_mpz_submul(mpz_ptr c, mpz_srcptr a, mpz_srcptr b)
     }
 }
 
-static void WRAP_barrett_mod(mpz_ptr c, mpz_srcptr a, mpz_srcptr p, mpz_srcptr q)
-{
-    STOPWATCH_DECL;
-    STOPWATCH_GO();
-    mp_size_t na = mpz_size(a);
-    mp_size_t nb = mpz_size(p);
-    barrett_mod(c,a,p,q);
-    STOPWATCH_GET();
-    if (REPORT_THIS(na, nb) && na > nb + 10) {
-        logprint("<9> mpz_mod %d %d (%.1f) %.1f %.1f (%.1f%%)\n",
-                (int) na, (int) nb, (double)na/nb, t1-t0, w1-w0, rate);
-    }
-}
-
 static void WRAP_mpz_mod(mpz_ptr c, mpz_srcptr a, mpz_srcptr p)
 {
     STOPWATCH_DECL;
@@ -1682,30 +1668,6 @@ void sqrt_lift(struct prime_data * p, mpz_ptr A, mpz_ptr sx, int precision)
 }
 /* }}} */
 
-/* {{{ This wraps around barrett reduction, depending on whether we
- * choose to use it or not */
-mpz_ptr my_barrett_init(mpz_srcptr px MAYBE_UNUSED)
-{
-#ifndef WITH_BARRETT
-    return NULL;
-#else
-    if (mpz_size(px) < 10000)
-        return NULL;
-    mpz_ptr qx = malloc(sizeof(mpz_t));
-    mpz_init(qx);
-    barrett_init(qx, px);
-    return qx;
-#endif
-}
-
-void my_barrett_clear(mpz_ptr qx)
-{
-    if (!qx) return;
-    mpz_clear(qx);
-    free(qx);
-}
-/* }}} */
-
 void root_lift(struct prime_data * p, mpz_ptr rx, mpz_ptr irx, int precision)/* {{{ */
 {
     double w0 = WCT;
@@ -1723,7 +1685,6 @@ void root_lift(struct prime_data * p, mpz_ptr rx, mpz_ptr irx, int precision)/* 
         logprint("precision %d\n", precision);
     mpz_srcptr pk = power_lookup_const(p->powers, precision);
     mpz_srcptr pl = power_lookup_const(p->powers, lower);
-    mpz_ptr qk = my_barrett_init(pk);
 
     mpz_t ta, tb;
     mpz_init(ta);
@@ -1739,26 +1700,23 @@ void root_lift(struct prime_data * p, mpz_ptr rx, mpz_ptr irx, int precision)/* 
 
     mpz_ptr rr[2] = { tb, fprime };
     mpz_poly_srcptr ff[2] = { glob.f_hat, glob.f_hat_diff };
-    mpz_poly_eval_several_mod_mpz_barrett(rr, ff, 2, rx, pk, qk);
+    mpz_poly_eval_several_mod_mpz (rr, ff, 2, rx, pk);
     /* use irx. only one iteration of newton.  */
-    mpz_srcptr ql = NULL;       /* FIXME if we use barrett reduction */
-    WRAP_barrett_mod(fprime, fprime, pl, ql);
+    WRAP_mpz_mod(fprime, fprime, pl);
     WRAP_mpz_mul(ta, irx, fprime);
-    WRAP_barrett_mod(ta, ta, pl, ql);
+    WRAP_mpz_mod(ta, ta, pl);
     mpz_sub_ui(ta,ta,1);
     WRAP_mpz_submul(irx, irx, ta);
-    WRAP_barrett_mod(irx, irx, pl, ql);
+    WRAP_mpz_mod(irx, irx, pl);
 
     mpz_clear(fprime);
 
     WRAP_mpz_mul(tb, irx, tb);
     mpz_sub(rx, rx, tb);
-    WRAP_barrett_mod(rx, rx, pk, qk);
+    WRAP_mpz_mod(rx, rx, pk);
 
     mpz_clear(ta);
     mpz_clear(tb);
-
-    my_barrett_clear(qk);
 }/* }}} */
 
 void prime_initialization(struct prime_data * p)/* {{{ */

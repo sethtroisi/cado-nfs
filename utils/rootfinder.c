@@ -261,7 +261,8 @@ static int mpz_poly_coeff_cmp(const mpz_t *a, const mpz_t *b) {
    and put the corresponding roots mod p in r[]. Return number of roots
    which should be degree of f. Assumes p is odd, and deg(f) >= 1. */
 static int
-mpz_poly_cantor_zassenhaus (mpz_t *r, mpz_poly_srcptr f, mpz_srcptr p, int depth)
+mpz_poly_cantor_zassenhaus (mpz_t *r, mpz_poly_srcptr f, mpz_srcptr p,
+                            int depth)
 {
   mpz_t a, aux;
   mpz_poly q, h;
@@ -294,6 +295,7 @@ mpz_poly_cantor_zassenhaus (mpz_t *r, mpz_poly_srcptr f, mpz_srcptr p, int depth
     mpz_set_ui (aux, 1);
     mpz_poly_setcoeff (q, 1, aux);
     mpz_poly_setcoeff (q, 0, a);
+    q->deg = 1;
 
     /* h=(x+a)^((p-1)/2) mod (f, p) */
     mpz_sub_ui (aux, p, 1);
@@ -309,7 +311,7 @@ mpz_poly_cantor_zassenhaus (mpz_t *r, mpz_poly_srcptr f, mpz_srcptr p, int depth
     /* recursion-split */
     if (0 < dq && dq < d)
     {
-      n = mpz_poly_cantor_zassenhaus (r, q, p, depth+1);
+      n = mpz_poly_cantor_zassenhaus (r, q, p, depth + 1);
       ASSERT (n == dq);
 
       mpz_poly_divexact (h, f, q, p);
@@ -354,7 +356,7 @@ mpz_poly_roots_mpz (mpz_t *r, mpz_poly_srcptr f, mpz_srcptr p)
      In that case we only reduce coefficients in [-p+1, p-1], to keep
      negative coefficients small in absolute value. */
   if (mpz_poly_sizeinbase (f, 2) < mpz_sizeinbase (p, 2))
-    mpz_poly_mod_mpz_lazy (fp, f, p, NULL);
+    mpz_poly_mod_mpz_lazy (fp, f, p);
   else
     mpz_poly_makemonic_mod_mpz (fp, f, p);
   if (fp->deg <= 0)
