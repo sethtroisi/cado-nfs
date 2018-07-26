@@ -200,22 +200,17 @@ edwards_addsub (ec_point_t R, const ec_point_t P, const ec_point_t Q, int sub,
     mod_add (R->x, R->x, u0, m);    /* Rx <-       F+H */
     mod_mul (R->x, R->x, R->y, m);  /* Rx <-       G*(F+H) */
 #else
-    /* CAUTION! */
-    /* This may produce unstable results */
-    /* But seems to "work" for our purpose */
-    /* TODO: COMMENTS */
-    /* Edwards proj -> Montgomery proj
-     * (X:Y:Z) -> (X(Z+Y) : Z(Z+Y) : X(Z-Y))
-     *                        [ work for (X:Y:Z) != point of order 2 (0:-1:1) ]
-     *  drop Y
-     *         -> (X(Z+Y) :: X(Z-Y))
-     *                        [ work for (X:Y:Z) != point of order 2 (0:-1:1) ]
-     *  divides by X
-     *         -> (Z+Y :: (Z-Y))
-     *                        [ work for (X:Y:Z) != point at infinity (0:1:1) ]
-     *        -> (GF+GH :: GF-GH)
-     * divides by G           [ G = 0 => Z = Y = 0 = > (X:Y:Z) = (1:0:0) ]
-     *        -> (F+H :: F-H)
+    /* Conversion: Edwards completed -> Montgomery XZ-only
+     *                 ((E:G),(H,F)) -> (F+H :: F-H)
+     *
+     * Note: the forgotten Y-coordinate is G(F+H)/E.
+     *
+     * The above map is correct for every points except ((0:1),(1:1)) which is
+     * sent to (2 :: 0) instead of the point at infinity (0 :: 0).
+     * Nevertheless, in our context, computing with the point (2 :: 0)
+     * in place of the point at infinity (0 :: 0) produces the same result
+     * because both points have Z = 0 and this property is preserved after a
+     * doubling dDBL or a differential addition dADD of two points having Z = 0.
      */
     mod_sub (R->z, R->x, u0, m);    /* Rz <-       F-H */
     mod_add (R->x, R->x, u0, m);    /* Rx <-       F+H */
