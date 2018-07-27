@@ -147,7 +147,7 @@ for i in `seq 0 $((nsides-1))`; do
           -lim0 $lim0 -lim1 $lim1 -lpb0 $lpb0 -lpb1 $lpb1 -sqside $side \
           -mfb0 $mfb0 -mfb1 $mfb1 $compsq_las \
           -fb0 $rootfile0 -fb1 $rootfile1 -random-sample $NBSAMPLE \
-          -t 1 -dup -dup-qmin $dupqmin"
+          -t 1 -v -dup -dup-qmin $dupqmin"
         echo $cmd
         $cmd > $wdir/sample.side${side}.${q0}-${q1}
         echo "  Building fake relations..."
