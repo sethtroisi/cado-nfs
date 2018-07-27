@@ -323,7 +323,7 @@ lognorm_base::lognorm_base(siever_config const & sc, cxx_cado_poly const & cpoly
     scale = (int)(scale * 40) * 0.025;
 
     verbose_output_start_batch();
-    verbose_output_print (0, 1,
+    verbose_output_print (0, 2,
             "# Side %d: log2(maxnorm)=%1.2f scale=%1.2f, logbase=%1.6f",
             side, maxlog2, scale, exp2 (1. / scale));
 
@@ -349,9 +349,9 @@ lognorm_base::lognorm_base(siever_config const & sc, cxx_cado_poly const & cpoly
 
     bound = (unsigned char) (r * scale + GUARD);
 
-    verbose_output_print (0, 1, " bound=%u\n", bound);
+    verbose_output_print (0, 2, " bound=%u\n", bound);
     if (lambda > max_lambda)
-        verbose_output_print (0, 1, "# Warning, lambda>%.1f on side %d does "
+        verbose_output_print (0, 2, "# Warning, lambda>%.1f on side %d does "
                 "not make sense (capped to limit)\n", max_lambda, side);
 
     verbose_output_end_batch();

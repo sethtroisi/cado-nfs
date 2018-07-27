@@ -39,18 +39,18 @@ void siever_config::display() const /*{{{*/
 {
     if (bitsize == 0) return;
 
-    verbose_output_print(0, 1, "# Sieving parameters for q~2^%d on side %d\n",
+    verbose_output_print(0, 2, "# Sieving parameters for q~2^%d on side %d\n",
             bitsize, side);
     /* Strive to keep these output lines untouched */
-    verbose_output_print(0, 1,
+    verbose_output_print(0, 2,
 	    "# Sieving parameters: lim0=%lu lim1=%lu lpb0=%d lpb1=%d\n",
 	    sides[0].lim, sides[1].lim,
             sides[0].lpb, sides[1].lpb);
-    verbose_output_print(0, 1,
+    verbose_output_print(0, 2,
 	    "#                     mfb0=%d mfb1=%d\n",
 	    sides[0].mfb, sides[1].mfb);
     if (sides[0].lambda != 0 || sides[1].lambda != 0) {
-        verbose_output_print(0, 1,
+        verbose_output_print(0, 2,
                 "#                     lambda0=%1.1f lambda1=%1.1f\n",
             sides[0].lambda, sides[1].lambda);
     }
@@ -155,7 +155,7 @@ bool siever_config::parse_default(siever_config & sc, param_list_ptr pl)
                  * bucket sieving anyway */
                 sc.sides[side].powlim = ULONG_MAX;
             }
-            verbose_output_print(0, 1,
+            verbose_output_print(0, 2,
                     "# Using default value of %lu for -%s\n",
                     sc.sides[side].powlim, powlim_params[side]);
         }

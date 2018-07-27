@@ -858,7 +858,7 @@ facul_make_strategies(const unsigned long rfbb, const unsigned int rlpb,
       // TODO: is this really a limitation?
       ASSERT_ALWAYS (2*(max_ncurves + 4) <= NB_MAX_METHODS);
 
-      verbose_output_print(0, 1, "# Using default strategy for the cofactorization: ncurves0=%d ncurves1=%d\n", ncurves[0], ncurves[1]);
+      verbose_output_print(0, 2, "# Using default strategy for the cofactorization: ncurves0=%d ncurves1=%d\n", ncurves[0], ncurves[1]);
       strategies->precomputed_methods =
 	facul_make_default_strategy (max_ncurves, verbose);
       /* make two well-behaved facul_method_side_t* lists, based on which
@@ -886,7 +886,7 @@ facul_make_strategies(const unsigned long rfbb, const unsigned int rlpb,
     }
   else
     {/* to precompute our method from the file.*/
-      verbose_output_print(0, 1, "# Read the cofactorization strategy file\n");
+      verbose_output_print(0, 2, "# Read the cofactorization strategy file\n");
       facul_method_t* precomputed_methods =
 	(facul_method_t*) malloc (sizeof(facul_method_t) * NB_MAX_METHODS);
       precomputed_methods[0].method = 0;

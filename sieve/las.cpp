@@ -3017,7 +3017,7 @@ bool do_one_special_q(las_info & las, nfs_work & ws, std::shared_ptr<nfs_aux> au
         } else {
             factoq[0] = '\0';
         }
-        verbose_output_vfprint(0, 1, gmp_vfprintf,
+        verbose_output_vfprint(0, 2, gmp_vfprintf,
                 "# "
                 HILIGHT_START
                 "Sieving side-%d q=%Zd%s; rho=%Zd;"

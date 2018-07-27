@@ -1040,7 +1040,7 @@ fb_factorbase::slicing::slicing(fb_factorbase const & fb, fb_factorbase::key_typ
 
     std::ostringstream os;
     os << K;
-    verbose_output_print(0, 1, "# Creating new slicing on side %d for %s\n",
+    verbose_output_print(0, 2, "# Creating new slicing on side %d for %s\n",
             fb.side, os.str().c_str());
 
     /* This uses our cache of thresholds, we expect it to be quick enough */
@@ -1063,11 +1063,11 @@ fb_factorbase::slicing::slicing(fb_factorbase const & fb, fb_factorbase::key_typ
         total_weight += weight;
         int side = fb.side;
         if (!nr_primes) continue;
-            verbose_output_print(0, 1, "# Number of primes in side-%d factor base part %d = %zu\n",
+            verbose_output_print(0, 2, "# Number of primes in side-%d factor base part %d = %zu\n",
                     side, i, nr_primes);
-            verbose_output_print(0, 1, "# Number of prime ideals in side-%d factor base part %d = %zu\n",
+            verbose_output_print(0, 2, "# Number of prime ideals in side-%d factor base part %d = %zu\n",
                     side, i, nr_roots);
-            verbose_output_print(0, 1, "# Weight of primes in side-%d factor base part %d = %0.5g\n",
+            verbose_output_print(0, 2, "# Weight of primes in side-%d factor base part %d = %0.5g\n",
                     side, i, weight);
     }
 
@@ -1946,7 +1946,7 @@ fb_factorbase::fb_factorbase(cxx_cado_poly const & cpoly, int side, unsigned lon
         char paramname[5];
 
         if (f->deg > 1) {
-            verbose_output_print(0, 1,
+            verbose_output_print(0, 2,
                     "# Reading side-%d factor base from disk"
                     " for polynomial f%d(x) = %s\n",
                     side, side, polystring.c_str());
@@ -1965,7 +1965,7 @@ fb_factorbase::fb_factorbase(cxx_cado_poly const & cpoly, int side, unsigned lon
                     "# Reading side-%d factor base took %1.1fs (%1.1fs real)\n",
                     side, tfb, tfb_wct);
         } else {
-            verbose_output_print(0, 1,
+            verbose_output_print(0, 2,
                     "# Creating side-%d rational factor base"
                     " for polynomial f%d(x) = %s\n",
                     side, side, polystring.c_str());

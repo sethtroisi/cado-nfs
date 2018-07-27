@@ -49,7 +49,7 @@ sieve_info::sieve_info(siever_config const & sc, cxx_cado_poly const & cpoly, st
 
     if (psi != sievers.end()) {
         sieve_info & other(*psi);
-        verbose_output_print(0, 1, "# copy factor base data from previous siever\n");
+        verbose_output_print(0, 2, "# copy factor base data from previous siever\n");
         sides[0].fb = other.sides[0].fb;
         sides[1].fb = other.sides[1].fb;
     } else {
@@ -67,7 +67,7 @@ sieve_info::sieve_info(siever_config const & sc, cxx_cado_poly const & cpoly, st
 
     if (psi != sievers.end()) {
         sieve_info & other(*psi);
-        verbose_output_print(0, 1, "# copy cofactoring strategies from previous siever\n");
+        verbose_output_print(0, 2, "# copy cofactoring strategies from previous siever\n");
         strategies = other.strategies;
     } else {
         init_strategies(pl);
