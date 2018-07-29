@@ -62,6 +62,5 @@ void las_display_config_flags()
     verbose_output_print(0, 1, " USE_CACHEBUFFER");
 #endif
     verbose_output_print(0, 1, " LOGNORM_GUARD_BITS=%1.2f", (double) LOGNORM_GUARD_BITS);
-    verbose_output_print(0, 1, " LOG_MAX=%.1f", LOG_MAX);
     verbose_output_print(0, 1, "\n");
 }				/* }}} */

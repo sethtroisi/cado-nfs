@@ -128,11 +128,6 @@ extern int NB_DEVIATIONS_BUCKET_REGIONS;
    zero due to roundoff errors. */
 #define LOGNORM_GUARD_BITS 1
 
-/* LOGNORM_GUARD_BITS+LOG_MAX should be as near as possible from 256, to get more accuracy
-   in the norm computations, but not too much, otherwise a norm might be
-   rounded to zero. */
-#define LOG_MAX (255.9 - (double) LOGNORM_GUARD_BITS)
-
 /* See PROFILE flag above */
 /* Some functions should not be inlined when we profile or it's hard or
    impossible to tell them apart from the rest in the profiler output */
