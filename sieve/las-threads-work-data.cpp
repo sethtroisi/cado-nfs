@@ -123,8 +123,15 @@ nfs_work::buckets_max_full()
         auto const & BAs = bucket_arrays<LEVEL, HINT>(side);
         std::ostringstream os;
         os << "bucket " << maxfull_index << " on side " << maxfull_side << ":";
+        size_t m = 0;
         for (auto const & BA : bucket_arrays<LEVEL, HINT>(side)) {
-            os << " " << BA.nb_of_updates(maxfull_index);
+            if (BA.nb_of_updates(maxfull_index) >= m)
+                m = BA.nb_of_updates(maxfull_index);
+        }
+        for (auto const & BA : bucket_arrays<LEVEL, HINT>(side)) {
+            size_t z = BA.nb_of_updates(maxfull_index);
+            os << " " << z;
+            if (z == m) os << "*";
         }
         os << " /" << BAs[0].room_allocated_for_updates(maxfull_index);
 

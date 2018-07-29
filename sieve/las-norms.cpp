@@ -1025,7 +1025,7 @@ int sieve_range_adjust::adjust_with_estimated_yield()/*{{{*/
     {
         std::ostringstream os;
         os << "# Initial q-lattice: a0="<<Q.a0<<"; b0="<<Q.b0<<"; a1="<<Q.a1<<"; b1="<<Q.b1<<";\n";
-        verbose_output_print(0, 1, "%s",os.str().c_str());
+        verbose_output_print(0, 2, "%s",os.str().c_str());
     }
     prepare_fijd(); // side-effect of the above
 
@@ -1133,7 +1133,7 @@ B:=[bestrep(a):a in {{a*b*c*x:a in {1,-1},b in {1,d},c in {1,s}}:x in MM}];
     Q = shuffle * Q;
     J = 1 << (logA/2    + best_squeeze);
 
-    verbose_output_print(0, 1,
+    verbose_output_print(0, 2,
             "# Adjusting by [%d,%d,%d,%d], logI=%d (%+.2f%%)\n",
             shuffle(0,0), shuffle(0,1), shuffle(1,0), shuffle(1,1),
             logI,
@@ -1141,7 +1141,7 @@ B:=[bestrep(a):a in {{a*b*c*x:a in {1,-1},b in {1,d},c in {1,s}}:x in MM}];
     {
         std::ostringstream os;
         os << "# New q-lattice: a0="<<Q.a0<<"; b0="<<Q.b0<<"; a1="<<Q.a1<<"; b1="<<Q.b1<<";\n";
-        verbose_output_print(0, 1, "%s",os.str().c_str());
+        verbose_output_print(0, 2, "%s",os.str().c_str());
     }
 
     return round_to_full_bucket_regions(__func__);
