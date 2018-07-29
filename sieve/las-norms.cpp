@@ -244,7 +244,7 @@ get_maxnorm_rectangular (double_poly_srcptr src_poly, const double X,
 /*
  * These are two initializations of the algebraic and rational norms.
  * These 2 initializations compute F(i, const j)=f(i) for each line.
- * f(i)=log2(abs(sum[k=0...d] Ak i^k)+1.)*scale+GUARD = [GUARD...254],
+ * f(i)=log2(abs(sum[k=0...d] Ak i^k)+1.)*scale+LOGNORM_GUARD_BITS = [LOGNORM_GUARD_BITS...254],
  * where Ak are the coefficients of the polynomial.
  *
  * The classical initialization is slow; the only optimization is done
@@ -258,7 +258,8 @@ get_maxnorm_rectangular (double_poly_srcptr src_poly, const double X,
  */
 
 /* {{{ On the ::fill function in lognorm_base derived classes. */
-/* This function is used to initialize lognorms (=log2(F(i,j)*scale+GUARD)
+/* This function is used to initialize lognorms
+ * (=log2(F(i,j)*scale+LOGNORM_GUARD_BITS)
    for the bucket_region S[] number J.
    It's a wrapper; except for trivial degree = 0, it extracts the interesting
    parameters of the complex structure si and calls the right function.
@@ -313,9 +314,9 @@ lognorm_base::lognorm_base(siever_config const & sc, cxx_cado_poly const & cpoly
     /* we used to increase artificially maxlog2, purportedly "to allow larger values of J". I don't see why it's useful. */
     // maxlog2 += 2.0;
 
-    /* we want to map 0 <= x < maxlog2 to GUARD <= y < UCHAR_MAX,
-       thus y = GUARD + x * (UCHAR_MAX-GUARD)/maxlog2. */
-    scale = (UCHAR_MAX - GUARD) / maxlog2;
+    /* we want to map 0 <= x < maxlog2 to LOGNORM_GUARD_BITS <= y < UCHAR_MAX,
+       thus y = LOGNORM_GUARD_BITS + x * (UCHAR_MAX-LOGNORM_GUARD_BITS)/maxlog2. */
+    scale = (UCHAR_MAX - LOGNORM_GUARD_BITS) / maxlog2;
 
     /* We require that scale is of the form (int) * 0.025, so that only a small
        number of different factor base slicings can occur. */
@@ -329,9 +330,9 @@ lognorm_base::lognorm_base(siever_config const & sc, cxx_cado_poly const & cpoly
             side, maxlog2, scale, exp2 (1. / scale));
 
     /* we want to select relations with a cofactor of less than r bits */
-    double max_lambda = (maxlog2 - GUARD / scale) / sc.sides[side].lpb;
+    double max_lambda = (maxlog2 - LOGNORM_GUARD_BITS / scale) / sc.sides[side].lpb;
     double lambda = sc.sides[side].lambda;
-    double r = maxlog2 - GUARD / scale;
+    double r = maxlog2 - LOGNORM_GUARD_BITS / scale;
 
     /* when lambda = 0 (automatic), we take mfb/lpb + 0.3, which is
        experimentally close to optimal in terms of seconds per relation
@@ -348,7 +349,7 @@ lognorm_base::lognorm_base(siever_config const & sc, cxx_cado_poly const & cpoly
      * r = std::min(r, lambda ? lambda * sc.sides[side].lpb : sc.sides[side].mfb);
      */
 
-    bound = (unsigned char) (r * scale + GUARD);
+    bound = (unsigned char) (r * scale + LOGNORM_GUARD_BITS);
 
     verbose_output_print (0, 2, " bound=%u\n", bound);
     if (lambda > max_lambda)
@@ -364,7 +365,7 @@ void lognorm_base::norm(mpz_ptr x, int i, unsigned int j) const {
 unsigned char lognorm_base::lognorm(int i, unsigned int j) const {
     cxx_mpz x;
     norm(x, i, j);
-    return log2(mpz_get_d(x)) * scale + GUARD;
+    return log2(mpz_get_d(x)) * scale + LOGNORM_GUARD_BITS;
 }
 
     /* common definitions -- for the moment it's a macro, eventually I
@@ -391,7 +392,7 @@ unsigned char lognorm_base::lognorm(int i, unsigned int j) const {
         memset(S, 255, i1-i0);						\
         if (has_origin) {						\
             double norm = (log2(fabs(fijd->coeff[fijd->deg]))) * scale;	\
-            S[1 - i0] = GUARD + (unsigned char) (norm);			\
+            S[1 - i0] = LOGNORM_GUARD_BITS + (unsigned char) (norm);			\
         }								\
         /* And now make sure we start at the next line */		\
         S+=I;								\
@@ -436,7 +437,7 @@ lognorm_reference::lognorm_reference(siever_config const & sc, cxx_cado_poly con
             else
             {
                 norm = norm * scale;
-                lognorm_table[(i << l) + j] = GUARD + (unsigned char) norm;
+                lognorm_table[(i << l) + j] = LOGNORM_GUARD_BITS + (unsigned char) norm;
             }
         }
     }
@@ -501,7 +502,7 @@ void lognorm_fill_alg_reference (unsigned char *S, uint32_t N, int logI, double 
     LOGNORM_COMMON_HANDLE_ORIGIN();
 
     double modscale = scale/0x100000;
-    const double offset = 0x3FF00000 - GUARD / modscale;
+    const double offset = 0x3FF00000 - LOGNORM_GUARD_BITS / modscale;
 
     cxx_double_poly u;
     for (unsigned int j = j0 ; j < j1 ; j++) {
@@ -530,7 +531,7 @@ lognorm_smart::lognorm_smart(siever_config const & sc, cxx_cado_poly const & cpo
     /* See init_degree_one_norms_bucket_region_smart for the explanation of
      * this table */
     for (int i = 0; i < 257 ; i++)
-        cexp2[i] = lg2_reciprocal((i-GUARD)/scale);
+        cexp2[i] = lg2_reciprocal((i-LOGNORM_GUARD_BITS)/scale);
 
     if (fijd->deg > 1) {
         piecewise_linear_approximator A(fijd, log(2)/scale);
@@ -551,7 +552,7 @@ static inline double compute_y(double G, double offset, double modscale) {
 void lognorm_fill_rat_smart_inner (unsigned char *S, int i0, int i1, unsigned int j0, unsigned int j1, double scale, cxx_double_poly const & fijd, const double *cexp2)
 {
     double modscale = scale / 0x100000;
-    double offset = 0x3FF00000 - GUARD / modscale;
+    double offset = 0x3FF00000 - LOGNORM_GUARD_BITS / modscale;
     /* The lg2 function wants  a positive value.
      * Here, in the classical rational initialization, the degree of the
      * used polynomial F(i,j) is hardcoded to 1. So, it's possible to have
@@ -561,7 +562,7 @@ void lognorm_fill_rat_smart_inner (unsigned char *S, int i0, int i1, unsigned in
      */
 // #define COMPUTE_Y(G) lg2 ((G) + 1., offset, modscale)
 #define COMPUTE_Y(G) compute_y(G, offset, modscale)
-    /* COMPUTE_Y(z) returns GUARD + L(z) * scale. Recall that
+    /* COMPUTE_Y(z) returns LOGNORM_GUARD_BITS + L(z) * scale. Recall that
      * we have 0 <= log2(z) - L(z) < 0.0861, for any real z > 0.
      */
 
@@ -607,7 +608,7 @@ void lognorm_fill_rat_smart_inner (unsigned char *S, int i0, int i1, unsigned in
 	    y = COMPUTE_Y(g);
 	    root_ahead = root >= i0;
 	} else {
-	    y = GUARD;
+	    y = LOGNORM_GUARD_BITS;
 	}
 
 	if (root_ahead) {
