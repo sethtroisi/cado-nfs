@@ -2347,7 +2347,7 @@ void display_expected_memory_usage(siever_config const & sc0, cado_poly_srcptr c
 
     for(int logI = logImin ; logI <= logImax ; logI++) {
         sc.logI = logI;
-        verbose_output_print(0, 3, "# Expected memory usage assuming logI=%d:\n", sc.logI);
+        verbose_output_print(0, 3, "# Expected memory usage for logI=%d:\n", sc.logI);
 
         fb_factorbase::key_type K[2] {
             sc.instantiate_thresholds(0),
@@ -3032,14 +3032,14 @@ bool do_one_special_q(las_info & las, nfs_work & ws, std::shared_ptr<nfs_aux> au
                 HILIGHT_START
                 "Sieving side-%d q=%Zd%s; rho=%Zd;"
                 HILIGHT_END
-                " a0=%" PRId64 "; b0=%" PRId64 "; a1=%" PRId64 "; b1=%" PRId64 "; J=%u;%s\n",
+                " a0=%" PRId64 "; b0=%" PRId64 "; a1=%" PRId64 "; b1=%" PRId64 "; I=%u; J=%u;%s\n",
                 si.doing.side,
                 (mpz_srcptr) si.doing.p,
                 factoq,
                 (mpz_srcptr) si.doing.r,
                 si.qbasis.a0, si.qbasis.b0,
                 si.qbasis.a1, si.qbasis.b1,
-                si.J, extra.str().c_str());
+                si.I, si.J, extra.str().c_str());
 
 
         if (!las.allow_composite_q && !mpz_probab_prime_p(doing.p, 1)) {
@@ -3047,8 +3047,6 @@ bool do_one_special_q(las_info & las, nfs_work & ws, std::shared_ptr<nfs_aux> au
                     "# Warning, q=%Zd is not prime\n",
                     (mpz_srcptr) doing.p);
         }
-
-        verbose_output_print(0, 2, "# I=%u; J=%u\n", si.I, si.J);
     }
 
     unsigned int sublat_bound = si.conf.sublat.m;

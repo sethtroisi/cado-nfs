@@ -231,7 +231,8 @@ sieve_info & sieve_info::get_sieve_info_from_config(siever_config const & sc, cx
     std::list<sieve_info>::iterator psi;
     psi = find_if(registry.begin(), registry.end(), sc.same_config());
     if (psi != registry.end()) {
-        sc.display();
+        // This has been displayed already.
+        // sc.display();
         return *psi;
     }
     registry.push_back(sieve_info(sc, cpoly, registry, pl, try_fbc));

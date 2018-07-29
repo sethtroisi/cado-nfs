@@ -160,6 +160,14 @@ private:
         T & operator()(int i, int j) { return x[2*i+j]; }
         mat(T a, T b, T c, T d) { x[0]=a; x[1]=b; x[2]=c; x[3]=d; }
         mat(T y[4]) { x[0]=y[0]; x[1]=y[1]; x[2]=y[2]; x[3]=y[3]; }
+        std::ostream& print_me(std::ostream& o) const {
+            o << "["
+                << x[0] << ", "
+                << x[1] << ", "
+                << x[2] << ", "
+                << x[3] << "]";
+            return o;
+        }
     };
     template<typename T> struct vec {
         T x[2];
@@ -169,11 +177,17 @@ private:
         T & operator[](int i) { return x[i]; }
         T const& operator()(int i) const { return x[i]; }
         T & operator()(int i) { return x[i]; }
+        std::ostream& print_me(std::ostream& o) const {
+            o << "["
+                << x[0] << ", "
+                << x[1] << "]";
+            return o;
+        }
     };
     friend sieve_range_adjust::vec<double> operator*(sieve_range_adjust::vec<double> const& a, sieve_range_adjust::mat<int> const& m) ;
     friend qlattice_basis operator*(sieve_range_adjust::mat<int> const& m, qlattice_basis const& Q) ;
     void prepare_fijd();
-    int round_to_full_bucket_regions(const char *);
+    int round_to_full_bucket_regions(const char *, std::string const & s = std::string());
     double estimate_yield_in_sieve_area(mat<int> const& shuffle, int squeeze, int N);
 };/*}}}*/
 

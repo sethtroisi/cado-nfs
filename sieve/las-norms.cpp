@@ -2,6 +2,7 @@
 #include <string.h>
 #include <limits.h>
 #include <cmath>               /* ceil signbit */
+#include <iomanip>
 #include <pthread.h>
 #include <algorithm>
 #include <stdarg.h> /* Required so that GMP defines gmp_vfprintf() */
@@ -1022,11 +1023,6 @@ double sieve_range_adjust::estimate_yield_in_sieve_area(mat<int> const& shuffle,
 
 int sieve_range_adjust::adjust_with_estimated_yield()/*{{{*/
 {
-    {
-        std::ostringstream os;
-        os << "# Initial q-lattice: a0="<<Q.a0<<"; b0="<<Q.b0<<"; a1="<<Q.a1<<"; b1="<<Q.b1<<";\n";
-        verbose_output_print(0, 2, "%s",os.str().c_str());
-    }
     prepare_fijd(); // side-effect of the above
 
     /* List a few candidate matrices which can be used for distorting the
@@ -1133,18 +1129,13 @@ B:=[bestrep(a):a in {{a*b*c*x:a in {1,-1},b in {1,d},c in {1,s}}:x in MM}];
     Q = shuffle * Q;
     J = 1 << (logA/2    + best_squeeze);
 
-    verbose_output_print(0, 2,
-            "# Adjusting by [%d,%d,%d,%d], logI=%d (%+.2f%%)\n",
-            shuffle(0,0), shuffle(0,1), shuffle(1,0), shuffle(1,1),
-            logI,
-            100.0*(best_sum/reference-1));
-    {
-        std::ostringstream os;
-        os << "# New q-lattice: a0="<<Q.a0<<"; b0="<<Q.b0<<"; a1="<<Q.a1<<"; b1="<<Q.b1<<";\n";
-        verbose_output_print(0, 2, "%s",os.str().c_str());
-    }
+    std::ostringstream adjust_message;
+    adjust_message << "adjusting by ";
+    shuffle.print_me(adjust_message);
+    adjust_message << " (+" << std::fixed << std::setprecision(2) <<
+            100.0*(best_sum/reference-1) << "%)";
 
-    return round_to_full_bucket_regions(__func__);
+    return round_to_full_bucket_regions(__func__, adjust_message.str());
 }/*}}}*/
 
 /* return 0 if we should discard that special-q because the rounded
@@ -1208,7 +1199,7 @@ int sieve_range_adjust::sieve_info_adjust_IJ()/*{{{*/
      */
     const double skew = cpoly->skew;
     const double rt_skew = sqrt(skew);
-    verbose_output_vfprint(0, 2, gmp_vfprintf,
+    verbose_output_vfprint(0, 3, gmp_vfprintf,
             "# Called sieve_info_adjust_IJ((a0=%" PRId64 "; b0=%" PRId64
             "; a1=%" PRId64 "; b1=%" PRId64 "), p=%Zd, skew=%f)\n",
             Q.a0, Q.b0, Q.a1, Q.b1,
@@ -1232,7 +1223,7 @@ int sieve_range_adjust::sieve_info_adjust_IJ()/*{{{*/
     return round_to_full_bucket_regions(__func__);
 }/*}}}*/
 
-int sieve_range_adjust::round_to_full_bucket_regions(const char * origin)/*{{{*/
+int sieve_range_adjust::round_to_full_bucket_regions(const char * origin, std::string const & message)/*{{{*/
 {
     /* Compute number of i-lines per bucket region, must be integer */
     uint32_t i = 1U << MAX(LOG_BUCKET_REGION - logI, 0);
@@ -1243,7 +1234,11 @@ int sieve_range_adjust::round_to_full_bucket_regions(const char * origin)/*{{{*/
     /* Bug 15617: if we round up, we are not true to our promises */
     uint32_t nJ = (J / i) * i; /* Round down to multiple of i */
 
-    verbose_output_print(0, 2, "# %s(): Final logI=%d J=%" PRIu32 "\n", origin, logI, nJ);
+    if (message.empty()) {
+        verbose_output_print(0, 3, "# %s(): logI=%d J=%" PRIu32 "\n", origin, logI, nJ);
+    } else {
+        verbose_output_print(0, 3, "# %s(): logI=%d J=%" PRIu32 " [%s]\n", origin, logI, nJ, message.c_str());
+    }
     /* XXX No rounding if we intend to abort */
     if (nJ > 0) J = nJ;
     return nJ > 0;

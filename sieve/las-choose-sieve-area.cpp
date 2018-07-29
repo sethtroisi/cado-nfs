@@ -130,8 +130,9 @@ static bool choose_sieve_area(las_info const & las,
     Q = Adj.Q;
     J = Adj.J;
 
-    return true;
     }
+
+    return true;
 }
 
 bool choose_sieve_area(las_info const & las,
