@@ -1176,7 +1176,6 @@ utils/tdict.cpp
 scripts/check_compilation_units_policy.pl
 scripts/check_repo_policies.sh
 sieve/las-trialdiv.cpp
-sieve/las-fb.cpp
 config/shared_ptr.cmake
 config/cxxabi.cmake
 sieve/display-lattice-adjust.sage

@@ -26,7 +26,7 @@ set (las_sources
   las-debug.cpp las-report-stats.cpp las-duplicate.cpp
   las-config.c bucket.cpp las-smallsieve.cpp las-unsieve.cpp
   las-sieve2357.cpp las-unsieve-sse2.cpp
-  las-trialdiv.cpp las-fb.cpp
+  las-trialdiv.cpp
   las-descent-trees.cpp las-cofactor.cpp
   las-fill-in-buckets.cpp las-threads.cpp las-threads-work-data.cpp)
 set (las_libraries trialdiv facul utils ${pthread_libs})
@@ -75,7 +75,7 @@ add_executable(dupsup
     las-unsieve.cpp
     las-unsieve-sse2.cpp
     las-smallsieve.cpp
-    las-trialdiv.cpp las-fb.cpp
+    las-trialdiv.cpp
     las-debug.cpp
     las-sieve2357.cpp
     trialdiv.c

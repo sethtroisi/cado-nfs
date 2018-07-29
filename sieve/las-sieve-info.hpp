@@ -165,10 +165,6 @@ struct sieve_info {
      * been named setup_* or something like this.
      */
 
-    /* in las-fb.cpp */
-    // void init_factor_bases( param_list_ptr pl);
-    // void share_factor_bases(sieve_info & other);
-
     /* in las-trialdiv.cpp */
     void init_trialdiv(int side);
 
