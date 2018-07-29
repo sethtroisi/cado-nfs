@@ -2444,7 +2444,9 @@ void display_expected_memory_usage(siever_config const & sc0, cado_poly_srcptr c
 
         double m1s, m1l, m2s;
         size_t s1s, s1l, s2s;
-        size_t mins1s, mins1l, mins2s;
+        slice_index_t (*round1s)(slice_index_t);
+        slice_index_t (*round2s)(slice_index_t);
+        slice_index_t (*round1l)(slice_index_t);
         if (do_resieve) {
             s2s=sizeof(bucket_update_t<2, shorthint_t>);
             m2s=bkmult.get<bucket_update_t<2, shorthint_t>>();
@@ -2452,9 +2454,9 @@ void display_expected_memory_usage(siever_config const & sc0, cado_poly_srcptr c
             m1s=bkmult.get<bucket_update_t<1, shorthint_t>>();
             s1l=sizeof(bucket_update_t<1, longhint_t>);
             m1l=bkmult.get<bucket_update_t<1, longhint_t>>();
-            mins1s = 256; // bucket_array_t<1, shorthint_t>::initial_slice_alloc;
-            mins2s = 256; // bucket_array_t<2, shorthint_t>::initial_slice_alloc;
-            mins1l = 256; // bucket_array_t<1, longhint_t>::initial_slice_alloc;
+            round1s = &bucket_slice_alloc_defaults<1, shorthint_t>::round;
+            round2s = &bucket_slice_alloc_defaults<2, shorthint_t>::round;
+            round1l = &bucket_slice_alloc_defaults<1, longhint_t>::round;
         } else {
             s2s=sizeof(bucket_update_t<2, emptyhint_t>);
             m2s=bkmult.get<bucket_update_t<2, emptyhint_t>>();
@@ -2462,9 +2464,9 @@ void display_expected_memory_usage(siever_config const & sc0, cado_poly_srcptr c
             m1s=bkmult.get<bucket_update_t<1, emptyhint_t>>();
             s1l=sizeof(bucket_update_t<1, logphint_t>);
             m1l=bkmult.get<bucket_update_t<1, logphint_t>>();
-            mins1s = 256; // bucket_array_t<1, emptyhint_t>::initial_slice_alloc;
-            mins2s = 256; // bucket_array_t<2, emptyhint_t>::initial_slice_alloc;
-            mins1l = 256; // bucket_array_t<1, logphint_t>::initial_slice_alloc;
+            round1s = &bucket_slice_alloc_defaults<1, emptyhint_t>::round;
+            round2s = &bucket_slice_alloc_defaults<2, emptyhint_t>::round;
+            round1l = &bucket_slice_alloc_defaults<1, logphint_t>::round;
         }
 
         if (toplevel == 2) {
@@ -2519,15 +2521,17 @@ void display_expected_memory_usage(siever_config const & sc0, cado_poly_srcptr c
                      * array. A rough rule of thumb probably works.
                      */
                     size_t nslices_estim = iceildiv(nprimes >> 16, nba);
+                    size_t nslices_alloc = round2s(nslices_estim);
                     std::ostringstream os;
-                    if (nslices_estim < mins2s)
-                        os << " [note: using minimum value of " << mins2s << " slices instead; " << 100.0*(mins2s-nslices_estim)/mins2s << "% waste !]";
+                    size_t waste = (nslices_alloc - nslices_estim) * nba * nreg * sizeof(void*);
+                    if (waste > (100<<20))
+                        os << " [note: using coarse-grain value of " << nslices_alloc << " slices instead; " << 100.0*(nslices_alloc-nslices_estim)/nslices_alloc << "% waste ("<<(waste>>20)<<" MB) !]";
                     verbose_output_print(0, 3, "# level 2, side %d: expect %zu slices per array, %zu pointers each, in %d arrays: %zu MB%s\n",
                             side,
                             nslices_estim,
                             nreg,
                             nba,
-                            (more = nba * nreg * MAX(nslices_estim, mins2s) * sizeof(void*)) >> 20,
+                            (more = nba * nreg * MAX(nslices_estim, nslices_alloc) * sizeof(void*)) >> 20,
                             os.str().c_str());
                     memory += more;
                 }
@@ -2542,16 +2546,18 @@ void display_expected_memory_usage(siever_config const & sc0, cado_poly_srcptr c
                 }
                 {
                     size_t nslices_estim = 1;
+                    size_t nslices_alloc = round1l(nslices_estim);
                     size_t nreg = 1 << (LOG_BUCKET_REGIONS[2] - LOG_BUCKET_REGIONS[1]);
                     std::ostringstream os;
-                    if (nslices_estim < mins1l)
-                        os << " [note: using minimum value of " << mins1l << " slices instead; " << 100.0*(mins1l-nslices_estim)/mins1l << "% waste !]";
+                    size_t waste = (nslices_alloc - nslices_estim) * nba * nreg * sizeof(void*);
+                    if (waste > (100<<20))
+                        os << " [note: using coarse-grain value of " << nslices_alloc << " slices instead; " << 100.0*(nslices_alloc-nslices_estim)/nslices_alloc << "% waste ("<<(waste>>20)<<" MB) !]";
                     verbose_output_print(0, 3, "# level 1, side %d: expect %zu slices per array, %zu pointers each, in %d arrays: %zu MB%s\n",
                             side,
                             nslices_estim,
                             nreg,
                             nba,
-                            (more = nba * nreg * MAX(nslices_estim, mins1l) * sizeof(void*)) >> 20,
+                            (more = nba * nreg * MAX(nslices_estim, nslices_alloc) * sizeof(void*)) >> 20,
                             os.str().c_str());
                     memory += more;
                 }
@@ -2586,15 +2592,17 @@ void display_expected_memory_usage(siever_config const & sc0, cado_poly_srcptr c
                      * array. A rough rule of thumb probably works.
                      */
                     size_t nslices_estim = iceildiv(nprimes >> 16, nba);
+                    size_t nslices_alloc = round1s(nslices_estim);
                     std::ostringstream os;
-                    if (nslices_estim < mins1s)
-                        os << " [note: using minimum value of " << mins1s << " slices instead; " << 100.0*(mins1s-nslices_estim)/mins1s << "% waste !]";
+                    size_t waste = (nslices_alloc - nslices_estim) * nba * nreg * sizeof(void*);
+                    if (waste > (100<<20))
+                        os << " [note: using coarse-grain value of " << nslices_alloc << " slices instead; " << 100.0*(nslices_alloc-nslices_estim)/nslices_alloc << "% waste ("<<(waste>>20)<<" MB) !]";
                     verbose_output_print(0, 3, "# level 1, side %d: expect %zu slices per array, %zu pointers each, in %d arrays: %zu MB%s\n",
                             side,
                             nslices_estim,
                             nreg,
                             nba,
-                            (more = nba * nreg * MAX(nslices_estim, mins1s) * sizeof(void*)) >> 20,
+                            (more = nba * nreg * MAX(nslices_estim, nslices_alloc) * sizeof(void*)) >> 20,
                             os.str().c_str());
                     memory += more;
                 }
@@ -2630,15 +2638,17 @@ void display_expected_memory_usage(siever_config const & sc0, cado_poly_srcptr c
                      * array. A rough rule of thumb probably works.
                      */
                     size_t nslices_estim = iceildiv(nprimes >> 16, nba);
+                    size_t nslices_alloc = round1s(nslices_estim);
                     std::ostringstream os;
-                    if (nslices_estim < mins1s)
-                        os << " [note: using minimum value of " << mins1s << " slices instead; " << 100.0*(mins1s-nslices_estim)/mins1s << "% waste !]";
+                    size_t waste = (nslices_alloc - nslices_estim) * nba * nreg * sizeof(void*);
+                    if (waste > (100<<20))
+                        os << " [note: using coarse-grain value of " << nslices_alloc << " slices instead; " << 100.0*(nslices_alloc-nslices_estim)/nslices_alloc << "% waste ("<<(waste>>20)<<" MB) !]";
                     verbose_output_print(0, 3, "# level 1, side %d: expect %zu slices per array, %zu pointers each, in %d arrays: %zu MB%s\n",
                             side,
                             nslices_estim,
                             nreg,
                             nba,
-                            (more = nba * nreg * MAX(nslices_estim, mins1s) * sizeof(void*)) >> 20,
+                            (more = nba * nreg * MAX(nslices_estim, nslices_alloc) * sizeof(void*)) >> 20,
                             os.str().c_str());
                     memory += more;
                 }
