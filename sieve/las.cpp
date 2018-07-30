@@ -2444,29 +2444,43 @@ void display_expected_memory_usage(siever_config const & sc0, cado_poly_srcptr c
 
         double m1s, m1l, m2s;
         size_t s1s, s1l, s2s;
-        slice_index_t (*round1s)(slice_index_t);
-        slice_index_t (*round2s)(slice_index_t);
-        slice_index_t (*round1l)(slice_index_t);
+
+        struct round_me {
+            slice_index_t initial;
+            slice_index_t increase;
+            slice_index_t operator()(slice_index_t y) const {
+                return std::max(initial, increase * iceildiv(y, increase));
+            }
+        };
+
+        round_me round1s, round2s, round1l;
+
         if (do_resieve) {
-            s2s=sizeof(bucket_update_t<2, shorthint_t>);
-            m2s=bkmult.get<bucket_update_t<2, shorthint_t>>();
-            s1s=sizeof(bucket_update_t<1, shorthint_t>);
-            m1s=bkmult.get<bucket_update_t<1, shorthint_t>>();
-            s1l=sizeof(bucket_update_t<1, longhint_t>);
-            m1l=bkmult.get<bucket_update_t<1, longhint_t>>();
-            round1s = &bucket_slice_alloc_defaults<1, shorthint_t>::round;
-            round2s = &bucket_slice_alloc_defaults<2, shorthint_t>::round;
-            round1l = &bucket_slice_alloc_defaults<1, longhint_t>::round;
+            typedef bucket_update_t<1, shorthint_t> T1s;
+            typedef bucket_update_t<2, shorthint_t> T2s;
+            typedef bucket_update_t<1, longhint_t> T1l;
+            typedef bucket_slice_alloc_defaults<1, shorthint_t> W1s;
+            typedef bucket_slice_alloc_defaults<2, shorthint_t> W2s;
+            typedef bucket_slice_alloc_defaults<1, longhint_t> W1l;
+            s2s=sizeof(T2s); m2s=bkmult.get<T2s>();
+            s1s=sizeof(T1s); m1s=bkmult.get<T1s>();
+            s1l=sizeof(T1l); m1l=bkmult.get<T1l>();
+            round1s = round_me { W1s::initial, W1s::increase };
+            round2s = round_me { W2s::initial, W2s::increase };
+            round1l = round_me { W1l::initial, W1l::increase };
         } else {
-            s2s=sizeof(bucket_update_t<2, emptyhint_t>);
-            m2s=bkmult.get<bucket_update_t<2, emptyhint_t>>();
-            s1s=sizeof(bucket_update_t<1, emptyhint_t>);
-            m1s=bkmult.get<bucket_update_t<1, emptyhint_t>>();
-            s1l=sizeof(bucket_update_t<1, logphint_t>);
-            m1l=bkmult.get<bucket_update_t<1, logphint_t>>();
-            round1s = &bucket_slice_alloc_defaults<1, emptyhint_t>::round;
-            round2s = &bucket_slice_alloc_defaults<2, emptyhint_t>::round;
-            round1l = &bucket_slice_alloc_defaults<1, logphint_t>::round;
+            typedef bucket_update_t<1, emptyhint_t> T1s;
+            typedef bucket_update_t<2, emptyhint_t> T2s;
+            typedef bucket_update_t<1, logphint_t> T1l;
+            typedef bucket_slice_alloc_defaults<1, emptyhint_t> W1s;
+            typedef bucket_slice_alloc_defaults<2, emptyhint_t> W2s;
+            typedef bucket_slice_alloc_defaults<1, logphint_t> W1l;
+            s2s=sizeof(T2s); m2s=bkmult.get<T2s>();
+            s1s=sizeof(T1s); m1s=bkmult.get<T1s>();
+            s1l=sizeof(T1l); m1l=bkmult.get<T1l>();
+            round1s = round_me { W1s::initial, W1s::increase };
+            round2s = round_me { W2s::initial, W2s::increase };
+            round1l = round_me { W1l::initial, W1l::increase };
         }
 
         if (toplevel == 2) {

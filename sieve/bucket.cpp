@@ -201,11 +201,6 @@ void
 bucket_array_t<LEVEL, HINT>::realloc_slice_start(const size_t extra_space)
 {
   const size_t new_alloc_slices = alloc_slices + extra_space;
-  /* I pretty much doubt that this message is _ever_ useful. At the very
-   * least, reallocating from 0 to something shouldn't trigger loud
-   * output. And I'm not sure there's a situation where alloc_slices >
-   * 0...
-   */
   if (alloc_slices)
   verbose_output_print(0, 3, "# [%d%c] Reallocating BA->slice_start from %zu entries to %zu entries\n",
                        LEVEL, HINT::rtti[0],
