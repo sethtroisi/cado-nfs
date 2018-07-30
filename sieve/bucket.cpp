@@ -217,8 +217,8 @@ bucket_array_t<LEVEL, HINT>::realloc_slice_start(const size_t extra_space)
   ASSERT_ALWAYS(slice_start != NULL);
   slice_index = (slice_index_t *) realloc(slice_index, new_alloc_slices * sizeof(slice_index_t));
   ASSERT_ALWAYS(slice_index != NULL);
+  memset(slice_index + alloc_slices, 0, extra_space * sizeof(slice_index_t));
   alloc_slices = new_alloc_slices;
-  memset(slice_index, 0, new_alloc_slices * sizeof(slice_index_t));
 }
 
 /* Returns how full the fullest bucket is, as a fraction of its size */
