@@ -1117,15 +1117,14 @@ fb_factorbase::slicing::slicing(fb_factorbase const & fb, fb_factorbase::key_typ
 
         std::ostringstream os;
 
-        os  << "# side-" << side
+        os  << "side-" << side
             << " part " << i
             << ": " << nr_primes << " primes"
             << ", " << nr_roots << " ideals"
             << ", weight " << std::setprecision(5) << weight;
         if (i) os << " [" << parts[i].nslices() << " slices]";
-        os  << "\n";
 
-        verbose_output_print(0, 2, os.str().c_str());
+        verbose_output_print(0, 2, "# %s\n", os.str().c_str());
     }
 
 
