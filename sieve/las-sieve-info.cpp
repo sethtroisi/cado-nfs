@@ -116,28 +116,6 @@ void sieve_info::update (unsigned int nb_threads)
         if (sis.fb->empty()) continue;
 
 	init_trialdiv(side); /* Init refactoring stuff */
-
-        {
-            /* TODO: In this block, we're doing just a copy. We should
-             * kill that, and use the field from the slicing directly. */
-            const fb_factorbase::slicing * fbs = sis.fbs;
-            /* put the resieved primes first. */
-            auto s = std::make_shared<std::vector<fb_entry_general>>();
-            std::vector<fb_entry_general> const & RS(fbs->small_sieve_entries.resieved);
-            s->insert(s->end(), RS.begin(), RS.end());
-            sis.resieve_start_offset = 0;
-            sis.resieve_end_offset = s->size();
-            std::vector<fb_entry_general> const & R(fbs->small_sieve_entries.rest);
-            s->insert(s->end(), R.begin(), R.end());
-            sis.fb_smallsieved = s;
-        }
-
-        /*
-        verbose_output_print(0, 2, "# small side-%d factor base", side);
-        size_t nr_roots;
-        sides[side].fb->get_part(0)->count_entries(NULL, &nr_roots, NULL);
-        verbose_output_print(0, 2, " (total %zu)\n", nr_roots);
-        */
     }
 
     // Now that fb have been initialized, we can set the toplevel.

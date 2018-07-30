@@ -115,20 +115,6 @@ struct sieve_info {
          */
         std::shared_ptr<trialdiv_divisor_t> trialdiv_data;
 
-
-        /* TODO
-         * fb_smallsieved is a middle man which we should kill. Really,
-         * fbs->small_sieve_entries has everything we need, and we should
-         * use that instead.
-         *
-         * This is currently set in sieve_info::update
-         */
-        std::shared_ptr<std::vector<fb_entry_general> > fb_smallsieved;
-
-        /* Offsets into fb_smallsieved; the entries between these
-           two offsets are to be small-sieved, the others are not. */
-        size_t resieve_start_offset, resieve_end_offset;
-
         /* precomp_plattice_dense: caching of the FK-basis in sublat mode.
          * (for the toplevel only). This is not the same as the
          * precomp_plattice that is done for lower levels.

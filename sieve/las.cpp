@@ -2859,10 +2859,8 @@ void do_one_special_q_sublat(las_info const & las, sieve_info & si, nfs_work & w
 
                     small_sieve_init(s.ssd,
                             s.ssd_offsets,
-                            s.fb_smallsieved.get()->begin(),
-                            s.fb_smallsieved.get()->end(),
-                            s.fb_smallsieved.get()->begin() + s.resieve_start_offset,
-                            s.fb_smallsieved.get()->begin() + s.resieve_end_offset,
+                            s.fbs->small_sieve_entries.resieved,
+                            s.fbs->small_sieve_entries.rest,
                             si, side);
 
                     small_sieve_info("small sieve", side, s.ssd);
