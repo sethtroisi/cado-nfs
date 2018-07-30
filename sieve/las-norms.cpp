@@ -937,7 +937,7 @@ sieve_range_adjust::sieve_info_update_norm_data_Jmax (bool keep_logI)
   return round_to_full_bucket_regions(__func__);
 }//}}}
 
-/* {{{ a few helpers (otherwise I'll menage to get things wrong
+/* {{{ a few helpers (otherwise I'll manage to get things wrong
  * eventually)
  */
 sieve_range_adjust::vec<double> operator*(sieve_range_adjust::vec<double> const& a, sieve_range_adjust::mat<int> const& m) {
