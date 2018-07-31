@@ -225,9 +225,6 @@ struct order_ssp_t {
 };
 static order_ssp_t order_ssp;
 
-/* TODO all these iterator arguments are ridiculous: we have si at hand
- * anyway...
- */
 void small_sieve_init(small_sieve_data_t & ssd,
                       small_sieve_block_offsets_t & ssd_offsets,
                       std::vector<fb_entry_general> const & resieved,
@@ -973,13 +970,13 @@ resieve_small_bucket_region (bucket_primes_t *BP,
     // now. Same for i.
     ASSERT_ALWAYS(!sublatm || ((sublatm & 1) == 1));
 
-    for(size_t index = ssd.resieve_start_offset ; index < ssd.resieve_end_offset ; index++) {
+    for(size_t index = 0 ; index < ssd.resieve_end_offset ; index++) {
         auto const & ssps(ssd.ssps[index]);
 
         const fbprime_t p = ssps.get_p();
         fbprime_t r = ssps.get_r();
         WHERE_AM_I_UPDATE(w, p, p);
-        int pos = ssdpos[index - ssd.resieve_start_offset];
+        int pos = ssdpos[index];
         S_ptr = S;
         ASSERT(pos < (spos_t) p);
         /* for j even, we sieve only odd index. This translates into loops

@@ -110,9 +110,8 @@ struct small_sieve_data_t {
     fb_factorbase::key_type fbK;
     std::vector<ssp_simple_t> ssps;
     std::vector<ssp_t> ssp;
-    /* These offsets, relative to the start of ssps, tell which of the ssps
-       entries should be used for re-sieving */
-    size_t resieve_start_offset, resieve_end_offset;
+    /* This counts the resieved primes in ssps */
+    size_t resieve_end_offset;
 
 };
 
