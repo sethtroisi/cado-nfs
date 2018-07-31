@@ -2678,8 +2678,8 @@ void display_expected_memory_usage(siever_config const & sc0, cado_poly_srcptr c
         }
     }
 
-    verbose_output_print(0, 0, "# Expected memory use (max reached for logI=%d), counting %zu MB of base footprint: %zu MB\n", logI_max_memory,
-            base_memory >> 20, max_memory >> 20);
+    if (logImin != logImax)
+        verbose_output_print(0, 0, "# Expected memory use (max reached for logI=%d), counting %zu MB of base footprint: %zu MB\n", logI_max_memory, base_memory >> 20, max_memory >> 20);
 }
 
 #ifdef  DLP_DESCENT
