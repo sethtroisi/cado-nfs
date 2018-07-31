@@ -568,70 +568,84 @@ void small_sieve_prepare_many_start_positions(
 {
     /* We're going to stage the next batch of init values in
      * ssdpos_many_next, while the init values in ssdpos_many are
-     * potentially still in use, *except for the last one*, because by
+     * potentially still in use, *except for the few last ones*, because by
      * design we always compute the "next" batch of init values as well.
-     * Therefore it is legitimate to steal this last element, which was
-     * constructed exactly for us.
+     * Here, we mean that the init positions for a full row of bucket
+     * regions above the bucket regions that are currently considered are
+     * always computed. This means 1<<(max(0,logI-logB)) bucket regions.
+     *
+     * Therefore it is legitimate to steal these last elements, they were
+     * constructed exactly for us !
      */
 
     auto & res(ssd.ssdpos_many_next);
     res.clear();
 
-    res.assign(nregions + 1, std::vector<spos_t>(ssd.ssps.size(), 0));
+    int logI = si.conf.logI;
+    int logB = LOG_BUCKET_REGION;
+    int v = logI - logB;
+    int w = (v > 0) ? (1 << v) : 1;
+
+    res.assign(nregions + w, std::vector<spos_t>(ssd.ssps.size(), 0));
+
+    int k;
 
     if (ssd.ssdpos_many.empty()) {
         small_sieve_start(res.front(), ssd, first_region_index, si);
+        k = 0;
+        /* must complete the first row */
+        for(int i = 1 ; i < w ; i++) {
+            for(size_t s = 0 ; s < ssd.ssps.size(); ++s) {
+                fbprime_t x = res[k+i-1][s];
+                x = x + ssd.offsets[s];
+                if (x >= ssd.ssps[s].get_p()) x -= ssd.ssps[s].get_p();
+                res[k+i][s] = x;
+            }
+        }
+        k = w;
     } else {
-        std::swap(ssd.ssdpos_many.back(), res.front());
+        ASSERT_ALWAYS(ssd.ssdpos_many.size() >= (size_t) w);
+        for(int i = 0 ; i < w ; ++i)
+            std::swap(ssd.ssdpos_many[ssd.ssdpos_many.size()-w+i], res[i]);
     }
     ASSERT(res.front().size() == ssd.ssps.size());
 
-    int logI = si.conf.logI;
-    int logB = LOG_BUCKET_REGION;
-    if (logI > logB) {
-        int v = logI - logB;
-        int w = 1 << v;
+    if (logI >= logB) {
         ASSERT(nregions % w == 0);
-        for(int k = 1; k < nregions + 1 ; ) {
+        for(int k = w; k < nregions + w ; k += w) {
+            ASSERT(res[k].size() == ssd.ssps.size());
             /* Would it be possible to do all this with SIMD
              * instructions? It seems fairly likely, in fact.
              */
-            if (k > 1) {
-                ASSERT((k % w) == 0);
-                /* infer from previous row of bucket regions.  */
-                for(size_t s = 0 ; s < ssd.ssps.size(); ++s) {
-                    fbprime_t x = res[k-w][s];
-                    x = x + ssd.ssps[s].get_r();
-                    if (x >= ssd.ssps[s].get_p()) x -= ssd.ssps[s].get_p();
-                    res[k][s] = x;
-                }
-                k++;
-            }
-            for(int i = 1 ; i < w ; i++, k++) {
-                /* infer from previous row of bucket regions.  */
-                for(size_t s = 0 ; s < ssd.ssps.size(); ++s) {
-                    fbprime_t x = res[k-1][s];
-                    x = x + ssd.offsets[s];
-                    if (x >= ssd.ssps[s].get_p()) x -= ssd.ssps[s].get_p();
-                    res[k][s] = x;
-                }
-            }
-        }
-    } else if (logI == logB) {
-        for(int k = 1; k < nregions + 1 ; k++) {
-            /* infer from previous bucket region  */
+
+            /* infer from previous row of bucket regions.  */
             for(size_t s = 0 ; s < ssd.ssps.size(); ++s) {
-                fbprime_t x = res[k-1][s];
+                fbprime_t x = res[k-w][s];
                 x = x + ssd.ssps[s].get_r();
                 if (x >= ssd.ssps[s].get_p()) x -= ssd.ssps[s].get_p();
                 res[k][s] = x;
             }
+
+            /* Note that when logI == logB, we have w==1, so that ssd.offsets
+             * is not needed at all.
+             */
+            for(int i = 1 ; i < w ; i++) {
+                /* complete this row */
+                for(size_t s = 0 ; s < ssd.ssps.size(); ++s) {
+                    fbprime_t x = res[k+i-1][s];
+                    x = x + ssd.offsets[s];
+                    if (x >= ssd.ssps[s].get_p()) x -= ssd.ssps[s].get_p();
+                    res[k+i][s] = x;
+                }
+            }
         }
     } else {
-        for(int k = 1; k < nregions + 1 ; k++) {
+        for(int k = w; k < nregions + w ; k+= w) {
             /* infer from previous bucket region  */
+            ASSERT(res[k].size() == ssd.ssps.size());
             for(size_t s = 0 ; s < ssd.ssps.size(); ++s) {
-                fbprime_t x = res[k-1][s];
+                fbprime_t x = res[k-w][s];
+                /* ssd.offsets, not just ssd.ssps[s].get_r() */
                 x = x + ssd.offsets[s];
                 if (x >= ssd.ssps[s].get_p()) x -= ssd.ssps[s].get_p();
                 res[k][s] = x;
@@ -639,7 +653,8 @@ void small_sieve_prepare_many_start_positions(
         }
     }
 #ifndef NDEBUG
-    for(int k = 0; k < nregions + 1 ; k++) {
+    for(int k = 0; k < nregions + w ; k++) {
+        ASSERT(res[k].size() == ssd.ssps.size());
         int N = first_region_index + k;
         small_sieve_base C(si.conf.logI, N, si.conf.sublat);
         for(size_t s = 0 ; s < ssd.ssps.size(); ++s) {
