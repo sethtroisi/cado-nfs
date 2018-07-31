@@ -263,132 +263,132 @@ void small_sieve_init(small_sieve_data_t & ssd,
     unsigned int sublatm = si.conf.sublat.m;
 
     for (auto const & c : { &resieved, &rest }) {
-    if (c == &rest)
-        ssd.resieve_end_offset = ssd.ssps.size();
-    for (auto const & e : *c) {
-        /* p=pp^k, the prime or prime power in this entry, and pp is prime */
-        const fbprime_t p = e.q, pp = e.p;
-        WHERE_AM_I_UPDATE(w, p, p);
+        if (c == &rest)
+            ssd.resieve_end_offset = ssd.ssps.size();
+        for (auto const & e : *c) {
+            /* p=pp^k, the prime or prime power in this entry, and pp is prime */
+            const fbprime_t p = e.q, pp = e.p;
+            WHERE_AM_I_UPDATE(w, p, p);
 
-        ASSERT_ALWAYS(p <= thresh);
-        if (p > thresh) {
-            continue;
-        }
-
-        for (int nr = 0; nr < e.nr_roots; nr++) {
-            const fb_general_root &root = e.roots[nr];
-            /* Convert into old format for projective roots by adding p if projective.
-               FIXME, this sucks. */
-            const fbroot_t r = root.r + (root.proj ? p : 0);
-
-            if (!si.doing.is_coprime_to(pp)) {
+            ASSERT_ALWAYS(p <= thresh);
+            if (p > thresh) {
                 continue;
             }
 
-            if (sublatm) {
-                // In sublat mode, disable pattern sieving and primes
-                // dividing m. (pp is the prime, here)
-                //
-                // FIXME. ok, they're certainly not "nice", but we should
-                // sieve them nonetheless.
-                if (pp == 3 || (sublatm % pp) == 0) {
+            for (int nr = 0; nr < e.nr_roots; nr++) {
+                const fb_general_root &root = e.roots[nr];
+                /* Convert into old format for projective roots by adding p if projective.
+                   FIXME, this sucks. */
+                const fbroot_t r = root.r + (root.proj ? p : 0);
+
+                if (!si.doing.is_coprime_to(pp)) {
                     continue;
                 }
-            }
 
-            const unsigned char logp = fb_log_delta (pp, root.exp, root.oldexp,
-                si.sides[side].lognorms->scale);
-            
-            WHERE_AM_I_UPDATE(w, r, r);
-            fbroot_t r_q = fb_root_in_qlattice(p, r, e.invq, si.qbasis);
-            /* If this root is somehow interesting (projective in (a,b) or
-               in (i,j) plane), print a message */
-            const bool is_proj_in_ij = r_q >= p;
-            if (is_proj_in_ij) r_q -= p;
-            if (verbose && (r > p || is_proj_in_ij))
-                verbose_output_print(0, 1, "# small_sieve_init: side %d, prime %"
-                        FBPRIME_FORMAT " root %s%" FBROOT_FORMAT " (logp %hhu) "
-                        " -> %s%" FBROOT_FORMAT "\n", side, p,
-                        r >= p ? "1/" : "", r % p, logp,
-                        is_proj_in_ij ? "1/" : "", r_q);
+                if (sublatm) {
+                    // In sublat mode, disable pattern sieving and primes
+                    // dividing m. (pp is the prime, here)
+                    //
+                    // FIXME. ok, they're certainly not "nice", but we should
+                    // sieve them nonetheless.
+                    if (pp == 3 || (sublatm % pp) == 0) {
+                        continue;
+                    }
+                }
 
-            ssp_t new_ssp(p, r_q, logp, is_proj_in_ij);
+                const unsigned char logp = fb_log_delta (pp, root.exp, root.oldexp,
+                        si.sides[side].lognorms->scale);
 
-            if (p != pp)
-                new_ssp.set_pow(pp);
+                WHERE_AM_I_UPDATE(w, r, r);
+                fbroot_t r_q = fb_root_in_qlattice(p, r, e.invq, si.qbasis);
+                /* If this root is somehow interesting (projective in (a,b) or
+                   in (i,j) plane), print a message */
+                const bool is_proj_in_ij = r_q >= p;
+                if (is_proj_in_ij) r_q -= p;
+                if (verbose && (r > p || is_proj_in_ij))
+                    verbose_output_print(0, 1, "# small_sieve_init: side %d, prime %"
+                            FBPRIME_FORMAT " root %s%" FBROOT_FORMAT " (logp %hhu) "
+                            " -> %s%" FBROOT_FORMAT "\n", side, p,
+                            r >= p ? "1/" : "", r % p, logp,
+                            is_proj_in_ij ? "1/" : "", r_q);
 
-            /* pattern-sieved primes go to ssp */
-            if (new_ssp.is_proj()) {
+                ssp_t new_ssp(p, r_q, logp, is_proj_in_ij);
+
+                if (p != pp)
+                    new_ssp.set_pow(pp);
+
+                /* pattern-sieved primes go to ssp */
+                if (new_ssp.is_proj()) {
 #if 0
-                if (new_ssp.get_g() >= si.J) {
-                    /* some projective primes never hit (number of lines
-                     * to skip is >= J). We're tempted to remove them,
-                     * but:
-                     *  - we lose hits to (+-1,0) this way (the two
-                     *    locations are equal up to sign, but we should
-                     *    sieve one of them!) -- see bug 21505.
-                     *  - the cost of having them in the list is
-                     *    ridiculously small anyway.
-                     *
-                     * this being said, we should probably deal with
-                     * projective primes a bit differently, because the
-                     * arithmetic constraints we're imposing on the pos
-                     * fields are different from what we have in the
-                     * normal case (see the computation of gI), and it
-                     * isn't neat.
-                     */
-                    if (verbose) {
-                        verbose_output_print(0, 1,
-                                "# small_sieve_init: not adding projective prime"
-                                " (1:%" FBROOT_FORMAT ") mod %" FBPRIME_FORMAT ")"
-                                " to small sieve  because g=%d >= si.J = %d\n",
-                                r_q-p, p, new_ssp.get_g(), si.J);
+                    if (new_ssp.get_g() >= si.J) {
+                        /* some projective primes never hit (number of lines
+                         * to skip is >= J). We're tempted to remove them,
+                         * but:
+                         *  - we lose hits to (+-1,0) this way (the two
+                         *    locations are equal up to sign, but we should
+                         *    sieve one of them!) -- see bug 21505.
+                         *  - the cost of having them in the list is
+                         *    ridiculously small anyway.
+                         *
+                         * this being said, we should probably deal with
+                         * projective primes a bit differently, because the
+                         * arithmetic constraints we're imposing on the pos
+                         * fields are different from what we have in the
+                         * normal case (see the computation of gI), and it
+                         * isn't neat.
+                         */
+                        if (verbose) {
+                            verbose_output_print(0, 1,
+                                    "# small_sieve_init: not adding projective prime"
+                                    " (1:%" FBROOT_FORMAT ") mod %" FBPRIME_FORMAT ")"
+                                    " to small sieve  because g=%d >= si.J = %d\n",
+                                    r_q-p, p, new_ssp.get_g(), si.J);
+                        }
+                        continue;
                     }
-                    continue;
-                }
 #endif
-                /* projective primes of all sorts go to ssp anyway */
-                ssd.ssp.push_back(new_ssp);
-            } else if (new_ssp.is_pow2() || new_ssp.is_pattern_sieved()) {
-                ssd.ssp.push_back(new_ssp);
-            } else if (new_ssp.is_nice()) {
-                ssd.ssps.push_back(new_ssp);
-                /* We're only pushing the offsets for the ssps anyway.  */
-                if (logI < LOG_BUCKET_REGION) {
-                    /* The "up" offset is equal to r whenever logI >=
-                     * LOG_BUCKET_REGION, and then we'll use r to compute
-                     * the start positions.
-                     */
-                    int v = LOG_BUCKET_REGION - logI;
-                    /* faster than a modular reduction as long as v<=10,
-                     * which will be our use case anyway.
-                     */
-                    fbprime_t offset = r_q;
-                    for(int k = 0 ; k < v ; k++) {
-                        offset = offset + offset;
-                        if (offset > p) offset -= p;
+                    /* projective primes of all sorts go to ssp anyway */
+                    ssd.ssp.push_back(new_ssp);
+                } else if (new_ssp.is_pow2() || new_ssp.is_pattern_sieved()) {
+                    ssd.ssp.push_back(new_ssp);
+                } else if (new_ssp.is_nice()) {
+                    ssd.ssps.push_back(new_ssp);
+                    /* We're only pushing the offsets for the ssps anyway.  */
+                    if (logI < LOG_BUCKET_REGION) {
+                        /* The "up" offset is equal to r whenever logI >=
+                         * LOG_BUCKET_REGION, and then we'll use r to compute
+                         * the start positions.
+                         */
+                        int v = LOG_BUCKET_REGION - logI;
+                        /* faster than a modular reduction as long as v<=10,
+                         * which will be our use case anyway.
+                         */
+                        fbprime_t offset = r_q;
+                        for(int k = 0 ; k < v ; k++) {
+                            offset = offset + offset;
+                            if (offset > p) offset -= p;
+                        }
+                        ASSERT(offset == (r_q << v) % p);
+                        ssd_offsets.up.push_back(offset);
                     }
-                    ASSERT(offset == (r_q << v) % p);
-                    ssd_offsets.up.push_back(offset);
+                    if (logI > LOG_BUCKET_REGION) {
+                        /* The "right" offset is needed only in this case.
+                         *
+                         * It is such that (B+c, 0) is in L_p.
+                         *
+                         * Since LOG_BUCKET_REGION is a priori something as
+                         * large as 16 bits, and p might also be of roughly
+                         * the same size, maybe even more (up to logI), we
+                         * must pay attention to overflows.
+                         */
+                        unsigned long offset = ((int64_t) (p - 1) << LOG_BUCKET_REGION) % p;
+                        ssd_offsets.right.push_back(offset);
+                    }
+                } else {
+                    ASSERT_ALWAYS(0);
                 }
-                if (logI > LOG_BUCKET_REGION) {
-                    /* The "right" offset is needed only in this case.
-                     *
-                     * It is such that (B+c, 0) is in L_p.
-                     *
-                     * Since LOG_BUCKET_REGION is a priori something as
-                     * large as 16 bits, and p might also be of roughly
-                     * the same size, maybe even more (up to logI), we
-                     * must pay attention to overflows.
-                     */
-                    unsigned long offset = ((int64_t) (p - 1) << LOG_BUCKET_REGION) % p;
-                    ssd_offsets.right.push_back(offset);
-                }
-            } else {
-                ASSERT_ALWAYS(0);
             }
         }
-    }
     }
 
     /* arrange so that the small_sieve() ctor is happy */
