@@ -143,10 +143,12 @@ las_info::las_info(cxx_param_list & pl)
     if (param_list_parse_uint(pl, "random-sample", &nq_max)) {
         random_sampling = 1;
     } else if (param_list_parse_uint(pl, "nq", &nq_max)) {
-        if (param_list_lookup_string(pl, "q1") || param_list_lookup_string(pl, "rho")) {
-            fprintf(stderr, "Error: argument -nq is incompatible with -q1 or -rho\n");
+        if (param_list_lookup_string(pl, "rho")) {
+            fprintf(stderr, "Error: argument -nq is incompatible with -rho\n");
             exit(EXIT_FAILURE);
         }
+        if (param_list_lookup_string(pl, "q1"))
+            verbose_output_print(0, 1, "Warning: argument -nq takes priority over -q1 ; -q1 ignored\n");
     }
 
     /* Init and parse info regarding work to be done by the siever */

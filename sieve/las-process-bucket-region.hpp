@@ -39,7 +39,7 @@ extern task_result * process_bucket_regions_congruence_class(worker_thread * wor
 
 #endif
 
-extern void process_many_bucket_regions(nfs_work & ws, std::shared_ptr<nfs_work_cofac> wc_p, std::shared_ptr<nfs_aux> aux_p, thread_pool & pool, int first_region0_index, int small_sieve_regions_ready, sieve_info & si, where_am_I const & w);
+extern void process_many_bucket_regions(nfs_work & ws, std::shared_ptr<nfs_work_cofac> wc_p, std::shared_ptr<nfs_aux> aux_p, thread_pool & pool, int first_region0_index, sieve_info & si, where_am_I const & w);
 
 /* {{{ process_one_bucket_region */
 
@@ -49,17 +49,31 @@ struct process_bucket_region_spawn {
     std::shared_ptr<nfs_aux> aux_p;
     sieve_info & si;
     where_am_I w_saved;
+    
+    /* These two indices are set from within process_many_bucket_regions,
+     * prior to spawning all threads.
+     *
+     * first_region0_index is the bucket index of the first region for
+     * which we filled the buckets.
+     *
+     * already done is, relative to first_region0_index, the index of the
+     * first region for which the small sieve start position are
+     * available in ssdpos_many.
+     *
+     * The i-th process_bucket_region task thus handles the bucket region
+     * of index first_region0_index + already_done + i
+     */
     int first_region0_index;
+    int already_done;
 
     process_bucket_region_spawn(
             nfs_work & ws,
             std::shared_ptr<nfs_work_cofac> wc_p,
             std::shared_ptr<nfs_aux> aux_p,
             sieve_info & si,
-            where_am_I w,
-            int first_region0_index
+            where_am_I w
             ) :
-        ws(ws), wc_p(wc_p), aux_p(aux_p), si(si), w_saved(w), first_region0_index(first_region0_index) {}
+        ws(ws), wc_p(wc_p), aux_p(aux_p), si(si), w_saved(w) {}
 
     void operator()(worker_thread * worker, int id);
 };

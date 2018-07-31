@@ -1319,7 +1319,7 @@ struct process_bucket_region_run : public process_bucket_region_spawn {
             w(taux.w)
     {
         w = w_saved;
-        WHERE_AM_I_UPDATE(w, N, first_region0_index + bucket_relative_index);
+        WHERE_AM_I_UPDATE(w, N, first_region0_index + already_done + bucket_relative_index);
 
         /* This is local to this thread */
         for(int side = 0 ; side < 2 ; side++)
@@ -1345,7 +1345,7 @@ void process_bucket_region_run::init_norms(int side)/*{{{*/
     CHILD_TIMER(timer, "init norms");
 
     rep.tn[side] -= seconds_thread ();
-    si.sides[side].lognorms->fill(S[side], first_region0_index + bucket_relative_index);
+    si.sides[side].lognorms->fill(S[side], first_region0_index + already_done + bucket_relative_index);
     rep.tn[side] += seconds_thread ();
 #if defined(TRACE_K) 
     if (trace_on_spot_N(w.N))
@@ -1362,7 +1362,7 @@ void process_bucket_region_run::apply_buckets_inner(int side)/*{{{*/
     {
         CHILD_TIMER(timer, "apply buckets");
         for (auto const & BA : ws.bucket_arrays<1, my_shorthint_t>(side))
-            apply_one_bucket(SS, BA, bucket_relative_index, si.sides[side].fbs->get_part(1), w);
+            apply_one_bucket(SS, BA, already_done + bucket_relative_index, si.sides[side].fbs->get_part(1), w);
     }
 
     /* Apply downsorted buckets, if necessary. */
@@ -1373,7 +1373,7 @@ void process_bucket_region_run::apply_buckets_inner(int side)/*{{{*/
             // FIXME: the updates could come from part 3 as well,
             // not only part 2.
             ASSERT_ALWAYS(si.toplevel <= 2);
-            apply_one_bucket(SS, BAd, bucket_relative_index, si.sides[side].fbs->get_part(2), w);
+            apply_one_bucket(SS, BAd, already_done + bucket_relative_index, si.sides[side].fbs->get_part(2), w);
         }
     }
     rep.ttbuckets_apply += seconds_thread();
@@ -1394,7 +1394,7 @@ void process_bucket_region_run::small_sieve(int side)/*{{{*/
     sieve_info::side_info & s(si.sides[side]);
 
     sieve_small_bucket_region(SS,
-            first_region0_index + bucket_relative_index,
+            first_region0_index + already_done + bucket_relative_index,
             s.ssd,
             s.ssd.ssdpos_many[bucket_relative_index],
             si,
@@ -1424,7 +1424,7 @@ process_bucket_region_run::survivors_t process_bucket_region_run::search_survivo
     CHILD_TIMER(timer, __func__);
     TIMER_CATEGORY(timer, search_survivors());
 
-    int N = first_region0_index + bucket_relative_index;
+    int N = first_region0_index + already_done + bucket_relative_index;
 
     /* change N, which is a bucket number, to
      * (i0, i1, j0, j1) */
@@ -1536,15 +1536,15 @@ void process_bucket_region_run::purge_buckets(int side)/*{{{*/
 
     for (auto & BA : ws.bucket_arrays<1, shorthint_t>(side)) {
 #if defined(HAVE_SSE2) && defined(SMALLSET_PURGE)
-        sides[side].purged.purge(BA, bucket_relative_index, Sx, survivors);
+        sides[side].purged.purge(BA, already_done + bucket_relative_index, Sx, survivors);
 #else
-        sides[side].purged.purge(BA, bucket_relative_index, Sx);
+        sides[side].purged.purge(BA, already_done + bucket_relative_index, Sx);
 #endif
     }
 
     /* Add entries coming from downsorting, if any */
     for (auto const & BAd : ws.bucket_arrays<1, longhint_t>(side)) {
-        sides[side].purged.purge(BAd, bucket_relative_index, Sx);
+        sides[side].purged.purge(BAd, already_done + bucket_relative_index, Sx);
     }
 
     /* Sort the entries to avoid O(n^2) complexity when looking for
@@ -1563,7 +1563,7 @@ void process_bucket_region_run::resieve(int side)/*{{{*/
        together with the primes recovered from the bucket updates */
     resieve_small_bucket_region (&sides[side].primes,
             Sx,
-            first_region0_index + bucket_relative_index,
+            first_region0_index + already_done + bucket_relative_index,
             si.sides[side].ssd,
             s.ssd.ssdpos_many[bucket_relative_index],
             si, w);
@@ -1888,7 +1888,7 @@ void process_bucket_region_run::cofactoring_sync (survivors_t & survivors)/*{{{*
     CHILD_TIMER(timer, __func__);
     TIMER_CATEGORY(timer, cofactoring_mixed());
 
-    int N = first_region0_index + bucket_relative_index;
+    int N = first_region0_index + already_done + bucket_relative_index;
     unsigned char * Sx = S[0] ? S[0] : S[1];
 
     cofac_standalone cur;
@@ -2193,7 +2193,7 @@ void process_bucket_region_run::operator()() {/*{{{*/
     }
 
 #ifdef TRACE_K
-    int N = first_region0_index + bucket_relative_index;
+    int N = first_region0_index + already_done + bucket_relative_index;
     if (trace_on_spot_Nx(N, trace_Nx.x)) {
         unsigned char * Sx = S[0] ? S[0] : S[1];
         verbose_output_print(TRACE_CHANNEL, 0, "# Slot [%u] in bucket %u has value %u\n",
@@ -2751,13 +2751,13 @@ void postprocess_specialq_descent(las_info & las, las_todo_entry const & doing, 
 }
 #endif  /* DLP_DESCENT */
 
-void process_many_bucket_regions(nfs_work & ws, std::shared_ptr<nfs_work_cofac> wc_p, std::shared_ptr<nfs_aux> aux_p, thread_pool & pool, int first_region0_index, int small_sieve_regions_ready, sieve_info & si, where_am_I const & w)
+void process_many_bucket_regions(nfs_work & ws, std::shared_ptr<nfs_work_cofac> wc_p, std::shared_ptr<nfs_aux> aux_p, thread_pool & pool, int first_region0_index, sieve_info & si, where_am_I const & w)
 {
     /* first_region0_index is always 0 when toplevel == 1, but the
      * present function is also called from within downsort_tree when
      * toplevel > 1, and then first_region0_index may be larger.
      */
-    auto P = thread_pool::make_shared_task<process_bucket_region_spawn>(ws, wc_p, aux_p, si, w, first_region0_index);
+    auto P = thread_pool::make_shared_task<process_bucket_region_spawn>(ws, wc_p, aux_p, si, w);
 
     /* Make sure we don't schedule too many tasks when J was truncated
      * anyway */
@@ -2769,18 +2769,62 @@ void process_many_bucket_regions(nfs_work & ws, std::shared_ptr<nfs_work_cofac> 
     else
         first_skipped_br >>= LOG_BUCKET_REGION - si.conf.logI;
 
-    /* We might be in a situation where not all of the si.nb_buckets[1]
-     * initial positions for the small sieve buckets are ready.
-     * (someday)
-     */
-    ASSERT_ALWAYS(small_sieve_regions_ready == si.nb_buckets[1]);
-    for(int i = 0 ; i < si.nb_buckets[1] ; i++) {
-        if (first_region0_index + i >= first_skipped_br) {
-            /* Hmm, then we should also make sure that we truncated
-             * fill_in_buckets, right ? */
-            break;
+    size_t small_sieve_regions_ready = std::min(SMALL_SIEVE_START_POSITIONS_MAX_ADVANCE, si.nb_buckets[1]);
+
+    for(int done = 0, ready = small_sieve_regions_ready ; done < si.nb_buckets[1] ; ) {
+
+        /* yes, it's a bit ugly */
+        P->first_region0_index = first_region0_index;
+        P->already_done = done;
+
+        for(int i = 0 ; i < ready ; i++) {
+            if (first_region0_index + done + i >= first_skipped_br) {
+                /* Hmm, then we should also make sure that we truncated
+                 * fill_in_buckets, right ? */
+                break;
+            }
+            pool.add_shared_task(P, i, 0);
         }
-        pool.add_shared_task(P, i, 0);
+
+        /* it's only really done when we do drain_queue(0), of course */
+        done += ready;
+
+        if (done < si.nb_buckets[1]) {
+
+            /* We need to compute more init positions */
+            int more = std::min(SMALL_SIEVE_START_POSITIONS_MAX_ADVANCE, si.nb_buckets[1] - done);
+
+            for(int side = 0 ; side < 2 ; side++) {
+                pool.add_task_lambda([=,&si](worker_thread * worker, int){
+                        timetree_t & timer(aux_p->th[worker->rank()].timer);
+                        ENTER_THREAD_TIMER(timer);
+                        MARK_TIMER_FOR_SIDE(timer, side);
+                        SIBLING_TIMER(timer, "prepare small sieve");
+                        sieve_info::side_info & s(si.sides[side]);
+                        if (s.fb->empty()) return;
+                        SIBLING_TIMER(timer, "small sieve start positions");
+                        /* When we're doing 2-level sieving, there is probably
+                         * no real point in doing ssdpos initialization in
+                         * several passes.
+                         */
+                        small_sieve_prepare_many_start_positions(s.ssd,
+                                first_region0_index + done,
+                                more,
+                                si);
+                        },0);
+            }
+
+            pool.drain_queue(0);
+
+            ready = more;
+
+            /* Now these new start positions are ready to be used */
+            for(int side = 0 ; side < 2 ; side++) {
+                sieve_info::side_info & s(si.sides[side]);
+                if (s.fb->empty()) return;
+                small_sieve_activate_many_start_positions(s.ssd);
+            }
+        }
     }
 }
 
@@ -2874,7 +2918,10 @@ void do_one_special_q_sublat(las_info const & las, sieve_info & si, nfs_work & w
                          * several times.
                          */
                         SIBLING_TIMER(timer, "small sieve start positions ");
-                        small_sieve_prepare_many_start_positions(s.ssd, 0, si.nb_buckets[1], si);
+                        small_sieve_prepare_many_start_positions(s.ssd,
+                                0,
+                                std::min(SMALL_SIEVE_START_POSITIONS_MAX_ADVANCE, si.nb_buckets[1]),
+                                si);
                         small_sieve_activate_many_start_positions(s.ssd);
                     }
             },0);
@@ -2900,7 +2947,7 @@ void do_one_special_q_sublat(las_info const & las, sieve_info & si, nfs_work & w
         TIMER_CATEGORY(timer_special_q, sieving_mixed());
         if (si.toplevel == 1) {
             /* Process bucket regions in parallel */
-            process_many_bucket_regions(ws, wc_p, aux_p, pool, 0, si.nb_buckets[1], si, w);
+            process_many_bucket_regions(ws, wc_p, aux_p, pool, 0, si, w);
         } else {
             // Prepare plattices at internal levels
 

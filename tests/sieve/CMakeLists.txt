@@ -173,6 +173,13 @@ cado_divert_test(F9 sieve
             REFERENCE_REVISION=ede066464ba58b2d6127fa256cef01706282e0ed
         )
 
+cado_divert_test(F9 sieve_recompute_ssdpos
+    APPEND_ARGUMENTS -B 12 -nq 1
+    APPEND_ENVIRONMENT
+        REL_COUNT=54
+        CHECKSUM_FILE=
+)
+
 # go wild for the under-allocation. If this is valgrind-ok, then
 # surely #21513 is fixed. While we're at it, check all kind of possible
 # under-allocation recovers (the base test below serves only as a stem).

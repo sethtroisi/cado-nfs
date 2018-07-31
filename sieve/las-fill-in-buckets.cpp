@@ -1279,14 +1279,17 @@ downsort_tree_inner(
                    * no real point in doing ssdpos initialization in
                    * several passes.
                    */
-                  small_sieve_prepare_many_start_positions(s.ssd, first_region0_index, si.nb_buckets[1], si);
+                  small_sieve_prepare_many_start_positions(s.ssd,
+                          first_region0_index,
+                          std::min(SMALL_SIEVE_START_POSITIONS_MAX_ADVANCE, si.nb_buckets[1]),
+                          si);
                   small_sieve_activate_many_start_positions(s.ssd);
                   },0);
       }
 
 
       pool.drain_queue(0);
-      /* Now fill_in_buckets is completed for all levels. Time to check
+      /* Now fill_in_buckets has completed for all levels. Time to check
        * that we had no overflow, and move on to process_bucket_region.
        */
 
@@ -1297,7 +1300,7 @@ downsort_tree_inner(
       }
 
       /* PROCESS THE REGIONS AT LEVEL 0 */
-      process_many_bucket_regions(ws, wc_p, aux_p, pool, first_region0_index, si.nb_buckets[1], si, w);
+      process_many_bucket_regions(ws, wc_p, aux_p, pool, first_region0_index, si, w);
 
       /* We need that, because the next downsort_tree call in the loop
        * above (for LEVEL>1) will reset the pointers while filling the 1l
