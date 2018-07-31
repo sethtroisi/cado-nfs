@@ -49,7 +49,11 @@ las_augmented_output_channel::las_augmented_output_channel(cxx_param_list & pl)
     verbose = param_list_parse_switch(pl, "-v");
     setvbuf(output, NULL, _IOLBF, 0);      /* mingw has no setlinebuf */
     las_verbose_enter(pl, output, verbose);
+
+    param_list_print_command_line(output, pl);
+    las_display_config_flags();
 }
+
 las_augmented_output_channel::~las_augmented_output_channel()
 {
     if (outputname)
@@ -96,10 +100,6 @@ las_info::las_info(cxx_param_list & pl)
         }
     }
 
-    param_list_print_command_line(output, pl);
-
-
-    las_display_config_flags();
     /*  Parse polynomial */
     const char *tmp;
     if ((tmp = param_list_lookup_string(pl, "poly")) == NULL) {
