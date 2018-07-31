@@ -12,7 +12,6 @@
 #include "verbose.h"
 #include "las-smallsieve-glue.hpp"
 #include "las-sieve2357.hpp"
-#include "concatenate_range.hpp"        // utility
 
 /* small sieve and resieving */
 
@@ -263,16 +262,13 @@ void small_sieve_init(small_sieve_data_t & ssd,
     // times faster.
     unsigned int sublatm = si.conf.sublat.m;
 
-    ssd.resieve_end_offset = SIZE_MAX;
-    
-    for (auto const & e : concatenate_range(resieved, rest)) {
+    for (auto const & c : { &resieved, &rest }) {
+    if (c == &rest)
+        ssd.resieve_end_offset = ssd.ssps.size();
+    for (auto const & e : *c) {
         /* p=pp^k, the prime or prime power in this entry, and pp is prime */
         const fbprime_t p = e.q, pp = e.p;
         WHERE_AM_I_UPDATE(w, p, p);
-
-        if (&e == &rest.front()) {
-            ssd.resieve_end_offset = ssd.ssps.size();
-        }
 
         ASSERT_ALWAYS(p <= thresh);
         if (p > thresh) {
@@ -393,9 +389,7 @@ void small_sieve_init(small_sieve_data_t & ssd,
             }
         }
     }
-
-    if (ssd.resieve_end_offset == SIZE_MAX)
-        ssd.resieve_end_offset = ssd.ssps.size();
+    }
 
     /* arrange so that the small_sieve() ctor is happy */
     /* I _think_ that normally, if the new code does its job correctly,
