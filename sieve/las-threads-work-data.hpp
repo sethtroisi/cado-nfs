@@ -13,9 +13,12 @@
  * is intentionally detached from the rest of the ``stats-like'' control
  * data (found in nfs_aux, defined in las-auxiliary-data.hpp)
  *
+ * This is really sort of a "work space", with allocated buckets, bucket
+ * regions, and so on.
+ *
  * Two important aspects here:
  *
- *  - this structure remains the same when sieve_info changes
+ *  - this structure remains the same when sieve_info "in use" changes
  *  - no concurrent access with two different sieve_info structures is
  *    possible.
  *

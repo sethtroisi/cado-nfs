@@ -2,6 +2,7 @@
 #define LAS_SMALLSIEVE_TYPES_HPP_
 
 #include <vector>
+#include "las-forwardtypes.hpp"
 #include "fb-types.h"
 #include "fb.hpp"
 #include "macros.h"
@@ -106,6 +107,10 @@ private:
 
 // static_assert(sizeof(ssp_simple_t) == sizeof(ssp_t), "struct padding has been tampered with");
 
+/* The prototypes in las-smallsieve.hpp should all be member functions
+ * for this struct. However we have an interface nesting problem with
+ * sieve_info, at the moment.
+ */
 struct small_sieve_data_t {
     fb_factorbase::key_type fbK;
     std::vector<ssp_simple_t> ssps;
@@ -113,28 +118,36 @@ struct small_sieve_data_t {
     /* This counts the resieved primes in ssps */
     size_t resieve_end_offset;
 
-};
+    /* We have some vectors of small sieve positions prepared in
+     * advanced (up to si.nb_buckets[1] of them). The ssdpos_many_next
+     * area is for staging the next set of start positions, possible
+     * while threads are using the positions in ssdpos_many.
+     */
+    std::vector<std::vector<spos_t>> ssdpos_many;
+    std::vector<std::vector<spos_t>> ssdpos_many_next;
+    size_t ssdpos_many_offset;
 
-struct small_sieve_block_offsets_t {
-    /* These vectors are computed at the same time as ssd is
-     * intialized, in small_sieve_start.  We use them to compute the
+    /* This vectors are computed at the same time as ssd is
+     * intialized, in small_sieve_start.  We use it to compute the
      * ssdpos fields for primes in ssps (easy ones).
      *
-     * c=right[i] is such that for the i-th p-lattice L_p, the
+     * for logI <= logB:
+     * c=offsets[i] is equal to ssd[i].offset when logI>logB.
+     * In full generality, if logB = v + min(logI, logB), then c is
+     * such that (c, 2^v) in L_p.
+     *
+     * for logI > logB:
+     * c=offsets[i] is such that for the i-th p-lattice L_p, the
      * vector (2^min(logB, logI) + c, 0) is in L_p. We do not need it at
      * all when logI <= logB, so we may as well define it as (B+c,p)
      * in L_p.
      *
-     * c=up[i] is equal to ssd[i].offset when logI>logB.
-     * In full generality, if logB = v + min(logI, logB), then c is
-     * such that (c, 2^v) in L_p.
      */
     
     /* Note that at most one of these two vectors will be used anyway,
      * depnding on how logI and logB compare.
      */
-    std::vector<fbprime_t> right;
-    std::vector<fbprime_t> up;
+    std::vector<fbprime_t> offsets;
 };
 
 #endif

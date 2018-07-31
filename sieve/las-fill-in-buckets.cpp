@@ -1275,7 +1275,12 @@ downsort_tree_inner(
                   if (s.fb->empty()) return;
                   ASSERT(si.toplevel > 1);
                   SIBLING_TIMER(timer, "small sieve start positions");
-                  small_sieve_start_many(s.ssdpos_many, s.ssd, s.ssd_offsets, first_region0_index, si);
+                  /* When we're doing 2-level sieving, there is probably
+                   * no real point in doing ssdpos initialization in
+                   * several passes.
+                   */
+                  small_sieve_prepare_many_start_positions(s.ssd, first_region0_index, si.nb_buckets[1], si);
+                  small_sieve_activate_many_start_positions(s.ssd);
                   },0);
       }
 
@@ -1292,7 +1297,7 @@ downsort_tree_inner(
       }
 
       /* PROCESS THE REGIONS AT LEVEL 0 */
-      process_many_bucket_regions(ws, wc_p, aux_p, pool, first_region0_index, si, w);
+      process_many_bucket_regions(ws, wc_p, aux_p, pool, first_region0_index, si.nb_buckets[1], si, w);
 
       /* We need that, because the next downsort_tree call in the loop
        * above (for LEVEL>1) will reset the pointers while filling the 1l

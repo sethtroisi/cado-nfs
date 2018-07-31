@@ -1396,7 +1396,7 @@ void process_bucket_region_run::small_sieve(int side)/*{{{*/
     sieve_small_bucket_region(SS,
             first_region0_index + bucket_relative_index,
             s.ssd,
-            s.ssdpos_many[bucket_relative_index],
+            s.ssd.ssdpos_many[bucket_relative_index],
             si,
             side,
             w);
@@ -1565,7 +1565,7 @@ void process_bucket_region_run::resieve(int side)/*{{{*/
             Sx,
             first_region0_index + bucket_relative_index,
             si.sides[side].ssd,
-            s.ssdpos_many[bucket_relative_index],
+            s.ssd.ssdpos_many[bucket_relative_index],
             si, w);
 
     /* same reason as above */
@@ -2751,7 +2751,7 @@ void postprocess_specialq_descent(las_info & las, las_todo_entry const & doing, 
 }
 #endif  /* DLP_DESCENT */
 
-void process_many_bucket_regions(nfs_work & ws, std::shared_ptr<nfs_work_cofac> wc_p, std::shared_ptr<nfs_aux> aux_p, thread_pool & pool, int first_region0_index, sieve_info & si, where_am_I const & w)
+void process_many_bucket_regions(nfs_work & ws, std::shared_ptr<nfs_work_cofac> wc_p, std::shared_ptr<nfs_aux> aux_p, thread_pool & pool, int first_region0_index, int small_sieve_regions_ready, sieve_info & si, where_am_I const & w)
 {
     /* first_region0_index is always 0 when toplevel == 1, but the
      * present function is also called from within downsort_tree when
@@ -2769,6 +2769,11 @@ void process_many_bucket_regions(nfs_work & ws, std::shared_ptr<nfs_work_cofac> 
     else
         first_skipped_br >>= LOG_BUCKET_REGION - si.conf.logI;
 
+    /* We might be in a situation where not all of the si.nb_buckets[1]
+     * initial positions for the small sieve buckets are ready.
+     * (someday)
+     */
+    ASSERT_ALWAYS(small_sieve_regions_ready == si.nb_buckets[1]);
     for(int i = 0 ; i < si.nb_buckets[1] ; i++) {
         if (first_region0_index + i >= first_skipped_br) {
             /* Hmm, then we should also make sure that we truncated
@@ -2858,7 +2863,6 @@ void do_one_special_q_sublat(las_info const & las, sieve_info & si, nfs_work & w
                     if (s.fb->empty()) return;
 
                     small_sieve_init(s.ssd,
-                            s.ssd_offsets,
                             s.fbs->small_sieve_entries.resieved,
                             s.fbs->small_sieve_entries.rest,
                             si, side);
@@ -2870,7 +2874,8 @@ void do_one_special_q_sublat(las_info const & las, sieve_info & si, nfs_work & w
                          * several times.
                          */
                         SIBLING_TIMER(timer, "small sieve start positions ");
-                        small_sieve_start_many(s.ssdpos_many, s.ssd, s.ssd_offsets, 0, si);
+                        small_sieve_prepare_many_start_positions(s.ssd, 0, si.nb_buckets[1], si);
+                        small_sieve_activate_many_start_positions(s.ssd);
                     }
             },0);
         }
@@ -2895,7 +2900,7 @@ void do_one_special_q_sublat(las_info const & las, sieve_info & si, nfs_work & w
         TIMER_CATEGORY(timer_special_q, sieving_mixed());
         if (si.toplevel == 1) {
             /* Process bucket regions in parallel */
-            process_many_bucket_regions(ws, wc_p, aux_p, pool, 0, si, w);
+            process_many_bucket_regions(ws, wc_p, aux_p, pool, 0, si.nb_buckets[1], si, w);
         } else {
             // Prepare plattices at internal levels
 
@@ -3097,10 +3102,7 @@ bool do_one_special_q(las_info & las, nfs_work & ws, std::shared_ptr<nfs_aux> au
 
     for(int side = 0 ; side < 2 ; side++) {
         sieve_info::side_info & s(si.sides[side]);
-        s.ssdpos_many.clear();
         small_sieve_clear(s.ssd);
-        s.ssd_offsets.up.clear();
-        s.ssd_offsets.right.clear();
     }
 
 #ifdef DLP_DESCENT

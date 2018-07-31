@@ -83,12 +83,6 @@ struct sieve_info {
          *      conf.sides[side].lim
          *      conf.sides[side].powlim
          *
-         * Morally there should be one single factor base. Currently, in
-         * las_descent, we have several. See comment in
-         * sieve_info::sieve_info
-         *
-         * sieve_info::sieve_info is also the place from where the factor
-         * base is created.
          */
         std::shared_ptr<fb_factorbase> fb;
 
@@ -105,35 +99,39 @@ struct sieve_info {
          */
         fb_factorbase::slicing * fbs = NULL;
 
-        /* trialdiv_data depends on fbK.td_thresh, and marginally on
-         * fbK.thresholds[0].
+        /* trialdiv_data depends on
+         *      fbK.td_thresh
+         * and marginally on
+         *      fbK.thresholds[0]
          *
          * TODO
-         * Currently it is set by sieve_info::update, but this looks
+         * Currently it is set by sieve_info::update and init_trialdiv, but this looks
          * completely wrong. There's absolutely no reason why we can't
          * cache it based on fbK.td_thresh.
+         *
+         * This is recomputed for each special-q, but it shouldn't.
          */
         std::shared_ptr<trialdiv_divisor_t> trialdiv_data;
 
         /* precomp_plattice_dense: caching of the FK-basis in sublat mode.
          * (for the toplevel only). This is not the same as the
          * precomp_plattice that is done for lower levels.
+         *
+         * This is (obviously) recomputed for each special-q in sublat
+         * mode. The only reason why it's here is because we would like
+         * the storage to remain allocated, adnd avoid constant
+         * malloc/free.
          */
         precomp_plattice_dense_t precomp_plattice_dense;
 
         /* This is updated by applying the special-q lattice transform to
          * the factor base. This is a "current status" that gets updated
          * as we sieve. It's initialized by small_sieve_init
+         *
+         * Again, this is recomputed for each special-q, and is only put
+         * here as an allocation optimization.
          */
         small_sieve_data_t ssd;
-
-        /* We have nb_buckets[1] vectors of small sieve positions. These
-         * are precomputed before process_many_bucket_regions is called.
-         * (see small_sieve_start_many)
-         */
-        std::vector<std::vector<spos_t>> ssdpos_many;
-
-        small_sieve_block_offsets_t ssd_offsets;
     };
 
     /* }}} */
