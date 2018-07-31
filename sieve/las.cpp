@@ -2821,7 +2821,7 @@ void process_many_bucket_regions(nfs_work & ws, std::shared_ptr<nfs_work_cofac> 
             /* Now these new start positions are ready to be used */
             for(int side = 0 ; side < 2 ; side++) {
                 sieve_info::side_info & s(si.sides[side]);
-                if (s.fb->empty()) return;
+                if (s.fb->empty()) continue;
                 small_sieve_activate_many_start_positions(s.ssd);
             }
         }
