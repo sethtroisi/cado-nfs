@@ -44,7 +44,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 #define ALPHA_BOUND_SMALL  100
 #define ALPHA_BOUND       2000
 
-#define MURPHY_K 2000
+#define MURPHY_K 1000
 
 extern double bound_f, bound_g, area;
 
