@@ -2042,7 +2042,7 @@ void process_bucket_region_run::cofactoring_sync (survivors_t & survivors)/*{{{*
 
                 SIBLING_TIMER(timer, "recompute complete norm");
 
-                /* factor() is batch.cpp recomputes the complete norm, so
+                /* factor() in batch.cpp recomputes the complete norm, so
                  * there's no need to compute the norm right now for the
                  * side we've sieved with.
                  */
