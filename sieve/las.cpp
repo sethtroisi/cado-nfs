@@ -3476,6 +3476,8 @@ int main (int argc0, char *argv0[])/*{{{*/
     /* This is a synchronization point */
     delete pool;
 
+    las.clear_sieve_info_cache();
+
     verbose_output_print(0, 1, "# Cumulated wait time over all threads %.2f\n", thread_pool::cumulated_wait_time);
 
     for(auto & P : aux_good) {

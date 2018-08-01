@@ -201,16 +201,21 @@ las_info::las_info(cxx_param_list & pl)
     dump_filename = param_list_lookup_string(pl, "dumpfile");
 }/*}}}*/
 
-las_info::~las_info()/*{{{*/
+void las_info::clear_sieve_info_cache()
 {
     char buf1[16];
 
+    if (sievers.empty()) return;
     verbose_output_print(0, 2, "# Getting rid of %zu sieve_info structures [rss=%s]\n", sievers.size(), size_disp_fine(1024UL * Memusage2(), buf1, 10000.0));
     for(int i = 0 ; !sievers.empty() ; ++i) {
         sievers.erase(sievers.begin());
         verbose_output_print(0, 2, "# Discarded %d-th sieve_info [rss=%s]\n", i, size_disp_fine(1024UL * Memusage2(), buf1, 10000.0));
     }
+}
 
+las_info::~las_info()/*{{{*/
+{
+    clear_sieve_info_cache();
 
     // ----- general operational flags {{{
     gmp_randclear(rstate);

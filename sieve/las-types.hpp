@@ -119,6 +119,7 @@ struct las_info : private NonCopyable, public las_augmented_output_channel {
     const char *dump_filename;
     mutable dumpfile dumpfiles[2];
 
+    void clear_sieve_info_cache();
     las_info(cxx_param_list &);
     ~las_info();
 };
