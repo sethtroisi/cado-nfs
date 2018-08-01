@@ -3314,18 +3314,18 @@ int main (int argc0, char *argv0[])/*{{{*/
     las_report global_report;
     timetree_t global_timer;
 
-    /* A pointer just to control when the dtor is called... */
+    std::list<std::pair<las_report, timetree_t>> aux_good;
+    std::list<std::pair<las_report, timetree_t>> aux_botched;
+
+    {
+        /* add scoping to control dtor call */
     /* queue 0: main
      * queue 1: ECM
      * queue 2: things that we join almost immediately, but are
      * multithreaded nevertheless: alloc buckets, ...
      */
-    thread_pool *pool = new thread_pool(las.nb_threads, 3);
-
+    thread_pool pool(las.nb_threads, 3);
     nfs_work workspaces(las);
-
-    std::list<std::pair<las_report, timetree_t>> aux_good;
-    std::list<std::pair<las_report, timetree_t>> aux_botched;
 
     /* {{{ Doc on todo list handling
      * The function las_todo_feed behaves in different
@@ -3413,7 +3413,7 @@ int main (int argc0, char *argv0[])/*{{{*/
 
                 prepare_timer_layout_for_multithreaded_tasks(timer_special_q);
 
-                bool done = do_one_special_q(las, workspaces, aux_p, *pool, pl);
+                bool done = do_one_special_q(las, workspaces, aux_p, pool, pl);
 
                 if (!done) {
                     /* Then we don't even keep track of the time, it's
@@ -3473,10 +3473,11 @@ int main (int argc0, char *argv0[])/*{{{*/
 
       } // end of loop over special q ideals.
 
-    /* This is a synchronization point */
-    delete pool;
-
+    /* we also delete the "pool" and "workspaces" variables at this point. */
+    /* The dtor for "pool" is a synchronization point */
     las.clear_sieve_info_cache();
+    }
+
 
     verbose_output_print(0, 1, "# Cumulated wait time over all threads %.2f\n", thread_pool::cumulated_wait_time);
 
