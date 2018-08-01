@@ -556,7 +556,7 @@ clique_removal_core_mono (purge_matrix_ptr mat, int64_t target_excess,
   if (verbose > 0)
     purge_matrix_print_stats_on_cliques (stdout, mat, verbose);
 
-  /* At this point, comp_tree contains max_nb_comp connected components order
+  /* At this point, comp_tree contains max_nb_comp connected components ordered
    * by decreasing weight.
    */
   size_t next_clique = 0;
