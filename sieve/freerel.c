@@ -807,7 +807,7 @@ main (int argc, char *argv[])
                    renumber_table->size);
 
   /* produce an error when index_t is too small to represent all ideals */
-  if (renumber_table->size >> (8 * __SIZEOF_INDEX__))
+  if ((__SIZEOF_INDEX__ < 8) && renumber_table->size >> (8 * __SIZEOF_INDEX__))
     {
       fprintf (stderr, "Error, please increase __SIZEOF_INDEX__\n");
       fprintf (stderr, "(see local.sh.example)\n");
