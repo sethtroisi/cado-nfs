@@ -50,7 +50,7 @@ set_property(TARGET las_descent PROPERTY COMPILE_DEFINITIONS DLP_DESCENT SUPPORT
 set_target_properties(las_descent PROPERTIES LINK_FLAGS "${OpenMP_CXX_FLAGS}")
 target_link_libraries (las_descent ${las_libraries})
 
-add_library (trialdiv trialdiv.c)
+add_library (trialdiv trialdiv.cpp)
 
 add_executable(freerel freerel.c fb.cpp las-plattice.cpp)
 target_link_libraries(freerel utils)
@@ -78,7 +78,7 @@ add_executable(dupsup
     las-trialdiv.cpp
     las-debug.cpp
     las-sieve2357.cpp
-    trialdiv.c
+    trialdiv.cpp
     )
 target_link_libraries(dupsup utils_with_io facul)
 set_target_properties(dupsup PROPERTIES LINK_FLAGS "${OpenMP_CXX_FLAGS}")

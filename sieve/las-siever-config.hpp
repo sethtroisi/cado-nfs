@@ -8,6 +8,7 @@
 #include <string.h>
 #include <string>
 #include <map>
+#include <tuple>
 #include "params.h"
 
 /* siever_config */
@@ -25,7 +26,12 @@ struct siever_config : public _padded_pod<siever_config> {
 
     int logI;   /* see below. logI is initialized late in the game */
 
-    sublat_t sublat;
+    /* This does not really belong here. I'd rather have it at the
+     * las_info level. However for obscure reasons,
+     * sieve_info::get_strategies wants it.
+     */
+    unsigned int sublat_bound;
+
 
     /* These four parameters are as they are provided in the command
      * line. In truth, the ones that really matter are the ones in the
@@ -73,8 +79,6 @@ struct siever_config : public _padded_pod<siever_config> {
         int ncurves;          /* number of cofactorization curves */
         double lambda;        /* lambda sieve parameter */
         
-        unsigned long qmin;   /* smallest q sieved on this side, for dupsup */
-        unsigned long qmax;   /* largest q sieved on this side, for dupsup */
     };
     side_config sides[2];
 
@@ -158,6 +162,17 @@ struct siever_config : public _padded_pod<siever_config> {
             }
             return ok;
         }
+        struct comparison {
+            bool operator()(siever_config const& a, siever_config const& b) const {
+                return std::tie(
+                        a.sides[0].lambda, a.sides[0].lpb, a.sides[0].mfb, a.sides[0].ncurves,
+                        a.sides[1].lambda, a.sides[1].lpb, a.sides[1].mfb, a.sides[1].ncurves) <
+                    std::tie(
+                        b.sides[0].lambda, b.sides[0].lpb, b.sides[0].mfb, b.sides[0].ncurves,
+                        b.sides[1].lambda, b.sides[1].lpb, b.sides[1].mfb, b.sides[1].ncurves);
+            }
+        };
+
     };
     has_same_cofactoring same_cofactoring() const { return has_same_cofactoring(*this); }
     /*}}}*/

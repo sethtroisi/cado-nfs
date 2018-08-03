@@ -39,7 +39,7 @@ extern task_result * process_bucket_regions_congruence_class(worker_thread * wor
 
 #endif
 
-extern void process_many_bucket_regions(nfs_work & ws, std::shared_ptr<nfs_work_cofac> wc_p, std::shared_ptr<nfs_aux> aux_p, thread_pool & pool, int first_region0_index, sieve_info & si, where_am_I const & w);
+extern void process_many_bucket_regions(nfs_work & ws, std::shared_ptr<nfs_work_cofac> wc_p, std::shared_ptr<nfs_aux> aux_p, thread_pool & pool, int first_region0_index, where_am_I const & w);
 
 /* {{{ process_one_bucket_region */
 
@@ -47,7 +47,6 @@ struct process_bucket_region_spawn {
     nfs_work & ws;
     std::shared_ptr<nfs_work_cofac> wc_p;
     std::shared_ptr<nfs_aux> aux_p;
-    sieve_info & si;
     where_am_I w_saved;
     
     /* These two indices are set from within process_many_bucket_regions,
@@ -70,10 +69,9 @@ struct process_bucket_region_spawn {
             nfs_work & ws,
             std::shared_ptr<nfs_work_cofac> wc_p,
             std::shared_ptr<nfs_aux> aux_p,
-            sieve_info & si,
             where_am_I w
             ) :
-        ws(ws), wc_p(wc_p), aux_p(aux_p), si(si), w_saved(w) {}
+        ws(ws), wc_p(wc_p), aux_p(aux_p), w_saved(w) {}
 
     void operator()(worker_thread * worker, int id);
 };

@@ -3,17 +3,17 @@
 
 #include "las-config.h"
 
-/* This is copied from LOGNORM_FILL_COMMON_DEFS in las-norms.cpp ; from
- * logI, N, and LOG_BUCKET_REGION, define the integers i0, i1, j0, j1,
- * and I.
- */
-
 /* About row0_is_oddj: in order to check whether a j coordinate is even,
  * we need to take into account the bucket number, especially in case
  * buckets are as large as the sieve region. The row number corresponding
  * to a given i0 is i0/I, but we also need to add bucket_nr*bucket_size/I
  * to this, which is what this flag is for.  Sublat must also be taken
  * into account.
+ */
+
+/* This is copied from LOGNORM_FILL_COMMON_DEFS in las-norms.cpp ; from
+ * logI, N, and LOG_BUCKET_REGION, define the integers i0, i1, j0, j1,
+ * and I.
  */
 
 #define SMALLSIEVE_COMMON_DEFS()                                         \
@@ -28,9 +28,9 @@
     const int i0 = (region_rank_in_line << LOG_BUCKET_REGION) - I/2;          \
     const int i1 MAYBE_UNUSED = i0 + (1 << MIN(LOG_BUCKET_REGION, logI));     \
     /* those are (1,0,0) in the standard case */                        \
-    const int sublatm MAYBE_UNUSED = si.conf.sublat.m ? si.conf.sublat.m : 1; \
-    const unsigned int sublati0 MAYBE_UNUSED = si.conf.sublat.i0;       \
-    const unsigned int sublatj0 MAYBE_UNUSED = si.conf.sublat.j0;       \
+    const int sublatm MAYBE_UNUSED = sl.m ? sl.m : 1; \
+    const unsigned int sublati0 MAYBE_UNUSED = sl.i0;       \
+    const unsigned int sublatj0 MAYBE_UNUSED = sl.j0;       \
     const int row0_is_oddj MAYBE_UNUSED = (j0*sublatm + sublatj0) & 1;  \
     bool has_haxis = !j0;                                               \
     bool has_vaxis = region_rank_in_line == ((regions_per_line-1)/2);   \

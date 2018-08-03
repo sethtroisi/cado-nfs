@@ -2,148 +2,120 @@
 
 #include "las-sieve-info.hpp"
 
-/* This function creates a new sieve_info structure, taking advantage of
- * structures which might already exist in las.sievers
- *  - for sieving, if factor base parameters are similar, we're going to
- *    share_factor_bases()
- *  - for cofactoring, if large prime bounds and mfbs are similar, we're
- *    going to reuse the strategies.
- *
- * The siever_config structure to be passed to this function is not
- * permitted to lack anything.
- *
- * This function differs from las_info::get_sieve_info_from_config(),
- * since the latters also registers the returned object within
- * las.sievers (while the function here only *reads* this list).
+sieve_info::side_data::side_data(int side,
+        cxx_cado_poly const & cpoly,
+        cxx_param_list & pl,
+        bool try_fbc)
+    :
+        f(cpoly->pols[side]),
+        fb(cpoly, side,
+            pl, try_fbc ? param_list_lookup_string(pl, "fbc") : NULL)
+{
+}
+
+/* We need sc_max because that is used to compute the factor base up to
+ * that limit.
  */
-sieve_info::sieve_info(siever_config const & sc, cxx_cado_poly const & cpoly, std::list<sieve_info> & sievers, cxx_param_list & pl, bool try_fbc) /*{{{*/
-    : cpoly_ptr(&cpoly), conf(sc)
+sieve_info::sieve_info(cxx_cado_poly const & cpoly, cxx_param_list & pl, bool try_fbc) /*{{{*/
+    : cpoly(cpoly), sides {
+        {0, cpoly, pl, try_fbc},
+        {1, cpoly, pl, try_fbc}
+    }
 {
-    I = 1UL << sc.logI;
-
-    std::list<sieve_info>::iterator psi;
-
-    /*** factor base ***/
-    
-    /* This is screwed.
-     *
-     * We wish to address the case where depending on the special-q,
-     * there may be different sieving bounds (lim). And then, this causes
-     * us to read new factor bases.
-     *
-     * This is screwed because morally, there should be one single factor
-     * base. It should be truncated if needed, when creating a slicing.
-     *
-     * How exactly this should be done is not totally clear. Maybe along
-     * the following lines.
-     *
-     * The factor base can be initialized essentially with the
-     * polynomials, lim, and powlim.
-     *
-     * The siever_config that comes now *may* be used to restrict the
-     * factor base: it defines a new fb_factorbase::key_type, which then
-     * is used to create a slicing.
-     */
-
-    psi = find_if(sievers.begin(), sievers.end(), sc.same_fb_parameters());
-
-    if (psi != sievers.end()) {
-        sieve_info & other(*psi);
-        verbose_output_print(0, 2, "# copy factor base data from previous siever\n");
-        sides[0].fb = other.sides[0].fb;
-        sides[1].fb = other.sides[1].fb;
-    } else {
-        const char * fbc_filename = param_list_lookup_string(pl, "fbc");
-        for(int side = 0 ; side < 2 ; side++) {
-            unsigned long lim = sc.sides[side].lim;
-            unsigned long powlim = sc.sides[side].powlim;
-            sides[side].fb=std::make_shared<fb_factorbase>(cpoly, side, lim, powlim, pl, try_fbc ? fbc_filename : NULL);
-        }
-    }
-
-
-    /*** Cofactoring ***/
-    psi = find_if(sievers.begin(), sievers.end(), sc.same_cofactoring());
-
-    if (psi != sievers.end()) {
-        sieve_info & other(*psi);
-        verbose_output_print(0, 2, "# copy cofactoring strategies from previous siever\n");
-        strategies = other.strategies;
-    } else {
-        init_strategies(pl);
-    }
+    cofactfilename = param_list_lookup_string (pl, "file-cofact");
 }
 /*}}}*/
 
-void sieve_info::update_norm_data ()/*{{{*/
+unsieve_data const * sieve_info::get_unsieve_data(siever_config const & conf) /* {{{ */
 {
-    for(int side = 0 ; side < 2 ; side++) {
-        sides[side].lognorms = std::make_shared<lognorm_smart>(conf, *cpoly_ptr, side, qbasis, conf.logI, J);
+    std::pair<int, int> p(conf.logI, conf.logA);
+    static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
+    pthread_mutex_lock(&lock);
+    auto it = us_cache.find(p);
+    if (it != us_cache.end()) {
+        pthread_mutex_unlock(&lock);
+        return &it->second;
     }
-}
-
-/*}}}*/
-
-/* This is one of the most terrible misnomers in cado-nfs... */
-void sieve_info::update (unsigned int nb_threads)
-{
-    uint64_t A = UINT64_C(1) << conf.logA;
-
-    for(int side = 0 ; side < 2 ; side++) {
-        sieve_info::side_info & sis(sides[side]);
-        if (sis.fb->empty()) continue;
-
-        fb_factorbase::key_type K = conf.instantiate_thresholds(side);
-
-        K.scale = sis.lognorms->scale,
-        /* The size of the slices must be in accordance to our
-         * multithread setting. Hopefully, that one does not change...
-         * We want to divide in small enough pieces, so that the amout of
-         * work sums up more or less evenly across the threads.
-         *
-         * This "small enough" criterion used to be computed around this
-         * place, and has now moved to inside the make_slices call. It is
-         * inherently tied to the count of the entries in each part.
-         */
-        K.nb_threads = nb_threads;
-
-        sis.fbK = K;
-        sis.fbs = &(*sis.fb)[K];
-    }
-
-    for(int side = 0 ; side < 2 ; side++) {
-        sieve_info::side_info & sis(sides[side]);
-        if (sis.fb->empty()) continue;
-
-	init_trialdiv(side); /* Init refactoring stuff */
-    }
-
-    // Now that fb have been initialized, we can set the toplevel.
-    toplevel = -1;
-    for(int side = 0 ; side < 2 ; side++) {
-        sieve_info::side_info & sis(sides[side]);
-        if (sis.fb->empty()) continue;
-
-        int level = sides[side].fbs->get_toplevel();
-        if (level > toplevel) toplevel = level;
-    }
-
-    /* update number of buckets at toplevel */
-    size_t (&BRS)[FB_MAX_PARTS] = BUCKET_REGIONS;
-
-    for(int i = 0 ; i < FB_MAX_PARTS ; ++i) nb_buckets[i] = 0;
-
-    nb_buckets[toplevel] = iceildiv(A, BRS[toplevel]);
-
-    // maybe there is only 1 bucket at toplevel and less than 256 at
-    // toplevel-1, due to a tiny J.
-    if (toplevel > 1) {
-        if (nb_buckets[toplevel] == 1) {
-            nb_buckets[toplevel-1] = iceildiv(A, BRS[toplevel - 1]);
-            // we forbid skipping two levels.
-            ASSERT_ALWAYS(nb_buckets[toplevel-1] != 1);
-        } else {
-            nb_buckets[toplevel-1] = BRS[toplevel]/BRS[toplevel-1];
-        }
-    }
+    auto itb = us_cache.emplace(p, p);
+    ASSERT(itb.second);
+    pthread_mutex_unlock(&lock);
+    return &(*itb.first).second;
 }/*}}}*/
+j_divisibility_helper const * sieve_info::get_j_divisibility_helper(int J) /* {{{ */
+{
+    ASSERT_ALWAYS(J);
+    /* Round to the next power of two */
+    unsigned int Jround = 1 << nbits(J-1);
+    static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
+    pthread_mutex_lock(&lock);
+    auto it = jdiv_cache.find(Jround);
+    if (it != jdiv_cache.end()) {
+        pthread_mutex_unlock(&lock);
+        return &it->second;
+    }
+    auto itb = jdiv_cache.emplace(Jround, Jround);
+    ASSERT(itb.second);
+    pthread_mutex_unlock(&lock);
+    return &(*itb.first).second;
+}/*}}}*/
+facul_strategies_t const * sieve_info::get_strategies(siever_config const & conf) /* {{{ */
+{
+    static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
+    pthread_mutex_lock(&lock);
+    auto it = facul_strategies_cache.find(conf);
+    if (it != facul_strategies_cache.end()) {
+        pthread_mutex_unlock(&lock);
+        return it->second.get();
+    }
+
+
+#if 0
+    /* Temporary hack. We return *ALWAYS* the same cofactoring strategy.
+     * TODO: investigate, see how this behaves. (for the descent case)
+     */
+    /* Cannot work: the descent is _really_ allowed to have various mfb
+     * set up, so that multiple strategy tables are necessary.
+     */
+    if (!facul_strategies_cache.empty()) {
+        it = facul_strategies_cache.begin();
+        if (!siever_config::has_same_cofactoring(conf)(it->first)) {
+            verbose_output_print(0, 1, "# NOTE: using previously stored cofactoring strategy, although it was not necessarily meant for the current set of parameters.\n");
+        }
+        return it->second.get();
+    }
+#endif
+
+    FILE* file = NULL;
+    if (cofactfilename != NULL) /* a file was given */
+        file = fopen (cofactfilename, "r");
+    double time_strat = seconds();
+
+    auto itb = facul_strategies_cache.emplace(conf,
+            std::shared_ptr<facul_strategies_t>(
+                facul_make_strategies (conf, file, 0),
+                facul_clear_strategies)
+            );
+
+    ASSERT_ALWAYS(itb.second);
+    verbose_output_print(0, 1, "# Building/reading strategies took %1.1fs\n",
+            seconds() - time_strat);
+
+    if (file)
+        fclose (file);
+
+    if (!(*itb.first).second.get()) {
+        fprintf (stderr, "impossible to read %s\n", cofactfilename);
+        pthread_mutex_unlock(&lock);
+        abort ();
+    }
+    pthread_mutex_unlock(&lock);
+
+    return (*itb.first).second.get();
+}/*}}}*/
+
+sieve_info::~sieve_info()
+{
+    char buf1[16];
+    verbose_output_print(0, 2, "# Getting rid of sieve_info structure [rss=%s]\n",
+            size_disp_fine(1024UL * Memusage2(), buf1, 10000.0));
+}

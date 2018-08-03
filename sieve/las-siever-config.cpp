@@ -12,7 +12,6 @@
 
 void siever_config::declare_usage(param_list_ptr pl)
 {
-    param_list_decl_usage(pl, "sublat", "modulus for sublattice sieving");
     param_list_decl_usage(pl, "lim0", "factor base bound on side 0");
     param_list_decl_usage(pl, "lim1", "factor base bound on side 1");
     param_list_decl_usage(pl, "lpb0", "set large prime bound on side 0 to 2^lpb0");
@@ -31,8 +30,6 @@ void siever_config::declare_usage(param_list_ptr pl)
     param_list_decl_usage(pl, "bkthresh1", "2-level bucket-sieve primes in [bkthresh1,lim] (default=lim, meaning inactive)");
     param_list_decl_usage(pl, "bkmult", "multiplier to use for taking margin in the bucket allocation\n");
     param_list_decl_usage(pl, "unsievethresh", "Unsieve all p > unsievethresh where p|gcd(a,b)");
-    param_list_decl_usage(pl, "dup-qmin", "lower limit of global q-range for 2-sided duplicate removal");
-    param_list_decl_usage(pl, "dup-qmax", "upper limit of global q-range for 2-sided duplicate removal");
 }
 
 void siever_config::display() const /*{{{*/
@@ -72,6 +69,16 @@ bool siever_config::parse_default(siever_config & sc, param_list_ptr pl)
      * we have no default either, and no siever is configured to provide
      * this ``default'' behaviour (yet, the default bits here are used to
      * pre-fill the config data later on).
+     */
+
+    /* Note: the stuff about the config being complete or not is mostly
+     * rubbish. sieve_info, as such, no longer has the
+     * first-class-citizen status it once had.
+     *
+     * Note that lim0 lim1 powlim0 powlim1 are also parsed from
+     * fb_factorbase::fb_factorbase, using only the command line (and no
+     * hint file, in particular). This is intended to be the "max" pair
+     * of limits.
      */
     mpz_t q0;
     mpz_init(q0);
@@ -118,8 +125,8 @@ bool siever_config::parse_default(siever_config & sc, param_list_ptr pl)
     }
 
     // Sublattices?
-    sc.sublat.m = 0; // no sublattices by default.
-    param_list_parse_uint(pl, "sublat", &(sc.sublat.m));
+    sc.sublat_bound = 0; // no sublattices by default.
+    param_list_parse_uint(pl, "sublat", &sc.sublat_bound);
 
     /* Parse optional siever configuration parameters */
     param_list_parse_uint(pl, "tdthresh", &(sc.td_thresh));
@@ -155,9 +162,14 @@ bool siever_config::parse_default(siever_config & sc, param_list_ptr pl)
                  * bucket sieving anyway */
                 sc.sides[side].powlim = ULONG_MAX;
             }
+            /* This message is also printed by
+             * fb_factorbase::fb_factorbase
+             */
+            /*
             verbose_output_print(0, 2,
                     "# Using default value of %lu for -%s\n",
                     sc.sides[side].powlim, powlim_params[side]);
+                    */
         }
     }
 
@@ -166,21 +178,6 @@ bool siever_config::parse_default(siever_config & sc, param_list_ptr pl)
         if (!param_list_parse_int(pl, ncurves_params[side],
                     &sc.sides[side].ncurves))
             sc.sides[side].ncurves = -1;
-
-    long dupqmin[2] = {0, 0};
-    param_list_parse_long_and_long(pl, "dup-qmin", dupqmin, ",");
-    sc.sides[0].qmin = dupqmin[0];
-    sc.sides[1].qmin = dupqmin[1];
-
-    /* Change 0 (not initialized) into LONG_MAX */
-    for (int side = 0; side < 2; side ++)
-        if (sc.sides[side].qmin == 0)
-            sc.sides[side].qmin = LONG_MAX;
-
-    long dupqmax[2] = {LONG_MAX, LONG_MAX};
-    param_list_parse_long_and_long(pl, "dup-qmax", dupqmax, ",");
-    sc.sides[0].qmax = dupqmax[0];
-    sc.sides[1].qmax = dupqmax[1];
 
     return complete;
 }
@@ -219,7 +216,7 @@ fb_factorbase::key_type siever_config::instantiate_thresholds(int side) const
     if (bucket_thresh > bucket_thresh1) bucket_thresh1 = bucket_thresh;
 
     return fb_factorbase::key_type {
-        {bucket_thresh, bucket_thresh1, fbb, fbb},
+        {{bucket_thresh, bucket_thresh1, fbb, fbb}},
             td_thresh,
             skipped,
             0,

@@ -135,6 +135,22 @@ mpz_mul_uint64 (mpz_t a, mpz_srcptr b, uint64_t c)
     }
 }
 
+int
+mpz_cmp_uint64 (mpz_srcptr a, uint64_t c)
+{
+  if (sizeof (unsigned long) >= sizeof (uint64_t))
+    return mpz_cmp_ui (a, (unsigned long) c);
+  else
+    {
+      mpz_t d;
+      mpz_init (d);
+      mpz_set_uint64 (d, c);
+      int r = mpz_cmp (a, d);
+      mpz_clear (d);
+      return r;
+    }
+}
+
 void
 mpz_addmul_uint64 (mpz_t a, mpz_srcptr b, uint64_t c)
 {

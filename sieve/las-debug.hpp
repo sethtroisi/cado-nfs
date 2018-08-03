@@ -22,6 +22,12 @@ extern void las_install_sighandlers();
 /* {{{ where_am_I (debug) */
 struct where_am_I {
 #ifdef TRACK_CODE_PATH
+    int logI;
+    const qlattice_basis * pQ;
+    struct side_data {
+        const fb_factorbase::slicing * fbs;
+    };
+    side_data sides[2];
     fbprime_t p;        /* current prime or prime power, when applicable */
     fbroot_t r;         /* current root */
     slice_index_t i;    /* Slice index, if applicable */
@@ -33,7 +39,6 @@ struct where_am_I {
     unsigned int N;     /* bucket number */
     int side;
     const las_info * plas;
-    const sieve_info * psi;
 #endif  /* TRACK_CODE_PATH */
 } /* TYPE_MAYBE_UNUSED */;
 
@@ -49,7 +54,7 @@ struct trace_ab_t { int64_t a; uint64_t b; };
 struct trace_ij_t { int i; unsigned int j; };
 
 extern void init_trace_k(cxx_param_list &);
-extern void trace_per_sq_init(sieve_info const & si);
+extern void trace_per_sq_init(nfs_work const & ws);
 
 /* When TRACE_K is defined, we are exposing some non trivial stuff.
  * Otherwise this all collapses to no-ops */

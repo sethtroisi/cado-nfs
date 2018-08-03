@@ -290,9 +290,6 @@ int main (int argc0, char *argv0[])/*{{{*/
 
         sieve_range_adjust Adj(doing, cpoly, config_base);
 
-        if (!Adj.SkewGauss())
-            continue;
-
         /* Try strategies for adopting the sieving range */
         int should_discard = !Adj.sieve_info_adjust_IJ();
 

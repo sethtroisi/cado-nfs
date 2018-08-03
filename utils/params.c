@@ -789,6 +789,36 @@ int param_list_parse_long_and_long(param_list_ptr pl, const char * key, long * r
     return seen;
 }
 
+int param_list_parse_ulong_and_ulong(param_list_ptr pl, const char * key, unsigned long * r, const char * sep)
+{
+    char *value;
+    int seen;
+    if (!get_assoc(pl, key, &value, &seen))
+        return 0;
+    char *orig_value = value, * end;
+    unsigned long res[2];
+    res[0] = strtoul(value, &end, 0);
+    if (strncmp(end, sep, strlen(sep)) != 0) {
+        fprintf(stderr, "Parse error: parameter for key %s"
+                " must match %%d%s%%d; got %s\n",
+                key, sep, orig_value);
+        exit(1);
+    }
+    value = end + strlen(sep);
+    res[1] = strtoul(value, &end, 0);
+    if (*end != '\0') {
+        fprintf(stderr, "Parse error: parameter for key %s"
+                " must match %%d%s%%d; got %s\n",
+                key, sep, orig_value);
+        exit(1);
+    }
+    if (r) {
+        r[0] = res[0];
+        r[1] = res[1];
+    }
+    return seen;
+}
+
 int param_list_parse_int_and_int(param_list_ptr pl, const char * key, int * r, const char * sep)
 {
 #if 1

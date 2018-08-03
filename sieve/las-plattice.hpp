@@ -629,6 +629,7 @@ public:
         x = src.x;
     }
 
+    /* This function is quite critical */
     void next() {
       uint32_t i = x & maskI;
       if (i >= bound1)
@@ -790,6 +791,11 @@ public:
     plattices_dense_vector_t() = default;
 #endif
 };
+
+// This one is for remembering the FK basis in sublat mode, between two
+// different congruences of (i,j) mod m.
+// For simplicity, we remember them only for the toplevel.
+typedef std::vector<plattices_dense_vector_t> precomp_plattice_dense_t;
 
 
 #if 0

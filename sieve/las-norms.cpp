@@ -295,15 +295,15 @@ lognorm_base::lognorm_base(siever_config const & sc, cxx_cado_poly const & cpoly
 
     mpz_poly_homography (fij, cpoly->pols[side], H);
     if (sc.side == side) {
-        ASSERT_ALWAYS(mpz_poly_divisible_mpz(fij, Q.q));
-        mpz_poly_divexact_mpz(fij, fij, Q.q);
+        ASSERT_ALWAYS(mpz_poly_divisible_mpz(fij, Q.doing.p));
+        mpz_poly_divexact_mpz(fij, fij, Q.doing.p);
     }
     double_poly_set_mpz_poly(fijd, fij);
     // Take sublat into account: multiply all coefs by m^deg.
     // We do it only for the floating point version, that is used to
     // compute a bound on the norms, and in the norm_init phase.
-    if (sc.sublat.m > 0)
-        double_poly_mul_double(fijd, fijd, pow(sc.sublat.m, fijd->deg));
+    if (Q.sublat.m > 0)
+        double_poly_mul_double(fijd, fijd, pow(Q.sublat.m, fijd->deg));
 
     int I = 1 << logI;
 
@@ -845,9 +845,9 @@ void sieve_range_adjust::prepare_fijd()/*{{{*/
     for (int side = 0; side < 2; side++) {
         cxx_mpz_poly fz;
         mpz_poly_homography (fz, cpoly->pols[side], H);
-        if (doing.side == side) {
-            ASSERT_ALWAYS(mpz_poly_divisible_mpz(fz, doing.p));
-            mpz_poly_divexact_mpz(fz, fz, doing.p);
+        if (Q.doing.side == side) {
+            ASSERT_ALWAYS(mpz_poly_divisible_mpz(fz, Q.doing.p));
+            mpz_poly_divexact_mpz(fz, fz, Q.doing.p);
         }
         double_poly_set_mpz_poly(fijd[side], fz);
     }
@@ -888,7 +888,7 @@ sieve_range_adjust::sieve_info_update_norm_data_Jmax (bool keep_logI)
   if (!keep_logI)
       logI = (logA+1)/2;
   const double I = (double) (1 << logI);
-  const double q = mpz_get_d(doing.p);
+  const double q = mpz_get_d(Q.doing.p);
   const double skew = cpoly->skew;
   const double A = (1 << logI)*sqrt(q*skew);
   const double B = (1 << (logA - logI))*sqrt(q/skew);
@@ -903,12 +903,12 @@ sieve_range_adjust::sieve_info_update_norm_data_Jmax (bool keep_logI)
       double_poly dpoly;
       double_poly_init (dpoly, cpoly->pols[side]->deg);
       double_poly_set_mpz_poly (dpoly, cpoly->pols[side]);
-      if (conf.sublat.m > 0)
-          double_poly_mul_double(dpoly, dpoly, pow(conf.sublat.m, cpoly->pols[side]->deg));
+      if (Q.sublat.m > 0)
+          double_poly_mul_double(dpoly, dpoly, pow(Q.sublat.m, cpoly->pols[side]->deg));
       double maxnorm = get_maxnorm_circular (dpoly, fudge_factor*A/2.,
               fudge_factor*B);
       double_poly_clear (dpoly);
-      if (side == doing.side)
+      if (side == Q.doing.side)
         maxnorm /= q;
 
       /* in the (i,j)-plane, the sieving region is rectangular */
@@ -1204,14 +1204,14 @@ int sieve_range_adjust::sieve_info_adjust_IJ()/*{{{*/
             "# Called sieve_info_adjust_IJ((a0=%" PRId64 "; b0=%" PRId64
             "; a1=%" PRId64 "; b1=%" PRId64 "), p=%Zd, skew=%f)\n",
             Q.a0, Q.b0, Q.a1, Q.b1,
-            (mpz_srcptr) doing.p, skew);
+            (mpz_srcptr) Q.doing.p, skew);
     if (Q.skewed_norm0(skew) > Q.skewed_norm1(skew)) {
         /* exchange u0 and u1, thus I and J */
         swap(Q.a0, Q.a1);
         swap(Q.b0, Q.b1);
     }
     double maxab1 = MAX(abs(Q.a1) / rt_skew, abs(Q.b1) * rt_skew);
-    double B = sqrt (2.0 * mpz_get_d(doing.p) / sqrt (3.0));
+    double B = sqrt (2.0 * mpz_get_d(Q.doing.p) / sqrt (3.0));
 
     uint32_t I = 1UL << ((logA+1)/2);
     J = 1UL << ((logA-1)/2);
