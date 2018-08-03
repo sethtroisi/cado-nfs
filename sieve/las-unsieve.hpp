@@ -56,8 +56,6 @@ struct j_divisibility_helper {
     entry& operator[](int i) { return entries[i]; }
     entry const & operator[](int i) const { return entries[i]; }
     j_divisibility_helper(uint32_t J);
-    j_divisibility_helper(j_divisibility_helper const &);
-    j_divisibility_helper& operator=(j_divisibility_helper const &);
 };
 
 

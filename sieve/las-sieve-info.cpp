@@ -36,7 +36,7 @@ unsieve_data const * sieve_info::get_unsieve_data(siever_config const & conf) /*
         pthread_mutex_unlock(&lock);
         return &it->second;
     }
-    auto itb = us_cache.emplace(p, p);
+    auto itb = us_cache.insert(std::make_pair(p, unsieve_data(p)));
     ASSERT(itb.second);
     pthread_mutex_unlock(&lock);
     return &(*itb.first).second;
@@ -53,7 +53,7 @@ j_divisibility_helper const * sieve_info::get_j_divisibility_helper(int J) /* {{
         pthread_mutex_unlock(&lock);
         return &it->second;
     }
-    auto itb = jdiv_cache.emplace(Jround, Jround);
+    auto itb = jdiv_cache.insert(std::move(decltype(jdiv_cache)::value_type(Jround, Jround)));
     ASSERT(itb.second);
     pthread_mutex_unlock(&lock);
     return &(*itb.first).second;
@@ -90,10 +90,10 @@ facul_strategies_t const * sieve_info::get_strategies(siever_config const & conf
         file = fopen (cofactfilename, "r");
     double time_strat = seconds();
 
-    auto itb = facul_strategies_cache.emplace(conf,
+    auto itb = facul_strategies_cache.insert(std::make_pair(conf,
             std::shared_ptr<facul_strategies_t>(
                 facul_make_strategies (conf, file, 0),
-                facul_clear_strategies)
+                facul_clear_strategies))
             );
 
     ASSERT_ALWAYS(itb.second);
