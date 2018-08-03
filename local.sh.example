@@ -78,7 +78,7 @@
 #
 # Example values:
 # CFLAGS=-O2
-# CFLAGS="-O3 -g -fkeep-inline-functions"
+# CFLAGS="-O3 -funroll-loops -DNDEBUG"
 # CFLAGS=-g
 # CFLAGS="-O2 -DNDEBUG"
 #
