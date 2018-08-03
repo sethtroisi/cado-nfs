@@ -56,6 +56,7 @@ struct las_info : private NonCopyable, public las_augmented_output_channel {
     int nb_threads;
     const char * galois; /* a string to indicate which galois to use in las */
     int suppress_duplicates;
+    int adjust_strategy = 0;
 
     /* It's not ``general operational'', but global enough to be here */
     cxx_cado_poly cpoly;
@@ -70,10 +71,6 @@ struct las_info : private NonCopyable, public las_augmented_output_channel {
         bk_multiplier.grow(key, d);
     }
 
-    /* There may be several configured sievers. This is used mostly for
-     * the descent.  */
-    std::list<sieve_info> sievers;
-
     // ----- todo list and various specification of what the siever will
     // be doing.
     std::stack<las_todo_entry> todo;
@@ -83,6 +80,8 @@ struct las_info : private NonCopyable, public las_augmented_output_channel {
     cxx_mpz todo_q0;
     cxx_mpz todo_q1;
     FILE * todo_list_fd;
+    std::array<unsigned long, 2> dupqmin;   /* smallest q sieved, for dupsup */
+    std::array<unsigned long, 2> dupqmax;   /* largest q sieved, for dupsup */
  
     /* For composite special-q */
     int allow_composite_q;
@@ -119,7 +118,6 @@ struct las_info : private NonCopyable, public las_augmented_output_channel {
     const char *dump_filename;
     mutable dumpfile dumpfiles[2];
 
-    void clear_sieve_info_cache();
     las_info(cxx_param_list &);
     ~las_info();
 };

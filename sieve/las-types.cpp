@@ -86,19 +86,6 @@ las_info::las_info(cxx_param_list & pl)
 
     galois = param_list_lookup_string(pl, "galois");
     suppress_duplicates = param_list_parse_switch(pl, "-dup");
-    if (suppress_duplicates) {
-        bool qmin_initialized = false;
-        for (int side = 0; side < 2; side++) {
-            if (config_pool.default_config_ptr->sides[side].qmin != LONG_MAX) {
-                qmin_initialized = true;
-            }
-        }
-        if (!qmin_initialized) {
-            fprintf(stderr,
-                    "Error: -dup-qmin is mandatory with -dup\n");
-            exit(EXIT_FAILURE);
-        }
-    }
 
     /*  Parse polynomial */
     const char *tmp;
@@ -129,6 +116,8 @@ las_info::las_info(cxx_param_list & pl)
     }
 
     // }}}
+
+    param_list_parse_int(pl, "adjust-strategy", &adjust_strategy);
 
     // ----- stuff roughly related to the descent {{{
 #ifdef  DLP_DESCENT
@@ -166,7 +155,7 @@ las_info::las_info(cxx_param_list & pl)
     } else {
         todo_list_fd = NULL;
     }
-
+    
     /* composite special-q ? */
     allow_composite_q = param_list_parse_switch(pl, "-allow-compsq");
     if (allow_composite_q) {
@@ -183,6 +172,25 @@ las_info::las_info(cxx_param_list & pl)
     }
 
     // }}}
+
+    dupqmin = {{ 0, 0 }};
+    dupqmax = {{ ULONG_MAX, ULONG_MAX}};
+    if (!param_list_parse_ulong_and_ulong(pl, "dup-qmin", &dupqmin[0], ",") && suppress_duplicates) {
+        fprintf(stderr, "Error: -dup-qmin is mandatory with -dup\n");
+        exit(EXIT_FAILURE);
+    }
+    param_list_parse_ulong_and_ulong(pl, "dup-qmax", &dupqmax[0], ",");
+    /* Change 0 (not initialized) into LONG_MAX */
+    for (auto & x : dupqmin) if (x == 0) x = ULONG_MAX;
+
+    /* If qmin is not given, use lim on the special-q side by default.
+     * This makes sense only if the relevant fields have been filled from
+     * the command line.
+     */
+    if (dupqmin[config_pool.base.side] == ULONG_MAX)
+        dupqmin[config_pool.base.side] = config_pool.base.sides[config_pool.base.side].lim;
+
+    
 
     // ----- batch mode {{{
     batch = param_list_parse_switch(pl, "-batch");
@@ -201,21 +209,9 @@ las_info::las_info(cxx_param_list & pl)
     dump_filename = param_list_lookup_string(pl, "dumpfile");
 }/*}}}*/
 
-void las_info::clear_sieve_info_cache()
-{
-    char buf1[16];
-
-    if (sievers.empty()) return;
-    verbose_output_print(0, 2, "# Getting rid of %zu sieve_info structures [rss=%s]\n", sievers.size(), size_disp_fine(1024UL * Memusage2(), buf1, 10000.0));
-    for(int i = 0 ; !sievers.empty() ; ++i) {
-        sievers.erase(sievers.begin());
-        verbose_output_print(0, 2, "# Discarded %d-th sieve_info [rss=%s]\n", i, size_disp_fine(1024UL * Memusage2(), buf1, 10000.0));
-    }
-}
 
 las_info::~las_info()/*{{{*/
 {
-    clear_sieve_info_cache();
 
     // ----- general operational flags {{{
     gmp_randclear(rstate);
@@ -231,21 +227,4 @@ las_info::~las_info()/*{{{*/
     // ----- batch mode: very little
     if (batch_print_survivors) fclose(batch_print_survivors);
     cofac_list_clear (L);
-}/*}}}*/
-
-sieve_info & sieve_info::get_sieve_info_from_config(siever_config const & sc, cxx_cado_poly const & cpoly, std::list<sieve_info> & registry, cxx_param_list & pl, bool try_fbc)/*{{{*/
-{
-    std::list<sieve_info>::iterator psi;
-    psi = find_if(registry.begin(), registry.end(), sc.same_config());
-    if (psi != registry.end()) {
-        // This has been displayed already.
-        // sc.display();
-        return *psi;
-    }
-    registry.push_back(sieve_info(sc, cpoly, registry, pl, try_fbc));
-    sieve_info & si(registry.back());
-    verbose_output_print(0, 2, "# Creating new sieve configuration for q~2^%d on side %d (logI=%d)\n",
-            sc.bitsize, sc.side, si.conf.logI);
-    sc.display();
-    return registry.back();
 }/*}}}*/

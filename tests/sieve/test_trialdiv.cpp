@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <limits.h>
 #include <sys/time.h>
-#include "sieve/trialdiv.h"
+#include "sieve/trialdiv.hpp"
 #include "utils.h"
 #include "test_iter.h"
 #include "tests_common.h"
@@ -11,34 +11,21 @@
 void
 trialdiv_stdinput(const unsigned long pmax, const int verbose)
 {
-  unsigned long *primes;
-  trialdiv_divisor_t *d;
-  unsigned long *factors;
-  int nr_primes = 0;
+    std::vector<unsigned long> primes;
   unsigned long p;
-  const size_t max_div = 32;
-  mpz_t N;
+  cxx_mpz N;
   prime_info pi;
 
   prime_info_init (pi);
   for (p = getprime_mt (pi); p <= pmax; p = getprime_mt (pi))
-    nr_primes++;
-  primes = malloc (nr_primes * sizeof (unsigned long));
+    primes.push_back(p);
   prime_info_clear (pi);
 
-  prime_info_init (pi);
-  nr_primes = 0;
-  for (p = getprime_mt (pi); p <= pmax; p = getprime_mt (pi))
-    primes[nr_primes++] = p;
-  prime_info_clear (pi);
+  trialdiv_data d(primes);
 
-  d = trialdiv_init (primes, nr_primes);
-  free (primes);
-  factors = (unsigned long *) malloc (max_div * sizeof (unsigned long));
   
-  mpz_init(N);
   while (!feof(stdin)) {
-    size_t t, i;
+    size_t i;
     unsigned long bit; /* old versions of GMP do not have mp_bitcnt_t */
     
     if (mpz_inp_str (N, stdin, 10) == 0)
@@ -60,37 +47,31 @@ trialdiv_stdinput(const unsigned long pmax, const int verbose)
       printf ("1\n");
       continue;
     }
-    t = trialdiv (factors, N, d, max_div);
-    ASSERT_ALWAYS (t <= max_div);
+
+    std::vector<uint64_t> factors = d.trial_divide(N);
 
     if (verbose) {
       for (i = 0; i < bit; i++) {
         printf ("2 ");
       }
-      for (i = 0; i < t; i++)
-        printf ("%lu ", (unsigned long) factors[i]);
+      for (auto p: factors)
+        printf ("%lu ", p);
     }
-    gmp_printf ("%Zd\n", N);
+    gmp_printf ("%Zd\n", (mpz_srcptr) N);
   }
-  
-  mpz_clear (N);
-  trialdiv_clear (d);
 }
 
 /* performs iter random tests with a cofactor of n limbs */
 void
 test_trialdiv (int n, unsigned long iter)
 {
-  mpz_t N;
-  trialdiv_divisor_t *d;
-  unsigned long f[1];
-  unsigned long p, g[1], i, pmax;
-  size_t s;
+  cxx_mpz N;
+  unsigned long p, pmax;
+  std::vector<uint64_t> g;
   int ret;
 
-  mpz_init (N);
   pmax = trialdiv_get_max_p();
-  for (i = 0; i < iter; i++)
+  for (unsigned long i = 0; i <iter; i++)
     {
       if (i == 0)
         p = 3;
@@ -102,40 +83,35 @@ test_trialdiv (int n, unsigned long iter)
       } else {
           do p = ulong_nextprime (lrand48 () % pmax); while (p > pmax || p < 3);
       }
-      f[0] = p;
-      d = trialdiv_init (f, 1);
+      trialdiv_data d(std::vector<unsigned long>(1, p));
 
       mpz_urandomb (N, state, n * mp_bits_per_limb);
       ret = mpz_divisible_ui_p (N, p);
-      s = trialdiv (g, N, d, 1);
-      ASSERT_ALWAYS (s <= 2); /* s can be max_div+1, i.e., 2 */
+      g = d.trial_divide (N, 1);
+      ASSERT_ALWAYS (g.size() <= 1); 
       if (ret) {
-        ASSERT_ALWAYS (s >= 1);
+        ASSERT_ALWAYS (g.size() >= 1);
         ASSERT_ALWAYS (g[0] == p);
-      } else
-        ASSERT_ALWAYS (s == 0);
+      } else {
+        ASSERT_ALWAYS (g.size() == 0);
+      }
 
       /* now test a case where it should divide */
       mpz_sub_ui (N, N, mpz_fdiv_ui (N, p));
       if (mpz_sgn(N) == 0)
         mpz_set_ui(N, p);
-      s = trialdiv (g, N, d, 1);
-      ASSERT_ALWAYS (1 <= s && s <= 2); /* s can be max_div+1, i.e., 2 */
+      g = d.trial_divide(N, 1);
+
+      ASSERT_ALWAYS (g.size() == 1);
       ASSERT_ALWAYS (g[0] == p);
-      trialdiv_clear(d);
     }
-  mpz_clear (N);
 }
 
 int main (int argc, const char **argv)
 {
-  unsigned long *primes;
-  trialdiv_divisor_t *d;
-  const size_t max_div = 16;
-  unsigned long *factors;
   int i, len = 1, nr_primes = 1000, nr_N = 100000;
   unsigned long expect = 0, nr_div = 0;
-  mpz_t M, N, pk, t1, t2;
+  cxx_mpz M, N, pk, t1, t2;
   double usrtime;
   int verbose = 0, input = 0;
   unsigned long iter = 10000;
@@ -182,27 +158,23 @@ int main (int argc, const char **argv)
       exit (EXIT_FAILURE);
     }
 
-  mpz_init (M);
-  mpz_init (N);
-  mpz_init (pk);
-  mpz_init (t1);
-  mpz_init (t2);
   mpz_set_ui (N, 1UL);
   mpz_mul_2exp (N, N, 8 * sizeof(unsigned long) * len);
   mpz_tdiv_q_ui (N, N, 3UL);
   mpz_nextprime (N, N);
 
+  std::vector<unsigned long> primes;
   prime_info pi;
   prime_info_init (pi);
   for (i = 0; i < 0; i++) /* To skip some primes */
     getprime_mt (pi);
-  primes = malloc (nr_primes * sizeof (unsigned long));
+  primes.reserve(nr_primes);
 
   mpz_add_ui (M, N, nr_N - 1); /* We'll divide integers in [N, M] */
   mpz_sub_ui (N, N, 1UL);
   for (i = 0; i < nr_primes; i++)
     {
-      primes[i] = getprime_mt (pi);
+      primes.push_back(getprime_mt (pi));
       /* Estimate the number of divisors we'll find when trial dividing by
          this p and its powers. 
          The number of times d divides in [0, n] is floor(n/d)+1,
@@ -224,35 +196,23 @@ int main (int argc, const char **argv)
   if (verbose)
     gmp_printf ("Trial dividing integers in [%Zd, %Zd] "
                 "by the %d primes in [%lu, %lu]\n", 
-                N, M, nr_primes, (unsigned long) primes[0], 
+                (mpz_srcptr) N,
+                (mpz_srcptr) M,
+                nr_primes, (unsigned long) primes[0], 
                 (unsigned long) primes[nr_primes - 1]);
   prime_info_clear (pi);
 
-  d = trialdiv_init (primes, nr_primes);
-  free (primes);
-  factors = (unsigned long *) malloc (max_div * sizeof (unsigned long));
-  
+  trialdiv_data d(primes);
+
   for (i = 0; i < nr_N; i++)
     {
-      size_t t;
       mpz_set (M, N);
-      do {
-	t = trialdiv (factors, M, d, max_div);
-	nr_div += (t > max_div) ? max_div : t;
-      } while (t > max_div); /* If more factors were found than fit in factor 
-                                array, continue factoring on cofactor */
+      nr_div += d.trial_divide(M).size();
       mpz_add_ui (N, N, 1UL);
     }
   
   usrtime = microseconds();
 
-  mpz_clear (t1);
-  mpz_clear (t2);
-  mpz_clear (pk);
-  mpz_clear (M);
-  mpz_clear (N);
-  trialdiv_clear (d);
-  free (factors);
   if (verbose)
     {
       printf ("Found %lu divisors, expected %lu\n", nr_div, expect);

@@ -11,10 +11,14 @@ int never_discard = 0;      /* only enabled for las_descent */
 
 static bool choose_sieve_area(las_info const & las,
         timetree_t * ptimer MAYBE_UNUSED,
-        int adjust_strategy, las_todo_entry const & doing, siever_config & conf, qlattice_basis & Q, uint32_t & J)
+        las_todo_entry const & doing,
+        siever_config & conf,
+        qlattice_basis & Q,
+        uint32_t & J)
 {
     sieve_range_adjust Adj;
 
+    int adjust_strategy = las.adjust_strategy;
     {
 
     /* Our business: find an appropriate siever_config, that is
@@ -29,9 +33,9 @@ static bool choose_sieve_area(las_info const & las,
      * optimal logI and J for this special-q. We have several
      * strategies for that.
      */
-    Adj = sieve_range_adjust(doing, las.cpoly, conf);
-
-    if (!Adj.SkewGauss()) {
+    try {
+        Adj = sieve_range_adjust(doing, las.cpoly, conf);
+    } catch (qlattice_basis::too_skewed const & x) {
         verbose_output_vfprint(0, 1, gmp_vfprintf,
                 "# "
                 HILIGHT_START
@@ -54,6 +58,13 @@ static bool choose_sieve_area(las_info const & las,
 #endif
 
     }
+
+    /* Must be done before any sort of lognorm computation, even before the
+     * adjustment. (only sublat_bound matters, here -- which actual
+     * sublattice we will sieve is irrelevant at this point, as what we
+     * do will be shared for all sublattices).
+     */
+    Adj.Q.sublat.m = conf.sublat_bound;
 
     {
 
@@ -137,15 +148,21 @@ static bool choose_sieve_area(las_info const & las,
 
 bool choose_sieve_area(las_info const & las,
         std::shared_ptr<nfs_aux> aux_p,
-        int adjust_strategy, las_todo_entry const & doing, siever_config & conf, qlattice_basis & Q, uint32_t & J)
+        las_todo_entry const & doing,
+        siever_config & conf,
+        qlattice_basis & Q,
+        uint32_t & J)
 {
     timetree_t & timer(aux_p->timer_special_q);
-    return choose_sieve_area(las, &timer, adjust_strategy, doing, conf, Q, J);
+    return choose_sieve_area(las, &timer, doing, conf, Q, J);
 }
 
 bool choose_sieve_area(las_info const & las,
-        int adjust_strategy, las_todo_entry const & doing, siever_config & conf, qlattice_basis & Q, uint32_t & J)
+        las_todo_entry const & doing,
+        siever_config & conf,
+        qlattice_basis & Q,
+        uint32_t & J)
 {
-    return choose_sieve_area(las, nullptr, adjust_strategy, doing, conf, Q, J);
+    return choose_sieve_area(las, nullptr, doing, conf, Q, J);
 }
 

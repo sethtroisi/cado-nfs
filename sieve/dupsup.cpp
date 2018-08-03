@@ -85,6 +85,10 @@ check (int seen, const char *param)
     }
 }
 
+/* XXX would this be covered by a call to siever_config::parse_default ?
+ * Maybe the requirements on which parameters to provide are not the
+ * same.
+ */
 static int
 parse_config(siever_config & sc, param_list_ptr pl)
 {
@@ -124,23 +128,6 @@ parse_config(siever_config & sc, param_list_ptr pl)
     param_list_parse_double(pl, "lambda1", &(sc.sides[1].lambda));
     seen &= param_list_parse_int   (pl, "ncurves1",  &(sc.sides[1].ncurves));
     check (seen, "ncurves1");
-    long dupqmin[2] = {0, 0};
-    param_list_parse_long_and_long(pl, "dup-qmin", dupqmin, ",");
-    sc.sides[0].qmin = dupqmin[0];
-    sc.sides[1].qmin = dupqmin[1];
-    long dupqmax[2] = {LONG_MAX, LONG_MAX};
-    param_list_parse_long_and_long(pl, "dup-qmax", dupqmax, ",");
-    sc.sides[0].qmax = dupqmax[0];
-    sc.sides[1].qmax = dupqmax[1];
-
-    /* Change 0 (not initialized) into LONG_MAX */
-    for (int side = 0; side < 2; side ++)
-      if (sc.sides[side].qmin == 0)
-	sc.sides[side].qmin = LONG_MAX;
-
-    /* If qmin is not given, use lim on the special-q side by default. */
-    if (sc.sides[sc.side].qmin == LONG_MAX)
-      sc.sides[sc.side].qmin = sc.sides[sc.side].lim;
 
     int logI = (sc.logA+1)/2;
     if (!param_list_parse_ulong(pl, "powlim0", &sc.sides[0].powlim))
@@ -198,7 +185,6 @@ int
 main (int argc, char * argv[])
 {
     char * argv0 = argv[0];
-    siever_config conf;
     int adjust_strategy = 0;
 
     cxx_param_list pl;
@@ -242,6 +228,15 @@ main (int argc, char * argv[])
 
     cxx_cado_poly cpoly;
     read_poly(cpoly, pl);
+    /* We only need this config in order to fetch the strategies. And
+     * even then, it slightly improper, given that one may have different
+     * strtaegies depending on q (but probably not in the dupsup
+     * context).
+     *
+     * (anyway we don't want relation_is_duplicate to access the global
+     * cache that stores strategies -- it would be a pain in the las).
+     */
+    siever_config conf;
     int ok = parse_config(conf, pl);
     /* the polynomial skewness can be overriden on the command line,
        but the option -skew is optional */
@@ -265,24 +260,15 @@ main (int argc, char * argv[])
 	}
     }
 
-    setvbuf(output, NULL, _IOLBF, 0);      /* mingw has no setlinebuf */
-    std::shared_ptr<facul_strategies_t> strategies(facul_make_strategies(
-            conf.sides[0].lim,
-            conf.sides[0].lpb,
-            conf.sides[0].mfb,
-            conf.sides[1].lim,
-            conf.sides[1].lpb,
-            conf.sides[1].mfb,
-            true,
-            conf.sides[0].ncurves,
-            conf.sides[1].ncurves,
-            NULL, 0), facul_clear_strategies);
 
-    mpz_t sq, rho;
-    mpz_init(sq);
-    mpz_init(rho);
+    setvbuf(output, NULL, _IOLBF, 0);      /* mingw has no setlinebuf */
+
+    facul_strategies_t * strategies = facul_make_strategies (conf, NULL, 0);
+
+    cxx_mpz sq, rho;
 
     las_info las(pl);
+
 
     las_todo_entry doing;
 
@@ -292,35 +278,27 @@ main (int argc, char * argv[])
           perror(argv[argi]);
           abort();
       }
-      sieve_info * psi = NULL;
       for (int row = 0 ; !feof(f) ; row++) {
         char line[1024];
         if (fgets(line, sizeof(line), f) == NULL)
           break;
-        if (read_sq_comment(doing, line)) {
-            /* TODO we need to fix that for dynamic I */
-            if (psi) delete psi;
-            uint32_t I = 1UL << ((conf.logA+1)/2);
-            uint32_t J = 1UL << ((conf.logA-1)/2);
-            psi = fill_in_sieve_info(doing, I, J, cpoly, conf);
-            psi->strategies = strategies;
-        } else {
-            relation rel;
-            if (rel.parse(line)) {
-                int is_dupe = relation_is_duplicate(rel, doing, las, psi->conf, psi->strategies, adjust_strategy);
-                dupsup(output, rel, doing, is_dupe);
-            }
+
+        if (read_sq_comment(doing, line))
+            continue;
+
+        relation rel;
+        if (rel.parse(line)) {
+            int is_dupe = relation_is_duplicate(rel, doing, las, strategies);
+            dupsup(output, rel, doing, is_dupe);
         }
       }
       fclose_maybe_compressed(f, argv[argi]);
-      if (psi) delete psi;
     }
     
+    facul_clear_strategies(strategies);
+
     if (outputname)
         fclose_maybe_compressed(output, outputname);
-
-    mpz_clear(sq);
-    mpz_clear(rho);
 
     return 0;
 }

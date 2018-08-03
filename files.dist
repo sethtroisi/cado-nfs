@@ -429,8 +429,8 @@ sieve/las-fill-in-buckets.hpp
 sieve/las.cpp
 sieve/makefb.c
 sieve/makefb.sage
-sieve/trialdiv.c
-sieve/trialdiv.h
+sieve/trialdiv.cpp
+sieve/trialdiv.hpp
 sieve/dupsup.cpp
 sieve/fake_rels.cpp
 sqrt/CMakeLists.txt
@@ -512,7 +512,7 @@ tests/sieve/F9.hint
 tests/sieve/c120.poly
 tests/sieve/c120.roots1.gz
 tests/sieve/sievetest.sh
-tests/sieve/test_trialdiv.c
+tests/sieve/test_trialdiv.cpp
 tests/sieve/ecm/CMakeLists.txt
 tests/sieve/ecm/test_factor_ecm_10_100_1000.inp
 tests/sieve/ecm/test_factor_ecm_11_100_1000.inp

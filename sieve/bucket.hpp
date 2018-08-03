@@ -623,6 +623,7 @@ class bkmult_specifier {
     template<typename T> double get(T const &) const { return get<T>(); }
     template<typename T> double operator()(T const &) const { return get<T>(); }
     template<typename T> double operator()() const { return get<T>(); }
+    bkmult_specifier() = default;
     bkmult_specifier(double x) : base(x) {}
     bkmult_specifier(const char * specifier);
     std::string print_all() const;

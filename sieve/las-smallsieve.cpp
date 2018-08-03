@@ -230,15 +230,17 @@ static order_ssp_t order_ssp;
 void small_sieve_init(small_sieve_data_t & ssd,
                       std::vector<fb_entry_general> const & resieved,
                       std::vector<fb_entry_general> const & rest,
-                      sieve_info const & si, const int side)
+                      int logI,
+                      int side,
+                      fb_factorbase::key_type const & fbK,
+                      qlattice_basis const & Q,
+                      double scale)
 {
-    const unsigned int thresh = si.sides[side].fbK.thresholds[0];
+    const unsigned int thresh = fbK.thresholds[0];
     const int verbose = 0;
     where_am_I w MAYBE_UNUSED;
 
-    int logI = si.conf.logI;
-
-    ssd.fbK = si.sides[side].fbK;
+    ssd.fbK = fbK;
 
     // This zeroes out all vectors, but keeps storage around nevertheless
     small_sieve_clear(ssd);
@@ -260,7 +262,7 @@ void small_sieve_init(small_sieve_data_t & ssd,
     
     // If we are doing sublattices modulo m, then we jump virtually m
     // times faster.
-    unsigned int sublatm = si.conf.sublat.m;
+    unsigned int sublatm = Q.sublat.m;
 
     for (auto const & c : { &resieved, &rest }) {
         if (c == &rest)
@@ -281,7 +283,7 @@ void small_sieve_init(small_sieve_data_t & ssd,
                    FIXME, this sucks. */
                 const fbroot_t r = root.r + (root.proj ? p : 0);
 
-                if (!si.doing.is_coprime_to(pp)) {
+                if (!Q.doing.is_coprime_to(pp)) {
                     continue;
                 }
 
@@ -296,11 +298,10 @@ void small_sieve_init(small_sieve_data_t & ssd,
                     }
                 }
 
-                const unsigned char logp = fb_log_delta (pp, root.exp, root.oldexp,
-                        si.sides[side].lognorms->scale);
+                const unsigned char logp = fb_log_delta (pp, root.exp, root.oldexp, scale);
 
                 WHERE_AM_I_UPDATE(w, r, r);
-                fbroot_t r_q = fb_root_in_qlattice(p, r, e.invq, si.qbasis);
+                fbroot_t r_q = fb_root_in_qlattice(p, r, e.invq, Q);
                 /* If this root is somehow interesting (projective in (a,b) or
                    in (i,j) plane), print a message */
                 const bool is_proj_in_ij = r_q >= p;
@@ -499,36 +500,11 @@ void small_sieve_init(small_sieve_data_t & ssd,
  */
 /*}}}*/
 
-/* This is copied from LOGNORM_FILL_COMMON_DEFS in las-norms.cpp ; from
- * logI, N, and LOG_BUCKET_REGION, define the integers i0, i1, j0, j1,
- * and I.
- */
-#define SMALLSIEVE_COMMON_DEFS()                                         \
-    const unsigned int log_lines_per_region = MAX(0, LOG_BUCKET_REGION - logI);\
-    const unsigned int log_regions_per_line = MAX(0, logI - LOG_BUCKET_REGION);\
-    const unsigned int regions_per_line = 1 << log_regions_per_line;           \
-    const unsigned int region_rank_in_line = N & (regions_per_line - 1);       \
-    const bool last_region_in_line MAYBE_UNUSED = region_rank_in_line == (regions_per_line - 1); \
-    const unsigned int j0 = (N >> log_regions_per_line) << log_lines_per_region;    \
-    const unsigned int j1 MAYBE_UNUSED = j0 + (1 << log_lines_per_region);    \
-    const int I = 1 << logI;                                            \
-    const int i0 = (region_rank_in_line << LOG_BUCKET_REGION) - I/2;          \
-    const int i1 MAYBE_UNUSED = i0 + (1 << MIN(LOG_BUCKET_REGION, logI));     \
-    /* those are (1,0,0) in the standard case */                        \
-    const int sublatm MAYBE_UNUSED = si.conf.sublat.m ? si.conf.sublat.m : 1; \
-    const unsigned int sublati0 MAYBE_UNUSED = si.conf.sublat.i0;       \
-    const unsigned int sublatj0 MAYBE_UNUSED = si.conf.sublat.j0;       \
-    const int row0_is_oddj MAYBE_UNUSED = (j0*sublatm + sublatj0) & 1;  \
-    bool has_haxis = !j0;                                               \
-    bool has_vaxis = region_rank_in_line == ((regions_per_line-1)/2);   \
-    bool has_origin MAYBE_UNUSED = has_haxis && has_vaxis;              \
-    do {} while (0)
-
 /* Only compute the initial ssdpos fields. */
 void small_sieve_start(std::vector<spos_t> & ssdpos,
         small_sieve_data_t & ssd,
         unsigned int first_region_index,
-        sieve_info const & si)
+        int logI, sublat_t const & sl)
 {
     /* We want to compute the index of the "next" hit, counted from the
      * starting offset of the "current" bucket region at (i0,j0). The
@@ -547,7 +523,7 @@ void small_sieve_start(std::vector<spos_t> & ssdpos,
      *  compute the starting point from within sieve_small_bucket_region
      *  for each bucket region.
      */
-    small_sieve_base C(si.conf.logI, first_region_index, si.conf.sublat);
+    small_sieve_base C(logI, first_region_index, sl);
     ssdpos.clear();
     ssdpos.reserve(ssd.ssps.size());
     for (ssp_simple_t const & ssp : ssd.ssps) {
@@ -564,7 +540,7 @@ void small_sieve_prepare_many_start_positions(
         small_sieve_data_t & ssd,
         unsigned int first_region_index,
         int nregions,
-        sieve_info const & si)
+        int logI, sublat_t const & sl)
 {
     /* We're going to stage the next batch of init values in
      * ssdpos_many_next, while the init values in ssdpos_many are
@@ -581,7 +557,6 @@ void small_sieve_prepare_many_start_positions(
     auto & res(ssd.ssdpos_many_next);
     res.clear();
 
-    int logI = si.conf.logI;
     int logB = LOG_BUCKET_REGION;
     int v = logI - logB;
     int w = (v > 0) ? (1 << v) : 1;
@@ -591,7 +566,7 @@ void small_sieve_prepare_many_start_positions(
     int k;
 
     if (ssd.ssdpos_many.empty()) {
-        small_sieve_start(res.front(), ssd, first_region_index, si);
+        small_sieve_start(res.front(), ssd, first_region_index, logI, sl);
         k = 0;
         /* must complete the first row */
         for(int i = 1 ; i < w ; i++) {
@@ -656,7 +631,7 @@ void small_sieve_prepare_many_start_positions(
     for(int k = 0; k < nregions + w ; k++) {
         ASSERT(res[k].size() == ssd.ssps.size());
         int N = first_region_index + k;
-        small_sieve_base C(si.conf.logI, N, si.conf.sublat);
+        small_sieve_base C(logI, N, sl);
         for(size_t s = 0 ; s < ssd.ssps.size(); ++s) {
             ASSERT(res[k][s] == C.first_position_ordinary_prime(ssd.ssps[s]));
         }
@@ -939,36 +914,24 @@ void small_sieve::do_pattern_sieve(where_am_I & w MAYBE_UNUSED)
 void sieve_small_bucket_region(unsigned char *S, unsigned int N,
                                small_sieve_data_t const & ssd,
                                std::vector<spos_t> const & ssdpos,
-                               sieve_info & si, int side MAYBE_UNUSED,
+                               int logI, sublat_t const & sl,
                                where_am_I & w)
 {
-    int logI = si.conf.logI;
-    // bool is_fragment = logI > LOG_BUCKET_REGION;
-
-    small_sieve SS(ssdpos, ssd.ssps, ssd.ssp, S, logI, N, si.conf.sublat);
+    small_sieve SS(ssdpos, ssd.ssps, ssd.ssp, S, logI, N, sl);
     SS.do_pattern_sieve(w);
     SS.exceptional_sieve(w);
     SS.normal_sieve(w);
-
-#if 0
-    if (is_fragment) {
-        small_sieve<true> SS(ssdpos, ssd.ssps, ssd.ssp, S, logI, N, si.conf.sublat, nthreads);
-        SS.do_pattern_sieve(w);
-        SS.exceptional_sieve(w);
-        SS.normal_sieve(w);
-    } else {
-        small_sieve<false> SS(ssdpos, ssd.ssps, ssd.ssp, S, logI, N, si.conf.sublat, nthreads);
-        SS.do_pattern_sieve(w);
-        SS.exceptional_sieve(w);
-        SS.normal_sieve(w);
-    }
-#endif
 }
 /*}}}*/
 
 /* {{{ resieving. Different interface, since it plays with buckets as well.
  */
 
+
+/* SMALLSIEVE_COMMON_DEFS() is defined in
+ * sieve/las-smallsieve-lowlevel.hpp because the testing framework uses
+ * it.
+ */
 /* Sieve small primes (p < I) of the factor
    base fb in the next sieve region S, and add primes and the x position
    where they divide and where there's a sieve report to a bucket (rather
@@ -976,14 +939,14 @@ void sieve_small_bucket_region(unsigned char *S, unsigned int N,
    Information about where we are is in ssd. */
 void
 resieve_small_bucket_region (bucket_primes_t *BP,
-        unsigned char *S,
-        unsigned int N,
-        small_sieve_data_t & ssd, std::vector<spos_t> const & ssdpos,
-        sieve_info const & si, where_am_I & w MAYBE_UNUSED)
+        unsigned char *S, unsigned int N,
+        small_sieve_data_t & ssd,
+        std::vector<spos_t> const & ssdpos,
+        int logI, sublat_t const & sl,
+        where_am_I & w MAYBE_UNUSED)
 {
-    int logI = si.conf.logI;
     SMALLSIEVE_COMMON_DEFS();
-    small_sieve_base C(logI, N, si.conf.sublat);
+    small_sieve_base C(logI, N, sl);
 
     unsigned char *S_ptr;
     const int resieve_very_verbose = 0;

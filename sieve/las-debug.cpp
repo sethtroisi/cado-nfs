@@ -12,6 +12,7 @@
 #include "las-types.hpp"
 #include "las-debug.hpp"
 #include "las-coordinates.hpp"
+#include "las-threads-work-data.hpp"    /* trace_per_sq_init needs this */
 #include "portability.h"
 
 using namespace std;
@@ -125,8 +126,12 @@ void init_trace_k(cxx_param_list & pl)
 /* This fills all the trace_* structures from the main one. The main
  * structure is the one for which a non-NULL pointer is passed.
  */
-void trace_per_sq_init(sieve_info const & si)
+void trace_per_sq_init(nfs_work const & ws)
 {
+    int logI = ws.conf.logI;
+    unsigned int J = ws.J;
+    qlattice_basis const & Q(ws.Q);
+
 #ifndef TRACE_K
     if (pl_Nx || pl_ab || pl_ij) {
         fprintf (stderr, "Error, relation tracing requested but this siever "
@@ -141,8 +146,8 @@ void trace_per_sq_init(sieve_info const & si)
     if (pl_ab) {
       trace_ab = *pl_ab;
       /* can possibly fall outside the q-lattice. We have to check for it */
-      if (ABToIJ(&trace_ij.i, &trace_ij.j, trace_ab.a, trace_ab.b, si)) {
-          IJToNx(&trace_Nx.N, &trace_Nx.x, trace_ij.i, trace_ij.j, si);
+      if (ABToIJ(trace_ij.i, trace_ij.j, trace_ab.a, trace_ab.b, Q)) {
+          IJToNx(trace_Nx.N, trace_Nx.x, trace_ij.i, trace_ij.j, logI);
       } else {
           verbose_output_print(TRACE_CHANNEL, 0, "# Relation (%" PRId64 ",%" PRIu64 ") to be traced "
                   "is outside of the current q-lattice\n",
@@ -151,16 +156,17 @@ void trace_per_sq_init(sieve_info const & si)
           trace_ij.j=UINT_MAX;
           trace_Nx.N=0;
           trace_Nx.x=UINT_MAX;
+          return;
       }
     } else if (pl_ij) {
         trace_ij = *pl_ij;
-        IJToAB(&trace_ab.a, &trace_ab.b, trace_ij.i, trace_ij.j, si);
-        IJToNx(&trace_Nx.N, &trace_Nx.x, trace_ij.i, trace_ij.j, si);
+        IJToAB(trace_ab.a, trace_ab.b, trace_ij.i, trace_ij.j, Q);
+        IJToNx(trace_Nx.N, trace_Nx.x, trace_ij.i, trace_ij.j, logI);
     } else if (pl_Nx) {
         trace_Nx = *pl_Nx;
         if (trace_Nx.x < ((size_t) 1 << LOG_BUCKET_REGION)) {
-            NxToIJ(&trace_ij.i, &trace_ij.j, trace_Nx.N, trace_Nx.x, si);
-            IJToAB(&trace_ab.a, &trace_ab.b, trace_ij.i, trace_ij.j, si);
+            NxToIJ(trace_ij.i, trace_ij.j, trace_Nx.N, trace_Nx.x, logI);
+            IJToAB(trace_ab.a, trace_ab.b, trace_ij.i, trace_ij.j, Q);
         } else {
             fprintf(stderr, "Error, tracing requested for x=%u but"
                     " this siever was compiled with LOG_BUCKET_REGION=%d\n",
@@ -169,9 +175,9 @@ void trace_per_sq_init(sieve_info const & si)
         }
     }
 
-    if ((trace_ij.j < UINT_MAX && trace_ij.j >= si.J)
-         || (trace_ij.i < -(1L << (si.conf.logI-1)))
-         || (trace_ij.i >= (1L << (si.conf.logI-1))))
+    if ((trace_ij.j < UINT_MAX && trace_ij.j >= J)
+         || (trace_ij.i < -(1L << (logI-1)))
+         || (trace_ij.i >= (1L << (logI-1))))
     {
         verbose_output_print(TRACE_CHANNEL, 0, "# Relation (%" PRId64 ",%" PRIu64 ") to be traced is "
                 "outside of the current (i,j)-rectangle (i=%d j=%u)\n",
@@ -180,6 +186,7 @@ void trace_per_sq_init(sieve_info const & si)
         trace_ij.j=UINT_MAX;
         trace_Nx.N=0;
         trace_Nx.x=UINT_MAX;
+        return;
     }
     if (trace_ij.i || trace_ij.j < UINT_MAX) {
         verbose_output_print(TRACE_CHANNEL, 0, "# Tracing relation (a,b)=(%" PRId64 ",%" PRIu64 ") "
@@ -191,8 +198,8 @@ void trace_per_sq_init(sieve_info const & si)
     for(int side = 0 ; side < 2 ; side++) {
         int i = trace_ij.i;
         unsigned j = trace_ij.j;
-        adjustIJsublat(&i, &j, si);
-        si.sides[side].lognorms->norm(traced_norms[side], i, j);
+        adjustIJsublat(i, j, Q.sublat);
+        ws.sides[side].lognorms.norm(traced_norms[side], i, j);
     }
 }
 
@@ -208,7 +215,7 @@ int test_divisible(where_am_I& w)
     fbprime_t p = w.p;
     if (p==0) return 1;
 
-    const unsigned int logI = w.psi->conf.logI;
+    const unsigned int logI = w.logI;
     const unsigned int I = 1U << logI;
 
     const unsigned long X = w.x + (w.N << LOG_BUCKET_REGION);
@@ -357,8 +364,8 @@ void sieve_increase_underflow_trap(unsigned char *S, const unsigned char logp, w
     uint64_t b;
     static unsigned char maxdiff = ~0;
 
-    NxToIJ(&i, &j, w.N, w.x, w.si);
-    IJToAB(&a, &b, i, j, w.si);
+    NxToIJ(&i, &j, w.N, w.x, w.logI);
+    IJToAB(&a, &b, i, j, *w.Q);
     if ((unsigned int) logp + *S > maxdiff)
       {
         maxdiff = logp - *S;

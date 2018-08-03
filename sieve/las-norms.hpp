@@ -33,6 +33,9 @@ struct lognorm_base {/*{{{*/
     double scale;      /* scale used for logarithms for fb and norm.
                         * must be of form (int)x * 0.1 */
 
+    lognorm_base() = default;
+    lognorm_base(lognorm_base const &) = default;
+    lognorm_base& operator=(lognorm_base const &) = default;
     lognorm_base(siever_config const & sc, cxx_cado_poly const & cpoly, int side, qlattice_basis const & Q, int logI, int J);
 
     void norm(mpz_ptr x, int i, unsigned int j) const;
@@ -59,6 +62,9 @@ struct lognorm_reference : public lognorm_base {/*{{{*/
 
     unsigned char lognorm_table[1 << NORM_BITS];
 
+    lognorm_reference() = default;
+    lognorm_reference(lognorm_reference const &) = default;
+    lognorm_reference& operator=(lognorm_reference const &) = default;
     lognorm_reference(siever_config const & sc, cxx_cado_poly const & cpoly, int side, qlattice_basis const & Q, int logI, int J);
     virtual void fill(unsigned char * S, int N) const;
 };
@@ -74,6 +80,9 @@ struct lognorm_smart : public lognorm_base {/*{{{*/
      * original one on the segment [-I,I]x{1}.
      */
     piecewise_linear_function G;
+    lognorm_smart() = default;
+    lognorm_smart(lognorm_smart const &) = default;
+    lognorm_smart& operator=(lognorm_smart const &) = default;
     lognorm_smart(siever_config const & sc, cxx_cado_poly const & cpoly, int side, qlattice_basis const & Q, int logI, int J);
     virtual void fill(unsigned char * S, int N) const;
 };
@@ -81,12 +90,11 @@ struct lognorm_smart : public lognorm_base {/*{{{*/
 /*}}}*/
 struct sieve_range_adjust {/*{{{*/
     friend struct sieve_info;
+    qlattice_basis Q;
 private:
-    las_todo_entry doing;
     siever_config conf;         /* This "conf" field is only used for a
                                  * few fields:
                                  *      logA
-                                 *      sublat
                                  *      lpb
                                  * We're specifically *not* using the
                                  * sieving fields, since by design these
@@ -99,7 +107,6 @@ private:
 public:
     int logI;
     uint32_t J;
-    qlattice_basis Q;
 
 #if 0
     sieve_range_adjust(las_todo_entry const & doing, las_info const & las)
@@ -116,9 +123,12 @@ public:
 #endif
 
     /* This is only for desperate cases. In las-duplicates, for the
-     * moment it seems that we're lacking the las_info structure... */
+     * moment it seems that we're lacking the las_info structure...
+     *
+     * Note that the ctor for qlattice_basis calls SkewGauss
+     */
     sieve_range_adjust(las_todo_entry const & doing, cado_poly_srcptr cpoly, siever_config const & conf)
-        : doing(doing), conf(conf), cpoly(cpoly)
+        : Q(doing, cpoly->skew), conf(conf), cpoly(cpoly)
     {
         logA = conf.logA;
         logI = J = 0;
@@ -126,15 +136,6 @@ public:
     sieve_range_adjust() = default;
     sieve_range_adjust(sieve_range_adjust&&) = default;
     sieve_range_adjust& operator=(sieve_range_adjust&&) = default;
-
-
-    int SkewGauss() {
-        int ret = ::SkewGauss(Q, doing.p, doing.r, cpoly->skew);
-        Q.set_q(doing.p, doing.prime_sq);
-        if (!Q.prime_sq)
-            Q.prime_factors = Q.prime_factors;
-        return ret;
-    }
 
     /* There are three strategies to do a post-SkewGauss adjustment of
      * the q-lattice basis.  */

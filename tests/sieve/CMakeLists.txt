@@ -377,10 +377,12 @@ cado_define_test(F9_fakereltest
     TEST_DEPENDENCIES F9_makefb)
 
 # Try with default TRIALDIV_MAXLEN, whatever it may be
-cado_define_test(test_trialdiv.c ${CADO_NFS_SOURCE_DIR}/sieve/trialdiv.c LIBRARIES utils tests trialdiv)
+cado_define_test(test_trialdiv.cpp
+    ${CADO_NFS_SOURCE_DIR}/sieve/trialdiv.cpp LIBRARIES utils tests trialdiv)
 
 macro (add_trialdiv_test MAXLEN)
-    cado_define_test(test_trialdiv_${MAXLEN} SOURCES test_trialdiv.c ${CADO_NFS_SOURCE_DIR}/sieve/trialdiv.c LIBRARIES utils tests)
+    cado_define_test(test_trialdiv_${MAXLEN} SOURCES test_trialdiv.cpp
+        ${CADO_NFS_SOURCE_DIR}/sieve/trialdiv.cpp LIBRARIES utils tests)
     set_property(TARGET test_trialdiv_${MAXLEN}
                 PROPERTY COMPILE_DEFINITIONS TRIALDIV_MAXLEN=${MAXLEN})
 endmacro()

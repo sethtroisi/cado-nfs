@@ -1908,8 +1908,24 @@ struct helper_functor_put_first_0 {
         }
 };
 
-fb_factorbase::fb_factorbase(cxx_cado_poly const & cpoly, int side, unsigned long lim, unsigned long powlim, cxx_param_list & pl, const char * fbc_filename) : f(cpoly->pols[side]), side(side), lim(lim), powlim(powlim)
+fb_factorbase::fb_factorbase(cxx_cado_poly const & cpoly, int side, cxx_param_list & pl, const char * fbc_filename) : f(cpoly->pols[side]), side(side)
 {
+    {
+        std::ostringstream os;
+        os << "lim" << side;
+        param_list_parse_ulong(pl, os.str().c_str(), &lim);
+    }
+    {
+        std::ostringstream os;
+        os << "powlim" << side;
+        if (!param_list_parse_ulong(pl, os.str().c_str(), &powlim)) {
+            powlim = ULONG_MAX;
+            verbose_output_print(0, 2,
+                    "# Using default value %s=ULONG_MAX\n",
+                    os.str().c_str());
+        }
+    }
+
     /* This initial 0 must be here in all cases, even for an empty factor
      * base.
      */

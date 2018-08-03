@@ -381,7 +381,7 @@ class fb_factorbase {
      * to divide the views on our factor base.
      */
         struct key_type {
-            fbprime_t thresholds[FB_MAX_PARTS];
+            std::array<fbprime_t, FB_MAX_PARTS> thresholds;
             fbprime_t td_thresh;
             fbprime_t skipped;
             double scale;
@@ -688,12 +688,18 @@ class fb_factorbase {
          * create stuff. */
     
         inline slicing & operator[](key_type const& K) { 
+            static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
+            pthread_mutex_lock(&lock);
             auto it = cache.find(K);
-            if (it != cache.end())
+            if (it != cache.end()) {
+                pthread_mutex_unlock(&lock);
                 return it->second;
+            }
 
             /* create a new slot */
-            return cache[K] = slicing(*this, K);
+            slicing & res(cache[K] = slicing(*this, K));
+            pthread_mutex_unlock(&lock);
+            return res;
         }
 
         inline slicing const & operator[](key_type const& K) const {
@@ -705,7 +711,13 @@ class fb_factorbase {
         void make_linear_threadpool (unsigned int nb_threads);
 
     public:
-        fb_factorbase(cxx_cado_poly const & cpoly, int side, unsigned long lim, unsigned long powlim, cxx_param_list & pl, const char * fbc_filename);
+        /* Note that the intent here is to read the factor base once and
+         * for all. In the descent context, where we have several
+         * different fb lim parameters, we should get away with different
+         * slicings, instead of trying to redo the factor base
+         * initialization.
+         */
+        fb_factorbase(cxx_cado_poly const & cpoly, int side, cxx_param_list & pl, const char * fbc_filename);
 
     private:
         struct sorter {

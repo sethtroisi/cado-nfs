@@ -44,46 +44,55 @@ void nfs_work::thread_data::allocate_bucket_regions()
         S.allocate_bucket_region();
 }
 
+void nfs_work::zeroinit_defaults()
+{
+    memset(nb_buckets, 0, sizeof(nb_buckets));
+    toplevel = 0;
+}
+
 nfs_work::nfs_work(las_info const & _las)
     : nfs_work(_las, NUMBER_OF_BAS_FOR_THREADS(_las.nb_threads))
-{}
+{
+    zeroinit_defaults();
+}
 nfs_work::nfs_work(las_info const & _las, int nr_workspaces)
     : las(_las),
     nr_workspaces(nr_workspaces),
-    groups { {nr_workspaces}, {nr_workspaces} },
+    sides {{ {nr_workspaces}, {nr_workspaces} }},
     th(_las.nb_threads, thread_data(*this))
-{ }
+{
+    zeroinit_defaults();
+}
 
-nfs_work_cofac::nfs_work_cofac(las_info const& las, sieve_info const & si) :
+nfs_work_cofac::nfs_work_cofac(las_info const& las, sieve_info & si, nfs_work const & ws) :
     las(las),
-    sc(si.conf),
-    doing(si.doing),
-    strategies(si.strategies)
-{}
+    sc(ws.conf),
+    doing(ws.Q.doing)
+{
+    strategies = si.get_strategies(sc);
+}
 
 /* Prepare to work on sieving a special-q as described by _si.
    This implies allocating all the memory we need for bucket arrays,
    sieve regions, etc. */
-void nfs_work::allocate_buckets(sieve_info const & si, nfs_aux & aux, thread_pool & pool)
+void nfs_work::allocate_buckets(nfs_aux & aux, thread_pool & pool)
 {
-    /* Always allocate the max number of buckets (i.e., as if we were using the
-       max value for J), even if we use a smaller J due to a poor q-lattice
-       basis */
-    /* Take some margin depending on parameters */
-    /* Multithreading perturbates the fill-in ratio */
-    bkmult_specifier const & multiplier = * si.bk_multiplier;
-    verbose_output_print(0, 2, "# Reserving buckets with a multiplier of %s\n",
-            multiplier.print_all().c_str());
+    /* We always allocate the max number of buckets (i.e., as if we were
+     * using the max value for J), even if we use a smaller J due to a
+     * poor q-lattice basis */ 
 
-    bool do_resieve = si.conf.sides[0].lim && si.conf.sides[1].lim;
+    verbose_output_print(0, 2, "# Reserving buckets with a multiplier of %s\n",
+            bk_multiplier.print_all().c_str());
+
+    bool do_resieve = conf.sides[0].lim && conf.sides[1].lim;
 
     for (unsigned int side = 0; side < 2; side++) {
-        sieve_info::side_info const & sis(si.sides[side]);
-        if (sis.fb->empty()) continue;
-        groups[side].allocate_buckets(si.nb_buckets,
-                multiplier,
-                si.sides[side].fbs->stats.weight,
-                si.conf.logI,
+        side_data & wss(sides[side]);
+        if (wss.no_fb()) continue;
+        wss.group.allocate_buckets(nb_buckets,
+                bk_multiplier,
+                wss.fbs->stats.weight,
+                conf.logI,
                 aux, pool, do_resieve);
     }
     pool.drain_queue(2);
@@ -106,7 +115,8 @@ nfs_work::buckets_max_full()
     size_t maxfull_room = 0;
     typedef bucket_array_t<LEVEL, HINT> BA_t;
     for(int side = 0 ; side < 2 ; side++) {
-        for (auto const & BA : bucket_arrays<LEVEL, HINT>(side)) {
+        side_data & wss(sides[side]);
+        for (auto const & BA : wss.bucket_arrays<LEVEL, HINT>()) {
             unsigned int index;
             const double ratio = BA.max_full(&index);
             if (ratio > maxfull_ratio) {
@@ -120,15 +130,16 @@ nfs_work::buckets_max_full()
     }
     if (maxfull_ratio > 1) {
         int side = maxfull_side;
-        auto const & BAs = bucket_arrays<LEVEL, HINT>(side);
+        side_data & wss(sides[side]);
+        auto const & BAs = wss.bucket_arrays<LEVEL, HINT>();
         std::ostringstream os;
         os << "bucket " << maxfull_index << " on side " << maxfull_side << ":";
         size_t m = 0;
-        for (auto const & BA : bucket_arrays<LEVEL, HINT>(side)) {
+        for (auto const & BA : wss.bucket_arrays<LEVEL, HINT>()) {
             if (BA.nb_of_updates(maxfull_index) >= m)
                 m = BA.nb_of_updates(maxfull_index);
         }
-        for (auto const & BA : bucket_arrays<LEVEL, HINT>(side)) {
+        for (auto const & BA : wss.bucket_arrays<LEVEL, HINT>()) {
             size_t z = BA.nb_of_updates(maxfull_index);
             os << " " << z;
             if (z == m) os << "*";
@@ -199,13 +210,85 @@ template double nfs_work::check_buckets_max_full<logphint_t>(int);
 
 template <int LEVEL, typename HINT>
 void
-nfs_work::reset_all_pointers(int side) {
-    groups[side].get<LEVEL, HINT>().reset_all_pointers();
+nfs_work::side_data::reset_all_pointers() {
+    group.get<LEVEL, HINT>().reset_all_pointers();
 }
 
-template void nfs_work::reset_all_pointers<1, shorthint_t>(int);
-template void nfs_work::reset_all_pointers<2, shorthint_t>(int);
-template void nfs_work::reset_all_pointers<3, shorthint_t>(int);
-template void nfs_work::reset_all_pointers<1, emptyhint_t>(int);
-template void nfs_work::reset_all_pointers<2, emptyhint_t>(int);
-template void nfs_work::reset_all_pointers<3, emptyhint_t>(int);
+template void nfs_work::side_data::reset_all_pointers<1, shorthint_t>();
+template void nfs_work::side_data::reset_all_pointers<2, shorthint_t>();
+template void nfs_work::side_data::reset_all_pointers<3, shorthint_t>();
+template void nfs_work::side_data::reset_all_pointers<1, emptyhint_t>();
+template void nfs_work::side_data::reset_all_pointers<2, emptyhint_t>();
+template void nfs_work::side_data::reset_all_pointers<3, emptyhint_t>();
+
+void nfs_work::compute_toplevel_and_buckets()
+{
+    // Now that fb have been initialized, we can set the toplevel.
+    toplevel = -1;
+    for(int side = 0 ; side < 2 ; side++) {
+        side_data & wss(sides[side]);
+        if (wss.no_fb()) continue;
+
+        int level = wss.fbs->get_toplevel();
+        if (level > toplevel) toplevel = level;
+    }
+    ASSERT_ALWAYS(toplevel >= 1);
+
+    /* update number of buckets at toplevel */
+    size_t (&BRS)[FB_MAX_PARTS] = BUCKET_REGIONS;
+
+    for(int i = 0 ; i < FB_MAX_PARTS ; ++i) nb_buckets[i] = 0;
+
+    nb_buckets[toplevel] = iceildiv(1UL << conf.logA, BRS[toplevel]);
+
+    // maybe there is only 1 bucket at toplevel and less than 256 at
+    // toplevel-1, due to a tiny J.
+    if (toplevel > 1) {
+        if (nb_buckets[toplevel] == 1) {
+            nb_buckets[toplevel-1] = iceildiv(1UL << conf.logA, BRS[toplevel - 1]);
+            // we forbid skipping two levels.
+            ASSERT_ALWAYS(nb_buckets[toplevel-1] != 1);
+        } else {
+            nb_buckets[toplevel-1] = BRS[toplevel]/BRS[toplevel-1];
+        }
+    }
+}
+
+void nfs_work::prepare_for_new_q(sieve_info & si) {
+    /* The config on which we're running is now decided. In order to
+     * select the factor base to use, we also need the log scale */
+    for(int side = 0 ; side < 2 ; side++) {
+        sieve_info::side_data & sis(si.sides[side]);
+        nfs_work::side_data & wss(sides[side]);
+
+        /* Even when we have no factor base, we do the lognorm setup
+         * because we need it for the norm computation. It's admittedly a
+         * bit ridiculous, given that only initializing lognorm_base
+         * would be sufficient. The cost should be negligible, though.
+         */
+        wss.lognorms = lognorm_smart(conf, las.cpoly, side, Q, conf.logI, J);
+
+        if (sis.no_fb()) {
+            wss.fbs = NULL;
+            continue;
+        }
+
+        wss.fbK = conf.instantiate_thresholds(side);
+        wss.fbK.scale = wss.lognorms.scale;
+        wss.fbK.nb_threads = las.nb_threads;
+
+        /* Now possibly trigger the creation of a new slicing. There's a
+         * design decision of whether we want the slicing replicated on
+         * all sub-jobs, on sub-jobs with the same memory binding only,
+         * or in a loose, unbound fashion. I think the second option is
+         * better.
+         */
+        wss.fbs = sis.get_factorbase_slicing(wss.fbK);
+        wss.td = sis.get_trialdiv_data(wss.fbK, wss.fbs);
+    }
+    compute_toplevel_and_buckets();
+
+    jd = si.get_j_divisibility_helper(J);
+    us = si.get_unsieve_data(conf);
+
+}
