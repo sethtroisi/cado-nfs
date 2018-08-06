@@ -74,7 +74,7 @@ struct sieve_info {
 
         private:
         struct equivalent_fbK_for_td {
-            bool operator()(fb_factorbase::key_type const & a, fb_factorbase::key_type const & b) {
+            bool operator()(fb_factorbase::key_type const & a, fb_factorbase::key_type const & b) const {
                 if (a.thresholds[0] < b.thresholds[0]) return true;
                 if (a.thresholds[0] > b.thresholds[0]) return false;
                 return a.td_thresh < b.td_thresh;
