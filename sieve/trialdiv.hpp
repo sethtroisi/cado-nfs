@@ -28,6 +28,7 @@ unsigned long trialdiv_get_max_p();
 
 struct trialdiv_data : public std::vector<trialdiv_divisor_t>
 {
+    trialdiv_data() = default;
     trialdiv_data(std::vector<unsigned long> const & primes, size_t skip = 0);
     static unsigned long max_p;
 

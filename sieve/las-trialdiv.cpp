@@ -75,9 +75,9 @@ trialdiv_data const * sieve_info::side_data::get_trialdiv_data(fb_factorbase::ke
     size_t skip2 = !trialdiv_primes.empty() && trialdiv_primes[0] == 2;
 
     trialdiv_data td(trialdiv_primes, skip2);
-    auto itb = trialdiv_data_cache.emplace(fbK, std::move(td));
-    ASSERT(itb.second);
+    trialdiv_data_cache[fbK];
+    std::swap(trialdiv_data_cache[fbK], td);
 
     pthread_mutex_unlock(&lock);
-    return &itb.first->second;
+    return &trialdiv_data_cache[fbK];
 }
