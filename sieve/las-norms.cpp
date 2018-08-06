@@ -945,7 +945,7 @@ sieve_range_adjust::vec<double> operator*(sieve_range_adjust::vec<double> const&
 }
 
 qlattice_basis operator*(sieve_range_adjust::mat<int> const& m, qlattice_basis const& Q) {
-    qlattice_basis R;
+    qlattice_basis R = Q;       // copy all non-matrix fields.
     R.a0 = m(0,0) * Q.a0 + m(0,1) * Q.a1;
     R.a1 = m(1,0) * Q.a0 + m(1,1) * Q.a1;
     R.b0 = m(0,0) * Q.b0 + m(0,1) * Q.b1;
