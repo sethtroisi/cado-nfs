@@ -407,7 +407,6 @@ sieve/las-duplicate.cpp
 sieve/las-duplicate.hpp
 sieve/las-norms.cpp
 sieve/las-norms.hpp
-sieve/las-plattice.cpp
 sieve/las-plattice.hpp
 sieve/las-qlattice.cpp
 sieve/las-qlattice.hpp

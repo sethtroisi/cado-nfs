@@ -2617,7 +2617,7 @@ void display_expected_memory_usage(siever_config const & sc0,
                 memory += more;
                 verbose_output_print(0, 3, "# level 1, side %d: %zu primes => precomp_plattices: %zu MB\n",
                         side, nprimes,
-                        (more = nprimes * sizeof(plattice_enumerate_t)) >> 20);
+                        (more = nprimes * sizeof(plattice_enumerator<1>)) >> 20);
                 memory += more;
 
                 {
@@ -2873,15 +2873,9 @@ void do_one_special_q_sublat(las_info const & las, nfs_work & ws, std::shared_pt
     trace_per_sq_init(ws);
 #endif
 
-    plattice_x_t max_area = plattice_x_t(ws.J) << ws.conf.logI;
-    plattice_enumerate_area<1>::value =
-        MIN(max_area, plattice_x_t(BUCKET_REGIONS[2]));
-    plattice_enumerate_area<2>::value =
-        MIN(max_area, plattice_x_t(BUCKET_REGIONS[3]));
-    plattice_enumerate_area<3>::value = max_area;
-
     /* TODO: is there a way to share this in sublat mode ? */
-    precomp_plattice_t precomp_plattice;
+
+    multityped_array<precomp_plattice_t, 1, FB_MAX_PARTS> precomp_plattice;
 
     {
         rep.ttbuckets_fill -= seconds();
@@ -2901,11 +2895,8 @@ void do_one_special_q_sublat(las_info const & las, nfs_work & ws, std::shared_pt
 
             fill_in_buckets_toplevel(ws, aux, pool, side, w);
 
-            // Prepare plattices at internal levels.
-            for (int level = 1; level < ws.toplevel; ++level) {
-                fill_in_buckets_prepare_precomp_plattice(
-                        ws, pool, side, level, precomp_plattice);
-            }
+            fill_in_buckets_prepare_plattices(ws, pool, side, precomp_plattice);
+
         }
 
         /*
@@ -3138,7 +3129,7 @@ bool do_one_special_q(las_info & las, nfs_work & ws, std::shared_ptr<nfs_aux> au
      * around for longer than we think if we get an exception above. 
      */
     for(auto & wss : ws.sides) {
-        wss.precomp_plattice_dense.clear();
+        wss.precomp_plattice_dense_clear();
         small_sieve_clear(wss.ssd);
     }
 
@@ -3265,8 +3256,6 @@ int main (int argc0, char *argv0[])/*{{{*/
             }
         }
     }
-
-    verbose_output_print (0, 1, "# FIXME FIXME plattice_enumerate_area<LEVEL>::value mess, line 1031 of las-fill-in-buckets.cpp. Move masks and bound closer to the iterator, maybe ?\n");
 
     t0 = seconds ();
     wct = wct_seconds();

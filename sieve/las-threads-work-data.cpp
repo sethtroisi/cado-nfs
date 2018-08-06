@@ -292,3 +292,15 @@ void nfs_work::prepare_for_new_q(sieve_info & si) {
     us = si.get_unsieve_data(conf);
 
 }
+
+/* Yes, it's quite unfortunate that we add so much red tape.
+ */
+struct helper_functor_precomp_plattice_dense_clear {
+    template<typename T>
+        void operator()(T & x) { x.clear(); }
+};
+void nfs_work::side_data::precomp_plattice_dense_clear()
+{
+    helper_functor_precomp_plattice_dense_clear H;
+    multityped_array_foreach(H, precomp_plattice_dense);
+}

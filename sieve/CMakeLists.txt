@@ -22,7 +22,7 @@ set (las_sources
     las-types.cpp
     las-choose-sieve-area.cpp
     las-auxiliary-data.cpp
-    las.cpp fb.cpp fb-slice-weight.cpp las-plattice.cpp
+    las.cpp fb.cpp fb-slice-weight.cpp
   las-debug.cpp las-report-stats.cpp las-duplicate.cpp
   las-config.c bucket.cpp las-smallsieve.cpp las-unsieve.cpp
   las-sieve2357.cpp las-unsieve-sse2.cpp
@@ -52,7 +52,7 @@ target_link_libraries (las_descent ${las_libraries})
 
 add_library (trialdiv trialdiv.cpp)
 
-add_executable(freerel freerel.c fb.cpp las-plattice.cpp)
+add_executable(freerel freerel.c fb.cpp)
 target_link_libraries(freerel utils)
 
 add_subdirectory(ecm)
@@ -69,7 +69,7 @@ add_executable(dupsup
     bucket.cpp
 
     dupsup.cpp las-duplicate.cpp
-    las-plattice.cpp las-cofactor.cpp fb.cpp
+    las-cofactor.cpp fb.cpp
     las-config.c
     las-types.cpp
     las-unsieve.cpp

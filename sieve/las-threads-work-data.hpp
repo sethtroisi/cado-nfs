@@ -9,6 +9,7 @@
 #include "las-norms.hpp"
 #include "las-unsieve.hpp"
 #include "ecm/facul.hpp"
+#include "multityped_array.hpp"
 
 #define NUMBER_OF_BAS_FOR_THREADS(n)    ((n) == 1 ? 1 : ((n) + 2))
 
@@ -112,7 +113,8 @@ class nfs_work {
          * the storage to remain allocated, adnd avoid constant
          * malloc/free.
          */
-        precomp_plattice_dense_t precomp_plattice_dense;
+        multityped_array<precomp_plattice_dense_t, 1, FB_MAX_PARTS> precomp_plattice_dense;
+        void precomp_plattice_dense_clear();
 
         /* This is updated by applying the special-q lattice transform to
          * the factor base. This is a "current status" that gets updated
