@@ -53,7 +53,7 @@ j_divisibility_helper const * sieve_info::get_j_divisibility_helper(int J) /* {{
         pthread_mutex_unlock(&lock);
         return &it->second;
     }
-    auto itb = jdiv_cache.insert(std::move(decltype(jdiv_cache)::value_type(Jround, Jround)));
+    auto itb = jdiv_cache.insert(std::pair<unsigned int, j_divisibility_helper>(Jround, Jround));
     ASSERT(itb.second);
     pthread_mutex_unlock(&lock);
     return &(*itb.first).second;
