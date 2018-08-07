@@ -28,7 +28,11 @@ struct siever_config : public _padded_pod<siever_config> {
 
     /* This does not really belong here. I'd rather have it at the
      * las_info level. However for obscure reasons,
-     * sieve_info::get_strategies wants it.
+     * las.get_strategies(siever_config&)
+     * wants it.
+     *
+     * FIXME: er. now that get_strategies lives below las, we can do this
+     * move, right ?
      */
     unsigned int sublat_bound;
 
@@ -47,11 +51,7 @@ struct siever_config : public _padded_pod<siever_config> {
      *    this struct be dynamic depending on a setter function for logI
      *  - the side, as well.
      */
-    private:    /* someday I'll put "private". sieve_info::update, or
-                 * whatever it may be called in the future, might access
-                 * this data from a member function.
-                 * display_expected_memory_usage must be adapted, too.
-                 */
+    private:
     /* access should rather be
      * via ws.sides[side].fbK.thresholds[0,1]
      * and ws.sides[side].fbK.{td_thresh, skipped}

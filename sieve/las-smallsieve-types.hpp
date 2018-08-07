@@ -108,8 +108,8 @@ private:
 // static_assert(sizeof(ssp_simple_t) == sizeof(ssp_t), "struct padding has been tampered with");
 
 /* The prototypes in las-smallsieve.hpp should all be member functions
- * for this struct. However we have an interface nesting problem with
- * sieve_info, at the moment.
+ * for this struct.  However we used to have an interface nesting problem
+ * with sieve_info, perhaps it's gone now [FIXME, check]
  */
 struct small_sieve_data_t {
     fb_factorbase::key_type fbK;

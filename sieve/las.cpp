@@ -1759,9 +1759,7 @@ task_result * detached_cofac(worker_thread * worker, task_parameters * _param, i
      */
     detached_cofac_parameters *param = static_cast<detached_cofac_parameters *>(_param);
 
-    /* Import some contextual stuff. Careful: at this point, we expect
-     * that a new sieve task has begun. Therefore we cannot safely access
-     * the sieve_info structure. */
+    /* Import some contextual stuff. */
     int id = worker->rank();
     nfs_work_cofac & wc(*param->wc_p);
     nfs_aux & aux(*param->aux_p);
@@ -1845,8 +1843,7 @@ task_result * detached_cofac(worker_thread * worker, task_parameters * _param, i
 
         const char * dup_comment = NULL;
 
-        if (do_check && relation_is_duplicate(rel,
-                    wc.doing, wc.las, wc.strategies)) {
+        if (do_check && relation_is_duplicate(rel, wc.doing, wc.las)) {
             dup_comment = "# DUPE ";
         } else {
             if (!is_new_rel) {

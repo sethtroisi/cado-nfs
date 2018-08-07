@@ -66,7 +66,20 @@ struct las_info : private NonCopyable, public las_augmented_output_channel {
     siever_config_pool config_pool;
 
     private:
-    sieve_shared_data shared_structure_cache;
+    /* It's slightly unfortunate to have "mutable" here, obviously. The
+     * root cause is the fetching of strategies for cofactoring in
+     * duplicate suppression mode. As the call to relation_is_duplicate
+     * happens really deep in the call chain, we have a const ref to las
+     * at this point, and this is generally a good thing ! So the
+     * get_strategies() method must be const.
+     *
+     * Other cache access calls, on the other hand, are all relatively
+     * shallow and can access a non-const ref to las very close by. So
+     * there is no compelling need to have the mutable keyword here, as
+     * we can afford to call them with the non-const ref (see
+     * nfs_work::prepare_for_new_q and nfs_work_cofac::nfs_work_cofac).
+     */
+    mutable sieve_shared_data shared_structure_cache;
 
     public:
     /* These accessors are for everyone to use. */
@@ -82,7 +95,7 @@ struct las_info : private NonCopyable, public las_augmented_output_channel {
     j_divisibility_helper const * get_j_divisibility_helper(int J) {
         return shared_structure_cache.get_j_divisibility_helper(J);
     }
-    facul_strategies_t const * get_strategies(siever_config const & conf) {
+    facul_strategies_t const * get_strategies(siever_config const & conf) const {
         return shared_structure_cache.get_strategies(conf);
     }
     bool no_fb(int side) const {

@@ -8,7 +8,6 @@
 int
 relation_is_duplicate(relation const& rel,
         las_todo_entry const & doing,
-        las_info const& las,
-        facul_strategies_t const * old_strategies);
+        las_info const& las);
 
 #endif

@@ -71,10 +71,7 @@ bool siever_config::parse_default(siever_config & sc, param_list_ptr pl)
      * pre-fill the config data later on).
      */
 
-    /* Note: the stuff about the config being complete or not is mostly
-     * rubbish. sieve_info, as such, no longer has the
-     * first-class-citizen status it once had.
-     *
+    /*
      * Note that lim0 lim1 powlim0 powlim1 are also parsed from
      * fb_factorbase::fb_factorbase, using only the command line (and no
      * hint file, in particular). This is intended to be the "max" pair
@@ -93,6 +90,10 @@ bool siever_config::parse_default(siever_config & sc, param_list_ptr pl)
     }
     param_list_parse_double(pl, "lambda0", &(sc.sides[0].lambda));
     param_list_parse_double(pl, "lambda1", &(sc.sides[1].lambda));
+    /*
+     * Note: the stuff about the config being complete or not is mostly
+     * rubbish now...
+     */
     int complete = 1;
     complete &= param_list_parse_ulong(pl, "lim0", &(sc.sides[0].lim));
     complete &= param_list_parse_ulong(pl, "lim1", &(sc.sides[1].lim));

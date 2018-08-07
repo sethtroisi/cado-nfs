@@ -188,8 +188,7 @@ subtract_fb_log(const unsigned char lognorm,
 static bool
 sq_finds_relation(las_info const & las,
         las_todo_entry const & doing,
-        relation const& rel,
-        facul_strategies_t const * strategies)
+        relation const& rel)
 {
   siever_config conf;
   qlattice_basis Q;
@@ -307,6 +306,7 @@ sq_finds_relation(las_info const & las,
   }
 
   std::array<std::vector<cxx_mpz>, 2> f;
+  facul_strategies_t const * strategies = las.get_strategies(conf);
   int pass = factor_both_leftover_norms(cof, f, {{conf.sides[0].lim, conf.sides[1].lim}}, strategies);
 
   if (pass <= 0) {
@@ -391,8 +391,7 @@ all_multiples(std::vector<uint64_t> & prime_list) {
 int
 relation_is_duplicate(relation const& rel,
         las_todo_entry const & doing,
-        las_info const& las,
-        facul_strategies_t const * old_strategies)
+        las_info const& las)
 {
     /* If the special-q does not fit in an unsigned long, we assume it's not a
        duplicate and just move on */
@@ -452,7 +451,7 @@ relation_is_duplicate(relation const& rel,
             // relation.
             las_todo_entry other = special_q_from_ab(rel.a, rel.b, sq, side);
 
-            bool is_dupe = sq_finds_relation(las, other, rel, old_strategies);
+            bool is_dupe = sq_finds_relation(las, other, rel);
             verbose_output_print(0, VERBOSE_LEVEL,
                     "# DUPECHECK relation is probably%s a dupe\n",
                     is_dupe ? "" : " not");
