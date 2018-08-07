@@ -1,7 +1,7 @@
 #include "cado.h"
 #include "las-auxiliary-data.hpp"
 #include "las-threads.hpp"
-#include "las-types.hpp"
+#include "las-info.hpp"
 
 /* in las.cpp */
 extern int sync_at_special_q;

@@ -1,8 +1,8 @@
-#ifndef LAS_SIEVE_INFO_HPP_
-#define LAS_SIEVE_INFO_HPP_
+#ifndef LAS_SIEVE_SHARED_DATA_HPP_
+#define LAS_SIEVE_SHARED_DATA_HPP_
 
 
-/* various includes that are needed to define the sieve_info type */
+/* various includes that are needed to define the sieve_shared_data type */
 #include "cado_poly.h"
 #include "las-siever-config.hpp"
 #include "bucket.hpp"  /* for bkmult_specifier */
@@ -11,7 +11,6 @@
 #include "las-norms.hpp"
 #include "trialdiv.hpp"
 #include "fb.hpp"
-#include "las-fill-in-buckets.hpp"
 #include "las-smallsieve-types.hpp"
 #include "las-unsieve.hpp"
 #include "ecm/facul.hpp"
@@ -24,24 +23,26 @@ namespace std { using boost::shared_ptr; using boost::make_shared; }
 #endif
 
 /*
- * A sieve_info struct is only a thin layer above the factor base. It
+ * A sieve_shared_data struct is only a thin layer above the factor base. It
  * provides the factor base, and the possibility to access some data
  * structures that depend on the current configuration (e.g. on I).
+ *
+ * We have a singleton of this type, contained in the las_info structure.
 
  *
  * It must be regarded as a (mostly) const repository from where we fetch
  * data that is of interest to many special-q's.
  *
- * The data at the sieve_info level should not be attached to a
+ * The data at the sieve_shared_data level should not be attached to a
  * particular config, nor to particular q.
  *
- * In the multi-las context, sieve_info is *shared* between the different
+ * In the multi-las context, sieve_shared_data is *shared* between the different
  * sub-processes.
  *
  * TODO: at some point, the query mechanism for the cached entries will
  * depend on the memory binding.
  */
-struct sieve_info {
+struct sieve_shared_data {
     cxx_cado_poly cpoly;
 
     /* {{{ side_data */
@@ -86,7 +87,7 @@ struct sieve_info {
         /* in las-trialdiv.cpp */
         trialdiv_data const * get_trialdiv_data(fb_factorbase::key_type fbK, fb_factorbase::slicing const * fbs);
 
-        side_data(int side, cxx_cado_poly const & cpoly, cxx_param_list & pl, bool try_fbc);
+        side_data(int side, cxx_cado_poly const & cpoly, cxx_param_list & pl);
     };
 
     /* }}} */
@@ -132,13 +133,8 @@ struct sieve_info {
     public:
     facul_strategies_t const * get_strategies(siever_config const & conf);
 
-    /* These functions must be called before actually sieving */
-    void update_norm_data ();
-
-    sieve_info(cxx_cado_poly const & cpoly, cxx_param_list & pl, bool try_fbc = false);
-    ~sieve_info();
+    ~sieve_shared_data();
+    sieve_shared_data(cxx_cado_poly const & cpoly, cxx_param_list & pl);
 };
 
-/*  */
-
-#endif	/* LAS_SIEVE_INFO_HPP_ */
+#endif	/* LAS_SIEVE_SHARED_DATA_HPP_ */

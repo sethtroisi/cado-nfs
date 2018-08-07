@@ -1,5 +1,5 @@
 #include "cado.h"
-#include "las-types.hpp"
+#include "las-info.hpp"
 #include "las-threads-work-data.hpp"
 
 void nfs_work::thread_data::side_data::allocate_bucket_region()
@@ -64,12 +64,12 @@ nfs_work::nfs_work(las_info const & _las, int nr_workspaces)
     zeroinit_defaults();
 }
 
-nfs_work_cofac::nfs_work_cofac(las_info const& las, sieve_info & si, nfs_work const & ws) :
+nfs_work_cofac::nfs_work_cofac(las_info & las, nfs_work const & ws) :
     las(las),
     sc(ws.conf),
     doing(ws.Q.doing)
 {
-    strategies = si.get_strategies(sc);
+    strategies = las.get_strategies(sc);
 }
 
 /* Prepare to work on sieving a special-q as described by _si.
@@ -254,11 +254,11 @@ void nfs_work::compute_toplevel_and_buckets()
     }
 }
 
-void nfs_work::prepare_for_new_q(sieve_info & si) {
+void nfs_work::prepare_for_new_q(las_info & las0) {
+    ASSERT_ALWAYS(&las == &las0);
     /* The config on which we're running is now decided. In order to
      * select the factor base to use, we also need the log scale */
     for(int side = 0 ; side < 2 ; side++) {
-        sieve_info::side_data & sis(si.sides[side]);
         nfs_work::side_data & wss(sides[side]);
 
         /* Even when we have no factor base, we do the lognorm setup
@@ -268,7 +268,7 @@ void nfs_work::prepare_for_new_q(sieve_info & si) {
          */
         wss.lognorms = lognorm_smart(conf, las.cpoly, side, Q, conf.logI, J);
 
-        if (sis.no_fb()) {
+        if (las.no_fb(side)) {
             wss.fbs = NULL;
             continue;
         }
@@ -283,14 +283,13 @@ void nfs_work::prepare_for_new_q(sieve_info & si) {
          * or in a loose, unbound fashion. I think the second option is
          * better.
          */
-        wss.fbs = sis.get_factorbase_slicing(wss.fbK);
-        wss.td = sis.get_trialdiv_data(wss.fbK, wss.fbs);
+        wss.fbs = las0.get_factorbase_slicing(side, wss.fbK);
+        wss.td = las0.get_trialdiv_data(side, wss.fbK, wss.fbs);
     }
     compute_toplevel_and_buckets();
 
-    jd = si.get_j_divisibility_helper(J);
-    us = si.get_unsieve_data(conf);
-
+    jd = las0.get_j_divisibility_helper(J);
+    us = las0.get_unsieve_data(conf);
 }
 
 /* Yes, it's quite unfortunate that we add so much red tape.

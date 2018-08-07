@@ -1,7 +1,7 @@
 #include "cado.h"
 #include "memory.h"
 #include "las-threads.hpp"
-#include "las-types.hpp"
+#include "las-info.hpp"
 #include "las-config.h"
 #include "las-auxiliary-data.hpp"
 

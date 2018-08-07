@@ -417,7 +417,7 @@ sieve/las-smallsieve.hpp
 sieve/las-smallsieve-types.hpp
 sieve/las-sieve2357.cpp
 sieve/las-sieve2357.hpp
-sieve/las-types.hpp
+sieve/las-info.hpp
 sieve/las-unsieve.cpp
 sieve/las-unsieve-sse2.cpp
 sieve/las-unsieve.hpp
@@ -1183,7 +1183,7 @@ config/gmp_randstate.c
 config/gmp_randstate.cmake
 config/regex.cmake
 tests/sieve/test_init_norms.cpp
-sieve/las-types.cpp
+sieve/las-info.cpp
 sieve/las-siever-config.cpp
 sieve/las-siever-config.hpp
 sieve/las-todo-entry.cpp
@@ -1210,8 +1210,8 @@ config/alignas.cmake
 config/neon.c
 config/neon.cmake
 utils/multityped_array.hpp
-sieve/las-sieve-info.cpp
-sieve/las-sieve-info.hpp
+sieve/las-sieve-shared-data.cpp
+sieve/las-sieve-shared-data.hpp
 utils/cxx_misc.hpp
 sieve/fb-slice-weight.cpp
 sieve/fb-slice-weight.hpp

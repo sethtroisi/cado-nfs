@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <stdarg.h>
 #include <gmp.h>
-#include "las-types.hpp"
+#include "las-info.hpp"
 #include "las-config.h"
 #include "las-norms.hpp"
 #include "misc.h"
@@ -66,7 +66,9 @@ las_augmented_output_channel::~las_augmented_output_channel()
 
 las_info::las_info(cxx_param_list & pl)
     : las_augmented_output_channel(pl),
+      cpoly(pl),
       config_pool(pl),
+      shared_structure_cache(cpoly, pl),
 #ifdef  DLP_DESCENT
       dlog_base(pl),
 #endif
@@ -87,25 +89,6 @@ las_info::las_info(cxx_param_list & pl)
     galois = param_list_lookup_string(pl, "galois");
     suppress_duplicates = param_list_parse_switch(pl, "-dup");
 
-    /*  Parse polynomial */
-    const char *tmp;
-    if ((tmp = param_list_lookup_string(pl, "poly")) == NULL) {
-        fprintf(stderr, "Error: -poly is missing\n");
-        param_list_print_usage(pl, NULL, stderr);
-        exit(EXIT_FAILURE);
-    }
-    if (!cado_poly_read(cpoly, tmp)) {
-	fprintf(stderr, "Error reading polynomial file %s\n", tmp);
-	exit(EXIT_FAILURE);
-    }
-    // sc.skewness = cpoly->skew;
-    /* -skew (or -S) may override (or set) the skewness given in the
-     * polynomial file */
-    param_list_parse_double(pl, "skew", &(cpoly->skew));
-    if (cpoly->skew <= 0.0) {
-	fprintf(stderr, "Error, please provide a positive skewness\n");
-	exit(EXIT_FAILURE);
-    }
     gmp_randinit_default(rstate);
     unsigned long seed = 0;
     if (param_list_parse_ulong(pl, "seed", &seed))

@@ -36,7 +36,7 @@ struct siever_config : public _padded_pod<siever_config> {
     /* These four parameters are as they are provided in the command
      * line. In truth, the ones that really matter are the ones in the
      * fb_factorbase::key_type object that is stored within the
-     * sieve_info structure (in si.sides[side].fbK).
+     * nfs_work structure (in sides[side].fbK).
      *
      * In particular, bucket_thresh and bucket_thresh1 below have a
      * default value that is dependent on:
@@ -53,8 +53,8 @@ struct siever_config : public _padded_pod<siever_config> {
                  * display_expected_memory_usage must be adapted, too.
                  */
     /* access should rather be
-     * via si.sides[side].fbK.thresholds[0,1]
-     * and si.sides[side].fbK.{td_thresh, skipped}
+     * via ws.sides[side].fbK.thresholds[0,1]
+     * and ws.sides[side].fbK.{td_thresh, skipped}
      */
     unsigned long bucket_thresh = 0;  // bucket sieve primes >= bucket_thresh
     unsigned long bucket_thresh1 = 0; // primes above are 2-level bucket-sieved

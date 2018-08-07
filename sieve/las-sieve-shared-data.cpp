@@ -1,32 +1,36 @@
 #include "cado.h"
 
-#include "las-sieve-info.hpp"
+#include "las-sieve-shared-data.hpp"
+#include "las-cofactor.hpp"     // proxy facul_make_strategies
 
-sieve_info::side_data::side_data(int side,
+sieve_shared_data::side_data::side_data(int side,
         cxx_cado_poly const & cpoly,
-        cxx_param_list & pl,
-        bool try_fbc)
+        cxx_param_list & pl)
     :
         f(cpoly->pols[side]),
-        fb(cpoly, side,
-            pl, try_fbc ? param_list_lookup_string(pl, "fbc") : NULL)
+        fb(cpoly, side, pl, param_list_lookup_string(pl, "fbc"))
 {
 }
 
-/* We need sc_max because that is used to compute the factor base up to
- * that limit.
+/* FIXME: get_trialdiv_data is currently in las-trialdiv.cpp ; it belongs
+ * here (that is, the bulk should stay there, but the interaction with
+ * the cache mechanism should be be here instead).
  */
-sieve_info::sieve_info(cxx_cado_poly const & cpoly, cxx_param_list & pl, bool try_fbc) /*{{{*/
+
+/* The fb_factorbase ctor parses the lim[01] and powlim[01] directly from
+ * the command line. These get interpreted as the "max" bounds, and we
+ * compute the factor base up to that limit.
+ */
+sieve_shared_data::sieve_shared_data(cxx_cado_poly const & cpoly, cxx_param_list & pl) /*{{{*/
     : cpoly(cpoly), sides {
-        {0, cpoly, pl, try_fbc},
-        {1, cpoly, pl, try_fbc}
+        {0, cpoly, pl},
+        {1, cpoly, pl}
     }
 {
     cofactfilename = param_list_lookup_string (pl, "file-cofact");
 }
 /*}}}*/
-
-unsieve_data const * sieve_info::get_unsieve_data(siever_config const & conf) /* {{{ */
+unsieve_data const * sieve_shared_data::get_unsieve_data(siever_config const & conf) /* {{{ */
 {
     std::pair<int, int> p(conf.logI, conf.logA);
     static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
@@ -41,7 +45,7 @@ unsieve_data const * sieve_info::get_unsieve_data(siever_config const & conf) /*
     pthread_mutex_unlock(&lock);
     return &(*itb.first).second;
 }/*}}}*/
-j_divisibility_helper const * sieve_info::get_j_divisibility_helper(int J) /* {{{ */
+j_divisibility_helper const * sieve_shared_data::get_j_divisibility_helper(int J) /* {{{ */
 {
     ASSERT_ALWAYS(J);
     /* Round to the next power of two */
@@ -58,7 +62,7 @@ j_divisibility_helper const * sieve_info::get_j_divisibility_helper(int J) /* {{
     pthread_mutex_unlock(&lock);
     return &(*itb.first).second;
 }/*}}}*/
-facul_strategies_t const * sieve_info::get_strategies(siever_config const & conf) /* {{{ */
+facul_strategies_t const * sieve_shared_data::get_strategies(siever_config const & conf) /* {{{ */
 {
     static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
     pthread_mutex_lock(&lock);
@@ -113,9 +117,9 @@ facul_strategies_t const * sieve_info::get_strategies(siever_config const & conf
     return (*itb.first).second.get();
 }/*}}}*/
 
-sieve_info::~sieve_info()
+sieve_shared_data::~sieve_shared_data()
 {
     char buf1[16];
-    verbose_output_print(0, 2, "# Getting rid of sieve_info structure [rss=%s]\n",
+    verbose_output_print(0, 2, "# Getting rid of sieve_shared_data structure [rss=%s]\n",
             size_disp_fine(1024UL * Memusage2(), buf1, 10000.0));
 }

@@ -3,7 +3,7 @@
 #include <string.h>
 
 #include "las-config.h"
-#include "las-types.hpp"
+#include "las-info.hpp"
 #include "las-unsieve.hpp"
 #include "ularith.h"
 #include "las-norms.hpp"

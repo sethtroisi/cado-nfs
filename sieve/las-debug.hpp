@@ -32,8 +32,6 @@ struct where_am_I {
     fbroot_t r;         /* current root */
     slice_index_t i;    /* Slice index, if applicable */
     slice_offset_t h;   /* Prime hint, if not decoded yet */
-    int fb_idx;         /* index into the factor base si->sides[side]->fb
-                           or into th->sides[side]->fb_bucket */
     unsigned int j;     /* row number in bucket */
     unsigned int x;     /* value in bucket */
     unsigned int N;     /* bucket number */

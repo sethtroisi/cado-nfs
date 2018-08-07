@@ -9,7 +9,7 @@
 
 #include "las-config.h"
 #include "cxx_mpz.hpp"
-#include "las-types.hpp"
+#include "las-info.hpp"
 #include "las-debug.hpp"
 #include "las-coordinates.hpp"
 #include "las-threads-work-data.hpp"    /* trace_per_sq_init needs this */

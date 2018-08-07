@@ -1,7 +1,7 @@
 #ifndef LAS_CHOOSE_SIEVE_AREA_HPP_
 #define LAS_CHOOSE_SIEVE_AREA_HPP_
 
-#include "las-types.hpp"
+#include "las-info.hpp"
 #include "verbose.h"
 
 extern int never_discard;

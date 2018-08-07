@@ -231,7 +231,7 @@ sq_finds_relation(las_info const & las,
   }
 
   /* If the coordinate is outside the i,j-region used when sieving
-     the special-q described in si, then it's not a duplicate */
+     the special-q described in [doing], then it's not a duplicate */
   if (j >= J || (i < -(1L << (logI-1))) || (i >= (1L << (logI-1))))
   {
     verbose_output_print(0, VERBOSE_LEVEL,
@@ -321,9 +321,9 @@ sq_finds_relation(las_info const & las,
 
 
 /* This function decides whether the given (sq,side) was previously
- * sieved (compared to the current special-q stored in si.doing).
+ * sieved (compared to the current special-q stored in [doing]).
  * This takes qmin and qmax into account, on the side of the sq. The side
- * of si.doing is irrelevant here.
+ * doing.side is irrelevant here.
  */
 static int
 sq_was_previously_sieved (las_info const & las, const uint64_t sq, int side, las_todo_entry const & doing)

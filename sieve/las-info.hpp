@@ -1,5 +1,5 @@
-#ifndef LAS_TYPES_HPP_
-#define LAS_TYPES_HPP_
+#ifndef LAS_INFO_HPP_
+#define LAS_INFO_HPP_
 
 #include <stdint.h>
 #include "las-config.h"
@@ -13,7 +13,7 @@
 #include "sieve/bucket.hpp"     // bkmult
 #include "ecm/batch.h"          // cofac_list
 #include "las-forwardtypes.hpp"
-#include "las-sieve-info.hpp"
+#include "las-sieve-shared-data.hpp"
 #include "las-cofactor.hpp"     // cofactorization_statistics
 #include <list>
 #include <vector>
@@ -64,6 +64,30 @@ struct las_info : private NonCopyable, public las_augmented_output_channel {
 
     // ----- default config and adaptive configs
     siever_config_pool config_pool;
+
+    private:
+    sieve_shared_data shared_structure_cache;
+
+    public:
+    /* These accessors are for everyone to use. */
+    fb_factorbase::slicing const * get_factorbase_slicing(int side, fb_factorbase::key_type fbK) {
+        return shared_structure_cache.sides[side].get_factorbase_slicing(fbK);
+    }
+    trialdiv_data const * get_trialdiv_data(int side, fb_factorbase::key_type fbK, fb_factorbase::slicing const * fbs) {
+        return shared_structure_cache.sides[side].get_trialdiv_data(fbK, fbs);
+    }
+    unsieve_data const * get_unsieve_data(siever_config const & conf) {
+        return shared_structure_cache.get_unsieve_data(conf);
+    }
+    j_divisibility_helper const * get_j_divisibility_helper(int J) {
+        return shared_structure_cache.get_j_divisibility_helper(J);
+    }
+    facul_strategies_t const * get_strategies(siever_config const & conf) {
+        return shared_structure_cache.get_strategies(conf);
+    }
+    bool no_fb(int side) const {
+        return shared_structure_cache.sides[side].no_fb();
+    }
 
     bkmult_specifier bk_multiplier { 1.0 };
 
@@ -132,4 +156,4 @@ enum {
 };
 
 
-#endif	/* LAS_TYPES_HPP_ */
+#endif	/* LAS_INFO_HPP_ */

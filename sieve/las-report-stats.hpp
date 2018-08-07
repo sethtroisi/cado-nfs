@@ -22,6 +22,8 @@ struct las_report {
         unsigned long cofactored;
         unsigned long smooth;
     } survivors;
+    unsigned long nr_sq_processed=0;
+    unsigned long nr_sq_discarded=0;
     unsigned long total_logI=0;
     unsigned long total_J=0;
     unsigned long reports=0;
@@ -35,6 +37,8 @@ struct las_report {
     double ttbuckets_apply=0;
     double ttf=0;                 /* factor_survivors */
     double ttcof=0;               /* cofactorisation */
+    int nwaste=0;                 /* number of restarted special-q's */
+    double waste=0;               /* restarted special-q's */
     las_report() = default;
     las_report(las_report const&) = delete;
     las_report(las_report &&) = default;
@@ -59,6 +63,8 @@ struct las_report {
                 ps[i] += qs[i];
             }
         }
+        nr_sq_processed += q.nr_sq_processed;
+        nr_sq_discarded += q.nr_sq_discarded;
         total_logI += q.total_logI;
         total_J += q.total_J;
         reports += q.reports;
@@ -69,6 +75,8 @@ struct las_report {
         ttbuckets_apply += q.ttbuckets_apply;
         ttf     += q.ttf;
         ttcof     += q.ttcof;
+        nwaste    += q.nwaste;
+        waste     += q.waste;
         if (survivor_counts) {
             count_matrix * ps = survivor_counts.get();
             count_matrix * qs = q.survivor_counts.get();

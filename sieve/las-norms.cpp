@@ -262,7 +262,7 @@ get_maxnorm_rectangular (double_poly_srcptr src_poly, const double X,
  * (=log2(F(i,j)*scale+LOGNORM_GUARD_BITS)
    for the bucket_region S[] number J.
    It's a wrapper; except for trivial degree = 0, it extracts the interesting
-   parameters of the complex structure si and calls the right function.
+   parameters of the lognorm structure and calls the right function.
 
    - For degree 0, S[] is initialized by a memset: always exact.
    - A special ultra fast init function is used for degree = 1; it could be
@@ -271,15 +271,9 @@ get_maxnorm_rectangular (double_poly_srcptr src_poly, const double X,
      computed with a fast log2. The maximal error is always -/+ 1 on S[].
      It's obviously slow.
 
-   - For smart != 0 and others degrees, cf las-config.h for the smart init algo.
-     It's ~10 times faster than the exact init.
-
-   This smart algo needs :
-   -> The roots of d^2(F(i,1)/d(i)^2 must be in sis.roots;
-   -> sis.roots.size() is the number of roots + 1;
-   -> si.roots[sis.nroots - 1] must be = 0.0 : it's a "pseudo" root
-      in order to correct the neigborhood of F(0, const j).
-   Of course, if sis.nroots = 0, no correction is done.
+   - For smart != 0 and degree > 1, we first approximate the polynomial
+     by piecewise linear functions, which are correct up to the
+     prescribed multiplicative factor.
 */
 
 /* }}} */
@@ -1141,7 +1135,7 @@ B:=[bestrep(a):a in {{a*b*c*x:a in {1,-1},b in {1,d},c in {1,s}}:x in MM}];
 
 /* return 0 if we should discard that special-q because the rounded
  * region in the (a,b)-plane is flat to the point of having height 0.
- * For diagnostic, we set si.J to the unrounded value (rounding would
+ * For diagnostic, we set this->J to the unrounded value (rounding would
  * give 0) and then we return "false".
  *
  * The current check for discarding is whether we do fill one bucket

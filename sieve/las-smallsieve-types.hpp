@@ -119,7 +119,7 @@ struct small_sieve_data_t {
     size_t resieve_end_offset;
 
     /* We have some vectors of small sieve positions prepared in
-     * advanced (up to si.nb_buckets[1] of them). The ssdpos_many_next
+     * advanced (up to nb_buckets[1] of them). The ssdpos_many_next
      * area is for staging the next set of start positions, possible
      * while threads are using the positions in ssdpos_many.
      */

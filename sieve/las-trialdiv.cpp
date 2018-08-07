@@ -1,6 +1,6 @@
 #include "cado.h"
 #include <iterator>
-#include "las-types.hpp"
+#include "las-info.hpp"
 
 template<typename T>
 unsigned long
@@ -21,7 +21,7 @@ append_prime_list (T inserter, prime_info pi, unsigned long pmax, cxx_mpz_poly c
 }
 
 
-trialdiv_data const * sieve_info::side_data::get_trialdiv_data(fb_factorbase::key_type fbK, fb_factorbase::slicing const * fbs)
+trialdiv_data const * sieve_shared_data::side_data::get_trialdiv_data(fb_factorbase::key_type fbK, fb_factorbase::slicing const * fbs)
 {
     static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
     pthread_mutex_lock(&lock);

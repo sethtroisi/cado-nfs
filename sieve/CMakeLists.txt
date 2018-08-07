@@ -18,8 +18,8 @@ set (las_sources
     las-qlattice.cpp
     las-norms.cpp logapprox.cpp
     las-coordinates.cpp
-    las-sieve-info.cpp
-    las-types.cpp
+    las-sieve-shared-data.cpp
+    las-info.cpp
     las-choose-sieve-area.cpp
     las-auxiliary-data.cpp
     las.cpp fb.cpp fb-slice-weight.cpp
@@ -61,7 +61,7 @@ add_subdirectory(strategies)
 add_executable(dupsup
     las-todo-entry.cpp
     las-siever-config.cpp
-    las-sieve-info.cpp
+    las-sieve-shared-data.cpp
     las-qlattice.cpp
     las-choose-sieve-area.cpp
     las-norms.cpp logapprox.cpp
@@ -71,7 +71,7 @@ add_executable(dupsup
     dupsup.cpp las-duplicate.cpp
     las-cofactor.cpp fb.cpp
     las-config.c
-    las-types.cpp
+    las-info.cpp
     las-unsieve.cpp
     las-unsieve-sse2.cpp
     las-smallsieve.cpp

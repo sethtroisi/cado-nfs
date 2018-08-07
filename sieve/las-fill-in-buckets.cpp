@@ -7,7 +7,7 @@
 #include "modredc_2ul2.h"
 #include "threadpool.hpp"
 #include "las-config.h"
-#include "las-types.hpp"
+#include "las-info.hpp"
 #include "las-coordinates.hpp"
 #include "las-debug.hpp"
 #include "las-arith.hpp"

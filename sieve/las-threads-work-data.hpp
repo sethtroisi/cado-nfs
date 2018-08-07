@@ -2,7 +2,7 @@
 #define LAS_THREADS_WORK_DATA_HPP_
 
 #include "las-forwardtypes.hpp"
-#include "las-types.hpp"
+#include "las-info.hpp"
 #include "las-threads.hpp"
 #include "las-plattice.hpp"
 #include "las-smallsieve-types.hpp"
@@ -54,15 +54,12 @@ class nfs_work {
     /* This is set via prepare_for_new_q() */
     int nb_buckets[FB_MAX_PARTS];
 
-    /* This conditions the validity of the sieve_info_side members
-     * sides[0,1], as well as some other members. If config fields match,
-     * we can basically use the same sieve_info structure. */
     siever_config conf;
 
     qlattice_basis Q;
 
-    /* These are fetched from the sieve_info structure, which caches them
-     * */
+    /* These are fetched from the sieve_shared_data structure, which
+     * caches them */
     j_divisibility_helper const * jd;
     unsieve_data const * us;
 
@@ -71,7 +68,7 @@ class nfs_work {
     struct side_data {
         reservation_group group;
 
-        /* lognorms is set by sieve_info::update_norm_data(), and depends on
+        /* lognorms is set by prepare_for_new_q(), and depends on
          *      conf.logA
          *      conf.sides[side].lpb
          *      conf.sides[side].sublat
@@ -217,7 +214,9 @@ class nfs_work {
     void zeroinit_defaults();
     void compute_toplevel_and_buckets();        // utility
     public:
-    void prepare_for_new_q(sieve_info & si);
+    /* This uses the same reference as this->las, except that we want it
+     * non-const */
+    void prepare_for_new_q(las_info &);
 
     void allocate_buckets(nfs_aux&, thread_pool&);
     void allocate_bucket_regions();
@@ -242,7 +241,10 @@ class nfs_work_cofac {
 
     facul_strategies_t const * strategies;
 
-    nfs_work_cofac(las_info const& las, sieve_info & si, nfs_work const & ws);
+    /* yes, the ctor takes a non-const reference, but this->las is const.
+     * This is because the ctor wants to access the cache in the las
+     * structure. */
+    nfs_work_cofac(las_info & las, nfs_work const & ws);
 };
 
 #endif	/* LAS_THREADS_WORK_DATA_HPP_ */

@@ -141,6 +141,7 @@ class thread_pool : private monitor, private NonCopyable {
   void add_exception(size_t queue, clonable_exception * e);
   bool all_task_queues_empty() const;
 public:
+  /* This is protected by a static mutex in threadpool.cpp */
   static double cumulated_wait_time;
   thread_pool(size_t _nr_threads, size_t nr_queues = 1);
   ~thread_pool();

@@ -19,6 +19,7 @@
 #include <vector>
 #include <sstream>  /* for c++ string handling */
 #include <iterator> /* ostream_iterator */
+#include <thread> /* we use std::thread for las sub-jobs */
 #include "threadpool.hpp"
 #include "fb.hpp"
 #include "portability.h"
@@ -28,7 +29,7 @@
 #include "bucket.hpp"
 #include "trialdiv.hpp"
 #include "las-config.h"
-#include "las-types.hpp"
+#include "las-info.hpp"
 #include "las-coordinates.hpp"
 #include "las-debug.hpp"
 #include "las-duplicate.hpp"
@@ -59,6 +60,7 @@
 #include <smmintrin.h>
 #endif
 
+size_t base_memory = 0;
 int recursive_descent = 0;
 int prepend_relation_time = 0;
 int exit_after_rel_found = 0;
@@ -3001,7 +3003,7 @@ void do_one_special_q_sublat(las_info const & las, nfs_work & ws, std::shared_pt
 }/*}}}*/
 
 /* This returns false if the special-q was discarded */
-bool do_one_special_q(las_info & las, nfs_work & ws, std::shared_ptr<nfs_aux> aux_p, thread_pool & pool, sieve_info & si)
+bool do_one_special_q(las_info & las, nfs_work & ws, std::shared_ptr<nfs_aux> aux_p, thread_pool & pool)
 {
     nfs_aux & aux(*aux_p);
     ws.Q.doing = aux.doing;     /* will be set by choose_sieve_area anyway */
@@ -3056,7 +3058,7 @@ bool do_one_special_q(las_info & las, nfs_work & ws, std::shared_ptr<nfs_aux> au
 
     BOOKKEEPING_TIMER(timer_special_q);
 
-    ws.prepare_for_new_q(si);
+    ws.prepare_for_new_q(las);
     ws.bk_multiplier = las.bk_multiplier;
 
     /* the where_am_I structure is store in nfs_aux. We have a few
@@ -3078,7 +3080,7 @@ bool do_one_special_q(las_info & las, nfs_work & ws, std::shared_ptr<nfs_aux> au
     std::shared_ptr<nfs_work_cofac> wc_p;
 
     {
-        wc_p = std::make_shared<nfs_work_cofac>(las, si, ws);
+        wc_p = std::make_shared<nfs_work_cofac>(las, ws);
 
         rep.total_logI += ws.conf.logI;
         rep.total_J += ws.J;
@@ -3154,11 +3156,202 @@ void prepare_timer_layout_for_multithreaded_tasks(timetree_t & timer)
     }
 }
 
+void las_subjob(las_info & las, las_report & global_report, timetree_t & global_timer, cxx_param_list & pl)
+{
+    where_am_I w MAYBE_UNUSED;
+    WHERE_AM_I_UPDATE(w, plas, &las);
+
+    std::list<std::pair<las_report, timetree_t>> aux_good;
+    std::list<std::pair<las_report, timetree_t>> aux_botched;
+
+    {
+        /* add scoping to control dtor call */
+        /* queue 0: main
+         * queue 1: ECM
+         * queue 2: things that we join almost immediately, but are
+         * multithreaded nevertheless: alloc buckets, ...
+         */
+        thread_pool pool(las.nb_threads, 3);
+        nfs_work workspaces(las);
+
+        /* {{{ Doc on todo list handling
+         * The function las_todo_feed behaves in different
+         * ways depending on whether we're in q-range mode or in q-list mode.
+         *
+         * q-range mode: the special-q's to be handled are specified as a
+         * range. Then, whenever the las.todo list almost runs out, it is
+         * refilled if possible, up to the limit q1 (-q0 & -rho just gives a
+         * special case of this).
+         *
+         * q-list mode: the special-q's to be handled are always read from a
+         * file. Therefore each new special-q to be handled incurs a
+         * _blocking_ read on the file, until EOF. This mode is also used for
+         * the descent, which has the implication that the read occurs if and
+         * only if the todo list is empty. }}} */
+
+        for( ; las_todo_feed(las, pl) ; ) {
+            /* If the next special-q to try is a special marker, it means
+             * that we're done with a special-q we started before, including
+             * all its spawned sub-special-q's. Indeed, each time we start a
+             * special-q from the todo list, we replace it by a special
+             * marker. But newer special-q's may enver the todo list in turn
+             * (pushed with las_todo_push_withdepth).
+             */
+            if (las_todo_pop_closing_brace(las)) {
+                las.tree.done_node();
+                if (las.tree.depth() == 0) {
+                    if (recursive_descent) {
+                        /* BEGIN TREE / END TREE are for the python script */
+                        fprintf(las.output, "# BEGIN TREE\n");
+                        las.tree.display_last_tree(las.output);
+                        fprintf(las.output, "# END TREE\n");
+                    }
+                    las.tree.visited.clear();
+                }
+                continue;
+            }
+
+            /* pick a new entry from the stack, and do a few sanity checks */
+            las_todo_entry doing = las_todo_pop(las);
+            las_todo_push_closing_brace(las, doing.depth);
+            /* We set this aside because we may have to rollback our changes
+             * if we catch an exception because of full buckets. */
+            std::stack<las_todo_entry> saved_todo(las.todo);
+
+            las.tree.new_node(doing);
+
+            /* We'll convert that to a shared_ptr later on, because this is
+             * to be kept by the cofactoring tasks that will linger on quite
+             * late.
+             * Note that we must construct this object *outside* the try
+             * block, because we want this list to be common to all attempts
+             * for this q.
+             */
+            auto rel_hash_p = std::make_shared<nfs_aux::rel_hash_t>();
+
+            for(;;) {
+                /* We're playing a very dangerous game here. rep and timer
+                 * below are created here, at the end of a temp list. When
+                 * exiting this loop, they will still be live somewhere,
+                 * either in aux_good or aux_botched. The nfs_aux data holds
+                 * references to this stuff. But this nfs_aux is expected to
+                 * live slightly longer, so it will tinker with these structs
+                 * at a time where they've already been moved to aux_good (or
+                 * even aux_botched, if an exception occurs late during 1l
+                 * downsorting). We must be sure that all threads are done
+                 * when we finally consume the aux_good and aux_botched
+                 * lists!
+                 */
+                std::list<std::pair<las_report, timetree_t>> aux_pending;
+                aux_pending.push_back(std::pair<las_report, timetree_t>());
+                las_report & rep(aux_pending.back().first);
+                timetree_t & timer_special_q(aux_pending.back().second);
+
+                /* ready to start over if we encounter an exception */
+                try {
+                    /* The nfs_aux ctor below starts the special-q timer.
+                     * However we must not give it a category right now,
+                     * since it is an essential property ot the timer trees
+                     * that the root of the trees must not have a nontrivial
+                     * category */
+                    auto aux_p = std::make_shared<nfs_aux>(las, doing, rel_hash_p, rep, timer_special_q, las.nb_threads);
+                    nfs_aux & aux(*aux_p);
+                    ACTIVATE_TIMER(timer_special_q);
+
+                    prepare_timer_layout_for_multithreaded_tasks(timer_special_q);
+
+                    bool done = do_one_special_q(las, workspaces, aux_p, pool);
+
+                    if (!done) {
+                        /* Then we don't even keep track of the time, it's
+                         * totally insignificant.
+                         */
+                        global_report.nr_sq_discarded++;
+                        break;
+                    }
+
+                    /* for statistics */
+                    global_report.nr_sq_processed++;
+
+                    aux.complete = true;
+                    aux_good.splice(aux_good.end(), aux_pending);
+
+                    /* We used to display timer_special_q ; now it makes little
+                     * sense, in fact, because we've started to aggressively
+                     * desynchronize some of the tasks */
+                    // global_timer += timer_special_q;
+
+                    if (exit_after_rel_found > 1 && rep.reports > 0)
+                        break;
+
+                    break;
+                } catch (buckets_are_full const & e) {
+                    aux_botched.splice(aux_botched.end(), aux_pending);
+                    verbose_output_vfprint (2, 1, gmp_vfprintf,
+                            "# redoing q=%Zd, rho=%Zd because %s buckets are full\n"
+                            "# %s\n",
+                            (mpz_srcptr) doing.p, (mpz_srcptr) doing.r,
+                            bkmult_specifier::printkey(e.key).c_str(),
+                            e.what());
+
+                    double old = las.bk_multiplier.get(e.key);
+                    double ratio = (double) e.reached_size / e.theoretical_max_size * 1.1;
+                    double new_bk_multiplier = old * ratio;
+                    verbose_output_print(0, 1, "# Updating %s bucket multiplier to %.3f*%d/%d*1.1=%.3f\n",
+                            bkmult_specifier::printkey(e.key).c_str(),
+                            old,
+                            e.reached_size,
+                            e.theoretical_max_size,
+                            new_bk_multiplier
+                            );
+                    las.grow_bk_multiplier(e.key, ratio);
+                    if (las.config_pool.default_config_ptr) {
+                        siever_config const & sc(*las.config_pool.default_config_ptr);
+                        display_expected_memory_usage(sc, las, base_memory);
+                    }
+                    /* we have to roll back the updates we made to
+                     * this structure. */
+                    std::swap(las.todo, saved_todo);
+                    // las.tree.ditch_node();
+                    continue;
+                }
+                break;
+            }
+
+        } // end of loop over special q ideals.
+
+        /* we delete the "pool" and "workspaces" variables at this point. */
+        /* The dtor for "pool" is a synchronization point */
+    }
+
+    static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
+    pthread_mutex_lock(&lock);
+
+    for(auto & P : aux_good) {
+        global_report.accumulate_and_clear(std::move(P.first));
+        global_timer += P.second;
+    }
+    las_report botched_report;
+    timetree_t botched_timer;
+    for(auto & P : aux_botched) {
+        botched_report.accumulate_and_clear(std::move(P.first));
+        botched_timer += P.second;
+    }
+
+    global_report.nwaste += aux_botched.size();
+    global_report.waste += botched_report.tn[0];
+    global_report.waste += botched_report.tn[1];
+    global_report.waste += botched_report.ttbuckets_fill;
+    global_report.waste += botched_report.ttbuckets_apply;
+    global_report.waste += botched_report.ttf;
+    global_report.waste += botched_report.ttcof;
+
+    pthread_mutex_unlock(&lock);
+}
+
 int main (int argc0, char *argv0[])/*{{{*/
 {
     double t0, tts, wct;
-    unsigned long nr_sq_processed = 0;
-    unsigned long nr_sq_discarded = 0;
     int argc = argc0;
     char **argv = argv0;
 
@@ -3227,16 +3420,11 @@ int main (int argc0, char *argv0[])/*{{{*/
 #endif
 
     /* experimental. */
-    size_t base_memory = Memusage() << 10;
+    base_memory = Memusage() << 10;
     if (las.config_pool.default_config_ptr) {
         siever_config const & sc(*las.config_pool.default_config_ptr);
         display_expected_memory_usage(sc, las, base_memory);
     }
-
-    /* This "sieve_info" structure is **NO LONGER** what it used to be.
-     * It's not accessible from within the computation.
-     */
-    sieve_info si(las.cpoly, pl, true);
 
     if (las.batch) {
         ASSERT_ALWAYS(las.config_pool.default_config_ptr);
@@ -3257,12 +3445,6 @@ int main (int argc0, char *argv0[])/*{{{*/
         }
     }
 
-    t0 = seconds ();
-    wct = wct_seconds();
-
-    where_am_I w MAYBE_UNUSED;
-    WHERE_AM_I_UPDATE(w, plas, &las);
-
     /* The global timer and global report structures are not active for
      * now.  Most of the accounting is done per special_q, and this will
      * be summarized once we're done with the multithreaded run.
@@ -3270,182 +3452,27 @@ int main (int argc0, char *argv0[])/*{{{*/
     las_report global_report;
     timetree_t global_timer;
 
-    std::list<std::pair<las_report, timetree_t>> aux_good;
-    std::list<std::pair<las_report, timetree_t>> aux_botched;
+    t0 = seconds ();
+    wct = wct_seconds();
 
-    {
-        /* add scoping to control dtor call */
-    /* queue 0: main
-     * queue 1: ECM
-     * queue 2: things that we join almost immediately, but are
-     * multithreaded nevertheless: alloc buckets, ...
-     */
-    thread_pool pool(las.nb_threads, 3);
-    nfs_work workspaces(las);
-
-    /* {{{ Doc on todo list handling
-     * The function las_todo_feed behaves in different
-     * ways depending on whether we're in q-range mode or in q-list mode.
-     *
-     * q-range mode: the special-q's to be handled are specified as a
-     * range. Then, whenever the las.todo list almost runs out, it is
-     * refilled if possible, up to the limit q1 (-q0 & -rho just gives a
-     * special case of this).
-     *
-     * q-list mode: the special-q's to be handled are always read from a
-     * file. Therefore each new special-q to be handled incurs a
-     * _blocking_ read on the file, until EOF. This mode is also used for
-     * the descent, which has the implication that the read occurs if and
-     * only if the todo list is empty. }}} */
-
-    for( ; las_todo_feed(las, pl) ; ) {
-        /* If the next special-q to try is a special marker, it means
-         * that we're done with a special-q we started before, including
-         * all its spawned sub-special-q's. Indeed, each time we start a
-         * special-q from the todo list, we replace it by a special
-         * marker. But newer special-q's may enver the todo list in turn
-         * (pushed with las_todo_push_withdepth).
+    std::vector<std::thread> subjobs;
+    int nsubjobs = 1;
+    for(int subjob = 0 ; subjob < nsubjobs ; ++subjob) {
+        /* when references are passed through variadic template arguments
+         * as for the std::thread ctor, we have automatic decaying unless
+         * we use std::ref.
          */
-        if (las_todo_pop_closing_brace(las)) {
-            las.tree.done_node();
-            if (las.tree.depth() == 0) {
-                if (recursive_descent) {
-                    /* BEGIN TREE / END TREE are for the python script */
-                    fprintf(las.output, "# BEGIN TREE\n");
-                    las.tree.display_last_tree(las.output);
-                    fprintf(las.output, "# END TREE\n");
-                }
-                las.tree.visited.clear();
-            }
-            continue;
-        }
-
-        /* pick a new entry from the stack, and do a few sanity checks */
-        las_todo_entry doing = las_todo_pop(las);
-        las_todo_push_closing_brace(las, doing.depth);
-        /* We set this aside because we may have to rollback our changes
-         * if we catch an exception because of full buckets. */
-        std::stack<las_todo_entry> saved_todo(las.todo);
-
-        las.tree.new_node(doing);
-
-        /* We'll convert that to a shared_ptr later on, because this is
-         * to be kept by the cofactoring tasks that will linger on quite
-         * late.
-         * Note that we must construct this object *outside* the try
-         * block, because we want this list to be common to all attempts
-         * for this q.
-         */
-        auto rel_hash_p = std::make_shared<nfs_aux::rel_hash_t>();
-
-        for(;;) {
-            /* We're playing a very dangerous game here. rep and timer
-             * below are created here, at the end of a temp list. When
-             * exiting this loop, they will still be live somewhere,
-             * either in aux_good or aux_botched. The nfs_aux data holds
-             * references to this stuff. But this nfs_aux is expected to
-             * live slightly longer, so it will tinker with these structs
-             * at a time where they've already been moved to aux_good (or
-             * even aux_botched, if an exception occurs late during 1l
-             * downsorting). We must be sure that all threads are done
-             * when we finally consume the aux_good and aux_botched
-             * lists!
-             */
-            std::list<std::pair<las_report, timetree_t>> aux_pending;
-            aux_pending.push_back(std::pair<las_report, timetree_t>());
-            las_report & rep(aux_pending.back().first);
-            timetree_t & timer_special_q(aux_pending.back().second);
-
-            /* ready to start over if we encounter an exception */
-            try {
-                /* The nfs_aux ctor below starts the special-q timer.
-                 * However we must not give it a category right now,
-                 * since it is an essential property ot the timer trees
-                 * that the root of the trees must not have a nontrivial
-                 * category */
-                auto aux_p = std::make_shared<nfs_aux>(las, doing, rel_hash_p, rep, timer_special_q, las.nb_threads);
-                nfs_aux & aux(*aux_p);
-                ACTIVATE_TIMER(timer_special_q);
-
-                prepare_timer_layout_for_multithreaded_tasks(timer_special_q);
-
-                bool done = do_one_special_q(las, workspaces, aux_p, pool, si);
-
-                if (!done) {
-                    /* Then we don't even keep track of the time, it's
-                     * totally insignificant.
-                     */
-                    nr_sq_discarded++;
-                    break;
-                }
-
-                /* for statistics */
-                nr_sq_processed++;
-
-                aux.complete = true;
-                aux_good.splice(aux_good.end(), aux_pending);
-
-                /* We used to display timer_special_q ; now it makes little
-                 * sense, in fact, because we've started to aggressively
-                 * desynchronize some of the tasks */
-                // global_timer += timer_special_q;
-
-                if (exit_after_rel_found > 1 && rep.reports > 0)
-                    break;
-
-                break;
-            } catch (buckets_are_full const & e) {
-                aux_botched.splice(aux_botched.end(), aux_pending);
-                verbose_output_vfprint (2, 1, gmp_vfprintf,
-                        "# redoing q=%Zd, rho=%Zd because %s buckets are full\n"
-                        "# %s\n",
-                        (mpz_srcptr) doing.p, (mpz_srcptr) doing.r,
-                        bkmult_specifier::printkey(e.key).c_str(),
-                        e.what());
-
-                double old = las.bk_multiplier.get(e.key);
-                double ratio = (double) e.reached_size / e.theoretical_max_size * 1.1;
-                double new_bk_multiplier = old * ratio;
-                verbose_output_print(0, 1, "# Updating %s bucket multiplier to %.3f*%d/%d*1.1=%.3f\n",
-                        bkmult_specifier::printkey(e.key).c_str(),
-                        old,
-                        e.reached_size,
-                        e.theoretical_max_size,
-                        new_bk_multiplier
-                        );
-                las.grow_bk_multiplier(e.key, ratio);
-                if (las.config_pool.default_config_ptr) {
-                    siever_config const & sc(*las.config_pool.default_config_ptr);
-                    display_expected_memory_usage(sc, las, base_memory);
-                }
-                /* we have to roll back the updates we made to
-                 * this structure. */
-                std::swap(las.todo, saved_todo);
-                // las.tree.ditch_node();
-                continue;
-            }
-            break;
-        }
-
-      } // end of loop over special q ideals.
-
-    /* we delete the "pool" and "workspaces" variables at this point. */
-    /* The dtor for "pool" is a synchronization point */
+        subjobs.push_back(
+                std::thread(las_subjob,
+                    std::ref(las),
+                    std::ref(global_report),
+                    std::ref(global_timer),
+                    std::ref(pl))
+                );
     }
-
+    for(auto & t : subjobs) t.join();
 
     verbose_output_print(0, 1, "# Cumulated wait time over all threads %.2f\n", thread_pool::cumulated_wait_time);
-
-    for(auto & P : aux_good) {
-        global_report.accumulate_and_clear(std::move(P.first));
-        global_timer += P.second;
-    }
-    las_report botched_report;
-    timetree_t botched_timer;
-    for(auto & P : aux_botched) {
-        botched_report.accumulate_and_clear(std::move(P.first));
-        botched_timer += P.second;
-    }
 
     if (recursive_descent) {
         verbose_output_print(0, 1, "# Now displaying again the results of all descents\n");
@@ -3513,13 +3540,13 @@ int main (int argc0, char *argv0[])/*{{{*/
 
     if (las.adjust_strategy < 2) {
         verbose_output_print (2, 1, "# Average J=%1.0f for %lu special-q's, max bucket fill -bkmult %s\n",
-                global_report.total_J / (double) nr_sq_processed, nr_sq_processed, las.bk_multiplier.print_all().c_str());
+                global_report.total_J / (double) global_report.nr_sq_processed, global_report.nr_sq_processed, las.bk_multiplier.print_all().c_str());
     } else {
         verbose_output_print (2, 1, "# Average logI=%1.1f for %lu special-q's, max bucket fill -bkmult %s\n",
-                global_report.total_logI / (double) nr_sq_processed, nr_sq_processed, las.bk_multiplier.print_all().c_str());
+                global_report.total_logI / (double) global_report.nr_sq_processed, global_report.nr_sq_processed, las.bk_multiplier.print_all().c_str());
     }
     verbose_output_print (2, 1, "# Discarded %lu special-q's out of %u pushed\n",
-            nr_sq_discarded, las.nq_pushed);
+            global_report.nr_sq_discarded, las.nq_pushed);
 
     global_timer.stop();
 
@@ -3554,40 +3581,16 @@ int main (int argc0, char *argv0[])/*{{{*/
                  nr_bucket_primes, nr_div_tests, nr_composite_tests, nr_wrap_was_composite);
     }
 
-    double waste = 0;
-    waste += botched_report.tn[0];
-    waste += botched_report.tn[1];
-    waste += botched_report.ttbuckets_fill;
-    waste += botched_report.ttbuckets_apply;
-    waste += botched_report.ttf;
-    waste += botched_report.ttcof;
 
-    verbose_output_print (2, 1, "# Wasted cpu time due to %zu bkmult adjustments: %1.2f [norm %1.2f+%1.2f, sieving "
-                " (%1.2f + %1.2f),"
-                " factor (%1.2f + %1.2f)]\n",
-                aux_botched.size(),
-                waste,
-                botched_report.tn[0],
-                botched_report.tn[1],
-                botched_report.ttbuckets_fill,
-                botched_report.ttbuckets_apply,
-		botched_report.ttf, botched_report.ttcof);
+    verbose_output_print (2, 1, "# Wasted cpu time due to %d bkmult adjustments: %1.2f\n", global_report.nwaste, global_report.waste);
 
-    t0 -= waste;
+    t0 -= global_report.waste;
 
     tts = t0;
     tts -= global_report.tn[0];
     tts -= global_report.tn[1];
     tts -= global_report.ttf;
     tts -= global_report.ttcof;
-    /*
-    global_report.tn[0] -= botched_report.tn[0];
-    global_report.tn[1] -= botched_report.tn[1];
-    global_report.ttbuckets_fill -= botched_report.ttbuckets_fill;
-    global_report.ttbuckets_apply -= botched_report.ttbuckets_apply;
-    global_report.ttf -= botched_report.ttf;
-    global_report.ttcof -= botched_report.ttcof;
-    */
 
     if (dont_print_tally && las.nb_threads > 1) 
         verbose_output_print (2, 1, "# Total cpu time %1.2fs [tally available only in mono-thread]\n", t0);
@@ -3605,7 +3608,7 @@ int main (int argc0, char *argv0[])/*{{{*/
 		global_report.ttf + global_report.ttcof, global_report.ttf, global_report.ttcof);
 
     verbose_output_print (2, 1, "# Total elapsed time %1.2fs, per special-q %gs, per relation %gs\n",
-                 wct, wct / (double) nr_sq_processed, wct / (double) global_report.reports);
+                 wct, wct / (double) global_report.nr_sq_processed, wct / (double) global_report.reports);
 
     /* memory usage */
     if (las.verbose >= 1 && las.config_pool.default_config_ptr) {
@@ -3621,7 +3624,7 @@ int main (int argc0, char *argv0[])/*{{{*/
     }
     verbose_output_print (2, 1, "# Total %lu reports [%1.3gs/r, %1.1fr/sq] in %1.3g elapsed s [%.1f%% CPU]\n",
             global_report.reports, t0 / (double) global_report.reports,
-            (double) global_report.reports / (double) nr_sq_processed,
+            (double) global_report.reports / (double) global_report.nr_sq_processed,
             wct,
             100*t0/wct);
 

@@ -8,7 +8,7 @@
 #if defined(HAVE_SSE2)
 #include <emmintrin.h>
 #endif
-#include "las-types.hpp"
+#include "las-info.hpp"
 #include "bucket.hpp"
 #include "portability.h"
 #include "memory.h"

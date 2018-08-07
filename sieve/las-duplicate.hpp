@@ -1,7 +1,7 @@
 #ifndef LAS_DUPLICATE_HPP_
 #define LAS_DUPLICATE_HPP_
 
-#include "las-types.hpp"
+#include "las-info.hpp"
 #include "relation.hpp"
 #include <memory>
 

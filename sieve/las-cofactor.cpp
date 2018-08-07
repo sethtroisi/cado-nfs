@@ -8,7 +8,7 @@
 #include "modredc_ul.h"
 #include "modredc_15ul.h"
 #include "modredc_2ul2.h"
-#include "las-types.hpp"
+#include "las-info.hpp"
 
 // {{{ las_info::{init,clear,print}_cof_stats
 cofactorization_statistics::cofactorization_statistics(param_list_ptr pl)
