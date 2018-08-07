@@ -465,9 +465,15 @@ static inline uint32_t invmod(uint32_t x, uint32_t m) {
     }
 }
 
-// TODO: put this function somewhere in a class: right now it is
-// duplicated in many compilation units.
-static plattice_x_t plattice_starting_point(const plattice_info_t &pli,
+/* This is (currently) common across all instantiations of
+ * plattice_enumerator. However if someday plattice_x_t changes type to
+ * vary depending on the level (which, in my reckoning, is now doable),
+ * then we should probably just move this function to the
+ * plattice_enumerator class anyway (or, equivalently, make it a template
+ * based on plattice_x_t).
+ */
+struct plattice_enumerator_base {
+static plattice_x_t starting_point(const plattice_info_t &pli,
         const int logI, const sublat_t &sublat) {
     int64_t I = int64_t(1)<<logI;
     uint32_t m  = sublat.m;
@@ -550,12 +556,11 @@ static plattice_x_t plattice_starting_point(const plattice_info_t &pli,
     plattice_x_t res = (ii+I/2) + (jj<<logI);
     return res;
 }
-
-
+};
 
 /* Class for enumerating lattice points with the Franke-Kleinjung algorithm */
 template<int LEVEL>
-class plattice_enumerator {
+class plattice_enumerator : public plattice_enumerator_base {
 protected:
     // Maybe at some point, the plattice_x_t type could be templated in
     // order to have it 32 bits for non-top levels.
@@ -591,7 +596,7 @@ public:
         if (!sublat.m) 
             x = plattice_x_t(1) << (logI-1);
         else {
-            x = plattice_starting_point(basis, logI, sublat);
+            x = plattice_enumerator_base::starting_point(basis, logI, sublat);
         }
     }
 
