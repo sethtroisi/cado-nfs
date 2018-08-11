@@ -1,3 +1,5 @@
+#ifndef GPF_H_
+#define GPF_H_
 
 extern unsigned int *gpf;
 
@@ -7,3 +9,5 @@ static inline unsigned int gpf_get(const unsigned long i) {
 }
 
 void gpf_clear();
+
+#endif
