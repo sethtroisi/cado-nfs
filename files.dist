@@ -1235,6 +1235,9 @@ tests/sieve/Makefile
 tests/sqrt/Makefile
 tests/utils/Makefile
 utils/utils_cxx.hpp
+utils/gpf.c
+utils/gpf.h
+tests/utils/test_gpf.c
 sieve/las-choose-sieve-area.cpp
 sieve/las-choose-sieve-area.hpp
 sieve/las-process-bucket-region.hpp
