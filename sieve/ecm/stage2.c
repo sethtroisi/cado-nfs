@@ -57,7 +57,7 @@ find_prime_div (const unsigned int n, const unsigned int min_f MAYBE_UNUSED,
 {
     const unsigned int p = gpf_get(n);
 
-    ASSERT(p >= min_f);
+    ASSERT_ALWAYS(p >= min_f);
     if (primes[p] == 0)
       return 0;
     return p;
@@ -187,7 +187,7 @@ stage2_make_plan (stage2_plan_t *plan, const unsigned int B2min,
 	 The smallest prime not in d is not_in_d, the maximal value for i
 	 is imax, the maximal value for j is d/2-1, so any proper divisor
 	 of i*d+-j is at most (i*d+d/2-1) / not_in_d */
-      gpf_init(B2);
+      gpf_init(max_i * d + d / 2);
       for (p = B2; p >= (max_i * d + d/2 - 1) / not_in_d; p--)
       {
 	  if (primes[p])
