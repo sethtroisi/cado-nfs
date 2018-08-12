@@ -7,7 +7,7 @@
 #include "ularith.h"
 #include "gpf.h"
 
-static unsigned int gpf_max = 0;
+unsigned int gpf_max = 0;
 unsigned int *gpf = NULL;
 
 void gpf_init(unsigned int m)
@@ -19,6 +19,7 @@ void gpf_init(unsigned int m)
       } else {
         gpf = realloc (gpf, (m + 1) * sizeof(unsigned int));
       }
+      gpf_max = m;
       
       /* When we increase gpf_max we could and probably should keep
          the old gpf data and sieve only over the newly added area.
