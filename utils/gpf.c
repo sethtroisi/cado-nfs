@@ -9,6 +9,7 @@
 
 unsigned int gpf_max = 0;
 unsigned int *gpf = NULL;
+static int have_registered_atexit = 0;
 
 void gpf_init(unsigned int m)
 {
@@ -16,8 +17,10 @@ void gpf_init(unsigned int m)
           return;
       if (gpf == NULL) {
         gpf = malloc ((m + 1) * sizeof(unsigned int));
+        ASSERT_ALWAYS(gpf != NULL);
       } else {
         gpf = realloc (gpf, (m + 1) * sizeof(unsigned int));
+        ASSERT_ALWAYS(gpf != NULL);
       }
       gpf_max = m;
       
@@ -59,6 +62,10 @@ void gpf_init(unsigned int m)
           }
       }
       prime_info_clear (pi);
+      if (!have_registered_atexit) {
+          atexit(gpf_clear);
+          have_registered_atexit = 1;
+      }
 }
 
 void gpf_clear()
