@@ -1,6 +1,8 @@
 #ifndef GPF_H_
 #define GPF_H_
 
+#include "macros.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
