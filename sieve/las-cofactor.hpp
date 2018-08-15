@@ -33,6 +33,7 @@ public:
         cof_success[bits0][bits1]++;
     }
     ~cofactorization_statistics();
+    static void declare_usage(cxx_param_list & pl);
 };
 
 int check_leftover_norm (cxx_mpz const & n, siever_config::side_config const & sc);

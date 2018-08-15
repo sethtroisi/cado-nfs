@@ -53,7 +53,6 @@ void nfs_work::zeroinit_defaults()
 nfs_work::nfs_work(las_info const & _las)
     : nfs_work(_las, NUMBER_OF_BAS_FOR_THREADS(_las.nb_threads))
 {
-    zeroinit_defaults();
 }
 nfs_work::nfs_work(las_info const & _las, int nr_workspaces)
     : las(_las),
@@ -62,6 +61,8 @@ nfs_work::nfs_work(las_info const & _las, int nr_workspaces)
     th(_las.nb_threads, thread_data(*this))
 {
     zeroinit_defaults();
+    sides[0].dumpfile.open(las.dump_filename, Q.doing, 0);
+    sides[1].dumpfile.open(las.dump_filename, Q.doing, 1);
 }
 
 nfs_work_cofac::nfs_work_cofac(las_info & las, nfs_work const & ws) :
@@ -286,6 +287,7 @@ void nfs_work::prepare_for_new_q(las_info & las0) {
         wss.fbs = las0.get_factorbase_slicing(side, wss.fbK);
         wss.td = las0.get_trialdiv_data(side, wss.fbK, wss.fbs);
     }
+    bk_multiplier = las.bk_multiplier;
     compute_toplevel_and_buckets();
 
     jd = las0.get_j_divisibility_helper(J);

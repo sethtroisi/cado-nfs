@@ -23,13 +23,15 @@ typedef struct {
 extern "C" {
 #endif
 
-/* Get the largest candidate factor that can be trial divided */
-unsigned long trialdiv_get_max_p();
-
 struct trialdiv_data : public std::vector<trialdiv_divisor_t>
 {
     trialdiv_data() = default;
     trialdiv_data(std::vector<unsigned long> const & primes, size_t skip = 0);
+
+    /* Get the largest candidate factor that can be trial divided. This
+     * should be a constexpr, but I have some difficulties with it.
+     * Perhaps chiefly due to std::sqrt not being constexpr itself.
+     */
     static unsigned long max_p;
 
     /* TODO ; input primes are unsigned long, output primes are uint64_t,

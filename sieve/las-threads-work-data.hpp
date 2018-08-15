@@ -125,7 +125,10 @@ class nfs_work {
         /* the "group" member is not default-constructible,
          * unfortunately.
          */
-        side_data(int nr_arrays) : group(nr_arrays) {}
+        side_data(int nr_arrays)
+            : group(nr_arrays)
+        {
+        }
 
         template <int LEVEL, typename HINT> void reset_all_pointers();
 
@@ -157,6 +160,7 @@ class nfs_work {
             std::vector<bucket_array_t<LEVEL, HINT>> const &
             bucket_arrays() const {return group.cget<LEVEL, HINT>().bucket_arrays();}
 
+        dumpfile_t dumpfile;
     };
 
     std::array<side_data, 2> sides;

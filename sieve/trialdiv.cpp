@@ -26,21 +26,6 @@ unsigned long trialdiv_data::max_p =
                         (unsigned long) (std::sqrt(ULONG_MAX / (TRIALDIV_MAXLEN - 1)) - 1),
                         ULONG_MAX);
 
-unsigned long
-trialdiv_get_max_p()
-{
-  /* With if(TRIALDIV_MAXLEN == 1) here, gcc complains about a division of zero
-     in ULONG_MAX / (TRIALDIV_MAXLEN - 1), so have to use preprocessor to get
-     gcc to shut up */
-#if TRIALDIV_MAXLEN == 1
-  return ULONG_MAX;
-#else
-  double s = sqrt(ULONG_MAX / (TRIALDIV_MAXLEN - 1));
-  ASSERT(s >= 1.);
-  return MIN((unsigned long)s - 1, ULONG_MAX);
-#endif
-}
-
 static void
 trialdiv_init_divisor (trialdiv_divisor_t *d, const unsigned long p)
 {
@@ -49,7 +34,7 @@ trialdiv_init_divisor (trialdiv_divisor_t *d, const unsigned long p)
 #endif
   ASSERT (p % 2UL == 1UL);
   /* Test that p < sqrt (word_base / (TRIALDIV_MAXLEN - 1)) */
-  ASSERT (p <= trialdiv_get_max_p());
+  ASSERT (p <= trialdiv_data::max_p);
   d->p = p;
 #if TRIALDIV_MAXLEN > 1
   if (p == 1UL)

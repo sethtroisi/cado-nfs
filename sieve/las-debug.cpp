@@ -381,21 +381,25 @@ void sieve_increase_underflow_trap(unsigned char *S, const unsigned char logp, w
 #endif
 
 
-dumpfile::~dumpfile() {
+dumpfile_t::~dumpfile_t() {
     if (f) fclose(f);
 }
 
-void dumpfile::setname(const char *filename_stem, las_todo_entry const & doing)
+void dumpfile_t::close() {
+    if (f) fclose(f);
+}
+
+void dumpfile_t::open(const char *filename_stem, las_todo_entry const & doing, int side)
 {
-    if (f != NULL)
-        fclose(f);
+    ASSERT_ALWAYS(!f);
     if (filename_stem != NULL) {
         char *filename;
-        int rc = gmp_asprintf(&filename, "%s.sq%Zd.rho%Zd.side%d.dump",
+        int rc = gmp_asprintf(&filename, "%s.%d.sq%Zd.rho%Zd.side%d.dump",
             filename_stem,
+            doing.side,
             (mpz_srcptr) doing.p, 
             (mpz_srcptr) doing.r, 
-            doing.side);
+            side);
         ASSERT_ALWAYS(rc > 0);
         f = fopen(filename, "w");
         if (f == NULL) {
@@ -405,7 +409,7 @@ void dumpfile::setname(const char *filename_stem, las_todo_entry const & doing)
     }
 }
 
-size_t dumpfile::write(const unsigned char * const data, const size_t size) const {
+size_t dumpfile_t::write(const unsigned char * const data, const size_t size) const {
     if (!f) return 0;
 
     size_t rc = fwrite(data, sizeof(unsigned char), size, f);

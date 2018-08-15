@@ -3,6 +3,15 @@
 #include "las-sieve-shared-data.hpp"
 #include "las-cofactor.hpp"     // proxy facul_make_strategies
 
+
+void sieve_shared_data::declare_usage(cxx_param_list & pl)
+{
+    cxx_cado_poly::declare_usage(pl);
+    param_list_decl_usage(pl, "fb0",   "factor base file on the rational side");
+    param_list_decl_usage(pl, "fb1",   "(alias fb) factor base file on the algebraic side");
+    param_list_decl_usage(pl, "fbc",  "factor base cache file (not yet functional)");
+}
+
 sieve_shared_data::side_data::side_data(int side,
         cxx_cado_poly const & cpoly,
         cxx_param_list & pl)

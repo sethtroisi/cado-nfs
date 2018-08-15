@@ -8,65 +8,56 @@
 #include "misc.h"
 #include "memusage.h"
 
-static void las_verbose_enter(cxx_param_list & pl, FILE * output, int verbose)
-{
-    verbose_interpret_parameters(pl);
-    verbose_output_init(NR_CHANNELS);
-    verbose_output_add(0, output, verbose + 1);
-    verbose_output_add(1, stderr, 1);
-    /* Channel 2 is for statistics. We always print them to las' normal output */
-    verbose_output_add(2, output, 1);
-    if (param_list_parse_switch(pl, "-stats-stderr")) {
-        /* If we should also print stats to stderr, add stderr to channel 2 */
-        verbose_output_add(2, stderr, 1);
-    }
-#ifdef TRACE_K
-    const char *trace_file_name = param_list_lookup_string(pl, "traceout");
-    FILE *trace_file = stderr;
-    if (trace_file_name != NULL) {
-        trace_file = fopen(trace_file_name, "w");
-        DIE_ERRNO_DIAG(trace_file == NULL, "fopen", trace_file_name);
-    }
-    verbose_output_add(TRACE_CHANNEL, trace_file, 1);
-#endif
-}
-
-static void las_verbose_leave()
-{
-    verbose_output_clear();
-}
-
-las_augmented_output_channel::las_augmented_output_channel(cxx_param_list & pl)
-{
-    output = stdout;
-    outputname = param_list_lookup_string(pl, "out");
-    if (outputname) {
-	if (!(output = fopen_maybe_compressed(outputname, "w"))) {
-	    fprintf(stderr, "Could not open %s for writing\n", outputname);
-	    exit(EXIT_FAILURE);
-	}
-    }
-    verbose = param_list_parse_switch(pl, "-v");
-    setvbuf(output, NULL, _IOLBF, 0);      /* mingw has no setlinebuf */
-    las_verbose_enter(pl, output, verbose);
-
-    param_list_print_command_line(output, pl);
-    las_display_config_flags();
-}
-
-las_augmented_output_channel::~las_augmented_output_channel()
-{
-    if (outputname)
-        fclose_maybe_compressed(output, outputname);
-    las_verbose_leave();
-}
-
-
 /* las_info stuff */
 
+void las_info::declare_usage(cxx_param_list & pl)
+{
+    cxx_cado_poly::declare_usage(pl);
+    siever_config_pool::declare_usage(pl);
+    sieve_shared_data::declare_usage(pl);
+#ifdef  DLP_DESCENT
+    las_dlog_base::declare_usage(pl);
+#endif
+    cofactorization_statistics::declare_usage(pl);
+
+
+    param_list_decl_usage(pl, "seed", "Use this seed for random state seeding (currently used only by --random-sample)");
+
+    param_list_decl_usage(pl, "t",   "number of threads to use");
+
+    param_list_decl_usage(pl, "galois", "(switch) for reciprocal polynomials, sieve only half of the q's");
+
+    /* Note: also declared by las_todo_list ! */
+    param_list_decl_usage(pl, "allow-compsq", "(switch) allows composite special-q");
+    param_list_decl_usage(pl, "qfac-min", "factors of q must be at least that");
+    param_list_decl_usage(pl, "qfac-max", "factors of q must be at most that");
+
+
+
+
+    param_list_decl_usage(pl, "dup", "(switch) suppress duplicate relations");
+    param_list_decl_usage(pl, "dup-qmin", "lower limit of global q-range for 2-sided duplicate removal");
+    param_list_decl_usage(pl, "dup-qmax", "upper limit of global q-range for 2-sided duplicate removal");
+    param_list_decl_usage(pl, "adjust-strategy", "strategy used to adapt the sieving range to the q-lattice basis (0 = logI constant, J so that boundary is capped; 1 = logI constant, (a,b) plane norm capped; 2 = logI dynamic, skewed basis; 3 = combine 2 and then 0) ; default=0");
+    param_list_decl_usage(pl, "allow-largesq", "(switch) allows large special-q, e.g. for a DL descent");
+
+
+    param_list_decl_usage(pl, "batch", "(switch) use batch cofactorization");
+    param_list_decl_usage(pl, "batch0", "side-0 batch file");
+    param_list_decl_usage(pl, "batch1", "side-1 batch file");
+    param_list_decl_usage(pl, "batchmfb0", "cofactor bound on side 0 to be considered after batch cofactorization. After primes below 2^batchlpb0 have been extracted, cofactors below this bound will go through ecm. Defaults to lpb0.");
+    param_list_decl_usage(pl, "batchmfb1", "cofactor bound on side 1 to be considered after batch cofactorization. After primes below 2^batchlpb1 have been extracted, cofactors below this bound will go through ecm. Defaults to lpb1.");
+    param_list_decl_usage(pl, "batchlpb0", "large prime bound on side 0 to be considered by batch cofactorization. Primes between lim0 and 2^batchlpb0 will be extracted by product trees. Defaults to lpb0.");
+    param_list_decl_usage(pl, "batchlpb1", "large prime bound on side 1 to be considered by batch cofactorization. Primes between lim1 and 2^batchlpb1 will be extracted by product trees. Defaults to lpb1.");
+    param_list_decl_usage(pl, "batch-print-survivors", "just print survivors to the specified file (or pipe) for an external cofactorization");
+
+
+    param_list_decl_usage(pl, "dumpfile", "Dump entire sieve region to file for debugging.");
+}
+
+
 las_info::las_info(cxx_param_list & pl)
-    : las_augmented_output_channel(pl),
-      cpoly(pl),
+    : cpoly(pl),
       config_pool(pl),
       shared_structure_cache(cpoly, pl),
 #ifdef  DLP_DESCENT
@@ -78,7 +69,13 @@ las_info::las_info(cxx_param_list & pl)
     /* We strive to initialize things in the exact order they're written
      * in the struct */
     // ----- general operational flags {{{
+    gmp_randinit_default(rstate);
+    unsigned long seed = 0;
+    if (param_list_parse_ulong(pl, "seed", &seed))
+        gmp_randseed_ui(rstate, seed);
+
     nb_threads = 1;		/* default value */
+
     param_list_parse_int(pl, "t", &nb_threads);
     if (nb_threads <= 0) {
 	fprintf(stderr,
@@ -89,18 +86,22 @@ las_info::las_info(cxx_param_list & pl)
     galois = param_list_lookup_string(pl, "galois");
     suppress_duplicates = param_list_parse_switch(pl, "-dup");
 
-    gmp_randinit_default(rstate);
-    unsigned long seed = 0;
-    if (param_list_parse_ulong(pl, "seed", &seed))
-        gmp_randseed_ui(rstate, seed);
-
     if (const char * tmp = param_list_lookup_string(pl, "bkmult")) {
         bk_multiplier = bkmult_specifier(tmp);
     }
 
+    param_list_parse_int(pl, "adjust-strategy", &adjust_strategy);
+
     // }}}
 
-    param_list_parse_int(pl, "adjust-strategy", &adjust_strategy);
+
+    /* composite special-q ? Note: this block is present both in
+     * las-todo-list.cpp and las-info.cpp */
+    if ((allow_composite_q = param_list_parse_switch(pl, "-allow-compsq"))) {
+        /* defaults are set in the class description */
+        param_list_parse_uint64(pl, "qfac-min", &qfac_min);
+        param_list_parse_uint64(pl, "qfac-max", &qfac_max);
+    }
 
     // ----- stuff roughly related to the descent {{{
 #ifdef  DLP_DESCENT
@@ -108,54 +109,7 @@ las_info::las_info(cxx_param_list & pl)
 #endif
     // }}}
 
-    // ----- todo list and such {{{
-    nq_pushed = 0;
-    nq_max = UINT_MAX;
-    random_sampling = 0;
-    if (param_list_parse_uint(pl, "random-sample", &nq_max)) {
-        random_sampling = 1;
-    } else if (param_list_parse_uint(pl, "nq", &nq_max)) {
-        if (param_list_lookup_string(pl, "rho")) {
-            fprintf(stderr, "Error: argument -nq is incompatible with -rho\n");
-            exit(EXIT_FAILURE);
-        }
-        if (param_list_lookup_string(pl, "q1"))
-            verbose_output_print(0, 1, "Warning: argument -nq takes priority over -q1 ; -q1 ignored\n");
-    }
-
-    /* Init and parse info regarding work to be done by the siever */
-    /* Actual parsing of the command-line fragments is done within
-     * las_todo_feed, but this is an admittedly contrived way to work */
-    const char * filename = param_list_lookup_string(pl, "todo");
-    if (filename) {
-        todo_list_fd = fopen(filename, "r");
-        if (todo_list_fd == NULL) {
-            fprintf(stderr, "%s: %s\n", filename, strerror(errno));
-            /* There's no point in proceeding, since it would really change
-             * the behaviour of the program to do so */
-            exit(EXIT_FAILURE);
-        }
-    } else {
-        todo_list_fd = NULL;
-    }
-    
-    /* composite special-q ? */
-    allow_composite_q = param_list_parse_switch(pl, "-allow-compsq");
-    if (allow_composite_q) {
-        if (galois) {
-            fprintf(stderr, "-galois and -allow-compsq are incompatible options at the moment");
-            exit(EXIT_FAILURE);
-        }
-        if (!param_list_parse_uint64(pl, "qfac-min", &qfac_min)) {
-            qfac_min = 1024;
-        }
-        if (!param_list_parse_uint64(pl, "qfac-max", &qfac_max)) {
-            qfac_max = UINT64_MAX;
-        }
-    }
-
-    // }}}
-
+    /* {{{ duplicate suppression */
     dupqmin = {{ 0, 0 }};
     dupqmax = {{ ULONG_MAX, ULONG_MAX}};
     if (!param_list_parse_ulong_and_ulong(pl, "dup-qmin", &dupqmin[0], ",") && suppress_duplicates) {
@@ -166,17 +120,38 @@ las_info::las_info(cxx_param_list & pl)
     /* Change 0 (not initialized) into LONG_MAX */
     for (auto & x : dupqmin) if (x == 0) x = ULONG_MAX;
 
-    /* If qmin is not given, use lim on the special-q side by default.
-     * This makes sense only if the relevant fields have been filled from
-     * the command line.
-     */
-    if (dupqmin[config_pool.base.side] == ULONG_MAX)
-        dupqmin[config_pool.base.side] = config_pool.base.sides[config_pool.base.side].lim;
-
-    
+    /* }}} */
 
     // ----- batch mode {{{
     batch = param_list_parse_switch(pl, "-batch");
+
+    if (batch) {
+        ASSERT_ALWAYS(config_pool.default_config_ptr);
+        siever_config const & sc0(*config_pool.default_config_ptr);
+	batchlpb[0] = sc0.sides[0].lpb;
+	batchlpb[1] = sc0.sides[1].lpb;
+	batchmfb[0] = sc0.sides[0].lpb;
+	batchmfb[1] = sc0.sides[1].lpb;
+        param_list_parse_int(pl, "batchlpb0", &(batchlpb[0]));
+        param_list_parse_int(pl, "batchlpb1", &(batchlpb[1]));
+        param_list_parse_int(pl, "batchmfb0", &(batchmfb[0]));
+        param_list_parse_int(pl, "batchmfb1", &(batchmfb[1]));
+	batch_file[0] = param_list_lookup_string (pl, "batch0");
+	batch_file[1] = param_list_lookup_string (pl, "batch1");
+
+        for(int side = 0 ; side < 2 ; side++) {
+            // the product of primes up to B takes \log2(B)-\log\log 2 /
+            // \log 2 bits. The added constant is 0.5287.
+            if (batchlpb[side] + 0.5287 >= 31 + log2(GMP_LIMB_BITS)) {
+                fprintf(stderr, "Gnu MP cannot deal with primes product that large (max 37 bits, asked for batchlpb%d=%d)\n", side, batchlpb[side]);
+                abort();
+            } else if (batchlpb[side] + 0.5287 >= 34) {
+                fprintf(stderr, "Gnu MP's mpz_inp_raw and mpz_out_raw functions are limited to integers of at most 34 bits (asked for batchlpb%d=%d)\n",side,batchlpb[side]);
+                abort();
+            }
+        }
+    }
+
 
     const char * bps = param_list_lookup_string(pl, "batch-print-survivors");
     if (bps) {
@@ -200,13 +175,6 @@ las_info::~las_info()/*{{{*/
     gmp_randclear(rstate);
     // }}}
 
-    // ----- todo list and such {{{
-    if (todo_list_fd) {
-        fclose(todo_list_fd);
-        todo_list_fd = NULL;
-    }
-    // }}}
- 
     // ----- batch mode: very little
     if (batch_print_survivors) fclose(batch_print_survivors);
     cofac_list_clear (L);

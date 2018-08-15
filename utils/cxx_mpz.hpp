@@ -6,10 +6,15 @@
 #include <istream>
 #include <ostream>
 
+#include "gmp_aux.h"
+
 struct cxx_mpz {
     mpz_t x;
     cxx_mpz() { mpz_init(x); }
     cxx_mpz(unsigned long p) { mpz_init_set_ui(x, p); }
+#if ULONG_BITS < 64
+    cxx_mpz(uint64_t p) { mpz_init_set_uint64(x, p); }
+#endif
     ~cxx_mpz() { mpz_clear(x); }
     cxx_mpz(cxx_mpz const & o) {
         mpz_init(x);

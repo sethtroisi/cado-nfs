@@ -288,7 +288,7 @@ lognorm_base::lognorm_base(siever_config const & sc, cxx_cado_poly const & cpoly
      * get_maxnorm_rectangular(). */
 
     mpz_poly_homography (fij, cpoly->pols[side], H);
-    if (sc.side == side) {
+    if (Q.doing.side == side) {
         ASSERT_ALWAYS(mpz_poly_divisible_mpz(fij, Q.doing.p));
         mpz_poly_divexact_mpz(fij, fij, Q.doing.p);
     }

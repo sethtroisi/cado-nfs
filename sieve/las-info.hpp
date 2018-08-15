@@ -14,6 +14,7 @@
 #include "ecm/batch.h"          // cofac_list
 #include "las-forwardtypes.hpp"
 #include "las-sieve-shared-data.hpp"
+#include "las-todo-list.hpp"
 #include "las-cofactor.hpp"     // cofactorization_statistics
 #include <list>
 #include <vector>
@@ -35,14 +36,6 @@ namespace std { using boost::shared_ptr; using boost::make_shared; }
 #define HILIGHT_START   ""
 #define HILIGHT_END   ""
 
-struct las_augmented_output_channel {
-    int verbose;
-    FILE *output;
-    const char * outputname; /* keep track of whether it's gzipped or not */
-    las_augmented_output_channel(cxx_param_list & pl);
-    ~las_augmented_output_channel();
-};
-
 
 /* {{{ las_info
  *
@@ -51,7 +44,7 @@ struct las_augmented_output_channel {
  * lives outside the choice of one particular way to configure the siever
  * versus another.
  */
-struct las_info : private NonCopyable, public las_augmented_output_channel {
+struct las_info : private NonCopyable {
     // ----- general operational flags
     int nb_threads;
     const char * galois; /* a string to indicate which galois to use in las */
@@ -108,23 +101,18 @@ struct las_info : private NonCopyable, public las_augmented_output_channel {
         bk_multiplier.grow(key, d);
     }
 
-    // ----- todo list and various specification of what the siever will
-    // be doing.
-    std::stack<las_todo_entry> todo;
-    unsigned int nq_pushed;
-    unsigned int nq_max;
-    int random_sampling;
-    cxx_mpz todo_q0;
-    cxx_mpz todo_q1;
-    FILE * todo_list_fd;
+    /* For composite special-q: note present both in las_info and
+     * las_todo_list */
+    bool allow_composite_q = false;
+    uint64_t qfac_min = 1024;
+    uint64_t qfac_max = UINT64_MAX;
+    inline bool is_in_qfac_range(uint64_t p) const {
+        return (p >= qfac_min) && (p >= qfac_max);
+    }
+
     std::array<unsigned long, 2> dupqmin;   /* smallest q sieved, for dupsup */
     std::array<unsigned long, 2> dupqmax;   /* largest q sieved, for dupsup */
  
-    /* For composite special-q */
-    int allow_composite_q;
-    uint64_t qfac_min;
-    uint64_t qfac_max;
-
     // ----- stuff roughly related to the descent
     unsigned int max_hint_bitsize[2];
     int * hint_lookups[2]; /* quick access indices into hint_table */
@@ -136,9 +124,13 @@ struct las_info : private NonCopyable, public las_augmented_output_channel {
     mutable descent_tree tree;
     void init_hint_table(param_list_ptr);
     void clear_hint_table();
+
     // ----- batch mode
     int batch; /* batch mode for cofactorization */
     FILE * batch_print_survivors;
+    const char *batch_file[2];
+    int batchlpb[2];
+    int batchmfb[2];
 
     /* Would this rather go somewhere else ? In a global (not per-sq)
      * version of nfs_work_cofac perhaps ?
@@ -153,10 +145,11 @@ struct las_info : private NonCopyable, public las_augmented_output_channel {
     mutable cofactorization_statistics cofac_stats;
 
     const char *dump_filename;
-    mutable dumpfile dumpfiles[2];
 
     las_info(cxx_param_list &);
     ~las_info();
+
+    static void declare_usage(cxx_param_list & pl);
 };
 /* }}} */
 

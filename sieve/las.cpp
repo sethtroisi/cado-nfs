@@ -48,6 +48,7 @@
 #include "las-choose-sieve-area.hpp"
 #include "las-auxiliary-data.hpp"
 #include "las-process-bucket-region.hpp"
+#include "las-galois.hpp"
 
 #include "memusage.h"
 #include "tdict.hpp"
@@ -74,687 +75,87 @@ double tt_qstart;
 
 /*****************************/
 
-void las_todo_push_withdepth(las_info & las, cxx_mpz const & p, cxx_mpz const & r, int side, int depth, int iteration = 0)/*{{{*/
-{
-    las.todo.push(las_todo_entry(p, r, side, depth, iteration));
-}
-void las_todo_push(las_info & las, cxx_mpz const & p, cxx_mpz const & r, int side)
-{
-    las_todo_push_withdepth(las, p, r, side, 0);
-}
-void las_todo_push_closing_brace(las_info & las, int depth)
-{
-    las.todo.push(las_todo_entry(-1, depth));
-}
-las_todo_entry las_todo_pop(las_info & las)
-{
-    las_todo_entry r = las.todo.top();
-    las.todo.pop();
-    return r;
-}
-int las_todo_pop_closing_brace(las_info & las)
-{
-    if (las.todo.top().side >= 0)
-        return 0;
-    las.todo.pop();
-    return 1;
-}
-
-
-
 /*}}}*/
 
 
-// FIXME: This should go to utils/rootfinder.c and be merged with
-// mpz_poly_roots_gen().
+/*{{{ stuff related to las output: -out, -stats-stderr, and so on. */
+struct las_augmented_output_channel {
+    int verbose = 1;
+    FILE *output = NULL;
+    const char * outputname = NULL; /* keep track of whether it's gzipped or not */
+    void set(cxx_param_list & pl);
+    ~las_augmented_output_channel();
+    static void declare_usage(cxx_param_list & pl);
+};
 
-/* Compute the roots of f modulo q, where q is a composite number whose
- * factorization is given. Returns the number of roots.
- * The array roots must be pre-allocated with sufficient space (degree of
- * f raised to the power of the maximum number of factors of q).
- * Note: q is supposed to be squarefree, so that all elements of fac_q
- * are distinct primes. The end of the list of prime factors is marked by
- * a terminating 0 in fac_q.
- */
-static int roots_for_composite_q(mpz_t* roots, mpz_poly_srcptr f,
-        const mpz_t q, const unsigned long * fac_q)
+las_augmented_output_channel las_output;
+
+static void las_verbose_enter(cxx_param_list & pl, FILE * output, int verbose)
 {
-    ASSERT_ALWAYS(fac_q[0] != 0);
-    // only one prime left ?
-    if (fac_q[1] == 0) {
-        ASSERT(mpz_cmp_ui(q, fac_q[0]) == 0);
-        return mpz_poly_roots(roots, f, q);
+    verbose_interpret_parameters(pl);
+    verbose_output_init(NR_CHANNELS);
+    verbose_output_add(0, output, verbose + 1);
+    verbose_output_add(1, stderr, 1);
+    /* Channel 2 is for statistics. We always print them to las' normal output */
+    verbose_output_add(2, output, 1);
+    if (param_list_parse_switch(pl, "-stats-stderr")) {
+        /* If we should also print stats to stderr, add stderr to channel 2 */
+        verbose_output_add(2, stderr, 1);
     }
-    // First, a recursive call with q' = q / fac_q[0]
-    mpz_t qp;
-    mpz_init(qp);
-    ASSERT(mpz_divisible_ui_p(q, fac_q[0]));
-    mpz_divexact_ui(qp, q, fac_q[0]);
-    int nr = roots_for_composite_q(roots, f, qp, fac_q+1);
-    if (nr == 0) { // no roots modulo q'; we have finished.
-        mpz_clear(qp);
-        return 0;
+#ifdef TRACE_K
+    const char *trace_file_name = param_list_lookup_string(pl, "traceout");
+    FILE *trace_file = stderr;
+    if (trace_file_name != NULL) {
+        trace_file = fopen(trace_file_name, "w");
+        DIE_ERRNO_DIAG(trace_file == NULL, "fopen", trace_file_name);
     }
-
-    // Second, compute the roots modulo fac_q[0]
-    mpz_t fac_q0;
-    mpz_init_set_ui(fac_q0, fac_q[0]);
-    mpz_t roots2[MAX_DEGREE];
-    for (int i = 0; i < MAX_DEGREE; ++i)
-        mpz_init(roots2[i]);
-    int nr2 = mpz_poly_roots(roots2, f, fac_q0);
-
-    // Combine by CRT
-    if (nr2 > 0) {
-        mpz_t new_root, aux;
-        mpz_init(new_root);
-        mpz_init(aux);
-        // pre-compute the coefficients of the CRT
-        mpz_t c, c2;
-        mpz_init(c);
-        mpz_init(c2);
-        int ret = mpz_invert(c, fac_q0, qp);
-        ASSERT_ALWAYS(ret > 0);
-        mpz_mul(c, c, fac_q0);
-        ret = mpz_invert(c2, qp, fac_q0);
-        ASSERT_ALWAYS(ret > 0);
-        mpz_mul(c2, c2, qp);
-
-        // reverse order to avoid erasing the input in roots[]
-        for (int i = nr2-1; i >= 0; --i) {
-            for (int j = 0; j < nr; ++j) {
-                mpz_mul(new_root, roots[j], c);
-                mpz_mul(aux, roots2[i], c2);
-                mpz_add(new_root, new_root, aux);
-                mpz_mod(new_root, new_root, q);
-                mpz_set(roots[i*nr+j], new_root);
-            }
-        }
-        mpz_clear(new_root);
-        mpz_clear(aux);
-    }
-
-    for (int i = 0; i < MAX_DEGREE; ++i)
-        mpz_clear(roots2[i]);
-    mpz_clear(fac_q0);
-    mpz_clear(qp);
-
-    return nr*nr2; // can be 0.
-}
-
-
-/* Put in r the smallest legitimate special-q value that it at least
-   s + diff (note that if s+diff is already legitimate, then r = s+diff
-   will result.
-   In case of composite sq, also store the factorization of r in fac_r,
-   with 0 marking the end of the list of factors.
-   */
-static void
-next_legitimate_specialq(mpz_t r, unsigned long fac_r[], const mpz_t s,
-        const unsigned long diff, las_info const & las)
-{
-    if (las.allow_composite_q) {
-        int nf = next_mpz_with_factor_constraints(r, &fac_r[0],
-                s, diff, las.qfac_min, las.qfac_max);
-        fac_r[nf] = 0;
-    } else {
-        mpz_add_ui(r, s, diff);
-        /* mpz_nextprime() returns a prime *greater than* its input argument,
-           which we don't always want, so we subtract 1 first. */
-        mpz_sub_ui(r, r, 1);
-        mpz_nextprime(r, r);
-    }
-}
-
-
-static void
-parse_command_line_q0_q1(las_info & las, cxx_mpz & q0, unsigned long fac_q0 [],
-        cxx_mpz & q1, param_list pl, const int qside)
-{
-    ASSERT_ALWAYS(param_list_parse_mpz(pl, "q0", q0));
-    if (param_list_parse_mpz(pl, "q1", q1)) {
-        next_legitimate_specialq(q0, fac_q0, q0, 0, las);
-        return;
-    }
-
-    /* We don't have -q1. If we have -rho, we sieve only <q0, rho>. */
-    cxx_mpz t;
-    if (param_list_parse_mpz(pl, "rho", (mpz_ptr) t)) {
-        las_todo_push(las, q0, t, qside);
-        /* Set empty interval [q0 + 1, q0] as special-q interval */
-        mpz_set(q1, q0);
-        mpz_add_ui (q0, q0, 1);
-    } else {
-    /* If we don't have -rho, we sieve only q0, but all roots of it.
-       If -q0 does not give a legitimate special-q value, advance to the
-       next legitimate one. */
-        mpz_set(t, q0);
-        next_legitimate_specialq(q0, fac_q0, q0, 0, las);
-        mpz_set(q1, q0);
-    }
-}
-
-static int
-skip_galois_roots(const int orig_nroots, const mpz_t q, mpz_t *roots,
-		  const char *galois_autom)
-{
-    int imat[4];
-    residueul_t mat[4];
-    int nroots = orig_nroots, ord;
-
-    if(nroots == 0)
-	return 0;
-    automorphism_init(&ord, imat, galois_autom);
-    modulusul_t mm;
-    unsigned long qq = mpz_get_ui(q);
-    modul_initmod_ul(mm, qq);
-    for(int i = 0; i < 4; i++){
-	modul_init(mat[i], mm);
-	modul_set_int64(mat[i], imat[i], mm);
-    }
-    if (nroots % ord) {
-        fprintf(stderr, "Number of roots modulo q is not divisible by %d. Don't know how to interpret -galois.\n", ord);
-        ASSERT_ALWAYS(0);
-    }
-    // Keep only one root among sigma-orbits.
-    residueul_t r2, r3;
-    modul_init(r2, mm);
-    modul_init(r3, mm);
-    residueul_t conj[ord]; // where to put conjugates
-    for(int k = 0; k < ord; k++)
-	modul_init(conj[k], mm);
-    char used[nroots];     // used roots: non-principal conjugates
-    memset(used, 0, nroots);
-    for(int k = 0; k < nroots; k++){
-	if(used[k]) continue;
-	unsigned long rr0 = mpz_get_ui(roots[k]), rr;
-	rr = rr0;
-	// build ord-1 conjugates for roots[k]
-	for(int l = 0; l < ord; l++){
-	    rr = automorphism_apply(mat, rr, mm, qq);
-	    modul_set_ul(conj[l], rr, mm);
-	}
-#if 0 // debug. 
-	printf("orbit for %lu: %lu", qq, rr);
-	for(int l = 0; l < ord-1; l++)
-	    printf(" -> %lu", conj[l][0]);
-	printf("\n");
+    verbose_output_add(TRACE_CHANNEL, trace_file, 1);
 #endif
-	// check: sigma^ord(rr0) should be rr0
-	ASSERT_ALWAYS(rr == rr0);
-	// look at roots
-	for(int l = k+1; l < nroots; l++){
-	    unsigned long ss = mpz_get_ui(roots[l]);
-	    modul_set_ul(r2, ss, mm);
-	    for(int i = 0; i < ord-1; i++)
-		if(modul_equal(r2, conj[i], mm)){
-		    ASSERT_ALWAYS(used[l] == 0);
-		    // l is some conjugate, we erase it
-		    used[l] = (char)1;
-		    break;
-		}
-	}
-    }
-    // now, compact roots
-    int kk = 0;
-    for(int k = 0; k < nroots; k++)
-	if(used[k] == 0){
-	    if(k > kk)
-		mpz_set(roots[kk], roots[k]);
-	    kk++;
-	}
-    ASSERT_ALWAYS(kk == (nroots/ord));
-    nroots = kk;
-    for(int k = 0; k < ord; k++)
-	modul_clear(conj[k], mm);
-    for(int i = 0; i < 4; i++)
-	modul_clear(mat[i], mm);
-    modul_clear(r2, mm);
-    modul_clear(r3, mm);
-    modul_clearmod(mm);
-    return nroots;
 }
 
-static void adwg(std::ostream& os, const char *comment, unsigned long *cpt,
-		 relation &rel, int64_t a, int64_t b){
-    if(b < 0) { a = -a; b = -b; }
-    rel.a = a; rel.b = (uint64_t)b;
-    if (comment) os << comment;
-    os << rel << '\n';
-    *cpt += (*comment != '\0');
-}
-
-/* removing p^vp from the list of factors in rel. */
-static void remove_galois_factors(relation &rel, int p, int vp){
-    int ok = 0;
-
-    for(int side = 0 ; side < 2 ; side++){
-	for(unsigned int i = 0 ; i < rel.sides[side].size(); i++)
-	    if(mpz_cmp_ui(rel.sides[side][i].p, p) == 0){
-		ok = 1;
-		ASSERT_ALWAYS(rel.sides[side][i].e >= vp);
-		rel.sides[side][i].e -= vp;
-	    }
-    }
-    /* indeed, p was present */
-    ASSERT_ALWAYS(ok == 1);
-}
-
-/* adding p^vp to the list of factors in rel. */
-static void add_galois_factors(relation &rel, int p, int vp){
-    int ok[2] = {0, 0};
-
-    for(int side = 0 ; side < 2 ; side++){
-	for(unsigned int i = 0 ; i < rel.sides[side].size(); i++)
-	    if(mpz_cmp_ui(rel.sides[side][i].p, p) == 0){
-		ok[side] = 1;
-		rel.sides[side][i].e += vp;
-	    }
-    }
-    // FIXME: are we sure this is safe?
-    for(int side = 0 ; side < 2 ; side++)
-	if(ok[side] == 0)
-	    /* we must add p^vp */
-	    for(int i = 0; i < vp; i++)
-		rel.add(side, p);
-}
-
-/* adding relations on the fly in Galois cases */
-static void add_relations_with_galois(const char *galois, std::ostream& os,
-				      const char *comment, unsigned long *cpt,
-				      relation &rel){
-    int64_t a0, b0, a1, b1, a2, b2, a3, b3, a5, b5, aa, bb, a;
-    uint64_t b;
-    int d;
-
-    a = rel.a; b = rel.b; // should be obsolete one day
-    // (a0, b0) = sigma^0((a, b)) = (a, b)
-    a0 = rel.a; b0 = (int64_t)rel.b;
-    if(strcmp(galois, "autom2.1") == 0)
-	// remember, 1/x is for plain autom
-	// 1/y is for Galois filtering: x^4+1 -> DO NOT DUPLICATE RELATIONS!
-	// (a-b/x) = 1/x*(-b+a*x)
-	adwg(os, comment, cpt, rel, -b0, -a0);
-    else if(strcmp(galois, "autom2.2") == 0)
-	// remember, -x is for plain autom
-	// -y is for Galois filtering: x^4+1 -> DO NOT DUPLICATE RELATIONS!
-	// (a-(-b)*x) ~ (-a-b*x)
-	adwg(os, comment, cpt, rel, -a0, b0);
-    else if(strcmp(galois, "autom3.1") == 0){
-	// x -> 1-1/x; hence 1/x*(b-(b-a)*x)
-	a1 = a; b1 = (int64_t)b;
-	a2 = b1; b2 = b1-a1;
-	adwg(os, comment, cpt, rel, a2, b2);
-	a3 = b2; b3 = b2-a2;
-	adwg(os, comment, cpt, rel, a3, b3);
-    }
-    else if(strcmp(galois, "autom3.2") == 0){
-	// x -> -1-1/x; hence 1/x*(b-(-a-b)*x)
-	a1 = a; b1 = (int64_t)b;
-	a2 = b1; b2 = -a1-b1;
-	adwg(os, comment, cpt, rel, a2, b2);
-	a3 = b2; b3 = -a2-b2;
-	adwg(os, comment, cpt, rel, a3, b3);
-    }
-    else if(strcmp(galois, "autom4.1") == 0){
-	// FIXME: rewrite and check
-	a1 = a; b1 = (int64_t)b;
-	// tricky: sig^2((a, b)) = (2b, -2a) ~ (b, -a)
-	aa = b1; bb = -a1;
-	if(bb < 0){ aa = -aa; bb = -bb; }
-	rel.a = aa; rel.b = (uint64_t)bb;
-	// same factorization as for (a, b)
-        if (comment) os << comment;
-        os << rel << '\n';
-        *cpt += (*comment != '\0');
-	// sig((a, b)) = (-(a+b), a-b)
-	aa = -(a1+b1);
-	bb = a1-b1;
-	int am2 = a1 & 1, bm2 = b1 & 1;
-	if(am2+bm2 == 1){
-	    // (a, b) = (1, 0) or (0, 1) mod 2
-	    // aa and bb are odd, aa/bb = 1 mod 2
-	    // we must add "2,2" in front of f and g
-	    add_galois_factors(rel, 2, 2);
-	}
-	else{
-	    // (a, b) = (1, 1), aa and bb are even
-	    // we must remove "2,2" in front of f and g
-	    // taken from relation.cpp
-	    remove_galois_factors(rel, 2, 2);
-	    // remove common powers of 2
-	    do {
-		aa >>= 1;
-		bb >>= 1;
-	    } while((aa & 1) == 0 && (bb & 1) == 0);
-	}
-	if(bb < 0){ aa = -aa; bb = -bb; }
-	rel.a = aa; rel.b = (uint64_t)bb;
-        if (comment) os << comment;
-        os << rel << '\n';
-        *cpt += (*comment != '\0');
-	// sig^3((a, b)) = sig((b, -a)) = (a-b, a+b)
-	aa = -aa; // FIXME: check!
-	if(aa < 0){ aa = -aa; bb = -bb; }
-	rel.a = bb; rel.b = (uint64_t)aa;
-        if (comment) os << comment;
-        os << rel << '\n';
-        *cpt += (*comment != '\0');
-    }
-    else if(strcmp(galois, "autom6.1") == 0){
-	// fact do not change
-	adwg(os, comment, cpt, rel, a0 + b0, -a0); // (a2, b2)
-	adwg(os, comment, cpt, rel, b0, -(a0+b0)); // (a4, b4)
-
-	// fact do change
-        a1 = -(2*a0+b0); b1= a0-b0;
-	d = 0;
-	while(((a1 % 3) == 0) && ((b1 % 3) == 0)){
-	    a1 /= 3;
-	    b1 /= 3;
-	    d++;
-	}
-	os << "# d1=" << d << "\n";
-	a3 =-(2*b0+a0); b3 = 2*a0+b0;
-	a5 = a0-b0;     b5 = 2*b0+a0;
-	if(d == 0)
-	    // we need to add 3^3
-	    add_galois_factors(rel, 3, 3);
-	else
-	    // we need to remove 3^3
-	    remove_galois_factors(rel, 3, 3);
-	adwg(os, comment, cpt, rel, a1, b1); // (a1/3^d, b1/3^d)
-	for(int i = 0; i < d; i++){
-	    a3 /= 3;
-	    b3 /= 3;
-	    a5 /= 3;
-	    b5 /= 3;
-	}
-	adwg(os, comment, cpt, rel, a3, b3); // (a3/3^d, b3/3^d)
-	adwg(os, comment, cpt, rel, a5, b5); // (a5/3^d, b5/3^d)
-    }
-}
-
-cxx_mpz bound_following_previous_legitimate_specialq_withroots(cxx_mpz const& q1_orig, mpz_poly_srcptr f, las_info const & las)
+static void las_verbose_leave()
 {
-    /* For random sampling, it's important that for all integers in
-     * the range [q0, q1[, their nextprime() is within the range, and
-     * that at least one such has roots mod f. Make sure that
-     * this is the case.
-     */
-    // FIXME: only 3 factors in composite q !!!!
-    cxx_mpz roots[MAX_DEGREE*MAX_DEGREE*MAX_DEGREE];
-
-    cxx_mpz q, q1 = q1_orig;
-    /* we need to know the limit of the q range */
-    for(unsigned long i = 1 ; ; i++) {
-        mpz_sub_ui(q, q1, i);
-        unsigned long facq[10];
-        next_legitimate_specialq(q, facq, q, 0, las);
-        if (mpz_cmp(q, q1) >= 0)
-            continue;
-        int nroots;
-        if (!las.allow_composite_q) {
-            nroots = mpz_poly_roots ((mpz_t*)roots, f, q);
-        } else {
-            nroots = roots_for_composite_q((mpz_t *)roots, f, q, facq);
-        }
-        if (nroots > 0)
-            break;
-        /* small optimization: avoid redoing root finding
-         * several times */
-        mpz_set (q1, q);
-        i = 1;
-    }
-    /* now q is the largest prime < q1 with f having roots mod q */
-    mpz_add_ui (q1, q, 1);
-
-    return q1;
+    verbose_output_clear();
 }
 
-
-/* {{{ Populating the todo list */
-/* See below in main() for documentation about the q-range and q-list
- * modes */
-/* These functions return non-zero if the todo list is not empty.
- * Note: contrary to the qlist mode, here the q-range will be pushed at
- * once (but the caller doesn't need to know that).
- * */
-int las_todo_feed_qrange(las_info & las, param_list pl)
+void las_augmented_output_channel::set(cxx_param_list & pl)
 {
-    /* If we still have entries in the stack, don't add more now */
-    if (!las.todo.empty())
-        return 1;
-
-    cxx_mpz & q0 = las.todo_q0;
-    cxx_mpz & q1 = las.todo_q1;
-
-    int qside = las.config_pool.base.side;
-
-    mpz_poly_ptr f = las.cpoly->pols[qside];
-
-    // FIXME: only 3 factors in composite q !!!!
-    cxx_mpz roots[MAX_DEGREE*MAX_DEGREE*MAX_DEGREE];
-    unsigned long fac_q[10];
-
-    if (mpz_cmp_ui(q0, 0) == 0) {
-        parse_command_line_q0_q1(las, q0, fac_q, q1, pl, qside);
-        if (las.random_sampling) {
-            cxx_mpz q1_restrict = bound_following_previous_legitimate_specialq_withroots(q1, f, las);
-            /* so now if we pick an integer in [q0, q1[, then its nextprime(x-1)
-             * will be in [q0, q1_orig[, which is what we look for,
-             * really.
-             */
-            if (mpz_cmp(q0, q1_restrict) > 0) {
-                gmp_fprintf(stderr, "Error: range [%Zd,%Zd[ contains no prime with roots mod f\n",
-                        (mpz_srcptr) q0,
-                        (mpz_srcptr) q1);
-                exit(EXIT_FAILURE);
-            }
-            q1 = q1_restrict;
-        }
+    ASSERT_ALWAYS(output == NULL);
+    output = stdout;
+    outputname = param_list_lookup_string(pl, "out");
+    if (outputname) {
+	if (!(output = fopen_maybe_compressed(outputname, "w"))) {
+	    fprintf(stderr, "Could not open %s for writing\n", outputname);
+	    exit(EXIT_FAILURE);
+	}
     }
+    verbose = param_list_parse_switch(pl, "-v");
+    setvbuf(output, NULL, _IOLBF, 0);      /* mingw has no setlinebuf */
+    las_verbose_enter(pl, output, verbose);
 
-    if (!las.random_sampling) {
-        /* We're going to process the sq's and put them into the list
-           The loop processes all special-q in [q0, q1]. On loop entry, the value
-           in q0 is known to be a legitimate special-q and its factorization is in
-           fac_q. */
-
-        /* handy aliases */
-        mpz_ptr q = q0;
-
-        struct q_r_pair {
-            cxx_mpz q;
-            cxx_mpz r;
-            q_r_pair(const mpz_t _q, const mpz_t _r) {
-                mpz_set(q, _q);
-                mpz_set(r, _r);
-            }
-        };
-
-        std::vector<q_r_pair> my_list;
-
-        int nb_no_roots = 0;
-        int nb_rootfinding = 0;
-        /* If nq_max is specified, then q1 has no effect, even though it
-         * has been set equal to q */
-        for ( ; (las.nq_max < UINT_MAX || mpz_cmp(q, q1) < 0) &&
-                las.nq_pushed + my_list.size() < las.nq_max ; )
-        {
-            int nroots;
-            if (!las.allow_composite_q) {
-                nroots = mpz_poly_roots ((mpz_t*)roots, f, q);
-            } else {
-                nroots = roots_for_composite_q((mpz_t *)roots, f, q, &fac_q[0]);
-            }
-
-            nb_rootfinding++;
-            if (nroots == 0) nb_no_roots++;
-
-            if (las.galois != NULL)
-                nroots = skip_galois_roots(nroots, q, (mpz_t*)roots, las.galois);
-
-            for (int i = 0; i < nroots; ++i) {
-                q_r_pair qr(q, roots[i]);
-                my_list.push_back(qr);
-            }
-            next_legitimate_specialq(q, fac_q, q, 1, las);
-        }
-
-        if (nb_no_roots) {
-            verbose_output_vfprint(0, 1, gmp_vfprintf, "# polynomial has no roots for %d of the %d primes that were tried\n", nb_no_roots, nb_rootfinding);
-        }
-
-        // Truncate to nq_max if necessary and push the sq in reverse
-        // order, because they are processed via a stack (required for
-        // the descent).
-        int push_here = my_list.size();
-        if (las.nq_max < UINT_MAX)
-            push_here = std::min(push_here, int(las.nq_max - las.nq_pushed));
-        for(int i = 0 ; i < push_here ; i++) {
-            las.nq_pushed++;
-            int ind = push_here-i-1;
-            las_todo_push(las, my_list[ind].q, my_list[ind].r, qside);
-        }
-    } else { /* random sampling case */
-        /* we care about being uniform here */
-        cxx_mpz q;
-        cxx_mpz diff;
-        mpz_sub(diff, q1, q0);
-        ASSERT_ALWAYS(las.nq_pushed == 0 || las.nq_pushed == las.nq_max);
-	unsigned long n = las.nq_max;
-        for ( ; las.nq_pushed < n ; ) {
-            /* try in [q0 + k * (q1-q0) / n, q0 + (k+1) * (q1-q0) / n[ */
-            cxx_mpz q0l, q1l;
-	    /* we use k = n-1-nq_pushed instead of k=nq_pushed so that
-	       special-q's are sieved in increasing order */
-	    unsigned long k = n - 1 - las.nq_pushed;
-            mpz_mul_ui(q0l, diff, k);
-            mpz_mul_ui(q1l, diff, k + 1);
-            mpz_fdiv_q_ui(q0l, q0l, n);
-            mpz_fdiv_q_ui(q1l, q1l, n);
-            mpz_add(q0l, q0, q0l);
-            mpz_add(q1l, q0, q1l);
-
-            mpz_sub(q, q1l, q0l);
-            mpz_urandomm(q, las.rstate, q);
-            mpz_add(q, q, q0l);
-            next_legitimate_specialq(q, fac_q, q, 0, las);
-            int nroots;
-            if (!las.allow_composite_q) {
-                nroots = mpz_poly_roots ((mpz_t*)roots, f, q);
-            } else {
-                nroots = roots_for_composite_q((mpz_t *)roots, f, q, fac_q);
-            }
-            if (!nroots) continue;
-            if (las.galois != NULL)
-                nroots = skip_galois_roots(nroots, q, (mpz_t*)roots, las.galois);
-            unsigned long i = gmp_urandomm_ui(las.rstate, nroots);
-            las.nq_pushed++;
-            las_todo_push(las, q, roots[i], qside);
-        }
-    }
-
-    return las.todo.size();
+    param_list_print_command_line(output, pl);
+    las_display_config_flags();
 }
 
-/* Format of a file with a list of special-q (-todo option):
- *   - Comments are allowed (start line with #)
- *   - Blank lines are ignored
- *   - Each valid line must have the form
- *       s q r
- *     where s is the side (0 or 1) of the special q, and q and r are as usual.
- */
-int las_todo_feed_qlist(las_info & las, param_list pl)
+las_augmented_output_channel::~las_augmented_output_channel()
 {
-    if (!las.todo.empty())
-        return 1;
-
-    char line[1024];
-    FILE * f = las.todo_list_fd;
-    /* The fgets call below is blocking, so flush las.output here just to
-     * be sure. */
-    fflush(las.output);
-    char * x;
-    for( ; ; ) {
-        x = fgets(line, sizeof(line), f);
-        /* Tolerate comments and blank lines */
-        if (x == NULL) return 0;
-        if (*x == '#') continue;
-        for( ; *x && isspace(*x) ; x++) ;
-        if (!*x) continue;
-        break;
-    }
-
-    /* We have a new entry to parse */
-    cxx_mpz p, r;
-    int side = -1;
-    int rc;
-    switch(*x++) {
-        case '0':
-        case '1':
-        case '2':
-        case '3':
-        case '4':
-        case '5':
-        case '6':
-        case '7':
-        case '8':
-        case '9':
-                   x--;
-                   errno = 0;
-                   side = strtoul(x, &x, 0);
-                   ASSERT_ALWAYS(!errno);
-                   ASSERT_ALWAYS(side < 2);
-                   break;
-        default:
-                   fprintf(stderr, "%s: parse error at %s\n",
-                           param_list_lookup_string(pl, "todo"), line);
-                   /* We may as well default on the command-line switch */
-                   exit(1);
-    }
-
-    int nread1 = 0;
-    int nread2 = 0;
-
-    mpz_set_ui(r, 0);
-    for( ; *x && !isdigit(*x) ; x++) ;
-    rc = gmp_sscanf(x, "%Zi%n %Zi%n", (mpz_ptr) p, &nread1, (mpz_ptr) r, &nread2);
-    ASSERT_ALWAYS(rc == 1 || rc == 2); /* %n does not count */
-    x += (rc==1) ? nread1 : nread2;
-    ASSERT_ALWAYS(mpz_probab_prime_p(p, 2));
-    {
-        mpz_poly_ptr f = las.cpoly->pols[side];
-        /* specifying the rational root as <0
-         * means that it must be recomputed. Putting 0 does not have this
-         * effect, since it is a legitimate value after all.
-         */
-        if (rc < 2 || (f->deg == 1 && rc == 2 && mpz_cmp_ui(r, 0) < 0)) {
-            // For rational side, we can compute the root easily.
-            ASSERT_ALWAYS(f->deg == 1);
-            /* ugly cast, yes */
-            int nroots = mpz_poly_roots ((mpz_t*) &r, f, p);
-            ASSERT_ALWAYS(nroots == 1);
-        }
-    }
-
-    for( ; *x ; x++) ASSERT_ALWAYS(isspace(*x));
-    las_todo_push(las, p, r, side);
-    return 1;
+    if (outputname)
+        fclose_maybe_compressed(output, outputname);
+    las_verbose_leave();
 }
 
-
-int las_todo_feed(las_info & las, param_list pl)
+void las_augmented_output_channel::declare_usage(cxx_param_list & pl)
 {
-    if (!las.todo.empty())
-        return 1;
-    if (las.todo_list_fd)
-        return las_todo_feed_qlist(las, pl);
-    else
-        return las_todo_feed_qrange(las, pl);
+    param_list_decl_usage(pl, "v",    "(switch) verbose mode, also prints sieve-area checksums");
+    param_list_decl_usage(pl, "out",  "filename where relations are written, instead of stdout");
+#ifdef TRACE_K
+    param_list_decl_usage(pl, "traceout", "Output file for trace output, default: stderr");
+#endif
+    param_list_decl_usage(pl, "stats-stderr", "(switch) print stats to stderr in addition to stdout/out file");
 }
-/* }}} */
+/*}}}*/
+
+
 
 /* {{{ apply_buckets */
 template <typename HINT>
@@ -2179,11 +1580,12 @@ void process_bucket_region_run::operator()() {/*{{{*/
          * and clear SS.  */
         SminusS(side);
 
-        ws.las.dumpfiles[side].write(S[side], BUCKET_REGION);
+        ws.sides[side].dumpfile.write(S[side], BUCKET_REGION);
+
         BOOKKEEPING_TIMER(timer);
     }
 
-    if (ws.las.verbose >= 2)
+    if (las_output.verbose >= 2)
         taux.update_checksums(tws);
 
     /* rep.ttf does not count the asynchronous time spent in
@@ -2240,7 +1642,7 @@ void process_bucket_region_run::operator()() {/*{{{*/
 /*************************** main program ************************************/
 
 
-static void declare_usage(param_list pl)/*{{{*/
+static void declare_usage(cxx_param_list & pl)/*{{{*/
 {
     param_list_usage_header(pl,
             "In the names and in the descriptions of the parameters, below there are often\n"
@@ -2251,80 +1653,40 @@ static void declare_usage(param_list pl)/*{{{*/
             "no need to provide a fb0 parameter.\n"
             );
 
-    param_list_decl_usage(pl, "poly", "polynomial file");
-    param_list_decl_usage(pl, "skew", "(alias S) skewness");
 
-    param_list_decl_usage(pl, "fb0",   "factor base file on the rational side");
-    param_list_decl_usage(pl, "fb1",   "(alias fb) factor base file on the algebraic side");
-    param_list_decl_usage(pl, "fbc",  "factor base cache file (not yet functional)");
 
-    param_list_decl_usage(pl, "q0",   "left bound of special-q range");
-    param_list_decl_usage(pl, "q1",   "right bound of special-q range");
-    param_list_decl_usage(pl, "rho",  "sieve only root r mod q0");
-    param_list_decl_usage(pl, "dup-qmin", "lower limit of global q-range for 2-sided duplicate removal");
-    param_list_decl_usage(pl, "dup-qmax", "upper limit of global q-range for 2-sided duplicate removal");
+    cxx_cado_poly::declare_usage(pl);
+    las_todo_list::declare_usage(pl);
+    las_augmented_output_channel::declare_usage(pl);
+    las_info::declare_usage(pl);
 
-    /* Many of the parameters below are extracted in the las_info ctor.
-     * Maybe we should have a las_info::declare_usage() at this point.
-     */
-    param_list_decl_usage(pl, "sqside", "put special-q on this side");
-    param_list_decl_usage(pl, "trialdiv-first-side", "begin trial division on this side");
-    param_list_decl_usage(pl, "random-sample", "Sample this number of special-q's at random, within the range [q0,q1]");
-    param_list_decl_usage(pl, "seed", "Use this seed for the random sampling of special-q's (see random-sample)");
-    param_list_decl_usage(pl, "nq", "Process this number of special-q's and stop");
-    param_list_decl_usage(pl, "todo", "provide file with a list of special-q to sieve instead of qrange");
-    param_list_decl_usage(pl, "allow-compsq", "(switch) allows composite special-q");
-    param_list_decl_usage(pl, "qfac-min", "factors of q must be at least that");
-    param_list_decl_usage(pl, "qfac-max", "factors of q must be at most that");
+
     param_list_decl_usage(pl, "sublat", "modulus for sublattice sieving");
 
-    param_list_decl_usage(pl, "v",    "(switch) verbose mode, also prints sieve-area checksums");
-    param_list_decl_usage(pl, "out",  "filename where relations are written, instead of stdout");
-    param_list_decl_usage(pl, "t",   "number of threads to use");
-
     param_list_decl_usage(pl, "log-bucket-region", "set bucket region to 2^x");
-    param_list_decl_usage(pl, "I",    "set sieving region to 2^I times J");
-    param_list_decl_usage(pl, "A",    "set sieving region to 2^A");
 
     siever_config::declare_usage(pl);
 
-    param_list_decl_usage(pl, "adjust-strategy", "strategy used to adapt the sieving range to the q-lattice basis (0 = logI constant, J so that boundary is capped; 1 = logI constant, (a,b) plane norm capped; 2 = logI dynamic, skewed basis; 3 = combine 2 and then 0) ; default=0");
-    param_list_decl_usage(pl, "allow-largesq", "(switch) allows large special-q, e.g. for a DL descent");
     param_list_decl_usage(pl, "exit-early", "once a relation has been found, go to next special-q (value==1), or exit (value==2)");
-    param_list_decl_usage(pl, "stats-stderr", "(switch) print stats to stderr in addition to stdout/out file");
-    param_list_decl_usage(pl, "stats-cofact", "write statistics about the cofactorization step in file xxx");
     param_list_decl_usage(pl, "file-cofact", "provide file with strategies for the cofactorization step");
     param_list_decl_usage(pl, "prepend-relation-time", "prefix all relation produced with time offset since beginning of special-q processing");
     param_list_decl_usage(pl, "ondemand-siever-config", "(switch) defer initialization of siever precomputed structures (one per special-q side) to time of first actual use");
-    param_list_decl_usage(pl, "dup", "(switch) suppress duplicate relations");
     param_list_decl_usage(pl, "sync", "(switch) synchronize all threads at each special-q");
-    param_list_decl_usage(pl, "batch", "(switch) use batch cofactorization");
-    param_list_decl_usage(pl, "batch0", "side-0 batch file");
-    param_list_decl_usage(pl, "batch1", "side-1 batch file");
-    param_list_decl_usage(pl, "batchlpb0", "large prime bound on side 0 to be considered by batch cofactorization. Primes between lim0 and 2^batchlpb0 will be extracted by product trees. Defaults to lpb0.");
-    param_list_decl_usage(pl, "batchlpb1", "large prime bound on side 1 to be considered by batch cofactorization. Primes between lim1 and 2^batchlpb1 will be extracted by product trees. Defaults to lpb1.");
-    param_list_decl_usage(pl, "batchmfb0", "cofactor bound on side 0 to be considered after batch cofactorization. After primes below 2^batchlpb0 have been extracted, cofactors below this bound will go through ecm. Defaults to lpb0.");
-    param_list_decl_usage(pl, "batchmfb1", "cofactor bound on side 1 to be considered after batch cofactorization. After primes below 2^batchlpb1 have been extracted, cofactors below this bound will go through ecm. Defaults to lpb1.");
-    param_list_decl_usage(pl, "batch-print-survivors", "just print survivors to the specified file (or pipe) for an external cofactorization");
-    param_list_decl_usage(pl, "galois", "(switch) for reciprocal polynomials, sieve only half of the q's");
 #ifdef TRACE_K
     param_list_decl_usage(pl, "traceab", "Relation to trace, in a,b format");
     param_list_decl_usage(pl, "traceij", "Relation to trace, in i,j format");
     param_list_decl_usage(pl, "traceNx", "Relation to trace, in N,x format");
-    param_list_decl_usage(pl, "traceout", "Output file for trace output, default: stderr");
 #endif
-    param_list_decl_usage(pl, "hint-table", "filename with per-special q sieving data");
 #ifdef  DLP_DESCENT
-    param_list_decl_usage(pl, "descent-hint-table", "Alias to hint-table");
     param_list_decl_usage(pl, "recursive-descent", "descend primes recursively");
     /* given that this option is dangerous, we enable it only for
      * las_descent
      */
     param_list_decl_usage(pl, "grace-time-ratio", "Fraction of the estimated further descent time which should be spent processing the current special-q, to find a possibly better relation");
-    las_dlog_base::declare_parameter_usage(pl);
+
 #endif /* DLP_DESCENT */
     param_list_decl_usage(pl, "never-discard", "Disable the discarding process for special-q's. This is dangerous. See bug #15617");
-    param_list_decl_usage(pl, "dumpfile", "Dump entire sieve region to file for debugging.");
+
     verbose_decl_usage(pl);
     tdict_decl_usage(pl);
 }/*}}}*/
@@ -2349,7 +1711,7 @@ double nprimes_interval(double p0, double p1)
  *
  * Our fetching of the siever_config fields is definitely wrong here.
  */
-void display_expected_memory_usage(siever_config const & sc0,
+void display_expected_memory_usage(siever_config const & sc0,/*{{{*/
         las_info const & las,
         size_t base_memory = 0)
 {
@@ -2699,10 +2061,10 @@ void display_expected_memory_usage(siever_config const & sc0,
 
     if (logImin != logImax)
         verbose_output_print(0, 0, "# Expected memory use (max reached for logI=%d), counting %zu MB of base footprint: %zu MB\n", logI_max_memory, base_memory >> 20, max_memory >> 20);
-}
+}/*}}}*/
 
 #ifdef  DLP_DESCENT
-void postprocess_specialq_descent(las_info & las, las_todo_entry const & doing, timetree_t & timer_special_q)
+void postprocess_specialq_descent(las_info & las, las_todo_list & todo, las_todo_entry const & doing, timetree_t & timer_special_q)/*{{{*/
 {
     SIBLING_TIMER(timer_special_q, "descent");
     TIMER_CATEGORY(timer_special_q, bookkeeping());
@@ -2752,7 +2114,7 @@ void postprocess_specialq_descent(las_info & las, las_todo_entry const & doing, 
                 relation::pr const & v(winner.outstanding[i].second);
                 unsigned int n = mpz_sizeinbase(v.p, 2);
                 verbose_output_vfprint(0, 1, gmp_vfprintf, "# [descent] " HILIGHT_START "pushing side-%d (%Zd,%Zd) [%d@%d]" HILIGHT_END " to todo list\n", side, (mpz_srcptr) v.p, (mpz_srcptr) v.r, n, side);
-                las_todo_push_withdepth(las, v.p, v.r, side, doing.depth + 1);
+                todo.push_withdepth(v.p, v.r, side, doing.depth + 1);
             }
         }
     } else {
@@ -2765,12 +2127,12 @@ void postprocess_specialq_descent(las_info & las, las_todo_entry const & doing, 
         verbose_output_vfprint(0, 1, gmp_vfprintf, "# [descent] Failed to find a relation for " HILIGHT_START "side-%d (%Zd,%Zd) [%d@%d]" HILIGHT_END " (iteration %d). Putting back to todo list.\n", doing.side,
                 (mpz_srcptr) doing.p,
                 (mpz_srcptr) doing.r, n, doing.side, doing.iteration);
-        las_todo_push_withdepth(las, doing.p, doing.r, doing.side, doing.depth + 1, doing.iteration + 1);
+        todo.push_withdepth(doing.p, doing.r, doing.side, doing.depth + 1, doing.iteration + 1);
     }
-}
+}/*}}}*/
 #endif  /* DLP_DESCENT */
 
-void process_many_bucket_regions(nfs_work & ws, std::shared_ptr<nfs_work_cofac> wc_p, std::shared_ptr<nfs_aux> aux_p, thread_pool & pool, int first_region0_index, where_am_I const & w)
+void process_many_bucket_regions(nfs_work & ws, std::shared_ptr<nfs_work_cofac> wc_p, std::shared_ptr<nfs_aux> aux_p, thread_pool & pool, int first_region0_index, where_am_I const & w)/*{{{*/
 {
     /* first_region0_index is always 0 when toplevel == 1, but the
      * present function is also called from within downsort_tree when
@@ -2846,14 +2208,14 @@ void process_many_bucket_regions(nfs_work & ws, std::shared_ptr<nfs_work_cofac> 
             }
         }
     }
-}
+}/*}}}*/
 
 
 /* This is the core of the sieving routine. We do fill-in-buckets,
  * downsort, apply-buckets, lognorm computation, small sieve computation,
  * and survivor search and detection, all from here.
  */
-void do_one_special_q_sublat(las_info const & las, nfs_work & ws, std::shared_ptr<nfs_work_cofac> wc_p, std::shared_ptr<nfs_aux> aux_p, thread_pool & pool)/*{{{*/
+void do_one_special_q_sublat(nfs_work & ws, std::shared_ptr<nfs_work_cofac> wc_p, std::shared_ptr<nfs_aux> aux_p, thread_pool & pool)/*{{{*/
 {
     nfs_aux & aux(*aux_p);
     timetree_t & timer_special_q(aux.timer_special_q);
@@ -2861,11 +2223,11 @@ void do_one_special_q_sublat(las_info const & las, nfs_work & ws, std::shared_pt
     where_am_I & w(aux.w);
 
     /* essentially update the fij polynomials and the max log bounds */
-    if (las.verbose >= 2) {
+    if (las_output.verbose >= 2) {
         verbose_output_print (0, 1, "# f_0'(x) = ");
-        mpz_poly_fprintf(las.output, ws.sides[0].lognorms.fij);
+        mpz_poly_fprintf(las_output.output, ws.sides[0].lognorms.fij);
         verbose_output_print (0, 1, "# f_1'(x) = ");
-        mpz_poly_fprintf(las.output, ws.sides[1].lognorms.fij);
+        mpz_poly_fprintf(las_output.output, ws.sides[1].lognorms.fij);
     }
 
 #ifdef TRACE_K
@@ -3000,7 +2362,7 @@ void do_one_special_q_sublat(las_info const & las, nfs_work & ws, std::shared_pt
 }/*}}}*/
 
 /* This returns false if the special-q was discarded */
-bool do_one_special_q(las_info & las, nfs_work & ws, std::shared_ptr<nfs_aux> aux_p, thread_pool & pool)
+bool do_one_special_q(las_info & las, nfs_work & ws, std::shared_ptr<nfs_aux> aux_p, thread_pool & pool)/*{{{*/
 {
     nfs_aux & aux(*aux_p);
     ws.Q.doing = aux.doing;     /* will be set by choose_sieve_area anyway */
@@ -3021,28 +2383,6 @@ bool do_one_special_q(las_info & las, nfs_work & ws, std::shared_ptr<nfs_aux> au
                          aux.doing.side,
                          (mpz_srcptr) aux.doing.p,
                          (mpz_srcptr) aux.doing.r);
-    /* Check whether q is larger than the large prime bound.
-     * This can create some problems, for instance in characters.
-     * By default, this is not allowed, but the parameter
-     * -allow-largesq is a by-pass to this test.
-     */
-    if (!allow_largesq) {
-        siever_config const & config = las.config_pool.base;
-        if ((int)mpz_sizeinbase(aux.doing.p, 2) >
-                config.sides[config.side].lpb) {
-            fprintf(stderr, "ERROR: The special q (%d bits) is larger than the "
-                    "large prime bound on side %d (%d bits).\n",
-                    (int) mpz_sizeinbase(aux.doing.p, 2),
-                    config.side,
-                    config.sides[config.side].lpb);
-            fprintf(stderr, "       You can disable this check with "
-                    "the -allow-largesq argument,\n");
-            fprintf(stderr, "       It is for instance useful for the "
-                    "descent.\n");
-	    fprintf(stderr, "       Use tasks.sieve.allow_largesq=true.\n");
-            exit(EXIT_FAILURE);
-        }
-    }
 
     SIBLING_TIMER(timer_special_q, "skew Gauss");
     TIMER_CATEGORY(timer_special_q, bookkeeping());
@@ -3053,10 +2393,31 @@ bool do_one_special_q(las_info & las, nfs_work & ws, std::shared_ptr<nfs_aux> au
     if (!choose_sieve_area(las, aux_p, aux.doing, ws.conf, ws.Q, ws.J))
         return false;
 
+    /* Check whether q is larger than the large prime bound.
+     * This can create some problems, for instance in characters.
+     * By default, this is not allowed, but the parameter
+     * -allow-largesq is a by-pass to this test.
+     */
+    if (!allow_largesq) {
+        if ((int)mpz_sizeinbase(aux.doing.p, 2) >
+                ws.conf.sides[aux.doing.side].lpb) {
+            fprintf(stderr, "ERROR: The special q (%d bits) is larger than the "
+                    "large prime bound on side %d (%d bits).\n",
+                    (int) mpz_sizeinbase(aux.doing.p, 2),
+                    aux.doing.side,
+                    ws.conf.sides[aux.doing.side].lpb);
+            fprintf(stderr, "       You can disable this check with "
+                    "the -allow-largesq argument,\n");
+            fprintf(stderr, "       It is for instance useful for the "
+                    "descent.\n");
+	    fprintf(stderr, "       Use tasks.sieve.allow_largesq=true.\n");
+            exit(EXIT_FAILURE);
+        }
+    }
+
     BOOKKEEPING_TIMER(timer_special_q);
 
     ws.prepare_for_new_q(las);
-    ws.bk_multiplier = las.bk_multiplier;
 
     /* the where_am_I structure is store in nfs_aux. We have a few
      * adjustments to make, and we want to make sure that the threads,
@@ -3081,9 +2442,6 @@ bool do_one_special_q(las_info & las, nfs_work & ws, std::shared_ptr<nfs_aux> au
 
         rep.total_logI += ws.conf.logI;
         rep.total_J += ws.J;
-
-        for(int side = 0 ; side < 2 ; side++)
-            las.dumpfiles[side].setname(las.dump_filename, ws.Q.doing);
 
         std::ostringstream extra;
         if (ws.Q.doing.depth)
@@ -3120,7 +2478,7 @@ bool do_one_special_q(las_info & las, nfs_work & ws, std::shared_ptr<nfs_aux> au
                 verbose_output_print(0, 1, "# Sublattice (i,j) == (%u, %u) mod %u\n",
                         ws.Q.sublat.i0, ws.Q.sublat.j0, ws.Q.sublat.m);
             }
-            do_one_special_q_sublat(las, ws, wc_p, aux_p, pool);
+            do_one_special_q_sublat(ws, wc_p, aux_p, pool);
         }
     }
 
@@ -3132,12 +2490,8 @@ bool do_one_special_q(las_info & las, nfs_work & ws, std::shared_ptr<nfs_aux> au
         small_sieve_clear(wss.ssd);
     }
 
-#ifdef DLP_DESCENT
-    postprocess_specialq_descent(las, ws.Q.doing, timer_special_q);
-#endif
-
     return true;
-}
+}/*}}}*/
 
 void prepare_timer_layout_for_multithreaded_tasks(timetree_t & timer)
 {
@@ -3153,7 +2507,7 @@ void prepare_timer_layout_for_multithreaded_tasks(timetree_t & timer)
     }
 }
 
-void las_subjob(las_info & las, las_report & global_report, timetree_t & global_timer, cxx_param_list & pl)
+void las_subjob(las_info & las, las_todo_list & todo, las_report & global_report, timetree_t & global_timer)/*{{{*/
 {
     where_am_I w MAYBE_UNUSED;
     WHERE_AM_I_UPDATE(w, plas, &las);
@@ -3176,7 +2530,7 @@ void las_subjob(las_info & las, las_report & global_report, timetree_t & global_
          * ways depending on whether we're in q-range mode or in q-list mode.
          *
          * q-range mode: the special-q's to be handled are specified as a
-         * range. Then, whenever the las.todo list almost runs out, it is
+         * range. Then, whenever the todo list almost runs out, it is
          * refilled if possible, up to the limit q1 (-q0 & -rho just gives a
          * special case of this).
          *
@@ -3186,7 +2540,10 @@ void las_subjob(las_info & las, las_report & global_report, timetree_t & global_
          * the descent, which has the implication that the read occurs if and
          * only if the todo list is empty. }}} */
 
-        for( ; las_todo_feed(las, pl) ; ) {
+        for( ; fflush(las_output.output), todo.feed(las.rstate) ; ) {
+
+            las_todo_entry doing = todo.pop();
+
             /* If the next special-q to try is a special marker, it means
              * that we're done with a special-q we started before, including
              * all its spawned sub-special-q's. Indeed, each time we start a
@@ -3194,14 +2551,14 @@ void las_subjob(las_info & las, las_report & global_report, timetree_t & global_
              * marker. But newer special-q's may enver the todo list in turn
              * (pushed with las_todo_push_withdepth).
              */
-            if (las_todo_pop_closing_brace(las)) {
+            if (todo.is_closing_brace(doing)) {
                 las.tree.done_node();
                 if (las.tree.depth() == 0) {
                     if (recursive_descent) {
                         /* BEGIN TREE / END TREE are for the python script */
-                        fprintf(las.output, "# BEGIN TREE\n");
-                        las.tree.display_last_tree(las.output);
-                        fprintf(las.output, "# END TREE\n");
+                        fprintf(las_output.output, "# BEGIN TREE\n");
+                        las.tree.display_last_tree(las_output.output);
+                        fprintf(las_output.output, "# END TREE\n");
                     }
                     las.tree.visited.clear();
                 }
@@ -3209,11 +2566,10 @@ void las_subjob(las_info & las, las_report & global_report, timetree_t & global_
             }
 
             /* pick a new entry from the stack, and do a few sanity checks */
-            las_todo_entry doing = las_todo_pop(las);
-            las_todo_push_closing_brace(las, doing.depth);
+            todo.push_closing_brace(doing.depth);
             /* We set this aside because we may have to rollback our changes
              * if we catch an exception because of full buckets. */
-            std::stack<las_todo_entry> saved_todo(las.todo);
+            auto saved_todo = todo.save();
 
             las.tree.new_node(doing);
 
@@ -3270,13 +2626,12 @@ void las_subjob(las_info & las, las_report & global_report, timetree_t & global_
                     /* for statistics */
                     global_report.nr_sq_processed++;
 
+#ifdef DLP_DESCENT
+                    postprocess_specialq_descent(las, todo, doing, timer_special_q);
+#endif
+
                     aux.complete = true;
                     aux_good.splice(aux_good.end(), aux_pending);
-
-                    /* We used to display timer_special_q ; now it makes little
-                     * sense, in fact, because we've started to aggressively
-                     * desynchronize some of the tasks */
-                    // global_timer += timer_special_q;
 
                     if (exit_after_rel_found > 1 && rep.reports > 0)
                         break;
@@ -3303,12 +2658,11 @@ void las_subjob(las_info & las, las_report & global_report, timetree_t & global_
                             );
                     las.grow_bk_multiplier(e.key, ratio);
                     if (las.config_pool.default_config_ptr) {
-                        siever_config const & sc(*las.config_pool.default_config_ptr);
-                        display_expected_memory_usage(sc, las, base_memory);
+                        display_expected_memory_usage(las.config_pool.base, las, base_memory);
                     }
                     /* we have to roll back the updates we made to
                      * this structure. */
-                    std::swap(las.todo, saved_todo);
+                    todo.restore(std::move(saved_todo));
                     // las.tree.ditch_node();
                     continue;
                 }
@@ -3344,7 +2698,7 @@ void las_subjob(las_info & las, las_report & global_report, timetree_t & global_
     global_report.waste += botched_report.ttcof;
 
     pthread_mutex_unlock(&lock);
-}
+}/*}}}*/
 
 int main (int argc0, char *argv0[])/*{{{*/
 {
@@ -3410,7 +2764,20 @@ int main (int argc0, char *argv0[])/*{{{*/
     param_list_parse_int(pl, "log-bucket-region", &LOG_BUCKET_REGION);
     set_LOG_BUCKET_REGION();
 
+    las_output.set(pl);
+
     las_info las(pl);    /* side effects: prints cmdline and flags */
+
+    las_todo_list todo(las.cpoly, pl);
+
+    /* If qmin is not given, use lim on the special-q side by default.
+     * This makes sense only if the relevant fields have been filled from
+     * the command line.
+     *
+     * This is a kludge, really.
+     */
+    if (todo.sqside >= 0 && las.dupqmin[todo.sqside] == ULONG_MAX)
+        las.dupqmin[todo.sqside] = las.config_pool.base.sides[todo.sqside].lim;
 
 #ifdef TRACE_K
     init_trace_k(pl);
@@ -3419,27 +2786,7 @@ int main (int argc0, char *argv0[])/*{{{*/
     /* experimental. */
     base_memory = Memusage() << 10;
     if (las.config_pool.default_config_ptr) {
-        siever_config const & sc(*las.config_pool.default_config_ptr);
-        display_expected_memory_usage(sc, las, base_memory);
-    }
-
-    if (las.batch) {
-        ASSERT_ALWAYS(las.config_pool.default_config_ptr);
-        siever_config const & sc0(*las.config_pool.default_config_ptr);
-        int lpb[2] = { sc0.sides[0].lpb, sc0.sides[1].lpb, };
-        param_list_parse_int(pl, "batchlpb0", &(lpb[0]));
-        param_list_parse_int(pl, "batchlpb1", &(lpb[1]));
-        for(int side = 0 ; side < 2 ; side++) {
-            // the product of primes up to B takes \log2(B)-\log\log 2 /
-            // \log 2 bits. The added constant is 0.5287.
-            if (lpb[side] + 0.5287 >= 31 + log2(GMP_LIMB_BITS)) {
-                fprintf(stderr, "Gnu MP cannot deal with primes product that large (max 37 bits, asked for batchlpb%d=%d)\n", side, lpb[side]);
-                abort();
-            } else if (lpb[side] + 0.5287 >= 34) {
-                fprintf(stderr, "Gnu MP's mpz_inp_raw and mpz_out_raw functions are limited to integers of at most 34 bits (asked for batchlpb%d=%d)\n",side,lpb[side]);
-                abort();
-            }
-        }
+        display_expected_memory_usage(las.config_pool.base, las, base_memory);
     }
 
     /* The global timer and global report structures are not active for
@@ -3462,10 +2809,10 @@ int main (int argc0, char *argv0[])/*{{{*/
         subjobs.push_back(
                 std::thread(las_subjob,
                     std::ref(las),
+                    std::ref(todo),
                     std::ref(global_report),
-                    std::ref(global_timer),
-                    std::ref(pl))
-                );
+                    std::ref(global_timer)
+                ));
     }
     for(auto & t : subjobs) t.join();
 
@@ -3473,61 +2820,51 @@ int main (int argc0, char *argv0[])/*{{{*/
 
     if (recursive_descent) {
         verbose_output_print(0, 1, "# Now displaying again the results of all descents\n");
-        las.tree.display_all_trees(las.output);
+        las.tree.display_all_trees(las_output.output);
     }
 
     global_timer.start();
 
     if (las.batch)
       {
-        ASSERT_ALWAYS(las.config_pool.default_config_ptr);
-        siever_config const & sc0(*las.config_pool.default_config_ptr);
+        /* We need to access lim[01] and lpb[01] */
+        siever_config const & sc0(las.config_pool.base);
         SIBLING_TIMER(global_timer, "batch cofactorization (time is wrong because of openmp)");
         TIMER_CATEGORY(global_timer, batch_mixed());
 
-	const char *batch0_file, *batch1_file;
-	batch0_file = param_list_lookup_string (pl, "batch0");
-	batch1_file = param_list_lookup_string (pl, "batch1");
-	unsigned long lim[2] = { sc0.sides[0].lim, sc0.sides[1].lim };
-	int lpb[2] = { sc0.sides[0].lpb, sc0.sides[1].lpb };
-	int batchlpb[2] = { lpb[0], lpb[1]};
-	int batchmfb[2] = { sc0.sides[0].lpb, sc0.sides[1].lpb};
-        param_list_parse_int(pl, "batchlpb0", &(batchlpb[0]));
-        param_list_parse_int(pl, "batchlpb1", &(batchlpb[1]));
-        param_list_parse_int(pl, "batchmfb0", &(batchmfb[0]));
-        param_list_parse_int(pl, "batchmfb1", &(batchmfb[1]));
-	mpz_t batchP[2];
-	mpz_init (batchP[0]);
-	mpz_init (batchP[1]);
-	create_batch_file (batch0_file, batchP[0], lim[0], 1UL << batchlpb[0],
-			   las.cpoly->pols[0], las.output, las.nb_threads);
-	create_batch_file (batch1_file, batchP[1], lim[1], 1UL << batchlpb[1],
-			   las.cpoly->pols[1], las.output, las.nb_threads);
-	double tcof_batch = seconds ();
+	cxx_mpz batchP[2], B[2], L[2], M[2];
+        int lpb[2] = { sc0.sides[0].lpb, sc0.sides[1].lpb };
+
+        for(int side = 0 ; side < 2 ; side++) {
+            create_batch_file (las.batch_file[side],
+                    batchP[side],
+                    sc0.sides[side].lim,
+                    1UL << las.batchlpb[side],
+                    las.cpoly->pols[side],
+                    las_output.output,
+                    las.nb_threads);
+            mpz_ui_pow_ui(B[side], 2, las.batchlpb[side]);
+            mpz_ui_pow_ui(L[side], 2, lpb[side]);
+            mpz_ui_pow_ui(M[side], 2, las.batchmfb[side]);
+        }
+
 	cofac_list_realloc (las.L, las.L->size);
 
-        mpz_t B[2], L[2], M[2];
+	double tcof_batch = seconds ();
 
-        for(int side = 0 ; side < 2 ; side++) {
-            mpz_init(B[side]);
-            mpz_init(L[side]);
-            mpz_init(M[side]);
-            mpz_ui_pow_ui(B[side], 2, batchlpb[side]);
-            mpz_ui_pow_ui(L[side], 2, lpb[side]);
-            mpz_ui_pow_ui(M[side], 2, batchmfb[side]);
-        }
+	unsigned long nsmooth = find_smooth (las.L,
+                (mpz_t*) batchP, (mpz_t*) B, (mpz_t*) L, (mpz_t*) M,
+                las_output.output,
+                las.nb_threads);
 
-	global_report.reports = find_smooth (las.L, batchP, B, L, M, las.output,
-				       las.nb_threads);
+	global_report.reports = factor (las.L,
+                nsmooth,
+                las.cpoly,
+                las.batchlpb,
+                lpb,
+		las_output.output,
+                las.nb_threads);
 
-        for(int side = 0 ; side < 2 ; side++) {
-            mpz_clear (batchP[side]);
-            mpz_clear (B[side]);
-            mpz_clear (L[side]);
-            mpz_clear (M[side]);
-        }
-	global_report.reports = factor (las.L, global_report.reports, las.cpoly, batchlpb, lpb,
-		las.output, las.nb_threads);
 	tcof_batch = seconds () - tcof_batch;
 	global_report.ttcof += tcof_batch;
       }
@@ -3543,7 +2880,7 @@ int main (int argc0, char *argv0[])/*{{{*/
                 global_report.total_logI / (double) global_report.nr_sq_processed, global_report.nr_sq_processed, las.bk_multiplier.print_all().c_str());
     }
     verbose_output_print (2, 1, "# Discarded %lu special-q's out of %u pushed\n",
-            global_report.nr_sq_discarded, las.nq_pushed);
+            global_report.nr_sq_discarded, todo.nq_pushed);
 
     global_timer.stop();
 
@@ -3564,8 +2901,8 @@ int main (int argc0, char *argv0[])/*{{{*/
     global_report.display_survivor_counters();
 
 
-    if (las.verbose)
-        facul_print_stats (las.output);
+    if (las_output.verbose)
+        facul_print_stats (las_output.output);
 
     /*{{{ Display tally */
 #ifdef HAVE_RUSAGE_THREAD
@@ -3608,9 +2945,8 @@ int main (int argc0, char *argv0[])/*{{{*/
                  wct, wct / (double) global_report.nr_sq_processed, wct / (double) global_report.reports);
 
     /* memory usage */
-    if (las.verbose >= 1 && las.config_pool.default_config_ptr) {
-        siever_config const & sc(*las.config_pool.default_config_ptr);
-        display_expected_memory_usage(sc, las, base_memory);
+    if (las_output.verbose >= 1 && las.config_pool.default_config_ptr) {
+        display_expected_memory_usage(las.config_pool.base, las, base_memory);
     }
     const long peakmem = PeakMemusage();
     if (peakmem > 0)

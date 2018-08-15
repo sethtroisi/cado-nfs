@@ -60,7 +60,7 @@ read_sq_comment(las_todo_entry & doing, const char *line)
  * Well, except that indeed some parameters are used in general by
  * las_info, and not in this case.
  */
-static void declare_usage(param_list_ptr pl)
+static void declare_usage(cxx_param_list & pl)
 {
   param_list_decl_usage(pl, "path_antebuffer", "path to antebuffer program");
   param_list_decl_usage(pl, "poly", "polynomial file");
@@ -93,6 +93,7 @@ static void declare_usage(param_list_ptr pl)
   param_list_decl_usage(pl, "adjust-strategy",   "(unused)");
   param_list_decl_usage(pl, "v",    "(unused)");
   verbose_decl_usage(pl);
+  las_info::declare_usage(pl);
 }
 
 static void
@@ -148,10 +149,10 @@ main (int argc, char * argv[])
     param_list_parse_int(pl, "adjust-strategy", &adjust_strategy);
     const char * outputname = param_list_lookup_string(pl, "out");
 
-
     cxx_mpz sq, rho;
 
     las_info las(pl);
+
 
     if (param_list_warn_unused(pl))
     {
@@ -182,8 +183,24 @@ main (int argc, char * argv[])
         if (fgets(line, sizeof(line), f) == NULL)
           break;
 
-        if (read_sq_comment(doing, line))
+        if (read_sq_comment(doing, line)) {
+            /* If qmin is not given, use lim on the (current) special-q
+             * side by default.  This makes sense only if the relevant
+             * fields have been filled from the command line.
+             *
+             * This is a kludge, really. If we have special-q's on two
+             * sides, the only reliable way to go is to provide both
+             * dup-qmin arguments. The default below kinda makes sense as
+             * a shortcut for the special-q-on-only-one-side setting.
+             *
+             * Note that in particular, this mandates the use of the
+             * -sync argument.
+             */
+            if (las.dupqmin[doing.side] == ULONG_MAX)
+                las.dupqmin[doing.side] = las.config_pool.base.sides[doing.side].lim;
+
             continue;
+        }
 
         relation rel;
         if (rel.parse(line)) {

@@ -199,8 +199,6 @@ sq_finds_relation(las_info const & las,
   }
   int logI = conf.logI;
 
-  ASSERT_ALWAYS(conf.side == doing.side);
-
   {   // Print some info
       verbose_output_vfprint(0, VERBOSE_LEVEL, gmp_vfprintf,
               "# DUPECHECK Checking if relation"
@@ -424,13 +422,16 @@ relation_is_duplicate(relation const& rel,
 
             // can this p be part of valid sq ?
             if (! las.allow_composite_q) {
+                /* this check is also done in sq_was_previously_sieved,
+                 * but it's easy enough to skip the divisibility test
+                 * when we know there's no point.
+                 */
                 if ((p < las.dupqmin[side]) || (p >= las.dupqmax[side])) {
                     continue;
                 }
             } else {
-                if ((p < las.qfac_min) || (p >= las.qfac_max)) {
+                if (!las.is_in_qfac_range(p))
                     continue;
-                }
             }
 
             /* projective primes are currently not allowed for composite

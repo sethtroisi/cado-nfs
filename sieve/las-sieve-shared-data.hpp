@@ -135,6 +135,7 @@ struct sieve_shared_data {
 
     ~sieve_shared_data();
     sieve_shared_data(cxx_cado_poly const & cpoly, cxx_param_list & pl);
+    static void declare_usage(cxx_param_list & pl);
 };
 
 #endif	/* LAS_SIEVE_SHARED_DATA_HPP_ */

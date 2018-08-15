@@ -10,7 +10,12 @@
 #include "modredc_2ul2.h"
 #include "las-info.hpp"
 
-// {{{ las_info::{init,clear,print}_cof_stats
+void cofactorization_statistics::declare_usage(cxx_param_list & pl)
+{
+    param_list_decl_usage(pl, "stats-cofact", "write statistics about the cofactorization step in file xxx");
+}
+
+//  las_info::{init,clear,print}_cof_stats
 cofactorization_statistics::cofactorization_statistics(param_list_ptr pl)
 {
     const char * statsfilename = param_list_lookup_string (pl, "stats-cofact");
@@ -78,7 +83,7 @@ cofactorization_statistics::~cofactorization_statistics()
     if (!file) return;
     fclose (file);
 }
-//}}}
+//
 
 /* {{{ factor_leftover_norm */
 

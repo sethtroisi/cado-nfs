@@ -70,7 +70,7 @@ test_trialdiv (int n, unsigned long iter)
   std::vector<uint64_t> g;
   int ret;
 
-  pmax = trialdiv_get_max_p();
+  pmax = trialdiv_data::max_p;
   for (unsigned long i = 0; i <iter; i++)
     {
       if (i == 0)

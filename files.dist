@@ -607,7 +607,7 @@ utils/relation.cpp
 utils/relation.hpp
 utils/renumber.c
 utils/renumber.h
-utils/rootfinder.c
+utils/rootfinder.cpp
 utils/rootfinder.h
 utils/select_mpi.h
 tests/utils/test-rootfinder-script.sh
@@ -1242,3 +1242,7 @@ sieve/las-auxiliary-data.cpp
 sieve/las-threads-work-data.hpp
 sieve/las-threads-work-data.cpp
 tests/sieve/c95_21684.poly
+sieve/las-todo-list.cpp
+sieve/las-todo-list.hpp
+sieve/las-galois.cpp
+sieve/las-galois.hpp

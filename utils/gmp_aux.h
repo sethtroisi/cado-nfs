@@ -36,31 +36,33 @@ extern "C" {
 #endif
 
 /* gmp_aux */
-extern void mpz_set_uint64 (mpz_t, uint64_t);
-extern void mpz_set_int64 (mpz_t, int64_t);
+extern void mpz_init_set_uint64 (mpz_ptr, uint64_t);
+extern void mpz_init_set_int64 (mpz_ptr, int64_t);
+extern void mpz_set_uint64 (mpz_ptr, uint64_t);
+extern void mpz_set_int64 (mpz_ptr, int64_t);
 extern uint64_t mpz_get_uint64 (mpz_srcptr);
 extern int64_t mpz_get_int64 (mpz_srcptr);
-extern void mpz_mul_uint64 (mpz_t a, mpz_srcptr b, uint64_t c);
+extern void mpz_mul_uint64 (mpz_ptr a, mpz_srcptr b, uint64_t c);
 extern int mpz_cmp_uint64 (mpz_srcptr a, uint64_t c);
-extern void mpz_addmul_uint64 (mpz_t a, mpz_srcptr b, uint64_t c);
-extern void mpz_submul_uint64 (mpz_t a, mpz_srcptr b, uint64_t c);
-extern void mpz_submul_int64 (mpz_t a, mpz_srcptr b, int64_t c);
-extern void mpz_divexact_uint64 (mpz_t a, mpz_srcptr b, uint64_t c);
-extern void mpz_mul_int64 (mpz_t a, mpz_srcptr b, int64_t c);
-extern void mpz_addmul_int64 (mpz_t a, mpz_srcptr b, int64_t c);
+extern void mpz_addmul_uint64 (mpz_ptr a, mpz_srcptr b, uint64_t c);
+extern void mpz_submul_uint64 (mpz_ptr a, mpz_srcptr b, uint64_t c);
+extern void mpz_submul_int64 (mpz_ptr a, mpz_srcptr b, int64_t c);
+extern void mpz_divexact_uint64 (mpz_ptr a, mpz_srcptr b, uint64_t c);
+extern void mpz_mul_int64 (mpz_ptr a, mpz_srcptr b, int64_t c);
+extern void mpz_addmul_int64 (mpz_ptr a, mpz_srcptr b, int64_t c);
 extern int mpz_fits_uint64_p(mpz_srcptr);
 extern int mpz_fits_int64_p(mpz_srcptr);
 extern unsigned long ulong_nextprime (unsigned long);
 extern uint64_t uint64_nextprime (uint64_t);
 extern int ulong_isprime (unsigned long);
 extern unsigned long ulong_nextcomposite (unsigned long, unsigned long);
-extern void mpz_ndiv_qr (mpz_t q, mpz_t r, mpz_t n, const mpz_t d);
-extern void mpz_ndiv_r (mpz_t r, mpz_srcptr n, mpz_srcptr d);
-extern void mpz_ndiv_qr_ui (mpz_t q, mpz_t r, mpz_t n, unsigned long int d);
-extern void mpz_ndiv_q (mpz_t q, mpz_t n, const mpz_t d);
-extern void mpz_ndiv_q_ui (mpz_t q, mpz_t n, unsigned long int d);
-extern int mpz_divisible_uint64_p (mpz_t a, uint64_t c);
-extern int mpz_coprime_p (mpz_t a, mpz_t b);
+extern void mpz_ndiv_qr (mpz_ptr q, mpz_ptr r, mpz_srcptr n, mpz_srcptr d);
+extern void mpz_ndiv_r (mpz_ptr r, mpz_srcptr n, mpz_srcptr d);
+extern void mpz_ndiv_qr_ui (mpz_ptr q, mpz_ptr r, mpz_srcptr n, unsigned long int d);
+extern void mpz_ndiv_q (mpz_ptr q, mpz_srcptr n, mpz_srcptr d);
+extern void mpz_ndiv_q_ui (mpz_ptr q, mpz_srcptr n, unsigned long int d);
+extern int mpz_divisible_uint64_p (mpz_ptr a, uint64_t c);
+extern int mpz_coprime_p (mpz_srcptr a, mpz_srcptr b);
 
 /* Put in r the smallest legitimate value that it at least s + diff (note
    that if s+diff is already legitimate, then r = s+diff will result.
@@ -71,13 +73,17 @@ extern int mpz_coprime_p (mpz_t a, mpz_t b);
    The prime factors of r are put in factor_r, and the number of them is
    returned. The caller must have allocated factor_r with enough space.
    */
-int next_mpz_with_factor_constraints(mpz_t r, unsigned long factor_r[],
-        const mpz_t s, const unsigned long diff, unsigned long pmin,
+int 
+next_mpz_with_factor_constraints(mpz_ptr r,
+        unsigned long factor_r[],
+        mpz_srcptr s,
+        unsigned long diff,
+        unsigned long pmin,
         unsigned long pmax);
 
 /* return the number of bits of p, counting from the least significant end */
 extern int nbits (uintmax_t p);
-extern long double mpz_get_ld (mpz_t z);
+extern long double mpz_get_ld (mpz_srcptr z);
 
 extern int mpz_p_valuation(mpz_srcptr a, mpz_srcptr p);
 extern int mpz_p_valuation_ui(mpz_srcptr a, unsigned long p);

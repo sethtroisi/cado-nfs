@@ -333,7 +333,7 @@ int main (int argc0, char *argv0[])/*{{{*/
         verbose_output_vfprint(0, 1, gmp_vfprintf,
                              "# "
                              "Sieving side-%d q=%Zd; rho=%Zd;",
-                             conf.side,
+                             doing.side,
                              (mpz_srcptr) doing.p,
                              (mpz_srcptr) doing.r);
 
