@@ -1712,12 +1712,12 @@ double nprimes_interval(double p0, double p1)
  * Our fetching of the siever_config fields is definitely wrong here.
  */
 void display_expected_memory_usage(siever_config const & sc0,/*{{{*/
-        las_info const & las,
+        las_info & las,
         size_t base_memory = 0)
 {
     cado_poly_srcptr cpoly = las.cpoly;
     int nthreads = las.nb_threads;
-    bkmult_specifier const & bkmult(las.bk_multiplier);
+    bkmult_specifier bkmult(las.get_bk_multiplier());
 
     /* do the estimate based on the "average" logI. This is most often
      * going to give a reasonable rough idea anyway.
@@ -2659,7 +2659,7 @@ void las_subjob(las_info & las, las_todo_list & todo, las_report & global_report
                             bkmult_specifier::printkey(e.key).c_str(),
                             e.what());
 
-                    double old = las.bk_multiplier.get(e.key);
+                    double old = las.get_bk_multiplier().get(e.key);
                     double ratio = (double) e.reached_size / e.theoretical_max_size * 1.1;
                     double new_bk_multiplier = old * ratio;
                     verbose_output_print(0, 1, "# Updating %s bucket multiplier to %.3f*%d/%d*1.1=%.3f\n",
@@ -2897,10 +2897,10 @@ int main (int argc0, char *argv0[])/*{{{*/
 
     if (las.adjust_strategy < 2) {
         verbose_output_print (2, 1, "# Average J=%1.0f for %lu special-q's, max bucket fill -bkmult %s\n",
-                global_report.total_J / (double) global_report.nr_sq_processed, global_report.nr_sq_processed, las.bk_multiplier.print_all().c_str());
+                global_report.total_J / (double) global_report.nr_sq_processed, global_report.nr_sq_processed, las.get_bk_multiplier().print_all().c_str());
     } else {
         verbose_output_print (2, 1, "# Average logI=%1.1f for %lu special-q's, max bucket fill -bkmult %s\n",
-                global_report.total_logI / (double) global_report.nr_sq_processed, global_report.nr_sq_processed, las.bk_multiplier.print_all().c_str());
+                global_report.total_logI / (double) global_report.nr_sq_processed, global_report.nr_sq_processed, las.get_bk_multiplier().print_all().c_str());
     }
     verbose_output_print (2, 1, "# Discarded %lu special-q's out of %u pushed\n",
             global_report.nr_sq_discarded, todo.nq_pushed);

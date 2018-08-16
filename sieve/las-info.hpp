@@ -19,6 +19,7 @@
 #include <list>
 #include <vector>
 #include <stack>
+#include <mutex>
 #include "cxx_mpz.hpp"
 
 #include <memory>
@@ -95,10 +96,18 @@ struct las_info : private NonCopyable {
         return shared_structure_cache.sides[side].no_fb();
     }
 
+    private:
     bkmult_specifier bk_multiplier { 1.0 };
+    std::mutex mm;
 
+    public:
     void grow_bk_multiplier(bkmult_specifier::key_type const& key, double d) {
+        std::lock_guard<std::mutex> foo(mm);
         bk_multiplier.grow(key, d);
+    }
+    bkmult_specifier get_bk_multiplier() {
+        std::lock_guard<std::mutex> foo(mm);
+        return bk_multiplier;
     }
 
     /* For composite special-q: note present both in las_info and
