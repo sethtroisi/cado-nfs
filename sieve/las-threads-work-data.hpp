@@ -240,7 +240,7 @@ class nfs_work {
 class nfs_work_cofac {
     public:
     las_info const & las;
-    siever_config const & sc;
+    siever_config sc;
     las_todo_entry doing;
 
     facul_strategies_t const * strategies;

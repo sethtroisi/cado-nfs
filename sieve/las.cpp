@@ -1679,12 +1679,12 @@ static void declare_usage(cxx_param_list & pl)/*{{{*/
 #endif
 #ifdef  DLP_DESCENT
     param_list_decl_usage(pl, "recursive-descent", "descend primes recursively");
-    /* given that this option is dangerous, we enable it only for
-     * las_descent
-     */
     param_list_decl_usage(pl, "grace-time-ratio", "Fraction of the estimated further descent time which should be spent processing the current special-q, to find a possibly better relation");
 
 #endif /* DLP_DESCENT */
+    /* given that this option is dangerous, we used to enable it only for
+     * las_descent
+     */
     param_list_decl_usage(pl, "never-discard", "Disable the discarding process for special-q's. This is dangerous. See bug #15617");
 
     verbose_decl_usage(pl);
@@ -2512,8 +2512,8 @@ void las_subjob(las_info & las, las_todo_list & todo, las_report & global_report
     where_am_I w MAYBE_UNUSED;
     WHERE_AM_I_UPDATE(w, plas, &las);
 
-    std::list<std::pair<las_report, timetree_t>> aux_good;
-    std::list<std::pair<las_report, timetree_t>> aux_botched;
+    std::list<nfs_aux::caller_stuff> aux_good;
+    std::list<nfs_aux::caller_stuff> aux_botched;
 
     {
         /* add scoping to control dtor call */
@@ -2544,6 +2544,7 @@ void las_subjob(las_info & las, las_todo_list & todo, las_report & global_report
 
             las_todo_entry doing = todo.pop();
 
+#ifdef DLP_DESCENT
             /* If the next special-q to try is a special marker, it means
              * that we're done with a special-q we started before, including
              * all its spawned sub-special-q's. Indeed, each time we start a
@@ -2567,11 +2568,15 @@ void las_subjob(las_info & las, las_todo_list & todo, las_report & global_report
 
             /* pick a new entry from the stack, and do a few sanity checks */
             todo.push_closing_brace(doing.depth);
+#endif
+
             /* We set this aside because we may have to rollback our changes
              * if we catch an exception because of full buckets. */
             auto saved_todo = todo.save();
 
+#ifdef DLP_DESCENT
             las.tree.new_node(doing);
+#endif
 
             /* We'll convert that to a shared_ptr later on, because this is
              * to be kept by the cofactoring tasks that will linger on quite
@@ -2594,11 +2599,19 @@ void las_subjob(las_info & las, las_todo_list & todo, las_report & global_report
                  * downsorting). We must be sure that all threads are done
                  * when we finally consume the aux_good and aux_botched
                  * lists!
+                 *
+                 * Note that the lifetime of the nfs_aux object *is*
+                 * thread-safe, because the shared_ptr construct provides
+                 * this guarantee. Helgrind, however, is not able to
+                 * detect it properly, and sees stuff happening in the
+                 * nfs_aux dtor as conflicting with what is done in the
+                 * try{} block. This is a false positive. cado-nfs.supp
+                 * has an explicit suppression for this.
                  */
-                std::list<std::pair<las_report, timetree_t>> aux_pending;
-                aux_pending.push_back(std::pair<las_report, timetree_t>());
-                las_report & rep(aux_pending.back().first);
-                timetree_t & timer_special_q(aux_pending.back().second);
+                std::list<nfs_aux::caller_stuff> aux_pending;
+                aux_pending.push_back({});
+                las_report & rep(std::get<0>(aux_pending.back()));
+                timetree_t & timer_special_q(std::get<1>(aux_pending.back()));
 
                 /* ready to start over if we encounter an exception */
                 try {
@@ -2607,7 +2620,7 @@ void las_subjob(las_info & las, las_todo_list & todo, las_report & global_report
                      * since it is an essential property ot the timer trees
                      * that the root of the trees must not have a nontrivial
                      * category */
-                    auto aux_p = std::make_shared<nfs_aux>(las, doing, rel_hash_p, rep, timer_special_q, las.nb_threads);
+                    auto aux_p = std::make_shared<nfs_aux>(las, doing, rel_hash_p, aux_pending.back(), las.nb_threads);
                     nfs_aux & aux(*aux_p);
                     ACTIVATE_TIMER(timer_special_q);
 
@@ -2619,12 +2632,12 @@ void las_subjob(las_info & las, las_todo_list & todo, las_report & global_report
                         /* Then we don't even keep track of the time, it's
                          * totally insignificant.
                          */
-                        global_report.nr_sq_discarded++;
+                        rep.nr_sq_discarded++;
                         break;
                     }
 
                     /* for statistics */
-                    global_report.nr_sq_processed++;
+                    rep.nr_sq_processed++;
 
 #ifdef DLP_DESCENT
                     postprocess_specialq_descent(las, todo, doing, timer_special_q);
@@ -2679,14 +2692,14 @@ void las_subjob(las_info & las, las_todo_list & todo, las_report & global_report
     pthread_mutex_lock(&lock);
 
     for(auto & P : aux_good) {
-        global_report.accumulate_and_clear(std::move(P.first));
-        global_timer += P.second;
+        global_report.accumulate_and_clear(std::move(std::get<0>(P)));
+        global_timer += std::get<1>(P);
     }
     las_report botched_report;
     timetree_t botched_timer;
     for(auto & P : aux_botched) {
-        botched_report.accumulate_and_clear(std::move(P.first));
-        botched_timer += P.second;
+        botched_report.accumulate_and_clear(std::move(std::get<0>(P)));
+        botched_timer += std::get<1>(P);
     }
 
     global_report.nwaste += aux_botched.size();
@@ -2800,7 +2813,15 @@ int main (int argc0, char *argv0[])/*{{{*/
     wct = wct_seconds();
 
     std::vector<std::thread> subjobs;
+#ifdef DLP_DESCENT
+    /* In theory we would be able to to multiple descents in parallel, of
+     * course, but how we should proceed with the todo list, our brace
+     * mechanism, and the descent tree thing is altogether not obvious
+     */
     int nsubjobs = 1;
+#else
+    int nsubjobs = 2;
+#endif
     for(int subjob = 0 ; subjob < nsubjobs ; ++subjob) {
         /* when references are passed through variadic template arguments
          * as for the std::thread ctor, we have automatic decaying unless
@@ -2818,10 +2839,12 @@ int main (int argc0, char *argv0[])/*{{{*/
 
     verbose_output_print(0, 1, "# Cumulated wait time over all threads %.2f\n", thread_pool::cumulated_wait_time);
 
+#ifdef DLP_DESCENT
     if (recursive_descent) {
         verbose_output_print(0, 1, "# Now displaying again the results of all descents\n");
         las.tree.display_all_trees(las_output.output);
     }
+#endif
 
     global_timer.start();
 

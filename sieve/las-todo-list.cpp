@@ -131,7 +131,7 @@ las_todo_list::las_todo_list(cxx_cado_poly const & cpoly, cxx_param_list & pl)
         cxx_mpz t;
         if (param_list_parse_mpz(pl, "rho", (mpz_ptr) t)) {
             /* FIXME: is q0 a legitimate special-q ? */
-            push(q0, t, sqside);
+            push_unlocked(q0, t, sqside);
             /* Set empty interval [q0 + 1, q0] as special-q interval */
             mpz_set(q1, q0);
             mpz_add_ui (q0, q0, 1);
@@ -259,7 +259,7 @@ bool las_todo_list::feed_qrange(gmp_randstate_t rstate)
         for(int i = 0 ; i < push_here ; i++) {
             nq_pushed++;
             int ind = push_here-i-1;
-            push(my_list[ind].q, my_list[ind].r, sqside);
+            push_unlocked(my_list[ind].q, my_list[ind].r, sqside);
         }
     } else { /* random sampling case */
         /* we care about being uniform here */
@@ -292,7 +292,7 @@ bool las_todo_list::feed_qrange(gmp_randstate_t rstate)
                 roots.erase(roots.begin() + nroots, roots.end());
             }
             nq_pushed++;
-            push(q, roots[gmp_urandomm_ui(rstate, roots.size())], sqside);
+            push_unlocked(q, roots[gmp_urandomm_ui(rstate, roots.size())], sqside);
         }
     }
 
@@ -377,13 +377,14 @@ bool las_todo_list::feed_qlist()
     }
 
     for( ; *x ; x++) ASSERT_ALWAYS(isspace(*x));
-    push(p, r, side);
+    push_unlocked(p, r, side);
     return true;
 }
 
 
 bool las_todo_list::feed(gmp_randstate_t rstate)
 {
+    std::lock_guard<std::mutex> foo(mm);
     if (!super::empty())
         return true;
     if (todo_list_fd)

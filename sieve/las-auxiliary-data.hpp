@@ -2,6 +2,7 @@
 #define LAS_AUXILIARY_DATA_HPP_
 
 #include <unordered_set>
+#include <tuple>
 #include "las-threads.hpp"
 #include "las-todo-entry.hpp"
 #include "las-report-stats.hpp"
@@ -79,9 +80,10 @@ class nfs_aux {/*{{{*/
     std::shared_ptr<rel_hash_t> rel_hash_p;
     rel_hash_t & get_rel_hash() { return * rel_hash_p ; }
 
-    /* These two are initialized by the caller, and the caller itself
+    /* These fields are initialized by the caller, and the caller itself
      * will collate them with the global counters.
      */
+    typedef std::tuple<las_report, timetree_t> caller_stuff;
     las_report & rep;
     timetree_t & timer_special_q;
     where_am_I w;
@@ -112,15 +114,14 @@ class nfs_aux {/*{{{*/
     nfs_aux(las_info const & las,
             las_todo_entry const & doing,
             std::shared_ptr<rel_hash_t> & rel_hash_p,
-            las_report & rep,
-            timetree_t & t,
+            caller_stuff & c,
             int nthreads)
         :
             las(las),   /* shame... */
             doing(doing),
             rel_hash_p(rel_hash_p),
-            rep(rep),
-            timer_special_q(t),
+            rep(std::get<0>(c)),
+            timer_special_q(std::get<1>(c)),
             th(nthreads)//, thread_data(*this))
     {
         wct_qt0 = wct_seconds();

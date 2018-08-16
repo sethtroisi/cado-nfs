@@ -7,8 +7,10 @@
 #include <stdio.h>
 #include <stack>
 #include <vector>
+#include <mutex>        /* std::mutex and std::lock_guard */
 
 class las_todo_list : private std::stack<las_todo_entry> {
+    std::mutex mm;
     cxx_cado_poly cpoly;
     typedef std::stack<las_todo_entry> super;
     unsigned int nq_max = 0;
@@ -19,6 +21,14 @@ class las_todo_list : private std::stack<las_todo_entry> {
     FILE * todo_list_fd = NULL;
     bool feed_qrange(gmp_randstate_t);
     bool feed_qlist();
+    void push_withdepth_unlocked(cxx_mpz const & p, cxx_mpz const & r, int side, int depth, int iteration = 0)
+    {
+        super::push(las_todo_entry(p, r, side, depth, iteration));
+    }
+    void push_unlocked(cxx_mpz const & p, cxx_mpz const & r, int side)
+    {
+        push_withdepth_unlocked(p, r, side, 0);
+    }
     public:
     int sqside;
     /* For composite special-q: note present both in las_info and
@@ -32,7 +42,8 @@ class las_todo_list : private std::stack<las_todo_entry> {
     /*{{{*/
     void push_withdepth(cxx_mpz const & p, cxx_mpz const & r, int side, int depth, int iteration = 0)
     {
-        super::push(las_todo_entry(p, r, side, depth, iteration));
+        std::lock_guard<std::mutex> foo(mm);
+        push_withdepth_unlocked(p, r, side, depth, iteration);
     }
     void push(cxx_mpz const & p, cxx_mpz const & r, int side)
     {
@@ -40,10 +51,12 @@ class las_todo_list : private std::stack<las_todo_entry> {
     }
     void push_closing_brace(int depth)
     {
+        std::lock_guard<std::mutex> foo(mm);
         super::push(las_todo_entry(-1, depth));
     }
     las_todo_entry pop()
     {
+        std::lock_guard<std::mutex> foo(mm);
         las_todo_entry r = super::top();
         super::pop();
         return r;
@@ -64,8 +77,14 @@ class las_todo_list : private std::stack<las_todo_entry> {
     las_todo_list(cxx_cado_poly const & cpoly, cxx_param_list & pl);
     ~las_todo_list();
 
-    super save() { return (super)*this; }
-    void restore(super && x) { std::swap((super&)*this, x); }
+    super save() {
+        std::lock_guard<std::mutex> foo(mm);
+        return (super)*this;
+    }
+    void restore(super && x) {
+        std::lock_guard<std::mutex> foo(mm);
+        std::swap((super&)*this, x);
+    }
 
     static void declare_usage(cxx_param_list & pl);
 };
