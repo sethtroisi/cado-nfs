@@ -38,7 +38,7 @@ void las_info::declare_usage(cxx_param_list & pl)
 
     param_list_decl_usage(pl, "t",   "number of threads to use");
 
-    param_list_decl_usage(pl, "galois", "for reciprocal polynomials, sieve only half of the q's");
+    param_list_decl_usage(pl, "galois", "depending on the specified galois automorphism, sieve only part of the q's");
 
     /* Note: also declared by las_todo_list ! */
     param_list_decl_usage(pl, "allow-compsq", "allows composite special-q");

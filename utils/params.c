@@ -131,8 +131,9 @@ void param_list_usage_header(param_list_ptr pl, const char * hdr, ...)
 void param_list_decl_usage(param_list_ptr pl, const char * key, const char * doc)
 {
     /* Note that duplicate calls to param_list_decl_usage for the same
-     * key will (for now) trigger two distinct prints of the same
-     * documentation string.
+     * key will not trigger two distinct prints of the same
+     * documentation string. See the collapsing logic in
+     * param_list_print_usage.
      */
     if (pl->ndocs == pl->ndocs_alloc) {
         pl->ndocs_alloc += 16;
@@ -180,6 +181,16 @@ int alias_sort(const char *(*a)[2], const char *(*b)[2])
     return strcmp((*a)[0], (*b)[0]);
 }
 
+int pointed_param_list_doc_cmp_bykey(const param_list_doc_srcptr * a, const param_list_doc_srcptr * b)
+{
+    return strcmp((*a)->key, (*b)->key);
+}
+
+int pointed_param_list_doc_cmp_byaddr(const param_list_doc_srcptr * a, const param_list_doc_srcptr * b)
+{
+    return ((*a) > (*b)) - ((*b) > (*a));
+}
+
 void param_list_print_usage(param_list_ptr pl, const char * argv0, FILE *f)
 {
     if (argv0 != NULL)
@@ -210,18 +221,39 @@ void param_list_print_usage(param_list_ptr pl, const char * argv0, FILE *f)
     }
     qsort(all_aliases, naliases_kept, 2 * sizeof(char*), (sortfunc_t) alias_sort);
 
+    param_list_doc_srcptr * all_docs = malloc(pl->ndocs * sizeof(param_list_doc_srcptr));
+    for(int i = 0 ; i < pl->ndocs ; i ++)
+        all_docs[i] = pl->docs[i];
+    qsort(all_docs, pl->ndocs, sizeof(param_list_doc_srcptr), (sortfunc_t) pointed_param_list_doc_cmp_bykey);
+    /* consolidate */
+    int ndocs_kept = 0;
+    for(int i = 0, j ; i < pl->ndocs ; i += j) {
+        param_list_doc_srcptr di = all_docs[i];
+        for(j = 1 ; i + j < pl->ndocs ; j++) {
+            param_list_doc_srcptr dij = all_docs[i+j];
+            if (strcmp(di->key, dij->key) != 0) break;
+            if (strcmp(di->doc, dij->doc) == 0) continue;
+            fprintf(stderr, "WARNING: two documentation strings for option %s:\n\t%s\n\t%s\n", di->key, all_docs[i]->doc, dij->doc);
+        }
+        all_docs[ndocs_kept++] = di;
+    }
+    qsort(all_docs, ndocs_kept, sizeof(param_list_doc_srcptr), (sortfunc_t) pointed_param_list_doc_cmp_byaddr);
+
     fprintf(f, "The available parameters are the following:\n");
     char whites[20];
     for (int i = 0; i < 20; ++i)
         whites[i] = ' ';
-    for (int i = 0; i < pl->ndocs; ++i) {
-        int sw = bsearch(&pl->docs[i]->key, all_switches, nswitches_kept, sizeof(const char *), (sortfunc_t) pointed_strcmp) != NULL;
-        const char *(*al)[2] = bsearch(&pl->docs[i]->key, all_aliases, naliases_kept, 2 * sizeof(const char *), (sortfunc_t) alias_sort);
+    for (int i = 0; i < ndocs_kept; ++i) {
+        const char * key = all_docs[i]->key;
+        const char * doc = all_docs[i]->doc;
+
+        int sw = bsearch(&key, all_switches, nswitches_kept, sizeof(const char *), (sortfunc_t) pointed_strcmp) != NULL;
+        const char *(*al)[2] = bsearch(&key, all_aliases, naliases_kept, 2 * sizeof(const char *), (sortfunc_t) alias_sort);
         char * al_string = NULL;
         if (al) {
             size_t s = 9;       // "(alias) " incl terminating \0
             for(int j = 0 ; al + j < all_aliases + naliases_kept ; ++j) {
-                if (strcmp(al[j][0], pl->docs[i]->key) != 0)
+                if (strcmp(al[j][0], key) != 0)
                     break;
                 s += strlen(al[j][1]) + 1;      /* incl space */
             }
@@ -229,23 +261,24 @@ void param_list_print_usage(param_list_ptr pl, const char * argv0, FILE *f)
             size_t k = 0;
             k += snprintf(al_string + k, s - k, "(alias");
             for(int j = 0 ; al + j < all_aliases + naliases_kept ; ++j) {
-                if (strcmp(al[j][0], pl->docs[i]->key) != 0)
+                if (strcmp(al[j][0], key) != 0)
                     break;
                 k += snprintf(al_string + k, s - k, " %s", al[j][1]);
             }
             k += snprintf(al_string + k, s - k, ") ");
             ASSERT_ALWAYS(k + 1 == s);
         }
-        int l = strlen(pl->docs[i]->key);
+        int l = strlen(key);
         l = MAX(1, 10-l);
         whites[l] ='\0';
-        fprintf(f, "    -%s%s%s%s%s\n", pl->docs[i]->key, whites, 
+        fprintf(f, "    -%s%s%s%s%s\n", key, whites, 
                 sw ? "(switch) " : "",
                 al_string ? al_string : "",
-                pl->docs[i]->doc);
+                doc);
         whites[l] =' ';
         if (al_string) free(al_string);
     }
+    free(all_docs);
     free(all_switches);
     free(all_aliases);
 }
