@@ -15,6 +15,8 @@
 #include "version_info.h"
 #include "verbose.h"
 
+typedef int (*sortfunc_t) (const void *, const void *);
+
 static pthread_mutex_t mutex[1] = {PTHREAD_MUTEX_INITIALIZER};
 
 void param_list_init(param_list_ptr pl)
@@ -128,6 +130,10 @@ void param_list_usage_header(param_list_ptr pl, const char * hdr, ...)
 
 void param_list_decl_usage(param_list_ptr pl, const char * key, const char * doc)
 {
+    /* Note that duplicate calls to param_list_decl_usage for the same
+     * key will (for now) trigger two distinct prints of the same
+     * documentation string.
+     */
     if (pl->ndocs == pl->ndocs_alloc) {
         pl->ndocs_alloc += 16;
         pl->docs = (param_list_doc *) realloc(pl->docs,
@@ -164,23 +170,84 @@ static int is_documented_key(param_list_ptr pl, const char *key) {
     return 0;
 }
 
+int pointed_strcmp(const char ** a, const char **b)
+{
+    return strcmp(*a, *b);
+}
+
+int alias_sort(const char *(*a)[2], const char *(*b)[2])
+{
+    return strcmp((*a)[0], (*b)[0]);
+}
+
 void param_list_print_usage(param_list_ptr pl, const char * argv0, FILE *f)
 {
     if (argv0 != NULL)
         fprintf(f, "Usage: %s <parameters>\n", argv0);
     if (pl->usage_hdr != NULL)
         fputs(pl->usage_hdr, f);
+
+    /* copy the list of switches and aliases, so that we can accurately
+     * report them with -help 
+     */
+    const char ** all_switches = malloc(pl->nswitches * sizeof(char*));
+    int nswitches_kept = 0;
+    for(int i = 0 ; i < pl->nswitches ; ++i) {
+        if (strncmp(pl->switches[i]->switchname, "--", 2) == 0) continue;
+        ASSERT_ALWAYS(pl->switches[i]->switchname[0] == '-');
+        all_switches[nswitches_kept++] = pl->switches[i]->switchname + 1;
+    }
+    qsort(all_switches, nswitches_kept, sizeof(const char*), (sortfunc_t) pointed_strcmp);
+
+    const char *(*all_aliases)[2] = malloc(pl->naliases * 2 * sizeof(char*));
+    int naliases_kept = 0;
+    for(int i = 0 ; i < pl->naliases ; ++i) {
+        if (strncmp(pl->aliases[i]->alias, "--", 2) == 0) continue;
+        if (strncmp(pl->aliases[i]->alias, "-", 1) != 0) continue;
+        all_aliases[naliases_kept][0] = pl->aliases[i]->key;
+        all_aliases[naliases_kept][1] = pl->aliases[i]->alias;
+        naliases_kept++;
+    }
+    qsort(all_aliases, naliases_kept, 2 * sizeof(char*), (sortfunc_t) alias_sort);
+
     fprintf(f, "The available parameters are the following:\n");
     char whites[20];
     for (int i = 0; i < 20; ++i)
         whites[i] = ' ';
     for (int i = 0; i < pl->ndocs; ++i) {
+        int sw = bsearch(&pl->docs[i]->key, all_switches, nswitches_kept, sizeof(const char *), (sortfunc_t) pointed_strcmp) != NULL;
+        const char *(*al)[2] = bsearch(&pl->docs[i]->key, all_aliases, naliases_kept, 2 * sizeof(const char *), (sortfunc_t) alias_sort);
+        char * al_string = NULL;
+        if (al) {
+            size_t s = 9;       // "(alias) " incl terminating \0
+            for(int j = 0 ; al + j < all_aliases + naliases_kept ; ++j) {
+                if (strcmp(al[j][0], pl->docs[i]->key) != 0)
+                    break;
+                s += strlen(al[j][1]) + 1;      /* incl space */
+            }
+            al_string = malloc(s);
+            size_t k = 0;
+            k += snprintf(al_string + k, s - k, "(alias");
+            for(int j = 0 ; al + j < all_aliases + naliases_kept ; ++j) {
+                if (strcmp(al[j][0], pl->docs[i]->key) != 0)
+                    break;
+                k += snprintf(al_string + k, s - k, " %s", al[j][1]);
+            }
+            k += snprintf(al_string + k, s - k, ") ");
+            ASSERT_ALWAYS(k + 1 == s);
+        }
         int l = strlen(pl->docs[i]->key);
         l = MAX(1, 10-l);
         whites[l] ='\0';
-        fprintf(f, "    -%s%s%s\n", pl->docs[i]->key, whites, pl->docs[i]->doc);
+        fprintf(f, "    -%s%s%s%s%s\n", pl->docs[i]->key, whites, 
+                sw ? "(switch) " : "",
+                al_string ? al_string : "",
+                pl->docs[i]->doc);
         whites[l] =' ';
+        if (al_string) free(al_string);
     }
+    free(all_switches);
+    free(all_aliases);
 }
 
 static void make_room(param_list_ptr pl, unsigned int more)
@@ -225,8 +292,6 @@ struct sorting_data {
     parameter_srcptr s;
     int p;
 };
-
-typedef int (*sortfunc_t) (const void *, const void *);
 
 int paramcmp(const struct sorting_data * a, const struct sorting_data * b)
 {

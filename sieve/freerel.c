@@ -634,7 +634,7 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "pmin", "do not create freerel below this bound");
   param_list_decl_usage(pl, "pmax", "do not create freerel beyond this bound");
   param_list_decl_usage(pl, "badideals", "file describing bad ideals (for DL)");
-  param_list_decl_usage(pl, "lcideals", "(switch) Add ideals for the leading "
+  param_list_decl_usage(pl, "lcideals", "Add ideals for the leading "
                                         "coeffs of the polynomials (for DL)");
   param_list_decl_usage(pl, "t", "number of threads");
 }

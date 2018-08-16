@@ -10,6 +10,19 @@
 
 /* las_info stuff */
 
+void las_info::configure_aliases(cxx_param_list & pl)
+{
+    cxx_cado_poly::configure_aliases(pl);
+}
+
+void las_info::configure_switches(cxx_param_list & pl)
+{
+    cxx_cado_poly::configure_switches(pl);
+    param_list_configure_switch(pl, "-allow-compsq", NULL);
+    param_list_configure_switch(pl, "-dup", NULL);
+    param_list_configure_switch(pl, "-batch", NULL);
+}
+
 void las_info::declare_usage(cxx_param_list & pl)
 {
     cxx_cado_poly::declare_usage(pl);
@@ -25,24 +38,23 @@ void las_info::declare_usage(cxx_param_list & pl)
 
     param_list_decl_usage(pl, "t",   "number of threads to use");
 
-    param_list_decl_usage(pl, "galois", "(switch) for reciprocal polynomials, sieve only half of the q's");
+    param_list_decl_usage(pl, "galois", "for reciprocal polynomials, sieve only half of the q's");
 
     /* Note: also declared by las_todo_list ! */
-    param_list_decl_usage(pl, "allow-compsq", "(switch) allows composite special-q");
+    param_list_decl_usage(pl, "allow-compsq", "allows composite special-q");
     param_list_decl_usage(pl, "qfac-min", "factors of q must be at least that");
     param_list_decl_usage(pl, "qfac-max", "factors of q must be at most that");
 
 
 
 
-    param_list_decl_usage(pl, "dup", "(switch) suppress duplicate relations");
+    param_list_decl_usage(pl, "dup", "suppress duplicate relations");
     param_list_decl_usage(pl, "dup-qmin", "lower limit of global q-range for 2-sided duplicate removal");
     param_list_decl_usage(pl, "dup-qmax", "upper limit of global q-range for 2-sided duplicate removal");
     param_list_decl_usage(pl, "adjust-strategy", "strategy used to adapt the sieving range to the q-lattice basis (0 = logI constant, J so that boundary is capped; 1 = logI constant, (a,b) plane norm capped; 2 = logI dynamic, skewed basis; 3 = combine 2 and then 0) ; default=0");
-    param_list_decl_usage(pl, "allow-largesq", "(switch) allows large special-q, e.g. for a DL descent");
 
 
-    param_list_decl_usage(pl, "batch", "(switch) use batch cofactorization");
+    param_list_decl_usage(pl, "batch", "use batch cofactorization");
     param_list_decl_usage(pl, "batch0", "side-0 batch file");
     param_list_decl_usage(pl, "batch1", "side-1 batch file");
     param_list_decl_usage(pl, "batchmfb0", "cofactor bound on side 0 to be considered after batch cofactorization. After primes below 2^batchlpb0 have been extracted, cofactors below this bound will go through ecm. Defaults to lpb0.");

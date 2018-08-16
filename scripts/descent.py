@@ -269,7 +269,6 @@ class GeneralClass(object):
         # TODO add threads once it's fixed.
         s=[
             self.las_bin() + "_descent",
-            "-ondemand-siever-config",
             "--recursive-descent",
             "--allow-largesq",
             "--never-discard",  # useful for small computations.

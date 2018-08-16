@@ -73,9 +73,13 @@ struct cxx_cado_poly {
     cado_poly x;
     cxx_cado_poly() { cado_poly_init(x); }
     cxx_cado_poly(cado_poly_srcptr f) { cado_poly_init(x); cado_poly_set(x, f); }
+    static void configure_switches(cxx_param_list &) {}
+    static void configure_aliases(cxx_param_list & pl) {
+        param_list_configure_alias(pl, "skew", "S");
+    }
     static void declare_usage(cxx_param_list & pl) {
         param_list_decl_usage(pl, "poly", "polynomial file");
-        param_list_decl_usage(pl, "skew", "(alias S) skewness");
+        param_list_decl_usage(pl, "skew", "skewness");
     }
 
     cxx_cado_poly(cxx_param_list & pl) {

@@ -159,6 +159,8 @@ struct las_info : private NonCopyable {
     ~las_info();
 
     static void declare_usage(cxx_param_list & pl);
+    static void configure_switches(cxx_param_list & pl);
+    static void configure_aliases(cxx_param_list & pl);
 };
 /* }}} */
 

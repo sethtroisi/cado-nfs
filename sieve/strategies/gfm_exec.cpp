@@ -26,7 +26,7 @@ static void declare_usage(param_list pl)
 			  "to specify the file which contain our factoring methods.");
     param_list_decl_usage(pl, "m",
 			  "to specify the method : PM1, PP1-27, PP1-65, ECM-M12, ECM-M16,\n ECM-B12. By default, we use all methods one after the other.");
-    param_list_decl_usage(pl, "ch", "(switch) to apply the convex hull.");
+    param_list_decl_usage(pl, "ch", "to apply the convex hull.");
 
     param_list_decl_usage(pl, "b1min", "to set b1_min (sieve region).");
     param_list_decl_usage(pl, "b1max", "to set b1_max (sieve region).");
@@ -35,7 +35,7 @@ static void declare_usage(param_list pl)
     param_list_decl_usage(pl, "cmax", "to set c_max (sieve region).");
     param_list_decl_usage(pl, "cstep", "to set c_step (sieve region).");
 
-    param_list_decl_usage(pl, "fch", "(switch) to apply the convex hull");
+    param_list_decl_usage(pl, "fch", "to apply the convex hull");
     param_list_decl_usage(pl, "fch_in",
 			  "to specify the input file which contains \n the factoring methods (default name :'default_fch_in').");
     param_list_decl_usage(pl, "fch_out",

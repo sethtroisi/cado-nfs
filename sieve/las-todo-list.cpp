@@ -40,11 +40,10 @@ void las_todo_list::declare_usage(cxx_param_list & pl)
     param_list_decl_usage(pl, "q0",   "left bound of special-q range");
     param_list_decl_usage(pl, "rho",  "sieve only root r mod q0");
     param_list_decl_usage(pl, "q1",   "right bound of special-q range");
-    param_list_decl_usage(pl, "trialdiv-first-side", "begin trial division on this side");
     param_list_decl_usage(pl, "random-sample", "Sample this number of special-q's at random, within the range [q0,q1]");
     param_list_decl_usage(pl, "nq", "Process this number of special-q's and stop");
     param_list_decl_usage(pl, "todo", "provide file with a list of special-q to sieve instead of qrange");
-    param_list_decl_usage(pl, "allow-compsq", "(switch) allows composite special-q");
+    param_list_decl_usage(pl, "allow-compsq", "allows composite special-q");
     param_list_decl_usage(pl, "qfac-min", "factors of q must be at least that");
     param_list_decl_usage(pl, "qfac-max", "factors of q must be at most that");
 }

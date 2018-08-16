@@ -403,6 +403,10 @@ public:
                 return *this;
             }
         };
+
+    void declare_usage(cxx_param_list & pl);
+    void configure_switches(cxx_param_list & pl);
+    void configure_aliases(cxx_param_list & pl);
 };
 
 typedef tdict::tree<tdict::timer_seconds_thread> timetree_t;
@@ -455,9 +459,6 @@ class : public tdict::slot_base {
     timetree_t::accounting_activate UNIQUE_ID(sentry) (T);
 #define DEBUG_DISPLAY_TIMER_AT_DTOR(T,o)				\
     timetree_t::accounting_debug UNIQUE_ID(sentry) (T, o);
-
-void tdict_decl_usage(param_list pl);
-void tdict_configure_switch(param_list pl);
 
 
 #endif	/* TDICT_HPP_ */

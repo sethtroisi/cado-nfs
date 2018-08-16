@@ -86,6 +86,8 @@ struct las_augmented_output_channel {
     void set(cxx_param_list & pl);
     ~las_augmented_output_channel();
     static void declare_usage(cxx_param_list & pl);
+    static void configure_aliases(cxx_param_list &) { }
+    static void configure_switches(cxx_param_list & pl);
 };
 
 las_augmented_output_channel las_output;
@@ -144,14 +146,21 @@ las_augmented_output_channel::~las_augmented_output_channel()
     las_verbose_leave();
 }
 
+
+void las_augmented_output_channel::configure_switches(cxx_param_list & pl)
+{
+    param_list_configure_switch(pl, "-stats-stderr", NULL);
+    param_list_configure_switch(pl, "-v", NULL);
+}
+
 void las_augmented_output_channel::declare_usage(cxx_param_list & pl)
 {
-    param_list_decl_usage(pl, "v",    "(switch) verbose mode, also prints sieve-area checksums");
+    param_list_decl_usage(pl, "v",    "verbose mode, also prints sieve-area checksums");
     param_list_decl_usage(pl, "out",  "filename where relations are written, instead of stdout");
 #ifdef TRACE_K
     param_list_decl_usage(pl, "traceout", "Output file for trace output, default: stderr");
 #endif
-    param_list_decl_usage(pl, "stats-stderr", "(switch) print stats to stderr in addition to stdout/out file");
+    param_list_decl_usage(pl, "stats-stderr", "print stats to stderr in addition to stdout/out file");
 }
 /*}}}*/
 
@@ -1641,6 +1650,29 @@ void process_bucket_region_run::operator()() {/*{{{*/
 
 /*************************** main program ************************************/
 
+static void configure_aliases(cxx_param_list & pl)
+{
+    las_info::configure_aliases(pl);
+    param_list_configure_alias(pl, "log-bucket-region", "B");
+    las_augmented_output_channel::configure_aliases(pl);
+    tdict::configure_aliases(pl);
+}
+
+static void configure_switches(cxx_param_list & pl)
+{
+    las_info::configure_switches(pl);
+    las_augmented_output_channel::configure_switches(pl);
+    tdict::configure_switches(pl);
+
+    param_list_configure_switch(pl, "-allow-largesq", &allow_largesq);
+#ifdef  DLP_DESCENT
+    param_list_configure_switch(pl, "-recursive-descent", &recursive_descent);
+#endif
+
+    param_list_configure_switch(pl, "-prepend-relation-time", &prepend_relation_time);
+    param_list_configure_switch(pl, "-sync", &sync_at_special_q);
+    param_list_configure_switch(pl, "-never-discard", &never_discard);
+}
 
 static void declare_usage(cxx_param_list & pl)/*{{{*/
 {
@@ -1653,13 +1685,13 @@ static void declare_usage(cxx_param_list & pl)/*{{{*/
             "no need to provide a fb0 parameter.\n"
             );
 
-
-
-    cxx_cado_poly::declare_usage(pl);
+    las_info::declare_usage(pl);
     las_todo_list::declare_usage(pl);
     las_augmented_output_channel::declare_usage(pl);
-    las_info::declare_usage(pl);
+    tdict::declare_usage(pl);
 
+    param_list_decl_usage(pl, "trialdiv-first-side", "begin trial division on this side");
+    param_list_decl_usage(pl, "allow-largesq", "allows large special-q, e.g. for a DL descent");
 
     param_list_decl_usage(pl, "sublat", "modulus for sublattice sieving");
 
@@ -1670,8 +1702,7 @@ static void declare_usage(cxx_param_list & pl)/*{{{*/
     param_list_decl_usage(pl, "exit-early", "once a relation has been found, go to next special-q (value==1), or exit (value==2)");
     param_list_decl_usage(pl, "file-cofact", "provide file with strategies for the cofactorization step");
     param_list_decl_usage(pl, "prepend-relation-time", "prefix all relation produced with time offset since beginning of special-q processing");
-    param_list_decl_usage(pl, "ondemand-siever-config", "(switch) defer initialization of siever precomputed structures (one per special-q side) to time of first actual use");
-    param_list_decl_usage(pl, "sync", "(switch) synchronize all threads at each special-q");
+    param_list_decl_usage(pl, "sync", "synchronize all threads at each special-q");
 #ifdef TRACE_K
     param_list_decl_usage(pl, "traceab", "Relation to trace, in a,b format");
     param_list_decl_usage(pl, "traceij", "Relation to trace, in i,j format");
@@ -1688,7 +1719,6 @@ static void declare_usage(cxx_param_list & pl)/*{{{*/
     param_list_decl_usage(pl, "never-discard", "Disable the discarding process for special-q's. This is dangerous. See bug #15617");
 
     verbose_decl_usage(pl);
-    tdict_decl_usage(pl);
 }/*}}}*/
 
 double nprimes_interval(double p0, double p1)
@@ -2729,29 +2759,8 @@ int main (int argc0, char *argv0[])/*{{{*/
     las_install_sighandlers();
 
     declare_usage(pl);
-
-    /* Passing NULL is allowed here. Find value with
-     * param_list_parse_switch later on */
-    param_list_configure_switch(pl, "-v", NULL);
-    param_list_configure_switch(pl, "-ondemand-siever-config", NULL);
-    param_list_configure_switch(pl, "-allow-largesq", &allow_largesq);
-    param_list_configure_switch(pl, "-allow-compsq", NULL);
-    param_list_configure_switch(pl, "-stats-stderr", NULL);
-    param_list_configure_switch(pl, "-prepend-relation-time", &prepend_relation_time);
-    param_list_configure_switch(pl, "-dup", NULL);
-    param_list_configure_switch(pl, "-sync", &sync_at_special_q);
-    param_list_configure_switch(pl, "-batch", NULL);
-    //    param_list_configure_switch(pl, "-galois", NULL);
-    param_list_configure_alias(pl, "skew", "S");
-    param_list_configure_alias(pl, "log-bucket-region", "B");
-    // TODO: All these aliases should disappear, someday.
-    // This is just legacy.
-    param_list_configure_alias(pl, "fb1", "fb");
-#ifdef  DLP_DESCENT
-    param_list_configure_switch(pl, "-recursive-descent", &recursive_descent);
-#endif
-    param_list_configure_switch(pl, "-never-discard", &never_discard);
-    tdict_configure_switch(pl);
+    configure_switches(pl);
+    configure_aliases(pl);
 
     argv++, argc--;
     for( ; argc ; ) {

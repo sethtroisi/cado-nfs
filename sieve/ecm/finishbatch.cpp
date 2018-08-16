@@ -23,7 +23,7 @@ static void declare_usage(param_list pl)
     param_list_decl_usage(pl, "batchlpb1", "batch bound on side 1");
     param_list_decl_usage(pl, "batch0", "file of product of primes on side 0");
     param_list_decl_usage(pl, "batch1", "file of product of primes on side 1");
-    param_list_decl_usage(pl, "doecm", "(switch) finish with ECM [default = no]");
+    param_list_decl_usage(pl, "doecm", "finish with ECM [default = no]");
 
     verbose_decl_usage(pl);
 }
