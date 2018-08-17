@@ -9,6 +9,7 @@
 #include "las-norms.hpp"
 #include "las-debug.hpp"
 #include "gcd.h"
+#include "gpf.h"
 #include "memory.h"
 
 static const int verify_gcd = 0; /* Enable slow but thorough test */
@@ -38,17 +39,11 @@ unsieve_data::unsieve_data(int logI, int logA)
   entries = new entry[Jmax];
   entries[0] = entry(0,0);
   entries[1] = entry(1,1);
+  gpf_init(Jmax - 1);
   for (unsigned int k = 2U; k < Jmax; k++)
     {
       unsigned int p, c = k;
-      for (p = 2U; p * p <= c; p += 1U + p % 2U)
-        {
-          while (c % p == 0U)
-            c /= p;
-          if (c == 1U)
-            break;
-        }
-      p = (c == 1U) ? p : c;
+      p = gpf_get(k);
       c = k; do {c /= p;} while (c % p == 0);
       entries[k] = entry(p, c);
     }
