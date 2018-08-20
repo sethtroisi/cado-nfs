@@ -24,6 +24,9 @@ endif()
 if (NOT MINGW)
     set (sources ${sources} cado_popen.c)
 endif()
+if(HAVE_HWLOC)
+    set (sources ${sources} hwloc-aux.c)
+endif()
 
 set (sources_io
         filter_io.cpp
@@ -53,6 +56,9 @@ add_library (utils ${CADO_SHARED} ${sources})
 set_source_files_properties("${CMAKE_CURRENT_BINARY_DIR}/modified_files.c" PROPERTIES GENERATED TRUE)
 add_dependencies(utils list_modified_files)
 target_link_libraries(utils pthread ${gmp_libname} m)
+if(HAVE_HWLOC)
+target_link_libraries(utils hwloc)
+endif()
 
 add_library (utils_with_io ${CADO_SHARED} ${sources_io})
 target_link_libraries(utils_with_io utils)

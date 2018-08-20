@@ -1246,3 +1246,7 @@ sieve/las-todo-list.cpp
 sieve/las-todo-list.hpp
 sieve/las-galois.cpp
 sieve/las-galois.hpp
+utils/hwloc-aux.c
+utils/hwloc-aux.h
+sieve/las-parallel.cpp
+sieve/las-parallel.hpp

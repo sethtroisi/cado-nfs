@@ -30,7 +30,9 @@ sieve_shared_data::side_data::side_data(int side,
  * the command line. These get interpreted as the "max" bounds, and we
  * compute the factor base up to that limit.
  */
-sieve_shared_data::sieve_shared_data(cxx_cado_poly const & cpoly, cxx_param_list & pl) /*{{{*/
+sieve_shared_data::sieve_shared_data( /*{{{*/
+        cxx_cado_poly const & cpoly,
+        cxx_param_list & pl)
     : cpoly(cpoly), sides {
         {0, cpoly, pl},
         {1, cpoly, pl}

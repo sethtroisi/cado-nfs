@@ -94,7 +94,7 @@ nfs_aux::~nfs_aux()
 #else
     int dont_print_tally = 1;
 #endif
-    if (dont_print_tally && las.nb_threads > 1) {
+    if (dont_print_tally && las.number_of_threads_total() > 1) {
         verbose_output_print(0, 2, "# Time for this special-q: %1.4fs [tally available only in mono-thread] in %1.4f elapsed s\n", qt0, wct_qt0);
     } else {
         const char * fmt_always[2] = {

@@ -88,6 +88,9 @@ struct sieve_shared_data {
         trialdiv_data const * get_trialdiv_data(fb_factorbase::key_type fbK, fb_factorbase::slicing const * fbs);
 
         side_data(int side, cxx_cado_poly const & cpoly, cxx_param_list & pl);
+        side_data() = default;
+        side_data(side_data &&) = default;
+        side_data& operator=(side_data &&) = default;
     };
 
     /* }}} */
@@ -135,6 +138,9 @@ struct sieve_shared_data {
 
     ~sieve_shared_data();
     sieve_shared_data(cxx_cado_poly const & cpoly, cxx_param_list & pl);
+    sieve_shared_data() = default;
+    sieve_shared_data(sieve_shared_data&&) = default;
+    sieve_shared_data& operator=(sieve_shared_data&&) = default;
     static void declare_usage(cxx_param_list & pl);
 };
 

@@ -51,14 +51,14 @@ void nfs_work::zeroinit_defaults()
 }
 
 nfs_work::nfs_work(las_info const & _las)
-    : nfs_work(_las, NUMBER_OF_BAS_FOR_THREADS(_las.nb_threads))
+    : nfs_work(_las, NUMBER_OF_BAS_FOR_THREADS(_las.number_of_threads_per_subjob()))
 {
 }
 nfs_work::nfs_work(las_info const & _las, int nr_workspaces)
     : las(_las),
     nr_workspaces(nr_workspaces),
     sides {{ {nr_workspaces}, {nr_workspaces} }},
-    th(_las.nb_threads, thread_data(*this))
+    th(_las.number_of_threads_per_subjob(), thread_data(*this))
 {
     zeroinit_defaults();
     sides[0].dumpfile.open(las.dump_filename, Q.doing, 0);
@@ -276,7 +276,7 @@ void nfs_work::prepare_for_new_q(las_info & las0) {
 
         wss.fbK = conf.instantiate_thresholds(side);
         wss.fbK.scale = wss.lognorms.scale;
-        wss.fbK.nb_threads = las.nb_threads;
+        wss.fbK.nb_threads = las.number_of_threads_per_subjob();
 
         /* Now possibly trigger the creation of a new slicing. There's a
          * design decision of whether we want the slicing replicated on

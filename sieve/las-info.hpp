@@ -16,6 +16,7 @@
 #include "las-sieve-shared-data.hpp"
 #include "las-todo-list.hpp"
 #include "las-cofactor.hpp"     // cofactorization_statistics
+#include "las-parallel.hpp"
 #include <list>
 #include <vector>
 #include <stack>
@@ -45,9 +46,23 @@ namespace std { using boost::shared_ptr; using boost::make_shared; }
  * lives outside the choice of one particular way to configure the siever
  * versus another.
  */
-struct las_info : private NonCopyable {
+struct las_info : public las_parallel_desc, private NonCopyable {
     // ----- general operational flags
-    int nb_threads;
+    /*
+    las_parallel_desc parallel;
+    int number_of_threads_per_subjob() const {
+        return parallel.number_of_threads_per_subjob();
+    }
+    int number_of_binding_zones() const {
+        return parallel.number_of_binding_zones();
+    }
+    int number_of_subjobs_per_binding_zone() const {
+        return parallel.number_of_subjobs_per_zone();
+    }
+    */
+    template<typename... Args> void set_parallel(Args&& ...args) {
+        (las_parallel_desc&)*this = las_parallel_desc(std::forward<Args>(args)...);
+    }
     const char * galois; /* a string to indicate which galois to use in las */
     int suppress_duplicates;
     int adjust_strategy = 0;
@@ -98,14 +113,14 @@ struct las_info : private NonCopyable {
 
     private:
     bkmult_specifier bk_multiplier { 1.0 };
-    std::mutex mm;
+    mutable std::mutex mm;
 
     public:
     void grow_bk_multiplier(bkmult_specifier::key_type const& key, double d) {
         std::lock_guard<std::mutex> foo(mm);
         bk_multiplier.grow(key, d);
     }
-    bkmult_specifier get_bk_multiplier() {
+    bkmult_specifier get_bk_multiplier() const {
         std::lock_guard<std::mutex> foo(mm);
         return bk_multiplier;
     }
@@ -155,6 +170,7 @@ struct las_info : private NonCopyable {
 
     const char *dump_filename;
 
+    void load_factor_base(cxx_param_list & pl);
     las_info(cxx_param_list &);
     ~las_info();
 

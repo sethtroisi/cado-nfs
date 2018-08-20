@@ -1,0 +1,63 @@
+#ifndef LAS_PARALLEL_HPP_
+#define LAS_PARALLEL_HPP_
+
+#ifdef HAVE_HWLOC
+#include <hwloc.h>
+#endif
+#include <exception>
+#include "params.h"
+
+class las_parallel_desc {
+    const char * desc_c = NULL;
+    double jobram = -1;
+
+    int subjobs = 1;
+    int threads_per_subjob = 1;
+    int binding_zones = 1;
+    int binding_size = 0;       /* unset in the default setting */
+
+public:
+    int number_of_binding_zones() const { return binding_zones; }
+    int number_of_subjobs_per_zone() const { return subjobs; }
+    int number_of_threads_per_subjob() const { return threads_per_subjob; }
+    int number_of_threads_total() const { return binding_zones * subjobs * threads_per_subjob; }
+    static void declare_usage(cxx_param_list & pl) {
+        param_list_decl_usage(pl, "t", "Number of threads and subjobs. Use -t help for extended documentation");
+#ifdef HAVE_HWLOC
+        param_list_decl_usage(pl, "job-memory", "Estimated memory per subjobs, used for job placement (see -t help)");
+#else
+        param_list_decl_usage(pl, "job-memory", "(unused, needs hwloc)\n");
+#endif
+    }
+    las_parallel_desc() = default;
+    las_parallel_desc(las_parallel_desc const &) = default;
+    las_parallel_desc(cxx_param_list & pl, double jobram = -1);
+    void display_binding_info();
+    struct helper;
+    friend struct helper;
+
+    struct needs_job_ram : public std::exception {
+        virtual const char * what() const noexcept {
+            return "The \"fit\" specifier requires an estimate of the available RAM\n";
+        }
+    };
+
+    class bad_specification : public std::exception {
+        std::string message;
+        void build_message(std::ostream &) { }
+        template <typename Car, typename... Cdr>
+        void build_message(std::ostream & os, Car car, Cdr... cdr) {
+            build_message(os << car, cdr...);
+        }
+        public:
+        template<typename ...Args>
+        bad_specification(Args&&... args) {
+            std::ostringstream os;
+            build_message(os, args...);
+            message = os.str();
+        }
+        virtual const char * what() const noexcept { return message.c_str(); }
+    };
+};
+
+#endif	/* LAS_PARALLEL_HPP_ */

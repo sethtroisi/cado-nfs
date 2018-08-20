@@ -36,8 +36,6 @@ void las_info::declare_usage(cxx_param_list & pl)
 
     param_list_decl_usage(pl, "seed", "Use this seed for random state seeding (currently used only by --random-sample)");
 
-    param_list_decl_usage(pl, "t",   "number of threads to use");
-
     param_list_decl_usage(pl, "galois", "depending on the specified galois automorphism, sieve only part of the q's");
 
     /* Note: also declared by las_todo_list ! */
@@ -68,10 +66,15 @@ void las_info::declare_usage(cxx_param_list & pl)
 }
 
 
+void las_info::load_factor_base(cxx_param_list & pl)
+{
+    shared_structure_cache = sieve_shared_data(cpoly, pl);
+}
+
 las_info::las_info(cxx_param_list & pl)
     : cpoly(pl),
       config_pool(pl),
-      shared_structure_cache(cpoly, pl),
+      shared_structure_cache(),
 #ifdef  DLP_DESCENT
       dlog_base(pl),
 #endif
@@ -85,15 +88,6 @@ las_info::las_info(cxx_param_list & pl)
     unsigned long seed = 0;
     if (param_list_parse_ulong(pl, "seed", &seed))
         gmp_randseed_ui(rstate, seed);
-
-    nb_threads = 1;		/* default value */
-
-    param_list_parse_int(pl, "t", &nb_threads);
-    if (nb_threads <= 0) {
-	fprintf(stderr,
-		"Error, please provide a positive number of threads\n");
-	exit(EXIT_FAILURE);
-    }
 
     galois = param_list_lookup_string(pl, "galois");
     suppress_duplicates = param_list_parse_switch(pl, "-dup");
