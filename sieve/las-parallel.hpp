@@ -5,6 +5,7 @@
 #include <hwloc.h>
 #endif
 #include <exception>
+#include <memory>
 #include "params.h"
 
 class las_parallel_desc {
@@ -48,6 +49,7 @@ public:
     void display_binding_info();
     struct helper;
     friend struct helper;
+    std::shared_ptr<helper> help;
 
     struct needs_job_ram : public std::exception {
         virtual const char * what() const noexcept {

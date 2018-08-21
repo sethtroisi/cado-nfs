@@ -660,32 +660,32 @@ las_parallel_desc::las_parallel_desc(cxx_param_list & pl, double jobram_arg)
         exit(EXIT_SUCCESS);
     }/*}}}*/
 
-    helper help;
+    help = std::make_shared<helper>();
 
 #ifdef HAVE_HWLOC
     /* The --job-memory argument will **ALWAYS** win */
     param_list_parse_double(pl, "job-memory", &jobram);
 #endif
     if (jobram != -1)
-        help.min_pu_fit(jobram);
+        help->min_pu_fit(jobram);
 
     try {
-        help.parse(desc_c);
+        help->parse(desc_c);
     } catch (bad_specification & b) {
         throw bad_specification("Cannot interpret specification -t ",
                 desc_c,
                 ": ", b.what(), "."
                 " See -t help for extended documentation");
     }
-    help.interpret_binding_specifier();
-    help.interpret_njobs_specifier();
-    help.interpret_nthreads_specifier();
+    help->interpret_binding_specifier();
+    help->interpret_njobs_specifier();
+    help->interpret_nthreads_specifier();
 
-    subjobs_per_cpu_binding_zone = help.njobs_per_cpu_binding;
-    threads_per_subjob = help.nthreads_per_job;
+    subjobs_per_cpu_binding_zone = help->njobs_per_cpu_binding;
+    threads_per_subjob = help->nthreads_per_job;
 #ifdef HAVE_HWLOC
-    memory_binding_size = help.memory_binding;
-    memory_binding_zones = help.number_of(-1, 0) / memory_binding_size;
+    memory_binding_size = help->memory_binding;
+    memory_binding_zones = help->number_of(-1, 0) / memory_binding_size;
     /* maybe this will be different someday. */
     cpu_binding_size = memory_binding_size;
     cpu_binding_zones_per_memory_binding_zone = 1;
@@ -694,12 +694,8 @@ las_parallel_desc::las_parallel_desc(cxx_param_list & pl, double jobram_arg)
 
 void las_parallel_desc::display_binding_info()/*{{{*/
 {
-    /* This re-does the enumeration of the topology. No big deal for us.
-     */
-    helper help;
-
     std::string desc(desc_c);
-    help.replace_aliases(desc);
+    help->replace_aliases(desc);
 
     verbose_output_start_batch();
 #ifdef HAVE_HWLOC
@@ -707,17 +703,17 @@ void las_parallel_desc::display_binding_info()/*{{{*/
             " on a machine with topology %s"
             " (%" PRIu64 " GB RAM)\n",
             desc.c_str(),
-            help.synthetic_topology_string.c_str(),
-            help.total_ram() >> 30);
-    verbose_output_print(0, 1, "# %d memory_binding contexts\n", memory_binding_zones);
+            help->synthetic_topology_string.c_str(),
+            help->total_ram() >> 30);
+    verbose_output_print(0, 1, "# %d memory (and cpu) binding contexts\n", memory_binding_zones);
     ASSERT_ALWAYS(cpu_binding_zones_per_memory_binding_zone == 1);
-    verbose_output_print(0, 1, "# %d jobs within each memory_binding context (hence %d in total)\n",
+    verbose_output_print(0, 1, "# %d jobs within each binding context (hence %d in total)\n",
             number_of_subjobs_per_memory_binding_zone(),
             number_of_subjobs_total());
     verbose_output_print(0, 1, "# %d threads per job\n", threads_per_subjob);
     if (jobram >= 0) {
         double all = jobram * number_of_subjobs_total();
-        int physical = help.total_ram() >> 30;
+        int physical = help->total_ram() >> 30;
         double ratio = 100 * all / physical;
 
         verbose_output_print(0, 1, "# Based on an estimate of %.2f GB per job, we use %.2f GB in total, i.e. %.1f%% of %d GB\n",
@@ -733,9 +729,9 @@ void las_parallel_desc::display_binding_info()/*{{{*/
 
 
 #ifdef HAVE_HWLOC
-    std::vector<std::string> tm = help.all_textual_descriptions_for_binding(memory_binding_size);
-    std::vector<std::string> tc = help.all_textual_descriptions_for_binding(cpu_binding_size);
-    std::vector<std::string> tj = help.all_textual_descriptions_for_binding(cpu_binding_size / number_of_subjobs_per_cpu_binding_zone());
+    std::vector<std::string> tm = help->all_textual_descriptions_for_binding(memory_binding_size);
+    std::vector<std::string> tc = help->all_textual_descriptions_for_binding(cpu_binding_size);
+    std::vector<std::string> tj = help->all_textual_descriptions_for_binding(cpu_binding_size / number_of_subjobs_per_cpu_binding_zone());
     size_t m = 0, c = 0;
     {
         std::ostringstream pu_app;
