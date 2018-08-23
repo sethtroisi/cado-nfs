@@ -24,11 +24,12 @@ struct las_parallel_desc::helper {
     std::string jobs_within_cpu_binding_string;
     std::string threads_per_job_string;
     mutable int computed_min_pu_fit = -1;
-    int memory_binding;
-    int cpu_binding;
+
+    int memory_binding_size;
+    int cpu_binding_size;
 #endif
-    int njobs_per_cpu_binding;
-    int nthreads_per_job;
+    int nsubjobs_per_cpu_binding_zone;
+    int nthreads_per_subjob;
 
     bool loose = false;
     bool replicate = true;
@@ -46,10 +47,10 @@ struct las_parallel_desc::helper {
     hwloc_topology_t topology;
 
     /* size() == number of memory binding zones */
-    std::vector<cxx_hwloc_nodeset> memory_bindings;
+    std::vector<cxx_hwloc_nodeset> memory_binding_nodesets;
 
     /* size() == total number of subjobs */
-    std::vector<cxx_hwloc_nodeset> subjob_cpu_bindings;
+    std::vector<cxx_hwloc_nodeset> subjob_binding_cpusets;
 
     int mod(int&i) const {/*{{{*/
         i = i % depth; if (i < 0) i += depth;
@@ -383,8 +384,8 @@ struct las_parallel_desc::helper {
         * simultaneously. We might want to do that differently someday
         * (maybe with a 4-token format ?, e.g numa,fit*4,fit,pu ? )
         */
-       if (is_number(memory_binding_specifier_string, memory_binding))
-           return cpu_binding = memory_binding;
+       if (is_number(memory_binding_specifier_string, memory_binding_size))
+           return cpu_binding_size = memory_binding_size;
        const char * binding_specifier_regexp = 
            "^("                         // 1 : non-limited part.
                "([^*/[:space:]]*)"      // 2: object, or "fit"
@@ -469,7 +470,7 @@ struct las_parallel_desc::helper {
                }
            }
        }
-       return cpu_binding = memory_binding = objsize;
+       return cpu_binding_size = memory_binding_size = objsize;
 #else
        if (strcasecmp(memory_binding_specifier_string.c_str(), "machine") != 0)
            throw bad_specification("hwloc being disabled, the only accepted binding specifier is \"machine\"");
@@ -477,8 +478,8 @@ struct las_parallel_desc::helper {
 #endif
    }/*}}}*/
    int interpret_njobs_specifier() {/*{{{*/
-       if (is_number(jobs_within_cpu_binding_string, njobs_per_cpu_binding))
-           return njobs_per_cpu_binding;
+       if (is_number(jobs_within_cpu_binding_string, nsubjobs_per_cpu_binding_zone))
+           return nsubjobs_per_cpu_binding_zone;
 #ifdef HAVE_HWLOC
        int objsize;
        if (strcasecmp(jobs_within_cpu_binding_string.c_str(), "fit") == 0) {
@@ -492,42 +493,42 @@ struct las_parallel_desc::helper {
                throw bad_specification(jobs_within_cpu_binding_string, " is invalid");
            objsize = number_of(-1, argdepth);
        }
-       if (cpu_binding % objsize)
+       if (cpu_binding_size % objsize)
            throw bad_specification("cannot place jobs according to",
                    " the ", jobs_within_cpu_binding_string, " rule,",
                    " as there is not an integer number of these",
                    " in the binding ",
-                   textual_description_for_binding(cpu_binding));
-       return njobs_per_cpu_binding = cpu_binding / objsize;
+                   textual_description_for_binding(cpu_binding_size));
+       return nsubjobs_per_cpu_binding_zone = cpu_binding_size / objsize;
 #else
        throw bad_specification("hwloc being disabled, the only accepted specifiers for the number of jobs are integers");
 #endif
    }/*}}}*/
    int interpret_nthreads_specifier() {/*{{{*/
-       if (is_number(threads_per_job_string, nthreads_per_job))
-           return nthreads_per_job;
+       if (is_number(threads_per_job_string, nthreads_per_subjob))
+           return nthreads_per_subjob;
 #ifdef HAVE_HWLOC
        int objsize;
        int argdepth = hwloc_aux_get_depth_from_string(topology, threads_per_job_string.c_str());
        if (argdepth < 0)
            throw bad_specification(threads_per_job_string, " is invalid");
        objsize = number_of(-1, argdepth);
-       int loose_per_job_scale = cpu_binding / njobs_per_cpu_binding;
+       int loose_per_job_scale = cpu_binding_size / nsubjobs_per_cpu_binding_zone;
        if (loose_per_job_scale % objsize)
            throw bad_specification("cannot place threads according to",
                    " the ", threads_per_job_string, " rule,",
                    " as there is not an integer number of these",
-                   " in the per-job fraction (1/", njobs_per_cpu_binding, ")",
+                   " in the per-job fraction (1/", nsubjobs_per_cpu_binding_zone, ")",
                    " of the binding ",
-                   textual_description_for_binding(cpu_binding));
-       return nthreads_per_job = loose_per_job_scale / objsize;
+                   textual_description_for_binding(cpu_binding_size));
+       return nthreads_per_subjob = loose_per_job_scale / objsize;
 #else
        throw bad_specification("hwloc being disabled, the only accepted specifiers for the number of threads are integers");
 #endif
    }/*}}}*/
     void compute_binding_bitmaps() {/*{{{*/
-        subjob_cpu_bindings = all_cpu_bitmaps(memory_binding, njobs_per_cpu_binding);
-        memory_bindings = all_mem_bitmaps(memory_binding);
+        subjob_binding_cpusets = all_cpu_bitmaps(memory_binding_size, nsubjobs_per_cpu_binding_zone);
+        memory_binding_nodesets = all_mem_bitmaps(memory_binding_size);
     }/*}}}*/
 };
 
@@ -725,24 +726,20 @@ las_parallel_desc::las_parallel_desc(cxx_param_list & pl, double jobram_arg)
     help->interpret_njobs_specifier();
     help->interpret_nthreads_specifier();
 
-    subjobs_per_cpu_binding_zone = help->njobs_per_cpu_binding;
-    threads_per_subjob = help->nthreads_per_job;
+    nsubjobs_per_cpu_binding_zone = help->nsubjobs_per_cpu_binding_zone;
+    nthreads_per_subjob = help->nthreads_per_subjob;
 #ifdef HAVE_HWLOC
-    memory_binding_size = help->memory_binding;
-    memory_binding_zones = help->number_of(-1, 0) / memory_binding_size;
+    memory_binding_size = help->memory_binding_size;
+    nmemory_binding_zones = help->number_of(-1, 0) / memory_binding_size;
     if (!help->replicate)
-        memory_binding_zones = 1;
+        nmemory_binding_zones = 1;
     /* maybe this will be different someday. */
     cpu_binding_size = memory_binding_size;
-    cpu_binding_zones_per_memory_binding_zone = 1;
+    ncpu_binding_zones_per_memory_binding_zone = 1;
 
-    /* Need to populate the arrays subjob_cpu_bindings and
-     * memory_bindings.
-     *
-     * Should go to the inner class, it seems.
-     */
+    /* Need to populate the arrays subjob_binding_cpusets and
+     * memory_binding_nodesets. */
     help->compute_binding_bitmaps();
-
 #endif
 
     const struct hwloc_topology_support* s = hwloc_topology_get_support(help->topology);
@@ -764,12 +761,12 @@ void las_parallel_desc::display_binding_info() const /*{{{*/
             desc.c_str(),
             help->synthetic_topology_string.c_str(),
             help->total_ram() >> 30);
-    verbose_output_print(0, 1, "# %d memory (and cpu) binding contexts\n", memory_binding_zones);
-    ASSERT_ALWAYS(cpu_binding_zones_per_memory_binding_zone == 1);
+    verbose_output_print(0, 1, "# %d memory (and cpu) binding contexts\n", nmemory_binding_zones);
+    ASSERT_ALWAYS(ncpu_binding_zones_per_memory_binding_zone == 1);
     verbose_output_print(0, 1, "# %d jobs within each binding context (hence %d in total)\n",
             number_of_subjobs_per_memory_binding_zone(),
             number_of_subjobs_total());
-    verbose_output_print(0, 1, "# %d threads per job\n", threads_per_subjob);
+    verbose_output_print(0, 1, "# %d threads per job\n", nthreads_per_subjob);
     if (jobram >= 0) {
         double all = jobram * number_of_subjobs_total();
         int physical = help->total_ram() >> 30;
@@ -783,7 +780,7 @@ void las_parallel_desc::display_binding_info() const /*{{{*/
             " with hwloc disabled\n",
             desc.c_str());
     verbose_output_print(0, 1, "# %d jobs in parallel\n", number_of_subjobs_total());
-    verbose_output_print(0, 1, "# %d threads per job\n", threads_per_subjob);
+    verbose_output_print(0, 1, "# %d threads per job\n", nthreads_per_subjob);
 #endif
 
 
@@ -803,21 +800,21 @@ void las_parallel_desc::display_binding_info() const /*{{{*/
         for(auto & x : tc) { x += " "; x += pu_app.str(); if (x.size() > c) c = x.size(); }
     }
     size_t qc = number_of_subjobs_per_cpu_binding_zone();
-    size_t qm = qc * cpu_binding_zones_per_memory_binding_zone;
+    size_t qm = qc * ncpu_binding_zones_per_memory_binding_zone;
     for(size_t i = 0 ; i < tj.size() ; i++) {
         if (!help->replicate && i >= qc) break;
-        ASSERT_ALWAYS(i/qc < help->subjob_cpu_bindings.size());
+        ASSERT_ALWAYS(i/qc < help->subjob_binding_cpusets.size());
         char * sc;
-        hwloc_bitmap_asprintf(&sc, help->subjob_cpu_bindings[i/qc]);
-        ASSERT_ALWAYS(i/qm < help->memory_bindings.size());
+        hwloc_bitmap_asprintf(&sc, help->subjob_binding_cpusets[i/qc]);
+        ASSERT_ALWAYS(i/qm < help->memory_binding_nodesets.size());
         char * sm;
-        hwloc_bitmap_asprintf(&sm, help->memory_bindings[i/qm]);
+        hwloc_bitmap_asprintf(&sm, help->memory_binding_nodesets[i/qm]);
 
         verbose_output_print(0, 2, "# %-*s %-*s %s [%d thread(s)] [ %s %s ]\n",
                 (int) m, (i % qm) ? "" : tm[i / qm].c_str(),
                 (int) c, (i % qc) ? "" : tc[i / qc].c_str(),
                 tj[i].c_str(),
-                threads_per_subjob,
+                nthreads_per_subjob,
                 sm, sc
                 );
     }
@@ -893,11 +890,11 @@ int las_parallel_desc::set_loose_binding() const
 
 int las_parallel_desc::set_subjob_binding(int k) const
 {
-    ASSERT_ALWAYS(0<= k && k < (int) help->subjob_cpu_bindings.size());
+    ASSERT_ALWAYS(0<= k && k < (int) help->subjob_binding_cpusets.size());
     int m = k / number_of_subjobs_per_memory_binding_zone();
-    ASSERT_ALWAYS(m < (int) help->memory_bindings.size());
+    ASSERT_ALWAYS(m < (int) help->memory_binding_nodesets.size());
     int rc;
-    rc = hwloc_set_membind_nodeset(help->topology, help->memory_bindings[m], HWLOC_MEMBIND_BIND, HWLOC_MEMBIND_PROCESS | HWLOC_MEMBIND_STRICT);
+    rc = hwloc_set_membind_nodeset(help->topology, help->memory_binding_nodesets[m], HWLOC_MEMBIND_BIND, HWLOC_MEMBIND_PROCESS | HWLOC_MEMBIND_STRICT);
     if (rc < 0) {
         if (errno == EXDEV) {
             fprintf(stderr, "Error, cannot enforce memory binding for job %d\n", k);
@@ -906,7 +903,7 @@ int las_parallel_desc::set_subjob_binding(int k) const
         }
         exit(EXIT_FAILURE);
     }
-    rc = hwloc_set_cpubind(help->topology, help->subjob_cpu_bindings[k], HWLOC_CPUBIND_PROCESS |  HWLOC_CPUBIND_STRICT);
+    rc = hwloc_set_cpubind(help->topology, help->subjob_binding_cpusets[k], HWLOC_CPUBIND_PROCESS |  HWLOC_CPUBIND_STRICT);
     if (rc < 0) {
         if (errno == EXDEV) {
             fprintf(stderr, "Error, cannot enforce cpu binding for job %d\n", k);
@@ -918,10 +915,10 @@ int las_parallel_desc::set_subjob_binding(int k) const
     return 0;
 }
 
-int las_parallel_desc::number_of_threads_loose() const {
+int las_parallel_desc::nthreads_loose() const {
 #ifdef HAVE_HWLOC
-    return help->replicate ? help->number_of(-1, 0) : help->memory_binding;
+    return help->replicate ? help->number_of(-1, 0) : help->memory_binding_size;
 #else
-    return threads_per_subjob;
+    return nthreads_per_subjob;
 #endif
 }

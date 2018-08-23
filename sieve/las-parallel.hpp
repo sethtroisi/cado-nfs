@@ -12,11 +12,13 @@ class las_parallel_desc {
     const char * desc_c = NULL;
     double jobram = -1;
 
-    int subjobs_per_cpu_binding_zone = 1;
-    int threads_per_subjob = 1;
-    int memory_binding_zones = 1;
+
+    int nmemory_binding_zones = 1;
+    int ncpu_binding_zones_per_memory_binding_zone = 1;
+    int nsubjobs_per_cpu_binding_zone = 1;
+    int nthreads_per_subjob = 1;
+
     int memory_binding_size = 0;       /* unset in the default setting */
-    int cpu_binding_zones_per_memory_binding_zone = 1;
     int cpu_binding_size = 0;
 
     /* when we apply the "loose" cpu binding, we often do this to process
@@ -29,26 +31,26 @@ class las_parallel_desc {
      *  - without job replication: total number of PUs in the binding context.
      *  - with job replication: total number of PUs on the machine.
      */
-    int number_of_threads_loose() const;
+    int nthreads_loose() const;
 
     struct helper;
     friend struct helper;
     std::shared_ptr<helper> help;
 public:
-    int number_of_memory_binding_zones() const { return memory_binding_zones; }
-    int number_of_subjobs_per_cpu_binding_zone() const { return subjobs_per_cpu_binding_zone; }
-    int number_of_threads_per_subjob() const { return threads_per_subjob; }
+    int number_of_memory_binding_zones() const { return nmemory_binding_zones; }
+    int number_of_subjobs_per_cpu_binding_zone() const { return nsubjobs_per_cpu_binding_zone; }
+    int number_of_threads_per_subjob() const { return nthreads_per_subjob; }
 
     int number_of_subjobs_per_memory_binding_zone() const {
-        return subjobs_per_cpu_binding_zone *
-            cpu_binding_zones_per_memory_binding_zone;
+        return nsubjobs_per_cpu_binding_zone *
+            ncpu_binding_zones_per_memory_binding_zone;
     }
     int number_of_subjobs_total() const {
-        return memory_binding_zones *
+        return nmemory_binding_zones *
             number_of_subjobs_per_memory_binding_zone();
     }
     int number_of_threads_total() const {
-        return number_of_subjobs_total() * threads_per_subjob;
+        return number_of_subjobs_total() * nthreads_per_subjob;
     }
     static void declare_usage(cxx_param_list & pl) {
         param_list_decl_usage(pl, "t", "Number of threads and subjobs. Use -t help for extended documentation");
