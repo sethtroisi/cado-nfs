@@ -177,7 +177,7 @@ static void singletons_and_cliques_removal(purge_matrix_ptr mat, int nsteps,
     target_excess = excess - chunk;
     if (target_excess < final_excess)
       target_excess = final_excess;
-    fprintf(stdout, "\nStep %u on %u: target excess is %" PRId64 "\n",
+    fprintf(stdout, "\nStep %u of %u: target excess is %" PRId64 "\n",
                     count + 1, nsteps, target_excess);
     fflush(stdout);
 

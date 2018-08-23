@@ -42,6 +42,7 @@
 #include "mpz_mat.h"
 #include "rho.h"
 #include "version_info.h"
+#include "gpf.h"
 #ifdef __cplusplus
 #include "utils_cxx.hpp"
 #include "cxx_mpz.hpp"

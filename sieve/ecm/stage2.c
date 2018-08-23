@@ -52,27 +52,15 @@ eulerphi_ul (unsigned long n)
    We assume p is the largest prime factor of n.
    If successful, return p, otherwise return 0. */
 unsigned int 
-find_prime_div (const unsigned int n, const unsigned int min_f, 
+find_prime_div (const unsigned int n, const unsigned int min_f MAYBE_UNUSED,
 		const unsigned char *primes)
 {
-    unsigned int p = n, f = min_f;
+    const unsigned int p = gpf_get(n);
 
-    ASSERT (n % 2 != 0);
-    while (p >= f*f)
-    {
-	while (p % f == 0)
-	{
-	    p /= f;
- 	    if (primes[p])
-		return p;
-	}
-	f += 2; /* Assumes n and min_f both odd */
-    }
-    
-    if (primes[p])
-	return p;
-    
-    return 0;
+    ASSERT_ALWAYS(p >= min_f);
+    if (primes[p] == 0)
+      return 0;
+    return p;
 }
 
 void 
@@ -199,6 +187,7 @@ stage2_make_plan (stage2_plan_t *plan, const unsigned int B2min,
 	 The smallest prime not in d is not_in_d, the maximal value for i
 	 is imax, the maximal value for j is d/2-1, so any proper divisor
 	 of i*d+-j is at most (i*d+d/2-1) / not_in_d */
+      gpf_init(max_i * d + d / 2);
       for (p = B2; p >= (max_i * d + d/2 - 1) / not_in_d; p--)
       {
 	  if (primes[p])
