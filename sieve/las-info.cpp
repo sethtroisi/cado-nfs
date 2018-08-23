@@ -68,7 +68,16 @@ void las_info::declare_usage(cxx_param_list & pl)
 
 void las_info::load_factor_base(cxx_param_list & pl)
 {
-    shared_structure_cache = sieve_shared_data(cpoly, pl);
+    set_loose_binding();
+    for(int k = 0 ; k < number_of_subjobs_total() ; k+= number_of_subjobs_per_memory_binding_zone()) {
+        set_subjob_mem_binding(k);
+        /* right, so at this point we would probably need to 
+         * compute the factor base just once, and copy it in ram, isn't
+         * it ?
+         */
+        shared_structure_cache[current_memory_binding()] = sieve_shared_data(cpoly, pl, number_of_threads_loose());
+    }
+    set_loose_binding();
 }
 
 las_info::las_info(cxx_param_list & pl)

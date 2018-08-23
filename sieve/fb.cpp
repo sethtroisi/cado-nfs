@@ -1888,7 +1888,7 @@ struct helper_functor_put_first_0 {
         }
 };
 
-fb_factorbase::fb_factorbase(cxx_cado_poly const & cpoly, int side, cxx_param_list & pl, const char * fbc_filename) : f(cpoly->pols[side]), side(side)
+fb_factorbase::fb_factorbase(cxx_cado_poly const & cpoly, int side, cxx_param_list & pl, const char * fbc_filename, int nthreads) : f(cpoly->pols[side]), side(side)
 {
     {
         std::ostringstream os;
@@ -1979,11 +1979,7 @@ fb_factorbase::fb_factorbase(cxx_cado_poly const & cpoly, int side, cxx_param_li
                     " for polynomial f%d(x) = %s\n",
                     side, side, polystring.c_str());
 
-            /* note: we parse again the -t option here -- it gets parsed
-             * in the las_info ctor too */
-            int nb_threads = 1;		/* default value */
-            param_list_parse_int(pl, "t", &nb_threads);
-            make_linear_threadpool (nb_threads);
+            make_linear_threadpool (nthreads);
             tfb = seconds () - tfb;
             tfb_wct = wct_seconds() - tfb_wct;
             verbose_output_print(0, 1,

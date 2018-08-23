@@ -530,6 +530,14 @@ struct las_parallel_desc::helper {
         subjob_binding_cpusets = all_cpu_bitmaps(memory_binding_size, nsubjobs_per_cpu_binding_zone);
         memory_binding_nodesets = all_mem_bitmaps(memory_binding_size);
     }/*}}}*/
+
+    cxx_hwloc_nodeset current_memory_binding() const {
+        cxx_hwloc_nodeset nn;
+        hwloc_membind_policy_t pol;
+        int rc = hwloc_get_membind_nodeset(topology,  nn, &pol, HWLOC_MEMBIND_THREAD);
+        ASSERT_ALWAYS(rc >= 0);
+        return nn;
+    }
 };
 
 void extended_usage()/*{{{*/
@@ -867,22 +875,28 @@ int las_parallel_desc::set_loose_binding() const
      * fact.
      */
     int rc;
-    rc = hwloc_set_membind_nodeset(help->topology, n, HWLOC_MEMBIND_BIND, HWLOC_MEMBIND_PROCESS | HWLOC_MEMBIND_STRICT);
+    rc = hwloc_set_membind_nodeset(help->topology, n, HWLOC_MEMBIND_BIND, HWLOC_MEMBIND_THREAD | HWLOC_MEMBIND_STRICT);
     if (rc < 0) {
+        char * s;
+        hwloc_bitmap_asprintf(&s, n);
         if (errno == EXDEV) {
-            fprintf(stderr, "Error, cannot enforce loose memory binding\n");
+            fprintf(stderr, "Error, cannot enforce loose memory binding [ %s ]\n", s);
         } else {
-            fprintf(stderr, "Error while attempting to set loose memory binding\n");
+            fprintf(stderr, "Error while attempting to set loose memory binding [ %s ]\n", s);
         }
+        free(s);
         exit(EXIT_FAILURE);
     }
-    rc = hwloc_set_cpubind(help->topology, c, HWLOC_CPUBIND_PROCESS |  HWLOC_CPUBIND_STRICT);
+    rc = hwloc_set_cpubind(help->topology, c, HWLOC_CPUBIND_THREAD | HWLOC_CPUBIND_STRICT);
     if (rc < 0) {
+        char * s;
+        hwloc_bitmap_asprintf(&s, c);
         if (errno == EXDEV) {
-            fprintf(stderr, "Error, cannot enforce loose cpu binding\n");
+            fprintf(stderr, "Error, cannot enforce loose cpu binding [ %s ]\n", s);
         } else {
-            fprintf(stderr, "Error while attempting to set loose cpu binding\n");
+            fprintf(stderr, "Error while attempting to set loose cpu binding [ %s ]\n", s);
         }
+        free(s);
         exit(EXIT_FAILURE);
     }
     return 0;
@@ -890,35 +904,57 @@ int las_parallel_desc::set_loose_binding() const
 
 int las_parallel_desc::set_subjob_binding(int k) const
 {
+    set_subjob_cpu_binding(k);
+    set_subjob_mem_binding(k);
+    return 0;
+}
+
+int las_parallel_desc::set_subjob_mem_binding(int k) const
+{
     ASSERT_ALWAYS(0<= k && k < (int) help->subjob_binding_cpusets.size());
     int m = k / number_of_subjobs_per_memory_binding_zone();
     ASSERT_ALWAYS(m < (int) help->memory_binding_nodesets.size());
-    int rc;
-    rc = hwloc_set_membind_nodeset(help->topology, help->memory_binding_nodesets[m], HWLOC_MEMBIND_BIND, HWLOC_MEMBIND_PROCESS | HWLOC_MEMBIND_STRICT);
+    int rc = hwloc_set_membind_nodeset(help->topology, help->memory_binding_nodesets[m], HWLOC_MEMBIND_BIND, HWLOC_MEMBIND_THREAD | HWLOC_MEMBIND_STRICT);
     if (rc < 0) {
+        char * s;
+        hwloc_bitmap_asprintf(&s, help->memory_binding_nodesets[m]);
         if (errno == EXDEV) {
-            fprintf(stderr, "Error, cannot enforce memory binding for job %d\n", k);
+            fprintf(stderr, "Error, cannot enforce memory binding for job %d [ %s ]\n", k, s);
         } else {
-            fprintf(stderr, "Error while attempting to set memory binding for job %d\n", k);
+            fprintf(stderr, "Error while attempting to set memory binding for job %d [ %s ]\n", k, s);
         }
+        free(s);
         exit(EXIT_FAILURE);
     }
-    rc = hwloc_set_cpubind(help->topology, help->subjob_binding_cpusets[k], HWLOC_CPUBIND_PROCESS |  HWLOC_CPUBIND_STRICT);
+    return 0;
+}
+int las_parallel_desc::set_subjob_cpu_binding(int k) const
+{
+    ASSERT_ALWAYS(0<= k && k < (int) help->subjob_binding_cpusets.size());
+    int rc = hwloc_set_cpubind(help->topology, help->subjob_binding_cpusets[k], HWLOC_CPUBIND_THREAD |  HWLOC_CPUBIND_STRICT);
     if (rc < 0) {
+        char * s;
+        hwloc_bitmap_asprintf(&s, help->subjob_binding_cpusets[k]);
         if (errno == EXDEV) {
-            fprintf(stderr, "Error, cannot enforce cpu binding for job %d\n", k);
+            fprintf(stderr, "Error, cannot enforce cpu binding for job %d [ %s ]\n", k, s);
         } else {
-            fprintf(stderr, "Error while attempting to set cpu binding for job %d\n", k);
+            fprintf(stderr, "Error while attempting to set cpu binding for job %d [ %s ]\n", k, s);
         }
+        free(s);
         exit(EXIT_FAILURE);
     }
     return 0;
 }
 
-int las_parallel_desc::nthreads_loose() const {
+int las_parallel_desc::number_of_threads_loose() const {
 #ifdef HAVE_HWLOC
     return help->replicate ? help->number_of(-1, 0) : help->memory_binding_size;
 #else
     return nthreads_per_subjob;
 #endif
 }
+
+cxx_hwloc_nodeset las_parallel_desc::current_memory_binding() const {
+    return help->current_memory_binding();
+}
+

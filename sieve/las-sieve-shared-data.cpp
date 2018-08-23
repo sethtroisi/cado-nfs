@@ -14,10 +14,11 @@ void sieve_shared_data::declare_usage(cxx_param_list & pl)
 
 sieve_shared_data::side_data::side_data(int side,
         cxx_cado_poly const & cpoly,
-        cxx_param_list & pl)
+        cxx_param_list & pl,
+        int nthreads)
     :
         f(cpoly->pols[side]),
-        fb(cpoly, side, pl, param_list_lookup_string(pl, "fbc"))
+        fb(cpoly, side, pl, param_list_lookup_string(pl, "fbc"), nthreads)
 {
 }
 
@@ -32,10 +33,11 @@ sieve_shared_data::side_data::side_data(int side,
  */
 sieve_shared_data::sieve_shared_data( /*{{{*/
         cxx_cado_poly const & cpoly,
-        cxx_param_list & pl)
+        cxx_param_list & pl,
+        int nthreads)
     : cpoly(cpoly), sides {
-        {0, cpoly, pl},
-        {1, cpoly, pl}
+        {0, cpoly, pl, nthreads},
+        {1, cpoly, pl, nthreads}
     }
 {
     cofactfilename = param_list_lookup_string (pl, "file-cofact");

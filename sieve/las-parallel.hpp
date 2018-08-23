@@ -21,6 +21,10 @@ class las_parallel_desc {
     int memory_binding_size = 0;       /* unset in the default setting */
     int cpu_binding_size = 0;
 
+    struct helper;
+    friend struct helper;
+    std::shared_ptr<helper> help;
+public:
     /* when we apply the "loose" cpu binding, we often do this to process
      * or prepare data that is of interest to all cores, and we wish to
      * do that collectively. We wonder, however, how many threads this
@@ -31,12 +35,8 @@ class las_parallel_desc {
      *  - without job replication: total number of PUs in the binding context.
      *  - with job replication: total number of PUs on the machine.
      */
-    int nthreads_loose() const;
+    int number_of_threads_loose() const;
 
-    struct helper;
-    friend struct helper;
-    std::shared_ptr<helper> help;
-public:
     int number_of_memory_binding_zones() const { return nmemory_binding_zones; }
     int number_of_subjobs_per_cpu_binding_zone() const { return nsubjobs_per_cpu_binding_zone; }
     int number_of_threads_per_subjob() const { return nthreads_per_subjob; }
@@ -63,9 +63,13 @@ public:
     las_parallel_desc() = default;
     las_parallel_desc(las_parallel_desc const &) = default;
     las_parallel_desc(cxx_param_list & pl, double jobram = -1);
-    void display_binding_info() const ;
-    int set_loose_binding() const ;
-    int set_subjob_binding(int k) const ;
+    void display_binding_info() const;
+    int set_loose_binding() const;
+    int set_subjob_binding(int k) const;
+    int set_subjob_cpu_binding(int k) const;
+    int set_subjob_mem_binding(int k) const;
+
+    cxx_hwloc_nodeset current_memory_binding() const;
 
     struct needs_job_ram : public std::exception {
         virtual const char * what() const noexcept {

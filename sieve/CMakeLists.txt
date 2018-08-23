@@ -68,6 +68,7 @@ add_executable(dupsup
     las-choose-sieve-area.cpp
     las-norms.cpp logapprox.cpp
     las-coordinates.cpp
+    las-parallel.cpp
     bucket.cpp
 
     dupsup.cpp las-duplicate.cpp

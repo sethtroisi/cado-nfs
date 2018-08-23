@@ -88,27 +88,32 @@ struct las_info : public las_parallel_desc, private NonCopyable {
      * we can afford to call them with the non-const ref (see
      * nfs_work::prepare_for_new_q and nfs_work_cofac::nfs_work_cofac).
      */
-    mutable sieve_shared_data shared_structure_cache;
+    mutable std::map<cxx_hwloc_nodeset, sieve_shared_data> shared_structure_cache;
+    sieve_shared_data & local_cache() const {
+        cxx_hwloc_nodeset nn = current_memory_binding();
+        return shared_structure_cache[nn];
+    }
 
     public:
     /* These accessors are for everyone to use. */
     fb_factorbase::slicing const * get_factorbase_slicing(int side, fb_factorbase::key_type fbK) {
-        return shared_structure_cache.sides[side].get_factorbase_slicing(fbK);
+        sieve_shared_data::side_data & s(local_cache().sides[side]);
+        return s.get_factorbase_slicing(fbK);
     }
     trialdiv_data const * get_trialdiv_data(int side, fb_factorbase::key_type fbK, fb_factorbase::slicing const * fbs) {
-        return shared_structure_cache.sides[side].get_trialdiv_data(fbK, fbs);
+        return local_cache().sides[side].get_trialdiv_data(fbK, fbs);
     }
     unsieve_data const * get_unsieve_data(siever_config const & conf) {
-        return shared_structure_cache.get_unsieve_data(conf);
+        return local_cache().get_unsieve_data(conf);
     }
     j_divisibility_helper const * get_j_divisibility_helper(int J) {
-        return shared_structure_cache.get_j_divisibility_helper(J);
+        return local_cache().get_j_divisibility_helper(J);
     }
     facul_strategies_t const * get_strategies(siever_config const & conf) const {
-        return shared_structure_cache.get_strategies(conf);
+        return local_cache().get_strategies(conf);
     }
     bool no_fb(int side) const {
-        return shared_structure_cache.sides[side].no_fb();
+        return local_cache().sides[side].no_fb();
     }
 
     private:

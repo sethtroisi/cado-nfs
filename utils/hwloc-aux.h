@@ -57,6 +57,9 @@ struct cxx_hwloc_bitmap {
         hwloc_bitmap_not(res.x, x);
         return res;
     }
+    bool operator<(cxx_hwloc_bitmap const & o) const {
+        return hwloc_bitmap_compare(x, o.x) < 0;
+    }
 };
 typedef cxx_hwloc_bitmap cxx_hwloc_cpuset;
 typedef cxx_hwloc_bitmap cxx_hwloc_nodeset;
