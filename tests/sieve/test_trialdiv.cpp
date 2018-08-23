@@ -52,12 +52,12 @@ trialdiv_stdinput(const unsigned long pmax, const int verbose)
 
     if (verbose) {
       for (i = 0; i < bit; i++) {
-        printf ("2");
+        printf ("2 ");
       }
       for (auto p: factors)
-        printf (" %" PRIu64, p);
+        printf ("%" PRIu64 " ", p);
     }
-    gmp_printf (" %Zd\n", (mpz_srcptr) N);
+    gmp_printf ("%Zd\n", (mpz_srcptr) N);
   }
 }
 
