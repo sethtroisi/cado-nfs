@@ -19,6 +19,21 @@ class las_parallel_desc {
     int cpu_binding_zones_per_memory_binding_zone = 1;
     int cpu_binding_size = 0;
 
+    /* when we apply the "loose" cpu binding, we often do this to process
+     * or prepare data that is of interest to all cores, and we wish to
+     * do that collectively. We wonder, however, how many threads this
+     * means. The following rules are followed:
+     *
+     *  - no hwloc: same integer as the number of threads of the unique
+     *  subjob.
+     *  - without job replication: total number of PUs in the binding context.
+     *  - with job replication: total number of PUs on the machine.
+     */
+    int number_of_threads_loose() const;
+
+    struct helper;
+    friend struct helper;
+    std::shared_ptr<helper> help;
 public:
     int number_of_memory_binding_zones() const { return memory_binding_zones; }
     int number_of_subjobs_per_cpu_binding_zone() const { return subjobs_per_cpu_binding_zone; }
@@ -46,10 +61,9 @@ public:
     las_parallel_desc() = default;
     las_parallel_desc(las_parallel_desc const &) = default;
     las_parallel_desc(cxx_param_list & pl, double jobram = -1);
-    void display_binding_info();
-    struct helper;
-    friend struct helper;
-    std::shared_ptr<helper> help;
+    void display_binding_info() const ;
+    int set_loose_binding() const ;
+    int set_subjob_binding(int k) const ;
 
     struct needs_job_ram : public std::exception {
         virtual const char * what() const noexcept {

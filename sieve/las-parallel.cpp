@@ -45,6 +45,12 @@ struct las_parallel_desc::helper {
 #ifdef HAVE_HWLOC
     hwloc_topology_t topology;
 
+    /* size() == number of memory binding zones */
+    std::vector<cxx_hwloc_nodeset> memory_bindings;
+
+    /* size() == total number of subjobs */
+    std::vector<cxx_hwloc_nodeset> subjob_cpu_bindings;
+
     int mod(int&i) const {/*{{{*/
         i = i % depth; if (i < 0) i += depth;
         return i;
@@ -308,6 +314,40 @@ struct las_parallel_desc::helper {
        }
        return res;
    }/*}}}*/
+    std::vector<cxx_hwloc_cpuset> all_cpu_bitmaps(int width, int multiply = 1)/*{{{*/
+    {
+        int n = width;
+        int k, child_size, part_size;
+        ASSERT(n <= number_of(-1, 0));
+        std::tie(k, child_size, part_size) = flat_to_hierarchical(n);
+        std::vector<cxx_hwloc_cpuset> res;
+        int nk = number_of(k, 0);
+        for(int i = 0 ; i < nk ; i+=part_size) {
+            cxx_hwloc_cpuset c;
+            for(int j = 0 ; j < part_size ; j++)
+                c = c | hwloc_get_obj_by_depth(topology, k, i + j)->cpuset;
+            for(int k = 0 ; k < multiply ; k++)
+                res.push_back(c);
+        }
+        return res;
+    }/*}}}*/
+    std::vector<cxx_hwloc_nodeset> all_mem_bitmaps(int width, int multiply = 1)/*{{{*/
+    {
+        int n = width;
+        int k, child_size, part_size;
+        ASSERT(n <= number_of(-1, 0));
+        std::tie(k, child_size, part_size) = flat_to_hierarchical(n);
+        std::vector<cxx_hwloc_cpuset> res;
+        int nk = number_of(k, 0);
+        for(int i = 0 ; i < nk ; i+=part_size) {
+            cxx_hwloc_nodeset c;
+            for(int j = 0 ; j < part_size ; j++)
+                c = c | hwloc_get_obj_by_depth(topology, k, i + j)->nodeset;
+            for(int k = 0 ; k < multiply ; k++)
+                res.push_back(c);
+        }
+        return res;
+    }/*}}}*/
    int min_pu_fit(double jobram) const {/*{{{*/
        if (computed_min_pu_fit >= 0) return computed_min_pu_fit;
        /* This computes the minimal number n of PUs such that
@@ -485,6 +525,10 @@ struct las_parallel_desc::helper {
        throw bad_specification("hwloc being disabled, the only accepted specifiers for the number of threads are integers");
 #endif
    }/*}}}*/
+    void compute_binding_bitmaps() {/*{{{*/
+        subjob_cpu_bindings = all_cpu_bitmaps(memory_binding, njobs_per_cpu_binding);
+        memory_bindings = all_mem_bitmaps(memory_binding);
+    }/*}}}*/
 };
 
 void extended_usage()/*{{{*/
@@ -686,13 +730,28 @@ las_parallel_desc::las_parallel_desc(cxx_param_list & pl, double jobram_arg)
 #ifdef HAVE_HWLOC
     memory_binding_size = help->memory_binding;
     memory_binding_zones = help->number_of(-1, 0) / memory_binding_size;
+    if (!help->replicate)
+        memory_binding_zones = 1;
     /* maybe this will be different someday. */
     cpu_binding_size = memory_binding_size;
     cpu_binding_zones_per_memory_binding_zone = 1;
+
+    /* Need to populate the arrays subjob_cpu_bindings and
+     * memory_bindings.
+     *
+     * Should go to the inner class, it seems.
+     */
+    help->compute_binding_bitmaps();
+
 #endif
+
+    const struct hwloc_topology_support* s = hwloc_topology_get_support(help->topology);
+    /* see /usr/share/doc/libhwloc-doc/html/a00234.html */
+    /* just examples of flags we may be interested in */
+    ASSERT_ALWAYS(s->membind->get_area_membind);
 }
 
-void las_parallel_desc::display_binding_info()/*{{{*/
+void las_parallel_desc::display_binding_info() const /*{{{*/
 {
     std::string desc(desc_c);
     help->replace_aliases(desc);
@@ -746,13 +805,123 @@ void las_parallel_desc::display_binding_info()/*{{{*/
     size_t qc = number_of_subjobs_per_cpu_binding_zone();
     size_t qm = qc * cpu_binding_zones_per_memory_binding_zone;
     for(size_t i = 0 ; i < tj.size() ; i++) {
-        verbose_output_print(0, 2, "# %-*s %-*s %s [%d thread(s)]\n",
+        if (!help->replicate && i >= qc) break;
+        ASSERT_ALWAYS(i/qc < help->subjob_cpu_bindings.size());
+        char * sc;
+        hwloc_bitmap_asprintf(&sc, help->subjob_cpu_bindings[i/qc]);
+        ASSERT_ALWAYS(i/qm < help->memory_bindings.size());
+        char * sm;
+        hwloc_bitmap_asprintf(&sm, help->memory_bindings[i/qm]);
+
+        verbose_output_print(0, 2, "# %-*s %-*s %s [%d thread(s)] [ %s %s ]\n",
                 (int) m, (i % qm) ? "" : tm[i / qm].c_str(),
                 (int) c, (i % qc) ? "" : tc[i / qc].c_str(),
                 tj[i].c_str(),
-                threads_per_subjob
+                threads_per_subjob,
+                sm, sc
                 );
     }
 #endif
     verbose_output_end_batch();
 }/*}}}*/
+
+
+#if 0
+int las_parallel_desc::query_memory_binding(void * addr, size_t len);
+{
+    /* tentative specification. This is most probably a debug function.
+     *
+     * return an integer k for something that matches precisely the k-th
+     * memory binding zone that we have defined.
+     *
+     * return -1 for something that isn't bound.
+     *
+     * return -2 if none of the above.
+     */
+    /* base this on one of the following hwloc api calls ?
+    
+    int hwloc_get_area_membind_nodeset (hwloc_topology_t topology,
+            const void *addr, size_t len,
+            hwloc_nodeset_t nodeset,
+            hwloc_membind_policy_t *policy,
+            int flags);
+    int hwloc_get_area_membind (hwloc_topology_t topology,
+            const void *addr, size_t len,
+            hwloc_bitmap_t set,
+            hwloc_membind_policy_t *policy,
+            int flags);
+    int hwloc_get_area_memlocation (hwloc_topology_t topology,
+            const void *addr, size_t len,
+            hwloc_bitmap_t set,
+            int flags);
+
+     */
+    return -2;
+}
+#endif
+
+int las_parallel_desc::set_loose_binding() const
+{
+    hwloc_obj_t root = hwloc_get_root_obj(help->topology);
+    hwloc_nodeset_t n = root->nodeset;
+    hwloc_cpuset_t c = root->cpuset;
+    /* This achieves a **global** binding. It's not entirely clear we
+     * ever want this in the normal course of an execution of las, in
+     * fact.
+     */
+    int rc;
+    rc = hwloc_set_membind_nodeset(help->topology, n, HWLOC_MEMBIND_BIND, HWLOC_MEMBIND_PROCESS | HWLOC_MEMBIND_STRICT);
+    if (rc < 0) {
+        if (errno == EXDEV) {
+            fprintf(stderr, "Error, cannot enforce loose memory binding\n");
+        } else {
+            fprintf(stderr, "Error while attempting to set loose memory binding\n");
+        }
+        exit(EXIT_FAILURE);
+    }
+    rc = hwloc_set_cpubind(help->topology, c, HWLOC_CPUBIND_PROCESS |  HWLOC_CPUBIND_STRICT);
+    if (rc < 0) {
+        if (errno == EXDEV) {
+            fprintf(stderr, "Error, cannot enforce loose cpu binding\n");
+        } else {
+            fprintf(stderr, "Error while attempting to set loose cpu binding\n");
+        }
+        exit(EXIT_FAILURE);
+    }
+    return 0;
+}
+
+int las_parallel_desc::set_subjob_binding(int k) const
+{
+    ASSERT_ALWAYS(0<= k && k < (int) help->subjob_cpu_bindings.size());
+    int m = k / number_of_subjobs_per_memory_binding_zone();
+    ASSERT_ALWAYS(m < (int) help->memory_bindings.size());
+    int rc;
+    rc = hwloc_set_membind_nodeset(help->topology, help->memory_bindings[m], HWLOC_MEMBIND_BIND, HWLOC_MEMBIND_PROCESS | HWLOC_MEMBIND_STRICT);
+    if (rc < 0) {
+        if (errno == EXDEV) {
+            fprintf(stderr, "Error, cannot enforce memory binding for job %d\n", k);
+        } else {
+            fprintf(stderr, "Error while attempting to set memory binding for job %d\n", k);
+        }
+        exit(EXIT_FAILURE);
+    }
+    rc = hwloc_set_cpubind(help->topology, help->subjob_cpu_bindings[k], HWLOC_CPUBIND_PROCESS |  HWLOC_CPUBIND_STRICT);
+    if (rc < 0) {
+        if (errno == EXDEV) {
+            fprintf(stderr, "Error, cannot enforce cpu binding for job %d\n", k);
+        } else {
+            fprintf(stderr, "Error while attempting to set cpu binding for job %d\n", k);
+        }
+        exit(EXIT_FAILURE);
+    }
+    return 0;
+}
+
+int las_parallel_desc::number_of_threads_loose() const {
+#ifdef HAVE_HWLOC
+    return help->replicate ? help->number_of(-1, 0) : help->memory_binding;
+#else
+    return threads_per_subjob;
+#endif
+}

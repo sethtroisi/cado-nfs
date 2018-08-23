@@ -2665,10 +2665,12 @@ void prepare_timer_layout_for_multithreaded_tasks(timetree_t & timer)
     }
 }
 
-void las_subjob(las_info & las, las_todo_list & todo, las_report & global_report, timetree_t & global_timer)/*{{{*/
+void las_subjob(las_info & las, int subjob, las_todo_list & todo, las_report & global_report, timetree_t & global_timer)/*{{{*/
 {
     where_am_I w MAYBE_UNUSED;
     WHERE_AM_I_UPDATE(w, plas, &las);
+
+    las.set_subjob_binding(subjob);
 
     std::list<nfs_aux::caller_stuff> aux_good;
     std::list<nfs_aux::caller_stuff> aux_botched;
@@ -3008,7 +3010,7 @@ int main (int argc0, char *argv0[])/*{{{*/
      */
     int nsubjobs = 1;
 #else
-    int nsubjobs = 2;
+    int nsubjobs = las.number_of_subjobs_total();
 #endif
     for(int subjob = 0 ; subjob < nsubjobs ; ++subjob) {
         /* when references are passed through variadic template arguments
@@ -3018,6 +3020,7 @@ int main (int argc0, char *argv0[])/*{{{*/
         subjobs.push_back(
                 std::thread(las_subjob,
                     std::ref(las),
+                    subjob,
                     std::ref(todo),
                     std::ref(global_report),
                     std::ref(global_timer)
@@ -3063,12 +3066,19 @@ int main (int argc0, char *argv0[])/*{{{*/
 
 	double tcof_batch = seconds ();
 
+        /* This one uses openmp, and forks from the current thread (well,
+         * I believe so -- it's not entirely clear how openmp deals with
+         * cpu binding. At least I presume that it does nothing before
+         * the first pragma omp statement.)
+         */
 	unsigned long nsmooth = find_smooth (las.L,
                 (mpz_t*) batchP, (mpz_t*) B, (mpz_t*) L, (mpz_t*) M,
                 las_output.output,
                 las.number_of_threads_per_subjob());
 
-	global_report.reports = factor (las.L,
+        /* We may go back to our general thread placement at this point.
+         * Currently the code below still uses openmp */
+        global_report.reports = factor (las.L,
                 nsmooth,
                 las.cpoly,
                 las.batchlpb,
