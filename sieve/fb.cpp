@@ -1739,11 +1739,11 @@ fbc_header find_fbc_header_block_for_poly(const char * fbc_filename, cxx_mpz_pol
 
         if (mpz_poly_cmp(hdr.f, f) != 0) continue;
         if (hdr.lim != lim) {
-            fprintf(stderr, "Note: cached factor base number %zu in file %s skipped because not consistent with lim%d=%lu\n", index, fbc_filename, side, lim);
+            verbose_output_print(0, 1, "# Note: cached factor base number %zu in file %s skipped because not consistent with lim%d=%lu\n", index, fbc_filename, side, lim);
             continue;
         }
         if (hdr.powlim != powlim) {
-            fprintf(stderr, "Note: cached factor base number %zu in file %s skipped because not consistent with powlim%d=%lu\n", index, fbc_filename, side, lim);
+            verbose_output_print(0, 1, "# Note: cached factor base number %zu in file %s skipped because not consistent with powlim%d=%lu\n", index, fbc_filename, side, lim);
             continue;
         }
 

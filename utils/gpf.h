@@ -10,6 +10,7 @@ extern "C" {
 extern unsigned int *gpf;
 extern unsigned int gpf_max;
 
+/* caution: gpf_init is not MT-safe. Caller must take appropriate measures */
 void gpf_init(unsigned int);
 static inline unsigned int gpf_get(const unsigned long i) {
     ASSERT(i <= gpf_max);

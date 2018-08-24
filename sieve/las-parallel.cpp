@@ -818,10 +818,10 @@ void las_parallel_desc::display_binding_info() const /*{{{*/
             desc.c_str(),
             help->synthetic_topology_string.c_str(),
             help->total_ram() >> 30);
-    verbose_output_print(0, 1, "# %d memory (and cpu) binding contexts\n", nmemory_binding_zones);
-    ASSERT_ALWAYS(ncpu_binding_zones_per_memory_binding_zone == 1);
+    verbose_output_print(0, 1, "# %d memory binding zones\n", nmemory_binding_zones);
+    verbose_output_print(0, 1, "# %d cpu binding zones within each memory binding\n", ncpu_binding_zones_per_memory_binding_zone);
     verbose_output_print(0, 1, "# %d jobs within each binding context (hence %d in total)\n",
-            number_of_subjobs_per_memory_binding_zone(),
+            number_of_subjobs_per_cpu_binding_zone(),
             number_of_subjobs_total());
     verbose_output_print(0, 1, "# %d threads per job\n", nthreads_per_subjob);
     if (jobram >= 0) {
