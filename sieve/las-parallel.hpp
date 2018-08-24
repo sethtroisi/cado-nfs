@@ -18,8 +18,10 @@ class las_parallel_desc {
     int nsubjobs_per_cpu_binding_zone = 1;
     int nthreads_per_subjob = 1;
 
+#ifdef HAVE_HWLOC
     int memory_binding_size = 0;
     int cpu_binding_size = 0;
+#endif
 
     struct helper;
     friend struct helper;
