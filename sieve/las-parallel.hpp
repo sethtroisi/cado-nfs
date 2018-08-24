@@ -81,17 +81,35 @@ public:
 
     class bad_specification : public std::exception {
         std::string message;
+#if ! GNUC_VERSION_ATMOST(4,7,99)
         void build_message(std::ostream &) { }
         template <typename Car, typename... Cdr>
         void build_message(std::ostream & os, Car car, Cdr... cdr) {
             build_message(os << car, cdr...);
         }
+#endif
         public:
         template<typename ...Args>
-        bad_specification(Args&&... args) {
+        bad_specification(Args&&... args MAYBE_UNUSED) {
+#if GNUC_VERSION_ATMOST(4,7,99)
+            message = "no message for exception, missing compiler feature";
+            /* ostream:600 in gcc-4.7.2 has this code:
+             *
+    template<typename _CharT, typename _Traits, typename _Tp>
+    inline basic_ostream<_CharT, _Traits>&
+    operator<<(basic_ostream<_CharT, _Traits>&& __os, const _Tp& __x)
+    { return (__os << __x); }
+             *
+             * which has been replaced by a much more subtle
+             * implementation in recent g++. Seems to guard against
+             * compilation ambiguities: in particular, the use of
+             * variadic templates triggers difficulties.
+             */
+#else
             std::ostringstream os;
             build_message(os, args...);
             message = os.str();
+#endif
         }
         virtual const char * what() const noexcept { return message.c_str(); }
     };
