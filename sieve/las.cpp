@@ -2989,6 +2989,7 @@ int main (int argc0, char *argv0[])/*{{{*/
     if (las.config_pool.default_config_ptr)
         expected_memory_usage(las.config_pool.base, las, true, base_memory);
 
+    las.prepare_sieve_shared_data(pl);
     las.load_factor_base(pl);
 
 

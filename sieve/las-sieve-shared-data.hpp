@@ -137,8 +137,9 @@ struct sieve_shared_data {
     facul_strategies_t const * get_strategies(siever_config const & conf);
 
     ~sieve_shared_data();
-    sieve_shared_data(cxx_cado_poly const & cpoly, cxx_param_list & pl, int nthreads = 1);
-    sieve_shared_data() = default;
+    sieve_shared_data(cxx_cado_poly const & cpoly, cxx_param_list & pl);
+    void load_factor_base(cxx_param_list & pl, int nthreads = 1);
+    // sieve_shared_data() = default;
     sieve_shared_data(sieve_shared_data&&) = default;
     sieve_shared_data& operator=(sieve_shared_data&&) = default;
     static void declare_usage(cxx_param_list & pl);

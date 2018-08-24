@@ -2726,41 +2726,40 @@ class FactorBaseTask(Task):
         # Check if we have already computed the outputfile for this polynomial
         # and fbb. If any of the inputs mismatch, we remove outputfile from
         # state
-        if "outputfile" in self.state:
+        if "outputfile1" in self.state:
             prevpoly = Polynomials(self.state["poly"].splitlines())
             if poly != prevpoly:
                 self.logger.warn("Received different polynomial, "
                                  "discarding old factor base file")
-                del(self.state["outputfile"])
+                del(self.state["outputfile1"])
+                del(self.state["outputfile0"])
             else:
                 for key in check_params:
                     if self.state[key] != check_params[key]:
                         self.logger.warn("Parameter %s changed, discarding old "
                                          "factor base file", key)
-                        del(self.state["outputfile"])
+                        del(self.state["outputfile1"])
+                        del(self.state["outputfile0"])
                     break
         # If outputfile is not in state, because we never produced it or because
         # input parameters changed, we remember our current input parameters
-        if not "outputfile" in self.state:
+        if not "outputfile1" in self.state:
             check_params["poly"] = str(poly)
             self.state.update(check_params)
         
-        if not "outputfile" in self.state or self.have_new_input_files():
+        if not "outputfile1" in self.state or self.have_new_input_files():
             
             # Make file name for factor base/free relations file
             # We use .gzip by default, unless set to no in parameters
             use_gz = ".gz" if self.params["gzip"] else ""
-            if not twoalgsides:
-                outputfilename = self.workdir.make_filename("roots" + use_gz)
-            else:
-                outputfilename0 = self.workdir.make_filename("roots0" + use_gz)
-                outputfilename1 = self.workdir.make_filename("roots1" + use_gz)
+            outputfilename0 = self.workdir.make_filename("roots0" + use_gz)
+            outputfilename1 = self.workdir.make_filename("roots1" + use_gz)
 
             # Run command to generate factor base file
             (stdoutpath, stderrpath) = \
                     self.make_std_paths(cadoprograms.MakeFB.name)
             if not twoalgsides:
-                p = cadoprograms.MakeFB(out=str(outputfilename),
+                p = cadoprograms.MakeFB(out=str(outputfilename1),
                                     lim=self.params["lim1"],
                                     stdout=str(stdoutpath),
                                     stderr=str(stderrpath),
@@ -2788,27 +2787,21 @@ class FactorBaseTask(Task):
                 if message.get_exitcode(0) != 0:
                     raise Exception("Program failed")
             
-            if not twoalgsides:
-                self.state["outputfile"] = outputfilename.get_wdir_relative()
-            else:
+            self.state["outputfile1"] = outputfilename1.get_wdir_relative()
+            if twoalgsides:
                 self.state["outputfile0"] = outputfilename0.get_wdir_relative()
-                self.state["outputfile1"] = outputfilename1.get_wdir_relative()
-                self.state["outputfile"] = outputfilename1.get_wdir_relative()
             self.logger.info("Finished")
 
-        self.check_files_exist([self.get_filename()], "output",
-                               shouldexist=True)
+        self.check_files_exist([self.get_filename1()], "output", shouldexist=True)
+        if twoalgsides:
+            self.check_files_exist([self.get_filename0()], "output", shouldexist=True)
         return True
     
-    def get_filename(self):
-        return self.get_state_filename("outputfile")
-
     def get_filename0(self):
         assert self.send_request(Request.GET_HAVE_TWO_ALG_SIDES)
         return self.get_state_filename("outputfile0")
 
     def get_filename1(self):
-        assert self.send_request(Request.GET_HAVE_TWO_ALG_SIDES)
         return self.get_state_filename("outputfile1")
 
 class FreeRelTask(Task):
@@ -3061,11 +3054,9 @@ class SievingTask(ClientServerTask, DoesImport, FilesCreator, HasStatistics,
     def run(self):
         super().run()
         have_two_alg = self.send_request(Request.GET_HAVE_TWO_ALG_SIDES)
+        fb1 = self.send_request(Request.GET_FACTORBASE1_FILENAME)
         if have_two_alg:
             fb0 = self.send_request(Request.GET_FACTORBASE0_FILENAME)
-            fb1 = self.send_request(Request.GET_FACTORBASE1_FILENAME)
-        else:
-            factorbase = self.send_request(Request.GET_FACTORBASE_FILENAME)
 
         self.logger.info("We want %d relation(s)", self.state["rels_wanted"])
         while self.get_nrels() < self.state["rels_wanted"]:
@@ -3081,7 +3072,7 @@ class SievingTask(ClientServerTask, DoesImport, FilesCreator, HasStatistics,
                                    shouldexist=False)
             if not have_two_alg:
                 p = cadoprograms.Las(q0=q0, q1=q1,
-                                     factorbase=factorbase,
+                                     factorbase1=fb1,
                                      out=outputfilename, stats_stderr=True,
                                      **self.merged_args[0])
             else:
@@ -5680,7 +5671,6 @@ class CompleteFactorization(HasState, wudb.DbAccess,
 
 
         self.request_map = {
-            Request.GET_FACTORBASE_FILENAME: self.fb.get_filename,
             Request.GET_FACTORBASE0_FILENAME: self.fb.get_filename0,
             Request.GET_FACTORBASE1_FILENAME: self.fb.get_filename1,
             Request.GET_FREEREL_FILENAME: self.freerel.get_freerel_filename,

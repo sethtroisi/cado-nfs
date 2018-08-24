@@ -18,7 +18,7 @@ class las_parallel_desc {
     int nsubjobs_per_cpu_binding_zone = 1;
     int nthreads_per_subjob = 1;
 
-    int memory_binding_size = 0;       /* unset in the default setting */
+    int memory_binding_size = 0;
     int cpu_binding_size = 0;
 
     struct helper;
@@ -60,7 +60,7 @@ public:
         param_list_decl_usage(pl, "job-memory", "(unused, needs hwloc)\n");
 #endif
     }
-    las_parallel_desc() = default;
+    las_parallel_desc();
     las_parallel_desc(las_parallel_desc const &) = default;
     las_parallel_desc(cxx_param_list & pl, double jobram = -1);
     void display_binding_info() const;
@@ -69,7 +69,9 @@ public:
     int set_subjob_cpu_binding(int k) const;
     int set_subjob_mem_binding(int k) const;
 
+#ifdef HAVE_HWLOC
     cxx_hwloc_nodeset current_memory_binding() const;
+#endif
 
     struct needs_job_ram : public std::exception {
         virtual const char * what() const noexcept {

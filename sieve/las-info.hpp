@@ -48,21 +48,6 @@ namespace std { using boost::shared_ptr; using boost::make_shared; }
  */
 struct las_info : public las_parallel_desc, private NonCopyable {
     // ----- general operational flags
-    /*
-    las_parallel_desc parallel;
-    int number_of_threads_per_subjob() const {
-        return parallel.number_of_threads_per_subjob();
-    }
-    int number_of_binding_zones() const {
-        return parallel.number_of_binding_zones();
-    }
-    int number_of_subjobs_per_binding_zone() const {
-        return parallel.number_of_subjobs_per_zone();
-    }
-    */
-    template<typename... Args> void set_parallel(Args&& ...args) {
-        (las_parallel_desc&)*this = las_parallel_desc(std::forward<Args>(args)...);
-    }
     const char * galois; /* a string to indicate which galois to use in las */
     int suppress_duplicates;
     int adjust_strategy = 0;
@@ -88,11 +73,18 @@ struct las_info : public las_parallel_desc, private NonCopyable {
      * we can afford to call them with the non-const ref (see
      * nfs_work::prepare_for_new_q and nfs_work_cofac::nfs_work_cofac).
      */
+#ifdef HAVE_HWLOC
     mutable std::map<cxx_hwloc_nodeset, sieve_shared_data> shared_structure_cache;
     sieve_shared_data & local_cache() const {
         cxx_hwloc_nodeset nn = current_memory_binding();
-        return shared_structure_cache[nn];
+        return shared_structure_cache.at(nn);
     }
+#else
+    mutable sieve_shared_data shared_structure_cache;
+    sieve_shared_data & local_cache() const {
+        return shared_structure_cache;
+    }
+#endif
 
     public:
     /* These accessors are for everyone to use. */
@@ -175,8 +167,15 @@ struct las_info : public las_parallel_desc, private NonCopyable {
 
     const char *dump_filename;
 
-    void load_factor_base(cxx_param_list & pl);
+
+    /* typicall call order is as follows */
     las_info(cxx_param_list &);
+    template<typename... Args> void set_parallel(cxx_param_list &pl, Args&& ...args) {
+        (las_parallel_desc&)*this = las_parallel_desc(pl, std::forward<Args>(args)...);
+        prepare_sieve_shared_data(pl);
+    }
+    void prepare_sieve_shared_data(cxx_param_list & pl);
+    void load_factor_base(cxx_param_list & pl);
     ~las_info();
 
     static void declare_usage(cxx_param_list & pl);

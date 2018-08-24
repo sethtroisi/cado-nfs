@@ -809,7 +809,6 @@ class Las(Program):
                  verbose: Toggle("v")=None,
                  powlim0: Parameter(checktype=int)=None,
                  powlim1: Parameter(checktype=int)=None,
-                 factorbase: Parameter("fb", is_input_file=True)=None,
                  factorbase0: Parameter("fb0", is_input_file=True)=None,
                  factorbase1: Parameter("fb1", is_input_file=True)=None,
                  out: Parameter(is_output_file=True)=None,

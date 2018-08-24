@@ -33,15 +33,17 @@ sieve_shared_data::side_data::side_data(int side,
  */
 sieve_shared_data::sieve_shared_data( /*{{{*/
         cxx_cado_poly const & cpoly,
-        cxx_param_list & pl,
-        int nthreads)
-    : cpoly(cpoly), sides {
-        {0, cpoly, pl, nthreads},
-        {1, cpoly, pl, nthreads}
-    }
+        cxx_param_list & pl)
+    : cpoly(cpoly)
 {
     cofactfilename = param_list_lookup_string (pl, "file-cofact");
 }
+void sieve_shared_data::load_factor_base(cxx_param_list & pl, int nthreads) /*{{{*/
+{
+    sides[0] = side_data {0, cpoly, pl, nthreads};
+    sides[1] = side_data {1, cpoly, pl, nthreads};
+}
+/*}}}*/
 /*}}}*/
 unsieve_data const * sieve_shared_data::get_unsieve_data(siever_config const & conf) /* {{{ */
 {

@@ -85,12 +85,12 @@ static void declare_usage(cxx_param_list & pl)
   /* those are typical from las invocations, we wish to keep them
    * accepted */
   param_list_decl_usage(pl, "out",  "filename where relations are written, instead of stdout");
-  param_list_decl_usage(pl, "fb",   "(unused)");
+  param_list_decl_usage(pl, "fb0",   "(unused)");
+  param_list_decl_usage(pl, "fb1",   "(unused)");
   param_list_decl_usage(pl, "fbc",  "(unused)");
   param_list_decl_usage(pl, "q0",   "(unused)");
   param_list_decl_usage(pl, "q1",   "(unused)");
   param_list_decl_usage(pl, "nq",   "(unused)");
-  param_list_decl_usage(pl, "adjust-strategy",   "(unused)");
   param_list_decl_usage(pl, "v",    "(unused)");
   verbose_decl_usage(pl);
   las_info::declare_usage(pl);
@@ -108,7 +108,6 @@ int
 main (int argc, char * argv[])
 {
     char * argv0 = argv[0];
-    int adjust_strategy = 0;
 
     cxx_param_list pl;
     declare_usage(pl);
@@ -141,18 +140,19 @@ main (int argc, char * argv[])
       usage(pl, argv0);
     }
 
-    param_list_lookup_string(pl, "fb");
+    param_list_lookup_string(pl, "fb0");
+    param_list_lookup_string(pl, "fb1");
     param_list_lookup_string(pl, "fbc");
     param_list_lookup_string(pl, "q0");
     param_list_lookup_string(pl, "q1");
     param_list_lookup_string(pl, "nq");
-    param_list_parse_int(pl, "adjust-strategy", &adjust_strategy);
     const char * outputname = param_list_lookup_string(pl, "out");
 
     cxx_mpz sq, rho;
 
     las_info las(pl);
 
+    las.prepare_sieve_shared_data(pl);
 
     if (param_list_warn_unused(pl))
     {

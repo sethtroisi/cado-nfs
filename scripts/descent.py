@@ -200,7 +200,7 @@ class GeneralClass(object):
     def badidealinfo(self):
         return self.__getfile("badidealinfo", "badidealinfo", "numbertheory", "badidealinfofile")
     def fb1(self):
-        return self.__getfile("fb1", "roots.gz", "factorbase", "outputfile")
+        return self.__getfile("fb1", "roots1.gz", "factorbase", "outputfile")
     def ell(self):
         return int(args.ell)
     def lpb0(self):

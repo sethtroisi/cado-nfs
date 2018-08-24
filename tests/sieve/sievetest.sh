@@ -50,17 +50,10 @@ for var in poly I lim{0,1} lpb{0,1} mfb{0,1} ; do
     args=("${args[@]}" -$var $(eval "echo \${$var:?missing}"))
 done
 
-if [ "$fb" ] ; then
-    args=("${args[@]}" -fb "$fb")
-    if [ "$fb0" ] || [ "$fb1" ] ; then
-        echo "fb incompatible with fb0/fb1" >&2 ; exit 1
-    fi
-else
-    if [ "$fb0" ] ; then args=("${args[@]}" -fb0 "$fb0") ; fi
-    if [ "$fb1" ] ; then args=("${args[@]}" -fb1 "$fb1") ; fi
-    if ! [ "$fb0" ] && ! [ "$fb1" ] ; then
-        echo "neither fb nor fb0/fb1 provided" >&2 ; exit 1
-    fi
+if [ "$fb0" ] ; then args=("${args[@]}" -fb0 "$fb0") ; fi
+if [ "$fb1" ] ; then args=("${args[@]}" -fb1 "$fb1") ; fi
+if ! [ "$fb0" ] && ! [ "$fb1" ] ; then
+    echo "neither fb nor fb0/fb1 provided" >&2 ; exit 1
 fi
 
 

@@ -66,8 +66,41 @@ void las_info::declare_usage(cxx_param_list & pl)
 }
 
 
+void las_info::prepare_sieve_shared_data(cxx_param_list & pl)
+{
+#ifdef HAVE_HWLOC
+    shared_structure_cache.clear();
+    set_loose_binding();
+    for(int k = 0 ; k < number_of_subjobs_total() ; k+= number_of_subjobs_per_memory_binding_zone()) {
+        set_subjob_mem_binding(k);
+        /* gcc pre 4.7 does not have map::emplace ; while it's
+         * admittedly not a c++11-complete compiler anyway, we still have
+         * hope to use such an ancient thing on a few machines (old *bsd,
+         * for example).
+         *
+         * See:
+         * https://gcc.gnu.org/bugzilla/show_bug.cgi?id=44436#c30
+         */
+#if 0
+        shared_structure_cache.emplace(
+                current_memory_binding(),
+                sieve_shared_data(cpoly, pl));
+#else
+        std::pair<cxx_hwloc_nodeset, sieve_shared_data> v(
+                current_memory_binding(),
+                sieve_shared_data(cpoly, pl));
+        shared_structure_cache.insert(std::move(v));
+#endif
+    }
+    set_loose_binding();
+#else
+    shared_structure_cache = sieve_shared_data(cpoly, pl);
+#endif
+}
+
 void las_info::load_factor_base(cxx_param_list & pl)
 {
+#ifdef HAVE_HWLOC
     set_loose_binding();
     for(int k = 0 ; k < number_of_subjobs_total() ; k+= number_of_subjobs_per_memory_binding_zone()) {
         set_subjob_mem_binding(k);
@@ -75,15 +108,22 @@ void las_info::load_factor_base(cxx_param_list & pl)
          * compute the factor base just once, and copy it in ram, isn't
          * it ?
          */
-        shared_structure_cache[current_memory_binding()] = sieve_shared_data(cpoly, pl, number_of_threads_loose());
+        shared_structure_cache.at(current_memory_binding()).load_factor_base(pl, number_of_threads_loose());
     }
     set_loose_binding();
+#else
+    shared_structure_cache.load_factor_base(pl, number_of_threads_loose());
+#endif
 }
 
 las_info::las_info(cxx_param_list & pl)
     : cpoly(pl),
       config_pool(pl),
+#ifdef HAVE_HWLOC
       shared_structure_cache(),
+#else
+      shared_structure_cache(cpoly, pl),
+#endif
 #ifdef  DLP_DESCENT
       dlog_base(pl),
 #endif
