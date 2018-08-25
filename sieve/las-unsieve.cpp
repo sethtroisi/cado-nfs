@@ -39,12 +39,7 @@ unsieve_data::unsieve_data(int logI, int logA)
   entries = new entry[Jmax];
   entries[0] = entry(0,0);
   entries[1] = entry(1,1);
-  {
-      /* gpf_init is not MT-safe */
-      static std::mutex mm;
-      std::lock_guard<std::mutex> foo(mm);
-      gpf_init(Jmax - 1);
-  }
+  gpf_init(Jmax - 1);
   for (unsigned int k = 2U; k < Jmax; k++)
     {
       unsigned int p, c = k;

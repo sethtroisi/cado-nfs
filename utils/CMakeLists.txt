@@ -16,7 +16,7 @@ set (sources
         version_info.c
 	modified_files.c threadpool.cpp mpz_poly_bivariate.c
         gmpxx.cpp
-        rho.c gpf.c
+        rho.c gpf.cpp
 )
 if (HAVE_GLIBC_VECTOR_INTERNALS)
     set(sources ${sources} mmap_allocator.cpp)
