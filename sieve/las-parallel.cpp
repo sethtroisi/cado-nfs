@@ -874,6 +874,8 @@ void las_parallel_desc::display_binding_info() const /*{{{*/
                 nthreads_per_subjob,
                 sm, sc
                 );
+        free(sm);
+        free(sc);
     }
 #endif
     verbose_output_end_batch();
