@@ -1575,7 +1575,10 @@ void process_bucket_region_run::operator()() {/*{{{*/
     for (int side = 0; side < 2; side++) {
         WHERE_AM_I_UPDATE(w, side, side);
         nfs_work::side_data & wss(ws.sides[side]);
-        if (wss.no_fb()) continue;
+        if (wss.no_fb()) {
+            memset(S[side], 0, BUCKET_REGION);
+            continue;
+        }
 
         MARK_TIMER_FOR_SIDE(timer, side);
 
