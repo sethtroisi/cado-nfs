@@ -15,12 +15,13 @@ void gpf_init(unsigned int m)
 {
       if (m <= gpf_max)
           return;
+      ASSERT_ALWAYS(m < UINT_MAX); /* Otherwise m+1 overflows */
       if (gpf == NULL) {
-        gpf = malloc ((m + 1) * sizeof(unsigned int));
-        ASSERT_ALWAYS(gpf != NULL);
+          gpf = malloc ((m + 1) * sizeof(unsigned int));
+          ASSERT_ALWAYS(gpf != NULL);
       } else {
-        gpf = realloc (gpf, (m + 1) * sizeof(unsigned int));
-        ASSERT_ALWAYS(gpf != NULL);
+          gpf = realloc (gpf, (m + 1) * sizeof(unsigned int));
+          ASSERT_ALWAYS(gpf != NULL);
       }
       gpf_max = m;
       
@@ -28,7 +29,7 @@ void gpf_init(unsigned int m)
          the old gpf data and sieve only over the newly added area.
          For now, Q&D: sieve everything again. */
       for (size_t i = 0; i <= m; i++) {
-        gpf[i] = i;
+          gpf[i] = i;
       }
       prime_info pi;
       prime_info_init (pi);
@@ -39,9 +40,9 @@ void gpf_init(unsigned int m)
           for (unsigned int i = 2; i <= m ; i += 2) {
               ASSERT(gpf[i] % 2 == 0);
               while (gpf[i] > 2) {
-                gpf[i] /= 2;
-                if (gpf[i] % 2 != 0)
-                    break;
+                  gpf[i] /= 2;
+                  if (gpf[i] % 2 != 0)
+                      break;
               }
           }
       }
@@ -54,10 +55,10 @@ void gpf_init(unsigned int m)
               ASSERT_EXPENSIVE(gpf[i] / p == gpf[i] * inv_p);
 
               while (gpf[i] > p) {
-                unsigned int candidate = gpf[i] * inv_p;
-                if (candidate > lim_p)
-                  break;
-                gpf[i] = candidate;
+                  unsigned int candidate = gpf[i] * inv_p;
+                  if (candidate > lim_p)
+                      break;
+                  gpf[i] = candidate;
               }
           }
       }

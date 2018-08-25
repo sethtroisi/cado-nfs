@@ -1,6 +1,12 @@
 #ifndef GPF_H_
 #define GPF_H_
 
+/* A look-up table of the largest prime factor of an integer
+
+Before calling gpf_get(i), gpf_init(m) must have been called with m >= i.
+
+*/
+
 #include "macros.h"
 
 #ifdef __cplusplus
