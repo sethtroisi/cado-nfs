@@ -3042,6 +3042,7 @@ int main (int argc0, char *argv0[])/*{{{*/
 #endif
 
     global_timer.start();
+    las.set_loose_binding();
 
     if (las.batch)
       {
@@ -3060,7 +3061,7 @@ int main (int argc0, char *argv0[])/*{{{*/
                     1UL << las.batchlpb[side],
                     las.cpoly->pols[side],
                     las_output.output,
-                    las.number_of_threads_per_subjob());
+                    las.number_of_threads_loose());
             mpz_ui_pow_ui(B[side], 2, las.batchlpb[side]);
             mpz_ui_pow_ui(L[side], 2, lpb[side]);
             mpz_ui_pow_ui(M[side], 2, las.batchmfb[side]);
