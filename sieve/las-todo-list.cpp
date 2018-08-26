@@ -359,7 +359,6 @@ bool las_todo_list::feed_qlist()
     rc = gmp_sscanf(x, "%Zi%n %Zi%n", (mpz_ptr) p, &nread1, (mpz_ptr) r, &nread2);
     ASSERT_ALWAYS(rc == 1 || rc == 2); /* %n does not count */
     x += (rc==1) ? nread1 : nread2;
-    ASSERT_ALWAYS(mpz_probab_prime_p(p, 2));
     {
         mpz_poly_ptr f = cpoly->pols[side];
         /* specifying the rational root as <0
