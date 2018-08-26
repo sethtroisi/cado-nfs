@@ -111,6 +111,19 @@
    fun:start_thread
    fun:clone
 }
+{
+   same_as_above
+   Helgrind:Race
+   fun:_ZNK5tdict4slotcvNS_3keyEEv
+   fun:_Z23do_one_special_q_sublatR8nfs_workSt10shared_ptrI14nfs_work_cofacES1_I7nfs_auxER11thread_pool
+   fun:_Z16do_one_special_qR8las_infoR8nfs_workSt10shared_ptrI7nfs_auxER11thread_pool
+   fun:_Z10las_subjobR8las_infoiR13las_todo_listR10las_reportRN5tdict4treeINS5_20timer_seconds_threadEEE
+   ...
+   obj:/usr/lib/x86_64-linux-gnu/libstdc++.so.6.0.25
+   fun:mythread_wrapper
+   fun:start_thread
+}
+
 
 {  
    drd_does_no_better
