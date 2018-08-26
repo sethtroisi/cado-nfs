@@ -797,10 +797,13 @@ las_parallel_desc::las_parallel_desc(cxx_param_list & pl, double jobram_arg)
      * memory_binding_nodesets. */
     help->compute_binding_bitmaps();
 
+#if 0
     const struct hwloc_topology_support* s = hwloc_topology_get_support(help->topology);
     /* see /usr/share/doc/libhwloc-doc/html/a00234.html */
     /* just examples of flags we may be interested in */
     ASSERT_ALWAYS(s->membind->get_area_membind);
+#endif
+
 #endif
 }
 
