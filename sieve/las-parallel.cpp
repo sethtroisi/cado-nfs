@@ -940,7 +940,7 @@ int las_parallel_desc::set_loose_binding() const
             fprintf(stderr, "Error while attempting to set loose memory binding [ %s ]\n", s);
         }
         free(s);
-        exit(EXIT_FAILURE);
+        return -1;
     }
     rc = hwloc_set_cpubind(help->topology, c, HWLOC_CPUBIND_THREAD | HWLOC_CPUBIND_STRICT);
     if (rc < 0) {
@@ -952,7 +952,7 @@ int las_parallel_desc::set_loose_binding() const
             fprintf(stderr, "Error while attempting to set loose cpu binding [ %s ]\n", s);
         }
         free(s);
-        exit(EXIT_FAILURE);
+        return -1;
     }
 #endif
     return 0;
@@ -981,7 +981,7 @@ int las_parallel_desc::set_subjob_mem_binding(int k MAYBE_UNUSED) const
             fprintf(stderr, "Error while attempting to set memory binding for job %d [ %s ]\n", k, s);
         }
         free(s);
-        exit(EXIT_FAILURE);
+        return -1;
     }
 #endif
     return 0;
@@ -1000,7 +1000,7 @@ int las_parallel_desc::set_subjob_cpu_binding(int k MAYBE_UNUSED) const
             fprintf(stderr, "Error while attempting to set cpu binding for job %d [ %s ]\n", k, s);
         }
         free(s);
-        exit(EXIT_FAILURE);
+        return -1;
     }
 #endif
     return 0;
