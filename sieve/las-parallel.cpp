@@ -5,6 +5,7 @@
 #include <vector>
 #include <sstream>
 #include <regex.h>
+#include <mutex>
 #include "utils.h"
 #include "las-parallel.hpp"
 
@@ -399,7 +400,14 @@ struct las_parallel_desc::helper {
         cxx_hwloc_nodeset nn;
         hwloc_membind_policy_t pol;
         int rc = hwloc_get_membind_nodeset(topology,  nn, &pol, HWLOC_MEMBIND_THREAD);
-        ASSERT_ALWAYS(rc >= 0);
+        if (rc < 0) {
+            static std::mutex mm;
+            std::lock_guard<std::mutex> dummy(mm);
+            static int got_message = 0;
+            if (!got_message++)
+                fprintf(stderr, "Error while attempting to get memory binding\n");
+            hwloc_bitmap_zero(nn);
+        }
         return nn;
     }/*}}}*/
 #endif
