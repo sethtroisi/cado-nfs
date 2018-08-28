@@ -25,16 +25,16 @@ void gpf_init(unsigned int m)
     std::lock_guard<std::mutex> foo(mm);
     if (m < gpf_cxx.size())
         return;
-    gpf_cxx.assign(m+1, 0);
 
-    gpf = &gpf_cxx.front();
+    std::vector<unsigned int> res;
 
+    res.assign(m+1, 0);
 
     /* When we increase gpf_max we could and probably should keep
        the old gpf data and sieve only over the newly added area.
        For now, Q&D: sieve everything again. */
     for (size_t i = 0; i <= m; i++) {
-        gpf[i] = i;
+        res[i] = i;
     }
     prime_info pi;
     prime_info_init (pi);
@@ -43,10 +43,10 @@ void gpf_init(unsigned int m)
     /* Do 2 separately so the compiler can use bit shift for division */
     if (2 <= max_sieve) {
         for (unsigned int i = 2; i <= m ; i += 2) {
-            ASSERT(gpf[i] % 2 == 0);
-            while (gpf[i] > 2) {
-                gpf[i] /= 2;
-                if (gpf[i] % 2 != 0)
+            ASSERT(res[i] % 2 == 0);
+            while (res[i] > 2) {
+                res[i] /= 2;
+                if (res[i] % 2 != 0)
                     break;
             }
         }
@@ -56,16 +56,23 @@ void gpf_init(unsigned int m)
         const unsigned int inv_p = ularith_invmod(p);
         const unsigned int lim_p = UINT_MAX / p;
         for (unsigned int i = 2*p; i <= m ; i += p) {
-            ASSERT_EXPENSIVE(gpf[i] % p == 0);
-            ASSERT_EXPENSIVE(gpf[i] / p == gpf[i] * inv_p);
+            ASSERT_EXPENSIVE(res[i] % p == 0);
+            ASSERT_EXPENSIVE(res[i] / p == res[i] * inv_p);
 
-            while (gpf[i] > p) {
-                unsigned int candidate = gpf[i] * inv_p;
+            while (res[i] > p) {
+                unsigned int candidate = res[i] * inv_p;
                 if (candidate > lim_p)
                     break;
-                gpf[i] = candidate;
+                res[i] = candidate;
             }
         }
     }
     prime_info_clear (pi);
+
+    /* modify the globals only now. gpf_get only uses the global pointer
+     * gpf, so it should be safe to do so (maybe not as helgrind sees it,
+     * but in the most common memory model, we're not frightened, as a
+     * pointer-size value can be read in one atomic op anyway). */
+    std::swap(res, gpf_cxx);
+    gpf = &res.front();
 }
