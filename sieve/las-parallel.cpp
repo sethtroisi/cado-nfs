@@ -393,7 +393,7 @@ struct las_parallel_desc::helper {
        return computed_min_pu_fit = iceildiv(number_of(-1, 0), how_many);
    }/*}}}*/
     void compute_binding_bitmaps() {/*{{{*/
-        subjob_binding_cpusets = all_cpu_bitmaps(memory_binding_size, nsubjobs_per_cpu_binding_zone);
+        subjob_binding_cpusets = all_cpu_bitmaps(cpu_binding_size, nsubjobs_per_cpu_binding_zone);
         memory_binding_nodesets = all_mem_bitmaps(memory_binding_size);
     }/*}}}*/
     cxx_hwloc_nodeset current_memory_binding() const {/*{{{*/
@@ -871,17 +871,17 @@ void las_parallel_desc::display_binding_info() const /*{{{*/
     size_t qm = qc * ncpu_binding_zones_per_memory_binding_zone;
     for(size_t i = 0 ; i < tj.size() ; i++) {
         if (!help->replicate && i >= qc) break;
-        ASSERT_ALWAYS(i/qc < help->subjob_binding_cpusets.size());
+        ASSERT_ALWAYS(i < help->subjob_binding_cpusets.size());
         char * sc;
-        hwloc_bitmap_asprintf(&sc, help->subjob_binding_cpusets[i/qc]);
+        hwloc_bitmap_asprintf(&sc, help->subjob_binding_cpusets[i]);
         ASSERT_ALWAYS(i/qm < help->memory_binding_nodesets.size());
         char * sm;
         hwloc_bitmap_asprintf(&sm, help->memory_binding_nodesets[i/qm]);
 
-        verbose_output_print(0, 2, "# %-*s %-*s %s [%d thread(s)] [ %s %s ]\n",
+        verbose_output_print(0, 2, "# %-*s %-*s %s [%d thread(s)] [ m:%s c:%s ]\n",
                 (int) m, (i % qm) ? "" : tm[i / qm].c_str(),
                 (int) c, (i % qc) ? "" : tc[i / qc].c_str(),
-                tj[i].c_str(),
+                "job", // tj[i].c_str(),
                 nthreads_per_subjob,
                 sm, sc
                 );
