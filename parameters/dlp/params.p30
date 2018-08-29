@@ -1,3 +1,4 @@
+
 ###########################################################################
 #     Parameter file for Cado-NFS ; DLP version
 ###########################################################################
@@ -9,19 +10,18 @@
 
 name = p30
 
+
 ###########################################################################
 # Polynomial selection with Kleinjung's algorithm
 ###########################################################################
 
-tasks.polyselect.degree = 3
+jlpoly = true
+fastSM = true
 
-tasks.polyselect.admax = 2000
-tasks.polyselect.incr = 20
-tasks.polyselect.adrange = 100
-tasks.polyselect.P = 272
-tasks.polyselect.nq = 3
-tasks.polyselect.nrkeep = 2
-tasks.polyselect.ropteffort = 1
+tasks.polyselect.degree = 3
+tasks.polyselect.bound = 3
+tasks.polyselect.modm = 5
+
 
 ###########################################################################
 # Sieve
@@ -29,30 +29,46 @@ tasks.polyselect.ropteffort = 1
 
 
 tasks.I = 9
-lim0 = 30000
-lim1 = 30000
-lpb0 = 17
-lpb1 = 17
-tasks.sieve.mfb0 = 18
-tasks.sieve.mfb1 = 18
+lim0 = 4000
+lim1 = 600
+lpb0 = 12
+lpb1 = 11
+tasks.sieve.mfb0 = 12
+tasks.sieve.mfb1 = 22
+tasks.sieve.lambda0 = 1.1
+tasks.sieve.lambda1 = 2.1
+tasks.sieve.qmin = 700
+tasks.sieve.qrange = 100
+tasks.sieve.sqside = 0
+tasks.sieve.rels_wanted = 1500
 
-tasks.sieve.qmin = 50000
-tasks.sieve.qrange = 1000
-tasks.sieve.rels_wanted = 60000
+
+
+###########################################################################
+# Filtering
+###########################################################################
+
+tasks.filter.maxlevel = 12
+tasks.filter.target_density = 45
 
 tasks.reconstructlog.partial=false
+tasks.reconstructlog.checkdlp=false
+
+###########################################################################
+# Individual log
+###########################################################################
 
 tasks.descent.init_I = 10
 tasks.descent.init_ncurves = 5
-tasks.descent.init_lpb = 19
-tasks.descent.init_lim = 500000
-tasks.descent.init_mfb = 38
+tasks.descent.init_lpb = 17
+tasks.descent.init_lim = 1500
+tasks.descent.init_mfb = 34
 tasks.descent.init_tkewness = 100000
 tasks.descent.I = 10
-tasks.descent.lim0 = 20000
-tasks.descent.lim1 = 20000
-tasks.descent.lpb0 = 17
-tasks.descent.lpb1 = 17
-tasks.descent.mfb0 = 35
-tasks.descent.mfb1 = 35
+tasks.descent.lim0 = 1500
+tasks.descent.lim1 = 1500
+tasks.descent.lpb0 = 12
+tasks.descent.lpb1 = 12
+tasks.descent.mfb0 = 24
+tasks.descent.mfb1 = 24
 
