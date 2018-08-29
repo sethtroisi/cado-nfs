@@ -29,6 +29,18 @@
    fun:pi_go_inner_not_interleaved
 }
 {
+   hwloc_again
+   Memcheck:Leak
+   match-leak-kinds: definite
+   fun:malloc
+   ...
+   fun:lt_dlopenadvise
+   ...
+   fun:hwloc_topology_init
+   fun:_ZN17las_parallel_desc6helperC1Ev
+   ...
+}
+{
    openmp_leak
    Memcheck:Leak
    match-leak-kinds: possible
