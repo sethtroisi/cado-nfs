@@ -82,10 +82,12 @@ double tt_qstart;
 /*{{{ stuff related to las output: -out, -stats-stderr, and so on. */
 struct las_augmented_output_channel {
     int verbose = 1;
+    /* outputname is owned by pl, and output by the libc. We want to
+     * control when these get released, with the release() function */
     FILE *output = NULL;
     const char * outputname = NULL; /* keep track of whether it's gzipped or not */
     void set(cxx_param_list & pl);
-    ~las_augmented_output_channel();
+    void release();
     static void declare_usage(cxx_param_list & pl);
     static void configure_aliases(cxx_param_list &) { }
     static void configure_switches(cxx_param_list & pl);
@@ -140,11 +142,16 @@ void las_augmented_output_channel::set(cxx_param_list & pl)
     las_display_config_flags();
 }
 
-las_augmented_output_channel::~las_augmented_output_channel()
+/* This cannot be a dtor because las_output is a global, and it holds
+ * references to pl which is local -- Thus we want to control the exact
+ * time where fclose is called.
+ */
+void las_augmented_output_channel::release()
 {
     if (outputname)
         fclose_maybe_compressed(output, outputname);
     las_verbose_leave();
+    outputname = NULL;
 }
 
 
@@ -3193,6 +3200,9 @@ int main (int argc0, char *argv0[])/*{{{*/
     /*}}}*/
 
     las.cofac_stats.print();
+
+    /* In essence, almost a dtor, but we want it to be before the pl dtor */
+    las_output.release();
 
     return 0;
 }/*}}}*/
