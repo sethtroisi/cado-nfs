@@ -3086,7 +3086,7 @@ int main (int argc0, char *argv0[])/*{{{*/
 	unsigned long nsmooth = find_smooth (las.L,
                 (mpz_t*) batchP, (mpz_t*) B, (mpz_t*) L, (mpz_t*) M,
                 las_output.output,
-                las.number_of_threads_per_subjob());
+                las.number_of_threads_loose());
 
         /* We may go back to our general thread placement at this point.
          * Currently the code below still uses openmp */
@@ -3096,7 +3096,7 @@ int main (int argc0, char *argv0[])/*{{{*/
                 las.batchlpb,
                 lpb,
 		las_output.output,
-                las.number_of_threads_per_subjob());
+                las.number_of_threads_loose());
 
 	tcof_batch = seconds () - tcof_batch;
 	global_report.ttcof += tcof_batch;
