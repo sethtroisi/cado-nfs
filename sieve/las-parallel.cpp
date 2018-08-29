@@ -45,7 +45,7 @@ struct las_parallel_desc::helper {
     std::vector<cxx_hwloc_nodeset> memory_binding_nodesets;
 
     /* size() == total number of subjobs */
-    std::vector<cxx_hwloc_nodeset> subjob_binding_cpusets;
+    std::vector<cxx_hwloc_cpuset> subjob_binding_cpusets;
 
     int memory_binding_size;
     int cpu_binding_size;
@@ -193,7 +193,7 @@ struct las_parallel_desc::helper {
             memory_binding_specifier_string = tokens[0];
             jobs_within_cpu_binding_string = tokens[1];
             threads_per_job_string = tokens[2];
-        } else if (tokens.size() != 4) {
+        } else if (tokens.size() == 4) {
             memory_binding_specifier_string = tokens[0];
             cpu_binding_specifier_string = tokens[1];
             jobs_within_cpu_binding_string = tokens[2];
