@@ -1270,6 +1270,8 @@ struct process_bucket_region_run : public process_bucket_region_spawn {
 
     unsigned char *SS;
     
+    /* FIXME: Having the "primes" array allocated to BUCKET_REGION seems
+     * grossly wrong. See e-mail exchange ET/PG 20170622141358 */
     struct side_data {/*{{{*/
         bucket_array_complete purged;   /* for purge_buckets */
         bucket_primes_t primes;         /* for resieving */
