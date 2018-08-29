@@ -211,10 +211,23 @@ thread_sm (void * context_data, earlyparsed_relation_ptr rel)
     uint64_t b = rel->b;
 
     uint64_t nonvoidside = 0; /* bit vector of which sides appear in the rel */
-    for (weight_t i = 0; i < rel->nb; i++) {
-      index_t h = rel->primes[i].h;
-      int side = renumber_get_side_from_index (data->renum_tab, h, data->poly);
-      nonvoidside |= ((uint64_t) 1) << side;
+    if (data->poly->nb_polys > 2) {
+        for (weight_t i = 0; i < rel->nb; i++) {
+          index_t h = rel->primes[i].h;
+          int side = renumber_get_side_from_index (data->renum_tab, h, data->poly);
+          nonvoidside |= ((uint64_t) 1) << side;
+        }
+        /* nonvoidside must *not* be a power of two. If it is, then we
+         * have a nasty problem similar to bug 21707: in a sense, we have
+         * true gem of a relation that yields a trivial norm on one side,
+         * but it's really too bad that we have no effective way to check
+         * for it. */
+        ASSERT_ALWAYS(nonvoidside & (nonvoidside - 1));
+        /* one thing we might do at this point is recompute the norm from
+         * a, b, and data->poly->pols[side], and see if we get \pm1.
+         */
+    } else {
+        nonvoidside = 3;
     }
 
     if (rel->sm_size) {
