@@ -73,6 +73,7 @@ class las_todo_list : private std::stack<las_todo_entry> {
     }
 
     bool feed(gmp_randstate_t rstate);
+    bool feed_and_pop(gmp_randstate_t rstate, las_todo_entry &);
 
     las_todo_list(cxx_cado_poly const & cpoly, cxx_param_list & pl);
     ~las_todo_list();

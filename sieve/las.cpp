@@ -2710,9 +2710,10 @@ void las_subjob(las_info & las, int subjob, las_todo_list & todo, las_report & g
          * the descent, which has the implication that the read occurs if and
          * only if the todo list is empty. }}} */
 
-        for( ; fflush(las_output.output), todo.feed(las.rstate) ; ) {
-
-            las_todo_entry doing = todo.pop();
+        for(las_todo_entry doing ; ; ) {
+            fflush(las_output.output);
+            if (!todo.feed_and_pop(las.rstate, doing))
+                break;
 
 #ifdef DLP_DESCENT
             /* If the next special-q to try is a special marker, it means

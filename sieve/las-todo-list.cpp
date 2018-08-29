@@ -390,5 +390,23 @@ bool las_todo_list::feed(gmp_randstate_t rstate)
     else
         return feed_qrange(rstate);
 }
+
+/* This exists because of the race condition between feed() and pop()
+ */
+bool las_todo_list::feed_and_pop(gmp_randstate_t rstate, las_todo_entry & doing)
+{
+    std::lock_guard<std::mutex> foo(mm);
+    if (super::empty()) {
+        if (todo_list_fd)
+            feed_qlist();
+        else
+            feed_qrange(rstate);
+    }
+    if (super::empty())
+        return false;
+    doing = super::top();
+    super::pop();
+    return true;
+}
 /* }}} */
 
