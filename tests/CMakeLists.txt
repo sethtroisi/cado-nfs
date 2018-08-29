@@ -500,11 +500,11 @@ cado_define_test(full_c30
             SCRIPT
             ${CMAKE_CURRENT_SOURCE_DIR}/provide-wdir.sh  --arg workdir
             ${CADO_NFS_SOURCE_DIR}/cado-nfs.py
-            -dlp -ell 445257213376519703258944813
+            -dlp -ell 350586976534485556208993720963
             -t 2 -dlp-no-keep
-            3037544709654617415632521514287
+            701173953068971112417987441927
             fastSM=true
-            jlpoly=true tasks.polyselect.bound=5 tasks.polyselect.modm=7
+            jlpoly=true tasks.polyselect.bound=3 tasks.polyselect.modm=5
             tasks.polyselect.degree=3 tasks.reconstructlog.checkdlp=false
             TARGET_DEPENDENCIES full_c30_dependencies debug_renumber
             plingen_pz sm sm_simple las_descent reconstructlog-dl
