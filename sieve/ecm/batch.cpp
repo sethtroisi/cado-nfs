@@ -7,7 +7,7 @@
 #include <vector>
 #include <list>
 #include <sstream>
-#include "batch.h"
+#include "batch.hpp"
 #include "utils.h"
 
 #define STATUS_SMOOTH  0

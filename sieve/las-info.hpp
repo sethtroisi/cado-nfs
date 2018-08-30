@@ -11,7 +11,7 @@
 #include "las-dlog-base.hpp"
 #endif
 #include "sieve/bucket.hpp"     // bkmult
-#include "ecm/batch.h"          // cofac_list
+#include "ecm/batch.hpp"          // cofac_list
 #include "las-forwardtypes.hpp"
 #include "las-sieve-shared-data.hpp"
 #include "las-todo-list.hpp"
