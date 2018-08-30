@@ -61,8 +61,8 @@ class nfs_aux {/*{{{*/
     /* okay, it's hidden. We *only* use it in the dtor, where we decide
      * whether we print some stuff or not. But beyond that, really, it
      * seems wrong to keep a tie to las_info here (well, actually
-     * anywhere, to be honest -- but for the core algorithmic data, that'
-     * slightly more entangled).
+     * anywhere, to be honest -- but for the core algorithmic data,
+     * that's slightly more entangled).
      */
     las_info const & las;
     public:

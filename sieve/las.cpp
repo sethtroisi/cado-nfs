@@ -1538,7 +1538,7 @@ void process_bucket_region_run::cofactoring_sync (survivors_t & survivors)/*{{{*
             if (ws.conf.sublat_bound && !cur.ab_coprime()) continue;
             /* make sure threads don't write the cofactor list at the
              * same time !!! */
-            cur.transfer_to_cofac_list(ws.las.L, ws.Q.doing);
+            cur.transfer_to_cofac_list(ws.cofac_candidates, ws.Q.doing);
             continue; /* we deal with all cofactors at the end of las */
         }
 
@@ -2811,6 +2811,24 @@ void las_subjob(las_info & las, int subjob, las_todo_list & todo, las_report & g
 #ifdef DLP_DESCENT
                     postprocess_specialq_descent(las, todo, doing, timer_special_q);
 #endif
+
+                    if (!workspaces.cofac_candidates.empty()) {
+                        {
+                            std::lock_guard<std::mutex> foo(las.L.mutex());
+                            las.L.reserve(las.L.size() +
+                                    workspaces.cofac_candidates.size());
+                            /* do we fear that this move could be
+                             * expensive ?  We're single-threaded at this
+                             * point, so many threads could be waiting
+                             * idly while we're moving pointers around.
+                             * Worse, we have a mutex on las.L, so other
+                             * subjobs might be waiting too. */
+                            for(auto & x : workspaces.cofac_candidates)
+                                las.L.emplace_back(std::move(x));
+                            /* we can release the mutex now */
+                        }
+                        workspaces.cofac_candidates.clear();
+                    }
 
                     aux.complete = true;
                     aux_good.splice(aux_good.end(), aux_pending);

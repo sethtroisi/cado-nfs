@@ -9,7 +9,9 @@
 #include "las-norms.hpp"
 #include "las-unsieve.hpp"
 #include "ecm/facul.hpp"
+#include "ecm/batch.hpp"
 #include "multityped_array.hpp"
+#include "lock_guarded_container.hpp"
 
 #define NUMBER_OF_BAS_FOR_THREADS(n)    ((n) == 1 ? 1 : ((n) + 2))
 
@@ -64,6 +66,11 @@ class nfs_work {
     unsieve_data const * us;
 
     uint32_t J;
+
+    /* This is used only in batch mode. The list of cofactorization
+     * candidates will be transfered to the main list when we're done
+     * with this special-q */
+    lock_guarded_container<cofac_list> cofac_candidates;
 
     struct side_data {
         reservation_group group;
