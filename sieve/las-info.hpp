@@ -22,6 +22,7 @@
 #include <stack>
 #include <mutex>
 #include "cxx_mpz.hpp"
+#include "lock_guarded_container.hpp"
 
 #include <memory>
 #ifdef HAVE_BOOST_SHARED_PTR
@@ -160,7 +161,7 @@ struct las_info : public las_parallel_desc, private NonCopyable {
      * annoying me, and more than a hint at the fact that we should think
      * the design a bit differently.
      */
-    mutable cofac_list L; /* store (a,b) and corresponding cofactors in batch mode */
+    mutable lock_guarded_container<cofac_list> L; /* store (a,b) and corresponding cofactors in batch mode */
 
     /* ----- cofactorization statistics for the default config */
     mutable cofactorization_statistics cofac_stats;

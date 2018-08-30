@@ -87,22 +87,6 @@ mpz_product_tree_clear (mpz_product_tree t)
   t->size = 0;
 }
 
-void
-cofac_list_init (cofac_list l)
-{
-  l->a = NULL;
-  l->b = NULL;
-  l->R = NULL;
-  l->A = NULL;
-  l->R0 = NULL;
-  l->A0 = NULL;
-  l->sq = NULL;
-  l->side = NULL;
-  l->perm = NULL;
-  l->alloc = 0;
-  l->size = 0;
-}
-
 static void
 prime_list (std::vector<unsigned long> & L, prime_info pi,
             unsigned long pmax)
@@ -113,7 +97,7 @@ prime_list (std::vector<unsigned long> & L, prime_info pi,
 
 static void
 prime_list_poly (std::vector<unsigned long> & L, prime_info pi,
-                 unsigned long pmax, mpz_poly f)
+                 unsigned long pmax, mpz_poly_srcptr f)
 {
   if (f->deg == 1)
     return prime_list (L, pi, pmax);
@@ -186,82 +170,6 @@ prime_tree_poly (mpz_product_tree L, unsigned long pmax, mpz_poly_srcptr f)
   free (q);
 }
 
-void
-cofac_list_realloc (cofac_list l, size_t newsize)
-{
-  unsigned long i;
-
-  /* if we shrink the list, clear the mpz_t's */
-  for (i = newsize; i < l->size; i++)
-    {
-      mpz_clear (l->R[i]);
-      mpz_clear (l->A[i]);
-      mpz_clear (l->R0[i]);
-      mpz_clear (l->A0[i]);
-      mpz_clear (l->sq[i]);
-    }
-  l->a = (int64_t*) realloc (l->a, newsize * sizeof (int64_t));
-  l->b = (uint64_t*) realloc (l->b, newsize * sizeof (uint64_t));
-  // The following two fields are not really necessary when preparing the
-  // list and sometimes the caller prefers to leave them blank.
-  if (l->R != NULL)
-      l->R = (mpz_t*) realloc (l->R, newsize * sizeof (mpz_t));
-  if (l->A != NULL)
-      l->A = (mpz_t*) realloc (l->A, newsize * sizeof (mpz_t));
-  l->R0 = (mpz_t*) realloc (l->R0, newsize * sizeof (mpz_t));
-  l->A0 = (mpz_t*) realloc (l->A0, newsize * sizeof (mpz_t));
-  l->sq = (mpz_t*) realloc (l->sq, newsize * sizeof (mpz_t));
-  l->side = (int*) realloc (l->side, newsize * sizeof (int));
-  l->perm = (uint32_t*) realloc (l->perm, newsize * sizeof (uint32_t));
-  l->alloc = newsize;
-  if (newsize < l->size)
-    l->size = newsize;
-}
-
-void
-cofac_list_add (cofac_list l, long a, unsigned long b,
-        mpz_srcptr R, mpz_srcptr A,
-                int side, mpz_srcptr sq)
-{
-  if (l->size == l->alloc)
-    cofac_list_realloc (l, 2 * l->alloc + 1);
-  l->a[l->size] = a;
-  l->b[l->size] = b;
-  mpz_init_set (l->R0[l->size], R);
-  mpz_init_set (l->A0[l->size], A);
-  if (l->R != NULL)
-      mpz_init_set (l->R[l->size], R);
-  if (l->A != NULL)
-      mpz_init_set (l->A[l->size], A);
-  mpz_init_set (l->sq[l->size], sq);
-  l->side[l->size] = side;
-  l->perm[l->size] = l->size;
-  (l->size)++;
-}
-
-void
-cofac_list_clear (cofac_list l)
-{
-  unsigned long i;
-  for (i = 0; i < l->size; i++)
-    {
-      mpz_clear (l->R[i]);
-      mpz_clear (l->A[i]);
-      mpz_clear (l->R0[i]);
-      mpz_clear (l->A0[i]);
-      mpz_clear (l->sq[i]);
-    }
-  free (l->a);
-  free (l->b);
-  free (l->R);
-  free (l->A);
-  free (l->R0);
-  free (l->A0);
-  free (l->sq);
-  free (l->side);
-  free (l->perm);
-}
-
 /* put in P the product of primes p for which the given polynomial has factors
    modulo p */
 static void
@@ -296,8 +204,9 @@ tree_height (unsigned long n)
    Put in w[i] the number of elements of level i:
    w[0] = n, w[1] = ceil(n/2), ... */
 static mpz_t**
-product_tree (mpz_t *R, uint32_t *perm, unsigned long n, unsigned long *w)
+product_tree (std::vector<cxx_mpz> const & R, unsigned long *w)
 {
+  unsigned long n = R.size();
   unsigned long h = tree_height (n), i, j;
   mpz_t **T;
 
@@ -316,8 +225,8 @@ product_tree (mpz_t *R, uint32_t *perm, unsigned long n, unsigned long *w)
     }
 
   /* initialize T[0] to R */
-  for (j = 0; j < n; j++)
-    mpz_set (T[0][j], R[perm[j]]);
+  for (size_t j = 0 ; j < R.size() ; ++j)
+    mpz_set (T[0][j], R[j]);
 
   /* compute product tree */
   for (i = 1; i <= h; i++)
@@ -359,9 +268,10 @@ remainder_tree_aux (mpz_t **T, unsigned long **nbits, unsigned long i,
    At the root, we compute a floating-point
    approximation of P/T[h][0] with m+guard bits, where m = nbits(T[h][0]). */
 static void
-remainder_tree (mpz_t **T, unsigned long n, unsigned long *w, mpz_t P,
-                mpz_t *R, uint32_t *perm)
+remainder_tree (mpz_t **T, unsigned long *w, mpz_t P,
+        std::vector<cxx_mpz> & R)
 {
+  unsigned long n = R.size();
   unsigned long h = tree_height (n), i, j, guard;
   unsigned long **nbits;
   mpz_t Q;
@@ -393,9 +303,10 @@ remainder_tree (mpz_t **T, unsigned long n, unsigned long *w, mpz_t P,
 
   /* from T[0][j] ~ P/R[j]*2^(nbits[0][j] + guard) mod 2^(nbits[0][j] + guard),
      get T[0][j]*R[j]/2^(nbits[0][j] + guard) ~ P mod R[j] */
-  for (j = 0; j < n; j++)
+  ASSERT_ALWAYS(R.size() == w[0]);
+  for (size_t j = 0 ; j < R.size() ; ++j)
     {
-      mpz_mul (T[0][j], T[0][j], R[perm[j]]);
+      mpz_mul (T[0][j], T[0][j], R[j]);
       /* T[0][j] ~ P*2^(nbits[0][j] + guard) mod R[j]*2^(nbits[0][j]+guard) */
       mpz_div_2exp (T[0][j], T[0][j], nbits[0][j]);
       /* T[0][j] ~ P*2^guard mod R[j]*2^guard */
@@ -433,11 +344,12 @@ clear_product_tree (mpz_t **T, unsigned long n, unsigned long *w)
    Each R[j] has been divided by its P-smooth part.
 */
 static void
-smoothness_test (mpz_t *R, uint32_t *perm, unsigned long n, mpz_t P, FILE *out)
+smoothness_test (std::vector<cxx_mpz> & R, mpz_ptr P, FILE *out)
 {
-  unsigned long j, w[MAX_DEPTH];
+  size_t w[MAX_DEPTH];
   mpz_t **T;
   double st, wct;
+  size_t n = R.size();
 
   if (n == 0)
     return;
@@ -449,160 +361,117 @@ smoothness_test (mpz_t *R, uint32_t *perm, unsigned long n, mpz_t P, FILE *out)
 
   st = seconds ();
   wct = wct_seconds ();
-  T = product_tree (R, perm, n, w);
-  unsigned long h = tree_height (n);
+  T = product_tree (R, w);
+  size_t h = tree_height (n);
   fprintf (out, "# batch: took %.2fs (wct %.2fs) to compute product tree of %zu bits\n",
            seconds () - st, wct_seconds () - wct, mpz_sizeinbase (T[h][0], 2));
 
   /* compute remainder tree */
   st = seconds ();
   wct = wct_seconds ();
-  remainder_tree (T, n, w, P, R, perm);
+  remainder_tree (T, w, P, R);
   fprintf (out, "# batch: took %.2fs (wct %.2fs) to compute remainder tree\n",
            seconds () - st, wct_seconds () - wct);
 
   /* now T[0][j] = P mod R[j] for 0 <= j < n */
-  for (j = 0; j < n; j++)
-    {
+  ASSERT_ALWAYS(R.size() == w[0]);
+  for (size_t j = 0 ; j < R.size() ; ++j) {
         /* Divide out R by gcd(P, R) as much as we can. The first gcd may
          * have some cost, the subsequent ones are supposedly cheap
          * enough */
         for(;;) {
-            mpz_gcd (T[0][j], T[0][j], R[perm[j]]);
+            mpz_gcd (T[0][j], T[0][j], R[j]);
             if (mpz_cmp_ui(T[0][j], 1) == 0)
                 break;
-            mpz_divexact (R[perm[j]], R[perm[j]], T[0][j]);
+            mpz_divexact (R[j], R[j], T[0][j]);
         }
     }
 
   clear_product_tree (T, n, w);
 }
 
-/* invariant:
-   relations 0 to *nb_smooth-1 are smooth
-   relations *nb_smooth to *nb_unknown-1 are unknown
-   relations >= *nb_unknown are non-smooth (useless).
-
-   on input, we know that n has no factor<=B. 
-   We're willing to accept prime cofactors <= L,
-   and to try harder to factor composites which are <= M
-*/
-static void
-update_status (mpz_t *R, uint32_t *perm,
-               unsigned char *b_status_r, unsigned char *b_status_a,
-               mpz_srcptr B,
-               mpz_srcptr L,
-               mpz_srcptr M,
-               unsigned long *nb_smooth, unsigned long *nb_unknown)
+/* return the number n of smooth relations in l (same as l.size()) */
+size_t
+find_smooth (cofac_list & l,
+        std::array<cxx_mpz, 2> & batchP,
+        int batchlpb[2], int lpb[2], int batchmfb[2],
+        FILE *out,
+        int nthreads MAYBE_UNUSED)
 {
-  mpz_t BB;
-  mpz_init(BB);
-  mpz_mul(BB,B,B);
-
-  for (unsigned long j = *nb_smooth; j < *nb_unknown; j++)
-    {
-      unsigned long i = perm[j];
-      if (b_status_r[i] == STATUS_UNKNOWN)
-      {
-        /* relation i is smooth iff R[i]=1 ; another option is in case
-         * the remaining cofactor is below the mfb we've been given. */
-        if (mpz_cmp_ui (R[i], 1) == 0
-                || mpz_cmp(R[i], L) <= 0
-                || (
-                    mpz_cmp(R[i], BB) >= 0
-                    && mpz_cmp(R[i], M) <= 0
-                    && !mpz_probab_prime_p(R[i], 1)
-                ))
-          {
-            b_status_r[i] = STATUS_SMOOTH;
-            if (b_status_a[i] == STATUS_SMOOTH)
-              {
-                /* relation j is smooth, swap it with relation *nb_smooth */
-                perm[j] = perm[*nb_smooth];
-                perm[*nb_smooth] = i;
-                (*nb_smooth)++;
-              }
-          }
-        else /* not smooth */
-          {
-            /* relation j is useless, swap it with relation *nb_unknown - 1 */
-            (*nb_unknown)--;
-            perm[j] = perm[*nb_unknown];
-            perm[*nb_unknown] = i;
-            j--;
-          }
-      }
-    }
-  mpz_clear(BB);
-}
-
-/* return the number n of smooth relations in l,
-   which should be at the end in locations perm[0], perm[1], ..., perm[n-1] */
-unsigned long
-find_smooth (cofac_list l, mpz_t batchP[2], mpz_t B[2], mpz_t L[2], mpz_t M[2], FILE *out,
-             int nthreads MAYBE_UNUSED)
-{
-  unsigned long nb_rel_read = l->size;
-  unsigned long nb_smooth;
-  unsigned long nb_unknown;
-  unsigned char *b_status_r;
-  unsigned char *b_status_a;
-  double start = seconds ();
-
 #ifdef HAVE_OPENMP
-  omp_set_num_threads (nthreads);
+    omp_set_num_threads (nthreads);
 #endif
 
-  b_status_r = (unsigned char *) malloc (nb_rel_read * sizeof(unsigned char));
-  b_status_a = (unsigned char *) malloc (nb_rel_read * sizeof(unsigned char));
-  memset (b_status_r, STATUS_UNKNOWN, nb_rel_read);
-  memset (b_status_a, STATUS_UNKNOWN, nb_rel_read);
+    /* it seems faster to start from the algebraic side */
+    int first_smoothness_test_side = 1;
 
-  nb_smooth = 0;
-  nb_unknown = nb_rel_read;
-
-  /* The cofactor must be initialized with the initial values */
-  if (l->R == NULL) {
-      ASSERT_ALWAYS(l->A == NULL);
-      l->R = (mpz_t*) malloc ((l->size) * sizeof (mpz_t));
-      l->A = (mpz_t*) malloc ((l->size) * sizeof (mpz_t));
-      ASSERT_ALWAYS(l->R != NULL);
-      ASSERT_ALWAYS(l->A != NULL);
-      for (size_t i = 0; i < l->size; ++i) {
-          mpz_init_set(l->R[i], l->R0[i]);
-          mpz_init_set(l->A[i], l->A0[i]);
-      }
-  }
-
-  /* invariant: the smooth relations are in 0..nb_smooth-1,
-     the unknown ones in nb_smooth..nb_unknown-1,
-     the remaining ones are not smooth */
-
-  /* it seems faster to start from the algebraic side */
-  for (int z = 1; z >= 0; z--)
+    for (int s = 0 ; s < 2 ; ++s)
     {
-      if (z == 0)
-        smoothness_test (l->R, l->perm + nb_smooth, nb_unknown - nb_smooth,
-                         batchP[0], out);
-      else
-        smoothness_test (l->A, l->perm + nb_smooth, nb_unknown - nb_smooth,
-                         batchP[1],  out);
+        double start = seconds ();
 
-      /* we only need to update relations in [nb_smooth, nb_unknown-1] */
-      if (z == 0)
-        update_status (l->R, l->perm, b_status_r, b_status_a, B[0], L[0], M[0],
-                       &nb_smooth, &nb_unknown);
-      else
-        update_status (l->A, l->perm, b_status_a, b_status_r, B[1], L[1], M[1],
-                       &nb_smooth, &nb_unknown);
+        size_t input_candidates = l.size();
+
+        int side = s ^ first_smoothness_test_side;
+
+        cxx_mpz B, BB, L, M;
+
+        mpz_ui_pow_ui(B, 2, batchlpb[side]);
+        mpz_ui_pow_ui(L, 2, lpb[side]);
+        mpz_ui_pow_ui(M, 2, batchmfb[side]);
+        mpz_mul(BB,B,B);
+
+        /* The post-tree cofactor is useless. Therefore, we:
+         *  - copy the cofactors to an auxiliary structure,
+         *  - tamper with these auxiliary integers
+         *  - keep or discard the original cofactors, depending on
+         *  whether we've found that something is smooth.
+         */
+
+        std::vector<cxx_mpz> temp;
+        temp.reserve(l.size());
+        for(auto const & x : l)
+            temp.push_back(x.cofactor[side]);
+
+        smoothness_test (temp, batchP[side], out);
+
+        size_t kept = l.size();
+        for(size_t i = 0 ; i < kept ; /* incremented within the loop */ ) {
+            /* check if the cofactor on the side we've just tested is
+             * smooth. If it isn't, we put it at the end of the array,
+             * and we free it.
+             *
+             * on input, we know that cofactors have no factor<=B. 
+             * We're willing to accept prime cofactors <= L,
+             * and to try harder to factor composites which are <= M
+             *
+             * relation i is smooth iff R[i]=1 ; another option is in case
+             * the remaining cofactor is below the mfb we've been given.
+             */
+            cxx_mpz const& c(temp[i]);
+
+            if (mpz_cmp_ui (c, 1) == 0
+                    || mpz_cmp(c, L) <= 0
+                    || (mpz_cmp(c, BB) >= 0 && mpz_cmp(c, M) <= 0
+                        && !mpz_probab_prime_p(c, 1)
+                       ))
+            {
+                /* cofactor is smooth, we keep it where it is.  */
+                i++;
+            } else {
+                /* cofactor is not smooth, put it aside (schedule for
+                 * deletion). The next cofactor we'll examine is the
+                 * cofactor that used to be the last one. */
+                kept--;
+                std::swap(l[i], l[kept]);
+                std::swap(temp[i], temp[kept]);
+            }
+        }
+        l.erase(l.begin() + kept, l.end());
+
+        fprintf (out, "# batch (side %d): took %.2fs to detect %zu smooth relations out of %zu\n", side, seconds () - start, l.size(), input_candidates);
     }
 
-  free (b_status_r);
-  free (b_status_a);
-
-  fprintf (out, "# batch: took %.2fs to detect %lu smooth relations out of %lu\n", seconds () - start, nb_smooth, nb_rel_read);
-
-  return nb_smooth;
+    return l.size();
 }
 
 static void
@@ -629,7 +498,7 @@ factor_simple_minded (std::vector<cxx_mpz> &factors,
               facul_method_t *methods,
               unsigned int lpb, double B,
               std::vector<unsigned long> const& SP,
-              cxx_mpz& cofac, mpz_ptr sq)
+              cxx_mpz& cofac, mpz_srcptr sq)
 {
     double BB = B * B, BBB = B * B * B;
 
@@ -755,30 +624,59 @@ strip (unsigned long *l, unsigned long n, mpz_t P)
 
 /* sqside = 1 if the special-q is on side 1 (algebraic) */
 static bool
-factor_one (cofac_list L, cado_poly pol, unsigned long *lim, int * batchlpb, int *lpb,
-            FILE *out, facul_method_t *methods,
-            std::vector<unsigned long> (&SP)[2],
-            unsigned long i)
+factor_one (cofac_candidate const & C,
+        cado_poly_srcptr pol,
+        unsigned long lim[2],
+        int batchlpb[2],
+        int lpb[2],
+        FILE *out,
+        facul_method_t *methods,
+        std::vector<unsigned long> (&SP)[2])
 {
-    uint32_t *perm = L->perm;
-    std::ostringstream os;
+    int64_t a = C.a;
+    uint64_t b = C.b;
 
-    int64_t a = L->a[perm[i]];
-    uint64_t b = L->b[perm[i]];
-
-    os << a << "," << b;
-
-    bool smooth = true;
     std::vector<cxx_mpz> factors[2];
     cxx_mpz norm, cofac;
-    int side;
-    for(side = 0 ; smooth && side < 2 ; side++) {
-        mpz_set(cofac,(side ? L->A0 : L->R0)[perm[i]]);
+    for(int side = 0 ; side < 2 ; side++) {
+        mpz_set(cofac, C.cofactor[side]);
         mpz_poly_homogeneous_eval_siui (norm, pol->pols[side], a, b);
-        smooth = smooth && factor_simple_minded (factors[side], norm, methods,
+        bool smooth = factor_simple_minded (factors[side], norm, methods,
                 lpb[side], (double) lim[side], SP[side],
                 cofac,
-                (L->side[perm[i]] == side) ? L->sq[perm[i]] : NULL);
+                (C.sqside == side) ? (mpz_srcptr) C.sq : NULL);
+        if (!smooth) {
+            /* when we've knowingly decided to _do_ some cofactoring
+             * after the product-tree on that side, then it's normal to
+             * have non-smooth values after all.
+             */
+            if (batchlpb[side] == lpb[side]) {
+#ifdef  HAVE_OPENMP
+#pragma omp critical
+#endif
+                {
+                    std::ostringstream os;
+                    os << a << "," << b;
+                    gmp_fprintf(out,
+                            "# failed on %s on side %d;"
+                            " non-smooth cofactor %Zd\n",
+                            os.str().c_str(), side, (mpz_srcptr) cofac);
+                }
+            }
+            return false;
+        }
+    }
+
+    /* We could as well return a relation, after all */
+    std::ostringstream os;
+    os << a << "," << b;
+    for(int side = 0 ; side < 2 ; side++) {
+        os << ":";
+        auto it = factors[side].begin();
+        os << std::hex << *it++;
+        for( ; it < factors[side].end() ; ++it) {
+            os << "," << std::hex << *it;
+        }
     }
 
     /* avoid two threads writing a relation simultaneously */
@@ -786,43 +684,25 @@ factor_one (cofac_list L, cado_poly pol, unsigned long *lim, int * batchlpb, int
 #pragma omp critical
 #endif
     {
-        if (!smooth) {
-            --side;
-            /* when we've knowingly decided to _do_ some cofactoring
-             * after the product-tree on that side, then it's normal to
-             * have non-smooth values after all.
-             */
-            if (batchlpb[side] == lpb[side]) {
-                gmp_fprintf(out,
-                        "# failed on %s on side %d; non-smooth cofactor %Zd\n",
-                        os.str().c_str(), side, (mpz_srcptr) cofac);
-            }
-        } else {
-            for(int side = 0 ; smooth && side < 2 ; side++) {
-                os << ":";
-                auto it = factors[side].begin();
-                os << std::hex << *it++;
-                for( ; it < factors[side].end() ; ++it) {
-                    os << "," << std::hex << *it;
-                }
-            }
-            fprintf (out, "%s\n", os.str().c_str());
-        }
+        fprintf (out, "%s\n", os.str().c_str());
         fflush (out);
     }
 
-    return smooth;
+    return stdout;
 }
 
 /* Given a list L of bi-smooth cofactors, print the corresponding relations
    on "out".
    n is the number of bi-smooth cofactors in L.
 */
-unsigned long
-factor (cofac_list L, unsigned long n, cado_poly pol, int batchlpb[], int lpb[],
+size_t
+factor (cofac_list const & L,
+        cado_poly_srcptr pol,
+        int batchlpb[2],
+        int lpb[2],
         FILE *out, int nthreads MAYBE_UNUSED)
 {
-  unsigned long i, B[2];
+  unsigned long B[2];
   int nb_methods;
   facul_method_t *methods;
   std::vector<unsigned long> SP[2];
@@ -841,19 +721,19 @@ factor (cofac_list L, unsigned long n, cado_poly pol, int batchlpb[], int lpb[],
     nb_methods = NB_MAX_METHODS - 1;
   methods = facul_make_default_strategy (nb_methods - 3, 0);
 
-  unsigned long rep = 0;
+  size_t rep = 0;
 #ifdef HAVE_OPENMP
   omp_set_num_threads (nthreads);
 #pragma omp parallel for schedule(static)
 #endif
-  for (i = 0; i < n; i++)
-    rep += factor_one (L, pol, B, batchlpb, lpb, out, methods, SP, i);
+  for (size_t i = 0 ; i < L.size() ; ++i)
+    rep += factor_one (L[i], pol, B, batchlpb, lpb, out, methods, SP);
 
   facul_clear_methods (methods);
 
   fprintf (out,
-          "# batch: took %.2fs (wct %.2fs) to factor %lu smooth relations (%lu final cofac misses)\n",
-           seconds () - start, wct_seconds () - wct_start, rep, n-rep);
+          "# batch: took %.2fs (wct %.2fs) to factor %zu smooth relations (%zd final cofac misses)\n",
+           seconds () - start, wct_seconds () - wct_start, rep, L.size()-rep);
 
   return rep;
 }

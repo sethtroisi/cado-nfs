@@ -1129,22 +1129,18 @@ struct cofac_standalone {
         rel.compress();
         return rel;
     }/*}}}*/
-    void transfer_to_cofac_list(cofac_list_t * L, las_todo_entry const & doing) {/*{{{*/
+    void transfer_to_cofac_list(lock_guarded_container<cofac_list> & L, las_todo_entry const & doing) {/*{{{*/
+        std::lock_guard<std::mutex> foo(L.mutex());
+        L.emplace_back(a, b, norm, doing.p, doing.side);
+#if 0
         /* make sure threads don't write the cofactor list at the
          * same time !!! */
 #warning "possible contention"
         static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
         pthread_mutex_lock(&lock);
-        cofac_list_add ((cofac_list_t*) L,
-                a, b,
-                /* We would like to do std::move() here. That would
-                 * entail changing the prototype of cofac_list_add to
-                 * have an && */
-                (mpz_srcptr) norm[0],
-                (mpz_srcptr) norm[1],
-                doing.side,
-                (mpz_srcptr) doing.p);
+        cofac_list_add (L, a, b, norm, doing.side, doing.p);
         pthread_mutex_unlock(&lock);
+#endif
     }/*}}}*/
     int factor_both_leftover_norms(nfs_work_cofac & wc) {/*{{{*/
         /* This proxies to las-cofactor.cpp */
@@ -3061,7 +3057,7 @@ int main (int argc0, char *argv0[])/*{{{*/
         SIBLING_TIMER(global_timer, "batch cofactorization (time is wrong because of openmp)");
         TIMER_CATEGORY(global_timer, batch_mixed());
 
-	cxx_mpz batchP[2], B[2], L[2], M[2];
+        std::array<cxx_mpz, 2> batchP;
         int lpb[2] = { sc0.sides[0].lpb, sc0.sides[1].lpb };
 
         for(int side = 0 ; side < 2 ; side++) {
@@ -3072,12 +3068,7 @@ int main (int argc0, char *argv0[])/*{{{*/
                     las.cpoly->pols[side],
                     las_output.output,
                     las.number_of_threads_loose());
-            mpz_ui_pow_ui(B[side], 2, las.batchlpb[side]);
-            mpz_ui_pow_ui(L[side], 2, lpb[side]);
-            mpz_ui_pow_ui(M[side], 2, las.batchmfb[side]);
         }
-
-	cofac_list_realloc (las.L, las.L->size);
 
 	double tcof_batch = seconds ();
 
@@ -3086,15 +3077,14 @@ int main (int argc0, char *argv0[])/*{{{*/
          * cpu binding. At least I presume that it does nothing before
          * the first pragma omp statement.)
          */
-	unsigned long nsmooth = find_smooth (las.L,
-                (mpz_t*) batchP, (mpz_t*) B, (mpz_t*) L, (mpz_t*) M,
+	find_smooth (las.L,
+                batchP, las.batchlpb, lpb, las.batchmfb,
                 las_output.output,
                 las.number_of_threads_loose());
 
         /* We may go back to our general thread placement at this point.
          * Currently the code below still uses openmp */
         global_report.reports = factor (las.L,
-                nsmooth,
                 las.cpoly,
                 las.batchlpb,
                 lpb,

@@ -215,8 +215,6 @@ las_info::las_info(cxx_param_list & pl)
     } else {
         batch_print_survivors = NULL;
     }
-
-    cofac_list_init (L);
     // }}} 
 
     dump_filename = param_list_lookup_string(pl, "dumpfile");
@@ -232,5 +230,4 @@ las_info::~las_info()/*{{{*/
 
     // ----- batch mode: very little
     if (batch_print_survivors) fclose(batch_print_survivors);
-    cofac_list_clear (L);
 }/*}}}*/
