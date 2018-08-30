@@ -1254,3 +1254,4 @@ utils/hwloc-aux.h
 sieve/las-parallel.cpp
 sieve/las-parallel.hpp
 config/check_uint64_type.cmake
+utils/lock_guarded_container.hpp

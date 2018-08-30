@@ -10,6 +10,7 @@
 #include "utils/timing.h"
 #include "las-threads-work-data.hpp"
 #include "ecm/facul.hpp"
+#include "lock_guarded_container.hpp"
 
 /* Compute a checksum over the bucket region.
  *
@@ -75,7 +76,7 @@ class nfs_aux {/*{{{*/
         }
     };
 
-    typedef std::unordered_set<abpair_t, abpair_hash_t> rel_hash_t;
+    typedef lock_guarded_container<std::unordered_set<abpair_t, abpair_hash_t>> rel_hash_t;
 
     std::shared_ptr<rel_hash_t> rel_hash_p;
     rel_hash_t & get_rel_hash() { return * rel_hash_p ; }

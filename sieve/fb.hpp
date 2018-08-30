@@ -24,6 +24,7 @@
 #include "las-qlattice.hpp"
 #include "las-plattice.hpp"
 #include "las-base.hpp"
+#include "lock_guarded_container.hpp"
 
 #ifdef HAVE_GLIBC_VECTOR_INTERNALS
 #include "mmappable_vector.hpp"
@@ -679,7 +680,7 @@ class fb_factorbase {
     };
 
     private:
-        std::map<key_type, slicing> cache;
+        lock_guarded_container<std::map<key_type, slicing>> cache;
         int read(const char * const filename);
 
     public:
@@ -688,17 +689,13 @@ class fb_factorbase {
          * create stuff. */
     
         inline slicing & operator[](key_type const& K) { 
-            static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
-            pthread_mutex_lock(&lock);
+            std::lock_guard<std::mutex> foo(cache.mutex());
             auto it = cache.find(K);
-            if (it != cache.end()) {
-                pthread_mutex_unlock(&lock);
+            if (it != cache.end())
                 return it->second;
-            }
 
             /* create a new slot */
             slicing & res(cache[K] = slicing(*this, K));
-            pthread_mutex_unlock(&lock);
             return res;
         }
 
@@ -720,7 +717,7 @@ class fb_factorbase {
         fb_factorbase(cxx_cado_poly const & cpoly, int side, cxx_param_list & pl, const char * fbc_filename, int nthreads = 1);
         fb_factorbase() = default;
         fb_factorbase(fb_factorbase &&) = default;
-        fb_factorbase& operator=(fb_factorbase &&) = default;
+        fb_factorbase& operator=(fb_factorbase && o) = default;
 
     private:
         struct sorter {

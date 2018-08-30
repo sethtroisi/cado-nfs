@@ -1132,6 +1132,7 @@ struct cofac_standalone {
     void transfer_to_cofac_list(cofac_list_t * L, las_todo_entry const & doing) {/*{{{*/
         /* make sure threads don't write the cofactor list at the
          * same time !!! */
+#warning "possible contention"
         static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
         pthread_mutex_lock(&lock);
         cofac_list_add ((cofac_list_t*) L,
@@ -1253,11 +1254,12 @@ task_result * detached_cofac(worker_thread * worker, task_parameters * _param, i
          * quickly return "no".
          */
 
-        static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
-        pthread_mutex_lock(&lock);
         nfs_aux::abpair_t ab(cur.a, cur.b);
-        bool is_new_rel = rel_hash.insert(ab).second;
-        pthread_mutex_unlock(&lock);
+        bool is_new_rel;
+        {
+            std::lock_guard<std::mutex> foo(rel_hash.mutex());
+            is_new_rel = rel_hash.insert(ab).second;
+        }
 
         const char * dup_comment = NULL;
 
