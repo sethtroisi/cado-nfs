@@ -204,9 +204,9 @@ tree_height (unsigned long n)
    Put in w[i] the number of elements of level i:
    w[0] = n, w[1] = ceil(n/2), ... */
 static mpz_t**
-product_tree (std::vector<cxx_mpz> const & R, unsigned long *w)
+product_tree (std::vector<cxx_mpz> const & R, size_t *w)
 {
-  unsigned long n = R.size();
+  size_t n = R.size();
   unsigned long h = tree_height (n), i, j;
   mpz_t **T;
 
@@ -268,10 +268,10 @@ remainder_tree_aux (mpz_t **T, unsigned long **nbits, unsigned long i,
    At the root, we compute a floating-point
    approximation of P/T[h][0] with m+guard bits, where m = nbits(T[h][0]). */
 static void
-remainder_tree (mpz_t **T, unsigned long *w, mpz_t P,
+remainder_tree (mpz_t **T, size_t *w, mpz_t P,
         std::vector<cxx_mpz> & R)
 {
-  unsigned long n = R.size();
+  size_t n = R.size();
   unsigned long h = tree_height (n), i, j, guard;
   unsigned long **nbits;
   mpz_t Q;
@@ -322,7 +322,7 @@ remainder_tree (mpz_t **T, unsigned long *w, mpz_t P,
 
 /* Clear the product tree. */
 static void
-clear_product_tree (mpz_t **T, unsigned long n, unsigned long *w)
+clear_product_tree (mpz_t **T, unsigned long n, size_t *w)
 {
   unsigned long i, j, h = tree_height (n);
 
