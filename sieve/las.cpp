@@ -2691,6 +2691,7 @@ void las_subjob(las_info & las, int subjob, las_todo_list & todo, las_report & g
     std::list<nfs_aux::caller_stuff> aux_good;
     std::list<nfs_aux::caller_stuff> aux_botched;
 
+    double cumulated_wait_time = 0;     /* for this subjob only */
     {
         /* add scoping to control dtor call */
         /* queue 0: main
@@ -2881,6 +2882,7 @@ void las_subjob(las_info & las, int subjob, las_todo_list & todo, las_report & g
 
         /* we delete the "pool" and "workspaces" variables at this point. */
         /* The dtor for "pool" is a synchronization point */
+        cumulated_wait_time = pool.cumulated_wait_time;
     }
 
     static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
@@ -2904,6 +2906,7 @@ void las_subjob(las_info & las, int subjob, las_todo_list & todo, las_report & g
     global_report.waste += botched_report.ttbuckets_apply;
     global_report.waste += botched_report.ttf;
     global_report.waste += botched_report.ttcof;
+    global_report.cumulated_wait_time += cumulated_wait_time;
 
     pthread_mutex_unlock(&lock);
 }/*}}}*/
@@ -3064,7 +3067,7 @@ int main (int argc0, char *argv0[])/*{{{*/
     }
     for(auto & t : subjobs) t.join();
 
-    verbose_output_print(0, 1, "# Cumulated wait time over all threads %.2f\n", thread_pool::cumulated_wait_time);
+    verbose_output_print(0, 1, "# Cumulated wait time over all threads %.2f\n", global_report.cumulated_wait_time);
 
 #ifdef DLP_DESCENT
     if (recursive_descent) {

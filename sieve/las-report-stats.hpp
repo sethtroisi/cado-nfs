@@ -39,6 +39,7 @@ struct las_report {
     double ttcof=0;               /* cofactorisation */
     int nwaste=0;                 /* number of restarted special-q's */
     double waste=0;               /* restarted special-q's */
+    double cumulated_wait_time=0; /* wait time in threadpool */
     las_report() = default;
     las_report(las_report const&) = delete;
     las_report(las_report &&) = default;

@@ -8,6 +8,7 @@
 #include <stdarg.h>
 #include <errno.h>
 #include <memory>
+#include <mutex>
 
 #include "macros.h"
 #include "utils_cxx.hpp"
@@ -135,14 +136,16 @@ class thread_pool : private monitor, private NonCopyable {
 
   bool kill_threads; /* If true, hands out kill tasks once work queues are empty */
 
-  static void * thread_work_on_tasks(void *pool);
+  static void * thread_work_on_tasks_static(void *worker);
+  void thread_work_on_tasks(worker_thread &);
   thread_task get_task(size_t& queue);
   void add_result(size_t queue, task_result *result);
   void add_exception(size_t queue, clonable_exception * e);
   bool all_task_queues_empty() const;
 public:
-  /* This is protected by a static mutex in threadpool.cpp */
-  static double cumulated_wait_time;
+  double cumulated_wait_time = 0;
+  std::mutex mm_cumulated_wait_time;
+
   thread_pool(size_t _nr_threads, size_t nr_queues = 1);
   ~thread_pool();
   task_result *get_result(size_t queue = 0, bool blocking = true);

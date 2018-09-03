@@ -3,11 +3,12 @@
 
 #include <mutex>
 
-/* This is a bundle of a contained (well, in fact, of anything) plus a
+/* This is a bundle of a container (well, in fact, of anything) plus a
  * lock. The copy/move work just the same as they do (or don't) in the
  * original container, while a lock is created afresh for each new
  * object. Moves don't move the mutexes.
  */
+
 template<typename T> struct lock_guarded_container : public T {
     private:
     mutable std::mutex mm;

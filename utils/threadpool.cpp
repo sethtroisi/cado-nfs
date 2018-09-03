@@ -25,7 +25,7 @@
 worker_thread::worker_thread(thread_pool &_pool, const size_t _preferred_queue)
   : pool(_pool), preferred_queue(_preferred_queue)
 {
-  int rc = pthread_create(&thread, NULL, pool.thread_work_on_tasks, this);
+  int rc = pthread_create(&thread, NULL, pool.thread_work_on_tasks_static, this);
   ASSERT_ALWAYS(rc == 0);
 }
 
@@ -112,12 +112,17 @@ thread_pool::~thread_pool() {
   for (auto const & E : exceptions) ASSERT_ALWAYS(E.empty());
 }
 
-double thread_pool::cumulated_wait_time = 0;
-
 void *
-thread_pool::thread_work_on_tasks(void *arg)
+thread_pool::thread_work_on_tasks_static(void *arg)
 {
-  worker_thread *I = (worker_thread *) arg;
+    worker_thread *I = static_cast<worker_thread *>(arg);
+    I->pool.thread_work_on_tasks(*I);
+    return NULL;
+}
+
+void
+thread_pool::thread_work_on_tasks(worker_thread & I)
+{
   /* we removed the per-thread timer, because that goes in the way
    * of our intent to make threads more special-q agnostic: timers are
    * attached to the nfs_aux structure, now. This implies that all
@@ -127,32 +132,28 @@ thread_pool::thread_work_on_tasks(void *arg)
    */
   double tt = -wct_seconds();
   while (1) {
-      size_t queue = I->preferred_queue;
-      thread_task task = I->pool.get_task(queue);
+      size_t queue = I.preferred_queue;
+      thread_task task = get_task(queue);
       if (task.is_terminal())
           break;
       try {
           tt += wct_seconds();
-          task_result *result = task(I);
+          task_result *result = task(&I);
           tt -= wct_seconds();
           if (result != NULL)
-              I->pool.add_result(queue, result);
+              add_result(queue, result);
       } catch (clonable_exception const& e) {
           tt -= wct_seconds();
-          I->pool.add_exception(queue, e.clone());
+          add_exception(queue, e.clone());
           /* We need to wake the listener... */
-          I->pool.add_result(queue, NULL);
+          add_result(queue, NULL);
       }
   }
   tt += wct_seconds();
   /* tt is now the wall-clock time spent really within this function,
-   * waiting for mutexes and condition variables...
-   */
-  static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
-  pthread_mutex_lock(&lock);
+   * waiting for mutexes and condition variables...  */
+  std::lock_guard<std::mutex> dummy(mm_cumulated_wait_time);
   cumulated_wait_time += tt;
-  pthread_mutex_unlock(&lock);
-  return NULL;
 }
 
 bool
