@@ -316,7 +316,7 @@ static pthread_mutex_t chunks_lock = PTHREAD_MUTEX_INITIALIZER;
 
 // static pthread_once_t chunks_init_control = PTHREAD_ONCE_INIT;
 
-#define VERBOSE_CONTIGUOUS_MALLOC 1
+// #define VERBOSE_CONTIGUOUS_MALLOC 1
 
 static void chunks_init()
 {
