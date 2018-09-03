@@ -7,6 +7,8 @@ namespace tdict {
 
 int global_enable = 0;
 
+#ifndef DISABLE_TIMINGS
+
 pthread_mutex_t slot_base::m = PTHREAD_MUTEX_INITIALIZER;
 
 void declare_usage(cxx_param_list & pl)
@@ -23,4 +25,11 @@ void configure_switches(cxx_param_list & pl)
     param_list_configure_switch(pl, "-T", &global_enable);
 }
 
+#else
+
+void declare_usage(cxx_param_list &) {}
+void configure_aliases(cxx_param_list &) {}
+void configure_switches(cxx_param_list &) {}
+
+#endif
 };

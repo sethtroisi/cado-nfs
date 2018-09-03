@@ -28,7 +28,9 @@ reservation_array<T>::allocate_buckets(int n_bucket, double fill_ratio, int logI
       pool.add_task_lambda([=,&B,&aux](worker_thread * worker,int){
             timetree_t & timer(aux.th[worker->rank()].timer);
             ENTER_THREAD_TIMER(timer);
+#ifndef DISABLE_TIMINGS
             timetree_t::accounting_sibling dummy(timer, tdict_slot_for_alloc_buckets);
+#endif
             TIMER_CATEGORY(timer, bookkeeping());
             B.allocate_memory(n_bucket, ratio / n, logI);
               }, i, 2, cost);

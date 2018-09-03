@@ -140,7 +140,11 @@ struct coarse_las_timers {
     }
 };
 
+#ifndef DISABLE_TIMINGS
 #define TIMER_CATEGORY(timer, cat) \
     timer.set_current_category(coarse_las_timers::cat)
+#else
+#define TIMER_CATEGORY(timer, cat) /**/
+#endif
 
 #endif	/* LAS_REPORT_STATS_HPP_ */

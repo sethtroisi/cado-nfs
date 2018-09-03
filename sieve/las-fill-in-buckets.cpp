@@ -915,6 +915,7 @@ fill_in_buckets_toplevel_wrapper(worker_thread * worker MAYBE_UNUSED, task_param
     ENTER_THREAD_TIMER(timer);
     MARK_TIMER_FOR_SIDE(timer, side);
 
+#ifndef DISABLE_TIMINGS
     /* This is one of the places where helgrind is likely to complain. We
      * use thread-safe statics. Helgrind can't cope with it,
      * unfortunately. So the error is a false positive.
@@ -922,6 +923,7 @@ fill_in_buckets_toplevel_wrapper(worker_thread * worker MAYBE_UNUSED, task_param
      * https://sourceforge.net/p/valgrind/mailman/message/32434015/
      */
     timetree_t::accounting_child local_timer_sentry(timer, tdict_slot_for_fibt);
+#endif
 
     WHERE_AM_I_UPDATE(w, side, param->side);
     WHERE_AM_I_UPDATE(w, i, param->slice->get_index());
@@ -964,6 +966,7 @@ fill_in_buckets_toplevel_sublat_wrapper(worker_thread * worker MAYBE_UNUSED, tas
     ENTER_THREAD_TIMER(timer);
     MARK_TIMER_FOR_SIDE(timer, side);
 
+#ifndef DISABLE_TIMINGS
     /* This is one of the places where helgrind is likely to complain. We
      * use thread-safe statics. Helgrind can't cope with it,
      * unfortunately. So the error is a false positive.
@@ -971,6 +974,7 @@ fill_in_buckets_toplevel_sublat_wrapper(worker_thread * worker MAYBE_UNUSED, tas
      * https://sourceforge.net/p/valgrind/mailman/message/32434015/
      */
     timetree_t::accounting_child local_timer_sentry(timer, tdict_slot_for_fibt);
+#endif
 
     WHERE_AM_I_UPDATE(w, side, param->side);
     WHERE_AM_I_UPDATE(w, i, param->slice->get_index());

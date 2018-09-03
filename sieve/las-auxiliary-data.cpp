@@ -132,10 +132,12 @@ nfs_aux::~nfs_aux()
     verbose_output_end_batch();
 }
 
+#ifndef DISABLE_TIMINGS
 /* we really wish to have a single timing slot for all the instantiations
  * of fill_in_buckets_toplevel_wrapper */
 tdict::slot tdict_slot_for_fibt("fill_in_buckets_toplevel");
 tdict::slot tdict_slot_for_alloc_buckets("allocate_buckets");
 tdict::slot tdict_slot_for_threads("multithreaded tasks");
 tdict::slot_parametric tdict_slot_for_side("side ", "");
+#endif
 

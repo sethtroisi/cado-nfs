@@ -670,7 +670,9 @@ struct process_bucket_region_run : public process_bucket_region_spawn {
     nfs_work::thread_data & tws;
     timetree_t & timer;
     int bucket_relative_index;
+#ifndef DISABLE_TIMINGS
     timetree_t::accounting_child_autoactivate dummy;
+#endif
     las_report& rep;
     unsigned char * S[2];
     /* We will have this point to the thread's where_am_I data member.
@@ -752,7 +754,9 @@ struct process_bucket_region_run : public process_bucket_region_spawn {
             /* these two are a bit annoying. we want them to scope
              * properly.
              */
+#ifndef DISABLE_TIMINGS
             dummy(timer, tdict_slot_for_threads),
+#endif
             rep(taux.rep),
             w(taux.w)
     {
@@ -2683,11 +2687,15 @@ void prepare_timer_layout_for_multithreaded_tasks(timetree_t & timer)
      * begin with MARK_TIMER_FOR_SIDE are properly registered
      * under the "sieving on side X" umbrella.
      */
+#ifndef DISABLE_TIMINGS
     timetree_t::accounting_child x(timer, tdict_slot_for_threads);
     for (int side = 0; side < 2; ++side) {
         MARK_TIMER_FOR_SIDE(timer, side);
         TIMER_CATEGORY(timer, sieving(side));
     }
+#else
+    timer.nop();
+#endif
 }
 
 void las_subjob(las_info & las, int subjob, las_todo_list & todo, las_report & global_report, timetree_t & global_timer)/*{{{*/

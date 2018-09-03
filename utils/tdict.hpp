@@ -9,6 +9,10 @@
 #include "params.h"
 #include "timing.h"
 
+#define DISABLE_TIMINGS
+
+#ifndef DISABLE_TIMINGS
+
 /* This header file defines objects for a "timing dictionary".
  *
  *  - We define "timing slots", which are the main thrust of the idea.
@@ -412,6 +416,7 @@ public:
 typedef tdict::tree<tdict::timer_seconds_thread> timetree_t;
 
 #if 0
+
 // an example. In fact this one is already covered by tdict::parametric
 
 /* This is an anonymous class, intentionally. We have no use for the
@@ -460,5 +465,39 @@ class : public tdict::slot_base {
 #define DEBUG_DISPLAY_TIMER_AT_DTOR(T,o)				\
     timetree_t::accounting_debug UNIQUE_ID(sentry) (T, o);
 
+
+#else /* DISABLE_TIMINGS */
+
+struct timetree_t {
+    std::map<int, double> filter_by_category() const {
+        /* always an empty map */
+        return std::map<int, double>();
+    }
+    void filter_by_category(std::map<int, double> &, int) const { }
+    timetree_t& operator+=(timetree_t const&) { return *this; }
+    std::string display() const { return std::string(); }
+    /* what should we do */
+    bool running() const { return false; }
+    inline void nop() const {}
+    inline void start() const {}
+    inline void stop() const {}
+};
+
+namespace tdict {
+    extern int global_enable;
+    void declare_usage(cxx_param_list & pl);
+    void configure_switches(cxx_param_list & pl);
+    void configure_aliases(cxx_param_list & pl);
+};
+
+#define CHILD_TIMER(T, name) T.nop()
+#define CHILD_TIMER_PARAMETRIC(T, name, arg, suffix) T.nop()
+#define SIBLING_TIMER(T, name) T.nop()
+#define SIBLING_TIMER_PARAMETRIC(T, name, arg, suffix) T.nop()
+#define BOOKKEEPING_TIMER(T) T.nop()
+#define ACTIVATE_TIMER(T) T.nop()
+#define DEBUG_DISPLAY_TIMER_AT_DTOR(T,o) T.nop()
+
+#endif
 
 #endif	/* TDICT_HPP_ */
