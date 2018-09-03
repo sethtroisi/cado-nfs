@@ -698,6 +698,8 @@ struct process_bucket_region_run : public process_bucket_region_spawn {
 
     unsigned char *SS;
     
+    /* FIXME: Having the "primes" array allocated to BUCKET_REGION seems
+     * grossly wrong. See e-mail exchange ET/PG 20170622141358 */
     struct side_data {/*{{{*/
         bucket_array_complete purged;   /* for purge_buckets */
         bucket_primes_t primes;         /* for resieving */
@@ -1284,6 +1286,13 @@ task_result * detached_cofac(worker_thread * worker, task_parameters * _param, i
             rep.reports ++;
             /* Not clear what gives when we have Galois relations.  */
         }
+
+        /* In some rare cases, the norm on one side is exactly 1, which
+         * creates undefined behaviour later on. (bug # 21707) */
+        if (rel.nb_polys > 2)
+            for (int i = 0; i < rel.nb_polys; ++i)
+                if (rel.sides[i].size() == 0)
+                    dup_comment = "# NORM1 ";
 
         if (!dup_comment) dup_comment = "";
 
