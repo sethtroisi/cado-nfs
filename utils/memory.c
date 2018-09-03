@@ -329,6 +329,7 @@ static void chunks_init()
        to hugepage_size_allocated. */
     hugepage_size_allocated = LARGE_PAGE_SIZE;
     hugepages = malloc_hugepages(hugepage_size_allocated);
+    ASSERT_ALWAYS(hugepages != NULL);
     pthread_mutex_unlock(&chunks_lock);
 
 #ifdef VERBOSE_CONTIGUOUS_MALLOC

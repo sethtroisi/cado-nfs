@@ -117,9 +117,7 @@ main (int argc, char *argv[])
       exit(EXIT_FAILURE);
   }
 
-  mpz_t batchP[2];
-  mpz_init (batchP[0]);
-  mpz_init (batchP[1]);
+  std::array<cxx_mpz, 2> batchP;
 
   for (int side = 0; side < 2; ++side) {
       create_batch_file (batch_file[side], batchP[side], lim[side],
@@ -128,61 +126,37 @@ main (int argc, char *argv[])
 
   // Read list from the input file.
   cofac_list List;
-  cofac_list_init(List);
   FILE * inp = fopen_maybe_compressed(infilename, "r");
   ASSERT_ALWAYS(inp);
 
 #define MAX_SIZE 2048
   char str[MAX_SIZE];
-  mpz_t A, R, q;
-  mpz_init(A);
-  mpz_init(R);
-  mpz_init(q);
+  std::array<cxx_mpz, 2> norms;
+  cxx_mpz q;
   mpz_set_ui(q, 1);
   long a;
   unsigned long b;
   while (fgets(str, MAX_SIZE, inp)) {
       if (str[0] == '#') continue;
-      gmp_sscanf(str, "%ld %lu %Zd %Zd\n", &a, &b, R, A);
-      cofac_list_add(List, a, b, R, A, 0, q);
+      gmp_sscanf(str, "%ld %lu %Zd %Zd\n", &a, &b, (mpz_ptr) norms[0], (mpz_ptr) norms[1]);
+      List.emplace_back(a, b, norms, q, 0);
   }
   fclose_maybe_compressed(inp, infilename);
-  mpz_clear(A);
-  mpz_clear(R);
-  mpz_clear(q);
 
-  mpz_t B[2], L[2], M[2];
-  for(int side = 0 ; side < 2 ; side++) {
-      mpz_init(B[side]);
-      mpz_init(L[side]);
-      mpz_init(M[side]);
-      mpz_ui_pow_ui(B[side], 2, batchlpb[side]);
-      mpz_ui_pow_ui(L[side], 2, lpb[side]);
-      mpz_ui_pow_ui(M[side], 2, batchmfb[side]);
-  }
-  unsigned long nrels = find_smooth(List, batchP, B, L, M, stdout, nb_threads);
+  find_smooth(List, batchP, batchlpb, lpb, batchmfb, stdout, nb_threads);
   
   if (doecm) {
-      factor(List, nrels, cpoly, batchlpb, lpb, stdout, nb_threads);
+      factor(List, cpoly, batchlpb, lpb, stdout, nb_threads);
   } else {
-      for (unsigned long i = 0; i < nrels; i++) {
-          uint32_t *perm = List->perm;
+      for (auto const & x : List) {
           gmp_printf("%" PRIi64 " %" PRIu64 " %Zd %Zd\n",
-                  List->a[perm[i]], List->b[perm[i]],
-                  List->R[perm[i]], List->A[perm[i]]);
+                  x.a, x.b,
+                  (mpz_srcptr) x.cofactor[0],
+                  (mpz_srcptr) x.cofactor[1]);
       }
   }
 
-  for(int side = 0 ; side < 2 ; side++) {
-      mpz_clear(B[side]);
-      mpz_clear(L[side]);
-      mpz_clear(M[side]);
-  }
-  cofac_list_clear(List);
-
   cado_poly_clear(cpoly);
-  mpz_clear (batchP[0]);
-  mpz_clear (batchP[1]);
   param_list_clear(pl);
 
   return EXIT_SUCCESS;
