@@ -9,7 +9,9 @@
 #include "params.h"
 #include "timing.h"
 
-#define DISABLE_TIMINGS
+/* Uncomment this flag if you believe that the fine-grain -T timings
+ * negatively impact the performance */
+#define xxxDISABLE_TIMINGS
 
 #ifndef DISABLE_TIMINGS
 
