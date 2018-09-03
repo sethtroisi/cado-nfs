@@ -314,13 +314,13 @@ static size_t hugepage_size_allocated = 0;
 static dllist chunks;
 static pthread_mutex_t chunks_lock = PTHREAD_MUTEX_INITIALIZER;
 
-static pthread_once_t chunks_init_control = PTHREAD_ONCE_INIT;
+// static pthread_once_t chunks_init_control = PTHREAD_ONCE_INIT;
 
-// #define VERBOSE_CONTIGUOUS_MALLOC 1
+#define VERBOSE_CONTIGUOUS_MALLOC 1
 
 static void chunks_init()
 {
-    pthread_mutex_lock(&chunks_lock);
+    // pthread_mutex_lock(&chunks_lock);
     dll_init(chunks);
 
     ASSERT_ALWAYS(hugepages == NULL);
@@ -330,7 +330,7 @@ static void chunks_init()
     hugepage_size_allocated = LARGE_PAGE_SIZE;
     hugepages = malloc_hugepages(hugepage_size_allocated);
     ASSERT_ALWAYS(hugepages != NULL);
-    pthread_mutex_unlock(&chunks_lock);
+    // pthread_mutex_unlock(&chunks_lock);
 
 #ifdef VERBOSE_CONTIGUOUS_MALLOC
     printf ("# Allocated %zu bytes of huge page memory at = %p\n",
@@ -344,13 +344,13 @@ void *contiguous_malloc(const size_t size)
     return NULL;
   }
 
-    pthread_once(&chunks_init_control, &chunks_init);
+  // pthread_once(&chunks_init_control, &chunks_init);
 
   /* Get offset and size of last entry in linked list */
   void *free_ptr;
   size_t free_size;
   pthread_mutex_lock(&chunks_lock);
-  ASSERT_ALWAYS(hugepages != NULL);
+  if (hugepages == NULL) chunks_init();
   if (!dll_is_empty(chunks)) {
     struct chunk_s *chunk = dll_get_nth(chunks, dll_length(chunks) - 1)->data;
     free_ptr = (char *)(chunk->ptr) + chunk->size;

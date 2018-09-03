@@ -88,6 +88,7 @@ struct las_augmented_output_channel {
     const char * outputname = NULL; /* keep track of whether it's gzipped or not */
     void set(cxx_param_list & pl);
     void release();
+    void fflush();
     static void declare_usage(cxx_param_list & pl);
     static void configure_aliases(cxx_param_list &) { }
     static void configure_switches(cxx_param_list & pl);
@@ -121,6 +122,13 @@ static void las_verbose_enter(cxx_param_list & pl, FILE * output, int verbose)
 static void las_verbose_leave()
 {
     verbose_output_clear();
+}
+
+void las_augmented_output_channel::fflush()
+{
+    verbose_output_start_batch();
+    ::fflush(output);
+    verbose_output_end_batch();
 }
 
 void las_augmented_output_channel::set(cxx_param_list & pl)
@@ -2709,7 +2717,7 @@ void las_subjob(las_info & las, int subjob, las_todo_list & todo, las_report & g
          * only if the todo list is empty. }}} */
 
         for(las_todo_entry doing ; ; ) {
-            fflush(las_output.output);
+            las_output.fflush();
             if (!todo.feed_and_pop(las.rstate, doing))
                 break;
 
