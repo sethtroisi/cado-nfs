@@ -20,6 +20,7 @@
 #include <sstream>  /* for c++ string handling */
 #include <iterator> /* ostream_iterator */
 #include <thread> /* we use std::thread for las sub-jobs */
+#include <iomanip> /* std::setprecision, std::fixed */
 #include "threadpool.hpp"
 #include "fb.hpp"
 #include "portability.h"
@@ -3159,16 +3160,21 @@ int main (int argc0, char *argv0[])/*{{{*/
     if (tdict::global_enable >= 1) {
         verbose_output_print (0, 1, "#\n# Hierarchical timings:\n%s", global_timer.display().c_str());
 
-        double t = 0;
+        timetree_t::timer_data_type t = 0;
         auto D = global_timer.filter_by_category();
         for(auto const &c : D)
             t += c.second;
-        verbose_output_print (0, 1, "#\n# Categorized timings (total counted time %.2f):\n", t);
-        for(auto const &c : D)
-            verbose_output_print (0, 1, "# %s: %.2f\n", 
+        std::ostringstream os;
+        os << std::fixed << std::setprecision(2) << t;
+        verbose_output_print (0, 1, "#\n# Categorized timings (total counted time %s):\n", os.str().c_str());
+        for(auto const &c : D) {
+            std::ostringstream xos;
+            xos << std::fixed << std::setprecision(2) << c.second;
+            verbose_output_print (0, 1, "# %s: %s\n", 
                     coarse_las_timers::explain(c.first).c_str(),
-                    c.second);
-        verbose_output_print (0, 1, "# total counted time: %.2f\n#\n", t);
+                    xos.str().c_str());
+        }
+        verbose_output_print (0, 1, "# total counted time: %s\n#\n", os.str().c_str());
     }
     global_report.display_survivor_counters();
 

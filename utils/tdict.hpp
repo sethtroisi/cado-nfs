@@ -205,14 +205,46 @@ namespace tdict {
                 return 0;
         }
     };
+    struct timer_seconds_thread_and_wct {
+        struct type {
+            double t = 0;
+            double w = 0;
+            type(type const&) = default;
+            type(type&&) = default;
+            type() = default;
+            type(int) : t(0), w(0) {}
+            type(double t, double w) : t(t), w(w) {}
+            type& operator-=(type const & o) {
+                t-=o.t;
+                w-=o.w;
+                return *this;
+            }
+            type& operator+=(type const & o) {
+                t+=o.t;
+                w+=o.w;
+                return *this;
+            }
+            bool operator>(double const& c) const {
+                return w > c;
+            }
+        };
+        type operator()() const {
+            if (tdict::global_enable)
+                return type(seconds_thread(), wct_seconds());
+            else
+                return type();
+        }
+    };
+    std::ostream& operator<<(std::ostream & o, timer_seconds_thread_and_wct::type const & a);
+
 
     /*
     template<typename T>
         class sentry {
-            std::map<key, typename T::type> & m;
+            std::map<key, timer_data_type> & m;
             key k;
             public:
-            sentry(std::map<key, typename T::type> & m, key const& k) : k(k), m(m) {
+            sentry(std::map<key, timer_data_type> & m, key const& k) : k(k), m(m) {
                 m[k] -= T()();
             }
             ~sentry() {
@@ -223,25 +255,26 @@ namespace tdict {
 
     template<typename T>
         struct tree {
-            typename T::type self;
+            typedef typename T::type timer_data_type;
+            timer_data_type self;
             bool scoping;
             int category;
             typedef std::map<tdict::key, tree<T> > M_t;
             M_t M;
             tree<T> * current;   /* could be NULL */
             tree<T> * parent;   /* could be NULL */
-            tree() : self(typename T::type()), scoping(true), category(-1), current(NULL), parent(this) { }
+            tree() : self(timer_data_type()), scoping(true), category(-1), current(NULL), parent(this) { }
             bool running() const { return current != NULL; }
             void stop() {
                 if (!running()) return;
-                typename T::type v = T()();
+                timer_data_type v = T()();
                 current->self += v;
                 current = NULL;
                 return;
             }
             void start() {
                 if (running()) return;
-                typename T::type v = T()();
+                timer_data_type v = T()();
                 self -= v;
                 current = this;
             }
@@ -254,10 +287,10 @@ namespace tdict {
             }
 
 
-            typename T::type stop_and_start() {
+            timer_data_type stop_and_start() {
                 ASSERT_ALWAYS(running());
-                typename T::type v = T()();
-                typename T::type res = current->self + v;
+                timer_data_type v = T()();
+                timer_data_type res = current->self + v;
                 current->self = -v;
                 return res;
             }
@@ -276,7 +309,7 @@ namespace tdict {
             struct accounting_child_meta : public BB {
                 accounting_child_meta(tree& t, tdict::key k): BB(t) {
                     ASSERT_ALWAYS(BB::t.running());
-                    typename T::type v = T()();
+                    timer_data_type v = T()();
                     BB::t.current->self += v;
                     tree<T> * kid = &(BB::t.current->M[k]);  /* auto-vivifies */
                     kid->parent = BB::t.current;
@@ -285,7 +318,7 @@ namespace tdict {
                     BB::t.current = kid;
                 }
                 ~accounting_child_meta() {
-                    typename T::type v = T()();
+                    timer_data_type v = T()();
                     BB::t.current->self += v;
                     /* It could be that we are one level below. */
                     for(;!BB::t.current->scoping;) {
@@ -313,7 +346,7 @@ namespace tdict {
             struct accounting_sibling {
                 accounting_sibling(tree& t, tdict::key k) {
                     ASSERT_ALWAYS(t.running());
-                    typename T::type v = T()();
+                    timer_data_type v = T()();
                     tree<T> * kid;
                     if (t.current->scoping) {
                         kid = &(t.current->M[k]);  /* auto-vivifies */
@@ -335,7 +368,7 @@ namespace tdict {
             struct accounting_bookkeeping {
                 accounting_bookkeeping(tree& t) {
                     ASSERT_ALWAYS(t.running());
-                    typename T::type v = T()();
+                    timer_data_type v = T()();
                     if (!t.current->scoping) {
                         t.current->self += v;
                         t.current = t.current->parent;
@@ -362,7 +395,7 @@ private:
                 return o;
             }
 
-            void filter_by_category(std::map<int, typename T::type> & D, int inherited) const {
+            void filter_by_category(std::map<int, timer_data_type> & D, int inherited) const {
                 int flag = inherited;
                 if (category >= 0)
                     flag = category;
@@ -374,8 +407,8 @@ private:
             }
 
 public:
-            std::map<int, typename T::type> filter_by_category() const {
-                std::map<int, typename T::type> res;
+            std::map<int, timer_data_type> filter_by_category() const {
+                std::map<int, timer_data_type> res;
                 filter_by_category(res, -1);
                 return res;
             }
@@ -415,7 +448,7 @@ public:
     void configure_aliases(cxx_param_list & pl);
 };
 
-typedef tdict::tree<tdict::timer_seconds_thread> timetree_t;
+typedef tdict::tree<tdict::timer_seconds_thread_and_wct> timetree_t;
 
 #if 0
 
