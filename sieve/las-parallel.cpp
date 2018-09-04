@@ -9,7 +9,7 @@
 #include "utils.h"
 #include "las-parallel.hpp"
 
-const char * default_placement_with_auto = "fit*4/NUMAnode,fit,pu";
+const char * default_placement_with_auto = "node,fit*4,fit,pu,loose";
 
 bool parse_number(std::string const & s, int & x, std::string::size_type pos = 0) /*{{{*/
 {
@@ -156,8 +156,8 @@ struct las_parallel_desc::helper {
             return;
         }
         if (desc == "single") { desc = "machine,1,pu"; return; }
-        if (desc == "auto") { desc = "fit*4/NUMAnode,fit,pu,loose"; return; }
-        if (desc == "auto,no-replicate") { desc = "fit*4/NUMAnode,fit,pu,loose, no-replicate"; return; }
+        if (desc == "auto") { desc = default_placement_with_auto; desc += ",loose"; return; }
+        if (desc == "auto,no-replicate") { desc = default_placement_with_auto; desc += ",loose,no-replicate"; return; }
         if (desc.substr(0,7) == "single-") {
             ostringstream os;
             os << desc.substr(7) << ",1,pu";
@@ -424,7 +424,8 @@ struct las_parallel_desc::helper {
        if (cpu_binding_specifier_string.empty()) {
            return cpu_binding_size = memory_binding_size;
        } else {
-           return cpu_binding_size = interpret_generic_binding_specifier(cpu_binding_specifier_string);
+           /* cap to memory binding size */
+           cpu_binding_size = interpret_generic_binding_specifier(cpu_binding_specifier_string, memory_binding_size);
            if (memory_binding_size % cpu_binding_size)
                throw bad_specification(
                        "cpu binding ", cpu_binding_specifier_string,
@@ -433,6 +434,7 @@ struct las_parallel_desc::helper {
                        " the memory binding size of ", memory_binding_size,
                        " PUs, which follows from the specifier ",
                        memory_binding_specifier_string);
+           return cpu_binding_size;
        }
 #else
        /* just check for errors */
@@ -443,7 +445,7 @@ struct las_parallel_desc::helper {
        }
 #endif
    }
-   int interpret_generic_binding_specifier(std::string const & specifier) {/*{{{*/
+   int interpret_generic_binding_specifier(std::string const & specifier, int cap = -1) {/*{{{*/
 #ifdef HAVE_HWLOC
        int binding_size;
        /* and apply our different calculation rules to the provided
@@ -493,7 +495,7 @@ struct las_parallel_desc::helper {
            ASSERT_ALWAYS(t);
            objsize *= x;
        }
-       int cap = number_of(-1, 0);
+       if (cap < 0) cap = number_of(-1, 0);
        if (objsize > cap)
            objsize = cap;
        if (is_fit)
@@ -740,10 +742,17 @@ Examples
             and then run each on exactly the number of pus (hyperthreaded
             cores). Abort if it is not possible to fit on one numa node
 
+    -t numa,core*2,fit,pu
+            -> memory-bind at the numa level, and do cpu-bind on pairs of
+            cores. Stick as many different jobs as can fit in each cpu
+            binding context, and have each of these jobs use as many
+            threads as the number of pus we have (per sub-job in the cpu
+            binding context of two cores).
+
     -t numa,fit,20
             -> same, but force 20-thread jobs (no matter what)
 
-    -t auto -> resolves to fit*4/NUMANode,fit,pu = bind fractions of NUMA
+    -t auto -> resolves to )" << default_placement_with_auto << R"( = bind fractions of NUMA
             nodes, and put as many jobs in there as can fit. Then have
             each run the number of threads so that all PUs are busy.
 
