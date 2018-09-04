@@ -115,7 +115,7 @@ void las_info::load_factor_base(cxx_param_list & pl)
     }
     set_loose_binding();
 #else
-    shared_structure_cache.load_factor_base(pl, number_of_threads_loose());
+    shared_structure_private.load_factor_base(pl, number_of_threads_loose());
 #endif
 }
 
@@ -125,7 +125,7 @@ las_info::las_info(cxx_param_list & pl)
 #ifdef HAVE_HWLOC
       shared_structure_cache(),
 #else
-      shared_structure_cache(cpoly, pl),
+      shared_structure_private(cpoly, pl),
 #endif
 #ifdef  DLP_DESCENT
       dlog_base(pl),
