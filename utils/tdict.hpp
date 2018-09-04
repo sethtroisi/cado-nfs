@@ -504,6 +504,7 @@ class : public tdict::slot_base {
 #else /* DISABLE_TIMINGS */
 
 struct timetree_t {
+    typedef double timer_data_type;
     std::map<int, double> filter_by_category() const {
         /* always an empty map */
         return std::map<int, double>();
