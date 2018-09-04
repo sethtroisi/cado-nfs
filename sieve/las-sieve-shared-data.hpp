@@ -14,6 +14,7 @@
 #include "las-smallsieve-types.hpp"
 #include "las-unsieve.hpp"
 #include "ecm/facul.hpp"
+#include "lock_guarded_container.hpp"
 
 #include <memory>
 #ifdef HAVE_BOOST_SHARED_PTR
@@ -81,8 +82,13 @@ struct sieve_shared_data {
                 return a.td_thresh < b.td_thresh;
             }
         };
-        std::map<fb_factorbase::key_type, trialdiv_data, equivalent_fbK_for_td>
-            trialdiv_data_cache;
+        lock_guarded_container<
+            std::map<
+                fb_factorbase::key_type,
+                trialdiv_data,
+                equivalent_fbK_for_td
+            >
+        > trialdiv_data_cache;
         public:
         /* in las-trialdiv.cpp */
         trialdiv_data const * get_trialdiv_data(fb_factorbase::key_type fbK, fb_factorbase::slicing const * fbs);
@@ -112,14 +118,24 @@ struct sieve_shared_data {
     /* Data for unsieving locations where gcd(i,j) > 1 */
     /* This gets initialized only when I is finally decided */
     private:
-    std::map<std::pair<int, int>, unsieve_data> us_cache;
+    lock_guarded_container<
+        std::map<
+            std::pair<int, int>,
+            unsieve_data
+        >
+    > us_cache;
     public:
     unsieve_data const * get_unsieve_data(siever_config const & conf);
 
     /* in las-unsieve.cpp */
     /* Data for divisibility tests p|i in lines where p|j */
     private:
-    std::map<unsigned int, j_divisibility_helper> jdiv_cache;
+    lock_guarded_container<
+        std::map<
+            unsigned int,
+            j_divisibility_helper
+        >
+    > jdiv_cache;
     public:
     j_divisibility_helper const * get_j_divisibility_helper(int J);
 
@@ -130,9 +146,13 @@ struct sieve_shared_data {
      */
     private:
     const char *cofactfilename;
-    std::map<siever_config,
-        std::shared_ptr<facul_strategies_t>,
-        siever_config::has_same_cofactoring::comparison> facul_strategies_cache;
+    lock_guarded_container<
+        std::map<
+            siever_config,
+            std::shared_ptr<facul_strategies_t>,
+            siever_config::has_same_cofactoring::comparison
+        >
+    > facul_strategies_cache;
     public:
     facul_strategies_t const * get_strategies(siever_config const & conf);
 

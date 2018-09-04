@@ -48,16 +48,13 @@ void sieve_shared_data::load_factor_base(cxx_param_list & pl, int nthreads) /*{{
 unsieve_data const * sieve_shared_data::get_unsieve_data(siever_config const & conf) /* {{{ */
 {
     std::pair<int, int> p(conf.logI, conf.logA);
-    static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
-    pthread_mutex_lock(&lock);
+    std::lock_guard<std::mutex> dummy(us_cache.mutex());
     auto it = us_cache.find(p);
     if (it != us_cache.end()) {
-        pthread_mutex_unlock(&lock);
         return &it->second;
     }
     auto itb = us_cache.insert(std::make_pair(p, unsieve_data(p)));
     ASSERT(itb.second);
-    pthread_mutex_unlock(&lock);
     return &(*itb.first).second;
 }/*}}}*/
 j_divisibility_helper const * sieve_shared_data::get_j_divisibility_helper(int J) /* {{{ */
@@ -65,25 +62,20 @@ j_divisibility_helper const * sieve_shared_data::get_j_divisibility_helper(int J
     ASSERT_ALWAYS(J);
     /* Round to the next power of two */
     unsigned int Jround = 1 << nbits(J-1);
-    static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
-    pthread_mutex_lock(&lock);
+    std::lock_guard<std::mutex> dummy(jdiv_cache.mutex());
     auto it = jdiv_cache.find(Jround);
     if (it != jdiv_cache.end()) {
-        pthread_mutex_unlock(&lock);
         return &it->second;
     }
     auto itb = jdiv_cache.insert(std::pair<unsigned int, j_divisibility_helper>(Jround, Jround));
     ASSERT(itb.second);
-    pthread_mutex_unlock(&lock);
     return &(*itb.first).second;
 }/*}}}*/
 facul_strategies_t const * sieve_shared_data::get_strategies(siever_config const & conf) /* {{{ */
 {
-    static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
-    pthread_mutex_lock(&lock);
+    std::lock_guard<std::mutex> dummy(facul_strategies_cache.mutex());
     auto it = facul_strategies_cache.find(conf);
     if (it != facul_strategies_cache.end()) {
-        pthread_mutex_unlock(&lock);
         return it->second.get();
     }
 
@@ -124,10 +116,8 @@ facul_strategies_t const * sieve_shared_data::get_strategies(siever_config const
 
     if (!(*itb.first).second.get()) {
         fprintf (stderr, "impossible to read %s\n", cofactfilename);
-        pthread_mutex_unlock(&lock);
         abort ();
     }
-    pthread_mutex_unlock(&lock);
 
     return (*itb.first).second.get();
 }/*}}}*/
