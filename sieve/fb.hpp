@@ -717,7 +717,7 @@ class fb_factorbase {
         fb_factorbase(cxx_cado_poly const & cpoly, int side, cxx_param_list & pl, const char * fbc_filename, int nthreads = 1);
         fb_factorbase() = default;
         fb_factorbase(fb_factorbase &&) = default;
-        fb_factorbase& operator=(fb_factorbase && o) = default;
+        fb_factorbase& operator=(fb_factorbase &&) = default;
 
     private:
         struct sorter {
