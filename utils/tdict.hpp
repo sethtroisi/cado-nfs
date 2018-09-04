@@ -305,6 +305,11 @@ namespace tdict {
                 inline accounting_activate(tree& t): accounting_base(t) { accounting_base::t.start(); }
                 inline ~accounting_activate() { accounting_base::t.stop(); }
             };
+            struct accounting_activate_recursive : public accounting_base {
+                bool act = false;
+                inline accounting_activate_recursive(tree& t): accounting_base(t), act(!t.running()) { if (act) accounting_base::t.start(); }
+                inline ~accounting_activate_recursive() { if (act) accounting_base::t.stop(); }
+            };
             template<typename BB>
             struct accounting_child_meta : public BB {
                 accounting_child_meta(tree& t, tdict::key k): BB(t) {
@@ -330,6 +335,7 @@ namespace tdict {
             };
             typedef accounting_child_meta<accounting_base> accounting_child;
             typedef accounting_child_meta<accounting_activate> accounting_child_autoactivate;
+            typedef accounting_child_meta<accounting_activate_recursive> accounting_child_autoactivate_recursive;
 
             struct accounting_debug : public accounting_base {
                 std::ostream& o;
@@ -497,6 +503,8 @@ class : public tdict::slot_base {
     timetree_t::accounting_bookkeeping UNIQUE_ID(sentry) (T);
 #define ACTIVATE_TIMER(T)						\
     timetree_t::accounting_activate UNIQUE_ID(sentry) (T);
+#define ACTIVATE_TIMER_IF_NOT_RUNNING(T)				\
+    timetree_t::accounting_activate_recursive UNIQUE_ID(sentry) (T);
 #define DEBUG_DISPLAY_TIMER_AT_DTOR(T,o)				\
     timetree_t::accounting_debug UNIQUE_ID(sentry) (T, o);
 

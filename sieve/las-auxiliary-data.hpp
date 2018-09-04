@@ -109,6 +109,10 @@ class nfs_aux {/*{{{*/
 
     std::vector<thread_data> th;
 
+    timetree_t & get_timer(worker_thread * worker) {
+        return worker->is_synchronous() ? timer_special_q : th[worker->rank()].timer;
+    }
+
     double qt0;
     double wct_qt0;
 
@@ -144,7 +148,7 @@ extern tdict::slot tdict_slot_for_threads;
 extern tdict::slot tdict_slot_for_fibt;
 
 #define ENTER_THREAD_TIMER(timer)       \
-    ACTIVATE_TIMER(timer);                           \
+    ACTIVATE_TIMER_IF_NOT_RUNNING(timer);                           \
     timetree_t::accounting_child UNIQUE_ID(dummy)(timer, tdict_slot_for_threads)
 
 #define MARK_TIMER_FOR_SIDE(timer, side)       \

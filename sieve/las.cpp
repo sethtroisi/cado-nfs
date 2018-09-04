@@ -672,7 +672,7 @@ struct process_bucket_region_run : public process_bucket_region_spawn {
     timetree_t & timer;
     int bucket_relative_index;
 #ifndef DISABLE_TIMINGS
-    timetree_t::accounting_child_autoactivate dummy;
+    timetree_t::accounting_child_autoactivate_recursive dummy;
 #endif
     las_report& rep;
     unsigned char * S[2];
@@ -750,7 +750,7 @@ struct process_bucket_region_run : public process_bucket_region_spawn {
             worker(worker),
             taux(aux_p->th[worker->rank()]),
             tws(ws.th[worker->rank()]),
-            timer(taux.timer),
+            timer(aux_p->get_timer(worker)),
             bucket_relative_index(id),
             /* these two are a bit annoying. we want them to scope
              * properly.
@@ -779,6 +779,8 @@ struct process_bucket_region_run : public process_bucket_region_spawn {
     }/*}}}*/
 void process_bucket_region_spawn::operator()(worker_thread * worker, int id) /*{{{{*/
 {
+    timetree_t & timer(aux_p->get_timer(worker));
+    ENTER_THREAD_TIMER(timer);
     /* create a temp object with more fields, and dispose it shortly
      * afterwards once we're done.  */
     process_bucket_region_run(*this, worker, id)();
@@ -1196,7 +1198,7 @@ task_result * detached_cofac(worker_thread * worker, task_parameters * _param, i
     nfs_aux::thread_data & taux(aux.th[id]);
     las_info const & las(wc.las);
     las_report & rep(taux.rep);
-    timetree_t & timer(taux.timer);
+    timetree_t & timer(aux.get_timer(worker));
     /* The timer is normally not running, as we're in a thread task.
      * However, in descent mode, this is called synchronously, and then
      * the situation is different since the timer has already been
@@ -2365,7 +2367,7 @@ void process_many_bucket_regions(nfs_work & ws, std::shared_ptr<nfs_work_cofac> 
 
             for(int side = 0 ; side < 2 ; side++) {
                 pool.add_task_lambda([=,&ws](worker_thread * worker, int){
-                        timetree_t & timer(aux_p->th[worker->rank()].timer);
+                        timetree_t & timer(aux_p->get_timer(worker));
                         ENTER_THREAD_TIMER(timer);
                         MARK_TIMER_FOR_SIDE(timer, side);
                         SIBLING_TIMER(timer, "prepare small sieve");
@@ -2456,8 +2458,7 @@ void do_one_special_q_sublat(nfs_work & ws, std::shared_ptr<nfs_work_cofac> wc_p
 
         for(int side = 0 ; side < 2 ; side++) {
             pool.add_task_lambda([&ws,aux_p,side](worker_thread * worker,int){
-                    timetree_t & timer(aux_p->th[worker->rank()].timer);
-
+                    timetree_t & timer(aux_p->get_timer(worker));
                     ENTER_THREAD_TIMER(timer);
                     MARK_TIMER_FOR_SIDE(timer, side);
 

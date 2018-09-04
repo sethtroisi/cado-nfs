@@ -841,7 +841,7 @@ fill_in_buckets_one_slice_internal(worker_thread * worker, task_parameters * _pa
     /* Import some contextual stuff */
     int id = worker->rank();
     nfs_aux::thread_data & taux(param->aux.th[id]);
-    timetree_t & timer(taux.timer);
+    timetree_t & timer(param->aux.get_timer(worker));
     ENTER_THREAD_TIMER(timer);
     nfs_work & ws(param->ws);
     where_am_I & w(taux.w);
@@ -905,12 +905,11 @@ fill_in_buckets_toplevel_wrapper(worker_thread * worker MAYBE_UNUSED, task_param
     /* Import some contextual stuff */
     int id = worker->rank();
     nfs_aux::thread_data & taux(param->aux.th[id]);
-    timetree_t & timer(taux.timer);
+    timetree_t & timer(param->aux.get_timer(worker));
     nfs_work & ws(param->ws);
     where_am_I & w(taux.w);
     int side = param->side;
     nfs_work::side_data & wss(ws.sides[side]);
-
 
     ENTER_THREAD_TIMER(timer);
     MARK_TIMER_FOR_SIDE(timer, side);
@@ -957,7 +956,7 @@ fill_in_buckets_toplevel_sublat_wrapper(worker_thread * worker MAYBE_UNUSED, tas
     /* Import some contextual stuff */
     int id = worker->rank();
     nfs_aux::thread_data & taux(param->aux.th[id]);
-    timetree_t & timer(taux.timer);
+    timetree_t & timer(param->aux.get_timer(worker));
     nfs_work & ws(param->ws);
     where_am_I & w(taux.w);
     int side = param->side;
@@ -1156,7 +1155,7 @@ void downsort_aux(
     for(auto const & BAin : wss.bucket_arrays<LEVEL+1,longhint_t>()) {
         pool.add_task_lambda([&,side,w](worker_thread * worker, int bucket_index) {
             nfs_aux::thread_data & taux(aux.th[worker->rank()]);
-            timetree_t & timer(taux.timer);
+            timetree_t & timer(aux.get_timer(worker));
             ENTER_THREAD_TIMER(timer);
             MARK_TIMER_FOR_SIDE(timer, side);
             taux.w = w;
@@ -1232,7 +1231,7 @@ downsort_tree_inner(
         for(auto const & BAin : wss.bucket_arrays<LEVEL+1,my_shorthint_t>()) {
             pool.add_task_lambda([&,side,w](worker_thread * worker, int bucket_index) {
                 nfs_aux::thread_data & taux(aux.th[worker->rank()]);
-                timetree_t & timer(taux.timer);
+                timetree_t & timer(aux.get_timer(worker));
                 taux.w = w;
                 ENTER_THREAD_TIMER(timer);
                 MARK_TIMER_FOR_SIDE(timer, side);
@@ -1290,8 +1289,8 @@ downsort_tree_inner(
        * las.cpp
        */
       for(int side = 0 ; side < 2 ; side++) {
-          pool.add_task_lambda([=,&ws](worker_thread * worker, int){
-                  timetree_t & timer(aux_p->th[worker->rank()].timer);
+          pool.add_task_lambda([=,&ws,&aux](worker_thread * worker, int){
+                  timetree_t & timer(aux.get_timer(worker));
                   ENTER_THREAD_TIMER(timer);
                   MARK_TIMER_FOR_SIDE(timer, side);
                   SIBLING_TIMER(timer, "prepare small sieve");
