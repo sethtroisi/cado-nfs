@@ -90,11 +90,14 @@ void las_info::prepare_sieve_shared_data(cxx_param_list & pl)
                 current_memory_binding(),
                 sieve_shared_data(cpoly, pl));
         shared_structure_cache.insert(std::move(v));
+        /* for this one, the default ctor is good enough */
+        las_memory_accessor_cache[current_memory_binding()];
 #endif
     }
     set_loose_binding();
 #else
-    shared_structure_cache = sieve_shared_data(cpoly, pl);
+    shared_structure_private = sieve_shared_data(cpoly, pl);
+    /* the default-constructed memory accessor is fine */
 #endif
 }
 

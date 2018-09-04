@@ -23,6 +23,7 @@
 #include <mutex>
 #include "cxx_mpz.hpp"
 #include "lock_guarded_container.hpp"
+#include "las-memory.hpp"
 
 #include <memory>
 #ifdef HAVE_BOOST_SHARED_PTR
@@ -80,11 +81,24 @@ struct las_info : public las_parallel_desc, private NonCopyable {
         cxx_hwloc_nodeset nn = current_memory_binding();
         return shared_structure_cache.at(nn);
     }
-#else
-    mutable sieve_shared_data shared_structure_cache;
-    sieve_shared_data & local_cache() const {
-        return shared_structure_cache;
+    std::map<cxx_hwloc_nodeset, las_memory_accessor> las_memory_accessor_cache;
+    public:
+    las_memory_accessor & local_memory_accessor() {
+        cxx_hwloc_nodeset nn = current_memory_binding();
+        return las_memory_accessor_cache.at(nn);
     }
+    private:
+#else
+    mutable sieve_shared_data shared_structure_private;
+    sieve_shared_data & local_cache() const {
+        return shared_structure_private;
+    }
+    las_memory_accessor las_memory_accessor_private;
+    public:
+    las_memory_accessor & local_memory_accessor() {
+        return las_memory_accessor_private;
+    }
+    private:
 #endif
 
     public:

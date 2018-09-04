@@ -2,46 +2,72 @@
 #include "las-info.hpp"
 #include "las-threads-work-data.hpp"
 
-void nfs_work::thread_data::side_data::allocate_bucket_region()
+nfs_work::thread_data::thread_data(thread_data && o) : ws(o.ws)
 {
-  /* Allocate memory for each side's bucket region. Our intention is to
-   * avoid doing it in case we have no factor base. Not that much because
-   * of the spared memory, but rather because it's a useful way to trim
-   * the irrelevant parts of the code in that case.
-   */
-  if (!bucket_region)
-  bucket_region = (unsigned char *) contiguous_malloc(BUCKET_REGION + MEMSET_MIN);
+    for(int side = 0 ; side < 2 ; side++) {
+        sides[side].bucket_region = o.sides[side].bucket_region;
+        o.sides[side].bucket_region = NULL;
+    }
+    SS = o.SS;
+    o.SS = NULL;
 }
 
 nfs_work::thread_data::thread_data(thread_data const & o)
-    : ws(o.ws), sides(o.sides)
+    : ws(o.ws)
 {
-    SS = (unsigned char *) contiguous_malloc(BUCKET_REGION);
+    for(int side = 0 ; side < 2 ; side++) {
+        ASSERT_ALWAYS(o.sides[side].bucket_region == NULL);
+        sides[side].bucket_region = NULL;
+    }
+    ASSERT_ALWAYS(o.SS == NULL);
+    SS = NULL;
+#if 0
+    /* We do not need MEMSET_MIN here. However we're making life easier
+     * for the memory allocator if we allocate and free always the same
+     * size.
+     */
+    for(int side = 0 ; side < 2 ; side++) {
+        if (!sides[side].bucket_region)
+            sides[side].bucket_region = ws.local_memory.alloc_bucket_region();
+        memcpy(sides[side].bucket_region, o.sides[side].bucket_region, BUCKET_REGION);
+    }
+    SS = ws.local_memory.alloc_bucket_region();
     memcpy(SS, o.SS, BUCKET_REGION);
+#endif
 }
 
-nfs_work::thread_data::side_data::~side_data()
-{
-  if (bucket_region) contiguous_free(bucket_region);
-  bucket_region = NULL;
-}
-
+/* our promise is that allocation only occurs when explicitly asked, so
+ * we do not call local_memory.alloc_bucket_region() yet.
+ */
 nfs_work::thread_data::thread_data(nfs_work & ws)
     : ws(ws)
 {
-  /* Allocate memory for the intermediate sum (only one for both sides) */
-  SS = (unsigned char *) contiguous_malloc(BUCKET_REGION);
+#if 0
+    for(int side = 0 ; side < 2 ; side++) {
+        sides[side].bucket_region = ws.local_memory.alloc_bucket_region();
+    }
+    /* Allocate memory for the intermediate sum (only one for both sides) */
+    SS = ws.local_memory.alloc_bucket_region();
+#endif
 }
 
 nfs_work::thread_data::~thread_data()
 {
-    contiguous_free(SS);
+    for(int side = 0 ; side < 2 ; side++) {
+        ws.local_memory.free_bucket_region(sides[side].bucket_region);
+        sides[side].bucket_region = NULL;
+    }
+    ws.local_memory.free_bucket_region(SS);
+    SS = NULL;
 }
 
 void nfs_work::thread_data::allocate_bucket_regions()
 {
-    for (auto & S : sides)
-        S.allocate_bucket_region();
+    for(int side = 0 ; side < 2 ; side++) {
+        sides[side].bucket_region = ws.local_memory.alloc_bucket_region();
+    }
+    /* Allocate memory for the intermediate sum (only one for both sides) */
+    SS = ws.local_memory.alloc_bucket_region();
 }
 
 void nfs_work::zeroinit_defaults()
@@ -50,12 +76,13 @@ void nfs_work::zeroinit_defaults()
     toplevel = 0;
 }
 
-nfs_work::nfs_work(las_info const & _las)
+nfs_work::nfs_work(las_info & _las)
     : nfs_work(_las, NUMBER_OF_BAS_FOR_THREADS(_las.number_of_threads_per_subjob()))
 {
 }
-nfs_work::nfs_work(las_info const & _las, int nr_workspaces)
+nfs_work::nfs_work(las_info & _las, int nr_workspaces)
     : las(_las),
+    local_memory(_las.local_memory_accessor()),
     nr_workspaces(nr_workspaces),
     sides {{ {nr_workspaces}, {nr_workspaces} }},
     th(_las.number_of_threads_per_subjob(), thread_data(*this))
@@ -90,7 +117,9 @@ void nfs_work::allocate_buckets(nfs_aux & aux, thread_pool & pool)
     for (unsigned int side = 0; side < 2; side++) {
         side_data & wss(sides[side]);
         if (wss.no_fb()) continue;
-        wss.group.allocate_buckets(nb_buckets,
+        wss.group.allocate_buckets(
+                local_memory,
+                nb_buckets,
                 bk_multiplier,
                 wss.fbs->stats.weight,
                 conf.logI,

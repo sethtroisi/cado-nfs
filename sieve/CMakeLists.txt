@@ -30,6 +30,7 @@ set (las_sources
   las-descent-trees.cpp las-cofactor.cpp
   las-fill-in-buckets.cpp las-threads.cpp las-threads-work-data.cpp
   las-parallel.cpp
+  las-memory.cpp
   )
 set (las_libraries trialdiv facul utils ${pthread_libs})
 # set (las_libraries trialdiv facul utils ${pthread_libs})

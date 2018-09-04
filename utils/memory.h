@@ -21,15 +21,6 @@ extern void free_aligned(void * ptr);
 extern void * malloc_pagealigned(size_t sz) ATTR_ASSUME_ALIGNED(32);
 extern void free_pagealigned(void * ptr);
 
-
-/* Using any of the interfaces below (physical_* of contiguous_*)
- * triggers the initialization of some static data defined in memory.c
- */
-extern void * physical_malloc(const size_t x, const int affect) ATTR_ASSUME_ALIGNED(32);
-extern void physical_free(void *, size_t);
-extern void *contiguous_malloc(size_t);
-extern void contiguous_free(void *);
-
 #ifdef __cplusplus
 }
 #endif

@@ -11,6 +11,7 @@
 #include "ecm/facul.hpp"
 #include "ecm/batch.hpp"
 #include "multityped_array.hpp"
+#include "las-memory.hpp"
 #include "lock_guarded_container.hpp"
 
 #define NUMBER_OF_BAS_FOR_THREADS(n)    ((n) == 1 ? 1 : ((n) + 2))
@@ -42,6 +43,8 @@ class nfs_work {
     public:
     las_info const & las;
     private:
+    las_memory_accessor & local_memory;
+
     const int nr_workspaces;
 
     public:
@@ -179,13 +182,6 @@ class nfs_work {
              * This has size BUCKET_REGION_0 and should be close to L1
              * cache size. */
             unsigned char *bucket_region = NULL;
-
-            ~side_data();
-
-            private:
-            void allocate_bucket_region();
-            friend struct thread_data;
-            public:
         };
 
         nfs_work &ws;  /* a pointer to the parent structure, really */
@@ -213,14 +209,15 @@ class nfs_work {
 
         thread_data(nfs_work &);
         thread_data(thread_data const &);
+        thread_data(thread_data &&);
         ~thread_data();
         void allocate_bucket_regions();
     };
 
     std::vector<thread_data> th;
 
-    nfs_work(las_info const & _las);
-    nfs_work(las_info const & _las, int);
+    nfs_work(las_info & _las);
+    nfs_work(las_info & _las, int);
     private:
     void zeroinit_defaults();
     void compute_toplevel_and_buckets();        // utility
