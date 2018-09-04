@@ -22,7 +22,7 @@
 #include "threadpool.hpp"
 #include "las-memory.hpp"
 
-#include "electric_alloc.h"
+// #include "electric_alloc.h"
 
 /*
  * This bucket module provides a way to store elements (that are called
@@ -524,15 +524,15 @@ class bucket_single {
 public:
   bucket_single (const size_t size) : _size(size)
   {
-    start = electric_new<update_t>(size);
-    // start = new update_t[size];
+    // start = electric_new<update_t>(size);
+    start = new update_t[size];
     read = start;
     write = start;
   }
 
   ~bucket_single() {
-    electric_delete(start,_size);
-    // delete[] start;
+    // electric_delete(start,_size);
+    delete[] start;
     start = read  = write = NULL;
     _size = 0;
   }
