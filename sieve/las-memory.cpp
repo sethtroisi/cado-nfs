@@ -123,7 +123,7 @@ void las_memory_accessor::touch(void * p, size_t x)
     }
 }
 
-void las_memory_accessor::physical_free(void * p, size_t size)
+void las_memory_accessor::physical_free(void * p, size_t size MAYBE_UNUSED)
 {
 #if defined(HAVE_MMAP) && defined(MAP_HUGETLB)
     {
