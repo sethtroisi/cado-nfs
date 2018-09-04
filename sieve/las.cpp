@@ -2927,6 +2927,8 @@ void las_subjob(las_info & las, int subjob, las_todo_list & todo, las_report & g
     global_report.cumulated_wait_time += cumulated_wait_time;
 
     pthread_mutex_unlock(&lock);
+
+    verbose_output_print(0, 1, "# subjob %d done, now waiting for other jobs\n", subjob);
 }/*}}}*/
 
 int main (int argc0, char *argv0[])/*{{{*/
