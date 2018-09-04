@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <inttypes.h>
 #include <gmp.h>
-#include <vector>
+#include <list>
 #include <array>
 #include "cxx_mpz.hpp"
 #include "facul.hpp"

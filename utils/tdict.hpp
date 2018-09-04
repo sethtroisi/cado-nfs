@@ -454,7 +454,9 @@ public:
     void configure_aliases(cxx_param_list & pl);
 };
 
-typedef tdict::tree<tdict::timer_seconds_thread_and_wct> timetree_t;
+// timer_seconds_thread_and_wct is not satisfactory.
+// typedef tdict::tree<tdict::timer_seconds_thread_and_wct> timetree_t;
+typedef tdict::tree<tdict::timer_seconds_thread> timetree_t;
 
 #if 0
 
