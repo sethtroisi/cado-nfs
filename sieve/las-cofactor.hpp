@@ -7,11 +7,13 @@
 #include "ecm/facul.hpp"
 #include <array>
 #include <vector>
+#include <mutex>
 
 class cofactorization_statistics {
     FILE * file;
     std::vector<std::vector<uint32_t>> cof_call;
     std::vector<std::vector<uint32_t>> cof_success;
+    std::mutex lock;
 public:
     cofactorization_statistics(param_list_ptr pl);
     bool active() { return file != NULL; }
