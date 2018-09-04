@@ -407,7 +407,7 @@ find_smooth (cofac_list & l,
 
     for (int s = 0 ; s < 2 ; ++s)
     {
-        double start = seconds ();
+        double start = seconds (), wct_start = wct_seconds ();
 
         size_t input_candidates = l.size();
 
@@ -464,7 +464,7 @@ find_smooth (cofac_list & l,
             }
         }
 
-        fprintf (out, "# batch (side %d): took %.2fs to detect %zu smooth relations out of %zu\n", side, seconds () - start, l.size(), input_candidates);
+        fprintf (out, "# batch (side %d): took %.2fs (wct %.2fs) to detect %zu smooth relations out of %zu\n", side, seconds () - start, wct_seconds() - wct_start, l.size(), input_candidates);
     }
 
     return l.size();
