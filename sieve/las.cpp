@@ -2842,6 +2842,7 @@ void las_subjob(las_info & las, int subjob, las_todo_list & todo, las_report & g
                     if (!workspaces.cofac_candidates.empty()) {
                         {
                             std::lock_guard<std::mutex> foo(las.L.mutex());
+#if 0
                             las.L.reserve(las.L.size() +
                                     workspaces.cofac_candidates.size());
                             /* do we fear that this move could be
@@ -2853,6 +2854,9 @@ void las_subjob(las_info & las, int subjob, las_todo_list & todo, las_report & g
                             for(auto & x : workspaces.cofac_candidates)
                                 las.L.emplace_back(std::move(x));
                             /* we can release the mutex now */
+#else
+                            las.L.splice(las.L.end(), workspaces.cofac_candidates);
+#endif
                         }
                         workspaces.cofac_candidates.clear();
                     }

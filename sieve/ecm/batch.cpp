@@ -434,8 +434,8 @@ find_smooth (cofac_list & l,
 
         smoothness_test (temp, batchP[side], out);
 
-        size_t kept = l.size();
-        for(size_t i = 0 ; i < kept ; /* incremented within the loop */ ) {
+        auto jt = begin(temp);
+        for(auto it = begin(l) ; it != end(l) ; /* it++ within loop */) {
             /* check if the cofactor on the side we've just tested is
              * smooth. If it isn't, we put it at the end of the array,
              * and we free it.
@@ -447,7 +447,7 @@ find_smooth (cofac_list & l,
              * relation i is smooth iff R[i]=1 ; another option is in case
              * the remaining cofactor is below the mfb we've been given.
              */
-            cxx_mpz const& c(temp[i]);
+            cxx_mpz const& c(*jt++);
 
             if (mpz_cmp_ui (c, 1) == 0
                     || mpz_cmp(c, L) <= 0
@@ -456,17 +456,13 @@ find_smooth (cofac_list & l,
                        ))
             {
                 /* cofactor is smooth, we keep it where it is.  */
-                i++;
+                ++it;
             } else {
-                /* cofactor is not smooth, put it aside (schedule for
-                 * deletion). The next cofactor we'll examine is the
-                 * cofactor that used to be the last one. */
-                kept--;
-                std::swap(l[i], l[kept]);
-                std::swap(temp[i], temp[kept]);
+                /* cofactor is not smooth, get rid of it */
+                auto nit = it++;
+                l.erase(nit);
             }
         }
-        l.erase(l.begin() + kept, l.end());
 
         fprintf (out, "# batch (side %d): took %.2fs to detect %zu smooth relations out of %zu\n", side, seconds () - start, l.size(), input_candidates);
     }
@@ -722,12 +718,20 @@ factor (cofac_list const & L,
   methods = facul_make_default_strategy (nb_methods - 3, 0);
 
   size_t rep = 0;
+  cofac_list::const_iterator it;
 #ifdef HAVE_OPENMP
   omp_set_num_threads (nthreads);
-#pragma omp parallel for schedule(static)
+#pragma omp parallel private(it) reduction(+:rep)
 #endif
-  for (size_t i = 0 ; i < L.size() ; ++i)
-    rep += factor_one (L[i], pol, B, batchlpb, lpb, out, methods, SP);
+  for (it = begin(L); it != end(L); ++it) {
+#ifdef HAVE_OPENMP
+#pragma omp single nowait
+#endif
+      {
+          rep += factor_one (*it, pol, B, batchlpb, lpb, out, methods, SP);
+      }
+  }
+
 
   facul_clear_methods (methods);
 

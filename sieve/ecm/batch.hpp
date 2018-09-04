@@ -38,7 +38,7 @@ struct cofac_candidate {
       {}
 };
 
-typedef std::vector<cofac_candidate> cofac_list;
+typedef std::list<cofac_candidate> cofac_list;
 
 #ifdef __cplusplus
 extern "C" {
