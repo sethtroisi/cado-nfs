@@ -70,6 +70,7 @@ add_executable(dupsup
     las-norms.cpp logapprox.cpp
     las-coordinates.cpp
     las-parallel.cpp
+    las-memory.cpp
     bucket.cpp
 
     dupsup.cpp las-duplicate.cpp
