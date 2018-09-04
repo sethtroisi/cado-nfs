@@ -5,6 +5,7 @@
 #include <pthread.h>
 #include "portability.h"
 #include "utils.h"
+#include "memusage.h"
 #include "batch.hpp"
 
 
@@ -155,6 +156,11 @@ main (int argc, char *argv[])
                   (mpz_srcptr) x.cofactor[1]);
       }
   }
+
+    const long peakmem = PeakMemusage();
+    if (peakmem > 0)
+        printf ("# PeakMemusage (MB) = %ld \n",
+                peakmem >> 10);
 
   cado_poly_clear(cpoly);
   param_list_clear(pl);
