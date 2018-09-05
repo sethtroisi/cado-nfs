@@ -445,7 +445,7 @@ struct las_parallel_desc::helper {
        }
 #endif
    }
-   int interpret_generic_binding_specifier(std::string const & specifier, int cap = -1) {/*{{{*/
+   int interpret_generic_binding_specifier(std::string const & specifier, int cap MAYBE_UNUSED = -1) {/*{{{*/
 #ifdef HAVE_HWLOC
        int binding_size;
        /* and apply our different calculation rules to the provided
