@@ -5,6 +5,8 @@
 #include <array>
 #include <memory>
 #include <string.h>
+#include <string>
+#include <sstream>
 #include "tdict.hpp"
 #include "las-base.hpp"
 
@@ -120,7 +122,7 @@ struct coarse_las_timers {
     static int batch(int side) { return 8 + side; }
     static int batch_mixed() { return 10; }
     static int thread_wait() { return 11; }
-    static std::string explain(int x) {
+    static std::string explain_base(int x) {
         switch(x) {
             case -1: return "uncategorized (top-level bookkeeping)";
             case 0: return "bookkeeping (lower levels)";
@@ -137,6 +139,11 @@ struct coarse_las_timers {
             case 11: return "worker thread wait";
             default: ASSERT_ALWAYS(0);
         }
+    }
+    static std::string explain(int x) {
+        std::ostringstream os;
+        os << x << " " << explain_base(x);
+        return os.str();
     }
 };
 
