@@ -147,7 +147,12 @@ main (int argc, char *argv[])
   find_smooth(List, batchP, batchlpb, lpb, batchmfb, stdout, nb_threads);
   
   if (doecm) {
-      factor(List, cpoly, batchlpb, lpb, stdout, nb_threads);
+      std::list<relation> smooth = factor(List, cpoly, batchlpb, lpb, stdout, nb_threads);
+        for(auto const & rel : rels) {
+            std::ostringstream os;
+            os << rel << "\n";
+            printf("%s\n", os.str().c_str());
+        }
   } else {
       for (auto const & x : List) {
           gmp_printf("%" PRIi64 " %" PRIu64 " %Zd %Zd\n",

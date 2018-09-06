@@ -10,6 +10,7 @@
 #include "facul.hpp"
 #include "facul_doit.hpp"
 #include "utils.h"
+#include "relation.hpp"
 
 /* structure to compute on-line a product tree, avoiding to first compute a
    list of mpz_t (which might take too much memory) */
@@ -51,13 +52,15 @@ inline void cofac_list_add (cofac_list& L, long a, unsigned long b, std::array<c
 */
 
 unsigned long prime_product (mpz_ptr, prime_info, unsigned long, unsigned long);
-size_t find_smooth (cofac_list & l,
+size_t find_smooth (
+        cofac_list & l,
         std::array<cxx_mpz, 2> & batchP,
         int batchlpb[2], int lpb[2], int batchmfb[2],
         FILE *out,
         int nthreads MAYBE_UNUSED);
 
-size_t factor (cofac_list const &, cado_poly_srcptr, int[2], int[2], FILE*, int);
+std::list<relation>
+factor (cofac_list const &, cado_poly_srcptr, int[2], int[2], FILE*, int);
 void create_batch_file (const char*, mpz_t, unsigned long, unsigned long,
                         mpz_poly, FILE*, int);
 

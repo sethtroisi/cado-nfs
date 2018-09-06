@@ -620,7 +620,9 @@ strip (unsigned long *l, unsigned long n, mpz_t P)
 
 /* sqside = 1 if the special-q is on side 1 (algebraic) */
 static bool
-factor_one (cofac_candidate const & C,
+factor_one (
+        std::list<relation> & smooth,
+        cofac_candidate const & C,
         cado_poly_srcptr pol,
         unsigned long lim[2],
         int batchlpb[2],
@@ -663,35 +665,22 @@ factor_one (cofac_candidate const & C,
         }
     }
 
-    /* We could as well return a relation, after all */
-    std::ostringstream os;
-    os << a << "," << b;
-    for(int side = 0 ; side < 2 ; side++) {
-        os << ":";
-        auto it = factors[side].begin();
-        os << std::hex << *it++;
-        for( ; it < factors[side].end() ; ++it) {
-            os << "," << std::hex << *it;
-        }
+    relation rel(a,b);
+    for (int side = 0; side < 2; side++) {
+        for (auto const& z : factors[side])
+            rel.add(side, z, 0);
     }
+    rel.compress();
+    smooth.push_back(rel);
 
-    /* avoid two threads writing a relation simultaneously */
-#ifdef  HAVE_OPENMP
-#pragma omp critical
-#endif
-    {
-        fprintf (out, "%s\n", os.str().c_str());
-        fflush (out);
-    }
-
-    return stdout;
+    return true;
 }
 
 /* Given a list L of bi-smooth cofactors, print the corresponding relations
    on "out".
    n is the number of bi-smooth cofactors in L.
 */
-size_t
+std::list<relation>
 factor (cofac_list const & L,
         cado_poly_srcptr pol,
         int batchlpb[2],
@@ -717,29 +706,36 @@ factor (cofac_list const & L,
     nb_methods = NB_MAX_METHODS - 1;
   methods = facul_make_default_strategy (nb_methods - 3, 0);
 
-  size_t rep = 0;
+  std::list<relation> smooth;
   cofac_list::const_iterator it;
 #ifdef HAVE_OPENMP
   omp_set_num_threads (nthreads);
-#pragma omp parallel private(it) reduction(+:rep)
+#pragma omp parallel private(it)
+  {
+      std::list<relation> smooth_local;
+#else
+      std::list<relation> & smooth_local(smooth);
 #endif
-  for (it = begin(L); it != end(L); ++it) {
+      for (it = begin(L); it != end(L); ++it) {
 #ifdef HAVE_OPENMP
 #pragma omp single nowait
 #endif
-      {
-          rep += factor_one (*it, pol, B, batchlpb, lpb, out, methods, SP);
+          factor_one (smooth_local, *it, pol, B, batchlpb, lpb, out, methods, SP);
       }
+#ifdef HAVE_OPENMP
+#pragma omp critical
+      smooth.splice(smooth.end(), smooth_local);
   }
+#endif
 
 
   facul_clear_methods (methods);
 
   fprintf (out,
           "# batch: took %.2fs (wct %.2fs) to factor %zu smooth relations (%zd final cofac misses)\n",
-           seconds () - start, wct_seconds () - wct_start, rep, L.size()-rep);
+           seconds () - start, wct_seconds () - wct_start, smooth.size(), L.size()-smooth.size());
 
-  return rep;
+  return smooth;
 }
 
 static void

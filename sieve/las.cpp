@@ -1564,6 +1564,25 @@ void process_bucket_region_run::cofactoring_sync (survivors_t & survivors)/*{{{*
 
         if (!pass) continue;
 
+#if 0
+        if (ws.las.batch || ws.las.batch_print_survivors) {
+            /* in these cases, we won't go through detached_cofac, hence
+             * we won't check for potential (a,b) duplicates. Those can
+             * and will happen if we encounter overflowing buckets at
+             * level 2.
+             *
+             * However, in the long term we expect that this won't happen
+             * for real, as overflowing buckets are unlikely to occur
+             * unless very early in the process. Therefore we can omit
+             * the check here, and do it only at relation printing time.
+             */
+            nfs_aux::rel_hash_t& rel_hash(aux_p->get_rel_hash());
+            nfs_aux::abpair_t ab(cur.a, cur.b);
+            std::lock_guard<std::mutex> foo(rel_hash.mutex());
+            if (!rel_hash.insert(ab).second) continue;
+        }
+#endif
+
         rep.survivors.enter_cofactoring++;
 
         if (ws.las.batch_print_survivors) {
@@ -3178,12 +3197,33 @@ int main (int argc0, char *argv0[])/*{{{*/
 
         /* We may go back to our general thread placement at this point.
          * Currently the code below still uses openmp */
-        global_report.reports = factor (las.L,
+        std::list<relation> rels = factor (las.L,
                 las.cpoly,
                 las.batchlpb,
                 lpb,
 		las_output.output,
                 las.number_of_threads_loose());
+
+        verbose_output_start_batch();
+        nfs_aux::rel_hash_t rel_hash;
+        size_t nondup = 0;
+        for(auto const & rel : rels) {
+            std::ostringstream os;
+            nfs_aux::abpair_t ab(rel.a, rel.b);
+            bool is_new_rel = rel_hash.insert(ab).second;
+            if (!is_new_rel) {
+                /* we had this (a,b) pair twice, probably because of a
+                 * failed attempt, that was aborted because of an
+                 * exception. (occurs only with 2-level sieving) */
+                os << "# DUP ";
+            } else {
+                nondup++;
+            }
+            os << rel;
+            verbose_output_print(0, 1, "%s\n", os.str().c_str());
+        }
+        verbose_output_end_batch();
+        global_report.reports = nondup;
 
 	tcof_batch = seconds () - tcof_batch;
 	global_report.ttcof += tcof_batch;
