@@ -211,13 +211,18 @@ apply_one_bucket (unsigned char *S,
 {
   WHERE_AM_I_UPDATE(w, p, 0);
 
+  /* The slice indices are only fake indices in this case. So we must not
+   * instantiate this code ! */
+  static_assert(!std::is_same<HINT, logphint_t>::value, "This code must not be instantiated with hint type logphint_t");
+  static_assert(!std::is_same<HINT, longhint_t>::value, "This code must not be instantiated with hint type longhint_t");
+
   for (slice_index_t i_slice = 0; i_slice < BA.get_nr_slices(); i_slice++) {
       auto sl = BA.slice_range(i, i_slice);
       auto it = sl.begin();
       auto it_end = sl.end();
 
     const slice_index_t slice_index = BA.get_slice_index(i_slice);
-    const unsigned char logp = fbp[fbp.get_first_slice_index() + slice_index].get_logp();
+    const unsigned char logp = fbp[slice_index].get_logp();
 
     /* TODO: the code below is quite possibly correct, except perhaps for the
      * treatment of where_am_I stuff. I get inconsistent
@@ -287,10 +292,15 @@ apply_one_bucket (unsigned char *S,
   }
 }
 
-// Create the two instances, the longhint_t being specialized.
+// Create the four instances, longhint_t and logphint_t are specialized.
 template 
 void apply_one_bucket<shorthint_t> (unsigned char *S,
         const bucket_array_t<1, shorthint_t> &BA, const int i,
+        fb_factorbase::slicing::part const & fbp, where_am_I & w);
+
+template 
+void apply_one_bucket<emptyhint_t> (unsigned char *S,
+        const bucket_array_t<1, emptyhint_t> &BA, const int i,
         fb_factorbase::slicing::part const & fbp, where_am_I & w);
 
 template <>
@@ -299,13 +309,26 @@ void apply_one_bucket<longhint_t> (unsigned char *S,
         fb_factorbase::slicing::part const & fbp, where_am_I & w)
 {
     WHERE_AM_I_UPDATE(w, p, 0);
-
-    // There is only one fb_slice. Slice indices are embedded in the
-    // (long) hints.
+    // There is only one fb_slice. Slice indices are embedded in the hints.
+    ASSERT(BA.get_nr_slices() == 1);
+    ASSERT(BA.get_slice_index(0) == std::numeric_limits<slice_index_t>::max());
     for(auto const & it : BA.slice_range(i, 0)) {
         slice_index_t index = it.index;
         const unsigned char logp = fbp[index].get_logp();
         apply_one_update<longhint_t> (S, it, logp, w);
+    }
+}
+template <>
+void apply_one_bucket<logphint_t> (unsigned char *S,
+        const bucket_array_t<1, logphint_t> &BA, const int i,
+        fb_factorbase::slicing::part const &, where_am_I & w)
+{
+    WHERE_AM_I_UPDATE(w, p, 0);
+    // There is only one fb_slice. logp's are embedded in the hints.
+    ASSERT(BA.get_nr_slices() == 1);
+    ASSERT(BA.get_slice_index(0) == std::numeric_limits<slice_index_t>::max());
+    for(auto const & it : BA.slice_range(i, 0)) {
+        apply_one_update<logphint_t> (S, it, it.logp, w);
     }
 }
 /* }}} */
@@ -811,7 +834,6 @@ template<bool with_hints> void process_bucket_region_run::apply_buckets_inner(in
     rep.ttbuckets_apply -= seconds_thread();
     {
         CHILD_TIMER(timer, "apply buckets");
-        ASSERT_ALWAYS(wss.fbs->get_part(1).get_first_slice_index() == 0);
         for (auto const & BA : wss.bucket_arrays<1, my_shorthint_t>())
             apply_one_bucket(SS, BA, already_done + bucket_relative_index, wss.fbs->get_part(1), w);
     }
