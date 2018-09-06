@@ -203,6 +203,7 @@ class fb_slice_interface {
         virtual unsigned char get_logp() const = 0;
         virtual fbprime_t get_prime(slice_offset_t offset) const = 0;
         virtual unsigned char get_k(slice_offset_t offset) const = 0;
+        /* global index across all fb parts */
         virtual slice_index_t get_index() const = 0;
         virtual double get_weight() const = 0;
         virtual bool is_general() const = 0;
@@ -224,7 +225,7 @@ class fb_slice : public fb_slice_interface {
     typedef mmappable_vector<FB_ENTRY_TYPE> fb_entry_vector;
     typename fb_entry_vector::const_iterator _begin, _end;
     unsigned char logp;
-    slice_index_t index;
+    slice_index_t index; /* global index across all fb parts */
     double weight;
     friend struct helper_functor_subdivide_slices;
     fb_slice(typename fb_entry_vector::const_iterator it, unsigned char logp) : _begin(it), _end(it), logp(logp), index(0), weight(0) {}
@@ -250,6 +251,7 @@ class fb_slice : public fb_slice_interface {
          * access it from the virtual base though. This is way we're
          * not folding it to a template access.  */
     }
+    /* global index across all fb parts */
     slice_index_t get_index() const override {return index;}
     double get_weight() const override {return weight;}
     bool is_general() const override { return FB_ENTRY_TYPE::is_general_type; }
@@ -429,7 +431,6 @@ class fb_factorbase {
             slices_t slices;
             slice_index_t first_slice_index = 0;
             public:
-            inline slice_index_t get_first_slice_index() const { return first_slice_index; }
             template<int n>
                 typename fb_slices_factory<n>::type& get_slices_vector_for_nroots() {
                     return slices.get<n>();
@@ -471,7 +472,8 @@ class fb_factorbase {
                     }
             };
 
-            fb_slice_interface const * get(slice_index_t & index) const {
+            /* index is the global index across all fb parts */
+            fb_slice_interface const * get(slice_index_t index) const {
                 /* used to be in fb_vector::get_slice
                  *
                  * and in fb_part::get_slice for the lookup of the
@@ -483,7 +485,7 @@ class fb_factorbase {
                 if (index < first_slice_index) return NULL;
                 slice_index_t idx = index - first_slice_index;
                 if (idx >= nslices()) {
-                    index = idx - nslices();
+                    // index = idx - nslices();
                     return NULL;
                 }
                 const fb_slice_interface * res = multityped_array_locate<helper_functor_get>()(slices, idx);
@@ -518,12 +520,12 @@ class fb_factorbase {
                 template<typename T>
                 void operator()(T & x) {
                     for(auto & a : x)
-                        f(a); // , first_slice_index + &a-begin(x));
+                        f(a);
                 }
                 template<typename T>
                 void operator()(T const & x) {
                     for(auto const & a : x) 
-                        f(a); // , first_slice_index + &a-begin(x));
+                        f(a);
                 }
             };
             public:
@@ -550,7 +552,8 @@ class fb_factorbase {
                 multityped_array_foreach(foreach_slice_s<F> { f }, slices);
             }
             */
-
+ 
+            /* index: global index across all fb parts */
             fb_slice_interface const & operator[](slice_index_t index) const {
                 /* This bombs out at runtime if get returns NULL, but
                  * then it should be an indication of a programmer
@@ -576,6 +579,7 @@ class fb_factorbase {
         /* toplevel is set by the ctor */
         int toplevel = 0;
 
+        /* index: global index across all fb parts */
         fb_slice_interface const * get(slice_index_t index) const {
             for (auto const & p : parts) {
                 if (index < p.first_slice_index + p.nslices()) 
@@ -590,7 +594,8 @@ class fb_factorbase {
         inline int get_toplevel() const { return toplevel; }
 
         /* This accesses the *fb_slice* with this index. Not the vector of
-         * slices ! */
+         * slices !
+         * index: global index across all fb parts */
         fb_slice_interface const & operator[](slice_index_t index) const {
             return *get(index);
         }

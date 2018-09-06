@@ -994,7 +994,8 @@ struct push_slice_to_task_list_saving_precomp {
         : pool(pool), P(P), model(m), Vpre(Vpre) {}
     template<typename T>
     void operator()(T const & s) {
-        slice_index_t idx = s.get_index() - P.get_first_slice_index();
+        /* we're pushing the global index, relative to all fb parts */
+        slice_index_t idx = s.get_index();
         ASSERT_ALWAYS((size_t) idx == pushed);
 
         plattices_dense_vector_t & pre(Vpre[idx]);
@@ -1213,7 +1214,8 @@ downsort_tree_inner(
                 // used by apply_one_bucket
                 // and purge.
                 BAout.reset_pointers();
-                BAout.add_slice_index(0);
+                BAout.add_slice_index(
+                        std::numeric_limits<slice_index_t>::max());
                 downsort<LEVEL+1>(fbs, BAout, BAin, bucket_index, taux.w);
                 wss.template release_BA<LEVEL,my_longhint_t>(BAout);
             }, bucket_index, 0);
