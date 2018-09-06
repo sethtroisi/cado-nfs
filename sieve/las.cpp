@@ -788,7 +788,7 @@ apply_one_bucket (unsigned char *S,
       auto it_end = sl.end();
 
     const slice_index_t slice_index = BA.get_slice_index(i_slice);
-    const unsigned char logp = fbp[slice_index].get_logp();
+    const unsigned char logp = fbp[fbp.get_first_slice_index() + slice_index].get_logp();
 
     /* TODO: the code below is quite possibly correct, except perhaps for the
      * treatment of where_am_I stuff. I get inconsistent
@@ -1376,6 +1376,7 @@ template<bool with_hints> void process_bucket_region_run::apply_buckets_inner(in
     rep.ttbuckets_apply -= seconds_thread();
     {
         CHILD_TIMER(timer, "apply buckets");
+        ASSERT_ALWAYS(wss.fbs->get_part(1).get_first_slice_index() == 0);
         for (auto const & BA : wss.bucket_arrays<1, my_shorthint_t>())
             apply_one_bucket(SS, BA, already_done + bucket_relative_index, wss.fbs->get_part(1), w);
     }
