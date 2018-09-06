@@ -8,21 +8,20 @@
 # General parameters
 ###########################################################################
 
-name = p60
+name = p35
 
 
 ###########################################################################
 # Polynomial selection with Kleinjung's algorithm
 ###########################################################################
 
-tasks.polyselect.degree = 4
+tasks.polyselect.degree = 3
 
 tasks.polyselect.admax = 1000
-tasks.polyselect.incr = 60
-tasks.polyselect.adrange = 500
-tasks.polyselect.P = 400
-tasks.polyselect.nq = 250
-tasks.polyselect.ropteffort = 0.01
+tasks.polyselect.incr = 30
+tasks.polyselect.adrange = 200
+tasks.polyselect.P = 320
+tasks.polyselect.nq = 75
 
 
 ###########################################################################
@@ -30,26 +29,27 @@ tasks.polyselect.ropteffort = 0.01
 ###########################################################################
 
 
-tasks.I = 11
-lim0 = 25000
-lim1 = 25000
-lpb0 = 17
-lpb1 = 17
-tasks.sieve.mfb0 = 34
-tasks.sieve.mfb1 = 34
-tasks.sieve.lambda0 = 2.1
-tasks.sieve.lambda1 = 2.1
-tasks.sieve.qmin = 10000
-tasks.sieve.qrange = 2000
-tasks.sieve.rels_wanted = 32000
+tasks.I = 10
+lim0 = 4000
+lim1 = 4000
+lpb0 = 13
+lpb1 = 13
+tasks.sieve.mfb0 = 26
+tasks.sieve.mfb1 = 26
+tasks.sieve.lambda0 = 2.2
+tasks.sieve.lambda1 = 2.2
+tasks.sieve.qmin = 1000
+tasks.sieve.qrange = 250
+tasks.sieve.rels_wanted = 3000
+
 
 
 ###########################################################################
 # Filtering
 ###########################################################################
 
-tasks.filter.maxlevel = 20
-tasks.filter.target_density = 80
+tasks.filter.maxlevel = 15
+tasks.filter.target_density = 65
 
 tasks.reconstructlog.partial=false
 
@@ -57,17 +57,17 @@ tasks.reconstructlog.partial=false
 # Individual log
 ###########################################################################
 
-tasks.descent.init_I = 11
+tasks.descent.init_I = 10
 tasks.descent.init_ncurves = 10
-tasks.descent.init_lpb = 27
-tasks.descent.init_lim = 25000
-tasks.descent.init_mfb = 54
-tasks.descent.init_tkewness = 25000
-tasks.descent.I = 11
-tasks.descent.lim0 = 25000
-tasks.descent.lim1 = 25000
-tasks.descent.lpb0 = 17
-tasks.descent.lpb1 = 17
-tasks.descent.mfb0 = 34
-tasks.descent.mfb1 = 34
+tasks.descent.init_lpb = 18
+tasks.descent.init_lim = 4000
+tasks.descent.init_mfb = 36
+tasks.descent.init_tkewness = 4000
+tasks.descent.I = 10
+tasks.descent.lim0 = 4000
+tasks.descent.lim1 = 4000
+tasks.descent.lpb0 = 13
+tasks.descent.lpb1 = 13
+tasks.descent.mfb0 = 26
+tasks.descent.mfb1 = 26
 

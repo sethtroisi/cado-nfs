@@ -2,7 +2,7 @@
 ###########################################################################
 #     Parameter file for Cado-NFS ; DLP version
 ###########################################################################
-# See params/params.c90 for an example which contains some documentation.
+# See parameters/dlp/params.p70 for an example which contains some documentation.
 
 ###########################################################################
 # General parameters
@@ -12,17 +12,15 @@ name = p60
 
 
 ###########################################################################
-# Polynomial selection with Kleinjung's algorithm
+# Polynomial selection with Joux-Lercier's algorithm
 ###########################################################################
 
-tasks.polyselect.degree = 4
+jlpoly = true
+fastSM = true
 
-tasks.polyselect.admax = 1000
-tasks.polyselect.incr = 60
-tasks.polyselect.adrange = 500
-tasks.polyselect.P = 400
-tasks.polyselect.nq = 250
-tasks.polyselect.ropteffort = 0.01
+tasks.polyselect.degree = 3
+tasks.polyselect.bound = 4
+tasks.polyselect.modm = 7
 
 
 ###########################################################################
@@ -30,18 +28,20 @@ tasks.polyselect.ropteffort = 0.01
 ###########################################################################
 
 
-tasks.I = 11
-lim0 = 25000
-lim1 = 25000
-lpb0 = 17
-lpb1 = 17
-tasks.sieve.mfb0 = 34
-tasks.sieve.mfb1 = 34
-tasks.sieve.lambda0 = 2.1
-tasks.sieve.lambda1 = 2.1
-tasks.sieve.qmin = 10000
+tasks.I = 10
+lim0 = 250000
+lim1 = 7500
+lpb0 = 18
+lpb1 = 16
+tasks.sieve.mfb0 = 18
+tasks.sieve.mfb1 = 32
+tasks.sieve.lambda0 = 1.2
+tasks.sieve.lambda1 = 2.2
 tasks.sieve.qrange = 2000
-tasks.sieve.rels_wanted = 32000
+tasks.sieve.qmin = 2500
+tasks.sieve.sqside = 0
+tasks.sieve.rels_wanted = 50000
+
 
 
 ###########################################################################
@@ -51,7 +51,12 @@ tasks.sieve.rels_wanted = 32000
 tasks.filter.maxlevel = 20
 tasks.filter.target_density = 80
 
+###########################################################################
+# Reconstructlog
+###########################################################################
+
 tasks.reconstructlog.partial=false
+tasks.reconstructlog.checkdlp=false
 
 ###########################################################################
 # Individual log
@@ -62,7 +67,7 @@ tasks.descent.init_ncurves = 10
 tasks.descent.init_lpb = 27
 tasks.descent.init_lim = 25000
 tasks.descent.init_mfb = 54
-tasks.descent.init_tkewness = 25000
+tasks.descent.init_tkewness = 200000
 tasks.descent.I = 11
 tasks.descent.lim0 = 25000
 tasks.descent.lim1 = 25000

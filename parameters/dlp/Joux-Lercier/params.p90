@@ -2,27 +2,24 @@
 ###########################################################################
 #     Parameter file for Cado-NFS ; DLP version
 ###########################################################################
-# See params/params.c90 for an example which contains some documentation.
+# See parameters/dlp/params.p70 for an example which contains some documentation.
 
 ###########################################################################
 # General parameters
 ###########################################################################
 
-name = p60
+name = p90
 
 
 ###########################################################################
-# Polynomial selection with Kleinjung's algorithm
+# Polynomial selection with Joux-Lercier's algorithm
 ###########################################################################
 
-tasks.polyselect.degree = 4
+jlpoly = true
 
-tasks.polyselect.admax = 1000
-tasks.polyselect.incr = 60
-tasks.polyselect.adrange = 500
-tasks.polyselect.P = 400
-tasks.polyselect.nq = 250
-tasks.polyselect.ropteffort = 0.01
+tasks.polyselect.degree = 3
+tasks.polyselect.bound = 8
+tasks.polyselect.modm = 13
 
 
 ###########################################################################
@@ -30,44 +27,51 @@ tasks.polyselect.ropteffort = 0.01
 ###########################################################################
 
 
-tasks.I = 11
-lim0 = 25000
-lim1 = 25000
-lpb0 = 17
-lpb1 = 17
-tasks.sieve.mfb0 = 34
-tasks.sieve.mfb1 = 34
-tasks.sieve.lambda0 = 2.1
-tasks.sieve.lambda1 = 2.1
-tasks.sieve.qmin = 10000
-tasks.sieve.qrange = 2000
-tasks.sieve.rels_wanted = 32000
+tasks.I = 13
+lim0 = 650000
+lim1 = 37500
+lpb0 = 21
+lpb1 = 19
+tasks.sieve.mfb0 = 21
+tasks.sieve.mfb1 = 36
+tasks.sieve.lambda0 = 1.2
+tasks.sieve.lambda1 = 2.2
+tasks.sieve.qmin = 100000
+tasks.sieve.qrange = 10000
+tasks.sieve.sqside = 0
+tasks.sieve.rels_wanted = 240000
+
 
 
 ###########################################################################
 # Filtering
 ###########################################################################
 
-tasks.filter.maxlevel = 20
-tasks.filter.target_density = 80
+tasks.filter.maxlevel = 25
+tasks.filter.target_density = 100
+
+###########################################################################
+# Reconstructlog
+###########################################################################
 
 tasks.reconstructlog.partial=false
+tasks.reconstructlog.checkdlp=false
 
 ###########################################################################
 # Individual log
 ###########################################################################
 
-tasks.descent.init_I = 11
+tasks.descent.init_I = 12
 tasks.descent.init_ncurves = 10
-tasks.descent.init_lpb = 27
-tasks.descent.init_lim = 25000
-tasks.descent.init_mfb = 54
-tasks.descent.init_tkewness = 25000
-tasks.descent.I = 11
-tasks.descent.lim0 = 25000
-tasks.descent.lim1 = 25000
-tasks.descent.lpb0 = 17
-tasks.descent.lpb1 = 17
-tasks.descent.mfb0 = 34
-tasks.descent.mfb1 = 34
+tasks.descent.init_lpb = 38
+tasks.descent.init_lim = 240000
+tasks.descent.init_mfb = 76
+tasks.descent.init_tkewness = 200000
+tasks.descent.I = 12
+tasks.descent.lim0 = 240000
+tasks.descent.lim1 = 240000
+tasks.descent.lpb0 = 20
+tasks.descent.lpb1 = 20
+tasks.descent.mfb0 = 40
+tasks.descent.mfb1 = 40
 

@@ -8,21 +8,20 @@
 # General parameters
 ###########################################################################
 
-name = p60
+name = p40
 
 
 ###########################################################################
 # Polynomial selection with Kleinjung's algorithm
 ###########################################################################
 
-tasks.polyselect.degree = 4
+tasks.polyselect.degree = 3
 
 tasks.polyselect.admax = 1000
-tasks.polyselect.incr = 60
-tasks.polyselect.adrange = 500
-tasks.polyselect.P = 400
-tasks.polyselect.nq = 250
-tasks.polyselect.ropteffort = 0.01
+tasks.polyselect.incr = 30
+tasks.polyselect.adrange = 250
+tasks.polyselect.P = 350
+tasks.polyselect.nq = 100
 
 
 ###########################################################################
@@ -31,25 +30,26 @@ tasks.polyselect.ropteffort = 0.01
 
 
 tasks.I = 11
-lim0 = 25000
-lim1 = 25000
-lpb0 = 17
-lpb1 = 17
-tasks.sieve.mfb0 = 34
-tasks.sieve.mfb1 = 34
+lim0 = 7000
+lim1 = 7000
+lpb0 = 14
+lpb1 = 14
+tasks.sieve.mfb0 = 28
+tasks.sieve.mfb1 = 28
 tasks.sieve.lambda0 = 2.1
 tasks.sieve.lambda1 = 2.1
-tasks.sieve.qmin = 10000
-tasks.sieve.qrange = 2000
-tasks.sieve.rels_wanted = 32000
+tasks.sieve.qmin = 5000
+tasks.sieve.qrange = 500
+tasks.sieve.rels_wanted = 5000
+
 
 
 ###########################################################################
 # Filtering
 ###########################################################################
 
-tasks.filter.maxlevel = 20
-tasks.filter.target_density = 80
+tasks.filter.maxlevel = 15
+tasks.filter.target_density = 67.5
 
 tasks.reconstructlog.partial=false
 
@@ -59,15 +59,15 @@ tasks.reconstructlog.partial=false
 
 tasks.descent.init_I = 11
 tasks.descent.init_ncurves = 10
-tasks.descent.init_lpb = 27
-tasks.descent.init_lim = 25000
-tasks.descent.init_mfb = 54
-tasks.descent.init_tkewness = 25000
+tasks.descent.init_lpb = 20
+tasks.descent.init_lim = 7000
+tasks.descent.init_mfb = 40
+tasks.descent.init_tkewness = 7000
 tasks.descent.I = 11
-tasks.descent.lim0 = 25000
-tasks.descent.lim1 = 25000
-tasks.descent.lpb0 = 17
-tasks.descent.lpb1 = 17
-tasks.descent.mfb0 = 34
-tasks.descent.mfb1 = 34
+tasks.descent.lim0 = 7000
+tasks.descent.lim1 = 7000
+tasks.descent.lpb0 = 14
+tasks.descent.lpb1 = 14
+tasks.descent.mfb0 = 28
+tasks.descent.mfb1 = 28
 
