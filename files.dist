@@ -728,6 +728,7 @@ parameters/dlp/params.p80
 parameters/dlp/params.p85
 parameters/dlp/params.p90
 parameters/dlp/params.p95
+parameters/dlp/params.p100
 parameters/dlp/Joux-Lercier/params.p100
 parameters/dlp/Joux-Lercier/params.p30
 parameters/dlp/Joux-Lercier/params.p35
@@ -744,6 +745,8 @@ parameters/dlp/Joux-Lercier/params.p85
 parameters/dlp/Joux-Lercier/params.p90
 parameters/dlp/Joux-Lercier/params.p95
 parameters/dlp/Joux-Lercier/params.p100
+parameters/dlp/TwoQuadratics/README
+parameters/dlp/TwoQuadratics/params.p30
 parameters/dlp/p30.hint
 parameters/dlp/p35.hint
 parameters/dlp/p40.hint
