@@ -1290,15 +1290,17 @@ downsort_tree_inner(
        * corresponding initialization is done with identical code in
        * las.cpp
        */
+      ASSERT(ws.toplevel > 1);
       for(int side = 0 ; side < 2 ; side++) {
+          nfs_work::side_data & wss(ws.sides[side]);
+          if (wss.no_fb()) continue;
           pool.add_task_lambda([=,&ws,&aux](worker_thread * worker, int){
                   timetree_t & timer(aux.get_timer(worker));
                   ENTER_THREAD_TIMER(timer);
                   MARK_TIMER_FOR_SIDE(timer, side);
                   SIBLING_TIMER(timer, "prepare small sieve");
                   nfs_work::side_data & wss(ws.sides[side]);
-                  if (wss.no_fb()) return;
-                  ASSERT(ws.toplevel > 1);
+                  // if (wss.no_fb()) return;
                   SIBLING_TIMER(timer, "small sieve start positions");
                   /* When we're doing 2-level sieving, there is probably
                    * no real point in doing ssdpos initialization in

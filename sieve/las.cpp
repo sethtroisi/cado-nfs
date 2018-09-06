@@ -2408,13 +2408,15 @@ void process_many_bucket_regions(nfs_work & ws, std::shared_ptr<nfs_work_cofac> 
             int more = std::min(SMALL_SIEVE_START_POSITIONS_MAX_ADVANCE, ws.nb_buckets[1] - done);
 
             for(int side = 0 ; side < 2 ; side++) {
+                nfs_work::side_data & wss(ws.sides[side]);
+                if (wss.no_fb()) continue;
                 pool.add_task_lambda([=,&ws](worker_thread * worker, int){
                         timetree_t & timer(aux_p->get_timer(worker));
                         ENTER_THREAD_TIMER(timer);
                         MARK_TIMER_FOR_SIDE(timer, side);
                         SIBLING_TIMER(timer, "prepare small sieve");
                         nfs_work::side_data & wss(ws.sides[side]);
-                        if (wss.no_fb()) return;
+                        // if (wss.no_fb()) return;
                         SIBLING_TIMER(timer, "small sieve start positions");
                         /* When we're doing 2-level sieving, there is probably
                          * no real point in doing ssdpos initialization in
@@ -2499,6 +2501,8 @@ void do_one_special_q_sublat(nfs_work & ws, std::shared_ptr<nfs_work_cofac> wc_p
         BOOKKEEPING_TIMER(timer_special_q);
 
         for(int side = 0 ; side < 2 ; side++) {
+            nfs_work::side_data & wss(ws.sides[side]);
+            if (wss.no_fb()) continue;
             pool.add_task_lambda([&ws,aux_p,side](worker_thread * worker,int){
                     timetree_t & timer(aux_p->get_timer(worker));
                     ENTER_THREAD_TIMER(timer);
@@ -2507,7 +2511,7 @@ void do_one_special_q_sublat(nfs_work & ws, std::shared_ptr<nfs_work_cofac> wc_p
                     SIBLING_TIMER(timer, "prepare small sieve");
 
                     nfs_work::side_data & wss(ws.sides[side]);
-                    if (wss.no_fb()) return;
+                    // if (wss.no_fb()) return;
 
                     small_sieve_init(wss.ssd,
                             wss.fbs->small_sieve_entries.resieved,
