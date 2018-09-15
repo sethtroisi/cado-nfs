@@ -69,15 +69,15 @@ if __name__ == '__main__':
     # up do bizarre things with duplicated keys if we resume from a
     # parameter snapshot file *and* we have something on the command
     # line.
-    if parameters.get_simple("database", None):
+    if parameters.get_or_set_default("database", None):
         parameters.replace("database", db.uri_without_credentials)
         # do this so that the parameter does not appear unused.
-        parameters.get_simple("database")
+        parameters.get_or_set_default("database")
 
 
     # well, this *must* exist, right ?
-    name = parameters.get_simple("tasks.name")
-    wdir = parameters.get_simple("tasks.workdir")
+    name = parameters.get_or_set_default("tasks.name")
+    wdir = parameters.get_or_set_default("tasks.workdir")
     
     # Add a logger to capture the command lines of programs we run
     cmdfilename = os.path.join(wdir, name + ".cmd")
