@@ -329,6 +329,72 @@ double matpoly_addmul(abdst_field ab, matpoly c, matpoly a, matpoly b, int draft
     return x0 + x1;
 }/*}}}*/
 
+/* This is special-purpose. We multiply c by a scalar matrix, and we
+ * acknowledge the fact that the columns of c may be unbalanced.
+ */
+void matpoly_mul_unbalanced_columns_by_scalar_matrix(abdst_field ab, matpoly c, matpoly a, unsigned int * lengths, matpoly b)/*{{{*/
+{
+    ASSERT_ALWAYS(b->size == 1);
+    unsigned int csize = 0;
+    for(unsigned int j = 0 ; j < a->n ; ++j) {
+        if (lengths[j] > csize) csize = lengths[j];
+    }
+
+    if (c == a) {
+        matpoly tc;
+        matpoly_init(ab, tc, a->m, b->n, csize);
+        matpoly_mul_unbalanced_columns_by_scalar_matrix(ab, tc, a, lengths, b);
+        matpoly_swap(tc, c);
+        matpoly_clear(ab, tc);
+        return;
+    }
+    ASSERT_ALWAYS(c != a && a != b);
+    ASSERT_ALWAYS(a->n == b->m);
+    if (matpoly_check_pre_init(c)) {
+        matpoly_init(ab, c, a->m, b->n, csize);
+    }
+    ASSERT_ALWAYS(c->m == a->m);
+    ASSERT_ALWAYS(c->n == b->n);
+    ASSERT_ALWAYS(c->alloc >= csize);
+
+    c->size = csize;
+
+    abvec_ur vtmp;
+    abelt_ur etmp;
+
+    abelt_ur_init(ab, &etmp);
+    abvec_ur_init(ab, &vtmp, c->size);
+
+    for(unsigned int i = 0 ; i < a->m ; i++) {
+        for(unsigned int j = 0 ; j < b->n ; j++) {
+            abvec_ur_set_zero(ab, vtmp, lengths[j]);
+
+            for(unsigned int k = 0 ; k < a->n ; k++) {
+                if (abcmp_ui(ab, matpoly_coeff_const(ab, b, k, j, 0), 0) != 0) {
+                    ASSERT_ALWAYS(lengths[k] <= lengths[j]);
+                    /* a[i,k] has length lengths[k]. Multiply that by b[k,j],
+                     * which is a constant. Add to the unreduced thing. We don't
+                     * have an mpfq api call for that operation.
+                     */
+                    for(unsigned int s = 0 ; s < lengths[j] ; s++) {
+                        abmul_ur(ab,
+                                etmp,
+                                matpoly_coeff_const(ab, a, i, k, s),
+                                matpoly_coeff_const(ab, b, k, j, 0));
+                        abelt_ur_add(ab,
+                                abvec_ur_coeff_ptr(ab, vtmp, s),
+                                abvec_ur_coeff_ptr(ab, vtmp, s),
+                                etmp);
+                    }
+                }
+            }
+            abvec_reduce(ab, matpoly_part(ab, c, i, j, 0), vtmp, lengths[j]);
+        }
+    }
+    abelt_ur_clear(ab, &etmp);
+    abvec_ur_clear(ab, &vtmp, c->size);
+}/*}}}*/
+
 double matpoly_mul(abdst_field ab, matpoly c, matpoly a, matpoly b, int draft)/*{{{*/
 {
     size_t csize = a->size + b->size; csize -= (csize > 0);

@@ -277,12 +277,33 @@ bw_lingen_basecase(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta) 
     matpoly_init(ab, pi, b, b, pi_room_base);
     pi->size = pi_room_base;
 
+    /* We now compute the Gaussian elimination matrix T explicitly,
+     * instead of computing by transvections. This allows us to do fewer
+     * reductions per coefficient of the final matrix, which ultimately
+     * is a improvement of the running time. [plingen_pz
+     * --random-input-with-length 20000 prime=1009 lingen_threshold=1000
+     *  m=8 n=4 ==> basecase time reduced by 25%]
+     */
+#define COMPUTE_T_EXPLICITLY
+
+#ifdef COMPUTE_T_EXPLICITLY
+    /* This is a "secondary" pi. When we multiply by the matrix T, we
+     * can't do this in place, so we need to allocate a new matrix.
+     * However, this adds many alloc/free calls that we'd like to avoid.
+     * Instead, we reserve a secondary matrix, and do matpoly_swap at
+     * each turn.
+     */
+    matpoly xpi;
+    matpoly_init(ab, xpi, b, b, pi_room_base);
+    xpi->size = pi_room_base;
+#endif
+
     /* Also keep track of the
      * number of coefficients for the columns of pi. Set pi to Id */
 
     unsigned int *pi_lengths = (unsigned int*) malloc(b * sizeof(unsigned int));
+    matpoly_set_constant_ui(ab, pi, 1);
     for(unsigned int i = 0 ; i < b ; i++) {
-        abset_ui(ab, matpoly_coeff(ab, pi, i, i, 0), 1);
         pi_lengths[i] = 1;
     }
 
@@ -391,6 +412,11 @@ bw_lingen_basecase(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta) 
         /* }}} */
 
         /* {{{ Now do Gaussian elimination */
+#ifdef COMPUTE_T_EXPLICITLY
+            matpoly T;
+            matpoly_init(ab, T, b, b, 1);
+            matpoly_set_constant_ui(ab, T, 1);
+#endif
         memset(is_pivot, 0, b * sizeof(int));
         unsigned int r = 0;
         /* Loop through logical indices */
@@ -451,6 +477,20 @@ bw_lingen_basecase(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta) 
                     bm->lucky[k] = -1;
                     continue;
                 }
+#ifdef COMPUTE_T_EXPLICITLY
+                /* multiply T by the transvection matrix. Later on we'll
+                 * apply this to pi
+                 */
+                for(unsigned int i = 0 ; i < b ; i++) {
+                    /* TODO: Would be better if mpfq had an addmul */
+                    abmul(ab, tmp, lambda,
+                            matpoly_coeff(ab, T, i, j, 0));
+                    abadd(ab,
+                            matpoly_coeff(ab, T, i, k, 0),
+                            matpoly_coeff(ab, T, i, k, 0),
+                            tmp);
+                }
+#else
                 for(unsigned int i = 0 ; i < b ; i++) {
                     /* Beware. One may be tempted to think that the code
                      * above is dubious. It is, in fact, not a problem.
@@ -469,6 +509,7 @@ bw_lingen_basecase(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta) 
                                 tmp);
                     }
                 }
+#endif
                 abclear(ab, &tmp);
                 /* }}} */
                 abclear(ab, &lambda);
@@ -476,6 +517,11 @@ bw_lingen_basecase(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta) 
             abclear(ab, &inv); /* }}} */
         }
         /* }}} */
+#ifdef COMPUTE_T_EXPLICITLY
+            matpoly_mul_unbalanced_columns_by_scalar_matrix(ab, xpi, pi, pi_lengths, T);
+            matpoly_swap(xpi, pi);
+            matpoly_clear(ab, T);
+#endif
         free(ctable);
 
         ASSERT_ALWAYS(r == m);
@@ -516,6 +562,9 @@ bw_lingen_basecase(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta) 
             pi->size = pi_lengths[j];
     }
     pi->size = MIN(pi->size, pi->alloc);
+#ifdef COMPUTE_T_EXPLICITLY
+    matpoly_clear(ab, xpi);
+#endif
     matpoly_clear(ab, e);
     free(is_pivot);
     free(pivots);
