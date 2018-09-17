@@ -41,10 +41,6 @@ struct cofac_candidate {
 
 typedef std::list<cofac_candidate> cofac_list;
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 /*
  * These three functions add to to the double& extra_time argument the
  * cpu time (RUSAGE_THREAD, seconds_thread()) spent in openmp helper
@@ -57,12 +53,8 @@ size_t find_smooth (
         FILE *out,
         int nthreads MAYBE_UNUSED, double &);
 
-std::list<relation> factor (cofac_list const &, cado_poly_srcptr, int[2], int[2], FILE*, int, double&);
-void create_batch_file (const char*, mpz_t, unsigned long, unsigned long,
-                        mpz_poly, FILE*, int, double &);
-
-#ifdef __cplusplus
-}
-#endif
+std::list<relation> factor (cofac_list const &, cxx_cado_poly const&, int[2], int[2], FILE*, int, double&);
+void create_batch_file (const char*, cxx_mpz &, unsigned long, unsigned long,
+                        cxx_mpz_poly const &, FILE*, int, double &);
 
 #endif /* COFAC_LIST_H */

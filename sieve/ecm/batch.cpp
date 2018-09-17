@@ -145,7 +145,7 @@ prime_list (std::vector<unsigned long> & L, prime_info pi,
 
 static void
 prime_list_poly (std::vector<unsigned long> & L, prime_info pi,
-                 unsigned long pmax, mpz_poly_srcptr f)
+                 unsigned long pmax, cxx_mpz_poly const & f)
 {
   if (f->deg == 1)
     return prime_list (L, pi, pmax);
@@ -180,7 +180,7 @@ prime_tree (mpz_product_tree L, unsigned long pmax)
  * main thread.
  */
 static void
-prime_tree_poly (mpz_product_tree L, unsigned long pmax, mpz_poly_srcptr f, double & extra_time)
+prime_tree_poly (mpz_product_tree L, unsigned long pmax, cxx_mpz_poly const& f, double & extra_time)
 {
   if (f->deg == 1) {
     prime_tree (L, pmax);
@@ -232,7 +232,7 @@ prime_tree_poly (mpz_product_tree L, unsigned long pmax, mpz_poly_srcptr f, doub
 /* put in P the product of primes p for which the given polynomial has factors
    modulo p */
 static void
-prime_product_poly (mpz_t P, unsigned long p_max, mpz_poly_srcptr f, double & extra_time)
+prime_product_poly (mpz_t P, unsigned long p_max, cxx_mpz_poly const & f, double & extra_time)
 {
   mpz_product_tree L;
 
@@ -730,7 +730,7 @@ static bool
 factor_one (
         std::list<relation> & smooth,
         cofac_candidate const & C,
-        cado_poly_srcptr pol,
+        cxx_cado_poly const & pol,
         unsigned long lim[2],
         int batchlpb[2],
         int lpb[2],
@@ -793,7 +793,7 @@ factor_one (
  */
 std::list<relation>
 factor (cofac_list const & L,
-        cado_poly_srcptr pol,
+        cxx_cado_poly const & pol,
         int batchlpb[2],
         int lpb[2],
         FILE *out, int nthreads MAYBE_UNUSED, double& extra_time)
@@ -866,7 +866,7 @@ factor (cofac_list const & L,
 }
 
 static void
-create_batch_product (mpz_t P, unsigned long L, mpz_poly_srcptr pol, double & extra_time)
+create_batch_product (mpz_t P, unsigned long L, cxx_mpz_poly const & pol, double & extra_time)
 {
   prime_product_poly (P, L, pol, extra_time);
 }
@@ -879,7 +879,7 @@ create_batch_product (mpz_t P, unsigned long L, mpz_poly_srcptr pol, double & ex
    The header can be read by a human with head -3 batch_file. */
 static void
 output_batch (FILE *fp, unsigned long B, unsigned long L,
-              mpz_poly pol, mpz_t P, const char *f)
+              cxx_mpz_poly const & pol, cxx_mpz const & P, const char *f)
 {
   int ret;
 
@@ -899,8 +899,8 @@ output_batch (FILE *fp, unsigned long B, unsigned long L,
 /* read a batch file from fp, and check the header is consistent with
    B, L and pol. See #21459. */
 static void
-input_batch (FILE *fp, unsigned long B, unsigned long L, mpz_poly pol,
-             mpz_t P, const char *f)
+input_batch (FILE *fp, unsigned long B, unsigned long L, cxx_mpz_poly const & pol,
+             cxx_mpz & P, const char *f)
 {
   unsigned long Bread, Lread;
   mpz_poly pol_read;
@@ -956,8 +956,8 @@ parse_error:
    3) if f != NULL and file is existing: P is read from file
 */
 void
-create_batch_file (const char *f, mpz_t P, unsigned long B, unsigned long L,
-                   mpz_poly pol, FILE *out, int nthreads MAYBE_UNUSED, double & extra_time)
+create_batch_file (const char *f, cxx_mpz & P, unsigned long B, unsigned long L,
+                   cxx_mpz_poly const & pol, FILE *out, int nthreads MAYBE_UNUSED, double & extra_time)
 {
   FILE *fp;
   double e0, s, st, wct;

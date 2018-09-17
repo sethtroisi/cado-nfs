@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h> /* for strcmp() */
 #include <pthread.h>
+#include <sstream>
 #include "portability.h"
 #include "utils.h"
 #include "memusage.h"
@@ -32,13 +33,12 @@ static void declare_usage(param_list pl)
 int
 main (int argc, char *argv[])
 {
-  param_list pl;
-  cado_poly cpoly;
+  cxx_param_list pl;
+  cxx_cado_poly cpoly;
   char *argv0 = argv[0];
   unsigned long nb_threads = 1;
   int doecm = 0;
 
-  param_list_init(pl);
   declare_usage(pl);
 
   param_list_configure_switch(pl, "-doecm", &doecm);
@@ -69,7 +69,6 @@ main (int argc, char *argv[])
       param_list_print_usage(pl, argv0, stderr);
       exit(EXIT_FAILURE);
   }
-  cado_poly_init(cpoly);
   if (!cado_poly_read(cpoly, filename)) {
       fprintf (stderr, "Error reading polynomial file %s\n", filename);
       exit (EXIT_FAILURE);
@@ -120,9 +119,12 @@ main (int argc, char *argv[])
 
   std::array<cxx_mpz, 2> batchP;
 
+  double extra_time = 0;
+
   for (int side = 0; side < 2; ++side) {
       create_batch_file (batch_file[side], batchP[side], lim[side],
-              1UL << batchlpb[side], cpoly->pols[side], stdout, nb_threads);
+              1UL << batchlpb[side], cpoly->pols[side], stdout, nb_threads,
+              extra_time);
   }
 
   // Read list from the input file.
@@ -144,11 +146,11 @@ main (int argc, char *argv[])
   }
   fclose_maybe_compressed(inp, infilename);
 
-  find_smooth(List, batchP, batchlpb, lpb, batchmfb, stdout, nb_threads);
+  find_smooth(List, batchP, batchlpb, lpb, batchmfb, stdout, nb_threads, extra_time);
   
   if (doecm) {
-      std::list<relation> smooth = factor(List, cpoly, batchlpb, lpb, stdout, nb_threads);
-        for(auto const & rel : rels) {
+      std::list<relation> smooth = factor(List, cpoly, batchlpb, lpb, stdout, nb_threads, extra_time);
+        for(auto const & rel : smooth) {
             std::ostringstream os;
             os << rel << "\n";
             printf("%s\n", os.str().c_str());
@@ -166,9 +168,6 @@ main (int argc, char *argv[])
     if (peakmem > 0)
         printf ("# PeakMemusage (MB) = %ld \n",
                 peakmem >> 10);
-
-  cado_poly_clear(cpoly);
-  param_list_clear(pl);
 
   return EXIT_SUCCESS;
 }
