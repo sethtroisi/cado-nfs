@@ -37,6 +37,7 @@ struct lognorm_base {/*{{{*/
     lognorm_base(lognorm_base const &) = default;
     lognorm_base& operator=(lognorm_base const &) = default;
     lognorm_base(siever_config const & sc, cxx_cado_poly const & cpoly, int side, qlattice_basis const & Q, int logI, int J);
+    virtual ~lognorm_base() {}
 
     void norm(mpz_ptr x, int i, unsigned int j) const;
     unsigned char lognorm(int i, unsigned int j) const;
@@ -66,6 +67,7 @@ struct lognorm_reference : public lognorm_base {/*{{{*/
     lognorm_reference(lognorm_reference const &) = default;
     lognorm_reference& operator=(lognorm_reference const &) = default;
     lognorm_reference(siever_config const & sc, cxx_cado_poly const & cpoly, int side, qlattice_basis const & Q, int logI, int J);
+    virtual ~lognorm_reference() {}
     virtual void fill(unsigned char * S, int N) const;
 };
 
@@ -84,6 +86,7 @@ struct lognorm_smart : public lognorm_base {/*{{{*/
     lognorm_smart(lognorm_smart const &) = default;
     lognorm_smart& operator=(lognorm_smart const &) = default;
     lognorm_smart(siever_config const & sc, cxx_cado_poly const & cpoly, int side, qlattice_basis const & Q, int logI, int J);
+    virtual ~lognorm_smart() {}
     virtual void fill(unsigned char * S, int N) const;
 };
 
