@@ -38,6 +38,8 @@ int matpoly_cmp(abdst_field ab MAYBE_UNUSED, matpoly_srcptr a, matpoly_srcptr b)
 static inline abdst_vec matpoly_part(abdst_field ab, matpoly_ptr p, unsigned int i, unsigned int j, unsigned int k);
 static inline abdst_elt matpoly_coeff(abdst_field ab, matpoly_ptr p, unsigned int i, unsigned int j, unsigned int k);
 void matpoly_set_polymat(abdst_field ab MAYBE_UNUSED, matpoly_ptr dst, polymat_srcptr src);
+void matpoly_set_constant_ui(abdst_field ab, matpoly_ptr p, unsigned long e);
+void matpoly_set_constant(abdst_field ab, matpoly_ptr p, absrc_elt e);
 
 #if 0   /* nonexistent ? */
 void matpoly_addmat(abdst_field ab,

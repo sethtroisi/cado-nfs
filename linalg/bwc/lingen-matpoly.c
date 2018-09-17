@@ -72,6 +72,28 @@ void matpoly_zero(abdst_field ab, matpoly_ptr p) {
     p->size = 0;
     abvec_set_zero(ab, p->x, p->m*p->n*p->alloc);
 }
+void matpoly_set_constant_ui(abdst_field ab, matpoly_ptr p, unsigned long e) {
+    ASSERT_ALWAYS(p->m == p->n);
+    p->size = 0;
+    if (p->alloc == 0 && e)
+        matpoly_realloc(ab, p, 1);
+    matpoly_zero(ab, p);
+    if (!e) return;
+    p->size = 1;
+    for(unsigned int i = 0 ; i < p->m ; ++i)
+        abset_ui(ab, matpoly_coeff(ab, p, i, i, 0), e);
+}
+void matpoly_set_constant(abdst_field ab, matpoly_ptr p, absrc_elt e) {
+    ASSERT_ALWAYS(p->m == p->n);
+    p->size = 0;
+    if (p->alloc == 0 && abcmp_ui(ab, e, 0) != 0)
+        matpoly_realloc(ab, p, 1);
+    matpoly_zero(ab, p);
+    if (abcmp_ui(ab, e, 0) == 0) return;
+    p->size = 1;
+    for(unsigned int i = 0 ; i < p->m ; ++i)
+        abset(ab, matpoly_coeff(ab, p, i, i, 0), e);
+}
 void matpoly_clear(abdst_field ab, matpoly_ptr p) {
     abvec_clear(ab, &(p->x), p->m*p->n*p->alloc);
     memset(p, 0, sizeof(matpoly));
