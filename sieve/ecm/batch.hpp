@@ -45,24 +45,21 @@ typedef std::list<cofac_candidate> cofac_list;
 extern "C" {
 #endif
 
-    /*
-inline void cofac_list_add (cofac_list& L, long a, unsigned long b, std::array<cxx_mpz, 2>& RA, int side, cxx_mpz const & sq) {
-    L.emplace_back(a, b, RA, sq, side);
-}
-*/
-
-unsigned long prime_product (mpz_ptr, prime_info, unsigned long, unsigned long);
+/*
+ * These three functions add to to the double& extra_time argument the
+ * cpu time (RUSAGE_THREAD, seconds_thread()) spent in openmp helper
+ * threads, NOT counting the time spent in the main thread.
+ */
 size_t find_smooth (
         cofac_list & l,
         std::array<cxx_mpz, 2> & batchP,
         int batchlpb[2], int lpb[2], int batchmfb[2],
         FILE *out,
-        int nthreads MAYBE_UNUSED);
+        int nthreads MAYBE_UNUSED, double &);
 
-std::list<relation>
-factor (cofac_list const &, cado_poly_srcptr, int[2], int[2], FILE*, int);
+std::list<relation> factor (cofac_list const &, cado_poly_srcptr, int[2], int[2], FILE*, int, double&);
 void create_batch_file (const char*, mpz_t, unsigned long, unsigned long,
-                        mpz_poly, FILE*, int);
+                        mpz_poly, FILE*, int, double &);
 
 #ifdef __cplusplus
 }

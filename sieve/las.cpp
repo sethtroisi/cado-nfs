@@ -694,9 +694,6 @@ struct process_bucket_region_run : public process_bucket_region_spawn {
     nfs_work::thread_data & tws;
     timetree_t & timer;
     int bucket_relative_index;
-#ifndef DISABLE_TIMINGS
-    timetree_t::accounting_child_autoactivate_recursive dummy;
-#endif
     las_report& rep;
     unsigned char * S[2];
     /* We will have this point to the thread's where_am_I data member.
@@ -775,12 +772,6 @@ struct process_bucket_region_run : public process_bucket_region_spawn {
             tws(ws.th[worker->rank()]),
             timer(aux_p->get_timer(worker)),
             bucket_relative_index(id),
-            /* these two are a bit annoying. we want them to scope
-             * properly.
-             */
-#ifndef DISABLE_TIMINGS
-            dummy(timer, tdict_slot_for_threads),
-#endif
             rep(taux.rep),
             w(taux.w)
     {
@@ -811,6 +802,7 @@ void process_bucket_region_spawn::operator()(worker_thread * worker, int id) /*{
 void process_bucket_region_run::init_norms(int side)/*{{{*/
 {
     CHILD_TIMER(timer, "init norms");
+    TIMER_CATEGORY(timer, norms(side));
 
     int N = first_region0_index + already_done + bucket_relative_index;
 
@@ -834,6 +826,7 @@ template<bool with_hints> void process_bucket_region_run::apply_buckets_inner(in
     rep.ttbuckets_apply -= seconds_thread();
     {
         CHILD_TIMER(timer, "apply buckets");
+        TIMER_CATEGORY(timer, sieving(side));
         for (auto const & BA : wss.bucket_arrays<1, my_shorthint_t>())
             apply_one_bucket(SS, BA, already_done + bucket_relative_index, wss.fbs->get_part(1), w);
     }
@@ -841,6 +834,7 @@ template<bool with_hints> void process_bucket_region_run::apply_buckets_inner(in
     /* Apply downsorted buckets, if necessary. */
     if (ws.toplevel > 1) {
         CHILD_TIMER(timer, "apply downsorted buckets");
+        TIMER_CATEGORY(timer, sieving(side));
 
         for (auto const & BAd : wss.bucket_arrays<1, my_longhint_t>()) {
             // FIXME: the updates could come from part 3 as well,
@@ -863,6 +857,7 @@ void process_bucket_region_run::apply_buckets(int side)
 void process_bucket_region_run::small_sieve(int side)/*{{{*/
 {
     CHILD_TIMER(timer, "small sieve");
+    TIMER_CATEGORY(timer, sieving(side));
 
     nfs_work::side_data & wss(ws.sides[side]);
 
@@ -878,6 +873,7 @@ void process_bucket_region_run::SminusS(int side)/*{{{*/
     /* compute S[side][x] = max(S[side][x] - SS[x], 0),
      * and clear SS.  */
     CHILD_TIMER(timer, "S minus S (2)");
+    TIMER_CATEGORY(timer, cofactoring(side));
 
     ::SminusS(S[side], S[side] + BUCKET_REGION, SS);
 #if defined(TRACE_K) 
@@ -1007,6 +1003,7 @@ void process_bucket_region_run::purge_buckets(int side)/*{{{*/
     nfs_work::side_data & wss(ws.sides[side]);
 
     SIBLING_TIMER(timer, "purge buckets");
+    TIMER_CATEGORY(timer, cofactoring(side));
 
     unsigned char * Sx = S[0] ? S[0] : S[1];
 
@@ -1031,6 +1028,7 @@ void process_bucket_region_run::resieve(int side)/*{{{*/
 {
     nfs_work::side_data & wss(ws.sides[side]);
     SIBLING_TIMER(timer, "resieve");
+    TIMER_CATEGORY(timer, sieving(side));
 
     unsigned char * Sx = S[0] ? S[0] : S[1];
 
@@ -1652,6 +1650,7 @@ void process_bucket_region_run::operator()() {/*{{{*/
         }
 
         MARK_TIMER_FOR_SIDE(timer, side);
+        TIMER_CATEGORY(timer, sieving(side));
 
         /* Compute norms in S[side] */
         init_norms(side);
@@ -2929,7 +2928,7 @@ void las_subjob(las_info & las, int subjob, las_todo_list & todo, las_report & g
                      * prepare_for_new_q, called from do_one_special_q.
                      */
                     double old_value = workspaces.bk_multiplier.get(e.key);
-                    double ratio = (double) e.reached_size / e.theoretical_max_size * 1.1;
+                    double ratio = (double) e.reached_size / e.theoretical_max_size * 1.05;
                     double new_value = old_value * ratio;
                     double fresh_value = las.get_bk_multiplier().get(e.key);
                     if (fresh_value > new_value) {
@@ -3164,15 +3163,19 @@ int main (int argc0, char *argv0[])/*{{{*/
     }
 #endif
 
-    global_timer.start();
     las.set_loose_binding();
 
     if (las.batch)
       {
+          timetree_t batch_timer;
+          auto z = call_dtor([&]() { global_timer += batch_timer; });
+          ACTIVATE_TIMER(batch_timer);
+
         /* We need to access lim[01] and lpb[01] */
         siever_config const & sc0(las.config_pool.base);
-        SIBLING_TIMER(global_timer, "batch cofactorization (time is wrong because of openmp)");
-        TIMER_CATEGORY(global_timer, batch_mixed());
+        CHILD_TIMER(batch_timer, "batch cofactorization (time is wrong because of openmp)");
+        TIMER_CATEGORY(batch_timer, batch_mixed());
+        double extra_time = 0;
 
         std::array<cxx_mpz, 2> batchP;
         int lpb[2] = { sc0.sides[0].lpb, sc0.sides[1].lpb };
@@ -3184,7 +3187,8 @@ int main (int argc0, char *argv0[])/*{{{*/
                     1UL << las.batchlpb[side],
                     las.cpoly->pols[side],
                     las_output.output,
-                    las.number_of_threads_loose());
+                    las.number_of_threads_loose(),
+                    extra_time);
         }
 
 	double tcof_batch = seconds ();
@@ -3197,16 +3201,21 @@ int main (int argc0, char *argv0[])/*{{{*/
 	find_smooth (las.L,
                 batchP, las.batchlpb, lpb, las.batchmfb,
                 las_output.output,
-                las.number_of_threads_loose());
+                las.number_of_threads_loose(),
+                extra_time);
 
         /* We may go back to our general thread placement at this point.
          * Currently the code below still uses openmp */
+
         std::list<relation> rels = factor (las.L,
                 las.cpoly,
                 las.batchlpb,
                 lpb,
 		las_output.output,
-                las.number_of_threads_loose());
+                las.number_of_threads_loose(),
+                extra_time);
+        verbose_output_print (0, 1, "# batch reported time for additional threads: %.2f\n", extra_time);
+        batch_timer.add_foreign_time(extra_time);
 
         verbose_output_start_batch();
         nfs_aux::rel_hash_t rel_hash;
@@ -3245,8 +3254,6 @@ int main (int argc0, char *argv0[])/*{{{*/
     }
     verbose_output_print (2, 1, "# Discarded %lu special-q's out of %u pushed\n",
             global_report.nr_sq_discarded, todo.nq_pushed);
-
-    global_timer.stop();
 
     if (tdict::global_enable >= 1) {
         verbose_output_print (0, 1, "#\n# Hierarchical timings:\n%s", global_timer.display().c_str());

@@ -278,6 +278,9 @@ namespace tdict {
                 self -= v;
                 current = this;
             }
+            void add_foreign_time(timer_data_type const & t) {
+                self += t;
+            }
             void set_current_category(int c) {
                 ASSERT_ALWAYS(running());
                 /* It is not allowed to set a category for the root of
@@ -406,9 +409,8 @@ private:
                 if (category >= 0)
                     flag = category;
                 D[flag] += self;
-                for(typename M_t::const_iterator a = M.begin() ; a != M.end() ; a++) {
-                    a->second.filter_by_category(D, flag);
-
+                for(auto const & a : M) {
+                    a.second.filter_by_category(D, flag);
                 }
             }
 

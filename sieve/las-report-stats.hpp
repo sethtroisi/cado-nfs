@@ -117,11 +117,12 @@ struct coarse_las_timers {
     static int search_survivors() { return 1; }
     static int sieving(int side) { return 2 + side; }
     static int sieving_mixed() { return 4; }
-    static int cofactoring(int side) { return 5 + side; }
-    static int cofactoring_mixed() { return 7; }
-    static int batch(int side) { return 8 + side; }
-    static int batch_mixed() { return 10; }
-    static int thread_wait() { return 11; }
+    static int norms(int side) { return 5 + side; }
+    static int cofactoring(int side) { return 7 + side; }
+    static int cofactoring_mixed() { return 9; }
+    static int batch(int side) { return 10 + side; }
+    static int batch_mixed() { return 12; }
+    static int thread_wait() { return 13; }
     static std::string explain_base(int x) {
         switch(x) {
             case -1: return "uncategorized (top-level bookkeeping)";
@@ -130,13 +131,15 @@ struct coarse_las_timers {
             case 2: return "sieving on side 0";
             case 3: return "sieving on side 1";
             case 4: return "sieving (not differentiated)";
-            case 5: return "cofactoring on side 0";
-            case 6: return "cofactoring on side 1";
-            case 7: return "cofactoring (not differentiated)";
-            case 8: return "product trees on side 0";
-            case 9: return "product trees on side 1";
-            case 10: return "product trees (not differentiated)";
-            case 11: return "worker thread wait";
+            case 5: return "norms on side 0";
+            case 6: return "norms on side 1";
+            case 7: return "cofactoring on side 0";
+            case 8: return "cofactoring on side 1";
+            case 9: return "cofactoring (not differentiated)";
+            case 10: return "product trees on side 0";
+            case 11: return "product trees on side 1";
+            case 12: return "product trees (not differentiated)";
+            case 13: return "worker thread wait";
             default: ASSERT_ALWAYS(0);
         }
     }

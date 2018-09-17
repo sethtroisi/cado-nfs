@@ -823,7 +823,7 @@ public:
  */
 PREPARE_TEMPLATE_INST_NAMES(fill_in_buckets_one_slice_internal, "");
 PREPARE_TEMPLATE_INST_NAMES(downsort, "");
-PREPARE_TEMPLATE_INST_NAMES(downsort_tree, "");
+PREPARE_TEMPLATE_INST_NAMES(downsort_tree, " (dispatcher only)");
 
 #define TEMPLATE_INST_NAME(x,y) CADO_CONCATENATE(x, _name)<y>::value
 #else
