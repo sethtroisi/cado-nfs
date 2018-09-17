@@ -241,6 +241,14 @@ void matpoly_rshift(abdst_field ab, matpoly_ptr dst, matpoly_srcptr src, unsigne
 double matpoly_addmul(abdst_field ab, matpoly c, matpoly a, matpoly b, int draft)/*{{{*/
 {
     size_t csize = a->size + b->size; csize -= (csize > 0);
+    if (c == a || c == b) {
+        matpoly tc;
+        matpoly_init(ab, tc, a->m, b->n, csize);
+        double t = matpoly_addmul(ab, tc, a, b, draft);
+        matpoly_swap(tc, c);
+        matpoly_clear(ab, tc);
+        return t;
+    }
     ASSERT_ALWAYS(a->n == b->m);
     if (matpoly_check_pre_init(c)) {
         matpoly_init(ab, c, a->m, b->n, csize);
@@ -248,6 +256,15 @@ double matpoly_addmul(abdst_field ab, matpoly c, matpoly a, matpoly b, int draft
     ASSERT_ALWAYS(c->m == a->m);
     ASSERT_ALWAYS(c->n == b->n);
     ASSERT_ALWAYS(c->alloc >= csize);
+
+    for(unsigned int i = 0 ; i < c->m ; ++i) {
+        for(unsigned int j = 0 ; j < c->n ; ++j) {
+            abvec_set_zero(ab,
+                    matpoly_part(ab, c, i, j, c->size),
+                    csize - c->size);
+        }
+    }
+
     c->size = csize;
     abvec_ur tmp[2];
     abvec_ur_init(ab, &tmp[0], c->size);
@@ -294,6 +311,15 @@ double matpoly_mul(abdst_field ab, matpoly c, matpoly a, matpoly b, int draft)/*
 {
     size_t csize = a->size + b->size; csize -= (csize > 0);
 
+    if (c == a || c == b) {
+        matpoly tc;
+        matpoly_init(ab, tc, a->m, b->n, csize);
+        double t = matpoly_mul(ab, tc, a, b, draft);
+        matpoly_swap(tc, c);
+        matpoly_clear(ab, tc);
+        return t;
+    }
+        
     ASSERT_ALWAYS(a->n == b->m);
     if (matpoly_check_pre_init(c)) {
         matpoly_init(ab, c, a->m, b->n, csize);
