@@ -141,6 +141,9 @@ void matpoly_add(abdst_field ab,
     }
 }
 
+/* shift by a multiplication by x all coefficients of degree k and above
+ * in column j. (that is, whole polynomial entries if k==0)
+ */
 void matpoly_multiply_column_by_x(abdst_field ab, matpoly_ptr pi, unsigned int j, unsigned int size)/*{{{*/
 {
     ASSERT_ALWAYS((size + 1) <= pi->alloc);
@@ -148,6 +151,15 @@ void matpoly_multiply_column_by_x(abdst_field ab, matpoly_ptr pi, unsigned int j
         memmove(matpoly_part(ab, pi, i, j, 1), matpoly_part(ab, pi, i, j, 0), 
                 size * abvec_elt_stride(ab, 1));
         abset_ui(ab, matpoly_coeff(ab, pi, i, j, 0), 0);
+    }
+}/*}}}*/
+void matpoly_divide_column_by_x(abdst_field ab, matpoly_ptr pi, unsigned int j, unsigned int size)/*{{{*/
+{
+    ASSERT_ALWAYS(size <= pi->alloc);
+    for(unsigned int i = 0 ; i < pi->m ; i++) {
+        memmove(matpoly_part(ab, pi, i, j, 0), matpoly_part(ab, pi, i, j, 1), 
+                (size-1) * abvec_elt_stride(ab, 1));
+        abset_ui(ab, matpoly_coeff(ab, pi, i, j, size-1), 0);
     }
 }/*}}}*/
 
@@ -330,20 +342,22 @@ double matpoly_addmul(abdst_field ab, matpoly c, matpoly a, matpoly b, int draft
 }/*}}}*/
 
 /* This is special-purpose. We multiply c by a scalar matrix, and we
- * acknowledge the fact that the columns of c may be unbalanced.
+ * acknowledge the fact that the columns of c may be unbalanced. Entries
+ * are taken from coefficient of degree k0 onwards, up to coefficient of
+ * degree k1s[j]-1 for column j.
  */
-void matpoly_mul_unbalanced_columns_by_scalar_matrix(abdst_field ab, matpoly c, matpoly a, unsigned int * lengths, matpoly b)/*{{{*/
+void matpoly_mul_unbalanced_columns_by_scalar_matrix(abdst_field ab, matpoly c, matpoly a, unsigned int k0, unsigned int * k1s, matpoly b)/*{{{*/
 {
     ASSERT_ALWAYS(b->size == 1);
     unsigned int csize = 0;
     for(unsigned int j = 0 ; j < a->n ; ++j) {
-        if (lengths[j] > csize) csize = lengths[j];
+        if (k1s[j] > csize) csize = k1s[j];
     }
 
     if (c == a) {
         matpoly tc;
         matpoly_init(ab, tc, a->m, b->n, csize);
-        matpoly_mul_unbalanced_columns_by_scalar_matrix(ab, tc, a, lengths, b);
+        matpoly_mul_unbalanced_columns_by_scalar_matrix(ab, tc, a, k0, k1s, b);
         matpoly_swap(tc, c);
         matpoly_clear(ab, tc);
         return;
@@ -363,36 +377,44 @@ void matpoly_mul_unbalanced_columns_by_scalar_matrix(abdst_field ab, matpoly c, 
     abelt_ur etmp;
 
     abelt_ur_init(ab, &etmp);
-    abvec_ur_init(ab, &vtmp, c->size);
+    abvec_ur_init(ab, &vtmp, c->size - k0);
 
     for(unsigned int i = 0 ; i < a->m ; i++) {
         for(unsigned int j = 0 ; j < b->n ; j++) {
-            abvec_ur_set_zero(ab, vtmp, lengths[j]);
+            abvec_ur_set_zero(ab, vtmp, k1s[j] - k0);
 
             for(unsigned int k = 0 ; k < a->n ; k++) {
                 if (abcmp_ui(ab, matpoly_coeff_const(ab, b, k, j, 0), 0) != 0) {
-                    ASSERT_ALWAYS(lengths[k] <= lengths[j]);
-                    /* a[i,k] has length lengths[k]. Multiply that by b[k,j],
+                    ASSERT_ALWAYS(k1s[k] <=k1s[j]);
+                    /* a[i,k] has length k1s[k]. Multiply that by b[k,j],
                      * which is a constant. Add to the unreduced thing. We don't
                      * have an mpfq api call for that operation.
                      */
-                    for(unsigned int s = 0 ; s < lengths[j] ; s++) {
+                    for(unsigned int s = k0 ; s < k1s[j] ; s++) {
                         abmul_ur(ab,
                                 etmp,
                                 matpoly_coeff_const(ab, a, i, k, s),
                                 matpoly_coeff_const(ab, b, k, j, 0));
                         abelt_ur_add(ab,
-                                abvec_ur_coeff_ptr(ab, vtmp, s),
-                                abvec_ur_coeff_ptr(ab, vtmp, s),
+                                abvec_ur_coeff_ptr(ab, vtmp, s - k0),
+                                abvec_ur_coeff_ptr(ab, vtmp, s - k0),
                                 etmp);
                     }
                 }
             }
-            abvec_reduce(ab, matpoly_part(ab, c, i, j, 0), vtmp, lengths[j]);
+            abvec_reduce(ab, matpoly_part(ab, c, i, j, k0), vtmp, k1s[j] - k0);
         }
     }
     abelt_ur_clear(ab, &etmp);
-    abvec_ur_clear(ab, &vtmp, c->size);
+    abvec_ur_clear(ab, &vtmp, c->size - k0);
+}/*}}}*/
+void matpoly_mul_shifted_columns_by_scalar_matrix(abdst_field ab, matpoly c, matpoly a, unsigned int k, matpoly b)/*{{{*/
+{
+    unsigned int * lengths = (unsigned int *) malloc(a->n * sizeof(unsigned int));
+    for(unsigned int j = 0 ; j < a->n ; j++)
+        lengths[j] = a->size;
+    matpoly_mul_unbalanced_columns_by_scalar_matrix(ab, c, a, k, lengths, b);
+    free(lengths);
 }/*}}}*/
 
 double matpoly_mul(abdst_field ab, matpoly c, matpoly a, matpoly b, int draft)/*{{{*/

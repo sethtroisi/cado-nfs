@@ -55,6 +55,7 @@ void matpoly_submat(abdst_field ab,
 
 void matpoly_truncate(abdst_field ab, matpoly_ptr dst, matpoly_srcptr src, unsigned int size);
 void matpoly_multiply_column_by_x(abdst_field ab, matpoly_ptr pi, unsigned int j, unsigned int size);
+void matpoly_divide_column_by_x(abdst_field ab, matpoly_ptr pi, unsigned int j, unsigned int size);
 void matpoly_zero_column(abdst_field ab,
         matpoly_ptr dst, unsigned int jdst, unsigned int kdst);
 void matpoly_extract_column(abdst_field ab,
@@ -73,7 +74,8 @@ double matpoly_addmp(abdst_field ab, matpoly c, matpoly a, matpoly b, int draft)
 double matpoly_mul(abdst_field ab, matpoly c, matpoly a, matpoly b, int draft);
 double matpoly_mp(abdst_field ab, matpoly c, matpoly a, matpoly b, int draft);
 
-void matpoly_mul_unbalanced_columns_by_scalar_matrix(abdst_field ab, matpoly c, matpoly a, unsigned int * lengths, matpoly b);
+void matpoly_mul_unbalanced_columns_by_scalar_matrix(abdst_field ab, matpoly c, matpoly a, unsigned int, unsigned int * lengths, matpoly b);
+void matpoly_mul_shifted_columns_by_scalar_matrix(abdst_field ab, matpoly c, matpoly a, unsigned int k, matpoly b);
 
 
 /* {{{ access interface for matpoly */
