@@ -15,7 +15,9 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/utsname.h>
-
+#ifdef  HAVE_OPENMP
+#include <omp.h>
+#endif
 
 #include <assert.h>
 
@@ -334,39 +336,54 @@ bw_lingen_basecase(bmstatus_ptr bm, matpoly_ptr pi, matpoly_srcptr E, unsigned i
          * at the physical positions of the corresponding columns of pi.
          */
 
-        abelt_ur tmp_ur;
-        abelt_ur_init(ab, &tmp_ur);
-
-        abvec_ur e_ur;
-        abvec_ur_init(ab, &e_ur, m*b);
-        abvec_ur_set_zero(ab, e_ur, m*b);
+        std::vector<unsigned int> todo;
         for(unsigned int j = 0 ; j < b ; j++) {
             if (is_pivot[j]) continue;
             /* We should never have to recompute from pi using discarded
              * columns. Discarded columns should always correspond to
              * pivots */
             ASSERT_ALWAYS(bm->lucky[j] >= 0);
-            for(unsigned int s = 0 ; s < pi_lengths[j] ; s++) {
-                for(unsigned int i = 0 ; i < m ; i++) {
-                    for(unsigned int k = 0 ; k < b ; k++) {
-                        abmul_ur(ab, tmp_ur,
-                                matpoly_coeff_const(ab, E, i, k, t - s),
-                                matpoly_coeff(ab, pi, k, j, s));
-                        abelt_ur_add(ab,
-                                abvec_ur_coeff_ptr(ab, e_ur, i*b+j),
-                                abvec_ur_coeff_ptr_const(ab, e_ur, i*b+j),
-                                tmp_ur);
+            todo.push_back(j);
+        }
+
+#ifdef HAVE_OPENMP
+#pragma omp parallel
+#endif
+        {
+            abelt_ur tmp_ur;
+            abelt_ur_init(ab, &tmp_ur);
+
+            abelt_ur e_ur;
+            abelt_ur_init(ab, &e_ur);
+            
+#ifdef HAVE_OPENMP
+#pragma omp for collapse(2)
+#endif
+            for(unsigned int jl = 0 ; jl < todo.size() ; ++jl) {
+                for(unsigned int i = 0 ; i < m ; ++i) {
+                    unsigned int j = todo[jl];
+                    abelt_ur_set_zero(ab, e_ur);
+                    for(unsigned int k = 0 ; k < b ; ++k) {
+                        for(unsigned int s = 0 ; s < pi_lengths[j] ; s++) {
+                            abmul_ur(ab, tmp_ur,
+                                    matpoly_coeff_const(ab, E, i, k, t - s),
+                                    matpoly_coeff(ab, pi, k, j, s));
+                            abelt_ur_add(ab, e_ur, e_ur, tmp_ur);
+                        }
                     }
+                    abreduce(ab, matpoly_coeff(ab, e, i, j, 0), e_ur);
                 }
             }
+
+            abelt_ur_clear(ab, &tmp_ur);
+            abelt_ur_clear(ab, &e_ur);
         }
+
         unsigned int newluck = 0;
-        for(unsigned int j = 0 ; j < b ; j++) {
-            if (is_pivot[j]) continue;
+        for(unsigned int jl = 0 ; jl < todo.size() ; ++jl) {
+            unsigned int j = todo[jl];
             unsigned int nz = 0;
             for(unsigned int i = 0 ; i < m ; i++) {
-                abreduce(ab, matpoly_coeff(ab, e, i, j, 0),
-                        abvec_ur_coeff_ptr(ab, e_ur, i*b+j));
                 nz += abcmp_ui(ab, matpoly_coeff(ab, e, i, j, 0), 0) == 0;
             }
             if (nz == m) {
@@ -375,8 +392,8 @@ bw_lingen_basecase(bmstatus_ptr bm, matpoly_ptr pi, matpoly_srcptr E, unsigned i
                 bm->lucky[j] = 0;
             }
         }
-        abelt_ur_clear(ab, &tmp_ur);
-        abvec_ur_clear(ab, &e_ur, m*b);
+
+
         if (newluck) {
             /* If newluck == n, then we probably have a generator. We add an
              * extra guarantee. newluck==n, for a total of k iterations in a
@@ -559,26 +576,26 @@ bw_lingen_basecase(bmstatus_ptr bm, matpoly_ptr pi, matpoly_srcptr E, unsigned i
                 pivot_columns.push_back(j);
         }
 
-        abvec_ur vtmp;
-        abelt_ur etmp;
-        unsigned int vs = *std::max_element(pi_lengths, pi_lengths + b);
-        abelt_ur_init(ab, &etmp);
-        abvec_ur_init(ab, &vtmp, vs);
+#ifdef HAVE_OPENMP
+#pragma omp parallel
+#endif
+        {
+            abelt_ur vtmp;
+            abelt_ur etmp;
+            abelt_ur_init(ab, &etmp);
+            abelt_ur_init(ab, &vtmp);
 
-        for(unsigned int jl = 0 ; jl < b ; ++jl) {
-            unsigned int j = pivot_columns[jl];
-            /* compute column j completely. We may put this interface in
-             * matpoly, but it's really special-purposed, to the point
-             * that it really makes little sense IMO
-             *
-             * Beware: operations on the different columns are *not*
-             * independent, here ! Operations on the different degrees,
-             * on the other hand, are. As well of course as the
-             * operations on the different entries in each column.
-             */
-
-            for(unsigned int i = 0 ; i < b ; i++) {
-                abvec_ur_set_vec(ab, vtmp, matpoly_part(ab, pi, i, j, 0), pi_lengths[j]);
+            for(unsigned int jl = 0 ; jl < b ; ++jl) {
+                unsigned int j = pivot_columns[jl];
+                /* compute column j completely. We may put this interface in
+                 * matpoly, but it's really special-purposed, to the point
+                 * that it really makes little sense IMO
+                 *
+                 * Beware: operations on the different columns are *not*
+                 * independent, here ! Operations on the different degrees,
+                 * on the other hand, are. As well of course as the
+                 * operations on the different entries in each column.
+                 */
 
 #ifndef NDEBUG
                 for(unsigned int kl = m ; kl < b ; kl++) {
@@ -586,37 +603,46 @@ bw_lingen_basecase(bmstatus_ptr bm, matpoly_ptr pi, matpoly_srcptr E, unsigned i
                     absrc_elt Tkj = matpoly_coeff_const(ab, T, k, j, 0);
                     ASSERT(abcmp_ui(ab, Tkj, k==j) == 0);
                 }
-#endif
                 for(unsigned int kl = 0 ; kl < MIN(m,jl) ; kl++) {
-                    unsigned int k = pivot_columns[kl];
-                    /* TODO: if column k was already a pivot on previous
-                     * turn (which could happen, depending on m and n),
-                     * then the corresponding entry is probably zero
-                     * (exact condition needs to be written more
-                     * accurately).
-                     */
-
-                    absrc_elt Tkj = matpoly_coeff_const(ab, T, k, j, 0);
                     if (abcmp_ui(ab, Tkj, 0) == 0) continue;
-                    ASSERT_ALWAYS(pi_lengths[k] <=pi_lengths[j]);
-                    /* pi[i,k] has length pi_lengths[k]. Multiply that by
-                     * T[k,j], which is a constant. Add to the unreduced
-                     * thing. We don't have an mpfq api call for that
-                     * operation.
-                     */
+                    ASSERT_ALWAYS(pi_lengths[k] <= pi_lengths[j]);
+                }
+#endif
+
+#ifdef HAVE_OPENMP
+#pragma omp for collapse(2)
+#endif
+                for(unsigned int i = 0 ; i < b ; i++) {
                     for(unsigned int s = 0 ; s < pi_lengths[j] ; s++) {
-                        absrc_elt piiks = matpoly_coeff_const(ab, pi, i, k, s);
-                        abdst_elt_ur vs = abvec_ur_coeff_ptr(ab, vtmp, s);
-                        abmul_ur(ab, etmp, piiks, Tkj);
-                        abelt_ur_add(ab, vs, vs, etmp);
+                        abelt_ur_set_elt(ab, vtmp, matpoly_part(ab, pi, i, j, s));
+
+                        for(unsigned int kl = 0 ; kl < MIN(m,jl) ; kl++) {
+                            unsigned int k = pivot_columns[kl];
+                            /* TODO: if column k was already a pivot on previous
+                             * turn (which could happen, depending on m and n),
+                             * then the corresponding entry is probably zero
+                             * (exact condition needs to be written more
+                             * accurately).
+                             */
+
+                            absrc_elt Tkj = matpoly_coeff_const(ab, T, k, j, 0);
+                            if (abcmp_ui(ab, Tkj, 0) == 0) continue;
+                            /* pi[i,k] has length pi_lengths[k]. Multiply that by
+                             * T[k,j], which is a constant. Add to the unreduced
+                             * thing. We don't have an mpfq api call for that
+                             * operation.
+                             */
+                            absrc_elt piiks = matpoly_coeff_const(ab, pi, i, k, s);
+                            abmul_ur(ab, etmp, piiks, Tkj);
+                            abelt_ur_add(ab, vtmp, vtmp, etmp);
+                        }
+                        abreduce(ab, matpoly_coeff(ab, pi, i, j, s), vtmp);
                     }
                 }
-                abvec_reduce(ab, matpoly_part(ab, pi, i, j, 0), vtmp, pi_lengths[j]);
             }
+            abelt_ur_clear(ab, &etmp);
+            abelt_ur_clear(ab, &vtmp);
         }
-
-        abelt_ur_clear(ab, &etmp);
-        abvec_ur_clear(ab, &vtmp, vs);
 #endif
         matpoly_clear(ab, T);
         free(ctable);

@@ -428,13 +428,17 @@ foreach(v ${BWC_GFP_ARITHMETIC_BACKENDS})
     target_link_libraries(plingen_${v}_support flint-fft ${gmp_libname} utils)
     target_link_libraries(plingen_${v} plingen_${v}_support)
 
+    # we also need link flags, and config/openmp.cmake won't provide them
+    # separately.
+
+    # set_source_files_properties(plingen.cpp PROPERTIES COMPILE_FLAGS "${OpenMP_CXX_FLAGS}")
     set_target_properties(plingen_${v}_support PROPERTIES
-        COMPILE_FLAGS "--mpi -DSELECT_MPFQ_LAYER_${v}"
-        LINK_FLAGS "--mpi"
+        COMPILE_FLAGS "--mpi ${OpenMP_CXX_FLAGS} -DSELECT_MPFQ_LAYER_${v}"
+        LINK_FLAGS "--mpi ${OpenMP_CXX_FLAGS}"
         )
     set_target_properties(plingen_${v} PROPERTIES
-        COMPILE_FLAGS "--mpi -DSELECT_MPFQ_LAYER_${v}"
-        LINK_FLAGS "--mpi"
+        COMPILE_FLAGS "--mpi ${OpenMP_CXX_FLAGS} -DSELECT_MPFQ_LAYER_${v}"
+        LINK_FLAGS "--mpi ${OpenMP_CXX_FLAGS}"
         )
 endforeach(v)
 
