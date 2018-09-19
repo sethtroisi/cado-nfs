@@ -74,10 +74,6 @@ double matpoly_addmp(abdst_field ab, matpoly c, matpoly a, matpoly b, int draft)
 double matpoly_mul(abdst_field ab, matpoly c, matpoly a, matpoly b, int draft);
 double matpoly_mp(abdst_field ab, matpoly c, matpoly a, matpoly b, int draft);
 
-void matpoly_mul_unbalanced_columns_by_scalar_matrix(abdst_field ab, matpoly c, matpoly a, unsigned int, unsigned int * lengths, matpoly b);
-void matpoly_mul_shifted_columns_by_scalar_matrix(abdst_field ab, matpoly c, matpoly a, unsigned int k, matpoly b);
-
-
 /* {{{ access interface for matpoly */
 static inline abdst_vec matpoly_part(abdst_field ab, matpoly_ptr p, unsigned int i, unsigned int j, unsigned int k) {
     ASSERT_ALWAYS(p->size);
