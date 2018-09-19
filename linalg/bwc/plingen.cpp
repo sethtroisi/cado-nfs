@@ -299,6 +299,10 @@ bw_lingen_basecase(bmstatus_ptr bm, matpoly_ptr pi, matpoly_srcptr E, unsigned i
     matpoly_init(ab, e, m, b, 1);
     e->size = 1;
 
+    matpoly T;
+    matpoly_init(ab, T, b, b, 1);
+    int (*ctable)[2] = (int(*)[2]) malloc(b * 2 * sizeof(int));
+
     for (unsigned int t = 0; t < E->size ; t++, bm->t++) {
 
         /* {{{ Update the columns of e for degree t. Save computation
@@ -349,6 +353,9 @@ bw_lingen_basecase(bmstatus_ptr bm, matpoly_ptr pi, matpoly_srcptr E, unsigned i
             abelt_ur_clear(ab, &tmp_ur);
             abelt_ur_clear(ab, &e_ur);
         }
+        /* }}} */
+
+        /* {{{ check for cancellations */
 
         unsigned int newluck = 0;
         for(unsigned int jl = 0 ; jl < todo.size() ; ++jl) {
@@ -395,7 +402,6 @@ bw_lingen_basecase(bmstatus_ptr bm, matpoly_ptr pi, matpoly_srcptr E, unsigned i
 
         if (generator_found) break;
 
-        int (*ctable)[2] = (int(*)[2]) malloc(b * 2 * sizeof(int));
         /* {{{ Now see in which order I may look at the columns of pi, so
          * as to keep the nominal degrees correct. In contrast with what
          * we used to do before, we no longer apply the permutation to
@@ -418,8 +424,6 @@ bw_lingen_basecase(bmstatus_ptr bm, matpoly_ptr pi, matpoly_srcptr E, unsigned i
          * opportunity to do lazy reductions.
          */
 
-        matpoly T;
-        matpoly_init(ab, T, b, b, 1);
         matpoly_set_constant_ui(ab, T, 1);
 
         memset(is_pivot, 0, b * sizeof(int));
@@ -496,6 +500,10 @@ bw_lingen_basecase(bmstatus_ptr bm, matpoly_ptr pi, matpoly_srcptr E, unsigned i
             abclear(ab, &inv); /* }}} */
         }
         /* }}} */
+
+        /* {{{ apply the transformations, using the transvection
+         * reordering trick */
+
         /* non-pivot columns are only added to and never read, so it does
          * not really matter where we put their computation, provided
          * that the columns that we do read are done at this point.
@@ -560,10 +568,10 @@ bw_lingen_basecase(bmstatus_ptr bm, matpoly_ptr pi, matpoly_srcptr E, unsigned i
 
                             absrc_elt Tkj = matpoly_coeff_const(ab, T, k, j, 0);
                             if (abcmp_ui(ab, Tkj, 0) == 0) continue;
-                            /* pi[i,k] has length pi_lengths[k]. Multiply that by
-                             * T[k,j], which is a constant. Add to the unreduced
-                             * thing. We don't have an mpfq api call for that
-                             * operation.
+                            /* pi[i,k] has length pi_lengths[k]. Multiply
+                             * that by T[k,j], which is a constant. Add
+                             * to the unreduced thing. We don't have an
+                             * mpfq api call for that operation.
                              */
                             absrc_elt piiks = matpoly_coeff_const(ab, pi, i, k, s);
                             abmul_ur(ab, tmp, piiks, Tkj);
@@ -576,8 +584,7 @@ bw_lingen_basecase(bmstatus_ptr bm, matpoly_ptr pi, matpoly_srcptr E, unsigned i
             abelt_ur_clear(ab, &tmp);
             abelt_ur_clear(ab, &tmp_pi);
         }
-        matpoly_clear(ab, T);
-        free(ctable);
+        /* }}} */
 
         ASSERT_ALWAYS(r == m);
 
@@ -617,6 +624,8 @@ bw_lingen_basecase(bmstatus_ptr bm, matpoly_ptr pi, matpoly_srcptr E, unsigned i
             pi->size = pi_lengths[j];
     }
     pi->size = MIN(pi->size, pi->alloc);
+    matpoly_clear(ab, T);
+    free(ctable);
     matpoly_clear(ab, e);
     free(is_pivot);
     free(pivots);
