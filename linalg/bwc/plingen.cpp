@@ -280,35 +280,6 @@ bw_lingen_basecase(bmstatus_ptr bm, matpoly_ptr pi, matpoly_srcptr E, unsigned i
     matpoly_init(ab, pi, b, b, pi_room_base);
     pi->size = pi_room_base;
 
-    /* COMPUTE_T_EXPLICITLY: compute the Gaussian elimination matrix T
-     * explicitly, instead of computing by transvections. This allows us
-     * to do fewer reductions per coefficient of the final matrix, which
-     * ultimately is a improvement of the running time. [plingen_pz
-     * --random-input-with-length 20000 prime=1009 lingen_threshold=1000
-     * m=8 n=4 ==> basecase time reduced by 25%]
-     *
-     * REORDER_TRANSVECTIONS: alternative strategy. The matrix T is *not*
-     * used for actually storing the product of the transvections, just
-     * the list of transvections. Then, instead of applying them
-     * row-major, we apply them column-major (abiding by the ordering of
-     * pivots), so that we get a better opportunity to do lazy
-     * reductions.
-     */
-#define xxxCOMPUTE_T_EXPLICITLY
-#define REORDER_TRANSVECTIONS
-
-#ifdef COMPUTE_T_EXPLICITLY
-    /* This is a "secondary" pi. When we multiply by the matrix T, we
-     * can't do this in place, so we need to allocate a new matrix.
-     * However, this adds many alloc/free calls that we'd like to avoid.
-     * Instead, we reserve a secondary matrix, and do matpoly_swap at
-     * each turn.
-     */
-    matpoly xpi;
-    matpoly_init(ab, xpi, b, b, pi_room_base);
-    xpi->size = pi_room_base;
-#endif
-
     /* Also keep track of the
      * number of coefficients for the columns of pi. Set pi to Id */
 
@@ -438,17 +409,23 @@ bw_lingen_basecase(bmstatus_ptr bm, matpoly_ptr pi, matpoly_srcptr E, unsigned i
         /* }}} */
 
         /* {{{ Now do Gaussian elimination */
-#if defined(COMPUTE_T_EXPLICITLY) || defined(REORDER_TRANSVECTIONS)
+
+        /*
+         * The matrix T is *not* used for actually storing the product of
+         * the transvections, just the *list* of transvections. Then,
+         * instead of applying them row-major, we apply them column-major
+         * (abiding by the ordering of pivots), so that we get a better
+         * opportunity to do lazy reductions.
+         */
+
         matpoly T;
         matpoly_init(ab, T, b, b, 1);
         matpoly_set_constant_ui(ab, T, 1);
-#endif
+
         memset(is_pivot, 0, b * sizeof(int));
         unsigned int r = 0;
 
-#ifdef REORDER_TRANSVECTIONS
         std::vector<unsigned int> pivot_columns;
-#endif
         /* Loop through logical indices */
         for(unsigned int jl = 0; jl < b; jl++) {
             unsigned int j = ctable[jl][1];
@@ -463,9 +440,7 @@ bw_lingen_basecase(bmstatus_ptr bm, matpoly_ptr pi, matpoly_srcptr E, unsigned i
             /* }}} */
             pivots[r++] = j;
             is_pivot[j] = 1;
-#ifdef REORDER_TRANSVECTIONS
             pivot_columns.push_back(j);
-#endif
             /* {{{ Cancel this coeff in all other columns. */
             abelt inv;
             abinit(ab, &inv);
@@ -510,52 +485,10 @@ bw_lingen_basecase(bmstatus_ptr bm, matpoly_ptr pi, matpoly_srcptr E, unsigned i
                     bm->lucky[k] = -1;
                     continue;
                 }
-#ifdef COMPUTE_T_EXPLICITLY
-                /* multiply T by the transvection matrix. Later on we'll
-                 * apply this to pi
-                 */
-                for(unsigned int i = 0 ; i < b ; i++) {
-                    /* Our distinction here on 0 vs 1 vs something else
-                     * is not really useful, as the computation of T is
-                     * not very expensive anyway compared to the rest.
-                     */
-                    absrc_elt Tij = matpoly_coeff_const(ab, T, i, j, 0);
-                    abdst_elt Tik = matpoly_coeff(ab, T, i, k, 0);
-                    if (abcmp_ui(ab, Tij, 0) == 0) {
-                        continue;
-                    } else if (abcmp_ui(ab, Tij, 1) == 0) {
-                        abadd(ab, Tik, Tik, lambda);
-                    } else {
-                        /* TODO: Would be better if mpfq had an addmul */
-                        abmul(ab, tmp, lambda, Tij);
-                        abadd(ab, Tik, Tik, tmp);
-                    }
-                }
-#elif defined(REORDER_TRANSVECTIONS)
                 /* We do *NOT* really update T. T is only used as
                  * storage!
                  */
                 abset(ab, matpoly_coeff(ab, T, j, k, 0), lambda);
-#else
-                for(unsigned int i = 0 ; i < b ; i++) {
-                    /* Beware. One may be tempted to think that the code
-                     * above is dubious. It is, in fact, not a problem.
-                     * As long as the delta[] array undergoes no
-                     * disturbing modification, everything is ok.
-                     */
-                    if (pi_lengths[k] < pi_lengths[j])
-                        pi_lengths[k] = pi_lengths[j];
-                    for(unsigned int s = 0 ; s < pi_lengths[j] ; s++) {
-                        /* TODO: Would be better if mpfq had an addmul */
-                        abmul(ab, tmp, lambda,
-                                matpoly_coeff(ab, pi, i, j, s));
-                        abadd(ab,
-                                matpoly_coeff(ab, pi, i, k, s),
-                                matpoly_coeff(ab, pi, i, k, s),
-                                tmp);
-                    }
-                }
-#endif
                 abclear(ab, &tmp);
                 /* }}} */
                 abclear(ab, &lambda);
@@ -563,10 +496,6 @@ bw_lingen_basecase(bmstatus_ptr bm, matpoly_ptr pi, matpoly_srcptr E, unsigned i
             abclear(ab, &inv); /* }}} */
         }
         /* }}} */
-#ifdef COMPUTE_T_EXPLICITLY
-        matpoly_mul_unbalanced_columns_by_scalar_matrix(ab, xpi, pi, 0, pi_lengths, T);
-        matpoly_swap(xpi, pi);
-#elif defined(REORDER_TRANSVECTIONS)
         /* non-pivot columns are only added to and never read, so it does
          * not really matter where we put their computation, provided
          * that the columns that we do read are done at this point.
@@ -616,7 +545,9 @@ bw_lingen_basecase(bmstatus_ptr bm, matpoly_ptr pi, matpoly_srcptr E, unsigned i
 #endif
                 for(unsigned int i = 0 ; i < b ; i++) {
                     for(unsigned int s = 0 ; s < pi_lengths[j] ; s++) {
-                        abelt_ur_set_elt(ab, tmp_pi, matpoly_part(ab, pi, i, j, s));
+                        abdst_elt piijs = matpoly_coeff(ab, pi, i, j, s);
+
+                        abelt_ur_set_elt(ab, tmp_pi, piijs);
 
                         for(unsigned int kl = 0 ; kl < MIN(m,jl) ; kl++) {
                             unsigned int k = pivot_columns[kl];
@@ -638,14 +569,13 @@ bw_lingen_basecase(bmstatus_ptr bm, matpoly_ptr pi, matpoly_srcptr E, unsigned i
                             abmul_ur(ab, tmp, piiks, Tkj);
                             abelt_ur_add(ab, tmp_pi, tmp_pi, tmp);
                         }
-                        abreduce(ab, matpoly_coeff(ab, pi, i, j, s), tmp_pi);
+                        abreduce(ab, piijs, tmp_pi);
                     }
                 }
             }
             abelt_ur_clear(ab, &tmp);
             abelt_ur_clear(ab, &tmp_pi);
         }
-#endif
         matpoly_clear(ab, T);
         free(ctable);
 
@@ -687,434 +617,7 @@ bw_lingen_basecase(bmstatus_ptr bm, matpoly_ptr pi, matpoly_srcptr E, unsigned i
             pi->size = pi_lengths[j];
     }
     pi->size = MIN(pi->size, pi->alloc);
-#ifdef COMPUTE_T_EXPLICITLY
-    matpoly_clear(ab, xpi);
-#endif
     matpoly_clear(ab, e);
-    free(is_pivot);
-    free(pivots);
-    free(pi_lengths);   /* What shall we do with this one ??? */
-
-    return generator_found;
-}/*}}}*/
-
-/* This version operates on E directly, so that the operation of
- * computing the "current" coefficient becomes constant (versus linear in
- * t when it entails computing E*pi).
- *
- * This function overwrites E !
- *
- * This is actually more expensive than bw_lingen_basecase, because we
- * have more reductions to compute.
- */
-int
-bw_lingen_basecase2(bmstatus_ptr bm, matpoly_ptr pi, matpoly_ptr E, unsigned int *delta) /*{{{*/
-{
-    tree_stats::sentinel dummy(stats, __func__, E->size, false);
-    int generator_found = 0;
-
-    dims * d = bm->d;
-    unsigned int m = d->m;
-    unsigned int n = d->n;
-    unsigned int b = m + n;
-    abdst_field ab = d->ab;
-    ASSERT(E->m == m);
-    ASSERT(E->n == b);
-
-    ASSERT(pi->m == 0);
-    ASSERT(pi->n == 0);
-    ASSERT(pi->alloc == 0);
-
-    /* Allocate something large enough for the result. This will be
-     * soon freed anyway. Set it to identity. */
-    unsigned int pi_room_base = expected_pi_length(d, E->size);
-
-    matpoly_init(ab, pi, b, b, pi_room_base);
-    pi->size = pi_room_base;
-
-    /* We now compute the Gaussian elimination matrix T explicitly,
-     * instead of computing by transvections. This allows us to do fewer
-     * reductions per coefficient of the final matrix, which ultimately
-     * is a improvement of the running time. [plingen_pz
-     * --random-input-with-length 20000 prime=1009 lingen_threshold=1000
-     *  m=8 n=4 ==> basecase time reduced by 25%]
-     */
-
-#if !defined(COMPUTE_T_EXPLICITLY) && !defined(REORDER_TRANSVECTIONS)
-#error "want one of the two"
-#endif
-
-#ifdef COMPUTE_T_EXPLICITLY
-    /* This is a "secondary" pi. When we multiply by the matrix T, we
-     * can't do this in place, so we need to allocate a new matrix.
-     * However, this adds many alloc/free calls that we'd like to avoid.
-     * Instead, we reserve a secondary matrix, and do matpoly_swap at
-     * each turn.
-     */
-    matpoly xpi;
-    matpoly xE;
-    matpoly_init(ab, xpi, b, b, pi_room_base);
-    matpoly_init(ab, xE, E->m, E->n, E->size);
-    xpi->size = pi_room_base;
-#endif
-
-    /* Also keep track of the
-     * number of coefficients for the columns of pi. Set pi to Id */
-
-    unsigned int *pi_lengths = (unsigned int*) malloc(b * sizeof(unsigned int));
-    matpoly_set_constant_ui(ab, pi, 1);
-    for(unsigned int i = 0 ; i < b ; i++) {
-        pi_lengths[i] = 1;
-    }
-
-    /* Keep a list of columns which have been used as pivots at the
-     * previous iteration */
-    unsigned int * pivots = (unsigned int*) malloc(m * sizeof(unsigned int));
-    int * is_pivot = (int*) malloc(b * sizeof(int));
-    memset(is_pivot, 0, b * sizeof(int));
-
-    /* E->size will change as the loop proceeds, so we need to save it
-     * somewhere. */
-    unsigned int L = E->size;
-    for (unsigned int t = 0; t < L ; t++, bm->t++) {
-        ASSERT_ALWAYS(E->size + t == L);
-
-        /* We work on the degree 0 coefficients in E */
-        /* {{{ check for accidental cancellations */
-        unsigned int newluck = 0;
-        for(unsigned int j = 0 ; j < b ; j++) {
-            if (is_pivot[j]) continue;
-            unsigned int nz = 0;
-            for(unsigned int i = 0 ; i < m ; i++) {
-                nz += abcmp_ui(ab, matpoly_coeff(ab, E, i, j, 0), 0) == 0;
-            }
-            if (nz == m) {
-                newluck++, bm->lucky[j]++;
-            } else if (bm->lucky[j] > 0) {
-                bm->lucky[j] = 0;
-            }
-        }
-
-        if (newluck) {
-            /* If newluck == n, then we probably have a generator. We add an
-             * extra guarantee. newluck==n, for a total of k iterations in a
-             * row, means m*n*k coefficients cancelling magically. We would
-             * like this to be impossible by mere chance. Thus we want n*k >
-             * luck_mini, which can easily be checked */
-
-            int luck_mini = expected_pi_length(d, 0);
-            unsigned int luck_sure = 0;
-
-            printf("t=%d, canceled columns:", bm->t);
-            for(unsigned int j = 0 ; j < b ; j++) {
-                if (bm->lucky[j] > 0) {
-                    printf(" %u", j);
-                    luck_sure += bm->lucky[j] > luck_mini;
-                }
-            }
-
-            if (newluck == n && luck_sure == n) {
-                if (!generator_found) {
-                    printf(", complete generator found, for sure");
-                }
-                generator_found = 1;
-            }
-            printf(".\n");
-        }
-        /* }}} */
-
-        if (generator_found) break;
-
-        int (*ctable)[2] = (int(*)[2]) malloc(b * 2 * sizeof(int));
-        /* {{{ Now see in which order I may look at the columns of pi, so
-         * as to keep the nominal degrees correct. In contrast with what
-         * we used to do before, we no longer apply the permutation to
-         * delta. So the delta[] array keeps referring to physical
-         * indices, and we'll tune this in the end. */
-        for(unsigned int j = 0; j < b; j++) {
-            ctable[j][0] = delta[j];
-            ctable[j][1] = j;
-        }
-        qsort(ctable, b, 2 * sizeof(int), (sortfunc_t) & lexcmp2);
-        /* }}} */
-
-        /* {{{ Now do Gaussian elimination */
-        matpoly T;
-        matpoly_init(ab, T, b, b, 1);
-        matpoly_set_constant_ui(ab, T, 1);
-
-        memset(is_pivot, 0, b * sizeof(int));
-        unsigned int r = 0;
-
-#ifdef REORDER_TRANSVECTIONS
-        std::vector<unsigned int> pivot_columns;
-#endif
-        /* Loop through logical indices */
-        for(unsigned int jl = 0; jl < b; jl++) {
-            unsigned int j = ctable[jl][1];
-            unsigned int u = 0;
-            /* {{{ Find the pivot */
-            for( ; u < m ; u++) {
-                if (abcmp_ui(ab, matpoly_coeff(ab, E, u, j, 0), 0) != 0)
-                    break;
-            }
-            if (u == m) continue;
-            assert(r < m);
-            /* }}} */
-            pivots[r++] = j;
-            is_pivot[j] = 1;
-#ifdef REORDER_TRANSVECTIONS
-            pivot_columns.push_back(j);
-#endif
-            /* {{{ Cancel this coeff in all other columns. */
-            abelt inv;
-            abinit(ab, &inv);
-            int rc = abinv(ab, inv, matpoly_coeff(ab, E, u, j, 0));
-            if (!rc) {
-                fprintf(stderr, "Error, found a factor of the modulus: ");
-                abfprint(ab, stderr, inv);
-                fprintf(stderr, "\n");
-                exit(EXIT_FAILURE);
-            }
-            abneg(ab, inv, inv);
-            for (unsigned int kl = jl + 1; kl < b ; kl++) {
-                unsigned int k = ctable[kl][1];
-                if (abcmp_ui(ab, matpoly_coeff(ab, E, u, k, 0), 0) == 0)
-                    continue;
-                // add lambda = e[u,k]*-e[u,j]^-1 times col j to col k.
-                abelt lambda;
-                abinit(ab, &lambda);
-                abmul(ab, lambda, inv, matpoly_coeff(ab, E, u, k, 0));
-                assert(delta[j] <= delta[k]);
-                /* {{{ Apply on e=[X^0]E and T */
-                abelt tmp;
-                abinit(ab, &tmp);
-                for(unsigned int i = 0 ; i < m ; i++) {
-                    /* TODO: Would be better if mpfq had an addmul */
-                    abmul(ab, tmp, lambda, matpoly_coeff(ab, E, i, j, 0));
-                    abadd(ab,
-                            matpoly_coeff(ab, E, i, k, 0),
-                            matpoly_coeff(ab, E, i, k, 0),
-                            tmp);
-                }
-                if (bm->lucky[k] < 0) {
-                    /* This column is already discarded, don't bother */
-                    continue;
-                }
-                if (bm->lucky[j] < 0) {
-                    /* This column is discarded. This is going to
-                     * invalidate another column of pi. Not a problem,
-                     * unless it's been marked as lucky previously ! */
-                    ASSERT_ALWAYS(bm->lucky[k] <= 0);
-                    printf("Column %u discarded from now on (through addition from column %u)\n", k, j);
-                    bm->lucky[k] = -1;
-                    continue;
-                }
-#ifdef COMPUTE_T_EXPLICITLY
-                /* multiply T by the transvection matrix. Later on we'll
-                 * apply this to pi
-                 */
-                for(unsigned int i = 0 ; i < b ; i++) {
-                    /* Our distinction here on 0 vs 1 vs something else
-                     * is not really useful, as the computation of T is
-                     * not very expensive anyway compared to the rest.
-                     */
-                    absrc_elt Tij = matpoly_coeff_const(ab, T, i, j, 0);
-                    abdst_elt Tik = matpoly_coeff(ab, T, i, k, 0);
-                    if (abcmp_ui(ab, Tij, 0) == 0) {
-                        continue;
-                    } else if (abcmp_ui(ab, Tij, 1) == 0) {
-                        abadd(ab, Tik, Tik, lambda);
-                    } else {
-                        /* TODO: Would be better if mpfq had an addmul */
-                        abmul(ab, tmp, lambda, Tij);
-                        abadd(ab, Tik, Tik, tmp);
-                    }
-                }
-#elif defined(REORDER_TRANSVECTIONS)
-                /* We do *NOT* really update T. T is only used as
-                 * storage!
-                 */
-                abset(ab, matpoly_coeff(ab, T, j, k, 0), lambda);
-#else
-#error "want one of the two"
-#endif
-                abclear(ab, &tmp);
-                /* }}} */
-                abclear(ab, &lambda);
-            }
-            abclear(ab, &inv); /* }}} */
-        }
-        /* }}} */
-
-#ifdef COMPUTE_T_EXPLICITLY
-        /* The two "mul" operations below can conveniently be multi-threaded */
-        matpoly_mul_shifted_columns_by_scalar_matrix(ab, xE, E, 1, T);
-
-        matpoly_mul_unbalanced_columns_by_scalar_matrix(ab, xpi, pi, 0, pi_lengths, T);
-        matpoly_swap(xE, E);
-        matpoly_swap(xpi, pi);
-#elif defined(REORDER_TRANSVECTIONS)
-        /* non-pivot columns are only added to and never read, so it does
-         * not really matter where we put their computation, provided
-         * that the columns that we do read are done at this point.
-         */
-        for(unsigned int j = 0; j < b; j++) {
-            if (!is_pivot[j])
-                pivot_columns.push_back(j);
-        }
-
-#ifdef HAVE_OPENMP
-#pragma omp parallel
-#endif
-        {
-            abelt_ur tmp_pi;
-            abelt_ur tmp_E;
-            abelt_ur tmp;
-            abelt_ur_init(ab, &tmp);
-            abelt_ur_init(ab, &tmp_pi);
-            abelt_ur_init(ab, &tmp_E);
-
-            for(unsigned int jl = 0 ; jl < b ; ++jl) {
-                unsigned int j = pivot_columns[jl];
-                /* compute column j completely. We may put this interface in
-                 * matpoly, but it's really special-purposed, to the point
-                 * that it really makes little sense IMO
-                 *
-                 * Beware: operations on the different columns are *not*
-                 * independent, here ! Operations on the different degrees,
-                 * on the other hand, are. As well of course as the
-                 * operations on the different entries in each column.
-                 */
-
-#ifndef NDEBUG
-                for(unsigned int kl = m ; kl < b ; kl++) {
-                    unsigned int k = pivot_columns[kl];
-                    absrc_elt Tkj = matpoly_coeff_const(ab, T, k, j, 0);
-                    ASSERT(abcmp_ui(ab, Tkj, k==j) == 0);
-                }
-#endif
-
-#ifdef HAVE_OPENMP
-#pragma omp for collapse(2) nowait
-#endif
-                for(unsigned int i = 0 ; i < b ; i++) {
-                    for(unsigned int s = 0 ; s < pi_lengths[j] ; s++) {
-                        abelt_ur_set_elt(ab, tmp_pi, matpoly_part(ab, pi, i, j, s));
-                        for(unsigned int kl = 0 ; kl < MIN(m,jl) ; kl++) {
-                            unsigned int k = pivot_columns[kl];
-                            /* TODO: if column k was already a pivot on previous
-                             * turn (which could happen, depending on m and n),
-                             * then the corresponding entry is probably zero
-                             * (exact condition needs to be written more
-                             * accurately).
-                             */
-
-                            absrc_elt Tkj = matpoly_coeff_const(ab, T, k, j, 0);
-                            if (abcmp_ui(ab, Tkj, 0) == 0) continue;
-                            ASSERT_ALWAYS(pi_lengths[k] <=pi_lengths[j]);
-                            /* pi[i,k] has length pi_lengths[k]. Multiply that by
-                             * T[k,j], which is a constant. Add to the unreduced
-                             * thing. We don't have an mpfq api call for that
-                             * operation.
-                             */
-                            absrc_elt piiks = matpoly_coeff_const(ab, pi, i, k, s);
-                            abmul_ur(ab, tmp, piiks, Tkj);
-                            abelt_ur_add(ab, tmp_pi, tmp_pi, tmp);
-                        }
-                        abreduce(ab, matpoly_part(ab, pi, i, j, s), tmp_pi);
-                    }
-                }
-#ifdef HAVE_OPENMP
-#pragma omp for collapse(2)
-#endif
-                for(unsigned int i = 0 ; i < m ; i++) {
-                    for(unsigned int s = 0 ; s < E->size - 1 ; s++) {
-                        abelt_ur_set_elt(ab, tmp_E, matpoly_part(ab, E, i, j, 1+s));
-                        for(unsigned int kl = 0 ; kl < MIN(m,jl) ; kl++) {
-                            unsigned int k = pivot_columns[kl];
-                            absrc_elt Tkj = matpoly_coeff_const(ab, T, k, j, 0);
-                            if (abcmp_ui(ab, Tkj, 0) == 0) continue;
-                            /* pi[i,k] has length pi_lengths[k]. Multiply that by
-                             * T[k,j], which is a constant. Add to the unreduced
-                             * thing. We don't have an mpfq api call for that
-                             * operation.
-                             */
-                            absrc_elt Eiks = matpoly_coeff_const(ab, E, i, k, 1+s);
-                            abmul_ur(ab, tmp, Eiks, Tkj);
-                            abelt_ur_add(ab, tmp_E, tmp_E, tmp);
-                        }
-                        abreduce(ab, matpoly_part(ab, E, i, j, 1+s), tmp_E);
-                    }
-                }
-            }
-            abelt_ur_clear(ab, &tmp);
-            abelt_ur_clear(ab, &tmp_pi);
-            abelt_ur_clear(ab, &tmp_E);
-        }
-#endif
-
-        /* non-pivot columns can now be shifted by x */
-        for (unsigned int j = 0; j < b ; j++) {
-            if (is_pivot[j]) {
-#ifndef REORDER_TRANSVECTIONS
-                /* simple copy */
-                for(unsigned int i = 0 ; i < m ; i++)
-                    abset(ab,
-                            matpoly_coeff(ab, E, i, j, 0),
-                            matpoly_coeff_const(ab, xE, i, j, 0));
-#endif
-            } else {
-                matpoly_divide_column_by_x(ab, E, j, E->size);
-            }
-        }
-        E->size--;
-
-        matpoly_clear(ab, T);
-        free(ctable);
-
-        ASSERT_ALWAYS(r == m);
-
-        /* {{{ Now for all pivots, multiply column in pi by x */
-        for (unsigned int j = 0; j < b ; j++) {
-            if (!is_pivot[j]) continue;
-            if (pi_lengths[j] >= pi->alloc) {
-                if (!generator_found) {
-                    matpoly_realloc(ab, pi, pi->alloc + MAX(pi->alloc / (m+n), 1));
-                    printf("t=%u, expanding allocation for pi (now %zu%%) ; lengths: ",
-                            bm->t,
-                            100 * pi->alloc / pi_room_base);
-                    for(unsigned int j = 0; j < b; j++)
-                        printf(" %u", pi_lengths[j]);
-                    printf("\n");
-                } else {
-                    ASSERT_ALWAYS(bm->lucky[j] <= 0);
-                    if (bm->lucky[j] == 0)
-                        printf("t=%u, column %u discarded from now on\n",
-                                bm->t, j);
-                    bm->lucky[j] = -1;
-                    pi_lengths[j]++;
-                    delta[j]++;
-                    continue;
-                }
-            }
-            matpoly_multiply_column_by_x(ab, pi, j, pi_lengths[j]);
-            pi_lengths[j]++;
-            delta[j]++;
-        }
-        /* }}} */
-    }
-
-    pi->size = 0;
-    for(unsigned int j = 0; j < b; j++) {
-        if (pi_lengths[j] > pi->size)
-            pi->size = pi_lengths[j];
-    }
-    pi->size = MIN(pi->size, pi->alloc);
-#ifdef COMPUTE_T_EXPLICITLY
-    matpoly_clear(ab, xpi);
-    matpoly_clear(ab, xE);
-#endif
     free(is_pivot);
     free(pivots);
     free(pi_lengths);   /* What shall we do with this one ??? */
