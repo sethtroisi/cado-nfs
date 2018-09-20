@@ -227,6 +227,9 @@ misc/CMakeLists.txt
 misc/check_rels.c
 misc/debug_renumber.c
 misc/renumber_convert.c
+misc/descent_init_Fp.c
+misc/smooth_detect.c
+misc/smooth_detect.h
 parameters/factor/params.c100
 parameters/factor/params.c105
 parameters/factor/params.c110
