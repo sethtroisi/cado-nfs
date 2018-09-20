@@ -554,6 +554,7 @@ tests/filter/testsm.sh
 tests/filter/testsm.p59.poly
 tests/filter/testsm.p59.purged.gz
 tests/filter/testsm.p59.index.gz
+tests/misc/p30.poly
 tests/misc/c60.poly
 tests/misc/c60.rels1
 tests/misc/c60.rels2
