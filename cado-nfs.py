@@ -136,6 +136,9 @@ if __name__ == '__main__':
     if not dlp:
         print(" ".join(factors))
     else:
+        if target != 0:
+            logtarget = int(factors[4])
+            print(str(logtarget))
         logger.info("If you want to compute a new target, run %s %s target=<target>", sys.argv[0], snapshot_filename)
         if checkdlp:
             p = int(factors[0])
@@ -151,9 +154,8 @@ if __name__ == '__main__':
             print("The other logarithms of the factor base elements are in %s" %
                     factorjob.request_map[cadotask.Request.GET_DLOG_FILENAME]())
             if target != 0:
-                logtarget = int(factors[4])
-                assert pow(target, log2*((p-1) // ell), p) == pow(2, logtarget*((p-1) // ell), p)
                 print("target = " + str(target))
                 print("log(target) = " + str(logtarget))
+                assert pow(target, log2*((p-1) // ell), p) == pow(2, logtarget*((p-1) // ell), p)
         else:
-            print("No check was performed. Logarithms of the factor base elements are in %s" % factorjob.request_map[cadotask.Request.GET_DLOG_FILENAME]())
+            logger.info("No check was performed. Logarithms of the factor base elements are in %s" % factorjob.request_map[cadotask.Request.GET_DLOG_FILENAME]())
