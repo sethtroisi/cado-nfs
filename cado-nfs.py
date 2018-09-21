@@ -136,26 +136,28 @@ if __name__ == '__main__':
     if not dlp:
         print(" ".join(factors))
     else:
-        if target != 0:
-            logtarget = int(factors[4])
-            print(str(logtarget))
-        logger.info("If you want to compute a new target, run %s %s target=<target>", sys.argv[0], snapshot_filename)
         if checkdlp:
             p = int(factors[0])
             ell = int(factors[1])
             log2 = int(factors[2])
             log3 = int(factors[3])
+            logger.info("Checking that log(2) and log(3) are consistent...")
+            logger.info("  p = " + str(p))
+            logger.info("  ell = " + str(ell))
+            logger.info("  log2 = " + str(log2))
+            logger.info("  log3 = " + str(log3))
             assert (p-1) % ell == 0
             assert pow(3, log2*((p-1) // ell), p) == pow(2, log3*((p-1) // ell), p)
-            print("p = " + str(p))
-            print("ell = " + str(ell))
-            print("log2 = " + str(log2))
-            print("log3 = " + str(log3))
-            print("The other logarithms of the factor base elements are in %s" %
-                    factorjob.request_map[cadotask.Request.GET_DLOG_FILENAME]())
             if target != 0:
-                print("target = " + str(target))
-                print("log(target) = " + str(logtarget))
+                logtarget = int(factors[4])
+                logger.info("Also check log(target) vs log(2) ...")
                 assert pow(target, log2*((p-1) // ell), p) == pow(2, logtarget*((p-1) // ell), p)
         else:
             logger.info("No check was performed. Logarithms of the factor base elements are in %s" % factorjob.request_map[cadotask.Request.GET_DLOG_FILENAME]())
+        if target != 0:
+            logtarget = int(factors[4])
+            logger.info("target = " + str(target))
+            logger.info("log(target) = " + str(logtarget))
+            print(str(logtarget))
+        logger.info("If you want to compute a new target, run %s %s target=<target>", sys.argv[0], snapshot_filename)
+
