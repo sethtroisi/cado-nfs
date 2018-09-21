@@ -298,7 +298,9 @@ void stats_init(stats_t S) {
   }
 }
 
+#if 0
 void stats_clear(stats_t S) { }
+#endif
 
 void stats_update(stats_t S, double gain, unsigned int i) {
   double newav = S->aver_gain[i]*S->nb_test[i] + gain;
