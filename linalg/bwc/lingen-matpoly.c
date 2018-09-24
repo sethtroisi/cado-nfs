@@ -457,3 +457,18 @@ void matpoly_set_polymat(abdst_field ab MAYBE_UNUSED, matpoly_ptr dst, polymat_s
         }
     }
 }
+
+int matpoly_coeff_is_zero(abdst_field ab, matpoly_srcptr pi, unsigned int k)
+{
+    for(unsigned int j = 0; j < pi->m; j++)
+        for(unsigned int i = 0 ; i < pi->n ; i++)
+            if (!abis_zero(ab, matpoly_coeff_const(ab, pi, i, j, k)))
+                return 0;
+    return 1;
+}
+void matpoly_coeff_set_zero(abdst_field ab, matpoly_ptr pi, unsigned int k)
+{
+    for(unsigned int j = 0; j < pi->m; j++)
+        for(unsigned int i = 0 ; i < pi->n ; i++)
+            abset_zero(ab, matpoly_coeff(ab, pi, i, j, k));
+}
