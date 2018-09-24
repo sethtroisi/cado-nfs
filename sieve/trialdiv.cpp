@@ -9,9 +9,22 @@
 #include <math.h>
 #include "ularith.h"
 #include "modredc_ul.h"
-#include "trialdiv.h"
+#include "trialdiv.hpp"
 #include "portability.h"
 
+/* shortcoming of C++11. C++17 would (I think) allow this be defined
+ * directly in the struct body and get a real compile-time constant,
+ * without the need for an out-of-class definition. However, on top of
+ * that, clang complaints on sqrt not being constexp, which is a bit
+ * weird given that the prototype appears to mention it as being
+ * constexpr. Anyway.
+ */
+unsigned long trialdiv_data::max_p =
+            (TRIALDIV_MAXLEN == 1) ?
+                ULONG_MAX : 
+                std::min(
+                        (unsigned long) (std::sqrt(ULONG_MAX / (TRIALDIV_MAXLEN - 1)) - 1),
+                        ULONG_MAX);
 
 unsigned long
 trialdiv_get_max_p()
@@ -276,7 +289,7 @@ trialdiv_div8 (const unsigned long *n, const trialdiv_divisor_t *d)
         this ensures that q[i]*p - n[i] >= 0.
 */
 static inline void
-trialdiv2_divexact (mpz_t N, mp_limb_t p, mp_limb_t pinv)
+trialdiv2_divexact (mpz_ptr N, mp_limb_t p, mp_limb_t pinv)
 {
   mp_limb_t x0, r0, r1;
   mp_ptr n = N->_mp_d;
@@ -298,16 +311,15 @@ trialdiv2_divexact (mpz_t N, mp_limb_t p, mp_limb_t pinv)
    by repeated calls of trialdiv(). */
 
 size_t 
-trialdiv (unsigned long *f, mpz_t N, const trialdiv_divisor_t *d,
-	  const size_t max_div)
+trialdiv_data::trial_divide (std::vector<uint64_t> & f, cxx_mpz & N, size_t max_factors) const
 {
-  size_t n = 0;
-
+  auto d = begin();
+  
 #if TRIALDIV_MAXLEN > 8
 #error trialdiv not implemented for input sizes of more than 8 words
 #endif
 
-  while (mpz_cmp_ui (N, 1UL) > 0)
+  for ( ; mpz_cmp_ui (N, 1UL) > 0 && max_factors ; max_factors--)
     {
       size_t s = mpz_size(N);
       mp_limb_t u = 0;
@@ -324,42 +336,42 @@ trialdiv (unsigned long *f, mpz_t N, const trialdiv_divisor_t *d,
 #if TRIALDIV_MAXLEN >= 2
       else if (s == 2)
         {
-          while (!trialdiv_div2 (N[0]._mp_d, d))
+          while (!trialdiv_div2 (N[0]._mp_d, &*d))
             d++;
         }
 #endif
 #if TRIALDIV_MAXLEN >= 3
       else if (s == 3)
         {
-          while (!trialdiv_div3 (N[0]._mp_d, d))
+          while (!trialdiv_div3 (N[0]._mp_d, &*d))
             d++;
         }
 #endif
 #if TRIALDIV_MAXLEN >= 4
       else if (s == 4)
         {
-          while (!trialdiv_div4 (N[0]._mp_d, d))
+          while (!trialdiv_div4 (N[0]._mp_d, &*d))
             d++;
         }
 #endif
 #if TRIALDIV_MAXLEN >= 5
       else if (s == 5)
         {
-          while (!trialdiv_div5 (N[0]._mp_d, d))
+          while (!trialdiv_div5 (N[0]._mp_d, &*d))
             d++;
         }
 #endif
 #if TRIALDIV_MAXLEN >= 6
       else if (s == 6)
         {
-          while (!trialdiv_div6 (N[0]._mp_d, d))
+          while (!trialdiv_div6 (N[0]._mp_d, &*d))
             d++;
         }
 #endif
 #if TRIALDIV_MAXLEN >= 7
       else if (s == 7)
         {
-          while (!trialdiv_div7 (N[0]._mp_d, d))
+          while (!trialdiv_div7 (N[0]._mp_d, &*d))
             d++;
         }
 #endif
@@ -367,7 +379,7 @@ trialdiv (unsigned long *f, mpz_t N, const trialdiv_divisor_t *d,
 #if TRIALDIV_MAXLEN >= 8
       else if (s == 8)
         {
-          while (!trialdiv_div8 (N[0]._mp_d, d))
+          while (!trialdiv_div8 (N[0]._mp_d, &*d))
             d++;
         }
 #endif
@@ -380,10 +392,7 @@ trialdiv (unsigned long *f, mpz_t N, const trialdiv_divisor_t *d,
 
       ASSERT (mpz_divisible_ui_p (N, d->p));
 
-      if (n == max_div)
-	return max_div + 1;
-
-      f[n++] = d->p;
+      f.push_back(d->p);
       if (s == 1)
         N->_mp_d[0] = u;
       else if (s == 2)
@@ -391,31 +400,19 @@ trialdiv (unsigned long *f, mpz_t N, const trialdiv_divisor_t *d,
       else
         mpz_divexact_ui (N, N, d->p);
     }
-  
-  return n;
+  return f.size();
 }
 
-
-/* Initialise a trialdiv_divisor_t array with the nr primes stored in *f.
-   This function allocates memory for the array, inits each entry, and puts
-   a sentinel at the end. */
-trialdiv_divisor_t *
-trialdiv_init (const unsigned long *f, const unsigned int nr)
+trialdiv_data::trialdiv_data(std::vector<unsigned long> const & primes, size_t skip)
 {
-  trialdiv_divisor_t *d;
-  unsigned int i;
-  
-  d = (trialdiv_divisor_t *) malloc ((nr + 1) * sizeof (trialdiv_divisor_t));
-  ASSERT (d != NULL);
-  for (i = 0; i < nr; i++)
-    trialdiv_init_divisor (&(d[i]), f[i]);
-  trialdiv_init_divisor (&(d[nr]), 1UL);
-
-  return d;
-}
-
-void
-trialdiv_clear (trialdiv_divisor_t *d)
-{
-  free (d);
+    ASSERT_ALWAYS(skip <= primes.size());
+    reserve(1 + primes.size() - skip);
+    for(size_t i = skip ; i < primes.size() ; ++i) {
+        emplace_back();
+        trialdiv_init_divisor(&back(), primes[i]);
+    }
+    /* This sentinel is here so that the loop in trialdiv doesn't have to
+     * bother about checking */
+    emplace_back();
+    trialdiv_init_divisor(&back(), 1UL);
 }

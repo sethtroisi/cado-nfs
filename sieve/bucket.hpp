@@ -274,6 +274,25 @@ static_assert(sizeof(bucket_update_t<3, shorthint_t>) == 8, "wrong size");
 /******** Bucket array typedef **************/
 /******** Bucket array implementation **************/
 template <int LEVEL, typename HINT>
+struct bucket_slice_alloc_defaults {
+        static const slice_index_t initial = 64;
+        static const slice_index_t increase = 64;
+};
+
+template <int LEVEL>
+struct bucket_slice_alloc_defaults<LEVEL, longhint_t> {
+        static const slice_index_t initial = 1;
+        static const slice_index_t increase = 1;
+};
+
+template <int LEVEL>
+struct bucket_slice_alloc_defaults<LEVEL, logphint_t> {
+        static const slice_index_t initial = 1;
+        static const slice_index_t increase = 1;
+};
+
+
+template <int LEVEL, typename HINT>
 class bucket_array_t : private NonCopyable {
     public:
   static const int level = LEVEL;
@@ -305,8 +324,8 @@ private:
   size_t   alloc_slices = 0;            // number of checkpoints (each of size
                                         // size_b_align) we have allocated
 
-  static const slice_index_t initial_slice_alloc = 256;
-  static const slice_index_t increase_slice_alloc = 128;
+  static constexpr slice_index_t initial_slice_alloc = bucket_slice_alloc_defaults<LEVEL, HINT>::initial;
+  static constexpr slice_index_t increase_slice_alloc = bucket_slice_alloc_defaults<LEVEL, HINT>::increase;
 
   /* Get a pointer to the pointer-set for the i_slice-th slice */
   update_t ** get_slice_pointers(const slice_index_t i_slice) const {
@@ -405,7 +424,7 @@ public:
      SAFE_BUCKETS is defined. */
   void push_update(const int i, const update_t &update) {
 #ifdef SAFE_BUCKETS
-      if (bucket_start[i] + bucket_size == bucket_write[i]) {
+      if (bucket_write[i] >= bucket_start[i + 1]) {
           fprintf(stderr, "# Warning: hit end of bucket nb %d\n", i);
           ASSERT_ALWAYS(0);
           return;
@@ -604,6 +623,7 @@ class bkmult_specifier {
     template<typename T> double get(T const &) const { return get<T>(); }
     template<typename T> double operator()(T const &) const { return get<T>(); }
     template<typename T> double operator()() const { return get<T>(); }
+    bkmult_specifier() = default;
     bkmult_specifier(double x) : base(x) {}
     bkmult_specifier(const char * specifier);
     std::string print_all() const;

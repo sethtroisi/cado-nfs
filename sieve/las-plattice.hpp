@@ -629,6 +629,7 @@ public:
         x = src.x;
     }
 
+    /* This function is quite critical */
     void next() {
       uint32_t i = x & maskI;
       if (i >= bound1)
@@ -674,11 +675,13 @@ public:
 
 class plattices_vector_t:
         public std::vector<plattice_enumerate_t> {
+    /* The index here is the global index, across all fb parts */
     slice_index_t index;
     double weight;
 public:
     plattices_vector_t() = default;
     plattices_vector_t(slice_index_t index, double weight) : index(index), weight(weight) {}
+    /* returns a global index */
     slice_index_t get_index() const {return index;};
     slice_index_t get_weight() const {return weight;};
 };
@@ -790,6 +793,11 @@ public:
     plattices_dense_vector_t() = default;
 #endif
 };
+
+// This one is for remembering the FK basis in sublat mode, between two
+// different congruences of (i,j) mod m.
+// For simplicity, we remember them only for the toplevel.
+typedef std::vector<plattices_dense_vector_t> precomp_plattice_dense_t;
 
 
 #if 0

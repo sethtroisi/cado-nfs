@@ -496,16 +496,26 @@ cado_define_test(full_c30
             TARGET_DEPENDENCIES full_c30_dependencies debug_renumber
             plingen_pz sm sm_simple las_descent reconstructlog-dl
             merge-dl replay-dl badideals)
+        # The following case was hitting the bug #21707
         cado_define_test(full_p30_JL
             SCRIPT
             ${CMAKE_CURRENT_SOURCE_DIR}/provide-wdir.sh  --arg workdir
             ${CADO_NFS_SOURCE_DIR}/cado-nfs.py
-            -dlp -ell 445257213376519703258944813
+            -dlp -ell 350586976534485556208993720963
             -t 2 -dlp-no-keep
-            3037544709654617415632521514287
+            701173953068971112417987441927
             fastSM=true
-            jlpoly=true tasks.polyselect.bound=5 tasks.polyselect.modm=7
+            jlpoly=true tasks.polyselect.bound=3 tasks.polyselect.modm=5
             tasks.polyselect.degree=3 tasks.reconstructlog.checkdlp=false
+            lim0=4000 lim1=600 lpb0=12 lpb1=11
+            tasks.sieve.mfb0=12
+            tasks.sieve.mfb1=22
+            tasks.sieve.lambda0=1.1
+            tasks.sieve.lambda1=2.1
+            tasks.sieve.qmin=700
+            tasks.sieve.qrange=100
+            tasks.sieve.sqside=0
+            tasks.sieve.rels_wanted=1500
             TARGET_DEPENDENCIES full_c30_dependencies debug_renumber
             plingen_pz sm sm_simple las_descent reconstructlog-dl
             dlpolyselect merge-dl replay-dl badideals)
@@ -609,4 +619,5 @@ add_subdirectory (linalg)
 add_subdirectory (gf2x)
 add_subdirectory (misc)
 add_subdirectory (sqrt)
-add_subdirectory (nfs-hd)
+# commented the following since nfs-hd is not in "make dist"
+# add_subdirectory (nfs-hd)

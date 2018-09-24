@@ -30,11 +30,6 @@ struct precomp_plattice_t {
 };
 
 
-// This one is for remembering the FK basis in sublat mode, between two
-// different congruences of (i,j) mod m.
-// For simplicity, we remember them only for the toplevel.
-typedef std::vector<plattices_dense_vector_t> precomp_plattice_dense_t;
-
 template <int LEVEL>
 void
 downsort_tree(
@@ -44,7 +39,6 @@ downsort_tree(
         thread_pool &pool,
         uint32_t bucket_index,
         uint32_t first_region0_index,
-        sieve_info& si,
         precomp_plattice_t & precomp_plattice,
         where_am_I & w);
 
@@ -52,15 +46,14 @@ void fill_in_buckets_toplevel(
         nfs_work &ws,
         nfs_aux &aux,
         thread_pool &pool,
-        sieve_info& si,
         int side,
         where_am_I & w);
 
 void fill_in_buckets_prepare_precomp_plattice(
+        nfs_work &ws,
         thread_pool &pool,
         int side,
         int level,
-        sieve_info const & si,
         precomp_plattice_t & precomp_plattice);
 
 #endif

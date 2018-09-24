@@ -271,7 +271,14 @@ int mpfq_u64k3_vec_asprint(mpfq_u64k3_dst_field K MAYBE_UNUSED, char * * pstr, m
             alloc = len+ltmp+100 + alloc / 4;
             *pstr = (char *)realloc(*pstr, alloc);
         }
+#if GNUC_VERSION_ATLEAST(7,1,0)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wstringop-overflow"
+#endif
         strncpy(*pstr+len, tmp, ltmp+4);
+#if GNUC_VERSION_ATLEAST(7,1,0)
+#pragma GCC diagnostic pop
+#endif
         len += ltmp;
         free(tmp);
     }

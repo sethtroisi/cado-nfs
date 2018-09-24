@@ -28,15 +28,7 @@ int abort_on_fail = 0;
 int only_complete_functions = 0;
 
 /* this is really a mock structure just for the fun of it. */
-struct {
-    struct {
-        sublat_t sublat;
-        int logI;
-    } conf;
-    struct {
-        mpz_t q;
-    } qbasis;
-} si;
+sublat_t sl;
 
 
 
@@ -242,7 +234,7 @@ void current_I18_branch(std::vector<int> const & positions, std::vector<ssp_simp
         const unsigned char logp = ssp.logp;
         unsigned char * S0 = S;
 
-        unsigned int i_compens_sublat = si.conf.sublat.i0 & 1;
+        unsigned int i_compens_sublat = sl.i0 & 1;
         unsigned int j = j0;
 
 
@@ -306,7 +298,7 @@ void modified_I18_branch_C(std::vector<int> const & positions, std::vector<ssp_s
             /* for j even, we sieve only odd pi, so step = 2p. */
             WHERE_AM_I_UPDATE(w, j, j);
             sieve_full_line(S0, S0 + (i1 - i0), S0 - S,
-                    pos + (((si.conf.sublat.i0^pos^1)&1&~j)?p:0), px, logp, w);
+                    pos + (((sl.i0^pos^1)&1&~j)?p:0), px, logp, w);
             S0 += I;
             pos += r; if (pos >= (int) p) pos -= p;
             px ^= spx;
@@ -329,7 +321,7 @@ void legacy_branch(std::vector<int> const & positions, std::vector<ssp_simple_t>
 
         unsigned long j;
         const int test_divisibility MAYBE_UNUSED = 0; /* very slow, but nice for debugging */
-        const unsigned long nj = bucket_region >> si.conf.logI; /* Nr. of lines per bucket region */
+        const unsigned long nj = bucket_region >> logI; /* Nr. of lines per bucket region */
 
         WHERE_AM_I_UPDATE(w, p, p);
 
@@ -338,8 +330,8 @@ void legacy_branch(std::vector<int> const & positions, std::vector<ssp_simple_t>
         size_t p_or_2p = p;
         ASSERT((fbprime_t) pos < p);
         unsigned int i_compens_sublat = 0;
-        if (si.conf.sublat.m != 0) {
-            i_compens_sublat = si.conf.sublat.i0 & 1;
+        if (sl.m != 0) {
+            i_compens_sublat = sl.i0 & 1;
         }
         j = 0;
         if (row0_is_oddj) goto j_odd;
@@ -411,7 +403,7 @@ void devel_branch(std::vector<int> const & positions, std::vector<ssp_simple_t> 
         for( ; j < j1 ; ) {
             /* for S(j) even, we sieve only odd pi, so step = 2p. */
             {
-            int xpos = ((si.conf.sublat.i0 + pos) & 1) ? pos : (pos+p);
+            int xpos = ((sl.i0 + pos) & 1) ? pos : (pos+p);
             sieve_full_line_new_half(S0, S0 + (i1 - i0), S0 - S,
                     xpos, p+p, logp, w);
             }
@@ -447,7 +439,7 @@ void legacy_mod_branch(std::vector<int> const & positions, std::vector<ssp_simpl
 
             unsigned long j;
             const int test_divisibility MAYBE_UNUSED = 0; /* very slow, but nice for debugging */
-            const unsigned long nj = bucket_region >> si.conf.logI; /* Nr. of lines per bucket region */
+            const unsigned long nj = bucket_region >> logI; /* Nr. of lines per bucket region */
 
             WHERE_AM_I_UPDATE(w, p, p);
 
@@ -457,8 +449,8 @@ void legacy_mod_branch(std::vector<int> const & positions, std::vector<ssp_simpl
             size_t p_or_2p = p;
             ASSERT(pos < (int) p);
             unsigned int i_compens_sublat = 0;
-            if (si.conf.sublat.m != 0) {
-                i_compens_sublat = si.conf.sublat.i0 & 1;
+            if (sl.m != 0) {
+                i_compens_sublat = sl.i0 & 1;
             }
             j = 0;
             if (row0_is_oddj) goto j_odd0;
@@ -505,7 +497,7 @@ j_odd0:
 
             unsigned long j;
             const int test_divisibility MAYBE_UNUSED = 0; /* very slow, but nice for debugging */
-            const unsigned long nj = bucket_region >> si.conf.logI; /* Nr. of lines per bucket region */
+            const unsigned long nj = bucket_region >> logI; /* Nr. of lines per bucket region */
 
             WHERE_AM_I_UPDATE(w, p, p);
 
@@ -514,8 +506,8 @@ j_odd0:
             size_t p_or_2p = p;
             ASSERT(pos < (int) p);
             unsigned int i_compens_sublat = 0;
-            if (si.conf.sublat.m != 0) {
-                i_compens_sublat = si.conf.sublat.i0 & 1;
+            if (sl.m != 0) {
+                i_compens_sublat = sl.i0 & 1;
             }
             j = 0;
             if (row0_is_oddj) goto j_odd;
@@ -587,7 +579,7 @@ template<typename even_code, typename odd_code, bool fragment> void devel_branch
         for( ; j < j1 ; ) {
             /* for j even, we sieve only odd pi, so step = 2p. */
             {
-            int xpos = ((si.conf.sublat.i0 + pos) & 1) ? pos : (pos+p);
+            int xpos = ((sl.i0 + pos) & 1) ? pos : (pos+p);
             even_code()(S0, S0 + (i1 - i0), S0 - S, xpos, p+p, logp, w);
             }
             S0 += I;
@@ -609,7 +601,7 @@ j_odd_devel0:
 void generated(std::vector<int> const & positions, std::vector<ssp_simple_t> const & primes, unsigned char * S, int logI, unsigned int N, where_am_I & w MAYBE_UNUSED) /*{{{*/
 {
     std::vector<ssp_t> not_nice_primes;
-    small_sieve SS(positions, primes, not_nice_primes, S, logI, N, si.conf.sublat);
+    small_sieve SS(positions, primes, not_nice_primes, S, logI, N, sl);
     // SS.pattern_sieve2(w);
     // SS.pattern_sieve3(w);
     SS.normal_sieve(w);
@@ -967,14 +959,11 @@ int main(int argc0, char * argv0[])
     param_list_parse_int(pl, "bmin", &bmin);
     param_list_parse_int(pl, "bmax", &bmax);
 
-    si.conf.logI = logI;
     if (!bmax) bmax = logI;
     if (!logA) logA = 2*logI-1;
 
     gmp_randstate_t rstate;
     gmp_randinit_default(rstate);
-
-    mpz_init_set_ui(si.qbasis.q, 4294967291);
 
     int errors = 0;
 
@@ -1091,7 +1080,6 @@ int main(int argc0, char * argv0[])
         errors += !bbase.test(funcs);
     }
 
-    mpz_clear(si.qbasis.q);
     gmp_randclear(rstate);
 
     return errors ? EXIT_FAILURE : EXIT_SUCCESS;

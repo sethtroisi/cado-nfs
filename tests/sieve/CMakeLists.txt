@@ -173,6 +173,13 @@ cado_divert_test(F9 sieve
             REFERENCE_REVISION=ede066464ba58b2d6127fa256cef01706282e0ed
         )
 
+cado_divert_test(F9 sieve_recompute_ssdpos
+    APPEND_ARGUMENTS -B 12 -nq 1
+    APPEND_ENVIRONMENT
+        REL_COUNT=54
+        CHECKSUM_FILE=
+)
+
 # go wild for the under-allocation. If this is valgrind-ok, then
 # surely #21513 is fixed. While we're at it, check all kind of possible
 # under-allocation recovers (the base test below serves only as a stem).
@@ -370,10 +377,12 @@ cado_define_test(F9_fakereltest
     TEST_DEPENDENCIES F9_makefb)
 
 # Try with default TRIALDIV_MAXLEN, whatever it may be
-cado_define_test(test_trialdiv.c ${CADO_NFS_SOURCE_DIR}/sieve/trialdiv.c LIBRARIES utils tests trialdiv)
+cado_define_test(test_trialdiv.cpp
+    ${CADO_NFS_SOURCE_DIR}/sieve/trialdiv.cpp LIBRARIES utils tests trialdiv)
 
 macro (add_trialdiv_test MAXLEN)
-    cado_define_test(test_trialdiv_${MAXLEN} SOURCES test_trialdiv.c ${CADO_NFS_SOURCE_DIR}/sieve/trialdiv.c LIBRARIES utils tests)
+    cado_define_test(test_trialdiv_${MAXLEN} SOURCES test_trialdiv.cpp
+        ${CADO_NFS_SOURCE_DIR}/sieve/trialdiv.cpp LIBRARIES utils tests)
     set_property(TARGET test_trialdiv_${MAXLEN}
                 PROPERTY COMPILE_DEFINITIONS TRIALDIV_MAXLEN=${MAXLEN})
 endmacro()
