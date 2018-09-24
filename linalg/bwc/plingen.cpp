@@ -1355,6 +1355,8 @@ bw_lingen_recursive(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta,
     matpoly_init(ab, pi_right, 0, 0, 0);
     matpoly_init(ab, E_right, 0, 0, 0);
 
+    int depth = stats.depth;
+
     matpoly_truncate(ab, E_left, E, half);
 
     /* prepare for MP ! */
@@ -1385,8 +1387,8 @@ bw_lingen_recursive(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta,
         matpoly_rshift(ab, E, E, pi_left_expect - pi_left->size);
 
     // matpoly_rshift(ab, E, E, half - pi_left->size + 1);
-    logline_begin(stdout, z, "t=%u MP%s(%zu, %zu) -> %zu",
-            bm->t, caching ? "-caching" : "",
+    logline_begin(stdout, z, "t=%u %*sMP%s(%zu, %zu) -> %zu",
+            bm->t, depth,"", caching ? "-caching" : "",
             E->size, pi_left->size, E->size - pi_left->size + 1);
 
     /* the artificial time is the time we've skipped by not doing the mp
@@ -1414,8 +1416,8 @@ bw_lingen_recursive(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta,
     matpoly_clear(ab, E_right);
 
     stats.begin_smallstep("MUL");
-    logline_begin(stdout, z, "t=%u MUL%s(%zu, %zu) -> %zu",
-            bm->t, caching ? "-caching" : "",
+    logline_begin(stdout, z, "t=%u %*sMUL%s(%zu, %zu) -> %zu",
+            bm->t, depth, "", caching ? "-caching" : "",
             pi_left->size, pi_right->size, pi_left->size + pi_right->size - 1);
 
     /* when we're just measuring the time, we're going to fake the
