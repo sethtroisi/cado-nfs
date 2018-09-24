@@ -727,7 +727,22 @@ polygen_JL1 (mpz_t n,
 static void
 usage ()
 {
-    fprintf (stderr, "./dlpolyselect -N xxx -df xxx -dg xxx -bound xxx [-modr xxx] [-modm xxx] [-t xxx] [-easySM <ell>] [-skew]\n");
+    fprintf (stderr, "./dlpolyselect -N xxx -df xxx -dg xxx -bound xxx [-modr xxx] [-modm xxx] [-t xxx] [-easySM <ell>] [-skew] [-rrf nnn]\n");
+    fprintf (stderr, "Mandatory parameters:\n");
+    fprintf (stderr, "   -N xxx            input number\n");
+    fprintf (stderr, "   -df xxx           degree of polynomial f\n");
+    fprintf (stderr, "   -dg xxx           degree of polynomial g\n");
+    fprintf (stderr, "   -bound xxx        bound for absolute value of coefficients of f\n");
+    fprintf (stderr, "Optional parameters:\n");
+    fprintf (stderr, "   -modr r -modm m   processes only polynomials of index r mod m\n");
+    fprintf (stderr, "   -t nnn            uses n threads\n");
+    fprintf (stderr, "   -easySM ell       generates polynomials with minimal number of SMs mod ell\n");
+    fprintf (stderr, "   -skew s           wanted skewness\n");
+    fprintf (stderr, "   -rrf nnn          f should have nnn real roots\n");
+    fprintf (stderr, "   -rrg nnn          g should have nnn real roots\n");
+    fprintf (stderr, "   -Bf nnn           sieving bound for f\n");
+    fprintf (stderr, "   -Bg nnn           sieving bound for g\n");
+    fprintf (stderr, "   -area nnn         sieving area\n");
     exit (1);
 }
 
