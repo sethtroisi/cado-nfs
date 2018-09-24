@@ -546,41 +546,16 @@ polygen_JL_g (mpz_t kN, int dg, mat_Z g, mpz_t root, double skew_f)
     mpz_clear (r);
 }
 
-/* lift root r of f mod N to a root of f mod k*N, where kN = k*N.
-   For Joux-Lercier, N=p is a large prime, and k is a small integer.
-   Return 0 if lift is not possible. */
-static int
-root_lift (mpz_t N, mpz_t kN, unsigned long k, mpz_poly f, mpz_t r)
-{
-  if (k == 1)
-    return 1;
-
-  unsigned long i;
-  mpz_t v;
-  mpz_init (v);
-  for (i = 0; i < k; i++)
-    {
-      mpz_poly_eval (v, f, r);
-      mpz_mod (v, v, kN);
-      if (mpz_cmp_ui (v, 0) == 0)
-        break;
-      mpz_add (r, r, N);
-    }
-  mpz_clear (v);
-
-  return i < k;
-}
-
 /* JL method to generate degree d and d-1 polynomials.
    Given irreducible polynomial f of degree df, find roots of f mod n,
    and for each root, use Joux-Lercier method to find good polynomials g. */
 static void
-polygen_JL2 (mpz_t n, unsigned long k,
+polygen_JL2 (mpz_t n,
              unsigned int df, unsigned int dg,
 	     unsigned long nb_comb, mpz_poly f, long bound2, mpz_t ell)
 {
     unsigned int i, j, nr, format = 1;
-    mpz_t *rf, c, kn;
+    mpz_t *rf, c;
     mat_Z g;
     mpz_poly *v, u;
     long *a;
@@ -588,8 +563,6 @@ polygen_JL2 (mpz_t n, unsigned long k,
 
     ASSERT_ALWAYS (df >= 3);
     mpz_init (c);
-    mpz_init (kn);
-    mpz_mul_ui (kn, n, k); /* k * n */
     rf = (mpz_t *) malloc (df * sizeof(mpz_t));
     for (i = 0; i < df; i ++)
       mpz_init (rf[i]);
@@ -646,10 +619,8 @@ polygen_JL2 (mpz_t n, unsigned long k,
 
     /* for each root of f mod n, generate the corresponding g */
     for (i = 0; i < nr; i ++) {
-        if (root_lift (n, kn, k, f, rf[i]) == 0)
-          continue;
         /* generate g of degree dg */
-        polygen_JL_g (kn, dg, g, rf[i], skew_f);
+        polygen_JL_g (n, dg, g, rf[i], skew_f);
 
         /* we skip idx = 0 which should correspond to c[0] = ... = c[dg] = 0 */
         for (unsigned long idx = 1; idx < nb_comb; idx ++)
@@ -720,18 +691,12 @@ polygen_JL2 (mpz_t n, unsigned long k,
     free (g.coeff);
     free (rf);
     mpz_clear (c);
-    mpz_clear (kn);
 }
 
 /* JL method to generate d and d-1 polynomial.
-   Generate polynomial f of degree df with |f[i]| <= bound and index 'idx'.
-   k is the multiplier (default 1, must be a small integer):
-   - we lift roots of f from mod n to mod (k*n)
-   - we put k*n in the LLL matrix instead
-   - in such a way the resultant is divisible by k, thus for any prime factor q of k
-     f and g might have common roots mod q */
+   Generate polynomial f of degree df with |f[i]| <= bound and index 'idx'. */
 static void
-polygen_JL1 (mpz_t n, unsigned long k,
+polygen_JL1 (mpz_t n,
              unsigned int df, unsigned int dg, unsigned int bound,
              unsigned long idx, unsigned long nb_comb, unsigned int bound2,
              mpz_t ell)
@@ -752,7 +717,7 @@ polygen_JL1 (mpz_t n, unsigned long k,
     /* generate f of degree d with small coefficients */
     irred = polygen_JL_f (df, bound, f, idx);
     if (irred)
-      polygen_JL2 (n, k, df, dg, nb_comb, ff, bound2, ell);
+      polygen_JL2 (n, df, dg, nb_comb, ff, bound2, ell);
     /* clear */
     for (i = 0; i <= df; i ++)
       mpz_clear (f[i]);
@@ -778,7 +743,6 @@ main (int argc, char *argv[])
     unsigned long maxtries;
     double t;
     unsigned long modr = 0, modm = 1;
-    unsigned long multiplier = 1;
 
     t = seconds ();
     mpz_init (N);
@@ -832,11 +796,6 @@ main (int argc, char *argv[])
         }
         else if (argc >= 3 && strcmp (argv[1], "-t") == 0) {
             nthreads = atoi (argv[2]);
-            argv += 2;
-            argc -= 2;
-        }
-        else if (argc >= 3 && strcmp (argv[1], "-k") == 0) {
-            multiplier = atoi (argv[2]);
             argv += 2;
             argc -= 2;
         }
@@ -950,7 +909,7 @@ main (int argc, char *argv[])
     }
 #endif
     for (unsigned long c = modr; c < maxtries; c += modm)
-      polygen_JL1 (N, multiplier, df, dg, bound, c, nb_comb, bound2, ell);
+      polygen_JL1 (N, df, dg, bound, c, nb_comb, bound2, ell);
 
     t = seconds () - t;
 
