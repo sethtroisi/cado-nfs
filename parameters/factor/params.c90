@@ -206,12 +206,13 @@ tasks.polyselect.adrange = 5000		# size of individual tasks
     # a workunit to a slave for computation.
 
 tasks.polyselect.nq = 256
-    # Number of small primes in the leading coefficient of the linear polynomial
-    # Safe to leave at the default value
+    # Number of small prime combinations in the leading coefficient of the
+    # linear polynomial. Safe to leave at the default value.
     # Recommended values are powers of the degree, e.g., 625 for degree 5,
     # or 1296 for degree 6. Here 256 = 4^4 thus the leading coefficient of
     # the linear polynomial will be q1*q2*q3*q4*p1*p2 where q1,q2,q3,q4 are
-    # small primes, and P <= p1, p2 < 2*P.
+    # small primes, and P <= p1, p2 < 2*P. For a given pair (p1,p2), 256
+    # different combinations of q1,q2,q3,q4 will be tried.
 
 tasks.polyselect.sopteffort = 0
     # Indicates how much effort is spent in stage 1 (size optimization) of the
