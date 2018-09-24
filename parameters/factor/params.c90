@@ -195,7 +195,8 @@ tasks.polyselect.incr = 60	    # increment for leading coefficient of f(x)
     # The polynomial selection search time is proportional to the
     # length of the search interval, i.e., (admax-admin)/incr.
 
-tasks.polyselect.nrkeep = 40
+tasks.polyselect.nrkeep = 40 # number of polynomials kept in step 1 of
+                             # polynomial selection (size optimization)
 
 tasks.polyselect.adrange = 5000		# size of individual tasks
     # Polynomial selection is split into several individual tasks. The
