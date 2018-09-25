@@ -861,13 +861,13 @@ main (int argc, char *argv[])
     }
 
     if (df == 0) {
-        fprintf (stderr, "Error, error degree (-df option)\n");
+        fprintf (stderr, "Error, missing degree (-df option)\n");
         usage ();
     }
 
     if (dg == 0 || dg >= df) {
-        fprintf (stderr, "Error, missing or error degree (-dg option)\n");
-        fprintf (stderr, "       only support dg < df.\n");
+        fprintf (stderr, "Error, missing or erroneous degree (-dg option): ");
+        fprintf (stderr, "one should have dg < df.\n");
         usage ();
     }
 
