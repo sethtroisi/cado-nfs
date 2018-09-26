@@ -160,6 +160,7 @@ class Polynomials(object):
     re_pol_g = re.compile(r"Y(\d+)\s*:\s*(-?\d+)")
     re_polys = re.compile(r"poly(\d+)\s*:") # FIXME: do better?
     re_Murphy = re.compile(re_cap_n_fp(r"\s*#\s*MurphyE\s*\((.*)\)\s*=", 1))
+    re_skew = re.compile(re_cap_n_fp(r"skew:", 1))
     re_best = re.compile(r"# Best polynomial found \(revision (.*)\):")
     # the 'lognorm' variable now represents the expected E-value
     re_lognorm = re.compile(re_cap_n_fp(r"\s*#\s*exp_E", 1))
@@ -179,6 +180,7 @@ class Polynomials(object):
             and polyselect_ropt
         """
         self.MurphyE = 0.
+        self.skew = 0.
         self.MurphyParams = None
         self.revision = None
         self.lognorm = 0.
@@ -227,6 +229,10 @@ class Polynomials(object):
                 self.MurphyParams = match.group(1)
                 self.MurphyE = float(match.group(2))
                 continue
+            match = self.re_skew.match(line)
+            if match:
+                self.skew = float(match.group(1))
+                # go through
             match = self.re_best.match(line)
             if match:
                 self.revision = match.group(1)
