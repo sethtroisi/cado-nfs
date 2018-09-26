@@ -134,6 +134,7 @@ misc/cacheline.c
 misc/CMakeLists-nodist.txt
 misc/descent-init.c
 misc/filter_sieved_pairs.c
+misc/svsm.c
 filter/out-of-core/Makefile
 filter/out-of-core/clique.c
 filter/out-of-core/singleton.c

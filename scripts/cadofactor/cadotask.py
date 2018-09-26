@@ -2338,7 +2338,14 @@ class Polysel2Task(ClientServerTask, HasStatistics, DoesImport, patterns.Observe
         if not poly.MurphyE:
             self.logger.warn("Polynomial in file %s has no Murphy E value",
                              filename)
-        if self.bestpoly is None or poly.MurphyE > self.bestpoly.MurphyE:
+        # in case poly.MurphyE = self.bestpoly.MurphyE (MurphyE is printed
+        # only with 3 digits in the cxxx.poly file), we choose the polynomial
+        # with the smallest skewness, to avoid non-determinism in polynomial
+        # selection. Indeed, if we have two polynomials with the same MurphyE
+        # value (when rounded on 3 digits), the one found first was chosen
+        # before that change.
+        if self.bestpoly is None or (poly.MurphyE > self.bestpoly.MurphyE or
+            poly.MurphyE == self.bestpoly.MurphyE and poly.skew < self.bestpoly.skew):
             self.logger.info("New best polynomial from file %s:"
                              " Murphy E = %g" % (filename, poly.MurphyE))
             self.logger.debug("New best polynomial is:\n%s", poly)
@@ -2550,7 +2557,8 @@ class PolyselJLTask(ClientServerTask, patterns.Observer):
             self.logger.warn("Polynomial in file %s has no MurphyE, skipping it",
                              filename)
             return 0
-        if self.bestpoly is None or self.bestpoly.MurphyE < poly.MurphyE:
+        if self.bestpoly is None or (self.bestpoly.MurphyE < poly.MurphyE or
+            self.bestpoly.MurphyE == poly.MurphyE and self.bestpoly.skew > poly.skew):
             self.bestpoly = poly
             self.logger.info("Best polynomial so far has MurphyE %f",
                     poly.MurphyE);
