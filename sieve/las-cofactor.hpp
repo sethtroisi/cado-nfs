@@ -43,4 +43,22 @@ int factor_both_leftover_norms(
         std::array<unsigned long, 2> const &,
         facul_strategies_t const *);
 
+/* handy shortcut. Can't have it defined at the facul.hpp level because
+ * facul does not know about las stuff. */
+static inline facul_strategies_t* facul_make_strategies (siever_config const & conf, FILE* file, const int verbose);
+static inline facul_strategies_t* facul_make_strategies (siever_config const & conf, FILE* file, const int verbose)
+{
+    return facul_make_strategies(
+            conf.sides[0].lim,
+            conf.sides[0].lpb,
+            conf.sides[0].mfb,
+            conf.sides[1].lim,
+            conf.sides[1].lpb,
+            conf.sides[1].mfb,
+            (conf.sublat_bound == 0), // with sublat, some primes are skipped.
+            conf.sides[0].ncurves,
+            conf.sides[1].ncurves,
+            file, verbose);
+}
+
 #endif

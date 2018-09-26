@@ -168,7 +168,8 @@ clear_Q_to_Fp_context(struct contexts_s *contexts)
    if we reach the end of the factor base. */
 static inline size_t
 transform_n_roots(unsigned long *p, unsigned long *r, fb_iterator t,
-                  const size_t n, const int side, sieve_info const & si,
+                  const size_t n, const int side,
+                  sieve_info const & si,
                   struct contexts_s *contexts)
 {
   size_t i;
@@ -290,7 +291,7 @@ inline bool discard_power_for_bucket_sieving<fb_entry_general>(fb_entry_general 
 }
 
 
-/*********y**************************************************************/
+/***********************************************************************/
 /* multithreaded processing of make_lattice_bases (a.k.a
  * precomp_plattices)
  *
@@ -305,42 +306,20 @@ inline bool discard_power_for_bucket_sieving<fb_entry_general>(fb_entry_general 
 struct make_lattice_bases_parameters_base: public task_parameters {
   int side;
   int level;
-  qlattice_basis const & basis;
-  int logI;
-  sublat_t const & sublat;
+  nfs_work & ws;
   precomp_plattice_t::vec_type & V;
-  make_lattice_bases_parameters_base(
-          int side,
-          int level,
-          qlattice_basis const & basis,
-          int logI,
-          sublat_t const & sublat,
+  make_lattice_bases_parameters_base(int side, int level, nfs_work & ws,
           precomp_plattice_t::vec_type & V) :
-      side(side),
-      level(level),
-      basis(basis),
-      logI(logI),
-      sublat(sublat),
-      V(V) {}
+      side(side), level(level), ws(ws), V(V)
+    {}
 };
 template <class FB_ENTRY_TYPE>
 struct make_lattice_bases_parameters : public make_lattice_bases_parameters_base {
     fb_slice<FB_ENTRY_TYPE> const & slice;
-  make_lattice_bases_parameters(
-          int side,
-          int level,
-          qlattice_basis const & basis,
-          int logI,
-          sublat_t const & sublat,
-          precomp_plattice_t::vec_type & V,
-          fb_slice<FB_ENTRY_TYPE> const & slice) :
-      make_lattice_bases_parameters_base(side, level, basis, logI, sublat, V),
-      slice(slice)
-    { }
-  make_lattice_bases_parameters(
-          make_lattice_bases_parameters_base const & model,
-          fb_slice<FB_ENTRY_TYPE> const & slice) :
-      make_lattice_bases_parameters_base(model), slice(slice)
+    make_lattice_bases_parameters(
+            make_lattice_bases_parameters_base const & model,
+            fb_slice<FB_ENTRY_TYPE> const & slice) :
+        make_lattice_bases_parameters_base(model), slice(slice)
     { }
 };
 
@@ -351,10 +330,12 @@ make_lattice_bases(worker_thread * worker MAYBE_UNUSED,
 {
     const make_lattice_bases_parameters<FB_ENTRY_TYPE> *param = static_cast<const make_lattice_bases_parameters<FB_ENTRY_TYPE> *>(_param);
 
-   fb_slice<FB_ENTRY_TYPE> const & slice(param->slice);
-   qlattice_basis const &basis(param->basis);
-   int logI = param->logI;
-   sublat_t const & sublat(param->sublat);
+    nfs_work & ws(param->ws);
+    qlattice_basis const &Q(ws.Q);
+    int logI = ws.conf.logI;
+    sublat_t const & sublat(ws.Q.sublat);
+    precomp_plattice_t::vec_type & V(param->V);
+    fb_slice<FB_ENTRY_TYPE> const & slice(param->slice);
 
    slice_index_t index = slice.get_index();
 
@@ -366,11 +347,11 @@ make_lattice_bases(worker_thread * worker MAYBE_UNUSED,
   slice_offset_t i_entry = 0;
   for (auto const & e : slice) {
       increment_counter_on_dtor<slice_offset_t> _dummy(i_entry);
-    if (!basis.is_coprime_to(e.p))
+    if (!Q.is_coprime_to(e.p))
       continue;
     if (discard_power_for_bucket_sieving(e))
         continue;
-    e.transform_roots(transformed, basis);
+    e.transform_roots(transformed, Q);
     for (unsigned char i_root = 0; i_root != transformed.nr_roots; i_root++) {
       const fbroot_t r = transformed.get_r(i_root);
       const bool proj = transformed.get_proj(i_root);
@@ -389,7 +370,7 @@ make_lattice_bases(worker_thread * worker MAYBE_UNUSED,
     }
   }
   /* This is moved, not copied. Note that V is a reference. */
-  param->V[result.get_index()] = std::move(result);
+  V[result.get_index()] = std::move(result);
   delete param;
   return new task_result;
 }
@@ -409,14 +390,19 @@ struct push_make_bases_to_task_list {
     }
 };
 
+/* It's a bit ridiculous to break all the relevant fields that we know of
+ * in nfs_work to pass them at parameters, and keep nfs_work const. We
+ * should simply pass nfs_work and be done with it...
+ */
 void fill_in_buckets_prepare_precomp_plattice(
+        nfs_work & ws,
         thread_pool &pool,
         int side,
         int level,
-        sieve_info const & si,
         precomp_plattice_t & precomp_plattice)
 {
-    fb_factorbase::slicing::part const & P = si.sides[side].fbs->get_part(level);
+    nfs_work::side_data const & wss(ws.sides[side]);
+    fb_factorbase::slicing::part const & P = wss.fbs->get_part(level);
     precomp_plattice_t::vec_type & V = precomp_plattice.v[side][level];
     /* We pre-assign the result, so that all threads can write to it
      * comfortably.
@@ -426,7 +412,7 @@ void fill_in_buckets_prepare_precomp_plattice(
      */
     V.assign(P.nslices(), plattices_vector_t());
     make_lattice_bases_parameters_base model {
-        side, level, si.qbasis, si.conf.logI, si.conf.sublat, V
+        side, level, ws, V
     };
     push_make_bases_to_task_list F { pool, model };
     P.foreach_slice(F);
@@ -461,13 +447,13 @@ void fill_in_buckets_prepare_precomp_plattice(
 template <int LEVEL, class FB_ENTRY_TYPE, typename TARGET_HINT>
 void
 fill_in_buckets_toplevel_sublat(bucket_array_t<LEVEL, TARGET_HINT> &orig_BA,
-                sieve_info const & si MAYBE_UNUSED,
+                int logI, qlattice_basis const & Q,
                 fb_slice<FB_ENTRY_TYPE> const & slice,
                 plattices_dense_vector_t * precomp_slice,
                 where_am_I & w)
 {
-  ASSERT_ALWAYS(si.conf.sublat.m != 0);
-  bool first_sublat = si.conf.sublat.i0 == 0 && si.conf.sublat.j0 == 1;
+  ASSERT_ALWAYS(Q.sublat.m);
+  bool first_sublat = Q.sublat.i0 == 0 && Q.sublat.j0 == 1;
   bucket_array_t<LEVEL, TARGET_HINT> BA;  /* local copy. Gain a register + use stack */
   BA.move(orig_BA);
 
@@ -483,23 +469,23 @@ fill_in_buckets_toplevel_sublat(bucket_array_t<LEVEL, TARGET_HINT> &orig_BA,
     slice_offset_t i_entry = 0;
     for (auto const & e : slice) {
       increment_counter_on_dtor<slice_offset_t> _dummy(i_entry);
-      if (!si.qbasis.is_coprime_to(e.p))
+      if (!Q.is_coprime_to(e.p))
         continue;
       if (discard_power_for_bucket_sieving(e))
           continue;
-      e.transform_roots(transformed, si.qbasis);
+      e.transform_roots(transformed, Q);
       for (unsigned char i_root = 0; i_root != transformed.nr_roots; i_root++) {
         const fbroot_t r = transformed.get_r(i_root);
         const bool proj = transformed.get_proj(i_root);
         /* If proj and r > 0, then r == 1/p (mod p^2), so all hits would be in
            locations with p | gcd(i,j). */
         if (LIKELY(!proj || r == 0)) {
-          plattice_info_t pli = plattice_info_t(transformed.get_q(), r, proj, si.conf.logI);
+          plattice_info_t pli = plattice_info_t(transformed.get_q(), r, proj, logI);
           // In sublat mode, save it for later use
           plattice_info_dense_t plid(pli, i_entry);
           precomp_slice->push_back(plid);
 
-          plattice_enumerate_t ple = plattice_enumerate_t(pli, i_entry, si.conf.logI, si.conf.sublat);
+          plattice_enumerate_t ple = plattice_enumerate_t(pli, i_entry, logI, Q.sublat);
 
           if (plattice_enumerate_finished<LEVEL>(ple.get_x()))
             continue;
@@ -514,7 +500,7 @@ fill_in_buckets_toplevel_sublat(bucket_array_t<LEVEL, TARGET_HINT> &orig_BA,
             const fbprime_t p = 0;
 #endif
             // Handle the rare special cases
-            const uint32_t I = si.I;
+            const uint32_t I = 1 << logI;
             if ((UNLIKELY(ple.get_inc_c() == 1 && ple.get_bound1() == I - 1))
                 ||
                 (UNLIKELY(ple.get_inc_c() == I && ple.get_bound1() == I))) {
@@ -533,10 +519,10 @@ fill_in_buckets_toplevel_sublat(bucket_array_t<LEVEL, TARGET_HINT> &orig_BA,
     }
   } else { // Use precomputed FK-basis
     for (unsigned int i = 0; i < precomp_slice->size(); ++i) {
-      plattice_info_t pli = (*precomp_slice)[i].unpack(si.conf.logI);
+      plattice_info_t pli = (*precomp_slice)[i].unpack(logI);
       slice_offset_t i_entry = (*precomp_slice)[i].get_hint();
 
-      plattice_enumerate_t ple = plattice_enumerate_t(pli, i_entry, si.conf.logI, si.conf.sublat);
+      plattice_enumerate_t ple = plattice_enumerate_t(pli, i_entry, logI, Q.sublat);
 
       if (plattice_enumerate_finished<LEVEL>(ple.get_x()))
         continue;
@@ -551,7 +537,7 @@ fill_in_buckets_toplevel_sublat(bucket_array_t<LEVEL, TARGET_HINT> &orig_BA,
 #endif
 
         // Handle the rare special cases
-        const uint32_t I = si.I;
+        const uint32_t I = 1 << logI;
         if ((UNLIKELY(ple.get_inc_c() == 1 && ple.get_bound1() == I - 1))
             ||
             (UNLIKELY(ple.get_inc_c() == I && ple.get_bound1() == I))) {
@@ -576,12 +562,12 @@ fill_in_buckets_toplevel_sublat(bucket_array_t<LEVEL, TARGET_HINT> &orig_BA,
 template <int LEVEL, class FB_ENTRY_TYPE, typename TARGET_HINT>
 void
 fill_in_buckets_toplevel(bucket_array_t<LEVEL, TARGET_HINT> &orig_BA,
-                sieve_info const & si MAYBE_UNUSED,
+                int logI, qlattice_basis const & Q,
                 fb_slice<FB_ENTRY_TYPE> const & slice,
                 plattices_dense_vector_t * /* unused */,
                 where_am_I & w)
 {
-  ASSERT_ALWAYS(!si.conf.sublat.m);
+  ASSERT_ALWAYS(!Q.sublat.m);
 
   bool first_reg = true;
   bucket_array_t<LEVEL, TARGET_HINT> BA;  /* local copy. Gain a register + use stack */
@@ -598,20 +584,20 @@ fill_in_buckets_toplevel(bucket_array_t<LEVEL, TARGET_HINT> &orig_BA,
 
   for (auto const & e : slice) {
     increment_counter_on_dtor<slice_offset_t> _dummy(i_entry);
-    if (!si.qbasis.is_coprime_to(e.p))
+    if (!Q.is_coprime_to(e.p))
       continue;
     if (discard_power_for_bucket_sieving(e))
         continue;
-    e.transform_roots(transformed, si.qbasis);
+    e.transform_roots(transformed, Q);
     for (unsigned char i_root = 0; i_root != transformed.nr_roots; i_root++) {
       const fbroot_t r = transformed.get_r(i_root);
       const bool proj = transformed.get_proj(i_root);
       /* If proj and r > 0, then r == 1/p (mod p^2), so all hits would be in
          locations with p | gcd(i,j). */
       if (LIKELY(!proj || r == 0)) {
-        plattice_info_t pli = plattice_info_t(transformed.get_q(), r, proj, si.conf.logI);
+        plattice_info_t pli = plattice_info_t(transformed.get_q(), r, proj, logI);
   
-        plattice_enumerate_t ple = plattice_enumerate_t(pli, i_entry, si.conf.logI);
+        plattice_enumerate_t ple = plattice_enumerate_t(pli, i_entry, logI);
 
         // Skip (i,j)=(0,0)
         ple.next();
@@ -628,7 +614,7 @@ fill_in_buckets_toplevel(bucket_array_t<LEVEL, TARGET_HINT> &orig_BA,
 #endif
 
           // Handle the rare special cases
-          const uint32_t I = si.I;
+          const uint32_t I = 1 << logI;
           if (UNLIKELY(ple.get_inc_c() == 1 && ple.get_bound1() == I - 1)) {
             // Projective root: only update is at (1,0).
             if (first_reg) {
@@ -668,7 +654,7 @@ template <int LEVEL, typename TARGET_HINT>
   void
 fill_in_buckets_lowlevel(
     bucket_array_t<LEVEL, TARGET_HINT> &orig_BA,
-    sieve_info const & si MAYBE_UNUSED,
+    int logI, qlattice_basis const & Q,
     plattices_vector_t & plattices_vector,
     bool first_reg,
     where_am_I & w)
@@ -681,18 +667,20 @@ fill_in_buckets_lowlevel(
   /* Write new set of pointers for the new slice */
   BA.add_slice_index(slice_index);
 
-  for (auto & ple : plattices_vector) {
+  for (auto & ple_orig : plattices_vector) {
     // Work with a copy, otherwise we don't get all optimizations.
     // Maybe with a wise use of the 'restrict' keyword, we might get
     // what we want, but this is C++11, anyway.
-    plattice_enumerate_t pl(ple);
+    //
+    // FIXME we're c++11 now. Look into this.
+    plattice_enumerate_t ple(ple_orig);
 
-    const slice_offset_t hint = pl.get_hint();
+    const slice_offset_t hint = ple.get_hint();
     WHERE_AM_I_UPDATE(w, h, hint);
 #ifdef TRACE_K
     /* this is a bit expensive, since we're scanning all parts.
      * Fortunately it's only a debug call anyway. */
-    fb_slice_interface const & slice = (*si.sides[w.side].fbs)[slice_index];
+    fb_slice_interface const & slice = (*w.sides[w.side].fbs)[slice_index];
     const fbprime_t p = slice.get_prime(hint); 
     WHERE_AM_I_UPDATE(w, p, p);
 #else
@@ -700,18 +688,18 @@ fill_in_buckets_lowlevel(
 #endif
 
     // Handle the rare special cases
-    const uint32_t I = si.I;
-    if (UNLIKELY(pl.get_inc_c() == 1 && pl.get_bound1() == I - 1)) {
+    const uint32_t I = 1 << logI;
+    if (UNLIKELY(ple.get_inc_c() == 1 && ple.get_bound1() == I - 1)) {
         // Projective root: only update is at (1,0).
-        if (!si.conf.sublat.m && first_reg) {
+        if (!Q.sublat.m && first_reg) {
             uint64_t x = 1 + (I >> 1);
             BA.push_update(x, p, hint, slice_index, w);
         }
         continue;
     }
-    if (UNLIKELY(pl.get_inc_c() == I && pl.get_bound1() == I)) {
+    if (UNLIKELY(ple.get_inc_c() == I && ple.get_bound1() == I)) {
         // Root=0: only update is at (0,1).
-        if (!si.conf.sublat.m && first_reg) {
+        if (!Q.sublat.m && first_reg) {
             uint64_t x = I + (I >> 1);
             BA.push_update(x, p, hint, slice_index, w);
         }
@@ -721,22 +709,22 @@ fill_in_buckets_lowlevel(
     /* Now, do the real work: the filling of the buckets */
     // Without sublattices, we test (very basic) coprimality,
     // otherwise not atm. FIXME!
-    if (!si.conf.sublat.m) {
-        while (!plattice_enumerate_finished<LEVEL>(pl.get_x())) {
-            if (LIKELY(pl.probably_coprime()))
-                BA.push_update(pl.get_x(), p, hint, slice_index, w);
-            pl.next();
+    if (!Q.sublat.m) {
+        while (!plattice_enumerate_finished<LEVEL>(ple.get_x())) {
+            if (LIKELY(ple.probably_coprime()))
+                BA.push_update(ple.get_x(), p, hint, slice_index, w);
+            ple.next();
         }
     } else {
-        while (!plattice_enumerate_finished<LEVEL>(pl.get_x())) {
-            BA.push_update(pl.get_x(), p, hint, slice_index, w);
-            pl.next();
+        while (!plattice_enumerate_finished<LEVEL>(ple.get_x())) {
+            BA.push_update(ple.get_x(), p, hint, slice_index, w);
+            ple.next();
         }
     }
 
     // save current position, and prepare for next area.
-    ple.set_x(pl.get_x());
-    ple.advance_to_next_area(LEVEL);
+    ple_orig.set_x(ple.get_x());
+    ple_orig.advance_to_next_area(LEVEL);
   } 
   // printf("%.3f\n", BA.max_full());
   orig_BA.move(BA);
@@ -744,10 +732,9 @@ fill_in_buckets_lowlevel(
 
 class fill_in_buckets_parameters: public task_parameters {
 public:
-  nfs_work &ws;
-  nfs_aux &aux;
+  nfs_work & ws;
+  nfs_aux & aux;
   const int side;
-  sieve_info const & si;
   const fb_slice_interface * slice;
   plattices_vector_t * plattices_vector; // content changed during fill-in
   plattices_dense_vector_t * plattices_dense_vector; // for sublat
@@ -755,11 +742,11 @@ public:
   where_am_I w;
 
   fill_in_buckets_parameters(nfs_work &_ws, nfs_aux& aux, const int _side,
-          sieve_info const & _si, const fb_slice_interface *_slice,
+          const fb_slice_interface *_slice,
           plattices_vector_t *_platt, plattices_dense_vector_t *_dplatt,
           const uint32_t _reg0,
           where_am_I const& w)
-  : ws(_ws), aux(aux), side(_side), si(_si), slice(_slice),
+  : ws(_ws), aux(aux), side(_side), slice(_slice),
     plattices_vector(_platt), plattices_dense_vector(_dplatt),
     first_region0_index(_reg0),
     w(w)
@@ -820,9 +807,9 @@ fill_in_buckets_one_slice_internal(worker_thread * worker, task_parameters * _pa
     timetree_t & timer(taux.timer);
     ENTER_THREAD_TIMER(timer);
     nfs_work & ws(param->ws);
-    sieve_info const & si(param->si);
     where_am_I & w(taux.w);
     int side = param->side;
+    nfs_work::side_data & wss(ws.sides[side]);
 
     MARK_TIMER_FOR_SIDE(timer, side);
 
@@ -832,31 +819,32 @@ fill_in_buckets_one_slice_internal(worker_thread * worker, task_parameters * _pa
     CHILD_TIMER(timer, TEMPLATE_INST_NAME(fill_in_buckets_one_slice_internal, LEVEL));
 
     w = param->w;
-    WHERE_AM_I_UPDATE(w, psi, & si);
     WHERE_AM_I_UPDATE(w, side, param->side);
     WHERE_AM_I_UPDATE(w, i, param->plattices_vector->get_index());
     WHERE_AM_I_UPDATE(w, N, param->first_region0_index);
 
     try {
+
         /* Get an unused bucket array that we can write to */
         /* clearly, reserve_BA() possibly throws. As it turns out,
          * fill_in_buckets_lowlevel<> does not, at least currently. One
          * could imagine that it could throw, so let's wrap it too.
          */
         bucket_array_t<LEVEL, TARGET_HINT> &BA =
-            ws.reserve_BA<LEVEL, TARGET_HINT>(param->side, -1);
+            wss.reserve_BA<LEVEL, TARGET_HINT>(-1);
 
         /* Fill the buckets */
         try {
-            fill_in_buckets_lowlevel<LEVEL>(BA, si,
+            fill_in_buckets_lowlevel<LEVEL>(BA,
+                    ws.conf.logI, ws.Q,
                     *param->plattices_vector,
                     (param->first_region0_index == 0), w);
         } catch(buckets_are_full & e) {
-            ws.release_BA(param->side, BA);
+            wss.release_BA(BA);
             throw e;
         }
         /* Release bucket array again */
-        ws.release_BA(param->side, BA);
+        wss.release_BA(BA);
     } catch(buckets_are_full & e) {
         delete param;
         throw e;
@@ -881,10 +869,11 @@ fill_in_buckets_toplevel_wrapper(worker_thread * worker MAYBE_UNUSED, task_param
     int id = worker->rank();
     nfs_aux::thread_data & taux(param->aux.th[id]);
     timetree_t & timer(taux.timer);
-    sieve_info const & si(param->si);
     nfs_work & ws(param->ws);
     where_am_I & w(taux.w);
     int side = param->side;
+    nfs_work::side_data & wss(ws.sides[side]);
+
 
     ENTER_THREAD_TIMER(timer);
     MARK_TIMER_FOR_SIDE(timer, side);
@@ -897,20 +886,20 @@ fill_in_buckets_toplevel_wrapper(worker_thread * worker MAYBE_UNUSED, task_param
      */
     timetree_t::accounting_child local_timer_sentry(timer, tdict_slot_for_fibt);
 
-    WHERE_AM_I_UPDATE(w, psi, & param->si);
     WHERE_AM_I_UPDATE(w, side, param->side);
     WHERE_AM_I_UPDATE(w, i, param->slice->get_index());
     WHERE_AM_I_UPDATE(w, N, 0);
 
     try {
         /* Get an unused bucket array that we can write to */
-        bucket_array_t<LEVEL, TARGET_HINT> &BA = ws.reserve_BA<LEVEL, TARGET_HINT>(param->side, -1);
+        bucket_array_t<LEVEL, TARGET_HINT> &BA = wss.reserve_BA<LEVEL, TARGET_HINT>(-1);
         ASSERT(param->slice);
-        fill_in_buckets_toplevel<LEVEL,FB_ENTRY_TYPE,TARGET_HINT>(BA, si,
+        fill_in_buckets_toplevel<LEVEL,FB_ENTRY_TYPE,TARGET_HINT>(BA,
+                ws.conf.logI, ws.Q,
                 *dynamic_cast<fb_slice<FB_ENTRY_TYPE> const *>(param->slice),
                 param->plattices_dense_vector, w);
         /* Release bucket array again */
-        param->ws.release_BA(side, BA);
+        wss.release_BA(BA);
         delete param;
         return new task_result;
     } catch (buckets_are_full const& e) {
@@ -929,10 +918,10 @@ fill_in_buckets_toplevel_sublat_wrapper(worker_thread * worker MAYBE_UNUSED, tas
     int id = worker->rank();
     nfs_aux::thread_data & taux(param->aux.th[id]);
     timetree_t & timer(taux.timer);
-    sieve_info const & si(param->si);
     nfs_work & ws(param->ws);
     where_am_I & w(taux.w);
     int side = param->side;
+    nfs_work::side_data & wss(ws.sides[side]);
 
     ENTER_THREAD_TIMER(timer);
     MARK_TIMER_FOR_SIDE(timer, side);
@@ -945,20 +934,20 @@ fill_in_buckets_toplevel_sublat_wrapper(worker_thread * worker MAYBE_UNUSED, tas
      */
     timetree_t::accounting_child local_timer_sentry(timer, tdict_slot_for_fibt);
 
-    WHERE_AM_I_UPDATE(w, psi, & si);
     WHERE_AM_I_UPDATE(w, side, param->side);
     WHERE_AM_I_UPDATE(w, i, param->slice->get_index());
     WHERE_AM_I_UPDATE(w, N, 0);
 
     try {
         /* Get an unused bucket array that we can write to */
-        bucket_array_t<LEVEL, TARGET_HINT> &BA = ws.reserve_BA<LEVEL, TARGET_HINT>(param->side, -1);
+        bucket_array_t<LEVEL, TARGET_HINT> &BA = wss.reserve_BA<LEVEL, TARGET_HINT>(-1);
         ASSERT(param->slice);
-        fill_in_buckets_toplevel_sublat<LEVEL,FB_ENTRY_TYPE>(BA, si,
+        fill_in_buckets_toplevel_sublat<LEVEL,FB_ENTRY_TYPE>(BA,
+                ws.conf.logI, ws.Q,
                 *dynamic_cast<fb_slice<FB_ENTRY_TYPE> const *>(param->slice),
                 param->plattices_dense_vector, w);
         /* Release bucket array again */
-        ws.release_BA(side, BA);
+        wss.release_BA(BA);
         delete param;
         return new task_result;
     } catch (buckets_are_full const& e) {
@@ -1005,7 +994,8 @@ struct push_slice_to_task_list_saving_precomp {
         : pool(pool), P(P), model(m), Vpre(Vpre) {}
     template<typename T>
     void operator()(T const & s) {
-        slice_index_t idx = s.get_index() - P.get_first_slice_index();
+        /* we're pushing the global index, relative to all fb parts */
+        slice_index_t idx = s.get_index();
         ASSERT_ALWAYS((size_t) idx == pushed);
 
         plattices_dense_vector_t & pre(Vpre[idx]);
@@ -1023,10 +1013,10 @@ struct push_slice_to_task_list_saving_precomp {
 
 template <int LEVEL, typename TARGET_HINT>
 static void
-fill_in_buckets_one_side(nfs_work &ws, nfs_aux & aux, thread_pool &pool, sieve_info & si, const int side, where_am_I & w)
+fill_in_buckets_one_side(nfs_work &ws, nfs_aux & aux, thread_pool &pool, const int side, where_am_I & w)
 {
     timetree_t & timer(aux.timer_special_q);
-    const fb_factorbase::slicing * fbs = si.sides[side].fbs;
+    nfs_work::side_data & wss(ws.sides[side]);
 
     /* We're just pushing tasks, here. */
     BOOKKEEPING_TIMER(timer);
@@ -1035,28 +1025,34 @@ fill_in_buckets_one_side(nfs_work &ws, nfs_aux & aux, thread_pool &pool, sieve_i
      * that max value of j.
      *
      * Hmmm. ::value... It's a global :-0
+     *
+     * FIXME FIXME FIXME
      */
-    plattice_enumerate_t::set_masks(si.conf.logI);
-    plattice_enumerate_area<LEVEL>::value = plattice_x_t(si.J) << si.conf.logI;
+    plattice_enumerate_t::set_masks(ws.conf.logI);
+    plattice_enumerate_area<LEVEL>::value = plattice_x_t(ws.J) << ws.conf.logI;
 
-    fill_in_buckets_parameters model(ws, aux, side, si, NULL, NULL, NULL, 0, w);
+    /* FIXME. Really, we can't deal with that at all */
 
-    if (!si.conf.sublat.m) {
+    fill_in_buckets_parameters model(ws, aux, side, NULL, NULL, NULL, 0, w);
+
+    if (!ws.Q.sublat.m) {
         /* This creates a task meant to call
          * fill_in_buckets_toplevel_wrapper */
         push_slice_to_task_list<LEVEL, TARGET_HINT> F(pool, model);
-        fbs->get_part(LEVEL).foreach_slice(F);
+        wss.fbs->get_part(LEVEL).foreach_slice(F);
     } else {
         /* This creates a task meant to call
          * fill_in_buckets_toplevel_sublat_wrapper */
-        auto & Vpre(si.sides[side].precomp_plattice_dense);
-        fb_factorbase::slicing::part const & P = fbs->get_part(LEVEL);
+        auto & Vpre(wss.precomp_plattice_dense);
+        fb_factorbase::slicing::part const & P = wss.fbs->get_part(LEVEL);
+
         /* This way we can spare the need to expose the copy contructor
          * of the container's value_type */
-        if (si.conf.sublat.i0 == 0 && si.conf.sublat.j0 == 1) {
+        if (ws.Q.sublat.i0 == 0 && ws.Q.sublat.j0 == 1) {
             /* first sublat */
             Vpre = precomp_plattice_dense_t(P.nslices());
         }
+
         ASSERT_ALWAYS(Vpre.size() == P.nslices());
         push_slice_to_task_list_saving_precomp<LEVEL, TARGET_HINT> F(pool, P, model, Vpre);
         P.foreach_slice(F);
@@ -1064,37 +1060,37 @@ fill_in_buckets_one_side(nfs_work &ws, nfs_aux & aux, thread_pool &pool, sieve_i
 }
 
 
-void fill_in_buckets_toplevel(nfs_work &ws, nfs_aux & aux, thread_pool &pool, sieve_info & si, int side, where_am_I & w)
+void fill_in_buckets_toplevel(nfs_work &ws, nfs_aux & aux, thread_pool &pool, int side, where_am_I & w)
 {
     // per se, we're not doing anything here.
     // CHILD_TIMER(timer, __func__);
     
-    bool do_resieve = si.conf.sides[0].lim && si.conf.sides[1].lim;
+    bool do_resieve = ws.conf.sides[0].lim && ws.conf.sides[1].lim;
 
     if (do_resieve) {
-        switch (si.toplevel) {
+        switch (ws.toplevel) {
             case 1:
-                fill_in_buckets_one_side<1, shorthint_t>(ws, aux, pool, si, side, w);
+                fill_in_buckets_one_side<1, shorthint_t>(ws, aux, pool, side, w);
                 break;
             case 2:
-                fill_in_buckets_one_side<2, shorthint_t>(ws, aux, pool, si, side, w);
+                fill_in_buckets_one_side<2, shorthint_t>(ws, aux, pool, side, w);
                 break;
             case 3:
-                fill_in_buckets_one_side<3, shorthint_t>(ws, aux, pool, si, side, w);
+                fill_in_buckets_one_side<3, shorthint_t>(ws, aux, pool, side, w);
                 break;
             default:
                 ASSERT_ALWAYS(0);
         }
     } else {
-        switch (si.toplevel) {
+        switch (ws.toplevel) {
             case 1:
-                fill_in_buckets_one_side<1, emptyhint_t>(ws, aux, pool, si, side, w);
+                fill_in_buckets_one_side<1, emptyhint_t>(ws, aux, pool, side, w);
                 break;
             case 2:
-                fill_in_buckets_one_side<2, emptyhint_t>(ws, aux, pool, si, side, w);
+                fill_in_buckets_one_side<2, emptyhint_t>(ws, aux, pool, side, w);
                 break;
             case 3:
-                fill_in_buckets_one_side<3, emptyhint_t>(ws, aux, pool, si, side, w);
+                fill_in_buckets_one_side<3, emptyhint_t>(ws, aux, pool, side, w);
                 break;
             default:
                 ASSERT_ALWAYS(0);
@@ -1126,8 +1122,9 @@ void downsort_aux(
     uint32_t bucket_index,
     where_am_I & w)
 {
+    nfs_work::side_data & wss(ws.sides[side]);
     // What comes from already downsorted data above:
-    for(auto const & BAin : ws.bucket_arrays<LEVEL+1,longhint_t>(side)) {
+    for(auto const & BAin : wss.bucket_arrays<LEVEL+1,longhint_t>()) {
         pool.add_task_lambda([&,side,w](worker_thread * worker, int bucket_index) {
             nfs_aux::thread_data & taux(aux.th[worker->rank()]);
             timetree_t & timer(taux.timer);
@@ -1135,9 +1132,9 @@ void downsort_aux(
             MARK_TIMER_FOR_SIDE(timer, side);
             taux.w = w;
             CHILD_TIMER(timer, TEMPLATE_INST_NAME(downsort, LEVEL));
-            auto & BAout(ws.reserve_BA<LEVEL, longhint_t>(side, ws.rank_BA(side, BAin)));
+            auto & BAout(wss.reserve_BA<LEVEL, longhint_t>(wss.rank_BA(BAin)));
             downsort<LEVEL+1>(fbs, BAout, BAin, bucket_index, taux.w);
-            ws.template release_BA<LEVEL,longhint_t>(side, BAout);
+            wss.template release_BA<LEVEL,longhint_t>(BAout);
         }, bucket_index, 0);
     }
 }
@@ -1159,7 +1156,6 @@ downsort_tree_inner(
     thread_pool &pool,
     uint32_t bucket_index,      /* for the current level ! */
     uint32_t first_region0_index,
-    sieve_info & si,
     precomp_plattice_t & precomp_plattice,
     where_am_I & w)
 {
@@ -1173,12 +1169,11 @@ downsort_tree_inner(
   TIMER_CATEGORY(timer, sieving_mixed());
   ASSERT_ALWAYS(LEVEL > 0);
 
-  WHERE_AM_I_UPDATE(w, psi, & si);
   WHERE_AM_I_UPDATE(w, N, first_region0_index);
 
   for (int side = 0; side < 2; ++side) {
-    sieve_info::side_info & sis(si.sides[side]);
-    if (sis.fb->empty()) continue;
+    nfs_work::side_data & wss(ws.sides[side]);
+    if (wss.no_fb()) continue;
 
     WHERE_AM_I_UPDATE(w, side, side);
     TIMER_CATEGORY(timer, sieving(side));
@@ -1194,10 +1189,10 @@ downsort_tree_inner(
          * entries. We rarely need it, except when downsorting short entries
          * in the case where we've eliminated the hint
          */
-        fb_factorbase::slicing const & fbs(*si.sides[side].fbs);
+        fb_factorbase::slicing const & fbs(*wss.fbs);
 
-        size_t n2s = ws.bucket_arrays<LEVEL+1,my_shorthint_t>(side).size();
-        size_t n1l = ws.bucket_arrays<LEVEL,my_longhint_t>(side).size();
+        size_t n2s = wss.bucket_arrays<LEVEL+1,my_shorthint_t>().size();
+        size_t n1l = wss.bucket_arrays<LEVEL,my_longhint_t>().size();
         /* otherwise the code here can't work */
         ASSERT_ALWAYS(n2s == n1l);
 
@@ -1205,7 +1200,7 @@ downsort_tree_inner(
          * process them in parallel. There would be various ways to
          * achieve that.
          */
-        for(auto const & BAin : ws.bucket_arrays<LEVEL+1,my_shorthint_t>(side)) {
+        for(auto const & BAin : wss.bucket_arrays<LEVEL+1,my_shorthint_t>()) {
             pool.add_task_lambda([&,side,w](worker_thread * worker, int bucket_index) {
                 nfs_aux::thread_data & taux(aux.th[worker->rank()]);
                 timetree_t & timer(taux.timer);
@@ -1213,33 +1208,34 @@ downsort_tree_inner(
                 ENTER_THREAD_TIMER(timer);
                 MARK_TIMER_FOR_SIDE(timer, side);
                 CHILD_TIMER(timer, TEMPLATE_INST_NAME(downsort, LEVEL));
-                auto & BAout(ws.reserve_BA<LEVEL, my_longhint_t>(side, ws.rank_BA(side, BAin)));
+                auto & BAout(wss.reserve_BA<LEVEL, my_longhint_t>(wss.rank_BA(BAin)));
                 // This is a fake slice_index. For a longhint_t bucket,
                 // each update contains its own slice_index, directly
                 // used by apply_one_bucket
                 // and purge.
                 BAout.reset_pointers();
-                BAout.add_slice_index(0);
+                BAout.add_slice_index(
+                        std::numeric_limits<slice_index_t>::max());
                 downsort<LEVEL+1>(fbs, BAout, BAin, bucket_index, taux.w);
-                ws.template release_BA<LEVEL,my_longhint_t>(side, BAout);
+                wss.template release_BA<LEVEL,my_longhint_t>(BAout);
             }, bucket_index, 0);
         }
         // What comes from already downsorted data above. We put this in
         // an external function because we need the code to be elided or
         // LEVEL >= 2.
-        if (LEVEL < si.toplevel - 1)
+        if (LEVEL < ws.toplevel - 1)
             downsort_aux<LEVEL>(fbs, ws, aux, pool, side, bucket_index, w);
     }
 
 
     /* SECOND: fill in buckets at this level, for this region. */
-    ws.reset_all_pointers<LEVEL,my_shorthint_t>(side);
+    wss.reset_all_pointers<LEVEL,my_shorthint_t>();
 
     for (auto & it : precomp_plattice(side, LEVEL)) {
       pool.add_task(
               fill_in_buckets_one_slice_internal<LEVEL, my_shorthint_t>,
               new fill_in_buckets_parameters {
-                  ws, aux, side, si,
+                  ws, aux, side,
                   (fb_slice_interface *)NULL,
                   &it,
                   NULL,
@@ -1252,36 +1248,45 @@ downsort_tree_inner(
 
   /* RECURSE */
   if (LEVEL > 1) {
-      for (int i = 0; i < si.nb_buckets[LEVEL]; ++i) {
+      for (int i = 0; i < ws.nb_buckets[LEVEL]; ++i) {
           size_t (&BRS)[FB_MAX_PARTS] = BUCKET_REGIONS;
           uint32_t N = first_region0_index + i*(BRS[LEVEL]/BRS[1]);
-          downsort_tree<LEVEL-1>(ws, wc_p, aux_p, pool, i, N, si, precomp_plattice, w);
+          downsort_tree<LEVEL-1>(ws, wc_p, aux_p, pool, i, N, precomp_plattice, w);
       }
   } else {
       /* Prepare for PBR: we need to precompute the small sieve positions
        * for all the small sieved primes.
        *
-       * For si.toplevel==1, we don't reach here, of course, and the
+       * For ws.toplevel==1, we don't reach here, of course, and the
        * corresponding initialization is done with identical code in
        * las.cpp
        */
       for(int side = 0 ; side < 2 ; side++) {
-          pool.add_task_lambda([=,&si](worker_thread * worker, int){
+          pool.add_task_lambda([=,&ws](worker_thread * worker, int){
                   timetree_t & timer(aux_p->th[worker->rank()].timer);
                   ENTER_THREAD_TIMER(timer);
                   MARK_TIMER_FOR_SIDE(timer, side);
                   SIBLING_TIMER(timer, "prepare small sieve");
-                  sieve_info::side_info & s(si.sides[side]);
-                  if (s.fb->empty()) return;
-                  ASSERT(si.toplevel > 1);
+                  nfs_work::side_data & wss(ws.sides[side]);
+                  if (wss.no_fb()) return;
+                  ASSERT(ws.toplevel > 1);
                   SIBLING_TIMER(timer, "small sieve start positions");
-                  small_sieve_start_many(s.ssdpos_many, s.ssd, s.ssd_offsets, first_region0_index, si);
+                  /* When we're doing 2-level sieving, there is probably
+                   * no real point in doing ssdpos initialization in
+                   * several passes.
+                   */
+                  small_sieve_prepare_many_start_positions(
+                          wss.ssd,
+                          first_region0_index,
+                          std::min(SMALL_SIEVE_START_POSITIONS_MAX_ADVANCE, ws.nb_buckets[1]),
+                          ws.conf.logI, ws.Q.sublat);
+                  small_sieve_activate_many_start_positions(wss.ssd);
                   },0);
       }
 
 
       pool.drain_queue(0);
-      /* Now fill_in_buckets is completed for all levels. Time to check
+      /* Now fill_in_buckets has completed for all levels. Time to check
        * that we had no overflow, and move on to process_bucket_region.
        */
 
@@ -1292,13 +1297,13 @@ downsort_tree_inner(
       }
 
       /* PROCESS THE REGIONS AT LEVEL 0 */
-      process_many_bucket_regions(ws, wc_p, aux_p, pool, first_region0_index, si, w);
+      process_many_bucket_regions(ws, wc_p, aux_p, pool, first_region0_index, w);
 
       /* We need that, because the next downsort_tree call in the loop
        * above (for LEVEL>1) will reset the pointers while filling the 1l
        * buckets -- and we read the 1l buckets from PBR.
        */
-      if (si.toplevel > 1)
+      if (ws.toplevel > 1)
           pool.drain_queue(0);
   }
 }
@@ -1312,15 +1317,14 @@ downsort_tree(
     thread_pool &pool,
     uint32_t bucket_index,      /* for the current level ! */
     uint32_t first_region0_index,
-    sieve_info & si,
     precomp_plattice_t & precomp_plattice,
     where_am_I & w)
 {
-    bool do_resieve = si.conf.sides[0].lim && si.conf.sides[1].lim;
+    bool do_resieve = ws.conf.sides[0].lim && ws.conf.sides[1].lim;
     if (do_resieve) {
-        downsort_tree_inner<LEVEL, true>(ws,wc_p,aux_p,pool,bucket_index,first_region0_index,si,precomp_plattice,w);
+        downsort_tree_inner<LEVEL, true>(ws,wc_p,aux_p,pool,bucket_index,first_region0_index,precomp_plattice,w);
     } else {
-        downsort_tree_inner<LEVEL, false>(ws,wc_p,aux_p,pool,bucket_index,first_region0_index,si,precomp_plattice,w);
+        downsort_tree_inner<LEVEL, false>(ws,wc_p,aux_p,pool,bucket_index,first_region0_index,precomp_plattice,w);
     }
 }
 /* Instances to be compiled */
@@ -1333,7 +1337,6 @@ void downsort_tree<0>(
   std::shared_ptr<nfs_aux>,
   thread_pool &,
   uint32_t, uint32_t,
-  sieve_info &,
   precomp_plattice_t &, where_am_I &)
 {
     ASSERT_ALWAYS(0);
@@ -1356,9 +1359,9 @@ template
 void downsort_tree<1>(nfs_work &,
         std::shared_ptr<nfs_work_cofac>,
         std::shared_ptr<nfs_aux> aux_p,
-        thread_pool &, uint32_t, uint32_t, sieve_info &, precomp_plattice_t &, where_am_I &);
+        thread_pool &, uint32_t, uint32_t, precomp_plattice_t &, where_am_I &);
 template 
 void downsort_tree<2>(nfs_work &,
         std::shared_ptr<nfs_work_cofac>,
         std::shared_ptr<nfs_aux>,
-        thread_pool &, uint32_t, uint32_t, sieve_info &, precomp_plattice_t &, where_am_I &);
+        thread_pool &, uint32_t, uint32_t, precomp_plattice_t &, where_am_I &);

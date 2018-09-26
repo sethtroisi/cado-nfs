@@ -70,12 +70,10 @@ nfs_aux::~nfs_aux()
             checksum_post_sieve[1].get_checksum());
 
     verbose_output_vfprint(0, 1, gmp_vfprintf,
-            "# %lu %s for side-%d (%Zd,%Zd)\n",
+            "# %lu %s\n",
             rep.reports,
-            las.batch ? "survivor(s) saved" : "relation(s)",
-            doing.side,
-            (mpz_srcptr) doing.p,
-            (mpz_srcptr) doing.r);
+            las.batch ? "survivor(s) saved" : "relation(s)"
+            );
 
     if (las.suppress_duplicates)
         verbose_output_print(0, 1, "# number of eliminated duplicates: %lu\n", rep.duplicates);
@@ -97,25 +95,29 @@ nfs_aux::~nfs_aux()
     int dont_print_tally = 1;
 #endif
     if (dont_print_tally && las.nb_threads > 1) {
-        verbose_output_print(0, 1, "# Time for this special-q: %1.4fs [tally available only in mono-thread] in %1.4f elapsed s\n", qt0, wct_qt0);
+        verbose_output_print(0, 2, "# Time for this special-q: %1.4fs [tally available only in mono-thread] in %1.4f elapsed s\n", qt0, wct_qt0);
     } else {
+        const char * fmt_always[2] = {
+            /* for default, special-q-overlapping mode: */
+            "# Time for this special-q: *%1.4fs",
+            /* for legacy synchronous mode: */
+            "# Time for this special-q: %1.4fs"
+        };
         const char * fmt[2] = {
             /* for default, special-q-overlapping mode: */
-            "# Time for this special-q: *%1.4fs"
                 " [norm %1.4f+%1.4f, sieving *%1.4f"
                 " (%1.4f + %1.4f + *%1.4f),"
                 " factor %1.4f (%1.4f + %1.4f)]"
                 " in %1.4f elapsed s"
-                " [*: incl overlap time]\n",
+                " [*: incl overlap time]",
             /* for legacy synchronous mode: */
-            "# Time for this special-q: %1.4fs"
                 " [norm %1.4f+%1.4f, sieving %1.4f"
                 " (%1.4f + %1.4f + %1.4f),"
                 " factor %1.4f (%1.4f + %1.4f)]"
                 " in %1.4f elapsed s"
-                "\n" };
-        verbose_output_print(0, 1, fmt[sync_at_special_q != 0],
-                qt0,
+        };
+        verbose_output_print(0, 1, fmt_always[sync_at_special_q != 0], qt0);
+        verbose_output_print(0, 2, fmt[sync_at_special_q != 0],
                 rep.tn[0],
                 rep.tn[1],
                 qtts,
@@ -124,6 +126,7 @@ nfs_aux::~nfs_aux()
                 qtts-rep.ttbuckets_fill-rep.ttbuckets_apply,
                 rep.ttf + rep.ttcof, rep.ttf, rep.ttcof,
                 wct_qt0);
+        verbose_output_print(0, 1, "\n");
     }
 
     verbose_output_end_batch();

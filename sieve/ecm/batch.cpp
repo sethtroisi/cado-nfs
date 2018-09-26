@@ -202,8 +202,12 @@ cofac_list_realloc (cofac_list l, size_t newsize)
     }
   l->a = (int64_t*) realloc (l->a, newsize * sizeof (int64_t));
   l->b = (uint64_t*) realloc (l->b, newsize * sizeof (uint64_t));
-  l->R = (mpz_t*) realloc (l->R, newsize * sizeof (mpz_t));
-  l->A = (mpz_t*) realloc (l->A, newsize * sizeof (mpz_t));
+  // The following two fields are not really necessary when preparing the
+  // list and sometimes the caller prefers to leave them blank.
+  if (l->R != NULL)
+      l->R = (mpz_t*) realloc (l->R, newsize * sizeof (mpz_t));
+  if (l->A != NULL)
+      l->A = (mpz_t*) realloc (l->A, newsize * sizeof (mpz_t));
   l->R0 = (mpz_t*) realloc (l->R0, newsize * sizeof (mpz_t));
   l->A0 = (mpz_t*) realloc (l->A0, newsize * sizeof (mpz_t));
   l->sq = (mpz_t*) realloc (l->sq, newsize * sizeof (mpz_t));
@@ -223,10 +227,12 @@ cofac_list_add (cofac_list l, long a, unsigned long b,
     cofac_list_realloc (l, 2 * l->alloc + 1);
   l->a[l->size] = a;
   l->b[l->size] = b;
-  mpz_init_set (l->R[l->size], R);
-  mpz_init_set (l->A[l->size], A);
   mpz_init_set (l->R0[l->size], R);
   mpz_init_set (l->A0[l->size], A);
+  if (l->R != NULL)
+      mpz_init_set (l->R[l->size], R);
+  if (l->A != NULL)
+      mpz_init_set (l->A[l->size], A);
   mpz_init_set (l->sq[l->size], sq);
   l->side[l->size] = side;
   l->perm[l->size] = l->size;
@@ -555,6 +561,19 @@ find_smooth (cofac_list l, mpz_t batchP[2], mpz_t B[2], mpz_t L[2], mpz_t M[2], 
   nb_smooth = 0;
   nb_unknown = nb_rel_read;
 
+  /* The cofactor must be initialized with the initial values */
+  if (l->R == NULL) {
+      ASSERT_ALWAYS(l->A == NULL);
+      l->R = (mpz_t*) malloc ((l->size) * sizeof (mpz_t));
+      l->A = (mpz_t*) malloc ((l->size) * sizeof (mpz_t));
+      ASSERT_ALWAYS(l->R != NULL);
+      ASSERT_ALWAYS(l->A != NULL);
+      for (size_t i = 0; i < l->size; ++i) {
+          mpz_init_set(l->R[i], l->R0[i]);
+          mpz_init_set(l->A[i], l->A0[i]);
+      }
+  }
+
   /* invariant: the smooth relations are in 0..nb_smooth-1,
      the unknown ones in nb_smooth..nb_unknown-1,
      the remaining ones are not smooth */
@@ -709,7 +728,14 @@ factor_simple_minded (std::vector<cxx_mpz> &factors,
             /* t should be composite, i.e., t >= BB */
             ASSERT(mpz_cmp_d (t, BB) >= 0);
 
-            composites.push_back(std::make_pair(std::move(t), pm));
+            if (mpz_perfect_square_p (t))
+            {
+              mpz_sqrt (t, t);
+              composites.push_back(std::make_pair(t, pm));
+              composites.push_back(std::make_pair(std::move(t), pm));
+            }
+            else
+              composites.push_back(std::make_pair(std::move(t), pm));
         }
     }
 

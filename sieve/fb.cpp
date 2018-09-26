@@ -9,6 +9,7 @@
 #include <pthread.h>
 #include <streambuf>
 #include <istream>
+#include <iomanip>
 #ifdef HAVE_GLIBC_VECTOR_INTERNALS
 /* need all that for mmap() stuff */
 #include <sys/types.h>
@@ -930,7 +931,7 @@ struct helper_functor_subdivide_slices {
             std::ostringstream n_eq;
             n_eq << "n=";
             if (n < 0) n_eq << "*"; else n_eq << n;
-            verbose_output_print (0, 3, "# slices for side-%d part %d, %s roots: %zu entries, %zu logp values\n", side, part_index, n_eq.str().c_str(), interval_width, pool.size());
+            verbose_output_print (0, 4, "# slices for side-%d part %d, %s roots: %zu entries, %zu logp values\n", side, part_index, n_eq.str().c_str(), interval_width, pool.size());
 
             /* We now divide into several slices of roughly equal weight.
              * We can assess this weight by looking at the cdf.
@@ -946,7 +947,7 @@ struct helper_functor_subdivide_slices {
                 size_t npieces_for_addressable_slices = iceildiv(s.size(), std::numeric_limits<slice_offset_t>::max());
                 size_t npieces_for_no_bulky_slice = ceil(s.weight / max_slice_weight);
                 if (npieces_for_no_bulky_slice > 1 || npieces_for_addressable_slices > 1)
-                    verbose_output_print (0, 3, "# [side-%d part %d %s logp=%d; %zu entries, weight=%f]: min %zu slices to be addressable, min %zu to make sure weight does not exceed cap %f\n",
+                    verbose_output_print (0, 4, "# [side-%d part %d %s logp=%d; %zu entries, weight=%f]: min %zu slices to be addressable, min %zu to make sure weight does not exceed cap %f\n",
                             side,
                             part_index,
                             n_eq.str().c_str(),
@@ -974,7 +975,7 @@ struct helper_functor_subdivide_slices {
                         if (jt - it > std::numeric_limits<slice_offset_t>::max()) {
                             /* overflow. Do not push the split point, we'll try
                              * with more pieces */
-                            verbose_output_print (0, 3, "# [side-%d part %d %s logp=%d; %zu entries, weight=%f]: slice %zu/%zu overflows. Trying %zu slices\n",
+                            verbose_output_print (0, 4, "# [side-%d part %d %s logp=%d; %zu entries, weight=%f]: slice %zu/%zu overflows. Trying %zu slices\n",
                                     side,
                                     part_index,
                                     n_eq.str().c_str(),
@@ -1011,7 +1012,7 @@ struct helper_functor_subdivide_slices {
             for(auto & s : sdst) s.index = index++;
 
             for(auto const & s : sdst) {
-                verbose_output_print (0, 3, "# [side-%d %lu] %s logp=%d: %zu entries, weight=%f\n",
+                verbose_output_print (0, 4, "# [side-%d %lu] %s logp=%d: %zu entries, weight=%f\n",
                         side,
                         (unsigned long) s.get_index(),
                         n_eq.str().c_str(),
@@ -1038,10 +1039,12 @@ fb_factorbase::slicing::slicing(fb_factorbase const & fb, fb_factorbase::key_typ
      * stuff using the helper_functor_dispatch_weight_parts structure above.
      */
 
-    std::ostringstream os;
-    os << K;
-    verbose_output_print(0, 1, "# Creating new slicing on side %d for %s\n",
-            fb.side, os.str().c_str());
+    {
+        std::ostringstream os;
+        os << K;
+        verbose_output_print(0, 2, "# Creating new slicing on side %d for %s\n",
+                fb.side, os.str().c_str());
+    }
 
     /* This uses our cache of thresholds, we expect it to be quick enough */
     std::array<threshold_pos, FB_MAX_PARTS+1> local_thresholds;
@@ -1057,18 +1060,7 @@ fb_factorbase::slicing::slicing(fb_factorbase const & fb, fb_factorbase::key_typ
     double total_weight = 0;
 
     for (int i = 0; i <= toplevel; i++) {
-        size_t nr_primes = D.primes[i];
-        size_t nr_roots = D.ideals[i];
-        double weight = D.weight[i];
-        total_weight += weight;
-        int side = fb.side;
-        if (!nr_primes) continue;
-            verbose_output_print(0, 1, "# Number of primes in side-%d factor base part %d = %zu\n",
-                    side, i, nr_primes);
-            verbose_output_print(0, 1, "# Number of prime ideals in side-%d factor base part %d = %zu\n",
-                    side, i, nr_roots);
-            verbose_output_print(0, 1, "# Weight of primes in side-%d factor base part %d = %0.5g\n",
-                    side, i, weight);
+        total_weight += D.weight[i];
     }
 
     /* D.weight[i] is now what used to be called max_bucket_fill_ratio. We
@@ -1114,6 +1106,27 @@ fb_factorbase::slicing::slicing(fb_factorbase const & fb, fb_factorbase::key_typ
         multityped_array_foreach(SUB, fb.entries);
         s += parts[i].nslices();
     }
+
+    for (int i = 0; i <= toplevel; i++) {
+        size_t nr_primes = D.primes[i];
+        size_t nr_roots = D.ideals[i];
+        double weight = D.weight[i];
+        total_weight += weight;
+        int side = fb.side;
+        if (!nr_primes) continue;
+
+        std::ostringstream os;
+
+        os  << "side-" << side
+            << " part " << i
+            << ": " << nr_primes << " primes"
+            << ", " << nr_roots << " ideals"
+            << ", weight " << std::setprecision(5) << weight;
+        if (i) os << " [" << parts[i].nslices() << " slices]";
+
+        verbose_output_print(0, 2, "# %s\n", os.str().c_str());
+    }
+
 
     /* we're going to divide our vector in several
      * parts, and compute slices. That used to be done by many
@@ -1895,8 +1908,24 @@ struct helper_functor_put_first_0 {
         }
 };
 
-fb_factorbase::fb_factorbase(cxx_cado_poly const & cpoly, int side, unsigned long lim, unsigned long powlim, cxx_param_list & pl, const char * fbc_filename) : f(cpoly->pols[side]), side(side), lim(lim), powlim(powlim)
+fb_factorbase::fb_factorbase(cxx_cado_poly const & cpoly, int side, cxx_param_list & pl, const char * fbc_filename) : f(cpoly->pols[side]), side(side)
 {
+    {
+        std::ostringstream os;
+        os << "lim" << side;
+        param_list_parse_ulong(pl, os.str().c_str(), &lim);
+    }
+    {
+        std::ostringstream os;
+        os << "powlim" << side;
+        if (!param_list_parse_ulong(pl, os.str().c_str(), &powlim)) {
+            powlim = ULONG_MAX;
+            verbose_output_print(0, 2,
+                    "# Using default value %s=ULONG_MAX\n",
+                    os.str().c_str());
+        }
+    }
+
     /* This initial 0 must be here in all cases, even for an empty factor
      * base.
      */
@@ -1946,7 +1975,7 @@ fb_factorbase::fb_factorbase(cxx_cado_poly const & cpoly, int side, unsigned lon
         char paramname[5];
 
         if (f->deg > 1) {
-            verbose_output_print(0, 1,
+            verbose_output_print(0, 2,
                     "# Reading side-%d factor base from disk"
                     " for polynomial f%d(x) = %s\n",
                     side, side, polystring.c_str());
@@ -1965,7 +1994,7 @@ fb_factorbase::fb_factorbase(cxx_cado_poly const & cpoly, int side, unsigned lon
                     "# Reading side-%d factor base took %1.1fs (%1.1fs real)\n",
                     side, tfb, tfb_wct);
         } else {
-            verbose_output_print(0, 1,
+            verbose_output_print(0, 2,
                     "# Creating side-%d rational factor base"
                     " for polynomial f%d(x) = %s\n",
                     side, side, polystring.c_str());

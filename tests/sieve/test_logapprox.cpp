@@ -27,6 +27,17 @@ int test_from_bug21684(bool display)
     return 0;
 }
 
+int test_from_bug21701(bool display)
+{
+    cxx_double_poly f(4);
+    for(double x : {-1.6425515054690201e+34, -2.4119595460727266e+36, -1.1805918683048612e+38, -1.926230702854181e+39}) f->coeff[++f->deg]=x;
+    piecewise_linear_approximator A(f, 0.44719172939351309);
+    piecewise_linear_function F = A.logapprox(-2048,2048);
+    ASSERT_ALWAYS(F.equations.size() == 57);
+    if (display) display_logapprox(F);
+    return 0;
+}
+
 int original_test(bool display)
 {
     cxx_double_poly f(6);
@@ -45,5 +56,6 @@ int main(int argc, char * argv[])
         display=true;
     original_test(display);
     test_from_bug21684(display);
+    test_from_bug21701(display);
 }
 

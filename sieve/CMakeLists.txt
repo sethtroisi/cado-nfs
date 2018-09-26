@@ -26,7 +26,7 @@ set (las_sources
   las-debug.cpp las-report-stats.cpp las-duplicate.cpp
   las-config.c bucket.cpp las-smallsieve.cpp las-unsieve.cpp
   las-sieve2357.cpp las-unsieve-sse2.cpp
-  las-trialdiv.cpp las-fb.cpp
+  las-trialdiv.cpp
   las-descent-trees.cpp las-cofactor.cpp
   las-fill-in-buckets.cpp las-threads.cpp las-threads-work-data.cpp)
 set (las_libraries trialdiv facul utils ${pthread_libs})
@@ -50,7 +50,7 @@ set_property(TARGET las_descent PROPERTY COMPILE_DEFINITIONS DLP_DESCENT SUPPORT
 set_target_properties(las_descent PROPERTIES LINK_FLAGS "${OpenMP_CXX_FLAGS}")
 target_link_libraries (las_descent ${las_libraries})
 
-add_library (trialdiv trialdiv.c)
+add_library (trialdiv trialdiv.cpp)
 
 add_executable(freerel freerel.c fb.cpp las-plattice.cpp)
 target_link_libraries(freerel utils)
@@ -75,10 +75,10 @@ add_executable(dupsup
     las-unsieve.cpp
     las-unsieve-sse2.cpp
     las-smallsieve.cpp
-    las-trialdiv.cpp las-fb.cpp
+    las-trialdiv.cpp
     las-debug.cpp
     las-sieve2357.cpp
-    trialdiv.c
+    trialdiv.cpp
     )
 target_link_libraries(dupsup utils_with_io facul)
 set_target_properties(dupsup PROPERTIES LINK_FLAGS "${OpenMP_CXX_FLAGS}")

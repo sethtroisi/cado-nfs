@@ -109,7 +109,8 @@ int main(int argc, char *argv[])
 	fclose(file_out);
     } else {
 	//default values
-	int lb = -1, ub = -1, len_n = -1, method = -1, curve = 0;
+	int lb = -1, ub = -1, len_n = -1, method = -1;
+  ec_parameterization_t curve = MONTY12;
 	// {b1min, b1max, b1step, cmin, cmax, cstep}
 	int *param = (int*) calloc(sizeof(int), 6);
 	ASSERT(param != NULL);

@@ -309,6 +309,7 @@ include("${CADO_NFS_SOURCE_DIR}/config/test-rand.cmake")
 include("${CADO_NFS_SOURCE_DIR}/config/strlcpy.cmake")
 include("${CADO_NFS_SOURCE_DIR}/config/linux.cmake")
 include("${CADO_NFS_SOURCE_DIR}/config/hwloc.cmake")
+include("${CADO_NFS_SOURCE_DIR}/config/gmpecm.cmake")
 IF (NOT DEFINED ENV{NO_PYTHON_CHECK})
   include("${CADO_NFS_SOURCE_DIR}/config/python.cmake")
 endif()
@@ -443,7 +444,8 @@ add_subdirectory (linalg/bwc)
 add_subdirectory (misc)
 add_subdirectory (scripts/cadofactor)
 add_subdirectory (tests EXCLUDE_FROM_ALL)
-add_subdirectory (nfs-hd)
+# commented the following since nfs-hd is not in "make dist"
+# add_subdirectory (nfs-hd)
 
 add_custom_target(dist
     COMMAND scripts/dist.sh ${package_basename}
