@@ -1398,6 +1398,7 @@ bw_lingen_recursive(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta,
         art = matpoly_mp_caching(ab, E_right, E, pi_left, draft);
     else
         art = matpoly_mp(ab, E_right, E, pi_left, draft);
+    matpoly_clear(ab, E);
     stats.add_artificial_time(art);
 
     logline_end(&(bm->t_mp), "");
