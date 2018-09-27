@@ -282,7 +282,7 @@ tasks.sieve.sqside = 1
     # special-q.  For snfs numbers, sometimes it is better to put is on
     # the rational side.
 
-tasks.sieve.qmin = 200923
+tasks.qmin = 200923
     # Start of the special-q range
     # qmin is usually equal to the corresponding factor base bound, but this
     # is not a requirement - it can be both larger or smaller.

@@ -512,7 +512,7 @@ cado_define_test(full_c30
             tasks.sieve.mfb1=22
             tasks.sieve.lambda0=1.1
             tasks.sieve.lambda1=2.1
-            tasks.sieve.qmin=700
+            tasks.qmin=700
             tasks.sieve.qrange=100
             tasks.sieve.sqside=0
             tasks.sieve.rels_wanted=1500

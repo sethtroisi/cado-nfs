@@ -2160,7 +2160,7 @@ class Polysel2Task(ClientServerTask, HasStatistics, DoesImport, patterns.Observe
     @property
     def paramnames(self):
         return self.join_params(super().paramnames, {
-            "N": int, "I": int, "lim1": int, "lpb1": int, "lpb0": int,
+            "N": int, "I": int, "qmin": int, "lpb1": int, "lpb0": int,
             "batch": [int], "import_ropt": [str]})
     @property
     def stat_conversions(self):
@@ -2202,7 +2202,7 @@ class Polysel2Task(ClientServerTask, HasStatistics, DoesImport, patterns.Observe
         self.state.setdefault("nr_poly_submitted", 0)
         # I don't understand why the area is based on one particular side.
         self.progparams[0].setdefault("area", 2.**(2*self.params["I"]-1) \
-                * self.params["lim1"])
+                * self.params["qmin"])
         # on Sep 26, 2018, changed Bf,Bg from lim1/lim0 to 2^lpb1/2^lpb0
         self.progparams[0].setdefault("Bf", float(2**self.params["lpb1"]))
         self.progparams[0].setdefault("Bg", float(2**self.params["lpb0"]))
