@@ -63,12 +63,28 @@ selection with the following command-line:
 
 $ ./cado-nfs.py -dlp -ell 101538509534246169632617439 191907783019725260605646959711 jlpoly=true tasks.polyselect.bound=5 tasks.polyselect.modm=5 tasks.polyselect.degree=3 tasks.reconstructlog.checkdlp=false
 
-Note that the individual logarithm phase (also called the descent) is not
-implemented in that case, and the full consistency check is not possible
-either. However, setting
-  tasks.reconstructlog.partial=false
-provides a very good test that everything went as expected (not as good
-as checkdlp=true would do, but we can't have that here).
+In that case, the individual logarithm phase implementation is based on
+GMP-ECM, so this is available only if this library is installed and
+detected by the configuration script (see local.sh.example for indicating
+non-standard locations).
+
+Note that tasks.reconstructlog.checkdlp=false is there to disable some
+consistency checks that can not be made in JL mode.
+
+This is still experimental, but parameters optimized for the JL
+polynomial selection can be found in parameters/dlp/Joux-Lercier/ .
+Copying
+  parameters/dlp/Joux-Lercier/params.p30
+to
+  parameters/dlp/params.p30
+will automatically activate the JL polynomial selection (but will crash
+if GMP-ECM failed to be detected at compile time) for primes of this
+size. For instance, 
+
+$ ./cado-nfs.py -dlp -ell 101538509534246169632617439 target=92800609832959449330691138186 191907783019725260605646959711
+
+should then work and compute the log of the given target using JL.
+
 
 **** Using non-linear polynomials
 

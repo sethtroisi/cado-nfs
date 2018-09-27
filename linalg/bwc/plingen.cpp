@@ -11,10 +11,13 @@
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
+#include <algorithm>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/utsname.h>
-
+#ifdef  HAVE_OPENMP
+#include <omp.h>
+#endif
 
 #include <assert.h>
 
@@ -224,7 +227,7 @@ static inline unsigned int expected_pi_length(dims * d, unsigned int len)/*{{{*/
     unsigned int n = d->n;
     unsigned int b = m + n;
     abdst_field ab MAYBE_UNUSED = d->ab;
-    unsigned int res = iceildiv(len * m, b);
+    unsigned int res = 1 + iceildiv(len * m, b);
     mpz_t p;
     mpz_init(p);
     abfield_characteristic(ab, p);
@@ -242,6 +245,38 @@ static inline unsigned int expected_pi_length(dims * d, unsigned int len)/*{{{*/
     return res + safety;
 }/*}}}*/
 
+static inline unsigned int expected_pi_length_lowerbound(dims * d, unsigned int len)/*{{{*/
+{
+    /* generically we expect that len*m % (m+n) columns have length
+     * 1+\lfloor(len*m/(m+n))\rfloor, and the others have length one more.
+     * For one column to a length less than \lfloor(len*m/(m+n))\rfloor,
+     * it takes probability 2^-(m*l) using the notations above. Therefore
+     * we can simply count 2^(64-m*l) accidental zero cancellations at
+     * most below the bound.
+     * In particular, it is sufficient to derive from the code above!
+     */
+    unsigned int m = d->m;
+    unsigned int n = d->n;
+    unsigned int b = m + n;
+    abdst_field ab MAYBE_UNUSED = d->ab;
+    unsigned int res = 1 + (len * m) / b;
+    mpz_t p;
+    mpz_init(p);
+    abfield_characteristic(ab, p);
+    unsigned int l;
+    if (mpz_cmp_ui(p, 1024) >= 0) {
+        l = mpz_sizeinbase(p, 2);
+        l *= abfield_degree(ab);    /* roughly log_2(#K) */
+    } else {
+        mpz_pow_ui(p, p, abfield_degree(ab));
+        l = mpz_sizeinbase(p, 2);
+    }
+    mpz_clear(p);
+    unsigned int safety = iceildiv(64, m * l);
+    return res - safety;
+}/*}}}*/
+
+
 /* This destructively cancels the first len coefficients of E, and
  * computes the appropriate matrix pi which achieves this. The
  * elimination is done in accordance with the nominal degrees found in
@@ -253,7 +288,7 @@ static inline unsigned int expected_pi_length(dims * d, unsigned int len)/*{{{*/
 
 /* TODO: adapt for GF(2) */
 int
-bw_lingen_basecase(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta) /*{{{*/
+bw_lingen_basecase(bmstatus_ptr bm, matpoly_ptr pi, matpoly_srcptr E, unsigned int *delta) /*{{{*/
 {
     tree_stats::sentinel dummy(stats, __func__, E->size, false);
     int generator_found = 0;
@@ -281,8 +316,8 @@ bw_lingen_basecase(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta) 
      * number of coefficients for the columns of pi. Set pi to Id */
 
     unsigned int *pi_lengths = (unsigned int*) malloc(b * sizeof(unsigned int));
+    matpoly_set_constant_ui(ab, pi, 1);
     for(unsigned int i = 0 ; i < b ; i++) {
-        abset_ui(ab, matpoly_coeff(ab, pi, i, i, 0), 1);
         pi_lengths[i] = 1;
     }
 
@@ -296,6 +331,10 @@ bw_lingen_basecase(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta) 
     matpoly_init(ab, e, m, b, 1);
     e->size = 1;
 
+    matpoly T;
+    matpoly_init(ab, T, b, b, 1);
+    int (*ctable)[2] = (int(*)[2]) malloc(b * 2 * sizeof(int));
+
     for (unsigned int t = 0; t < E->size ; t++, bm->t++) {
 
         /* {{{ Update the columns of e for degree t. Save computation
@@ -304,39 +343,57 @@ bw_lingen_basecase(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta) 
          * at the physical positions of the corresponding columns of pi.
          */
 
-        abelt_ur tmp_ur;
-        abelt_ur_init(ab, &tmp_ur);
-
-        abvec_ur e_ur;
-        abvec_ur_init(ab, &e_ur, m*b);
-        abvec_ur_set_zero(ab, e_ur, m*b);
+        std::vector<unsigned int> todo;
         for(unsigned int j = 0 ; j < b ; j++) {
             if (is_pivot[j]) continue;
             /* We should never have to recompute from pi using discarded
              * columns. Discarded columns should always correspond to
              * pivots */
             ASSERT_ALWAYS(bm->lucky[j] >= 0);
-            for(unsigned int s = 0 ; s < pi_lengths[j] ; s++) {
-                for(unsigned int i = 0 ; i < m ; i++) {
-                    for(unsigned int k = 0 ; k < b ; k++) {
-                        abmul_ur(ab, tmp_ur,
-                                matpoly_coeff(ab, E, i, k, t - s),
-                                matpoly_coeff(ab, pi, k, j, s));
-                        abelt_ur_add(ab,
-                                abvec_ur_coeff_ptr(ab, e_ur, i*b+j),
-                                abvec_ur_coeff_ptr_const(ab, e_ur, i*b+j),
-                                tmp_ur);
+            todo.push_back(j);
+        }
+
+#ifdef HAVE_OPENMP
+#pragma omp parallel
+#endif
+        {
+            abelt_ur tmp_ur;
+            abelt_ur_init(ab, &tmp_ur);
+
+            abelt_ur e_ur;
+            abelt_ur_init(ab, &e_ur);
+            
+#ifdef HAVE_OPENMP
+#pragma omp for collapse(2)
+#endif
+            for(unsigned int jl = 0 ; jl < todo.size() ; ++jl) {
+                for(unsigned int i = 0 ; i < m ; ++i) {
+                    unsigned int j = todo[jl];
+                    abelt_ur_set_zero(ab, e_ur);
+                    for(unsigned int k = 0 ; k < b ; ++k) {
+                        for(unsigned int s = 0 ; s < pi_lengths[j] ; s++) {
+                            abmul_ur(ab, tmp_ur,
+                                    matpoly_coeff_const(ab, E, i, k, t - s),
+                                    matpoly_coeff(ab, pi, k, j, s));
+                            abelt_ur_add(ab, e_ur, e_ur, tmp_ur);
+                        }
                     }
+                    abreduce(ab, matpoly_coeff(ab, e, i, j, 0), e_ur);
                 }
             }
+
+            abelt_ur_clear(ab, &tmp_ur);
+            abelt_ur_clear(ab, &e_ur);
         }
+        /* }}} */
+
+        /* {{{ check for cancellations */
+
         unsigned int newluck = 0;
-        for(unsigned int j = 0 ; j < b ; j++) {
-            if (is_pivot[j]) continue;
+        for(unsigned int jl = 0 ; jl < todo.size() ; ++jl) {
+            unsigned int j = todo[jl];
             unsigned int nz = 0;
             for(unsigned int i = 0 ; i < m ; i++) {
-                abreduce(ab, matpoly_coeff(ab, e, i, j, 0),
-                        abvec_ur_coeff_ptr(ab, e_ur, i*b+j));
                 nz += abcmp_ui(ab, matpoly_coeff(ab, e, i, j, 0), 0) == 0;
             }
             if (nz == m) {
@@ -345,8 +402,8 @@ bw_lingen_basecase(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta) 
                 bm->lucky[j] = 0;
             }
         }
-        abelt_ur_clear(ab, &tmp_ur);
-        abvec_ur_clear(ab, &e_ur, m*b);
+
+
         if (newluck) {
             /* If newluck == n, then we probably have a generator. We add an
              * extra guarantee. newluck==n, for a total of k iterations in a
@@ -377,7 +434,6 @@ bw_lingen_basecase(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta) 
 
         if (generator_found) break;
 
-        int (*ctable)[2] = (int(*)[2]) malloc(b * 2 * sizeof(int));
         /* {{{ Now see in which order I may look at the columns of pi, so
          * as to keep the nominal degrees correct. In contrast with what
          * we used to do before, we no longer apply the permutation to
@@ -391,8 +447,21 @@ bw_lingen_basecase(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta) 
         /* }}} */
 
         /* {{{ Now do Gaussian elimination */
+
+        /*
+         * The matrix T is *not* used for actually storing the product of
+         * the transvections, just the *list* of transvections. Then,
+         * instead of applying them row-major, we apply them column-major
+         * (abiding by the ordering of pivots), so that we get a better
+         * opportunity to do lazy reductions.
+         */
+
+        matpoly_set_constant_ui(ab, T, 1);
+
         memset(is_pivot, 0, b * sizeof(int));
         unsigned int r = 0;
+
+        std::vector<unsigned int> pivot_columns;
         /* Loop through logical indices */
         for(unsigned int jl = 0; jl < b; jl++) {
             unsigned int j = ctable[jl][1];
@@ -407,6 +476,7 @@ bw_lingen_basecase(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta) 
             /* }}} */
             pivots[r++] = j;
             is_pivot[j] = 1;
+            pivot_columns.push_back(j);
             /* {{{ Cancel this coeff in all other columns. */
             abelt inv;
             abinit(ab, &inv);
@@ -451,24 +521,10 @@ bw_lingen_basecase(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta) 
                     bm->lucky[k] = -1;
                     continue;
                 }
-                for(unsigned int i = 0 ; i < b ; i++) {
-                    /* Beware. One may be tempted to think that the code
-                     * above is dubious. It is, in fact, not a problem.
-                     * As long as the delta[] array undergoes no
-                     * disturbing modification, everything is ok.
-                     */
-                    if (pi_lengths[k] < pi_lengths[j])
-                        pi_lengths[k] = pi_lengths[j];
-                    for(unsigned int s = 0 ; s < pi_lengths[j] ; s++) {
-                        /* TODO: Would be better if mpfq had an addmul */
-                        abmul(ab, tmp, lambda,
-                                matpoly_coeff(ab, pi, i, j, s));
-                        abadd(ab,
-                                matpoly_coeff(ab, pi, i, k, s),
-                                matpoly_coeff(ab, pi, i, k, s),
-                                tmp);
-                    }
-                }
+                /* We do *NOT* really update T. T is only used as
+                 * storage!
+                 */
+                abset(ab, matpoly_coeff(ab, T, j, k, 0), lambda);
                 abclear(ab, &tmp);
                 /* }}} */
                 abclear(ab, &lambda);
@@ -476,7 +532,91 @@ bw_lingen_basecase(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta) 
             abclear(ab, &inv); /* }}} */
         }
         /* }}} */
-        free(ctable);
+
+        /* {{{ apply the transformations, using the transvection
+         * reordering trick */
+
+        /* non-pivot columns are only added to and never read, so it does
+         * not really matter where we put their computation, provided
+         * that the columns that we do read are done at this point.
+         */
+        for(unsigned int j = 0; j < b; j++) {
+            if (!is_pivot[j])
+                pivot_columns.push_back(j);
+        }
+
+#ifdef HAVE_OPENMP
+#pragma omp parallel
+#endif
+        {
+            abelt_ur tmp_pi;
+            abelt_ur tmp;
+            abelt_ur_init(ab, &tmp);
+            abelt_ur_init(ab, &tmp_pi);
+
+            for(unsigned int jl = 0 ; jl < b ; ++jl) {
+                unsigned int j = pivot_columns[jl];
+                /* compute column j completely. We may put this interface in
+                 * matpoly, but it's really special-purposed, to the point
+                 * that it really makes little sense IMO
+                 *
+                 * Beware: operations on the different columns are *not*
+                 * independent, here ! Operations on the different degrees,
+                 * on the other hand, are. As well of course as the
+                 * operations on the different entries in each column.
+                 */
+
+#ifndef NDEBUG
+                for(unsigned int kl = m ; kl < b ; kl++) {
+                    unsigned int k = pivot_columns[kl];
+                    absrc_elt Tkj = matpoly_coeff_const(ab, T, k, j, 0);
+                    ASSERT(abcmp_ui(ab, Tkj, k==j) == 0);
+                }
+                for(unsigned int kl = 0 ; kl < MIN(m,jl) ; kl++) {
+                    unsigned int k = pivot_columns[kl];
+                    absrc_elt Tkj = matpoly_coeff_const(ab, T, k, j, 0);
+                    if (abcmp_ui(ab, Tkj, 0) == 0) continue;
+                    ASSERT_ALWAYS(pi_lengths[k] <= pi_lengths[j]);
+                }
+#endif
+
+#ifdef HAVE_OPENMP
+#pragma omp for collapse(2)
+#endif
+                for(unsigned int i = 0 ; i < b ; i++) {
+                    for(unsigned int s = 0 ; s < pi_lengths[j] ; s++) {
+                        abdst_elt piijs = matpoly_coeff(ab, pi, i, j, s);
+
+                        abelt_ur_set_elt(ab, tmp_pi, piijs);
+
+                        for(unsigned int kl = 0 ; kl < MIN(m,jl) ; kl++) {
+                            unsigned int k = pivot_columns[kl];
+                            /* TODO: if column k was already a pivot on previous
+                             * turn (which could happen, depending on m and n),
+                             * then the corresponding entry is probably zero
+                             * (exact condition needs to be written more
+                             * accurately).
+                             */
+
+                            absrc_elt Tkj = matpoly_coeff_const(ab, T, k, j, 0);
+                            if (abcmp_ui(ab, Tkj, 0) == 0) continue;
+                            /* pi[i,k] has length pi_lengths[k]. Multiply
+                             * that by T[k,j], which is a constant. Add
+                             * to the unreduced thing. We don't have an
+                             * mpfq api call for that operation.
+                             */
+                            absrc_elt piiks = matpoly_coeff_const(ab, pi, i, k, s);
+                            abmul_ur(ab, tmp, piiks, Tkj);
+                            abelt_ur_add(ab, tmp_pi, tmp_pi, tmp);
+                        }
+                        abreduce(ab, piijs, tmp_pi);
+                    }
+                }
+            }
+            abelt_ur_clear(ab, &tmp);
+            abelt_ur_clear(ab, &tmp_pi);
+        }
+        /* }}} */
 
         ASSERT_ALWAYS(r == m);
 
@@ -515,7 +655,20 @@ bw_lingen_basecase(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta) 
         if (pi_lengths[j] > pi->size)
             pi->size = pi_lengths[j];
     }
+    /* Given the structure of the computation, there's no reason for the
+     * initial estimate to go wrong.
+     */
+    ASSERT_ALWAYS(pi->size <= pi->alloc);
+    for(unsigned int j = 0; j < b; j++) {
+        for(unsigned int k = pi_lengths[j] ; k < pi->size ; k++) {
+            for(unsigned int i = 0 ; i < b ; i++) {
+                ASSERT_ALWAYS(abis_zero(ab, matpoly_coeff_const(ab, pi, i, j, k)));
+            }
+        }
+    }
     pi->size = MIN(pi->size, pi->alloc);
+    matpoly_clear(ab, T);
+    free(ctable);
     matpoly_clear(ab, e);
     free(is_pivot);
     free(pivots);
@@ -1184,6 +1337,9 @@ bw_lingen_recursive(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta,
     int done;
     double art;
 
+    unsigned int pi_expect = expected_pi_length(d, E->size);
+    unsigned int pi_expect_lowerbound = expected_pi_length_lowerbound(d, E->size);
+
     /* we have to start with something large enough to get all
      * coefficients of E_right correct */
     size_t half = E->size - (E->size / 2);
@@ -1199,7 +1355,14 @@ bw_lingen_recursive(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta,
     matpoly_init(ab, pi_right, 0, 0, 0);
     matpoly_init(ab, E_right, 0, 0, 0);
 
+    int depth = stats.depth;
+
     matpoly_truncate(ab, E_left, E, half);
+
+    /* prepare for MP ! */
+    unsigned int pi_left_expect = expected_pi_length(d, half);
+    unsigned int pi_left_expect_lowerbound = expected_pi_length_lowerbound(d, half);
+    matpoly_rshift(ab, E, E, half - pi_left_expect + 1);
 
     done = bw_lingen_single(bm, pi_left, E_left, delta, draft);
 
@@ -1214,9 +1377,18 @@ bw_lingen_recursive(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta,
     }
 
     stats.begin_smallstep("MP");
-    matpoly_rshift(ab, E, E, half - pi_left->size + 1);
-    logline_begin(stdout, z, "t=%u MP%s(%zu, %zu) -> %zu",
-            bm->t, caching ? "-caching" : "",
+    ASSERT_ALWAYS(pi_left->size <= pi_left_expect);
+    ASSERT_ALWAYS(pi_left->size >= pi_left_expect_lowerbound);
+
+    /* XXX I don't understand why I need to do this. It seems to me that
+     * MP(XA, B) and MP(A, B) should be identical whenever deg A > deg B.
+     */
+    if (pi_left_expect != pi_left->size)
+        matpoly_rshift(ab, E, E, pi_left_expect - pi_left->size);
+
+    // matpoly_rshift(ab, E, E, half - pi_left->size + 1);
+    logline_begin(stdout, z, "t=%u %*sMP%s(%zu, %zu) -> %zu",
+            bm->t, depth,"", caching ? "-caching" : "",
             E->size, pi_left->size, E->size - pi_left->size + 1);
 
     /* the artificial time is the time we've skipped by not doing the mp
@@ -1226,6 +1398,7 @@ bw_lingen_recursive(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta,
         art = matpoly_mp_caching(ab, E_right, E, pi_left, draft);
     else
         art = matpoly_mp(ab, E_right, E, pi_left, draft);
+    matpoly_clear(ab, E);
     stats.add_artificial_time(art);
 
     logline_end(&(bm->t_mp), "");
@@ -1233,14 +1406,19 @@ bw_lingen_recursive(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta,
 
     int do_right = !draft || stats.spent_so_far() < draft;
 
+    unsigned int pi_right_expect = expected_pi_length(d, E_right->size);
+    unsigned int pi_right_expect_lowerbound = expected_pi_length_lowerbound(d, E_right->size);
     if (do_right)
         done = bw_lingen_single(bm, pi_right, E_right, delta, draft);
+
+    ASSERT_ALWAYS(pi_right->size <= pi_right_expect);
+    ASSERT_ALWAYS(pi_right->size >= pi_right_expect_lowerbound);
 
     matpoly_clear(ab, E_right);
 
     stats.begin_smallstep("MUL");
-    logline_begin(stdout, z, "t=%u MUL%s(%zu, %zu) -> %zu",
-            bm->t, caching ? "-caching" : "",
+    logline_begin(stdout, z, "t=%u %*sMUL%s(%zu, %zu) -> %zu",
+            bm->t, depth, "", caching ? "-caching" : "",
             pi_left->size, pi_right->size, pi_left->size + pi_right->size - 1);
 
     /* when we're just measuring the time, we're going to fake the
@@ -1250,6 +1428,25 @@ bw_lingen_recursive(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta,
         art = matpoly_mul_caching(ab, pi, pi_left, do_right ? pi_right : pi_left, draft);
     else
         art = matpoly_mul(ab, pi, pi_left, do_right ? pi_right : pi_left, draft);
+
+    /* Note that the leading coefficients of pi_left and pi_right are not
+     * necessarily full-rank, so that we have to fix potential zeros. If
+     * we don't, the degree of pi artificially grows with the recursive
+     * level.
+     */
+    for(; pi->size > pi_expect ; pi->size--) {
+        /* These coefficients really must be zero */
+        ASSERT_ALWAYS(matpoly_coeff_is_zero(ab, pi, pi->size - 1));
+    }
+    ASSERT_ALWAYS(pi->size <= pi_expect);
+    /* Now below pi_expect, it's not impossible to have a few
+     * cancellations as well.
+     */
+    for(; pi->size ; pi->size--) {
+        if (!matpoly_coeff_is_zero(ab, pi, pi->size - 1)) break;
+    }
+    ASSERT_ALWAYS(pi->size >= pi_expect_lowerbound);
+
     stats.add_artificial_time(art);
 
     logline_end(&bm->t_mul, "");

@@ -306,7 +306,7 @@ sed "s/ncurves0.*=.*$/ncurves0 = $ncurves0_opt/g" | \
 sed "s/ncurves1.*=.*$/ncurves1 = $ncurves1_opt/g" | \
 sed "s/I.*=.*$/I = $I_opt/g" > $params.opt
 if [ $has_qmin -eq 0 ]; then
-   echo "tasks.sieve.qmin = $qmin_opt" >> $params.opt
+   echo "tasks.qmin = $qmin_opt" >> $params.opt
 fi
 if [ $has_bkthresh1 -eq 0 ]; then
    echo "tasks.sieve.bkthresh1 = $bkthresh1_opt" >> $params.opt

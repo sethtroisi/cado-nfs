@@ -15,13 +15,22 @@
 #include <pthread.h>
 #include <gmp.h>
 
+#include "ecm.h"
 #include "smooth_detect.h"
+
+double default_B1done;
 
 /*
 ECM=...
 gcc -Wall -g -std=c99 -I${ECM}/include descent_init_Fp.c smooth_detect.c -o descent_init_Fp -L${ECM}/lib -lecm -lgmp -lm -lpthread
 */
 
+pthread_cond_t cond_found = PTHREAD_COND_INITIALIZER;
+pthread_mutex_t mut_found = PTHREAD_MUTEX_INITIALIZER;
+static unsigned int thid_found = 0;
+
+pthread_mutex_t mut_die = PTHREAD_MUTEX_INITIALIZER;
+static unsigned int please_die = 0;
 
 void HalfGcd(mpz_t a, mpz_t b, mpz_t u) {
   mpz_t v, w, x, q, r;
@@ -56,7 +65,13 @@ typedef struct {
   mpz_t m;      // root of f mod p (the one common with g)
 } Fp_param;
 
-void next_cand_Fp_hgcd(cand_t cand, void *params) {
+int next_cand_Fp_hgcd(cand_t cand, void *params) {
+  pthread_mutex_lock(&mut_die);
+  int die = please_die;
+  pthread_mutex_unlock(&mut_die);
+  if (die) {
+    return 0;
+  }
   Fp_param * param = (Fp_param *)params;
   unsigned long e = random();
   mpz_t u0, v0;
@@ -73,12 +88,29 @@ void next_cand_Fp_hgcd(cand_t cand, void *params) {
   mpz_clear(tmp);
   mpz_clear(u0);
   mpz_clear(v0);
+  return 1;
+}
+
+int is_probably_sqrfree(mpz_t z)
+{
+  unsigned long x;
+//  const int nb_p = 15;
+  const int nb_p = 1;
+  unsigned long tab_p[15] = {2,3,5,7,11,13,17,19,23,29,31,37,41,43,47};
+
+  for (int i = 0; i < nb_p; ++i) {
+    unsigned long p2 = tab_p[i]*tab_p[i];
+    x = mpz_gcd_ui(NULL, z, p2);
+    if (x == p2)
+      return 0;
+  }
+  return 1;
 }
 
 // JL version
 // Returns a boolean meaning "failure, try again".
-int get_JL_candiate_from_e(unsigned long e, mpz_t u, mpz_t v, Fp_param * param,
-    int print)
+int get_JL_candiate_from_e(unsigned long e, mpz_poly_ptr UU, mpz_poly_ptr VV,
+    mpz_t u, mpz_t v, Fp_param * param)
 {
   mpz_t ze;
   mpz_init(ze);
@@ -132,38 +164,18 @@ int get_JL_candiate_from_e(unsigned long e, mpz_t u, mpz_t v, Fp_param * param,
   //**** Compute norms
   mpz_poly_resultant(u, U, param->f);
   mpz_poly_resultant(v, V, param->f);
+  if (UU != NULL)
+    mpz_poly_set(UU, U);
+  if (VV != NULL)
+    mpz_poly_set(VV, V);
   mpz_abs(u, u);
   mpz_abs(v, v);
-  if (print) {
-    printf("U = ");
-    mpz_poly_fprintf_coeffs(stdout, U, ',');
-    printf("V = ");
-    mpz_poly_fprintf_coeffs(stdout, V, ',');
-    gmp_printf("u = %Zd\nv = %Zd\n", u, v);
-  }
   // TODO: we don't want to deal with ideals of degree > 1.
   // The simplest way is to forbid squares at all. This is not optimal,
   // and furthermore, we can do it only for small factors...
   int fail = 0;
-  unsigned long x;
-  x = mpz_gcd_ui(NULL, u, 4);   fail |= (x == 4);
-  x = mpz_gcd_ui(NULL, u, 9);   fail |= (x == 9);
-  x = mpz_gcd_ui(NULL, u, 25);  fail |= (x == 25);
-  x = mpz_gcd_ui(NULL, u, 49);  fail |= (x == 49);
-  x = mpz_gcd_ui(NULL, u, 121); fail |= (x == 121);
-  x = mpz_gcd_ui(NULL, u, 169); fail |= (x == 169);
-  x = mpz_gcd_ui(NULL, u, 289); fail |= (x == 289);
-  x = mpz_gcd_ui(NULL, u, 361); fail |= (x == 361);
-  x = mpz_gcd_ui(NULL, u, 529); fail |= (x == 529);
-  x = mpz_gcd_ui(NULL, v, 4);   fail |= (x == 4);
-  x = mpz_gcd_ui(NULL, v, 9);   fail |= (x == 9);
-  x = mpz_gcd_ui(NULL, v, 25);  fail |= (x == 25);
-  x = mpz_gcd_ui(NULL, v, 49);  fail |= (x == 49);
-  x = mpz_gcd_ui(NULL, v, 121); fail |= (x == 121);
-  x = mpz_gcd_ui(NULL, v, 169); fail |= (x == 169);
-  x = mpz_gcd_ui(NULL, v, 289); fail |= (x == 289);
-  x = mpz_gcd_ui(NULL, v, 361); fail |= (x == 361);
-  x = mpz_gcd_ui(NULL, v, 529); fail |= (x == 529);
+  if (!is_probably_sqrfree(u) || !is_probably_sqrfree(v))
+    fail = 1;
 
   LLL_clear(&M);
   mpz_poly_clear(U);
@@ -172,7 +184,14 @@ int get_JL_candiate_from_e(unsigned long e, mpz_t u, mpz_t v, Fp_param * param,
   return fail;
 }
 
-void next_cand_Fp_jl(cand_t cand, void *params) {
+int next_cand_Fp_jl(cand_t cand, void *params) {
+  pthread_mutex_lock(&mut_die);
+  int die = please_die;
+  pthread_mutex_unlock(&mut_die);
+  if (die) {
+    return 0;
+  }
+
   Fp_param * param = (Fp_param *)params;
   mpz_t u, v;
   mpz_init(u);
@@ -181,17 +200,132 @@ void next_cand_Fp_jl(cand_t cand, void *params) {
   int fail;
   do {
     e = random();
-    fail = get_JL_candiate_from_e(e, u, v, param, 0);
+    fail = get_JL_candiate_from_e(e, NULL, NULL, u, v, param);
   } while (fail); 
 
   cand_set_original_values(cand, u, v, e);
   mpz_clear(u);
   mpz_clear(v);
+  return 1;
+}
+
+int my_mpz_cmp(const void *a, const void *b) {
+  mpz_t *pa, *pb;
+  pa = (mpz_t *)a;
+  pb = (mpz_t *)b;
+  return mpz_cmp(pa[0], pb[0]);
+}
+
+// Full factorization of z0; non-optimized.
+// Assume fac_z has been allocated.
+// Returns the number of factors.
+int full_factor(mpz_t *fac_z, mpz_t z0) {
+  double B1 = 100.0;
+  long sig;
+  int nf = 0;
+  mpz_t z, f;
+  mpz_init_set(z, z0);
+  mpz_init(f);
+
+  // Remove small primes, ECM can't separate them
+  const int nb_p = 15;
+  unsigned long tab_p[15] = {2,3,5,7,11,13,17,19,23,29,31,37,41,43,47};
+  for (int i = 0; i < nb_p; ++i) {
+    while (mpz_divisible_ui_p(z, tab_p[i])) {
+      mpz_set_ui(fac_z[nf], tab_p[i]);
+      nf++;
+      mpz_divexact_ui(z, z, tab_p[i]);
+    }
+  }
+
+  while (!mpz_probab_prime_p(z, 10)) {
+    int success = 0;
+    while (!success) {
+      ecm_params ecm_par;
+      ecm_init(ecm_par);
+      ecm_par->B1done = default_B1done; /* issue with ECM 6.4.x */
+      sig = random();
+      mpz_set_ui(ecm_par->sigma, sig);
+      success = ecm_factor(f, z, B1, ecm_par);
+      B1 += sqrt(B1);
+      ecm_clear(ecm_par);
+    }
+    if (mpz_perfect_power_p(f)) {
+      mpz_t ff;
+      mpz_init(ff);
+      for (int pow = 2; ; pow++) {
+        if (mpz_root(ff, f, pow)) {
+          mpz_set(f, ff);
+          break;
+        }
+      }
+      mpz_clear(ff);
+    }
+    if (!mpz_probab_prime_p(f, 10)) {
+      B1 -= 3*sqrt(B1);
+      if (B1 <= 20.0)
+        B1 = 20.0;
+      continue;
+    }
+    do {
+      mpz_set(fac_z[nf], f);
+      nf++;
+      mpz_divexact(z, z, f);
+    } while (mpz_divisible_p(z, f));
+  }
+  mpz_set(fac_z[nf], z);
+  nf++;
+  qsort(fac_z, nf, sizeof(mpz_t), my_mpz_cmp);
+  mpz_clear(z);
+  mpz_clear(f);
+  return nf;
+}
+
+// Check if there are multiple factors.
+// This assumes that the factors are sorted, so that multiple factors are
+// consecutive.
+int has_distinct_factors(mpz_t *fac_z, int nf) {
+  for (int i = 1; i <= nf; ++i) {
+    if (mpz_cmp(fac_z[i], fac_z[i-1]) == 0)
+      return 0;
+  }
+  return 1;
+}
+
+void find_root(mpz_t r, mpz_t p, mpz_poly f1, mpz_poly f2)
+{
+  // Check if projective root
+  mpz_mod(r, f1->coeff[f1->deg], p);
+  if (mpz_cmp_ui(r, 0) ==  0) {
+    mpz_mod(r, f2->coeff[f2->deg], p);
+    if (mpz_cmp_ui(r, 0) ==  0) {
+      mpz_set(r, p);
+      return;
+    }
+  }
+
+  // Non projective
+  mpz_poly G;
+  mpz_poly_init(G, 1);
+  mpz_poly_gcd_mpz(G, f1, f2, p);
+  ASSERT_ALWAYS(G->deg == 1);
+  mpz_invert(r, G->coeff[1], p);
+  mpz_mul(r, r, G->coeff[0]);
+  mpz_neg(r, r);
+  mpz_mod(r, r, p);
+  mpz_poly_clear(G);
+}
+
+
+void print_fac(mpz_t *fac, mpz_t *roots, int nf) {
+  for (int i = 0; i < nf - 1; ++i)
+    gmp_printf("%Zd,%Zd ", fac[i], roots[i]);
+  gmp_printf("%Zd,%Zd", fac[nf-1], roots[nf-1]);
 }
 
 
 void usage(char *argv0) {
-  fprintf(stderr, "./%s [-poly polfile] [-sqside xxx] [-jl] [-mt n] [-mineff e] [-maxeff E] [-seed s] [-target t] [-v] p z\n", argv0);
+  fprintf(stderr, "./%s [-poly polfile] [-side xxx] [-jl] [-mt n] [-mineff e] [-maxeff E] [-seed s] [-target t] [-v] p z\n", argv0);
   abort();
 }
 
@@ -200,6 +334,7 @@ typedef struct {
   const smooth_detect_param_s * smooth_param;
   unsigned long target;
   int jl;
+  unsigned int id;
 } thparam_s;
 typedef thparam_s* thparam_t;
 
@@ -217,6 +352,11 @@ void * process_one_thread(void *thparams) {
   cand_s *winner = (cand_s*) malloc(sizeof(cand_s));
   cand_init(winner);
   cand_set(winner, C);
+  cand_clear(C);
+  pthread_mutex_lock(&mut_found);
+  thid_found =  thparam->id;
+  pthread_cond_signal(&cond_found);
+  pthread_mutex_unlock(&mut_found);
   return (void *)winner;
 }
 
@@ -230,7 +370,7 @@ int main(int argc, char **argv) {
   double minB1 = 100.0;
   int verbose = 0;
   int jl = 0;
-  int sqside = 1;
+  int side = 1;
   cado_poly cpoly;
   int gotpoly = 0;
   clock_t tm = clock();
@@ -254,8 +394,8 @@ int main(int argc, char **argv) {
       mineff = strtof(argv[2], NULL);
       argc -= 2;
       argv += 2;
-    } else if (strcmp(argv[1], "-sqside") == 0) {
-      sqside = strtoul(argv[2], NULL, 10);
+    } else if (strcmp(argv[1], "-side") == 0) {
+      side = strtoul(argv[2], NULL, 10);
       argc -= 2;
       argv += 2;
     } else if (strcmp(argv[1], "-maxeff") == 0) {
@@ -303,52 +443,132 @@ int main(int argc, char **argv) {
   mpz_init_set_str(params.p, argv[1], 10);
   mpz_init_set_str(params.z, argv[2], 10);
   if (jl) {
-    mpz_poly_init(params.f, cpoly->pols[sqside]->deg);
-    mpz_poly_set(params.f, cpoly->pols[sqside]);
+    mpz_poly_init(params.f, cpoly->pols[side]->deg);
+    mpz_poly_set(params.f, cpoly->pols[side]);
     mpz_init(params.m);
     int ret = cado_poly_getm(params.m, cpoly, params.p);
     ASSERT_ALWAYS(ret);
   }
   
   const smooth_detect_param_s smooth_param = {mineff, maxeff, 10, verbose, minB1};
-  thparam_s thparam[1];
-  thparam->params = &params;
-  thparam->smooth_param = &smooth_param;
-  thparam->target = target;
-  thparam->jl = jl;
+  
+  thparam_s * thparam;
+  thparam = (thparam_s *)malloc(nthread*sizeof(thparam_s));
 
   pthread_t *thid = malloc(nthread*sizeof(pthread_t));
   for (unsigned int i = 0; i < nthread; ++i) {
-    int ret = pthread_create(&thid[i], NULL, process_one_thread, thparam);
+    thparam[i].params = &params;
+    thparam[i].smooth_param = &smooth_param;
+    thparam[i].target = target;
+    thparam[i].jl = jl;
+    thparam[i].id = i;
+    int ret = pthread_create(&thid[i], NULL, process_one_thread, &thparam[i]);
     assert(ret == 0);
   }
+
+  // Wait for one thread to signal success.
+  pthread_mutex_lock(&mut_found);
+  pthread_cond_wait(&cond_found, &mut_found);
+  unsigned int i = thid_found;
+  pthread_mutex_unlock(&mut_found);
   
-  while (1) {
-    for (unsigned int i = 0; i < nthread; ++i) {
-      cand_s *winner;
-      // Non-blocking join: non-portable, gnu-specific.
-      int ret = pthread_tryjoin_np(thid[i], (void *)(&winner));
-      if (ret == 0) {
-        printf("Youpi: e = %lu is a winner\n", winner->id);
-        if (jl) {
-          mpz_t u, v;
-          mpz_init(u); mpz_init(v);
-          // do again the LLL thing and print result.
-          int fail = get_JL_candiate_from_e(winner->id, u, v, &params, 1);
-          ASSERT_ALWAYS(!fail);
-          mpz_clear(u); mpz_clear(v);
-        }
-        goto end;
+  int found = 0;
+  do {
+    cand_s *winner;
+    int ret = pthread_join(thid[i], (void *)(&winner));
+    ASSERT_ALWAYS(ret == 0);
+    if (jl) {
+      mpz_t u, v;
+      mpz_init(u); mpz_init(v);
+      mpz_poly U, V;
+      mpz_poly_init(U, params.f->deg-1);
+      mpz_poly_init(V, params.f->deg-1);
+      // do again the LLL thing and print result.
+      int fail = get_JL_candiate_from_e(winner->id, U, V, u, v, &params);
+      ASSERT_ALWAYS(!fail);
+
+      mpz_t facu[50];
+      mpz_t facv[50];
+      mpz_t roots[50];
+      int nfu, nfv;
+      for (int j = 0; j < 50; ++j) {
+        mpz_init(facu[j]);
+        mpz_init(facv[j]);
+        mpz_init(roots[j]);
       }
+      nfu = full_factor(facu, u);
+      nfv = full_factor(facv, v);
+      if (!has_distinct_factors(facu, nfu) || !has_distinct_factors(facv, nfv)) {
+        // one of them is not squarefree. Restart the thread and wait for
+        // another candidate.
+        ret = pthread_create(&thid[i], NULL, process_one_thread, &thparam[i]);
+        assert(ret == 0);
+        pthread_mutex_lock(&mut_found);
+        pthread_cond_wait(&cond_found, &mut_found);
+        i = thid_found;
+        pthread_mutex_unlock(&mut_found);
+        printf("Fail: non-squarefree norm\n");
+        mpz_clear(u); mpz_clear(v);
+        mpz_poly_clear(U); mpz_poly_clear(V);
+        for (int j = 0; j < 50; ++j) {
+          mpz_clear(facu[j]);
+          mpz_clear(facv[j]);
+          mpz_clear(roots[j]);
+        }
+        cand_clear(winner);
+        free(winner);
+        continue;
+      }
+
+      printf("U = ");
+      mpz_poly_fprintf_coeffs(stdout, U, ',');
+      printf("V = ");
+      mpz_poly_fprintf_coeffs(stdout, V, ',');
+      gmp_printf("u = %Zd\nv = %Zd\n", u, v);
+
+      for (int j = 0; j < nfu; ++j)
+        find_root(roots[j], facu[j], U, params.f);
+      printf("fac_u = "); print_fac(facu, roots, nfu); printf("\n");
+
+      for (int j = 0; j < nfv; ++j)
+        find_root(roots[j], facv[j], V, params.f);
+      printf("fac_v = "); print_fac(facv, roots, nfv); printf("\n");
+
+      for (int j = 0; j < 50; ++j) {
+        mpz_clear(facu[j]);
+        mpz_clear(facv[j]);
+        mpz_clear(roots[j]);
+      }
+      mpz_clear(u); mpz_clear(v);
+      mpz_poly_clear(U); mpz_poly_clear(V);
     }
-    sleep(1);
+    printf("Youpi: e = %lu is a winner\n", winner->id);
+    cand_clear(winner);
+    free(winner);
+
+    found = 1;
+  } while (!found);
+
+  // Cancel other threads
+  pthread_mutex_lock(&mut_die);
+  please_die = 1;
+  pthread_mutex_unlock(&mut_die);
+  for (unsigned int j = 0; j < nthread; ++j) {
+    if (i == j)
+      continue;
+    cand_s *winner;
+    pthread_join(thid[j], (void *)(&winner));
+    cand_clear(winner);
+    free(winner);
   }
 
-end:
   printf("Total CPU time: %.1f s\n", ((double)(clock() - tm)) / CLOCKS_PER_SEC);
   free(thid);
+  free(thparam);
   cado_poly_clear(cpoly);
+  mpz_poly_clear(params.f);
   mpz_clear(params.p);
   mpz_clear(params.z);
+  mpz_clear(params.m);
   return EXIT_SUCCESS;
 }

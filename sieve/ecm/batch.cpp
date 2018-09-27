@@ -700,7 +700,14 @@ factor_simple_minded (std::vector<cxx_mpz> &factors,
             /* t should be composite, i.e., t >= BB */
             ASSERT(mpz_cmp_d (t, BB) >= 0);
 
-            composites.push_back(std::make_pair(std::move(t), pm));
+            if (mpz_perfect_square_p (t))
+            {
+              mpz_sqrt (t, t);
+              composites.push_back(std::make_pair(t, pm));
+              composites.push_back(std::make_pair(std::move(t), pm));
+            }
+            else
+              composites.push_back(std::make_pair(std::move(t), pm));
         }
     }
 

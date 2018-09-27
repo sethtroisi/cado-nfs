@@ -107,7 +107,7 @@ tasks.sieve.lambda1 = 2.1
 # Note that special-q is a prime factor we would impose in a relation.
 # qmin should not be to large to avoid it to be larger than lpb.
 
-tasks.sieve.qmin = 25000
+tasks.qmin = 25000
 
 # qrange define the number of special-q to compute in one las working unit.
 
@@ -237,7 +237,7 @@ tasks.descent.mfb1 = 36
 #tasks.sieve.mfb1 = 36
 #tasks.sieve.lambda0 = 2.2
 #tasks.sieve.lambda1 = 2.2
-#tasks.sieve.qmin = 15000
+#tasks.qmin = 15000
 #tasks.sieve.qrange = 2500
 #tasks.sieve.rels_wanted = 78000
 

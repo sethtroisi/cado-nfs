@@ -115,6 +115,9 @@ export CURL_LIBDIR
 export HWLOC
 export HWLOC_INCDIR
 export HWLOC_LIBDIR
+export GMPECM
+export GMPECM_INCDIR
+export GMPECM_LIBDIR
 export JEVENTS
 export JEVENTS_INCDIR
 export JEVENTS_LIBDIR

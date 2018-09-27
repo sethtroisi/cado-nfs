@@ -15,6 +15,9 @@ name = p30
 # Polynomial selection: see README
 ###########################################################################
 
+# we suggest:
+# twoquadratics -N <nnn> -maxP 10000 -q -skewness 1
+
 tasks.polyselect.admax = 750
 tasks.polyselect.adrange = 100
 
@@ -32,7 +35,7 @@ tasks.sieve.mfb0 = 12
 tasks.sieve.mfb1 = 12
 tasks.sieve.lambda0 = 1.1
 tasks.sieve.lambda1 = 1.1
-tasks.sieve.qmin = 500
+tasks.qmin = 500
 tasks.sieve.qrange = 200
 tasks.sieve.rels_wanted = 2000
 

@@ -101,6 +101,8 @@
 
 #cmakedefine    HAVE_HWLOC
 
+#cmakedefine    HAVE_GMPECM
+
 #cmakedefine    HAVE_STD_SHARED_PTR
 #cmakedefine    HAVE_BOOST_SHARED_PTR
 

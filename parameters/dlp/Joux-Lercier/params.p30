@@ -37,7 +37,7 @@ tasks.sieve.mfb0 = 12
 tasks.sieve.mfb1 = 22
 tasks.sieve.lambda0 = 1.1
 tasks.sieve.lambda1 = 2.1
-tasks.sieve.qmin = 700
+tasks.qmin = 700
 tasks.sieve.qrange = 200
 tasks.sieve.sqside = 0
 tasks.sieve.rels_wanted = 1600
@@ -56,7 +56,7 @@ tasks.filter.target_density = 45
 ###########################################################################
 
 tasks.reconstructlog.partial=false
-tasks.reconstructlog.checkdlp=false
+checkdlp=false
 
 ###########################################################################
 # Individual log
@@ -64,15 +64,14 @@ tasks.reconstructlog.checkdlp=false
 
 tasks.descent.init_I = 10
 tasks.descent.init_ncurves = 5
-tasks.descent.init_lpb = 17
+tasks.descent.init_lpb = 22
 tasks.descent.init_lim = 1500
 tasks.descent.init_mfb = 34
 tasks.descent.init_tkewness = 100000
 tasks.descent.I = 10
-tasks.descent.lim0 = 1500
-tasks.descent.lim1 = 1500
+tasks.descent.lim0 = 1900
+tasks.descent.lim1 = 1900
 tasks.descent.lpb0 = 12
-tasks.descent.lpb1 = 12
+tasks.descent.lpb1 = 11
 tasks.descent.mfb0 = 24
-tasks.descent.mfb1 = 24
-
+tasks.descent.mfb1 = 22
