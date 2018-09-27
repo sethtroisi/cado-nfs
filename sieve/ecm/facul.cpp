@@ -69,6 +69,14 @@ int nb_curves (const unsigned int lpb, const unsigned int mfb)
 }
 
 static int
+nb_curves_with_fbb (const unsigned long fbb,
+		    const unsigned int lpb, const unsigned int mfb)
+{
+  /* if 2^mfb <= fbb^2, we can have only one large prime */
+  return (1UL << mfb <= fbb * fbb) ? 0 : nb_curves (lpb, mfb);
+}
+
+static int
 nb_curves90 (const unsigned int lpb)
 {
   /* The following table, computed with do_table(10,33,ntries=10000) from the
@@ -222,7 +230,7 @@ facul_make_strategy (const unsigned long fbb, const unsigned int lpb,
   facul_strategy_t *strategy;
 
   if (n == -1)
-    n = nb_curves (lpb, mfb);
+    n = nb_curves_with_fbb (fbb, lpb, mfb);
   strategy = (facul_strategy_t*) malloc (sizeof (facul_strategy_t));
   strategy->lpb = lpb;
   /* Store fbb^2 in assume_prime_thresh */
@@ -868,8 +876,8 @@ facul_make_strategies(const unsigned long rfbb, const unsigned int rlpb,
   if (file == NULL)
     {// make_default_strategy
       int ncurves[2];
-      ncurves[0] = (n0 > -1) ? n0 : nb_curves (rlpb, rmfb);
-      ncurves[1] = (n1 > -1) ? n1 : nb_curves (alpb, amfb);
+      ncurves[0] = (n0 > -1) ? n0 : nb_curves_with_fbb (rfbb, rlpb, rmfb);
+      ncurves[1] = (n1 > -1) ? n1 : nb_curves_with_fbb (afbb, alpb, amfb);
       int max_ncurves = ncurves[0] > ncurves[1]? ncurves[0]: ncurves[1];
       max_curves_used_before_aux = max_ncurves + 4; // account for fixed methods.
       // There is an hardcoded bound on the number of methods.
