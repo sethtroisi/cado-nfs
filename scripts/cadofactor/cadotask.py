@@ -160,6 +160,7 @@ class Polynomials(object):
     re_pol_g = re.compile(r"Y(\d+)\s*:\s*(-?\d+)")
     re_polys = re.compile(r"poly(\d+)\s*:") # FIXME: do better?
     re_Murphy = re.compile(re_cap_n_fp(r"\s*#\s*MurphyE\s*\((.*)\)\s*=", 1))
+    re_skew = re.compile(re_cap_n_fp(r"skew:", 1))
     re_best = re.compile(r"# Best polynomial found \(revision (.*)\):")
     # the 'lognorm' variable now represents the expected E-value
     re_lognorm = re.compile(re_cap_n_fp(r"\s*#\s*exp_E", 1))
@@ -179,6 +180,7 @@ class Polynomials(object):
             and polyselect_ropt
         """
         self.MurphyE = 0.
+        self.skew = 0.
         self.MurphyParams = None
         self.revision = None
         self.lognorm = 0.
@@ -227,6 +229,10 @@ class Polynomials(object):
                 self.MurphyParams = match.group(1)
                 self.MurphyE = float(match.group(2))
                 continue
+            match = self.re_skew.match(line)
+            if match:
+                self.skew = float(match.group(1))
+                # go through
             match = self.re_best.match(line)
             if match:
                 self.revision = match.group(1)
@@ -2154,8 +2160,8 @@ class Polysel2Task(ClientServerTask, HasStatistics, DoesImport, patterns.Observe
     @property
     def paramnames(self):
         return self.join_params(super().paramnames, {
-            "N": int, "I": int, "lim1": int, "lim0": int, "batch": [int],
-            "import_ropt": [str]})
+            "N": int, "I": int, "qmin": int, "lpb1": int, "lpb0": int,
+            "batch": [int], "import_ropt": [str]})
     @property
     def stat_conversions(self):
         return (
@@ -2196,9 +2202,10 @@ class Polysel2Task(ClientServerTask, HasStatistics, DoesImport, patterns.Observe
         self.state.setdefault("nr_poly_submitted", 0)
         # I don't understand why the area is based on one particular side.
         self.progparams[0].setdefault("area", 2.**(2*self.params["I"]-1) \
-                * self.params["lim1"])
-        self.progparams[0].setdefault("Bf", float(self.params["lim1"]))
-        self.progparams[0].setdefault("Bg", float(self.params["lim0"]))
+                * self.params["qmin"])
+        # on Sep 26, 2018, changed Bf,Bg from lim1/lim0 to 2^lpb1/2^lpb0
+        self.progparams[0].setdefault("Bf", float(2**self.params["lpb1"]))
+        self.progparams[0].setdefault("Bg", float(2**self.params["lpb0"]))
         if not "batch" in self.params:
             t = self.progparams[0].get("threads", 1)
             # batch = 5 rounded up to a multiple of t
@@ -2337,7 +2344,14 @@ class Polysel2Task(ClientServerTask, HasStatistics, DoesImport, patterns.Observe
         if not poly.MurphyE:
             self.logger.warn("Polynomial in file %s has no Murphy E value",
                              filename)
-        if self.bestpoly is None or poly.MurphyE > self.bestpoly.MurphyE:
+        # in case poly.MurphyE = self.bestpoly.MurphyE (MurphyE is printed
+        # only with 3 digits in the cxxx.poly file), we choose the polynomial
+        # with the smallest skewness, to avoid non-determinism in polynomial
+        # selection. Indeed, if we have two polynomials with the same MurphyE
+        # value (when rounded on 3 digits), the one found first was chosen
+        # before that change.
+        if self.bestpoly is None or (poly.MurphyE > self.bestpoly.MurphyE or
+            poly.MurphyE == self.bestpoly.MurphyE and poly.skew < self.bestpoly.skew):
             self.logger.info("New best polynomial from file %s:"
                              " Murphy E = %g" % (filename, poly.MurphyE))
             self.logger.debug("New best polynomial is:\n%s", poly)
@@ -2549,7 +2563,8 @@ class PolyselJLTask(ClientServerTask, patterns.Observer):
             self.logger.warn("Polynomial in file %s has no MurphyE, skipping it",
                              filename)
             return 0
-        if self.bestpoly is None or self.bestpoly.MurphyE < poly.MurphyE:
+        if self.bestpoly is None or (self.bestpoly.MurphyE < poly.MurphyE or
+            self.bestpoly.MurphyE == poly.MurphyE and self.bestpoly.skew > poly.skew):
             self.bestpoly = poly
             self.logger.info("Best polynomial so far has MurphyE %f",
                     poly.MurphyE);

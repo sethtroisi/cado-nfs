@@ -36,7 +36,7 @@ tasks.sieve.mfb1 = 42
 tasks.sieve.ncurves0 = 16
 tasks.sieve.ncurves1 = 14
 tasks.I = 11
-tasks.sieve.qmin = 18640
+tasks.qmin = 18640
 tasks.sieve.qrange = 1000
 
 ###########################################################################

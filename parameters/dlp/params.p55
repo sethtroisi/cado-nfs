@@ -39,7 +39,7 @@ tasks.sieve.mfb0 = 32
 tasks.sieve.mfb1 = 32
 tasks.sieve.lambda0 = 2.2
 tasks.sieve.lambda1 = 2.2
-tasks.sieve.qmin = 4000
+tasks.qmin = 4000
 tasks.sieve.qrange = 2000
 tasks.sieve.rels_wanted = 20000
 

@@ -227,7 +227,7 @@ static inline unsigned int expected_pi_length(dims * d, unsigned int len)/*{{{*/
     unsigned int n = d->n;
     unsigned int b = m + n;
     abdst_field ab MAYBE_UNUSED = d->ab;
-    unsigned int res = iceildiv(len * m, b);
+    unsigned int res = 1 + iceildiv(len * m, b);
     mpz_t p;
     mpz_init(p);
     abfield_characteristic(ab, p);
@@ -244,6 +244,38 @@ static inline unsigned int expected_pi_length(dims * d, unsigned int len)/*{{{*/
     unsigned int safety = iceildiv(64, m * l);
     return res + safety;
 }/*}}}*/
+
+static inline unsigned int expected_pi_length_lowerbound(dims * d, unsigned int len)/*{{{*/
+{
+    /* generically we expect that len*m % (m+n) columns have length
+     * 1+\lfloor(len*m/(m+n))\rfloor, and the others have length one more.
+     * For one column to a length less than \lfloor(len*m/(m+n))\rfloor,
+     * it takes probability 2^-(m*l) using the notations above. Therefore
+     * we can simply count 2^(64-m*l) accidental zero cancellations at
+     * most below the bound.
+     * In particular, it is sufficient to derive from the code above!
+     */
+    unsigned int m = d->m;
+    unsigned int n = d->n;
+    unsigned int b = m + n;
+    abdst_field ab MAYBE_UNUSED = d->ab;
+    unsigned int res = 1 + (len * m) / b;
+    mpz_t p;
+    mpz_init(p);
+    abfield_characteristic(ab, p);
+    unsigned int l;
+    if (mpz_cmp_ui(p, 1024) >= 0) {
+        l = mpz_sizeinbase(p, 2);
+        l *= abfield_degree(ab);    /* roughly log_2(#K) */
+    } else {
+        mpz_pow_ui(p, p, abfield_degree(ab));
+        l = mpz_sizeinbase(p, 2);
+    }
+    mpz_clear(p);
+    unsigned int safety = iceildiv(64, m * l);
+    return res - safety;
+}/*}}}*/
+
 
 /* This destructively cancels the first len coefficients of E, and
  * computes the appropriate matrix pi which achieves this. The
@@ -622,6 +654,17 @@ bw_lingen_basecase(bmstatus_ptr bm, matpoly_ptr pi, matpoly_srcptr E, unsigned i
     for(unsigned int j = 0; j < b; j++) {
         if (pi_lengths[j] > pi->size)
             pi->size = pi_lengths[j];
+    }
+    /* Given the structure of the computation, there's no reason for the
+     * initial estimate to go wrong.
+     */
+    ASSERT_ALWAYS(pi->size <= pi->alloc);
+    for(unsigned int j = 0; j < b; j++) {
+        for(unsigned int k = pi_lengths[j] ; k < pi->size ; k++) {
+            for(unsigned int i = 0 ; i < b ; i++) {
+                ASSERT_ALWAYS(abis_zero(ab, matpoly_coeff_const(ab, pi, i, j, k)));
+            }
+        }
     }
     pi->size = MIN(pi->size, pi->alloc);
     matpoly_clear(ab, T);
@@ -1294,6 +1337,9 @@ bw_lingen_recursive(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta,
     int done;
     double art;
 
+    unsigned int pi_expect = expected_pi_length(d, E->size);
+    unsigned int pi_expect_lowerbound = expected_pi_length_lowerbound(d, E->size);
+
     /* we have to start with something large enough to get all
      * coefficients of E_right correct */
     size_t half = E->size - (E->size / 2);
@@ -1309,7 +1355,14 @@ bw_lingen_recursive(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta,
     matpoly_init(ab, pi_right, 0, 0, 0);
     matpoly_init(ab, E_right, 0, 0, 0);
 
+    int depth = stats.depth;
+
     matpoly_truncate(ab, E_left, E, half);
+
+    /* prepare for MP ! */
+    unsigned int pi_left_expect = expected_pi_length(d, half);
+    unsigned int pi_left_expect_lowerbound = expected_pi_length_lowerbound(d, half);
+    matpoly_rshift(ab, E, E, half - pi_left_expect + 1);
 
     done = bw_lingen_single(bm, pi_left, E_left, delta, draft);
 
@@ -1324,9 +1377,18 @@ bw_lingen_recursive(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta,
     }
 
     stats.begin_smallstep("MP");
-    matpoly_rshift(ab, E, E, half - pi_left->size + 1);
-    logline_begin(stdout, z, "t=%u MP%s(%zu, %zu) -> %zu",
-            bm->t, caching ? "-caching" : "",
+    ASSERT_ALWAYS(pi_left->size <= pi_left_expect);
+    ASSERT_ALWAYS(pi_left->size >= pi_left_expect_lowerbound);
+
+    /* XXX I don't understand why I need to do this. It seems to me that
+     * MP(XA, B) and MP(A, B) should be identical whenever deg A > deg B.
+     */
+    if (pi_left_expect != pi_left->size)
+        matpoly_rshift(ab, E, E, pi_left_expect - pi_left->size);
+
+    // matpoly_rshift(ab, E, E, half - pi_left->size + 1);
+    logline_begin(stdout, z, "t=%u %*sMP%s(%zu, %zu) -> %zu",
+            bm->t, depth,"", caching ? "-caching" : "",
             E->size, pi_left->size, E->size - pi_left->size + 1);
 
     /* the artificial time is the time we've skipped by not doing the mp
@@ -1336,6 +1398,7 @@ bw_lingen_recursive(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta,
         art = matpoly_mp_caching(ab, E_right, E, pi_left, draft);
     else
         art = matpoly_mp(ab, E_right, E, pi_left, draft);
+    matpoly_clear(ab, E);
     stats.add_artificial_time(art);
 
     logline_end(&(bm->t_mp), "");
@@ -1343,14 +1406,19 @@ bw_lingen_recursive(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta,
 
     int do_right = !draft || stats.spent_so_far() < draft;
 
+    unsigned int pi_right_expect = expected_pi_length(d, E_right->size);
+    unsigned int pi_right_expect_lowerbound = expected_pi_length_lowerbound(d, E_right->size);
     if (do_right)
         done = bw_lingen_single(bm, pi_right, E_right, delta, draft);
+
+    ASSERT_ALWAYS(pi_right->size <= pi_right_expect);
+    ASSERT_ALWAYS(pi_right->size >= pi_right_expect_lowerbound);
 
     matpoly_clear(ab, E_right);
 
     stats.begin_smallstep("MUL");
-    logline_begin(stdout, z, "t=%u MUL%s(%zu, %zu) -> %zu",
-            bm->t, caching ? "-caching" : "",
+    logline_begin(stdout, z, "t=%u %*sMUL%s(%zu, %zu) -> %zu",
+            bm->t, depth, "", caching ? "-caching" : "",
             pi_left->size, pi_right->size, pi_left->size + pi_right->size - 1);
 
     /* when we're just measuring the time, we're going to fake the
@@ -1360,6 +1428,25 @@ bw_lingen_recursive(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta,
         art = matpoly_mul_caching(ab, pi, pi_left, do_right ? pi_right : pi_left, draft);
     else
         art = matpoly_mul(ab, pi, pi_left, do_right ? pi_right : pi_left, draft);
+
+    /* Note that the leading coefficients of pi_left and pi_right are not
+     * necessarily full-rank, so that we have to fix potential zeros. If
+     * we don't, the degree of pi artificially grows with the recursive
+     * level.
+     */
+    for(; pi->size > pi_expect ; pi->size--) {
+        /* These coefficients really must be zero */
+        ASSERT_ALWAYS(matpoly_coeff_is_zero(ab, pi, pi->size - 1));
+    }
+    ASSERT_ALWAYS(pi->size <= pi_expect);
+    /* Now below pi_expect, it's not impossible to have a few
+     * cancellations as well.
+     */
+    for(; pi->size ; pi->size--) {
+        if (!matpoly_coeff_is_zero(ab, pi, pi->size - 1)) break;
+    }
+    ASSERT_ALWAYS(pi->size >= pi_expect_lowerbound);
+
     stats.add_artificial_time(art);
 
     logline_end(&bm->t_mul, "");

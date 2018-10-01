@@ -74,6 +74,9 @@ double matpoly_addmp(abdst_field ab, matpoly c, matpoly a, matpoly b, int draft)
 double matpoly_mul(abdst_field ab, matpoly c, matpoly a, matpoly b, int draft);
 double matpoly_mp(abdst_field ab, matpoly c, matpoly a, matpoly b, int draft);
 
+int matpoly_coeff_is_zero(abdst_field ab, matpoly_srcptr pi, unsigned int k);
+void matpoly_coeff_set_zero(abdst_field ab, matpoly_ptr pi, unsigned int k);
+
 /* {{{ access interface for matpoly */
 static inline abdst_vec matpoly_part(abdst_field ab, matpoly_ptr p, unsigned int i, unsigned int j, unsigned int k) {
     ASSERT_ALWAYS(p->size);
