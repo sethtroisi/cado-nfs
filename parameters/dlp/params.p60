@@ -31,10 +31,10 @@ tasks.polyselect.ropteffort = 0.01
 
 
 tasks.I = 11
-lim0 = 25000
-lim1 = 25000
-lpb0 = 17
-lpb1 = 17
+tasks.lim0 = 25000
+tasks.lim1 = 25000
+tasks.lpb0 = 17
+tasks.lpb1 = 17
 tasks.sieve.mfb0 = 34
 tasks.sieve.mfb1 = 34
 tasks.sieve.lambda0 = 2.1

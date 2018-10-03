@@ -29,10 +29,10 @@ tasks.polyselect.modm = 7
 
 
 tasks.I = 12
-lim0 = 850000
-lim1 = 17500
-lpb0 = 20
-lpb1 = 18
+tasks.lim0 = 850000
+tasks.lim1 = 17500
+tasks.lpb0 = 20
+tasks.lpb1 = 18
 tasks.sieve.mfb0 = 20
 tasks.sieve.mfb1 = 36
 tasks.sieve.lambda0 = 1.1

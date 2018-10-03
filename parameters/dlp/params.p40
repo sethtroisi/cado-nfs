@@ -30,10 +30,10 @@ tasks.polyselect.nq = 100
 
 
 tasks.I = 11
-lim0 = 7000
-lim1 = 7000
-lpb0 = 14
-lpb1 = 14
+tasks.lim0 = 7000
+tasks.lim1 = 7000
+tasks.lpb0 = 14
+tasks.lpb1 = 14
 tasks.sieve.mfb0 = 28
 tasks.sieve.mfb1 = 28
 tasks.sieve.lambda0 = 2.1

@@ -47,10 +47,10 @@ tasks.I = 10
 # Sieve
 #########
 
-lim0 = 20000
-lim1 = 20000
-lpb0 = 17
-lpb1 = 17
+tasks.lim0 = 20000
+tasks.lim1 = 20000
+tasks.lpb0 = 17
+tasks.lpb1 = 17
 tasks.sieve.mfb0 = 34
 tasks.sieve.mfb1 = 34
 tasks.qmin = 20000
