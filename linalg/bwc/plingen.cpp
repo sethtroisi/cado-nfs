@@ -1436,7 +1436,11 @@ bw_lingen_recursive(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta,
      */
     for(; pi->size > pi_expect ; pi->size--) {
         /* These coefficients really must be zero */
-        ASSERT_ALWAYS(matpoly_coeff_is_zero(ab, pi, pi->size - 1));
+        if (!draft) {
+            ASSERT_ALWAYS(matpoly_coeff_is_zero(ab, pi, pi->size - 1));
+        } else {
+            matpoly_coeff_set_zero(ab, pi, pi->size - 1);
+        }
     }
     ASSERT_ALWAYS(pi->size <= pi_expect);
     /* Now below pi_expect, it's not impossible to have a few
