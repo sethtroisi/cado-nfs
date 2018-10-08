@@ -47,7 +47,6 @@ struct lognorm_base {/*{{{*/
          * A no-op would do as well. */
         memset(S, 255, 1U << LOG_BUCKET_REGION);
     }
-    virtual ~lognorm_base() {}
 };
 
 /*}}}*/
@@ -70,7 +69,6 @@ struct lognorm_reference : public lognorm_base {/*{{{*/
     lognorm_reference(siever_config const & sc, cxx_cado_poly const & cpoly, int side, qlattice_basis const & Q, int logI, int J);
     virtual ~lognorm_reference() {}
     virtual void fill(unsigned char * S, int N) const;
-    virtual ~lognorm_reference() {}
 };
 
 /*}}}*/
@@ -90,7 +88,6 @@ struct lognorm_smart : public lognorm_base {/*{{{*/
     lognorm_smart(siever_config const & sc, cxx_cado_poly const & cpoly, int side, qlattice_basis const & Q, int logI, int J);
     virtual ~lognorm_smart() {}
     virtual void fill(unsigned char * S, int N) const;
-    virtual ~lognorm_smart() {}
 };
 
 /*}}}*/
