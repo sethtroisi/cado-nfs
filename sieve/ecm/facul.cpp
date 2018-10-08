@@ -72,8 +72,9 @@ static int
 nb_curves_with_fbb (const unsigned long fbb,
 		    const unsigned int lpb, const unsigned int mfb)
 {
-  /* if 2^mfb <= fbb^2, we can have only one large prime */
-  return (1UL << mfb <= fbb * fbb) ? 0 : nb_curves (lpb, mfb);
+  /* if 2^mfb < fbb^2, we can have only one large prime */
+  return (ldexp (1.0, mfb) < (double) fbb * (eoubld) fbb)
+    ? 0 : nb_curves (lpb, mfb);
 }
 
 static int
