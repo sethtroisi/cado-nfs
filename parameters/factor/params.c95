@@ -26,10 +26,10 @@ tasks.polyselect.ropteffort = 1
 # Sieve
 ###########################################################################
 
-lim0 = 600000
-lim1 = 850000
-lpb0 = 24
-lpb1 = 25
+tasks.lim0 = 600000
+tasks.lim1 = 850000
+tasks.lpb0 = 24
+tasks.lpb1 = 25
 tasks.sieve.mfb0 = 48
 tasks.sieve.mfb1 = 50
 tasks.sieve.ncurves0 = 11

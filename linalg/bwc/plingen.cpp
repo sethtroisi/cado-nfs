@@ -273,7 +273,7 @@ static inline unsigned int expected_pi_length_lowerbound(dims * d, unsigned int 
     }
     mpz_clear(p);
     unsigned int safety = iceildiv(64, m * l);
-    return res - safety;
+    return safety < res ? res - safety : 0;
 }/*}}}*/
 
 
@@ -1362,7 +1362,8 @@ bw_lingen_recursive(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta,
     /* prepare for MP ! */
     unsigned int pi_left_expect = expected_pi_length(d, half);
     unsigned int pi_left_expect_lowerbound = expected_pi_length_lowerbound(d, half);
-    matpoly_rshift(ab, E, E, half - pi_left_expect + 1);
+    unsigned int pi_left_expect_used_for_shift = MIN(pi_left_expect, half + 1);
+    matpoly_rshift(ab, E, E, half + 1 - pi_left_expect_used_for_shift);
 
     done = bw_lingen_single(bm, pi_left, E_left, delta, draft);
 
@@ -1378,13 +1379,13 @@ bw_lingen_recursive(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta,
 
     stats.begin_smallstep("MP");
     ASSERT_ALWAYS(pi_left->size <= pi_left_expect);
-    ASSERT_ALWAYS(pi_left->size >= pi_left_expect_lowerbound);
+    ASSERT_ALWAYS(done || pi_left->size >= pi_left_expect_lowerbound);
 
     /* XXX I don't understand why I need to do this. It seems to me that
      * MP(XA, B) and MP(A, B) should be identical whenever deg A > deg B.
      */
-    if (pi_left_expect != pi_left->size)
-        matpoly_rshift(ab, E, E, pi_left_expect - pi_left->size);
+    if (pi_left_expect_used_for_shift != pi_left->size)
+        matpoly_rshift(ab, E, E, pi_left_expect_used_for_shift - pi_left->size);
 
     // matpoly_rshift(ab, E, E, half - pi_left->size + 1);
     logline_begin(stdout, z, "t=%u %*sMP%s(%zu, %zu) -> %zu",
@@ -1408,11 +1409,11 @@ bw_lingen_recursive(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta,
 
     unsigned int pi_right_expect = expected_pi_length(d, E_right->size);
     unsigned int pi_right_expect_lowerbound = expected_pi_length_lowerbound(d, E_right->size);
-    if (do_right)
+    if (do_right) {
         done = bw_lingen_single(bm, pi_right, E_right, delta, draft);
-
-    ASSERT_ALWAYS(pi_right->size <= pi_right_expect);
-    ASSERT_ALWAYS(pi_right->size >= pi_right_expect_lowerbound);
+        ASSERT_ALWAYS(pi_right->size <= pi_right_expect);
+        ASSERT_ALWAYS(done || pi_right->size >= pi_right_expect_lowerbound);
+    }
 
     matpoly_clear(ab, E_right);
 
@@ -1436,7 +1437,11 @@ bw_lingen_recursive(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta,
      */
     for(; pi->size > pi_expect ; pi->size--) {
         /* These coefficients really must be zero */
-        ASSERT_ALWAYS(matpoly_coeff_is_zero(ab, pi, pi->size - 1));
+        if (!draft) {
+            ASSERT_ALWAYS(matpoly_coeff_is_zero(ab, pi, pi->size - 1));
+        } else {
+            matpoly_coeff_set_zero(ab, pi, pi->size - 1);
+        }
     }
     ASSERT_ALWAYS(pi->size <= pi_expect);
     /* Now below pi_expect, it's not impossible to have a few
@@ -1445,7 +1450,7 @@ bw_lingen_recursive(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta,
     for(; pi->size ; pi->size--) {
         if (!matpoly_coeff_is_zero(ab, pi, pi->size - 1)) break;
     }
-    ASSERT_ALWAYS(pi->size >= pi_expect_lowerbound);
+    ASSERT_ALWAYS(done || pi->size >= pi_expect_lowerbound);
 
     stats.add_artificial_time(art);
 

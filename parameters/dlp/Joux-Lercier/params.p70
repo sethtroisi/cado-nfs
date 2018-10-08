@@ -83,14 +83,14 @@ tasks.I = 11
 # They will define the larger area where logarithms would be known for the
 # descent step
 
-lpb0 = 18
-lpb1 = 17
+tasks.lpb0 = 18
+tasks.lpb1 = 17
 
 # lim define the bound until wich we get prime factors using the Eratostene
 # sieving.
 
-lim0 = 250000
-lim1 = 12500
+tasks.lim0 = 250000
+tasks.lim1 = 12500
 
 # mfb define the size in bits of the co-factor not sieved under lim we accept to
 # factorize with ECM. mfb should be a multiple of lpb.

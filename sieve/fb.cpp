@@ -1645,8 +1645,18 @@ struct fbc_header {
         if (!in) return in;
         in >> f;
         if (!in) return in;
-        in >> lim >> powlim;
+        in >> lim;
         if (!in) return in;
+        /* parse as a 64-bit integer, as otherwise we have
+         * wordsize-dependent fb caches for no good reason
+         */
+        uint64_t cc;
+        in >> cc;
+        if (!in) return in;
+        if (cc == UINT64_MAX)
+            powlim = ULONG_MAX;
+        else
+            powlim = cc;
         for(int s = -1 ; s <= mpz_poly_degree(f) ; s++) {
             entryvec e;
             if (!e.parse(in)) return in;
@@ -1660,7 +1670,7 @@ struct fbc_header {
             << f->deg << "\n"
             << f << "\n"
             << lim << "\n"
-            << powlim << "\n";
+            << (uint64_t) powlim << "\n";
         if (!out) return out;
         for(auto e : entries) {
             /* copy by value because we want a relative offset here */
