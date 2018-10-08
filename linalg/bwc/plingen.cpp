@@ -273,7 +273,7 @@ static inline unsigned int expected_pi_length_lowerbound(dims * d, unsigned int 
     }
     mpz_clear(p);
     unsigned int safety = iceildiv(64, m * l);
-    return res - safety;
+    return safety < res ? res - safety : 0;
 }/*}}}*/
 
 
@@ -1362,7 +1362,8 @@ bw_lingen_recursive(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta,
     /* prepare for MP ! */
     unsigned int pi_left_expect = expected_pi_length(d, half);
     unsigned int pi_left_expect_lowerbound = expected_pi_length_lowerbound(d, half);
-    matpoly_rshift(ab, E, E, half - pi_left_expect + 1);
+    unsigned int pi_left_expect_used_for_shift = MIN(pi_left_expect, half + 1);
+    matpoly_rshift(ab, E, E, half + 1 - pi_left_expect_used_for_shift);
 
     done = bw_lingen_single(bm, pi_left, E_left, delta, draft);
 
@@ -1383,8 +1384,8 @@ bw_lingen_recursive(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta,
     /* XXX I don't understand why I need to do this. It seems to me that
      * MP(XA, B) and MP(A, B) should be identical whenever deg A > deg B.
      */
-    if (pi_left_expect != pi_left->size)
-        matpoly_rshift(ab, E, E, pi_left_expect - pi_left->size);
+    if (pi_left_expect_used_for_shift != pi_left->size)
+        matpoly_rshift(ab, E, E, pi_left_expect_used_for_shift - pi_left->size);
 
     // matpoly_rshift(ab, E, E, half - pi_left->size + 1);
     logline_begin(stdout, z, "t=%u %*sMP%s(%zu, %zu) -> %zu",
