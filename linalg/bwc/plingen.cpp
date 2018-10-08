@@ -1408,11 +1408,11 @@ bw_lingen_recursive(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta,
 
     unsigned int pi_right_expect = expected_pi_length(d, E_right->size);
     unsigned int pi_right_expect_lowerbound = expected_pi_length_lowerbound(d, E_right->size);
-    if (do_right)
+    if (do_right) {
         done = bw_lingen_single(bm, pi_right, E_right, delta, draft);
-
-    ASSERT_ALWAYS(pi_right->size <= pi_right_expect);
-    ASSERT_ALWAYS(done || pi_right->size >= pi_right_expect_lowerbound);
+        ASSERT_ALWAYS(pi_right->size <= pi_right_expect);
+        ASSERT_ALWAYS(done || pi_right->size >= pi_right_expect_lowerbound);
+    }
 
     matpoly_clear(ab, E_right);
 
