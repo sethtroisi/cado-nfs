@@ -1378,7 +1378,7 @@ bw_lingen_recursive(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta,
 
     stats.begin_smallstep("MP");
     ASSERT_ALWAYS(pi_left->size <= pi_left_expect);
-    ASSERT_ALWAYS(pi_left->size >= pi_left_expect_lowerbound);
+    ASSERT_ALWAYS(done || pi_left->size >= pi_left_expect_lowerbound);
 
     /* XXX I don't understand why I need to do this. It seems to me that
      * MP(XA, B) and MP(A, B) should be identical whenever deg A > deg B.
@@ -1412,7 +1412,7 @@ bw_lingen_recursive(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta,
         done = bw_lingen_single(bm, pi_right, E_right, delta, draft);
 
     ASSERT_ALWAYS(pi_right->size <= pi_right_expect);
-    ASSERT_ALWAYS(pi_right->size >= pi_right_expect_lowerbound);
+    ASSERT_ALWAYS(done || pi_right->size >= pi_right_expect_lowerbound);
 
     matpoly_clear(ab, E_right);
 
@@ -1445,7 +1445,7 @@ bw_lingen_recursive(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta,
     for(; pi->size ; pi->size--) {
         if (!matpoly_coeff_is_zero(ab, pi, pi->size - 1)) break;
     }
-    ASSERT_ALWAYS(pi->size >= pi_expect_lowerbound);
+    ASSERT_ALWAYS(done || pi->size >= pi_expect_lowerbound);
 
     stats.add_artificial_time(art);
 
