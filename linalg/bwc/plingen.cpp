@@ -363,10 +363,13 @@ bw_lingen_basecase(bmstatus_ptr bm, matpoly_ptr pi, matpoly_srcptr E, unsigned i
             abelt_ur e_ur;
             abelt_ur_init(ab, &e_ur);
             
+            /* icc openmp doesn't grok todo.size() as being a constant
+             * loop bound */
+            unsigned int nj = todo.size();
 #ifdef HAVE_OPENMP
 #pragma omp for collapse(2)
 #endif
-            for(unsigned int jl = 0 ; jl < todo.size() ; ++jl) {
+            for(unsigned int jl = 0 ; jl < nj ; ++jl) {
                 for(unsigned int i = 0 ; i < m ; ++i) {
                     unsigned int j = todo[jl];
                     abelt_ur_set_zero(ab, e_ur);
