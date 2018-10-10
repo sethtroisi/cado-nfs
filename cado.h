@@ -144,4 +144,11 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #define    __USE_MINGW_ANSI_STDIO
 #endif
 
+/* It's really a bit of a pity, we we don't even have our macros.h at this
+ * point.
+ */
+#ifdef __cplusplus
+#include <cstddef>	// problem with gcc 4.9.4
+#endif
+
 #endif  /* CADO_H_ */
