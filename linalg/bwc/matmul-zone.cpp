@@ -695,6 +695,8 @@ void matmul_zone_data<gfp, fast_gfp>::build_cache(uint32_t * data, size_t size)/
 
     coeff_stats cstats(coeff_repeat_bound);
 
+    unsigned int maxrow = 0;
+
     for(unsigned int i0 = 0 ; i0 < nrows_t ; i0 += rowbatch) {
         /* Create the data structures for the horizontal strip starting
          * at row i0, column 0.
@@ -708,7 +710,15 @@ void matmul_zone_data<gfp, fast_gfp>::build_cache(uint32_t * data, size_t size)/
         pp[0] = ptr;
         for(unsigned int k = 0 ; k < rowbatch ; k++) {
             cc[k] = pp[k] + 1;
-            if (i0 + k < nrows_t) {
+
+            if (pp[k] == data + size) {
+                /* reached the end of our data stream. We have empty
+                 * padding rows, we must treat them accordingly */
+                pp[k+1] = pp[k];
+            } else if (i0 + k >= nrows_t) {
+                pp[k+1] = pp[k];
+            } else {
+                maxrow = i0 + k + 1;
                 ASSERT_ALWAYS((pp[k] - data) < (ptrdiff_t) size);
                 uint32_t weight = *pp[k];
                 pp[k+1] = pp[k] + 1 + 2*weight;
@@ -718,8 +728,6 @@ void matmul_zone_data<gfp, fast_gfp>::build_cache(uint32_t * data, size_t size)/
                 pair<uint32_t, int32_t> * cb = (pair<uint32_t, int32_t> *) cc[k];
                 pair<uint32_t, int32_t> * ce = cb + weight;
                 sort(cb, ce, sort_jc());
-            } else {
-                pp[k+1] = pp[k];
             }
         }
         ptr = pp[rowbatch];
@@ -773,7 +781,8 @@ void matmul_zone_data<gfp, fast_gfp>::build_cache(uint32_t * data, size_t size)/
         }
         blocks.push_back(std::move(B));
     }
-    ASSERT_ALWAYS(ptr - data == (ptrdiff_t) (nrows_t + 2 * mm->public_->ncoeffs));
+    ASSERT_ALWAYS(maxrow <= nrows_t);
+    ASSERT_ALWAYS(ptr - data == (ptrdiff_t) (maxrow + 2 * mm->public_->ncoeffs));
 #ifdef DISPATCHERS_AND_COMBINERS
     /* We now merge dispatchers */
     sort(D.begin(), D.end(), dispatcher::colmajor_sorter());
