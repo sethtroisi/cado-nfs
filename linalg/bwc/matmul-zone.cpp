@@ -476,7 +476,7 @@ public:
     /* {{{ front-end */
     ~matmul_zone_data();
     matmul_zone_data(void* xx, param_list pl, int optimized_direction);
-    void build_cache(uint32_t * data);
+    void build_cache(uint32_t * data, size_t size);
     int reload_cache();
     void save_cache();
     void mul(void * xdst, void const * xsrc, int d);
@@ -498,9 +498,9 @@ matmul_ptr MATMUL_NAME(init)(void* xx, param_list pl, int optimized_direction)
     return (matmul_ptr) new matmul_zone_data<gfp>(xx, pl, optimized_direction);
 }
 
-void MATMUL_NAME(build_cache)(matmul_ptr mm0, uint32_t * data)
+void MATMUL_NAME(build_cache)(matmul_ptr mm0, uint32_t * data, size_t size)
 {
-    ((matmul_zone_data<gfp>*)mm0)->build_cache(data);
+    ((matmul_zone_data<gfp>*)mm0)->build_cache(data, size);
 }
 
 int MATMUL_NAME(reload_cache)(matmul_ptr mm0)
@@ -667,7 +667,7 @@ pair<dispatcher, combiner> create_dispatcher_and_combiner(zone const& q)/*{{{*/
 #endif
 
 template<typename gfp, typename fast_gfp>
-void matmul_zone_data<gfp, fast_gfp>::build_cache(uint32_t * data)/*{{{*/
+void matmul_zone_data<gfp, fast_gfp>::build_cache(uint32_t * data, size_t size)/*{{{*/
 {
     matmul_zone_data * mm = this;
 
@@ -709,6 +709,7 @@ void matmul_zone_data<gfp, fast_gfp>::build_cache(uint32_t * data)/*{{{*/
         for(unsigned int k = 0 ; k < rowbatch ; k++) {
             cc[k] = pp[k] + 1;
             if (i0 + k < nrows_t) {
+                ASSERT_ALWAYS((pp[k] - data) < (ptrdiff_t) size);
                 uint32_t weight = *pp[k];
                 pp[k+1] = pp[k] + 1 + 2*weight;
                 mm->public_->ncoeffs += weight;
@@ -722,6 +723,7 @@ void matmul_zone_data<gfp, fast_gfp>::build_cache(uint32_t * data)/*{{{*/
             }
         }
         ptr = pp[rowbatch];
+        ASSERT_ALWAYS((ptr - data) <= (ptrdiff_t) size);
         for(unsigned int j0 = 0, colbatch ; j0 < ncols_t ; j0 += colbatch) {
 #ifdef DISPATCHERS_AND_COMBINERS
             colbatch = (j0 < col_dispatcher_cutoff) ? colbatch0 : colbatch1;
