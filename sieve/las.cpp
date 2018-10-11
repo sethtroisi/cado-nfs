@@ -1,10 +1,10 @@
-#include "cado.h"
 #define __STDCPP_MATH_SPEC_FUNCS__ 201003L
 #define __STDCPP_WANT_MATH_SPEC_FUNCS__ 1       /* for expint() */
 /* the macro above is for #include <cmath> -- however it must happen
  * first, because it may well be that one of the intermediary headers
  * pull stuff that is dependent on this flag.
  */
+#include "cado.h"
 #include <stdint.h>     /* AIX wants it first (it's a bug) */
 #include <stdio.h>
 #include <stdlib.h>
