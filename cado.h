@@ -144,11 +144,15 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #define    __USE_MINGW_ANSI_STDIO
 #endif
 
-/* It's really a bit of a pity, we we don't even have our macros.h at this
+/* It's really a bit of a pity, we don't even have our macros.h at this
  * point.
  */
 #ifdef __cplusplus
+#ifdef __GNUC__
+#if (__GNUC__ == 4 && __GNUC_MINOR__ == 9) || (__GNUC__ == 5 && __GNUC_MINOR__ == 0)
 #include <cstddef>	// problem with gcc 4.9.4
+#endif
+#endif
 #endif
 
 #endif  /* CADO_H_ */
