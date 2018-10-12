@@ -2835,7 +2835,7 @@ static void matmul_top_read_submatrix(matmul_top_data_ptr mmt, int midx, param_l
     /* see remark in raw_matrix_u32.h about data ownership for type
      * matrix_u32 */
 
-    if (verbose_enabled(CADO_VERBOSE_PRINT_BWC_CACHE_MAJOR_INFO)) {
+    if (Mloc->mm->cachefile_name && verbose_enabled(CADO_VERBOSE_PRINT_BWC_CACHE_MAJOR_INFO)) {
         my_pthread_mutex_lock(mmt->pi->m->th->m);
         printf("[%s] J%uT%u uses cache file %s\n",
                 mmt->pi->nodenumber_s,
