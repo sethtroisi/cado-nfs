@@ -442,7 +442,12 @@ static unsigned int bw_set_length_and_interval_common(struct bw_params * bw, uns
     krylov_length = iceildiv(krylov_length, bw->interval) * bw->interval;
     mksol_length = iceildiv(mksol_length, bw->interval) * bw->interval;
 
-    if (bw->end == 0) bw->end = is_krylov ? krylov_length : mksol_length;
+    /* The thing about mksol_length is that because of off-by-ones, our
+     * estimate is quite often off by a bit. So presently, the code just
+     * reads the F file for as long as data can be found there. We do
+     * need the typical expected length for the ETA calculation, though !
+     */
+    if (bw->end == 0) bw->end = is_krylov ? krylov_length : INT_MAX;
     
     return is_krylov ? krylov_length : mksol_length;
 }

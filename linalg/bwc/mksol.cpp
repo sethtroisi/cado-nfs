@@ -157,16 +157,25 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
     }
     /* }}} */
 
+    unsigned int expected_last_iteration;
+
     serialize_threads(pi->m);
     if (pi->m->trank == 0) {
         /* the bw object is global ! */
-        bw_set_length_and_interval_mksol(bw, mmt->n0);
+        expected_last_iteration = bw_set_length_and_interval_mksol(bw, mmt->n0);
     }
+    pi_thread_bcast(&expected_last_iteration, 1, BWC_PI_UNSIGNED, 0, pi->m);
     serialize_threads(pi->m);
-    if (tcan_print) {
-        printf ("Target iteration is %u\n", bw->end);
+    if (bw->end == INT_MAX) {
+        if (tcan_print)
+            printf ("Target iteration is unspecified ;"
+                    " going to end of F file\n");
+    } else {
+        if (tcan_print)
+            printf ("Target iteration is %u\n", bw->end);
+        expected_last_iteration = bw->end;
     }
-    ASSERT_ALWAYS(bw->end % bw->interval == 0);
+    ASSERT_ALWAYS(bw->end == INT_MAX || bw->end % bw->interval == 0);
 
     /* {{{ Prepare temp space for F coefficients */
     /* F plays the role of a right-hand-side in mksol. Vector iterates
@@ -213,7 +222,7 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
     /* }}} */
     
     /* {{{ bless our timers */
-    timing_init(timing, 4 * mmt->nmatrices, bw->start, bw->end);
+    timing_init(timing, 4 * mmt->nmatrices, bw->start, expected_last_iteration);
     for(int i = 0 ; i < mmt->nmatrices; i++) {
         timing_set_timer_name(timing, 4*i, "CPU%d", i);
         timing_set_timer_items(timing, 4*i, mmt->matrices[i]->mm->ncoeffs);

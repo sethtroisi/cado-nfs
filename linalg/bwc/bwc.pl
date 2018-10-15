@@ -1060,8 +1060,8 @@ sub task_begin_message {
 }
 
 sub task_check_message {
-    return unless $my_verbose_flags->{'checks'};
     my $status = shift;
+    return unless $my_verbose_flags->{'checks'} || $status eq 'error';
     my $normal = $terminal_colors->{'normal'} || '';
     my $color = {
         'ok' => $terminal_colors->{'green'} || '',
@@ -1077,7 +1077,10 @@ sub task_check_message {
         $_ = "\t" . $_;
     }
     unshift @lines, $head;
-    print "## $color->{$status}Check for $current_task$normal: $_\n" for @lines;
+    my @printme;
+    push @printme, "## $color->{$status}Check for $current_task$normal: $_\n" for @lines;
+    die @printme if $status eq 'error';
+    print @printme;
 }
 # }}}
 
@@ -1272,7 +1275,6 @@ sub list_files_generic {
         $filesize = $size if !defined($filesize);
         if ($filesize != $size) {
             task_check_message 'error', "Inconsistency detected for the sizes of the ${pattern} files. We have seen at least $filesize and $size (last seen: $file, $size). Please fix.\n";
-            die;
         }
     }
     return $files, $filesize;
@@ -1517,7 +1519,6 @@ sub subtask_krylov_todo {
                     task_check_message 'error',
                     "No starting vector for range $r"
                     . " (interleaved sub-range from $yrange)\n";
-                    die;
                 };
                 push @sub_starts, $s;
             } 
@@ -1527,7 +1528,6 @@ sub subtask_krylov_todo {
                 . " interleaved sub-ranges from $yrange"
                 . " (first at $sub_starts[0],"
                 . " second at $sub_starts[1])\n";
-                die;
             };
             $start = $sub_starts[0];
         } else {
@@ -1543,7 +1543,6 @@ sub subtask_krylov_todo {
     }
     if (!@todo && @impossible) {
         task_check_message 'error', "Cannot schedule remaining work. No checkpoints for ranges:\n", @impossible;
-        die;
     }
     return @todo;
 }
@@ -1590,7 +1589,6 @@ sub task_prep {
 
     if ($status eq 'some') {
         task_check_message 'error', "Missing output files for $current_task", @missing, "We don't fix this automatically. Please investigate.";
-        die;
     }
 
     task_check_message 'missing', "none of the output files for $current_task have been found, need to run $current_task now. We want to create files:", @missing;
@@ -1728,7 +1726,6 @@ sub task_lingen {
     my $h = {};
     if (my @errors = task_lingen_input_errors $h) {
         task_check_message 'error', @errors;
-        die;
     }
 
     my $concatenated_A = $h->{'concatenated_A'};
@@ -1763,7 +1760,6 @@ sub task_lingen {
         return;
     } elsif (@missing < @expected) {
         task_check_message 'error', "Incomplete lingen output found. Missing files:\n" , @missing;
-        die;
     }
 
     task_check_message 'missing', "lingen has not run yet. Running now.";
@@ -1877,7 +1873,6 @@ sub task_mksol {
         }
         if ($@) {
             task_check_message 'error', "Failure message while checking $current_task files";
-            die;
         }
         if (!@todo) {
             # Note that we haven't checked for the A files yet !
@@ -1943,7 +1938,6 @@ sub task_gather {
     my $maxmksol = eval { max_mksol_iteration; };
     if ($@) {
         task_check_message 'error', "Lingen output files missing", $@, "Please run lingen first.";
-        die;
     }
     print "## mksol max iteration is $maxmksol\n";
 
@@ -1998,7 +1992,6 @@ sub task_gather {
 
     if (@missing) {
         task_check_message 'error', "Missing files for $current_task:", @missing;
-        die;
     }
 
     task_check_message 'ok', "All required files for gather seem to be present, good.";
