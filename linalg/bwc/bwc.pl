@@ -15,7 +15,7 @@ use Carp;
 # It should be rewritten someday, perhaps in python. At least this has to
 # be more modular (to be honest, it used to be much worse).
 
-# MPI_BINDIR=/opt/mpich2-1.1a2-1.fc10.x86_64/usr/bin ./bwc.pl :complete matrix=c72 interval=256 mn=64 ys=0..64 mpi=4x4
+# MPI_BINDIR=/opt/mpich2-1.1a2-1.fc10.x86_64/usr/bin ./bwc.pl :complete matrix=c72 mn=64 ys=0..64 mpi=4x4
 
 # {{{ usage
 sub usage {
@@ -45,7 +45,6 @@ parameters control the wrapping script itself.
 mpi thr              same meaning as for bwc programs.
 mn m n prime         same meaning as for bwc programs.
 nullspace            same meaning as for bwc programs.
-interval             same meaning as for bwc programs.
 ys                   same meaning as for bwc programs (krylov)
 solutions            same meaning as for bwc programs (mksol, gather)
 lingen_mpi           like mpi, but for plingen only (and someday lingen).
@@ -132,7 +131,6 @@ my $param_defaults={
     thr => '1x1',
     mpi => '1x1',
     lingen_mpi => '1x1',
-    interval => 200,
 };
 # {{{
 while (defined($_ = shift @ARGV)) {
@@ -197,7 +195,7 @@ my $nrhs=0;
 ## example, if libvirt-bin is installed on a linux system, openmpi will
 ## need the following additions.
 ##    
-## ./build/x86_64/linalg/bwc/bwc.pl :complete matrix=/net/tiramisu/localdisk/thome/mats/c90b wdir=/local/rsa768/tmp/c59 mn=64 mpi=2x1 thr=2x4 hosts=patate,tiramisu interval=10 mpi_extra_args='--mca btl_tcp_if_exclude lo,virbr0'
+## ./build/x86_64/linalg/bwc/bwc.pl :complete matrix=/net/tiramisu/localdisk/thome/mats/c90b wdir=/local/rsa768/tmp/c59 mn=64 mpi=2x1 thr=2x4 hosts=patate,tiramisu mpi_extra_args='--mca btl_tcp_if_exclude lo,virbr0'
 ##    
 ## This tells mpi not to try routing traffic through either the lo or the 
 ## virbr0 interface. For the former, it's already openmpi's default
@@ -351,7 +349,7 @@ if ($main =~ /:mpirun(?:_single)?/) {
 
 # {{{ Some important argument checks
 {
-    my @miss = grep { !defined $param->{$_}; } (qw/prime interval/);
+    my @miss = grep { !defined $param->{$_}; } (qw/prime/);
     die "Missing argument(s): @miss" if @miss;
     if (!defined($param->{'matrix'}) && !defined($param->{'random_matrix'})) {
         die "Missing parameter: matrix (or random_matrix)";
@@ -1611,9 +1609,9 @@ sub task_prep {
 sub subtask_secure {
     return if $param->{'skip_online_checks'};
     my $leader_files = get_cached_leadernode_filelist 'HASH';
-    my @x = grep { !exists($leader_files->{$_}); } "C.$param->{'interval'}";
-    if (@x) {
-        task_check_message 'missing', "missing check vector @x\n";
+    my @x = grep { /^C\.\d+$/ && !/^C\.0$/ } keys %$leader_files;
+    unless (@x) {
+        task_check_message 'missing', "no check vector found\n";
         task_common_run('secure', @main_args);
     }
 }
@@ -1630,10 +1628,6 @@ sub task_krylov {
     # if ys is found in the command line, then we focus on that sequence
     # specifically. Otherwise, we process all sequences one after
     # another.
-    #
-    # Other:
-    #   - C.$interval ; check vector for online checks. Computation
-    #   skipped if explicitly requested (skip_online_checks=1).
     #
     # side-effect files, which have no impact on whether this step gets
     # re-run or not:
@@ -1676,10 +1670,8 @@ sub task_lingen_input_errors {
     my $astrings = {};
     my $ok = 1;
     my $nb_afiles = 0;
-    my $rlength = int(($length + $param->{'interval'} - 1) / $param->{'interval'}) * $param->{'interval'};
-    if (defined($param->{'krylov_length'})) {
-        $rlength = $param->{'krylov_length'};
-    }
+    my $maxz1;
+    my $minz1;
     for my $k (keys %$afiles) {
         my @strings;
         my ($z0, $z1);
@@ -1699,8 +1691,13 @@ sub task_lingen_input_errors {
         }
         $ok = 0 unless scalar @strings == 0 && $z0 == 0 && $z1 >= $length;
         push @strings, [$z0, $z1] if defined $z1;
+        $maxz1 = $z1 unless defined($maxz1) && $z1 < $maxz1;
+        $minz1 = $z1 unless defined($minz1) && $z1 > $minz1;
         $astrings->{$k} = \@strings;
     }
+
+    $ok = 0 if $minz1 != $maxz1;
+    my $rlength = $minz1;
 
     if (!$ok) {
         my @errors;
@@ -1818,10 +1815,6 @@ sub task_mksol {
     # for which a V file is here, and no S file yet (for any of the
     # solutions considered, which is a number limited by $nrhs if
     # specified).
-    #
-    # Other:
-    #   - C.$interval ; check vector for online checks. Computation
-    #   skipped if explicitly requested (skip_online_checks=1).
     #
     # side-effect files, which have no impact on whether this step gets
     # re-run or not:
