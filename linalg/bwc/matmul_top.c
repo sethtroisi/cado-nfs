@@ -100,6 +100,8 @@ void matmul_top_decl_usage(param_list_ptr pl)
             "the matrix balancing file, as computed by mf_bal");
     param_list_decl_usage(pl, "random_matrix",
             "characteristics of a random matrix to be used for staged runs.");
+    param_list_decl_usage(pl, "static_random_matrix",
+            "(unset or set to something arbitrary): indicate that the matrix is fake, and that there is no need to bother with the generation of vectors");
 
     param_list_decl_usage(pl, "rebuild_cache",
             "force rebuilding matrix caches");
@@ -122,6 +124,7 @@ void matmul_top_lookup_parameters(param_list_ptr pl)
     param_list_lookup_string(pl, "matrix");
     param_list_lookup_string(pl, "balancing");
     param_list_lookup_string(pl, "random_matrix");
+    param_list_lookup_string(pl, "static_random_matrix");
     param_list_lookup_string(pl, "rebuild_cache");
     param_list_lookup_string(pl, "export_cachelist");
     param_list_lookup_string(pl, "save_submatrices");
