@@ -220,3 +220,4 @@ nfs-hd/automatic_p6bd40.sh
 nfs-hd/check_relations/
 parameters/nfs-hd/
 filter/CMakeLists-nodist.txt
+nfs-hd/ntv/
