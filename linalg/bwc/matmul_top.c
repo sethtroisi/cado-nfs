@@ -100,6 +100,8 @@ void matmul_top_decl_usage(param_list_ptr pl)
             "the matrix balancing file, as computed by mf_bal");
     param_list_decl_usage(pl, "random_matrix",
             "characteristics of a random matrix to be used for staged runs.");
+    param_list_decl_usage(pl, "static_random_matrix",
+            "(unset or set to something arbitrary): indicate that the matrix is fake, and that there is no need to bother with the generation of vectors");
 
     param_list_decl_usage(pl, "rebuild_cache",
             "force rebuilding matrix caches");
@@ -122,6 +124,7 @@ void matmul_top_lookup_parameters(param_list_ptr pl)
     param_list_lookup_string(pl, "matrix");
     param_list_lookup_string(pl, "balancing");
     param_list_lookup_string(pl, "random_matrix");
+    param_list_lookup_string(pl, "static_random_matrix");
     param_list_lookup_string(pl, "rebuild_cache");
     param_list_lookup_string(pl, "export_cachelist");
     param_list_lookup_string(pl, "save_submatrices");
@@ -2835,7 +2838,7 @@ static void matmul_top_read_submatrix(matmul_top_data_ptr mmt, int midx, param_l
     /* see remark in raw_matrix_u32.h about data ownership for type
      * matrix_u32 */
 
-    if (verbose_enabled(CADO_VERBOSE_PRINT_BWC_CACHE_MAJOR_INFO)) {
+    if (Mloc->mm->cachefile_name && verbose_enabled(CADO_VERBOSE_PRINT_BWC_CACHE_MAJOR_INFO)) {
         my_pthread_mutex_lock(mmt->pi->m->th->m);
         printf("[%s] J%uT%u uses cache file %s\n",
                 mmt->pi->nodenumber_s,

@@ -1518,7 +1518,14 @@ void param_list_print_command_line(FILE * stream, param_list_ptr pl)
     }
     if (verbose_enabled(CADO_VERBOSE_PRINT_COMPILATION_INFO)) {
 #ifdef  __GNUC__
+#ifndef __ICC
         fprintf (stream, "# Compiled with gcc " __VERSION__ "\n");
+#else
+        /* icc defines __GNUC__ too */
+        fprintf (stream, "# Compiled with icc %d.%d.%d (gcc version %d.%d.%d compatibility)\n",
+                 __ICC / 100, __INTEL_COMPILER % 100, __INTEL_COMPILER_UPDATE,
+                 __GNUC__, __GNUC_MINOR__, __GNUC_PATCHLEVEL__);
+#endif
 
         /* Apple Clang (based on llvm) identifies itself as a flavour of GNUC 4.2.1
            but seems to compile CADO-NFS properly 

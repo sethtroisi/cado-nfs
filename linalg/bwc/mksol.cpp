@@ -157,6 +157,26 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
     }
     /* }}} */
 
+    unsigned int expected_last_iteration;
+
+    serialize_threads(pi->m);
+    if (pi->m->trank == 0) {
+        /* the bw object is global ! */
+        expected_last_iteration = bw_set_length_and_interval_mksol(bw, mmt->n0);
+    }
+    pi_thread_bcast(&expected_last_iteration, 1, BWC_PI_UNSIGNED, 0, pi->m);
+    serialize_threads(pi->m);
+    if (bw->end == INT_MAX) {
+        if (tcan_print)
+            printf ("Target iteration is unspecified ;"
+                    " going to end of F file\n");
+    } else {
+        if (tcan_print)
+            printf ("Target iteration is %u\n", bw->end);
+        expected_last_iteration = bw->end;
+    }
+    ASSERT_ALWAYS(bw->end == INT_MAX || bw->end % bw->interval == 0);
+
     /* {{{ Prepare temp space for F coefficients */
     /* F plays the role of a right-hand-side in mksol. Vector iterates
      * have to be multiplied on the right by a matrix corresponding to
@@ -201,35 +221,8 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
     }
     /* }}} */
     
-    /* {{{ tell something about the end value. Both relative to the commabd
-     * line, and to what we expect as a total duration */
-    if (bw->end == 0) {
-        // for mksol we use EOF as an ending indication.
-        serialize_threads(pi->m);
-        if (pi->m->trank == 0)
-            bw->end = INT_MAX;
-        serialize_threads(pi->m);
-        if (tcan_print) {
-            printf ("Target iteration is unspecified ;"
-                    " going to end of F file\n");
-        }
-    } else if (tcan_print) {
-        printf ("Target iteration is %u ; going to %u\n", bw->end,
-                bw->interval * iceildiv(bw->end, bw->interval));
-    }
-    
-    /* We can either look up the F files to get an idea of the number of
-     * coefficients to be considered, or make our guess based on the
-     * expected degree of the generator. The latter is obviously less
-     * accurate, but not by much, and anyway for the purpose of making up
-     * an ETA, it's good enough.
-     */
-
-    int exp_end = iceildiv(MAX(mmt->n[0], mmt->n[1]), bw->n);
-    /* }}} */
-
     /* {{{ bless our timers */
-    timing_init(timing, 4 * mmt->nmatrices, bw->start, bw->interval * iceildiv(exp_end, bw->interval));
+    timing_init(timing, 4 * mmt->nmatrices, bw->start, expected_last_iteration);
     for(int i = 0 ; i < mmt->nmatrices; i++) {
         timing_set_timer_name(timing, 4*i, "CPU%d", i);
         timing_set_timer_items(timing, 4*i, mmt->matrices[i]->mm->ncoeffs);

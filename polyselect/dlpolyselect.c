@@ -85,8 +85,8 @@ double best_score_f = DBL_MAX, worst_score_f = DBL_MIN, sum_score_f = 0;
 unsigned long f_candidate = 0;   /* number of irreducibility tests */
 unsigned long f_irreducible = 0; /* number of irreducible polynomials */
 double max_guard = DBL_MIN;
-int skew = 0;                   /* see the -skew option */
-unsigned long *count = NULL;    /* use only with -skew */
+int skewed = 0;                 /* boolean (use skewed polynomial) */
+unsigned long *count = NULL;    /* use only with -skewed */
 int easySM = 0;                 /* see the -easySM option */
 int rrf = -1;                   /* see the -rrf option */
 int rrg = -1;                   /* see the -rrg option */
@@ -268,7 +268,7 @@ print_nonlinear_poly_info (mpz_poly ff, double alpha_f, mpz_poly gg,
     return 1;
 }
 
-/* return the number of polynomials we look for in the case of skewness:
+/* return the number of polynomials we look for with -skewed:
  * we compute the maximal skewness s = B^(-2/d)
  * the coefficients of degree >= d/2 are bounded by B
  * the coefficients of degree i < d/2 are bounded by B*s^(d/2-i) */
@@ -433,7 +433,7 @@ polygen_JL_f (int d, unsigned int bound, mpz_t *f, unsigned long idx)
     ff->deg = d;
     ff->coeff = f;
     //mpz_poly_init(ff, d);
-    if (!skew) {
+    if (!skewed) {
         int max_abs_coeffs;
         unsigned long next_counter;
         ok = mpz_poly_setcoeffs_counter(ff, &max_abs_coeffs, &next_counter,
@@ -727,7 +727,7 @@ polygen_JL1 (mpz_t n,
 static void
 usage ()
 {
-    fprintf (stderr, "./dlpolyselect -N xxx -df xxx -dg xxx -bound xxx [-modr xxx] [-modm xxx] [-t xxx] [-easySM <ell>] [-skew] [-rrf nnn]\n");
+    fprintf (stderr, "./dlpolyselect -N xxx -df xxx -dg xxx -bound xxx [-modr xxx] [-modm xxx] [-t xxx] [-easySM <ell>] [-skewed] [-rrf nnn]\n");
     fprintf (stderr, "Mandatory parameters:\n");
     fprintf (stderr, "   -N xxx            input number\n");
     fprintf (stderr, "   -df xxx           degree of polynomial f\n");
@@ -737,7 +737,7 @@ usage ()
     fprintf (stderr, "   -modr r -modm m   processes only polynomials of index r mod m\n");
     fprintf (stderr, "   -t nnn            uses n threads\n");
     fprintf (stderr, "   -easySM ell       generates polynomials with minimal number of SMs mod ell\n");
-    fprintf (stderr, "   -skew s           wanted skewness\n");
+    fprintf (stderr, "   -skewed           search for skewed polynomials\n");
     fprintf (stderr, "   -rrf nnn          f should have nnn real roots\n");
     fprintf (stderr, "   -rrg nnn          g should have nnn real roots\n");
     fprintf (stderr, "   -Bf nnn           sieving bound for f\n");
@@ -828,8 +828,8 @@ main (int argc, char *argv[])
             argv += 2;
             argc -= 2;
         }
-        else if (argc >= 2 && strcmp (argv[1], "-skew") == 0) {
-            skew = 1;
+        else if (argc >= 2 && strcmp (argv[1], "-skewed") == 0) {
+            skewed = 1;
             argv += 1;
             argc -= 1;
         }
@@ -877,7 +877,7 @@ main (int argc, char *argv[])
 
     ASSERT_ALWAYS (bound >= 1);
 
-    if (skew)
+    if (skewed)
       maxtries = get_maxtries (bound, df);
     else {
       /* check modm has no common factor with B, B+1, 2B+1 and 2B to avoid
@@ -948,7 +948,7 @@ main (int argc, char *argv[])
 
     mpz_clear (N);
     mpz_clear (ell);
-    if (skew)
+    if (skewed)
         free (count);
 
     return 0;

@@ -163,7 +163,7 @@ matmul_ptr MATMUL_NAME(init)(abdst_field xx, param_list pl, int optimized_direct
 }
 
 
-void MATMUL_NAME(build_cache)(matmul_ptr mm0, uint32_t * data)
+void MATMUL_NAME(build_cache)(matmul_ptr mm0, uint32_t * data, size_t size MAYBE_UNUSED)
 {
     struct matmul_sliced_data_s * mm = (struct matmul_sliced_data_s *) mm0;
     ASSERT_ALWAYS(data);

@@ -507,7 +507,7 @@ cado_define_test(full_c30
             fastSM=true
             jlpoly=true tasks.polyselect.bound=3 tasks.polyselect.modm=5
             tasks.polyselect.degree=3 tasks.reconstructlog.checkdlp=false
-            lim0=4000 lim1=600 lpb0=12 lpb1=11
+            tasks.lim0=4000 tasks.lim1=600 tasks.lpb0=12 tasks.lpb1=11
             tasks.sieve.mfb0=12
             tasks.sieve.mfb1=22
             tasks.sieve.lambda0=1.1

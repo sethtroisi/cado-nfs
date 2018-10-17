@@ -183,6 +183,7 @@ foreach(gfp_layer ${BWC_GFP_ARITHMETIC_BACKENDS})
             PROGRAM ${CADO_NFS_BINARY_DIR}/linalg/bwc/plingen_pz
             ARGUMENTS
 lingen_threshold=60  m=4 n=2  prime=101538509534246169632617439 --random-input-with-length 20000  --draft 2 logline_threshold=2048
+            TARGET_DEPENDENCIES plingen_pz
         )
     endif()
 

@@ -135,18 +135,25 @@ export OPAL_CADO_SQSIDE="$sqside"
 echo "OPAL_CADO_SQSIDE=${OPAL_CADO_SQSIDE}"
 
 ### Get parameters from params file and set _min and _max
-lim0=`grep "^lim0.*=" $params | cut -d= -f2`
-lim1=`grep "^lim1.*=" $params | cut -d= -f2`
-echo $lim0 $lim1
-if grep -q "qmin.*=" $params ; then
-   qmin=`grep "qmin.*=" $params | cut -d= -f2`
+lim0=`grep "^\(tasks\.\(sieve\.\)\?\)\?lim0.*=" $params | cut -d= -f2`
+lim1=`grep "^\(tasks\.\(sieve\.\)\?\)\?lim1.*=" $params | cut -d= -f2`
+qmin=`grep "^\(tasks\.\(sieve\.\)\?\)\?qmin.*=" $params | cut -d= -f2`
+bkthresh1=`grep "^\(tasks\.\(sieve\.\)\?\)\?bkthresh1.*=" $params | cut -d= -f2`
+lpb0=`grep "^\(tasks\.\(sieve\.\)\?\)\?lpb0.*=" $params | cut -d= -f2`
+lpb1=`grep "^\(tasks\.\(sieve\.\)\?\)\?lpb1.*=" $params | cut -d= -f2`
+mfb0=`grep "^\(tasks\.\(sieve\.\)\?\)\?mfb0.*=" $params | cut -d= -f2`
+mfb1=`grep "^\(tasks\.\(sieve\.\)\?\)\?mfb1.*=" $params | cut -d= -f2`
+ncurves0=`grep "^\(tasks\.\(sieve\.\)\?\)\?ncurves0.*=" $params | cut -d= -f2`
+ncurves1=`grep "^\(tasks\.\(sieve\.\)\?\)\?ncurves1.*=" $params | cut -d= -f2`
+I=`grep "^\(tasks\.\(sieve\.\)\?\)\?I.*=" $params | cut -d= -f2`
+echo lim01 $lim0 $lim1
+if [ "$qmin" ] ; then
    has_qmin=1
 else
    qmin=$lim1
    has_qmin=0
 fi
-if grep -q "bkthresh1.*=" $params ; then
-   bkthresh1=`grep "bkthresh1.*=" $params | cut -d= -f2`
+if [ "$bkthresh1" ] ; then
    has_bkthresh1=1
 else
    # factor base primes larger than bkthresh (default 2^I) are bucket-sieved
@@ -157,28 +164,22 @@ else
    bkthresh1=0
    has_bkthresh1=0
 fi
-lpb0=`grep "^lpb0.*=" $params | cut -d= -f2`
-lpb1=`grep "^lpb1.*=" $params | cut -d= -f2`
-echo $lpb0 $lpb1
-mfb0=`grep "mfb0.*=" $params | cut -d= -f2`
-mfb1=`grep "mfb1.*=" $params | cut -d= -f2`
-echo $mfb0 $mfb1
-if grep -q "ncurves0.*=" $params ; then
-   ncurves0=`grep "ncurves0.*=" $params | cut -d= -f2`
+echo lpb01 $lpb0 $lpb1
+echo mfb01 $mfb0 $mfb1
+if [ "$ncurves0" ] ; then
    has_ncurves0=1
 else
    ncurves0=10
    has_ncurves0=0
 fi
-if grep -q "ncurves1.*=" $params ; then
-   ncurves1=`grep "ncurves1.*=" $params | cut -d= -f2`
+if [ "$ncurves1" ] ; then
    has_ncurves1=1
 else
    ncurves1=10
    has_ncurves1=0
 fi
-I=`grep "I.*=" $params | cut -d= -f2`
-echo $I
+echo ncurves01 $ncurves0 $ncurves1
+echo I $I
 qmin_min=`expr $qmin / 2`
 qmin_max=`expr $qmin \* 2`
 echo $qmin_min $qmin_max
