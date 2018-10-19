@@ -371,11 +371,11 @@ void * prep_prog_gfp(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_
         vec_file = fopen(vec_name, "wb");
         ASSERT_ALWAYS(vec_file != NULL);
         printf("// Creating %s\n", vec_name);
-        cheating_vec_init(A, &vec, mmt->n0[!bw->dir]);
-        A->vec_random(A, vec, mmt->n0[!bw->dir], rstate);
-        rc = fwrite(vec, A->vec_elt_stride(A,1), mmt->n0[!bw->dir], vec_file);
-        ASSERT_ALWAYS(rc >= 0 && ((unsigned int) rc) == mmt->n0[!bw->dir]);
-        cheating_vec_clear(A, &vec, mmt->n0[!bw->dir]);
+        cheating_vec_init(A, &vec, mmt->n0[bw->dir]);
+        A->vec_random(A, vec, mmt->n0[bw->dir], rstate);
+        rc = fwrite(vec, A->vec_elt_stride(A,1), mmt->n0[bw->dir], vec_file);
+        ASSERT_ALWAYS(rc >= 0 && ((unsigned int) rc) == mmt->n0[bw->dir]);
+        cheating_vec_clear(A, &vec, mmt->n0[bw->dir]);
         fclose(vec_file);
         free(vec_name);
     }
