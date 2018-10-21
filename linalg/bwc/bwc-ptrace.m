@@ -513,24 +513,28 @@ for j in [0..n div splitwidth - 1] do
     j0:=j*splitwidth;
     j1:=j0+splitwidth;
     printf "Checking that sols%o-%o yields a solution... ", j0, j1;
-    tzz:=zz;
     if IsZero(images) then
+        /* Begin with raw solutions first, and check for trivial zeros each
+         * time */
+        tzz:=Matrix(solutions[j0+1..j1]);
         for c in [0..10] do
             if nullspace eq "right" and IsZero(Eltseq(tzz*Transpose(Qsmall))[1..nc_orig]) then
-                print " ### WARNING: This choice leads to a zero solution vector because of the padding: MM^%o*v is non-zero only on the padded coordinates";
+                printf " ### WARNING: This choice leads to a zero solution vector because of the padding: MM^%o*v is non-zero only on the padded coordinates", c;
+                assert false;
             end if;
-            if IsZero(tzz[j0+1..j1]) then
+            tzz:=tzz*Transpose(MM);
+            if IsZero(tzz) then
                 printf "(for MM^%o) ", c+1;
                 Append(~MM_nilpotency, c);
                 break;
             end if;
-            tzz:=tzz*Transpose(MM);
         end for;
     else
         /* Then we can't make sense of this nilpotency thing */
+        tzz:=Matrix(zz[j0+1..j1]);
         Append(~MM_nilpotency, 0);
     end if;
-    assert IsZero(tzz[j0+1..j1]);
+    assert IsZero(tzz);
     print " ok";
 end for;
 

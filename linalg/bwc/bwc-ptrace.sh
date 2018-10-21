@@ -204,6 +204,7 @@ create_test_matrix_if_needed() {
         matrix="$basename.matrix.bin"
         rmargs=("${rmargs[@]}" --k$nullspace ${random_matrix_minkernel})
         rmargs=("${rmargs[@]}" -c ${random_matrix_maxcoeff})
+        rmargs=("${rmargs[@]}" -Z)
     else
         # This is an experimental mode. In the DLP context, we have a
         # matrix with N rows, N-r ideal columns, and r Schirokauer maps.   
