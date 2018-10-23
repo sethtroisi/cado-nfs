@@ -204,6 +204,7 @@ create_test_matrix_if_needed() {
         matrix="$basename.matrix.bin"
         rmargs=("${rmargs[@]}" --k$nullspace ${random_matrix_minkernel})
         rmargs=("${rmargs[@]}" -c ${random_matrix_maxcoeff})
+        rmargs=("${rmargs[@]}" -Z)
     else
         # This is an experimental mode. In the DLP context, we have a
         # matrix with N rows, N-r ideal columns, and r Schirokauer maps.   
@@ -372,6 +373,36 @@ fi
 
 set +x
 
+cmd=`dirname $0`/convert_magma.pl
+
+# Required parameters below this point:
+
+# wdir
+# matrix
+# m
+# n
+# prime
+# interval
+# splitwidth
+# cmd (pay attention to dirname $0 above !)
+# rwfile
+# cwfile
+# nullspace
+
+for v in wdir matrix m n prime interval splitwidth cmd rwfile cwfile nullspace ; do
+    a=`eval echo '$'"$v"`
+    if ! [ "$a" ] ; then
+        echo "Missing parameter \$$v" >&2
+    fi
+done
+
+
+# nrows and ncols are also needed, but can be deduced from rwfile and
+# cwfile easily.
+: ${ncols=$((`wc -c < $cwfile` / 4))}
+: ${nrows=$((`wc -c < $rwfile` / 4))}
+
+
 mdir=$wdir
 
 if ! [[ "$mpi,$thr" =~ ^([0-9]*)x([0-9]*),([0-9]*)x([0-9]*)$ ]] ; then
@@ -383,8 +414,6 @@ Nh=$((${BASH_REMATCH[1]}*${BASH_REMATCH[3]}))
 Nv=$((${BASH_REMATCH[2]}*${BASH_REMATCH[4]}))
 
 bfile="`basename $matrix .bin`.${Nh}x${Nv}.bin"
-
-cmd=`dirname $0`/convert_magma.pl
 
 
 # This is for the **unbalanced** matrix !!

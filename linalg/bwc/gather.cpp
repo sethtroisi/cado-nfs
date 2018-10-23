@@ -251,42 +251,82 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
         mmt_vec_clear(mmt, svec);
     } /* }}} */
 
-    mmt_vec_unapply_T(mmt, y);
-    {
-        char * tmp;
-        int rc = asprintf(&tmp, "%s.0", kprefix);
-        ASSERT_ALWAYS(rc >= 0);
-        mmt_vec_save(y, tmp, unpadded);
-        free(tmp);
-    }
-    mmt_vec_apply_T(mmt, y);
-
-    serialize(pi->m);
-    mmt_vec_twist(mmt, y);
-
-    int is_zero = A->vec_is_zero(A,
-            mmt_my_own_subvec(y), mmt_my_own_size_in_items(y));
-    pi_allreduce(NULL, &is_zero, 1, BWC_PI_INT, BWC_PI_MIN, pi->m);
-
-    if (is_zero) {
-        if (tcan_print)
-            fprintf(stderr, "Found zero vector. Most certainly a bug. "
-                    "No solution found.\n");
-        pthread_mutex_lock(pi->m->th->m);
-        exitcode=1;
-        pthread_mutex_unlock(pi->m->th->m);
-        return NULL;
-    }
-    serialize(pi->m);
-
-
     /* Note that for the inhomogeneous case, we'll do the loop only
      * once, since we end with a break. */
-    for(int i = 1 ; i < 10 ; i++) {
+    int winning_iter = 0;
+
+    /* This is used as an out-of-loop check for an exceptional condition.
+     * This is slighly clumsy, I should do it better */
+    int is_zero;
+
+    for(int i = 1 ; nrhs ? (i<=1) : (i < 10) ; i++) {
+
+        mmt_vec_unapply_T(mmt, y);
+        /* Here, we want to make sure that we have something non-zero in
+         * the **input coordinate space**. It matters little to us if we
+         * found a solution of (M||zero-pad) * x = 0 with x having
+         * non-zero coordinates only in the zero-pad part.
+         *
+         * Therefore, the following check is unfortunately not good
+         * enough:
+         
+        int is_zero = A->vec_is_zero(A,
+                mmt_my_own_subvec(y), mmt_my_own_size_in_items(y));
+
+         * instead, we want to check only up to index mmt->n0[bw->dir]
+         * (and bw->dir is y->d). (this is valid because at this point, y
+         * is untwisted and has T unapplied).
+         */
+        size_t my_input_coordinates;
+        size_t my_pad_coordinates;
+        ASSERT_ALWAYS(y->d == bw->dir);
+        size_t my_i0 = y->i0 + mmt_my_own_offset_in_items(y);
+        size_t my_i1 = my_i0 + mmt_my_own_size_in_items(y);
+
+        if (my_i0 >= mmt->n0[bw->dir]) {
+            my_input_coordinates = 0;
+            my_pad_coordinates =  mmt_my_own_size_in_items(y);
+        } else if (my_i1 >= mmt->n0[bw->dir]) {
+            my_input_coordinates = mmt->n0[bw->dir] - my_i0;
+            my_pad_coordinates =  my_i1 - mmt->n0[bw->dir];
+        } else {
+            my_input_coordinates = mmt_my_own_size_in_items(y);
+            my_pad_coordinates = 0;
+        }
+        int input_is_zero = A->vec_is_zero(A,
+                mmt_my_own_subvec(y),
+                my_input_coordinates);
+        int pad_is_zero = A->vec_is_zero(A,
+                A->vec_subvec(A, mmt_my_own_subvec(y), my_input_coordinates),
+                my_pad_coordinates);
+
+        pi_allreduce(NULL, &input_is_zero, 1, BWC_PI_INT, BWC_PI_MIN, pi->m);
+        pi_allreduce(NULL, &pad_is_zero, 1, BWC_PI_INT, BWC_PI_MIN, pi->m);
+
+        if (input_is_zero) {
+            if (tcan_print)
+                fprintf(stderr, "Found zero vector. (coordinates on the padding part are %s zero). Most certainly a bug. "
+                        "No solution found.\n",
+                        pad_is_zero ? "also" : "NOT");
+            serialize(pi->m);
+            pthread_mutex_lock(pi->m->th->m);
+            exitcode=1;
+            pthread_mutex_unlock(pi->m->th->m);
+            return NULL;
+        }
+        {
+            char * tmp;
+            int rc = asprintf(&tmp, "%s.%d", kprefix, i-1);
+            ASSERT_ALWAYS(rc >= 0);
+            mmt_vec_save(y, tmp, unpadded);
+            free(tmp);
+        }
+        mmt_vec_apply_T(mmt, y);
+
+
         serialize(pi->m);
-
+        mmt_vec_twist(mmt, y);
         matmul_top_mul(mmt, ymy, NULL);
-
         mmt_vec_untwist(mmt, y);
 
         /* Add the contributions from the right-hand side vectors, to see
@@ -338,40 +378,36 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
             mmt_vec_clear(mmt, vi);
         }
 
+        /* This "is zero" check is also valid on the padded matrix of
+         * course, so we don't heave the same headache as above */
         is_zero = A->vec_is_zero(A,
                 mmt_my_own_subvec(y), mmt_my_own_size_in_items(y));
         pi_allreduce(NULL, &is_zero, 1, BWC_PI_INT, BWC_PI_MIN, pi->m);
 
-        if (is_zero) {
-            if (tcan_print) {
-                if (nrhs) {
-                    const char * strings[] = {
-                        "V * M^%u + R is zero\n", /* unsupported anyway */
-                        "M^%u * V + R is zero\n",};
-                    printf(strings[bw->dir], i);
-                } else {
-                    const char * strings[] = {
-                    "V * M^%u is zero [K.sols%u-%u.%u contains V * M^%u]!\n",
-                    "M^%u * V is zero [K.sols%u-%u.%u contains M^%u * V]!\n",
-                    };
-                    printf(strings[bw->dir], i, solutions[0], solutions[1], i-1, i-1);
-                }
+        if (tcan_print) {
+            if (nrhs) {
+                const char * strings[] = {
+                    "V * M^%u + R is %s\n", /* unsupported anyway */
+                    "M^%u * V + R is %s\n",};
+                printf(strings[bw->dir], i, is_zero ? "zero" : "NOT zero");
+            } else {
+                const char * strings[] = {
+                    "V * M^%u is %s [K.sols%u-%u.%u contains V * M^%u]!\n",
+                    "M^%u * V is %s [K.sols%u-%u.%u contains M^%u * V]!\n",
+                };
+                printf(strings[bw->dir], i,
+                        is_zero ? "zero" : "NOT zero",
+                        solutions[0], solutions[1], i-1, i-1);
             }
+        }
+        if (is_zero) {
+            winning_iter = i-1;
             break;
         }
-        if (nrhs) break;
-
-        mmt_vec_unapply_T(mmt, y);
-        {
-            char * tmp;
-            int rc = asprintf(&tmp, "%s.%d", kprefix, i);
-            ASSERT_ALWAYS(rc >= 0);
-            mmt_vec_save(y, tmp, unpadded);
-            free(tmp);
-        }
-        mmt_vec_apply_T(mmt, y);
-        mmt_vec_twist(mmt, y);
     }
+
+    /* we exit with an untwisted vector. */
+
     if (!is_zero) {
         int nb_nonzero_coeffs=0;
         for(unsigned int i = 0 ; i < mmt_my_own_size_in_items(y) ; i++) {
@@ -382,7 +418,7 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
         }
         pi_allreduce(NULL, &nb_nonzero_coeffs, 1, BWC_PI_INT, BWC_PI_SUM, pi->m);
         if (tcan_print) {
-            printf("Solution range %u..%u: no solution found [%d non zero coefficients], most probably a bug\n", solutions[0], solutions[1], nb_nonzero_coeffs);
+            printf("Solution range %u..%u: no solution found [%d non zero coefficients in result], most probably a bug\n", solutions[0], solutions[1], nb_nonzero_coeffs);
             if (nb_nonzero_coeffs < bw->n) {
                 printf("There is some likelihood that by combining %d different solutions (each entailing a separate mksol run), a full solution can be recovered. Ask for support.\n", nb_nonzero_coeffs + 1);
             }
@@ -392,11 +428,23 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
         pthread_mutex_unlock(pi->m->th->m);
         return NULL;
     }
+
     if (pi->m->jrank == 0 && pi->m->trank == 0) {   /* leader node only ! */
+        /* About the ASSERT below: The 0-characteristic subspace
+         * nilpotent part is not really a topic of interest in the case
+         * of inhomogenous linear systems.  Exiting the loop with i>1 in
+         * the inhomogenous case is an error, it seems, and I believe
+         * that the solution provided was never really a solution. On the
+         * contrary, the i>1 case in homogenous situations is perfectly
+         * valid, and we're handling it now instead of using
+         * winning_iter==0 always.
+         */
+        ASSERT_ALWAYS(winning_iter == 0 || rhs_name == NULL);
+
         /* We now append the rhs coefficients to the vector we
          * have just saved. Of course only the I/O thread does this. */
         char * tmp;
-        int rc = asprintf(&tmp, "%s.%u", kprefix, 0);
+        int rc = asprintf(&tmp, "%s.%u", kprefix, winning_iter);
         ASSERT_ALWAYS(rc >= 0);
         if (nrhs)
         printf("Expanding %s so as to include the coefficients for the %d RHS columns\n", tmp, nrhs);
@@ -413,7 +461,7 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
 
         /* write an ascii version while we're at it */
         char * tmp2;
-        rc = asprintf(&tmp2, "%s.%u.txt", kprefix, 0);
+        rc = asprintf(&tmp2, "%s.%u.txt", kprefix, winning_iter);
         ASSERT_ALWAYS(rc >= 0);
 
         f = fopen(tmp, "rb");
