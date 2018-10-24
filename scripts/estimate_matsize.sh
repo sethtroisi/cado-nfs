@@ -114,7 +114,9 @@ for i in `seq 0 $((nsides-1))`; do
 done
 
 ## Sampling / faking on each side
+# the [qmin,qmax] range is split into $NCHUNKS sub-ranges
 NCHUNKS=2
+# for each sub-range, we call las with -random-sample $NBSAMPLE
 NBSAMPLE=5
 fakefiles=()
 if [ $nsides == 1 ]; then
