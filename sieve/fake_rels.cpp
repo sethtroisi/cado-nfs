@@ -248,7 +248,7 @@ void read_sample_file(vector<unsigned int> &nrels, vector<fake_rel> &rels,
         int sqside, const char *filename, renumber_t ren_tab, int compsq)
 {
     FILE * file;
-    file = fopen(filename, "r");
+    file = fopen_maybe_compressed(filename, "r");
     ASSERT_ALWAYS (file != NULL);
     uint64_t q = 0;
     vector<uint64_t> facq;

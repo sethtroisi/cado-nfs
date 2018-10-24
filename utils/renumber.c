@@ -202,7 +202,7 @@ print_info (FILE * f, renumber_srcptr r, int after_reading)
   for (unsigned int i = 0; i < r->nb_polys; i++)
     fprintf (f, "%slpb%d = %lu\n", pre, i, r->lpb[i]);
 
-  if (after_reading) /* there is more info to print*/
+  if (after_reading) /* there is more info to print */
   {
     fprintf (f, "%ssize = %" PRIu64 "\n%ssmallest prime not cached = "
              "0x%" PRpr " at index 0x%" PRid "\n", pre, r->size, pre,
@@ -212,6 +212,17 @@ print_info (FILE * f, renumber_srcptr r, int after_reading)
                   "0x%" PRid "\n", pre, i, r->biggest_prime_below_lpb[i],
                   r->index_biggest_prime_below_lpb[i]);
   }
+
+  /* if the size of the renumber table exceeds 2^32, check we have compiled
+     with -D__SIZEOF_INDEX__=8 */
+#if __SIZEOF_INDEX__ != 8
+  if (r->size >> 32)
+    {
+      fprintf (stderr, "Error, for 2^32 ideals or more, please recompile with -D__SIZEOF_INDEX__=8\n");
+      exit (1);
+    }
+#endif
+
   fflush (stdout);
 }
 
