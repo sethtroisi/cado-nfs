@@ -218,8 +218,8 @@ print_info (FILE * f, renumber_srcptr r, int after_reading)
 #if __SIZEOF_INDEX__ != 8
   if (r->size >> 32)
     {
-      fprintf (stderr, "Error, for 2^32 ideals or more, please recompile with -D__SIZEOF_INDEX__=8\n");
-      exit (1);
+      fprintf (stderr, "Error, for 2^32 ideals or more, add -D__SIZEOF_INDEX__=8 to CFLAGS/CXXFLAGS in local.sh\n");
+      abort ();
     }
 #endif
 
@@ -976,6 +976,9 @@ renumber_get_first_index_from_p(renumber_srcptr renumber_info,
                             "%" PRpr " are not in the renumbering table\n"
                             "Maybe p is not prime ?\n", __func__, __FILE__,
                             __LINE__, p);
+#if __SIZEOF_INDEX__ != 8
+            fprintf (stderr, "Note: for >= 2^32 ideals or relations, add -D__SIZEOF_INDEX__=8 to CFLAGS/CXXFLAGS in local.sh\n");
+#endif
             abort();
           }
         }
