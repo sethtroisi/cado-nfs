@@ -40,6 +40,9 @@ using namespace std;
 // A global mutex for I/O
 pthread_mutex_t io_mutex = PTHREAD_MUTEX_INITIALIZER;
 
+// A global variable for the number of relations printed
+unsigned long rels_printed = 0;
+
 // We need a re-entrant random. Let's take GMP.
 static inline uint64_t long_random(gmp_randstate_t buf) {
 #if ULONG_BITS == 64
@@ -350,9 +353,11 @@ void print_fake_rel_manyq(
     char str[MAX_STR];
     char *pstr;
     int len = MAX_STR;
+    unsigned long nrels_thread = 0;
     for (uint64_t ii = 0; ii < nfacq*nq; ii += nfacq) {
         int nr = int((*nrels)[long_random(buf)%nrels->size()]);
 //        fprintf(stdout, "%u, %u\n", list_q[ii], list_q[ii+1]);
+	nrels_thread += nr; /* we will output nr fake relations */
         for (; nr > 0; --nr) {
             pstr = str;
             len = MAX_STR;
@@ -399,6 +404,9 @@ void print_fake_rel_manyq(
             pthread_mutex_unlock(&io_mutex);
         }
     }
+    pthread_mutex_lock(&io_mutex);
+    rels_printed += nrels_thread;
+    pthread_mutex_unlock(&io_mutex);
 #undef MAX_STR
 }
 
@@ -726,6 +734,9 @@ main (int argc, char *argv[])
   uint64_t block2 = (last_indq2 - first_indq2) / (2*mt);
   uint64_t block3 = (last_indq3 - first_indq3) / (3*mt);
 
+  double t0 = seconds ();
+  double wct_t0 = wct_seconds ();
+
   pthread_t * thid = (pthread_t *)malloc(mt*sizeof(pthread_t));
   struct th_args * args = (struct th_args *)malloc(mt*sizeof(struct th_args));
   for (int i = 0; i < mt; ++i) {
@@ -766,6 +777,14 @@ main (int argc, char *argv[])
       pthread_join(thid[i], NULL);
       gmp_randclear(args[i].rstate);
   }
+
+  /* print statistics */
+  t0 = seconds () - t0;
+  printf ("# Output %lu relations in %.2fs cpu (%.0f rels/s)\n",
+	  rels_printed, t0, (double) rels_printed / t0);
+  wct_t0 = wct_seconds () - wct_t0;
+  printf ("# Output %lu relations in %.2fs wct (%.0f rels/s)\n",
+	  rels_printed, wct_t0, (double) rels_printed / wct_t0);
 
   gmp_randclear(global_rstate_non_mt);
   free(thid);
