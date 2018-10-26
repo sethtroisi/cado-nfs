@@ -43,6 +43,7 @@ fi
 : ${allow_compsq=true}
 : ${qfac_min=200}
 : ${qfac_max=100000}
+: ${dlp=true}
 
 ## read poly file on command line
 polyfile=$1
@@ -182,5 +183,10 @@ if (grep "number of rows < number of columns + keep" $wdir/purge.log > /dev/null
 fi
 
 # merge
-$CADO_BUILD/filter/merge-dl -mat $wdir/purged.gz -out $wdir/history.gz \
-    -maxlevel $maxlevel -keep 3 -skip 0 -target_density $target_density
+if [ "$dlp" == "true" ]; then
+   $CADO_BUILD/filter/merge-dl -mat $wdir/purged.gz -out $wdir/history.gz \
+      -maxlevel $maxlevel -keep 3 -skip 0 -target_density $target_density
+else
+   $CADO_BUILD/filter/merge -mat $wdir/purged.gz -out $wdir/history.gz \
+      -maxlevel $maxlevel -keep 3 -skip 0 -target_density $target_density
+fi
