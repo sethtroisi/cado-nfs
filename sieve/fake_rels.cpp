@@ -26,6 +26,7 @@
  *   - lpb on each side
  *   - a range of special-q for a given side
  *   - a sample of relations (output of las) for this range
+ *     NOTE: las should be run with the -v option
  *   - the renumber table.
  * The renumber table is required, because this binary will produce
  * relations as if they were coming out of dup2 (hence renumbered).
