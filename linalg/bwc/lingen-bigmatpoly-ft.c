@@ -453,6 +453,8 @@ double bigmatpoly_mp_caching_adj(abdst_field ab, bigmatpoly c, bigmatpoly a, big
     bigmatpoly_ptr model = a;
     bigmatpoly_ft_ptr ftmodel = (bigmatpoly_ft_ptr) a;
     bigmatpoly_init(ab, c, model, a->m, b->n, MAX(a->size, b->size) - MIN(a->size, b->size) + 1);
+    /* The first grave mistake is here. We should not allocate 3*m*n
+     * transforms locally. We don't need that much. */
     bigmatpoly_ft_init(ab, ta, ftmodel, a->m, a->n, fti);
     bigmatpoly_ft_init(ab, tb, ftmodel, b->m, b->n, fti);
     bigmatpoly_ft_init(ab, tc, ftmodel, a->m, b->n, fti);

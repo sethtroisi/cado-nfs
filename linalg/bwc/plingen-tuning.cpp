@@ -1353,11 +1353,13 @@ void plingen_tune_full(abdst_field ab, unsigned int m, unsigned int n, size_t N,
     printf("# mpi_threshold comm time: %.1f\n", tt_com0);
 
     bool basecase_eliminated = false;
+    size_t suggest_threshold = 0;
 
     ASSERT_ALWAYS(m % (r*batch) == 0);
     ASSERT_ALWAYS(n % (r*batch) == 0);
 
     double tt_total = tt_com0 * 2;
+    size_t peakpeak=0;
 
     for(int i = log2(L) ; i>=0 ; i--) {
         if ((L >> i) <= 2) continue;
@@ -1662,18 +1664,28 @@ void plingen_tune_full(abdst_field ab, unsigned int m, unsigned int n, size_t N,
         /* }}} */
 
         if (!basecase_eliminated) {
-            if (tt_mp_total + tt_mul_total < tt_basecase_total)
-                printf("# suggest lingen_mpi_threshold = %u\n", L>>i);
+            if (tt_mp_total + tt_mul_total < tt_basecase_total) {
+                if (suggest_threshold == 0) {
+                    suggest_threshold = L>>i;
+                    printf("# suggest lingen_mpi_threshold = %u\n", L>>i);
+                }
+            } else {
+                suggest_threshold = 0;
+            }
 
-            if (tt_mp_total + tt_mul_total < tt_basecase_total / 2)
+
+            if (tt_mp_total + tt_mul_total < tt_basecase_total / 32)
                 basecase_eliminated = 1;
             tt_total += std::min(tt_mp_total + tt_mul_total, tt_basecase_total);
         } else {
             tt_total += tt_mp_total + tt_mul_total;
         }
 
-        printf("# Cumulated time so far %.1f [%.1f days], peak RAM = %s\n", tt_total, tt_total / 86400, size_disp(std::max(peak_mp, peak_mul), buf));
+        printf("# Cumulated time so far %.1f [%.1f days], peak RAM = %s, lingen_mpi_threshold=%zu\n", tt_total, tt_total / 86400, size_disp(std::max(peak_mp, peak_mul), buf), suggest_threshold);
+        peakpeak = std::max(peakpeak, std::max(peak_mp, peak_mul));
     }
+
+    printf("(%u,%u,%u,%u,%u,%.1f,%1.f)\n",m,n,r,shrink0,shrink2,tt_total,(double)peakpeak/1024./1024./1024.);
 
     gmp_randclear(rstate);
     mpz_clear(p);
