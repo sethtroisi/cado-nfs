@@ -15,6 +15,9 @@
 #ifdef  HAVE_SIGHUP
 #include <signal.h>
 #endif
+#ifdef  HAVE_OPENMP
+#include <omp.h>
+#endif
 
 #include "portability.h"
 #include "macros.h"
@@ -28,6 +31,7 @@
 #include "plingen-tuning.h"
 
 #include <vector>
+#include <array>
 #include <utility>
 #include <map>
 #include <string>
@@ -41,11 +45,32 @@ void plingen_tuning_decl_usage(param_list_ptr pl)
             "minimum end of bench span window");
     param_list_decl_usage(pl, "catchsig",
             "enable intercepting ^C");
+    param_list_decl_usage(pl, "tuning_N",
+            "For --tune only: target size for the corresponding matrix");
+    param_list_decl_usage(pl, "tuning_T",
+            "For --tune only: target number of threads (if for different platform)");
+    param_list_decl_usage(pl, "tuning_r",
+            "For --tune only: size of the mpi grid (the grid would be r times r)");
+    param_list_decl_usage(pl, "tuning_b",
+            "For --tune only: schedule b times more simultaneous transforms, so that we can have more parallelism. Costs b times more RAM");
+    param_list_decl_usage(pl, "tuning_shrink0",
+            "For --tune only: divide the number of transforms on dimension 0 (m/n for MP, (m+n)/r for MUL) so as to save memory");
+    param_list_decl_usage(pl, "tuning_shrink2",
+            "For --tune only: divide the number of transforms on dimension 2 (m+n)/r for both MP and MUL) so as to save memory");
+    param_list_decl_usage(pl, "tuning_timing_cache_filename",
+            "For --tune only: save (and re-load) timings for individual transforms in this file\n");
 }
 void plingen_tuning_lookup_parameters(param_list_ptr pl)
 {
     param_list_lookup_string(pl, "B");
     param_list_lookup_string(pl, "catchsig");
+    param_list_lookup_string(pl, "tuning_N");
+    param_list_lookup_string(pl, "tuning_T");
+    param_list_lookup_string(pl, "tuning_r");
+    param_list_lookup_string(pl, "tuning_b");
+    param_list_lookup_string(pl, "tuning_shrink0");
+    param_list_lookup_string(pl, "tuning_shrink2");
+    param_list_lookup_string(pl, "tuning_timing_cache_filename");
 }
 
 /* interface to C programs for list of cutoffs we compute *//*{{{*/
@@ -1223,6 +1248,437 @@ void plingen_tune_mp(abdst_field ab, unsigned int m, unsigned int n, cutoff_list
     polymat_cutoff_info_clear(improved);
 }/*}}}*/
 
+const char * timing_cache_filename = NULL;
+typedef std::tuple<size_t, size_t, size_t, size_t> tcache_key;
+typedef std::tuple<double, double, double, double> tcache_value;
+
+std::map<tcache_key, tcache_value> tcache;
+
+void read_tcache()
+{
+    if (timing_cache_filename == NULL) return;
+
+    FILE * f = fopen(timing_cache_filename, "r");
+
+    if (f == NULL && errno == ENOENT) return;
+
+    ASSERT_ALWAYS(f);
+    for(;;) {
+        char line[2048];
+        if (!fgets(line, sizeof(line), f)) break;
+
+        for(char * p = line; *p ; p++)
+            if (*p == ';') *p=' ';
+        std::istringstream is(line);
+        size_t logp;
+        /* for MUL and MP, op1 and op2 are operand lengths. For basecase,
+         * this denotes m and n. Yes, it's ugly.
+         */
+        size_t op1;
+        size_t op2;
+        size_t op3;     /* 0: MUL; 1: MP; above: basecase */
+        double t_dft1;
+        double t_dft2;
+        double t_conv;
+        double t_ift;
+        is >> logp >> op1 >> op2 >> op3;
+        is >> t_dft1  >> t_dft2  >> t_conv  >> t_ift;
+        if (!is) {
+            fprintf(stderr, "parse error in %s\n", timing_cache_filename);
+        }
+        tcache_key K { logp, op1, op2, op3 };
+        tcache[K] = { t_dft1, t_dft2, t_conv, t_ift };
+    }
+    fclose(f);
+}
+
+void write_tcache()
+{
+    if (timing_cache_filename == NULL) return;
+
+    FILE * f = fopen(timing_cache_filename, "w");
+    ASSERT_ALWAYS(f);
+    for(auto const & e : tcache) {
+        size_t logp; size_t op1; size_t op2; size_t op3;
+        double t_dft1; double t_dft2; double t_conv; double t_ift;
+
+        std::tie(logp, op1, op2, op3) = e.first;
+        std::tie(t_dft1, t_dft2, t_conv, t_ift) = e.second;
+
+        std::ostringstream os;
+        os << logp;
+        for(auto x : { op1, op2, op3 }) os << ";" << x;
+        for(auto x : { t_dft1, t_dft2, t_conv, t_ift }) os << ";" << x;
+
+        fprintf(f, "%s\n", os.str().c_str());
+    }
+    fclose(f);
+}
+
+void plingen_tune_full(abdst_field ab, unsigned int m, unsigned int n, size_t N, unsigned int r, unsigned int T, unsigned int batch, unsigned int shrink0, unsigned int shrink2)/*{{{*/
+{
+    cutoff_list cl = NULL;
+
+    gmp_randstate_t rstate;
+    gmp_randinit_default(rstate);
+    gmp_randseed_ui(rstate, 1);
+    mpz_t p;
+    mpz_init(p);
+    abfield_characteristic(ab, p);
+
+    /* Assume we output something like one gigabyte per second. This is
+     * rather conservative for HPC networks */
+    double mpi_xput = 1e9;
+
+    printf("Measuring lingen data for N=%zu m=%u n=%u for a %zu-bit prime p, using a %u*%u grid of %u-thread nodes, with %u-fold batching\n",
+            N, m, n, mpz_sizeinbase(p, 2), r, r, T, batch);
+
+    unsigned int L = N/n + N/m;
+
+#ifdef HAVE_OPENMP
+    int omp_T = omp_get_max_threads();
+    printf("Note: basecase measurements are done using openmp as it is configured for the running code, that is, with %d threads\n", omp_T);
+#endif
+    extern void test_basecase(abdst_field ab, unsigned int m, unsigned int n, size_t L, gmp_randstate_t rstate);
+
+    char buf[20];
+
+    size_t S = abvec_elt_stride(ab, 1);
+    size_t data0 = m*(m+n)*(r*r-1);
+    data0 = data0 * L * S;
+    data0 = data0 / (r*r);
+    printf("# mpi_threshold comm: %s\n",
+            size_disp(2*data0, buf));
+    double tt_com0 = data0 / mpi_xput;
+    printf("# mpi_threshold comm time: %.1f\n", tt_com0);
+
+    bool basecase_eliminated = false;
+
+    ASSERT_ALWAYS(m % (r*batch) == 0);
+    ASSERT_ALWAYS(n % (r*batch) == 0);
+
+    double tt_total = tt_com0 * 2;
+
+    for(int i = log2(L) ; i>=0 ; i--) {
+        if ((L >> i) <= 2) continue;
+
+        printf("Measuring time at depth %d\n", i);
+
+        int nacc = m+n;
+
+        double tt_basecase_total = 0;
+        double tt_mp_total = 0;
+        double tt_mul_total = 0;
+        size_t peak_mp = 0;
+        size_t peak_mul = 0;
+
+        if (!basecase_eliminated) {/*{{{*/
+            double tt;
+            tcache_key K { mpz_sizeinbase(p, 2), m, n, L >> i };
+            if (tcache.find(K) != tcache.end()) {
+                tt = std::get<0>(tcache[K]);
+            } else {
+                tt = wct_seconds();
+                test_basecase(ab, m, n, L >> i, rstate);
+                tt = wct_seconds() - tt;
+                tcache[K] = std::make_tuple(tt, 0., 0., 0.);
+            }
+
+            printf("# total basecase time, if threshold=%u: %.1f\n", L >> i, tt * (1 << i));
+            tt_basecase_total = tt * (1 << i);
+        }/*}}}*/
+
+        /* {{{ Middle product first */
+        {
+            const char * step = "MP";
+
+            struct fft_transform_info fti_mp[1];
+            double tt_mp_dft1, tt_mp_dft2, tt_mp_conv, tt_mp_ift;
+
+            unsigned int ER_length = (L>>i) / 2;
+            unsigned int pi_length = m * (L>>i) / (m+n) / 2;
+            unsigned int EL_length = ER_length + pi_length - 1;
+
+            matpoly xER, xEL, xpiL;
+            matpoly_init(ab, xEL, 1, 1, EL_length);
+            matpoly_init(ab, xpiL, 1, 1, pi_length);
+            matpoly_init(ab, xER, 1, 1, ER_length);
+            matpoly_fill_random(ab, xEL, EL_length, rstate);
+            matpoly_fill_random(ab, xpiL, pi_length, rstate);
+            unsigned int adj = cl ? cutoff_list_get(cl, (L>>i)) : UINT_MAX;
+            struct fft_transform_info * fti = fti_mp;
+            double & tt_dft1 = tt_mp_dft1;
+            double & tt_dft2 = tt_mp_dft2;
+            double & tt_conv = tt_mp_conv;
+            double & tt_ift = tt_mp_ift;
+            matpoly_ptr a = xEL;
+            matpoly_ptr b = xpiL;
+            matpoly_ptr c = xER;
+            fft_get_transform_info_fppol_mp(fti, p, MIN(a->size, b->size), MAX(a->size, b->size), nacc);
+
+            size_t fft_alloc_sizes[3];
+            fft_get_transform_allocs(fft_alloc_sizes, fti);
+
+            if (adj != UINT_MAX) fft_transform_info_adjust_depth(fti, adj);
+            matpoly_ft tc, ta, tb;
+
+            matpoly_clear(ab, c);
+            matpoly_init(ab, c, a->m, b->n, MAX(a->size, b->size) - MIN(a->size, b->size) + 1);
+
+            tcache_key K { mpz_sizeinbase(p, 2), a->size, b->size, 1 };
+            if (tcache.find(K) != tcache.end()) {
+                std::tie(tt_dft1, tt_dft2, tt_conv, tt_ift) = tcache[K];
+            } else {
+
+                matpoly_ft_init(ab, ta, a->m, a->n, fti);
+                matpoly_ft_init(ab, tb, b->m, b->n, fti);
+                matpoly_ft_init(ab, tc, a->m, b->n, fti);
+
+                double tt = 0;
+
+                tt = -wct_seconds();
+                matpoly_ft_dft(ab, ta, a, fti, 0);
+                tt_dft1 = wct_seconds() + tt;
+
+                tt = -wct_seconds();
+                matpoly_ft_dft(ab, tb, b, fti, 0);
+                tt_dft2 = wct_seconds() + tt;
+
+                tt = -wct_seconds();
+                matpoly_ft_mul(ab, tc, ta, tb, fti, 0);
+                tt_conv = wct_seconds() + tt;
+
+                tt = -wct_seconds();
+                c->size = MAX(a->size, b->size) - MIN(a->size, b->size) + 1;
+                ASSERT_ALWAYS(c->size <= c->alloc);
+                matpoly_ft_ift_mp(ab, c, tc, MIN(a->size, b->size) - 1, fti, 0);
+                tt_ift = wct_seconds() + tt;
+
+                matpoly_ft_clear(ab, ta, fti);
+                matpoly_ft_clear(ab, tb, fti);
+                matpoly_ft_clear(ab, tc,  fti);
+
+                tcache[K] = std::tie(tt_dft1, tt_dft2, tt_conv, tt_ift);
+            }
+
+
+            unsigned int n0 = m;
+            unsigned int n1 = m + n;
+            unsigned int n2 = m + n;
+
+            printf(";%d;%u;%s;%zu;%zu;%s;%.2f;%.2f;%.2f;%.2f\n",
+                    i,
+                    (L>>i), step, a->size, b->size, 
+                    size_disp(fft_alloc_sizes[0], buf),
+                    tt_dft1, tt_dft2, tt_conv, tt_ift);
+
+            double T_dft1 = (n0/r)*(n1/r)*tt_dft1;
+            double T_dft2 = (n1/r)*(n2/r)*tt_dft2;
+            double T_ift = (n0/r)*(n2/r)*tt_ift;
+            double T_conv = (n1/r)*r*(n0/r)*(n2/r)*tt_conv;
+
+            T_dft1 = T_dft1 * (1 << i);
+            T_dft2 = T_dft2 * (1 << i);
+            T_conv = T_conv * (1 << i);
+            T_ift = T_ift * (1 << i);
+
+            printf("# total %s 1-threaded time on %u nodes:"
+                    " %.1f + %.1f + %.1f + %.1f = %.1f\n",
+                    step, r*r,
+                    T_dft1, T_dft2, T_conv, T_ift,
+                    T_dft1 + T_dft2 + T_conv + T_ift);
+
+            T_dft1 = iceildiv(n0*batch/r,T)*(n1/r/batch)*tt_dft1;
+            T_dft2 = (n1/r/batch)*shrink2*iceildiv(n2/shrink2*batch/r,T)*tt_dft2;
+            T_ift = shrink2*iceildiv((n0/r)*(n2/r/shrink2),T)*tt_ift;
+            T_conv = (n1/r)*r*shrink2*iceildiv((n0/r)*(n2/r/shrink2),T)*tt_conv;
+
+            T_dft1 = T_dft1 * (1 << i);
+            T_dft2 = T_dft2 * (1 << i);
+            T_conv = T_conv * (1 << i);
+            T_ift = T_ift * (1 << i);
+
+            printf("# total %s %u-threaded time on %u nodes:"
+                    " %.1f + %.1f + %.1f + %.1f = %.1f\n",
+                    step, T, r*r,
+                    T_dft1, T_dft2, T_conv, T_ift,
+                    T_dft1 + T_dft2 + T_conv + T_ift);
+
+            size_t peak = fft_alloc_sizes[0] * (batch*(r*n0/r/shrink0+r*n2/r/shrink2) + (n0/r/shrink0)*(n2/r/shrink2));
+            size_t comm = fft_alloc_sizes[0] * (n0+n2) * (n1/r) << i;
+            double T_comm = comm / mpi_xput;
+
+            printf("# %s peak memory %s\n", step, size_disp(peak, buf));
+            printf("# %s comm per node %s\n", step, size_disp(comm, buf));
+            printf("# %s comm time %.1f\n", step, T_comm);
+
+            matpoly_clear(ab, a);
+            matpoly_clear(ab, b);
+            matpoly_clear(ab, c);
+
+            tt_mp_total = T_dft1 + T_dft2 + T_conv + T_ift + T_comm;
+            peak_mp = peak;
+        }
+        /* }}} */
+
+        /* {{{ Then the plain product */
+        {
+            const char * step = "MUL";
+
+            struct fft_transform_info fti_mul[1];
+            double tt_mul_dft1, tt_mul_dft2, tt_mul_conv, tt_mul_ift;
+
+            unsigned int piL_length = m * (L>>i) / (m+n) / 2;
+            unsigned int piR_length = m * (L>>i) / (m+n) / 2;
+            unsigned int pi_length = m * (L>>i) / (m+n);
+
+            matpoly xpiL, xpiR, xpi;
+
+            /* make all of these 1*1 matrices, just for timing purposes */
+            matpoly_init(ab, xpiL, 1, 1, piL_length);
+            matpoly_init(ab, xpiR, 1, 1, piR_length);
+            matpoly_init(ab, xpi, 1, 1, pi_length);
+            matpoly_fill_random(ab, xpiL, piL_length, rstate);
+            matpoly_fill_random(ab, xpiR, piR_length, rstate);
+
+            unsigned int adj = cl ? cutoff_list_get(cl, (L>>i)) : UINT_MAX;
+
+            struct fft_transform_info * fti = fti_mul;
+            double & tt_dft1 = tt_mul_dft1;
+            double & tt_dft2 = tt_mul_dft2;
+            double & tt_conv = tt_mul_conv;
+            double & tt_ift = tt_mul_ift;
+
+            matpoly_ptr a = xpiL;
+            matpoly_ptr b = xpiR;
+            matpoly_ptr c = xpi;
+
+            size_t csize = a->size + b->size; csize -= (csize > 0);
+
+            fft_get_transform_info_fppol(fti, p, a->size, b->size, nacc);
+
+            size_t fft_alloc_sizes[3];
+            fft_get_transform_allocs(fft_alloc_sizes, fti);
+
+            if (adj != UINT_MAX) fft_transform_info_adjust_depth(fti, adj);
+            matpoly_ft tc, ta, tb;
+
+            matpoly_clear(ab, c);
+            matpoly_init(ab, c, a->m, b->n, csize);
+
+            tcache_key K { mpz_sizeinbase(p, 2), a->size, b->size, 0 };
+
+            if (tcache.find(K) != tcache.end()) {
+                std::tie(tt_dft1, tt_dft2, tt_conv, tt_ift) = tcache[K];
+            } else {
+                matpoly_ft_init(ab, ta, a->m, a->n, fti);
+                matpoly_ft_init(ab, tb, b->m, b->n, fti);
+                matpoly_ft_init(ab, tc, a->m, b->n, fti);
+
+                double tt = 0;
+
+                tt = -wct_seconds();
+                matpoly_ft_dft(ab, ta, a, fti, 0);
+                tt_dft1 = wct_seconds() + tt;
+
+                tt = -wct_seconds();
+                matpoly_ft_dft(ab, tb, b, fti, 0);
+                tt_dft2 = wct_seconds() + tt;
+
+                tt = -wct_seconds();
+                matpoly_ft_mul(ab, tc, ta, tb, fti, 0);
+                tt_conv = wct_seconds() + tt;
+
+                tt = -wct_seconds();
+                c->size = csize;
+                ASSERT_ALWAYS(c->size <= c->alloc);
+                matpoly_ft_ift(ab, c, tc, fti, 0);
+                tt_ift = wct_seconds() + tt;
+
+                matpoly_ft_clear(ab, ta, fti);
+                matpoly_ft_clear(ab, tb, fti);
+                matpoly_ft_clear(ab, tc,  fti);
+
+                tcache[K] = std::tie(tt_dft1, tt_dft2, tt_conv, tt_ift);
+            }
+
+            unsigned int n0 = m + n;
+            unsigned int n1 = m + n;
+            unsigned int n2 = m + n;
+
+            printf(";%d;%u;%s;%zu;%zu;%s;%.2f;%.2f;%.2f;%.2f\n",
+                    i,
+                    (L>>i), step, a->size, b->size, 
+                    size_disp(fft_alloc_sizes[0], buf),
+                    tt_dft1, tt_dft2, tt_conv, tt_ift);
+
+            double T_dft1 = (n0/r)*(n1/r)*tt_dft1;
+            double T_dft2 = (n1/r)*(n2/r)*tt_dft2;
+            double T_ift = (n0/r)*(n2/r)*tt_ift;
+            double T_conv = (n1/r)*r*(n0/r)*(n2/r)*tt_conv;
+
+            T_dft1 = T_dft1 * (1 << i);
+            T_dft2 = T_dft2 * (1 << i);
+            T_conv = T_conv * (1 << i);
+            T_ift = T_ift * (1 << i);
+
+            printf("# %s 1-threaded time on %u nodes:"
+                    " %.1f + %.1f + %.1f + %.1f = %.1f\n",
+                    step, r*r,
+                    T_dft1, T_dft2, T_conv, T_ift,
+                    T_dft1 + T_dft2 + T_conv + T_ift);
+
+            T_dft1 = iceildiv(n0*batch/r,T)*(n1/r/batch)*tt_dft1;
+            T_dft2 = (n1/r/batch)*shrink2*iceildiv(n2/shrink2*batch/r,T)*tt_dft2;
+            T_ift = shrink2*iceildiv((n0/r)*(n2/r/shrink2),T)*tt_ift;
+            T_conv = (n1/r)*r*shrink2*iceildiv((n0/r)*(n2/r/shrink2),T)*tt_conv;
+
+            T_dft1 = T_dft1 * (1 << i);
+            T_dft2 = T_dft2 * (1 << i);
+            T_conv = T_conv * (1 << i);
+            T_ift = T_ift * (1 << i);
+
+            printf("# %s %u-threaded time on %u nodes:"
+                    " %.1f + %.1f + %.1f + %.1f = %.1f\n",
+                    step, T, r*r,
+                    T_dft1, T_dft2, T_conv, T_ift,
+                    T_dft1 + T_dft2 + T_conv + T_ift);
+
+            size_t peak = fft_alloc_sizes[0] * (batch*(r*n0/r/shrink0+r*n2/r/shrink2) + (n0/r/shrink0)*(n2/r/shrink2));
+            size_t comm = fft_alloc_sizes[0] * (n0+n2) * (n1/r) << i;
+            double T_comm = comm / mpi_xput;
+
+            printf("# %s peak memory %s\n", step, size_disp(peak, buf));
+            printf("# %s comm per node %s\n", step, size_disp(comm, buf));
+            printf("# %s comm time %.1f\n", step, T_comm);
+
+            matpoly_clear(ab, a);
+            matpoly_clear(ab, b);
+            matpoly_clear(ab, c);
+
+            tt_mul_total = T_dft1 + T_dft2 + T_conv + T_ift + T_comm;
+            peak_mul = peak;
+        }
+        /* }}} */
+
+        if (!basecase_eliminated) {
+            if (tt_mp_total + tt_mul_total < tt_basecase_total)
+                printf("# suggest lingen_mpi_threshold = %u\n", L>>i);
+
+            if (tt_mp_total + tt_mul_total < tt_basecase_total / 2)
+                basecase_eliminated = 1;
+            tt_total += std::min(tt_mp_total + tt_mul_total, tt_basecase_total);
+        } else {
+            tt_total += tt_mp_total + tt_mul_total;
+        }
+
+        printf("# Cumulated time so far %.1f [%.1f days], peak RAM = %s\n", tt_total, tt_total / 86400, size_disp(std::max(peak_mp, peak_mul), buf));
+    }
+
+    gmp_randclear(rstate);
+    mpz_clear(p);
+}/*}}}*/
+
 #if 0
 /* 20150826: bigpolymat deleted */
 void plingen_tune_bigmul(abdst_field ab, unsigned int m, unsigned int n, unsigned int m1, unsigned int n1, MPI_Comm comm)/*{{{*/
@@ -1332,8 +1788,28 @@ void plingen_tuning(abdst_field ab, unsigned int m, unsigned int n, MPI_Comm com
 #endif
     }
 
+    unsigned int N = 37000000;
+    unsigned int T = 4;
+    unsigned int b = 1;
+    unsigned int r = 1;
+    unsigned int shrink0 = 1;
+    unsigned int shrink2 = 1;
+    param_list_parse_uint(pl, "tuning_N", &N);
+    param_list_parse_uint(pl, "tuning_T", &T);
+    param_list_parse_uint(pl, "tuning_r", &r);
+    param_list_parse_uint(pl, "tuning_b", &b);
+    param_list_parse_uint(pl, "tuning_shrink0", &shrink0);
+    param_list_parse_uint(pl, "tuning_shrink2", &shrink2);
+    timing_cache_filename = param_list_lookup_string(pl, "tuning_timing_cache_filename");
+
+    read_tcache();
+    plingen_tune_full(ab, m, n, N, r, T, b, shrink0, shrink2);
+    write_tcache();
+
     /* XXX BUG: with depth adjustment==0 early on, we get check failures.
      * Must investigate */
+
+#if 0
 
     cutoff_list cl_mp = NULL;
     // plingen_tune_mp_fti_depth(ab, m, n, &cl_mp);
@@ -1342,6 +1818,7 @@ void plingen_tuning(abdst_field ab, unsigned int m, unsigned int n, MPI_Comm com
     cutoff_list cl_mul = NULL;
     // plingen_tune_mul_fti_depth(ab, m, n, &cl_mul);
     plingen_tune_mul(ab, m, n, cl_mul);
+#endif
 
 #if 0
     /* This should normally be reasonably quick, and running it every

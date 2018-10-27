@@ -1440,6 +1440,11 @@ void matmul_top_comm_bench(matmul_top_data_ptr mmt, int d)
          * picol->ncores, too.
          *
          * Note that vrow->i1 - vrow->i0 is #rows / picol->totalsize
+         *
+         * Note also that picol->ncores * #rows / picol->totalsize =
+         * #rows / picol->njobs, so that the final thing we compute is
+         * really:
+         *      #rows / mmt->pi->m->njobs * (pirow->njobs - 1)
          */
         size_t data_out_ra = abase->vec_elt_stride(abase,
                 picol->ncores * (mmt->n[!d] / picol->totalsize) /
@@ -1450,6 +1455,10 @@ void matmul_top_comm_bench(matmul_top_data_ptr mmt, int d)
          * the calculation is similar, and we'll use it as a guide. Note
          * of course that if hardware-level multicast is used, our
          * throughput estimation is way off.
+         *
+         * as above, this is really:
+         *      #cols / mmt->pi->m->njobs * (picol->njobs - 1)
+         *
          */
         size_t data_out_ag = abase->vec_elt_stride(abase,
                 pirow->ncores * (mmt->n[d] / pirow->totalsize) /
