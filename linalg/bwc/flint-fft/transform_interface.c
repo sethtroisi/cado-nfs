@@ -604,6 +604,11 @@ void fft_get_transform_info_fppol(struct fft_transform_info * fti, mpz_srcptr p,
  * <= nmax. */
 void fft_get_transform_info_fppol_mp(struct fft_transform_info * fti, mpz_srcptr p, mp_size_t nmin, mp_size_t nmax, unsigned int nacc)
 {
+    if (nmin > nmax) {
+        fft_get_transform_info_fppol_mp(fti, p, nmax, nmin, nacc);
+        return;
+    }
+
     /* The maximum number of summands is nmin */
     mp_bitcnt_t cbits = 2 * mpz_sizeinbase(p, 2) + FLINT_CLOG2(nacc * nmin);
     /* See above */
