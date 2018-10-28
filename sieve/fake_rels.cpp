@@ -349,7 +349,7 @@ void print_fake_rel_manyq(
         indexrange *Ind, int dl,
         gmp_randstate_t buf)
 {
-    index_t frel[MAXFACTORS];
+    index_t frel[2*MAXFACTORS];
 #define MAX_STR 256  // string containing a printable relation.
     char str[MAX_STR];
     char *pstr;
@@ -379,9 +379,9 @@ void print_fake_rel_manyq(
                 int np = (*rels)[i].nb_ind[side];
                 for (int j = 0; j < np; ++j) {
                     index_t ind = Ind[side].random_index((*rels)[i].ind[side][j], buf);
+                    ASSERT(nf < 2*MAXFACTORS);
                     frel[nf] = ind;
                     nf++;
-                    ASSERT(nf < MAXFACTORS);
                 }
             }
             qsort(frel, nf, sizeof(index_t), index_cmp);
