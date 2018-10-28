@@ -350,17 +350,19 @@ void print_fake_rel_manyq(
         gmp_randstate_t buf)
 {
     index_t frel[2*MAXFACTORS];
+#define BUF_SIZE 100 // buffer containing several relations
 #define MAX_STR 256  // string containing a printable relation.
-    char str[MAX_STR];
+    char str[BUF_SIZE*MAX_STR];
     char *pstr;
     int len = MAX_STR;
+    int size = 0; // number of relations in buffer
     unsigned long nrels_thread = 0;
+    pstr = str; // initialize buffer
     for (uint64_t ii = 0; ii < nfacq*nq; ii += nfacq) {
         int nr = int((*nrels)[long_random(buf)%nrels->size()]);
 //        fprintf(stdout, "%u, %u\n", list_q[ii], list_q[ii+1]);
 	nrels_thread += nr; /* we will output nr fake relations */
         for (; nr > 0; --nr) {
-            pstr = str;
             len = MAX_STR;
             // pick fake a,b
             int nc = snprintf(pstr, len, "%ld,%lu:",
@@ -399,16 +401,26 @@ void print_fake_rel_manyq(
 
             }
             snprintf(pstr, len, "\n");
-            // Get the mutex and print
-            pthread_mutex_lock(&io_mutex);
-            printf("%s", str);
-            pthread_mutex_unlock(&io_mutex);
+	    pstr++;
+	    size++;
+	    if (size == BUF_SIZE)
+	      {
+		// Get the mutex and print
+		pthread_mutex_lock(&io_mutex);
+		printf("%s", str);
+		pthread_mutex_unlock(&io_mutex);
+		pstr = str;
+		size = 0;
+	      }
         }
     }
     pthread_mutex_lock(&io_mutex);
+    if (size > 0) // print leftover relations if any
+      printf("%s", str);
     rels_printed += nrels_thread;
     pthread_mutex_unlock(&io_mutex);
 #undef MAX_STR
+#undef BUF_SIZE
 }
 
 struct th_args {
