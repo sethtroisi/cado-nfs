@@ -188,5 +188,5 @@ if [ "$dlp" == "true" ]; then
       -maxlevel $maxlevel -keep 3 -skip 0 -target_density $target_density
 else
    $CADO_BUILD/filter/merge -mat $wdir/purged.gz -out $wdir/history.gz \
-      -maxlevel $maxlevel -keep 3 -skip 0 -target_density $target_density
+      -maxlevel $maxlevel -keep 3 -skip 32 -target_density $target_density
 fi
