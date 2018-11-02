@@ -44,6 +44,7 @@ fi
 : ${qfac_min=200}
 : ${qfac_max=100000}
 : ${dlp=true}
+: ${shrink_factor=1}
 
 ## read poly file on command line
 polyfile=$1
@@ -157,6 +158,7 @@ for i in `seq 0 $((nsides-1))`; do
         cmd="$CADO_BUILD/sieve/fake_rels -poly $polyfile -lpb0 $lpb0 -lpb1 $lpb1 \
           -q0 $q0 -q1 $q1 -sqside $side $compsq_fake \
           -sample $wdir/sample.side${side}.${q0}-${q1} \
+          -shrink-factor $shrink_factor \
           -renumber $renumberfile"
         echo $cmd
         $cmd > $wdir/fakerels.side${side}.${q0}-${q1}
@@ -168,7 +170,7 @@ echo "We have $nrels fake relations"
 
 ## Filtering
 # take a huge upper bound for the number of primes...
-nprimes=`echo "2*2^$lpb0/l(2^$lpb0) + 2*2^$lpb1/l(2^$lpb1)" | bc -l | cut -d "." -f 1`
+nprimes=`echo "(2*2^$lpb0/l(2^$lpb0) + 2*2^$lpb1/l(2^$lpb1))/$shrink_factor" | bc -l | cut -d "." -f 1`
 
 # purge
 $CADO_BUILD/filter/purge -out $wdir/purged.gz -nrels $nrels -keep 3 \
