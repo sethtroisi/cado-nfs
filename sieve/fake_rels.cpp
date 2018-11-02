@@ -345,9 +345,12 @@ void reduce_mod_2(index_t *frel, int *nf) {
 
 void shrink_indices(index_t *frel, int nf, int shrink_factor) {
     // Indices below this threshold are not shrinked
-    const index_t noshrink_threshold = 1024;
+    // FIXME: I am not sure we should keep the heavy weight columns
+    // un-shrinked. The answer might be different in DL and in facto...
+    const index_t noshrink_threshold = 0;
     for (int i = 0; i < nf; ++i) {
-        if (frel[i] >= noshrink_threshold) {
+//        if (frel[i] >= noshrink_threshold) {
+        if (1) {
             frel[i] = noshrink_threshold +
                 (frel[i] - noshrink_threshold) / shrink_factor;
         }
@@ -414,6 +417,9 @@ void print_fake_rel_manyq(
             }
             if (shrink_factor > 1) {
                 shrink_indices(frel, nf, shrink_factor);
+                if (!dl) {
+                    reduce_mod_2(frel, &nf);
+                }
             }
             for (int i = 0; i < nf; ++i) {
                 nc = snprintf(pstr, len, "%" PRid, frel[i]);
