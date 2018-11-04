@@ -286,6 +286,11 @@ for i in [1..256] do
     end if;
 end for;
 
+time for i in [1..32] do
+    Yblock cat:= Rows(Yi);
+    Yi:=Yi*Transpose(MM);
+    printf ".";
+end for;
 
 
 */

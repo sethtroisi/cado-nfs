@@ -303,22 +303,36 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
         pi_allreduce(NULL, &input_is_zero, 1, BWC_PI_INT, BWC_PI_MIN, pi->m);
         pi_allreduce(NULL, &pad_is_zero, 1, BWC_PI_INT, BWC_PI_MIN, pi->m);
 
+        {
+            char * tmp;
+            int rc = asprintf(&tmp, "%s%s.%d", input_is_zero ? "zero" : "",
+                    kprefix, i-1);
+            ASSERT_ALWAYS(rc >= 0);
+            mmt_vec_save(y, tmp, unpadded);
         if (input_is_zero) {
             if (tcan_print)
-                fprintf(stderr, "Found zero vector. (coordinates on the padding part are %s zero). Most certainly a bug. "
-                        "No solution found.\n",
+                fprintf(stderr,
+                        "Using %sM^%u%s as input: Found zero vector."
+                        " (coordinates on the padding part are %s zero)."
+                        "\n"
+                        "No solution found."
+                        " Most certainly a bug."
+                        "\n",
+                        bw->dir ? "" : "V * ",
+                        i-1,
+                        bw->dir ? " * V" : "",
                         pad_is_zero ? "also" : "NOT");
+            if (tcan_print && !pad_is_zero)
+                fprintf(stderr,
+                        "For reference, this useless vector (non-zero out, zero in) is stored in %s."
+                        "\n",
+                        tmp);
             serialize(pi->m);
             pthread_mutex_lock(pi->m->th->m);
             exitcode=1;
             pthread_mutex_unlock(pi->m->th->m);
             return NULL;
         }
-        {
-            char * tmp;
-            int rc = asprintf(&tmp, "%s.%d", kprefix, i-1);
-            ASSERT_ALWAYS(rc >= 0);
-            mmt_vec_save(y, tmp, unpadded);
             free(tmp);
         }
         mmt_vec_apply_T(mmt, y);
