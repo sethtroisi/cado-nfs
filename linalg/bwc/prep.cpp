@@ -60,9 +60,9 @@ void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUS
     unsigned int A_multiplex = bw->n / A_width;
     mpfq_vbase_oo_field_init_byfeatures(A, 
             MPFQ_PRIME_MPZ, bw->p,
-            MPFQ_GROUPSIZE, A_width,
+            MPFQ_SIMD_GROUPSIZE, A_width,
             MPFQ_DONE);
-    ASSERT_ALWAYS(A->groupsize(A) * A_multiplex == (unsigned int) bw->n);
+    ASSERT_ALWAYS(A->simd_groupsize(A) * A_multiplex == (unsigned int) bw->n);
 
     matmul_top_init(mmt, A, pi, pl, bw->dir);
 
@@ -219,7 +219,7 @@ void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUS
         /* the kernel() call is not reentrant */
         if (pi->m->trank == 0) {
             dimk = kernel((mp_limb_t *) xymats, NULL,
-                    bw->m, prep_lookahead_iterations * A->groupsize(A) * A_multiplex,
+                    bw->m, prep_lookahead_iterations * A->simd_groupsize(A) * A_multiplex,
                     A->vec_elt_stride(A, prep_lookahead_iterations * A_multiplex)/sizeof(mp_limb_t),
                     0);
         }
@@ -287,7 +287,7 @@ void * prep_prog_gfp(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_
     mpfq_vbase A;
     mpfq_vbase_oo_field_init_byfeatures(A, 
             MPFQ_PRIME_MPZ, bw->p,
-            MPFQ_GROUPSIZE, splitwidth,
+            MPFQ_SIMD_GROUPSIZE, splitwidth,
             MPFQ_DONE);
 
     matmul_top_init(mmt, A, pi, pl, bw->dir);
@@ -387,7 +387,7 @@ void * prep_prog_gfp(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_
 
     {
         /* initialize x -- make it completely deterministic. */
-        unsigned int my_nx = 1;
+        unsigned int my_nx = 4;
         uint32_t * xvecs = (uint32_t*) malloc(my_nx * bw->m * sizeof(uint32_t));
         /* with rhs, consider the strategy where the matrix is kept with
          * its full size, but the SM block is replaced with zeros. Here

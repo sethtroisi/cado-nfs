@@ -2213,7 +2213,7 @@ void mmt_vec_set_x_indices(mmt_vec_ptr y, uint32_t * gxvecs, int m, unsigned int
                      * first, then add.
                      */
                     A->set_zero(A, dummy);
-                    A->set_ui_at(A, dummy, j, 1);
+                    A->simd_set_ui_at(A, dummy, j, 1);
                     A->add(A,
                             A->vec_coeff_ptr(A, y->v, i - y->i0), 
                             A->vec_coeff_ptr(A, y->v, i - y->i0),

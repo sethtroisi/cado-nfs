@@ -23,8 +23,8 @@ void mmt_vec_set_0n(mmt_vec_ptr v, size_t items)
      * thing: IOW, we have set_ui_at, but no set_ui. So let's do a
      * dirty cast */
     // ASSERT_ALWAYS((size_t) v->abase->vec_elt_stride(v->abase, 1) <= sizeof(uint64_t));
-    ASSERT_ALWAYS(v->abase->vec_elt_stride(v->abase, 1) % sizeof(uint64_t) == 0);
-    // size_t nwords = (size_t) v->abase->vec_elt_stride(v->abase, 1) / sizeof(uint64_t);
+    ASSERT_ALWAYS(v->abase->elt_stride(v->abase) % sizeof(uint64_t) == 0);
+    // size_t nwords = (size_t) v->abase->elt_stride(v->abase) / sizeof(uint64_t);
     size_t off = mmt_my_own_offset_in_items(v);
     size_t sz = mmt_my_own_size_in_items(v);
     void * data = mmt_my_own_subvec(v);
@@ -131,7 +131,7 @@ void * tst_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
     mpfq_vbase A;
     mpfq_vbase_oo_field_init_byfeatures(A, 
             MPFQ_PRIME_MPZ, bw->p,
-            MPFQ_GROUPSIZE, nchecks,
+            MPFQ_SIMD_GROUPSIZE, nchecks,
             MPFQ_DONE);
 
     gmp_randinit_default(rstate);

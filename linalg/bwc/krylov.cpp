@@ -37,7 +37,7 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
     mpfq_vbase A;
     mpfq_vbase_oo_field_init_byfeatures(A, 
             MPFQ_PRIME_MPZ, bw->p,
-            MPFQ_GROUPSIZE, ys[1]-ys[0],
+            MPFQ_SIMD_GROUPSIZE, ys[1]-ys[0],
             MPFQ_DONE);
 
     /* Hmmm. This would deserve better thought. Surely we don't need 64
@@ -48,7 +48,7 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
     mpfq_vbase Ac;
     mpfq_vbase_oo_field_init_byfeatures(Ac,
             MPFQ_PRIME_MPZ, bw->p,
-            MPFQ_GROUPSIZE, nchecks,
+            MPFQ_SIMD_GROUPSIZE, nchecks,
             MPFQ_DONE);
 
     pi_datatype_ptr Ac_pi = pi_alloc_mpfq_datatype(pi, Ac);
