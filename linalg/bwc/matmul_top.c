@@ -2195,8 +2195,6 @@ void mmt_vec_set_x_indices(mmt_vec_ptr y, uint32_t * gxvecs, int m, unsigned int
     int shared = !y->siblings;
     mpfq_vbase_ptr A = y->abase;
     mmt_full_vec_set_zero(y);
-    void * dummy;
-    cheating_vec_init(A, &dummy, 1);
     if (!shared || y->pi->wr[y->d]->trank == 0) {
         for(int j = 0 ; j < m ; j++) {
             for(unsigned int k = 0 ; k < nx ; k++) {
@@ -2205,24 +2203,12 @@ void mmt_vec_set_x_indices(mmt_vec_ptr y, uint32_t * gxvecs, int m, unsigned int
                 if (i < y->i0 || i >= y->i1)
                     continue;
                 {
-                    /* We're not doing to do set_ui_at unconditionally,
-                     * because then we would be doing rubbish in presence
-                     * of duplicate coordinates -- which can happen.
-                     *
-                     * So set_ui_at on something which we know is zero
-                     * first, then add.
-                     */
-                    A->set_zero(A, dummy);
-                    A->simd_set_ui_at(A, dummy, j, 1);
-                    A->add(A,
-                            A->vec_coeff_ptr(A, y->v, i - y->i0), 
-                            A->vec_coeff_ptr(A, y->v, i - y->i0),
-                            dummy);
+                    void * x = A->vec_coeff_ptr(A, y->v, i - y->i0);
+                    A->simd_add_ui_at(A, x, x, j, 1);
                 }
             }
         }
     }
-    cheating_vec_clear(A, &dummy, 1);
     y->consistency=2;
     if (shared)
         serialize_threads(y->pi->wr[y->d]);
