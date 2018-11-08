@@ -1287,7 +1287,7 @@ void read_tcache()
             fprintf(stderr, "parse error in %s\n", timing_cache_filename);
         }
         tcache_key K { logp, op1, op2, op3 };
-        tcache[K] = { t_dft1, t_dft2, t_conv, t_ift };
+        tcache[K] = std::make_tuple(t_dft1, t_dft2, t_conv, t_ift);
     }
     fclose(f);
 }
