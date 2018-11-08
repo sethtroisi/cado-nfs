@@ -1857,7 +1857,7 @@ void mpfq_p_9_simd_set_ui_at(mpfq_p_9_dst_field K MAYBE_UNUSED, mpfq_p_9_dst_elt
 static inline
 void mpfq_p_9_simd_add_ui_at(mpfq_p_9_dst_field K MAYBE_UNUSED, mpfq_p_9_dst_elt p, mpfq_p_9_src_elt p0, int k MAYBE_UNUSED, unsigned long v)
 {
-    mpfq_p_9_add(K,p,p0,v);
+    mpfq_p_9_add_ui(K,p,p0,v);
 }
 
 /* *simd_gfp::code_for_simd_set_ui_all */

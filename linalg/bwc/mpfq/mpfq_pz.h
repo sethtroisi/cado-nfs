@@ -1101,7 +1101,7 @@ void mpfq_pz_simd_set_ui_at(mpfq_pz_dst_field K MAYBE_UNUSED, mpfq_pz_dst_elt p,
 static inline
 void mpfq_pz_simd_add_ui_at(mpfq_pz_dst_field K MAYBE_UNUSED, mpfq_pz_dst_elt p, mpfq_pz_src_elt p0, int k MAYBE_UNUSED, unsigned long v)
 {
-    mpfq_pz_add(K,p,p0,v);
+    mpfq_pz_add_ui(K,p,p0,v);
 }
 
 /* *simd_pz::code_for_simd_set_ui_all */

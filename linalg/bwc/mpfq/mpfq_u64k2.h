@@ -769,7 +769,7 @@ void mpfq_u64k2_simd_set_ui_at(mpfq_u64k2_dst_field K MAYBE_UNUSED, mpfq_u64k2_d
 static inline
 void mpfq_u64k2_simd_add_ui_at(mpfq_u64k2_dst_field K MAYBE_UNUSED, mpfq_u64k2_dst_elt p, mpfq_u64k2_src_elt p0, int k, unsigned long v)
 {
-        mpfq_u64k2_set(k, p, p0);
+        mpfq_u64k2_set(K, p, p0);
         assert(k < mpfq_u64k2_simd_groupsize(K));
         uint64_t * xp = (uint64_t *) p;
         uint64_t mask = ((uint64_t)1) << (k%64);
