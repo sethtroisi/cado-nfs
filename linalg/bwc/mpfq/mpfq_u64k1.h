@@ -740,7 +740,7 @@ int mpfq_u64k1_simd_find_first_set(mpfq_u64k1_dst_field K MAYBE_UNUSED, mpfq_u64
                 return f + 4 + tab[xp[c] >> 4];
             }
 #endif
-            assert(false);
+            abort();
         }
         return -1;
 }
