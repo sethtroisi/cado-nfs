@@ -109,6 +109,11 @@ end if;
 // Mx:=Cr*M*Transpose(Cc);
 Mx:=M;
 
+Mp:=Matrix(GF(p),Matrix(M_orig));
+assert Mp eq Submatrix(M,1,1,Nrows(Mp),Ncols(Mp));
+assert Mp eq Submatrix(Mx,1,1,Nrows(Mp),Ncols(Mp));
+
+
 assert Mx[2] eq (Sr*Mx)[2^(sr^-1)];
 assert Transpose(Mx)[2] eq (Sc*Transpose(Mx))[2^(sc^-1)];
 
@@ -269,6 +274,10 @@ for i in [1..64] do
         time d:=Rank(Matrix(xblock));
         print #xblock, d, #xblock-d;
     end if;
+end for;
+for i in [1..64] do
+    xblock cat:= Rows(Xi);
+    Xi:=Xi*MM;
 end for;
 
 
