@@ -334,6 +334,14 @@ void mmt_own_vec_set(mmt_vec_ptr w, mmt_vec_ptr v)
     mmt_own_vec_set2(v, w, v);
     w->consistency = 1;
 }
+void mmt_vec_swap(mmt_vec_ptr w, mmt_vec_ptr v)
+{
+    mmt_vec foo;
+    memcpy(foo,v,sizeof(mmt_vec));
+    memcpy(v,w,sizeof(mmt_vec));
+    memcpy(w,foo,sizeof(mmt_vec));
+}
+
 void mmt_full_vec_set(mmt_vec_ptr w, mmt_vec_ptr v)
 {
     ASSERT_ALWAYS(v != NULL);

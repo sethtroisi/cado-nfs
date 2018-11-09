@@ -171,6 +171,7 @@ extern void mmt_vec_init(matmul_top_data_ptr mmt, mpfq_vbase_ptr abase, pi_datat
 extern void mmt_vec_clear(matmul_top_data_ptr mmt, mmt_vec_ptr v);
 extern void mmt_own_vec_set(mmt_vec_ptr w, mmt_vec_ptr v);
 extern void mmt_own_vec_set2(mmt_vec_ptr z, mmt_vec_ptr w, mmt_vec_ptr v);
+extern void mmt_vec_swap(mmt_vec_ptr w, mmt_vec_ptr v);
 extern void mmt_full_vec_set(mmt_vec_ptr w, mmt_vec_ptr v);
 extern void mmt_full_vec_set_zero(mmt_vec_ptr v);
 extern void mmt_vec_set_basis_vector_at(mmt_vec_ptr v, int k, unsigned int j);

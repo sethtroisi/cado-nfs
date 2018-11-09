@@ -7,6 +7,7 @@
 #include <dirent.h>
 #include <errno.h>
 #include <vector>
+#include <array>
 #include <set>
 #include <map>
 #include <tuple>
@@ -364,320 +365,6 @@ struct abase_proxy {
     }
 };
 
-class parasite_fixer {/*{{{*/
-    matmul_top_data_ptr mmt;
-    mpfq_vbase_ptr A;
-    parallelizing_info_ptr pi;
-
-    typedef std::map<std::pair<unsigned int, unsigned int>, cxx_mpz> pre_matrix_t;
-
-    public:
-    bool attempt_to_fix;
-
-    std::vector<unsigned int> cols;
-    std::vector<unsigned int> rows;
-    void * matrix;
-
-    parasite_fixer(matmul_top_data_ptr mmt) : mmt(mmt), A(mmt->abase), pi(mmt->pi) {/*{{{*/
-        matrix = NULL;
-
-        int tcan_print = bw->can_print && pi->m->trank == 0;
-
-        cols = get_possibly_wrong_columns(mmt);
-
-        attempt_to_fix = !cols.empty() && cols.size() < 64;
-
-        if (!cols.empty() && tcan_print) {
-            printf("# %zu possibly wrong coordinates detected"
-                    " in solution vector because the matrix"
-                    " has a non-trivial nilpotent space.\n",
-                    cols.size());
-            if (attempt_to_fix) {
-                printf("# Will try to fix\n");
-            } else {
-                printf("# Deliberately avoiding attempt to fix because"
-                        " this number of vectors is large."
-                        " It is rather an indication that something is wrong."
-                        " Proceeding anyway\n");
-            }
-        }
-        compute_matrix();
-    }/*}}}*/
-
-    parasite_fixer(parasite_fixer const&) = delete;
-
-    /*{{{ row_coordinates_of_nonzero_cols(matmul_top_data_ptr mmt) */
-    std::vector<unsigned int> row_coordinates_of_nonzero_cols(matmul_top_data_ptr mmt, std::vector<unsigned int> const& cols)
-    {
-        int tcan_print = bw->can_print && pi->m->trank == 0;
-
-        mpfq_vbase_ptr A = mmt->abase;
-
-        mmt_vec ymy[2];
-        mmt_vec_ptr y = ymy[0];
-        mmt_vec_ptr my = ymy[1];
-
-        mmt_vec_init(mmt,0,0, y,   bw->dir, /* shared ! */ 1, mmt->n[bw->dir]);
-        mmt_vec_init(mmt,0,0, my, !bw->dir,                0, mmt->n[!bw->dir]);
-
-        /* Now try to see which indices are potentially affected */
-        unsigned int B = A->simd_groupsize(A);
-        for(unsigned int jjq = 0 ; jjq < cols.size() ; jjq+=B) {
-            mmt_full_vec_set_zero(y);
-            for(unsigned int jjr = 0 ; jjr < B && (jjq + jjr < cols.size()) ; jjr++) {
-                unsigned int j = cols[jjq + jjr];
-                mmt_vec_add_basis_vector_at(y, jjr, j);
-            }
-            mmt_vec_apply_T(mmt, y);
-            mmt_vec_twist(mmt, y);
-            matmul_top_mul(mmt, ymy, NULL);
-            mmt_vec_untwist(mmt, y);
-            /* Not entirely clear to me if I should unapply_T here or not
-            */
-            mmt_apply_identity(my, y);
-            mmt_vec_allreduce(my);
-            mmt_vec_unapply_T(mmt, my);
-            serialize(pi->m);
-
-            /* This reads the global list */
-            std::vector<unsigned int> kk = indices_of_nonzero_values(my, mmt->n0[!bw->dir]);
-
-            if (tcan_print) {
-                printf("# List of the %zu non-zero coordinates attached to input coordinate(s)", kk.size());
-                for(unsigned int jjr = 0 ; jjr < B && (jjq + jjr < cols.size()) ; jjr++) {
-                    unsigned int j = cols[jjq + jjr];
-                    printf(" %u", j);
-                }
-                printf("\n");
-                for(auto k : kk)
-                    printf("#\t%u\n", k);
-            }
-            rows.insert(rows.end(), kk.begin(), kk.end());
-            serialize(pi->m);
-        }
-        std::sort(rows.begin(), rows.end());
-        std::unique(rows.begin(), rows.end());
-        mmt_vec_clear(mmt, y);
-        mmt_vec_clear(mmt, my);
-
-        return rows;
-    }/*}}}*/
-
-    /* this one could live outside the class */
-    void pre_matrix_to_matrix(pre_matrix_t /* const */ & pre_matrix)/*{{{*/
-    {
-        /* we should have a const arg, but an error in the mpfq api
-         * prevents this.
-         */
-        if (pi->wr[!bw->dir]->jrank == 0 && pi->wr[!bw->dir]->trank == 0) {
-            unsigned int kk = 0;
-            for(unsigned int ii = 0 ; ii < rows.size() ; ii++) {
-                unsigned int i = rows[ii];
-                for(unsigned int jj = 0 ; jj < cols.size() ; jj++) {
-                    unsigned int j = cols[jj];
-                    auto it = pre_matrix.find(std::make_pair(i,j));
-                    if (it != pre_matrix.end()) {
-                        /* FIXME: Api error in mpfq. */
-                        A->set_mpz(A, A->vec_coeff_ptr(A, matrix, kk), (mpz_ptr) it->second);
-                    }
-                    kk++;
-                }
-            }
-        }
-
-        pi_allreduce(NULL, matrix,
-                rows.size() * cols.size(),
-                mmt->pitype, BWC_PI_SUM, pi->m);
-    }/*}}}*/
-
-    void debug_print_local_matrix(void * nz = NULL)/*{{{*/
-    {
-        printf("# Dump of the full matrix%s as seen by J%uT%u\n",
-                nz ? " (with coefficients of the vector encountered)" : "",
-                pi->m->jrank, pi->m->trank);
-        unsigned int kk = 0;
-        unsigned int cblocks = iceildiv(cols.size(), A->simd_groupsize(A));
-        for(unsigned int ii = 0 ; ii < rows.size() ; ii++) {
-            printf("#\t");
-            for(unsigned int jj = 0 ; jj < cblocks ; jj++) {
-                printf(" ");
-                fprint_signed(stdout, A, A->vec_coeff_ptr(A, matrix, kk));
-                kk++;
-            }
-            if (nz) {
-                printf(" ");
-                fprint_signed(stdout, A, A->vec_coeff_ptr(A, nz, ii));
-            }
-            printf("\n");
-        }
-    }/*}}}*/
-
-    void debug_print_all_local_matrices(void * nz = NULL)/*{{{*/
-    {
-        for(unsigned int jr = 0 ; jr < pi->m->njobs ; jr++) {
-            for(unsigned int tr = 0 ; tr < pi->m->ncores ; tr++) {
-                if (pi->m->jrank == jr && pi->m->trank == tr)
-                    debug_print_local_matrix(nz);
-                serialize(pi->m);
-            }
-        }
-    }/*}}}*/
-
-    void compute_matrix() {/*{{{*/
-        if (!attempt_to_fix) return;
-
-        int tcan_print = bw->can_print && pi->m->trank == 0;
-        int leader = pi->m->jrank == 0 && pi->m->trank == 0;
-
-        rows = row_coordinates_of_nonzero_cols(mmt, cols);
-
-        if (tcan_print) {
-            printf("# Candidate solutions will be checked for accordance with a matrix of dimension %zu*%zu\n", rows.size(), cols.size());
-        }
-
-        mpfq_vbase_ptr A = mmt->abase;
-
-        unsigned int cblocks = iceildiv(cols.size(), A->simd_groupsize(A));
-
-        cheating_vec_init(A, &matrix, cblocks * rows.size());
-        A->vec_set_zero(A, matrix, cblocks * rows.size());
-
-        /* code is similar to row_coordinates_of_nonzero_cols() */
-        mmt_vec ymy[2];
-        mmt_vec_ptr y = ymy[0];
-        mmt_vec_ptr my = ymy[1];
-
-        mmt_vec_init(mmt,0,0, y,   bw->dir, /* shared ! */ 1, mmt->n[bw->dir]);
-        mmt_vec_init(mmt,0,0, my, !bw->dir,                0, mmt->n[!bw->dir]);
-
-        /* Now try to see which indices are potentially affected */
-        unsigned int B = A->simd_groupsize(A);
-        for(unsigned int jjq = 0 ; jjq < cols.size() ; jjq+=A->simd_groupsize(A)) {
-            mmt_full_vec_set_zero(y);
-            for(unsigned int jjr = 0 ; jjr < B && (jjq + jjr < cols.size()) ; jjr++) {
-                unsigned int j = cols[jjq + jjr];
-                mmt_vec_add_basis_vector_at(y, jjr, j);
-            }
-            mmt_vec_apply_T(mmt, y);
-            mmt_vec_twist(mmt, y);
-            matmul_top_mul(mmt, ymy, NULL);
-            mmt_vec_untwist(mmt, y);
-            /* Not entirely clear to me if I should unapply_T here or not
-            */
-            mmt_apply_identity(my, y);
-            mmt_vec_allreduce(my);
-            mmt_vec_unapply_T(mmt, my);
-            serialize(pi->m);
-
-            compress_vector_to_sparse(matrix, jjq, cblocks, my, rows);
-
-            serialize(pi->m);
-        }
-        mmt_vec_clear(mmt, y);
-        mmt_vec_clear(mmt, my);
-
-        pi_allreduce(NULL, matrix,
-                rows.size() * cblocks,
-                mmt->pitype, BWC_PI_SUM, pi->m);
-
-        if (leader) debug_print_local_matrix();
-
-        serialize(pi->m);
-    }/*}}}*/
-
-    ~parasite_fixer() {/*{{{*/
-        if (matrix) cheating_vec_clear(A, &matrix, rows.size() * cols.size());
-    }/*}}}*/
-
-    bool attempt(mmt_vec_ptr my, mmt_vec_ptr y)/*{{{*/
-    {
-        int tcan_print = bw->can_print && pi->m->trank == 0;
-        int leader = pi->m->jrank == 0 && pi->m->trank == 0;
-
-        std::vector<unsigned int> nz_pos;
-
-        /* Need to get the indices with respect to !bw->dir...  */
-        mmt_apply_identity(my, y);
-        mmt_vec_allreduce(my);
-        mmt_vec_unapply_T(mmt, my);
-        serialize(pi->m);
-
-        nz_pos = indices_of_nonzero_values(my, mmt->n0[!bw->dir]);
-
-        if (!std::includes(rows.begin(), rows.end(), nz_pos.begin(), nz_pos.end())) return false;
-
-        if (tcan_print)
-            printf("# Note: all the non-zero coordinates are included in the output of the \"possibly wrong\" columns, which is a good sign\n");
-
-        void * nz;
-
-        cheating_vec_init(A, &nz, rows.size());
-
-        ASSERT_ALWAYS(my->abase == mmt->abase);
-
-        compress_vector_to_sparse(nz, 0, 1, my, rows);
-
-        // debug_print_all_local_matrices(nz);
-
-        if (leader) debug_print_local_matrix(nz);
-
-        cheating_vec_clear(A, &nz, rows.size());
-
-        /* TODO: change that to a "return true" once we've done the fix
-         * for good.
-         */
-        return false;
-    }/*}}}*/
-};/*}}}*/
-
-std::tuple<int, int> check_zero_and_padding(mmt_vec_ptr y, unsigned int maxidx)/*{{{*/
-{
-
-    /* Here, we want to make sure that we have something non-zero in
-     * the **input coordinate space**. It matters little to us if we
-     * found a solution of (M||zero-pad) * x = 0 with x having
-     * non-zero coordinates only in the zero-pad part.
-     *
-     * Therefore, the following check is unfortunately not good
-     * enough:
-
-     int is_zero = A->vec_is_zero(A,
-     mmt_my_own_subvec(y), mmt_my_own_size_in_items(y));
-
-     * instead, we want to check only up to index mmt->n0[bw->dir]
-     * (and bw->dir is y->d). (this is valid because at this point, y
-     * is untwisted and has T unapplied).
-     */
-    size_t my_input_coordinates;
-    size_t my_pad_coordinates;
-    ASSERT_ALWAYS(y->d == bw->dir);
-    size_t my_i0 = y->i0 + mmt_my_own_offset_in_items(y);
-    size_t my_i1 = my_i0 + mmt_my_own_size_in_items(y);
-
-    if (my_i0 >= maxidx) {
-        my_input_coordinates = 0;
-        my_pad_coordinates =  mmt_my_own_size_in_items(y);
-    } else if (my_i1 >= maxidx) {
-        my_input_coordinates = maxidx - my_i0;
-        my_pad_coordinates =  my_i1 - maxidx;
-    } else {
-        my_input_coordinates = mmt_my_own_size_in_items(y);
-        my_pad_coordinates = 0;
-    }
-    int input_is_zero = y->abase->vec_is_zero(y->abase,
-            mmt_my_own_subvec(y),
-            my_input_coordinates);
-    int pad_is_zero = y->abase->vec_is_zero(y->abase,
-            y->abase->vec_subvec(y->abase,
-                mmt_my_own_subvec(y), my_input_coordinates),
-            my_pad_coordinates);
-
-    pi_allreduce(NULL, &input_is_zero, 1, BWC_PI_INT, BWC_PI_MIN, y->pi->m);
-    pi_allreduce(NULL, &pad_is_zero, 1, BWC_PI_INT, BWC_PI_MIN, y->pi->m);
-
-    return std::make_tuple(input_is_zero, pad_is_zero);
-}/*}}}*/
-
 struct rhs /*{{{*/ {
     matmul_top_data_ptr mmt;
     mpfq_vbase_ptr A;
@@ -766,7 +453,7 @@ struct rhs /*{{{*/ {
     }/*}}}*/
     operator bool() const { return nrhs; }
 
-    void add_contribution(mmt_vec_ptr y)/*{{{*/
+    void add_contribution(mmt_vec_ptr y) const/*{{{*/
     {
         if (!nrhs) return;
 
@@ -810,7 +497,55 @@ struct rhs /*{{{*/ {
 };
 /*}}}*/
 
-std::tuple<int, int, int> test_one_vector(matmul_top_data_ptr mmt, mmt_vec * ymy, rhs & R)
+std::tuple<int, int> check_zero_and_padding(mmt_vec_ptr y, unsigned int maxidx)/*{{{*/
+{
+
+    /* Here, we want to make sure that we have something non-zero in
+     * the **input coordinate space**. It matters little to us if we
+     * found a solution of (M||zero-pad) * x = 0 with x having
+     * non-zero coordinates only in the zero-pad part.
+     *
+     * Therefore, the following check is unfortunately not good
+     * enough:
+
+     int is_zero = A->vec_is_zero(A,
+     mmt_my_own_subvec(y), mmt_my_own_size_in_items(y));
+
+     * instead, we want to check only up to index mmt->n0[bw->dir]
+     * (and bw->dir is y->d). (this is valid because at this point, y
+     * is untwisted and has T unapplied).
+     */
+    size_t my_input_coordinates;
+    size_t my_pad_coordinates;
+    ASSERT_ALWAYS(y->d == bw->dir);
+    size_t my_i0 = y->i0 + mmt_my_own_offset_in_items(y);
+    size_t my_i1 = my_i0 + mmt_my_own_size_in_items(y);
+
+    if (my_i0 >= maxidx) {
+        my_input_coordinates = 0;
+        my_pad_coordinates =  mmt_my_own_size_in_items(y);
+    } else if (my_i1 >= maxidx) {
+        my_input_coordinates = maxidx - my_i0;
+        my_pad_coordinates =  my_i1 - maxidx;
+    } else {
+        my_input_coordinates = mmt_my_own_size_in_items(y);
+        my_pad_coordinates = 0;
+    }
+    int input_is_zero = y->abase->vec_is_zero(y->abase,
+            mmt_my_own_subvec(y),
+            my_input_coordinates);
+    int pad_is_zero = y->abase->vec_is_zero(y->abase,
+            y->abase->vec_subvec(y->abase,
+                mmt_my_own_subvec(y), my_input_coordinates),
+            my_pad_coordinates);
+
+    pi_allreduce(NULL, &input_is_zero, 1, BWC_PI_INT, BWC_PI_MIN, y->pi->m);
+    pi_allreduce(NULL, &pad_is_zero, 1, BWC_PI_INT, BWC_PI_MIN, y->pi->m);
+
+    return std::make_tuple(input_is_zero, pad_is_zero);
+}/*}}}*/
+
+std::tuple<int, int, int> test_one_vector(matmul_top_data_ptr mmt, mmt_vec * ymy, rhs const & R)
 {
     mpfq_vbase_ptr A = mmt->abase;
     parallelizing_info_ptr pi = mmt->pi;
@@ -844,6 +579,472 @@ std::tuple<int, int, int> test_one_vector(matmul_top_data_ptr mmt, mmt_vec * ymy
     return std::make_tuple(input_is_zero, pad_is_zero, hamming_out);
 }
 
+std::tuple<int, int, int> expanded_test(matmul_top_data_ptr mmt, mmt_vec ymy[2], mmt_vec_ptr y_saved, rhs const& R)
+{
+    parallelizing_info_ptr pi = mmt->pi;
+    mmt_vec_ptr y = ymy[0];
+    mmt_vec_ptr my = ymy[1];
+    mmt_full_vec_set(y, y_saved);
+    auto res = test_one_vector(mmt, ymy, R);
+    /* Need to get the indices with respect to !bw->dir...  */
+    mmt_apply_identity(my, y);
+    mmt_vec_allreduce(my);
+    mmt_vec_unapply_T(mmt, my);
+    serialize(pi->m);
+    return res;
+}
+
+class parasite_fixer {/*{{{*/
+    matmul_top_data_ptr mmt;
+    mpfq_vbase_ptr A;
+    parallelizing_info_ptr pi;
+
+    // typedef std::map<std::pair<unsigned int, unsigned int>, cxx_mpz> pre_matrix_t;
+
+    void * matrix;
+    public:
+    bool attempt_to_fix;
+
+    std::vector<unsigned int> cols;
+    std::vector<unsigned int> rows;
+    size_t nrows() const { return rows.size(); }
+    std::vector<std::pair<std::array<unsigned int, 2>, int> > pivot_list;
+
+    parasite_fixer(matmul_top_data_ptr mmt) : mmt(mmt), A(mmt->abase), pi(mmt->pi) {/*{{{*/
+        matrix = NULL;
+        int tcan_print = bw->can_print && pi->m->trank == 0;
+
+        cols = get_possibly_wrong_columns(mmt);
+
+        attempt_to_fix = !cols.empty() && cols.size() < 64;
+
+        if (!cols.empty() && tcan_print) {
+            printf("# %zu possibly wrong coordinates detected"
+                    " in solution vector because the matrix"
+                    " has a non-trivial nilpotent space.\n",
+                    cols.size());
+            if (attempt_to_fix) {
+                printf("# Will try to fix\n");
+            } else {
+                printf("# Deliberately avoiding attempt to fix because"
+                        " this number of vectors is large."
+                        " It is rather an indication that something is wrong."
+                        " Proceeding anyway\n");
+            }
+        }
+        compute_pivot_list();
+    }/*}}}*/
+
+    parasite_fixer(parasite_fixer const&) = delete;
+
+    /*{{{ row_coordinates_of_nonzero_cols(matmul_top_data_ptr mmt) */
+    std::vector<unsigned int> row_coordinates_of_nonzero_cols(matmul_top_data_ptr mmt, std::vector<unsigned int> const& cols)
+    {
+        // int tcan_print = bw->can_print && pi->m->trank == 0;
+
+        mpfq_vbase_ptr A = mmt->abase;
+
+        mmt_vec ymy[2];
+        mmt_vec_ptr y = ymy[0];
+        mmt_vec_ptr my = ymy[1];
+
+        mmt_vec_init(mmt,0,0, y,   bw->dir, /* shared ! */ 1, mmt->n[bw->dir]);
+        mmt_vec_init(mmt,0,0, my, !bw->dir,                0, mmt->n[!bw->dir]);
+
+        /* Now try to see which indices are potentially affected */
+        unsigned int B = A->simd_groupsize(A);
+        for(unsigned int jjq = 0 ; jjq < cols.size() ; jjq+=B) {
+            mmt_full_vec_set_zero(y);
+            for(unsigned int jjr = 0 ; jjr < B && (jjq + jjr < cols.size()) ; jjr++) {
+                unsigned int j = cols[jjq + jjr];
+                mmt_vec_add_basis_vector_at(y, jjr, j);
+            }
+            mmt_vec_apply_T(mmt, y);
+            mmt_vec_twist(mmt, y);
+            matmul_top_mul(mmt, ymy, NULL);
+            mmt_vec_untwist(mmt, y);
+            /* Not entirely clear to me if I should unapply_T here or not
+            */
+            mmt_apply_identity(my, y);
+            mmt_vec_allreduce(my);
+            mmt_vec_unapply_T(mmt, my);
+            serialize(pi->m);
+
+            /* This reads the global list */
+            std::vector<unsigned int> kk = indices_of_nonzero_values(my, mmt->n0[!bw->dir]);
+
+#if 0
+            if (tcan_print) {
+                printf("# List of the %zu non-zero coordinates attached to input coordinate(s)", kk.size());
+                for(unsigned int jjr = 0 ; jjr < B && (jjq + jjr < cols.size()) ; jjr++) {
+                    unsigned int j = cols[jjq + jjr];
+                    printf(" %u", j);
+                }
+                printf("\n");
+                for(auto k : kk)
+                    printf("#\t%u\n", k);
+            }
+#endif
+            rows.insert(rows.end(), kk.begin(), kk.end());
+            serialize(pi->m);
+        }
+        std::sort(rows.begin(), rows.end());
+        auto it = std::unique(rows.begin(), rows.end());
+        rows.resize(it - rows.begin());
+        mmt_vec_clear(mmt, y);
+        mmt_vec_clear(mmt, my);
+
+        return rows;
+    }/*}}}*/
+
+#if 0
+    /* this one could live outside the class */
+    void pre_matrix_to_matrix(pre_matrix_t & pre_matrix)/*{{{*/
+    {
+        if (pi->wr[!bw->dir]->jrank == 0 && pi->wr[!bw->dir]->trank == 0) {
+            unsigned int kk = 0;
+            for(unsigned int ii = 0 ; ii < rows.size() ; ii++) {
+                unsigned int i = rows[ii];
+                for(unsigned int jj = 0 ; jj < cols.size() ; jj++) {
+                    unsigned int j = cols[jj];
+                    auto it = pre_matrix.find(std::make_pair(i,j));
+                    if (it != pre_matrix.end()) {
+                        A->set_mpz(A, A->vec_coeff_ptr(A, matrix, kk), (mpz_srcptr) it->second);
+                    }
+                    kk++;
+                }
+            }
+        }
+
+        pi_allreduce(NULL, matrix,
+                rows.size() * cols.size(),
+                mmt->pitype, BWC_PI_SUM, pi->m);
+    }/*}}}*/
+#endif
+
+    void debug_print_local_matrix(void * matrix,
+            std::vector<unsigned int> const & rows,
+            std::vector<unsigned int> const & cols,
+            void * nz = NULL)/*{{{*/
+    {
+        size_t nr = rows.size();
+        size_t nc = cols.size();
+        printf("# Dump of the full matrix%s as seen by J%uT%u\n",
+                nz ? " (with coefficients of the vector encountered)" : "",
+                pi->m->jrank, pi->m->trank);
+        unsigned int kk = 0;
+        unsigned int B = A->simd_groupsize(A);
+        unsigned int cblocks = iceildiv(nc, B);
+        printf("#\t\t");
+        for(unsigned int jj = 0 ; jj < nc ; jj++) {
+            printf("[%u] ", cols[jj]);
+        }
+        printf("\n");
+        for(unsigned int ii = 0 ; ii < nr ; ii++) {
+            printf("#\t%u\t", rows[ii]);
+            for(unsigned int jj = 0 ; jj < cblocks ; jj++) {
+                printf(" ");
+                fprint_signed(stdout, A, A->vec_coeff_ptr(A, matrix, kk));
+                kk++;
+            }
+            if (nz) {
+                printf(" ");
+                fprint_signed(stdout, A, A->vec_coeff_ptr(A, nz, ii));
+            }
+            printf("\n");
+        }
+    }/*}}}*/
+
+#if 0
+    void debug_print_all_local_matrices(void * nz = NULL)/*{{{*/
+    {
+        for(unsigned int jr = 0 ; jr < pi->m->njobs ; jr++) {
+            for(unsigned int tr = 0 ; tr < pi->m->ncores ; tr++) {
+                if (pi->m->jrank == jr && pi->m->trank == tr)
+                    debug_print_local_matrix(rows.size(), cols.size(), nz);
+                serialize(pi->m);
+            }
+        }
+    }/*}}}*/
+#endif
+
+    void compute_pivot_list() {/*{{{*/
+        if (!attempt_to_fix) return;
+
+        int tcan_print = bw->can_print && pi->m->trank == 0;
+        int leader = pi->m->jrank == 0 && pi->m->trank == 0;
+
+        rows = row_coordinates_of_nonzero_cols(mmt, cols);
+
+        mpfq_vbase_ptr A = mmt->abase;
+        void * dummy;
+        A->vec_init(A, &dummy, 1);
+
+        int char2 = mpz_cmp_ui(bw->p, 2) == 0;
+
+        /* code is similar to row_coordinates_of_nonzero_cols() */
+        mmt_vec ymy[2];
+        mmt_vec_ptr y = ymy[0];
+        mmt_vec_ptr my = ymy[1];
+
+        mmt_vec_init(mmt,0,0, y,   bw->dir, /* shared ! */ 1, mmt->n[bw->dir]);
+        mmt_vec_init(mmt,0,0, my, !bw->dir,                0, mmt->n[!bw->dir]);
+
+        /* 1, -1: coeff is 1 or -1.
+         * 2: coeff is something else, and lookup is needed (char!=2
+         * only)
+         */
+        std::map<unsigned int, std::pair<unsigned int, int> > pivots;
+        std::set<unsigned int> scols(cols.begin(), cols.end());
+        std::set<unsigned int> srows;
+        for(unsigned int ii = 0 ; ii < rows.size() ; ii++)
+            srows.insert(ii);
+
+        unsigned int B = A->simd_groupsize(A);
+
+        cheating_vec_init(A, &matrix, iceildiv(cols.size(), B) * rows.size());
+        A->vec_set_zero(A, matrix, iceildiv(cols.size(), B) * rows.size());
+
+        for(unsigned int drop = UINT_MAX, spin=0 ; drop && !scols.empty() ; spin++) {
+            drop = 0;
+
+            std::vector<unsigned int> vcols(scols.begin(), scols.end());
+            std::vector<unsigned int> vrows;
+            for(auto x : srows) vrows.push_back(rows[x]);
+
+            if (tcan_print)
+                printf("# Pass %d: checking for error fixing pivots within a matrix of dimension %zu*%zu\n", spin, vrows.size(), vcols.size());
+
+            void * mat;
+            void ** pmat = &mat;
+            unsigned int cblocks = iceildiv(vcols.size(), B);
+            if (spin) {
+                cheating_vec_init(A, pmat, cblocks * vrows.size());
+                A->vec_set_zero(A, *pmat, cblocks * vrows.size());
+            } else {
+                pmat = &matrix;
+            }
+
+            /* Now try to see which indices are potentially affected by these
+             * columns. */
+            for(unsigned int jjq = 0 ; jjq < cols.size() ; jjq += B) {
+                mmt_full_vec_set_zero(y);
+                for(unsigned int jjr = 0 ; jjr < B && (jjq + jjr < vcols.size()) ; jjr++) {
+                    unsigned int j = vcols[jjq + jjr];
+                    mmt_vec_add_basis_vector_at(y, jjr, j);
+                }
+                mmt_vec_apply_T(mmt, y);
+                mmt_vec_twist(mmt, y);
+                matmul_top_mul(mmt, ymy, NULL);
+                mmt_vec_untwist(mmt, y);
+                /* Not entirely clear to me if I should unapply_T here or not
+                */
+                mmt_apply_identity(my, y);
+                mmt_vec_allreduce(my);
+                mmt_vec_unapply_T(mmt, my);
+                serialize(pi->m);
+
+                compress_vector_to_sparse(*pmat, jjq, cblocks, my, vrows);
+
+                serialize(pi->m);
+            }
+
+            pi_allreduce(NULL, *pmat,
+                    cblocks * vrows.size(),
+                    mmt->pitype, BWC_PI_SUM, pi->m);
+
+            if (leader) {
+                printf("Print matrix of size %zu*%zu\n", srows.size(), scols.size());
+                debug_print_local_matrix(matrix, vrows, vcols);
+            }
+
+            size_t ii = 0;
+            for(auto xi : srows) {
+                /* xi is the index of the row within the set of error
+                 * rows.
+                 * ii is the index within the set of the error rows that
+                 * are being considered within this pass.
+                 */
+                const void * row = A->vec_subvec(A, *pmat, ii * cblocks);
+                int w = A->vec_simd_hamming_weight(A, row, cblocks);
+                if (w == 1) {
+                    if (char2) {
+                        int p = A->vec_simd_find_first_set(A, row, cblocks);
+                        pivots[xi] = std::make_pair(vcols[p], 1);
+                    } else {
+                        ASSERT_ALWAYS(A->simd_groupsize(A) == 1);
+                        int p = A->vec_find_first_set(A, row, cblocks);
+                        const void * x = A->vec_coeff_ptr_const(A, row, p);
+                        if (A->cmp_ui(A, x, 1) == 0) {
+                            pivots[xi] = std::make_pair(vcols[p], 1);
+                        } else if (A->neg(A, dummy, x), A->cmp_ui(A, dummy, 1) == 0) {
+                            pivots[xi] = std::make_pair(vcols[p], -1);
+                        } else if (pivots[xi].second == 0) {
+                            pivots[xi] = std::make_pair(vcols[p], 2);
+                        }
+                    }
+                }
+                ii++;
+            }
+
+            for(auto const & pp : pivots) {
+                unsigned int xi = pp.first;
+                unsigned int j = pp.second.first;
+                int v = pp.second.second;
+                if (v == 2) continue;
+                if (tcan_print)
+                    printf("Found pivot for row %u:"
+                            " column %u has coefficient %d\n",
+                            rows[xi], j, v);
+                /*
+                            */
+                srows.erase(xi);
+                if (scols.erase(j)) {
+                    drop++;
+                    /* XXX colum j may have already been deleted */
+                    pivot_list.push_back({{xi, j}, v});
+                }
+            }
+            if (spin)
+                cheating_vec_clear(A, pmat, vrows.size() * cblocks);
+
+            if (tcan_print)
+                printf("# Pass %d: number of cols has dropped by %u. We have %zu rows (at most) and %zu columns left\n", spin, drop, srows.size(), scols.size());
+            /* use this marker to indicate synchronization */
+            pivot_list.push_back({{0u, 0u}, 0});
+        }
+        if (!scols.empty()) {
+            /* we exited with drop==0 then, so srows correctly reflects
+             * the last set of active rows */
+            for(auto r : srows) {
+                auto it = pivots.find(r);
+                if (it != pivots.end()) {
+                    printf("For row %u, only pivot found is non-trivial. Please implement that code\n", rows[r]);
+                } else {
+                    printf("For row %u, linear algebra reduction is needed. Please implement real code\n", rows[r]);
+                }
+            }
+        }
+        ASSERT_ALWAYS(scols.empty());
+
+        mmt_vec_clear(mmt, y);
+        mmt_vec_clear(mmt, my);
+        A->vec_clear(A, &dummy, 1);
+
+        serialize(pi->m);
+    }/*}}}*/
+
+    ~parasite_fixer() {/*{{{*/
+        if (matrix)
+            cheating_vec_clear(A, &matrix, rows.size() * iceildiv(cols.size(), A->simd_groupsize(A)));
+    }/*}}}*/
+
+    std::tuple<int, int, int> attempt(matmul_top_data_ptr mmt, mmt_vec ymy[2], mmt_vec_ptr y_saved, rhs const& R)/*{{{*/
+    {
+        mmt_vec_ptr my = ymy[1];
+        int tcan_print = bw->can_print && pi->m->trank == 0;
+        int leader = pi->m->jrank == 0 && pi->m->trank == 0;
+
+        int input_is_zero;
+        int pad_is_zero;
+        int hamming_out;
+        std::tuple<int, int, int> res;
+
+        res = expanded_test(mmt, ymy, y_saved, R);
+        std::tie(input_is_zero, pad_is_zero, hamming_out) = res;
+
+        if (input_is_zero || hamming_out == 0) return res;
+
+        std::vector<unsigned int> nz_pos;
+        nz_pos = indices_of_nonzero_values(my, mmt->n0[!bw->dir]);
+
+        if (tcan_print) {
+            printf("# Input vector has %s input, %s padding\n",
+                    input_is_zero ? "zero" : "non-zero",
+                    pad_is_zero ? "zero" : "non-zero");
+            printf("# Output has Hamming weight %d\n", hamming_out);
+        }
+        if (!std::includes(rows.begin(), rows.end(), nz_pos.begin(), nz_pos.end())) {
+            if (tcan_print)
+                printf("# Note: cannot attempting to fix %zu wrong coordinates, not included in the set of %zu known possibly wrong ones\n", nz_pos.size(), rows.size());
+            return res;
+        }
+
+        if (tcan_print)
+            printf("# Note: all the non-zero coordinates are included in the output of the \"possibly wrong\" columns, which is a good sign\n");
+
+        void * nz;
+
+
+        ASSERT_ALWAYS(my->abase == mmt->abase);
+
+        cheating_vec_init(A, &nz, rows.size());
+        A->vec_set_zero(A, nz, rows.size());
+        compress_vector_to_sparse(nz, 0, 1, my, rows);
+        pi_allreduce(NULL, nz, rows.size(), mmt->pitype, BWC_PI_SUM, pi->m); 
+
+        if (leader) debug_print_local_matrix(matrix, rows, cols, nz);
+
+        // debug_print_all_local_matrices(nz);
+
+        for(auto pp : pivot_list) {
+            unsigned int ii = pp.first[0];
+            // unsigned int i = rows[ii];
+            unsigned int j = pp.first[1];
+            int v = pp.second;
+            if (!v) {
+                serialize(pi->m);
+                res = expanded_test(mmt, ymy, y_saved, R);
+                std::tie(input_is_zero, pad_is_zero, hamming_out) = res;
+                A->vec_set_zero(A, nz, rows.size());
+                compress_vector_to_sparse(nz, 0, 1, my, rows);
+                pi_allreduce(NULL, nz, rows.size(), mmt->pitype, BWC_PI_SUM, pi->m); 
+
+                if (leader) debug_print_local_matrix(matrix, rows, cols, nz);
+                continue;
+            }
+
+            /* Everyone has this coefficient */
+            const void * error = A->vec_coeff_ptr(A, nz, ii);
+
+            /* y_saved is shared across threads in the wiring direction,
+             * so we only need to touch our very own data in there.
+             *
+             * (is this is ever meant to change, see mmt_full_vec_set for
+             * instance)
+             */
+            ASSERT_ALWAYS(!y_saved->siblings);
+
+            size_t own_i0 = y_saved->i0 + mmt_my_own_offset_in_items(y_saved);
+            size_t own_i1 = own_i0 + mmt_my_own_size_in_items(y_saved);
+
+            if (own_i0 <= j && j < own_i1) {
+                void * source = A->vec_coeff_ptr(A, y_saved->v, j - y_saved->i0);
+                // printf("Row %u, coefficient is ", rows[ii]);
+                // fprint_signed(stdout, A, source);
+                if (v == -1) {
+                    // printf(" ; fixing by adding to coordinate %u\n", j);
+                    A->add(A, source, source, error);
+                } else if (v == 1) {
+                    // printf(" ; fixing by subtracting from coordinate %u\n", j);
+                    A->sub(A, source, source, error);
+                } else {
+                    ASSERT_ALWAYS(0);
+                }
+            }
+        }
+        serialize(pi->m);
+
+        if (tcan_print)
+            printf("# After fix, Hamming weight is %d\n", hamming_out);
+
+        // if (leader) debug_print_local_matrix(matrix, rows, cols, nz);
+
+        cheating_vec_clear(A, &nz, rows.size());
+
+        return res;
+    }/*}}}*/
+};/*}}}*/
 
 void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSED)
 {
@@ -885,9 +1086,11 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
     parasite_fixer pfixer(mmt);
 
     mmt_vec ymy[2];
+    mmt_vec y_saved;
     mmt_vec_ptr y = ymy[0];
     mmt_vec_ptr my = ymy[1];
 
+    mmt_vec_init(mmt,0,0, y_saved,   bw->dir, /* shared ! */ 1, mmt->n[bw->dir]);
     mmt_vec_init(mmt,0,0, y,   bw->dir, /* shared ! */ 1, mmt->n[bw->dir]);
     mmt_vec_init(mmt,0,0, my, !bw->dir,                0, mmt->n[!bw->dir]);
     mmt_full_vec_set_zero(y);
@@ -1004,18 +1207,17 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
         int input_is_zero;
         int pad_is_zero;
         int hamming_out;
-        std::tie(input_is_zero, pad_is_zero, hamming_out) = test_one_vector(mmt, ymy, R);
-        is_zero = hamming_out == 0;
 
-        if (!is_zero && pfixer.attempt_to_fix) {
-            if (hamming_out >= sqrt(mmt->n0[!bw->dir])) {
-                printf("# not attempting to fix possibly wrong coordinates, too many non-zero coordinates in output\n");
-            } else {
-                pfixer.attempt(my, y);
-                std::tie(input_is_zero, pad_is_zero, hamming_out) = test_one_vector(mmt, ymy, R);
-                is_zero = hamming_out == 0;
-            }
+        if (pfixer.attempt_to_fix) {
+            mmt_vec_swap(y, y_saved);
+            auto res = pfixer.attempt(mmt, ymy, y_saved, R);
+            std::tie(input_is_zero, pad_is_zero, hamming_out) = res;
+        } else {
+            mmt_full_vec_set(y_saved, y);
+            auto res = test_one_vector(mmt, ymy, R);
+            std::tie(input_is_zero, pad_is_zero, hamming_out) = res;
         }
+        is_zero = hamming_out == 0;
 
         /* {{{ save file. If input is zero, bail out */
         {
@@ -1023,7 +1225,7 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
             int rc = asprintf(&tmp, "%s%s.%d", input_is_zero ? "zero" : "",
                     kprefix, i-1);
             ASSERT_ALWAYS(rc >= 0);
-            mmt_vec_save(y, tmp, unpadded);
+            mmt_vec_save(y_saved, tmp, unpadded);
             if (input_is_zero) {
                 if (tcan_print)
                     fprintf(stderr,
@@ -1163,6 +1365,7 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
     serialize(pi->m);
     free(kprefix);
 
+    mmt_vec_clear(mmt, y_saved);
     mmt_vec_clear(mmt, y);
     mmt_vec_clear(mmt, my);
 
