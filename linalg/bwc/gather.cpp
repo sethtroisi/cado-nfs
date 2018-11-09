@@ -307,36 +307,31 @@ std::vector<unsigned int> get_possibly_wrong_columns(matmul_top_data_ptr mmt)/*{
 /* Take a vector, a priori sparse, and pick its coefficients at indices
  * marked by [rows], and put them, in order, in the j-th column of the
  * matrix pointed to by matrix, which has cblocks blocks of
- * Av->simd_groupsize(Av) entries. The column number j is thus made of elements
+ * A->simd_groupsize(A) entries. The column number j is thus made of elements
  * of the blocks whose index is congruent to
- * (j/groupsize)-th block mod cblocks ; Av is my->abase.
+ * (j/groupsize)-th block mod cblocks ; A is my->abase.
  */
 void compress_vector_to_sparse(void * matrix, unsigned int j, unsigned int cblocks, mmt_vec_ptr my, std::vector<unsigned int> & rows)
 {
-    parallelizing_info_ptr pi = my->pi;
-    mpfq_vbase_ptr Av = my->abase;
-    pi_datatype_ptr Av_pi = my->pitype;
+    mpfq_vbase_ptr A = my->abase;
 
     unsigned int own_i0 = my->i0 + mmt_my_own_offset_in_items(my);
     unsigned int own_i1 = own_i0 + mmt_my_own_size_in_items(my);
     cxx_mpz v;
-    unsigned int jq = j / Av->simd_groupsize(Av);
-    // unsigned int jr = j % Av->simd_groupsize(Av);
+    unsigned int jq = j / A->simd_groupsize(A);
+    // unsigned int jr = j % A->simd_groupsize(A);
 
     int char2 = mpz_cmp_ui(bw->p, 2) == 0;
-    ASSERT_ALWAYS(char2 || Av->simd_groupsize(Av) == 1);
+    ASSERT_ALWAYS(char2 || A->simd_groupsize(A) == 1);
 
     for(unsigned int ii = 0 ; ii < rows.size() ; ii++) {
         unsigned int i = rows[ii];
         if (own_i0 <= i && i < own_i1) {
-            const void * src = Av->vec_coeff_ptr_const(Av, my->v, i - my->i0);
-            void * dst = Av->vec_coeff_ptr(Av, matrix, ii * cblocks + jq);
-            Av->set(Av, dst, src);
+            const void * src = A->vec_coeff_ptr_const(A, my->v, i - my->i0);
+            void * dst = A->vec_coeff_ptr(A, matrix, ii * cblocks + jq);
+            A->set(A, dst, src);
         }
     }
-    pi_allreduce(NULL, matrix,
-            rows.size() * cblocks,
-            Av_pi, BWC_PI_SUM, pi->m);
 }
 
 struct abase_proxy {
@@ -416,19 +411,17 @@ class parasite_fixer {/*{{{*/
     {
         int tcan_print = bw->can_print && pi->m->trank == 0;
 
-        abase_proxy natural = abase_proxy::most_natural(pi);
-        mpfq_vbase_ptr Av = natural.A;
-        pi_datatype_ptr Av_pi = natural.A_pi;
+        mpfq_vbase_ptr A = mmt->abase;
 
         mmt_vec ymy[2];
         mmt_vec_ptr y = ymy[0];
         mmt_vec_ptr my = ymy[1];
 
-        mmt_vec_init(mmt,Av,Av_pi, y,   bw->dir, /* shared ! */ 1, mmt->n[bw->dir]);
-        mmt_vec_init(mmt,Av,Av_pi, my, !bw->dir,                0, mmt->n[!bw->dir]);
+        mmt_vec_init(mmt,0,0, y,   bw->dir, /* shared ! */ 1, mmt->n[bw->dir]);
+        mmt_vec_init(mmt,0,0, my, !bw->dir,                0, mmt->n[!bw->dir]);
 
         /* Now try to see which indices are potentially affected */
-        unsigned int B = Av->simd_groupsize(Av);
+        unsigned int B = A->simd_groupsize(A);
         for(unsigned int jjq = 0 ; jjq < cols.size() ; jjq+=B) {
             mmt_full_vec_set_zero(y);
             for(unsigned int jjr = 0 ; jjr < B && (jjq + jjr < cols.size()) ; jjr++) {
@@ -542,26 +535,24 @@ class parasite_fixer {/*{{{*/
             printf("# Candidate solutions will be checked for accordance with a matrix of dimension %zu*%zu\n", rows.size(), cols.size());
         }
 
-        abase_proxy natural = abase_proxy::most_natural(pi);
-        mpfq_vbase_ptr Av = natural.A;
-        pi_datatype_ptr Av_pi = natural.A_pi;
+        mpfq_vbase_ptr A = mmt->abase;
 
-        unsigned int cblocks = iceildiv(cols.size(), Av->simd_groupsize(Av));
+        unsigned int cblocks = iceildiv(cols.size(), A->simd_groupsize(A));
 
-        cheating_vec_init(Av, &matrix, cblocks * rows.size());
-        Av->vec_set_zero(Av, matrix, cblocks * rows.size());
+        cheating_vec_init(A, &matrix, cblocks * rows.size());
+        A->vec_set_zero(A, matrix, cblocks * rows.size());
 
         /* code is similar to row_coordinates_of_nonzero_cols() */
         mmt_vec ymy[2];
         mmt_vec_ptr y = ymy[0];
         mmt_vec_ptr my = ymy[1];
 
-        mmt_vec_init(mmt,Av,Av_pi, y,   bw->dir, /* shared ! */ 1, mmt->n[bw->dir]);
-        mmt_vec_init(mmt,Av,Av_pi, my, !bw->dir,                0, mmt->n[!bw->dir]);
+        mmt_vec_init(mmt,0,0, y,   bw->dir, /* shared ! */ 1, mmt->n[bw->dir]);
+        mmt_vec_init(mmt,0,0, my, !bw->dir,                0, mmt->n[!bw->dir]);
 
         /* Now try to see which indices are potentially affected */
-        unsigned int B = Av->simd_groupsize(Av);
-        for(unsigned int jjq = 0 ; jjq < cols.size() ; jjq+=Av->simd_groupsize(Av)) {
+        unsigned int B = A->simd_groupsize(A);
+        for(unsigned int jjq = 0 ; jjq < cols.size() ; jjq+=A->simd_groupsize(A)) {
             mmt_full_vec_set_zero(y);
             for(unsigned int jjr = 0 ; jjr < B && (jjq + jjr < cols.size()) ; jjr++) {
                 unsigned int j = cols[jjq + jjr];
@@ -584,6 +575,10 @@ class parasite_fixer {/*{{{*/
         }
         mmt_vec_clear(mmt, y);
         mmt_vec_clear(mmt, my);
+
+        pi_allreduce(NULL, matrix,
+                rows.size() * cblocks,
+                mmt->pitype, BWC_PI_SUM, pi->m);
 
         if (leader) debug_print_local_matrix();
 
@@ -615,25 +610,10 @@ class parasite_fixer {/*{{{*/
             printf("# Note: all the non-zero coordinates are included in the output of the \"possibly wrong\" columns, which is a good sign\n");
 
         void * nz;
-        mpfq_vbase_ptr A = my->abase;
-        cheating_vec_init(A, &nz, rows.size());
-        A->vec_set_zero(A, nz, rows.size());
 
-        /* (my) has width solutions[1] - solutions[0], which may
-         * differ from the "natural" width.
-         *
-         * (1) Either we enforce equality, which is basically what we've
-         * always used anyway.
-         *
-         * (2) Or we use solutions[1] - solutions[0] as a width throughout,
-         * including the matrix
-         *
-         * (3) Or we add code to split in chunks. Unfortunately no such thing
-         * exists in mpfq.
-         *
-         * It seems that (2) is the best option.
-         */
-        ASSERT_ALWAYS(A->simd_groupsize(A) == my->abase->simd_groupsize(my->abase));
+        cheating_vec_init(A, &nz, rows.size());
+
+        ASSERT_ALWAYS(my->abase == mmt->abase);
 
         compress_vector_to_sparse(nz, 0, 1, my, rows);
 
@@ -641,7 +621,7 @@ class parasite_fixer {/*{{{*/
 
         if (leader) debug_print_local_matrix(nz);
 
-        cheating_vec_clear(A, &nz, nz_pos.size());
+        cheating_vec_clear(A, &nz, rows.size());
 
         /* TODO: change that to a "return true" once we've done the fix
          * for good.
@@ -822,8 +802,6 @@ struct rhs /*{{{*/ {
         }
 
         mmt_vec_clear(mmt, vi);
-        pi_free_mpfq_datatype(pi, Av_pi);
-        Av->oo_field_clear(Av);
 
         y->consistency = 1;
         mmt_vec_broadcast(y);
@@ -897,11 +875,8 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
         exit(EXIT_FAILURE);
     }
 
-    mpfq_vbase A;
-    mpfq_vbase_oo_field_init_byfeatures(A,
-            MPFQ_PRIME_MPZ, bw->p,
-            MPFQ_SIMD_GROUPSIZE, A_width,
-            MPFQ_DONE);
+    abase_proxy abase_solutions(pi, A_width);
+    mpfq_vbase_ptr A = abase_solutions.A;
 
     /* }}} */
 
@@ -1192,7 +1167,6 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
     mmt_vec_clear(mmt, my);
 
     matmul_top_clear(mmt);
-    A->oo_field_clear(A);
 
     return NULL;
 }
