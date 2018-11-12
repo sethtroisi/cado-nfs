@@ -773,6 +773,18 @@ las_parallel_desc::las_parallel_desc(cxx_param_list & pl, double jobram_arg)
     jobram = jobram_arg;
     desc_c = param_list_lookup_string(pl, "t");
 
+    if (!desc_c) {
+        verbose_output_start_batch();
+        verbose_output_print(0, 1, "# No -t option found, running single-threaded.");
+#ifdef HAVE_HWLOC
+        verbose_output_print(0, 1, " See also -t help");
+#endif
+        verbose_output_print(0, 1, "\n");
+        verbose_output_end_batch();
+        /* feed a constant string */
+        desc_c = "1";
+    }
+
     if (desc_c) {
         if (strcmp(desc_c, "help") == 0) {/*{{{*/
             extended_usage();
@@ -827,6 +839,7 @@ las_parallel_desc::las_parallel_desc(cxx_param_list & pl, double jobram_arg)
 void las_parallel_desc::display_binding_info() const /*{{{*/
 {
     std::string desc;
+    if (!desc_c) return;
     if (desc_c) desc = desc_c;
     help->replace_aliases(desc);
 
