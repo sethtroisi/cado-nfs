@@ -2221,15 +2221,12 @@ void mmt_vec_set_random_through_file(mmt_vec_ptr v, const char * filename, unsig
 }
 
 unsigned long mmt_vec_hamming_weight(mmt_vec_ptr y) {
-    unsigned long nb_nonzero_coeffs=0;
-    for(unsigned int i = 0 ; i < mmt_my_own_size_in_items(y) ; i++) {
-        nb_nonzero_coeffs += !
-            y->abase->vec_is_zero(y->abase,
-                    y->abase->vec_subvec(y->abase, mmt_my_own_subvec(y), i),
-                    1);
-    }
-    pi_allreduce(NULL, &nb_nonzero_coeffs, 1, BWC_PI_UNSIGNED_LONG, BWC_PI_SUM, y->pi->m);
-    return nb_nonzero_coeffs;
+    ASSERT_ALWAYS(y->consistency == 2);
+    unsigned long w = y->abase->vec_hamming_weight(y->abase, y->v, y->i1 - y->i0);
+    /* all threads / cores in wiring wr[y->d] share the same data and
+     * thus deduce the same count */
+    pi_allreduce(NULL, &w, 1, BWC_PI_UNSIGNED_LONG, BWC_PI_SUM, y->pi->wr[!y->d]);
+    return w;
 }
 
 /* this is inconsistent in the sense that it's balancing-dependent */

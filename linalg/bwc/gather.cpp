@@ -557,6 +557,7 @@ std::tuple<int, int, int> test_one_vector(matmul_top_data_ptr mmt, mmt_vec * ymy
     int hamming_out = -1;
     std::tie(input_is_zero, pad_is_zero) = check_zero_and_padding(y, mmt->n0[bw->dir]);
     if (!input_is_zero) {
+        serialize(pi->m);
         mmt_vec_apply_T(mmt, y);
         serialize(pi->m);
         mmt_vec_twist(mmt, y);
@@ -579,6 +580,8 @@ std::tuple<int, int, int> test_one_vector(matmul_top_data_ptr mmt, mmt_vec * ymy
     return std::make_tuple(input_is_zero, pad_is_zero, hamming_out);
 }
 
+/* Use y_saved as input (and leave it untouched). Store result in both y
+ * and my */
 std::tuple<int, int, int> expanded_test(matmul_top_data_ptr mmt, mmt_vec ymy[2], mmt_vec_ptr y_saved, rhs const& R)
 {
     parallelizing_info_ptr pi = mmt->pi;
@@ -587,6 +590,7 @@ std::tuple<int, int, int> expanded_test(matmul_top_data_ptr mmt, mmt_vec ymy[2],
     mmt_full_vec_set(y, y_saved);
     auto res = test_one_vector(mmt, ymy, R);
     /* Need to get the indices with respect to !bw->dir...  */
+    serialize(pi->m);
     mmt_apply_identity(my, y);
     mmt_vec_allreduce(my);
     mmt_vec_unapply_T(mmt, my);
@@ -1020,18 +1024,22 @@ class parasite_fixer {/*{{{*/
 
             if (own_i0 <= j && j < own_i1) {
                 void * source = A->vec_coeff_ptr(A, y_saved->v, j - y_saved->i0);
-                // printf("Row %u, coefficient is ", rows[ii]);
-                // fprint_signed(stdout, A, source);
+                printf("Row %u, coefficient is ", rows[ii]);
+                fprint_signed(stdout, A, source);
                 if (v == -1) {
-                    // printf(" ; fixing by adding to coordinate %u\n", j);
+                    printf(" ; fixing by adding to coordinate %u\n", j);
                     A->add(A, source, source, error);
                 } else if (v == 1) {
-                    // printf(" ; fixing by subtracting from coordinate %u\n", j);
+                    printf(" ; fixing by subtracting from coordinate %u\n", j);
                     A->sub(A, source, source, error);
                 } else {
                     ASSERT_ALWAYS(0);
                 }
             }
+            /* On the other hand, we're not shared across MPI nodes here
+             * anyway, so we have some work to do ! */
+            y_saved->consistency = 1;
+            mmt_vec_broadcast(y_saved);
         }
         serialize(pi->m);
 
@@ -1208,12 +1216,13 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
         int pad_is_zero;
         int hamming_out;
 
+        mmt_full_vec_set(y_saved, y);
         if (pfixer.attempt_to_fix) {
-            mmt_vec_swap(y, y_saved);
+            /* uses y_saved as input */
             auto res = pfixer.attempt(mmt, ymy, y_saved, R);
             std::tie(input_is_zero, pad_is_zero, hamming_out) = res;
         } else {
-            mmt_full_vec_set(y_saved, y);
+            /* uses y as input */
             auto res = test_one_vector(mmt, ymy, R);
             std::tie(input_is_zero, pad_is_zero, hamming_out) = res;
         }
