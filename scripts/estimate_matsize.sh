@@ -43,6 +43,8 @@ fi
 : ${allow_compsq=true}
 : ${qfac_min=200}
 : ${qfac_max=100000}
+: ${dlp=true}
+: ${shrink_factor=1}
 
 ## read poly file on command line
 polyfile=$1
@@ -114,7 +116,9 @@ for i in `seq 0 $((nsides-1))`; do
 done
 
 ## Sampling / faking on each side
+# the [qmin,qmax] range is split into $NCHUNKS sub-ranges
 NCHUNKS=2
+# for each sub-range, we call las with -random-sample $NBSAMPLE
 NBSAMPLE=5
 fakefiles=()
 if [ $nsides == 1 ]; then
@@ -154,6 +158,7 @@ for i in `seq 0 $((nsides-1))`; do
         cmd="$CADO_BUILD/sieve/fake_rels -poly $polyfile -lpb0 $lpb0 -lpb1 $lpb1 \
           -q0 $q0 -q1 $q1 -sqside $side $compsq_fake \
           -sample $wdir/sample.side${side}.${q0}-${q1} \
+          -shrink-factor $shrink_factor \
           -renumber $renumberfile"
         echo $cmd
         $cmd > $wdir/fakerels.side${side}.${q0}-${q1}
@@ -165,7 +170,7 @@ echo "We have $nrels fake relations"
 
 ## Filtering
 # take a huge upper bound for the number of primes...
-nprimes=`echo "2*2^$lpb0/l(2^$lpb0) + 2*2^$lpb1/l(2^$lpb1)" | bc -l | cut -d "." -f 1`
+nprimes=`echo "(2*2^$lpb0/l(2^$lpb0) + 2*2^$lpb1/l(2^$lpb1))/$shrink_factor" | bc -l | cut -d "." -f 1`
 
 # purge
 $CADO_BUILD/filter/purge -out $wdir/purged.gz -nrels $nrels -keep 3 \
@@ -180,5 +185,10 @@ if (grep "number of rows < number of columns + keep" $wdir/purge.log > /dev/null
 fi
 
 # merge
-$CADO_BUILD/filter/merge-dl -mat $wdir/purged.gz -out $wdir/history.gz \
-    -maxlevel $maxlevel -keep 3 -skip 0 -target_density $target_density
+if [ "$dlp" == "true" ]; then
+   $CADO_BUILD/filter/merge-dl -mat $wdir/purged.gz -out $wdir/history.gz \
+      -maxlevel $maxlevel -keep 3 -skip 0 -target_density $target_density
+else
+   $CADO_BUILD/filter/merge -mat $wdir/purged.gz -out $wdir/history.gz \
+      -maxlevel $maxlevel -keep 3 -skip 32 -target_density $target_density
+fi

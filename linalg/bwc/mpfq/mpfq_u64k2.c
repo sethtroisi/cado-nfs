@@ -97,7 +97,7 @@
 /* *simd_u64k::code_for_field_specify */
 void mpfq_u64k2_field_specify(mpfq_u64k2_dst_field K MAYBE_UNUSED, unsigned long tag, const void * x MAYBE_UNUSED)
 {
-        if (tag == MPFQ_GROUPSIZE) {
+        if (tag == MPFQ_SIMD_GROUPSIZE) {
             assert(*(int*)x == 128);
         } else if (tag == MPFQ_PRIME_MPZ) {
             assert(mpz_cmp_ui((mpz_srcptr)x, 2) == 0);
@@ -125,7 +125,7 @@ int mpfq_u64k2_asprint(mpfq_u64k2_dst_field K MAYBE_UNUSED, char * * ps, mpfq_u6
 {
         /* Hmm, this has never been tested, right ? Attempting a quick fix... */
         const uint64_t * y = x;
-        const unsigned int stride = mpfq_u64k2_vec_elt_stride(K,1)/sizeof(uint64_t);
+        const unsigned int stride = mpfq_u64k2_elt_stride(K)/sizeof(uint64_t);
         *ps = mpfq_malloc_check(stride * 16 + 1);
         memset(*ps, ' ', stride * 16);
         int n;
@@ -153,7 +153,7 @@ int mpfq_u64k2_sscan(mpfq_u64k2_dst_field k MAYBE_UNUSED, mpfq_u64k2_dst_elt z, 
 {
         char tmp[17];
         uint64_t * y = z;
-        const unsigned int stride = mpfq_u64k2_vec_elt_stride(K,1)/sizeof(uint64_t);
+        const unsigned int stride = mpfq_u64k2_elt_stride(K)/sizeof(uint64_t);
         assert(strlen(str) >= 1 * 16);
         int r = 0;
         for(unsigned int i = 0 ; i < stride ; i++) {
@@ -465,46 +465,46 @@ static void mpfq_u64k2_wrapper_dotprod(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u
     mpfq_u64k2_dotprod(vbase->obj, xw, xu1, xu0, n);
 }
 
-static void mpfq_u64k2_wrapper_elt_ur_set_ui_all(mpfq_vbase_ptr, mpfq_u64k2_dst_elt, unsigned long);
-static void mpfq_u64k2_wrapper_elt_ur_set_ui_all(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_dst_elt r MAYBE_UNUSED, unsigned long v MAYBE_UNUSED)
+static void mpfq_u64k2_wrapper_simd_set_ui_all(mpfq_vbase_ptr, mpfq_u64k2_dst_elt, unsigned long);
+static void mpfq_u64k2_wrapper_simd_set_ui_all(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_dst_elt r MAYBE_UNUSED, unsigned long v MAYBE_UNUSED)
 {
-    mpfq_u64k2_elt_ur_set_ui_all(vbase->obj, r, v);
+    mpfq_u64k2_simd_set_ui_all(vbase->obj, r, v);
 }
 
-static void mpfq_u64k2_wrapper_elt_ur_set_ui_at(mpfq_vbase_ptr, mpfq_u64k2_dst_elt, int, unsigned long);
-static void mpfq_u64k2_wrapper_elt_ur_set_ui_at(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_dst_elt p MAYBE_UNUSED, int k MAYBE_UNUSED, unsigned long v MAYBE_UNUSED)
+static void mpfq_u64k2_wrapper_simd_add_ui_at(mpfq_vbase_ptr, mpfq_u64k2_dst_elt, mpfq_u64k2_src_elt, int, unsigned long);
+static void mpfq_u64k2_wrapper_simd_add_ui_at(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_dst_elt p MAYBE_UNUSED, mpfq_u64k2_src_elt p0 MAYBE_UNUSED, int k MAYBE_UNUSED, unsigned long v MAYBE_UNUSED)
 {
-    mpfq_u64k2_elt_ur_set_ui_at(vbase->obj, p, k, v);
+    mpfq_u64k2_simd_add_ui_at(vbase->obj, p, p0, k, v);
 }
 
-static void mpfq_u64k2_wrapper_set_ui_all(mpfq_vbase_ptr, mpfq_u64k2_dst_elt, unsigned long);
-static void mpfq_u64k2_wrapper_set_ui_all(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_dst_elt r MAYBE_UNUSED, unsigned long v MAYBE_UNUSED)
+static void mpfq_u64k2_wrapper_simd_set_ui_at(mpfq_vbase_ptr, mpfq_u64k2_dst_elt, int, unsigned long);
+static void mpfq_u64k2_wrapper_simd_set_ui_at(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_dst_elt p MAYBE_UNUSED, int k MAYBE_UNUSED, unsigned long v MAYBE_UNUSED)
 {
-    mpfq_u64k2_set_ui_all(vbase->obj, r, v);
+    mpfq_u64k2_simd_set_ui_at(vbase->obj, p, k, v);
 }
 
-static void mpfq_u64k2_wrapper_set_ui_at(mpfq_vbase_ptr, mpfq_u64k2_dst_elt, int, unsigned long);
-static void mpfq_u64k2_wrapper_set_ui_at(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_dst_elt p MAYBE_UNUSED, int k MAYBE_UNUSED, unsigned long v MAYBE_UNUSED)
+static unsigned long mpfq_u64k2_wrapper_simd_get_ui_at(mpfq_vbase_ptr, mpfq_u64k2_src_elt, int);
+static unsigned long mpfq_u64k2_wrapper_simd_get_ui_at(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_src_elt p MAYBE_UNUSED, int k MAYBE_UNUSED)
 {
-    mpfq_u64k2_set_ui_at(vbase->obj, p, k, v);
+    return mpfq_u64k2_simd_get_ui_at(vbase->obj, p, k);
 }
 
-static int mpfq_u64k2_wrapper_stride(mpfq_vbase_ptr);
-static int mpfq_u64k2_wrapper_stride(mpfq_vbase_ptr vbase MAYBE_UNUSED)
+static int mpfq_u64k2_wrapper_simd_find_first_set(mpfq_vbase_ptr, mpfq_u64k2_src_elt);
+static int mpfq_u64k2_wrapper_simd_find_first_set(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_src_elt p MAYBE_UNUSED)
 {
-    return mpfq_u64k2_stride(vbase->obj);
+    return mpfq_u64k2_simd_find_first_set(vbase->obj, p);
 }
 
-static int mpfq_u64k2_wrapper_offset(mpfq_vbase_ptr, int);
-static int mpfq_u64k2_wrapper_offset(mpfq_vbase_ptr vbase MAYBE_UNUSED, int n MAYBE_UNUSED)
+static int mpfq_u64k2_wrapper_simd_hamming_weight(mpfq_vbase_ptr, mpfq_u64k2_src_elt);
+static int mpfq_u64k2_wrapper_simd_hamming_weight(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_src_elt p MAYBE_UNUSED)
 {
-    return mpfq_u64k2_offset(vbase->obj, n);
+    return mpfq_u64k2_simd_hamming_weight(vbase->obj, p);
 }
 
-static int mpfq_u64k2_wrapper_groupsize(mpfq_vbase_ptr);
-static int mpfq_u64k2_wrapper_groupsize(mpfq_vbase_ptr vbase MAYBE_UNUSED)
+static int mpfq_u64k2_wrapper_simd_groupsize(mpfq_vbase_ptr);
+static int mpfq_u64k2_wrapper_simd_groupsize(mpfq_vbase_ptr vbase MAYBE_UNUSED)
 {
-    return mpfq_u64k2_groupsize(vbase->obj);
+    return mpfq_u64k2_simd_groupsize(vbase->obj);
 }
 
 static ptrdiff_t mpfq_u64k2_wrapper_vec_ur_elt_stride(mpfq_vbase_ptr, int);
@@ -849,6 +849,12 @@ static void mpfq_u64k2_wrapper_elt_ur_set(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpf
     mpfq_u64k2_elt_ur_set(vbase->obj, r, s);
 }
 
+static ptrdiff_t mpfq_u64k2_wrapper_elt_ur_stride(mpfq_vbase_ptr);
+static ptrdiff_t mpfq_u64k2_wrapper_elt_ur_stride(mpfq_vbase_ptr vbase MAYBE_UNUSED)
+{
+    return mpfq_u64k2_elt_ur_stride(vbase->obj);
+}
+
 static void mpfq_u64k2_wrapper_elt_ur_clear(mpfq_vbase_ptr, mpfq_u64k2_elt_ur *);
 static void mpfq_u64k2_wrapper_elt_ur_clear(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_elt_ur * px MAYBE_UNUSED)
 {
@@ -909,6 +915,12 @@ static void mpfq_u64k2_wrapper_set(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2
     mpfq_u64k2_set(vbase->obj, r, s);
 }
 
+static ptrdiff_t mpfq_u64k2_wrapper_elt_stride(mpfq_vbase_ptr);
+static ptrdiff_t mpfq_u64k2_wrapper_elt_stride(mpfq_vbase_ptr vbase MAYBE_UNUSED)
+{
+    return mpfq_u64k2_elt_stride(vbase->obj);
+}
+
 static void mpfq_u64k2_wrapper_clear(mpfq_vbase_ptr, mpfq_u64k2_elt *);
 static void mpfq_u64k2_wrapper_clear(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_elt * px MAYBE_UNUSED)
 {
@@ -951,8 +963,8 @@ static int mpfq_u64k2_wrapper_field_degree(mpfq_vbase_ptr vbase MAYBE_UNUSED)
     return mpfq_u64k2_field_degree(vbase->obj);
 }
 
-static void mpfq_u64k2_wrapper_field_characteristic(mpfq_vbase_ptr, mpz_t);
-static void mpfq_u64k2_wrapper_field_characteristic(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpz_t z MAYBE_UNUSED)
+static void mpfq_u64k2_wrapper_field_characteristic(mpfq_vbase_ptr, mpz_ptr);
+static void mpfq_u64k2_wrapper_field_characteristic(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpz_ptr z MAYBE_UNUSED)
 {
     mpfq_u64k2_field_characteristic(vbase->obj, z);
 }
@@ -985,7 +997,7 @@ void mpfq_u64k2_oo_field_init(mpfq_vbase_ptr vbase)
     vbase->impl_name = (const char * (*) ()) mpfq_u64k2_wrapper_impl_name;
     vbase->impl_max_characteristic_bits = (unsigned long (*) ()) mpfq_u64k2_wrapper_impl_max_characteristic_bits;
     vbase->impl_max_degree = (unsigned long (*) ()) mpfq_u64k2_wrapper_impl_max_degree;
-    vbase->field_characteristic = (void (*) (mpfq_vbase_ptr, mpz_t)) mpfq_u64k2_wrapper_field_characteristic;
+    vbase->field_characteristic = (void (*) (mpfq_vbase_ptr, mpz_ptr)) mpfq_u64k2_wrapper_field_characteristic;
     /* missing field_characteristic_bits */
     vbase->field_degree = (int (*) (mpfq_vbase_ptr)) mpfq_u64k2_wrapper_field_degree;
     vbase->field_init = (void (*) (mpfq_vbase_ptr)) mpfq_u64k2_wrapper_field_init;
@@ -994,6 +1006,7 @@ void mpfq_u64k2_oo_field_init(mpfq_vbase_ptr vbase)
     vbase->field_setopt = (void (*) (mpfq_vbase_ptr, unsigned long, void *)) mpfq_u64k2_wrapper_field_setopt;
     vbase->init = (void (*) (mpfq_vbase_ptr, void *)) mpfq_u64k2_wrapper_init;
     vbase->clear = (void (*) (mpfq_vbase_ptr, void *)) mpfq_u64k2_wrapper_clear;
+    vbase->elt_stride = (ptrdiff_t (*) (mpfq_vbase_ptr)) mpfq_u64k2_wrapper_elt_stride;
     vbase->set = (void (*) (mpfq_vbase_ptr, void *, const void *)) mpfq_u64k2_wrapper_set;
     /* missing set_ui */
     vbase->set_zero = (void (*) (mpfq_vbase_ptr, void *)) mpfq_u64k2_wrapper_set_zero;
@@ -1020,6 +1033,7 @@ void mpfq_u64k2_oo_field_init(mpfq_vbase_ptr vbase)
     vbase->inv = (int (*) (mpfq_vbase_ptr, void *, const void *)) mpfq_u64k2_wrapper_inv;
     vbase->elt_ur_init = (void (*) (mpfq_vbase_ptr, void *)) mpfq_u64k2_wrapper_elt_ur_init;
     vbase->elt_ur_clear = (void (*) (mpfq_vbase_ptr, void *)) mpfq_u64k2_wrapper_elt_ur_clear;
+    vbase->elt_ur_stride = (ptrdiff_t (*) (mpfq_vbase_ptr)) mpfq_u64k2_wrapper_elt_ur_stride;
     vbase->elt_ur_set = (void (*) (mpfq_vbase_ptr, void *, const void *)) mpfq_u64k2_wrapper_elt_ur_set;
     vbase->elt_ur_set_elt = (void (*) (mpfq_vbase_ptr, void *, const void *)) mpfq_u64k2_wrapper_elt_ur_set_elt;
     vbase->elt_ur_set_zero = (void (*) (mpfq_vbase_ptr, void *)) mpfq_u64k2_wrapper_elt_ur_set_zero;
@@ -1126,13 +1140,13 @@ void mpfq_u64k2_oo_field_init(mpfq_vbase_ptr vbase)
     /* missing poly_sscan */
     /* missing poly_fscan */
     /* missing poly_scan */
-    vbase->groupsize = (int (*) (mpfq_vbase_ptr)) mpfq_u64k2_wrapper_groupsize;
-    vbase->offset = (int (*) (mpfq_vbase_ptr, int)) mpfq_u64k2_wrapper_offset;
-    vbase->stride = (int (*) (mpfq_vbase_ptr)) mpfq_u64k2_wrapper_stride;
-    vbase->set_ui_at = (void (*) (mpfq_vbase_ptr, void *, int, unsigned long)) mpfq_u64k2_wrapper_set_ui_at;
-    vbase->set_ui_all = (void (*) (mpfq_vbase_ptr, void *, unsigned long)) mpfq_u64k2_wrapper_set_ui_all;
-    vbase->elt_ur_set_ui_at = (void (*) (mpfq_vbase_ptr, void *, int, unsigned long)) mpfq_u64k2_wrapper_elt_ur_set_ui_at;
-    vbase->elt_ur_set_ui_all = (void (*) (mpfq_vbase_ptr, void *, unsigned long)) mpfq_u64k2_wrapper_elt_ur_set_ui_all;
+    vbase->simd_groupsize = (int (*) (mpfq_vbase_ptr)) mpfq_u64k2_wrapper_simd_groupsize;
+    vbase->simd_hamming_weight = (int (*) (mpfq_vbase_ptr, const void *)) mpfq_u64k2_wrapper_simd_hamming_weight;
+    vbase->simd_find_first_set = (int (*) (mpfq_vbase_ptr, const void *)) mpfq_u64k2_wrapper_simd_find_first_set;
+    vbase->simd_get_ui_at = (unsigned long (*) (mpfq_vbase_ptr, const void *, int)) mpfq_u64k2_wrapper_simd_get_ui_at;
+    vbase->simd_set_ui_at = (void (*) (mpfq_vbase_ptr, void *, int, unsigned long)) mpfq_u64k2_wrapper_simd_set_ui_at;
+    vbase->simd_add_ui_at = (void (*) (mpfq_vbase_ptr, void *, const void *, int, unsigned long)) mpfq_u64k2_wrapper_simd_add_ui_at;
+    vbase->simd_set_ui_all = (void (*) (mpfq_vbase_ptr, void *, unsigned long)) mpfq_u64k2_wrapper_simd_set_ui_all;
     vbase->dotprod = (void (*) (mpfq_vbase_ptr, void *, const void *, const void *, unsigned int)) mpfq_u64k2_wrapper_dotprod;
     vbase->oo_field_init = (void (*) (mpfq_vbase_ptr)) mpfq_u64k2_wrapper_oo_field_init;
     vbase->oo_field_clear = (void (*) (mpfq_vbase_ptr)) mpfq_u64k2_wrapper_oo_field_clear;

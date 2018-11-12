@@ -100,6 +100,8 @@ void matmul_top_decl_usage(param_list_ptr pl)
             "the matrix balancing file, as computed by mf_bal");
     param_list_decl_usage(pl, "random_matrix",
             "characteristics of a random matrix to be used for staged runs.");
+    param_list_decl_usage(pl, "static_random_matrix",
+            "(unset or set to something arbitrary): indicate that the matrix is fake, and that there is no need to bother with the generation of vectors");
 
     param_list_decl_usage(pl, "rebuild_cache",
             "force rebuilding matrix caches");
@@ -122,6 +124,7 @@ void matmul_top_lookup_parameters(param_list_ptr pl)
     param_list_lookup_string(pl, "matrix");
     param_list_lookup_string(pl, "balancing");
     param_list_lookup_string(pl, "random_matrix");
+    param_list_lookup_string(pl, "static_random_matrix");
     param_list_lookup_string(pl, "rebuild_cache");
     param_list_lookup_string(pl, "export_cachelist");
     param_list_lookup_string(pl, "save_submatrices");
@@ -1437,6 +1440,11 @@ void matmul_top_comm_bench(matmul_top_data_ptr mmt, int d)
          * picol->ncores, too.
          *
          * Note that vrow->i1 - vrow->i0 is #rows / picol->totalsize
+         *
+         * Note also that picol->ncores * #rows / picol->totalsize =
+         * #rows / picol->njobs, so that the final thing we compute is
+         * really:
+         *      #rows / mmt->pi->m->njobs * (pirow->njobs - 1)
          */
         size_t data_out_ra = abase->vec_elt_stride(abase,
                 picol->ncores * (mmt->n[!d] / picol->totalsize) /
@@ -1447,6 +1455,10 @@ void matmul_top_comm_bench(matmul_top_data_ptr mmt, int d)
          * the calculation is similar, and we'll use it as a guide. Note
          * of course that if hardware-level multicast is used, our
          * throughput estimation is way off.
+         *
+         * as above, this is really:
+         *      #cols / mmt->pi->m->njobs * (picol->njobs - 1)
+         *
          */
         size_t data_out_ag = abase->vec_elt_stride(abase,
                 pirow->ncores * (mmt->n[d] / pirow->totalsize) /
@@ -2201,7 +2213,7 @@ void mmt_vec_set_x_indices(mmt_vec_ptr y, uint32_t * gxvecs, int m, unsigned int
                      * first, then add.
                      */
                     A->set_zero(A, dummy);
-                    A->set_ui_at(A, dummy, j, 1);
+                    A->simd_set_ui_at(A, dummy, j, 1);
                     A->add(A,
                             A->vec_coeff_ptr(A, y->v, i - y->i0), 
                             A->vec_coeff_ptr(A, y->v, i - y->i0),
@@ -2835,7 +2847,7 @@ static void matmul_top_read_submatrix(matmul_top_data_ptr mmt, int midx, param_l
     /* see remark in raw_matrix_u32.h about data ownership for type
      * matrix_u32 */
 
-    if (verbose_enabled(CADO_VERBOSE_PRINT_BWC_CACHE_MAJOR_INFO)) {
+    if (Mloc->mm->cachefile_name && verbose_enabled(CADO_VERBOSE_PRINT_BWC_CACHE_MAJOR_INFO)) {
         my_pthread_mutex_lock(mmt->pi->m->th->m);
         printf("[%s] J%uT%u uses cache file %s\n",
                 mmt->pi->nodenumber_s,

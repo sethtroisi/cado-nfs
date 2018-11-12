@@ -110,10 +110,11 @@ foreach(gfp_layer ${BWC_GFP_ARITHMETIC_BACKENDS})
                 prime=1009 random_matrix_size=50 nrhs=1 m=1 n=1 seed=1 ${mextra})
             add_dependencies(test-bwc-modp-inhomogeneous-minimal-1rhs-mn1_dependencies
                 plingen_pz plingen_${gfp_layer})
-            #        add_bwc_test(modp-homogeneous-minimal-mn4 bwc-ptrace.sh
-            #            prime=1009 random_matrix_size=50 m=4 n=4 seed=1 ${mextra})
-            #        add_dependencies(modp-homogeneous-minimal-mn4_dependencies
-            #        plingen_pz plingen_${gfp_layer})
+            add_bwc_test(modp-homogeneous-minimal-mn4 bwc-ptrace.sh
+                prime=1009 random_matrix_size=50 m=4 n=4 seed=1
+                random_matrix_minkernel=1 ${mextra})
+            add_dependencies(test-bwc-modp-homogeneous-minimal-mn4_dependencies
+                plingen_pz plingen_${gfp_layer})
             #        add_bwc_test(modp-inhomogeneous-minimal-2rhs-mn2 bwc-ptrace.sh
             #            prime=1009 random_matrix_size=50 nrhs=2 m=2 n=2 seed=1 ${mextra})
             #        add_dependencies(modp-inhomogeneous-minimal-2rhs-mn2_dependencies

@@ -26,6 +26,7 @@
  *   - lpb on each side
  *   - a range of special-q for a given side
  *   - a sample of relations (output of las) for this range
+ *     NOTE: las should be run with the -v option
  *   - the renumber table.
  * The renumber table is required, because this binary will produce
  * relations as if they were coming out of dup2 (hence renumbered).
@@ -39,6 +40,9 @@ using namespace std;
 
 // A global mutex for I/O
 pthread_mutex_t io_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+// A global variable for the number of relations printed
+unsigned long rels_printed = 0;
 
 // We need a re-entrant random. Let's take GMP.
 static inline uint64_t long_random(gmp_randstate_t buf) {
@@ -248,7 +252,7 @@ void read_sample_file(vector<unsigned int> &nrels, vector<fake_rel> &rels,
         int sqside, const char *filename, renumber_t ren_tab, int compsq)
 {
     FILE * file;
-    file = fopen(filename, "r");
+    file = fopen_maybe_compressed(filename, "r");
     ASSERT_ALWAYS (file != NULL);
     uint64_t q = 0;
     vector<uint64_t> facq;
@@ -339,22 +343,51 @@ void reduce_mod_2(index_t *frel, int *nf) {
     *nf = j;
 }
 
+void shrink_indices(index_t *frel, int nf, int shrink_factor) {
+    // Indices below this threshold are not shrinked
+    // FIXME: I am not sure we should keep the heavy weight columns
+    // un-shrinked. The answer might be different in DL and in facto...
+    const index_t noshrink_threshold = 0;
+    for (int i = 0; i < nf; ++i) {
+//        if (frel[i] >= noshrink_threshold) {
+        if (1) {
+            frel[i] = noshrink_threshold +
+                (frel[i] - noshrink_threshold) / shrink_factor;
+        }
+    }
+}
+
 void print_fake_rel_manyq(
         vector<index_t>::iterator list_q, int nfacq, uint64_t nq,
         vector<fake_rel> *rels, vector<unsigned int> *nrels,
-        indexrange *Ind, int dl,
+        indexrange *Ind, int dl, int shrink_factor,
         gmp_randstate_t buf)
 {
-    index_t frel[MAXFACTORS];
+    index_t frel[2*MAXFACTORS];
+#define BUF_SIZE 100 // buffer containing several relations
 #define MAX_STR 256  // string containing a printable relation.
-    char str[MAX_STR];
+    char str[BUF_SIZE*MAX_STR];
     char *pstr;
     int len = MAX_STR;
+    int size = 0; // number of relations in buffer
+    unsigned long nrels_thread = 0;
+    pstr = str; // initialize buffer
     for (uint64_t ii = 0; ii < nfacq*nq; ii += nfacq) {
-        int nr = int((*nrels)[long_random(buf)%nrels->size()]);
-//        fprintf(stdout, "%u, %u\n", list_q[ii], list_q[ii+1]);
+        int nr;
+        if (shrink_factor == 1) {
+            nr = int((*nrels)[long_random(buf)%nrels->size()]);
+        } else {
+            double nr_dble = double((*nrels)[long_random(buf)%nrels->size()])
+                / double(shrink_factor);
+            // Do probabilistic rounding, in case nr_dble is small (maybe < 1)
+            double trunc_part = trunc(nr_dble);
+            double frac_part = nr_dble - trunc_part;
+            double rnd = double(long_random(buf)) / double(UINT64_MAX);
+            nr = int(trunc_part) + int(rnd < frac_part);
+        }
+        //        fprintf(stdout, "%u, %u\n", list_q[ii], list_q[ii+1]);
+	nrels_thread += nr; /* we will output nr fake relations */
         for (; nr > 0; --nr) {
-            pstr = str;
             len = MAX_STR;
             // pick fake a,b
             int nc = snprintf(pstr, len, "%ld,%lu:",
@@ -373,14 +406,20 @@ void print_fake_rel_manyq(
                 int np = (*rels)[i].nb_ind[side];
                 for (int j = 0; j < np; ++j) {
                     index_t ind = Ind[side].random_index((*rels)[i].ind[side][j], buf);
+                    ASSERT(nf < 2*MAXFACTORS);
                     frel[nf] = ind;
                     nf++;
-                    ASSERT(nf < MAXFACTORS);
                 }
             }
             qsort(frel, nf, sizeof(index_t), index_cmp);
             if (!dl) {
                 reduce_mod_2(frel, &nf); // update nf
+            }
+            if (shrink_factor > 1) {
+                shrink_indices(frel, nf, shrink_factor);
+                if (!dl) {
+                    reduce_mod_2(frel, &nf);
+                }
             }
             for (int i = 0; i < nf; ++i) {
                 nc = snprintf(pstr, len, "%" PRid, frel[i]);
@@ -393,13 +432,26 @@ void print_fake_rel_manyq(
 
             }
             snprintf(pstr, len, "\n");
-            // Get the mutex and print
-            pthread_mutex_lock(&io_mutex);
-            printf("%s", str);
-            pthread_mutex_unlock(&io_mutex);
+	    pstr++;
+	    size++;
+	    if (size == BUF_SIZE)
+	      {
+		// Get the mutex and print
+		pthread_mutex_lock(&io_mutex);
+		printf("%s", str);
+		pthread_mutex_unlock(&io_mutex);
+		pstr = str;
+		size = 0;
+	      }
         }
     }
+    pthread_mutex_lock(&io_mutex);
+    if (size > 0) // print leftover relations if any
+      printf("%s", str);
+    rels_printed += nrels_thread;
+    pthread_mutex_unlock(&io_mutex);
 #undef MAX_STR
+#undef BUF_SIZE
 }
 
 struct th_args {
@@ -413,6 +465,7 @@ struct th_args {
     vector<unsigned int> *nrels;
     indexrange *Ind;
     int dl;
+    int shrink_factor;
     gmp_randstate_t rstate;
 };
 
@@ -421,15 +474,18 @@ void * do_thread(void * rgs) {
     struct th_args * args = (struct th_args *) rgs;
     if (args->nq > 0)
         print_fake_rel_manyq(args->list_q_prime, 1, args->nq, args->rels,
-                args->nrels, args->Ind, args->dl, args->rstate);
+                args->nrels, args->Ind, args->dl, args->shrink_factor,
+                args->rstate);
     
     if (args->nq2 > 0)
         print_fake_rel_manyq(args->list_q_comp2, 2, args->nq2, args->rels,
-                args->nrels, args->Ind, args->dl, args->rstate);
+                args->nrels, args->Ind, args->dl, args->shrink_factor,
+                args->rstate);
 
     if (args->nq3 > 0)
         print_fake_rel_manyq(args->list_q_comp3, 3, args->nq3, args->rels,
-                args->nrels, args->Ind, args->dl, args->rstate);
+                args->nrels, args->Ind, args->dl, args->shrink_factor,
+                args->rstate);
 
     return NULL;
 }
@@ -539,6 +595,7 @@ static void declare_usage(param_list pl)
     param_list_decl_usage(pl, "sqside", "side of the special-q");
     param_list_decl_usage(pl, "sample", "file where to find a sample of relations");
     param_list_decl_usage(pl, "renumber", "renumber table");
+    param_list_decl_usage(pl, "shrink-factor", "simulate with a matrix that number (integer >= 1) times smaller");
     param_list_decl_usage(pl, "dl", "dl mode");
     param_list_decl_usage(pl, "allow-compsq", "(switch) allows composite sq");
     param_list_decl_usage(pl, "qfac-min", "factors of q must be at least that");
@@ -562,6 +619,7 @@ main (int argc, char *argv[])
   int compsq = 0;
   uint64_t qfac_min = 1024;
   uint64_t qfac_max = UINT64_MAX;
+  int shrink_factor = 1; // by default, no shrink
 
   param_list_init(pl);
   declare_usage(pl);
@@ -620,6 +678,13 @@ main (int argc, char *argv[])
   param_list_parse_uint64(pl, "q1", &q1);
   if (q1 == 0) {
       fprintf(stderr, "Error: parameter -q1 is mandatory\n");
+      param_list_print_usage(pl, argv0, stderr);
+      exit(EXIT_FAILURE);
+  }
+  
+  param_list_parse_int(pl, "shrink-factor", &shrink_factor);
+  if (shrink_factor < 1) {
+      fprintf(stderr, "Error: shrink factor must be an integer >= 1\n");
       param_list_print_usage(pl, argv0, stderr);
       exit(EXIT_FAILURE);
   }
@@ -726,6 +791,9 @@ main (int argc, char *argv[])
   uint64_t block2 = (last_indq2 - first_indq2) / (2*mt);
   uint64_t block3 = (last_indq3 - first_indq3) / (3*mt);
 
+  double t0 = seconds ();
+  double wct_t0 = wct_seconds ();
+
   pthread_t * thid = (pthread_t *)malloc(mt*sizeof(pthread_t));
   struct th_args * args = (struct th_args *)malloc(mt*sizeof(struct th_args));
   for (int i = 0; i < mt; ++i) {
@@ -757,6 +825,7 @@ main (int argc, char *argv[])
       args[i].nrels = &nrels;
       args[i].Ind = &Ind[0];
       args[i].dl = dl;
+      args[i].shrink_factor = shrink_factor;
       gmp_randinit_default(args[i].rstate);
       gmp_randseed_ui(args[i].rstate, 171717+i);
 
@@ -766,6 +835,14 @@ main (int argc, char *argv[])
       pthread_join(thid[i], NULL);
       gmp_randclear(args[i].rstate);
   }
+
+  /* print statistics */
+  t0 = seconds () - t0;
+  printf ("# Output %lu relations in %.2fs cpu (%.0f rels/s)\n",
+	  rels_printed, t0, (double) rels_printed / t0);
+  wct_t0 = wct_seconds () - wct_t0;
+  printf ("# Output %lu relations in %.2fs wct (%.0f rels/s)\n",
+	  rels_printed, wct_t0, (double) rels_printed / wct_t0);
 
   gmp_randclear(global_rstate_non_mt);
   free(thid);
