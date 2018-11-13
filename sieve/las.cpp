@@ -119,19 +119,6 @@ static void las_verbose_enter(cxx_param_list & pl, FILE * output, int verbose)
     verbose_output_add(TRACE_CHANNEL, trace_file, 1);
 #endif
 }
-typedef int (*sortfunc_t) (const void *, const void *);
-static int pmpz_cmp(const mpz_t *a, const mpz_t *b) {
-    return mpz_cmp(*a, *b) < 0 ? -1 : 1;
-}
-static int roots_for_composite_q_sorted(mpz_t* roots, mpz_poly_srcptr f,
-        const mpz_t q, const unsigned long * fac_q)
-{
-    int nroots = roots_for_composite_q(roots,f,q,fac_q);
-    if (roots && nroots)
-        qsort(roots, nroots, sizeof(mpz_t), (sortfunc_t) &pmpz_cmp);
-    return nroots;
-}
-
 
 static void las_verbose_leave()
 {
