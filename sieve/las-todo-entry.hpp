@@ -26,8 +26,8 @@ struct las_todo_entry {
     int depth;
     int iteration;      /* number of times we failed on this prime */
 
-    /* Default ctor is just to enable sieve_info default ctor */
     las_todo_entry() : side(0), depth(0), iteration(0) {}
+
     /* Empty p, r is used for "closing brace" */
     las_todo_entry(const int side, const int depth) : side(side), depth(depth), iteration(0) { }
 

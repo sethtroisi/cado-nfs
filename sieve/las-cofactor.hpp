@@ -7,11 +7,13 @@
 #include "ecm/facul.hpp"
 #include <array>
 #include <vector>
+#include <mutex>
 
 class cofactorization_statistics {
     FILE * file;
     std::vector<std::vector<uint32_t>> cof_call;
     std::vector<std::vector<uint32_t>> cof_success;
+    std::mutex lock;
 public:
     cofactorization_statistics(param_list_ptr pl);
     bool active() { return file != NULL; }
@@ -33,6 +35,7 @@ public:
         cof_success[bits0][bits1]++;
     }
     ~cofactorization_statistics();
+    static void declare_usage(cxx_param_list & pl);
 };
 
 int check_leftover_norm (cxx_mpz const & n, siever_config::side_config const & sc);

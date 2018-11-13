@@ -546,7 +546,7 @@ int main(int argc, char * argv[])
 
     bw_common_decl_usage(pl);
     parallelizing_info_decl_usage(pl);
-    param_list_decl_usage(pl, "v", "(switch) turn on some demo logging");
+    param_list_decl_usage(pl, "v", "turn on some demo logging");
     matmul_top_decl_usage(pl);
 
     /* declare local parameters and switches. */

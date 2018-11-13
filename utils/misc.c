@@ -291,7 +291,7 @@ const char *size_disp_fine(size_t s, char buf[16], double cutoff)
 	ds /= 1024.0;
 	px++;
     }
-    snprintf(buf, 10, "%.1f%c", ds, *px);
+    snprintf(buf, 10, "%.2f %c%s", ds, *px, px==prefixes ? "" : "B");
     return buf;
 }
 const char *size_disp(size_t s, char buf[16])

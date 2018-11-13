@@ -1167,12 +1167,12 @@ static void declare_usage(param_list pl)
                                       "(see purge -outdel parameter)");
   param_list_decl_usage(pl, "nrels", "number of relations (same as purge "
                                      "-nrels parameter)");
-  param_list_decl_usage(pl, "partial", "(switch) do not reconstruct everything "
+  param_list_decl_usage(pl, "partial", "do not reconstruct everything "
                                        "that can be reconstructed");
   param_list_decl_usage(pl, "nsm", "number of SM's to add on side 0,1,...");
   param_list_decl_usage(pl, "mt", "number of threads (default 1)");
   param_list_decl_usage(pl, "wanted", "file containing list of wanted logs");
-  param_list_decl_usage(pl, "force-posix-threads", "(switch)");
+  param_list_decl_usage(pl, "force-posix-threads", "force the use of posix threads, do not rely on platform memory semantics");
   param_list_decl_usage(pl, "path_antebuffer", "path to antebuffer program");
   verbose_decl_usage(pl);
 }

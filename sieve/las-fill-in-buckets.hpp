@@ -3,29 +3,34 @@
 
 #include <array>
 #include <memory>
+#include "las-config.h" // FB_MAX_PARTS
 #include "fb-types.h"
 #include "las-plattice.hpp"
 #include "tdict.hpp"
 #include "threadpool.hpp"
 #include "las-threads-work-data.hpp"
-
 #include "las-forwardtypes.hpp"
+#include "multityped_array.hpp"
 
 // This one is used for keeping information of middle primes.
+template<int LEVEL>
 struct precomp_plattice_t {
-    typedef std::vector<plattices_vector_t> vec_type;
-    std::array<std::array<vec_type, FB_MAX_PARTS>, 2> v;
-    precomp_plattice_t(precomp_plattice_t const&) = delete;
+    static const int level = LEVEL;
+    typedef precomp_plattice_t type;    /* for multityped_array */
+    typedef std::vector<plattices_vector_t<LEVEL>> vec_type;
+    std::array<vec_type, 2> v;
+    precomp_plattice_t(precomp_plattice_t<LEVEL> const&) = delete;
     precomp_plattice_t() = default;
-    void push(int side, int level, plattices_vector_t&& x) {
-        v[side][level].push_back(std::move(x));
+    void push(int side, vec_type&& x) {
+        std::swap(v[side], x);
     }
     ~precomp_plattice_t() = default;
-    std::vector<plattices_vector_t> & operator()(int side, int level) {
-        return v[side][level];
+    /* This allows us to access the contents with range-based for loops */
+    vec_type & operator()(int side) {
+        return v[side];
     }
-    std::vector<plattices_vector_t> const & operator()(int side, int level) const {
-        return v[side][level];
+    vec_type const & operator()(int side) const {
+        return v[side];
     }
 };
 
@@ -39,7 +44,7 @@ downsort_tree(
         thread_pool &pool,
         uint32_t bucket_index,
         uint32_t first_region0_index,
-        precomp_plattice_t & precomp_plattice,
+        multityped_array<precomp_plattice_t, 1, FB_MAX_PARTS> & precomp_plattice,
         where_am_I & w);
 
 void fill_in_buckets_toplevel(
@@ -49,11 +54,9 @@ void fill_in_buckets_toplevel(
         int side,
         where_am_I & w);
 
-void fill_in_buckets_prepare_precomp_plattice(
-        nfs_work &ws,
+void fill_in_buckets_prepare_plattices(
+        nfs_work & ws,
         thread_pool &pool,
         int side,
-        int level,
-        precomp_plattice_t & precomp_plattice);
-
+        multityped_array<precomp_plattice_t, 1, FB_MAX_PARTS> & precomp_plattice);
 #endif

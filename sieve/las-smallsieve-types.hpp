@@ -108,8 +108,8 @@ private:
 // static_assert(sizeof(ssp_simple_t) == sizeof(ssp_t), "struct padding has been tampered with");
 
 /* The prototypes in las-smallsieve.hpp should all be member functions
- * for this struct. However we have an interface nesting problem with
- * sieve_info, at the moment.
+ * for this struct.  However we used to have an interface nesting problem
+ * with sieve_info, perhaps it's gone now [FIXME, check]
  */
 struct small_sieve_data_t {
     fb_factorbase::key_type fbK;
@@ -119,7 +119,7 @@ struct small_sieve_data_t {
     size_t resieve_end_offset;
 
     /* We have some vectors of small sieve positions prepared in
-     * advanced (up to si.nb_buckets[1] of them). The ssdpos_many_next
+     * advanced (up to nb_buckets[1] of them). The ssdpos_many_next
      * area is for staging the next set of start positions, possible
      * while threads are using the positions in ssdpos_many.
      */

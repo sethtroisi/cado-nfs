@@ -19,16 +19,21 @@
  */
 struct siever_config : public _padded_pod<siever_config> {
     /* The bit size of the special-q. Counting in bits is no necessity,
-     * we could imagine being more accurate */
-    unsigned int bitsize;  /* bitsize == 0 indicates end of table */
-    int side;              /* special-q side */
-    int logA;
+     * we could imagine being more accurate. This is set by
+     * siever_config_pool::get_config_for_q  */
+    // unsigned int bitsize __attribute__((deprecated));  /* bitsize == 0 indicates end of table */
+    // int side __attribute__((deprecated));              /* special-q side */
 
+    int logA;
     int logI;   /* see below. logI is initialized late in the game */
 
     /* This does not really belong here. I'd rather have it at the
      * las_info level. However for obscure reasons,
-     * sieve_info::get_strategies wants it.
+     * las.get_strategies(siever_config&)
+     * wants it.
+     *
+     * FIXME: er. now that get_strategies lives below las, we can do this
+     * move, right ?
      */
     unsigned int sublat_bound;
 
@@ -36,7 +41,7 @@ struct siever_config : public _padded_pod<siever_config> {
     /* These four parameters are as they are provided in the command
      * line. In truth, the ones that really matter are the ones in the
      * fb_factorbase::key_type object that is stored within the
-     * sieve_info structure (in si.sides[side].fbK).
+     * nfs_work structure (in sides[side].fbK).
      *
      * In particular, bucket_thresh and bucket_thresh1 below have a
      * default value that is dependent on:
@@ -47,14 +52,10 @@ struct siever_config : public _padded_pod<siever_config> {
      *    this struct be dynamic depending on a setter function for logI
      *  - the side, as well.
      */
-    private:    /* someday I'll put "private". sieve_info::update, or
-                 * whatever it may be called in the future, might access
-                 * this data from a member function.
-                 * display_expected_memory_usage must be adapted, too.
-                 */
+    private:
     /* access should rather be
-     * via si.sides[side].fbK.thresholds[0,1]
-     * and si.sides[side].fbK.{td_thresh, skipped}
+     * via ws.sides[side].fbK.thresholds[0,1]
+     * and ws.sides[side].fbK.{td_thresh, skipped}
      */
     unsigned long bucket_thresh = 0;  // bucket sieve primes >= bucket_thresh
     unsigned long bucket_thresh1 = 0; // primes above are 2-level bucket-sieved
@@ -82,7 +83,7 @@ struct siever_config : public _padded_pod<siever_config> {
     };
     side_config sides[2];
 
-    void display() const;
+    void display(int side, unsigned int bitsize) const;
 
     static void declare_usage(param_list_ptr pl);
     static bool parse_default(siever_config & sc, param_list_ptr pl);
@@ -208,11 +209,20 @@ struct siever_config_pool {
             return &it->second;
     }
 
-    siever_config const * default_config_ptr;
+    /* The siever_config in [base] needs not be complete. The
+     * default_config_ptr field points here if it is complete. If not,
+     * the fields here are just used as a base for initializing the other
+     * configurations.
+     *
+     * Note that while the "base for initializing" functionality is
+     * likely to stay, the notion of a "default config" seems to be
+     * screwed altogether, and we would rather like to see it disappear
+     * someday. Currently it is used for displaying memory usage, setting
+     * defaults for dupqmin, and getting the lim abd lpb parameters
+     * before going to the batch step.
+     */
 
-    /* This needs not be complete. The default_config_ptr field points
-     * here if it is complete. If not, the fields here are just used as a
-     * base for initializing the other configurations */
+    siever_config const * default_config_ptr;
     siever_config base;
 
     siever_config get_config_for_q(las_todo_entry const& doing) const;
@@ -229,6 +239,8 @@ struct siever_config_pool {
             return -1;
         return hints.at(K).expected_success;
     }
+
+    static void declare_usage(cxx_param_list & pl);
 };
 
 #endif	/* LAS_SIEVER_CONFIG_HPP_ */

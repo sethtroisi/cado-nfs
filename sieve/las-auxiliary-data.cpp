@@ -1,7 +1,8 @@
 #include "cado.h"
 #include "las-auxiliary-data.hpp"
 #include "las-threads.hpp"
-#include "las-types.hpp"
+#include "las-info.hpp"
+#include <iomanip>
 
 /* in las.cpp */
 extern int sync_at_special_q;
@@ -51,14 +52,18 @@ nfs_aux::~nfs_aux()
     if (tdict::global_enable >= 2) {
         verbose_output_print (0, 1, "%s", timer_special_q.display().c_str());
 
-        double t = 0;
+        timetree_t::timer_data_type t = 0;
         for(auto const &c : timer_special_q.filter_by_category()) {
-            verbose_output_print (0, 1, "# %s: %.2f\n",
+            std::ostringstream os;
+            os << std::fixed << std::setprecision(2) << c.second;
+            verbose_output_print (0, 1, "# %s: %s\n",
                     coarse_las_timers::explain(c.first).c_str(),
-                    c.second);
+                    os.str().c_str());
             t += c.second;
         }
-        verbose_output_print (0, 1, "# total counted time: %.2f\n", t);
+        std::ostringstream os;
+        os << std::fixed << std::setprecision(2) << t;
+        verbose_output_print (0, 1, "# total counted time: %s\n", os.str().c_str());
     }
 
     rep.display_survivor_counters();
@@ -94,7 +99,7 @@ nfs_aux::~nfs_aux()
 #else
     int dont_print_tally = 1;
 #endif
-    if (dont_print_tally && las.nb_threads > 1) {
+    if (dont_print_tally && las.number_of_threads_total() > 1) {
         verbose_output_print(0, 2, "# Time for this special-q: %1.4fs [tally available only in mono-thread] in %1.4f elapsed s\n", qt0, wct_qt0);
     } else {
         const char * fmt_always[2] = {
@@ -132,10 +137,12 @@ nfs_aux::~nfs_aux()
     verbose_output_end_batch();
 }
 
+#ifndef DISABLE_TIMINGS
 /* we really wish to have a single timing slot for all the instantiations
  * of fill_in_buckets_toplevel_wrapper */
 tdict::slot tdict_slot_for_fibt("fill_in_buckets_toplevel");
 tdict::slot tdict_slot_for_alloc_buckets("allocate_buckets");
 tdict::slot tdict_slot_for_threads("multithreaded tasks");
 tdict::slot_parametric tdict_slot_for_side("side ", "");
+#endif
 

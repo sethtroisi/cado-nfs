@@ -92,7 +92,6 @@ struct lognorm_smart : public lognorm_base {/*{{{*/
 
 /*}}}*/
 struct sieve_range_adjust {/*{{{*/
-    friend struct sieve_info;
     qlattice_basis Q;
 private:
     siever_config conf;         /* This "conf" field is only used for a

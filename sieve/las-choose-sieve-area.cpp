@@ -2,7 +2,7 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <gmp.h>
-#include "las-types.hpp"
+#include "las-info.hpp"
 #include "las-auxiliary-data.hpp"
 #include "verbose.h"
 #include "utils_cxx.hpp"

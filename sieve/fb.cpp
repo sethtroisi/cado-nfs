@@ -1027,9 +1027,14 @@ struct helper_functor_subdivide_slices {
 
 fb_factorbase::slicing::slicing(fb_factorbase const & fb, fb_factorbase::key_type const & K) {
 
-    /* parts[0] will be unused.
+    /* we're going to divide our vector in several parts, and compute
+     * slices.
+     *
+     * parts[0] will be unused.
      * parts[1] will have primes between K.thresholds[0] and K.thresholds[1]
+     *          (will be bucket-sieved in N passes if toplevel==N)
      * parts[2] will have primes above K.thresholds[1].
+     *          (will be bucket-sieved in N-1 passes if toplevel==N)
      */
 
     /* First thing we're going to do is count the weight of each part.
@@ -1126,31 +1131,6 @@ fb_factorbase::slicing::slicing(fb_factorbase const & fb, fb_factorbase::key_typ
 
         verbose_output_print(0, 2, "# %s\n", os.str().c_str());
     }
-
-
-    /* we're going to divide our vector in several
-     * parts, and compute slices. That used to be done by many
-     * functions:
-     *
-     * fb_factorbase::append
-     * fb_part::append
-     * fb_vector::append
-     *
-     * print_fb_statistics (yes, it's true)
-     * fb_read
-     * fb_factorbase::make_slices
-     * sieve_info::update
-     *
-     * part0: will be small-sieved, so we don't care about
-     * slices.
-     * part1: will be bucket-sieved in N passes if toplevel==N
-     * part2: if toplevel>=2: in N-1 passes if toplevel==N
-     * and so on.
-     */
-    /* Append a factor base entry to the factor base.
-   The new entry is inserted into the correct part, as determined by the
-   size of the prime p, and within that part, into the correct fb_slice, as
-   determined by the number of roots. */
 }
 
 /* {{{ Generation of the factor base on the rational side */
@@ -1769,11 +1749,11 @@ fbc_header find_fbc_header_block_for_poly(const char * fbc_filename, cxx_mpz_pol
 
         if (mpz_poly_cmp(hdr.f, f) != 0) continue;
         if (hdr.lim != lim) {
-            fprintf(stderr, "Note: cached factor base number %zu in file %s skipped because not consistent with lim%d=%lu\n", index, fbc_filename, side, lim);
+            verbose_output_print(0, 1, "# Note: cached factor base number %zu in file %s skipped because not consistent with lim%d=%lu\n", index, fbc_filename, side, lim);
             continue;
         }
         if (hdr.powlim != powlim) {
-            fprintf(stderr, "Note: cached factor base number %zu in file %s skipped because not consistent with powlim%d=%lu\n", index, fbc_filename, side, lim);
+            verbose_output_print(0, 1, "# Note: cached factor base number %zu in file %s skipped because not consistent with powlim%d=%lu\n", index, fbc_filename, side, lim);
             continue;
         }
 
@@ -1918,7 +1898,7 @@ struct helper_functor_put_first_0 {
         }
 };
 
-fb_factorbase::fb_factorbase(cxx_cado_poly const & cpoly, int side, cxx_param_list & pl, const char * fbc_filename) : f(cpoly->pols[side]), side(side)
+fb_factorbase::fb_factorbase(cxx_cado_poly const & cpoly, int side, cxx_param_list & pl, const char * fbc_filename, int nthreads) : f(cpoly->pols[side]), side(side)
 {
     {
         std::ostringstream os;
@@ -2009,11 +1989,7 @@ fb_factorbase::fb_factorbase(cxx_cado_poly const & cpoly, int side, cxx_param_li
                     " for polynomial f%d(x) = %s\n",
                     side, side, polystring.c_str());
 
-            /* note: we parse again the -t option here -- it gets parsed
-             * in the las_info ctor too */
-            int nb_threads = 1;		/* default value */
-            param_list_parse_int(pl, "t", &nb_threads);
-            make_linear_threadpool (nb_threads);
+            make_linear_threadpool (nthreads);
             tfb = seconds () - tfb;
             tfb_wct = wct_seconds() - tfb_wct;
             verbose_output_print(0, 1,

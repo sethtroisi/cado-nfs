@@ -8,7 +8,7 @@
 #if defined(HAVE_SSE2)
 #include <emmintrin.h>
 #endif
-#include "las-types.hpp"
+#include "las-info.hpp"
 #include "bucket.hpp"
 #include "portability.h"
 #include "memory.h"
@@ -44,7 +44,7 @@ bucket_array_t<LEVEL, HINT>::reset_pointers()
 template <int LEVEL, typename HINT>
 bucket_array_t<LEVEL, HINT>::~bucket_array_t()
 {
-  physical_free (big_data, big_size);
+  if (used_accessor) used_accessor->physical_free (big_data, big_size);
   free (slice_index);
   free_aligned(slice_start);
   free_aligned(bucket_read);
@@ -76,11 +76,14 @@ bucket_array_t<LEVEL, HINT>::move(bucket_array_t<LEVEL, HINT> &other)
    allocated, does not shrink the allocation. */
 template <int LEVEL, typename HINT>
 void
-bucket_array_t<LEVEL, HINT>::allocate_memory(const uint32_t new_n_bucket,
-                                const double fill_ratio,
-                                int logI,
-                                const slice_index_t prealloc_slices)
+bucket_array_t<LEVEL, HINT>::allocate_memory(
+        las_memory_accessor & memory,
+        const uint32_t new_n_bucket,
+        const double fill_ratio,
+        int logI,
+        const slice_index_t prealloc_slices)
 {
+    used_accessor = &memory;
   /* Don't try to allocate anything, nor print a message, for sieving levels
      where the corresponding factor base part is empty. */
   if (fill_ratio == 0.)
@@ -140,7 +143,7 @@ bucket_array_t<LEVEL, HINT>::allocate_memory(const uint32_t new_n_bucket,
 
   if (new_big_size > big_size) {
     if (big_data != NULL)
-      physical_free (big_data, big_size);
+      memory.physical_free (big_data, big_size);
     if (bitmask_line_ordinate) {
         verbose_output_print(0, 3, "# [%d%c] Allocating %zu bytes for %" PRIu32 " buckets of %zu to %zu update entries of %zu bytes each\n",
                              LEVEL, HINT::rtti[0],
@@ -155,7 +158,7 @@ bucket_array_t<LEVEL, HINT>::allocate_memory(const uint32_t new_n_bucket,
                              sizeof(update_t));
     }
     big_size = new_big_size;
-    big_data = (update_t *) physical_malloc (big_size, 1);
+    big_data = (update_t *) memory.physical_alloc (big_size, 1);
     void * internet_of_things MAYBE_UNUSED = NULL;
   }
 

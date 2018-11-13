@@ -84,9 +84,9 @@ static void declare_usage(param_list pl)/*{{{*/
   );
 
   param_list_decl_usage(pl, "poly", "polynomial file");
-  param_list_decl_usage(pl, "skew", "(alias S) skewness");
+  param_list_decl_usage(pl, "skew", "skewness");
 
-  param_list_decl_usage(pl, "v",    "(switch) verbose mode, also prints sieve-area checksums");
+  param_list_decl_usage(pl, "v",    "verbose mode, also prints sieve-area checksums");
 
   param_list_decl_usage(pl, "q0",   "left bound of special-q range");
   param_list_decl_usage(pl, "q1",   "right bound of special-q range");
@@ -333,7 +333,7 @@ int main (int argc0, char *argv0[])/*{{{*/
         verbose_output_vfprint(0, 1, gmp_vfprintf,
                              "# "
                              "Sieving side-%d q=%Zd; rho=%Zd;",
-                             conf.side,
+                             doing.side,
                              (mpz_srcptr) doing.p,
                              (mpz_srcptr) doing.r);
 

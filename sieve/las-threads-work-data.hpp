@@ -2,13 +2,17 @@
 #define LAS_THREADS_WORK_DATA_HPP_
 
 #include "las-forwardtypes.hpp"
-#include "las-types.hpp"
+#include "las-info.hpp"
 #include "las-threads.hpp"
 #include "las-plattice.hpp"
 #include "las-smallsieve-types.hpp"
 #include "las-norms.hpp"
 #include "las-unsieve.hpp"
 #include "ecm/facul.hpp"
+#include "ecm/batch.hpp"
+#include "multityped_array.hpp"
+#include "las-memory.hpp"
+#include "lock_guarded_container.hpp"
 
 #define NUMBER_OF_BAS_FOR_THREADS(n)    ((n) == 1 ? 1 : ((n) + 2))
 
@@ -39,6 +43,8 @@ class nfs_work {
     public:
     las_info const & las;
     private:
+    las_memory_accessor & local_memory;
+
     const int nr_workspaces;
 
     public:
@@ -53,24 +59,26 @@ class nfs_work {
     /* This is set via prepare_for_new_q() */
     int nb_buckets[FB_MAX_PARTS];
 
-    /* This conditions the validity of the sieve_info_side members
-     * sides[0,1], as well as some other members. If config fields match,
-     * we can basically use the same sieve_info structure. */
     siever_config conf;
 
     qlattice_basis Q;
 
-    /* These are fetched from the sieve_info structure, which caches them
-     * */
+    /* These are fetched from the sieve_shared_data structure, which
+     * caches them */
     j_divisibility_helper const * jd;
     unsieve_data const * us;
 
     uint32_t J;
 
+    /* This is used only in batch mode. The list of cofactorization
+     * candidates will be transfered to the main list when we're done
+     * with this special-q */
+    lock_guarded_container<cofac_list> cofac_candidates;
+
     struct side_data {
         reservation_group group;
 
-        /* lognorms is set by sieve_info::update_norm_data(), and depends on
+        /* lognorms is set by prepare_for_new_q(), and depends on
          *      conf.logA
          *      conf.sides[side].lpb
          *      conf.sides[side].sublat
@@ -112,7 +120,8 @@ class nfs_work {
          * the storage to remain allocated, adnd avoid constant
          * malloc/free.
          */
-        precomp_plattice_dense_t precomp_plattice_dense;
+        multityped_array<precomp_plattice_dense_t, 1, FB_MAX_PARTS> precomp_plattice_dense;
+        void precomp_plattice_dense_clear();
 
         /* This is updated by applying the special-q lattice transform to
          * the factor base. This is a "current status" that gets updated
@@ -126,7 +135,10 @@ class nfs_work {
         /* the "group" member is not default-constructible,
          * unfortunately.
          */
-        side_data(int nr_arrays) : group(nr_arrays) {}
+        side_data(int nr_arrays)
+            : group(nr_arrays)
+        {
+        }
 
         template <int LEVEL, typename HINT> void reset_all_pointers();
 
@@ -158,6 +170,7 @@ class nfs_work {
             std::vector<bucket_array_t<LEVEL, HINT>> const &
             bucket_arrays() const {return group.cget<LEVEL, HINT>().bucket_arrays();}
 
+        dumpfile_t dumpfile;
     };
 
     std::array<side_data, 2> sides;
@@ -169,13 +182,6 @@ class nfs_work {
              * This has size BUCKET_REGION_0 and should be close to L1
              * cache size. */
             unsigned char *bucket_region = NULL;
-
-            ~side_data();
-
-            private:
-            void allocate_bucket_region();
-            friend struct thread_data;
-            public:
         };
 
         nfs_work &ws;  /* a pointer to the parent structure, really */
@@ -203,19 +209,22 @@ class nfs_work {
 
         thread_data(nfs_work &);
         thread_data(thread_data const &);
+        thread_data(thread_data &&);
         ~thread_data();
         void allocate_bucket_regions();
     };
 
     std::vector<thread_data> th;
 
-    nfs_work(las_info const & _las);
-    nfs_work(las_info const & _las, int);
+    nfs_work(las_info & _las);
+    nfs_work(las_info & _las, int);
     private:
     void zeroinit_defaults();
     void compute_toplevel_and_buckets();        // utility
     public:
-    void prepare_for_new_q(sieve_info & si);
+    /* This uses the same reference as this->las, except that we want it
+     * non-const */
+    void prepare_for_new_q(las_info &);
 
     void allocate_buckets(nfs_aux&, thread_pool&);
     void allocate_bucket_regions();
@@ -235,12 +244,15 @@ class nfs_work {
 class nfs_work_cofac {
     public:
     las_info const & las;
-    siever_config const & sc;
+    siever_config sc;
     las_todo_entry doing;
 
     facul_strategies_t const * strategies;
 
-    nfs_work_cofac(las_info const& las, sieve_info & si, nfs_work const & ws);
+    /* yes, the ctor takes a non-const reference, but this->las is const.
+     * This is because the ctor wants to access the cache in the las
+     * structure. */
+    nfs_work_cofac(las_info & las, nfs_work const & ws);
 };
 
 #endif	/* LAS_THREADS_WORK_DATA_HPP_ */

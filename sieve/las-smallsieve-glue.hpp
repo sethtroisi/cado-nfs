@@ -318,7 +318,7 @@ struct small_sieve_base {/*{{{*/
          */
         /* For powers of 2, we sieve only odd lines (*) and 
          * ssdpos needs to point at line j=1. We assume
-         * that in this case (si.I/2) % p == 0
+         * that in this case (I/2) % p == 0
          * (*) for lines with j even, we have a root mod the prime
          * power for i-j*r multiple of our power of 2, which means
          * i even too. Thus a useless report.

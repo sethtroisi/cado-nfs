@@ -8,9 +8,14 @@
 #include "modredc_ul.h"
 #include "modredc_15ul.h"
 #include "modredc_2ul2.h"
-#include "las-types.hpp"
+#include "las-info.hpp"
 
-// {{{ las_info::{init,clear,print}_cof_stats
+void cofactorization_statistics::declare_usage(cxx_param_list & pl)
+{
+    param_list_decl_usage(pl, "stats-cofact", "write statistics about the cofactorization step in file xxx");
+}
+
+//  las_info::{init,clear,print}_cof_stats
 cofactorization_statistics::cofactorization_statistics(param_list_ptr pl)
 {
     const char * statsfilename = param_list_lookup_string (pl, "stats-cofact");
@@ -28,28 +33,20 @@ cofactorization_statistics::cofactorization_statistics(param_list_ptr pl)
 void cofactorization_statistics::call(int bits0, int bits1)
 {
     if (!file) return;
-    static pthread_rwlock_t lock = PTHREAD_RWLOCK_INITIALIZER;
-    pthread_rwlock_rdlock(&lock);
+    std::lock_guard<std::mutex> dummy(lock);
     size_t s0 = cof_call.size();
-    pthread_rwlock_unlock(&lock);
     if ((size_t) bits0 >= s0) {
-        pthread_rwlock_wrlock(&lock);
         size_t news0 = std::max((size_t) bits0+1, s0 + s0/2);
         cof_call.insert(cof_call.end(), news0-s0, std::vector<uint32_t>());
         cof_success.insert(cof_success.end(), news0-s0, std::vector<uint32_t>());
         s0 = news0;
-        pthread_rwlock_unlock(&lock);
     }
-    pthread_rwlock_rdlock(&lock);
     size_t s1 = cof_call[bits0].size();
-    pthread_rwlock_unlock(&lock);
     if ((size_t) bits1 >= s1) {
-        pthread_rwlock_wrlock(&lock);
         size_t news1 = std::max((size_t) bits1+1, s1 + s1/2);
         cof_call[bits0].insert(cof_call[bits0].end(), news1-s1, 0);
         cof_success[bits0].insert(cof_success[bits0].end(), news1-s1, 0);
         s1 = news1;
-        pthread_rwlock_unlock(&lock);
     }
     /* no need to use a mutex here: either we use one thread only
        to compute the cofactorization data and if several threads
@@ -78,7 +75,7 @@ cofactorization_statistics::~cofactorization_statistics()
     if (!file) return;
     fclose (file);
 }
-//}}}
+//
 
 /* {{{ factor_leftover_norm */
 

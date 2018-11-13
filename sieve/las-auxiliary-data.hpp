@@ -2,6 +2,7 @@
 #define LAS_AUXILIARY_DATA_HPP_
 
 #include <unordered_set>
+#include <tuple>
 #include "las-threads.hpp"
 #include "las-todo-entry.hpp"
 #include "las-report-stats.hpp"
@@ -9,6 +10,7 @@
 #include "utils/timing.h"
 #include "las-threads-work-data.hpp"
 #include "ecm/facul.hpp"
+#include "lock_guarded_container.hpp"
 
 /* Compute a checksum over the bucket region.
  *
@@ -59,8 +61,8 @@ class nfs_aux {/*{{{*/
     /* okay, it's hidden. We *only* use it in the dtor, where we decide
      * whether we print some stuff or not. But beyond that, really, it
      * seems wrong to keep a tie to las_info here (well, actually
-     * anywhere, to be honest -- but for the core algorithmic data, that'
-     * slightly more entangled).
+     * anywhere, to be honest -- but for the core algorithmic data,
+     * that's slightly more entangled).
      */
     las_info const & las;
     public:
@@ -74,14 +76,15 @@ class nfs_aux {/*{{{*/
         }
     };
 
-    typedef std::unordered_set<abpair_t, abpair_hash_t> rel_hash_t;
+    typedef lock_guarded_container<std::unordered_set<abpair_t, abpair_hash_t>> rel_hash_t;
 
     std::shared_ptr<rel_hash_t> rel_hash_p;
     rel_hash_t & get_rel_hash() { return * rel_hash_p ; }
 
-    /* These two are initialized by the caller, and the caller itself
+    /* These fields are initialized by the caller, and the caller itself
      * will collate them with the global counters.
      */
+    typedef std::tuple<las_report, timetree_t> caller_stuff;
     las_report & rep;
     timetree_t & timer_special_q;
     where_am_I w;
@@ -106,21 +109,24 @@ class nfs_aux {/*{{{*/
 
     std::vector<thread_data> th;
 
+    timetree_t & get_timer(worker_thread * worker) {
+        return worker->is_synchronous() ? timer_special_q : th[worker->rank()].timer;
+    }
+
     double qt0;
     double wct_qt0;
 
     nfs_aux(las_info const & las,
             las_todo_entry const & doing,
             std::shared_ptr<rel_hash_t> & rel_hash_p,
-            las_report & rep,
-            timetree_t & t,
+            caller_stuff & c,
             int nthreads)
         :
             las(las),   /* shame... */
             doing(doing),
             rel_hash_p(rel_hash_p),
-            rep(rep),
-            timer_special_q(t),
+            rep(std::get<0>(c)),
+            timer_special_q(std::get<1>(c)),
             th(nthreads)//, thread_data(*this))
     {
         wct_qt0 = wct_seconds();
@@ -134,17 +140,25 @@ class nfs_aux {/*{{{*/
     ~nfs_aux();
 };/*}}}*/
 
+#ifndef DISABLE_TIMINGS
+
 extern tdict::slot_parametric tdict_slot_for_side;
 extern tdict::slot tdict_slot_for_alloc_buckets;
 extern tdict::slot tdict_slot_for_threads;
 extern tdict::slot tdict_slot_for_fibt;
 
 #define ENTER_THREAD_TIMER(timer)       \
-    ACTIVATE_TIMER(timer);                           \
+    ACTIVATE_TIMER_IF_NOT_RUNNING(timer);                           \
     timetree_t::accounting_child UNIQUE_ID(dummy)(timer, tdict_slot_for_threads)
 
 #define MARK_TIMER_FOR_SIDE(timer, side)       \
     timetree_t::accounting_child UNIQUE_ID(dummy)(timer, tdict_slot_for_side(side))
 
+#else /* DISABLE_TIMINGS */
+
+#define ENTER_THREAD_TIMER(timer) timer.nop() /**/
+#define MARK_TIMER_FOR_SIDE(timer, side) timer.nop() /**/
+
+#endif  /* DISABLE_TIMINGS */
 
 #endif	/* LAS_AUXILIARY_DATA_HPP_ */
