@@ -1164,7 +1164,7 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
 
     /* This is used as an out-of-loop check for an exceptional condition.
      * This is slighly clumsy, I should do it better */
-    int is_zero;
+    int is_zero = 0; /* placate old compilers */
 
     /* The mmt_vec_unapply_T below is disturbing. Does that mean that the
      * vectors we feed are with T applied ? All of this is slightly
