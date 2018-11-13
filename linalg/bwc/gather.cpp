@@ -911,7 +911,7 @@ class parasite_fixer {/*{{{*/
                 if (scols.erase(j)) {
                     drop++;
                     /* XXX colum j may have already been deleted */
-                    std::array<unsigned int, 2> xij { xi, j};
+                    std::array<unsigned int, 2> xij {{ xi, j }};
                     pivot_list.push_back({xij, v});
                 }
             }
@@ -921,7 +921,7 @@ class parasite_fixer {/*{{{*/
             if (tcan_print)
                 printf("# Pass %d: number of cols has dropped by %u. We have %zu rows (at most) and %zu columns left\n", spin, drop, srows.size(), scols.size());
             /* use this marker to indicate synchronization */
-            std::array<unsigned int, 2> xij { 0u, 0u };
+            std::array<unsigned int, 2> xij {{ 0u, 0u }};
             pivot_list.push_back({xij, 0});
         }
         if (!scols.empty()) {
