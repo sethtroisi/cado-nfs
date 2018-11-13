@@ -563,11 +563,16 @@ std::tuple<int, int, int> test_one_vector(matmul_top_data_ptr mmt, mmt_vec * ymy
         mmt_vec_twist(mmt, y);
         matmul_top_mul(mmt, ymy, NULL);
         mmt_vec_untwist(mmt, y);
-        mmt_vec_unapply_T(mmt, y);
         serialize(pi->m);
         /* Add the contributions from the right-hand side vectors, to see
          * whether that makes the sum equal to zero */
-        R.add_contribution(y);
+        if (R) {
+            R.add_contribution(y);
+        } else {
+            // unapply_T is only valid with respect to something we'll
+            // multiply *again*. 
+            mmt_vec_unapply_T(mmt, y);
+        }
 
         /* This "is zero" check is also valid on the padded matrix of
          * course, so we don't heave the same headache as above */
