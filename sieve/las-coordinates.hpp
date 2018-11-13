@@ -2,7 +2,7 @@
 #define LAS_COORDINATES_HPP_
 
 #include <stdint.h>
-#include "las-types.hpp"
+#include "las-info.hpp"
 
 /*  Forward declarations of conversion functions */
 void xToIJ(int & i, unsigned int & j, const uint64_t x, int logI);
@@ -16,8 +16,8 @@ static inline void xToAB(int64_t & a, uint64_t & b, const uint64_t x, int logI, 
 static inline void NxToAB(int64_t & a, uint64_t & b, const unsigned int N, const unsigned int x, int logI, qlattice_basis const & Q);
 int ABToIJ(int & i, unsigned int & j, const int64_t a, const uint64_t b, qlattice_basis const & Q);
 // code exists in las-coordinates.cpp, but is unused, so untested.
-// int ABTox(uint64_t *x, const int64_t a, const uint64_t b, sieve_info const & si);
-// int ABToNx(unsigned int * N, unsigned int *x, const int64_t a, const uint64_t b, sieve_info const & si);
+// int ABTox(uint64_t *x, const int64_t a, const uint64_t b, int logI, qlattice_basis const & Q);
+// int ABToNx(unsigned int * N, unsigned int *x, const int64_t a, const uint64_t b, int logI, qlattice_basis const & Q);
 
 /* Warning: b might be negative, in which case we return (-a,-b) */
 static inline void xToAB(int64_t & a, uint64_t & b, const uint64_t x, int logI, qlattice_basis const & Q)

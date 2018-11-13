@@ -10,6 +10,7 @@
 #include "fb.hpp"
 #include "las-report-stats.hpp"
 #include "las-base.hpp"
+#include "las-memory.hpp"
 #include "tdict.hpp"
 
 /* A set of n bucket arrays, all of the same type, and methods to reserve one
@@ -39,7 +40,7 @@ public:
 
   /* Allocate enough memory to be able to store at least n_bucket buckets,
      each of size at least fill_ratio * bucket region size. */
-  void allocate_buckets(int n_bucket, double fill_ratio, int logI, nfs_aux&, thread_pool&);
+  void allocate_buckets(las_memory_accessor & memory, int n_bucket, double fill_ratio, int logI, nfs_aux&, thread_pool&);
   // typename std::vector<T>::const_iterator cbegin() const {return BAs.cbegin();}
   // typename std::vector<T>::const_iterator cend() const {return BAs.cend();}
   // std::vector<T>& arrays() { return BAs; }
@@ -80,7 +81,9 @@ protected:
   cget() const;
 public:
   reservation_group(int nr_bucket_arrays);
-  void allocate_buckets(const int *n_bucket,
+  void allocate_buckets(
+          las_memory_accessor & memory,
+          const int *n_bucket,
           bkmult_specifier const& multiplier,
           std::array<double, FB_MAX_PARTS> const &
           fill_ratio, int logI, nfs_aux&, thread_pool&,

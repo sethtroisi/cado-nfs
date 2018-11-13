@@ -32,8 +32,6 @@ struct where_am_I {
     fbroot_t r;         /* current root */
     slice_index_t i;    /* Slice index, if applicable */
     slice_offset_t h;   /* Prime hint, if not decoded yet */
-    int fb_idx;         /* index into the factor base si->sides[side]->fb
-                           or into th->sides[side]->fb_bucket */
     unsigned int j;     /* row number in bucket */
     unsigned int x;     /* value in bucket */
     unsigned int N;     /* bucket number */
@@ -126,12 +124,12 @@ static inline void sieve_increase(unsigned char *S, const unsigned char logp, wh
 /* If -dumpregion is given, dump sieve region to a file to be able to
    compare new sieving code with a known good reference. Beware of
    resulting large files. */
-class dumpfile {
+class dumpfile_t {
     FILE *f = NULL;
-    
 public:
-    ~dumpfile();
-    void setname(const char *filename_stem, las_todo_entry const & doing);
+    ~dumpfile_t();
+    void close();
+    void open(const char *filename_stem, las_todo_entry const & doing, int side);
     size_t write(const unsigned char *, size_t) const;
 };
 

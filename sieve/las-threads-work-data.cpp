@@ -1,47 +1,73 @@
 #include "cado.h"
-#include "las-types.hpp"
+#include "las-info.hpp"
 #include "las-threads-work-data.hpp"
 
-void nfs_work::thread_data::side_data::allocate_bucket_region()
+nfs_work::thread_data::thread_data(thread_data && o) : ws(o.ws)
 {
-  /* Allocate memory for each side's bucket region. Our intention is to
-   * avoid doing it in case we have no factor base. Not that much because
-   * of the spared memory, but rather because it's a useful way to trim
-   * the irrelevant parts of the code in that case.
-   */
-  if (!bucket_region)
-  bucket_region = (unsigned char *) contiguous_malloc(BUCKET_REGION + MEMSET_MIN);
+    for(int side = 0 ; side < 2 ; side++) {
+        sides[side].bucket_region = o.sides[side].bucket_region;
+        o.sides[side].bucket_region = NULL;
+    }
+    SS = o.SS;
+    o.SS = NULL;
 }
 
 nfs_work::thread_data::thread_data(thread_data const & o)
-    : ws(o.ws), sides(o.sides)
+    : ws(o.ws)
 {
-    SS = (unsigned char *) contiguous_malloc(BUCKET_REGION);
+    for(int side = 0 ; side < 2 ; side++) {
+        ASSERT_ALWAYS(o.sides[side].bucket_region == NULL);
+        sides[side].bucket_region = NULL;
+    }
+    ASSERT_ALWAYS(o.SS == NULL);
+    SS = NULL;
+#if 0
+    /* We do not need MEMSET_MIN here. However we're making life easier
+     * for the memory allocator if we allocate and free always the same
+     * size.
+     */
+    for(int side = 0 ; side < 2 ; side++) {
+        if (!sides[side].bucket_region)
+            sides[side].bucket_region = ws.local_memory.alloc_bucket_region();
+        memcpy(sides[side].bucket_region, o.sides[side].bucket_region, BUCKET_REGION);
+    }
+    SS = ws.local_memory.alloc_bucket_region();
     memcpy(SS, o.SS, BUCKET_REGION);
+#endif
 }
 
-nfs_work::thread_data::side_data::~side_data()
-{
-  if (bucket_region) contiguous_free(bucket_region);
-  bucket_region = NULL;
-}
-
+/* our promise is that allocation only occurs when explicitly asked, so
+ * we do not call local_memory.alloc_bucket_region() yet.
+ */
 nfs_work::thread_data::thread_data(nfs_work & ws)
     : ws(ws)
 {
-  /* Allocate memory for the intermediate sum (only one for both sides) */
-  SS = (unsigned char *) contiguous_malloc(BUCKET_REGION);
+#if 0
+    for(int side = 0 ; side < 2 ; side++) {
+        sides[side].bucket_region = ws.local_memory.alloc_bucket_region();
+    }
+    /* Allocate memory for the intermediate sum (only one for both sides) */
+    SS = ws.local_memory.alloc_bucket_region();
+#endif
 }
 
 nfs_work::thread_data::~thread_data()
 {
-    contiguous_free(SS);
+    for(int side = 0 ; side < 2 ; side++) {
+        ws.local_memory.free_bucket_region(sides[side].bucket_region);
+        sides[side].bucket_region = NULL;
+    }
+    ws.local_memory.free_bucket_region(SS);
+    SS = NULL;
 }
 
 void nfs_work::thread_data::allocate_bucket_regions()
 {
-    for (auto & S : sides)
-        S.allocate_bucket_region();
+    for(int side = 0 ; side < 2 ; side++) {
+        sides[side].bucket_region = ws.local_memory.alloc_bucket_region();
+    }
+    /* Allocate memory for the intermediate sum (only one for both sides) */
+    SS = ws.local_memory.alloc_bucket_region();
 }
 
 void nfs_work::zeroinit_defaults()
@@ -50,26 +76,28 @@ void nfs_work::zeroinit_defaults()
     toplevel = 0;
 }
 
-nfs_work::nfs_work(las_info const & _las)
-    : nfs_work(_las, NUMBER_OF_BAS_FOR_THREADS(_las.nb_threads))
+nfs_work::nfs_work(las_info & _las)
+    : nfs_work(_las, NUMBER_OF_BAS_FOR_THREADS(_las.number_of_threads_per_subjob()))
 {
-    zeroinit_defaults();
 }
-nfs_work::nfs_work(las_info const & _las, int nr_workspaces)
+nfs_work::nfs_work(las_info & _las, int nr_workspaces)
     : las(_las),
+    local_memory(_las.local_memory_accessor()),
     nr_workspaces(nr_workspaces),
     sides {{ {nr_workspaces}, {nr_workspaces} }},
-    th(_las.nb_threads, thread_data(*this))
+    th(_las.number_of_threads_per_subjob(), thread_data(*this))
 {
     zeroinit_defaults();
+    sides[0].dumpfile.open(las.dump_filename, Q.doing, 0);
+    sides[1].dumpfile.open(las.dump_filename, Q.doing, 1);
 }
 
-nfs_work_cofac::nfs_work_cofac(las_info const& las, sieve_info & si, nfs_work const & ws) :
+nfs_work_cofac::nfs_work_cofac(las_info & las, nfs_work const & ws) :
     las(las),
     sc(ws.conf),
     doing(ws.Q.doing)
 {
-    strategies = si.get_strategies(sc);
+    strategies = las.get_strategies(sc);
 }
 
 /* Prepare to work on sieving a special-q as described by _si.
@@ -89,7 +117,9 @@ void nfs_work::allocate_buckets(nfs_aux & aux, thread_pool & pool)
     for (unsigned int side = 0; side < 2; side++) {
         side_data & wss(sides[side]);
         if (wss.no_fb()) continue;
-        wss.group.allocate_buckets(nb_buckets,
+        wss.group.allocate_buckets(
+                local_memory,
+                nb_buckets,
                 bk_multiplier,
                 wss.fbs->stats.weight,
                 conf.logI,
@@ -254,11 +284,11 @@ void nfs_work::compute_toplevel_and_buckets()
     }
 }
 
-void nfs_work::prepare_for_new_q(sieve_info & si) {
+void nfs_work::prepare_for_new_q(las_info & las0) {
+    ASSERT_ALWAYS(&las == &las0);
     /* The config on which we're running is now decided. In order to
      * select the factor base to use, we also need the log scale */
     for(int side = 0 ; side < 2 ; side++) {
-        sieve_info::side_data & sis(si.sides[side]);
         nfs_work::side_data & wss(sides[side]);
 
         /* Even when we have no factor base, we do the lognorm setup
@@ -268,14 +298,14 @@ void nfs_work::prepare_for_new_q(sieve_info & si) {
          */
         wss.lognorms = lognorm_smart(conf, las.cpoly, side, Q, conf.logI, J);
 
-        if (sis.no_fb()) {
+        if (las.no_fb(side)) {
             wss.fbs = NULL;
             continue;
         }
 
         wss.fbK = conf.instantiate_thresholds(side);
         wss.fbK.scale = wss.lognorms.scale;
-        wss.fbK.nb_threads = las.nb_threads;
+        wss.fbK.nb_threads = las.number_of_threads_per_subjob();
 
         /* Now possibly trigger the creation of a new slicing. There's a
          * design decision of whether we want the slicing replicated on
@@ -283,12 +313,24 @@ void nfs_work::prepare_for_new_q(sieve_info & si) {
          * or in a loose, unbound fashion. I think the second option is
          * better.
          */
-        wss.fbs = sis.get_factorbase_slicing(wss.fbK);
-        wss.td = sis.get_trialdiv_data(wss.fbK, wss.fbs);
+        wss.fbs = las0.get_factorbase_slicing(side, wss.fbK);
+        wss.td = las0.get_trialdiv_data(side, wss.fbK, wss.fbs);
     }
+    bk_multiplier = las0.get_bk_multiplier();
     compute_toplevel_and_buckets();
 
-    jd = si.get_j_divisibility_helper(J);
-    us = si.get_unsieve_data(conf);
+    jd = las0.get_j_divisibility_helper(J);
+    us = las0.get_unsieve_data(conf);
+}
 
+/* Yes, it's quite unfortunate that we add so much red tape.
+ */
+struct helper_functor_precomp_plattice_dense_clear {
+    template<typename T>
+        void operator()(T & x) { x.clear(); }
+};
+void nfs_work::side_data::precomp_plattice_dense_clear()
+{
+    helper_functor_precomp_plattice_dense_clear H;
+    multityped_array_foreach(H, precomp_plattice_dense);
 }

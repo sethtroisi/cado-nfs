@@ -321,7 +321,7 @@ void small_sieve_init(small_sieve_data_t & ssd,
                 /* pattern-sieved primes go to ssp */
                 if (new_ssp.is_proj()) {
 #if 0
-                    if (new_ssp.get_g() >= si.J) {
+                    if (new_ssp.get_g() >= J) {
                         /* some projective primes never hit (number of lines
                          * to skip is >= J). We're tempted to remove them,
                          * but:
@@ -337,13 +337,17 @@ void small_sieve_init(small_sieve_data_t & ssd,
                          * fields are different from what we have in the
                          * normal case (see the computation of gI), and it
                          * isn't neat.
+                         *
+                         * (on top of all that, notice that J is no
+                         * longer something we have access to from this
+                         * point of the code)
                          */
                         if (verbose) {
                             verbose_output_print(0, 1,
                                     "# small_sieve_init: not adding projective prime"
                                     " (1:%" FBROOT_FORMAT ") mod %" FBPRIME_FORMAT ")"
-                                    " to small sieve  because g=%d >= si.J = %d\n",
-                                    r_q-p, p, new_ssp.get_g(), si.J);
+                                    " to small sieve  because g=%d >= J = %d\n",
+                                    r_q-p, p, new_ssp.get_g(), J);
                         }
                         continue;
                     }

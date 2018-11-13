@@ -8,6 +8,7 @@
 #include <stdarg.h>
 #include <errno.h>
 #include <memory>
+#include <mutex>
 
 #include "macros.h"
 #include "utils_cxx.hpp"
@@ -77,6 +78,23 @@ public:
   void wait(condition_variable &cond) {cond.wait(m);}
 };
 
+class monitor_or_synchronous : public monitor {
+    bool sync = false;
+    public:
+    monitor_or_synchronous(bool sync = false) : sync(sync) {}
+    bool is_synchronous() const { return sync; }
+    void enter() { if (!sync) monitor::enter();}
+    void leave() { if (!sync) monitor::leave();}
+    void signal(condition_variable &cond) { if (!sync) monitor::signal(cond); }
+    void broadcast(condition_variable &cond){ if (!sync) monitor::broadcast(cond);}
+    void wait(condition_variable &cond) {
+        if (sync)
+            ASSERT_ALWAYS(0);
+        else
+            monitor::wait(cond);
+    }
+};
+
 /* Base for classes that hold parameters for worker functions */
 class task_parameters {
   public:
@@ -117,13 +135,14 @@ public:
    * for example.
    */
   thread_pool & get_pool() { return pool; }
-  worker_thread(thread_pool &, size_t);
+  worker_thread(thread_pool &, size_t, bool = true);
   ~worker_thread();
+  bool is_synchronous() const;
 };
 
 typedef task_result *(*task_function_t)(worker_thread * worker, task_parameters *, int id);
 
-class thread_pool : private monitor, private NonCopyable {
+class thread_pool : private monitor_or_synchronous, private NonCopyable {
   friend class worker_thread;
 
   std::vector<worker_thread> threads;
@@ -135,13 +154,17 @@ class thread_pool : private monitor, private NonCopyable {
 
   bool kill_threads; /* If true, hands out kill tasks once work queues are empty */
 
-  static void * thread_work_on_tasks(void *pool);
+  static void * thread_work_on_tasks_static(void *worker);
+  void thread_work_on_tasks(worker_thread &);
   thread_task get_task(size_t& queue);
   void add_result(size_t queue, task_result *result);
   void add_exception(size_t queue, clonable_exception * e);
   bool all_task_queues_empty() const;
 public:
-  static double cumulated_wait_time;
+  bool is_synchronous() const { return monitor_or_synchronous::is_synchronous(); }
+  double cumulated_wait_time = 0;
+  std::mutex mm_cumulated_wait_time;
+
   thread_pool(size_t _nr_threads, size_t nr_queues = 1);
   ~thread_pool();
   task_result *get_result(size_t queue = 0, bool blocking = true);
@@ -255,7 +278,7 @@ public:
    * albeit at the expense of the shared_ptr management.
    *
    * Alas, since the thread_task objects only have raw pointers to the
-   * parameter object, there's not much we can do but to create an extra
+   * parameter object, there's not much we can do but create an extra
    * level of indirection, which kinds of defeats the purpose...
    *
    * The next step toward making it more useful would be to convert

@@ -1,6 +1,6 @@
 #include "cado.h"
 #include "las-config.h"
-#include "las-types.hpp"
+#include "las-info.hpp"
 #include "las-coordinates.hpp"
 #include "gmp_aux.h"
 
@@ -13,9 +13,9 @@
  * (i, j): For a given special q, this is a point in the q-lattice. Given
  *         the lattice basis given by (a0 b0 a1 b1), this corresponds to
  *         the (a,b) pair equal to i*(a0,b0)+j*(a1,b1). By construction
- *         this should lead to one of the norms having si.doing.p as a factor.
+ *         this should lead to one of the norms having doing.p as a factor.
  *         i is within [-I/2, I/2[, and j is within [1, J[
- * (N, x): bucket number N, location x. N is within [0,si.nb_buckets[
+ * (N, x): bucket number N, location x. N is within [0,nb_buckets[
  *         and x within [0,bucket_region[ ; we have:
  *         N*bucket_region+x == (I/2+i)+j*I
  *
@@ -96,8 +96,8 @@ int ABToIJ(int & i, unsigned int & j, const int64_t a, const uint64_t b, qlattic
     mpz_mul(ii, za, b1); mpz_submul(ii, zb, a1);
     mpz_mul(jj, zb, a0); mpz_submul(jj, za, b0);
     /*
-    int64_t ii =   a * (int64_t) si.qbasis.b1 - b * (int64_t)si.qbasis.a1;
-    int64_t jj = - a * (int64_t) si.qbasis.b0 + b * (int64_t)si.qbasis.a0;
+    int64_t ii =   a * (int64_t) Q.b1 - b * (int64_t)Q.a1;
+    int64_t jj = - a * (int64_t) Q.b0 + b * (int64_t)Q.a0;
     */
     if (!mpz_divisible_p(ii, Q.doing.p)) ok = 0;
     if (!mpz_divisible_p(jj, Q.doing.p)) ok = 0;
@@ -139,25 +139,24 @@ int ABToIJ(int & i, unsigned int & j, const int64_t a, const uint64_t b, qlattic
 }
 
 #if 0 /* currently unused */
-int ABTox(unsigned int *x, const int64_t a, const uint64_t b, sieve_info const & si)
+int ABTox(unsigned int *x, const int64_t a, const uint64_t b, int logI, qlattice_basis const & Q)
 {
     int i;
     unsigned int j;
-    if (!ABToIJ(&i, &j, a, b, si)) return 0;
-    IJTox(x, a, b, si);
+    if (!ABToIJ(i, j, a, b, Q)) return 0;
+    IJTox(x, a, b, logI);
     return 1;
 }
 #endif
 
 #if 0 /* currently unused */
-int ABToNx(unsigned int * N, unsigned int *x, const int64_t a, const uint64_t b, sieve_info const & si)
+int ABToNx(unsigned int * N, unsigned int *x, const int64_t a, const uint64_t b, int logI, qlattice_basis const & Q)
 {
     int i;
     unsigned int j;
-    if (!ABToIJ(&i, &j, a, b, si)) return 0;
-    IJToNx(N, x, a, b, si);
+    if (!ABToIJ(i, j, a, b, Q)) return 0;
+    IJToNx(N, x, a, b, logI);
     return 1;
 }
 #endif
-/*  */
 

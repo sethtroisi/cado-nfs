@@ -18,17 +18,20 @@ set (las_sources
     las-qlattice.cpp
     las-norms.cpp logapprox.cpp
     las-coordinates.cpp
-    las-sieve-info.cpp
-    las-types.cpp
+    las-sieve-shared-data.cpp
+    las-info.cpp
     las-choose-sieve-area.cpp
     las-auxiliary-data.cpp
-    las.cpp fb.cpp fb-slice-weight.cpp las-plattice.cpp
+    las.cpp fb.cpp fb-slice-weight.cpp las-todo-list.cpp las-galois.cpp
   las-debug.cpp las-report-stats.cpp las-duplicate.cpp
   las-config.c bucket.cpp las-smallsieve.cpp las-unsieve.cpp
   las-sieve2357.cpp las-unsieve-sse2.cpp
   las-trialdiv.cpp
   las-descent-trees.cpp las-cofactor.cpp
-  las-fill-in-buckets.cpp las-threads.cpp las-threads-work-data.cpp)
+  las-fill-in-buckets.cpp las-threads.cpp las-threads-work-data.cpp
+  las-parallel.cpp
+  las-memory.cpp
+  )
 set (las_libraries trialdiv facul utils ${pthread_libs})
 # set (las_libraries trialdiv facul utils ${pthread_libs})
 
@@ -52,7 +55,7 @@ target_link_libraries (las_descent ${las_libraries})
 
 add_library (trialdiv trialdiv.cpp)
 
-add_executable(freerel freerel.c fb.cpp las-plattice.cpp)
+add_executable(freerel freerel.c fb.cpp)
 target_link_libraries(freerel utils)
 
 add_subdirectory(ecm)
@@ -61,17 +64,19 @@ add_subdirectory(strategies)
 add_executable(dupsup
     las-todo-entry.cpp
     las-siever-config.cpp
-    las-sieve-info.cpp
+    las-sieve-shared-data.cpp
     las-qlattice.cpp
     las-choose-sieve-area.cpp
     las-norms.cpp logapprox.cpp
     las-coordinates.cpp
+    las-parallel.cpp
+    las-memory.cpp
     bucket.cpp
 
     dupsup.cpp las-duplicate.cpp
-    las-plattice.cpp las-cofactor.cpp fb.cpp
+    las-cofactor.cpp fb.cpp
     las-config.c
-    las-types.cpp
+    las-info.cpp
     las-unsieve.cpp
     las-unsieve-sse2.cpp
     las-smallsieve.cpp

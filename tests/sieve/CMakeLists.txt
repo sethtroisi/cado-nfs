@@ -29,7 +29,7 @@ set(F9_baseargs
         maxbits=10
         I=12 q0=1200000 q1=1200200
         poly=${F9_poly}
-        fb=${F9_roots}
+        fb1=${F9_roots}
         fbc=.
         CHECKSUM_FILE=${F9_checksums}
         LAS_BINARY=${las_path}
@@ -50,7 +50,7 @@ cado_define_test(c90_21505_sieve
         ENVIRONMENT
             I=11 poly=${c90_21505_poly} 
             lim0=404327 lim1=811066 lpb0=23 lpb1=23 mfb0=46 mfb1=46 ncurves0=9
-            ncurves1=10 fb=${c90_21505_roots} sqside=1
+            ncurves1=10 fb1=${c90_21505_roots} sqside=1
             q0=375923 rho=119201
             CHECKSUM_FILE=
             LAS_BINARY=${las_path}
@@ -79,7 +79,7 @@ cado_define_test(c90_21553_sieve
         ENVIRONMENT
             I=11 poly=${c90_21553_poly} 
             lim0=404327 lim1=811066 lpb0=23 lpb1=23 mfb0=46 mfb1=46 ncurves0=9
-            ncurves1=10 fb=${c90_21553_roots} sqside=1
+            ncurves1=10 fb1=${c90_21553_roots} sqside=1
             q0=327127 rho=22938
             CHECKSUM_FILE=
             LAS_BINARY=${las_path}
@@ -309,7 +309,7 @@ set(c120_baseargs
         lim1=10000 lpb1=26 mfb1=28 powlim1=8000
         I=12 q0=15350029 rho=14463285
         poly=${c120_poly}
-        fb=${c120_fb}
+        fb1=${c120_fb}
         t=2)
 
 # Try sieving I (see bug 18814)

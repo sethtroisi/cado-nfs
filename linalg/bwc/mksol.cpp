@@ -49,7 +49,7 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
     unsigned int Av_multiplex = bw->n / Av_width;
     mpfq_vbase_oo_field_init_byfeatures(Av, 
             MPFQ_PRIME_MPZ, bw->p,
-            MPFQ_GROUPSIZE, Av_width,
+            MPFQ_SIMD_GROUPSIZE, Av_width,
             MPFQ_DONE);
     pi_datatype_ptr Av_pi = pi_alloc_mpfq_datatype(pi, Av);
     /* }}} */
@@ -73,7 +73,7 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
     mpfq_vbase As;
     mpfq_vbase_oo_field_init_byfeatures(As,
             MPFQ_PRIME_MPZ, bw->p,
-            MPFQ_GROUPSIZE, As_width,
+            MPFQ_SIMD_GROUPSIZE, As_width,
             MPFQ_DONE);
     /* }}} */
 
@@ -197,7 +197,7 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
      */
 
     // XXX remove ?
-    // ASSERT(Av->vec_elt_stride(Av,As_width) == As->vec_elt_stride(As, Av->groupsize(Av)));
+    // ASSERT(Av->vec_elt_stride(Av,As_width) == As->vec_elt_stride(As, Av->simd_groupsize(Av)));
 
     /* We'll load all the F coefficient matrices before the main loop
      * (and for a full interval).
@@ -207,7 +207,7 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
      * We have Av_multiplex "sets of rows", and As_multiplex "sets of columns".
      */
     void ** fcoeffs = new void*[Av_multiplex * As_multiplex];
-    size_t one_fcoeff = As->vec_elt_stride(As, Av->groupsize(Av));
+    size_t one_fcoeff = As->vec_elt_stride(As, Av->simd_groupsize(Av));
     if (tcan_print) {
         printf("Each thread allocates %zd kb for the F matrices\n",
                 (Av_multiplex *
@@ -333,7 +333,7 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
         for(unsigned int i = 0 ; i < Av_multiplex ; i++) {
             for(unsigned int j = 0 ; j < As_multiplex ; j++) {
                 void * ff = fcoeffs[i * As_multiplex + j];
-                pi_bcast(ff, Av->groupsize(Av) * bw->interval, As_pi, 0, 0, pi->m);
+                pi_bcast(ff, Av->simd_groupsize(Av) * bw->interval, As_pi, 0, 0, pi->m);
             }
         }
 
@@ -384,7 +384,7 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
                                 mmt_my_own_subvec(ymy[0]),
                                 mmt_my_own_subvec(vi[i]),
                                 As->vec_subvec(As, ff,
-                                    (bw->interval - 1 - k) * Av->groupsize(Av)),
+                                    (bw->interval - 1 - k) * Av->simd_groupsize(Av)),
                                 eblock);
                 }
                 ymy[0]->consistency = 1;

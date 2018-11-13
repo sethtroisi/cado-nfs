@@ -64,6 +64,7 @@ Required software tools
  - Support for posix threads.
  - The main cado-nfs.py script uses a lot of unix tools: Python, Python3,
    ssh, rsync, gzip to mention but a few.
+ - For a large computation, MySQL is recommended.
 
 Optionally:
 

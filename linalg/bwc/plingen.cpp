@@ -288,9 +288,8 @@ static inline unsigned int expected_pi_length_lowerbound(dims * d, unsigned int 
 
 /* TODO: adapt for GF(2) */
 int
-bw_lingen_basecase(bmstatus_ptr bm, matpoly_ptr pi, matpoly_srcptr E, unsigned int *delta) /*{{{*/
+bw_lingen_basecase_raw(bmstatus_ptr bm, matpoly_ptr pi, matpoly_srcptr E, unsigned int *delta) /*{{{*/
 {
-    tree_stats::sentinel dummy(stats, __func__, E->size, false);
     int generator_found = 0;
 
     dims * d = bm->d;
@@ -678,7 +677,14 @@ bw_lingen_basecase(bmstatus_ptr bm, matpoly_ptr pi, matpoly_srcptr E, unsigned i
     free(pi_lengths);   /* What shall we do with this one ??? */
 
     return generator_found;
-}/*}}}*/
+}
+int
+bw_lingen_basecase(bmstatus_ptr bm, matpoly_ptr pi, matpoly_srcptr E, unsigned int *delta)
+{
+    tree_stats::sentinel dummy(stats, __func__, E->size, false);
+    return bw_lingen_basecase_raw(bm, pi, E, delta);
+}
+/*}}}*/
 
 /*}}}*/
 
@@ -3047,6 +3053,28 @@ void print_node_assignment(MPI_Comm comm)
         }
     }
     free(global);
+}
+
+/* used by testing code */
+void test_basecase(abdst_field ab, unsigned int m, unsigned int n, size_t L, gmp_randstate_t rstate)
+{
+    bmstatus bm;
+    bmstatus_init(bm, m, n);
+    mpz_t p;
+    mpz_init(p);
+    abfield_characteristic(ab, p);
+    abfield_specify(bm->d->ab, MPFQ_PRIME_MPZ, p);
+    unsigned int t0 = bm->t;
+    unsigned int * delta = (unsigned int*) malloc((m + n) * sizeof(unsigned int));
+    for(unsigned int j = 0 ; j < m + n ; delta[j++]=t0);
+    matpoly pi, E;
+    matpoly_init(ab, E, m, m+n, L);
+    matpoly_fill_random(ab, E, L, rstate);
+    matpoly_init(ab, pi, 0,0,0);
+    bw_lingen_basecase_raw(bm, pi, E, delta);
+    free(delta);
+    bmstatus_clear(bm);
+    mpz_clear(p);
 }
 
 

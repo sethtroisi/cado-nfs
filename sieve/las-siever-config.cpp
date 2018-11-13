@@ -12,6 +12,8 @@
 
 void siever_config::declare_usage(param_list_ptr pl)
 {
+    param_list_decl_usage(pl, "I",    "set sieving region to 2^I times J");
+    param_list_decl_usage(pl, "A",    "set sieving region to 2^A");
     param_list_decl_usage(pl, "lim0", "factor base bound on side 0");
     param_list_decl_usage(pl, "lim1", "factor base bound on side 1");
     param_list_decl_usage(pl, "lpb0", "set large prime bound on side 0 to 2^lpb0");
@@ -32,7 +34,7 @@ void siever_config::declare_usage(param_list_ptr pl)
     param_list_decl_usage(pl, "unsievethresh", "Unsieve all p > unsievethresh where p|gcd(a,b)");
 }
 
-void siever_config::display() const /*{{{*/
+void siever_config::display(int side, unsigned int bitsize) const /*{{{*/
 {
     if (bitsize == 0) return;
 
@@ -60,39 +62,21 @@ bool siever_config::parse_default(siever_config & sc, param_list_ptr pl)
 {
     /* The default config is not necessarily a complete bit of
      * information.
-     *
-     * The field with the bitsize of q is here filled with q0 as found in
-     * the command line. Note though that this is only one choice among
-     * several possible (q1, or just no default).
-     * For the descent, we do not intend to have a default config, thus
-     * specifying q0 makes no sense. Likewise, for file-based todo lists,
-     * we have no default either, and no siever is configured to provide
-     * this ``default'' behaviour (yet, the default bits here are used to
-     * pre-fill the config data later on).
      */
 
-    /* Note: the stuff about the config being complete or not is mostly
-     * rubbish. sieve_info, as such, no longer has the
-     * first-class-citizen status it once had.
-     *
+    /*
      * Note that lim0 lim1 powlim0 powlim1 are also parsed from
      * fb_factorbase::fb_factorbase, using only the command line (and no
      * hint file, in particular). This is intended to be the "max" pair
      * of limits.
      */
-    mpz_t q0;
-    mpz_init(q0);
-    if (param_list_parse_mpz(pl, "q0", q0)) {
-        sc.bitsize = mpz_sizeinbase(q0, 2);
-    }
-    mpz_clear(q0);
-    sc.side = 1; // Legacy.
-    if (!param_list_parse_int(pl, "sqside", &sc.side)) {
-        verbose_output_print(0, 1, "# Warning: sqside not given, "
-                "assuming side 1 for backward compatibility.\n");
-    }
+
     param_list_parse_double(pl, "lambda0", &(sc.sides[0].lambda));
     param_list_parse_double(pl, "lambda1", &(sc.sides[1].lambda));
+    /*
+     * Note: the stuff about the config being complete or not is mostly
+     * rubbish now...
+     */
     int complete = 1;
     complete &= param_list_parse_ulong(pl, "lim0", &(sc.sides[0].lim));
     complete &= param_list_parse_ulong(pl, "lim1", &(sc.sides[1].lim));
@@ -226,15 +210,15 @@ fb_factorbase::key_type siever_config::instantiate_thresholds(int side) const
 siever_config siever_config_pool::get_config_for_q(las_todo_entry const & doing) const /*{{{*/
 {
     siever_config config = base;
-    config.bitsize = mpz_sizeinbase(doing.p, 2);
-    config.side = doing.side;
+    unsigned int bitsize = mpz_sizeinbase(doing.p, 2);
+    int side = doing.side;
 
     /* Do we have a hint table with specifically tuned parameters,
      * well suited to this problem size ? */
-    siever_config const * adapted = get_hint(config.side, config.bitsize);
+    siever_config const * adapted = get_hint(side, bitsize);
     if (adapted) {
         config = *adapted;
-        verbose_output_print(0, 1, "# Using parameters from hint list for q~2^%d on side %d [%d@%d]\n", config.bitsize, config.side, config.bitsize, config.side);
+        verbose_output_print(0, 1, "# Using parameters from hint list for q~2^%d on side %d [%d@%d]\n", bitsize, side, bitsize, side);
     }
 
     if (doing.iteration) {
@@ -260,6 +244,16 @@ siever_config siever_config_pool::get_config_for_q(las_todo_entry const & doing)
 
     return config;
 }/*}}}*/
+
+void 
+siever_config_pool::declare_usage(cxx_param_list & pl)/*{{{*/
+{
+    param_list_decl_usage(pl, "hint-table", "filename with per-special q sieving data");
+#ifdef  DLP_DESCENT
+    param_list_decl_usage(pl, "descent-hint-table", "Alias to hint-table");
+#endif
+}
+/*}}}*/
 
 siever_config_pool::siever_config_pool(cxx_param_list & pl)/*{{{*/
 {
@@ -311,13 +305,16 @@ siever_config_pool::siever_config_pool(cxx_param_list & pl)/*{{{*/
         /* start with the global defaults */
         sc = base;
 
+        int side;
+        unsigned int bitsize;
+
         z = strtoul(x, &x, 10);
         ASSERT_ALWAYS(z > 0);
-        sc.bitsize = z;
+        bitsize = z;
         switch(*x++) {
             case '@' :
-                sc.side = strtoul(x, &x, 0);
-                ASSERT_ALWAYS(sc.side < 2);
+                side = strtoul(x, &x, 0);
+                ASSERT_ALWAYS(side < 2);
                 break;
             default:
                 fprintf(stderr, "%s: parse error at %s\n", filename, line);
@@ -374,11 +371,11 @@ siever_config_pool::siever_config_pool(cxx_param_list & pl)/*{{{*/
         }
         for( ; *x ; x++) ASSERT_ALWAYS(isspace(*x));
 
-        key_type K(sc.side, sc.bitsize);
+        key_type K(side, bitsize);
 
         if (hints.find(K) != hints.end()) {
             fprintf(stderr, "Error: two hints found for %d@%d\n",
-                    sc.bitsize, sc.side);
+                    bitsize, side);
             exit(EXIT_FAILURE);
         }
 

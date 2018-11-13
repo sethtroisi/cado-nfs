@@ -236,7 +236,7 @@ my $needs_mpd;
 #    --> Linear system is over GF(p) for that prime. For factoring, which
 #    is the default, we have prime==2
 #  - $splitwidth
-#    --> Number of vector which are put together in a file. This is only
+#    --> Number of vectors which are put together in a file. This is only
 #    inferred from $prime, and set to 64 for prime==2, 1 otherwise.
 #
 # {{{

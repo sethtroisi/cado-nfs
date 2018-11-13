@@ -50,6 +50,9 @@
 #include "cxx_misc.hpp"
 #endif
 #include "mpz_poly_bivariate.h"
+#ifdef HAVE_HWLOC
+#include "hwloc-aux.h"
+#endif
 
 
 #endif	/* CADO_UTILS_H_ */

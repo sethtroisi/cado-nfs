@@ -3,7 +3,7 @@
 
 #include <stdarg.h>
 #include "las-smallsieve-types.hpp"
-#include "las-types.hpp"
+#include "las-info.hpp"
 #include "bucket.hpp"
 
 

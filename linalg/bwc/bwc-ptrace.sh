@@ -49,6 +49,7 @@ pass_bwcpl_args=("$@")
 : ${matsfallback=/local/rsa768/mats}
 : ${pre_wipe=}
 : ${seed=$RANDOM}
+: ${balancing_options=reorder=columns}
 
 pass_bwcpl_args=("${pass_bwcpl_args[@]}" "seed=$seed")
 
@@ -290,7 +291,7 @@ prepare_common_arguments() {
     # This sets the common arguments for all bwc binaries
     read -s -r -d '' common <<-EOF
         matrix=$matrix
-        balancing_options=reorder=columns
+        balancing_options=$balancing_options
         mpi=$mpi
         thr=$thr
         m=$m
@@ -689,3 +690,5 @@ $magma -b $s < /dev/null | tee magma.out | grep -v '^Loading'
 if egrep -q "(Runtime error|Assertion failed)" magma.out ; then
     exit 1
 fi
+
+exit $rc

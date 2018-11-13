@@ -48,7 +48,7 @@ mpn_copyd(mp_limb_t *rp, const mp_limb_t *up, mp_size_t n)
 
 /* Set z to q. Warning: on 32-bit machines, we cannot use mpz_set_ui! */
 void
-mpz_set_uint64 (mpz_t z, uint64_t q)
+mpz_set_uint64 (mpz_ptr z, uint64_t q)
 {
   if (sizeof (unsigned long) == 8)
     mpz_set_ui (z, (unsigned long) q);
@@ -64,7 +64,7 @@ mpz_set_uint64 (mpz_t z, uint64_t q)
 }
 
 void
-mpz_set_int64 (mpz_t z, int64_t q)
+mpz_set_int64 (mpz_ptr z, int64_t q)
 {
   if (sizeof (long) == 8)
     mpz_set_si (z, (long) q);
@@ -75,6 +75,17 @@ mpz_set_int64 (mpz_t z, int64_t q)
       mpz_set_uint64 (z, -q);
       mpz_neg (z, z);
     }
+}
+void mpz_init_set_uint64 (mpz_ptr z, uint64_t x)
+{
+    mpz_init(z);
+    mpz_set_uint64(z, x);
+}
+
+void mpz_init_set_int64 (mpz_ptr z, int64_t x)
+{
+    mpz_init(z);
+    mpz_set_int64(z, x);
 }
 
 uint64_t
@@ -121,7 +132,7 @@ mpz_fits_int64_p (mpz_srcptr z)
 }
 
 void
-mpz_mul_uint64 (mpz_t a, mpz_srcptr b, uint64_t c)
+mpz_mul_uint64 (mpz_ptr a, mpz_srcptr b, uint64_t c)
 {
   if (sizeof (unsigned long) >= sizeof (uint64_t))
     mpz_mul_ui (a, b, (unsigned long) c);
@@ -152,7 +163,7 @@ mpz_cmp_uint64 (mpz_srcptr a, uint64_t c)
 }
 
 void
-mpz_addmul_uint64 (mpz_t a, mpz_srcptr b, uint64_t c)
+mpz_addmul_uint64 (mpz_ptr a, mpz_srcptr b, uint64_t c)
 {
   if (sizeof (unsigned long) >= sizeof (uint64_t))
     mpz_addmul_ui (a, b, (unsigned long) c);
@@ -167,7 +178,7 @@ mpz_addmul_uint64 (mpz_t a, mpz_srcptr b, uint64_t c)
 }
 
 void
-mpz_submul_uint64 (mpz_t a, mpz_srcptr b, uint64_t c)
+mpz_submul_uint64 (mpz_ptr a, mpz_srcptr b, uint64_t c)
 {
   if (sizeof (unsigned long) >= sizeof (uint64_t))
     mpz_submul_ui (a, b, (unsigned long) c);
@@ -182,7 +193,7 @@ mpz_submul_uint64 (mpz_t a, mpz_srcptr b, uint64_t c)
 }
 
 void
-mpz_submul_int64 (mpz_t a, mpz_srcptr b, int64_t c)
+mpz_submul_int64 (mpz_ptr a, mpz_srcptr b, int64_t c)
 {
   if (c >= 0)
     mpz_submul_uint64 (a, b, (uint64_t) c);
@@ -191,7 +202,7 @@ mpz_submul_int64 (mpz_t a, mpz_srcptr b, int64_t c)
 }
 
 void
-mpz_divexact_uint64 (mpz_t a, mpz_srcptr b, uint64_t c)
+mpz_divexact_uint64 (mpz_ptr a, mpz_srcptr b, uint64_t c)
 {
   if (sizeof (unsigned long) >= sizeof (uint64_t))
     mpz_divexact_ui (a, b, (unsigned long) c);
@@ -206,7 +217,7 @@ mpz_divexact_uint64 (mpz_t a, mpz_srcptr b, uint64_t c)
 }
 
 int
-mpz_divisible_uint64_p (mpz_t a, uint64_t c)
+mpz_divisible_uint64_p (mpz_ptr a, uint64_t c)
 {
   if (sizeof (unsigned long) >= sizeof (uint64_t))
     return mpz_divisible_ui_p (a, (unsigned long) c);
@@ -224,7 +235,7 @@ mpz_divisible_uint64_p (mpz_t a, uint64_t c)
 }
 
 void
-mpz_mul_int64 (mpz_t a, mpz_srcptr b, int64_t c)
+mpz_mul_int64 (mpz_ptr a, mpz_srcptr b, int64_t c)
 {
   if (sizeof (long) == 8)
     mpz_mul_si (a, b, (long) c);
@@ -240,7 +251,7 @@ mpz_mul_int64 (mpz_t a, mpz_srcptr b, int64_t c)
 
 /* a <- a + b * c */
 void
-mpz_addmul_int64 (mpz_t a, mpz_srcptr b, int64_t c)
+mpz_addmul_int64 (mpz_ptr a, mpz_srcptr b, int64_t c)
 {
   if (sizeof (long) == 8)
     mpz_addmul_si (a, b, (long) c);
@@ -344,8 +355,11 @@ ulong_nextcomposite (unsigned long q, unsigned long pmin)
    returned. The caller must have allocated factor_r with enough space.
    */
 int 
-next_mpz_with_factor_constraints(mpz_t r, unsigned long factor_r[],
-        const mpz_t s, const unsigned long diff, unsigned long pmin,
+next_mpz_with_factor_constraints(mpz_ptr r,
+        unsigned long factor_r[],
+        mpz_srcptr s,
+        unsigned long diff,
+        unsigned long pmin,
         unsigned long pmax)
 {
     ASSERT_ALWAYS(pmin > 2);
@@ -443,7 +457,7 @@ int nbits (uintmax_t p)
    Output: -d/2 <= r < d/2
 */
 void
-mpz_ndiv_qr (mpz_t q, mpz_t r, mpz_t n, const mpz_t d)
+mpz_ndiv_qr (mpz_ptr q, mpz_ptr r, mpz_srcptr n, mpz_srcptr d)
 {
   int s;
 
@@ -460,7 +474,7 @@ mpz_ndiv_qr (mpz_t q, mpz_t r, mpz_t n, const mpz_t d)
 }
 
 void
-mpz_ndiv_qr_ui (mpz_t q, mpz_t r, mpz_t n, unsigned long int d)
+mpz_ndiv_qr_ui (mpz_ptr q, mpz_ptr r, mpz_srcptr n, unsigned long int d)
 {
   int s;
 
@@ -480,7 +494,7 @@ mpz_ndiv_qr_ui (mpz_t q, mpz_t r, mpz_t n, unsigned long int d)
    Output satisfies |n-q*d| <= |d|/2
 */
 void
-mpz_ndiv_q (mpz_t q, mpz_t n, const mpz_t d)
+mpz_ndiv_q (mpz_ptr q, mpz_srcptr n, mpz_srcptr d)
 {
   mpz_t r;
 
@@ -490,7 +504,7 @@ mpz_ndiv_q (mpz_t q, mpz_t n, const mpz_t d)
 }
 
 void
-mpz_ndiv_q_ui (mpz_t q, mpz_t n, unsigned long int d)
+mpz_ndiv_q_ui (mpz_ptr q, mpz_srcptr n, unsigned long int d)
 {
   mpz_t r;
 
@@ -534,7 +548,7 @@ mpz_ndiv_r (mpz_ptr a, mpz_srcptr b, mpz_srcptr c)
 
 /* Return non-zero if a and b are coprime, else return 0 if gcd(a, b) != 1 */
 int
-mpz_coprime_p (mpz_t a, mpz_t b)
+mpz_coprime_p (mpz_srcptr a, mpz_srcptr b)
 {
   mpz_t g;
   mpz_init(g);
@@ -545,7 +559,7 @@ mpz_coprime_p (mpz_t a, mpz_t b)
 }
 
 long double
-mpz_get_ld (mpz_t z)
+mpz_get_ld (mpz_srcptr z)
 {
   long double ld;
   double d;
