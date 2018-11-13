@@ -811,8 +811,8 @@ void mpfq_u64k4_simd_add_ui_at(mpfq_u64k4_dst_field K MAYBE_UNUSED, mpfq_u64k4_d
         mpfq_u64k4_set(K, p, p0);
         assert(k < mpfq_u64k4_simd_groupsize(K));
         uint64_t * xp = (uint64_t *) p;
-        uint64_t mask = ((uint64_t)1) << (k%64);
-        xp[k/64] ^= v & mask;
+        uint64_t mask = ((uint64_t)(v&1)) << (k%64);
+        xp[k/64] ^= mask;
 }
 
 /* *simd_flat::code_for_simd_set_ui_all, simd_char2 */
