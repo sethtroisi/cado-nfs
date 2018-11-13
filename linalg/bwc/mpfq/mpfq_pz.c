@@ -610,6 +610,13 @@ void mpfq_pz_vec_sub(mpfq_pz_dst_field k, mpfq_pz_dst_vec w, mpfq_pz_src_vec u, 
         mpfq_pz_sub(k, w + i * mpz_size(k->p), u + i * mpz_size(k->p), v + i * mpz_size(k->p));
 }
 
+/* *pz::code_for_vec_scal_mul */
+void mpfq_pz_vec_scal_mul(mpfq_pz_dst_field k, mpfq_pz_dst_vec w, mpfq_pz_src_vec v, mpfq_pz_src_elt x, unsigned int n)
+{
+        for (unsigned int i = 0; i < n; ++i)
+        mpfq_pz_mul(k, w + i * mpz_size(k->p), v + i * mpz_size(k->p), x);
+}
+
 /* *pz::code_for_vec_conv */
 void mpfq_pz_vec_conv(mpfq_pz_dst_field k, mpfq_pz_dst_vec w, mpfq_pz_src_vec u, unsigned int n, mpfq_pz_src_vec v, unsigned int m)
 {
@@ -620,43 +627,36 @@ void mpfq_pz_vec_conv(mpfq_pz_dst_field k, mpfq_pz_dst_vec w, mpfq_pz_src_vec u,
         mpfq_pz_vec_ur_clear(k, &tmp, m + n - 1);
 }
 
-/* *Mpfq::defaults::vec::generic::code_for_vec_random, pz */
+/* *pz::code_for_vec_random */
 void mpfq_pz_vec_random(mpfq_pz_dst_field k, mpfq_pz_dst_vec w, unsigned int n, gmp_randstate_t state)
 {
-        for (unsigned int i = 0; i < n; ++i) {
-            mpfq_pz_dst_elt x = mpfq_pz_vec_coeff_ptr(k, w, i);
-        mpfq_pz_random(k, x, state);
-        }
+        for (unsigned int i = 0; i < n; ++i)
+        mpfq_pz_random(k, w + i * mpz_size(k->p), state);
 }
 
-/* *Mpfq::defaults::vec::generic::code_for_vec_random2, pz */
+/* *pz::code_for_vec_random2 */
 void mpfq_pz_vec_random2(mpfq_pz_dst_field k, mpfq_pz_dst_vec w, unsigned int n, gmp_randstate_t state)
 {
-        for (unsigned int i = 0; i < n; ++i) {
-            mpfq_pz_dst_elt x = mpfq_pz_vec_coeff_ptr(k, w, i);
-        mpfq_pz_random2(k, x, state);
-        }
+        for (unsigned int i = 0; i < n; ++i)
+        mpfq_pz_random2(k, w + i * mpz_size(k->p), state);
 }
 
-/* *Mpfq::defaults::vec::generic::code_for_vec_cmp, pz */
+/* *pz::code_for_vec_cmp */
 int mpfq_pz_vec_cmp(mpfq_pz_dst_field k, mpfq_pz_src_vec u, mpfq_pz_src_vec v, unsigned int n)
 {
         for (unsigned int i = 0; i < n; ++i) {
-            mpfq_pz_src_elt x = mpfq_pz_vec_coeff_ptr_const(k, u, i);
-            mpfq_pz_src_elt y = mpfq_pz_vec_coeff_ptr_const(k, v, i);
-        int ret = mpfq_pz_cmp(k, x, y);
+        int ret = mpfq_pz_cmp(k, u + i * mpz_size(k->p), v + i * mpz_size(k->p));
         if (ret != 0)
             return ret;
         }
         return 0;
 }
 
-/* *Mpfq::defaults::vec::generic::code_for_vec_is_zero, pz */
+/* *pz::code_for_vec_is_zero */
 int mpfq_pz_vec_is_zero(mpfq_pz_dst_field k, mpfq_pz_src_vec v, unsigned int n)
 {
         for (unsigned int i = 0; i < n; ++i) {
-            mpfq_pz_src_elt x = mpfq_pz_vec_coeff_ptr_const(k, v, i);
-        if (!mpfq_pz_is_zero(k, x))
+        if (!mpfq_pz_is_zero(k, v + i * mpz_size(k->p)))
             return 0;
         }
         return 1;
@@ -806,50 +806,6 @@ int mpfq_pz_vec_fscan(mpfq_pz_dst_field K MAYBE_UNUSED, FILE * file, mpfq_pz_vec
     return ret;
 }
 
-/* *Mpfq::defaults::vec::generic::code_for_vec_hamming_weight, pz */
-int mpfq_pz_vec_hamming_weight(mpfq_pz_dst_field k, mpfq_pz_src_vec v, unsigned int n)
-{
-        int w = 0;
-        for (unsigned int i = 0; i < n; ++i) {
-            mpfq_pz_src_elt x = mpfq_pz_vec_coeff_ptr_const(k, v, i);
-        w += !mpfq_pz_is_zero(k, x);
-        }
-        return w;
-}
-
-/* *Mpfq::defaults::vec::generic::code_for_vec_find_first_set, pz */
-int mpfq_pz_vec_find_first_set(mpfq_pz_dst_field k, mpfq_pz_src_vec v, unsigned int n)
-{
-        for (unsigned int i = 0; i < n; ++i) {
-            mpfq_pz_src_elt x = mpfq_pz_vec_coeff_ptr_const(k, v, i);
-        if (!mpfq_pz_is_zero(k, x))
-            return i;
-        }
-        return -1;
-}
-
-/* *Mpfq::defaults::vec::generic::code_for_vec_simd_hamming_weight, pz */
-int mpfq_pz_vec_simd_hamming_weight(mpfq_pz_dst_field k, mpfq_pz_src_vec v, unsigned int n)
-{
-        int w = 0;
-        for (unsigned int i = 0; i < n; ++i) {
-            mpfq_pz_src_elt x = mpfq_pz_vec_coeff_ptr_const(k, v, i);
-        w += mpfq_pz_simd_hamming_weight(k, x);
-        }
-        return w;
-}
-
-/* *Mpfq::defaults::vec::generic::code_for_vec_simd_find_first_set, pz */
-int mpfq_pz_vec_simd_find_first_set(mpfq_pz_dst_field k, mpfq_pz_src_vec v, unsigned int n)
-{
-        for (unsigned int i = 0; i < n; ++i) {
-            mpfq_pz_src_elt x = mpfq_pz_vec_coeff_ptr_const(k, v, i);
-        if (!mpfq_pz_is_zero(k, x))
-            return i * mpfq_pz_simd_groupsize(k) + mpfq_pz_simd_hamming_weight(k, x);
-        }
-        return -1;
-}
-
 /* *pz::code_for_vec_ur_init */
 void mpfq_pz_vec_ur_init(mpfq_pz_dst_field k, mpfq_pz_vec_ur * v, unsigned int n)
 {
@@ -937,6 +893,13 @@ void mpfq_pz_vec_ur_rev(mpfq_pz_dst_field k, mpfq_pz_dst_vec_ur w, mpfq_pz_src_v
         if (n & 1)
         mpfq_pz_elt_ur_set(k, w + nn * mpz_size(k->bigmul_p), v + nn * mpz_size(k->bigmul_p));
         mpfq_pz_elt_ur_clear(k, &tmp);
+}
+
+/* *pz::code_for_vec_scal_mul_ur */
+void mpfq_pz_vec_scal_mul_ur(mpfq_pz_dst_field k, mpfq_pz_dst_vec_ur w, mpfq_pz_src_vec v, mpfq_pz_src_elt x, unsigned int n)
+{
+        for (unsigned int i = 0; i < n; ++i)
+        mpfq_pz_mul_ur(k, w + i * mpz_size(k->bigmul_p), v + i * mpz_size(k->p), x);
 }
 
 static void mpfq_pz_vec_conv_ur_ks(mpfq_pz_field, mpfq_pz_dst_vec_ur, mpfq_pz_src_vec, unsigned int, mpfq_pz_src_vec, unsigned int);
@@ -1509,9 +1472,9 @@ static void mpfq_pz_wrapper_vec_conv_ur(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_
 }
 
 static void mpfq_pz_wrapper_vec_scal_mul_ur(mpfq_vbase_ptr, mpfq_pz_dst_vec_ur, mpfq_pz_src_vec, mpfq_pz_src_elt, unsigned int);
-static void mpfq_pz_wrapper_vec_scal_mul_ur(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_pz_dst_vec_ur w MAYBE_UNUSED, mpfq_pz_src_vec u MAYBE_UNUSED, mpfq_pz_src_elt c MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
+static void mpfq_pz_wrapper_vec_scal_mul_ur(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_pz_dst_vec_ur w MAYBE_UNUSED, mpfq_pz_src_vec v MAYBE_UNUSED, mpfq_pz_src_elt x MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
 {
-    mpfq_pz_vec_scal_mul_ur(vbase->obj, w, u, c, n);
+    mpfq_pz_vec_scal_mul_ur(vbase->obj, w, v, x, n);
 }
 
 static void mpfq_pz_wrapper_vec_ur_rev(mpfq_vbase_ptr, mpfq_pz_dst_vec_ur, mpfq_pz_src_vec_ur, unsigned int);
@@ -1584,30 +1547,6 @@ static void mpfq_pz_wrapper_vec_ur_init(mpfq_vbase_ptr, mpfq_pz_vec_ur *, unsign
 static void mpfq_pz_wrapper_vec_ur_init(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_pz_vec_ur * v MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
 {
     mpfq_pz_vec_ur_init(vbase->obj, v, n);
-}
-
-static int mpfq_pz_wrapper_vec_simd_find_first_set(mpfq_vbase_ptr, mpfq_pz_src_vec, unsigned int);
-static int mpfq_pz_wrapper_vec_simd_find_first_set(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_pz_src_vec v MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
-{
-    return mpfq_pz_vec_simd_find_first_set(vbase->obj, v, n);
-}
-
-static int mpfq_pz_wrapper_vec_simd_hamming_weight(mpfq_vbase_ptr, mpfq_pz_src_vec, unsigned int);
-static int mpfq_pz_wrapper_vec_simd_hamming_weight(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_pz_src_vec v MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
-{
-    return mpfq_pz_vec_simd_hamming_weight(vbase->obj, v, n);
-}
-
-static int mpfq_pz_wrapper_vec_find_first_set(mpfq_vbase_ptr, mpfq_pz_src_vec, unsigned int);
-static int mpfq_pz_wrapper_vec_find_first_set(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_pz_src_vec v MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
-{
-    return mpfq_pz_vec_find_first_set(vbase->obj, v, n);
-}
-
-static int mpfq_pz_wrapper_vec_hamming_weight(mpfq_vbase_ptr, mpfq_pz_src_vec, unsigned int);
-static int mpfq_pz_wrapper_vec_hamming_weight(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_pz_src_vec v MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
-{
-    return mpfq_pz_vec_hamming_weight(vbase->obj, v, n);
 }
 
 static int mpfq_pz_wrapper_vec_scan(mpfq_vbase_ptr, mpfq_pz_vec *, unsigned int *);
@@ -1701,9 +1640,9 @@ static void mpfq_pz_wrapper_vec_conv(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_pz_
 }
 
 static void mpfq_pz_wrapper_vec_scal_mul(mpfq_vbase_ptr, mpfq_pz_dst_vec, mpfq_pz_src_vec, mpfq_pz_src_elt, unsigned int);
-static void mpfq_pz_wrapper_vec_scal_mul(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_pz_dst_vec w MAYBE_UNUSED, mpfq_pz_src_vec u MAYBE_UNUSED, mpfq_pz_src_elt c MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
+static void mpfq_pz_wrapper_vec_scal_mul(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_pz_dst_vec w MAYBE_UNUSED, mpfq_pz_src_vec v MAYBE_UNUSED, mpfq_pz_src_elt x MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
 {
-    mpfq_pz_vec_scal_mul(vbase->obj, w, u, c, n);
+    mpfq_pz_vec_scal_mul(vbase->obj, w, v, x, n);
 }
 
 static void mpfq_pz_wrapper_vec_sub(mpfq_vbase_ptr, mpfq_pz_dst_vec, mpfq_pz_src_vec, mpfq_pz_src_vec, unsigned int);
@@ -2242,10 +2181,6 @@ void mpfq_pz_oo_field_init(mpfq_vbase_ptr vbase)
     /* missing vec_write */
     /* missing vec_import */
     /* missing vec_export */
-    vbase->vec_hamming_weight = (int (*) (mpfq_vbase_ptr, const void *, unsigned int)) mpfq_pz_wrapper_vec_hamming_weight;
-    vbase->vec_find_first_set = (int (*) (mpfq_vbase_ptr, const void *, unsigned int)) mpfq_pz_wrapper_vec_find_first_set;
-    vbase->vec_simd_hamming_weight = (int (*) (mpfq_vbase_ptr, const void *, unsigned int)) mpfq_pz_wrapper_vec_simd_hamming_weight;
-    vbase->vec_simd_find_first_set = (int (*) (mpfq_vbase_ptr, const void *, unsigned int)) mpfq_pz_wrapper_vec_simd_find_first_set;
     vbase->vec_ur_init = (void (*) (mpfq_vbase_ptr, void *, unsigned int)) mpfq_pz_wrapper_vec_ur_init;
     vbase->vec_ur_set_zero = (void (*) (mpfq_vbase_ptr, void *, unsigned int)) mpfq_pz_wrapper_vec_ur_set_zero;
     vbase->vec_ur_set_vec = (void (*) (mpfq_vbase_ptr, void *, const void *, unsigned int)) mpfq_pz_wrapper_vec_ur_set_vec;

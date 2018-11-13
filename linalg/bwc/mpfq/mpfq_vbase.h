@@ -119,10 +119,6 @@ struct mpfq_vbase_s {
     int (*vec_write)(mpfq_vbase_ptr, FILE *, const void *, unsigned int);
     int (*vec_import)(mpfq_vbase_ptr, void *, unsigned int, int, int);
     int (*vec_export)(mpfq_vbase_ptr, const void *, unsigned int, int, int);
-    int (*vec_hamming_weight)(mpfq_vbase_ptr, const void *, unsigned int);
-    int (*vec_find_first_set)(mpfq_vbase_ptr, const void *, unsigned int);
-    int (*vec_simd_hamming_weight)(mpfq_vbase_ptr, const void *, unsigned int);
-    int (*vec_simd_find_first_set)(mpfq_vbase_ptr, const void *, unsigned int);
     void (*vec_ur_init)(mpfq_vbase_ptr, void *, unsigned int);
     void (*vec_ur_set_zero)(mpfq_vbase_ptr, void *, unsigned int);
     void (*vec_ur_set_vec)(mpfq_vbase_ptr, void *, const void *, unsigned int);

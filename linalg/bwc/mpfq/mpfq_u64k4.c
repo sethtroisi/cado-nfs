@@ -242,48 +242,7 @@ void mpfq_u64k4_vec_clear(mpfq_u64k4_dst_field K MAYBE_UNUSED, mpfq_u64k4_vec * 
 }
 
 /* missing vec_setcoeff_ui */
-/* *Mpfq::defaults::vec::generic::code_for_vec_random, Mpfq::defaults::vec */
-void mpfq_u64k4_vec_random(mpfq_u64k4_dst_field k, mpfq_u64k4_dst_vec w, unsigned int n, gmp_randstate_t state)
-{
-        for (unsigned int i = 0; i < n; ++i) {
-            mpfq_u64k4_dst_elt x = mpfq_u64k4_vec_coeff_ptr(k, w, i);
-        mpfq_u64k4_random(k, x, state);
-        }
-}
-
-/* *Mpfq::defaults::vec::generic::code_for_vec_random2, Mpfq::defaults::vec */
-void mpfq_u64k4_vec_random2(mpfq_u64k4_dst_field k, mpfq_u64k4_dst_vec w, unsigned int n, gmp_randstate_t state)
-{
-        for (unsigned int i = 0; i < n; ++i) {
-            mpfq_u64k4_dst_elt x = mpfq_u64k4_vec_coeff_ptr(k, w, i);
-        mpfq_u64k4_random2(k, x, state);
-        }
-}
-
-/* *Mpfq::defaults::vec::generic::code_for_vec_cmp, Mpfq::defaults::vec */
-int mpfq_u64k4_vec_cmp(mpfq_u64k4_dst_field k, mpfq_u64k4_src_vec u, mpfq_u64k4_src_vec v, unsigned int n)
-{
-        for (unsigned int i = 0; i < n; ++i) {
-            mpfq_u64k4_src_elt x = mpfq_u64k4_vec_coeff_ptr_const(k, u, i);
-            mpfq_u64k4_src_elt y = mpfq_u64k4_vec_coeff_ptr_const(k, v, i);
-        int ret = mpfq_u64k4_cmp(k, x, y);
-        if (ret != 0)
-            return ret;
-        }
-        return 0;
-}
-
-/* *Mpfq::defaults::vec::generic::code_for_vec_is_zero, Mpfq::defaults::vec */
-int mpfq_u64k4_vec_is_zero(mpfq_u64k4_dst_field k, mpfq_u64k4_src_vec v, unsigned int n)
-{
-        for (unsigned int i = 0; i < n; ++i) {
-            mpfq_u64k4_src_elt x = mpfq_u64k4_vec_coeff_ptr_const(k, v, i);
-        if (!mpfq_u64k4_is_zero(k, x))
-            return 0;
-        }
-        return 1;
-}
-
+/* missing vec_random2 */
 /* *Mpfq::defaults::vec::io::code_for_vec_asprint, Mpfq::defaults::vec */
 int mpfq_u64k4_vec_asprint(mpfq_u64k4_dst_field K MAYBE_UNUSED, char * * pstr, mpfq_u64k4_src_vec w, unsigned int n)
 {
@@ -435,50 +394,6 @@ int mpfq_u64k4_vec_fscan(mpfq_u64k4_dst_field K MAYBE_UNUSED, FILE * file, mpfq_
     return ret;
 }
 
-/* *Mpfq::defaults::vec::generic::code_for_vec_hamming_weight, Mpfq::defaults::vec */
-int mpfq_u64k4_vec_hamming_weight(mpfq_u64k4_dst_field k, mpfq_u64k4_src_vec v, unsigned int n)
-{
-        int w = 0;
-        for (unsigned int i = 0; i < n; ++i) {
-            mpfq_u64k4_src_elt x = mpfq_u64k4_vec_coeff_ptr_const(k, v, i);
-        w += !mpfq_u64k4_is_zero(k, x);
-        }
-        return w;
-}
-
-/* *Mpfq::defaults::vec::generic::code_for_vec_find_first_set, Mpfq::defaults::vec */
-int mpfq_u64k4_vec_find_first_set(mpfq_u64k4_dst_field k, mpfq_u64k4_src_vec v, unsigned int n)
-{
-        for (unsigned int i = 0; i < n; ++i) {
-            mpfq_u64k4_src_elt x = mpfq_u64k4_vec_coeff_ptr_const(k, v, i);
-        if (!mpfq_u64k4_is_zero(k, x))
-            return i;
-        }
-        return -1;
-}
-
-/* *Mpfq::defaults::vec::generic::code_for_vec_simd_hamming_weight, Mpfq::defaults::vec */
-int mpfq_u64k4_vec_simd_hamming_weight(mpfq_u64k4_dst_field k, mpfq_u64k4_src_vec v, unsigned int n)
-{
-        int w = 0;
-        for (unsigned int i = 0; i < n; ++i) {
-            mpfq_u64k4_src_elt x = mpfq_u64k4_vec_coeff_ptr_const(k, v, i);
-        w += mpfq_u64k4_simd_hamming_weight(k, x);
-        }
-        return w;
-}
-
-/* *Mpfq::defaults::vec::generic::code_for_vec_simd_find_first_set, Mpfq::defaults::vec */
-int mpfq_u64k4_vec_simd_find_first_set(mpfq_u64k4_dst_field k, mpfq_u64k4_src_vec v, unsigned int n)
-{
-        for (unsigned int i = 0; i < n; ++i) {
-            mpfq_u64k4_src_elt x = mpfq_u64k4_vec_coeff_ptr_const(k, v, i);
-        if (!mpfq_u64k4_is_zero(k, x))
-            return i * mpfq_u64k4_simd_groupsize(k) + mpfq_u64k4_simd_hamming_weight(k, x);
-        }
-        return -1;
-}
-
 /* *Mpfq::defaults::vec::alloc::code_for_vec_ur_init, Mpfq::defaults::vec */
 void mpfq_u64k4_vec_ur_init(mpfq_u64k4_dst_field K MAYBE_UNUSED, mpfq_u64k4_vec_ur * v, unsigned int n)
 {
@@ -513,6 +428,8 @@ void mpfq_u64k4_vec_ur_clear(mpfq_u64k4_dst_field K MAYBE_UNUSED, mpfq_u64k4_vec
     free(*v);
 }
 
+/* missing vec_scal_mul_ur */
+/* missing vec_reduce */
 
 /* Polynomial functions */
 
@@ -626,18 +543,6 @@ static mpfq_u64k4_dst_vec_ur mpfq_u64k4_wrapper_vec_ur_subvec(mpfq_vbase_ptr vba
     return mpfq_u64k4_vec_ur_subvec(vbase->obj, v, i);
 }
 
-static void mpfq_u64k4_wrapper_vec_reduce(mpfq_vbase_ptr, mpfq_u64k4_dst_vec, mpfq_u64k4_dst_vec_ur, unsigned int);
-static void mpfq_u64k4_wrapper_vec_reduce(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k4_dst_vec w MAYBE_UNUSED, mpfq_u64k4_dst_vec_ur u MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
-{
-    mpfq_u64k4_vec_reduce(vbase->obj, w, u, n);
-}
-
-static void mpfq_u64k4_wrapper_vec_scal_mul_ur(mpfq_vbase_ptr, mpfq_u64k4_dst_vec_ur, mpfq_u64k4_src_vec, mpfq_u64k4_src_elt, unsigned int);
-static void mpfq_u64k4_wrapper_vec_scal_mul_ur(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k4_dst_vec_ur w MAYBE_UNUSED, mpfq_u64k4_src_vec u MAYBE_UNUSED, mpfq_u64k4_src_elt c MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
-{
-    mpfq_u64k4_vec_scal_mul_ur(vbase->obj, w, u, c, n);
-}
-
 static void mpfq_u64k4_wrapper_vec_ur_rev(mpfq_vbase_ptr, mpfq_u64k4_dst_vec_ur, mpfq_u64k4_src_vec_ur, unsigned int);
 static void mpfq_u64k4_wrapper_vec_ur_rev(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k4_dst_vec_ur w MAYBE_UNUSED, mpfq_u64k4_src_vec_ur u MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
 {
@@ -710,30 +615,6 @@ static void mpfq_u64k4_wrapper_vec_ur_init(mpfq_vbase_ptr vbase MAYBE_UNUSED, mp
     mpfq_u64k4_vec_ur_init(vbase->obj, v, n);
 }
 
-static int mpfq_u64k4_wrapper_vec_simd_find_first_set(mpfq_vbase_ptr, mpfq_u64k4_src_vec, unsigned int);
-static int mpfq_u64k4_wrapper_vec_simd_find_first_set(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k4_src_vec v MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
-{
-    return mpfq_u64k4_vec_simd_find_first_set(vbase->obj, v, n);
-}
-
-static int mpfq_u64k4_wrapper_vec_simd_hamming_weight(mpfq_vbase_ptr, mpfq_u64k4_src_vec, unsigned int);
-static int mpfq_u64k4_wrapper_vec_simd_hamming_weight(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k4_src_vec v MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
-{
-    return mpfq_u64k4_vec_simd_hamming_weight(vbase->obj, v, n);
-}
-
-static int mpfq_u64k4_wrapper_vec_find_first_set(mpfq_vbase_ptr, mpfq_u64k4_src_vec, unsigned int);
-static int mpfq_u64k4_wrapper_vec_find_first_set(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k4_src_vec v MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
-{
-    return mpfq_u64k4_vec_find_first_set(vbase->obj, v, n);
-}
-
-static int mpfq_u64k4_wrapper_vec_hamming_weight(mpfq_vbase_ptr, mpfq_u64k4_src_vec, unsigned int);
-static int mpfq_u64k4_wrapper_vec_hamming_weight(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k4_src_vec v MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
-{
-    return mpfq_u64k4_vec_hamming_weight(vbase->obj, v, n);
-}
-
 static int mpfq_u64k4_wrapper_vec_scan(mpfq_vbase_ptr, mpfq_u64k4_vec *, unsigned int *);
 static int mpfq_u64k4_wrapper_vec_scan(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k4_vec * w MAYBE_UNUSED, unsigned int * n MAYBE_UNUSED)
 {
@@ -795,21 +676,15 @@ static mpfq_u64k4_dst_vec mpfq_u64k4_wrapper_vec_subvec(mpfq_vbase_ptr vbase MAY
 }
 
 static int mpfq_u64k4_wrapper_vec_is_zero(mpfq_vbase_ptr, mpfq_u64k4_src_vec, unsigned int);
-static int mpfq_u64k4_wrapper_vec_is_zero(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k4_src_vec v MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
+static int mpfq_u64k4_wrapper_vec_is_zero(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k4_src_vec r MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
 {
-    return mpfq_u64k4_vec_is_zero(vbase->obj, v, n);
+    return mpfq_u64k4_vec_is_zero(vbase->obj, r, n);
 }
 
 static int mpfq_u64k4_wrapper_vec_cmp(mpfq_vbase_ptr, mpfq_u64k4_src_vec, mpfq_u64k4_src_vec, unsigned int);
 static int mpfq_u64k4_wrapper_vec_cmp(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k4_src_vec u MAYBE_UNUSED, mpfq_u64k4_src_vec v MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
 {
     return mpfq_u64k4_vec_cmp(vbase->obj, u, v, n);
-}
-
-static void mpfq_u64k4_wrapper_vec_random2(mpfq_vbase_ptr, mpfq_u64k4_dst_vec, unsigned int, gmp_randstate_t);
-static void mpfq_u64k4_wrapper_vec_random2(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k4_dst_vec w MAYBE_UNUSED, unsigned int n MAYBE_UNUSED, gmp_randstate_t state MAYBE_UNUSED)
-{
-    mpfq_u64k4_vec_random2(vbase->obj, w, n, state);
 }
 
 static void mpfq_u64k4_wrapper_vec_random(mpfq_vbase_ptr, mpfq_u64k4_dst_vec, unsigned int, gmp_randstate_t);
@@ -819,9 +694,9 @@ static void mpfq_u64k4_wrapper_vec_random(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpf
 }
 
 static void mpfq_u64k4_wrapper_vec_scal_mul(mpfq_vbase_ptr, mpfq_u64k4_dst_vec, mpfq_u64k4_src_vec, mpfq_u64k4_src_elt, unsigned int);
-static void mpfq_u64k4_wrapper_vec_scal_mul(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k4_dst_vec w MAYBE_UNUSED, mpfq_u64k4_src_vec u MAYBE_UNUSED, mpfq_u64k4_src_elt c MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
+static void mpfq_u64k4_wrapper_vec_scal_mul(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k4_dst_vec w MAYBE_UNUSED, mpfq_u64k4_src_vec u MAYBE_UNUSED, mpfq_u64k4_src_elt x MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
 {
-    mpfq_u64k4_vec_scal_mul(vbase->obj, w, u, c, n);
+    mpfq_u64k4_vec_scal_mul(vbase->obj, w, u, x, n);
 }
 
 static void mpfq_u64k4_wrapper_vec_sub(mpfq_vbase_ptr, mpfq_u64k4_dst_vec, mpfq_u64k4_src_vec, mpfq_u64k4_src_vec, unsigned int);
@@ -938,18 +813,6 @@ static int mpfq_u64k4_wrapper_cmp(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k4_
     return mpfq_u64k4_cmp(vbase->obj, r, s);
 }
 
-static void mpfq_u64k4_wrapper_reduce(mpfq_vbase_ptr, mpfq_u64k4_dst_elt, mpfq_u64k4_dst_elt_ur);
-static void mpfq_u64k4_wrapper_reduce(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k4_dst_elt r MAYBE_UNUSED, mpfq_u64k4_dst_elt_ur s MAYBE_UNUSED)
-{
-    mpfq_u64k4_reduce(vbase->obj, r, s);
-}
-
-static void mpfq_u64k4_wrapper_mul_ur(mpfq_vbase_ptr, mpfq_u64k4_dst_elt_ur, mpfq_u64k4_src_elt, mpfq_u64k4_src_elt);
-static void mpfq_u64k4_wrapper_mul_ur(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k4_dst_elt_ur r MAYBE_UNUSED, mpfq_u64k4_src_elt s1 MAYBE_UNUSED, mpfq_u64k4_src_elt s2 MAYBE_UNUSED)
-{
-    mpfq_u64k4_mul_ur(vbase->obj, r, s1, s2);
-}
-
 static void mpfq_u64k4_wrapper_elt_ur_sub(mpfq_vbase_ptr, mpfq_u64k4_dst_elt_ur, mpfq_u64k4_src_elt_ur, mpfq_u64k4_src_elt_ur);
 static void mpfq_u64k4_wrapper_elt_ur_sub(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k4_dst_elt_ur r MAYBE_UNUSED, mpfq_u64k4_src_elt_ur s1 MAYBE_UNUSED, mpfq_u64k4_src_elt_ur s2 MAYBE_UNUSED)
 {
@@ -1032,12 +895,6 @@ static void mpfq_u64k4_wrapper_add(mpfq_vbase_ptr, mpfq_u64k4_dst_elt, mpfq_u64k
 static void mpfq_u64k4_wrapper_add(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k4_dst_elt r MAYBE_UNUSED, mpfq_u64k4_src_elt s1 MAYBE_UNUSED, mpfq_u64k4_src_elt s2 MAYBE_UNUSED)
 {
     mpfq_u64k4_add(vbase->obj, r, s1, s2);
-}
-
-static void mpfq_u64k4_wrapper_random2(mpfq_vbase_ptr, mpfq_u64k4_dst_elt, gmp_randstate_t);
-static void mpfq_u64k4_wrapper_random2(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k4_dst_elt r MAYBE_UNUSED, gmp_randstate_t state MAYBE_UNUSED)
-{
-    mpfq_u64k4_random2(vbase->obj, r, state);
 }
 
 static void mpfq_u64k4_wrapper_random(mpfq_vbase_ptr, mpfq_u64k4_dst_elt, gmp_randstate_t);
@@ -1159,7 +1016,7 @@ void mpfq_u64k4_oo_field_init(mpfq_vbase_ptr vbase)
     /* missing get_mpn */
     /* missing get_mpz */
     vbase->random = (void (*) (mpfq_vbase_ptr, void *, gmp_randstate_t)) mpfq_u64k4_wrapper_random;
-    vbase->random2 = (void (*) (mpfq_vbase_ptr, void *, gmp_randstate_t)) mpfq_u64k4_wrapper_random2;
+    /* missing random2 */
     vbase->add = (void (*) (mpfq_vbase_ptr, void *, const void *, const void *)) mpfq_u64k4_wrapper_add;
     vbase->sub = (void (*) (mpfq_vbase_ptr, void *, const void *, const void *)) mpfq_u64k4_wrapper_sub;
     vbase->neg = (void (*) (mpfq_vbase_ptr, void *, const void *)) mpfq_u64k4_wrapper_neg;
@@ -1184,9 +1041,9 @@ void mpfq_u64k4_oo_field_init(mpfq_vbase_ptr vbase)
     vbase->elt_ur_add = (void (*) (mpfq_vbase_ptr, void *, const void *, const void *)) mpfq_u64k4_wrapper_elt_ur_add;
     vbase->elt_ur_neg = (void (*) (mpfq_vbase_ptr, void *, const void *)) mpfq_u64k4_wrapper_elt_ur_neg;
     vbase->elt_ur_sub = (void (*) (mpfq_vbase_ptr, void *, const void *, const void *)) mpfq_u64k4_wrapper_elt_ur_sub;
-    vbase->mul_ur = (void (*) (mpfq_vbase_ptr, void *, const void *, const void *)) mpfq_u64k4_wrapper_mul_ur;
+    /* missing mul_ur */
     /* missing sqr_ur */
-    vbase->reduce = (void (*) (mpfq_vbase_ptr, void *, void *)) mpfq_u64k4_wrapper_reduce;
+    /* missing reduce */
     vbase->cmp = (int (*) (mpfq_vbase_ptr, const void *, const void *)) mpfq_u64k4_wrapper_cmp;
     /* missing cmp_ui */
     vbase->is_zero = (int (*) (mpfq_vbase_ptr, const void *)) mpfq_u64k4_wrapper_is_zero;
@@ -1215,7 +1072,7 @@ void mpfq_u64k4_oo_field_init(mpfq_vbase_ptr vbase)
     vbase->vec_scal_mul = (void (*) (mpfq_vbase_ptr, void *, const void *, const void *, unsigned int)) mpfq_u64k4_wrapper_vec_scal_mul;
     /* missing vec_conv */
     vbase->vec_random = (void (*) (mpfq_vbase_ptr, void *, unsigned int, gmp_randstate_t)) mpfq_u64k4_wrapper_vec_random;
-    vbase->vec_random2 = (void (*) (mpfq_vbase_ptr, void *, unsigned int, gmp_randstate_t)) mpfq_u64k4_wrapper_vec_random2;
+    /* missing vec_random2 */
     vbase->vec_cmp = (int (*) (mpfq_vbase_ptr, const void *, const void *, unsigned int)) mpfq_u64k4_wrapper_vec_cmp;
     vbase->vec_is_zero = (int (*) (mpfq_vbase_ptr, const void *, unsigned int)) mpfq_u64k4_wrapper_vec_is_zero;
     vbase->vec_subvec = (void * (*) (mpfq_vbase_ptr, void *, int)) mpfq_u64k4_wrapper_vec_subvec;
@@ -1232,10 +1089,6 @@ void mpfq_u64k4_oo_field_init(mpfq_vbase_ptr vbase)
     /* missing vec_write */
     /* missing vec_import */
     /* missing vec_export */
-    vbase->vec_hamming_weight = (int (*) (mpfq_vbase_ptr, const void *, unsigned int)) mpfq_u64k4_wrapper_vec_hamming_weight;
-    vbase->vec_find_first_set = (int (*) (mpfq_vbase_ptr, const void *, unsigned int)) mpfq_u64k4_wrapper_vec_find_first_set;
-    vbase->vec_simd_hamming_weight = (int (*) (mpfq_vbase_ptr, const void *, unsigned int)) mpfq_u64k4_wrapper_vec_simd_hamming_weight;
-    vbase->vec_simd_find_first_set = (int (*) (mpfq_vbase_ptr, const void *, unsigned int)) mpfq_u64k4_wrapper_vec_simd_find_first_set;
     vbase->vec_ur_init = (void (*) (mpfq_vbase_ptr, void *, unsigned int)) mpfq_u64k4_wrapper_vec_ur_init;
     vbase->vec_ur_set_zero = (void (*) (mpfq_vbase_ptr, void *, unsigned int)) mpfq_u64k4_wrapper_vec_ur_set_zero;
     vbase->vec_ur_set_vec = (void (*) (mpfq_vbase_ptr, void *, const void *, unsigned int)) mpfq_u64k4_wrapper_vec_ur_set_vec;
@@ -1248,9 +1101,9 @@ void mpfq_u64k4_oo_field_init(mpfq_vbase_ptr vbase)
     vbase->vec_ur_sub = (void (*) (mpfq_vbase_ptr, void *, const void *, const void *, unsigned int)) mpfq_u64k4_wrapper_vec_ur_sub;
     vbase->vec_ur_neg = (void (*) (mpfq_vbase_ptr, void *, const void *, unsigned int)) mpfq_u64k4_wrapper_vec_ur_neg;
     vbase->vec_ur_rev = (void (*) (mpfq_vbase_ptr, void *, const void *, unsigned int)) mpfq_u64k4_wrapper_vec_ur_rev;
-    vbase->vec_scal_mul_ur = (void (*) (mpfq_vbase_ptr, void *, const void *, const void *, unsigned int)) mpfq_u64k4_wrapper_vec_scal_mul_ur;
+    /* missing vec_scal_mul_ur */
     /* missing vec_conv_ur */
-    vbase->vec_reduce = (void (*) (mpfq_vbase_ptr, void *, void *, unsigned int)) mpfq_u64k4_wrapper_vec_reduce;
+    /* missing vec_reduce */
     vbase->vec_ur_subvec = (void * (*) (mpfq_vbase_ptr, void *, int)) mpfq_u64k4_wrapper_vec_ur_subvec;
     vbase->vec_ur_subvec_const = (const void * (*) (mpfq_vbase_ptr, const void *, int)) mpfq_u64k4_wrapper_vec_ur_subvec_const;
     vbase->vec_ur_coeff_ptr = (void * (*) (mpfq_vbase_ptr, void *, int)) mpfq_u64k4_wrapper_vec_ur_coeff_ptr;

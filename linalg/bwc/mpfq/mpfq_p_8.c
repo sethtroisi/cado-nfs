@@ -432,48 +432,6 @@ void mpfq_p_8_vec_clear(mpfq_p_8_dst_field K MAYBE_UNUSED, mpfq_p_8_vec * v, uns
     free(*v);
 }
 
-/* *Mpfq::defaults::vec::generic::code_for_vec_random, Mpfq::defaults::vec, Mpfq::gfp */
-void mpfq_p_8_vec_random(mpfq_p_8_dst_field k, mpfq_p_8_dst_vec w, unsigned int n, gmp_randstate_t state)
-{
-        for (unsigned int i = 0; i < n; ++i) {
-            mpfq_p_8_dst_elt x = mpfq_p_8_vec_coeff_ptr(k, w, i);
-        mpfq_p_8_random(k, x, state);
-        }
-}
-
-/* *Mpfq::defaults::vec::generic::code_for_vec_random2, Mpfq::defaults::vec, Mpfq::gfp */
-void mpfq_p_8_vec_random2(mpfq_p_8_dst_field k, mpfq_p_8_dst_vec w, unsigned int n, gmp_randstate_t state)
-{
-        for (unsigned int i = 0; i < n; ++i) {
-            mpfq_p_8_dst_elt x = mpfq_p_8_vec_coeff_ptr(k, w, i);
-        mpfq_p_8_random2(k, x, state);
-        }
-}
-
-/* *Mpfq::defaults::vec::generic::code_for_vec_cmp, Mpfq::defaults::vec, Mpfq::gfp */
-int mpfq_p_8_vec_cmp(mpfq_p_8_dst_field k, mpfq_p_8_src_vec u, mpfq_p_8_src_vec v, unsigned int n)
-{
-        for (unsigned int i = 0; i < n; ++i) {
-            mpfq_p_8_src_elt x = mpfq_p_8_vec_coeff_ptr_const(k, u, i);
-            mpfq_p_8_src_elt y = mpfq_p_8_vec_coeff_ptr_const(k, v, i);
-        int ret = mpfq_p_8_cmp(k, x, y);
-        if (ret != 0)
-            return ret;
-        }
-        return 0;
-}
-
-/* *Mpfq::defaults::vec::generic::code_for_vec_is_zero, Mpfq::defaults::vec, Mpfq::gfp */
-int mpfq_p_8_vec_is_zero(mpfq_p_8_dst_field k, mpfq_p_8_src_vec v, unsigned int n)
-{
-        for (unsigned int i = 0; i < n; ++i) {
-            mpfq_p_8_src_elt x = mpfq_p_8_vec_coeff_ptr_const(k, v, i);
-        if (!mpfq_p_8_is_zero(k, x))
-            return 0;
-        }
-        return 1;
-}
-
 /* *Mpfq::defaults::vec::io::code_for_vec_asprint, Mpfq::defaults::vec, Mpfq::gfp */
 int mpfq_p_8_vec_asprint(mpfq_p_8_dst_field K MAYBE_UNUSED, char * * pstr, mpfq_p_8_src_vec w, unsigned int n)
 {
@@ -623,50 +581,6 @@ int mpfq_p_8_vec_fscan(mpfq_p_8_dst_field K MAYBE_UNUSED, FILE * file, mpfq_p_8_
     int ret=mpfq_p_8_vec_sscan(K,w,n,tmp);
     free(tmp);
     return ret;
-}
-
-/* *Mpfq::defaults::vec::generic::code_for_vec_hamming_weight, Mpfq::defaults::vec, Mpfq::gfp */
-int mpfq_p_8_vec_hamming_weight(mpfq_p_8_dst_field k, mpfq_p_8_src_vec v, unsigned int n)
-{
-        int w = 0;
-        for (unsigned int i = 0; i < n; ++i) {
-            mpfq_p_8_src_elt x = mpfq_p_8_vec_coeff_ptr_const(k, v, i);
-        w += !mpfq_p_8_is_zero(k, x);
-        }
-        return w;
-}
-
-/* *Mpfq::defaults::vec::generic::code_for_vec_find_first_set, Mpfq::defaults::vec, Mpfq::gfp */
-int mpfq_p_8_vec_find_first_set(mpfq_p_8_dst_field k, mpfq_p_8_src_vec v, unsigned int n)
-{
-        for (unsigned int i = 0; i < n; ++i) {
-            mpfq_p_8_src_elt x = mpfq_p_8_vec_coeff_ptr_const(k, v, i);
-        if (!mpfq_p_8_is_zero(k, x))
-            return i;
-        }
-        return -1;
-}
-
-/* *Mpfq::defaults::vec::generic::code_for_vec_simd_hamming_weight, Mpfq::defaults::vec, Mpfq::gfp */
-int mpfq_p_8_vec_simd_hamming_weight(mpfq_p_8_dst_field k, mpfq_p_8_src_vec v, unsigned int n)
-{
-        int w = 0;
-        for (unsigned int i = 0; i < n; ++i) {
-            mpfq_p_8_src_elt x = mpfq_p_8_vec_coeff_ptr_const(k, v, i);
-        w += mpfq_p_8_simd_hamming_weight(k, x);
-        }
-        return w;
-}
-
-/* *Mpfq::defaults::vec::generic::code_for_vec_simd_find_first_set, Mpfq::defaults::vec, Mpfq::gfp */
-int mpfq_p_8_vec_simd_find_first_set(mpfq_p_8_dst_field k, mpfq_p_8_src_vec v, unsigned int n)
-{
-        for (unsigned int i = 0; i < n; ++i) {
-            mpfq_p_8_src_elt x = mpfq_p_8_vec_coeff_ptr_const(k, v, i);
-        if (!mpfq_p_8_is_zero(k, x))
-            return i * mpfq_p_8_simd_groupsize(k) + mpfq_p_8_simd_hamming_weight(k, x);
-        }
-        return -1;
 }
 
 /* *Mpfq::defaults::vec::alloc::code_for_vec_ur_init, Mpfq::defaults::vec, Mpfq::gfp */
@@ -1278,9 +1192,9 @@ static void mpfq_p_8_wrapper_vec_conv_ur(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq
 }
 
 static void mpfq_p_8_wrapper_vec_scal_mul_ur(mpfq_vbase_ptr, mpfq_p_8_dst_vec_ur, mpfq_p_8_src_vec, mpfq_p_8_src_elt, unsigned int);
-static void mpfq_p_8_wrapper_vec_scal_mul_ur(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_p_8_dst_vec_ur w MAYBE_UNUSED, mpfq_p_8_src_vec u MAYBE_UNUSED, mpfq_p_8_src_elt c MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
+static void mpfq_p_8_wrapper_vec_scal_mul_ur(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_p_8_dst_vec_ur w MAYBE_UNUSED, mpfq_p_8_src_vec u MAYBE_UNUSED, mpfq_p_8_src_elt x MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
 {
-    mpfq_p_8_vec_scal_mul_ur(vbase->obj, w, u, c, n);
+    mpfq_p_8_vec_scal_mul_ur(vbase->obj, w, u, x, n);
 }
 
 static void mpfq_p_8_wrapper_vec_ur_rev(mpfq_vbase_ptr, mpfq_p_8_dst_vec_ur, mpfq_p_8_src_vec_ur, unsigned int);
@@ -1355,30 +1269,6 @@ static void mpfq_p_8_wrapper_vec_ur_init(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq
     mpfq_p_8_vec_ur_init(vbase->obj, v, n);
 }
 
-static int mpfq_p_8_wrapper_vec_simd_find_first_set(mpfq_vbase_ptr, mpfq_p_8_src_vec, unsigned int);
-static int mpfq_p_8_wrapper_vec_simd_find_first_set(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_p_8_src_vec v MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
-{
-    return mpfq_p_8_vec_simd_find_first_set(vbase->obj, v, n);
-}
-
-static int mpfq_p_8_wrapper_vec_simd_hamming_weight(mpfq_vbase_ptr, mpfq_p_8_src_vec, unsigned int);
-static int mpfq_p_8_wrapper_vec_simd_hamming_weight(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_p_8_src_vec v MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
-{
-    return mpfq_p_8_vec_simd_hamming_weight(vbase->obj, v, n);
-}
-
-static int mpfq_p_8_wrapper_vec_find_first_set(mpfq_vbase_ptr, mpfq_p_8_src_vec, unsigned int);
-static int mpfq_p_8_wrapper_vec_find_first_set(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_p_8_src_vec v MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
-{
-    return mpfq_p_8_vec_find_first_set(vbase->obj, v, n);
-}
-
-static int mpfq_p_8_wrapper_vec_hamming_weight(mpfq_vbase_ptr, mpfq_p_8_src_vec, unsigned int);
-static int mpfq_p_8_wrapper_vec_hamming_weight(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_p_8_src_vec v MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
-{
-    return mpfq_p_8_vec_hamming_weight(vbase->obj, v, n);
-}
-
 static int mpfq_p_8_wrapper_vec_scan(mpfq_vbase_ptr, mpfq_p_8_vec *, unsigned int *);
 static int mpfq_p_8_wrapper_vec_scan(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_p_8_vec * w MAYBE_UNUSED, unsigned int * n MAYBE_UNUSED)
 {
@@ -1440,9 +1330,9 @@ static mpfq_p_8_dst_vec mpfq_p_8_wrapper_vec_subvec(mpfq_vbase_ptr vbase MAYBE_U
 }
 
 static int mpfq_p_8_wrapper_vec_is_zero(mpfq_vbase_ptr, mpfq_p_8_src_vec, unsigned int);
-static int mpfq_p_8_wrapper_vec_is_zero(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_p_8_src_vec v MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
+static int mpfq_p_8_wrapper_vec_is_zero(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_p_8_src_vec r MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
 {
-    return mpfq_p_8_vec_is_zero(vbase->obj, v, n);
+    return mpfq_p_8_vec_is_zero(vbase->obj, r, n);
 }
 
 static int mpfq_p_8_wrapper_vec_cmp(mpfq_vbase_ptr, mpfq_p_8_src_vec, mpfq_p_8_src_vec, unsigned int);
@@ -1470,9 +1360,9 @@ static void mpfq_p_8_wrapper_vec_conv(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_p_
 }
 
 static void mpfq_p_8_wrapper_vec_scal_mul(mpfq_vbase_ptr, mpfq_p_8_dst_vec, mpfq_p_8_src_vec, mpfq_p_8_src_elt, unsigned int);
-static void mpfq_p_8_wrapper_vec_scal_mul(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_p_8_dst_vec w MAYBE_UNUSED, mpfq_p_8_src_vec u MAYBE_UNUSED, mpfq_p_8_src_elt c MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
+static void mpfq_p_8_wrapper_vec_scal_mul(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_p_8_dst_vec w MAYBE_UNUSED, mpfq_p_8_src_vec u MAYBE_UNUSED, mpfq_p_8_src_elt x MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
 {
-    mpfq_p_8_vec_scal_mul(vbase->obj, w, u, c, n);
+    mpfq_p_8_vec_scal_mul(vbase->obj, w, u, x, n);
 }
 
 static void mpfq_p_8_wrapper_vec_sub(mpfq_vbase_ptr, mpfq_p_8_dst_vec, mpfq_p_8_src_vec, mpfq_p_8_src_vec, unsigned int);
@@ -2024,10 +1914,6 @@ void mpfq_p_8_oo_field_init(mpfq_vbase_ptr vbase)
     /* missing vec_write */
     /* missing vec_import */
     /* missing vec_export */
-    vbase->vec_hamming_weight = (int (*) (mpfq_vbase_ptr, const void *, unsigned int)) mpfq_p_8_wrapper_vec_hamming_weight;
-    vbase->vec_find_first_set = (int (*) (mpfq_vbase_ptr, const void *, unsigned int)) mpfq_p_8_wrapper_vec_find_first_set;
-    vbase->vec_simd_hamming_weight = (int (*) (mpfq_vbase_ptr, const void *, unsigned int)) mpfq_p_8_wrapper_vec_simd_hamming_weight;
-    vbase->vec_simd_find_first_set = (int (*) (mpfq_vbase_ptr, const void *, unsigned int)) mpfq_p_8_wrapper_vec_simd_find_first_set;
     vbase->vec_ur_init = (void (*) (mpfq_vbase_ptr, void *, unsigned int)) mpfq_p_8_wrapper_vec_ur_init;
     vbase->vec_ur_set_zero = (void (*) (mpfq_vbase_ptr, void *, unsigned int)) mpfq_p_8_wrapper_vec_ur_set_zero;
     vbase->vec_ur_set_vec = (void (*) (mpfq_vbase_ptr, void *, const void *, unsigned int)) mpfq_p_8_wrapper_vec_ur_set_vec;

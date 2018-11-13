@@ -184,12 +184,6 @@
 #define Kvec_write(a0,a1,a2)	Kcommon_name_(vec_write) (K,a0,a1,a2)
 #define Kvec_import(a0,a1,a2,a3)	Kcommon_name_(vec_import) (K,a0,a1,a2,a3)
 #define Kvec_export(a0,a1,a2,a3)	Kcommon_name_(vec_export) (K,a0,a1,a2,a3)
-#define Kvec_hamming_weight(a0,a1)	Kcommon_name_(vec_hamming_weight) (K,a0,a1)
-#define Kvec_find_first_set(a0,a1)	Kcommon_name_(vec_find_first_set) (K,a0,a1)
-
-#define Kvec_simd_hamming_weight(a0,a1)	Kcommon_name_(vec_simd_hamming_weight) (K,a0,a1)
-#define Kvec_simd_find_first_set(a0,a1)	Kcommon_name_(vec_simd_find_first_set) (K,a0,a1)
-
 
 #define Kvec_ur_init(a0,a1)	Kcommon_name_(vec_ur_init) (K,a0,a1)
 #define Kvec_ur_set_zero(a0,a1)	Kcommon_name_(vec_ur_set_zero) (K,a0,a1)
