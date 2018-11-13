@@ -1,13 +1,13 @@
 #include "cado.h"
 #include "memory.h"
 #include "las-threads.hpp"
-#include "las-types.hpp"
+#include "las-info.hpp"
 #include "las-config.h"
 #include "las-auxiliary-data.hpp"
 
 template <typename T>
 void
-reservation_array<T>::allocate_buckets(int n_bucket, double fill_ratio, int logI, nfs_aux & aux, thread_pool & pool)
+reservation_array<T>::allocate_buckets(las_memory_accessor & memory, int n_bucket, double fill_ratio, int logI, nfs_aux & aux, thread_pool & pool)
 {
     if (n_bucket <= 0) return;
 
@@ -25,12 +25,14 @@ reservation_array<T>::allocate_buckets(int n_bucket, double fill_ratio, int logI
       auto & B(BAs[i]);
       /* Arrange so that the largest allocations are done first ! */
       double cost = ratio/n * BUCKET_REGIONS[T::level] * n_bucket * sizeof(typename T::update_t);
-      pool.add_task_lambda([=,&B,&aux](worker_thread * worker,int){
+      pool.add_task_lambda([=,&B,&aux,&memory](worker_thread * worker,int){
             timetree_t & timer(aux.th[worker->rank()].timer);
             ENTER_THREAD_TIMER(timer);
+#ifndef DISABLE_TIMINGS
             timetree_t::accounting_sibling dummy(timer, tdict_slot_for_alloc_buckets);
+#endif
             TIMER_CATEGORY(timer, bookkeeping());
-            B.allocate_memory(n_bucket, ratio / n, logI);
+            B.allocate_memory(memory, n_bucket, ratio / n, logI);
               }, i, 2, cost);
       /* queue 2. Joined in nfs_work::allocate_buckets */
   }
@@ -155,7 +157,9 @@ reservation_group::reservation_group(int nr_bucket_arrays)
  * allocation either on the bare or non-bare bucket arrays.
  */
 void
-reservation_group::allocate_buckets(const int *n_bucket,
+reservation_group::allocate_buckets(
+        las_memory_accessor & memory,
+        const int *n_bucket,
         bkmult_specifier const& mult,
         std::array<double, FB_MAX_PARTS> const & fill_ratio, int logI,
         nfs_aux & aux,
@@ -174,22 +178,22 @@ reservation_group::allocate_buckets(const int *n_bucket,
    * hints".
    */
   if (with_hints) {
-      RA1_short.allocate_buckets(n_bucket[1], mult.get<T1s>()*fill_ratio[1], logI, aux, pool);
-      RA2_short.allocate_buckets(n_bucket[2], mult.get<T2s>()*fill_ratio[2], logI, aux, pool);
-      RA3_short.allocate_buckets(n_bucket[3], mult.get<T3s>()*fill_ratio[3], logI, aux, pool);
+      RA1_short.allocate_buckets(memory, n_bucket[1], mult.get<T1s>()*fill_ratio[1], logI, aux, pool);
+      RA2_short.allocate_buckets(memory, n_bucket[2], mult.get<T2s>()*fill_ratio[2], logI, aux, pool);
+      RA3_short.allocate_buckets(memory, n_bucket[3], mult.get<T3s>()*fill_ratio[3], logI, aux, pool);
 
       /* Long hint bucket arrays get filled by downsorting. The level-2 longhint
          array gets the shorthint updates from level 3 sieving, and the level-1
          longhint array gets the shorthint updates from level 2 sieving as well
          as the previously downsorted longhint updates from level 3 sieving. */
-      RA1_long.allocate_buckets(n_bucket[1], mult.get<T1l>()*(fill_ratio[2] + fill_ratio[3]), logI, aux, pool);
-      RA2_long.allocate_buckets(n_bucket[2], mult.get<T2l>()*fill_ratio[3], logI, aux, pool);
+      RA1_long.allocate_buckets(memory, n_bucket[1], mult.get<T1l>()*(fill_ratio[2] + fill_ratio[3]), logI, aux, pool);
+      RA2_long.allocate_buckets(memory, n_bucket[2], mult.get<T2l>()*fill_ratio[3], logI, aux, pool);
   } else {
-      RA1_empty.allocate_buckets(n_bucket[1], mult.get<T1s>()*fill_ratio[1], logI, aux, pool);
-      RA2_empty.allocate_buckets(n_bucket[2], mult.get<T2s>()*fill_ratio[2], logI, aux, pool);
-      RA3_empty.allocate_buckets(n_bucket[3], mult.get<T3s>()*fill_ratio[3], logI, aux, pool);
-      RA1_logp.allocate_buckets(n_bucket[1], mult.get<T1l>()*(fill_ratio[2] + fill_ratio[3]), logI, aux, pool);
-      RA2_logp.allocate_buckets(n_bucket[2], mult.get<T2l>()*fill_ratio[3], logI, aux, pool);
+      RA1_empty.allocate_buckets(memory, n_bucket[1], mult.get<T1s>()*fill_ratio[1], logI, aux, pool);
+      RA2_empty.allocate_buckets(memory, n_bucket[2], mult.get<T2s>()*fill_ratio[2], logI, aux, pool);
+      RA3_empty.allocate_buckets(memory, n_bucket[3], mult.get<T3s>()*fill_ratio[3], logI, aux, pool);
+      RA1_logp.allocate_buckets(memory, n_bucket[1], mult.get<T1l>()*(fill_ratio[2] + fill_ratio[3]), logI, aux, pool);
+      RA2_logp.allocate_buckets(memory, n_bucket[2], mult.get<T2l>()*fill_ratio[3], logI, aux, pool);
   }
 }
 

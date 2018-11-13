@@ -1,6 +1,6 @@
 #include "cado.h"
 #include <math.h>       /* rint etc */
-#include "las-types.hpp"
+#include "las-info.hpp"
 #include "las-qlattice.hpp"
 #include "las-arith.hpp"
 

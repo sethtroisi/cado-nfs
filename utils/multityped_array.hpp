@@ -1,7 +1,7 @@
 #ifndef MULTITYPED_ARRAY_HPP_
 #define MULTITYPED_ARRAY_HPP_
 
-/* A multityped_array<F, 4> is equivalent to
+/* A multityped_array<F, 1, 4> is equivalent to
  *   struct foo {
  *      F<1>::type x1;
  *      F<2>::type x2;

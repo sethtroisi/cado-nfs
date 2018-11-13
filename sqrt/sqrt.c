@@ -1342,14 +1342,14 @@ void declare_usage(param_list pl)
     param_list_decl_usage(pl, "index", "Index file, as produced by 'merge'");
     param_list_decl_usage(pl, "ker", "Kernel file, as produced by 'characters'");
     param_list_decl_usage(pl, "prefix", "File name prefix used for output files");
-    param_list_decl_usage(pl, "ab", "(switch) For each dependency, create file with the a,b-values of the relations used in that dependency");
-    param_list_decl_usage(pl, "side0", "(switch) Compute square root for side 0 and store in file");
-    param_list_decl_usage(pl, "side1", "(switch) Compute square root for side 1 and store in file");
-    param_list_decl_usage(pl, "gcd", "(switch) Compute gcd of the two square roots. Requires square roots on both sides");
+    param_list_decl_usage(pl, "ab", "For each dependency, create file with the a,b-values of the relations used in that dependency");
+    param_list_decl_usage(pl, "side0", "Compute square root for side 0 and store in file");
+    param_list_decl_usage(pl, "side1", "Compute square root for side 1 and store in file");
+    param_list_decl_usage(pl, "gcd", "Compute gcd of the two square roots. Requires square roots on both sides");
     param_list_decl_usage(pl, "dep", "The initial dependency for which to compute square roots");
     param_list_decl_usage(pl, "t",   "The number of dependencies to process (default 1)");
     param_list_decl_usage(pl, "v", "More verbose output");
-    param_list_decl_usage(pl, "force-posix-threads", "(switch)");
+    param_list_decl_usage(pl, "force-posix-threads", "force the use of posix threads, do not rely on platform memory semantics");
 }
 
 void usage(param_list pl, const char * argv0, FILE *f)

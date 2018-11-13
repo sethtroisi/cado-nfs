@@ -596,7 +596,7 @@ static void declare_usage(param_list pl)
     param_list_decl_usage(pl, "sample", "file where to find a sample of relations");
     param_list_decl_usage(pl, "renumber", "renumber table");
     param_list_decl_usage(pl, "shrink-factor", "simulate with a matrix that number (integer >= 1) times smaller");
-    param_list_decl_usage(pl, "dl", "(switch) dl mode");
+    param_list_decl_usage(pl, "dl", "dl mode");
     param_list_decl_usage(pl, "allow-compsq", "(switch) allows composite sq");
     param_list_decl_usage(pl, "qfac-min", "factors of q must be at least that");
     param_list_decl_usage(pl, "qfac-max", "factors of q must be at most that");

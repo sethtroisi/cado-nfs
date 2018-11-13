@@ -14,12 +14,16 @@ extern "C" {
 #endif
 
 extern unsigned int *gpf;
-extern unsigned int gpf_max;
 
 void gpf_init(unsigned int);
+
+unsigned int gpf_safe_get(const unsigned long i);
 static inline unsigned int gpf_get(const unsigned long i) {
-    ASSERT(i <= gpf_max);
+#ifndef NDEBUG
+    return gpf_safe_get(i);
+#else
     return gpf[i];
+#endif
 }
 
 void gpf_clear();

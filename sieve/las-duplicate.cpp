@@ -188,8 +188,7 @@ subtract_fb_log(const unsigned char lognorm,
 static bool
 sq_finds_relation(las_info const & las,
         las_todo_entry const & doing,
-        relation const& rel,
-        facul_strategies_t const * strategies)
+        relation const& rel)
 {
   siever_config conf;
   qlattice_basis Q;
@@ -199,8 +198,6 @@ sq_finds_relation(las_info const & las,
     return false;
   }
   int logI = conf.logI;
-
-  ASSERT_ALWAYS(conf.side == doing.side);
 
   {   // Print some info
       verbose_output_vfprint(0, VERBOSE_LEVEL, gmp_vfprintf,
@@ -231,7 +228,7 @@ sq_finds_relation(las_info const & las,
   }
 
   /* If the coordinate is outside the i,j-region used when sieving
-     the special-q described in si, then it's not a duplicate */
+     the special-q described in [doing], then it's not a duplicate */
   if (j >= J || (i < -(1L << (logI-1))) || (i >= (1L << (logI-1))))
   {
     verbose_output_print(0, VERBOSE_LEVEL,
@@ -307,6 +304,7 @@ sq_finds_relation(las_info const & las,
   }
 
   std::array<std::vector<cxx_mpz>, 2> f;
+  facul_strategies_t const * strategies = las.get_strategies(conf);
   int pass = factor_both_leftover_norms(cof, f, {{conf.sides[0].lim, conf.sides[1].lim}}, strategies);
 
   if (pass <= 0) {
@@ -321,9 +319,9 @@ sq_finds_relation(las_info const & las,
 
 
 /* This function decides whether the given (sq,side) was previously
- * sieved (compared to the current special-q stored in si.doing).
+ * sieved (compared to the current special-q stored in [doing]).
  * This takes qmin and qmax into account, on the side of the sq. The side
- * of si.doing is irrelevant here.
+ * doing.side is irrelevant here.
  */
 static int
 sq_was_previously_sieved (las_info const & las, const uint64_t sq, int side, las_todo_entry const & doing)
@@ -391,8 +389,7 @@ all_multiples(std::vector<uint64_t> & prime_list) {
 int
 relation_is_duplicate(relation const& rel,
         las_todo_entry const & doing,
-        las_info const& las,
-        facul_strategies_t const * old_strategies)
+        las_info const& las)
 {
     /* If the special-q does not fit in an unsigned long, we assume it's not a
        duplicate and just move on */
@@ -425,13 +422,16 @@ relation_is_duplicate(relation const& rel,
 
             // can this p be part of valid sq ?
             if (! las.allow_composite_q) {
+                /* this check is also done in sq_was_previously_sieved,
+                 * but it's easy enough to skip the divisibility test
+                 * when we know there's no point.
+                 */
                 if ((p < las.dupqmin[side]) || (p >= las.dupqmax[side])) {
                     continue;
                 }
             } else {
-                if ((p < las.qfac_min) || (p >= las.qfac_max)) {
+                if (!las.is_in_qfac_range(p))
                     continue;
-                }
             }
 
             /* projective primes are currently not allowed for composite
@@ -452,7 +452,7 @@ relation_is_duplicate(relation const& rel,
             // relation.
             las_todo_entry other = special_q_from_ab(rel.a, rel.b, sq, side);
 
-            bool is_dupe = sq_finds_relation(las, other, rel, old_strategies);
+            bool is_dupe = sq_finds_relation(las, other, rel);
             verbose_output_print(0, VERBOSE_LEVEL,
                     "# DUPECHECK relation is probably%s a dupe\n",
                     is_dupe ? "" : " not");

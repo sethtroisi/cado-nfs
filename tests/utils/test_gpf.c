@@ -39,6 +39,5 @@ int main ()
   }
   if (test(150) == 0)
     rc = EXIT_FAILURE;
-  gpf_clear();
   exit(rc);
 }

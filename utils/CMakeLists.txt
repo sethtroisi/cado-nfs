@@ -3,7 +3,7 @@ set (sources
         cado_poly.c timing.cpp getprime.c mod_ul.c relation.cpp
         relation-tools.c
         modredc_ul.c modredc_15ul.c modredc_2ul2.c modul_poly.c gmp_aux.c
-        double_poly.cpp rootfinder.c params.c gcd.c
+        double_poly.cpp rootfinder.cpp params.c gcd.c
         gzip.c misc.c
         mpz_mat.cpp mpz_poly.cpp crc.c purgedfile.c bit_vector.c
         barrier.c usp.c fix-endianness.c memusage.c
@@ -16,13 +16,16 @@ set (sources
         version_info.c
 	modified_files.c threadpool.cpp mpz_poly_bivariate.c
         gmpxx.cpp
-        rho.c gpf.c
+        rho.c gpf.cpp
 )
 if (HAVE_GLIBC_VECTOR_INTERNALS)
     set(sources ${sources} mmap_allocator.cpp)
 endif()
 if (NOT MINGW)
     set (sources ${sources} cado_popen.c)
+endif()
+if(HAVE_HWLOC)
+    set (sources ${sources} hwloc-aux.c)
 endif()
 
 set (sources_io
@@ -53,6 +56,9 @@ add_library (utils ${CADO_SHARED} ${sources})
 set_source_files_properties("${CMAKE_CURRENT_BINARY_DIR}/modified_files.c" PROPERTIES GENERATED TRUE)
 add_dependencies(utils list_modified_files)
 target_link_libraries(utils pthread ${gmp_libname} m)
+if(HAVE_HWLOC)
+target_link_libraries(utils hwloc)
+endif()
 
 add_library (utils_with_io ${CADO_SHARED} ${sources_io})
 target_link_libraries(utils_with_io utils)

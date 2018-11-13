@@ -5,6 +5,8 @@
 #include <array>
 #include <memory>
 #include <string.h>
+#include <string>
+#include <sstream>
 #include "tdict.hpp"
 #include "las-base.hpp"
 
@@ -22,6 +24,8 @@ struct las_report {
         unsigned long cofactored;
         unsigned long smooth;
     } survivors;
+    unsigned long nr_sq_processed=0;
+    unsigned long nr_sq_discarded=0;
     unsigned long total_logI=0;
     unsigned long total_J=0;
     unsigned long reports=0;
@@ -35,6 +39,9 @@ struct las_report {
     double ttbuckets_apply=0;
     double ttf=0;                 /* factor_survivors */
     double ttcof=0;               /* cofactorisation */
+    int nwaste=0;                 /* number of restarted special-q's */
+    double waste=0;               /* restarted special-q's */
+    double cumulated_wait_time=0; /* wait time in threadpool */
     las_report() = default;
     las_report(las_report const&) = delete;
     las_report(las_report &&) = default;
@@ -59,6 +66,8 @@ struct las_report {
                 ps[i] += qs[i];
             }
         }
+        nr_sq_processed += q.nr_sq_processed;
+        nr_sq_discarded += q.nr_sq_discarded;
         total_logI += q.total_logI;
         total_J += q.total_J;
         reports += q.reports;
@@ -69,6 +78,8 @@ struct las_report {
         ttbuckets_apply += q.ttbuckets_apply;
         ttf     += q.ttf;
         ttcof     += q.ttcof;
+        nwaste    += q.nwaste;
+        waste     += q.waste;
         if (survivor_counts) {
             count_matrix * ps = survivor_counts.get();
             count_matrix * qs = q.survivor_counts.get();
@@ -106,12 +117,13 @@ struct coarse_las_timers {
     static int search_survivors() { return 1; }
     static int sieving(int side) { return 2 + side; }
     static int sieving_mixed() { return 4; }
-    static int cofactoring(int side) { return 5 + side; }
-    static int cofactoring_mixed() { return 7; }
-    static int batch(int side) { return 8 + side; }
-    static int batch_mixed() { return 10; }
-    static int thread_wait() { return 11; }
-    static std::string explain(int x) {
+    static int norms(int side) { return 5 + side; }
+    static int cofactoring(int side) { return 7 + side; }
+    static int cofactoring_mixed() { return 9; }
+    static int batch(int side) { return 10 + side; }
+    static int batch_mixed() { return 12; }
+    static int thread_wait() { return 13; }
+    static std::string explain_base(int x) {
         switch(x) {
             case -1: return "uncategorized (top-level bookkeeping)";
             case 0: return "bookkeeping (lower levels)";
@@ -119,19 +131,30 @@ struct coarse_las_timers {
             case 2: return "sieving on side 0";
             case 3: return "sieving on side 1";
             case 4: return "sieving (not differentiated)";
-            case 5: return "cofactoring on side 0";
-            case 6: return "cofactoring on side 1";
-            case 7: return "cofactoring (not differentiated)";
-            case 8: return "product trees on side 0";
-            case 9: return "product trees on side 1";
-            case 10: return "product trees (not differentiated)";
-            case 11: return "worker thread wait";
+            case 5: return "norms on side 0";
+            case 6: return "norms on side 1";
+            case 7: return "cofactoring on side 0";
+            case 8: return "cofactoring on side 1";
+            case 9: return "cofactoring (not differentiated)";
+            case 10: return "product trees on side 0";
+            case 11: return "product trees on side 1";
+            case 12: return "product trees (not differentiated)";
+            case 13: return "worker thread wait";
             default: ASSERT_ALWAYS(0);
         }
     }
+    static std::string explain(int x) {
+        std::ostringstream os;
+        os << x << " " << explain_base(x);
+        return os.str();
+    }
 };
 
+#ifndef DISABLE_TIMINGS
 #define TIMER_CATEGORY(timer, cat) \
     timer.set_current_category(coarse_las_timers::cat)
+#else
+#define TIMER_CATEGORY(timer, cat) /**/
+#endif
 
 #endif	/* LAS_REPORT_STATS_HPP_ */

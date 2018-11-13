@@ -15,12 +15,12 @@ cxx_mpz operator "" _mpz (const char* str, size_t)
 }
 
 std::vector<std::pair<std::string, std::vector<cxx_mpz>>> examples {
-    { "X^128+(X+1)^2+(X^3+X^2+1)*(X+1)-X^2^7", {2, 3, 2, 2, 1}},
+    { "X^128+(X+1)^2+(X^3+X^2+1)*(X+1)-X^2^7", {2UL, 3UL, 2UL, 2UL, 1UL}},
     { "X+1-(X+1)", {} },
-    { "z+1", {1,1} },
+    { "z+1", {1UL,1UL} },
     /* see whether we correctly parse the c85 polynomial */
     { "960*x^4+85585660*x^3+405578084588*x^2+4213006218645262637*x-2287975327041639106629845",
-     {"-2287975327041639106629845"_mpz, "4213006218645262637"_mpz, "405578084588"_mpz, 85585660, 960}},
+     {"-2287975327041639106629845"_mpz, "4213006218645262637"_mpz, "405578084588"_mpz, 85585660UL, 960UL}},
 };
 
 std::vector<std::string> expected_failures {

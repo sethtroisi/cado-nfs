@@ -200,10 +200,7 @@ class GeneralClass(object):
     def badidealinfo(self):
         return self.__getfile("badidealinfo", "badidealinfo", "numbertheory", "badidealinfofile")
     def fb1(self):
-        if self.has_rational_side():
-            return self.__getfile("fb1", "roots.gz", "factorbase", "outputfile")
-        else:
-            return self.__getfile("fb1", "roots1.gz", "factorbase", "outputfile")
+        return self.__getfile("fb1", "roots1.gz", "factorbase", "outputfile")
     def fb0(self):
         return self.__getfile("fb0", "roots0.gz", "factorbase", "outputfile")
     def ell(self):
@@ -282,7 +279,6 @@ class GeneralClass(object):
         # TODO add threads once it's fixed.
         s=[
             self.las_bin() + "_descent",
-            "-ondemand-siever-config",
             "--recursive-descent",
             "--allow-largesq",
             "--never-discard",  # useful for small computations.
