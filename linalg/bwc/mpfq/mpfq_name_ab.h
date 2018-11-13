@@ -184,6 +184,12 @@
 #define abvec_write(a0,a1,a2,a3)	abcommon_name_(vec_write) (a0,a1,a2,a3)
 #define abvec_import(a0,a1,a2,a3,a4)	abcommon_name_(vec_import) (a0,a1,a2,a3,a4)
 #define abvec_export(a0,a1,a2,a3,a4)	abcommon_name_(vec_export) (a0,a1,a2,a3,a4)
+#define abvec_hamming_weight(a0,a1,a2)	abcommon_name_(vec_hamming_weight) (a0,a1,a2)
+#define abvec_find_first_set(a0,a1,a2)	abcommon_name_(vec_find_first_set) (a0,a1,a2)
+
+#define abvec_simd_hamming_weight(a0,a1,a2)	abcommon_name_(vec_simd_hamming_weight) (a0,a1,a2)
+#define abvec_simd_find_first_set(a0,a1,a2)	abcommon_name_(vec_simd_find_first_set) (a0,a1,a2)
+
 
 #define abvec_ur_init(a0,a1,a2)	abcommon_name_(vec_ur_init) (a0,a1,a2)
 #define abvec_ur_set_zero(a0,a1,a2)	abcommon_name_(vec_ur_set_zero) (a0,a1,a2)
