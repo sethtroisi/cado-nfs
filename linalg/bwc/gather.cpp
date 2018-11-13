@@ -351,12 +351,12 @@ struct abase_proxy {
     static abase_proxy most_natural(parallelizing_info_ptr pi) {
         return abase_proxy(pi, mpz_cmp_ui(bw->p, 2) == 0 ? 64 : 1);
     }
-    std::map<mpfq_vbase_ptr, mpfq_vbase_tmpl> tdict;
+    std::map<mpfq_vbase_ptr, mpfq_vbase_tmpl_s> tdict;
     mpfq_vbase_tmpl_ptr templates(mpfq_vbase_ptr A1) {
         auto it = tdict.find(A1);
         if (it == tdict.end())
-            mpfq_vbase_oo_init_templates(tdict[A1], A, A1);
-        return tdict[A1];
+            mpfq_vbase_oo_init_templates(&tdict[A1], A, A1);
+        return &tdict[A1];
     }
     ~abase_proxy()
     {
