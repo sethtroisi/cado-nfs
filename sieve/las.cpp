@@ -179,6 +179,19 @@ static int roots_for_composite_q(mpz_t* roots, mpz_poly_srcptr f,
 
     return nr*nr2; // can be 0.
 }
+typedef int (*sortfunc_t) (const void *, const void *);
+static int pmpz_cmp(const mpz_t *a, const mpz_t *b) {
+    return mpz_cmp(*a, *b) < 0 ? -1 : 1;
+}
+static int roots_for_composite_q_sorted(mpz_t* roots, mpz_poly_srcptr f,
+        const mpz_t q, const unsigned long * fac_q)
+{
+    int nroots = roots_for_composite_q(roots,f,q,fac_q);
+    if (roots && nroots)
+        qsort(roots, nroots, sizeof(mpz_t), (sortfunc_t) &pmpz_cmp);
+    return nroots;
+}
+
 
 
 /* Put in r the smallest legitimate special-q value that it at least
@@ -584,7 +597,7 @@ int las_todo_feed_qrange(las_info & las, param_list pl)
             if (!las.allow_composite_q) {
                 nroots = mpz_poly_roots ((mpz_t*)roots, f, q);
             } else {
-                nroots = roots_for_composite_q((mpz_t *)roots, f, q, &fac_q[0]);
+                nroots = roots_for_composite_q_sorted((mpz_t *)roots, f, q, &fac_q[0]);
             }
 
             nb_rootfinding++;
@@ -643,7 +656,7 @@ int las_todo_feed_qrange(las_info & las, param_list pl)
             if (!las.allow_composite_q) {
                 nroots = mpz_poly_roots ((mpz_t*)roots, f, q);
             } else {
-                nroots = roots_for_composite_q((mpz_t *)roots, f, q, fac_q);
+                nroots = roots_for_composite_q_sorted((mpz_t *)roots, f, q, fac_q);
             }
             if (!nroots) continue;
             if (las.galois != NULL)
