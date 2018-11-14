@@ -1605,7 +1605,6 @@ void process_bucket_region_run::cofactoring_sync (survivors_t & survivors)/*{{{*
             if (ws.conf.sublat_bound && !cur.ab_coprime()) continue;
             /* make sure threads don't write the cofactor list at the
              * same time !!! */
-            ASSERT(ws.Q.doing == aux_p->doing);
             cur.transfer_to_cofac_list(ws.cofac_candidates, aux_p->doing);
             continue; /* we deal with all cofactors at the end of las */
         }
