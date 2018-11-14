@@ -137,12 +137,15 @@ main (int argc, char *argv[])
   std::array<cxx_mpz, 2> norms;
   cxx_mpz q;
   mpz_set_ui(q, 1);
+  // Create a fake special-q
+  std::vector<uint64_t> empty;
+  las_todo_entry doing(q, q, 0, empty);
   long a;
   unsigned long b;
   while (fgets(str, MAX_SIZE, inp)) {
       if (str[0] == '#') continue;
       gmp_sscanf(str, "%ld %lu %Zd %Zd\n", &a, &b, (mpz_ptr) norms[0], (mpz_ptr) norms[1]);
-      List.emplace_back(a, b, norms, q, 0);
+      List.emplace_back(a, b, norms, &doing);
   }
   fclose_maybe_compressed(inp, infilename);
 
