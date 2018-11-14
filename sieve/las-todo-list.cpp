@@ -205,11 +205,12 @@ bool las_todo_list::feed_qrange(gmp_randstate_t rstate)
     if (!random_sampling) {
         /* We're going to process the sq's and put them into the list
            The loop processes all special-q in [q0, q1]. On loop entry,
-           the value in q0 is known to be a legitimate special-q and its
-           factorization is in fac_q. */
+           the value in q0 is known to be a legitimate special-q. Its
+           factorization is lost, so we recompute it. */
 
         /* handy aliases */
         cxx_mpz & q = q0;
+        next_legitimate_specialq(q, fac_q, q, 0, *this);
 
         struct q_r_pair {
             cxx_mpz q;
