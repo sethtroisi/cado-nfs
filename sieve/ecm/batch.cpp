@@ -756,7 +756,7 @@ factor_one (
         bool smooth = factor_simple_minded (factors[side], norm, methods,
                 lpb[side], (double) lim[side], SP[side],
                 cofac,
-                (C.sqside == side) ? (mpz_srcptr) C.sq : NULL);
+                (C.doing_p->side == side) ? (mpz_srcptr) C.doing_p->p : NULL);
         if (!smooth) {
             /* when we've knowingly decided to _do_ some cofactoring
              * after the product-tree on that side, then it's normal to

@@ -3,7 +3,7 @@
 # The following is needed for some SSE stuff
 # set (CMAKE_C_FLAGS   "-flax-vector-conversions ${CMAKE_C_FLAGS}")
 
-include_directories (ecm)
+include_directories (. ecm)
 #include_directories (${CMAKE_CURRENT_BINARY_DIR})
 link_directories (${CMAKE_CURRENT_BINARY_DIR}/ecm)
 
