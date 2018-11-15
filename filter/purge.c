@@ -208,7 +208,7 @@ static void singletons_and_cliques_removal(purge_matrix_ptr mat, int nsteps,
 
   /* May need an extra step of clique removal + singletons removal if excess is
      still larger than keep. It may happen due to the fact that each clique does
-     not make the excess go down by one but can (rarely) left the excess
+     not make the excess go down by one but can (rarely) leave the excess
      unchanged. */
   if (excess > final_excess && nsteps > 0)
   {

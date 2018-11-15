@@ -1284,8 +1284,12 @@ class WuAccess(object): # {
         cursor = self.get_cursor()
         if not self.conn.in_transaction:
             cursor.begin(EXCLUSIVE)
+# This "priority" stuff is the root cause for the server taking time to
+# hand out WUs when the count of available WUs drops to zero.
+#        r = self.mapper.table.where(cursor, limit = 1,
+#                                    order=("priority", "DESC"),
+#                                    eq={"status": WuStatus.AVAILABLE})
         r = self.mapper.table.where(cursor, limit = 1,
-                                    order=("priority", "DESC"),
                                     eq={"status": WuStatus.AVAILABLE})
         assert len(r) <= 1
         if len(r) == 1:
