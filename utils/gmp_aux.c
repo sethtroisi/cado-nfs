@@ -371,6 +371,9 @@ next_mpz_with_factor_constraints(mpz_ptr r,
         mpz_add_ui(r, r, 1);
     }
     while (1) {
+        /* This function is used for the composite special-q code, and it
+         * is really important that no composite special-q is considered
+         * prime.*/
         if (mpz_probab_prime_p(r, 10)) {
             if (mpz_cmp_ui(r, pmax) < 0) {
                 factor_r[0] = mpz_get_ui(r);
