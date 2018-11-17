@@ -129,7 +129,18 @@ las_todo_list::las_todo_list(cxx_cado_poly const & cpoly, cxx_param_list & pl)
          * rho>. */
         cxx_mpz t;
         if (param_list_parse_mpz(pl, "rho", (mpz_ptr) t)) {
-            /* FIXME: is q0 a legitimate special-q ? */
+            cxx_mpz q0_cmdline = q0;
+            std::vector<uint64_t> fac_q;
+            next_legitimate_specialq(q0, fac_q, q0, 0, *this);
+            if (mpz_cmp(q0, q0_cmdline) != 0) {
+                fprintf(stderr, "Error: q0 is not a legitimate special-q\n");
+                exit(EXIT_FAILURE);
+            }
+            std::vector<cxx_mpz> roots = mpz_poly_roots(cpoly->pols[sqside], q0, fac_q);
+            if (std::find(roots.begin(), roots.end(), t) == roots.end()) {
+                fprintf(stderr, "Error: rho is not a root modulo q0\n");
+                exit(EXIT_FAILURE);
+            }
             push_unlocked(q0, t, sqside);
             /* Set empty interval [q0 + 1, q0] as special-q interval */
             mpz_set(q1, q0);

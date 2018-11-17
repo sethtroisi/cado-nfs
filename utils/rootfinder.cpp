@@ -502,7 +502,7 @@ struct poly_roots_impl_details<cxx_mpz> {
         mpz_invert (y,x,p);
     }
     static bool probab_prime_p(cxx_mpz const & x) { 
-        return mpz_probab_prime_p(x, 1);
+        return mpz_probab_prime_p(x, 10);
     }
     static inline bool fits(cxx_mpz const &) { return true; }
     static inline cxx_mpz get_from_cxx_mpz(cxx_mpz const & x) { return x; }
