@@ -101,6 +101,8 @@ my $my_cmdline="$0 $main @ARGV";
 ## used for running all programs.
 my $mpiexec='@MPIEXEC@';
 $mpiexec='' if $mpiexec =~ m{^\@.*\@$};
+my $mpiexec_extra_stanzas='@MPIEXEC_EXTRA_STANZAS@';
+$mpiexec_extra_stanzas='' if $mpiexec_extra_stanzas =~ m{^\@.*\@$};
 
 
 my $bindir;
@@ -336,7 +338,7 @@ $splitwidth = ($prime == 2) ? 64 : 1;
 
 print "$my_cmdline\n" if $my_verbose_flags->{'cmdline'};
 
-if ($main =~ /:mpirun(?:_single)?/) {
+if ($main =~ /:(?:mpi|s)run(?:_single)?/) {
     # ok, this is really an ugly ugly hack. We have some mpi detection
     # magic in this script, which we would like to use. So the :mpirun
     # meta-command is just for that. Of course the argument requirements
@@ -345,6 +347,11 @@ if ($main =~ /:mpirun(?:_single)?/) {
     $param->{'prime'}=2;
     $m=$n=64;
     $wdir=$param->{'wdir'}="/";
+    if ($main =~ /^:srun/) {
+        # Setting this will trigger mpi_needed, mpi detection check,
+        # and ultimately passing -n
+        $mpiexec='srun';
+    }
 }
 
 # {{{ Some important argument checks
@@ -549,6 +556,7 @@ if (!defined($random_matrix) && !-d $wdir) {        # create $wdir on script nod
 
 # If we've been built with mpi, then we _need_ mpi for running. Otherwise
 # we run into shared libraries mess.
+
 my $mpi_needed = $mpiexec ne '';
 
 # @mpi_precmd_single is something silly; we want provision for the case
@@ -695,6 +703,19 @@ sub detect_mpi {
                     my $v = `unset I_MPI_ROOT ; . $mpi/mpivars.sh  ; echo \$I_MPI_ROOT`;
                     if ($v) {
                         $mpi_ver="Intel MPI";
+#       comment out, as this requires mpicc on the compute nodes (at least for debugging), and that isn't always available...
+#			my $v = `$mpi/mpicc -v`;
+#			chomp($v);
+#			if ($v =~ /Intel \(R\) MPI Library (.*?) for/) {
+#			    $mpi_ver="$1";
+#			    $mpi_ver=~/^(\d+)/;
+#                            my $mpi_year=$1;
+#                            $mpi_ver=~s/\s+/_/g;
+#			    $mpi_ver="intel-$mpi_ver";
+#                            $needs_mpd=0;
+#			} else {
+#                            warn "Could not correctly recognize mpi version (perhaps intel ?)";
+#                        }
                         $needs_mpd=0;
                     }
                     last SEVERAL_CHECKS;
@@ -877,12 +898,19 @@ if ($mpi_needed) {
     # print STDERR "$_=$ENV{$_}\n" for keys %ENV;
     detect_mpi;
 
-    push @mpi_precmd, "$mpi/mpiexec";
+    # quirk. If called with srun, then we want to avoid mpiexec anyway.
+    if ($main =~ /^:srun/) {
+        push @mpi_precmd, 'srun';
+    } else {
+        push @mpi_precmd, "$mpi/mpiexec";
+    }
 
     my $auto_hostfile_pattern="/tmp/hosts_XXXXXXXX";
 
     # Need hosts. Put that to the list @hosts first.
-    if (exists($ENV{'OAR_JOBID'}) && !defined($hostfile) && !scalar @hosts) {
+    if ($main =~ /^:srun/) {
+	    print STDERR "srun environment detected, not detecting hostfile.\n";
+    } elsif (exists($ENV{'OAR_JOBID'}) && !defined($hostfile) && !scalar @hosts) {
 	    print STDERR "OAR environment detected, setting hostfile.\n";
 	    get_mpi_hosts_oar;
 	    $auto_hostfile_pattern="/tmp/hosts.$ENV{'OAR_JOBID'}.XXXXXXX";
@@ -963,7 +991,7 @@ if ($mpi_needed) {
     if (defined($mpi_extra_args)) {
         push @mpi_precmd, split(' ', $mpi_extra_args);
     }
-    push @mpi_precmd, split(' ', '@MPIEXEC_EXTRA_STANZAS@');
+    push @mpi_precmd, split(' ', $mpiexec_extra_stanzas);
     push @mpi_precmd, split(' ', $ENV{'MPI_EXTRA_ARGS'}) if $ENV{'MPI_EXTRA_ARGS'};
 
     @mpi_precmd_single = @mpi_precmd;
@@ -1001,7 +1029,7 @@ if ($mpi_needed) {
     # without having ever tried to join in an mpi collective like
     # mpi_init(), there's potential for the mpirun command to complain.
     dosystem('-nofatal', @mpi_precmd, split(' ', "mkdir -p $wdir"))
-        unless defined $random_matrix;
+        unless defined($random_matrix) || $wdir eq '/';
 }
 
 if ($main eq ':mpirun') {
@@ -1014,6 +1042,22 @@ if ($main eq ':mpirun') {
 if ($main eq ':mpirun_single') {
     # we don't even put @main_args in, because we're tinkering with it
     # somewhat.
+    dosystem(@mpi_precmd_single, @extra_args);
+    exit 0;
+}
+
+if ($main eq ':srun') {
+    # we don't even put @main_args in, because we're tinkering with it
+    # somewhat.
+    s/mpiexec/srun/ for (@mpi_precmd);
+    dosystem(@mpi_precmd, @extra_args);
+    exit 0;
+}
+
+if ($main eq ':srun_single') {
+    # we don't even put @main_args in, because we're tinkering with it
+    # somewhat.
+    s/mpiexec/srun/ for (@mpi_precmd);
     dosystem(@mpi_precmd_single, @extra_args);
     exit 0;
 }
