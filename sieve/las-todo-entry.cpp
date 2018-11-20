@@ -7,7 +7,8 @@ void las_todo_entry::find_prime_factors()
 {
     prime_factors.clear();
 
-    if (mpz_probab_prime_p(p, 2)) {
+    /* We really do not want composites to be considered as primes... */
+    if (mpz_probab_prime_p(p, 10)) {
         /* This is rubbish if p does not fit in 64 bits */
         if (mpz_fits_uint64_p(p))
             prime_factors.push_back(mpz_get_uint64(p));
@@ -35,7 +36,7 @@ void las_todo_entry::find_prime_factors()
             // Powers are not allowed in special-q
             ASSERT_ALWAYS(!mpz_divisible_ui_p(pp, f));
             prime_factors.push_back(f);
-            if (mpz_probab_prime_p(pp, 2)) {
+            if (mpz_probab_prime_p(pp, 10)) {
                 ASSERT_ALWAYS(mpz_fits_ulong_p(pp));
                 prime_factors.push_back(mpz_get_ui(pp));
                 mpz_set_ui(pp, 1);

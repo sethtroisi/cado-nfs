@@ -313,8 +313,9 @@ uint64_nextprime (uint64_t q)
                 (then 1803601, 1943521, 2237017, 3604201, 5095177, ...);
    with REPS=2, it is 1943521 (then 16661633, 18790021, 54470491, ...);
    with REPS=3, it is 465658903 (then 2242724851, 5969607379, 6635692801, ...);
-   with REPS=4, none < 10000000000.
-   See also https://en.wikipedia.org/wiki/Miller–Rabin_primality_test
+   with REPS=4, it is 239626837621 (then 277376554153, 537108528133,
+                      898547205403, and no other <= 10^12).
+   See also https://en.wikipedia.org/wiki/Miller–Rabin_primality_test.
 */
 int
 ulong_isprime (unsigned long p)
@@ -371,6 +372,9 @@ next_mpz_with_factor_constraints(mpz_ptr r,
         mpz_add_ui(r, r, 1);
     }
     while (1) {
+        /* This function is used for the composite special-q code, and it
+         * is really important that no composite special-q is considered
+         * prime.*/
         if (mpz_probab_prime_p(r, 10)) {
             if (mpz_cmp_ui(r, pmax) < 0) {
                 factor_r[0] = mpz_get_ui(r);

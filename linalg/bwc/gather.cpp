@@ -351,12 +351,12 @@ struct abase_proxy {
     static abase_proxy most_natural(parallelizing_info_ptr pi) {
         return abase_proxy(pi, mpz_cmp_ui(bw->p, 2) == 0 ? 64 : 1);
     }
-    std::map<mpfq_vbase_ptr, mpfq_vbase_tmpl> tdict;
+    std::map<mpfq_vbase_ptr, mpfq_vbase_tmpl_s> tdict;
     mpfq_vbase_tmpl_ptr templates(mpfq_vbase_ptr A1) {
         auto it = tdict.find(A1);
         if (it == tdict.end())
-            mpfq_vbase_oo_init_templates(tdict[A1], A, A1);
-        return tdict[A1];
+            mpfq_vbase_oo_init_templates(&tdict[A1], A, A1);
+        return &tdict[A1];
     }
     ~abase_proxy()
     {
@@ -563,11 +563,16 @@ std::tuple<int, int, int> test_one_vector(matmul_top_data_ptr mmt, mmt_vec * ymy
         mmt_vec_twist(mmt, y);
         matmul_top_mul(mmt, ymy, NULL);
         mmt_vec_untwist(mmt, y);
-        mmt_vec_unapply_T(mmt, y);
         serialize(pi->m);
         /* Add the contributions from the right-hand side vectors, to see
          * whether that makes the sum equal to zero */
-        R.add_contribution(y);
+        if (R) {
+            R.add_contribution(y);
+        } else {
+            // unapply_T is only valid with respect to something we'll
+            // multiply *again*. 
+            mmt_vec_unapply_T(mmt, y);
+        }
 
         /* This "is zero" check is also valid on the padded matrix of
          * course, so we don't heave the same headache as above */
@@ -906,7 +911,8 @@ class parasite_fixer {/*{{{*/
                 if (scols.erase(j)) {
                     drop++;
                     /* XXX colum j may have already been deleted */
-                    pivot_list.push_back({{xi, j}, v});
+                    std::array<unsigned int, 2> xij {{ xi, j }};
+                    pivot_list.push_back({xij, v});
                 }
             }
             if (spin)
@@ -915,7 +921,8 @@ class parasite_fixer {/*{{{*/
             if (tcan_print)
                 printf("# Pass %d: number of cols has dropped by %u. We have %zu rows (at most) and %zu columns left\n", spin, drop, srows.size(), scols.size());
             /* use this marker to indicate synchronization */
-            pivot_list.push_back({{0u, 0u}, 0});
+            std::array<unsigned int, 2> xij {{ 0u, 0u }};
+            pivot_list.push_back({xij, 0});
         }
         if (!scols.empty()) {
             /* we exited with drop==0 then, so srows correctly reflects

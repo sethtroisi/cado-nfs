@@ -590,7 +590,8 @@ trial_divide (std::vector<cxx_mpz>& factors, cxx_mpz & n, std::vector<unsigned l
 
 /* Puts in factors[] the prime factors of n. Additional info provided:
  *  - cofac must be a divisor of n (possibly composite)
- *  - sq, if not null, must be a prime divisor of n.
+ *  - sq_factors, is the (possibly empty if on the wrong side) list of
+ *    prime factors of the special-q 
  *
  * The list SP contains small primes (less than B).
  * B is the small prime bound: any factor < B^2 is necessarily prime.
@@ -601,23 +602,28 @@ factor_simple_minded (std::vector<cxx_mpz> &factors,
               facul_method_t *methods,
               unsigned int lpb, double B,
               std::vector<unsigned long> const& SP,
-              cxx_mpz& cofac, mpz_srcptr sq)
+              cxx_mpz& cofac,
+              std::vector<uint64_t> const& sq_factors)
 {
     double BB = B * B, BBB = B * B * B;
 
     if (mpz_cmp_ui(cofac, 0) == 0) {
-        if (sq) {
-            ASSERT(mpz_divisible_p (n, sq));
-            mpz_divexact (n, n, sq);
+        for (auto sqf : sq_factors) {
+            cxx_mpz Sqf;
+            mpz_set_uint64(Sqf, sqf);
+            ASSERT(mpz_divisible_p (n, Sqf));
+            mpz_divexact (n, n, Sqf);
         }
         trial_divide (factors, n, SP);
     } else {
         ASSERT(mpz_divisible_p (n, cofac));
         mpz_divexact (n, n, cofac);
 
-        if (sq) {
-            ASSERT(mpz_divisible_p (n, sq));
-            mpz_divexact (n, n, sq);
+        for (auto sqf : sq_factors) {
+            cxx_mpz Sqf;
+            mpz_set_uint64(Sqf, sqf);
+            ASSERT(mpz_divisible_p (n, Sqf));
+            mpz_divexact (n, n, Sqf);
         }
 
         /* remove small primes */
@@ -711,9 +717,9 @@ factor_simple_minded (std::vector<cxx_mpz> &factors,
         }
     }
 
-    if (sq) {
+    for (auto sqf : sq_factors) {
         cxx_mpz tz;
-        mpz_set(tz, sq);
+        mpz_set_uint64(tz, sqf);
         factors.push_back(std::move(tz));
     }
 
@@ -753,10 +759,11 @@ factor_one (
     for(int side = 0 ; side < 2 ; side++) {
         mpz_set(cofac, C.cofactor[side]);
         mpz_poly_homogeneous_eval_siui (norm, pol->pols[side], a, b);
+        std::vector<uint64_t> empty;
         bool smooth = factor_simple_minded (factors[side], norm, methods,
                 lpb[side], (double) lim[side], SP[side],
                 cofac,
-                (C.sqside == side) ? (mpz_srcptr) C.sq : NULL);
+                (C.doing_p->side == side) ? C.doing_p->prime_factors : empty);
         if (!smooth) {
             /* when we've knowingly decided to _do_ some cofactoring
              * after the product-tree on that side, then it's normal to

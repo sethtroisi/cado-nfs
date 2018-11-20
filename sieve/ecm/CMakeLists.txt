@@ -35,6 +35,8 @@
 # set_property(SOURCE facul_doit_2ul2.c PROPERTY COMPILE_FLAGS "-O0 -g")
 # set_property(SOURCE facul_doit_mpz.c PROPERTY COMPILE_FLAGS "-O0 -g")
 
+include_directories(. ..)
+
 # We now have wrappers, so it's very easy from the cmake perspective.
 add_library(facul
         ecm_ul.c

@@ -66,7 +66,7 @@ class nfs_aux {/*{{{*/
      */
     las_info const & las;
     public:
-    las_todo_entry doing;
+    las_todo_entry const & doing;
 
     typedef std::pair< int64_t, uint64_t> abpair_t;
 

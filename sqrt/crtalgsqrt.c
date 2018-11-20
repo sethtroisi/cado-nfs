@@ -571,7 +571,7 @@ struct ab_source_s {
     char * sname;
     size_t sname_len;
     size_t nab;
-    char prefix[100];
+    char * prefix;
     int depnum;
     // int cado; // use !numfiles instead.
 
@@ -605,6 +605,7 @@ void ab_source_init(ab_source_ptr ab, const char * fname, int rank, int root, MP
     char * magic;
     if ((magic = strstr(fname, ".prep.")) != NULL) {
         // then assume kleinjung format.
+        ab->prefix = (char*) malloc(magic - fname + 1);
         strncpy(ab->prefix, fname, magic-fname);
         ab->prefix[magic-fname]='\0';
         magic++;
@@ -617,6 +618,7 @@ void ab_source_init(ab_source_ptr ab, const char * fname, int rank, int root, MP
     } else if ((magic = strstr(fname, ".dep.alg.")) != NULL) {
         // assume cado format (means only one file, so we don't need to
         // parse, really.
+        ab->prefix = (char*) malloc(magic - fname + 1);
         strncpy(ab->prefix, fname, magic-fname);
         ab->prefix[magic-fname]='\0';
         magic++;
@@ -628,6 +630,7 @@ void ab_source_init(ab_source_ptr ab, const char * fname, int rank, int root, MP
     } else if ((magic = strstr(fname, ".dep.")) != NULL) {
         // assume cado format (means only one file, so we don't need to
         // parse, really.
+        ab->prefix = (char*) malloc(magic - fname + 1);
         strncpy(ab->prefix, fname, magic-fname);
         ab->prefix[magic-fname]='\0';
         magic++;
@@ -736,6 +739,7 @@ void ab_source_rewind(ab_source_ptr ab)
 void ab_source_init_set(ab_source_ptr ab, ab_source_ptr ab0)
 {
     memcpy(ab, ab0, sizeof(struct ab_source_s));
+    ab->prefix = strdup(ab0->prefix);
     ab->sname = malloc(ab->sname_len);
     ab->file_bases = malloc((ab->nfiles+1) * sizeof(size_t));
     memcpy(ab->file_bases, ab0->file_bases, (ab->nfiles+1) * sizeof(size_t));
@@ -746,6 +750,7 @@ void ab_source_init_set(ab_source_ptr ab, ab_source_ptr ab0)
 void ab_source_clear(ab_source_ptr ab)
 {
     ab_source_rewind(ab);
+    free(ab->prefix);
     free(ab->sname);
     free(ab->file_bases);
     memset(ab, 0, sizeof(ab_source));

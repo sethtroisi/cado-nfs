@@ -1659,6 +1659,8 @@ class ClientServerTask(Task, wudb.UsesWorkunitDb, patterns.Observer):
         if not results:
             # self.logger.debug("Found no timed-out workunits")
             pass
+        self.logger.debug("Timeout check took %f s, found %d WUs",
+                time.time() - now, len(results))
         for entry in results:
             self.cancel_wu(entry["wuid"], commit=False)
             self.resubmit_one_wu(Workunit(entry["wu"]), commit=True)

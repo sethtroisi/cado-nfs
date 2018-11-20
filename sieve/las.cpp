@@ -13,14 +13,14 @@
 #include <cmath>   // for ceiling, floor in cfrac
 #include <ctype.h>
 #include <float.h>
-#include <fcntl.h>   /* for _O_BINARY */
+#include <fcntl.h>  /* for _O_BINARY */
 #include <stdarg.h> /* Required so that GMP defines gmp_vfprintf() */
 #include <algorithm>
 #include <vector>
 #include <sstream>  /* for c++ string handling */
 #include <iterator> /* ostream_iterator */
-#include <thread> /* we use std::thread for las sub-jobs */
-#include <iomanip> /* std::setprecision, std::fixed */
+#include <thread>   /* we use std::thread for las sub-jobs */
+#include <iomanip>  /* std::setprecision, std::fixed */
 #include "threadpool.hpp"
 #include "fb.hpp"
 #include "portability.h"
@@ -1169,7 +1169,10 @@ struct cofac_standalone {
     }/*}}}*/
     void transfer_to_cofac_list(lock_guarded_container<cofac_list> & L, las_todo_entry const & doing) {/*{{{*/
         std::lock_guard<std::mutex> foo(L.mutex());
-        L.emplace_back(a, b, norm, doing.p, doing.side);
+        /* "doing" must be an object that lives in the main todo list,
+         * and will stay alive until the end of the program. Yes, it's a
+         * bit dangerous. */
+        L.emplace_back(a, b, norm, &doing);
 #if 0
         /* make sure threads don't write the cofactor list at the
          * same time !!! */
@@ -1602,7 +1605,7 @@ void process_bucket_region_run::cofactoring_sync (survivors_t & survivors)/*{{{*
             if (ws.conf.sublat_bound && !cur.ab_coprime()) continue;
             /* make sure threads don't write the cofactor list at the
              * same time !!! */
-            cur.transfer_to_cofac_list(ws.cofac_candidates, ws.Q.doing);
+            cur.transfer_to_cofac_list(ws.cofac_candidates, aux_p->doing);
             continue; /* we deal with all cofactors at the end of las */
         }
 
@@ -2600,8 +2603,8 @@ bool do_one_special_q(las_info & las, nfs_work & ws, std::shared_ptr<nfs_aux> au
 {
     nfs_aux & aux(*aux_p);
     ws.Q.doing = aux.doing;     /* will be set by choose_sieve_area anyway */
-    cxx_mpz & p(aux.doing.p);
-    cxx_mpz & r(aux.doing.r);
+    cxx_mpz const & p(aux.doing.p);
+    cxx_mpz const & r(aux.doing.r);
 
     ASSERT_ALWAYS(mpz_poly_is_root(las.cpoly->pols[aux.doing.side], r, p));
 
@@ -2781,10 +2784,11 @@ void las_subjob(las_info & las, int subjob, las_todo_list & todo, las_report & g
          * the descent, which has the implication that the read occurs if and
          * only if the todo list is empty. }}} */
 
-        for(las_todo_entry doing ; ; ) {
+        for(;;) {
             las_output.fflush();
-            if (!todo.feed_and_pop(las.rstate, doing))
-                break;
+            las_todo_entry * doing_p = todo.feed_and_pop(las.rstate);
+            if (!doing_p) break;
+            las_todo_entry& doing(*doing_p);
 
 #ifdef DLP_DESCENT
             /* If the next special-q to try is a special marker, it means

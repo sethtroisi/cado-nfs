@@ -11,6 +11,7 @@
 #include "facul_doit.hpp"
 #include "utils.h"
 #include "relation.hpp"
+#include "las-todo-entry.hpp"
 
 /* structure to compute on-line a product tree, avoiding to first compute a
    list of mpz_t (which might take too much memory) */
@@ -28,14 +29,10 @@ struct cofac_candidate {
   int64_t a;
   uint64_t b;
   std::array<cxx_mpz, 2> cofactor;
-  cxx_mpz sq;   /* special-q */
-  int sqside;   /* most often n times the same thing.
-                   Have to do that since otherwise the las todo mode breaks.
-                   There ought to be a better way, but this one's a no-brain.
-                   Well, we have mpz's around anyway... */
+  las_todo_entry const * doing_p;
   cofac_candidate() = default;
-  cofac_candidate(int64_t a, uint64_t b, std::array<cxx_mpz,2> & cofactor, cxx_mpz const & sq, int sqside)
-      : a(a), b(b), cofactor(std::move(cofactor)), sq(sq), sqside(sqside)
+  cofac_candidate(int64_t a, uint64_t b, std::array<cxx_mpz,2> & cofactor, las_todo_entry const * doing_p)
+      : a(a), b(b), cofactor(std::move(cofactor)), doing_p(doing_p)
       {}
 };
 

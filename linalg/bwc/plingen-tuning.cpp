@@ -1317,7 +1317,7 @@ void write_tcache()
 
 void plingen_tune_full(abdst_field ab, unsigned int m, unsigned int n, size_t N, unsigned int r, unsigned int T, unsigned int batch, unsigned int shrink0, unsigned int shrink2)/*{{{*/
 {
-    cutoff_list cl = NULL;
+    // cutoff_list cl = NULL;
 
     gmp_randstate_t rstate;
     gmp_randinit_default(rstate);
@@ -1394,43 +1394,47 @@ void plingen_tune_full(abdst_field ab, unsigned int m, unsigned int n, size_t N,
         {
             const char * step = "MP";
 
-            struct fft_transform_info fti_mp[1];
-            double tt_mp_dft1, tt_mp_dft2, tt_mp_conv, tt_mp_ift;
+            unsigned int csize = (L>>i) / 2;
+            unsigned int bsize = m * (L>>i) / (m+n) / 2;
+            unsigned int asize = csize + bsize - 1;
 
-            unsigned int ER_length = (L>>i) / 2;
-            unsigned int pi_length = m * (L>>i) / (m+n) / 2;
-            unsigned int EL_length = ER_length + pi_length - 1;
+            ASSERT_ALWAYS(asize >= bsize);
 
-            matpoly xER, xEL, xpiL;
-            matpoly_init(ab, xEL, 1, 1, EL_length);
-            matpoly_init(ab, xpiL, 1, 1, pi_length);
-            matpoly_init(ab, xER, 1, 1, ER_length);
-            matpoly_fill_random(ab, xEL, EL_length, rstate);
-            matpoly_fill_random(ab, xpiL, pi_length, rstate);
-            unsigned int adj = cl ? cutoff_list_get(cl, (L>>i)) : UINT_MAX;
-            struct fft_transform_info * fti = fti_mp;
-            double & tt_dft1 = tt_mp_dft1;
-            double & tt_dft2 = tt_mp_dft2;
-            double & tt_conv = tt_mp_conv;
-            double & tt_ift = tt_mp_ift;
-            matpoly_ptr a = xEL;
-            matpoly_ptr b = xpiL;
-            matpoly_ptr c = xER;
-            fft_get_transform_info_fppol_mp(fti, p, MIN(a->size, b->size), MAX(a->size, b->size), nacc);
+            unsigned int n0 = m;
+            unsigned int n1 = m + n;
+            unsigned int n2 = m + n;
 
+            double tt_dft1;
+            double tt_dft2;
+            double tt_conv;
+            double tt_ift;
+
+            tcache_key K { mpz_sizeinbase(p, 2), asize, bsize, 1 };
+
+            struct fft_transform_info fti[1];
             size_t fft_alloc_sizes[3];
+            fft_get_transform_info_fppol_mp(fti, p, asize, bsize, nacc);
             fft_get_transform_allocs(fft_alloc_sizes, fti);
 
-            if (adj != UINT_MAX) fft_transform_info_adjust_depth(fti, adj);
-            matpoly_ft tc, ta, tb;
-
-            matpoly_clear(ab, c);
-            matpoly_init(ab, c, a->m, b->n, MAX(a->size, b->size) - MIN(a->size, b->size) + 1);
-
-            tcache_key K { mpz_sizeinbase(p, 2), a->size, b->size, 1 };
             if (tcache.find(K) != tcache.end()) {
                 std::tie(tt_dft1, tt_dft2, tt_conv, tt_ift) = tcache[K];
             } else {
+                /* make all of these 1*1 matrices, just for timing purposes */
+                matpoly a, b, c;
+                matpoly_init(ab, a, 1, 1, asize);
+                matpoly_init(ab, b, 1, 1, bsize);
+                matpoly_init(ab, c, 1, 1, csize);
+                matpoly_fill_random(ab, a, asize, rstate);
+                matpoly_fill_random(ab, b, bsize, rstate);
+
+                /* bogus, I think
+                   unsigned int adj = cl ? cutoff_list_get(cl, (L>>i)) : UINT_MAX;
+                   if (adj != UINT_MAX) fft_transform_info_adjust_depth(fti, adj);
+                   */
+
+                matpoly_ft tc, ta, tb;
+                matpoly_clear(ab, c);
+                matpoly_init(ab, c, a->m, b->n, csize);
 
                 matpoly_ft_init(ab, ta, a->m, a->n, fti);
                 matpoly_ft_init(ab, tb, b->m, b->n, fti);
@@ -1451,7 +1455,7 @@ void plingen_tune_full(abdst_field ab, unsigned int m, unsigned int n, size_t N,
                 tt_conv = wct_seconds() + tt;
 
                 tt = -wct_seconds();
-                c->size = MAX(a->size, b->size) - MIN(a->size, b->size) + 1;
+                c->size = csize;
                 ASSERT_ALWAYS(c->size <= c->alloc);
                 matpoly_ft_ift_mp(ab, c, tc, MIN(a->size, b->size) - 1, fti, 0);
                 tt_ift = wct_seconds() + tt;
@@ -1461,16 +1465,16 @@ void plingen_tune_full(abdst_field ab, unsigned int m, unsigned int n, size_t N,
                 matpoly_ft_clear(ab, tc,  fti);
 
                 tcache[K] = std::tie(tt_dft1, tt_dft2, tt_conv, tt_ift);
+
+                matpoly_clear(ab, a);
+                matpoly_clear(ab, b);
+                matpoly_clear(ab, c);
             }
 
 
-            unsigned int n0 = m;
-            unsigned int n1 = m + n;
-            unsigned int n2 = m + n;
-
-            printf(";%d;%u;%s;%zu;%zu;%s;%.2f;%.2f;%.2f;%.2f\n",
+            printf(";%d;%u;%s;%u;%u;%s;%.2f;%.2f;%.2f;%.2f\n",
                     i,
-                    (L>>i), step, a->size, b->size, 
+                    (L>>i), step, asize, bsize, 
                     size_disp(fft_alloc_sizes[0], buf),
                     tt_dft1, tt_dft2, tt_conv, tt_ift);
 
@@ -1490,7 +1494,7 @@ void plingen_tune_full(abdst_field ab, unsigned int m, unsigned int n, size_t N,
                     T_dft1, T_dft2, T_conv, T_ift,
                     T_dft1 + T_dft2 + T_conv + T_ift);
 
-            T_dft1 = iceildiv(n0*batch/r,T)*(n1/r/batch)*tt_dft1;
+            T_dft1 = shrink2*iceildiv(n0*batch/r,T)*(n1/r/batch)*tt_dft1;
             T_dft2 = (n1/r/batch)*shrink2*iceildiv(n2/shrink2*batch/r,T)*tt_dft2;
             T_ift = shrink2*iceildiv((n0/r)*(n2/r/shrink2),T)*tt_ift;
             T_conv = (n1/r)*r*shrink2*iceildiv((n0/r)*(n2/r/shrink2),T)*tt_conv;
@@ -1514,10 +1518,6 @@ void plingen_tune_full(abdst_field ab, unsigned int m, unsigned int n, size_t N,
             printf("# %s comm per node %s\n", step, size_disp(comm, buf));
             printf("# %s comm time %.1f\n", step, T_comm);
 
-            matpoly_clear(ab, a);
-            matpoly_clear(ab, b);
-            matpoly_clear(ab, c);
-
             tt_mp_total = T_dft1 + T_dft2 + T_conv + T_ift + T_comm;
             peak_mp = peak;
         }
@@ -1527,52 +1527,46 @@ void plingen_tune_full(abdst_field ab, unsigned int m, unsigned int n, size_t N,
         {
             const char * step = "MUL";
 
-            struct fft_transform_info fti_mul[1];
-            double tt_mul_dft1, tt_mul_dft2, tt_mul_conv, tt_mul_ift;
+            unsigned int asize = m * (L>>i) / (m+n) / 2;
+            unsigned int bsize = m * (L>>i) / (m+n) / 2;
+            unsigned int csize = asize + bsize - 1;
 
-            unsigned int piL_length = m * (L>>i) / (m+n) / 2;
-            unsigned int piR_length = m * (L>>i) / (m+n) / 2;
-            unsigned int pi_length = m * (L>>i) / (m+n);
+            unsigned int n0 = m + n;
+            unsigned int n1 = m + n;
+            unsigned int n2 = m + n;
 
-            matpoly xpiL, xpiR, xpi;
+            double tt_dft1;
+            double tt_dft2;
+            double tt_conv;
+            double tt_ift;
 
-            /* make all of these 1*1 matrices, just for timing purposes */
-            matpoly_init(ab, xpiL, 1, 1, piL_length);
-            matpoly_init(ab, xpiR, 1, 1, piR_length);
-            matpoly_init(ab, xpi, 1, 1, pi_length);
-            matpoly_fill_random(ab, xpiL, piL_length, rstate);
-            matpoly_fill_random(ab, xpiR, piR_length, rstate);
+            tcache_key K { mpz_sizeinbase(p, 2), asize, bsize, 0 };
 
-            unsigned int adj = cl ? cutoff_list_get(cl, (L>>i)) : UINT_MAX;
-
-            struct fft_transform_info * fti = fti_mul;
-            double & tt_dft1 = tt_mul_dft1;
-            double & tt_dft2 = tt_mul_dft2;
-            double & tt_conv = tt_mul_conv;
-            double & tt_ift = tt_mul_ift;
-
-            matpoly_ptr a = xpiL;
-            matpoly_ptr b = xpiR;
-            matpoly_ptr c = xpi;
-
-            size_t csize = a->size + b->size; csize -= (csize > 0);
-
-            fft_get_transform_info_fppol(fti, p, a->size, b->size, nacc);
-
+            struct fft_transform_info fti[1];
             size_t fft_alloc_sizes[3];
+            fft_get_transform_info_fppol(fti, p, asize, bsize, nacc);
             fft_get_transform_allocs(fft_alloc_sizes, fti);
-
-            if (adj != UINT_MAX) fft_transform_info_adjust_depth(fti, adj);
-            matpoly_ft tc, ta, tb;
-
-            matpoly_clear(ab, c);
-            matpoly_init(ab, c, a->m, b->n, csize);
-
-            tcache_key K { mpz_sizeinbase(p, 2), a->size, b->size, 0 };
 
             if (tcache.find(K) != tcache.end()) {
                 std::tie(tt_dft1, tt_dft2, tt_conv, tt_ift) = tcache[K];
             } else {
+                /* make all of these 1*1 matrices, just for timing purposes */
+                matpoly a, b, c;
+                matpoly_init(ab, a, 1, 1, asize);
+                matpoly_init(ab, b, 1, 1, bsize);
+                matpoly_init(ab, c, 1, 1, csize);
+                matpoly_fill_random(ab, a, asize, rstate);
+                matpoly_fill_random(ab, b, bsize, rstate);
+
+                /* bogus, I think
+                   unsigned int adj = cl ? cutoff_list_get(cl, (L>>i)) : UINT_MAX;
+                   if (adj != UINT_MAX) fft_transform_info_adjust_depth(fti, adj);
+                   */
+
+                matpoly_ft tc, ta, tb;
+                matpoly_clear(ab, c);
+                matpoly_init(ab, c, a->m, b->n, csize);
+
                 matpoly_ft_init(ab, ta, a->m, a->n, fti);
                 matpoly_ft_init(ab, tb, b->m, b->n, fti);
                 matpoly_ft_init(ab, tc, a->m, b->n, fti);
@@ -1602,15 +1596,15 @@ void plingen_tune_full(abdst_field ab, unsigned int m, unsigned int n, size_t N,
                 matpoly_ft_clear(ab, tc,  fti);
 
                 tcache[K] = std::tie(tt_dft1, tt_dft2, tt_conv, tt_ift);
+
+                matpoly_clear(ab, a);
+                matpoly_clear(ab, b);
+                matpoly_clear(ab, c);
             }
 
-            unsigned int n0 = m + n;
-            unsigned int n1 = m + n;
-            unsigned int n2 = m + n;
-
-            printf(";%d;%u;%s;%zu;%zu;%s;%.2f;%.2f;%.2f;%.2f\n",
+            printf(";%d;%u;%s;%u;%u;%s;%.2f;%.2f;%.2f;%.2f\n",
                     i,
-                    (L>>i), step, a->size, b->size, 
+                    (L>>i), step, asize, bsize, 
                     size_disp(fft_alloc_sizes[0], buf),
                     tt_dft1, tt_dft2, tt_conv, tt_ift);
 
@@ -1630,7 +1624,7 @@ void plingen_tune_full(abdst_field ab, unsigned int m, unsigned int n, size_t N,
                     T_dft1, T_dft2, T_conv, T_ift,
                     T_dft1 + T_dft2 + T_conv + T_ift);
 
-            T_dft1 = iceildiv(n0*batch/r,T)*(n1/r/batch)*tt_dft1;
+            T_dft1 = shrink2*iceildiv(n0*batch/r,T)*(n1/r/batch)*tt_dft1;
             T_dft2 = (n1/r/batch)*shrink2*iceildiv(n2/shrink2*batch/r,T)*tt_dft2;
             T_ift = shrink2*iceildiv((n0/r)*(n2/r/shrink2),T)*tt_ift;
             T_conv = (n1/r)*r*shrink2*iceildiv((n0/r)*(n2/r/shrink2),T)*tt_conv;
@@ -1653,10 +1647,6 @@ void plingen_tune_full(abdst_field ab, unsigned int m, unsigned int n, size_t N,
             printf("# %s peak memory %s\n", step, size_disp(peak, buf));
             printf("# %s comm per node %s\n", step, size_disp(comm, buf));
             printf("# %s comm time %.1f\n", step, T_comm);
-
-            matpoly_clear(ab, a);
-            matpoly_clear(ab, b);
-            matpoly_clear(ab, c);
 
             tt_mul_total = T_dft1 + T_dft2 + T_conv + T_ift + T_comm;
             peak_mul = peak;

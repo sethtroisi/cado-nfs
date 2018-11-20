@@ -154,7 +154,6 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
         gmp_randseed_ui(rstate, bw->seed + g);
         mmt_vec_set_random_inconsistent(ymy[0], rstate);
         mmt_vec_truncate(mmt, ymy[0]);
-        mmt_vec_allreduce(ymy[0]);
 #endif
         gmp_randclear(rstate);
     }

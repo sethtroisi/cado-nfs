@@ -13,6 +13,9 @@ class las_todo_list : private std::stack<las_todo_entry> {
     std::mutex mm;
     cxx_cado_poly cpoly;
     typedef std::stack<las_todo_entry> super;
+    /* "history" is append-only: everything we pop from the stack goes
+     * here, and lives until the destruction */
+    std::list<las_todo_entry> history;
     unsigned int nq_max = 0;
     int random_sampling = 0;
     cxx_mpz q0;
@@ -73,7 +76,7 @@ class las_todo_list : private std::stack<las_todo_entry> {
     }
 
     bool feed(gmp_randstate_t rstate);
-    bool feed_and_pop(gmp_randstate_t rstate, las_todo_entry &);
+    las_todo_entry * feed_and_pop(gmp_randstate_t rstate);
 
     las_todo_list(cxx_cado_poly const & cpoly, cxx_param_list & pl);
     ~las_todo_list();
