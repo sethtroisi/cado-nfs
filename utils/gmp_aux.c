@@ -315,7 +315,8 @@ uint64_nextprime (uint64_t q)
    with REPS=3, it is 465658903 (then 2242724851, 5969607379, 6635692801, ...);
    with REPS=4, it is 239626837621 (then 277376554153, 537108528133,
                       898547205403, and no other <= 10^12).
-   See also https://en.wikipedia.org/wiki/Miller–Rabin_primality_test.
+   See also https://en.wikipedia.org/wiki/Miller–Rabin_primality_test
+   and http://www.trnicely.net/misc/mpzspsp.html.
 */
 int
 ulong_isprime (unsigned long p)
