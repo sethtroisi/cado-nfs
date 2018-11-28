@@ -1483,6 +1483,7 @@ class ClientServerTask(Task, wudb.UsesWorkunitDb, patterns.Observer):
             {"maxwu": 10, 
              "wutimeout": 10800,  # Default: 3h
              "maxresubmit": 5, 
+             "maxwuerror": 2,   # increase if job are often killed badly.
              "maxtimedout": 100, 
              "maxfailed": 100})
     
@@ -1677,6 +1678,7 @@ class ClientServerTask(Task, wudb.UsesWorkunitDb, patterns.Observer):
         self.log_failed_command_error(message, 0)
         key = "wu_failed"
         maxfailed = self.params["maxfailed"]
+        maxwuerror = self.params["maxwuerror"]
         if not self.state[key] < maxfailed:
             self.logger.error("Exceeded maximum number of failed "
                               "workunits, maxfailed=%d ", maxfailed)
@@ -1687,7 +1689,7 @@ class ClientServerTask(Task, wudb.UsesWorkunitDb, patterns.Observer):
         wu = workunit.Workunit(results[0]["wu"])
         self.state.update({key: self.state[key] + 1}, commit=False)
         self.verification(message.get_wu_id(), False, commit=False)
-        self.resubmit_one_wu(wu, commit=True, maxresubmit=2)
+        self.resubmit_one_wu(wu, commit=True, maxresubmit=maxwuerror)
         return True
 
 
