@@ -1151,7 +1151,7 @@ renumber_get_side_from_index (renumber_srcptr renumber_info, index_t i,
       }
       ASSERT_ALWAYS (b != 0);
     }
-    else /* i corresponds to a bad ideals. */
+    else /* i corresponds to a bad ideal. */
     {
       index_t bad = renumber_info->naddcols;
       int k;
