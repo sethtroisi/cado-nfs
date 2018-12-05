@@ -506,7 +506,7 @@ void advance_prime_in_fb(int *mult, uint64_t *q, uint64_t *roots,
 }
 
 // All composite special-q in [q0, q1] with 2 prime factors in the range
-// of the factor base pointed by positions in [pos_min, pos_max] in Ind
+// [qfac_min, qfac_max] in Ind.
 vector<index_t> all_comp_sq_2(uint64_t q0, uint64_t q1, uint64_t qfac_min,
         uint64_t qfac_max, indexrange &Ind)
 {
@@ -541,14 +541,11 @@ vector<index_t> all_comp_sq_2(uint64_t q0, uint64_t q1, uint64_t qfac_min,
 }
 
 // All composite special-q in [q0, q1] with 3 prime factors in the range
-// of the factor base pointed by positions in [pos_min, pos_max] in Ind
-vector<index_t> all_comp_sq_3(uint64_t q0, uint64_t q1, uint64_t pos_min,
-        uint64_t pos_max, indexrange &Ind)
+// [qfac_min, qfac_max] in Ind.
+vector<index_t> all_comp_sq_3(uint64_t q0, uint64_t q1, uint64_t qfac_min,
+        uint64_t qfac_max, indexrange &Ind)
 {
     vector<index_t> list;
-
-    uint64_t qfac_min = Ind.p_from_pos(pos_min);
-    uint64_t qfac_max = Ind.p_from_pos(pos_max);
 
     uint64_t l1min = MAX(q0/(qfac_max*qfac_max), qfac_min);
     uint64_t pos_l1min = Ind.pos_from_p(l1min);
