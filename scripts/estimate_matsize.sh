@@ -117,9 +117,9 @@ done
 
 ## Sampling / faking on each side
 # the [qmin,qmax] range is split into $NCHUNKS sub-ranges
-NCHUNKS=3
+NCHUNKS=2
 # for each sub-range, we call las with -random-sample $NBSAMPLE
-NBSAMPLE=50
+NBSAMPLE=5
 fakefiles=()
 if [ $nsides == 1 ]; then
     if [ ${sqside[0]} == 0 ]; then

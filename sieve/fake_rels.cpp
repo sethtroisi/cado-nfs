@@ -719,13 +719,6 @@ main (int argc, char *argv[])
   printf ("# Done reading renumber table\n");
   fflush (stdout);
 
-  for (int side = 0; side < 2; ++side) {
-      if (ren_table->lpb[side] != lpb[side]) {
-          fprintf(stderr, "Error: on side %d, lpb on the command-line is different from the one in the renumber file\n", side);
-          exit(EXIT_FAILURE);
-      }
-  }
-
   // read sample file
   const char * sample;
   if ((sample = param_list_lookup_string(pl, "sample")) == NULL) {
