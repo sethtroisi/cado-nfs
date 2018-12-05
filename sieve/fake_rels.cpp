@@ -713,7 +713,11 @@ main (int argc, char *argv[])
       exit(EXIT_FAILURE);
   }
   renumber_t ren_table;
+  printf ("# Start reading renumber table\n");
+  fflush (stdout);
   renumber_read_table(ren_table, renumberfile);
+  printf ("# Done reading renumber table\n");
+  fflush (stdout);
 
   // read sample file
   const char * sample;
@@ -729,13 +733,21 @@ main (int argc, char *argv[])
 
   vector<fake_rel> rels;
   vector<unsigned int> nrels;
+  printf ("# Start reading sample file\n");
+  fflush (stdout);
   read_sample_file(nrels, rels, sqside, sample, ren_table, compsq);
+  printf ("# Done reading sample file\n");
+  fflush (stdout);
 
   param_list_warn_unused(pl);
 
   // Two index ranges, one for each side
   indexrange Ind[2];
+  printf ("# Start preparing index ranges\n");
+  fflush (stdout);
   prepare_indexrange(Ind, ren_table, cpoly, sqside, compsq);
+  printf ("# Done preparing index ranges\n");
+  fflush (stdout);
 
 
   /****** Prime special-q ******/
