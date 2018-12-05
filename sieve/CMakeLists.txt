@@ -61,6 +61,9 @@ target_link_libraries(freerel utils)
 add_subdirectory(ecm)
 add_subdirectory(strategies)
 
+add_executable(refactorq refactorq.cpp)
+target_link_libraries(refactorq utils_with_io)
+
 add_executable(dupsup
     las-todo-entry.cpp
     las-siever-config.cpp
