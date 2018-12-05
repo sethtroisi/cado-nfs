@@ -46,7 +46,15 @@ fi
 : ${dlp=true}
 : ${shrink_factor=1}
 
+## The following can also be overriden with env variables
+# the [qmin,qmax] range is split into $NCHUNKS sub-ranges
+: ${NCHUNKS=3}
+# for each sub-range, we call las with -random-sample $NBSAMPLE
+: ${NBSAMPLE=50}
+
+
 ## read poly file on command line
+
 polyfile=$1
 if [ ! -e $1 ]; then
     echo "Error: file $1 does not exist?"
@@ -116,10 +124,6 @@ for i in `seq 0 $((nsides-1))`; do
 done
 
 ## Sampling / faking on each side
-# the [qmin,qmax] range is split into $NCHUNKS sub-ranges
-NCHUNKS=2
-# for each sub-range, we call las with -random-sample $NBSAMPLE
-NBSAMPLE=5
 fakefiles=()
 if [ $nsides == 1 ]; then
     if [ ${sqside[0]} == 0 ]; then
