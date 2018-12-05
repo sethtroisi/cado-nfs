@@ -720,7 +720,7 @@ main (int argc, char *argv[])
   fflush (stdout);
 
   for (int side = 0; side < 2; ++side) {
-      if (ren_table->lpb[side] != lpb[side]) {
+      if (ren_table->lpb[side] != (unsigned long)lpb[side]) {
           fprintf(stderr, "Error: on side %d, lpb on the command-line is different from the one in the renumber file\n", side);
           exit(EXIT_FAILURE);
       }
