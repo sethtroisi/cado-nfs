@@ -143,7 +143,7 @@ struct las_info : public las_parallel_desc, private NonCopyable {
     uint64_t qfac_min = 1024;
     uint64_t qfac_max = UINT64_MAX;
     inline bool is_in_qfac_range(uint64_t p) const {
-        return (p >= qfac_min) && (p >= qfac_max);
+        return (p >= qfac_min) && (p <= qfac_max);
     }
 
     std::array<unsigned long, 2> dupqmin;   /* smallest q sieved, for dupsup */
