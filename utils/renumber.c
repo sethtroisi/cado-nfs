@@ -1118,32 +1118,28 @@ renumber_get_p_r_from_index (renumber_srcptr renumber_info, p_r_values_t *p,
        If the second condition is evaluated, we knows that it means that
        renumber_info->rat >= 0.
     */
-    if (renumber_info->rat == -1)
+    if (renumber_info->rat == -1 ||
+        *p > renumber_info->biggest_prime_below_lpb[renumber_info->rat])
     {
-      *side = renumber_info->nb_polys - 1;
-      while (*side >= 0 && (*p > renumber_info->biggest_prime_below_lpb[*side]
-                            || !get_largest_nonbad_root_mod_p (r,
-                                  pol->pols[*side], *p, *side, renumber_info)))
-        (*side)--;
-      ASSERT_ALWAYS (*side >= 0);
-    }
-    else if (*p > renumber_info->biggest_prime_below_lpb[renumber_info->rat])
-    {
-      if (r == NULL) /* we don't need r */
-	{
-	  /* If nb_polys = 2, since there is a rational side, the side of p
-	     can only be the other one. */
-	  *side = 1 - renumber_info->rat;
-	}
-      else
-	{
-	  *side = renumber_info->nb_polys - 1;
-	  while (*side >= 0 && (*p > renumber_info->biggest_prime_below_lpb[*side]
-				|| !get_largest_nonbad_root_mod_p (r,
-								   pol->pols[*side], *p, *side, renumber_info)))
-	    (*side)--;
-	}
-      ASSERT_ALWAYS (*side >= 0);
+      if (renumber_info->rat == -1 || renumber_info->nb_polys != 2)
+      {
+        *side = renumber_info->nb_polys - 1;
+        while (*side >= 0 && (*p > renumber_info->biggest_prime_below_lpb[*side]
+                              || !get_largest_nonbad_root_mod_p (r,
+                                   pol->pols[*side], *p, *side, renumber_info)))
+          (*side)--;
+        ASSERT_ALWAYS (*side >= 0);
+      }
+      else /* with a rational side and 2 polys */
+      {
+        *side = 1 - renumber_info->rat;
+        if (r)
+        {
+          int ret = get_largest_nonbad_root_mod_p (r, pol->pols[*side], *p,
+                                                          *side, renumber_info);
+          ASSERT_ALWAYS (ret != 0); /* a root must exist */
+        }
+      }
     }
     else
     {
