@@ -168,6 +168,9 @@ pass1 (int argc, char *argv[], unsigned long col_max_index)
       while (fgets (s, MAX_SIZE, fp) != NULL)
 	{
 	  assert (s[0] != '\n');
+          /* ensure line ends with \n */
+          if (s[strlen(s)-1] != '\n')
+            sprintf (s + strlen(s), "\n");
 	  if (s[0] != '#') /* not a comment */
 	    {
 	      a = strtol (s, &end, AB_BASE);
@@ -231,6 +234,9 @@ pass2 (int argc, char *argv[], char *out_file)
       while (fgets (s, MAX_SIZE, fp) != NULL)
 	{
 	  assert (s[0] != '\n');
+          /* ensure line ends with \n */
+          if (s[strlen(s)-1] != '\n')
+            sprintf (s + strlen(s), "\n");
 	  if (s[0] != '#') /* not a comment */
 	    {
 	      int singleton = 0;
@@ -247,10 +253,6 @@ pass2 (int argc, char *argv[], char *out_file)
 	      if (singleton == 0)
 		{
 		  fprintf (out, s);
-                  /* ensure each relation ends with \n, otherwise two relations
-                     might be glued on the same line */
-                  if (s[strlen(s)-1] != '\n')
-                    fprintf (out, "\n");
 		  nrels_out ++;
 		}
 	      if ((nrels & 0x7fffff) == 0)
