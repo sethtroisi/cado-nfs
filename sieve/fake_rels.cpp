@@ -390,8 +390,9 @@ void print_fake_rel_manyq(
         for (; nr > 0; --nr) {
             len = MAX_STR;
             // pick fake a,b
-            int nc = snprintf(pstr, len, "%ld,%lu:",
-                    (long)long_random(buf), (unsigned long)long_random(buf));
+            int nc = snprintf(pstr, len, "%lx,%lx:",
+                    (unsigned long)long_random(buf),
+                    (unsigned long)long_random(buf));
             pstr += nc;
             len -= nc;
             // pick a random relation as a model and prepare a string to
