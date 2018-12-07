@@ -247,6 +247,10 @@ pass2 (int argc, char *argv[], char *out_file)
 	      if (singleton == 0)
 		{
 		  fprintf (out, s);
+                  /* ensure each relation ends with \n, otherwise two relations
+                     might be glued on the same line */
+                  if (s[strlen(s)-1] != '\n')
+                    fprintf (out, "\n");
 		  nrels_out ++;
 		}
 	      if ((nrels & 0x7fffff) == 0)
