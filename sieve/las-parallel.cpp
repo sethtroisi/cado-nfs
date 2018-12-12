@@ -491,6 +491,11 @@ struct las_parallel_desc::helper {
            objsize = computed_min_pu_fit;
        } else {
            int argdepth = hwloc_aux_get_depth_from_string(topology, base_object.c_str());
+#if HWLOC_API_VERSION >= 0x020000
+           if (argdepth == HWLOC_TYPE_DEPTH_NUMANODE) {
+               argdepth = hwloc_get_memory_parents_depth(topology);
+           }
+#endif
            if (argdepth < 0)
                throw bad_specification(base_object, " is invalid");
            objsize = number_of(-1, argdepth);
