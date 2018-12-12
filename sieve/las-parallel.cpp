@@ -95,7 +95,9 @@ struct las_parallel_desc::helper {
 #endif  /* HWLOC_API_VERSION >= 0x010700 */
             /* we must make sure to remove these flags, but it's likely that
              * they're off by default anyway */
+#if HWLOC_API_VERSION < 0x020000
             flags &= ~(HWLOC_TOPOLOGY_FLAG_IO_DEVICES | HWLOC_TOPOLOGY_FLAG_IO_BRIDGES);
+#endif
             hwloc_topology_set_flags(topology, flags);
 
             hwloc_topology_load(topology);
@@ -218,7 +220,11 @@ struct las_parallel_desc::helper {
          * that this is a convenient enough upper bound).
          */
 
+#if HWLOC_API_VERSION < 0x020000
         uint64_t ram = root->memory.total_memory;
+#else
+        uint64_t ram = root->total_memory;
+#endif
         /* Round this up to at most 1/16-th. This will do rubbish on a
          * machine where the 1 bits in the binary expansion of the
          * hardware ram size spread more than 4 positions, but we find
@@ -399,7 +405,8 @@ struct las_parallel_desc::helper {
     cxx_hwloc_nodeset current_memory_binding() const {/*{{{*/
         cxx_hwloc_nodeset nn;
         hwloc_membind_policy_t pol;
-        int rc = hwloc_get_membind_nodeset(topology,  nn, &pol, HWLOC_MEMBIND_THREAD);
+        int rc = hwloc_get_membind(topology,  nn, &pol,
+                HWLOC_MEMBIND_THREAD | HWLOC_MEMBIND_BYNODESET);
         if (rc < 0) {
             static std::mutex mm;
             std::lock_guard<std::mutex> dummy(mm);
@@ -960,7 +967,10 @@ int las_parallel_desc::set_loose_binding() const
      * fact.
      */
     int rc;
-    rc = hwloc_set_membind_nodeset(help->topology, n, HWLOC_MEMBIND_BIND, HWLOC_MEMBIND_THREAD | HWLOC_MEMBIND_STRICT);
+    rc = hwloc_set_membind(help->topology, n, HWLOC_MEMBIND_BIND,
+            HWLOC_MEMBIND_THREAD |
+            HWLOC_MEMBIND_STRICT |
+            HWLOC_MEMBIND_BYNODESET);
     if (rc < 0) {
         char * s;
         hwloc_bitmap_asprintf(&s, n);
@@ -972,7 +982,8 @@ int las_parallel_desc::set_loose_binding() const
         free(s);
         return -1;
     }
-    rc = hwloc_set_cpubind(help->topology, c, HWLOC_CPUBIND_THREAD | HWLOC_CPUBIND_STRICT);
+    rc = hwloc_set_cpubind(help->topology, c,
+            HWLOC_CPUBIND_THREAD | HWLOC_CPUBIND_STRICT);
     if (rc < 0) {
         char * s;
         hwloc_bitmap_asprintf(&s, c);
@@ -1001,7 +1012,12 @@ int las_parallel_desc::set_subjob_mem_binding(int k MAYBE_UNUSED) const
     ASSERT_ALWAYS(0<= k && k < (int) help->subjob_binding_cpusets.size());
     int m = k / number_of_subjobs_per_memory_binding_zone();
     ASSERT_ALWAYS(m < (int) help->memory_binding_nodesets.size());
-    int rc = hwloc_set_membind_nodeset(help->topology, help->memory_binding_nodesets[m], HWLOC_MEMBIND_BIND, HWLOC_MEMBIND_THREAD | HWLOC_MEMBIND_STRICT);
+    int rc = hwloc_set_membind(help->topology,
+            help->memory_binding_nodesets[m],
+            HWLOC_MEMBIND_BIND,
+            HWLOC_MEMBIND_THREAD |
+            HWLOC_MEMBIND_STRICT |
+            HWLOC_MEMBIND_BYNODESET);
     if (rc < 0) {
         char * s;
         hwloc_bitmap_asprintf(&s, help->memory_binding_nodesets[m]);
