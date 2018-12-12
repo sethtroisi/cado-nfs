@@ -161,8 +161,8 @@ struct las_parallel_desc::helper {
             return;
         }
         if (desc == "single") { desc = "machine,1,pu"; return; }
-        if (desc == "auto") { desc = default_placement_with_auto; desc += ",loose"; return; }
-        if (desc == "auto,no-replicate") { desc = default_placement_with_auto; desc += ",loose,no-replicate"; return; }
+        if (desc == "auto") { desc = default_placement_with_auto; return; }
+        if (desc == "auto,no-replicate") { desc = default_placement_with_auto; desc += ",no-replicate"; return; }
         if (desc.substr(0,7) == "single-") {
             ostringstream os;
             os << desc.substr(7) << ",1,pu";
