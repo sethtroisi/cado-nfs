@@ -405,8 +405,15 @@ struct las_parallel_desc::helper {
     cxx_hwloc_nodeset current_memory_binding() const {/*{{{*/
         cxx_hwloc_nodeset nn;
         hwloc_membind_policy_t pol;
+#if HWLOC_API_VERSION < 0x010b03
+        /* this legacy called remained valid throughout hwloc 1.x */
+        int rc = hwloc_get_membind_nodeset(topology,  nn, &pol,
+                HWLOC_MEMBIND_THREAD);
+#else
+        /* newer call */
         int rc = hwloc_get_membind(topology,  nn, &pol,
                 HWLOC_MEMBIND_THREAD | HWLOC_MEMBIND_BYNODESET);
+#endif
         if (rc < 0) {
             static std::mutex mm;
             std::lock_guard<std::mutex> dummy(mm);
@@ -972,10 +979,18 @@ int las_parallel_desc::set_loose_binding() const
      * fact.
      */
     int rc;
+#if HWLOC_API_VERSION < 0x010b03
+    /* this legacy called remained valid throughout hwloc 1.x */
+    rc = hwloc_set_membind_nodeset(help->topology, n, HWLOC_MEMBIND_BIND,
+            HWLOC_MEMBIND_THREAD |
+            HWLOC_MEMBIND_STRICT);
+#else
+    /* newer call */
     rc = hwloc_set_membind(help->topology, n, HWLOC_MEMBIND_BIND,
             HWLOC_MEMBIND_THREAD |
             HWLOC_MEMBIND_STRICT |
             HWLOC_MEMBIND_BYNODESET);
+#endif
     if (rc < 0) {
         char * s;
         hwloc_bitmap_asprintf(&s, n);
@@ -1017,12 +1032,22 @@ int las_parallel_desc::set_subjob_mem_binding(int k MAYBE_UNUSED) const
     ASSERT_ALWAYS(0<= k && k < (int) help->subjob_binding_cpusets.size());
     int m = k / number_of_subjobs_per_memory_binding_zone();
     ASSERT_ALWAYS(m < (int) help->memory_binding_nodesets.size());
+#if HWLOC_API_VERSION < 0x010b03
+    /* this legacy called remained valid throughout hwloc 1.x */
+    int rc = hwloc_set_membind_nodeset(help->topology,
+            help->memory_binding_nodesets[m],
+            HWLOC_MEMBIND_BIND,
+            HWLOC_MEMBIND_THREAD |
+            HWLOC_MEMBIND_STRICT);
+#else
+    /* newer call */
     int rc = hwloc_set_membind(help->topology,
             help->memory_binding_nodesets[m],
             HWLOC_MEMBIND_BIND,
             HWLOC_MEMBIND_THREAD |
             HWLOC_MEMBIND_STRICT |
             HWLOC_MEMBIND_BYNODESET);
+#endif
     if (rc < 0) {
         char * s;
         hwloc_bitmap_asprintf(&s, help->memory_binding_nodesets[m]);
