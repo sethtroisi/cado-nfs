@@ -847,9 +847,9 @@ las_parallel_desc::las_parallel_desc(cxx_param_list & pl, double jobram_arg)
 
     nsubjobs_per_cpu_binding_zone = help->nsubjobs_per_cpu_binding_zone;
     nthreads_per_subjob = help->nthreads_per_subjob;
-    if (!help->depth) return;
 
 #ifdef HAVE_HWLOC
+    if (!help->depth) return;
     memory_binding_size = help->memory_binding_size;
     nmemory_binding_zones = help->number_of(-1, 0) / memory_binding_size;
     if (!help->replicate)
@@ -988,9 +988,9 @@ int las_parallel_desc::query_memory_binding(void * addr, size_t len);
 
 int las_parallel_desc::set_loose_binding() const
 {
+#ifdef HAVE_HWLOC
     if (help->depth == 0)
         return 0;
-#ifdef HAVE_HWLOC
     hwloc_obj_t root = hwloc_get_root_obj(help->topology);
     hwloc_nodeset_t n = root->nodeset;
     hwloc_cpuset_t c = root->cpuset;
@@ -1041,8 +1041,10 @@ int las_parallel_desc::set_loose_binding() const
 
 int las_parallel_desc::set_subjob_binding(int k) const
 {
+#ifdef HAVE_HWLOC
     if (help->depth == 0)
         return -1;
+#endif
     set_subjob_cpu_binding(k);
     set_subjob_mem_binding(k);
     return 0;
@@ -1050,9 +1052,9 @@ int las_parallel_desc::set_subjob_binding(int k) const
 
 int las_parallel_desc::set_subjob_mem_binding(int k MAYBE_UNUSED) const
 {
+#ifdef HAVE_HWLOC
     if (help->depth == 0)
         return -1;
-#ifdef HAVE_HWLOC
     ASSERT_ALWAYS(0<= k && k < (int) help->subjob_binding_cpusets.size());
     int m = k / number_of_subjobs_per_memory_binding_zone();
     ASSERT_ALWAYS(m < (int) help->memory_binding_nodesets.size());
@@ -1088,9 +1090,9 @@ int las_parallel_desc::set_subjob_mem_binding(int k MAYBE_UNUSED) const
 }
 int las_parallel_desc::set_subjob_cpu_binding(int k MAYBE_UNUSED) const
 {
+#ifdef HAVE_HWLOC
     if (help->depth == 0)
         return -1;
-#ifdef HAVE_HWLOC
     ASSERT_ALWAYS(0<= k && k < (int) help->subjob_binding_cpusets.size());
     int rc = hwloc_set_cpubind(help->topology, help->subjob_binding_cpusets[k], HWLOC_CPUBIND_THREAD |  HWLOC_CPUBIND_STRICT);
     if (rc < 0) {
