@@ -59,6 +59,8 @@ void plingen_tuning_decl_usage(param_list_ptr pl)
             "For --tune only: divide the number of transforms on dimension 2 (m+n)/r for both MP and MUL) so as to save memory");
     param_list_decl_usage(pl, "tuning_timing_cache_filename",
             "For --tune only: save (and re-load) timings for individual transforms in this file\n");
+    param_list_decl_usage(pl, "basecase-keep-until",
+            "For --tune only: stop measuring basecase timing when it exceeds the time of strictly recursive operations by this factor\n");
 }
 void plingen_tuning_lookup_parameters(param_list_ptr pl)
 {
@@ -71,6 +73,7 @@ void plingen_tuning_lookup_parameters(param_list_ptr pl)
     param_list_lookup_string(pl, "tuning_shrink0");
     param_list_lookup_string(pl, "tuning_shrink2");
     param_list_lookup_string(pl, "tuning_timing_cache_filename");
+    param_list_lookup_string(pl, "basecase_keep_until");
 }
 
 /* interface to C programs for list of cutoffs we compute *//*{{{*/
@@ -106,6 +109,11 @@ unsigned int cutoff_list_get(cutoff_list cl, unsigned int k)
 /* The -B argument may be used to request printing of timing results at
  * least up to this input length */
 unsigned int bench_atleast_uptothis = 0;
+
+/* For --tune, stop measuring the time taken by the basecase when it is
+ * more than this number times the time taken by the other operations
+ */
+unsigned int basecase_keep_until = 32;
 
 using namespace std;
 
@@ -1333,7 +1341,7 @@ void plingen_tune_full(abdst_field ab, unsigned int m, unsigned int n, size_t N,
     printf("Measuring lingen data for N=%zu m=%u n=%u for a %zu-bit prime p, using a %u*%u grid of %u-thread nodes, with %u-fold batching\n",
             N, m, n, mpz_sizeinbase(p, 2), r, r, T, batch);
 
-    unsigned int L = N/n + N/m;
+    size_t L = N/n + N/m;
 
 #ifdef HAVE_OPENMP
     int omp_T = omp_get_max_threads();
@@ -1342,6 +1350,7 @@ void plingen_tune_full(abdst_field ab, unsigned int m, unsigned int n, size_t N,
     extern void test_basecase(abdst_field ab, unsigned int m, unsigned int n, size_t L, gmp_randstate_t rstate);
 
     char buf[20];
+    char buf2[20];
 
     size_t S = abvec_elt_stride(ab, 1);
     size_t data0 = m*(m+n)*(r*r-1);
@@ -1352,7 +1361,9 @@ void plingen_tune_full(abdst_field ab, unsigned int m, unsigned int n, size_t N,
     double tt_com0 = data0 / mpi_xput;
     printf("# mpi_threshold comm time: %.1f\n", tt_com0);
 
-    bool basecase_eliminated = false;
+    /* with basecase_keep_until == 0, then we never measure basecase */
+    bool basecase_eliminated = !basecase_keep_until;
+
     size_t suggest_threshold = 0;
 
     ASSERT_ALWAYS(m % (r*batch) == 0);
@@ -1362,9 +1373,9 @@ void plingen_tune_full(abdst_field ab, unsigned int m, unsigned int n, size_t N,
     size_t peakpeak=0;
 
     for(int i = log2(L) ; i>=0 ; i--) {
-        if ((L >> i) <= 2) continue;
+        if (m * (L>>i) / (m+n) <= 2) continue;
 
-        printf("Measuring time at depth %d\n", i);
+        printf("########## Measuring time at depth %d ##########\n", i);
 
         int nacc = m+n;
 
@@ -1386,7 +1397,7 @@ void plingen_tune_full(abdst_field ab, unsigned int m, unsigned int n, size_t N,
                 tcache[K] = std::make_tuple(tt, 0., 0., 0.);
             }
 
-            printf("# total basecase time, if threshold=%u: %.1f\n", L >> i, tt * (1 << i));
+            printf("# total basecase time, if threshold=%zu: %.1f\n", L >> i, tt * (1 << i));
             tt_basecase_total = tt * (1 << i);
         }/*}}}*/
 
@@ -1394,9 +1405,9 @@ void plingen_tune_full(abdst_field ab, unsigned int m, unsigned int n, size_t N,
         {
             const char * step = "MP";
 
-            unsigned int csize = (L>>i) / 2;
-            unsigned int bsize = m * (L>>i) / (m+n) / 2;
-            unsigned int asize = csize + bsize - 1;
+            size_t csize = (L>>i) / 2;
+            size_t bsize = m * (L>>i) / (m+n) / 2;
+            size_t asize = csize + bsize - 1;
 
             ASSERT_ALWAYS(asize >= bsize);
 
@@ -1472,11 +1483,32 @@ void plingen_tune_full(abdst_field ab, unsigned int m, unsigned int n, size_t N,
             }
 
 
-            printf(";%d;%u;%s;%u;%u;%s;%.2f;%.2f;%.2f;%.2f\n",
+            printf("#;depth;recursive_input_length;step;step_op1_length;step_op2_length;size_one_transform;tt_dft1;tt_dft2;tt_conv;tt_ift\n");
+            printf(";%d;%zu;%s;%zu;%zu;%s;%.2f;%.2f;%.2f;%.2f\n",
                     i,
                     (L>>i), step, asize, bsize, 
                     size_disp(fft_alloc_sizes[0], buf),
                     tt_dft1, tt_dft2, tt_conv, tt_ift);
+
+            printf("# %s op1 %s per coeff, %s in total\n", step,
+                    size_disp(asize*mpz_size(p)*sizeof(mp_limb_t), buf),
+                    size_disp(n0*n1*asize*mpz_size(p)*sizeof(mp_limb_t), buf2));
+            printf("# %s op2 %s per coeff, %s in total\n", step,
+                    size_disp(bsize*mpz_size(p)*sizeof(mp_limb_t), buf),
+                    size_disp(n1*n2*bsize*mpz_size(p)*sizeof(mp_limb_t), buf2));
+            printf("# %s res %s per coeff, %s in total\n", step,
+                    size_disp(csize*mpz_size(p)*sizeof(mp_limb_t), buf),
+                    size_disp(n0*n2*csize*mpz_size(p)*sizeof(mp_limb_t), buf2));
+            printf("# %s transform(op1) %s per coeff, %s in total\n", step,
+                    size_disp(fft_alloc_sizes[0], buf),
+                    size_disp(n0*n1*fft_alloc_sizes[0], buf2));
+            printf("# %s transform(op2) %s per coeff, %s in total\n", step,
+                    size_disp(fft_alloc_sizes[0], buf),
+                    size_disp(n1*n2*fft_alloc_sizes[0], buf2));
+            printf("# %s transform(res) %s per coeff, %s in total\n", step,
+                    size_disp(fft_alloc_sizes[0], buf),
+                    size_disp(n0*n2*fft_alloc_sizes[0], buf2));
+
 
             double T_dft1 = (n0/r)*(n1/r)*tt_dft1;
             double T_dft2 = (n1/r)*(n2/r)*tt_dft2;
@@ -1527,9 +1559,9 @@ void plingen_tune_full(abdst_field ab, unsigned int m, unsigned int n, size_t N,
         {
             const char * step = "MUL";
 
-            unsigned int asize = m * (L>>i) / (m+n) / 2;
-            unsigned int bsize = m * (L>>i) / (m+n) / 2;
-            unsigned int csize = asize + bsize - 1;
+            size_t asize = m * (L>>i) / (m+n) / 2;
+            size_t bsize = m * (L>>i) / (m+n) / 2;
+            size_t csize = asize + bsize - 1;
 
             unsigned int n0 = m + n;
             unsigned int n1 = m + n;
@@ -1602,11 +1634,30 @@ void plingen_tune_full(abdst_field ab, unsigned int m, unsigned int n, size_t N,
                 matpoly_clear(ab, c);
             }
 
-            printf(";%d;%u;%s;%u;%u;%s;%.2f;%.2f;%.2f;%.2f\n",
+            printf("#;depth;recursive_input_length;step;step_op1_length;step_op2_length;size_one_transform;tt_dft1;tt_dft2;tt_conv;tt_ift\n");
+            printf(";%d;%zu;%s;%zu;%zu;%s;%.2f;%.2f;%.2f;%.2f\n",
                     i,
                     (L>>i), step, asize, bsize, 
                     size_disp(fft_alloc_sizes[0], buf),
                     tt_dft1, tt_dft2, tt_conv, tt_ift);
+            printf("# %s op1 %s per coeff, %s in total\n", step,
+                    size_disp(asize*mpz_size(p)*sizeof(mp_limb_t), buf),
+                    size_disp(n0*n1*asize*mpz_size(p)*sizeof(mp_limb_t), buf2));
+            printf("# %s op2 %s per coeff, %s in total\n", step,
+                    size_disp(bsize*mpz_size(p)*sizeof(mp_limb_t), buf),
+                    size_disp(n1*n2*bsize*mpz_size(p)*sizeof(mp_limb_t), buf2));
+            printf("# %s res %s per coeff, %s in total\n", step,
+                    size_disp(csize*mpz_size(p)*sizeof(mp_limb_t), buf),
+                    size_disp(n0*n2*csize*mpz_size(p)*sizeof(mp_limb_t), buf2));
+            printf("# %s transform(op1) %s per coeff, %s in total\n", step,
+                    size_disp(fft_alloc_sizes[0], buf),
+                    size_disp(n0*n1*fft_alloc_sizes[0], buf2));
+            printf("# %s transform(op2) %s per coeff, %s in total\n", step,
+                    size_disp(fft_alloc_sizes[0], buf),
+                    size_disp(n1*n2*fft_alloc_sizes[0], buf2));
+            printf("# %s transform(res) %s per coeff, %s in total\n", step,
+                    size_disp(fft_alloc_sizes[0], buf),
+                    size_disp(n0*n2*fft_alloc_sizes[0], buf2));
 
             double T_dft1 = (n0/r)*(n1/r)*tt_dft1;
             double T_dft2 = (n1/r)*(n2/r)*tt_dft2;
@@ -1657,15 +1708,16 @@ void plingen_tune_full(abdst_field ab, unsigned int m, unsigned int n, size_t N,
             if (tt_mp_total + tt_mul_total < tt_basecase_total) {
                 if (suggest_threshold == 0) {
                     suggest_threshold = L>>i;
-                    printf("# suggest lingen_mpi_threshold = %u\n", L>>i);
+                    printf("# suggest lingen_mpi_threshold = %zu\n", L>>i);
                 }
             } else {
                 suggest_threshold = 0;
             }
 
 
-            if (tt_mp_total + tt_mul_total < tt_basecase_total / 32)
-                basecase_eliminated = 1;
+            if (basecase_keep_until * (tt_mp_total + tt_mul_total) < tt_basecase_total) {
+                basecase_eliminated = true;
+            }
             tt_total += std::min(tt_mp_total + tt_mul_total, tt_basecase_total);
         } else {
             tt_total += tt_mp_total + tt_mul_total;
@@ -1766,6 +1818,7 @@ void plingen_tuning(abdst_field ab, unsigned int m, unsigned int n, MPI_Comm com
     setbuf(stderr, NULL);
 
     param_list_parse_uint(pl, "B", &bench_atleast_uptothis);
+    param_list_parse_uint(pl, "basecase-keep-until", &basecase_keep_until);
     param_list_parse_int(pl, "catchsig", &catchsig);
 
     MPI_Comm_rank(comm, &rank);
