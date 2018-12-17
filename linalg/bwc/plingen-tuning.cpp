@@ -1526,10 +1526,22 @@ void plingen_tune_full(abdst_field ab, unsigned int m, unsigned int n, size_t N,
                     T_dft1, T_dft2, T_conv, T_ift,
                     T_dft1 + T_dft2 + T_conv + T_ift);
 
-            T_dft1 = shrink2*iceildiv(n0*batch/r,T)*(n1/r/batch)*tt_dft1;
-            T_dft2 = (n1/r/batch)*shrink2*iceildiv(n2/shrink2*batch/r,T)*tt_dft2;
-            T_ift = shrink2*iceildiv((n0/r)*(n2/r/shrink2),T)*tt_ift;
-            T_conv = (n1/r)*r*shrink2*iceildiv((n0/r)*(n2/r/shrink2),T)*tt_conv;
+            if (n0/shrink0 < n2/shrink2) {
+                /* then we want many live transforms on side 0 */
+                T_dft1 = (n1/r/batch)*iceildiv(n0*batch/r,shrink0*T)*tt_dft1;
+                T_dft2 = (n1/r/batch)*n2/shrink2*iceildiv(batch,T)*tt_dft2;
+            } else {
+                /* otherwise many live transforms on side 2 */
+                T_dft1 = (n1/r/batch)*n0/shrink0*iceildiv(batch,T)*tt_dft1;
+                T_dft2 = (n1/r/batch)*iceildiv(n2*batch/r,shrink2*T)*tt_dft2;
+            }
+            T_conv = (n1/r/batch)*r*batch*iceildiv((n0/r/shrink0)*(n2/r/shrink2),T)*tt_conv;
+            T_ift = iceildiv((n0/r/shrink0)*(n2/r/shrink2),T)*tt_ift;
+
+            T_dft1 = shrink0*shrink2*T_dft1;
+            T_dft2 = shrink0*shrink2*T_dft2;
+            T_conv = shrink0*shrink2*T_conv;
+            T_ift = shrink0*shrink2*T_ift;
 
             T_dft1 = T_dft1 * (1 << i);
             T_dft2 = T_dft2 * (1 << i);
@@ -1675,10 +1687,22 @@ void plingen_tune_full(abdst_field ab, unsigned int m, unsigned int n, size_t N,
                     T_dft1, T_dft2, T_conv, T_ift,
                     T_dft1 + T_dft2 + T_conv + T_ift);
 
-            T_dft1 = shrink2*iceildiv(n0*batch/r,T)*(n1/r/batch)*tt_dft1;
-            T_dft2 = (n1/r/batch)*shrink2*iceildiv(n2/shrink2*batch/r,T)*tt_dft2;
-            T_ift = shrink2*iceildiv((n0/r)*(n2/r/shrink2),T)*tt_ift;
-            T_conv = (n1/r)*r*shrink2*iceildiv((n0/r)*(n2/r/shrink2),T)*tt_conv;
+            if (n0/shrink0 < n2/shrink2) {
+                /* then we want many live transforms on side 0 */
+                T_dft1 = (n1/r/batch)*iceildiv(n0*batch/r,shrink0*T)*tt_dft1;
+                T_dft2 = (n1/r/batch)*n2/shrink2*iceildiv(batch,T)*tt_dft2;
+            } else {
+                /* otherwise many live transforms on side 2 */
+                T_dft1 = (n1/r/batch)*n0/shrink0*iceildiv(batch,T)*tt_dft1;
+                T_dft2 = (n1/r/batch)*iceildiv(n2*batch/r,shrink2*T)*tt_dft2;
+            }
+            T_conv = (n1/r/batch)*r*batch*iceildiv((n0/r/shrink0)*(n2/r/shrink2),T)*tt_conv;
+            T_ift = iceildiv((n0/r/shrink0)*(n2/r/shrink2),T)*tt_ift;
+
+            T_dft1 = shrink0*shrink2*T_dft1;
+            T_dft2 = shrink0*shrink2*T_dft2;
+            T_conv = shrink0*shrink2*T_conv;
+            T_ift = shrink0*shrink2*T_ift;
 
             T_dft1 = T_dft1 * (1 << i);
             T_dft2 = T_dft2 * (1 << i);
