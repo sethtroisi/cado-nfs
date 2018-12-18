@@ -142,8 +142,9 @@ foreach(gfp_layer ${BWC_GFP_ARITHMETIC_BACKENDS})
     # test).
     cado_define_test(test-bwc-plingen-${gfp_layer} SCRIPT
         ${CMAKE_CURRENT_SOURCE_DIR}/test-plingen.sh
+        NO_DEFAULT_RUN
         TARGET_DEPENDENCIES plingen_${gfp_layer})
-    set_tests_properties(test-bwc-plingen-${gfp_layer} PROPERTIES WILL_FAIL 1)
+    # set_tests_properties(test-bwc-plingen-${gfp_layer} PROPERTIES WILL_FAIL 1)
 
     # Note that the thr argument here is used only in MPI
     # context, and ignored otherwise. In MPI context, this triggers the
