@@ -45,8 +45,10 @@ void bigmatpoly_zero(abdst_field ab, bigmatpoly_ptr p);
 void bigmatpoly_clear(abdst_field ab, bigmatpoly_ptr p);
 void bigmatpoly_clear_model(bigmatpoly_ptr p);
 void bigmatpoly_set_size(bigmatpoly_ptr p, size_t size);
-
+void bigmatpoly_coeff_set_zero_loc(abdst_field ab, bigmatpoly_ptr pi, unsigned int k);
+int bigmatpoly_coeff_is_zero(abdst_field ab, bigmatpoly_srcptr pi, unsigned int k);
 void bigmatpoly_swap(bigmatpoly_ptr a, bigmatpoly_ptr b);
+
 static inline matpoly * bigmatpoly_part(bigmatpoly_ptr p, unsigned int i, unsigned int j);
 static inline matpoly_ptr bigmatpoly_cell(bigmatpoly_ptr p, unsigned int i, unsigned int j);
 

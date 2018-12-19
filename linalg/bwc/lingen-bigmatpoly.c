@@ -277,6 +277,19 @@ void bigmatpoly_truncate_loc(abdst_field ab, bigmatpoly_ptr dst, bigmatpoly_ptr 
 }
 /*}}}*/
 
+void bigmatpoly_coeff_set_zero_loc(abdst_field ab, bigmatpoly_ptr pi, unsigned int k)
+{
+    matpoly_coeff_set_zero(ab, bigmatpoly_my_cell(pi), k);
+}
+
+int bigmatpoly_coeff_is_zero(abdst_field ab, bigmatpoly_srcptr pi, unsigned int k)
+{
+    int t = matpoly_coeff_is_zero(ab, bigmatpoly_my_cell_const(pi), k);
+    MPI_Allreduce(MPI_IN_PLACE, &t, 1, MPI_INT, MPI_MIN, pi->com[0]);
+    return t;
+}
+
+
 void bigmatpoly_rshift(abdst_field ab, bigmatpoly_ptr dst, bigmatpoly_ptr src, unsigned int k)/*{{{*/
 {
     if (bigmatpoly_check_pre_init(dst)) {

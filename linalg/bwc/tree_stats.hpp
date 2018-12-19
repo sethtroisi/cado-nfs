@@ -67,10 +67,14 @@ class tree_stats {
 
     void print(unsigned int level);
 
-    bool draft = false;
+    /* max number of seconds to use as a bound before we consider that
+     * the timing is settled for good.
+     */
+    int draft = 0;
 public:
     unsigned int depth;
-    inline void set_draft_mode(bool d) { draft = d; }
+    inline int is_draft_mode() const { return draft; }
+    inline void set_draft_mode(int d) { draft = d; }
     
     void enter(const char * func, unsigned int inputsize, bool recurse = true); 
     void leave();
