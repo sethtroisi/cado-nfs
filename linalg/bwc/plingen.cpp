@@ -3371,8 +3371,10 @@ int main(int argc, char *argv[])
      * think that given the way we do the draft measurements, we would
      * get sensible projected timings.
      */
-    printf("Draft timings provided for single-thread execution\n");
-    omp_set_num_threads(1);
+    if (draft_mode) {
+        printf("Draft timings provided for single-thread execution\n");
+        omp_set_num_threads(1);
+    }
 #endif
 
     if (size > 1) {
