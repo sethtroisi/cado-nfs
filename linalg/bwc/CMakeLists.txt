@@ -393,6 +393,9 @@ if(BWC_GFP_ARITHMETIC_BACKENDS)
     # so there's absolutely no point in making it shared.
     file(GLOB flint_fft_files flint-fft/*.c)
     add_library(flint-fft ${flint_fft_files})
+    set_target_properties(flint-fft PROPERTIES
+        COMPILE_FLAGS "--mpi ${OpenMP_C_FLAGS}"
+        LINK_FLAGS "--mpi ${OpenMP_C_FLAGS}")
     add_executable(test-flint test-flint.c)
     target_link_libraries(test-flint flint-fft utils ${gmp_libname})
 endif()
