@@ -40,6 +40,10 @@
 #include "ulong_extras.h"
 #include "fft.h"
 
+#ifdef  HAVE_OPENMP
+#include <omp.h>
+#endif
+
 /*
  * Set \code{u = 2^b1*(s + t)}, \code{v = 2^b2*(s - t)} modulo 
  * \code{B^limbs + 1}. This is used to compute 

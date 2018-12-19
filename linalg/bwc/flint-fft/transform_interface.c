@@ -56,7 +56,7 @@ static int fft_tuning_table[5][2] = FFT_TAB;
 /* return the # of transform terms which are actually computed. Depending
  * on whether we use MFA or not, the truncation point varies.
  */
-static inline mp_size_t fti_trunc(struct fft_transform_info * fti)
+static inline mp_size_t fti_trunc(const struct fft_transform_info * fti)
 {
     mp_size_t depth1 = fti->depth / 2;
     mp_size_t n = 1 << fti->depth;
@@ -75,7 +75,7 @@ static inline mp_size_t fti_trunc(struct fft_transform_info * fti)
 
 /* return the one less than the # of words used to store coefficients in
  * R. */
-static inline mp_size_t fti_rsize0(struct fft_transform_info * fti)
+static inline mp_size_t fti_rsize0(const struct fft_transform_info * fti)
 {
     mp_size_t w = fti->w;
     mp_size_t n = 1 << fti->depth;
@@ -646,7 +646,7 @@ void fft_get_transform_info_fppol_mp(struct fft_transform_info * fti, mpz_srcptr
  * Note that the size returned in [0] for each transform entails slight
  * overallocation due to pointer swap tricks here and there.
  */
-void fft_get_transform_allocs(size_t sizes[3], struct fft_transform_info * fti)
+void fft_get_transform_allocs(size_t sizes[3], const struct fft_transform_info * fti)
 {
     mp_size_t w = fti->w;
     mp_size_t n = 1 << fti->depth;
@@ -666,7 +666,7 @@ void fft_get_transform_allocs(size_t sizes[3], struct fft_transform_info * fti)
 
 #define VOID_POINTER_ADD(x, k) (((char*)(x))+(k))
 
-void fft_transform_prepare(void * x, struct fft_transform_info * fti)
+void fft_transform_prepare(void * x, const struct fft_transform_info * fti)
 {
     mp_size_t n = 1 << fti->depth;
     mp_size_t rsize0 = fti_rsize0(fti);
@@ -677,7 +677,7 @@ void fft_transform_prepare(void * x, struct fft_transform_info * fti)
     }
 }
 
-void fft_transform_export(void * x, struct fft_transform_info * fti)
+void fft_transform_export(void * x, const struct fft_transform_info * fti)
 {
     mp_size_t n = 1 << fti->depth;
     mp_limb_t ** ptrs = (mp_limb_t **) x;
@@ -697,7 +697,7 @@ void fft_transform_export(void * x, struct fft_transform_info * fti)
 }
 
 
-void fft_transform_import(void * x, struct fft_transform_info * fti)
+void fft_transform_import(void * x, const struct fft_transform_info * fti)
 {
     mp_size_t n = 1 << fti->depth;
     mp_limb_t ** ptrs = (mp_limb_t **) x;
@@ -717,7 +717,7 @@ void fft_transform_import(void * x, struct fft_transform_info * fti)
 }
 
 /* Hardly useful, in fact */
-void * fft_transform_alloc(struct fft_transform_info * fti)
+void * fft_transform_alloc(const struct fft_transform_info * fti)
 {
     size_t allocs[3];
     fft_get_transform_allocs(allocs, fti);
@@ -728,7 +728,7 @@ void * fft_transform_alloc(struct fft_transform_info * fti)
 /* }}} */
 
 /* {{{ kronecker-schönhage */
-void fft_split_fppol(void * y, mp_limb_t * x, mp_size_t cx, struct fft_transform_info * fti, mpz_srcptr p)
+void fft_split_fppol(void * y, const mp_limb_t * x, mp_size_t cx, const struct fft_transform_info * fti, mpz_srcptr p)
 {
     /* XXX We are implicitly asserting that the transform here is
      * straight out of fft_transform_prepare(). If it is not, then we
@@ -781,7 +781,7 @@ void fft_split_fppol(void * y, mp_limb_t * x, mp_size_t cx, struct fft_transform
     mp_size_t xbit_offset = 0;
     mp_size_t xuntil_fence = 0;
     mp_size_t xnchunks = nx / np;
-    mp_limb_t * xr = x;
+    const mp_limb_t * xr = x;
 
     /* Intermediate area (not created): integer. The integer in itself
      * has no fence. */
@@ -882,7 +882,7 @@ void fft_split_fppol(void * y, mp_limb_t * x, mp_size_t cx, struct fft_transform
  * The nx first coefficients of the result (each occupying mpz_size(p)
  * limbs) go to the limb array x.
  */
-void fft_combine_fppol(mp_limb_t * x, mp_size_t cx, void * y, struct fft_transform_info * fti, mpz_srcptr p)
+void fft_combine_fppol(mp_limb_t * x, mp_size_t cx, void * y, const struct fft_transform_info * fti, mpz_srcptr p)
 {
     mp_size_t rsize0 = fti_rsize0(fti);
     mp_limb_t ** ptrs = (mp_limb_t **) y;
@@ -964,7 +964,7 @@ void fft_combine_fppol(mp_limb_t * x, mp_size_t cx, void * y, struct fft_transfo
  * presence of a carry is directly decided from the presence of the bit
  * just before the lowest polynomial coefficient in R[x].
  */
-void fft_combine_fppol_mp(mp_limb_t * x, mp_size_t cx, void * y, struct fft_transform_info * fti, mpz_srcptr p)
+void fft_combine_fppol_mp(mp_limb_t * x, mp_size_t cx, void * y, const struct fft_transform_info * fti, mpz_srcptr p)
 {
     mp_size_t rsize0 = fti_rsize0(fti);
     mp_limb_t ** ptrs = (mp_limb_t **) y;
@@ -1056,7 +1056,7 @@ void fft_combine_fppol_mp(mp_limb_t * x, mp_size_t cx, void * y, struct fft_tran
 /* }}} */
 
 #ifdef DEBUG_FFT/*{{{*/
-void fft_debug_print_ft(const char * filename, void * y, struct fft_transform_info * fti)
+void fft_debug_print_ft(const char * filename, void * y, const struct fft_transform_info * fti)
 {
     mp_size_t n = 1 << fti->depth;
     mp_size_t rsize0 = fti_rsize0(fti);
@@ -1096,13 +1096,10 @@ void fft_debug_print_ft(const char * filename, void * y, struct fft_transform_in
 #endif/*}}}*/
 
 /* {{{ dft/ift backends */
-static void fft_do_dft_backend(void * y, void * temp, struct fft_transform_info * fti)
+static void fft_do_dft_backend(void * y, void * temp, const struct fft_transform_info * fti)
 {
 #ifdef DEBUG_FFT
     fft_debug_print_ft("/tmp/before_dft.m", y, fti);
-#endif
-#ifdef TIME_FFT
-    fti->dft.t -= seconds();
 #endif
     mp_size_t n = 1 << fti->depth;
     mp_size_t rsize0 = fti_rsize0(fti);
@@ -1152,19 +1149,12 @@ static void fft_do_dft_backend(void * y, void * temp, struct fft_transform_info 
 #ifdef DEBUG_FFT
     fft_debug_print_ft("/tmp/after_dft.m", y, fti);
 #endif
-#ifdef TIME_FFT
-    fti->dft.t += seconds();
-    fti->dft.n++;
-#endif
 }
 
-static void fft_do_ift_backend(void * y, void * temp, struct fft_transform_info * fti)
+static void fft_do_ift_backend(void * y, void * temp, const struct fft_transform_info * fti)
 {
 #ifdef DEBUG_FFT
     fft_debug_print_ft("/tmp/before_ift.m", y, fti);
-#endif
-#ifdef TIME_FFT
-    fti->ift.t -= seconds();
 #endif
     mp_size_t n = 1 << fti->depth;
     mp_size_t rsize0 = fti_rsize0(fti);
@@ -1213,15 +1203,11 @@ static void fft_do_ift_backend(void * y, void * temp, struct fft_transform_info 
 #ifdef DEBUG_FFT
     fft_debug_print_ft("/tmp/after_ift.m", y, fti);
 #endif
-#ifdef TIME_FFT
-    fti->ift.t += seconds();
-    fti->ift.n++;
-#endif
 }
 /* }}} */
 
 /* {{{ dft/ift frontends */
-void fft_do_dft(void * y, mp_limb_t * x, mp_size_t nx, void * temp, struct fft_transform_info * fti)
+void fft_do_dft(void * y, const mp_limb_t * x, mp_size_t nx, void * temp, const struct fft_transform_info * fti)
 {
     /* See mul_truncate_sqrt2 */
     mp_size_t n = 1 << fti->depth;
@@ -1238,13 +1224,13 @@ void fft_do_dft(void * y, mp_limb_t * x, mp_size_t nx, void * temp, struct fft_t
 /* This does the same as above, except that x is an array of nx
  * coefficients modulo p, each taking mpz_size(p) limbs
  */
-void fft_do_dft_fppol(void * y, mp_limb_t * x, mp_size_t cx, void * temp, struct fft_transform_info * fti, mpz_srcptr p)
+void fft_do_dft_fppol(void * y, const mp_limb_t * x, mp_size_t cx, void * temp, const struct fft_transform_info * fti, mpz_srcptr p)
 {
     fft_split_fppol(y, x, cx, fti, p);
     fft_do_dft_backend(y, temp, fti);
 }
 
-void fft_do_ift(mp_limb_t * x, mp_size_t nx, void * y, void * temp, struct fft_transform_info * fti)
+void fft_do_ift(mp_limb_t * x, mp_size_t nx, void * y, void * temp, const struct fft_transform_info * fti)
 {
     mp_size_t w = fti->w;
     mp_size_t n = 1 << fti->depth;
@@ -1291,13 +1277,13 @@ void fft_do_ift(mp_limb_t * x, mp_size_t nx, void * y, void * temp, struct fft_t
 /* Same, but store the result as a polynomial over GF(p). nx must be a
  * multiple of mpz_size(p)
  */
-void fft_do_ift_fppol(mp_limb_t * x, mp_size_t cx, void * y, void * temp, struct fft_transform_info * fti, mpz_srcptr p)
+void fft_do_ift_fppol(mp_limb_t * x, mp_size_t cx, void * y, void * temp, const struct fft_transform_info * fti, mpz_srcptr p)
 {
     fft_do_ift_backend(y, temp, fti);
     fft_combine_fppol(x, cx, y, fti, p);
 }
 
-void fft_do_ift_fppol_mp(mp_limb_t * x, mp_size_t cx, void * y, void * temp, struct fft_transform_info * fti, mpz_srcptr p, mp_size_t shift)
+void fft_do_ift_fppol_mp(mp_limb_t * x, mp_size_t cx, void * y, void * temp, const struct fft_transform_info * fti, mpz_srcptr p, mp_size_t shift)
 {
     fft_do_ift_backend(y, temp, fti);
     mp_size_t nbigtemp = fft_get_mulmod_output_minlimbs(fti);
@@ -1348,11 +1334,8 @@ void fft_do_ift_fppol_mp(mp_limb_t * x, mp_size_t cx, void * y, void * temp, str
 
 /* }}} */
 
-void fft_mul(void * z, void * y0, void * y1, void * temp, struct fft_transform_info * fti)
+void fft_mul(void * z, const void * y0, const void * y1, void * temp, const struct fft_transform_info * fti)
 {
-#ifdef TIME_FFT
-    fti->conv.t -= seconds();
-#endif
     /* See mul_truncate_sqrt2 */
     mp_size_t nw = fti->w << fti->depth;
     mp_size_t rsize0 = fti_rsize0(fti);
@@ -1405,10 +1388,6 @@ void fft_mul(void * z, void * y0, void * y1, void * temp, struct fft_transform_i
             }
         }
     }
-#ifdef TIME_FFT
-    fti->conv.t += seconds();
-    fti->conv.n++;
-#endif
 }
 
 static __inline__
@@ -1459,7 +1438,7 @@ void mpn_addmod_2expp1(mp_limb_t * z, mp_limb_t * x, mp_limb_t * y, mp_size_t li
     }
 }
 
-void fft_zero(void * z, struct fft_transform_info * fti)
+void fft_zero(void * z, const struct fft_transform_info * fti)
 {
     mp_limb_t ** ptrs = (mp_limb_t **) z;
     mp_size_t n = 1 << fti->depth;
@@ -1468,7 +1447,7 @@ void fft_zero(void * z, struct fft_transform_info * fti)
     mpn_zero(area, (4*n+2) * (rsize0 + 1));
 }
 
-void fft_add(void * z, void * y0, void * y1, struct fft_transform_info * fti)
+void fft_add(void * z, void * y0, void * y1, const struct fft_transform_info * fti)
 {
     /* See fft_mul */
     mp_size_t rsize0 = fti_rsize0(fti);
@@ -1515,11 +1494,8 @@ void fft_add(void * z, void * y0, void * y1, struct fft_transform_info * fti)
     }
 }
 
-void fft_addmul(void * z, void * y0, void * y1, void * temp, void * qtemp, struct fft_transform_info * fti)
+void fft_addmul(void * z, const void * y0, const void * y1, void * temp, void * qtemp, const struct fft_transform_info * fti)
 {
-#ifdef TIME_FFT
-    fti->conv.t -= seconds();
-#endif
     /* See mul_truncate_sqrt2 */
     mp_size_t nw = fti->w << fti->depth;
     mp_size_t rsize0 = fti_rsize0(fti);
@@ -1577,15 +1553,11 @@ void fft_addmul(void * z, void * y0, void * y1, void * temp, void * qtemp, struc
             }
         }
     }
-#ifdef TIME_FFT
-    fti->conv.t += seconds();
-    fti->conv.n++;
-#endif
 }
 
 
 
-void get_ft_hash(mpz_t h, int bits_per_coeff, void * data, struct fft_transform_info * fti)
+void get_ft_hash(mpz_t h, int bits_per_coeff, void * data, const struct fft_transform_info * fti)
 {
     mp_limb_t ** ptrs = data;
     mp_size_t trunc = fti_trunc(fti);

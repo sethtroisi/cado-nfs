@@ -964,21 +964,6 @@ void plingen_tune_mul(abdst_field ab, unsigned int m, unsigned int n, cutoff_lis
             } else if (matpoly_cmp(ab, xpi, xpiref) != 0) {
                 fprintf(stderr, "MISMATCH3!\n");
             }
-#if 0
-#ifdef  TIME_FFT
-            char msg[256];
-            snprintf(msg, sizeof(msg),
-                    " [depth %d, %d*%.2f dft %d*%.2f conv %d*%.2f ift]",
-                    (int) fti->depth,
-                    fti->dft.n/s, 1000*fti->dft.t/fti->dft.n,
-                    fti->conv.n/s, 1000*fti->conv.t/fti->conv.n,
-                    fti->ift.n/s, 1000*fti->ift.t/fti->ift.n);
-            extra_info << msg;
-            /* the following one-liner may be used to grab only
-             * fft-related data */
-    // perl -ne '/^\d+\s(\d+).*depth (\d+).*\*([\d\.]+)\sdft.*\*([\d\.]+)\sconv.*\*([\d\.]+)\sift/ && print "$1 $2 $3 $4 $5\n";' 
-#endif
-#endif
         }
 
         cout << input_length
@@ -1208,21 +1193,6 @@ void plingen_tune_mp(abdst_field ab, unsigned int m, unsigned int n, cutoff_list
             } else if (matpoly_cmp(ab, xER, xERref) != 0) {
                 fprintf(stderr, "MISMATCH3!\n");
             }
-#if 0
-#ifdef  TIME_FFT
-            char msg[256];
-            snprintf(msg, sizeof(msg),
-                    " [depth %d, %d*%.2f dft %d*%.2f conv %d*%.2f ift]",
-                    (int) fti->depth,
-                    fti->dft.n/s, 1000*fti->dft.t/fti->dft.n,
-                    fti->conv.n/s, 1000*fti->conv.t/fti->conv.n,
-                    fti->ift.n/s, 1000*fti->ift.t/fti->ift.n);
-            extra_info << msg;
-            /* the following one-liner may be used to grab only
-             * fft-related data */
-    // perl -ne '/^\d+\s(\d+).*depth (\d+).*\*([\d\.]+)\sdft.*\*([\d\.]+)\sconv.*\*([\d\.]+)\sift/ && print "$1 $2 $3 $4 $5\n";' 
-#endif
-#endif
         }
 
         cout << input_length

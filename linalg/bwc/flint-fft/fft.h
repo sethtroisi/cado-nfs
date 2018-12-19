@@ -329,7 +329,6 @@ void fft_convolution(mp_limb_t ** ii, mp_limb_t ** jj, slong depth,
 
 
 #define xxxDEBUG_FFT
-#define TIME_FFT
 
 struct fft_transform_info {
     mp_bitcnt_t bits1;
@@ -346,12 +345,6 @@ struct fft_transform_info {
     mp_bitcnt_t ks_coeff_bits;  /* This is used only for kronecker substitution */
     mp_bitcnt_t minwrap;        /* zero when no wraparound wanted */
     int alg;            /* alg==1: use matrix fourier algorithm */
-#ifdef  TIME_FFT
-    struct {
-        int n;
-        double t;
-    } dft, conv, ift;
-#endif
 };
 
 /* The transform data is provided as an opaque void* pointer ; in reality
@@ -399,19 +392,19 @@ void fft_get_transform_info_mulmod(struct fft_transform_info * fti, mp_bitcnt_t 
 void fft_transform_info_adjust_depth(struct fft_transform_info * fti, unsigned int adj);
 void fft_transform_info_set_first_guess(struct fft_transform_info * fti);
 int fft_transform_info_check(const struct fft_transform_info * fti);
-void fft_get_transform_allocs(size_t sizes[3], struct fft_transform_info * fti);
-void fft_transform_prepare(void * x, struct fft_transform_info * fti);
-void fft_do_dft(void * y, mp_limb_t * x, mp_size_t nx, void * temp, struct fft_transform_info * fti);
-void fft_do_ift(mp_limb_t * x, mp_size_t nx, void * y, void * temp, struct fft_transform_info * fti);
-void fft_mul(void * z, void * y0, void * y1, void * temp, struct fft_transform_info * fti);
-void fft_addmul(void * z, void * y0, void * y1, void * temp, void * qtemp, struct fft_transform_info * fti);
-void fft_add(void * z, void * y0, void * y1, struct fft_transform_info * fti);
-void fft_zero(void * z, struct fft_transform_info * fti);
+void fft_get_transform_allocs(size_t sizes[3], const struct fft_transform_info * fti);
+void fft_transform_prepare(void * x, const struct fft_transform_info * fti);
+void fft_do_dft(void * y, const mp_limb_t * x, mp_size_t nx, void * temp, const struct fft_transform_info * fti);
+void fft_do_ift(mp_limb_t * x, mp_size_t nx, void * y, void * temp, const struct fft_transform_info * fti);
+void fft_mul(void * z, const void * y0, const void * y1, void * temp, const struct fft_transform_info * fti);
+void fft_addmul(void * z, const void * y0, const void * y1, void * temp, void * qtemp, const struct fft_transform_info * fti);
+void fft_add(void * z, void * y0, void * y1, const struct fft_transform_info * fti);
+void fft_zero(void * z, const struct fft_transform_info * fti);
 void fft_get_transform_info_fppol(struct fft_transform_info * fti, mpz_srcptr p, mp_size_t n1, mp_size_t n2, unsigned int nacc);
 void fft_get_transform_info_fppol_mp(struct fft_transform_info * fti, mpz_srcptr p, mp_size_t nmin, mp_size_t nmax, unsigned int nacc);
-void fft_do_dft_fppol(void * y, mp_limb_t * x, mp_size_t nx, void * temp, struct fft_transform_info * fti, mpz_srcptr p);
-void fft_do_ift_fppol(mp_limb_t * x, mp_size_t nx, void * y, void * temp, struct fft_transform_info * fti, mpz_srcptr p);
-void fft_do_ift_fppol_mp(mp_limb_t * x, mp_size_t nx, void * y, void * temp, struct fft_transform_info * fti, mpz_srcptr p, mp_size_t shift);
+void fft_do_dft_fppol(void * y, const mp_limb_t * x, mp_size_t nx, void * temp, const struct fft_transform_info * fti, mpz_srcptr p);
+void fft_do_ift_fppol(mp_limb_t * x, mp_size_t nx, void * y, void * temp, const struct fft_transform_info * fti, mpz_srcptr p);
+void fft_do_ift_fppol_mp(mp_limb_t * x, mp_size_t nx, void * y, void * temp, const struct fft_transform_info * fti, mpz_srcptr p, mp_size_t shift);
 
 /* fft_transform_export modifies the transform area in x and makes it
  * position independent, so that the data may be moved, or transferred to
@@ -422,21 +415,21 @@ void fft_do_ift_fppol_mp(mp_limb_t * x, mp_size_t nx, void * y, void * temp, str
  * fft_transform_import must be called on x to revert the effect of
  * fft_transform_export (possibly after moving/transferring).
  */
-void fft_transform_export(void * x, struct fft_transform_info * fti);
-void fft_transform_import(void * x, struct fft_transform_info * fti);
+void fft_transform_export(void * x, const struct fft_transform_info * fti);
+void fft_transform_import(void * x, const struct fft_transform_info * fti);
 
 
 /* indicates whether the integer returned is actually reduced modulo some
  * B^n-a, with a=\pm1. Returns n, and sets a. If the result is known to
  * be valid in Z, then n is returned as 0.
  */
-static inline mp_bitcnt_t fft_get_mulmod(struct fft_transform_info * fti, int * a)
+static inline mp_bitcnt_t fft_get_mulmod(const struct fft_transform_info * fti, int * a)
 {
     *a=1;
     return fti->minwrap ? (4<<fti->depth)*fti->bits : 0;
 }
 
-static inline mp_size_t fft_get_mulmod_output_minlimbs(struct fft_transform_info * fti)
+static inline mp_size_t fft_get_mulmod_output_minlimbs(const struct fft_transform_info * fti)
 {
     if (!fti->minwrap) return 0;
     mp_size_t w = fti->w;

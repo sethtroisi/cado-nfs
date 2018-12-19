@@ -351,6 +351,9 @@ bw_lingen_basecase_raw(bmstatus_ptr bm, matpoly_ptr pi, matpoly_srcptr E, unsign
             ASSERT_ALWAYS(bm->lucky[j] >= 0);
             todo.push_back(j);
         }
+        /* icc openmp doesn't grok todo.size() as being a constant
+         * loop bound */
+        unsigned int nj = todo.size();
 
 #ifdef HAVE_OPENMP
 #pragma omp parallel
@@ -362,9 +365,6 @@ bw_lingen_basecase_raw(bmstatus_ptr bm, matpoly_ptr pi, matpoly_srcptr E, unsign
             abelt_ur e_ur;
             abelt_ur_init(ab, &e_ur);
             
-            /* icc openmp doesn't grok todo.size() as being a constant
-             * loop bound */
-            unsigned int nj = todo.size();
 #ifdef HAVE_OPENMP
 #pragma omp for collapse(2)
 #endif

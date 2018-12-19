@@ -6,6 +6,10 @@
 #include "lingen-matpoly-ft.h"
 #include "logline.h"
 
+#ifdef HAVE_OPENMP
+#include <omp.h>
+#endif
+
 /* timings made on cochon, rev 6877b97 (buggy; fixed in 76dde6c) */
 #define MP_FTI_DEPTH_ADJ_24_36_36 { { 1, 6 }, { 2, 4 }, { 3, 3 }, { 4, 2 }, { 10, 1 }, { 11, 2 }, { 13, 1 }, { 22, 2 }, { 28, 1 }, { 32, 2 }, { 33, 1 }, { 38, 0 }, { 39, 1 }, { 54, 0 }, { 55, 1 }, { 64, 0 }, { 65, 1 }, { 66, 0 }, { 103, 1 }, { 104, 0 }, { 107, 1 }, { 114, 0 }, { 115, 1 }, { 129, 0 }, }
 
@@ -20,6 +24,9 @@ void matpoly_ft_init(abdst_field ab MAYBE_UNUSED, matpoly_ft_ptr t, unsigned int
     t->n = n;
     t->data = malloc(m * n * fft_alloc_sizes[0]);
     memset(t->data, 0, m * n * fft_alloc_sizes[0]);
+#ifdef HAVE_OPENMP
+#pragma omp parallel for collapse(2)
+#endif
     for(unsigned int i = 0 ; i < t->m ; i++) {
         for(unsigned int j = 0 ; j < t->n ; j++) {
             size_t offset = (i*t->n+j) * fft_alloc_sizes[0];
@@ -35,7 +42,7 @@ void matpoly_ft_clear(abdst_field ab MAYBE_UNUSED, matpoly_ft_ptr t, struct fft_
     memset(t, 0, sizeof(*t));
 }
 
-double matpoly_ft_dft(abdst_field ab, matpoly_ft_ptr t, matpoly_ptr a, struct fft_transform_info * fti, int draft)
+double matpoly_ft_dft(abdst_field ab, matpoly_ft_ptr t, matpoly_ptr a, struct fft_transform_info * fti, int draft MAYBE_UNUSED)
 {
     /* Recall that this is for polynomials ! */
     ASSERT_ALWAYS(t->m == a->m);
@@ -43,14 +50,14 @@ double matpoly_ft_dft(abdst_field ab, matpoly_ft_ptr t, matpoly_ptr a, struct ff
 
     size_t fft_alloc_sizes[3];
     fft_get_transform_allocs(fft_alloc_sizes, fti);
-    void * tt = malloc(fft_alloc_sizes[1]);
-    memset(tt, 0, fft_alloc_sizes[1]);
 
+#if 0
     double tt0=0, ttm=0; /* placate gcc */
     unsigned long c0 = 0;
     int set = 0;
-
     if (draft) { ttm=wct_seconds(); tt0 -= ttm; }
+    void * tt = malloc(NTEMPS * fft_alloc_sizes[1]);
+    memset(tt, 0, NTEMPS * fft_alloc_sizes[1]);
     for(unsigned int i = 0 ; i < t->m && !set ; i++) {
         for(unsigned int j = 0 ; j < t->n && !set ; j++) {
             size_t offset = (i*t->n+j) * fft_alloc_sizes[0];
@@ -67,12 +74,39 @@ double matpoly_ft_dft(abdst_field ab, matpoly_ft_ptr t, matpoly_ptr a, struct ff
     if (!set) return 0;
     tt0 += ttm;
     return tt0 / c0 * (t->m * t->n - c0);
+#else
+
+#ifdef HAVE_OPENMP
+#pragma omp parallel
+#endif
+    {
+        void * tt = malloc(fft_alloc_sizes[1]);
+        memset(tt, 0, fft_alloc_sizes[1]);
+#ifdef HAVE_OPENMP
+#pragma omp for collapse(2)
+#endif
+        for(unsigned int i = 0 ; i < t->m ; i++) {
+            for(unsigned int j = 0 ; j < t->n ; j++) {
+                size_t offset = (i*t->n+j) * fft_alloc_sizes[0];
+                void * tij = pointer_arith(t->data, offset);
+                abvec aij = matpoly_part(ab, a, i, j, 0);
+                /* ok, casting like this is a crude hack ! */
+                fft_do_dft_fppol(tij, (mp_limb_t *) aij, a->size, tt, fti, ab->p);
+            }
+        }
+        free(tt);
+    }
+#endif
+    return 0;
 }
 
 void matpoly_ft_zero(abdst_field ab MAYBE_UNUSED, matpoly_ft_ptr t, struct fft_transform_info * fti)
 {
     size_t fft_alloc_sizes[3];
     fft_get_transform_allocs(fft_alloc_sizes, fti);
+#ifdef HAVE_OPENMP
+#pragma omp parallel for collapse(2)
+#endif
     for(unsigned int i = 0 ; i < t->m ; i++) {
         for(unsigned int j = 0 ; j < t->n ; j++) {
             size_t offset = (i*t->n+j) * fft_alloc_sizes[0];
@@ -86,6 +120,9 @@ void matpoly_ft_export(abdst_field ab MAYBE_UNUSED, matpoly_ft_ptr t, struct fft
 {
     size_t fft_alloc_sizes[3];
     fft_get_transform_allocs(fft_alloc_sizes, fti);
+#ifdef HAVE_OPENMP
+#pragma omp parallel for collapse(2)
+#endif
     for(unsigned int i = 0 ; i < t->m ; i++) {
         for(unsigned int j = 0 ; j < t->n ; j++) {
             size_t offset = (i*t->n+j) * fft_alloc_sizes[0];
@@ -99,6 +136,9 @@ void matpoly_ft_import(abdst_field ab MAYBE_UNUSED, matpoly_ft_ptr t, struct fft
 {
     size_t fft_alloc_sizes[3];
     fft_get_transform_allocs(fft_alloc_sizes, fti);
+#ifdef HAVE_OPENMP
+#pragma omp parallel for collapse(2)
+#endif
     for(unsigned int i = 0 ; i < t->m ; i++) {
         for(unsigned int j = 0 ; j < t->n ; j++) {
             size_t offset = (i*t->n+j) * fft_alloc_sizes[0];
@@ -119,6 +159,9 @@ void matpoly_ft_add(abdst_field ab MAYBE_UNUSED, matpoly_ft_ptr u, matpoly_ft_pt
     size_t fft_alloc_sizes[3];
     fft_get_transform_allocs(fft_alloc_sizes, fti);
 
+#ifdef HAVE_OPENMP
+#pragma omp parallel for collapse(2)
+#endif
     for(unsigned int i = 0 ; i < t0->m ; i++) {
         for(unsigned int j = 0 ; j < t0->n ; j++) {
             size_t offset = (i*t0->n+j) * fft_alloc_sizes[0];
@@ -130,7 +173,7 @@ void matpoly_ft_add(abdst_field ab MAYBE_UNUSED, matpoly_ft_ptr u, matpoly_ft_pt
     }
 }
 
-double matpoly_ft_addmul(abdst_field ab MAYBE_UNUSED, matpoly_ft_ptr u, matpoly_ft_ptr t0, matpoly_ft_ptr t1, struct fft_transform_info * fti, int draft)
+double matpoly_ft_addmul(abdst_field ab MAYBE_UNUSED, matpoly_ft_ptr u, matpoly_ft_ptr t0, matpoly_ft_ptr t1, struct fft_transform_info * fti, int draft MAYBE_UNUSED)
 {
     /* Recall that this is for polynomials ! */
     ASSERT_ALWAYS(t0->n == t1->m);
@@ -140,16 +183,17 @@ double matpoly_ft_addmul(abdst_field ab MAYBE_UNUSED, matpoly_ft_ptr u, matpoly_
     size_t fft_alloc_sizes[3];
     fft_get_transform_allocs(fft_alloc_sizes, fti);
     size_t tsize = fft_alloc_sizes[0];
+
+#if 0
+    double tt0=0, ttm=0; /* placate gcc */
+    unsigned long c0 = 0;
+    int set = 0;
+    if (draft) { ttm=wct_seconds(); tt0 -= ttm; }
+
     void * qt = malloc(fft_alloc_sizes[1]);
     void * tt = malloc(fft_alloc_sizes[2]);
     memset(qt, 0, fft_alloc_sizes[1]);
     memset(tt, 0, fft_alloc_sizes[2]);
-
-    double tt0=0, ttm=0; /* placate gcc */
-    unsigned long c0 = 0;
-    int set = 0;
-
-    if (draft) { ttm=wct_seconds(); tt0 -= ttm; }
     for(unsigned int i = 0 ; i < t0->m && !set ; i++) {
         for(unsigned int j = 0 ; j < t1->n && !set ; j++) {
             void * uij  = pointer_arith(u->data, (i*u->n+j) * tsize);
@@ -173,20 +217,40 @@ double matpoly_ft_addmul(abdst_field ab MAYBE_UNUSED, matpoly_ft_ptr u, matpoly_
     N *= (unsigned long) t0->n;
     N *= (unsigned long) t1->n;
     return tt0 / c0 * (N - c0);
+#else
+#ifdef HAVE_OPENMP
+#pragma omp parallel
+#endif
+    {
+        void * qt = malloc(fft_alloc_sizes[1]);
+        void * tt = malloc(fft_alloc_sizes[2]);
+        memset(qt, 0, fft_alloc_sizes[1]);
+        memset(tt, 0, fft_alloc_sizes[2]);
+        for(unsigned int k = 0 ; k < t0->n ; k++) {
+#ifdef HAVE_OPENMP
+#pragma omp for collapse(2)
+#endif
+            for(unsigned int i = 0 ; i < t0->m ; i++) {
+                for(unsigned int j = 0 ; j < t1->n ; j++) {
+                    void * uij  = pointer_arith(u->data, (i*u->n+j) * tsize);
+                    void * t0ik = pointer_arith(t0->data, (i*t0->n+k) * tsize);
+                    void * t1kj = pointer_arith(t1->data, (k*t1->n+j) * tsize);
+                    void * my_tt = tt;
+                    void * my_qt = qt;
+                    fft_addmul(uij, t0ik, t1kj, my_tt, my_qt, fti);
+                }
+            }
+        }
+        free(qt);
+        free(tt);
+    }
+    return 0;
+#endif
 }
 
 double matpoly_ft_mul(abdst_field ab MAYBE_UNUSED, matpoly_ft_ptr u, matpoly_ft_ptr t0, matpoly_ft_ptr t1, struct fft_transform_info * fti, int draft)
 {
-    size_t fft_alloc_sizes[3];
-    fft_get_transform_allocs(fft_alloc_sizes, fti);
-    size_t tsize = fft_alloc_sizes[0];
-    memset(u->data, 0, u->m * u->n * tsize);
-    for(unsigned int i = 0 ; i < u->m ; i++) {
-        for(unsigned int j = 0 ; j < u->n ; j++) {
-            void * uij  = pointer_arith(u->data, (i*u->n+j) * tsize);
-            fft_transform_prepare(uij, fti);
-        }
-    }
+    matpoly_ft_zero(ab, u, fti);
     return matpoly_ft_addmul(ab, u, t0, t1, fti, draft);
 }
 
@@ -194,7 +258,7 @@ double matpoly_ft_mul(abdst_field ab MAYBE_UNUSED, matpoly_ft_ptr u, matpoly_ft_
 void matpoly_ft_sub(abdst_field ab, matpoly_ft_ptr t0, matpoly_ft_ptr t1, struct fft_transform_info * fti);
 */
 
-double matpoly_ft_ift(abdst_field ab, matpoly_ptr a, matpoly_ft_ptr t, struct fft_transform_info * fti, int draft)
+double matpoly_ft_ift(abdst_field ab, matpoly_ptr a, matpoly_ft_ptr t, struct fft_transform_info * fti, int draft MAYBE_UNUSED)
 {
     /* the caller must allocate first by himself ! */
     ASSERT_ALWAYS(!matpoly_check_pre_init(a));
@@ -204,14 +268,15 @@ double matpoly_ft_ift(abdst_field ab, matpoly_ptr a, matpoly_ft_ptr t, struct ff
 
     size_t fft_alloc_sizes[3];
     fft_get_transform_allocs(fft_alloc_sizes, fti);
-    void * tt = malloc(fft_alloc_sizes[1]);
-    memset(tt, 0, fft_alloc_sizes[1]);
 
+#if 0
     double tt0=0, ttm=0; /* placate gcc */
     unsigned long c0 = 0;
     int set = 0;
-
     if (draft) { ttm=wct_seconds(); tt0 -= ttm; }
+
+    void * tt = malloc(fft_alloc_sizes[1]);
+    memset(tt, 0, fft_alloc_sizes[1]);
     for(unsigned int i = 0 ; i < t->m && !set ; i++) {
         for(unsigned int j = 0 ; j < t->n && !set ; j++) {
             size_t offset = (i*t->n+j) * fft_alloc_sizes[0];
@@ -228,9 +293,32 @@ double matpoly_ft_ift(abdst_field ab, matpoly_ptr a, matpoly_ft_ptr t, struct ff
     if (!set) return 0;
     tt0 += ttm;
     return tt0 / c0 * (t->m * t->n - c0);
+#else
+#ifdef HAVE_OPENMP
+#pragma omp parallel
+#endif
+    {
+        void * tt = malloc(fft_alloc_sizes[1]);
+        memset(tt, 0, fft_alloc_sizes[1]);
+#ifdef HAVE_OPENMP
+#pragma omp for collapse(2)
+#endif
+        for(unsigned int i = 0 ; i < t->m ; i++) {
+            for(unsigned int j = 0 ; j < t->n ; j++) {
+                size_t offset = (i*t->n+j) * fft_alloc_sizes[0];
+                void * tij = pointer_arith(t->data, offset);
+                abvec aij = matpoly_part(ab, a, i, j, 0);
+                /* ok, casting like this is a crude hack ! */
+                fft_do_ift_fppol((mp_limb_t *) aij, a->size, tij, tt, fti, ab->p);
+            }
+        }
+        free(tt);
+    }
+    return 0;
+#endif
 }
 
-double matpoly_ft_ift_mp(abdst_field ab, matpoly_ptr a, matpoly_ft_ptr t, unsigned int shift, struct fft_transform_info * fti, int draft)
+double matpoly_ft_ift_mp(abdst_field ab, matpoly_ptr a, matpoly_ft_ptr t, unsigned int shift, struct fft_transform_info * fti, int draft MAYBE_UNUSED)
 {
     /* Recall that this is for polynomials ! */
     ASSERT_ALWAYS(t->m == a->m);
@@ -238,14 +326,15 @@ double matpoly_ft_ift_mp(abdst_field ab, matpoly_ptr a, matpoly_ft_ptr t, unsign
 
     size_t fft_alloc_sizes[3];
     fft_get_transform_allocs(fft_alloc_sizes, fti);
-    void * tt = malloc(fft_alloc_sizes[1]);
-    memset(tt, 0, fft_alloc_sizes[1]);
 
+#if 0
     double tt0=0, ttm=0; /* placate gcc */
     unsigned long c0 = 0;
     int set = 0;
-
     if (draft) { ttm=wct_seconds(); tt0 -= ttm; }
+
+    void * tt = malloc(fft_alloc_sizes[1]);
+    memset(tt, 0, fft_alloc_sizes[1]);
     for(unsigned int i = 0 ; i < t->m && !set; i++) {
         for(unsigned int j = 0 ; j < t->n && !set; j++) {
             size_t offset = (i*t->n+j) * fft_alloc_sizes[0];
@@ -262,6 +351,29 @@ double matpoly_ft_ift_mp(abdst_field ab, matpoly_ptr a, matpoly_ft_ptr t, unsign
     if (!set) return 0;
     tt0 += ttm;
     return tt0 / c0 * (t->m * t->n - c0);
+#else
+
+#ifdef HAVE_OPENMP
+#pragma omp parallel
+#endif
+    {
+        void * tt = malloc(fft_alloc_sizes[1]);
+        memset(tt, 0, fft_alloc_sizes[1]);
+#ifdef HAVE_OPENMP
+#pragma omp for collapse(2)
+#endif
+        for(unsigned int i = 0 ; i < t->m; i++) {
+            for(unsigned int j = 0 ; j < t->n; j++) {
+                size_t offset = (i*t->n+j) * fft_alloc_sizes[0];
+                void * tij = pointer_arith(t->data, offset);
+                abvec aij = matpoly_part(ab, a, i, j, 0);
+                /* ok, casting like this is a crude hack ! */
+                fft_do_ift_fppol_mp((mp_limb_t *) aij, a->size, tij, tt, fti, ab->p, shift);
+            }
+        }
+    }
+    return 0;
+#endif
 }
 
 
