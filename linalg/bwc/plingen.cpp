@@ -1583,6 +1583,7 @@ int bw_biglingen_recursive(bmstatus_ptr bm, bigmatpoly pi, bigmatpoly E, unsigne
     stats.end_smallstep();
 
     int do_right = !draft || stats.spent_so_far() < draft;
+    MPI_Allreduce(MPI_IN_PLACE, &do_right, 1, MPI_INT, MPI_MIN, bm->com[0]);
 
     unsigned int pi_right_expect = expected_pi_length(d, E_right->size);
     unsigned int pi_right_expect_lowerbound = expected_pi_length_lowerbound(d, E_right->size);
