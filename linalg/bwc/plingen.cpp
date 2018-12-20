@@ -1935,7 +1935,7 @@ class bigmatpoly_read_task { /* {{{ */
 class bigmatpoly_write_task { /* {{{ */
     /* This writes a bigmatpoly, by chunks, so that the memory footprint
      * remains reasonable.
-     * Note that in any case, the coefficient indices mut be progressive
+     * Note that in any case, the coefficient indices must be progressive
      * in the write.
      */
     bigmatpoly_ptr xE;
@@ -1946,7 +1946,7 @@ class bigmatpoly_write_task { /* {{{ */
     int rank;
 
     /* forbid copies */
-    bigmatpoly_write_task(bigmatpoly_write_task&) {}
+    bigmatpoly_write_task(bigmatpoly_write_task const &) = delete;
 
     public:
     bigmatpoly_write_task(bm_io_ptr aa, bigmatpoly_ptr xE) : xE(xE) {
