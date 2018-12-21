@@ -398,6 +398,9 @@ if(BWC_GFP_ARITHMETIC_BACKENDS)
         LINK_FLAGS "--mpi ${OpenMP_C_FLAGS}")
     add_executable(test-flint test-flint.c)
     target_link_libraries(test-flint flint-fft utils ${gmp_libname})
+    set_target_properties(test-flint PROPERTIES
+        COMPILE_FLAGS "--mpi ${OpenMP_C_FLAGS}"
+        LINK_FLAGS "--mpi ${OpenMP_C_FLAGS}")
 endif()
 
 foreach(v ${BWC_GFP_ARITHMETIC_BACKENDS})
