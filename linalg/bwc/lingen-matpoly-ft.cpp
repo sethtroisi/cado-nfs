@@ -107,11 +107,13 @@ struct ft_wrap<false, T>
         {
             /* instantiate the temporaries */
             typename T::template instance<T> x(t);
+            unsigned int m = t.m();     /* for icc ... */
+            unsigned int n = t.n();
 #ifdef HAVE_OPENMP
 #pragma omp for collapse(2)
 #endif
-            for(unsigned int i = 0 ; i < t.m() ; i++)
-                for(unsigned int j = 0 ; j < t.n() ; j++)
+            for(unsigned int i = 0 ; i < m ; i++)
+                for(unsigned int j = 0 ; j < n ; j++)
                     x.doij(i, j);
         }
         return 0;
