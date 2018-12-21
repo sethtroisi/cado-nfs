@@ -418,7 +418,7 @@ foreach(v ${BWC_GFP_ARITHMETIC_BACKENDS})
         lingen-polymat.c
         # lingen-bigpolymat.c # deleted 20150826
         mpfq/mpfq_${v}.c
-        lingen-matpoly-ft.c
+        lingen-matpoly-ft.cpp
         lingen-bigmatpoly-ft.c)
 
     # make plingen_pz a default target, but not the others.

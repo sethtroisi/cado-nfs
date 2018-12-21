@@ -3366,16 +3366,6 @@ int main(int argc, char *argv[])
     }
 
     stats.set_draft_mode(draft_mode);
-#ifdef HAVE_OPENMP
-    /* The draft mode is relevant only in single-thread mode -- I don't
-     * think that given the way we do the draft measurements, we would
-     * get sensible projected timings.
-     */
-    if (draft_mode) {
-        printf("Draft timings provided for single-thread execution\n");
-        omp_set_num_threads(1);
-    }
-#endif
 
     if (size > 1) {
 #ifdef  ENABLE_MPI_LINGEN

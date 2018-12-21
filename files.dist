@@ -792,7 +792,7 @@ parameters/dlp/p95.hint
 parameters/dlp/p100.hint
 filter/filter_badideals.c
 linalg/bwc/lingen-matpoly-ft.h
-linalg/bwc/lingen-matpoly-ft.c
+linalg/bwc/lingen-matpoly-ft.cpp
 linalg/bwc/lingen-bigmatpoly-ft.c
 linalg/bwc/lingen-bigmatpoly-ft.h
 scripts/split.py
