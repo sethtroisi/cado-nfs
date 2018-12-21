@@ -137,6 +137,8 @@ for f in \
         ifft_mfa_truncate_sqrt2.c       \
         fft_mfa_truncate_sqrt2_inner.c  \
         fft_mfa_truncate_sqrt2.c        \
+        split_bits.c                    \
+        memory_manager.c                \
     ; do
 ex -s flint-fft/$f > /dev/null <<EOF
 1
@@ -144,22 +146,24 @@ i
 #ifdef  __GNUC__
 #pragma GCC diagnostic ignored "-Wsign-compare"
 #pragma GCC diagnostic ignored "-Wunused-parameter"
+/* flint uses unprotected openmp pragmas every so often */
+#pragma GCC diagnostic ignored "-Wunknown-pragmas"
 #endif
 .
 wq
 EOF
 done
 
-for f in `find flint-fft -name '*.c'` ; do
-ex -s $f > /dev/null <<EOF
-1
-i
-#include "cado.h"
-.
-wq
-EOF
-done
-
+#for f in `find flint-fft -name '*.c'` ; do
+#ex -s $f > /dev/null <<EOF
+#1
+#i
+##include "cado.h"
+#.
+#wq
+#EOF
+#done
+#
 git co HEAD flint-fft/transform_interface.c
 git co HEAD flint-fft/transform_interface.h
 
