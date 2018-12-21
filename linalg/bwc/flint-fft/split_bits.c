@@ -1,4 +1,9 @@
-#include "cado.h"
+#ifdef  __GNUC__
+#pragma GCC diagnostic ignored "-Wsign-compare"
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+/* flint uses unprotected openmp pragmas every so often */
+#pragma GCC diagnostic ignored "-Wunknown-pragmas"
+#endif
 /* 
  * Copyright (C) 2009, 2011 William Hart
  * 
