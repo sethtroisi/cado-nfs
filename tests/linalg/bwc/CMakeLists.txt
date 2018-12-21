@@ -194,9 +194,8 @@ lingen_threshold=60  m=4 n=2  prime=101538509534246169632617439 --random-input-w
         ARGUMENTS --prime ${p}
         LIBRARIES utils plingen_${gfp_layer}_support)
     set_target_properties(test_matpoly_${gfp_layer} PROPERTIES
-        COMPILE_FLAGS "--mpi -DSELECT_MPFQ_LAYER_${gfp_layer}"
-        LINK_FLAGS "--mpi"
-        )
+        COMPILE_FLAGS "--mpi ${OpenMP_CXX_FLAGS} -DSELECT_MPFQ_LAYER_${gfp_layer}"
+        LINK_FLAGS "--mpi ${OpenMP_CXX_FLAGS}")
 endforeach(gfp_layer ${BWC_GFP_ARITHMETIC_BACKENDS})
 
 
