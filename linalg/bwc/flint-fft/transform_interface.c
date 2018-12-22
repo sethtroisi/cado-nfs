@@ -137,7 +137,7 @@ static inline mp_size_t fti_rsize0(const struct fft_transform_info * fti)
  * Almost.
  *
  * The catch is that there are some bits above that index that *don't
- * wrap*, because they come from the coefficient of degree j_1 + j_2-2.
+ * wrap*, because they come from the coefficient of degree j_1 + j_2 - 2.
  *
  * Therefore, whenever j_1 + j_2-1<= transform_length (= 4 n), we're sure
  * that we get no wrapping bit (because the polynomial evaluation doesn't
@@ -155,7 +155,7 @@ static inline mp_size_t fti_rsize0(const struct fft_transform_info * fti)
  *
  * The following Lemma is a bit useful.
  *
- * Lemma: b_1 + b_2 <= 4 n b implies j_1 + j_2-1<=4 n
+ * Lemma: b_1 + b_2 <= 4 n b implies j_1 + j_2 - 1 <= 4 n
  *
  * Proof:
  *      since j_1 = Ceiling(b_1/b) and j_2 = Ceiling(b_2,b), we have
@@ -164,18 +164,18 @@ static inline mp_size_t fti_rsize0(const struct fft_transform_info * fti)
  *
  *      suppose now that b_1 + b_2 <= 4 n b. We have:
  *
- *      b j_1 + b j_2-e_1-e_2 <= 4 n b 
- *      j_1 + j_2-(e_1 + e_2)/b <= 4n
+ *      b j_1 + b j_2 - e_1 - e_2 <= 4 n b 
+ *      j_1 + j_2 - (e_1 + e_2) / b <= 4n
  *
- *      Let now Z=j_1 + j_2-(e_1 + e_2 + 1)/b.
- *      We have: Z < j_1 + j_2-(e_1 + e_2)/b <= 4n. In particular, Ceiling(Z) <= 4n
- *             e_1 + e_2 + 1 <= 2 b-1, whence 0 < (e_1 + e_2 + 1)/b < 2
+ *      Let now Z = j_1 + j_2- (e_1 + e_2 + 1) / b.
+ *      We have: Z < j_1 + j_2 - (e_1 + e_2) / b <= 4n. In particular, Ceiling(Z) <= 4n
+ *             e_1 + e_2 + 1 <= 2 b-1, whence 0 < (e_1 + e_2 + 1) / b < 2
  *      Thus j_1 + j_2-1 <= Ceiling(Z) <= 4n
  *      End of proof.
  *
  * A corollary is that for any integer W such that W >= b_1 + b_2 (in
  * particular, if we have W >= b_1 + b_2 + \log_2 m), if 4nb >= W
- * then we automatically have j_1 + j_2-1 <= 4 n. In other words, the
+ * then we automatically have j_1 + j_2 - 1 <= 4 n. In other words, the
  * former is a sufficient condition for no wrapping to occur below W,
  * while the latter is necessary.
  *
