@@ -176,7 +176,7 @@ main (int argc, char *argv[])
     }
     if (maxlevel <= 0 || maxlevel > MERGE_LEVEL_MAX)
     {
-      fprintf (stderr, "Error: maxlevel should be positive and less than %d\n",
+      fprintf (stderr, "Error: maxlevel should be nonnegative and at most %d\n",
                        MERGE_LEVEL_MAX);
       usage (pl, argv0);
     }
