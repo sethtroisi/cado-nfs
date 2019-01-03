@@ -72,6 +72,11 @@
  */
 int hwloc_aux_get_depth_from_string(hwloc_topology_t topology, const char * desc)
 {
+#if HWLOC_API_VERSION >= 0x00020000
+    int depth = 0;
+    hwloc_type_sscanf_as_depth(desc, NULL, topology, &depth);
+    return depth;
+#else
     hwloc_obj_type_t type;
     int depthattr;
     hwloc_obj_cache_type_t cachetypeattr;
@@ -116,4 +121,5 @@ int hwloc_aux_get_depth_from_string(hwloc_topology_t topology, const char * desc
         /* Same error cases as above */
     }
     return HWLOC_TYPE_DEPTH_UNKNOWN;
+#endif
 }

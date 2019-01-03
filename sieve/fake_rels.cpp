@@ -390,8 +390,9 @@ void print_fake_rel_manyq(
         for (; nr > 0; --nr) {
             len = MAX_STR;
             // pick fake a,b
-            int nc = snprintf(pstr, len, "%ld,%lu:",
-                    (long)long_random(buf), (unsigned long)long_random(buf));
+            int nc = snprintf(pstr, len, "%lx,%lx:",
+                    (unsigned long)long_random(buf),
+                    (unsigned long)long_random(buf));
             pstr += nc;
             len -= nc;
             // pick a random relation as a model and prepare a string to
@@ -506,7 +507,7 @@ void advance_prime_in_fb(int *mult, uint64_t *q, uint64_t *roots,
 }
 
 // All composite special-q in [q0, q1] with 2 prime factors in the range
-// of the factor base pointed by positions in [pos_min, pos_max] in Ind
+// [qfac_min, qfac_max] in Ind.
 vector<index_t> all_comp_sq_2(uint64_t q0, uint64_t q1, uint64_t qfac_min,
         uint64_t qfac_max, indexrange &Ind)
 {
@@ -541,14 +542,11 @@ vector<index_t> all_comp_sq_2(uint64_t q0, uint64_t q1, uint64_t qfac_min,
 }
 
 // All composite special-q in [q0, q1] with 3 prime factors in the range
-// of the factor base pointed by positions in [pos_min, pos_max] in Ind
-vector<index_t> all_comp_sq_3(uint64_t q0, uint64_t q1, uint64_t pos_min,
-        uint64_t pos_max, indexrange &Ind)
+// [qfac_min, qfac_max] in Ind.
+vector<index_t> all_comp_sq_3(uint64_t q0, uint64_t q1, uint64_t qfac_min,
+        uint64_t qfac_max, indexrange &Ind)
 {
     vector<index_t> list;
-
-    uint64_t qfac_min = Ind.p_from_pos(pos_min);
-    uint64_t qfac_max = Ind.p_from_pos(pos_max);
 
     uint64_t l1min = MAX(q0/(qfac_max*qfac_max), qfac_min);
     uint64_t pos_l1min = Ind.pos_from_p(l1min);
@@ -713,7 +711,18 @@ main (int argc, char *argv[])
       exit(EXIT_FAILURE);
   }
   renumber_t ren_table;
+  printf ("# Start reading renumber table\n");
+  fflush (stdout);
   renumber_read_table(ren_table, renumberfile);
+  printf ("# Done reading renumber table\n");
+  fflush (stdout);
+
+  for (int side = 0; side < 2; ++side) {
+      if (ren_table->lpb[side] != (unsigned long)lpb[side]) {
+          fprintf(stderr, "Error: on side %d, lpb on the command-line is different from the one in the renumber file\n", side);
+          exit(EXIT_FAILURE);
+      }
+  }
 
   // read sample file
   const char * sample;
@@ -729,13 +738,21 @@ main (int argc, char *argv[])
 
   vector<fake_rel> rels;
   vector<unsigned int> nrels;
+  printf ("# Start reading sample file\n");
+  fflush (stdout);
   read_sample_file(nrels, rels, sqside, sample, ren_table, compsq);
+  printf ("# Done reading sample file\n");
+  fflush (stdout);
 
   param_list_warn_unused(pl);
 
   // Two index ranges, one for each side
   indexrange Ind[2];
+  printf ("# Start preparing index ranges\n");
+  fflush (stdout);
   prepare_indexrange(Ind, ren_table, cpoly, sqside, compsq);
+  printf ("# Done preparing index ranges\n");
+  fflush (stdout);
 
 
   /****** Prime special-q ******/

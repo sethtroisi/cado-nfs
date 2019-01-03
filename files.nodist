@@ -137,6 +137,7 @@ misc/svsm.c
 filter/out-of-core/Makefile
 filter/out-of-core/clique.c
 filter/out-of-core/singleton.c
+misc/singleton_simple.c
 filter/replay_dblemat.c
 scripts/cadofactor/README.OAR
 scripts/plot_params.sh

@@ -700,7 +700,9 @@ linalg/bwc/flint-fft/butterfly_rshB.c
 linalg/bwc/flint-fft/combine_bits.c
 linalg/bwc/flint-fft/convolution.c
 linalg/bwc/flint-fft/div_2expmod_2expp1.c
-linalg/bwc/flint-fft/doc/fft.txt
+linalg/bwc/flint-fft/doc/fft.rst
+linalg/bwc/flint-fft/exception.c
+linalg/bwc/flint-fft/exception.h
 linalg/bwc/flint-fft/fermat_to_mpz.c
 linalg/bwc/flint-fft/fft.h
 linalg/bwc/flint-fft/fft_mfa_truncate_sqrt2.c
@@ -716,6 +718,7 @@ linalg/bwc/flint-fft/ifft_negacyclic.c
 linalg/bwc/flint-fft/ifft_radix2.c
 linalg/bwc/flint-fft/ifft_truncate.c
 linalg/bwc/flint-fft/ifft_truncate_sqrt2.c
+linalg/bwc/flint-fft/inlines.c
 linalg/bwc/flint-fft/longlong.h
 linalg/bwc/flint-fft/memory_manager.c
 linalg/bwc/flint-fft/mpn_extras.h
@@ -730,8 +733,9 @@ linalg/bwc/flint-fft/printf.c
 linalg/bwc/flint-fft/revbin.c
 linalg/bwc/flint-fft/scanf.c
 linalg/bwc/flint-fft/split_bits.c
-linalg/bwc/flint-fft/ulong_extras.h
 linalg/bwc/flint-fft/transform_interface.c
+linalg/bwc/flint-fft/transform_interface.h
+linalg/bwc/flint-fft/ulong_extras.h
 linalg/bwc/test-flint.c
 filter/filter_badideals.c
 parameters/dlp/params.p2dd20
@@ -788,7 +792,7 @@ parameters/dlp/p95.hint
 parameters/dlp/p100.hint
 filter/filter_badideals.c
 linalg/bwc/lingen-matpoly-ft.h
-linalg/bwc/lingen-matpoly-ft.c
+linalg/bwc/lingen-matpoly-ft.cpp
 linalg/bwc/lingen-bigmatpoly-ft.c
 linalg/bwc/lingen-bigmatpoly-ft.h
 scripts/split.py

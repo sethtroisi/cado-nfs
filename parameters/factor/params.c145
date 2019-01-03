@@ -34,6 +34,7 @@ tasks.sieve.mfb0 = 58
 tasks.sieve.mfb1 = 87
 
 tasks.I = 13
+tasks.qmin = 10000000
 tasks.sieve.qrange = 10000
 
 ###########################################################################

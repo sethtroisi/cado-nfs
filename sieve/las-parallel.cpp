@@ -35,7 +35,7 @@ struct las_parallel_desc::helper {
     hwloc_topology_t topology;
 
     std::string synthetic_topology_string;
-    int depth;
+    int depth = 0;
     std::vector<int> depth_per_level;
 
     /* for the "fit" keyword */
@@ -95,14 +95,19 @@ struct las_parallel_desc::helper {
 #endif  /* HWLOC_API_VERSION >= 0x010700 */
             /* we must make sure to remove these flags, but it's likely that
              * they're off by default anyway */
+#if HWLOC_API_VERSION < 0x020000
             flags &= ~(HWLOC_TOPOLOGY_FLAG_IO_DEVICES | HWLOC_TOPOLOGY_FLAG_IO_BRIDGES);
+#endif
             hwloc_topology_set_flags(topology, flags);
 
             hwloc_topology_load(topology);
 
             hwloc_obj_t root = hwloc_get_root_obj(topology);
             if (!root->symmetric_subtree) {
-                throw bad_specification("Topology is not symmetric, cannot proceed with replication of the las process with the current code");
+                fprintf(stderr, "# Topology is not symmetric,"
+                        " cannot proceed with replication"
+                        " of the las process with the current code."
+                        " No cpu/memory binding will be set.\n");
                 /* simply stick to the default */
                 return;
             }
@@ -156,8 +161,8 @@ struct las_parallel_desc::helper {
             return;
         }
         if (desc == "single") { desc = "machine,1,pu"; return; }
-        if (desc == "auto") { desc = default_placement_with_auto; desc += ",loose"; return; }
-        if (desc == "auto,no-replicate") { desc = default_placement_with_auto; desc += ",loose,no-replicate"; return; }
+        if (desc == "auto") { desc = default_placement_with_auto; return; }
+        if (desc == "auto,no-replicate") { desc = default_placement_with_auto; desc += ",no-replicate"; return; }
         if (desc.substr(0,7) == "single-") {
             ostringstream os;
             os << desc.substr(7) << ",1,pu";
@@ -218,7 +223,11 @@ struct las_parallel_desc::helper {
          * that this is a convenient enough upper bound).
          */
 
+#if HWLOC_API_VERSION < 0x020000
         uint64_t ram = root->memory.total_memory;
+#else
+        uint64_t ram = root->total_memory;
+#endif
         /* Round this up to at most 1/16-th. This will do rubbish on a
          * machine where the 1 bits in the binary expansion of the
          * hardware ram size spread more than 4 positions, but we find
@@ -399,7 +408,15 @@ struct las_parallel_desc::helper {
     cxx_hwloc_nodeset current_memory_binding() const {/*{{{*/
         cxx_hwloc_nodeset nn;
         hwloc_membind_policy_t pol;
-        int rc = hwloc_get_membind_nodeset(topology,  nn, &pol, HWLOC_MEMBIND_THREAD);
+#if HWLOC_API_VERSION < 0x010b03
+        /* this legacy called remained valid throughout hwloc 1.x */
+        int rc = hwloc_get_membind_nodeset(topology,  nn, &pol,
+                HWLOC_MEMBIND_THREAD);
+#else
+        /* newer call */
+        int rc = hwloc_get_membind(topology,  nn, &pol,
+                HWLOC_MEMBIND_THREAD | HWLOC_MEMBIND_BYNODESET);
+#endif
         if (rc < 0) {
             static std::mutex mm;
             std::lock_guard<std::mutex> dummy(mm);
@@ -413,40 +430,51 @@ struct las_parallel_desc::helper {
 #endif
    int interpret_memory_binding_specifier() {
 #ifdef HAVE_HWLOC
-       return memory_binding_size = interpret_generic_binding_specifier(memory_binding_specifier_string);
-#else
-       /* just check for errors */
-       return interpret_generic_binding_specifier(memory_binding_specifier_string);
+       if (depth) {
+           return memory_binding_size = interpret_generic_binding_specifier(memory_binding_specifier_string);
+       } else
 #endif
+       {
+           /* just check for errors */
+           return interpret_generic_binding_specifier(memory_binding_specifier_string);
+       }
    }
    int interpret_cpu_binding_specifier() {
 #ifdef HAVE_HWLOC
-       if (cpu_binding_specifier_string.empty()) {
-           return cpu_binding_size = memory_binding_size;
-       } else {
-           /* cap to memory binding size */
-           cpu_binding_size = interpret_generic_binding_specifier(cpu_binding_specifier_string, memory_binding_size);
-           if (memory_binding_size % cpu_binding_size)
-               throw bad_specification(
-                       "cpu binding ", cpu_binding_specifier_string,
-                       " yields a size of ", cpu_binding_size, " PUs,"
-                       " but this must be an integer divisor of",
-                       " the memory binding size of ", memory_binding_size,
-                       " PUs, which follows from the specifier ",
-                       memory_binding_specifier_string);
-           return cpu_binding_size;
-       }
-#else
-       /* just check for errors */
-       if (cpu_binding_specifier_string.empty()) {
-           return 0;
-       } else {
-           return interpret_generic_binding_specifier(cpu_binding_specifier_string);
-       }
+       if (depth) {
+           if (cpu_binding_specifier_string.empty()) {
+               return cpu_binding_size = memory_binding_size;
+           } else {
+               /* cap to memory binding size */
+               cpu_binding_size = interpret_generic_binding_specifier(cpu_binding_specifier_string, memory_binding_size);
+               if (memory_binding_size % cpu_binding_size)
+                   throw bad_specification(
+                           "cpu binding ", cpu_binding_specifier_string,
+                           " yields a size of ", cpu_binding_size, " PUs,"
+                           " but this must be an integer divisor of",
+                           " the memory binding size of ", memory_binding_size,
+                           " PUs, which follows from the specifier ",
+                           memory_binding_specifier_string);
+               return cpu_binding_size;
+           }
+       } else
 #endif
+       {
+           /* just check for errors */
+           if (cpu_binding_specifier_string.empty()) {
+               return 0;
+           } else {
+               return interpret_generic_binding_specifier(cpu_binding_specifier_string);
+           }
+       }
    }
    int interpret_generic_binding_specifier(std::string const & specifier, int cap MAYBE_UNUSED = -1) {/*{{{*/
 #ifdef HAVE_HWLOC
+       if (!depth) {
+           if (strcasecmp(specifier.c_str(), "machine") != 0)
+               throw bad_specification("hwloc detected asymmetric topology, the only accepted memory binding specifier is \"machine\"");
+           return 0;
+       }
        int binding_size;
        /* and apply our different calculation rules to the provided
         * string (either memory_binding_specifier_string or
@@ -484,6 +512,11 @@ struct las_parallel_desc::helper {
            objsize = computed_min_pu_fit;
        } else {
            int argdepth = hwloc_aux_get_depth_from_string(topology, base_object.c_str());
+#if HWLOC_API_VERSION >= 0x020000
+           if (argdepth == HWLOC_TYPE_DEPTH_NUMANODE) {
+               argdepth = hwloc_get_memory_parents_depth(topology);
+           }
+#endif
            if (argdepth < 0)
                throw bad_specification(base_object, " is invalid");
            objsize = number_of(-1, argdepth);
@@ -814,7 +847,9 @@ las_parallel_desc::las_parallel_desc(cxx_param_list & pl, double jobram_arg)
 
     nsubjobs_per_cpu_binding_zone = help->nsubjobs_per_cpu_binding_zone;
     nthreads_per_subjob = help->nthreads_per_subjob;
+
 #ifdef HAVE_HWLOC
+    if (!help->depth) return;
     memory_binding_size = help->memory_binding_size;
     nmemory_binding_zones = help->number_of(-1, 0) / memory_binding_size;
     if (!help->replicate)
@@ -875,40 +910,42 @@ void las_parallel_desc::display_binding_info() const /*{{{*/
 
 
 #ifdef HAVE_HWLOC
-    std::vector<std::string> tm = help->all_textual_descriptions_for_binding(memory_binding_size);
-    std::vector<std::string> tc = help->all_textual_descriptions_for_binding(cpu_binding_size);
-    std::vector<std::string> tj = help->all_textual_descriptions_for_binding(cpu_binding_size / number_of_subjobs_per_cpu_binding_zone());
-    size_t m = 0, c = 0;
-    {
-        std::ostringstream pu_app;
-        pu_app << "[" << memory_binding_size << " PUs]";
-        for(auto & x : tm) { x += " "; x += pu_app.str(); if (x.size() > m) m = x.size(); }
-    }
-    {
-        std::ostringstream pu_app;
-        pu_app << "[" << cpu_binding_size << " PUs]";
-        for(auto & x : tc) { x += " "; x += pu_app.str(); if (x.size() > c) c = x.size(); }
-    }
-    size_t qc = number_of_subjobs_per_cpu_binding_zone();
-    size_t qm = qc * ncpu_binding_zones_per_memory_binding_zone;
-    for(size_t i = 0 ; i < tj.size() ; i++) {
-        if (!help->replicate && i >= qc) break;
-        ASSERT_ALWAYS(i < help->subjob_binding_cpusets.size());
-        char * sc;
-        hwloc_bitmap_asprintf(&sc, help->subjob_binding_cpusets[i]);
-        ASSERT_ALWAYS(i/qm < help->memory_binding_nodesets.size());
-        char * sm;
-        hwloc_bitmap_asprintf(&sm, help->memory_binding_nodesets[i/qm]);
+    if (help->depth) {
+        std::vector<std::string> tm = help->all_textual_descriptions_for_binding(memory_binding_size);
+        std::vector<std::string> tc = help->all_textual_descriptions_for_binding(cpu_binding_size);
+        std::vector<std::string> tj = help->all_textual_descriptions_for_binding(cpu_binding_size / number_of_subjobs_per_cpu_binding_zone());
+        size_t m = 0, c = 0;
+        {
+            std::ostringstream pu_app;
+            pu_app << "[" << memory_binding_size << " PUs]";
+            for(auto & x : tm) { x += " "; x += pu_app.str(); if (x.size() > m) m = x.size(); }
+        }
+        {
+            std::ostringstream pu_app;
+            pu_app << "[" << cpu_binding_size << " PUs]";
+            for(auto & x : tc) { x += " "; x += pu_app.str(); if (x.size() > c) c = x.size(); }
+        }
+        size_t qc = number_of_subjobs_per_cpu_binding_zone();
+        size_t qm = qc * ncpu_binding_zones_per_memory_binding_zone;
+        for(size_t i = 0 ; i < tj.size() ; i++) {
+            if (!help->replicate && i >= qc) break;
+            ASSERT_ALWAYS(i < help->subjob_binding_cpusets.size());
+            char * sc;
+            hwloc_bitmap_asprintf(&sc, help->subjob_binding_cpusets[i]);
+            ASSERT_ALWAYS(i/qm < help->memory_binding_nodesets.size());
+            char * sm;
+            hwloc_bitmap_asprintf(&sm, help->memory_binding_nodesets[i/qm]);
 
-        verbose_output_print(0, 2, "# %-*s %-*s %s [%d thread(s)] [ m:%s c:%s ]\n",
-                (int) m, (i % qm) ? "" : tm[i / qm].c_str(),
-                (int) c, (i % qc) ? "" : tc[i / qc].c_str(),
-                "job", // tj[i].c_str(),
-                nthreads_per_subjob,
-                sm, sc
-                );
-        free(sm);
-        free(sc);
+            verbose_output_print(0, 2, "# %-*s %-*s %s [%d thread(s)] [ m:%s c:%s ]\n",
+                    (int) m, (i % qm) ? "" : tm[i / qm].c_str(),
+                    (int) c, (i % qc) ? "" : tc[i / qc].c_str(),
+                    "job", // tj[i].c_str(),
+                    nthreads_per_subjob,
+                    sm, sc
+                    );
+            free(sm);
+            free(sc);
+        }
     }
 #endif
     verbose_output_end_batch();
@@ -952,6 +989,8 @@ int las_parallel_desc::query_memory_binding(void * addr, size_t len);
 int las_parallel_desc::set_loose_binding() const
 {
 #ifdef HAVE_HWLOC
+    if (help->depth == 0)
+        return 0;
     hwloc_obj_t root = hwloc_get_root_obj(help->topology);
     hwloc_nodeset_t n = root->nodeset;
     hwloc_cpuset_t c = root->cpuset;
@@ -960,7 +999,18 @@ int las_parallel_desc::set_loose_binding() const
      * fact.
      */
     int rc;
-    rc = hwloc_set_membind_nodeset(help->topology, n, HWLOC_MEMBIND_BIND, HWLOC_MEMBIND_THREAD | HWLOC_MEMBIND_STRICT);
+#if HWLOC_API_VERSION < 0x010b03
+    /* this legacy called remained valid throughout hwloc 1.x */
+    rc = hwloc_set_membind_nodeset(help->topology, n, HWLOC_MEMBIND_BIND,
+            HWLOC_MEMBIND_THREAD |
+            HWLOC_MEMBIND_STRICT);
+#else
+    /* newer call */
+    rc = hwloc_set_membind(help->topology, n, HWLOC_MEMBIND_BIND,
+            HWLOC_MEMBIND_THREAD |
+            HWLOC_MEMBIND_STRICT |
+            HWLOC_MEMBIND_BYNODESET);
+#endif
     if (rc < 0) {
         char * s;
         hwloc_bitmap_asprintf(&s, n);
@@ -972,7 +1022,8 @@ int las_parallel_desc::set_loose_binding() const
         free(s);
         return -1;
     }
-    rc = hwloc_set_cpubind(help->topology, c, HWLOC_CPUBIND_THREAD | HWLOC_CPUBIND_STRICT);
+    rc = hwloc_set_cpubind(help->topology, c,
+            HWLOC_CPUBIND_THREAD | HWLOC_CPUBIND_STRICT);
     if (rc < 0) {
         char * s;
         hwloc_bitmap_asprintf(&s, c);
@@ -990,6 +1041,10 @@ int las_parallel_desc::set_loose_binding() const
 
 int las_parallel_desc::set_subjob_binding(int k) const
 {
+#ifdef HAVE_HWLOC
+    if (help->depth == 0)
+        return -1;
+#endif
     set_subjob_cpu_binding(k);
     set_subjob_mem_binding(k);
     return 0;
@@ -998,10 +1053,27 @@ int las_parallel_desc::set_subjob_binding(int k) const
 int las_parallel_desc::set_subjob_mem_binding(int k MAYBE_UNUSED) const
 {
 #ifdef HAVE_HWLOC
+    if (help->depth == 0)
+        return -1;
     ASSERT_ALWAYS(0<= k && k < (int) help->subjob_binding_cpusets.size());
     int m = k / number_of_subjobs_per_memory_binding_zone();
     ASSERT_ALWAYS(m < (int) help->memory_binding_nodesets.size());
-    int rc = hwloc_set_membind_nodeset(help->topology, help->memory_binding_nodesets[m], HWLOC_MEMBIND_BIND, HWLOC_MEMBIND_THREAD | HWLOC_MEMBIND_STRICT);
+#if HWLOC_API_VERSION < 0x010b03
+    /* this legacy called remained valid throughout hwloc 1.x */
+    int rc = hwloc_set_membind_nodeset(help->topology,
+            help->memory_binding_nodesets[m],
+            HWLOC_MEMBIND_BIND,
+            HWLOC_MEMBIND_THREAD |
+            HWLOC_MEMBIND_STRICT);
+#else
+    /* newer call */
+    int rc = hwloc_set_membind(help->topology,
+            help->memory_binding_nodesets[m],
+            HWLOC_MEMBIND_BIND,
+            HWLOC_MEMBIND_THREAD |
+            HWLOC_MEMBIND_STRICT |
+            HWLOC_MEMBIND_BYNODESET);
+#endif
     if (rc < 0) {
         char * s;
         hwloc_bitmap_asprintf(&s, help->memory_binding_nodesets[m]);
@@ -1019,6 +1091,8 @@ int las_parallel_desc::set_subjob_mem_binding(int k MAYBE_UNUSED) const
 int las_parallel_desc::set_subjob_cpu_binding(int k MAYBE_UNUSED) const
 {
 #ifdef HAVE_HWLOC
+    if (help->depth == 0)
+        return -1;
     ASSERT_ALWAYS(0<= k && k < (int) help->subjob_binding_cpusets.size());
     int rc = hwloc_set_cpubind(help->topology, help->subjob_binding_cpusets[k], HWLOC_CPUBIND_THREAD |  HWLOC_CPUBIND_STRICT);
     if (rc < 0) {
@@ -1038,10 +1112,11 @@ int las_parallel_desc::set_subjob_cpu_binding(int k MAYBE_UNUSED) const
 
 int las_parallel_desc::number_of_threads_loose() const {
 #ifdef HAVE_HWLOC
-    return help->replicate ? help->number_of(-1, 0) : help->memory_binding_size;
-#else
-    return nthreads_per_subjob;
+    if (help->depth)
+        return help->replicate ? help->number_of(-1, 0) : help->memory_binding_size;
+    else
 #endif
+        return nthreads_per_subjob;
 }
 
 #ifdef HAVE_HWLOC

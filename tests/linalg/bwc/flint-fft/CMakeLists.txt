@@ -7,4 +7,7 @@ if(BWC_GFP_ARITHMETIC_BACKENDS)
     include_directories(${PROJECT_SOURCE_DIR}/linalg/bwc/flint-fft)
     include_directories(${PROJECT_SOURCE_DIR}/utils)
     cado_define_test(test_transform_length.cpp LIBRARIES flint-fft utils)
+    set_target_properties(test_transform_length PROPERTIES
+        COMPILE_FLAGS "${OpenMP_CXX_FLAGS}"
+        LINK_FLAGS "${OpenMP_CXX_FLAGS}")
 endif()

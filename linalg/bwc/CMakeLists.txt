@@ -393,8 +393,14 @@ if(BWC_GFP_ARITHMETIC_BACKENDS)
     # so there's absolutely no point in making it shared.
     file(GLOB flint_fft_files flint-fft/*.c)
     add_library(flint-fft ${flint_fft_files})
+    set_target_properties(flint-fft PROPERTIES
+        COMPILE_FLAGS "--mpi ${OpenMP_C_FLAGS}"
+        LINK_FLAGS "--mpi ${OpenMP_C_FLAGS}")
     add_executable(test-flint test-flint.c)
     target_link_libraries(test-flint flint-fft utils ${gmp_libname})
+    set_target_properties(test-flint PROPERTIES
+        COMPILE_FLAGS "--mpi ${OpenMP_C_FLAGS}"
+        LINK_FLAGS "--mpi ${OpenMP_C_FLAGS}")
 endif()
 
 foreach(v ${BWC_GFP_ARITHMETIC_BACKENDS})
@@ -412,7 +418,7 @@ foreach(v ${BWC_GFP_ARITHMETIC_BACKENDS})
         lingen-polymat.c
         # lingen-bigpolymat.c # deleted 20150826
         mpfq/mpfq_${v}.c
-        lingen-matpoly-ft.c
+        lingen-matpoly-ft.cpp
         lingen-bigmatpoly-ft.c)
 
     # make plingen_pz a default target, but not the others.
