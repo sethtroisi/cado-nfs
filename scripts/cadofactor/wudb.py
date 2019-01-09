@@ -962,7 +962,7 @@ class DictDbAccess(collections.MutableMapping):
 
         Values from default dict are merged into self, *not* overwriting
         existing values in self '''
-        if key is None and isinstance(default, collections.abc.Mapping):
+        if key is None and isinstance(default, collections.Mapping):
             update = {key:default[key] for key in default if not key in self}
             if update:
                 self.update(update, commit=commit)
@@ -1172,7 +1172,7 @@ class WuAccess(object): # {
     def _checkstatus(wu, status):
         #logger.debug("WuAccess._checkstatus(%s, %s)", wu, status)
         wu_status = wu["status"]
-        if isinstance(status, collections.abc.Container):
+        if isinstance(status, collections.Container):
             ok = wu_status in status
         else:
             ok = wu_status == status
