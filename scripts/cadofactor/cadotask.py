@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import re
 import os.path
-from math import gcd
+from fractions import gcd
 import abc
 import random
 import time
