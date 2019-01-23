@@ -950,10 +950,15 @@ process_bucket_region_run::survivors_t process_bucket_region_run::search_survivo
     {
         int offset = (j-j0) << logI;
 
-        unsigned char * const both_S[2] = {
+        unsigned char * both_S[2] = {
             S[0] ? S[0] + offset : NULL,
             S[1] ? S[1] + offset : NULL,
         };
+        for (int side = 0; side < 2; side++) {
+            nfs_work::side_data & wss(ws.sides[side]);
+            if (wss.no_fb())
+                both_S[side] = NULL;
+        }
         /* TODO FIXME XXX that's weird. How come don't we merge that with
          * the lognorm computation that goes in the ws.sides[side]
          * regions before apply_buckets + small_sieve ?? Could it help
