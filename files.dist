@@ -650,7 +650,8 @@ tests/utils/test_threadpool.cpp
 utils/timing.cpp
 utils/timing.h
 utils/typedefs.h
-utils/ularith.h.orig
+utils/ularith.h
+utils/u64arith.h
 utils/usp.c
 utils/usp.h
 utils/utils.h
