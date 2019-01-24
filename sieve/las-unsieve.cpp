@@ -590,8 +590,12 @@ search_survivors_in_line(unsigned char * const SS[2],
 
         unsieve_not_coprime_line(Sf, j, i0, i1, td_max + 1, us);
 
-        /* TODO: implement an SSE2 version ! */
+#if defined(HAVE_SSE2)
+        search_survivors_in_line_sse2_oneside(Sf, b, j, i0, i1, N, j_div, td_max,
+                survivors);
+#else
         search_survivors_in_line1_oneside(Sf, b, j, i0, i1, N, j_div, td_max,
                 survivors);
+#endif
     }
 }
