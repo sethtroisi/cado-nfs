@@ -447,7 +447,7 @@ build_newrows_from_file(typerow_t **newrows, FILE *hisfile,
     stats_data_t stats; /* struct for printing progress */
     /* will print report at 2^10, 2^11, ... 2^23 computed primes and every
      * 2^23 primes after that */
-    stats_init (stats, stdout, &addread, 23, "Read", "row additions", "", "line");
+    stats_init (stats, stdout, &addread, 23, "Read", "row additions", "", "lines");
     while(fgets(str, STRLENMAX, hisfile) && nrows >= Nmax)
     {
         if (str[0] == '#') continue;
