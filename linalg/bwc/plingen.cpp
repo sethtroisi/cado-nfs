@@ -249,7 +249,7 @@ static inline unsigned int expected_pi_length_lowerbound(dims * d, unsigned int 
 {
     /* generically we expect that len*m % (m+n) columns have length
      * 1+\lfloor(len*m/(m+n))\rfloor, and the others have length one more.
-     * For one column to a length less than \lfloor(len*m/(m+n))\rfloor,
+     * For one column to have a length less than \lfloor(len*m/(m+n))\rfloor,
      * it takes probability 2^-(m*l) using the notations above. Therefore
      * we can simply count 2^(64-m*l) accidental zero cancellations at
      * most below the bound.
@@ -420,7 +420,7 @@ bw_lingen_basecase_raw(bmstatus_ptr bm, matpoly_ptr pi, matpoly_srcptr E, unsign
             for(unsigned int j = 0 ; j < b ; j++) {
                 if (bm->lucky[j] > 0) {
                     printf(" %u", j);
-                    luck_sure += bm->lucky[j] > luck_mini;
+                    luck_sure += bm->lucky[j] >= luck_mini;
                 }
             }
 

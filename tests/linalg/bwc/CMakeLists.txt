@@ -203,7 +203,8 @@ cado_define_test(test-bwc-lingen-21744
     PROGRAM ${CADO_NFS_BINARY_DIR}/linalg/bwc/plingen_p_1
     ARGUMENTS
     --afile ${CMAKE_CURRENT_SOURCE_DIR}/A.21744 ffile=/dev/null m=4 n=2
-    prime=485263)
+    prime=485263
+    TARGET_DEPENDENCIES plingen_p_1)
 
 add_bwc_test(mod2-plain bwc-trace.sh random_matrix_size=800 m=64 n=64 seed=1 thr=2x2)
 add_dependencies(test-bwc-mod2-plain_dependencies mf_scan)
