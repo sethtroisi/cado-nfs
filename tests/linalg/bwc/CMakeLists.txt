@@ -199,6 +199,12 @@ lingen_threshold=60  m=4 n=2  prime=101538509534246169632617439 --random-input-w
 endforeach(gfp_layer ${BWC_GFP_ARITHMETIC_BACKENDS})
 
 
+cado_define_test(test-bwc-lingen-21744
+    PROGRAM ${CADO_NFS_BINARY_DIR}/linalg/bwc/plingen_p_1
+    ARGUMENTS
+    --afile ${CMAKE_CURRENT_SOURCE_DIR}/A.21744 ffile=/dev/null m=4 n=2
+    prime=485263)
+
 add_bwc_test(mod2-plain bwc-trace.sh random_matrix_size=800 m=64 n=64 seed=1 thr=2x2)
 add_dependencies(test-bwc-mod2-plain_dependencies mf_scan)
 add_bwc_test(mod2-padded bwc-trace.sh random_matrix_size=700,600 m=64 n=64 seed=1 thr=2x2)
