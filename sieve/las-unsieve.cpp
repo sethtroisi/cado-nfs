@@ -42,7 +42,7 @@ unsieve_data::unsieve_data(int logI, int logA)
   gpf_init(Jmax - 1);
   for (unsigned int k = 2U; k < Jmax; k++)
     {
-      unsigned int p, c = k;
+      unsigned int p, c;
       p = gpf_get(k);
       c = k; do {c /= p;} while (c % p == 0);
       entries[k] = entry(p, c);

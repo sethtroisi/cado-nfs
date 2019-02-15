@@ -34,7 +34,7 @@
 
 /* Maximum level for a merge. Such a large value is only useful when not using
  * BW. */
-#define MERGE_LEVEL_MAX 64
+#define MERGE_LEVEL_MAX 32
 
 #ifndef FOR_DL
 /* the default value 170 was determined experimentally on RSA-155
@@ -64,14 +64,6 @@
 #include "utils.h"  /* for ideal_merge_t */
 
 static inline int
-cmp_index (const void *p, const void *q)
-{
-  index_t x = *((index_t *)p);
-  index_t y = *((index_t *)q);
-  return (x <= y ? -1 : 1);
-}
-
-static inline int
 cmp_ideal_merge (const void *p, const void *q)
 {
   ideal_merge_t x = *((ideal_merge_t *)p);
@@ -83,10 +75,10 @@ cmp_ideal_merge (const void *p, const void *q)
    since in case x[0] = y[0], qsort() may give different results on
    different machines */
 static inline int
-cmp_int2 (const void *p, const void *q)
+cmp_index (const void *p, const void *q)
 {
-  int *x = (int*) p;
-  int *y = (int*) q;
+  index_t *x = (index_t*) p;
+  index_t *y = (index_t*) q;
 
   if (x[0] < y[0])
     return -1;
