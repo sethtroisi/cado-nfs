@@ -206,6 +206,12 @@ cado_define_test(test-bwc-lingen-21744
     prime=485263
     TARGET_DEPENDENCIES plingen_p_1)
 
+cado_define_test(test-bwc-lingen-21744-bis
+    PROGRAM ${CADO_NFS_BINARY_DIR}/linalg/bwc/plingen_p_1
+    ARGUMENTS
+    --random-input-with-length 20   m=4 n=2  prime=1009 --seed 1377
+    TARGET_DEPENDENCIES plingen_p_1)
+
 add_bwc_test(mod2-plain bwc-trace.sh random_matrix_size=800 m=64 n=64 seed=1 thr=2x2)
 add_dependencies(test-bwc-mod2-plain_dependencies mf_scan)
 add_bwc_test(mod2-padded bwc-trace.sh random_matrix_size=700,600 m=64 n=64 seed=1 thr=2x2)

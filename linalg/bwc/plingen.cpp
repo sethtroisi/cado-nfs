@@ -542,7 +542,8 @@ bw_lingen_basecase_raw(bmstatus_ptr bm, matpoly_ptr pi, matpoly_srcptr E, unsign
          * not really matter where we put their computation, provided
          * that the columns that we do read are done at this point.
          */
-        for(unsigned int j = 0; j < b; j++) {
+        for(unsigned int jl = 0; jl < b; jl++) {
+            unsigned int j = ctable[jl][1];
             if (!is_pivot[j])
                 pivot_columns.push_back(j);
         }
@@ -569,16 +570,25 @@ bw_lingen_basecase_raw(bmstatus_ptr bm, matpoly_ptr pi, matpoly_srcptr E, unsign
                  */
 
 #ifndef NDEBUG
-                for(unsigned int kl = m ; kl < b ; kl++) {
-                    unsigned int k = pivot_columns[kl];
-                    absrc_elt Tkj = matpoly_coeff_const(ab, T, k, j, 0);
-                    ASSERT(abcmp_ui(ab, Tkj, k==j) == 0);
-                }
-                for(unsigned int kl = 0 ; kl < MIN(m,jl) ; kl++) {
-                    unsigned int k = pivot_columns[kl];
-                    absrc_elt Tkj = matpoly_coeff_const(ab, T, k, j, 0);
-                    if (abcmp_ui(ab, Tkj, 0) == 0) continue;
-                    ASSERT_ALWAYS(pi_lengths[k] <= pi_lengths[j]);
+#ifdef HAVE_OPENMP
+#pragma omp critical
+#endif
+                {
+                    for(unsigned int kl = m ; kl < b ; kl++) {
+                        unsigned int k = pivot_columns[kl];
+                        absrc_elt Tkj = matpoly_coeff_const(ab, T, k, j, 0);
+                        ASSERT_ALWAYS(abcmp_ui(ab, Tkj, k==j) == 0);
+                    }
+                    for(unsigned int kl = 0 ; kl < MIN(m,jl) ; kl++) {
+                        unsigned int k = pivot_columns[kl];
+                        absrc_elt Tkj = matpoly_coeff_const(ab, T, k, j, 0);
+                        if (abcmp_ui(ab, Tkj, 0) == 0) continue;
+                        /* This holds most often, when p is large and so
+                         * on. But it can't hold *always*. Try m=n=2 and
+                         * p=17 for instance.
+                         */
+                        ASSERT_ALWAYS(pi_lengths[k] <= pi_lengths[j]);
+                    }
                 }
 #endif
 
