@@ -401,9 +401,10 @@ bw_lingen_basecase_raw(bmstatus_ptr bm, matpoly_ptr pi, matpoly_srcptr E, unsign
             for(unsigned int jl = 0 ; jl < nj ; ++jl) {
                 for(unsigned int i = 0 ; i < m ; ++i) {
                     unsigned int j = todo[jl];
+                    unsigned int lj = MIN(pi_lengths[j], t + 1);
                     abelt_ur_set_zero(ab, e_ur);
                     for(unsigned int k = 0 ; k < b ; ++k) {
-                        for(unsigned int s = 0 ; s < pi_lengths[j] ; s++) {
+                        for(unsigned int s = 0 ; s < lj ; s++) {
                             abmul_ur(ab, tmp_ur,
                                     matpoly_coeff_const(ab, E, i, k, t - s),
                                     matpoly_coeff(ab, pi, k, j, s));
@@ -613,10 +614,6 @@ bw_lingen_basecase_raw(bmstatus_ptr bm, matpoly_ptr pi, matpoly_srcptr E, unsign
                         unsigned int k = pivot_columns[kl];
                         absrc_elt Tkj = matpoly_coeff_const(ab, T, k, j, 0);
                         if (abcmp_ui(ab, Tkj, 0) == 0) continue;
-                        /* This holds most often, when p is large and so
-                         * on. But it can't hold *always*. Try m=n=2 and
-                         * p=17 for instance.
-                         */
                         ASSERT_ALWAYS(pi_lengths[k] <= pi_lengths[j]);
                     }
                 }
