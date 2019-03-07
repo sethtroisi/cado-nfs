@@ -289,7 +289,7 @@ addRowsAndUpdate (filter_matrix_t *mat, index_t i1, index_t i2,
     for(; k2 <= l2;)
       tmp[k++] = rowCell(r2, k2), k2++;
     tmp[0] = k - 1;
-#if defined(FOR_DLP) || __SIZEOF_INDEX__ == 4 || __SIZEOF_INDEX__ == 8
+#if defined(FOR_DLP) || SIZEOF_INDEX == 4 || SIZEOF_INDEX == 8
     free (r1);
     rows[i1] = (k == len) ? tmp : realloc (tmp, k * sizeof(typerow_t));
 #else
@@ -677,10 +677,10 @@ print_memory_usage (filter_matrix_t *mat)
   mem_rows = mat->nrows * sizeof (typerow_t*);
   for (unsigned long i = 0; i < mat->nrows; i++)
     if (mat->rows[i] != NULL)
-#if defined(FOR_DL) || __SIZEOF_INDEX__ == 4 || __SIZEOF_INDEX__ == 8
+#if defined(FOR_DL) || SIZEOF_INDEX == 4 || SIZEOF_INDEX == 8
       mem_rows += (rowLength(mat->rows, i) + 1) * sizeof (typerow_t);
 #else
-      mem_rows += (rowLength(mat->rows, i) + 1) * __SIZEOF_INDEX__;
+      mem_rows += (rowLength(mat->rows, i) + 1) * SIZEOF_INDEX;
 #endif
   mem_wt = mat->ncols * sizeof (int32_t);
   mem_cols = mat->ncols * sizeof (index_t*);
