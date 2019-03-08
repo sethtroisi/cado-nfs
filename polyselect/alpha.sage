@@ -216,6 +216,44 @@ def alpha_affine(f,B):
     disc = f.discriminant()
     return sum([alpha_p_affine(f, disc, p) for p in prime_range(2,B+1)])
 
+# return statistics (min, max, avg, std) for the projective alpha for K random
+# irreducible polynomials of degree 'degree', and coefficients in -10^10..10^10
+def stats_alpha_projective(ad,degree,K):
+   set_random_seed(1) # to get deterministic results
+   l = []
+   R.<x> = ZZ[]
+   lp = prime_divisors(ad)
+   for k in range(K):
+      while true:
+         f = ad*x^degree+R.random_element(degree-1,-10^10,10^10)
+         if f.is_irreducible():
+            break
+      disc = f.discriminant()
+      l.append(sum([alpha_p_projective(f,disc,p) for p in lp]))
+   R3 = RealField(14) # to print 3 digits only
+   return R3(min(l)), R3(max(l)), R3(stats.mean(l)), R3(stats.std(l))
+
+# stats_alpha_projective_records(6,1000)
+# 1 (0.000, 0.000, 0.000, 0.000)
+# 2 (-0.462, -0.231, -0.348, 0.116)
+# 3 (-0.412, -0.275, -0.368, 0.0642)
+# 4 (-0.924, -0.462, -0.522, 0.114)
+# 6 (-0.874, -0.506, -0.716, 0.137)
+# 12 (-1.34, -0.737, -0.886, 0.121)
+# 24 (-1.57, -0.737, -0.973, 0.184)
+# 30 (-1.21, -0.774, -1.04, 0.142)
+# 60 (-1.67, -1.01, -1.21, 0.124)
+# 120 (-1.82, -1.01, -1.29, 0.184)
+def stats_alpha_projective_records(degree,K):
+   best = 1
+   ad = 0
+   while true:
+      ad += 1
+      r = stats_alpha_projective(ad,degree,K)
+      if r[2] < best:
+         best = r[2]
+         print ad, r
+
 # If we consider 10000 random irreducible polynomials (of degree 5) with
 # leading coefficient ad, the records for the average projective alpha are:
 # ad alpha
@@ -270,20 +308,6 @@ def alpha_projective(f,B):
     """
     disc = f.discriminant()
     return sum([alpha_p_projective(f, disc, p) for p in prime_range(2,B+1)])
-
-# estimate the average projective alpha of polynomials of degree d
-# with leading coefficient ad divisible by 'incr', for incr <= ad < K*incr
-def estimate_alpha_projective(d,incr,K,B):
-    ad = incr
-    n = s = 0
-    R.<x> = ZZ[]
-    for ad in range(incr,(K+1)*incr,incr):
-       f = ad*x^d + R.random_element(degree=d-1)
-       while not f.is_irreducible():
-          f = ad*x^d + R.random_element(degree=d-1)
-       s += alpha_projective (f, B)
-       n += 1
-       print ad, s/n
 
 # -*-*- debug -*-*-
 def estimate_average_valuation_homogeneous_coprime(f, p, x0, x1, y0, y1):
