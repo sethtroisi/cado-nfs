@@ -249,14 +249,14 @@ insert_relation_in_dup_hashtable (earlyparsed_relation_srcptr rel, unsigned int 
   }
 
   /* The largest block for a linear probing table of size m with l entries
-     behaves like log(m)/(beta-1-log(beta)) where beta = l/m.
+     behaves like (log(m)-1.5*log(log(m)))/(beta-1-log(beta)) where beta = l/m.
      See B. Pittel, Linear probing: the probable largest
      search time grows logarithmically with the number of records, Journal
      of Algorithms 8, number 2, 236-249, 1987.
      Here we have m = K and l <= nrels_expected.
      Since we take K >= 6/5 * nrels_expected, we have beta <= 5/6,
      the factor 1/(beta-1-log(beta)) is bounded by 64.
-     For m=2e8, the largest block can have up to length 1220,
+     For m=2e8, the largest block can have up to length 938,
      thus it is not surprising to have local_cost > 100. */
 
   cost += local_cost;
