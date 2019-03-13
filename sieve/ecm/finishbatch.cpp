@@ -156,7 +156,7 @@ main (int argc, char *argv[])
         for(auto const & rel : smooth) {
             std::ostringstream os;
             os << rel << "\n";
-            printf("%s\n", os.str().c_str());
+            printf("%s", os.str().c_str());
         }
   } else {
       for (auto const & x : List) {
