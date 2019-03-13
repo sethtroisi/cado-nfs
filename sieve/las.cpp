@@ -1597,19 +1597,8 @@ void process_bucket_region_run::cofactoring_sync (survivors_t & survivors)/*{{{*
 
         rep.survivors.enter_cofactoring++;
 
-        if (ws.las.batch_print_survivors) {
-            // In sublat mode, some non-primitive survivors can exist.
-            // The cofactoring via ECM is made aware of this, but not the
-            // batch mode, so we have to ensure it.
-            rep.reports++;
-            if (ws.conf.sublat_bound && !cur.ab_coprime()) continue;
-            verbose_output_start_batch ();
-            cur.print_as_survivor(ws.las.batch_print_survivors);
-            verbose_output_end_batch ();
-            continue;
-        }
-
-        if (ws.las.batch)
+        // we'll do the printing at the end.
+        if (ws.las.batch || ws.las.batch_print_survivors)
         {
             /* see above */
             rep.reports++;
@@ -1617,6 +1606,7 @@ void process_bucket_region_run::cofactoring_sync (survivors_t & survivors)/*{{{*
             /* make sure threads don't write the cofactor list at the
              * same time !!! */
             cur.transfer_to_cofac_list(ws.cofac_candidates, aux_p->doing);
+            //cur.print_as_survivor(ws.las.batch_print_survivors);
             continue; /* we deal with all cofactors at the end of las */
         }
 
@@ -3179,6 +3169,15 @@ int main (int argc0, char *argv0[])/*{{{*/
 #endif
 
     las.set_loose_binding();
+
+    if (las.batch_print_survivors) {
+        for (auto s : las.L) {
+        gmp_fprintf(las.batch_print_survivors,
+                "%" PRId64 " %" PRIu64 " %Zd %Zd\n", s.a, s.b,
+                (mpz_srcptr) s.cofactor[0],
+                (mpz_srcptr) s.cofactor[1]);
+        }
+    }
 
     if (las.batch)
       {
