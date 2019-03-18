@@ -294,10 +294,11 @@ print_poly_info ( char *buf,
       double x = sqrt (2.0 * log (K));
       double y  = log (log (K)) + 1.377;
       double best_exp_E = mu - sigma * (x - y / (2.0 * x));
-      double admax_d = mpz_get_d (adcur) * (maxtime / time_so_far);
+      double admin_d = mpz_get_d (admin);
+      double adrange = (mpz_get_d (adcur) - admin_d) * (maxtime / time_so_far);
       np += snprintf (buf + np, size - np,
                       "# %.2fs/poly, mu %.2f, sigma %.3f, admax = %.2e, best exp_E %.2f\n",
-                      time_per_poly, mu, sigma, admax_d, best_exp_E);
+                      time_per_poly, mu, sigma, admin_d + adrange, best_exp_E);
     }
 
   if (!raw_option)
