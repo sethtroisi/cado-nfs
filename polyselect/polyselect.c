@@ -47,6 +47,7 @@ static unsigned long incr = DEFAULT_INCR;
 const char *out = NULL; /* output file for msieve input (msieve.dat.m) */
 cado_poly best_poly, curr_poly;
 double best_E = 0.0; /* Murphy's E (the larger the better) */
+double maxtime = DBL_MAX;
 
 /* read-write global variables */
 static pthread_mutex_t lock=PTHREAD_MUTEX_INITIALIZER; /* used as mutual exclusion
@@ -278,25 +279,23 @@ print_poly_info ( char *buf,
                beta, eta);
     }
 
-  /* estimate the minimal E-value, assuming a normal distribution for E */
+  /* Estimate the minimal E-value, assuming a normal distribution for E.
+     This assumes -maxtime is given. */
   if (!raw_option && verbose)
     {
+      ASSERT_ALWAYS(maxtime < DBL_MAX);
       unsigned long n = data_exp_E->size; /* #polynomials found so far */
       double time_per_poly = seconds () / n; /* average time per poly */
       double mu = data_mean (data_exp_E); /* average E */
       double sigma = sqrt (data_var (data_exp_E)); /* stddev(E) */
-      double adrange = mpz_get_d (admax) - mpz_get_d (admin);
-      double done = mpz_get_d (adcur) - mpz_get_d (admin);
-      double ratio_done = adrange / done;
-      double K = (double) n * ratio_done;
+      double K = maxtime / time_per_poly;
       /* minimal order statistics */
       double x = sqrt (2.0 * log (K));
       double y  = log (log (K)) + 1.377;
       double best_exp_E = mu - sigma * (x - y / (2.0 * x));
       np += snprintf (buf + np, size - np,
-                      "# %.2fs/poly, total %.0fs, mu %.2f, sigma %.3f, best exp_E %.2f\n",
-                      time_per_poly, seconds () * ratio_done, mu, sigma,
-                      best_exp_E);
+                      "# %.2fs/poly, mu %.2f, sigma %.3f, best exp_E %.2f\n",
+                      time_per_poly, mu, sigma, best_exp_E);
     }
 
   if (!raw_option)
@@ -1902,7 +1901,7 @@ next_ad (mpz_t ad, int i)
     {
       mpz_set (ad, adcur);
       tries ++;
-      if (verbose >= 1)
+      if (verbose >= 2)
         {
           gmp_printf ("# thread %d: ad=%Zd\n", i, ad);
           fflush (stdout);
@@ -1967,7 +1966,7 @@ int
 main (int argc, char *argv[])
 {
   char **argv0 = argv;
-  double st0 = seconds (), maxtime = DBL_MAX;
+  double st0 = seconds ();
   mpz_t N;
   unsigned int d = 0;
   unsigned long P = 0;
