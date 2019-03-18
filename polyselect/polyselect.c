@@ -285,7 +285,8 @@ print_poly_info ( char *buf,
     {
       ASSERT_ALWAYS(maxtime < DBL_MAX);
       unsigned long n = data_exp_E->size; /* #polynomials found so far */
-      double time_per_poly = seconds () / n; /* average time per poly */
+      double time_so_far = seconds ();
+      double time_per_poly = time_so_far / n; /* average time per poly */
       double mu = data_mean (data_exp_E); /* average E */
       double sigma = sqrt (data_var (data_exp_E)); /* stddev(E) */
       double K = maxtime / time_per_poly;
@@ -293,9 +294,10 @@ print_poly_info ( char *buf,
       double x = sqrt (2.0 * log (K));
       double y  = log (log (K)) + 1.377;
       double best_exp_E = mu - sigma * (x - y / (2.0 * x));
+      double admax_d = mpz_get_d (adcur) * (maxtime / time_so_far);
       np += snprintf (buf + np, size - np,
-                      "# %.2fs/poly, mu %.2f, sigma %.3f, best exp_E %.2f\n",
-                      time_per_poly, mu, sigma, best_exp_E);
+                      "# %.2fs/poly, mu %.2f, sigma %.3f, admax = %.2e, best exp_E %.2f\n",
+                      time_per_poly, mu, sigma, admax_d, best_exp_E);
     }
 
   if (!raw_option)
