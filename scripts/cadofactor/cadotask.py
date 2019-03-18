@@ -1486,7 +1486,7 @@ class ClientServerTask(Task, wudb.UsesWorkunitDb, patterns.Observer):
             {"maxwu": 10, 
              "wutimeout": 10800,  # Default: 3h
              "maxresubmit": 5, 
-             "maxwuerror": 2,   # increase if job are often killed badly.
+             "maxwuerror": 2,   # increase if jobs are often killed badly.
              "maxtimedout": 100, 
              "maxfailed": 100})
     
