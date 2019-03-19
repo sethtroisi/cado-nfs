@@ -222,12 +222,16 @@ print_poly_info ( char *buf,
   if (raw_option)
     {
       np += snprintf (buf + np, size - np, "# Raw polynomial:\n");
+      mutex_lock (&lock);
       data_add (raw_proj_alpha, get_alpha_projective (F, ALPHA_BOUND));
+      mutex_unlock (&lock);
     }
   else
     {
       snprintf (buf + np, size - np, "# Size-optimized polynomial:\n");
+      mutex_lock (&lock);
       data_add (opt_proj_alpha, get_alpha_projective (F, ALPHA_BOUND));
+      mutex_unlock (&lock);
     }
 
   np += gmp_snprintf (buf + np, size - np, "%sn: %Zd\n", prefix, n);
@@ -257,12 +261,16 @@ print_poly_info ( char *buf,
          and we take the median of the beta/eta values */
       if (!isnan (beta) && !isinf (beta))
         {
+          mutex_lock (&lock);
           data_add (data_beta, beta);
+          mutex_unlock (&lock);
           beta = data_median (data_beta);
         }
       if (!isnan (eta) && !isinf (eta))
         {
+          mutex_lock (&lock);
           data_add (data_eta, eta);
+          mutex_unlock (&lock);
           eta = data_median (data_eta);
         }
       prob = 1.0 - exp (- pow (target_E / eta, beta));
