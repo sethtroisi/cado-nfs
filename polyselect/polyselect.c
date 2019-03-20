@@ -286,9 +286,8 @@ print_poly_info ( char *buf,
 
   /* Estimate the minimal E-value, assuming a normal distribution for E.
      This assumes -maxtime is given. */
-  if (!raw_option && verbose)
+  if (!raw_option && verbose && maxtime < DBL_MAX)
     {
-      ASSERT_ALWAYS(maxtime < DBL_MAX);
       unsigned long n = data_exp_E->size; /* #polynomials found so far */
       double time_so_far = seconds ();
       double time_per_poly = time_so_far / n; /* average time per poly */
