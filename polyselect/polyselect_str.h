@@ -140,7 +140,8 @@ shash_add (shash_t H, uint64_t i)
   *(H->current[i & (SHASH_NBUCKETS - 1)])++ = i;
   if (UNLIKELY(H->current[i & (SHASH_NBUCKETS - 1)] >= H->base[(i & (SHASH_NBUCKETS - 1)) + 1]))
     {
-      fprintf (stderr, "Shash bucket %lu is full.\n", i & (SHASH_NBUCKETS - 1));
+      fprintf (stderr, "Shash bucket %" PRIu64 " is full.\n",
+               i & (SHASH_NBUCKETS - 1));
       exit (1);
     }
 }
