@@ -2131,11 +2131,12 @@ main (int argc, char *argv[])
   if (idx_max == 0) /* admax was given */
     {
       /* ad = admin + idx * incr < admax
-         thus idx_max = floor((admax-admin-1)/incr) */
+         thus idx_max = floor((admax-admin-1)/incr) + 1
+                      = floor((admax-admin+incr-1)/incr) */
       mpz_t t;
       mpz_init_set (t, admax);
       mpz_sub (t, t, admin);
-      mpz_sub_ui (t, t, 1);
+      mpz_add_ui (t, t, incr - 1);
       mpz_fdiv_q_ui (t, t, incr);
       if (mpz_fits_ulong_p (t))
         idx_max = mpz_get_ui (t);
