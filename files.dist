@@ -1331,3 +1331,5 @@ utils/lock_guarded_container.hpp
 sieve/las-memory.cpp
 sieve/las-memory.hpp
 tests/linalg/bwc/A.21744
+tests/sieve/F9.with_hints.hints
+tests/sieve/F9.with_hints.todo
