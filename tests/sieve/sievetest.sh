@@ -43,27 +43,36 @@ chmod a+rx "${WORKDIR}"
 # We may put RELS in a special place.
 : ${RELS="${WORKDIR}/${BASENAME}.rels"}
 
-# create las command line from environment variables, moan if any is
-# missing.
 args=()
-for var in poly I lim{0,1} lpb{0,1} mfb{0,1} ; do
-    args=("${args[@]}" -$var $(eval "echo \${$var:?missing}"))
-done
 
-if [ "$fb0" ] ; then args=("${args[@]}" -fb0 "$fb0") ; fi
-if [ "$fb1" ] ; then args=("${args[@]}" -fb1 "$fb1") ; fi
-if ! [ "$fb0" ] && ! [ "$fb1" ] ; then
-    echo "neither fb nor fb0/fb1 provided" >&2 ; exit 1
-fi
-
-
-for var in fbc lambda{0,1} ncurves{0,1} descent_hint bkmult bkthresh{,1} ; do
+for var in fbc lambda{0,1} ncurves{0,1} descent_hint bkmult bkthresh{,1} hint_table ; do
     # Those are optional
     value=$(eval "echo \${$var}")
     if [ "$value" ] ; then
         args=("${args[@]}" -$var "$value")
     fi
 done
+
+# create las command line from environment variables, moan if any is
+# missing.
+for var in poly ; do
+    args=("${args[@]}" -$var $(eval "echo \${$var:?missing}"))
+done
+
+if true || ! [ "$hint_table" ] ; then
+    # Theoretically the ones below should not be needed at all if we have a
+    # hint_table. Yet, presently it seems that they _are_ needed, and that
+    # sounds odd.
+    for var in I lim{0,1} lpb{0,1} mfb{0,1} ; do
+        args=("${args[@]}" -$var $(eval "echo \${$var:?missing}"))
+    done
+fi
+
+if [ "$fb0" ] ; then args=("${args[@]}" -fb0 "$fb0") ; fi
+if [ "$fb1" ] ; then args=("${args[@]}" -fb1 "$fb1") ; fi
+if ! [ "$fb0" ] && ! [ "$fb1" ] ; then
+    echo "neither fb nor fb0/fb1 provided" >&2 ; exit 1
+fi
 
 for var in fbc batch{0,1} ; do
     # Those are optional too. Being filenames, we allow that they be

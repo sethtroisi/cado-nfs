@@ -23,16 +23,20 @@ set(F9_poly ${CADO_NFS_SOURCE_DIR}/parameters/polynomials/F9.poly)
 set(F9_checksums ${CMAKE_CURRENT_BINARY_DIR}/F9.checksums)
 set(F9_st ${CMAKE_CURRENT_SOURCE_DIR}/F9.st)
 
-set(F9_baseargs
-        lim0=2300000 lpb0=26 mfb0=52 lambda0=2.1
-        lim1=1200000 lpb1=26 mfb1=52 lambda1=2.2
+set(F9_mini_baseargs
         maxbits=10
-        I=12 q0=1200000 q1=1200200
         poly=${F9_poly}
         fb1=${F9_roots}
         fbc=.
-        CHECKSUM_FILE=${F9_checksums}
+        lim0=2300000 lpb0=26 mfb0=52 lambda0=2.1
+        lim1=1200000 lpb1=26 mfb1=52 lambda1=2.2
+        I=12 q0=1200000 q1=1200200
         LAS_BINARY=${las_path}
+)
+
+set(F9_baseargs
+        ${F9_mini_baseargs}
+        CHECKSUM_FILE=${F9_checksums}
 )
 
 set(c90_21505_poly ${CMAKE_CURRENT_SOURCE_DIR}/c90_21505.poly)
@@ -167,11 +171,23 @@ cado_define_test(F9
         )
 
 cado_divert_test(F9 sieve
+    APPEND_ARGUMENTS -B 12 -nq 1
         APPEND_ENVIRONMENT
             REL_COUNT=431
             REFERENCE_SHA1=e04ae591795ff30af703a2235a4f9fd09d17b380
             REFERENCE_REVISION=ede066464ba58b2d6127fa256cef01706282e0ed
         )
+
+# override all arguments for this one.
+cado_divert_test(F9 sieve_with_hints
+        ENVIRONMENT
+            ${F9_mini_baseargs}
+            todo=${CADO_NFS_SOURCE_DIR}/tests/sieve/F9.with_hints.todo
+            hint_table=${CADO_NFS_SOURCE_DIR}/tests/sieve/F9.with_hints.hints
+            REL_COUNT=153
+            REFERENCE_SHA1=e80b973209f78c7df4541956e15814e04d699932
+        )
+
 
 cado_divert_test(F9 sieve_recompute_ssdpos
     APPEND_ARGUMENTS -B 12 -nq 1

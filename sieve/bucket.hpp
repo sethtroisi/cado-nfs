@@ -334,6 +334,7 @@ private:
     ASSERT_ALWAYS(size_b_align % sizeof(update_t *) == 0);
     return (slice_start + i_slice * size_b_align / sizeof(update_t *));
   }
+  void free_slice_start();
   void realloc_slice_start(size_t);
   void log_this_update (const update_t update, uint64_t offset,
                         uint64_t bucket_number, where_am_I& w) const;
