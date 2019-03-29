@@ -23,20 +23,14 @@ set(F9_poly ${CADO_NFS_SOURCE_DIR}/parameters/polynomials/F9.poly)
 set(F9_checksums ${CMAKE_CURRENT_BINARY_DIR}/F9.checksums)
 set(F9_st ${CMAKE_CURRENT_SOURCE_DIR}/F9.st)
 
-set(F9_mini_baseargs
+set(F9_baseargs
         maxbits=10
         poly=${F9_poly}
         fb1=${F9_roots}
         fbc=.
-        lim0=2300000 lpb0=26 mfb0=52 lambda0=2.1
-        lim1=1200000 lpb1=26 mfb1=52 lambda1=2.2
-        I=12 q0=1200000 q1=1200200
         LAS_BINARY=${las_path}
-)
-
-set(F9_baseargs
-        ${F9_mini_baseargs}
-        CHECKSUM_FILE=${F9_checksums}
+        lim0=2300000
+        lim1=1200000
 )
 
 set(c90_21505_poly ${CMAKE_CURRENT_SOURCE_DIR}/c90_21505.poly)
@@ -161,6 +155,11 @@ cado_define_test(F9_makefb
 
 cado_define_test(F9
         ENVIRONMENT ${F9_baseargs}
+            I=12
+            lpb0=26 mfb0=52 lambda0=2.1
+            lpb1=26 mfb1=52 lambda1=2.2
+            q0=1200000 q1=1200200
+            CHECKSUM_FILE=${F9_checksums}
         SCRIPT
             "${CADO_NFS_SOURCE_DIR}/tests/provide-wdir.sh" --env WORKDIR
             ${CMAKE_CURRENT_SOURCE_DIR}/sievetest.sh
@@ -171,7 +170,6 @@ cado_define_test(F9
         )
 
 cado_divert_test(F9 sieve
-    APPEND_ARGUMENTS -B 12 -nq 1
         APPEND_ENVIRONMENT
             REL_COUNT=431
             REFERENCE_SHA1=e04ae591795ff30af703a2235a4f9fd09d17b380
@@ -181,11 +179,12 @@ cado_divert_test(F9 sieve
 # override all arguments for this one.
 cado_divert_test(F9 sieve_with_hints
         ENVIRONMENT
-            ${F9_mini_baseargs}
+            ${F9_baseargs}
             todo=${CADO_NFS_SOURCE_DIR}/tests/sieve/F9.with_hints.todo
             hint_table=${CADO_NFS_SOURCE_DIR}/tests/sieve/F9.with_hints.hints
             REL_COUNT=153
             REFERENCE_SHA1=e80b973209f78c7df4541956e15814e04d699932
+            REFERENCE_REVISION=21aa5e0327129475c37784b849cddc303d05f526
         )
 
 
@@ -368,6 +367,7 @@ cado_divert_test(F9 descent
 # different.
 cado_define_test(F9_dupsup
         ENVIRONMENT ${F9_baseargs}
+            I=12
             lpb0=28 mfb0=56 lambda0=2.1
             lpb1=28 mfb1=56 lambda1=2.1
             q0=250000000 nq=1
