@@ -8,25 +8,12 @@
 */
 
 #ifndef U64_ARITH_H__
-
 #define U64_ARITH_H__
 
 #include <assert.h>
 #include <stdint.h>
 #include <gmp.h>
-// #include "macros.h"
-
-#ifndef ASSERT
-#define ASSERT(x)	assert(x)
-#endif
-
-#ifndef ASSERT_ALWAYS
-#define ASSERT_ALWAYS(x)	assert(x)
-#endif
-
-#ifndef ATTRIBUTE
-#define ATTRIBUTE(X) __attribute__(X)
-#endif
+#include "macros.h"
 
 #ifdef WANT_ASSERT_EXPENSIVE
 #define ASSERT_EXPENSIVE(x) ASSERT(x)
@@ -38,39 +25,12 @@
 /* Let a = a1 + 2^64 * a2, b = b1 + 2^64 * b2. Return 1 if a > b,
    and 0 if a <= b. */
 static inline int
-u64arith_gt_2ul_2ul(uint64_t, uint64_t, uint64_t, uint64_t) ATTRIBUTE((const));
+u64arith_gt_2_2(uint64_t, uint64_t, uint64_t, uint64_t) ATTRIBUTE((const));
 static inline int
-u64arith_gt_2ul_2ul(const uint64_t a1, const uint64_t a2,
-                   const uint64_t b1, const uint64_t b2)
+u64arith_gt_2_2(const uint64_t a1, const uint64_t a2,
+                const uint64_t b1, const uint64_t b2)
 {
   return a2 > b2 || (a2 == b2 && a1 > b1);
-}
-
-
-/* Add a uint64_t to two uint64_t with carry propagation from low word (r1)
-   to high word (r2). Any carry out from high word is lost. */
-
-static inline void
-u64arith_add_ul_2ul (uint64_t *r1, uint64_t *r2,
-                     const uint64_t a)
-{
-#ifdef U64ARITH_VERBOSE_ASM
-  __asm__ ("# u64arith_add_ul_2ul (%0, %1, %2)\n" : : 
-           "X" (*r1), "X" (*r2), "X" (a));
-#endif
-#if !defined (U64ARITH_NO_ASM) && defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM)
-  __asm__ __VOLATILE (
-    "addq %2, %0\n\t"
-    "adcq $0, %1\n"
-    : "+&r" (*r1), "+r" (*r2) 
-    : "rme" (a)
-    : "cc"); /* TODO: add commutativity and alternative for add to 
-                memory */
-#else
-  *r1 += a;
-  if (*r1 < a)
-    (*r2)++;
-#endif
 }
 
 
@@ -78,11 +38,11 @@ u64arith_add_ul_2ul (uint64_t *r1, uint64_t *r2,
    low word (r1) to high word (r2). Any carry out from high word is lost. */
 
 static inline void
-u64arith_add_2ul_2ul (uint64_t *r1, uint64_t *r2, 
-		      const uint64_t a1, const uint64_t a2)
+u64arith_add_2_2 (uint64_t *r1, uint64_t *r2, 
+		  const uint64_t a1, const uint64_t a2)
 {
 #ifdef U64ARITH_VERBOSE_ASM
-  __asm__ ("# u64arith_add_2ul_2ul (%0, %1, %2, %3)\n" : : 
+  __asm__ ("# u64arith_add_2_2 (%0, %1, %2, %3)\n" : : 
            "X" (*r1), "X" (*r2), "X" (a1), "X" (a2));
 #endif
 #if !defined (U64ARITH_NO_ASM) && defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM)
@@ -98,17 +58,30 @@ u64arith_add_2ul_2ul (uint64_t *r1, uint64_t *r2,
 #endif
 }
 
+/* Add a uint64_t to two uint64_t with carry propagation from low word (r1)
+   to high word (r2). Any carry out from high word is lost. */
+
+static inline void
+u64arith_add_1_2 (uint64_t *r1, uint64_t *r2, const uint64_t a)
+{
+  /* We have assembly only for x86_64 and on that architecture, this function
+     would generate the same code as u64arith_add_2_2() with an immediate
+     zero value for the high word, so we fall back to that. */
+  u64arith_add_2_2(r1, r2, a, 0);
+}
+
+
 /* Adds two uint64_t from two uint64_t with carry propagation 
    from low word (r1) to high word (r2). Returns 1 if there was a carry out 
    from high word, otherwise returns 0. */
 
 static inline char
-u64arith_add_2ul_2ul_cy (uint64_t *r1, uint64_t *r2, 
-			 const uint64_t a1, const uint64_t a2)
+u64arith_add_2_2_cy (uint64_t *r1, uint64_t *r2, 
+		     const uint64_t a1, const uint64_t a2)
 {
   char cy;
 #ifdef U64ARITH_VERBOSE_ASM
-  __asm__ ("# u64arith_add_2ul_2ul_cy (%0, %1, %2, %3)\n" : : 
+  __asm__ ("# u64arith_add_2_2_cy (%0, %1, %2, %3)\n" : : 
            "X" (*r1), "X" (*r2), "X" (a1), "X" (a2));
 #endif
 #if !defined (U64ARITH_NO_ASM) && defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM)
@@ -123,7 +96,7 @@ u64arith_add_2ul_2ul_cy (uint64_t *r1, uint64_t *r2,
   uint64_t u1 = *r1 + a1,
            u2 = *r2 + a2 + (u1 < *r1);
   /* Overflow occurred iff the sum is smaller than one of the summands */
-  cy = u64arith_gt_2ul_2ul(a1, a2, u1, u2);
+  cy = u64arith_gt_2_2(a1, a2, u1, u2);
   *r1 = u1;
   *r2 = u2;
 #endif
@@ -133,8 +106,8 @@ u64arith_add_2ul_2ul_cy (uint64_t *r1, uint64_t *r2,
 
 /* Requires a < m and b <= m, then r == a+b (mod m) and r < m */
 static inline void
-u64arith_addmod_ul_ul (uint64_t *r, const uint64_t a,
-               const uint64_t b, const uint64_t m)
+u64arith_addmod_1_1 (uint64_t *r, const uint64_t a,
+                     const uint64_t b, const uint64_t m)
 {
   ASSERT_EXPENSIVE (a < m && b <= m);
 
@@ -165,11 +138,11 @@ u64arith_addmod_ul_ul (uint64_t *r, const uint64_t a,
    lost. */
 
 static inline void
-u64arith_sub_ul_2ul (uint64_t *r1, uint64_t *r2, 
-                     const uint64_t a)
+u64arith_sub_1_2 (uint64_t *r1, uint64_t *r2, 
+                  const uint64_t a)
 {
 #ifdef U64ARITH_VERBOSE_ASM
-  __asm__ ("# u64arith_sub_ul_2ul  (%0, %1, %2)\n" : : 
+  __asm__ ("# u64arith_sub_1_2  (%0, %1, %2)\n" : : 
            "X" (*r1), "X" (*r2), "X" (a));
 #endif
 #if !defined (U64ARITH_NO_ASM) && defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM)
@@ -193,11 +166,11 @@ u64arith_sub_ul_2ul (uint64_t *r1, uint64_t *r2,
    lost. */
 
 static inline void
-u64arith_sub_2ul_2ul (uint64_t *r1, uint64_t *r2, 
-			 const uint64_t a1, const uint64_t a2)
+u64arith_sub_2_2 (uint64_t *r1, uint64_t *r2, 
+		  const uint64_t a1, const uint64_t a2)
 {
 #ifdef U64ARITH_VERBOSE_ASM
-  __asm__ ("# u64arith_sub_2ul_2ul (%0, %1, %2, %3)\n" : : 
+  __asm__ ("# u64arith_sub_2_2 (%0, %1, %2, %3)\n" : : 
            "X" (*r1), "X" (*r2), "X" (a1), "X" (a2));
 #endif
 #if !defined (U64ARITH_NO_ASM) && defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM)
@@ -221,12 +194,12 @@ u64arith_sub_2ul_2ul (uint64_t *r1, uint64_t *r2,
    from high word, otherwise returns 0. */
 
 static inline char
-u64arith_sub_2ul_2ul_cy (uint64_t *r1, uint64_t *r2, 
-			const uint64_t a1, const uint64_t a2)
+u64arith_sub_2_2_cy (uint64_t *r1, uint64_t *r2, 
+                     const uint64_t a1, const uint64_t a2)
 {
   char cy;
 #ifdef U64ARITH_VERBOSE_ASM
-  __asm__ ("# u64arith_sub_2ul_2ul_cy (%0, %1, %2, %3)\n" : : 
+  __asm__ ("# u64arith_sub_2_2_cy (%0, %1, %2, %3)\n" : : 
            "X" (*r1), "X" (*r2), "X" (a1), "X" (a2));
 #endif
 #if !defined (U64ARITH_NO_ASM) && defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM)
@@ -241,7 +214,7 @@ u64arith_sub_2ul_2ul_cy (uint64_t *r1, uint64_t *r2,
   uint64_t u1 = *r1 - a1, u2 = *r2 - a2;
   if (a1 > *r1)
     u2--;
-  cy = u64arith_gt_2ul_2ul(a1, a2, *r1, *r2);
+  cy = u64arith_gt_2_2(a1, a2, *r1, *r2);
   *r1 = u1;
   *r2 = u2;
 #endif
@@ -252,11 +225,11 @@ u64arith_sub_2ul_2ul_cy (uint64_t *r1, uint64_t *r2,
 /* Subtract only if result is non-negative */
 
 static inline void
-u64arith_sub_ul_ul_ge (uint64_t *r, const uint64_t a)
+u64arith_sub_1_1_ge (uint64_t *r, const uint64_t a)
 {
   uint64_t t = *r;
 #ifdef U64ARITH_VERBOSE_ASM
-  __asm__ ("# u64arith_sub_2ul_2ul_ge (%0, %1, %2, %3)\n" : : 
+  __asm__ ("# u64arith_sub_1_1_ge (%0, %1, %2, %3)\n" : : 
            "X" (*r1), "X" (*r2), "X" (a1), "X" (a2));
 #endif
 #if !defined (U64ARITH_NO_ASM) && defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM)
@@ -275,12 +248,12 @@ u64arith_sub_ul_ul_ge (uint64_t *r, const uint64_t a)
 
 
 static inline void
-u64arith_sub_2ul_2ul_ge (uint64_t *r1, uint64_t *r2, 
-			const uint64_t a1, const uint64_t a2)
+u64arith_sub_2_2_ge (uint64_t *r1, uint64_t *r2, 
+                     const uint64_t a1, const uint64_t a2)
 {
   uint64_t t1 = *r1, t2 = *r2;
 #ifdef U64ARITH_VERBOSE_ASM
-  __asm__ ("# u64arith_sub_2ul_2ul_ge (%0, %1, %2, %3)\n" : : 
+  __asm__ ("# u64arith_sub_2_2_ge (%0, %1, %2, %3)\n" : : 
            "X" (*r1), "X" (*r2), "X" (a1), "X" (a2));
 #endif
 #if !defined (U64ARITH_NO_ASM) && defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM)
@@ -293,7 +266,7 @@ u64arith_sub_2ul_2ul_ge (uint64_t *r1, uint64_t *r2,
     : "r" (t1), "r" (t2), "rme" (a1), "rme" (a2)
     : "cc");
 #else
-  if (!u64arith_gt_2ul_2ul(a1, a2, *r1, *r2))
+  if (!u64arith_gt_2_2(a1, a2, *r1, *r2))
     {
       *r1 = t1 - a1;
       *r2 = t2 - a2 - (a1 > t1);
@@ -303,8 +276,8 @@ u64arith_sub_2ul_2ul_ge (uint64_t *r1, uint64_t *r2,
 
 
 static inline void
-u64arith_submod_ul_ul (uint64_t *r, const uint64_t a,
-                      const uint64_t b, const uint64_t m)
+u64arith_submod_1_1 (uint64_t *r, const uint64_t a,
+                     const uint64_t b, const uint64_t m)
 {
   ASSERT_EXPENSIVE (a < m && b < m);
 #if !defined (U64ARITH_NO_ASM) && defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM)
@@ -340,11 +313,11 @@ u64arith_submod_ul_ul (uint64_t *r, const uint64_t a,
    r2:r1 (r2 being the high word) */
 
 static inline void
-u64arith_mul_ul_ul_2ul (uint64_t *r1, uint64_t *r2, 
-			   const uint64_t a, const uint64_t b)
+u64arith_mul_1_1_2 (uint64_t *r1, uint64_t *r2, 
+		    const uint64_t a, const uint64_t b)
 {
 #ifdef U64ARITH_VERBOSE_ASM
-  __asm__ ("# u64arith_mul_ul_ul_2ul (%0, %1, %2, %3)\n" : : 
+  __asm__ ("# u64arith_mul_1_1_2 (%0, %1, %2, %3)\n" : : 
            "X" (*r1), "X" (*r2), "X" (a), "X" (b));
 #endif
 #if !defined (U64ARITH_NO_ASM) && defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM)
@@ -375,11 +348,11 @@ u64arith_mul_ul_ul_2ul (uint64_t *r1, uint64_t *r2,
   p1 = ah * bl;
   p2 = p1 >> 32;
   p1 = (p1 & mask) << 32;
-  u64arith_add_2ul_2ul (&t1, &t2, p1, p2);
+  u64arith_add_2_2 (&t1, &t2, p1, p2);
   p1 = al * bh;
   p2 = p1 >> 32;
   p1 = (p1 & mask) << 32;
-  u64arith_add_2ul_2ul (&t1, &t2, p1, p2);
+  u64arith_add_2_2 (&t1, &t2, p1, p2);
   t2 += ah * bh;
   *r1 = t1; 
   *r2 = t2;
@@ -388,11 +361,11 @@ u64arith_mul_ul_ul_2ul (uint64_t *r1, uint64_t *r2,
 
 
 static inline void
-u64arith_sqr_ul_2ul (uint64_t *r1, uint64_t *r2, 
-		    const uint64_t a)
+u64arith_sqr_1_2 (uint64_t *r1, uint64_t *r2, 
+		  const uint64_t a)
 {
 #ifdef U64ARITH_VERBOSE_ASM
-  __asm__ ("# u64arith_sqr_ul_ul_2ul (%0, %1, %2)\n" : : 
+  __asm__ ("# u64arith_sqr_1_2 (%0, %1, %2)\n" : : 
            "X" (*r1), "X" (*r2), "X" (a));
 #endif
 #if !defined (U64ARITH_NO_ASM) && defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM)
@@ -423,8 +396,8 @@ u64arith_sqr_ul_2ul (uint64_t *r1, uint64_t *r2,
   p1 = ah * al;
   p2 = p1 >> 32;
   p1 = (p1 & mask) << 32;
-  u64arith_add_2ul_2ul (&t1, &t2, p1, p2);
-  u64arith_add_2ul_2ul (&t1, &t2, p1, p2);
+  u64arith_add_2_2 (&t1, &t2, p1, p2);
+  u64arith_add_2_2 (&t1, &t2, p1, p2);
   t2 += ah * ah;
   *r1 = t1; 
   *r2 = t2;
@@ -436,16 +409,16 @@ u64arith_sqr_ul_2ul (uint64_t *r1, uint64_t *r2,
    quotient and remainder. */
 
 static inline void
-u64arith_div_2ul_ul_ul (uint64_t *q, uint64_t *r, 
-			   const uint64_t a1, const uint64_t a2, 
-			   const uint64_t b)
+u64arith_divqr_2_1_1 (uint64_t *q, uint64_t *r,
+		      const uint64_t a1, const uint64_t a2,
+		      const uint64_t b)
 {
   ASSERT(a2 < b); /* Or there will be quotient overflow */
 #ifdef U64ARITH_VERBOSE_ASM
-  __asm__ ("# u64arith_div_2ul_ul_ul (%0, %1, %2, %3, %4)\n" : : 
+  __asm__ ("# u64arith_divqr_2_1_1 (%0, %1, %2, %3, %4)\n" : : 
            "X" (*q), "X" (*r), "X" (a1), "X" (a2), "X" (b));
 #endif
-#ifdef HAVE_GCC_STYLE_AMD64_INLINE_ASM
+#if !defined (U64ARITH_NO_ASM) && defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM)
   __asm__ __VOLATILE (
     "divq %4"
     : "=a" (*q), "=d" (*r)
@@ -464,15 +437,15 @@ u64arith_div_2ul_ul_ul (uint64_t *q, uint64_t *r,
    only remainder. */
 
 static inline void
-u64arith_div_2ul_ul_ul_r (uint64_t *r, uint64_t a1,
-                 const uint64_t a2, const uint64_t b)
+u64arith_divr_2_1_1 (uint64_t *r, uint64_t a1, const uint64_t a2,
+                     const uint64_t b)
 {
   ASSERT(a2 < b); /* Or there will be quotient overflow */
 #ifdef U64ARITH_VERBOSE_ASM
-  __asm__ ("# u64arith_div_2ul_ul_ul_r (%0, %1, %2, %3)\n" : : 
+  __asm__ ("# u64arith_divr_2_1_1 (%0, %1, %2, %3)\n" : : 
            "X" (*r), "X" (a1), "X" (a2), "X" (b));
 #endif
-#ifdef HAVE_GCC_STYLE_AMD64_INLINE_ASM
+#if !defined (U64ARITH_NO_ASM) && defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM)
   __asm__ __VOLATILE (
     "divq %3"
     : "+a" (a1), "=d" (*r)
@@ -655,7 +628,7 @@ u64arith_invmod (const uint64_t n)
 static inline uint64_t
 u64arith_div2mod (const uint64_t n, const uint64_t m)
 {
-#if (defined(__i386__) && defined(__GNUC__)) || defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM)
+#if !defined (U64ARITH_NO_ASM) && defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM)
   uint64_t s = n, t = m;
   ASSERT_EXPENSIVE (m % 2UL != 0UL);
 
@@ -742,9 +715,9 @@ u64arith_post_process_inverse(const uint64_t r, const uint64_t p,
   uint64_t t = (r * p + rem) * den_inv;
   const uint64_t ratio_p = (ratio >= p) ? ratio % p : ratio;
   ASSERT_ALWAYS(t <= p); /* Cheap and fairly strong test */
-  /* u64arith_addmod_ul_ul() accepts third operand == p and still produces
+  /* u64arith_addmod_1_1() accepts third operand == p and still produces
      a properly reduced sum mod p. */
-  u64arith_addmod_ul_ul (&t, ratio_p, t, p);
+  u64arith_addmod_1_1 (&t, ratio_p, t, p);
 
   ASSERT_EXPENSIVE(t < p);
   ASSERT_EXPENSIVE(k == 0 || p % 2 == 1);
@@ -767,7 +740,7 @@ u64arith_redc(uint64_t *r, const uint64_t plow,
 
   ASSERT_EXPENSIVE (phigh < m);
 
-#ifdef HAVE_GCC_STYLE_AMD64_INLINE_ASM
+#if !defined (U64ARITH_NO_ASM) && defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM)
 
   /* TODO: are the register constraints watertight?
      %rax gets modified but putting tlow as an output constraint with "+"
@@ -790,7 +763,7 @@ u64arith_redc(uint64_t *r, const uint64_t plow,
 #else
   uint64_t tlow, thigh;
   tlow = plow * invm;
-  u64arith_mul_ul_ul_2ul (&tlow, &thigh, tlow, m);
+  u64arith_mul_1_1_2 (&tlow, &thigh, tlow, m);
   /* Let w = 2^wordsize. We know (phigh * w + plow) + (thigh * w + tlow)
      == 0 (mod w) so either plow == tlow == 0, or plow !=0 and tlow != 0.
      In the former case we want phigh + thigh + 1, in the latter
@@ -799,7 +772,7 @@ u64arith_redc(uint64_t *r, const uint64_t plow,
 
   t += (plow != 0UL) ? 1UL : 0UL; /* Does not depend on the mul */
 
-  u64arith_addmod_ul_ul(r, t, thigh, m);
+  u64arith_addmod_1_1(r, t, thigh, m);
 #endif
   ASSERT_EXPENSIVE (r[0] < m);
 }
