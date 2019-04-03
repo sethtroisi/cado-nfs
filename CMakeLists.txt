@@ -183,7 +183,7 @@ endif()
 if(CMAKE_C_COMPILER_ID MATCHES "Intel")
     message(STATUS "Applying flags for icc")
     set (CMAKE_C_FLAGS   "-g -W -Wall -wd13200,13203 ${CMAKE_C_FLAGS}")
-    set (CMAKE_CXX_FLAGS "-g -W -Wall -wd13200,13203 ${CMAKE_CXX_FLAGS}")
+    set (CMAKE_CXX_FLAGS "-g -W -Wall -wd13200,13203,3058 ${CMAKE_CXX_FLAGS}")
     set (CMAKE_C_FLAGS   "-std=c99 ${CMAKE_C_FLAGS}")
 
     # only icc>=15 is full c++11 compliant, it seems. But 14 will do.
