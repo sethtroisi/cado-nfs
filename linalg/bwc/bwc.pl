@@ -93,6 +93,7 @@ EOF
 # $program denotes either a simple command, or something prepended by ':'
 # which indicates something having a special meaning for the script.
 my $main = shift @ARGV or usage;
+
 my $my_cmdline="$0 $main @ARGV";
 
 # ----- cmake substituted variables -----
@@ -1449,7 +1450,7 @@ sub task_common_run {
     @_ = grep !/allow_zero_on_rhs/, @_ unless $program =~ /^plingen/;
     @_ = grep !/^save_submatrices?=/, @_ unless $program =~ /^(prep|krylov|mksol|gather)$/;
     # are we absolutely sure that lingen needs no matrix ?
-    @_ = grep !/^ys=/, @_ unless $program =~ /krylov$/;
+    @_ = grep !/^ys=/, @_ unless $program =~ /(krylov|dispatch)$/;
     @_ = grep !/^solutions=/, @_ unless $program =~ /(?:mksol|gather)$/;
     @_ = grep !/^rhs=/, @_ unless $program =~ /(?:prep|gather|plingen.*|mksol)$/;
     @_ = grep !/(?:precmd|tolerate_failure)/, @_;
@@ -1466,7 +1467,7 @@ sub task_common_run {
             unshift @_, @mpi_precmd_lingen;
         } elsif ($program =~ /\/(?:split|acollect|lingen|cleanup)$/) {
             unshift @_, @mpi_precmd_single;
-        } elsif ($program =~ /\/(?:prep|secure|krylov|mksol|gather)$/) {
+        } elsif ($program =~ /\/(?:prep|secure|krylov|mksol|gather|dispatch)$/) {
             unshift @_, @mpi_precmd;
         } else {
             die "Don't know the parallel status of program $program ... ?";
@@ -1650,14 +1651,57 @@ sub task_prep {
 # {{{ secure -- this is now just a subtask of krylov or mksol
 sub subtask_secure {
     return if $param->{'skip_online_checks'};
+    my $wanted_stops={};
+    if (defined(my $x = $param->{'interval'})) {
+        $wanted_stops->{$x}=1;
+    }
+    if (defined(my $x = $param->{'check_stops'})) {
+        my @x = split(',', $x);
+        $wanted_stops->{$_}=1 for @x;
+    }
     my $leader_files = get_cached_leadernode_filelist 'HASH';
-    my @x = grep { /^C\.\d+$/ && !/^C\.0$/ } keys %$leader_files;
-    unless (@x) {
-        task_check_message 'missing', "no check vector found\n";
+
+    my $mustrun = 0;
+    if (scalar keys %$wanted_stops) {
+        $wanted_stops->{0}=1;
+        for (keys %$wanted_stops) {
+            next if $leader_files->{"C.$_"};
+            task_check_message 'missing', "missing check vector C.$_\n";
+            $mustrun = 1;
+        }
+    } else {
+        # we can only check for the existence of _some_ check vector.
+        my @x = grep { /^C\.\d+$/ && !/^C\.0$/ } keys %$leader_files;
+        unless (@x) {
+            task_check_message 'missing', "no check vector found\n";
+            $mustrun = 1;
+        }
+    }
+    if ($mustrun) {
         task_common_run('secure', @main_args);
+    } else {
+        my $x = join(", ", sort { $a <=> $b } keys %$wanted_stops);
+        task_check_message 'ok', "All auxiliary files for checkpointing are here, good (wanted: $x).\n";
     }
 }
 # }}}
+
+sub task_dispatch {
+    task_begin_message;
+    return if defined $random_matrix;
+    # we do need to keep the ys, because those control the width that get
+    # passed to the cache building procedures.
+    task_common_run('dispatch', @main_args);
+}
+
+sub task_secure {
+    task_begin_message;
+    if (defined($random_matrix)) {
+        task_check_message 'ok', "No checkpoint verification with random_matrix\n";
+    } else {
+        subtask_secure;
+    }
+}
 
 # {{{ krylov
 sub task_krylov {
@@ -2099,22 +2143,40 @@ sub task_cleanup {
 }
 # }}}
 
-my @tasks = (
-    [ 'prep', \&task_prep],
-    [ 'krylov', \&task_krylov],
-    [ 'lingen', \&task_lingen],
-    [ 'mksol', \&task_mksol],
-    [ 'gather', \&task_gather],
-    [ 'cleanup', \&task_cleanup],
-);
+my $tasks = {
+    prep	=> \&task_prep,
+    krylov	=> \&task_krylov,
+    # also keep "secure" and "dispatch", but just as handy proxies.
+    secure	=> \&task_secure,
+    dispatch	=> \&task_dispatch,
+    lingen	=> \&task_lingen,
+    mksol	=> \&task_mksol,
+    gather	=> \&task_gather,
+    cleanup	=> \&task_cleanup,
+};
 
-for my $tc (@tasks) {
-    if ($main eq $tc->[0] || $main eq ':complete') {
-        if ($stop_at_step && $tc->[0] eq $stop_at_step) {
-            print "Exiting early, because of stop_at_step=$stop_at_step\n";
-            last;
-        }
-        $current_task = $tc->[0];
-        &{$tc->[1]}(@main_args);
+my @complete = qw(
+        prep
+        krylov
+        lingen
+        mksol
+        gather
+        cleanup
+    );
+
+my @tasks_todo=();
+
+if ($main eq ':complete') {
+    @tasks_todo=@complete;
+} else {
+    @tasks_todo=($main);
+}
+
+for (@tasks_todo) {
+    $current_task = $_;
+    if ($stop_at_step && $current_task eq $stop_at_step) {
+        print "Exiting early, because of stop_at_step=$stop_at_step\n";
+        last;
     }
+    &{$tasks->{$current_task}}(@main_args);
 }
