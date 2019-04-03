@@ -900,8 +900,11 @@ if ($mpi_needed) {
     detect_mpi;
 
     # quirk. If called with srun, then we want to avoid mpiexec anyway.
-    if ($main =~ /^:srun/) {
-        push @mpi_precmd, 'srun';
+    if ($main =~ /^:srun/ || $ENV{'SLURM_CLUSTER_NAME'} eq 'juwels') {
+        push @mpi_precmd, 'srun', '--cpu-bind=none', '-u';
+	if ($mpi_ver =~ /^openmpi/) {
+		push @mpi_precmd, "--mpi=openmpi";
+	}
     } else {
         push @mpi_precmd, "$mpi/mpiexec";
     }
