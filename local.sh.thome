@@ -1,0 +1,110 @@
+#!/bin/bash
+
+module load CMake
+module load GMP; GMP="$EBROOTGMP"
+module load Python
+module load Perl
+
+#
+#module load Intel
+#module load IntelMPI
+#MPI=1
+#CC=$(which icc)
+#CXX=$(which icpc)
+
+module load Intel
+module load ParaStationMPI
+MPI=1
+CC=$(which icc)
+CXX=$(which icpc)
+
+# module load GCC
+
+build_tree="${up_path}/build/juwels"
+
+use_if_exists() {
+    if [ -e "$2" ] ; then echo "$1=$2" ; else echo false ; fi ;
+}
+
+# if ! [ "$MPI" ] ; then
+# eval $(use_if_exists MPI $PROJECT/thome/openmpi-4.0.1)
+# fi
+
+
+if [ "$MPI" ] ; then
+    build_tree="${build_tree}.mpi"
+    mpicc=mpicc
+    if [ -d "$MPI" ] && [ -x "$MPI/bin/mpicc" ] ; then
+        mpicc="$MPI/bin/mpicc"
+    fi
+    output="`$mpicc -v 2>&1`"
+    family=
+    suffix=
+    if [[ $output =~ ^mpi.*for.MVAPICH2.version[[:space:]](.*) ]] ; then
+        family=mvapich2
+        suffix="${BASH_REMATCH[1]}"
+    elif [[ $output =~ ^mpi.*for.MPICH.*version[[:space:]](.*) ]] ; then
+        family=mpich
+        suffix="${BASH_REMATCH[1]}"
+    elif [[ $output =~ ^mpi.*for.*Intel.*MPI.*Library[[:space:]]([0-9].*)[[:space:]]for.* ]] ; then
+        family=impi
+        suffix="${BASH_REMATCH[1]}"
+    else
+        output0="$output"
+        output="`$mpicc -showme:version 2>&1`"
+        if [[ $output =~ ^.*Open[[:space:]]MPI[[:space:]]([^[:space:]]*) ]] ; then
+            family=openmpi
+            suffix="${BASH_REMATCH[1]}"
+        else
+            echo "MPI C compiler front-end not recognized, proceeding anyway (output0 was: $output0 ; later was $output)" >&2
+        fi
+    fi
+#    case "$MPI" in
+#        *mvapich2*) build_tree="${build_tree}.mvapich2";;
+#        *openmpi*) build_tree="${build_tree}.openmpi";;
+#    esac
+    if [ "$family" ] && [ "$suffix" ] ; then
+        suffix=`echo "$suffix" | tr A-Z a-z | tr -d -c 0-9a-z`
+        build_tree="${build_tree}.$family.$suffix"
+    fi
+fi
+
+
+if [ "$CLANG" ] ; then
+    : ${CC=clang}
+    : ${CXX=clang++}
+    build_tree="${build_tree}.clang"
+fi
+
+if [ "$COV" ] ; then
+    build_tree="${build_tree}.cov"
+    DEBUG=1
+    : ${CFLAGS="-O0 -g -fprofile-arcs -ftest-coverage"}
+    : ${CXXFLAGS="-O0 -g -fprofile-arcs -ftest-coverage"}
+elif [ "$ASSERT" ] ; then
+    build_tree="${build_tree}.assert"
+    # Don't put -DNDEBUG for this one !
+    : ${CFLAGS="-O2"}
+    : ${CXXFLAGS="$CFLAGS"}
+elif [ "$DEBUG" ] ; then
+    build_tree="${build_tree}.debug"
+    # Dangerous pitfall -- mpicc has the nasty habit of forcing -O2 !
+    if ! [ "$CLANG" ] ; then
+        : ${CFLAGS="-O0 -g -no-pie"}
+        : ${CXXFLAGS="-O0 -g -no-pie"}
+    else
+        : ${CFLAGS="-O0 -g"}
+        : ${CXXFLAGS="-O0 -g"}
+    fi
+fi
+
+# last resort
+: ${CFLAGS="-O3 -DNDEBUG"}
+: ${CXXFLAGS="$CFLAGS"}
+
+if [ "$force_build_tree" ] ; then
+        build_tree="$force_build_tree"
+fi
+BWC_GFP_ARITHMETIC_BACKENDS="p_1;p_2;p_3;p_4;p_5;p_6;p_7;p_8;p_9;p_13;pz"
+HWLOC=$PROJECT/thome/hwloc-2.0.3
+
