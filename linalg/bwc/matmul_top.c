@@ -2332,10 +2332,7 @@ static char * matrix_list_get_item(param_list_ptr pl, const char * key, int midx
     return res;
 }
 
-/* return an allocated string with the name of a balancing file for this
- * matrix and this mpi/thr split.
- */
-static char* matrix_get_derived_balancing_filename(const char * matrixname, parallelizing_info_ptr pi)
+static char* matrix_get_derived_cache_subdir(const char * matrixname, parallelizing_info_ptr pi)
 {
     /* input is NULL in the case of random matrices */
     if (!matrixname) return NULL;
@@ -2351,9 +2348,38 @@ static char* matrix_get_derived_balancing_filename(const char * matrixname, para
     } else {
         t++;
     }
-    int rc = asprintf(&t, "%s.%ux%u.bin", t, nh, nv);
+    int rc = asprintf(&t, "%s.%ux%u", t, nh, nv);
     ASSERT_ALWAYS(rc >=0);
     free(copy);
+    return t;
+}
+
+static void matrix_create_derived_cache_subdir(const char * matrixname, parallelizing_info_ptr pi)
+{
+    char * d = matrix_get_derived_cache_subdir(matrixname, pi);
+    struct stat sbuf[1];
+    int rc = stat(d, sbuf);
+    if (rc < 0 && errno == ENOENT) {
+        rc = mkdir(d, 0777);
+        if (rc < 0 && errno != EEXIST) {
+            fprintf(stderr, "mkdir(%s): %s\n", d, strerror(errno));
+        }
+    }
+    free(d);
+}
+
+/* return an allocated string with the name of a balancing file for this
+ * matrix and this mpi/thr split.
+ */
+static char* matrix_get_derived_balancing_filename(const char * matrixname, parallelizing_info_ptr pi)
+{
+    /* input is NULL in the case of random matrices */
+    if (!matrixname) return NULL;
+    char * dn = matrix_get_derived_cache_subdir(matrixname, pi);
+    char * t;
+    int rc = asprintf(&t, "%s/%s.bin", dn, dn);
+    free(dn);
+    ASSERT_ALWAYS(rc >=0);
     return t;
 }
 
@@ -2361,8 +2387,6 @@ static char* matrix_get_derived_cache_filename_stem(const char * matrixname, par
 {
     /* input is NULL in the case of random matrices */
     if (!matrixname) return NULL;
-    unsigned int nh = pi->wr[1]->totalsize;
-    unsigned int nv = pi->wr[0]->totalsize;
     char * copy = strdup(matrixname);
     char * t;
     if (strlen(copy) > 4 && strcmp((t = copy + strlen(copy) - 4), ".bin") == 0) {
@@ -2378,7 +2402,9 @@ static char* matrix_get_derived_cache_filename_stem(const char * matrixname, par
         pi_comm_ptr wr = pi->wr[d];
         pos[d] = wr->jrank * wr->ncores + wr->trank;
     }
-    int rc = asprintf(&t, "%s.%ux%u.%08" PRIx32 ".h%d.v%d", t, nh, nv, checksum, pos[1], pos[0]);
+    char * dn = matrix_get_derived_cache_subdir(matrixname, pi);
+    int rc = asprintf(&t, "%s/%s.%08" PRIx32 ".h%d.v%d", dn, dn, checksum, pos[1], pos[0]);
+    free(dn);
     ASSERT_ALWAYS(rc >=0);
     free(copy);
     return t;
@@ -2388,8 +2414,6 @@ static char* matrix_get_derived_submatrix_filename(const char * matrixname, para
 {
     /* input is NULL in the case of random matrices */
     if (!matrixname) return NULL;
-    unsigned int nh = pi->wr[1]->totalsize;
-    unsigned int nv = pi->wr[0]->totalsize;
     char * copy = strdup(matrixname);
     char * t;
     if (strlen(copy) > 4 && strcmp((t = copy + strlen(copy) - 4), ".bin") == 0) {
@@ -2405,7 +2429,9 @@ static char* matrix_get_derived_submatrix_filename(const char * matrixname, para
         pi_comm_ptr wr = pi->wr[d];
         pos[d] = wr->jrank * wr->ncores + wr->trank;
     }
-    int rc = asprintf(&t, "%s.%ux%u.h%d.v%d.bin", t, nh, nv, pos[1], pos[0]);
+    char * dn = matrix_get_derived_cache_subdir(matrixname, pi);
+    int rc = asprintf(&t, "%s/%s.h%d.v%d.bin", dn, dn, pos[1], pos[0]);
+    free(dn);
     ASSERT_ALWAYS(rc >=0);
     free(copy);
     return t;
@@ -2434,6 +2460,8 @@ static void matmul_top_init_fill_balancing_header(matmul_top_data_ptr mmt, int i
                     /* withcoeffs being a switch for param_list, it is
                      * clobbered by the configure_switch mechanism */
                     mba.withcoeffs = !is_char2(mmt->abase);
+                    matrix_create_derived_cache_subdir(Mloc->mname, mmt->pi);
+
                     mf_bal(&mba);
                 } else {
                     fprintf(stderr, "Cannot access balancing file %s: %s\n", Mloc->bname, strerror(errno));

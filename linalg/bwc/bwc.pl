@@ -1217,7 +1217,7 @@ sub get_cached_bfile {
     my $x = $matrix;
     $x =~ s{^(?:.*/)?([^/]+)$}{$1};
     $x =~ s/\.(?:bin|txt)$//;
-    my $bfile = "$wdir/$x.${nh}x${nv}.bin";
+    my $bfile = "$wdir/$x.${nh}x${nv}/$x.${nh}x${nv}.bin";
     if (!-f $bfile) {
         return undef;
     }
