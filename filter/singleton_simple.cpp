@@ -108,17 +108,11 @@ int main (int argc, char **argv)
     usage(pl, argv0);
   }
 
-  char ** list_files = (char **)malloc((argc+1)*sizeof(char *));
-  ASSERT_ALWAYS(list_files != NULL);
-  for (int i = 0; i < argc; ++i)
-      list_files[i] = argv[i];
-  list_files[argc] = NULL;
-
   table = (weight_t *)malloc(col_max_index*sizeof(weight_t));
   ASSERT_ALWAYS(table != NULL);
   memset(table, 0, col_max_index*sizeof(weight_t));
 
-  filter_rels(list_files,
+  filter_rels(argv,
       (filter_rels_callback_t) &update_table,
       NULL, EARLYPARSE_NEED_INDEX, NULL, NULL);
 
@@ -126,7 +120,7 @@ int main (int argc, char **argv)
   ASSERT_ALWAYS(out != NULL);
   count = 0;
 
-  filter_rels(list_files,
+  filter_rels(argv,
       (filter_rels_callback_t) &print_survivors,
       NULL, EARLYPARSE_NEED_LINE | EARLYPARSE_NEED_INDEX, NULL, NULL);
 
