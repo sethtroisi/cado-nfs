@@ -191,6 +191,9 @@ void * sec_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
 
             if (tcan_print) {
                 putchar('.');
+		if (!((k+1)%16)) {
+			putchar('\n');
+		}
                 fflush(stdout);
             }
         }
