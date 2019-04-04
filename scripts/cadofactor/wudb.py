@@ -433,7 +433,7 @@ class CursorWrapperBase(object,metaclass=abc.ABCMeta):
 class DB_base(object):
     @property
     def general_pattern(self):
-        return "(?:db:)?(\w+)://(?:(?:(\w+)(?::(.*))?@)?(?:([\w\.]+)|\[([\d:]+)*\])(?::(\d+))?/)?(.*)$"
+        return r"(?:db:)?(\w+)://(?:(?:(\w+)(?::(.*))?@)?(?:([\w\.]+)|\[([\d:]+)*\])(?::(\d+))?/)?(.*)$"
     def __init__(self, uri, backend_pattern=None):
         self.uri = uri
         foo=re.match(self.general_pattern,uri)
@@ -764,7 +764,7 @@ class DictDbTable(DbTable):
         super().__init__(*args, **kwargs)
 
 
-class DictDbAccess(collections.MutableMapping):
+class DictDbAccess(collections.abc.MutableMapping):
     """ A DB-backed flat dictionary.
 
     Flat means that the value of each dictionary entry must be a type that
@@ -962,7 +962,7 @@ class DictDbAccess(collections.MutableMapping):
 
         Values from default dict are merged into self, *not* overwriting
         existing values in self '''
-        if key is None and isinstance(default, collections.Mapping):
+        if key is None and isinstance(default, collections.abc.Mapping):
             update = {key:default[key] for key in default if not key in self}
             if update:
                 self.update(update, commit=commit)
