@@ -7,6 +7,35 @@
 #include "u64arith.h"
 
 void
+test_one_u64arith_gt_2_2(const uint64_t a1, const uint64_t a2,
+  const uint64_t b1, const uint64_t b2, const int v) {
+  const int r = u64arith_gt_2_2(a1, a2, b1, b2);
+  if (v != r) {
+    printf("%s: Error, got result %d, but expected %d\n", __func__, v, r);
+    abort();
+  }
+}
+
+void test_u64arith_gt_2_2() {
+  test_one_u64arith_gt_2_2(0,0,0,0,0);
+  test_one_u64arith_gt_2_2(1,0,0,0,1);
+  test_one_u64arith_gt_2_2(0,1,0,0,1);
+  test_one_u64arith_gt_2_2(1,1,0,0,1);
+  test_one_u64arith_gt_2_2(0,0,1,0,0);
+  test_one_u64arith_gt_2_2(1,0,1,0,0);
+  test_one_u64arith_gt_2_2(0,1,1,0,1);
+  test_one_u64arith_gt_2_2(1,1,1,0,1);
+  test_one_u64arith_gt_2_2(0,0,0,1,0);
+  test_one_u64arith_gt_2_2(1,0,0,1,0);
+  test_one_u64arith_gt_2_2(0,1,0,1,0);
+  test_one_u64arith_gt_2_2(1,1,0,1,1);
+  test_one_u64arith_gt_2_2(0,0,1,1,0);
+  test_one_u64arith_gt_2_2(1,0,1,1,0);
+  test_one_u64arith_gt_2_2(0,1,1,1,0);
+  test_one_u64arith_gt_2_2(1,1,1,1,0);
+}
+
+void
 test_one_u64arith_add_1_2(uint64_t r1, uint64_t r2,
     const uint64_t a, const uint64_t v1, const uint64_t v2) {
   u64arith_add_1_2(&r1, &r2, a);
@@ -69,6 +98,15 @@ test_u64arith_add_2_2_cy() {
 
 
 void
+test_one_u64arith_addmod_1_1(uint64_t *r, const uint64_t a,
+                     const uint64_t b, const uint64_t m) {
+  uint64_t r;
+  u64arith_addmod_1_1 (&r, a, b, m);
+
+}
+
+
+void
 test_one_u64arith_mul_1_1_2(const uint64_t a, const uint64_t b,
     const uint64_t v1, const uint64_t v2) {
   uint64_t r1, r2;
@@ -117,6 +155,7 @@ int
 main (int argc, const char *argv[])
 {
   tests_common_cmdline(&argc, &argv, 0);
+  test_u64arith_gt_2_2();
   test_u64arith_add_1_2();
   test_u64arith_add_2_2();
   test_u64arith_add_2_2_cy();
