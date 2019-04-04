@@ -2462,6 +2462,8 @@ class PolyselJLTask(ClientServerTask, patterns.Observer):
         if self.params["fastSM"]:
             self.progparams[0].setdefault("easySM", self.params["ell"])
         self.bestpoly = None
+        if "bestpoly" in self.state:
+            self.bestpoly = Polynomials(self.state["bestpoly"].splitlines())
             
     def run(self):
         super().run()
@@ -2482,6 +2484,7 @@ class PolyselJLTask(ClientServerTask, patterns.Observer):
         filename = self.workdir.make_filename("poly")
         self.bestpoly.create_file(filename)
         self.state["polyfilename"] = filename.get_wdir_relative()
+        self.state["bestpoly"] = str(self.bestpoly)
         self.logger.info("Selected polynomial has MurphyE %f",
                 self.bestpoly.MurphyE);
         return True
@@ -2599,10 +2602,12 @@ class PolyselJLTask(ClientServerTask, patterns.Observer):
         return self.get_state_filename("polyfilename")
 
     def get_poly(self):
-        return self.bestpoly
+        if not "bestpoly" in self.state:
+            return None
+        return Polynomials(self.state["bestpoly"].splitlines())
 
     def get_have_two_alg_sides(self):
-            return True
+        return True
 
     def need_more_wus(self):
         return 1 + self.state["rnext"] < self.params["modm"]
