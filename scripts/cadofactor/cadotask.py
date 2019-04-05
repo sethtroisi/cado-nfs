@@ -3148,7 +3148,10 @@ class SievingTask(ClientServerTask, DoesImport, FilesCreator, HasStatistics,
                          self.state["rels_wanted"])
         return True
 
-    re_rel = re.compile(rb"(-?\d*),(\d*):(.*)")
+    if tuple(sys.version_info)[0] < 3:
+        re_rel = re.compile(bytes(r"(-?\d*),(\d*):(.*)"))
+    else:
+        re_rel = re.compile(bytes(r"(-?\d*),(\d*):(.*)","ascii"))
     def verify_relation(self, line, poly):
         """ Check that the primes listed for a relation divide the value of
             the polynomials """

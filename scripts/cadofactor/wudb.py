@@ -41,6 +41,13 @@ else:
 import patterns
 import cadologger
 import logging
+try:
+    from collections.abc import MutableMapping
+    from collections.abc import Mapping
+except ImportError:
+    # oldish python wants this.
+    from collections import MutableMapping
+    from collections import Mapping
 
 DEBUG = 1
 exclusive_transaction = [None, None]
@@ -764,7 +771,7 @@ class DictDbTable(DbTable):
         super().__init__(*args, **kwargs)
 
 
-class DictDbAccess(collections.abc.MutableMapping):
+class DictDbAccess(MutableMapping):
     """ A DB-backed flat dictionary.
 
     Flat means that the value of each dictionary entry must be a type that
@@ -962,7 +969,7 @@ class DictDbAccess(collections.abc.MutableMapping):
 
         Values from default dict are merged into self, *not* overwriting
         existing values in self '''
-        if key is None and isinstance(default, collections.abc.Mapping):
+        if key is None and isinstance(default, Mapping):
             update = {key:default[key] for key in default if not key in self}
             if update:
                 self.update(update, commit=commit)
