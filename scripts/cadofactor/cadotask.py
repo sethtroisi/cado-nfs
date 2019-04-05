@@ -48,9 +48,9 @@ def re_cap_n_fp(prefix, n, suffix=""):
     if n > 0:
         # The first CAP_FP pattern is mandatory, and can have zero or more
         # whitespace in front
-        template += "\s*{cap_fp}"
+        template += r"\s*{cap_fp}"
         # The remaining FP_CAPs are optional, and have 1 or more whitespace
-        template += "(?:\s+{cap_fp})?" * (n - 1)
+        template += r"(?:\s+{cap_fp})?" * (n - 1)
     template += suffix
     return template.format(**REGEXES)
 
@@ -2989,7 +2989,7 @@ class SievingTask(ClientServerTask, DoesImport, FilesCreator, HasStatistics,
                     dv=f
                 s=1
             for pp in p[s:]:
-                r=re.compile("(\d+[a-z]+):(.*)")
+                r=re.compile(r"(\d+[a-z]+):(.*)")
                 m=r.match(pp)
                 assert m is not None
                 assert len(m.groups())==2
@@ -3018,7 +3018,7 @@ class SievingTask(ClientServerTask, DoesImport, FilesCreator, HasStatistics,
             (str,),
             "0",
             SievingTask.combine_bkmult,
-            re.compile("#.*max bucket fill -bkmult ([\d\.]+(?:,\d[sl]:[\d\.]+)*)"),
+            re.compile(r"#.*max bucket fill -bkmult ([\d\.]+(?:,\d[sl]:[\d\.]+)*)"),
             False
         ),
         (
@@ -3148,7 +3148,7 @@ class SievingTask(ClientServerTask, DoesImport, FilesCreator, HasStatistics,
                          self.state["rels_wanted"])
         return True
 
-    re_rel = re.compile(b"(-?\d*),(\d*):(.*)")
+    re_rel = re.compile(rb"(-?\d*),(\d*):(.*)")
     def verify_relation(self, line, poly):
         """ Check that the primes listed for a relation divide the value of
             the polynomials """

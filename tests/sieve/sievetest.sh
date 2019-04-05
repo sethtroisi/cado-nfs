@@ -55,15 +55,14 @@ done
 
 # create las command line from environment variables, moan if any is
 # missing.
-for var in poly ; do
+for var in poly lim{0,1} ; do
     args=("${args[@]}" -$var $(eval "echo \${$var:?missing}"))
 done
 
-if true || ! [ "$hint_table" ] ; then
-    # Theoretically the ones below should not be needed at all if we have a
-    # hint_table. Yet, presently it seems that they _are_ needed, and that
-    # sounds odd.
-    for var in I lim{0,1} lpb{0,1} mfb{0,1} ; do
+if ! [ "$hint_table" ] ; then
+    # The ones below are not be needed at all if we have a
+    # hint_table (unless we use -t auto).
+    for var in I lpb{0,1} mfb{0,1} ; do
         args=("${args[@]}" -$var $(eval "echo \${$var:?missing}"))
     done
 fi
