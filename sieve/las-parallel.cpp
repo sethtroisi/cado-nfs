@@ -47,7 +47,7 @@ struct las_parallel_desc::helper {
     /* size() == total number of subjobs */
     std::vector<cxx_hwloc_cpuset> subjob_binding_cpusets;
 
-    uint64_t total_ram_margin = 0;
+    double total_ram_margin = 0;
 
     int memory_binding_size;
     int cpu_binding_size;
@@ -237,7 +237,7 @@ struct las_parallel_desc::helper {
          */
         for(uint64_t x = ram >> 4; x ; x >>= 1) ram |= x;
         ram = ram + 1;
-        ram = ram - total_ram_margin;
+        ram = ram - ((uint64_t) (total_ram_margin * (1<<30)));
         return ram;
     }/*}}}*/
    int enclosing_depth(int n) const {/*{{{*/
@@ -828,7 +828,7 @@ las_parallel_desc::las_parallel_desc(cxx_param_list & pl, double jobram_arg)
         }/*}}}*/
 
 #ifdef HAVE_HWLOC
-        param_list_parse_uint64(pl, "memory-margin", &help->total_ram_margin);
+        param_list_parse_double(pl, "memory-margin", &help->total_ram_margin);
         /* The --job-memory argument will **ALWAYS** win */
         param_list_parse_double(pl, "job-memory", &jobram);
         if (jobram != -1)
