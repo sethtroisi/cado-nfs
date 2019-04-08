@@ -901,13 +901,12 @@ if ($mpi_needed) {
 
     # quirk. If called with srun, then we want to avoid mpiexec anyway.
     if ($main =~ /^:srun/ || $ENV{'SLURM_CLUSTER_NAME'} eq 'juwels') {
-        push @mpi_precmd, 'srun', '--cpu-bind=none', '-u';
+        push @mpi_precmd, 'srun', '--cpu-bind=verbose,none', '-u';
 	if ($mpi_ver =~ /^openmpi/) {
 		push @mpi_precmd, "--mpi=openmpi";
 	}
     } else {
         push @mpi_precmd, "$mpi/mpiexec";
-    }
 
     my $auto_hostfile_pattern="/tmp/hosts_XXXXXXXX";
 
@@ -991,6 +990,7 @@ if ($mpi_needed) {
             # Not older mpich2's, which need a daemon.
             push @mpi_precmd, qw/-launcher ssh -launcher-exec/, ssh_program();
         }
+    }
     }
     if (defined($mpi_extra_args)) {
         push @mpi_precmd, split(' ', $mpi_extra_args);
