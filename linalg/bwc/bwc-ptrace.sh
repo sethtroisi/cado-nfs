@@ -414,7 +414,7 @@ fi
 Nh=$((${BASH_REMATCH[1]}*${BASH_REMATCH[3]}))
 Nv=$((${BASH_REMATCH[2]}*${BASH_REMATCH[4]}))
 
-bfile="`basename $matrix .bin`.${Nh}x${Nv}.bin"
+bfile="`basename $matrix .bin`.${Nh}x${Nv}/`basename $matrix .bin`.${Nh}x${Nv}.bin"
 
 
 # This is for the **unbalanced** matrix !!
