@@ -1205,11 +1205,10 @@ sub get_cached_bfile {
     my $key = 'balancing';
     return undef if defined($random_matrix);
     if ($param->{$key}) {
-        $cache->{$key}=[$param->{$key}];
+        $cache->{$key}=$param->{$key};
     }
     if (defined(my $z = $cache->{$key})) {
-        my @x = @$z;
-        return wantarray ? @x : $x[0];
+        return $z;
     }
     # We're checking on the leader node only. Because the other nodes
     # don't really mind if they don't see the balancing file.
@@ -1220,6 +1219,7 @@ sub get_cached_bfile {
     $x =~ s/\.(?:bin|txt)$//;
     my $bfile = "$wdir/$x.${nh}x${nv}/$x.${nh}x${nv}.bin";
     if (!-f $bfile) {
+        print STDERR "$bfile: not found\n";
         return undef;
     }
     $cache->{$key} = $bfile;
@@ -1273,18 +1273,8 @@ sub get_nrows_ncols {
         return @x;
     }
     if (defined(my $balancing = get_cached_bfile)) {
-        sysopen(my $fh, $balancing, O_RDONLY) or die "$balancing: $!";
-        sysread($fh, my $bhdr, 24);
-        my @xx = unpack("LLLLLL", $bhdr);
-        my $zero = shift @xx;
-        die "$balancing: no leading 32-bit zero" unless $zero == 0;
-        my $magic = shift @xx;
-        die "$balancing: bad file magic" unless $magic == 0xba1a0000;
-        $cache->{'balancing_header'} = \@xx;
-        my @x = @xx;
-        close($fh);
-        shift @x;
-        shift @x;
+        my ($bnh, $bnv, $bnrows, $bncols) = get_cached_balancing_header;
+        my @x = ($bnrows, $bncols);
         $cache->{$key} = \@x;
         return @x;
     }
@@ -1364,7 +1354,7 @@ sub list_afiles {
 sub list_sfiles {
     my ($f, $filesize) = list_files_generic(2, qr/S\.sols(\d+)-(\d+)\.(\d+)-(\d+)/);
     if ($filesize) {    # take the occasion to store it.
-        my ($bnh, $bnv, $bnrows, $bncols) = get_cached_balancing_header;
+        my ($bnrows, $bncols) = get_nrows_ncols;
         my $N = $bncols > $bnrows ? $bncols : $bnrows;
         # In some cases (mksol for n=128 and p=2) we may create files
         # with larger data width than just $splitwidth. This should be
@@ -1689,6 +1679,10 @@ sub subtask_secure {
 sub task_dispatch {
     task_begin_message;
     return if defined $random_matrix;
+    if (defined(get_cached_bfile)) {
+        task_check_message 'ok', "All balancing files are present, good.\n";
+        return;
+    }
     # we do need to keep the ys, because those control the width that get
     # passed to the cache building procedures.
     task_common_run('dispatch', @main_args);
