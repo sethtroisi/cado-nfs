@@ -2920,7 +2920,6 @@ static void matmul_top_read_submatrix(matmul_top_data_ptr mmt, int midx, param_l
         }
     }
 
-
     if (!sqb) {
         if (!cache_loaded) {
             // everybody does it in parallel
@@ -2934,10 +2933,12 @@ static void matmul_top_read_submatrix(matmul_top_data_ptr mmt, int midx, param_l
             matmul_save_cache(Mloc->mm);
         }
     } else {
-        for(unsigned int j = 0 ; j < mmt->pi->m->ncores + 1 ; j++) {
+        if (can_print)
+            printf("Building local caches %d at a time\n", sqb);
+        for(unsigned int j = 0 ; j < mmt->pi->m->ncores + sqb ; j += sqb) {
             serialize_threads(mmt->pi->m);
             if (cache_loaded) continue;
-            if (j == mmt->pi->m->trank) {
+            if (j / sqb == mmt->pi->m->trank / sqb) {
                 if (verbose_enabled(CADO_VERBOSE_PRINT_BWC_CACHE_MAJOR_INFO))
                     printf("[%s] J%uT%u building cache for %s\n",
                             mmt->pi->nodenumber_s,
@@ -2945,11 +2946,12 @@ static void matmul_top_read_submatrix(matmul_top_data_ptr mmt, int midx, param_l
                             mmt->pi->m->trank,
                             Mloc->locfile);
                 matmul_build_cache(Mloc->mm, m);
-            } else if (j == mmt->pi->m->trank + 1) {
+            } else if (j / sqb == mmt->pi->m->trank / sqb + 1) {
                 matmul_save_cache(Mloc->mm);
             }
         }
     }
+
     /* see remark in raw_matrix_u32.h about data ownership for type
      * matrix_u32 */
 
