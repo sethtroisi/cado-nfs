@@ -2172,5 +2172,9 @@ for (@tasks_todo) {
         print "Exiting early, because of stop_at_step=$stop_at_step\n";
         last;
     }
-    &{$tasks->{$current_task}}(@main_args);
+    if (defined($tasks->{$current_task})) {
+        &{$tasks->{$current_task}}(@main_args);
+    } else {
+        die "No task by that name: $current_task";
+    }
 }
