@@ -294,6 +294,9 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
             if (s0 >= bw->end)
                 continue;
 
+            /* This is used only on the leader node */
+            bool short_read = false;
+
             serialize(pi->m);
             if (pi->m->trank == 0 && pi->m->jrank == 0) {
                 int rc0 = 0, rc = 0;
@@ -352,6 +355,7 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
                 }
 
                 if (rc0 < bw->interval) {
+                    short_read = true;
                     if (s1 != sx) {
                         fprintf(stderr, "Problem while reading coefficients of f for degrees [%d..%d[ ; we should not have a short read given that bw->end=%d\n",
                                 s0, s1, bw->end);
@@ -381,7 +385,7 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
             if (bw->end < s1)
                 s1 = bw->end;
 
-            if (tcan_print)
+            if (tcan_print && short_read)
                 printf("We read %d coefficients from F in total\n", bw->end);
 
             /* broadcast f */
