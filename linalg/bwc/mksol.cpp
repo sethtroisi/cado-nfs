@@ -364,6 +364,7 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
             pi_bcast(&s0, 1, BWC_PI_INT, 0, 0, pi->m);
             pi_bcast(&s1, 1, BWC_PI_INT, 0, 0, pi->m);
             pi_bcast(&sx, 1, BWC_PI_INT, 0, 0, pi->m);
+
             if (pi->m->trank == 0) {
                 /* we're good friends with the global leader. Try to grab
                  * the information about the end value -- it might have
@@ -372,6 +373,8 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
                 int err = MPI_Bcast(&(bw->end), 1, MPI_INT, 0, pi->m->pals);
                 ASSERT_ALWAYS(!err);
             }
+            serialize_threads(mmt->pi->m);
+
             if (s0 == bw->end)
                 continue;
 
