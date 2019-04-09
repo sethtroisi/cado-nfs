@@ -65,7 +65,6 @@ nfs_work::thread_data::~thread_data()
 /* only used once a siever_config has been attached to the parent structure */
 void nfs_work::thread_data::allocate_bucket_regions()
 {
-    printf("calling alloc_bucket_region three times\n");
     for(int side = 0 ; side < 2 ; side++) {
         if (ws.sides[side].no_fb()) {
             if (sides[side].bucket_region)
