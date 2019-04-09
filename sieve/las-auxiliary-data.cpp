@@ -50,9 +50,6 @@ nfs_aux::~nfs_aux()
             checksum_post_sieve[side].update(T.checksum_post_sieve[side]);
     }
 
-    (*dest_rep).accumulate_and_clear(std::move(rep));
-    (*dest_timer) += timer_special_q;
-
     verbose_output_start_batch();
 
     if (tdict::global_enable >= 2) {
@@ -141,6 +138,9 @@ nfs_aux::~nfs_aux()
     }
 
     verbose_output_end_batch();
+
+    (*dest_rep).accumulate_and_clear(std::move(rep));
+    (*dest_timer) += timer_special_q;
 }
 
 #ifndef DISABLE_TIMINGS
