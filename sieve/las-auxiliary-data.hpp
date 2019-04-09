@@ -81,16 +81,26 @@ class nfs_aux {/*{{{*/
     std::shared_ptr<rel_hash_t> rel_hash_p;
     rel_hash_t & get_rel_hash() { return * rel_hash_p ; }
 
-    /* These fields are initialized by the caller, and the caller itself
-     * will collate them with the global counters.
-     */
-    typedef std::tuple<las_report, timetree_t> caller_stuff;
-    las_report & rep;
-    timetree_t & timer_special_q;
     where_am_I w;
 
-    /* This boolean is set to true when we successfully run all the
-     * sieving without any need for reallocation */
+    las_report rep;
+    timetree_t timer_special_q;
+
+    /* The creator scope must fill these fields by hand. The final report
+     * will be collated into these two. A reasonable way to go is to
+     * first set a default destination that is essentially a trash can,
+     * and modify it to something that is a better-defined destination
+     * once we're sure we won't have exceptions.
+     *
+     * The boolean value "complete" is typically used to distinguish
+     * between the case where this destination is a trash can versus when
+     * we successfully run all the sieving without any need for
+     * reallocation.
+     *
+     * See las_subjob()
+     */
+    las_report * dest_rep = nullptr;
+    timetree_t * dest_timer = nullptr;
     bool complete = false;
 
     /* This gets completed somewhat late */
@@ -119,14 +129,13 @@ class nfs_aux {/*{{{*/
     nfs_aux(las_info const & las,
             las_todo_entry const & doing,
             std::shared_ptr<rel_hash_t> & rel_hash_p,
-            caller_stuff & c,
             int nthreads)
         :
             las(las),   /* shame... */
             doing(doing),
             rel_hash_p(rel_hash_p),
-            rep(std::get<0>(c)),
-            timer_special_q(std::get<1>(c)),
+            dest_rep(nullptr),
+            dest_timer(nullptr),
             th(nthreads)//, thread_data(*this))
     {
         wct_qt0 = wct_seconds();

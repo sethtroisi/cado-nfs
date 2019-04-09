@@ -37,6 +37,9 @@ nfs_aux::~nfs_aux()
 {
     ASSERT_ALWAYS(!timer_special_q.running());
 
+    ASSERT_ALWAYS(dest_timer);
+    ASSERT_ALWAYS(dest_rep);
+
     if (!complete)
         return;
 
@@ -46,6 +49,9 @@ nfs_aux::~nfs_aux()
         for (int side = 0; side < 2; side++)
             checksum_post_sieve[side].update(T.checksum_post_sieve[side]);
     }
+
+    (*dest_rep).accumulate_and_clear(std::move(rep));
+    (*dest_timer) += timer_special_q;
 
     verbose_output_start_batch();
 
