@@ -781,10 +781,12 @@ struct process_bucket_region_run : public process_bucket_region_spawn {
         /* This is local to this thread */
         for(int side = 0 ; side < 2 ; side++) {
             nfs_work::side_data & wss(ws.sides[side]);
-            if (wss.no_fb())
+            if (wss.no_fb()) {
                 S[side] = NULL;
-            else
+            } else {
                 S[side] = tws.sides[side].bucket_region;
+                ASSERT_ALWAYS(S[side]);
+            }
         }
 
         SS = tws.SS;
@@ -2482,8 +2484,7 @@ void do_one_special_q_sublat(nfs_work & ws, std::shared_ptr<nfs_work_cofac> wc_p
         {
             /* allocate_bucket_regions is probably ridiculously cheap in
              * comparison to allocate_buckets */
-            ws.allocate_bucket_regions();
-
+            // ws.allocate_bucket_regions();
             ws.allocate_buckets(*aux_p, pool);
         }
 
