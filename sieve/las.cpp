@@ -2830,8 +2830,8 @@ void las_subjob(las_info & las, int subjob, las_todo_list & todo, las_report & g
             las.tree.new_node(doing);
 #endif
 
-            /* join results from detached cofac */
-            for( ; pool.get_result(1, false) ; );
+            /* (non-blocking) join results from detached cofac */
+            for(task_result * r ; (r = pool.get_result(1, false)) ; delete r);
 
             /* We'll convert that to a shared_ptr later on, because this is
              * to be kept by the cofactoring tasks that will linger on quite
