@@ -2905,6 +2905,15 @@ static void matmul_top_read_submatrix(matmul_top_data_ptr mmt, int midx, param_l
             if (can_print) {
                 printf("Matrix dispatching starts\n");
             }
+
+            /* It might be that the leader and the other nodes do _not_
+             * share a common filesystem, in which case we must do this
+             * also here.
+             */
+            if (mmt->pi->m->trank == 0)
+                matrix_create_derived_cache_subdir(Mloc->mname, mmt->pi);
+            serialize_threads(mmt->pi->m);
+
             balancing_get_matrix_u32(mmt->pi, pl, m);
 
             int ssm = 0;

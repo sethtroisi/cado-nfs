@@ -37,8 +37,14 @@ nfs_aux::~nfs_aux()
 {
     ASSERT_ALWAYS(!timer_special_q.running());
 
-    if (!complete)
+    ASSERT_ALWAYS(dest_timer);
+    ASSERT_ALWAYS(dest_rep);
+
+    if (!complete) {
+        (*dest_rep).accumulate_and_clear(std::move(rep));
+        (*dest_timer) += timer_special_q;
         return;
+    }
 
     for (auto & T : th) {
         rep.accumulate_and_clear(std::move(T.rep));
@@ -135,6 +141,9 @@ nfs_aux::~nfs_aux()
     }
 
     verbose_output_end_batch();
+
+    (*dest_rep).accumulate_and_clear(std::move(rep));
+    (*dest_timer) += timer_special_q;
 }
 
 #ifndef DISABLE_TIMINGS

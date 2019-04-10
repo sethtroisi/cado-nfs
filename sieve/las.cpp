@@ -781,10 +781,12 @@ struct process_bucket_region_run : public process_bucket_region_spawn {
         /* This is local to this thread */
         for(int side = 0 ; side < 2 ; side++) {
             nfs_work::side_data & wss(ws.sides[side]);
-            if (wss.no_fb())
+            if (wss.no_fb()) {
                 S[side] = NULL;
-            else
+            } else {
                 S[side] = tws.sides[side].bucket_region;
+                ASSERT_ALWAYS(S[side]);
+            }
         }
 
         SS = tws.SS;
@@ -1613,6 +1615,10 @@ void process_bucket_region_run::cofactoring_sync (survivors_t & survivors)/*{{{*
         auto D = new detached_cofac_parameters(wc_p, aux_p, std::move(cur));
 
 #ifndef  DLP_DESCENT
+        /* We must make sure that we join the async threads at some
+         * point, otherwise we'll leak memory. It seems more appropriate
+         * to batch-join only, so this is done at the las_subjob level */
+        // worker->get_pool().get_result(1, false);
         worker->get_pool().add_task(detached_cofac, D, N, 1); /* id N, queue 1 */
 #else
         /* We must proceed synchronously for the descent */
@@ -2482,8 +2488,7 @@ void do_one_special_q_sublat(nfs_work & ws, std::shared_ptr<nfs_work_cofac> wc_p
         {
             /* allocate_bucket_regions is probably ridiculously cheap in
              * comparison to allocate_buckets */
-            ws.allocate_bucket_regions();
-
+            // ws.allocate_bucket_regions();
             ws.allocate_buckets(*aux_p, pool);
         }
 
@@ -2756,8 +2761,8 @@ void las_subjob(las_info & las, int subjob, las_todo_list & todo, las_report & g
 
     las.set_subjob_binding(subjob);
 
-    std::list<nfs_aux::caller_stuff> aux_good;
-    std::list<nfs_aux::caller_stuff> aux_botched;
+    las_report botched_report;
+    timetree_t botched_timer;
 
     double cumulated_wait_time = 0;     /* for this subjob only */
     {
@@ -2825,6 +2830,9 @@ void las_subjob(las_info & las, int subjob, las_todo_list & todo, las_report & g
             las.tree.new_node(doing);
 #endif
 
+            /* (non-blocking) join results from detached cofac */
+            for(task_result * r ; (r = pool.get_result(1, false)) ; delete r);
+
             /* We'll convert that to a shared_ptr later on, because this is
              * to be kept by the cofactoring tasks that will linger on quite
              * late.
@@ -2835,30 +2843,15 @@ void las_subjob(las_info & las, int subjob, las_todo_list & todo, las_report & g
             auto rel_hash_p = std::make_shared<nfs_aux::rel_hash_t>();
 
             for(;;) {
-                /* We're playing a very dangerous game here. rep and timer
-                 * below are created here, at the end of a temp list. When
-                 * exiting this loop, they will still be live somewhere,
-                 * either in aux_good or aux_botched. The nfs_aux data holds
-                 * references to this stuff. But this nfs_aux is expected to
-                 * live slightly longer, so it will tinker with these structs
-                 * at a time where they've already been moved to aux_good (or
-                 * even aux_botched, if an exception occurs late during 1l
-                 * downsorting). We must be sure that all threads are done
-                 * when we finally consume the aux_good and aux_botched
-                 * lists!
-                 *
-                 * Note that the lifetime of the nfs_aux object *is*
-                 * thread-safe, because the shared_ptr construct provides
-                 * this guarantee. Helgrind, however, is not able to
-                 * detect it properly, and sees stuff happening in the
-                 * nfs_aux dtor as conflicting with what is done in the
-                 * try{} block. This is a false positive. cado-nfs.supp
-                 * has an explicit suppression for this.
+                /*
+                 * The lifetime of the nfs_aux object *is* thread-safe,
+                 * because the shared_ptr construct provides this
+                 * guarantee. Helgrind, however, is not able to detect it
+                 * properly, and sees stuff happening in the nfs_aux dtor
+                 * as conflicting with what is done in the try{} block.
+                 * This is a false positive. cado-nfs.supp has an
+                 * explicit suppression for this.
                  */
-                std::list<nfs_aux::caller_stuff> aux_pending;
-                aux_pending.push_back({});
-                las_report & rep(std::get<0>(aux_pending.back()));
-                timetree_t & timer_special_q(std::get<1>(aux_pending.back()));
 
                 /* ready to start over if we encounter an exception */
                 try {
@@ -2867,8 +2860,14 @@ void las_subjob(las_info & las, int subjob, las_todo_list & todo, las_report & g
                      * since it is an essential property ot the timer trees
                      * that the root of the trees must not have a nontrivial
                      * category */
-                    auto aux_p = std::make_shared<nfs_aux>(las, doing, rel_hash_p, aux_pending.back(), las.number_of_threads_per_subjob());
+                    auto aux_p = std::make_shared<nfs_aux>(las, doing, rel_hash_p, las.number_of_threads_per_subjob());
                     nfs_aux & aux(*aux_p);
+                    las_report & rep(aux.rep);
+                    timetree_t & timer_special_q(aux.timer_special_q);
+                    /* in case we get an exception */
+                    aux.dest_rep = &botched_report;
+                    aux.dest_timer = &botched_timer;
+
                     ACTIVATE_TIMER(timer_special_q);
 
                     prepare_timer_layout_for_multithreaded_tasks(timer_special_q);
@@ -2913,14 +2912,15 @@ void las_subjob(las_info & las, int subjob, las_todo_list & todo, las_report & g
                     }
 
                     aux.complete = true;
-                    aux_good.splice(aux_good.end(), aux_pending);
+                    aux.dest_rep = &global_report;
+                    aux.dest_timer = &global_timer;
 
                     if (exit_after_rel_found > 1 && rep.reports > 0)
                         break;
 
                     break;
                 } catch (buckets_are_full const & e) {
-                    aux_botched.splice(aux_botched.end(), aux_pending);
+                    global_report.nwaste++;
                     verbose_output_vfprint (2, 1, gmp_vfprintf,
                             "# redoing q=%Zd, rho=%Zd because %s buckets are full\n"
                             "# %s\n",
@@ -2978,18 +2978,6 @@ void las_subjob(las_info & las, int subjob, las_todo_list & todo, las_report & g
     static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
     pthread_mutex_lock(&lock);
 
-    for(auto & P : aux_good) {
-        global_report.accumulate_and_clear(std::move(std::get<0>(P)));
-        global_timer += std::get<1>(P);
-    }
-    las_report botched_report;
-    timetree_t botched_timer;
-    for(auto & P : aux_botched) {
-        botched_report.accumulate_and_clear(std::move(std::get<0>(P)));
-        botched_timer += std::get<1>(P);
-    }
-
-    global_report.nwaste += aux_botched.size();
     global_report.waste += botched_report.tn[0];
     global_report.waste += botched_report.tn[1];
     global_report.waste += botched_report.ttbuckets_fill;
