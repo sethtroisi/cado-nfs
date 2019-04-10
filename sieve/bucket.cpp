@@ -208,8 +208,8 @@ bucket_array_t<LEVEL, HINT>::allocate_memory(
       cur += ((i & bitmask_line_ordinate) != 0) ? bs_odd : bs_even;
   }
   reset_pointers();
-#ifdef SAFE_BUCKETS
-  verbose_output_print(0, 0, "# WARNING: SAFE_BUCKETS is on !\n");
+#ifdef SAFE_BUCKET_ARRAYS
+  verbose_output_print(0, 0, "# WARNING: SAFE_BUCKET_ARRAYS is on !\n");
 #endif
 }
 
