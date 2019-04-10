@@ -721,15 +721,9 @@ struct process_bucket_region_run : public process_bucket_region_spawn {
 
     unsigned char *SS;
     
-    /* FIXME: Having the "primes" array allocated to BUCKET_REGION seems
-     * grossly wrong. See e-mail exchange ET/PG 20170622141358 */
     struct side_data {/*{{{*/
         bucket_array_complete purged;   /* for purge_buckets */
         bucket_primes_t primes;         /* for resieving */
-        side_data() :
-            purged(bucket_array_complete(BUCKET_REGION)),
-            primes(bucket_primes_t(BUCKET_REGION))
-        {}
     };/*}}}*/
 
     std::array<side_data, 2> sides;
@@ -1697,9 +1691,15 @@ void process_bucket_region_run::operator()() {/*{{{*/
      */
 
     /* These two steps used to be called "prepare_cofactoring" */
-    for(int side = 0 ; do_resieve && side < 2 ; side++) {
+    for(int side = 0 ; !survivors.empty() && do_resieve && side < 2 ; side++) {
         MARK_TIMER_FOR_SIDE(timer, side);
+        sides[side].purged.allocate_memory(ws.local_memory, BUCKET_REGION);
         purge_buckets(side);
+        size_t ns = survivors.size();
+        double maxnorm = ws.sides[side].lognorms.get_maxlog2();
+        double logp_lb = log2(ws.sides[side].fbK.td_thresh);
+        size_t nprimes_max = ns * maxnorm / logp_lb;
+        sides[side].primes.allocate_memory(ws.local_memory, nprimes_max);
         resieve(side);
     }
 
@@ -3030,6 +3030,12 @@ int main (int argc0, char *argv0[])/*{{{*/
     las_output.set(pl);
 
     las_info las(pl);    /* side effects: prints cmdline and flags */
+#ifdef SAFE_BUCKET_ARRAYS
+      verbose_output_print(0, 0, "# WARNING: SAFE_BUCKET_ARRAYS is on !\n");
+#endif
+#ifdef SAFE_BUCKETS_SINGLE
+      verbose_output_print(0, 0, "# WARNING: SAFE_BUCKETS_SINGLE is on !\n");
+#endif
 
     las_todo_list todo(las.cpoly, pl);
 

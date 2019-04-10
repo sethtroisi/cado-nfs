@@ -42,8 +42,8 @@
 class nfs_work {
     public:
     las_info const & las;
-    private:
     las_memory_accessor & local_memory;
+    private:
 
     const int nr_workspaces;
 
