@@ -1615,6 +1615,10 @@ void process_bucket_region_run::cofactoring_sync (survivors_t & survivors)/*{{{*
         auto D = new detached_cofac_parameters(wc_p, aux_p, std::move(cur));
 
 #ifndef  DLP_DESCENT
+        /* We must make sure that we join the async threads at some
+         * point, otherwise we'll leak memory. It seems more appropriate
+         * to batch-join only, so this is done at the las_subjob level */
+        // worker->get_pool().get_result(1, false);
         worker->get_pool().add_task(detached_cofac, D, N, 1); /* id N, queue 1 */
 #else
         /* We must proceed synchronously for the descent */
@@ -2825,6 +2829,9 @@ void las_subjob(las_info & las, int subjob, las_todo_list & todo, las_report & g
 #ifdef DLP_DESCENT
             las.tree.new_node(doing);
 #endif
+
+            /* join results from detached cofac */
+            for( ; pool.get_result(1, false) ; );
 
             /* We'll convert that to a shared_ptr later on, because this is
              * to be kept by the cofactoring tasks that will linger on quite
