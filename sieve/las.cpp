@@ -2764,6 +2764,7 @@ void las_subjob(las_info & las, int subjob, las_todo_list & todo, report_and_tim
     report_and_timer botched;
 
     int nwaste = 0;
+    int nq = 0;
     double cumulated_wait_time = 0;     /* for this subjob only */
     {
         /* add scoping to control dtor call */
@@ -2820,13 +2821,7 @@ void las_subjob(las_info & las, int subjob, las_todo_list & todo, report_and_tim
 
             /* pick a new entry from the stack, and do a few sanity checks */
             todo.push_closing_brace(doing.depth);
-#endif
 
-            /* We set this aside because we may have to rollback our changes
-             * if we catch an exception because of full buckets. */
-            auto saved_todo = todo.save();
-
-#ifdef DLP_DESCENT
             las.tree.new_node(doing);
 #endif
 
@@ -2841,6 +2836,8 @@ void las_subjob(las_info & las, int subjob, las_todo_list & todo, report_and_tim
              * for this q.
              */
             auto rel_hash_p = std::make_shared<nfs_aux::rel_hash_t>();
+
+            nq++;
 
             for(;;) {
                 /*
@@ -2881,9 +2878,9 @@ void las_subjob(las_info & las, int subjob, las_todo_list & todo, report_and_tim
                         break;
                     }
 
-                    /* for statistics */
-                    rep.nr_sq_processed++;
-
+                    /* At this point we no longer risk an exception,
+                     * therefore it is safe to tinker with the todo list
+                     */
 #ifdef DLP_DESCENT
                     postprocess_specialq_descent(las, todo, doing, timer_special_q);
 #endif
@@ -2957,10 +2954,6 @@ void las_subjob(las_info & las, int subjob, las_todo_list & todo, report_and_tim
                     if (las.config_pool.default_config_ptr) {
                         expected_memory_usage(las.config_pool.base, las, true, base_memory);
                     }
-                    /* we have to roll back the updates we made to
-                     * this structure. */
-                    todo.restore(std::move(saved_todo));
-                    // las.tree.ditch_node();
                     continue;
                 }
                 break;
@@ -2975,6 +2968,8 @@ void las_subjob(las_info & las, int subjob, las_todo_list & todo, report_and_tim
 
     {
         std::lock_guard<std::mutex> lock(global_rt.mm);
+
+        global_rt.rep.nr_sq_processed += nq;
         global_rt.rep.nwaste += nwaste;
         global_rt.rep.waste += botched.rep.tn[0];
         global_rt.rep.waste += botched.rep.tn[1];
@@ -2986,7 +2981,7 @@ void las_subjob(las_info & las, int subjob, las_todo_list & todo, report_and_tim
 
     }
 
-    verbose_output_print(0, 1, "# subjob %d done, now waiting for other jobs\n", subjob);
+    verbose_output_print(0, 1, "# subjob %d done (%d special-q's), now waiting for other jobs\n", subjob, nq);
 }/*}}}*/
 
 int main (int argc0, char *argv0[])/*{{{*/

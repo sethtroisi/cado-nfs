@@ -70,7 +70,7 @@ las_todo_list::las_todo_list(cxx_cado_poly const & cpoly, cxx_param_list & pl)
             exit(EXIT_FAILURE);
         }
         if (param_list_lookup_string(pl, "q1"))
-            verbose_output_print(0, 1, "Warning: argument -nq takes priority over -q1 ; -q1 ignored\n");
+            verbose_output_print(0, 1, "# Warning: argument -nq takes priority over -q1 ; -q1 ignored\n");
     }
 
     sqside = 1;
