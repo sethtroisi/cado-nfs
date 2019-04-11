@@ -3,6 +3,7 @@
 
 #include <unordered_set>
 #include <tuple>
+#include <mutex>
 #include "las-threads.hpp"
 #include "las-todo-entry.hpp"
 #include "las-report-stats.hpp"
@@ -23,6 +24,12 @@
  * bucket regions per thread. Thus the checksums are not necessarily
  * clonable between runs with different numbers of threads.
  */
+
+struct report_and_timer {
+    las_report rep;
+    timetree_t timer;
+    std::mutex mm;
+};
 
 class sieve_checksum {
   static const unsigned int checksum_prime = 4294967291u; /* < 2^32 */
@@ -83,8 +90,7 @@ class nfs_aux {/*{{{*/
 
     where_am_I w;
 
-    las_report rep;
-    timetree_t timer_special_q;
+    report_and_timer rt;
 
     /* The creator scope must fill these fields by hand. The final report
      * will be collated into these two. A reasonable way to go is to
@@ -95,12 +101,10 @@ class nfs_aux {/*{{{*/
      * The boolean value "complete" is typically used to distinguish
      * between the case where this destination is a trash can versus when
      * we successfully run all the sieving without any need for
-     * reallocation.
      *
      * See las_subjob()
      */
-    las_report * dest_rep = nullptr;
-    timetree_t * dest_timer = nullptr;
+    report_and_timer * dest_rt = nullptr;
     bool complete = false;
 
     /* This gets completed somewhat late */
@@ -120,7 +124,7 @@ class nfs_aux {/*{{{*/
     std::vector<thread_data> th;
 
     timetree_t & get_timer(worker_thread * worker) {
-        return worker->is_synchronous() ? timer_special_q : th[worker->rank()].timer;
+        return worker->is_synchronous() ? rt.timer : th[worker->rank()].timer;
     }
 
     double qt0;
@@ -134,8 +138,7 @@ class nfs_aux {/*{{{*/
             las(las),   /* shame... */
             doing(doing),
             rel_hash_p(rel_hash_p),
-            dest_rep(nullptr),
-            dest_timer(nullptr),
+            dest_rt(nullptr),
             th(nthreads)//, thread_data(*this))
     {
         wct_qt0 = wct_seconds();
