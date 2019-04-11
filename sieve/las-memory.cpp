@@ -41,7 +41,7 @@ las_memory_accessor::~las_memory_accessor()
 void * las_memory_accessor::alloc_frequent_size(size_t size)
 {
     if (size <= small_size_cutoff)
-        return malloc(size);
+        return malloc_aligned(size, 128);
     if (size == 0)
         return NULL;
     size_t rsize = next_power_of_2(size);
@@ -65,7 +65,7 @@ void * las_memory_accessor::alloc_frequent_size(size_t size)
 void las_memory_accessor::free_frequent_size(void * v, size_t size)
 {
     if (size <= small_size_cutoff) {
-        free(v);
+        free_aligned(v);
         return;
     }
     if (!v) return;
