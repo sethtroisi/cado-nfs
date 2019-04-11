@@ -2461,8 +2461,8 @@ void process_many_bucket_regions(nfs_work & ws, std::shared_ptr<nfs_work_cofac> 
 void do_one_special_q_sublat(nfs_work & ws, std::shared_ptr<nfs_work_cofac> wc_p, std::shared_ptr<nfs_aux> aux_p, thread_pool & pool)/*{{{*/
 {
     nfs_aux & aux(*aux_p);
-    timetree_t & timer_special_q(aux.timer_special_q);
-    las_report& rep(aux.rep);
+    timetree_t & timer_special_q(aux.rt.timer);
+    las_report& rep(aux.rt.rep);
     where_am_I & w(aux.w);
 
     /* essentially update the fij polynomials and the max log bounds */
@@ -2614,8 +2614,8 @@ bool do_one_special_q(las_info & las, nfs_work & ws, std::shared_ptr<nfs_aux> au
 
     ASSERT_ALWAYS(mpz_poly_is_root(las.cpoly->pols[aux.doing.side], r, p));
 
-    timetree_t& timer_special_q(aux.timer_special_q);
-    las_report& rep(aux.rep);
+    timetree_t& timer_special_q(aux.rt.timer);
+    las_report& rep(aux.rt.rep);
 
     // arrange so that we don't have the same header line as the one
     // which prints the q-lattice basis
@@ -2754,16 +2754,17 @@ void prepare_timer_layout_for_multithreaded_tasks(timetree_t & timer)
 #endif
 }
 
-void las_subjob(las_info & las, int subjob, las_todo_list & todo, las_report & global_report, timetree_t & global_timer)/*{{{*/
+void las_subjob(las_info & las, int subjob, las_todo_list & todo, report_and_timer & global_rt)/*{{{*/
 {
     where_am_I w MAYBE_UNUSED;
     WHERE_AM_I_UPDATE(w, plas, &las);
 
     las.set_subjob_binding(subjob);
 
-    las_report botched_report;
-    timetree_t botched_timer;
+    report_and_timer botched;
 
+    int nwaste = 0;
+    int nq = 0;
     double cumulated_wait_time = 0;     /* for this subjob only */
     {
         /* add scoping to control dtor call */
@@ -2820,13 +2821,7 @@ void las_subjob(las_info & las, int subjob, las_todo_list & todo, las_report & g
 
             /* pick a new entry from the stack, and do a few sanity checks */
             todo.push_closing_brace(doing.depth);
-#endif
 
-            /* We set this aside because we may have to rollback our changes
-             * if we catch an exception because of full buckets. */
-            auto saved_todo = todo.save();
-
-#ifdef DLP_DESCENT
             las.tree.new_node(doing);
 #endif
 
@@ -2841,6 +2836,8 @@ void las_subjob(las_info & las, int subjob, las_todo_list & todo, las_report & g
              * for this q.
              */
             auto rel_hash_p = std::make_shared<nfs_aux::rel_hash_t>();
+
+            nq++;
 
             for(;;) {
                 /*
@@ -2862,11 +2859,10 @@ void las_subjob(las_info & las, int subjob, las_todo_list & todo, las_report & g
                      * category */
                     auto aux_p = std::make_shared<nfs_aux>(las, doing, rel_hash_p, las.number_of_threads_per_subjob());
                     nfs_aux & aux(*aux_p);
-                    las_report & rep(aux.rep);
-                    timetree_t & timer_special_q(aux.timer_special_q);
+                    las_report & rep(aux.rt.rep);
+                    timetree_t & timer_special_q(aux.rt.timer);
                     /* in case we get an exception */
-                    aux.dest_rep = &botched_report;
-                    aux.dest_timer = &botched_timer;
+                    aux.dest_rt = &botched;
 
                     ACTIVATE_TIMER(timer_special_q);
 
@@ -2882,9 +2878,9 @@ void las_subjob(las_info & las, int subjob, las_todo_list & todo, las_report & g
                         break;
                     }
 
-                    /* for statistics */
-                    rep.nr_sq_processed++;
-
+                    /* At this point we no longer risk an exception,
+                     * therefore it is safe to tinker with the todo list
+                     */
 #ifdef DLP_DESCENT
                     postprocess_specialq_descent(las, todo, doing, timer_special_q);
 #endif
@@ -2912,15 +2908,14 @@ void las_subjob(las_info & las, int subjob, las_todo_list & todo, las_report & g
                     }
 
                     aux.complete = true;
-                    aux.dest_rep = &global_report;
-                    aux.dest_timer = &global_timer;
+                    aux.dest_rt = &global_rt;
 
                     if (exit_after_rel_found > 1 && rep.reports > 0)
                         break;
 
                     break;
                 } catch (buckets_are_full const & e) {
-                    global_report.nwaste++;
+                    nwaste++;
                     verbose_output_vfprint (2, 1, gmp_vfprintf,
                             "# redoing q=%Zd, rho=%Zd because %s buckets are full\n"
                             "# %s\n",
@@ -2959,10 +2954,6 @@ void las_subjob(las_info & las, int subjob, las_todo_list & todo, las_report & g
                     if (las.config_pool.default_config_ptr) {
                         expected_memory_usage(las.config_pool.base, las, true, base_memory);
                     }
-                    /* we have to roll back the updates we made to
-                     * this structure. */
-                    todo.restore(std::move(saved_todo));
-                    // las.tree.ditch_node();
                     continue;
                 }
                 break;
@@ -2975,20 +2966,22 @@ void las_subjob(las_info & las, int subjob, las_todo_list & todo, las_report & g
         cumulated_wait_time = pool.cumulated_wait_time;
     }
 
-    static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
-    pthread_mutex_lock(&lock);
+    {
+        std::lock_guard<std::mutex> lock(global_rt.mm);
 
-    global_report.waste += botched_report.tn[0];
-    global_report.waste += botched_report.tn[1];
-    global_report.waste += botched_report.ttbuckets_fill;
-    global_report.waste += botched_report.ttbuckets_apply;
-    global_report.waste += botched_report.ttf;
-    global_report.waste += botched_report.ttcof;
-    global_report.cumulated_wait_time += cumulated_wait_time;
+        global_rt.rep.nr_sq_processed += nq;
+        global_rt.rep.nwaste += nwaste;
+        global_rt.rep.waste += botched.rep.tn[0];
+        global_rt.rep.waste += botched.rep.tn[1];
+        global_rt.rep.waste += botched.rep.ttbuckets_fill;
+        global_rt.rep.waste += botched.rep.ttbuckets_apply;
+        global_rt.rep.waste += botched.rep.ttf;
+        global_rt.rep.waste += botched.rep.ttcof;
+        global_rt.rep.cumulated_wait_time += cumulated_wait_time;
 
-    pthread_mutex_unlock(&lock);
+    }
 
-    verbose_output_print(0, 1, "# subjob %d done, now waiting for other jobs\n", subjob);
+    verbose_output_print(0, 1, "# subjob %d done (%d special-q's), now waiting for other jobs\n", subjob, nq);
 }/*}}}*/
 
 int main (int argc0, char *argv0[])/*{{{*/
@@ -3121,8 +3114,7 @@ int main (int argc0, char *argv0[])/*{{{*/
      * now.  Most of the accounting is done per special_q, and this will
      * be summarized once we're done with the multithreaded run.
      */
-    las_report global_report;
-    timetree_t global_timer;
+    report_and_timer global_rt;
 
     t0 = seconds ();
     wct = wct_seconds();
@@ -3147,13 +3139,12 @@ int main (int argc0, char *argv0[])/*{{{*/
                     std::ref(las),
                     subjob,
                     std::ref(todo),
-                    std::ref(global_report),
-                    std::ref(global_timer)
+                    std::ref(global_rt)
                 ));
     }
     for(auto & t : subjobs) t.join();
 
-    verbose_output_print(0, 1, "# Cumulated wait time over all threads %.2f\n", global_report.cumulated_wait_time);
+    verbose_output_print(0, 1, "# Cumulated wait time over all threads %.2f\n", global_rt.rep.cumulated_wait_time);
 
 #ifdef DLP_DESCENT
     if (recursive_descent) {
@@ -3176,7 +3167,10 @@ int main (int argc0, char *argv0[])/*{{{*/
     if (las.batch)
       {
           timetree_t batch_timer;
-          auto z = call_dtor([&]() { global_timer += batch_timer; });
+          auto z = call_dtor([&]() {
+                  std::lock_guard<std::mutex> lock(global_rt.mm);
+                  global_rt.timer += batch_timer;
+                  });
           ACTIVATE_TIMER(batch_timer);
 
         /* We need to access lim[01] and lpb[01] */
@@ -3244,10 +3238,10 @@ int main (int argc0, char *argv0[])/*{{{*/
             verbose_output_print(0, 1, "%s\n", os.str().c_str());
         }
         verbose_output_end_batch();
-        global_report.reports = nondup;
+        global_rt.rep.reports = nondup;
 
 	tcof_batch = seconds () - tcof_batch;
-	global_report.ttcof += tcof_batch;
+	global_rt.rep.ttcof += tcof_batch;
       }
 
     t0 = seconds () - t0;
@@ -3255,19 +3249,19 @@ int main (int argc0, char *argv0[])/*{{{*/
 
     if (las.adjust_strategy < 2) {
         verbose_output_print (2, 1, "# Average J=%1.0f for %lu special-q's, max bucket fill -bkmult %s\n",
-                global_report.total_J / (double) global_report.nr_sq_processed, global_report.nr_sq_processed, las.get_bk_multiplier().print_all().c_str());
+                global_rt.rep.total_J / (double) global_rt.rep.nr_sq_processed, global_rt.rep.nr_sq_processed, las.get_bk_multiplier().print_all().c_str());
     } else {
         verbose_output_print (2, 1, "# Average logI=%1.1f for %lu special-q's, max bucket fill -bkmult %s\n",
-                global_report.total_logI / (double) global_report.nr_sq_processed, global_report.nr_sq_processed, las.get_bk_multiplier().print_all().c_str());
+                global_rt.rep.total_logI / (double) global_rt.rep.nr_sq_processed, global_rt.rep.nr_sq_processed, las.get_bk_multiplier().print_all().c_str());
     }
     verbose_output_print (2, 1, "# Discarded %lu special-q's out of %u pushed\n",
-            global_report.nr_sq_discarded, todo.nq_pushed);
+            global_rt.rep.nr_sq_discarded, todo.nq_pushed);
 
     if (tdict::global_enable >= 1) {
-        verbose_output_print (0, 1, "#\n# Hierarchical timings:\n%s", global_timer.display().c_str());
+        verbose_output_print (0, 1, "#\n# Hierarchical timings:\n%s", global_rt.timer.display().c_str());
 
         timetree_t::timer_data_type t = 0;
-        auto D = global_timer.filter_by_category();
+        auto D = global_rt.timer.filter_by_category();
         for(auto const &c : D)
             t += c.second;
         std::ostringstream os;
@@ -3282,7 +3276,7 @@ int main (int argc0, char *argv0[])/*{{{*/
         }
         verbose_output_print (0, 1, "# total counted time: %s\n#\n", os.str().c_str());
     }
-    global_report.display_survivor_counters();
+    global_rt.rep.display_survivor_counters();
 
 
     if (las_output.verbose)
@@ -3300,15 +3294,15 @@ int main (int argc0, char *argv0[])/*{{{*/
     }
 
 
-    verbose_output_print (2, 1, "# Wasted cpu time due to %d bkmult adjustments: %1.2f\n", global_report.nwaste, global_report.waste);
+    verbose_output_print (2, 1, "# Wasted cpu time due to %d bkmult adjustments: %1.2f\n", global_rt.rep.nwaste, global_rt.rep.waste);
 
-    t0 -= global_report.waste;
+    t0 -= global_rt.rep.waste;
 
     tts = t0;
-    tts -= global_report.tn[0];
-    tts -= global_report.tn[1];
-    tts -= global_report.ttf;
-    tts -= global_report.ttcof;
+    tts -= global_rt.rep.tn[0];
+    tts -= global_rt.rep.tn[1];
+    tts -= global_rt.rep.ttf;
+    tts -= global_rt.rep.ttcof;
 
     if (dont_print_tally && las.number_of_threads_total() > 1) 
         verbose_output_print (2, 1, "# Total cpu time %1.2fs [tally available only in mono-thread]\n", t0);
@@ -3317,16 +3311,16 @@ int main (int argc0, char *argv0[])/*{{{*/
                 " (%1.1f + %1.1f + %1.1f),"
                 " factor %1.1f (%1.1f + %1.1f)] (not incl wasted time)\n",
                 t0,
-                global_report.tn[0],
-                global_report.tn[1],
+                global_rt.rep.tn[0],
+                global_rt.rep.tn[1],
                 tts,
-                global_report.ttbuckets_fill,
-                global_report.ttbuckets_apply,
-                tts-global_report.ttbuckets_fill-global_report.ttbuckets_apply,
-		global_report.ttf + global_report.ttcof, global_report.ttf, global_report.ttcof);
+                global_rt.rep.ttbuckets_fill,
+                global_rt.rep.ttbuckets_apply,
+                tts-global_rt.rep.ttbuckets_fill-global_rt.rep.ttbuckets_apply,
+		global_rt.rep.ttf + global_rt.rep.ttcof, global_rt.rep.ttf, global_rt.rep.ttcof);
 
     verbose_output_print (2, 1, "# Total elapsed time %1.2fs, per special-q %gs, per relation %gs\n",
-                 wct, wct / (double) global_report.nr_sq_processed, wct / (double) global_report.reports);
+                 wct, wct / (double) global_rt.rep.nr_sq_processed, wct / (double) global_rt.rep.reports);
 
     /* memory usage */
     if (las_output.verbose >= 1 && las.config_pool.default_config_ptr) {
@@ -3337,11 +3331,11 @@ int main (int argc0, char *argv0[])/*{{{*/
         verbose_output_print (2, 1, "# PeakMemusage (MB) = %ld \n",
                 peakmem >> 10);
     if (las.suppress_duplicates) {
-        verbose_output_print(2, 1, "# Total number of eliminated duplicates: %lu\n", global_report.duplicates);
+        verbose_output_print(2, 1, "# Total number of eliminated duplicates: %lu\n", global_rt.rep.duplicates);
     }
     verbose_output_print (2, 1, "# Total %lu reports [%1.3gs/r, %1.1fr/sq] in %1.3g elapsed s [%.1f%% CPU]\n",
-            global_report.reports, t0 / (double) global_report.reports,
-            (double) global_report.reports / (double) global_report.nr_sq_processed,
+            global_rt.rep.reports, t0 / (double) global_rt.rep.reports,
+            (double) global_rt.rep.reports / (double) global_rt.rep.nr_sq_processed,
             wct,
             100*t0/wct);
 
