@@ -296,7 +296,7 @@ u64arith_submod_1_1 (uint64_t *r, const uint64_t a,
 #elif 1
   /* Seems to be faster than the one below */
   {
-    uint64_t t = 0UL, tr;
+    uint64_t t = 0, tr;
     if ((tr = a - b) > a)
       t = m;
     r[0] = tr + t;
@@ -339,12 +339,12 @@ u64arith_mul_1_1_2 (uint64_t *r1, uint64_t *r2,
   : [a] "r" (a), [b] "r" (b)
   );
 #else
-  const uint64_t mask = (1UL << 32) - 1UL;
+  const uint64_t mask = ((uint64_t)1 << 32) - 1;
   const uint64_t ah = a >> 32, al = a & mask, bh = b >> 32, bl = b & mask;
   uint64_t t1, t2, p1, p2;
 
   t1 = al * bl;
-  t2 = 0UL;
+  t2 = 0;
   p1 = ah * bl;
   p2 = p1 >> 32;
   p1 = (p1 & mask) << 32;
@@ -387,12 +387,12 @@ u64arith_sqr_1_2 (uint64_t *r1, uint64_t *r2,
   : [a] "r" (a)
   );
 #else
-  const uint64_t mask = (1UL << 32) - 1UL;
+  const uint64_t mask = ((uint64_t)1 << 32) - 1;
   const uint64_t ah = a >> 32, al = a & mask;
   uint64_t t1, t2, p1, p2;
 
   t1 = al * al;
-  t2 = 0UL;
+  t2 = 0;
   p1 = ah * al;
   p2 = p1 >> 32;
   p1 = (p1 & mask) << 32;
@@ -541,7 +541,7 @@ u64arith_ctz (const uint64_t a)
 {
 #if !defined (U64ARITH_NO_ASM) && defined(__GNUC__) && \
     (__GNUC__ >= 4 || __GNUC__ >= 3 && __GNUC_MINOR__ >= 4)
-  ASSERT_EXPENSIVE (a != 0UL);
+  ASSERT_EXPENSIVE (a != 0);
   return __builtin_ctzll(a);
 #else
   static const unsigned char trailing_zeros[256] =
@@ -555,7 +555,7 @@ u64arith_ctz (const uint64_t a)
      5,0,1,0,2,0,1,0,3,0,1,0,2,0,1,0,4,0,1,0,2,0,1,0,3,0,1,0,2,0,1,0};
   char lsh, t = 0;
   uint64_t y = a;
-  ASSERT_EXPENSIVE (a != 0UL);
+  ASSERT_EXPENSIVE (a != 0);
   do {
     lsh = trailing_zeros [(unsigned char) y];
     y >>= lsh;
@@ -571,7 +571,7 @@ u64arith_clz (const uint64_t a)
 {
 #if !defined (U64ARITH_NO_ASM) && defined(__GNUC__) && \
     (__GNUC__ >= 4 || __GNUC__ >= 3 && __GNUC_MINOR__ >= 4)
-  ASSERT_EXPENSIVE (a != 0UL);
+  ASSERT_EXPENSIVE (a != 0);
   if (sizeof(uint64_t) == sizeof(unsigned long))
     return __builtin_clzl(a);
   else if (sizeof(uint64_t) == sizeof(unsigned long long))
@@ -579,10 +579,10 @@ u64arith_clz (const uint64_t a)
   else
     assert(sizeof(uint64_t) == sizeof(unsigned long) || sizeof(uint64_t) == sizeof(unsigned long long));
 #else
-  uint64_t t = 1UL << (64 - 1);
+  uint64_t t = (uint64_t)1 << (64 - 1);
   int i;
-  ASSERT_EXPENSIVE (a != 0UL);
-  for (i = 0; (a & t) == 0UL; i++)
+  ASSERT_EXPENSIVE (a != 0);
+  for (i = 0; (a & t) == 0; i++)
     t >>= 1;
   return i;
 #endif
@@ -595,17 +595,17 @@ u64arith_invmod (const uint64_t n)
 {
   uint64_t r;
 
-  ASSERT (n % 2UL != 0UL);
+  ASSERT (n % 2 != 0);
   
   /* Suggestion from PLM: initing the inverse to (3*n) XOR 2 gives the
      correct inverse modulo 32, then 3 (for 32 bit) or 4 (for 64 bit) 
      Newton iterations are enough. */
-  r = (3UL * n) ^ 2UL;
+  r = (3 * n) ^ 2;
   /* Newton iteration */
-  r = 2UL * r - (uint32_t) r * (uint32_t) r * (uint32_t) n;
-  r = 2UL * r - (uint32_t) r * (uint32_t) r * (uint32_t) n;
+  r = 2 * r - (uint32_t) r * (uint32_t) r * (uint32_t) n;
+  r = 2 * r - (uint32_t) r * (uint32_t) r * (uint32_t) n;
 #if 0
-  r = 2UL * r - r * r * n;
+  r = 2 * r - r * r * n;
 #else
   /*
     r*n = k*2^32 + 1
@@ -630,7 +630,7 @@ u64arith_div2mod (const uint64_t n, const uint64_t m)
 {
 #if !defined (U64ARITH_NO_ASM) && defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM)
   uint64_t s = n, t = m;
-  ASSERT_EXPENSIVE (m % 2UL != 0UL);
+  ASSERT_EXPENSIVE (m % 2 != 0);
 
   __asm__ __VOLATILE(
 	  "add %1, %0\n\t"
@@ -642,11 +642,11 @@ u64arith_div2mod (const uint64_t n, const uint64_t m)
 	  );
   return t;
 #else
-  ASSERT_EXPENSIVE (m % 2UL != 0UL);
-  if (n % 2UL == 0UL)
-    return n / 2UL;
+  ASSERT_EXPENSIVE (m % 2 != 0);
+  if (n % 2 == 0)
+    return n / 2;
   else
-    return n / 2UL + m / 2UL + 1UL;
+    return n / 2 + m / 2 + 1;
 #endif
 }
 
@@ -660,8 +660,8 @@ u64arith_sqrt (const uint64_t n)
   const unsigned int l = 63 - (unsigned int)__builtin_clzl(n);
 
   d = n; /* d = n - x^2 */
-  xs = 0UL;
-  s2 = 1UL << (l - l % 2);
+  xs = 0;
+  s2 = (uint64_t)1 << (l - l % 2);
 
   for (i = l / 2; i != 0; i--)
     {
@@ -673,7 +673,7 @@ u64arith_sqrt (const uint64_t n)
       if (d >= c)
         {
           d -= c;
-          xs |= s2; /* x |= 1UL << i <=> xs |= 1UL << (2*i) */
+          xs |= s2; /* x |= 1 << i <=> xs |= 1 << (2*i) */
         }
       s2 >>= 2;
     }
@@ -770,7 +770,7 @@ u64arith_redc(uint64_t *r, const uint64_t plow,
      phigh + thigh. Since t = phigh < m, and modredcul_add can handle the
      case where the second operand is equal to m, adding 1 is safe */
 
-  t += (plow != 0UL) ? 1UL : 0UL; /* Does not depend on the mul */
+  t += (plow != 0) ? 1 : 0; /* Does not depend on the mul */
 
   u64arith_addmod_1_1(r, t, thigh, m);
 #endif
