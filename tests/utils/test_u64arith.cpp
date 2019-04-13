@@ -96,15 +96,47 @@ test_u64arith_add_2_2_cy() {
   test_one_u64arith_add_2_2_cy(1, 4, 0, 1, 1, 5, 0);
 }
 
-
-void
-test_one_u64arith_addmod_1_1(uint64_t *r, const uint64_t a,
-                     const uint64_t b, const uint64_t m) {
-  uint64_t r;
-  u64arith_addmod_1_1 (&r, a, b, m);
-
+static void check_result(const uint64_t r, const uint64_t v, const char *func) {
+  if (r != v) {
+    printf("%s: Error, got result %"PRIu64", but expected %"PRIu64"\n",
+        func, r, v);
+    exit(EXIT_FAILURE);
+  }
 }
 
+static void
+test_one_u64arith_addmod_1_1(const uint64_t a, const uint64_t b,
+    const uint64_t m, const uint64_t v) {
+  uint64_t r, ca = a, cb = b;
+  u64arith_addmod_1_1 (&r, a, b, m);
+  check_result(r, v, __func__);
+  /* Test with aliased output and input operands */
+  u64arith_addmod_1_1 (&ca, ca, b, m);
+  check_result(ca, v, __func__);
+  u64arith_addmod_1_1 (&cb, a, cb, m);
+  check_result(cb, v, __func__);
+}
+
+
+static void
+test_u64arith_addmod_1_1() {
+  test_one_u64arith_addmod_1_1(1, 1, 5, 2);
+  test_one_u64arith_addmod_1_1(2, 3, 5, 0);
+  test_one_u64arith_addmod_1_1(2, 4, 5, 1);
+  test_one_u64arith_addmod_1_1(1, UINT64_MAX - 1, UINT64_MAX, 0);
+  test_one_u64arith_addmod_1_1(2, UINT64_MAX - 1, UINT64_MAX, 1);
+  /* TODO: Write better tests */
+  /* u64arith_addmod_1_1() is specified to be correct for second argument
+     equal to modulus. */
+  test_one_u64arith_addmod_1_1(2, 5, 5, 2);
+}
+
+/* TODO: add tests for u64arith_sub_1_2() */
+/* TODO: add tests for u64arith_sub_2_2() */
+/* TODO: add tests for u64arith_sub_2_2_cy() */
+/* TODO: add tests for u64arith_sub_1_1_ge() */
+/* TODO: add tests for u64arith_sub_2_2_ge() */
+/* TODO: add tests for u64arith_submod_1_1() */
 
 void
 test_one_u64arith_mul_1_1_2(const uint64_t a, const uint64_t b,
@@ -150,6 +182,17 @@ test_u64arith_sqr_1_2() {
   test_one_u64arith_sqr_1_2(UINT64_MAX, 1, UINT64_MAX - 1);
 }
 
+/* TODO: add tests for u64arith_divqr_2_1_1() */
+/* TODO: add tests for u64arith_divr_2_1_1() */
+/* TODO: add tests for u64arith_shrd() */
+/* TODO: add tests for u64arith_shld() */
+/* TODO: add tests for u64arith_ctz() */
+/* TODO: add tests for u64arith_clz() */
+/* TODO: add tests for u64arith_invmod() */
+/* TODO: add tests for u64arith_div2mod() */
+/* TODO: add tests for u64arith_sqrt() */
+/* TODO: add tests for u64arith_post_process_inverse() */
+/* TODO: add tests for u64arith_redc() */
 
 int
 main (int argc, const char *argv[])
@@ -159,6 +202,7 @@ main (int argc, const char *argv[])
   test_u64arith_add_1_2();
   test_u64arith_add_2_2();
   test_u64arith_add_2_2_cy();
+  test_u64arith_addmod_1_1();
   test_u64arith_mul_1_1_2();
   test_u64arith_sqr_1_2();
   tests_common_clear();
