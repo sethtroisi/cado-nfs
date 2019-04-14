@@ -3039,6 +3039,21 @@ int main (int argc0, char *argv0[])/*{{{*/
 
     las_todo_list todo(las.cpoly, pl);
 
+    if (todo.print_todo_list) {
+        for(;;) {
+            las_todo_entry * doing_p = todo.feed_and_pop(las.rstate);
+            if (!doing_p) break;
+            las_todo_entry& doing(*doing_p);
+            verbose_output_vfprint(0, 1, gmp_vfprintf,
+                    "%d %Zd %Zd\n",
+                    doing.side,
+                    (mpz_srcptr) doing.p,
+                    (mpz_srcptr) doing.r);
+        }
+        las_output.release();
+        return EXIT_SUCCESS;
+    }
+
     /* If qmin is not given, use lim on the special-q side by default.
      * This makes sense only if the relevant fields have been filled from
      * the command line.
@@ -3102,11 +3117,15 @@ int main (int argc0, char *argv0[])/*{{{*/
             exit(EXIT_FAILURE);
         }
     }
+
+    ASSERT_ALWAYS(las.number_of_threads_total() > 0);
+
     las.display_binding_info();
     if (las.config_pool.default_config_ptr)
         expected_memory_usage(las.config_pool.base, las, true, base_memory);
 
-    las.prepare_sieve_shared_data(pl);
+    // already done below set_parallel
+    // las.prepare_sieve_shared_data(pl);
     las.load_factor_base(pl);
 
 
@@ -3349,6 +3368,6 @@ int main (int argc0, char *argv0[])/*{{{*/
     /* In essence, almost a dtor, but we want it to be before the pl dtor */
     las_output.release();
 
-    return 0;
+    return EXIT_SUCCESS;
 }/*}}}*/
 

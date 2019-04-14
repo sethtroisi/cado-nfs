@@ -18,6 +18,7 @@ void las_info::configure_aliases(cxx_param_list & pl)
 void las_info::configure_switches(cxx_param_list & pl)
 {
     cxx_cado_poly::configure_switches(pl);
+    las_todo_list::configure_switches(pl);
     param_list_configure_switch(pl, "-allow-compsq", NULL);
     param_list_configure_switch(pl, "-dup", NULL);
     param_list_configure_switch(pl, "-batch", NULL);
