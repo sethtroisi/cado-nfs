@@ -7,7 +7,7 @@
 
 #include <stdint.h>
 #include "cado-endian.h"
-#define SAFE_BUCKETS_SINGLE
+#define xxxSAFE_BUCKETS_SINGLE
 #define xxxSAFE_BUCKET_ARRAYS
 #if defined(SAFE_BUCKETS_SINGLE) || defined(SAFE_BUCKET_ARRAYS)
 #include <exception>
