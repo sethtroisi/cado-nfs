@@ -233,6 +233,12 @@ class GeneralClass(object):
                     d[s][int(i)]=value.strip()
                 else:
                     d[key] = value.strip()
+            if 'poly0' in d:
+                assert 'Y' not in d
+                d['Y'] = [ int(x) for x in d["poly0"].split(',') ]
+            if 'poly1' in d:
+                assert 'c' not in d
+                d['c'] = [ int(x) for x in d["poly1"].split(',') ]
         return d
 
     def p(self):
