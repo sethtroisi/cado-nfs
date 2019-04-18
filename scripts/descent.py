@@ -585,7 +585,7 @@ class DescentUpperClass(object):
                 help="ECM maximal effort" + c,
                 default=100000)
         parser.add_argument("--init-side",
-                help="Side of the bootstrap (when there is no rational side",
+                help="Side of the bootstrap (when there is no rational side)",
                 default=1)
         # Slave las processes in the initial step.
         parser.add_argument("--slaves",
@@ -619,7 +619,7 @@ class DescentUpperClass(object):
             self.minB1    = int(args.init_minB1)
             self.slaves   = int(args.slaves)
             # the final step needs to know the init side as well.
-            general.init_side = args.init_side
+            general.init_side = int(args.init_side)
 
     def __isqrt(self, n):
         x = n
@@ -1248,7 +1248,7 @@ class DescentLowerClass(object):
             factored = [ general.initfacu, general.initfacv ]
             for i in range(0,2):
                 for xx in factored[i]:
-                    vlog[i] += general.logDB.get_log(xx[0], xx[1], general.init_side)
+                    vlog[i] += logDB.get_log(xx[0], xx[1], general.init_side)
                 for j in range(len(SM2[i])):
                     vlog[i] += logDB.SM(j)*SM2[i][j]
                 vlog[i] = vlog[i] % ell
