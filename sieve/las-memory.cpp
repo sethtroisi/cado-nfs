@@ -23,6 +23,7 @@
 #define LARGE_PAGE_SIZE (2UL*1024*1024)
 #endif
 
+#include "utils.h"
 #include "las-memory.hpp"
 
 // memory.h provides some back-ends that we use here.
@@ -50,7 +51,7 @@ void * las_memory_accessor::alloc_frequent_size(size_t size)
     ASSERT_ALWAYS(rsize <= LARGE_PAGE_SIZE);
     if (pool.empty()) {
         /* allocate some more */
-        fprintf(stderr, "Allocating new large page dedicated to returning memory areas of size %zu\n", rsize);
+        verbose_output_print(1, 2, "# Allocating new large page dedicated to returning memory areas of size %zu\n", rsize);
         unsigned char * w = static_cast<unsigned char*>(malloc_aligned(LARGE_PAGE_SIZE, LARGE_PAGE_SIZE));
         ASSERT_ALWAYS(w != 0);
         for(size_t s = 0 ; s + rsize <= LARGE_PAGE_SIZE ; s += rsize)
