@@ -795,7 +795,7 @@ main (int argc, char *argv[])
 
   if (!*files_already_renumbered) {
       if (nrels_tot != nrels_expected) {
-          fprintf(stderr, "Warning: number of relations read (%" PRIu64") does not match with the number of relations expected (%lu)\n", nrels_tot, nrels_expected);
+          fprintf(stderr, "Warning: number of relations read (%" PRIu64") does not match the number of relations expected (%lu)\n", nrels_tot, nrels_expected);
       }
   } else {
       /* when we have renumbered files, we know that we won't have the
