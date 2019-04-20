@@ -339,7 +339,7 @@ $splitwidth = ($prime == 2) ? 64 : 1;
 
 print "$my_cmdline\n" if $my_verbose_flags->{'cmdline'};
 
-if ($main =~ /:(?:mpi|s)run(?:_single)?/) {
+if ($main =~ /^:(?:mpi|s)run(?:_single)?$/) {
     # ok, this is really an ugly ugly hack. We have some mpi detection
     # magic in this script, which we would like to use. So the :mpirun
     # meta-command is just for that. Of course the argument requirements
@@ -901,7 +901,12 @@ if ($mpi_needed) {
 
     # quirk. If called with srun, then we want to avoid mpiexec anyway.
     if ($main =~ /^:srun/) {
-        push @mpi_precmd, 'srun';
+        push @mpi_precmd, 'srun', '--cpu-bind=verbose,none', '-u';
+	if ($mpi_ver =~ /^openmpi/) {
+		push @mpi_precmd, "--mpi=openmpi";
+	}
+        # quirk
+        $main =~ s/^:srun://;
     } else {
         push @mpi_precmd, "$mpi/mpiexec";
     }
@@ -1160,24 +1165,29 @@ sub get_cached_leadernode_filelist {
     my @x;
     if (defined(my $z = $cache->{$key})) {
         @x = @$z;
-    } elsif (!$hostfile) {
-        # We're running locally, thus there's no need to go to a remote
-        # place just to run find -printf.
-        my $dh;
-        opendir $dh, $wdir;
-        for (readdir $dh) {
-            push @x, [$_, (stat "$wdir/$_")[7]];
-        }
-        closedir $dh;
     } else {
-        my $foo = join(' ', @mpi_precmd_single, "find $wdir -maxdepth 1 -follow -type f -a -printf '%s %p\\n'");
-        for my $line (`$foo`) {
-            $line =~ s/^\s*//;
-            chomp($line);
-            $line =~ s/^(\d+)\s+//;
-            my $s = $1;
-            push @x, [basename($line), $s];
+        if (!$hostfile) {
+            print STDERR "Listing files in $wdir via readdir\n";
+            # We're running locally, thus there's no need to go to a remote
+            # place just to run find -printf.
+            my $dh;
+            opendir $dh, $wdir;
+            for (readdir $dh) {
+                push @x, [$_, (stat "$wdir/$_")[7]];
+            }
+            closedir $dh;
+        } else {
+            my $foo = join(' ', @mpi_precmd_single, "find $wdir -maxdepth 1 -follow -type f -a -printf '%s %p\\n'");
+            print STDERR "Listing files in $wdir via $foo\n";
+            for my $line (`$foo`) {
+                $line =~ s/^\s*//;
+                chomp($line);
+                $line =~ s/^(\d+)\s+//;
+                my $s = $1;
+                push @x, [basename($line), $s];
+            }
         }
+        $cache->{$key}=\@x;
     }
     if ($opt && $opt eq 'HASH') { # we could also use wantarray
         my $h = {};
