@@ -182,7 +182,29 @@ test_u64arith_sqr_1_2() {
   test_one_u64arith_sqr_1_2(UINT64_MAX, 1, UINT64_MAX - 1);
 }
 
-/* TODO: add tests for u64arith_divqr_2_1_1() */
+void
+test_one_u64arith_divqr_2_1_1(const uint64_t a1, const uint64_t a2,
+    const uint64_t b, const uint64_t cq, const uint64_t cr)
+{
+  uint64_t q, r;
+  u64arith_divqr_2_1_1(&q, &r, a1, a2, b);
+  if (q != cq || r != cr) {
+    printf("%s(%" PRIu64 ", %" PRIu64 ", %" PRIu64 "): Error, got result q=%"
+        PRIu64 ", r=%" PRIu64 ", but expected q=%" PRIu64 ", r=%" PRIu64 "\n",
+        __func__, a1, a2, b, q, r, cq, cr);
+    exit(EXIT_FAILURE);
+  }
+}
+
+void
+test_u64arith_divqr_2_1_1()
+{
+  test_one_u64arith_divqr_2_1_1(123, 0, 123, 1, 0);
+  test_one_u64arith_divqr_2_1_1(124, 0, 123, 1, 1);
+  test_one_u64arith_divqr_2_1_1(UINT64_MAX, 122, 123, UINT64_MAX, 122);
+  test_one_u64arith_divqr_2_1_1(UINT64_MAX, UINT64_MAX - 1, UINT64_MAX, UINT64_MAX, UINT64_MAX - 1);
+}
+
 /* TODO: add tests for u64arith_divr_2_1_1() */
 /* TODO: add tests for u64arith_shrd() */
 /* TODO: add tests for u64arith_shld() */
@@ -205,6 +227,7 @@ main (int argc, const char *argv[])
   test_u64arith_addmod_1_1();
   test_u64arith_mul_1_1_2();
   test_u64arith_sqr_1_2();
+  test_u64arith_divqr_2_1_1();
   tests_common_clear();
   exit (EXIT_SUCCESS);
 }
