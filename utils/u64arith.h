@@ -16,7 +16,7 @@
 #include "macros.h"
 
 #ifdef WANT_ASSERT_EXPENSIVE
-#define ASSERT_EXPENSIVE(x) ASSERT(x)
+#define ASSERT_EXPENSIVE(x) ASSERT_ALWAYS(x)
 #else
 #define ASSERT_EXPENSIVE(x)
 #endif
@@ -405,67 +405,13 @@ u64arith_sqr_1_2 (uint64_t *r1, uint64_t *r2,
 }
 
 
-/* Integer division of a two uint64_t value a2:a1 by a uint64_t divisor. Returns
-   quotient and remainder. */
-
-static inline void
-u64arith_divqr_2_1_1 (uint64_t *q, uint64_t *r,
-		      const uint64_t a1, const uint64_t a2,
-		      const uint64_t b)
-{
-  ASSERT(a2 < b); /* Or there will be quotient overflow */
-#ifdef U64ARITH_VERBOSE_ASM
-  __asm__ ("# u64arith_divqr_2_1_1 (%0, %1, %2, %3, %4)\n" : : 
-           "X" (*q), "X" (*r), "X" (a1), "X" (a2), "X" (b));
-#endif
-#if !defined (U64ARITH_NO_ASM) && defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM)
-  __asm__ __VOLATILE (
-    "divq %4"
-    : "=a" (*q), "=d" (*r)
-    : "0" (a1), "1" (a2), "rm" (b)
-    : "cc");
-#else
-  mp_limb_t A[2] = {a1, a2};
-  ASSERT(sizeof(uint64_t) == sizeof(mp_limb_t));
-  r[0] = mpn_divmod_1 (A, A, 2, b);
-  q[0] = A[0];
-#endif
-}
-
-
-/* Integer division of a two uint64_t value by a uint64_t divisor. Returns
-   only remainder. */
-
-static inline void
-u64arith_divr_2_1_1 (uint64_t *r, uint64_t a1, const uint64_t a2,
-                     const uint64_t b)
-{
-  ASSERT(a2 < b); /* Or there will be quotient overflow */
-#ifdef U64ARITH_VERBOSE_ASM
-  __asm__ ("# u64arith_divr_2_1_1 (%0, %1, %2, %3)\n" : : 
-           "X" (*r), "X" (a1), "X" (a2), "X" (b));
-#endif
-#if !defined (U64ARITH_NO_ASM) && defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM)
-  __asm__ __VOLATILE (
-    "divq %3"
-    : "+a" (a1), "=d" (*r)
-    : "1" (a2), "rm" (b)
-    : "cc");
-#else
-  mp_limb_t A[2] = {a1, a2};
-  ASSERT(sizeof(uint64_t) == sizeof(mp_limb_t));
-  r[0] = mpn_divmod_1 (A, A, 2, b);
-#endif
-}
-
-
 /* Set *r to lo shifted right by i bits, filling in the low bits from hi into the high
    bits of *r. I.e., *r = (hi * 2^64 + lo) / 2^i. Assumes 0 <= i < 64. */
 static inline void
 u64arith_shrd (uint64_t *r, const uint64_t hi, const uint64_t lo,
-              const uint64_t i)
+              const unsigned char i)
 {
-  ASSERT_EXPENSIVE (0 <= i && i < 64);
+  ASSERT_EXPENSIVE (i < 64);
 #ifdef U64ARITH_VERBOSE_ASM
 /* Disable the "uninitialized" warning here, as *r is only written to and
    does not need to be initialized, but we need to write (*r) here so the
@@ -506,7 +452,7 @@ static inline void
 u64arith_shld (uint64_t *r, const uint64_t lo, const uint64_t hi,
               const unsigned char i)
 {
-  ASSERT_EXPENSIVE (0 <= i && i < 64);
+  ASSERT_EXPENSIVE (i < 64);
 #ifdef U64ARITH_VERBOSE_ASM
 #if GNUC_VERSION_ATLEAST(4,4,0)
 #if GNUC_VERSION_ATLEAST(4,6,0)
@@ -585,6 +531,92 @@ u64arith_clz (const uint64_t a)
   for (i = 0; (a & t) == 0; i++)
     t >>= 1;
   return i;
+#endif
+}
+
+
+/* Let A = a1 + a2*2^64. Returns q = floor(A / b), r = A mod b. Requires
+   a2 < b. Slow, simple binary grammar-school division. Used as reference
+   for testing faster code on machines without hardware division. */
+
+static inline void
+u64arith_divqr_2_1_1_slow (uint64_t *q, uint64_t *r,
+		      const uint64_t a1, const uint64_t a2,
+		      const uint64_t b)
+{
+  uint64_t R1 = a1, R2 = a2, D1 = 0, D2 = b, M = (uint64_t)1 << 63, Q = 0;
+
+  ASSERT(a2 < b); /* Or there will be quotient overflow */
+
+  for (int i = 0; i < 64; i++) {
+    u64arith_shrd(&D1, D2, D1, 1);
+    D2 >>= 1;
+    /* if R >= D */
+    if (!u64arith_gt_2_2(D1, D2, R1, R2)) {
+      u64arith_sub_2_2(&R1, &R2, D1, D2); /* R := R - D */
+      Q += M;
+    }
+    M >>= 1;
+  }
+
+#ifdef WANT_ASSERT_EXPENSIVE
+  ASSERT_EXPENSIVE(R2 == 0 && R1 < b);
+  uint64_t P1, P2;
+  u64arith_mul_1_1_2(&P1, &P2, Q, b);
+  u64arith_add_2_2(&P1, &P2, R1, R2);
+  ASSERT_EXPENSIVE(P1 == a1 && P2 == a2);
+#endif
+  *q = Q;
+  *r = R1;
+}
+
+/* Integer division of a two uint64_t value a2:a1 by a uint64_t divisor. Returns
+   quotient and remainder. */
+
+static inline void
+u64arith_divqr_2_1_1 (uint64_t *q, uint64_t *r,
+		      const uint64_t a1, const uint64_t a2,
+		      const uint64_t b)
+{
+  ASSERT(a2 < b); /* Or there will be quotient overflow */
+#ifdef U64ARITH_VERBOSE_ASM
+  __asm__ ("# u64arith_divqr_2_1_1 (%0, %1, %2, %3, %4)\n" : : 
+           "X" (*q), "X" (*r), "X" (a1), "X" (a2), "X" (b));
+#endif
+#if !defined (U64ARITH_NO_ASM) && defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM)
+  __asm__ __VOLATILE (
+    "divq %4"
+    : "=a" (*q), "=d" (*r)
+    : "0" (a1), "1" (a2), "rm" (b)
+    : "cc");
+#else 
+  /* TODO: Replace by Möller/Granlund "Improved Division by Invariant Integers" */
+  u64arith_divqr_2_1_1_slow(q, r, a1, a2, b);
+#endif
+}
+
+
+/* Integer division of a two uint64_t value by a uint64_t divisor. Returns
+   only remainder. */
+
+static inline void
+u64arith_divr_2_1_1 (uint64_t *r, uint64_t a1, const uint64_t a2,
+                     const uint64_t b)
+{
+  ASSERT(a2 < b); /* Or there will be quotient overflow */
+#ifdef U64ARITH_VERBOSE_ASM
+  __asm__ ("# u64arith_divr_2_1_1 (%0, %1, %2, %3)\n" : : 
+           "X" (*r), "X" (a1), "X" (a2), "X" (b));
+#endif
+#if !defined (U64ARITH_NO_ASM) && defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM)
+  __asm__ __VOLATILE (
+    "divq %3"
+    : "+a" (a1), "=d" (*r)
+    : "1" (a2), "rm" (b)
+    : "cc");
+#else
+  uint64_t dummy;
+  u64arith_divqr_2_1_1(&dummy, r, a1, a2, b);
 #endif
 }
 
