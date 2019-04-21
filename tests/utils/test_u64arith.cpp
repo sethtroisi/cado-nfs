@@ -40,7 +40,7 @@ test_one_u64arith_add_1_2(uint64_t r1, uint64_t r2,
     const uint64_t a, const uint64_t v1, const uint64_t v2) {
   u64arith_add_1_2(&r1, &r2, a);
   if (r1 != v1 || r2 != v2) {
-    printf("%s: Error, got result %"PRIu64":%"PRIu64", but expected %"PRIu64":%"PRIu64"\n",
+    printf("%s: Error, got result %" PRIu64 ":%" PRIu64 ", but expected %" PRIu64 ":%" PRIu64 "\n",
         __func__, r2, r1, v2, v1);
     exit(EXIT_FAILURE);
   }
@@ -59,7 +59,7 @@ test_one_u64arith_add_2_2(uint64_t r1, uint64_t r2,
     const uint64_t a1, const uint64_t a2, const uint64_t v1, const uint64_t v2) {
   u64arith_add_2_2(&r1, &r2, a1, a2);
   if (r1 != v1 || r2 != v2) {
-    printf("%s: Error, got result %"PRIu64":%"PRIu64", but expected %"PRIu64":%"PRIu64"\n",
+    printf("%s: Error, got result %" PRIu64 ":%" PRIu64 ", but expected %" PRIu64 ":%" PRIu64 "\n",
         __func__, r2, r1, v2, v1);
     exit(EXIT_FAILURE);
   }
@@ -81,7 +81,7 @@ test_one_u64arith_add_2_2_cy(uint64_t r1, uint64_t r2,
     const char vcy) {
   unsigned char cy = u64arith_add_2_2_cy(&r1, &r2, a1, a2);
   if (r1 != v1 || r2 != v2 || vcy != cy) {
-    printf("%s: Error, got result %hhu:%"PRIu64":%"PRIu64", but expected %hhu:%"PRIu64":%"PRIu64"\n",
+    printf("%s: Error, got result %hhu:%" PRIu64 ":%" PRIu64 ", but expected %hhu:%" PRIu64 ":%" PRIu64 "\n",
         __func__, cy, r2, r1, vcy, v2, v1);
     exit(EXIT_FAILURE);
   }
@@ -98,7 +98,7 @@ test_u64arith_add_2_2_cy() {
 
 static void check_result(const uint64_t r, const uint64_t v, const char *func) {
   if (r != v) {
-    printf("%s: Error, got result %"PRIu64", but expected %"PRIu64"\n",
+    printf("%s: Error, got result %" PRIu64 ", but expected %" PRIu64 "\n",
         func, r, v);
     exit(EXIT_FAILURE);
   }
@@ -144,7 +144,7 @@ test_one_u64arith_mul_1_1_2(const uint64_t a, const uint64_t b,
   uint64_t r1, r2;
   u64arith_mul_1_1_2 (&r1, &r2, a, b);
   if (r1 != v1 || r2 != v2) {
-    printf("%s: Error, got result %"PRIu64":%"PRIu64", but expected %"PRIu64":%"PRIu64"\n",
+    printf("%s: Error, got result %" PRIu64 ":%" PRIu64 ", but expected %" PRIu64 ":%" PRIu64 "\n",
         __func__, r2, r1, v2, v1);
     exit(EXIT_FAILURE);
   }
@@ -166,7 +166,7 @@ test_one_u64arith_sqr_1_2(const uint64_t a, const uint64_t v1, const uint64_t v2
   uint64_t r1, r2;
   u64arith_sqr_1_2 (&r1, &r2, a);
   if (r1 != v1 || r2 != v2) {
-    printf("%s: Error, got result %"PRIu64":%"PRIu64", but expected %"PRIu64":%"PRIu64"\n",
+    printf("%s: Error, got result %" PRIu64 ":%" PRIu64 ", but expected %" PRIu64 ":%" PRIu64 "\n",
         __func__, r2, r1, v2, v1);
     exit(EXIT_FAILURE);
   }
