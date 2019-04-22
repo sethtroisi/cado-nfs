@@ -373,7 +373,7 @@ class LogBase(object):
     def __init__(self, general):
         self.known={}
         self.badideals=[]
-        self.SMs = []
+        self.SMs = [ [], [] ]
         self.fullcolumn = None
         try:
             print ("--- Reading %s to find which are the known logs ---" % general.log())
@@ -382,7 +382,7 @@ class LogBase(object):
                 if p == "bad" and side == "ideals":
                     self.badideals.append(int(r))
                 elif p == "SM":
-                    self.SMs.append(int(value[0]))
+                    self.SMs[int(side)].append(int(value[0]))
                 else:
                     # for rational side, we actually don't have the root.
                     # We force it to be on side 0 (legacy, again...)
@@ -405,7 +405,9 @@ class LogBase(object):
                     if i % 1000000 == 0:
                         print("Reading line %d" % i)
                     process(line)
-            print("Found %d bad ideals, %d known logs, and %d SMs in %s" %(len(self.badideals), len(self.known),len(self.SMs), general.log()))
+            print("Found %d bad ideals, %d known logs, and %d,%d SMs in %s"
+                %(len(self.badideals), len(self.known),
+                len(self.SMs[0]), len(self.SMs[1]), general.log()))
         except:
             raise ValueError("Error while reading %s" % general.log())
     def has(self,p,r,side):
@@ -423,8 +425,13 @@ class LogBase(object):
         self.known[(p,r,side)] = log
     def bad_ideal(self,i):
         return self.badideals[i]
-    def SM(self,i):
-        return self.SMs[i]
+    def allSM(self,i):
+        SM = self.SMs[0] + self.SMs[1]
+        return SM[i]
+    def nSM(self,side):
+        return len(self.SMs[side])
+    def SM(self,side,i):
+        return self.SMs[side][i]
     def full_column(self):
         return self.fullcolumn
 
@@ -1152,7 +1159,7 @@ class DescentLowerClass(object):
                 acc_log += logDB.fullcolumn
             sm = SM[irel]
             for i in range(len(sm)):
-                acc_log += logDB.SM(i)*sm[i]
+                acc_log += logDB.allSM(i)*sm[i]
             for side in range(2):
                 for p, k in list_p[side]:
                     ideal = ideals_above_p(p, k, a, b, side, general)
@@ -1249,8 +1256,11 @@ class DescentLowerClass(object):
             for i in range(0,2):
                 for xx in factored[i]:
                     vlog[i] += logDB.get_log(xx[0], xx[1], general.init_side)
-                for j in range(len(SM2[i])):
-                    vlog[i] += logDB.SM(j)*SM2[i][j]
+                ind_shift = 0
+                if general.init_side == 1:
+                    ind_shift = logDB.nSM(0)
+                for j in range(logDB.nSM(general.init_side)):
+                    vlog[i] += logDB.SM(general.init_side,j)*SM2[i][ind_shift+j]
                 vlog[i] = vlog[i] % ell
 
             log_target = (vlog[0] - vlog[1]) % ell
