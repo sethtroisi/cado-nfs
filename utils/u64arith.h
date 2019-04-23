@@ -111,12 +111,12 @@ u64arith_addmod_1_1 (uint64_t *r, const uint64_t a,
 {
   ASSERT_EXPENSIVE (a < m && b <= m);
 
-#if (defined(__i386__) && defined(__GNUC__)) || defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM)
+#if  defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM)
   {
     uint64_t t = a + b, tr = a - m;
 
     __asm__ __VOLATILE (
-      "add %2, %0\n\t"   /* tr += b */
+      "addq %2, %0\n\t"   /* tr += b */
       "cmovnc %1, %0\n\t"  /* if (!cy) tr = t */
       : "+&r" (tr)
       : "rm" (t), "rme" (b)
