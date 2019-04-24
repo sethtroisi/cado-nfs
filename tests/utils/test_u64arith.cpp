@@ -182,6 +182,34 @@ test_u64arith_sqr_1_2() {
   test_one_u64arith_sqr_1_2(UINT64_MAX, 1, UINT64_MAX - 1);
 }
 
+
+void
+test_one_u64arith_reciprocal_for_div(const uint64_t d) {
+  uint64_t q, r;
+  const uint64_t v = u64arith_reciprocal_for_div(d);
+  u64arith_divqr_2_1_1(&q, &r, UINT64_MAX, UINT64_MAX - d, d);
+  if (q != v) {
+    printf("%s(%" PRIu64 "): Error, got result %" PRIu64 ", but expected %" PRIu64 "\n",
+        __func__, d, v, q);
+    exit(EXIT_FAILURE);
+  }
+  /* printf("u64arith_reciprocal_for_div(%" PRIu64 ") = %" PRIu64 "\n", d, v); */
+}
+
+void
+test_u64arith_reciprocal_for_div() {
+  const uint64_t one = 1;
+  unsigned long i, iter = 100;
+  tests_common_get_iter(&iter);
+  for (i = 0; i < iter; i++) {
+    test_one_u64arith_reciprocal_for_div((one << 63) + i);
+    test_one_u64arith_reciprocal_for_div(UINT64_MAX - 1);
+    test_one_u64arith_reciprocal_for_div((one << 63) + UINT64_MAX / 2 / iter);
+    test_one_u64arith_reciprocal_for_div((one << 63) | random_uint64());
+  }
+}
+
+
 void
 test_one_u64arith_divqr_2_1_1(const uint64_t a1, const uint64_t a2,
     const uint64_t b, const uint64_t cq, const uint64_t cr)
@@ -219,7 +247,7 @@ test_u64arith_divqr_2_1_1()
 int
 main (int argc, const char *argv[])
 {
-  tests_common_cmdline(&argc, &argv, 0);
+  tests_common_cmdline(&argc, &argv, PARSE_SEED | PARSE_ITER);
   test_u64arith_gt_2_2();
   test_u64arith_add_1_2();
   test_u64arith_add_2_2();
@@ -228,6 +256,7 @@ main (int argc, const char *argv[])
   test_u64arith_mul_1_1_2();
   test_u64arith_sqr_1_2();
   test_u64arith_divqr_2_1_1();
+  test_u64arith_reciprocal_for_div();
   tests_common_clear();
   exit (EXIT_SUCCESS);
 }

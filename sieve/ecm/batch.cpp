@@ -335,6 +335,9 @@ remainder_tree_aux (mpz_t **T, unsigned long **nbits, unsigned long i,
  * At the root, we compute a floating-point
  * approximation of P/T[h][0] with m+guard bits, where m = nbits(T[h][0]).
  *
+ * FIXME: the error analysis is missing, especially when h=0 we get guard=0,
+ * thus adding 2^guard-1 cannot repair rouding errors.
+ *
  * Adds to extra_time the cpu time (RUSAGE_THREAD, seconds_thread())
  * spent in openmp helper threads, NOT counting the time spent in the
  * main thread.
@@ -812,6 +815,7 @@ factor (cofac_list const & L,
         cxx_cado_poly const & pol,
         int batchlpb[2],
         int lpb[2],
+        int ncurves,
         FILE *out, int nthreads MAYBE_UNUSED, double& extra_time)
 {
   unsigned long B[2];
@@ -833,7 +837,7 @@ factor (cofac_list const & L,
       prime_info_clear (pi);
   }
 
-  nb_methods = 30;
+  nb_methods = ncurves;
   if (nb_methods >= NB_MAX_METHODS)
     nb_methods = NB_MAX_METHODS - 1;
   methods = facul_make_default_strategy (nb_methods - 3, 0);
