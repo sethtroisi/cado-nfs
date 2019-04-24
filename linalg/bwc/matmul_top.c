@@ -2929,6 +2929,17 @@ static void matmul_top_read_submatrix(matmul_top_data_ptr mmt, int midx, param_l
         }
     }
 
+    if (can_print && Mloc->bname) {
+        balancing bal;
+        balancing_init(bal);
+        balancing_read_header(bal, Mloc->bname);
+        balancing_set_row_col_count(bal);
+        printf("Matrix: total %" PRIu32 " rows %" PRIu32 " cols "
+                "%" PRIu64 " coeffs\n",
+                bal->h->nrows, bal->h->ncols, bal->h->ncoeffs);
+        balancing_clear(bal);
+    }
+
     if (!sqb) {
         if (!cache_loaded) {
             // everybody does it in parallel
