@@ -3180,7 +3180,7 @@ int main (int argc0, char *argv0[])/*{{{*/
             if (s.doing_p != curr_sq) {
                 gmp_fprintf(las.batch_print_survivors,
                         "# q = (%Zd, %Zd, %d)\n",
-                        s.doing_p->p, s.doing_p->r, s.doing_p->side);
+                        (mpz_srcptr) s.doing_p->p, (mpz_srcptr) s.doing_p->r, s.doing_p->side);
             }
             gmp_fprintf(las.batch_print_survivors,
                 "%" PRId64 " %" PRIu64 " %Zd %Zd\n", s.a, s.b,
