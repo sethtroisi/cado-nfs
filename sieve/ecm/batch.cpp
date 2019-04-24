@@ -335,6 +335,9 @@ remainder_tree_aux (mpz_t **T, unsigned long **nbits, unsigned long i,
  * At the root, we compute a floating-point
  * approximation of P/T[h][0] with m+guard bits, where m = nbits(T[h][0]).
  *
+ * FIXME: the error analysis is missing, especially when h=0 we get guard=0,
+ * thus adding 2^guard-1 cannot repair rouding errors.
+ *
  * Adds to extra_time the cpu time (RUSAGE_THREAD, seconds_thread())
  * spent in openmp helper threads, NOT counting the time spent in the
  * main thread.
