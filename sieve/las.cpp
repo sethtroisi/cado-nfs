@@ -3239,6 +3239,7 @@ int main (int argc0, char *argv0[])/*{{{*/
                 las.cpoly,
                 las.batchlpb,
                 lpb,
+                MAX(sc0.sides[0].ncurves, sc0.sides[1].ncurves),
 		las_output.output,
                 las.number_of_threads_loose(),
                 extra_time);
