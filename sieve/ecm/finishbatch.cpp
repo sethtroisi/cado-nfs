@@ -139,12 +139,13 @@ main (int argc, char *argv[])
   mpz_set_ui(q, 1);
   // Create a fake special-q
   std::vector<uint64_t> empty;
-  las_todo_entry doing(q, q, 0, empty);
+  las_todo_entry fake_q(q, q, 0, empty);
 
   // If the special-q info is present, we will use it. Otherwise, the
   // fake sq will be used everywhere. This list keeps in memory all the
   // special q encountered.
   std::list<las_todo_entry> list_q;
+  list_q.push_back(fake_q);
 
   long a;
   unsigned long b;
