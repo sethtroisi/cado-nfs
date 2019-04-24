@@ -1533,9 +1533,24 @@ sub subtask_krylov_todo {
         print " last $current_task checkpoint is $vstarts->{$yrange}\n";
     }
 
+    my @todo;
+
     my @ys;
     if (@ys = grep { /^ys/ } @main_args) {
         @ys = map { /^(?:ys=)?(\d+)\.\.(\d+)$/; $_=[$1, $2]; } @ys;
+        if (my @ss = grep { /^start/ } @main_args) {
+            my ($start) = grep { s/^start=(\d+)/$1/; } @ss;
+            my $yrange = $ys[0]->[0] . ".." . $ys[0]->[1];
+            my %ok = map { $_ => 1 } grep { $_ == 0 || &$morecheck($yrange, $_); } @{$vfiles->{$yrange}};
+            if ($ok{$start}) {
+                print "## Forcing ys=$yrange start=$start as requested\n";
+                push @todo, "ys=$yrange start=$start";
+                return @todo;
+            } else {
+                my @avail = sort { $a <=> $b } keys %ok;
+                task_check_message 'error', "Cannot start at ys=$yrange start=$start: missing checkpoints (available: @avail)";
+            }
+        }
     } elsif ($param->{'interleaving'}) {
         my @t = @all_ys;
         # merge 2 by 2.
@@ -1553,7 +1568,6 @@ sub subtask_krylov_todo {
 
     print "## range list for krylov: ".join(" ", map {"$_->[0]-$_->[1]";} @ys)."\n";
 
-    my @todo;
     my @impossible;
     for my $ab (@ys) {
         # most ys are double ranges, except maybe the last one.
@@ -1751,9 +1765,11 @@ sub task_krylov {
     task_check_message 'missing',
                 "Pending tasks for krylov:\n" . join("\n", @todo);
     for my $t (@todo) {
-        # take out ys from main_args, put the right one in place if
-        # needed.
-        my @args = grep { !/^ys/ } @main_args;
+        # take out ys and start from main_args, put the right ones in place if
+        # needed. (note that if both were specified, this is essentially
+        # putting the very same parameters back in place, but with the
+        # benefit of having performed a check inbetween).
+        my @args = grep { !/^ys/ && !/^start/ } @main_args;
         push @args, split(' ', $t);
         task_common_run 'krylov', @args;
     }
