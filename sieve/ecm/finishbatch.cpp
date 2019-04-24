@@ -140,12 +140,31 @@ main (int argc, char *argv[])
   // Create a fake special-q
   std::vector<uint64_t> empty;
   las_todo_entry doing(q, q, 0, empty);
+
+  // If the special-q info is present, we will use it. Otherwise, the
+  // fake sq will be used everywhere. This list keeps in memory all the
+  // special q encountered.
+  std::list<las_todo_entry> list_q;
+
   long a;
   unsigned long b;
   while (fgets(str, MAX_SIZE, inp)) {
-      if (str[0] == '#') continue;
+      if (str[0] == '#') {
+          cxx_mpz r;
+          int side;
+          int ret = gmp_sscanf(str, "# q = (%Zd, %Zd, %d)",
+                  &q, &r, &side);
+          if (ret == 3) {
+              std::vector<uint64_t> primes;
+              uint64_t qq = mpz_get_uint64(q);
+              primes.push_back(qq);
+              las_todo_entry this_q(q, r, side, primes);
+              list_q.push_back(this_q);
+          }
+          continue;
+      }
       gmp_sscanf(str, "%ld %lu %Zd %Zd\n", &a, &b, (mpz_ptr) norms[0], (mpz_ptr) norms[1]);
-      List.emplace_back(a, b, norms, &doing);
+      List.emplace_back(a, b, norms, &list_q.back());
   }
   fclose_maybe_compressed(inp, infilename);
 

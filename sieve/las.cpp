@@ -3175,8 +3175,14 @@ int main (int argc0, char *argv0[])/*{{{*/
     las.set_loose_binding();
 
     if (las.batch_print_survivors) {
+        las_todo_entry * curr_sq = NULL;
         for (auto s : las.L) {
-        gmp_fprintf(las.batch_print_survivors,
+            if (s.doing_p != curr_sq) {
+                gmp_fprintf(las.batch_print_survivors,
+                        "# q = (%Zd, %Zd, %d)\n",
+                        s.doing_p->p, s.doing_p->r, s.doing_p->side);
+            }
+            gmp_fprintf(las.batch_print_survivors,
                 "%" PRId64 " %" PRIu64 " %Zd %Zd\n", s.a, s.b,
                 (mpz_srcptr) s.cofactor[0],
                 (mpz_srcptr) s.cofactor[1]);
