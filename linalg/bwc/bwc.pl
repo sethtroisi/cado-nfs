@@ -903,96 +903,106 @@ if ($mpi_needed) {
     if ($main =~ /^:srun/) {
         push @mpi_precmd, 'srun', '--cpu-bind=verbose,none', '-u';
 	if ($mpi_ver =~ /^openmpi/) {
-		push @mpi_precmd, "--mpi=openmpi";
+            # srun might like that we give it the hint that we're running
+            # openmpi.
+            push @mpi_precmd, "--mpi=openmpi";
 	}
         # quirk
         $main =~ s/^:srun://;
     } else {
+        # Otherwise we'll start via mpiexec, and we need to be informed
+        # on the list of nodes.
         push @mpi_precmd, "$mpi/mpiexec";
-    }
 
-    my $auto_hostfile_pattern="/tmp/hosts_XXXXXXXX";
+        my $auto_hostfile_pattern="/tmp/hosts_XXXXXXXX";
 
-    # Need hosts. Put that to the list @hosts first.
-    if ($main =~ /^:srun/) {
-	    print STDERR "srun environment detected, not detecting hostfile.\n";
-    } elsif (exists($ENV{'OAR_JOBID'}) && !defined($hostfile) && !scalar @hosts) {
-	    print STDERR "OAR environment detected, setting hostfile.\n";
-	    get_mpi_hosts_oar;
-	    $auto_hostfile_pattern="/tmp/hosts.$ENV{'OAR_JOBID'}.XXXXXXX";
-    } elsif (exists($ENV{'PBS_JOBID'}) && !defined($hostfile) && !scalar @hosts ) {
-	    print STDERR "Torque/OpenPBS environment detected, setting hostfile.\n";
-	    get_mpi_hosts_torque;
-	    $auto_hostfile_pattern="/tmp/hosts.$ENV{'PBS_JOBID'}.XXXXXXX";
-    } elsif (exists($ENV{'PE_HOSTFILE'}) && exists($ENV{'NSLOTS'})) {
+        # Need hosts. Put that to the list @hosts first.
+        if ($main =~ /^:srun/) {
+            print STDERR "srun environment detected, not detecting hostfile.\n";
+        } elsif (exists($ENV{'OAR_JOBID'}) && !defined($hostfile) && !scalar @hosts) {
+            print STDERR "OAR environment detected, setting hostfile.\n";
+            get_mpi_hosts_oar;
+            $auto_hostfile_pattern="/tmp/hosts.$ENV{'OAR_JOBID'}.XXXXXXX";
+        } elsif (exists($ENV{'PBS_JOBID'}) && !defined($hostfile) && !scalar @hosts ) {
+            print STDERR "Torque/OpenPBS environment detected, setting hostfile.\n";
+            get_mpi_hosts_torque;
+            $auto_hostfile_pattern="/tmp/hosts.$ENV{'PBS_JOBID'}.XXXXXXX";
+        } elsif (exists($ENV{'PE_HOSTFILE'}) && exists($ENV{'NSLOTS'}) && !defined($hostfile) && !scalar @hosts) {
             print STDERR "Oracle/SGE environment detected, setting hostfile.\n";
-	    get_mpi_hosts_sge;
-    } elsif (exists($ENV{'SLURM_STEP_NODELIST'})) {
+            get_mpi_hosts_sge;
+            # } elsif (exists($ENV{'SLURM_STEP_NODELIST'})) {
+            # not clear that I want this detection to be done _only_ within a
+            # job step. I do see cases where mpiexec from the batch itself seems
+            # to make sense
+        } elsif (exists($ENV{'SLURM_JOBID'}) && !defined($hostfile) && !scalar @hosts) {
             get_mpi_hosts_slurm;
-    }
-
-    if (scalar @hosts) {
-        # I think that when doing so, the file will get deleted at
-        # program exit only.
-        my $fh = File::Temp->new(TEMPLATE=>$auto_hostfile_pattern);
-        $hostfile = $fh->filename;
-        push @tempfiles, $fh;
-        for my $h (@hosts) { print $fh "$h\n"; }
-        close $fh;
-    }
-
-    if (defined($hostfile)) {
-        if ($needs_mpd) {
-            # Assume daemons do the job.
-        } elsif ($mpi_ver =~ /^\+hydra/) {
-            my_setenv 'HYDRA_HOST_FILE', $hostfile;
-            # I used to have various setups using --hostfile for openmpi,
-            # --file in some other cases and so on. I think that
-            # -machinefile is documented in the published standard, so
-            # it's better to stick to it.
-#        } elsif ($mpi_ver =~ /^openmpi/) {
-#            push @mpi_precmd, "--hostfile", $hostfile;
-#        } else {
-#            push @mpi_precmd, "-file", $hostfile;
-        } else {
-            push @mpi_precmd, "-machinefile", $hostfile;
         }
 
-    }
-    if (!defined($hostfile)) {
-        # At this point we're going to run processes on localhost.
-        if ($mpi_ver =~ /^\+hydra/) {
-            my_setenv 'HYDRA_USE_LOCALHOST', 1;
+        if (scalar @hosts) {
+            # I think that when doing so, the file will get deleted at
+            # program exit only.
+            my $fh = File::Temp->new(TEMPLATE=>$auto_hostfile_pattern);
+            $hostfile = $fh->filename;
+            push @tempfiles, $fh;
+            for my $h (@hosts) { print $fh "$h\n"; }
+            close $fh;
         }
-        # Otherwise we'll assume that the simple setup will work fine.
-    }
-    check_mpd_daemons();
-    if (!$needs_mpd) {
-        # Then we must configure ssh
-        # Note that openmpi changes the name of the option pretty
-        # frequently.
-        if ($mpi_ver =~ /^openmpi-1\.2/) {
-            push @mpi_precmd, qw/--mca pls_rsh_agent/, ssh_program();
-        } elsif ($mpi_ver =~ /^openmpi-1\.[34]/) {
-            push @mpi_precmd, qw/--mca plm_rsh_agent/, ssh_program();
-        } elsif ($mpi_ver =~ /^openmpi-1\.[56]/) {
-            push @mpi_precmd, qw/--mca orte_rsh_agent/, ssh_program();
-        } elsif ($mpi_ver =~ /^openmpi/) {
-            push @mpi_precmd, qw/--mca plm_rsh_agent/, ssh_program();
-            if (version_ge($mpi_ver, "openmpi-1.8")) {
-                # This is VERY important for bwc ! The default policy for
-                # openmpi 1.8 seems to be by slot, which obviously
-                # schedules most of the desired jobs on only one node...
-                # which doesn't work too well.
-                if (!$param->{'only_mpi'}) {
-                    # with only_mpi=1, the default policy works fine.
-                    push @mpi_precmd, qw/--mca rmaps_base_mapping_policy/, 'node';
-                }
+
+        if (defined($hostfile)) {
+            if ($needs_mpd) {
+                # Assume daemons do the job.
+            } elsif ($mpi_ver =~ /^\+hydra/) {
+                my_setenv 'HYDRA_HOST_FILE', $hostfile;
+                # I used to have various setups using --hostfile for openmpi,
+                # --file in some other cases and so on. I think that
+                # -machinefile is documented in the published standard, so
+                # it's better to stick to it.
+                #        } elsif ($mpi_ver =~ /^openmpi/) {
+                #            push @mpi_precmd, "--hostfile", $hostfile;
+                #        } else {
+                #            push @mpi_precmd, "-file", $hostfile;
+            } else {
+                push @mpi_precmd, "-machinefile", $hostfile;
             }
-        } elsif ($mpi_ver =~ /^mpich2/ || $mpi_ver =~ /^mvapich2/) {
-            # Not older mpich2's, which need a daemon.
-            push @mpi_precmd, qw/-launcher ssh -launcher-exec/, ssh_program();
+
         }
+        if (!defined($hostfile)) {
+            # At this point we're going to run processes on localhost.
+            if ($mpi_ver =~ /^\+hydra/) {
+                my_setenv 'HYDRA_USE_LOCALHOST', 1;
+            }
+            # Otherwise we'll assume that the simple setup will work fine.
+        }
+        check_mpd_daemons();
+        if (!$needs_mpd) {
+            # Then we must configure ssh
+            # Note that openmpi changes the name of the option pretty
+            # frequently.
+            if ($mpi_ver =~ /^openmpi-1\.2/) {
+                push @mpi_precmd, qw/--mca pls_rsh_agent/, ssh_program();
+            } elsif ($mpi_ver =~ /^openmpi-1\.[34]/) {
+                push @mpi_precmd, qw/--mca plm_rsh_agent/, ssh_program();
+            } elsif ($mpi_ver =~ /^openmpi-1\.[56]/) {
+                push @mpi_precmd, qw/--mca orte_rsh_agent/, ssh_program();
+            } elsif ($mpi_ver =~ /^openmpi/) {
+                push @mpi_precmd, qw/--mca plm_rsh_agent/, ssh_program();
+                if (version_ge($mpi_ver, "openmpi-1.8")) {
+                    # This is VERY important for bwc ! The default policy for
+                    # openmpi 1.8 seems to be by slot, which obviously
+                    # schedules most of the desired jobs on only one node...
+                    # which doesn't work too well.
+                    if (!$param->{'only_mpi'}) {
+                        # with only_mpi=1, the default policy works fine.
+                        push @mpi_precmd, qw/--mca rmaps_base_mapping_policy/, 'node';
+                    }
+                }
+            } elsif ($mpi_ver =~ /^mpich2/ || $mpi_ver =~ /^mvapich2/) {
+                # Not older mpich2's, which need a daemon.
+                push @mpi_precmd, qw/-launcher ssh -launcher-exec/, ssh_program();
+            }
+        }
+        # End of section where we try to set up the proper options so
+        # that mpiexec reaches the desired nodes correctly.
     }
     if (defined($mpi_extra_args)) {
         push @mpi_precmd, split(' ', $mpi_extra_args);
