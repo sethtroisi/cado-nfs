@@ -3175,9 +3175,10 @@ int main (int argc0, char *argv0[])/*{{{*/
     las.set_loose_binding();
 
     if (las.batch_print_survivors) {
-        las_todo_entry * curr_sq = NULL;
+        las_todo_entry const * curr_sq = NULL;
         for (auto s : las.L) {
             if (s.doing_p != curr_sq) {
+                curr_sq = s.doing_p;
                 gmp_fprintf(las.batch_print_survivors,
                         "# q = (%Zd, %Zd, %d)\n",
                         (mpz_srcptr) s.doing_p->p, (mpz_srcptr) s.doing_p->r, s.doing_p->side);
