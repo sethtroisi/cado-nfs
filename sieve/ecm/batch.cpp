@@ -815,6 +815,7 @@ factor (cofac_list const & L,
         cxx_cado_poly const & pol,
         int batchlpb[2],
         int lpb[2],
+        int ncurves,
         FILE *out, int nthreads MAYBE_UNUSED, double& extra_time)
 {
   unsigned long B[2];
@@ -836,7 +837,7 @@ factor (cofac_list const & L,
       prime_info_clear (pi);
   }
 
-  nb_methods = 30;
+  nb_methods = ncurves;
   if (nb_methods >= NB_MAX_METHODS)
     nb_methods = NB_MAX_METHODS - 1;
   methods = facul_make_default_strategy (nb_methods - 3, 0);
