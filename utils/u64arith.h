@@ -446,6 +446,16 @@ u64arith_shrd (uint64_t *r, const uint64_t hi, const uint64_t lo,
 #endif
 }
 
+
+/* Shift the 128-bit integer in lo:hi right by i bits */
+
+static inline void
+u64arith_shr_2 (uint64_t *lo, uint64_t *hi, const unsigned char i)
+{
+  u64arith_shrd(lo, *hi, *lo, i);
+  *hi >>= i;
+}
+
 /* Set *r to hi shifted left by i bits, filling in the high bits from lo into the low
    bits of *r. I.e., *r = (hi + lo*2^-64) * 2^i. Assumes 0 <= i < 64. */
 static inline void
@@ -479,6 +489,16 @@ u64arith_shld (uint64_t *r, const uint64_t lo, const uint64_t hi,
   else
     *r = hi;
 #endif
+}
+
+
+/* Shift the 128-bit integer in lo:hi left by i bits */
+
+static inline void
+u64arith_shl_2 (uint64_t *lo, uint64_t *hi, const unsigned char i)
+{
+  u64arith_shld(hi, *lo, *hi, i);
+  *lo <<= i;
 }
 
 /* Returns number of trailing zeros in a. a must not be zero */
@@ -549,8 +569,7 @@ u64arith_divqr_2_1_1_slow (uint64_t *q, uint64_t *r,
   ASSERT(a2 < b); /* Or there will be quotient overflow */
 
   for (int i = 0; i < 64; i++) {
-    u64arith_shrd(&D1, D2, D1, 1);
-    D2 >>= 1;
+    u64arith_shr_2(&D2, &D1, 1);
     /* if R >= D */
     if (!u64arith_gt_2_2(D1, D2, R1, R2)) {
       u64arith_sub_2_2(&R1, &R2, D1, D2); /* R := R - D */
@@ -570,6 +589,8 @@ u64arith_divqr_2_1_1_slow (uint64_t *q, uint64_t *r,
   *r = R1;
 }
 
+
+/* Computes (2^128-1) / d - 1 for 2^63 <= d < 2^64. */
 
 static inline uint64_t
 u64arith_reciprocal_for_div(const uint64_t d)
@@ -624,8 +645,57 @@ u64arith_reciprocal_for_div(const uint64_t d)
 }
 
 
-/* Integer division of a two uint64_t value a2:a1 by a uint64_t divisor. Returns
-   quotient and remainder. */
+/* Integer division of two uint64_t values a2:a1 by a uint64_t divisor b.
+   Returns quotient and remainder. Uses the algorithm described in
+   Niels Möller and Torbjörn Granlund, Improved Division by Invariant
+   Integers, IEEE Transactions on Computers (Volume: 60, Issue: 2,
+   Feb. 2011) */
+
+static inline void
+u64arith_divqr_2_1_1_recip (uint64_t *q, uint64_t *r,
+		      const uint64_t a1, const uint64_t a2,
+		      const uint64_t b)
+{
+  if (a2 == 0) {
+    *q = a1 / b;
+    *r = a1 % b;
+    return;
+  }
+
+  uint64_t u0 = a1, u1 = a2, d = b;
+  /* Left-adjust dividend and divisor */
+  const int s = u64arith_clz(d);
+  u64arith_shl_2(&u0, &u1, s);
+  d <<= s;
+  const uint64_t v = u64arith_reciprocal_for_div(d);
+  uint64_t q0, q1;
+  u64arith_mul_1_1_2(&q0, &q1, v, u1);
+  u64arith_add_2_2(&q0, &q1, u0, u1);
+  q1++;
+  uint64_t r0 = u0 - q1*d;
+  if (r0 > q0) {
+    q1--;
+    r0 += d;
+  }
+  if (r0 >= d) {
+    q1++;
+    r0 -= d;
+  }
+  r0 >>= s;
+#ifdef WANT_ASSERT_EXPENSIVE
+  uint64_t P1, P2;
+  u64arith_mul_1_1_2(&P1, &P2, q1, b);
+  u64arith_add_2_2(&P1, &P2, r0, 0);
+  // printf("a1=%lu, a2=%lu, b=%lu, s=%d, q1=%lu, r0=%lu\n", a1, a2, b, s, q1, r0);
+  ASSERT_EXPENSIVE(P1 == a1 && P2 == a2);
+#endif
+  *q = q1;
+  *r = r0;
+}
+
+
+/* Integer division of two uint64_t values a2:a1 by a uint64_t divisor b.
+   Returns quotient and remainder. */
 
 static inline void
 u64arith_divqr_2_1_1 (uint64_t *q, uint64_t *r,
@@ -645,12 +715,12 @@ u64arith_divqr_2_1_1 (uint64_t *q, uint64_t *r,
     : "cc");
 #else 
   /* TODO: Replace by Möller/Granlund "Improved Division by Invariant Integers" */
-  u64arith_divqr_2_1_1_slow(q, r, a1, a2, b);
+  u64arith_divqr_2_1_1_recip(q, r, a1, a2, b);
 #endif
 }
 
 
-/* Integer division of a two uint64_t value by a uint64_t divisor. Returns
+/* Integer division of two uint64_t values by a uint64_t divisor. Returns
    only remainder. */
 
 static inline void
