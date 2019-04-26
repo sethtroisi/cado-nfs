@@ -3235,11 +3235,15 @@ int main (int argc0, char *argv0[])/*{{{*/
         /* We may go back to our general thread placement at this point.
          * Currently the code below still uses openmp */
 
+        int ncurves = MAX(sc0.sides[0].ncurves, sc0.sides[1].ncurves);
+        if (ncurves <= 0) {
+            ncurves = 50; // use the same default as finishbatch
+        }
         std::list<relation> rels = factor (las.L,
                 las.cpoly,
                 las.batchlpb,
                 lpb,
-                MAX(sc0.sides[0].ncurves, sc0.sides[1].ncurves),
+                ncurves,
 		las_output.output,
                 las.number_of_threads_loose(),
                 extra_time);
