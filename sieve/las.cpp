@@ -1517,7 +1517,7 @@ void process_bucket_region_run::cofactoring_sync (survivors_t & survivors)/*{{{*
                 rep.survivors.check_leftover_norm_on_side[side] += pass;
             }
         } else {
-            ASSERT_ALWAYS(ws.las.batch || ws.las.batch_print_survivors);
+            ASSERT_ALWAYS(ws.las.batch || ws.las.batch_print_survivors_filename);
 
             /* no resieve, so no list of prime factors to divide. No
              * point in doing trial division anyway either.
@@ -1593,8 +1593,8 @@ void process_bucket_region_run::cofactoring_sync (survivors_t & survivors)/*{{{*
 
         rep.survivors.enter_cofactoring++;
 
-        // we'll do the printing at the end.
-        if (ws.las.batch || ws.las.batch_print_survivors)
+        // we'll do the printing later.
+        if (ws.las.batch || ws.las.batch_print_survivors_filename)
         {
             /* see above */
             rep.reports++;
@@ -1602,8 +1602,7 @@ void process_bucket_region_run::cofactoring_sync (survivors_t & survivors)/*{{{*
             /* make sure threads don't write the cofactor list at the
              * same time !!! */
             cur.transfer_to_cofac_list(ws.cofac_candidates, aux_p->doing);
-            //cur.print_as_survivor(ws.las.batch_print_survivors);
-            continue; /* we deal with all cofactors at the end of las */
+            continue; /* we deal with all cofactors at the end of subjob */
         }
 
         auto D = new detached_cofac_parameters(wc_p, aux_p, std::move(cur));
@@ -2676,7 +2675,7 @@ bool do_one_special_q(las_info & las, nfs_work & ws, std::shared_ptr<nfs_aux> au
     /* Currently we assume that we're doing sieving + resieving on
      * both sides, or we're not. In the latter case, we expect to
      * complete the factoring work with batch cofactorization */
-    ASSERT_ALWAYS(las.batch || las.batch_print_survivors || (ws.conf.sides[0].lim && ws.conf.sides[1].lim));
+    ASSERT_ALWAYS(las.batch || las.batch_print_survivors_filename || (ws.conf.sides[0].lim && ws.conf.sides[1].lim));
 
     std::shared_ptr<nfs_work_cofac> wc_p;
 
@@ -2752,6 +2751,59 @@ void prepare_timer_layout_for_multithreaded_tasks(timetree_t & timer)
 #else
     timer.nop();
 #endif
+}
+
+struct ps_params {
+    std::shared_ptr<cofac_list> M;
+    las_info & las;
+    ps_params(std::shared_ptr<cofac_list> M, las_info & las) : M(M), las(las) {}
+};
+
+void *print_survivors_internal(void * arg)
+{
+    struct ps_params *params = (struct ps_params *)arg;
+    std::shared_ptr<cofac_list> &M = params->M;
+    las_info &las = params->las;
+        
+    std::string filename = las.batch_print_survivors_filename;
+    filename.append(".");
+    filename.append(std::to_string(las.batch_print_survivors_counter));
+    las.batch_print_survivors_counter++;
+    FILE * out = fopen(filename.c_str(), "w");
+    las_todo_entry const * curr_sq = NULL;
+    for (auto const &s : *M) {
+        if (s.doing_p != curr_sq) {
+            curr_sq = s.doing_p;
+            gmp_fprintf(out,
+                    "# q = (%Zd, %Zd, %d)\n",
+                    (mpz_srcptr) s.doing_p->p, (mpz_srcptr) s.doing_p->r, s.doing_p->side);
+        }
+        gmp_fprintf(out,
+                "%" PRId64 " %" PRIu64 " %Zd %Zd\n", s.a, s.b,
+                (mpz_srcptr) s.cofactor[0],
+                (mpz_srcptr) s.cofactor[1]);
+    }
+    fclose(out);
+    delete params; // was newed by caller.
+    return NULL;
+}
+
+void print_survivors(std::shared_ptr<cofac_list> M, las_info & las)
+{
+    // first, wait for the previous IO job to finish writing (if any)
+    if (las.batch_print_survivors_thid) {
+        pthread_join(*las.batch_print_survivors_thid, NULL);
+    } else {
+        // we are the first writing instance.
+        las.batch_print_survivors_thid = (pthread_t *)malloc(sizeof(pthread_t));
+        // this will be freed by the dtor of las_info
+    }
+
+    auto params = new struct ps_params(M, las);
+    // will be deleted by the tread
+
+    pthread_create(las.batch_print_survivors_thid, NULL,
+            &print_survivors_internal, params);
 }
 
 void las_subjob(las_info & las, int subjob, las_todo_list & todo, report_and_timer & global_rt)/*{{{*/
@@ -2902,6 +2954,18 @@ void las_subjob(las_info & las, int subjob, las_todo_list & todo, report_and_tim
                             /* we can release the mutex now */
 #else
                             las.L.splice(las.L.end(), workspaces.cofac_candidates);
+                            while (las.L.size() >= las.batch_print_survivors_filesize) {
+                                // M is another list containing the
+                                // elements that are going to be printed
+                                // by another thread.
+                                auto M = std::make_shared<cofac_list>();
+                                auto it = las.L.begin();
+                                for (uint64_t i = 0; i < las.batch_print_survivors_filesize; ++i) {
+                                    ++it;
+                                }
+                                M->splice(M->end(), las.L, las.L.begin(), it);
+                                print_survivors(M, las);
+                            }
 #endif
                         }
                         workspaces.cofac_candidates.clear();
@@ -3174,20 +3238,12 @@ int main (int argc0, char *argv0[])/*{{{*/
 
     las.set_loose_binding();
 
-    if (las.batch_print_survivors) {
-        las_todo_entry const * curr_sq = NULL;
-        for (auto s : las.L) {
-            if (s.doing_p != curr_sq) {
-                curr_sq = s.doing_p;
-                gmp_fprintf(las.batch_print_survivors,
-                        "# q = (%Zd, %Zd, %d)\n",
-                        (mpz_srcptr) s.doing_p->p, (mpz_srcptr) s.doing_p->r, s.doing_p->side);
-            }
-            gmp_fprintf(las.batch_print_survivors,
-                "%" PRId64 " %" PRIu64 " %Zd %Zd\n", s.a, s.b,
-                (mpz_srcptr) s.cofactor[0],
-                (mpz_srcptr) s.cofactor[1]);
-        }
+    if (las.batch_print_survivors_filename) {
+        auto M = std::make_shared<cofac_list>();
+        M->splice(M->end(), las.L);
+        print_survivors(M, las);
+        // this is the last writing. We need to wait for it to finish.
+        pthread_join(*las.batch_print_survivors_thid, NULL);
     }
 
     if (las.batch)
