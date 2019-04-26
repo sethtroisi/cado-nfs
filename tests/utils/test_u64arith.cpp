@@ -211,10 +211,11 @@ test_u64arith_reciprocal_for_div() {
 
 
 void
-test_one_u64arith_divqr_2_1_1(const uint64_t a1, const uint64_t a2,
-    const uint64_t b, const uint64_t cq, const uint64_t cr)
+test_one_u64arith_divqr_2_1_1(const uint64_t b, const uint64_t cq, const uint64_t cr)
 {
-  uint64_t q, r;
+  uint64_t a1, a2, q, r;
+  u64arith_mul_1_1_2(&a1, &a2, cq, b);
+  u64arith_add_2_2(&a1, &a2, cr, 0);
   u64arith_divqr_2_1_1(&q, &r, a1, a2, b);
   if (q != cq || r != cr) {
     printf("%s(%" PRIu64 ", %" PRIu64 ", %" PRIu64 "): Error, got result q=%"
@@ -227,10 +228,10 @@ test_one_u64arith_divqr_2_1_1(const uint64_t a1, const uint64_t a2,
 void
 test_u64arith_divqr_2_1_1()
 {
-  test_one_u64arith_divqr_2_1_1(123, 0, 123, 1, 0);
-  test_one_u64arith_divqr_2_1_1(124, 0, 123, 1, 1);
-  test_one_u64arith_divqr_2_1_1(UINT64_MAX, 122, 123, UINT64_MAX, 122);
-  test_one_u64arith_divqr_2_1_1(UINT64_MAX, UINT64_MAX - 1, UINT64_MAX, UINT64_MAX, UINT64_MAX - 1);
+  test_one_u64arith_divqr_2_1_1(123, 1, 0);
+  test_one_u64arith_divqr_2_1_1(123, 1, 1);
+  test_one_u64arith_divqr_2_1_1(123, UINT64_MAX, 122);
+  test_one_u64arith_divqr_2_1_1(UINT64_MAX, UINT64_MAX, UINT64_MAX - 1);
 }
 
 /* TODO: add tests for u64arith_divr_2_1_1() */
