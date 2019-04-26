@@ -2762,7 +2762,7 @@ struct ps_params {
 void *print_survivors_internal(void * arg)
 {
     struct ps_params *params = (struct ps_params *)arg;
-    std::shared_ptr<cofac_list> &M = params->M;
+    cofac_list const & M = * params->M;
     las_info &las = params->las;
         
     std::string filename = las.batch_print_survivors_filename;
@@ -2771,7 +2771,7 @@ void *print_survivors_internal(void * arg)
     las.batch_print_survivors_counter++;
     FILE * out = fopen(filename.c_str(), "w");
     las_todo_entry const * curr_sq = NULL;
-    for (auto const &s : *M) {
+    for (auto const &s : M) {
         if (s.doing_p != curr_sq) {
             curr_sq = s.doing_p;
             gmp_fprintf(out,
