@@ -1701,7 +1701,7 @@ struct plingen_tuner {
         printf("# total basecase time, if lingen_threshold = %zu: %.1f [%.1f days]\n", iceildiv(L, 1 << i) + 1, tt * (1 << i), tt * (1 << i) / 86400);
         return tt * (1 << i);
     }/*}}}*/
-    std::tuple<double, size_t> optimize_schedule_and_report(matrix_product_schedule_with_transforms & mystats) {
+    matrix_product_schedule_with_transforms optimize_schedule_and_report(matrix_product_schedule_with_transforms & mystats) {
         /* Just display the 1-threaded time, for fun */
         mystats.set_rT(1, 1);
         mystats.set_shrink02(1, 1);
@@ -1744,12 +1744,10 @@ struct plingen_tuner {
 
         mystats.report_stats_parsable();
 
-        return std::make_tuple(
-                mystats.compute_derived_timings(),
-                mystats.compute_derived_peak_ram());
+        return mystats;
     }
 
-    std::tuple<double, size_t> compute_and_report_mp(int i) { /* {{{ */
+    matrix_product_schedule_with_transforms compute_and_report_mp(int i) { /* {{{ */
         const char * step = "MP";
 
         size_t csize = iceildiv(L, 1 << (i+1));
@@ -1841,7 +1839,7 @@ struct plingen_tuner {
         mystats.per_transform = tcache[K];
         return optimize_schedule_and_report(mystats);
     } /* }}} */
-    std::tuple<double, size_t> compute_and_report_mul(int i) { /* {{{ */
+    matrix_product_schedule_with_transforms compute_and_report_mul(int i) { /* {{{ */
         const char * step = "MUL";
 
         // at the top level (i==0), the computed product has length 
@@ -1961,7 +1959,12 @@ void plingen_tune_full(abdst_field ab, unsigned int m, unsigned int n, size_t N,
 
     int floor = log2(L) + 1;
 
+    std::vector<matrix_product_schedule_with_transforms> schedules_mp;
+    std::vector<matrix_product_schedule_with_transforms> schedules_mul;
+    std::vector<std::pair<size_t, size_t>> aux_mems;
+
     for(int i = floor ; i>=0 ; i--) {
+
         printf("########## Measuring time at depth %d ##########\n", i);
 
         char buf[20];
@@ -1992,6 +1995,7 @@ void plingen_tune_full(abdst_field ab, unsigned int m, unsigned int n, size_t N,
         double tt_mul_total = 0;
         size_t peak_mp = 0;
         size_t peak_mul = 0;
+        aux_mems.push_back(std::make_pair(mem_our_input_and_output, mem_upper_layers));
 
         /* Arrange so that transforms + reserved storage does not exceed
          * our ram budget.
@@ -2002,8 +2006,12 @@ void plingen_tune_full(abdst_field ab, unsigned int m, unsigned int n, size_t N,
 
         if (i < floor) {
             try {
-                std::tie(tt_mp_total, peak_mp) = tuner.compute_and_report_mp(i);
-                std::tie(tt_mul_total, peak_mul) = tuner.compute_and_report_mul(i);
+                schedules_mp.push_back(tuner.compute_and_report_mp(i));
+                schedules_mul.push_back(tuner.compute_and_report_mul(i));
+                tt_mp_total  = schedules_mp.back() .compute_derived_timings();
+                peak_mp      = schedules_mp.back() .compute_derived_peak_ram();
+                tt_mul_total = schedules_mul.back().compute_derived_timings();
+                peak_mul     = schedules_mul.back().compute_derived_peak_ram();
             } catch (std::string & e) {
                 fputs("\n", stderr);
                 fprintf(stderr, "##################################\n");
@@ -2079,6 +2087,50 @@ void plingen_tune_full(abdst_field ab, unsigned int m, unsigned int n, size_t N,
                 tt_com0 / 86400,
                 suggest_threshold);
         peakpeak = std::max(peakpeak, rmem);
+    }
+    {
+        printf("#### Summary\n");
+        unsigned int i;
+        char buf[20];
+        for(i = 0 ; i < schedules_mp.size() ; ++i) {
+            /* should be const, really, but not until we get rid of
+             * matrix_product_schedule_with_transforms::per_matrix */
+            if ((L >> i) < suggest_threshold) break;
+            auto & Smp(*(schedules_mp.end()-i-1));
+            auto & Smul(*(schedules_mul.end()-i-1));
+            auto const & MM(*(aux_mems.end()-i-1));
+            printf("# depth=%u, input size %zu..%zu:\n", i, L >> i, iceildiv(L,1<<i));
+            printf("#    operands %s\n", size_disp(MM.first, buf));
+            printf("#    operands above %s\n", size_disp(MM.second, buf));
+            printf("#    MP[shrink=(%u,%u) batch=%u] time=%.1f [%.1f days] RAM=%s\n",
+                    Smp.shrink0,
+                    Smp.shrink2,
+                    Smp.batch,
+                    Smp.compute_derived_timings(),
+                    Smp.compute_derived_timings() / 86400,
+                    size_disp(Smp.compute_derived_peak_ram(), buf));
+            printf("#    MUL[shrink=(%u,%u) batch=%u] time=%.1f [%.1f days] RAM=%s\n",
+                    Smul.shrink0,
+                    Smul.shrink2,
+                    Smul.batch,
+                    Smul.compute_derived_timings(),
+                    Smul.compute_derived_timings() / 86400,
+                    size_disp(Smul.compute_derived_peak_ram(), buf));
+        }
+        {
+            printf("# depth=%u: communication time=%.1f [%.1f days]\n",
+                    i, tt_com0, tt_com0/86400);
+            double ttb = tuner.compute_and_report_basecase(i);
+            printf("# depth=%u: basecase time=%.1f [%.1f days]\n",
+                    i, ttb, ttb/86400);
+        }
+        printf("# Cumulated time %.1f [%.1f days],"
+                " peak RAM = %s, incl. %.1f days comm"
+                " at lingen_mpi_threshold=%zu\n",
+                tt_total, tt_total / 86400,
+                size_disp(peakpeak, buf),
+                tt_com0 / 86400,
+                suggest_threshold);
     }
 
     printf("(%u,%u,%u,%.1f,%1.f)\n",m,n,r,tt_total,(double)peakpeak/1024./1024./1024.);
