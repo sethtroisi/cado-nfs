@@ -50,8 +50,8 @@ void plingen_tuning_decl_usage(param_list_ptr pl)
             "minimum end of bench span window");
     param_list_decl_usage(pl, "catchsig",
             "enable intercepting ^C");
-    param_list_decl_usage(pl, "max_transform_ram",
-            "Maximum memory amount to be used for transforms, in GB");
+    param_list_decl_usage(pl, "max_ram",
+            "Maximum local memory to be used for transforms and matrices, in GB");
     param_list_decl_usage(pl, "tuning_N",
             "For --tune only: target size for the corresponding matrix");
     param_list_decl_usage(pl, "tuning_T",
@@ -67,7 +67,7 @@ void plingen_tuning_lookup_parameters(param_list_ptr pl)
 {
     param_list_lookup_string(pl, "B");
     param_list_lookup_string(pl, "catchsig");
-    param_list_lookup_string(pl, "max_transform_ram");
+    param_list_lookup_string(pl, "max_ram");
     param_list_lookup_string(pl, "tuning_N");
     param_list_lookup_string(pl, "tuning_T");
     param_list_lookup_string(pl, "tuning_r");
@@ -1565,6 +1565,7 @@ struct matrix_product_schedule_with_transforms {
         printf("# %s res %s per coeff, %s in total\n", step,
                 size_disp(csize*mpz_size_p*sizeof(mp_limb_t), buf),
                 size_disp(n0*n2*csize*mpz_size_p*sizeof(mp_limb_t), buf2));
+
         printf("# %s transform(op1) %s per coeff, %s in total\n", step,
                 size_disp(transform_ram, buf),
                 size_disp(n0*n1*transform_ram, buf2));
@@ -1625,7 +1626,7 @@ struct plingen_tuner {
         abfield_characteristic(ab, p);
         L = N/n + N/m;
         char buf[20];
-        printf("Measuring lingen data for N=%zu m=%u n=%u for a %zu-bit prime p, using a %u*%u grid of %u-thread nodes [max target RAM for transforms = %s]\n",
+        printf("Measuring lingen data for N=%zu m=%u n=%u for a %zu-bit prime p, using a %u*%u grid of %u-thread nodes [max target RAM = %s]\n",
                 N, m, n, mpz_sizeinbase(p, 2),
                 r, r, T,
                 size_disp(max_transform_ram, buf));
@@ -1658,25 +1659,46 @@ struct plingen_tuner {
         return tt_com0;
     }/*}}}*/
     double compute_and_report_basecase(int i) { /*{{{*/
-        double tt;
         /*
          * FIXME There's also a real problem with multithreading
          * here.  test_basecase uses openmp, and we must check that
          * the stored cache data properly records the number of
          * threads that were used !
          */
+        
+        extern void test_basecase(abdst_field ab, unsigned int m, unsigned int n, size_t L, gmp_randstate_t rstate);
+
+        double tt;
         tcache_key K { mpz_sizeinbase(p, 2), m, n, iceildiv(L, 1 << i) };
         if (tcache.find(K) != tcache.end()) {
             tt = std::get<0>(tcache[K]);
         } else {
             tt = wct_seconds();
-            extern void test_basecase(abdst_field ab, unsigned int m, unsigned int n, size_t L, gmp_randstate_t rstate);
             test_basecase(ab, m, n, iceildiv(L, 1 << i), rstate);
             tt = wct_seconds() - tt;
             tcache[K] = std::make_tuple(tt, 0., 0., 0., 0.);
         }
 
-        printf("# total basecase time, if threshold=%zu: %.1f [%.1f days]\n", iceildiv(L, 1 << i), tt * (1 << i), tt * (1 << i) / 86400);
+        if (iceildiv(L, 1 << i) < 10) {
+            size_t ncalls_ceil = 1 + (L-1) % (1 << i);
+            size_t ncalls_ceilminus = (1 << i) - ncalls_ceil;
+            double ttm = 0;
+            size_t ceilminus = iceildiv(L, 1 << i) - 1;
+            if (ceilminus) {    /* This can be zero */
+                tcache_key K { mpz_sizeinbase(p, 2), m, n, ceilminus };
+                if (tcache.find(K) != tcache.end()) {
+                    ttm = std::get<0>(tcache[K]);
+                } else {
+                    ttm = wct_seconds();
+                    test_basecase(ab, m, n, ceilminus, rstate);
+                    ttm = wct_seconds() - ttm;
+                    tcache[K] = std::make_tuple(ttm, 0., 0., 0., 0.);
+                }
+            }
+            tt = (tt * ncalls_ceil + ttm * ncalls_ceilminus) / (1 << i);
+        }
+
+        printf("# total basecase time, if lingen_threshold = %zu: %.1f [%.1f days]\n", iceildiv(L, 1 << i) + 1, tt * (1 << i), tt * (1 << i) / 86400);
         return tt * (1 << i);
     }/*}}}*/
     std::tuple<double, size_t> optimize_schedule_and_report(matrix_product_schedule_with_transforms & mystats) {
@@ -1914,11 +1936,11 @@ struct plingen_tuner {
     } /* }}} */
 };
 
-void plingen_tune_full(abdst_field ab, unsigned int m, unsigned int n, size_t N, unsigned int r, unsigned int T, size_t max_transform_ram)/*{{{*/
+void plingen_tune_full(abdst_field ab, unsigned int m, unsigned int n, size_t N, unsigned int r, unsigned int T, size_t max_ram)/*{{{*/
 {
     // cutoff_list cl = NULL;
 
-    plingen_tuner tuner(ab, m, n, N, r, T, max_transform_ram);
+    plingen_tuner tuner(ab, m, n, N, r, T, max_ram);
 
     size_t L = N/n + N/m;
 
@@ -1942,12 +1964,39 @@ void plingen_tune_full(abdst_field ab, unsigned int m, unsigned int n, size_t N,
     for(int i = floor ; i>=0 ; i--) {
         printf("########## Measuring time at depth %d ##########\n", i);
 
+        char buf[20];
+
+        /* During recursive calls proper, we need:
+         *  - storage for our input and our output, that need often not
+         *    live simultaneously. For simplicity we'll count both, but
+         *    this overlap is clearly a gross upper bound.
+         *    our input is 1/r^2*m*(m+n)*\ell  (with \ell = L/2^i)
+         *    our output is 1/r^2*(m+n)*(m+n)*(m/(m+n))*\ell , i.e. the
+         *    same
+         *  - storage *at all levels above the current one* (i.e. with
+         *    lower depth) for the data that is still live and need to
+         *    exist until after we return. This count is maximized in the
+         *    rightmost branch, where pi_left at all levels must be kept.
+         *    pi_left at depth 0 is
+         *                  1/r^2*(m+n)*(m+n)*(m/(m+n))*L/2
+         *    so the cumulated cost above is twice that minus our
+         *    pi_right (i.e. L/2 above should instead be counted as
+         *    L-L/2^i).
+         */
+        size_t c0 = iceildiv(m,r)*iceildiv(m+n,r)*mpz_size(tuner.p);
+        size_t mem_our_input_and_output = 2 * c0 * iceildiv(L, 1 << i);
+        size_t mem_upper_layers = c0 * (L - (L >> i));
+
         double tt_basecase_total = 0;
         double tt_mp_total = 0;
         double tt_mul_total = 0;
         size_t peak_mp = 0;
         size_t peak_mul = 0;
 
+        /* Arrange so that transforms + reserved storage does not exceed
+         * our ram budget.
+         */
+        tuner.max_transform_ram = max_ram - mem_our_input_and_output - mem_upper_layers;
         if (!basecase_eliminated)
             tt_basecase_total = tuner.compute_and_report_basecase(i);
 
@@ -1990,7 +2039,7 @@ void plingen_tune_full(abdst_field ab, unsigned int m, unsigned int n, size_t N,
             if (tt_total_nocomm != 0 && tt_total_nocomm + tt_ontop < tt_basecase_total) {
                 if (suggest_threshold == 0) {
                     suggest_threshold = L>>i;
-                    printf("# suggest lingen_mpi_threshold = %zu\n", L>>i);
+                    printf("# suggest lingen_threshold = %zu\n", L>>i);
                 }
                 if (basecase_keep_until * (tt_total_nocomm + tt_ontop) < tt_basecase_total) {
                     printf("# no longer counting basecase cost\n");
@@ -2002,15 +2051,34 @@ void plingen_tune_full(abdst_field ab, unsigned int m, unsigned int n, size_t N,
                 suggest_threshold = 0;
                 tt_total_nocomm = tt_basecase_total;
             }
-
         } else {
+            printf( "# added cost at depth %d (MP+MUL): %.1f [%.1f days]\n",
+                    i, tt_ontop, tt_ontop / 86400);
             tt_total_nocomm += tt_ontop;
         }
 
+        size_t tmem = std::max(peak_mp, peak_mul);
+        size_t rmem = mem_our_input_and_output + mem_upper_layers + tmem;
+
+        printf("# Total reserved memory per node at depth %d: %s\n",
+                i,
+                size_disp(rmem, buf));
+        printf("#     operands at the levels above: %s\n",
+                size_disp(mem_upper_layers, buf));
+        printf("#     operands at this level: %s\n",
+                size_disp(mem_our_input_and_output, buf));
+        printf("#     transforms at this level: %s\n",
+                size_disp(tmem, buf));
+
         tt_total = tt_total_nocomm + tt_com0;
-        char buf[20];
-        printf("# Cumulated time so far (incl. communication at mpi threshold) %.1f [%.1f days], peak RAM = %s, lingen_mpi_threshold=%zu\n", tt_total, tt_total / 86400, size_disp(std::max(peak_mp, peak_mul), buf), suggest_threshold);
-        peakpeak = std::max(peakpeak, std::max(peak_mp, peak_mul));
+        printf("# Cumulated time so far %.1f [%.1f days],"
+                " peak RAM = %s, incl. %.1f days comm"
+                " at lingen_mpi_threshold=%zu\n",
+                tt_total, tt_total / 86400,
+                size_disp(rmem, buf),
+                tt_com0 / 86400,
+                suggest_threshold);
+        peakpeak = std::max(peakpeak, rmem);
     }
 
     printf("(%u,%u,%u,%.1f,%1.f)\n",m,n,r,tt_total,(double)peakpeak/1024./1024./1024.);
@@ -2129,11 +2197,11 @@ void plingen_tuning(abdst_field ab, unsigned int m, unsigned int n, MPI_Comm com
     unsigned int N = 37000000;
     unsigned int T = 4;
     unsigned int r = 1;
-    size_t max_transform_ram;
+    size_t max_ram;
     {
         double dtmp = 1;
-        param_list_parse_double(pl, "max_transform_ram", &dtmp);
-        max_transform_ram = dtmp * (1 << 30);
+        param_list_parse_double(pl, "max_ram", &dtmp);
+        max_ram = dtmp * (1 << 30);
     }
     param_list_parse_uint(pl, "tuning_N", &N);
     param_list_parse_uint(pl, "tuning_T", &T);
@@ -2141,7 +2209,7 @@ void plingen_tuning(abdst_field ab, unsigned int m, unsigned int n, MPI_Comm com
     timing_cache_filename = param_list_lookup_string(pl, "tuning_timing_cache_filename");
 
     read_tcache();
-    plingen_tune_full(ab, m, n, N, r, T, max_transform_ram);
+    plingen_tune_full(ab, m, n, N, r, T, max_ram);
     write_tcache();
 
     /* XXX BUG: with depth adjustment==0 early on, we get check failures.
