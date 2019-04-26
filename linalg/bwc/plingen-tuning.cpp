@@ -49,18 +49,14 @@ void plingen_tuning_decl_usage(param_list_ptr pl)
             "minimum end of bench span window");
     param_list_decl_usage(pl, "catchsig",
             "enable intercepting ^C");
+    param_list_decl_usage(pl, "max_transform_ram",
+            "Maximum memory amount to be used for transforms, in GB");
     param_list_decl_usage(pl, "tuning_N",
             "For --tune only: target size for the corresponding matrix");
     param_list_decl_usage(pl, "tuning_T",
             "For --tune only: target number of threads (if for different platform)");
     param_list_decl_usage(pl, "tuning_r",
             "For --tune only: size of the mpi grid (the grid would be r times r)");
-    param_list_decl_usage(pl, "tuning_b",
-            "For --tune only: schedule b times more simultaneous transforms, so that we can have more parallelism. Costs b times more RAM");
-    param_list_decl_usage(pl, "tuning_shrink0",
-            "For --tune only: divide the number of transforms on dimension 0 (m/n for MP, (m+n)/r for MUL) so as to save memory");
-    param_list_decl_usage(pl, "tuning_shrink2",
-            "For --tune only: divide the number of transforms on dimension 2 (m+n)/r for both MP and MUL) so as to save memory");
     param_list_decl_usage(pl, "tuning_timing_cache_filename",
             "For --tune only: save (and re-load) timings for individual transforms in this file\n");
     param_list_decl_usage(pl, "basecase-keep-until",
@@ -70,12 +66,10 @@ void plingen_tuning_lookup_parameters(param_list_ptr pl)
 {
     param_list_lookup_string(pl, "B");
     param_list_lookup_string(pl, "catchsig");
+    param_list_lookup_string(pl, "max_transform_ram");
     param_list_lookup_string(pl, "tuning_N");
     param_list_lookup_string(pl, "tuning_T");
     param_list_lookup_string(pl, "tuning_r");
-    param_list_lookup_string(pl, "tuning_b");
-    param_list_lookup_string(pl, "tuning_shrink0");
-    param_list_lookup_string(pl, "tuning_shrink2");
     param_list_lookup_string(pl, "tuning_timing_cache_filename");
     param_list_lookup_string(pl, "basecase_keep_until");
 }
@@ -1308,7 +1302,6 @@ struct matrix_product_schedule_with_transforms {
 
     tcache_key K;
 
-
     tcache_value per_transform, per_matrix, global;
     // size_t peakram;
 
@@ -1325,18 +1318,29 @@ struct matrix_product_schedule_with_transforms {
     unsigned int r;
     unsigned int T;
 
-    /* batch is not used much, because it goes in the direction of
-     * spending _more_ memory, which is rarely what we're interested in.
-     * What this does is that several steps of the outer loop (off size
-     * n1/r) are done simultaneously: more transforms are kept live.
+    /* batch, shrink0, shrink2. Used to be static parameters, now they're
+     * dynamic.
+     *
+     * batch: with batch=b, schedule b times more simultaneous
+     *  transforms, so that we can have more parallelism. Costs b times
+     *  more RAM
+     * shrink0: divide the number of transforms on dimension 0 (m/n for
+     *  MP, (m+n)/r for MUL) so as to save memory
+     * shrink2: divide the number of transforms on dimension 2 (m+n)/r
+     *  for both MP and MUL) so as to save memory
      */
-
-    unsigned int batch;
     /* shrink0 and shrink2 are important. Here, we restrict our operation
      * to shrink0*shrink2 multiplications of matrices of size
      * (n0/shrink0) times (n2/shrink2).
      */
     unsigned int shrink0, shrink2;
+
+    /* batch is not used much, because it goes in the direction of
+     * spending _more_ memory, which is rarely what we're interested in.
+     * What this does is that several steps of the outer loop (off size
+     * n1/r) are done simultaneously: more transforms are kept live.
+     */
+    unsigned int batch;
 
     /* Ram for one transform, in bytes */
     size_t transform_ram;
@@ -1407,6 +1411,35 @@ struct matrix_product_schedule_with_transforms {
 
         return transform_ram * (batch * (r*nrs0 + r*nrs2) + nrs0*nrs2);
     }/*}}}*/
+    matrix_product_schedule_with_transforms use_less_ram() const {
+        matrix_product_schedule_with_transforms res = *this;
+        unsigned int nr0 = iceildiv(n0, r);
+        unsigned int nr2 = iceildiv(n2, r);
+        unsigned int nrs0 = iceildiv(nr0, shrink0);
+        unsigned int nrs2 = iceildiv(nr2, shrink2);
+        if (nrs0 < nrs2 && res.shrink2 < nr2) {
+            res.shrink2++;
+        } else if (res.shrink0 < nr0) {
+            res.shrink0++;
+        } else {
+            char buf[20];
+            std::ostringstream os;
+            os << "Based on the cost at depth " << depth << ", we need at the very least " << size_disp(compute_derived_peak_ram(), buf);
+            os << " [with shrink=(" << shrink0 << "," << shrink2 << "), batch=" << batch << "]";
+            if (depth)
+                os << ", and probably more for the upper levels\n";
+            throw os.str();
+        }
+        return res;
+    }
+    std::pair<bool, matrix_product_schedule_with_transforms> use_more_ram() const {
+        matrix_product_schedule_with_transforms res = *this;
+        unsigned int nr1 = iceildiv(n1, r);
+        if (batch == nr1)
+            return std::make_pair(false, *this);
+        res.batch++;
+        return std::make_pair(true, res);
+    }
     double compute_derived_timings() {/*{{{*/
         double tt_dft0;
         double tt_dft2;
@@ -1454,6 +1487,7 @@ struct matrix_product_schedule_with_transforms {
             /* then we want many live transforms on side 0. */
             T_dft0 = nr1b * iceildiv(nrs0 * batch, T) * tt_dft0;
             T_dft2 = nr1b * nrs2 * iceildiv(batch, T) * tt_dft2;
+            T_conv = nr1b * nrs2 * r * batch * iceildiv(nrs0, T) * tt_conv;
         } else {
             /* then we want many live transforms on side 2. */
             /* typical loop (on each node)
@@ -1474,10 +1508,10 @@ struct matrix_product_schedule_with_transforms {
             */
             T_dft0 = nr1b * nrs0 * iceildiv(batch, T) * tt_dft0;
             T_dft2 = nr1b * iceildiv(nrs2 * batch, T) * tt_dft2;
+            T_conv = nr1b * nrs0 * r * batch * iceildiv(nrs2, T) * tt_conv;
         }
 
-        T_conv = nr1b * nrs0 * r*batch * iceildiv(nrs2, T) * tt_conv;
-        T_ift = iceildiv(nrs0*nrs2,T)*tt_ift;
+        T_ift = iceildiv(nrs0*nrs2,T) * tt_ift;
         T_comm = compute_derived_comm() / mpi_xput;
 
         T_dft0 *= shrink0*shrink2;
@@ -1485,27 +1519,36 @@ struct matrix_product_schedule_with_transforms {
         T_conv *= shrink0*shrink2;
         T_ift  *= shrink0*shrink2;
 
-        per_matrix = std::tie(T_dft0, T_dft2, T_conv, T_ift, T_comm);
+        per_matrix = std::make_tuple(T_dft0, T_dft2, T_conv, T_ift, T_comm);
 
         T_dft0 *= (1 << depth);
         T_dft2 *= (1 << depth);
         T_conv *= (1 << depth);
         T_ift  *= (1 << depth);
 
-        global = std::tie(T_dft0, T_dft2, T_conv, T_ift, T_comm);
+        global = std::make_tuple(T_dft0, T_dft2, T_conv, T_ift, T_comm);
 
         return T_dft0 + T_dft2 + T_conv + T_ift + T_comm;
     }/*}}}*/
-    void report_time_stats_human() const {/*{{{*/
+    void report_time_stats_human(double reference=0) const {/*{{{*/
         double T_dft0, T_dft2, T_conv, T_ift, T_comm;
         std::tie(T_dft0, T_dft2, T_conv, T_ift, T_comm) = global;
-        printf("# total %s %u-threaded time on %u nodes:"
-                " %.1f + %.1f + %.1f + %.1f + %.1f = %.1f\n",
+        double T_total = T_dft0 + T_dft2 + T_conv + T_ift + T_comm;
+        char buf[80] = { '\0' };
+
+        if (reference) {
+            snprintf(buf, sizeof(buf), " [efficiency %.1f%%]", 100.0 * reference / (r * r * T * T_total));
+        }
+
+        printf("# total %s %u-threaded time on %u nodes [shrink=(%u,%u) batch=%u]:"
+                " %.1f + %.1f + %.1f + %.1f + %.1f = %.1f%s\n",
                 step,
                 T,
                 r*r,
-                T_dft0, T_dft2, T_conv, T_ift, T_comm,
-                T_dft0 + T_dft2 + T_conv + T_ift + T_comm);
+                shrink0,
+                shrink2,
+                batch,
+                T_dft0, T_dft2, T_conv, T_ift, T_comm, T_total, buf);
     }/*}}}*/
     void report_size_stats_human() const {/*{{{*/
         char buf[20];
@@ -1529,10 +1572,14 @@ struct matrix_product_schedule_with_transforms {
         printf("# %s transform(res) %s per coeff, %s in total\n", step,
                 size_disp(transform_ram, buf),
                 size_disp(n0*n2*transform_ram, buf2));
+    }/*}}}*/
+    void report_comm_and_peakmem_human() const {/*{{{*/
+        char buf[20];
         size_t comm = compute_derived_comm();
-        size_t peakram = compute_derived_peak_ram();
-        printf("# %s peak memory %s\n", step, size_disp(peakram, buf));
         printf("# %s comm per node %s\n", step, size_disp(comm, buf));
+        size_t peakram = compute_derived_peak_ram();
+        printf("# %s peak memory [shrink=(%u,%u) batch=%u]: %s\n",
+                step, shrink0, shrink2, batch, size_disp(peakram, buf));
     }/*}}}*/
     void report_stats_parsable() const {/*{{{*/
         /* This data will go to a timing cache file, so that we can
@@ -1565,36 +1612,28 @@ struct plingen_tuner {
     size_t L;
     unsigned int r;
     unsigned int T;
+    size_t max_transform_ram;
     cxx_mpz p;
     gmp_randstate_t rstate;
-    unsigned int shrink0;
-    unsigned int shrink2;
-    unsigned int batch;
-    plingen_tuner(abdst_field ab, unsigned int m, unsigned int n, size_t N, unsigned int r, unsigned int T) : ab(ab), m(m), n(n), N(N), r(r), T(T)
+    plingen_tuner(abdst_field ab, unsigned int m, unsigned int n, size_t N, unsigned int r, unsigned int T, size_t max_transform_ram) : ab(ab), m(m), n(n), N(N), r(r), T(T), max_transform_ram(max_transform_ram)
     {
         gmp_randinit_default(rstate);
         gmp_randseed_ui(rstate, 1);
         abfield_characteristic(ab, p);
         L = N/n + N/m;
-    }
-    ~plingen_tuner() {
-        gmp_randclear(rstate);
-    }
-    void set_max_shrink02_and_batch(unsigned int shrink0, unsigned int shrink2, unsigned int batch) {
-        this->shrink0 = shrink0;
-        this->shrink2 = shrink2;
-        this->batch = batch;
-    }
-
-    void say_hello() {
-        printf("Measuring lingen data for N=%zu m=%u n=%u for a %zu-bit prime p, using a %u*%u grid of %u-thread nodes [max shrink=(%u,%u); max batch=%u]\n",
+        char buf[20];
+        printf("Measuring lingen data for N=%zu m=%u n=%u for a %zu-bit prime p, using a %u*%u grid of %u-thread nodes [max target RAM for transforms = %s]\n",
                 N, m, n, mpz_sizeinbase(p, 2),
                 r, r, T,
-                shrink0, shrink2, batch);
+                size_disp(max_transform_ram, buf));
 #ifdef HAVE_OPENMP
         int omp_T = omp_get_max_threads();
         printf("Note: basecase measurements are done using openmp as it is configured for the running code, that is, with %d threads\n", omp_T);
 #endif
+    }
+
+    ~plingen_tuner() {
+        gmp_randclear(rstate);
     }
     double compute_and_report_mpi_threshold_comm() {/*{{{*/
         /* This is the time taken by gather() and scatter() right at the
@@ -1611,7 +1650,7 @@ struct plingen_tuner {
         char buf[20];
         printf("# mpi_threshold comm: %s\n", size_disp(2*data0, buf));
         double tt_com0 = data0 / mpi_xput;
-        printf("# mpi_threshold comm time: %.1f\n", tt_com0);
+        printf("# mpi_threshold comm time: %.1f [%.1f days]\n", tt_com0, tt_com0/86400);
 
         return tt_com0;
     }/*}}}*/
@@ -1638,14 +1677,62 @@ struct plingen_tuner {
             tcache[K] = std::make_tuple(tt, 0., 0., 0., 0.);
         }
 
-        printf("# total basecase time, if threshold=%zu: %.1f\n", L >> i, tt * (1 << i));
+        printf("# total basecase time, if threshold=%zu: %.1f [%.1f days]\n", L >> i, tt * (1 << i), tt * (1 << i) / 86400);
         return tt * (1 << i);
     }/*}}}*/
+    std::tuple<double, size_t> optimize_schedule_and_report(matrix_product_schedule_with_transforms & mystats) {
+        /* Just display the 1-threaded time, for fun */
+        mystats.set_rT(1, 1);
+        mystats.set_shrink02(1, 1);
+        mystats.batch = 1;
+        double reference = mystats.compute_derived_timings();
+        mystats.report_time_stats_human();
+
+        /* Now the more serious one. We also adjust to the allocated
+         * memory */
+        mystats.set_rT(r, T);
+        size_t ram = mystats.compute_derived_peak_ram();
+        if (ram <= max_transform_ram) {
+            for(;;) {
+                auto other = mystats.use_more_ram();
+                if (!other.first)
+                    break;
+                size_t other_ram = other.second.compute_derived_peak_ram();
+                if (other_ram > max_transform_ram)
+                    break;
+                ram = other_ram;
+                mystats = other.second;
+            }
+        } else {
+            try {
+                for( ; ram > max_transform_ram ; ) {
+                    mystats = mystats.use_less_ram();
+                    ram = mystats.compute_derived_peak_ram();
+                }
+            } catch (std::string const & e) {
+                std::ostringstream os;
+                char buf[20];
+                os << "Fatal error: it is not possible to complete this calculation with only " << size_disp(max_transform_ram, buf) << " of memory for intermediate transforms.\n";
+                os << e;
+                throw os.str();
+            }
+        }
+        mystats.compute_derived_timings();
+        mystats.report_time_stats_human(reference);
+        mystats.report_comm_and_peakmem_human();
+
+        mystats.report_stats_parsable();
+
+        return std::make_tuple(
+                mystats.compute_derived_timings(),
+                mystats.compute_derived_peak_ram());
+    }
+
     std::tuple<double, size_t> compute_and_report_mp(int i) { /* {{{ */
         const char * step = "MP";
 
-        size_t csize = (L>>i) / 2;
-        size_t bsize = m * (L>>i) / (m+n) / 2;
+        size_t csize = iceildiv(L, 1 << (i+1));
+        size_t bsize = iceildiv(m * L, (m+n) << (i+1));
         size_t asize = csize + bsize - 1;
 
         ASSERT_ALWAYS(asize >= bsize);
@@ -1662,6 +1749,15 @@ struct plingen_tuner {
 
         fft_get_transform_info_fppol_mp(fti, p, asize, bsize, nacc);
         fft_get_transform_allocs(fft_alloc_sizes, fti);
+
+        matrix_product_schedule_with_transforms mystats(L, i, step, K);
+        mystats.transform_ram = fft_alloc_sizes[0];
+        mystats.set_p(p);
+        mystats.set_n012(n0, n1, n2);
+        mystats.set_abcsize(asize, bsize, csize);
+        /* size stats are only transforms size. They don't depend on
+         * shrink[02] and batch, nor on the timings of course. */
+        mystats.report_size_stats_human();
 
         if (tcache.find(K) == tcache.end()) {/*{{{*/
             double tt_dft0;
@@ -1721,35 +1817,14 @@ struct plingen_tuner {
             matpoly_clear(ab, c);
         }/*}}}*/
 
-        matrix_product_schedule_with_transforms mystats(L, i, step, K);
-
         mystats.per_transform = tcache[K];
-        mystats.transform_ram = fft_alloc_sizes[0];
-        mystats.set_p(p);
-        mystats.set_n012(n0, n1, n2);
-        mystats.set_abcsize(asize, bsize, csize);
-        mystats.set_shrink02(shrink0, shrink2);
-
-        mystats.set_rT(1, 1);
-        mystats.batch = 1;
-        mystats.compute_derived_timings();
-        mystats.report_time_stats_human();
-
-        mystats.set_rT(r, T);
-        mystats.set_shrink02(shrink0, shrink2);
-        mystats.batch = batch;
-        mystats.compute_derived_timings();
-        mystats.report_time_stats_human();
-
-        mystats.report_stats_parsable();
-
-        return std::make_tuple(mystats.compute_derived_timings(), mystats.compute_derived_peak_ram());
+        return optimize_schedule_and_report(mystats);
     } /* }}} */
     std::tuple<double, size_t> compute_and_report_mul(int i) { /* {{{ */
         const char * step = "MUL";
 
-        size_t asize = m * (L>>i) / (m+n) / 2;
-        size_t bsize = m * (L>>i) / (m+n) / 2;
+        size_t asize = iceildiv(m * L, (m+n) << (i+1));
+        size_t bsize = iceildiv(m * L, (m+n) << (i+1));
         size_t csize = asize + bsize - 1;
 
         unsigned int n0 = m + n;
@@ -1764,6 +1839,15 @@ struct plingen_tuner {
 
         fft_get_transform_info_fppol(fti, p, asize, bsize, nacc);
         fft_get_transform_allocs(fft_alloc_sizes, fti);
+
+        matrix_product_schedule_with_transforms mystats(L, i, step, K);
+        mystats.transform_ram = fft_alloc_sizes[0];
+        mystats.set_p(p);
+        mystats.set_n012(n0, n1, n2);
+        mystats.set_abcsize(asize, bsize, csize);
+        /* size stats are only transforms size. They don't depend on
+         * shrink[02] and batch, nor on the timings of course. */
+        mystats.report_size_stats_human();
 
         if (tcache.find(K) == tcache.end()) {/*{{{*/
             double tt_dft0;
@@ -1823,40 +1907,16 @@ struct plingen_tuner {
             matpoly_clear(ab, c);
         }/*}}}*/
 
-        matrix_product_schedule_with_transforms mystats(L, i, step, K);
-
         mystats.per_transform = tcache[K];
-        mystats.transform_ram = fft_alloc_sizes[0];
-        mystats.set_p(p);
-        mystats.set_n012(n0, n1, n2);
-        mystats.set_abcsize(asize, bsize, csize);
-        mystats.set_shrink02(shrink0, shrink2);
-
-        mystats.set_rT(1, 1);
-        mystats.batch = 1;
-        mystats.compute_derived_timings();
-        mystats.report_time_stats_human();
-
-        mystats.set_rT(r, T);
-        mystats.batch = batch;
-        mystats.compute_derived_timings();
-        mystats.report_time_stats_human();
-
-        mystats.report_stats_parsable();
-
-        return std::make_tuple(mystats.compute_derived_timings(), mystats.compute_derived_peak_ram());
+        return optimize_schedule_and_report(mystats);
     } /* }}} */
 };
 
-void plingen_tune_full(abdst_field ab, unsigned int m, unsigned int n, size_t N, unsigned int r, unsigned int T, unsigned int batch, unsigned int shrink0, unsigned int shrink2)/*{{{*/
+void plingen_tune_full(abdst_field ab, unsigned int m, unsigned int n, size_t N, unsigned int r, unsigned int T, size_t max_transform_ram)/*{{{*/
 {
     // cutoff_list cl = NULL;
 
-    plingen_tuner tuner(ab, m, n, N, r, T);
-
-    tuner.set_max_shrink02_and_batch(shrink0, shrink2, batch);
-
-    tuner.say_hello();
+    plingen_tuner tuner(ab, m, n, N, r, T, max_transform_ram);
 
     size_t L = N/n + N/m;
 
@@ -1864,9 +1924,6 @@ void plingen_tune_full(abdst_field ab, unsigned int m, unsigned int n, size_t N,
     bool basecase_eliminated = !basecase_keep_until;
 
     size_t suggest_threshold = 0;
-
-    ASSERT_ALWAYS(m % (r*batch) == 0);
-    ASSERT_ALWAYS(n % (r*batch) == 0);
 
     double tt_com0 = tuner.compute_and_report_mpi_threshold_comm();
 
@@ -1887,8 +1944,18 @@ void plingen_tune_full(abdst_field ab, unsigned int m, unsigned int n, size_t N,
 
         if (!basecase_eliminated)
             tt_basecase_total = tuner.compute_and_report_basecase(i);
-        std::tie(tt_mp_total, peak_mp) = tuner.compute_and_report_mp(i);
-        std::tie(tt_mul_total, peak_mul) = tuner.compute_and_report_mul(i);
+
+        try {
+            std::tie(tt_mp_total, peak_mp) = tuner.compute_and_report_mp(i);
+            std::tie(tt_mul_total, peak_mul) = tuner.compute_and_report_mul(i);
+        } catch (std::string & e) {
+            fputs("\n", stderr);
+            fprintf(stderr, "##################################\n");
+            fputs(e.c_str(), stderr);
+            fprintf(stderr, "##################################\n");
+            fputs("\n", stderr);
+            exit(EXIT_FAILURE);
+        }
 
         if (!basecase_eliminated) {
             if (tt_total_nocomm != 0 && tt_total_nocomm + tt_mp_total + tt_mul_total < tt_basecase_total) {
@@ -1917,7 +1984,7 @@ void plingen_tune_full(abdst_field ab, unsigned int m, unsigned int n, size_t N,
         peakpeak = std::max(peakpeak, std::max(peak_mp, peak_mul));
     }
 
-    printf("(%u,%u,%u,%u,%u,%.1f,%1.f)\n",m,n,r,shrink0,shrink2,tt_total,(double)peakpeak/1024./1024./1024.);
+    printf("(%u,%u,%u,%.1f,%1.f)\n",m,n,r,tt_total,(double)peakpeak/1024./1024./1024.);
 }/*}}}*/
 
 #if 0
@@ -2032,20 +2099,20 @@ void plingen_tuning(abdst_field ab, unsigned int m, unsigned int n, MPI_Comm com
 
     unsigned int N = 37000000;
     unsigned int T = 4;
-    unsigned int b = 1;
     unsigned int r = 1;
-    unsigned int shrink0 = 1;
-    unsigned int shrink2 = 1;
+    size_t max_transform_ram;
+    {
+        double dtmp = 1;
+        param_list_parse_double(pl, "max_transform_ram", &dtmp);
+        max_transform_ram = dtmp * (1 << 30);
+    }
     param_list_parse_uint(pl, "tuning_N", &N);
     param_list_parse_uint(pl, "tuning_T", &T);
     param_list_parse_uint(pl, "tuning_r", &r);
-    param_list_parse_uint(pl, "tuning_b", &b);
-    param_list_parse_uint(pl, "tuning_shrink0", &shrink0);
-    param_list_parse_uint(pl, "tuning_shrink2", &shrink2);
     timing_cache_filename = param_list_lookup_string(pl, "tuning_timing_cache_filename");
 
     read_tcache();
-    plingen_tune_full(ab, m, n, N, r, T, b, shrink0, shrink2);
+    plingen_tune_full(ab, m, n, N, r, T, max_transform_ram);
     write_tcache();
 
     /* XXX BUG: with depth adjustment==0 early on, we get check failures.
