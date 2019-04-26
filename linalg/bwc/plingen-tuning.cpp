@@ -39,6 +39,10 @@
 #include <iostream>
 #include <sstream>
 
+/* Assume we output something like one gigabyte per second. This is
+ * rather conservative for HPC networks */
+static const double mpi_xput = 1e9;
+
 void plingen_tuning_decl_usage(param_list_ptr pl)
 {
     param_list_decl_usage(pl, "B",
@@ -1228,7 +1232,7 @@ void plingen_tune_mp(abdst_field ab, unsigned int m, unsigned int n, cutoff_list
 
 const char * timing_cache_filename = NULL;
 typedef std::tuple<size_t, size_t, size_t, size_t> tcache_key;
-typedef std::tuple<double, double, double, double> tcache_value;
+typedef std::tuple<double, double, double, double, double> tcache_value;
 
 std::map<tcache_key, tcache_value> tcache;
 
@@ -1255,17 +1259,17 @@ void read_tcache()
         size_t op1;
         size_t op2;
         size_t op3;     /* 0: MUL; 1: MP; above: basecase */
-        double t_dft1;
+        double t_dft0;
         double t_dft2;
         double t_conv;
         double t_ift;
         is >> logp >> op1 >> op2 >> op3;
-        is >> t_dft1  >> t_dft2  >> t_conv  >> t_ift;
+        is >> t_dft0  >> t_dft2  >> t_conv >> t_ift;
         if (!is) {
             fprintf(stderr, "parse error in %s\n", timing_cache_filename);
         }
         tcache_key K { logp, op1, op2, op3 };
-        tcache[K] = std::make_tuple(t_dft1, t_dft2, t_conv, t_ift);
+        tcache[K] = std::make_tuple(t_dft0, t_dft2, t_conv, t_ift, 0.0);
     }
     fclose(f);
 }
@@ -1277,59 +1281,584 @@ void write_tcache()
     FILE * f = fopen(timing_cache_filename, "w");
     ASSERT_ALWAYS(f);
     for(auto const & e : tcache) {
-        size_t logp; size_t op1; size_t op2; size_t op3;
-        double t_dft1; double t_dft2; double t_conv; double t_ift;
+        size_t logp, op1, op2, op3;
+        double t_dft0, t_dft2, t_conv, t_ift, t_comm;
 
         std::tie(logp, op1, op2, op3) = e.first;
-        std::tie(t_dft1, t_dft2, t_conv, t_ift) = e.second;
+        std::tie(t_dft0, t_dft2, t_conv, t_ift, t_comm) = e.second;
 
         std::ostringstream os;
         os << logp;
         for(auto x : { op1, op2, op3 }) os << ";" << x;
-        for(auto x : { t_dft1, t_dft2, t_conv, t_ift }) os << ";" << x;
+        for(auto x : { t_dft0, t_dft2, t_conv, t_ift }) os << ";" << x;
 
         fprintf(f, "%s\n", os.str().c_str());
     }
     fclose(f);
 }
 
+struct matrix_product_schedule_with_transforms {
+    /* length of the input at the toplevel */
+    size_t total_length;
+
+    /* recursion depth */
+    unsigned int depth;
+
+    const char * step;
+
+    tcache_key K;
+
+
+    tcache_value per_transform, per_matrix, global;
+    // size_t peakram;
+
+    size_t mpz_size_p;
+
+    /* We're talking products (or any other bilinear operation that uses
+     * transforms 1 by 1, e.g. MP) of matrices of size n0*n1 and n1*n2
+     */
+    unsigned int n0;
+    unsigned int n1;
+    unsigned int n2;
+
+    /* We give timins for a run on r*r nodes, with T threads per node */
+    unsigned int r;
+    unsigned int T;
+
+    /* batch is not used much, because it goes in the direction of
+     * spending _more_ memory, which is rarely what we're interested in.
+     * What this does is that several steps of the outer loop (off size
+     * n1/r) are done simultaneously: more transforms are kept live.
+     */
+
+    unsigned int batch;
+    /* shrink0 and shrink2 are important. Here, we restrict our operation
+     * to shrink0*shrink2 multiplications of matrices of size
+     * (n0/shrink0) times (n2/shrink2).
+     */
+    unsigned int shrink0, shrink2;
+
+    /* Ram for one transform, in bytes */
+    size_t transform_ram;
+
+    /* length of the three operands.
+     * A has dimension n0*n1, length asize
+     * B has dimension n1*n2, length bsize
+     * C has dimension n1*n2, length csize
+     */
+    size_t asize, bsize, csize;
+
+    matrix_product_schedule_with_transforms(size_t L, unsigned int i, const char * step, tcache_key const & K)
+        : total_length(L), depth(i), step(step), K(K) {}
+
+    /* {{{ various set functions */
+    void set_p(cxx_mpz const & p) {
+        mpz_size_p = mpz_size(p);
+    }
+
+    void set_n012(unsigned int _n0, unsigned int _n1, unsigned int _n2) {
+        n0 = _n0;
+        n1 = _n1;
+        n2 = _n2;
+    }
+
+    void set_abcsize(size_t _asize, size_t _bsize, size_t _csize) {
+        asize = _asize;
+        bsize = _bsize;
+        csize = _csize;
+    }
+
+    void set_shrink02(unsigned int _shrink0, unsigned int _shrink2) {
+        shrink0 = _shrink0;
+        shrink2 = _shrink2;
+    }
+
+    void set_rT(unsigned int _r, unsigned int _T) {
+        r = _r;
+        T = _T;
+    }
+    /* }}} */
+    size_t compute_derived_comm() const {/*{{{*/
+        /* Each of the r*r nodes has local matrices size (at most)
+         * nr0*nr1, nr1*nr2, and nr0*nr2. For the actual computations, we
+         * care more about the shrinked submatrices, though */
+        unsigned int nr0 = iceildiv(n0, r);
+        unsigned int nr1 = iceildiv(n1, r);
+        unsigned int nr2 = iceildiv(n2, r);
+
+        /* The shrink parameters will divide the size of the local
+         * matrices we consider by numbers shrink0 and shrink2. This
+         * increases the time, and decreases the memory footprint */
+        unsigned int nrs0 = iceildiv(nr0, shrink0);
+        unsigned int nrs2 = iceildiv(nr2, shrink2);
+        unsigned int ns0 = r * nrs0;
+        unsigned int ns2 = r * nrs2;
+        size_t comm = transform_ram * (ns0+ns2) * nr1;
+        comm *= shrink0*shrink2;
+        comm *= (1 << depth);
+        return comm;
+    }/*}}}*/
+    size_t compute_derived_peak_ram() const {/*{{{*/
+        unsigned int nr0 = iceildiv(n0, r);
+        unsigned int nr2 = iceildiv(n2, r);
+
+        unsigned int nrs0 = iceildiv(nr0, shrink0);
+        unsigned int nrs2 = iceildiv(nr2, shrink2);
+
+        return transform_ram * (batch * (r*nrs0 + r*nrs2) + nrs0*nrs2);
+    }/*}}}*/
+    double compute_derived_timings() {/*{{{*/
+        double tt_dft0;
+        double tt_dft2;
+        double tt_conv;
+        double tt_ift;
+        double dummy_tt_comm; /* zero */
+        double T_dft0, T_dft2, T_conv, T_ift, T_comm;
+
+        std::tie(tt_dft0, tt_dft2, tt_conv, tt_ift, dummy_tt_comm) = tcache[K];
+
+        /* Each of the r*r nodes has local matrices size (at most)
+         * nr0*nr1, nr1*nr2, and nr0*nr2. For the actual computations, we
+         * care more about the shrinked submatrices, though */
+        unsigned int nr0 = iceildiv(n0, r);
+        unsigned int nr1 = iceildiv(n1, r);
+        unsigned int nr2 = iceildiv(n2, r);
+
+        /* The shrink parameters will divide the size of the local
+         * matrices we consider by numbers shrink0 and shrink2. This
+         * increases the time, and decreases the memory footprint */
+        unsigned int nrs0 = iceildiv(nr0, shrink0);
+        unsigned int nrs2 = iceildiv(nr2, shrink2);
+        // unsigned int ns0 = r * nrs0;
+        // unsigned int ns2 = r * nrs2;
+
+        unsigned int nr1b = iceildiv(nr1, batch);
+
+        /* The 1-threaded timing will be obtained by setting T=batch=1.  */
+
+        /* Locally, we'll add together r matrices of size nrs0*nrs2,
+         * which will be computed as products of vectors of size
+         * nrs0*batch and batch*nrs2. The operation will be repeated
+         * nr1/batch * times.
+         */
+
+        /* First, we must decide on the scheduling order for the loop.
+         * Either we compute, collect, and store all transforms on side
+         * 0, and then use the index on side 0 as the inner loop (so that
+         * the transforms on side 0 stay live much longer), or the
+         * converse. This depends on which size has the larger number of
+         * transforms.
+         */
+
+        if (nrs0 < nrs2) {
+            /* then we want many live transforms on side 0. */
+            T_dft0 = nr1b * iceildiv(nrs0 * batch, T) * tt_dft0;
+            T_dft2 = nr1b * nrs2 * iceildiv(batch, T) * tt_dft2;
+        } else {
+            /* then we want many live transforms on side 2. */
+            /* typical loop (on each node)
+                allocate space for nrs0 * nrs2 transforms.
+                for(k = 0 ; k < nr1 ; k += batch)
+                    allocate space for batch * nrs2 * r transforms for b_(k..k+batch-1,j) (this takes into account the * r multiplier that is necessary for the received data).
+                    compute batch * nrs2 transforms locally. This can be done in parallel
+                    share batch * nrs2 transforms with r peers.
+                    for(i = 0 ; i < nrs0 ; i++)
+                        allocate space for batch * r transforms for a_(i,k..k+batch-1) (this takes into account the * r multiplier that is necessary for the received data).
+                        compute batch transforms locally. This can be done in parallel
+                        share batch transforms with r peers.
+                        compute and accumulate r*batch*nrs2 convolution products into only nrs2 destination variables (therefore r*batch passes are necessary in order to avoid conflicts).
+                        free batch * r transforms
+                    free batch * nrs2 * r transforms
+                compute nrs0 * nrs2 inverse transforms locally, in parallel
+                free nrs0 * nrs2 transforms.
+            */
+            T_dft0 = nr1b * nrs0 * iceildiv(batch, T) * tt_dft0;
+            T_dft2 = nr1b * iceildiv(nrs2 * batch, T) * tt_dft2;
+        }
+
+        T_conv = nr1b * nrs0 * r*batch * iceildiv(nrs2, T) * tt_conv;
+        T_ift = iceildiv(nrs0*nrs2,T)*tt_ift;
+        T_comm = compute_derived_comm() / mpi_xput;
+
+        T_dft0 *= shrink0*shrink2;
+        T_dft2 *= shrink0*shrink2;
+        T_conv *= shrink0*shrink2;
+        T_ift  *= shrink0*shrink2;
+
+        per_matrix = std::tie(T_dft0, T_dft2, T_conv, T_ift, T_comm);
+
+        T_dft0 *= (1 << depth);
+        T_dft2 *= (1 << depth);
+        T_conv *= (1 << depth);
+        T_ift  *= (1 << depth);
+
+        global = std::tie(T_dft0, T_dft2, T_conv, T_ift, T_comm);
+
+        return T_dft0 + T_dft2 + T_conv + T_ift + T_comm;
+    }/*}}}*/
+    void report_time_stats_human() const {/*{{{*/
+        double T_dft0, T_dft2, T_conv, T_ift, T_comm;
+        std::tie(T_dft0, T_dft2, T_conv, T_ift, T_comm) = global;
+        printf("# total %s %u-threaded time on %u nodes:"
+                " %.1f + %.1f + %.1f + %.1f + %.1f = %.1f\n",
+                step,
+                T,
+                r*r,
+                T_dft0, T_dft2, T_conv, T_ift, T_comm,
+                T_dft0 + T_dft2 + T_conv + T_ift + T_comm);
+    }/*}}}*/
+    void report_size_stats_human() const {/*{{{*/
+        char buf[20];
+        char buf2[20];
+
+        printf("# %s op1 %s per coeff, %s in total\n", step,
+                size_disp(asize*mpz_size_p*sizeof(mp_limb_t), buf),
+                size_disp(n0*n1*asize*mpz_size_p*sizeof(mp_limb_t), buf2));
+        printf("# %s op2 %s per coeff, %s in total\n", step,
+                size_disp(bsize*mpz_size_p*sizeof(mp_limb_t), buf),
+                size_disp(n1*n2*bsize*mpz_size_p*sizeof(mp_limb_t), buf2));
+        printf("# %s res %s per coeff, %s in total\n", step,
+                size_disp(csize*mpz_size_p*sizeof(mp_limb_t), buf),
+                size_disp(n0*n2*csize*mpz_size_p*sizeof(mp_limb_t), buf2));
+        printf("# %s transform(op1) %s per coeff, %s in total\n", step,
+                size_disp(transform_ram, buf),
+                size_disp(n0*n1*transform_ram, buf2));
+        printf("# %s transform(op2) %s per coeff, %s in total\n", step,
+                size_disp(transform_ram, buf),
+                size_disp(n1*n2*transform_ram, buf2));
+        printf("# %s transform(res) %s per coeff, %s in total\n", step,
+                size_disp(transform_ram, buf),
+                size_disp(n0*n2*transform_ram, buf2));
+        size_t comm = compute_derived_comm();
+        size_t peakram = compute_derived_peak_ram();
+        printf("# %s peak memory %s\n", step, size_disp(peakram, buf));
+        printf("# %s comm per node %s\n", step, size_disp(comm, buf));
+    }/*}}}*/
+    void report_stats_parsable() const {/*{{{*/
+        /* This data will go to a timing cache file, so that we can
+         * easily rerun the program.
+         */
+        double tt_dft0;
+        double tt_dft2;
+        double tt_conv;
+        double tt_ift;
+        double dummy_tt_comm; /* zero */
+        char buf[20];
+
+        std::tie(tt_dft0, tt_dft2, tt_conv, tt_ift, dummy_tt_comm) = tcache[K];
+
+        size_t peakram = compute_derived_peak_ram();
+
+        printf("#;depth;recursive_input_length;step;step_op1_length;step_op2_length;size_one_transform;tt_dft0;tt_dft2;tt_conv;tt_ift\n");
+        printf(";%d;%zu;%s;%zu;%zu;%s;%.2f;%.2f;%.2f;%.2f\n",
+                depth,
+                total_length >> depth, step, asize, bsize, 
+                size_disp(peakram, buf),
+                tt_dft0, tt_dft2, tt_conv, tt_ift);
+    }/*}}}*/
+};
+
+struct plingen_tuner {
+    abdst_field ab;
+    unsigned int m,n;
+    size_t N;
+    size_t L;
+    unsigned int r;
+    unsigned int T;
+    cxx_mpz p;
+    gmp_randstate_t rstate;
+    unsigned int shrink0;
+    unsigned int shrink2;
+    unsigned int batch;
+    plingen_tuner(abdst_field ab, unsigned int m, unsigned int n, size_t N, unsigned int r, unsigned int T) : ab(ab), m(m), n(n), N(N), r(r), T(T)
+    {
+        gmp_randinit_default(rstate);
+        gmp_randseed_ui(rstate, 1);
+        abfield_characteristic(ab, p);
+        L = N/n + N/m;
+    }
+    ~plingen_tuner() {
+        gmp_randclear(rstate);
+    }
+    void set_max_shrink02_and_batch(unsigned int shrink0, unsigned int shrink2, unsigned int batch) {
+        this->shrink0 = shrink0;
+        this->shrink2 = shrink2;
+        this->batch = batch;
+    }
+
+    void say_hello() {
+        printf("Measuring lingen data for N=%zu m=%u n=%u for a %zu-bit prime p, using a %u*%u grid of %u-thread nodes [max shrink=(%u,%u); max batch=%u]\n",
+                N, m, n, mpz_sizeinbase(p, 2),
+                r, r, T,
+                shrink0, shrink2, batch);
+#ifdef HAVE_OPENMP
+        int omp_T = omp_get_max_threads();
+        printf("Note: basecase measurements are done using openmp as it is configured for the running code, that is, with %d threads\n", omp_T);
+#endif
+    }
+    double compute_and_report_mpi_threshold_comm() {/*{{{*/
+        /* This is the time taken by gather() and scatter() right at the
+         * threshold point. This total time is independent of the
+         * threshold itself, in fact.
+         */
+        size_t S = abvec_elt_stride(ab, 1);
+        size_t data0 = m*(m+n)*(r*r-1);
+        data0 = data0 * L * S;
+        // We must **NOT** divide by r*r, because the problem is
+        // precisely caused by the fact that gather() and scatter() all
+        // imply one contention point which is the central node.
+        // data0 = data0 / (r*r);
+        char buf[20];
+        printf("# mpi_threshold comm: %s\n", size_disp(2*data0, buf));
+        double tt_com0 = data0 / mpi_xput;
+        printf("# mpi_threshold comm time: %.1f\n", tt_com0);
+
+        return tt_com0;
+    }/*}}}*/
+    double compute_and_report_basecase(int i) { /*{{{*/
+        double tt;
+        /* no real necessity, except that we're using 0 and 1 as
+         * markers.
+         */
+        ASSERT_ALWAYS((L >> i) > 1);
+        /*
+         * FIXME There's also a real problem with multithreading
+         * here.  test_basecase uses openmp, and we must check that
+         * the stored cache data properly records the number of
+         * threads that were used !
+         */
+        tcache_key K { mpz_sizeinbase(p, 2), m, n, L >> i };
+        if (tcache.find(K) != tcache.end()) {
+            tt = std::get<0>(tcache[K]);
+        } else {
+            tt = wct_seconds();
+            extern void test_basecase(abdst_field ab, unsigned int m, unsigned int n, size_t L, gmp_randstate_t rstate);
+            test_basecase(ab, m, n, L >> i, rstate);
+            tt = wct_seconds() - tt;
+            tcache[K] = std::make_tuple(tt, 0., 0., 0., 0.);
+        }
+
+        printf("# total basecase time, if threshold=%zu: %.1f\n", L >> i, tt * (1 << i));
+        return tt * (1 << i);
+    }/*}}}*/
+    std::tuple<double, size_t> compute_and_report_mp(int i) { /* {{{ */
+        const char * step = "MP";
+
+        size_t csize = (L>>i) / 2;
+        size_t bsize = m * (L>>i) / (m+n) / 2;
+        size_t asize = csize + bsize - 1;
+
+        ASSERT_ALWAYS(asize >= bsize);
+
+        unsigned int n0 = m;
+        unsigned int n1 = m + n;
+        unsigned int n2 = m + n;
+
+        tcache_key K { mpz_sizeinbase(p, 2), asize, bsize, 1 };
+
+        struct fft_transform_info fti[1];
+        size_t fft_alloc_sizes[3];
+        int nacc = m+n;
+
+        fft_get_transform_info_fppol_mp(fti, p, asize, bsize, nacc);
+        fft_get_transform_allocs(fft_alloc_sizes, fti);
+
+        if (tcache.find(K) == tcache.end()) {/*{{{*/
+            double tt_dft0;
+            double tt_dft2;
+            double tt_conv;
+            double tt_ift;
+
+            /* make all of these 1*1 matrices, just for timing purposes */
+            matpoly a, b, c;
+            matpoly_init(ab, a, 1, 1, asize);
+            matpoly_init(ab, b, 1, 1, bsize);
+            matpoly_init(ab, c, 1, 1, csize);
+            matpoly_fill_random(ab, a, asize, rstate);
+            matpoly_fill_random(ab, b, bsize, rstate);
+
+            /* bogus, I think
+               unsigned int adj = cl ? cutoff_list_get(cl, (L>>i)) : UINT_MAX;
+               if (adj != UINT_MAX) fft_transform_info_adjust_depth(fti, adj);
+               */
+
+            matpoly_ft tc, ta, tb;
+            matpoly_clear(ab, c);
+            matpoly_init(ab, c, a->m, b->n, csize);
+
+            matpoly_ft_init(ab, ta, a->m, a->n, fti);
+            matpoly_ft_init(ab, tb, b->m, b->n, fti);
+            matpoly_ft_init(ab, tc, a->m, b->n, fti);
+
+            double tt = 0;
+
+            tt = -wct_seconds();
+            matpoly_ft_dft(ab, ta, a, fti, 0);
+            tt_dft0 = wct_seconds() + tt;
+
+            tt = -wct_seconds();
+            matpoly_ft_dft(ab, tb, b, fti, 0);
+            tt_dft2 = wct_seconds() + tt;
+
+            tt = -wct_seconds();
+            matpoly_ft_mul(ab, tc, ta, tb, fti, 0);
+            tt_conv = wct_seconds() + tt;
+
+            tt = -wct_seconds();
+            c->size = csize;
+            ASSERT_ALWAYS(c->size <= c->alloc);
+            matpoly_ft_ift_mp(ab, c, tc, MIN(a->size, b->size) - 1, fti, 0);
+            tt_ift = wct_seconds() + tt;
+
+            matpoly_ft_clear(ab, ta, fti);
+            matpoly_ft_clear(ab, tb, fti);
+            matpoly_ft_clear(ab, tc,  fti);
+
+            tcache[K] = std::make_tuple(tt_dft0, tt_dft2, tt_conv, tt_ift, 0);
+
+            matpoly_clear(ab, a);
+            matpoly_clear(ab, b);
+            matpoly_clear(ab, c);
+        }/*}}}*/
+
+        matrix_product_schedule_with_transforms mystats(L, i, step, K);
+
+        mystats.per_transform = tcache[K];
+        mystats.transform_ram = fft_alloc_sizes[0];
+        mystats.set_p(p);
+        mystats.set_n012(n0, n1, n2);
+        mystats.set_abcsize(asize, bsize, csize);
+        mystats.set_shrink02(shrink0, shrink2);
+
+        mystats.set_rT(1, 1);
+        mystats.batch = 1;
+        mystats.compute_derived_timings();
+        mystats.report_time_stats_human();
+
+        mystats.set_rT(r, T);
+        mystats.set_shrink02(shrink0, shrink2);
+        mystats.batch = batch;
+        mystats.compute_derived_timings();
+        mystats.report_time_stats_human();
+
+        mystats.report_stats_parsable();
+
+        return std::make_tuple(mystats.compute_derived_timings(), mystats.compute_derived_peak_ram());
+    } /* }}} */
+    std::tuple<double, size_t> compute_and_report_mul(int i) { /* {{{ */
+        const char * step = "MUL";
+
+        size_t asize = m * (L>>i) / (m+n) / 2;
+        size_t bsize = m * (L>>i) / (m+n) / 2;
+        size_t csize = asize + bsize - 1;
+
+        unsigned int n0 = m + n;
+        unsigned int n1 = m + n;
+        unsigned int n2 = m + n;
+
+        tcache_key K { mpz_sizeinbase(p, 2), asize, bsize, 0 };
+
+        struct fft_transform_info fti[1];
+        size_t fft_alloc_sizes[3];
+        int nacc = m+n;
+
+        fft_get_transform_info_fppol(fti, p, asize, bsize, nacc);
+        fft_get_transform_allocs(fft_alloc_sizes, fti);
+
+        if (tcache.find(K) == tcache.end()) {/*{{{*/
+            double tt_dft0;
+            double tt_dft2;
+            double tt_conv;
+            double tt_ift;
+
+            /* make all of these 1*1 matrices, just for timing purposes */
+            matpoly a, b, c;
+            matpoly_init(ab, a, 1, 1, asize);
+            matpoly_init(ab, b, 1, 1, bsize);
+            matpoly_init(ab, c, 1, 1, csize);
+            matpoly_fill_random(ab, a, asize, rstate);
+            matpoly_fill_random(ab, b, bsize, rstate);
+
+            /* bogus, I think
+               unsigned int adj = cl ? cutoff_list_get(cl, (L>>i)) : UINT_MAX;
+               if (adj != UINT_MAX) fft_transform_info_adjust_depth(fti, adj);
+               */
+
+            matpoly_ft tc, ta, tb;
+            matpoly_clear(ab, c);
+            matpoly_init(ab, c, a->m, b->n, csize);
+
+            matpoly_ft_init(ab, ta, a->m, a->n, fti);
+            matpoly_ft_init(ab, tb, b->m, b->n, fti);
+            matpoly_ft_init(ab, tc, a->m, b->n, fti);
+
+            double tt = 0;
+
+            tt = -wct_seconds();
+            matpoly_ft_dft(ab, ta, a, fti, 0);
+            tt_dft0 = wct_seconds() + tt;
+
+            tt = -wct_seconds();
+            matpoly_ft_dft(ab, tb, b, fti, 0);
+            tt_dft2 = wct_seconds() + tt;
+
+            tt = -wct_seconds();
+            matpoly_ft_mul(ab, tc, ta, tb, fti, 0);
+            tt_conv = wct_seconds() + tt;
+
+            tt = -wct_seconds();
+            c->size = csize;
+            ASSERT_ALWAYS(c->size <= c->alloc);
+            matpoly_ft_ift(ab, c, tc, fti, 0);
+            tt_ift = wct_seconds() + tt;
+
+            matpoly_ft_clear(ab, ta, fti);
+            matpoly_ft_clear(ab, tb, fti);
+            matpoly_ft_clear(ab, tc,  fti);
+
+            tcache[K] = std::make_tuple(tt_dft0, tt_dft2, tt_conv, tt_ift, 0);
+
+            matpoly_clear(ab, a);
+            matpoly_clear(ab, b);
+            matpoly_clear(ab, c);
+        }/*}}}*/
+
+        matrix_product_schedule_with_transforms mystats(L, i, step, K);
+
+        mystats.per_transform = tcache[K];
+        mystats.transform_ram = fft_alloc_sizes[0];
+        mystats.set_p(p);
+        mystats.set_n012(n0, n1, n2);
+        mystats.set_abcsize(asize, bsize, csize);
+        mystats.set_shrink02(shrink0, shrink2);
+
+        mystats.set_rT(1, 1);
+        mystats.batch = 1;
+        mystats.compute_derived_timings();
+        mystats.report_time_stats_human();
+
+        mystats.set_rT(r, T);
+        mystats.batch = batch;
+        mystats.compute_derived_timings();
+        mystats.report_time_stats_human();
+
+        mystats.report_stats_parsable();
+
+        return std::make_tuple(mystats.compute_derived_timings(), mystats.compute_derived_peak_ram());
+    } /* }}} */
+};
+
 void plingen_tune_full(abdst_field ab, unsigned int m, unsigned int n, size_t N, unsigned int r, unsigned int T, unsigned int batch, unsigned int shrink0, unsigned int shrink2)/*{{{*/
 {
     // cutoff_list cl = NULL;
 
-    gmp_randstate_t rstate;
-    gmp_randinit_default(rstate);
-    gmp_randseed_ui(rstate, 1);
-    mpz_t p;
-    mpz_init(p);
-    abfield_characteristic(ab, p);
+    plingen_tuner tuner(ab, m, n, N, r, T);
 
-    /* Assume we output something like one gigabyte per second. This is
-     * rather conservative for HPC networks */
-    double mpi_xput = 1e9;
+    tuner.set_max_shrink02_and_batch(shrink0, shrink2, batch);
 
-    printf("Measuring lingen data for N=%zu m=%u n=%u for a %zu-bit prime p, using a %u*%u grid of %u-thread nodes, with %u-fold batching\n",
-            N, m, n, mpz_sizeinbase(p, 2), r, r, T, batch);
+    tuner.say_hello();
 
     size_t L = N/n + N/m;
-
-#ifdef HAVE_OPENMP
-    int omp_T = omp_get_max_threads();
-    printf("Note: basecase measurements are done using openmp as it is configured for the running code, that is, with %d threads\n", omp_T);
-#endif
-    extern void test_basecase(abdst_field ab, unsigned int m, unsigned int n, size_t L, gmp_randstate_t rstate);
-
-    char buf[20];
-    char buf2[20];
-
-    size_t S = abvec_elt_stride(ab, 1);
-    size_t data0 = m*(m+n)*(r*r-1);
-    data0 = data0 * L * S;
-    data0 = data0 / (r*r);
-    printf("# mpi_threshold comm: %s\n",
-            size_disp(2*data0, buf));
-    double tt_com0 = data0 / mpi_xput;
-    printf("# mpi_threshold comm time: %.1f\n", tt_com0);
 
     /* with basecase_keep_until == 0, then we never measure basecase */
     bool basecase_eliminated = !basecase_keep_until;
@@ -1339,15 +1868,16 @@ void plingen_tune_full(abdst_field ab, unsigned int m, unsigned int n, size_t N,
     ASSERT_ALWAYS(m % (r*batch) == 0);
     ASSERT_ALWAYS(n % (r*batch) == 0);
 
+    double tt_com0 = tuner.compute_and_report_mpi_threshold_comm();
+
     double tt_total = tt_com0 * 2;
+    double tt_total_nocomm = 0;
     size_t peakpeak=0;
 
     for(int i = log2(L) ; i>=0 ; i--) {
-        if (m * (L>>i) / (m+n) <= 2) continue;
+        if (m * (L>>i) / (m+n) < 1) continue;
 
         printf("########## Measuring time at depth %d ##########\n", i);
-
-        int nacc = m+n;
 
         double tt_basecase_total = 0;
         double tt_mp_total = 0;
@@ -1355,376 +1885,39 @@ void plingen_tune_full(abdst_field ab, unsigned int m, unsigned int n, size_t N,
         size_t peak_mp = 0;
         size_t peak_mul = 0;
 
-        if (!basecase_eliminated) {/*{{{*/
-            double tt;
-            tcache_key K { mpz_sizeinbase(p, 2), m, n, L >> i };
-            if (tcache.find(K) != tcache.end()) {
-                tt = std::get<0>(tcache[K]);
-            } else {
-                tt = wct_seconds();
-                test_basecase(ab, m, n, L >> i, rstate);
-                tt = wct_seconds() - tt;
-                tcache[K] = std::make_tuple(tt, 0., 0., 0.);
-            }
-
-            printf("# total basecase time, if threshold=%zu: %.1f\n", L >> i, tt * (1 << i));
-            tt_basecase_total = tt * (1 << i);
-        }/*}}}*/
-
-        /* {{{ Middle product first */
-        {
-            const char * step = "MP";
-
-            size_t csize = (L>>i) / 2;
-            size_t bsize = m * (L>>i) / (m+n) / 2;
-            size_t asize = csize + bsize - 1;
-
-            ASSERT_ALWAYS(asize >= bsize);
-
-            unsigned int n0 = m;
-            unsigned int n1 = m + n;
-            unsigned int n2 = m + n;
-
-            double tt_dft1;
-            double tt_dft2;
-            double tt_conv;
-            double tt_ift;
-
-            tcache_key K { mpz_sizeinbase(p, 2), asize, bsize, 1 };
-
-            struct fft_transform_info fti[1];
-            size_t fft_alloc_sizes[3];
-            fft_get_transform_info_fppol_mp(fti, p, asize, bsize, nacc);
-            fft_get_transform_allocs(fft_alloc_sizes, fti);
-
-            if (tcache.find(K) != tcache.end()) {
-                std::tie(tt_dft1, tt_dft2, tt_conv, tt_ift) = tcache[K];
-            } else {
-                /* make all of these 1*1 matrices, just for timing purposes */
-                matpoly a, b, c;
-                matpoly_init(ab, a, 1, 1, asize);
-                matpoly_init(ab, b, 1, 1, bsize);
-                matpoly_init(ab, c, 1, 1, csize);
-                matpoly_fill_random(ab, a, asize, rstate);
-                matpoly_fill_random(ab, b, bsize, rstate);
-
-                /* bogus, I think
-                   unsigned int adj = cl ? cutoff_list_get(cl, (L>>i)) : UINT_MAX;
-                   if (adj != UINT_MAX) fft_transform_info_adjust_depth(fti, adj);
-                   */
-
-                matpoly_ft tc, ta, tb;
-                matpoly_clear(ab, c);
-                matpoly_init(ab, c, a->m, b->n, csize);
-
-                matpoly_ft_init(ab, ta, a->m, a->n, fti);
-                matpoly_ft_init(ab, tb, b->m, b->n, fti);
-                matpoly_ft_init(ab, tc, a->m, b->n, fti);
-
-                double tt = 0;
-
-                tt = -wct_seconds();
-                matpoly_ft_dft(ab, ta, a, fti, 0);
-                tt_dft1 = wct_seconds() + tt;
-
-                tt = -wct_seconds();
-                matpoly_ft_dft(ab, tb, b, fti, 0);
-                tt_dft2 = wct_seconds() + tt;
-
-                tt = -wct_seconds();
-                matpoly_ft_mul(ab, tc, ta, tb, fti, 0);
-                tt_conv = wct_seconds() + tt;
-
-                tt = -wct_seconds();
-                c->size = csize;
-                ASSERT_ALWAYS(c->size <= c->alloc);
-                matpoly_ft_ift_mp(ab, c, tc, MIN(a->size, b->size) - 1, fti, 0);
-                tt_ift = wct_seconds() + tt;
-
-                matpoly_ft_clear(ab, ta, fti);
-                matpoly_ft_clear(ab, tb, fti);
-                matpoly_ft_clear(ab, tc,  fti);
-
-                tcache[K] = std::tie(tt_dft1, tt_dft2, tt_conv, tt_ift);
-
-                matpoly_clear(ab, a);
-                matpoly_clear(ab, b);
-                matpoly_clear(ab, c);
-            }
-
-
-            printf("#;depth;recursive_input_length;step;step_op1_length;step_op2_length;size_one_transform;tt_dft1;tt_dft2;tt_conv;tt_ift\n");
-            printf(";%d;%zu;%s;%zu;%zu;%s;%.2f;%.2f;%.2f;%.2f\n",
-                    i,
-                    (L>>i), step, asize, bsize, 
-                    size_disp(fft_alloc_sizes[0], buf),
-                    tt_dft1, tt_dft2, tt_conv, tt_ift);
-
-            printf("# %s op1 %s per coeff, %s in total\n", step,
-                    size_disp(asize*mpz_size(p)*sizeof(mp_limb_t), buf),
-                    size_disp(n0*n1*asize*mpz_size(p)*sizeof(mp_limb_t), buf2));
-            printf("# %s op2 %s per coeff, %s in total\n", step,
-                    size_disp(bsize*mpz_size(p)*sizeof(mp_limb_t), buf),
-                    size_disp(n1*n2*bsize*mpz_size(p)*sizeof(mp_limb_t), buf2));
-            printf("# %s res %s per coeff, %s in total\n", step,
-                    size_disp(csize*mpz_size(p)*sizeof(mp_limb_t), buf),
-                    size_disp(n0*n2*csize*mpz_size(p)*sizeof(mp_limb_t), buf2));
-            printf("# %s transform(op1) %s per coeff, %s in total\n", step,
-                    size_disp(fft_alloc_sizes[0], buf),
-                    size_disp(n0*n1*fft_alloc_sizes[0], buf2));
-            printf("# %s transform(op2) %s per coeff, %s in total\n", step,
-                    size_disp(fft_alloc_sizes[0], buf),
-                    size_disp(n1*n2*fft_alloc_sizes[0], buf2));
-            printf("# %s transform(res) %s per coeff, %s in total\n", step,
-                    size_disp(fft_alloc_sizes[0], buf),
-                    size_disp(n0*n2*fft_alloc_sizes[0], buf2));
-
-
-            double T_dft1 = (n0/r)*(n1/r)*tt_dft1;
-            double T_dft2 = (n1/r)*(n2/r)*tt_dft2;
-            double T_ift = (n0/r)*(n2/r)*tt_ift;
-            double T_conv = (n1/r)*r*(n0/r)*(n2/r)*tt_conv;
-
-            T_dft1 = T_dft1 * (1 << i);
-            T_dft2 = T_dft2 * (1 << i);
-            T_conv = T_conv * (1 << i);
-            T_ift = T_ift * (1 << i);
-
-            printf("# total %s 1-threaded time on %u nodes:"
-                    " %.1f + %.1f + %.1f + %.1f = %.1f\n",
-                    step, r*r,
-                    T_dft1, T_dft2, T_conv, T_ift,
-                    T_dft1 + T_dft2 + T_conv + T_ift);
-
-            if (n0/shrink0 < n2/shrink2) {
-                /* then we want many live transforms on side 0 */
-                T_dft1 = (n1/r/batch)*iceildiv(n0*batch/r,shrink0*T)*tt_dft1;
-                T_dft2 = (n1/r/batch)*n2/shrink2*iceildiv(batch,T)*tt_dft2;
-            } else {
-                /* otherwise many live transforms on side 2 */
-                T_dft1 = (n1/r/batch)*n0/shrink0*iceildiv(batch,T)*tt_dft1;
-                T_dft2 = (n1/r/batch)*iceildiv(n2*batch/r,shrink2*T)*tt_dft2;
-            }
-            T_conv = (n1/r/batch)*r*batch*iceildiv((n0/r/shrink0)*(n2/r/shrink2),T)*tt_conv;
-            T_ift = iceildiv((n0/r/shrink0)*(n2/r/shrink2),T)*tt_ift;
-
-            T_dft1 = shrink0*shrink2*T_dft1;
-            T_dft2 = shrink0*shrink2*T_dft2;
-            T_conv = shrink0*shrink2*T_conv;
-            T_ift = shrink0*shrink2*T_ift;
-
-            T_dft1 = T_dft1 * (1 << i);
-            T_dft2 = T_dft2 * (1 << i);
-            T_conv = T_conv * (1 << i);
-            T_ift = T_ift * (1 << i);
-
-            printf("# total %s %u-threaded time on %u nodes:"
-                    " %.1f + %.1f + %.1f + %.1f = %.1f\n",
-                    step, T, r*r,
-                    T_dft1, T_dft2, T_conv, T_ift,
-                    T_dft1 + T_dft2 + T_conv + T_ift);
-
-            size_t peak = fft_alloc_sizes[0] * (batch*(r*n0/r/shrink0+r*n2/r/shrink2) + (n0/r/shrink0)*(n2/r/shrink2));
-            size_t comm = fft_alloc_sizes[0] * (n0+n2) * (n1/r) << i;
-            double T_comm = comm / mpi_xput;
-
-            printf("# %s peak memory %s\n", step, size_disp(peak, buf));
-            printf("# %s comm per node %s\n", step, size_disp(comm, buf));
-            printf("# %s comm time %.1f\n", step, T_comm);
-
-            tt_mp_total = T_dft1 + T_dft2 + T_conv + T_ift + T_comm;
-            peak_mp = peak;
-        }
-        /* }}} */
-
-        /* {{{ Then the plain product */
-        {
-            const char * step = "MUL";
-
-            size_t asize = m * (L>>i) / (m+n) / 2;
-            size_t bsize = m * (L>>i) / (m+n) / 2;
-            size_t csize = asize + bsize - 1;
-
-            unsigned int n0 = m + n;
-            unsigned int n1 = m + n;
-            unsigned int n2 = m + n;
-
-            double tt_dft1;
-            double tt_dft2;
-            double tt_conv;
-            double tt_ift;
-
-            tcache_key K { mpz_sizeinbase(p, 2), asize, bsize, 0 };
-
-            struct fft_transform_info fti[1];
-            size_t fft_alloc_sizes[3];
-            fft_get_transform_info_fppol(fti, p, asize, bsize, nacc);
-            fft_get_transform_allocs(fft_alloc_sizes, fti);
-
-            if (tcache.find(K) != tcache.end()) {
-                std::tie(tt_dft1, tt_dft2, tt_conv, tt_ift) = tcache[K];
-            } else {
-                /* make all of these 1*1 matrices, just for timing purposes */
-                matpoly a, b, c;
-                matpoly_init(ab, a, 1, 1, asize);
-                matpoly_init(ab, b, 1, 1, bsize);
-                matpoly_init(ab, c, 1, 1, csize);
-                matpoly_fill_random(ab, a, asize, rstate);
-                matpoly_fill_random(ab, b, bsize, rstate);
-
-                /* bogus, I think
-                   unsigned int adj = cl ? cutoff_list_get(cl, (L>>i)) : UINT_MAX;
-                   if (adj != UINT_MAX) fft_transform_info_adjust_depth(fti, adj);
-                   */
-
-                matpoly_ft tc, ta, tb;
-                matpoly_clear(ab, c);
-                matpoly_init(ab, c, a->m, b->n, csize);
-
-                matpoly_ft_init(ab, ta, a->m, a->n, fti);
-                matpoly_ft_init(ab, tb, b->m, b->n, fti);
-                matpoly_ft_init(ab, tc, a->m, b->n, fti);
-
-                double tt = 0;
-
-                tt = -wct_seconds();
-                matpoly_ft_dft(ab, ta, a, fti, 0);
-                tt_dft1 = wct_seconds() + tt;
-
-                tt = -wct_seconds();
-                matpoly_ft_dft(ab, tb, b, fti, 0);
-                tt_dft2 = wct_seconds() + tt;
-
-                tt = -wct_seconds();
-                matpoly_ft_mul(ab, tc, ta, tb, fti, 0);
-                tt_conv = wct_seconds() + tt;
-
-                tt = -wct_seconds();
-                c->size = csize;
-                ASSERT_ALWAYS(c->size <= c->alloc);
-                matpoly_ft_ift(ab, c, tc, fti, 0);
-                tt_ift = wct_seconds() + tt;
-
-                matpoly_ft_clear(ab, ta, fti);
-                matpoly_ft_clear(ab, tb, fti);
-                matpoly_ft_clear(ab, tc,  fti);
-
-                tcache[K] = std::tie(tt_dft1, tt_dft2, tt_conv, tt_ift);
-
-                matpoly_clear(ab, a);
-                matpoly_clear(ab, b);
-                matpoly_clear(ab, c);
-            }
-
-            printf("#;depth;recursive_input_length;step;step_op1_length;step_op2_length;size_one_transform;tt_dft1;tt_dft2;tt_conv;tt_ift\n");
-            printf(";%d;%zu;%s;%zu;%zu;%s;%.2f;%.2f;%.2f;%.2f\n",
-                    i,
-                    (L>>i), step, asize, bsize, 
-                    size_disp(fft_alloc_sizes[0], buf),
-                    tt_dft1, tt_dft2, tt_conv, tt_ift);
-            printf("# %s op1 %s per coeff, %s in total\n", step,
-                    size_disp(asize*mpz_size(p)*sizeof(mp_limb_t), buf),
-                    size_disp(n0*n1*asize*mpz_size(p)*sizeof(mp_limb_t), buf2));
-            printf("# %s op2 %s per coeff, %s in total\n", step,
-                    size_disp(bsize*mpz_size(p)*sizeof(mp_limb_t), buf),
-                    size_disp(n1*n2*bsize*mpz_size(p)*sizeof(mp_limb_t), buf2));
-            printf("# %s res %s per coeff, %s in total\n", step,
-                    size_disp(csize*mpz_size(p)*sizeof(mp_limb_t), buf),
-                    size_disp(n0*n2*csize*mpz_size(p)*sizeof(mp_limb_t), buf2));
-            printf("# %s transform(op1) %s per coeff, %s in total\n", step,
-                    size_disp(fft_alloc_sizes[0], buf),
-                    size_disp(n0*n1*fft_alloc_sizes[0], buf2));
-            printf("# %s transform(op2) %s per coeff, %s in total\n", step,
-                    size_disp(fft_alloc_sizes[0], buf),
-                    size_disp(n1*n2*fft_alloc_sizes[0], buf2));
-            printf("# %s transform(res) %s per coeff, %s in total\n", step,
-                    size_disp(fft_alloc_sizes[0], buf),
-                    size_disp(n0*n2*fft_alloc_sizes[0], buf2));
-
-            double T_dft1 = (n0/r)*(n1/r)*tt_dft1;
-            double T_dft2 = (n1/r)*(n2/r)*tt_dft2;
-            double T_ift = (n0/r)*(n2/r)*tt_ift;
-            double T_conv = (n1/r)*r*(n0/r)*(n2/r)*tt_conv;
-
-            T_dft1 = T_dft1 * (1 << i);
-            T_dft2 = T_dft2 * (1 << i);
-            T_conv = T_conv * (1 << i);
-            T_ift = T_ift * (1 << i);
-
-            printf("# %s 1-threaded time on %u nodes:"
-                    " %.1f + %.1f + %.1f + %.1f = %.1f\n",
-                    step, r*r,
-                    T_dft1, T_dft2, T_conv, T_ift,
-                    T_dft1 + T_dft2 + T_conv + T_ift);
-
-            if (n0/shrink0 < n2/shrink2) {
-                /* then we want many live transforms on side 0 */
-                T_dft1 = (n1/r/batch)*iceildiv(n0*batch/r,shrink0*T)*tt_dft1;
-                T_dft2 = (n1/r/batch)*n2/shrink2*iceildiv(batch,T)*tt_dft2;
-            } else {
-                /* otherwise many live transforms on side 2 */
-                T_dft1 = (n1/r/batch)*n0/shrink0*iceildiv(batch,T)*tt_dft1;
-                T_dft2 = (n1/r/batch)*iceildiv(n2*batch/r,shrink2*T)*tt_dft2;
-            }
-            T_conv = (n1/r/batch)*r*batch*iceildiv((n0/r/shrink0)*(n2/r/shrink2),T)*tt_conv;
-            T_ift = iceildiv((n0/r/shrink0)*(n2/r/shrink2),T)*tt_ift;
-
-            T_dft1 = shrink0*shrink2*T_dft1;
-            T_dft2 = shrink0*shrink2*T_dft2;
-            T_conv = shrink0*shrink2*T_conv;
-            T_ift = shrink0*shrink2*T_ift;
-
-            T_dft1 = T_dft1 * (1 << i);
-            T_dft2 = T_dft2 * (1 << i);
-            T_conv = T_conv * (1 << i);
-            T_ift = T_ift * (1 << i);
-
-            printf("# %s %u-threaded time on %u nodes:"
-                    " %.1f + %.1f + %.1f + %.1f = %.1f\n",
-                    step, T, r*r,
-                    T_dft1, T_dft2, T_conv, T_ift,
-                    T_dft1 + T_dft2 + T_conv + T_ift);
-
-            size_t peak = fft_alloc_sizes[0] * (batch*(r*n0/r/shrink0+r*n2/r/shrink2) + (n0/r/shrink0)*(n2/r/shrink2));
-            size_t comm = fft_alloc_sizes[0] * (n0+n2) * (n1/r) << i;
-            double T_comm = comm / mpi_xput;
-
-            printf("# %s peak memory %s\n", step, size_disp(peak, buf));
-            printf("# %s comm per node %s\n", step, size_disp(comm, buf));
-            printf("# %s comm time %.1f\n", step, T_comm);
-
-            tt_mul_total = T_dft1 + T_dft2 + T_conv + T_ift + T_comm;
-            peak_mul = peak;
-        }
-        /* }}} */
+        if (!basecase_eliminated)
+            tt_basecase_total = tuner.compute_and_report_basecase(i);
+        std::tie(tt_mp_total, peak_mp) = tuner.compute_and_report_mp(i);
+        std::tie(tt_mul_total, peak_mul) = tuner.compute_and_report_mul(i);
 
         if (!basecase_eliminated) {
-            if (tt_mp_total + tt_mul_total < tt_basecase_total) {
+            if (tt_total_nocomm != 0 && tt_total_nocomm + tt_mp_total + tt_mul_total < tt_basecase_total) {
                 if (suggest_threshold == 0) {
                     suggest_threshold = L>>i;
                     printf("# suggest lingen_mpi_threshold = %zu\n", L>>i);
                 }
+                tt_total_nocomm = tt_total_nocomm + tt_mp_total + tt_mul_total;
             } else {
+                printf("# basecase still seems to win for input size = %zu\n", L>>i);
                 suggest_threshold = 0;
+                tt_total_nocomm = tt_basecase_total;
             }
 
 
             if (basecase_keep_until * (tt_mp_total + tt_mul_total) < tt_basecase_total) {
                 basecase_eliminated = true;
             }
-            tt_total += std::min(tt_mp_total + tt_mul_total, tt_basecase_total);
         } else {
-            tt_total += tt_mp_total + tt_mul_total;
+            tt_total_nocomm += tt_mp_total + tt_mul_total;
         }
 
+        tt_total = tt_total_nocomm + tt_com0 * 2;
+        char buf[20];
         printf("# Cumulated time so far %.1f [%.1f days], peak RAM = %s, lingen_mpi_threshold=%zu\n", tt_total, tt_total / 86400, size_disp(std::max(peak_mp, peak_mul), buf), suggest_threshold);
         peakpeak = std::max(peakpeak, std::max(peak_mp, peak_mul));
     }
 
     printf("(%u,%u,%u,%u,%u,%.1f,%1.f)\n",m,n,r,shrink0,shrink2,tt_total,(double)peakpeak/1024./1024./1024.);
-
-    gmp_randclear(rstate);
-    mpz_clear(p);
 }/*}}}*/
 
 #if 0
