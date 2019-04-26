@@ -310,6 +310,25 @@ product_tree (std::vector<cxx_mpz> const & R, size_t *w, double & extra_time)
   return T;
 }
 
+/* Auxiliary routine: a node T[i][j] with left son T[i-1][2*j] and right
+   son T[i-1][2*j+1] corresponds to a node say t with left son u and right
+   son u in the original product tree, where t = u*v.
+   Now the current value of T[i][j], say t', is an approximation of
+   (P*2^k)/t mod 2^k, where k = nbits(t) + g (g is the guard).
+   This routine puts in T[i-1][2*j] and T[i-1][2*j+1] an approximation
+   u' of (P*2^ku)/u mod 2^ku and v' of (P*2^kv)/v mod 2^kb respectively, where
+   ku = nbits(u) + g, and kv = nbits(v) + g.
+   Assume at input we have |t' - (P*2^k)/t| < x mod 2^k, where "mod 2^k"
+   means that all quantities are reduced modulo 2^k (centered reduction).
+   Then we first compute v*t':
+   |v*t' - (P*2^k)/u| < v*x mod 2^k   [since t = u*v]
+   then we divide by 2^(k-ku):
+   |v*t'/2^(k-ku) - (P*2^ku)/u| < v*x/2^(k-ku) mod 2^ku
+   thus since v = t/u < 2^k/2^(ku-1):
+   |u' - (P*2^ku)/u| < 2*x mod 2^ku
+   This proves that the error is multiplied by at most 2 at each step
+   of the tree, thus since it is at most 1 at the root of the tree, it is
+   at most 2^h at the leaves. */
 static void
 remainder_tree_aux (mpz_t **T, unsigned long **nbits, unsigned long i,
                     unsigned long j, unsigned long guard)
@@ -335,9 +354,6 @@ remainder_tree_aux (mpz_t **T, unsigned long **nbits, unsigned long i,
  * At the root, we compute a floating-point
  * approximation of P/T[h][0] with m+guard bits, where m = nbits(T[h][0]).
  *
- * FIXME: the error analysis is missing, especially when h=0 we get guard=0,
- * thus adding 2^guard-1 cannot repair rouding errors.
- *
  * Adds to extra_time the cpu time (RUSAGE_THREAD, seconds_thread())
  * spent in openmp helper threads, NOT counting the time spent in the
  * main thread.
@@ -352,7 +368,7 @@ remainder_tree (mpz_t **T, size_t *w, mpz_t P,
   unsigned long **nbits;
   mpz_t Q;
 
-  guard = h;
+  guard = h + 1; /* see error analysis below */
   nbits = (unsigned long**) malloc ((h + 1) * sizeof (unsigned long*));
   for (i = 0; i <= h; i++)
     {
@@ -367,7 +383,9 @@ remainder_tree (mpz_t **T, size_t *w, mpz_t P,
   mpz_mod (Q, P, T[h][0]); /* first reduce modulo T[h][0] in case P is huge */
   mpz_mul_2exp (Q, Q, nbits[h][0] + guard);
   mpz_tdiv_q (T[h][0], Q, T[h][0]);
-  /* P/T[h][0] ~ Q/2^(m+guard) */
+  /* |T' - 2^k*P/T| < 1 mod 2^k, where T is the original value of T[h][0],
+     T' is the new value of T[h][0], k = nbits(T) + guard, and "mod 2^k"
+     means that all values are taken modulo 2^k (centered reduction). */
   for (i = h; i > 0; i--)
     {
 #ifdef HAVE_OPENMP
@@ -378,6 +396,15 @@ remainder_tree (mpz_t **T, size_t *w, mpz_t P,
       if (w[i-1] & 1)
         mpz_swap (T[i-1][w[i-1]-1], T[i][w[i]-1]);
     }
+
+  /* now for all leaves, if R = R[j], and R' = T[0][j],
+     we have |R' - 2^k*P/R| < 2^h mod 2^k, where k = nbits(R) + g,
+     thus R' = 2^k*P/R + a*2^k + b, with a integer, and |b| < 2^h,
+     thus R*R' = 2^k*P + a*R*2^k + b*R
+     thus P mod R = R*R'/2^k - b*R/2^k, with |b*R/2^k| < 2^(h-g).
+     Now it suffices to have g >= h+1 so that the 2^(h-g) term
+     is less than 1/2, and rounding R*R'/2^k to the nearest integer
+     gives P mod R. */
 
   /* from T[0][j] ~ P/R[j]*2^(nbits[0][j] + guard) mod 2^(nbits[0][j] + guard),
      get T[0][j]*R[j]/2^(nbits[0][j] + guard) ~ P mod R[j] */
