@@ -12,6 +12,7 @@
 #include <time.h>
 #include <unistd.h>
 #include <assert.h>
+#include <float.h>
 #ifdef  HAVE_SIGHUP
 #include <signal.h>
 #endif
@@ -60,7 +61,7 @@ void plingen_tuning_decl_usage(param_list_ptr pl)
     param_list_decl_usage(pl, "tuning_timing_cache_filename",
             "For --tune only: save (and re-load) timings for individual transforms in this file\n");
     param_list_decl_usage(pl, "basecase-keep-until",
-            "For --tune only: stop measuring basecase timing when it exceeds the time of strictly recursive operations by this factor\n");
+            "For --tune only: stop measuring basecase timing when it exceeds the time of the recursive algorithm (counting its leaf calls) by this factor\n");
 }
 void plingen_tuning_lookup_parameters(param_list_ptr pl)
 {
@@ -1225,7 +1226,7 @@ void plingen_tune_mp(abdst_field ab, unsigned int m, unsigned int n, cutoff_list
 }/*}}}*/
 
 const char * timing_cache_filename = NULL;
-typedef std::tuple<size_t, size_t, size_t, size_t> tcache_key;
+typedef std::tuple<size_t, size_t, size_t, ssize_t> tcache_key;
 typedef std::tuple<double, double, double, double, double> tcache_value;
 
 std::map<tcache_key, tcache_value> tcache;
@@ -1246,24 +1247,26 @@ void read_tcache()
         for(char * p = line; *p ; p++)
             if (*p == ';') *p=' ';
         std::istringstream is(line);
-        size_t logp;
         /* for MUL and MP, op1 and op2 are operand lengths. For basecase,
          * this denotes m and n. Yes, it's ugly.
+         *
+         * op3 = -1 for MUL, op3=-2 for basecase
          */
-        size_t op1;
-        size_t op2;
-        size_t op3;     /* 0: MUL; 1: MP; above: basecase */
-        double t_dft0;
-        double t_dft2;
-        double t_conv;
-        double t_ift;
-        is >> logp >> op1 >> op2 >> op3;
-        is >> t_dft0  >> t_dft2  >> t_conv >> t_ift;
+        tcache_key K;
+        is >> std::get<0>(K);
+        is >> std::get<1>(K);
+        is >> std::get<2>(K);
+        is >> std::get<3>(K);
+        tcache_value V;
+        is >> std::get<0>(V);
+        is >> std::get<1>(V);
+        is >> std::get<2>(V);
+        is >> std::get<3>(V);
+
         if (!is) {
             fprintf(stderr, "parse error in %s\n", timing_cache_filename);
         }
-        tcache_key K { logp, op1, op2, op3 };
-        tcache[K] = std::make_tuple(t_dft0, t_dft2, t_conv, t_ift, 0.0);
+        tcache[K] = V;
     }
     fclose(f);
 }
@@ -1275,16 +1278,15 @@ void write_tcache()
     FILE * f = fopen(timing_cache_filename, "w");
     ASSERT_ALWAYS(f);
     for(auto const & e : tcache) {
-        size_t logp, op1, op2, op3;
-        double t_dft0, t_dft2, t_conv, t_ift, t_comm;
-
-        std::tie(logp, op1, op2, op3) = e.first;
-        std::tie(t_dft0, t_dft2, t_conv, t_ift, t_comm) = e.second;
-
         std::ostringstream os;
-        os << logp;
-        for(auto x : { op1, op2, op3 }) os << ";" << x;
-        for(auto x : { t_dft0, t_dft2, t_conv, t_ift }) os << ";" << x;
+        os        << std::get<0>(e.first);
+        os << ";" << std::get<1>(e.first);
+        os << ";" << std::get<2>(e.first);
+        os << ";" << std::get<3>(e.first);
+        os << ";" << std::get<0>(e.second);
+        os << ";" << std::get<1>(e.second);
+        os << ";" << std::get<2>(e.second);
+        os << ";" << std::get<3>(e.second);
 
         fprintf(f, "%s\n", os.str().c_str());
     }
@@ -1599,7 +1601,8 @@ struct matrix_product_schedule_with_transforms {
         printf("#;depth;recursive_input_length;step;step_op1_length;step_op2_length;size_one_transform;tt_dft0;tt_dft2;tt_conv;tt_ift\n");
         printf(";%d;%zu;%s;%zu;%zu;%s;%.2f;%.2f;%.2f;%.2f\n",
                 depth,
-                total_length >> depth, step, asize, bsize, 
+                iceildiv(total_length, 1 << depth),
+                step, asize, bsize, 
                 size_disp(peakram, buf),
                 tt_dft0, tt_dft2, tt_conv, tt_ift);
     }/*}}}*/
@@ -1649,35 +1652,31 @@ struct plingen_tuner {
         // data0 = data0 / (r*r);
         char buf[20];
         printf("# mpi_threshold comm: %s\n", size_disp(2*data0, buf));
-        double tt_com0 = data0 / mpi_xput;
+        double tt_com0 = 2 * data0 / mpi_xput;
         printf("# mpi_threshold comm time: %.1f [%.1f days]\n", tt_com0, tt_com0/86400);
 
         return tt_com0;
     }/*}}}*/
     double compute_and_report_basecase(int i) { /*{{{*/
         double tt;
-        /* no real necessity, except that we're using 0 and 1 as
-         * markers.
-         */
-        ASSERT_ALWAYS((L >> i) > 1);
         /*
          * FIXME There's also a real problem with multithreading
          * here.  test_basecase uses openmp, and we must check that
          * the stored cache data properly records the number of
          * threads that were used !
          */
-        tcache_key K { mpz_sizeinbase(p, 2), m, n, L >> i };
+        tcache_key K { mpz_sizeinbase(p, 2), m, n, iceildiv(L, 1 << i) };
         if (tcache.find(K) != tcache.end()) {
             tt = std::get<0>(tcache[K]);
         } else {
             tt = wct_seconds();
             extern void test_basecase(abdst_field ab, unsigned int m, unsigned int n, size_t L, gmp_randstate_t rstate);
-            test_basecase(ab, m, n, L >> i, rstate);
+            test_basecase(ab, m, n, iceildiv(L, 1 << i), rstate);
             tt = wct_seconds() - tt;
             tcache[K] = std::make_tuple(tt, 0., 0., 0., 0.);
         }
 
-        printf("# total basecase time, if threshold=%zu: %.1f [%.1f days]\n", L >> i, tt * (1 << i), tt * (1 << i) / 86400);
+        printf("# total basecase time, if threshold=%zu: %.1f [%.1f days]\n", iceildiv(L, 1 << i), tt * (1 << i), tt * (1 << i) / 86400);
         return tt * (1 << i);
     }/*}}}*/
     std::tuple<double, size_t> optimize_schedule_and_report(matrix_product_schedule_with_transforms & mystats) {
@@ -1741,7 +1740,7 @@ struct plingen_tuner {
         unsigned int n1 = m + n;
         unsigned int n2 = m + n;
 
-        tcache_key K { mpz_sizeinbase(p, 2), asize, bsize, 1 };
+        tcache_key K { mpz_sizeinbase(p, 2), asize, bsize, -2 };
 
         struct fft_transform_info fti[1];
         size_t fft_alloc_sizes[3];
@@ -1823,6 +1822,9 @@ struct plingen_tuner {
     std::tuple<double, size_t> compute_and_report_mul(int i) { /* {{{ */
         const char * step = "MUL";
 
+        // at the top level (i==0), the computed product has length 
+        // m/(m+n) * L
+
         size_t asize = iceildiv(m * L, (m+n) << (i+1));
         size_t bsize = iceildiv(m * L, (m+n) << (i+1));
         size_t csize = asize + bsize - 1;
@@ -1831,7 +1833,7 @@ struct plingen_tuner {
         unsigned int n1 = m + n;
         unsigned int n2 = m + n;
 
-        tcache_key K { mpz_sizeinbase(p, 2), asize, bsize, 0 };
+        tcache_key K { mpz_sizeinbase(p, 2), asize, bsize, -1 };
 
         struct fft_transform_info fti[1];
         size_t fft_alloc_sizes[3];
@@ -1927,13 +1929,17 @@ void plingen_tune_full(abdst_field ab, unsigned int m, unsigned int n, size_t N,
 
     double tt_com0 = tuner.compute_and_report_mpi_threshold_comm();
 
-    double tt_total = tt_com0 * 2;
+    double tt_total = tt_com0;
     double tt_total_nocomm = 0;
     size_t peakpeak=0;
 
-    for(int i = log2(L) ; i>=0 ; i--) {
-        if (m * (L>>i) / (m+n) < 1) continue;
+    /* At depth i=log2(L) we run with input length L/2^i < 1, which means
+     * sometimes a matrix, sometimes not. For sure, it makes no sense to
+     * go _below_ that and use recursive calls at this depth */
 
+    int floor = log2(L) + 1;
+
+    for(int i = floor ; i>=0 ; i--) {
         printf("########## Measuring time at depth %d ##########\n", i);
 
         double tt_basecase_total = 0;
@@ -1945,42 +1951,65 @@ void plingen_tune_full(abdst_field ab, unsigned int m, unsigned int n, size_t N,
         if (!basecase_eliminated)
             tt_basecase_total = tuner.compute_and_report_basecase(i);
 
-        try {
-            std::tie(tt_mp_total, peak_mp) = tuner.compute_and_report_mp(i);
-            std::tie(tt_mul_total, peak_mul) = tuner.compute_and_report_mul(i);
-        } catch (std::string & e) {
-            fputs("\n", stderr);
-            fprintf(stderr, "##################################\n");
-            fputs(e.c_str(), stderr);
-            fprintf(stderr, "##################################\n");
-            fputs("\n", stderr);
-            exit(EXIT_FAILURE);
+        if (i < floor) {
+            try {
+                std::tie(tt_mp_total, peak_mp) = tuner.compute_and_report_mp(i);
+                std::tie(tt_mul_total, peak_mul) = tuner.compute_and_report_mul(i);
+            } catch (std::string & e) {
+                fputs("\n", stderr);
+                fprintf(stderr, "##################################\n");
+                fputs(e.c_str(), stderr);
+                fprintf(stderr, "##################################\n");
+                fputs("\n", stderr);
+                exit(EXIT_FAILURE);
+            }
+        } else {
+            /* We have no other option than to use the basecase
+             * algorithm.
+             */
+            tt_mp_total = DBL_MAX;
+            tt_mul_total = DBL_MAX;
         }
 
-        if (!basecase_eliminated) {
-            if (tt_total_nocomm != 0 && tt_total_nocomm + tt_mp_total + tt_mul_total < tt_basecase_total) {
+        double tt_ontop = tt_mp_total + tt_mul_total;
+
+        if (i == floor) {
+            suggest_threshold = 0;
+            tt_total_nocomm = tt_basecase_total;
+        } else if (!basecase_eliminated) {
+            printf("# cost of doing depth %d by a recursive call:\n"
+                    "#     cost at depth %d: %.1f [%.1f days]\n"
+                    "#     cost at depth %d (MP+MUL): %.1f [%.1f days]\n"
+                    "#     total: %.1f [%.1f days]\n",
+                    i,
+                    i+1, tt_total_nocomm, tt_total_nocomm / 86400,
+                    i, tt_ontop, tt_ontop / 86400,
+                    (tt_total_nocomm + tt_ontop),
+                    (tt_total_nocomm + tt_ontop) / 86400
+                    );
+            if (tt_total_nocomm != 0 && tt_total_nocomm + tt_ontop < tt_basecase_total) {
                 if (suggest_threshold == 0) {
                     suggest_threshold = L>>i;
                     printf("# suggest lingen_mpi_threshold = %zu\n", L>>i);
                 }
-                tt_total_nocomm = tt_total_nocomm + tt_mp_total + tt_mul_total;
+                if (basecase_keep_until * (tt_total_nocomm + tt_ontop) < tt_basecase_total) {
+                    printf("# no longer counting basecase cost\n");
+                    basecase_eliminated = true;
+                }
+                tt_total_nocomm += tt_ontop;
             } else {
-                printf("# basecase still seems to win for input size = %zu\n", L>>i);
+                printf("# basecase still seems to win for depth %d, input length <= %zu\n", i, iceildiv(L, 1<<i));
                 suggest_threshold = 0;
                 tt_total_nocomm = tt_basecase_total;
             }
 
-
-            if (basecase_keep_until * (tt_mp_total + tt_mul_total) < tt_basecase_total) {
-                basecase_eliminated = true;
-            }
         } else {
-            tt_total_nocomm += tt_mp_total + tt_mul_total;
+            tt_total_nocomm += tt_ontop;
         }
 
-        tt_total = tt_total_nocomm + tt_com0 * 2;
+        tt_total = tt_total_nocomm + tt_com0;
         char buf[20];
-        printf("# Cumulated time so far %.1f [%.1f days], peak RAM = %s, lingen_mpi_threshold=%zu\n", tt_total, tt_total / 86400, size_disp(std::max(peak_mp, peak_mul), buf), suggest_threshold);
+        printf("# Cumulated time so far (incl. communication at mpi threshold) %.1f [%.1f days], peak RAM = %s, lingen_mpi_threshold=%zu\n", tt_total, tt_total / 86400, size_disp(std::max(peak_mp, peak_mul), buf), suggest_threshold);
         peakpeak = std::max(peakpeak, std::max(peak_mp, peak_mul));
     }
 
