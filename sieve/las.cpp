@@ -3292,9 +3292,18 @@ int main (int argc0, char *argv0[])/*{{{*/
          * Currently the code below still uses openmp */
 
         int ncurves = MAX(sc0.sides[0].ncurves, sc0.sides[1].ncurves);
+
+        // Possible issue: if lpb=batchlp, ECM is still used for finding
+        // the sieved primes in order to print the smooth relations.
+        // In that case, we need enough curves to find them.
+        if (las.batchlpb[0] == lpb[0] || las.batchlpb[1] == lpb[1]) {
+            ncurves = MAX(ncurves, 30);
+        }
+
         if (ncurves <= 0) {
             ncurves = 50; // use the same default as finishbatch
         }
+
         std::list<relation> rels = factor (las.L,
                 las.cpoly,
                 las.batchlpb,
