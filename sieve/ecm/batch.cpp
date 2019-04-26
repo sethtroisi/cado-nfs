@@ -867,7 +867,7 @@ factor (cofac_list const & L,
   nb_methods = ncurves;
   if (nb_methods >= NB_MAX_METHODS)
     nb_methods = NB_MAX_METHODS - 1;
-  methods = facul_make_default_strategy (nb_methods - 3, 0);
+  methods = facul_make_default_strategy (nb_methods, 0);
 
   std::list<relation> smooth;
   cofac_list::const_iterator it;
