@@ -2954,17 +2954,19 @@ void las_subjob(las_info & las, int subjob, las_todo_list & todo, report_and_tim
                             /* we can release the mutex now */
 #else
                             las.L.splice(las.L.end(), workspaces.cofac_candidates);
-                            while (las.L.size() >= las.batch_print_survivors_filesize) {
-                                // M is another list containing the
-                                // elements that are going to be printed
-                                // by another thread.
-                                auto M = std::make_shared<cofac_list>();
-                                auto it = las.L.begin();
-                                for (uint64_t i = 0; i < las.batch_print_survivors_filesize; ++i) {
-                                    ++it;
+                            if (las.batch_print_survivors_filename) {
+                                while (las.L.size() >= las.batch_print_survivors_filesize) {
+                                    // M is another list containing the
+                                    // elements that are going to be printed
+                                    // by another thread.
+                                    auto M = std::make_shared<cofac_list>();
+                                    auto it = las.L.begin();
+                                    for (uint64_t i = 0; i < las.batch_print_survivors_filesize; ++i) {
+                                        ++it;
+                                    }
+                                    M->splice(M->end(), las.L, las.L.begin(), it);
+                                    print_survivors(M, las);
                                 }
-                                M->splice(M->end(), las.L, las.L.begin(), it);
-                                print_survivors(M, las);
                             }
 #endif
                         }
