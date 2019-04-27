@@ -2768,8 +2768,11 @@ void *print_survivors_internal(void * arg)
     std::string filename = las.batch_print_survivors_filename;
     filename.append(".");
     filename.append(std::to_string(las.batch_print_survivors_counter));
+    std::string filename_part = filename;
+    filename_part.append(".part");
+
     las.batch_print_survivors_counter++;
-    FILE * out = fopen(filename.c_str(), "w");
+    FILE * out = fopen(filename_part.c_str(), "w");
     las_todo_entry const * curr_sq = NULL;
     for (auto const &s : M) {
         if (s.doing_p != curr_sq) {
@@ -2784,6 +2787,7 @@ void *print_survivors_internal(void * arg)
                 (mpz_srcptr) s.cofactor[1]);
     }
     fclose(out);
+    rename(filename_part.c_str(), filename.c_str());
     delete params; // was newed by caller.
     return NULL;
 }
