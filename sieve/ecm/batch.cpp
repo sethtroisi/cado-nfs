@@ -312,7 +312,7 @@ product_tree (std::vector<cxx_mpz> const & R, size_t *w, double & extra_time)
 
 /* Auxiliary routine: a node T[i][j] with left son T[i-1][2*j] and right
    son T[i-1][2*j+1] corresponds to a node say t with left son u and right
-   son u in the original product tree, where t = u*v.
+   son v in the original product tree, where t = u*v.
    Now the current value of T[i][j], say t', is an approximation of
    (P*2^k)/t mod 2^k, where k = nbits(t) + g (g is the guard).
    This routine puts in T[i-1][2*j] and T[i-1][2*j+1] an approximation
