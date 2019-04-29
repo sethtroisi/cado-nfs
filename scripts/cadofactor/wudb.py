@@ -1179,7 +1179,7 @@ class WuAccess(object): # {
     def _checkstatus(wu, status):
         #logger.debug("WuAccess._checkstatus(%s, %s)", wu, status)
         wu_status = wu["status"]
-        if isinstance(status, collections.Container):
+        if isinstance(status, collections.abc.Container):
             ok = wu_status in status
         else:
             ok = wu_status == status
