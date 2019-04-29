@@ -319,8 +319,8 @@ product_tree (std::vector<cxx_mpz> const & R, size_t *w, double & extra_time)
    u' of (P*2^ku)/u mod 2^ku and v' of (P*2^kv)/v mod 2^kb respectively, where
    ku = nbits(u) + g, and kv = nbits(v) + g.
    Assume at input we have |t' - (P*2^k)/t| < x mod 2^k, where "mod 2^k"
-   means that all quantities are reduced modulo 2^k (centered reduction).
-   Then we first compute v*t':
+   means that all quantities are reduced modulo 2^k with remainder in
+   [-2^k/2, 2^k/2]. Then we first compute v*t':
    |v*t' - (P*2^k)/u| < v*x mod 2^k   [since t = u*v]
    then we divide by 2^(k-ku):
    |v*t'/2^(k-ku) - (P*2^ku)/u| < v*x/2^(k-ku) mod 2^ku
@@ -385,7 +385,8 @@ remainder_tree (mpz_t **T, size_t *w, mpz_t P,
   mpz_tdiv_q (T[h][0], Q, T[h][0]);
   /* |T' - 2^k*P/T| < 1 mod 2^k, where T is the original value of T[h][0],
      T' is the new value of T[h][0], k = nbits(T) + guard, and "mod 2^k"
-     means that all values are taken modulo 2^k (centered reduction). */
+     means that all values are taken modulo 2^k, with remainder in
+     [-2^k/2,2^k/2]. */
   for (i = h; i > 0; i--)
     {
 #ifdef HAVE_OPENMP
