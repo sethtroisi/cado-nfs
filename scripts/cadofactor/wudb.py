@@ -41,13 +41,8 @@ else:
 import patterns
 import cadologger
 import logging
-try:
-    from collections.abc import MutableMapping
-    from collections.abc import Mapping
-except ImportError:
-    # oldish python wants this.
-    from collections import MutableMapping
-    from collections import Mapping
+from collections.abc import MutableMapping
+from collections.abc import Mapping
 
 DEBUG = 1
 exclusive_transaction = [None, None]
@@ -868,7 +863,7 @@ class DictDbAccess(MutableMapping):
     def get_cursor(self):
         return self._conn.cursor()
 
-    # Implement the abstract methods defined by collections.MutableMapping
+    # Implement the abstract methods defined by collections.abc.MutableMapping
     # All but __del__ and __setitem__ are simply passed through to the self._data
     # dictionary
 
