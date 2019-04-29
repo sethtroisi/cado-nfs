@@ -2852,6 +2852,9 @@ static void matmul_top_read_submatrix(matmul_top_data_ptr mmt, int midx, param_l
         } else {
             cache_loaded = matmul_reload_cache(Mloc->mm);
         }
+        if (!mmt->pi->m->trank) {
+            printf("J%u %s done reading (result=%d)\n", mmt->pi->m->jrank, mmt->pi->nodename, cache_loaded);
+        }
     }
 
     if (!pi_data_eq(&cache_loaded, 1, BWC_PI_INT, mmt->pi->m)) {
