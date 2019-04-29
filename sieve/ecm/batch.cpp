@@ -324,11 +324,11 @@ product_tree (std::vector<cxx_mpz> const & R, size_t *w, double & extra_time)
    |v*t' - (P*2^k)/u| < v*x mod 2^k   [since t = u*v]
    then we divide by 2^(k-ku):
    |v*t'/2^(k-ku) - (P*2^ku)/u| < v*x/2^(k-ku) mod 2^ku
-   thus since v = t/u < 2^k/2^(ku-1):
-   |u' - (P*2^ku)/u| < 2*x mod 2^ku
-   This proves that the error is multiplied by at most 2 at each step
+   thus since v = t/u < 2^k/2^(ku-1) and |v*t'/2^(k-ku) - u'| < 1,
+   |u' - (P*2^ku)/u| < 2*x+1 mod 2^ku
+   This proves that the error goes from x to 2x+1 at each step
    of the tree, thus since it is at most 1 at the root of the tree, it is
-   at most 2^h at the leaves. */
+   at most 2^(h+1)-1 at the leaves. */
 static void
 remainder_tree_aux (mpz_t **T, unsigned long **nbits, unsigned long i,
                     unsigned long j, unsigned long guard)
@@ -368,7 +368,7 @@ remainder_tree (mpz_t **T, size_t *w, mpz_t P,
   unsigned long **nbits;
   mpz_t Q;
 
-  guard = h + 1; /* see error analysis below */
+  guard = h + 2; /* see error analysis above */
   nbits = (unsigned long**) malloc ((h + 1) * sizeof (unsigned long*));
   for (i = 0; i <= h; i++)
     {
@@ -400,10 +400,10 @@ remainder_tree (mpz_t **T, size_t *w, mpz_t P,
 
   /* now for all leaves, if R = R[j], and R' = T[0][j],
      we have |R' - 2^k*P/R| < 2^h mod 2^k, where k = nbits(R) + g,
-     thus R' = 2^k*P/R + a*2^k + b, with a integer, and |b| < 2^h,
+     thus R' = 2^k*P/R + a*2^k + b, with a integer, and |b| < 2^(h+1),
      thus R*R' = 2^k*P + a*R*2^k + b*R
-     thus P mod R = R*R'/2^k - b*R/2^k, with |b*R/2^k| < 2^(h-g).
-     Now it suffices to have g >= h+1 so that the 2^(h-g) term
+     thus P mod R = R*R'/2^k - b*R/2^k, with |b*R/2^k| < 2^(h+1-g).
+     Now it suffices to have g >= h+2 so that the 2^(h+1-g) term
      is less than 1/2, and rounding R*R'/2^k to the nearest integer
      gives P mod R. */
 
