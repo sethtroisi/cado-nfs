@@ -225,13 +225,24 @@ test_one_u64arith_divqr_2_1_1(const uint64_t b, const uint64_t cq, const uint64_
   }
 }
 
+
 void
 test_u64arith_divqr_2_1_1()
 {
+  unsigned long i, iter = 100;
+
+  tests_common_get_iter(&iter);
   test_one_u64arith_divqr_2_1_1(123, 1, 0);
   test_one_u64arith_divqr_2_1_1(123, 1, 1);
   test_one_u64arith_divqr_2_1_1(123, UINT64_MAX, 122);
   test_one_u64arith_divqr_2_1_1(UINT64_MAX, UINT64_MAX, UINT64_MAX - 1);
+
+  for (i = 0; i < iter; i++) {
+    uint64_t b = random_uint64(),
+      q = random_uint64(),
+      r = random_uint64() % b;
+      test_one_u64arith_divqr_2_1_1(b, q, r);
+  }
 }
 
 /* TODO: add tests for u64arith_divr_2_1_1() */
