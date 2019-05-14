@@ -70,7 +70,7 @@ unsigned long collisions = 0;
 unsigned long collisions_good = 0;
 double *best_opt_logmu, *best_exp_E;
 double optimize_time = 0.0;
-mpz_t admin, adcur, admax;
+mpz_t admin, admax;
 int tries = 0;
 double target_E = 0.0; /* target E-value, 0.0 if not given */
 
@@ -1945,7 +1945,6 @@ main (int argc, char *argv[])
 
   mpz_init (N);
   mpz_init (admin);
-  mpz_init (adcur);
   mpz_init (admax);
   cado_poly_init (best_poly);
   cado_poly_init (curr_poly);
@@ -2219,7 +2218,6 @@ main (int argc, char *argv[])
 
   mpz_clear (N);
   mpz_clear (admin);
-  mpz_clear (adcur);
   mpz_clear (admax);
   cado_poly_clear (best_poly);
   cado_poly_clear (curr_poly);
