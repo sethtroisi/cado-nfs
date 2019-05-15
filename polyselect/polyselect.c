@@ -70,7 +70,7 @@ unsigned long collisions = 0;
 unsigned long collisions_good = 0;
 double *best_opt_logmu, *best_exp_E;
 double optimize_time = 0.0;
-mpz_t admin, adcur, admax;
+mpz_t admin, admax;
 int tries = 0;
 double target_E = 0.0; /* target E-value, 0.0 if not given */
 
@@ -291,7 +291,8 @@ print_poly_info ( char *buf,
       unsigned long n = data_exp_E->size; /* #polynomials found so far */
       double time_so_far = seconds ();
       double time_per_poly = time_so_far / n; /* average time per poly */
-      double mu = data_mean (data_exp_E); /* average E */
+      double mu = data_mean (data_exp_E); /* average E, taking into account
+					     the projective alpha */
       double sigma = sqrt (data_var (data_exp_E)); /* stddev(E) */
       double K = maxtime / time_per_poly;
       /* minimal order statistics */
@@ -451,6 +452,7 @@ optimize_raw_poly (mpz_poly F, mpz_t *g)
 
   skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
   logmu = L2_lognorm (F, skew);
+  /* expected_rotation_gain() takes into account the projective alpha */
   exp_E = logmu + expected_rotation_gain ((mpz_poly_ptr) F, (mpz_poly_ptr) G);
 
   sorted_insert_double (best_opt_logmu, keep, logmu);
@@ -1943,7 +1945,6 @@ main (int argc, char *argv[])
 
   mpz_init (N);
   mpz_init (admin);
-  mpz_init (adcur);
   mpz_init (admax);
   cado_poly_init (best_poly);
   cado_poly_init (curr_poly);
@@ -2217,7 +2218,6 @@ main (int argc, char *argv[])
 
   mpz_clear (N);
   mpz_clear (admin);
-  mpz_clear (adcur);
   mpz_clear (admax);
   cado_poly_clear (best_poly);
   cado_poly_clear (curr_poly);
