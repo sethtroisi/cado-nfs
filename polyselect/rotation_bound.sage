@@ -13,7 +13,7 @@ import os,time
 
 attach alpha.sage
 attach integral.sage
-
+attach E.sage
 
 # optional
 attach gnuplot_stuff.sage
@@ -315,15 +315,21 @@ def skew_l2norm_tk_circular(f, verbose=false):
    else:
       raise ValueError, "skew_l2norm_tk_circular not yet implemented for degree %d" % f.degree()
 
-def L2_combined_skewness (f, g, Bf, Bg, area):
+def L2_combined_skewness (f, g, Bf, Bg, area, verbose=false):
    a = skew_l2norm_tk_circular (f)
+   if verbose:
+      print "optimal skewness(f) = ", a
    b = skew_l2norm_tk_circular (g)
+   if verbose:
+      print "optimal skewness(g) = ", b
    if b < a:
       a, b = b, a
    # now a <= b
    va = MurphyE (f, g, a, Bf, Bg, area)
    vb = MurphyE (f, g, b, Bf, Bg, area)
    while b - a > a * 0.001:
+      if verbose:
+         print "a=", a, "va=", va, "b=", b, "vb=", vb
       c = (2 * a + b) / 3.0
       vc = MurphyE (f, g, c, Bf, Bg, area)
       d = (a + 2 * b) / 3.0
