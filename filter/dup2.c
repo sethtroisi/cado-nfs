@@ -86,6 +86,8 @@ static double factor = 1.0;
 
 static int is_for_dl; /* Do we reduce mod 2 or not */
 
+static unsigned long shift[2] = {0,0}; /* Index shift for side 0,1 */
+
 /* For debugging */
 //#define TRACE_HASH_TABLE
 #ifdef TRACE_HASH_TABLE
@@ -152,7 +154,7 @@ print_relation (FILE * file, earlyparsed_relation_srcptr rel)
     if (rel->primes[i].e > 0)
     {
       op = p;
-      p = u64toa16(p, (uint64_t) rel->primes[i].h);
+      p = u64toa16(p, (uint64_t) (rel->primes[i].h + shift[rel->primes[i].side]));
       *p++ = ',';
       t = p - op;
       for (j = (unsigned int) ((rel->primes[i].e) - 1); j--; p += t)
@@ -557,6 +559,7 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "badidealinfo", "file containing info about bad ideals");
   param_list_decl_usage(pl, "force-posix-threads", "force the use of posix threads, do not rely on platform memory semantics");
   param_list_decl_usage(pl, "path_antebuffer", "path to antebuffer program");
+  param_list_decl_usage(pl, "shift[01]", "index shift for side 0,1");
   verbose_decl_usage(pl);
 }
 
@@ -610,6 +613,9 @@ main (int argc, char *argv[])
     const char * badidealinfofile = param_list_lookup_string(pl, "badidealinfo");
     const char * path_antebuffer = param_list_lookup_string(pl, "path_antebuffer");
     param_list_parse_ulong(pl, "nrels", &nrels_expected);
+
+    param_list_parse_ulong(pl, "shift0", &(shift[0]));
+    param_list_parse_ulong(pl, "shift1", &(shift[1]));
 
     if (param_list_warn_unused(pl))
     {
