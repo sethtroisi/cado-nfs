@@ -30,105 +30,64 @@ void mf_scan2_decl_usage(cxx_param_list & pl)
 }
 
 size_t thread_private_count = 1UL << 20;
+
+/* These two are in bytes as far as the default value is concerned, but
+ * they're converted to number of uint32_t's when the program runs.
+ */
 size_t thread_read_window = 1UL << 13;
 size_t thread_write_window = 1UL << 10;
 
-
-size_t produced;
-std::atomic<size_t> consumed;
-
-#if 0
-uint32_t quarter_cutoffs[][4] = {
-    /*  0 */ { 1, 1, 1, },
-    /*  1 */ { 2, 2, 3, },
-    /*  2 */ { 4, 5, 6, },
-    /*  3 */ { 9, 11, 13, },
-    /*  4 */ { 19, 22, 26, },
-    /*  5 */ { 38, 45, 53, },
-    /*  6 */ { 76, 90, 107, },
-    /*  7 */ { 152, 181, 215, },
-    /*  8 */ { 304, 362, 430, },
-    /*  9 */ { 608, 724, 861, },
-    /* 10 */ { 1217, 1448, 1722, },
-    /* 11 */ { 2435, 2896, 3444, },
-    /* 12 */ { 4870, 5792, 6888, },
-    /* 13 */ { 9741, 11585, 13777, },
-    /* 14 */ { 19483, 23170, 27554, },
-    /* 15 */ { 38967, 46340, 55108, },
-    /* 16 */ { 77935, 92681, 110217, },
-    /* 17 */ { 155871, 185363, 220435, },
-    /* 18 */ { 311743, 370727, 440871, },
-    /* 19 */ { 623487, 741455, 881743, },
-    /* 20 */ { 1246974, 1482910, 1763487, },
-    /* 21 */ { 2493948, 2965820, 3526975, },
-    /* 22 */ { 4987896, 5931641, 7053950, },
-    /* 23 */ { 9975792, 11863283, 14107900, },
-    /* 24 */ { 19951584, 23726566, 28215801, },
-    /* 25 */ { 39903169, 47453132, 56431603, },
-    /* 26 */ { 79806338, 94906265, 112863206, },
-    /* 27 */ { 159612677, 189812531, 225726412, },
-    /* 28 */ { 319225354, 379625062, 451452825, },
-    /* 29 */ { 638450708, 759250124, 902905650, },
-    /* 30 */ { 1276901416, 1518500249, 1805811301, },
-    /* 31 */ { 2553802833, 3037000499, 3611622602, },
+class reporter {
+    std::atomic<size_t> produced;
+    std::atomic<size_t> consumed;
+    double t0;
+    double last_report;
+    std::mutex m;
+    void report(bool force = false) {
+        std::lock_guard<std::mutex> dummy(m);
+        double tt = wct_seconds();
+        if (!force && tt < last_report + 1) return;
+        char buf1[20];
+        char buf2[20];
+        printf("read %s, parsed %s, in %.1f s\n",
+                size_disp(produced, buf1),
+                size_disp(consumed.load(), buf2),
+                (last_report = tt) - t0);
+    }
+    public:
+    struct consumer_data {
+        double last;
+        size_t s = 0;
+        consumer_data() : last(wct_seconds()) {}
+    };
+    /* tells wheter this consumer has reason to schedule a new report */
+    void consumer_report(consumer_data & D, size_t s, bool force = false) {
+        double tt = wct_seconds();
+        if (!force && tt < D.last + 0.9) {
+            D.s += s;
+            return;
+        }
+        consumed += D.s + s;
+        D.last = tt;
+        D.s = 0;
+        report();
+    }
+    void producer_report(size_t s, bool force = false) {
+        produced += s;
+        report(force);
+    }
+    void reset() { t0 = last_report = wct_seconds(); }
 };
-#endif
+
+reporter report;
 
 inline int get_segment_index(uint32_t c)
 {
-    unsigned int t = 64 - cado_clz64((uint64_t) c);
-#if 1
-    return t;
-#else
-    int j = 0;
-    for( ; j < 3 ; j++)
-        if (c < quarter_cutoffs[t][j]) break;
-    return 4*t+j;
-#endif
+    return 64 - cado_clz64((uint64_t) c);
 }
-inline uint32_t get_segment_offset(int t)
-{
-#if 1
-    return 1UL << (t-1);
-#else
-    int t0 = t / 4;
-    int j = t % 4;
-    uint32_t c0 = 1UL << (t0-1);
-    if (j)
-        c0 = quarter_cutoffs[t0][j-1];
-    return c0;
-#endif
-}
+inline uint32_t get_segment_offset(int t) { return 1UL << (t-1); }
+inline uint32_t get_segment_size(int t) { return 1UL << (t-1); }
 
-inline uint32_t get_segment_size(int t)
-{
-#if 1
-    return 1UL << (t-1);
-#else
-    int t0 = t / 4;
-    uint32_t s0 = 1UL << (t0-1);
-    int j = t % 4;
-    uint32_t c0 = 1UL << (t0-1);
-    if (j)
-        c0 = quarter_cutoffs[t0][j-1];
-    return s0 - (c0 - s0);
-#endif
-}
-
-#if 0
-struct segment {
-    static const int bits_items_per_mutex = 13;
-    std::vector<std::mutex> mutexes;
-    std::vector<uint32_t> data;
-    static size_t segment_size(int t) { return get_segment_size(t); }
-    segment(int t) : mutexes(iceildiv(segment_size(t), 1 << bits_items_per_mutex)), data(segment_size(t)) {}
-    void incr(uint32_t c) {
-        std::lock_guard<std::mutex> dummy(mutexes[c >> bits_items_per_mutex]);
-        data[c]++;
-    }
-};
-#endif
-#if 1
 struct segment {
     std::atomic<uint32_t> * data;
     static size_t segment_size(int t) { return get_segment_size(t); }
@@ -146,18 +105,6 @@ struct segment {
         data[c]++;
     }
 };
-#endif
-#if 0
-/* This version is not concurrent-safe. */
-struct segment {
-    std::vector<uint32_t> data;
-    static size_t segment_size(int t) { return get_segment_size(t); }
-    segment(int t) : data(segment_size(t)) {}
-    void incr(uint32_t c) {
-        data[c]++;
-    }
-};
-#endif
 
 /* It might seem somewhat overkill to use std::atomic here. Some of the
  * associated fencing is quite probably overkill on x86. But I'm not too
@@ -169,6 +116,12 @@ struct segment {
  *
  * (the reassuring thing is that I _think_ that the worst that can happen
  * is a seg fault, which would be loud enough, and therefore fine).
+ *
+ * Some pointers:
+ *
+ * https://bartoszmilewski.com/2008/12/01/c-atomics-and-memory-ordering/
+ * https://bartoszmilewski.com/2008/12/23/the-inscrutable-c-memory-model/
+ * http://www.cplusplus.com/reference/atomic/memory_order/
  */
 std::atomic<segment *> segments[64];
 std::mutex segment_mutexes[64];
@@ -180,9 +133,10 @@ struct parser_thread {
     uint32_t colmax=0;
     parser_thread() : cw(thread_private_count, 0) {};
     void loop() {
+        reporter::consumer_data D;
         uint32_t buffer[thread_read_window];
         for(size_t s ; (s = ringbuf_get(R, (char*) buffer, sizeof(buffer))) != 0 ; ) {
-            consumed += s;
+            report.consumer_report(D, s);
             uint32_t * v = (uint32_t *) buffer;
             ASSERT_ALWAYS(s % sizeof(uint32_t) == 0);
             size_t sv = s / sizeof(uint32_t);
@@ -198,10 +152,6 @@ struct parser_thread {
                     ASSERT_ALWAYS(c1 < get_segment_size(t));
                     segment * x;
                     {
-                        /* https://bartoszmilewski.com/2008/12/01/c-atomics-and-memory-ordering/
-                         * https://bartoszmilewski.com/2008/12/23/the-inscrutable-c-memory-model/
-                         * http://www.cplusplus.com/reference/atomic/memory_order/
-                         */
                         x = segments[t].load(std::memory_order_relaxed);
                         if (!x) {
                             std::lock_guard<std::mutex> dummy(segment_mutexes[t]);
@@ -214,6 +164,7 @@ struct parser_thread {
                 }
             }
         }
+        report.consumer_report(D, 0, true);
     }
 };
 
@@ -331,8 +282,7 @@ int main(int argc, char * argv[])
     int consumers = threads-1;
     parser_thread T[consumers];
     
-    double t0 = wct_seconds();
-    double last_report = t0;
+    report.reset();
 
     omp_set_num_threads(threads);
 #pragma omp parallel
@@ -352,17 +302,8 @@ int main(int argc, char * argv[])
                     int k = fread32_little(buf, s, f_in);
                     ASSERT_ALWAYS(k == s);
                     ringbuf_put(R, (char *) buf, s * sizeof(uint32_t));
-                    produced += s * sizeof(uint32_t);
+                    report.producer_report(s * sizeof(uint32_t));
                     row_length -= s;
-                }
-                double tt = wct_seconds();
-                if (tt > last_report + 1) {
-                    char buf1[20];
-                    char buf2[20];
-                    printf("read %s, parsed %s, in %.1f s\n",
-                            size_disp(produced, buf1),
-                            size_disp(consumed.load(), buf2),
-                            (last_report = tt) - t0);
                 }
             }
             ringbuf_mark_done(R);
@@ -371,13 +312,7 @@ int main(int argc, char * argv[])
         }
     }
 #pragma omp barrier
-    {
-        char buf2[20];
-        double tt = wct_seconds();
-        printf("parsed %s, in %.1f s\n",
-                size_disp(consumed.load(), buf2),
-                tt - t0);
-    }
+    report.producer_report(0, true);
     for(int i = 1 ; i < consumers ; i++) {
         for(size_t j = 0 ; j < thread_private_count ; j++)
             T[0].cw[j] += T[i].cw[j];
