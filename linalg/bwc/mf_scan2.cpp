@@ -23,12 +23,17 @@ void mf_scan2_decl_usage(cxx_param_list & pl)
     param_list_decl_usage(pl, "rwfile", "Name of the row weight file to write (defaults to auto-determine from matrix name)");
     param_list_decl_usage(pl, "cwfile", "Name of the col weight file to write (defaults to auto-determine from matrix name)");
     param_list_decl_usage(pl, "threads", "Number of threads to use (defaults to auto detect\n");
-    param_list_decl_usage(pl, "memory", "Amount of RAM to use for rolling buffer memory");
+    param_list_decl_usage(pl, "io-memory", "Amount of RAM to use for rolling buffer memory (in GB, floating point allowed)");
+    param_list_decl_usage(pl, "thread-private-count", "Number of columns for which a thread-private zone is used");
+    param_list_decl_usage(pl, "thread-read-window", "Chunk size for consumer thread reads from rolling buffer");
+    param_list_decl_usage(pl, "thread-write-window", "Chunk size for producer thread writes to rolling buffer");
 }
 
-size_t cw_cutoff = 1UL << 16;
-std::atomic<std::atomic<uint32_t> *> cw_global_pools[64];
-std::mutex mutexes[64];
+size_t thread_private_count = 1UL << 20;
+size_t thread_read_window = 1UL << 13;
+size_t thread_write_window = 1UL << 10;
+
+
 size_t produced;
 std::atomic<size_t> consumed;
 
@@ -110,16 +115,73 @@ inline uint32_t get_segment_size(int t)
 #endif
 }
 
+#if 0
+struct segment {
+    static const int bits_items_per_mutex = 13;
+    std::vector<std::mutex> mutexes;
+    std::vector<uint32_t> data;
+    static size_t segment_size(int t) { return get_segment_size(t); }
+    segment(int t) : mutexes(iceildiv(segment_size(t), 1 << bits_items_per_mutex)), data(segment_size(t)) {}
+    void incr(uint32_t c) {
+        std::lock_guard<std::mutex> dummy(mutexes[c >> bits_items_per_mutex]);
+        data[c]++;
+    }
+};
+#endif
+#if 1
+struct segment {
+    std::atomic<uint32_t> * data;
+    static size_t segment_size(int t) { return get_segment_size(t); }
+    segment(int t) {
+        data = new std::atomic<uint32_t>[segment_size(t)];
+    }
+    ~segment() {
+        delete[] data;
+    }
+    segment(segment const&) = delete;
+    segment& operator=(segment const&) = delete;
+    segment(segment &&) = delete;
+    segment& operator=(segment &&) = delete;
+    void incr(uint32_t c) {
+        data[c]++;
+    }
+};
+#endif
+#if 0
+/* This version is not concurrent-safe. */
+struct segment {
+    std::vector<uint32_t> data;
+    static size_t segment_size(int t) { return get_segment_size(t); }
+    segment(int t) : data(segment_size(t)) {}
+    void incr(uint32_t c) {
+        data[c]++;
+    }
+};
+#endif
+
+/* It might seem somewhat overkill to use std::atomic here. Some of the
+ * associated fencing is quite probably overkill on x86. But I'm not too
+ * sure.
+ *
+ * I've added some loose memory_order constraints below, that seem to
+ * improve performance. But I'm on thin ice, I'm not sure of what I'm
+ * doing.
+ *
+ * (the reassuring thing is that I _think_ that the worst that can happen
+ * is a seg fault, which would be loud enough, and therefore fine).
+ */
+std::atomic<segment *> segments[64];
+std::mutex segment_mutexes[64];
 
 ringbuf R;
 
-struct cw_thread {
+struct parser_thread {
     std::vector<uint32_t> cw;
     uint32_t colmax=0;
-    cw_thread() : cw(cw_cutoff, 0) {};
+    parser_thread() : cw(thread_private_count, 0) {};
     void loop() {
-        char buffer[1 << 14];
-        for(size_t s ; (s = ringbuf_get(R, buffer, sizeof(buffer))) != 0 ; ) {
+        uint32_t buffer[thread_read_window];
+        for(size_t s ; (s = ringbuf_get(R, (char*) buffer, sizeof(buffer))) != 0 ; ) {
             consumed += s;
             uint32_t * v = (uint32_t *) buffer;
             ASSERT_ALWAYS(s % sizeof(uint32_t) == 0);
@@ -127,27 +189,28 @@ struct cw_thread {
             for(size_t i = 0 ; i < sv ; i++) {
                 uint32_t c = v[i];
                 colmax = MAX(colmax, c+1);
-                if (c < cw_cutoff) {
+                if (c < thread_private_count) {
                     cw[c]++;
                 } else {
                     /* Get the bit size */
                     unsigned int t = get_segment_index(c);
-                    std::atomic<uint32_t> * x = cw_global_pools[t].load();
                     uint32_t c1 = c-get_segment_offset(t);
                     ASSERT_ALWAYS(c1 < get_segment_size(t));
-                    if (!x) {
-                        std::lock_guard<std::mutex> dummy(mutexes[t]);
-                        x = cw_global_pools[t].load();
+                    segment * x;
+                    {
+                        /* https://bartoszmilewski.com/2008/12/01/c-atomics-and-memory-ordering/
+                         * https://bartoszmilewski.com/2008/12/23/the-inscrutable-c-memory-model/
+                         * http://www.cplusplus.com/reference/atomic/memory_order/
+                         */
+                        x = segments[t].load(std::memory_order_relaxed);
                         if (!x) {
-                            std::atomic<uint32_t> * xx = new std::atomic<uint32_t>[get_segment_size(t)];
-                            for(size_t i = 0 ; i < get_segment_size(t) ; i++) {
-                                xx[i]=0;
-                            }
-                            cw_global_pools[t] = xx;
-                            x = xx;
+                            std::lock_guard<std::mutex> dummy(segment_mutexes[t]);
+                            x = segments[t].load(std::memory_order_relaxed);
+                            if (!x)
+                                segments[t].store(x = new segment(t), std::memory_order_relaxed);
                         }
                     }
-                    x[c1]++;
+                    x->incr(c1);
                 }
             }
         }
@@ -184,6 +247,14 @@ int main(int argc, char * argv[])
         param_list_print_usage(pl, argv0, stderr);
         exit(EXIT_FAILURE);
     }
+
+    param_list_parse_size_t(pl, "thread-private-count", &thread_private_count);
+    param_list_parse_size_t(pl, "thread-read-window", &thread_read_window);
+    param_list_parse_size_t(pl, "thread-write-window", &thread_write_window);
+    ASSERT_ALWAYS(thread_read_window % sizeof(uint32_t) == 0);
+    ASSERT_ALWAYS(thread_write_window % sizeof(uint32_t) == 0);
+    thread_read_window  /= sizeof(uint32_t);
+    thread_write_window /= sizeof(uint32_t);
 
     const char * tmp;
     if ((tmp = param_list_lookup_string(pl, "mfile")) != NULL) {
@@ -237,7 +308,12 @@ int main(int argc, char * argv[])
     size_t ringbuf_size = ram / 4;
 
     param_list_parse_int(pl, "threads", &threads);
-    param_list_parse_size_t(pl, "memory", &ringbuf_size);
+    {
+        double r;
+        if (param_list_parse_double(pl, "io-memory", &r)) {
+            ringbuf_size = r * (1UL << 30);
+        }
+    }
 
     ringbuf_init(R, ringbuf_size);
 
@@ -253,7 +329,7 @@ int main(int argc, char * argv[])
     ASSERT_ALWAYS(threads >= 2);
 
     int consumers = threads-1;
-    cw_thread T[consumers];
+    parser_thread T[consumers];
     
     double t0 = wct_seconds();
     double last_report = t0;
@@ -263,7 +339,7 @@ int main(int argc, char * argv[])
     {
         int t = omp_get_thread_num();
         if (t == 0) {
-            uint32_t buf[256];
+            uint32_t buf[thread_write_window];
             for( ; ; ) {
                 uint32_t row_length;
                 int rc = fread32_little(&row_length, 1, f_in);
@@ -272,7 +348,7 @@ int main(int argc, char * argv[])
                 rc = fwrite32_little(&row_length, 1, f_rw);
                 ASSERT_ALWAYS(rc == 1);
                 for( ; row_length ; ) {
-                    int s = MIN(row_length, 256);
+                    int s = MIN(row_length, thread_write_window);
                     int k = fread32_little(buf, s, f_in);
                     ASSERT_ALWAYS(k == s);
                     ringbuf_put(R, (char *) buf, s * sizeof(uint32_t));
@@ -303,27 +379,28 @@ int main(int argc, char * argv[])
                 tt - t0);
     }
     for(int i = 1 ; i < consumers ; i++) {
-        for(size_t j = 0 ; j < cw_cutoff ; j++)
+        for(size_t j = 0 ; j < thread_private_count ; j++)
             T[0].cw[j] += T[i].cw[j];
         T[0].colmax = MAX(T[0].colmax, T[i].colmax);
     }
     uint32_t colmax = T[0].colmax;
     uint32_t c = 0;
-    for( ; c < cw_cutoff && c < colmax ; c++) {
+    for( ; c < thread_private_count && c < colmax ; c++) {
         int rc = fwrite32_little(&T[0].cw[c], 1, f_cw);
         ASSERT_ALWAYS(rc == 1);
     }
     for( ; c < colmax ; ) {
         unsigned int t = get_segment_index(c);
+        std::lock_guard<std::mutex> dummy(segment_mutexes[t]);
         uint32_t c1 = c-get_segment_offset(t);
         uint32_t max1 = MIN(colmax-get_segment_offset(t), get_segment_size(t));
         uint32_t n1 = max1 - c1;
-        std::atomic<uint32_t> * x = cw_global_pools[t].load();
-        ASSERT_ALWAYS(x);
-        ASSERT_ALWAYS(sizeof(*x) == sizeof(uint32_t));
-        int rc = fwrite32_little((uint32_t*) &x[c1], n1, f_cw);
+        segment * x = segments[t];
+        if (!x) x = new segment(t);
+        int rc = fwrite32_little((uint32_t*) &x->data[c1], n1, f_cw);
         ASSERT_ALWAYS(rc == (int) n1);
         c += n1;
+        delete x;
     }
 
     ringbuf_clear(R);
