@@ -1337,3 +1337,4 @@ tests/sieve/F9.with_hints.todo
 tests/utils/test_sha1.c
 utils/sha1.c
 utils/sha1.h
+linalg/bwc/mf_scan2.cpp
