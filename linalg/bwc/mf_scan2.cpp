@@ -190,6 +190,10 @@ void master_loop(ringbuf_ptr R, FILE * f_in, FILE * f_rw)
         int rc = fread32_little(&row_length, 1, f_in);
         if (rc != 1)
             break;
+        if (((int32_t)row_length) < 0) {
+            fprintf(stderr, "Found row with more than 2G entries. You most probably omitted the --withcoeffs flag\n");
+            exit(EXIT_FAILURE);
+        }
         rc = fwrite32_little(&row_length, 1, f_rw);
         ASSERT_ALWAYS(rc == 1);
         for( ; row_length ; ) {
