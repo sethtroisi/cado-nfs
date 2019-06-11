@@ -47,17 +47,21 @@ class reporter {
     std::atomic<size_t> consumed;
     double t0;
     double last_report;
+    double delay = 1;
     std::mutex m;
     void report(bool force = false) {
         std::lock_guard<std::mutex> dummy(m);
         double tt = wct_seconds();
-        if (!force && tt < last_report + 1) return;
+        bool want = tt >= last_report + delay;
+        if (!force && !want) return;
         char buf1[20];
         char buf2[20];
         printf("read %s, parsed %s, in %.1f s\n",
                 size_disp(produced, buf1),
                 size_disp(consumed.load(), buf2),
                 (last_report = tt) - t0);
+        if (want)
+            delay *= 1.189207;
     }
     public:
     struct consumer_data {
@@ -199,6 +203,14 @@ void master_loop(ringbuf_ptr R, FILE * f_in, FILE * f_rw)
         for( ; row_length ; ) {
             int s = MIN(row_length, tw);
             int k = fread32_little((uint32_t *) buf, s * (1 + c), f_in);
+            if (k != s * (1+c)) {
+                fprintf(stderr, "Input error while reading %d 32-bit entries from fd %d at position %zd : Got only %d values\n",
+                        s * (1+c),
+                        fileno(f_in),
+                        ftell(f_in),
+                        k);
+                abort();
+            }
             ASSERT_ALWAYS(k == s * (1 + c));
             ringbuf_put(R, (char *) buf, s * sizeof(coeff_t));
             report.producer_report(s * sizeof(coeff_t));
