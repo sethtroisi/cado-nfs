@@ -3,10 +3,13 @@
 #include <cstdlib>
 #include <cstdint>
 #include <pthread.h>
+#ifdef HAVE_HWLOC
 #include <hwloc.h>
+#endif
 #include <mutex>
 #include <atomic>
 #include <omp.h>
+#include <tuple>
 #include "utils.h"
 #include "ringbuf.h"
 
@@ -23,7 +26,7 @@ void mf_scan2_decl_usage(cxx_param_list & pl)
     param_list_decl_usage(pl, "rwfile", "Name of the row weight file to write (defaults to auto-determine from matrix name)");
     param_list_decl_usage(pl, "cwfile", "Name of the col weight file to write (defaults to auto-determine from matrix name)");
     param_list_decl_usage(pl, "threads", "Number of threads to use (defaults to auto detect\n");
-    param_list_decl_usage(pl, "io-memory", "Amount of RAM to use for rolling buffer memory (in GB, floating point allowed)");
+    param_list_decl_usage(pl, "io-memory", "Amount of RAM to use for rolling buffer memory (in GB, floating point allowed). Defaults to 25%% of RAM (with hwloc)");
     param_list_decl_usage(pl, "thread-private-count", "Number of columns for which a thread-private zone is used");
     param_list_decl_usage(pl, "thread-read-window", "Chunk size for consumer thread reads from rolling buffer");
     param_list_decl_usage(pl, "thread-write-window", "Chunk size for producer thread writes to rolling buffer");
@@ -36,6 +39,8 @@ size_t thread_private_count = 1UL << 20;
  */
 size_t thread_read_window = 1UL << 13;
 size_t thread_write_window = 1UL << 10;
+
+int withcoeffs = 0;
 
 class reporter {
     std::atomic<size_t> produced;
@@ -126,22 +131,26 @@ struct segment {
 std::atomic<segment *> segments[64];
 std::mutex segment_mutexes[64];
 
-ringbuf R;
+template<bool> struct nz_coeff;
+template<> struct nz_coeff<false> { struct type { uint32_t j; }; };
+template<> struct nz_coeff<true> { struct type { uint32_t j; int32_t v; }; };
 
+template<bool withcoeffs>
 struct parser_thread {
+    typedef typename nz_coeff<withcoeffs>::type coeff_t;
     std::vector<uint32_t> cw;
     uint32_t colmax=0;
     parser_thread() : cw(thread_private_count, 0) {};
-    void loop() {
+    void loop(ringbuf_ptr R) {
         reporter::consumer_data D;
-        uint32_t buffer[thread_read_window];
+        coeff_t buffer[thread_read_window];
         for(size_t s ; (s = ringbuf_get(R, (char*) buffer, sizeof(buffer))) != 0 ; ) {
             report.consumer_report(D, s);
-            uint32_t * v = (uint32_t *) buffer;
-            ASSERT_ALWAYS(s % sizeof(uint32_t) == 0);
-            size_t sv = s / sizeof(uint32_t);
+            coeff_t * v = (coeff_t *) buffer;
+            ASSERT_ALWAYS(s % sizeof(coeff_t) == 0);
+            size_t sv = s / sizeof(coeff_t);
             for(size_t i = 0 ; i < sv ; i++) {
-                uint32_t c = v[i];
+                uint32_t c = v[i].j;
                 colmax = MAX(colmax, c+1);
                 if (c < thread_private_count) {
                     cw[c]++;
@@ -168,6 +177,86 @@ struct parser_thread {
     }
 };
 
+template<bool withcoeffs>
+void master_loop(ringbuf_ptr R, FILE * f_in, FILE * f_rw)
+{
+    constexpr int c = withcoeffs != 0;
+    typedef typename nz_coeff<withcoeffs>::type coeff_t;
+    ASSERT_ALWAYS(thread_write_window % sizeof(coeff_t) == 0);
+    size_t tw = thread_write_window / sizeof(coeff_t);
+    coeff_t buf[tw];
+    for( ; ; ) {
+        uint32_t row_length;
+        int rc = fread32_little(&row_length, 1, f_in);
+        if (rc != 1)
+            break;
+        rc = fwrite32_little(&row_length, 1, f_rw);
+        ASSERT_ALWAYS(rc == 1);
+        for( ; row_length ; ) {
+            int s = MIN(row_length, tw);
+            int k = fread32_little((uint32_t *) buf, s * (1 + c), f_in);
+            ASSERT_ALWAYS(k == s * (1 + c));
+            ringbuf_put(R, (char *) buf, s * sizeof(coeff_t));
+            report.producer_report(s * sizeof(coeff_t));
+            row_length -= s;
+        }
+    }
+    ringbuf_mark_done(R);
+}
+
+void finish_write_and_clear_segments(uint32_t c, uint32_t colmax, FILE * f_cw)
+{
+    for( ; c < colmax ; ) {
+        unsigned int t = get_segment_index(c);
+        std::lock_guard<std::mutex> dummy(segment_mutexes[t]);
+        uint32_t c1 = c-get_segment_offset(t);
+        uint32_t max1 = MIN(colmax-get_segment_offset(t), get_segment_size(t));
+        uint32_t n1 = max1 - c1;
+        segment * x = segments[t];
+        if (!x) x = new segment(t);
+        int rc = fwrite32_little((uint32_t*) &x->data[c1], n1, f_cw);
+        ASSERT_ALWAYS(rc == (int) n1);
+        c += n1;
+        delete x;
+    }
+}
+
+template<bool withcoeffs>
+void write_column_weights(parser_thread<withcoeffs> * T, int consumers, FILE * f_cw)
+{
+    for(int i = 1 ; i < consumers ; i++) {
+        for(size_t j = 0 ; j < thread_private_count ; j++)
+            T[0].cw[j] += T[i].cw[j];
+        T[0].colmax = MAX(T[0].colmax, T[i].colmax);
+    }
+    uint32_t colmax = T[0].colmax;
+    uint32_t c = 0;
+    for( ; c < thread_private_count && c < colmax ; c++) {
+        int rc = fwrite32_little(&T[0].cw[c], 1, f_cw);
+        ASSERT_ALWAYS(rc == 1);
+    }
+    finish_write_and_clear_segments(c, colmax, f_cw);
+}
+
+template<bool withcoeffs>
+void maincode(ringbuf_ptr R, int consumers, FILE * f_in, FILE * f_rw, FILE * f_cw)
+{
+    parser_thread<withcoeffs> T[consumers];
+#pragma omp parallel
+    {
+        int t = omp_get_thread_num();
+        if (t == 0) {
+            master_loop<withcoeffs>(R, f_in, f_rw);
+        } else {
+            T[t-1].loop(R);
+        }
+    }
+    report.producer_report(0, true);
+#pragma omp barrier
+    write_column_weights(T, consumers, f_cw);
+}
+
+
 int main(int argc, char * argv[])
 {
     char * argv0 = argv[0];
@@ -178,7 +267,6 @@ int main(int argc, char * argv[])
     const char * mfile = NULL;
 
     unsigned int wild =  0;
-    int withcoeffs = 0;
 
     argv++,argc--;
 
@@ -202,10 +290,6 @@ int main(int argc, char * argv[])
     param_list_parse_size_t(pl, "thread-private-count", &thread_private_count);
     param_list_parse_size_t(pl, "thread-read-window", &thread_read_window);
     param_list_parse_size_t(pl, "thread-write-window", &thread_write_window);
-    ASSERT_ALWAYS(thread_read_window % sizeof(uint32_t) == 0);
-    ASSERT_ALWAYS(thread_write_window % sizeof(uint32_t) == 0);
-    thread_read_window  /= sizeof(uint32_t);
-    thread_write_window /= sizeof(uint32_t);
 
     const char * tmp;
     if ((tmp = param_list_lookup_string(pl, "mfile")) != NULL) {
@@ -237,8 +321,7 @@ int main(int argc, char * argv[])
         cwfile = leakme = derived_filename(mfile, "cw", ".bin");
     }
 
-    if (withcoeffs) abort();    // not implemented yet
-
+#ifdef HAVE_HWLOC
     /* Detect hardware */
     hwloc_topology_t topology;
     hwloc_topology_init(&topology);
@@ -251,11 +334,20 @@ int main(int argc, char * argv[])
 #else
     uint64_t ram = root->total_memory;
 #endif
-
     for(uint64_t x = ram >> 4; x ; x >>= 1) ram |= x;
     ram = ram + 1;
-
+    hwloc_topology_destroy(topology);
     int threads = npu;
+#else
+    uint64_t ram = 1 << 30;
+    int threads = 2;
+#pragma omp parallel
+    {
+#pragma omp single
+        threads = omp_get_num_threads();
+    }
+#endif
+
     size_t ringbuf_size = ram / 4;
 
     param_list_parse_int(pl, "threads", &threads);
@@ -266,6 +358,7 @@ int main(int argc, char * argv[])
         }
     }
 
+    ringbuf R;
     ringbuf_init(R, ringbuf_size);
 
     /* Start with the input */
@@ -279,71 +372,23 @@ int main(int argc, char * argv[])
 
     ASSERT_ALWAYS(threads >= 2);
 
-    int consumers = threads-1;
-    parser_thread T[consumers];
-    
+    ASSERT_ALWAYS(thread_read_window % sizeof(uint32_t) == 0);
+    thread_read_window  /= sizeof(uint32_t);
     report.reset();
 
     omp_set_num_threads(threads);
-#pragma omp parallel
-    {
-        int t = omp_get_thread_num();
-        if (t == 0) {
-            uint32_t buf[thread_write_window];
-            for( ; ; ) {
-                uint32_t row_length;
-                int rc = fread32_little(&row_length, 1, f_in);
-                if (rc != 1)
-                    break;
-                rc = fwrite32_little(&row_length, 1, f_rw);
-                ASSERT_ALWAYS(rc == 1);
-                for( ; row_length ; ) {
-                    int s = MIN(row_length, thread_write_window);
-                    int k = fread32_little(buf, s, f_in);
-                    ASSERT_ALWAYS(k == s);
-                    ringbuf_put(R, (char *) buf, s * sizeof(uint32_t));
-                    report.producer_report(s * sizeof(uint32_t));
-                    row_length -= s;
-                }
-            }
-            ringbuf_mark_done(R);
-        } else {
-            T[t-1].loop();
-        }
-    }
-#pragma omp barrier
-    report.producer_report(0, true);
-    for(int i = 1 ; i < consumers ; i++) {
-        for(size_t j = 0 ; j < thread_private_count ; j++)
-            T[0].cw[j] += T[i].cw[j];
-        T[0].colmax = MAX(T[0].colmax, T[i].colmax);
-    }
-    uint32_t colmax = T[0].colmax;
-    uint32_t c = 0;
-    for( ; c < thread_private_count && c < colmax ; c++) {
-        int rc = fwrite32_little(&T[0].cw[c], 1, f_cw);
-        ASSERT_ALWAYS(rc == 1);
-    }
-    for( ; c < colmax ; ) {
-        unsigned int t = get_segment_index(c);
-        std::lock_guard<std::mutex> dummy(segment_mutexes[t]);
-        uint32_t c1 = c-get_segment_offset(t);
-        uint32_t max1 = MIN(colmax-get_segment_offset(t), get_segment_size(t));
-        uint32_t n1 = max1 - c1;
-        segment * x = segments[t];
-        if (!x) x = new segment(t);
-        int rc = fwrite32_little((uint32_t*) &x->data[c1], n1, f_cw);
-        ASSERT_ALWAYS(rc == (int) n1);
-        c += n1;
-        delete x;
-    }
+    int consumers = threads-1;
 
-    ringbuf_clear(R);
-
-    hwloc_topology_destroy(topology);
+    if (!withcoeffs) {
+        maincode<false>(R, consumers, f_in, f_rw, f_cw);
+    } else {
+        maincode<true>(R, consumers, f_in, f_rw, f_cw);
+    }
 
     fclose(f_rw);
     fclose(f_cw);
     fclose(f_in);
+
+    ringbuf_clear(R);
 }
 
