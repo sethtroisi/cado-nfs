@@ -204,7 +204,7 @@ void master_loop(ringbuf_ptr R, FILE * f_in, FILE * f_rw)
             int s = MIN(row_length, tw);
             int k = fread32_little((uint32_t *) buf, s * (1 + c), f_in);
             if (k != s * (1+c)) {
-                fprintf(stderr, "Input error while reading %d 32-bit entries from fd %d at position %zd : Got only %d values\n",
+                fprintf(stderr, "Input error while reading %d 32-bit entries from fd %d at position %ld : Got only %d values\n",
                         s * (1+c),
                         fileno(f_in),
                         ftell(f_in),
