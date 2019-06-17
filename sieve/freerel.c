@@ -427,8 +427,10 @@ pthread_primes_consumer (void *arg)
           offset_roots[side] = 0;
         else
           offset_roots[side] = offset_roots[side - 1] + nroots[side - 1];
-        if (nroots[side] == deg[side] && !mpz_divisible_ui_p (lc[side], p)
-            && my_data->pmin <= p && p <= my_data->pmax)
+        /* Check if this polynomial has a maximal number of roots.
+           Warning: we count projective roots as well. */
+        if (nroots[side] == deg[side] &&
+            my_data->pmin <= p && p <= my_data->pmax)
           max_roots[t++] = side;
       }
 
@@ -438,18 +440,17 @@ pthread_primes_consumer (void *arg)
 
       /* Check if p corresponds to free relations.
          For 2 polynomials, this happens when the number of roots modulo p
-         is maximal for both polynomials, and p does not divide the leading
-         coefficient.
-         For 3 or more polynomials, let t be the number of polynomials such that
-         the number of roots modulo p is maximal, and p does not divide the leading
-         coefficient, then the number of free relations is t-1 (see Section 4.6 from
-         the PhD thesis from Marije Elkenbracht-Huizing, "Factoring integers with
-         the Number Field Sieve" */
+         is maximal for both polynomials.
+         For 3 or more polynomials, let t be the number of polynomials such
+         that the number of roots modulo p is maximal.
+         Then the number of free relations is t-1 (see Section 4.6 from
+         the PhD thesis from Marije Elkenbracht-Huizing, "Factoring integers
+         with the Number Field Sieve") */
       for (int i = 1; i < t; i++)
         {
           int j1 = max_roots[i-1];
           int j2 = max_roots[i];
-          /* free relation between poly[max_roots[i-1]] and poly[max_roots[i]] */
+          /* free relation between poly[j1] and poly[j2] */
           local_buf->freerels_p[local_buf->nfreerels] = p;
           local_buf->freerels_first_index[local_buf->nfreerels] =
             local_buf->nroots_tot + offset_roots[j1];
