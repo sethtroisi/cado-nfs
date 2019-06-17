@@ -24,7 +24,7 @@ class mmappable_vector: public std::vector<T, A> {
 
         mmappable_vector(): Base() { }
 
-        mmappable_vector(const mmappable_vector<T, A> &other) = default;
+        mmappable_vector(const mmappable_vector<T, A> &) = default;
         mmappable_vector& operator=(const mmappable_vector<T, A> &) = default;
 
         /* This is not conforming, since the container
