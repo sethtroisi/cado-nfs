@@ -153,7 +153,7 @@ void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUS
 
         for(unsigned int j = 0 ; j < A_multiplex ; j++) {
             char * tmp;
-            int rc = asprintf(&tmp, "V%u-%u.0", j * A_width, (j+1) * A_width);
+            int rc = asprintf(&tmp, "V%s.0", "%u-%u");
             ASSERT_ALWAYS(rc >= 0);
             /* Random generation + save is better done as writing random data
              * to a file followed by reading it: this way, seeding works
@@ -163,7 +163,7 @@ void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUS
                 /* create it as an extraction from the rhs file */
                 ASSERT_ALWAYS(0);       /* implement me... See GF(p) below. */
             } else {
-                mmt_vec_set_random_through_file(y, tmp, unpadded, rstate);
+                mmt_vec_set_random_through_file(y, tmp, unpadded, rstate, j * A_width);
             }
             if (tcan_print) {
                 printf("// generated %s (trial # %u)\n", tmp, ntri);

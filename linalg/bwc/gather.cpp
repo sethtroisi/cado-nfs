@@ -33,6 +33,7 @@ struct sfile_info {/*{{{*/
     unsigned int iter0;
     unsigned int iter1;
     char name[NAME_MAX];
+    char name_pattern[NAME_MAX];
     static bool match(sfile_info& v, const char * name, unsigned int sol0, unsigned int sol1) {
         int k;
         int rc;
@@ -47,6 +48,7 @@ struct sfile_info {/*{{{*/
         v.iter1 = iter1;
         size_t res = strlcpy(v.name, name, NAME_MAX);
         ASSERT_ALWAYS(res < NAME_MAX);
+        snprintf(v.name_pattern, sizeof(name_pattern), "S.sols%%u-%%u.%u-%u", iter0, iter1);
         return true;
     }
 };/*}}}*/
@@ -472,14 +474,10 @@ struct rhs /*{{{*/ {
         mmt_vec_init(mmt,Av,Av_pi, vi,bw->dir, /* shared ! */ 1, mmt->n[bw->dir]);
 
         for(unsigned int j = 0 ; j < nrhs ; j++) {
-            char * tmp;
-            int rc = asprintf(&tmp, "V%u-%u.0", j, j + 1);
-            ASSERT_ALWAYS(rc >= 0);
             if (tcan_print && verbose_enabled(CADO_VERBOSE_PRINT_BWC_LOADING_MKSOL_FILES)) {
-                printf("loading %s\n", tmp);
+                printf("loading V%u-%u.0\n", j, j + 1);
             }
-            mmt_vec_load(vi, tmp, unpadded);
-            free(tmp);
+            mmt_vec_load(vi, "V%u-%u.0", unpadded, j);
 
             natural.templates(A)->addmul_tiny(Av, A, 
                     mmt_my_own_subvec(y),
@@ -1136,13 +1134,8 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
 
     rhs R(mmt, param_list_lookup_string(pl, "rhs"), solutions);
 
-    char * kprefix;
-
     if (tcan_print)
         printf("Trying to build solutions %u..%u\n", solutions[0], solutions[1]);
-
-    int rc = asprintf(&kprefix, "K.sols%u-%u", solutions[0], solutions[1]);
-    ASSERT_ALWAYS(rc >= 0);
 
 
     { /* {{{ Collect now the sum of the LHS contributions */
@@ -1152,7 +1145,7 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
             if (tcan_print && verbose_enabled(CADO_VERBOSE_PRINT_BWC_LOADING_MKSOL_FILES)) {
                 printf("loading %s\n", sl[i].name);
             }
-            mmt_vec_load(svec, sl[i].name, unpadded);
+            mmt_vec_load(svec, sl[i].name_pattern, unpadded, solutions[0]);
 
             A->vec_add(A,
                     mmt_my_own_subvec(y), 
@@ -1238,10 +1231,10 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
         /* {{{ save file. If input is zero, bail out */
         {
             char * tmp;
-            int rc = asprintf(&tmp, "%s%s.%d", input_is_zero ? "zero" : "",
-                    kprefix, i-1);
+            int rc = asprintf(&tmp, "%sK.sols%%u-%%u.%d", input_is_zero ? "zero" : "",
+                    i-1);
             ASSERT_ALWAYS(rc >= 0);
-            mmt_vec_save(y_saved, tmp, unpadded);
+            mmt_vec_save(y_saved, tmp, unpadded, solutions[0]);
             if (input_is_zero) {
                 if (tcan_print)
                     fprintf(stderr,
@@ -1255,15 +1248,20 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
                             i-1,
                             bw->dir ? " * V" : "",
                             pad_is_zero ? "also" : "NOT");
-                if (tcan_print && !pad_is_zero)
+                if (tcan_print && !pad_is_zero) {
+                    char * tmp2;
+                    asprintf(&tmp2, tmp, solutions[0], solutions[1]);
                     fprintf(stderr,
                             "For reference, this useless vector (non-zero out, zero in) is stored in %s."
                             "\n",
-                            tmp);
+                            tmp2);
+                    free(tmp2);
+                }
                 serialize(pi->m);
                 pthread_mutex_lock(pi->m->th->m);
                 exitcode=1;
                 pthread_mutex_unlock(pi->m->th->m);
+                free(tmp);
                 return NULL;
             }
             free(tmp);
@@ -1323,63 +1321,64 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
          * winning_iter==0 always.
          */
         ASSERT_ALWAYS(winning_iter == 0 || !R);
-
-        char * tmp;
-        int rc = asprintf(&tmp, "%s.%u", kprefix, winning_iter);
-        ASSERT_ALWAYS(rc >= 0);
-        /* {{{ append the RHS coefficients if relevant */
-        if (R) {
-            printf("Expanding %s so as to include the coefficients for the %d RHS columns\n", tmp, R.nrhs);
-            FILE * f = fopen(tmp, "ab");
-            ASSERT_ALWAYS(f);
-            rc = fseek(f, 0, SEEK_END);
+        int splitwidth = char2 ? 64 : 1;
+        for(unsigned int sol0 = solutions[0] ; sol0 < solutions[1] ; sol0 += splitwidth) {
+            char * tmp;
+            int rc = asprintf(&tmp, "K.sols%u-%u.%u", sol0, sol0 + splitwidth, winning_iter);
             ASSERT_ALWAYS(rc >= 0);
-            R.fwrite_rhs_coeffs(f);
-            fclose(f);
-        }
-
-        printf("%s is now a %s nullspace vector for %s"
-                " (for a square M of dimension %" PRIu32"x%" PRIu32").\n",
-                tmp,
-                bw_dirtext[bw->dir],
-                R ? "(M|RHS)" : "M",
-                unpadded, unpadded);
-        /* }}} */
-
-        char * tmp2;
-        rc = asprintf(&tmp2, "%s.%u.txt", kprefix, winning_iter);
-        ASSERT_ALWAYS(rc >= 0);
-        /* {{{ write an ascii version while we're at it */
-        {
-            FILE * f  = fopen(tmp, "rb");
-            FILE * f2 = fopen(tmp2, "w");
-            ASSERT_ALWAYS(f);
-            ASSERT_ALWAYS(f2);
-            void * data = malloc(A->vec_elt_stride(A, 1));
-            for(uint32_t i = 0 ; i < mmt->n0[bw->dir] ; i++) {
-                size_t rc = fread(data, A->vec_elt_stride(A, 1), 1, f);
-                ASSERT_ALWAYS(rc == 1);
-                A->fprint(A, f2, data);
-                fprintf(f2, "\n");
+            /* {{{ append the RHS coefficients if relevant */
+            if (R) {
+                printf("Expanding %s so as to include the coefficients for the %d RHS columns\n", tmp, R.nrhs);
+                FILE * f = fopen(tmp, "ab");
+                ASSERT_ALWAYS(f);
+                rc = fseek(f, 0, SEEK_END);
+                ASSERT_ALWAYS(rc >= 0);
+                R.fwrite_rhs_coeffs(f);
+                fclose(f);
             }
-            free(data);
-            R.fprint_rhs_coeffs(f2);
-            fclose(f2);
-        }
 
-        printf("%s (in ascii) is now a %s nullspace vector for %s"
-                " (for the original M, of dimension %" PRIu32"x%" PRIu32").\n",
-                tmp2,
-                bw_dirtext[bw->dir],
-                R ? "(M|RHS)" : "M",
-                mmt->n0[0], mmt->n0[1]);
-        /* }}} */
-        free(tmp2);
-        free(tmp);
+            printf("%s is now a %s nullspace vector for %s"
+                    " (for a square M of dimension %" PRIu32"x%" PRIu32").\n",
+                    tmp,
+                    bw_dirtext[bw->dir],
+                    R ? "(M|RHS)" : "M",
+                    unpadded, unpadded);
+            /* }}} */
+
+            char * tmp2;
+            rc = asprintf(&tmp2, "K.sols%u-%u.%u.txt", sol0, sol0 + splitwidth, winning_iter);
+            ASSERT_ALWAYS(rc >= 0);
+            /* {{{ write an ascii version while we're at it */
+            {
+                FILE * f  = fopen(tmp, "rb");
+                FILE * f2 = fopen(tmp2, "w");
+                ASSERT_ALWAYS(f);
+                ASSERT_ALWAYS(f2);
+                void * data = malloc(A->vec_elt_stride(A, 1));
+                for(uint32_t i = 0 ; i < mmt->n0[bw->dir] ; i++) {
+                    size_t rc = fread(data, A->vec_elt_stride(A, 1), 1, f);
+                    ASSERT_ALWAYS(rc == 1);
+                    A->fprint(A, f2, data);
+                    fprintf(f2, "\n");
+                }
+                free(data);
+                R.fprint_rhs_coeffs(f2);
+                fclose(f2);
+            }
+
+            printf("%s (in ascii) is now a %s nullspace vector for %s"
+                    " (for the original M, of dimension %" PRIu32"x%" PRIu32").\n",
+                    tmp2,
+                    bw_dirtext[bw->dir],
+                    R ? "(M|RHS)" : "M",
+                    mmt->n0[0], mmt->n0[1]);
+            /* }}} */
+            free(tmp2);
+            free(tmp);
+        }
     }
 
     serialize(pi->m);
-    free(kprefix);
 
     mmt_vec_clear(mmt, y_saved);
     mmt_vec_clear(mmt, y);

@@ -257,7 +257,7 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
         for(int i = 0 ; i < bw->n / splitwidth ; i++) {
             int ys[2] = { i * splitwidth, (i + 1) * splitwidth };
             char * v_name = NULL;
-            int rc = asprintf(&v_name, "V%u-%u.%u", ys[0], ys[1], s);
+            int rc = asprintf(&v_name, "V%s.%u", "%u-%u", s);
             ASSERT_ALWAYS(rc >= 0);
             if (tcan_print) {
                 printf(fake ? "Creating fake %s..." : "Loading %s ...",
@@ -265,9 +265,9 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
                 fflush(stdout);
             }
             if (fake) {
-                mmt_vec_set_random_through_file(vi[i], v_name, unpadded, rstate);
+                mmt_vec_set_random_through_file(vi[i], v_name, unpadded, rstate, ys[0]);
             } else {
-                mmt_vec_load(vi[i], v_name, unpadded);
+                mmt_vec_load(vi[i], v_name, unpadded, ys[0]);
                 mmt_vec_reduce_mod_p(vi[i]);
             }
             mmt_vec_twist(mmt, vi[i]);
@@ -479,12 +479,13 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
              */
             int j = 0;
             char * s_name;
-            int rc = asprintf(&s_name, "S.sols%u-%u.%u-%u",
-                    solutions[0] + j * As_width,
-                    solutions[0] + (j + 1) * As_width,
+            int rc = asprintf(&s_name, "S.sols%s.%u-%u",
+                    "%u-%u",
                     s, s + bw->checkpoint_precious);
             ASSERT_ALWAYS(rc >= 0);
-            mmt_vec_save(ymy[0], s_name, unpadded);
+            ASSERT_ALWAYS(ymy[0]->abase->simd_groupsize(ymy[0]->abase) == (int) As_width);
+            mmt_vec_save(ymy[0], s_name, unpadded,
+                    solutions[0] + j * As_width);
             free(s_name);
         }
     }

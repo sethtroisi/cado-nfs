@@ -3,6 +3,8 @@
 
 #include <stdarg.h>
 #include "mpfq_vbase.h"
+#include "mpfq_m128.h"
+#include "mpfq_m128_t.h"
 #include "mpfq_u64k1.h"
 #include "mpfq_u64k1_t.h"
 #include "mpfq_u64k2.h"
@@ -102,6 +104,8 @@ void mpfq_vbase_oo_field_init_byfeatures(mpfq_vbase_ptr v, ...)
         va_end(ap);
         if (mandatory_tag) {
             if (0) {
+            } else if (strcmp(mandatory_tag, "m128") == 0 && groupsize == 128 && mpz_cmp_ui(p, 2) == 0) {
+                mpfq_m128_oo_field_init(v);
             } else if (strcmp(mandatory_tag, "u64k1") == 0 && groupsize == 64 && mpz_cmp_ui(p, 2) == 0) {
                 mpfq_u64k1_oo_field_init(v);
             } else if (strcmp(mandatory_tag, "u64k2") == 0 && groupsize == 128 && mpz_cmp_ui(p, 2) == 0) {
@@ -179,6 +183,8 @@ void mpfq_vbase_oo_field_init_byfeatures(mpfq_vbase_ptr v, ...)
                 exit(1);
             }
         /* now for the case where there is no mandatory tag */
+        } else if (groupsize == 128 && mpz_cmp_ui(p, 2) == 0) {
+            mpfq_m128_oo_field_init(v);
         } else if (groupsize == 64 && mpz_cmp_ui(p, 2) == 0) {
             mpfq_u64k1_oo_field_init(v);
         } else if (groupsize == 128 && mpz_cmp_ui(p, 2) == 0) {
@@ -265,6 +271,30 @@ void mpfq_vbase_oo_init_templates(mpfq_vbase_tmpl_ptr w, mpfq_vbase_ptr v0, mpfq
     const char * s0 = v0->impl_name();
     const char * s1 = v1->impl_name();
     if (0) {
+    } else if (strcmp(s0, "m128") == 0 && strcmp(s1, "m128") == 0) {
+        w->dotprod = (void (*) (mpfq_vbase_ptr, mpfq_vbase_ptr, void *, const void *, const void *, unsigned int)) mpfq_m128_m128_wrapper_dotprod;
+        w->addmul_tiny = (void (*) (mpfq_vbase_ptr, mpfq_vbase_ptr, void *, const void *, void *, unsigned int)) mpfq_m128_m128_wrapper_addmul_tiny;
+        w->transpose = (void (*) (mpfq_vbase_ptr, mpfq_vbase_ptr, void *, const void *)) mpfq_m128_m128_wrapper_transpose;
+    } else if (strcmp(s0, "m128") == 0 && strcmp(s1, "u64k1") == 0) {
+        w->dotprod = (void (*) (mpfq_vbase_ptr, mpfq_vbase_ptr, void *, const void *, const void *, unsigned int)) mpfq_m128_u64k1_wrapper_dotprod;
+        w->addmul_tiny = (void (*) (mpfq_vbase_ptr, mpfq_vbase_ptr, void *, const void *, void *, unsigned int)) mpfq_m128_u64k1_wrapper_addmul_tiny;
+        w->transpose = (void (*) (mpfq_vbase_ptr, mpfq_vbase_ptr, void *, const void *)) mpfq_m128_u64k1_wrapper_transpose;
+    } else if (strcmp(s0, "m128") == 0 && strcmp(s1, "u64k2") == 0) {
+        w->dotprod = (void (*) (mpfq_vbase_ptr, mpfq_vbase_ptr, void *, const void *, const void *, unsigned int)) mpfq_m128_u64k2_wrapper_dotprod;
+        w->addmul_tiny = (void (*) (mpfq_vbase_ptr, mpfq_vbase_ptr, void *, const void *, void *, unsigned int)) mpfq_m128_u64k2_wrapper_addmul_tiny;
+        w->transpose = (void (*) (mpfq_vbase_ptr, mpfq_vbase_ptr, void *, const void *)) mpfq_m128_u64k2_wrapper_transpose;
+    } else if (strcmp(s0, "m128") == 0 && strcmp(s1, "u64k3") == 0) {
+        w->dotprod = (void (*) (mpfq_vbase_ptr, mpfq_vbase_ptr, void *, const void *, const void *, unsigned int)) mpfq_m128_u64k3_wrapper_dotprod;
+        w->addmul_tiny = (void (*) (mpfq_vbase_ptr, mpfq_vbase_ptr, void *, const void *, void *, unsigned int)) mpfq_m128_u64k3_wrapper_addmul_tiny;
+        w->transpose = (void (*) (mpfq_vbase_ptr, mpfq_vbase_ptr, void *, const void *)) mpfq_m128_u64k3_wrapper_transpose;
+    } else if (strcmp(s0, "m128") == 0 && strcmp(s1, "u64k4") == 0) {
+        w->dotprod = (void (*) (mpfq_vbase_ptr, mpfq_vbase_ptr, void *, const void *, const void *, unsigned int)) mpfq_m128_u64k4_wrapper_dotprod;
+        w->addmul_tiny = (void (*) (mpfq_vbase_ptr, mpfq_vbase_ptr, void *, const void *, void *, unsigned int)) mpfq_m128_u64k4_wrapper_addmul_tiny;
+        w->transpose = (void (*) (mpfq_vbase_ptr, mpfq_vbase_ptr, void *, const void *)) mpfq_m128_u64k4_wrapper_transpose;
+    } else if (strcmp(s0, "u64k1") == 0 && strcmp(s1, "m128") == 0) {
+        w->dotprod = (void (*) (mpfq_vbase_ptr, mpfq_vbase_ptr, void *, const void *, const void *, unsigned int)) mpfq_u64k1_m128_wrapper_dotprod;
+        w->addmul_tiny = (void (*) (mpfq_vbase_ptr, mpfq_vbase_ptr, void *, const void *, void *, unsigned int)) mpfq_u64k1_m128_wrapper_addmul_tiny;
+        w->transpose = (void (*) (mpfq_vbase_ptr, mpfq_vbase_ptr, void *, const void *)) mpfq_u64k1_m128_wrapper_transpose;
     } else if (strcmp(s0, "u64k1") == 0 && strcmp(s1, "u64k1") == 0) {
         w->dotprod = (void (*) (mpfq_vbase_ptr, mpfq_vbase_ptr, void *, const void *, const void *, unsigned int)) mpfq_u64k1_u64k1_wrapper_dotprod;
         w->addmul_tiny = (void (*) (mpfq_vbase_ptr, mpfq_vbase_ptr, void *, const void *, void *, unsigned int)) mpfq_u64k1_u64k1_wrapper_addmul_tiny;
@@ -281,6 +311,10 @@ void mpfq_vbase_oo_init_templates(mpfq_vbase_tmpl_ptr w, mpfq_vbase_ptr v0, mpfq
         w->dotprod = (void (*) (mpfq_vbase_ptr, mpfq_vbase_ptr, void *, const void *, const void *, unsigned int)) mpfq_u64k1_u64k4_wrapper_dotprod;
         w->addmul_tiny = (void (*) (mpfq_vbase_ptr, mpfq_vbase_ptr, void *, const void *, void *, unsigned int)) mpfq_u64k1_u64k4_wrapper_addmul_tiny;
         w->transpose = (void (*) (mpfq_vbase_ptr, mpfq_vbase_ptr, void *, const void *)) mpfq_u64k1_u64k4_wrapper_transpose;
+    } else if (strcmp(s0, "u64k2") == 0 && strcmp(s1, "m128") == 0) {
+        w->dotprod = (void (*) (mpfq_vbase_ptr, mpfq_vbase_ptr, void *, const void *, const void *, unsigned int)) mpfq_u64k2_m128_wrapper_dotprod;
+        w->addmul_tiny = (void (*) (mpfq_vbase_ptr, mpfq_vbase_ptr, void *, const void *, void *, unsigned int)) mpfq_u64k2_m128_wrapper_addmul_tiny;
+        w->transpose = (void (*) (mpfq_vbase_ptr, mpfq_vbase_ptr, void *, const void *)) mpfq_u64k2_m128_wrapper_transpose;
     } else if (strcmp(s0, "u64k2") == 0 && strcmp(s1, "u64k1") == 0) {
         w->dotprod = (void (*) (mpfq_vbase_ptr, mpfq_vbase_ptr, void *, const void *, const void *, unsigned int)) mpfq_u64k2_u64k1_wrapper_dotprod;
         w->addmul_tiny = (void (*) (mpfq_vbase_ptr, mpfq_vbase_ptr, void *, const void *, void *, unsigned int)) mpfq_u64k2_u64k1_wrapper_addmul_tiny;
@@ -297,6 +331,10 @@ void mpfq_vbase_oo_init_templates(mpfq_vbase_tmpl_ptr w, mpfq_vbase_ptr v0, mpfq
         w->dotprod = (void (*) (mpfq_vbase_ptr, mpfq_vbase_ptr, void *, const void *, const void *, unsigned int)) mpfq_u64k2_u64k4_wrapper_dotprod;
         w->addmul_tiny = (void (*) (mpfq_vbase_ptr, mpfq_vbase_ptr, void *, const void *, void *, unsigned int)) mpfq_u64k2_u64k4_wrapper_addmul_tiny;
         w->transpose = (void (*) (mpfq_vbase_ptr, mpfq_vbase_ptr, void *, const void *)) mpfq_u64k2_u64k4_wrapper_transpose;
+    } else if (strcmp(s0, "u64k3") == 0 && strcmp(s1, "m128") == 0) {
+        w->dotprod = (void (*) (mpfq_vbase_ptr, mpfq_vbase_ptr, void *, const void *, const void *, unsigned int)) mpfq_u64k3_m128_wrapper_dotprod;
+        w->addmul_tiny = (void (*) (mpfq_vbase_ptr, mpfq_vbase_ptr, void *, const void *, void *, unsigned int)) mpfq_u64k3_m128_wrapper_addmul_tiny;
+        w->transpose = (void (*) (mpfq_vbase_ptr, mpfq_vbase_ptr, void *, const void *)) mpfq_u64k3_m128_wrapper_transpose;
     } else if (strcmp(s0, "u64k3") == 0 && strcmp(s1, "u64k1") == 0) {
         w->dotprod = (void (*) (mpfq_vbase_ptr, mpfq_vbase_ptr, void *, const void *, const void *, unsigned int)) mpfq_u64k3_u64k1_wrapper_dotprod;
         w->addmul_tiny = (void (*) (mpfq_vbase_ptr, mpfq_vbase_ptr, void *, const void *, void *, unsigned int)) mpfq_u64k3_u64k1_wrapper_addmul_tiny;
@@ -313,6 +351,10 @@ void mpfq_vbase_oo_init_templates(mpfq_vbase_tmpl_ptr w, mpfq_vbase_ptr v0, mpfq
         w->dotprod = (void (*) (mpfq_vbase_ptr, mpfq_vbase_ptr, void *, const void *, const void *, unsigned int)) mpfq_u64k3_u64k4_wrapper_dotprod;
         w->addmul_tiny = (void (*) (mpfq_vbase_ptr, mpfq_vbase_ptr, void *, const void *, void *, unsigned int)) mpfq_u64k3_u64k4_wrapper_addmul_tiny;
         w->transpose = (void (*) (mpfq_vbase_ptr, mpfq_vbase_ptr, void *, const void *)) mpfq_u64k3_u64k4_wrapper_transpose;
+    } else if (strcmp(s0, "u64k4") == 0 && strcmp(s1, "m128") == 0) {
+        w->dotprod = (void (*) (mpfq_vbase_ptr, mpfq_vbase_ptr, void *, const void *, const void *, unsigned int)) mpfq_u64k4_m128_wrapper_dotprod;
+        w->addmul_tiny = (void (*) (mpfq_vbase_ptr, mpfq_vbase_ptr, void *, const void *, void *, unsigned int)) mpfq_u64k4_m128_wrapper_addmul_tiny;
+        w->transpose = (void (*) (mpfq_vbase_ptr, mpfq_vbase_ptr, void *, const void *)) mpfq_u64k4_m128_wrapper_transpose;
     } else if (strcmp(s0, "u64k4") == 0 && strcmp(s1, "u64k1") == 0) {
         w->dotprod = (void (*) (mpfq_vbase_ptr, mpfq_vbase_ptr, void *, const void *, const void *, unsigned int)) mpfq_u64k4_u64k1_wrapper_dotprod;
         w->addmul_tiny = (void (*) (mpfq_vbase_ptr, mpfq_vbase_ptr, void *, const void *, void *, unsigned int)) mpfq_u64k4_u64k1_wrapper_addmul_tiny;

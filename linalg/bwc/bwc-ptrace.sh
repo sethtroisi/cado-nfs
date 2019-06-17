@@ -552,9 +552,9 @@ done
 # }}}
 
 echo "Saving check vectors to magma format" # {{{
-if [ -f "$wdir/C.0" ] ; then
-    $cmd $magmaprintmode < $wdir/C.0 > $mdir/C0.m
-    $cmd $magmaprintmode < $wdir/C.$interval > $mdir/Ci.m
+if [ -f "$wdir/C0-$splitwidth.0" ] ; then
+    $cmd $magmaprintmode < $wdir/C0-$splitwidth.0 > $mdir/C0.m
+    $cmd $magmaprintmode < $wdir/C0-$splitwidth.$interval > $mdir/Ci.m
 else
     echo "var:=0;" > $mdir/C0.m
     echo "var:=0;" > $mdir/Ci.m

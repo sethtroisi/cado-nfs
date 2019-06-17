@@ -117,10 +117,10 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
     serialize(pi->m);
     char * v_name = NULL;
     if (!fake) {
-        int rc = asprintf(&v_name, "V%u-%u.%u", ys[0], ys[1], bw->start);
+        int rc = asprintf(&v_name, "V%s.%u", "%u-%u", bw->start);
         if (tcan_print) { printf("Loading %s ...", v_name); fflush(stdout); }
         ASSERT_ALWAYS(rc >= 0);
-        mmt_vec_load(ymy[0], v_name, unpadded);
+        mmt_vec_load(ymy[0], v_name, unpadded, ys[0]);
         free(v_name);
         mmt_vec_reduce_mod_p(ymy[0]);
         if (tcan_print) { printf("done\n"); }
@@ -184,10 +184,10 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
         mmt_vec_init(mmt, Ac, Ac_pi,
                 check_vector, bw->dir, THREAD_SHARED_VECTOR, mmt->n[bw->dir]);
         char * tmp;
-        int rc = asprintf(&tmp, "C.%u", bw->interval);
+        int rc = asprintf(&tmp, "C%s.%u", "%u-%u", bw->interval);
         ASSERT_ALWAYS(rc >= 0);
         if (tcan_print) { printf("Loading check vector %s...", tmp); fflush(stdout); }
-        mmt_vec_load(check_vector, tmp,  mmt->n0[bw->dir]);
+        mmt_vec_load(check_vector, tmp,  mmt->n0[bw->dir], 0);
         if (tcan_print) { printf("done\n"); }
         free(tmp);
     }
@@ -303,9 +303,9 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
         }
 
         if (!fake) {
-            int rc = asprintf(&v_name, "V%u-%u.%u", ys[0], ys[1], s + bw->interval);
+            int rc = asprintf(&v_name, "V%s.%u", "%u-%u", s + bw->interval);
             ASSERT_ALWAYS(rc >= 0);
-            mmt_vec_save(ymy[0], v_name, unpadded);
+            mmt_vec_save(ymy[0], v_name, unpadded, ys[0]);
             free(v_name);
         }
 

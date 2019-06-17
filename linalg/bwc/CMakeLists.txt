@@ -22,7 +22,7 @@ set(BUILD_DYNAMICALLY_LINKABLE_BWC ${ENABLE_SHARED})
 # with it. We *have* to compile all the u64k* which are in the set of
 # sources, because of cross dependencies which are presently not
 # correctly guarded.
-set(BWC_GF2_ARITHMETIC_BACKENDS u64k1 u64k2 u64k3 u64k4
+set(BWC_GF2_ARITHMETIC_BACKENDS m128 u64k1 u64k2 u64k3 u64k4
     CACHE STRING
     "which low-level arithmetic backends to use for GF(2) linear algebra")
 set(BWC_GF2_MATMUL_BACKENDS bucket basic sliced
@@ -170,7 +170,7 @@ set_target_properties(random_matrix PROPERTIES
 
 # FIXME: does this have to be the same as BWC_GF2_ARITHMETIC_BACKENDS ?
 # Is there any reason for having two variables ??
-set(bwc_abases u64k1 u64k2 u64k3 u64k4)
+set(bwc_abases m128 u64k1 u64k2 u64k3 u64k4)
 
 set(bwc_mpfq_sources mpfq/mpfq_vbase.c)
 foreach(v ${bwc_abases})
