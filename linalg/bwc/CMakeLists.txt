@@ -144,11 +144,13 @@ endif()
 
 mpi_add_executable(mf_scan ${EXCLUDE_FROM_RELEASE_BUILD} mf_scan.c)
 target_link_libraries(mf_scan bwc_base)
+if (HAVE_OPENMP)
 mpi_add_executable(mf_scan2 ${EXCLUDE_FROM_RELEASE_BUILD} mf_scan2.cpp)
 target_link_libraries(mf_scan2 bwc_base)
 set_target_properties(mf_scan2 PROPERTIES
     COMPILE_FLAGS "${OpenMP_CXX_FLAGS}"
     LINK_FLAGS "${OpenMP_CXX_FLAGS}")
+endif()
 
 
 include_directories(${CADO_NFS_SOURCE_DIR}/linalg)
