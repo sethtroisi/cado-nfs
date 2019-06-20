@@ -22,7 +22,11 @@ set(BUILD_DYNAMICALLY_LINKABLE_BWC ${ENABLE_SHARED})
 # with it. We *have* to compile all the u64k* which are in the set of
 # sources, because of cross dependencies which are presently not
 # correctly guarded.
-set(BWC_GF2_ARITHMETIC_BACKENDS u64k1 u64k2 u64k3 u64k4
+set(BWC_GF2_DEFAULT_ARITHMETIC_BACKENDS u64k1 u64k2 u64k3 u64k4)
+if (HAVE_SSE41)
+set(BWC_GF2_DEFAULT_ARITHMETIC_BACKENDS m128 ${BWC_GF2_DEFAULT_ARITHMETIC_BACKENDS})
+endif()
+set(BWC_GF2_ARITHMETIC_BACKENDS ${BWC_GF2_DEFAULT_ARITHMETIC_BACKENDS}
     CACHE STRING
     "which low-level arithmetic backends to use for GF(2) linear algebra")
 set(BWC_GF2_MATMUL_BACKENDS bucket basic sliced
@@ -170,12 +174,8 @@ set_target_properties(random_matrix PROPERTIES
 
 ### bwc_mpfq
 
-# FIXME: does this have to be the same as BWC_GF2_ARITHMETIC_BACKENDS ?
-# Is there any reason for having two variables ??
-set(bwc_abases u64k1 u64k2 u64k3 u64k4)
-
 set(bwc_mpfq_sources mpfq/mpfq_vbase.c)
-foreach(v ${bwc_abases})
+foreach(v ${BWC_GF2_ARITHMETIC_BACKENDS})
     set(bwc_mpfq_sources ${bwc_mpfq_sources} mpfq/mpfq_${v}.c mpfq/mpfq_${v}_t.c )
 endforeach(v)
 
@@ -186,6 +186,9 @@ endforeach(v)
 add_library(bwc_mpfq ${CADO_SHARED} ${bwc_mpfq_sources})
 
 set(bwc_mpfq_flags)
+foreach(v ${BWC_GF2_ARITHMETIC_BACKENDS})
+    set(bwc_mpfq_flags "${bwc_mpfq_flags} -DCOMPILE_MPFQ_BINARY_FIELD_${v}")
+endforeach(v)
 foreach(v ${BWC_GFP_ARITHMETIC_BACKENDS})
     set(bwc_mpfq_flags "${bwc_mpfq_flags} -DCOMPILE_MPFQ_PRIME_FIELD_${v}")
 endforeach(v)

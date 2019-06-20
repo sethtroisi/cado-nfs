@@ -1338,3 +1338,7 @@ tests/utils/test_sha1.c
 utils/sha1.c
 utils/sha1.h
 linalg/bwc/mf_scan2.cpp
+linalg/bwc/mpfq/mpfq_m128.c
+linalg/bwc/mpfq/mpfq_m128.h
+linalg/bwc/mpfq/mpfq_m128_t.c
+linalg/bwc/mpfq/mpfq_m128_t.h

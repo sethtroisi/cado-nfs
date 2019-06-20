@@ -605,74 +605,127 @@ mmt_vec_broadcast(mmt_vec_ptr v)
 
 /* {{{ generic interfaces for load/save */
 /* {{{ load */
-int mmt_vec_load_stream(pi_file_handle f, mmt_vec_ptr v, unsigned int itemsondisk)
+int mmt_vec_load(mmt_vec_ptr v, const char * filename_pattern, unsigned int itemsondisk, unsigned int block_position)
 {
     ASSERT_ALWAYS(v != NULL);
     serialize(v->pi->m);
+    int tcan_print = v->pi->m->trank == 0 && v->pi->m->jrank == 0;
+
+    ASSERT_ALWAYS(strstr(filename_pattern, "%u-%u") != NULL);
+
+    mpz_t p;
+    mpz_init(p);
+    v->abase->field_characteristic(v->abase, p);
+    int char2 = mpz_cmp_ui(p, 2) == 0;
+    mpz_clear(p);
+    int splitwidth = char2 ? 64 : 1;
+    unsigned int Adisk_width = splitwidth;
+    unsigned int Adisk_multiplex = v->abase->simd_groupsize(v->abase) / Adisk_width;
+
     size_t sizeondisk = v->abase->vec_elt_stride(v->abase, itemsondisk);
     void * mychunk = mmt_my_own_subvec(v);
     size_t mysize = mmt_my_own_size_in_bytes(v);
-    ssize_t s = pi_file_read(f, mychunk, mysize, sizeondisk);
-    int ok =  s >= 0 && (size_t) s == sizeondisk;
-    v->consistency = ok;
-    /* not clear it's useful, but well. */
-    if (ok) mmt_vec_broadcast(v);
-    serialize_threads(v->pi->m);
-    return ok;
-}
-int mmt_vec_load(mmt_vec_ptr v, const char * filename, unsigned int itemsondisk)
-{
-    ASSERT_ALWAYS(v != NULL);
-    serialize(v->pi->m);
+    size_t bigstride = v->abase->vec_elt_stride(v->abase, 1);
+    size_t smallstride = bigstride / Adisk_multiplex;
 
-    pi_file_handle f;
-    int ok = pi_file_open(f, v->pi, v->d, filename, "rb");
-    if (ok) {
-        ok = mmt_vec_load_stream(f, v, itemsondisk);
-        pi_file_close(f);
-    }
-    if (!ok) {
-        if (v->pi->m->trank == 0 && v->pi->m->jrank == 0) {
-            fprintf(stderr, "ERROR: failed to load %s\n", filename);
+    int global_ok = 1;
+
+    for(unsigned int b = 0 ; b < Adisk_multiplex ; b++) {
+        unsigned int b0 = block_position + b * Adisk_width;
+        char * filename;
+        asprintf(&filename, filename_pattern, b0, b0 + splitwidth);
+        if (tcan_print) {
+            printf("Loading %s ...", filename);
+            fflush(stdout);
         }
-        if (v->pi->m->trank == 0)
-            MPI_Abort(v->pi->m->pals, EXIT_FAILURE);
+        pi_file_handle f;
+        int ok = pi_file_open(f, v->pi, v->d, filename, "rb");
+        if (ok) {
+            ASSERT_ALWAYS(v != NULL);
+            serialize(v->pi->m);
+            ssize_t s = pi_file_read_chunk(f, mychunk, mysize, sizeondisk,
+                    bigstride, b * smallstride, (b+1) * smallstride);
+            int ok = s >= 0 && (size_t) s == sizeondisk / Adisk_multiplex;
+            v->consistency = ok;
+            /* not clear it's useful, but well. */
+            if (ok) mmt_vec_broadcast(v);
+            serialize_threads(v->pi->m);
+            pi_file_close(f);
+        }
+        if (!ok) {
+            if (v->pi->m->trank == 0 && v->pi->m->jrank == 0) {
+                fprintf(stderr, "ERROR: failed to load %s\n", filename);
+            }
+            if (v->pi->m->trank == 0)
+                MPI_Abort(v->pi->m->pals, EXIT_FAILURE);
+        }
+        free(filename);
+        if (tcan_print) { printf(" done\n"); }
+        global_ok = global_ok && ok;
     }
+
     serialize_threads(v->pi->m);
-    return ok;
+    return global_ok;
 }
 /* }}} */
 /* {{{ save */
-int mmt_vec_save_stream(pi_file_handle f, mmt_vec_ptr v, unsigned int itemsondisk)
+int mmt_vec_save(mmt_vec_ptr v, const char * filename_pattern, unsigned int itemsondisk, unsigned int block_position)
 {
-    ASSERT_ALWAYS(v != NULL);
-    ASSERT_ALWAYS(v->consistency == 2);
     serialize_threads(v->pi->m);
+    int tcan_print = v->pi->m->trank == 0 && v->pi->m->jrank == 0;
+
+    ASSERT_ALWAYS(strstr(filename_pattern, "%u-%u") != NULL);
+
+    mpz_t p;
+    mpz_init(p);
+    v->abase->field_characteristic(v->abase, p);
+    int char2 = mpz_cmp_ui(p, 2) == 0;
+    mpz_clear(p);
+    int splitwidth = char2 ? 64 : 1;
+    unsigned int Adisk_width = splitwidth;
+    unsigned int Adisk_multiplex = v->abase->simd_groupsize(v->abase) / Adisk_width;
+
     size_t sizeondisk = v->abase->vec_elt_stride(v->abase, itemsondisk);
     void * mychunk = mmt_my_own_subvec(v);
     size_t mysize = mmt_my_own_size_in_bytes(v);
-    ssize_t s = pi_file_write(f, mychunk, mysize, sizeondisk);
-    serialize_threads(v->pi->m);
-    return s >= 0 && (size_t) s == sizeondisk;
-}
-int mmt_vec_save(mmt_vec_ptr v, const char * filename, unsigned int itemsondisk)
-{
-    serialize_threads(v->pi->m);
+    size_t bigstride = v->abase->vec_elt_stride(v->abase, 1);
+    size_t smallstride = bigstride / Adisk_multiplex;
 
-    pi_file_handle f;
-    int ok = pi_file_open(f, v->pi, v->d, filename, "wb");
-    if (ok) {
-        ok = mmt_vec_save_stream(f, v, itemsondisk);
-        pi_file_close(f);
-    }
-    if (!ok) {
-        if (v->pi->m->trank == 0 && v->pi->m->jrank == 0) {
-            fprintf(stderr, "WARNING: failed to save %s\n", filename);
-            unlink(filename);
+    int global_ok = 1;
+
+    for(unsigned int b = 0 ; b < Adisk_multiplex ; b++) {
+        unsigned int b0 = block_position + b * Adisk_width;
+        char * filename;
+        asprintf(&filename, filename_pattern, b0, b0 + splitwidth);
+        if (tcan_print) {
+            printf("Saving %s ...", filename);
+            fflush(stdout);
         }
+        pi_file_handle f;
+        int ok = pi_file_open(f, v->pi, v->d, filename, "wb");
+        if (ok) {
+            ASSERT_ALWAYS(v != NULL);
+            ASSERT_ALWAYS(v->consistency == 2);
+            serialize_threads(v->pi->m);
+            ssize_t s = pi_file_write_chunk(f, mychunk, mysize, sizeondisk,
+                    bigstride, b * smallstride, (b+1) * smallstride);
+            serialize_threads(v->pi->m);
+            ok = s >= 0 && (size_t) s == sizeondisk / Adisk_multiplex;
+            pi_file_close(f);
+        }
+        if (!ok) {
+            if (v->pi->m->trank == 0 && v->pi->m->jrank == 0) {
+                fprintf(stderr, "WARNING: failed to save %s\n", filename);
+                unlink(filename);
+            }
+        }
+        free(filename);
+        if (tcan_print) { printf(" done\n"); }
+        global_ok = global_ok && ok;
     }
+
     serialize_threads(v->pi->m);
-    return ok;
+    return global_ok;
 }
 /* }}} */
 /* }}} */
@@ -2187,7 +2240,7 @@ void matmul_top_mul_comm(mmt_vec_ptr v, mmt_vec_ptr w)
 // Doing a mmt_vec_broadcast columns will ensure that each row contains
 // the complete data set for our vector.
 
-void mmt_vec_set_random_through_file(mmt_vec_ptr v, const char * filename, unsigned int itemsondisk, gmp_randstate_t rstate)
+void mmt_vec_set_random_through_file(mmt_vec_ptr v, const char * filename_pattern, unsigned int itemsondisk, gmp_randstate_t rstate, unsigned int block_position)
 {
     /* FIXME: this generates the complete vector on rank 0, saves it, and
      * loads it again. But I'm a bit puzzled by the choice of saving a
@@ -2195,29 +2248,52 @@ void mmt_vec_set_random_through_file(mmt_vec_ptr v, const char * filename, unsig
      * incorrect, we want n0[!d] here.
      */
     mpfq_vbase_ptr A = v->abase;
-    pi_datatype_ptr A_pi = v->pitype;
     parallelizing_info_ptr pi = v->pi;
+    int tcan_print = v->pi->m->trank == 0 && v->pi->m->jrank == 0;
 
-    if (pi->m->trank == 0) {
-        void * y;
-        cheating_vec_init(A, &y, v->n);
-        A->vec_set_zero(A, y, v->n);
-        /* we generate garbage for the padding coordinates too, but
-         * that's not really an issue since that does not get written,
-         * thanks to itemsondisk conveying the info about the correct
-         * size
-         */
-        A->vec_random(A, y, v->n, rstate);
-        int err = MPI_Bcast(y, v->n, A_pi->datatype, 0, pi->m->pals);
-        ASSERT_ALWAYS(!err);
-        FILE * f = fopen(filename, "wb");
-        ASSERT_ALWAYS(f);
-        int rc = fwrite(y, A->vec_elt_stride(A,1), itemsondisk, f);
-        ASSERT_ALWAYS(rc == (int) itemsondisk);
-        fclose(f);
-        cheating_vec_clear(A, &y, v->n);
+    mpz_t p;
+    mpz_init(p);
+    v->abase->field_characteristic(v->abase, p);
+    int char2 = mpz_cmp_ui(p, 2) == 0;
+    mpz_clear(p);
+    int splitwidth = char2 ? 64 : 1;
+    unsigned int Adisk_width = splitwidth;
+    unsigned int Adisk_multiplex = v->abase->simd_groupsize(v->abase) / Adisk_width;
+
+    ASSERT_ALWAYS(itemsondisk % Adisk_multiplex == 0);
+    unsigned int loc_itemsondisk = itemsondisk / Adisk_multiplex;
+
+    if (pi->m->trank == 0 && pi->m->jrank == 0) {
+        for(unsigned int b = 0 ; b < Adisk_multiplex ; b++) {
+            unsigned int b0 = block_position + b * Adisk_width;
+            char * filename;
+            asprintf(&filename, filename_pattern, b0, b0 + splitwidth);
+
+            /* we want to create v->n / Adisk_multiplex entries --
+             * but we can't do that with access to just A. So we
+             * generate slightly more, and rely on itemsondisk to do
+             * the job of properly cutting the overflowing data.
+             */
+
+            size_t nitems = iceildiv(v->n, Adisk_multiplex);
+            void * y;
+            cheating_vec_init(A, &y, nitems);
+            A->vec_set_zero(A, y, nitems);
+            A->vec_random(A, y, nitems, rstate);
+            if (tcan_print) {
+                printf("Creating fake vector %s...", filename);
+                fflush(stdout);
+            }
+            FILE * f = fopen(filename, "wb");
+            ASSERT_ALWAYS(f);
+            int rc = fwrite(y, A->vec_elt_stride(A,1), loc_itemsondisk, f);
+            ASSERT_ALWAYS(rc == (int) loc_itemsondisk);
+            fclose(f);
+            if (tcan_print) { printf(" done\n"); }
+            cheating_vec_clear(A, &y, v->n);
+        }
     }
-    mmt_vec_load(v, filename, itemsondisk);
+    mmt_vec_load(v, filename_pattern, itemsondisk, block_position);
 }
 
 unsigned long mmt_vec_hamming_weight(mmt_vec_ptr y) {
