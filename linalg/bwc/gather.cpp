@@ -519,7 +519,6 @@ struct rhs /*{{{*/ {
         parallelizing_info_ptr pi = mmt->pi;
         mpfq_vbase_ptr A = mmt->abase;
         ASSERT_ALWAYS(y->abase == A);
-        int tcan_print = bw->can_print && pi->m->trank == 0;
         unsigned int unpadded = MAX(mmt->n0[0], mmt->n0[1]);
         size_t eblock = mmt_my_own_size_in_items(y);
 
@@ -531,9 +530,6 @@ struct rhs /*{{{*/ {
         mmt_vec_init(mmt,Av,Av_pi, vi,bw->dir, /* shared ! */ 1, mmt->n[bw->dir]);
 
         for(unsigned int j = 0 ; j < nrhs ; j++) {
-            if (tcan_print && verbose_enabled(CADO_VERBOSE_PRINT_BWC_LOADING_MKSOL_FILES)) {
-                printf("loading V%u-%u.0\n", j, j + 1);
-            }
             mmt_vec_load(vi, "V%u-%u.0", unpadded, j);
 
             natural.templates(A)->addmul_tiny(Av, A, 

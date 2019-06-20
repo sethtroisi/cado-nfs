@@ -118,12 +118,10 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
     char * v_name = NULL;
     if (!fake) {
         int rc = asprintf(&v_name, "V%s.%u", "%u-%u", bw->start);
-        if (tcan_print) { printf("Loading %s ...", v_name); fflush(stdout); }
         ASSERT_ALWAYS(rc >= 0);
         mmt_vec_load(ymy[0], v_name, unpadded, ys[0]);
         free(v_name);
         mmt_vec_reduce_mod_p(ymy[0]);
-        if (tcan_print) { printf("done\n"); }
     } else {
         gmp_randstate_t rstate;
         gmp_randinit_default(rstate);
@@ -186,9 +184,7 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
         char * tmp;
         int rc = asprintf(&tmp, "C%s.%u", "%u-%u", bw->interval);
         ASSERT_ALWAYS(rc >= 0);
-        if (tcan_print) { printf("Loading check vector %s...", tmp); fflush(stdout); }
         mmt_vec_load(check_vector, tmp,  mmt->n0[bw->dir], 0);
-        if (tcan_print) { printf("done\n"); }
         free(tmp);
     }
 
