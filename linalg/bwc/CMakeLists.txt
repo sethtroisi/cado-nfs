@@ -22,11 +22,7 @@ set(BUILD_DYNAMICALLY_LINKABLE_BWC ${ENABLE_SHARED})
 # with it. We *have* to compile all the u64k* which are in the set of
 # sources, because of cross dependencies which are presently not
 # correctly guarded.
-set(BWC_GF2_DEFAULT_ARITHMETIC_BACKENDS u64k1 u64k2 u64k3 u64k4)
-if (HAVE_SSE41)
-set(BWC_GF2_DEFAULT_ARITHMETIC_BACKENDS m128 ${BWC_GF2_DEFAULT_ARITHMETIC_BACKENDS})
-endif()
-set(BWC_GF2_ARITHMETIC_BACKENDS ${BWC_GF2_DEFAULT_ARITHMETIC_BACKENDS}
+set(BWC_GF2_ARITHMETIC_BACKENDS m128 u64k1 u64k2 u64k3 u64k4
     CACHE STRING
     "which low-level arithmetic backends to use for GF(2) linear algebra")
 set(BWC_GF2_MATMUL_BACKENDS bucket basic sliced
@@ -48,22 +44,12 @@ set(BWC_GFP_MATMUL_BACKENDS ${bmb}
 set(BWC_EXTRA_BACKENDS "" CACHE STRING "list of pairs (arithmetic,matmul) backends for linear algebra")
 
 # In case there's a user override, just make mention of the situation.
-if(NOT BWC_GFP_ARITHMETIC_BACKENDS)
-    message(STATUS "DL mode disabled for linear algebra")
-else()
-    if(HAVE_GCC_STYLE_AMD64_INLINE_ASM)
-        string_join(FOO ", " ${BWC_GFP_ARITHMETIC_BACKENDS})
-        message(STATUS "GF(p) implementations enabled for DL linear algebra: ${FOO}")
-        string_join(FOO ", " ${BWC_GFP_MATMUL_BACKENDS})
-        message(STATUS "GF(p) SpMV backends for DL linear algebra: ${FOO}")
-    else()
-        # The code in linalg/bwc/mpfq/ is 64-bit only, and relies on GNU
-        # CC idioms. As it is not used in production yet, we don't want
-        # to expose it on 32-bit platforms.
-        set(BWC_GFP_ARITHMETIC_BACKENDS CACHE STRING
-                "which GF(p) backends to compile for DLOG mode" FORCE)
-        message(STATUS "Warning: DL mode forcibly disabled for linear algebra (amd64-only)")
-    endif()
+if(NOT BWC_GFP_ARITHMETIC_BACKENDS OR NOT HAVE_GCC_STYLE_AMD64_INLINE_ASM)
+    # The code in linalg/bwc/mpfq/ is 64-bit only, and relies on GNU
+    # CC idioms. We don't want to expose it on 32-bit platforms.
+    set(BWC_GFP_ARITHMETIC_BACKENDS CACHE STRING
+        "which GF(p) backends to compile for DLOG mode" FORCE)
+    message(STATUS "Warning: DL mode forcibly disabled for linear algebra (amd64-only)")
 endif()
 
 ### end bwc-specific configuration.
@@ -173,23 +159,24 @@ set_target_properties(random_matrix PROPERTIES
 ### bwc_mpfq
 
 set(bwc_mpfq_sources mpfq/mpfq_vbase.c)
+set(bwc_mpfq_flags)
 foreach(v ${BWC_GF2_ARITHMETIC_BACKENDS})
-    set(bwc_mpfq_sources ${bwc_mpfq_sources} mpfq/mpfq_${v}.c mpfq/mpfq_${v}_t.c )
+    if (v STREQUAL "m128" AND NOT HAVE_SSE41)
+        message(STATUS "GF(2) arithmetic backend m128 not compiled in, sse-4.1 support missing")
+    else()
+        set(bwc_mpfq_sources ${bwc_mpfq_sources} mpfq/mpfq_${v}.c mpfq/mpfq_${v}_t.c )
+        set(bwc_mpfq_flags "${bwc_mpfq_flags} -DCOMPILE_MPFQ_BINARY_FIELD_${v}")
+        message(STATUS "GF(2) arithmetic backend enabled for DL linear algebra: ${v}")
+    endif()
 endforeach(v)
 
 foreach(v ${BWC_GFP_ARITHMETIC_BACKENDS})
     set(bwc_mpfq_sources ${bwc_mpfq_sources} mpfq/mpfq_${v}.c mpfq/mpfq_${v}_t.c )
+    set(bwc_mpfq_flags "${bwc_mpfq_flags} -DCOMPILE_MPFQ_PRIME_FIELD_${v}")
+    message(STATUS "GF(p) arithmetic backend enabled for DL linear algebra: ${v}")
 endforeach(v)
 
 add_library(bwc_mpfq ${CADO_SHARED} ${bwc_mpfq_sources})
-
-set(bwc_mpfq_flags)
-foreach(v ${BWC_GF2_ARITHMETIC_BACKENDS})
-    set(bwc_mpfq_flags "${bwc_mpfq_flags} -DCOMPILE_MPFQ_BINARY_FIELD_${v}")
-endforeach(v)
-foreach(v ${BWC_GFP_ARITHMETIC_BACKENDS})
-    set(bwc_mpfq_flags "${bwc_mpfq_flags} -DCOMPILE_MPFQ_PRIME_FIELD_${v}")
-endforeach(v)
 
 if(ENABLE_SHARED)
     install(TARGETS bwc_mpfq DESTINATION ${LIBSUFFIX}/linalg/bwc)
@@ -278,17 +265,20 @@ macro(CONFIGURE_MATMUL_LIB v i)
     endif()
 endmacro()
 
-string_join(FOO ", " ${BWC_GF2_ARITHMETIC_BACKENDS})
-message(STATUS "GF(2) implementations enabled for linear algebra: ${FOO}")
 string_join(FOO ", " ${BWC_GF2_MATMUL_BACKENDS})
 message(STATUS "GF(2) SpMV backends for linear algebra: ${FOO}")
+string_join(FOO ", " ${BWC_GFP_MATMUL_BACKENDS})
+message(STATUS "GF(P) SpMV backends for linear algebra: ${FOO}")
 
 
 
 foreach(v ${BWC_GF2_ARITHMETIC_BACKENDS})
-    foreach(w ${BWC_GF2_MATMUL_BACKENDS})
-        CONFIGURE_MATMUL_LIB(${v} ${w})
-    endforeach(w)
+    if (v STREQUAL "m128" AND NOT HAVE_SSE41)
+    else()
+        foreach(w ${BWC_GF2_MATMUL_BACKENDS})
+            CONFIGURE_MATMUL_LIB(${v} ${w})
+        endforeach(w)
+    endif()
 endforeach(v)
 foreach(v ${BWC_GFP_ARITHMETIC_BACKENDS})
     foreach(w ${BWC_GFP_MATMUL_BACKENDS})
