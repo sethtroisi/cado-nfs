@@ -2291,6 +2291,8 @@ void mmt_vec_set_random_through_file(mmt_vec_ptr v, const char * filename_patter
             fclose(f);
             if (tcan_print) { printf(" done\n"); }
             cheating_vec_clear(A, &y, v->n);
+
+            free(filename);
         }
     }
     mmt_vec_load(v, filename_pattern, itemsondisk, block_position);
