@@ -295,10 +295,12 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
 
         int sx = MIN(bw_end_copy, s + bw->checkpoint_precious);
         if (tcan_print) {
+            /*
             printf("// bw->start=%d bw_end_copy=%d sx=%d s=%d\n",
                     bw->start,
                     bw_end_copy,
                     sx, s);
+                    */
             printf("about to do %d iterations starting from vectors at iteration %d to handle the coefficients of degree [%d..%d] in F\n", sx-s-1, s, s, sx-1);
         }
 
@@ -345,7 +347,7 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
                                     sol0, sol1,
                                     i * Av_width, (i + 1) * Av_width);
 
-                            printf("[%d] reading from %s\n", pi->interleaved ? pi->interleaved->idx : -1, tmp);
+                            // printf("[%d] reading from %s\n", pi->interleaved ? pi->interleaved->idx : -1, tmp);
                             FILE * f = fopen(tmp, "rb");
                             DIE_ERRNO_DIAG(f == NULL, "fopen", tmp);
                             rc = fseek(f, one_fcoeff / Af_multiplex * s0, SEEK_SET);
