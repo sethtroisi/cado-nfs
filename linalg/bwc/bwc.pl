@@ -1552,7 +1552,7 @@ sub subtask_krylov_todo {
         my @ys=();
         for(my $x = 0; $x < $n ; $x += $simd) {
             my $y = $x + $simd;
-            push @ys, [ $x, $y];
+            push @ys, "ys=$x..$y";
         }
         return @ys;
     }
