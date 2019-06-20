@@ -1,11 +1,11 @@
 #include "cado.h"
 
-#include <stdio.h>
-#include <string.h>
+#include <cstdio>
+#include <cstring>
 #include <unistd.h>
-#include <limits.h>
+#include <climits>
 #include <dirent.h>
-#include <errno.h>
+#include <cerrno>
 #include <vector>
 #include <array>
 #include <set>
@@ -30,11 +30,12 @@
 using namespace std;
 
 struct sfile_info {/*{{{*/
+    unsigned int s0,s1;
     unsigned int iter0;
     unsigned int iter1;
     char name[NAME_MAX];
     char name_pattern[NAME_MAX];
-    static bool match(sfile_info& v, const char * name, unsigned int sol0, unsigned int sol1) {
+    static bool match(sfile_info& v, const char * name) {
         int k;
         int rc;
         unsigned int s0,s1;
@@ -42,8 +43,8 @@ struct sfile_info {/*{{{*/
         rc = sscanf(name, "S.sols%u-%u.%u-%u%n", &s0, &s1, &iter0, &iter1, &k);
         if (rc < 4 || k != (int) strlen(name))
             return false;
-        if (s0 != sol0 || s1 != sol1)
-            return false;
+        v.s0 = s0;
+        v.s1 = s1;
         v.iter0 = iter0;
         v.iter1 = iter1;
         size_t res = strlcpy(v.name, name, NAME_MAX);
@@ -55,7 +56,15 @@ struct sfile_info {/*{{{*/
 
 static bool operator<(sfile_info const & a, sfile_info const & b)/*{{{*/
 {
-    return a.iter1 < b.iter1;
+    if (a.iter1 < b.iter1) return true;
+    if (a.iter1 > b.iter1) return false;
+    if (a.iter0 < b.iter0) return true;
+    if (a.iter0 > b.iter0) return false;
+    if (a.s1 < b.s1) return true;
+    if (a.s1 > b.s1) return false;
+    if (a.s0 < b.s0) return true;
+    if (a.s0 > b.s0) return false;
+    return false;
 }/*}}}*/
 
 int exitcode = 0;
@@ -63,6 +72,8 @@ int exitcode = 0;
 vector<sfile_info> prelude(parallelizing_info_ptr pi)/*{{{*/
 {
     int leader = pi->m->jrank == 0 && pi->m->trank == 0;
+    int char2 = mpz_cmp_ui(bw->p, 2) == 0;
+    int splitwidth = char2 ? 64 : 1;
     vector<sfile_info> res;
     serialize_threads(pi->m);
     if (leader) {
@@ -71,7 +82,7 @@ vector<sfile_info> prelude(parallelizing_info_ptr pi)/*{{{*/
         struct dirent * de;
         for( ; (de = readdir(dir)) != NULL ; ) {
             sfile_info sf;
-            if (!sfile_info::match(sf, de->d_name, bw->solutions[0], bw->solutions[1]))
+            if (!sfile_info::match(sf, de->d_name))
                 continue;
             res.push_back(sf);
             if (bw->interval && sf.iter1 % bw->interval != 0) {
@@ -83,13 +94,36 @@ vector<sfile_info> prelude(parallelizing_info_ptr pi)/*{{{*/
             }
         }
         closedir(dir);
-
         sort(res.begin(), res.end());
+
+        vector<sfile_info> res2;
+        auto it = res.begin();
+        for( ; it < res.end() ; ) {
+            if (it->s0 < bw->solutions[0] || it->s0 >= bw->solutions[1]) {
+                it++;
+                continue;
+            }
+            /* try to read a complete set of files at this iteration */
+            unsigned int x = bw->solutions[0];
+            unsigned int z = bw->solutions[1];
+            bool ok = true;
+            auto current = *it;
+            for(unsigned int y ; ok && x < z ; x = y, it++) {
+                y = x + splitwidth;
+                ok = it->s0 == x && it->s1 == y;
+            }
+            if (ok) {
+                current.s0 = bw->solutions[0];
+                current.s1 = bw->solutions[1];
+                res2.push_back(current);
+            }
+        }
+        std::swap(res, res2);
 
         unsigned int prev_iter = 0;
         for(size_t i = 0 ; i < res.size() ; i++) {
             sfile_info const & cur(res[i]);
-            if (cur.iter0 != prev_iter) {
+            if (cur.iter0 && cur.iter0 != prev_iter) {
                 fprintf(stderr, "Within the set of S files, file "
                         "%s seems to be the first "
                         "to come after iteration %u, therefore there is "
@@ -372,10 +406,12 @@ struct rhs /*{{{*/ {
     mpfq_vbase_ptr A;
     unsigned int nrhs;
     void * rhscoeffs;
+    abase_proxy natural;
+    mpfq_vbase_ptr Av;
 
     rhs(rhs const&) = delete;
 
-    rhs(matmul_top_data_ptr mmt, const char * rhs_name, unsigned int solutions[2]) : mmt(mmt), A(mmt->abase) /* {{{ */
+    rhs(matmul_top_data_ptr mmt, const char * rhs_name, unsigned int solutions[2]) : mmt(mmt), A(mmt->abase), natural(abase_proxy::most_natural(mmt->pi)) /* {{{ */
     {
         nrhs = 0;
         rhscoeffs = NULL;
@@ -386,9 +422,14 @@ struct rhs /*{{{*/ {
         int tcan_print = bw->can_print && pi->m->trank == 0;
         int leader = pi->m->jrank == 0 && pi->m->trank == 0;
 
+        /* This is just for a check -- in truth, it might be that the
+         * code here works correctly for inhomogeneous characteristic 2,
+         * but that would be pure chance, as it was never tested */
         int char2 = mpz_cmp_ui(bw->p, 2) == 0;
         ASSERT_ALWAYS(!char2);
         ASSERT_ALWAYS(A->simd_groupsize(A) == 1);
+
+        Av = natural.A;
 
         if (leader)
             get_rhs_file_header(rhs_name, NULL, &nrhs, NULL);
@@ -413,25 +454,35 @@ struct rhs /*{{{*/ {
 
         if (leader) {
             int splitwidth = char2 ? 64 : 1;
-            unsigned int Av_width = splitwidth;
+            ASSERT_ALWAYS(Av->simd_groupsize(Av) == splitwidth);
+
+            if (char2 || solutions[1] != solutions[0] + splitwidth) {
+                ASSERT_ALWAYS(0);/* never tested. I did attempt to code it right for the simd case though, but did not test. */
+            }
+            unsigned int Av_multiplex = (solutions[1] - solutions[0]) / splitwidth;
             for(unsigned int j = 0 ; j < nrhs ; j++) {
-                char * tmp;
-                int rc = asprintf(&tmp, "F.sols%u-%u.%u-%u.rhs", solutions[0], solutions[1], j, j+Av_width);
-                if (verbose_enabled(CADO_VERBOSE_PRINT_BWC_LOADING_MKSOL_FILES)) {
-                    printf("loading %s\n", tmp);
+                for(unsigned int i = 0 ; i < Av_multiplex ; i++) {
+                    char * tmp;
+                    unsigned int s0 = solutions[0] + i * splitwidth;
+                    unsigned int s1 = solutions[0] + (i + 1) * splitwidth;
+                    int rc = asprintf(&tmp, "F.sols%u-%u.%u-%u.rhs", s0, s1, j, j+splitwidth);
+                    if (verbose_enabled(CADO_VERBOSE_PRINT_BWC_LOADING_MKSOL_FILES)) {
+                        printf("loading %s\n", tmp);
+                    }
+                    ASSERT_ALWAYS(rc >= 0);
+                    FILE * f = fopen(tmp, "rb");
+                    ASSERT_ALWAYS(f);
+                    rc = fread(
+                            Av->vec_subvec(Av, rhscoeffs, j * Av_multiplex + i),
+                            Av->vec_elt_stride(Av,1),
+                            1, f);
+                    ASSERT_ALWAYS(rc == 1);
+                    if (Av->is_zero(Av, Av->vec_coeff_ptr_const(Av, rhscoeffs, j * Av_multiplex + i))) {
+                        printf("Notice: coefficient for vector V%u-%u in file %s is zero\n", j, j+1, tmp);
+                    }
+                    fclose(f);
+                    free(tmp);
                 }
-                ASSERT_ALWAYS(rc >= 0);
-                FILE * f = fopen(tmp, "rb");
-                rc = fread(
-                        A->vec_subvec(A, rhscoeffs, j),
-                        A->vec_elt_stride(A,1),
-                        1, f);
-                ASSERT_ALWAYS(rc == 1);
-                if (A->is_zero(A, A->vec_coeff_ptr_const(A, rhscoeffs, j))) {
-                    printf("Notice: coefficient for vector V%u-%u in file %s is zero\n", j, j+1, tmp);
-                }
-                fclose(f);
-                free(tmp);
             }
         }
         pi_bcast(rhscoeffs, nrhs, mmt->pitype, 0, 0, pi->m);
@@ -441,10 +492,16 @@ struct rhs /*{{{*/ {
         if (rhscoeffs)
             cheating_vec_clear(A, &rhscoeffs, nrhs);
     }/*}}}*/
-    void fwrite_rhs_coeffs(FILE * f) /* {{{ */
+    void fwrite_rhs_coeffs(FILE * f, unsigned int i=0) /* {{{ */
     {
-        int rc = fwrite(rhscoeffs, A->vec_elt_stride(A, 1), nrhs, f);
-        ASSERT_ALWAYS(rc == (int) nrhs);
+        unsigned int Av_multiplex = A->simd_groupsize(A) / Av->simd_groupsize(Av);
+        for(unsigned int j = 0 ; j < nrhs ; j++) {
+            int rc = fwrite(
+                    Av->vec_subvec(Av, rhscoeffs, j * Av_multiplex + i),
+                    Av->vec_elt_stride(Av,1),
+                    1, f);
+            ASSERT_ALWAYS(rc == 1);
+        }
     }/*}}}*/
     void fprint_rhs_coeffs(FILE * f2) /* {{{ */
     {
@@ -1322,9 +1379,12 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
          */
         ASSERT_ALWAYS(winning_iter == 0 || !R);
         int splitwidth = char2 ? 64 : 1;
-        for(unsigned int sol0 = solutions[0] ; sol0 < solutions[1] ; sol0 += splitwidth) {
+        unsigned int Av_multiplex = (solutions[1] - solutions[0]) / splitwidth;
+        for(unsigned int i = 0 ; i < Av_multiplex ; ++i) {
+            unsigned int sol0 = solutions[0] + i * splitwidth;
+            unsigned int sol1 = sol0 + splitwidth;
             char * tmp;
-            int rc = asprintf(&tmp, "K.sols%u-%u.%u", sol0, sol0 + splitwidth, winning_iter);
+            int rc = asprintf(&tmp, "K.sols%u-%u.%u", sol0, sol1, winning_iter);
             ASSERT_ALWAYS(rc >= 0);
             /* {{{ append the RHS coefficients if relevant */
             if (R) {
@@ -1333,7 +1393,7 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
                 ASSERT_ALWAYS(f);
                 rc = fseek(f, 0, SEEK_END);
                 ASSERT_ALWAYS(rc >= 0);
-                R.fwrite_rhs_coeffs(f);
+                R.fwrite_rhs_coeffs(f, i);
                 fclose(f);
             }
 
@@ -1356,7 +1416,7 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
                 ASSERT_ALWAYS(f2);
                 void * data = malloc(A->vec_elt_stride(A, 1));
                 for(uint32_t i = 0 ; i < mmt->n0[bw->dir] ; i++) {
-                    size_t rc = fread(data, A->vec_elt_stride(A, 1), 1, f);
+                    size_t rc = fread(data, A->vec_elt_stride(A, 1) / Av_multiplex, 1, f);
                     ASSERT_ALWAYS(rc == 1);
                     A->fprint(A, f2, data);
                     fprintf(f2, "\n");

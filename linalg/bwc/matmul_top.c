@@ -609,6 +609,7 @@ int mmt_vec_load(mmt_vec_ptr v, const char * filename_pattern, unsigned int item
 {
     ASSERT_ALWAYS(v != NULL);
     serialize(v->pi->m);
+    int tcan_print = v->pi->m->trank == 0 && v->pi->m->jrank == 0;
 
     ASSERT_ALWAYS(strstr(filename_pattern, "%u-%u") != NULL);
 
@@ -633,6 +634,10 @@ int mmt_vec_load(mmt_vec_ptr v, const char * filename_pattern, unsigned int item
         unsigned int b0 = block_position + b * Adisk_width;
         char * filename;
         asprintf(&filename, filename_pattern, b0, b0 + splitwidth);
+        if (tcan_print) {
+            printf("Loading %s ...", filename);
+            fflush(stdout);
+        }
         pi_file_handle f;
         int ok = pi_file_open(f, v->pi, v->d, filename, "rb");
         if (ok) {
@@ -655,6 +660,7 @@ int mmt_vec_load(mmt_vec_ptr v, const char * filename_pattern, unsigned int item
                 MPI_Abort(v->pi->m->pals, EXIT_FAILURE);
         }
         free(filename);
+        if (tcan_print) { printf(" done\n"); }
         global_ok = global_ok && ok;
     }
 
@@ -666,6 +672,7 @@ int mmt_vec_load(mmt_vec_ptr v, const char * filename_pattern, unsigned int item
 int mmt_vec_save(mmt_vec_ptr v, const char * filename_pattern, unsigned int itemsondisk, unsigned int block_position)
 {
     serialize_threads(v->pi->m);
+    int tcan_print = v->pi->m->trank == 0 && v->pi->m->jrank == 0;
 
     ASSERT_ALWAYS(strstr(filename_pattern, "%u-%u") != NULL);
 
@@ -690,6 +697,10 @@ int mmt_vec_save(mmt_vec_ptr v, const char * filename_pattern, unsigned int item
         unsigned int b0 = block_position + b * Adisk_width;
         char * filename;
         asprintf(&filename, filename_pattern, b0, b0 + splitwidth);
+        if (tcan_print) {
+            printf("Saving %s ...", filename);
+            fflush(stdout);
+        }
         pi_file_handle f;
         int ok = pi_file_open(f, v->pi, v->d, filename, "wb");
         if (ok) {
@@ -709,6 +720,7 @@ int mmt_vec_save(mmt_vec_ptr v, const char * filename_pattern, unsigned int item
             }
         }
         free(filename);
+        if (tcan_print) { printf(" done\n"); }
         global_ok = global_ok && ok;
     }
 
@@ -2237,6 +2249,7 @@ void mmt_vec_set_random_through_file(mmt_vec_ptr v, const char * filename_patter
      */
     mpfq_vbase_ptr A = v->abase;
     parallelizing_info_ptr pi = v->pi;
+    int tcan_print = v->pi->m->trank == 0 && v->pi->m->jrank == 0;
 
     mpz_t p;
     mpz_init(p);
@@ -2267,12 +2280,16 @@ void mmt_vec_set_random_through_file(mmt_vec_ptr v, const char * filename_patter
             cheating_vec_init(A, &y, nitems);
             A->vec_set_zero(A, y, nitems);
             A->vec_random(A, y, nitems, rstate);
-
+            if (tcan_print) {
+                printf("Creating fake vector %s...", filename);
+                fflush(stdout);
+            }
             FILE * f = fopen(filename, "wb");
             ASSERT_ALWAYS(f);
             int rc = fwrite(y, A->vec_elt_stride(A,1), loc_itemsondisk, f);
             ASSERT_ALWAYS(rc == (int) loc_itemsondisk);
             fclose(f);
+            if (tcan_print) { printf(" done\n"); }
             cheating_vec_clear(A, &y, v->n);
         }
     }

@@ -415,7 +415,7 @@ void blstate_save_result(struct blstate * bl, unsigned int iter)
 
     /* save raw V because it's conceivably useful */
     ASSERT_ALWAYS(bl->y->n == mmt->n[bw->dir]);
-    rc = asprintf(&tmp, "%s.y", filename_base);
+    rc = asprintf(&tmp, "%s.Y%s", filename_base, "%u-%u");
     ASSERT_ALWAYS(rc >= 0);
     mmt_vec_save(bl->y, tmp, mmt->n0[bw->dir], 0);
     free(tmp);
@@ -434,7 +434,7 @@ void blstate_save_result(struct blstate * bl, unsigned int iter)
      */
     ASSERT_ALWAYS(bl->my->n == mmt->n[!bw->dir]);
     ASSERT_ALWAYS(bl->y->n == mmt->n[bw->dir]);
-    rc = asprintf(&tmp, "%s.my", filename_base);
+    rc = asprintf(&tmp, "%s.MY%s", filename_base, "%u-%u");
     ASSERT_ALWAYS(rc >= 0);
     mmt_vec_save(bl->my, tmp, mmt->n0[!bw->dir], 0);
     free(tmp);
@@ -456,7 +456,7 @@ void blstate_save_result(struct blstate * bl, unsigned int iter)
         m1[i] = 0;
     }
     if (pi->m->jrank == 0 && pi->m->trank == 0) {
-        rc = asprintf(&tmp, "%s.m1", filename_base);
+        rc = asprintf(&tmp, "%s.M1", filename_base);
         ASSERT_ALWAYS(rc >= 0);
         FILE * f = fopen(tmp, "wb");
         ASSERT_ALWAYS(f);
@@ -482,7 +482,7 @@ void blstate_save_result(struct blstate * bl, unsigned int iter)
         m2[i] = 0;
     }
     if (pi->m->jrank == 0 && pi->m->trank == 0) {
-        rc = asprintf(&tmp, "%s.m2", filename_base);
+        rc = asprintf(&tmp, "%s.M2", filename_base);
         ASSERT_ALWAYS(rc >= 0);
         FILE * f = fopen(tmp, "wb");
         ASSERT_ALWAYS(f);
@@ -506,7 +506,7 @@ void blstate_save_result(struct blstate * bl, unsigned int iter)
 
     /* Now save the reduced kernel basis */
     ASSERT_ALWAYS(bl->y->n == mmt->n[bw->dir]);
-    rc = asprintf(&tmp, "%s.yr", filename_base);
+    rc = asprintf(&tmp, "%s.YR%s", filename_base, "%u-%u");
     ASSERT_ALWAYS(rc >= 0);
     mmt_vec_save(bl->y, tmp, mmt->n0[bw->dir], 0);
     free(tmp);

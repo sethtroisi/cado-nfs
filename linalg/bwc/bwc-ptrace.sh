@@ -146,6 +146,7 @@ derived_variables() {
     else
         splitwidth=1
     fi
+    : ${simd=$splitwidth}
 }
 
 prepare_wdir() {
@@ -300,6 +301,7 @@ prepare_common_arguments() {
         prime=$prime
         nullspace=$nullspace
         interval=$interval
+        simd=$simd
 
 EOF
     if [ "$mm_impl" ] ; then common="$common mm_impl=$mm_impl" ; fi
