@@ -2105,7 +2105,18 @@ sub task_gather {
         }
         next if @loc_found;
         push @missing, @loc_notfound;
-        push @todo, "solutions=$s";
+        if ($param->{'interleaving'}) {
+            # Gather doesn't support interleaving at all, so let's do two
+            # distinct executions.
+            $s =~ /^(\d+)-(\d+)$/ or die;
+            my $x=$1;
+            my $y=int(($1+$2)/2);
+            my $z=$2;
+            push @todo, "solutions=$x-$y";
+            push @todo, "solutions=$y-$z";
+        } else {
+            push @todo, "solutions=$s";
+        }
     }
     if (@missing == 0) {
         task_check_message 'ok', "All solution files produced by gather seem to be present, good.";

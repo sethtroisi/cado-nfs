@@ -18,10 +18,6 @@ set(BUILD_DYNAMICALLY_LINKABLE_BWC ${ENABLE_SHARED})
 # add_library calls, and then I'm not sure whether
 # target_link_libraries picks the static or shared ones...
 
-# This is a default setting, but in reality we don't have much latitude
-# with it. We *have* to compile all the u64k* which are in the set of
-# sources, because of cross dependencies which are presently not
-# correctly guarded.
 set(BWC_GF2_ARITHMETIC_BACKENDS m128 u64k1 u64k2 u64k3 u64k4
     CACHE STRING
     "which low-level arithmetic backends to use for GF(2) linear algebra")
@@ -165,6 +161,7 @@ foreach(v ${BWC_GF2_ARITHMETIC_BACKENDS})
         message(STATUS "GF(2) arithmetic backend m128 not compiled in, sse-4.1 support missing")
     else()
         set(bwc_mpfq_sources ${bwc_mpfq_sources} mpfq/mpfq_${v}.c mpfq/mpfq_${v}_t.c )
+        set(COMPILE_MPFQ_BINARY_FIELD_${v} 1)
         set(bwc_mpfq_flags "${bwc_mpfq_flags} -DCOMPILE_MPFQ_BINARY_FIELD_${v}")
         message(STATUS "GF(2) arithmetic backend enabled for DL linear algebra: ${v}")
     endif()
@@ -172,6 +169,7 @@ endforeach(v)
 
 foreach(v ${BWC_GFP_ARITHMETIC_BACKENDS})
     set(bwc_mpfq_sources ${bwc_mpfq_sources} mpfq/mpfq_${v}.c mpfq/mpfq_${v}_t.c )
+    set(COMPILE_MPFQ_PRIME_FIELD_${v} 1)
     set(bwc_mpfq_flags "${bwc_mpfq_flags} -DCOMPILE_MPFQ_PRIME_FIELD_${v}")
     message(STATUS "GF(p) arithmetic backend enabled for DL linear algebra: ${v}")
 endforeach(v)
@@ -267,8 +265,10 @@ endmacro()
 
 string_join(FOO ", " ${BWC_GF2_MATMUL_BACKENDS})
 message(STATUS "GF(2) SpMV backends for linear algebra: ${FOO}")
+if (BWC_GFP_ARITHMETIC_BACKENDS)
 string_join(FOO ", " ${BWC_GFP_MATMUL_BACKENDS})
-message(STATUS "GF(P) SpMV backends for linear algebra: ${FOO}")
+message(STATUS "GF(p) SpMV backends for linear algebra: ${FOO}")
+endif()
 
 
 

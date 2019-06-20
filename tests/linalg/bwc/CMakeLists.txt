@@ -229,8 +229,10 @@ add_dependencies(test-bwc-mod2-rolling_dependencies mf_scan)
 add_bwc_test(mod2-8k bwc-trace.sh random_matrix_size=8000 m=128 n=128 seed=1 thr=2)
 add_dependencies(test-bwc-mod2-8k_dependencies mf_scan)
 
+if (COMPILE_MPFQ_BINARY_FIELD_m128)
 add_bwc_test(mod2-8k-simd128 bwc-trace.sh random_matrix_size=8000 m=128 n=128 seed=1 thr=2 simd=128)
-add_dependencies(test-bwc-mod2-8k_dependencies mf_scan)
+add_dependencies(test-bwc-mod2-8k-simd128_dependencies mf_scan)
+endif()
 
 add_bwc_test(mod2-oddthr bwc-trace.sh random_matrix_size=800 m=128 n=128 seed=1 thr=3)
 add_dependencies(test-bwc-mod2-oddthr_dependencies mf_scan)
