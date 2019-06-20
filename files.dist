@@ -1342,3 +1342,5 @@ linalg/bwc/mpfq/mpfq_m128.c
 linalg/bwc/mpfq/mpfq_m128.h
 linalg/bwc/mpfq/mpfq_m128_t.c
 linalg/bwc/mpfq/mpfq_m128_t.h
+config/popcnt.c
+config/popcnt.cmake
