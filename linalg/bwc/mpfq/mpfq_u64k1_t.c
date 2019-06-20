@@ -13,13 +13,25 @@
 /* Active handler: trivialities */
 /* Active handler: simd_char2 */
 /* Options used:{
-   family=[ m128, u64k1, u64k2, u64k3, u64k4, ],
+   family=[
+    { cpp_ifdef=COMPILE_MPFQ_BINARY_FIELD_m128, tag=m128, },
+    u64k1,
+    u64k2,
+    u64k3,
+    u64k4,
+    ],
    k=1,
    tag=u64k1,
    vbase_stuff={
     choose_byfeatures=<code>,
     families=[
-     [ m128, u64k1, u64k2, u64k3, u64k4, ],
+     [
+      { cpp_ifdef=COMPILE_MPFQ_BINARY_FIELD_m128, tag=m128, },
+      u64k1,
+      u64k2,
+      u64k3,
+      u64k4,
+      ],
      [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_1, tag=p_1, }, ],
      [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_10, tag=p_10, }, ],
      [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_11, tag=p_11, }, ],
@@ -38,7 +50,13 @@
      [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_pz, tag=pz, }, ],
      ],
     member_templates_restrict={
-     m128=[ m128, u64k1, u64k2, u64k3, u64k4, ],
+     m128=[
+      { cpp_ifdef=COMPILE_MPFQ_BINARY_FIELD_m128, tag=m128, },
+      u64k1,
+      u64k2,
+      u64k3,
+      u64k4,
+      ],
      p_1=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_1, tag=p_1, }, ],
      p_10=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_10, tag=p_10, }, ],
      p_11=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_11, tag=p_11, }, ],
@@ -55,10 +73,34 @@
      p_8=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_8, tag=p_8, }, ],
      p_9=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_9, tag=p_9, }, ],
      pz=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_pz, tag=pz, }, ],
-     u64k1=[ m128, u64k1, u64k2, u64k3, u64k4, ],
-     u64k2=[ m128, u64k1, u64k2, u64k3, u64k4, ],
-     u64k3=[ m128, u64k1, u64k2, u64k3, u64k4, ],
-     u64k4=[ m128, u64k1, u64k2, u64k3, u64k4, ],
+     u64k1=[
+      { cpp_ifdef=COMPILE_MPFQ_BINARY_FIELD_m128, tag=m128, },
+      u64k1,
+      u64k2,
+      u64k3,
+      u64k4,
+      ],
+     u64k2=[
+      { cpp_ifdef=COMPILE_MPFQ_BINARY_FIELD_m128, tag=m128, },
+      u64k1,
+      u64k2,
+      u64k3,
+      u64k4,
+      ],
+     u64k3=[
+      { cpp_ifdef=COMPILE_MPFQ_BINARY_FIELD_m128, tag=m128, },
+      u64k1,
+      u64k2,
+      u64k3,
+      u64k4,
+      ],
+     u64k4=[
+      { cpp_ifdef=COMPILE_MPFQ_BINARY_FIELD_m128, tag=m128, },
+      u64k1,
+      u64k2,
+      u64k3,
+      u64k4,
+      ],
      },
     vc:includes=[ <stdarg.h>, ],
     },
@@ -118,12 +160,15 @@
 /* Member templates related to SIMD operation */
 
 /* Object-oriented interface */
+#ifdef COMPILE_MPFQ_BINARY_FIELD_m128
 /* Mpfq::engine::handler::create_code */
 void mpfq_u64k1_m128_wrapper_dotprod(mpfq_vbase_ptr K0 MAYBE_UNUSED, mpfq_vbase_ptr K1 MAYBE_UNUSED, mpfq_u64k1_dst_vec xw, mpfq_m128_src_vec xu1, mpfq_u64k1_src_vec xu0, unsigned int n)
 {
     mpfq_u64k1_m128_dotprod(K0->obj, K1->obj, xw, xu1, xu0, n);
 }
+#endif /* COMPILE_MPFQ_BINARY_FIELD_m128 */
 
+#ifdef COMPILE_MPFQ_BINARY_FIELD_m128
 /* *simd_dotprod::code_for_member_template_dotprod */
 void mpfq_u64k1_m128_dotprod(mpfq_u64k1_dst_field K0 MAYBE_UNUSED, mpfq_m128_dst_field K1 MAYBE_UNUSED, mpfq_u64k1_dst_vec xw, mpfq_m128_src_vec xu1, mpfq_u64k1_src_vec xu0, unsigned int n)
 {
@@ -132,6 +177,7 @@ void mpfq_u64k1_m128_dotprod(mpfq_u64k1_dst_field K0 MAYBE_UNUSED, mpfq_m128_dst
     const uint64_t * u1 = (const uint64_t *) xu1;
     dotprod_64K_128(w,u0,u1,n,1);
 }
+#endif /* COMPILE_MPFQ_BINARY_FIELD_m128 */
 
 /* Mpfq::engine::handler::create_code */
 void mpfq_u64k1_u64k1_wrapper_dotprod(mpfq_vbase_ptr K0 MAYBE_UNUSED, mpfq_vbase_ptr K1 MAYBE_UNUSED, mpfq_u64k1_dst_vec xw, mpfq_u64k1_src_vec xu1, mpfq_u64k1_src_vec xu0, unsigned int n)
@@ -193,17 +239,21 @@ void mpfq_u64k1_u64k4_dotprod(mpfq_u64k1_dst_field K0 MAYBE_UNUSED, mpfq_u64k4_d
     dotprod_64K_64(w,u1,u0,n,4);
 }
 
+#ifdef COMPILE_MPFQ_BINARY_FIELD_m128
 /* Mpfq::engine::handler::create_code */
 void mpfq_u64k1_m128_wrapper_addmul_tiny(mpfq_vbase_ptr K MAYBE_UNUSED, mpfq_vbase_ptr L MAYBE_UNUSED, mpfq_m128_dst_vec w, mpfq_u64k1_src_vec u, mpfq_m128_dst_vec v, unsigned int n)
 {
     mpfq_u64k1_m128_addmul_tiny(K->obj, L->obj, w, u, v, n);
 }
+#endif /* COMPILE_MPFQ_BINARY_FIELD_m128 */
 
+#ifdef COMPILE_MPFQ_BINARY_FIELD_m128
 /* *simd_dotprod::code_for_member_template_addmul_tiny */
 void mpfq_u64k1_m128_addmul_tiny(mpfq_u64k1_dst_field K MAYBE_UNUSED, mpfq_m128_dst_field L MAYBE_UNUSED, mpfq_m128_dst_vec w, mpfq_u64k1_src_vec u, mpfq_m128_dst_vec v, unsigned int n)
 {
     vaddmul_tiny_64K_64L((uint64_t*)w[0],(const uint64_t*)u[0],(const uint64_t*)v[0],n,1,2);
 }
+#endif /* COMPILE_MPFQ_BINARY_FIELD_m128 */
 
 /* Mpfq::engine::handler::create_code */
 void mpfq_u64k1_u64k1_wrapper_addmul_tiny(mpfq_vbase_ptr K MAYBE_UNUSED, mpfq_vbase_ptr L MAYBE_UNUSED, mpfq_u64k1_dst_vec w, mpfq_u64k1_src_vec u, mpfq_u64k1_dst_vec v, unsigned int n)
@@ -253,17 +303,21 @@ void mpfq_u64k1_u64k4_addmul_tiny(mpfq_u64k1_dst_field K MAYBE_UNUSED, mpfq_u64k
     vaddmul_tiny_64K_64L((uint64_t*)w[0],(const uint64_t*)u[0],(const uint64_t*)v[0],n,1,4);
 }
 
+#ifdef COMPILE_MPFQ_BINARY_FIELD_m128
 /* Mpfq::engine::handler::create_code */
 void mpfq_u64k1_m128_wrapper_transpose(mpfq_vbase_ptr K MAYBE_UNUSED, mpfq_vbase_ptr L MAYBE_UNUSED, mpfq_u64k1_dst_vec w, mpfq_m128_src_vec u)
 {
     mpfq_u64k1_m128_transpose(K->obj, L->obj, w, u);
 }
+#endif /* COMPILE_MPFQ_BINARY_FIELD_m128 */
 
+#ifdef COMPILE_MPFQ_BINARY_FIELD_m128
 /* *simd_dotprod::code_for_member_template_transpose */
 void mpfq_u64k1_m128_transpose(mpfq_u64k1_dst_field K MAYBE_UNUSED, mpfq_m128_dst_field L MAYBE_UNUSED, mpfq_u64k1_dst_vec w, mpfq_m128_src_vec u)
 {
     vtranspose_64K_64L((uint64_t*)w[0],(const uint64_t*)u[0],1,2);
 }
+#endif /* COMPILE_MPFQ_BINARY_FIELD_m128 */
 
 /* Mpfq::engine::handler::create_code */
 void mpfq_u64k1_u64k1_wrapper_transpose(mpfq_vbase_ptr K MAYBE_UNUSED, mpfq_vbase_ptr L MAYBE_UNUSED, mpfq_u64k1_dst_vec w, mpfq_u64k1_src_vec u)

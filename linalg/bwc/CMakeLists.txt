@@ -172,12 +172,8 @@ set_target_properties(random_matrix PROPERTIES
 
 ### bwc_mpfq
 
-# FIXME: does this have to be the same as BWC_GF2_ARITHMETIC_BACKENDS ?
-# Is there any reason for having two variables ??
-set(bwc_abases m128 u64k1 u64k2 u64k3 u64k4)
-
 set(bwc_mpfq_sources mpfq/mpfq_vbase.c)
-foreach(v ${bwc_abases})
+foreach(v ${BWC_GF2_ARITHMETIC_BACKENDS})
     set(bwc_mpfq_sources ${bwc_mpfq_sources} mpfq/mpfq_${v}.c mpfq/mpfq_${v}_t.c )
 endforeach(v)
 
@@ -188,6 +184,9 @@ endforeach(v)
 add_library(bwc_mpfq ${CADO_SHARED} ${bwc_mpfq_sources})
 
 set(bwc_mpfq_flags)
+foreach(v ${BWC_GF2_ARITHMETIC_BACKENDS})
+    set(bwc_mpfq_flags "${bwc_mpfq_flags} -DCOMPILE_MPFQ_BINARY_FIELD_${v}")
+endforeach(v)
 foreach(v ${BWC_GFP_ARITHMETIC_BACKENDS})
     set(bwc_mpfq_flags "${bwc_mpfq_flags} -DCOMPILE_MPFQ_PRIME_FIELD_${v}")
 endforeach(v)

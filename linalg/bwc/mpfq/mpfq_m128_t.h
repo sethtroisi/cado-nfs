@@ -3,7 +3,9 @@
 
 /* MPFQ generated file -- do not edit */
 
+#ifdef COMPILE_MPFQ_BINARY_FIELD_m128
 #include "mpfq_m128.h"
+#endif /* COMPILE_MPFQ_BINARY_FIELD_m128 */
 #include "mpfq_u64k1.h"
 #include "mpfq_u64k2.h"
 #include "mpfq_u64k3.h"
@@ -16,13 +18,25 @@
 /* Active handler: io */
 /* Active handler: trivialities */
 /* Options used:{
-   family=[ m128, u64k1, u64k2, u64k3, u64k4, ],
+   family=[
+    { cpp_ifdef=COMPILE_MPFQ_BINARY_FIELD_m128, tag=m128, },
+    u64k1,
+    u64k2,
+    u64k3,
+    u64k4,
+    ],
    k=2,
    tag=m128,
    vbase_stuff={
     choose_byfeatures=<code>,
     families=[
-     [ m128, u64k1, u64k2, u64k3, u64k4, ],
+     [
+      { cpp_ifdef=COMPILE_MPFQ_BINARY_FIELD_m128, tag=m128, },
+      u64k1,
+      u64k2,
+      u64k3,
+      u64k4,
+      ],
      [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_1, tag=p_1, }, ],
      [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_10, tag=p_10, }, ],
      [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_11, tag=p_11, }, ],
@@ -41,7 +55,13 @@
      [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_pz, tag=pz, }, ],
      ],
     member_templates_restrict={
-     m128=[ m128, u64k1, u64k2, u64k3, u64k4, ],
+     m128=[
+      { cpp_ifdef=COMPILE_MPFQ_BINARY_FIELD_m128, tag=m128, },
+      u64k1,
+      u64k2,
+      u64k3,
+      u64k4,
+      ],
      p_1=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_1, tag=p_1, }, ],
      p_10=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_10, tag=p_10, }, ],
      p_11=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_11, tag=p_11, }, ],
@@ -58,10 +78,34 @@
      p_8=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_8, tag=p_8, }, ],
      p_9=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_p_9, tag=p_9, }, ],
      pz=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELD_pz, tag=pz, }, ],
-     u64k1=[ m128, u64k1, u64k2, u64k3, u64k4, ],
-     u64k2=[ m128, u64k1, u64k2, u64k3, u64k4, ],
-     u64k3=[ m128, u64k1, u64k2, u64k3, u64k4, ],
-     u64k4=[ m128, u64k1, u64k2, u64k3, u64k4, ],
+     u64k1=[
+      { cpp_ifdef=COMPILE_MPFQ_BINARY_FIELD_m128, tag=m128, },
+      u64k1,
+      u64k2,
+      u64k3,
+      u64k4,
+      ],
+     u64k2=[
+      { cpp_ifdef=COMPILE_MPFQ_BINARY_FIELD_m128, tag=m128, },
+      u64k1,
+      u64k2,
+      u64k3,
+      u64k4,
+      ],
+     u64k3=[
+      { cpp_ifdef=COMPILE_MPFQ_BINARY_FIELD_m128, tag=m128, },
+      u64k1,
+      u64k2,
+      u64k3,
+      u64k4,
+      ],
+     u64k4=[
+      { cpp_ifdef=COMPILE_MPFQ_BINARY_FIELD_m128, tag=m128, },
+      u64k1,
+      u64k2,
+      u64k3,
+      u64k4,
+      ],
      },
     vc:includes=[ <stdarg.h>, ],
     },
@@ -121,8 +165,14 @@
 /* Member templates related to SIMD operation */
 
 /* Object-oriented interface */
+#ifdef COMPILE_MPFQ_BINARY_FIELD_m128
 void mpfq_m128_m128_wrapper_dotprod(mpfq_vbase_ptr, mpfq_vbase_ptr, mpfq_m128_dst_vec, mpfq_m128_src_vec, mpfq_m128_src_vec, unsigned int);
+#endif /* COMPILE_MPFQ_BINARY_FIELD_m128 */
+
+#ifdef COMPILE_MPFQ_BINARY_FIELD_m128
 void mpfq_m128_m128_dotprod(mpfq_m128_dst_field, mpfq_m128_dst_field, mpfq_m128_dst_vec, mpfq_m128_src_vec, mpfq_m128_src_vec, unsigned int);
+#endif /* COMPILE_MPFQ_BINARY_FIELD_m128 */
+
 void mpfq_m128_u64k1_wrapper_dotprod(mpfq_vbase_ptr, mpfq_vbase_ptr, mpfq_m128_dst_vec, mpfq_u64k1_src_vec, mpfq_m128_src_vec, unsigned int);
 void mpfq_m128_u64k1_dotprod(mpfq_m128_dst_field, mpfq_u64k1_dst_field, mpfq_m128_dst_vec, mpfq_u64k1_src_vec, mpfq_m128_src_vec, unsigned int);
 void mpfq_m128_u64k2_wrapper_dotprod(mpfq_vbase_ptr, mpfq_vbase_ptr, mpfq_m128_dst_vec, mpfq_u64k2_src_vec, mpfq_m128_src_vec, unsigned int);
@@ -131,8 +181,14 @@ void mpfq_m128_u64k3_wrapper_dotprod(mpfq_vbase_ptr, mpfq_vbase_ptr, mpfq_m128_d
 void mpfq_m128_u64k3_dotprod(mpfq_m128_dst_field, mpfq_u64k3_dst_field, mpfq_m128_dst_vec, mpfq_u64k3_src_vec, mpfq_m128_src_vec, unsigned int);
 void mpfq_m128_u64k4_wrapper_dotprod(mpfq_vbase_ptr, mpfq_vbase_ptr, mpfq_m128_dst_vec, mpfq_u64k4_src_vec, mpfq_m128_src_vec, unsigned int);
 void mpfq_m128_u64k4_dotprod(mpfq_m128_dst_field, mpfq_u64k4_dst_field, mpfq_m128_dst_vec, mpfq_u64k4_src_vec, mpfq_m128_src_vec, unsigned int);
+#ifdef COMPILE_MPFQ_BINARY_FIELD_m128
 void mpfq_m128_m128_wrapper_addmul_tiny(mpfq_vbase_ptr, mpfq_vbase_ptr, mpfq_m128_dst_vec, mpfq_m128_src_vec, mpfq_m128_dst_vec, unsigned int);
+#endif /* COMPILE_MPFQ_BINARY_FIELD_m128 */
+
+#ifdef COMPILE_MPFQ_BINARY_FIELD_m128
 void mpfq_m128_m128_addmul_tiny(mpfq_m128_dst_field, mpfq_m128_dst_field, mpfq_m128_dst_vec, mpfq_m128_src_vec, mpfq_m128_dst_vec, unsigned int);
+#endif /* COMPILE_MPFQ_BINARY_FIELD_m128 */
+
 void mpfq_m128_u64k1_wrapper_addmul_tiny(mpfq_vbase_ptr, mpfq_vbase_ptr, mpfq_u64k1_dst_vec, mpfq_m128_src_vec, mpfq_u64k1_dst_vec, unsigned int);
 void mpfq_m128_u64k1_addmul_tiny(mpfq_m128_dst_field, mpfq_u64k1_dst_field, mpfq_u64k1_dst_vec, mpfq_m128_src_vec, mpfq_u64k1_dst_vec, unsigned int);
 void mpfq_m128_u64k2_wrapper_addmul_tiny(mpfq_vbase_ptr, mpfq_vbase_ptr, mpfq_u64k2_dst_vec, mpfq_m128_src_vec, mpfq_u64k2_dst_vec, unsigned int);
@@ -141,8 +197,14 @@ void mpfq_m128_u64k3_wrapper_addmul_tiny(mpfq_vbase_ptr, mpfq_vbase_ptr, mpfq_u6
 void mpfq_m128_u64k3_addmul_tiny(mpfq_m128_dst_field, mpfq_u64k3_dst_field, mpfq_u64k3_dst_vec, mpfq_m128_src_vec, mpfq_u64k3_dst_vec, unsigned int);
 void mpfq_m128_u64k4_wrapper_addmul_tiny(mpfq_vbase_ptr, mpfq_vbase_ptr, mpfq_u64k4_dst_vec, mpfq_m128_src_vec, mpfq_u64k4_dst_vec, unsigned int);
 void mpfq_m128_u64k4_addmul_tiny(mpfq_m128_dst_field, mpfq_u64k4_dst_field, mpfq_u64k4_dst_vec, mpfq_m128_src_vec, mpfq_u64k4_dst_vec, unsigned int);
+#ifdef COMPILE_MPFQ_BINARY_FIELD_m128
 void mpfq_m128_m128_wrapper_transpose(mpfq_vbase_ptr, mpfq_vbase_ptr, mpfq_m128_dst_vec, mpfq_m128_src_vec);
+#endif /* COMPILE_MPFQ_BINARY_FIELD_m128 */
+
+#ifdef COMPILE_MPFQ_BINARY_FIELD_m128
 void mpfq_m128_m128_transpose(mpfq_m128_dst_field, mpfq_m128_dst_field, mpfq_m128_dst_vec, mpfq_m128_src_vec);
+#endif /* COMPILE_MPFQ_BINARY_FIELD_m128 */
+
 void mpfq_m128_u64k1_wrapper_transpose(mpfq_vbase_ptr, mpfq_vbase_ptr, mpfq_m128_dst_vec, mpfq_u64k1_src_vec);
 void mpfq_m128_u64k1_transpose(mpfq_m128_dst_field, mpfq_u64k1_dst_field, mpfq_m128_dst_vec, mpfq_u64k1_src_vec);
 void mpfq_m128_u64k2_wrapper_transpose(mpfq_vbase_ptr, mpfq_vbase_ptr, mpfq_m128_dst_vec, mpfq_u64k2_src_vec);
