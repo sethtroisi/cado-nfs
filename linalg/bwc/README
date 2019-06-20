@@ -492,7 +492,7 @@ build
     must match the width which is used eventually for krylov/mksol,
     otherwise data block sizes might be chosen too large or too small. In
     the latter case, you will encounter the warning ``cached matrix file
-    fits data with different striding''. This is not innocuous for
+    fits data with different stride''. This is not innocuous for
     krylov/mksol, as it hurts performance.
 
     Once /tmp/wdir/mat.h0.v0.bucket.bin (or /tmp/wdir/mat.h0.v0.bucketT.bin)

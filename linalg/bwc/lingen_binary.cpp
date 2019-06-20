@@ -439,7 +439,7 @@ void read_data_for_series(polmat& A MAYBE_UNUSED, unsigned int ondisk_length)
     using namespace globals;
 
     /* It's slightly non-trivial. polmat entries are polynomials, so
-     * we've got to cope with the non-trivial striding */
+     * we've got to cope with the non-trivial stride */
     
     { /* {{{ check file size */
         struct stat sbuf[1];
