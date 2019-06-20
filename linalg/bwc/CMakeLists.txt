@@ -165,7 +165,7 @@ foreach(v ${BWC_GF2_ARITHMETIC_BACKENDS})
         set(bwc_mpfq_sources ${bwc_mpfq_sources} mpfq/mpfq_${v}.c mpfq/mpfq_${v}_t.c )
         set(COMPILE_MPFQ_BINARY_FIELD_${v} 1)
         set(bwc_mpfq_flags "${bwc_mpfq_flags} -DCOMPILE_MPFQ_BINARY_FIELD_${v}")
-        message(STATUS "GF(2) arithmetic backend enabled for DL linear algebra: ${v}")
+        message(STATUS "GF(2) arithmetic backend enabled for factoring linear algebra: ${v}")
     endif()
 endforeach(v)
 
