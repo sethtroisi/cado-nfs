@@ -466,7 +466,6 @@ if (!defined($param->{'solutions'})) {
     if ($param->{'interleaving'}) {
         $param->{'solutions'} = [ "0-" . (2*$simd) ];
     }
-    print "## main solution ranges for mksol ".join(" ", @{$param->{'solutions'}})."\n";
 } else {
     # make that a list.
     $param->{'solutions'} = [ split(',',$param->{'solutions'}) ];
