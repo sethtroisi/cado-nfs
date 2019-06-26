@@ -206,6 +206,7 @@ extern pi_datatype_ptr BWC_PI_UNSIGNED;
 extern pi_datatype_ptr BWC_PI_UNSIGNED_LONG;
 extern pi_datatype_ptr BWC_PI_UNSIGNED_LONG_LONG;
 extern pi_datatype_ptr BWC_PI_LONG;
+extern pi_datatype_ptr BWC_PI_SIZE_T;
 
 
 struct pi_op_s {
@@ -314,6 +315,11 @@ extern void pi_thread_allreduce(void * sendbuf, void * recvbuf,
         pi_comm_ptr wr);
 extern void pi_allreduce(void * sendbuf, void *recvbuf,
         size_t count, pi_datatype_ptr datatype, pi_op_ptr op,
+        pi_comm_ptr wr);
+extern void pi_allgather(void * sendbuf,
+        size_t sendcount, pi_datatype_ptr sendtype,
+        void *recvbuf,
+        size_t recvcount, pi_datatype_ptr recvtype,
         pi_comm_ptr wr);
 extern int pi_thread_data_eq(void * buffer,
         size_t count, pi_datatype_ptr datatype,

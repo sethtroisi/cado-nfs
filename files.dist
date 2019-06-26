@@ -1344,3 +1344,12 @@ linalg/bwc/mpfq/mpfq_m128_t.c
 linalg/bwc/mpfq/mpfq_m128_t.h
 config/popcnt.c
 config/popcnt.cmake
+tests/linalg/bwc/test-parallelizing_info.cpp
+utils/fmt/LICENSE.rst
+utils/fmt/README.rst
+utils/fmt/core.h
+utils/fmt/format-inl.h
+utils/fmt/format.cc
+utils/fmt/format.h
+utils/fmt/ostream.h
+utils/fmt/printf.h

@@ -266,6 +266,33 @@ if(HAVE_CXX11 AND HAVE_HWLOC)
         LIBRARIES utils bwc_base)
 endif()
 
+cado_define_test(test-parallelizing_info.cpp
+    ARGUMENTS thr=2x2
+    LIBRARIES utils bwc_base
+    )
+set_target_properties(test-parallelizing_info PROPERTIES
+            LINKER_LANGUAGE CXX
+            COMPILE_FLAGS "--mpi"
+            LINK_FLAGS "--mpi")
+if (HAVE_MPI)
+    # mimick what we did with test_hello (which, in a way, tests most of
+    # the same code anyway)
+    cado_define_test(test-parallelizing_info_mpi PROGRAM
+        ${PROJECT_BINARY_DIR}/linalg/bwc/bwc.pl
+        NO_DEFAULT_RUN
+        TARGET_DEPENDENCIES test-parallelizing_info
+        TEST_DEPENDENCIES test-parallelizing_info)
+    macro(test_parallelizing_info_mpi code)
+        cado_divert_test(test-parallelizing_info_mpi ${code} ARGUMENTS
+            :mpirun ${ARGN}
+            -- ${CMAKE_CURRENT_BINARY_DIR}/test-parallelizing_info -v ${ARGN}
+            TEST_DEPENDENCIES test-parallelizing_info)
+    endmacro()
+    test_parallelizing_info_mpi(2122 mpi=2x1 thr=2x2)
+    test_parallelizing_info_mpi(1322 mpi=1x3 thr=2x2)
+    test_parallelizing_info_mpi(3222 mpi=3x2 thr=2x2)
+endif()
+
 macro(test_dispatch_matmul testname)
     cado_define_test(${testname} SCRIPT
         ${CMAKE_CURRENT_SOURCE_DIR}/bwc-dispatch-matmul.sh

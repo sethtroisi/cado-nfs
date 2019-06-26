@@ -1069,6 +1069,10 @@ pi_datatype_ptr BWC_PI_UNSIGNED_LONG    = pi_predefined_types + 4;
 pi_datatype_ptr BWC_PI_UNSIGNED_LONG_LONG    = pi_predefined_types + 5;
 pi_datatype_ptr BWC_PI_LONG             = pi_predefined_types + 6;
 
+char statically_assert_that_size_t_is_either_ulong_or_ulonglong[((sizeof(size_t) == sizeof(unsigned long)) || (sizeof(size_t) == sizeof(unsigned long long))) ? 1 : -1];
+pi_datatype_ptr BWC_PI_SIZE_T = pi_predefined_types + 4 + (sizeof(size_t) == sizeof(unsigned long long));
+
+
 
 struct pi_op_s BWC_PI_MIN[1]	= { { .stock = MPI_MIN, } };
 struct pi_op_s BWC_PI_MAX[1]	= { { .stock = MPI_MAX, } };
@@ -1451,6 +1455,32 @@ void pi_allreduce(void *sendbuf, void *recvbuf, size_t count,
     }
     /* now it's just a matter of broadcasting to all threads */
     pi_thread_bcast(recvbuf, count, datatype, 0, wr);
+}
+
+extern void pi_allgather(void * sendbuf,
+        size_t sendcount, pi_datatype_ptr sendtype,
+        void *recvbuf,
+        size_t recvcount, pi_datatype_ptr recvtype,
+        pi_comm_ptr wr)
+{
+    ASSERT_ALWAYS(sendbuf == NULL);
+    ASSERT_ALWAYS(sendtype == NULL);
+    ASSERT_ALWAYS(sendcount == 0);
+    size_t per_thread = recvcount * recvtype->item_size;
+    /* share the adress of the leader's buffer with everyone */
+    void * recvbuf_leader = recvbuf;
+    pi_thread_bcast(&recvbuf_leader, sizeof(void*), BWC_PI_BYTE, 0, wr);
+    /* Now everyone writes its data there. */
+    memcpy(recvbuf_leader + (wr->jrank * wr->ncores + wr->trank) * per_thread, recvbuf + (wr->jrank * wr->ncores + wr->trank) * per_thread, per_thread);
+    serialize_threads(wr);
+    if (wr->trank == 0) {
+        MPI_Allgather(MPI_IN_PLACE, 0, MPI_DATATYPE_NULL,
+                recvbuf, wr->ncores * per_thread, MPI_BYTE,
+                wr->pals);
+    }
+    serialize_threads(wr);
+    /* and copy back */
+    memcpy(recvbuf + (wr->jrank * wr->ncores + wr->trank) * per_thread, recvbuf_leader + (wr->jrank * wr->ncores + wr->trank) * per_thread, per_thread);
 }
 
 /* }}} */

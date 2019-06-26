@@ -14,9 +14,10 @@
 
 #include <algorithm>
 
-#include <stdint.h>
-#include <inttypes.h>
-#include <string.h>
+#include <cstdint>
+#include <cinttypes>
+#include <cstring>
+#include <sstream>
 
 // C++ headers.
 // #include <string>
@@ -26,6 +27,7 @@
 #include <algorithm>    // sort
 #include <iostream>     // cout
 #include <limits>       // underlying_type_{min,max}
+#include <fmt/printf.h>
 #include "macros.h"
 #include "utils.h"
 #include "bwc_config.h"
@@ -3188,7 +3190,7 @@ void MATMUL_NAME(mul)(matmul_ptr mm0, void * xdst, void const * xsrc, int d)
     mm->public_->iteration[d]++;
 }
 
-static void matmul_bucket_report_vsc(struct matmul_bucket_data_s * mm, double scale, vector<slice_header_t>::iterator & hdr, double * p_t_total)
+static std::ostream& matmul_bucket_report_vsc(std::ostream& os, struct matmul_bucket_data_s * mm, double scale, vector<slice_header_t>::iterator & hdr, double * p_t_total)
 {
     uint64_t scale0;
     scale0 = (mm->public_->iteration[0] + mm->public_->iteration[1]);
@@ -3244,18 +3246,19 @@ static void matmul_bucket_report_vsc(struct matmul_bucket_data_s * mm, double sc
         nc = dtime[l].first;
         t = dtime[l].second / scale0;
         a = 1.0e9 * t / nc;
-        printf("defer\t%.2fs        ; n=%-9" PRIu64 " ; %5.2f ns/c ;"
+        fmt::fprintf(os, "defer\t%.2fs        ; n=%-9" PRIu64 " ; %5.2f ns/c ;"
             " scaled*%.2f : %5.2f/c\n",
             t, nc, a, scale, a * scale);
         nc = ctime[l].first;
         t = ctime[l].second / scale0;
         a = 1.0e9 * t / nc;
         *p_t_total += t;
-        printf("      + %.2fs [%.2fs] ; n=%-9" PRIu64 " ; %5.2f ns/c ;"
+        fmt::fprintf(os, "      + %.2fs [%.2fs] ; n=%-9" PRIu64 " ; %5.2f ns/c ;"
             " scaled*%.2f : %5.2f/c\n",
             t, *p_t_total, nc, a, scale, a * scale);
     }
     hdr--;
+    return os;
 }
 
 
@@ -3265,15 +3268,17 @@ void MATMUL_NAME(report)(matmul_ptr mm0, double scale)
     uint64_t scale0;
     scale0 = (mm->public_->iteration[0] + mm->public_->iteration[1]);
 
-    printf("n %" PRIu64 "\n", mm->public_->ncoeffs);
+    std::ostringstream os;
 
     vector<slice_header_t>::iterator hdr;
+
+    fmt::fprintf(os, "n %" PRIu64 "\n", mm->public_->ncoeffs);
 
     double t_total = 0;
     for(hdr = mm->headers.begin() ; hdr != mm->headers.end() ; hdr++) {
         if (hdr->t == SLICE_TYPE_SMALL1_VBLOCK) continue;
         if (hdr->t == SLICE_TYPE_DEFER_ENVELOPE) {
-            matmul_bucket_report_vsc(mm, scale, hdr, &t_total);
+            matmul_bucket_report_vsc(os, mm, scale, hdr, &t_total);
             continue;
         }
         double t = mm->slice_timings[hdr - mm->headers.begin()].t;
@@ -3281,13 +3286,13 @@ void MATMUL_NAME(report)(matmul_ptr mm0, double scale)
         t /= scale0;
         t_total += t;
         double a = 1.0e9 * t / nc;
-        printf("%s\t%.2fs [%.2fs] ; n=%-9" PRIu64 " ; %5.2f ns/c ;"
+        fmt::fprintf(os, "%s\t%.2fs [%.2fs] ; n=%-9" PRIu64 " ; %5.2f ns/c ;"
             " scaled*%.2f : %5.2f/c\n",
             slice_name(hdr->t), t, t_total,
             nc, a, scale, a * scale);
     }
-    for(int i = 0 ; i < 40 ; i++) putchar('-');
-    putchar('\n');
+    for(int i = 0 ; i < 40 ; i++) os << '-';
+    os << '\n';
     for(int i = 0 ; i < SLICE_TYPE_MAX ; i++) {
         if (i == SLICE_TYPE_SMALL1_VBLOCK) continue;
         double t = 0;
@@ -3300,11 +3305,15 @@ void MATMUL_NAME(report)(matmul_ptr mm0, double scale)
         if (nc == 0) continue;
         t /= scale0;
         double a = 1.0e9 * t / nc;
-        printf("%s\t%.2fs ; n=%-9" PRIu64 " ; %5.2f ns/c ;"
+        fmt::fprintf(os, "%s\t%.2fs ; n=%-9" PRIu64 " ; %5.2f ns/c ;"
             " scaled*%.2f : %5.2f/c\n",
             slice_name(i), t,
             nc, a, scale, a * scale);
     }
+    if (mm->public_->report_string)
+        free(mm->public_->report_string);
+    mm->public_->report_string_size = os.str().size() + 1;
+    mm->public_->report_string = strdup(os.str().c_str());
 }
 
 void MATMUL_NAME(auxv)(matmul_ptr mm0, int op MAYBE_UNUSED, va_list ap MAYBE_UNUSED)

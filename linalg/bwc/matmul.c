@@ -392,6 +392,10 @@ void matmul_clear(matmul_ptr mm)
 #else
     mm->bind->clear(mm);
 #endif
+    if (mm->report_string_size) {
+        free(mm->report_string);
+        mm->report_string = NULL;
+    }
 }
 
 void matmul_auxv(matmul_ptr mm, int op, va_list ap)

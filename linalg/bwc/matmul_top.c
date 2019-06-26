@@ -2921,11 +2921,10 @@ static void matmul_top_read_submatrix(matmul_top_data_ptr mmt, int midx, param_l
             printf("Now trying to load matrix cache files\n");
         }
         if (sqread) {
-            for(unsigned int j = 0 ; j < mmt->pi->m->ncores ; j++) {
+            for(unsigned int j = 0 ; j < mmt->pi->m->ncores ; j += sqread) {
                 serialize_threads(mmt->pi->m);
-                if (j == mmt->pi->m->trank) {
+                if (j / sqread == mmt->pi->m->trank / sqread)
                     cache_loaded = matmul_reload_cache(Mloc->mm);
-                }
             }
         } else {
             cache_loaded = matmul_reload_cache(Mloc->mm);
@@ -3072,6 +3071,24 @@ void matmul_top_report(matmul_top_data_ptr mmt, double scale)
     for(int midx = 0 ; midx < mmt->nmatrices ; midx++) {
         matmul_top_matrix_ptr Mloc = mmt->matrices[midx];
         matmul_report(Mloc->mm, scale);
+        size_t max_report_size = 0;
+        pi_allreduce(&Mloc->mm->report_string_size, &max_report_size, 1, BWC_PI_SIZE_T, BWC_PI_MAX, mmt->pi->m);
+        char * all_reports = malloc(mmt->pi->m->totalsize * max_report_size);
+        memset(all_reports, 0, mmt->pi->m->totalsize * max_report_size);
+        memcpy(all_reports + max_report_size * (mmt->pi->m->jrank * mmt->pi->m->ncores + mmt->pi->m->trank), Mloc->mm->report_string, Mloc->mm->report_string_size);
+        pi_allgather(NULL, 0, 0,
+                all_reports, max_report_size, BWC_PI_BYTE, mmt->pi->m);
+
+        if (max_report_size > 1 && mmt->pi->m->jrank == 0 && mmt->pi->m->trank == 0) {
+            for(unsigned int j = 0 ; j < mmt->pi->m->njobs ; j++) {
+                for(unsigned int t = 0 ; t < mmt->pi->m->ncores ; t++) {
+                    char * locreport = all_reports + max_report_size * (j * mmt->pi->m->ncores + t);
+                    printf("##### J%uT%u timing report:\n%s",
+                            j, t, locreport);
+                }
+            }
+        }
+        serialize(mmt->pi->m);
     }
 }
 

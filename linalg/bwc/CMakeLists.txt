@@ -140,6 +140,7 @@ endif()
 
 
 include_directories(${CADO_NFS_SOURCE_DIR}/linalg)
+
 mpi_add_executable(mf_bal mf_bal_main.c)
 target_link_libraries(mf_bal bwc_base m)
 install(TARGETS mf_bal RUNTIME DESTINATION ${LIBSUFFIX}/linalg/bwc)
