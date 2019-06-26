@@ -634,6 +634,7 @@ int mmt_vec_load(mmt_vec_ptr v, const char * filename_pattern, unsigned int item
         unsigned int b0 = block_position + b * Adisk_width;
         char * filename;
         asprintf(&filename, filename_pattern, b0, b0 + splitwidth);
+        double tt = -wct_seconds();
         if (tcan_print) {
             printf("Loading %s ...", filename);
             fflush(stdout);
@@ -660,7 +661,14 @@ int mmt_vec_load(mmt_vec_ptr v, const char * filename_pattern, unsigned int item
                 MPI_Abort(v->pi->m->pals, EXIT_FAILURE);
         }
         free(filename);
-        if (tcan_print) { printf(" done\n"); }
+        tt += wct_seconds();
+        if (tcan_print) {
+            char buf[20], buf2[20];
+            printf(" done [%s in %.2fs, %s/s]\n",
+                    size_disp(sizeondisk / Adisk_multiplex, buf),
+                    tt,
+                    size_disp(sizeondisk / Adisk_multiplex / tt, buf2));
+        }
         global_ok = global_ok && ok;
     }
 
@@ -699,6 +707,7 @@ int mmt_vec_save(mmt_vec_ptr v, const char * filename_pattern, unsigned int item
         asprintf(&filename, filename_pattern, b0, b0 + splitwidth);
         char * tmpfilename;
         asprintf(&tmpfilename, "%s.tmp", filename);
+        double tt = -wct_seconds();
         if (tcan_print) {
             printf("Saving %s ...", filename);
             fflush(stdout);
@@ -723,7 +732,14 @@ int mmt_vec_save(mmt_vec_ptr v, const char * filename_pattern, unsigned int item
         }
         free(filename);
         free(tmpfilename);
-        if (tcan_print) { printf(" done\n"); }
+        tt += wct_seconds();
+        if (tcan_print) {
+            char buf[20], buf2[20];
+            printf(" done [%s in %.2fs, %s/s]\n",
+                    size_disp(sizeondisk / Adisk_multiplex, buf),
+                    tt,
+                    size_disp(sizeondisk / Adisk_multiplex / tt, buf2));
+        }
         global_ok = global_ok && ok;
     }
 
@@ -2283,6 +2299,7 @@ void mmt_vec_set_random_through_file(mmt_vec_ptr v, const char * filename_patter
             cheating_vec_init(A, &y, nitems);
             A->vec_set_zero(A, y, nitems);
             A->vec_random(A, y, nitems, rstate);
+            double tt = -wct_seconds();
             if (tcan_print) {
                 printf("Creating fake vector %s...", filename);
                 fflush(stdout);
@@ -2292,7 +2309,15 @@ void mmt_vec_set_random_through_file(mmt_vec_ptr v, const char * filename_patter
             int rc = fwrite(y, A->vec_elt_stride(A,1), loc_itemsondisk, f);
             ASSERT_ALWAYS(rc == (int) loc_itemsondisk);
             fclose(f);
-            if (tcan_print) { printf(" done\n"); }
+            tt += wct_seconds();
+            if (tcan_print) {
+                size_t sizeondisk = A->vec_elt_stride(A, loc_itemsondisk);
+                char buf[20], buf2[20];
+                printf(" done [%s in %.2fs, %s/s]\n",
+                        size_disp(sizeondisk / Adisk_multiplex, buf),
+                        tt,
+                        size_disp(sizeondisk / Adisk_multiplex / tt, buf2));
+            }
             cheating_vec_clear(A, &y, v->n);
 
             free(filename);
@@ -2926,11 +2951,36 @@ static void matmul_top_read_submatrix(matmul_top_data_ptr mmt, int midx, param_l
         if (sqread) {
             for(unsigned int j = 0 ; j < mmt->pi->m->ncores ; j += sqread) {
                 serialize_threads(mmt->pi->m);
+                double t_read = -wct_seconds();
                 if (j / sqread == mmt->pi->m->trank / sqread)
                     cache_loaded = matmul_reload_cache(Mloc->mm);
+                t_read += wct_seconds();
+                serialize_threads(mmt->pi->m);
+                if (mmt->pi->m->jrank == 0 && mmt->pi->m->trank == j && cache_loaded) {
+                    printf("[%s] J%uT%u-%u: read cache %s (and others) in %.2fs (round %u/%u)\n",
+                    mmt->pi->nodenumber_s,
+                    mmt->pi->m->jrank,
+                    mmt->pi->m->trank,
+                    MIN(mmt->pi->m->ncores, mmt->pi->m->trank + sqread) - 1,
+                    Mloc->mm->cachefile_name,
+                    t_read,
+                    j / sqread, iceildiv(mmt->pi->m->ncores, sqread)
+                    );
+                }
             }
         } else {
+            double t_read = -wct_seconds();
             cache_loaded = matmul_reload_cache(Mloc->mm);
+            t_read += wct_seconds();
+            serialize_threads(mmt->pi->m);
+            if (mmt->pi->m->jrank == 0 && mmt->pi->m->trank == 0 && cache_loaded) {
+                printf("[%s] J%u: read cache %s (and others) in %.2fs\n",
+                        mmt->pi->nodenumber_s,
+                        mmt->pi->m->jrank,
+                        Mloc->mm->cachefile_name,
+                        t_read
+                      );
+            }
         }
         if (!mmt->pi->m->trank) {
             printf("J%u %s done reading (result=%d)\n", mmt->pi->m->jrank, mmt->pi->nodename, cache_loaded);
