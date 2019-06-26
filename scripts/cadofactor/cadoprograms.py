@@ -221,7 +221,7 @@ class Sha1Cache(object):
         # Check whether the file on disk changed
         if realpath in self._sha1 and not self._sha1[realpath][1] == file_id:
             logger = logging.getLogger("Sha1Cache")
-            logger.warn("File %s changed! Discarding old SHA1 sum", realpath)
+            logger.warning("File %s changed! Discarding old SHA1 sum", realpath)
             del(self._sha1[realpath])
         if not realpath in self._sha1:
             logger = logging.getLogger("Sha1Cache")

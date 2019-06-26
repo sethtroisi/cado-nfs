@@ -876,7 +876,7 @@ class WorkunitClient(object):
                 self.cleanup()
                 raise WorkunitParseError()
             if not force_reload and self.workunit.get("DEADLINE") and time.time() > float(self.workunit.get("DEADLINE")):
-                logging.warn("Old workunit file %s has passed deadline (%s), ignoring",
+                logging.warning("Old workunit file %s has passed deadline (%s), ignoring",
                         self.wu_filename, 
                         time.asctime(time.localtime(float(self.workunit.get("DEADLINE")))))
                 os.remove(self.wu_filename)
@@ -1584,9 +1584,9 @@ if __name__ == '__main__':
     still_need_cert = False # This will be set to True if we need the certi-
                             # ficate, but could not download it right away
     if not SETTINGS["CERTSHA1"] is None and scheme != "https":
-        logging.warn("Option --certsha1 makes sense only with an https URL, ignoring it.")
+        logging.warning("Option --certsha1 makes sense only with an https URL, ignoring it.")
     elif SETTINGS["CERTSHA1"] is None and scheme == "https":
-        logging.warn("An https URL was given but no --certsha1 option, NO SSL VALIDATION WILL BE PERFORMED.")
+        logging.warning("An https URL was given but no --certsha1 option, NO SSL VALIDATION WILL BE PERFORMED.")
     elif not SETTINGS["CERTSHA1"] is None and scheme == "https":
         certfilename = os.path.join(SETTINGS["DLDIR"], "server.%s.pem" % SETTINGS["CERTSHA1"][0:8])
         SETTINGS["CERTFILE"] = certfilename
