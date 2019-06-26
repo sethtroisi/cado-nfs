@@ -1994,7 +1994,7 @@ class Polysel1Task(ClientServerTask, DoesImport, HasStatistics, patterns.Observe
         with open(filename, "r") as inputfile:
             for line in inputfile:
                 if re_warning.match(line):
-                    self.logger.warning"File %s contains: %s",
+                    self.logger.warning("File %s contains: %s",
                                      filename, line.strip())
                 yield line
 
@@ -2011,7 +2011,7 @@ class Polysel1Task(ClientServerTask, DoesImport, HasStatistics, patterns.Observe
                               poly)
             return (0, 0)
         if not poly.lognorm:
-            self.logger.warning"Polynomial in file %s has no lognorm, skipping it",
+            self.logger.warning("Polynomial in file %s has no lognorm, skipping it",
                              filename)
             return (0, 0)
         if self._add_poly_heap_db(poly):
@@ -2083,7 +2083,7 @@ class Polysel1Task(ClientServerTask, DoesImport, HasStatistics, patterns.Observe
             poly = Polynomials(text)
         except PolynomialParseException as e:
             if str(e) != "No polynomials found":
-                self.logger.warning"Invalid polyselect file '%s': %s",
+                self.logger.warning("Invalid polyselect file '%s': %s",
                                   filename, e)
                 return None
         except UnicodeDecodeError as e:
@@ -2251,7 +2251,7 @@ class Polysel2Task(ClientServerTask, HasStatistics, DoesImport, patterns.Observe
             # If the poly file got lost somehow, write it again
             filename = self.get_state_filename("polyfilename")
             if filename is None or not filename.isfile():
-                self.logger.warning"Polynomial file disappeared, writing again")
+                self.logger.warning("Polynomial file disappeared, writing again")
                 self.write_poly_file()
             return True
         
@@ -2319,7 +2319,7 @@ class Polysel2Task(ClientServerTask, HasStatistics, DoesImport, patterns.Observe
         with open(filename, "r") as inputfile:
             for line in inputfile:
                 if re_warning.match(line):
-                    self.logger.warning"File %s contains: %s",
+                    self.logger.warning("File %s contains: %s",
                                      filename, line.strip())
                 yield line
 
@@ -2335,7 +2335,7 @@ class Polysel2Task(ClientServerTask, HasStatistics, DoesImport, patterns.Observe
                 raise
         except PolynomialParseException as e:
             if str(e) != "No polynomials found":
-                self.logger.warning"Invalid polyselect file '%s': %s",
+                self.logger.warning("Invalid polyselect file '%s': %s",
                                   filename, e)
                 return None
         except UnicodeDecodeError as e:
@@ -2350,7 +2350,7 @@ class Polysel2Task(ClientServerTask, HasStatistics, DoesImport, patterns.Observe
                               poly)
             return None
         if not poly.MurphyE:
-            self.logger.warning"Polynomial in file %s has no Murphy E value",
+            self.logger.warning("Polynomial in file %s has no Murphy E value",
                              filename)
         # in case poly.MurphyE = self.bestpoly.MurphyE (MurphyE is printed
         # only with 3 digits in the cxxx.poly file), we choose the polynomial
@@ -2558,7 +2558,7 @@ class PolyselJLTask(ClientServerTask, patterns.Observer):
         with open(filename, "r") as inputfile:
             for line in inputfile:
                 if re_warning.match(line):
-                    self.logger.warning"File %s contains: %s",
+                    self.logger.warning("File %s contains: %s",
                                      filename, line.strip())
                 yield line
 
@@ -2571,7 +2571,7 @@ class PolyselJLTask(ClientServerTask, patterns.Observer):
                               poly)
             return 0
         if not poly.MurphyE:
-            self.logger.warning"Polynomial in file %s has no MurphyE, skipping it",
+            self.logger.warning("Polynomial in file %s has no MurphyE, skipping it",
                              filename)
             return 0
         if self.bestpoly is None or (self.bestpoly.MurphyE < poly.MurphyE or
@@ -2587,7 +2587,7 @@ class PolyselJLTask(ClientServerTask, patterns.Observer):
             poly = Polynomials(text)
         except PolynomialParseException as e:
             if str(e) != "No polynomials found":
-                self.logger.warning"Invalid polyselect file '%s': %s",
+                self.logger.warning("Invalid polyselect file '%s': %s",
                                   filename, e)
                 return None
         except UnicodeDecodeError as e:
@@ -2757,14 +2757,14 @@ class FactorBaseTask(Task):
         if "outputfile1" in self.state:
             prevpoly = Polynomials(self.state["poly"].splitlines())
             if poly != prevpoly:
-                self.logger.warning"Received different polynomial, "
+                self.logger.warning("Received different polynomial, "
                                  "discarding old factor base file")
                 del(self.state["outputfile1"])
                 del(self.state["outputfile0"])
             else:
                 for key in check_params:
                     if self.state[key] != check_params[key]:
-                        self.logger.warning"Parameter %s changed, discarding old "
+                        self.logger.warning("Parameter %s changed, discarding old "
                                          "factor base file", key)
                         del(self.state["outputfile1"])
                         del(self.state["outputfile0"])
@@ -2887,12 +2887,12 @@ class FreeRelTask(Task):
             discard = False
             prevpoly = Polynomials(self.state["poly"].splitlines())
             if poly != prevpoly:
-                self.logger.warning"Received different polynomial, discarding "
+                self.logger.warning("Received different polynomial, discarding "
                                  "old free relations file")
                 discard = True
             elif self.state["lpb1"] != self.progparams[0]["lpb1"] or \
                  self.state["lpb0"] != self.progparams[0]["lpb0"]:
-                self.logger.warning"Parameter lpb1/lpb0 changed, discarding old "
+                self.logger.warning("Parameter lpb1/lpb0 changed, discarding old "
                                  "free relations file")
                 discard = True
             if discard:
@@ -3128,7 +3128,7 @@ class SievingTask(ClientServerTask, DoesImport, FilesCreator, HasStatistics,
             return True
         output_files = message.get_output_files()
         if len(output_files) != 1:
-            self.logger.warning"Received output with %d files: %s" % (len(output_files), ", ".join(output_files)))
+            self.logger.warning("Received output with %d files: %s" % (len(output_files), ", ".join(output_files)))
             return False
         stderrfilename = message.get_stderrfile(0)
         ok = self.add_file(output_files[0], stderrfilename, commit=False)
@@ -3872,17 +3872,17 @@ class PurgeTask(Task):
         last_nrels = self.state.get("last_output_nrels", 0)
         last_nprimes = self.state.get("last_output_nprimes", 0)
         if last_input_nrels >= input_nrels:
-            self.logger.warning"Previously stored input nrels (%d) is no "
+            self.logger.warning("Previously stored input nrels (%d) is no "
                              "smaller than value from new run (%d)",
                              last_input_nrels, input_nrels)
             return
         if nrels <= last_nrels:
-            self.logger.warning"Previously stored nrels (%d) is no "
+            self.logger.warning("Previously stored nrels (%d) is no "
                              "smaller than value from new run (%d)",
                              last_nrels, nrels)
             return
         if nprimes <= last_nprimes:
-            self.logger.warning"Previously stored nprimes (%d) is no "
+            self.logger.warning("Previously stored nprimes (%d) is no "
                              "smaller than value from new run (%d)",
                              last_nprimes, nprimes)
             return
@@ -4325,7 +4325,7 @@ class LinAlgDLPTask(Task):
         super().run()
 
         if self.state["ran_already"] and self.params["force_wipeout"]:
-                self.logger.warning"Ran before, but force_wipeout is set. "
+                self.logger.warning("Ran before, but force_wipeout is set. "
                                  "Wiping out working directory.")
                 self.workdir.make_dirname(subdir="bwc").rmtree()
                 self.state["ran_already"] = False
@@ -4596,7 +4596,7 @@ class LinAlgTask(Task, HasStatistics):
         super().run()
 
         if self.state["ran_already"] and self.params["force_wipeout"]:
-                self.logger.warning"Ran before, but force_wipeout is set. "
+                self.logger.warning("Ran before, but force_wipeout is set. "
                                  "Wiping out working directory.")
                 self.workdir.make_dirname(subdir="bwc").rmtree()
                 self.state["ran_already"] = False
@@ -5318,12 +5318,12 @@ class StartClientsTask(Task):
         # Check for old clients which we did not mean to start this run
         for cid in set(self.pids) - set(self.used_ids):
             if self.is_alive(cid):
-                self.logger.warning"Client id %s (Host %s, PID %d), launched "
+                self.logger.warning("Client id %s (Host %s, PID %d), launched "
                                  "in a previous run and not meant to be "
                                  "launched this time, is still running",
                                  cid, self.hosts[cid], self.pids[cid])
             else:
-                self.logger.warning"Client id %s (Host %s, PID %d), launched "
+                self.logger.warning("Client id %s (Host %s, PID %d), launched "
                                  "in a previous run and not meant to be "
                                  "launched this time, seems to have died. "
                                  "I'll forget about this client.",
