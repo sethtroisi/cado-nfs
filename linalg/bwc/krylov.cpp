@@ -285,8 +285,12 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
 
         if (pi->m->trank == 0 && pi->m->jrank == 0 && !fake) {
             char * tmp;
+            char * tmptmp;
             int rc = asprintf(&tmp, "A%u-%u.%u-%u", ys[0], ys[1], s, s+bw->interval);
-            FILE * f = fopen(tmp, "wb");
+            ASSERT_ALWAYS(rc >= 0);
+            rc = asprintf(&tmptmp, "%s.tmp", tmp);
+            ASSERT_ALWAYS(rc >= 0);
+            FILE * f = fopen(tmptmp, "wb");
             rc = fwrite(xymats, A->vec_elt_stride(A, 1), bw->m*bw->interval, f);
             if (rc != bw->m*bw->interval) {
                 fprintf(stderr, "Ayee -- short write\n");
@@ -295,6 +299,9 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
                 // failure is temporary (?)
             }
             fclose(f);
+            rc = rename(tmptmp, tmp);
+            ASSERT_ALWAYS(rc == 0);
+            free(tmptmp);
             free(tmp);
         }
 

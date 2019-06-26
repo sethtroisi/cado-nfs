@@ -3246,7 +3246,7 @@ static std::ostream& matmul_bucket_report_vsc(std::ostream& os, struct matmul_bu
         nc = dtime[l].first;
         t = dtime[l].second / scale0;
         a = 1.0e9 * t / nc;
-        fmt::fprintf(os, "defer\t%.2fs        ; n=%-9" PRIu64 " ; %5.2f ns/c ;"
+        fmt::fprintf(os, "defer\t%.2fs         ; n=%-9" PRIu64 " ; %5.2f ns/c ;"
             " scaled*%.2f : %5.2f/c\n",
             t, nc, a, scale, a * scale);
         nc = ctime[l].first;

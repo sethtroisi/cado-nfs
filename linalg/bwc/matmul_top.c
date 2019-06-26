@@ -697,12 +697,14 @@ int mmt_vec_save(mmt_vec_ptr v, const char * filename_pattern, unsigned int item
         unsigned int b0 = block_position + b * Adisk_width;
         char * filename;
         asprintf(&filename, filename_pattern, b0, b0 + splitwidth);
+        char * tmpfilename;
+        asprintf(&tmpfilename, "%s.tmp", filename);
         if (tcan_print) {
             printf("Saving %s ...", filename);
             fflush(stdout);
         }
         pi_file_handle f;
-        int ok = pi_file_open(f, v->pi, v->d, filename, "wb");
+        int ok = pi_file_open(f, v->pi, v->d, tmpfilename, "wb");
         if (ok) {
             ASSERT_ALWAYS(v != NULL);
             ASSERT_ALWAYS(v->consistency == 2);
@@ -713,13 +715,14 @@ int mmt_vec_save(mmt_vec_ptr v, const char * filename_pattern, unsigned int item
             ok = s >= 0 && (size_t) s == sizeondisk / Adisk_multiplex;
             pi_file_close(f);
         }
-        if (!ok) {
-            if (v->pi->m->trank == 0 && v->pi->m->jrank == 0) {
+        if (v->pi->m->trank == 0 && v->pi->m->jrank == 0) {
+            if (!ok || (rename(tmpfilename, filename)) != 0) {
                 fprintf(stderr, "WARNING: failed to save %s\n", filename);
-                unlink(filename);
+                unlink(tmpfilename);
             }
         }
         free(filename);
+        free(tmpfilename);
         if (tcan_print) { printf(" done\n"); }
         global_ok = global_ok && ok;
     }
