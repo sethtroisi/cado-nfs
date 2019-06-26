@@ -438,6 +438,7 @@ struct matmul_bucket_data_s {
     vector<unsigned int> aux;   /* Various descriptors -- fairly small */
     /* headers are the first thing found in memory */
     vector<slice_header_t> headers;
+    slice_runtime_stats main_timing;
     vector<slice_runtime_stats> slice_timings;
     matmul_bucket_methods methods;
 };
@@ -3173,6 +3174,8 @@ void MATMUL_NAME(mul)(matmul_ptr mm0, void * xdst, void const * xsrc, int d)
 
     abdst_field x = mm->xab;
 
+    mm->main_timing.t -= wct_seconds();
+
     if (d == !mm->public_->store_transposed) {
         /* This is the ``normal'' case (matrix times vector). */
     } else {
@@ -3186,6 +3189,8 @@ void MATMUL_NAME(mul)(matmul_ptr mm0, void * xdst, void const * xsrc, int d)
         abvec_set_zero(x, dst, pos->ncols_t);
     }
     matmul_bucket_mul_loop(mm, dst, src, d, pos);
+
+    mm->main_timing.t += wct_seconds();
 
     mm->public_->iteration[d]++;
 }
@@ -3246,6 +3251,7 @@ static std::ostream& matmul_bucket_report_vsc(std::ostream& os, struct matmul_bu
         nc = dtime[l].first;
         t = dtime[l].second / scale0;
         a = 1.0e9 * t / nc;
+        *p_t_total += t;
         fmt::fprintf(os, "defer\t%.2fs         ; n=%-9" PRIu64 " ; %5.2f ns/c ;"
             " scaled*%.2f : %5.2f/c\n",
             t, nc, a, scale, a * scale);
@@ -3272,7 +3278,10 @@ void MATMUL_NAME(report)(matmul_ptr mm0, double scale)
 
     vector<slice_header_t>::iterator hdr;
 
-    fmt::fprintf(os, "n %" PRIu64 "\n", mm->public_->ncoeffs);
+    fmt::fprintf(os, "n %" PRIu64 " %.3fs/iter (wct of cpu-bound loop)\n",
+            mm->public_->ncoeffs,
+            mm->main_timing.t / scale0
+            );
 
     double t_total = 0;
     for(hdr = mm->headers.begin() ; hdr != mm->headers.end() ; hdr++) {
