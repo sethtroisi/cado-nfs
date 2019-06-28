@@ -382,6 +382,10 @@ void matmul_report(matmul_ptr mm, double scale)
 
 void matmul_clear(matmul_ptr mm)
 {
+    if (mm->report_string_size) {
+        free(mm->report_string);
+        mm->report_string = NULL;
+    }
     if (mm->cachefile_name != NULL) free(mm->cachefile_name);
     if (mm->local_cache_copy != NULL) free(mm->local_cache_copy);
     mm->locfile = NULL;
@@ -392,10 +396,6 @@ void matmul_clear(matmul_ptr mm)
 #else
     mm->bind->clear(mm);
 #endif
-    if (mm->report_string_size) {
-        free(mm->report_string);
-        mm->report_string = NULL;
-    }
 }
 
 void matmul_auxv(matmul_ptr mm, int op, va_list ap)
