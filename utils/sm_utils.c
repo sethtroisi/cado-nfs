@@ -39,7 +39,7 @@ void compute_sm_piecewise(mpz_poly_ptr dst, mpz_poly_srcptr u, sm_side_info_srcp
 
     int s = 0;
     for(int j = 0; j < fac->size ; j++) {
-        if (!sm->legacy && !sm->is_factor_used[j])
+        if (!sm->is_factor_used[j])
             continue;
         /* simply call the usual function here */
         mpz_poly_srcptr g = fac->factors[j]->f;
@@ -70,11 +70,14 @@ void compute_sm_piecewise(mpz_poly_ptr dst, mpz_poly_srcptr u, sm_side_info_srcp
                 g, sm->ell, sm->exponents[j], sm->ell2);
 #endif
         for(int k = 0 ; k < g->deg ; k++, s++) {
-            mpz_swap(temp->coeff[s], chunks[j]->coeff[k]);
+            if (sm->mode == SM_MODE_2019REV)
+                mpz_swap(temp->coeff[s], chunks[j]->coeff[g->deg-1-k]);
+            else
+                mpz_swap(temp->coeff[s], chunks[j]->coeff[k]);
         }
     }
 
-    if (sm->legacy) {
+    if (sm->mode == SM_MODE_LEGACY_PRE2018) {
         temp->deg = n - 1;
         /* now apply the change of basis matrix */
         for(int s = 0 ; s < n ; s++) {
@@ -107,7 +110,7 @@ print_sm2 (FILE *f, sm_side_info_srcptr S, mpz_poly_srcptr SM, const char * deli
 
     for (int j = 0; j < S->nsm; ++j) {
 
-        int jx = S->legacy ? S->f->deg-1-j : j;
+        int jx = S->mode == SM_MODE_LEGACY_PRE2018 ? S->f->deg-1-j : j;
 
         if (jx > SM->deg)
             fprintf(f, "0");
@@ -290,14 +293,13 @@ void sm_side_info_print(FILE * out, sm_side_info_srcptr sm)
     fprintf(out, "# unit rank is %d\n", sm->unit_rank);
     fprintf(out, "# lifted factors of f modulo ell^2\n");
     for(int i = 0 ; i < sm->fac->size ; i++) {
-        gmp_fprintf(out, "# factor %d (used=%d)%s, exponent ell^%d-1=%Zd:\n# ",
+        gmp_fprintf(out, "# factor %d (used=%d), exponent ell^%d-1=%Zd:\n# ",
                 i, sm->is_factor_used[i],
-                sm->legacy ? " [used anyway because of legacy mode]" : "",
                 sm->fac->factors[i]->f->deg,
                 sm->exponents[i]);
         mpz_poly_fprintf(out, sm->fac->factors[i]->f);
     }
-    if (sm->legacy) {
+    if (sm->mode == SM_MODE_LEGACY_PRE2018) {
         fprintf(out, "# change of basis matrix to OK/ell*OK from piecewise representation\n");
         for(int i = 0 ; i < sm->f->deg ; i++) {
             fprintf(out, "# ");
@@ -378,16 +380,30 @@ void sm_side_info_init(sm_side_info_ptr sm, mpz_poly_srcptr f0, mpz_srcptr ell)
     }
 }
 
-void sm_side_info_set_mode(sm_side_info_ptr sm)
+void sm_side_info_set_mode(sm_side_info_ptr sm, const char * mode_string)
 {
-    sm->legacy = 1;
-    sm->matrix = malloc(sm->f->deg * sm->f->deg * sizeof(mpz_t));
-    for(int i = 0 ; i < sm->f->deg ; i++)
-        for(int j = 0 ; j < sm->f->deg ; j++)
-            mpz_init_set_ui(sm->matrix[i * sm->f->deg + j], 0);
-    compute_change_of_basis_matrix(sm->matrix, sm->f, sm->fac, sm->ell);
-    for(int j = 0; j < sm->fac->size ; j++)
-        sm->is_factor_used[j] = 1;
+    if (strcmp(mode_string, "default") == 0) {
+        sm->mode = SM_MODE_2018;
+    } else if (strcmp(mode_string, "2018") == 0) {
+        sm->mode = SM_MODE_2018;
+    } else if (strcmp(mode_string, "legacy") == 0) {
+        sm->mode = SM_MODE_LEGACY_PRE2018;
+    } else if (strcmp(mode_string, "2019rev") == 0) {
+        sm->mode = SM_MODE_2019REV;
+    } else if (strcmp(mode_string, "pseudorandom-combination") == 0) {
+        sm->mode = SM_MODE_PSEUDORANDOM_COMBINATION;
+        abort(); /* not implemented yet */
+    }
+
+    if (sm->mode == SM_MODE_LEGACY_PRE2018) {
+        sm->matrix = malloc(sm->f->deg * sm->f->deg * sizeof(mpz_t));
+        for(int i = 0 ; i < sm->f->deg ; i++)
+            for(int j = 0 ; j < sm->f->deg ; j++)
+                mpz_init_set_ui(sm->matrix[i * sm->f->deg + j], 0);
+        compute_change_of_basis_matrix(sm->matrix, sm->f, sm->fac, sm->ell);
+        for(int j = 0; j < sm->fac->size ; j++)
+            sm->is_factor_used[j] = 1;
+    }
 }
 
 

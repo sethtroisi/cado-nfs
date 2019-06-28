@@ -63,9 +63,9 @@ class GeneralClass(object):
         # parser.add_argument("--no-wipe",
         #         help="Keep working files",
         #         action="store_true")
-        parser.add_argument("--legacy-sm",
-                help="Use legacy SM choice",
-                action="store_true")
+        parser.add_argument("--sm-mode",
+                help="Select SM mode",
+                type=str)
         parser.add_argument("--datadir",
                 help="cadofactor working directory",
                 type=str)
@@ -1164,8 +1164,8 @@ class DescentLowerClass(object):
                         "-out", SMfile,
                         "-ell", general.ell()
                     ]
-        if self.args.legacy_sm:
-            call_that += [ "--legacy-sm" ]
+        if self.args.sm_mode is not None:
+            call_that += [ "-sm-mode", self.args.sm_mode ]
         call_that = [str(x) for x in call_that]
         print("command line:\n" + " ".join(call_that))
         with open(os.devnull, 'w') as devnull:

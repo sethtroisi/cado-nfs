@@ -1056,7 +1056,7 @@ class SM(Program):
                  ell: Parameter(),
                  nsm: Parameter()=None,
                  threads: Parameter("t")=None,
-                 legacy_sm: Toggle("legacy-sm")=None,
+                 sm_mode: Parameter("sm-mode")=None,
                  **kwargs):
         super().__init__(locals(), **kwargs)
  
@@ -1076,7 +1076,7 @@ class ReconstructLog(Program):
                  relsdel: Parameter(),
                  nrels: Parameter(),
                  partial: Toggle()=None,
-                 legacy_sm: Toggle("legacy-sm")=None,
+                 sm_mode: Parameter("sm-mode")=None,
                  nsm: Parameter(),
                  **kwargs):
         super().__init__(locals(), **kwargs)
@@ -1098,7 +1098,7 @@ class Descent(Program):
                  init_lim: Parameter("init-lim", prefix="--"),
                  init_mfb: Parameter("init-mfb", prefix="--"),
                  init_tkewness: Parameter("init-tkewness", prefix="--"),
-                 legacy_sm: Toggle("legacy-sm")=None,
+                 sm_mode: Parameter("sm-mode", prefix="--")=None,
                  I: Parameter(prefix="--"),
                  lpb0: Parameter(prefix="--"),
                  lpb1: Parameter(prefix="--"),
