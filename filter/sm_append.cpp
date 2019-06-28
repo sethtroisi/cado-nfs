@@ -338,7 +338,7 @@ static void sm_append_sync(FILE * in, FILE * out, sm_side_info *sm_info, int nb_
         fputc(':', out);
         for (int side = 0; side < nb_polys; ++side) {
             compute_sm_piecewise(smpol, pol, sm_info[side]);
-            print_sm2(out, smpol, sm_info[side]->nsm, sm_info[side]->f->deg, ",");
+            print_sm2(out, sm_info[side], smpol, ",");
             if (side == 0 && sm_info[0]->nsm > 0 && sm_info[1]->nsm > 0)
                 fputc(',', out);
         }
@@ -373,6 +373,7 @@ static void declare_usage(param_list pl)
     param_list_decl_usage(pl, "poly", "(required) poly file");
     param_list_decl_usage(pl, "ell", "(required) group order");
     param_list_decl_usage(pl, "nsm", "number of SMs to use per side");
+    param_list_decl_usage(pl, "--legacy-sm", "use legacy sm choice");
     param_list_decl_usage(pl, "in", "data input (defaults to stdin)");
     param_list_decl_usage(pl, "out", "data output (defaults to stdout)");
     param_list_decl_usage(pl, "b", "batch size for MPI loop");
@@ -413,6 +414,9 @@ int main (int argc, char **argv)
 
     if (argc == 1)
         usage (argv[0], NULL, pl);
+
+    int want_legacy_sm = 0;
+    param_list_configure_switch(pl, "--legacy-sm", &want_legacy_sm);
 
     argc--,argv++;
     for ( ; argc ; ) {
@@ -476,6 +480,8 @@ int main (int argc, char **argv)
 
     for(int side = 0 ; side < pol->nb_polys; side++) {
         sm_side_info_init(sm_info[side], F[side], ell);
+        if (want_legacy_sm)
+            sm_side_info_set_legacy_mode(sm_info[side]);
         if (nsm_arg[side] >= 0)
             sm_info[side]->nsm = nsm_arg[side]; /* command line wins */
         if (!rank)

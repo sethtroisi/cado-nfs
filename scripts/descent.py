@@ -60,8 +60,11 @@ from threading import Thread
 class GeneralClass(object):
 
     def declare_args(parser):
-        parser.add_argument("--no-wipe",
-                help="Keep working files",
+        # parser.add_argument("--no-wipe",
+        #         help="Keep working files",
+        #         action="store_true")
+        parser.add_argument("--legacy-sm",
+                help="Use legacy SM choice",
                 action="store_true")
         parser.add_argument("--datadir",
                 help="cadofactor working directory",
@@ -1161,6 +1164,8 @@ class DescentLowerClass(object):
                         "-out", SMfile,
                         "-ell", general.ell()
                     ]
+        if self.args.legacy_sm:
+            call_that += [ "--legacy-sm" ]
         call_that = [str(x) for x in call_that]
         print("command line:\n" + " ".join(call_that))
         with open(os.devnull, 'w') as devnull:

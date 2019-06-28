@@ -45,6 +45,8 @@ struct sm_side_info_s {
     int is_factor_used[MAX_DEGREE];
     mpz_t exponent;
     mpz_t * exponents;
+    mpz_t * matrix;
+    int legacy;
 };
 typedef struct sm_side_info_s sm_side_info[1];
 typedef struct sm_side_info_s * sm_side_info_ptr;
@@ -65,6 +67,7 @@ extern "C" {
 #endif
 
 void sm_side_info_init(sm_side_info_ptr sm, mpz_poly_srcptr f0, mpz_srcptr ell);
+void sm_side_info_set_legacy_mode(sm_side_info_ptr sm);
 void sm_side_info_clear(sm_side_info_ptr sm);
 void sm_side_info_print(FILE * out, sm_side_info_srcptr sm);
 
@@ -83,14 +86,10 @@ void sm_build_one_relset (sm_relset_ptr rel, uint64_t *r, int64_t *e, int len,
 			  mpz_poly * abpolys, mpz_poly_ptr *F, int nb_polys, 
 			  const mpz_t ell2);
 
-// Taking a polynomial modulo F as input, compute the corresponding SM
-// as a polynomial.
-void compute_sm_straightforward(mpz_poly_ptr dst, mpz_poly_srcptr u, sm_side_info_srcptr sm);
-
 // Print coeffs of the SM polynomial
-void print_sm (FILE *, mpz_poly, int, int);
+void print_sm (FILE *f, sm_side_info_srcptr S, mpz_poly_srcptr SM);
 // same, with a delimiter
-void print_sm2 (FILE *f, mpz_poly SM, int nSM, int d, const char * delim);
+void print_sm2 (FILE *f, sm_side_info_srcptr S, mpz_poly_srcptr SM, const char * delim);
 
 /* This does the same as compute_sm_straightforward, except that it works piecewise on
  * the different components. It is thus noticeably faster. Results are

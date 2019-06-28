@@ -248,7 +248,11 @@ thread_sm (void * context_data, earlyparsed_relation_ptr rel)
                 ASSERT_ALWAYS(u->deg < S->f->deg);
                 ASSERT_ALWAYS(u->deg == S->f->deg - 1);
                 for(int i = 0 ; i < S->nsm; i++) {
-                    ASSERT_ALWAYS(mpz_cmp(u->coeff[i],rel->sm[c + i]) == 0);
+                    if (S->legacy)
+                        ASSERT_ALWAYS(mpz_cmp(u->coeff[S->f->deg-1-i],rel->sm[c + i
+]) == 0);
+                    else
+                        ASSERT_ALWAYS(mpz_cmp(u->coeff[i],rel->sm[c + i]) == 0);
                 }
 
 #endif
@@ -273,13 +277,13 @@ thread_sm (void * context_data, earlyparsed_relation_ptr rel)
                 mpz_poly_setcoeff_int64(u, 1, -b);
                 compute_sm_piecewise(u, u, S);
                 ASSERT_ALWAYS(u->deg < S->f->deg);
-#if 0 // Legacy SMs
-                for(int i = S->f->deg-1-u->deg; i < S->nsm; i++)
-                    mpz_addmul (l, data->smlogs[side][i], u->coeff[S->f->deg-1-i]);
-#else
-                for(int i = 0; i < S->nsm; i++)
-                    mpz_addmul (l, data->smlogs[side][i], u->coeff[i]);
-#endif
+                if (S->legacy) {
+                    for(int i = S->f->deg-1-u->deg; i < S->nsm; i++)
+                        mpz_addmul (l, data->smlogs[side][i], u->coeff[S->f->deg-1-i]);
+                } else {
+                    for(int i = 0; i < S->nsm; i++)
+                        mpz_addmul (l, data->smlogs[side][i], u->coeff[i]);
+                }
                 mpz_mod(l, l, ell);
                 mpz_poly_clear(u);
             }
@@ -1169,6 +1173,7 @@ static void declare_usage(param_list pl)
                                      "-nrels parameter)");
   param_list_decl_usage(pl, "partial", "do not reconstruct everything "
                                        "that can be reconstructed");
+  param_list_decl_usage(pl, "--legacy-sm", "use legacy sm choice");
   param_list_decl_usage(pl, "nsm", "number of SM's to add on side 0,1,...");
   param_list_decl_usage(pl, "mt", "number of threads (default 1)");
   param_list_decl_usage(pl, "wanted", "file containing list of wanted logs");
@@ -1211,6 +1216,8 @@ main(int argc, char *argv[])
   declare_usage(pl);
   argv++,argc--;
 
+  int want_legacy_sm;
+  param_list_configure_switch(pl, "--legacy-sm", &want_legacy_sm);
   param_list_configure_switch(pl, "partial", &partial);
   param_list_configure_switch(pl, "force-posix-threads", &filter_rels_force_posix_threads);
 
@@ -1348,6 +1355,8 @@ main(int argc, char *argv[])
   for (int side = 0; side < poly->nb_polys; side++)
   {
     sm_side_info_init(sm_info[side], poly->pols[side], ell);
+    if (want_legacy_sm)
+        sm_side_info_set_legacy_mode(sm_info[side]);
     fprintf(stdout, "\n# Polynomial on side %d:\n# F[%d] = ", side, side);
     mpz_poly_fprintf(stdout, poly->pols[side]);
     printf("# SM info on side %d:\n", side);
