@@ -3142,6 +3142,7 @@ void matmul_top_report(matmul_top_data_ptr mmt, double scale)
             }
         }
         serialize(mmt->pi->m);
+        free(all_reports);
     }
 }
 
