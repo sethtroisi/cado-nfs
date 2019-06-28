@@ -382,7 +382,7 @@ void sm_side_info_init(sm_side_info_ptr sm, mpz_poly_srcptr f0, mpz_srcptr ell)
 
 void sm_side_info_set_mode(sm_side_info_ptr sm, const char * mode_string)
 {
-    if (strcmp(mode_string, "default") == 0) {
+    if (mode_string == NULL || strcmp(mode_string, "default") == 0) {
         sm->mode = SM_MODE_2018;
     } else if (strcmp(mode_string, "2018") == 0) {
         sm->mode = SM_MODE_2018;
