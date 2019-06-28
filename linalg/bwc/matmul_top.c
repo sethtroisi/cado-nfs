@@ -2954,8 +2954,8 @@ static void matmul_top_read_submatrix(matmul_top_data_ptr mmt, int midx, param_l
                 double t_read = -wct_seconds();
                 if (j / sqread == mmt->pi->m->trank / sqread)
                     cache_loaded = matmul_reload_cache(Mloc->mm);
+                serialize(mmt->pi->m);
                 t_read += wct_seconds();
-                serialize_threads(mmt->pi->m);
                 if (mmt->pi->m->jrank == 0 && mmt->pi->m->trank == j && cache_loaded) {
                     printf("[%s] J%uT%u-%u: read cache %s (and others) in %.2fs (round %u/%u)\n",
                     mmt->pi->nodenumber_s,
@@ -2971,8 +2971,8 @@ static void matmul_top_read_submatrix(matmul_top_data_ptr mmt, int midx, param_l
         } else {
             double t_read = -wct_seconds();
             cache_loaded = matmul_reload_cache(Mloc->mm);
+            serialize(mmt->pi->m);
             t_read += wct_seconds();
-            serialize_threads(mmt->pi->m);
             if (mmt->pi->m->jrank == 0 && mmt->pi->m->trank == 0 && cache_loaded) {
                 printf("[%s] J%u: read cache %s (and others) in %.2fs\n",
                         mmt->pi->nodenumber_s,
