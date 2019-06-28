@@ -55,9 +55,8 @@ slaves.hostnames = localhost
 
 tasks.polyselect.import = $POLYFILE
 
-tasks.galois = _y
-tasks.sieve.freerel.pmax=3
-tasks.lcideals = true
+tasks.sieve.freerel.pmax=1
+tasks.sm_mode = 2019rev
 
 tasks.I = 10
 tasks.polyselect.degree = 4
@@ -75,10 +74,8 @@ lpb1 = 15
 tasks.sieve.mfb0 = 17
 tasks.sieve.mfb1 = 17
 tasks.sieve.qrange = 100
-# tasks.sieve.rels_wanted = 10000
+tasks.sieve.rels_wanted = 100000
 
-tasks.linalg.allow_zero_on_rhs = 1
-tasks.reconstructlog.partial = true
 checkdlp = false
 EOF
 
