@@ -285,7 +285,7 @@ while (my ($k,$v) = each %$param) {
     if ($k eq 'mpi_extra_args') { $mpi_extra_args=$v; next; }
     ## if ($k eq 'force_complete') { $force_complete=$v; next; }
     if ($k eq 'stop_at_step') {
-        die "stop_at_step requires :complete" unless $main eq ':complete';
+        die "stop_at_step requires :complete" unless $main =~ /^(?::srun)?:complete/;
         $stop_at_step=$v;
         next;
     }
@@ -439,7 +439,7 @@ if (!defined($random_matrix)) {
         push @main_args, "wdir=$wdir";
     }
 
-    if ($main !~ /^:(?:complete|bench)$/ && !-d $param->{'wdir'}) {
+    if ($main !~ /^(?::srun)?:(?:complete|bench)$/ && !-d $param->{'wdir'}) {
         die "$param->{'wdir'}: no such directory";
     }
 }
@@ -924,6 +924,7 @@ if ($mpi_needed) {
 	}
         # quirk
         $main =~ s/^:srun://;
+        $main =~ s/^complete/:complete/;
     } else {
         # Otherwise we'll start via mpiexec, and we need to be informed
         # on the list of nodes.
