@@ -757,22 +757,35 @@ class DescentUpperClass(object):
         if os.path.exists(relsfilename):
             processes = [important_file(relsfilename,[])]
         else:
+            fbcfilename = os.path.join(tmpdir, prefix + "fbc")
+            call_common = [ general.las_bin(),
+                      "-poly", polyfilename,
+                      "-lim0", self.lim,
+                      "-lim1", self.lim,
+                      "-lpb0", self.lpb,
+                      "-lpb1", self.lpb,
+                      "-mfb0", self.mfb,
+                      "-mfb1", self.mfb,
+                      "-ncurves0", self.ncurves,
+                      "-ncurves1", self.ncurves,
+                      "-fbc", fbcfilename,
+                      "-I", self.I
+                ]
+            def fbc_call():
+                call_that = call_common + [
+                        "-q0", self.tkewness,
+                        "-q1", self.tkewness,
+                        "-nq", 0,
+                        "-t", "machine,1,pu"
+                ]
+                call_that = [str(x) for x in call_that]
+                return call_that
             def construct_call(q0,q1):
-                call_that = [ general.las_bin(),
-                          "-poly", polyfilename,
-                          "-lim0", self.lim,
-                          "-lim1", self.lim,
-                          "-lpb0", self.lpb,
-                          "-lpb1", self.lpb,
-                          "-mfb0", self.mfb,
-                          "-mfb1", self.mfb,
-                          "-ncurves0", self.ncurves,
-                          "-ncurves1", self.ncurves,
-                          "-I", self.I,
+                call_that = call_common + [
                           "-q0", q0,
                           "-q1", q1,
                           "--exit-early", 2,
-                          "-t", 4
+                          "-t", "auto"
                 ]
                 call_that = [str(x) for x in call_that]
                 return call_that
@@ -780,6 +793,25 @@ class DescentUpperClass(object):
             call_params = [(os.path.join(relsfilename+"."+str(i)), # outfile
                             self.tkewness+100000*i, #q0
                             self.tkewness+100000*(i+1)) for i in range(self.slaves)] #q1
+
+            if not os.path.exists(fbcfilename):
+                all_ok = True
+                for t in call_params:
+                    if not os.path.exists(t[0]):
+                        all_ok = False
+                        break
+
+                if all_ok:
+                    print (" - Using %s" % fbcfilename)
+                else:
+                    print (" - Factor base cache -")
+                    with open(os.devnull, 'w') as devnull:
+                        subprocess.check_call(fbc_call(), stdout=devnull)
+                    print (" - done -")
+
+            # Whether or not the output files are already present, this
+            # will do the right thing and run the new processes only if
+            # needed.
             processes = [important_file(outfile, construct_call(q0,q1)) for (outfile,q0,q1) in call_params]
 
         q = Queue()
