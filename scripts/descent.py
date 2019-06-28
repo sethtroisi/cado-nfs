@@ -55,6 +55,8 @@ import random
 from queue import Queue, Empty
 from threading import Thread
 
+has_hwloc = None
+
 # This gives the boring info about the file names for everything, and
 # the boilerplate arguments to be fed to binaries.
 class GeneralClass(object):
@@ -779,7 +781,7 @@ class DescentUpperClass(object):
                         "-q0", self.tkewness,
                         "-q1", self.tkewness,
                         "-nq", 0,
-                        "-t", "machine,1,pu"
+                        "-t", "machine,1,pu" if has_hwloc else "4"
                 ]
                 call_that = [str(x) for x in call_that]
                 return call_that
@@ -788,7 +790,7 @@ class DescentUpperClass(object):
                           "-q0", q0,
                           "-q1", q1,
                           "--exit-early", 2,
-                          "-t", "auto"
+                          "-t", "auto" if has_hwloc else "4"
                 ]
                 call_that = [str(x) for x in call_that]
                 return call_that
@@ -1063,6 +1065,7 @@ class DescentMiddleClass(object):
                 "--mfb0", self.args.mfb0,
                 "--lpb1", general.lpb1(),
                 "--mfb1", self.args.mfb1,
+                "-t", "machine,1,pu" if has_hwloc else "4"
              ]
         s += [ "--todo", todofile ]
         call_that=[str(x) for x in s]
@@ -1364,6 +1367,15 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     sys.stdout = drive_me_crazy(sys.stdout, args.timestamp)
+
+    las_bin = os.path.join(args.cadobindir, "sieve", "las")
+    cp = subprocess.Popen([ las_bin, "-help" ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE)
+    if re.search("unused, needs hwloc", cp.stderr.read().decode()):
+        has_hwloc = False
+    else:
+        has_hwloc = True
 
 
     general = GeneralClass(args)
