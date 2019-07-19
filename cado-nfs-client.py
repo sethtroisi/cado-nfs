@@ -1490,6 +1490,8 @@ if __name__ == '__main__':
         parser.add_option("--override", nargs=2, action='append',
                           metavar=('REGEXP', 'VALUE'),
                           help="Modify command-line arguments which match ^-{1,2}REGEXP$ to take the given VALUE. Note that REGEXP cannot start with a dash")
+        parser.add_option("--logdate", default=True, action='store_true',
+                          help="Include ISO8601 format date in logging")
         # Parse command line
         (options, args) = parser.parse_args()
 
@@ -1568,7 +1570,12 @@ if __name__ == '__main__':
         logfilename = "%s/%s.log" % (SETTINGS["WORKDIR"], SETTINGS["CLIENTID"])
         SETTINGS["LOGFILE"] = logfilename
     logfile = None if logfilename is None else open(logfilename, "a")
-    logging.basicConfig(level=loglevel)
+    if options.logdate:
+        logging.basicConfig(
+            format='%(asctime)s - %(levelname)s:%(name)s:%(message)s',
+            level=loglevel)
+    else:
+        logging.basicConfig(level=loglevel)
     if logfile:
         logging.getLogger().addHandler(logging.StreamHandler(logfile))
     logging.info("Starting client %s", SETTINGS["CLIENTID"])
