@@ -35,8 +35,6 @@ from string import Template
 from io import BytesIO
 
 
-import re
-
 cado_python_libs_path="@CMAKE_INSTALL_PREFIX@/@LIBSUFFIX@/scripts/cadofactor"
 if not re.search("^/", cado_python_libs_path):
     cado_python_libs_path=os.path.join(os.path.dirname(sys.argv[0]),"scripts","cadofactor")
