@@ -1424,8 +1424,8 @@ REQUIRED_SETTINGS = {"SERVER" : (None, "Base URL for WU server")}
 
 # Optional settings with defaults, overrideable on command line,
 # and a help text
-OPTIONAL_SETTINGS = {"WU_FILENAME" :
-                     (None, "Filename under which to store WU files"),
+OPTIONAL_SETTINGS = {"WU_FILENAME" : (None, "Filename under which to store WU "
+                                            "files"),
                      "CLIENTID" : (None, "Unique ID for this client. If not "
                                    "specified, a default of "
                                    "<hostname>.<random hex number> is used"),
@@ -1452,9 +1452,9 @@ OPTIONAL_SETTINGS = {"WU_FILENAME" :
                      ("0", "Run subprocesses under this niceness"),
                      "LOGLEVEL" : ("INFO", "Verbosity of logging"),
                      "LOGFILE" : (None, "File to which to write log output. "
-                                  "In demon mode, if no file is specified, a "
-                                  "default of <workdir>/<clientid>.log is used")
-                     }
+                                  "In daemon mode, if no file is specified, a "
+                                  "default of <workdir>/<clientid>.log is used"),
+}
 # Merge the two, removing help string
 SETTINGS = dict([(a, b) for (a, (b, c)) in list(REQUIRED_SETTINGS.items()) + \
                                         list(OPTIONAL_SETTINGS.items())])
