@@ -609,10 +609,11 @@ def run_command(command, print_error=True, **kwargs):
     """ Run command, wait for it to finish, return exit status, stdout
     and stderr
 
+    If a KeyboardInterrupt exception occurs while waiting for the command to
+    finish, the command is terminated.
+
     If print_error is True and the command exits with a non-zero exit code,
-    print stdout and stderr to the log. If a KeyboardInterrupt exception
-    occurs while waiting for the command to finish, the command is
-    terminated.
+    print stdout and stderr to the log.
     """
 
     command_str = command if isinstance(command, str) else " ".join(command)
@@ -684,9 +685,6 @@ class WorkunitProcessor(object):
     def  __str__(self):
         return "Processor for Workunit:\n%s" % super(WorkunitProcessor, self)
 
-    def renice(self):
-        os.nice(int(self.settings["NICENESS"]))
-
     @staticmethod
     def is_executable(filename):
         """ Test that the file exists and, if the stat object knows the
@@ -713,6 +711,19 @@ class WorkunitProcessor(object):
             if WorkunitProcessor.is_executable(tryname):
                 return tryname
         return None
+
+    def preexec_func(self):
+        # If niceness command line parameter was set, call self.renice()
+        # in child process, before executing command
+        if int(self.settings["NICENESS"]) > 0:
+            os.nice(int(self.settings["NICENESS"]))
+
+        # Don't forward signals, This allows us to use SIGQUIT (Ctrl+\) and
+        # SIGTSPT (Ctrl+Z) to signal quit-after-current-WU-finishes. without
+        # this SIGTSPT/SIGQUIT are passed to the child and child stops/quits.
+        if self.settings["CTRLZ"]:
+            # Don't forward signals
+            os.setpgrp()
 
     def run_commands(self):
         if self.result_exists():
@@ -753,13 +764,6 @@ class WorkunitProcessor(object):
         for (counter, command) in enumerate(self.workunit.get("COMMAND", [])):
             command = Template(command).safe_substitute(files)
 
-            # If niceness command line parameter was set, call self.renice()
-            # in child process, before executing command
-            if int(self.settings["NICENESS"]) > 0:
-                renice_func = self.renice
-            else:
-                renice_func = None
-
             # to override several parameters, use:
             # --override t 1 --override bkthresh1 15000000
             if self.settings["override"]:
@@ -786,9 +790,10 @@ class WorkunitProcessor(object):
                     mangled.append(v)
                 command=' '.join(mangled)
 
-
-            (returncode, stdout, stderr) = run_command(command, shell=True,
-                    preexec_fn=renice_func)
+            (returncode, stdout, stderr) = run_command(
+                command,
+                shell=True,
+                preexec_fn=self.preexec_func)
 
             self.stdio["stdout"].append(stdout)
             self.stdio["stderr"].append(stderr)
@@ -1494,6 +1499,10 @@ if __name__ == '__main__':
                           help="Modify command-line arguments which match ^-{1,2}REGEXP$ to take the given VALUE. Note that REGEXP cannot start with a dash")
         parser.add_option("--logdate", default=True, action='store_true',
                           help="Include ISO8601 format date in logging")
+        parser.add_option("--noctrlz", default=False, action='store_true',
+                          help="Pass SIGTSTP/SIGQUIT to children, if not set "
+                          "Ctrl+Z will cause client to stop after current WU "
+                          "is complete.")
         # Parse command line
         (options, args) = parser.parse_args()
 
@@ -1555,6 +1564,7 @@ if __name__ == '__main__':
     SETTINGS["NOSHA1CHECK"] = options.nosha1check
     SETTINGS["USE_EXTERNAL_DL"] = options.externdl
     SETTINGS["NO_CN_CHECK"] = options.nocncheck
+    SETTINGS["CTRLZ"] = not options.noctrlz
 
     # Create download and working directories if they don't exist
     if not os.path.isdir(SETTINGS["DLDIR"]):
@@ -1624,6 +1634,14 @@ if __name__ == '__main__':
     if still_need_cert:
         get_missing_certificate(certfilename, netloc, SETTINGS["CERTSHA1"],
                 retry=True, retrytime=SETTINGS["DOWNLOADRETRY"])
+
+    def sigstop_handler(sig, frame):
+        logging.info("Caught SIGQUIT/SIGTSTP, will stop after current WU")
+        options.single = True
+
+    if SETTINGS["CTRLZ"]:
+        signal.signal(signal.SIGTSTP , sigstop_handler)
+        signal.signal(signal.SIGQUIT , sigstop_handler)
 
     client_ok = True
     bad_wu_counter = 0
