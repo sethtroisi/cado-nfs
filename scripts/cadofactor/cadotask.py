@@ -2425,7 +2425,7 @@ class Polysel2Task(ClientServerTask, HasStatistics, DoesImport, patterns.Observe
     def get_will_import(self):
         return "import" in self.params
 
-class PolyselJLTask(ClientServerTask, patterns.Observer):
+class PolyselJLTask(ClientServerTask, DoesImport, patterns.Observer):
     """ Find a polynomial pair using Joux-Lercier for DL in GF(p), uses client/server """
     @property
     def name(self):
@@ -2450,6 +2450,8 @@ class PolyselJLTask(ClientServerTask, patterns.Observer):
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator=mediator, db=db, parameters=parameters,
                          path_prefix=path_prefix)
+        if "import" in self.params:
+            self.logger.warning('Have "import" parameter')
         assert self.params["nrkeep"] > 0
         self.state["rnext"] = self.state.get("rnext", 0)
         qmin = self.params["qmin"]
@@ -2467,20 +2469,22 @@ class PolyselJLTask(ClientServerTask, patterns.Observer):
             
     def run(self):
         super().run()
+       
+        if not "import" in self.params:
+            if self.is_done():
+                self.logger.info("Already finished - nothing to do")
+                return True
+            
+            # Submit all the WUs we need to reach the final modr
+            while self.need_more_wus():
+                self.submit_one_wu()
+            
+            # Wait for all the WUs to finish
+            while self.get_number_outstanding_wus() > 0:
+                self.wait()
+            
+            self.logger.info("Finished")
 
-        if self.is_done():
-            self.logger.info("Already finished - nothing to do")
-            return True
-        
-        # Submit all the WUs we need to reach the final modr
-        while self.need_more_wus():
-            self.submit_one_wu()
-        
-        # Wait for all the WUs to finish
-        while self.get_number_outstanding_wus() > 0:
-            self.wait()
-        
-        self.logger.info("Finished")
         filename = self.workdir.make_filename("poly")
         self.bestpoly.create_file(filename)
         self.state["polyfilename"] = filename.get_wdir_relative()
