@@ -487,7 +487,7 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
                         // if (tcan_print) printf("v:=M*v;\n");
                         matmul_top_mul(mmt, ymy, timing);
 
-                        timing_check(pi, timing, bw->start + sx - s1 + k + 1, tcan_print);
+                        timing_check(pi, timing, s + sx - s1 + k + 1, tcan_print);
                     }
                 }
 
@@ -497,7 +497,7 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
                 pi_interleaving_flip(pi);
 
             // reached s + bw->interval. Count our time on cpu, and compute the sum.
-            timing_disp_collective_oneline(pi, timing, bw->start + sx - s0, tcan_print, "mksol");
+            timing_disp_collective_oneline(pi, timing, s + sx - s0, tcan_print, "mksol");
         }
 
         mmt_vec_untwist(mmt, ymy[0]);
