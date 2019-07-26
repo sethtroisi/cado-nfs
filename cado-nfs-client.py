@@ -35,8 +35,6 @@ from string import Template
 from io import BytesIO
 
 
-import re
-
 cado_python_libs_path="@CMAKE_INSTALL_PREFIX@/@LIBSUFFIX@/scripts/cadofactor"
 if not re.search("^/", cado_python_libs_path):
     cado_python_libs_path=os.path.join(os.path.dirname(sys.argv[0]),"scripts","cadofactor")
@@ -1426,37 +1424,30 @@ REQUIRED_SETTINGS = {"SERVER" : (None, "Base URL for WU server")}
 
 # Optional settings with defaults, overrideable on command line, 
 # and a help text
-OPTIONAL_SETTINGS = {"WU_FILENAME" : 
-                     (None, "Filename under which to store WU files"), 
-                     "CLIENTID" : (None, "Unique ID for this client. If not "
-                                   "specified, a default of "
-                                   "<hostname>.<random hex number> is used"), 
-                     "DLDIR" : ('download/', "Directory for downloading files"),
-                     "WORKDIR" : (None, "Directory for result files"),
-                     "BINDIR" : (None, "Directory with existing executable "
-                                       "files to use"),
-                     "BASEPATH" : (None, "Base directory for download and work "
-                                         "directories"),
-                     "GETWUPATH" : 
-                     ("/cgi-bin/getwu", 
-                      "Path segment of URL for requesting WUs from server"), 
-                     "POSTRESULTPATH" : 
-                     ("/cgi-bin/upload.py", 
-                      "Path segment of URL for reporting results to server"), 
-                     "DEBUG" : ("0", "Debugging verbosity"),
-                     "ARCH" : ("", "Architecture string for this client"),
-                     "DOWNLOADRETRY" : 
-                     ("10", "Time to wait before download retries"),
-                     "CERTSHA1" : (None, "SHA1 of server SSL certificate"),
-                     "SILENT_WAIT": (None, "Discard repeated messages about client waiting for work (does not affect uploads)"),
-                     "MAX_CONNECTION_FAILURES" : ("999999", "Maximum number of successive connection failures to tolerate"),
-                     "NICENESS" : 
-                     ("0", "Run subprocesses under this niceness"),
-                     "LOGLEVEL" : ("INFO", "Verbosity of logging"),
-                     "LOGFILE" : (None, "File to which to write log output. "
-                                  "In demon mode, if no file is specified, a "
-                                  "default of <workdir>/<clientid>.log is used")
-                     }
+OPTIONAL_SETTINGS = {
+    "WU_FILENAME" : (None, "Filename under which to store WU files"),
+    "CLIENTID" : (None, "Unique ID for this client. If not specified, "
+                        "a default of <hostname>.<random hex number> is used"),
+    "DLDIR" : ('download/', "Directory for downloading files"),
+    "WORKDIR" : (None, "Directory for result files"),
+    "BINDIR" : (None, "Directory with existing executable files to use"),
+    "BASEPATH" : (None, "Base directory for download and work directories"),
+    "GETWUPATH" : ("/cgi-bin/getwu",
+                   "Path segment of URL for requesting WUs from server"),
+    "POSTRESULTPATH" : ("/cgi-bin/upload.py",
+                        "Path segment of URL for reporting results to server"),
+    "DEBUG" : ("0", "Debugging verbosity"),
+    "ARCH" : ("", "Architecture string for this client"),
+    "DOWNLOADRETRY" : ("10", "Time to wait before download retries"),
+    "CERTSHA1" : (None, "SHA1 of server SSL certificate"),
+    "SILENT_WAIT": (None, "Discard repeated messages about client waiting for work (does not affect uploads)"),
+    "MAX_CONNECTION_FAILURES" : ("999999", "Maximum number of successive connection failures to tolerate"),
+    "NICENESS" : ("0", "Run subprocesses under this niceness"),
+    "LOGLEVEL" : ("INFO", "Verbosity of logging"),
+    "LOGFILE" : (None, "File to which to write log output. "
+                 "In daemon mode, if no file is specified, a "
+                 "default of <workdir>/<clientid>.log is used"),
+}
 # Merge the two, removing help string
 SETTINGS = dict([(a, b) for (a, (b, c)) in list(REQUIRED_SETTINGS.items()) + \
                                         list(OPTIONAL_SETTINGS.items())])
