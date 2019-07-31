@@ -1,5 +1,5 @@
 #include "cado.h"
-#include <stdio.h>
+#include <cstdio>
 #include "bwc_config.h"
 #include "parallelizing_info.h"
 #include "matmul_top.h"
@@ -15,48 +15,6 @@
 
 /* We merely have to build up a check vector. We've got a fairly easy
  * candidate for that: the x vector.  */
-
-#if 0
-void save_untwisted_transposed_vector(matmul_top_data_ptr mmt, const char * name, int d, int iter)
-{
-    mmt_comm_ptr mcol = mmt->wr[!d];
-    mmt_comm_ptr mrow = mmt->wr[d];
-    pi_comm_ptr picol = mmt->pi->wr[!d];
-    pi_comm_ptr pirow = mmt->pi->wr[d];
-
-    // v ---> Pr^-1*Sr^-1*v
-    matmul_top_twist_vector(mmt, d);
-
-    serialize_threads(mmt->pi->m);
-
-    // v ---> Pr*v          [[ Sr^-1 * v ]]
-    if (pirow->trank == 0 || !(mrow->v->flags & THREAD_SHARED_VECTOR)) {
-        if (pirow->jrank == 0 && pirow->trank == 0) {
-            /* ok, we keep the data */
-        } else {
-            abzero(mmt->abase, mrow->v->v, mrow->i1 - mrow->i0);
-        }
-    }
-    matmul_top_mul_comm(mmt, !d);
-    serialize_threads(mmt->pi->m);
-
-    mmt_vec_save(mmt, NULL, name, !d, iter);
-    // v --> Pr^-1 * v      [[ Pr^-1*Sr^-1*v ]]
-    if (picol->trank == 0 || !(mcol->v->flags & THREAD_SHARED_VECTOR)) {
-        if (picol->jrank == 0 && picol->trank == 0) {
-            /* ok, we keep the data */
-        } else {
-            abzero(mmt->abase, mcol->v->v, mcol->i1 - mcol->i0);
-        }
-    }
-    matmul_top_mul_comm(mmt, d);
-    serialize_threads(mmt->pi->m);
-
-    // v --> Sr*Pr*v        [[ v ]]
-    matmul_top_untwist_vector(mmt, d);
-    serialize_threads(mmt->pi->m);
-}
-#endif
 
 void * sec_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSED)
 {
@@ -120,25 +78,6 @@ void * sec_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
         }
         free(tmp);
     }
-
-    /*
-    for(int j = 0 ; j < nchecks ; j++) {
-        for(unsigned int k = 0 ; k < nx ; k++) {
-            uint32_t i = gxvecs[j*nx+k];
-            // set bit j of entry i to 1.
-            if (i < mrow->i0 || i >= mrow->i1)
-                continue;
-            abt * where;
-            where = mrow->v->v + aboffset(abase, i-mrow->i0);
-            abset_ui(abase, where, j, 1);
-        }
-    }
-    */
-    // mmt_vec_allreduce(mmt, !bw->dir);
-
-    // matmul_top_twist_vector(mmt, !bw->dir);
-    // mmt_vec_save(mmt, NULL, "ux", !bw->dir, 0);
-    // save_untwisted_transposed_vector(mmt, "tx", !bw->dir, 0);
 
     serialize_threads(pi->m);
     if (pi->m->trank == 0) {
