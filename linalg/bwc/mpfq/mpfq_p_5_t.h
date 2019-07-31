@@ -158,11 +158,11 @@
 
 /* Object-oriented interface */
 #ifdef COMPILE_MPFQ_PRIME_FIELD_p_5
-void mpfq_p_5_p_5_wrapper_dotprod(mpfq_vbase_ptr, mpfq_vbase_ptr, mpfq_p_5_dst_vec, mpfq_p_5_src_vec, mpfq_p_5_src_vec, unsigned int);
+void mpfq_p_5_p_5_wrapper_add_dotprod(mpfq_vbase_ptr, mpfq_vbase_ptr, mpfq_p_5_dst_vec, mpfq_p_5_src_vec, mpfq_p_5_src_vec, unsigned int);
 #endif /* COMPILE_MPFQ_PRIME_FIELD_p_5 */
 
 #ifdef COMPILE_MPFQ_PRIME_FIELD_p_5
-void mpfq_p_5_p_5_dotprod(mpfq_p_5_dst_field, mpfq_p_5_dst_field, mpfq_p_5_dst_vec, mpfq_p_5_src_vec, mpfq_p_5_src_vec, unsigned int);
+void mpfq_p_5_p_5_add_dotprod(mpfq_p_5_dst_field, mpfq_p_5_dst_field, mpfq_p_5_dst_vec, mpfq_p_5_src_vec, mpfq_p_5_src_vec, unsigned int);
 #endif /* COMPILE_MPFQ_PRIME_FIELD_p_5 */
 
 #ifdef COMPILE_MPFQ_PRIME_FIELD_p_5

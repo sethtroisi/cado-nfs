@@ -158,11 +158,11 @@
 
 /* Object-oriented interface */
 #ifdef COMPILE_MPFQ_PRIME_FIELD_p_3
-void mpfq_p_3_p_3_wrapper_dotprod(mpfq_vbase_ptr, mpfq_vbase_ptr, mpfq_p_3_dst_vec, mpfq_p_3_src_vec, mpfq_p_3_src_vec, unsigned int);
+void mpfq_p_3_p_3_wrapper_add_dotprod(mpfq_vbase_ptr, mpfq_vbase_ptr, mpfq_p_3_dst_vec, mpfq_p_3_src_vec, mpfq_p_3_src_vec, unsigned int);
 #endif /* COMPILE_MPFQ_PRIME_FIELD_p_3 */
 
 #ifdef COMPILE_MPFQ_PRIME_FIELD_p_3
-void mpfq_p_3_p_3_dotprod(mpfq_p_3_dst_field, mpfq_p_3_dst_field, mpfq_p_3_dst_vec, mpfq_p_3_src_vec, mpfq_p_3_src_vec, unsigned int);
+void mpfq_p_3_p_3_add_dotprod(mpfq_p_3_dst_field, mpfq_p_3_dst_field, mpfq_p_3_dst_vec, mpfq_p_3_src_vec, mpfq_p_3_src_vec, unsigned int);
 #endif /* COMPILE_MPFQ_PRIME_FIELD_p_3 */
 
 #ifdef COMPILE_MPFQ_PRIME_FIELD_p_3

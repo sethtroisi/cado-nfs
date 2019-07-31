@@ -232,7 +232,7 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
 
         if (!bw->skip_online_checks) {
             A->vec_set_zero(A, ahead, nchecks);
-            AxAc->dotprod(A, Ac, ahead,
+            AxAc->add_dotprod(A, Ac, ahead,
                     mmt_my_own_subvec(check_vector),
                     mmt_my_own_subvec(ymy[0]),
                     mmt_my_own_size_in_items(ymy[0]));

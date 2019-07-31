@@ -147,7 +147,8 @@ void * dispatch_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_
         how_many = intersect_two_intervals(&offset_c, &offset_v,
                 my->i0, my->i1,
                 y->i0, y->i1);
-        A->dotprod(A, dp0,
+        A->vec_set_zero(A, dp0, A->simd_groupsize(A));
+        A->add_dotprod(A, dp0,
                 A->vec_subvec(A, my->v, offset_c),
                 A->vec_subvec(A, y->v, offset_v),
                 how_many);
@@ -179,7 +180,8 @@ void * dispatch_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_
             uint64_t value = DUMMY_VECTOR_COORD_VALUE(i);
             memcpy(dst, &value, sizeof(uint64_t));
         }
-        A->dotprod(A, dp1,
+        A->vec_set_zero(A, dp1, A->simd_groupsize(A));
+        A->add_dotprod(A, dp1,
                 A->vec_subvec(A, my->v, offset_c),
                 A->vec_subvec(A, y->v, offset_v),
                 how_many);

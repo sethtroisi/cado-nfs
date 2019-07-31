@@ -368,14 +368,15 @@ void * check_prog(param_list pl MAYBE_UNUSED, int argc, char * argv[])
                     Av->vec_set_zero(Av, dotprod_scratch[0], nchecks);
 
                     /* compute the dot product */
-                    AvxAc->dotprod(Av, Ac, 
+                    AvxAc->add_dotprod(Av, Ac, 
                             dotprod_scratch[0],
                             Cv_i1, Vv, vsize);
 
                     vec_read(Ac, Vv, Vs[j].c_str(), vsize, "   ");
                     Vv_iter = Vs[j].n;
 
-                    AvxAc->dotprod(Av, Ac, 
+                    Av->vec_set_zero(Av, dotprod_scratch[1], nchecks);
+                    AvxAc->add_dotprod(Av, Ac, 
                             dotprod_scratch[1],
                             Cv_i0, Vv, vsize);
 

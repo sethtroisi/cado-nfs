@@ -695,7 +695,9 @@ void * bl_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSED
              *  A * V_n         mcol->v
              */
 
-            AxA->dotprod(A, A, vav,
+            A->vec_set_zero(A, vav, nelts_for_nnmat);
+
+            AxA->add_dotprod(A, A, vav,
                     mmt_my_own_subvec(bl->V[i0]),
                     mmt_my_own_subvec(bl->y),
                     mmt_my_own_size_in_items(bl->y));
@@ -703,7 +705,9 @@ void * bl_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSED
             pi_allreduce(NULL, vav,
                     nelts_for_nnmat, bl->mmt->pitype, BWC_PI_SUM, pi->m);
 
-            AxA->dotprod(A, A, vaav,
+            A->vec_set_zero(A, vav, nelts_for_nnmat);
+
+            AxA->add_dotprod(A, A, vaav,
                     mmt_my_own_subvec(bl->y),
                     mmt_my_own_subvec(bl->y),
                     mmt_my_own_size_in_items(bl->y));

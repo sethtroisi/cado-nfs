@@ -156,20 +156,20 @@
 /* Object-oriented interface */
 #ifdef COMPILE_MPFQ_PRIME_FIELD_pz
 /* Mpfq::engine::handler::create_code */
-void mpfq_pz_pz_wrapper_dotprod(mpfq_vbase_ptr K0 MAYBE_UNUSED, mpfq_vbase_ptr K1 MAYBE_UNUSED, mpfq_pz_dst_vec xw, mpfq_pz_src_vec xu1, mpfq_pz_src_vec xu0, unsigned int n)
+void mpfq_pz_pz_wrapper_add_dotprod(mpfq_vbase_ptr K0 MAYBE_UNUSED, mpfq_vbase_ptr K1 MAYBE_UNUSED, mpfq_pz_dst_vec xw, mpfq_pz_src_vec xu1, mpfq_pz_src_vec xu0, unsigned int n)
 {
-    mpfq_pz_pz_dotprod(K0->obj, K1->obj, xw, xu1, xu0, n);
+    mpfq_pz_pz_add_dotprod(K0->obj, K1->obj, xw, xu1, xu0, n);
 }
 #endif /* COMPILE_MPFQ_PRIME_FIELD_pz */
 
 #ifdef COMPILE_MPFQ_PRIME_FIELD_pz
-/* *simd_pz::code_for_member_template_dotprod */
-void mpfq_pz_pz_dotprod(mpfq_pz_dst_field K0 MAYBE_UNUSED, mpfq_pz_dst_field K1 MAYBE_UNUSED, mpfq_pz_dst_vec xw, mpfq_pz_src_vec xu1, mpfq_pz_src_vec xu0, unsigned int n)
+/* *simd_pz::code_for_member_template_add_dotprod */
+void mpfq_pz_pz_add_dotprod(mpfq_pz_dst_field K0 MAYBE_UNUSED, mpfq_pz_dst_field K1 MAYBE_UNUSED, mpfq_pz_dst_vec xw, mpfq_pz_src_vec xu1, mpfq_pz_src_vec xu0, unsigned int n)
 {
         mpfq_pz_elt_ur s,t;
         mpfq_pz_elt_ur_init(K0, &s);
         mpfq_pz_elt_ur_init(K0, &t);
-        mpfq_pz_elt_ur_set_zero(K0, s);
+        mpfq_pz_elt_ur_set_elt(K0, s, mpfq_pz_vec_coeff_ptr(K0, xw, 0));
         for(unsigned int i = 0 ; i < n ; i++) {
             mpfq_pz_mul_ur(K0, t, mpfq_pz_vec_coeff_ptr_const(K0, xu0, i), mpfq_pz_vec_coeff_ptr_const(K1, xu1, i));
             mpfq_pz_elt_ur_add(K0, s, s, t);

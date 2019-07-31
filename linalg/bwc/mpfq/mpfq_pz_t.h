@@ -156,11 +156,11 @@
 
 /* Object-oriented interface */
 #ifdef COMPILE_MPFQ_PRIME_FIELD_pz
-void mpfq_pz_pz_wrapper_dotprod(mpfq_vbase_ptr, mpfq_vbase_ptr, mpfq_pz_dst_vec, mpfq_pz_src_vec, mpfq_pz_src_vec, unsigned int);
+void mpfq_pz_pz_wrapper_add_dotprod(mpfq_vbase_ptr, mpfq_vbase_ptr, mpfq_pz_dst_vec, mpfq_pz_src_vec, mpfq_pz_src_vec, unsigned int);
 #endif /* COMPILE_MPFQ_PRIME_FIELD_pz */
 
 #ifdef COMPILE_MPFQ_PRIME_FIELD_pz
-void mpfq_pz_pz_dotprod(mpfq_pz_dst_field, mpfq_pz_dst_field, mpfq_pz_dst_vec, mpfq_pz_src_vec, mpfq_pz_src_vec, unsigned int);
+void mpfq_pz_pz_add_dotprod(mpfq_pz_dst_field, mpfq_pz_dst_field, mpfq_pz_dst_vec, mpfq_pz_src_vec, mpfq_pz_src_vec, unsigned int);
 #endif /* COMPILE_MPFQ_PRIME_FIELD_pz */
 
 #ifdef COMPILE_MPFQ_PRIME_FIELD_pz
