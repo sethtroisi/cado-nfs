@@ -2412,6 +2412,26 @@ void mmt_vec_set_x_indices(mmt_vec_ptr y, uint32_t * gxvecs, int m, unsigned int
         serialize_threads(y->pi->wr[y->d]);
 }
 
+/* Set to the zero vector, except for the first n entries that are taken
+ * from the vector v
+ */
+void mmt_vec_set_expanded_copy_of_local_data(mmt_vec_ptr y, const void * v, unsigned int n)
+{
+    int shared = !y->siblings;
+    mpfq_vbase_ptr A = y->abase;
+    mmt_full_vec_set_zero(y);
+    if (!shared || y->pi->wr[y->d]->trank == 0) {
+        for(unsigned int i = y->i0 ; i < y->i1 && i < n ; i++) {
+            A->set(A,
+                    A->vec_coeff_ptr(A, y->v, i - y->i0),
+                    A->vec_coeff_ptr_const(A, v, i));
+        }
+    }
+    y->consistency=2;
+    if (shared)
+        serialize_threads(y->pi->wr[y->d]);
+}
+
 
 
 /**********************************************************************/

@@ -118,7 +118,7 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
     }
     /* }}} */
 
-    /* {{{ For the vectors which we read from disk and which participate to
+    /* {{{ For the vectors which we read from disk and which participate in
      *   the coefficients which get added to the computation at each
      *   iteration: we need n vectors -- or n/64 for the binary case.
      */

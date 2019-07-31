@@ -201,7 +201,7 @@ my $nrhs=0;
 ## example, if libvirt-bin is installed on a linux system, openmpi will
 ## need the following additions.
 ##    
-## ./build/x86_64/linalg/bwc/bwc.pl :complete matrix=/net/tiramisu/localdisk/thome/mats/c90b wdir=/local/rsa768/tmp/c59 mn=64 mpi=2x1 thr=2x4 hosts=patate,tiramisu mpi_extra_args='--mca btl_tcp_if_exclude lo,virbr0'
+## ./build/x86_64/linalg/bwc/bwc.pl :complete matrix=/tmp/mats/c90b wdir=/tmp/c59 mn=64 mpi=2x1 thr=2x4 hosts=node0,node1 mpi_extra_args='--mca btl_tcp_if_exclude lo,virbr0'
 ##    
 ## This tells mpi not to try routing traffic through either the lo or the 
 ## virbr0 interface. For the former, it's already openmpi's default
@@ -1728,17 +1728,29 @@ sub subtask_secure {
     if (scalar keys %$wanted_stops) {
         $wanted_stops->{0}=1;
         for (keys %$wanted_stops) {
-            next if $leader_files->{"C0-$splitwidth.$_"};
-            task_check_message 'missing', "missing check vector C0-$splitwidth.$_\n";
-            $mustrun = 1;
+            my @wnames=("Cv0-$splitwidth.$_");
+            push @wnames, "Cd0-$splitwidth.$_" if $_ > 0;
+            for my $name (@wnames) {
+                next if $leader_files->{$name};
+                task_check_message 'missing', "missing check vector $name\n";
+                $mustrun = 1;
+            }
         }
     } else {
         # we can only check for the existence of _some_ check vector.
-        my @x = grep { /^C0-(\d+)\.\d+$/ && ($1 == $splitwidth) && !/^C0-\d+\.0$/ } keys %$leader_files;
-        unless (@x) {
-            task_check_message 'missing', "no check vector found\n";
+        unless (grep { /^Cv0-(\d+)\.\d+$/ && ($1 == $splitwidth) && !/^Cv0-\d+\.0$/ } keys %$leader_files) {
+            task_check_message 'missing', "no check vector (Cv) found\n";
             $mustrun = 1;
         }
+        unless (grep { /^Cd0-(\d+)\.\d+$/ && ($1 == $splitwidth) } keys %$leader_files) {
+            task_check_message 'missing', "no check vector (Cd) found\n";
+            $mustrun = 1;
+        }
+    }
+    for my $name ("Cr0-$splitwidth.0-$splitwidth", "Ct0-$splitwidth.0-$m") {
+        next if $leader_files->{$name};
+        task_check_message 'missing', "missing check vector $name\n";
+        $mustrun = 1;
     }
     if ($mustrun) {
         task_common_run('secure', @main_args);

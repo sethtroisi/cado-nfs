@@ -46,7 +46,6 @@ pass_bwcpl_args=("$@")
 : ${random_matrix_maxcoeff=10}
 : ${random_matrix_minkernel=10}
 : ${mats=$HOME/Local/mats}
-: ${matsfallback=/local/rsa768/mats}
 : ${pre_wipe=}
 : ${seed=$RANDOM}
 : ${balancing_options=reorder=columns}
@@ -140,7 +139,7 @@ argument_checking() {
 }
 
 derived_variables() {
-    if ! [ -d $mats ] ; then mats=$matsfallback; fi
+    if ! [ -d $mats ] ; then mats=$wdir; fi
     if [ "$prime" = 2 ] ; then
         splitwidth=64
     else
@@ -554,12 +553,27 @@ done
 # }}}
 
 echo "Saving check vectors to magma format" # {{{
-if [ -f "$wdir/C0-$splitwidth.0" ] ; then
-    $cmd $magmaprintmode < $wdir/C0-$splitwidth.0 > $mdir/C0.m
-    $cmd $magmaprintmode < $wdir/C0-$splitwidth.$interval > $mdir/Ci.m
+if [ -f "$wdir/Cv0-$splitwidth.0" ] ; then
+    $cmd $magmaprintmode < $wdir/Cv0-$splitwidth.0 > $mdir/Cv0.m
+    $cmd $magmaprintmode < $wdir/Cv0-$splitwidth.$interval > $mdir/Cvi.m
 else
-    echo "var:=0;" > $mdir/C0.m
-    echo "var:=0;" > $mdir/Ci.m
+    echo "var:=0;" > $mdir/Cv0.m
+    echo "var:=0;" > $mdir/Cvi.m
+fi
+if [ -f "$wdir/Cd0-$splitwidth.$interval" ] ; then
+    $cmd $magmaprintmode < $wdir/Cd0-$splitwidth.$interval > $mdir/Cdi.m
+else
+    echo "var:=0;" > $mdir/Cdi.m
+fi
+if [ -f "$wdir/Cr0-$splitwidth.0-$splitwidth" ] ; then
+    $cmd $magmaprintmode < $wdir/Cr0-$splitwidth.0-$splitwidth > $mdir/Cr.m
+else
+    echo "var:=0;" > $mdir/Cr.m
+fi
+if [ -f "$wdir/Ct0-$splitwidth.0-$m" ] ; then
+    $cmd $magmaprintmode < $wdir/Ct0-$splitwidth.0-$m > $mdir/Ct.m
+else
+    echo "var:=0;" > $mdir/Ct.m
 fi
 # }}}
 
@@ -569,13 +583,12 @@ echo "Saving krylov sequence to magma format" # {{{
 afile=(`find $wdir -name 'A*[0-9]' -a -type f`)
 if [ "${#afile[@]}" != 1 ] ; then
     echo "########## FAILURE ! Krylov sequence not finished #############"
-    find $wdir -name 'A*[0-9]' -a -type f | xargs -n 1 echo "### Found file "
-    exit 1
+    find $wdir -name 'A*[0-9]' -a -type f | xargs -r -n 1 echo "### Found file "
+else
+    afile=$(basename "${afile[0]}")
+    $cmd $magmaprintmode < $wdir/$afile > $mdir/A.m
 fi
-afile=$(basename "${afile[0]}")
-$cmd $magmaprintmode < $wdir/$afile > $mdir/A.m
 # }}}
-
 
 echo "Saving linear generator to magma format" # {{{
 #    $cmd spvector64 < $wdir/$afile.gen > $mdir/F.m
@@ -601,6 +614,7 @@ print_all_Ffiles() {
         for s in `seq 0 $splitwidth $((n-1))` ; do
             let s1=s+splitwidth
             basename=F.sols${s}-${s1}.${j}-${j1}
+            if [ -f "$wdir/$basename" ] ; then
             $cmd $magmaprintmode < $wdir/$basename > $mdir/$basename.m
             cat <<-EOF
                 load "$mdir/$basename.m";
@@ -615,6 +629,7 @@ EOF
                         Append(~Rj, g(var));
 EOF
                 fi
+            fi
             fi
         done
         echo "Append(~Fchunks, Fj);"

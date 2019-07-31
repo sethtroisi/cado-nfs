@@ -1,5 +1,5 @@
 #include "cado.h"
-#include <stdio.h>
+#include <cstdio>
 #include "bwc_config.h"
 #include "parallelizing_info.h"
 #include "matmul_top.h"
@@ -169,6 +169,7 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
     ASSERT_ALWAYS(bw->end % bw->interval == 0);
 
     mmt_vec check_vector;
+    void * Tdata = NULL;
     void * ahead = NULL;
 
     mpfq_vbase_tmpl AxAc;
@@ -182,13 +183,21 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
         mmt_vec_init(mmt, Ac, Ac_pi,
                 check_vector, bw->dir, THREAD_SHARED_VECTOR, mmt->n[bw->dir]);
         char * tmp;
-        int rc = asprintf(&tmp, "C%s.%u", "%u-%u", bw->interval);
+        int rc = asprintf(&tmp, "Cv%s.%u", "%u-%u", bw->interval);
         ASSERT_ALWAYS(rc >= 0);
         mmt_vec_load(check_vector, tmp,  mmt->n0[bw->dir], 0);
         free(tmp);
-    }
 
-    if (!bw->skip_online_checks) {
+        char * Tfilename;
+        rc = asprintf(&Tfilename, "Ct0-%u.0-%u", nchecks, bw->m);
+        ASSERT_ALWAYS(rc >= 0);
+        cheating_vec_init(Ac, &Tdata, bw->m);
+        FILE * Tfile = fopen(Tfilename, "rb");
+        rc = fread(Tdata, Ac->vec_elt_stride(Ac, bw->m), 1, Tfile);
+        ASSERT_ALWAYS(rc == 1);
+        fclose(Tfile);
+        if (tcan_print) printf("loaded %s\n", Tfilename);
+
         cheating_vec_init(A, &ahead, nchecks);
     }
 
@@ -231,7 +240,17 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
          * memory */
 
         if (!bw->skip_online_checks) {
+            /* create a matrix of size nchecks * nbys with the dot
+             * product with Cv -- in the case where nbys != nchecks,
+             * dealing with that data will require some care.
+             *
+             */
             A->vec_set_zero(A, ahead, nchecks);
+            /* The syntax of ->dotprod is a bit weird. We compute
+             * transpose(data-operand-0)*data-operand1, but data-operand0
+             * (check_vector here) actually refers to field-operand1 (Ac
+             * here).
+             */
             AxAc->add_dotprod(A, Ac, ahead,
                     mmt_my_own_subvec(check_vector),
                     mmt_my_own_subvec(ymy[0]),
@@ -267,7 +286,22 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
 
         if (!bw->skip_online_checks) {
             /* Last dot product. This must cancel ! */
-            x_dotprod(ahead, gxvecs, nchecks, nx, ymy[0], -1);
+            void * tmp1 = NULL;
+            cheating_vec_init(A, &tmp1, nchecks);
+            for(int c = 0 ; c < bw->m ; c += nchecks) {
+                /* First zero out the matrix of size nchecks * nbys.  */
+                A->vec_set_zero(A, tmp1, nchecks);
+                x_dotprod(tmp1, gxvecs + c * nx, nchecks, nx, ymy[0], -1);
+                /* And now compute the product transpose(part of
+                 * T)*ahead_tmp, and subtract that from our check value
+                 */
+                AxAc->add_dotprod(A, Ac,
+                        ahead,
+                        Ac->vec_subvec(Ac, Tdata, c),
+                        tmp1,
+                        nchecks);
+            }
+            cheating_vec_clear(A, &tmp1, nchecks);
 
             pi_allreduce(NULL, ahead, nchecks, mmt->pitype, BWC_PI_SUM, pi->m);
             if (!A->vec_is_zero(A, ahead, nchecks)) {
@@ -344,6 +378,7 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
     if (!bw->skip_online_checks) {
         mmt_vec_clear(mmt, check_vector);
         cheating_vec_clear(A, &ahead, nchecks);
+        cheating_vec_clear(Ac, &Tdata, bw->m);
     }
 
     free(gxvecs);
