@@ -322,10 +322,11 @@ void * sec_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
          * stdio buffering), while no Cd file has been written yet.
          * Therefore this is mostly a matter of consistency.
          */
-        void * Rdata_stream;
+        void * Rdata_stream = NULL;
         int k0 = k;
         if (!legacy_check_mode) {
             cheating_vec_init(A, &Rdata_stream, nchecks * (next - k0));
+            A->vec_set_zero(A, Rdata_stream, nchecks * (next - k0));
         }
     
         for( ; k < next ; k++) {
