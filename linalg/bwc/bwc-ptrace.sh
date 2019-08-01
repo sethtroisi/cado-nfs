@@ -50,7 +50,7 @@ pass_bwcpl_args=("$@")
 : ${seed=$RANDOM}
 : ${balancing_options=reorder=columns}
 
-pass_bwcpl_args=("${pass_bwcpl_args[@]}" "seed=$seed")
+pass_bwcpl_args+=("seed=$seed")
 
 wordsize=64
 # XXX note that $wdir is wiped out by this script !
@@ -123,10 +123,7 @@ argument_checking() {
             echo "Unsupported combination of arguments for specifying system" >&2
             echo "Detected arguments:" >&2
             for a in matrix rhsfile nrhs random_matrix_size random_matrix_maxcoeff ; do
-                v=`eval echo '$'"$a"`
-                if [ "$v" != "" ] ; then
-                    echo "$a=$v" >&2
-                fi
+                if [ "${!a}" ] ; then echo "$a=${!a}" >&2 ; fi
             done
             echo "Supported combinations:">&2
             echo "matrix rhsfile nrhs" >&2
@@ -198,14 +195,14 @@ create_test_matrix_if_needed() {
     if [ "$prime" = 2 ] ; then
         basename=$mats/t${escaped_size}
         matrix="$basename.matrix.bin"
-        rmargs=("${rmargs[@]}"  --k$nullspace ${random_matrix_minkernel})
+        rmargs+=(--k$nullspace ${random_matrix_minkernel})
         # ncols=
     elif ! [ "$nrhs" ] ; then
         basename=$mats/t${escaped_size}p
         matrix="$basename.matrix.bin"
-        rmargs=("${rmargs[@]}" --k$nullspace ${random_matrix_minkernel})
-        rmargs=("${rmargs[@]}" -c ${random_matrix_maxcoeff})
-        rmargs=("${rmargs[@]}" -Z)
+        rmargs+=(--k$nullspace ${random_matrix_minkernel})
+        rmargs+=(-c ${random_matrix_maxcoeff})
+        rmargs+=(-Z)
     else
         # This is an experimental mode. In the DLP context, we have a
         # matrix with N rows, N-r ideal columns, and r Schirokauer maps.   
@@ -223,11 +220,11 @@ create_test_matrix_if_needed() {
         # consider.
         density=$((${#random_matrix_size}*${#random_matrix_size}*2))
         if [ "$density" -lt 12 ] ; then density=12; fi
-        rmargs=("${rmargs[@]}" -d $density -Z)
+        rmargs+=(-d $density -Z)
         matrix="$basename.matrix.bin"
         rhsfile="$basename.rhs.txt"
-        rmargs=("${rmargs[@]}" -c ${random_matrix_maxcoeff})
-        rmargs=("${rmargs[@]}" rhs="$nrhs,$prime,$rhsfile")
+        rmargs+=(-c ${random_matrix_maxcoeff})
+        rmargs+=(rhs="$nrhs,$prime,$rhsfile")
     fi
     rmargs=($nrows $ncols -s $seed "${rmargs[@]}" --freq --binary --output "$matrix")
     ${bindir}/random_matrix "${rmargs[@]}"
@@ -289,7 +286,7 @@ create_auxiliary_weight_files() {
 
 prepare_common_arguments() {
     # This sets the common arguments for all bwc binaries
-    read -s -r -d '' common <<-EOF
+    common=(
         matrix=$matrix
         balancing_options=$balancing_options
         mpi=$mpi
@@ -301,10 +298,9 @@ prepare_common_arguments() {
         nullspace=$nullspace
         interval=$interval
         simd=$simd
-
-EOF
-    if [ "$mm_impl" ] ; then common="$common mm_impl=$mm_impl" ; fi
-    if [ "$prime" != 2 ] ; then common="$common lingen_mpi=$lingen_mpi" ; fi
+    )
+    if [ "$mm_impl" ] ; then common+=(mm_impl=$mm_impl) ; fi
+    if [ "$prime" != 2 ] ; then common+=(lingen_mpi=$lingen_mpi) ; fi
 }
 
 argument_checking
@@ -324,21 +320,16 @@ fi
 prepare_common_arguments
 
 if [ "$rhsfile" ] ; then
-    common="$common rhs=$rhsfile"
+    common+=(rhs=$rhsfile)
 fi
 
 for v in tolerate_failure stop_at_step keep_rolling_checkpoints checkpoint_precious skip_online_checks interleaving ; do
-    c="$(eval echo \$$v)"
-    if [ "$c" ] ; then
-        common="$common $v=$c"
-    fi
+    if [ "${!v}" ] ; then common+=("$v=${!v}") ; fi
 done
-
-set $common
 
 if [ "$magma" ] ; then
     echo "### Enabling magma checking ###"
-    set "$@" save_submatrices=1
+    common+=(save_submatrices=1)
     if [ -d "$magma" ] ; then
         if [ -x "$magma/magma" ] ; then
             magma="$magma/magma"
@@ -350,14 +341,14 @@ if [ "$magma" ] ; then
 fi
 
 if ! [ "$magma" ] ; then
-    $bindir/bwc.pl :complete "$@" "${pass_bwcpl_args[@]}"
+    $bindir/bwc.pl :complete "${common[@]}" "${pass_bwcpl_args[@]}"
     rc=$?
     $bindir/bwc.pl :mpirun_single -- $bindir/bwccheck prime=$prime m=$m n=$n -- $wdir/[ACVFS]* > $wdir/bwccheck.log
     grep NOK $wdir/bwccheck.log || :
     exit $rc
 else
     set +e
-    $bindir/bwc.pl :complete "$@" "${pass_bwcpl_args[@]}" 
+    $bindir/bwc.pl :complete "${common[@]}" "${pass_bwcpl_args[@]}" 
     rc=$?
     $bindir/bwc.pl :mpirun_single -- $bindir/bwccheck prime=$prime m=$m n=$n -- $wdir/[ACVFS]* > $wdir/bwccheck.log
     grep NOK $wdir/bwccheck.log
@@ -392,10 +383,7 @@ cmd=`dirname $0`/convert_magma.pl
 # nullspace
 
 for v in wdir matrix m n prime interval splitwidth cmd rwfile cwfile nullspace ; do
-    a=`eval echo '$'"$v"`
-    if ! [ "$a" ] ; then
-        echo "Missing parameter \$$v" >&2
-    fi
+    if ! [ "${!v}" ] ; then echo "Missing parameter \$$v" >&2 ; fi
 done
 
 
