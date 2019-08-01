@@ -411,8 +411,10 @@ int main(int argc, char * argv[])
     catch_control_signals();
 
     if (param_list_warn_unused(pl)) {
-        param_list_print_usage(pl, bw->original_argv[0], stderr);
-        exit(EXIT_FAILURE);
+        int rank;
+        MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+        if (!rank) param_list_print_usage(pl, bw->original_argv[0], stderr);
+        MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
     }
 
     pi_go(sec_prog, pl, 0);
