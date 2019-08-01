@@ -188,12 +188,12 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
         std::string Cv_filename = "Cv%u-%u"+sprintf(".%u", bw->interval);
         int ok = mmt_vec_load(check_vector, Cv_filename, mmt->n0[bw->dir], 0);
         if (!ok) {
-            fmt::fprintf(stderr, "check file %s not found, trying legacy check mode\n");
+            fmt::fprintf(stderr, "check file %s not found, trying legacy check mode\n", Cv_filename);
             std::string C_filename = "C%u-%u"+sprintf(".%u", bw->interval);
             ok = mmt_vec_load(check_vector, C_filename, mmt->n0[bw->dir], 0);
             if (!ok) {
 
-                fmt::fprintf(stderr, "check file %s not found either\n");
+                fmt::fprintf(stderr, "check file %s not found either\n", C_filename);
                 pi_abort(EXIT_FAILURE, pi->m);
             }
             legacy_check_mode = 1;
