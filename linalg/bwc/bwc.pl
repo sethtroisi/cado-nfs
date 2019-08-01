@@ -908,6 +908,8 @@ sub version_ge {
 
 # }}}
 
+open STDIN,  '<',  '/dev/null' or die "can't redirect STDIN: $!\n";
+
 if ($mpi_needed) {
     # This is useful for debugging in case we see new MPI environments.
     # print STDERR "Inherited environment:\n";

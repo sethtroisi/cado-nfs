@@ -2,6 +2,8 @@
 
 set -e
 
+exec < /dev/null
+
 if [ "$CADO_DEBUG" ] ; then
     set -x
 fi
