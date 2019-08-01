@@ -18,6 +18,8 @@
 #include "cheating_vec_init.h"
 #include "fmt/printf.h"
 
+int legacy_check_mode = 0;
+
 /* We create the check data based on:
  *
  *  - the random seed
@@ -40,6 +42,7 @@
 
 void * sec_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSED)
 {
+
     int fake = param_list_lookup_string(pl, "random_matrix") != NULL;
 
     ASSERT_ALWAYS(!pi->interleaved);
@@ -122,7 +125,7 @@ void * sec_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
      * if an inconsistency is detected.
      */
     int consistency = 1;
-    if (pi->m->jrank == 0 && pi->m->trank == 0) {
+    if (!legacy_check_mode && pi->m->jrank == 0 && pi->m->trank == 0) {
         struct stat sbuf[1];
         rc = stat(Rfilename.c_str(), sbuf);
         if (bw->start == 0) {
@@ -160,33 +163,35 @@ void * sec_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
     /* }}} */
 
     /* {{{ create or load T, based on the random seed. */
-    if (bw->start == 0) {
-        /* keep random state synchronized for everyone */
-        A->vec_random(A, Tdata, bw->m, rstate);
-        if (pi->m->jrank == 0 && pi->m->trank == 0) {
-            FILE * Tfile = fopen(Tfilename.c_str(), "wb");
-            rc = fwrite(Tdata, A->vec_elt_stride(A, bw->m), 1, Tfile);
-            ASSERT_ALWAYS(rc == 1);
-            fclose(Tfile);
-            if (tcan_print) fmt::printf("Saved %s\n", Tfilename);
-        }
-    } else {
-        /* The call below does not care about the data it generates, it
-         * only cares about the side effect to the random state. We do it
-         * just in order to keep the random state synchronized compared
-         * to what would have happened if we started with start=0. It's
-         * cheap enough anyway. */
-        A->vec_random(A, Tdata, bw->m, rstate);
-        if (pi->m->jrank == 0 && pi->m->trank == 0) {
-            FILE * Tfile = fopen(Tfilename.c_str(), "rb");
-            rc = fread(Tdata, A->vec_elt_stride(A, bw->m), 1, Tfile);
-            ASSERT_ALWAYS(rc == 1);
-            fclose(Tfile);
-            if (tcan_print) fmt::printf("loaded %s\n", Tfilename);
+    if (!legacy_check_mode) {
+        if (bw->start == 0) {
+            /* keep random state synchronized for everyone */
+            A->vec_random(A, Tdata, bw->m, rstate);
+            if (pi->m->jrank == 0 && pi->m->trank == 0) {
+                FILE * Tfile = fopen(Tfilename.c_str(), "wb");
+                rc = fwrite(Tdata, A->vec_elt_stride(A, bw->m), 1, Tfile);
+                ASSERT_ALWAYS(rc == 1);
+                fclose(Tfile);
+                if (tcan_print) fmt::printf("Saved %s\n", Tfilename);
+            }
+        } else {
+            /* The call below does not care about the data it generates, it
+             * only cares about the side effect to the random state. We do it
+             * just in order to keep the random state synchronized compared
+             * to what would have happened if we started with start=0. It's
+             * cheap enough anyway. */
+            A->vec_random(A, Tdata, bw->m, rstate);
+            if (pi->m->jrank == 0 && pi->m->trank == 0) {
+                FILE * Tfile = fopen(Tfilename.c_str(), "rb");
+                rc = fread(Tdata, A->vec_elt_stride(A, bw->m), 1, Tfile);
+                ASSERT_ALWAYS(rc == 1);
+                fclose(Tfile);
+                if (tcan_print) fmt::printf("loaded %s\n", Tfilename);
+            }
         }
     }
     /* }}} */
-    {
+    if (legacy_check_mode) {
         void * Rdata;
         cheating_vec_init(A, &Rdata, nchecks);
         for(int k = 0 ; k < bw->start ; k++) {
@@ -197,7 +202,7 @@ void * sec_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
     }
 
     /* {{{ Set file pointer for R (append-only) */
-    if (pi->m->jrank == 0 && pi->m->trank == 0) {
+    if (!legacy_check_mode && pi->m->jrank == 0 && pi->m->trank == 0) {
         Rfile = fopen(Rfilename.c_str(), "ab");
     }
     /* }}} */
@@ -218,16 +223,21 @@ void * sec_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
         mmt_full_vec_set_zero(my);
         ASSERT_ALWAYS(bw->m % nchecks == 0);
 
-        for(int c = 0 ; c < bw->m ; c += nchecks) {
-            mmt_full_vec_set_zero(dvec);
-            mmt_vec_set_x_indices(dvec, gxvecs + c * nx, MIN(nchecks, bw->m), nx);
-            AxA->addmul_tiny(A, A,
-                    mmt_my_own_subvec(my),
-                    mmt_my_own_subvec(dvec),
-                    A->vec_subvec(A, Tdata, c),
-                    mmt_my_own_size_in_items(my));
+        if (legacy_check_mode) {
+            mmt_vec_set_x_indices(my, gxvecs, MIN(nchecks, bw->m), nx);
+            mmt_vec_save(my, "C%u-%u.0", unpadded, 0);
+        } else {
+            for(int c = 0 ; c < bw->m ; c += nchecks) {
+                mmt_full_vec_set_zero(dvec);
+                mmt_vec_set_x_indices(dvec, gxvecs + c * nx, MIN(nchecks, bw->m), nx);
+                AxA->addmul_tiny(A, A,
+                        mmt_my_own_subvec(my),
+                        mmt_my_own_subvec(dvec),
+                        A->vec_subvec(A, Tdata, c),
+                        mmt_my_own_size_in_items(my));
+            }
+            mmt_vec_save(my, "Cv%u-%u.0", unpadded, 0);
         }
-        mmt_vec_save(my, "Cv%u-%u.0", unpadded, 0);
 
         free(gxvecs);
 
@@ -235,10 +245,16 @@ void * sec_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
     } else {
         using fmt::sprintf;
         int ok;
-        ok = mmt_vec_load(my,   "Cv%u-%u"+sprintf(".%d", bw->start), unpadded, 0);
-        ASSERT_ALWAYS(ok);
-        ok = mmt_vec_load(dvec, "Cd%u-%u"+sprintf(".%d", bw->start), unpadded, 0);
-        ASSERT_ALWAYS(ok);
+
+        if (legacy_check_mode) {
+            ok = mmt_vec_load(my,   "C%u-%u"+sprintf(".%d", bw->start), unpadded, 0);
+            ASSERT_ALWAYS(ok);
+        } else {
+            ok = mmt_vec_load(my,   "Cv%u-%u"+sprintf(".%d", bw->start), unpadded, 0);
+            ASSERT_ALWAYS(ok);
+            ok = mmt_vec_load(dvec, "Cd%u-%u"+sprintf(".%d", bw->start), unpadded, 0);
+            ASSERT_ALWAYS(ok);
+        }
     }
     /* }}} */
 
@@ -308,19 +324,23 @@ void * sec_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
          */
         void * Rdata_stream;
         int k0 = k;
-        cheating_vec_init(A, &Rdata_stream, nchecks * (next - k0));
+        if (!legacy_check_mode) {
+            cheating_vec_init(A, &Rdata_stream, nchecks * (next - k0));
+        }
     
         for( ; k < next ; k++) {
             /* new random coefficient in R */
-            void * Rdata = A->vec_subvec(A, Rdata_stream, (k-k0) * nchecks);
-            A->vec_random(A, Rdata, nchecks, rstate);
-            /* At this point Rdata should be consistent across all
-             * threads */
-            AxA->addmul_tiny(A, A,
-                    mmt_my_own_subvec(dvec),
-                    mmt_my_own_subvec(my),
-                    Rdata,
-                    mmt_my_own_size_in_items(my));
+            if (!legacy_check_mode) {
+                void * Rdata = A->vec_subvec(A, Rdata_stream, (k-k0) * nchecks);
+                A->vec_random(A, Rdata, nchecks, rstate);
+                /* At this point Rdata should be consistent across all
+                 * threads */
+                AxA->addmul_tiny(A, A,
+                        mmt_my_own_subvec(dvec),
+                        mmt_my_own_subvec(my),
+                        Rdata,
+                        mmt_my_own_size_in_items(my));
+            }
             pi_log_op(mmt->pi->m, "iteration %d", k);
             matmul_top_mul(mmt, myy, NULL);
 
@@ -335,13 +355,17 @@ void * sec_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
         mmt_vec_untwist(mmt, dvec);
 
         using fmt::sprintf;
-        mmt_vec_save(my,   "Cv%u-%u"+sprintf(".%d", k), unpadded, 0);
-        mmt_vec_save(dvec, "Cd%u-%u"+sprintf(".%d", k), unpadded, 0);
-        if (pi->m->trank == 0 && pi->m->jrank == 0) {
-            rc = fwrite(Rdata_stream, A->vec_elt_stride(A, nchecks), next - k0, Rfile);
-            ASSERT_ALWAYS(rc == (next - k0));
+        if (legacy_check_mode) {
+            mmt_vec_save(my,   "C%u-%u"+sprintf(".%d", k), unpadded, 0);
+        } else {
+            mmt_vec_save(my,   "Cv%u-%u"+sprintf(".%d", k), unpadded, 0);
+            mmt_vec_save(dvec, "Cd%u-%u"+sprintf(".%d", k), unpadded, 0);
+            if (pi->m->trank == 0 && pi->m->jrank == 0) {
+                rc = fwrite(Rdata_stream, A->vec_elt_stride(A, nchecks), next - k0, Rfile);
+                ASSERT_ALWAYS(rc == (next - k0));
+            }
+            cheating_vec_clear(A, &Rdata_stream, nchecks * (next - k0));
         }
-        cheating_vec_clear(A, &Rdata_stream, nchecks * (next - k0));
     }
 
     gmp_randclear(rstate);
@@ -369,6 +393,7 @@ int main(int argc, char * argv[])
     parallelizing_info_decl_usage(pl);
     matmul_top_decl_usage(pl);
     /* declare local parameters and switches: none here (so far). */
+    param_list_decl_usage(pl, "legacy_check_mode", "generate check data for legacy mode");
 
     bw_common_parse_cmdline(bw, pl, &argc, &argv);
 
@@ -378,6 +403,8 @@ int main(int argc, char * argv[])
     parallelizing_info_lookup_parameters(pl);
     matmul_top_lookup_parameters(pl);
     /* interpret our parameters */
+    param_list_parse_int(pl, "legacy_check_mode", &legacy_check_mode);
+
     catch_control_signals();
 
     if (param_list_warn_unused(pl)) {
