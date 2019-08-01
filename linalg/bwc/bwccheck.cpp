@@ -564,7 +564,6 @@ void * check_prog(param_list pl MAYBE_UNUSED, int argc, char * argv[])
                      * requirement that n_reach == A.n0 .*/
                     n_reach = A.n1;
                     a_list << " " << A;
-                    continue;
                 }
                 if (n_reach >= V0.n + D.stretch)
                     break;
@@ -573,7 +572,7 @@ void * check_prog(param_list pl MAYBE_UNUSED, int argc, char * argv[])
             if (n_reach < V0.n + D.stretch)
                 continue;
 
-            fmt::printf("  check %s against %s\n", V0, a_list.str());
+            fmt::printf("  check %s against%s\n", V0, a_list.str());
 
             mpfq_vbase Av;
             mpfq_vbase_oo_field_init_byfeatures(Av, 
@@ -599,7 +598,7 @@ void * check_prog(param_list pl MAYBE_UNUSED, int argc, char * argv[])
                 if (A.n1 <= n_reach) continue;
                 if (A.n0 <= n_reach) {
                     ASSERT_ALWAYS(n_reach == V0.n || n_reach == A.n0);
-                    fmt::printf("    reading %lu small %d*%d matrices from %s\n",
+                    fmt::printf("   reading %lu small %d*%d matrices from %s\n",
                             std::min(A.n1, V0.n + D.stretch) - n_reach,
                             bw->m, bw->n, A);
                     FILE * a = fopen(A.c_str(), "rb");
@@ -653,13 +652,13 @@ void * check_prog(param_list pl MAYBE_UNUSED, int argc, char * argv[])
 
             int cmp = Av->vec_cmp(Av, dotprod_scratch[0], dotprod_scratch[1], nchecks);
 
-            fmt::printf("  check %s against %s -> %s\n",
+            fmt::printf("  check %s against%s -> %s\n",
                     V0, a_list.str(),
                     cmp == 0 ? "ok" : "NOK NOK NOK NOK NOK");
 
             if (cmp != 0) {
                 nfailed++;
-                fmt::fprintf(stderr, "  check %s against %s -> %s\n",
+                fmt::fprintf(stderr, "  check %s against%s -> %s\n",
                         V0, a_list.str(),
                         cmp == 0 ? "ok" : "NOK NOK NOK NOK NOK");
 
