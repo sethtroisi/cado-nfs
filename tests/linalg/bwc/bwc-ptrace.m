@@ -29,7 +29,7 @@ if p eq 2 then
     ung:=func<M|[Seqint(Eltseq(x),2):x in Rows(Transpose(ChangeRing(M,Integers())))]>;
 else
     function group(nlimbs)
-        return func<var|[Seqint([x mod 2^64:x in var[i*k+1..i*k+k]],2^64):i in [0..#var div k - 1]] where k is nlimbs>;
+        return func<var|Vector([GF(p)|Seqint([x mod 2^64:x in var[i*k+1..i*k+k]],2^64):i in [0..#var div k - 1]] where k is nlimbs)>;
     end function;
     plimbs:=Ceiling(Log(2^64,p));
     g:=group(plimbs);
@@ -334,7 +334,7 @@ if assigned Cv0 then
      * Which means that in magma, we're making it a matrix with splitwidth
      * rows and m columns. This fits well with Xt which has m rows.
      */
-    assert Cv0 eq Ct*VS!Xt;
+    assert Cv0 eq Ct*Xt;
     printf "Checking consistency of check vector Cv.0-%o.0: done\n", splitwidth;
 end if;
 
@@ -348,6 +348,10 @@ end if;
 load "Cr.m";
 if Category(var) ne RngIntElt then
     Cr:=[g(var[j..j+nchecks-1]) : j in [1..#var by nchecks]];
+    if p ne 2 then
+        assert #Eltseq(Cr[1]) eq 1;
+        Cr:=[x[1]:x in Cr];
+    end if;
 elif assigned Cr then
     delete Cr;
 end if;
@@ -386,12 +390,12 @@ end if;
 /* Note that (below, "where i is 2" always means that the result holds for all
  * i>=0 -- we just want something that is easy to copy-paste.
  *
-    Cv0 eq Ct*VS!Xt;
-    Cv0*MM^i eq Ct*VS!Xt*MM^i                    where i is 2;
+    Cv0 eq Ct*Xt;
+    Cv0*MM^i eq Ct*Xt*MM^i                    where i is 2;
 
     Xt*MM^i*Transpose(VV[1][1]) eq mcoeff(A,i)   where i is 2;
 
-    &+[Cr[1+i]*Ct*VS!Xt*MM^i:i in [0..interval-1]] eq Cdi;
+    &+[Cr[1+i]*Ct*Xt*MM^i:i in [0..interval-1]] eq Cdi;
 
     &+[Cr[1+i]*Ct*mcoeff(A,i):i in [0..interval-1]] eq Cdi * Transpose(VV[1][1]);
 */
@@ -465,14 +469,15 @@ end function;
 
 load "A.m";
 function matpol_from_sequence(seq, m, n)
+    assert Nrows(seq)*Ncols(seq) mod m*n eq 0;
+    deg:=Nrows(seq)*Ncols(seq) div (m*n)-1;
     if p gt 2 then
-        assert #seq mod m*n eq 0;
-        deg:=#seq div (m*n)-1;
-        F:=&+[KP.1^i*      Matrix(KP,m,n,seq[i*m*n+1..(i+1)*m*n]):i in [0..deg]];
+        enum0:=func<s|[<i-1,s[i]>:i in [1..#s]]>;
+        smat:=Matrix(GF(p),deg+1,m*n,Eltseq(seq));
+        F:=&+[KP.1^i*Matrix(KP,m,n,Eltseq(r)) where i,r is Explode(ir) : ir in enum0(Rows(smat))];
+
         // Fr:= &+[KP.1^(deg-i)*Matrix(KP,m,n,seq[i*m*n+1..(i+1)*m*n]):i in [0..deg]];
     else
-        assert Nrows(seq)*Ncols(seq) mod m*n eq 0;
-        deg:=Nrows(seq)*Ncols(seq) div (m*n)-1;
         // it's quite messy...
         tmp:=Matrix((deg+1)*m, n, Eltseq(Transpose(seq)));
         F:=&+[KP.1^i*Matrix(KP,Submatrix(tmp,i*m+1,1,m,n)):i in [0..deg]];
@@ -501,11 +506,7 @@ F:=BlockMatrix(
             :i,j in [1..n div splitwidth]
         ]);
 // F:=Matrix(n,n,[Polynomial(GF(p),Fchunks[i][j]): i,j in [1..n]]);
-if p gt 2 then
-degsF:={#Fchunks[i][j] div splitwidth -1:i,j in [1..n div splitwidth]};
-else
 degsF:={Ncols(Fchunks[i][j]) div splitwidth -1:i,j in [1..n div splitwidth]};
-end if;
 assert #degsF eq 1;
 degF:=Setseq(degsF)[1];
 Fr:=Parent(F)![reciprocal(x,degF):x in Eltseq(F)];

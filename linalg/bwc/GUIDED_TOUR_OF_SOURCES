@@ -128,15 +128,6 @@ linalg/bwc/matmul_top.h
     matrix-times-vector operation.
 
 
-
-linalg/bwc/bwc-ptrace.m
-linalg/bwc/bwc-ptrace.sh
-linalg/bwc/bwc-trace.sh
-linalg/bwc/convert_magma.pl
-
-    => debug code, used in tests.
-
-
 linalg/bwc/bwc.pl
 
     => main driver scripts, prepares command lines for binaries.
@@ -265,15 +256,6 @@ linalg/bwc/bcast-file.c
 linalg/bwc/bench_polmatmul.cpp
 
     => old bench code, being phased out.
-
-
-linalg/bwc/bind_threads.sh
-linalg/bwc/bwc.sty
-linalg/bwc/creating-sm-example.m
-linalg/bwc/sm-outside-matrix.m
-
-    => unused cruft
-
 
 
 The pi_go() function

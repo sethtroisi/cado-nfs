@@ -176,6 +176,12 @@ void * sec_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
             if (tcan_print) printf("saved %s\n", Tfilename);
         }
     } else {
+        /* The call below does not care about the data it generates, it
+         * only cares about the side effect to the random state. We do it
+         * just in order to keep the random state synchronized compared
+         * to what would have happened if we started with start=0. It's
+         * cheap enough anyway. */
+        A->vec_random(A, Tdata, bw->m, rstate);
         if (pi->m->jrank == 0 && pi->m->trank == 0) {
             FILE * Tfile = fopen(Tfilename, "rb");
             rc = fread(Tdata, A->vec_elt_stride(A, bw->m), 1, Tfile);
@@ -185,6 +191,10 @@ void * sec_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
         }
     }
     /* }}} */
+    for(int k = 0 ; k < bw->start ; k++) {
+        /* same remark as above */
+        A->vec_random(A, Rdata, nchecks, rstate);
+    }
 
     /* {{{ Set file pointer for R (append-only) */
     if (pi->m->jrank == 0 && pi->m->trank == 0) {
@@ -192,6 +202,7 @@ void * sec_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
     }
     /* }}} */
 
+    /* {{{ create initial Cv and Cd, or load them if start>0 */
     if (bw->start == 0) {
         if (tcan_print)
             printf("We have start=0: creating Cv0-%u.0 as an expanded copy of X*T\n", nchecks);
@@ -219,17 +230,26 @@ void * sec_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
         mmt_vec_save(my, "Cv%u-%u.0", unpadded, 0);
 
         free(gxvecs);
+
+        mmt_full_vec_set_zero(dvec);
     } else {
         char * tmp;
-        int rc = asprintf(&tmp, "Cv%s.%d", "%u-%u", bw->start);
+        int rc;
+        rc = asprintf(&tmp, "Cv%s.%d", "%u-%u", bw->start);
         ASSERT_ALWAYS(rc >= 0);
         mmt_vec_load(my, tmp, unpadded, 0);
-        if (tcan_print) {
-            printf("loaded %s\n", tmp);
-        }
+        free(tmp);
+
+        rc = asprintf(&tmp, "Cd%s.%d", "%u-%u", bw->start);
+        ASSERT_ALWAYS(rc >= 0);
+        mmt_vec_load(dvec, tmp, unpadded, 0);
         free(tmp);
     }
+    /* }}} */
 
+    /* {{{ adjust the list of check stops according to the check_stops
+     * and interval parameters
+     */
     serialize_threads(pi->m);
     if (pi->m->trank == 0) {
         /* the bw object is global ! */
@@ -263,19 +283,24 @@ void * sec_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
         }
         printf("\n");
     }
-
     serialize(pi->m);
+    /* }}} */
 
-    // kill the warning.
+    // {{{ kill the warning about wrong spmv direction
     for(int i = 0 ; i < mmt->nmatrices ; i++) {
         mmt->matrices[i]->mm->iteration[!bw->dir] = INT_MIN;
     }
-
-    mmt_full_vec_set_zero(dvec);
+    // }}}
 
     int k = bw->start;
     for(int s = 0 ; s < bw->number_of_check_stops ; s++) {
         int next = bw->check_stops[s];
+        if (next < k) {
+            /* This may happen when start is passed and is beyond the
+             * first check stop.
+             */
+            continue;
+        }
         mmt_vec_twist(mmt, my);
         mmt_vec_twist(mmt, dvec);
         for( ; k < next ; k++) {

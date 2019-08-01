@@ -49,6 +49,7 @@ pass_bwcpl_args=("$@")
 : ${pre_wipe=}
 : ${seed=$RANDOM}
 : ${balancing_options=reorder=columns}
+: ${script_steps=wipecheck,matrix,bwc.pl/:complete,bwccheck,magma}
 
 pass_bwcpl_args+=("seed=$seed")
 
@@ -146,15 +147,25 @@ derived_variables() {
 }
 
 prepare_wdir() {
-    if [ -d $wdir ] ; then
-        if [ "$pre_wipe" ] ; then
-            rm -rf $wdir 2>/dev/null
-        else
-            echo "Won't wipe $wdir unless \$pre_wipe is set" >&2
+    if [[ $script_steps =~ wipecheck ]] ; then
+        if [ -d $wdir ] ; then
+            if [ "$pre_wipe" ] ; then
+                rm -rf $wdir 2>/dev/null
+            else
+                echo "Won't wipe $wdir unless \$pre_wipe is set" >&2
+                exit 1
+            fi
+        fi
+        mkdir $wdir
+    elif [[ $script_steps =~ keepdir ]] ; then
+        if ! [ -d $wdir ] ; then
+            echo "cannot work with keepdir: $wdir does not exist" >&2
             exit 1
         fi
+    else
+        echo "Want either wipecheck or keepdir in script_steps" >&2
+        exit 1
     fi
-    mkdir $wdir
 }
 
 
@@ -227,22 +238,24 @@ create_test_matrix_if_needed() {
         rmargs+=(rhs="$nrhs,$prime,$rhsfile")
     fi
     rmargs=($nrows $ncols -s $seed "${rmargs[@]}" --freq --binary --output "$matrix")
-    ${bindir}/random_matrix "${rmargs[@]}"
     rwfile=${matrix%%bin}rw.bin
     cwfile=${matrix%%bin}cw.bin
     ncols=$outer_ncols
     nrows=$outer_nrows
-    data_ncols=$((`wc -c < $cwfile` / 4))
-    data_nrows=$((`wc -c < $rwfile` / 4))
-    if [ "$data_ncols" -lt "$ncols" ] ; then
-        if [ "$prime" = 2 ] || ! [ "$nrhs" ] ; then
-            echo "padding $cwfile with $((ncols-data_ncols)) zero columns"
-            dd if=/dev/zero bs=4 count=$((ncols-data_ncols)) >> $cwfile
+    if [[ $script_steps =~ matrix ]] ; then
+        ${bindir}/random_matrix "${rmargs[@]}"
+        data_ncols=$((`wc -c < $cwfile` / 4))
+        data_nrows=$((`wc -c < $rwfile` / 4))
+        if [ "$data_ncols" -lt "$ncols" ] ; then
+            if [ "$prime" = 2 ] || ! [ "$nrhs" ] ; then
+                echo "padding $cwfile with $((ncols-data_ncols)) zero columns"
+                dd if=/dev/zero bs=4 count=$((ncols-data_ncols)) >> $cwfile
+            fi
         fi
-    fi
-    if [ "$data_nrows" -lt "$nrows" ] ; then
-        echo "padding $cwfile with $((nrows-data_nrows)) zero rows"
-        dd if=/dev/zero bs=4 count=$((nrows-data_nrows)) >> $rwfile
+        if [ "$data_nrows" -lt "$nrows" ] ; then
+            echo "padding $cwfile with $((nrows-data_nrows)) zero rows"
+            dd if=/dev/zero bs=4 count=$((nrows-data_nrows)) >> $rwfile
+        fi
     fi
 }
 
@@ -250,6 +263,9 @@ create_test_matrix_if_needed() {
 # provided by the user (which may be ither in text or binary format). In
 # this case, we must make sure that we have the .cw and .rw files too.
 create_auxiliary_weight_files() {
+    if ! [[ $script_steps =~ matrix ]] ; then
+        return
+    fi
     if [ "$prime" != 2 ] ; then withcoeffs=--withcoeffs ; fi
     case "$matrix" in
         *.txt)
@@ -314,6 +330,9 @@ else
     # This also sets rwfile cwfile nrows ncols
     create_auxiliary_weight_files
 fi
+for f in matrix cwfile rwfile ; do
+    if ! [ -f "${!f}" ] ; then echo "Missing file $f=${!f}" >&2 ; exit 1 ; fi
+done
 
 # if [ "$magma" ] ; then interval=1 ; fi
 
@@ -326,6 +345,10 @@ fi
 for v in tolerate_failure stop_at_step keep_rolling_checkpoints checkpoint_precious skip_online_checks interleaving ; do
     if [ "${!v}" ] ; then common+=("$v=${!v}") ; fi
 done
+
+if ! [[ $script_steps =~ magma ]] ; then
+    magma=
+fi
 
 if [ "$magma" ] ; then
     echo "### Enabling magma checking ###"
@@ -341,26 +364,47 @@ if [ "$magma" ] ; then
 fi
 
 if ! [ "$magma" ] ; then
-    $bindir/bwc.pl :complete "${common[@]}" "${pass_bwcpl_args[@]}"
-    rc=$?
-    $bindir/bwc.pl :mpirun_single -- $bindir/bwccheck prime=$prime m=$m n=$n -- $wdir/[ACVFS]* > $wdir/bwccheck.log
-    grep NOK $wdir/bwccheck.log || :
+    rc=0
+    if [[ $script_steps =~ bwc\.pl/([a-z:/]*) ]] ; then
+        IFS=/ read -a bwcpl_steps <<< "${BASH_REMATCH[1]}"
+        for s in "${bwcpl_steps}" ; do
+            if ! $bindir/bwc.pl "$s" "${common[@]}" "${pass_bwcpl_args[@]}" ; then
+                rc=$?
+                break
+            fi
+        done
+    fi
+    if [[ $script_steps =~ bwccheck ]] ; then
+        $bindir/bwc.pl :mpirun_single -- $bindir/bwccheck prime=$prime m=$m n=$n -- $wdir/[ACVFS]* > $wdir/bwccheck.log
+        grep NOK $wdir/bwccheck.log || :
+    fi
     exit $rc
 else
     set +e
-    $bindir/bwc.pl :complete "${common[@]}" "${pass_bwcpl_args[@]}" 
-    rc=$?
-    $bindir/bwc.pl :mpirun_single -- $bindir/bwccheck prime=$prime m=$m n=$n -- $wdir/[ACVFS]* > $wdir/bwccheck.log
-    grep NOK $wdir/bwccheck.log
+    if [[ $script_steps =~ bwc\.pl/([a-z:/]*) ]] ; then
+        IFS=/ read -a bwcpl_steps <<< "${BASH_REMATCH[1]}"
+        for s in "${bwcpl_steps}" ; do
+            if ! $bindir/bwc.pl "$s" "${common[@]}" "${pass_bwcpl_args[@]}" ; then
+                rc=$?
+                break
+            fi
+        done
+    fi
+    if [[ $script_steps =~ bwccheck ]] ; then
+        $bindir/bwc.pl :mpirun_single -- $bindir/bwccheck prime=$prime m=$m n=$n -- $wdir/[ACVFS]* > $wdir/bwccheck.log
+        grep NOK $wdir/bwccheck.log
+    fi
     set +x
-    if [ $rc = 0 ] ; then
-        echo " ========== SUCCESS ! bwc.pl returned true ========== "
-        echo " ========== SUCCESS ! bwc.pl returned true ========== "
-        echo " ========== SUCCESS ! bwc.pl returned true ========== "
-    else
-        echo " ########## FAILURE ! bwc.pl returned false ########## "
-        echo " ########## FAILURE ! bwc.pl returned false ########## "
-        echo " ########## FAILURE ! bwc.pl returned false ########## "
+    if [[ $script_steps =~ bwc\.pl([a-z:/]*) ]] ; then
+        if [ $rc = 0 ] ; then
+            echo " ========== SUCCESS ! bwc.pl returned true ========== "
+            echo " ========== SUCCESS ! bwc.pl returned true ========== "
+            echo " ========== SUCCESS ! bwc.pl returned true ========== "
+        else
+            echo " ########## FAILURE ! bwc.pl returned false ########## "
+            echo " ########## FAILURE ! bwc.pl returned false ########## "
+            echo " ########## FAILURE ! bwc.pl returned false ########## "
+        fi
     fi
 fi
 

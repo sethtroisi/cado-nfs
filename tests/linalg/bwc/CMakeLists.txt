@@ -5,7 +5,7 @@
 macro(add_bwc_test nm script)
     cado_define_test(test-bwc-${nm} SCRIPT
         ${CADO_NFS_SOURCE_DIR}/tests/provide-wdir.sh --arg mats --other --arg wdir --
-        ${CADO_NFS_SOURCE_DIR}/linalg/bwc/${script}
+        ${CADO_NFS_SOURCE_DIR}/tests/linalg/bwc/${script}
         bindir=${CADO_NFS_BINARY_DIR}/linalg/bwc pre_wipe=1 ${ARGN} -- verbose_flags=^all-bwc-sub-timings,^all-bwc-dispatch,^bwc-loading-mksol-files,^bwc-cache-major-info,^bwc-cpubinding,^perl-checks,^perl-sections
         TARGET_DEPENDENCIES bwc_full)
 endmacro()
@@ -120,6 +120,7 @@ foreach(gfp_layer ${BWC_GFP_ARITHMETIC_BACKENDS})
             #        add_dependencies(modp-inhomogeneous-minimal-2rhs-mn2_dependencies
             #        plingen_pz plingen_${gfp_layer})
         endif()
+        add_bwc_test(modp-secure-continuation-${gfp_layer} bwc-test-secure-continuation.sh prime=${p} random_matrix_size=500 nrhs=4 m=8 n=8 seed=1 interval=32 ${extra})
     endif()
 
     # Also add some plingen tests if it so occurs that the current
@@ -218,6 +219,9 @@ add_bwc_test(mod2-plain bwc-trace.sh random_matrix_size=800 m=64 n=64 seed=1 thr
 add_dependencies(test-bwc-mod2-plain_dependencies mf_scan)
 add_bwc_test(mod2-padded bwc-trace.sh random_matrix_size=700,600 m=64 n=64 seed=1 thr=2x2)
 add_dependencies(test-bwc-mod2-padded_dependencies mf_scan)
+
+add_bwc_test(mod2-secure-continuation bwc-test-secure-continuation.sh random_matrix_size=800 m=64 n=64 seed=1 thr=2x2 interval=64)
+add_dependencies(test-bwc-mod2-secure-continuation_dependencies mf_scan)
 
 # Note: because of stop_at_step here, we're not verifying what we're
 # doing, which is a bit stupid.
