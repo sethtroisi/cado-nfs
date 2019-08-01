@@ -64,7 +64,7 @@ foreach(gfp_layer ${BWC_GFP_ARITHMETIC_BACKENDS})
     set(p "${prime_${width}}")
     if(gfp_layer STREQUAL "pz")
     else()
-        add_bwc_test(modp-inhomogeneous-${gfp_layer} bwc-ptrace.sh prime=${p} random_matrix_size=500 nrhs=4 m=8 n=8 seed=1 ${extra})
+        add_bwc_test(modp-inhomogeneous-${gfp_layer} bwc-ptrace.sh prime=${p} random_matrix_size=500 nrhs=2 m=6 n=4 seed=1 ${extra})
         add_dependencies(test-bwc-modp-inhomogeneous-${gfp_layer}_dependencies
             plingen_pz plingen_${gfp_layer})
         if(gfp_layer STREQUAL "p_1")

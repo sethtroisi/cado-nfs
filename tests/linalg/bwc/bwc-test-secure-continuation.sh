@@ -32,15 +32,17 @@ args1=(
 )
 args2=(
     "${pre_doubledash[@]}"
-    interval=$((2*interval)) start=$interval
+    interval=$((4*interval)) start=$interval
     script_steps=keepdir,bwc.pl/secure
     "${post_doubledash[@]}"
+    check_stops=$((interval/2)),$interval,$((2*interval))
 )
 args3=(
     "${pre_doubledash[@]}"
-    interval=$((2*interval))
+    interval=$((4*interval))
     script_steps=keepdir,bwc.pl/secure
     "${post_doubledash[@]}"
+    check_stops=$((interval/2)),$interval,$((2*interval))
 )
 "`dirname $0`"/bwc-ptrace.sh "${args1[@]}"
 "`dirname $0`"/bwc-ptrace.sh "${args2[@]}"
@@ -48,11 +50,16 @@ mkdir "$wdir/saved_check"
 mv "$wdir"/C[rvdt]* "$wdir/saved_check"
 "`dirname $0`"/bwc-ptrace.sh "${args3[@]}"
 
+failed=
 for f in `cd "$wdir" ; ls C[rvdt]*` ; do
     if ! diff -q "$wdir/$f" "$wdir/saved_check/$f" ; then
         echo "Files $wdir/$f and $wdir/saved_check/$f differ" >&2
         sha1sum "$wdir/$f" "$wdir/saved_check/$f"
-        exit 1
+        failed=1
     fi
 done
-echo "Check files are consistent, good"
+if ! [ "$failed" ] ; then
+    echo "Check files are consistent, good"
+else
+    exit 1
+fi

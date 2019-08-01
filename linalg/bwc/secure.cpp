@@ -307,7 +307,7 @@ void * sec_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
          * Therefore this is mostly a matter of consistency.
          */
         void * Rdata_stream;
-        int k0 = 0;
+        int k0 = k;
         cheating_vec_init(A, &Rdata_stream, nchecks * (next - k0));
     
         for( ; k < next ; k++) {
