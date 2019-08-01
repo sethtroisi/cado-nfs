@@ -542,6 +542,7 @@ struct rhs /*{{{*/ {
 
         mmt_vec_clear(mmt, vi);
 
+        /* addmul_tiny degrades consistency ! */
         y->consistency = 1;
         mmt_vec_broadcast(y);
         mmt_vec_reduce_mod_p(y);

@@ -64,6 +64,7 @@ void * sec_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
 
 
     matmul_top_init(mmt, A, pi, pl, bw->dir);
+    pi_datatype_ptr A_pi = mmt->pitype;
 
     mmt_vec myy[2];
     mmt_vec_ptr my = myy[0];
@@ -164,9 +165,16 @@ void * sec_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
 
     /* {{{ create or load T, based on the random seed. */
     if (!legacy_check_mode) {
+        /* When start > 0, the call below does not care about the data it
+         * generates, it only cares about the side effect to the random
+         * state. We do it just in order to keep the random state
+         * synchronized compared to what would have happened if we
+         * started with start=0. It's cheap enough anyway.
+         *
+         * (also, random generation matters only at the leader node)
+         */
+        A->vec_random(A, Tdata, bw->m, rstate);
         if (bw->start == 0) {
-            /* keep random state synchronized for everyone */
-            A->vec_random(A, Tdata, bw->m, rstate);
             if (pi->m->jrank == 0 && pi->m->trank == 0) {
                 FILE * Tfile = fopen(Tfilename.c_str(), "wb");
                 rc = fwrite(Tdata, A->vec_elt_stride(A, bw->m), 1, Tfile);
@@ -175,12 +183,6 @@ void * sec_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
                 if (tcan_print) fmt::printf("Saved %s\n", Tfilename);
             }
         } else {
-            /* The call below does not care about the data it generates, it
-             * only cares about the side effect to the random state. We do it
-             * just in order to keep the random state synchronized compared
-             * to what would have happened if we started with start=0. It's
-             * cheap enough anyway. */
-            A->vec_random(A, Tdata, bw->m, rstate);
             if (pi->m->jrank == 0 && pi->m->trank == 0) {
                 FILE * Tfile = fopen(Tfilename.c_str(), "rb");
                 rc = fread(Tdata, A->vec_elt_stride(A, bw->m), 1, Tfile);
@@ -189,6 +191,7 @@ void * sec_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
                 if (tcan_print) fmt::printf("loaded %s\n", Tfilename);
             }
         }
+        pi_bcast(Tdata, bw->m, A_pi, 0, 0, pi->m);
     }
     /* }}} */
     if (legacy_check_mode) {
@@ -228,14 +231,16 @@ void * sec_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
             mmt_vec_save(my, "C%u-%u.0", unpadded, 0);
         } else {
             for(int c = 0 ; c < bw->m ; c += nchecks) {
-                mmt_full_vec_set_zero(dvec);
-                mmt_vec_set_x_indices(dvec, gxvecs + c * nx, MIN(nchecks, bw->m), nx);
+                mmt_vec_set_x_indices(dvec, gxvecs + c * nx, nchecks, nx);
                 AxA->addmul_tiny(A, A,
                         mmt_my_own_subvec(my),
                         mmt_my_own_subvec(dvec),
                         A->vec_subvec(A, Tdata, c),
                         mmt_my_own_size_in_items(my));
             }
+            /* addmul_tiny degrades consistency ! */
+            my->consistency = 1;
+            mmt_vec_broadcast(my);
             mmt_vec_save(my, "Cv%u-%u.0", unpadded, 0);
         }
 
@@ -305,6 +310,7 @@ void * sec_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
 
     int k = bw->start;
     for(int s = 0 ; s < bw->number_of_check_stops ; s++) {
+        serialize(pi->m);
         int next = bw->check_stops[s];
         if (next < k) {
             /* This may happen when start is passed and is beyond the
@@ -324,16 +330,17 @@ void * sec_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
          */
         void * Rdata_stream = NULL;
         int k0 = k;
-        if (!legacy_check_mode) {
+        if (!legacy_check_mode && (next - k0)) {
             cheating_vec_init(A, &Rdata_stream, nchecks * (next - k0));
             A->vec_set_zero(A, Rdata_stream, nchecks * (next - k0));
+            A->vec_random(A, Rdata_stream, nchecks * (next - k0), rstate);
+            pi_bcast(Rdata_stream, nchecks * (next - k0), A_pi, 0, 0, pi->m);
         }
     
         for( ; k < next ; k++) {
             /* new random coefficient in R */
             if (!legacy_check_mode) {
                 void * Rdata = A->vec_subvec(A, Rdata_stream, (k-k0) * nchecks);
-                A->vec_random(A, Rdata, nchecks, rstate);
                 /* At this point Rdata should be consistent across all
                  * threads */
                 AxA->addmul_tiny(A, A,
@@ -342,6 +349,9 @@ void * sec_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
                         Rdata,
                         mmt_my_own_size_in_items(my));
             }
+            /* addmul_tiny degrades consistency ! */
+            dvec->consistency = 1;
+            mmt_vec_broadcast(dvec);
             pi_log_op(mmt->pi->m, "iteration %d", k);
             matmul_top_mul(mmt, myy, NULL);
 
@@ -361,7 +371,7 @@ void * sec_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
         } else {
             mmt_vec_save(my,   "Cv%u-%u"+sprintf(".%d", k), unpadded, 0);
             mmt_vec_save(dvec, "Cd%u-%u"+sprintf(".%d", k), unpadded, 0);
-            if (pi->m->trank == 0 && pi->m->jrank == 0) {
+            if (pi->m->trank == 0 && pi->m->jrank == 0 && (next - k0)) {
                 rc = fwrite(Rdata_stream, A->vec_elt_stride(A, nchecks), next - k0, Rfile);
                 ASSERT_ALWAYS(rc == (next - k0));
                 rc = fflush(Rfile);

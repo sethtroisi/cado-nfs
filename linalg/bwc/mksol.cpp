@@ -461,8 +461,8 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
                                     (s1 - s0 - 1 - k) * Av->simd_groupsize(Av)),
                                 eblock);
                     }
+                    /* addmul_tiny degrades consistency ! */
                     ymy[0]->consistency = 1;
-
                     mmt_vec_broadcast(ymy[0]);
                     /* we're doing something which we normally avoid: write
                      * on the next input vector. This means a race condition
