@@ -630,7 +630,7 @@ int mmt_vec_load(mmt_vec_ptr v, const char * filename_pattern, unsigned int item
 
     int global_ok = 1;
 
-    for(unsigned int b = 0 ; b < Adisk_multiplex ; b++) {
+    for(unsigned int b = 0 ; global_ok && b < Adisk_multiplex ; b++) {
         unsigned int b0 = block_position + b * Adisk_width;
         char * filename;
         asprintf(&filename, filename_pattern, b0, b0 + splitwidth);
@@ -641,28 +641,32 @@ int mmt_vec_load(mmt_vec_ptr v, const char * filename_pattern, unsigned int item
         }
         pi_file_handle f;
         int ok = pi_file_open(f, v->pi, v->d, filename, "rb");
-        if (ok) {
+        /* "ok" is globally consistent after pi_file_open */
+        if (!ok) {
+            if (v->pi->m->trank == 0 && v->pi->m->jrank == 0) {
+                fprintf(stderr, "ERROR: failed to load %s: %s\n", filename, strerror(errno));
+            }
+        } else {
             ASSERT_ALWAYS(v != NULL);
             serialize(v->pi->m);
             ssize_t s = pi_file_read_chunk(f, mychunk, mysize, sizeondisk,
                     bigstride, b * smallstride, (b+1) * smallstride);
             int ok = s >= 0 && (size_t) s == sizeondisk / Adisk_multiplex;
+            /* "ok" is globally consistent after pi_file_read_chunk */
+            if (!ok) {
+                if (v->pi->m->trank == 0 && v->pi->m->jrank == 0) {
+                    fprintf(stderr, "ERROR: failed to load %s: short read, %s\n", filename, errno ? strerror(errno) : "no error reported via errno");
+                }
+            }
             v->consistency = ok;
             /* not clear it's useful, but well. */
             if (ok) mmt_vec_broadcast(v);
             serialize_threads(v->pi->m);
             pi_file_close(f);
         }
-        if (!ok) {
-            if (v->pi->m->trank == 0 && v->pi->m->jrank == 0) {
-                fprintf(stderr, "ERROR: failed to load %s\n", filename);
-            }
-            if (v->pi->m->trank == 0)
-                MPI_Abort(v->pi->m->pals, EXIT_FAILURE);
-        }
         free(filename);
         tt += wct_seconds();
-        if (tcan_print) {
+        if (ok && tcan_print) {
             char buf[20], buf2[20];
             printf(" done [%s in %.2fs, %s/s]\n",
                     size_disp(sizeondisk / Adisk_multiplex, buf),
@@ -714,7 +718,13 @@ int mmt_vec_save(mmt_vec_ptr v, const char * filename_pattern, unsigned int item
         }
         pi_file_handle f;
         int ok = pi_file_open(f, v->pi, v->d, tmpfilename, "wb");
-        if (ok) {
+        /* "ok" is globally consistent after pi_file_open */
+        if (!ok) {
+            if (v->pi->m->trank == 0 && v->pi->m->jrank == 0) {
+                fprintf(stderr, "WARNING: failed to save %s: %s\n", filename, strerror(errno));
+                unlink(tmpfilename);    // just in case
+            }
+        } else {
             ASSERT_ALWAYS(v != NULL);
             ASSERT_ALWAYS(v->consistency == 2);
             serialize_threads(v->pi->m);
@@ -722,13 +732,21 @@ int mmt_vec_save(mmt_vec_ptr v, const char * filename_pattern, unsigned int item
                     bigstride, b * smallstride, (b+1) * smallstride);
             serialize_threads(v->pi->m);
             ok = s >= 0 && (size_t) s == sizeondisk / Adisk_multiplex;
-            pi_file_close(f);
-        }
-        if (v->pi->m->trank == 0 && v->pi->m->jrank == 0) {
-            if (!ok || (rename(tmpfilename, filename)) != 0) {
-                fprintf(stderr, "WARNING: failed to save %s\n", filename);
-                unlink(tmpfilename);
+            /* "ok" is globally consistent after pi_file_write_chunk */
+            if (!ok && v->pi->m->trank == 0 && v->pi->m->jrank == 0) {
+                fprintf(stderr, "ERROR: failed to save %s: short write, %s\n", filename, errno ? strerror(errno) : "no error reported via errno");
             }
+            ok = pi_file_close(f);
+            if (!ok && v->pi->m->trank == 0 && v->pi->m->jrank == 0) {
+                fprintf(stderr, "ERROR: failed to save %s: failed fclose, %s\n", filename, errno ? strerror(errno) : "no error reported via errno");
+            }
+            if (v->pi->m->trank == 0 && v->pi->m->jrank == 0) {
+                ok = rename(tmpfilename, filename) == 0;
+                if (!ok) {
+                    fprintf(stderr, "ERROR: failed to save %s: failed rename, %s\n", filename, errno ? strerror(errno) : "no error reported via errno");
+                }
+            }
+            pi_bcast(&ok, 1, BWC_PI_INT, 0, 0, v->pi->m);
         }
         free(filename);
         free(tmpfilename);
@@ -2323,7 +2341,8 @@ void mmt_vec_set_random_through_file(mmt_vec_ptr v, const char * filename_patter
             free(filename);
         }
     }
-    mmt_vec_load(v, filename_pattern, itemsondisk, block_position);
+    int ok = mmt_vec_load(v, filename_pattern, itemsondisk, block_position);
+    ASSERT_ALWAYS(ok);
 }
 
 unsigned long mmt_vec_hamming_weight(mmt_vec_ptr y) {

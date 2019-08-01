@@ -239,17 +239,20 @@ void blstate_load(struct blstate * bl, unsigned int iter)
 
     rc = asprintf(&tmp, "%s.V%s.i0", filename_base, "%u-%u");
     ASSERT_ALWAYS(rc >= 0);
-    mmt_vec_load(bl->V[i0], tmp, mmt->n0[bw->dir], 0);
+    rc = mmt_vec_load(bl->V[i0], tmp, mmt->n0[bw->dir], 0);
+    ASSERT_ALWAYS(rc >= 0);
     free(tmp);
 
     rc = asprintf(&tmp, "%s.V%s.i1", filename_base, "%u-%u");
     ASSERT_ALWAYS(rc >= 0);
-    mmt_vec_load(bl->V[i1], tmp, mmt->n0[bw->dir], 0);
+    rc = mmt_vec_load(bl->V[i1], tmp, mmt->n0[bw->dir], 0);
+    ASSERT_ALWAYS(rc >= 0);
     free(tmp);
 
     rc = asprintf(&tmp, "%s.V%s.i2", filename_base, "%u-%u");
     ASSERT_ALWAYS(rc >= 0);
-    mmt_vec_load(bl->V[i2], tmp, mmt->n0[bw->dir], 0);
+    rc = mmt_vec_load(bl->V[i2], tmp, mmt->n0[bw->dir], 0);
+    ASSERT_ALWAYS(rc >= 0);
     free(tmp);
 
     if (tcan_print) { printf("done\n"); fflush(stdout); }

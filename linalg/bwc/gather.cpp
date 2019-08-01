@@ -530,7 +530,8 @@ struct rhs /*{{{*/ {
         mmt_vec_init(mmt,Av,Av_pi, vi,bw->dir, /* shared ! */ 1, mmt->n[bw->dir]);
 
         for(unsigned int j = 0 ; j < nrhs ; j++) {
-            mmt_vec_load(vi, "V%u-%u.0", unpadded, j);
+            int ok = mmt_vec_load(vi, "V%u-%u.0", unpadded, j);
+            ASSERT_ALWAYS(ok);
 
             natural.templates(A)->addmul_tiny(Av, A, 
                     mmt_my_own_subvec(y),
@@ -1198,7 +1199,8 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
             if (tcan_print && verbose_enabled(CADO_VERBOSE_PRINT_BWC_LOADING_MKSOL_FILES)) {
                 printf("loading %s\n", sl[i].name);
             }
-            mmt_vec_load(svec, sl[i].name_pattern, unpadded, solutions[0]);
+            int ok = mmt_vec_load(svec, sl[i].name_pattern, unpadded, solutions[0]);
+            ASSERT_ALWAYS(ok);
 
             A->vec_add(A,
                     mmt_my_own_subvec(y), 

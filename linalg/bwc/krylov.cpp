@@ -119,7 +119,8 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
     char * v_name = NULL;
     if (!fake) {
         using fmt::sprintf;
-        mmt_vec_load(ymy[0], "V%u-%u"+sprintf(".%u", bw->start), unpadded, ys[0]);
+        int ok = mmt_vec_load(ymy[0], "V%u-%u"+sprintf(".%u", bw->start), unpadded, ys[0]);
+        ASSERT_ALWAYS(ok);
         free(v_name);
         mmt_vec_reduce_mod_p(ymy[0]);
     } else {

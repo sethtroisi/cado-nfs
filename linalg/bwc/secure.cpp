@@ -231,8 +231,11 @@ void * sec_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
         mmt_full_vec_set_zero(dvec);
     } else {
         using fmt::sprintf;
-        mmt_vec_load(my,   "Cv%u-%u"+sprintf(".%d", bw->start), unpadded, 0);
-        mmt_vec_load(dvec, "Cd%u-%u"+sprintf(".%d", bw->start), unpadded, 0);
+        int ok;
+        ok = mmt_vec_load(my,   "Cv%u-%u"+sprintf(".%d", bw->start), unpadded, 0);
+        ASSERT_ALWAYS(ok);
+        ok = mmt_vec_load(dvec, "Cd%u-%u"+sprintf(".%d", bw->start), unpadded, 0);
+        ASSERT_ALWAYS(ok);
     }
     /* }}} */
 

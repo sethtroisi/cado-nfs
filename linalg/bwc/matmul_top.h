@@ -187,7 +187,7 @@ extern void mmt_vec_add_basis_vector(mmt_vec_ptr v, unsigned int j);
 #if 0
 extern void matmul_top_fill_random_source_generic(matmul_top_data_ptr mmt, size_t stride, mmt_vec_ptr v, int d);
 #endif
-extern int mmt_vec_load(mmt_vec_ptr v, const char * name, unsigned int itemsondisk, unsigned int block_position);
+extern int mmt_vec_load(mmt_vec_ptr v, const char * name, unsigned int itemsondisk, unsigned int block_position) ATTRIBUTE_WARN_UNUSED_RESULT;
 extern int mmt_vec_save(mmt_vec_ptr v, const char * name, unsigned int itemsondisk, unsigned int block_position);
 extern void mmt_vec_reduce_mod_p(mmt_vec_ptr v);
 extern void mmt_vec_clear_padding(mmt_vec_ptr v, size_t unpadded, size_t padded);
@@ -218,6 +218,7 @@ extern void indices_twist(matmul_top_data_ptr mmt, uint32_t * xs, unsigned int n
 static inline void mmt_vec_set_random_through_file(mmt_vec_ptr v, std::string const & name, unsigned int itemsondisk, gmp_randstate_t rstate, unsigned int block_position) {
     mmt_vec_set_random_through_file(v, name.c_str(), itemsondisk, rstate, block_position);
 }
+static inline int mmt_vec_load(mmt_vec_ptr v, std::string const & name, unsigned int itemsondisk, unsigned int block_position) ATTRIBUTE_WARN_UNUSED_RESULT;
 static inline int mmt_vec_load(mmt_vec_ptr v, std::string const & name, unsigned int itemsondisk, unsigned int block_position)
 {
     return mmt_vec_load(v, name.c_str(), itemsondisk, block_position);

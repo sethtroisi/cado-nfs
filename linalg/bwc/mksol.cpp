@@ -282,7 +282,8 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
             if (fake) {
                 mmt_vec_set_random_through_file(vi[i], v_name, unpadded, rstate, ys[0]);
             } else {
-                mmt_vec_load(vi[i], v_name, unpadded, ys[0]);
+                int ok = mmt_vec_load(vi[i], v_name, unpadded, ys[0]);
+                ASSERT_ALWAYS(ok);
                 mmt_vec_reduce_mod_p(vi[i]);
             }
             mmt_vec_twist(mmt, vi[i]);
