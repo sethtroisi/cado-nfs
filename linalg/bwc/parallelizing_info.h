@@ -280,7 +280,7 @@ extern void pi_hello(parallelizing_info_ptr pi);
 
 /* I/O functions */
 extern int pi_file_open(pi_file_handle_ptr f, parallelizing_info_ptr pi, int inner, const char * name, const char * mode);
-extern void pi_file_close(pi_file_handle_ptr f);
+extern int pi_file_close(pi_file_handle_ptr f);
 /* totalsize is the size which should be on disk. It may be shorter than
  * the sum of the individual sizes, in case of padding */
 extern ssize_t pi_file_write(pi_file_handle_ptr f, void * buf, size_t size, size_t totalsize);
