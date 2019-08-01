@@ -17,6 +17,7 @@
 #include "mpfq/mpfq.h"
 #include "mpfq/mpfq_vbase.h"
 #include "cheating_vec_init.h"
+#include "fmt/printf.h"
 
 void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSED)
 {
@@ -276,9 +277,8 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
         serialize(pi->m);
         for(int i = 0 ; i < bw->n / splitwidth ; i++) {
             int ys[2] = { i * splitwidth, (i + 1) * splitwidth };
-            char * v_name = NULL;
-            int rc = asprintf(&v_name, "V%s.%u", "%u-%u", s);
-            ASSERT_ALWAYS(rc >= 0);
+            using fmt::sprintf;
+            std::string v_name = "V%u-%u"+fmt::sprintf(".%u", s);
             if (fake) {
                 mmt_vec_set_random_through_file(vi[i], v_name, unpadded, rstate, ys[0]);
             } else {
@@ -286,7 +286,6 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
                 mmt_vec_reduce_mod_p(vi[i]);
             }
             mmt_vec_twist(mmt, vi[i]);
-            free(v_name);
         }
 
         serialize(pi->m);
@@ -338,18 +337,18 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
                                 buffer = fcoeff_tmp;
                             }
 
-                            char * tmp;
                             unsigned int sol0, sol1;
                             sol0 = (j * Af_multiplex + k) * Av_width;
                             sol0 += solutions[0];
                             sol1 = sol0 + Av_width;
-                            rc = asprintf(&tmp, "F.sols%u-%u.%u-%u",
+                            std::string f_name = fmt::sprintf(
+                                    "F.sols%u-%u.%u-%u",
                                     sol0, sol1,
                                     i * Av_width, (i + 1) * Av_width);
 
                             // printf("[%d] reading from %s\n", pi->interleaved ? pi->interleaved->idx : -1, tmp);
-                            FILE * f = fopen(tmp, "rb");
-                            DIE_ERRNO_DIAG(f == NULL, "fopen", tmp);
+                            FILE * f = fopen(f_name.c_str(), "rb");
+                            DIE_ERRNO_DIAG(f == NULL, "fopen", f_name.c_str());
                             rc = fseek(f, one_fcoeff / Af_multiplex * s0, SEEK_SET);
                             if (rc >= 0) {
                                 /* Read everything in one go. We might want to
@@ -389,7 +388,6 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
                             /* TODO: *maybe* transpose the F coefficients
                              * at this point */
                             fclose(f);
-                            free(tmp);
                         }
                     }
                 }
@@ -508,15 +506,11 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
              * really (and As_multiplex == 1)
              */
             int j = 0;
-            char * s_name;
-            int rc = asprintf(&s_name, "S.sols%s.%u-%u",
-                    "%u-%u",
-                    s, s + bw->checkpoint_precious);
-            ASSERT_ALWAYS(rc >= 0);
+            std::string s_name = "S.sols%u-%u" +
+                    fmt::sprintf(".%u-%u", s, s + bw->checkpoint_precious);
             ASSERT_ALWAYS(ymy[0]->abase->simd_groupsize(ymy[0]->abase) == (int) As_width);
             mmt_vec_save(ymy[0], s_name, unpadded,
                     solutions[0] + j * As_width);
-            free(s_name);
         }
     }
 

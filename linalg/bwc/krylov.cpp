@@ -15,6 +15,7 @@
 #include "mpfq/mpfq.h"
 #include "mpfq/mpfq_vbase.h"
 #include "cheating_vec_init.h"
+#include "fmt/printf.h"
 
 void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSED)
 {
@@ -117,9 +118,8 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
     serialize(pi->m);
     char * v_name = NULL;
     if (!fake) {
-        int rc = asprintf(&v_name, "V%s.%u", "%u-%u", bw->start);
-        ASSERT_ALWAYS(rc >= 0);
-        mmt_vec_load(ymy[0], v_name, unpadded, ys[0]);
+        using fmt::sprintf;
+        mmt_vec_load(ymy[0], "V%u-%u"+sprintf(".%u", bw->start), unpadded, ys[0]);
         free(v_name);
         mmt_vec_reduce_mod_p(ymy[0]);
     } else {
@@ -182,21 +182,17 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
          */
         mmt_vec_init(mmt, Ac, Ac_pi,
                 check_vector, bw->dir, THREAD_SHARED_VECTOR, mmt->n[bw->dir]);
-        char * tmp;
-        int rc = asprintf(&tmp, "Cv%s.%u", "%u-%u", bw->interval);
-        ASSERT_ALWAYS(rc >= 0);
-        mmt_vec_load(check_vector, tmp,  mmt->n0[bw->dir], 0);
-        free(tmp);
+        using fmt::sprintf;
+        std::string Cv_filename = "Cv%u-%u"+sprintf(".%u", bw->interval);
+        int ok = mmt_vec_load(check_vector, Cv_filename, mmt->n0[bw->dir], 0);
 
-        char * Tfilename;
-        rc = asprintf(&Tfilename, "Ct0-%u.0-%u", nchecks, bw->m);
-        ASSERT_ALWAYS(rc >= 0);
-        cheating_vec_init(Ac, &Tdata, bw->m);
-        FILE * Tfile = fopen(Tfilename, "rb");
-        rc = fread(Tdata, Ac->vec_elt_stride(Ac, bw->m), 1, Tfile);
-        ASSERT_ALWAYS(rc == 1);
-        fclose(Tfile);
-        if (tcan_print) printf("loaded %s\n", Tfilename);
+            std::string Ct_filename = fmt::sprintf("Ct0-%u.0-%u", nchecks, bw->m);
+            cheating_vec_init(Ac, &Tdata, bw->m);
+            FILE * Tfile = fopen(Ct_filename.c_str(), "rb");
+            int rc = fread(Tdata, Ac->vec_elt_stride(Ac, bw->m), 1, Tfile);
+            ASSERT_ALWAYS(rc == 1);
+            fclose(Tfile);
+            if (tcan_print) fmt::printf("loaded %s\n", Ct_filename);
 
         cheating_vec_init(A, &ahead, nchecks);
     }
@@ -318,14 +314,10 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
                 mmt->pitype, BWC_PI_SUM, pi->m);
 
         if (pi->m->trank == 0 && pi->m->jrank == 0 && !fake) {
-            char * tmp;
-            char * tmptmp;
-            int rc = asprintf(&tmp, "A%u-%u.%u-%u", ys[0], ys[1], s, s+bw->interval);
-            ASSERT_ALWAYS(rc >= 0);
-            rc = asprintf(&tmptmp, "%s.tmp", tmp);
-            ASSERT_ALWAYS(rc >= 0);
-            FILE * f = fopen(tmptmp, "wb");
-            rc = fwrite(xymats, A->vec_elt_stride(A, 1), bw->m*bw->interval, f);
+            std::string tmp = fmt::sprintf("A%u-%u.%u-%u", ys[0], ys[1], s, s+bw->interval);
+            std::string tmptmp = tmp + ".tmp";
+            FILE * f = fopen(tmptmp.c_str(), "wb");
+            int rc = fwrite(xymats, A->vec_elt_stride(A, 1), bw->m*bw->interval, f);
             if (rc != bw->m*bw->interval) {
                 fprintf(stderr, "Ayee -- short write\n");
                 // make sure our input data won't be deleted -- this
@@ -333,25 +325,17 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
                 // failure is temporary (?)
             }
             fclose(f);
-            rc = rename(tmptmp, tmp);
+            rc = rename(tmptmp.c_str(), tmp.c_str());
             ASSERT_ALWAYS(rc == 0);
-            free(tmptmp);
-            free(tmp);
         }
 
         if (!fake) {
-            int rc = asprintf(&v_name, "V%s.%u", "%u-%u", s + bw->interval);
-            ASSERT_ALWAYS(rc >= 0);
-            mmt_vec_save(ymy[0], v_name, unpadded, ys[0]);
-            free(v_name);
+            using fmt::sprintf;
+            mmt_vec_save(ymy[0], "V%u-%u"+sprintf(".%u", s + bw->interval), unpadded, ys[0]);
         }
 
         if (pi->m->trank == 0 && pi->m->jrank == 0) {
-            char * v_stem;
-            int rc = asprintf(&v_stem, "V%u-%u", ys[0], ys[1]);
-            ASSERT_ALWAYS(rc >= 0);
-            keep_rolling_checkpoints(v_stem, s + bw->interval);
-            free(v_stem);
+            keep_rolling_checkpoints(fmt::sprintf("V%u-%u", ys[0], ys[1]), s + bw->interval);
         }
 
         serialize(pi->m);

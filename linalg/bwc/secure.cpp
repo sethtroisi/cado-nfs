@@ -16,6 +16,7 @@
 #include "portability.h"
 #include <algorithm>
 #include "cheating_vec_init.h"
+#include "fmt/printf.h"
 
 /* We create the check data based on:
  *
@@ -104,18 +105,14 @@ void * sec_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
     /* Ct is a constant projection matrix of size bw->m * nchecks */
     /* It depends only on the random seed. We create it if start==0, or
      * reload it otherwise. */
-    char * Tfilename;
-    rc = asprintf(&Tfilename, "Ct0-%u.0-%u", nchecks, bw->m);
-    ASSERT_ALWAYS(rc >= 0);
+    std::string Tfilename = fmt::sprintf("Ct0-%u.0-%u", nchecks, bw->m);
     size_t T_coeff_size = A->vec_elt_stride(A, bw->m);
     void * Tdata;
     cheating_vec_init(A, &Tdata, bw->m);
 
     /* Cr is a list of matrices of size nchecks * nchecks */
     /* It depends only on the random seed */
-    char * Rfilename;
-    rc = asprintf(&Rfilename, "Cr0-%u.0-%u", nchecks, nchecks);
-    ASSERT_ALWAYS(rc >= 0);
+    std::string Rfilename = fmt::sprintf("Cr0-%u.0-%u", nchecks, nchecks);
     FILE * Rfile = NULL;
     size_t R_coeff_size = A->vec_elt_stride(A, nchecks);
     void * Rdata;
@@ -129,33 +126,33 @@ void * sec_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
     int consistency = 1;
     if (pi->m->jrank == 0 && pi->m->trank == 0) {
         struct stat sbuf[1];
-        rc = stat(Rfilename, sbuf);
+        rc = stat(Rfilename.c_str(), sbuf);
         if (bw->start == 0) {
             if ((rc == 0 && sbuf->st_size) || errno != ENOENT) {
-                fprintf(stderr, "Refusing to overwrite %s with new random data\n", Rfilename);
+                fmt::fprintf(stderr, "Refusing to overwrite %s with new random data\n", Rfilename);
                 consistency = 0;
             }
         } else {
             if (rc != 0) {
-                fprintf(stderr, "Cannot expand non-existing %s with new random data\n", Rfilename);
+                fmt::fprintf(stderr, "Cannot expand non-existing %s with new random data\n", Rfilename);
                 consistency = 0;
             } else if ((size_t) sbuf->st_size != (size_t) bw->start * R_coeff_size) {
-                fprintf(stderr, "Cannot expand %s (%u entries) starting at position %u\n", Rfilename, (unsigned int) (sbuf->st_size / R_coeff_size), bw->start);
+                fmt::fprintf(stderr, "Cannot expand %s (%u entries) starting at position %u\n", Rfilename, (unsigned int) (sbuf->st_size / R_coeff_size), bw->start);
                 consistency = 0;
             }
         }
-        rc = stat(Tfilename, sbuf);
+        rc = stat(Tfilename.c_str(), sbuf);
         if (bw->start == 0) {
             if ((rc == 0 && sbuf->st_size) || errno != ENOENT) {
-                fprintf(stderr, "Refusing to overwrite %s with new random data\n", Tfilename);
+                fmt::fprintf(stderr, "Refusing to overwrite %s with new random data\n", Tfilename);
                 consistency = 0;
             }
         } else {
             if (rc != 0) {
-                fprintf(stderr, "File %s not found, cannot expand check data\n", Tfilename);
+                fmt::fprintf(stderr, "File %s not found, cannot expand check data\n", Tfilename);
                 consistency = 0;
             } else if ((size_t) sbuf->st_size != T_coeff_size) {
-                fprintf(stderr, "File %s has wrong size (%zu != %zu), cannot expand check data\n", Tfilename, (size_t) sbuf->st_size, T_coeff_size);
+                fmt::fprintf(stderr, "File %s has wrong size (%zu != %zu), cannot expand check data\n", Tfilename, (size_t) sbuf->st_size, T_coeff_size);
                 consistency = 0;
             }
         }
@@ -169,11 +166,11 @@ void * sec_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
         /* keep random state synchronized for everyone */
         A->vec_random(A, Tdata, bw->m, rstate);
         if (pi->m->jrank == 0 && pi->m->trank == 0) {
-            FILE * Tfile = fopen(Tfilename, "wb");
+            FILE * Tfile = fopen(Tfilename.c_str(), "wb");
             rc = fwrite(Tdata, A->vec_elt_stride(A, bw->m), 1, Tfile);
             ASSERT_ALWAYS(rc == 1);
             fclose(Tfile);
-            if (tcan_print) printf("saved %s\n", Tfilename);
+            if (tcan_print) fmt::printf("Saved %s\n", Tfilename);
         }
     } else {
         /* The call below does not care about the data it generates, it
@@ -183,11 +180,11 @@ void * sec_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
          * cheap enough anyway. */
         A->vec_random(A, Tdata, bw->m, rstate);
         if (pi->m->jrank == 0 && pi->m->trank == 0) {
-            FILE * Tfile = fopen(Tfilename, "rb");
+            FILE * Tfile = fopen(Tfilename.c_str(), "rb");
             rc = fread(Tdata, A->vec_elt_stride(A, bw->m), 1, Tfile);
             ASSERT_ALWAYS(rc == 1);
             fclose(Tfile);
-            if (tcan_print) printf("loaded %s\n", Tfilename);
+            if (tcan_print) fmt::printf("loaded %s\n", Tfilename);
         }
     }
     /* }}} */
@@ -198,7 +195,7 @@ void * sec_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
 
     /* {{{ Set file pointer for R (append-only) */
     if (pi->m->jrank == 0 && pi->m->trank == 0) {
-        Rfile = fopen(Rfilename, "ab");
+        Rfile = fopen(Rfilename.c_str(), "ab");
     }
     /* }}} */
 
@@ -233,17 +230,9 @@ void * sec_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
 
         mmt_full_vec_set_zero(dvec);
     } else {
-        char * tmp;
-        int rc;
-        rc = asprintf(&tmp, "Cv%s.%d", "%u-%u", bw->start);
-        ASSERT_ALWAYS(rc >= 0);
-        mmt_vec_load(my, tmp, unpadded, 0);
-        free(tmp);
-
-        rc = asprintf(&tmp, "Cd%s.%d", "%u-%u", bw->start);
-        ASSERT_ALWAYS(rc >= 0);
-        mmt_vec_load(dvec, tmp, unpadded, 0);
-        free(tmp);
+        using fmt::sprintf;
+        mmt_vec_load(my,   "Cv%u-%u"+sprintf(".%d", bw->start), unpadded, 0);
+        mmt_vec_load(dvec, "Cd%u-%u"+sprintf(".%d", bw->start), unpadded, 0);
     }
     /* }}} */
 
@@ -329,20 +318,10 @@ void * sec_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
         serialize_threads(mmt->pi->m);
         mmt_vec_untwist(mmt, my);
         mmt_vec_untwist(mmt, dvec);
-        {
-            char * tmp;
-            int rc = asprintf(&tmp, "Cv%s.%d", "%u-%u", k);
-            ASSERT_ALWAYS(rc >= 0);
-            mmt_vec_save(my, tmp, unpadded, 0);
-            free(tmp);
-        }
-        {
-            char * tmp;
-            int rc = asprintf(&tmp, "Cd%s.%d", "%u-%u", k);
-            ASSERT_ALWAYS(rc >= 0);
-            mmt_vec_save(dvec, tmp, unpadded, 0);
-            free(tmp);
-        }
+
+        using fmt::sprintf;
+        mmt_vec_save(my,   "Cv%u-%u"+sprintf(".%d", k), unpadded, 0);
+        mmt_vec_save(dvec, "Cd%u-%u"+sprintf(".%d", k), unpadded, 0);
     }
 
     gmp_randclear(rstate);
