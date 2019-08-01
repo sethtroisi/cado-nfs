@@ -115,8 +115,6 @@ void * sec_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
     std::string Rfilename = fmt::sprintf("Cr0-%u.0-%u", nchecks, nchecks);
     FILE * Rfile = NULL;
     size_t R_coeff_size = A->vec_elt_stride(A, nchecks);
-    void * Rdata;
-    cheating_vec_init(A, &Rdata, nchecks);
 
 
     /* {{{ First check consistency of existing files with the bw->start
@@ -188,9 +186,14 @@ void * sec_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
         }
     }
     /* }}} */
-    for(int k = 0 ; k < bw->start ; k++) {
-        /* same remark as above */
-        A->vec_random(A, Rdata, nchecks, rstate);
+    {
+        void * Rdata;
+        cheating_vec_init(A, &Rdata, nchecks);
+        for(int k = 0 ; k < bw->start ; k++) {
+            /* same remark as above */
+            A->vec_random(A, Rdata, nchecks, rstate);
+        }
+        cheating_vec_clear(A, &Rdata, nchecks);
     }
 
     /* {{{ Set file pointer for R (append-only) */
@@ -295,13 +298,22 @@ void * sec_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
         }
         mmt_vec_twist(mmt, my);
         mmt_vec_twist(mmt, dvec);
+
+        /* Allocate an area in memory where we store the random
+         * coefficient. We do so in order to avoid the situation where an
+         * interrupted execution of the binary has already committed to
+         * disk the random coefficients (possibly cut halfway because of
+         * stdio buffering), while no Cd file has been written yet.
+         * Therefore this is mostly a matter of consistency.
+         */
+        void * Rdata_stream;
+        int k0 = 0;
+        cheating_vec_init(A, &Rdata_stream, nchecks * (next - k0));
+    
         for( ; k < next ; k++) {
             /* new random coefficient in R */
+            void * Rdata = A->vec_subvec(A, Rdata_stream, (k-k0) * nchecks);
             A->vec_random(A, Rdata, nchecks, rstate);
-            if (pi->m->trank == 0 && pi->m->jrank == 0) {
-                rc = fwrite(Rdata, A->vec_elt_stride(A, nchecks), 1, Rfile);
-                ASSERT_ALWAYS(rc == 1);
-            }
             /* At this point Rdata should be consistent across all
              * threads */
             AxA->addmul_tiny(A, A,
@@ -325,10 +337,14 @@ void * sec_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
         using fmt::sprintf;
         mmt_vec_save(my,   "Cv%u-%u"+sprintf(".%d", k), unpadded, 0);
         mmt_vec_save(dvec, "Cd%u-%u"+sprintf(".%d", k), unpadded, 0);
+        if (pi->m->trank == 0 && pi->m->jrank == 0) {
+            rc = fwrite(Rdata_stream, A->vec_elt_stride(A, nchecks), next - k0, Rfile);
+            ASSERT_ALWAYS(rc == (next - k0));
+        }
+        cheating_vec_clear(A, &Rdata_stream, nchecks * (next - k0));
     }
 
     gmp_randclear(rstate);
-    cheating_vec_clear(A, &Rdata, nchecks);
 
     mmt_vec_clear(mmt, dvec);
     mmt_vec_clear(mmt, y);
