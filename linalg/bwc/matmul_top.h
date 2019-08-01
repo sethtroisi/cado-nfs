@@ -4,6 +4,10 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#ifdef __cplusplus
+#include <string>
+#endif
+
 #include "select_mpi.h"
 #include "intersections.h"
 #include "parallelizing_info.h"
@@ -151,6 +155,7 @@ extern size_t mmt_my_own_offset_in_bytes(mmt_vec_ptr v);
 extern void * mmt_my_own_subvec(mmt_vec_ptr v);
 
 extern void mmt_vec_set_random_through_file(mmt_vec_ptr v, const char * name, unsigned int itemsondisk, gmp_randstate_t rstate, unsigned int block_position);
+
 /* do not use this function if you want consistency when the splitting
  * changes ! */
 extern void mmt_vec_set_random_inconsistent(mmt_vec_ptr v, gmp_randstate_t rstate);
@@ -203,6 +208,23 @@ extern void mmt_apply_identity(mmt_vec_ptr w, mmt_vec_ptr v);
 extern void indices_twist(matmul_top_data_ptr mmt, uint32_t * xs, unsigned int n, int d);
 
 #ifdef __cplusplus
+}
+#endif
+
+#ifdef __cplusplus
+/* proxies to use std::string instead of const char * ; this must not be
+ * bracketed by extern "C" ...
+ */
+static inline void mmt_vec_set_random_through_file(mmt_vec_ptr v, std::string const & name, unsigned int itemsondisk, gmp_randstate_t rstate, unsigned int block_position) {
+    mmt_vec_set_random_through_file(v, name.c_str(), itemsondisk, rstate, block_position);
+}
+static inline int mmt_vec_load(mmt_vec_ptr v, std::string const & name, unsigned int itemsondisk, unsigned int block_position)
+{
+    return mmt_vec_load(v, name.c_str(), itemsondisk, block_position);
+}
+static inline int mmt_vec_save(mmt_vec_ptr v, std::string const & name, unsigned int itemsondisk, unsigned int block_position)
+{
+    return mmt_vec_save(v, name.c_str(), itemsondisk, block_position);
 }
 #endif
 
