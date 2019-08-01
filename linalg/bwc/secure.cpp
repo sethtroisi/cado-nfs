@@ -363,6 +363,8 @@ void * sec_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
             if (pi->m->trank == 0 && pi->m->jrank == 0) {
                 rc = fwrite(Rdata_stream, A->vec_elt_stride(A, nchecks), next - k0, Rfile);
                 ASSERT_ALWAYS(rc == (next - k0));
+                rc = fflush(Rfile);
+                ASSERT_ALWAYS(rc == 0);
             }
             cheating_vec_clear(A, &Rdata_stream, nchecks * (next - k0));
         }
