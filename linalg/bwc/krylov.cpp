@@ -19,6 +19,7 @@
 
 void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSED)
 {
+    int legacy_check_mode = 0;
     int fake = param_list_lookup_string(pl, "random_matrix") != NULL;
     fake = fake || param_list_lookup_string(pl, "static_random_matrix") != NULL;
     if (fake) bw->skip_online_checks = 1;
@@ -186,7 +187,18 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
         using fmt::sprintf;
         std::string Cv_filename = "Cv%u-%u"+sprintf(".%u", bw->interval);
         int ok = mmt_vec_load(check_vector, Cv_filename, mmt->n0[bw->dir], 0);
+        if (!ok) {
+            fmt::fprintf(stderr, "check file %s not found, trying legacy check mode\n");
+            std::string C_filename = "C%u-%u"+sprintf(".%u", bw->interval);
+            ok = mmt_vec_load(check_vector, C_filename, mmt->n0[bw->dir], 0);
+            if (!ok) {
 
+                fmt::fprintf(stderr, "check file %s not found either\n");
+                MPI_Abort(pi->m->pals, EXIT_FAILURE);
+            }
+            legacy_check_mode = 1;
+        }
+        if (!legacy_check_mode) {
             std::string Ct_filename = fmt::sprintf("Ct0-%u.0-%u", nchecks, bw->m);
             cheating_vec_init(Ac, &Tdata, bw->m);
             FILE * Tfile = fopen(Ct_filename.c_str(), "rb");
@@ -194,6 +206,7 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
             ASSERT_ALWAYS(rc == 1);
             fclose(Tfile);
             if (tcan_print) fmt::printf("loaded %s\n", Ct_filename);
+        }
 
         cheating_vec_init(A, &ahead, nchecks);
     }
@@ -208,7 +221,7 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
                 A->vec_elt_stride(A, bw->m*bw->interval) >> 10);
     }
     cheating_vec_init(A, &xymats, bw->m*bw->interval);
-    
+   
 #if 0
     /* FIXME -- that's temporary ! only for debugging */
     pi_log_init(pi->m);
@@ -283,26 +296,30 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
 
         if (!bw->skip_online_checks) {
             /* Last dot product. This must cancel ! */
-            void * tmp1 = NULL;
-            cheating_vec_init(A, &tmp1, nchecks);
-            for(int c = 0 ; c < bw->m ; c += nchecks) {
-                /* First zero out the matrix of size nchecks * nbys.  */
-                A->vec_set_zero(A, tmp1, nchecks);
-                x_dotprod(tmp1, gxvecs + c * nx, nchecks, nx, ymy[0], -1);
-                /* And now compute the product transpose(part of
-                 * T)*ahead_tmp, and subtract that from our check value
-                 */
-                AxAc->add_dotprod(A, Ac,
-                        ahead,
-                        Ac->vec_subvec(Ac, Tdata, c),
-                        tmp1,
-                        nchecks);
+            if (legacy_check_mode) {
+                x_dotprod(ahead, gxvecs, nchecks, nx, ymy[0], -1);
+            } else {
+                void * tmp1 = NULL;
+                cheating_vec_init(A, &tmp1, nchecks);
+                for(int c = 0 ; c < bw->m ; c += nchecks) {
+                    /* First zero out the matrix of size nchecks * nbys.  */
+                    A->vec_set_zero(A, tmp1, nchecks);
+                    x_dotprod(tmp1, gxvecs + c * nx, nchecks, nx, ymy[0], -1);
+                    /* And now compute the product transpose(part of
+                     * T)*ahead_tmp, and subtract that from our check value
+                     */
+                    AxAc->add_dotprod(A, Ac,
+                            ahead,
+                            Ac->vec_subvec(Ac, Tdata, c),
+                            tmp1,
+                            nchecks);
+                }
+                cheating_vec_clear(A, &tmp1, nchecks);
             }
-            cheating_vec_clear(A, &tmp1, nchecks);
 
             pi_allreduce(NULL, ahead, nchecks, mmt->pitype, BWC_PI_SUM, pi->m);
             if (!A->vec_is_zero(A, ahead, nchecks)) {
-                printf("Failed check at iteration %d\n", s + bw->interval);
+                printf("Failed %scheck at iteration %d\n", legacy_check_mode ? "(legacy) " : "", s + bw->interval);
                 exit(1);
             }
         }
