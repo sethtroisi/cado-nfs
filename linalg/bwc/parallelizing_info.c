@@ -237,7 +237,7 @@ static void display_process_grid(parallelizing_info_ptr pi)
         unsigned int j = y * pi->wr[0]->njobs + x;
         if (j >= pi->m->njobs) {
             fprintf(stderr, "uh ?\n");
-            MPI_Abort(pi->m->pals, 42);
+            pi_abort(EXIT_FAILURE, pi->m);
         }
         memcpy(all_node_ids2 + j * PI_NAMELEN,
                 all_node_ids + i * PI_NAMELEN,
@@ -1366,6 +1366,13 @@ void pi_bcast(void * ptr, size_t count, pi_datatype_ptr datatype, unsigned int j
     pi_thread_bcast(ptr, count, datatype, troot, wr);
 }
 
+void pi_abort(int err, pi_comm_ptr wr)
+{
+    /* This only exists because an MPI_Abort that is initiated by all
+     * threads is likely to clutter the output quite a lot */
+    if (wr->trank == 0)
+        MPI_Abort(wr->pals, err);
+}
 /* }}} */
 
 /* {{{ allreduce

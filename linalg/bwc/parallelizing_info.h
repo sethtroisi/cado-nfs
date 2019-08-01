@@ -310,6 +310,7 @@ extern void pi_bcast(void * sendbuf,
         size_t count, pi_datatype_ptr datatype,
         unsigned int jroot, unsigned int troot,
         pi_comm_ptr wr);
+extern void pi_abort(int err, pi_comm_ptr wr);
 extern void pi_thread_allreduce(void * sendbuf, void * recvbuf,
         size_t count, pi_datatype_ptr datatype, pi_op_ptr op,
         pi_comm_ptr wr);

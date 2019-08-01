@@ -158,7 +158,7 @@ void * sec_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
         }
     }
     pi_bcast(&consistency, 1, BWC_PI_INT, 0, 0, pi->m);
-    if (!consistency) MPI_Abort(pi->m->pals, 1);
+    if (!consistency) pi_abort(EXIT_FAILURE, pi->m);
     /* }}} */
 
     /* {{{ create or load T, based on the random seed. */

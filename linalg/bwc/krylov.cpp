@@ -194,7 +194,7 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
             if (!ok) {
 
                 fmt::fprintf(stderr, "check file %s not found either\n");
-                MPI_Abort(pi->m->pals, EXIT_FAILURE);
+                pi_abort(EXIT_FAILURE, pi->m);
             }
             legacy_check_mode = 1;
         }
