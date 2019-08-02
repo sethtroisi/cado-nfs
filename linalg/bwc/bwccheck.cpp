@@ -561,14 +561,14 @@ void check_A_files(mpfq_vbase_ptr Ac, std::vector<Vfile> const & Vfiles, std::ve
             if (can_check) {
                 int cmp = Av->vec_cmp(Av, dotprod_scratch[0], dotprod_scratch[1], nchecks);
 
-                fmt::printf("  check %s against%s -> %s\n",
-                        V0, a_list.str(),
+                fmt::printf("  check %s against %u entries of%s -> %s\n",
+                        V0, D.stretch, a_list.str(),
                         cmp == 0 ? "ok" : "NOK NOK NOK NOK NOK");
 
                 if (cmp != 0) {
                     nfailed++;
-                    fmt::fprintf(stderr, "  check %s against%s -> %s\n",
-                            V0, a_list.str(),
+                    fmt::fprintf(stderr, "  check %s against %u entries of%s -> %s\n",
+                            V0, D.stretch, a_list.str(),
                             cmp == 0 ? "ok" : "NOK NOK NOK NOK NOK");
 
                 }
