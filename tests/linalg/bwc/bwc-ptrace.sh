@@ -383,6 +383,7 @@ if ! [ "$magma" ] ; then
     exit $rc
 else
     set +e
+    rc=0
     if [[ $script_steps =~ bwc\.pl/([a-z:/]*) ]] ; then
         IFS=/ read -a bwcpl_steps <<< "${BASH_REMATCH[1]}"
         for s in "${bwcpl_steps}" ; do
@@ -398,7 +399,7 @@ else
     fi
     set +x
     if [[ $script_steps =~ bwc\.pl([a-z:/]*) ]] ; then
-        if [ $rc = 0 ] ; then
+        if [ "$rc" = 0 ] ; then
             echo " ========== SUCCESS ! bwc.pl returned true ========== "
             echo " ========== SUCCESS ! bwc.pl returned true ========== "
             echo " ========== SUCCESS ! bwc.pl returned true ========== "
