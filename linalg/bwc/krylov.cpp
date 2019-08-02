@@ -336,15 +336,19 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
             std::string tmptmp = tmp + ".tmp";
             FILE * f = fopen(tmptmp.c_str(), "wb");
             int rc = fwrite(xymats, A->vec_elt_stride(A, 1), bw->m*bw->interval, f);
+            fclose(f);
             if (rc != bw->m*bw->interval) {
                 fprintf(stderr, "Ayee -- short write\n");
                 // make sure our input data won't be deleted -- this
                 // chunk will have to be redone later, maybe the disk
                 // failure is temporary (?)
+                // 
+                // anyway, better not rename the file immediately in this
+                // case.
+            } else {
+                rc = rename(tmptmp.c_str(), tmp.c_str());
+                ASSERT_ALWAYS(rc == 0);
             }
-            fclose(f);
-            rc = rename(tmptmp.c_str(), tmp.c_str());
-            ASSERT_ALWAYS(rc == 0);
         }
 
         if (!fake) {
