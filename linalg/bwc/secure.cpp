@@ -381,6 +381,8 @@ void * sec_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
         }
     }
 
+    cheating_vec_clear(A, &Tdata, bw->m);
+
     gmp_randclear(rstate);
 
     mmt_vec_clear(mmt, dvec);
