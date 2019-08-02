@@ -352,7 +352,7 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
         }
 
         if (pi->m->trank == 0 && pi->m->jrank == 0) {
-            keep_rolling_checkpoints("V%u-%u"_format(ys[0], ys[1]), s + bw->interval);
+            keep_rolling_checkpoints("V{}-{}"_format(ys[0], ys[1]), s + bw->interval);
         }
 
         serialize(pi->m);
