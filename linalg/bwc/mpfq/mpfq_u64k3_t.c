@@ -257,7 +257,7 @@ void mpfq_u64k3_u64k4_add_dotprod(mpfq_u64k3_dst_field K0 MAYBE_UNUSED, mpfq_u64
 
 #ifdef COMPILE_MPFQ_BINARY_FIELD_m128
 /* Mpfq::engine::handler::create_code */
-void mpfq_u64k3_m128_wrapper_addmul_tiny(mpfq_vbase_ptr K MAYBE_UNUSED, mpfq_vbase_ptr L MAYBE_UNUSED, mpfq_m128_dst_vec w, mpfq_u64k3_src_vec u, mpfq_m128_dst_vec v, unsigned int n)
+void mpfq_u64k3_m128_wrapper_addmul_tiny(mpfq_vbase_ptr K MAYBE_UNUSED, mpfq_vbase_ptr L MAYBE_UNUSED, mpfq_m128_dst_vec w, mpfq_u64k3_src_vec u, mpfq_m128_src_vec v, unsigned int n)
 {
     mpfq_u64k3_m128_addmul_tiny(K->obj, L->obj, w, u, v, n);
 }
@@ -265,7 +265,7 @@ void mpfq_u64k3_m128_wrapper_addmul_tiny(mpfq_vbase_ptr K MAYBE_UNUSED, mpfq_vba
 
 #ifdef COMPILE_MPFQ_BINARY_FIELD_m128
 /* *simd_dotprod::code_for_member_template_addmul_tiny */
-void mpfq_u64k3_m128_addmul_tiny(mpfq_u64k3_dst_field K MAYBE_UNUSED, mpfq_m128_dst_field L MAYBE_UNUSED, mpfq_m128_dst_vec w, mpfq_u64k3_src_vec u, mpfq_m128_dst_vec v, unsigned int n)
+void mpfq_u64k3_m128_addmul_tiny(mpfq_u64k3_dst_field K MAYBE_UNUSED, mpfq_m128_dst_field L MAYBE_UNUSED, mpfq_m128_dst_vec w, mpfq_u64k3_src_vec u, mpfq_m128_src_vec v, unsigned int n)
 {
     vaddmul_tiny_64K_64L((uint64_t*)w[0],(const uint64_t*)u[0],(const uint64_t*)v[0],n,3,2);
 }
@@ -273,7 +273,7 @@ void mpfq_u64k3_m128_addmul_tiny(mpfq_u64k3_dst_field K MAYBE_UNUSED, mpfq_m128_
 
 #ifdef COMPILE_MPFQ_BINARY_FIELD_u64k1
 /* Mpfq::engine::handler::create_code */
-void mpfq_u64k3_u64k1_wrapper_addmul_tiny(mpfq_vbase_ptr K MAYBE_UNUSED, mpfq_vbase_ptr L MAYBE_UNUSED, mpfq_u64k1_dst_vec w, mpfq_u64k3_src_vec u, mpfq_u64k1_dst_vec v, unsigned int n)
+void mpfq_u64k3_u64k1_wrapper_addmul_tiny(mpfq_vbase_ptr K MAYBE_UNUSED, mpfq_vbase_ptr L MAYBE_UNUSED, mpfq_u64k1_dst_vec w, mpfq_u64k3_src_vec u, mpfq_u64k1_src_vec v, unsigned int n)
 {
     mpfq_u64k3_u64k1_addmul_tiny(K->obj, L->obj, w, u, v, n);
 }
@@ -281,7 +281,7 @@ void mpfq_u64k3_u64k1_wrapper_addmul_tiny(mpfq_vbase_ptr K MAYBE_UNUSED, mpfq_vb
 
 #ifdef COMPILE_MPFQ_BINARY_FIELD_u64k1
 /* *simd_dotprod::code_for_member_template_addmul_tiny */
-void mpfq_u64k3_u64k1_addmul_tiny(mpfq_u64k3_dst_field K MAYBE_UNUSED, mpfq_u64k1_dst_field L MAYBE_UNUSED, mpfq_u64k1_dst_vec w, mpfq_u64k3_src_vec u, mpfq_u64k1_dst_vec v, unsigned int n)
+void mpfq_u64k3_u64k1_addmul_tiny(mpfq_u64k3_dst_field K MAYBE_UNUSED, mpfq_u64k1_dst_field L MAYBE_UNUSED, mpfq_u64k1_dst_vec w, mpfq_u64k3_src_vec u, mpfq_u64k1_src_vec v, unsigned int n)
 {
     vaddmul_tiny_64K_64L((uint64_t*)w[0],(const uint64_t*)u[0],(const uint64_t*)v[0],n,3,1);
 }
@@ -289,7 +289,7 @@ void mpfq_u64k3_u64k1_addmul_tiny(mpfq_u64k3_dst_field K MAYBE_UNUSED, mpfq_u64k
 
 #ifdef COMPILE_MPFQ_BINARY_FIELD_u64k2
 /* Mpfq::engine::handler::create_code */
-void mpfq_u64k3_u64k2_wrapper_addmul_tiny(mpfq_vbase_ptr K MAYBE_UNUSED, mpfq_vbase_ptr L MAYBE_UNUSED, mpfq_u64k2_dst_vec w, mpfq_u64k3_src_vec u, mpfq_u64k2_dst_vec v, unsigned int n)
+void mpfq_u64k3_u64k2_wrapper_addmul_tiny(mpfq_vbase_ptr K MAYBE_UNUSED, mpfq_vbase_ptr L MAYBE_UNUSED, mpfq_u64k2_dst_vec w, mpfq_u64k3_src_vec u, mpfq_u64k2_src_vec v, unsigned int n)
 {
     mpfq_u64k3_u64k2_addmul_tiny(K->obj, L->obj, w, u, v, n);
 }
@@ -297,7 +297,7 @@ void mpfq_u64k3_u64k2_wrapper_addmul_tiny(mpfq_vbase_ptr K MAYBE_UNUSED, mpfq_vb
 
 #ifdef COMPILE_MPFQ_BINARY_FIELD_u64k2
 /* *simd_dotprod::code_for_member_template_addmul_tiny */
-void mpfq_u64k3_u64k2_addmul_tiny(mpfq_u64k3_dst_field K MAYBE_UNUSED, mpfq_u64k2_dst_field L MAYBE_UNUSED, mpfq_u64k2_dst_vec w, mpfq_u64k3_src_vec u, mpfq_u64k2_dst_vec v, unsigned int n)
+void mpfq_u64k3_u64k2_addmul_tiny(mpfq_u64k3_dst_field K MAYBE_UNUSED, mpfq_u64k2_dst_field L MAYBE_UNUSED, mpfq_u64k2_dst_vec w, mpfq_u64k3_src_vec u, mpfq_u64k2_src_vec v, unsigned int n)
 {
     vaddmul_tiny_64K_64L((uint64_t*)w[0],(const uint64_t*)u[0],(const uint64_t*)v[0],n,3,2);
 }
@@ -305,7 +305,7 @@ void mpfq_u64k3_u64k2_addmul_tiny(mpfq_u64k3_dst_field K MAYBE_UNUSED, mpfq_u64k
 
 #ifdef COMPILE_MPFQ_BINARY_FIELD_u64k3
 /* Mpfq::engine::handler::create_code */
-void mpfq_u64k3_u64k3_wrapper_addmul_tiny(mpfq_vbase_ptr K MAYBE_UNUSED, mpfq_vbase_ptr L MAYBE_UNUSED, mpfq_u64k3_dst_vec w, mpfq_u64k3_src_vec u, mpfq_u64k3_dst_vec v, unsigned int n)
+void mpfq_u64k3_u64k3_wrapper_addmul_tiny(mpfq_vbase_ptr K MAYBE_UNUSED, mpfq_vbase_ptr L MAYBE_UNUSED, mpfq_u64k3_dst_vec w, mpfq_u64k3_src_vec u, mpfq_u64k3_src_vec v, unsigned int n)
 {
     mpfq_u64k3_u64k3_addmul_tiny(K->obj, L->obj, w, u, v, n);
 }
@@ -313,7 +313,7 @@ void mpfq_u64k3_u64k3_wrapper_addmul_tiny(mpfq_vbase_ptr K MAYBE_UNUSED, mpfq_vb
 
 #ifdef COMPILE_MPFQ_BINARY_FIELD_u64k3
 /* *simd_dotprod::code_for_member_template_addmul_tiny */
-void mpfq_u64k3_u64k3_addmul_tiny(mpfq_u64k3_dst_field K MAYBE_UNUSED, mpfq_u64k3_dst_field L MAYBE_UNUSED, mpfq_u64k3_dst_vec w, mpfq_u64k3_src_vec u, mpfq_u64k3_dst_vec v, unsigned int n)
+void mpfq_u64k3_u64k3_addmul_tiny(mpfq_u64k3_dst_field K MAYBE_UNUSED, mpfq_u64k3_dst_field L MAYBE_UNUSED, mpfq_u64k3_dst_vec w, mpfq_u64k3_src_vec u, mpfq_u64k3_src_vec v, unsigned int n)
 {
     vaddmul_tiny_64K_64L((uint64_t*)w[0],(const uint64_t*)u[0],(const uint64_t*)v[0],n,3,3);
 }
@@ -321,7 +321,7 @@ void mpfq_u64k3_u64k3_addmul_tiny(mpfq_u64k3_dst_field K MAYBE_UNUSED, mpfq_u64k
 
 #ifdef COMPILE_MPFQ_BINARY_FIELD_u64k4
 /* Mpfq::engine::handler::create_code */
-void mpfq_u64k3_u64k4_wrapper_addmul_tiny(mpfq_vbase_ptr K MAYBE_UNUSED, mpfq_vbase_ptr L MAYBE_UNUSED, mpfq_u64k4_dst_vec w, mpfq_u64k3_src_vec u, mpfq_u64k4_dst_vec v, unsigned int n)
+void mpfq_u64k3_u64k4_wrapper_addmul_tiny(mpfq_vbase_ptr K MAYBE_UNUSED, mpfq_vbase_ptr L MAYBE_UNUSED, mpfq_u64k4_dst_vec w, mpfq_u64k3_src_vec u, mpfq_u64k4_src_vec v, unsigned int n)
 {
     mpfq_u64k3_u64k4_addmul_tiny(K->obj, L->obj, w, u, v, n);
 }
@@ -329,7 +329,7 @@ void mpfq_u64k3_u64k4_wrapper_addmul_tiny(mpfq_vbase_ptr K MAYBE_UNUSED, mpfq_vb
 
 #ifdef COMPILE_MPFQ_BINARY_FIELD_u64k4
 /* *simd_dotprod::code_for_member_template_addmul_tiny */
-void mpfq_u64k3_u64k4_addmul_tiny(mpfq_u64k3_dst_field K MAYBE_UNUSED, mpfq_u64k4_dst_field L MAYBE_UNUSED, mpfq_u64k4_dst_vec w, mpfq_u64k3_src_vec u, mpfq_u64k4_dst_vec v, unsigned int n)
+void mpfq_u64k3_u64k4_addmul_tiny(mpfq_u64k3_dst_field K MAYBE_UNUSED, mpfq_u64k4_dst_field L MAYBE_UNUSED, mpfq_u64k4_dst_vec w, mpfq_u64k3_src_vec u, mpfq_u64k4_src_vec v, unsigned int n)
 {
     vaddmul_tiny_64K_64L((uint64_t*)w[0],(const uint64_t*)u[0],(const uint64_t*)v[0],n,3,4);
 }

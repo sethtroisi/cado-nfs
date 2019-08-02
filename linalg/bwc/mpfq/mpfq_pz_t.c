@@ -182,7 +182,7 @@ void mpfq_pz_pz_add_dotprod(mpfq_pz_dst_field K0 MAYBE_UNUSED, mpfq_pz_dst_field
 
 #ifdef COMPILE_MPFQ_PRIME_FIELD_pz
 /* Mpfq::engine::handler::create_code */
-void mpfq_pz_pz_wrapper_addmul_tiny(mpfq_vbase_ptr K MAYBE_UNUSED, mpfq_vbase_ptr L MAYBE_UNUSED, mpfq_pz_dst_vec w, mpfq_pz_src_vec u, mpfq_pz_dst_vec v, unsigned int n)
+void mpfq_pz_pz_wrapper_addmul_tiny(mpfq_vbase_ptr K MAYBE_UNUSED, mpfq_vbase_ptr L MAYBE_UNUSED, mpfq_pz_dst_vec w, mpfq_pz_src_vec u, mpfq_pz_src_vec v, unsigned int n)
 {
     mpfq_pz_pz_addmul_tiny(K->obj, L->obj, w, u, v, n);
 }
@@ -190,7 +190,7 @@ void mpfq_pz_pz_wrapper_addmul_tiny(mpfq_vbase_ptr K MAYBE_UNUSED, mpfq_vbase_pt
 
 #ifdef COMPILE_MPFQ_PRIME_FIELD_pz
 /* *simd_pz::code_for_member_template_addmul_tiny */
-void mpfq_pz_pz_addmul_tiny(mpfq_pz_dst_field K MAYBE_UNUSED, mpfq_pz_dst_field L MAYBE_UNUSED, mpfq_pz_dst_vec w, mpfq_pz_src_vec u, mpfq_pz_dst_vec v, unsigned int n)
+void mpfq_pz_pz_addmul_tiny(mpfq_pz_dst_field K MAYBE_UNUSED, mpfq_pz_dst_field L MAYBE_UNUSED, mpfq_pz_dst_vec w, mpfq_pz_src_vec u, mpfq_pz_src_vec v, unsigned int n)
 {
         mpfq_pz_elt s;
         mpfq_pz_init(K, &s);

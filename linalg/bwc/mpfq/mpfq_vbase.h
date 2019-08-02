@@ -189,7 +189,7 @@ struct mpfq_vbase_s {
 
 struct mpfq_vbase_tmpl_s {
     void (*add_dotprod)(mpfq_vbase_ptr, mpfq_vbase_ptr, void *, const void *, const void *, unsigned int);
-    void (*addmul_tiny)(mpfq_vbase_ptr, mpfq_vbase_ptr, void *, const void *, void *, unsigned int);
+    void (*addmul_tiny)(mpfq_vbase_ptr, mpfq_vbase_ptr, void *, const void *, const void *, unsigned int);
     void (*transpose)(mpfq_vbase_ptr, mpfq_vbase_ptr, void *, const void *);
 };
 typedef struct mpfq_vbase_s mpfq_vbase[1];

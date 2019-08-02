@@ -166,11 +166,11 @@ void mpfq_p_3_p_3_add_dotprod(mpfq_p_3_dst_field, mpfq_p_3_dst_field, mpfq_p_3_d
 #endif /* COMPILE_MPFQ_PRIME_FIELD_p_3 */
 
 #ifdef COMPILE_MPFQ_PRIME_FIELD_p_3
-void mpfq_p_3_p_3_wrapper_addmul_tiny(mpfq_vbase_ptr, mpfq_vbase_ptr, mpfq_p_3_dst_vec, mpfq_p_3_src_vec, mpfq_p_3_dst_vec, unsigned int);
+void mpfq_p_3_p_3_wrapper_addmul_tiny(mpfq_vbase_ptr, mpfq_vbase_ptr, mpfq_p_3_dst_vec, mpfq_p_3_src_vec, mpfq_p_3_src_vec, unsigned int);
 #endif /* COMPILE_MPFQ_PRIME_FIELD_p_3 */
 
 #ifdef COMPILE_MPFQ_PRIME_FIELD_p_3
-void mpfq_p_3_p_3_addmul_tiny(mpfq_p_3_dst_field, mpfq_p_3_dst_field, mpfq_p_3_dst_vec, mpfq_p_3_src_vec, mpfq_p_3_dst_vec, unsigned int);
+void mpfq_p_3_p_3_addmul_tiny(mpfq_p_3_dst_field, mpfq_p_3_dst_field, mpfq_p_3_dst_vec, mpfq_p_3_src_vec, mpfq_p_3_src_vec, unsigned int);
 #endif /* COMPILE_MPFQ_PRIME_FIELD_p_3 */
 
 #ifdef COMPILE_MPFQ_PRIME_FIELD_p_3

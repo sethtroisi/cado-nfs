@@ -184,7 +184,7 @@ void mpfq_p_4_p_4_add_dotprod(mpfq_p_4_dst_field K0 MAYBE_UNUSED, mpfq_p_4_dst_f
 
 #ifdef COMPILE_MPFQ_PRIME_FIELD_p_4
 /* Mpfq::engine::handler::create_code */
-void mpfq_p_4_p_4_wrapper_addmul_tiny(mpfq_vbase_ptr K MAYBE_UNUSED, mpfq_vbase_ptr L MAYBE_UNUSED, mpfq_p_4_dst_vec w, mpfq_p_4_src_vec u, mpfq_p_4_dst_vec v, unsigned int n)
+void mpfq_p_4_p_4_wrapper_addmul_tiny(mpfq_vbase_ptr K MAYBE_UNUSED, mpfq_vbase_ptr L MAYBE_UNUSED, mpfq_p_4_dst_vec w, mpfq_p_4_src_vec u, mpfq_p_4_src_vec v, unsigned int n)
 {
     mpfq_p_4_p_4_addmul_tiny(K->obj, L->obj, w, u, v, n);
 }
@@ -192,7 +192,7 @@ void mpfq_p_4_p_4_wrapper_addmul_tiny(mpfq_vbase_ptr K MAYBE_UNUSED, mpfq_vbase_
 
 #ifdef COMPILE_MPFQ_PRIME_FIELD_p_4
 /* *simd_gfp::code_for_member_template_addmul_tiny */
-void mpfq_p_4_p_4_addmul_tiny(mpfq_p_4_dst_field K MAYBE_UNUSED, mpfq_p_4_dst_field L MAYBE_UNUSED, mpfq_p_4_dst_vec w, mpfq_p_4_src_vec u, mpfq_p_4_dst_vec v, unsigned int n)
+void mpfq_p_4_p_4_addmul_tiny(mpfq_p_4_dst_field K MAYBE_UNUSED, mpfq_p_4_dst_field L MAYBE_UNUSED, mpfq_p_4_dst_vec w, mpfq_p_4_src_vec u, mpfq_p_4_src_vec v, unsigned int n)
 {
         mpfq_p_4_elt s;
         mpfq_p_4_init(K, &s);

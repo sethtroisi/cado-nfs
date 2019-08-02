@@ -184,7 +184,7 @@ void mpfq_p_13_p_13_add_dotprod(mpfq_p_13_dst_field K0 MAYBE_UNUSED, mpfq_p_13_d
 
 #ifdef COMPILE_MPFQ_PRIME_FIELD_p_13
 /* Mpfq::engine::handler::create_code */
-void mpfq_p_13_p_13_wrapper_addmul_tiny(mpfq_vbase_ptr K MAYBE_UNUSED, mpfq_vbase_ptr L MAYBE_UNUSED, mpfq_p_13_dst_vec w, mpfq_p_13_src_vec u, mpfq_p_13_dst_vec v, unsigned int n)
+void mpfq_p_13_p_13_wrapper_addmul_tiny(mpfq_vbase_ptr K MAYBE_UNUSED, mpfq_vbase_ptr L MAYBE_UNUSED, mpfq_p_13_dst_vec w, mpfq_p_13_src_vec u, mpfq_p_13_src_vec v, unsigned int n)
 {
     mpfq_p_13_p_13_addmul_tiny(K->obj, L->obj, w, u, v, n);
 }
@@ -192,7 +192,7 @@ void mpfq_p_13_p_13_wrapper_addmul_tiny(mpfq_vbase_ptr K MAYBE_UNUSED, mpfq_vbas
 
 #ifdef COMPILE_MPFQ_PRIME_FIELD_p_13
 /* *simd_gfp::code_for_member_template_addmul_tiny */
-void mpfq_p_13_p_13_addmul_tiny(mpfq_p_13_dst_field K MAYBE_UNUSED, mpfq_p_13_dst_field L MAYBE_UNUSED, mpfq_p_13_dst_vec w, mpfq_p_13_src_vec u, mpfq_p_13_dst_vec v, unsigned int n)
+void mpfq_p_13_p_13_addmul_tiny(mpfq_p_13_dst_field K MAYBE_UNUSED, mpfq_p_13_dst_field L MAYBE_UNUSED, mpfq_p_13_dst_vec w, mpfq_p_13_src_vec u, mpfq_p_13_src_vec v, unsigned int n)
 {
         mpfq_p_13_elt s;
         mpfq_p_13_init(K, &s);
