@@ -203,21 +203,28 @@ void vec_free(mpfq_vbase_ptr A, void *& z, size_t vsize)
     cheating_vec_clear(A, &z, vsize);
 }
 
-void vec_read(mpfq_vbase_ptr A, void * z, string const & v, size_t vsize, const char * prefix = NULL)
+int vec_read(mpfq_vbase_ptr A, void * z, string const & v, size_t vsize, const char * prefix = NULL)
 {
-    if (prefix) fmt::printf("%sload %s\n", prefix, v);
-    FILE * f = fopen(v.c_str(), "rb");
-    ASSERT_ALWAYS(f != NULL);
-    int rc = fread(z, A->elt_stride(A), vsize, f);
-    ASSERT_ALWAYS(rc >= 0);
-    ASSERT_ALWAYS((size_t) rc == vsize);
-    fclose(f);
+    fmt::printf("%sload %s ...", prefix, v);
+    FILE * f;
+    if ((f = fopen(v.c_str(), "rb")) != NULL) {
+        int rc = fread(z, A->elt_stride(A), vsize, f);
+        if (rc >= 0 && (size_t) rc == vsize) {
+            fmt::printf(" done\n");
+            return rc;
+        }
+        fclose(f);
+    }
+    fmt::printf(" failed\n");
+    return -1;
 }
 
 size_t vec_items(mpfq_vbase_ptr A, string const & v)
 {
     struct stat sbuf[1];
     int rc = stat(v.c_str(), sbuf);
+    if (rc < 0 && errno == ENOENT)
+        return 0;
     ASSERT_ALWAYS(rc == 0);
     return sbuf->st_size / A->elt_stride(A);
 }
@@ -230,6 +237,10 @@ size_t common_size(mpfq_vbase_ptr Ac, std::vector<T> const & Cfiles, const char 
 
     for(auto & C : Cfiles) {
         size_t items = vec_items(Ac, C);
+        if (items == 0) {
+            fmt::printf("%s has disappeared\n", C);
+            continue;
+        }
         if (vsize == 0) {
             vsize = items;
             vsize_first = C;
@@ -318,10 +329,12 @@ void check_V_files(mpfq_vbase_ptr Ac, vseq_t & Vsequences, std::vector<Cfile> & 
                     if (j == Vs.size()) continue;
 
                     if (!has_read_Cv_i0++)
-                        vec_read(Ac, Cv_i0, C_i0, vsize, " ");
+                        if (vec_read(Ac, Cv_i0, C_i0, vsize, " ") < 0)
+                            continue;
 
                     if (!has_read_Cv_i1++)
-                        vec_read(Ac, Cv_i1, C_i1, vsize, " ");
+                        if (vec_read(Ac, Cv_i1, C_i1, vsize, " ") < 0)
+                            continue;
 
                     Vs[j].checks++;
                     const char * vi = Vs[i].c_str();
@@ -334,7 +347,8 @@ void check_V_files(mpfq_vbase_ptr Ac, vseq_t & Vsequences, std::vector<Cfile> & 
                     }
                     fmt::printf("  check %s against %s\n", vi, vj);
                     if (Vs[i].n != Vv_iter) {
-                        vec_read(Ac, Vv, Vs[i].c_str(), vsize, "   ");
+                        if (vec_read(Ac, Vv, Vs[i].c_str(), vsize, "   ") < 0)
+                            continue;
                         Vv_iter = Vs[i].n;
                     }
 
@@ -345,7 +359,9 @@ void check_V_files(mpfq_vbase_ptr Ac, vseq_t & Vsequences, std::vector<Cfile> & 
                             dotprod_scratch[0],
                             Cv_i1, Vv, vsize);
 
-                    vec_read(Ac, Vv, Vs[j].c_str(), vsize, "   ");
+                    if (vec_read(Ac, Vv, Vs[j].c_str(), vsize, "   ") < 0)
+                        continue;
+
                     Vv_iter = Vs[j].n;
 
                     Av->vec_set_zero(Av, dotprod_scratch[1], nchecks);
@@ -451,7 +467,8 @@ void check_A_files(mpfq_vbase_ptr Ac, std::vector<Vfile> const & Vfiles, std::ve
             if (n_reach < V0.n + D.stretch)
                 continue;
 
-            fmt::printf("  check %s against%s\n", V0, a_list.str());
+            fmt::printf("  check %s against %u entries of%s\n",
+                    V0, D.stretch, a_list.str());
 
             mpfq_vbase Av;
             mpfq_vbase_oo_field_init_byfeatures(Av, 
@@ -461,7 +478,6 @@ void check_A_files(mpfq_vbase_ptr Ac, std::vector<Vfile> const & Vfiles, std::ve
             mpfq_vbase_tmpl AvxAc;
             mpfq_vbase_oo_init_templates(AvxAc, Av, Ac);
 
-            void * Vv;
             void * dotprod_scratch[3];
             vec_alloc(Av, dotprod_scratch[0], nchecks);
             vec_alloc(Av, dotprod_scratch[1], nchecks);
@@ -519,36 +535,53 @@ void check_A_files(mpfq_vbase_ptr Ac, std::vector<Vfile> const & Vfiles, std::ve
                     break;
             }
 
+            int can_check = 1;
+
             if (!has_read_D++)
-                vec_read(Ac, Dv, D.c_str(), vsize, "   ");
-            vec_alloc(Av, Vv, vsize);
-            vec_read(Av, Vv, V0.c_str(), vsize, "   ");
-            Av->vec_set_zero(Av, dotprod_scratch[1], nchecks);
-            AvxAc->add_dotprod(Av, Ac, 
-                    dotprod_scratch[1],
-                    Dv, Vv, vsize);
-            vec_free(Av, Vv, vsize);
+                if (vec_read(Ac, Dv, D.c_str(), vsize, "   ") < 0)
+                    can_check = 0;
 
-            int cmp = Av->vec_cmp(Av, dotprod_scratch[0], dotprod_scratch[1], nchecks);
+            if (can_check) {
+                void * Vv;
 
-            fmt::printf("  check %s against%s -> %s\n",
-                    V0, a_list.str(),
-                    cmp == 0 ? "ok" : "NOK NOK NOK NOK NOK");
+                vec_alloc(Av, Vv, vsize);
+                if (vec_read(Av, Vv, V0.c_str(), vsize, "   ") < 0)
+                    can_check = 0;
 
-            if (cmp != 0) {
-                nfailed++;
-                fmt::fprintf(stderr, "  check %s against%s -> %s\n",
+                if (can_check) {
+                    Av->vec_set_zero(Av, dotprod_scratch[1], nchecks);
+                    AvxAc->add_dotprod(Av, Ac, 
+                            dotprod_scratch[1],
+                            Dv, Vv, vsize);
+                }
+
+                vec_free(Av, Vv, vsize);
+            }
+
+            if (can_check) {
+                int cmp = Av->vec_cmp(Av, dotprod_scratch[0], dotprod_scratch[1], nchecks);
+
+                fmt::printf("  check %s against%s -> %s\n",
                         V0, a_list.str(),
                         cmp == 0 ? "ok" : "NOK NOK NOK NOK NOK");
 
+                if (cmp != 0) {
+                    nfailed++;
+                    fmt::fprintf(stderr, "  check %s against%s -> %s\n",
+                            V0, a_list.str(),
+                            cmp == 0 ? "ok" : "NOK NOK NOK NOK NOK");
+
+                }
             }
+
+            if (!can_check)
+                fmt::printf("  (check aborted because of missing files)\n");
 
             vec_free(Av, dotprod_scratch[2], nchecks);
             vec_free(Av, dotprod_scratch[1], nchecks);
             vec_free(Av, dotprod_scratch[0], nchecks);
 
             Av->oo_field_clear(Av);
-
         }
     }
     cheating_vec_clear(Ac, &Rdata, Ac->vec_elt_stride(Ac, nchecks) * rsize);
