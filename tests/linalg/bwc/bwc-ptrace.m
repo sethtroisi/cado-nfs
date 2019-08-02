@@ -510,7 +510,7 @@ degsF:={Ncols(Fchunks[i][j]) div splitwidth -1:i,j in [1..n div splitwidth]};
 assert #degsF eq 1;
 degF:=Setseq(degsF)[1];
 Fr:=Parent(F)![reciprocal(x,degF):x in Eltseq(F)];
-rhscoeffs:=Matrix(GF(p),#RHS,n,[Polynomial(Rchunks[i][j]):
+rhscoeffs:=Matrix(GF(p),#RHS,n,[Polynomial(Eltseq(Rchunks[i][j])):
 j in [1..n],
 i in [1..#RHS]
 ]);
