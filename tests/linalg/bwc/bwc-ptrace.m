@@ -347,7 +347,7 @@ end if;
 
 load "Cr.m";
 if Category(var) ne RngIntElt then
-    Cr:=[g(var[j..j+nchecks-1]) : j in [1..#var by nchecks]];
+    Cr:=[g(var[j..j+nchecks*plimbs-1]) : j in [1..#var by nchecks*plimbs]];
     if p ne 2 then
         assert #Eltseq(Cr[1]) eq 1;
         Cr:=[x[1]:x in Cr];
