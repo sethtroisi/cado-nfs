@@ -17,6 +17,8 @@
 #include <algorithm>
 #include "cheating_vec_init.h"
 #include "fmt/printf.h"
+#include "fmt/format.h"
+using namespace fmt::literals;
 
 int legacy_check_mode = 0;
 
@@ -109,14 +111,14 @@ void * sec_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
     /* Ct is a constant projection matrix of size bw->m * nchecks */
     /* It depends only on the random seed. We create it if start==0, or
      * reload it otherwise. */
-    std::string Tfilename = fmt::sprintf("Ct0-%u.0-%u", nchecks, bw->m);
+    std::string Tfilename = "Ct0-{}.0-{}"_format(nchecks, bw->m);
     size_t T_coeff_size = A->vec_elt_stride(A, bw->m);
     void * Tdata;
     cheating_vec_init(A, &Tdata, bw->m);
 
     /* Cr is a list of matrices of size nchecks * nchecks */
     /* It depends only on the random seed */
-    std::string Rfilename = fmt::sprintf("Cr0-%u.0-%u", nchecks, nchecks);
+    std::string Rfilename = "Cr0-{}.0-{}"_format(nchecks, nchecks);
     FILE * Rfile = NULL;
     size_t R_coeff_size = A->vec_elt_stride(A, nchecks);
 
@@ -248,16 +250,15 @@ void * sec_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
 
         mmt_full_vec_set_zero(dvec);
     } else {
-        using fmt::sprintf;
         int ok;
 
         if (legacy_check_mode) {
-            ok = mmt_vec_load(my,   "C%u-%u"+sprintf(".%d", bw->start), unpadded, 0);
+            ok = mmt_vec_load(my,   "C%u-%u.{}"_format(bw->start), unpadded, 0);
             ASSERT_ALWAYS(ok);
         } else {
-            ok = mmt_vec_load(my,   "Cv%u-%u"+sprintf(".%d", bw->start), unpadded, 0);
+            ok = mmt_vec_load(my,   "Cv%u-%u.{}"_format(bw->start), unpadded, 0);
             ASSERT_ALWAYS(ok);
-            ok = mmt_vec_load(dvec, "Cd%u-%u"+sprintf(".%d", bw->start), unpadded, 0);
+            ok = mmt_vec_load(dvec, "Cd%u-%u.{}"_format(bw->start), unpadded, 0);
             ASSERT_ALWAYS(ok);
         }
     }
@@ -365,12 +366,11 @@ void * sec_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
         mmt_vec_untwist(mmt, my);
         mmt_vec_untwist(mmt, dvec);
 
-        using fmt::sprintf;
         if (legacy_check_mode) {
-            mmt_vec_save(my,   "C%u-%u"+sprintf(".%d", k), unpadded, 0);
+            mmt_vec_save(my,   "C%u-%u.{}"_format(k), unpadded, 0);
         } else {
-            mmt_vec_save(my,   "Cv%u-%u"+sprintf(".%d", k), unpadded, 0);
-            mmt_vec_save(dvec, "Cd%u-%u"+sprintf(".%d", k), unpadded, 0);
+            mmt_vec_save(my,   "Cv%u-%u.{}"_format(k), unpadded, 0);
+            mmt_vec_save(dvec, "Cd%u-%u.{}"_format(k), unpadded, 0);
             if (pi->m->trank == 0 && pi->m->jrank == 0 && (next - k0)) {
                 rc = fwrite(Rdata_stream, A->vec_elt_stride(A, nchecks), next - k0, Rfile);
                 ASSERT_ALWAYS(rc == (next - k0));

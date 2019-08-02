@@ -16,6 +16,8 @@
 #include "mpfq/mpfq_vbase.h"
 #include "cheating_vec_init.h"
 #include "fmt/printf.h"
+#include "fmt/format.h"
+using namespace fmt::literals;
 
 void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSED)
 {
@@ -119,8 +121,7 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
     serialize(pi->m);
     char * v_name = NULL;
     if (!fake) {
-        using fmt::sprintf;
-        int ok = mmt_vec_load(ymy[0], "V%u-%u"+sprintf(".%u", bw->start), unpadded, ys[0]);
+        int ok = mmt_vec_load(ymy[0], "V%u-%u.{}"_format(bw->start), unpadded, ys[0]);
         ASSERT_ALWAYS(ok);
         free(v_name);
         mmt_vec_reduce_mod_p(ymy[0]);
@@ -184,12 +185,11 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
          */
         mmt_vec_init(mmt, Ac, Ac_pi,
                 check_vector, bw->dir, THREAD_SHARED_VECTOR, mmt->n[bw->dir]);
-        using fmt::sprintf;
-        std::string Cv_filename = "Cv%u-%u"+sprintf(".%u", bw->interval);
+        std::string Cv_filename = "Cv%u-%u.{}"_format(bw->interval);
         int ok = mmt_vec_load(check_vector, Cv_filename, mmt->n0[bw->dir], 0);
         if (!ok) {
             fmt::fprintf(stderr, "check file %s not found, trying legacy check mode\n", Cv_filename);
-            std::string C_filename = "C%u-%u"+sprintf(".%u", bw->interval);
+            std::string C_filename = "C%u-%u.{}"_format(bw->interval);
             ok = mmt_vec_load(check_vector, C_filename, mmt->n0[bw->dir], 0);
             if (!ok) {
 
@@ -199,7 +199,7 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
             legacy_check_mode = 1;
         }
         if (!legacy_check_mode) {
-            std::string Ct_filename = fmt::sprintf("Ct0-%u.0-%u", nchecks, bw->m);
+            std::string Ct_filename = "Ct0-{}.0-{}"_format(nchecks, bw->m);
             cheating_vec_init(Ac, &Tdata, bw->m);
             FILE * Tfile = fopen(Ct_filename.c_str(), "rb");
             int rc = fread(Tdata, Ac->vec_elt_stride(Ac, bw->m), 1, Tfile);
@@ -332,7 +332,7 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
                 mmt->pitype, BWC_PI_SUM, pi->m);
 
         if (pi->m->trank == 0 && pi->m->jrank == 0 && !fake) {
-            std::string tmp = fmt::sprintf("A%u-%u.%u-%u", ys[0], ys[1], s, s+bw->interval);
+            std::string tmp = "A{}-{}.{}-{}"_format(ys[0], ys[1], s, s+bw->interval);
             std::string tmptmp = tmp + ".tmp";
             FILE * f = fopen(tmptmp.c_str(), "wb");
             int rc = fwrite(xymats, A->vec_elt_stride(A, 1), bw->m*bw->interval, f);
@@ -348,12 +348,11 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
         }
 
         if (!fake) {
-            using fmt::sprintf;
-            mmt_vec_save(ymy[0], "V%u-%u"+sprintf(".%u", s + bw->interval), unpadded, ys[0]);
+            mmt_vec_save(ymy[0], "V%u-%u.{}"_format(s + bw->interval), unpadded, ys[0]);
         }
 
         if (pi->m->trank == 0 && pi->m->jrank == 0) {
-            keep_rolling_checkpoints(fmt::sprintf("V%u-%u", ys[0], ys[1]), s + bw->interval);
+            keep_rolling_checkpoints("V%u-%u"_format(ys[0], ys[1]), s + bw->interval);
         }
 
         serialize(pi->m);
