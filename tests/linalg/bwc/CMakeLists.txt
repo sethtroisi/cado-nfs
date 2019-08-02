@@ -215,44 +215,45 @@ lingen_threshold=60  m=4 n=2  prime=101538509534246169632617439 --random-input-w
 endforeach(gfp_layer ${BWC_GFP_ARITHMETIC_BACKENDS})
 
 
-add_bwc_test(mod2-plain bwc-trace.sh random_matrix_size=800 m=64 n=64 seed=1 thr=2x2)
+add_bwc_test(mod2-plain bwc-ptrace.sh prime=2 nullspace=left random_matrix_size=800 m=64 n=64 seed=1 thr=2x2)
 add_dependencies(test-bwc-mod2-plain_dependencies mf_scan)
-add_bwc_test(mod2-padded bwc-trace.sh random_matrix_size=700,600 m=64 n=64 seed=1 thr=2x2)
+add_bwc_test(mod2-padded bwc-ptrace.sh prime=2 nullspace=left random_matrix_size=700,600 m=64 n=64 seed=1 thr=2x2)
 add_dependencies(test-bwc-mod2-padded_dependencies mf_scan)
 
-add_bwc_test(mod2-secure-continuation bwc-test-secure-continuation.sh random_matrix_size=800 m=64 n=64 seed=1 thr=2x2 interval=64)
+add_bwc_test(mod2-secure-continuation bwc-test-secure-continuation.sh
+    prime=2 nullspace=left random_matrix_size=800 m=64 n=64 seed=1 thr=2x2 interval=64)
 add_dependencies(test-bwc-mod2-secure-continuation_dependencies mf_scan)
 
 # Note: because of stop_at_step here, we're not verifying what we're
 # doing, which is a bit stupid.
-add_bwc_test(mod2-rolling bwc-trace.sh random_matrix_size=2000
+add_bwc_test(mod2-rolling bwc-ptrace.sh prime=2 nullspace=left random_matrix_size=2000
     interval=10 keep_rolling_checkpoints=2 checkpoint_precious=40 m=64 n=64
     seed=1 thr=2x2 stop_at_step=lingen)
 add_dependencies(test-bwc-mod2-rolling_dependencies mf_scan)
 
-add_bwc_test(mod2-8k bwc-trace.sh random_matrix_size=8000 m=128 n=128 seed=1 thr=2)
+add_bwc_test(mod2-8k bwc-ptrace.sh prime=2 nullspace=left random_matrix_size=8000 m=128 n=128 seed=1 thr=2)
 add_dependencies(test-bwc-mod2-8k_dependencies mf_scan)
 
 if (COMPILE_MPFQ_BINARY_FIELD_m128)
-add_bwc_test(mod2-8k-simd128 bwc-trace.sh random_matrix_size=8000 m=128 n=128 seed=1 thr=2 simd=128)
+add_bwc_test(mod2-8k-simd128 bwc-ptrace.sh prime=2 nullspace=left random_matrix_size=8000 m=128 n=128 seed=1 thr=2 simd=128)
 add_dependencies(test-bwc-mod2-8k-simd128_dependencies mf_scan)
 endif()
 
-add_bwc_test(mod2-oddthr bwc-trace.sh random_matrix_size=800 m=128 n=128 seed=1 thr=3)
+add_bwc_test(mod2-oddthr bwc-ptrace.sh prime=2 nullspace=left random_matrix_size=800 m=128 n=128 seed=1 thr=3)
 add_dependencies(test-bwc-mod2-oddthr_dependencies mf_scan)
 
-add_bwc_test(mod2-interleaving bwc-trace.sh random_matrix_size=800 m=128 n=128
+add_bwc_test(mod2-interleaving bwc-ptrace.sh prime=2 nullspace=left random_matrix_size=800 m=128 n=128
     interleaving=1 seed=1 thr=2)
 add_dependencies(test-bwc-mod2-oddthr_dependencies mf_scan)
  
-add_bwc_test(mod2-m-neq-n bwc-trace.sh random_matrix_size=400 m=128 n=64
+add_bwc_test(mod2-m-neq-n bwc-ptrace.sh prime=2 nullspace=left random_matrix_size=400 m=128 n=64
     seed=1 thr=5)
 add_dependencies(test-bwc-mod2-m-neq-n_dependencies mf_scan)
 if (HAVE_MPI)
-add_bwc_test(mpi1-mod2-m-neq-n bwc-trace.sh random_matrix_size=400 m=128 n=64
+add_bwc_test(mpi1-mod2-m-neq-n bwc-ptrace.sh prime=2 nullspace=left random_matrix_size=400 m=128 n=64
     seed=1 thr=5 mpi=2x3 lingen_mpi=2x2)
 add_dependencies(test-bwc-mpi1-mod2-m-neq-n_dependencies mf_scan)
-add_bwc_test(mpi2-mod2-m-neq-n bwc-trace.sh random_matrix_size=400 m=128 n=64
+add_bwc_test(mpi2-mod2-m-neq-n bwc-ptrace.sh prime=2 nullspace=left random_matrix_size=400 m=128 n=64
     seed=1 thr=5 mpi=3x2 lingen_mpi=2x2)
 add_dependencies(test-bwc-mpi2-mod2-m-neq-n_dependencies mf_scan)
 endif()

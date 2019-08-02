@@ -117,7 +117,6 @@ linalg/bwc/bw-common.h
 tests/linalg/bwc/convert_magma.pl
 tests/linalg/bwc/bwc-ptrace.m
 tests/linalg/bwc/bwc-ptrace.sh
-tests/linalg/bwc/bwc-trace.sh
 tests/linalg/bwc/bwc-test-secure-continuation.sh
 linalg/bwc/bwc.pl
 linalg/bwc/bwc_config_h.in
