@@ -105,7 +105,7 @@ elif os.name == "posix":
         @staticmethod
         def lock(f, exclusive=False, blocking=True):
             """ Lock a file
-            
+
             If exclusive is True, lock for exclusive (a.k.a "write") access,
             otherwise lock for shared (a.k.a. "read") access.
             If blocking is False, don't block in case of already-locked
@@ -366,7 +366,7 @@ if sys.version_info[0] == 2:
                 return
 
             raise ssl.SSLError("Host name '%s' doesn't match certificate host '%s'"
-                               % (host, certhost))	
+                               % (host, certhost))
 
     class MyHTTPSHandler(urllib_request.HTTPSHandler):
         """ HTTPS handler that uses MyHTTPSConnection for verifying the
@@ -386,7 +386,7 @@ def create_daemon(workdir=None, umask=None, keepfd=None):
 
     http://code.activestate.com/recipes/278731-creating-a-daemon-the-python-way/
 
-    Changes: workdir is now a parameter, daemon changes CWD only if workdir 
+    Changes: workdir is now a parameter, daemon changes CWD only if workdir
     parameter is specified. umask is also a parameter, and the process' umask
     is set only if a value is specified.
     """
@@ -436,7 +436,7 @@ def create_daemon(workdir=None, umask=None, keepfd=None):
     maxfd = resource.getrlimit(resource.RLIMIT_NOFILE)[1]
     if (maxfd == resource.RLIM_INFINITY):
         maxfd = maxfd_default
-  
+
     # Iterate through and close all file descriptors.
     for fd in range(0, maxfd):
         try:
@@ -461,16 +461,16 @@ def create_daemon(workdir=None, umask=None, keepfd=None):
     return(0)
 
 class WuMIMEMultipart(MIMEMultipart):
-    ''' Defines convenience functions for attaching files and data to a 
+    ''' Defines convenience functions for attaching files and data to a
     MIMEMultipart object
     '''
-    
+
     def attach_data(self, name, filename, data, filetype=None, command=None):
         ''' Attach the data as a file
 
-        name is the string that is sent to the server as the name of the form 
+        name is the string that is sent to the server as the name of the form
         input field for the upload; for us it is always 'result'.
-        filename is the string that is sent to the server as the source file 
+        filename is the string that is sent to the server as the source file
         name, this is the name as given in the RESULT lines, or some generated
         name for captured stdout/stderr.
         data is the content of the file to send.
@@ -481,19 +481,19 @@ class WuMIMEMultipart(MIMEMultipart):
         gives the index of the COMMAND line that produced this stdout/stderr.
         '''
         result = MIMEApplication(data, _encoder=email.encoders.encode_noop)
-        result.add_header('Content-Disposition', 'form-data', 
+        result.add_header('Content-Disposition', 'form-data',
                           name=name, filename=filename)
         if not filetype is None:
             result.add_header("filetype", filetype)
         if not command is None:
             result.add_header("command", str(command))
         self.attach(result)
-    
+
     def attach_file(self, name, filename, filepath, filetype=None,
                     command=None):
         ''' Attach the file as a file
 
-        Parameters as in attach_data(), but filepath is the path to the file 
+        Parameters as in attach_data(), but filepath is the path to the file
         whose data should be sent
         '''
         logging.debug ("Adding result file %s to upload", filepath)
@@ -508,14 +508,14 @@ class WuMIMEMultipart(MIMEMultipart):
     def attach_key(self, key, value):
         ''' Attach a simple key=value pair '''
         attachment = MIMEText(str(value))
-        attachment.add_header('Content-Disposition', 'form-data', 
+        attachment.add_header('Content-Disposition', 'form-data',
                               name=key)
         self.attach(attachment)
 
     def flatten(self, debug = 0):
         ''' Flatten the mimedata with BytesGenerator and return bytes array '''
         if debug >= 2:
-            logging.debug("Headers of mimedata as a dictionary: %s", 
+            logging.debug("Headers of mimedata as a dictionary: %s",
                           dict(self.items()))
         bio = BytesIO()
         gen = FixedBytesGenerator(bio, mangle_from_=False)
@@ -564,13 +564,13 @@ class SharedFile(object):
         self.close()
 
     def wait_until_positive_filesize(self, timeout = 60):
-        # There is a possible race condition here. If process A creates 
+        # There is a possible race condition here. If process A creates
         # the file, then process B tries and finds that the file exists
-        # and immediately get a shared lock for reading, then process A 
+        # and immediately get a shared lock for reading, then process A
         # can never get an exclusive lock for writing.
-        # To avoid this, we let process B wait until the file has 
-        # positive size, which implies that process A must have the 
-        # lock already. After 60 seconds, assume the file really has 0 
+        # To avoid this, we let process B wait until the file has
+        # positive size, which implies that process A must have the
+        # lock already. After 60 seconds, assume the file really has 0
         # bytes and return
         slept = 0
         while slept < timeout and os.path.getsize(self.filename) == 0:
@@ -578,7 +578,7 @@ class SharedFile(object):
             time.sleep(1)
             slept += 1
         if slept == timeout:
-            logging.warning("Slept %d seconds, %s still has no data", 
+            logging.warning("Slept %d seconds, %s still has no data",
                             timeout, self.filename)
         return
 
@@ -612,9 +612,9 @@ def run_command(command, print_error=True, **kwargs):
     occurs while waiting for the command to finish, the command is
     terminated.
     """
-    
+
     command_str = command if isinstance(command, str) else " ".join(command)
-    
+
     if os.name == "nt":
         # We need to call bash explicitly as the WU COMMAND assumes POSIX
         # syntax which the Windows command line shell does not implement.
@@ -646,9 +646,9 @@ def run_command(command, print_error=True, **kwargs):
     # so that SIGTERM likewise raises a KeyboardInterrupt exception.
 
     sigint_handler = signal.getsignal(signal.SIGINT)
-    signal.signal(signal.SIGTERM , sigint_handler)  
+    signal.signal(signal.SIGTERM , sigint_handler)
 
-    # Wait for command to finish executing, capturing stdout and stderr 
+    # Wait for command to finish executing, capturing stdout and stderr
     # in output tuple
     try:
         (stdout, stderr) = child.communicate()
@@ -657,10 +657,10 @@ def run_command(command, print_error=True, **kwargs):
                          "process with PID %d", child.pid)
         child.terminate()
         raise # Re-raise KeyboardInterrupt to terminate cado-nfs-client.py
-    
+
     # Un-install our handler and revert to the default handler
     signal.signal(signal.SIGTERM , signal.SIG_DFL)
-    
+
     if print_error and child.returncode != 0:
         logging.error("Command resulted in exit code %d", child.returncode)
         if stdout:
@@ -719,11 +719,11 @@ class WorkunitProcessor(object):
             else:
                 self.cleanup()
         files = {}
-        
+
         # To which directory do workunit files map?
         dirs = {"FILE": self.settings["DLDIR"],
                 "RESULT": self.settings["WORKDIR"]}
-        
+
         for key in dirs:
             for (index, filename) in enumerate(self.workunit.get(key, [])):
                 if not isinstance(filename, str):
@@ -747,11 +747,11 @@ class WorkunitProcessor(object):
             else:
                 binfile = os.path.join(self.settings["DLDIR"], filename)
             files["%s%d" % (key, index + 1)] = binfile
-        
+
         for (counter, command) in enumerate(self.workunit.get("COMMAND", [])):
             command = Template(command).safe_substitute(files)
 
-            # If niceness command line parameter was set, call self.renice() 
+            # If niceness command line parameter was set, call self.renice()
             # in child process, before executing command
             if int(self.settings["NICENESS"]) > 0:
                 renice_func = self.renice
@@ -800,7 +800,7 @@ class WorkunitProcessor(object):
         return True
 
     def result_exists(self):
-        ''' Check whether all result files already exist, returns True of False 
+        ''' Check whether all result files already exist, returns True of False
         '''
         # If there is no RESULT line in the workunit, always run commands
         if self.workunit.get("RESULT", None) is None:
@@ -843,8 +843,8 @@ class WorkunitClientToFinish(Exception):
 class WorkunitClient(object):
     def __init__(self, settings):
         self.settings = settings
-        
-        self.wu_filename = os.path.join(self.settings["DLDIR"], 
+
+        self.wu_filename = os.path.join(self.settings["DLDIR"],
                                         self.settings["WU_FILENAME"])
 
         force_reload=False
@@ -852,14 +852,14 @@ class WorkunitClient(object):
         while True:
             self.download_wu(force_reload=force_reload)
 
-            # Get an exclusive lock to avoid two clients working on the same 
+            # Get an exclusive lock to avoid two clients working on the same
             # workunit
             try:
                 self.wu_file = open_exclusive(self.wu_filename)
             except FileLockedException:
                 logging.error("File '%s' is already locked. This may "
                               "indicate that two clients with clientid '%s' are "
-                              "running. Terminating.", 
+                              "running. Terminating.",
                               self.wu_filename, self.settings["CLIENTID"])
                 raise
 
@@ -875,7 +875,7 @@ class WorkunitClient(object):
                 raise WorkunitParseError()
             if not force_reload and self.workunit.get("DEADLINE") and time.time() > float(self.workunit.get("DEADLINE")):
                 logging.warning("Old workunit file %s has passed deadline (%s), ignoring",
-                        self.wu_filename, 
+                        self.wu_filename,
                         time.asctime(time.localtime(float(self.workunit.get("DEADLINE")))))
                 os.remove(self.wu_filename)
                 close_exclusive(self.wu_file)
@@ -884,7 +884,7 @@ class WorkunitClient(object):
                 break
 
         logging.debug ("Workunit ID is %s", self.workunit.get_id())
-    
+
     def download_wu(self, *args, **kwargs):
         # Download the WU file if none exists
         url = self.settings["GETWUPATH"]
@@ -937,11 +937,11 @@ class WorkunitClient(object):
                 MyHTTPSConnection.check_hostname = check_hostname
                 return urllib_request.urlopen(request)
         else:
-            # If we are not using HTTPS, we can just let urllib do it, 
+            # If we are not using HTTPS, we can just let urllib do it,
             # and there is no need for a cafile parameter (which Python 2
             # urlopen() does not accept)
             return urllib_request.urlopen(request)
-    
+
     def _urlopen(self, request, wait, is_upload=False, cafile=None):
         """ Wrapper around urllib2.urlopen() that retries in case of
         connection failure.
@@ -993,8 +993,8 @@ class WorkunitClient(object):
                         connfailed = 0
 
                 if givemsg:
-                    logging.error("%s failed, %s", 
-                                  'Upload' if is_upload else 'Download', 
+                    logging.error("%s failed, %s",
+                                  'Upload' if is_upload else 'Download',
                                   errorstr)
                     if waiting_since > 0:
                         logging.error("Waiting %s seconds before retrying (I have been waiting since %s seconds)", wait, waiting_since)
@@ -1012,10 +1012,10 @@ class WorkunitClient(object):
 
     @staticmethod
     def get_content_charset(conn):
-        """ Returns the character set of the server's response. 
-        
+        """ Returns the character set of the server's response.
+
         Defaults to latin-1 if no charset header was sent.
-        The encoding may matter if the path names for the uploaded files 
+        The encoding may matter if the path names for the uploaded files
         contain special characters, like accents.
         """
         if sys.version_info[0] == 3:
@@ -1048,7 +1048,7 @@ class WorkunitClient(object):
 
     def wget_file(self, url, wait, dlpath, cafile=None):
         """ Download via wget
-        
+
         This is used as a fall-back for doing HTTPS downloads when running
         under Python 2, whose ssl module does not implement SSL certificate
         checks.
@@ -1058,10 +1058,10 @@ class WorkunitClient(object):
             command.append("--ca-certificate=%s" % cafile)
         command.append(url)
         return self.external_get_file(command, url, wait)
-        
+
     def curl_get_file(self, url, wait, dlpath, cafile=None):
         """ Download via curl
-        
+
         Like wget_file(), this is used as a fall-back.
         """
         command = ["curl", "--silent", "--show-error", "--fail", "--output", dlpath]
@@ -1069,7 +1069,7 @@ class WorkunitClient(object):
             command += ["--cacert", cafile]
         command.append(url)
         return self.external_get_file(command, url, wait)
-        
+
     def get_file(self, urlpath, dlpath=None, options=None):
         # print('get_file("' + urlpath + '", "' + dlpath + '")')
         if dlpath == None:
@@ -1098,13 +1098,13 @@ class WorkunitClient(object):
             fd = os.open(dlpath, os.O_CREAT | os.O_WRONLY | os.O_EXCL, 0o600)
         except OSError as err:
             if err.errno == 17: # File exists error
-                # There is a possible race condition here. If process A creates 
+                # There is a possible race condition here. If process A creates
                 # the file, then process B tries and finds that the file exists
-                # and immediately get a shared lock for reading, then process A 
+                # and immediately get a shared lock for reading, then process A
                 # can never get an exclusive lock for writing.
-                # To avoid this, we let process B wait until the file has 
-                # positive size, which implies that process A must have the 
-                # lock already. After 60 seconds, assume the file really has 0 
+                # To avoid this, we let process B wait until the file has
+                # positive size, which implies that process A must have the
+                # lock already. After 60 seconds, assume the file really has 0
                 # bytes and return
                 logging.warning("Looks like another process already created "
                                 "file %s", dlpath)
@@ -1118,7 +1118,7 @@ class WorkunitClient(object):
         FileLock.unlock(outfile)
         outfile.close() # This should also close the fd
         request.close()
-    
+
     def get_missing_file(self, urlpath, filename, checksum=None,
                          options=None, force_reload=False):
         """ Downloads a file if it does not exit already.
@@ -1143,12 +1143,12 @@ class WorkunitClient(object):
                 if filesum.lower() == checksum.lower():
                     return True
                 logging.error ("Existing file %s has wrong checksum %s, "
-                               "workunit specified %s. Deleting file.", 
+                               "workunit specified %s. Deleting file.",
                                filename, filesum, checksum)
                 os.remove(filename)
 
-        # If checksum is wrong and does not change during two downloads, exit 
-        # with failue, as apparently the file on the server and checksum in 
+        # If checksum is wrong and does not change during two downloads, exit
+        # with failue, as apparently the file on the server and checksum in
         # workunit do not agree
         last_filesum = None
         while True:
@@ -1160,11 +1160,11 @@ class WorkunitClient(object):
             if filesum.lower() == checksum.lower():
                 return True
             if not last_filesum is None and filesum == last_filesum:
-                logging.error ("Downloaded file %s has same wrong checksum %s" 
+                logging.error ("Downloaded file %s has same wrong checksum %s"
                                " again. Exiting.", filename, filesum)
                 return False
-            logging.error ("Downloaded file %s has wrong checksum %s, " 
-                           "workunit specified %s. Deleting file.", 
+            logging.error ("Downloaded file %s has wrong checksum %s, "
+                           "workunit specified %s. Deleting file.",
                            filename, filesum, checksum)
             os.remove(filename)
             last_filesum = filesum
@@ -1188,7 +1188,7 @@ class WorkunitClient(object):
             with open(dlpath) as file_to_lock:
                 FileLock.lock(file_to_lock)
                 FileLock.unlock(file_to_lock)
-            
+
             if os.name != "nt" and \
                     filename in dict(self.workunit.get("EXECFILE", [])):
                 mode = os.stat(dlpath).st_mode
@@ -1212,7 +1212,7 @@ class WorkunitClient(object):
         for name in processor.stdio:
             for (counter, data) in enumerate(processor.stdio[name]):
                 if data:
-                    logging.info ("Attaching %s for command %s to upload", 
+                    logging.info ("Attaching %s for command %s to upload",
                                   name, counter)
                     filename = "%s.%s%d" % (self.workunit.get_id(), name,
                                             counter)
@@ -1229,9 +1229,9 @@ class WorkunitClient(object):
 
         url = self.settings["SERVER"].rstrip("/") + "/" + \
                 self.settings["POSTRESULTPATH"].lstrip("/")
-        logging.info("Sending result for workunit %s to %s", 
+        logging.info("Sending result for workunit %s to %s",
                      self.workunit.get_id(), url)
-        request = urllib_request.Request(url, data=postdata, 
+        request = urllib_request.Request(url, data=postdata,
                                          headers=dict(mimedata.items()))
         wait = float(self.settings["DOWNLOADRETRY"])
         cafile = self.settings.get("CERTFILE", None)
@@ -1257,13 +1257,13 @@ class WorkunitClient(object):
             time.sleep(1)
             slept += 1
         if slept == timeout:
-            logging.warning("Slept %d seconds, %s still has no data", 
+            logging.warning("Slept %d seconds, %s still has no data",
                             timeout, filename)
         return
 
     @staticmethod
     def do_checksum(filename, checksum = None):
-        """ Computes the SHA1 checksum for a file. If checksum is None, returns 
+        """ Computes the SHA1 checksum for a file. If checksum is None, returns
             the computed checksum. If checksum is not None, return whether the
             computed SHA1 sum and checksum agree """
         blocksize = 65536
@@ -1274,7 +1274,7 @@ class WorkunitClient(object):
         WorkunitClient.wait_until_positive_filesize(filename)
         infile = open(filename, "rb")
         FileLock.lock(infile)
-        
+
         data = infile.read(blocksize)
         while data:
             sha1hash.update(data)
@@ -1292,7 +1292,7 @@ class WorkunitClient(object):
 
     def process(self):
         # If all output files exist, send them, return WU as done
-        # Otherwise, run commands in WU. If no error and all output 
+        # Otherwise, run commands in WU. If no error and all output
         #   files exist, send them, return WU as done
         # print(wu)
         if self.have_terminate_request():
@@ -1324,7 +1324,7 @@ class WorkunitClient(object):
 
 def get_ssl_certificate(server, port=443, retry=False, retrytime=0):
     """ Download the SSL certificate from the server.
-    
+
     In case of connection refused error, if retry is True, retry
     indefinitely waiting retrytime seconds between tries, and if
     retry is False, return None.
@@ -1348,9 +1348,9 @@ def get_ssl_certificate(server, port=443, retry=False, retrytime=0):
 def get_missing_certificate(certfilename, netloc, fingerprint, retry=False,
         retrytime=0):
     """ Download the certificate if it is missing and check its fingerprint
-    
+
     If the file 'certfilename' already exists, the certificate does not
-    get downloaded. 
+    get downloaded.
     If the certificate existed or could be downloaded and the fingerprint
     matches, returns True. If the fingerprint check fails, exits with error.
     If the server refuses connections and retry is False, returns False;
@@ -1412,7 +1412,7 @@ def try_curl():
 
     if re.search("SecureTransport", version_lines[0]):
         logging.error("Found Apple version of curl with SecureTransport SSL "
-                      "backend") 
+                      "backend")
         logging.error("SecureTransport doesn't allow self-signed certificates "
                       "provided in files. Please see the SSL section in "
                       "README.Python for details.")
@@ -1422,7 +1422,7 @@ def try_curl():
 # Settings which we require on the command line (no defaults)
 REQUIRED_SETTINGS = {"SERVER" : (None, "Base URL for WU server")}
 
-# Optional settings with defaults, overrideable on command line, 
+# Optional settings with defaults, overrideable on command line,
 # and a help text
 OPTIONAL_SETTINGS = {
     "WU_FILENAME" : (None, "Filename under which to store WU files"),
@@ -1463,22 +1463,22 @@ if __name__ == '__main__':
             parser.add_option('--' + arg.lower(), help=default[1])
         for (arg, default) in OPTIONAL_SETTINGS.items():
             if not default[0] is None:
-                parser.add_option('--' + arg.lower(), default=default[0], 
+                parser.add_option('--' + arg.lower(), default=default[0],
                     help=default[1] + " (default: " + default[0] + ")")
             else:
                 parser.add_option('--' + arg.lower(), help=default[1])
         parser.add_option("-d", "--daemon", action="store_true", dest="daemon",
                           help="Daemonize the client")
-        parser.add_option("--keepoldresult", default=False, action="store_true", 
+        parser.add_option("--keepoldresult", default=False, action="store_true",
                           help="Keep and upload old results when client starts")
-        parser.add_option("--nosha1check", default=False, action="store_true", 
+        parser.add_option("--nosha1check", default=False, action="store_true",
                           help="Skip checking the SHA1 for input files")
-        parser.add_option("--single", default=False, action="store_true", 
+        parser.add_option("--single", default=False, action="store_true",
                           help="process only a single WU, then exit")
-        parser.add_option("--nocncheck", default=False, action="store_true", 
+        parser.add_option("--nocncheck", default=False, action="store_true",
                           help="Don't check common name/SAN of certificate. "
                           "Currently works only under Python 2.")
-        parser.add_option("--externdl", default=False, action="store_true", 
+        parser.add_option("--externdl", default=False, action="store_true",
                           help="Use wget or curl for HTTPS downloads")
         parser.add_option("--override", nargs=2, action='append',
                           metavar=('REGEXP', 'VALUE'),
@@ -1498,7 +1498,7 @@ if __name__ == '__main__':
                 SETTINGS[arg] = getattr(options, arg.lower())
         for arg in REQUIRED_SETTINGS.keys():
             if SETTINGS[arg] is None:
-                raise Exception("Command line parameter --%s is required" 
+                raise Exception("Command line parameter --%s is required"
                                 % arg.lower())
         return options
 
@@ -1534,9 +1534,9 @@ if __name__ == '__main__':
     if SETTINGS["WORKDIR"] is None:
         SETTINGS["WORKDIR"] = SETTINGS["CLIENTID"] + '.work/'
     if not SETTINGS["BASEPATH"] is None:
-        SETTINGS["WORKDIR"] = os.path.join(SETTINGS["BASEPATH"], 
+        SETTINGS["WORKDIR"] = os.path.join(SETTINGS["BASEPATH"],
                                            SETTINGS["WORKDIR"])
-        SETTINGS["DLDIR"] = os.path.join(SETTINGS["BASEPATH"], 
+        SETTINGS["DLDIR"] = os.path.join(SETTINGS["BASEPATH"],
                                          SETTINGS["DLDIR"])
     # If no WU filename is given, we use "WU." + client id
     if SETTINGS["WU_FILENAME"] is None:
@@ -1595,7 +1595,7 @@ if __name__ == '__main__':
             logging.info("Could not download SSL certificate: The connection was refused.")
             logging.info("Assuming the server will come up later. Will keep trying%s.",
                          " after daemonizing" if options.daemon else "")
-        
+
         # Can we download with HTTPS at all?
         if sys.version_info[0] == 2:
             HAVE_WGET = try_wget()
