@@ -610,7 +610,8 @@ def run_command(command, print_error=True, **kwargs):
     and stderr
 
     If a KeyboardInterrupt exception occurs while waiting for the command to
-    finish, the command is terminated.
+    finish, quit after command, if a 2nd KeyboardInterrupt exception occurs,
+    the command is terminated immediately
 
     If print_error is True and the command exits with a non-zero exit code,
     print stdout and stderr to the log.
@@ -718,13 +719,6 @@ class WorkunitProcessor(object):
         if int(self.settings["NICENESS"]) > 0:
             os.nice(int(self.settings["NICENESS"]))
 
-        # Don't forward signals, This allows us to use SIGQUIT (Ctrl+\) and
-        # SIGTSPT (Ctrl+Z) to signal quit-after-current-WU-finishes. without
-        # this SIGTSPT/SIGQUIT are passed to the child and child stops/quits.
-        if self.settings["CTRLZ"]:
-            # Don't forward signals
-            os.setpgrp()
-
     def run_commands(self):
         if self.result_exists():
             if self.settings["KEEPOLDRESULT"]:
@@ -760,6 +754,8 @@ class WorkunitProcessor(object):
             else:
                 binfile = os.path.join(self.settings["DLDIR"], filename)
             files["%s%d" % (key, index + 1)] = binfile
+
+
 
         for (counter, command) in enumerate(self.workunit.get("COMMAND", [])):
             command = Template(command).safe_substitute(files)
@@ -1499,10 +1495,6 @@ if __name__ == '__main__':
                           help="Modify command-line arguments which match ^-{1,2}REGEXP$ to take the given VALUE. Note that REGEXP cannot start with a dash")
         parser.add_option("--logdate", default=True, action='store_true',
                           help="Include ISO8601 format date in logging")
-        parser.add_option("--noctrlz", default=False, action='store_true',
-                          help="Pass SIGTSTP/SIGQUIT to children, if not set "
-                          "Ctrl+Z will cause client to stop after current WU "
-                          "is complete.")
         # Parse command line
         (options, args) = parser.parse_args()
 
@@ -1564,7 +1556,6 @@ if __name__ == '__main__':
     SETTINGS["NOSHA1CHECK"] = options.nosha1check
     SETTINGS["USE_EXTERNAL_DL"] = options.externdl
     SETTINGS["NO_CN_CHECK"] = options.nocncheck
-    SETTINGS["CTRLZ"] = not options.noctrlz
 
     # Create download and working directories if they don't exist
     if not os.path.isdir(SETTINGS["DLDIR"]):
@@ -1635,13 +1626,19 @@ if __name__ == '__main__':
         get_missing_certificate(certfilename, netloc, SETTINGS["CERTSHA1"],
                 retry=True, retrytime=SETTINGS["DOWNLOADRETRY"])
 
+    caught_sigint = False
     def sigstop_handler(sig, frame):
-        logging.info("Caught SIGQUIT/SIGTSTP, will stop after current WU")
-        options.single = True
+        if caught_sigint:
+            logging.critical("Caught 2nd ^C hard stopping.")
+            # Activate original SIGINT handler which will causes
+            # client.process() to terminate.
+            old_signal(sig, frame)
+        else:
+            logging.critical("Caught ^C, will stop after current WU.")
+            options.single = True
 
-    if SETTINGS["CTRLZ"]:
-        signal.signal(signal.SIGTSTP , sigstop_handler)
-        signal.signal(signal.SIGQUIT , sigstop_handler)
+    old_signal = signal.getsignal(signal.SIGINT)
+    signal.signal(signal.SIGINT, sigstop_handler)
 
     client_ok = True
     bad_wu_counter = 0
